@@ -1,0 +1,27 @@
+# Auto-detect text files and normalize to LF
+* text=auto
+
+# Python source
+*.py text diff=python
+
+# Markdown / docs
+*.md text
+*.txt text
+
+# Frontend
+*.html text
+*.css text
+*.js text
+
+# Config
+*.json text
+*.toml text
+*.yaml text
+*.yml text
+*.example text
+
+# Denylist — binary files
+*.db binary
+*.sqlite binary
+*.png binary
+*.ico binary
