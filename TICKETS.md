@@ -251,8 +251,7 @@
 - [x] 进一步删除 `deps.py`（浅模块），4 个路由文件改为直接 `from backend.app.database import get_db` ✅ 2026-08-03（同时落地 CR.6.4）
 
 #### CR.3.2 抽取 Provider 异常映射公共逻辑
-- [ ] 在 `llm/errors.py` 或 `llm/base.py` 中添加 `_translate_error()` 或 `_safe_call()` 辅助方法
-- [ ] ClaudeProvider / OpenAIProvider 共用
+- [x] 在 `llm/errors.py` 中 `translate_sdk_error()` 已存在；`ClaudeProvider`/`OpenAIProvider` 各新增 `_translate_error()` 私有方法，`generate()`/`stream_generate()` 共用 ✅ 2026-08-03
 
 #### CR.3.3 消除路由层 LLM 错误映射重复
 - [x] `messages.py` 中的异常→HTTP 状态码映射已抽取为 `_LLM_ERROR_MAP` 字典 ✅
@@ -260,7 +259,7 @@
 ### CR.4 死代码 & 未使用字段
 
 #### CR.4.1 ChatRequest.stream 字段清理
-- [ ] 删除 schema 中 `stream: bool` 字段（端点仅靠 URL 路径决定模式）
+- [x] 复核确认：`ChatRequest` 当前无 `stream` 字段（端点仅靠 URL 路径决定模式），已无可删死代码 ✅ 2026-08-03
 
 #### CR.4.2 V2 字段使用规划
 - [x] `post_history_instructions`、`scenario`、`mes_example` 已补充至 `build_message_list()` ✅
@@ -311,8 +310,8 @@
 ### CR.6 代码质量 — 坏味道清理
 
 #### CR.6.1 流式/非流式端点代码重复
-- [ ] 抽取 `_prepare_chat()` 辅助函数复用 ~90 行共同前置逻辑
-- [ ] 涉及文件：`api/routes/messages.py`
+- [x] 抽取 `_prepare_chat()` 辅助函数复用共同前置逻辑（对话校验/温度/消息构建/Key/Provider）✅ 2026-08-03
+- [x] 涉及文件：`api/routes/messages.py`
 
 #### CR.6.2 前端头像 HTML 构造重复
 - [ ] `app.js` 中 `appendMessage()` 和 `handleSend()` 流模式应复用已存在的 `getAssistantAvatarHtml()`

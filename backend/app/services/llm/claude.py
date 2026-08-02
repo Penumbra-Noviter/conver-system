@@ -9,7 +9,7 @@ from typing import AsyncIterator
 import anthropic
 
 from backend.app.services.llm.base import BaseLLM
-from backend.app.services.llm.errors import translate_sdk_error
+from backend.app.services.llm.errors import LLMError, translate_sdk_error
 
 
 class ClaudeProvider(BaseLLM):
@@ -26,6 +26,16 @@ class ClaudeProvider(BaseLLM):
     @property
     def provider_name(self) -> str:
         return "claude"
+
+    def _translate_error(self, error: Exception) -> LLMError:
+        """将 Claude SDK 异常统一映射为 LLMError 层级"""
+        return translate_sdk_error(
+            error, "Claude",
+            auth_cls=anthropic.AuthenticationError,
+            rate_cls=anthropic.RateLimitError,
+            timeout_cls=anthropic.APITimeoutError,
+            bad_request_cls=anthropic.BadRequestError,
+        )
 
     def _prepare_messages(
         self, messages: list[dict]
@@ -65,13 +75,7 @@ class ClaudeProvider(BaseLLM):
                     return block.text
             return ""
         except Exception as e:
-            raise translate_sdk_error(
-                e, "Claude",
-                auth_cls=anthropic.AuthenticationError,
-                rate_cls=anthropic.RateLimitError,
-                timeout_cls=anthropic.APITimeoutError,
-                bad_request_cls=anthropic.BadRequestError,
-            )
+            raise self._translate_error(e)
 
     async def stream_generate(
         self,
@@ -95,10 +99,4 @@ class ClaudeProvider(BaseLLM):
                 async for text in stream.text_stream:
                     yield text
         except Exception as e:
-            raise translate_sdk_error(
-                e, "Claude",
-                auth_cls=anthropic.AuthenticationError,
-                rate_cls=anthropic.RateLimitError,
-                timeout_cls=anthropic.APITimeoutError,
-                bad_request_cls=anthropic.BadRequestError,
-            )
+            raise self._translate_error(e)

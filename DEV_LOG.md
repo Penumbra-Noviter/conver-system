@@ -401,3 +401,18 @@
 ### 验证
 - [x] `py_compile` 通过
 - [x] `from backend.app.main import app` 导入正常
+
+---
+
+## 2026-08-03 — CR.6.1 + CR.3.2 + CR.4.1 代码质量收尾
+
+> 抽取流式/非流式端点共同逻辑、Provider 异常映射公共方法、ChatRequest.stream 死代码复核。
+
+### 变更
+- [x] **CR.6.1** `api/routes/messages.py` 抽取 `_prepare_chat()` + `_ChatContext` dataclass，`create_chat`/`stream_chat` 的 ~90 行共同前置逻辑收敛为一处
+- [x] **CR.3.2** `ClaudeProvider`/`OpenAIProvider` 各新增 `_translate_error()` 私有方法，`generate()`/`stream_generate()` 共用 SDK 异常映射
+- [x] **CR.4.1** 复核确认 `ChatRequest` 无 `stream` 字段，无死代码可删（端点仅靠 URL 路径决定模式）
+
+### 验证
+- [x] `py_compile` 通过
+- [x] `from backend.app.main import app` 导入正常

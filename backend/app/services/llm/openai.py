@@ -14,7 +14,7 @@ from typing import AsyncIterator
 import openai
 
 from backend.app.services.llm.base import BaseLLM
-from backend.app.services.llm.errors import translate_sdk_error
+from backend.app.services.llm.errors import LLMError, translate_sdk_error
 
 
 class OpenAIProvider(BaseLLM):
@@ -31,6 +31,16 @@ class OpenAIProvider(BaseLLM):
     @property
     def provider_name(self) -> str:
         return "openai"
+
+    def _translate_error(self, error: Exception) -> LLMError:
+        """将 OpenAI SDK 异常统一映射为 LLMError 层级"""
+        return translate_sdk_error(
+            error, "OpenAI",
+            auth_cls=openai.AuthenticationError,
+            rate_cls=openai.RateLimitError,
+            timeout_cls=openai.APITimeoutError,
+            bad_request_cls=openai.BadRequestError,
+        )
 
     def _prepare_messages(
         self, messages: list[dict]
@@ -70,13 +80,7 @@ class OpenAIProvider(BaseLLM):
             )
             return response.choices[0].message.content or ""
         except Exception as e:
-            raise translate_sdk_error(
-                e, "OpenAI",
-                auth_cls=openai.AuthenticationError,
-                rate_cls=openai.RateLimitError,
-                timeout_cls=openai.APITimeoutError,
-                bad_request_cls=openai.BadRequestError,
-            )
+            raise self._translate_error(e)
 
     async def stream_generate(
         self,
@@ -103,10 +107,4 @@ class OpenAIProvider(BaseLLM):
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except Exception as e:
-            raise translate_sdk_error(
-                e, "OpenAI",
-                auth_cls=openai.AuthenticationError,
-                rate_cls=openai.RateLimitError,
-                timeout_cls=openai.APITimeoutError,
-                bad_request_cls=openai.BadRequestError,
-            )
+            raise self._translate_error(e)
