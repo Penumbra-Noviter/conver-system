@@ -385,3 +385,19 @@
 ### 验证
 - [x] `py_compile` 通过
 - [x] `from backend.app.main import app` 导入正常
+
+---
+
+## 2026-08-03 — CR.3.1 + CR.6.4 deps.py 清理
+
+> CR.3.1 复核确认：`deps.py` 已是纯转发（无重复定义）。经确认一并删除 deps.py 浅模块，落地 CR.6.4。
+
+### 变更
+- [x] 删除 `backend/app/api/deps.py`（纯转发浅模块）
+- [x] 4 个路由文件导入改为直接 `from backend.app.database import get_db`：
+  - `characters.py` / `conversations.py` / `settings.py` / `messages.py`
+- [x] `git grep` 确认无残留 `api.deps` 引用
+
+### 验证
+- [x] `py_compile` 通过
+- [x] `from backend.app.main import app` 导入正常

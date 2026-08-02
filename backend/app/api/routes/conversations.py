@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 
-from backend.app.api.deps import get_db
+from backend.app.database import get_db
 from backend.app.schemas.conversation import ConversationCreate, ConversationResponse, ConversationUpdate
 from backend.app.services import conversation as service
 

@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from backend.app.api.deps import get_db
+from backend.app.database import get_db
 from backend.app.models.character import Character
 from backend.app.models.setting import Setting
 from backend.app.schemas.message import ChatRequest, ChatResponse, MessageResponse

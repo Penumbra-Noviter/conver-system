@@ -7,7 +7,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from backend.app.api.deps import get_db
+from backend.app.database import get_db
 from backend.app.schemas.character import CharacterCreate, CharacterResponse, CharacterUpdate
 from backend.app.services import character as service
 

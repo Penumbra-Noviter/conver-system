@@ -247,7 +247,8 @@
 ### CR.3 代码质量 — 坏味道清理
 
 #### CR.3.1 消除 `get_db()` 重复定义
-- [ ] `deps.py` 中 `get_db()` 改为从 `database.py` 导入复用，或删除 deps.py 中重复体
+- [x] `deps.py` 原本已是纯转发（`from backend.app.database import get_db`），无重复定义 ✅ 复核确认
+- [x] 进一步删除 `deps.py`（浅模块），4 个路由文件改为直接 `from backend.app.database import get_db` ✅ 2026-08-03（同时落地 CR.6.4）
 
 #### CR.3.2 抽取 Provider 异常映射公共逻辑
 - [ ] 在 `llm/errors.py` 或 `llm/base.py` 中添加 `_translate_error()` 或 `_safe_call()` 辅助方法
@@ -322,7 +323,7 @@
 - [ ] Message.role 应使用 Enum 而非 String(20)
 
 #### CR.6.4 deps.py Middle Man
-- [ ] 考虑删除 `deps.py`，路由直接 `from backend.app.database import get_db`
+- [x] 已删除 `deps.py`，路由直接 `from backend.app.database import get_db` ✅ 2026-08-03（与 CR.3.1 一并落地）
 
 #### CR.6.5 messages.py 职责分离
 - [ ] 考虑将聊天端点拆出独立路由文件（如 `chat.py`），与消息检索分离

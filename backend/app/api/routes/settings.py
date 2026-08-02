@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from backend.app.api.deps import get_db
+from backend.app.database import get_db
 from backend.app.models.setting import Setting
 
 router = APIRouter(prefix="/api/settings", tags=["设置管理"])
