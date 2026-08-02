@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 
 from backend.app.api.deps import get_db
@@ -65,8 +66,6 @@ def delete_all_conversations(db: Session = Depends(get_db)):
 @router.get("/{conversation_id}/export/json")
 def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)):
     """导出对话为 JSON 格式文件"""
-    from fastapi.responses import JSONResponse
-
     data = service.export_conversation_json(db, conversation_id)
     if not data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
@@ -84,8 +83,6 @@ def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)
 @router.get("/{conversation_id}/export/markdown")
 def export_conversation_markdown(conversation_id: int, db: Session = Depends(get_db)):
     """导出对话为 Markdown 格式文件"""
-    from fastapi.responses import PlainTextResponse
-
     md = service.export_conversation_markdown(db, conversation_id)
     if not md:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")

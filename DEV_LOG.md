@@ -357,3 +357,31 @@
   - `navigateToConversation()` — 点击结果跳转到对话
   - 搜索框自动聚焦 + Enter/Escape 快捷键
 - [x] `style.css` — 搜索输入框/结果列表/高亮/响应式样式
+
+---
+
+## 2026-08-03 — CR.2 代码质量硬性违规清理
+
+> 复核 TICKETS CR.2 四项：大部分审计条目在现行代码中已就绪（复核确认），仅补齐剩余 3 处局部导入清理。
+
+### CR.2.1 类型注解（复核确认已就绪）
+- [x] `database.py:set_sqlite_pragma(dbapi_connection, connection_record) -> None`
+- [x] `database.py:init_db() -> None`
+- [x] `main.py:on_startup() -> None`
+
+### CR.2.2 路由函数命名（复核确认已就绪）
+- [x] `messages.py` — `create_chat` / `stream_chat`（符合 `create_*` 前缀规范）
+
+### CR.2.3 消除函数内局部导入
+- [x] `conversation.py` — `Setting` 已在模块顶部（复核确认）
+- [x] `message.py` — `Character` 已在模块顶部（复核确认）
+- [x] `conversation.py:delete_all_conversations()` — 移除冗余的 `from backend.app.models.message import Message` 局部导入（顶部已导入）
+- [x] `conversations.py` — 导出端点中 `JSONResponse` / `PlainTextResponse` 局部导入移至模块顶部
+- [~] 保留项：`main.py:on_startup()` 的 `init_db` 与 `database.py:init_db()` 的 `import backend.app.models` — 启动期延迟加载，属合理模式
+
+### CR.2.4 旧式 typing 语法（复核确认已就绪）
+- [x] `settings.py` 使用 `dict[str, Any]`，全库无 `Dict[`/`List[` 旧式写法
+
+### 验证
+- [x] `py_compile` 通过
+- [x] `from backend.app.main import app` 导入正常

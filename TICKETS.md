@@ -225,24 +225,24 @@
 - [x] `api.js` 中 `chatStream()` 已含 `error` 事件类型处理（调用 `onError` 回调）✅ 代码已实现
 - [x] 前端 `onError` 回调已在 `handleSend()` 中显示错误信息 ✅
 
-### CR.2 代码质量 — 硬性违规
+### CR.2 代码质量 — 硬性违规 ✅ 已完成
 
 #### CR.2.1 补充缺少的类型注解
-- [ ] `database.py:set_sqlite_pragma()` — 参数 + 返回值类型注解
-- [ ] `database.py:init_db()` — 返回注解
-- [ ] `main.py:on_startup()` — 返回注解
+- [x] `database.py:set_sqlite_pragma()` — 参数 + 返回值类型注解 ✅ 2026-08-03（审计时已就绪，复核确认）
+- [x] `database.py:init_db()` — 返回注解 ✅ 2026-08-03（审计时已就绪，复核确认）
+- [x] `main.py:on_startup()` — 返回注解 ✅ 2026-08-03（审计时已就绪，复核确认）
 
 #### CR.2.2 路由函数命名对齐规范
-- [ ] `messages.py:chat()` → `send_chat()` 或 `create_chat_message()`
-- [ ] `messages.py:chat_stream()` → `stream_chat()`
+- [x] `messages.py` 端点函数已命名为 `create_chat` / `stream_chat`，符合 `create_*` 前缀规范 ✅ 2026-08-03（复核确认）
 
 #### CR.2.3 消除函数内局部导入
-- [ ] `conversation.py:create_conversation()` — `Setting` 导入移至模块顶部
-- [ ] `message.py:auto_insert_greeting()` — `Character` 导入移至模块顶部
-- [ ] `message.py:build_message_list()` — `Character` 导入移至模块顶部
+- [x] `conversation.py:create_conversation()` — `Setting` 导入已在模块顶部 ✅ 2026-08-03（复核确认）
+- [x] `message.py:auto_insert_greeting()` / `build_message_list()` — `Character` 导入已在模块顶部 ✅ 2026-08-03（复核确认）
+- [x] 额外清理：`conversation.py:delete_all_conversations()` 冗余 `Message` 局部导入移除；`conversations.py` 导出端点 `JSONResponse`/`PlainTextResponse` 局部导入移至模块顶部 ✅ 2026-08-03
+- [x] 备注：`main.py:on_startup()` 的 `init_db` 局部导入与 `database.py:init_db()` 内 `import backend.app.models` 保留 — 属启动期延迟加载的合理模式，非违规
 
 #### CR.2.4 旧式 typing 语法清理
-- [ ] `settings.py:10` — `Dict[str, Any]` → `dict[str, Any]`
+- [x] `settings.py` 已用 `dict[str, Any]`，全库无 `Dict[`/`List[` 旧式写法 ✅ 2026-08-03（复核确认）
 
 ### CR.3 代码质量 — 坏味道清理
 

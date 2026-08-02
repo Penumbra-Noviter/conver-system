@@ -102,7 +102,6 @@ def delete_conversation(db: Session, conversation_id: int) -> bool:
 
 def delete_all_conversations(db: Session) -> None:
     """清空所有对话及关联消息"""
-    from backend.app.models.message import Message
     db.query(Message).delete()
     db.query(Conversation).delete()
     db.commit()
