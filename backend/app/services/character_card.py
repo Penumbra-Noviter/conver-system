@@ -34,6 +34,7 @@ _V1_TO_V2 = {
     "world_scenario": "scenario",
     "creatorcomment": "creator_notes",
     "char_version": "character_version",
+    "description": "description",  # 与 V2 同名，直通保留
 }
 
 
@@ -151,8 +152,8 @@ def _build_create(data: dict) -> CharacterCreate:
     else:
         avatar_value = ns.get("avatar_url") or None
 
-    # temperature：命名空间优先，无则默认 0.7，并裁剪到 [0, 2] 合法区间
-    temperature = _clamp_temperature(ns.get("temperature", 0.7))
+    # temperature：命名空间优先，其次裸 data 顶层（容错），无则默认 0.7，并裁剪到 [0, 2] 合法区间
+    temperature = _clamp_temperature(ns.get("temperature", data.get("temperature", 0.7)))
 
     version = data.get("character_version") or data.get("version") or "1.0"
 
