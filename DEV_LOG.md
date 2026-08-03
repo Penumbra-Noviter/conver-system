@@ -7,14 +7,21 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：P3.5 停止生成 + 对话标题自动生成**完成**（P3.5.1 后端 19 单测 + Playwright 前端验证；P3.5.2 标题默认值/截断/首条消息替换 + 头部联动）；下一步 P4.3 API Key 测试连接 / P6.4 Tauri（→ TICKETS）
-- **代码质量**：CR.1-CR.7 全部清零（最终 commit `6bdb1ca`）
-- **测试**：pytest 共 72 用例（character_card 53 + P3.5 19）；运行 `pytest`
+- **阶段**：P4.3 API Key 保存时测试连接**完成**（后端 `test-connection` 端点 + 前端保存前验证 + 失败确认）；P3.5 停止生成 + 标题自动生成**完成**；下一步 P6.4 Tauri / P6.5 Ollama、多 tab（→ TICKETS）
+- **代码质量**：CR.1-CR.7 全部清零（最终 commit `6bdb1ca`）；P4.3 新增模块 100% 行覆盖
+- **测试**：pytest 共 83 用例（character_card 53 + P3.5 19 + P4.3 11）；运行 `pytest`
 - **文档**：本次按《文档规范》改造 —— PROJECT_REFERENCE 修正同步 ORM、DEV_LOG 瘦身、TICKETS CR 归档
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 实现 | P4.3 API Key 保存时测试连接
+- **后端**：`BaseLLM.test_connection()` 默认实现（发起最小生成请求 max_tokens=1，连接无效抛出 Provider `_translate_error` 映射的 LLMError，Provider 可覆写）；`POST /api/settings/test-connection` 端点（请求 Key 为空回退 DB 已存 Key；不支持的 provider / 未提供 Key / LLMError / 通用异常均 400 + 可读原因）
+- **前端**：`api.js:settings.testConnection()`；`app.js:testApiKeys()` 保存设置前对每个非空 Key 并发测试，任一失败弹 `showConfirm`「仍然保存？」由用户决定（Key 无误但网络不可达可继续保存），取消则不落库
+- 单测 11 项（`tests/test_settings_connection.py`：BaseLLM 默认实现参数断言 / 端点成功 / 鉴权失败 / 不支持 provider / 空 Key 回退已存 Key / base_url 透传 / 通用异常 / GET+PUT 设置 CRUD）；settings 路由 + schemas.settings + llm.base **100% 行覆盖**
+- Playwright 前端验证：无效 Claude Key 保存 → 确认框「API Key 连接测试未通过」→「仍然保存」→「设置已保存」；验证后清理临时 DB 写入（dev 库还原至 `default_provider/user_name` 两行）
+- 避坑：schema 类名带 `Test` 前缀会被 pytest 误认为测试类告警，命名 `ConnectionTestRequest/Response` 规避；Playwright 需显式 `executablePath` 指向 ms-playwright 已装 chromium（MCP 默认 channel=chrome 未装系统 Chrome）
 
 ### 2026-08-03 | 实现 | P3.5 停止生成按钮 + 对话标题自动生成
 - **停止生成（仅流式）**：后端 `chat.py:stream_chat` 的 `event_generator` 每 token 轮询 `request.is_disconnected()`，客户端断开即停止 LLM 调用并**保存已生成部分**为 assistant 消息（另 `except ClientDisconnect` 兜底）；前端 `api.js:chatStream()` 重构为返回 `{abort, done}`（内部 AbortController），发送按钮流式生成中两态变身 `➤` ⇄ `⏹ 停止`，停止的气泡追加「（已停止）」标记（非错误语义）
