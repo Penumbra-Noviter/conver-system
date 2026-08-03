@@ -7,7 +7,7 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：架构深化 ③⑤（Prompt 纯函数化 + app.js 拆分）**完成**；①②⑥ 已归档；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；下一步 P6.4 Tauri（暂缓，缺 Rust 工具链）/ P6.5 多 tab（→ TICKETS）
+- **阶段**：架构深化 ③⑤（Prompt 纯函数化 + app.js 拆分）**完成**；①②⑥ 已归档；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；Rust 工具链已装（P6.4 Tauri 前置就绪）；下一步 P6.4 Tauri / P6.5 多 tab（→ TICKETS）
 - **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7 + 架构深化 ①②⑥③⑤；P4.3 / prompt.py 新增模块 100% 行覆盖
 - **测试**：pytest 共 117 用例（character_card 53 + P3.5 19 + P4.3 11 + setting 深模块 8 + prompt 纯函数 26）；运行 `pytest`；`character_card` / `prompt` 100% 覆盖可复现
 - **文档**：《文档规范》已强化（测试规范章节 + 防漂移检查项）；修复 api-design / architecture / llm-integration / p2.5 spec 全部漂移；新增 CONTEXT.md 领域词汇表
@@ -15,6 +15,17 @@
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 基础设施 | Rust 工具链安装（Tauri 桌面端前置）
+- **Rust 工具链**：rustup 1.29.0 + rustc/cargo 1.97.1（stable-x86_64-pc-windows-msvc）安装完成
+  - 工具链目录：`C:\Users\Administrator\.rustup`
+  - Cargo 目录：`C:\Users\Administrator\.cargo\bin\`（已加 PATH）
+  - 组件：clippy、rustfmt
+- **MSVC 工具**：14.50.35717（link.exe）已就位
+- **Windows SDK**：10.0.22621.0 已安装（`C:\Program Files (x86)\Windows Kits\10\`）
+- **验证**：`cargo build` 冒烟测试通过 ✅
+- **文档**：`PROJECT_REFERENCE.md` 新增「五、桌面端准备」章节；memory 新增 `rust-toolchain.md`
+- **避坑**：Git Bash 的 `/usr/bin/link.exe`（GNU coreutils）会遮蔽真正的 MSVC `link.exe`，需在 **cmd.exe** 或 **PowerShell** 中运行 `cargo build`
 
 ### 2026-08-03 | 实现 | 架构深化 ③⑤：Prompt 纯函数化 + 前端 app.js 拆分
 - **③ Prompt 纯函数化**：新建 `services/llm/prompt.py`，把模板变量替换（`apply_template_vars`）、mes_example 解析（`parse_mes_example`）、完整消息列表组装（`build_messages`）从 `message.py` 迁移为纯函数；`CharacterData` frozen dataclass 作为角色纯数据容器（去 db Session 依赖）；`message.py::build_message_list` 签名与行为不变（查角色+查历史→委托纯函数）；26 项单测，新模块 100% 行覆盖（62 stmts 0 miss）

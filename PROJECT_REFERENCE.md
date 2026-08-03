@@ -38,7 +38,24 @@
 3. **JSON 列兼容**：Character 的 `tags`/`alternate_greetings` 等为 SQLAlchemy JSON 列，存量 TEXT 数据可无缝读出；`Message.role` 枚举按值存取，存量 VARCHAR 无需迁移。
 4. **SSE 停止语义**：停止生成 = 用户主动中止（`AbortController` 断开 + 后端 `is_disconnected()` 感知），气泡标记「（已停止）」而非错误；非流式不提供停止按钮。
 
-## 四、相关文档
+## 五、桌面端准备（Tauri 前置）
+
+**当前状态**（2026-08-03）：✅ 工具链完整可用
+
+| 组件 | 版本 | 路径 |
+|------|------|------|
+| rustup | 1.29.0 | `C:\Users\Administrator\.rustup` |
+| rustc / cargo | 1.97.1 (stable) | `C:\Users\Administrator\.cargo\bin\` |
+| MSVC 工具 | 14.50.35717 | `C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\` |
+| Windows SDK | 10.0.22621.0 | `C:\Program Files (x86)\Windows Kits\10\` |
+
+- 目标平台：`x86_64-pc-windows-msvc`
+- `cargo build` 冒烟测试通过 ✅
+
+**⚠️ 注意事项**：Git Bash 的 `/usr/bin/link.exe`（GNU coreutils）会遮蔽真正的 MSVC `link.exe`。  
+**解决方案**：在 **cmd.exe** 或 **PowerShell** 中运行 `cargo build`。
+
+## 六、相关文档
 
 - [文档规范](docs/documentation-standards.md) — 文档架构与单一事实来源规则
 - [共识文档](CONSENSUS.md) — 需求定义与技术决策
