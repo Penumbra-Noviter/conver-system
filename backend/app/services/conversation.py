@@ -16,7 +16,7 @@ from backend.app.schemas.conversation import ConversationCreate, ConversationUpd
 from backend.app.services import setting as setting_service
 
 
-def list_conversations(db: Session, character_id: Optional[int] = None) -> list[dict]:
+def list_conversations(db: Session, character_id: Optional[int] = None) -> list[Conversation]:
     """获取对话列表，附带消息数量"""
     query = db.query(
         Conversation,
@@ -28,22 +28,11 @@ def list_conversations(db: Session, character_id: Optional[int] = None) -> list[
     if character_id is not None:
         query = query.filter(Conversation.character_id == character_id)
 
-    results = query.order_by(Conversation.updated_at.desc()).all()
-
-    output = []
-    for conv, count in results:
-        d = {
-            "id": conv.id,
-            "character_id": conv.character_id,
-            "title": conv.title,
-            "model_provider": conv.model_provider,
-            "model_name": conv.model_name,
-            "message_count": count,
-            "created_at": conv.created_at,
-            "updated_at": conv.updated_at,
-        }
-        output.append(d)
-    return output
+    results = []
+    for conv, count in query.order_by(Conversation.updated_at.desc()).all():
+        conv.message_count = count
+        results.append(conv)
+    return results
 
 
 def get_conversation(db: Session, conversation_id: int) -> Optional[Conversation]:

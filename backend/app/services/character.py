@@ -14,7 +14,7 @@ from backend.app.models.conversation import Conversation
 from backend.app.schemas.character import CharacterCreate, CharacterUpdate
 
 
-def list_characters(db: Session) -> list[dict]:
+def list_characters(db: Session) -> list[Character]:
     """获取所有角色，附带对话数量，按更新时间倒序"""
     query = db.query(
         Character,
@@ -23,12 +23,11 @@ def list_characters(db: Session) -> list[dict]:
         Conversation, Conversation.character_id == Character.id
     ).group_by(Character.id).order_by(Character.updated_at.desc())
 
-    results = query.all()
-
-    output = []
-    for char, count in results:
-        output.append(_char_to_dict(char, count))
-    return output
+    results = []
+    for char, count in query.all():
+        char.conversation_count = count
+        results.append(char)
+    return results
 
 
 def get_character(db: Session, character_id: int) -> Optional[Character]:
@@ -36,7 +35,7 @@ def get_character(db: Session, character_id: int) -> Optional[Character]:
     return db.query(Character).filter(Character.id == character_id).first()
 
 
-def get_character_with_count(db: Session, character_id: int) -> Optional[dict]:
+def get_character_with_count(db: Session, character_id: int) -> Optional[Character]:
     """获取单个角色（附带对话数量，供 API 路由使用）"""
     query = db.query(
         Character,
@@ -50,33 +49,8 @@ def get_character_with_count(db: Session, character_id: int) -> Optional[dict]:
         return None
 
     char, count = result
-    return _char_to_dict(char, count)
-
-
-def _char_to_dict(char: Character, conversation_count: int) -> dict:
-    """角色 ORM → 字典（附带对话计数），供 list / get 复用"""
-    return {
-        "id": char.id,
-        "name": char.name,
-        "description": char.description,
-        "personality": char.personality,
-        "scenario": char.scenario,
-        "first_mes": char.first_mes,
-        "mes_example": char.mes_example,
-        "system_prompt": char.system_prompt,
-        "post_history_instructions": char.post_history_instructions,
-        "alternate_greetings": char.alternate_greetings,
-        "tags": char.tags,
-        "creator": char.creator,
-        "version": char.version,
-        "creator_notes": char.creator_notes,
-        "extensions": char.extensions,
-        "avatar": char.avatar,
-        "temperature": char.temperature,
-        "conversation_count": conversation_count,
-        "created_at": char.created_at,
-        "updated_at": char.updated_at,
-    }
+    char.conversation_count = count
+    return char
 
 
 def create_character(db: Session, data: CharacterCreate) -> Character:
