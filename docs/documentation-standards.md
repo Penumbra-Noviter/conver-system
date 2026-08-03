@@ -18,6 +18,7 @@
 | `docs/api-design.md` | 技术事实 | API 契约（路径/请求/响应/错误），改路由必须同步 |
 | `docs/llm-integration.md` | 技术事实 | LLM Provider 抽象层、Factory 注册、消息组装 |
 | `docs/p2.5-character-import-export.md` | 专项设计 | 角色卡 V2 导入/导出规格与决策（D1-D6） |
+| `docs/tauri-setup.md` | 技术事实 | Tauri 桌面端工具链安装、路径、环境注意事项 |
 | `docs/development-plan.md` | 历史 | **已被 TICKETS.md 取代**，仅作历史保留，不再维护 |
 | `.claude/` 记忆 + Serena memory | 会话上下文 | 项目状态、规范速记；**不持待办** |
 
