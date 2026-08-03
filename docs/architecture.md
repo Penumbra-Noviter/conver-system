@@ -48,7 +48,7 @@ conver-system/
 │   │   │   └── routes/
 │   │   │       ├── __init__.py
 │   │   │       ├── characters.py  # 角色 CRUD
-│   │   │       ├── chat.py        # 聊天（POST /api/chats、/api/chats/stream + LLM 辅助）
+│   │   │       ├── chat.py        # 聊天端点（HTTP 映射 + SSE 帧包装，逻辑在 services/chat.py）
 │   │   │       ├── conversations.py # 对话管理
 │   │   │       ├── messages.py    # 消息检索（GET 历史 + 搜索）
 │   │   │       ├── models.py      # 可用模型列表
@@ -72,8 +72,10 @@ conver-system/
 │   │       ├── __init__.py
 │   │       ├── character.py
 │   │       ├── character_card.py  # SillyTavern V2 卡转换层
+│   │       ├── chat.py            # 聊天回合编排（prepare_chat / stream_reply 深模块）
 │   │       ├── conversation.py
 │   │       ├── message.py
+│   │       ├── setting.py         # 运行时设置读写（白名单 + 回退链 + 整型容错）
 │   │       └── llm/
 │   │           ├── __init__.py
 │   │           ├── base.py        # BaseLLM 抽象基类（含 test_connection）

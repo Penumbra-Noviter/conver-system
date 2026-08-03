@@ -205,6 +205,6 @@ Service 层调用 LLM 时捕获这些异常，转为对应的 HTTP 响应。
 ## 添加新 Provider 的步骤
 
 1. 在 `app/services/llm/` 下新建文件，实现 `BaseLLM` 抽象类（含 `test_connection`，默认实现够用）
-2. 在 `app/services/llm/__init__.py` 中导入并用 Factory 注册
-3. 在 `api/routes/settings.py` 的 `ALLOWED_KEYS` 白名单中加入 `{provider}_api_key` 配置项
+2. 在 `app/services/llm/__init__.py` 中导入该 Provider 类，并在 `app/services/llm/factory.py` 的 `LLMFactory.register_builtin_providers()`（内置 Provider 注册清单）中注册——不要用裸的模块级 `LLMFactory.register(...)` 副作用
+3. 在 `app/services/setting.py` 的 `ALLOWED_KEYS` 白名单中加入 `{provider}_api_key` 配置项
 4. 在 `api/routes/models.py` 的 `AVAILABLE_MODELS` 中加入新 Provider 的模型名

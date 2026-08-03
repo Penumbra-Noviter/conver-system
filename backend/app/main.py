@@ -16,9 +16,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.routes import characters, chat, conversations, messages, models, settings
-
-# 注册 LLM Provider（触发 llm/__init__.py 中的注册逻辑）
-import backend.app.services.llm  # noqa: F401
+from backend.app.services.llm import LLMFactory
 
 app = FastAPI(
     title="Conver System",
@@ -45,6 +43,7 @@ if FRONTEND_DIR.exists():
 # ── 启动事件 ──
 @app.on_event("startup")
 def on_startup() -> None:
-    """应用启动时初始化数据库"""
+    """应用启动时注册内置 LLM Provider 并初始化数据库"""
+    LLMFactory.register_builtin_providers()
     from backend.app.database import init_db
     init_db()

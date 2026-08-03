@@ -17,9 +17,11 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 
+from backend.app.config import settings
 from backend.app.models.setting import Setting
 from backend.app.schemas.settings import ConnectionTestRequest
 from backend.app.api.routes import settings as settings_route
+from backend.app.services import setting as setting_service
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import LLMAuthError
 from backend.app.services.llm.factory import LLMFactory
@@ -143,6 +145,40 @@ class TestSettingsCrud:
         """PUT 对不存在的白名单键走创建分支"""
         result = settings_route.update_settings({"user_name": "Alice"}, db_session)
         assert result["user_name"] == "Alice"
+
+
+# ── 4. services/setting.py 深模块语义（收口后的读写 + 500 修复）──
+
+
+class TestSettingService:
+    def test_get_int_falls_back_on_non_numeric(self, db_session) -> None:
+        """sliding_window_rounds 存非数字 → get_int 回退默认 30（防 500）"""
+        _save_setting(db_session, "sliding_window_rounds", "abc")
+        assert setting_service.sliding_window_rounds(db_session) == 30
+
+    def test_sliding_window_default_when_missing(self, db_session) -> None:
+        assert setting_service.sliding_window_rounds(db_session) == 30
+
+    def test_sliding_window_reads_int(self, db_session) -> None:
+        _save_setting(db_session, "sliding_window_rounds", "7")
+        assert setting_service.sliding_window_rounds(db_session) == 7
+
+    def test_default_provider_falls_back_to_config(self, db_session) -> None:
+        assert setting_service.default_provider(db_session) == settings.DEFAULT_PROVIDER
+
+    def test_default_provider_from_db(self, db_session) -> None:
+        _save_setting(db_session, "default_provider", "openai")
+        assert setting_service.default_provider(db_session) == "openai"
+
+    def test_default_model_from_db(self, db_session) -> None:
+        _save_setting(db_session, "default_model", "gpt-4o")
+        assert setting_service.default_model(db_session) == "gpt-4o"
+
+    def test_user_name_default(self, db_session) -> None:
+        assert setting_service.user_name(db_session) == "User"
+
+    def test_api_key_unconfigured_returns_empty(self, db_session) -> None:
+        assert setting_service.api_key(db_session, "claude") == ""
 
 
 class TestConnectionEndpoint:

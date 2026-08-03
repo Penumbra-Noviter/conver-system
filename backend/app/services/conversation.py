@@ -9,12 +9,11 @@ from typing import Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.app.config import settings
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message
-from backend.app.models.setting import Setting
 from backend.app.schemas.conversation import ConversationCreate, ConversationUpdate
+from backend.app.services import setting as setting_service
 
 
 def list_conversations(db: Session, character_id: Optional[int] = None) -> list[dict]:
@@ -50,12 +49,6 @@ def list_conversations(db: Session, character_id: Optional[int] = None) -> list[
 def get_conversation(db: Session, conversation_id: int) -> Optional[Conversation]:
     """获取单个对话"""
     return db.query(Conversation).filter(Conversation.id == conversation_id).first()
-
-
-def _get_setting_value(db: Session, key: str) -> str | None:
-    """读取单个设置值，不存在或为空返回 None"""
-    row = db.query(Setting).filter(Setting.key == key).first()
-    return row.value if row and row.value else None
 
 
 def _default_title_for_character(char_name: str | None) -> str:
@@ -103,12 +96,12 @@ def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
     provider = (
         data.model_provider
         if "model_provider" in data.model_fields_set
-        else _get_setting_value(db, "default_provider") or settings.DEFAULT_PROVIDER
+        else setting_service.default_provider(db)
     )
     model_name = (
         data.model_name
         if "model_name" in data.model_fields_set
-        else _get_setting_value(db, "default_model") or settings.DEFAULT_MODEL
+        else setting_service.default_model(db)
     )
 
     conv = Conversation(

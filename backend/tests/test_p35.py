@@ -24,6 +24,8 @@ from backend.app.schemas.conversation import ConversationCreate
 from backend.app.schemas.message import ChatRequest
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
+from backend.app.services import chat as chat_service
+from backend.app.services import setting as setting_service
 from backend.app.api.routes import chat as chat_route
 
 __all__: list[str] = []
@@ -222,9 +224,9 @@ def _make_stream_context(db_session, monkeypatch, tokens, **kwargs):
     )
     req = ChatRequest(conversation_id=conv.id, content="你好")
 
-    monkeypatch.setattr(chat_route, "_get_api_key", lambda db, provider: "test-key")
+    monkeypatch.setattr(setting_service, "api_key", lambda db, provider: "test-key")
     monkeypatch.setattr(
-        chat_route,
+        chat_service,
         "LLMFactory",
         type("_FakeLLMFactory", (), {"get_provider": staticmethod(lambda p, k: _StubProvider(tokens, **kwargs))}),
     )
@@ -281,7 +283,7 @@ def test_stream_disconnect_saves_partial(db_session, monkeypatch) -> None:
     )
     # 覆写 fake request：第 2 次检查起视为断开
     req = ChatRequest(conversation_id=conv.id, content="你好")
-    monkeypatch.setattr(chat_route, "_get_api_key", lambda db, provider: "test-key")
+    monkeypatch.setattr(setting_service, "api_key", lambda db, provider: "test-key")
 
     async def _run() -> list[str]:
         resp = await chat_route.stream_chat(
@@ -301,7 +303,7 @@ def test_stream_disconnect_before_token_saves_nothing(db_session, monkeypatch) -
     """客户端在首个 token 前断开：无事件产出，也不保存空消息"""
     response, conv = _make_stream_context(db_session, monkeypatch, ["你好", "世界"])
     req = ChatRequest(conversation_id=conv.id, content="你好")
-    monkeypatch.setattr(chat_route, "_get_api_key", lambda db, provider: "test-key")
+    monkeypatch.setattr(setting_service, "api_key", lambda db, provider: "test-key")
 
     async def _run() -> list[str]:
         resp = await chat_route.stream_chat(
@@ -323,7 +325,7 @@ def test_stream_client_disconnect_raised_saves_partial(db_session, monkeypatch) 
         raise_disconnect_after=0,  # 产出第 1 个 token 后抛 ClientDisconnect
     )
     req = ChatRequest(conversation_id=conv.id, content="你好")
-    monkeypatch.setattr(chat_route, "_get_api_key", lambda db, provider: "test-key")
+    monkeypatch.setattr(setting_service, "api_key", lambda db, provider: "test-key")
 
     async def _run() -> list[str]:
         resp = await chat_route.stream_chat(req, _FakeRequest(), db_session)
@@ -353,9 +355,9 @@ def test_stream_llm_error_emits_error_event(db_session, monkeypatch) -> None:
         ConversationCreate(character_id=char_id, model_provider="claude", model_name="claude-test"),
     )
     req = ChatRequest(conversation_id=conv.id, content="你好")
-    monkeypatch.setattr(chat_route, "_get_api_key", lambda db, provider: "test-key")
+    monkeypatch.setattr(setting_service, "api_key", lambda db, provider: "test-key")
     monkeypatch.setattr(
-        chat_route,
+        chat_service,
         "LLMFactory",
         type("_FakeLLMFactory", (), {"get_provider": staticmethod(lambda p, k: _ErrorProvider([]))}),
     )
