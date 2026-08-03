@@ -7,13 +7,20 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：P2.5 SillyTavern V2 导入/导出进行中（P2.5.1-5.5 完成，P2.5.6-5.8 待办 → TICKETS）
+- **阶段**：P2.5 SillyTavern V2 导入/导出进行中（P2.5.1-5.6 完成，P2.5.7-5.8 待办 → TICKETS）
 - **代码质量**：CR.1-CR.7 全部清零（最终 commit `6bdb1ca`）
 - **文档**：本次按《文档规范》改造 —— PROJECT_REFERENCE 修正同步 ORM、DEV_LOG 瘦身、TICKETS CR 归档
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 实现 | P2.5.6 手动创建完整性引导
+- character-form.js 软提示：姓名/人格设定/开场白缺项时 label 旁「建议填写」badge + 汇总 field-hint「完整角色建议包含：人格设定 + 开场白」，输入实时刷新
+- 保存时缺项 → `showConfirm` 软确认「设定不完整…仍要保存吗？」（仍要保存/返回修改），软提示不拦截；仅手动表单，导入路径不参与（D6）
+- `confirm-dialog.js` 修复：只清已有确认弹窗（`.modal-overlay .confirm-modal`），不再误删其它模态框，角色表单与确认弹窗可叠放
+- Playwright E2E 验证：空名硬校验、软提示文案、返回修改后表单保留、填齐保存无确认、badge/hint 实时状态
+- 避坑：测试时发现 Playwright 浏览器配置文件缓存旧模块，需用 `newContext()` 全新上下文验证（非代码问题）
 
 ### 2026-08-03 | 文档 | 文档规范改造
 - 依据 Profit Calculator 经验 + 知识库沉淀《文档规范》（`docs/documentation-standards.md`）

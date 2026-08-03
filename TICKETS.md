@@ -18,7 +18,7 @@
 > 立项完成 2026-08-03 — 详见 `docs/p2.5-character-import-export.md`
 > 决策：仅 JSON 卡（D1）｜V2+裸data+V1 兼容导入（D2）｜重名直接新建（D3）｜头部导入+卡片导出（D4）｜extensions.conver_system 保真（D5）｜手动创建完整性引导（D6）
 
-- [ ] **P2.5.6** 手动创建完整性引导 — character-form.js 软提示（姓名+人格+开场白缺项提醒，保存前汇总提示可跳过，仅手动表单；导入路径不参与）（spec §5.3 / D6）
+- [x] **P2.5.6** 手动创建完整性引导 — character-form.js 软提示（姓名+人格+开场白缺项提醒，保存前汇总提示可跳过，仅手动表单；导入路径不参与）（spec §5.3 / D6）
 - [ ] **P2.5.7** 转换层单元测试（V2 往返 / V1 归一化 / 裸 data / 非法卡 422 / 头像三形态）
 - [ ] **P2.5.8** 文档同步 + 打包验证（CONSENSUS/TICKETS/DEV_LOG + 前端全流程手测）
 
@@ -89,15 +89,16 @@
 | CR.6.3 | Character JSON 列 + Message.role 枚举 | 2026-08-03 | `6bdb1ca` |
 | CR.6.5 | messages.py 职责分离（chat.py 拆出） | 2026-08-03 | `6bdb1ca` |
 
-### P2.5.1-5.5（2026-08-03，本提交）
+### P2.5.1-5.6（2026-08-03）
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
-| P2.5.1 | 后端转换层 `services/character_card.py`（to_v2_card / from_v2_card） | 2026-08-03 | 本提交 |
-| P2.5.2 | 导出 API `GET /api/characters/{id}/export` | 2026-08-03 | 本提交 |
-| P2.5.3 | 导入 API `POST /api/characters/import` | 2026-08-03 | 本提交 |
-| P2.5.4 | 前端导入 UI（「导入角色」按钮 + toast） | 2026-08-03 | 本提交 |
-| P2.5.5 | 前端导出 UI（📤 卡片按钮 + `downloadBlob` 复用） | 2026-08-03 | 本提交 |
+| P2.5.1 | 后端转换层 `services/character_card.py`（to_v2_card / from_v2_card） | 2026-08-03 | `bb4e7ba` |
+| P2.5.2 | 导出 API `GET /api/characters/{id}/export` | 2026-08-03 | `bb4e7ba` |
+| P2.5.3 | 导入 API `POST /api/characters/import` | 2026-08-03 | `bb4e7ba` |
+| P2.5.4 | 前端导入 UI（「导入角色」按钮 + toast） | 2026-08-03 | `bb4e7ba` |
+| P2.5.5 | 前端导出 UI（📤 卡片按钮 + `downloadBlob` 复用） | 2026-08-03 | `bb4e7ba` |
+| P2.5.6 | 手动创建完整性引导（字段缺项 badge + 保存前软确认，仅手动表单） | 2026-08-03 | `5efb35f` |
 
 ---
 

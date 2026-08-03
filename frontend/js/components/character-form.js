@@ -7,6 +7,7 @@
 
 import { characters } from '../api.js';
 import { escapeHtml } from '../utils.js';
+import { showConfirm } from './confirm-dialog.js';
 
 /**
  * 打开角色表单模态框
@@ -33,9 +34,10 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             </div>
             <div class="modal-body">
                 <div class="form-field">
-                    <label for="cf-name">角色名称 <span class="required">*</span></label>
+                    <label for="cf-name">角色名称 <span class="required">*</span><span class="field-warning" id="cf-warn-name" hidden>建议填写</span></label>
                     <input type="text" id="cf-name" maxlength="100" placeholder="输入角色名称" value="${escapeHtml(char.name || '')}">
                     <span class="field-error" id="cf-name-error"></span>
+                    <span class="field-hint" id="cf-completeness-hint" hidden>完整角色建议包含：人格设定 + 开场白</span>
                 </div>
 
                 <div class="form-field">
@@ -44,13 +46,13 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                 </div>
 
                 <div class="form-field">
-                    <label for="cf-personality">人格设定 (Personality)</label>
+                    <label for="cf-personality">人格设定 (Personality)<span class="field-warning" id="cf-warn-personality" hidden>建议填写</span></label>
                     <textarea id="cf-personality" rows="6" placeholder="角色的人格设定、性格特征、说话方式等核心 System Prompt">${escapeHtml(char.personality || '')}</textarea>
                     <span class="field-hint">支持模板变量：<code>{{user}}</code>（用户昵称）、<code>{{char}}</code>（角色名称）</span>
                 </div>
 
                 <div class="form-field">
-                    <label for="cf-first-mes">开场白 (Greeting)</label>
+                    <label for="cf-first-mes">开场白 (Greeting)<span class="field-warning" id="cf-warn-first-mes" hidden>建议填写</span></label>
                     <textarea id="cf-first-mes" rows="3" placeholder="首次对话时角色自动发送的开场消息">${escapeHtml(char.first_mes || '')}</textarea>
                     <span class="field-hint">支持模板变量：<code>{{user}}</code>、<code>{{char}}</code></span>
                 </div>
@@ -113,11 +115,29 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
 
     // ── DOM 引用 ──
     const nameInput = overlay.querySelector('#cf-name');
+    const personalityInput = overlay.querySelector('#cf-personality');
+    const firstMesInput = overlay.querySelector('#cf-first-mes');
     const tempSlider = overlay.querySelector('#cf-temperature');
     const tempValue = overlay.querySelector('#cf-temp-value');
     const statusEl = overlay.querySelector('#cf-status');
     const avatarInput = overlay.querySelector('#cf-avatar');
     const avatarPreview = overlay.querySelector('#cf-avatar-preview');
+    const warnName = overlay.querySelector('#cf-warn-name');
+    const warnPersonality = overlay.querySelector('#cf-warn-personality');
+    const warnFirstMes = overlay.querySelector('#cf-warn-first-mes');
+    const completenessHint = overlay.querySelector('#cf-completeness-hint');
+
+    // 完整性引导（D6）：姓名 + 人格设定 + 开场白三项均非空视为完整
+    const updateCompletenessHints = () => {
+        const name = nameInput.value.trim();
+        const personality = personalityInput.value.trim();
+        const firstMes = firstMesInput.value.trim();
+        warnName.hidden = name.length > 0;
+        warnPersonality.hidden = personality.length > 0;
+        warnFirstMes.hidden = firstMes.length > 0;
+        completenessHint.hidden = name.length > 0 && personality.length > 0 && firstMes.length > 0;
+    };
+    updateCompletenessHints();
 
     // ── 事件绑定 ──
 
@@ -144,6 +164,11 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
         }
     });
 
+    // 完整性引导：关键字段输入时实时刷新提示
+    [nameInput, personalityInput, firstMesInput].forEach((el) => {
+        el.addEventListener('input', updateCompletenessHints);
+    });
+
     // 键盘事件：Escape 关闭
     overlay.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') close();
@@ -160,12 +185,28 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             return;
         }
 
+        // 完整性软提示（D6：软提示可跳过，不拦截；仅手动表单）
+        const personality = personalityInput.value.trim();
+        const firstMes = firstMesInput.value.trim();
+        const missing = [];
+        if (!personality) missing.push('人格设定');
+        if (!firstMes) missing.push('开场白');
+        if (missing.length > 0) {
+            const confirmed = await showConfirm({
+                title: '设定不完整',
+                message: `未填写 ${missing.join(' / ')}。建议补齐后保存，仍要保存吗？`,
+                confirmText: '仍要保存',
+                cancelText: '返回修改',
+            });
+            if (!confirmed) return;
+        }
+
         // 收集数据
         const data = {
             name,
             description: overlay.querySelector('#cf-description').value.trim(),
-            personality: overlay.querySelector('#cf-personality').value.trim(),
-            first_mes: overlay.querySelector('#cf-first-mes').value.trim(),
+            personality,
+            first_mes: firstMes,
             scenario: overlay.querySelector('#cf-scenario').value.trim(),
             mes_example: overlay.querySelector('#cf-mes-example').value.trim(),
             system_prompt: overlay.querySelector('#cf-system-prompt').value.trim(),

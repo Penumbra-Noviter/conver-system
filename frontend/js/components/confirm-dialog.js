@@ -28,9 +28,9 @@ export function showConfirm(options = {}) {
             danger = false,
         } = options;
 
-        // 移除已有模态框
-        const existing = document.querySelector('.modal-overlay');
-        if (existing) existing.remove();
+        // 移除已存在的确认弹窗（只清确认弹窗，避免误关其它模态框如角色表单）
+        const existing = document.querySelector('.modal-overlay .confirm-modal');
+        if (existing) existing.closest('.modal-overlay').remove();
 
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
