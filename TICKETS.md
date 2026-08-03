@@ -316,8 +316,9 @@
 - [x] 涉及文件：`api/routes/messages.py`
 
 #### CR.6.2 前端头像 HTML 构造重复
-- [ ] `app.js` 中 `appendMessage()` 和 `handleSend()` 流模式应复用已存在的 `getAssistantAvatarHtml()`
-- [ ] 同理，复制按钮事件绑定应抽取为 `attachCopyButton(btn, content)`
+- [x] `app.js` — `appendMessage()` / `handleSend()` 流模式复用 `getAssistantAvatarHtml()` ✅ 2026-08-03
+- [x] 新增 `createAvatarElement(role)` — HTML 字符串 → DOM 元素包装，统一头像构造 ✅ 2026-08-03
+- [x] 复制按钮事件绑定抽取为 `attachCopyButton(btn, content)`，renderMessages / appendMessage 共用 ✅ 2026-08-03
 
 #### CR.6.3 Primitive Obsession
 - [ ] Character 模型 JSON 字段（tags/alternate_greetings/creator_notes/extensions）应使用 SQLite JSON 类型或序列化器

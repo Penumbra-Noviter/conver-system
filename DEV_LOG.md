@@ -444,6 +444,29 @@
 
 ---
 
+## 2026-08-03 — CR.6.2 前端头像/复制按钮构造去重
+
+> `app.js` 中头像 HTML 构造出现 3 处重复（renderMessages / appendMessage / handleSend 流模式），复制按钮绑定重复 2 处，统一收敛。
+
+### 变更
+- [x] 新增 `createAvatarElement(role)` — 将 `getAssistantAvatarHtml()` / `getUserAvatarHtml()` 的 HTML 字符串解析为 DOM 元素，供 `appendMessage()` / `handleSend()` 流模式复用
+- [x] 新增 `attachCopyButton(btn, content)` — 复制按钮点击事件（剪贴板 + ✅/❌ 反馈）统一绑定，`renderMessages()` 与 `appendMessage()` 共用
+- [x] `appendMessage()` 头像构造从 ~20 行 DOM 手工构建 → 一行 `createAvatarElement(role)`
+- [x] `handleSend()` 流模式头像同样一行复用
+
+### 验证
+- [x] `node --check` 语法通过
+- [x] 最小 DOM shim 单元测试 12 用例通过（真实函数源码提取测试）：
+  - assistant 无头像 → `avatar-placeholder-xs` 占位 + 首字母
+  - assistant 有头像 → `<img src/alt>` 正确
+  - user → `.msg-avatar.user-avatar` 👤
+  - `attachCopyButton` 绑定、复制原文（未转义）、✅+copied 反馈
+  - renderMessages 路径 `dataset` 解码正确
+- [x] uvicorn 启动验证通过；页面 `/` 与 `/js/app.js` 均 200
+- [x] 测试数据已通过 API 清理（无残留）
+
+---
+
 ## 2026-08-03 — CR.5.5 + CR.7 默认模型配置回退链重构
 
 > `create_conversation()` 删除硬编码字符串比较，改用 Pydantic v2 `model_fields_set` 判断显式传参，重建回退链。

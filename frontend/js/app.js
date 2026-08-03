@@ -589,21 +589,7 @@ function renderMessages() {
 
     // 复制按钮事件
     container.querySelectorAll('.btn-copy-message').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const content = btn.dataset.content;
-            try {
-                await navigator.clipboard.writeText(content);
-                btn.textContent = '✅';
-                btn.classList.add('copied');
-                setTimeout(() => {
-                    btn.textContent = '📋';
-                    btn.classList.remove('copied');
-                }, 1500);
-            } catch {
-                btn.textContent = '❌';
-            }
-        });
+        attachCopyButton(btn, btn.dataset.content);
     });
 
     scrollToBottom();
@@ -622,27 +608,7 @@ function appendMessage(role, content) {
     div.className = `message ${role}`;
 
     // 头像
-    const avatarEl = document.createElement('div');
-    if (role === 'assistant') {
-        avatarEl.className = 'msg-avatar';
-        const char = state.characters.find(c => c.id === state.currentCharacterId);
-        if (char?.avatar) {
-            const img = document.createElement('img');
-            img.src = char.avatar;
-            img.alt = char.name || '角色';
-            img.onerror = function () { this.parentElement.innerHTML = `<div class="avatar-placeholder-xs">${getInitials(char.name || 'A')}</div>`; };
-            avatarEl.appendChild(img);
-        } else {
-            const ph = document.createElement('div');
-            ph.className = 'avatar-placeholder-xs';
-            ph.textContent = getInitials(char?.name || 'AI');
-            avatarEl.appendChild(ph);
-        }
-    } else {
-        avatarEl.className = 'msg-avatar user-avatar';
-        avatarEl.textContent = '👤';
-    }
-    div.appendChild(avatarEl);
+    div.appendChild(createAvatarElement(role));
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
@@ -659,20 +625,7 @@ function appendMessage(role, content) {
     copyBtn.title = '复制消息';
     copyBtn.textContent = '📋';
     copyBtn.dataset.content = content;
-    copyBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        try {
-            await navigator.clipboard.writeText(content);
-            copyBtn.textContent = '✅';
-            copyBtn.classList.add('copied');
-            setTimeout(() => {
-                copyBtn.textContent = '📋';
-                copyBtn.classList.remove('copied');
-            }, 1500);
-        } catch {
-            copyBtn.textContent = '❌';
-        }
-    });
+    attachCopyButton(copyBtn, content);
     div.appendChild(copyBtn);
 
     container.appendChild(div);
@@ -806,6 +759,39 @@ function getUserAvatarHtml() {
     return `<div class="msg-avatar user-avatar">👤</div>`;
 }
 
+/**
+ * 创建消息头像 DOM 元素（复用 HTML 字符串辅助函数）
+ * @param {'assistant'|'user'} role - 消息角色
+ * @returns {HTMLElement} 头像元素
+ */
+function createAvatarElement(role) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = role === 'assistant' ? getAssistantAvatarHtml() : getUserAvatarHtml();
+    return wrapper.firstElementChild;
+}
+
+/**
+ * 为消息复制按钮绑定点击事件（复制内容到剪贴板并给出 ✅/❌ 反馈）
+ * @param {HTMLButtonElement} btn - 复制按钮元素
+ * @param {string} content - 要复制的消息内容
+ */
+function attachCopyButton(btn, content) {
+    btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+            await navigator.clipboard.writeText(content);
+            btn.textContent = '✅';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = '📋';
+                btn.classList.remove('copied');
+            }, 1500);
+        } catch {
+            btn.textContent = '❌';
+        }
+    });
+}
+
 // ── 发送消息 ──
 
 async function handleSend() {
@@ -828,22 +814,7 @@ async function handleSend() {
         const assistantDiv = document.createElement('div');
         assistantDiv.className = 'message assistant';
         // 头像
-        const avatarEl2 = document.createElement('div');
-        avatarEl2.className = 'msg-avatar';
-        const char2 = state.characters.find(c => c.id === state.currentCharacterId);
-        if (char2?.avatar) {
-            const img = document.createElement('img');
-            img.src = char2.avatar;
-            img.alt = char2.name || '角色';
-            img.onerror = function () { this.parentElement.innerHTML = `<div class="avatar-placeholder-xs">${getInitials(char2.name || 'A')}</div>`; };
-            avatarEl2.appendChild(img);
-        } else {
-            const ph = document.createElement('div');
-            ph.className = 'avatar-placeholder-xs';
-            ph.textContent = getInitials(char2?.name || 'AI');
-            avatarEl2.appendChild(ph);
-        }
-        assistantDiv.appendChild(avatarEl2);
+        assistantDiv.appendChild(createAvatarElement('assistant'));
         const assistantContentDiv = document.createElement('div');
         assistantContentDiv.className = 'message-content';
         assistantDiv.appendChild(assistantContentDiv);
