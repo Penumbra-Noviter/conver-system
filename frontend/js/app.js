@@ -1097,6 +1097,53 @@ async function loadSettings() {
     }
 }
 
+/**
+ * 保存设置前测试已填写的 API Key 连接（P4.3）
+ *
+ * 对每个非空 Key 并发测试；任一失败弹确认框，由用户决定是否继续保存。
+ * @param {object} data - 设置表单数据（claude_api_key / openai_api_key / openai_base_url）
+ * @returns {Promise<boolean>} true=可继续保存；false=用户选择取消保存
+ */
+async function testApiKeys(data) {
+    const checks = [];
+    if (data.claude_api_key) {
+        checks.push({
+            label: 'Claude',
+            data: { provider: 'claude', api_key: data.claude_api_key },
+        });
+    }
+    if (data.openai_api_key) {
+        checks.push({
+            label: 'OpenAI',
+            data: {
+                provider: 'openai',
+                api_key: data.openai_api_key,
+                base_url: data.openai_base_url || null,
+            },
+        });
+    }
+    if (checks.length === 0) return true;
+
+    // 并发测试，收集失败项（不中断其它 Provider 的测试）
+    const results = await Promise.all(checks.map((check) =>
+        settings.testConnection(check.data)
+            .then(() => null)
+            .catch((err) => ({ label: check.label, message: err.message })),
+    ));
+    const failures = results.filter(Boolean);
+    if (failures.length === 0) return true;
+
+    const detail = failures.map((f) => `· ${f.label}: ${f.message}`).join('\n');
+    const confirmed = await showConfirm({
+        title: 'API Key 连接测试未通过',
+        message: `已填写 ${failures.length} 个 Key 测试失败`,
+        detail: `${detail}\n\n仍然保存吗？（若 Key 无误但当前网络不可达，可继续保存）`,
+        confirmText: '仍然保存',
+        cancelText: '取消',
+    });
+    return confirmed;
+}
+
 dom.btnSaveSettings.addEventListener('click', async () => {
     const data = {
         claude_api_key: $('#setting-claude-key').value,
@@ -1108,6 +1155,10 @@ dom.btnSaveSettings.addEventListener('click', async () => {
         theme_mode: $('#setting-theme').value,
         user_name: $('#setting-user-name').value,
     };
+
+    // P4.3：保存前测试已填写的 API Key 连接，失败由用户确认是否继续
+    const canSave = await testApiKeys(data);
+    if (!canSave) return;
 
     try {
         const result = await settings.update(data);
