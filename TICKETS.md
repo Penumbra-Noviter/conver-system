@@ -24,11 +24,6 @@
 - [ ] 多 tab 会话管理
 - [ ] Ollama 本地模型支持
 
-### P0 手动项（非代码）
-
-- [ ] 填写 API Key（用户手动填入 `.env` 模板 / 设置面板）
-- [ ] 手动访问 http://localhost:8000/docs 与首页确认 Swagger / 前端加载正常
-
 ---
 
 ## 已完成归档
@@ -39,6 +34,8 @@
 |------|------|----------|------|
 | Phase 0 | 基础设施（P0.1 `.env` 模板 / P0.2 依赖 / P0.4 启动验证；P0.3 Git 按决策暂缓） | 2026-07-30 | `b5fe037` |
 | Phase 1 | 项目骨架（后端 8 模块 + 前端 4 文件） | 2026-07-30 | `b5fe037` |
+
+> **P0 手动项（非代码，2026-08-03 归档）**：填写 API Key（P4.3 设置面板 + 保存时测试连接已完成）；手动访问 `/docs` 与首页确认（Phase 0 P0.4 验收，已在 `b5fe037` 完成）。
 | Phase 2 | 角色管理前端（P2.1 表单 / P2.2 编辑 / P2.3 删除确认 / P2.4 卡片增强） | 2026-07-30 | `b5fe037` |
 | Phase 3 | 对话核心（P3.1 Claude Provider / P3.2 聊天 API / P3.3 上下文管理 / P3.4 流式渲染） | 2026-07-30 | `b5fe037` |
 | Phase 4 | 多模型（P4.1 OpenAI Provider / P4.2 模型切换 UI / P4.4 Provider 路由） | 2026-07-30 | `b5fe037` |
@@ -70,6 +67,20 @@
 | CR.5.3 + CR.5.4 | `stream_*` 前缀决策；`save_message` → `create_message` | 2026-08-03 | `6bdb1ca` |
 | CR.6.3 | Character JSON 列 + Message.role 枚举 | 2026-08-03 | `6bdb1ca` |
 | CR.6.5 | messages.py 职责分离（chat.py 拆出） | 2026-08-03 | `6bdb1ca` |
+
+### 文档/测试专项审查 CR（2026-08-03，双轴 code-review）
+
+> 依据《文档规范》单点原则 + 防漂移速查的专项审查。双轴：Standards（规范符合度）+ Spec（文档/测试与代码一致性）。全部在本次会话修复归档。
+
+| CR | 标题 | 完成日期 | 提交 |
+|----|------|----------|------|
+| CR-D1 | `api-design.md` 契约漂移：`greeting`→`first_mes` + V2 字段；conversation 响应去 `character_name`；模型列表补 `claude-opus-4-8`/`gpt-4-turbo`；补 6 个缺失端点（角色 import/export、对话 export json/markdown、`DELETE /api/conversations`、消息 search、settings test-connection）；settings 键补全；错误码补 401/429/504 | 2026-08-03 | `8259266` |
+| CR-D2 | `architecture.md` 漂移：`/api/convs`→`/api/conversations`；角色表补 V2 全列；目录树补 `models/setting.py`/`schemas/settings.py`/`services/character_card.py`/前端组件/`tests`；数据流同步 `build_message_list` | 2026-08-03 | `8259266` |
+| CR-D3 | `llm-integration.md` 过时：`generate_reply`→`build_message_list`；BaseLLM 签名 + `test_connection`；Factory 带 `base_url`；Prompt 构建/滑窗策略；新 Provider 添加步骤对齐代码 | 2026-08-03 | `8259266` |
+| CR-D4 | `p2.5` 规格偏差闭环：§4.2 `get_character_with_count`→`get_character`（DEV_LOG 已记偏差但规格文档未同步） | 2026-08-03 | `8259266` |
+| CR-D5 | 测试规范整改：`db_session` fixture 移入 `conftest.py`（消除 test_p35 / test_settings_connection 重复副本）+ 清理失效 import | 2026-08-03 | `8259266` |
+| CR-D6 | 文档规范强化：`documentation-standards.md` 新增 §三 测试规范（共享 fixture / 覆盖率声明可复现 / 测试数同步）+ §六 防漂移新增 4 检查项（契约完整性 / 字段名以 schema 为准 / 规格偏差闭环 / 覆盖率有产物） | 2026-08-03 | `8259266` |
+| CR-D7 | 杂项清理：`CONSENSUS` 更新记录补 2026-08-03；TICKETS P0 手动项归档；`character_card` 100% 覆盖声明补可复现命令 | 2026-08-03 | `8259266` |
 
 ### P2.5.1-5.8（2026-08-03）
 

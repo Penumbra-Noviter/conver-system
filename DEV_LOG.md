@@ -7,14 +7,21 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：P4.3 API Key 保存时测试连接**完成**（后端 `test-connection` 端点 + 前端保存前验证 + 失败确认）；P3.5 停止生成 + 标题自动生成**完成**；下一步 P6.4 Tauri / P6.5 Ollama、多 tab（→ TICKETS）
-- **代码质量**：CR.1-CR.7 全部清零（最终 commit `6bdb1ca`）；P4.3 新增模块 100% 行覆盖
-- **测试**：pytest 共 83 用例（character_card 53 + P3.5 19 + P4.3 11）；运行 `pytest`
-- **文档**：本次按《文档规范》改造 —— PROJECT_REFERENCE 修正同步 ORM、DEV_LOG 瘦身、TICKETS CR 归档
+- **阶段**：P4.3 API Key 保存时测试连接**完成**；P3.5 停止生成 + 标题自动生成**完成**；文档/测试专项审查**完成**（CR-D1~D7 清零）；下一步 P6.4 Tauri / P6.5 Ollama、多 tab（→ TICKETS）
+- **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7（本次）；P4.3 新增模块 100% 行覆盖
+- **测试**：pytest 共 83 用例（character_card 53 + P3.5 19 + P4.3 11）；运行 `pytest`；`character_card` 100% 覆盖可复现（`pytest --cov=backend.app.services.character_card`）
+- **文档**：本次强化《文档规范》——新增测试规范章节 + 防漂移检查项；修复 api-design / architecture / llm-integration / p2.5 spec 全部漂移
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 审计 | 文档/测试专项审查（Standards + Spec 双轴）
+- **范围**：`b5fe037..HEAD` 全部文档与测试。双轴 = Standards（对照《文档规范》/CLAUDE.md 惯例/嗅探基线）+ Spec（文档/测试 vs 实际代码一致性）
+- **Spec 轴修复**：`api-design.md`（`greeting`→`first_mes` + V2 字段、conversation 误含 `character_name`、模型列表缺 `claude-opus-4-8`/`gpt-4-turbo`、补 6 个缺失端点：角色 import/export、对话 export json/markdown、`DELETE /api/conversations`、消息 search、settings test-connection、settings 键补全、错误码补 401/429/504）；`architecture.md`（`/api/convs`→`/api/conversations`、角色表 V2 全列、目录树补 `setting.py`/`settings.py`/`character_card.py`/前端组件/`tests`、数据流同步 `build_message_list`）；`llm-integration.md`（`generate_reply` 函数不存在→`build_message_list`、BaseLLM 签名 + `test_connection`、Factory 带 `base_url`、Prompt 构建/滑窗策略对齐代码、新 Provider 添加步骤）；`p2.5` SPEC §4.2 偏差只记 DEV_LOG 未改规格文档（闭环修正）
+- **Standards 轴修复**：`db_session` fixture 在 test_p35 / test_settings_connection 各复制一份 → 移入 `conftest.py`（删重复 + 清理失效 import）；`character_card` 100% 覆盖声明原无 `.coverage` 产物 → 补可复现命令实测（101 stmts 0 miss）；TICKETS P0 手动项（P4.3 完成后过时）归档；CONSENSUS 更新记录过期
+- **规范强化**：`docs/documentation-standards.md` 新增 §三 测试规范（共享 fixture 入 conftest / 覆盖率声明可复现 / 测试数同步）+ §六 防漂移新增 4 检查项（API 契约完整性 / 字段名以 schema 为准 / 规格偏差闭环 / 覆盖率有产物）
+- 新增 CR-D1~D7 全部修复归档；83 用例通过
 
 ### 2026-08-03 | 实现 | P4.3 API Key 保存时测试连接
 - **后端**：`BaseLLM.test_connection()` 默认实现（发起最小生成请求 max_tokens=1，连接无效抛出 Provider `_translate_error` 映射的 LLMError，Provider 可覆写）；`POST /api/settings/test-connection` 端点（请求 Key 为空回退 DB 已存 Key；不支持的 provider / 未提供 Key / LLMError / 通用异常均 400 + 可读原因）
