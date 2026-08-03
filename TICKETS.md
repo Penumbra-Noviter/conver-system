@@ -26,9 +26,7 @@
 
 ### 架构深化候选（2026-08-03 评审）
 
-- [ ] ③ 抽 `services/llm/prompt.py`（纯函数化 Prompt 组装，去 db 参数）— Worth exploring
 - [ ] ④ 线上形状统一（CharacterResponse 驱动序列化，退役手写 dict）— Speculative
-- [ ] ⑤ 前端 `app.js` 1380 行拆分（`js/chat.js` + `js/state.js`）— Speculative，需先补前端测试网
 
 ---
 
@@ -36,13 +34,22 @@
 
 ### 架构深化候选 ①②⑥（2026-08-03）
 
-> 依据架构评审（候选 ① 聊天回合 / ② 运行时设置 / ⑥ Provider 注册显式化）把两大概念沉淀为单一所有权的**深模块**，并消除 import 副作用。候选 ③④⑤ 未采纳，见活跃工单「架构深化候选」。
+> 依据架构评审（候选 ① 聊天回合 / ② 运行时设置 / ⑥ Provider 注册显式化）把两大概念沉淀为单一所有权的**深模块**，并消除 import 副作用。候选 ③⑤ 后续批次落地（见下方「架构深化候选 ③⑤」），候选 ④ 仍为 Speculative。
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
 | ① | 抽 `services/chat.py` 聊天回合深模块：`ChatContext` / `prepare_chat` / `llm_error_response` / `stream_reply`；路由层仅留 HTTP 映射 + SSE `data:` 帧包装（已接受「service 层带 HTTPException 原样上移」取舍） | 2026-08-03 | `25bf5a4` |
 | ② | 抽 `services/setting.py` 运行时设置深模块：读 / 写 / 白名单 / 默认回退链 / 整型容错（防 500）收口 | 2026-08-03 | `25bf5a4` |
 | ⑥ | Provider 注册显式化：`main.py` on_startup 调 `register_builtin_providers()`，`factory.py` 懒加载兜底，去 import 副作用 | 2026-08-03 | `25bf5a4` |
+
+### 架构深化候选 ③⑤（2026-08-03）
+
+> Prompt 组装纯函数化（③）与前端 app.js 拆分（⑤）并行落地。③ 把 Prompt 组装从 `message.py` 抽离为纯函数模块（去 db 依赖，独立可测）；⑤ 把 1380 行 `app.js` 拆为 `chat.js` + `state.js`，行为保持机械重构，Playwright 冒烟通过。候选 ④ 仍保留为 Speculative，待 ③ 落地后再评。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| ③ | 抽 `services/llm/prompt.py` 纯函数化 Prompt 组装：`CharacterData` frozen dataclass + `apply_template_vars` / `parse_mes_example` / `build_messages` 纯函数；`message.py::build_message_list` 签名与行为不变（查角色+查历史→委托纯函数）；26 项单测，新模块 100% 行覆盖 | 2026-08-03 | `98e0c29` |
+| ⑤ | 前端 `app.js` 拆分（1380→1080 行）：`js/state.js`（全局状态+模块级状态，54 行）、`js/chat.js`（聊天域渲染+交互+chatDom，328 行，通过 `setConversationsRefresher` 钩子避免反向依赖）；`index.html` 无变更（ESM 内部 import）；Playwright 冒烟通过，无 JS 错误 | 2026-08-03 | `98e0c29` |
 
 ### Phase 0-5 + P6.1-6.3（2026-07-30，初始 commit `b5fe037`）
 

@@ -7,14 +7,19 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：架构深化 ①②⑥（聊天回合 + 运行时设置深模块 + Provider 注册显式化）**完成**；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；下一步 P6.4 Tauri / P6.5 Ollama、多 tab（→ TICKETS）
-- **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7 + 架构深化 ①②⑥（`25bf5a4`）；P4.3 新增模块 100% 行覆盖
-- **测试**：pytest 共 91 用例（character_card 53 + P3.5 19 + P4.3 11 + setting 深模块 8）；运行 `pytest`；`character_card` 100% 覆盖可复现（`pytest --cov=backend.app.services.character_card`）
+- **阶段**：架构深化 ③⑤（Prompt 纯函数化 + app.js 拆分）**完成**；①②⑥ 已归档；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；下一步 P6.4 Tauri（暂缓，缺 Rust 工具链）/ P6.5 多 tab（→ TICKETS）
+- **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7 + 架构深化 ①②⑥③⑤；P4.3 / prompt.py 新增模块 100% 行覆盖
+- **测试**：pytest 共 117 用例（character_card 53 + P3.5 19 + P4.3 11 + setting 深模块 8 + prompt 纯函数 26）；运行 `pytest`；`character_card` / `prompt` 100% 覆盖可复现
 - **文档**：《文档规范》已强化（测试规范章节 + 防漂移检查项）；修复 api-design / architecture / llm-integration / p2.5 spec 全部漂移；新增 CONTEXT.md 领域词汇表
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 实现 | 架构深化 ③⑤：Prompt 纯函数化 + 前端 app.js 拆分
+- **③ Prompt 纯函数化**：新建 `services/llm/prompt.py`，把模板变量替换（`apply_template_vars`）、mes_example 解析（`parse_mes_example`）、完整消息列表组装（`build_messages`）从 `message.py` 迁移为纯函数；`CharacterData` frozen dataclass 作为角色纯数据容器（去 db Session 依赖）；`message.py::build_message_list` 签名与行为不变（查角色+查历史→委托纯函数）；26 项单测，新模块 100% 行覆盖（62 stmts 0 miss）
+- **⑤ 前端 app.js 拆分**：1380 行 → `chat.js`（328 行，聊天域渲染+交互+chatDom）+ `state.js`（54 行，全局状态+模块级状态）+ `app.js`（1080 行，视图/角色/对话/设置/搜索/init）；`setConversationsRefresher` 钩子解决 handleSend 对 loadConversations 的反向依赖（避免循环 import）；`index.html` 无变更（ESM 内部 import）；Playwright 冒烟通过（流式/非流式/主题/设置/搜索），无 JS 错误
+- **测试**：pytest **117 passed**（原 91 + prompt 26）
 
 ### 2026-08-03 | 实现 | 架构深化 ①②⑥：聊天回合 + 运行时设置深模块 + Provider 注册显式化
 - **① 聊天回合深模块**：`services/chat.py` 收拢一次聊天回合全生命周期（插开场白 → 存用户消息 → 组装上下文 → 取 Key / Provider → 生成 → 保存 / 断开保存部分）；`ChatContext` / `prepare_chat` / `llm_error_response` / `stream_reply` 四接口，`api/routes/chat.py` 仅留 HTTP 映射 + SSE `data:` 帧包装（-199 行）
