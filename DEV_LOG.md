@@ -7,14 +7,21 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：P4.3 API Key 保存时测试连接**完成**；P3.5 停止生成 + 标题自动生成**完成**；文档/测试专项审查**完成**（CR-D1~D7 清零）；下一步 P6.4 Tauri / P6.5 Ollama、多 tab（→ TICKETS）
-- **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7（本次）；P4.3 新增模块 100% 行覆盖
-- **测试**：pytest 共 83 用例（character_card 53 + P3.5 19 + P4.3 11）；运行 `pytest`；`character_card` 100% 覆盖可复现（`pytest --cov=backend.app.services.character_card`）
-- **文档**：本次强化《文档规范》——新增测试规范章节 + 防漂移检查项；修复 api-design / architecture / llm-integration / p2.5 spec 全部漂移
+- **阶段**：架构深化 ①②⑥（聊天回合 + 运行时设置深模块 + Provider 注册显式化）**完成**；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；下一步 P6.4 Tauri / P6.5 Ollama、多 tab（→ TICKETS）
+- **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7 + 架构深化 ①②⑥（`25bf5a4`）；P4.3 新增模块 100% 行覆盖
+- **测试**：pytest 共 91 用例（character_card 53 + P3.5 19 + P4.3 11 + setting 深模块 8）；运行 `pytest`；`character_card` 100% 覆盖可复现（`pytest --cov=backend.app.services.character_card`）
+- **文档**：《文档规范》已强化（测试规范章节 + 防漂移检查项）；修复 api-design / architecture / llm-integration / p2.5 spec 全部漂移；新增 CONTEXT.md 领域词汇表
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 实现 | 架构深化 ①②⑥：聊天回合 + 运行时设置深模块 + Provider 注册显式化
+- **① 聊天回合深模块**：`services/chat.py` 收拢一次聊天回合全生命周期（插开场白 → 存用户消息 → 组装上下文 → 取 Key / Provider → 生成 → 保存 / 断开保存部分）；`ChatContext` / `prepare_chat` / `llm_error_response` / `stream_reply` 四接口，`api/routes/chat.py` 仅留 HTTP 映射 + SSE `data:` 帧包装（-199 行）
+- **② 运行时设置深模块**：`services/setting.py` 收口三处手写点（chat 路由 `_get_api_key` 等 / settings 路由 `ALLOWED_KEYS` / conversation `_get_setting_value`）；白名单 + DB→config 默认回退链 + 整型容错（防 500）；`ALLOWED_KEYS` 主位移至 service（`docs/llm-integration.md` step 3 路径同步）
+- **⑥ Provider 注册显式化**：`main.py` on_startup 调 `LLMFactory.register_builtin_providers()`，`factory.py` `_ensure_builtins` 懒加载兜底（`get_provider` / `list_providers` 首次调用自动注册）；`llm/__init__.py` 导出 `register_builtin_providers`，去 import 副作用
+- **取舍（架构评审已接受，不重构）**：`services/chat.py` 仍抛 `HTTPException` 并 import fastapi / starlette 类型——service 层未做到 HTTP-agnostic，按「原样上移」设计保留，文档化不重构
+- **测试**：test_p35 改用 service 层 patch（`setting_service.api_key` / `chat_service.LLMFactory`）；test_settings_connection 新增 `services/setting.py` 深模块语义 8 用例（整型回退防 500 / 默认回退链 / api_key 未配置空串）；pytest **91 passed**
 
 ### 2026-08-03 | 审计 | 文档/测试专项审查（Standards + Spec 双轴）
 - **范围**：`b5fe037..HEAD` 全部文档与测试。双轴 = Standards（对照《文档规范》/CLAUDE.md 惯例/嗅探基线）+ Spec（文档/测试 vs 实际代码一致性）
