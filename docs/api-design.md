@@ -13,16 +13,28 @@
 GET /api/characters
 ```
 
-**响应** `200`
+**响应** `200` — 角色对象含 V2 全字段（下为节选，完整字段见 `CharacterResponse`）
 ```json
 [
   {
     "id": 1,
     "name": "林墨",
-    "avatar": null,
+    "description": "一位流浪诗人",
     "personality": "你是林墨，一位流浪诗人...",
-    "greeting": "你来了。正好，陪我喝一杯？",
+    "scenario": "月下竹林",
+    "first_mes": "你来了。正好，陪我喝一杯？",
+    "mes_example": "<START>\n{{user}}: 你好\n{{char}}: 欢迎",
+    "system_prompt": "",
+    "post_history_instructions": "",
+    "alternate_greetings": [],
+    "tags": [],
+    "creator": "",
+    "version": "1.0",
+    "creator_notes": {},
+    "extensions": {},
+    "avatar": null,
     "temperature": 0.7,
+    "conversation_count": 0,
     "created_at": "2026-07-30T10:00:00",
     "updated_at": "2026-07-30T10:00:00"
   }
@@ -41,13 +53,24 @@ GET /api/characters/{character_id}
 POST /api/characters
 ```
 
-**请求体**
+**请求体** — 字段与响应一致（除 `id`/`conversation_count`/`created_at`/`updated_at` 计算字段），`name` 必填，其余默认空/默认值
 ```json
 {
   "name": "林墨",
-  "avatar": null,
+  "description": "一位流浪诗人",
   "personality": "你是林墨，一位流浪诗人...",
-  "greeting": "你来了。正好，陪我喝一杯？",
+  "scenario": "月下竹林",
+  "first_mes": "你来了。正好，陪我喝一杯？",
+  "mes_example": "<START>\n{{user}}: 你好\n{{char}}: 欢迎",
+  "system_prompt": "",
+  "post_history_instructions": "",
+  "alternate_greetings": [],
+  "tags": [],
+  "creator": "",
+  "version": "1.0",
+  "creator_notes": {},
+  "extensions": {},
+  "avatar": null,
   "temperature": 0.7
 }
 ```
@@ -71,6 +94,24 @@ DELETE /api/characters/{character_id}
 **响应** `204` — 无内容
 > 删除角色时级联删除其所有对话和消息
 
+### 导出角色卡（V2）
+
+```
+GET /api/characters/{character_id}/export
+```
+
+**响应** `200` — `application/json` 附件（`Content-Disposition` 附件头，中文文件名 URL 编码），内容为 SillyTavern V2 信封（`spec`/`data`，见 [P2.5 规格](p2.5-character-import-export.md)）
+
+### 导入角色卡
+
+```
+POST /api/characters/import
+```
+
+**请求体** — 角色卡原始 JSON（任意 dict，兼容 V2 信封 / 裸 data / V1 旧卡）
+
+**响应** `201` — 导入后的角色对象；非法卡 → `422`「导入失败：<原因>」
+
 ---
 
 ## 对话 API
@@ -92,7 +133,6 @@ GET /api/conversations?character_id=1
   {
     "id": 1,
     "character_id": 1,
-    "character_name": "林墨",
     "title": "关于诗歌的讨论",
     "model_provider": "claude",
     "model_name": "claude-sonnet-4-20250514",
@@ -147,6 +187,30 @@ DELETE /api/conversations/{conversation_id}
 
 **响应** `204`
 
+### 清空所有对话
+
+```
+DELETE /api/conversations
+```
+
+**响应** `204` — 级联删除所有对话及消息
+
+### 导出对话（JSON）
+
+```
+GET /api/conversations/{conversation_id}/export/json
+```
+
+**响应** `200` — `application/json` 附件，结构 `{ conversation, character, messages[] }`（`role` 为纯字符串 `user`/`assistant`/`system`）
+
+### 导出对话（Markdown）
+
+```
+GET /api/conversations/{conversation_id}/export/markdown
+```
+
+**响应** `200` — `text/markdown` 附件（标题 + 角色信息 + 按日期分组消息）
+
 ---
 
 ## 消息 API
@@ -172,6 +236,35 @@ GET /api/conversations/{conversation_id}/messages
     "conversation_id": 1,
     "role": "user",
     "content": "今天心情不错",
+    "created_at": "2026-07-30T10:01:00"
+  }
+]
+```
+
+### 搜索消息
+
+```
+GET /api/messages/search?q=关键词&limit=50
+```
+
+**查询参数**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| q | str | 搜索关键词（SQL LIKE 跨对话匹配） |
+| limit | int | 最大返回条数，默认 50 |
+
+**响应** `200`
+```json
+[
+  {
+    "message_id": 3,
+    "conversation_id": 1,
+    "conversation_title": "关于诗歌的讨论",
+    "character_id": 1,
+    "character_name": "林墨",
+    "character_avatar": null,
+    "role": "user",
+    "content_preview": "…今天心情不错…",
     "created_at": "2026-07-30T10:01:00"
   }
 ]
@@ -254,6 +347,7 @@ GET /api/models
       "name": "Claude (Anthropic)",
       "models": [
         "claude-sonnet-4-20250514",
+        "claude-opus-4-8-20250514",
         "claude-haiku-4-5-20251001"
       ]
     },
@@ -262,7 +356,8 @@ GET /api/models
       "name": "OpenAI / 兼容 API",
       "models": [
         "gpt-4o",
-        "gpt-4o-mini"
+        "gpt-4o-mini",
+        "gpt-4-turbo"
       ]
     }
   ]
@@ -287,8 +382,12 @@ GET /api/settings
 {
   "claude_api_key": "sk-ant-...",
   "openai_api_key": "sk-...",
+  "openai_base_url": "https://api.example.com/v1",
   "default_provider": "claude",
-  "default_model": "claude-sonnet-4-20250514"
+  "default_model": "claude-sonnet-4-20250514",
+  "sliding_window_rounds": "30",
+  "theme_mode": "auto",
+  "user_name": "User"
 }
 ```
 
@@ -298,7 +397,8 @@ GET /api/settings
 PUT /api/settings
 ```
 
-**请求体**
+**请求体** — 键为白名单内设置项（如上），可部分更新；白名单外的键被忽略
+
 ```json
 {
   "claude_api_key": "sk-ant-...",
@@ -310,6 +410,40 @@ PUT /api/settings
 
 > API Key 同时支持 `.env` 文件注入和运行时设置面板修改。
 > 运行时设置优先于 `.env` 默认值。
+
+### 测试 API Key 连接
+
+```
+POST /api/settings/test-connection
+```
+
+**请求体**
+```json
+{
+  "provider": "claude",
+  "api_key": "sk-ant-...",
+  "base_url": null,
+  "model": null
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| provider | Provider 标识（claude / openai） |
+| api_key | 要测试的 Key；**留空则回退到已保存的 Key** |
+| base_url | 自定义 API 地址（OpenAI 兼容服务用） |
+| model | 测试用模型名；留空用 Provider 默认模型 |
+
+**响应** `200`
+```json
+{
+  "ok": true,
+  "provider": "claude",
+  "message": "连接成功"
+}
+```
+
+**错误** `400` — 不支持的 Provider / 未提供 Key / Key 无效 / 网络不可达（detail 为可读原因）
 
 ---
 
@@ -329,7 +463,10 @@ PUT /api/settings
 | 201 | 创建成功 |
 | 204 | 删除成功（无内容） |
 | 400 | 请求参数错误 |
+| 401 | API Key 无效或未配置 |
 | 404 | 资源不存在 |
-| 422 | 请求体验证失败 |
+| 422 | 请求体验证失败 / 角色卡导入失败 |
+| 429 | LLM API 请求频率超限 |
 | 500 | 服务器内部错误 |
 | 502 | LLM API 调用失败 |
+| 504 | LLM API 请求超时 |

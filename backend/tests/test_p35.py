@@ -16,10 +16,8 @@ from __future__ import annotations
 import asyncio
 import json
 
-import pytest
 from starlette.requests import ClientDisconnect
 
-from backend.app.database import Base
 from backend.app.models import Conversation, Message
 from backend.app.models.message import Role
 from backend.app.schemas.conversation import ConversationCreate
@@ -32,26 +30,6 @@ __all__: list[str] = []
 
 
 # ── 测试基础设施 ──
-
-
-@pytest.fixture
-def db_session():
-    """内存 SQLite 会话（每次测试独立建库/删库）"""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import StaticPool
-
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-    Base.metadata.drop_all(engine)
 
 
 def _create_character(db_session, name: str = "测试角色") -> int:

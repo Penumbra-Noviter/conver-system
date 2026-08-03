@@ -18,7 +18,7 @@
 │  │   API Routes    │   │   Services   │   │   LLM Layer   │  │
 │  │                 │   │              │   │               │  │
 │  │ /api/characters │──▶│ Character    │   │  BaseLLM      │  │
-│  │ /api/convs      │──▶│ Conversation │   │  ├─Claude     │  │
+│  │ /api/conversations│▶│ Conversation │   │  ├─Claude     │  │
 │  │ /api/chats      │──▶│ Message      │──▶│  ├─OpenAI     │  │
 │  │ /api/settings   │   │ Settings     │   │  └─(扩展)     │  │
 │  └────────┬───────┘   └──────┬───────┘   └───────┬───────┘  │
@@ -58,28 +58,37 @@ conver-system/
 │   │   │   ├── __init__.py
 │   │   │   ├── character.py
 │   │   │   ├── conversation.py
-│   │   │   └── message.py
+│   │   │   ├── message.py
+│   │   │   └── setting.py
 │   │   │
 │   │   ├── schemas/               # Pydantic 请求/响应
 │   │   │   ├── __init__.py
 │   │   │   ├── character.py
 │   │   │   ├── conversation.py
-│   │   │   └── message.py
+│   │   │   ├── message.py
+│   │   │   └── settings.py
 │   │   │
 │   │   └── services/
 │   │       ├── __init__.py
 │   │       ├── character.py
+│   │       ├── character_card.py  # SillyTavern V2 卡转换层
 │   │       ├── conversation.py
 │   │       ├── message.py
 │   │       └── llm/
 │   │           ├── __init__.py
-│   │           ├── base.py        # BaseLLM 抽象基类
+│   │           ├── base.py        # BaseLLM 抽象基类（含 test_connection）
 │   │           ├── claude.py      # Claude Provider
 │   │           ├── openai.py      # OpenAI Provider
 │   │           ├── factory.py     # Provider 工厂
 │   │           └── errors.py      # LLM 异常定义
 │   │
 │   ├── requirements.txt
+│   ├── requirements-dev.txt       # pytest / pytest-cov
+│   ├── tests/                     # 单元测试（pytest）
+│   │   ├── conftest.py            # 共享 fixture（db_session / make_character）
+│   │   ├── test_character_card.py
+│   │   ├── test_p35.py
+│   │   └── test_settings_connection.py
 │   └── .env.example
 │
 ├── frontend/
@@ -90,10 +99,8 @@ conver-system/
 │   │   ├── app.js                 # 主入口 + 状态管理
 │   │   ├── api.js                 # API 调用层
 │   │   ├── components/
-│   │   │   ├── chat.js            # 聊天区域
-│   │   │   ├── character-manager.js # 角色管理
-│   │   │   ├── conversation-list.js # 对话历史
-│   │   │   └── settings.js        # 设置面板
+│   │   │   ├── character-form.js  # 角色表单
+│   │   │   └── confirm-dialog.js  # 确认弹窗
 │   │   └── utils.js
 │   └── assets/
 │
@@ -101,8 +108,11 @@ conver-system/
 │   ├── architecture.md
 │   ├── api-design.md
 │   ├── llm-integration.md
+│   ├── documentation-standards.md
+│   ├── p2.5-character-import-export.md
 │   └── development-plan.md
 │
+├── pytest.ini                     # pytest 配置（pythonpath + testpaths）
 ├── conver_system.db               # 运行时生成
 ├── .gitignore
 └── README.md
@@ -116,8 +126,10 @@ conver-system/
 用户输入 → POST /api/chats { conversation_id, content }
     │
     ├─ 1. 路由接收请求
-    ├─ 2. Service 加载 conversation 及其角色 personality
-    ├─ 3. 构建 messages: [system(角色设定), user(历史)... , user(新消息)]
+    ├─ 2. Service 加载 conversation 及其角色
+    ├─ 3. build_message_list 构建 messages（见 llm-integration.md）：
+    │    system(system_prompt 或 personality) → [scenario 系统消息] → [mes_example few-shot]
+    │    → 历史消息（滑窗，保留最近 N 轮）→ [post_history_instructions] → user(新消息)
     ├─ 4. 从 DB 获取该对话的 model_provider + model_name
     ├─ 5. Factory 获取对应的 LLM Provider 实例
     ├─ 6. provider.generate(messages) → 回复文本
@@ -145,9 +157,20 @@ conver-system/
 |------|------|------|
 | id | INTEGER PK | 自增 |
 | name | VARCHAR(100) | 角色名称 |
+| description | TEXT | 角色简短描述 |
+| personality | TEXT | **人设设定**（默认 system prompt） |
+| scenario | TEXT | 场景设定（附加 system 消息） |
+| first_mes | TEXT | 开场白（V2: first_mes，原 greeting） |
+| mes_example | TEXT | 对话范例（few-shot，`<START>` 分隔） |
+| system_prompt | TEXT | 覆盖系统提示词（优先于 personality） |
+| post_history_instructions | TEXT | 历史后指令 |
+| alternate_greetings | JSON | 备选开场白 (list) |
+| tags | JSON | 标签 (list) |
+| creator | VARCHAR(100) | 创作者 |
+| version | VARCHAR(50) | 版本，默认 1.0 |
+| creator_notes | JSON | 创作者备注 (dict) |
+| extensions | JSON | 扩展字段 (dict) |
 | avatar | TEXT | 头像（base64 / 路径，可空） |
-| personality | TEXT | **人设设定**（注入 system prompt） |
-| greeting | TEXT | 开场白 |
 | temperature | FLOAT | 默认 0.7 |
 | created_at | DATETIME | |
 | updated_at | DATETIME | |

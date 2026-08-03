@@ -5,7 +5,8 @@
 ```
 ┌──────────────────────────────────────────────────┐
 │                   Service 层                      │
-│   message_service.generate_reply(conversation)    │
+│   message.build_message_list(db, conv, content)   │
+│   message.create_message(db, conv_id, role, txt)  │
 └─────────────────────┬────────────────────────────┘
                       │
                       ▼
@@ -31,12 +32,17 @@ from typing import AsyncIterator
 class BaseLLM(ABC):
     """所有 LLM Provider 的抽象基类"""
 
+    def __init__(self, api_key: str, base_url: str | None = None):
+        self.api_key = api_key
+        self.base_url = base_url
+
     @abstractmethod
     async def generate(
         self,
         messages: list[dict],       # [{"role": "...", "content": "..."}, ...]
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        model: str | None = None,
     ) -> str:
         """非流式生成完整回复"""
         ...
@@ -47,6 +53,7 @@ class BaseLLM(ABC):
         messages: list[dict],
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        model: str | None = None,
     ) -> AsyncIterator[str]:
         """流式生成，逐 token 产出"""
         ...
@@ -55,6 +62,10 @@ class BaseLLM(ABC):
     @abstractmethod
     def provider_name(self) -> str:
         """返回唯一标识，如 'claude' / 'openai'"""
+        ...
+
+    async def test_connection(self, model: str | None = None) -> None:
+        """测试 API 连接可用性（默认实现：最小请求 max_tokens=1，可覆写）"""
         ...
 ```
 
@@ -69,10 +80,10 @@ class LLMFactory:
         cls._providers[name] = provider_cls
 
     @classmethod
-    def get_provider(cls, name: str, api_key: str) -> BaseLLM:
+    def get_provider(cls, name: str, api_key: str, base_url: str | None = None) -> BaseLLM:
         if name not in cls._providers:
             raise ValueError(f"不支持的 Provider: {name}")
-        return cls._providers[name](api_key=api_key)
+        return cls._providers[name](api_key=api_key, base_url=base_url)
 
     @classmethod
     def list_providers(cls) -> list[str]:
@@ -152,22 +163,23 @@ class OpenAIProvider(BaseLLM):
 
 ## Prompt 构建逻辑
 
+`message_service.build_message_list(db, conversation, user_content, max_rounds=30)` 组装顺序：
+
 ```
-1. 加载角色: character.personality
-2. 加载对话: conversation 下的所有 messages（按时间正序）
-3. 构建消息列表:
-   system_prompt = character.personality
-   messages = [
-       {"role": "system", "content": system_prompt},
-       ...history...,             # 历史消息
-       {"role": "user", "content": 用户最新输入}
-   ]
-4. 截断策略（可选）:
-   - 计算历史消息的 token 估算值
-   - 超出 max_tokens 时，从最早的非 system 消息开始丢弃
-   - 至少保留最近的 N 轮对话
-5. 送入 LLM Provider
+1. system_prompt = character.system_prompt or character.personality
+   messages = [{"role": "system", "content": system_prompt}]
+2. scenario 非空 → 追加系统消息 "[场景设定]\n{scenario}"
+3. mes_example 非空 → 解析为 few-shot 示例（{{user}}: / {{char}}: 行，
+   <START> 分隔多轮），插入历史之前
+4. 历史消息（按时间正序；超过 max_rounds*2 条时截取最近 N 轮滑窗）
+5. post_history_instructions 非空 → 追加系统消息（置于历史之后、当前输入之前）
+6. 当前用户输入 → 追加 {"role": "user", "content": user_content}
 ```
+
+- **模板变量**：上述所有文本经 `_apply_template_vars()` 替换 `{{user}}` → 用户昵称（settings `user_name`）、`{{char}}` → 角色名。
+- **上下文策略**：滑动窗口保留最近 N 轮（`max_rounds` 从 settings `sliding_window_rounds` 读取，默认 30），非 token 估算截断。
+- **首条消息**：`create_message` 保存首条 user 消息时，若标题仍为占位默认值，则替换为规则截断标题（见 api-design.md 创建对话）；`auto_insert_greeting` 在对话无消息时插入角色 `first_mes` 开场白。
+- 结果送入 LLM Provider。
 
 ## 异常处理
 
@@ -192,7 +204,7 @@ Service 层调用 LLM 时捕获这些异常，转为对应的 HTTP 响应。
 
 ## 添加新 Provider 的步骤
 
-1. 在 `app/services/llm/` 下新建文件，实现 `BaseLLM` 抽象类
+1. 在 `app/services/llm/` 下新建文件，实现 `BaseLLM` 抽象类（含 `test_connection`，默认实现够用）
 2. 在 `app/services/llm/__init__.py` 中导入并用 Factory 注册
-3. 在 `config.py` 中添加对应的 API Key 配置项
-4. 在前端模型列表中加入新 Provider 的模型名
+3. 在 `api/routes/settings.py` 的 `ALLOWED_KEYS` 白名单中加入 `{provider}_api_key` 配置项
+4. 在 `api/routes/models.py` 的 `AVAILABLE_MODELS` 中加入新 Provider 的模型名

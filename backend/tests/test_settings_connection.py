@@ -17,7 +17,6 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 
-from backend.app.database import Base
 from backend.app.models.setting import Setting
 from backend.app.schemas.settings import ConnectionTestRequest
 from backend.app.api.routes import settings as settings_route
@@ -26,26 +25,6 @@ from backend.app.services.llm.errors import LLMAuthError
 from backend.app.services.llm.factory import LLMFactory
 
 __all__: list[str] = []
-
-
-@pytest.fixture
-def db_session():
-    """内存 SQLite 会话（每次测试独立建库/删库）"""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import StaticPool
-
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-    Base.metadata.drop_all(engine)
 
 
 def _save_setting(db_session, key: str, value: str) -> None:
