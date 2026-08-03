@@ -49,13 +49,13 @@ def _set_settings(db: Session, data: dict[str, str]) -> None:
 
 
 @router.get("")
-def get_settings(db: Session = Depends(get_db)):
+def get_settings(db: Session = Depends(get_db)) -> dict[str, str]:
     """获取所有设置"""
     return _get_all_settings(db)
 
 
 @router.put("")
-def update_settings(data: dict[str, Any], db: Session = Depends(get_db)):
+def update_settings(data: dict[str, Any], db: Session = Depends(get_db)) -> dict[str, str]:
     """更新设置（只更新白名单内的键）"""
     _set_settings(db, data)
     return _get_all_settings(db)

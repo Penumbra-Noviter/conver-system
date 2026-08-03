@@ -48,8 +48,8 @@
 ## 6. 流式输出
 
 - **两个模式都做**，用户可选择流式/非流式
-- 非流式：`POST /api/chat` → 等待 → 完整回复
-- 流式：`POST /api/chat/stream` → SSE → 打字机效果渲染
+- 非流式：`POST /api/chats` → 等待 → 完整回复
+- 流式：`POST /api/chats/stream` → SSE → 打字机效果渲染
 - Phase 3 同时实现两种模式
 
 ## 7. 前端布局与交互

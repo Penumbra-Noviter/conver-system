@@ -87,8 +87,8 @@
 - [ ] 实现 `schemas/conversation.py` + `services/conversation.py`
 - [ ] 实现 `schemas/message.py` + `services/message.py`（含聊天逻辑）
 - [ ] 实现 `api/routes/conversations.py`（对话 CRUD）
-- [ ] 实现聊天接口: `POST /api/chat`（非流式）
-- [ ] 实现聊天接口: `POST /api/chat/stream`（SSE 流式）
+- [ ] 实现聊天接口: `POST /api/chats`（非流式）
+- [ ] 实现聊天接口: `POST /api/chats/stream`（SSE 流式）
 
 ### 前端
 

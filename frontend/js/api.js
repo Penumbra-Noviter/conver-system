@@ -78,7 +78,7 @@ export const conversations = {
 
 export const messages = {
     list: (conversationId) => request('GET', `/conversations/${conversationId}/messages`),
-    chat: (data) => request('POST', '/chat', data),
+    chat: (data) => request('POST', '/chats', data),
     search: (q, limit = 50) => request('GET', `/messages/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 };
 
@@ -92,7 +92,7 @@ export const messages = {
  */
 export async function chatStream(data, onToken, onDone, onError) {
     try {
-        const res = await fetch(`${API_BASE}/chat/stream`, {
+        const res = await fetch(`${API_BASE}/chats/stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),

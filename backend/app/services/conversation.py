@@ -9,6 +9,7 @@ from typing import Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app.config import settings
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message
@@ -51,20 +52,25 @@ def get_conversation(db: Session, conversation_id: int) -> Optional[Conversation
     return db.query(Conversation).filter(Conversation.id == conversation_id).first()
 
 
-def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
-    """创建对话，未指定模型时从 settings 表读取默认值"""
-    # 从 settings 表读取默认 provider/model（若传参为空或为默认值但 settings 中有值）
-    provider = data.model_provider
-    model_name = data.model_name
+def _get_setting_value(db: Session, key: str) -> str | None:
+    """读取单个设置值，不存在或为空返回 None"""
+    row = db.query(Setting).filter(Setting.key == key).first()
+    return row.value if row and row.value else None
 
-    if provider == "claude" and model_name == "claude-sonnet-4-20250514":
-        # 使用了默认值，检查 settings 是否有覆盖
-        default_provider = db.query(Setting).filter(Setting.key == "default_provider").first()
-        default_model = db.query(Setting).filter(Setting.key == "default_model").first()
-        if default_provider and default_provider.value:
-            provider = default_provider.value
-        if default_model and default_model.value:
-            model_name = default_model.value
+
+def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
+    """创建对话，未显式指定模型时回退到 settings 默认值（再回退到 config 默认值）"""
+    # 仅当请求显式传入 model_provider/model_name 时采用；否则用 settings 默认值（未设置时用 config 默认值）
+    provider = (
+        data.model_provider
+        if "model_provider" in data.model_fields_set
+        else _get_setting_value(db, "default_provider") or settings.DEFAULT_PROVIDER
+    )
+    model_name = (
+        data.model_name
+        if "model_name" in data.model_fields_set
+        else _get_setting_value(db, "default_model") or settings.DEFAULT_MODEL
+    )
 
     conv = Conversation(
         character_id=data.character_id,

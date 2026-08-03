@@ -3,13 +3,14 @@
 
 包含：
     - GET /api/conversations/{id}/messages — 获取消息历史
-    - POST /api/chat — 非流式聊天
-    - POST /api/chat/stream — 流式聊天（SSE）
+    - POST /api/chats — 非流式聊天
+    - POST /api/chats/stream — 流式聊天（SSE）
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -159,7 +160,7 @@ def _prepare_chat(db: Session, request: ChatRequest) -> _ChatContext:
     "/api/conversations/{conversation_id}/messages",
     response_model=list[MessageResponse],
 )
-def get_messages(conversation_id: int, db: Session = Depends(get_db)):
+def get_messages(conversation_id: int, db: Session = Depends(get_db)) -> list[MessageResponse]:
     """获取对话的消息历史（按时间正序）"""
     conv = conversation_service.get_conversation(db, conversation_id)
     if not conv:
@@ -167,8 +168,8 @@ def get_messages(conversation_id: int, db: Session = Depends(get_db)):
     return message_service.get_messages(db, conversation_id)
 
 
-@router.post("/api/chat", response_model=ChatResponse)
-async def create_chat(request: ChatRequest, db: Session = Depends(get_db)):
+@router.post("/api/chats", response_model=ChatResponse)
+async def create_chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     """非流式聊天 — 接入真实 LLM"""
     ctx = _prepare_chat(db, request)
 
@@ -194,12 +195,12 @@ async def create_chat(request: ChatRequest, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/api/chat/stream")
-async def stream_chat(request: ChatRequest, db: Session = Depends(get_db)):
+@router.post("/api/chats/stream")
+async def stream_chat(request: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
     """流式聊天（SSE）— 逐 token 返回"""
     ctx = _prepare_chat(db, request)
 
-    async def event_generator():
+    async def event_generator() -> AsyncIterator[str]:
         """SSE 事件生成器"""
         full_content = ""
         try:
@@ -242,7 +243,7 @@ def search_messages(
     q: str = Query("", description="搜索关键词"),
     limit: int = Query(50, description="最大返回条数"),
     db: Session = Depends(get_db),
-):
+) -> list[dict]:
     """搜索消息内容（关键词匹配）
 
     返回包含关键词的消息列表，每条附带对话标题和角色信息。

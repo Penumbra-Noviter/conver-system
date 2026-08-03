@@ -416,3 +416,50 @@
 ### 验证
 - [x] `py_compile` 通过
 - [x] `from backend.app.main import app` 导入正常
+
+---
+
+## 2026-08-03 — CR.5.1 + CR.5.2 类型注解与 API 路径重命名
+
+> 补齐全部路由函数返回类型注解；聊天端点路径 `/api/chat*` → `/api/chats*` 并同步前端。
+
+### CR.5.1 路由/服务函数返回类型注解
+- [x] `messages.py` — `get_messages -> list[MessageResponse]`、`create_chat -> ChatResponse`、`stream_chat -> StreamingResponse`、`search_messages -> list[dict]`、`event_generator -> AsyncIterator[str]`
+- [x] `characters.py` — `list_*`/`get_*`/`create_*`/`update_* -> CharacterResponse`、`delete_* -> None`
+- [x] `conversations.py` — `list_*`/`get_*`/`create_*`/`update_* -> ConversationResponse`、`delete_* -> None`、导出端点 `-> JSONResponse` / `PlainTextResponse`
+- [x] `models.py` — `list_models() -> dict[str, list[dict]]`
+- [x] `settings.py` — `get_settings` / `update_settings -> dict[str, str]`
+- [x] `database.py` — `get_db() -> Iterator[Session]`（生成器注解，导入 `collections.abc.Iterator`）
+- [x] Service 层复核确认：`character.py` / `conversation.py` / `message.py` 返回注解已完备
+
+### CR.5.2 API 路径重命名
+- [x] `messages.py` — `POST /api/chat` → `POST /api/chats`；`POST /api/chat/stream` → `POST /api/chats/stream`（模块 docstring 同步）
+- [x] `frontend/js/api.js` — `messages.chat()` → `/chats`；`chatStream()` → `/chats/stream`
+- [x] 文档同步 — `docs/api-design.md`、`docs/architecture.md`、`docs/development-plan.md`、`CONSENSUS.md`
+
+### 验证
+- [x] `py_compile` 通过
+- [x] `from backend.app.main import app` 导入正常
+- [x] 前端全库无 `/api/chat` 残留引用
+
+---
+
+## 2026-08-03 — CR.5.5 + CR.7 默认模型配置回退链重构
+
+> `create_conversation()` 删除硬编码字符串比较，改用 Pydantic v2 `model_fields_set` 判断显式传参，重建回退链。
+
+### 变更
+- [x] **CR.5.5** `conversation.py` — 移除硬编码 `"claude"` / `"claude-sonnet-4-20250514"`，改为引用 `config.settings.DEFAULT_PROVIDER` / `DEFAULT_MODEL`
+- [x] **CR.7** 删除靠比较默认字符串判断"是否覆盖 settings"的脆弱逻辑
+- [x] 新回退链：请求显式传入 `model_provider`/`model_name` → 尊重用户选择；未传入 → DB settings 默认值；settings 未设置 → config 默认值
+- [x] 新增 `_get_setting_value(db, key)` 辅助函数，收敛 settings 读取
+- [x] `ConversationCreate` 字段默认值保留，`model_fields_set` 识别是否显式传参
+
+### 行为差异说明
+- 前端流程（始终显式传参）行为不变：选择器预选 settings 默认值，显式值即等于默认值
+- 修复了边界：用户显式选择 `claude/claude-sonnet-4-20250514` 但 settings 默认不同时，旧逻辑会静默覆盖用户选择，新逻辑尊重用户显式选择
+
+### 验证
+- [x] `py_compile` 通过
+- [x] `from backend.app.main import app` 导入正常
+- [x] 内存 SQLite 功能测试 3 用例通过（显式传参 / settings 回退 / config 回退）

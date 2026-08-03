@@ -182,7 +182,7 @@ GET /api/conversations/{conversation_id}/messages
 ### 非流式聊天
 
 ```
-POST /api/chat
+POST /api/chats
 ```
 
 **请求体**
@@ -205,7 +205,7 @@ POST /api/chat
 ### 流式聊天
 
 ```
-POST /api/chat/stream
+POST /api/chats/stream
 ```
 
 **请求体** 同非流式
@@ -222,7 +222,7 @@ data: {"type": "done", "message_id": 3}
 
 **前端处理**
 ```javascript
-const eventSource = fetch('/api/chat/stream', { /* POST */ });
+const eventSource = fetch('/api/chats/stream', { /* POST */ });
 const reader = response.body.getReader();
 // 逐块解码渲染，实现打字机效果
 ```

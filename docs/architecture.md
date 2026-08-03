@@ -19,7 +19,7 @@
 │  │                 │   │              │   │               │  │
 │  │ /api/characters │──▶│ Character    │   │  BaseLLM      │  │
 │  │ /api/convs      │──▶│ Conversation │   │  ├─Claude     │  │
-│  │ /api/chat       │──▶│ Message      │──▶│  ├─OpenAI     │  │
+│  │ /api/chats      │──▶│ Message      │──▶│  ├─OpenAI     │  │
 │  │ /api/settings   │   │ Settings     │   │  └─(扩展)     │  │
 │  └────────┬───────┘   └──────┬───────┘   └───────┬───────┘  │
 │           │                  │                    │          │
@@ -113,7 +113,7 @@ conver-system/
 ### 非流式
 
 ```
-用户输入 → POST /api/chat { conversation_id, content }
+用户输入 → POST /api/chats { conversation_id, content }
     │
     ├─ 1. 路由接收请求
     ├─ 2. Service 加载 conversation 及其角色 personality
@@ -128,7 +128,7 @@ conver-system/
 ### 流式
 
 ```
-用户输入 → POST /api/chat/stream
+用户输入 → POST /api/chats/stream
     │
     ├─ 1-5 同上
     ├─ 6. provider.stream_generate(messages) → AsyncIterator[token]

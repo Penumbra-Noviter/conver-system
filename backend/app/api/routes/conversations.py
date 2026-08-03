@@ -21,13 +21,13 @@ router = APIRouter(prefix="/api/conversations", tags=["对话管理"])
 def list_conversations(
     character_id: Optional[int] = Query(None, description="按角色筛选"),
     db: Session = Depends(get_db),
-):
+) -> list[ConversationResponse]:
     """获取对话列表"""
     return service.list_conversations(db, character_id)
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)
-def get_conversation(conversation_id: int, db: Session = Depends(get_db)):
+def get_conversation(conversation_id: int, db: Session = Depends(get_db)) -> ConversationResponse:
     """获取单个对话"""
     conv = service.get_conversation(db, conversation_id)
     if not conv:
@@ -36,13 +36,13 @@ def get_conversation(conversation_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
-def create_conversation(data: ConversationCreate, db: Session = Depends(get_db)):
+def create_conversation(data: ConversationCreate, db: Session = Depends(get_db)) -> ConversationResponse:
     """创建新对话"""
     return service.create_conversation(db, data)
 
 
 @router.put("/{conversation_id}", response_model=ConversationResponse)
-def update_conversation(conversation_id: int, data: ConversationUpdate, db: Session = Depends(get_db)):
+def update_conversation(conversation_id: int, data: ConversationUpdate, db: Session = Depends(get_db)) -> ConversationResponse:
     """更新对话"""
     conv = service.update_conversation(db, conversation_id, data)
     if not conv:
@@ -51,20 +51,20 @@ def update_conversation(conversation_id: int, data: ConversationUpdate, db: Sess
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_conversation(conversation_id: int, db: Session = Depends(get_db)):
+def delete_conversation(conversation_id: int, db: Session = Depends(get_db)) -> None:
     """删除对话（级联删除消息）"""
     if not service.delete_conversation(db, conversation_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
-def delete_all_conversations(db: Session = Depends(get_db)):
+def delete_all_conversations(db: Session = Depends(get_db)) -> None:
     """清空所有对话（级联删除所有消息）"""
     service.delete_all_conversations(db)
 
 
 @router.get("/{conversation_id}/export/json")
-def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)):
+def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)) -> JSONResponse:
     """导出对话为 JSON 格式文件"""
     data = service.export_conversation_json(db, conversation_id)
     if not data:
@@ -81,7 +81,7 @@ def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)
 
 
 @router.get("/{conversation_id}/export/markdown")
-def export_conversation_markdown(conversation_id: int, db: Session = Depends(get_db)):
+def export_conversation_markdown(conversation_id: int, db: Session = Depends(get_db)) -> PlainTextResponse:
     """导出对话为 Markdown 格式文件"""
     md = service.export_conversation_markdown(db, conversation_id)
     if not md:

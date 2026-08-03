@@ -6,8 +6,10 @@ SQLAlchemy 2.0 异步引擎配置，基于 pydantic-settings。
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from backend.app.config import settings
 
@@ -39,7 +41,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def get_db():
+def get_db() -> Iterator[Session]:
     """FastAPI 依赖注入：获取数据库会话
 
     用法：

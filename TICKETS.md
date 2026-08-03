@@ -289,13 +289,14 @@
 ### CR.5 代码质量 — 硬性违规
 
 #### CR.5.1 路由/服务函数缺少类型注解
-- [ ] 全部 27 个路由/服务函数逐一补充 `->` 返回类型注解
-- [ ] `database.py:42` — `get_db()` 生成器无注解
-- [ ] 涉及文件：`messages.py`、`characters.py`、`conversations.py`、`models.py`、`settings.py`、`database.py`
+- [x] 全部 27 个路由/服务函数逐一补充 `->` 返回类型注解 ✅ 2026-08-03
+- [x] `database.py:42` — `get_db()` 生成器无注解 ✅ 2026-08-03
+- [x] 涉及文件：`messages.py`、`characters.py`、`conversations.py`、`models.py`、`settings.py`、`database.py`
 
 #### CR.5.2 API 路径命名违规范
-- [ ] `messages.py:95` — `POST /api/chat` → `POST /api/chats`
-- [ ] `messages.py:157` — `POST /api/chat/stream` → `POST /api/chats/stream`
+- [x] `messages.py` — `POST /api/chat` → `POST /api/chats` ✅ 2026-08-03
+- [x] `messages.py` — `POST /api/chat/stream` → `POST /api/chats/stream` ✅ 2026-08-03
+- [x] 前端联动：`api.js` 的 `chat()` / `chatStream()` 已同步更新 ✅ 2026-08-03
 
 #### CR.5.3 路由函数命名违规范
 - [ ] `messages.py:158` — `stream_chat()` → 应遵循 `create_*` 或 `list_*` 等前缀，或更新规范允许特殊动词
@@ -305,7 +306,8 @@
 - [ ] `message.py:42` — `auto_insert_greeting()` → 无法简单映射规范前缀，需决策是否保留
 
 #### CR.5.5 配置分散
-- [ ] `conversation.py:59-60` — 硬编码 `"claude"` / `"claude-sonnet-4-20250514"`，应引用 `config.settings.DEFAULT_PROVIDER` 和 `config.settings.DEFAULT_MODEL`
+- [x] `conversation.py:59-60` — 硬编码 `"claude"` / `"claude-sonnet-4-20250514"` → 改为引用 `config.settings.DEFAULT_PROVIDER` / `DEFAULT_MODEL` ✅ 2026-08-03
+- [x] 新增 `_get_setting_value()` 读取设置值，回退链：显式传参 → settings 默认 → config 默认 ✅ 2026-08-03
 
 ### CR.6 代码质量 — 坏味道清理
 
@@ -328,8 +330,8 @@
 - [ ] 考虑将聊天端点拆出独立路由文件（如 `chat.py`），与消息检索分离
 
 ### CR.7 默认模型覆盖逻辑脆弱
-- [ ] `services/conversation.py:59-66` — 靠比较硬编码字符串 `"claude-sonnet-4-20250514"` 判断是否覆盖 settings 默认值，用户选择同值时不覆盖
-- [ ] 改进方案：仅当 `data.model_provider` 或 `data.model_name` 显式传入时才覆盖，否则始终用 settings 默认值
+- [x] `services/conversation.py:59-66` — 删除靠比较硬编码字符串判断"是否覆盖"的脆弱逻辑 ✅ 2026-08-03
+- [x] 改用 Pydantic v2 `model_fields_set` 判断字段是否显式传入：显式传入 → 尊重用户选择；未传入 → settings 默认 → config 默认 ✅ 2026-08-03
 
 ### CR.8 流式时消息计数错误
 - [x] `app.js:handleSend()` — `loadConversations()` 已在 `onDone` 和 `onError` 回调中调用 ✅

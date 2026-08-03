@@ -34,6 +34,6 @@ AVAILABLE_MODELS = {
 
 
 @router.get("")
-def list_models():
+def list_models() -> dict[str, list[dict]]:
     """获取可用模型列表"""
     return AVAILABLE_MODELS

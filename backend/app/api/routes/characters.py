@@ -15,13 +15,13 @@ router = APIRouter(prefix="/api/characters", tags=["角色管理"])
 
 
 @router.get("", response_model=list[CharacterResponse])
-def list_characters(db: Session = Depends(get_db)):
+def list_characters(db: Session = Depends(get_db)) -> list[CharacterResponse]:
     """获取所有角色"""
     return service.list_characters(db)
 
 
 @router.get("/{character_id}", response_model=CharacterResponse)
-def get_character(character_id: int, db: Session = Depends(get_db)):
+def get_character(character_id: int, db: Session = Depends(get_db)) -> CharacterResponse:
     """获取单个角色"""
     char = service.get_character_with_count(db, character_id)
     if not char:
@@ -30,13 +30,13 @@ def get_character(character_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=CharacterResponse, status_code=status.HTTP_201_CREATED)
-def create_character(data: CharacterCreate, db: Session = Depends(get_db)):
+def create_character(data: CharacterCreate, db: Session = Depends(get_db)) -> CharacterResponse:
     """创建新角色"""
     return service.create_character(db, data)
 
 
 @router.put("/{character_id}", response_model=CharacterResponse)
-def update_character(character_id: int, data: CharacterUpdate, db: Session = Depends(get_db)):
+def update_character(character_id: int, data: CharacterUpdate, db: Session = Depends(get_db)) -> CharacterResponse:
     """更新角色"""
     char = service.update_character(db, character_id, data)
     if not char:
@@ -45,7 +45,7 @@ def update_character(character_id: int, data: CharacterUpdate, db: Session = Dep
 
 
 @router.delete("/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_character(character_id: int, db: Session = Depends(get_db)):
+def delete_character(character_id: int, db: Session = Depends(get_db)) -> None:
     """删除角色（级联删除关联对话和消息）"""
     if not service.delete_character(db, character_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="角色不存在")
