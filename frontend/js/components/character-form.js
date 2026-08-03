@@ -172,7 +172,7 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             temperature: parseFloat(tempSlider.value),
             avatar: avatarInput.value.trim() || null,
             creator: overlay.querySelector('#cf-creator').value.trim(),
-            tags: tagsToJson(overlay.querySelector('#cf-tags').value.trim()),
+            tags: tagsToArray(overlay.querySelector('#cf-tags').value.trim()),
         };
 
         // 提交按钮状态
@@ -211,22 +211,17 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
 }
 
 /**
- * 将标签 JSON 数组转为逗号分隔字符串
+ * 将标签数组转为逗号分隔字符串
  */
 function tagsToComma(tags) {
-    if (!tags || tags === '[]') return '';
-    try {
-        return JSON.parse(tags).join(', ');
-    } catch {
-        return tags;
-    }
+    if (!Array.isArray(tags) || tags.length === 0) return '';
+    return tags.join(', ');
 }
 
 /**
- * 将逗号分隔的标签转为 JSON 数组字符串
+ * 将逗号分隔的标签文本转为标签数组
  */
-function tagsToJson(tags) {
-    if (!tags) return '[]';
-    const arr = tags.split(/[,，]/).map(t => t.trim()).filter(Boolean);
-    return JSON.stringify(arr);
+function tagsToArray(tags) {
+    if (!tags) return [];
+    return tags.split(/[,，]/).map(t => t.trim()).filter(Boolean);
 }

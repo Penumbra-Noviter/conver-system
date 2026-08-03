@@ -174,7 +174,7 @@ async function renderCharacters() {
             </div>
             <div class="character-card-details">
                 ${c.first_mes ? `<div class="detail-item"><span class="detail-label">开场白:</span> ${escapeHtml(c.first_mes.slice(0, 60))}${c.first_mes.length > 60 ? '…' : ''}</div>` : ''}
-                ${c.tags && c.tags !== '[]' ? `<div class="detail-item"><span class="detail-label">标签:</span> ${escapeHtml(formatTags(c.tags))}</div>` : ''}
+                ${c.tags && c.tags.length ? `<div class="detail-item"><span class="detail-label">标签:</span> ${escapeHtml(formatTags(c.tags))}</div>` : ''}
             </div>
             <div class="character-card-meta">
                 <span class="meta-badge">🌡️ ${c.temperature?.toFixed(1) ?? '0.7'}</span>

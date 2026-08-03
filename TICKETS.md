@@ -299,11 +299,12 @@
 - [x] 前端联动：`api.js` 的 `chat()` / `chatStream()` 已同步更新 ✅ 2026-08-03
 
 #### CR.5.3 路由函数命名违规范
-- [ ] `messages.py:158` — `stream_chat()` → 应遵循 `create_*` 或 `list_*` 等前缀，或更新规范允许特殊动词
+- [x] `stream_chat()` 决策：**更新规范允许 `stream_*` 特殊动词前缀**（SSE 流式端点，与 `create_chat` 配对更清晰，避免 `create_chat_stream` 冗长）✅ 2026-08-03
+- [x] 规范已同步至 `memory:conventions`；`create_chat` / `stream_chat` 均符合新规范
 
 #### CR.5.4 Service 层函数命名违规范
-- [ ] `message.py:27` — `save_message()` → `create_message()`
-- [ ] `message.py:42` — `auto_insert_greeting()` → 无法简单映射规范前缀，需决策是否保留
+- [x] `message.py` — `save_message()` → `create_message()`，调用点（auto_insert_greeting / chat.py）同步更新 ✅ 2026-08-03
+- [x] `auto_insert_greeting()` 决策：**保留原名** — 条件自动插入行为，`create_*` 会误导为无条件创建 ✅ 2026-08-03
 
 #### CR.5.5 配置分散
 - [x] `conversation.py:59-60` — 硬编码 `"claude"` / `"claude-sonnet-4-20250514"` → 改为引用 `config.settings.DEFAULT_PROVIDER` / `DEFAULT_MODEL` ✅ 2026-08-03
@@ -321,14 +322,17 @@
 - [x] 复制按钮事件绑定抽取为 `attachCopyButton(btn, content)`，renderMessages / appendMessage 共用 ✅ 2026-08-03
 
 #### CR.6.3 Primitive Obsession
-- [ ] Character 模型 JSON 字段（tags/alternate_greetings/creator_notes/extensions）应使用 SQLite JSON 类型或序列化器
-- [ ] Message.role 应使用 Enum 而非 String(20)
+- [x] Character 模型 JSON 字段（tags/alternate_greetings/creator_notes/extensions）→ SQLAlchemy `JSON` 列，schema 改 `list[str]`/`dict`，前端 tags 处理改数组 ✅ 2026-08-03
+- [x] Message.role → `Role` 枚举（`Enum` 列，`values_callable` 按值存取，兼容既有 VARCHAR 存量数据）✅ 2026-08-03
+- [x] 涉及文件：`models/character.py`、`models/message.py`、`schemas/character.py`、`services/message.py`、`services/conversation.py`（导出 role 用 `.value`）、`api/routes/chat.py`、`frontend/js/utils.js`、`app.js`、`components/character-form.js`
 
 #### CR.6.4 deps.py Middle Man
 - [x] 已删除 `deps.py`，路由直接 `from backend.app.database import get_db` ✅ 2026-08-03（与 CR.3.1 一并落地）
 
 #### CR.6.5 messages.py 职责分离
-- [ ] 考虑将聊天端点拆出独立路由文件（如 `chat.py`），与消息检索分离
+- [x] 聊天端点拆出独立路由文件 `api/routes/chat.py`，与消息检索分离 ✅ 2026-08-03
+- [x] `messages.py` 仅保留消息检索：GET 历史 + GET 搜索；`chat.py` 承载 POST /api/chats + POST /api/chats/stream 及 LLM 相关辅助 ✅ 2026-08-03
+- [x] 涉及文件: `api/routes/chat.py`（新增）、`api/routes/messages.py`、`main.py`
 
 ### CR.7 默认模型覆盖逻辑脆弱
 - [x] `services/conversation.py:59-66` — 删除靠比较硬编码字符串判断"是否覆盖"的脆弱逻辑 ✅ 2026-08-03

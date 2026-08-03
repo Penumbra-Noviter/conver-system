@@ -26,12 +26,12 @@ class CharacterCreate(BaseModel):
     mes_example: str = Field("", description="对话范例")
     system_prompt: str = Field("", description="覆盖系统提示词")
     post_history_instructions: str = Field("", description="历史后指令")
-    alternate_greetings: str = Field("[]", description="备选开场白 (JSON array)")
-    tags: str = Field("[]", description="标签 (JSON array)")
+    alternate_greetings: list[str] = Field(default_factory=list, description="备选开场白")
+    tags: list[str] = Field(default_factory=list, description="标签")
     creator: str = Field("", description="创作者")
     version: str = Field("1.0", description="版本")
-    creator_notes: str = Field("{}", description="创作者备注 (JSON)")
-    extensions: str = Field("{}", description="扩展字段 (JSON)")
+    creator_notes: dict = Field(default_factory=dict, description="创作者备注")
+    extensions: dict = Field(default_factory=dict, description="扩展字段")
     avatar: Optional[str] = Field(None, description="头像 base64 / 路径")
     temperature: float = Field(0.7, ge=0.0, le=2.0, description="LLM 温度参数")
 
@@ -46,12 +46,12 @@ class CharacterUpdate(BaseModel):
     mes_example: Optional[str] = None
     system_prompt: Optional[str] = None
     post_history_instructions: Optional[str] = None
-    alternate_greetings: Optional[str] = None
-    tags: Optional[str] = None
+    alternate_greetings: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
     creator: Optional[str] = None
     version: Optional[str] = None
-    creator_notes: Optional[str] = None
-    extensions: Optional[str] = None
+    creator_notes: Optional[dict] = None
+    extensions: Optional[dict] = None
     avatar: Optional[str] = None
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
 
@@ -70,12 +70,12 @@ class CharacterResponse(BaseModel):
     mes_example: str
     system_prompt: str
     post_history_instructions: str
-    alternate_greetings: str
-    tags: str
+    alternate_greetings: list[str]
+    tags: list[str]
     creator: str
     version: str
-    creator_notes: str
-    extensions: str
+    creator_notes: dict
+    extensions: dict
     avatar: Optional[str] = None
     temperature: float
     conversation_count: int = 0

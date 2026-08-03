@@ -486,3 +486,51 @@
 - [x] `py_compile` 通过
 - [x] `from backend.app.main import app` 导入正常
 - [x] 内存 SQLite 功能测试 3 用例通过（显式传参 / settings 回退 / config 回退）
+
+---
+
+## 2026-08-03 — CR.6.5 messages.py 职责分离
+
+> 聊天端点与消息检索混在一个路由文件。聊天涉及 LLM 配置/错误映射/Provider 获取，协议表面与消息查询完全不同，拆分为独立路由文件，各自承担单一职责。
+
+### 变更
+- [x] 新增 `api/routes/chat.py` — 承载聊天职责：
+  - `POST /api/chats`（`create_chat`）+ `POST /api/chats/stream`（`stream_chat`）
+  - LLM 相关辅助整体迁移：`_get_api_key` / `_get_sliding_window_rounds` / `_get_user_name`、`_LLM_ERROR_MAP` / `_llm_error_response` / `_raise_llm_http_error`、`_ChatContext` / `_prepare_chat`
+  - 仅保留聊天所需的 LLM 导入（BaseLLM / LLM 错误 / LLMFactory / ChatRequest / ChatResponse）
+- [x] `api/routes/messages.py` — 只保留消息检索：`GET /api/conversations/{id}/messages`（`get_messages`）+ `GET /api/messages/search`（`search_messages`），删除全部 LLM/聊天导入与辅助
+- [x] `main.py` — 注册 `chat.router`；路由 tags 拆分：chat.py → `聊天`，messages.py → `消息`（Swagger 分组更清晰）
+- [x] 所有 API 路径不变，前端 `api.js` 无需改动
+
+### 验证
+- [x] `py_compile` 通过（chat.py / messages.py / main.py）
+- [x] `from backend.app.main import app` 导入正常
+- [x] OpenAPI 路径核对：`/api/chats`、`/api/chats/stream` 由 chat 路由承载；`/api/conversations/{id}/messages`、`/api/messages/search` 由 messages 路由承载
+
+---
+
+## 2026-08-03 — CR.5.3 + CR.5.4 + CR.6.3 命名规范与 Primitive Obsession
+
+> 收尾剩余代码质量项：两个命名决策 + Primitive Obsession 全量整改。
+
+### CR.5.4 Service 函数命名
+- [x] `save_message()` → `create_message()`（对齐 `create_*` 规范），`auto_insert_greeting()` 内部调用 + `chat.py` 3 处调用点同步
+- [x] `auto_insert_greeting()` 决策保留原名 — 条件自动插入语义，`create_*` 会误导为无条件创建
+
+### CR.5.3 路由命名规范决策
+- [x] 决策：**更新规范允许 `stream_*` 特殊动词前缀**（SSE 流式端点），`stream_chat` 与 `create_chat` 配对，避免 `create_chat_stream` 冗长
+- [x] 规范同步至 `memory:conventions`
+
+### CR.6.3 Primitive Obsession
+- [x] `models/character.py` — `alternate_greetings`/`tags` → `Column(JSON, default=list)`，`creator_notes`/`extensions` → `Column(JSON, default=dict)`；既有 TEXT 存量 JSON 字符串可无缝读出（SQLAlchemy JSON 序列化），无数据迁移
+- [x] `schemas/character.py` — 四字段改 `list[str]`/`dict`（Create/Update/Response）
+- [x] 前端联动：`utils.js:formatTags()` 改收数组、`app.js` 标签显示判断 `c.tags.length`、`character-form.js` `tagsToJson` → `tagsToArray`（提交发送数组）
+- [x] `models/message.py` — 新增 `Role` 枚举 + `Enum` 列；`values_callable` 按枚举值存取（user/assistant/system），兼容既有 VARCHAR(20) 存量数据，无需迁移
+- [x] 引用点收敛：`create_message` 签名 `role: Role`；`build_message_list` / `search_messages` / 对话导出 JSON+Markdown 输出 `msg.role.value`（LLM 契约与导出文件需纯字符串）
+- [x] `api/routes/chat.py` — 调用传 `Role.USER` / `Role.ASSISTANT`
+
+### 验证
+- [x] `compileall backend/app` 通过；`from backend.app.main import app` 正常
+- [x] 内存 SQLite 全流程测试：JSON 列读写（list/dict）、Role 枚举落库为值 `user`（非枚举名 `USER`）、LLM 消息/导出/搜索 role 均为字符串
+- [x] 既有 `conver_system.db` 兼容读测试通过（TEXT JSON → list、VARCHAR(20) → Role 枚举）
+- [x] `node --check` 前端 3 文件通过；Pydantic 序列化（枚举→值、list→数组）通过

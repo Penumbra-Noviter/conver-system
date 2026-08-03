@@ -15,7 +15,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from backend.app.api.routes import characters, conversations, messages, models, settings
+from backend.app.api.routes import characters, chat, conversations, messages, models, settings
 
 # 注册 LLM Provider（触发 llm/__init__.py 中的注册逻辑）
 import backend.app.services.llm  # noqa: F401
@@ -29,6 +29,7 @@ app = FastAPI(
 
 # ── 注册 API 路由 ──
 app.include_router(characters.router)
+app.include_router(chat.router)
 app.include_router(conversations.router)
 app.include_router(messages.router)
 app.include_router(models.router)

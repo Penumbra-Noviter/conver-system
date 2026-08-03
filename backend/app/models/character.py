@@ -23,9 +23,8 @@
 from __future__ import annotations
 
 import datetime
-from typing import Optional
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text, func
+from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text, func
 
 from backend.app.database import Base
 
@@ -47,14 +46,14 @@ class Character(Base):
     # ── V2 高级字段 ──
     system_prompt = Column(Text, default="", comment="覆盖系统提示词")
     post_history_instructions = Column(Text, default="", comment="历史后指令")
-    alternate_greetings = Column(Text, default="[]", comment="备选开场白 (JSON array)")
-    tags = Column(Text, default="[]", comment="标签 (JSON array)")
+    alternate_greetings = Column(JSON, default=list, comment="备选开场白 (list)")
+    tags = Column(JSON, default=list, comment="标签 (list)")
 
     # ── 元数据 ──
     creator = Column(String(100), default="")
     version = Column(String(50), default="1.0")
-    creator_notes = Column(Text, default="{}", comment="创作者备注 (JSON)")
-    extensions = Column(Text, default="{}", comment="扩展字段 (JSON)")
+    creator_notes = Column(JSON, default=dict, comment="创作者备注 (dict)")
+    extensions = Column(JSON, default=dict, comment="扩展字段 (dict)")
 
     # ── 项目原有字段 ──
     avatar = Column(Text, nullable=True, comment="头像（base64 或路径）")

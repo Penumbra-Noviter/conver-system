@@ -5,13 +5,12 @@
 from __future__ import annotations
 
 import datetime
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
-from backend.app.models.message import Message
+from backend.app.models.message import Message, Role
 
 
 def _apply_template_vars(text: str, user_name: str = "User", char_name: str = "Character") -> str:
@@ -38,7 +37,7 @@ def get_messages(db: Session, conversation_id: int) -> list[Message]:
     )
 
 
-def save_message(db: Session, conversation_id: int, role: str, content: str) -> Message:
+def create_message(db: Session, conversation_id: int, role: Role, content: str) -> Message:
     """保存单条消息，同时更新对话的 updated_at 时间戳"""
     msg = Message(conversation_id=conversation_id, role=role, content=content)
     db.add(msg)
@@ -81,7 +80,7 @@ def auto_insert_greeting(
     greeting = _apply_template_vars(character.first_mes, user_name, character.name)
 
     # 插入 greeting 作为 assistant 消息
-    return save_message(db, conversation_id, "assistant", greeting)
+    return create_message(db, conversation_id, Role.ASSISTANT, greeting)
 
 
 def _parse_mes_example(mes_example: str, user_name: str = "User", char_name: str = "Character") -> list[dict]:
@@ -173,7 +172,7 @@ def build_message_list(
         history = history[-(max_rounds * 2):]
 
     for msg in history:
-        messages.append({"role": msg.role, "content": msg.content})
+        messages.append({"role": msg.role.value, "content": msg.content})
 
     # 历史后指令（post_history_instructions）— 附加在历史消息之后、当前输入之前
     if character.post_history_instructions:
@@ -236,7 +235,7 @@ def search_messages(
             "character_id": char.id,
             "character_name": char.name,
             "character_avatar": char.avatar,
-            "role": msg.role,
+            "role": msg.role.value,
             "content_preview": preview,
             "created_at": msg.created_at.isoformat() if msg.created_at else None,
         })

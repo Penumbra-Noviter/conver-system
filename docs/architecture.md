@@ -45,12 +45,12 @@ conver-system/
 │   │   │
 │   │   ├── api/
 │   │   │   ├── __init__.py
-│   │   │   ├── deps.py            # 依赖注入（get_db 等）
 │   │   │   └── routes/
 │   │   │       ├── __init__.py
 │   │   │       ├── characters.py  # 角色 CRUD
+│   │   │       ├── chat.py        # 聊天（POST /api/chats、/api/chats/stream + LLM 辅助）
 │   │   │       ├── conversations.py # 对话管理
-│   │   │       ├── messages.py    # 消息 + 聊天
+│   │   │       ├── messages.py    # 消息检索（GET 历史 + 搜索）
 │   │   │       ├── models.py      # 可用模型列表
 │   │   │       └── settings.py    # 配置管理
 │   │   │
@@ -170,7 +170,7 @@ conver-system/
 |------|------|------|
 | id | INTEGER PK | 自增 |
 | conversation_id | INTEGER FK | → conversations.id |
-| role | VARCHAR(20) | user / assistant / system |
+| role | VARCHAR(20) | user / assistant / system（ORM 层 Role 枚举，按值存取） |
 | content | TEXT | 消息内容 |
 | created_at | DATETIME | |
 

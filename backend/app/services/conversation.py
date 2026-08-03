@@ -146,7 +146,7 @@ def export_conversation_json(db: Session, conversation_id: int) -> dict | None:
     for msg in messages:
         messages_data.append({
             "id": msg.id,
-            "role": msg.role,
+            "role": msg.role.value,
             "content": msg.content,
             "created_at": msg.created_at.isoformat() if msg.created_at else None,
         })
@@ -218,7 +218,7 @@ def export_conversation_markdown(db: Session, conversation_id: int) -> str | Non
             lines.append("")
             current_date = msg_date
 
-        lines.append(f"**{msg.role}**: {msg.content}")
+        lines.append(f"**{msg.role.value}**: {msg.content}")
         lines.append("")
 
     return "\n".join(lines)

@@ -115,15 +115,11 @@ export function getInitials(name) {
 }
 
 /**
- * 格式化标签 JSON 为可读字符串
- * @param {string} tags - JSON 数组字符串或逗号分隔文本
+ * 格式化标签数组为可读字符串
+ * @param {string[]} tags - 标签数组
  * @returns {string}
  */
 export function formatTags(tags) {
-    if (!tags || tags === '[]') return '';
-    try {
-        return JSON.parse(tags).slice(0, 3).join(', ');
-    } catch {
-        return tags;
-    }
+    if (!Array.isArray(tags) || tags.length === 0) return '';
+    return tags.slice(0, 3).join(', ');
 }
