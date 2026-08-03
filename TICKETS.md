@@ -13,6 +13,15 @@
 
 ## 活跃工单
 
+### 架构深化候选（第二轮，2026-08-03 评审）
+
+> 评审报告：`%TEMP%/architecture-review-20260803.html`。候选 ①（Conversation dict 退役）已并入候选 ④ 落地（见归档）。
+
+- [ ] ② `Worth exploring` — 抽 `services/conversation_export.py` 收拢导出逻辑：`export_conversation_json` / `export_conversation_markdown` 从 CRUD 模块抽离，character 字段提取复用 `character_card` 或 Schema；conversation.py 从 257 行降 ~150 行
+- [ ] ③ `Worth exploring` — 前端抽 `components/modal.js` 通用模态框工厂：`showModelSelector`（80 行）/ `createExportDialog`（60 行）/ `showConfirm` 统一走一个接口；app.js 收敛 ~140 行
+- [ ] ④ `Speculative` — 搜索结果走 Schema：`message.py::search_messages` 返回 `list[dict]` → `list[SearchResult]`，路由声明 `response_model`；统一序列化路径
+- [ ] ⑤ `Speculative` — 前端测试基础设施：引入 Vitest/jsdom；纯函数（renderMessages / highlightText / escapeHtml）从 DOM 操作分离可独立测；api.js 注入 fetch seam
+
 ### P6.4 Tauri 桌面版
 
 - [ ] Tauri 项目初始化
@@ -22,11 +31,8 @@
 ### P6.5 其他
 
 - [ ] 多 tab 会话管理
-- [ ] Ollama 本地模型支持
 
-### 架构深化候选（2026-08-03 评审）
-
-- [ ] ④ 线上形状统一（CharacterResponse 驱动序列化，退役手写 dict）— Speculative
+> ⚠️ Ollama 本地模型支持 — **已封存**（2026-08-03 用户决定：发布获得用户反馈后再考虑）
 
 ---
 
@@ -34,7 +40,7 @@
 
 ### 架构深化候选 ①②⑥（2026-08-03）
 
-> 依据架构评审（候选 ① 聊天回合 / ② 运行时设置 / ⑥ Provider 注册显式化）把两大概念沉淀为单一所有权的**深模块**，并消除 import 副作用。候选 ③⑤ 后续批次落地（见下方「架构深化候选 ③⑤」），候选 ④ 仍为 Speculative。
+> 依据架构评审（候选 ① 聊天回合 / ② 运行时设置 / ⑥ Provider 注册显式化）把两大概念沉淀为单一所有权的**深模块**，并消除 import 副作用。候选 ③⑤ 后续批次落地（见下方「架构深化候选 ③⑤」），候选 ④ 后续落地（见下方「架构深化候选 ④」）。
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
@@ -44,12 +50,20 @@
 
 ### 架构深化候选 ③⑤（2026-08-03）
 
-> Prompt 组装纯函数化（③）与前端 app.js 拆分（⑤）并行落地。③ 把 Prompt 组装从 `message.py` 抽离为纯函数模块（去 db 依赖，独立可测）；⑤ 把 1380 行 `app.js` 拆为 `chat.js` + `state.js`，行为保持机械重构，Playwright 冒烟通过。候选 ④ 仍保留为 Speculative，待 ③ 落地后再评。
+> Prompt 组装纯函数化（③）与前端 app.js 拆分（⑤）并行落地。③ 把 Prompt 组装从 `message.py` 抽离为纯函数模块（去 db 依赖，独立可测）；⑤ 把 1380 行 `app.js` 拆为 `chat.js` + `state.js`，行为保持机械重构，Playwright 冒烟通过。候选 ④ 后续落地（见下方「架构深化候选 ④」）。
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
 | ③ | 抽 `services/llm/prompt.py` 纯函数化 Prompt 组装：`CharacterData` frozen dataclass + `apply_template_vars` / `parse_mes_example` / `build_messages` 纯函数；`message.py::build_message_list` 签名与行为不变（查角色+查历史→委托纯函数）；26 项单测，新模块 100% 行覆盖 | 2026-08-03 | `98e0c29` |
 | ⑤ | 前端 `app.js` 拆分（1380→1080 行）：`js/state.js`（全局状态+模块级状态，54 行）、`js/chat.js`（聊天域渲染+交互+chatDom，328 行，通过 `setConversationsRefresher` 钩子避免反向依赖）；`index.html` 无变更（ESM 内部 import）；Playwright 冒烟通过，无 JS 错误 | 2026-08-03 | `98e0c29` |
+
+### 架构深化候选 ④（2026-08-03）
+
+> 线上形状统一：`response_model` 驱动序列化，退役 service 层手写 dict（character + conversation）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| ④ | 退役 service 层手写 dict，由 FastAPI `response_model=*(from_attributes=True)` 统一驱动序列化：`character.py::_char_to_dict` 删除（`list_characters`/`get_character_with_count` 返回 ORM 对象 + 瞬态 `conversation_count`）；`conversation.py::list_conversations` 返回 `list[dict]`→`list[Conversation]` + 瞬态 `message_count`（13 行手写映射删除，第二轮评审候选 ①）；schema/路由已就绪零改动。消除字段列表重复维护，后端所有 list 端点不再有手写 dict | 2026-08-03 | `5ee1ba8` |
 
 ### Phase 0-5 + P6.1-6.3（2026-07-30，初始 commit `b5fe037`）
 

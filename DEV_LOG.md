@@ -7,7 +7,7 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：架构深化 ③⑤（Prompt 纯函数化 + app.js 拆分）**完成**；①②⑥ 已归档；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；Rust 工具链已装（P6.4 Tauri 前置就绪）；下一步 P6.4 Tauri / P6.5 多 tab（→ TICKETS）
+- **阶段**：架构深化 ④（response_model 统一驱动序列化，character + conversation 手写 dict 全退役）**完成**；③⑤ / ①②⑥ 已归档；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；Rust 工具链已装（P6.4 Tauri 前置就绪）；下一步候选 ②（导出逻辑收拢）/ ③（前端模态框抽象）/ P6.4 Tauri / P6.5 多 tab（→ TICKETS）
 - **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7 + 架构深化 ①②⑥③⑤；P4.3 / prompt.py 新增模块 100% 行覆盖
 - **测试**：pytest 共 117 用例（character_card 53 + P3.5 19 + P4.3 11 + setting 深模块 8 + prompt 纯函数 26）；运行 `pytest`；`character_card` / `prompt` 100% 覆盖可复现
 - **文档**：《文档规范》已强化（测试规范章节 + 防漂移检查项）；修复 api-design / architecture / llm-integration / p2.5 spec 全部漂移；新增 CONTEXT.md 领域词汇表
@@ -15,6 +15,13 @@
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 实现 | 架构深化 ④：response_model 统一驱动序列化，退役手写 dict（character + conversation）
+- **character.py**：删除 `_char_to_dict()`（23 行手写字段映射，与 `CharacterResponse` 完全重复）；`list_characters` / `get_character_with_count` 返回 ORM `Character` 对象 + 瞬态属性 `conversation_count`
+- **conversation.py**（第二轮架构评审候选 ①）：`list_conversations` 返回 `list[dict]` → `list[Conversation]` + 瞬态属性 `message_count`，删除 13 行手写字段映射；`ConversationResponse` 已有 `message_count` + `from_attributes`，schema/路由零改动
+- FastAPI `response_model=*(from_attributes=True)` 统一驱动序列化，后端所有 list 端点不再有手写 dict 落在 service 层
+- 新增字段只需改 ORM model + Schema，不再需要同步改手写 dict
+- 测试：117 项全过；端到端冒烟 `GET /api/conversations` 返回正确（`message_count` 正确填充：有消息=3 / 空对话=0）
 
 ### 2026-08-03 | 基础设施 | Rust 工具链安装（Tauri 桌面端前置）
 - **Rust 工具链**：rustup 1.29.0 + rustc/cargo 1.97.1（stable-x86_64-pc-windows-msvc）安装完成
