@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
+from backend.app.services import conversation as conversation_service
 
 
 def _apply_template_vars(text: str, user_name: str = "User", char_name: str = "Character") -> str:
@@ -37,15 +38,40 @@ def get_messages(db: Session, conversation_id: int) -> list[Message]:
     )
 
 
-def create_message(db: Session, conversation_id: int, role: Role, content: str) -> Message:
-    """保存单条消息，同时更新对话的 updated_at 时间戳"""
-    msg = Message(conversation_id=conversation_id, role=role, content=content)
-    db.add(msg)
+def _auto_title_on_first_user_message(
+    db: Session, conv: Conversation, content: str
+) -> None:
+    """首条 user 消息且标题仍为占位默认值时，用规则截断标题替换（P3.5）
 
-    # 更新对话的更新时间
+    调用时机：create_message 保存 user 消息之前（避免 autoflush 把本条算作已有 user 消息）。
+    """
+    if not conv or not content:
+        return
+    existing_user = (
+        db.query(Message)
+        .filter(Message.conversation_id == conv.id, Message.role == Role.USER)
+        .first()
+    )
+    if existing_user is not None:
+        return  # 本条不是首条 user 消息
+    if conv.title != conversation_service.default_conversation_title(db, conv.id):
+        return  # 标题已被显式命名，不覆盖
+    conv.title = conversation_service.truncate_title(content)
+
+
+def create_message(db: Session, conversation_id: int, role: Role, content: str) -> Message:
+    """保存单条消息，同时更新对话的 updated_at 时间戳
+
+    保存首条 user 消息时，若标题仍为占位默认值则同步替换为规则截断标题。
+    """
     conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if conv:
         conv.updated_at = datetime.datetime.now()
+        if role == Role.USER:
+            _auto_title_on_first_user_message(db, conv, content)
+
+    msg = Message(conversation_id=conversation_id, role=role, content=content)
+    db.add(msg)
 
     db.commit()
     db.refresh(msg)

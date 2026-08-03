@@ -640,6 +640,25 @@ body {
     cursor: not-allowed;
 }
 
+/* 流式生成中 — 发送按钮变身停止按钮（P3.5） */
+.btn-send.btn-stop {
+    background: var(--color-danger);
+}
+
+.btn-send.btn-stop:hover {
+    background: var(--color-danger);
+    filter: brightness(1.1);
+}
+
+/* 用户主动停止的 assistant 气泡标记（非错误语义，P3.5） */
+.message-stop-tag {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    font-style: italic;
+    user-select: none;
+}
+
 .input-options {
     margin-top: 8px;
     display: flex;

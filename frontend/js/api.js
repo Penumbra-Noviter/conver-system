@@ -86,65 +86,78 @@ export const messages = {
 
 /**
  * 流式聊天 — 通过 fetch + ReadableStream 逐 token 消费
+ *
+ * 内部创建 AbortController，返回 { abort, done }：
+ *   - abort(): 中止请求（客户端停止生成）→ fetch 以 AbortError 中断，后端感知断开并保存部分内容
+ *   - done: Promise<void>，await 等待整条流消费完成
+ *
  * @param {object} data - { conversation_id, content }
- * @param {function} onToken - 每个 token 的回调 (token: string) => void
- * @param {function} onDone - 完成回调 (messageId: number) => void
- * @param {function} onError - 错误回调 (error: Error) => void
- * @returns {Promise<void>}
+ * @param {object} callbacks
+ * @param {function} callbacks.onToken - 每个 token 的回调 (token: string) => void
+ * @param {function} callbacks.onDone - 完成回调 (messageId: number|null) => void
+ * @param {function} callbacks.onError - 错误/中止回调 (error: Error) => void
+ * @returns {{abort: () => void, done: Promise<void>}}
  */
-export async function chatStream(data, onToken, onDone, onError) {
-    try {
-        const res = await fetch(`${API_BASE}/chats/stream`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
+export function chatStream(data, { onToken, onDone, onError }) {
+    const controller = new AbortController();
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ detail: '流式请求失败' }));
-            throw new Error(err.detail || `HTTP ${res.status}`);
-        }
+    const done = (async () => {
+        try {
+            const res = await fetch(`${API_BASE}/chats/stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                signal: controller.signal,
+            });
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let completed = false;
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: '流式请求失败' }));
+                throw new Error(err.detail || `HTTP ${res.status}`);
+            }
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let completed = false;
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+            while (true) {
+                const { done: streamDone, value } = await reader.read();
+                if (streamDone) break;
 
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith('data: ')) continue;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
 
-                try {
-                    const parsed = JSON.parse(trimmed.slice(6));
-                    if (parsed.type === 'token') {
-                        onToken(parsed.content);
-                    } else if (parsed.type === 'done') {
-                        completed = true;
-                        onDone(parsed.message_id);
-                    } else if (parsed.type === 'error') {
-                        if (onError) onError(new Error(parsed.message));
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed.startsWith('data: ')) continue;
+
+                    try {
+                        const parsed = JSON.parse(trimmed.slice(6));
+                        if (parsed.type === 'token') {
+                            onToken(parsed.content);
+                        } else if (parsed.type === 'done') {
+                            completed = true;
+                            onDone(parsed.message_id);
+                        } else if (parsed.type === 'error') {
+                            if (onError) onError(new Error(parsed.message));
+                        }
+                    } catch {
+                        // 跳过解析失败的行
                     }
-                } catch {
-                    // 跳过解析失败的行
                 }
             }
-        }
 
-        // 流结束但未收到 done 事件（连接中断/异常关闭）
-        if (!completed) {
-            if (onDone) onDone(null);
+            // 流结束但未收到 done 事件（连接中断/异常关闭）
+            if (!completed) {
+                if (onDone) onDone(null);
+            }
+        } catch (err) {
+            onError(err);
         }
-    } catch (err) {
-        onError(err);
-    }
+    })();
+
+    return { abort: () => controller.abort(), done };
 }
 
 // ══════════════════════════════════════════════════

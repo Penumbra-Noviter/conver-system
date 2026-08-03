@@ -24,6 +24,7 @@ const state = {
     currentCharacterId: null,
     messages: [],
     isStreaming: false,
+    activeStream: null,            // 当前流式请求的 { abort, done } 句柄
     models: { providers: [] },       // 可用模型列表
     defaultProvider: 'claude',
     defaultModel: 'claude-sonnet-4-20250514',
@@ -413,9 +414,9 @@ async function startChatWithCharacter(characterId) {
     try {
         const conv = await conversations.create({
             character_id: characterId,
-            title: '新对话',
             model_provider: selection.provider,
             model_name: selection.model,
+            // 标题不传：后端默认「与 {角色名} 的对话」，首条消息后自动替换（P3.5）
         });
         state.currentConversationId = conv.id;
         switchView('chat');
@@ -859,6 +860,48 @@ function attachCopyButton(btn, content) {
 
 // ── 发送消息 ──
 
+/**
+ * 发送按钮两态 — 流式生成中变身停止按钮（P3.5）
+ * @param {'send'|'stop'} mode - 'stop': ⏹ 停止生成；'send': ➤ 发送
+ */
+function setSendButtonState(mode) {
+    const btn = dom.btnSend;
+    if (mode === 'stop') {
+        btn.disabled = false;
+        btn.textContent = '⏹';
+        btn.title = '停止生成';
+        btn.classList.add('btn-stop');
+    } else {
+        btn.disabled = false;
+        btn.textContent = '➤';
+        btn.title = '发送';
+        btn.classList.remove('btn-stop');
+    }
+}
+
+/**
+ * 给停止的 assistant 气泡追加「（已停止）」标记 — 语义为用户主动停止，非错误（P3.5）
+ * @param {HTMLElement} assistantDiv - assistant 消息元素
+ */
+function markStopped(assistantDiv) {
+    const tag = document.createElement('div');
+    tag.className = 'message-stop-tag';
+    tag.textContent = '（已停止）';
+    assistantDiv.appendChild(tag);
+    scrollToBottom();
+}
+
+/**
+ * 同步聊天头部标题 — 与对话列表保持一致（P3.5 标题联动）
+ * 后端保存首条 user 消息后自动替换占位标题，发送完成后据此刷新头部标题。
+ */
+function syncChatHeaderTitle() {
+    const titleEl = dom.chatHeader.querySelector('#chat-title-text');
+    if (!titleEl || !state.currentConversationId) return;
+    const conv = state.conversations.find((c) => c.id === state.currentConversationId);
+    if (conv) titleEl.textContent = conv.title;
+}
+
 async function handleSend() {
     const content = dom.chatInput.value.trim();
     if (!content || !state.currentConversationId || state.isStreaming) return;
@@ -874,7 +917,7 @@ async function handleSend() {
     if (useStream) {
         // 流式模式
         state.isStreaming = true;
-        dom.btnSend.disabled = true;
+        setSendButtonState('stop');
 
         const assistantDiv = document.createElement('div');
         assistantDiv.className = 'message assistant';
@@ -886,41 +929,60 @@ async function handleSend() {
         dom.chatMessages.appendChild(assistantDiv);
 
         let fullContent = '';
+        const isAbortError = (err) => err?.name === 'AbortError';
 
-        await chatStream(
+        const stream = chatStream(
             { conversation_id: state.currentConversationId, content },
-            (token) => {
-                fullContent += token;
-                assistantContentDiv.innerHTML = renderMarkdown(fullContent);
-                scrollToBottom();
-            },
-            (messageId) => {
-                state.isStreaming = false;
-                dom.btnSend.disabled = false;
-                if (messageId) {
-                    // 正常完成 — 保存完整消息
-                    state.messages.push(
-                        { role: 'user', content },
-                        { role: 'assistant', content: fullContent, id: messageId }
-                    );
-                } else if (fullContent) {
-                    // 流中断但已有部分内容
-                    state.messages.push(
-                        { role: 'user', content },
-                        { role: 'assistant', content: fullContent }
-                    );
-                }
-                // 刷新对话列表（更新消息数量）
-                loadConversations();
-            },
-            (err) => {
-                state.isStreaming = false;
-                dom.btnSend.disabled = false;
-                assistantDiv.querySelector('.message-content').textContent = `[错误] ${err.message}`;
-                // 错误时也刷新对话列表（避免计数卡死）
-                loadConversations();
+            {
+                onToken: (token) => {
+                    fullContent += token;
+                    assistantContentDiv.innerHTML = renderMarkdown(fullContent);
+                    scrollToBottom();
+                },
+                onDone: (messageId) => {
+                    state.isStreaming = false;
+                    state.activeStream = null;
+                    setSendButtonState('send');
+                    if (messageId) {
+                        // 正常完成 — 保存完整消息
+                        state.messages.push(
+                            { role: 'user', content },
+                            { role: 'assistant', content: fullContent, id: messageId }
+                        );
+                    } else if (fullContent) {
+                        // 流中断但已有部分内容
+                        state.messages.push(
+                            { role: 'user', content },
+                            { role: 'assistant', content: fullContent }
+                        );
+                    }
+                    // 刷新对话列表（更新消息数量）
+                    loadConversations();
+                },
+                onError: (err) => {
+                    state.isStreaming = false;
+                    state.activeStream = null;
+                    setSendButtonState('send');
+                    if (isAbortError(err)) {
+                        // 用户主动停止 — 语义是「已停止」而非错误；后端已保存部分内容
+                        if (fullContent) {
+                            assistantContentDiv.innerHTML = renderMarkdown(fullContent);
+                        }
+                        markStopped(assistantDiv);
+                        state.messages.push(
+                            { role: 'user', content },
+                            { role: 'assistant', content: fullContent }
+                        );
+                    } else {
+                        assistantContentDiv.textContent = `[错误] ${err.message}`;
+                    }
+                    // 错误/停止时也刷新对话列表（避免计数卡死）
+                    loadConversations();
+                },
             }
         );
+        state.activeStream = stream;
+        await stream.done;
     } else {
         // 非流式模式
         showThinkingIndicator();
@@ -943,12 +1005,21 @@ async function handleSend() {
     }
 
     // 刷新对话列表（更新消息数量）
-    loadConversations();
+    await loadConversations();
+    // 首条 user 消息后后端已自动替换占位标题 → 同步头部标题（P3.5 标题联动）
+    syncChatHeaderTitle();
 }
 
 // ── 输入框事件 ──
 
-dom.btnSend.addEventListener('click', handleSend);
+dom.btnSend.addEventListener('click', () => {
+    if (state.isStreaming) {
+        // 流式生成中 → 点击为「停止生成」
+        state.activeStream?.abort();
+    } else {
+        handleSend();
+    }
+});
 
 dom.chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

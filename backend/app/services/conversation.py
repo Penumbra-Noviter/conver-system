@@ -58,8 +58,47 @@ def _get_setting_value(db: Session, key: str) -> str | None:
     return row.value if row and row.value else None
 
 
+def _default_title_for_character(char_name: str | None) -> str:
+    """生成对话占位默认标题「与 {角色名} 的对话」"""
+    return f"与 {char_name or '角色'} 的对话"
+
+
+def truncate_title(text: str, max_len: int = 20) -> str:
+    """规则截断对话标题（纯函数）
+
+    折叠所有空白为单空格并去首尾，截取前 max_len 个字符后追加「…」；
+    不剥离 Markdown 语法（原样截断字符）。
+    """
+    collapsed = " ".join(text.split())
+    if len(collapsed) <= max_len:
+        return collapsed
+    return collapsed[:max_len] + "…"
+
+
+def default_conversation_title(db: Session, conversation_id: int) -> str:
+    """返回对话当前的占位默认标题
+
+    用于判断标题是否仍为自动生成的占位值（首条 user 消息后应被替换）。
+    """
+    conv = get_conversation(db, conversation_id)
+    if not conv:
+        return "新对话"
+    character = db.query(Character).filter(Character.id == conv.character_id).first()
+    return _default_title_for_character(character.name if character else None)
+
+
 def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
-    """创建对话，未显式指定模型时回退到 settings 默认值（再回退到 config 默认值）"""
+    """创建对话
+
+    标题：未显式传 title（或传空）时默认「与 {角色名} 的对话」；
+    模型：未显式传 model_provider/model_name 时回退到 settings 默认值（再回退到 config 默认值）。
+    """
+    character = db.query(Character).filter(Character.id == data.character_id).first()
+    title = (
+        data.title
+        if "title" in data.model_fields_set and data.title
+        else _default_title_for_character(character.name if character else None)
+    )
     # 仅当请求显式传入 model_provider/model_name 时采用；否则用 settings 默认值（未设置时用 config 默认值）
     provider = (
         data.model_provider
@@ -74,7 +113,7 @@ def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
 
     conv = Conversation(
         character_id=data.character_id,
-        title=data.title,
+        title=title,
         model_provider=provider,
         model_name=model_name,
     )

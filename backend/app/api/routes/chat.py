@@ -12,9 +12,10 @@ import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from starlette.requests import ClientDisconnect
 
 from backend.app.database import get_db
 from backend.app.models.character import Character
@@ -184,8 +185,15 @@ async def create_chat(request: ChatRequest, db: Session = Depends(get_db)) -> Ch
 
 
 @router.post("/api/chats/stream")
-async def stream_chat(request: ChatRequest, db: Session = Depends(get_db)) -> StreamingResponse:
-    """流式聊天（SSE）— 逐 token 返回"""
+async def stream_chat(
+    request: ChatRequest,
+    raw_request: Request,
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """流式聊天（SSE）— 逐 token 返回
+
+    客户端断开（停止生成）时停止 LLM 调用，并保存已生成的部分内容为 assistant 消息。
+    """
     ctx = _prepare_chat(db, request)
 
     async def event_generator() -> AsyncIterator[str]:
@@ -197,6 +205,14 @@ async def stream_chat(request: ChatRequest, db: Session = Depends(get_db)) -> St
                 temperature=ctx.temperature,
                 model=ctx.conversation.model_name,
             ):
+                # 客户端断开 → 停止生成，保存已生成部分（不再发送事件）
+                if await raw_request.is_disconnected():
+                    if full_content:
+                        message_service.create_message(
+                            db, request.conversation_id, Role.ASSISTANT, full_content
+                        )
+                    return
+
                 full_content += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
 
@@ -205,6 +221,14 @@ async def stream_chat(request: ChatRequest, db: Session = Depends(get_db)) -> St
                 db, request.conversation_id, Role.ASSISTANT, full_content
             )
             yield f"data: {json.dumps({'type': 'done', 'message_id': saved.id})}\n\n"
+
+        except ClientDisconnect:
+            # 客户端在发送过程中断开 — 尽力保存已生成部分
+            if full_content:
+                message_service.create_message(
+                    db, request.conversation_id, Role.ASSISTANT, full_content
+                )
+            return
 
         except LLMError as e:
             _, message = _llm_error_response(e, ctx.conversation.model_provider)
