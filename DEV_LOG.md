@@ -7,13 +7,23 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：P2.5 SillyTavern V2 导入/导出进行中（P2.5.1-5.6 完成，P2.5.7-5.8 待办 → TICKETS）
+- **阶段**：P2.5 SillyTavern V2 导入/导出**全部完成**（P2.5.1-5.8，含转换层单元测试 + 全流程验证）；下一步 P3.5（停止生成 + 对话标题自动生成，→ TICKETS）
 - **代码质量**：CR.1-CR.7 全部清零（最终 commit `6bdb1ca`）
+- **测试**：新增 pytest 基础设施（`backend/tests/` + `pytest.ini`），character_card 53 用例 / 100% 覆盖；运行 `pytest`
 - **文档**：本次按《文档规范》改造 —— PROJECT_REFERENCE 修正同步 ORM、DEV_LOG 瘦身、TICKETS CR 归档
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 验证 | P2.5.8 打包验证 + 文档同步
+- Playwright 前端全流程手测（临时 DB，验证后清理）：V2 卡导入（base64 头像 / temperature / lorebook / custom_ext 全保真）、导出为合法 V2 信封（data 15 键）、导出→导入往返不丢数据、V1 旧卡导入（含 description 直通）、裸 data 导入（temperature 0.5 兜底生效）、非法卡 → 422、非 JSON 文件前端拦截不发请求
+- 文档同步：TICKETS P2.5 全部归档、DEV_LOG、PROJECT_REFERENCE、SPEC 状态 ✅、memory project-status
+
+### 2026-08-03 | 测试 | P2.5.7 转换层单元测试
+- 新建 pytest 基础设施：`pytest.ini`（`pythonpath=.` 使 `backend.app.*` 可导入）+ `backend/requirements-dev.txt` + `backend/tests/`（conftest `make_character` 工厂 + test_character_card.py）
+- 53 用例覆盖：V2 往返 / V1 归一化 / 裸 data / 非法卡 ValueError（路由转 422）/ 头像三形态 + MIME 魔数推断 / temperature 默认与裁剪 / extensions 保真 / 脏数据容错；character_card.py **100% 行覆盖**
+- 测试驱动发现并修复 2 个 bug：V1 卡 `description` 字段被归一化丢弃（`_V1_TO_V2` 缺 `description` 映射，违反 spec §3.4）；裸 data 顶层 `temperature` 被忽略（`_build_create` 补 data 兜底读取，命名空间仍优先）
 
 ### 2026-08-03 | 实现 | P2.5.6 手动创建完整性引导
 - character-form.js 软提示：姓名/人格设定/开场白缺项时 label 旁「建议填写」badge + 汇总 field-hint「完整角色建议包含：人格设定 + 开场白」，输入实时刷新
