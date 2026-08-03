@@ -7,14 +7,23 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：架构深化 ④（response_model 统一驱动序列化，character + conversation 手写 dict 全退役）**完成**；③⑤ / ①②⑥ 已归档；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；Rust 工具链已装（P6.4 Tauri 前置就绪）；下一步候选 ②（导出逻辑收拢）/ ③（前端模态框抽象）/ P6.4 Tauri / P6.5 多 tab（→ TICKETS）
-- **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7 + 架构深化 ①②⑥③⑤；P4.3 / prompt.py 新增模块 100% 行覆盖
-- **测试**：pytest 共 117 用例（character_card 53 + P3.5 19 + P4.3 11 + setting 深模块 8 + prompt 纯函数 26）；运行 `pytest`；`character_card` / `prompt` 100% 覆盖可复现
+- **阶段**：架构深化第二轮收官（②导出收拢 / ③前端模态框抽象 / ④搜索结果 Schema / ⑤前端测试基建）**完成**；①②⑥③⑤④ 已归档；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；Rust 工具链已装（P6.4 Tauri 前置就绪）；下一步 P6.4 Tauri / P6.5 多 tab（→ TICKETS）
+- **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7 + 架构深化 ①②⑥③⑤④；P4.3 / prompt.py / conversation_export.py 新增模块 100% 行覆盖
+- **测试**：pytest **141** 用例（原 117 + conversation_export + SearchResult + message）+ 前端 Vitest **28** 用例（format 15 / utils 8 / api 5）；后端运行 `pytest`，前端运行 `npm test`（`frontend/`）；`character_card` / `prompt` 100% 覆盖可复现
 - **文档**：《文档规范》已强化（测试规范章节 + 防漂移检查项）；修复 api-design / architecture / llm-integration / p2.5 spec 全部漂移；新增 CONTEXT.md 领域词汇表
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 实现 | 架构深化第二轮收官：②导出收拢 + ④搜索结果 Schema + ③前端模态框 + ⑤前端测试基建
+- **② 导出收拢**：新 `services/conversation_export.py` 深模块（`__all__` 仅 `export_conversation_json`/`export_conversation_markdown`）收纳导出逻辑；`conversation.py` 257→134 行；角色字段提取由新增 `ConversationExportCharacter` Schema（`from_attributes=True`，9 字段）唯一驱动，service 层零手写字段映射（弃用初稿「手写 frozenset + model_dump(include=) 混合方案」，字段清单单点化）
+- **④ 搜索结果 Schema**：`search_messages` 返回 `list[SearchResult]`（9 字段与旧 dict 契约逐字段一致：role `.value` / created_at isoformat / 空 query `[]`）；路由 `GET /api/messages/search` 声明 `response_model=list[SearchResult]`；与 ④ 序列化主线（response_model 驱动）汇合
+- **③ 前端模态框抽象**：`components/modal.js` 通用工厂 `openModal`（遮罩/标题转义/body/actions/关闭三路径/结果回传）；`showConfirm`/`showAlert` 对外 API 不变、内部复用工厂；`showModelSelector`/`createExportDialog` 迁入 `model-selector.js`/`export-dialog.js`，函数体从 app.js 删除；`downloadBlob`/`showToast` 移入 utils.js（`showError`/`showSuccess` 1 行委托，解 app.js↔组件循环依赖）；app.js 1080→864 行；Playwright 冒烟三弹窗开合 + 消息渲染无 JS 错误
+- **⑤ 前端测试基建**：Vitest ^3 + jsdom ^26（`frontend/package.json` + `vitest.config.js`）；纯函数模块 `format.js`（`highlightText`/`buildMessagesHtml`/头像 HTML）数据→HTML 映射与 DOM 分离；`renderMessages` 改 `container.innerHTML = buildMessagesHtml(...)`；api.js 注入 `setFetch(fn)` seam（`doFetch` 默认 `globalThis.fetch`，浏览器行为不变）；`.gitignore` 补 `node_modules/`
+- **测试**：pytest **141 passed**；前端 `npm test` **28 passed**（3 文件：format 15 / utils 8 / api 5，mock fetch 测字符列表/创建/search URL 编码/422 错误/204 空）
+- **ADR 取舍**：导出角色段用专用 Schema 而非 `to_v2_card`——后者输出 SillyTavern V2 信封（spec 包裹 + 字段改名 + 头像去 data-URI 前缀）会破坏既有导出契约；Schema 放 `schemas/conversation.py`（唯一消费方是对话导出，保 locality）
+- **遗留**：`schemas/__init__.py` / `services/__init__.py` 空导出（与 `models/`、`services/llm/` 不一致，属存量问题），留待统一清理
 
 ### 2026-08-03 | 实现 | 架构深化 ④：response_model 统一驱动序列化，退役手写 dict（character + conversation）
 - **character.py**：删除 `_char_to_dict()`（23 行手写字段映射，与 `CharacterResponse` 完全重复）；`list_characters` / `get_character_with_count` 返回 ORM `Character` 对象 + 瞬态属性 `conversation_count`

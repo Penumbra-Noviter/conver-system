@@ -13,15 +13,6 @@
 
 ## 活跃工单
 
-### 架构深化候选（第二轮，2026-08-03 评审）
-
-> 评审报告：`%TEMP%/architecture-review-20260803.html`。候选 ①（Conversation dict 退役）已并入候选 ④ 落地（见归档）。
-
-- [ ] ② `Worth exploring` — 抽 `services/conversation_export.py` 收拢导出逻辑：`export_conversation_json` / `export_conversation_markdown` 从 CRUD 模块抽离，character 字段提取复用 `character_card` 或 Schema；conversation.py 从 257 行降 ~150 行
-- [ ] ③ `Worth exploring` — 前端抽 `components/modal.js` 通用模态框工厂：`showModelSelector`（80 行）/ `createExportDialog`（60 行）/ `showConfirm` 统一走一个接口；app.js 收敛 ~140 行
-- [ ] ④ `Speculative` — 搜索结果走 Schema：`message.py::search_messages` 返回 `list[dict]` → `list[SearchResult]`，路由声明 `response_model`；统一序列化路径
-- [ ] ⑤ `Speculative` — 前端测试基础设施：引入 Vitest/jsdom；纯函数（renderMessages / highlightText / escapeHtml）从 DOM 操作分离可独立测；api.js 注入 fetch seam
-
 ### P6.4 Tauri 桌面版
 
 - [ ] Tauri 项目初始化
@@ -37,6 +28,17 @@
 ---
 
 ## 已完成归档
+
+### 架构深化候选 ②③④⑤（第二轮收官，2026-08-03）
+
+> 并行两路落地：后端路（②④）收拢导出 + 搜索结果 Schema；前端路（③⑤）模态框抽象 + Vitest 测试基建。前端 ③⑤ 共用 `app.js` 故在同一代理内串行，后端 ②④ 共享 response_model/序列化约定在同一代理内串行。行为逐项保持，双端测试全绿（pytest 141 + npm 28）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| ② | 抽 `services/conversation_export.py` 收拢导出逻辑：`export_conversation_json` / `export_conversation_markdown` 迁入新深模块（`__all__` 仅两函数）；conversation.py 257→134 行；角色字段提取**不复用手写字段列表**，改由新增 `ConversationExportCharacter` Schema（`from_attributes=True`，9 字段）唯一驱动；路由 import 改走 `export_service` | 2026-08-03 | `8098114` |
+| ③ | 抽 `components/modal.js` 通用模态框工厂 `openModal`（遮罩/标题转义/body/actions/关闭三路径/结果回传）；`showConfirm`/`showAlert` 对外 API 不变、内部复用工厂；`showModelSelector`/`createExportDialog` 迁入 `model-selector.js`/`export-dialog.js`，函数体从 app.js 删除；`downloadBlob`/`showToast` 移入 utils.js（解 app.js↔组件循环依赖）；app.js 1080→864 行；Playwright 冒烟三弹窗开合正常、无 JS 错误 | 2026-08-03 | `8098114` |
+| ④ | 搜索结果走 Schema：`message.py::search_messages` 返回 `list[dict]` → `list[SearchResult]`（9 字段与旧 dict 契约逐字段一致，role `.value`/created_at isoformat）；路由 `GET /api/messages/search` 声明 `response_model=list[SearchResult]`；空 query 返回 `[]` | 2026-08-03 | `8098114` |
+| ⑤ | 前端测试基础设施：Vitest ^3 + jsdom ^26（`frontend/package.json` `"type":"module"` + `"test":"vitest run"` + `vitest.config.js`）；纯函数模块 `format.js`（`highlightText`/`buildMessagesHtml`/头像 HTML）从 DOM 分离；`renderMessages` 改 `innerHTML=buildMessagesHtml(...)`；api.js 注入 `setFetch` seam（`doFetch` 默认 `globalThis.fetch`）；`.gitignore` 补 `node_modules/`；28 用例全过（format 15 / utils 8 / api 5） | 2026-08-03 | `8098114` |
 
 ### 架构深化候选 ①②⑥（2026-08-03）
 
