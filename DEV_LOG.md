@@ -7,14 +7,20 @@
 
 ## 滚动摘要（2026-08-03）
 
-- **阶段**：P2.5 SillyTavern V2 导入/导出**全部完成**（P2.5.1-5.8，含转换层单元测试 + 全流程验证）；下一步 P3.5（停止生成 + 对话标题自动生成，→ TICKETS）
+- **阶段**：P3.5 停止生成 + 对话标题自动生成**完成**（P3.5.1 后端 19 单测 + Playwright 前端验证；P3.5.2 标题默认值/截断/首条消息替换 + 头部联动）；下一步 P4.3 API Key 测试连接 / P6.4 Tauri（→ TICKETS）
 - **代码质量**：CR.1-CR.7 全部清零（最终 commit `6bdb1ca`）
-- **测试**：新增 pytest 基础设施（`backend/tests/` + `pytest.ini`），character_card 53 用例 / 100% 覆盖；运行 `pytest`
+- **测试**：pytest 共 72 用例（character_card 53 + P3.5 19）；运行 `pytest`
 - **文档**：本次按《文档规范》改造 —— PROJECT_REFERENCE 修正同步 ORM、DEV_LOG 瘦身、TICKETS CR 归档
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 实现 | P3.5 停止生成按钮 + 对话标题自动生成
+- **停止生成（仅流式）**：后端 `chat.py:stream_chat` 的 `event_generator` 每 token 轮询 `request.is_disconnected()`，客户端断开即停止 LLM 调用并**保存已生成部分**为 assistant 消息（另 `except ClientDisconnect` 兜底）；前端 `api.js:chatStream()` 重构为返回 `{abort, done}`（内部 AbortController），发送按钮流式生成中两态变身 `➤` ⇄ `⏹ 停止`，停止的气泡追加「（已停止）」标记（非错误语义）
+- **标题自动生成**：`create_conversation` 未传 title 时默认「与 {角色名} 的对话」；新增 `truncate_title` 纯函数（折叠空白 + 截 20 字 + 「…」，不剥离 Markdown）；`create_message` 保存首条 user 消息且标题仍为占位默认值时同步替换；前端移除 `startChatWithCharacter` 的 `title:'新对话'` 硬编码，并新增 `syncChatHeaderTitle()` 让头部标题跟随后端替换
+- 后端 19 项单测（`tests/test_p35.py`：truncate_title 纯函数 / 默认标题 / 首条替换 / 流式断开保存部分内容 / ClientDisconnect / LLM 错误）；Playwright 前端验证：停止按钮两态 + 「已停止」标记 + 标题联动（头部/侧栏同步截断标题）
+- 避坑：Playwright stub 伪造 SSE 流需显式 `controller.close()`，否则 `reader.read()` 永不返回 done、`stream.done` 悬挂，正常完成路径无法验证（停止路径因 abort error 仍可达）
 
 ### 2026-08-03 | 验证 | P2.5.8 打包验证 + 文档同步
 - Playwright 前端全流程手测（临时 DB，验证后清理）：V2 卡导入（base64 头像 / temperature / lorebook / custom_ext 全保真）、导出为合法 V2 信封（data 15 键）、导出→导入往返不丢数据、V1 旧卡导入（含 description 直通）、裸 data 导入（temperature 0.5 兜底生效）、非法卡 → 422、非 JSON 文件前端拦截不发请求

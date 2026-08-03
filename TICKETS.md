@@ -13,11 +13,6 @@
 
 ## 活跃工单
 
-### P3.5 对话过程交互增强 📝 已立项 2026-08-03（grill → to-spec 完成，规格见 CONSENSUS §4/§6）
-
-- [ ] **停止生成按钮**（仅流式）— 后端 `api/routes/chat.py:stream_chat` 的 `event_generator` 接收 `request`，token 循环轮询 `request.is_disconnected()`，客户端断开时停止 LLM 调用并**保存已生成部分**为 assistant 消息；前端 `api.js:chatStream()` 支持 `AbortController.signal` 返回 abort 句柄，流式生成中发送按钮两态变身（`➤` → `⏹ 停止`），气泡标记「（已停止）」非错误
-- [ ] **对话标题自动生成** — 后端 `create_conversation` 未传 title 时默认「与 {角色名} 的对话」；新增标题截断纯函数（折叠空白 + 截取 20 字 + 「…」，不剥离 Markdown）；保存首条 user 消息时若标题仍为占位默认值则同步替换；前端 `startChatWithCharacter` 移除 `title: '新对话'` 硬编码
-
 ### P4.3 增强（待后续）
 
 - [ ] API Key 验证（保存时测试连接）
@@ -92,6 +87,15 @@
 | P2.5.6 | 手动创建完整性引导（字段缺项 badge + 保存前软确认，仅手动表单） | 2026-08-03 | `585e5f9` |
 | P2.5.7 | 转换层单元测试（pytest 基础设施 + 53 用例 / character_card 100% 覆盖；修复 V1 description 丢失 + 裸 data temperature 兜底） | 2026-08-03 | `c5f014b` |
 | P2.5.8 | 文档同步 + 打包验证（Playwright 前端全流程手测 + 文档归档） | 2026-08-03 | `5902ee2` |
+
+### P3.5 对话过程交互增强（2026-08-03）
+
+> 规格见 CONSENSUS §4（标题）+ §6（停止生成）；后端 19 项单测（`backend/tests/test_p35.py`）+ Playwright 前端验证（停止按钮两态 / 「已停止」标记 / 标题联动）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| P3.5.1 | 停止生成按钮（仅流式）：后端 `stream_chat` 轮询 `is_disconnected()` 停止 LLM 并保存部分内容；前端 `chatStream()` 返回 `{abort, done}`（AbortController），发送按钮两态变身（`➤` ⇄ `⏹ 停止`），气泡「（已停止）」非错误 | 2026-08-03 | `4053e38` |
+| P3.5.2 | 对话标题自动生成：未传 title 默认「与 {角色名} 的对话」；`truncate_title` 规则截断纯函数；首条 user 消息同步替换占位标题；前端移除 `title:'新对话'` 硬编码 + 头部标题联动 | 2026-08-03 | `4053e38` |
 
 ---
 
