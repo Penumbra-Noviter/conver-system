@@ -11,7 +11,8 @@
  */
 
 import { chatStream, messages } from './api.js';
-import { escapeHtml, getInitials, renderMarkdown } from './utils.js';
+import { escapeHtml, renderMarkdown } from './utils.js';
+import { buildMessagesHtml, assistantAvatarHtml, userAvatarHtml } from './format.js';
 import { state } from './state.js';
 
 // ══════════════════════════════════════════════════
@@ -40,22 +41,10 @@ export function setConversationsRefresher(fn) {
 
 export function renderMessages() {
     const container = chatDom.chatMessages;
-    if (state.messages.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>开始一段对话吧</p></div>';
-        return;
-    }
-
-    container.innerHTML = state.messages
-        .map(
-            (m) => `
-        <div class="message ${m.role}">
-            ${m.role === 'assistant' ? getAssistantAvatarHtml() : getUserAvatarHtml()}
-            <div class="message-content">${m.role === 'assistant' ? renderMarkdown(m.content) : escapeHtml(m.content)}</div>
-            <button class="btn-copy-message" title="复制消息" data-content="${escapeHtml(m.content)}">📋</button>
-        </div>
-    `
-        )
-        .join('');
+    container.innerHTML = buildMessagesHtml(state.messages, {
+        characters: state.characters,
+        currentCharacterId: state.currentCharacterId,
+    });
 
     // 复制按钮事件
     container.querySelectorAll('.btn-copy-message').forEach(btn => {
@@ -126,12 +115,7 @@ function scrollToBottom() {
  * @returns {string}
  */
 function getAssistantAvatarHtml() {
-    const char = state.characters.find(c => c.id === state.currentCharacterId);
-    if (char?.avatar) {
-        return `<div class="msg-avatar"><img src="${escapeHtml(char.avatar)}" alt="${escapeHtml(char.name || '角色')}" onerror="this.parentElement.innerHTML='<div class=\\'avatar-placeholder-xs\\'>${escapeHtml(getInitials(char.name || 'A'))}</div>'"></div>`;
-    }
-    const name = char?.name || 'AI';
-    return `<div class="msg-avatar"><div class="avatar-placeholder-xs">${escapeHtml(getInitials(name))}</div></div>`;
+    return assistantAvatarHtml(state.characters, state.currentCharacterId);
 }
 
 /**
@@ -139,7 +123,7 @@ function getAssistantAvatarHtml() {
  * @returns {string}
  */
 function getUserAvatarHtml() {
-    return `<div class="msg-avatar user-avatar">👤</div>`;
+    return userAvatarHtml();
 }
 
 /**

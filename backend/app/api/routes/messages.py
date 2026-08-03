@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.schemas.message import MessageResponse
+from backend.app.schemas.message import MessageResponse, SearchResult
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 
@@ -31,12 +31,12 @@ def get_messages(conversation_id: int, db: Session = Depends(get_db)) -> list[Me
     return message_service.get_messages(db, conversation_id)
 
 
-@router.get("/api/messages/search")
+@router.get("/api/messages/search", response_model=list[SearchResult])
 def search_messages(
     q: str = Query("", description="搜索关键词"),
     limit: int = Query(50, description="最大返回条数"),
     db: Session = Depends(get_db),
-) -> list[dict]:
+) -> list[SearchResult]:
     """搜索消息内容（关键词匹配）
 
     返回包含关键词的消息列表，每条附带对话标题和角色信息。

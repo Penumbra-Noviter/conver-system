@@ -9,6 +9,22 @@
 
 const API_BASE = '/api';
 
+// ── fetch seam ──
+// 允许测试注入自定义 fetch 实现；浏览器环境默认使用全局 fetch。
+let fetchImpl = null;
+
+/**
+ * 注入自定义 fetch 实现（测试用，避免真实网络）。传 null/非函数恢复默认全局 fetch。
+ * @param {Function|null} fn - fetch 兼容函数 (url, options) => Promise<Response>
+ */
+export function setFetch(fn) {
+    fetchImpl = typeof fn === 'function' ? fn : null;
+}
+
+function doFetch(...args) {
+    return (fetchImpl ?? globalThis.fetch)(...args);
+}
+
 /**
  * 通用请求函数
  * @param {string} method - HTTP 方法
@@ -27,7 +43,7 @@ async function request(method, path, body = null) {
         options.body = JSON.stringify(body);
     }
 
-    const res = await fetch(url, options);
+    const res = await doFetch(url, options);
 
     // 204 No Content
     if (res.status === 204) {
@@ -103,7 +119,7 @@ export function chatStream(data, { onToken, onDone, onError }) {
 
     const done = (async () => {
         try {
-            const res = await fetch(`${API_BASE}/chats/stream`, {
+            const res = await doFetch(`${API_BASE}/chats/stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),

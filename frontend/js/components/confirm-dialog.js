@@ -2,9 +2,11 @@
  * Conver System — 删除/通用确认对话框
  *
  * 替代原生 confirm()，支持自定义标题、消息、详情展示。
+ * 基于通用模态框工厂 openModal 实现，对外 API 保持不变。
  */
 
 import { escapeHtml } from '../utils.js';
+import { openModal } from './modal.js';
 
 /**
  * 显示确认对话框
@@ -28,60 +30,35 @@ export function showConfirm(options = {}) {
             danger = false,
         } = options;
 
-        // 移除已存在的确认弹窗（只清确认弹窗，避免误关其它模态框如角色表单）
-        const existing = document.querySelector('.modal-overlay .confirm-modal');
-        if (existing) existing.closest('.modal-overlay').remove();
-
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-
-        overlay.innerHTML = `
-            <div class="modal confirm-modal">
-                <div class="modal-header">
-                    <h3>${escapeHtml(title)}</h3>
-                    <button class="btn-icon modal-close" title="关闭">✕</button>
+        openModal({
+            title,
+            modalClass: 'confirm-modal',
+            // 只清确认弹窗，避免误关其它模态框如角色表单
+            removeExisting: '.confirm-modal',
+            focusSelector: '.confirm-ok',
+            cancelResult: false,
+            onClose: resolve,
+            body: `
+                <div class="confirm-icon ${danger ? 'danger' : ''}">
+                    ${danger ? '⚠️' : 'ℹ️'}
                 </div>
-                <div class="modal-body">
-                    <div class="confirm-icon ${danger ? 'danger' : ''}">
-                        ${danger ? '⚠️' : 'ℹ️'}
-                    </div>
-                    <p class="confirm-message">${escapeHtml(message)}</p>
-                    ${detail ? `<p class="confirm-detail">${escapeHtml(detail)}</p>` : ''}
-                </div>
-                <div class="modal-footer">
-                    ${cancelText ? `<button class="btn-secondary confirm-cancel">${escapeHtml(cancelText)}</button>` : ''}
-                    <button class="btn-primary confirm-ok ${danger ? 'btn-danger' : ''}">${escapeHtml(confirmText)}</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-
-        const close = (result) => {
-            overlay.remove();
-            resolve(result);
-        };
-
-        // 关闭事件
-        overlay.querySelector('.modal-close').addEventListener('click', () => close(false));
-        if (cancelText) {
-            overlay.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
-        }
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) close(false);
+                <p class="confirm-message">${escapeHtml(message)}</p>
+                ${detail ? `<p class="confirm-detail">${escapeHtml(detail)}</p>` : ''}
+            `,
+            actions: `
+                ${cancelText ? `<button class="btn-secondary confirm-cancel">${escapeHtml(cancelText)}</button>` : ''}
+                <button class="btn-primary confirm-ok ${danger ? 'btn-danger' : ''}">${escapeHtml(confirmText)}</button>
+            `,
+            onOpen: (overlay, close) => {
+                if (cancelText) {
+                    overlay.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
+                }
+                overlay.querySelector('.confirm-ok').addEventListener('click', () => close(true));
+                overlay.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') close(true);
+                });
+            },
         });
-
-        // 确认事件
-        overlay.querySelector('.confirm-ok').addEventListener('click', () => close(true));
-
-        // 键盘事件
-        overlay.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') close(false);
-            if (e.key === 'Enter') close(true);
-        });
-
-        // 聚焦确认按钮
-        setTimeout(() => overlay.querySelector('.confirm-ok').focus(), 50);
     });
 }
 

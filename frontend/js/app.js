@@ -9,12 +9,17 @@
  * 模块结构：
  *   - ./state.js — 全局状态 + 模块级状态
  *   - ./chat.js  — 聊天域渲染与交互（renderMessages / handleSend / chatDom）
+ *   - ./format.js — 渲染/格式化纯函数（highlightText / buildMessagesHtml）
+ *   - ./components/ — 模态框相关组件（modal 工厂 / confirm / model-selector / export / character-form）
  */
 
 import { characters, conversations, messages, models, settings } from './api.js';
 import { showCharacterForm } from './components/character-form.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
-import { escapeHtml, getInitials, formatTags } from './utils.js';
+import { showModelSelector } from './components/model-selector.js';
+import { showExportDialog } from './components/export-dialog.js';
+import { escapeHtml, getInitials, formatTags, showToast, downloadBlob } from './utils.js';
+import { highlightText } from './format.js';
 import { state, getConvListVisible, setConvListVisible, setSearchTimeout, clearSearchTimeout } from './state.js';
 import { chatDom, renderMessages, handleSend, setConversationsRefresher } from './chat.js';
 
@@ -105,19 +110,11 @@ function toggleConvList() {
 // ══════════════════════════════════════════════════
 
 function showError(message) {
-    const toast = document.createElement('div');
-    toast.className = 'toast toast-error';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 5000);
+    showToast(message, 'error');
 }
 
 function showSuccess(message) {
-    const toast = document.createElement('div');
-    toast.className = 'toast toast-success';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 5000);
+    showToast(message, 'success');
 }
 
 // ══════════════════════════════════════════════════
@@ -288,105 +285,6 @@ dom.characterImportInput.addEventListener('change', handleCharacterImport);
 // ══════════════════════════════════════════════════
 // 模型选择 & 开始对话
 // ══════════════════════════════════════════════════
-
-/**
- * 显示模型选择对话框 — 创建对话时让用户选择 Provider 和模型
- * @param {string} characterName - 角色名称（用于展示）
- * @returns {Promise<{provider: string, model: string}|null>} 选择的配置，取消返回 null
- */
-function showModelSelector(characterName) {
-    return new Promise((resolve) => {
-        const existing = document.querySelector('.modal-overlay');
-        if (existing) existing.remove();
-
-        const providers = state.models.providers || [];
-        const defaultProviderId = state.defaultProvider;
-        const defaultModelName = state.defaultModel;
-
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-
-        overlay.innerHTML = `
-            <div class="modal model-selector-modal">
-                <div class="modal-header">
-                    <h3>开始对话 · ${escapeHtml(characterName)}</h3>
-                    <button class="btn-icon modal-close" title="关闭">✕</button>
-                </div>
-                <div class="modal-body">
-                    <p class="model-selector-hint">选择要使用的模型进行对话</p>
-                    <div class="form-field">
-                        <label for="ms-provider">Provider</label>
-                        <select id="ms-provider">
-                            ${providers.map(p =>
-                                `<option value="${escapeHtml(p.id)}" ${p.id === defaultProviderId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
-                            ).join('')}
-                        </select>
-                    </div>
-                    <div class="form-field">
-                        <label for="ms-model">模型</label>
-                        <select id="ms-model"></select>
-                    </div>
-                    <div class="model-selector-info">
-                        ⚡ 可在设置中修改默认值
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary ms-cancel">取消</button>
-                    <button class="btn-primary ms-start">开始对话</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-
-        const providerSelect = overlay.querySelector('#ms-provider');
-        const modelSelect = overlay.querySelector('#ms-model');
-
-        // ── 填充模型下拉列表 ──
-        function populateModels(providerId) {
-            const provider = providers.find(p => p.id === providerId);
-            if (!provider) return;
-            modelSelect.innerHTML = provider.models
-                .map(m => {
-                    const selected = m === defaultModelName && providerId === defaultProviderId ? 'selected' : '';
-                    return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
-                })
-                .join('');
-        }
-        populateModels(providerSelect.value);
-
-        // Provider 切换时更新模型列表
-        providerSelect.addEventListener('change', () => populateModels(providerSelect.value));
-
-        const close = (result) => {
-            overlay.remove();
-            resolve(result);
-        };
-
-        overlay.querySelector('.modal-close').addEventListener('click', () => close(null));
-        overlay.querySelector('.ms-cancel').addEventListener('click', () => close(null));
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) close(null);
-        });
-
-        overlay.querySelector('.ms-start').addEventListener('click', () => {
-            const provider = providerSelect.value;
-            const model = modelSelect.value;
-            close({ provider, model });
-        });
-
-        overlay.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') close(null);
-            if (e.key === 'Enter') {
-                const provider = providerSelect.value;
-                const model = modelSelect.value;
-                close({ provider, model });
-            }
-        });
-
-        setTimeout(() => overlay.querySelector('.ms-start').focus(), 50);
-    });
-}
 
 async function startChatWithCharacter(characterId) {
     state.currentCharacterId = characterId;
@@ -606,105 +504,6 @@ async function loadMessages() {
         console.error('加载消息失败:', err);
         showError('加载消息失败');
     }
-}
-
-// ══════════════════════════════════════════════════
-// 对话导出
-// ══════════════════════════════════════════════════
-
-function showExportDialog(conversationId) {
-    const overlay = document.getElementById('export-dialog-overlay');
-    if (overlay) {
-        overlay.classList.add('active');
-        return;
-    }
-    createExportDialog(conversationId);
-}
-
-function createExportDialog(conversationId) {
-    const overlay = document.createElement('div');
-    overlay.id = 'export-dialog-overlay';
-    overlay.className = 'modal-overlay';
-
-    overlay.innerHTML = `
-        <div class="modal export-modal">
-            <div class="modal-header">
-                <h3>导出对话</h3>
-                <button class="btn-icon modal-close" title="关闭">✕</button>
-            </div>
-            <div class="modal-body">
-                <p class="export-hint">选择导出格式：</p>
-                <div class="export-options">
-                    <button class="export-option-btn" data-format="markdown">
-                        <span class="export-option-icon">📄</span>
-                        <span class="export-option-label">Markdown (.md)</span>
-                        <span class="export-option-desc">可读的纯文本格式，适合分享和查看</span>
-                    </button>
-                    <button class="export-option-btn" data-format="json">
-                        <span class="export-option-icon">📋</span>
-                        <span class="export-option-label">JSON (.json)</span>
-                        <span class="export-option-desc">结构化数据格式，适合程序处理</span>
-                    </button>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary export-cancel">取消</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    const close = () => {
-        overlay.remove();
-    };
-
-    overlay.querySelector('.modal-close').addEventListener('click', close);
-    overlay.querySelector('.export-cancel').addEventListener('click', close);
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) close();
-    });
-    overlay.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') close();
-    });
-
-    overlay.querySelectorAll('.export-option-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const format = btn.dataset.format;
-            close();
-            downloadExport(conversationId, format);
-        });
-    });
-}
-
-/**
- * 通用 Blob 下载 — fetch 导出端点 → blob → <a download> 触发浏览器保存
- * 对话导出与角色卡导出共用（P2.5.5）
- * @param {string} url - 导出 API 地址
- * @param {string} filename - 下载文件名（浏览器自动清洗非法字符）
- * @param {string} [errorPrefix='导出失败'] - 失败提示前缀
- */
-async function downloadBlob(url, filename, errorPrefix = '导出失败') {
-    try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('请求失败');
-        const blob = await res.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(a.href);
-    } catch (err) {
-        showError(`${errorPrefix}: ${err.message}`);
-    }
-}
-
-function downloadExport(conversationId, format) {
-    const ext = format === 'markdown' ? '.md' : '.json';
-    downloadBlob(
-        `/api/conversations/${conversationId}/export/${format}`,
-        `conversation-${conversationId}${ext}`
-    );
 }
 
 // ══════════════════════════════════════════════════
@@ -991,21 +790,6 @@ function renderSearchResults(results, query) {
             }
         });
     });
-}
-
-/**
- * 高亮文本中的关键词
- * @param {string} text - 已转义的文本
- * @param {string} keyword - 已转义的关键词
- * @returns {string} HTML
- */
-function highlightText(text, keyword) {
-    if (!keyword) return text;
-    const idx = text.toLowerCase().indexOf(keyword.toLowerCase());
-    if (idx === -1) return text;
-    return text.slice(0, idx)
-        + '<mark class="search-highlight">' + text.slice(idx, idx + keyword.length) + '</mark>'
-        + text.slice(idx + keyword.length);
 }
 
 /**

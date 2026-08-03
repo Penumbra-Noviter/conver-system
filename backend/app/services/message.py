@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
+from backend.app.schemas.message import SearchResult
 from backend.app.services import conversation as conversation_service
 from backend.app.services.llm.prompt import CharacterData, apply_template_vars, build_messages
 
@@ -146,11 +147,12 @@ def search_messages(
     db: Session,
     query: str,
     limit: int = 50,
-) -> list[dict]:
+) -> list[SearchResult]:
     """搜索消息内容，返回带对话和角色上下文的搜索结果
 
     使用 SQLite LIKE 进行关键词匹配，按时间倒序排列。
     每条结果包含：消息预览、所属对话标题、角色名、角色头像、发送时间。
+    返回 `list[SearchResult]`（字段契约见 schemas/message.py）。
     """
     if not query or not query.strip():
         return []
@@ -184,16 +186,16 @@ def search_messages(
         else:
             preview = content[:120] + ("…" if len(content) > 120 else "")
 
-        output.append({
-            "message_id": msg.id,
-            "conversation_id": conv.id,
-            "conversation_title": conv.title,
-            "character_id": char.id,
-            "character_name": char.name,
-            "character_avatar": char.avatar,
-            "role": msg.role.value,
-            "content_preview": preview,
-            "created_at": msg.created_at.isoformat() if msg.created_at else None,
-        })
+        output.append(SearchResult(
+            message_id=msg.id,
+            conversation_id=conv.id,
+            conversation_title=conv.title,
+            character_id=char.id,
+            character_name=char.name,
+            character_avatar=char.avatar,
+            role=msg.role.value,
+            content_preview=preview,
+            created_at=msg.created_at.isoformat() if msg.created_at else None,
+        ))
 
     return output

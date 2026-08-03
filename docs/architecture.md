@@ -74,6 +74,7 @@ conver-system/
 │   │       ├── character_card.py  # SillyTavern V2 卡转换层
 │   │       ├── chat.py            # 聊天回合编排（prepare_chat / stream_reply 深模块）
 │   │       ├── conversation.py
+│   │       ├── conversation_export.py # 对话导出（json/markdown 深模块）
 │   │       ├── message.py
 │   │       ├── setting.py         # 运行时设置读写（白名单 + 回退链 + 整型容错）
 │   │       └── llm/
@@ -82,6 +83,7 @@ conver-system/
 │   │           ├── claude.py      # Claude Provider
 │   │           ├── openai.py      # OpenAI Provider
 │   │           ├── factory.py     # Provider 工厂
+│   │           ├── prompt.py      # Prompt 组装纯函数（apply_template_vars / build_messages）
 │   │           └── errors.py      # LLM 异常定义
 │   │
 │   ├── requirements.txt
@@ -90,20 +92,35 @@ conver-system/
 │   │   ├── conftest.py            # 共享 fixture（db_session / make_character）
 │   │   ├── test_character_card.py
 │   │   ├── test_p35.py
-│   │   └── test_settings_connection.py
+│   │   ├── test_prompt.py
+│   │   ├── test_settings_connection.py
+│   │   ├── test_conversation_export.py
+│   │   └── test_search.py
 │   └── .env.example
 │
 ├── frontend/
 │   ├── index.html                 # SPA 入口
 │   ├── css/
 │   │   └── style.css
+│   ├── package.json               # 前端测试基建（Vitest/jsdom，type: module）
+│   ├── vitest.config.js
+│   ├── tests/                     # 前端单元测试（vitest run）
+│   │   ├── format.test.js
+│   │   ├── utils.test.js
+│   │   └── api.test.js
 │   ├── js/
-│   │   ├── app.js                 # 主入口 + 状态管理
-│   │   ├── api.js                 # API 调用层
+│   │   ├── app.js                 # 主入口（视图切换 / 业务协调 / 事件绑定）
+│   │   ├── state.js               # 全局状态 + 模块级状态
+│   │   ├── chat.js                # 聊天域渲染与交互（renderMessages / handleSend / chatDom）
+│   │   ├── api.js                 # API 调用层（含 setFetch 注入 seam）
+│   │   ├── format.js              # 数据→HTML 纯函数（highlightText / buildMessagesHtml）
 │   │   ├── components/
 │   │   │   ├── character-form.js  # 角色表单
-│   │   │   └── confirm-dialog.js  # 确认弹窗
-│   │   └── utils.js
+│   │   │   ├── confirm-dialog.js  # 确认弹窗（showConfirm / showAlert，复用 openModal）
+│   │   │   ├── modal.js           # 通用模态框工厂（openModal）
+│   │   │   ├── model-selector.js  # 模型选择弹窗
+│   │   │   └── export-dialog.js   # 导出弹窗
+│   │   └── utils.js               # 工具函数（escapeHtml / downloadBlob / showToast）
 │   └── assets/
 │
 ├── docs/                          # 核心文档

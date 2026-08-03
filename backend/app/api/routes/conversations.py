@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from backend.app.database import get_db
 from backend.app.schemas.conversation import ConversationCreate, ConversationResponse, ConversationUpdate
 from backend.app.services import conversation as service
+from backend.app.services import conversation_export as export_service
 
 router = APIRouter(prefix="/api/conversations", tags=["对话管理"])
 
@@ -66,7 +67,7 @@ def delete_all_conversations(db: Session = Depends(get_db)) -> None:
 @router.get("/{conversation_id}/export/json")
 def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)) -> JSONResponse:
     """导出对话为 JSON 格式文件"""
-    data = service.export_conversation_json(db, conversation_id)
+    data = export_service.export_conversation_json(db, conversation_id)
     if not data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
 
@@ -83,7 +84,7 @@ def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)
 @router.get("/{conversation_id}/export/markdown")
 def export_conversation_markdown(conversation_id: int, db: Session = Depends(get_db)) -> PlainTextResponse:
     """导出对话为 Markdown 格式文件"""
-    md = service.export_conversation_markdown(db, conversation_id)
+    md = export_service.export_conversation_markdown(db, conversation_id)
     if not md:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
 

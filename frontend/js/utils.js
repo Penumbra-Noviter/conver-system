@@ -100,6 +100,41 @@ export function renderMarkdown(text) {
 }
 
 /**
+ * 显示 Toast 通知（自动 5 秒后消失）
+ * @param {string} message - 提示内容
+ * @param {'success'|'error'} type - 类型（影响样式）
+ */
+export function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+/**
+ * 通用 Blob 下载 — fetch 导出端点 → blob → <a download> 触发浏览器保存
+ * 对话导出与角色卡导出共用（P2.5.5）
+ * @param {string} url - 导出 API 地址
+ * @param {string} filename - 下载文件名（浏览器自动清洗非法字符）
+ * @param {string} [errorPrefix='导出失败'] - 失败提示前缀
+ */
+export async function downloadBlob(url, filename, errorPrefix = '导出失败') {
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('请求失败');
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (err) {
+        showToast(`${errorPrefix}: ${err.message}`, 'error');
+    }
+}
+
+/**
  * 获取角色名称首字母/首字
  * @param {string} name
  * @returns {string}

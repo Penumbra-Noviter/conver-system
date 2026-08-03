@@ -37,3 +37,23 @@ class ConversationResponse(BaseModel):
     updated_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+
+
+class ConversationExportCharacter(BaseModel):
+    """对话导出 JSON 的 character 段
+
+    Schema 即导出契约：字段名 / 顺序 / 类型由本类唯一定义，
+    service 层经 model_validate + model_dump 驱动序列化，无需手写字段映射。
+    字段子集为 CharacterResponse 的投影（不含 mes_example / 元数据等非导出字段）。
+    """
+    id: int
+    name: str
+    description: str
+    personality: str
+    scenario: str
+    first_mes: str
+    system_prompt: str
+    avatar: Optional[str] = None
+    temperature: float
+
+    model_config = {"from_attributes": True}

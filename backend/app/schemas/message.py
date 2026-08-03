@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +19,19 @@ class MessageResponse(BaseModel):
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+
+
+class SearchResult(BaseModel):
+    """消息搜索结果条目（跨对话搜索，附带对话与角色上下文）"""
+    message_id: int
+    conversation_id: int
+    conversation_title: str
+    character_id: int
+    character_name: str
+    character_avatar: Optional[str] = None
+    role: str
+    content_preview: str
+    created_at: Optional[str] = None
 
 
 class ChatRequest(BaseModel):

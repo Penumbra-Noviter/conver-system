@@ -31,3 +31,6 @@ Thumbs.db
 # Project local
 dist/
 build/
+
+# Node / frontend tooling
+node_modules/
