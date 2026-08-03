@@ -54,6 +54,8 @@ export const characters = {
     create: (data) => request('POST', '/characters', data),
     update: (id, data) => request('PUT', `/characters/${id}`, data),
     delete: (id) => request('DELETE', `/characters/${id}`),
+    /** 从 SillyTavern V2 角色卡 JSON 导入角色（V2 信封 / 裸 data / V1 旧卡均可） */
+    import: (card) => request('POST', '/characters/import', card),
 };
 
 // ══════════════════════════════════════════════════

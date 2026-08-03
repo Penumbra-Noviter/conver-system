@@ -21,8 +21,9 @@
 
 ## 3. 角色管理策略
 
-- **手动创建**：所有字段在 UI 中可编辑
-- **导入/导出**：兼容 SillyTavern Character Card V2 规范（全量映射）
+- **手动创建**：所有字段在 UI 中可编辑；设定不完整（缺人格设定/开场白）时软提示引导补齐，不拦截保存
+- **导入/导出**：兼容 SillyTavern Character Card V2 规范（全量映射），首期仅 JSON 卡（PNG 卡留待 P6.x）；导入容错 V1 旧卡与裸 data 格式
+- **往返保真**：temperature / URL 头像 / lorebook 等非 V2 标准字段存 `extensions.conver_system.*` 命名空间，导出→导入不丢数据（详见 `docs/p2.5-character-import-export.md`）
 - **字段设计**：DB 表完整映射 V2 字段（含 `scenario`、`mes_example`、`alternate_greetings`、`system_prompt`、`post_history_instructions` 等）
 - **删除行为**：
   - Phase 2：级联删除（角色 + 关联对话 + 消息）
@@ -33,6 +34,10 @@
 - **默认策略**：滑动窗口，保留最近 20-30 轮消息
 - **用户可配**：设置面板中提供滑块调节轮数
 - **高级策略**（Phase 6）：摘要压缩
+- **对话标题自动生成**（2026-08-03 立项，P3.5）：
+  - 创建对话时后端默认标题为「与 {角色名} 的对话」，前端不再传 `title: '新对话'`
+  - 发出首条 user 消息后，同步替换为该消息的**规则截断**标题（折叠空白 + 截取 20 字 + 「…」，不剥离 Markdown）
+  - 纯规则实现，零 LLM 调用、确定性、无感知延迟
 
 ## 5. LLM Provider 策略
 
@@ -51,6 +56,12 @@
 - 非流式：`POST /api/chats` → 等待 → 完整回复
 - 流式：`POST /api/chats/stream` → SSE → 打字机效果渲染
 - Phase 3 同时实现两种模式
+- **停止生成**（2026-08-03 立项，P3.5）：
+  - 仅流式模式提供。流式生成中发送按钮两态变身停止按钮（`➤` ⇄ `⏹ 停止`）
+  - 前端 `AbortController` 中止 fetch → SSE 连接断开
+  - 后端 `stream_chat` 的 `event_generator` 轮询 `request.is_disconnected()` 感知客户端断开，**保存已生成的部分内容**为 assistant 消息
+  - 前端气泡标记「（已停止）」，语义为「用户主动停止」而非错误
+  - 非流式模式不提供停止按钮（无法真正中断后端请求，避免「点了停止但消息仍出现」的误导）
 
 ## 7. 前端布局与交互
 

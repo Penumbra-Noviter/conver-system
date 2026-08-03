@@ -56,6 +56,8 @@ const dom = {
     // 角色
     characterGrid: $('#character-grid'),
     btnCreateCharacter: $('#btn-create-character'),
+    btnImportCharacter: $('#btn-import-character'),
+    characterImportInput: $('#character-import-input'),
 
     // 搜索
     searchInput: $('#search-input'),
@@ -183,6 +185,7 @@ async function renderCharacters() {
             <div class="character-card-actions">
                 <button class="btn-icon chat-with" title="开始对话">💬</button>
                 <button class="btn-icon edit-char" title="编辑">✏️</button>
+                <button class="btn-icon export-char" title="导出角色卡">📤</button>
                 <button class="btn-icon delete-char" title="删除">🗑️</button>
             </div>
         </div>
@@ -211,6 +214,16 @@ async function renderCharacters() {
                 console.error('加载角色详情失败:', err);
                 showAlert('加载角色信息失败: ' + err.message);
             }
+        });
+    });
+
+    // 事件委托：导出角色卡（P2.5.5）
+    grid.querySelectorAll('.export-char').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.closest('.character-card').dataset.id);
+            const char = state.characters.find((c) => c.id === id);
+            downloadBlob(`/api/characters/${id}/export`, `${char?.name || 'character'}.json`);
         });
     });
 
@@ -248,6 +261,46 @@ async function renderCharacters() {
 dom.btnCreateCharacter.addEventListener('click', () => {
     showCharacterForm('create', null, () => loadCharacters());
 });
+
+// ══════════════════════════════════════════════════
+// 角色导入（P2.5.4）
+// ══════════════════════════════════════════════════
+
+/**
+ * 处理导入角色文件：读取 → JSON.parse → POST /api/characters/import
+ * JSON.parse 失败 → 前端直接提示，不发请求。
+ */
+async function handleCharacterImport() {
+    const file = dom.characterImportInput.files?.[0];
+    if (!file) return;
+
+    let card;
+    try {
+        const text = await file.text();
+        card = JSON.parse(text);
+    } catch {
+        showError('不是有效的 JSON 文件');
+        dom.characterImportInput.value = '';
+        return;
+    }
+
+    try {
+        const created = await characters.import(card);
+        showSuccess(`成功导入角色「${created.name}」`);
+        await loadCharacters();
+    } catch (err) {
+        // 后端 422 已带「导入失败：<原因>」前缀，直接展示避免重复
+        showError(err.message);
+    } finally {
+        // 清空 input，允许重复选择同一文件
+        dom.characterImportInput.value = '';
+    }
+}
+
+dom.btnImportCharacter.addEventListener('click', () => {
+    dom.characterImportInput.click();
+});
+dom.characterImportInput.addEventListener('change', handleCharacterImport);
 
 /**
  * 显示模型选择对话框 — 创建对话时让用户选择 Provider 和模型
@@ -718,22 +771,34 @@ function createExportDialog(conversationId) {
     });
 }
 
+/**
+ * 通用 Blob 下载 — fetch 导出端点 → blob → <a download> 触发浏览器保存
+ * 对话导出与角色卡导出共用（P2.5.5）
+ * @param {string} url - 导出 API 地址
+ * @param {string} filename - 下载文件名（浏览器自动清洗非法字符）
+ * @param {string} [errorPrefix='导出失败'] - 失败提示前缀
+ */
+async function downloadBlob(url, filename, errorPrefix = '导出失败') {
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('请求失败');
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (err) {
+        showError(`${errorPrefix}: ${err.message}`);
+    }
+}
+
 function downloadExport(conversationId, format) {
-    const url = `/api/conversations/${conversationId}/export/${format}`;
-    fetch(url)
-        .then(res => {
-            if (!res.ok) throw new Error('导出失败');
-            return res.blob();
-        })
-        .then(blob => {
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            const ext = format === 'markdown' ? '.md' : '.json';
-            a.download = `conversation-${conversationId}${ext}`;
-            a.click();
-            URL.revokeObjectURL(a.href);
-        })
-        .catch(err => showError('导出失败: ' + err.message));
+    const ext = format === 'markdown' ? '.md' : '.json';
+    downloadBlob(
+        `/api/conversations/${conversationId}/export/${format}`,
+        `conversation-${conversationId}${ext}`
+    );
 }
 
 // ── 头像渲染 ──

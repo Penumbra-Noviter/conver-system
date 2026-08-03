@@ -23,6 +23,7 @@ Thumbs.db
 # Agent / IDE state
 .serena/
 .claude/settings.local.json
+.playwright-mcp/
 
 # Project local
 dist/

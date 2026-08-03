@@ -1,7 +1,7 @@
 """
 Conver System — 数据库引擎与会话管理
 
-SQLAlchemy 2.0 异步引擎配置，基于 pydantic-settings。
+SQLAlchemy 2.0 同步引擎配置（项目当前使用同步 ORM），基于 pydantic-settings。
 """
 
 from __future__ import annotations

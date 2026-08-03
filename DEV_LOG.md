@@ -1,536 +1,123 @@
 # Conver System — 开发日志 (DEV_LOG)
 
-> 记录 Bug 修复、优化/重构进展、踩坑记录。
-> 格式：`[状态] 日期 — 标题`
+> 只记「已做」与决策/避坑；待办一律进 [TICKETS.md](TICKETS.md)（唯一待办事实来源）。
+> 格式：`YYYY-MM-DD | <操作> | <描述>`（倒序，最新在前）
 
 ---
 
-## Phase 1 — 项目骨架
+## 滚动摘要（2026-08-03）
 
-### 2026-07-30
-
-#### 初始化
-- [x] 创建 CONSENSUS.md — 记录所有设计决策（经 grilling skill 深度讨论）
-- [x] 创建 DEV_LOG.md — 开发日志
-- [x] 创建 PROJECT_REFERENCE.md — 项目介绍书
-
-#### 后端骨架
-- [x] config.py — pydantic-settings 配置
-- [x] database.py — SQLAlchemy 引擎 + Session
-- [x] 数据库 Model — character(V2 完整字段) / conversation / message / setting
-- [x] Pydantic Schema — character / conversation / message
-- [x] LLM 层架构 — BaseLLM 基类 + Factory + Claude/OpenAI 桩
-- [x] API Routes — characters / conversations / messages / models / settings
-- [x] main.py — FastAPI 入口 + 静态文件挂载 + 数据库初始化
-
-#### 前端骨架
-- [x] index.html — SPA 三栏布局（侧栏 + 对话列表 + 聊天区）
-- [x] style.css — CSS 变量主题、亮/暗模式、完整组件样式
-- [x] api.js — 统一 fetch 封装（含流式 SSE 支持）
-- [x] app.js — 视图切换 + 状态管理 + 所有交互逻辑
-
-#### 待办
-- [ ] 创建 `.env`（从 `.env.example` 复制）
-- [ ] 安装依赖并测试启动
+- **阶段**：P2.5 SillyTavern V2 导入/导出进行中（P2.5.1-5.5 完成，P2.5.6-5.8 待办 → TICKETS）
+- **代码质量**：CR.1-CR.7 全部清零（最终 commit `6bdb1ca`）
+- **文档**：本次按《文档规范》改造 —— PROJECT_REFERENCE 修正同步 ORM、DEV_LOG 瘦身、TICKETS CR 归档
 
 ---
 
-## Phase 2 — 角色管理（前端增强）✅
-
-### 2026-07-30
-
-#### 后端（已完成 — Phase 1 骨架阶段已包含）
-- [x] characters API Routes — 完整 CRUD
-- [x] characters Service — 完整业务逻辑
-- [x] Character Schema — Create/Update/Response
-
-#### 前端 ✅ 已全部完成
-- [x] character-form.js — 角色创建/编辑专用表单（字段: name/personality/greeting/temperature/avatar）
-- [x] 角色编辑功能（预填数据 + 更新）
-- [x] 删除确认对话框（显示关联对话数，confirm-dialog.js）
-- [x] 角色卡片增强（头像/问候语摘要/温度/标签/对话数）
-- [ ] SillyTavern V2 导入/导出（推迟至 Phase 6）
-
----
-
-## Phase 3 — 对话核心（LLM 集成）
-
-### 2026-07-30
-
-#### 后端 — 全部完成 ✅
-- [x] ClaudeProvider.generate() — 实现 Anthropic SDK 非流式调用 ✅
-- [x] ClaudeProvider.stream_generate() — 实现流式调用（逐 token) ✅
-- [x] LLM 异常映射 — AuthenticationError / RateLimitError / TimeoutError / ContentFilter → 自定义 LLMError ✅
-- [x] POST /api/chat — 接入真实 LLM（构建消息列表 → 调用 Provider → 保存回复）✅
-- [x] POST /api/chat/stream — SSE StreamingResponse 逐 token 推送 ✅
-- [x] 对话上下文管理（system prompt + 滑窗截断 + 角色 greeting 自动插入）✅
-- [x] `save_message` 同步更新 conversation.updated_at ✅
-- [x] API Key 从 settings 表动态读取 ✅
-- [x] 使用角色的 temperature 参数 ✅
-
-#### 前端 — 核心完善
-- [x] api.js — fetch 封装 + SSE 流式支持 ✅
-- [x] app.js — 聊天 UI + 流式渲染 ✅
-- [x] app.js — 思考中指示器（非流式等待时）✅
-- [x] style.css — thinking-indicator 动画样式 ✅
-
----
-
-## Phase 4 — 多模型支持
-
-### 2026-07-30 — OpenAI Provider 实现 + 进度审计
-
-#### 进度审计与修正
-- [x] 对项目代码进行全量审计，发现 TICKETS.md 进度标记严重滞后实际代码
-- [x] Phase 2 前端实际完成度 100%（character-form.js、confirm-dialog.js、角色卡片增强均已就绪）
-- [x] Phase 3 前端实际完成度 100%（流式渲染、思考指示器、快捷键等均已完成）
-- [x] 统一修正 TICKETS.md 和 dev-workflow-status 记忆中的进度标记
-
-#### OpenAI Provider 实现
-- [x] `openai.py` — 实现 `generate()`（非流式）+ `stream_generate()`（流式）
-  - 使用 `openai` SDK 的 `AsyncOpenAI` 客户端
-  - 支持自定义 `base_url`（兼容第三方 API）
-  - 异常映射：AuthenticationError / RateLimitError / APITimeoutError / BadRequestError → 自定义 LLMError
-  - 与 ClaudeProvider 同级的 `_prepare_messages()` 逻辑（system 角色在消息列表中处理）
-- [x] `llm/__init__.py` — 注册 `OpenAIProvider` 到 Factory（之前被注释掉）
-- [x] `conversation.py` — 创建对话时从 settings 表读取默认 provider/model
-- [x] 服务启动验证通过（models API 返回 OpenAI 模型列表）
-
-#### 前端模型选择集成
-- [x] `app.js` — 新增 `loadModels()` 从 API 加载可用模型列表
-- [x] `app.js` — `refreshModelOptions()` 根据选择的 Provider 动态更新模型下拉
-- [x] `app.js` — `startChatWithCharacter()` 使用 `state.defaultProvider` / `state.defaultModel`
-- [x] `app.js` — 聊天头部显示当前对话使用的模型（model badge）
-- [x] `app.js` — 对话列表显示每条对话的模型名
-- [x] `app.js` — 对话删除功能（confirm-dialog 确认 + 级联刷新）
-- [x] `style.css` — model-badge / conversation delete button 样式
-- [x] 设置面板保存时更新 `state.defaultProvider` / `state.defaultModel` 本地状态
-
-#### 启动验证结果
-- [x] `uvicorn` 启动无报错（OpenAIProvider 注册成功，无导入错误）
-- [x] `GET /api/models` 返回 claude + openai 的完整模型列表
-- [x] `GET /api/settings` 返回正常
-- [x] 前端 index.html 正常加载
-- [ ] API Key 保存时测试连接（待 Phase 4 后续）
-
----
-
-
-### 2026-07-30 — to-tickets 阶段
-
-按照 `global/dev-workflow` 规范：
-
-| 步骤 | 状态 | 说明 |
-|------|------|------|
-| 1. grill me | ✅ 完成 | 需求深度讨论，见 CONSENSUS.md |
-| 2. to-spec | ✅ 完成 | CONSENSUS.md + 4 份设计文档 |
-| 3. to-tickets | ✅ 完成 | TICKETS.md — 全项目任务分解 |
-| 4. implement | ✅ 完成 | Phase 1-5 + P6.1 全部完成 |
-
-## 2026-07-30 — 全量代码审查（code-review skill）
-
-### Standards 轴发现
-
-**硬性违规（违反编码规范）**
-1. `database.py:29` — `set_sqlite_pragma()` 参数和返回值无类型注解
-2. `database.py:57` — `init_db()` 无返回注解
-3. `main.py:46` — `on_startup()` 无返回注解
-4. `messages.py:59,139` — 路由函数 `chat`/`chat_stream` 命名不符合 `list_*`/`get_*`/`create_*`/`delete_*` 前缀约定
-5. `conversation.py:60` `message.py:46,79` — 函数内部局部导入，违反模块级导入分组约定
-6. `settings.py:10` — 使用旧式 `Dict[str, Any]` 而非 `dict[str, Any]`
-
-**代码坏味道**
-1. `get_db()` 在 `database.py` 和 `deps.py` 中重复定义
-2. ClaudeProvider / OpenAIProvider 异常处理块逐字重复，可抽取 `_translate_error()` 方法
-3. 非流式/流式端点的 LLM 错误映射代码重复（`messages.py:102-126 vs 192-203`）
-4. Character 模型 JSON 字段（tags/alternate_greetings 等）使用 Text 列，缺少类型约束
-5. Message.role 使用 String(20) 而非枚举
-6. `post_history_instructions` 等 V2 字段已定义但未被 `build_message_list()` 使用
-
-### Spec 轴发现（对照 CONSENSUS.md）
-
-**缺失/错误实现**
-1. **🔴 滑动窗口轮数设置无效**: 值保存到 settings 表但 `build_message_list()` 硬编码 `max_rounds=30`，不从 settings 读取配置
-2. **🔴 SSE 错误事件前端静默丢弃**: 后端 `chat_stream` 发送 `{"type": "error", ...}` 但 `api.js:chatStream` 只处理 `token`/`done` 类型
-3. **ChatRequest.stream 字段死代码**: `stream: bool` 定义但两个端点均不读取（仅靠 URL 路径决定模式）
-4. **V2 角色卡导入/导出**: 完全缺失（CONSENSUS §3 要求存在但标记已推迟）
-5. **每对话模型选择无前端 UI**: 创建对话时只能用默认值，无法手动选择
-
-### 已记录决策
-
-| 优先级 | 事项 | 状态 |
-|--------|------|------|
-| 🚨 P0 | 修复滑动窗口轮数不生效 | ⬜ 待执行 |
-| 🚨 P0 | 修复 SSE 错误事件前端静默丢弃 | ⬜ 待执行 |
-| 📋 P1 | 补充缺少的类型注解 | ⬜ 待执行 |
-| 📋 P1 | 抽取异常处理公共逻辑（Provider + 路由） | ⬜ 待执行 |
-| 📋 P2 | 路由函数重命名 + 导入顺序清理 | ⬜ 待执行 |
-
-
-### 已记录决策
-
-#### Git 延迟初始化
-- **决策**：Git 的一切操作等待项目初步完善后再执行，目前阶段不考虑上传 GitHub 仓库
-- **原因**：避免频繁 commit 干扰开发节奏，待代码趋于稳定后再建立版本基线
-- **影响**：TICKETS.md 中 P0.3 项标记为暂缓，CONSENSUS.md 第 9 节已补充 Git 策略说明
-
----
-
-## 2026-07-30 — 全量代码审查（Phase 5 后）
-
-### Standards 硬性违规
-
-- [ ] 全部 27 个路由/服务函数缺少返回类型注解 — `messages.py`(3处)、`characters.py`(5处)、`conversations.py`(6处)、`models.py`(1处)、`settings.py`(2处)、`database.py`(1处) — 部分函数已标注，多处遗漏
-- [ ] `messages.py:95,157` — API 路径命名违规范：`POST /api/chat` 应使用复数 `/api/chats`
-- [ ] `messages.py:158` — 路由函数 `stream_chat()` 不匹配 `list_*/get_*/create_*` 前缀规范
-- [ ] `message.py:27` — Service 层 `save_message` 命名应为 `create_message`
-- [ ] `conversation.py:59-60` — 硬编码 `"claude"` / `"claude-sonnet-4-20250514"` 字符串，应引用 `config.settings`
-
-### Standards 代码坏味道
-
-- [ ] 流式/非流式端点 ~90 行重复的前置逻辑（获取 conv → temperature → 存 user 消息 → 构建消息列表 → 拿 API Key → 拿 Provider）
-- [ ] `app.js` 中头像 HTML 构造重复 3 次（renderMessages / appendMessage / handleSend 流模式）
-- [ ] 复制按钮事件绑定重复 2 次（renderMessages + appendMessage）
-- [ ] Character 模型 JSON 字段（tags/alternate_greetings 等）使用 Text 列而非序列化器
-- [ ] Message.role 为自由字符串 String(20) 而非枚举
-- [ ] `deps.py` 仅重新导出 `database.get_db`，无额外抽象（Middle Man）
-- [ ] `messages.py` 混合"消息检索"和"聊天交互"两种职责（Divergent Change）
-
-### Spec 缺失/未完成
-
-- [x] 🔴 V2 字段未用于 prompt 组装 — `scenario`、`mes_example`、`post_history_instructions` 已加入 `build_message_list()` ✅ 2026-07-30
-- [x] 🟡 `theme_mode` 设置不生效 — `applyTheme()` + CSS `[data-theme]` 选择器已实现 ✅ 2026-07-30
-- [ ] 🟡 `alternate_greetings` 存储但无 UI — 存在 DB 中，无管理界面，无读取逻辑
-
-### Spec 实现错误
-
-- [x] 🔴 SSE 流中断 → 按钮永久禁用 — ✅ 已修复（2026-07-30）
-- [ ] 🟡 默认模型覆盖逻辑脆弱 — 靠比较字符串 `"claude-sonnet-4-20250514"` 判断是否覆盖，用户选择同值时不覆盖
-- [ ] 🟡 流式时对话列表消息计数错误 — `loadConversations()` 在流结束前调用，计数短暂不准确
-- [ ] 🟡 数据加载无用户可见错误提示 — `loadCharacters/loadConversations/loadMessages` 失败只 `console.error`
-
-### 已确认范围蔓延（TICKETS 标记未完成但已有实现）
-
-- 对话重命名（P5.1）
-- 模型选择器对话框（P4.2）
-- 头像实时预览
-- 消息复制按钮（P5.2）
-
----
-
-## 2026-07-30 — Phase 6.1 对话导出 + CR.9 静默错误修复
-
-### P6.1 对话导出后端 API
-- [x] `services/conversation.py` — 新增 `export_conversation_json()` 导出对话为结构化 JSON（含角色信息）
-- [x] `services/conversation.py` — 新增 `export_conversation_markdown()` 导出对话为可读 Markdown（按日期分组）
-- [x] `api/routes/conversations.py` — 新增 `GET /{id}/export/json` 端点，返回 `Content-Disposition: attachment` 头
-- [x] `api/routes/conversations.py` — 新增 `GET /{id}/export/markdown` 端点，返回 `Content-Disposition: attachment` 头
-- [x] 404 处理完善，角色/消息空值检查完成
-
-### P6.1 对话导出前端 UI
-- [x] `app.js` — 新增 `showExportDialog()` / `createExportDialog()` / `downloadExport()` 导出流程
-- [x] `app.js` — 聊天头部新增导出按钮（📥），点击弹出格式选择弹窗
-- [x] `app.js` — 导出弹窗提供 Markdown / JSON 二选一，点击后通过 fetch + Blob 下载文件
-- [x] `style.css` — 导出对话框样式（`.export-modal`, `.export-option-btn`）
-
-### CR.9 修复 — 数据加载无用户可见错误
-- [x] `app.js` — 新增 `showError()` / `showSuccess()` toast 通知函数（底部居中，5秒自动消失）
-- [x] `app.js` — `loadCharacters()` catch 块调用 `showError('加载角色列表失败')`
-- [x] `app.js` — `loadConversations()` catch 块调用 `showError('加载对话列表失败')`
-- [x] `app.js` — `loadMessages()` catch 块调用 `showError('加载消息失败')`
-- [x] `style.css` — Toast 通知样式（`.toast`, `.toast-error`, `.toast-success`, `toast-in` 动画）
-
-### CR.4.1 🔴 SSE 流中断 → 按钮永久禁用
-- **根因**: `api.js:chatStream()` 中 `reader.read()` 返回 `{done: true}` 时直接 `break` 退出循环，从不触发 `onDone`/`onError`，导致 `app.js` 中 `state.isStreaming` 和 `btnSend.disabled` 永不重置
-- **修复**: 
-  - 添加 `completed` 标记，收到 `type: "done"` 时设为 `true`；循环结束后若 `!completed` 则调用 `onDone(null)`
-  - `app.js` 中 `onDone` 回调处理 `null messageId`：重置按钮状态，有部分内容时仍保存
-  - `onDone`/`onError` 中均调用 `loadConversations()` 避免计数卡死
-
-### CR.4.2 🔴 V2 字段未用于 prompt 组装
-- **根因**: `build_message_list()` 仅使用 `system_prompt`/`personality`，忽略 `scenario`、`mes_example`、`post_history_instructions`
-- **修复**:
-  - `scenario` → 附加在 system prompt 后，作为 `[场景设定]` 系统消息
-  - `mes_example` → 解析 `<START>` 分隔的 `{{user}}`/`{{char}}` 对话为 few-shot 消息序列（新增 `_parse_mes_example()`）
-  - `post_history_instructions` → 附加在历史消息之后、当前输入之前
-  - 空字段自动跳过，不增加 token 消耗
-
-### CR.4.3 🟡 theme_mode 设置不生效
-- **根因**: `theme_mode` 保存/加载了值但从未应用到 DOM；CSS 只用 `@media (prefers-color-scheme: dark)` 不认强制模式
-- **修复**:
-  - `app.js` 新增 `applyTheme(mode)`：`auto`/无 → 移除 `data-theme`；`light`/`dark` → 设置到 `<html>`
-  - `style.css` 新增 `:root[data-theme="dark"]` 和 `:root[data-theme="light"]` 选择器
-  - 媒体查询改为 `:root:not([data-theme="light"])` 避免与显式浅色冲突
-  - `loadSettings()` 和保存设置后自动应用主题
-
----
-
-## 2026-07-30 — 全量进度审计 + 文档同步
-
-### 审计过程
-- [x] 逐文件审计 Phase 1-5 + P6.1 的实际代码完成度
-- [x] 发现 Phase 4 前端实际达 100%（模型选择器/模型列表/设置集成均已完成）
-- [x] 发现 Phase 5 后端实际达 100%、前端 100%（全部功能已实现）
-- [x] P6.1 对话导出后端 + 前端均已完成
-- [x] CR.3.3 路由层 LLM 错误映射已抽取为 `_LLM_ERROR_MAP` ✅
-- [x] CR.4.2 V2 字段已用于 prompt 组装 ✅
-- [x] CR.8 流式计数问题已在 onDone/onError 回调中修复 ✅
-- [x] CR.10 范围蔓延项目已全部更新标记 ✅
-
-### 更新文档
-- [x] TICKETS.md — Phase 4/5 标记为完成、附录快照更新
-- [x] PROJECT_REFERENCE.md — 阶段描述更新
-- [x] memory:dev-workflow-status — 同步进度
-- [x] memory:features — 同步功能清单
-
-### 剩余开放项（代码质量，不影响功能）
-
-| CR | 描述 | 文件 |
-|----|------|------|
-| CR.5.5 | 硬编码 provider/model → config.settings | conversation.py |
-| CR.7 | 默认模型覆盖逻辑脆弱 | conversation.py |
-| CR.5.1 | 路由/服务函数缺少类型注解 | 多文件 |
-| CR.6.1 | 流式/非流式端点重复代码 | messages.py |
-| CR.2.2/5.2 | API 路径/函数命名规范 | messages.py |
-| CR.6.2 | 前端头像 HTML 构造重复 | app.js |
-| CR.3.2 | Provider 异常映射公共逻辑 | claude.py/openai.py |
-| CR.6.3 | JSON 字段/Message.role 枚举 | models.py |
-| CR.4.1 | ChatRequest.stream 死代码 | schemas/message.py |
-
-### 功能待增强 (Phase 6)
-
-| 功能 | 状态 |
-|------|------|
-| 搜索历史消息 | ✅ 已完成 |
-| Prompt 模板变量 | ✅ 已完成 |
-| Ollama 本地模型 | ⬜ |
-| 多 tab 会话管理 | ⬜ |
-| 角色 V2 导入/导出 | ⬜（已规划 P2.5） |
-| Tauri 桌面版 | ⬜ |
-| API Key 测试连接 | ⬜（P4.3 待增强） |
-
----
-
-## 2026-07-30 — P6.3 Prompt 模板变量 ({{user}}/{{char}}) 实现
-
-### 后端
-- [x] `services/message.py` — 新增 `_apply_template_vars(text, user_name, char_name)` 核心替换函数
-  - 支持 `{{user}}` → 用户昵称（从 settings 表读取）
-  - 支持 `{{char}}` → 角色名称（从 character 数据读取）
-- [x] `_parse_mes_example()` — 新增 `user_name`/`char_name` 参数，替换对话范例中的模板变量
-- [x] `auto_insert_greeting()` — 新增 `user_name` 参数，替换 greeting 中的模板变量
-- [x] `build_message_list()` — 新增 `user_name` 参数，替换以下字段中的模板变量：
-  - system_content（system prompt / personality）
-  - scenario（场景设定）
-  - mes_example（对话范例，通过 `_parse_mes_example`）
-  - post_history_instructions（历史后指令）
-  - 当前用户输入
-- [x] `api/routes/messages.py` — 新增 `_get_user_name(db)` 从 settings 表读取用户昵称
-- [x] `create_chat()` / `stream_chat()` — 将 `user_name` 传递到 service 层
-
-### 前端
-- [x] `index.html` — 设置面板新增"模板变量"分组 + 用户昵称输入框
-- [x] `app.js` — 设置加载/保存时处理 `user_name` 字段
-- [x] `character-form.js` — Personality/Greeting/Scenario 字段下方增加模板变量提示
-- [x] `style.css` — 新增 `.field-hint` 样式
-
----
-
-## 2026-07-30 — P6.2 搜索历史消息 实现
-
-### 后端
-- [x] `services/message.py` — 新增 `search_messages()` 函数
-  - SQL LIKE 搜索 + JOIN Conversation/Character 获取上下文
-  - 关键词上下文截取（关键词前后 50 字符）
-  - 返回消息预览、对话标题、角色名/头像、时间
-- [x] `api/routes/messages.py` — 新增 `GET /api/messages/search?q=&limit=50`
-  - 关键词参数 + 数量限制
-  - 空查询返回空列表
-
-### 前端
-- [x] `api.js` — 新增 `messages.search(q, limit)`
-- [x] `index.html` — 新增搜索视图（搜索框 + 结果区）+ 侧栏/移动端导航搜索按钮
-- [x] `app.js` — 新增搜索逻辑：
-  - `performSearch()` — 防抖 300ms、关键词 ≥ 2 字符
-  - `renderSearchResults()` — 渲染结果列表（角色图标、对话名、预览）
-  - `highlightText()` — 搜索结果关键词高亮（mark 标签）
-  - `navigateToConversation()` — 点击结果跳转到对话
-  - 搜索框自动聚焦 + Enter/Escape 快捷键
-- [x] `style.css` — 搜索输入框/结果列表/高亮/响应式样式
-
----
-
-## 2026-08-03 — CR.2 代码质量硬性违规清理
-
-> 复核 TICKETS CR.2 四项：大部分审计条目在现行代码中已就绪（复核确认），仅补齐剩余 3 处局部导入清理。
-
-### CR.2.1 类型注解（复核确认已就绪）
-- [x] `database.py:set_sqlite_pragma(dbapi_connection, connection_record) -> None`
-- [x] `database.py:init_db() -> None`
-- [x] `main.py:on_startup() -> None`
-
-### CR.2.2 路由函数命名（复核确认已就绪）
-- [x] `messages.py` — `create_chat` / `stream_chat`（符合 `create_*` 前缀规范）
-
-### CR.2.3 消除函数内局部导入
-- [x] `conversation.py` — `Setting` 已在模块顶部（复核确认）
-- [x] `message.py` — `Character` 已在模块顶部（复核确认）
-- [x] `conversation.py:delete_all_conversations()` — 移除冗余的 `from backend.app.models.message import Message` 局部导入（顶部已导入）
-- [x] `conversations.py` — 导出端点中 `JSONResponse` / `PlainTextResponse` 局部导入移至模块顶部
-- [~] 保留项：`main.py:on_startup()` 的 `init_db` 与 `database.py:init_db()` 的 `import backend.app.models` — 启动期延迟加载，属合理模式
-
-### CR.2.4 旧式 typing 语法（复核确认已就绪）
-- [x] `settings.py` 使用 `dict[str, Any]`，全库无 `Dict[`/`List[` 旧式写法
-
-### 验证
-- [x] `py_compile` 通过
-- [x] `from backend.app.main import app` 导入正常
-
----
-
-## 2026-08-03 — CR.3.1 + CR.6.4 deps.py 清理
-
-> CR.3.1 复核确认：`deps.py` 已是纯转发（无重复定义）。经确认一并删除 deps.py 浅模块，落地 CR.6.4。
-
-### 变更
-- [x] 删除 `backend/app/api/deps.py`（纯转发浅模块）
-- [x] 4 个路由文件导入改为直接 `from backend.app.database import get_db`：
-  - `characters.py` / `conversations.py` / `settings.py` / `messages.py`
-- [x] `git grep` 确认无残留 `api.deps` 引用
-
-### 验证
-- [x] `py_compile` 通过
-- [x] `from backend.app.main import app` 导入正常
-
----
-
-## 2026-08-03 — CR.6.1 + CR.3.2 + CR.4.1 代码质量收尾
-
-> 抽取流式/非流式端点共同逻辑、Provider 异常映射公共方法、ChatRequest.stream 死代码复核。
-
-### 变更
-- [x] **CR.6.1** `api/routes/messages.py` 抽取 `_prepare_chat()` + `_ChatContext` dataclass，`create_chat`/`stream_chat` 的 ~90 行共同前置逻辑收敛为一处
-- [x] **CR.3.2** `ClaudeProvider`/`OpenAIProvider` 各新增 `_translate_error()` 私有方法，`generate()`/`stream_generate()` 共用 SDK 异常映射
-- [x] **CR.4.1** 复核确认 `ChatRequest` 无 `stream` 字段，无死代码可删（端点仅靠 URL 路径决定模式）
-
-### 验证
-- [x] `py_compile` 通过
-- [x] `from backend.app.main import app` 导入正常
-
----
-
-## 2026-08-03 — CR.5.1 + CR.5.2 类型注解与 API 路径重命名
-
-> 补齐全部路由函数返回类型注解；聊天端点路径 `/api/chat*` → `/api/chats*` 并同步前端。
-
-### CR.5.1 路由/服务函数返回类型注解
-- [x] `messages.py` — `get_messages -> list[MessageResponse]`、`create_chat -> ChatResponse`、`stream_chat -> StreamingResponse`、`search_messages -> list[dict]`、`event_generator -> AsyncIterator[str]`
-- [x] `characters.py` — `list_*`/`get_*`/`create_*`/`update_* -> CharacterResponse`、`delete_* -> None`
-- [x] `conversations.py` — `list_*`/`get_*`/`create_*`/`update_* -> ConversationResponse`、`delete_* -> None`、导出端点 `-> JSONResponse` / `PlainTextResponse`
-- [x] `models.py` — `list_models() -> dict[str, list[dict]]`
-- [x] `settings.py` — `get_settings` / `update_settings -> dict[str, str]`
-- [x] `database.py` — `get_db() -> Iterator[Session]`（生成器注解，导入 `collections.abc.Iterator`）
-- [x] Service 层复核确认：`character.py` / `conversation.py` / `message.py` 返回注解已完备
-
-### CR.5.2 API 路径重命名
-- [x] `messages.py` — `POST /api/chat` → `POST /api/chats`；`POST /api/chat/stream` → `POST /api/chats/stream`（模块 docstring 同步）
-- [x] `frontend/js/api.js` — `messages.chat()` → `/chats`；`chatStream()` → `/chats/stream`
-- [x] 文档同步 — `docs/api-design.md`、`docs/architecture.md`、`docs/development-plan.md`、`CONSENSUS.md`
-
-### 验证
-- [x] `py_compile` 通过
-- [x] `from backend.app.main import app` 导入正常
-- [x] 前端全库无 `/api/chat` 残留引用
-
----
-
-## 2026-08-03 — CR.6.2 前端头像/复制按钮构造去重
-
-> `app.js` 中头像 HTML 构造出现 3 处重复（renderMessages / appendMessage / handleSend 流模式），复制按钮绑定重复 2 处，统一收敛。
-
-### 变更
-- [x] 新增 `createAvatarElement(role)` — 将 `getAssistantAvatarHtml()` / `getUserAvatarHtml()` 的 HTML 字符串解析为 DOM 元素，供 `appendMessage()` / `handleSend()` 流模式复用
-- [x] 新增 `attachCopyButton(btn, content)` — 复制按钮点击事件（剪贴板 + ✅/❌ 反馈）统一绑定，`renderMessages()` 与 `appendMessage()` 共用
-- [x] `appendMessage()` 头像构造从 ~20 行 DOM 手工构建 → 一行 `createAvatarElement(role)`
-- [x] `handleSend()` 流模式头像同样一行复用
-
-### 验证
-- [x] `node --check` 语法通过
-- [x] 最小 DOM shim 单元测试 12 用例通过（真实函数源码提取测试）：
-  - assistant 无头像 → `avatar-placeholder-xs` 占位 + 首字母
-  - assistant 有头像 → `<img src/alt>` 正确
-  - user → `.msg-avatar.user-avatar` 👤
-  - `attachCopyButton` 绑定、复制原文（未转义）、✅+copied 反馈
-  - renderMessages 路径 `dataset` 解码正确
-- [x] uvicorn 启动验证通过；页面 `/` 与 `/js/app.js` 均 200
-- [x] 测试数据已通过 API 清理（无残留）
-
----
-
-## 2026-08-03 — CR.5.5 + CR.7 默认模型配置回退链重构
-
-> `create_conversation()` 删除硬编码字符串比较，改用 Pydantic v2 `model_fields_set` 判断显式传参，重建回退链。
-
-### 变更
-- [x] **CR.5.5** `conversation.py` — 移除硬编码 `"claude"` / `"claude-sonnet-4-20250514"`，改为引用 `config.settings.DEFAULT_PROVIDER` / `DEFAULT_MODEL`
-- [x] **CR.7** 删除靠比较默认字符串判断"是否覆盖 settings"的脆弱逻辑
-- [x] 新回退链：请求显式传入 `model_provider`/`model_name` → 尊重用户选择；未传入 → DB settings 默认值；settings 未设置 → config 默认值
-- [x] 新增 `_get_setting_value(db, key)` 辅助函数，收敛 settings 读取
-- [x] `ConversationCreate` 字段默认值保留，`model_fields_set` 识别是否显式传参
-
-### 行为差异说明
-- 前端流程（始终显式传参）行为不变：选择器预选 settings 默认值，显式值即等于默认值
-- 修复了边界：用户显式选择 `claude/claude-sonnet-4-20250514` 但 settings 默认不同时，旧逻辑会静默覆盖用户选择，新逻辑尊重用户显式选择
-
-### 验证
-- [x] `py_compile` 通过
-- [x] `from backend.app.main import app` 导入正常
-- [x] 内存 SQLite 功能测试 3 用例通过（显式传参 / settings 回退 / config 回退）
-
----
-
-## 2026-08-03 — CR.6.5 messages.py 职责分离
-
-> 聊天端点与消息检索混在一个路由文件。聊天涉及 LLM 配置/错误映射/Provider 获取，协议表面与消息查询完全不同，拆分为独立路由文件，各自承担单一职责。
-
-### 变更
-- [x] 新增 `api/routes/chat.py` — 承载聊天职责：
-  - `POST /api/chats`（`create_chat`）+ `POST /api/chats/stream`（`stream_chat`）
-  - LLM 相关辅助整体迁移：`_get_api_key` / `_get_sliding_window_rounds` / `_get_user_name`、`_LLM_ERROR_MAP` / `_llm_error_response` / `_raise_llm_http_error`、`_ChatContext` / `_prepare_chat`
-  - 仅保留聊天所需的 LLM 导入（BaseLLM / LLM 错误 / LLMFactory / ChatRequest / ChatResponse）
-- [x] `api/routes/messages.py` — 只保留消息检索：`GET /api/conversations/{id}/messages`（`get_messages`）+ `GET /api/messages/search`（`search_messages`），删除全部 LLM/聊天导入与辅助
-- [x] `main.py` — 注册 `chat.router`；路由 tags 拆分：chat.py → `聊天`，messages.py → `消息`（Swagger 分组更清晰）
-- [x] 所有 API 路径不变，前端 `api.js` 无需改动
-
-### 验证
-- [x] `py_compile` 通过（chat.py / messages.py / main.py）
-- [x] `from backend.app.main import app` 导入正常
-- [x] OpenAPI 路径核对：`/api/chats`、`/api/chats/stream` 由 chat 路由承载；`/api/conversations/{id}/messages`、`/api/messages/search` 由 messages 路由承载
-
----
-
-## 2026-08-03 — CR.5.3 + CR.5.4 + CR.6.3 命名规范与 Primitive Obsession
-
-> 收尾剩余代码质量项：两个命名决策 + Primitive Obsession 全量整改。
-
-### CR.5.4 Service 函数命名
-- [x] `save_message()` → `create_message()`（对齐 `create_*` 规范），`auto_insert_greeting()` 内部调用 + `chat.py` 3 处调用点同步
-- [x] `auto_insert_greeting()` 决策保留原名 — 条件自动插入语义，`create_*` 会误导为无条件创建
-
-### CR.5.3 路由命名规范决策
-- [x] 决策：**更新规范允许 `stream_*` 特殊动词前缀**（SSE 流式端点），`stream_chat` 与 `create_chat` 配对，避免 `create_chat_stream` 冗长
-- [x] 规范同步至 `memory:conventions`
-
-### CR.6.3 Primitive Obsession
-- [x] `models/character.py` — `alternate_greetings`/`tags` → `Column(JSON, default=list)`，`creator_notes`/`extensions` → `Column(JSON, default=dict)`；既有 TEXT 存量 JSON 字符串可无缝读出（SQLAlchemy JSON 序列化），无数据迁移
-- [x] `schemas/character.py` — 四字段改 `list[str]`/`dict`（Create/Update/Response）
-- [x] 前端联动：`utils.js:formatTags()` 改收数组、`app.js` 标签显示判断 `c.tags.length`、`character-form.js` `tagsToJson` → `tagsToArray`（提交发送数组）
-- [x] `models/message.py` — 新增 `Role` 枚举 + `Enum` 列；`values_callable` 按枚举值存取（user/assistant/system），兼容既有 VARCHAR(20) 存量数据，无需迁移
-- [x] 引用点收敛：`create_message` 签名 `role: Role`；`build_message_list` / `search_messages` / 对话导出 JSON+Markdown 输出 `msg.role.value`（LLM 契约与导出文件需纯字符串）
-- [x] `api/routes/chat.py` — 调用传 `Role.USER` / `Role.ASSISTANT`
-
-### 验证
-- [x] `compileall backend/app` 通过；`from backend.app.main import app` 正常
-- [x] 内存 SQLite 全流程测试：JSON 列读写（list/dict）、Role 枚举落库为值 `user`（非枚举名 `USER`）、LLM 消息/导出/搜索 role 均为字符串
-- [x] 既有 `conver_system.db` 兼容读测试通过（TEXT JSON → list、VARCHAR(20) → Role 枚举）
-- [x] `node --check` 前端 3 文件通过；Pydantic 序列化（枚举→值、list→数组）通过
+## 日志正文
+
+### 2026-08-03 | 文档 | 文档规范改造
+- 依据 Profit Calculator 经验 + 知识库沉淀《文档规范》（`docs/documentation-standards.md`）
+- PROJECT_REFERENCE 修正「同步 ORM」错误（原误写 async/aiosqlite）、删除与 README/CONSENSUS 重复的技术栈/路线图
+- README 修正 `.env` 复制路径（应为根目录）、删除重复内容
+- DEV_LOG 瘦身 579 → ~100 行：待办项移 TICKETS、审计快照压缩为一行、历史改倒序滚动条目
+- TICKETS 新增「已完成归档」区，CR 项按生命周期归档（记日期 + 提交哈希）
+- `database.py` docstring 同步化；`.serena` tech_stack 记忆修正 aiosqlite → 同步
+
+### 2026-08-03 | 实现 | P2.5.5 前端导出 UI
+- 角色卡片操作区新增 📤 导出按钮（`.export-char`，置于编辑与删除之间，D4）
+- 抽取通用 `downloadBlob(url, filename, errorPrefix)`；对话导出 `downloadExport()` 重构复用，消除两处 Blob 下载重复（与 CR.6.2 去重思路一致）
+- Playwright E2E：中文文件名正确、V2 信封完整（data 15 键）、temperature 入 `extensions.conver_system` 命名空间
+
+### 2026-08-03 | 实现 | P2.5.4 前端导入 UI
+- 角色视图「导入角色」按钮 + 隐藏文件输入 + `characters.import()` + toast 反馈（D4/D6）
+- Playwright E2E：V2 卡导入、非法 JSON 前端拦截（不发请求）、后端 422 单前缀展示
+
+### 2026-08-03 | 实现 | P2.5.3 角色导入 API
+- `POST /api/characters/import`：`from_v2_card` 归一化 → create_character 落库（D3 重名直接新建）
+- `ValueError` → 422 友好 detail；非 dict body 自动 422；路由零业务逻辑（复用 character_card 深模块）
+- 验证：V2/裸 data/V1 旧卡导入 201、非法卡 422、导出→导入往返保真
+
+### 2026-08-03 | 实现 | P2.5.2 角色导出 API
+- `GET /api/characters/{id}/export`：`to_v2_card` → JSONResponse + `Content-Disposition` 附件头（中文名 URL 编码）
+- 规格偏差：SPEC §4.2 用 `get_character_with_count` 校验，实际需 ORM 对象 → 改用 `get_character`（同源校验，语义等价）
+
+### 2026-08-03 | 实现 | P2.5.1 后端转换层
+- `services/character_card.py`：`to_v2_card` / `from_v2_card`（V2 信封 + 裸 data + V1 归一化 + `extensions.conver_system` 往返保真）
+
+### 2026-08-03 | 实现 | CR.6.5 messages.py 职责分离
+- 聊天端点拆出 `api/routes/chat.py`（POST /api/chats + /api/chats/stream + LLM 辅助），`messages.py` 仅留消息检索；路由 tags 拆「聊天」/「消息」
+
+### 2026-08-03 | 实现 | CR.5.3 + CR.5.4 + CR.6.3 命名规范 + Primitive Obsession
+- 决策：允许 `stream_*` 特殊动词前缀（SSE 流式端点）；`save_message` → `create_message`，`auto_insert_greeting` 保留原名
+- Character JSON 字段（tags/alternate_greetings/creator_notes/extensions）→ SQLAlchemy JSON 列，存量 TEXT 兼容
+- Message.role → `Role` 枚举（`Enum` 列 `values_callable` 按值存取，存量 VARCHAR 兼容），LLM 消息/导出输出 `.value` 纯字符串
+
+### 2026-08-03 | 实现 | CR.5.5 + CR.7 默认模型回退链重构
+- 移除硬编码 `"claude"`/`"claude-sonnet-4-20250514"` → 引用 config 默认；删除靠字符串比较判断「是否覆盖」的脆弱逻辑
+- 改用 Pydantic v2 `model_fields_set`：显式传参 → settings 默认 → config 默认；修复「显式选择=默认值时被静默覆盖」边界
+
+### 2026-08-03 | 实现 | CR.6.2 前端头像/复制按钮构造去重
+- 新增 `createAvatarElement(role)` + `attachCopyButton(btn, content)`，renderMessages/appendMessage/流模式复用；最小 DOM shim 测试 12 用例通过
+
+### 2026-08-03 | 实现 | CR.5.1 + CR.5.2 类型注解 + API 路径重命名
+- 全部路由/服务函数补返回类型注解（27+ 处）；`/api/chat` → `/api/chats`（前端 api.js + 4 份文档同步）
+
+### 2026-08-03 | 实现 | CR.6.1 + CR.3.2 + CR.4.1 代码质量收尾
+- `_prepare_chat()` + `_ChatContext` 收敛 ~90 行共同前置逻辑；Provider 新增 `_translate_error()` 共用 SDK 异常映射；ChatRequest.stream 复核无死代码
+
+### 2026-08-03 | 实现 | CR.3.1 + CR.6.4 deps.py 清理
+- 删除纯转发浅模块 `api/deps.py`，4 个路由直连 `database.get_db`
+
+### 2026-08-03 | 实现 | CR.2 代码质量硬性违规清理
+- 复核确认 3/4 子项在现行代码已就绪（类型注解/命名/typing 语法），仅补齐冗余局部导入清理（见 `经验/审计快照过期需复核`）
+
+### 2026-07-30 | 实现 | P6.3 Prompt 模板变量
+- `_apply_template_vars()`：`{{user}}` → 用户昵称、`{{char}}` → 角色名，作用于 greeting/scenario/mes_example/系统提示/用户输入
+- 前端设置面板「模板变量」分组 + 表单字段提示
+
+### 2026-07-30 | 实现 | P6.2 搜索历史消息
+- `search_messages()`：SQL LIKE 跨对话搜索 + JOIN 上下文 + 关键词前后 50 字截取；`GET /api/messages/search?q=&limit=50`
+- 前端搜索视图（防抖 300ms、关键词高亮、结果跳转）
+
+### 2026-07-30 | 修复 | CR.4.3 theme_mode 设置不生效
+- 根因：值保存/加载但从未应用 DOM，CSS 只认 `@media` 不认强制模式
+- 修复：`applyTheme(mode)` 设置/移除 `<html data-theme>` + `:root[data-theme="dark"/"light"]` 选择器
+
+### 2026-07-30 | 修复 | CR.4.2 V2 字段未用于 prompt 组装
+- 根因：`build_message_list()` 忽略 scenario/mes_example/post_history_instructions
+- 修复：scenario → `[场景设定]` 系统消息；mes_example 解析 `<START>` 对话为 few-shot；post_history_instructions 置于历史后；空字段跳过
+
+### 2026-07-30 | 修复 | CR.4.1 SSE 流中断 → 按钮永久禁用
+- 根因：`reader.read()` 返回 done 时直接 break，从不触发 onDone/onError，`isStreaming`/`btnSend.disabled` 永不重置
+- 修复：`completed` 标记，流结束未收 done → `onDone(null)` 重置状态，有部分内容仍保存
+
+### 2026-07-30 | 实现 | P6.1 对话导出
+- `export_conversation_json/markdown`；`GET /{id}/export/json|markdown`（附件头）+ 前端导出弹窗 + Blob 下载
+- CR.9 toast 通知（showError/showSuccess），数据加载失败用户可见
+
+### 2026-07-30 | 实现 | Phase 5 体验完善
+- 对话历史/重命名/删除确认/清空、Markdown 渲染、复制按钮、Toast、快捷键、主题切换（auto/light/dark）、响应式、设置面板（滑窗/默认模型/base_url）
+
+### 2026-07-30 | 实现 | Phase 4 多模型支持
+- OpenAIProvider（generate/stream_generate、base_url 可配、异常映射）+ Factory 注册；前端模型选择器 + model badge + 设置集成
+
+### 2026-07-30 | 实现 | Phase 3 对话核心
+- ClaudeProvider generate/stream_generate + LLM 异常映射；POST /api/chats + /api/chats/stream（SSE）
+- 上下文管理：system prompt + 滑窗（轮数从 settings 读）+ greeting 自动插入；Key 动态读取；temperature 生效；前端流式渲染 + 思考指示器
+
+### 2026-07-30 | 实现 | Phase 2 角色管理前端
+- character-form.js（完整字段）、编辑预填、删除确认（关联对话数）、角色卡片增强
+
+### 2026-07-30 | 实现 | Phase 1 项目骨架
+- config / database（同步 ORM + PRAGMA FK）/ models（V2 完整字段）/ schemas / LLM 层（BaseLLM+Factory+桩）/ API Routes / main.py
+- 前端 index.html 三栏 + style.css 主题 + api.js（fetch+SSE）+ app.js
+
+### 2026-07-30 | 审计 | 全量代码审查（Phase 5 后）
+- 发现 27 处缺类型注解、/api/chat 命名、头像/复制按钮重复、JSON 字段、Message.role、deps.py、messages.py 职责混杂 → CR 项已入 TICKETS（CR.1-CR.10）
+
+### 2026-07-30 | 审计 | 全量代码审查（初轮）
+- Standards + Spec 双轴：滑窗不生效、SSE 错误静默丢弃、类型注解缺失、异常映射重复 → CR 项已入 TICKETS
+- 决策：Git 延迟初始化（项目完善后再 `git init`）
+
+### 2026-07-30 | 立项 | to-tickets 阶段
+- grill → to-spec（CONSENSUS + 4 份设计文档）→ to-tickets（TICKETS 全量任务分解）→ implement

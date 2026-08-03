@@ -119,6 +119,8 @@ POST /api/conversations
 }
 ```
 
+> **title 可选**：不传时后端默认「与 {角色名} 的对话」（角色存在时）；发出首条 user 消息后，服务端同步替换为该消息的规则截断标题（折叠空白 + 20 字 + 「…」），详见 CONSENSUS §4。
+
 **响应** `201`
 ```json
 {
@@ -226,6 +228,12 @@ const eventSource = fetch('/api/chats/stream', { /* POST */ });
 const reader = response.body.getReader();
 // 逐块解码渲染，实现打字机效果
 ```
+
+**停止生成**（流式模式）
+- 前端持 `AbortController`，点击停止按钮 → `controller.abort()` → fetch 中断 → SSE 连接断开
+- 后端 `event_generator` 在 token 循环中轮询 `request.is_disconnected()`：检测到客户端断开即停止继续调用 LLM，**将已生成的部分内容保存为 assistant 消息**后正常收尾
+- 停止语义为「用户主动停止」，非错误；前端气泡标记「（已停止）」
+- 非流式端点 `POST /api/chats` 不提供停止（请求不可真正中断）
 
 ---
 

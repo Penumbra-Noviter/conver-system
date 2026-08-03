@@ -87,7 +87,11 @@
         <section id="view-characters" class="view">
             <div class="view-header">
                 <h2>角色管理</h2>
-                <button class="btn-primary" id="btn-create-character">＋ 创建角色</button>
+                <div class="view-header-actions">
+                    <button class="btn-secondary" id="btn-import-character" title="从 SillyTavern V2 角色卡 JSON 导入">📥 导入角色</button>
+                    <button class="btn-primary" id="btn-create-character">＋ 创建角色</button>
+                    <input type="file" id="character-import-input" accept=".json,application/json" style="display:none">
+                </div>
             </div>
             <div class="character-grid" id="character-grid">
                 <p class="empty-hint">暂无角色，点击上方按钮创建</p>
