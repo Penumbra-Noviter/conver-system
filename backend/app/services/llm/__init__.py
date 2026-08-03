@@ -11,6 +11,12 @@ from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.claude import ClaudeProvider
 from backend.app.services.llm.factory import LLMFactory, register_builtin_providers
 from backend.app.services.llm.openai import OpenAIProvider
+from backend.app.services.llm.prompt import (
+    CharacterData,
+    apply_template_vars,
+    build_messages,
+    parse_mes_example,
+)
 
 __all__ = [
     "BaseLLM",
@@ -18,4 +24,8 @@ __all__ = [
     "OpenAIProvider",
     "LLMFactory",
     "register_builtin_providers",
+    "CharacterData",
+    "apply_template_vars",
+    "parse_mes_example",
+    "build_messages",
 ]

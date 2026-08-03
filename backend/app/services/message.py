@@ -12,20 +12,7 @@ from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
 from backend.app.services import conversation as conversation_service
-
-
-def _apply_template_vars(text: str, user_name: str = "User", char_name: str = "Character") -> str:
-    """替换文本中的模板变量
-
-    支持变量:
-        {{user}}  — 用户昵称（从设置读取）
-        {{char}}  — 角色名称（从角色数据读取）
-    """
-    if not text:
-        return text
-    text = text.replace("{{user}}", user_name)
-    text = text.replace("{{char}}", char_name)
-    return text
+from backend.app.services.llm.prompt import CharacterData, apply_template_vars, build_messages
 
 
 def get_messages(db: Session, conversation_id: int) -> list[Message]:
@@ -102,52 +89,11 @@ def auto_insert_greeting(
     if not character or not character.first_mes:
         return None
 
-    # 模板变量替换
-    greeting = _apply_template_vars(character.first_mes, user_name, character.name)
+    # 模板变量替换（纯函数来自 services/llm/prompt.py）
+    greeting = apply_template_vars(character.first_mes, user_name, character.name)
 
     # 插入 greeting 作为 assistant 消息
     return create_message(db, conversation_id, Role.ASSISTANT, greeting)
-
-
-def _parse_mes_example(mes_example: str, user_name: str = "User", char_name: str = "Character") -> list[dict]:
-    """解析 mes_example 对话范例为 user/assistant 消息序列
-
-    支持 <START> 分隔的多轮范例，每行格式为 {{user}}: 或 {{char}}: 开头。
-    参考 SillyTavern V2 规范，{{user}} 映射为 user 角色，{{char}} 映射为 assistant 角色。
-    同时替换消息内容中的 {{user}}/{{char}} 模板变量。
-    """
-    if not mes_example or not mes_example.strip():
-        return []
-
-    messages: list[dict] = []
-    # 按 <START> 分隔多轮范例
-    blocks = mes_example.split('<START>')
-
-    for block in blocks:
-        block = block.strip()
-        if not block:
-            continue
-
-        for line in block.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith('{{user}}'):
-                content = line[len('{{user}}'):].lstrip(':').strip()
-                if content:
-                    messages.append({
-                        "role": "user",
-                        "content": _apply_template_vars(content, user_name, char_name),
-                    })
-            elif line.startswith('{{char}}'):
-                content = line[len('{{char}}'):].lstrip(':').strip()
-                if content:
-                    messages.append({
-                        "role": "assistant",
-                        "content": _apply_template_vars(content, user_name, char_name),
-                    })
-
-    return messages
 
 
 def build_message_list(
@@ -160,12 +106,14 @@ def build_message_list(
     """构建发送给 LLM 的消息列表
 
     组装顺序：
-        1. character.personality（作为 system prompt，支持模板变量）
+        1. character.system_prompt 或 personality（作为 system prompt，支持模板变量）
         2. character.scenario（场景设定，支持模板变量）
         3. character.mes_example（对话范例，支持模板变量）
         4. 历史消息（按时间正序，受滑窗限制）
         5. character.post_history_instructions（历史后指令，支持模板变量）
         6. 当前用户输入（支持模板变量）
+
+    查询角色与历史消息后，委托给 services/llm/prompt.py 的纯函数完成组装。
 
     模板变量：
         {{user}} — 用户昵称
@@ -175,41 +123,23 @@ def build_message_list(
     if not character:
         raise ValueError(f"角色不存在: {conversation.character_id}")
 
-    char_name = character.name or "Character"
-
-    # system prompt（优先使用 system_prompt 字段，其次 personality）
-    system_content = character.system_prompt or character.personality
-    system_content = _apply_template_vars(system_content, user_name, char_name)
-    messages: list[dict] = [{"role": "system", "content": system_content}]
-
-    # 场景设定（scenario）— 附加在 system prompt 后，作为补充上下文
-    if character.scenario:
-        scenario = _apply_template_vars(character.scenario, user_name, char_name)
-        messages.append({"role": "system", "content": f"[场景设定]\n{scenario}"})
-
-    # 对话范例（mes_example）— 作为 few-shot 示例插入
-    if character.mes_example:
-        examples = _parse_mes_example(character.mes_example, user_name, char_name)
-        messages.extend(examples)
-
-    # 历史消息（滑窗截断，保留最近 N 轮对话）
+    char_data = CharacterData(
+        name=character.name or "",
+        system_prompt=character.system_prompt or "",
+        personality=character.personality or "",
+        scenario=character.scenario or "",
+        mes_example=character.mes_example or "",
+        post_history_instructions=character.post_history_instructions or "",
+    )
     history = get_messages(db, conversation.id)
-    if len(history) > max_rounds * 2:
-        history = history[-(max_rounds * 2):]
 
-    for msg in history:
-        messages.append({"role": msg.role.value, "content": msg.content})
-
-    # 历史后指令（post_history_instructions）— 附加在历史消息之后、当前输入之前
-    if character.post_history_instructions:
-        phi = _apply_template_vars(character.post_history_instructions, user_name, char_name)
-        messages.append({"role": "system", "content": phi})
-
-    # 当前输入
-    content = _apply_template_vars(user_content, user_name, char_name)
-    messages.append({"role": "user", "content": content})
-
-    return messages
+    return build_messages(
+        character=char_data,
+        history=history,
+        user_content=user_content,
+        max_rounds=max_rounds,
+        user_name=user_name,
+    )
 
 
 def search_messages(

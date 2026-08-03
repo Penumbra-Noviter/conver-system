@@ -3,32 +3,20 @@
  *
  * 职责：
  *   1. 视图切换（侧栏导航）
- *   2. 全局状态管理
+ *   2. 业务协调（角色 / 对话 / 设置 / 搜索）
  *   3. 事件绑定
+ *
+ * 模块结构：
+ *   - ./state.js — 全局状态 + 模块级状态
+ *   - ./chat.js  — 聊天域渲染与交互（renderMessages / handleSend / chatDom）
  */
 
-import { characters, conversations, messages, chatStream, models, settings } from './api.js';
+import { characters, conversations, messages, models, settings } from './api.js';
 import { showCharacterForm } from './components/character-form.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
-import { escapeHtml, getInitials, formatTags, renderMarkdown } from './utils.js';
-
-// ══════════════════════════════════════════════════
-// 全局状态
-// ══════════════════════════════════════════════════
-
-const state = {
-    currentView: 'chat',
-    characters: [],
-    conversations: [],
-    currentConversationId: null,
-    currentCharacterId: null,
-    messages: [],
-    isStreaming: false,
-    activeStream: null,            // 当前流式请求的 { abort, done } 句柄
-    models: { providers: [] },       // 可用模型列表
-    defaultProvider: 'claude',
-    defaultModel: 'claude-sonnet-4-20250514',
-};
+import { escapeHtml, getInitials, formatTags } from './utils.js';
+import { state, getConvListVisible, setConvListVisible, setSearchTimeout, clearSearchTimeout } from './state.js';
+import { chatDom, renderMessages, handleSend, setConversationsRefresher } from './chat.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -42,14 +30,9 @@ const dom = {
     views: $$('.view'),
     navBtns: $$('.nav-btn'),
 
-    // 聊天
+    // 聊天（聊天域 DOM 引用见 chat.js chatDom）
     conversationList: $('#conversation-list'),
-    chatMessages: $('#chat-messages'),
-    chatInput: $('#chat-input'),
-    btnSend: $('#btn-send'),
     btnNewChat: $('#btn-new-chat'),
-    chatHeader: $('#chat-header'),
-    toggleStream: $('#toggle-stream'),
     // 移动端
     mobileNavBtns: $$('.mobile-nav-btn'),
     convListToggle: null, // 将在初始化时创建
@@ -110,12 +93,11 @@ dom.mobileNavBtns.forEach((btn) => {
 });
 
 // 切换对话列表显示（移动端）
-let convListVisible = true;
 function toggleConvList() {
     const sidebar = document.querySelector('.chat-sidebar');
     if (!sidebar) return;
-    convListVisible = !convListVisible;
-    sidebar.style.display = convListVisible ? '' : 'none';
+    setConvListVisible(!getConvListVisible());
+    sidebar.style.display = getConvListVisible() ? '' : 'none';
 }
 
 // ══════════════════════════════════════════════════
@@ -303,6 +285,10 @@ dom.btnImportCharacter.addEventListener('click', () => {
 });
 dom.characterImportInput.addEventListener('change', handleCharacterImport);
 
+// ══════════════════════════════════════════════════
+// 模型选择 & 开始对话
+// ══════════════════════════════════════════════════
+
 /**
  * 显示模型选择对话框 — 创建对话时让用户选择 Provider 和模型
  * @param {string} characterName - 角色名称（用于展示）
@@ -422,7 +408,7 @@ async function startChatWithCharacter(characterId) {
         switchView('chat');
         await loadConversations();
         await loadMessages();
-        dom.chatInput.focus();
+        chatDom.chatInput.focus();
     } catch (err) {
         showAlert('创建对话失败: ' + err.message);
     }
@@ -511,7 +497,7 @@ dom.btnNewChat.addEventListener('click', () => {
 });
 
 // ══════════════════════════════════════════════════
-// 消息 & 聊天
+// 消息 & 聊天（协调层 — 聊天域渲染/发送见 chat.js）
 // ══════════════════════════════════════════════════
 
 /**
@@ -519,7 +505,7 @@ dom.btnNewChat.addEventListener('click', () => {
  * @param {object} conv - 对话对象
  */
 function startRename(conv) {
-    const titleEl = dom.chatHeader.querySelector('#chat-title-text');
+    const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
     if (!titleEl) return;
 
     const input = document.createElement('input');
@@ -574,8 +560,8 @@ function startRename(conv) {
 
 async function loadMessages() {
     if (!state.currentConversationId) {
-        dom.chatMessages.innerHTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
-        dom.chatHeader.textContent = '选择一个角色开始对话';
+        chatDom.chatMessages.innerHTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
+        chatDom.chatHeader.textContent = '选择一个角色开始对话';
         return;
     }
 
@@ -588,17 +574,17 @@ async function loadMessages() {
         if (conv) {
             const modelLabel = conv.model_name || '';
             const providerLabel = conv.model_provider === 'openai' ? 'OpenAI' : 'Claude';
-            dom.chatHeader.innerHTML = `
+            chatDom.chatHeader.innerHTML = `
                 <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">☰</button>
                 <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
                 <span class="chat-model-badge">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</span>
                 <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">📥</button>
             `;
             // 双击标题重命名
-            const titleEl = dom.chatHeader.querySelector('#chat-title-text');
+            const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
             titleEl.addEventListener('dblclick', () => startRename(conv));
             // 移动端切换对话列表
-            const toggleBtn = dom.chatHeader.querySelector('#btn-toggle-conv-list');
+            const toggleBtn = chatDom.chatHeader.querySelector('#btn-toggle-conv-list');
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', () => {
                     const sidebar = document.querySelector('.chat-sidebar');
@@ -609,7 +595,7 @@ async function loadMessages() {
                 });
             }
             // 导出按钮
-            const exportBtn = dom.chatHeader.querySelector('#btn-export-conv');
+            const exportBtn = chatDom.chatHeader.querySelector('#btn-export-conv');
             if (exportBtn) {
                 exportBtn.addEventListener('click', () => {
                     showExportDialog(state.currentConversationId);
@@ -620,87 +606,6 @@ async function loadMessages() {
         console.error('加载消息失败:', err);
         showError('加载消息失败');
     }
-}
-
-function renderMessages() {
-    const container = dom.chatMessages;
-    if (state.messages.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>开始一段对话吧</p></div>';
-        return;
-    }
-
-    container.innerHTML = state.messages
-        .map(
-            (m) => `
-        <div class="message ${m.role}">
-            ${m.role === 'assistant' ? getAssistantAvatarHtml() : getUserAvatarHtml()}
-            <div class="message-content">${m.role === 'assistant' ? renderMarkdown(m.content) : escapeHtml(m.content)}</div>
-            <button class="btn-copy-message" title="复制消息" data-content="${escapeHtml(m.content)}">📋</button>
-        </div>
-    `
-        )
-        .join('');
-
-    // 复制按钮事件
-    container.querySelectorAll('.btn-copy-message').forEach(btn => {
-        attachCopyButton(btn, btn.dataset.content);
-    });
-
-    scrollToBottom();
-}
-
-function appendMessage(role, content) {
-    const container = dom.chatMessages;
-    // 移除空状态
-    const empty = container.querySelector('.empty-state');
-    if (empty) empty.remove();
-    // 移除 thinking 指示器
-    const thinking = container.querySelector('.thinking-indicator');
-    if (thinking) thinking.remove();
-
-    const div = document.createElement('div');
-    div.className = `message ${role}`;
-
-    // 头像
-    div.appendChild(createAvatarElement(role));
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    if (role === 'assistant') {
-        contentDiv.innerHTML = renderMarkdown(content);
-    } else {
-        contentDiv.textContent = content;
-    }
-    div.appendChild(contentDiv);
-
-    // 复制按钮
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'btn-copy-message';
-    copyBtn.title = '复制消息';
-    copyBtn.textContent = '📋';
-    copyBtn.dataset.content = content;
-    attachCopyButton(copyBtn, content);
-    div.appendChild(copyBtn);
-
-    container.appendChild(div);
-    scrollToBottom();
-}
-
-function showThinkingIndicator() {
-    const container = dom.chatMessages;
-    // 移除已有 thinking
-    const existing = container.querySelector('.thinking-indicator');
-    if (existing) existing.remove();
-
-    const div = document.createElement('div');
-    div.className = 'thinking-indicator';
-    div.innerHTML = '<span class="dot-pulse"></span> 思考中…';
-    container.appendChild(div);
-    scrollToBottom();
-}
-
-function scrollToBottom() {
-    dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
 }
 
 // ══════════════════════════════════════════════════
@@ -802,217 +707,11 @@ function downloadExport(conversationId, format) {
     );
 }
 
-// ── 头像渲染 ──
+// ══════════════════════════════════════════════════
+// 输入框事件（发送/停止逻辑见 chat.js handleSend）
+// ══════════════════════════════════════════════════
 
-/**
- * 获取当前角色的头像 HTML
- * @returns {string}
- */
-function getAssistantAvatarHtml() {
-    const char = state.characters.find(c => c.id === state.currentCharacterId);
-    if (char?.avatar) {
-        return `<div class="msg-avatar"><img src="${escapeHtml(char.avatar)}" alt="${escapeHtml(char.name || '角色')}" onerror="this.parentElement.innerHTML='<div class=\\'avatar-placeholder-xs\\'>${escapeHtml(getInitials(char.name || 'A'))}</div>'"></div>`;
-    }
-    const name = char?.name || 'AI';
-    return `<div class="msg-avatar"><div class="avatar-placeholder-xs">${escapeHtml(getInitials(name))}</div></div>`;
-}
-
-/**
- * 获取默认用户头像 HTML
- * @returns {string}
- */
-function getUserAvatarHtml() {
-    return `<div class="msg-avatar user-avatar">👤</div>`;
-}
-
-/**
- * 创建消息头像 DOM 元素（复用 HTML 字符串辅助函数）
- * @param {'assistant'|'user'} role - 消息角色
- * @returns {HTMLElement} 头像元素
- */
-function createAvatarElement(role) {
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = role === 'assistant' ? getAssistantAvatarHtml() : getUserAvatarHtml();
-    return wrapper.firstElementChild;
-}
-
-/**
- * 为消息复制按钮绑定点击事件（复制内容到剪贴板并给出 ✅/❌ 反馈）
- * @param {HTMLButtonElement} btn - 复制按钮元素
- * @param {string} content - 要复制的消息内容
- */
-function attachCopyButton(btn, content) {
-    btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        try {
-            await navigator.clipboard.writeText(content);
-            btn.textContent = '✅';
-            btn.classList.add('copied');
-            setTimeout(() => {
-                btn.textContent = '📋';
-                btn.classList.remove('copied');
-            }, 1500);
-        } catch {
-            btn.textContent = '❌';
-        }
-    });
-}
-
-// ── 发送消息 ──
-
-/**
- * 发送按钮两态 — 流式生成中变身停止按钮（P3.5）
- * @param {'send'|'stop'} mode - 'stop': ⏹ 停止生成；'send': ➤ 发送
- */
-function setSendButtonState(mode) {
-    const btn = dom.btnSend;
-    if (mode === 'stop') {
-        btn.disabled = false;
-        btn.textContent = '⏹';
-        btn.title = '停止生成';
-        btn.classList.add('btn-stop');
-    } else {
-        btn.disabled = false;
-        btn.textContent = '➤';
-        btn.title = '发送';
-        btn.classList.remove('btn-stop');
-    }
-}
-
-/**
- * 给停止的 assistant 气泡追加「（已停止）」标记 — 语义为用户主动停止，非错误（P3.5）
- * @param {HTMLElement} assistantDiv - assistant 消息元素
- */
-function markStopped(assistantDiv) {
-    const tag = document.createElement('div');
-    tag.className = 'message-stop-tag';
-    tag.textContent = '（已停止）';
-    assistantDiv.appendChild(tag);
-    scrollToBottom();
-}
-
-/**
- * 同步聊天头部标题 — 与对话列表保持一致（P3.5 标题联动）
- * 后端保存首条 user 消息后自动替换占位标题，发送完成后据此刷新头部标题。
- */
-function syncChatHeaderTitle() {
-    const titleEl = dom.chatHeader.querySelector('#chat-title-text');
-    if (!titleEl || !state.currentConversationId) return;
-    const conv = state.conversations.find((c) => c.id === state.currentConversationId);
-    if (conv) titleEl.textContent = conv.title;
-}
-
-async function handleSend() {
-    const content = dom.chatInput.value.trim();
-    if (!content || !state.currentConversationId || state.isStreaming) return;
-
-    dom.chatInput.value = '';
-    dom.chatInput.style.height = 'auto';
-
-    // 显示用户消息
-    appendMessage('user', content);
-
-    const useStream = dom.toggleStream.checked;
-
-    if (useStream) {
-        // 流式模式
-        state.isStreaming = true;
-        setSendButtonState('stop');
-
-        const assistantDiv = document.createElement('div');
-        assistantDiv.className = 'message assistant';
-        // 头像
-        assistantDiv.appendChild(createAvatarElement('assistant'));
-        const assistantContentDiv = document.createElement('div');
-        assistantContentDiv.className = 'message-content';
-        assistantDiv.appendChild(assistantContentDiv);
-        dom.chatMessages.appendChild(assistantDiv);
-
-        let fullContent = '';
-        const isAbortError = (err) => err?.name === 'AbortError';
-
-        const stream = chatStream(
-            { conversation_id: state.currentConversationId, content },
-            {
-                onToken: (token) => {
-                    fullContent += token;
-                    assistantContentDiv.innerHTML = renderMarkdown(fullContent);
-                    scrollToBottom();
-                },
-                onDone: (messageId) => {
-                    state.isStreaming = false;
-                    state.activeStream = null;
-                    setSendButtonState('send');
-                    if (messageId) {
-                        // 正常完成 — 保存完整消息
-                        state.messages.push(
-                            { role: 'user', content },
-                            { role: 'assistant', content: fullContent, id: messageId }
-                        );
-                    } else if (fullContent) {
-                        // 流中断但已有部分内容
-                        state.messages.push(
-                            { role: 'user', content },
-                            { role: 'assistant', content: fullContent }
-                        );
-                    }
-                    // 刷新对话列表（更新消息数量）
-                    loadConversations();
-                },
-                onError: (err) => {
-                    state.isStreaming = false;
-                    state.activeStream = null;
-                    setSendButtonState('send');
-                    if (isAbortError(err)) {
-                        // 用户主动停止 — 语义是「已停止」而非错误；后端已保存部分内容
-                        if (fullContent) {
-                            assistantContentDiv.innerHTML = renderMarkdown(fullContent);
-                        }
-                        markStopped(assistantDiv);
-                        state.messages.push(
-                            { role: 'user', content },
-                            { role: 'assistant', content: fullContent }
-                        );
-                    } else {
-                        assistantContentDiv.textContent = `[错误] ${err.message}`;
-                    }
-                    // 错误/停止时也刷新对话列表（避免计数卡死）
-                    loadConversations();
-                },
-            }
-        );
-        state.activeStream = stream;
-        await stream.done;
-    } else {
-        // 非流式模式
-        showThinkingIndicator();
-        try {
-            dom.btnSend.disabled = true;
-            const result = await messages.chat({
-                conversation_id: state.currentConversationId,
-                content,
-            });
-            appendMessage('assistant', result.reply);
-            state.messages.push(
-                { role: 'user', content },
-                { role: 'assistant', content: result.reply }
-            );
-        } catch (err) {
-            appendMessage('system', `发送失败: ${err.message}`);
-        } finally {
-            dom.btnSend.disabled = false;
-        }
-    }
-
-    // 刷新对话列表（更新消息数量）
-    await loadConversations();
-    // 首条 user 消息后后端已自动替换占位标题 → 同步头部标题（P3.5 标题联动）
-    syncChatHeaderTitle();
-}
-
-// ── 输入框事件 ──
-
-dom.btnSend.addEventListener('click', () => {
+chatDom.btnSend.addEventListener('click', () => {
     if (state.isStreaming) {
         // 流式生成中 → 点击为「停止生成」
         state.activeStream?.abort();
@@ -1021,16 +720,16 @@ dom.btnSend.addEventListener('click', () => {
     }
 });
 
-dom.chatInput.addEventListener('keydown', (e) => {
+chatDom.chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
     }
 });
 
-dom.chatInput.addEventListener('input', () => {
-    dom.chatInput.style.height = 'auto';
-    dom.chatInput.style.height = Math.min(dom.chatInput.scrollHeight, 150) + 'px';
+chatDom.chatInput.addEventListener('input', () => {
+    chatDom.chatInput.style.height = 'auto';
+    chatDom.chatInput.style.height = Math.min(chatDom.chatInput.scrollHeight, 150) + 'px';
 });
 
 // ══════════════════════════════════════════════════
@@ -1058,6 +757,10 @@ function refreshModelOptions() {
         .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
         .join('');
 }
+
+// ══════════════════════════════════════════════════
+// 设置
+// ══════════════════════════════════════════════════
 
 /**
  * 应用主题模式到 DOM
@@ -1210,8 +913,6 @@ dom.btnClearAllConvs.addEventListener('click', async () => {
 // 搜索
 // ══════════════════════════════════════════════════
 
-let searchTimeout = null;
-
 /**
  * 执行搜索并渲染结果
  * @param {string} query - 搜索关键词
@@ -1334,16 +1035,16 @@ async function navigateToConversation(conversationId) {
 // ── 搜索输入事件 ──
 
 dom.searchInput.addEventListener('input', () => {
-    clearTimeout(searchTimeout);
+    clearSearchTimeout();
     const q = dom.searchInput.value;
     // 延迟搜索，避免每输入一个字就请求
-    searchTimeout = setTimeout(() => performSearch(q), 300);
+    setSearchTimeout(setTimeout(() => performSearch(q), 300));
 });
 
 dom.searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        clearTimeout(searchTimeout);
+        clearSearchTimeout();
         performSearch(dom.searchInput.value);
     }
     if (e.key === 'Escape') {
@@ -1360,10 +1061,6 @@ dom.btnSearchClear.addEventListener('click', () => {
 });
 
 // ══════════════════════════════════════════════════
-// 工具函数 — 已迁移至 utils.js
-// ══════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════
 // 初始化
 // ══════════════════════════════════════════════════
 
@@ -1376,5 +1073,8 @@ async function init() {
     // Provider 切换时动态更新模型列表
     $('#setting-default-provider').addEventListener('change', refreshModelOptions);
 }
+
+// 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）
+setConversationsRefresher(loadConversations);
 
 init();
