@@ -5,18 +5,24 @@
 
 ---
 
-## 滚动摘要（2026-08-03）
+## 滚动摘要（2026-08-04）
 
-- **阶段**：架构深化第二轮收官（②导出收拢 / ③前端模态框抽象 / ④搜索结果 Schema / ⑤前端测试基建）**完成**；①②⑥③⑤④ 已归档；P4.3 / P3.5 / 文档测试专项审查（CR-D1~D7）已归档；Rust 工具链已装（P6.4 Tauri 前置就绪）；下一步 P6.4 Tauri / P6.5 多 tab（→ TICKETS）
-- **代码质量**：CR.1-CR.7 全部清零（`6bdb1ca`）+ 文档/测试专项 CR-D1~D7 + 架构深化 ①②⑥③⑤④；P4.3 / prompt.py / conversation_export.py 新增模块 100% 行覆盖
-- **测试**：pytest **141** 用例（原 117 + conversation_export + SearchResult + message）+ 前端 Vitest **28** 用例（format 15 / utils 8 / api 5）；后端运行 `pytest`，前端运行 `npm test`（`frontend/`）；`character_card` / `prompt` 100% 覆盖可复现
-- **文档**：《文档规范》已强化（测试规范章节 + 防漂移检查项）；修复 api-design / architecture / llm-integration / p2.5 spec 全部漂移；新增 CONTEXT.md 领域词汇表
+- **阶段**：架构深化第二轮收官完成；P6.4 Tauri / P6.5 多 tab 待办（→ TICKETS）
+- **UI 重设计**：Linear 设计语言全面重写 CSS（near-black canvas + 薰衣草蓝 accent #5e6ad2）；Token 化设计系统、surface 4 层阶梯、hairline 边框、skeleton 骨架屏；所有 JS class 名保持不变，0 行 JS 修改；code-review 8 项问题全部修复
+- **代码质量**：CR.1-CR.7 全部清零；文档/测试专项 CR-D1~D7 已归档
+- **测试**：pytest **141** 用例 + 前端 Vitest **28** 用例，全部通过
+- **文档**：已同步
 
 ---
 
 ## 日志正文
 
-### 2026-08-03 | 实现 | 架构深化第二轮收官：②导出收拢 + ④搜索结果 Schema + ③前端模态框 + ⑤前端测试基建
+### 2026-08-04 | 实现 | Linear 设计语言 UI 重设计（`f83ec2f`）
+- **设计系统**：CSS 全面重写为 Linear 风格（near-black `#010102` canvas + 薰衣草蓝 `#5e6ad2` accent）；4 层 surface 阶梯（page → bg → panel-2 → panel-3 → panel-4）+ hairline 半透明边框
+- **Token 化**：全部颜色、间距、圆角、字号通过 CSS 自定义属性管理；深色模式优先，浅色模式从同一色板推导
+- **组件**：新增 SVG logo 图标 + 发送按钮箭头；skeleton 骨架屏加载状态类（`.skeleton` / `.skeleton-line` / `.skeleton-card` / `.skeleton-circle`）
+- **合规**：Inter 字体使用系统栈替代（无云依赖）；移除 backdrop-filter glassmorphism、纯黑/纯白、accent 色超范围使用
+- **遗留**：是非 Ticket 驱动的一次性视觉改进，不影响已有功能
 - **② 导出收拢**：新 `services/conversation_export.py` 深模块（`__all__` 仅 `export_conversation_json`/`export_conversation_markdown`）收纳导出逻辑；`conversation.py` 257→134 行；角色字段提取由新增 `ConversationExportCharacter` Schema（`from_attributes=True`，9 字段）唯一驱动，service 层零手写字段映射（弃用初稿「手写 frozenset + model_dump(include=) 混合方案」，字段清单单点化）
 - **④ 搜索结果 Schema**：`search_messages` 返回 `list[SearchResult]`（9 字段与旧 dict 契约逐字段一致：role `.value` / created_at isoformat / 空 query `[]`）；路由 `GET /api/messages/search` 声明 `response_model=list[SearchResult]`；与 ④ 序列化主线（response_model 驱动）汇合
 - **③ 前端模态框抽象**：`components/modal.js` 通用工厂 `openModal`（遮罩/标题转义/body/actions/关闭三路径/结果回传）；`showConfirm`/`showAlert` 对外 API 不变、内部复用工厂；`showModelSelector`/`createExportDialog` 迁入 `model-selector.js`/`export-dialog.js`，函数体从 app.js 删除；`downloadBlob`/`showToast` 移入 utils.js（`showError`/`showSuccess` 1 行委托，解 app.js↔组件循环依赖）；app.js 1080→864 行；Playwright 冒烟三弹窗开合 + 消息渲染无 JS 错误
