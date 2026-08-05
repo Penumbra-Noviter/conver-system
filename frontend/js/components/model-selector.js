@@ -39,6 +39,7 @@ export function showModelSelector(characterName) {
                 <div class="form-field">
                     <label for="ms-model">模型</label>
                     <select id="ms-model"></select>
+                    <input type="text" id="ms-custom-model" class="custom-model-input" style="display:none" placeholder="输入模型名称">
                 </div>
                 <div class="model-selector-info">
                     ⚡ 可在设置中修改默认值
@@ -51,25 +52,62 @@ export function showModelSelector(characterName) {
             onOpen: (overlay, close) => {
                 const providerSelect = overlay.querySelector('#ms-provider');
                 const modelSelect = overlay.querySelector('#ms-model');
+                const customInput = overlay.querySelector('#ms-custom-model');
 
-                // ── 填充模型下拉列表 ──
+                // ── 填充模型下拉列表（含自定义选项） ──
                 const fillModels = () => {
                     const provider = providers.find(p => p.id === providerSelect.value);
                     if (!provider) return;
+                    const isCustom = modelSelect.value === '__custom__';
                     modelSelect.innerHTML = provider.models
                         .map(m => {
                             const selected = m === defaultModelName && providerSelect.value === defaultProviderId ? 'selected' : '';
                             return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
                         })
-                        .join('');
+                        .join('')
+                        + '<option value="__custom__">✏️ 自定义模型</option>';
+
+                    // 如果默认模型不在当前 provider 列表中，自动切到自定义
+                    const exists = defaultModelName && provider.models.includes(defaultModelName) && providerSelect.value === defaultProviderId;
+                    if (exists) {
+                        modelSelect.value = defaultModelName;
+                        customInput.style.display = 'none';
+                    } else if (isCustom || (defaultModelName && !provider.models.includes(defaultModelName) && providerSelect.value === defaultProviderId)) {
+                        modelSelect.value = '__custom__';
+                        customInput.value = defaultModelName || '';
+                        customInput.style.display = '';
+                        modelSelect.style.display = 'none';
+                        customInput.focus();
+                    } else {
+                        modelSelect.value = '';
+                        customInput.style.display = 'none';
+                        modelSelect.style.display = '';
+                    }
                 };
                 fillModels();
 
                 // Provider 切换时更新模型列表
                 providerSelect.addEventListener('change', fillModels);
 
+                // 模型下拉切换时联动自定义输入框
+                modelSelect.addEventListener('change', function () {
+                    if (this.value === '__custom__') {
+                        customInput.style.display = '';
+                        this.style.display = 'none';
+                        customInput.focus();
+                    } else {
+                        customInput.style.display = 'none';
+                        this.style.display = '';
+                    }
+                });
+
                 // 读取当前选择
-                const pick = () => close({ provider: providerSelect.value, model: modelSelect.value });
+                const pick = () => {
+                    const model = modelSelect.value === '__custom__'
+                        ? customInput.value.trim()
+                        : modelSelect.value;
+                    close({ provider: providerSelect.value, model });
+                };
                 overlay.querySelector('.ms-cancel').addEventListener('click', () => close(null));
                 overlay.querySelector('.ms-start').addEventListener('click', pick);
                 overlay.addEventListener('keydown', (e) => {
