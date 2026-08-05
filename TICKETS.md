@@ -29,6 +29,25 @@
 
 ## 已完成归档
 
+### 架构摩擦分析 11 候选（第三轮收官，2026-08-05）
+
+> 依据 architecture-review 报告（/improve-codebase-architecture）候选 ①–⑪ 全部落地。
+> 行为逐项保持，双端测试全绿（pytest 141 + Vitest 32）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| ① | 设置面板提取：`components/settings-panel.js`（协议表面 initSettingsPanel/loadSettings/initProviderDropdown）；app.js 1050→~700 行 | 2026-08-05 | `a69c53e` |
+| ② | 模型选择逻辑统一：`utils/model-utils.js`（fillModelSelect/createCustomModelHandler），settings-panel 与 model-selector 共享 | 2026-08-05 | `a69c53e` |
+| ③ | Provider 标识符重构：key/id 分离（8 provider 唯一 key），前端 value 用 key，data-index 退役；factory 注册第三方；setting 经 _PROVIDER_API_MAP 映射存储键 | 2026-08-05 | `429b075` |
+| ④ | 服务层异常解耦：`services/exceptions.py` 领域异常替换 HTTPException，路由层 _prepare_or_raise 转换 | 2026-08-05 | `abd8920` |
+| ⑤ | 模型数据迁移：`services/model_data.py`，路由 131→18 行纯化 | 2026-08-05 | `429b075` |
+| ⑥ | state.js 职责收缩：convListVisible/searchTimeout 移入 app.js | 2026-08-05 | `a69c53e` |
+| ⑦ | BaseLLM 死代码清理：移除无调用方 provider_name 抽象属性 | 2026-08-05 | `29da016` |
+| ⑧ | 角色卡异常层次：CardFormatError/CardValidationError 精确捕获，路由转 422 | 2026-08-05 | `abd8920` |
+| ⑨ | SSE 流解析器提取：`utils/sse-reader.js` parseSSEStream 纯函数 + 4 用例 | 2026-08-05 | `a69c53e` |
+| ⑩ | 查询逻辑 DRY：`_base_character_query` + `_attach_count` | 2026-08-05 | `29da016` |
+| ⑪ | 静态文件路由冲突：/ 挂载点注册顺序契约注释 | 2026-08-05 | `29da016` |
+
 ### 架构深化候选 ②③④⑤（第二轮收官，2026-08-03）
 
 > 并行两路落地：后端路（②④）收拢导出 + 搜索结果 Schema；前端路（③⑤）模态框抽象 + Vitest 测试基建。前端 ③⑤ 共用 `app.js` 故在同一代理内串行，后端 ②④ 共享 response_model/序列化约定在同一代理内串行。行为逐项保持，双端测试全绿（pytest 141 + npm 28）。

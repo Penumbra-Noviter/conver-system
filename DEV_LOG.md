@@ -5,17 +5,33 @@
 
 ---
 
-## 滚动摘要（2026-08-04）
+## 滚动摘要（2026-08-05）
 
-- **阶段**：架构深化第二轮收官完成；P6.4 Tauri / P6.5 多 tab 待办（→ TICKETS）
-- **UI 重设计**：Linear 设计语言全面重写 CSS（near-black canvas + 薰衣草蓝 accent #5e6ad2）；Token 化设计系统、surface 4 层阶梯、hairline 边框、skeleton 骨架屏；所有 JS class 名保持不变，0 行 JS 修改；code-review 8 项问题全部修复
-- **代码质量**：CR.1-CR.7 全部清零；文档/测试专项 CR-D1~D7 已归档
-- **测试**：pytest **141** 用例 + 前端 Vitest **28** 用例，全部通过
-- **文档**：已同步
+- **阶段**：架构摩擦分析 11 候选全部收官；P6.4 Tauri / P6.5 多 tab 待办（→ TICKETS）
+- **前端模块化**：设置面板提取 `settings-panel.js`；模型选择统一 `model-utils.js`；SSE 解析器 `sse-reader.js`；state.js 收缩
+- **Provider 标识符**：key/id 分离，data-index 退役，模型数据迁移 `services/model_data.py`
+- **服务层解耦**：领域异常 `services/exceptions.py` + 角色卡异常层次
+- **测试**：pytest **141** 用例 + 前端 Vitest **32** 用例，全部通过
+- **数据**：清理测试数据（TestBot + 3 对话 + 6 消息）；`default_provider` 修正 openai→deepseek 对齐新 key 方案
 
 ---
 
 ## 日志正文
+
+### 2026-08-05 | 重构 | 架构摩擦分析 11 候选全部落地
+- **① 设置面板提取**（`a69c53e`）：app.js ~320 行设置逻辑（Provider/模型下拉、主题、侧栏、保存/清空/API Key 测试）迁入 `components/settings-panel.js`，协议表面 `initSettingsPanel`/`loadSettings`/`initProviderDropdown`；app.js 1050→~700 行
+- **② 模型选择统一**（`a69c53e`）：`utils/model-utils.js` 暴露 `fillModelSelect`/`createCustomModelHandler`，settings-panel 与 model-selector 共享，消除重复
+- **③ Provider 标识符重构**（`429b075`）：8 provider 各配唯一 `key`，`id` 保留为 API 协议标识符；前端下拉 value 用 key，`data-index` 匹配逻辑退役；factory 注册第三方 OpenAI 兼容 Provider；`setting.api_key`/`base_url` 经 `_PROVIDER_API_MAP` 将 key 映射到协议存储键（如 deepseek→openai_api_key）
+- **④ 服务层异常解耦**（`abd8920`）：`services/exceptions.py` 定义领域异常（ConversationNotFound/ApiKeyMissing/ProviderNotSupported），`prepare_chat` 不再抛 HTTPException，路由层 `_prepare_or_raise` 捕获转 HTTP 状态码
+- **⑤ 模型数据迁移**（`429b075`）：`AVAILABLE_MODELS` 移至 `services/model_data.py`，models 路由 131→18 行纯化
+- **⑥ state.js 职责收缩**（`a69c53e`）：`convListVisible`/`searchTimeout` 移至 app.js 模块级，state.js 仅留应用级数据
+- **⑦ BaseLLM 死代码清理**（`29da016`）：移除无调用方引用的 `provider_name` 抽象属性
+- **⑧ 角色卡异常层次**（`abd8920`）：`CardFormatError`/`CardValidationError` 精确区分格式与校验错误，路由统一转 422；测试断言同步迁移
+- **⑨ SSE 流解析器提取**（`a69c53e`）：`utils/sse-reader.js` `parseSSEStream` 纯函数，api.js 解析逻辑收敛为 1 行调用；新增 4 用例
+- **⑩ 查询逻辑 DRY**（`29da016`）：`_base_character_query` + `_attach_count` 消除 list/get 重复 outerjoin/group_by
+- **⑪ 静态文件路由冲突**（`29da016`）：`/` 挂载点添加注册顺序契约注释（API 路由须 /api 前缀且在挂载前注册）
+- **数据清理**：删除测试角色 TestBot 及其 3 对话 6 消息（备份 `conver_system.backup-20260805-233559.db`）；`default_provider` 修正 `openai`→`deepseek` 对齐新 key 方案（default_provider_name=DeepSeek）
+- **测试**：pytest **141 passed**；前端 Vitest **32 passed**（4 文件，新增 sse-reader 4 用例）
 
 ### 2026-08-04 | 实现 | Linear 设计语言 UI 重设计（`f83ec2f`）
 - **设计系统**：CSS 全面重写为 Linear 风格（near-black `#010102` canvas + 薰衣草蓝 `#5e6ad2` accent）；4 层 surface 阶梯（page → bg → panel-2 → panel-3 → panel-4）+ hairline 半透明边框
