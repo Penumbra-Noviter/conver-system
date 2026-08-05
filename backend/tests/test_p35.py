@@ -192,7 +192,7 @@ class _FakeFactory:
     """替代 LLMFactory.get_provider 的工厂"""
 
     @staticmethod
-    def get_provider(provider: str, api_key: str) -> _StubProvider:
+    def get_provider(provider: str, api_key: str, base_url: str | None = None) -> _StubProvider:
         return _StubProvider(["你好", "世界"])
 
 
@@ -228,7 +228,7 @@ def _make_stream_context(db_session, monkeypatch, tokens, **kwargs):
     monkeypatch.setattr(
         chat_service,
         "LLMFactory",
-        type("_FakeLLMFactory", (), {"get_provider": staticmethod(lambda p, k: _StubProvider(tokens, **kwargs))}),
+        type("_FakeLLMFactory", (), {"get_provider": staticmethod(lambda p, k, b=None: _StubProvider(tokens, **kwargs))}),
     )
 
     response = asyncio.run(chat_route.stream_chat(req, _FakeRequest(), db_session))
@@ -359,7 +359,7 @@ def test_stream_llm_error_emits_error_event(db_session, monkeypatch) -> None:
     monkeypatch.setattr(
         chat_service,
         "LLMFactory",
-        type("_FakeLLMFactory", (), {"get_provider": staticmethod(lambda p, k: _ErrorProvider([]))}),
+        type("_FakeLLMFactory", (), {"get_provider": staticmethod(lambda p, k, b=None: _ErrorProvider([]))}),
     )
 
     async def _run() -> list[str]:

@@ -101,9 +101,10 @@ def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
             detail=f"未配置 {conv.model_provider} API Key，请在设置中填写",
         )
 
-    # 7. 获取 Provider
+    # 7. 获取 Provider（含自定义 base_url）
     try:
-        provider = LLMFactory.get_provider(conv.model_provider, api_key)
+        base_url = setting_service.get_value(db, f"{conv.model_provider}_base_url") or None
+        provider = LLMFactory.get_provider(conv.model_provider, api_key, base_url)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

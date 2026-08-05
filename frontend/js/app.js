@@ -656,6 +656,7 @@ async function loadSettings() {
     try {
         const s = await settings.get();
         if (s.claude_api_key) $('#setting-claude-key').value = s.claude_api_key;
+        if (s.claude_base_url) $('#setting-claude-url').value = s.claude_base_url;
         if (s.openai_api_key) $('#setting-openai-key').value = s.openai_api_key;
         if (s.openai_base_url) $('#setting-openai-url').value = s.openai_base_url;
         if (s.default_provider) {
@@ -690,7 +691,11 @@ async function testApiKeys(data) {
     if (data.claude_api_key) {
         checks.push({
             label: 'Claude',
-            data: { provider: 'claude', api_key: data.claude_api_key },
+            data: {
+                provider: 'claude',
+                api_key: data.claude_api_key,
+                base_url: data.claude_base_url || null,
+            },
         });
     }
     if (data.openai_api_key) {
@@ -728,6 +733,7 @@ async function testApiKeys(data) {
 dom.btnSaveSettings.addEventListener('click', async () => {
     const data = {
         claude_api_key: $('#setting-claude-key').value,
+        claude_base_url: $('#setting-claude-url').value,
         openai_api_key: $('#setting-openai-key').value,
         openai_base_url: $('#setting-openai-url').value,
         default_provider: $('#setting-default-provider').value,

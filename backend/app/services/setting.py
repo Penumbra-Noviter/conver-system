@@ -35,6 +35,7 @@ __all__ = [
 # 允许前端读写的配置键白名单
 ALLOWED_KEYS = {
     "claude_api_key",
+    "claude_base_url",
     "openai_api_key",
     "openai_base_url",
     "default_provider",
