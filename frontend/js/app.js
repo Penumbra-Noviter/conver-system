@@ -584,7 +584,7 @@ async function toggleTheme() {
     const next = current === 'dark' ? 'light' : 'dark';
     applyTheme(next);
     try {
-        await settings.save({ theme_mode: next });
+        await settings.update({ theme_mode: next });
     } catch (err) {
         console.error('保存主题设置失败:', err);
     }
@@ -617,14 +617,17 @@ function toggleSidebar() {
     state.sidebarCollapsed = !state.sidebarCollapsed;
     const sidebar = $('#sidebar');
     const btn = $('#btn-collapse-sidebar');
+    const expandBtn = $('#btn-expand-sidebar');
     if (state.sidebarCollapsed) {
         sidebar.classList.add('sidebar-collapsed');
         btn.textContent = '▶';
         btn.title = '展开侧栏';
+        expandBtn.style.display = 'flex';
     } else {
         sidebar.classList.remove('sidebar-collapsed');
         btn.textContent = '◀';
         btn.title = '收起侧栏';
+        expandBtn.style.display = 'none';
     }
 }
 
@@ -635,14 +638,17 @@ function toggleChatSidebar() {
     state.chatSidebarCollapsed = !state.chatSidebarCollapsed;
     const sidebar = document.querySelector('.chat-sidebar');
     const btn = $('#btn-collapse-chat');
+    const expandBtn = $('#btn-expand-chat');
     if (state.chatSidebarCollapsed) {
         sidebar.classList.add('chat-sidebar-collapsed');
         btn.textContent = '▶';
         btn.title = '展开侧栏';
+        expandBtn.style.display = 'flex';
     } else {
         sidebar.classList.remove('chat-sidebar-collapsed');
         btn.textContent = '◀';
         btn.title = '收起侧栏';
+        expandBtn.style.display = 'none';
     }
 }
 
@@ -937,6 +943,10 @@ async function init() {
     // 侧栏收起按钮
     $('#btn-collapse-sidebar')?.addEventListener('click', toggleSidebar);
     $('#btn-collapse-chat')?.addEventListener('click', toggleChatSidebar);
+
+    // 侧栏展开按钮（收起时浮动显示）
+    $('#btn-expand-sidebar')?.addEventListener('click', toggleSidebar);
+    $('#btn-expand-chat')?.addEventListener('click', toggleChatSidebar);
 }
 
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）

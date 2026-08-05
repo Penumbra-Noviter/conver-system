@@ -326,6 +326,9 @@ body {
 }
 
 /* ── Sidebar collapse states ── */
+#sidebar {
+    transition: width 0.2s ease, min-width 0.2s ease, padding 0.2s ease, border 0.2s ease;
+}
 #sidebar.sidebar-collapsed {
     width: 0;
     overflow: hidden;
@@ -333,13 +336,10 @@ body {
     min-width: 0;
     padding: 0;
 }
-#sidebar.sidebar-collapsed > * {
-    visibility: hidden;
-}
-#sidebar {
-    transition: width 0.2s ease, min-width 0.2s ease, padding 0.2s ease;
-}
 
+.chat-sidebar {
+    transition: width 0.2s ease, min-width 0.2s ease, padding 0.2s ease, border 0.2s ease;
+}
 .chat-sidebar.chat-sidebar-collapsed {
     width: 0;
     overflow: hidden;
@@ -347,11 +347,58 @@ body {
     min-width: 0;
     padding: 0;
 }
-.chat-sidebar.chat-sidebar-collapsed > * {
-    visibility: hidden;
+
+/* ── Floating expand buttons (shown when sidebar is collapsed) ── */
+.floating-expand {
+    display: none;
+    position: fixed;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    width: 24px;
+    height: 48px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-left: none;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--panel-3);
+    color: var(--ink-3);
+    cursor: pointer;
+    font-size: 10px;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition-fast), background var(--transition-fast);
 }
-.chat-sidebar {
-    transition: width 0.2s ease, min-width 0.2s ease, padding 0.2s ease;
+.floating-expand:hover {
+    background: var(--panel-4);
+    color: var(--ink-1);
+}
+
+.chat-floating-expand {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    width: 24px;
+    height: 48px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-left: none;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--panel-3);
+    color: var(--ink-3);
+    cursor: pointer;
+    font-size: 10px;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition-fast), background var(--transition-fast);
+}
+.chat-floating-expand:hover {
+    background: var(--panel-4);
+    color: var(--ink-1);
 }
 
 /* ══════════════════════════════════════════════════
@@ -409,6 +456,7 @@ body {
 .chat-layout {
     display: flex;
     height: 100%;
+    position: relative;  /* 为浮动展开按钮提供定位容器 */
 }
 
 /* 对话列表（左侧第二栏） */
@@ -2072,6 +2120,12 @@ mark.search-highlight {
     }
     .chat-sidebar.chat-sidebar-collapsed {
         display: none;
+    }
+    .floating-expand {
+        display: none !important;
+    }
+    .chat-floating-expand {
+        display: none !important;
     }
 
     #main-content {
