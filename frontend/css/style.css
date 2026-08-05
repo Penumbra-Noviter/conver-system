@@ -492,6 +492,12 @@ body {
     align-items: center;
 }
 
+/* ── 自定义模型输入框 ── */
+.custom-model-input {
+    margin-top: var(--space-2);
+    width: 100%;
+}
+
 .conversation-list {
     flex: 1;
     overflow-y: auto;

@@ -550,11 +550,49 @@ async function loadModels() {
 function refreshModelOptions() {
     const providerSelect = $('#setting-default-provider');
     const modelSelect = $('#setting-default-model');
+    const customInput = $('#setting-custom-model');
     const provider = state.models.providers?.find(p => p.id === providerSelect.value);
     if (!provider) return;
+
+    // 重建下拉选项（含自定义选项）
+    const wasCustom = modelSelect.value === '__custom__';
     modelSelect.innerHTML = provider.models
         .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
-        .join('');
+        .join('')
+        + '<option value="__custom__">✏️ 自定义模型</option>';
+
+    // 决定显示模式：优先显示下拉
+    const savedModel = state.defaultModel;
+    const existsInList = savedModel && provider.models.includes(savedModel);
+
+    if (existsInList) {
+        modelSelect.value = savedModel;
+        modelSelect.style.display = '';
+        customInput.style.display = 'none';
+    } else if (savedModel && !existsInList) {
+        // 已保存模型不在列表中 → 显示下拉（选中自定义），并回填输入框
+        modelSelect.value = '__custom__';
+        customInput.value = savedModel;
+        customInput.style.display = '';
+        modelSelect.style.display = '';
+    } else {
+        modelSelect.value = '';
+        modelSelect.style.display = '';
+        customInput.style.display = 'none';
+    }
+}
+
+/**
+ * 获取当前选中的模型名称（下拉或自定义输入）
+ * @returns {string}
+ */
+function getSelectedModel() {
+    const modelSelect = $('#setting-default-model');
+    const customInput = $('#setting-custom-model');
+    if (modelSelect.value === '__custom__') {
+        return customInput.value.trim();
+    }
+    return modelSelect.value;
 }
 
 // ══════════════════════════════════════════════════
@@ -737,7 +775,7 @@ dom.btnSaveSettings.addEventListener('click', async () => {
         openai_api_key: $('#setting-openai-key').value,
         openai_base_url: $('#setting-openai-url').value,
         default_provider: $('#setting-default-provider').value,
-        default_model: $('#setting-default-model').value,
+        default_model: getSelectedModel(),
         sliding_window_rounds: $('#setting-sliding-window').value,
         theme_mode: $('#setting-theme').value,
         user_name: $('#setting-user-name').value,
@@ -940,8 +978,23 @@ async function init() {
     await loadModels();
     await loadSettings();
 
+    // 初始化模型下拉选项（含自定义模型回填）
+    refreshModelOptions();
+
     // Provider 切换时动态更新模型列表
     $('#setting-default-provider').addEventListener('change', refreshModelOptions);
+
+    // 模型下拉切换时联动自定义输入框
+    $('#setting-default-model').addEventListener('change', function () {
+        const customInput = $('#setting-custom-model');
+        if (this.value === '__custom__') {
+            customInput.style.display = '';
+            this.style.display = 'none';
+            customInput.focus();
+        } else {
+            customInput.style.display = 'none';
+        }
+    });
 
     // 主题切换按钮
     $('#btn-theme-toggle')?.addEventListener('click', toggleTheme);
