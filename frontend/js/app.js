@@ -544,17 +544,45 @@ async function loadModels() {
 }
 
 /**
- * 刷新设置面板中的模型下拉选项
+ * 刷新设置面板中的 Provider 和模型下拉选项
  * 在 settings 视图切换或 provider 变更时调用
  */
 function refreshModelOptions() {
     const providerSelect = $('#setting-default-provider');
     const modelSelect = $('#setting-default-model');
     const customInput = $('#setting-custom-model');
-    const provider = state.models.providers?.find(p => p.id === providerSelect.value);
+
+    // 动态填充 Provider 下拉（显示所有模型分组，用 data-index 定位）
+    const providers = state.models.providers || [];
+    providerSelect.innerHTML = providers
+        .map((p, i) => `<option value="${escapeHtml(p.id)}" data-index="${i}">${escapeHtml(p.name)}</option>`)
+        .join('');
+
+    // 恢复已保存的 provider：按名称优先 → 按 id 兜底
+    let matched = false;
+    if (state.defaultProviderName) {
+        const byName = providerSelect.querySelector(`option[value="${state.defaultProvider}"]`);
+        // 遍历所有 options，匹配名称
+        for (const opt of providerSelect.options) {
+            const p = providers[parseInt(opt.dataset.index)];
+            if (p && p.name === state.defaultProviderName) {
+                opt.selected = true;
+                matched = true;
+                break;
+            }
+        }
+    }
+    if (!matched && state.defaultProvider) {
+        const byId = providerSelect.querySelector(`option[value="${state.defaultProvider}"]`);
+        if (byId) { byId.selected = true; matched = true; }
+    }
+
+    // 根据当前选中的 provider 填充模型列表
+    const selectedIdx = parseInt(providerSelect.options[providerSelect.selectedIndex]?.dataset?.index ?? '0');
+    const provider = providers[selectedIdx];
     if (!provider) return;
 
-    // 重建下拉选项（含自定义选项）
+    // 重建模型下拉选项（含自定义选项）
     const wasCustom = modelSelect.value === '__custom__';
     modelSelect.innerHTML = provider.models
         .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
@@ -698,8 +726,10 @@ async function loadSettings() {
         if (s.openai_api_key) $('#setting-openai-key').value = s.openai_api_key;
         if (s.openai_base_url) $('#setting-openai-url').value = s.openai_base_url;
         if (s.default_provider) {
-            $('#setting-default-provider').value = s.default_provider;
             state.defaultProvider = s.default_provider;
+        }
+        if (s.default_provider_name) {
+            state.defaultProviderName = s.default_provider_name;
         }
         if (s.default_model) {
             $('#setting-default-model').value = s.default_model;
@@ -775,6 +805,7 @@ dom.btnSaveSettings.addEventListener('click', async () => {
         openai_api_key: $('#setting-openai-key').value,
         openai_base_url: $('#setting-openai-url').value,
         default_provider: $('#setting-default-provider').value,
+        default_provider_name: $('#setting-default-provider option:checked').textContent.trim(),
         default_model: getSelectedModel(),
         sliding_window_rounds: $('#setting-sliding-window').value,
         theme_mode: $('#setting-theme').value,
@@ -789,6 +820,7 @@ dom.btnSaveSettings.addEventListener('click', async () => {
         const result = await settings.update(data);
         // 更新本地状态
         state.defaultProvider = result.default_provider || data.default_provider;
+        state.defaultProviderName = result.default_provider_name || data.default_provider_name || state.defaultProviderName;
         state.defaultModel = result.default_model || data.default_model;
         // 应用主题
         applyTheme(data.theme_mode || 'auto');

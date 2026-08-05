@@ -39,6 +39,7 @@ ALLOWED_KEYS = {
     "openai_api_key",
     "openai_base_url",
     "default_provider",
+    "default_provider_name",
     "default_model",
     "sliding_window_rounds",
     "theme_mode",

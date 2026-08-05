@@ -31,8 +31,8 @@ export function showModelSelector(characterName) {
                 <div class="form-field">
                     <label for="ms-provider">Provider</label>
                     <select id="ms-provider">
-                        ${providers.map(p =>
-                            `<option value="${escapeHtml(p.id)}" ${p.id === defaultProviderId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+                        ${providers.map((p, i) =>
+                            `<option value="${escapeHtml(p.id)}" data-index="${i}" ${p.id === defaultProviderId && p.name === state.defaultProviderName ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
                         ).join('')}
                     </select>
                 </div>
@@ -59,7 +59,9 @@ export function showModelSelector(characterName) {
 
                 // ── 填充模型下拉列表（含自定义选项） ──
                 const fillModels = (initial) => {
-                    const provider = providers.find(p => p.id === providerSelect.value);
+                    // 用 data-index 精确查找当前选中的 provider 分组
+                    const selectedIdx = parseInt(providerSelect.options[providerSelect.selectedIndex]?.dataset?.index ?? '0');
+                    const provider = providers[selectedIdx];
                     if (!provider) return;
 
                     // 保存当前自定义输入值，切换 provider 时保留

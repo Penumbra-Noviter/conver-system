@@ -23,6 +23,7 @@ export const state = {
     activeStream: null,            // 当前流式请求的 { abort, done } 句柄
     models: { providers: [] },       // 可用模型列表
     defaultProvider: 'claude',
+    defaultProviderName: 'Claude (Anthropic)',
     defaultModel: 'claude-sonnet-4-20250514',
     sidebarCollapsed: false,
     chatSidebarCollapsed: false,
