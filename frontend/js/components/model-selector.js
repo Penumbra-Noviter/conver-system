@@ -54,48 +54,56 @@ export function showModelSelector(characterName) {
                 const modelSelect = overlay.querySelector('#ms-model');
                 const customInput = overlay.querySelector('#ms-custom-model');
 
+                // 标记用户是否已切换到自定义模式（选中自定义 或 已有自定义输入值）
+                let isCustomMode = false;
+
                 // ── 填充模型下拉列表（含自定义选项） ──
-                const fillModels = () => {
+                const fillModels = (initial) => {
                     const provider = providers.find(p => p.id === providerSelect.value);
                     if (!provider) return;
-                    const isCustom = modelSelect.value === '__custom__';
+
+                    // 保存当前自定义输入值，切换 provider 时保留
+                    const prevCustomVal = customInput.value.trim();
+
                     modelSelect.innerHTML = provider.models
-                        .map(m => {
-                            const selected = m === defaultModelName && providerSelect.value === defaultProviderId ? 'selected' : '';
-                            return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
-                        })
+                        .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
                         .join('')
                         + '<option value="__custom__">✏️ 自定义模型</option>';
 
-                    // 如果默认模型不在当前 provider 列表中，自动切到自定义
-                    const exists = defaultModelName && provider.models.includes(defaultModelName) && providerSelect.value === defaultProviderId;
-                    if (exists) {
-                        modelSelect.value = defaultModelName;
-                        customInput.style.display = 'none';
-                    } else if (isCustom || (defaultModelName && !provider.models.includes(defaultModelName) && providerSelect.value === defaultProviderId)) {
+                    if (initial && defaultModelName && !provider.models.includes(defaultModelName) && providerSelect.value === defaultProviderId) {
+                        // 首次打开：默认模型不在当前 provider 列表中 → 切到自定义
+                        isCustomMode = true;
                         modelSelect.value = '__custom__';
-                        customInput.value = defaultModelName || '';
+                        customInput.value = defaultModelName;
                         customInput.style.display = '';
                         modelSelect.style.display = 'none';
                         customInput.focus();
+                    } else if (isCustomMode || prevCustomVal) {
+                        // 已处于自定义模式，或自定义输入框有值 → 保持
+                        isCustomMode = true;
+                        modelSelect.value = '__custom__';
+                        customInput.style.display = '';
+                        modelSelect.style.display = 'none';
                     } else {
                         modelSelect.value = '';
                         customInput.style.display = 'none';
                         modelSelect.style.display = '';
                     }
                 };
-                fillModels();
+                fillModels(true);
 
-                // Provider 切换时更新模型列表
-                providerSelect.addEventListener('change', fillModels);
+                // Provider 切换时更新模型列表（保留自定义状态）
+                providerSelect.addEventListener('change', () => fillModels(false));
 
                 // 模型下拉切换时联动自定义输入框
                 modelSelect.addEventListener('change', function () {
                     if (this.value === '__custom__') {
+                        isCustomMode = true;
                         customInput.style.display = '';
                         this.style.display = 'none';
                         customInput.focus();
                     } else {
+                        isCustomMode = false;
                         customInput.style.display = 'none';
                         this.style.display = '';
                     }
