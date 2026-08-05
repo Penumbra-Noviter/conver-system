@@ -14,6 +14,7 @@ from backend.app.database import get_db
 from backend.app.schemas.character import CharacterCreate, CharacterResponse, CharacterUpdate
 from backend.app.services import character as service
 from backend.app.services.character_card import from_v2_card, to_v2_card
+from backend.app.services.exceptions import CardFormatError, CardValidationError
 
 router = APIRouter(prefix="/api/characters", tags=["角色管理"])
 
@@ -80,7 +81,7 @@ def import_character(card: dict, db: Session = Depends(get_db)) -> CharacterResp
     """
     try:
         data = from_v2_card(card)
-    except ValueError as exc:
+    except (CardFormatError, CardValidationError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"导入失败：{exc}",

@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 
-from fastapi import HTTPException, status
+from fastapi import status
 from sqlalchemy.orm import Session
 from starlette.requests import ClientDisconnect
 
@@ -27,6 +27,11 @@ from backend.app.schemas.message import ChatRequest
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
+from backend.app.services.exceptions import (
+    ApiKeyMissingError,
+    ConversationNotFoundError,
+    ProviderNotSupportedError,
+)
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import (
     LLMAuthError,
@@ -69,12 +74,14 @@ def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
         组装好的聊天上下文（对话、温度、消息列表、Provider 实例）
 
     Raises:
-        HTTPException: 对话不存在 / 未配置 API Key / 不支持的 Provider
+        ConversationNotFoundError: 对话不存在
+        ApiKeyMissingError: 未配置 API Key
+        ProviderNotSupportedError: 不支持的 Provider
     """
     # 1. 验证对话存在
     conv = conversation_service.get_conversation(db, request.conversation_id)
     if not conv:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
+        raise ConversationNotFoundError("对话不存在")
 
     # 2. 获取角色（用于 temperature）
     character = db.query(Character).filter(Character.id == conv.character_id).first()
@@ -96,19 +103,17 @@ def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
     # 6. 获取 API Key
     api_key = setting_service.api_key(db, conv.model_provider)
     if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"未配置 {conv.model_provider} API Key，请在设置中填写",
+        raise ApiKeyMissingError(
+            f"未配置 {conv.model_provider} API Key，请在设置中填写",
         )
 
     # 7. 获取 Provider（含自定义 base_url）
     try:
-        base_url = setting_service.get_value(db, f"{conv.model_provider}_base_url") or None
+        base_url = setting_service.base_url(db, conv.model_provider) or None
         provider = LLMFactory.get_provider(conv.model_provider, api_key, base_url)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"不支持的 Provider: {conv.model_provider}",
+        raise ProviderNotSupportedError(
+            f"不支持的 Provider: {conv.model_provider}",
         )
 
     return ChatContext(

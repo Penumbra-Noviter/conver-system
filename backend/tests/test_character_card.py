@@ -5,7 +5,7 @@ SillyTavern Character Card V2 转换层单元测试
 - V2 往返（to_v2_card → from_v2_card 字段保真）
 - V1 旧卡归一化（char_name 等旧字段 → V2/DB 字段）
 - 裸 data（顶层含 name，无 spec/data 信封）
-- 非法卡 → ValueError（路由层统一转 422 友好报错）
+- 非法卡 → CardFormatError / CardValidationError（路由层统一转 422 友好报错）
 - 头像三形态（base64 data URI / URL / 无）
 
 另含：temperature 默认与裁剪、name 截断、extensions.conver_system 保真、
@@ -21,6 +21,7 @@ import pytest
 from backend.app.models.character import Character
 from backend.app.schemas.character import CharacterCreate
 from backend.app.services.character_card import SPEC, from_v2_card, to_v2_card
+from backend.app.services.exceptions import CardFormatError, CardValidationError
 
 __all__: list[str] = []
 
@@ -119,7 +120,7 @@ def test_from_v2_uses_character_version() -> None:
 
 def test_from_v2_envelope_missing_data() -> None:
     """V2 信封缺 data → ValueError"""
-    with pytest.raises(ValueError, match="缺少 data 字段"):
+    with pytest.raises(CardFormatError, match="缺少 data 字段"):
         from_v2_card({"spec": SPEC})
 
 
@@ -139,22 +140,22 @@ def test_from_data_envelope_without_spec() -> None:
 
 def test_from_unrecognizable() -> None:
     """结构无法识别 → ValueError"""
-    with pytest.raises(ValueError, match="无法识别的角色卡格式"):
+    with pytest.raises(CardFormatError, match="无法识别的角色卡格式"):
         from_v2_card({"foo": "bar"})
-    with pytest.raises(ValueError, match="无法识别的角色卡格式"):
+    with pytest.raises(CardFormatError, match="无法识别的角色卡格式"):
         from_v2_card({})
 
 
 def test_from_unsupported_spec() -> None:
     """spec 非 v2 → ValueError「不支持的卡片规格」"""
-    with pytest.raises(ValueError, match="不支持的卡片规格"):
+    with pytest.raises(CardFormatError, match="不支持的卡片规格"):
         from_v2_card({"spec": "chara_card_v1", "data": {}})
 
 
 @pytest.mark.parametrize("bad", [None, "字符串", ["list"], 123, 1.5, True])
 def test_from_non_dict_body(bad: object) -> None:
     """非 dict 请求体 → ValueError「必须是 JSON 对象」"""
-    with pytest.raises(ValueError, match="必须是 JSON 对象"):
+    with pytest.raises(CardFormatError, match="必须是 JSON 对象"):
         from_v2_card(bad)  # type: ignore[arg-type]
 
 
@@ -202,13 +203,13 @@ def test_from_v1_card_partial_fields() -> None:
 
 def test_from_missing_name() -> None:
     """data 缺 name → ValueError「角色名称不能为空」"""
-    with pytest.raises(ValueError, match="角色名称不能为空"):
+    with pytest.raises(CardValidationError, match="角色名称不能为空"):
         from_v2_card({"spec": SPEC, "data": {"personality": "只有人格"}})
 
 
 def test_from_blank_name() -> None:
     """name 为空白 → ValueError（strip 后为空）"""
-    with pytest.raises(ValueError, match="角色名称不能为空"):
+    with pytest.raises(CardValidationError, match="角色名称不能为空"):
         from_v2_card({"name": "   "})
 
 

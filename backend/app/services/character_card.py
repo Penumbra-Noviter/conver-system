@@ -15,6 +15,7 @@ import binascii
 
 from backend.app.models.character import Character
 from backend.app.schemas.character import CharacterCreate
+from backend.app.services.exceptions import CardFormatError, CardValidationError
 
 __all__ = ["to_v2_card", "from_v2_card"]
 
@@ -106,19 +107,20 @@ def from_v2_card(card: dict) -> CharacterCreate:
         可直接交 create_character 落库的 CharacterCreate。
 
     Raises:
-        ValueError: 卡片格式无法识别 / 缺 name / 缺 data 信封。
+        CardFormatError: 卡片格式无法识别 / 缺 data 信封。
+        CardValidationError: 角色名称不能为空。
     """
     if not isinstance(card, dict):
-        raise ValueError("角色卡必须是 JSON 对象")
+        raise CardFormatError("角色卡必须是 JSON 对象")
 
     spec = card.get("spec")
 
     if spec == SPEC:
         data = card.get("data")
         if not isinstance(data, dict):
-            raise ValueError("角色卡缺少 data 字段")
+            raise CardFormatError("角色卡缺少 data 字段")
     elif spec is not None:
-        raise ValueError(f"不支持的卡片规格: {spec}")
+        raise CardFormatError(f"不支持的卡片规格: {spec}")
     elif isinstance(card.get("data"), dict) and "name" in card["data"]:
         data = card["data"]
     elif "char_name" in card:
@@ -126,7 +128,7 @@ def from_v2_card(card: dict) -> CharacterCreate:
     elif "name" in card:
         data = card
     else:
-        raise ValueError("无法识别的角色卡格式")
+        raise CardFormatError("无法识别的角色卡格式")
 
     return _build_create(data)
 
@@ -140,7 +142,7 @@ def _build_create(data: dict) -> CharacterCreate:
     """归一化后的 data dict → CharacterCreate（含类型容错与边界裁剪）"""
     name = str(data.get("name") or "").strip()[:100]
     if not name:
-        raise ValueError("角色名称不能为空")
+        raise CardValidationError("角色名称不能为空")
 
     extensions = _as_dict(data.get("extensions"))
     ns = _conver_system(extensions)

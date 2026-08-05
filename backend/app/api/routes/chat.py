@@ -23,15 +23,37 @@ from backend.app.models.message import Role
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import chat as chat_service
 from backend.app.services import message as message_service
+from backend.app.services.exceptions import (
+    ApiKeyMissingError,
+    ConversationNotFoundError,
+    ProviderNotSupportedError,
+)
 from backend.app.services.llm.errors import LLMError
 
 router = APIRouter(tags=["聊天"])
 
 
+# DomainError → HTTP 状态码映射
+_DOMAIN_ERROR_MAP: dict[type, int] = {
+    ConversationNotFoundError: status.HTTP_404_NOT_FOUND,
+    ApiKeyMissingError: status.HTTP_400_BAD_REQUEST,
+    ProviderNotSupportedError: status.HTTP_400_BAD_REQUEST,
+}
+
+
+def _prepare_or_raise(db: Session, request: ChatRequest):
+    """调用 prepare_chat，捕获领域异常并转为 HTTPException"""
+    try:
+        return chat_service.prepare_chat(db, request)
+    except tuple(_DOMAIN_ERROR_MAP) as e:
+        http_status = _DOMAIN_ERROR_MAP.get(type(e), status.HTTP_400_BAD_REQUEST)
+        raise HTTPException(status_code=http_status, detail=str(e))
+
+
 @router.post("/api/chats", response_model=ChatResponse)
 async def create_chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     """非流式聊天 — 接入真实 LLM"""
-    ctx = chat_service.prepare_chat(db, request)
+    ctx = _prepare_or_raise(db, request)
 
     try:
         reply_text = await ctx.provider.generate(
@@ -66,7 +88,7 @@ async def stream_chat(
 
     客户端断开（停止生成）时停止 LLM 调用，并保存已生成的部分内容为 assistant 消息。
     """
-    ctx = chat_service.prepare_chat(db, request)
+    ctx = _prepare_or_raise(db, request)
 
     async def event_generator() -> AsyncIterator[str]:
         """SSE 事件生成器 — 仅做 data: 帧包装，事件由 services/chat.py 产出"""
