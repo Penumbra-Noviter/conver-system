@@ -1,26 +1,28 @@
 /**
- * Conver System — 主入口
+ * Conver System — 主入口（协调层）
  *
  * 职责：
  *   1. 视图切换（侧栏导航）
- *   2. 业务协调（角色 / 对话 / 设置 / 搜索）
+ *   2. 业务协调（角色 / 对话 / 搜索）
  *   3. 事件绑定
  *
  * 模块结构：
- *   - ./state.js — 全局状态 + 模块级状态
+ *   - ./state.js — 全局状态
  *   - ./chat.js  — 聊天域渲染与交互（renderMessages / handleSend / chatDom）
  *   - ./format.js — 渲染/格式化纯函数（highlightText / buildMessagesHtml）
+ *   - ./components/settings-panel.js — 设置面板（Provider 下拉、主题、侧栏、保存、清空）
  *   - ./components/ — 模态框相关组件（modal 工厂 / confirm / model-selector / export / character-form）
  */
 
-import { characters, conversations, messages, models, settings } from './api.js';
+import { characters, conversations, messages, models } from './api.js';
 import { showCharacterForm } from './components/character-form.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
 import { showModelSelector } from './components/model-selector.js';
 import { showExportDialog } from './components/export-dialog.js';
+import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
 import { escapeHtml, getInitials, formatTags, showToast, downloadBlob } from './utils.js';
 import { highlightText } from './format.js';
-import { state, getConvListVisible, setConvListVisible, setSearchTimeout, clearSearchTimeout } from './state.js';
+import { state } from './state.js';
 import { chatDom, renderMessages, handleSend, setConversationsRefresher } from './chat.js';
 
 // ══════════════════════════════════════════════════
@@ -29,6 +31,10 @@ import { chatDom, renderMessages, handleSend, setConversationsRefresher } from '
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
+
+// 模块级状态（UI 实现细节，不属于全局应用状态）
+let convListVisible = true;
+let searchTimeout = null;
 
 const dom = {
     // 视图
@@ -52,17 +58,13 @@ const dom = {
     searchInput: $('#search-input'),
     searchResults: $('#search-results'),
     btnSearchClear: $('#btn-search-clear'),
-
-    // 设置
-    btnSaveSettings: $('#btn-save-settings'),
-    btnClearAllConvs: $('#btn-clear-all-convs'),
 };
 
 // ══════════════════════════════════════════════════
 // 视图切换
 // ══════════════════════════════════════════════════
 
-function switchView(viewName) {
+async function switchView(viewName) {
     state.currentView = viewName;
 
     dom.views.forEach((v) => v.classList.remove('active'));
@@ -80,8 +82,8 @@ function switchView(viewName) {
     if (viewName === 'characters') loadCharacters();
     if (viewName === 'chat') loadConversations();
     if (viewName === 'settings') {
-        refreshModelOptions();
-        loadSettings();
+        await loadSettings();
+        initProviderDropdown();
     }
     if (viewName === 'search') {
         setTimeout(() => dom.searchInput?.focus(), 100);
@@ -101,8 +103,8 @@ dom.mobileNavBtns.forEach((btn) => {
 function toggleConvList() {
     const sidebar = document.querySelector('.chat-sidebar');
     if (!sidebar) return;
-    setConvListVisible(!getConvListVisible());
-    sidebar.style.display = getConvListVisible() ? '' : 'none';
+    convListVisible = !convListVisible;
+    sidebar.style.display = convListVisible ? '' : 'none';
 }
 
 // ══════════════════════════════════════════════════
@@ -543,327 +545,6 @@ async function loadModels() {
     }
 }
 
-/**
- * 刷新设置面板中的 Provider 和模型下拉选项
- * 在 settings 视图切换或 provider 变更时调用
- */
-function refreshModelOptions() {
-    const providerSelect = $('#setting-default-provider');
-    const modelSelect = $('#setting-default-model');
-    const customInput = $('#setting-custom-model');
-
-    // 动态填充 Provider 下拉（显示所有模型分组，用 data-index 定位）
-    const providers = state.models.providers || [];
-    providerSelect.innerHTML = providers
-        .map((p, i) => `<option value="${escapeHtml(p.id)}" data-index="${i}">${escapeHtml(p.name)}</option>`)
-        .join('');
-
-    // 恢复已保存的 provider：按名称优先 → 按 id 兜底
-    let matched = false;
-    if (state.defaultProviderName) {
-        const byName = providerSelect.querySelector(`option[value="${state.defaultProvider}"]`);
-        // 遍历所有 options，匹配名称
-        for (const opt of providerSelect.options) {
-            const p = providers[parseInt(opt.dataset.index)];
-            if (p && p.name === state.defaultProviderName) {
-                opt.selected = true;
-                matched = true;
-                break;
-            }
-        }
-    }
-    if (!matched && state.defaultProvider) {
-        const byId = providerSelect.querySelector(`option[value="${state.defaultProvider}"]`);
-        if (byId) { byId.selected = true; matched = true; }
-    }
-
-    // 根据当前选中的 provider 填充模型列表
-    const selectedIdx = parseInt(providerSelect.options[providerSelect.selectedIndex]?.dataset?.index ?? '0');
-    const provider = providers[selectedIdx];
-    if (!provider) return;
-
-    // 重建模型下拉选项（含自定义选项）
-    const wasCustom = modelSelect.value === '__custom__';
-    modelSelect.innerHTML = provider.models
-        .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
-        .join('')
-        + '<option value="__custom__">✏️ 自定义模型</option>';
-
-    // 决定显示模式：优先显示下拉
-    const savedModel = state.defaultModel;
-    const existsInList = savedModel && provider.models.includes(savedModel);
-
-    if (existsInList) {
-        modelSelect.value = savedModel;
-        modelSelect.style.display = '';
-        customInput.style.display = 'none';
-    } else if (savedModel && !existsInList) {
-        // 已保存模型不在列表中 → 显示下拉（选中自定义），并回填输入框
-        modelSelect.value = '__custom__';
-        customInput.value = savedModel;
-        customInput.style.display = '';
-        modelSelect.style.display = '';
-    } else {
-        modelSelect.value = '';
-        modelSelect.style.display = '';
-        customInput.style.display = 'none';
-    }
-}
-
-/**
- * 获取当前选中的模型名称（下拉或自定义输入）
- * @returns {string}
- */
-function getSelectedModel() {
-    const modelSelect = $('#setting-default-model');
-    const customInput = $('#setting-custom-model');
-    if (modelSelect.value === '__custom__') {
-        return customInput.value.trim();
-    }
-    return modelSelect.value;
-}
-
-// ══════════════════════════════════════════════════
-// 设置
-// ══════════════════════════════════════════════════
-
-/**
- * 应用主题模式到 DOM
- * @param {string} mode - 'auto' | 'light' | 'dark'
- */
-function applyTheme(mode) {
-    const root = document.documentElement;
-    if (mode === 'auto' || !mode) {
-        root.removeAttribute('data-theme');
-    } else {
-        root.dataset.theme = mode;
-    }
-}
-
-/**
- * 切换主题（深色 ⇄ 浅色循环）
- * 从当前主题切换到另一种，并持久化到后端
- */
-async function toggleTheme() {
-    const root = document.documentElement;
-    const current = root.getAttribute('data-theme') || 'dark';
-    const next = current === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
-    try {
-        await settings.update({ theme_mode: next });
-    } catch (err) {
-        console.error('保存主题设置失败:', err);
-    }
-    // 更新主题按钮图标
-    updateThemeToggleIcon(next);
-    // 同步设置页面下拉框
-    $('#setting-theme').value = next;
-}
-
-/**
- * 更新主题切换按钮的图标
- * @param {string} mode - 'light' | 'dark' | 'auto'
- */
-function updateThemeToggleIcon(mode) {
-    const btn = $('#btn-theme-toggle');
-    if (!btn) return;
-    if (mode === 'light') {
-        btn.textContent = '☀️';
-        btn.title = '切换深色模式';
-    } else {
-        btn.textContent = '🌙';
-        btn.title = '切换浅色模式';
-    }
-}
-
-/**
- * 切换左侧导航栏的展开/收起
- */
-function toggleSidebar() {
-    state.sidebarCollapsed = !state.sidebarCollapsed;
-    const sidebar = $('#sidebar');
-    const btn = $('#btn-collapse-sidebar');
-    const expandBtn = $('#btn-expand-sidebar');
-    if (state.sidebarCollapsed) {
-        sidebar.classList.add('sidebar-collapsed');
-        btn.textContent = '▶';
-        btn.title = '展开侧栏';
-        expandBtn.style.display = 'flex';
-    } else {
-        sidebar.classList.remove('sidebar-collapsed');
-        btn.textContent = '◀';
-        btn.title = '收起侧栏';
-        expandBtn.style.display = 'none';
-    }
-}
-
-/**
- * 切换对话列表栏的展开/收起
- */
-function toggleChatSidebar() {
-    state.chatSidebarCollapsed = !state.chatSidebarCollapsed;
-    const sidebar = document.querySelector('.chat-sidebar');
-    const btn = $('#btn-collapse-chat');
-    const expandBtn = $('#btn-expand-chat');
-    if (state.chatSidebarCollapsed) {
-        sidebar.classList.add('chat-sidebar-collapsed');
-        btn.textContent = '▶';
-        btn.title = '展开侧栏';
-        expandBtn.style.display = 'flex';
-    } else {
-        sidebar.classList.remove('chat-sidebar-collapsed');
-        btn.textContent = '◀';
-        btn.title = '收起侧栏';
-        expandBtn.style.display = 'none';
-    }
-}
-
-async function loadSettings() {
-    try {
-        const s = await settings.get();
-        if (s.claude_api_key) $('#setting-claude-key').value = s.claude_api_key;
-        if (s.claude_base_url) $('#setting-claude-url').value = s.claude_base_url;
-        if (s.openai_api_key) $('#setting-openai-key').value = s.openai_api_key;
-        if (s.openai_base_url) $('#setting-openai-url').value = s.openai_base_url;
-        if (s.default_provider) {
-            state.defaultProvider = s.default_provider;
-        }
-        if (s.default_provider_name) {
-            state.defaultProviderName = s.default_provider_name;
-        }
-        if (s.default_model) {
-            $('#setting-default-model').value = s.default_model;
-            state.defaultModel = s.default_model;
-        }
-        if (s.sliding_window_rounds) $('#setting-sliding-window').value = s.sliding_window_rounds;
-        if (s.theme_mode) {
-            $('#setting-theme').value = s.theme_mode;
-            applyTheme(s.theme_mode);
-            updateThemeToggleIcon(s.theme_mode || 'dark');
-        }
-        if (s.user_name) $('#setting-user-name').value = s.user_name;
-    } catch (err) {
-        console.error('加载设置失败:', err);
-    }
-}
-
-/**
- * 保存设置前测试已填写的 API Key 连接（P4.3）
- *
- * 对每个非空 Key 并发测试；任一失败弹确认框，由用户决定是否继续保存。
- * @param {object} data - 设置表单数据（claude_api_key / openai_api_key / openai_base_url）
- * @returns {Promise<boolean>} true=可继续保存；false=用户选择取消保存
- */
-async function testApiKeys(data) {
-    const checks = [];
-    if (data.claude_api_key) {
-        checks.push({
-            label: 'Claude',
-            data: {
-                provider: 'claude',
-                api_key: data.claude_api_key,
-                base_url: data.claude_base_url || null,
-            },
-        });
-    }
-    if (data.openai_api_key) {
-        checks.push({
-            label: 'OpenAI',
-            data: {
-                provider: 'openai',
-                api_key: data.openai_api_key,
-                base_url: data.openai_base_url || null,
-            },
-        });
-    }
-    if (checks.length === 0) return true;
-
-    // 并发测试，收集失败项（不中断其它 Provider 的测试）
-    const results = await Promise.all(checks.map((check) =>
-        settings.testConnection(check.data)
-            .then(() => null)
-            .catch((err) => ({ label: check.label, message: err.message })),
-    ));
-    const failures = results.filter(Boolean);
-    if (failures.length === 0) return true;
-
-    const detail = failures.map((f) => `· ${f.label}: ${f.message}`).join('\n');
-    const confirmed = await showConfirm({
-        title: 'API Key 连接测试未通过',
-        message: `已填写 ${failures.length} 个 Key 测试失败`,
-        detail: `${detail}\n\n仍然保存吗？（若 Key 无误但当前网络不可达，可继续保存）`,
-        confirmText: '仍然保存',
-        cancelText: '取消',
-    });
-    return confirmed;
-}
-
-dom.btnSaveSettings.addEventListener('click', async () => {
-    const data = {
-        claude_api_key: $('#setting-claude-key').value,
-        claude_base_url: $('#setting-claude-url').value,
-        openai_api_key: $('#setting-openai-key').value,
-        openai_base_url: $('#setting-openai-url').value,
-        default_provider: $('#setting-default-provider').value,
-        default_provider_name: $('#setting-default-provider option:checked').textContent.trim(),
-        default_model: getSelectedModel(),
-        sliding_window_rounds: $('#setting-sliding-window').value,
-        theme_mode: $('#setting-theme').value,
-        user_name: $('#setting-user-name').value,
-    };
-
-    // P4.3：保存前测试已填写的 API Key 连接，失败由用户确认是否继续
-    const canSave = await testApiKeys(data);
-    if (!canSave) return;
-
-    try {
-        const result = await settings.update(data);
-        // 更新本地状态
-        state.defaultProvider = result.default_provider || data.default_provider;
-        state.defaultProviderName = result.default_provider_name || data.default_provider_name || state.defaultProviderName;
-        state.defaultModel = result.default_model || data.default_model;
-        // 应用主题
-        applyTheme(data.theme_mode || 'auto');
-        updateThemeToggleIcon(data.theme_mode || 'dark');
-        showAlert('设置已保存');
-    } catch (err) {
-        showAlert('保存失败: ' + err.message);
-    }
-});
-
-// ── 清空所有对话 ──
-dom.btnClearAllConvs.addEventListener('click', async () => {
-    const convCount = state.conversations.length;
-    if (convCount === 0) {
-        showAlert('当前没有对话需要清空');
-        return;
-    }
-
-    const confirmed = await showConfirm({
-        title: '清空所有对话',
-        message: `确定要清空全部 ${convCount} 个对话吗？`,
-        detail: '此操作将删除所有对话和消息记录，不可撤销。',
-        confirmText: '清空所有',
-        cancelText: '取消',
-        danger: true,
-    });
-
-    if (confirmed) {
-        try {
-            await conversations.deleteAll();
-            state.conversations = [];
-            state.currentConversationId = null;
-            state.currentCharacterId = null;
-            state.messages = [];
-            renderConversations();
-            loadMessages();
-            showAlert(`已清空 ${convCount} 个对话`);
-        } catch (err) {
-            showAlert('清空失败: ' + err.message);
-        }
-    }
-});
-
 // ══════════════════════════════════════════════════
 // 搜索
 // ══════════════════════════════════════════════════
@@ -975,16 +656,18 @@ async function navigateToConversation(conversationId) {
 // ── 搜索输入事件 ──
 
 dom.searchInput.addEventListener('input', () => {
-    clearSearchTimeout();
+    clearTimeout(searchTimeout);
+    searchTimeout = null;
     const q = dom.searchInput.value;
     // 延迟搜索，避免每输入一个字就请求
-    setSearchTimeout(setTimeout(() => performSearch(q), 300));
+    searchTimeout = setTimeout(() => performSearch(q), 300);
 });
 
 dom.searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        clearSearchTimeout();
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
         performSearch(dom.searchInput.value);
     }
     if (e.key === 'Escape') {
@@ -1010,34 +693,16 @@ async function init() {
     await loadModels();
     await loadSettings();
 
-    // 初始化模型下拉选项（含自定义模型回填）
-    refreshModelOptions();
+    // 初始化 Provider 下拉 + 模型下拉选项（含自定义模型回填）
+    initProviderDropdown();
 
-    // Provider 切换时动态更新模型列表
-    $('#setting-default-provider').addEventListener('change', refreshModelOptions);
-
-    // 模型下拉切换时联动自定义输入框
-    $('#setting-default-model').addEventListener('change', function () {
-        const customInput = $('#setting-custom-model');
-        if (this.value === '__custom__') {
-            customInput.style.display = '';
-            this.style.display = 'none';
-            customInput.focus();
-        } else {
-            customInput.style.display = 'none';
-        }
+    // 初始化设置面板事件绑定（主题、侧栏、保存、清空等）
+    initSettingsPanel({
+        onConversationsCleared: () => {
+            renderConversations();
+            loadMessages();
+        },
     });
-
-    // 主题切换按钮
-    $('#btn-theme-toggle')?.addEventListener('click', toggleTheme);
-
-    // 侧栏收起按钮
-    $('#btn-collapse-sidebar')?.addEventListener('click', toggleSidebar);
-    $('#btn-collapse-chat')?.addEventListener('click', toggleChatSidebar);
-
-    // 侧栏展开按钮（收起时浮动显示）
-    $('#btn-expand-sidebar')?.addEventListener('click', toggleSidebar);
-    $('#btn-expand-chat')?.addEventListener('click', toggleChatSidebar);
 }
 
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）

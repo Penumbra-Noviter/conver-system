@@ -9,6 +9,8 @@
 
 const API_BASE = '/api';
 
+import { parseSSEStream } from './utils/sse-reader.js';
+
 // ── fetch seam ──
 // 允许测试注入自定义 fetch 实现；浏览器环境默认使用全局 fetch。
 let fetchImpl = null;
@@ -132,42 +134,8 @@ export function chatStream(data, { onToken, onDone, onError }) {
             }
 
             const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            let completed = false;
 
-            while (true) {
-                const { done: streamDone, value } = await reader.read();
-                if (streamDone) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (!trimmed.startsWith('data: ')) continue;
-
-                    try {
-                        const parsed = JSON.parse(trimmed.slice(6));
-                        if (parsed.type === 'token') {
-                            onToken(parsed.content);
-                        } else if (parsed.type === 'done') {
-                            completed = true;
-                            onDone(parsed.message_id);
-                        } else if (parsed.type === 'error') {
-                            if (onError) onError(new Error(parsed.message));
-                        }
-                    } catch {
-                        // 跳过解析失败的行
-                    }
-                }
-            }
-
-            // 流结束但未收到 done 事件（连接中断/异常关闭）
-            if (!completed) {
-                if (onDone) onDone(null);
-            }
+            await parseSSEStream(reader, { onToken, onDone, onError });
         } catch (err) {
             onError(err);
         }

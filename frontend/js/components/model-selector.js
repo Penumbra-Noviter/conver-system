@@ -7,6 +7,7 @@
 import { openModal } from './modal.js';
 import { escapeHtml } from '../utils.js';
 import { state } from '../state.js';
+import { fillModelSelect, createCustomModelHandler } from '../utils/model-utils.js';
 
 /**
  * 显示模型选择对话框 — 创建对话时让用户选择 Provider 和模型
@@ -31,8 +32,8 @@ export function showModelSelector(characterName) {
                 <div class="form-field">
                     <label for="ms-provider">Provider</label>
                     <select id="ms-provider">
-                        ${providers.map((p, i) =>
-                            `<option value="${escapeHtml(p.id)}" data-index="${i}" ${p.id === defaultProviderId && p.name === state.defaultProviderName ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+                        ${providers.map((p) =>
+                            `<option value="${escapeHtml(p.key)}" ${p.key === defaultProviderId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
                         ).join('')}
                     </select>
                 </div>
@@ -59,38 +60,19 @@ export function showModelSelector(characterName) {
 
                 // ── 填充模型下拉列表（含自定义选项） ──
                 const fillModels = (initial) => {
-                    // 用 data-index 精确查找当前选中的 provider 分组
-                    const selectedIdx = parseInt(providerSelect.options[providerSelect.selectedIndex]?.dataset?.index ?? '0');
-                    const provider = providers[selectedIdx];
+                    // 用 key 精确查找当前选中的 provider
+                    const selectedKey = providerSelect.value;
+                    const provider = providers.find(p => p.key === selectedKey);
                     if (!provider) return;
 
                     // 保存当前自定义输入值，切换 provider 时保留
                     const prevCustomVal = customInput.value.trim();
 
-                    modelSelect.innerHTML = provider.models
-                        .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
-                        .join('')
-                        + '<option value="__custom__">✏️ 自定义模型</option>';
-
-                    if (initial && defaultModelName && !provider.models.includes(defaultModelName) && providerSelect.value === defaultProviderId) {
-                        // 首次打开：默认模型不在当前 provider 列表中 → 切到自定义
-                        isCustomMode = true;
-                        modelSelect.value = '__custom__';
-                        customInput.value = defaultModelName;
-                        customInput.style.display = '';
-                        modelSelect.style.display = 'none';
-                        customInput.focus();
-                    } else if (isCustomMode || prevCustomVal) {
-                        // 已处于自定义模式，或自定义输入框有值 → 保持
-                        isCustomMode = true;
-                        modelSelect.value = '__custom__';
-                        customInput.style.display = '';
-                        modelSelect.style.display = 'none';
-                    } else {
-                        modelSelect.value = '';
-                        customInput.style.display = 'none';
-                        modelSelect.style.display = '';
-                    }
+                    isCustomMode = fillModelSelect(modelSelect, provider, defaultModelName, customInput, {
+                        forceCustom: isCustomMode,
+                        prevCustomVal,
+                        focusCustom: initial,
+                    });
                 };
                 fillModels(true);
 
@@ -98,17 +80,10 @@ export function showModelSelector(characterName) {
                 providerSelect.addEventListener('change', () => fillModels(false));
 
                 // 模型下拉切换时联动自定义输入框
+                const modelChangeHandler = createCustomModelHandler(modelSelect, customInput);
                 modelSelect.addEventListener('change', function () {
-                    if (this.value === '__custom__') {
-                        isCustomMode = true;
-                        customInput.style.display = '';
-                        this.style.display = 'none';
-                        customInput.focus();
-                    } else {
-                        isCustomMode = false;
-                        customInput.style.display = 'none';
-                        this.style.display = '';
-                    }
+                    modelChangeHandler.call(this);
+                    isCustomMode = this.value === '__custom__';
                 });
 
                 // 读取当前选择
