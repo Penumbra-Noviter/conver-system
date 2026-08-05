@@ -25,6 +25,7 @@ from backend.app.services import setting as setting_service
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import LLMAuthError
 from backend.app.services.llm.factory import LLMFactory
+from backend.app.services.llm.openai import _normalize_base_url
 
 __all__: list[str] = []
 
@@ -79,6 +80,29 @@ class TestBaseLLMTestConnection:
         assert model == "claude-sonnet-5"
 
 
+# ── 1.5 OpenAI base_url 规范化（面板根地址 → /v1 端点）──
+
+
+class TestNormalizeBaseUrl:
+    def test_none_passthrough(self) -> None:
+        assert _normalize_base_url(None) is None
+
+    def test_root_url_appends_v1(self) -> None:
+        """用户只填面板根地址 → 补 /v1（New API 等常见配置）"""
+        assert _normalize_base_url("https://api.kukuit.com") == "https://api.kukuit.com/v1"
+
+    def test_trailing_slash_appends_v1(self) -> None:
+        assert _normalize_base_url("https://api.example.com/") == "https://api.example.com/v1"
+
+    def test_already_v1_unchanged(self) -> None:
+        assert _normalize_base_url("https://api.openai.com/v1") == "https://api.openai.com/v1"
+        assert _normalize_base_url("https://api.example.com/v1/") == "https://api.example.com/v1"
+
+    def test_custom_version_segment_kept(self) -> None:
+        """非 /v1 版本段（如 /v1beta）不误改"""
+        assert _normalize_base_url("https://api.example.com/v1beta") == "https://api.example.com/v1beta"
+
+
 # ── 2. POST /api/settings/test-connection 端点 ──
 
 
@@ -97,15 +121,26 @@ def _patch_provider(monkeypatch, *, error: Exception | None = None) -> dict:
     """让 LLMFactory.get_provider 返回 stub，并记录其收到的参数
 
     Returns:
-        记录 get_provider 调用参数的 dict（name / api_key / base_url）
+        记录调用参数的 dict（name / api_key / base_url / model）
     """
     calls: dict = {}
+
+    class _RecStub:
+        """记录 test_connection 收到的 model，可配置抛出错误"""
+
+        def __init__(self, err: Exception | None) -> None:
+            self.err = err
+
+        async def test_connection(self, model: str | None = None) -> None:
+            calls["model"] = model
+            if self.err:
+                raise self.err
 
     def fake_get_provider(name: str, api_key: str, base_url: str | None = None) -> object:
         calls["name"] = name
         calls["api_key"] = api_key
         calls["base_url"] = base_url
-        return _StubLLM(error=error)
+        return _RecStub(error)
 
     monkeypatch.setattr(LLMFactory, "get_provider", fake_get_provider)
     return calls
@@ -264,6 +299,31 @@ class TestConnectionEndpoint:
         resp = _run(req, db_session)
         assert resp.ok is True
         assert calls["api_key"] == "sk-saved"
+
+    def test_model_falls_back_to_default_model(self, db_session, monkeypatch) -> None:
+        """请求无 model 时回退默认模型（用户配置的），避免硬编码模型误报"""
+        _save_setting(db_session, "default_model", "deepseek-v4-flash")
+        calls = _patch_provider(monkeypatch)
+        req = ConnectionTestRequest(provider="deepseek", api_key="sk-test")
+        _run(req, db_session)
+        assert calls["model"] == "deepseek-v4-flash"
+        assert calls["name"] == "deepseek"
+
+    def test_model_explicit_wins_over_default(self, db_session, monkeypatch) -> None:
+        """请求显式传 model 时优先使用"""
+        _save_setting(db_session, "default_model", "deepseek-v4-flash")
+        calls = _patch_provider(monkeypatch)
+        req = ConnectionTestRequest(provider="deepseek", api_key="sk-test", model="qwen-max")
+        _run(req, db_session)
+        assert calls["model"] == "qwen-max"
+
+    def test_base_url_falls_back_to_saved(self, db_session, monkeypatch) -> None:
+        """请求无 base_url 时回退库中已存 URL（通用解析：同协议 → 跨协议）"""
+        _save_setting(db_session, "claude_base_url", "https://relay.example.com")
+        calls = _patch_provider(monkeypatch)
+        req = ConnectionTestRequest(provider="deepseek", api_key="sk-test")
+        _run(req, db_session)
+        assert calls["base_url"] == "https://relay.example.com"
 
     def test_base_url_passed_through(self, db_session, monkeypatch) -> None:
         """OpenAI 兼容 base_url 透传给 Provider"""

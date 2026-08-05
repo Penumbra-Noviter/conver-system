@@ -223,54 +223,45 @@ export async function loadSettings() {
 }
 
 /**
- * 保存设置前测试已填写的 API Key 连接（P4.3）
+ * 保存设置前测试「默认 Provider + 默认模型」连接（P4.3）
  *
- * 对每个非空 Key 并发测试；任一失败弹确认框，由用户决定是否继续保存。
+ * 测试目标 = 用户实际对话将使用的配置（默认 Provider 的 key/url/模型），
+ * 而非逐个协议测试 —— 通用凭证解析下，用户填任一字段的 key/url 即可全局使用，
+ * 因此测默认配置一个就足够且最准确。
+ *
+ * Key/URL 取值：表单中同协议字段优先，跨协议兜底（与后端 _slot_value 一致）。
  * @param {object} data - 设置表单数据
  * @returns {Promise<boolean>} true=可继续保存；false=用户选择取消保存
  */
 async function testApiKeys(data) {
-    const checks = [];
-    if (data.claude_api_key) {
-        checks.push({
-            label: 'Claude',
-            data: {
-                provider: 'claude',
-                api_key: data.claude_api_key,
-                base_url: data.claude_base_url || null,
-            },
-        });
-    }
-    if (data.openai_api_key) {
-        checks.push({
-            label: 'OpenAI',
-            data: {
-                provider: 'openai',
-                api_key: data.openai_api_key,
-                base_url: data.openai_base_url || null,
-            },
-        });
-    }
-    if (checks.length === 0) return true;
+    const provider = (state.models.providers || []).find(p => p.key === state.defaultProvider);
+    if (!provider) return true;
 
-    // 并发测试，收集失败项（不中断其它 Provider 的测试）
-    const results = await Promise.all(checks.map((check) =>
-        settings.testConnection(check.data)
-            .then(() => null)
-            .catch((err) => ({ label: check.label, message: err.message })),
-    ));
-    const failures = results.filter(Boolean);
-    if (failures.length === 0) return true;
+    // 按 provider 协议选表单字段（同协议优先 → 跨协议兜底）
+    const proto = provider.id; // 'claude' | 'openai'
+    const other = proto === 'claude' ? 'openai' : 'claude';
+    const apiKey = data[`${proto}_api_key`] || data[`${other}_api_key`];
+    const baseUrl = data[`${proto}_base_url`] || data[`${other}_base_url`];
 
-    const detail = failures.map((f) => `· ${f.label}: ${f.message}`).join('\n');
-    const confirmed = await showConfirm({
-        title: 'API Key 连接测试未通过',
-        message: `已填写 ${failures.length} 个 Key 测试失败`,
-        detail: `${detail}\n\n仍然保存吗？（若 Key 无误但当前网络不可达，可继续保存）`,
-        confirmText: '仍然保存',
-        cancelText: '取消',
-    });
-    return confirmed;
+    // 未填任何 Key → 跳过测试直接保存（Key 可在后续补）
+    if (!apiKey) return true;
+
+    // 用当前默认模型测试（用户配置的模型名，而非硬编码默认）
+    const model = getSelectedModel() || null;
+
+    try {
+        await settings.testConnection({ provider: provider.key, api_key: apiKey, base_url: baseUrl || null, model });
+        return true;
+    } catch (err) {
+        const confirmed = await showConfirm({
+            title: 'API Key 连接测试未通过',
+            message: `${provider.name} 连接测试失败`,
+            detail: `${err.message}\n\n仍然保存吗？（若 Key 或模型名无误，可继续保存）`,
+            confirmText: '仍然保存',
+            cancelText: '取消',
+        });
+        return confirmed;
+    }
 }
 
 // ══════════════════════════════════════════════════

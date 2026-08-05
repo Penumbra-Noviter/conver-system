@@ -41,8 +41,10 @@ async def test_connection(
 ) -> ConnectionTestResponse:
     """测试指定 Provider 的 API Key 连接是否可用
 
-    用请求携带的 Key（留空则回退到已保存的 Key）发起一次最小请求；
-    失败返回 400 及用户可读的原因（Key 无效 / 网络不可达等）。
+    未显式传 Key / URL / 模型时全部回退通用解析：
+        - Key / URL → setting_service（provider 特定 → 同协议槽位 → 跨协议兜底）
+        - 模型 → 当前默认模型（用户配置的），避免用硬编码模型导致误报
+    失败返回 400 及用户可读的原因（Key 无效 / 网络不可达 / 模型无权限等）。
     """
     provider = data.provider
     if provider not in LLMFactory.list_providers():
@@ -52,9 +54,12 @@ async def test_connection(
     if not api_key:
         raise HTTPException(status_code=400, detail="未提供 API Key，请在设置中填写后再测试")
 
+    base_url = data.base_url or setting_service.base_url(db, provider) or None
+    model = data.model or setting_service.default_model(db) or None
+
     try:
-        llm = LLMFactory.get_provider(provider, api_key, data.base_url or None)
-        await llm.test_connection(model=data.model)
+        llm = LLMFactory.get_provider(provider, api_key, base_url)
+        await llm.test_connection(model=model)
     except LLMError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
