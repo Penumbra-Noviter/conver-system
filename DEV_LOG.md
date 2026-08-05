@@ -33,6 +33,14 @@
 - **数据清理**：删除测试角色 TestBot 及其 3 对话 6 消息（备份 `conver_system.backup-20260805-233559.db`）；`default_provider` 修正 `openai`→`deepseek` 对齐新 key 方案（default_provider_name=DeepSeek）
 - **测试**：pytest **141 passed**；前端 Vitest **32 passed**（4 文件，新增 sse-reader 4 用例）
 
+### 2026-08-05 | 重构 | API 凭证通用解析 — 填任一字段即可全局使用
+- **需求**：通用系统，key/url 填 claude 或 openai 任一字段，选择任意模型即可直接用（聚合平台场景：一个 key + 一个平台 url 全协议通吃）
+- **setting.py 解析链重构**：`_slot_value` 统一凭证解析「provider 特定键 → 同协议槽位 → 跨协议兜底」；`api_key` 再叠 .env 兜底（同协议 → 另一协议）；`base_url` 同链
+- **效果**：用户只填 `claude_api_key`+`claude_base_url` 时，claude/openai/deepseek/qwen/kimi 全部解析到同一 key+url，协议由所选 provider 的 id 决定（SDK 自动加 /v1/chat/completions 或 /v1/messages）
+- **前端**：设置页 API 密钥 group 加通用提示文案
+- **测试**：+8 用例（同协议回退 / 跨协议兜底 / 同协议优先 / provider 特定优先 / base_url 同链）；pytest **149 passed**
+- **ADR 取舍**：不做 key/url 强制配对（多平台双字段场景少见）；跨协议兜底是默认行为，同协议槽位优先保证双字段场景仍正确路由
+
 ### 2026-08-04 | 实现 | Linear 设计语言 UI 重设计（`f83ec2f`）
 - **设计系统**：CSS 全面重写为 Linear 风格（near-black `#010102` canvas + 薰衣草蓝 `#5e6ad2` accent）；4 层 surface 阶梯（page → bg → panel-2 → panel-3 → panel-4）+ hairline 半透明边框
 - **Token 化**：全部颜色、间距、圆角、字号通过 CSS 自定义属性管理；深色模式优先，浅色模式从同一色板推导

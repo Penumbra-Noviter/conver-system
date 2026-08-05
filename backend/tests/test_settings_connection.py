@@ -176,6 +176,50 @@ class TestSettingService:
     def test_api_key_unconfigured_returns_empty(self, db_session) -> None:
         assert setting_service.api_key(db_session, "claude") == ""
 
+    # ── 通用凭证解析（任一槽位有值即可用）──
+
+    def test_api_key_same_protocol_fallback(self, db_session) -> None:
+        """DeepSeek（OpenAI 协议）→ 同协议槽位 openai_api_key"""
+        _save_setting(db_session, "openai_api_key", "sk-openai")
+        assert setting_service.api_key(db_session, "deepseek") == "sk-openai"
+
+    def test_api_key_cross_protocol_fallback(self, db_session) -> None:
+        """只填 claude_api_key，DeepSeek 跨协议兜底取到它（通用系统）"""
+        _save_setting(db_session, "claude_api_key", "sk-claude")
+        assert setting_service.api_key(db_session, "deepseek") == "sk-claude"
+
+    def test_api_key_prefers_same_protocol(self, db_session) -> None:
+        """两个槽位都有值 → 同协议槽位优先"""
+        _save_setting(db_session, "claude_api_key", "sk-claude")
+        _save_setting(db_session, "openai_api_key", "sk-openai")
+        assert setting_service.api_key(db_session, "deepseek") == "sk-openai"
+        assert setting_service.api_key(db_session, "claude") == "sk-claude"
+
+    def test_api_key_provider_specific_wins(self, db_session) -> None:
+        """provider 特定键优先于协议槽位"""
+        _save_setting(db_session, "deepseek_api_key", "sk-deepseek")
+        _save_setting(db_session, "openai_api_key", "sk-openai")
+        assert setting_service.api_key(db_session, "deepseek") == "sk-deepseek"
+
+    def test_base_url_same_protocol_fallback(self, db_session) -> None:
+        """DeepSeek → 同协议槽位 openai_base_url"""
+        _save_setting(db_session, "openai_base_url", "https://openai.example.com")
+        assert setting_service.base_url(db_session, "deepseek") == "https://openai.example.com"
+
+    def test_base_url_cross_protocol_fallback(self, db_session) -> None:
+        """只填 claude_base_url，DeepSeek 跨协议兜底取到它"""
+        _save_setting(db_session, "claude_base_url", "https://relay.example.com")
+        assert setting_service.base_url(db_session, "deepseek") == "https://relay.example.com"
+
+    def test_base_url_prefers_same_protocol(self, db_session) -> None:
+        """两个槽位都有值 → 同协议槽位优先"""
+        _save_setting(db_session, "claude_base_url", "https://claude.example.com")
+        _save_setting(db_session, "openai_base_url", "https://openai.example.com")
+        assert setting_service.base_url(db_session, "deepseek") == "https://openai.example.com"
+
+    def test_base_url_unconfigured_returns_empty(self, db_session) -> None:
+        assert setting_service.base_url(db_session, "claude") == ""
+
 
 class TestConnectionEndpoint:
     def test_success(self, db_session, monkeypatch) -> None:

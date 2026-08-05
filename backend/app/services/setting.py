@@ -59,10 +59,32 @@ _PROVIDER_API_MAP: dict[str, str] = {
     "step": "openai",
 }
 
+# 凭证槽位：用户可填 claude / openai 任一字段，系统通用解析
+_CRED_SLOTS = ("claude", "openai")
+
 
 def _resolve_api_provider(provider: str) -> str:
-    """将 provider key 映射到 API Key 存储键对应的协议标识符"""
+    """将 provider key 映射到同协议的凭证槽位（claude / openai）"""
     return _PROVIDER_API_MAP.get(provider, provider)
+
+
+def _slot_value(db: Session, suffix: str, provider: str) -> str:
+    """通用凭证解析：provider 特定键 → 同协议槽位 → 任一非空槽位（跨协议兜底）
+
+    无论用户把 Key/URL 填在 claude 还是 openai 字段，选择任意模型都能解析到可用值。
+    """
+    # 1. provider 特定键（如 deepseek_api_key）
+    own = get_value(db, f"{provider}_{suffix}")
+    if own:
+        return own
+    # 2. 同协议槽位（如 DeepSeek → openai_api_key）
+    proto = _resolve_api_provider(provider)
+    # 3. 跨协议兜底（另一槽位，如 claude_api_key）
+    for slot in (proto,) + tuple(s for s in _CRED_SLOTS if s != proto):
+        val = get_value(db, f"{slot}_{suffix}")
+        if val:
+            return val
+    return ""
 
 
 def get_value(db: Session, key: str, default: str = "") -> str:
@@ -102,24 +124,31 @@ def set_many(db: Session, data: dict[str, str]) -> None:
 def api_key(db: Session, provider: str) -> str:
     """读取指定 Provider 的 API Key，未配置返回空串
 
-    回退链：DB settings 表 → .env 配置项（{PROVIDER}_API_KEY）
-    第三方 provider（如 DeepSeek）会映射到其协议对应的 API Key（如 openai_api_key）。
+    通用解析链（任一槽位有值即可用）：
+        1. provider 特定键（{provider}_api_key）
+        2. 同协议槽位（如 DeepSeek → openai_api_key）
+        3. 跨协议兜底（另一槽位，如 claude_api_key）
+        4. .env 配置（同协议 → 另一协议）
     """
-    base_provider = _resolve_api_provider(provider)
-    db_value = get_value(db, f"{base_provider}_api_key")
+    db_value = _slot_value(db, "api_key", provider)
     if db_value:
         return db_value
-    env_key = f"{base_provider.upper()}_API_KEY"
-    return getattr(settings, env_key, "")
+
+    # .env 兜底：同协议 → 另一协议
+    proto = _resolve_api_provider(provider)
+    for slot in (proto,) + tuple(s for s in _CRED_SLOTS if s != proto):
+        env_val = getattr(settings, f"{slot.upper()}_API_KEY", "")
+        if env_val:
+            return env_val
+    return ""
 
 
 def base_url(db: Session, provider: str) -> str:
     """读取指定 Provider 的 base_url，未配置返回空串
 
-    第三方 provider（如 DeepSeek）会映射到其协议对应的 base_url（如 openai_base_url）。
+    通用解析链：provider 特定 → 同协议槽位 → 跨协议兜底。
     """
-    base_provider = _resolve_api_provider(provider)
-    return get_value(db, f"{base_provider}_base_url")
+    return _slot_value(db, "base_url", provider)
 
 
 def user_name(db: Session) -> str:
