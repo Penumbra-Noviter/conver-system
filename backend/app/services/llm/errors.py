@@ -68,4 +68,13 @@ def translate_sdk_error(
                 f"内容被 {provider_label} 内容过滤器拦截", original_error=error
             )
         return LLMError(f"{provider_label} API 请求错误: {error}", original_error=error)
+
+    # 响应解析失败（如 relay 返回非标准结构）→ 提示检查端点协议兼容性
+    msg = str(error)
+    if "has no attribute" in msg or "not subscriptable" in msg:
+        return LLMError(
+            f"{provider_label} API 返回格式异常：{msg}。"
+            f"请检查 API 地址是否为兼容 {provider_label} 协议的端点（应返回标准响应结构）",
+            original_error=error,
+        )
     return LLMError(f"{provider_label} API 调用失败: {error}", original_error=error)

@@ -62,7 +62,7 @@ def _create_conversation(db_session, character_id: int, **overrides: object) -> 
         "character_id": character_id,
         "title": "关于诗歌的讨论",
         "model_provider": "claude",
-        "model_name": "claude-sonnet-4-20250514",
+        "model_name": "claude-sonnet-5",
     }
     base.update(overrides)
     conv = Conversation(**base)

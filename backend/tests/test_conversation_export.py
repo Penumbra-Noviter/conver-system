@@ -62,7 +62,7 @@ def _create_conversation(db_session, character_id: int, **overrides: object) -> 
         "character_id": character_id,
         "title": "关于诗歌的讨论",
         "model_provider": "claude",
-        "model_name": "claude-sonnet-4-20250514",
+        "model_name": "claude-sonnet-5",
     }
     base.update(overrides)
     conv = Conversation(**base)
@@ -111,7 +111,7 @@ class TestExportJson:
             "id": conv.id,
             "title": "关于诗歌的讨论",
             "model_provider": "claude",
-            "model_name": "claude-sonnet-4-20250514",
+            "model_name": "claude-sonnet-5",
             "created_at": conv.created_at.isoformat(),
             "updated_at": conv.updated_at.isoformat(),
         }
@@ -181,7 +181,7 @@ class TestExportMarkdown:
 
         assert lines[0] == "# 与 艾莉 的对话"
         assert "**角色信息**: 一个用于测试的角色；人格: 冷静、睿智；场景: 月下竹林" in lines
-        assert "**模型**: claude/claude-sonnet-4-20250514" in lines
+        assert "**模型**: claude/claude-sonnet-5" in lines
         assert f"**时间**: {conv.created_at.strftime('%Y-%m-%d %H:%M')}" in lines
         assert "**user**: 你好" in lines
         assert "**assistant**: 欢迎" in lines

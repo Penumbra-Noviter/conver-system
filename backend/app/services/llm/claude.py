@@ -55,7 +55,7 @@ class ClaudeProvider(BaseLLM):
     ) -> str:
         """非流式生成完整回复"""
         system, chat_messages = self._prepare_messages(messages)
-        model = model or "claude-sonnet-4-20250514"
+        model = model or "claude-sonnet-5"
 
         try:
             response = await self._async_client.messages.create(
@@ -82,7 +82,7 @@ class ClaudeProvider(BaseLLM):
     ) -> AsyncIterator[str]:
         """流式生成，逐 token 产出"""
         system, chat_messages = self._prepare_messages(messages)
-        model = model or "claude-sonnet-4-20250514"
+        model = model or "claude-sonnet-5"
 
         try:
             async with self._async_client.messages.stream(

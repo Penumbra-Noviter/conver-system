@@ -69,14 +69,14 @@ class TestBaseLLMTestConnection:
     def test_default_impl_uses_minimal_request(self) -> None:
         """默认实现用最小请求（1 token）调用 generate，并透传 model"""
         provider = _RecordingProvider()
-        asyncio.run(provider.test_connection(model="claude-sonnet-4-20250514"))
+        asyncio.run(provider.test_connection(model="claude-sonnet-5"))
 
         assert provider.called is not None
         messages, temperature, max_tokens, model = provider.called
         assert messages == [{"role": "user", "content": "ping"}]
         assert temperature == 0.0
         assert max_tokens == 1
-        assert model == "claude-sonnet-4-20250514"
+        assert model == "claude-sonnet-5"
 
 
 # ── 2. POST /api/settings/test-connection 端点 ──

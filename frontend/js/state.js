@@ -23,7 +23,7 @@ export const state = {
     models: { providers: [] },       // 可用模型列表
     defaultProvider: 'claude',
     defaultProviderName: 'Claude (Anthropic)',
-    defaultModel: 'claude-sonnet-4-20250514',
+    defaultModel: 'claude-sonnet-5',
     sidebarCollapsed: false,
     chatSidebarCollapsed: false,
 };

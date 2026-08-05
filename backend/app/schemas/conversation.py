@@ -15,7 +15,7 @@ class ConversationCreate(BaseModel):
     character_id: int = Field(..., description="角色 ID")
     title: str = Field("新对话", max_length=200)
     model_provider: str = Field("claude", description="模型提供商")
-    model_name: str = Field("claude-sonnet-4-20250514", description="具体模型名")
+    model_name: str = Field("claude-sonnet-5", description="具体模型名")
 
 
 class ConversationUpdate(BaseModel):

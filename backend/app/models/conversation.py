@@ -19,7 +19,7 @@ class Conversation(Base):
     character_id = Column(Integer, ForeignKey("characters.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(200), default="新对话")
     model_provider = Column(String(50), default="claude", comment="模型提供商")
-    model_name = Column(String(100), default="claude-sonnet-4-20250514", comment="具体模型名")
+    model_name = Column(String(100), default="claude-sonnet-5", comment="具体模型名")
 
     created_at = Column(DateTime, default=datetime.datetime.now, server_default=func.now())
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now, server_default=func.now())

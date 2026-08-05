@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # 默认模型
     DEFAULT_PROVIDER: str = "claude"
-    DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
+    DEFAULT_MODEL: str = "claude-sonnet-5"
 
     # 数据库
     DATABASE_URL: str = "sqlite+aiosqlite:///./conver_system.db"
