@@ -28,10 +28,6 @@ class OpenAIProvider(BaseLLM):
         self._client = openai.OpenAI(**client_kwargs)
         self._async_client = openai.AsyncOpenAI(**client_kwargs)
 
-    @property
-    def provider_name(self) -> str:
-        return "openai"
-
     def _translate_error(self, error: Exception) -> LLMError:
         """将 OpenAI SDK 异常统一映射为 LLMError 层级"""
         return translate_sdk_error(

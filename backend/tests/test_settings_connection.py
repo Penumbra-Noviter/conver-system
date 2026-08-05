@@ -45,10 +45,6 @@ class _RecordingProvider(BaseLLM):
         super().__init__(api_key="test-key")
         self.called: tuple | None = None
 
-    @property
-    def provider_name(self) -> str:
-        return "recording"
-
     async def generate(
         self,
         messages: list[dict],

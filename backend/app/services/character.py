@@ -7,27 +7,43 @@ from __future__ import annotations
 from typing import Optional
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.schemas.character import CharacterCreate, CharacterUpdate
 
 
-def list_characters(db: Session) -> list[Character]:
-    """获取所有角色，附带对话数量，按更新时间倒序"""
-    query = db.query(
+# ── 共享查询基座 ──
+
+
+def _base_character_query(db: Session) -> Query:
+    """返回预置 conversation_count 聚合列的 Character 查询
+
+    所有附带对话数量的角色查询共用此基座，消除重复的 outerjoin/group_by。
+    """
+    return db.query(
         Character,
         func.count(Conversation.id).label("conversation_count"),
     ).outerjoin(
         Conversation, Conversation.character_id == Character.id
-    ).group_by(Character.id).order_by(Character.updated_at.desc())
+    ).group_by(Character.id)
 
-    results = []
-    for char, count in query.all():
-        char.conversation_count = count
-        results.append(char)
-    return results
+
+def _attach_count(char, count) -> Character:
+    """将 conversation_count 挂载到 Character ORM 对象"""
+    char.conversation_count = count
+    return char
+
+
+def list_characters(db: Session) -> list[Character]:
+    """获取所有角色，附带对话数量，按更新时间倒序"""
+    return [
+        _attach_count(char, count)
+        for char, count in _base_character_query(db)
+        .order_by(Character.updated_at.desc())
+        .all()
+    ]
 
 
 def get_character(db: Session, character_id: int) -> Optional[Character]:
@@ -37,20 +53,10 @@ def get_character(db: Session, character_id: int) -> Optional[Character]:
 
 def get_character_with_count(db: Session, character_id: int) -> Optional[Character]:
     """获取单个角色（附带对话数量，供 API 路由使用）"""
-    query = db.query(
-        Character,
-        func.count(Conversation.id).label("conversation_count"),
-    ).outerjoin(
-        Conversation, Conversation.character_id == Character.id
-    ).filter(Character.id == character_id).group_by(Character.id)
-
-    result = query.first()
+    result = _base_character_query(db).filter(Character.id == character_id).first()
     if not result:
         return None
-
-    char, count = result
-    char.conversation_count = count
-    return char
+    return _attach_count(*result)
 
 
 def create_character(db: Session, data: CharacterCreate) -> Character:

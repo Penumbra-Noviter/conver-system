@@ -162,8 +162,6 @@ class TestAutoTitle:
 class _StubProvider:
     """桩 Provider：逐 token 产出；可选在指定 token 后抛 ClientDisconnect"""
 
-    provider_name = "stub"
-
     def __init__(
         self,
         tokens: list[str],

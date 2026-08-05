@@ -35,6 +35,9 @@ app.include_router(settings.router)
 
 
 # ── 挂载前端静态文件 ──
+# 注意：挂载在 / 路径上，会捕获所有未被 API 路由匹配的请求。
+# 契约：所有 API 路由必须使用 /api 前缀，且在此行之前注册。
+# 若添加非 /api 前缀的新路由，必须注册在此行之前，否则将被静态文件捕获。
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

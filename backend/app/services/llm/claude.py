@@ -23,10 +23,6 @@ class ClaudeProvider(BaseLLM):
         self._client = anthropic.Anthropic(**client_kwargs)
         self._async_client = anthropic.AsyncAnthropic(**client_kwargs)
 
-    @property
-    def provider_name(self) -> str:
-        return "claude"
-
     def _translate_error(self, error: Exception) -> LLMError:
         """将 Claude SDK 异常统一映射为 LLMError 层级"""
         return translate_sdk_error(

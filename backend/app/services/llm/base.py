@@ -41,12 +41,6 @@ class BaseLLM(ABC):
         """流式生成，逐 token 产出"""
         ...
 
-    @property
-    @abstractmethod
-    def provider_name(self) -> str:
-        """返回唯一标识，如 'claude' / 'openai'"""
-        ...
-
     async def test_connection(self, model: str | None = None) -> None:
         """测试 API 连接是否可用（校验 Key 有效性与网络可达性）
 
