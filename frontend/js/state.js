@@ -24,6 +24,8 @@ export const state = {
     models: { providers: [] },       // 可用模型列表
     defaultProvider: 'claude',
     defaultModel: 'claude-sonnet-4-20250514',
+    sidebarCollapsed: false,
+    chatSidebarCollapsed: false,
 };
 
 // ══════════════════════════════════════════════════

@@ -39,7 +39,9 @@
         </nav>
 
         <div class="sidebar-footer">
+            <button class="btn-icon btn-collapse-sidebar" id="btn-collapse-sidebar" title="收起侧栏">◀</button>
             <span class="version">v0.1.0</span>
+            <button class="btn-icon theme-toggle" id="btn-theme-toggle" title="切换主题">🌙</button>
         </div>
     </aside>
 
@@ -52,7 +54,10 @@
                 <div class="chat-sidebar">
                     <div class="chat-sidebar-header">
                         <h2>对话</h2>
-                        <button class="btn-icon" id="btn-new-chat" title="新对话">✏️</button>
+                        <div class="chat-sidebar-header-actions">
+                            <button class="btn-icon btn-collapse-chat" id="btn-collapse-chat" title="收起侧栏">◀</button>
+                            <button class="btn-icon" id="btn-new-chat" title="新对话">✏️</button>
+                        </div>
                     </div>
                     <div class="conversation-list" id="conversation-list">
                         <p class="empty-hint">暂无对话</p>

@@ -574,6 +574,78 @@ function applyTheme(mode) {
     }
 }
 
+/**
+ * 切换主题（深色 ⇄ 浅色循环）
+ * 从当前主题切换到另一种，并持久化到后端
+ */
+async function toggleTheme() {
+    const root = document.documentElement;
+    const current = root.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try {
+        await settings.save({ theme_mode: next });
+    } catch (err) {
+        console.error('保存主题设置失败:', err);
+    }
+    // 更新主题按钮图标
+    updateThemeToggleIcon(next);
+    // 同步设置页面下拉框
+    $('#setting-theme').value = next;
+}
+
+/**
+ * 更新主题切换按钮的图标
+ * @param {string} mode - 'light' | 'dark' | 'auto'
+ */
+function updateThemeToggleIcon(mode) {
+    const btn = $('#btn-theme-toggle');
+    if (!btn) return;
+    if (mode === 'light') {
+        btn.textContent = '☀️';
+        btn.title = '切换深色模式';
+    } else {
+        btn.textContent = '🌙';
+        btn.title = '切换浅色模式';
+    }
+}
+
+/**
+ * 切换左侧导航栏的展开/收起
+ */
+function toggleSidebar() {
+    state.sidebarCollapsed = !state.sidebarCollapsed;
+    const sidebar = $('#sidebar');
+    const btn = $('#btn-collapse-sidebar');
+    if (state.sidebarCollapsed) {
+        sidebar.classList.add('sidebar-collapsed');
+        btn.textContent = '▶';
+        btn.title = '展开侧栏';
+    } else {
+        sidebar.classList.remove('sidebar-collapsed');
+        btn.textContent = '◀';
+        btn.title = '收起侧栏';
+    }
+}
+
+/**
+ * 切换对话列表栏的展开/收起
+ */
+function toggleChatSidebar() {
+    state.chatSidebarCollapsed = !state.chatSidebarCollapsed;
+    const sidebar = document.querySelector('.chat-sidebar');
+    const btn = $('#btn-collapse-chat');
+    if (state.chatSidebarCollapsed) {
+        sidebar.classList.add('chat-sidebar-collapsed');
+        btn.textContent = '▶';
+        btn.title = '展开侧栏';
+    } else {
+        sidebar.classList.remove('chat-sidebar-collapsed');
+        btn.textContent = '◀';
+        btn.title = '收起侧栏';
+    }
+}
+
 async function loadSettings() {
     try {
         const s = await settings.get();
@@ -592,6 +664,7 @@ async function loadSettings() {
         if (s.theme_mode) {
             $('#setting-theme').value = s.theme_mode;
             applyTheme(s.theme_mode);
+            updateThemeToggleIcon(s.theme_mode || 'dark');
         }
         if (s.user_name) $('#setting-user-name').value = s.user_name;
     } catch (err) {
@@ -669,6 +742,7 @@ dom.btnSaveSettings.addEventListener('click', async () => {
         state.defaultModel = result.default_model || data.default_model;
         // 应用主题
         applyTheme(data.theme_mode || 'auto');
+        updateThemeToggleIcon(data.theme_mode || 'dark');
         showAlert('设置已保存');
     } catch (err) {
         showAlert('保存失败: ' + err.message);
@@ -856,6 +930,13 @@ async function init() {
 
     // Provider 切换时动态更新模型列表
     $('#setting-default-provider').addEventListener('change', refreshModelOptions);
+
+    // 主题切换按钮
+    $('#btn-theme-toggle')?.addEventListener('click', toggleTheme);
+
+    // 侧栏收起按钮
+    $('#btn-collapse-sidebar')?.addEventListener('click', toggleSidebar);
+    $('#btn-collapse-chat')?.addEventListener('click', toggleChatSidebar);
 }
 
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）
