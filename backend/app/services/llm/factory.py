@@ -29,12 +29,19 @@ class LLMFactory:
 
     @classmethod
     def register_builtin_providers(cls) -> None:
-        """注册所有内置 Provider（claude / openai）"""
+        """注册所有内置 Provider（claude / openai 及 OpenAI 兼容第三方）"""
         from backend.app.services.llm.claude import ClaudeProvider
         from backend.app.services.llm.openai import OpenAIProvider
 
         cls.register("claude", ClaudeProvider)
         cls.register("openai", OpenAIProvider)
+        # 第三方 OpenAI 兼容 Provider（key 在 models.py AVAILABLE_MODELS 中定义）
+        cls.register("deepseek", OpenAIProvider)
+        cls.register("qwen", OpenAIProvider)
+        cls.register("kimi", OpenAIProvider)
+        cls.register("glm", OpenAIProvider)
+        cls.register("minimax", OpenAIProvider)
+        cls.register("step", OpenAIProvider)
 
     @classmethod
     def _ensure_builtins(cls) -> None:

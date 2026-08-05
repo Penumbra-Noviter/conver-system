@@ -26,6 +26,7 @@ __all__ = [
     "get_all",
     "set_many",
     "api_key",
+    "base_url",
     "user_name",
     "sliding_window_rounds",
     "default_provider",
@@ -45,6 +46,23 @@ ALLOWED_KEYS = {
     "theme_mode",
     "user_name",
 }
+
+# Provider key → API 协议标识符映射
+# 多个第三方 provider 共享同一协议（如 DeepSeek/Qwen 使用 OpenAI 兼容 API）
+# 用于将 provider key 映射到对应的 API Key / base_url 存储键前缀
+_PROVIDER_API_MAP: dict[str, str] = {
+    "deepseek": "openai",
+    "qwen": "openai",
+    "kimi": "openai",
+    "glm": "openai",
+    "minimax": "openai",
+    "step": "openai",
+}
+
+
+def _resolve_api_provider(provider: str) -> str:
+    """将 provider key 映射到 API Key 存储键对应的协议标识符"""
+    return _PROVIDER_API_MAP.get(provider, provider)
 
 
 def get_value(db: Session, key: str, default: str = "") -> str:
@@ -82,8 +100,26 @@ def set_many(db: Session, data: dict[str, str]) -> None:
 
 
 def api_key(db: Session, provider: str) -> str:
-    """读取指定 Provider 的 API Key，未配置返回空串"""
-    return get_value(db, f"{provider}_api_key")
+    """读取指定 Provider 的 API Key，未配置返回空串
+
+    回退链：DB settings 表 → .env 配置项（{PROVIDER}_API_KEY）
+    第三方 provider（如 DeepSeek）会映射到其协议对应的 API Key（如 openai_api_key）。
+    """
+    base_provider = _resolve_api_provider(provider)
+    db_value = get_value(db, f"{base_provider}_api_key")
+    if db_value:
+        return db_value
+    env_key = f"{base_provider.upper()}_API_KEY"
+    return getattr(settings, env_key, "")
+
+
+def base_url(db: Session, provider: str) -> str:
+    """读取指定 Provider 的 base_url，未配置返回空串
+
+    第三方 provider（如 DeepSeek）会映射到其协议对应的 base_url（如 openai_base_url）。
+    """
+    base_provider = _resolve_api_provider(provider)
+    return get_value(db, f"{base_provider}_base_url")
 
 
 def user_name(db: Session) -> str:
