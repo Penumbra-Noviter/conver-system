@@ -5,7 +5,16 @@
 
 ---
 
-## 滚动摘要（2026-08-05）
+## 滚动摘要（2026-08-06）
+
+- **UI 重设计**：Linear 冷灰 → Warm Stone 暖灰 + 琥珀金 accent（温暖叙事风格）；SVG 图标替换全部 emoji；对话气泡 Telegram 风格重设计；角色卡片、输入区、空状态全面升级
+- **用户手册**：新增导航栏「手册」入口 + 7 章节完整用户指南
+- **Bug 修复**：流式对话空气泡问题 — 先显示 thinking 指示器，第一个 token 到达时再创建气泡
+- **测试**：pytest **157** + 前端 Vitest **32**，全部通过
+
+---
+
+## 日志正文
 
 - **阶段**：架构摩擦分析 11 候选全部收官；P6.4 Tauri / P6.5 多 tab 待办（→ TICKETS）
 - **前端模块化**：设置面板提取 `settings-panel.js`；模型选择统一 `model-utils.js`；SSE 解析器 `sse-reader.js`；state.js 收缩
@@ -17,6 +26,26 @@
 ---
 
 ## 日志正文
+
+### 2026-08-06 | 重设计 | 温暖叙事 UI 全面升级
+- **色板更换**：Linear 冷灰（lavender）→ Warm Stone 暖灰 + 琥珀金 accent（`#E8A33D`）；深色 `#0d0b08` 暖墨色基底，浅色 `#f4f0e9` 暖米白基底
+- **SVG 图标**：导航栏/按钮全部 emoji 替换为 inline SVG（对话气泡、人物、放大镜、齿轮、＋、↓、垃圾桶等）
+- **对话气泡**：圆角 8px→16px Telegram 风格；user 气泡琥珀填充 + 左下小圆角，assistant 气泡暖卡底色 + 细边框 + 右下小圆角；间距加大；头像缩小带边框
+- **输入区**：包裹在 `border-radius:20px` 圆角容器内，聚焦琥珀发光，发送按钮 hover 辉光
+- **角色卡片**：头像 44→52px 带边框阴影，hover 上移 2px，新增 accent 标签
+- **空状态**：新增 SVG 图标 + 三段式布局 + 有温度文案「你的故事从这里开始」
+- **思考指示器**：脉冲点灰色→琥珀色，匹配气泡样式
+- **测试**：pytest 157 + 前端 32 全绿
+
+### 2026-08-06 | 修复 | 流式对话空气泡问题
+- **chat.js `handleSend`**：流式路径先创建空气泡→用户看到空白消息 → 改为先显示 thinking 指示器，第一个 token 到达时再创建 assistant 气泡
+- **onError 保护**：错误发生在第一个 token 前时，移除 thinking 指示器并兜底创建气泡显示错误信息，防止 `assistantDiv` null 引用
+
+### 2026-08-06 | 实现 | 用户手册视图
+- 导航栏新增「手册」按钮（📄 文档图标），移动端同步
+- `#view-guide` 7 章节完整内容：快速开始、角色管理、对话功能、搜索消息、设置说明、支持模型、小贴士
+- 路由通过通用 `switchView` 模式自动生效，零 JS 改动
+- 卡片式布局，`max-width:1000px` 居中展示
 
 ### 2026-08-05 | 重构 | 架构摩擦分析 11 候选全部落地
 - **① 设置面板提取**（`a69c53e`）：app.js ~320 行设置逻辑（Provider/模型下拉、主题、侧栏、保存/清空/API Key 测试）迁入 `components/settings-panel.js`，协议表面 `initSettingsPanel`/`loadSettings`/`initProviderDropdown`；app.js 1050→~700 行

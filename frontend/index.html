@@ -12,8 +12,8 @@
         <div class="sidebar-header">
             <h1 class="logo">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" class="logo-icon">
-                    <rect x="2" y="2" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.5" fill="none"/>
-                    <path d="M6 10L9 13L14 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3 4a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H7l-4 3V4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M7 8h6M7 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
                 Conver
             </h1>
@@ -21,32 +21,64 @@
 
         <nav class="sidebar-nav">
             <button class="nav-btn active" data-view="chat" title="聊天">
-                <span class="nav-icon">💬</span>
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+                    <path d="M3 4a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H7l-4 3V4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M7 8h6M7 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
                 <span class="nav-label">聊天</span>
             </button>
             <button class="nav-btn" data-view="characters" title="角色管理">
-                <span class="nav-icon">👤</span>
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="6.5" r="3.5" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M3 18c0-3.5 3.5-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
                 <span class="nav-label">角色</span>
             </button>
             <button class="nav-btn" data-view="search" title="搜索">
-                <span class="nav-icon">🔍</span>
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+                    <circle cx="8.5" cy="8.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
                 <span class="nav-label">搜索</span>
             </button>
             <button class="nav-btn" data-view="settings" title="设置">
-                <span class="nav-icon">⚙️</span>
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M10 2.5v2M10 15.5v2M3.5 6.5l1.73 1M14.77 12.5l1.73 1M2.5 10h2M15.5 10h2M3.5 13.5l1.73-1M14.77 7.5l1.73-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
                 <span class="nav-label">设置</span>
+            </button>
+            <button class="nav-btn" data-view="guide" title="用户手册">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
+                    <path d="M4 3h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <span class="nav-label">手册</span>
             </button>
         </nav>
 
         <div class="sidebar-footer">
-            <button class="btn-icon btn-collapse-sidebar" id="btn-collapse-sidebar" title="收起侧栏">◀</button>
+            <button class="btn-icon btn-collapse-sidebar" id="btn-collapse-sidebar" title="收起侧栏">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M9 3L5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
             <span class="version">v0.1.0</span>
-            <button class="btn-icon theme-toggle" id="btn-theme-toggle" title="切换主题">🌙</button>
+            <button class="theme-toggle" id="btn-theme-toggle" title="切换主题">
+                <svg viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
         </div>
     </aside>
 
     <!-- ─── 侧栏展开按钮（收起时显示） ─── -->
-    <button class="floating-expand" id="btn-expand-sidebar" style="display:none" title="展开侧栏">▶</button>
+    <button class="floating-expand" id="btn-expand-sidebar" style="display:none" title="展开侧栏">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M4 2l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
 
     <!-- ─── 主内容区 ─── -->
     <main id="main-content">
@@ -58,8 +90,16 @@
                     <div class="chat-sidebar-header">
                         <h2>对话</h2>
                         <div class="chat-sidebar-header-actions">
-                            <button class="btn-icon btn-collapse-chat" id="btn-collapse-chat" title="收起侧栏">◀</button>
-                            <button class="btn-icon" id="btn-new-chat" title="新对话">✏️</button>
+                            <button class="btn-icon btn-collapse-chat" id="btn-collapse-chat" title="收起侧栏">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                    <path d="M9 3L5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button class="btn-icon" id="btn-new-chat" title="新对话">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                    <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                     <div class="conversation-list" id="conversation-list">
@@ -67,7 +107,11 @@
                     </div>
                 </div>
                 <!-- 对话列表展开按钮（收起时显示） -->
-                <button class="chat-floating-expand" id="btn-expand-chat" style="display:none" title="展开侧栏">▶</button>
+                <button class="chat-floating-expand" id="btn-expand-chat" style="display:none" title="展开侧栏">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M4 2l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
 
                 <!-- 聊天区域 -->
                 <div class="chat-main">
@@ -76,7 +120,14 @@
                     </div>
                     <div class="chat-messages" id="chat-messages">
                         <div class="empty-state">
-                            <p>选择左侧对话或创建新对话开始聊天</p>
+                            <div class="empty-state-icon">
+                                <svg viewBox="0 0 22 22" fill="none">
+                                    <path d="M3 5a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H8l-5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                                    <path d="M8 9h6M8 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                            <p class="empty-state-text">选择一段对话，<br>或创建一个新角色开始聊天</p>
+                            <p class="empty-state-hint">你的故事从这里开始</p>
                         </div>
                     </div>
                     <div class="chat-input-area">
@@ -87,10 +138,10 @@
                                 rows="1"
                             ></textarea>
                             <button class="btn-send" id="btn-send" title="发送">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M2 8L14 2L10 14L7 9L2 8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="currentColor"/>
-                </svg>
-            </button>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                    <path d="M2 8L14 2L10 14L7 9L2 8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="currentColor"/>
+                                </svg>
+                            </button>
                         </div>
                         <div class="input-options">
                             <label class="option-toggle">
@@ -108,8 +159,19 @@
             <div class="view-header">
                 <h2>角色管理</h2>
                 <div class="view-header-actions">
-                    <button class="btn-secondary" id="btn-import-character" title="从 SillyTavern V2 角色卡 JSON 导入">📥 导入角色</button>
-                    <button class="btn-primary" id="btn-create-character">＋ 创建角色</button>
+                    <button class="btn-secondary" id="btn-import-character" title="从 SillyTavern V2 角色卡 JSON 导入">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-right:4px">
+                            <path d="M7 2v8M3 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 11v1h10v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                        导入角色
+                    </button>
+                    <button class="btn-primary" id="btn-create-character">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-right:4px">
+                            <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                        创建角色
+                    </button>
                     <input type="file" id="character-import-input" accept=".json,application/json" style="display:none">
                 </div>
             </div>
@@ -125,9 +187,16 @@
             </div>
             <div class="search-container">
                 <div class="search-input-wrapper">
-                    <span class="search-input-icon">🔍</span>
+                    <svg class="search-input-icon" viewBox="0 0 16 16" fill="none">
+                        <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
                     <input type="text" id="search-input" class="search-input" placeholder="搜索消息内容…" autocomplete="off">
-                    <button class="btn-icon btn-search-clear" id="btn-search-clear" title="清空">✕</button>
+                    <button class="btn-icon btn-search-clear" id="btn-search-clear" title="清空">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
                 <div class="search-results" id="search-results">
                     <p class="search-hint">输入关键词搜索所有对话中的消息</p>
@@ -187,7 +256,13 @@
                     </div>
                     <div class="form-field danger-zone">
                         <label class="danger-label">危险操作</label>
-                        <button class="btn-danger" id="btn-clear-all-convs">🗑️ 清空所有对话</button>
+                        <button class="btn-danger" id="btn-clear-all-convs">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-right:4px; vertical-align:-2px">
+                                <path d="M3 4h8M5.5 4V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5V4M4 4v7.5a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M6 6.5v4M8 6.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            </svg>
+                            清空所有对话
+                        </button>
                         <p class="settings-hint">将删除所有对话和消息记录，此操作不可撤销。</p>
                     </div>
                 </div>
@@ -217,25 +292,125 @@
                 <p class="settings-hint">API Key 仅存储于本地数据库，不会上传</p>
             </div>
         </section>
+
+        <!-- 用户手册视图 -->
+        <section id="view-guide" class="view">
+            <div class="view-header">
+                <h2>用户手册</h2>
+            </div>
+            <div class="guide-container">
+                <div class="guide-section">
+                    <h3>📖 快速开始</h3>
+                    <p>Conver System 是一个角色对话系统，让你与 AI 驱动的虚拟角色进行多轮对话。整体流程：<strong>创建角色 → 开启对话 → 开始聊天</strong>。</p>
+                    <ol>
+                        <li><strong>配置 API 密钥</strong> — 首次使用，先点击侧栏「设置」，填入你的 Claude / OpenAI 兼容 API Key 和地址，保存即可。</li>
+                        <li><strong>创建角色</strong> — 点击「角色」视图的「创建角色」按钮，填写角色姓名、人格设定、开场白等信息。</li>
+                        <li><strong>开始对话</strong> — 在角色卡片上点击「对话」，系统自动创建新对话，在输入框中打字发送即可。</li>
+                    </ol>
+                </div>
+
+                <div class="guide-section">
+                    <h3>🎭 角色管理</h3>
+                    <p>角色是对话的核心——每个角色拥有独立的人设、语气和知识设定。</p>
+                    <ul>
+                        <li><strong>创建角色</strong>：填写姓名、人格设定（系统提示词）、开场白、语气风格、标签等信息。带 <span class="required">*</span> 的为必填项。</li>
+                        <li><strong>编辑角色</strong>：点击角色卡片上的「编辑」按钮修改已有角色。</li>
+                        <li><strong>删除角色</strong>：点击角色卡片上的「删除」按钮。如果有进行中的对话，系统会提示关联对话数量。</li>
+                        <li><strong>导入角色</strong>：点击「导入角色」按钮，选择 SillyTavern V2 格式的角色卡 JSON 文件（兼容 V1 旧卡与裸 data 格式）。</li>
+                        <li><strong>导出角色</strong>：点击角色卡片上的「📤」按钮，导出为 V2 格式的角色卡 JSON。</li>
+                    </ul>
+                </div>
+
+                <div class="guide-section">
+                    <h3>💬 对话功能</h3>
+                    <ul>
+                        <li><strong>发送消息</strong>：在输入框输入文字，按 <kbd>Enter</kbd> 发送，<kbd>Shift+Enter</kbd> 换行。</li>
+                        <li><strong>流式输出</strong>：默认开启，AI 回复会逐字显示（打字机效果）。可在输入框下方取消勾选「流式输出」切换为一次性输出。</li>
+                        <li><strong>停止生成</strong>：流式输出时，发送按钮会变为红色「⏹」停止按钮，点击即可中断 AI 回复，已生成的内容会保留。</li>
+                        <li><strong>复制消息</strong>：鼠标悬停在消息气泡上，右上角出现「📋」复制按钮，点击复制该条消息内容。</li>
+                        <li><strong>对话标题</strong>：发送首条消息后，系统自动生成标题（格式：与 {角色名} 的对话）。你也可以点击头部标题直接编辑。</li>
+                        <li><strong>删除对话</strong>：在对话列表中，鼠标悬停显示删除按钮，点击即可删除。</li>
+                        <li><strong>导出对话</strong>：在聊天头部点击「导出」按钮，可选择 JSON 或 Markdown 格式导出完整对话记录。</li>
+                    </ul>
+                </div>
+
+                <div class="guide-section">
+                    <h3>🔍 搜索消息</h3>
+                    <p>在「搜索」视图中输入关键词，系统会跨所有对话搜索匹配的消息。搜索结果会显示消息内容预览、角色归属和对话名称，点击结果可跳转到对应对话。</p>
+                </div>
+
+                <div class="guide-section">
+                    <h3>⚙️ 设置说明</h3>
+                    <ul>
+                        <li><strong>API 密钥</strong>：填入 Claude 或 OpenAI 兼容 API 的 Key 和地址。只需填任一栏（Claude 或 OpenAI），系统即可全局使用——选择任意模型时自动匹配对应协议。</li>
+                        <li><strong>默认模型</strong>：选择默认的 Provider 和模型。自定义模型可在下拉列表底部选择「自定义模型」手动输入。</li>
+                        <li><strong>上下文轮数</strong>：控制 AI 能记住的对话轮数（默认 30 轮）。轮数越多，AI 对上下文的记忆越好，但 Token 消耗也越大。</li>
+                        <li><strong>模板变量</strong>：在角色设定中使用 <code>{{user}}</code>（自动替换为用户昵称）和 <code>{{char}}</code>（自动替换为角色名），让角色设定更生动自然。</li>
+                        <li><strong>主题模式</strong>：支持跟随系统、深色模式、浅色模式三种选择。</li>
+                    </ul>
+                </div>
+
+                <div class="guide-section">
+                    <h3>🧠 支持的模型</h3>
+                    <p>系统通过统一的 Provider 抽象层支持多种模型服务，当前已内置：</p>
+                    <ul>
+                        <li><strong>Claude</strong>（Anthropic）— Claude Sonnet 5、Claude Opus 4.8 等</li>
+                        <li><strong>OpenAI</strong> — GPT-4o、GPT-4-turbo 等</li>
+                        <li><strong>DeepSeek</strong> — deepseek-v4-flash 等</li>
+                        <li><strong>通义千问（Qwen）</strong>、<strong>Kimi</strong>、<strong>智谱（GLM）</strong>、<strong>Moonshot</strong> 等国产模型</li>
+                    </ul>
+                    <p>所有兼容 OpenAI 接口的服务均可通过填入对应 <code>base_url</code> 使用。</p>
+                </div>
+
+                <div class="guide-section">
+                    <h3>💡 小贴士</h3>
+                    <ul>
+                        <li>角色的人格设定越详细，AI 的角色扮演效果越好。建议包含：性格特征、说话风格、背景故事、知识范围。</li>
+                        <li>开场白（<code>first_mes</code>）是角色与用户的第一句话，好的开场白能立刻建立角色氛围。</li>
+                        <li>使用 <code>{{user}}</code> 和 <code>{{char}}</code> 模板变量时，确保已在设置中填写了用户昵称。</li>
+                        <li>API Key 仅存储在本地 SQLite 数据库中，不会上传到任何服务器。</li>
+                        <li>遇到问题可以先查看浏览器开发者工具的控制台（F12）是否有错误提示。</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- ─── 移动端底部导航 ─── -->
     <nav class="mobile-bottom-nav">
         <button class="mobile-nav-btn active" data-view="chat">
-            <span class="nav-icon">💬</span>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M3 4a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H7l-4 3V4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
             <span>聊天</span>
         </button>
         <button class="mobile-nav-btn" data-view="characters">
-            <span class="nav-icon">👤</span>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="6.5" r="3.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M3 18c0-3.5 3.5-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
             <span>角色</span>
         </button>
         <button class="mobile-nav-btn" data-view="search">
-            <span class="nav-icon">🔍</span>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <circle cx="8.5" cy="8.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
             <span>搜索</span>
         </button>
         <button class="mobile-nav-btn" data-view="settings">
-            <span class="nav-icon">⚙️</span>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10 2.5v2M10 15.5v2M3.5 6.5l1.73 1M14.77 12.5l1.73 1M2.5 10h2M15.5 10h2M3.5 13.5l1.73-1M14.77 7.5l1.73-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
             <span>设置</span>
+        </button>
+        <button class="mobile-nav-btn" data-view="guide">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M4 3h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>手册</span>
         </button>
     </nav>
 

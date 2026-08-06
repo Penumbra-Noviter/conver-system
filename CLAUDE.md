@@ -28,13 +28,14 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-## 当前状态（2026-08-04）
+## 当前状态（2026-08-06）
 
 - ✅ Phase 1-5 + P6.1/6.2/6.3 + P2.5 全部完成
 - ✅ 代码质量 CR.1-CR.7 清零
-- ✅ 测试 141 用例通过（后端）+ 28 用例通过（前端）
+- ✅ 测试 157 用例通过（后端）+ 32 用例通过（前端）
 - ✅ Rust 工具链已装（Tauri 前置就绪）
-- ✅ UI 重设计：Linear 风格（深色产品 UI + 薰衣草蓝 accent）
+- ✅ UI 重设计：Warm Stone 暖灰 + 琥珀金 accent（温暖叙事风格）
+- ✅ 新增用户手册视图（导航栏「手册」入口）
 
 ## 待办管理
 

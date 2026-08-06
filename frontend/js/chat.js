@@ -219,23 +219,30 @@ export async function handleSend() {
         // 流式模式
         state.isStreaming = true;
         setSendButtonState('stop');
-
-        const assistantDiv = document.createElement('div');
-        assistantDiv.className = 'message assistant';
-        // 头像
-        assistantDiv.appendChild(createAvatarElement('assistant'));
-        const assistantContentDiv = document.createElement('div');
-        assistantContentDiv.className = 'message-content';
-        assistantDiv.appendChild(assistantContentDiv);
-        chatDom.chatMessages.appendChild(assistantDiv);
+        showThinkingIndicator();
 
         let fullContent = '';
+        let assistantDiv = null;
+        let assistantContentDiv = null;
         const isAbortError = (err) => err?.name === 'AbortError';
 
         const stream = chatStream(
             { conversation_id: state.currentConversationId, content },
             {
                 onToken: (token) => {
+                    // 第一个 token 到达时，替换 thinking 指示器为真正的 assistant 气泡
+                    if (!assistantDiv) {
+                        const thinking = chatDom.chatMessages.querySelector('.thinking-indicator');
+                        if (thinking) thinking.remove();
+
+                        assistantDiv = document.createElement('div');
+                        assistantDiv.className = 'message assistant';
+                        assistantDiv.appendChild(createAvatarElement('assistant'));
+                        assistantContentDiv = document.createElement('div');
+                        assistantContentDiv.className = 'message-content';
+                        assistantDiv.appendChild(assistantContentDiv);
+                        chatDom.chatMessages.appendChild(assistantDiv);
+                    }
                     fullContent += token;
                     assistantContentDiv.innerHTML = renderMarkdown(fullContent);
                     scrollToBottom();
@@ -264,17 +271,33 @@ export async function handleSend() {
                     state.isStreaming = false;
                     state.activeStream = null;
                     setSendButtonState('send');
+                    // 移除 thinking 指示器（如果还在）
+                    const thinking = chatDom.chatMessages.querySelector('.thinking-indicator');
+                    if (thinking) thinking.remove();
+
                     if (isAbortError(err)) {
                         // 用户主动停止 — 语义是「已停止」而非错误；后端已保存部分内容
-                        if (fullContent) {
+                        if (fullContent && assistantContentDiv) {
                             assistantContentDiv.innerHTML = renderMarkdown(fullContent);
                         }
-                        markStopped(assistantDiv);
+                        if (assistantDiv) {
+                            markStopped(assistantDiv);
+                        }
                         state.messages.push(
                             { role: 'user', content },
                             { role: 'assistant', content: fullContent }
                         );
                     } else {
+                        // 错误发生 — 如果还没有 assistant 气泡，创建一个显示错误
+                        if (!assistantDiv) {
+                            assistantDiv = document.createElement('div');
+                            assistantDiv.className = 'message assistant';
+                            assistantDiv.appendChild(createAvatarElement('assistant'));
+                            assistantContentDiv = document.createElement('div');
+                            assistantContentDiv.className = 'message-content';
+                            assistantDiv.appendChild(assistantContentDiv);
+                            chatDom.chatMessages.appendChild(assistantDiv);
+                        }
                         assistantContentDiv.textContent = `[错误] ${err.message}`;
                     }
                     // 错误/停止时也刷新对话列表（避免计数卡死）
