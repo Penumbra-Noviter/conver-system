@@ -24,6 +24,9 @@
 - **手动创建**：所有字段在 UI 中可编辑；设定不完整（缺人格设定/开场白）时软提示引导补齐，不拦截保存
 - **导入/导出**：兼容 SillyTavern Character Card V2 规范（全量映射），首期仅 JSON 卡（PNG 卡留待 P6.x）；导入容错 V1 旧卡与裸 data 格式
 - **往返保真**：temperature / URL 头像 / lorebook 等非 V2 标准字段存 `extensions.conver_system.*` 命名空间，导出→导入不丢数据（详见 `docs/p2.5-character-import-export.md`）
+- **创建向导**（2026-08-06）：新增 6 步角色创建向导（选择方式 → 文档导入/模板 → 基本信息 → 人格设定 → 对话风格 → 预览保存）；编辑角色仍使用原有简洁表单
+- **LLM 文档智能解析**（2026-08-06）：`POST /api/characters/parse-document` 端点，使用用户配置的 LLM 从自由文本中自动提取角色卡字段（name / personality / first_mes 等），支持 3 种 JSON 提取策略；需先配置 API Key
+- **角色模板**（2026-08-06）：内置 5 套通用角色模板（知性学姐/神秘旅人/毒舌助手/温柔管家/活力猫娘），用户可在向导中选择模板后自定义
 - **字段设计**：DB 表完整映射 V2 字段（含 `scenario`、`mes_example`、`alternate_greetings`、`system_prompt`、`post_history_instructions` 等）
 - **删除行为**：
   - Phase 2：级联删除（角色 + 关联对话 + 消息）
@@ -100,4 +103,4 @@
 | 5 | 体验完善 | 对话历史、UI 美化、快捷操作 |
 | 6 | 增强功能 | Tauri 桌面版、导出、搜索等 |
 
-> 更新记录：2026-07-30 初始版本，经 grilling skill 深度讨论后确认；2026-08-03 补充 P3.5（§4 标题自动生成、§6 停止生成）、P4.3（API Key 保存时测试连接）决策。
+> 更新记录：2026-07-30 初始版本，经 grilling skill 深度讨论后确认；2026-08-03 补充 P3.5（§4 标题自动生成、§6 停止生成）、P4.3（API Key 保存时测试连接）决策；2026-08-06 补充角色创建向导、LLM 文档智能解析、5 套内置模板

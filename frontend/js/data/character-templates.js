@@ -87,22 +87,3 @@ export const CHARACTER_TEMPLATES = [
         system_prompt: '',
     },
 ];
-
-/**
- * 根据模板 ID 获取模板
- * @param {string} id
- * @returns {object|null}
- */
-export function getTemplateById(id) {
-    return CHARACTER_TEMPLATES.find(t => t.id === id) || null;
-}
-
-/**
- * 获取模板推荐标签（所有模板标签去重）
- * @returns {string[]}
- */
-export function getAllTemplateTags() {
-    const tags = new Set();
-    CHARACTER_TEMPLATES.forEach(t => t.tags.forEach(tag => tags.add(tag)));
-    return [...tags];
-}

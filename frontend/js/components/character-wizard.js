@@ -445,15 +445,7 @@ function bindStep2Events(state, body, statusEl, render) {
 
                 try {
                     const result = await characters.parseDocument({ text });
-                    // 填充字段
-                    state.name = result.name || '';
-                    state.description = result.description || '';
-                    state.personality = result.personality || '';
-                    state.scenario = result.scenario || '';
-                    state.first_mes = result.first_mes || '';
-                    state.mes_example = result.mes_example || '';
-                    state.system_prompt = result.system_prompt || '';
-                    state.tags = Array.isArray(result.tags) ? result.tags : [];
+                    _applyCharacterData(state, result);
                     state.parsedFields = Array.isArray(result.parsed_fields) ? result.parsed_fields : [];
                     state.parseError = '';
                 } catch (err) {
@@ -473,14 +465,7 @@ function bindStep2Events(state, body, statusEl, render) {
                 const template = CHARACTER_TEMPLATES.find(t => t.id === tid);
                 if (template) {
                     state.selectedTemplate = tid;
-                    state.name = template.name || '';
-                    state.description = template.description || '';
-                    state.personality = template.personality || '';
-                    state.scenario = template.scenario || '';
-                    state.first_mes = template.first_mes || '';
-                    state.mes_example = template.mes_example || '';
-                    state.system_prompt = template.system_prompt || '';
-                    state.tags = [...(template.tags || [])];
+                    _applyCharacterData(state, template);
                 }
                 render();
             });
@@ -649,6 +634,17 @@ async function handleSave(state, statusEl, submitBtn, close, onSuccess) {
 // ══════════════════════════════════════════════════
 // 辅助
 // ══════════════════════════════════════════════════
+
+function _applyCharacterData(state, data) {
+    state.name = data.name || '';
+    state.description = data.description || '';
+    state.personality = data.personality || '';
+    state.scenario = data.scenario || '';
+    state.first_mes = data.first_mes || '';
+    state.mes_example = data.mes_example || '';
+    state.system_prompt = data.system_prompt || '';
+    state.tags = Array.isArray(data.tags) ? [...data.tags] : [];
+}
 
 function getTemplateIcon(templateId) {
     const icons = {

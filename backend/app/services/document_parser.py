@@ -9,7 +9,11 @@
 
 from __future__ import annotations
 
+import logging
+
 import json
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy.orm import Session
 
@@ -154,7 +158,7 @@ def _extract_json(raw: str) -> dict | None:
         if isinstance(data, dict):
             return data
     except json.JSONDecodeError:
-        pass
+        logger.debug("直接 JSON 解析失败，尝试代码块提取")
 
     # 代码块提取
     if "```" in text:
@@ -182,7 +186,7 @@ def _extract_json(raw: str) -> dict | None:
                 if isinstance(data, dict):
                     return data
             except json.JSONDecodeError:
-                pass
+                logger.debug("花括号范围 JSON 解析失败")
 
     return None
 
