@@ -16,6 +16,7 @@
 
 import { characters, conversations, messages, models } from './api.js';
 import { showCharacterForm } from './components/character-form.js';
+import { showCharacterWizard } from './components/character-wizard.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
 import { showModelSelector } from './components/model-selector.js';
 import { showExportDialog } from './components/export-dialog.js';
@@ -241,7 +242,7 @@ async function renderCharacters() {
 }
 
 dom.btnCreateCharacter.addEventListener('click', () => {
-    showCharacterForm('create', null, () => loadCharacters());
+    showCharacterWizard(() => loadCharacters());
 });
 
 // ══════════════════════════════════════════════════

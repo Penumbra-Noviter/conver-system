@@ -83,3 +83,28 @@ class CharacterResponse(BaseModel):
     updated_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── 文档解析 ──
+
+
+class DocParseRequest(BaseModel):
+    """文档解析请求"""
+    text: str = Field(..., min_length=1, max_length=50000, description="用户文档文本")
+    provider: Optional[str] = Field(None, description="LLM Provider（留空则用默认）")
+    model: Optional[str] = Field(None, description="LLM 模型名（留空则用默认）")
+
+
+class DocParseResponse(BaseModel):
+    """文档解析响应"""
+    name: str = ""
+    description: str = ""
+    personality: str = ""
+    scenario: str = ""
+    first_mes: str = ""
+    mes_example: str = ""
+    system_prompt: str = ""
+    post_history_instructions: str = ""
+    tags: list[str] = []
+    creator: str = ""
+    parsed_fields: list[str] = Field(default_factory=list, description="成功提取的字段列表")

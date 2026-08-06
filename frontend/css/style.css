@@ -2409,3 +2409,318 @@ mark.search-highlight {
         padding: var(--space-3);
     }
 }
+
+/* ══════════════════════════════════════════════════
+   角色创建向导 (Wizard)
+   ══════════════════════════════════════════════════ */
+
+.wizard-modal {
+    max-width: 680px;
+    min-height: 480px;
+}
+
+.wizard-progress {
+    height: 3px;
+    background: var(--border);
+    margin: 0 var(--space-5);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.wizard-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.wizard-step-indicators {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: var(--space-4) var(--space-5) 0;
+}
+
+.wizard-step-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    color: var(--ink-4);
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition-fast), color var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.wizard-step-dot.active {
+    background: var(--accent);
+    color: var(--accent-contrast);
+}
+
+.wizard-step-line {
+    height: 2px;
+    flex: 1;
+    max-width: 48px;
+    background: var(--border);
+    margin: 0 4px;
+}
+
+.wizard-body {
+    min-height: 300px;
+}
+
+.wizard-step {
+    animation: wizardFadeIn 0.2s ease;
+}
+
+@keyframes wizardFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.wizard-step-desc {
+    color: var(--ink-3);
+    margin-bottom: var(--space-4);
+    font-size: var(--text-sm);
+}
+
+/* ── 创建方式选择 ── */
+
+.wizard-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+}
+
+.wizard-mode-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    background: var(--bg);
+}
+
+.wizard-mode-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-soft);
+}
+
+.wizard-mode-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.wizard-mode-icon {
+    font-size: 32px;
+    margin-bottom: var(--space-2);
+}
+
+.wizard-mode-name {
+    font-weight: 600;
+    color: var(--ink-1);
+    margin-bottom: var(--space-1);
+}
+
+.wizard-mode-desc {
+    font-size: var(--text-sm);
+    color: var(--ink-4);
+    line-height: 1.4;
+}
+
+/* ── 文档导入区域 ── */
+
+.wizard-import-area {
+    margin-bottom: var(--space-3);
+}
+
+.wizard-import-area textarea {
+    width: 100%;
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--panel-1);
+    color: var(--ink-1);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    resize: vertical;
+    font-family: inherit;
+    transition: border-color var(--transition-fast);
+}
+
+.wizard-import-area textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.wizard-parse-status {
+    margin-bottom: var(--space-2);
+    font-size: var(--text-sm);
+}
+
+.wizard-parsing {
+    color: var(--ink-4);
+}
+
+.wizard-parse-error {
+    color: var(--danger);
+}
+
+.wizard-parse-success {
+    color: var(--success);
+}
+
+/* ── 模板选择 ── */
+
+.template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-3);
+}
+
+.template-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    background: var(--bg);
+}
+
+.template-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.template-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.template-card-icon {
+    font-size: 28px;
+    margin-bottom: var(--space-2);
+}
+
+.template-card-name {
+    font-weight: 600;
+    color: var(--ink-1);
+    margin-bottom: var(--space-1);
+}
+
+.template-card-desc {
+    font-size: var(--text-sm);
+    color: var(--ink-4);
+    margin-bottom: var(--space-2);
+    line-height: 1.4;
+}
+
+.template-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    justify-content: center;
+}
+
+.template-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--panel-2);
+    color: var(--ink-3);
+}
+
+/* ── 预览摘要 ── */
+
+.wizard-summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.wizard-summary-section h4 {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--ink-2);
+    margin-bottom: var(--space-2);
+    padding-bottom: var(--space-1);
+    border-bottom: 1px solid var(--border);
+}
+
+.wizard-summary-row {
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+    font-size: var(--text-sm);
+}
+
+.summary-label {
+    color: var(--ink-4);
+    flex-shrink: 0;
+    min-width: 64px;
+    font-weight: 500;
+}
+
+.summary-value {
+    color: var(--ink-1);
+    word-break: break-word;
+}
+
+.summary-text {
+    white-space: pre-wrap;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.summary-empty {
+    color: var(--ink-4);
+    font-style: italic;
+}
+
+.summary-tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    margin-right: 3px;
+}
+
+/* ── 向导底部按钮 ── */
+
+.wizard-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
+    border-top: 1px solid var(--border);
+}
+
+/* ── 响应式 ── */
+
+@media (max-width: 600px) {
+    .wizard-mode-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .template-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .wizard-step-indicators {
+        padding: var(--space-3) var(--space-4) 0;
+    }
+}

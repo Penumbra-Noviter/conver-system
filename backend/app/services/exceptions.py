@@ -16,6 +16,7 @@ __all__ = [
     "ProviderNotSupportedError",
     "CardFormatError",
     "CardValidationError",
+    "DocParseError",
     "DomainError",
 ]
 
@@ -42,3 +43,7 @@ class CardFormatError(DomainError):
 
 class CardValidationError(DomainError):
     """角色卡数据校验失败"""
+
+
+class DocParseError(DomainError):
+    """文档解析失败（LLM 调用失败 / 返回非 JSON / 字段提取失败）"""

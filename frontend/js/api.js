@@ -74,6 +74,8 @@ export const characters = {
     delete: (id) => request('DELETE', `/characters/${id}`),
     /** 从 SillyTavern V2 角色卡 JSON 导入角色（V2 信封 / 裸 data / V1 旧卡均可） */
     import: (card) => request('POST', '/characters/import', card),
+    /** 使用 LLM 从文档中提取角色卡字段 */
+    parseDocument: (data) => request('POST', '/characters/parse-document', data),
 };
 
 // ══════════════════════════════════════════════════
