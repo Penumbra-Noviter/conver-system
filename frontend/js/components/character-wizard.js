@@ -352,6 +352,7 @@ function renderStep6(state) {
                     <h4>🧠 人格设定</h4>
                     <div class="wizard-summary-row"><span class="summary-label">人格</span><span class="summary-value summary-text">${escapeHtml(state.personality) || '<span class="summary-empty">未填写</span>'}</span></div>
                     <div class="wizard-summary-row"><span class="summary-label">场景</span><span class="summary-value">${escapeHtml(state.scenario) || '<span class="summary-empty">未填写</span>'}</span></div>
+                    ${state.system_prompt ? `<div class="wizard-summary-row"><span class="summary-label">系统提示</span><span class="summary-value summary-text">${escapeHtml(state.system_prompt)}</span></div>` : ''}
                 </div>
                 <div class="wizard-summary-section">
                     <h4>💬 对话风格</h4>

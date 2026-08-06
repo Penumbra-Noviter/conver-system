@@ -48,12 +48,8 @@ class TestExtractJson:
 
     def test_brace_extraction(self) -> None:
         """从花括号范围提取"""
-        raw = "角色名称是小明。{name: '小明', personality: '安静'}其它内容"
+        raw = "前面文字 {\"name\": \"小明\", \"personality\": \"安静\"} 后面文字"
         result = _extract_json(raw)
-        # 注意：这是非标准 JSON，但应该能提取到花括号范围
-        # 测试用合法 JSON
-        raw2 = "前面文字 {\"name\": \"小明\", \"personality\": \"安静\"} 后面文字"
-        result = _extract_json(raw2)
         assert result == {"name": "小明", "personality": "安静"}
 
     def test_no_json(self) -> None:
@@ -104,8 +100,7 @@ class TestParseDocument:
         llm = MockLLM(response='{"name": "小红", "personality": "活泼开朗", "first_mes": "你好！", "tags": ["可爱", "活泼"]}')
         mock_factory.return_value = llm
 
-        with patch("backend.app.services.document_parser.LLMFactory._ensure_builtins"):
-            result = await parse_document(None, "小红是一个活泼的角色")
+        result = await parse_document(None, "小红是一个活泼的角色")
 
         assert isinstance(result, DocParseResponse)
         assert result.name == "小红"
@@ -127,8 +122,7 @@ class TestParseDocument:
         llm = MockLLM(response='{"name": "测试"}')
         mock_factory.return_value = llm
 
-        with patch("backend.app.services.document_parser.LLMFactory._ensure_builtins"):
-            result = await parse_document(None, "测试文本")
+        result = await parse_document(None, "测试文本")
 
         assert result.name == "测试"
         assert result.description == ""
@@ -148,8 +142,7 @@ class TestParseDocument:
         llm = MockLLM(response="```json\n{\"name\": \"代码块角色\"}\n```")
         mock_factory.return_value = llm
 
-        with patch("backend.app.services.document_parser.LLMFactory._ensure_builtins"):
-            result = await parse_document(None, "测试")
+        result = await parse_document(None, "测试")
 
         assert result.name == "代码块角色"
 
@@ -165,9 +158,8 @@ class TestParseDocument:
         llm = MockLLM(response="这只是一段普通的文本，没有 JSON")
         mock_factory.return_value = llm
 
-        with patch("backend.app.services.document_parser.LLMFactory._ensure_builtins"):
-            with pytest.raises(DocParseError, match="无法解析"):
-                await parse_document(None, "测试")
+        with pytest.raises(DocParseError, match="无法解析"):
+            await parse_document(None, "测试")
 
     @patch("backend.app.services.document_parser.LLMFactory.get_provider")
     @patch("backend.app.services.document_parser.setting_service")
@@ -181,9 +173,8 @@ class TestParseDocument:
         llm = MockLLM(error=Exception("API 超时"))
         mock_factory.return_value = llm
 
-        with patch("backend.app.services.document_parser.LLMFactory._ensure_builtins"):
-            with pytest.raises(DocParseError, match="LLM 调用失败"):
-                await parse_document(None, "测试")
+        with pytest.raises(DocParseError, match="LLM 调用失败"):
+            await parse_document(None, "测试")
 
     @patch("backend.app.services.document_parser.setting_service")
     async def test_parse_no_api_key(self, mock_setting) -> None:
@@ -206,8 +197,7 @@ class TestParseDocument:
         llm = MockLLM(response='{"name": "标签测试", "tags": ["奇幻", "冒险", "魔法"]}')
         mock_factory.return_value = llm
 
-        with patch("backend.app.services.document_parser.LLMFactory._ensure_builtins"):
-            result = await parse_document(None, "测试")
+        result = await parse_document(None, "测试")
 
         assert result.tags == ["奇幻", "冒险", "魔法"]
         assert "tags" in result.parsed_fields
