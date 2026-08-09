@@ -51,6 +51,14 @@
 | OBS-3 | MD 导出保留 {{char}}/{{user}} 字面量：export_conversation_markdown 复用 apply_template_vars 替换（JSON/角色卡导出保留原始设定为有意设计）；+4 复现测试（含 JSON 防回归） | 2026-08-09 | `dd1d07d` |
 | OBS-4 | 角色卡片操作按钮 emoji：4 按钮换 inline SVG（作用域 .character-card-actions .btn-icon svg 16px） | 2026-08-09 | `dd1d07d` |
 
+### 导入路径错误引导（2026-08-09）
+
+> 角色卡导入失败只有原因提示、无修正引导（与 LLM 解析路径「请重试或手动创建」不一致）→ 后端错误消息带支持格式说明 + 前端失败后引导到创建向导。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| IMP-1 | 导入失败引导：后端 `_IMPORT_FORMAT_HINT`（V2 spec=chara_card_v2 / data 信封 / 裸 data / V1 旧卡 + 向导指引）追加到 CardFormatError 的 422 detail（CardValidationError 保持纯原因）；前端 `promptUseWizardAfterImportFail()` 失败后弹「是否改用创建向导？」→ 打开向导；+3 路由层测试 | 2026-08-09 | 待补 |
+
 
 ### 架构摩擦分析 11 候选（第三轮收官，2026-08-05）
 

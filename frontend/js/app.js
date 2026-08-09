@@ -269,6 +269,21 @@ dom.btnCreateCharacter.addEventListener('click', () => {
 // ══════════════════════════════════════════════════
 
 /**
+ * 导入失败后的引导：询问是否改用「创建角色」向导
+ * （向导支持智能导入/内置模板/手动创建，比调试角色卡 JSON 更省力）
+ */
+async function promptUseWizardAfterImportFail() {
+    const useWizard = await showConfirm({
+        title: '导入失败',
+        message: '是否改用「创建角色」向导？',
+        detail: '向导支持智能导入（粘贴文档，AI 自动提取）、内置模板或手动创建。',
+        confirmText: '打开向导',
+        cancelText: '取消',
+    });
+    if (useWizard) showCharacterWizard();
+}
+
+/**
  * 处理导入角色文件：读取 → JSON.parse → POST /api/characters/import
  * JSON.parse 失败 → 前端直接提示，不发请求。
  */
@@ -283,6 +298,7 @@ async function handleCharacterImport() {
     } catch {
         showError('不是有效的 JSON 文件');
         dom.characterImportInput.value = '';
+        await promptUseWizardAfterImportFail();
         return;
     }
 
@@ -291,8 +307,9 @@ async function handleCharacterImport() {
         showSuccess(`成功导入角色「${created.name}」`);
         await loadCharacters();
     } catch (err) {
-        // 后端 422 已带「导入失败：<原因>」前缀，直接展示避免重复
+        // 后端 422 已带「导入失败：<原因> + 支持格式说明」，直接展示避免重复
         showError(err.message);
+        await promptUseWizardAfterImportFail();
     } finally {
         // 清空 input，允许重复选择同一文件
         dom.characterImportInput.value = '';

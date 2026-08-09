@@ -504,3 +504,49 @@ def test_v2_roundtrip_minimal(make_character) -> None:
     assert result.description == ""
     assert result.avatar is None
     assert result.version == "1.0"
+
+
+# ── 路由层导入错误引导 ──
+
+
+class TestImportRouteErrorHint:
+    """导入端点 422 错误消息：格式错误附带支持格式说明（引导改用向导）"""
+
+    def test_format_error_includes_hint(self) -> None:
+        """无法识别的格式 → 422 detail 含具体原因 + 支持格式说明 + 向导引导"""
+        from fastapi import HTTPException
+
+        from backend.app.api.routes.characters import import_character
+
+        with pytest.raises(HTTPException) as exc_info:
+            import_character({"foo": "bar"}, None)  # type: ignore[arg-type]
+        detail = exc_info.value.detail
+        assert detail.startswith("导入失败：")
+        assert "无法识别的角色卡格式" in detail
+        assert "支持格式" in detail
+        assert "chara_card_v2" in detail
+        assert "向导" in detail
+
+    def test_unsupported_spec_includes_hint(self) -> None:
+        """不认识的 spec → 422 detail 含具体原因 + 说明"""
+        from fastapi import HTTPException
+
+        from backend.app.api.routes.characters import import_character
+
+        with pytest.raises(HTTPException) as exc_info:
+            import_character({"spec": "chara_card_v9", "data": {}}, None)  # type: ignore[arg-type]
+        detail = exc_info.value.detail
+        assert "不支持的卡片规格" in detail
+        assert "支持格式" in detail
+
+    def test_validation_error_keeps_plain_message(self) -> None:
+        """内容校验错误（名称空）→ 422 detail 仅具体原因，不带格式说明"""
+        from fastapi import HTTPException
+
+        from backend.app.api.routes.characters import import_character
+
+        with pytest.raises(HTTPException) as exc_info:
+            import_character({"spec": "chara_card_v2", "data": {"personality": "x"}}, None)  # type: ignore[arg-type]
+        detail = exc_info.value.detail
+        assert "导入失败：" in detail
+        assert "支持格式" not in detail

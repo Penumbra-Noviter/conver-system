@@ -13,19 +13,32 @@
 - **BUG-1 badge 显示错误**：`providerDisplayName()` 纯函数（model_data key→name 映射）替代硬编码 `'openai' ? 'OpenAI' : 'Claude'`；+5 vitest 用例
 - **BUG-4 移动端 480px 错乱**：对话列表默认收起（display:none + .mobile-expanded 类），☰/toggleConvList 统一走类切换，.chat-messages min-height:0 防撑高，隐藏冗余「收起侧栏」按钮，删除 convListVisible 死代码
 - **观察项 ①-④ 修复**（子代理并行）：① greeting 首轮显示（chat.js 发送完成后重载消息列表）；② 错误气泡红字红框（--danger 变量 + .message-error 类，深浅主题）；③ MD 导出 {{char}}/{{user}} 替换（复用 apply_template_vars，JSON/角色卡保留原始设定）；④ 角色卡片 4 按钮 emoji→SVG（作用域 CSS 16px）
-- **测试**：pytest **178**（+4 观察项③复现）+ 前端 Vitest **37**，全部通过
+- **导入路径错误引导（IMP-1）**：角色卡导入失败时，后端 422 错误消息附带支持格式说明（V2/data 信封/裸 data/V1 + 向导指引）；前端失败后弹「是否改用创建向导？」确认框；+3 路由层测试
+- **测试**：pytest **181**（+6）+ 前端 Vitest **37**，全部通过
 
 ---
 
 ## 日志正文
 
+### 2026-08-09 | 修复 | 导入路径错误引导（IMP-1）
+- **背景**：GUI 验证时发现角色卡导入失败只有原因提示（如「无法识别的角色卡格式」），无修正引导；LLM 解析路径已有「请重试或手动创建」指引，导入路径引导程度不一致
+- **后端**（`api/routes/characters.py`）：`_IMPORT_FORMAT_HINT` 常量（支持格式：V2 spec=chara_card_v2 / data 信封 / 裸 data（name）/ V1 旧卡（char_name）+ 向导指引）；`CardFormatError` 的 422 detail 追加说明；`CardValidationError`（名称空）保持纯原因（内容问题与格式无关）
+- **前端**（`app.js`）：`promptUseWizardAfterImportFail()` 引导函数——失败后弹 showConfirm「是否改用创建向导？（智能导入/模板/手动）」→ 确认则 `showCharacterWizard()`；JSON 解析失败与后端 422 两条路径均触发
+- **测试**：+3 路由层测试（格式错误含说明 / 不支持 spec 含说明 / 校验错误不含说明）
+- **GUI 回归**：导入 `{"foo":"bar"}` → 后端 detail 完整（含格式说明与向导指引）→ 引导弹窗 →「打开向导」→ 向导第 1 步正常打开
+- **测试**：pytest **181 passed**（+3）；Vitest 37 不变
+
+
 ### 2026-08-09 | 修复 | 观察项 ①-④（子代理并行 + GUI 回归）
+
 - **① greeting 首轮显示**（代理 A）：`chat.js::handleSend` 流式 onDone 与非流式完成路径改为 `messages.list` 重载 + `renderMessages()`（失败退化本地 push），停止路径保持现状（保留「已停止」标记）。GUI 验证：Testbot 空对话首条消息后立即显示 greeting「1」+ 用户消息 + LLM 回复
 - **② 错误气泡样式**（代理 A）：错误气泡加 `.message-error` 类；CSS 变量 `--danger-bg/--danger-text`（深色半透明暗红底，浅色 #fdf0ef 底 + #c0392b 字）+ 红边框。GUI 验证：无效 key 触发错误气泡显示红字红框，与正常气泡明显区分
 - **③ MD 导出模板变量**（代理 B，TDD）：`conversation_export.py::export_conversation_markdown` 对 description/personality/scenario 调用 `apply_template_vars`（`char_name` 参数，user_name 一次读取）；JSON 导出与角色卡导出保留原始设定（防回归测试标注有意行为）。复现测试 2 failed→修复后全量 178 通过。GUI 验证：导出 MD 中 `{{char}}` 已替换为角色名
 - **④ 卡片按钮 SVG**（代理 A）：`app.js::renderCharacters` 4 个操作按钮 emoji→inline SVG（气泡/铅笔/导出/垃圾桶，stroke currentColor 风格）；`.character-card-actions .btn-icon svg` 作用域 16px 规则（避免影响其他按钮）。GUI 验证：卡片按钮单色线条图标与导航统一
 - **经验**：子代理修改后端代码后必须重启 uvicorn（无 --reload）才生效——首次 MD 导出验证因服务未重启误报失败
 
+
+### 2026-08-09 | 修复 | GUI 全功能验证发现的 4 个 bug（复现测试先行）
 
 - **背景**：Playwright 黑盒测试 + vision 模型逐图核验（当前模型不支持直接读图），覆盖 P0 主流程/P1 交互/P2 输入边界/P3 响应式
 - **BUG-2**（停止内容未落库）：`services/chat.py::stream_reply` 原有 is_disconnected 轮询与 ClientDisconnect 两条保存路径，但前端 abort 时 Starlette 取消 async generator 抛 GeneratorExit（BaseException），`except Exception` 捕获不到 → 竞态丢失。修复：`finally` 兜底保存 + `saved` 标志防重复；`logger.exception` 兜底失败日志。复现测试 `test_stream_generator_exit_saves_partial`（aclose 模拟取消）
@@ -34,13 +47,6 @@
 - **BUG-4**（480px 布局错乱）：768px 断点下对话列表默认展开占 35vh 并挤压聊天区。修复：CSS 默认 `display:none` + `.mobile-expanded` 展开类；`.chat-messages { min-height: 0 }`；`btn-collapse-chat` 移动端隐藏；JS 两处 toggle 改类切换；删除 `convListVisible` 死代码
 - **GUI 回归**：badge 显示 DeepSeek ✅；JSON 导出下载成功 ✅；停止生成部分内容落库（DB id=17 截断内容）✅；480px 列表收起/☰ 展开/消息可见/切换对话自动滚底 ✅
 - **测试**：pytest **174 passed**（+3）；Vitest **37 passed**（+5）
-
-
-
-- **UI 重设计**：Linear 冷灰 → Warm Stone 暖灰 + 琥珀金 accent（温暖叙事风格）；SVG 图标替换全部 emoji；对话气泡 Telegram 风格重设计；角色卡片、输入区、空状态全面升级
-- **用户手册**：新增导航栏「手册」入口 + 7 章节完整用户指南
-- **Bug 修复**：流式对话空气泡问题 — 先显示 thinking 指示器，第一个 token 到达时再创建气泡
-- **测试**：pytest **157** + 前端 Vitest **32**，全部通过
 
 ---
 

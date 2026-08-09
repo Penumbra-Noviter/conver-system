@@ -91,17 +91,29 @@ async def parse_character_document(
         ) from exc
 
 
+_IMPORT_FORMAT_HINT = (
+    "支持格式：SillyTavern V2 角色卡（spec=chara_card_v2）、data 信封、"
+    "裸 data（含 name 字段）、V1 旧卡（含 char_name 字段）；"
+    "也可改用「创建角色」向导（智能导入/模板/手动）"
+)
+
+
 @router.post("/import", response_model=CharacterResponse, status_code=status.HTTP_201_CREATED)
 def import_character(card: dict, db: Session = Depends(get_db)) -> CharacterResponse:
     """从 SillyTavern V2 角色卡 JSON 导入角色（V2 信封 / 裸 data / V1 旧卡）
 
     流程：from_v2_card 归一化 → 直接新建落库（D3 允许重名），
     不校验完整性（D6 导入路径不参与完整性引导）。
-    无法识别的卡 / 缺 name → 422 友好报错。
+    无法识别的卡 / 缺 name → 422 友好报错（格式错误附带支持格式说明，引导改用向导）。
     """
     try:
         data = from_v2_card(card)
-    except (CardFormatError, CardValidationError) as exc:
+    except CardFormatError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"导入失败：{exc}。{_IMPORT_FORMAT_HINT}",
+        ) from exc
+    except CardValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"导入失败：{exc}",
