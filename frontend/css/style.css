@@ -31,6 +31,8 @@
     --success: #4CAF50;
     --danger: #E0705A;
     --danger-soft: rgba(224, 112, 90, 0.12);
+    --danger-bg: rgba(224, 112, 90, 0.14);
+    --danger-text: #f2b8a8;
     --warning: #E8A33D;
     --warning-soft: rgba(232, 163, 61, 0.12);
 
@@ -108,6 +110,8 @@
         --accent-soft: rgba(183, 122, 22, 0.10);
         --accent-glow: rgba(183, 122, 22, 0.20);
         --on-accent: #ffffff;
+        --danger-bg: #fdf0ef;
+        --danger-text: #c0392b;
 
         --overlay: rgba(0, 0, 0, 0.35);
         --shadow-sm: 0 1px 3px rgba(60, 38, 20, 0.05);
@@ -162,6 +166,8 @@
     --accent-soft: rgba(183, 122, 22, 0.10);
     --accent-glow: rgba(183, 122, 22, 0.20);
     --on-accent: #ffffff;
+    --danger-bg: #fdf0ef;
+    --danger-text: #c0392b;
     --overlay: rgba(0, 0, 0, 0.35);
     --shadow-sm: 0 1px 3px rgba(60, 38, 20, 0.05);
     --shadow-md: 0 4px 16px rgba(60, 38, 20, 0.08);
@@ -848,6 +854,14 @@ body {
     box-shadow: var(--shadow-sm);
 }
 
+/* 错误气泡 — 警示底色，与正常回复区分（深浅色主题由 --danger-bg/--danger-text 变量驱动） */
+.message.message-error .message-content {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger);
+    border-bottom-left-radius: var(--radius-bubble-tail);
+    color: var(--danger-text);
+}
+
 .message.system .message-content {
     background: transparent;
     color: var(--ink-4);
@@ -1225,6 +1239,12 @@ body {
     justify-content: flex-end;
     padding-top: var(--space-3);
     border-top: 1px solid var(--border);
+}
+
+/* 角色卡片操作按钮 inline SVG 尺寸 */
+.character-card-actions .btn-icon svg {
+    width: 16px;
+    height: 16px;
 }
 
 /* ══════════════════════════════════════════════════

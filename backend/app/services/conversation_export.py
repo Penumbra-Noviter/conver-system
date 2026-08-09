@@ -8,6 +8,10 @@ character 段复用 `schemas/conversation.py::ConversationExportCharacter`（fro
 Schema 即导出契约（字段名/顺序/类型唯一定义于此），service 层零手写字段映射。
 与 character_card.to_v2_card 的区别：to_v2_card 输出的是 SillyTavern V2 信封（字段名/结构不同），
 不适用于导出 JSON 的子集投影。
+
+MD 导出的「角色信息」段在组装时应用模板变量替换（{{char}}/{{user}} → 角色名/用户昵称，
+昵称读取自 setting.user_name，未配置回退默认）；JSON 导出保留原始设定（结构化数据往返保真），
+两者行为差异是有意设计。
 """
 
 from __future__ import annotations
@@ -18,6 +22,8 @@ from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message
 from backend.app.schemas.conversation import ConversationExportCharacter
+from backend.app.services import setting as setting_service
+from backend.app.services.llm.prompt import apply_template_vars
 
 __all__ = ["export_conversation_json", "export_conversation_markdown"]
 
@@ -95,12 +101,21 @@ def export_conversation_markdown(db: Session, conversation_id: int) -> str | Non
     character_name = character.name if character else "未知角色"
     character_info_parts = []
     if character:
+        # 仅 MD 导出的「角色信息」段替换模板变量（{{char}}/{{user}}）；
+        # JSON 导出与角色卡导出保留原始设定（结构化数据/往返保真）
+        user_nickname = setting_service.user_name(db)
         if character.description:
-            character_info_parts.append(character.description)
+            character_info_parts.append(
+                apply_template_vars(character.description, user_name=user_nickname, char_name=character.name)
+            )
         if character.personality:
-            character_info_parts.append(f"人格: {character.personality}")
+            character_info_parts.append(
+                f"人格: {apply_template_vars(character.personality, user_name=user_nickname, char_name=character.name)}"
+            )
         if character.scenario:
-            character_info_parts.append(f"场景: {character.scenario}")
+            character_info_parts.append(
+                f"场景: {apply_template_vars(character.scenario, user_name=user_nickname, char_name=character.name)}"
+            )
     character_info = "；".join(character_info_parts) if character_info_parts else "无"
 
     lines = [f"# 与 {character_name} 的对话", ""]

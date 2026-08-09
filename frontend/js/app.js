@@ -164,10 +164,31 @@ async function renderCharacters() {
                 <span class="meta-badge">💬 ${c.conversation_count ?? 0}</span>
             </div>
             <div class="character-card-actions">
-                <button class="btn-icon chat-with" title="开始对话">💬</button>
-                <button class="btn-icon edit-char" title="编辑">✏️</button>
-                <button class="btn-icon export-char" title="导出角色卡">📤</button>
-                <button class="btn-icon delete-char" title="删除">🗑️</button>
+                <button class="btn-icon chat-with" title="开始对话">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 4.5A1.5 1.5 0 014.5 3h7A1.5 1.5 0 0113 4.5v4A1.5 1.5 0 0111.5 10H8l-3 2v-2H4.5A1.5 1.5 0 013 8.5v-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                        <path d="M6 6.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <button class="btn-icon edit-char" title="编辑">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M11.4 2.6a1.7 1.7 0 012.4 2.4L7.5 11.3 4 12l.7-3.5 6.7-5.9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button class="btn-icon export-char" title="导出角色卡">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M13.5 10v3.5a1 1 0 01-1 1h-9a1 1 0 01-1-1V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M8 9.5V2.5M5.5 5L8 2.5 10.5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button class="btn-icon delete-char" title="删除">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M2.5 4.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        <path d="M12.7 4.5v9.3a1.3 1.3 0 01-1.3 1.3H4.6a1.3 1.3 0 01-1.3-1.3V4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M6.6 4.5V3.4a.9.9 0 01.9-.9h1a.9.9 0 01.9.9v1.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M6.6 7.5v4M9.4 7.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </button>
             </div>
         </div>
     `

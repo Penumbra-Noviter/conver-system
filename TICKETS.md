@@ -40,6 +40,17 @@
 | FIX-3 | 聊天头部模型 badge provider 显示错误：`providerDisplayName()` 纯函数替代硬编码二元映射（deepseek 误显示 Claude）；+5 vitest 用例 | 2026-08-09 | `eaf3456` |
 | FIX-4 | 移动端 480px 布局错乱：对话列表默认收起（display:none + .mobile-expanded 类切换）、.chat-messages min-height:0 防撑高、隐藏冗余收起按钮、删 convListVisible 死代码 | 2026-08-09 | `eaf3456` |
 
+### GUI 观察项修复 ①-④（2026-08-09）
+
+> GUI 验证报告的 4 个观察项评估后全部值得修；前端 ①②④ 与后端 ③ 子代理并行落地，GUI 回归逐项确认。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| OBS-1 | greeting 开场白首轮发送后不显示：chat.js 发送完成路径改为重载消息列表（流式 onDone / 非流式；停止路径保留「已停止」标记） | 2026-08-09 | 待补 |
+| OBS-2 | 错误气泡无错误样式：`.message-error` 类 + `--danger-bg/--danger-text` CSS 变量（红字红框，深浅主题适配） | 2026-08-09 | 待补 |
+| OBS-3 | MD 导出保留 {{char}}/{{user}} 字面量：export_conversation_markdown 复用 apply_template_vars 替换（JSON/角色卡导出保留原始设定为有意设计）；+4 复现测试（含 JSON 防回归） | 2026-08-09 | 待补 |
+| OBS-4 | 角色卡片操作按钮 emoji：4 按钮换 inline SVG（作用域 .character-card-actions .btn-icon svg 16px） | 2026-08-09 | 待补 |
+
 
 ### 架构摩擦分析 11 候选（第三轮收官，2026-08-05）
 

@@ -6,6 +6,8 @@
        messages 三段结构、缺对话返回 None、缺角色 character=None、无消息 messages=[]
     2. Markdown 导出：标题 / 角色信息 / 模型 / 时间 / 按日期分组 / 无角色回退 /
        角色信息为空回退「无」
+    3. 模板变量：MD 导出「角色信息」段替换 {{char}}/{{user}}（未配置 user_name 回退默认）；
+       JSON 导出保留字面量（往返保真，防回归）
 
 依赖：pytest + SQLite 内存库（conftest.db_session，StaticPool 保证同一连接）。
 """
@@ -17,6 +19,7 @@ import datetime
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
+from backend.app.services import setting as setting_service
 from backend.app.services.conversation_export import (
     export_conversation_json,
     export_conversation_markdown,
@@ -282,7 +285,77 @@ class TestExportMarkdown:
         assert "**user**: 无时间首条" in md2
 
 
-# ── 3. 路由层导出响应（Content-Disposition 编码） ──
+# ── 3. 模板变量：MD 替换 / JSON 保留 ──
+
+
+class TestExportTemplateVars:
+    def test_markdown_replaces_template_vars(self, db_session) -> None:
+        """角色设定含 {{char}}/{{user}} → MD 导出替换为实际角色名与用户昵称"""
+        char = _create_character(
+            db_session,
+            name="艾莉",
+            description="{{char}}是月下的旅人",
+            personality="{{char}}性格冷静，与{{user}}是旧识",
+            scenario="{{char}}与{{user}}在竹林夜话",
+        )
+        setting_service.set_many(db_session, {"user_name": "小明"})
+        conv = _create_conversation(db_session, char.id)
+
+        md = export_conversation_markdown(db_session, conv.id)
+        assert md is not None
+        assert (
+            "**角色信息**: 艾莉是月下的旅人；人格: 艾莉性格冷静，与小明是旧识；"
+            "场景: 艾莉与小明在竹林夜话"
+        ) in md
+        assert "{{char}}" not in md
+        assert "{{user}}" not in md
+
+    def test_markdown_plain_text_unchanged(self, db_session) -> None:
+        """不含模板变量的普通文本原样输出（不受替换逻辑影响）"""
+        char = _create_character(
+            db_session,
+            name="艾莉",
+            description="月下旅人",
+            personality="冷静、睿智",
+            scenario="竹林夜话",
+        )
+        setting_service.set_many(db_session, {"user_name": "小明"})
+        conv = _create_conversation(db_session, char.id)
+
+        md = export_conversation_markdown(db_session, conv.id)
+        assert md is not None
+        assert "**角色信息**: 月下旅人；人格: 冷静、睿智；场景: 竹林夜话" in md
+
+    def test_markdown_default_user_name_without_setting(self, db_session) -> None:
+        """settings 表无 user_name → 回退默认 'User'，不崩溃"""
+        char = _create_character(db_session, name="艾莉", personality="{{user}}是{{char}}的向导")
+        conv = _create_conversation(db_session, char.id)
+
+        md = export_conversation_markdown(db_session, conv.id)
+        assert md is not None
+        assert "人格: User是艾莉的向导" in md
+        assert "{{user}}" not in md
+
+    def test_json_export_preserves_template_vars(self, db_session) -> None:
+        """JSON 导出保留 {{char}}/{{user}} 字面量（结构化数据往返保真，防回归）"""
+        char = _create_character(
+            db_session,
+            name="艾莉",
+            description="{{char}}是月下的旅人",
+            personality="{{char}}性格冷静，与{{user}}是旧识",
+            scenario="{{char}}与{{user}}在竹林夜话",
+        )
+        setting_service.set_many(db_session, {"user_name": "小明"})
+        conv = _create_conversation(db_session, char.id)
+
+        data = export_conversation_json(db_session, conv.id)
+        assert data is not None
+        assert data["character"]["description"] == "{{char}}是月下的旅人"
+        assert data["character"]["personality"] == "{{char}}性格冷静，与{{user}}是旧识"
+        assert data["character"]["scenario"] == "{{char}}与{{user}}在竹林夜话"
+
+
+# ── 4. 路由层导出响应（Content-Disposition 编码） ──
 
 
 class TestExportRouteHeaders:

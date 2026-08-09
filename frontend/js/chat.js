@@ -247,16 +247,23 @@ export async function handleSend() {
                     assistantContentDiv.innerHTML = renderMarkdown(fullContent);
                     scrollToBottom();
                 },
-                onDone: (messageId) => {
+                onDone: async (messageId) => {
                     state.isStreaming = false;
                     state.activeStream = null;
                     setSendButtonState('send');
                     if (messageId) {
-                        // 正常完成 — 保存完整消息
-                        state.messages.push(
-                            { role: 'user', content },
-                            { role: 'assistant', content: fullContent, id: messageId }
-                        );
+                        // 正常完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
+                        try {
+                            state.messages = await messages.list(state.currentConversationId);
+                            renderMessages();
+                        } catch (err) {
+                            // 重新加载失败 — 退化为本地增量渲染，避免消息丢失
+                            console.error('重新加载消息列表失败:', err);
+                            state.messages.push(
+                                { role: 'user', content },
+                                { role: 'assistant', content: fullContent, id: messageId }
+                            );
+                        }
                     } else if (fullContent) {
                         // 流中断但已有部分内容
                         state.messages.push(
@@ -298,6 +305,8 @@ export async function handleSend() {
                             assistantDiv.appendChild(assistantContentDiv);
                             chatDom.chatMessages.appendChild(assistantDiv);
                         }
+                        // 错误气泡标记 — 用于区别于正常回复的警示样式
+                        assistantDiv.classList.add('message-error');
                         assistantContentDiv.textContent = `[错误] ${err.message}`;
                     }
                     // 错误/停止时也刷新对话列表（避免计数卡死）
@@ -316,11 +325,19 @@ export async function handleSend() {
                 conversation_id: state.currentConversationId,
                 content,
             });
-            appendMessage('assistant', result.reply);
-            state.messages.push(
-                { role: 'user', content },
-                { role: 'assistant', content: result.reply }
-            );
+            // 非流式完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
+            try {
+                state.messages = await messages.list(state.currentConversationId);
+                renderMessages();
+            } catch (err) {
+                // 重新加载失败 — 退化为本地增量渲染，避免消息丢失
+                console.error('重新加载消息列表失败:', err);
+                appendMessage('assistant', result.reply);
+                state.messages.push(
+                    { role: 'user', content },
+                    { role: 'assistant', content: result.reply }
+                );
+            }
         } catch (err) {
             appendMessage('system', `发送失败: ${err.message}`);
         } finally {
