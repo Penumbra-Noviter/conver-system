@@ -2345,15 +2345,30 @@ mark.search-highlight {
         flex-direction: column;
     }
 
+    /* 移动端对话列表默认收起（点聊天头 ☰ 展开），避免占用/遮挡聊天区 */
     .chat-sidebar {
+        display: none;
         width: 100%;
         max-height: 35vh;
         border-right: none;
         border-bottom: 1px solid var(--border);
     }
 
+    .chat-sidebar.mobile-expanded {
+        display: flex;
+    }
+
+    /* 移动端收起/展开统一走 ☰ 按钮（.mobile-expanded），隐藏「收起侧栏」按钮 */
+    .chat-sidebar-header .btn-collapse-chat {
+        display: none;
+    }
+
     .chat-main {
         flex: 1;
+        min-height: 0;
+    }
+
+    .chat-messages {
         min-height: 0;
     }
 

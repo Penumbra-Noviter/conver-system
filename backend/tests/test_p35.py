@@ -370,3 +370,62 @@ def test_stream_llm_error_emits_error_event(db_session, monkeypatch) -> None:
     assert len(events) == 1
     assert events[0]["type"] == "error"
     assert _assistant_contents(db_session, conv.id) == []
+
+
+class _HangProvider:
+    """桩 Provider：产出指定 token 后永久挂起（模拟 LLM 仍在生成）"""
+
+    def __init__(self, tokens: list[str]) -> None:
+        self.tokens = tokens
+
+    async def stream_generate(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        model: str | None = None,
+    ):
+        for tok in self.tokens:
+            yield tok
+        # 挂起等待——aclose()/取消会在此抛 GeneratorExit / CancelledError
+        await asyncio.Event().wait()
+
+
+async def _never_disconnected() -> bool:
+    """is_disconnected 桩：永远返回 False（断开由 aclose 模拟）"""
+    return False
+
+
+def test_stream_generator_exit_saves_partial(db_session, monkeypatch) -> None:
+    """客户端断开触发 generator 关闭（GeneratorExit，Starlette 取消 SSE 的真实路径）：
+    即使 is_disconnected 轮询来不及执行，也应保存已生成的部分内容"""
+    char_id = _create_character(db_session, name="艾莉")
+    conv = conversation_service.create_conversation(
+        db_session,
+        ConversationCreate(
+            character_id=char_id,
+            model_provider="claude",
+            model_name="claude-test",
+        ),
+    )
+    message_service.create_message(db_session, conv.id, Role.USER, "你好")
+
+    ctx = chat_service.ChatContext(
+        conversation=conv,
+        temperature=0.7,
+        messages=[{"role": "user", "content": "你好"}],
+        provider=_HangProvider(["你好", "世界"]),
+    )
+
+    async def _run() -> None:
+        gen = chat_service.stream_reply(
+            db_session, conv.id, ctx, is_disconnected=_never_disconnected
+        )
+        first = await gen.__anext__()
+        assert first == {"type": "token", "content": "你好"}
+        # 模拟 Starlette 在客户端断开时取消 async generator（在挂起点抛 GeneratorExit）
+        await gen.aclose()
+
+    asyncio.run(_run())
+
+    assert _assistant_contents(db_session, conv.id) == ["你好"]

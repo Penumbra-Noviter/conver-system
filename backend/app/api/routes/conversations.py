@@ -64,6 +64,8 @@ def delete_all_conversations(db: Session = Depends(get_db)) -> None:
     service.delete_all_conversations(db)
 
 
+import urllib.parse
+
 @router.get("/{conversation_id}/export/json")
 def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)) -> JSONResponse:
     """导出对话为 JSON 格式文件"""
@@ -72,11 +74,17 @@ def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
 
     character_name = data["character"]["name"].replace(" ", "_") if data.get("character") and data["character"].get("name") else str(conversation_id)
+    # HTTP header 只支持 latin-1 → filename 用 ASCII 兜底，中文名走 RFC 5987 filename*（UTF-8 编码）
+    ascii_filename = f"conversation-{conversation_id}.json"
+    utf8_filename = f"conversation-{conversation_id}-{character_name}.json"
     return JSONResponse(
         content=data,
         media_type="application/json",
         headers={
-            "Content-Disposition": f'attachment; filename="conversation-{conversation_id}-{character_name}.json"'
+            "Content-Disposition": (
+                f'attachment; filename="{ascii_filename}"; '
+                f"filename*=UTF-8''{urllib.parse.quote(utf8_filename)}"
+            )
         },
     )
 

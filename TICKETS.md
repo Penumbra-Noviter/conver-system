@@ -29,6 +29,18 @@
 
 ## 已完成归档
 
+### GUI 全功能验证修复（2026-08-09）
+
+> Playwright 黑盒测试（P0-P3 全级别 + vision 视觉核验）发现 4 个 bug，全部修复：复现测试先行（pytest +3 / vitest +5），GUI 回归逐项确认。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| FIX-1 | 停止生成的部分内容未落库：`stream_reply` finally 兜底保存（GeneratorExit/CancelledError 路径）+ saved 防重标志；+1 复现测试（aclose 模拟 Starlette 取消） | 2026-08-09 | 待补 |
+| FIX-2 | 对话 JSON 导出 500：Content-Disposition 中文文件名 latin-1 编码失败 → RFC 5987（filename ASCII + filename*=UTF-8''）；+2 复现测试 | 2026-08-09 | 待补 |
+| FIX-3 | 聊天头部模型 badge provider 显示错误：`providerDisplayName()` 纯函数替代硬编码二元映射（deepseek 误显示 Claude）；+5 vitest 用例 | 2026-08-09 | 待补 |
+| FIX-4 | 移动端 480px 布局错乱：对话列表默认收起（display:none + .mobile-expanded 类切换）、.chat-messages min-height:0 防撑高、隐藏冗余收起按钮、删 convListVisible 死代码 | 2026-08-09 | 待补 |
+
+
 ### 架构摩擦分析 11 候选（第三轮收官，2026-08-05）
 
 > 依据 architecture-review 报告（/improve-codebase-architecture）候选 ①–⑪ 全部落地。

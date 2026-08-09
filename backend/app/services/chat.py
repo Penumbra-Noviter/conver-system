@@ -54,6 +54,11 @@ _LLM_ERROR_MAP: dict[type[LLMError], tuple[int, str | None]] = {
 }
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class ChatContext:
     """一次聊天请求的准备结果（流式/非流式共用）"""
@@ -147,6 +152,8 @@ async def stream_reply(
     - 客户端断开（is_disconnected 返回 True 或抛 ClientDisconnect）→ 停止 LLM，
       将已生成的部分内容保存为 assistant 消息后正常收尾。
     - 停止语义为「用户主动停止」，非错误；路由层只做 data: 帧包装。
+    - 兜底：生成器被取消（GeneratorExit / CancelledError，Starlette 在客户端
+      断开时取消 SSE 生成器的真实路径）时，finally 中仍尽力保存已生成部分。
 
     Args:
         db: 数据库会话
@@ -155,6 +162,8 @@ async def stream_reply(
         is_disconnected: 客户端是否已断开的协程判断（如 raw_request.is_disconnected）
     """
     full_content = ""
+    saved = False  # 是否已落库，防止 finally 兜底重复保存
+
     try:
         async for token in ctx.provider.stream_generate(
             ctx.messages,
@@ -163,27 +172,31 @@ async def stream_reply(
         ):
             # 客户端断开 → 停止生成，保存已生成部分（不再发送事件）
             if await is_disconnected():
-                if full_content:
+                if full_content and not saved:
                     message_service.create_message(
                         db, conversation_id, Role.ASSISTANT, full_content
                     )
+                    saved = True
                 return
 
             full_content += token
             yield {"type": "token", "content": token}
 
         # 流结束，保存完整回复到 DB
-        saved = message_service.create_message(
-            db, conversation_id, Role.ASSISTANT, full_content
-        )
-        yield {"type": "done", "message_id": saved.id}
+        if not saved:
+            saved_msg = message_service.create_message(
+                db, conversation_id, Role.ASSISTANT, full_content
+            )
+            saved = True
+        yield {"type": "done", "message_id": saved_msg.id}
 
     except ClientDisconnect:
         # 客户端在发送过程中断开 — 尽力保存已生成部分
-        if full_content:
+        if full_content and not saved:
             message_service.create_message(
                 db, conversation_id, Role.ASSISTANT, full_content
             )
+            saved = True
         return
 
     except LLMError as e:
@@ -191,3 +204,13 @@ async def stream_reply(
         yield {"type": "error", "message": message}
     except Exception as e:
         yield {"type": "error", "message": f"生成回复失败: {e}"}
+    finally:
+        # 生成器被取消（GeneratorExit / CancelledError）→ 兜底保存已生成部分。
+        # finally 中不可再 yield（取消场景下 yield 会抛 RuntimeError），只做落库。
+        if full_content and not saved:
+            try:
+                message_service.create_message(
+                    db, conversation_id, Role.ASSISTANT, full_content
+                )
+            except Exception:
+                logger.exception("保存已生成的部分消息失败")

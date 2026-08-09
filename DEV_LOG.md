@@ -5,7 +5,29 @@
 
 ---
 
-## 滚动摘要（2026-08-06）
+## 滚动摘要（2026-08-09）
+
+- **GUI 全功能验证**：Playwright 黑盒测试（角色/向导/对话/搜索/导出/设置/手册/响应式）+ vision 模型视觉核验，发现 4 个 bug 全部修复
+- **BUG-2 停止内容未落库**：`stream_reply` 增加 finally 兜底保存（GeneratorExit/CancelledError 是 Starlette 取消 SSE 生成器的真实路径，原 except 捕获不到）+ saved 防重标志；+1 复现测试（aclose 模拟）
+- **BUG-3 JSON 导出 500**：Content-Disposition 中文文件名 latin-1 编码失败 → RFC 5987（filename ASCII 兜底 + filename*=UTF-8''）；+2 复现测试
+- **BUG-1 badge 显示错误**：`providerDisplayName()` 纯函数（model_data key→name 映射）替代硬编码 `'openai' ? 'OpenAI' : 'Claude'`；+5 vitest 用例
+- **BUG-4 移动端 480px 错乱**：对话列表默认收起（display:none + .mobile-expanded 类），☰/toggleConvList 统一走类切换，.chat-messages min-height:0 防撑高，隐藏冗余「收起侧栏」按钮，删除 convListVisible 死代码
+- **测试**：pytest **174**（+3 复现）+ 前端 Vitest **37**（+5），全部通过
+
+---
+
+## 日志正文
+
+### 2026-08-09 | 修复 | GUI 全功能验证发现的 4 个 bug（复现测试先行）
+- **背景**：Playwright 黑盒测试 + vision 模型逐图核验（当前模型不支持直接读图），覆盖 P0 主流程/P1 交互/P2 输入边界/P3 响应式
+- **BUG-2**（停止内容未落库）：`services/chat.py::stream_reply` 原有 is_disconnected 轮询与 ClientDisconnect 两条保存路径，但前端 abort 时 Starlette 取消 async generator 抛 GeneratorExit（BaseException），`except Exception` 捕获不到 → 竞态丢失。修复：`finally` 兜底保存 + `saved` 标志防重复；`logger.exception` 兜底失败日志。复现测试 `test_stream_generator_exit_saves_partial`（aclose 模拟取消）
+- **BUG-3**（JSON 导出 500）：`api/routes/conversations.py` 导出 header 的 `filename` 含中文角色名 → latin-1 编码失败。修复：RFC 5987 `filename`（ASCII）+ `filename*=UTF-8''`（urlencode）；浏览器优先中文名，兼容不支持 filename* 的客户端
+- **BUG-1**（badge 显示 Claude）：`app.js` 硬编码 `model_provider === 'openai' ? 'OpenAI' : 'Claude'`，deepseek 被误显示。修复：`utils.js::providerDisplayName()` 从 `/api/models` providers 元数据解析 key→name，未匹配回退原始 key
+- **BUG-4**（480px 布局错乱）：768px 断点下对话列表默认展开占 35vh 并挤压聊天区。修复：CSS 默认 `display:none` + `.mobile-expanded` 展开类；`.chat-messages { min-height: 0 }`；`btn-collapse-chat` 移动端隐藏；JS 两处 toggle 改类切换；删除 `convListVisible` 死代码
+- **GUI 回归**：badge 显示 DeepSeek ✅；JSON 导出下载成功 ✅；停止生成部分内容落库（DB id=17 截断内容）✅；480px 列表收起/☰ 展开/消息可见/切换对话自动滚底 ✅
+- **测试**：pytest **174 passed**（+3）；Vitest **37 passed**（+5）
+
+
 
 - **UI 重设计**：Linear 冷灰 → Warm Stone 暖灰 + 琥珀金 accent（温暖叙事风格）；SVG 图标替换全部 emoji；对话气泡 Telegram 风格重设计；角色卡片、输入区、空状态全面升级
 - **用户手册**：新增导航栏「手册」入口 + 7 章节完整用户指南

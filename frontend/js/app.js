@@ -21,7 +21,7 @@ import { showConfirm, showAlert } from './components/confirm-dialog.js';
 import { showModelSelector } from './components/model-selector.js';
 import { showExportDialog } from './components/export-dialog.js';
 import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
-import { escapeHtml, getInitials, formatTags, showToast, downloadBlob } from './utils.js';
+import { escapeHtml, getInitials, formatTags, showToast, downloadBlob, providerDisplayName } from './utils.js';
 import { highlightText } from './format.js';
 import { state } from './state.js';
 import { chatDom, renderMessages, handleSend, setConversationsRefresher } from './chat.js';
@@ -34,7 +34,6 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 // 模块级状态（UI 实现细节，不属于全局应用状态）
-let convListVisible = true;
 let searchTimeout = null;
 
 const dom = {
@@ -104,8 +103,7 @@ dom.mobileNavBtns.forEach((btn) => {
 function toggleConvList() {
     const sidebar = document.querySelector('.chat-sidebar');
     if (!sidebar) return;
-    convListVisible = !convListVisible;
-    sidebar.style.display = convListVisible ? '' : 'none';
+    sidebar.classList.toggle('mobile-expanded');
 }
 
 // ══════════════════════════════════════════════════
@@ -474,7 +472,7 @@ async function loadMessages() {
         const conv = state.conversations.find((c) => c.id === state.currentConversationId);
         if (conv) {
             const modelLabel = conv.model_name || '';
-            const providerLabel = conv.model_provider === 'openai' ? 'OpenAI' : 'Claude';
+            const providerLabel = providerDisplayName(state.models, conv.model_provider);
             chatDom.chatHeader.innerHTML = `
                 <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">☰</button>
                 <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
@@ -490,8 +488,7 @@ async function loadMessages() {
                 toggleBtn.addEventListener('click', () => {
                     const sidebar = document.querySelector('.chat-sidebar');
                     if (sidebar) {
-                        const isHidden = sidebar.style.display === 'none';
-                        sidebar.style.display = isHidden ? '' : 'none';
+                        sidebar.classList.toggle('mobile-expanded');
                     }
                 });
             }

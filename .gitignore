@@ -34,3 +34,7 @@ build/
 
 # Node / frontend tooling
 node_modules/
+
+# GUI 测试截图
+/gui-test-screenshots/
+/t[0-9]*.png

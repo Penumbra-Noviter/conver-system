@@ -280,3 +280,38 @@ class TestExportMarkdown:
         assert md2 is not None
         assert "### None" not in md2
         assert "**user**: 无时间首条" in md2
+
+
+# ── 3. 路由层导出响应（Content-Disposition 编码） ──
+
+
+class TestExportRouteHeaders:
+    def test_export_json_chinese_filename_header(self, db_session) -> None:
+        """JSON 导出：角色名为中文时 Content-Disposition 必须可编码
+        （latin-1 只支持 ASCII → filename 用 ASCII 兜底，中文走 RFC 5987 filename*）"""
+        from backend.app.api.routes.conversations import export_conversation_json
+
+        char = _create_character(db_session, name="测试·毒舌助手")
+        conv = _create_conversation(db_session, char.id)
+        _create_message(db_session, conv.id, Role.USER, "你好")
+
+        resp = export_conversation_json(conv.id, db_session)
+        assert resp.status_code == 200
+        header = resp.headers["Content-Disposition"]
+        # ASCII 兜底 + UTF-8 编码名并存（RFC 5987）
+        assert 'filename="conversation-' in header
+        assert header.endswith('.json"') or ".json" in header
+        assert "filename*=UTF-8''" in header
+        assert "conversation-1-" in header  # 中文角色名已进 filename* 而非 filename
+
+    def test_export_markdown_ascii_filename(self, db_session) -> None:
+        """Markdown 导出：header 始终可编码（ASCII 文件名）"""
+        from backend.app.api.routes.conversations import export_conversation_markdown
+
+        char = _create_character(db_session, name="测试·毒舌助手")
+        conv = _create_conversation(db_session, char.id)
+        _create_message(db_session, conv.id, Role.USER, "你好")
+
+        resp = export_conversation_markdown(conv.id, db_session)
+        assert resp.status_code == 200
+        assert "attachment" in resp.headers["Content-Disposition"]
