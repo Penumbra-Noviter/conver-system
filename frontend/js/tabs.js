@@ -11,8 +11,8 @@
  *      且一律不写存储
  *
  * 协议表面（__all__）：openTab / activateTab / closeTab / closeTabs / closeAllTabs /
- *   getActiveTab / getTab / getTabs / updateTab / abortStream / serialize /
- *   restore / restoreFromStorage / onTabsChanged。
+ *   getActiveTab / getTab / getTabs / getTabDisplay / updateTab / abortStream /
+ *   serialize / restore / restoreFromStorage / onTabsChanged。
  * 纯逻辑零 DOM：jsdom 环境（提供 sessionStorage）即可完整测试。
  *
  * 关键语义：
@@ -47,9 +47,11 @@ let activeId = null;
 const listeners = new Set();
 
 /**
- * updateTab 触发 onTabsChanged 的展示字段（tab 条渲染所依赖：标题/阶段指示）。
+ * updateTab 触发 onTabsChanged 的展示字段 —— 即 getTabDisplay（见下）的派生输入
+ * （title / phase）。patch 含任一展示字段才可能改变 tab 条渲染，才触发通知；
  * 纯内容字段（messages/draft/scrollTop 等）patch 不触发通知 —— 流式逐 token 的
  * messages 更新不再引起 tab 条全量 innerHTML 重建（FIX-C 热路径节流）。
+ * 注意：本清单与 getTabDisplay 的派生输入互为约束（双清单），改动须同步。
  */
 const DISPLAY_KEYS = ['title', 'phase'];
 
@@ -233,11 +235,35 @@ export function getTabs() {
 }
 
 /**
+ * 展示契约（ARC-5）：由 tab 状态纯派生 tab 条渲染所需字段，tab-bar.js 渲染
+ * 只经本函数取展示字段（不直接读 tab.title / tab.phase）。
+ *   - title：缺省「未命名会话」（空串 / null / undefined 时）
+ *   - generating：phase 为 thinking | streaming（标题前脉冲点）
+ *   - errored：phase 为 error（警示标记）
+ *   - phase：原样透传（未知值不抛错、不产生任何指示）
+ * 纯函数：不修改输入、每次返回新对象。
+ * 约束：本函数派生输入（title/phase）与 DISPLAY_KEYS（updateTab 通知依据）互为
+ * 双清单，改动须同步 —— patch 含任一展示字段才触发 onTabsChanged（见上）。
+ * @param {object|null} tab - tab 对象（getTabs() 元素）；null/undefined → 缺省形态
+ * @returns {{title: string, phase: string, generating: boolean, errored: boolean}}
+ */
+export function getTabDisplay(tab) {
+    const phase = tab?.phase ?? 'idle';
+    return {
+        title: tab?.title || '未命名会话',
+        phase,
+        generating: phase === 'thinking' || phase === 'streaming',
+        errored: phase === 'error',
+    };
+}
+
+/**
  * 浅合并 patch 到 tab 状态；对不存在的 conversationId 幂等 no-op（不抛错、不新增）。
  * conversationId 是身份键，不可经 patch 改写（静默忽略）。
- * 通知分类（FIX-C）：patch 含展示字段（title/phase）才触发 onTabsChanged —— tab 条只
- * 订阅展示字段变化；纯内容 patch（messages/draft/scrollTop 等）不通知，流式逐 token
- * 的 messages 更新不触发 tab 条全量重渲染。一律不写 sessionStorage（见模块 docstring）。
+ * 通知分类（FIX-C）：patch 含展示字段（DISPLAY_KEYS —— getTabDisplay 的派生输入，
+ * 见上）才触发 onTabsChanged —— tab 条只订阅展示字段变化；纯内容 patch
+ * （messages/draft/scrollTop 等）不通知，流式逐 token 的 messages 更新不触发
+ * tab 条全量重渲染。一律不写 sessionStorage（见模块 docstring）。
  * @param {number|string} conversationId - 会话 id
  * @param {object} patch - 要合并的字段（如 { title, phase, messages, isStreaming }）
  */
@@ -335,6 +361,7 @@ export const __all__ = [
     'getActiveTab',
     'getTab',
     'getTabs',
+    'getTabDisplay',
     'updateTab',
     'abortStream',
     'serialize',

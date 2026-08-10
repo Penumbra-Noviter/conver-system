@@ -5,8 +5,9 @@
  *   1. 订阅 tabs.js 的 onTabsChanged，变更即重渲染 tab 条
  *   2. 事件委托：点击 tab → 经注入的 onActivate 处理器激活（app.js 注入，
  *      内部走 P6.5-2 收敛的统一激活流程）；点击 ✕ → 直接 closeTab
- *   3. 状态指示：生成中（phase thinking/streaming）tab 标题前脉冲小圆点；
- *      出错/停止（phase error）警示标记；完成（phase done）无提示
+ *   3. 状态指示：经 tabs.js 展示契约 getTabDisplay 取展示字段 —— 生成中
+ *      （phase thinking/streaming）tab 标题前脉冲小圆点；出错/停止（phase error）
+ *      警示标记；完成（phase done）无提示；title 缺省「未命名会话」
  *   4. 无 tab 时不渲染容器（hidden）
  *
  * 依赖方向：tab-bar.js → tabs.js（协议）+ utils.js（escapeHtml）；
@@ -21,7 +22,7 @@
  *     防止被关会话的 DOM 草稿/滚动污染新活动 tab 缓存
  */
 
-import { getTabs, getActiveTab, closeTab, abortStream, onTabsChanged } from '../tabs.js';
+import { getTabs, getActiveTab, getTabDisplay, closeTab, abortStream, onTabsChanged } from '../tabs.js';
 import { escapeHtml } from '../utils.js';
 
 /**
@@ -66,14 +67,13 @@ export function initTabBar({ container, onActivate } = {}) {
         const activeId = getActiveTab()?.conversationId ?? null;
         container.innerHTML = tabs
             .map((t) => {
+                const display = getTabDisplay(t); // 展示契约：title/phase 派生（ARC-5）
                 const isActive = t.conversationId === activeId;
-                const generating = t.phase === 'thinking' || t.phase === 'streaming';
-                const title = t.title || '未命名会话';
                 return `
-            <div class="chat-tab${isActive ? ' active' : ''}" data-conv-id="${t.conversationId}" title="${escapeHtml(title)}">
-                ${generating ? '<span class="tab-dot" title="生成中"></span>' : ''}
-                ${t.phase === 'error' ? '<span class="tab-warn" title="生成出错/已停止">!</span>' : ''}
-                <span class="tab-title">${escapeHtml(title)}</span>
+            <div class="chat-tab${isActive ? ' active' : ''}" data-conv-id="${t.conversationId}" title="${escapeHtml(display.title)}">
+                ${display.generating ? '<span class="tab-dot" title="生成中"></span>' : ''}
+                ${display.errored ? '<span class="tab-warn" title="生成出错/已停止">!</span>' : ''}
+                <span class="tab-title">${escapeHtml(display.title)}</span>
                 <button class="tab-close" title="关闭会话">✕</button>
             </div>`;
             })
