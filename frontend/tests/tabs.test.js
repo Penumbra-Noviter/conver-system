@@ -664,59 +664,270 @@ describe('FIX-A settle 按消息位置匹配：同字节双流不误结算', () 
     });
 });
 
-describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（非流式）', () => {
-    it('非流式 list 延迟返回期间连发第二条 → 旧快照不覆盖新消息', async () => {
+describe('FIX-B 非流式双击连发守卫（原 F-1 非流式连发场景同步更新 — 连发被守卫拒绝）', () => {
+    it('非流式请求在途时重复 handleSend 被拒绝：双击仅一次真实请求，草稿保留，完成后恢复', async () => {
         const { chat, tabs, api } = await loadChatModules();
         tabs.openTab(11);
         chat.chatDom.toggleStream.checked = false;
 
-        const staleList = {};
-        staleList.promise = new Promise((resolve) => { staleList.resolve = resolve; });
-        let listCalls = 0;
+        let chatCalls = 0;
         let serverState = [];
+        const pendingLists = [];
         api.setFetch(async (url, options = {}) => {
             const path = String(url);
             if (path.endsWith('/api/chats')) {
+                chatCalls += 1;
                 const body = JSON.parse(options.body);
                 serverState.push({ id: serverState.length + 1, role: 'user', content: body.content });
                 serverState.push({ id: serverState.length + 1, role: 'assistant', content: `回复${body.content}` });
                 return mockJson({ reply: `回复${body.content}` });
             }
             if (path.endsWith('/messages')) {
-                listCalls += 1;
-                if (listCalls === 1) return staleList.promise;
-                return mockJson([...serverState]);
+                const d = {};
+                d.promise = new Promise((resolve) => { d.resolve = resolve; });
+                pendingLists.push(d);
+                return d.promise;
             }
             throw new Error(`未 mock 的请求: ${path}`);
         });
 
-        // 第一次发送（非流式）— messages.list 在途
+        // 第一次提交（双击第 1 击）→ 真实请求在途（chat + list 挂起）
         chat.chatDom.chatInput.value = '第一条';
         chat.handleSend();
         await sleep(20);
-        expect(listCalls).toBe(1);
+        expect(chatCalls).toBe(1);
+        expect(pendingLists).toHaveLength(1);
 
-        // 连发第二条（非流式 isStreaming 恒 false，Enter/直接调用均可连发）
+        // 双击第 2 击（输入框已有内容）→ 在途拒绝：不发请求、不清草稿、不追加消息
+        chat.chatDom.chatInput.value = '第二条';
+        chat.handleSend();
+        await sleep(20);
+        expect(chatCalls).toBe(1); // 仅一次真实请求
+        expect(chat.chatDom.chatInput.value).toBe('第二条'); // 草稿保留（未清空）
+        expect(tabs.getTab(11).messages.some((m) => m.role === 'user' && m.content === '第二条')).toBe(false);
+
+        // 第一次完成（list 返回）→ 守卫清除 → 再次发送成功
+        pendingLists[0].resolve(mockJson([...serverState]));
+        await sleep(20);
+        chat.chatDom.chatInput.value = '第三条';
+        chat.handleSend();
+        await sleep(20);
+        expect(chatCalls).toBe(2);
+        expect(tabs.getTab(11).messages.some((m) => m.role === 'user' && m.content === '第三条')).toBe(true);
+        pendingLists[1].resolve(mockJson([...serverState]));
+        await sleep(20);
+        expect(tabs.getTab(11).messages).toEqual(serverState);
+    });
+
+    it('非流式请求失败后守卫清除 → 可再次发送', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+        chat.chatDom.toggleStream.checked = false;
+
+        let chatCalls = 0;
+        api.setFetch(async (url, options = {}) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats')) {
+                chatCalls += 1;
+                if (chatCalls === 1) return mockJson({ detail: '服务端故障' }, 500);
+                return mockJson({ reply: '成功回复' });
+            }
+            if (path.endsWith('/messages')) {
+                return mockJson([
+                    { id: 1, role: 'user', content: '第二条' },
+                    { id: 2, role: 'assistant', content: '成功回复' },
+                ]);
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        // 第一次发送失败（chat 500）
+        chat.chatDom.chatInput.value = '第一条';
+        await chat.handleSend();
+        expect(chatCalls).toBe(1);
+        expect(document.querySelector('#chat-messages').textContent).toContain('发送失败');
+
+        // 失败路径清除守卫 → 再次发送成功（第二次 list 返回完整快照）
         chat.chatDom.chatInput.value = '第二条';
         await chat.handleSend();
-        expect(tabs.getTab(11).messages.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
-
-        // 旧快照返回（只含第一条的往返）
-        staleList.resolve(mockJson([
-            { id: 1, role: 'user', content: '第一条' },
-            { id: 2, role: 'assistant', content: '回复第一条' },
-        ]));
-        await sleep(20);
-
-        // 核心断言：旧快照不覆盖连发的第二条
-        const msgs = tabs.getTab(11).messages;
-        expect(msgs.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
-        expect(msgs).toEqual([
-            { id: 1, role: 'user', content: '第一条' },
-            { id: 2, role: 'assistant', content: '回复第一条' },
-            { id: 3, role: 'user', content: '第二条' },
-            { id: 4, role: 'assistant', content: '回复第二条' },
+        expect(chatCalls).toBe(2);
+        expect(tabs.getTab(11).messages).toEqual([
+            { id: 1, role: 'user', content: '第二条' },
+            { id: 2, role: 'assistant', content: '成功回复' },
         ]);
+    });
+
+    it('chat 成功但 list 重载失败 → 本地增量兜底，且守卫在 list 失败路径同样清除', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+        chat.chatDom.toggleStream.checked = false;
+
+        let chatCalls = 0;
+        let listFailed = false;
+        api.setFetch(async (url, options = {}) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats')) {
+                chatCalls += 1;
+                const body = JSON.parse(options.body);
+                return mockJson({ reply: `回复${body.content}` });
+            }
+            if (path.endsWith('/messages')) {
+                if (!listFailed) {
+                    listFailed = true;
+                    return mockJson({ detail: '服务端故障' }, 500); // 第一次 list 失败
+                }
+                return mockJson([
+                    { id: 1, role: 'user', content: '第二条' },
+                    { id: 2, role: 'assistant', content: '回复第二条' },
+                ]);
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        // 第一次：chat 成功、list 失败 → 走本地增量兜底（消息不丢失）
+        chat.chatDom.chatInput.value = '第一条';
+        await chat.handleSend();
+        expect(chatCalls).toBe(1);
+        expect(tabs.getTab(11).messages).toEqual([
+            { role: 'user', content: '第一条' },
+            { role: 'assistant', content: '回复第一条' },
+        ]);
+
+        // list 失败后守卫仍已清除（finally 统一执行）→ 再次发送成功，list 返回完整快照
+        chat.chatDom.chatInput.value = '第二条';
+        await chat.handleSend();
+        expect(chatCalls).toBe(2);
+        expect(tabs.getTab(11).messages).toEqual([
+            { id: 1, role: 'user', content: '第二条' },
+            { id: 2, role: 'assistant', content: '回复第二条' },
+        ]);
+    });
+
+    it('守卫按 tab 作用域：其他 tab 的非流式发送不被本 tab 在途请求阻塞', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+        tabs.openTab(12); // openTab 自动激活 12 → 切回 11 作为首个发送 tab
+        tabs.activateTab(11);
+        chat.chatDom.toggleStream.checked = false;
+
+        let chatCalls = 0;
+        const pendingLists = [];
+        api.setFetch(async (url, options = {}) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats')) {
+                chatCalls += 1;
+                const body = JSON.parse(options.body);
+                return mockJson({ reply: `回复${body.content}` });
+            }
+            if (path.endsWith('/messages')) {
+                const d = {};
+                d.promise = new Promise((resolve) => { d.resolve = resolve; });
+                pendingLists.push(d);
+                return d.promise;
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        // tab 11 非流式请求在途
+        chat.chatDom.chatInput.value = 'tab11消息';
+        chat.handleSend();
+        await sleep(20);
+        expect(chatCalls).toBe(1);
+
+        // 切到 tab 12 发送 → 不被 11 的在途标记阻塞（per-tab 作用域）
+        tabs.activateTab(12);
+        chat.chatDom.chatInput.value = 'tab12消息';
+        chat.handleSend();
+        await sleep(20);
+        expect(chatCalls).toBe(2);
+        expect(tabs.getTab(12).messages.some((m) => m.role === 'user' && m.content === 'tab12消息')).toBe(true);
+
+        // 收尾放行挂起的 list，避免悬挂请求
+        pendingLists.forEach((d) => d.resolve(mockJson([])));
+        await sleep(20);
+    });
+});
+
+describe('流式 error 帧 → handleStreamError 错误分支（Falsify 失败路径补测）', () => {
+    it('error 帧 → phase error + 错误气泡 + 按钮复位', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+
+        api.setFetch(async (url) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats/stream')) {
+                let ctrl;
+                const stream = new ReadableStream({ start(c) { ctrl = c; } });
+                setTimeout(() => {
+                    ctrl.enqueue(ENCODER.encode(sseFrame('error', { message: '模型超时' })));
+                    ctrl.close();
+                }, 0);
+                return Promise.resolve({ ok: true, status: 200, body: stream });
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        chat.chatDom.chatInput.value = '触发错误';
+        await chat.handleSend();
+        expect(tabs.getTab(11).phase).toBe('error');
+        expect(tabs.getTab(11).isStreaming).toBe(false);
+        expect(document.querySelector('#chat-messages').textContent).toContain('[错误] 模型超时');
+        expect(chat.chatDom.btnSend.textContent).toBe('➤');
+        expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
+    });
+});
+
+describe('FIX-C 热路径节流：通知分类（tab 条只订阅展示字段）', () => {
+    it('messages/draft/scrollTop 纯内容 patch 不触发 onTabsChanged；title/phase 与结构性变更照常触发', async () => {
+        vi.resetModules();
+        const tabs = await import('../js/tabs.js');
+        const fn = vi.fn();
+        const off = tabs.onTabsChanged(fn);
+        tabs.openTab(1); // 结构性 → 1
+        tabs.updateTab(1, { messages: [{ role: 'user', content: 'x' }] }); // 纯内容 → 0
+        tabs.updateTab(1, { draft: '草稿' }); // 纯内容 → 0
+        tabs.updateTab(1, { scrollTop: 42 }); // 纯内容 → 0
+        tabs.updateTab(1, { phase: 'streaming' }); // 展示 → 1
+        tabs.updateTab(1, { title: '新标题' }); // 展示 → 1
+        tabs.updateTab(1, { phase: 'done', messages: [{ role: 'assistant', content: 'y' }] }); // 混合（含展示）→ 1
+        tabs.closeTab(1); // 结构性 → 1
+        off();
+        // 1(开) + 1(phase) + 1(title) + 1(混合含展示) + 1(关) = 5；纯内容 3 次均未通知
+        expect(fn).toHaveBeenCalledTimes(5);
+    });
+
+    it('tab 条组件：messages/draft patch 不重建 innerHTML（节点引用不变）；phase/title patch 触发重建', async () => {
+        vi.resetModules();
+        document.body.innerHTML = CHAT_DOM_HTML;
+        const tabs = await import('../js/tabs.js');
+        const { initTabBar } = await import('../js/components/tab-bar.js');
+        const container = document.createElement('div');
+        container.id = 'chat-tabs';
+        document.body.appendChild(container);
+        initTabBar({ container, onActivate: () => {} });
+
+        tabs.openTab(1);
+        const firstNode = container.firstElementChild;
+        expect(firstNode).not.toBeNull();
+        expect(container.innerHTML).toContain('data-conv-id="1"');
+
+        // 热路径：纯内容 patch（onToken 逐 token 的 messages 更新）→ 不重建
+        tabs.updateTab(1, { messages: [{ role: 'assistant', content: 'x' }] });
+        tabs.updateTab(1, { draft: '草稿' });
+        expect(container.firstElementChild).toBe(firstNode);
+
+        // 展示字段 patch → 重建（节点引用变化；生成中圆点出现）
+        tabs.updateTab(1, { phase: 'streaming' });
+        expect(container.firstElementChild).not.toBe(firstNode);
+        expect(container.innerHTML).toContain('tab-dot');
+
+        // 结构性变更（开新 tab）→ 重建
+        tabs.openTab(2);
+        expect(container.querySelectorAll('.chat-tab')).toHaveLength(2);
+
+        // phase 归 done → 圆点消失
+        tabs.updateTab(1, { phase: 'done' });
+        expect(container.innerHTML).not.toContain('tab-dot');
     });
 });
 
