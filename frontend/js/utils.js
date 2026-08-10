@@ -2,6 +2,8 @@
  * Conver System — 共享工具函数
  */
 
+import { requestBlob } from './api.js';
+
 /**
  * HTML 转义（防 XSS）
  * @param {string} str
@@ -113,20 +115,20 @@ export function showToast(message, type = 'success') {
 }
 
 /**
- * 通用 Blob 下载 — fetch 导出端点 → blob → <a download> 触发浏览器保存
- * 对话导出与角色卡导出共用（P2.5.5）
- * @param {string} url - 导出 API 地址
- * @param {string} filename - 下载文件名（浏览器自动清洗非法字符）
+ * 通用 Blob 下载 — 委托 api.requestBlob（走 doFetch seam）→ blob → <a download> 触发浏览器保存
+ * 对话导出与角色卡导出共用（P2.5.5）。签名与行为保持（app.js / export-dialog.js 调用点无需改）；
+ * URL 策略单一来源：一律经 requestBlob 拼接（旧式 '/api' 前缀自动归一化）。
+ * 下载文件名优先取服务端 Content-Disposition（RFC 5987 filename*），无则回退入参 filename。
+ * @param {string} url - 导出 API 地址（如 /api/characters/1/export）
+ * @param {string} filename - 下载文件名兜底（浏览器自动清洗非法字符）
  * @param {string} [errorPrefix='导出失败'] - 失败提示前缀
  */
 export async function downloadBlob(url, filename, errorPrefix = '导出失败') {
     try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('请求失败');
-        const blob = await res.blob();
+        const { blob, filename: serverFilename } = await requestBlob(url);
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = filename;
+        a.download = serverFilename || filename;
         a.click();
         URL.revokeObjectURL(a.href);
     } catch (err) {
