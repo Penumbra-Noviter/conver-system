@@ -103,4 +103,33 @@
 | 5 | 体验完善 | 对话历史、UI 美化、快捷操作 |
 | 6 | 增强功能 | Tauri 桌面版、导出、搜索等 |
 
-> 更新记录：2026-07-30 初始版本，经 grilling skill 深度讨论后确认；2026-08-03 补充 P3.5（§4 标题自动生成、§6 停止生成）、P4.3（API Key 保存时测试连接）决策；2026-08-06 补充角色创建向导、LLM 文档智能解析、5 套内置模板
+## 11. 多 tab 会话管理（P6.5，2026-08-10 立项）
+
+> 12 项共识决策的规格化表达见 `.scratch/p6.5-multi-tab/spec.md`；实现决策以 spec 为准。
+
+**问题**：一次只能聚焦一个会话——切换后草稿/滚动/流式上下文全丢；流式生成中切会话会污染视图（onDone/onError 读写「当前活动」的既有竞态）；刷新后工作现场重置。
+
+**决策**：
+
+1. **新深模块 tab 工作区状态**（`frontend/js/tabs.js`，唯一新增测试 seam，纯逻辑零 DOM）：协议 `openTab`/`activateTab`/`closeTab`/`closeAllTabs`/`getActiveTab`/`getTab`/`getTabs`/`updateTab`/`serialize`/`restore`/`restoreFromStorage`/`onTabsChanged`；tab 形态 `{ conversationId, characterId, title, messages, scrollTop, draft, isStreaming, activeStream, phase('idle'|'thinking'|'streaming'|'done'|'error') }`；openTab 按 id 去重；closeTab 激活右邻居（无则左），关最后 → null；**updateTab 对不存在 id 幂等 no-op**（关流式中的 tab 后异步写回兜底）；serialize 只存 ids+activeId；restore 经 isValidId 过滤失效 id；任何结构性变更写 sessionStorage + 通知，updateTab 内容更新仅通知不写盘（避免流式逐 token 写存储）
+2. **state.js 契约收缩**：退役 currentConversationId/currentCharacterId/messages/isStreaming/activeStream 五个会话级字段，只留全局配置；toggleStream 流式开关是全局偏好、不随 tab
+3. **会话 UI 单一事实来源 = 活动 tab**：消息渲染读活动 tab 缓存；头部（标题/模型 badge/导出）按活动 tab 派生；发送按钮两态（➤/⏹）只由活动 tab isStreaming 派生；切 tab 保存旧 tab 草稿/滚动、恢复新 tab
+4. **流式防悬挂核心设计**：handleSend 发送时捕获 conversationId；onToken 按活动归属分流（活动 tab DOM 增量 + 缓存同步，后台 tab 只累积 per-tab 缓存不碰 DOM）；**onDone/onError 一律经 updateTab(捕获的 conversationId) 写回发起 tab，绝不读「当前活动」**；停止（AbortError）写回 phase 'error'（警示标记，气泡保持「已停止」语义），正常完成写回 phase 'done'；停止是显式动作（点停止按钮 = 活动 tab；关流式中的 tab = 显式停止并 abort）
+5. **激活流程收敛**：app.js 单一内部函数承接「切到某会话」（openTab/activateTab + 补全 title/characterId + 懒加载消息 + 刷新发送按钮/列表高亮）；三入口（侧栏点击/角色「开始对话」/搜索结果跳转）与 tab 条共用；「新对话」按钮保持现状（切角色视图）
+6. **联动**：删除会话（开着）→ 先 abort 其中流式再 closeTab；「清空所有对话」→ closeAllTabs + 清 sessionStorage；关闭不弹确认
+7. **tab 条 UI**：presentational 组件订阅 onTabsChanged 重渲染；事件委托（点击激活 / ✕ 关闭）；激活经 app.js 注入处理器（复用 setConversationsRefresher 式注入模式），✕ 直接 closeTab；生成中（thinking/streaming）脉冲小圆点、后台出错/停止（error）警示标记、完成无提示；无 tab 不渲染；<768px 隐藏（行为不变）
+8. **恢复（restore）时序契约**：init() 在 conversations 加载完成后调 restoreFromStorage；isValidId 以已加载列表判定（过滤已删会话）；恢复的 tab 一律非流式（phase idle、isStreaming false、activeStream null）；消息激活时懒加载；无记录/全失效 → 现有空态，不报错
+9. **标题同步**：双击重命名与首条消息自动标题替换后，经 updateTab 同步 tab 标题
+10. **后端零改动**：全部按既有 conversation_id 寻址；对话历史列表仍是持久事实来源，tab 集只是 UI 工作区；单用户本地使用，无并发写冲突风险
+11. **执行串行单代理**：改造集中在同一前端协调层（chat.js 与 app.js 互相调用 + 共享 state），五张工单按阻塞链串行执行
+12. **测试**：新增 tabs.test.js 32 用例（jsdom 提供 sessionStorage，零 DOM 断言）；现有 37 用例不动；pytest 零新增 181 保持；Playwright GUI 回归场景以 jsdom 集成冒烟（81 项）替代落地
+
+**关键假设**：① 多 tab = 应用内会话工作区，非跨浏览器标签页；② 同一会话至多一个 tab（按 id 去重）；③ tab 集是 UI 态不是数据，sessionStorage 仅存 id + activeId；④ 流式/非流式完成一律按发起时捕获的 conversationId 写回；⑤ 后台 tab 流式 token 只累积 per-tab 缓存不碰 DOM；⑥ 发送按钮/停止状态 = 活动 tab isStreaming 单一事实来源；⑦ 单用户本地使用。
+
+**边界**：关闭 tab 只关视图、不删会话；恢复不恢复草稿/滚动/流式状态；同一会话在 tab 条与对话列表并存（去重开一个 tab）。
+
+**不做清单（Out of Scope）**：跨浏览器标签页同步；草稿持久化（刷新不保留）；流式恢复；tab 上限/驱逐策略；多 DOM 挂载；后端任何改动；tab 拖拽排序/固定/「+」快捷建会话；关闭确认弹窗。
+
+---
+
+> 更新记录：2026-07-30 初始版本，经 grilling skill 深度讨论后确认；2026-08-03 补充 P3.5（§4 标题自动生成、§6 停止生成）、P4.3（API Key 保存时测试连接）决策；2026-08-06 补充角色创建向导、LLM 文档智能解析、5 套内置模板；2026-08-10 补充 §11 多 tab 会话管理（P6.5，12 项决策）

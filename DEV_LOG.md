@@ -5,6 +5,31 @@
 
 ---
 
+## 滚动摘要（2026-08-10）
+
+- **P6.5 多 tab 会话管理（5 票串行，独立 worktree `.worktrees/p65-tabs`）**：应用内多会话工作区——tab 条切换、后台流式照跑、完成/停止/出错一律按发起时捕获的 conversation id 写回（防悬挂核心）、刷新后 sessionStorage 恢复（只存 ids+activeId）
+- **防悬挂写回设计**：`handleSend` 发送时捕获 convId；`onToken` 按活动归属分流（活动 tab DOM 增量 + 缓存同步，后台只累积 per-tab 缓存不碰 DOM）；`onDone`/`onError` 经 `updateTab(捕获 id)` 写回发起 tab，绝不读「当前活动」；发起 tab 可能已被关闭 → updateTab 幂等 no-op 兜底
+- **关键避坑**：① SSE 错误帧后流关闭会再触发 `onDone(null)` 覆盖 phase 'done' → `streamSettled` 终态守卫（onError 后一律忽略后续回调）；② 流式中切走再切回 DOM 重建会重复气泡 → `data-streaming-live` 标记 + onToken 复用；③ 缓存渲染路径 `renderMessages` 的 scrollToBottom 覆盖滚动恢复 → 渲染后回填缓存 scrollTop；④ 删活动 tab 时被删会话的 DOM 草稿/滚动会污染新活动 tab 缓存 → 先保存再 closeTab + 激活流程 `saveCurrent:false`
+- **restore 时序契约**：init 在 conversations 加载完成后调 `restoreFromStorage`，isValidId 以已加载列表判定（过滤已删会话）；无记录/损坏/全失效 → 空态不报错；恢复 tab 天然非流式
+- **联动**：删会话（开着）先 abort 流式再关 tab；清空所有对话 → closeAllTabs + 存储空集；✕ 关流式 tab = 显式停止（abort）；关活动 tab 激活右邻居（无则左），关最后 → 空态
+- **测试**：pytest **181** 全绿（后端零改动；本机需 `pip install pytest-asyncio`——缺失插件会误报 7 个 async 用例失败）；Vitest **69**（37 既有 + tabs 32）；jsdom 集成冒烟 **81 项**全过（无 JS 错误）
+
+---
+
+## 日志正文
+
+### 2026-08-10 | 实现 | P6.5 多 tab 会话管理（5 票串行链）
+
+- **P6.5-1** `frontend/js/tabs.js` 纯逻辑深模块（零 DOM，jsdom 可测）：tab 集 + 每 tab 会话级状态（消息缓存/草稿/滚动/流式阶段/流式句柄）；结构性变更写 sessionStorage（只存 ids+activeId）并通知，updateTab 内容更新仅通知不写盘（避免逐 token 写存储）；`updateTab` 对不存在 id 幂等 no-op（关流式中的 tab 后异步写回兜底）；restore 经 isValidId 过滤失效 id，activeId 失效回退首个
+- **P6.5-2** state.js 退役 5 个会话级字段（currentConversationId/currentCharacterId/messages/isStreaming/activeStream），只留全局配置；三入口（侧栏点击/角色开始对话/搜索跳转）收敛为 app.js 单一激活流程 `activateConversation`（openTab 去重 + 补全 title/characterId + 懒加载消息 + 草稿/滚动保存恢复 + 刷新发送按钮两态 + 列表高亮）；发送按钮状态 = 活动 tab isStreaming 单一来源
+- **P6.5-3** tab 条 presentational 组件：订阅 onTabsChanged 重渲染；点击激活经 app.js 注入处理器（复用 setConversationsRefresher 式注入模式）；✕ 直接 closeTab（先 abort 流式）；thinking/streaming 脉冲点、error 警示标记、done 无提示；<768px 媒体查询隐藏（行为不变）
+- **P6.5-4** `restoreFromStorage` 集成辅助 + init 恢复时序（conversations 加载后恢复、过滤已删会话、恢复非流式、激活懒加载）；双击重命名与首条消息自动标题（syncChatHeaderTitle）两条路径同步 tab 标题
+- **防悬挂细节**：停止（AbortError）写回 phase 'error'（警示标记）且气泡保持「已停止」语义；正常完成 phase 'done'；非流式完成同样写回发起 tab 缓存
+- **冒烟**：`frontend/smoke-integration.mjs`（jsdom 黑盒，不提交）覆盖双 tab 草稿/滚动互切、后台流完成写回发起 tab、停止/错误、关 tab/删会话/清空三联动、F5 恢复（含已删过滤/非流式）、tab 条交互、重命名联动，81 项全过
+- **环境备注**：pytest 需 `pytest-asyncio`（requirements-dev.txt 未列，属既有遗漏）；后端零改动
+
+---
+
 ## 滚动摘要（2026-08-09）
 
 - **GUI 全功能验证**：Playwright 黑盒测试（角色/向导/对话/搜索/导出/设置/手册/响应式）+ vision 模型视觉核验，发现 4 个 bug 全部修复
