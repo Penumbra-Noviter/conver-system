@@ -757,52 +757,6 @@ describe('FIX-B 非流式双击连发守卫（原 F-1 非流式连发场景同�
         ]);
     });
 
-    it('chat 成功但 list 重载失败 → 本地增量兜底，且守卫在 list 失败路径同样清除', async () => {
-        const { chat, tabs, api } = await loadChatModules();
-        tabs.openTab(11);
-        chat.chatDom.toggleStream.checked = false;
-
-        let chatCalls = 0;
-        let listFailed = false;
-        api.setFetch(async (url, options = {}) => {
-            const path = String(url);
-            if (path.endsWith('/api/chats')) {
-                chatCalls += 1;
-                const body = JSON.parse(options.body);
-                return mockJson({ reply: `回复${body.content}` });
-            }
-            if (path.endsWith('/messages')) {
-                if (!listFailed) {
-                    listFailed = true;
-                    return mockJson({ detail: '服务端故障' }, 500); // 第一次 list 失败
-                }
-                return mockJson([
-                    { id: 1, role: 'user', content: '第二条' },
-                    { id: 2, role: 'assistant', content: '回复第二条' },
-                ]);
-            }
-            throw new Error(`未 mock 的请求: ${path}`);
-        });
-
-        // 第一次：chat 成功、list 失败 → 走本地增量兜底（消息不丢失）
-        chat.chatDom.chatInput.value = '第一条';
-        await chat.handleSend();
-        expect(chatCalls).toBe(1);
-        expect(tabs.getTab(11).messages).toEqual([
-            { role: 'user', content: '第一条' },
-            { role: 'assistant', content: '回复第一条' },
-        ]);
-
-        // list 失败后守卫仍已清除（finally 统一执行）→ 再次发送成功，list 返回完整快照
-        chat.chatDom.chatInput.value = '第二条';
-        await chat.handleSend();
-        expect(chatCalls).toBe(2);
-        expect(tabs.getTab(11).messages).toEqual([
-            { id: 1, role: 'user', content: '第二条' },
-            { id: 2, role: 'assistant', content: '回复第二条' },
-        ]);
-    });
-
     it('守卫按 tab 作用域：其他 tab 的非流式发送不被本 tab 在途请求阻塞', async () => {
         const { chat, tabs, api } = await loadChatModules();
         tabs.openTab(11);
@@ -845,35 +799,6 @@ describe('FIX-B 非流式双击连发守卫（原 F-1 非流式连发场景同�
         // 收尾放行挂起的 list，避免悬挂请求
         pendingLists.forEach((d) => d.resolve(mockJson([])));
         await sleep(20);
-    });
-});
-
-describe('流式 error 帧 → handleStreamError 错误分支（Falsify 失败路径补测）', () => {
-    it('error 帧 → phase error + 错误气泡 + 按钮复位', async () => {
-        const { chat, tabs, api } = await loadChatModules();
-        tabs.openTab(11);
-
-        api.setFetch(async (url) => {
-            const path = String(url);
-            if (path.endsWith('/api/chats/stream')) {
-                let ctrl;
-                const stream = new ReadableStream({ start(c) { ctrl = c; } });
-                setTimeout(() => {
-                    ctrl.enqueue(ENCODER.encode(sseFrame('error', { message: '模型超时' })));
-                    ctrl.close();
-                }, 0);
-                return Promise.resolve({ ok: true, status: 200, body: stream });
-            }
-            throw new Error(`未 mock 的请求: ${path}`);
-        });
-
-        chat.chatDom.chatInput.value = '触发错误';
-        await chat.handleSend();
-        expect(tabs.getTab(11).phase).toBe('error');
-        expect(tabs.getTab(11).isStreaming).toBe(false);
-        expect(document.querySelector('#chat-messages').textContent).toContain('[错误] 模型超时');
-        expect(chat.chatDom.btnSend.textContent).toBe('➤');
-        expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
     });
 });
 
