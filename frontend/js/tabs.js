@@ -9,8 +9,8 @@
  *      并触发 onTabsChanged 通知；updateTab 内容更新仅通知、不写存储
  *
  * 协议表面（__all__）：openTab / activateTab / closeTab / closeAllTabs /
- *   getActiveTab / getTab / getTabs / updateTab / serialize / restore /
- *   restoreFromStorage / onTabsChanged。
+ *   getActiveTab / getTab / getTabs / updateTab / abortStream / serialize /
+ *   restore / restoreFromStorage / onTabsChanged。
  * 纯逻辑零 DOM：jsdom 环境（提供 sessionStorage）即可完整测试。
  *
  * 关键语义：
@@ -208,6 +208,21 @@ export function updateTab(conversationId, patch) {
 }
 
 /**
+ * 中止指定 tab 的在途流式请求（显式停止语义 — 停止按钮 / 删会话 / 关 tab / 清空联动统一入口）
+ * 无 tab / 无流式句柄 → no-op；abort() 抛错静默忽略（连接已断开等场景）。
+ * @param {number|string} conversationId - 会话 id
+ */
+export function abortStream(conversationId) {
+    const stream = getTab(conversationId)?.activeStream;
+    if (!stream) return;
+    try {
+        stream.abort();
+    } catch {
+        // 忽略中止失败（连接已断开等场景）
+    }
+}
+
+/**
  * 序列化 tab 集 —— 只返回 { ids, activeId }，不序列化消息/草稿/滚动等缓存
  * @returns {{ids: Array<number|string>, activeId: number|string|null}}
  */
@@ -278,6 +293,7 @@ export const __all__ = [
     'getTab',
     'getTabs',
     'updateTab',
+    'abortStream',
     'serialize',
     'restore',
     'restoreFromStorage',

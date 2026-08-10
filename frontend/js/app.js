@@ -25,8 +25,8 @@ import { initTabBar } from './components/tab-bar.js';
 import { escapeHtml, getInitials, formatTags, showToast, downloadBlob, providerDisplayName } from './utils.js';
 import { highlightText } from './format.js';
 import { state } from './state.js';
-import { chatDom, renderMessages, handleSend, refreshSendButton, setConversationsRefresher } from './chat.js';
-import { openTab, closeTab, closeAllTabs, getActiveTab, getTab, updateTab, restoreFromStorage } from './tabs.js';
+import { chatDom, renderMessages, handleSend, refreshSendButton, setConversationsRefresher, EMPTY_STATE_HTML } from './chat.js';
+import { openTab, closeTab, closeAllTabs, getActiveTab, getTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -254,6 +254,19 @@ async function renderCharacters() {
                 try {
                     await characters.delete(id);
                     await loadCharacters();
+                    // 联动：角色删除级联删除其全部对话 — 关闭对应会话 tab（先中止在途流式），
+                    // 其余 tab 保留；视图跟随新活动 tab（或空态）
+                    const doomed = getTabs().filter((t) => t.characterId === id);
+                    doomed.forEach((t) => abortStream(t.conversationId));
+                    doomed.forEach((t) => closeTab(t.conversationId));
+                    const active = getActiveTab();
+                    if (active) {
+                        await activateConversation(active.conversationId, { saveCurrent: false });
+                    } else {
+                        showEmptyState();
+                    }
+                    refreshSendButton();
+                    await loadConversations();
                 } catch (err) {
                     showAlert('删除失败: ' + err.message);
                 }
@@ -413,16 +426,12 @@ function renderConversations() {
             });
             if (confirmed) {
                 try {
-                    // 联动：删除会话（开着）→ 先 abort 其中流式再关 tab（显式停止）
-                    const tab = getTab(id);
-                    if (tab?.activeStream) {
-                        try { tab.activeStream.abort(); } catch { /* 忽略中止失败 */ }
-                    }
+                    // 联动：删除会话（开着）→ 先中止其中流式再关 tab（显式停止；经 tabs.js 协议统一）
+                    abortStream(id);
                     await conversations.delete(id);
                     const wasActive = getActiveTab()?.conversationId === id;
-                    // 先保存活动视图状态再关 tab —— 防止被删会话的 DOM 状态
-                    // （草稿/滚动）污染新活动 tab 的缓存
-                    if (wasActive) saveActiveTabViewState();
+                    // 被删会话的 tab 缓存（草稿/滚动）随 closeTab 一并销毁 —
+                    // 无需预先保存（保存进即将销毁的 tab 是无效写）
                     closeTab(id);
                     if (wasActive) {
                         // closeTab 已激活右邻居（无则左）— 渲染新活动 tab；无 tab → 空态
@@ -583,10 +592,11 @@ function renderChatHeader(conversationId) {
 
 /**
  * 无活动 tab 时的空态（聊天区 + 头部提示）
+ * 聊天区复用 chat.js 导出的共享常量（单一事实来源）
  */
 function showEmptyState() {
     chatDom.chatHeader.innerHTML = '<span class="chat-title">选择一个角色开始对话</span>';
-    chatDom.chatMessages.innerHTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
+    chatDom.chatMessages.innerHTML = EMPTY_STATE_HTML;
 }
 
 /**
@@ -674,8 +684,8 @@ chatDom.btnSend.addEventListener('click', () => {
     const tab = getActiveTab();
     if (!tab) return;
     if (tab.isStreaming) {
-        // 流式生成中 → 点击为「停止生成」（停止活动 tab 的流式句柄）
-        tab.activeStream?.abort();
+        // 流式生成中 → 点击为「停止生成」（停止活动 tab 的流式句柄；经 tabs.js 协议统一）
+        abortStream(tab.conversationId);
     } else {
         handleSend();
     }
@@ -857,7 +867,8 @@ async function init() {
     // 初始化设置面板事件绑定（主题、侧栏、保存、清空等）
     initSettingsPanel({
         onConversationsCleared: () => {
-            // 「清空所有对话」联动：清空全部 tab（含写 sessionStorage 空集）+ 空态
+            // 「清空所有对话」联动：先中止全部在途流式（与删会话路径一致），再清空全部 tab
+            getTabs().forEach((t) => abortStream(t.conversationId));
             closeAllTabs();
             renderConversations();
             showEmptyState();

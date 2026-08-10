@@ -41,8 +41,8 @@ export const chatDom = {
     chatHeader: $('#chat-header'),
 };
 
-/** 无活动 tab 时的消息区空态（与 app.js showEmptyState 文案一致） */
-const EMPTY_STATE_HTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
+/** 无活动 tab 时的消息区空态（单一事实来源 — app.js showEmptyState 复用，禁止内联重复） */
+export const EMPTY_STATE_HTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
 
 // ── 对话列表刷新钩子（由 app.js 注入，避免反向依赖）──
 let refreshConversations = () => {};
@@ -91,8 +91,7 @@ export function renderMessages() {
 }
 
 /**
- * DOM 追加消息气泡；user/assistant 同步写入活动 tab 缓存（system 仅 DOM 提示，
- * 与既有 state.messages 语义一致，不落缓存）
+ * DOM 追加消息气泡；user/assistant 同步写入活动 tab 缓存（system 仅 DOM 提示，不落 tab 缓存）
  * @param {'user'|'assistant'|'system'} role - 消息角色
  * @param {string} content - 消息内容
  * @param {object} [meta] - 附加字段（如 { stopped: true, error: true }）

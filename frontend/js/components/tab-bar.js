@@ -21,7 +21,7 @@
  *     防止被关会话的 DOM 草稿/滚动污染新活动 tab 缓存
  */
 
-import { getTabs, getActiveTab, getTab, closeTab, onTabsChanged } from '../tabs.js';
+import { getTabs, getActiveTab, closeTab, abortStream, onTabsChanged } from '../tabs.js';
 import { escapeHtml } from '../utils.js';
 
 /**
@@ -42,11 +42,8 @@ export function initTabBar({ container, onActivate } = {}) {
         const convId = Number(tabEl.dataset.convId);
 
         if (closeBtn) {
-            // 关闭流式中的 tab = 显式停止（先 abort 再关）
-            const tab = getTab(convId);
-            if (tab?.activeStream) {
-                try { tab.activeStream.abort(); } catch { /* 忽略中止失败 */ }
-            }
+            // 关闭流式中的 tab = 显式停止（先 abort 再关；经 tabs.js 协议统一）
+            abortStream(convId);
             const wasActive = getActiveTab()?.conversationId === convId;
             closeTab(convId);
             if (wasActive && typeof onActivate === 'function') {
