@@ -385,3 +385,4 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
         }
     });
 }
+export const __all__ = ['initSettingsPanel', 'loadSettings', 'initProviderDropdown', 'resolveCredentialTarget'];

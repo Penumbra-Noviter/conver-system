@@ -742,7 +742,10 @@ describe('FIX-A settle 按消息位置匹配：同字节双流不误结算', () 
         expect(live).toHaveLength(1);
         expect(live[0].content).toBe('你好');
         expect(live[0].id).toBeUndefined();
-        expect(msgs.filter((m) => m.id === 101)).toHaveLength(0);
+        // 期末 code-review finding 1 修复:stale 失配回退 anchor 写回 — 流 1 的最终
+        // 消息(aA,id=101)以锚点插入保留(不误结算流 2 的同时兑现「消息不丢失」)
+        expect(msgs.filter((m) => m.id === 101)).toHaveLength(1);
+        expect(msgs.filter((m) => m.id === 101)[0].content).toBe('你好');
 
         // 流 2 正常完成 → 最终与服务端一致（其 finalize 的 list 返回完整快照）
         serverState = [

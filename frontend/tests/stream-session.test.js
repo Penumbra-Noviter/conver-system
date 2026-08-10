@@ -424,6 +424,56 @@ describe('createStreamSession — onDone(完成/终态写回/三分支)', () => 
         errorSpy.mockRestore();
         listSpy.mockRestore();
     });
+
+    it('Falsify:stale 失配回退 anchor 写回 — A 完成 list 在途、B 连发清 A 占位、A list 成功(stale 失配)、B list 失败 → aA 不丢失', async () => {
+        // 期末 code-review finding 1:旧实现 stale 失配直接 no-op,含 aA 的服务端列表
+        // 整体丢弃 → aA 从缓存消失。修复:stale 守卫失败时回退 settleByPosition
+        // (幂等:同 id 已存在则 no-op)。
+        const tab = { conversationId: 1, phase: 'thinking', isStreaming: true, messages: [msg(1, 'user', 'u1')] };
+        const deps = {
+            convId: 1,
+            getTab: () => tab,
+            updateTab: (id, patch) => Object.assign(tab, patch),
+            isActiveStream: () => true,
+            renderMessages: vi.fn(),
+            refreshSendButton: vi.fn(),
+            refreshConversations: vi.fn(),
+        };
+        let resolveListA;
+        let listCall = 0;
+        const listSpy = vi.spyOn(messages, 'list');
+        listSpy.mockImplementation(() => {
+            if (listCall++ === 0) {
+                return new Promise((r) => { resolveListA = r; }); // A 的 list 挂起
+            }
+            return Promise.reject(new Error('服务端故障')); // B 的 list 失败
+        });
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        // 流 A:token + done(101),list 挂起
+        const sessionA = createStreamSession(deps);
+        sessionA.onToken('回复A');
+        const pA = sessionA.onDone(101);
+        // 流 B 连发:u2 + token(清除 A 的 streaming 占位)+ done(102),list 失败
+        deps.updateTab(1, { messages: [...tab.messages, msg(2, 'user', 'u2')] });
+        const sessionB = createStreamSession(deps);
+        sessionB.onToken('回复B');
+        const pB = sessionB.onDone(102);
+
+        // A 的 list 成功返回(服务端含 aA 的消息列表,长度已变 → stale 分支,settleIndex 失配)
+        resolveListA([msg(1, 'user', 'u1'), { id: 101, role: 'assistant', content: '回复A' }, msg(2, 'user', 'u2')]);
+        await pA;
+        // B 的 list 失败 → anchor 写回 aB
+        await pB;
+
+        const msgs = tab.messages;
+        expect(msgs.filter((m) => m.role === 'user')).toHaveLength(2);
+        expect(msgs.filter((m) => m.role === 'assistant')).toHaveLength(2); // aA + aB 都在(不丢失)
+        expect(msgs.filter((m) => m.streaming)).toEqual([]);
+        expect(msgs.filter((m) => m.role === 'assistant').map((m) => m.id).sort()).toEqual([101, 102]);
+        errorSpy.mockRestore();
+        listSpy.mockRestore();
+    });
 });
 
 describe('createStreamSession — onError(错误/停止,终态守卫)', () => {

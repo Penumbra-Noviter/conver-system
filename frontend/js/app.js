@@ -25,7 +25,7 @@ import { initTabBar } from './components/tab-bar.js';
 import { escapeHtml, showToast, downloadBlob, providerDisplayName } from './utils.js';
 import { characterCardHtml, conversationItemHtml, searchResultItemHtml } from './format.js';
 import { state } from './state.js';
-import { chatDom, renderMessages, handleSend, refreshSendButton, setConversationsRefresher, EMPTY_STATE_HTML } from './chat.js';
+import { chatDom, handleSend, refreshSendButton, setConversationsRefresher } from './chat.js';
 import { closeTabs, getActiveTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 
