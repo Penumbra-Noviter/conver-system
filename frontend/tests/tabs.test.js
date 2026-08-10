@@ -537,6 +537,52 @@ describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（流式 finalizeStre
         await sleep(20);
         expect(tabs.getTab(11).messages).toEqual(serverState);
     });
+
+    it('list 重载失败 + 期间连发 → 本地增量兜底，新消息保留、无 streaming 残留', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+
+        const streamCtrls = [];
+        api.setFetch(async (url) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats/stream')) {
+                let ctrl;
+                const stream = new ReadableStream({ start(c) { ctrl = c; } });
+                streamCtrls.push(ctrl);
+                return Promise.resolve({ ok: true, status: 200, body: stream });
+            }
+            if (path.endsWith('/messages')) {
+                // 本流与连发流的重载均失败（服务端故障）→ 走本地增量兜底
+                return mockJson({ detail: '服务端故障' }, 500);
+            }
+            throw new Error(`未 mock 的请求: ${url}`);
+        });
+
+        chat.chatDom.chatInput.value = '第一条';
+        chat.handleSend();
+        await sleep(20);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('token', { content: '你好' })));
+        await sleep(10);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('done', { message_id: 101 })));
+        streamCtrls[0].close();
+        await sleep(20);
+
+        // 连发第二条（其重载同样失败）
+        chat.chatDom.chatInput.value = '第二条';
+        chat.handleSend();
+        await sleep(20);
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('token', { content: '回复2' })));
+        await sleep(10);
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('done', { message_id: 102 })));
+        streamCtrls[1].close();
+        await sleep(20);
+
+        const msgs = tabs.getTab(11).messages;
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第一条')).toBe(true);
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+        expect(msgs.filter((m) => m.streaming)).toEqual([]);
+        expect(msgs.filter((m) => m.role === 'assistant')).toHaveLength(2);
+    });
 });
 
 describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（非流式）', () => {
@@ -674,6 +720,41 @@ describe('F-2 activateConversation 无守卫异步续体（await 期间切走/�
         const onRejection = (reason) => rejections.push(reason);
         process.on('unhandledRejection', onRejection);
         deferred.resolve(mockJson({ ...CONVS[0] }));
+        await sleep(50);
+        process.off('unhandledRejection', onRejection);
+        expect(rejections).toHaveLength(0);
+
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
+        expect(document.querySelector('#chat-title-text').textContent).toBe('会话12');
+    });
+
+    it('conversations.get 失败（404）且在途时关闭 tab → 无崩溃、无错渲染', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        globalThis.fetch = makeAppMock({
+            conversations: [...CONVS],
+            messagesByConv: MSGS,
+            deferGet: new Map([[11, deferred]]),
+        });
+        const { tabs, state } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+
+        clickConv(11);
+        await sleep(30);
+        state.conversations = state.conversations.filter((c) => c.id !== 11);
+        clickConv(11);
+        await sleep(30);
+        clickConv(12);
+        await sleep(30);
+        tabs.closeTab(11);
+
+        const rejections = [];
+        const onRejection = (reason) => rejections.push(reason);
+        process.on('unhandledRejection', onRejection);
+        deferred.resolve(mockJson({ detail: '会话不存在' }, 404));
         await sleep(50);
         process.off('unhandledRejection', onRejection);
         expect(rejections).toHaveLength(0);
