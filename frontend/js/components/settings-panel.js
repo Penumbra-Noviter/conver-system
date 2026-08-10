@@ -9,8 +9,9 @@
  *   5. API Key 连接测试
  *   6. 清空所有对话
  *
- * 协议表面（__all__）：initSettingsPanel / loadSettings / initProviderDropdown。
- * 外部只需调用这三个函数，其余实现细节封装在内。
+ * 协议表面（__all__）：initSettingsPanel / loadSettings / initProviderDropdown /
+ * resolveCredentialTarget（纯函数，供测试与复用，语义对齐后端 setting.py::_slot_value）。
+ * 外部只需调用这几个函数，其余实现细节封装在内。
  */
 
 import { state } from '../state.js';
@@ -223,13 +224,41 @@ export async function loadSettings() {
 }
 
 /**
+ * 解析设置表单中的凭证目标（纯函数，无 DOM/state 依赖）
+ *
+ * 语义与后端 backend/app/services/setting.py::_slot_value 一致：
+ * 同协议槽位优先 → 跨协议兜底 —— 用户把 Key/URL 填在 claude 或 openai
+ * 任一槽位，任意模型均可解析到可用凭证（全局使用）。
+ *
+ * 注意：新增协议槽位必须同步两处 —— 本函数与 setting.py::_CRED_SLOTS。
+ *
+ * @param {object} formFields - 设置表单数据
+ * @param {object} formFields.provider - 默认 provider 对象（含 key / id）
+ * @param {string} formFields.provider.key - provider key（如 'deepseek'）
+ * @param {string} formFields.provider.id - 协议标识（'claude' | 'openai'）
+ * @param {string} [formFields.claude_api_key] [formFields.claude_base_url]
+ * @param {string} [formFields.openai_api_key] [formFields.openai_base_url]
+ * @returns {{providerKey: string, key: string, baseUrl: string}}
+ *   providerKey=默认 provider key（连接测试目标）；key/baseUrl=解析出的凭证，未填为空串
+ */
+export function resolveCredentialTarget(formFields) {
+    const proto = formFields.provider.id; // 'claude' | 'openai'
+    const other = proto === 'claude' ? 'openai' : 'claude';
+    return {
+        providerKey: formFields.provider.key,
+        key: formFields[`${proto}_api_key`] || formFields[`${other}_api_key`] || '',
+        baseUrl: formFields[`${proto}_base_url`] || formFields[`${other}_base_url`] || '',
+    };
+}
+
+/**
  * 保存设置前测试「默认 Provider + 默认模型」连接（P4.3）
  *
  * 测试目标 = 用户实际对话将使用的配置（默认 Provider 的 key/url/模型），
  * 而非逐个协议测试 —— 通用凭证解析下，用户填任一字段的 key/url 即可全局使用，
  * 因此测默认配置一个就足够且最准确。
  *
- * Key/URL 取值：表单中同协议字段优先，跨协议兜底（与后端 _slot_value 一致）。
+ * Key/URL 取值：委托 resolveCredentialTarget（同协议优先 → 跨协议兜底，与后端 _slot_value 一致）。
  * @param {object} data - 设置表单数据
  * @returns {Promise<boolean>} true=可继续保存；false=用户选择取消保存
  */
@@ -237,20 +266,17 @@ async function testApiKeys(data) {
     const provider = (state.models.providers || []).find(p => p.key === state.defaultProvider);
     if (!provider) return true;
 
-    // 按 provider 协议选表单字段（同协议优先 → 跨协议兜底）
-    const proto = provider.id; // 'claude' | 'openai'
-    const other = proto === 'claude' ? 'openai' : 'claude';
-    const apiKey = data[`${proto}_api_key`] || data[`${other}_api_key`];
-    const baseUrl = data[`${proto}_base_url`] || data[`${other}_base_url`];
+    // 通用凭证解析：同协议槽位优先 → 跨协议兜底（与后端 _slot_value 一致）
+    const { providerKey, key, baseUrl } = resolveCredentialTarget({ ...data, provider });
 
     // 未填任何 Key → 跳过测试直接保存（Key 可在后续补）
-    if (!apiKey) return true;
+    if (!key) return true;
 
     // 用当前默认模型测试（用户配置的模型名，而非硬编码默认）
     const model = getSelectedModel() || null;
 
     try {
-        await settings.testConnection({ provider: provider.key, api_key: apiKey, base_url: baseUrl || null, model });
+        await settings.testConnection({ provider: providerKey, api_key: key, base_url: baseUrl || null, model });
         return true;
     } catch (err) {
         const confirmed = await showConfirm({
