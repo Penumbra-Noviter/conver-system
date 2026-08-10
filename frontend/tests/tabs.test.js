@@ -10,6 +10,7 @@ import {
     updateTab,
     serialize,
     restore,
+    restoreFromStorage,
     onTabsChanged,
     __all__,
 } from '../js/tabs.js';
@@ -259,6 +260,49 @@ describe('restore', () => {
     });
 });
 
+describe('restoreFromStorage（init 刷新恢复集成辅助 — P6.5-4）', () => {
+    it('有效存储记录 → 恢复 tab 集与活动 tab，且写回存储', () => {
+        closeAllTabs(); // 清空内存与存储，模拟刷新后的空状态（先于种子写入，避免被覆盖）
+        sessionStorage.setItem('conver.tabs.v1', JSON.stringify({ ids: [1, 2], activeId: 2 }));
+        const active = restoreFromStorage({ isValidId: () => true });
+        expect(active?.conversationId).toBe(2);
+        expect(serialize()).toEqual({ ids: [1, 2], activeId: 2 });
+        // 恢复写回存储（键内容与内存一致）
+        const stored = Object.values(sessionStorage).map((v) => JSON.parse(v)).find((v) => v?.ids);
+        expect(stored).toEqual({ ids: [1, 2], activeId: 2 });
+    });
+
+    it('isValidId 过滤已删会话；activeId 失效回退首个有效', () => {
+        sessionStorage.setItem('conver.tabs.v1', JSON.stringify({ ids: [1, 2], activeId: 2 }));
+        const active = restoreFromStorage({ isValidId: (id) => id === 1 });
+        expect(active?.conversationId).toBe(1);
+        expect(serialize()).toEqual({ ids: [1], activeId: 1 });
+    });
+
+    it('存储 JSON 损坏 → 空集，不抛错', () => {
+        sessionStorage.setItem('conver.tabs.v1', '{broken json');
+        expect(() => restoreFromStorage()).not.toThrow();
+        expect(getTabs()).toHaveLength(0);
+        expect(getActiveTab()).toBeNull();
+    });
+
+    it('无存储记录 → 空集，不抛错', () => {
+        expect(() => restoreFromStorage()).not.toThrow();
+        expect(getTabs()).toHaveLength(0);
+        expect(getActiveTab()).toBeNull();
+    });
+
+    it('恢复的 tab 一律非流式（phase idle、isStreaming false、activeStream null）', () => {
+        sessionStorage.setItem('conver.tabs.v1', JSON.stringify({ ids: [1], activeId: 1 }));
+        restoreFromStorage({ isValidId: () => true });
+        const tab = getTab(1);
+        expect(tab.phase).toBe('idle');
+        expect(tab.isStreaming).toBe(false);
+        expect(tab.activeStream).toBeNull();
+        expect(tab.messages).toEqual([]);
+    });
+});
+
 describe('onTabsChanged', () => {
     it('结构性变更各触发一次通知；无变更操作不通知', () => {
         const fn = vi.fn();
@@ -298,6 +342,7 @@ describe('协议表面', () => {
             'onTabsChanged',
             'openTab',
             'restore',
+            'restoreFromStorage',
             'serialize',
             'updateTab',
         ]);

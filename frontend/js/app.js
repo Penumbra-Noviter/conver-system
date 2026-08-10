@@ -26,7 +26,7 @@ import { escapeHtml, getInitials, formatTags, showToast, downloadBlob, providerD
 import { highlightText } from './format.js';
 import { state } from './state.js';
 import { chatDom, renderMessages, handleSend, refreshSendButton, setConversationsRefresher } from './chat.js';
-import { openTab, closeTab, closeAllTabs, getActiveTab, getTab, updateTab } from './tabs.js';
+import { openTab, closeTab, closeAllTabs, getActiveTab, getTab, updateTab, restoreFromStorage } from './tabs.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -475,6 +475,8 @@ function startRename(conv) {
         try {
             await conversations.update(conv.id, { title: newTitle });
             conv.title = newTitle;
+            // P6.5-4 标题联动：同步对应 tab 的 title（tab 条随动；onTabsChanged 驱动重渲染）
+            updateTab(conv.id, { title: newTitle });
             // 更新对话列表中的标题
             const items = dom.conversationList.querySelectorAll('.conversation-item');
             items.forEach(item => {
@@ -827,6 +829,20 @@ async function init() {
     await loadModels();
     await loadSettings();
 
+    // P6.5-4 恢复时序契约：conversations 加载完成后才 restore；
+    // isValidId 以已加载列表判定（过滤已删会话）；恢复的 tab 一律非流式，
+    // 消息在激活时懒加载（走统一激活流程）
+    restoreFromStorage({
+        isValidId: (id) => state.conversations.some((c) => c.id === id),
+    });
+    const restored = getActiveTab();
+    if (restored) {
+        await activateConversation(restored.conversationId, { saveCurrent: false });
+    } else {
+        // 无记录 / 全部失效 → 现有空态（无空 tab 残留、不报错）
+        showEmptyState();
+    }
+
     // 初始化 Provider 下拉 + 模型下拉选项（含自定义模型回填）
     initProviderDropdown();
 
@@ -840,10 +856,6 @@ async function init() {
             refreshSendButton();
         },
     });
-
-    // 无活动 tab → 现有空态（P6.5-2 起会话 UI 单一事实来源 = 活动 tab；
-    // P6.5-4 将在此前接入 sessionStorage 恢复）
-    if (!getActiveTab()) showEmptyState();
 }
 
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）

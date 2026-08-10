@@ -9,7 +9,8 @@
  *      并触发 onTabsChanged 通知；updateTab 内容更新仅通知、不写存储
  *
  * 协议表面（__all__）：openTab / activateTab / closeTab / closeAllTabs /
- *   getActiveTab / getTab / getTabs / updateTab / serialize / restore / onTabsChanged。
+ *   getActiveTab / getTab / getTabs / updateTab / serialize / restore /
+ *   restoreFromStorage / onTabsChanged。
  * 纯逻辑零 DOM：jsdom 环境（提供 sessionStorage）即可完整测试。
  *
  * 关键语义：
@@ -73,6 +74,21 @@ function persist() {
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
     } catch {
         // sessionStorage 不可用 — 静默降级
+    }
+}
+
+/**
+ * 从 sessionStorage 读取上次序列化的 tab 集（键名由本模块持有）。
+ * 读取失败 / JSON 损坏 / 无记录 → null（restore 语义兜底为空集，不抛错）
+ * @returns {object|null} 序列化结果（serialize() 的形状）或 null
+ */
+function readSerialized() {
+    try {
+        const raw = sessionStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        // sessionStorage 不可用 / 数据损坏 — 静默降级
+        return null;
     }
 }
 
@@ -227,6 +243,18 @@ export function restore(serialized, { isValidId } = {}) {
 }
 
 /**
+ * 从 sessionStorage 读取并恢复 tab 集（init 集成辅助 — P6.5-4 刷新恢复时序）。
+ * 等价于 restore(readSerialized(), opts)：无记录 / 数据损坏 / 全失效 → 空集，
+ * 不报错；恢复的 tab 一律非流式。任何有效恢复都写回存储并触发通知。
+ * @param {object} [options]
+ * @param {Function} [options.isValidId] - (conversationId) => boolean；缺省视为全部有效
+ * @returns {object|null} 恢复后的活动 tab（空集时为 null）
+ */
+export function restoreFromStorage({ isValidId } = {}) {
+    return restore(readSerialized(), { isValidId });
+}
+
+/**
  * 注册 tab 集变更通知（任何结构性变更与 updateTab 内容更新后触发，无参数）
  * @param {Function} fn - 变更回调
  * @returns {Function} 取消订阅函数
@@ -252,5 +280,6 @@ export const __all__ = [
     'updateTab',
     'serialize',
     'restore',
+    'restoreFromStorage',
     'onTabsChanged',
 ];
