@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
-from backend.app.models.message import Message
+from backend.app.models.message import Message, Role
 from backend.app.schemas.conversation import ConversationCreate, ConversationUpdate
 from backend.app.services import setting as setting_service
 
@@ -67,6 +67,30 @@ def default_conversation_title(db: Session, conversation_id: int) -> str:
         return "新对话"
     character = db.query(Character).filter(Character.id == conv.character_id).first()
     return _default_title_for_character(character.name if character else None)
+
+
+def maybe_auto_title(db: Session, conv: Conversation, content: str) -> None:
+    """首条 user 消息且标题仍为占位默认值时，用规则截断标题替换
+
+    标题生命周期（占位默认 → 首条替换）在此一文件收口：
+        - 占位默认：`_default_title_for_character`（「与 {角色名} 的对话」）
+        - 截断：`truncate_title`
+        - 替换：本函数，仅在首条 user 消息且标题未被显式命名时发生
+
+    调用时机：create_message 保存 user 消息之前（避免 autoflush 把本条算作已有 user 消息）。
+    """
+    if not conv or not content:
+        return
+    existing_user = (
+        db.query(Message)
+        .filter(Message.conversation_id == conv.id, Message.role == Role.USER)
+        .first()
+    )
+    if existing_user is not None:
+        return  # 本条不是首条 user 消息
+    if conv.title != default_conversation_title(db, conv.id):
+        return  # 标题已被显式命名，不覆盖
+    conv.title = truncate_title(content)
 
 
 def create_conversation(db: Session, data: ConversationCreate) -> Conversation:

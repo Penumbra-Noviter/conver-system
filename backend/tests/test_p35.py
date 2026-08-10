@@ -155,6 +155,63 @@ class TestAutoTitle:
             db_session, 99999
         ) == "新对话"
 
+    def test_maybe_auto_title_replaces_placeholder(self, db_session) -> None:
+        """首条自动标题经收口函数 maybe_auto_title 替换占位默认标题（ARC-3）"""
+        char_id = _create_character(db_session, name="艾莉")
+        conv = conversation_service.create_conversation(
+            db_session, ConversationCreate(character_id=char_id)
+        )
+        content = "第一条消息内容"
+        conversation_service.maybe_auto_title(db_session, conv, content)
+        db_session.commit()  # 与 create_message 调用链一致：收口函数改内存值后由调用方落库
+        db_session.refresh(conv)
+        assert conv.title == content
+        assert conv.title != "与 艾莉 的对话"
+
+    def test_maybe_auto_title_truncates_at_max_len_boundary(self, db_session) -> None:
+        """截断边界：首条超长内容经收口函数替换后为 max_len 字符 + 「…」"""
+        char_id = _create_character(db_session, name="艾莉")
+        conv = conversation_service.create_conversation(
+            db_session, ConversationCreate(character_id=char_id)
+        )
+        content = "好" * 25  # 超过默认 max_len=20
+        conversation_service.maybe_auto_title(db_session, conv, content)
+        db_session.commit()
+        db_session.refresh(conv)
+        assert conv.title == "好" * 20 + "…"
+        assert len(conv.title) == 21
+
+    def test_maybe_auto_title_empty_content_keeps_placeholder(self, db_session) -> None:
+        """Falsify：空 content 不触发替换，标题保持占位默认值"""
+        char_id = _create_character(db_session, name="艾莉")
+        conv = conversation_service.create_conversation(
+            db_session, ConversationCreate(character_id=char_id)
+        )
+        conversation_service.maybe_auto_title(db_session, conv, "")
+        db_session.commit()
+        db_session.refresh(conv)
+        assert conv.title == "与 艾莉 的对话"
+
+    def test_maybe_auto_title_none_conversation_no_error(self, db_session) -> None:
+        """Falsify：conv 为 None 时不抛异常（调用方防御）"""
+        conversation_service.maybe_auto_title(db_session, None, "内容")  # 不应抛错
+
+    def test_renamed_title_not_overwritten_by_first_message(self, db_session) -> None:
+        """Falsify：创建后手动重命名，首条 user 消息不覆盖手动标题"""
+        from backend.app.schemas.conversation import ConversationUpdate
+
+        char_id = _create_character(db_session, name="艾莉")
+        conv = conversation_service.create_conversation(
+            db_session, ConversationCreate(character_id=char_id)
+        )
+        renamed = conversation_service.update_conversation(
+            db_session, conv.id, ConversationUpdate(title="手动重命名")
+        )
+        assert renamed is not None
+        message_service.create_message(db_session, conv.id, Role.USER, "第一条消息")
+        db_session.refresh(conv)
+        assert conv.title == "手动重命名"
+
 
 # ── 4/5. 流式停止生成 ──
 
