@@ -1181,3 +1181,33 @@ describe('角色删除级联关 tab（app.js 角色删除路径）', () => {
         expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
     });
 });
+
+// 恢复：FIX-C 通知分类时误删的 Falsify 失败路径测试（error 帧 → handleStreamError 分支）
+describe('流式 error 帧 → handleStreamError 错误分支（Falsify 失败路径补测）', () => {
+    it('error 帧 → phase error + 错误气泡 + 按钮复位', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+
+        api.setFetch(async (url) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats/stream')) {
+                let ctrl;
+                const stream = new ReadableStream({ start(c) { ctrl = c; } });
+                setTimeout(() => {
+                    ctrl.enqueue(ENCODER.encode(sseFrame('error', { message: '模型超时' })));
+                    ctrl.close();
+                }, 0);
+                return Promise.resolve({ ok: true, status: 200, body: stream });
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        chat.chatDom.chatInput.value = '触发错误';
+        await chat.handleSend();
+        expect(tabs.getTab(11).phase).toBe('error');
+        expect(tabs.getTab(11).isStreaming).toBe(false);
+        expect(document.querySelector('#chat-messages').textContent).toContain('[错误] 模型超时');
+        expect(chat.chatDom.btnSend.textContent).toBe('➤');
+        expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
+    });
+});
