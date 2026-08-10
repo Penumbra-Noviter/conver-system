@@ -585,6 +585,85 @@ describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（流式 finalizeStre
     });
 });
 
+describe('FIX-A settle 按消息位置匹配：同字节双流不误结算', () => {
+    it('两连发回复字节相同 + 旧 list 延迟返回 → 新流 streaming 消息不被旧流结算', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+
+        // 流 1 的 finalizeStream 在途（list 延迟返回）；流 2 的 list 立即返回服务端快照
+        const staleList = {};
+        staleList.promise = new Promise((resolve) => { staleList.resolve = resolve; });
+        let listCalls = 0;
+        let serverState = [];
+        const streamCtrls = [];
+        api.setFetch(async (url, options = {}) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats/stream')) {
+                let ctrl;
+                const stream = new ReadableStream({ start(c) { ctrl = c; } });
+                streamCtrls.push(ctrl);
+                return Promise.resolve({ ok: true, status: 200, body: stream });
+            }
+            if (path.endsWith('/messages')) {
+                listCalls += 1;
+                if (listCalls === 1) return staleList.promise;
+                return mockJson([...serverState]);
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        // 流 1：回复字节「你好」
+        chat.chatDom.chatInput.value = '第一条';
+        chat.handleSend();
+        await sleep(20);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('token', { content: '你好' })));
+        await sleep(10);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('done', { message_id: 101 })));
+        streamCtrls[0].close();
+        await sleep(20);
+        expect(listCalls).toBe(1); // 流 1 的 list 在途
+
+        // 连发流 2 — 回复字节与流 1 完全相同
+        chat.chatDom.chatInput.value = '第二条';
+        chat.handleSend();
+        await sleep(20);
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('token', { content: '你好' })));
+        await sleep(10);
+
+        // 此刻缓存尾部是流 2 的 streaming 消息（内容与流 1 相同 — 内容等值无法区分）
+        let msgs = tabs.getTab(11).messages;
+        expect(msgs.filter((m) => m.streaming)).toHaveLength(1);
+        expect(msgs[msgs.length - 1].content).toBe('你好');
+
+        // 旧 list 返回（只含流 1 的陈旧快照）→ 走陈旧分支
+        staleList.resolve(mockJson([
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '你好' },
+        ]));
+        await sleep(20);
+
+        // 核心断言：流 2 的 streaming 消息未被流 1 误结算（不得获得 101 的 id、仍 streaming）
+        msgs = tabs.getTab(11).messages;
+        const live = msgs.filter((m) => m.streaming);
+        expect(live).toHaveLength(1);
+        expect(live[0].content).toBe('你好');
+        expect(live[0].id).toBeUndefined();
+        expect(msgs.filter((m) => m.id === 101)).toHaveLength(0);
+
+        // 流 2 正常完成 → 最终与服务端一致（其 finalize 的 list 返回完整快照）
+        serverState = [
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '你好' },
+            { id: 3, role: 'user', content: '第二条' },
+            { id: 4, role: 'assistant', content: '你好' },
+        ];
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('done', { message_id: 102 })));
+        streamCtrls[1].close();
+        await sleep(20);
+        expect(tabs.getTab(11).messages).toEqual(serverState);
+    });
+});
+
 describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（非流式）', () => {
     it('非流式 list 延迟返回期间连发第二条 → 旧快照不覆盖新消息', async () => {
         const { chat, tabs, api } = await loadChatModules();
