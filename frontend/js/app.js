@@ -21,6 +21,7 @@ import { showConfirm, showAlert } from './components/confirm-dialog.js';
 import { showModelSelector } from './components/model-selector.js';
 import { showExportDialog } from './components/export-dialog.js';
 import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
+import { initTabBar } from './components/tab-bar.js';
 import { escapeHtml, getInitials, formatTags, showToast, downloadBlob, providerDisplayName } from './utils.js';
 import { highlightText } from './format.js';
 import { state } from './state.js';
@@ -847,5 +848,21 @@ async function init() {
 
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）
 setConversationsRefresher(loadConversations);
+
+// 注入 tab 条激活处理器（P6.5-3）：组件内 ✕ 直接 closeTab（含 abort 流式），
+// 激活/联动一律经此回调走 P6.5-2 收敛的统一激活流程
+initTabBar({
+    container: $('#chat-tabs'),
+    onActivate: async (convId, { saveCurrent = true } = {}) => {
+        if (convId == null) {
+            // 关闭最后一个 tab → 现有空态（tab 条由组件自行隐藏）
+            showEmptyState();
+            refreshSendButton();
+            renderConversations();
+            return;
+        }
+        await activateConversation(convId, { saveCurrent });
+    },
+});
 
 init();
