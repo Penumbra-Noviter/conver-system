@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import {
     openTab,
     activateTab,
@@ -333,6 +333,7 @@ describe('onTabsChanged', () => {
 describe('协议表面', () => {
     it('__all__ 收口全部公开函数', () => {
         expect(__all__.sort()).toEqual([
+            'abortStream',
             'activateTab',
             'closeAllTabs',
             'closeTab',
@@ -346,5 +347,622 @@ describe('协议表面', () => {
             'serialize',
             'updateTab',
         ]);
+    });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// P6.5 code-review 修复的复现测试（F-1 / F-2 竞态）
+//
+// 全部经公共 seam 驱动（chat.js handleSend / app.js 侧栏激活 / tabs.js 关闭），
+// 断言用户可见行为（缓存内容 / DOM 渲染 / 按钮状态 / 无崩溃）。
+// 模块实例隔离：动态 import + vi.resetModules，DOM 先于模块求值就位。
+// ══════════════════════════════════════════════════════════════════
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ReadableStream } from 'node:stream/web';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function waitFor(fn, timeout = 800) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        if (fn()) return;
+        await sleep(5);
+    }
+    throw new Error('waitFor 超时');
+}
+
+/** 最小聊天域 DOM — chat.js 模块求值需要这些元素（chatDom 捕获） */
+const CHAT_DOM_HTML = `
+    <div id="chat-messages"></div>
+    <textarea id="chat-input"></textarea>
+    <button id="btn-send"></button>
+    <input type="checkbox" id="toggle-stream" checked>
+    <div id="chat-header"><span class="chat-title" id="chat-title-text"></span></div>
+`;
+
+/** 动态加载 chat/tabs/api（全新实例；DOM 已就位） */
+async function loadChatModules() {
+    vi.resetModules();
+    document.body.innerHTML = CHAT_DOM_HTML;
+    const chat = await import('../js/chat.js');
+    const tabs = await import('../js/tabs.js');
+    const api = await import('../js/api.js');
+    return { chat, tabs, api };
+}
+
+/** 真实 index.html body + 全新 app.js 实例（init 自动执行，fetch 须先 mock） */
+async function loadAppModules() {
+    vi.resetModules();
+    sessionStorage.clear();
+    document.body.innerHTML = INDEX_BODY;
+    const app = await import('../js/app.js');
+    const tabs = await import('../js/tabs.js');
+    const chat = await import('../js/chat.js');
+    const state = (await import('../js/state.js')).state;
+    return { app, tabs, chat, state };
+}
+
+const INDEX_HTML = readFileSync(join(process.cwd(), 'index.html'), 'utf8');
+const INDEX_BODY = INDEX_HTML.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? '';
+
+const mockJson = (data, status = 200) =>
+    Promise.resolve({ ok: status < 400, status, json: async () => data });
+
+const sseFrame = (type, payload) => `data: ${JSON.stringify({ type, ...payload })}\n\n`;
+const ENCODER = new TextEncoder();
+
+/** 构造 app 级 fetch mock；deferGet: Map<convId, {promise, resolve}>；
+ *  DELETE 处理器就地变更传入的数组（级联场景需要） */
+function makeAppMock({ characters = [], conversations, messagesByConv, deferGet }) {
+    return async (url, options = {}) => {
+        const path = String(url).replace(/^.*\/api/, '/api');
+        const { method = 'GET' } = options;
+        if (path === '/api/characters' && method === 'GET') return mockJson(characters);
+        const charMatch = path.match(/^\/api\/characters\/(\d+)$/);
+        if (charMatch && method === 'DELETE') {
+            const i = characters.findIndex((c) => c.id === Number(charMatch[1]));
+            if (i >= 0) characters.splice(i, 1);
+            return mockJson(null, 204);
+        }
+        if (path === '/api/conversations' && method === 'GET') return mockJson(conversations);
+        if (path === '/api/conversations' && method === 'DELETE') {
+            conversations.length = 0;
+            return mockJson(null, 204);
+        }
+        if (path === '/api/models' && method === 'GET') return mockJson({ providers: [{ key: 'claude', name: 'Claude (Anthropic)', id: 'claude', models: ['claude-sonnet-5'] }] });
+        if (path === '/api/settings' && method === 'GET') return mockJson({});
+        if (path === '/api/settings' && method === 'PUT') return mockJson({});
+        const convMatch = path.match(/^\/api\/conversations\/(\d+)$/);
+        if (convMatch && method === 'GET') {
+            const id = Number(convMatch[1]);
+            if (deferGet?.has(id)) return deferGet.get(id).promise;
+            const conv = conversations.find((c) => c.id === id);
+            return conv ? mockJson(conv) : mockJson({ detail: '会话不存在' }, 404);
+        }
+        if (convMatch && method === 'DELETE') {
+            const i = conversations.findIndex((c) => c.id === Number(convMatch[1]));
+            if (i >= 0) conversations.splice(i, 1);
+            return mockJson(null, 204);
+        }
+        const msgsMatch = path.match(/^\/api\/conversations\/(\d+)\/messages$/);
+        if (msgsMatch && method === 'GET') return mockJson(messagesByConv[Number(msgsMatch[1])] ?? []);
+        throw new Error(`未 mock 的请求: ${method} ${path}`);
+    };
+}
+
+const CONVS = [
+    { id: 11, character_id: 1, title: '会话11', model_provider: 'claude', model_name: 'm1', message_count: 1 },
+    { id: 12, character_id: 2, title: '会话12', model_provider: 'claude', model_name: 'm1', message_count: 1 },
+];
+const MSGS = {
+    11: [{ id: 1, role: 'assistant', content: '消息11' }],
+    12: [{ id: 2, role: 'assistant', content: '消息12' }],
+};
+
+describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（流式 finalizeStream）', () => {
+    it('list 响应延迟返回期间连发新消息 → 旧快照不覆盖、done 后按钮即时复位', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+
+        // list 第 1 次请求（finalizeStream 在途）延迟返回；后续请求立即返回服务端快照
+        const staleList = {};
+        staleList.promise = new Promise((resolve) => { staleList.resolve = resolve; });
+        let listCalls = 0;
+        let serverState = [];
+        const streamCtrls = [];
+        api.setFetch(async (url, options = {}) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats/stream')) {
+                let ctrl;
+                const stream = new ReadableStream({ start(c) { ctrl = c; } });
+                streamCtrls.push(ctrl);
+                return Promise.resolve({ ok: true, status: 200, body: stream });
+            }
+            if (path.endsWith('/messages')) {
+                listCalls += 1;
+                if (listCalls === 1) return staleList.promise;
+                return mockJson([...serverState]);
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        // 第一次发送（流式）→ 首个 token + done（finalizeStream 的 list 在途）
+        chat.chatDom.chatInput.value = '第一条';
+        chat.handleSend();
+        await sleep(20);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('token', { content: '你好' })));
+        await sleep(10);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('done', { message_id: 101 })));
+        streamCtrls[0].close();
+        await sleep(20);
+        expect(listCalls).toBe(1);
+
+        // done 后（list 未返回前）按钮即复位为发送态 — 无 ⏹→➤ UX 窗口
+        expect(chat.chatDom.btnSend.textContent).toBe('➤');
+        expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
+
+        // 同 tab 连发第二条（isStreaming 已 false → 允许发送）
+        chat.chatDom.chatInput.value = '第二条';
+        chat.handleSend();
+        await sleep(20);
+        expect(tabs.getTab(11).messages.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+
+        // 旧 list 快照延迟返回（不含第二条的陈旧状态）
+        staleList.resolve(mockJson([
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '你好' },
+        ]));
+        await sleep(20);
+
+        // 核心断言：旧快照不覆盖连发的新消息；本流 streaming 标记被结算
+        const msgs = tabs.getTab(11).messages;
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第一条')).toBe(true);
+        expect(msgs.filter((m) => m.streaming)).toEqual([]);
+        expect(msgs.find((m) => m.role === 'assistant' && m.content === '你好')?.id).toBe(101);
+
+        // 第二条流正常完成 → 最终与服务端一致
+        serverState = [
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '你好' },
+            { id: 3, role: 'user', content: '第二条' },
+            { id: 4, role: 'assistant', content: '回复2' },
+        ];
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('token', { content: '回复2' })));
+        await sleep(10);
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('done', { message_id: 102 })));
+        streamCtrls[1].close();
+        await sleep(20);
+        expect(tabs.getTab(11).messages).toEqual(serverState);
+    });
+
+    it('list 重载失败 + 期间连发 → 本地增量兜底，新消息保留、无 streaming 残留', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+
+        const streamCtrls = [];
+        api.setFetch(async (url) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats/stream')) {
+                let ctrl;
+                const stream = new ReadableStream({ start(c) { ctrl = c; } });
+                streamCtrls.push(ctrl);
+                return Promise.resolve({ ok: true, status: 200, body: stream });
+            }
+            if (path.endsWith('/messages')) {
+                // 本流与连发流的重载均失败（服务端故障）→ 走本地增量兜底
+                return mockJson({ detail: '服务端故障' }, 500);
+            }
+            throw new Error(`未 mock 的请求: ${url}`);
+        });
+
+        chat.chatDom.chatInput.value = '第一条';
+        chat.handleSend();
+        await sleep(20);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('token', { content: '你好' })));
+        await sleep(10);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('done', { message_id: 101 })));
+        streamCtrls[0].close();
+        await sleep(20);
+
+        // 连发第二条（其重载同样失败）
+        chat.chatDom.chatInput.value = '第二条';
+        chat.handleSend();
+        await sleep(20);
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('token', { content: '回复2' })));
+        await sleep(10);
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('done', { message_id: 102 })));
+        streamCtrls[1].close();
+        await sleep(20);
+
+        const msgs = tabs.getTab(11).messages;
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第一条')).toBe(true);
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+        expect(msgs.filter((m) => m.streaming)).toEqual([]);
+        expect(msgs.filter((m) => m.role === 'assistant')).toHaveLength(2);
+    });
+});
+
+describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（非流式）', () => {
+    it('非流式 list 延迟返回期间连发第二条 → 旧快照不覆盖新消息', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+        chat.chatDom.toggleStream.checked = false;
+
+        const staleList = {};
+        staleList.promise = new Promise((resolve) => { staleList.resolve = resolve; });
+        let listCalls = 0;
+        let serverState = [];
+        api.setFetch(async (url, options = {}) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats')) {
+                const body = JSON.parse(options.body);
+                serverState.push({ id: serverState.length + 1, role: 'user', content: body.content });
+                serverState.push({ id: serverState.length + 1, role: 'assistant', content: `回复${body.content}` });
+                return mockJson({ reply: `回复${body.content}` });
+            }
+            if (path.endsWith('/messages')) {
+                listCalls += 1;
+                if (listCalls === 1) return staleList.promise;
+                return mockJson([...serverState]);
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        // 第一次发送（非流式）— messages.list 在途
+        chat.chatDom.chatInput.value = '第一条';
+        chat.handleSend();
+        await sleep(20);
+        expect(listCalls).toBe(1);
+
+        // 连发第二条（非流式 isStreaming 恒 false，Enter/直接调用均可连发）
+        chat.chatDom.chatInput.value = '第二条';
+        await chat.handleSend();
+        expect(tabs.getTab(11).messages.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+
+        // 旧快照返回（只含第一条的往返）
+        staleList.resolve(mockJson([
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '回复第一条' },
+        ]));
+        await sleep(20);
+
+        // 核心断言：旧快照不覆盖连发的第二条
+        const msgs = tabs.getTab(11).messages;
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+        expect(msgs).toEqual([
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '回复第一条' },
+            { id: 3, role: 'user', content: '第二条' },
+            { id: 4, role: 'assistant', content: '回复第二条' },
+        ]);
+    });
+});
+
+describe('F-2 activateConversation 无守卫异步续体（await 期间切走/关闭）', () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+        globalThis.fetch = originalFetch;
+    });
+
+    it('conversations.get 在途时用户切走 → 旧续体不恢复草稿、不渲染错会话', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        globalThis.fetch = makeAppMock({
+            conversations: [...CONVS],
+            messagesByConv: MSGS,
+            deferGet: new Map([[11, deferred]]),
+        });
+        const { tabs, state } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+        const chatInput = () => document.querySelector('#chat-input');
+
+        // 打开 11 并输入草稿，再切到 12（11 的草稿入缓存）
+        clickConv(11);
+        await sleep(30);
+        chatInput().value = '草稿A';
+        clickConv(12);
+        await sleep(30);
+        expect(tabs.getTab(11)?.draft).toBe('草稿A');
+
+        // 让 11 从已加载列表消失（如列表过期），再点 11 → 走 await conversations.get 续体
+        state.conversations = state.conversations.filter((c) => c.id !== 11);
+        clickConv(11);
+        await sleep(30);
+        // get 在途期间用户切回 12
+        clickConv(12);
+        await sleep(30);
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+
+        // get 返回 → 旧续体不得恢复草稿/渲染 11
+        deferred.resolve(mockJson({ ...CONVS[0] }));
+        await sleep(30);
+
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
+        expect(document.querySelector('#chat-messages').textContent).not.toContain('消息11');
+        expect(document.querySelector('#chat-title-text').textContent).toBe('会话12');
+    });
+
+    it('conversations.get 在途时用户关闭该 tab → 无 TypeError 崩溃', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        globalThis.fetch = makeAppMock({
+            conversations: [...CONVS],
+            messagesByConv: MSGS,
+            deferGet: new Map([[11, deferred]]),
+        });
+        const { tabs, state } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+
+        // 打开 11，让 11 从已加载列表消失，再点 11 → await conversations.get 在途
+        clickConv(11);
+        await sleep(30);
+        state.conversations = state.conversations.filter((c) => c.id !== 11);
+        clickConv(11);
+        await sleep(30);
+        // get 在途期间：切到 12 并关闭 11 的 tab
+        clickConv(12);
+        await sleep(30);
+        tabs.closeTab(11);
+        expect(tabs.getTab(11)).toBeUndefined();
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+
+        // get 返回 → 旧续体必须安全退出（tab 已关：不抛 TypeError）
+        const rejections = [];
+        const onRejection = (reason) => rejections.push(reason);
+        process.on('unhandledRejection', onRejection);
+        deferred.resolve(mockJson({ ...CONVS[0] }));
+        await sleep(50);
+        process.off('unhandledRejection', onRejection);
+        expect(rejections).toHaveLength(0);
+
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
+        expect(document.querySelector('#chat-title-text').textContent).toBe('会话12');
+    });
+
+    it('conversations.get 失败（404）且在途时关闭 tab → 无崩溃、无错渲染', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        globalThis.fetch = makeAppMock({
+            conversations: [...CONVS],
+            messagesByConv: MSGS,
+            deferGet: new Map([[11, deferred]]),
+        });
+        const { tabs, state } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+
+        clickConv(11);
+        await sleep(30);
+        state.conversations = state.conversations.filter((c) => c.id !== 11);
+        clickConv(11);
+        await sleep(30);
+        clickConv(12);
+        await sleep(30);
+        tabs.closeTab(11);
+
+        const rejections = [];
+        const onRejection = (reason) => rejections.push(reason);
+        process.on('unhandledRejection', onRejection);
+        deferred.resolve(mockJson({ detail: '会话不存在' }, 404));
+        await sleep(50);
+        process.off('unhandledRejection', onRejection);
+        expect(rejections).toHaveLength(0);
+
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
+        expect(document.querySelector('#chat-title-text').textContent).toBe('会话12');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// 低成本非阻断项（P6.5 code-review）
+// ══════════════════════════════════════════════════
+
+describe('abortStream（tabs.js 协议 — 停止/删除/关闭/清空统一中止入口）', () => {
+    it('中止指定 tab 的在途流式句柄；无 tab / 无句柄 → no-op 不抛错', async () => {
+        vi.resetModules();
+        const tabs = await import('../js/tabs.js');
+        const abort = vi.fn();
+        tabs.openTab(1);
+        tabs.openTab(2);
+        tabs.updateTab(1, { activeStream: { abort } });
+        tabs.abortStream(1);
+        expect(abort).toHaveBeenCalledTimes(1);
+        tabs.abortStream(2);   // 有 tab 无句柄
+        tabs.abortStream(999); // 无 tab
+        expect(abort).toHaveBeenCalledTimes(1);
+    });
+
+    it('abort() 抛错静默忽略（连接已断开等场景）', async () => {
+        vi.resetModules();
+        const tabs = await import('../js/tabs.js');
+        tabs.openTab(1);
+        tabs.updateTab(1, { activeStream: { abort: () => { throw new Error('已断开'); } } });
+        expect(() => tabs.abortStream(1)).not.toThrow();
+    });
+
+    it('abortStream 收口进协议表面 __all__', async () => {
+        vi.resetModules();
+        const tabs = await import('../js/tabs.js');
+        expect(tabs.__all__).toContain('abortStream');
+    });
+});
+
+describe('EMPTY_STATE_HTML 共享常量（chat.js 导出，app.js 复用）', () => {
+    it('chat.js 导出共享空态常量；无活动 tab 时 renderMessages 渲染它', async () => {
+        const { chat, tabs } = await loadChatModules();
+        expect(typeof chat.EMPTY_STATE_HTML).toBe('string');
+        expect(chat.EMPTY_STATE_HTML).toContain('选择左侧对话或创建新对话开始聊天');
+        chat.renderMessages();
+        expect(document.querySelector('#chat-messages').innerHTML).toBe(chat.EMPTY_STATE_HTML);
+        tabs.closeAllTabs();
+        chat.renderMessages();
+        expect(document.querySelector('#chat-messages').innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+
+    it('app 空态（无 tab）与共享常量逐字一致（无重复字面量）', async () => {
+        globalThis.fetch = makeAppMock({ conversations: [], messagesByConv: {}, deferGet: new Map() });
+        const { chat } = await loadAppModules();
+        await sleep(50);
+        expect(document.querySelector('#chat-messages').innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+});
+
+describe('abort 流式三连复用 abortStream（app.js 停止按钮 / tab-bar ✕ / 删会话）+ 清空联动', () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+        globalThis.fetch = originalFetch;
+    });
+
+    it('停止按钮：活动 tab 流式中点击 → 经 abortStream 中止', async () => {
+        globalThis.fetch = makeAppMock({ conversations: [...CONVS], messagesByConv: MSGS, deferGet: new Map() });
+        const { tabs } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        document.querySelector('#conversation-list .conversation-item[data-id="11"]').click();
+        await sleep(30);
+        const spy = vi.fn();
+        tabs.updateTab(11, { isStreaming: true, activeStream: { abort: spy } });
+        document.querySelector('#btn-send').click();
+        await sleep(10);
+        expect(spy).toHaveBeenCalledTimes(1);
+        // 无流式句柄时点击回落到 handleSend（不误 abort）
+        expect(() => document.querySelector('#btn-send').click()).not.toThrow();
+    });
+
+    it('tab 条 ✕：关闭流式中的 tab → 先 abort 再关，右邻居激活', async () => {
+        globalThis.fetch = makeAppMock({ conversations: [...CONVS], messagesByConv: MSGS, deferGet: new Map() });
+        const { tabs } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+        clickConv(11);
+        await sleep(30);
+        clickConv(12);
+        await sleep(30);
+        clickConv(11);
+        await sleep(30);
+        const spy = vi.fn();
+        tabs.updateTab(11, { isStreaming: true, activeStream: { abort: spy } });
+        document.querySelector('#chat-tabs .chat-tab[data-conv-id="11"] .tab-close').click();
+        await sleep(30);
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(tabs.getTab(11)).toBeUndefined();
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+    });
+
+    it('删除会话（开着流式）→ 先 abort 再关 tab，右邻居草稿不被污染', async () => {
+        globalThis.fetch = makeAppMock({ conversations: [...CONVS], messagesByConv: MSGS, deferGet: new Map() });
+        const { tabs } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+        const chatInput = () => document.querySelector('#chat-input');
+
+        clickConv(11);
+        await sleep(30);
+        chatInput().value = '草稿A';
+        clickConv(12);
+        await sleep(30);
+        chatInput().value = '草稿B';
+        clickConv(11);
+        await sleep(30);
+        const spy = vi.fn();
+        tabs.updateTab(11, { isStreaming: true, activeStream: { abort: spy } });
+
+        document.querySelector('#conversation-list .conversation-item[data-id="11"] .btn-delete-conv').click();
+        await sleep(10);
+        document.querySelector('.confirm-ok').click();
+        await sleep(50);
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(tabs.getTab(11)).toBeUndefined();
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(tabs.getTab(12)?.draft).toBe('草稿B');
+        expect(chatInput().value).toBe('草稿B');
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
+    });
+
+    it('清空所有对话 → 先中止全部在途流式再关全部 tab', async () => {
+        globalThis.fetch = makeAppMock({ conversations: [...CONVS], messagesByConv: MSGS, deferGet: new Map() });
+        const { tabs } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        document.querySelector('#conversation-list .conversation-item[data-id="11"]').click();
+        await sleep(30);
+        document.querySelector('#conversation-list .conversation-item[data-id="12"]').click();
+        await sleep(30);
+        const spy = vi.fn();
+        tabs.updateTab(11, { isStreaming: true, activeStream: { abort: spy } });
+
+        document.querySelector('.nav-btn[data-view="settings"]').click();
+        await sleep(30);
+        document.querySelector('#btn-clear-all-convs').click();
+        await sleep(10);
+        document.querySelector('.confirm-ok').click();
+        await sleep(50);
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(tabs.getTabs()).toHaveLength(0);
+        expect(tabs.getActiveTab()).toBeNull();
+        expect(document.querySelector('#chat-messages').innerHTML).toContain('选择左侧对话');
+    });
+});
+
+describe('角色删除级联关 tab（app.js 角色删除路径）', () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+        globalThis.fetch = originalFetch;
+    });
+
+    it('删除角色 → 其会话 tab 关闭（含在途流式中止），其他 tab 保留并激活', async () => {
+        const characters = [
+            { id: 1, name: '角色A', avatar: null },
+            { id: 2, name: '角色B', avatar: null },
+        ];
+        const conversations = [
+            { id: 11, character_id: 1, title: '会话11', model_provider: 'claude', model_name: 'm1', message_count: 1 },
+            { id: 12, character_id: 2, title: '会话12', model_provider: 'claude', model_name: 'm1', message_count: 1 },
+        ];
+        const messagesByConv = {
+            11: [{ id: 1, role: 'assistant', content: '消息11' }],
+            12: [{ id: 2, role: 'assistant', content: '消息12' }],
+        };
+        globalThis.fetch = makeAppMock({ characters, conversations, messagesByConv, deferGet: new Map() });
+        const { tabs } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+
+        // 打开 11、12 两个 tab；11 挂上在途流式
+        document.querySelector('#conversation-list .conversation-item[data-id="11"]').click();
+        await sleep(30);
+        document.querySelector('#conversation-list .conversation-item[data-id="12"]').click();
+        await sleep(30);
+        const spy = vi.fn();
+        tabs.updateTab(11, { isStreaming: true, activeStream: { abort: spy } });
+
+        // 角色视图删除角色A（其对话 11 级联删除）
+        document.querySelector('.nav-btn[data-view="characters"]').click();
+        await waitFor(() => document.querySelectorAll('.character-card').length === 2);
+        document.querySelector('.character-card[data-id="1"] .delete-char').click();
+        await sleep(10);
+        document.querySelector('.confirm-ok').click();
+        await sleep(60);
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(tabs.getTab(11)).toBeUndefined();
+        expect(tabs.getTab(12)).toBeDefined();
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
     });
 });
