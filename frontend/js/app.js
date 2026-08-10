@@ -22,11 +22,12 @@ import { showModelSelector } from './components/model-selector.js';
 import { showExportDialog } from './components/export-dialog.js';
 import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
 import { initTabBar } from './components/tab-bar.js';
-import { escapeHtml, getInitials, formatTags, showToast, downloadBlob, providerDisplayName } from './utils.js';
-import { highlightText } from './format.js';
+import { escapeHtml, showToast, downloadBlob, providerDisplayName } from './utils.js';
+import { characterCardHtml, conversationItemHtml, searchResultItemHtml } from './format.js';
 import { state } from './state.js';
 import { chatDom, renderMessages, handleSend, refreshSendButton, setConversationsRefresher, EMPTY_STATE_HTML } from './chat.js';
-import { openTab, closeTabs, getActiveTab, getTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
+import { closeTabs, getActiveTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
+import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -141,61 +142,7 @@ async function renderCharacters() {
         return;
     }
 
-    grid.innerHTML = state.characters
-        .map(
-            (c) => `
-        <div class="character-card" data-id="${c.id}">
-            <div class="character-card-header">
-                <div class="character-avatar">
-                    ${c.avatar
-                        ? `<img src="${escapeHtml(c.avatar)}" alt="${escapeHtml(c.name)}" onerror="this.parentElement.innerHTML='<div class=\\'avatar-placeholder-sm\\'>${escapeHtml(getInitials(c.name))}</div>'">`
-                        : `<div class="avatar-placeholder-sm">${escapeHtml(getInitials(c.name))}</div>`
-                    }
-                </div>
-                <div class="character-card-info">
-                    <div class="name">${escapeHtml(c.name)}</div>
-                    <div class="subtitle">${escapeHtml(c.description || c.personality?.slice(0, 60) || '未设定')}</div>
-                </div>
-            </div>
-            <div class="character-card-details">
-                ${c.first_mes ? `<div class="detail-item"><span class="detail-label">开场白:</span> ${escapeHtml(c.first_mes.slice(0, 60))}${c.first_mes.length > 60 ? '…' : ''}</div>` : ''}
-                ${c.tags && c.tags.length ? `<div class="detail-item"><span class="detail-label">标签:</span> ${escapeHtml(formatTags(c.tags))}</div>` : ''}
-            </div>
-            <div class="character-card-meta">
-                <span class="meta-badge">🌡️ ${c.temperature?.toFixed(1) ?? '0.7'}</span>
-                <span class="meta-badge">💬 ${c.conversation_count ?? 0}</span>
-            </div>
-            <div class="character-card-actions">
-                <button class="btn-icon chat-with" title="开始对话">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 4.5A1.5 1.5 0 014.5 3h7A1.5 1.5 0 0113 4.5v4A1.5 1.5 0 0111.5 10H8l-3 2v-2H4.5A1.5 1.5 0 013 8.5v-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                        <path d="M6 6.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                </button>
-                <button class="btn-icon edit-char" title="编辑">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M11.4 2.6a1.7 1.7 0 012.4 2.4L7.5 11.3 4 12l.7-3.5 6.7-5.9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <button class="btn-icon export-char" title="导出角色卡">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M13.5 10v3.5a1 1 0 01-1 1h-9a1 1 0 01-1-1V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M8 9.5V2.5M5.5 5L8 2.5 10.5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <button class="btn-icon delete-char" title="删除">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M2.5 4.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                        <path d="M12.7 4.5v9.3a1.3 1.3 0 01-1.3 1.3H4.6a1.3 1.3 0 01-1.3-1.3V4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M6.6 4.5V3.4a.9.9 0 01.9-.9h1a.9.9 0 01.9.9v1.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M6.6 7.5v4M9.4 7.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    `
-        )
-        .join('');
+    grid.innerHTML = state.characters.map((c) => characterCardHtml(c)).join('');
 
     // 事件委托：开始对话
     grid.querySelectorAll('.chat-with').forEach((btn) => {
@@ -383,16 +330,7 @@ function renderConversations() {
     const activeConvId = getActiveTab()?.conversationId ?? null;
 
     list.innerHTML = state.conversations
-        .map(
-            (c) => `
-        <div class="conversation-item ${c.id === activeConvId ? 'active' : ''}"
-             data-id="${c.id}">
-            <div class="title">${escapeHtml(c.title)}</div>
-            <div class="meta">${c.message_count} 条消息 · ${escapeHtml(c.model_name || c.model_provider)}</div>
-            <button class="btn-icon btn-delete-conv" title="删除对话">✕</button>
-        </div>
-    `
-        )
+        .map((c) => conversationItemHtml(c, { activeId: activeConvId }))
         .join('');
 
     list.querySelectorAll('.conversation-item').forEach((item) => {
@@ -502,32 +440,10 @@ function startRename(conv) {
 }
 
 // ══════════════════════════════════════════════════
-// 会话激活流程（P6.5 收敛为单一内部函数 — 三入口与 tab 条共用）
+// 会话激活流程（ARC-6 移入 conversation-activation.js 深模块 —
+//   激活编排 / 草稿滚动保存恢复 / 懒加载 / F-2 守卫 / 空态 均由该模块持有，
+//   app.js 经 setActivationHooks 注入 DOM 渲染回调，本文件保留事件与协调）
 // ══════════════════════════════════════════════════
-
-/**
- * 保存当前活动 tab 的输入草稿与滚动位置到 tab 缓存（切换前调用）
- */
-function saveActiveTabViewState() {
-    const tab = getActiveTab();
-    if (!tab) return;
-    updateTab(tab.conversationId, {
-        draft: chatDom.chatInput.value,
-        scrollTop: chatDom.chatMessages.scrollTop,
-    });
-}
-
-/**
- * 恢复指定 tab 的输入草稿与滚动位置到 DOM
- * @param {object|undefined} tab - 目标 tab（已关闭/不存在 → no-op，防御 F-2 竞态）
- */
-function restoreTabViewState(tab) {
-    if (!tab) return;
-    chatDom.chatInput.value = tab.draft ?? '';
-    chatDom.chatInput.style.height = 'auto';
-    chatDom.chatInput.style.height = Math.min(chatDom.chatInput.scrollHeight, 150) + 'px';
-    chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
-}
 
 /**
  * 渲染聊天头部（标题 + 模型 badge + 导出/列表切换按钮 + 双击重命名绑定）
@@ -568,92 +484,6 @@ function renderChatHeader(conversationId) {
             showExportDialog(conversationId);
         });
     }
-}
-
-/**
- * 无活动 tab 时的空态（聊天区 + 头部提示）
- * 聊天区复用 chat.js 导出的共享常量（单一事实来源）
- */
-function showEmptyState() {
-    chatDom.chatHeader.innerHTML = '<span class="chat-title">选择一个角色开始对话</span>';
-    chatDom.chatMessages.innerHTML = EMPTY_STATE_HTML;
-}
-
-/**
- * 懒加载指定会话消息并写入其 tab 缓存；仅当该 tab 仍为活动 tab 时才渲染
- * （快速连续切 tab 时各响应写各自 tab 缓存，后返回的响应不覆盖先返回的；
- * 缓存分支同样须校验活动性 —— F-2：await 期间切走时旧续体不得把 A 渲染进 B 的视图）
- * @param {number|string} conversationId - 会话 id
- */
-async function loadTabMessages(conversationId) {
-    const tab = getTab(conversationId);
-    if (!tab) return;
-    // 已有缓存（含流式中断后的部分内容）→ 不重复请求，直接渲染
-    if (tab.messages.length > 0) {
-        if (getActiveTab()?.conversationId === conversationId) {
-            renderMessages();
-            // renderMessages 内部 scrollToBottom — 此处恢复缓存中的滚动位置（切 tab 恢复）
-            chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
-            renderChatHeader(conversationId);
-        }
-        return;
-    }
-    try {
-        const msgs = await messages.list(conversationId);
-        updateTab(conversationId, { messages: msgs });
-        if (getActiveTab()?.conversationId === conversationId) {
-            renderMessages();
-            renderChatHeader(conversationId);
-        }
-    } catch (err) {
-        console.error('加载消息失败:', err);
-        showError('加载消息失败');
-        if (getActiveTab()?.conversationId === conversationId) {
-            renderMessages();
-            renderChatHeader(conversationId);
-        }
-    }
-}
-
-/**
- * 切到某会话的统一激活流程（三入口与 tab 条共用）：
- *   openTab/activateTab + 以已知对话数据补全 tab 的 title/characterId（未知则经 API 获取）
- *   + 懒加载消息 + 草稿/滚动保存恢复 + 刷新发送按钮两态 + 列表高亮 + 视图切换
- * @param {number|string} conversationId - 会话 id
- * @param {object} [options]
- * @param {boolean} [options.saveCurrent=true] - 切换前保存当前活动 tab 的草稿/滚动。
- *   删除会话联动场景调用方已预先保存，传 false 防止旧视图 DOM 状态污染新活动 tab 缓存。
- */
-async function activateConversation(conversationId, { saveCurrent = true } = {}) {
-    // 1) 保存当前活动 tab 的草稿与滚动位置（切换前）
-    if (saveCurrent) saveActiveTabViewState();
-    // 2) 打开/激活 tab（已存在仅激活，不重复开）
-    const tab = openTab(conversationId);
-    if (!tab) return;
-    // 3) 补全 tab 的 title/characterId：已知对话数据直接取；未知经 API 获取
-    let conv = state.conversations.find((c) => c.id === conversationId);
-    if (!conv) {
-        try {
-            conv = await conversations.get(conversationId);
-        } catch {
-            // 忽略 — 至少尝试加载消息
-        }
-        // await 期间用户可能已切走或关闭该 tab — 放弃续体（F-2）：
-        // 否则恢复旧草稿覆盖新活动输入框、缓存分支把本会话渲染进错误视图
-        if (getActiveTab()?.conversationId !== conversationId) return;
-    }
-    if (conv) {
-        updateTab(conversationId, { title: conv.title, characterId: conv.character_id });
-    }
-    // 4) 恢复新 tab 的草稿与滚动位置
-    restoreTabViewState(getTab(conversationId));
-    // 5) 懒加载消息（缓存为空才请求）+ 头部渲染
-    await loadTabMessages(conversationId);
-    if (getActiveTab()?.conversationId !== conversationId) return;
-    // 6) 刷新发送按钮两态 + 列表高亮 + 视图（已在聊天视图则跳过 switchView 的重复 loadConversations）
-    refreshSendButton();
-    renderConversations();
-    if (state.currentView !== 'chat') switchView('chat');
 }
 
 /**
@@ -785,25 +615,7 @@ function renderSearchResults(results, query) {
     resultsEl.innerHTML = `
         <p class="search-count">共找到 ${results.length} 条匹配消息</p>
         <div class="search-result-list">
-            ${results.map(r => {
-                const roleLabel = r.role === 'user' ? '你' : escapeHtml(r.character_name);
-                const roleIcon = r.role === 'user' ? '👤' : '🎭';
-                const time = r.created_at ? new Date(r.created_at).toLocaleString('zh-CN') : '';
-
-                // 高亮关键词
-                const highlighted = highlightText(escapeHtml(r.content_preview), escapedQuery);
-
-                return `
-                    <div class="search-result-item" data-conversation-id="${r.conversation_id}" data-message-id="${r.message_id}">
-                        <div class="search-result-header">
-                            <span class="search-result-role">${roleIcon} ${escapeHtml(roleLabel)}</span>
-                            <span class="search-result-conv">💬 ${escapeHtml(r.conversation_title || '未命名对话')}</span>
-                        </div>
-                        <div class="search-result-preview">${highlighted}</div>
-                        <div class="search-result-time">${escapeHtml(time)}</div>
-                    </div>
-                `;
-            }).join('')}
+            ${results.map(r => searchResultItemHtml(r, query)).join('')}
         </div>
     `;
 
@@ -865,6 +677,14 @@ async function init() {
     await loadConversations();
     await loadModels();
     await loadSettings();
+
+    // ARC-6：激活编排模块的 DOM 渲染回调注入（renderConversations/头部/视图切换/错误提示）
+    setActivationHooks({
+        renderConversations,
+        renderChatHeader,
+        switchView: (viewName) => switchView(viewName),
+        showError,
+    });
 
     // P6.5-4 恢复时序契约：conversations 加载完成后才 restore；
     // isValidId 以已加载列表判定（过滤已删会话）；恢复的 tab 一律非流式，

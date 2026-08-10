@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { highlightText, buildMessagesHtml, assistantAvatarHtml, userAvatarHtml } from '../js/format.js';
+import { highlightText, buildMessagesHtml, assistantAvatarHtml, userAvatarHtml, characterCardHtml, conversationItemHtml, searchResultItemHtml } from '../js/format.js';
 
 describe('highlightText', () => {
     it('无关键词时原样返回', () => {
@@ -91,5 +91,79 @@ describe('assistantAvatarHtml', () => {
 describe('userAvatarHtml', () => {
     it('输出用户头像 div', () => {
         expect(userAvatarHtml()).toContain('msg-avatar user-avatar');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// 视图渲染模板纯函数（ARC-6 从 app.js 迁移）
+// ══════════════════════════════════════════════════
+
+describe('characterCardHtml', () => {
+    const char = {
+        id: 1, name: '测试角色', description: '简介', first_mes: '你好',
+        tags: ['甲', '乙'], temperature: 0.9, conversation_count: 3,
+    };
+
+    it('渲染卡片结构:头像/名称/简介/开场白/标签/元数据/4 操作按钮', () => {
+        const html = characterCardHtml(char);
+        expect(html).toContain('character-card" data-id="1"');
+        expect(html).toContain('测试角色');
+        expect(html).toContain('简介');
+        expect(html).toContain('开场白:');
+        expect(html).toContain('标签:');
+        expect(html).toContain('🌡️ 0.9');
+        expect(html).toContain('💬 3');
+        expect(html).toContain('chat-with');
+        expect(html).toContain('edit-char');
+        expect(html).toContain('export-char');
+        expect(html).toContain('delete-char');
+    });
+
+    it('转义用户内容:名称含 < 不注入 HTML', () => {
+        const html = characterCardHtml({ id: 2, name: '<script>', description: 'x', first_mes: 'y', temperature: 0.7, conversation_count: 0 });
+        expect(html).not.toContain('<script>');
+        expect(html).toContain('&lt;script&gt;');
+    });
+
+    it('缺省字段安全:无开场白/标签/温度 → 不渲染对应区块,温度回退 0.7', () => {
+        const html = characterCardHtml({ id: 3, name: '精简', temperature: undefined, conversation_count: undefined });
+        expect(html).not.toContain('开场白');
+        expect(html).not.toContain('标签');
+        expect(html).toContain('🌡️ 0.7');
+        expect(html).toContain('💬 0');
+    });
+});
+
+describe('conversationItemHtml', () => {
+    const conv = { id: 10, title: '对话A', message_count: 5, model_name: 'deepseek-v4-flash' };
+
+    it('渲染标题/消息数/模型,activeId 匹配时高亮', () => {
+        const html = conversationItemHtml(conv, { activeId: 10 });
+        expect(html).toContain('conversation-item active"');
+        expect(html).toContain('data-id="10"');
+        expect(html).toContain('对话A');
+        expect(html).toContain('5 条消息 · deepseek-v4-flash');
+    });
+
+    it('activeId 不匹配不高亮;model_name 缺省回退 provider', () => {
+        expect(conversationItemHtml(conv, { activeId: 99 })).toContain('conversation-item "');
+        expect(conversationItemHtml(conv, { activeId: 99 })).toContain('data-id="10"');
+        expect(conversationItemHtml({ id: 1, title: 't', message_count: 0, model_provider: 'openai' })).toContain('0 条消息 · openai');
+    });
+});
+
+describe('searchResultItemHtml', () => {
+    it('user 消息角色标签为「你」+ 👤;assistant 为角色名 + 🎭', () => {
+        const userHtml = searchResultItemHtml({ role: 'user', character_name: 'X', conversation_id: 1, message_id: 1, content_preview: 'hello', conversation_title: 'C' }, '');
+        expect(userHtml).toContain('👤 你');
+        const asstHtml = searchResultItemHtml({ role: 'assistant', character_name: 'AI', conversation_id: 1, message_id: 2, content_preview: 'hi', conversation_title: 'C' }, '');
+        expect(asstHtml).toContain('🎭 AI');
+    });
+
+    it('关键词高亮包 <mark>;对话标题缺省「未命名对话」', () => {
+        const html = searchResultItemHtml({ role: 'user', conversation_id: 1, message_id: 1, content_preview: '找到关键词了', conversation_title: undefined }, '关键词');
+        expect(html).toContain('<mark class="search-highlight">关键词</mark>');
+        expect(html).toContain('未命名对话');
+        expect(html).toContain('data-conversation-id="1"');
     });
 });
