@@ -19,21 +19,24 @@
 - [ ] Rust 后端作为 FastAPI 壳/替代
 - [ ] 系统托盘 / 开机自启
 
-### P6.5 多 tab 会话管理
-
-> 规格：[.scratch/p6.5-multi-tab/spec.md](.scratch/p6.5-multi-tab/spec.md) · 工单：`.scratch/p6.5-multi-tab/issues/`（每张一文件，含验收标准/文件范围/阻塞边）。实现路径串行（chat.js 与 app.js 互相调用 + 共享 state，单代理执行）。
-
-- [ ] P6.5-1 tabs 工作区状态深模块 + 单测（无阻塞，可立即开工）
-- [ ] P6.5-2 state.js 会话级字段退役 + 活动 tab 派生改造（含流式写回；阻塞 P6.5-1）
-- [ ] P6.5-3 tab 条 UI（桌面端 + 移动端隐藏；阻塞 P6.5-2）
-- [ ] P6.5-4 联动补全：标题同步 + sessionStorage 恢复 + 空态（阻塞 P6.5-3）
-- [ ] P6.5-5 GUI 回归 + 文档归档（阻塞 P6.5-4）
-
 > ⚠️ Ollama 本地模型支持 — **已封存**（2026-08-03 用户决定：发布获得用户反馈后再考虑）
 
 ---
 
 ## 已完成归档
+
+### P6.5 多 tab 会话管理（2026-08-10）
+
+> 应用内多会话工作区：tab 条切换、后台流式继续生成、完成/停止/出错按发起时捕获的 conversation id 写回、刷新后按 sessionStorage 恢复。规格见 `.scratch/p6.5-multi-tab/spec.md`（12 项共识决策）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| P6.5-1 | tabs 工作区状态深模块 + 单测：openTab/activateTab/closeTab/closeAllTabs/getActiveTab/getTab/getTabs/updateTab/serialize/restore/onTabsChanged；updateTab 幂等 no-op；27 用例、覆盖率 99%/96.6% | 2026-08-10 | `4cc4c2e` |
+| P6.5-2 | state.js 会话级字段退役 + 活动 tab 派生改造：三入口收敛统一激活流程；流式防悬挂（onToken 活动归属分流 + onDone/onError 按捕获 id 写回）；停止写回 phase error + 「已停止」语义；删除会话/清空联动 | 2026-08-10 | `089de63` |
+| P6.5-3 | tab 条 UI：`components/tab-bar.js` presentational 组件（注入激活处理器 + ✕ 直接 closeTab 含 abort）；脉冲点/警示标记指示；<768px 隐藏 | 2026-08-10 | `f71dffc` |
+| P6.5-4 | 标题同步 + sessionStorage 恢复 + 空态：`restoreFromStorage` 集成辅助（损坏/无记录/全失效 → 空集）；init 在 conversations 加载后恢复；重命名/自动标题联动 tab | 2026-08-10 | `c4c2fd3` |
+| P6.5-5 | GUI 回归 + 文档归档：jsdom 冒烟 81 项全过（无 JS 错误）；Vitest 69 + pytest 181 全绿；TICKETS/DEV_LOG/CONSENSUS 归档 | 2026-08-10 | `811645e` |
+
 
 ### GUI 全功能验证修复（2026-08-09）
 

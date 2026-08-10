@@ -5,8 +5,19 @@
  *   1. 消息渲染（renderMessages / appendMessage / thinking / 头像 / 复制）
  *   2. 发送与流式交互（handleSend）
  *   3. 聊天域 DOM 引用（chatDom）
+ *   4. 发送按钮两态（➤/⏹）— 由活动 tab 的 isStreaming 派生（refreshSendButton）
  *
- * 依赖方向：chat.js → state.js / api.js / utils.js；app.js → chat.js
+ * P6.5 多 tab 语义：
+ *   - 消息渲染读活动 tab 缓存（messages/characterId），无活动 tab → 空态
+ *   - handleSend 发起时捕获 conversationId；onToken 按活动归属分流 —— 活动 tab
+ *     走 DOM 增量追加 + 缓存同步，后台 tab 只累积 per-tab 缓存不碰 DOM
+ *   - onDone / onError 一律经 updateTab(捕获的 conversationId, …) 写回发起 tab，
+ *     绝不读「当前活动」—— 防悬挂核心设计（发起 tab 可能已被关闭，
+ *     updateTab 对不存在 id 幂等 no-op 兜底）
+ *   - 停止（AbortError）写回 phase 'error'（警示标记；气泡保持「已停止」语义），
+ *     正常完成写回 phase 'done'
+ *
+ * 依赖方向：chat.js → state.js / api.js / utils.js / format.js / tabs.js；app.js → chat.js
  * 不反向引用 app.js 私有函数 — 对话列表刷新通过 setConversationsRefresher 注入。
  */
 
@@ -14,6 +25,7 @@ import { chatStream, messages } from './api.js';
 import { escapeHtml, renderMarkdown } from './utils.js';
 import { buildMessagesHtml, assistantAvatarHtml, userAvatarHtml } from './format.js';
 import { state } from './state.js';
+import { getActiveTab, getTab, updateTab } from './tabs.js';
 
 // ══════════════════════════════════════════════════
 // 聊天域 DOM 引用
@@ -29,6 +41,9 @@ export const chatDom = {
     chatHeader: $('#chat-header'),
 };
 
+/** 无活动 tab 时的消息区空态（与 app.js showEmptyState 文案一致） */
+const EMPTY_STATE_HTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
+
 // ── 对话列表刷新钩子（由 app.js 注入，避免反向依赖）──
 let refreshConversations = () => {};
 export function setConversationsRefresher(fn) {
@@ -41,9 +56,14 @@ export function setConversationsRefresher(fn) {
 
 export function renderMessages() {
     const container = chatDom.chatMessages;
-    container.innerHTML = buildMessagesHtml(state.messages, {
+    const tab = getActiveTab();
+    if (!tab) {
+        container.innerHTML = EMPTY_STATE_HTML;
+        return;
+    }
+    container.innerHTML = buildMessagesHtml(tab.messages, {
         characters: state.characters,
-        currentCharacterId: state.currentCharacterId,
+        currentCharacterId: tab.characterId,
     });
 
     // 复制按钮事件
@@ -51,10 +71,33 @@ export function renderMessages() {
         attachCopyButton(btn, btn.dataset.content);
     });
 
+    // 缓存渲染路径还原停止/错误标记（切走再切回后语义保持一致）
+    const bubbles = container.querySelectorAll('.message');
+    tab.messages.forEach((m, i) => {
+        const bubble = bubbles[i];
+        if (!bubble) return;
+        if (m.stopped) markStopped(bubble);
+        if (m.error) bubble.classList.add('message-error');
+    });
+
+    // 标记缓存中的流式中消息 — 切回后 onToken 复用该气泡继续增量渲染（不重复创建气泡）
+    const lastMsg = tab.messages[tab.messages.length - 1];
+    if (lastMsg?.streaming) {
+        const liveBubble = bubbles[bubbles.length - 1];
+        if (liveBubble) liveBubble.dataset.streamingLive = '1';
+    }
+
     scrollToBottom();
 }
 
-function appendMessage(role, content) {
+/**
+ * DOM 追加消息气泡；user/assistant 同步写入活动 tab 缓存（system 仅 DOM 提示，
+ * 与既有 state.messages 语义一致，不落缓存）
+ * @param {'user'|'assistant'|'system'} role - 消息角色
+ * @param {string} content - 消息内容
+ * @param {object} [meta] - 附加字段（如 { stopped: true, error: true }）
+ */
+function appendMessage(role, content, meta = {}) {
     const container = chatDom.chatMessages;
     // 移除空状态
     const empty = container.querySelector('.empty-state');
@@ -89,6 +132,14 @@ function appendMessage(role, content) {
 
     container.appendChild(div);
     scrollToBottom();
+
+    // 缓存同步（仅活动 tab 的 DOM 追加会经过本函数）
+    if (role !== 'system') {
+        const tab = getActiveTab();
+        if (tab) {
+            updateTab(tab.conversationId, { messages: [...tab.messages, { role, content, ...meta }] });
+        }
+    }
 }
 
 function showThinkingIndicator() {
@@ -111,11 +162,11 @@ function scrollToBottom() {
 // ── 头像渲染 ──
 
 /**
- * 获取当前角色的头像 HTML
+ * 获取当前活动 tab 对应角色的头像 HTML
  * @returns {string}
  */
 function getAssistantAvatarHtml() {
-    return assistantAvatarHtml(state.characters, state.currentCharacterId);
+    return assistantAvatarHtml(state.characters, getActiveTab()?.characterId ?? null);
 }
 
 /**
@@ -159,15 +210,17 @@ function attachCopyButton(btn, content) {
     });
 }
 
-// ── 发送消息 ──
+// ── 发送按钮 ──
 
 /**
- * 发送按钮两态 — 流式生成中变身停止按钮（P3.5）
- * @param {'send'|'stop'} mode - 'stop': ⏹ 停止生成；'send': ➤ 发送
+ * 发送按钮两态 — 由活动 tab 的 isStreaming 派生（单一事实来源）
+ * 活动 tab 流式生成中 → ⏹ 停止；否则 → ➤ 发送。切 tab 时由激活流程调用刷新。
  */
-function setSendButtonState(mode) {
+export function refreshSendButton() {
     const btn = chatDom.btnSend;
-    if (mode === 'stop') {
+    if (!btn) return;
+    const streaming = getActiveTab()?.isStreaming ?? false;
+    if (streaming) {
         btn.disabled = false;
         btn.textContent = '⏹';
         btn.title = '停止生成';
@@ -194,127 +247,189 @@ function markStopped(assistantDiv) {
 
 /**
  * 同步聊天头部标题 — 与对话列表保持一致（P3.5 标题联动）
- * 后端保存首条 user 消息后自动替换占位标题，发送完成后据此刷新头部标题。
+ * 后端保存首条 user 消息后自动替换占位标题，发送完成后据此刷新头部标题，
+ * 并同步活动 tab 缓存中的 title（tab 条随动）。
  */
 function syncChatHeaderTitle() {
+    const tab = getActiveTab();
     const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
-    if (!titleEl || !state.currentConversationId) return;
-    const conv = state.conversations.find((c) => c.id === state.currentConversationId);
-    if (conv) titleEl.textContent = conv.title;
+    if (!titleEl || !tab) return;
+    const conv = state.conversations.find((c) => c.id === tab.conversationId);
+    if (conv) {
+        titleEl.textContent = conv.title;
+        updateTab(tab.conversationId, { title: conv.title });
+    }
+}
+
+// ── 发送消息（流式防悬挂核心）──
+
+/**
+ * 流式完成回调 — 按发起时捕获的 conversationId 写回发起 tab（绝不读「当前活动」）
+ * @param {number|string} convId - 发起时捕获的会话 id
+ * @param {string} fullContent - 已累积的 assistant 内容
+ * @param {number|null} messageId - 服务端消息 id（正常完成时非 null）
+ * @param {Function} isActiveStream - () => boolean，当前是否仍为活动 tab 的流
+ */
+async function finalizeStream(convId, fullContent, messageId, isActiveStream) {
+    updateTab(convId, { isStreaming: false, activeStream: null, phase: 'done' });
+    if (messageId) {
+        // 正常完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
+        try {
+            const msgs = await messages.list(convId);
+            updateTab(convId, { messages: msgs });
+            if (isActiveStream()) renderMessages();
+        } catch (err) {
+            // 重新加载失败 — 退化为本地增量渲染，避免消息丢失
+            console.error('重新加载消息列表失败:', err);
+            const tab = getTab(convId);
+            if (tab) {
+                updateTab(convId, {
+                    messages: [...tab.messages.filter((m) => !m.streaming), { role: 'assistant', content: fullContent, id: messageId }],
+                });
+            }
+            if (isActiveStream()) renderMessages();
+        }
+    } else if (fullContent) {
+        // 流中断但已有部分内容
+        const tab = getTab(convId);
+        if (tab) {
+            updateTab(convId, {
+                messages: [...tab.messages.filter((m) => !m.streaming), { role: 'assistant', content: fullContent }],
+            });
+        }
+        if (isActiveStream()) renderMessages();
+    }
+    // 刷新发送按钮（读活动 tab —— 若发起 tab 已非活动，按钮本就由其所在 tab 决定）
+    refreshSendButton();
+    // 刷新对话列表（更新消息数量）
+    refreshConversations();
+}
+
+/**
+ * 流式错误/停止回调 — 按发起时捕获的 conversationId 写回发起 tab
+ * 停止（AbortError）写回 phase 'error'（警示标记），气泡保持「已停止」语义；
+ * 普通错误写回 phase 'error' 并渲染错误气泡。
+ * @param {number|string} convId - 发起时捕获的会话 id
+ * @param {string} fullContent - 已累积的 assistant 内容
+ * @param {Error} err - 错误对象
+ * @param {Function} isActiveStream - () => boolean，当前是否仍为活动 tab 的流
+ * @param {Function} isAbortError - (err) => boolean
+ */
+function handleStreamError(convId, fullContent, err, isActiveStream, isAbortError) {
+    updateTab(convId, { isStreaming: false, activeStream: null, phase: 'error' });
+    const tab = getTab(convId);
+    const settled = tab ? tab.messages.filter((m) => !m.streaming) : [];
+
+    if (isAbortError(err)) {
+        // 用户主动停止 — 语义是「已停止」而非错误；后端已保存部分内容
+        if (fullContent) {
+            // 有部分内容 → 保留 + 停止标记；无内容 → 仅保留已发消息（与既有行为一致）
+            updateTab(convId, { messages: [...settled, { role: 'assistant', content: fullContent, stopped: true }] });
+        } else {
+            updateTab(convId, { messages: settled });
+        }
+        if (isActiveStream()) renderMessages();
+    } else {
+        // 错误发生 — 写入缓存（警示标记，渲染路径还原 message-error 样式）
+        updateTab(convId, { messages: [...settled, { role: 'assistant', content: `[错误] ${err.message}`, error: true }] });
+        if (isActiveStream()) renderMessages();
+    }
+    // 错误/停止时也刷新对话列表（避免计数卡死）
+    refreshSendButton();
+    refreshConversations();
 }
 
 export async function handleSend() {
     const content = chatDom.chatInput.value.trim();
-    if (!content || !state.currentConversationId || state.isStreaming) return;
+    const tab = getActiveTab();
+    if (!content || !tab || tab.isStreaming) return;
+    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    // 该请求是否归属当前活动 tab（DOM 增量只给活动 tab；后台只累积缓存）
+    const isActiveStream = () => getActiveTab()?.conversationId === convId;
 
     chatDom.chatInput.value = '';
     chatDom.chatInput.style.height = 'auto';
 
-    // 显示用户消息
+    // 显示用户消息（DOM + 活动 tab 缓存同步）
     appendMessage('user', content);
 
     const useStream = chatDom.toggleStream.checked;
 
     if (useStream) {
         // 流式模式
-        state.isStreaming = true;
-        setSendButtonState('stop');
+        updateTab(convId, { phase: 'thinking', isStreaming: true });
+        refreshSendButton();
         showThinkingIndicator();
 
         let fullContent = '';
         let assistantDiv = null;
         let assistantContentDiv = null;
+        // 流已终结（完成/错误/停止）— 后续回调一律忽略（错误帧后 SSE 流关闭会再触发
+        // onDone(null)，必须拦截，防止 phase 'done' 覆盖错误写回）
+        let streamSettled = false;
         const isAbortError = (err) => err?.name === 'AbortError';
 
         const stream = chatStream(
-            { conversation_id: state.currentConversationId, content },
+            { conversation_id: convId, content },
             {
                 onToken: (token) => {
-                    // 第一个 token 到达时，替换 thinking 指示器为真正的 assistant 气泡
-                    if (!assistantDiv) {
-                        const thinking = chatDom.chatMessages.querySelector('.thinking-indicator');
-                        if (thinking) thinking.remove();
-
-                        assistantDiv = document.createElement('div');
-                        assistantDiv.className = 'message assistant';
-                        assistantDiv.appendChild(createAvatarElement('assistant'));
-                        assistantContentDiv = document.createElement('div');
-                        assistantContentDiv.className = 'message-content';
-                        assistantDiv.appendChild(assistantContentDiv);
-                        chatDom.chatMessages.appendChild(assistantDiv);
-                    }
+                    if (streamSettled) return;
                     fullContent += token;
-                    assistantContentDiv.innerHTML = renderMarkdown(fullContent);
-                    scrollToBottom();
+
+                    if (isActiveStream()) {
+                        // DOM 被 renderMessages 重建（切走再切回）→ 旧引用失效，重新定位本流气泡
+                        if (assistantDiv && !assistantDiv.isConnected) {
+                            assistantDiv = null;
+                            assistantContentDiv = null;
+                        }
+                        if (!assistantDiv) {
+                            // 复用 renderMessages 标记的 live 气泡（切回场景，避免重复气泡）；
+                            // 无则新建（首个 token 替换 thinking 指示器）
+                            const live = chatDom.chatMessages.querySelector('.message[data-streaming-live="1"]');
+                            if (live) {
+                                assistantDiv = live;
+                                assistantContentDiv = live.querySelector('.message-content');
+                            } else {
+                                const thinking = chatDom.chatMessages.querySelector('.thinking-indicator');
+                                if (thinking) thinking.remove();
+
+                                assistantDiv = document.createElement('div');
+                                assistantDiv.className = 'message assistant';
+                                assistantDiv.appendChild(createAvatarElement('assistant'));
+                                assistantContentDiv = document.createElement('div');
+                                assistantContentDiv.className = 'message-content';
+                                assistantDiv.appendChild(assistantContentDiv);
+                                chatDom.chatMessages.appendChild(assistantDiv);
+                            }
+                        }
+                        assistantContentDiv.innerHTML = renderMarkdown(fullContent);
+                        scrollToBottom();
+                    }
+
+                    // per-tab 缓存同步（活动/后台都写；streaming 标记的 assistant 消息
+                    // 每次替换，最终消息在 onDone/onError 以无标记形态写回）
+                    const t = getTab(convId);
+                    if (t) {
+                        const settled = t.messages.filter((m) => !m.streaming);
+                        updateTab(convId, { messages: [...settled, { role: 'assistant', content: fullContent, streaming: true }] });
+                    }
+                    if (t && t.phase !== 'streaming') {
+                        updateTab(convId, { phase: 'streaming' });
+                    }
                 },
                 onDone: async (messageId) => {
-                    state.isStreaming = false;
-                    state.activeStream = null;
-                    setSendButtonState('send');
-                    if (messageId) {
-                        // 正常完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
-                        try {
-                            state.messages = await messages.list(state.currentConversationId);
-                            renderMessages();
-                        } catch (err) {
-                            // 重新加载失败 — 退化为本地增量渲染，避免消息丢失
-                            console.error('重新加载消息列表失败:', err);
-                            state.messages.push(
-                                { role: 'user', content },
-                                { role: 'assistant', content: fullContent, id: messageId }
-                            );
-                        }
-                    } else if (fullContent) {
-                        // 流中断但已有部分内容
-                        state.messages.push(
-                            { role: 'user', content },
-                            { role: 'assistant', content: fullContent }
-                        );
-                    }
-                    // 刷新对话列表（更新消息数量）
-                    refreshConversations();
+                    if (streamSettled) return;
+                    streamSettled = true;
+                    await finalizeStream(convId, fullContent, messageId, isActiveStream);
                 },
                 onError: (err) => {
-                    state.isStreaming = false;
-                    state.activeStream = null;
-                    setSendButtonState('send');
-                    // 移除 thinking 指示器（如果还在）
-                    const thinking = chatDom.chatMessages.querySelector('.thinking-indicator');
-                    if (thinking) thinking.remove();
-
-                    if (isAbortError(err)) {
-                        // 用户主动停止 — 语义是「已停止」而非错误；后端已保存部分内容
-                        if (fullContent && assistantContentDiv) {
-                            assistantContentDiv.innerHTML = renderMarkdown(fullContent);
-                        }
-                        if (assistantDiv) {
-                            markStopped(assistantDiv);
-                        }
-                        state.messages.push(
-                            { role: 'user', content },
-                            { role: 'assistant', content: fullContent }
-                        );
-                    } else {
-                        // 错误发生 — 如果还没有 assistant 气泡，创建一个显示错误
-                        if (!assistantDiv) {
-                            assistantDiv = document.createElement('div');
-                            assistantDiv.className = 'message assistant';
-                            assistantDiv.appendChild(createAvatarElement('assistant'));
-                            assistantContentDiv = document.createElement('div');
-                            assistantContentDiv.className = 'message-content';
-                            assistantDiv.appendChild(assistantContentDiv);
-                            chatDom.chatMessages.appendChild(assistantDiv);
-                        }
-                        // 错误气泡标记 — 用于区别于正常回复的警示样式
-                        assistantDiv.classList.add('message-error');
-                        assistantContentDiv.textContent = `[错误] ${err.message}`;
-                    }
-                    // 错误/停止时也刷新对话列表（避免计数卡死）
-                    refreshConversations();
+                    if (streamSettled) return;
+                    streamSettled = true;
+                    handleStreamError(convId, fullContent, err, isActiveStream, isAbortError);
                 },
             }
         );
-        state.activeStream = stream;
+        updateTab(convId, { activeStream: stream });
         await stream.done;
     } else {
         // 非流式模式
@@ -322,26 +437,27 @@ export async function handleSend() {
         try {
             chatDom.btnSend.disabled = true;
             const result = await messages.chat({
-                conversation_id: state.currentConversationId,
+                conversation_id: convId,
                 content,
             });
             // 非流式完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
             try {
-                state.messages = await messages.list(state.currentConversationId);
-                renderMessages();
+                const msgs = await messages.list(convId);
+                updateTab(convId, { messages: msgs });
+                if (isActiveStream()) renderMessages();
             } catch (err) {
                 // 重新加载失败 — 退化为本地增量渲染，避免消息丢失
                 console.error('重新加载消息列表失败:', err);
-                appendMessage('assistant', result.reply);
-                state.messages.push(
-                    { role: 'user', content },
-                    { role: 'assistant', content: result.reply }
-                );
+                const t = getTab(convId);
+                if (t) {
+                    updateTab(convId, { messages: [...t.messages, { role: 'assistant', content: result.reply }] });
+                }
+                if (isActiveStream()) renderMessages();
             }
         } catch (err) {
             appendMessage('system', `发送失败: ${err.message}`);
         } finally {
-            chatDom.btnSend.disabled = false;
+            refreshSendButton();
         }
     }
 

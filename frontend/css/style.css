@@ -694,6 +694,108 @@ body {
     flex-shrink: 0;
 }
 
+/* ══════════════════════════════════════════════════
+   会话 tab 条（P6.5 — 应用内多会话工作区）
+   ══════════════════════════════════════════════════ */
+.chat-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: thin;
+}
+
+/* 无 tab 时不渲染容器（组件 render() 同时设置 hidden 属性，双保险） */
+.chat-tabs:empty,
+.chat-tabs[hidden] {
+    display: none;
+}
+
+.chat-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 200px;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chat-tab:hover {
+    background: var(--panel-2);
+    color: var(--ink-1);
+}
+
+.chat-tab.active {
+    background: var(--accent-soft);
+    border-color: var(--accent-glow);
+    color: var(--accent);
+}
+
+.chat-tab .tab-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-tab .tab-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.chat-tab .tab-close:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+/* 生成中 — 标题前脉冲小圆点（复用既有 dotPulse 动画） */
+.chat-tab .tab-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: dotPulse 1.4s ease-in-out infinite;
+    flex-shrink: 0;
+}
+
+/* 出错/停止 — 警示标记 */
+.chat-tab .tab-warn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
 .chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -2338,6 +2440,11 @@ mark.search-highlight {
     :root {
         --sidebar-width: 0px;
         --chat-sidebar-width: 100%;
+    }
+
+    /* P6.5 移动端隐藏 tab 条（多会话行为不变，仅视觉隐藏） */
+    #chat-tabs {
+        display: none;
     }
 
     #sidebar {

@@ -349,9 +349,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
             try {
                 await conversations.deleteAll();
                 state.conversations = [];
-                state.currentConversationId = null;
-                state.currentCharacterId = null;
-                state.messages = [];
+                // 会话级字段（currentConversationId/messages 等）P6.5 已退役 —
+                // tab 清理由 app.js 的 onConversationsCleared 回调完成（closeAllTabs + 空态）
                 if (onConversationsCleared) onConversationsCleared();
                 showAlert(`已清空 ${convCount} 个对话`);
             } catch (err) {
