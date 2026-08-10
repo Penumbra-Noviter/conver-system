@@ -12,11 +12,21 @@
 - **关键避坑**：① SSE 错误帧后流关闭会再触发 `onDone(null)` 覆盖 phase 'done' → `streamSettled` 终态守卫（onError 后一律忽略后续回调）；② 流式中切走再切回 DOM 重建会重复气泡 → `data-streaming-live` 标记 + onToken 复用；③ 缓存渲染路径 `renderMessages` 的 scrollToBottom 覆盖滚动恢复 → 渲染后回填缓存 scrollTop；④ 删活动 tab 时被删会话的 DOM 草稿/滚动会污染新活动 tab 缓存 → 先保存再 closeTab + 激活流程 `saveCurrent:false`
 - **restore 时序契约**：init 在 conversations 加载完成后调 `restoreFromStorage`，isValidId 以已加载列表判定（过滤已删会话）；无记录/损坏/全失效 → 空态不报错；恢复 tab 天然非流式
 - **联动**：删会话（开着）先 abort 流式再关 tab；清空所有对话 → closeAllTabs + 存储空集；✕ 关流式 tab = 显式停止（abort）；关活动 tab 激活右邻居（无则左），关最后 → 空态
-- **测试**：pytest **181** 全绿（后端零改动；本机需 `pip install pytest-asyncio`——缺失插件会误报 7 个 async 用例失败）；Vitest **69**（37 既有 + tabs 32）；jsdom 集成冒烟 **81 项**全过（无 JS 错误）
+- **测试**：pytest **181** 全绿（后端零改动；本机需 `pip install pytest-asyncio`——缺失插件会误报 7 个 async 用例失败）；Vitest **85**（37 既有 + tabs 48）；jsdom 集成冒烟 **81 项**全过（无 JS 错误）
+- **code-review 三轴审核 + 修复**（固定点 d228fa8）：Falsify 轴发现 2 个阻断竞态（同 tab 连发陈旧 list 快照绝对覆盖新消息 → revision 守卫；activateConversation await 期间切走/关 tab 无守卫 → 续体双活动校验）→ 修复 + 复现测试红→绿实证 + Falsify 对抗补充；低成本项 6 件（abortStream 协议收口/EMPTY_STATE_HTML 共享/清空 abort/删角色级联关 tab/无效写移除/stale 注释）；复审放行（唯一新发现：同内容双流误结算边缘，建议 settle 改按消息位置匹配，不阻塞）
 
 ---
 
 ## 日志正文
+
+### 2026-08-10 | 修复 | P6.5 code-review 三轴审核修复（commit 链 1b64b9f → 1332b1c）
+
+- **F-1 阻断**：`finalizeStream`（chat.js）消息重载在途时用户连发新消息——旧 `messages.list` 响应返回后 `updateTab` 全量替换，新 user 消息从缓存+DOM 消失（`isActiveStream` 同 tab 为 true 还把陈旧快照渲染上屏）。修复：list 前捕获缓存 revision（messages.length），返回后仅当当前长度 === revision 才整体替换；refreshSendButton 提前到 done 写回后（消除 ⏹→发送 UX 窗口）。复现测试 2（流式/非流式）+ Falsify 对抗（空 fullContent no-op、tab 已关 revision=0、多连发 interleaving 只结算本流）
+- **F-2 阻断**：`activateConversation` 的 `await conversations.get`（仅会话不在已加载列表时命中）期间切走/关闭 tab → 续体无条件执行：关闭时 `restoreTabViewState(undefined)` TypeError；未关但已非活动则 DOM 显示 A、activeId 是 B（发送以 B 身份发 A 草稿）。修复：双 await 后活动校验 + restoreTabViewState undefined 防御 + 缓存分支渲染前活动校验。复现测试 2 + get 404+关 tab 对抗
+- **低成本项**（refactor `999e7e5`）：abort 流式三连（停止按钮/✕/删会话）收进 tabs.js 协议 `abortStream(convId)`；清空所有对话补 abort 遍历（与删会话路径一致）；删角色级联删会话补 closeTab（决策 6 语义完整）；删会话前 `saveActiveTabViewState` 无效写移除（写入即将销毁的 tab 缓存）；空态 HTML 双份 → chat.js 导出 `EMPTY_STATE_HTML` 共享；`chat.js:95` stale 注释修正
+- **文档**：TICKETS P6.5-1 归档用例数 27→32；spec.md 同步「Playwright GUI 回归 → jsdom 集成冒烟（不提交）+ <768px 人工核验」声明
+- **复审**（705d62f..82f5bb6）：F-1/F-2 已关闭、低成本项无回归、非阻断 4 项按指示保留；Falsify 新构造 8 项全部安全；唯一新发现 = 同内容双流误结算边缘（settle 按 `m.content === fullContent` 匹配，两连发字节相同时可能误结算，被新流 replace 自愈，概率极低）→ 建议后续 settle 改按消息位置匹配
+- **测试**：Vitest 69 → **85**（+16 复现/对抗）；pytest 181 不变；覆盖率 tabs.js 99.33/97.18（stmts/branch）
 
 ### 2026-08-10 | 实现 | P6.5 多 tab 会话管理（5 票串行链）
 
