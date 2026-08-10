@@ -107,18 +107,28 @@ export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor =
     if (tab.messages.length === revision) {
         return { messages: msgs, render: true };
     }
-    // stale:长度变了 → 仅按位置结算本流 streaming 标记(幂等)
-    if (settleIndex < 0 || !tab.messages[settleIndex]?.streaming) {
-        return { messages: tab.messages, render: false };
+    // stale:长度变了 → 优先按位置结算本流 streaming 标记(幂等)
+    if (settleIndex >= 0 && tab.messages[settleIndex]?.streaming) {
+        return {
+            messages: tab.messages.map((m, i) =>
+                i === settleIndex
+                    ? { ...m, streaming: false, ...(messageId != null ? { id: messageId } : {}) }
+                    : m
+            ),
+            render: false,
+        };
     }
-    return {
-        messages: tab.messages.map((m, i) =>
-            i === settleIndex
-                ? { ...m, streaming: false, ...(messageId != null ? { id: messageId } : {}) }
-                : m
-        ),
-        render: false,
-    };
+    // 本流占位已不在(被并发流 token 清除)— 回退 anchor 位置写回本流内容:
+    // 否则服务端列表(含本流最终消息)整体丢弃,「消息不丢失」承诺不成立。
+    // 幂等:缓存已含同 id 消息 → settleByPosition no-op,不重复插入。
+    if (anchor != null && content) {
+        return settleByPosition(tab, anchor, {
+            role: 'assistant',
+            content,
+            ...(messageId != null ? { id: messageId } : {}),
+        });
+    }
+    return { messages: tab.messages, render: false };
 }
 
 /**
@@ -232,7 +242,7 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
                 const msgs = await messages.list(convId);
                 const tab = getTab(convId);
                 if (tab) {
-                    const merged = mergeFreshList(tab, revision, msgs, { settleIndex, messageId });
+                    const merged = mergeFreshList(tab, revision, msgs, { settleIndex, anchor, messageId, content: fullContent });
                     updateTab(convId, { messages: merged.messages });
                     if (merged.render && isActive()) render();
                 }
