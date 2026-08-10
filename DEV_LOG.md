@@ -12,12 +12,24 @@
 - **关键避坑**：① SSE 错误帧后流关闭会再触发 `onDone(null)` 覆盖 phase 'done' → `streamSettled` 终态守卫（onError 后一律忽略后续回调）；② 流式中切走再切回 DOM 重建会重复气泡 → `data-streaming-live` 标记 + onToken 复用；③ 缓存渲染路径 `renderMessages` 的 scrollToBottom 覆盖滚动恢复 → 渲染后回填缓存 scrollTop；④ 删活动 tab 时被删会话的 DOM 草稿/滚动会污染新活动 tab 缓存 → 先保存再 closeTab + 激活流程 `saveCurrent:false`
 - **restore 时序契约**：init 在 conversations 加载完成后调 `restoreFromStorage`，isValidId 以已加载列表判定（过滤已删会话）；无记录/损坏/全失效 → 空态不报错；恢复 tab 天然非流式
 - **联动**：删会话（开着）先 abort 流式再关 tab；清空所有对话 → closeAllTabs + 存储空集；✕ 关流式 tab = 显式停止（abort）；关活动 tab 激活右邻居（无则左），关最后 → 空态
-- **测试**：pytest **181** 全绿（后端零改动；本机需 `pip install pytest-asyncio`——缺失插件会误报 7 个 async 用例失败）；Vitest **85**（37 既有 + tabs 48）；jsdom 集成冒烟 **81 项**全过（无 JS 错误）
+- **测试**：pytest **181** 全绿（后端零改动；本机需 `pip install pytest-asyncio`——缺失插件会误报 7 个 async 用例失败）；Vitest **91**（37 既有 + tabs 54）；jsdom 集成冒烟 **81 项**全过（无 JS 错误）
 - **code-review 三轴审核 + 修复**（固定点 d228fa8）：Falsify 轴发现 2 个阻断竞态（同 tab 连发陈旧 list 快照绝对覆盖新消息 → revision 守卫；activateConversation await 期间切走/关 tab 无守卫 → 续体双活动校验）→ 修复 + 复现测试红→绿实证 + Falsify 对抗补充；低成本项 6 件（abortStream 协议收口/EMPTY_STATE_HTML 共享/清空 abort/删角色级联关 tab/无效写移除/stale 注释）；复审放行（唯一新发现：同内容双流误结算边缘，建议 settle 改按消息位置匹配，不阻塞）
+- **P6.5 遗留修复**（commit 6e0489a/2f26a85/b16c097/acb144d，merge `0116650`）：FIX-A settle 按消息位置匹配（同字节双流不误结算）；FIX-B 非流式在途守卫（双击只发一次真实请求）；FIX-C 通知分类节流（纯内容 patch 不触发 tab 条重渲染）；**发现并恢复 FIX-C 误删的 error 帧 Falsify 测试**；轻量复审可放行（3 Standards + 2 Falsify 非阻断 → TICKETS P6.5-R1~R3）
+- **VERIFY-D 黑盒验证**（Playwright MCP，双流并发 + <768px）：双 tab 同时流式（各自脉冲点/⏹/后台累积/完成复位）；<768px tab 条 display:none 隐藏、tab 状态保留、侧栏切换行为不变；流式/后台写回全程无 JS 错误
 
 ---
 
 ## 日志正文
+
+### 2026-08-10 | 修复+验证 | P6.5 遗留修复（FIX-A/B/C）+ VERIFY-D 黑盒验证
+
+- **FIX-A**（`6e0489a`）：finalizeStream settle 改按消息位置匹配（settleIndex = 发起时刻尾消息位置，幂等：该位置仍 streaming 才结算），替代 `m.content === fullContent` 内容等值匹配——两连发回复字节相同时不再误结算新流消息；+1 复现测试
+- **FIX-B**（`2f26a85`）：非流式在途守卫 `nonStreamingInFlight` Set（per-tab 作用域）——Enter/按钮双击只发一次真实请求；守卫在清空输入之前（草稿保留）、finally 双路径清除、流式提交不受影响；+6 用例
+- **FIX-C**（`b16c097`）：通知分类节流——tabs.js `DISPLAY_KEYS=['title','phase']`，updateTab 仅 patch 含展示字段才 notifyChanged；结构性变更（open/close/activate/restore）仍走 commit() 通知；onToken 逐 token 的 messages patch 不再触发 tab 条全量 innerHTML 重建；tab-bar.js 无需改动（唯一订阅方）；用例同步更新
+- **误删测试恢复**（`acb144d`）：核验发现 b16c097 误删「流式 error 帧 → handleStreamError 错误分支」Falsify 测试（无等价替代），恢复（+1 用例）；该测试同时隐式覆盖 streamSettled 守卫（error 帧后流关闭补发 onDone(null) 若守卫失效 phase 被改 done 断言即失败）；同 commit 固化 @vitest/coverage-v8
+- **VERIFY-D 黑盒验证**（Playwright MCP + mock SSE 注入）：① 双流并发——tab A 流式中切 tab B 再发，两 tab 同时 dot=true、活动 tab ⏹、后台流继续累积、完成后 dot 消失按钮复位 ➤；② 生成中脉冲点 .tab-dot 渲染正常（FIX-C 后 phase 通知仍工作）；③ <768px——tab 条 display:none、tab 状态保留 DOM、侧栏切换会话正常加载；④ 全程无 JS 错误（mock 注入失误导致的递归已排查，非产品缺陷）
+- **轻量复审**（固定点 a252158）：可放行。Falsify 2 非阻断——P1 非流式无 fetch 超时（请求永不 settle 时发送无限期阻塞，罕见）；P3 FIX-A 失败路径洞（list 失败 catch 的 filter(!streaming) 清并发流占位，改动前既有行为）；Standards 3 非阻断（DISPLAY_KEYS 与 tab-bar render 隐式耦合最重）→ 录入 TICKETS P6.5-R1~R3
+- **测试**：Vitest 85 → **91**（+6：FIX-B 6 用例含恢复 1 的净增——FIX-A +1、FIX-B +6、恢复 +1、FIX-C 净 -2）；pytest 181 不变；后端零改动
 
 ### 2026-08-10 | 修复 | P6.5 code-review 三轴审核修复（commit 链 1b64b9f → 1332b1c）
 

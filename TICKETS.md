@@ -19,6 +19,14 @@
 - [ ] Rust 后端作为 FastAPI 壳/替代
 - [ ] 系统托盘 / 开机自启
 
+### P6.5 后续建议（2026-08-10 遗留修复复审候选，非阻断）
+
+> 来源：P6.5 遗留修复轻量复审（固定点 a252158，commit `0116650`）。均为极窄路径/维护性建议，不阻塞交付。
+
+- [ ] P6.5-R1 非流式 fetch 超时：api.js 全层无 fetch 超时——非流式请求永不 settle 时该会话发送被 in-flight 守卫无限期阻塞；建议加超时或守卫命中给轻量反馈
+- [ ] P6.5-R2 FIX-A catch 分支位置感知：list 失败路径 `filter(!m.streaming)` 会清掉并发流的 streaming 占位（时间序错位/丢失）；建议 catch 分支按位置结算
+- [ ] P6.5-R3 DISPLAY_KEYS 与 tab-bar render 隐式耦合：tabs.js DISPLAY_KEYS 与 tab-bar.js render 输入是两处手写清单，新增展示字段易静默失效；建议交叉引用注释或一致性测试
+
 > ⚠️ Ollama 本地模型支持 — **已封存**（2026-08-03 用户决定：发布获得用户反馈后再考虑）
 
 ---
