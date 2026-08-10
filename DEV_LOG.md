@@ -20,6 +20,10 @@
 
 ## 日志正文
 
+### 2026-08-10 | 预检 | P6.5 多 tab 会话管理开工预检
+- **知识库召回**：persona 已读（CLI 优先 / Vanilla JS / 深模块 / 评审驱动）；精读 3 条——SSE 流式前端状态陷阱、前端模块化拆分中的循环依赖处理、Conver System 高频小坑汇总；摘要带入——无框架前端 fetch seam、worktree 膨胀/CRLF 教训；守卫反查通过（无缺 summary）
+- **preflight**：基线 d228fa8、worktree 可用、main 分支、pytest + Vitest 双框架齐备
+
 ### 2026-08-09 | 修复 | 导入路径错误引导（IMP-1）
 - **背景**：GUI 验证时发现角色卡导入失败只有原因提示（如「无法识别的角色卡格式」），无修正引导；LLM 解析路径已有「请重试或手动创建」指引，导入路径引导程度不一致
 - **后端**（`api/routes/characters.py`）：`_IMPORT_FORMAT_HINT` 常量（支持格式：V2 spec=chara_card_v2 / data 信封 / 裸 data（name）/ V1 旧卡（char_name）+ 向导指引）；`CardFormatError` 的 422 detail 追加说明；`CardValidationError`（名称空）保持纯原因（内容问题与格式无关）
