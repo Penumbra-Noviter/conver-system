@@ -6,7 +6,9 @@
  *   2. 每个 tab 持有独立的会话视图状态：消息缓存、输入草稿、滚动位置、
  *      流式阶段（idle/thinking/streaming/done/error）与流式句柄
  *   3. 结构性变更（开/关/激活/全关/恢复）自动写入 sessionStorage（只存 ids + activeId）
- *      并触发 onTabsChanged 通知；updateTab 内容更新仅通知、不写存储
+ *      并触发 onTabsChanged 通知；updateTab 通知分类：patch 含展示字段（title/phase）
+ *      才通知（tab 条重渲染所需），纯内容 patch（messages/draft/scrollTop 等）不通知，
+ *      且一律不写存储
  *
  * 协议表面（__all__）：openTab / activateTab / closeTab / closeAllTabs /
  *   getActiveTab / getTab / getTabs / updateTab / abortStream / serialize /
@@ -21,8 +23,10 @@
  *     一律不持久化 —— 恢复的 tab 天然非流式（phase idle、isStreaming false、
  *     activeStream null），消息在激活时懒加载
  *   - updateTab 不写 sessionStorage：序列化结果只含 ids/activeId，内容更新不影响
- *     存储，避免流式逐 token 写盘；但会触发 onTabsChanged（tab 条状态指示随
- *     phase 刷新需要）
+ *     存储，避免流式逐 token 写盘；通知分类（FIX-C 热路径节流）：patch 含展示字段
+ *     （title/phase）才触发 onTabsChanged —— tab 条状态指示随 phase 刷新需要；
+ *     纯内容 patch（messages/draft/scrollTop 等）不通知，流式逐 token 的 messages
+ *     更新不再触发 tab 条全量 innerHTML 重建
  *
  * 依赖方向：tabs.js 不依赖任何模块；app.js / chat.js / components/tab-bar.js → tabs.js
  */
@@ -41,6 +45,13 @@ let activeId = null;
 
 /** @type {Set<Function>} onTabsChanged 监听器 */
 const listeners = new Set();
+
+/**
+ * updateTab 触发 onTabsChanged 的展示字段（tab 条渲染所依赖：标题/阶段指示）。
+ * 纯内容字段（messages/draft/scrollTop 等）patch 不触发通知 —— 流式逐 token 的
+ * messages 更新不再引起 tab 条全量 innerHTML 重建（FIX-C 热路径节流）。
+ */
+const DISPLAY_KEYS = ['title', 'phase'];
 
 // ══════════════════════════════════════════════════
 // 内部工具
@@ -195,7 +206,9 @@ export function getTabs() {
 /**
  * 浅合并 patch 到 tab 状态；对不存在的 conversationId 幂等 no-op（不抛错、不新增）。
  * conversationId 是身份键，不可经 patch 改写（静默忽略）。
- * 内容级更新只触发 onTabsChanged 通知，不写 sessionStorage（见模块 docstring）。
+ * 通知分类（FIX-C）：patch 含展示字段（title/phase）才触发 onTabsChanged —— tab 条只
+ * 订阅展示字段变化；纯内容 patch（messages/draft/scrollTop 等）不通知，流式逐 token
+ * 的 messages 更新不触发 tab 条全量重渲染。一律不写 sessionStorage（见模块 docstring）。
  * @param {number|string} conversationId - 会话 id
  * @param {object} patch - 要合并的字段（如 { title, phase, messages, isStreaming }）
  */
@@ -204,7 +217,7 @@ export function updateTab(conversationId, patch) {
     if (!tab || !patch || typeof patch !== 'object') return;
     const { conversationId: _identity, ...merged } = patch;
     Object.assign(tab, merged);
-    notifyChanged();
+    if (DISPLAY_KEYS.some((k) => k in merged)) notifyChanged();
 }
 
 /**

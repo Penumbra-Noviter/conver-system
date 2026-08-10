@@ -50,6 +50,12 @@ export function setConversationsRefresher(fn) {
     refreshConversations = typeof fn === 'function' ? fn : () => {};
 }
 
+// ── 非流式在途守卫（FIX-B）──
+// 非流式请求在途的 conversationId 集合（per-tab 作用域）：Enter/按钮双击或重复提交
+// 只发一次真实请求，完成/失败后经 finally 清除。流式连发语义不受影响 —— 流式由
+// tab.isStreaming + finalizeStream 即时复位管理，本守卫只拦截非流式提交。
+const nonStreamingInFlight = new Set();
+
 // ══════════════════════════════════════════════════
 // 消息渲染
 // ══════════════════════════════════════════════════
@@ -275,9 +281,15 @@ async function finalizeStream(convId, fullContent, messageId, isActiveStream) {
     refreshSendButton();
     if (messageId) {
         // 正常完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
-        // list 前捕获缓存 revision：await 期间同 tab 可能连发新消息（isStreaming 已 false），
-        // 返回后仅当缓存长度未变才整体替换，防止陈旧快照覆盖新消息（F-1）
-        const revision = getTab(convId)?.messages.length ?? 0;
+        // list 前捕获缓存 revision + 本流 streaming 消息位置：await 期间同 tab 可能连发
+        // 新消息（isStreaming 已 false），返回后仅当缓存长度未变才整体替换，防止陈旧
+        // 快照覆盖新消息（F-1）。结算按「发起时刻的位置」匹配而非内容等值 —— 两连发
+        // 回复字节相同时，内容匹配会误结算新流的 streaming 消息（FIX-A）。
+        const tabAtCall = getTab(convId);
+        const revision = tabAtCall?.messages.length ?? 0;
+        const settleIndex = tabAtCall?.messages.length > 0 && tabAtCall.messages[tabAtCall.messages.length - 1]?.streaming
+            ? tabAtCall.messages.length - 1
+            : -1;
         try {
             const msgs = await messages.list(convId);
             const tab = getTab(convId);
@@ -285,11 +297,15 @@ async function finalizeStream(convId, fullContent, messageId, isActiveStream) {
                 updateTab(convId, { messages: msgs });
                 if (isActiveStream()) renderMessages();
             } else if (tab) {
-                // 陈旧 list 响应 — 不整体替换（新消息保留），仅结算本流残留的 streaming 标记
+                // 陈旧 list 响应 — 不整体替换（新消息保留），仅结算本流残留的 streaming 标记。
+                // 幂等：该位置仍是 streaming 才结算（新流 token 已把尾部换成自己的消息时
+                // 位置失配 → 不误结算；本流消息已被结算过 → 不动）
                 updateTab(convId, {
-                    messages: tab.messages.map((m) =>
-                        m.streaming && m.content === fullContent ? { ...m, streaming: false, id: messageId } : m
-                    ),
+                    messages: settleIndex >= 0 && tab.messages[settleIndex]?.streaming
+                        ? tab.messages.map((m, i) =>
+                            i === settleIndex ? { ...m, streaming: false, id: messageId } : m
+                        )
+                        : tab.messages,
                 });
             }
         } catch (err) {
@@ -356,6 +372,10 @@ export async function handleSend() {
     const tab = getActiveTab();
     if (!content || !tab || tab.isStreaming) return;
     const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    const useStream = chatDom.toggleStream.checked;
+    // FIX-B：非流式在途守卫 — 同 tab 非流式请求在途时拒绝重复提交（双击只发一次真实请求；
+    // 拒绝发生在清空输入之前，草稿保留）。流式提交不受影响（isStreaming 已拦并发）。
+    if (!useStream && nonStreamingInFlight.has(convId)) return;
     // 该请求是否归属当前活动 tab（DOM 增量只给活动 tab；后台只累积缓存）
     const isActiveStream = () => getActiveTab()?.conversationId === convId;
 
@@ -364,8 +384,6 @@ export async function handleSend() {
 
     // 显示用户消息（DOM + 活动 tab 缓存同步）
     appendMessage('user', content);
-
-    const useStream = chatDom.toggleStream.checked;
 
     if (useStream) {
         // 流式模式
@@ -444,7 +462,8 @@ export async function handleSend() {
         updateTab(convId, { activeStream: stream });
         await stream.done;
     } else {
-        // 非流式模式
+        // 非流式模式 — 置在途标记（FIX-B：双击连发守卫，finally 清除）
+        nonStreamingInFlight.add(convId);
         showThinkingIndicator();
         try {
             chatDom.btnSend.disabled = true;
@@ -474,6 +493,8 @@ export async function handleSend() {
         } catch (err) {
             appendMessage('system', `发送失败: ${err.message}`);
         } finally {
+            // 完成/失败均清除在途标记 — 之后可再次发送
+            nonStreamingInFlight.delete(convId);
             refreshSendButton();
         }
     }
