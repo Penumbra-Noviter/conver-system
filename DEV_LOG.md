@@ -7,6 +7,7 @@
 
 ## 滚动摘要（2026-08-10）
 
+- **架构深化 8 候选全部完成**（improve-codebase-architecture → 全自动 kickoff）：StreamSession 流式结算深模块 / 级联收口 / 标题收口 / api seam+超时 / 展示契约 / app.js 拆分 / testApiKeys 纯函数化 / __init__ 导出；期末三轴审核放行（Falsify 实锤 1 条 stale 回退修复）；Vitest **177** + pytest **188** 全绿
 - **P6.5 多 tab 会话管理（5 票串行，独立 worktree `.worktrees/p65-tabs`）**：应用内多会话工作区——tab 条切换、后台流式照跑、完成/停止/出错一律按发起时捕获的 conversation id 写回（防悬挂核心）、刷新后 sessionStorage 恢复（只存 ids+activeId）
 - **防悬挂写回设计**：`handleSend` 发送时捕获 convId；`onToken` 按活动归属分流（活动 tab DOM 增量 + 缓存同步，后台只累积 per-tab 缓存不碰 DOM）；`onDone`/`onError` 经 `updateTab(捕获 id)` 写回发起 tab，绝不读「当前活动」；发起 tab 可能已被关闭 → updateTab 幂等 no-op 兜底
 - **关键避坑**：① SSE 错误帧后流关闭会再触发 `onDone(null)` 覆盖 phase 'done' → `streamSettled` 终态守卫（onError 后一律忽略后续回调）；② 流式中切走再切回 DOM 重建会重复气泡 → `data-streaming-live` 标记 + onToken 复用；③ 缓存渲染路径 `renderMessages` 的 scrollToBottom 覆盖滚动恢复 → 渲染后回填缓存 scrollTop；④ 删活动 tab 时被删会话的 DOM 草稿/滚动会污染新活动 tab 缓存 → 先保存再 closeTab + 激活流程 `saveCurrent:false`
@@ -20,6 +21,16 @@
 ---
 
 ## 日志正文
+
+### 2026-08-10 | 实现 | 架构深化 8 候选（improve-codebase-architecture 全自动 kickoff，merge 链 83bb9bf/3af9b61/1f2fdcc）
+
+- **流程**：Explore 扫描产出 8 候选（2 Strong/4 Worth/2 Speculative）→ 用户授权全自动 → Grilling/plan-tickets 子智能体多次空返回 → 主会话降级自调研设计 + 拆票（spec + 8 工单落 `.scratch/architecture-deepening/`）→ 两波并行（每波 4 worktree 文件互斥）→ 期末三轴 code-review 放行 + 修复
+- **波 1**（ARC-1/2/3/4）：StreamSession 流式回合结算深模块（createStreamSession + mergeFreshList 三分支：fresh 整体替换/stale 位置结算/失败 anchor 写回；anchor = 本流 user 消息对象引用——索引会漂移但引用永不移位，根治 R2 并发流占位清除）；closeTabs + closeConversationsAndResettle 级联收口（仅 wasActive 重激活）；标题策略收口 conversation.py；requestBlob + 超时（关 R1）
+- **波 2**（ARC-5/6/7/8）：getTabDisplay 展示契约（关 R3）；app.js 拆分（format.js 模板纯函数 + conversation-activation.js 激活编排深模块，setActivationHooks 注入）；resolveCredentialTarget 纯函数；services/schemas __init__ 导出
+- **期末审核 findings**：Falsify 实锤 1 条——stale 失配 no-op 导致前流最终消息缓存丢失（非回归、双故障边缘）→ 修复：stale 守卫失败回退 settleByPosition（幂等保证不重复），FIX-A 测试断言同步适配；Standards 2 条（app.js 死导入清理、settings-panel 补 __all__）一并修；Spec 1 条（ARC-6 签名漂移为良性，功能等价）
+- **测试**：Vitest 91 → **177**（+86：stream-session 41/conversation-activation 12/format 模板 7/tabs 联动 10/api 9/settings 5/恢复等）；pytest 181 → **188**（ARC-3 +5、ARC-8 +2）
+- **覆盖率**：stream-session 100/97.9（stmts/branch）、conversation-activation 100/79.4、tabs 99.46
+- **避坑**：① 子智能体「空返回」= 可能实际执行了（核验 worktree 后补 commit）或完全没干（重派），不可假设；② worktree 缺 node_modules → PowerShell `New-Item -ItemType Junction`（cmd mklink 的 `\D:` 前导反斜杠会指向错误位置）；③ vitest 缓存损坏（.vite-temp）时删除后重跑
 
 ### 2026-08-10 | 修复+验证 | P6.5 遗留修复（FIX-A/B/C）+ VERIFY-D 黑盒验证
 

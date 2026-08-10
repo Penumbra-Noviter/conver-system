@@ -19,19 +19,26 @@
 - [ ] Rust 后端作为 FastAPI 壳/替代
 - [ ] 系统托盘 / 开机自启
 
-### P6.5 后续建议（2026-08-10 遗留修复复审候选，非阻断）
-
-> 来源：P6.5 遗留修复轻量复审（固定点 a252158，commit `0116650`）。均为极窄路径/维护性建议，不阻塞交付。
-
-- [ ] P6.5-R1 非流式 fetch 超时：api.js 全层无 fetch 超时——非流式请求永不 settle 时该会话发送被 in-flight 守卫无限期阻塞；建议加超时或守卫命中给轻量反馈
-- [ ] P6.5-R2 FIX-A catch 分支位置感知：list 失败路径 `filter(!m.streaming)` 会清掉并发流的 streaming 占位（时间序错位/丢失）；建议 catch 分支按位置结算
-- [ ] P6.5-R3 DISPLAY_KEYS 与 tab-bar render 隐式耦合：tabs.js DISPLAY_KEYS 与 tab-bar.js render 输入是两处手写清单，新增展示字段易静默失效；建议交叉引用注释或一致性测试
-
 > ⚠️ Ollama 本地模型支持 — **已封存**（2026-08-03 用户决定：发布获得用户反馈后再考虑）
 
 ---
 
 ## 已完成归档
+
+### 架构深化 8 候选（2026-08-10，improve-codebase-architecture 全自动 kickoff）
+
+> 两波并行（波 1：ARC-1/2/3/4；波 2：ARC-5/6/7/8，均文件互斥 worktree），期末三轴 code-review 放行 + 修复（`b78db1c`）。P6.5-R1~R3 候选由 ARC-4/ARC-1/ARC-5 分别关闭。规格见 `.scratch/architecture-deepening/spec.md`。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| ARC-1 | StreamSession 流式回合结算深模块：createStreamSession 状态机 + mergeFreshList 三分支（anchor 引用定位，stale 失配回退写回——兑现消息不丢失，根治 R2）；chat.js 变 DOM 适配器；40 用例、覆盖率 100%/97.9% | 2026-08-10 | `aba8335` |
+| ARC-2 | doomed-tab 级联收口：tabs.js `closeTabs` 批量原语 + app.js `closeConversationsAndResettle`（仅 wasActive 重激活，消除 4 处手写分歧）；+10 用例 | 2026-08-10 | `3512378` |
+| ARC-3 | 对话标题策略收口：message.py `_auto_title_on_first_user_message` → conversation.py `maybe_auto_title`（逐行等价迁移）；+5 pytest | 2026-08-10 | `522e88c` |
+| ARC-4 | api.js seam 收口：`requestBlob` 走 doFetch seam + Content-Disposition 解析 + request/requestBlob 可选超时（关 R1）；+9 用例 | 2026-08-10 | `daa1e13` |
+| ARC-5 | 展示契约 `getTabDisplay`（title/phase/generating/errored 纯派生），tab-bar 只消费契约（消隐 DISPLAY_KEYS 与 render 双清单漂移，关 R3）；+2 用例 | 2026-08-10 | `be1b3c8` |
+| ARC-6 | app.js 拆分：渲染模板纯函数化（format.js characterCardHtml/conversationItemHtml/searchResultItemHtml）+ 激活编排深模块 conversation-activation.js（F-2 守卫/草稿滚动/懒加载，setActivationHooks 注入）；+19 用例 | 2026-08-10 | `c00c8f5` |
+| ARC-7 | testApiKeys 轻量下沉：`resolveCredentialTarget` 纯函数（同协议优先→跨协议兜底，交叉引用后端 _slot_value）；+5 用例 | 2026-08-10 | `231370e` |
+| ARC-8 | services/schemas `__init__.py` `__all__` 深模块清单（不 re-export，docstring 指 CONTEXT）+ 包导出冒烟测试 | 2026-08-10 | `432d89b` |
 
 ### P6.5 多 tab 会话管理（2026-08-10）
 
