@@ -10,7 +10,7 @@
  *      才通知（tab 条重渲染所需），纯内容 patch（messages/draft/scrollTop 等）不通知，
  *      且一律不写存储
  *
- * 协议表面（__all__）：openTab / activateTab / closeTab / closeAllTabs /
+ * 协议表面（__all__）：openTab / activateTab / closeTab / closeTabs / closeAllTabs /
  *   getActiveTab / getTab / getTabs / updateTab / abortStream / serialize /
  *   restore / restoreFromStorage / onTabsChanged。
  * 纯逻辑零 DOM：jsdom 环境（提供 sessionStorage）即可完整测试。
@@ -151,20 +151,49 @@ export function activateTab(conversationId) {
 }
 
 /**
- * 关闭会话 tab。关闭的是活动 tab 时激活右邻居，无右取左；
- * 关最后一个 → activeTab 为 null。目标不存在 → no-op。
+ * 内部：移除指定 tab（不 commit；由调用方统一 commit）。
+ * activeId 重定位语义与 closeTab 一致：关活动 tab 激活右邻居，无右取左；
+ * 关最后一个 → activeId 为 null。
  * @param {number|string} conversationId - 会话 id
+ * @returns {boolean} 是否实际移除（不存在 → false）
  */
-export function closeTab(conversationId) {
+function removeTab(conversationId) {
     const idx = tabList.findIndex((t) => t.conversationId === conversationId);
-    if (idx === -1) return;
+    if (idx === -1) return false;
     tabList.splice(idx, 1);
     if (activeId === conversationId) {
         const right = tabList[idx]; // 原右邻居顶上
         const left = tabList[idx - 1]; // 无右取左
         activeId = right ? right.conversationId : (left ? left.conversationId : null);
     }
-    commit();
+    return true;
+}
+
+/**
+ * 关闭会话 tab。关闭的是活动 tab 时激活右邻居，无右取左；
+ * 关最后一个 → activeTab 为 null。目标不存在 → no-op。
+ * @param {number|string} conversationId - 会话 id
+ */
+export function closeTab(conversationId) {
+    if (removeTab(conversationId)) commit();
+}
+
+/**
+ * 批量关闭会话 tab（级联删除 / 清空全部的统一批量原语）：
+ *   对每个 id 先中止在途流式再移除（abort 全覆盖），逐 tab 语义与多次 closeTab
+ *   一致（活动 tab 被关 → 右邻居顶上、无则左；最后一个 → activeTab 为 null）；
+ *   整个批次只 commit 一次（单次持久化 + 单次 onTabsChanged，避免 N 次 commit 风暴）。
+ *   空数组 / 非数组 / 全部 id 不存在 → no-op 无通知；重复 id 幂等（只关一次）。
+ * @param {Array<number|string>} ids - 要关闭的会话 id 列表
+ */
+export function closeTabs(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    let changed = false;
+    for (const conversationId of ids) {
+        abortStream(conversationId);
+        if (removeTab(conversationId)) changed = true;
+    }
+    if (changed) commit();
 }
 
 /**
@@ -301,6 +330,7 @@ export const __all__ = [
     'openTab',
     'activateTab',
     'closeTab',
+    'closeTabs',
     'closeAllTabs',
     'getActiveTab',
     'getTab',

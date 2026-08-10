@@ -26,7 +26,7 @@ import { escapeHtml, getInitials, formatTags, showToast, downloadBlob, providerD
 import { highlightText } from './format.js';
 import { state } from './state.js';
 import { chatDom, renderMessages, handleSend, refreshSendButton, setConversationsRefresher, EMPTY_STATE_HTML } from './chat.js';
-import { openTab, closeTab, closeAllTabs, getActiveTab, getTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
+import { openTab, closeTabs, getActiveTab, getTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -254,19 +254,12 @@ async function renderCharacters() {
                 try {
                     await characters.delete(id);
                     await loadCharacters();
-                    // 联动：角色删除级联删除其全部对话 — 关闭对应会话 tab（先中止在途流式），
-                    // 其余 tab 保留；视图跟随新活动 tab（或空态）
-                    const doomed = getTabs().filter((t) => t.characterId === id);
-                    doomed.forEach((t) => abortStream(t.conversationId));
-                    doomed.forEach((t) => closeTab(t.conversationId));
-                    const active = getActiveTab();
-                    if (active) {
-                        await activateConversation(active.conversationId, { saveCurrent: false });
-                    } else {
-                        showEmptyState();
-                    }
-                    refreshSendButton();
-                    await loadConversations();
+                    // 联动：角色删除级联删除其全部对话 — 统一收口关闭对应会话 tab
+                    //（closeTabs 内部先 abort 在途流式；仅被删会话含活动 tab 才重定位视图）
+                    const doomed = getTabs()
+                        .filter((t) => t.characterId === id)
+                        .map((t) => t.conversationId);
+                    await closeConversationsAndResettle({ ids: doomed, reloadList: true });
                 } catch (err) {
                     showAlert('删除失败: ' + err.message);
                 }
@@ -426,24 +419,11 @@ function renderConversations() {
             });
             if (confirmed) {
                 try {
-                    // 联动：删除会话（开着）→ 先中止其中流式再关 tab（显式停止；经 tabs.js 协议统一）
-                    abortStream(id);
                     await conversations.delete(id);
-                    const wasActive = getActiveTab()?.conversationId === id;
-                    // 被删会话的 tab 缓存（草稿/滚动）随 closeTab 一并销毁 —
-                    // 无需预先保存（保存进即将销毁的 tab 是无效写）
-                    closeTab(id);
-                    if (wasActive) {
-                        // closeTab 已激活右邻居（无则左）— 渲染新活动 tab；无 tab → 空态
-                        const active = getActiveTab();
-                        if (active) {
-                            await activateConversation(active.conversationId, { saveCurrent: false });
-                        } else {
-                            showEmptyState();
-                        }
-                    }
-                    refreshSendButton();
-                    await loadConversations();
+                    // 联动：统一收口（closeTabs 内部先中止在途流式再关 tab；
+                    // 被删 tab 为活动时才重定位渲染 — saveCurrent:false；
+                    // 被删会话的 tab 缓存（草稿/滚动）随关闭一并销毁 — 无需预先保存）
+                    await closeConversationsAndResettle({ ids: [id], reloadList: true });
                 } catch (err) {
                     showAlert('删除失败: ' + err.message);
                 }
@@ -676,6 +656,45 @@ async function activateConversation(conversationId, { saveCurrent = true } = {})
     if (state.currentView !== 'chat') switchView('chat');
 }
 
+/**
+ * 级联关闭会话 tab 的统一收口（ARC-2 — 删角色级联 / 删会话 / 清空全部 /
+ * tab-bar 关最后 tab 回调共用）：
+ *   closeTabs 批量关闭（内部先 abort 各在途流式，单次 commit/notify）
+ *   → 重定位活动 tab 视图 → refreshSendButton → reloadList 时 loadConversations
+ *   （否则仅重渲染列表高亮/空态）。
+ * 统一语义：仅当被关集合含活动 tab（wasActive）才重激活视图（saveCurrent:false —
+ *   被关 tab 的 DOM 草稿/滚动不得污染新活动 tab 缓存；无剩余 tab → 空态）；
+ *   活动 tab 未被关 → 不重激活，视图停留原地（消除删角色路径无条件重激活分歧）。
+ *   已无任何 tab（tab-bar 已关最后 tab / 空集清空）→ 空态兜底（幂等）。
+ * @param {object} [options]
+ * @param {Array<number|string>|'all'} [options.ids='all'] - 要关闭的会话 id 列表；
+ *   'all' 为当前全部 tab
+ * @param {boolean} [options.reloadList=false] - 关闭后是否重新拉取对话列表
+ *   （删会话/删角色路径；清空路径调用方已置空 state.conversations，仅重渲染即可）
+ */
+async function closeConversationsAndResettle({ ids = 'all', reloadList = false } = {}) {
+    const doomed = ids === 'all'
+        ? getTabs().map((t) => t.conversationId)
+        : (Array.isArray(ids) ? ids : []);
+    const activeBefore = getActiveTab()?.conversationId ?? null;
+    const wasActive = activeBefore !== null && doomed.includes(activeBefore);
+    if (doomed.length > 0) closeTabs(doomed);
+    if (wasActive || getTabs().length === 0) {
+        const active = getActiveTab();
+        if (active) {
+            await activateConversation(active.conversationId, { saveCurrent: false });
+        } else {
+            showEmptyState();
+        }
+    }
+    refreshSendButton();
+    if (reloadList) {
+        await loadConversations();
+    } else {
+        renderConversations();
+    }
+}
+
 // ══════════════════════════════════════════════════
 // 输入框事件（发送/停止逻辑见 chat.js handleSend）
 // ══════════════════════════════════════════════════
@@ -867,12 +886,9 @@ async function init() {
     // 初始化设置面板事件绑定（主题、侧栏、保存、清空等）
     initSettingsPanel({
         onConversationsCleared: () => {
-            // 「清空所有对话」联动：先中止全部在途流式（与删会话路径一致），再清空全部 tab
-            getTabs().forEach((t) => abortStream(t.conversationId));
-            closeAllTabs();
-            renderConversations();
-            showEmptyState();
-            refreshSendButton();
+            // 「清空所有对话」联动：统一收口（abort 全部在途流式 + closeTabs 全关 +
+            // 空态 + 发送按钮）；settings-panel 已置空 state.conversations → 仅重渲染列表
+            closeConversationsAndResettle({ ids: 'all', reloadList: false });
         },
     });
 }
@@ -886,10 +902,9 @@ initTabBar({
     container: $('#chat-tabs'),
     onActivate: async (convId, { saveCurrent = true } = {}) => {
         if (convId == null) {
-            // 关闭最后一个 tab → 现有空态（tab 条由组件自行隐藏）
-            showEmptyState();
-            refreshSendButton();
-            renderConversations();
+            // 关闭最后一个 tab → 统一收口（tab-bar 已关 tab；settle 走空态 +
+            // 发送按钮 + 列表高亮/空态重渲染）
+            await closeConversationsAndResettle({ ids: [], reloadList: false });
             return;
         }
         await activateConversation(convId, { saveCurrent });

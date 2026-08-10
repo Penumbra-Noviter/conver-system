@@ -4,6 +4,7 @@ import {
     activateTab,
     closeTab,
     closeAllTabs,
+    closeTabs,
     getActiveTab,
     getTab,
     getTabs,
@@ -138,6 +139,96 @@ describe('closeAllTabs', () => {
         closeAllTabs();
         expect(getTabs()).toHaveLength(0);
         expect(getActiveTab()).toBeNull();
+    });
+});
+
+describe('closeTabs（批量原语 — ARC-2 级联收口）', () => {
+    it('批量关闭指定 tab；关闭的是活动 tab 时右邻居顶上（无则左）', () => {
+        openTab(1);
+        openTab(2);
+        openTab(3);
+        activateTab(1);
+        closeTabs([1, 3]);
+        expect(getTabs().map((t) => t.conversationId)).toEqual([2]);
+        expect(getActiveTab()?.conversationId).toBe(2);
+    });
+
+    it('批量含活动 tab：逐 tab 移除语义与多次 closeTab 一致（先右后左）', () => {
+        openTab(1);
+        openTab(2);
+        openTab(3);
+        activateTab(2);
+        closeTabs([2, 3]);
+        expect(getTabs().map((t) => t.conversationId)).toEqual([1]);
+        expect(getActiveTab()?.conversationId).toBe(1);
+    });
+
+    it('关最后一个 → activeTab 为 null，存储同步为 { ids: [], activeId: null }', () => {
+        openTab(7);
+        closeTabs([7]);
+        expect(getActiveTab()).toBeNull();
+        expect(getTabs()).toHaveLength(0);
+        expect(readStored()).toEqual({ ids: [], activeId: null });
+    });
+
+    it('整个批次只触发一次 onTabsChanged 通知（单次 commit），而非逐 tab N 次', () => {
+        openTab(1);
+        openTab(2);
+        openTab(3);
+        const fn = vi.fn();
+        const off = onTabsChanged(fn);
+        closeTabs([1, 2, 3]);
+        off();
+        expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('空数组 / 不存在的 id → no-op 无通知；重复 id 幂等只关一次', () => {
+        openTab(1);
+        openTab(2);
+        const fn = vi.fn();
+        const off = onTabsChanged(fn);
+        closeTabs([]);
+        closeTabs([999, 1000]);
+        off();
+        expect(fn).not.toHaveBeenCalled();
+        expect(getTabs()).toHaveLength(2);
+        closeTabs([1, 1, 1]);
+        expect(getTabs().map((t) => t.conversationId)).toEqual([2]);
+    });
+
+    it('非数组入参（null / 数字 / 字符串）→ no-op 不抛错、不关任何 tab', () => {
+        openTab(1);
+        openTab(2);
+        expect(() => closeTabs(null)).not.toThrow();
+        expect(() => closeTabs(1)).not.toThrow();
+        expect(() => closeTabs('all')).not.toThrow();
+        expect(getTabs()).toHaveLength(2);
+        expect(getActiveTab()?.conversationId).toBe(2);
+    });
+});
+
+describe('closeTabs abort 全覆盖（批量关闭先中止每个在途流式 — ARC-2）', () => {
+    it('批量关闭对每个持有 activeStream 的 tab 逐一 abort', () => {
+        openTab(1);
+        openTab(2);
+        openTab(3);
+        const abort1 = vi.fn();
+        const abort3 = vi.fn();
+        updateTab(1, { activeStream: { abort: abort1 } });
+        updateTab(3, { activeStream: { abort: abort3 } });
+        closeTabs([1, 2, 3]);
+        expect(abort1).toHaveBeenCalledTimes(1);
+        expect(abort3).toHaveBeenCalledTimes(1);
+        expect(getTabs()).toHaveLength(0);
+        expect(getActiveTab()).toBeNull();
+    });
+
+    it('abort() 抛错静默忽略，批量关闭不中断', () => {
+        openTab(1);
+        openTab(2);
+        updateTab(1, { activeStream: { abort: () => { throw new Error('已断开'); } } });
+        expect(() => closeTabs([1, 2])).not.toThrow();
+        expect(getTabs()).toHaveLength(0);
     });
 });
 
@@ -337,6 +428,7 @@ describe('协议表面', () => {
             'activateTab',
             'closeAllTabs',
             'closeTab',
+            'closeTabs',
             'getActiveTab',
             'getTab',
             'getTabs',
@@ -1077,6 +1169,26 @@ describe('abort 流式三连复用 abortStream（app.js 停止按钮 / tab-bar �
         expect(tabs.getActiveTab()?.conversationId).toBe(12);
     });
 
+    it('tab 条 ✕ 关最后一个 tab → 统一收口：空态 + 发送按钮复位 + 列表高亮清除', async () => {
+        globalThis.fetch = makeAppMock({ conversations: [...CONVS], messagesByConv: MSGS, deferGet: new Map() });
+        const { tabs } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        // 只打开 11 一个 tab（活动）
+        document.querySelector('#conversation-list .conversation-item[data-id="11"]').click();
+        await sleep(30);
+        expect(tabs.getTabs()).toHaveLength(1);
+
+        document.querySelector('#chat-tabs .chat-tab[data-conv-id="11"] .tab-close').click();
+        await sleep(30);
+
+        expect(tabs.getTabs()).toHaveLength(0);
+        expect(tabs.getActiveTab()).toBeNull();
+        expect(document.querySelector('#chat-messages').innerHTML).toContain('选择左侧对话');
+        expect(document.querySelector('#btn-send').textContent).toBe('➤');
+        // 列表高亮清除：不再有 active 项
+        expect(document.querySelectorAll('#conversation-list .conversation-item.active')).toHaveLength(0);
+    });
+
     it('删除会话（开着流式）→ 先 abort 再关 tab，右邻居草稿不被污染', async () => {
         globalThis.fetch = makeAppMock({ conversations: [...CONVS], messagesByConv: MSGS, deferGet: new Map() });
         const { tabs } = await loadAppModules();
@@ -1178,6 +1290,50 @@ describe('角色删除级联关 tab（app.js 角色删除路径）', () => {
         expect(tabs.getTab(11)).toBeUndefined();
         expect(tabs.getTab(12)).toBeDefined();
         expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
+    });
+
+    it('被删角色的会话非活动 tab → 不再无条件重激活（停留角色视图、活动 tab 视图不重渲染）', async () => {
+        const characters = [
+            { id: 1, name: '角色A', avatar: null },
+            { id: 2, name: '角色B', avatar: null },
+        ];
+        const conversations = [
+            { id: 11, character_id: 1, title: '会话11', model_provider: 'claude', model_name: 'm1', message_count: 1 },
+            { id: 12, character_id: 2, title: '会话12', model_provider: 'claude', model_name: 'm1', message_count: 1 },
+        ];
+        const messagesByConv = {
+            11: [{ id: 1, role: 'assistant', content: '消息11' }],
+            12: [{ id: 2, role: 'assistant', content: '消息12' }],
+        };
+        globalThis.fetch = makeAppMock({ characters, conversations, messagesByConv, deferGet: new Map() });
+        const { tabs } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+
+        // 打开 11、12（活动 tab 为 12 — 属角色B，不在被删角色名下）；记录消息 DOM 节点
+        clickConv(11);
+        await sleep(30);
+        clickConv(12);
+        await sleep(30);
+        const msgNode = document.querySelector('#chat-messages').firstElementChild;
+
+        // 角色视图删除角色A（其会话 11 非活动 tab）— 旧实现会无条件重激活活动 tab，
+        // 副作用：切回聊天视图 + 重渲染消息区（DOM 节点重建）
+        document.querySelector('.nav-btn[data-view="characters"]').click();
+        await waitFor(() => document.querySelectorAll('.character-card').length === 2);
+        document.querySelector('.character-card[data-id="1"] .delete-char').click();
+        await sleep(10);
+        document.querySelector('.confirm-ok').click();
+        await sleep(60);
+
+        // 不再无条件重激活：停留角色视图、活动 tab 12 不变、消息区未被重渲染
+        expect(document.querySelector('#view-characters').classList.contains('active')).toBe(true);
+        expect(document.querySelector('#view-chat').classList.contains('active')).toBe(false);
+        expect(tabs.getTab(11)).toBeUndefined();
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').firstElementChild).toBe(msgNode);
         expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
     });
 });
