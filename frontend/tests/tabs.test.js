@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import {
     openTab,
     activateTab,
@@ -346,5 +346,324 @@ describe('协议表面', () => {
             'serialize',
             'updateTab',
         ]);
+    });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// P6.5 code-review 修复的复现测试（F-1 / F-2 竞态）
+//
+// 全部经公共 seam 驱动（chat.js handleSend / app.js 侧栏激活 / tabs.js 关闭），
+// 断言用户可见行为（缓存内容 / DOM 渲染 / 按钮状态 / 无崩溃）。
+// 模块实例隔离：动态 import + vi.resetModules，DOM 先于模块求值就位。
+// ══════════════════════════════════════════════════════════════════
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ReadableStream } from 'node:stream/web';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function waitFor(fn, timeout = 800) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        if (fn()) return;
+        await sleep(5);
+    }
+    throw new Error('waitFor 超时');
+}
+
+/** 最小聊天域 DOM — chat.js 模块求值需要这些元素（chatDom 捕获） */
+const CHAT_DOM_HTML = `
+    <div id="chat-messages"></div>
+    <textarea id="chat-input"></textarea>
+    <button id="btn-send"></button>
+    <input type="checkbox" id="toggle-stream" checked>
+    <div id="chat-header"><span class="chat-title" id="chat-title-text"></span></div>
+`;
+
+/** 动态加载 chat/tabs/api（全新实例；DOM 已就位） */
+async function loadChatModules() {
+    vi.resetModules();
+    document.body.innerHTML = CHAT_DOM_HTML;
+    const chat = await import('../js/chat.js');
+    const tabs = await import('../js/tabs.js');
+    const api = await import('../js/api.js');
+    return { chat, tabs, api };
+}
+
+/** 真实 index.html body + 全新 app.js 实例（init 自动执行，fetch 须先 mock） */
+async function loadAppModules() {
+    vi.resetModules();
+    sessionStorage.clear();
+    document.body.innerHTML = INDEX_BODY;
+    const app = await import('../js/app.js');
+    const tabs = await import('../js/tabs.js');
+    const state = (await import('../js/state.js')).state;
+    return { app, tabs, state };
+}
+
+const INDEX_HTML = readFileSync(join(process.cwd(), 'index.html'), 'utf8');
+const INDEX_BODY = INDEX_HTML.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? '';
+
+const mockJson = (data, status = 200) =>
+    Promise.resolve({ ok: status < 400, status, json: async () => data });
+
+const sseFrame = (type, payload) => `data: ${JSON.stringify({ type, ...payload })}\n\n`;
+const ENCODER = new TextEncoder();
+
+describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（流式 finalizeStream）', () => {
+    it('list 响应延迟返回期间连发新消息 → 旧快照不覆盖、done 后按钮即时复位', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+
+        // list 第 1 次请求（finalizeStream 在途）延迟返回；后续请求立即返回服务端快照
+        const staleList = {};
+        staleList.promise = new Promise((resolve) => { staleList.resolve = resolve; });
+        let listCalls = 0;
+        let serverState = [];
+        const streamCtrls = [];
+        api.setFetch(async (url, options = {}) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats/stream')) {
+                let ctrl;
+                const stream = new ReadableStream({ start(c) { ctrl = c; } });
+                streamCtrls.push(ctrl);
+                return Promise.resolve({ ok: true, status: 200, body: stream });
+            }
+            if (path.endsWith('/messages')) {
+                listCalls += 1;
+                if (listCalls === 1) return staleList.promise;
+                return mockJson([...serverState]);
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        // 第一次发送（流式）→ 首个 token + done（finalizeStream 的 list 在途）
+        chat.chatDom.chatInput.value = '第一条';
+        chat.handleSend();
+        await sleep(20);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('token', { content: '你好' })));
+        await sleep(10);
+        streamCtrls[0].enqueue(ENCODER.encode(sseFrame('done', { message_id: 101 })));
+        streamCtrls[0].close();
+        await sleep(20);
+        expect(listCalls).toBe(1);
+
+        // done 后（list 未返回前）按钮即复位为发送态 — 无 ⏹→➤ UX 窗口
+        expect(chat.chatDom.btnSend.textContent).toBe('➤');
+        expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
+
+        // 同 tab 连发第二条（isStreaming 已 false → 允许发送）
+        chat.chatDom.chatInput.value = '第二条';
+        chat.handleSend();
+        await sleep(20);
+        expect(tabs.getTab(11).messages.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+
+        // 旧 list 快照延迟返回（不含第二条的陈旧状态）
+        staleList.resolve(mockJson([
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '你好' },
+        ]));
+        await sleep(20);
+
+        // 核心断言：旧快照不覆盖连发的新消息；本流 streaming 标记被结算
+        const msgs = tabs.getTab(11).messages;
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第一条')).toBe(true);
+        expect(msgs.filter((m) => m.streaming)).toEqual([]);
+        expect(msgs.find((m) => m.role === 'assistant' && m.content === '你好')?.id).toBe(101);
+
+        // 第二条流正常完成 → 最终与服务端一致
+        serverState = [
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '你好' },
+            { id: 3, role: 'user', content: '第二条' },
+            { id: 4, role: 'assistant', content: '回复2' },
+        ];
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('token', { content: '回复2' })));
+        await sleep(10);
+        streamCtrls[1].enqueue(ENCODER.encode(sseFrame('done', { message_id: 102 })));
+        streamCtrls[1].close();
+        await sleep(20);
+        expect(tabs.getTab(11).messages).toEqual(serverState);
+    });
+});
+
+describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（非流式）', () => {
+    it('非流式 list 延迟返回期间连发第二条 → 旧快照不覆盖新消息', async () => {
+        const { chat, tabs, api } = await loadChatModules();
+        tabs.openTab(11);
+        chat.chatDom.toggleStream.checked = false;
+
+        const staleList = {};
+        staleList.promise = new Promise((resolve) => { staleList.resolve = resolve; });
+        let listCalls = 0;
+        let serverState = [];
+        api.setFetch(async (url, options = {}) => {
+            const path = String(url);
+            if (path.endsWith('/api/chats')) {
+                const body = JSON.parse(options.body);
+                serverState.push({ id: serverState.length + 1, role: 'user', content: body.content });
+                serverState.push({ id: serverState.length + 1, role: 'assistant', content: `回复${body.content}` });
+                return mockJson({ reply: `回复${body.content}` });
+            }
+            if (path.endsWith('/messages')) {
+                listCalls += 1;
+                if (listCalls === 1) return staleList.promise;
+                return mockJson([...serverState]);
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+
+        // 第一次发送（非流式）— messages.list 在途
+        chat.chatDom.chatInput.value = '第一条';
+        chat.handleSend();
+        await sleep(20);
+        expect(listCalls).toBe(1);
+
+        // 连发第二条（非流式 isStreaming 恒 false，Enter/直接调用均可连发）
+        chat.chatDom.chatInput.value = '第二条';
+        await chat.handleSend();
+        expect(tabs.getTab(11).messages.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+
+        // 旧快照返回（只含第一条的往返）
+        staleList.resolve(mockJson([
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '回复第一条' },
+        ]));
+        await sleep(20);
+
+        // 核心断言：旧快照不覆盖连发的第二条
+        const msgs = tabs.getTab(11).messages;
+        expect(msgs.some((m) => m.role === 'user' && m.content === '第二条')).toBe(true);
+        expect(msgs).toEqual([
+            { id: 1, role: 'user', content: '第一条' },
+            { id: 2, role: 'assistant', content: '回复第一条' },
+            { id: 3, role: 'user', content: '第二条' },
+            { id: 4, role: 'assistant', content: '回复第二条' },
+        ]);
+    });
+});
+
+describe('F-2 activateConversation 无守卫异步续体（await 期间切走/关闭）', () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+        globalThis.fetch = originalFetch;
+    });
+
+    /** 构造 app 级 fetch mock；deferGet: Map<convId, {promise, resolve}> */
+    function makeAppMock({ conversations, messagesByConv, deferGet }) {
+        return async (url, options = {}) => {
+            const path = String(url).replace(/^.*\/api/, '/api');
+            const { method = 'GET' } = options;
+            if (path === '/api/characters' && method === 'GET') return mockJson([]);
+            if (path === '/api/conversations' && method === 'GET') return mockJson(conversations);
+            if (path === '/api/conversations' && method === 'DELETE') return mockJson(null, 204);
+            if (path === '/api/models' && method === 'GET') return mockJson({ providers: [{ key: 'claude', name: 'Claude (Anthropic)', id: 'claude', models: ['claude-sonnet-5'] }] });
+            if (path === '/api/settings' && method === 'GET') return mockJson({});
+            if (path === '/api/settings' && method === 'PUT') return mockJson({});
+            const convMatch = path.match(/^\/api\/conversations\/(\d+)$/);
+            if (convMatch && method === 'GET') {
+                const id = Number(convMatch[1]);
+                if (deferGet?.has(id)) return deferGet.get(id).promise;
+                const conv = conversations.find((c) => c.id === id);
+                return conv ? mockJson(conv) : mockJson({ detail: '会话不存在' }, 404);
+            }
+            if (convMatch && method === 'DELETE') return mockJson(null, 204);
+            const msgsMatch = path.match(/^\/api\/conversations\/(\d+)\/messages$/);
+            if (msgsMatch && method === 'GET') return mockJson(messagesByConv[Number(msgsMatch[1])] ?? []);
+            throw new Error(`未 mock 的请求: ${method} ${path}`);
+        };
+    }
+
+    const CONVS = [
+        { id: 11, character_id: 1, title: '会话11', model_provider: 'claude', model_name: 'm1', message_count: 1 },
+        { id: 12, character_id: 2, title: '会话12', model_provider: 'claude', model_name: 'm1', message_count: 1 },
+    ];
+    const MSGS = {
+        11: [{ id: 1, role: 'assistant', content: '消息11' }],
+        12: [{ id: 2, role: 'assistant', content: '消息12' }],
+    };
+
+    it('conversations.get 在途时用户切走 → 旧续体不恢复草稿、不渲染错会话', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        globalThis.fetch = makeAppMock({
+            conversations: [...CONVS],
+            messagesByConv: MSGS,
+            deferGet: new Map([[11, deferred]]),
+        });
+        const { tabs, state } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+        const chatInput = () => document.querySelector('#chat-input');
+
+        // 打开 11 并输入草稿，再切到 12（11 的草稿入缓存）
+        clickConv(11);
+        await sleep(30);
+        chatInput().value = '草稿A';
+        clickConv(12);
+        await sleep(30);
+        expect(tabs.getTab(11)?.draft).toBe('草稿A');
+
+        // 让 11 从已加载列表消失（如列表过期），再点 11 → 走 await conversations.get 续体
+        state.conversations = state.conversations.filter((c) => c.id !== 11);
+        clickConv(11);
+        await sleep(30);
+        // get 在途期间用户切回 12
+        clickConv(12);
+        await sleep(30);
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+
+        // get 返回 → 旧续体不得恢复草稿/渲染 11
+        deferred.resolve(mockJson({ ...CONVS[0] }));
+        await sleep(30);
+
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
+        expect(document.querySelector('#chat-messages').textContent).not.toContain('消息11');
+        expect(document.querySelector('#chat-title-text').textContent).toBe('会话12');
+    });
+
+    it('conversations.get 在途时用户关闭该 tab → 无 TypeError 崩溃', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        globalThis.fetch = makeAppMock({
+            conversations: [...CONVS],
+            messagesByConv: MSGS,
+            deferGet: new Map([[11, deferred]]),
+        });
+        const { tabs, state } = await loadAppModules();
+        await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
+        const clickConv = (id) =>
+            document.querySelector(`#conversation-list .conversation-item[data-id="${id}"]`).click();
+
+        // 打开 11，让 11 从已加载列表消失，再点 11 → await conversations.get 在途
+        clickConv(11);
+        await sleep(30);
+        state.conversations = state.conversations.filter((c) => c.id !== 11);
+        clickConv(11);
+        await sleep(30);
+        // get 在途期间：切到 12 并关闭 11 的 tab
+        clickConv(12);
+        await sleep(30);
+        tabs.closeTab(11);
+        expect(tabs.getTab(11)).toBeUndefined();
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+
+        // get 返回 → 旧续体必须安全退出（tab 已关：不抛 TypeError）
+        const rejections = [];
+        const onRejection = (reason) => rejections.push(reason);
+        process.on('unhandledRejection', onRejection);
+        deferred.resolve(mockJson({ ...CONVS[0] }));
+        await sleep(50);
+        process.off('unhandledRejection', onRejection);
+        expect(rejections).toHaveLength(0);
+
+        expect(tabs.getActiveTab()?.conversationId).toBe(12);
+        expect(document.querySelector('#chat-messages').textContent).toContain('消息12');
+        expect(document.querySelector('#chat-title-text').textContent).toBe('会话12');
     });
 });

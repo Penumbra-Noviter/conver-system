@@ -530,9 +530,10 @@ function saveActiveTabViewState() {
 
 /**
  * 恢复指定 tab 的输入草稿与滚动位置到 DOM
- * @param {object} tab - 目标 tab
+ * @param {object|undefined} tab - 目标 tab（已关闭/不存在 → no-op，防御 F-2 竞态）
  */
 function restoreTabViewState(tab) {
+    if (!tab) return;
     chatDom.chatInput.value = tab.draft ?? '';
     chatDom.chatInput.style.height = 'auto';
     chatDom.chatInput.style.height = Math.min(chatDom.chatInput.scrollHeight, 150) + 'px';
@@ -590,7 +591,8 @@ function showEmptyState() {
 
 /**
  * 懒加载指定会话消息并写入其 tab 缓存；仅当该 tab 仍为活动 tab 时才渲染
- * （快速连续切 tab 时各响应写各自 tab 缓存，后返回的响应不覆盖先返回的）
+ * （快速连续切 tab 时各响应写各自 tab 缓存，后返回的响应不覆盖先返回的；
+ * 缓存分支同样须校验活动性 —— F-2：await 期间切走时旧续体不得把 A 渲染进 B 的视图）
  * @param {number|string} conversationId - 会话 id
  */
 async function loadTabMessages(conversationId) {
@@ -598,10 +600,12 @@ async function loadTabMessages(conversationId) {
     if (!tab) return;
     // 已有缓存（含流式中断后的部分内容）→ 不重复请求，直接渲染
     if (tab.messages.length > 0) {
-        renderMessages();
-        // renderMessages 内部 scrollToBottom — 此处恢复缓存中的滚动位置（切 tab 恢复）
-        chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
-        renderChatHeader(conversationId);
+        if (getActiveTab()?.conversationId === conversationId) {
+            renderMessages();
+            // renderMessages 内部 scrollToBottom — 此处恢复缓存中的滚动位置（切 tab 恢复）
+            chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
+            renderChatHeader(conversationId);
+        }
         return;
     }
     try {
@@ -644,6 +648,9 @@ async function activateConversation(conversationId, { saveCurrent = true } = {})
         } catch {
             // 忽略 — 至少尝试加载消息
         }
+        // await 期间用户可能已切走或关闭该 tab — 放弃续体（F-2）：
+        // 否则恢复旧草稿覆盖新活动输入框、缓存分支把本会话渲染进错误视图
+        if (getActiveTab()?.conversationId !== conversationId) return;
     }
     if (conv) {
         updateTab(conversationId, { title: conv.title, characterId: conv.character_id });
@@ -652,6 +659,7 @@ async function activateConversation(conversationId, { saveCurrent = true } = {})
     restoreTabViewState(getTab(conversationId));
     // 5) 懒加载消息（缓存为空才请求）+ 头部渲染
     await loadTabMessages(conversationId);
+    if (getActiveTab()?.conversationId !== conversationId) return;
     // 6) 刷新发送按钮两态 + 列表高亮 + 视图（已在聊天视图则跳过 switchView 的重复 loadConversations）
     refreshSendButton();
     renderConversations();

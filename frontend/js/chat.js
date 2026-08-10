@@ -272,12 +272,27 @@ function syncChatHeaderTitle() {
  */
 async function finalizeStream(convId, fullContent, messageId, isActiveStream) {
     updateTab(convId, { isStreaming: false, activeStream: null, phase: 'done' });
+    // 立即复位发送按钮 — 不等 list 重载完成（消除 ⏹→➤ 的 UX 窗口；连发依赖此即时复位）
+    refreshSendButton();
     if (messageId) {
         // 正常完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
+        // list 前捕获缓存 revision：await 期间同 tab 可能连发新消息（isStreaming 已 false），
+        // 返回后仅当缓存长度未变才整体替换，防止陈旧快照覆盖新消息（F-1）
+        const revision = getTab(convId)?.messages.length ?? 0;
         try {
             const msgs = await messages.list(convId);
-            updateTab(convId, { messages: msgs });
-            if (isActiveStream()) renderMessages();
+            const tab = getTab(convId);
+            if (tab && tab.messages.length === revision) {
+                updateTab(convId, { messages: msgs });
+                if (isActiveStream()) renderMessages();
+            } else if (tab) {
+                // 陈旧 list 响应 — 不整体替换（新消息保留），仅结算本流残留的 streaming 标记
+                updateTab(convId, {
+                    messages: tab.messages.map((m) =>
+                        m.streaming && m.content === fullContent ? { ...m, streaming: false, id: messageId } : m
+                    ),
+                });
+            }
         } catch (err) {
             // 重新加载失败 — 退化为本地增量渲染，避免消息丢失
             console.error('重新加载消息列表失败:', err);
@@ -299,8 +314,6 @@ async function finalizeStream(convId, fullContent, messageId, isActiveStream) {
         }
         if (isActiveStream()) renderMessages();
     }
-    // 刷新发送按钮（读活动 tab —— 若发起 tab 已非活动，按钮本就由其所在 tab 决定）
-    refreshSendButton();
     // 刷新对话列表（更新消息数量）
     refreshConversations();
 }
@@ -441,10 +454,15 @@ export async function handleSend() {
                 content,
             });
             // 非流式完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
+            // 与流式 finalizeStream 同型守卫：list 在途时连发的新消息不被陈旧快照覆盖（F-1）
+            const revision = getTab(convId)?.messages.length ?? 0;
             try {
                 const msgs = await messages.list(convId);
-                updateTab(convId, { messages: msgs });
-                if (isActiveStream()) renderMessages();
+                const t = getTab(convId);
+                if (t && t.messages.length === revision) {
+                    updateTab(convId, { messages: msgs });
+                    if (isActiveStream()) renderMessages();
+                }
             } catch (err) {
                 // 重新加载失败 — 退化为本地增量渲染，避免消息丢失
                 console.error('重新加载消息列表失败:', err);
