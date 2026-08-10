@@ -8,6 +8,7 @@ import {
     getActiveTab,
     getTab,
     getTabs,
+    getTabDisplay,
     updateTab,
     serialize,
     restore,
@@ -431,6 +432,7 @@ describe('协议表面', () => {
             'closeTabs',
             'getActiveTab',
             'getTab',
+            'getTabDisplay',
             'getTabs',
             'onTabsChanged',
             'openTab',
@@ -1365,5 +1367,111 @@ describe('流式 error 帧 → handleStreamError 错误分支（Falsify 失败�
         expect(document.querySelector('#chat-messages').textContent).toContain('[错误] 模型超时');
         expect(chat.chatDom.btnSend.textContent).toBe('➤');
         expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
+    });
+});
+
+// ══════════════════════════════════════════════════
+// ARC-5 展示契约：getTabDisplay（tabs.js 纯派生）＋ tab-bar 消费一致性
+// ══════════════════════════════════════════════════
+
+describe('getTabDisplay（展示契约派生 — ARC-5）', () => {
+    it('纯派生：title 缺省「未命名会话」；generating=thinking|streaming；errored=error；不改输入；null 安全', () => {
+        const tab = openTab(1);
+        // 空 title → 缺省「未命名会话」；idle 无任何指示
+        expect(getTabDisplay(tab)).toEqual({
+            title: '未命名会话', phase: 'idle', generating: false, errored: false,
+        });
+        // 已设 title 原样透传
+        updateTab(1, { title: '会话A' });
+        expect(getTabDisplay(tab).title).toBe('会话A');
+        // generating：thinking / streaming
+        updateTab(1, { phase: 'thinking' });
+        expect(getTabDisplay(tab)).toMatchObject({ generating: true, errored: false });
+        updateTab(1, { phase: 'streaming' });
+        expect(getTabDisplay(tab)).toMatchObject({ phase: 'streaming', generating: true, errored: false });
+        // errored：error（生成中指示熄灭）
+        updateTab(1, { phase: 'error' });
+        expect(getTabDisplay(tab)).toMatchObject({ generating: false, errored: true });
+        // done 与未知 phase → 均无指示、不抛错
+        updateTab(1, { phase: 'done' });
+        expect(getTabDisplay(tab)).toMatchObject({ generating: false, errored: false });
+        updateTab(1, { phase: 'bogus' });
+        expect(getTabDisplay(tab)).toMatchObject({ phase: 'bogus', generating: false, errored: false });
+        // 纯函数：不修改输入、每次返回新对象
+        const before = { ...tab };
+        const a = getTabDisplay(tab);
+        const b = getTabDisplay(tab);
+        expect(tab).toEqual(before);
+        expect(a).not.toBe(b);
+        // null / undefined 入参安全：不抛错，返回缺省形态
+        expect(getTabDisplay(null)).toEqual({
+            title: '未命名会话', phase: 'idle', generating: false, errored: false,
+        });
+        expect(getTabDisplay(undefined)).toEqual({
+            title: '未命名会话', phase: 'idle', generating: false, errored: false,
+        });
+    });
+});
+
+describe('tab-bar 消费 getTabDisplay（ARC-5 — 输出逐字节一致）', () => {
+    it('渲染输出与既有行为逐字节一致：标题转义/脉冲点/警示标记/激活高亮', async () => {
+        vi.resetModules();
+        document.body.innerHTML = CHAT_DOM_HTML;
+        const tabs = await import('../js/tabs.js');
+        const { initTabBar } = await import('../js/components/tab-bar.js');
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        initTabBar({ container, onActivate: () => {} });
+
+        // 空 title → 缺省「未命名会话」；活动 tab 高亮（active class）
+        tabs.openTab(7);
+        expect(container.innerHTML).toBe(
+            '\n            <div class="chat-tab active" data-conv-id="7" title="未命名会话">' +
+            '\n                ' +
+            '\n                ' +
+            '\n                <span class="tab-title">未命名会话</span>' +
+            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
+            '\n            </div>'
+        );
+
+        // 生成中（thinking）→ 标题前脉冲点
+        tabs.updateTab(7, { title: '会话A', phase: 'thinking' });
+        expect(container.innerHTML).toBe(
+            '\n            <div class="chat-tab active" data-conv-id="7" title="会话A">' +
+            '\n                <span class="tab-dot" title="生成中"></span>' +
+            '\n                ' +
+            '\n                <span class="tab-title">会话A</span>' +
+            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
+            '\n            </div>'
+        );
+
+        // 出错（error）→ 警示标记
+        tabs.updateTab(7, { phase: 'error' });
+        expect(container.innerHTML).toBe(
+            '\n            <div class="chat-tab active" data-conv-id="7" title="会话A">' +
+            '\n                ' +
+            '\n                <span class="tab-warn" title="生成出错/已停止">!</span>' +
+            '\n                <span class="tab-title">会话A</span>' +
+            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
+            '\n            </div>'
+        );
+
+        // 标题转义（< > &）；多 tab：激活高亮只落在活动 tab（8）
+        tabs.updateTab(7, { title: '会话<A&B>', phase: 'done' });
+        tabs.openTab(8);
+        expect(container.innerHTML).toBe(
+            '\n            <div class="chat-tab" data-conv-id="7" title="会话<A&amp;B>">' +
+            '\n                ' +
+            '\n                ' +
+            '\n                <span class="tab-title">会话&lt;A&amp;B&gt;</span>' +
+            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
+            '\n            </div>' +
+            '\n            <div class="chat-tab active" data-conv-id="8" title="未命名会话">' +
+            '\n                ' +
+            '\n                ' +
+            '\n                <span class="tab-title">未命名会话</span>' +
+            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
+            '\n            </div>'
+        );
     });
 });
