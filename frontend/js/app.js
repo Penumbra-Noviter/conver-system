@@ -24,7 +24,8 @@ import { initSettingsPanel, loadSettings, initProviderDropdown } from './compone
 import { escapeHtml, getInitials, formatTags, showToast, downloadBlob, providerDisplayName } from './utils.js';
 import { highlightText } from './format.js';
 import { state } from './state.js';
-import { chatDom, renderMessages, handleSend, setConversationsRefresher } from './chat.js';
+import { chatDom, renderMessages, handleSend, refreshSendButton, setConversationsRefresher } from './chat.js';
+import { openTab, closeTab, closeAllTabs, getActiveTab, getTab, updateTab } from './tabs.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -326,7 +327,6 @@ dom.characterImportInput.addEventListener('change', handleCharacterImport);
 // ══════════════════════════════════════════════════
 
 async function startChatWithCharacter(characterId) {
-    state.currentCharacterId = characterId;
     const char = state.characters.find(c => c.id === characterId);
     const charName = char?.name || '未知角色';
 
@@ -341,10 +341,10 @@ async function startChatWithCharacter(characterId) {
             model_name: selection.model,
             // 标题不传：后端默认「与 {角色名} 的对话」，首条消息后自动替换（P3.5）
         });
-        state.currentConversationId = conv.id;
         switchView('chat');
         await loadConversations();
-        await loadMessages();
+        // 创建即打开 tab（激活流程会以已知对话数据补全 title/characterId）
+        await activateConversation(conv.id);
         chatDom.chatInput.focus();
     } catch (err) {
         showAlert('创建对话失败: ' + err.message);
@@ -372,10 +372,13 @@ function renderConversations() {
         return;
     }
 
+    // 列表高亮按活动 tab 判定（单一事实来源）
+    const activeConvId = getActiveTab()?.conversationId ?? null;
+
     list.innerHTML = state.conversations
         .map(
             (c) => `
-        <div class="conversation-item ${c.id === state.currentConversationId ? 'active' : ''}"
+        <div class="conversation-item ${c.id === activeConvId ? 'active' : ''}"
              data-id="${c.id}">
             <div class="title">${escapeHtml(c.title)}</div>
             <div class="meta">${c.message_count} 条消息 · ${escapeHtml(c.model_name || c.model_provider)}</div>
@@ -389,12 +392,8 @@ function renderConversations() {
         item.addEventListener('click', (e) => {
             // 忽略删除按钮点击
             if (e.target.closest('.btn-delete-conv')) return;
-            state.currentConversationId = parseInt(item.dataset.id);
-            // 从对话数据获取 character_id
-            const conv = state.conversations.find(c => c.id === state.currentConversationId);
-            if (conv) state.currentCharacterId = conv.character_id;
-            renderConversations();
-            loadMessages();
+            // 打开或激活对应会话 tab（统一激活流程）
+            activateConversation(parseInt(item.dataset.id));
         });
     });
 
@@ -413,12 +412,27 @@ function renderConversations() {
             });
             if (confirmed) {
                 try {
-                    await conversations.delete(id);
-                    if (state.currentConversationId === id) {
-                        state.currentConversationId = null;
-                        state.messages = [];
-                        renderMessages();
+                    // 联动：删除会话（开着）→ 先 abort 其中流式再关 tab（显式停止）
+                    const tab = getTab(id);
+                    if (tab?.activeStream) {
+                        try { tab.activeStream.abort(); } catch { /* 忽略中止失败 */ }
                     }
+                    await conversations.delete(id);
+                    const wasActive = getActiveTab()?.conversationId === id;
+                    // 先保存活动视图状态再关 tab —— 防止被删会话的 DOM 状态
+                    // （草稿/滚动）污染新活动 tab 的缓存
+                    if (wasActive) saveActiveTabViewState();
+                    closeTab(id);
+                    if (wasActive) {
+                        // closeTab 已激活右邻居（无则左）— 渲染新活动 tab；无 tab → 空态
+                        const active = getActiveTab();
+                        if (active) {
+                            await activateConversation(active.conversationId, { saveCurrent: false });
+                        } else {
+                            showEmptyState();
+                        }
+                    }
+                    refreshSendButton();
                     await loadConversations();
                 } catch (err) {
                     showAlert('删除失败: ' + err.message);
@@ -495,53 +509,150 @@ function startRename(conv) {
     input.addEventListener('blur', save);
 }
 
-async function loadMessages() {
-    if (!state.currentConversationId) {
-        chatDom.chatMessages.innerHTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
-        chatDom.chatHeader.textContent = '选择一个角色开始对话';
+// ══════════════════════════════════════════════════
+// 会话激活流程（P6.5 收敛为单一内部函数 — 三入口与 tab 条共用）
+// ══════════════════════════════════════════════════
+
+/**
+ * 保存当前活动 tab 的输入草稿与滚动位置到 tab 缓存（切换前调用）
+ */
+function saveActiveTabViewState() {
+    const tab = getActiveTab();
+    if (!tab) return;
+    updateTab(tab.conversationId, {
+        draft: chatDom.chatInput.value,
+        scrollTop: chatDom.chatMessages.scrollTop,
+    });
+}
+
+/**
+ * 恢复指定 tab 的输入草稿与滚动位置到 DOM
+ * @param {object} tab - 目标 tab
+ */
+function restoreTabViewState(tab) {
+    chatDom.chatInput.value = tab.draft ?? '';
+    chatDom.chatInput.style.height = 'auto';
+    chatDom.chatInput.style.height = Math.min(chatDom.chatInput.scrollHeight, 150) + 'px';
+    chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
+}
+
+/**
+ * 渲染聊天头部（标题 + 模型 badge + 导出/列表切换按钮 + 双击重命名绑定）
+ * 按活动 tab 派生；对话数据以 conversations 列表为准（持久事实来源）
+ * @param {number|string} conversationId - 活动 tab 的会话 id
+ */
+function renderChatHeader(conversationId) {
+    const conv = state.conversations.find((c) => c.id === conversationId);
+    if (!conv) {
+        chatDom.chatHeader.innerHTML = '<span class="chat-title">选择一个角色开始对话</span>';
         return;
     }
+    const modelLabel = conv.model_name || '';
+    const providerLabel = providerDisplayName(state.models, conv.model_provider);
+    chatDom.chatHeader.innerHTML = `
+        <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">☰</button>
+        <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
+        <span class="chat-model-badge">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</span>
+        <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">📥</button>
+    `;
+    // 双击标题重命名
+    const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
+    titleEl.addEventListener('dblclick', () => startRename(conv));
+    // 移动端切换对话列表
+    const toggleBtn = chatDom.chatHeader.querySelector('#btn-toggle-conv-list');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            const sidebar = document.querySelector('.chat-sidebar');
+            if (sidebar) {
+                sidebar.classList.toggle('mobile-expanded');
+            }
+        });
+    }
+    // 导出按钮
+    const exportBtn = chatDom.chatHeader.querySelector('#btn-export-conv');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            showExportDialog(conversationId);
+        });
+    }
+}
 
-    try {
-        state.messages = await messages.list(state.currentConversationId);
+/**
+ * 无活动 tab 时的空态（聊天区 + 头部提示）
+ */
+function showEmptyState() {
+    chatDom.chatHeader.innerHTML = '<span class="chat-title">选择一个角色开始对话</span>';
+    chatDom.chatMessages.innerHTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
+}
+
+/**
+ * 懒加载指定会话消息并写入其 tab 缓存；仅当该 tab 仍为活动 tab 时才渲染
+ * （快速连续切 tab 时各响应写各自 tab 缓存，后返回的响应不覆盖先返回的）
+ * @param {number|string} conversationId - 会话 id
+ */
+async function loadTabMessages(conversationId) {
+    const tab = getTab(conversationId);
+    if (!tab) return;
+    // 已有缓存（含流式中断后的部分内容）→ 不重复请求，直接渲染
+    if (tab.messages.length > 0) {
         renderMessages();
-
-        // 更新头部：对话标题 + 模型信息 + 双击重命名
-        const conv = state.conversations.find((c) => c.id === state.currentConversationId);
-        if (conv) {
-            const modelLabel = conv.model_name || '';
-            const providerLabel = providerDisplayName(state.models, conv.model_provider);
-            chatDom.chatHeader.innerHTML = `
-                <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">☰</button>
-                <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
-                <span class="chat-model-badge">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</span>
-                <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">📥</button>
-            `;
-            // 双击标题重命名
-            const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
-            titleEl.addEventListener('dblclick', () => startRename(conv));
-            // 移动端切换对话列表
-            const toggleBtn = chatDom.chatHeader.querySelector('#btn-toggle-conv-list');
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', () => {
-                    const sidebar = document.querySelector('.chat-sidebar');
-                    if (sidebar) {
-                        sidebar.classList.toggle('mobile-expanded');
-                    }
-                });
-            }
-            // 导出按钮
-            const exportBtn = chatDom.chatHeader.querySelector('#btn-export-conv');
-            if (exportBtn) {
-                exportBtn.addEventListener('click', () => {
-                    showExportDialog(state.currentConversationId);
-                });
-            }
+        // renderMessages 内部 scrollToBottom — 此处恢复缓存中的滚动位置（切 tab 恢复）
+        chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
+        renderChatHeader(conversationId);
+        return;
+    }
+    try {
+        const msgs = await messages.list(conversationId);
+        updateTab(conversationId, { messages: msgs });
+        if (getActiveTab()?.conversationId === conversationId) {
+            renderMessages();
+            renderChatHeader(conversationId);
         }
     } catch (err) {
         console.error('加载消息失败:', err);
         showError('加载消息失败');
+        if (getActiveTab()?.conversationId === conversationId) {
+            renderMessages();
+            renderChatHeader(conversationId);
+        }
     }
+}
+
+/**
+ * 切到某会话的统一激活流程（三入口与 tab 条共用）：
+ *   openTab/activateTab + 以已知对话数据补全 tab 的 title/characterId（未知则经 API 获取）
+ *   + 懒加载消息 + 草稿/滚动保存恢复 + 刷新发送按钮两态 + 列表高亮 + 视图切换
+ * @param {number|string} conversationId - 会话 id
+ * @param {object} [options]
+ * @param {boolean} [options.saveCurrent=true] - 切换前保存当前活动 tab 的草稿/滚动。
+ *   删除会话联动场景调用方已预先保存，传 false 防止旧视图 DOM 状态污染新活动 tab 缓存。
+ */
+async function activateConversation(conversationId, { saveCurrent = true } = {}) {
+    // 1) 保存当前活动 tab 的草稿与滚动位置（切换前）
+    if (saveCurrent) saveActiveTabViewState();
+    // 2) 打开/激活 tab（已存在仅激活，不重复开）
+    const tab = openTab(conversationId);
+    if (!tab) return;
+    // 3) 补全 tab 的 title/characterId：已知对话数据直接取；未知经 API 获取
+    let conv = state.conversations.find((c) => c.id === conversationId);
+    if (!conv) {
+        try {
+            conv = await conversations.get(conversationId);
+        } catch {
+            // 忽略 — 至少尝试加载消息
+        }
+    }
+    if (conv) {
+        updateTab(conversationId, { title: conv.title, characterId: conv.character_id });
+    }
+    // 4) 恢复新 tab 的草稿与滚动位置
+    restoreTabViewState(getTab(conversationId));
+    // 5) 懒加载消息（缓存为空才请求）+ 头部渲染
+    await loadTabMessages(conversationId);
+    // 6) 刷新发送按钮两态 + 列表高亮 + 视图（已在聊天视图则跳过 switchView 的重复 loadConversations）
+    refreshSendButton();
+    renderConversations();
+    if (state.currentView !== 'chat') switchView('chat');
 }
 
 // ══════════════════════════════════════════════════
@@ -549,9 +660,11 @@ async function loadMessages() {
 // ══════════════════════════════════════════════════
 
 chatDom.btnSend.addEventListener('click', () => {
-    if (state.isStreaming) {
-        // 流式生成中 → 点击为「停止生成」
-        state.activeStream?.abort();
+    const tab = getActiveTab();
+    if (!tab) return;
+    if (tab.isStreaming) {
+        // 流式生成中 → 点击为「停止生成」（停止活动 tab 的流式句柄）
+        tab.activeStream?.abort();
     } else {
         handleSend();
     }
@@ -666,27 +779,11 @@ function renderSearchResults(results, query) {
 }
 
 /**
- * 跳转到指定对话
+ * 跳转到指定对话（搜索结果点击）— 与侧栏点击/创建对话共用统一激活流程
  * @param {number} conversationId
  */
 async function navigateToConversation(conversationId) {
-    state.currentConversationId = conversationId;
-    // 先尝试从本地状态找
-    let conv = state.conversations.find(c => c.id === conversationId);
-    if (conv) {
-        state.currentCharacterId = conv.character_id;
-    } else {
-        // 从 API 获取
-        try {
-            conv = await conversations.get(conversationId);
-            if (conv) state.currentCharacterId = conv.character_id;
-        } catch {
-            // 忽略 — 至少尝试加载消息
-        }
-    }
-    switchView('chat');
-    renderConversations();
-    await loadMessages();
+    await activateConversation(conversationId);
 }
 
 // ── 搜索输入事件 ──
@@ -735,10 +832,17 @@ async function init() {
     // 初始化设置面板事件绑定（主题、侧栏、保存、清空等）
     initSettingsPanel({
         onConversationsCleared: () => {
+            // 「清空所有对话」联动：清空全部 tab（含写 sessionStorage 空集）+ 空态
+            closeAllTabs();
             renderConversations();
-            loadMessages();
+            showEmptyState();
+            refreshSendButton();
         },
     });
+
+    // 无活动 tab → 现有空态（P6.5-2 起会话 UI 单一事实来源 = 活动 tab；
+    // P6.5-4 将在此前接入 sessionStorage 恢复）
+    if (!getActiveTab()) showEmptyState();
 }
 
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）
