@@ -13,7 +13,22 @@
 
 ## 活跃工单
 
-> 当前无未完成工单。P6.4 已全部归档（见下）。
+> 当前无未完成工单。P6.4 已全部归档（见下）。评审遗留见下方技术债区。
+
+---
+
+## 技术债区
+
+> 期末/波次审核的非阻断发现落盘于此（带推荐强度），供未来会话与下一轮 kickoff 可见。修复时机自由，不影响当前交付。
+
+| 编号 | 遗留项 | 来源 | 推荐强度 |
+|------|--------|------|----------|
+| T-01 | 数据目录 APPDATA 缺失/空串兜底三分歧（壳 CWD vs run_backend `Path.home()` vs 迁移 `home\AppData\Roaming`）——建议统一同一兜底并补测试 | 波 2 降配审核遗留 1（期末复核仍成立） | Strong |
+| T-02 | DATABASE_URL 特殊字符（`#`/`?`）不编码：CONVER_DATA_DIR 含特殊字符时壳注入的 URL 截断失效（迁移脚本 `_open_readonly` 已 quote，壳侧未对齐） | 期末 Falsify 非阻断 1 | Worth exploring |
+| T-03 | smoke-desktop.ps1 按全局进程名 `conver_backend` 清理，与脚本自述「残留检查严格限定自己端口」原则不一致 | 期末 Falsify 非阻断 2 | Worth exploring |
+| T-04 | run_backend 端口越界 SystemExit 在 try 外，CREATE_NO_WINDOW 下不留日志（经壳不可达，壳恒传合法 u16） | 波 2 降配审核遗留 5 | Speculative |
+| T-05 | setup_tray 失败即整体启动失败（响亮失败、低概率；图标产物齐全） | 波 2 降配审核遗留 4 | Speculative |
+| T-06 | CONVER_DATA_DIR 为 POSIX 路径（`/c/...`）不做归一化（三方行为自洽但落位不合预期；文档已警告） | 波 2 降配审核遗留 2 | Speculative |
 
 ---
 
@@ -21,7 +36,7 @@
 
 ### P6.4 Tauri 桌面版（2026-08-11 波次收官）
 
-> 规格 `.scratch/p64-tauri/spec.md`（approved，D1-D10 共识 + spike 结论折回 v0.2）。三波执行：波 1 并行 4（SPK-R1/SPK-R2 spike + P6.4-1/P6.4-3）、波 2 并行 3（P6.4-2/P6.4-4/P6.4-5）、波 3 串行 1（P6.4-6）；merge 零回退冲突；波 1 降配增量审核 5 findings（F1/F2 派回修复，F3-F5 非阻断）。spike#01（PyInstaller onedir 一次成型 + 三项硬契约）、spike#02（WebView2 不拦截 blob 下载 → 无导出回退条件分支）。测试同步（文档规范 §三）：pytest **259 + 1 skip** / Vitest **186** / cargo test **41**，全部全绿。
+> 规格 `.scratch/p64-tauri/spec.md`（approved，D1-D10 共识 + spike 结论折回 v0.2）。三波执行：波 1 并行 4（SPK-R1/SPK-R2 spike + P6.4-1/P6.4-3）、波 2 并行 3（P6.4-2/P6.4-4/P6.4-5）、波 3 串行 1（P6.4-6）；merge 零回退冲突；波 1 降配增量审核 5 findings（F1/F2 派回修复，F3-F5 非阻断）。spike#01（PyInstaller onedir 一次成型 + 三项硬契约）、spike#02（WebView2 不拦截 blob 下载 → 无导出回退条件分支）。**期末四轴 code-review**：2 阻断（壳 prod 无条件 spawn python 干净机启动失败 → `722ba4c` 随包资源定位 + 干净环境冒烟回归；spec `datas=[]` 打包态 UI 404 → `a29c501` 前端运行子集随包挂载）→ 修复复审放行 + 整改三项（`217385f`：build-backend 前置 cargo test 前 / datas 接线断言 / smoke 清除残留 env）。安装器形态冒烟 5 项全过（prod 随包定位 + GET / 200 应用标记 + 空库首启 + 退出无残留）。测试同步（文档规范 §三）：pytest **261 + 1 skip** / Vitest **186** / cargo test **43**，全部全绿。
 >
 > 人工项（R6）：验收 8（托盘/自启注册表）与验收 9（导出下载）由 docs/tauri-desktop.md §6 人工清单记录。
 

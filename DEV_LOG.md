@@ -11,10 +11,11 @@
 - **spike 结论**：SPK-R1 PyInstaller onedir **一次成型**（2.27s 就绪、25M、零 hiddenimports；三项硬契约：脚本启动器入口 / spec pathex=仓库根 / DATABASE_URL 必须 Windows 绝对路径 + 日志落盘）；SPK-R2 WebView2 **不拦截** blob 下载（三种机制全放行）→ **无导出回退条件分支**，验收 9 人工点一次导出闭合
 - **波次遥测**：波 1 并行 4（2 spike + 2 implement）、波 2 并行 3、波 3 串行 1；merge **零回退冲突**；波 1 降配增量审核 5 findings（F1 CONVER_DATA_DIR 壳侧未对齐 / F2 runtime.json 非原子写 → 派回 P6.4-4 修复 `908ff5a`；F3 %APPDATA% 不可写 / F4 迁移边缘大小写 / F5 cli 网络依赖 → 非阻断）
 - **F1/F2 修复**：数据目录环境变量对齐（壳/后端/迁移三方 CONVER_DATA_DIR 同一契约）+ runtime.json 原子写（临时文件 + rename，与迁移脚本 `_write_marker` 同款）
-- **测试**：pytest **259 + 1 skip**（P6.4-2 +20 打包用例、P6.4-3 +71 迁移用例）/ Vitest **186** / cargo test **41**（壳 Seam 1 纯逻辑），全绿
+- **测试**：pytest **261 + 1 skip**（P6.4-2 +22 打包用例、P6.4-3 +71 迁移用例）/ Vitest **186** / cargo test **43**（壳 Seam 1 纯逻辑），全绿
 - **P6.4-6 交付**：`scripts/build-desktop.ps1`（cargo test → pytest → vitest → tauri build → 冒烟，Git Bash link.exe 警告，R4 NSIS/WebView2 下载失败自动重试 + `--no-bundle` 降级）、`scripts/smoke-desktop.ps1`（验收 1-7 自动化：runtime.json 就绪 → /api/models 200 → %APPDATA% DB 表结构 → 优雅退出 → 端口释放无残留）、`docs/tauri-desktop.md`（构建/冒烟/数据目录/迁移/环境注意/人工清单）；NSIS `installMode: currentUser`（免管理员，卸载不动 %APPDATA% 数据）
 - **P6.4-6 冒烟实测避坑（已修）**：① 端口释放检查必须用**同步** `TcpClient.Connect`——异步 `BeginConnect`+`WaitHandle` 在连接被拒（端口已关）时 WaitHandle 不触发，永远误判「仍占用」（首轮冒烟假失败根因）；② 残留检查严格限定冒烟自己的端口（`Get-NetTCPConnection`）——按全局进程名/命令行匹配曾误杀本机正在运行的网页版 uvicorn（已恢复服务），教训：冒烟脚本绝不清理非自己启动的进程；③ `Write-Host "..." -f $x` 的 `-f` 会被解析为 `-ForegroundColor` 缩写参数 → 必须 `("..." -f $x)` 括号包裹
-- **P6.4-6 遗留交接**：① 壳 prod 模式后端定位仍走环境变量通道（CONVER_BACKEND_CMD），双击直启零配置需 Rust prod 探测（resource_dir 随包资源，超本工单范围）；② 打包后端 `datas=[]` 不随包挂载前端 UI（webview 就绪跳转根路径 404，API 全正常）——两项均记录于 docs/tauri-desktop.md §5，留主会话决策；③ 人工验收 8/9 清单在 docs §6
+- **期末四轴 code-review（2 阻断 → 修复 → 复审放行 → 冒烟闭合）**：① 阻断 1 壳 prod 无条件 spawn python（冒烟注入 env 掩盖）→ `722ba4c` 三优先级（env 覆盖 > 随包 exe 候选探测 > dev python）+ `tauri.conf.json` `bundle.resources`（安装器 2.3MB → 23.7MB）；Tauri Windows 实测 resources 装在 `%LOCALAPPDATA%\Conver System\_up_\dist\conver_backend\`（保留相对结构）——候选探测覆盖 `_up_`/平铺/无布局三分支；② 阻断 2 spec `datas=[]` 打包态 `GET /` 404 → `a29c501` `_FRONTEND_RUNTIME` 挂载 index.html/css/js 运行子集（排除 node_modules/tests，+364K）；③ 复审整改 `217385f`：build-backend 前置到 cargo test 前（tauri-build 编译期校验 resources 路径，干净检出必挂）/ datas 接线断言（原始形态 `datas=[]` 不改定义只改接线行，token 断言漏报）/ 冒烟安装态清除父环境残留 CONVER_BACKEND_CMD（防假干净）；④ **安装器形态冒烟 5 项全过**（prod 随包定位不注入 env + GET / 200 含应用标记 + 空库首启 + 退出无残留）——真实双击路径纳入自动化闭环
+- **P6.4 遗留交接**：期末审核 2 阻断已修复闭合（见上）；人工验收 8/9 清单在 docs/tauri-desktop.md §6；非阻断遗留入 TICKETS 技术债区（T-01~T-06）
 
 ---
 
