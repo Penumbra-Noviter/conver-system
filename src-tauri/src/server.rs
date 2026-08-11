@@ -101,20 +101,80 @@ pub struct BackendConfig {
     pub extra_env: Vec<(String, String)>,
 }
 
-/// 从环境变量解析后端配置：`CONVER_BACKEND_CMD`（缺省开发态 uvicorn 命令）、
-/// `CONVER_BACKEND_CWD`（工作目录）。命令串非法时返回 `Err`。
-pub fn backend_config_from_env() -> Result<BackendConfig, String> {
-    let cmd = std::env::var("CONVER_BACKEND_CMD")
-        .unwrap_or_else(|_| DEFAULT_DEV_BACKEND_CMD.to_string());
-    let mut parts = parse_command_line(&cmd)?;
-    let program = parts.remove(0);
+/// 从环境变量与运行模式解析后端配置：
+///
+/// 优先级（P6.4-6 期末审核阻断 1 修复——安装态双击直启必须可用，US-1）：
+/// 1. `CONVER_BACKEND_CMD` 显式覆盖（权威通道，行为不变）；
+/// 2. 生产态（`dev_mode=false`，即 release 构建）且资源目录可用 → **随包后端 exe**
+///    （`resource_dir/conver_backend/conver_backend.exe`，安装器经 bundle.resources 分发，
+///    干净用户机无 python 也可双击即用）；
+/// 3. 其余（开发态 / 生产态但无资源目录如 --no-bundle 直接跑）→ 开发态 uvicorn 命令。
+///
+/// `dev_mode` 由调用方注入（lib.rs：`cfg!(debug_assertions)`），保证两个分支均可单测。
+pub fn backend_config_from_env(
+    dev_mode: bool,
+    resource_dir: Option<&Path>,
+) -> Result<BackendConfig, String> {
     let cwd = std::env::var("CONVER_BACKEND_CWD").ok().map(PathBuf::from);
+    if let Ok(cmd) = std::env::var("CONVER_BACKEND_CMD") {
+        let mut parts = parse_command_line(&cmd)?;
+        let program = parts.remove(0);
+        return Ok(BackendConfig {
+            program,
+            args: parts,
+            cwd,
+            extra_env: Vec::new(),
+        });
+    }
+    if !dev_mode {
+        if let Some(dir) = resource_dir {
+            if let Some(exe) = find_prod_backend_exe(dir) {
+                return Ok(BackendConfig {
+                    program: exe.to_string_lossy().into_owned(),
+                    args: Vec::new(),
+                    cwd,
+                    extra_env: Vec::new(),
+                });
+            }
+        }
+    }
+    let mut parts = parse_command_line(DEFAULT_DEV_BACKEND_CMD)?;
+    let program = parts.remove(0);
     Ok(BackendConfig {
         program,
         args: parts,
         cwd,
         extra_env: Vec::new(),
     })
+}
+
+/// 生产态后端可执行文件候选（按 Tauri Windows 打包布局探测，优先返回存在的）：
+///
+/// 1. `resource_dir/_up_/dist/conver_backend/conver_backend.exe`——NSIS 安装态实测布局：
+///    `bundle.resources` 保留相对 src-tauri 的路径结构（`../dist/conver_backend`），
+///    整体置于安装目录的 `_up_` 子目录下；
+/// 2. `resource_dir/conver_backend/conver_backend.exe`——手工分发 / 未来布局兜底。
+///
+/// 路径含空格可直接作为 `Command::new` 程序名，无需引号；
+/// 安装态 `resource_dir` = 安装目录（NSIS currentUser → `%LOCALAPPDATA%\<productName>\`）。
+pub fn prod_backend_exe_candidates(resource_dir: &Path) -> Vec<PathBuf> {
+    vec![
+        resource_dir
+            .join("_up_")
+            .join("dist")
+            .join("conver_backend")
+            .join("conver_backend.exe"),
+        resource_dir
+            .join("conver_backend")
+            .join("conver_backend.exe"),
+    ]
+}
+
+/// 返回第一个实际存在的随包后端 exe（无则 None——调用方回退开发态命令）。
+pub fn find_prod_backend_exe(resource_dir: &Path) -> Option<PathBuf> {
+    prod_backend_exe_candidates(resource_dir)
+        .into_iter()
+        .find(|p| p.is_file())
 }
 
 // ── 子进程启停 ──────────────────────────────────────────────────────────────

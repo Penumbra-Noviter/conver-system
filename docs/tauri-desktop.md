@@ -25,9 +25,9 @@ powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 
 产物：
 
-- 安装器：`src-tauri/target/release/bundle/nsis/Conver System_0.1.0_x64-setup.exe`
+- 安装器：`src-tauri/target/release/bundle/nsis/Conver System_0.1.0_x64-setup.exe`（**内含后端随包资源** `dist/conver_backend`，经 `bundle.resources` 分发——安装后即可双击直启，无需 python）
 - 壳 exe：`src-tauri/target/release/conver-system.exe`
-- 后端打包 exe：`dist/conver_backend/conver_backend.exe`（build-backend.ps1 产出；冒烟缺失时自动补齐）
+- 后端打包 exe：`dist/conver_backend/conver_backend.exe`（build-backend.ps1 产出；构建时缺失自动补齐——tauri build 的 resources 依赖它）
 
 常用参数：
 
@@ -58,6 +58,16 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-desktop.ps1 -UseInstaller
 | 5 | 首次运行 `%APPDATA%\ConverSystem\conver_system.db` 存在、表结构完整（`GET /api/characters` 返回 `[]`）；数据目录已存在时只验结构并告警 |
 | 6 | 壳经 `CONVER_EXIT_AFTER_SECS` 钩子优雅退出 → 端口释放 + 无 `conver_backend.exe` / uvicorn 残留（查端口而非 pid，P6.4-1 遗留） |
 | 7 | 迁移脚本幂等由 P6.4-3 pytest 用例覆盖；`-RunMigrationCheck` 可轻量复跑 |
+| 阻断 1 回归 | **干净环境用例**：`-UseInstaller` 且不注入 `CONVER_BACKEND_CMD` 启动已安装应用 → 壳按 prod 随包资源定位后端（`resource_dir/conver_backend/conver_backend.exe`）→ runtime.json ready + `/api/models` 200——真实用户双击路径纳入自动化闭环 |
+| 阻断 2 回归 | `GET /` 200 且含 `<title>Conver System` 应用标记（webview 就绪跳转目标；依赖 PyInstaller datas 随包前端，未合并前预期 FAIL） |
+
+后端通道语义（期末审核阻断 1 修复后）：
+
+| 场景 | CONVER_BACKEND_CMD | 壳定位 |
+|------|--------------------|--------|
+| 开发态（cargo run / debug 构建） | 未注入 | 缺省 `python -m uvicorn backend.app.main:app` |
+| 安装态（release 构建 + 安装器，**真实用户**） | 未注入 | **随包资源**：`%LOCALAPPDATA%\Conver System\_up_\dist\conver_backend\conver_backend.exe`（Tauri Windows 把 resources 置于安装目录 `_up_` 子目录并保留相对路径结构；壳按候选探测，平铺布局兜底） |
+| 任意态显式注入 | 注入（`-BackendEnv` 或构建脚本） | env 权威通道优先 |
 
 关键参数：
 
@@ -121,8 +131,8 @@ $env:CONVER_DATA_DIR = "D:\conver-data"   # 覆盖后桌面版全部数据落此
 
 ## 5. 已知限制（P6.4-6 交接记录）
 
-1. **壳的生产模式后端定位依赖环境变量通道**：打包壳默认以 `CONVER_BACKEND_CMD` 指向后端 exe（冒烟已自动化此通道）。双击安装后直启的「零配置」形态需要壳内置 prod 探测（`resource_dir()` 定位随包资源），属超出 P6.4-6 文件范围的 Rust 改动，留给主会话决策。
-2. **打包后端不随包挂载前端 UI**：PyInstaller 配方 `datas=[]`（main.py frozen 分支 exists() 守卫跳过挂载）——打包态下 webview 就绪后跳转 `http://127.0.0.1:\<port\>/` 会得到 404；API 全部正常。若需要随包 UI，在 `backend/conver_backend.spec` 的 `datas` 追加 `frontend` 目录即可（配方注释已写明方法）。
+1. ~~壳的生产模式后端定位依赖环境变量通道~~ —— **已修复**（2026-08-11 期末审核阻断 1）：`bundle.resources` 随包分发后端，壳 release 构建按候选探测定位随包 exe（`server.rs::prod_backend_exe_candidates`：`_up_/dist/conver_backend/` 实测布局 + 平铺兜底），`CONVER_BACKEND_CMD` 覆盖保留；冒烟 `-UseInstaller` 干净环境用例（不注入 env）纳入自动化闭环。
+2. **打包后端不随包挂载前端 UI**：PyInstaller 配方 `datas=[]`（main.py frozen 分支 exists() 守卫跳过挂载）——打包态下 webview 就绪后跳转 `http://127.0.0.1:\<port\>/` 会得到 404；API 全部正常。修复：在 `backend/conver_backend.spec` 的 `datas` 追加 `frontend` 目录（配方注释已写明方法）；冒烟已加 `GET /` 标记断言防复发（期末审核阻断 2，修复合并后必须 PASS）。
 3. **验收 8/9 人工项**：托盘/自启/导出下载由人工清单记录（见下节），自动化冒烟不覆盖 GUI 行为（R6）。
 
 ## 6. 人工验收清单（验收 8 / 9，R6）

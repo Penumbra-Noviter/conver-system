@@ -42,7 +42,11 @@ param(
     # 冒烟结束后清理数据目录 %APPDATA%\ConverSystem（危险：会删除既有数据，默认关）
     [switch]$CleanAppData,
     # 轻量复跑迁移脚本幂等（验收 7，可选）
-    [switch]$RunMigrationCheck
+    [switch]$RunMigrationCheck,
+    # 显式注入后端命令（CONVER_BACKEND_CMD）。缺省语义：
+    #   安装态（-UseInstaller）= 不注入，壳按 prod 随包资源定位后端（真实用户路径回归，阻断 1）；
+    #   非安装态 = 注入打包后端 exe（快路径，验证 env 通道）
+    [string]$BackendEnv = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -118,16 +122,31 @@ if ($DbPreExisted) {
     Write-Host "检测到既有数据目录（非首启）：验收 5 仅验表结构，空库断言降级为告警" -ForegroundColor Yellow
 }
 
-# ── 后端 exe 缺失时自动补齐 ────────────────────────────────────────────────
+# ── 后端通道判定：注入 vs 随包定位 ──────────────────────────────────────────
 
-if (-not (Test-Path $BackendExe)) {
-    if ($SkipBackendBuild) {
-        throw "未找到后端打包 exe：$BackendExe（-SkipBackendBuild 已指定，不自动打包）"
-    }
-    Write-Host "后端打包 exe 缺失，调用 build-backend.ps1（PyInstaller onedir）..." -ForegroundColor Yellow
-    & (Join-Path $PSScriptRoot "build-backend.ps1")
+# 安装态（-UseInstaller）且未显式指定 -BackendEnv → 不注入 CONVER_BACKEND_CMD，
+# 壳在 prod 模式（release 构建）下从随包资源目录定位后端 exe——真实用户双击路径的回归用例。
+$injectBackendEnv = $false
+if ($BackendEnv) {
+    $injectBackendEnv = $true
+    $backendCmdValue = $BackendEnv
+} elseif (-not $UseInstaller) {
+    # 非安装态快路径：显式指向打包后端 exe（验证 env 权威通道）
+    $injectBackendEnv = $true
+    $backendCmdValue = $BackendExe
+}
+
+if ($injectBackendEnv) {
+    # ── 后端 exe 缺失时自动补齐（仅注入路径需要）────────────────────────
     if (-not (Test-Path $BackendExe)) {
-        throw "build-backend.ps1 执行后仍未找到 $BackendExe"
+        if ($SkipBackendBuild) {
+            throw "未找到后端打包 exe：$BackendExe（-SkipBackendBuild 已指定，不自动打包）"
+        }
+        Write-Host "后端打包 exe 缺失，调用 build-backend.ps1（PyInstaller onedir）..." -ForegroundColor Yellow
+        & (Join-Path $PSScriptRoot "build-backend.ps1")
+        if (-not (Test-Path $BackendExe)) {
+            throw "build-backend.ps1 执行后仍未找到 $BackendExe"
+        }
     }
 }
 
@@ -166,14 +185,20 @@ try {
 
     Write-Host ""
     Write-Host "==> 启动桌面壳：$AppExe" -ForegroundColor Cyan
-    Write-Host "    后端通道：CONVER_BACKEND_CMD=$BackendExe" -ForegroundColor Cyan
+    if ($injectBackendEnv) {
+        Write-Host "    后端通道：CONVER_BACKEND_CMD=$backendCmdValue（env 注入）" -ForegroundColor Cyan
+    } else {
+        Write-Host "    后端通道：prod 随包资源定位（不注入 env——真实用户双击路径）" -ForegroundColor Cyan
+    }
     Write-Host "    数据目录：$DataDir" -ForegroundColor Cyan
     Write-Host "    退出钩子：CONVER_EXIT_AFTER_SECS=$ExitAfterSecs" -ForegroundColor Cyan
 
-    # 壳-后端环境变量通道（spec 接口契约）：注入打包后端路径 + 自动退出计时
+    # 壳-后端环境变量通道（spec 接口契约）：条件注入后端命令 + 自动退出计时
     $origBackendCmd = $env:CONVER_BACKEND_CMD
     $origExitAfter = $env:CONVER_EXIT_AFTER_SECS
-    $env:CONVER_BACKEND_CMD = '"' + $BackendExe + '"'
+    if ($injectBackendEnv) {
+        $env:CONVER_BACKEND_CMD = '"' + $backendCmdValue + '"'
+    }
     $env:CONVER_EXIT_AFTER_SECS = [string]$ExitAfterSecs
 
     $ShellProc = Start-Process -FilePath $AppExe -PassThru
@@ -223,6 +248,22 @@ try {
     # ── 验收 4b：GET /api/models 200 ─────────────────────────────────────
     $modelsResp = Invoke-WebRequest -UseBasicParsing -Uri ("http://127.0.0.1:{0}/api/models" -f $port) -TimeoutSec 10
     Add-Result "验收4b-GET /api/models" ($modelsResp.StatusCode -eq 200) ("HTTP {0}" -f $modelsResp.StatusCode)
+
+    # ── 阻断 2 冒烟断言：GET / 挂载前端 UI（webview 就绪跳转目标）─────────
+    # 依赖 PyInstaller 配方 datas 随包分发前端（期末审核阻断 2，另一 agent 修复）；
+    # datas 未合并前本断言预期 FAIL（404），合并后必须 PASS——防「webview 跳转 404」复发。
+    $rootOk = $false
+    $rootDetail = ""
+    try {
+        $rootResp = Invoke-WebRequest -UseBasicParsing -Uri ("http://127.0.0.1:{0}/" -f $port) -TimeoutSec 10
+        $rootHasMark = $rootResp.Content -match "<title>Conver System"
+        $rootOk = $rootResp.StatusCode -eq 200 -and $rootHasMark
+        $rootDetail = "HTTP {0} 含应用标记={1}（期望 200 + <title>Conver System）" -f $rootResp.StatusCode, $rootHasMark
+    } catch {
+        $rootOk = $false
+        $rootDetail = "GET / 失败（datas 未随包分发时预期 404）：" + $_.Exception.Message
+    }
+    Add-Result "阻断2-GET / 前端挂载" $rootOk $rootDetail
 
     # ── 验收 5：DB 存在 + 表结构完整（GET /api/characters）───────────────
     $dbOk = Test-Path $DbPath
