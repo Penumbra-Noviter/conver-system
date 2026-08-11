@@ -35,7 +35,7 @@
 
 ### 2026-08-11 | 验证+修复 | OPT-1 GUI 黑盒回归（375px / 侧栏折叠 / 多 tab 流式）+ 错误气泡 CSS 回归修复
 
-- **流程**：IAB webview 本会话未就绪（browser guest not attached 连续 4 次）→ 切换 Playwright MCP 通道（上会话既有通道）；验证方法采用**本地 mock SSE**（`.scratch/gui-verify/mock-sse-server.cjs`，`page.route` 网络层拦截 `/api/chats/stream` → `mock-stream` 慢速 token / `mock-error` HTTP 422 / `mock-stream-error` 流中 error 帧三端点），**未触发真实外部 API**（安全项约束）
+- **流程**：IAB webview 本会话未就绪（browser guest not attached 连续 4 次）→ 切换 Playwright MCP 通道（上会话既有通道）；验证方法采用**本地 mock SSE**（一次性 `page.route` 网络层拦截 `/api/chats/stream` → `mock-stream` 慢速 token / `mock-error` HTTP 422 / `mock-stream-error` 流中 error 帧三端点），**未触发真实外部 API**（安全项约束）
 - **T1 375px**：`docScrollWidth==clientWidth==375`，全元素扫描无横向溢出；底部 5 图标导航 + 对话列表默认收起 + 空态 + 单列角色卡片（vision 核验 SVG 线条图标、长文本省略号截断、头像字母完整无裁剪）
 - **T2 主导航侧栏折叠/展开**：折叠 `aside` 208→0px（几何 + 按钮变「展开侧栏」+ 浮动展开按钮）、展开回 208px 主区 721px 还原；全程无横向滚动无重叠
 - **T3 多 tab 流式回归（mock SSE）**：① 复制反馈 `clipboard→check(+copied)→1.5s 还原`，连点无残留；② 流式停止：按钮 stop↔send 两态 + tab 脉冲点 + 部分内容保留 +「（已停止）」+ tab-warn warning 图标；③ 后台流式：流式中开第二会话后台 tab 保持脉冲点、活动 tab 按钮 send、切回内容完整累积；④ 错误路径：HTTP 422（错误气泡 + 按钮还原）+ 流中 error 帧（error 气泡稳定 6 采样无重载，streamSettled 守卫生效）
@@ -57,7 +57,7 @@
 
 ### 2026-08-10 | 实现 | 架构深化 8 候选（improve-codebase-architecture 全自动 kickoff，merge 链 83bb9bf/3af9b61/1f2fdcc）
 
-- **流程**：Explore 扫描产出 8 候选（2 Strong/4 Worth/2 Speculative）→ 用户授权全自动 → Grilling/plan-tickets 子智能体多次空返回 → 主会话降级自调研设计 + 拆票（spec + 8 工单落 `.scratch/architecture-deepening/`）→ 两波并行（每波 4 worktree 文件互斥）→ 期末三轴 code-review 放行 + 修复
+- **流程**：Explore 扫描产出 8 候选（2 Strong/4 Worth/2 Speculative）→ 用户授权全自动 → Grilling/plan-tickets 子智能体多次空返回 → 主会话降级自调研设计 + 拆票（spec + 8 工单）→ 两波并行（每波 4 worktree 文件互斥）→ 期末三轴 code-review 放行 + 修复
 - **波 1**（ARC-1/2/3/4）：StreamSession 流式回合结算深模块（createStreamSession + mergeFreshList 三分支：fresh 整体替换/stale 位置结算/失败 anchor 写回；anchor = 本流 user 消息对象引用——索引会漂移但引用永不移位，根治 R2 并发流占位清除）；closeTabs + closeConversationsAndResettle 级联收口（仅 wasActive 重激活）；标题策略收口 conversation.py；requestBlob + 超时（关 R1）
 - **波 2**（ARC-5/6/7/8）：getTabDisplay 展示契约（关 R3）；app.js 拆分（format.js 模板纯函数 + conversation-activation.js 激活编排深模块，setActivationHooks 注入）；resolveCredentialTarget 纯函数；services/schemas __init__ 导出
 - **期末审核 findings**：Falsify 实锤 1 条——stale 失配 no-op 导致前流最终消息缓存丢失（非回归、双故障边缘）→ 修复：stale 守卫失败回退 settleByPosition（幂等保证不重复），FIX-A 测试断言同步适配；Standards 2 条（app.js 死导入清理、settings-panel 补 __all__）一并修；Spec 1 条（ARC-6 签名漂移为良性，功能等价）

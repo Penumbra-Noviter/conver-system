@@ -38,7 +38,7 @@
 
 ### 架构深化 8 候选（2026-08-10，improve-codebase-architecture 全自动 kickoff）
 
-> 两波并行（波 1：ARC-1/2/3/4；波 2：ARC-5/6/7/8，均文件互斥 worktree），期末三轴 code-review 放行 + 修复（`b78db1c`）。P6.5-R1~R3 候选由 ARC-4/ARC-1/ARC-5 分别关闭。规格见 `.scratch/architecture-deepening/spec.md`。
+> 两波并行（波 1：ARC-1/2/3/4；波 2：ARC-5/6/7/8，均文件互斥 worktree），期末三轴 code-review 放行 + 修复（`b78db1c`）。P6.5-R1~R3 候选由 ARC-4/ARC-1/ARC-5 分别关闭。规格决策已并入本归档与 DEV_LOG。
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
@@ -53,7 +53,7 @@
 
 ### P6.5 多 tab 会话管理（2026-08-10）
 
-> 应用内多会话工作区：tab 条切换、后台流式继续生成、完成/停止/出错按发起时捕获的 conversation id 写回、刷新后按 sessionStorage 恢复。规格见 `.scratch/p6.5-multi-tab/spec.md`（12 项共识决策）。
+> 应用内多会话工作区：tab 条切换、后台流式继续生成、完成/停止/出错按发起时捕获的 conversation id 写回、刷新后按 sessionStorage 恢复。12 项共识决策见 CONSENSUS §11。
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
