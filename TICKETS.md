@@ -34,7 +34,7 @@
 | P6.4-2 | 后端 PyInstaller onedir 打包固化（启动器+spec+_MEIPASS+日志落盘契约） | 2026-08-11 | `b9e4eba` |
 | P6.4-4 | 托盘/开机自启/单实例 + 波 1 审核 F1/F2 修复（CONVER_DATA_DIR 对齐 + runtime.json 原子写） | 2026-08-11 | `e1fbc96` + `908ff5a` |
 | P6.4-5 | 品牌图标全套（SVG → Playwright 1024 PNG → tauri icons） | 2026-08-11 | `94f21c3` |
-| P6.4-6 | 安装器 + 一键构建冒烟 + 文档归档（NSIS currentUser；build-desktop.ps1/smoke-desktop.ps1；验收 1-7 自动化） | 2026-08-11 | `47752e0` |
+| P6.4-6 | 安装器 + 一键构建冒烟 + 文档归档（NSIS currentUser；build-desktop.ps1/smoke-desktop.ps1；验收 1-7 自动化） | 2026-08-11 | `1e93a97` |
 
 > ⚠️ Ollama 本地模型支持 — **已封存**（2026-08-03 用户决定：发布获得用户反馈后再考虑）
 
