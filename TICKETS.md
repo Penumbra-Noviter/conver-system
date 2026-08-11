@@ -34,7 +34,7 @@
 | OPT-1 | UI 克制化：`icons.js` 图标 seam（Object.hasOwn + 白名单防注入）、emoji 清除（用户数据保留）、深浅主题 token 单一来源、复制反馈竞态修复（WeakMap）；Vitest 186 + pytest 188 全绿；GUI 验证：375px 无横向滚动 / 侧栏折叠展开 / 多 tab 流式停止·错误·复制反馈 全过 | 2026-08-11 | `8ce17bd` |
 | OPT-1-FIX | 错误气泡警示样式回归：CSS 顶层 `.message.assistant .message-content`（`background:transparent`）覆盖 `.message.message-error` → 特异性 (0,4,0) 修复，深浅主题 GUI 复验通过 | 2026-08-11 | （见提交） |
 
-> ⚠️ **安全项（遗留，需用户处理）**：GUI 自动化曾读取到本机库中真实 API Key 前缀（sk-1ZET…），已停止读取；**建议用户立即轮换该 Key**（涉及 `https://api.kukuit.com`）。
+> ✅ **安全项（已结案 2026-08-11）**：GUI 自动化曾读取到本机库中真实 API Key 前缀（sk-1ZET…）；用户确认该 Key **早已过期**，无需轮换，停止读取约束继续保持。
 
 ### 架构深化 8 候选（2026-08-10，improve-codebase-architecture 全自动 kickoff）
 

@@ -12,7 +12,7 @@
 - **GUI 验证发现并修复 1 条回归（OPT-1-FIX）**：CSS 顶层新增 `.message.assistant .message-content`（`background:transparent;border:none`，style.css:2945）位于 `.message.message-error`（:922）之后，同特异性 (0,3,0) 覆盖错误气泡警示样式（深浅主题均受影响）→ 错误规则改 `.message.assistant.message-error` 特异性 (0,4,0)，GUI 深浅主题复验 + Vitest 186 仍全绿
 - **验证方法**：本地 mock SSE 服务器（网络层 `page.route` 拦截 `/api/chats/stream` → 慢速 token/422/error 帧三端点，未触发真实外部 API）；IAB webview 本会话未就绪 → 切换 Playwright MCP 通道（DEV_LOG 记录的既有通道）
 - **测试**：Vitest **186** 全绿（+9：icons 3 / components-icons 4 / tabs 语义 3 净增——复制竞态、send/stop、tab 图标、settings sun/moon/chevron）；pytest **188** 不变
-- **安全提醒**：GUI 自动化 DOM 输出暴露了本机数据库中的真实 API Key 前缀（sk-1ZET…），已停止读取该区域；**建议用户立即轮换该 Key**（涉及 `https://api.kukuit.com`）
+- **安全提醒（已结案）**：GUI 自动化 DOM 输出曾暴露本机数据库中的真实 API Key 前缀（sk-1ZET…）；用户确认该 Key **早已过期**，无需轮换；GUI 验证继续遵守「设置页只验证结构、不读取密钥值」约束
 
 ---
 
