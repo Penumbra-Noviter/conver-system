@@ -299,11 +299,20 @@ pub struct RuntimeInfo {
 }
 
 /// 写入 runtime.json（人类可读 JSON 文本；父目录必须已存在，由调用方保证）。
+///
+/// 原子写（F2，与迁移脚本 `_write_marker` 同款）：先写同目录临时文件再 rename 替换，
+/// 保证轮询方（就绪页 / 冒烟脚本）读到的始终是完整 JSON，不会出现半截文件。
 pub fn write_runtime_json(path: &Path, info: &RuntimeInfo) -> io::Result<()> {
     let json = serde_json::to_string_pretty(info).map_err(|e| {
         io::Error::new(io::ErrorKind::InvalidData, format!("序列化 runtime.json 失败: {e}"))
     })?;
-    std::fs::write(path, format!("{json}\n"))
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "runtime.json 路径缺少文件名")
+    })?;
+    let tmp_path = path.with_file_name(format!("{}.tmp", file_name.to_string_lossy()));
+    std::fs::write(&tmp_path, format!("{json}\n"))?;
+    std::fs::rename(&tmp_path, path)?;
+    Ok(())
 }
 
 /// 读取 runtime.json（文件缺失 / JSON 损坏返回 Err）。
@@ -320,8 +329,14 @@ pub fn data_dir_path(base: &Path) -> PathBuf {
     base.join(DATA_DIR_NAME)
 }
 
-/// 默认数据目录：`%APPDATA%\ConverSystem`（APPDATA 缺失时回退 CWD 下）。
+/// 默认数据目录（F1，与迁移脚本 P6.4-3 同优先级契约）：
+/// `CONVER_DATA_DIR`（环境变量覆盖，值即数据目录；空串视为未设置）→ `%APPDATA%\ConverSystem` → CWD 兜底。
 pub fn default_data_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os("CONVER_DATA_DIR") {
+        if !dir.is_empty() {
+            return PathBuf::from(dir);
+        }
+    }
     match std::env::var_os("APPDATA") {
         Some(base) => data_dir_path(Path::new(&base)),
         None => data_dir_path(&std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
