@@ -13,12 +13,6 @@
 
 ## 活跃工单
 
-### OPT-1 UI 克制化与图标协议收口（2026-08-11）
-
-- [ ] 🔄 进行中：保留 Warm Stone 与现有应用壳，降低常驻发光/卡片套娃/AI 模板感；统一动态 SVG 图标 seam（`icons.js`，含原型链/属性注入校验），移除应用自带 emoji 图标；深浅主题 token 单一来源收口；迁移并补充语义测试（Vitest 186 全绿）；桌面深浅主题/角色/向导 1-6 步/确认框/设置/768px DOM 已验证
-- [ ] ⬜ 待办（GUI 阻断，未验证）：375px 无横向滚动实机核验；主导航侧栏折叠展开；多 tab 流式停止/错误/复制反馈的浏览器级回归；评审复审通过后归档（附 DEV_LOG 视觉取舍与测试数）
-- [ ] ⚠️ 安全项：GUI 自动化曾读取到本机库中真实 API Key 前缀，已停止读取并建议用户轮换该 Key
-
 ### P6.4 Tauri 桌面版
 
 - [ ] Tauri 项目初始化
@@ -30,6 +24,17 @@
 ---
 
 ## 已完成归档
+
+### OPT-1 UI 克制化与图标协议收口（2026-08-11）
+
+> 保留 Warm Stone 与现有应用壳，统一动态 SVG 图标 seam + emoji 清除 + 主题 token 单一来源；四轴 code-review + GUI 黑盒回归全部完成。GUI 验证发现 1 条 CSS 回归（错误气泡警示样式被后置 `.message.assistant .message-content` 顶层规则覆盖）→ 特异性修复（`message.assistant.message-error`）。验证采用本地 mock SSE（网络层拦截，未触发真实外部 API）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| OPT-1 | UI 克制化：`icons.js` 图标 seam（Object.hasOwn + 白名单防注入）、emoji 清除（用户数据保留）、深浅主题 token 单一来源、复制反馈竞态修复（WeakMap）；Vitest 186 + pytest 188 全绿；GUI 验证：375px 无横向滚动 / 侧栏折叠展开 / 多 tab 流式停止·错误·复制反馈 全过 | 2026-08-11 | `8ce17bd` |
+| OPT-1-FIX | 错误气泡警示样式回归：CSS 顶层 `.message.assistant .message-content`（`background:transparent`）覆盖 `.message.message-error` → 特异性 (0,4,0) 修复，深浅主题 GUI 复验通过 | 2026-08-11 | （见提交） |
+
+> ⚠️ **安全项（遗留，需用户处理）**：GUI 自动化曾读取到本机库中真实 API Key 前缀（sk-1ZET…），已停止读取；**建议用户立即轮换该 Key**（涉及 `https://api.kukuit.com`）。
 
 ### 架构深化 8 候选（2026-08-10，improve-codebase-architecture 全自动 kickoff）
 

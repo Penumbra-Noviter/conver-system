@@ -7,11 +7,11 @@
 
 ## 滚动摘要（2026-08-11）
 
-- **OPT-1 UI 克制化与图标协议收口（进行中）**：保留 Warm Stone 与现有应用壳，统一动态 SVG 图标 seam（`frontend/js/icons.js` 只暴露 `iconHtml`，`Object.hasOwn` 注册表 + 尺寸/class 白名单校验，未知/非法输入显式抛错）；清除应用自带 emoji 图标（`format.js`/`chat.js`/`tab-bar.js`/`modal.js`/`confirm-dialog.js`/`export-dialog.js`/`character-form.js`/`character-wizard.js`/`model-selector.js`/`model-utils.js`/`settings-panel.js`/`app.js`/`index.html`），用户数据中的 emoji 保留不过滤
-- **视觉底层**：深浅主题 token 单一来源收口到文件顶部（删除尾部补丁层），常驻 glow/渐变文字/负字距清零，助理消息开放阅读面、用户消息克制气泡、聊天宽度 920px、输入区底部写作工具条、`:focus-visible`/`prefers-reduced-motion`/精细指针 hover
+- **OPT-1 UI 克制化与图标协议收口（完成 + 归档）**：保留 Warm Stone 与现有应用壳，统一动态 SVG 图标 seam（`frontend/js/icons.js` 只暴露 `iconHtml`，`Object.hasOwn` 注册表 + 尺寸/class 白名单校验，未知/非法输入显式抛错）；清除应用自带 emoji 图标（用户数据中的 emoji 保留不过滤）；深浅主题 token 单一来源收口；复制反馈竞态修复（WeakMap）；**四轴 code-review + GUI 黑盒回归全部完成**（`8ce17bd`）
+- **GUI 验证（补 375px / 侧栏折叠 / 多 tab 流式回归，全部通过）**：375px 无横向滚动（`scrollWidth==clientWidth` 双视图核验 + vision）；主导航侧栏折叠/展开（DOM 几何 aside 208→0→208px + 视觉）；多 tab 流式停止（stop↔send 图标两态 +「已停止」+ 部分内容保留）、错误路径（HTTP 422 / 流中 error 帧 → 错误气泡 + tab-warn）、复制反馈（clipboard→check→还原 + 连点竞态）；全程无 JS 错误（仅存量 favicon 404 + 错误测试的 HTTP 422 资源日志）
+- **GUI 验证发现并修复 1 条回归（OPT-1-FIX）**：CSS 顶层新增 `.message.assistant .message-content`（`background:transparent;border:none`，style.css:2945）位于 `.message.message-error`（:922）之后，同特异性 (0,3,0) 覆盖错误气泡警示样式（深浅主题均受影响）→ 错误规则改 `.message.assistant.message-error` 特异性 (0,4,0)，GUI 深浅主题复验 + Vitest 186 仍全绿
+- **验证方法**：本地 mock SSE 服务器（网络层 `page.route` 拦截 `/api/chats/stream` → 慢速 token/422/error 帧三端点，未触发真实外部 API）；IAB webview 本会话未就绪 → 切换 Playwright MCP 通道（DEV_LOG 记录的既有通道）
 - **测试**：Vitest **186** 全绿（+9：icons 3 / components-icons 4 / tabs 语义 3 净增——复制竞态、send/stop、tab 图标、settings sun/moon/chevron）；pytest **188** 不变
-- **code-review（固定点 HEAD）→ 修复**：Falsify 实锤 `iconHtml` 原型链名称绕过 + 属性注入（Object.hasOwn + 白名单校验 + 红→绿测试）；复制反馈连续点击竞态（每按钮独立定时器 + WeakMap 收口）；Standards/Architecture 实锤 CSS 主题 token 双源（合并单一来源）；DEV_LOG 测试数过期（本次同步 183→186）
-- **GUI 黑盒回归（部分）**：桌面深浅主题切换、角色视图、创建角色向导 1-6 步、清空确认框（取消）、设置页、768px DOM（底部导航+空态）；**未完成**：375px、主导航侧栏折叠（浏览器运行时截图/点击超时阻断，非产品缺陷）
 - **安全提醒**：GUI 自动化 DOM 输出暴露了本机数据库中的真实 API Key 前缀（sk-1ZET…），已停止读取该区域；**建议用户立即轮换该 Key**（涉及 `https://api.kukuit.com`）
 
 ---
@@ -32,6 +32,16 @@
 ---
 
 ## 日志正文
+
+### 2026-08-11 | 验证+修复 | OPT-1 GUI 黑盒回归（375px / 侧栏折叠 / 多 tab 流式）+ 错误气泡 CSS 回归修复
+
+- **流程**：IAB webview 本会话未就绪（browser guest not attached 连续 4 次）→ 切换 Playwright MCP 通道（上会话既有通道）；验证方法采用**本地 mock SSE**（`.scratch/gui-verify/mock-sse-server.cjs`，`page.route` 网络层拦截 `/api/chats/stream` → `mock-stream` 慢速 token / `mock-error` HTTP 422 / `mock-stream-error` 流中 error 帧三端点），**未触发真实外部 API**（安全项约束）
+- **T1 375px**：`docScrollWidth==clientWidth==375`，全元素扫描无横向溢出；底部 5 图标导航 + 对话列表默认收起 + 空态 + 单列角色卡片（vision 核验 SVG 线条图标、长文本省略号截断、头像字母完整无裁剪）
+- **T2 主导航侧栏折叠/展开**：折叠 `aside` 208→0px（几何 + 按钮变「展开侧栏」+ 浮动展开按钮）、展开回 208px 主区 721px 还原；全程无横向滚动无重叠
+- **T3 多 tab 流式回归（mock SSE）**：① 复制反馈 `clipboard→check(+copied)→1.5s 还原`，连点无残留；② 流式停止：按钮 stop↔send 两态 + tab 脉冲点 + 部分内容保留 +「（已停止）」+ tab-warn warning 图标；③ 后台流式：流式中开第二会话后台 tab 保持脉冲点、活动 tab 按钮 send、切回内容完整累积；④ 错误路径：HTTP 422（错误气泡 + 按钮还原）+ 流中 error 帧（error 气泡稳定 6 采样无重载，streamSettled 守卫生效）
+- **❌ 回归实锤 + 修复（OPT-1-FIX）**：CSS 顶层新增 `.message.assistant .message-content`（`background:transparent;border:none`，style.css:2945）位于 `.message.message-error`（:922）之后，同特异性 (0,3,0) 覆盖错误气泡警示样式（`git show 63542ca` 对比确认 OPT-1 新增该规则；计算样式 + CSSOM 双证）。修复：错误规则改 `.message.assistant.message-error .message-content` 特异性 (0,4,0)，浅色/深色 GUI 复验均恢复 danger 底色/红边/警示色（vision 确认）
+- **浏览器缓存避坑**：浏览器加载到旧版 style.css（含已删 `4px 0px` 顶层规则）导致桌面误判错误样式丢失 → `page.route` 强制 no-cache 重取后按真实文件复验；初判「内容重置」为 mock 服务器 URL 分支 bug（`/mock-stream-error`.startsWith(`/mock-stream`) 命中慢速分支）非产品缺陷
+- **测试**：Vitest **186** 全绿（CSS 修复无回归）；pytest **188** 不变；截图存 `gui-test-screenshots/`（t1_375px、t2_before/collapsed/expanded、t3_copy_check、t3_streaming、t3_error、t3_multitab_background、t3_stream_error_frame、t3_error_fixed_light）
 
 ### 2026-08-11 | 实现 | OPT-1 UI 克制化与图标协议收口（进行中，未 commit）
 

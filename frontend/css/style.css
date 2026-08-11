@@ -918,8 +918,10 @@ body {
     box-shadow: var(--shadow-sm);
 }
 
-/* 错误气泡 — 警示底色，与正常回复区分（深浅色主题由 --danger-bg/--danger-text 变量驱动） */
-.message.message-error .message-content {
+/* 错误气泡 — 警示底色，与正常回复区分（深浅色主题由 --danger-bg/--danger-text 变量驱动）
+   特异性 (0,4,0) 需高于后置的 .message.assistant .message-content（0,3,0，响应式区），
+   否则「助理消息开放阅读面」规则会覆盖警示底色（GUI 验证回归）。 */
+.message.assistant.message-error .message-content {
     background: var(--danger-bg);
     border: 1px solid var(--danger);
     border-bottom-left-radius: var(--radius-bubble-tail);
