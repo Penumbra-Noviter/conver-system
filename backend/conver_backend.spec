@@ -15,10 +15,10 @@
   3. 无需手工 hiddenimports：uvicorn/pydantic/websockets/anyio/certifi/jinja2
      由 pyinstaller-hooks-contrib 覆盖，sqlalchemy 由 PyInstaller 核心 hook
      覆盖；fastapi/starlette/httpx/anthropic/openai 为纯 Python 静态导入。
-  4. 前端静态目录：main.py 的 _frontend_dir() 在 frozen 下指向
-     _MEIPASS/frontend；要随包分发前端时在本文件 datas 追加：
-         datas += [(str(ROOT / "frontend" / "dist"), "frontend")]  # 或打包产物目录
-     不追加则 exists() 守卫跳过挂载，API 不受影响。
+  4. 前端静态目录随包分发（期末审核阻断2 修复）：main.py 的 _frontend_dir()
+     在 frozen 下指向 _MEIPASS/frontend，datas 挂载 index.html/css/js
+     子集后 exists() 守卫命中，StaticFiles 自动挂载 → 打包态 GET / 返回 UI。
+     只打运行所需子集（见 _FRONTEND_RUNTIME），排除 node_modules(55M) 与 tests。
   5. 环境变量契约：Tauri 在 spawn 前设置 DATABASE_URL（sqlite 绝对路径），
      端口经 CLI --port 传入；.env 文件不打包（pydantic-settings 缺失时忽略）。
 """
@@ -26,11 +26,22 @@ from pathlib import Path
 
 ROOT = Path(SPECPATH).parent  # SPECPATH = spec 所在目录（backend/），ROOT = 仓库根
 
+# 前端运行子集：index.html + css/js（js 含子目录，PyInstaller 递归收集）。
+# 目标目录均相对 _MEIPASS，与 main.py _frontend_dir() 的 /frontend 对齐。
+# 禁止改为整目录打包 frontend/（node_modules 55M 会被拖入）。
+# 注：frontend/assets 当前为空目录（git 不跟踪），不挂载；未来有内容时在此追加
+#     (str(ROOT / "frontend" / "assets"), "frontend/assets")。
+_FRONTEND_RUNTIME = (
+    (str(ROOT / "frontend" / "index.html"), "frontend"),
+    (str(ROOT / "frontend" / "css"), "frontend/css"),
+    (str(ROOT / "frontend" / "js"), "frontend/js"),
+)
+
 a = Analysis(
     [str(ROOT / "backend" / "run_backend.py")],
     pathex=[str(ROOT)],
     binaries=[],
-    datas=[],
+    datas=list(_FRONTEND_RUNTIME),
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
