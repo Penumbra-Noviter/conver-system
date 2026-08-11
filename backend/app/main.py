@@ -10,6 +10,7 @@ Conver System — FastAPI 应用入口
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -38,7 +39,19 @@ app.include_router(settings.router)
 # 注意：挂载在 / 路径上，会捕获所有未被 API 路由匹配的请求。
 # 契约：所有 API 路由必须使用 /api 前缀，且在此行之前注册。
 # 若添加非 /api 前缀的新路由，必须注册在此行之前，否则将被静态文件捕获。
-FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+def _frontend_dir() -> Path:
+    """前端静态目录定位：frozen（PyInstaller）态指向 _MEIPASS/frontend，源码态指向仓库 frontend。
+
+    打包态不随包分发前端（webview 走 http://127.0.0.1，后端无需挂载），
+    _MEIPASS/frontend 不存在时 exists() 守卫安全跳过，保证打包态不崩溃；
+    若未来需要随包分发，在 spec 的 datas 追加即可自动挂载。
+    """
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "frontend"
+    return Path(__file__).resolve().parent.parent.parent / "frontend"
+
+
+FRONTEND_DIR = _frontend_dir()
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
