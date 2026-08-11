@@ -9,6 +9,7 @@ P6.4-2 单元测试 — 后端打包固化（backend/run_backend.py 启动器 + 
     4. main 失败路径：日志目录不可用 / 端口越界 → 明确中文报错退出
     5. _frontend_dir 三分支：源码态 / frozen+_MEIPASS / frozen 无 _MEIPASS
     6. __main__ 入口真实运行冒烟（--help 子进程，不启动 uvicorn，无副作用）
+    7. spec 配方锁定：前端运行所需子集随包分发（期末审核阻断2 防复发回归断言）
 
 依赖：不触碰真实 %APPDATA%——一律 monkeypatch 环境变量指向 tmp_path。
 """
@@ -34,6 +35,7 @@ __all__ = [
     "TestMain",
     "TestFrontendDir",
     "TestEntrypoint",
+    "TestSpecFrontendPackaging",
 ]
 
 
@@ -256,3 +258,37 @@ class TestEntrypoint:
             assert run.returncode == 0, run.stderr
             assert "--host" in run.stdout and "--port" in run.stdout
             assert "--log-level" in run.stdout
+
+
+class TestSpecFrontendPackaging:
+    """conver_backend.spec 配方锁定：前端运行所需子集随包分发（期末审核阻断2 防复发）。
+
+    阻断2 背景：datas=[] 不打包 frontend → 打包态 GET / 404（boot.html 跳转根路径
+    用户看到 Not Found）。此断言锁定 datas 必须含 frontend 运行子集，且不得回退为
+    全目录打包（node_modules 55M 必须排除）。
+    """
+
+    #: spec 文件路径（backend/conver_backend.spec）
+    SPEC_PATH = Path(__file__).resolve().parents[1] / "conver_backend.spec"
+
+    def test_spec_ships_frontend_runtime_assets(self) -> None:
+        """datas 含 index.html 与 css/js 挂载，目标目录 frontend/ 与 _frontend_dir 对齐"""
+        spec_text = self.SPEC_PATH.read_text(encoding="utf-8")
+        # datas 源码形态（Path 拼接）：运行子集必须全部挂载
+        # （assets 为空目录 git 不跟踪，不在此列；有内容时 spec 需追加挂载并同步本断言）
+        for token in (
+            '"frontend" / "index.html"',
+            '"frontend" / "css"',
+            '"frontend" / "js"',
+        ):
+            assert token in spec_text, f"spec datas 缺少前端子集 {token}"
+        # 挂载目标目录：index.html 必须落在 frontend/ 根（StaticFiles html=True 的入口）
+        assert '"frontend"),' in spec_text
+
+    def test_spec_excludes_node_modules_and_tests(self) -> None:
+        """防回退：不得整目录打包 frontend/（node_modules 55M）或显式挂载 tests"""
+        spec_text = self.SPEC_PATH.read_text(encoding="utf-8")
+        # 整目录挂载形态 `…/ "frontend"), "frontend"` 会把 node_modules 整棵拖入
+        assert '"frontend"), "frontend"' not in spec_text
+        assert '"frontend/node_modules"' not in spec_text
+        assert '"frontend/tests"' not in spec_text
