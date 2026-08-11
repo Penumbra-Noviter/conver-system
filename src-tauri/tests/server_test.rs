@@ -126,27 +126,20 @@ fn parse_command_line_rejects_empty_or_blank() {
 }
 
 #[test]
-fn backend_config_from_env_defaults_to_dev_command() {
+fn backend_config_from_env_env_variants() {
+    // 顺序执行三组断言（同一测试内无并发），避免 CONVER_BACKEND_CMD 相关用例并行互踩环境变量。
+    assert_eq!(DEFAULT_DEV_BACKEND_CMD, "python -m uvicorn backend.app.main:app");
     with_env("CONVER_BACKEND_CMD", None, || {
         let cfg = backend_config_from_env().expect("默认配置应可解析");
         assert_eq!(cfg.program, "python");
         assert_eq!(cfg.args, vec!["-m", "uvicorn", "backend.app.main:app"]);
         assert_eq!(cfg.cwd, None);
     });
-    assert_eq!(DEFAULT_DEV_BACKEND_CMD, "python -m uvicorn backend.app.main:app");
-}
-
-#[test]
-fn backend_config_from_env_reads_override_with_quoted_path() {
     with_env("CONVER_BACKEND_CMD", Some("\"C:/Program Files/app.exe\" --flag"), || {
         let cfg = backend_config_from_env().expect("覆盖配置应可解析");
         assert_eq!(cfg.program, "C:/Program Files/app.exe");
         assert_eq!(cfg.args, vec!["--flag"]);
     });
-}
-
-#[test]
-fn backend_config_from_env_rejects_bad_command() {
     with_env("CONVER_BACKEND_CMD", Some("python \"unclosed"), || {
         assert!(backend_config_from_env().is_err(), "非法命令串应报错");
     });
