@@ -52,17 +52,22 @@ impl ShellState {
     }
 
     /// 应用入口：按环境配置启动后端并返回壳状态（失败原因记录到状态，不 panic）。
-    pub fn launch() -> ShellState {
+    ///
+    /// `resource_dir`：打包态资源目录（随包后端 exe 定位依据，见 `server::backend_config_from_env`）；
+    /// 开发态传 None。setup 中经 `app.path().resource_dir()` 获取。
+    pub fn launch(resource_dir: Option<PathBuf>) -> ShellState {
         let state = ShellState::new(0, server::default_data_dir());
-        let _ = state.try_start();
+        let _ = state.try_start(resource_dir);
         state
     }
 
-    /// 从环境变量（CONVER_BACKEND_CMD / CONVER_BACKEND_CWD）解析配置并启动后端。
+    /// 从运行模式（debug=开发态 / release=生产态）与资源目录解析配置并启动后端。
     ///
-    /// 任何失败路径都会把原因记录到状态（`status().error`），供就绪页展示。
-    pub fn try_start(&self) -> Result<(), String> {
-        match server::backend_config_from_env() {
+    /// 生产态（release 构建）默认定位随包后端 exe（安装器 bundle.resources 分发，US-1 双击直启）；
+    /// `CONVER_BACKEND_CMD` 环境变量覆盖保留。任何失败路径都会把原因记录到状态
+    /// （`status().error`），供就绪页展示。
+    pub fn try_start(&self, resource_dir: Option<PathBuf>) -> Result<(), String> {
+        match server::backend_config_from_env(cfg!(debug_assertions), resource_dir.as_deref()) {
             Ok(config) => self.try_start_with(config),
             Err(e) => {
                 self.set_error(e.clone());
@@ -230,8 +235,9 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![commands::backend_status])
         .setup(|app| {
-            // 壳在 setup 中启动：single-instance 插件已同步完成二次实例检查
-            let shell = ShellState::launch();
+            // 壳在 setup 中启动：single-instance 插件已同步完成二次实例检查；
+            // 打包态资源目录用于定位随包后端 exe（US-1 双击直启，阻断 1 修复）
+            let shell = ShellState::launch(app.path().resource_dir().ok());
             app.manage(shell);
             tray::setup_tray(app.handle())?;
             if let Some(secs) = std::env::var("CONVER_EXIT_AFTER_SECS")

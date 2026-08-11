@@ -10,9 +10,10 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use conver_app_lib::server::{
-    backend_config_from_env, data_dir_path, database_url, default_data_dir, http_probe,
-    parse_command_line, probe_free_port, read_runtime_json, spawn_backend, wait_until_ready,
-    write_runtime_json, BackendConfig, ReadyOutcome, RuntimeInfo, DEFAULT_DEV_BACKEND_CMD,
+    backend_config_from_env, data_dir_path, database_url, default_data_dir, find_prod_backend_exe,
+    http_probe, parse_command_line, probe_free_port, prod_backend_exe_candidates,
+    read_runtime_json, spawn_backend, wait_until_ready, write_runtime_json, BackendConfig,
+    ReadyOutcome, RuntimeInfo, DEFAULT_DEV_BACKEND_CMD,
 };
 
 // ── 测试辅助 ────────────────────────────────────────────────────────────────
@@ -127,22 +128,97 @@ fn parse_command_line_rejects_empty_or_blank() {
 
 #[test]
 fn backend_config_from_env_env_variants() {
-    // 顺序执行三组断言（同一测试内无并发），避免 CONVER_BACKEND_CMD 相关用例并行互踩环境变量。
+    // 顺序执行全部断言（同一测试内无并发），避免 CONVER_BACKEND_CMD 相关用例并行互踩环境变量。
     assert_eq!(DEFAULT_DEV_BACKEND_CMD, "python -m uvicorn backend.app.main:app");
+    let prod_dir = Some(Path::new(r"C:\Users\Me\AppData\Roaming\Conver System"));
+    // 开发态（dev_mode=true）：显式环境变量覆盖 > 缺省 uvicorn 命令
     with_env("CONVER_BACKEND_CMD", None, || {
-        let cfg = backend_config_from_env().expect("默认配置应可解析");
+        let cfg = backend_config_from_env(true, None).expect("默认配置应可解析");
         assert_eq!(cfg.program, "python");
         assert_eq!(cfg.args, vec!["-m", "uvicorn", "backend.app.main:app"]);
         assert_eq!(cfg.cwd, None);
     });
     with_env("CONVER_BACKEND_CMD", Some("\"C:/Program Files/app.exe\" --flag"), || {
-        let cfg = backend_config_from_env().expect("覆盖配置应可解析");
+        let cfg = backend_config_from_env(true, None).expect("覆盖配置应可解析");
         assert_eq!(cfg.program, "C:/Program Files/app.exe");
         assert_eq!(cfg.args, vec!["--flag"]);
     });
     with_env("CONVER_BACKEND_CMD", Some("python \"unclosed"), || {
-        assert!(backend_config_from_env().is_err(), "非法命令串应报错");
+        assert!(backend_config_from_env(true, None).is_err(), "非法命令串应报错");
     });
+    // 生产态（dev_mode=false）+ 资源目录含随包后端 → 命中 `_up_/dist/conver_backend` 布局
+    let prod_dir = tmp_dir("prod-layout");
+    let prod_exe = prod_dir
+        .join("_up_")
+        .join("dist")
+        .join("conver_backend")
+        .join("conver_backend.exe");
+    std::fs::create_dir_all(prod_exe.parent().unwrap()).unwrap();
+    std::fs::write(&prod_exe, b"stub").unwrap();
+    with_env("CONVER_BACKEND_CMD", None, || {
+        let cfg = backend_config_from_env(false, Some(&prod_dir)).expect("生产态配置应可解析");
+        assert_eq!(
+            cfg.program,
+            prod_exe.to_string_lossy(),
+            "生产态应定位随包后端 exe"
+        );
+        assert!(cfg.args.is_empty(), "随包 exe 无需附加参数");
+    });
+    // 生产态但资源目录无随包后端（如 --no-bundle 直接跑 release exe）→ 降级开发态命令
+    let empty_dir = tmp_dir("prod-empty");
+    with_env("CONVER_BACKEND_CMD", None, || {
+        let cfg = backend_config_from_env(false, Some(&empty_dir)).expect("回退配置应可解析");
+        assert_eq!(cfg.program, "python");
+        assert_eq!(cfg.args, vec!["-m", "uvicorn", "backend.app.main:app"]);
+    });
+    // 生产态下 CONVER_BACKEND_CMD 仍是权威通道（覆盖随包 exe 定位）
+    with_env("CONVER_BACKEND_CMD", Some("\"D:/custom/backend.exe\""), || {
+        let cfg = backend_config_from_env(false, Some(&prod_dir)).expect("覆盖配置应可解析");
+        assert_eq!(cfg.program, "D:/custom/backend.exe");
+        assert!(cfg.args.is_empty());
+    });
+}
+
+// ── 生产态后端定位（P6.4-6 期末审核阻断 1：安装态双击直启，US-1）────────────
+
+#[test]
+fn prod_backend_exe_candidates_ordered_by_windows_layout() {
+    // 安装目录含空格（NSIS currentUser → %LOCALAPPDATA%\Conver System\）；
+    // 候选 1 = _up_/dist/conver_backend（Tauri Windows 实测布局），候选 2 = 平铺兜底
+    let candidates = prod_backend_exe_candidates(Path::new(r"C:\Users\Me\AppData\Roaming\Conver System"));
+    assert_eq!(
+        candidates[0].to_string_lossy(),
+        r"C:\Users\Me\AppData\Roaming\Conver System\_up_\dist\conver_backend\conver_backend.exe"
+    );
+    assert_eq!(
+        candidates[1].to_string_lossy(),
+        r"C:\Users\Me\AppData\Roaming\Conver System\conver_backend\conver_backend.exe"
+    );
+}
+
+#[test]
+fn find_prod_backend_exe_detects_up_layout_then_fallback_layout() {
+    // 构造「安装态 _up_/dist/conver_backend」布局 → 命中候选 1
+    let dir = tmp_dir("prod-up");
+    let up_exe = dir
+        .join("_up_")
+        .join("dist")
+        .join("conver_backend")
+        .join("conver_backend.exe");
+    std::fs::create_dir_all(up_exe.parent().unwrap()).unwrap();
+    std::fs::write(&up_exe, b"stub").unwrap();
+    assert_eq!(find_prod_backend_exe(&dir), Some(up_exe));
+
+    // 无 _up_ 布局、仅有平铺布局 → 命中候选 2
+    let dir2 = tmp_dir("prod-flat");
+    let flat_exe = dir2.join("conver_backend").join("conver_backend.exe");
+    std::fs::create_dir_all(flat_exe.parent().unwrap()).unwrap();
+    std::fs::write(&flat_exe, b"stub").unwrap();
+    assert_eq!(find_prod_backend_exe(&dir2), Some(flat_exe));
+
+    // 两种布局都不存在 → None（调用方回退开发态命令）
+    let dir3 = tmp_dir("prod-none");
+    assert_eq!(find_prod_backend_exe(&dir3), None);
 }
 
 // ── DATABASE_URL 契约 ───────────────────────────────────────────────────────

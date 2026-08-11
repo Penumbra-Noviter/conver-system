@@ -83,7 +83,7 @@ fn try_start_records_error_for_bad_command() {
     let state = ShellState::new(0, dir);
     let old = std::env::var("CONVER_BACKEND_CMD").ok();
     std::env::set_var("CONVER_BACKEND_CMD", "python \"unclosed");
-    let result = state.try_start();
+    let result = state.try_start(None);
     match old {
         Some(v) => std::env::set_var("CONVER_BACKEND_CMD", v),
         None => std::env::remove_var("CONVER_BACKEND_CMD"),

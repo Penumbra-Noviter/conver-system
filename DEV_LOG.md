@@ -46,6 +46,13 @@
 
 ## 日志正文
 
+### 2026-08-11 | 修复 | P6.4-6 期末审核阻断 1：壳 prod 模式定位随包后端 + 干净环境冒烟
+
+- **阻断**：`DEFAULT_DEV_BACKEND_CMD`（python uvicorn）经 lib.rs 无条件使用 + tauri.conf.json 无 resources → 干净用户机（无 python）安装后双击必然 spawn 失败；此前冒烟 `-UseInstaller` 全绿是因为冒烟自己注入了 CONVER_BACKEND_CMD（真实用户路径无此通道）→ US-1 不成立
+- **修复**：① `tauri.conf.json` `bundle.resources: ["../dist/conver_backend"]`（PyInstaller onedir 产物随安装器分发——安装器 2.2MB → 24MB）；② `server.rs::backend_config_from_env(dev_mode, resource_dir)` 选择分支——CONVER_BACKEND_CMD 覆盖 > **生产态（release 构建）随包 exe**（候选探测 `prod_backend_exe_candidates`：**实测 Tauri Windows 把 resources 置于安装目录 `_up_` 子目录且保留相对路径结构** → `_up_/dist/conver_backend/conver_backend.exe`，平铺 `conver_backend/` 布局兜底；`find_prod_backend_exe` 找第一个存在的文件，全无则回退开发态命令）> 开发态 python 命令；`dev_mode` 由 lib.rs 注入 `cfg!(debug_assertions)`，两个分支均可单测；③ lib.rs setup 经 `app.path().resource_dir()` 传入
+- **防复发回归**：① cargo test +3（候选顺序断言；`_up_`/平铺/无布局三分支探测断言；env 变体断言并入单测试函数——**跨测试并行修改 CONVER_BACKEND_CMD 会互踩**，与既有惯例一致）；② 冒烟新增**干净环境用例**：`-UseInstaller` 且不注入 CONVER_BACKEND_CMD 启动已安装应用 → 壳 prod 随包定位 → ready + /api/models 200（`-BackendEnv` 可显式注入）；③ 冒烟新增 `GET /` 200 + `<title>Conver System` 标记断言（阻断 2 冒烟部分，依赖 PyInstaller datas 随包前端，另一 agent 修复合并前预期 FAIL；已在 `_internal/frontend` 模拟 datas 分发实证断言变 PASS）
+- **验证**：cargo test 43 全绿（28+7+8）；pytest 259+1skip / Vitest 186 基线保持；tauri build 重构建（增量 31s，安装器含后端资源 24MB）；干净安装冒烟 ready+200 实证 + GET / 标记 PASS（模拟分发）；安装目录 `%LOCALAPPDATA%\Conver System\_up_\dist\conver_backend\conver_backend.exe` 确认
+
 ### 2026-08-11 | 实现 | P6.4-6 安装器 + 一键构建冒烟 + 文档归档（波 3 收官）
 
 - **NSIS 配置**（tauri.conf.json）：`bundle.active: true` + `targets: ["nsis"]` + `bundle.windows.nsis`（`installMode: currentUser`；实测安装到 **`%LOCALAPPDATA%\Conver System\`**——tauri 2.11 NSIS 模板路径，非 `Programs\` 子目录；`languages: ["SimpChinese", "English"]`；卸载不动 %APPDATA% 数据——数据在安装目录之外，数据分离铁律已实证：静默卸载后 `%APPDATA%\ConverSystem` 完好）
