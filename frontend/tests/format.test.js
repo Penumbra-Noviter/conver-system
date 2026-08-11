@@ -111,8 +111,10 @@ describe('characterCardHtml', () => {
         expect(html).toContain('简介');
         expect(html).toContain('开场白:');
         expect(html).toContain('标签:');
-        expect(html).toContain('🌡️ 0.9');
-        expect(html).toContain('💬 3');
+        expect(html).toContain('data-icon="temperature"');
+        expect(html).toContain('0.9');
+        expect(html).toContain('data-icon="messages"');
+        expect(html).toContain('3');
         expect(html).toContain('chat-with');
         expect(html).toContain('edit-char');
         expect(html).toContain('export-char');
@@ -129,8 +131,10 @@ describe('characterCardHtml', () => {
         const html = characterCardHtml({ id: 3, name: '精简', temperature: undefined, conversation_count: undefined });
         expect(html).not.toContain('开场白');
         expect(html).not.toContain('标签');
-        expect(html).toContain('🌡️ 0.7');
-        expect(html).toContain('💬 0');
+        expect(html).toContain('data-icon="temperature"');
+        expect(html).toContain('0.7');
+        expect(html).toContain('data-icon="messages"');
+        expect(html).toContain('0');
     });
 });
 
@@ -153,11 +157,14 @@ describe('conversationItemHtml', () => {
 });
 
 describe('searchResultItemHtml', () => {
-    it('user 消息角色标签为「你」+ 👤;assistant 为角色名 + 🎭', () => {
+    it('user 消息角色标签使用 user 图标；assistant 使用 character 图标', () => {
         const userHtml = searchResultItemHtml({ role: 'user', character_name: 'X', conversation_id: 1, message_id: 1, content_preview: 'hello', conversation_title: 'C' }, '');
-        expect(userHtml).toContain('👤 你');
+        expect(userHtml).toContain('data-icon="user"');
+        expect(userHtml).toContain('你');
         const asstHtml = searchResultItemHtml({ role: 'assistant', character_name: 'AI', conversation_id: 1, message_id: 2, content_preview: 'hi', conversation_title: 'C' }, '');
-        expect(asstHtml).toContain('🎭 AI');
+        expect(asstHtml).toContain('data-icon="character"');
+        expect(asstHtml).toContain('AI');
+        expect(asstHtml).toContain('data-icon="messages"');
     });
 
     it('关键词高亮包 <mark>;对话标题缺省「未命名对话」', () => {

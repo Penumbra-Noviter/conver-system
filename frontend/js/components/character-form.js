@@ -8,6 +8,7 @@
 import { characters } from '../api.js';
 import { escapeHtml } from '../utils.js';
 import { showConfirm } from './confirm-dialog.js';
+import { iconHtml } from '../icons.js';
 
 /**
  * 打开角色表单模态框
@@ -30,7 +31,7 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
         <div class="modal character-form-modal">
             <div class="modal-header">
                 <h3>${isEdit ? '编辑角色' : '创建新角色'}</h3>
-                <button class="btn-icon modal-close" title="关闭">✕</button>
+                <button class="btn-icon modal-close" title="关闭">${iconHtml('x')}</button>
             </div>
             <div class="modal-body">
                 <div class="form-field">
@@ -226,10 +227,10 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
         try {
             if (isEdit) {
                 await characters.update(char.id, data);
-                statusEl.textContent = '✅ 更新成功';
+                statusEl.innerHTML = `${iconHtml('check', { size: 14 })} 更新成功`;
             } else {
                 await characters.create(data);
-                statusEl.textContent = '✅ 创建成功';
+                statusEl.innerHTML = `${iconHtml('check', { size: 14 })} 创建成功`;
             }
             statusEl.className = 'form-status success';
 
@@ -238,7 +239,7 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                 if (onSuccess) onSuccess();
             }, 600);
         } catch (err) {
-            statusEl.textContent = `❌ ${err.message}`;
+            statusEl.innerHTML = `${iconHtml('x', { size: 14 })} ${escapeHtml(err.message)}`;
             statusEl.className = 'form-status error';
             submitBtn.disabled = false;
             submitBtn.textContent = isEdit ? '保存修改' : '创建角色';

@@ -555,6 +555,75 @@ const MSGS = {
     12: [{ id: 2, role: 'assistant', content: '消息12' }],
 };
 
+describe('设置控件动态 SVG 状态', () => {
+    afterEach(() => {
+        document.documentElement.removeAttribute('data-theme');
+        vi.restoreAllMocks();
+    });
+
+    it('主题与双侧栏切换保持 sun/moon/chevron 语义图标', async () => {
+        globalThis.fetch = makeAppMock({ conversations: [...CONVS], messagesByConv: MSGS, deferGet: new Map() });
+        await loadAppModules();
+        await waitFor(() => document.querySelector('#setting-default-provider option'));
+
+        const theme = document.querySelector('#btn-theme-toggle');
+        theme.click();
+        await waitFor(() => theme.querySelector('[data-icon="sun"]'));
+        expect(theme.title).toBe('切换深色模式');
+        theme.click();
+        await waitFor(() => theme.querySelector('[data-icon="moon"]'));
+        expect(theme.title).toBe('切换浅色模式');
+
+        const sidebarToggle = document.querySelector('#btn-collapse-sidebar');
+        sidebarToggle.click();
+        expect(sidebarToggle.querySelector('[data-icon="chevronRight"]')).not.toBeNull();
+        expect(sidebarToggle.title).toBe('展开侧栏');
+        document.querySelector('#btn-expand-sidebar').click();
+        expect(sidebarToggle.querySelector('[data-icon="chevronLeft"]')).not.toBeNull();
+
+        const chatSidebarToggle = document.querySelector('#btn-collapse-chat');
+        chatSidebarToggle.click();
+        expect(chatSidebarToggle.querySelector('[data-icon="chevronRight"]')).not.toBeNull();
+        document.querySelector('#btn-expand-chat').click();
+        expect(chatSidebarToggle.querySelector('[data-icon="chevronLeft"]')).not.toBeNull();
+    });
+});
+
+describe('消息复制图标反馈', () => {
+    it('成功后显示 check；紧接失败会取消旧恢复计时并显示 x，随后恢复 clipboard', async () => {
+        vi.useFakeTimers();
+        const writeText = vi.fn()
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValueOnce(new Error('权限拒绝'));
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText },
+        });
+
+        const { chat, tabs } = await loadChatModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [{ role: 'assistant', content: '复制内容' }] });
+        chat.renderMessages();
+        const copy = document.querySelector('.btn-copy-message');
+
+        copy.click();
+        await Promise.resolve();
+        expect(copy.querySelector('[data-icon="check"]')).not.toBeNull();
+        expect(copy.classList.contains('copied')).toBe(true);
+
+        copy.click();
+        await Promise.resolve();
+        expect(copy.querySelector('[data-icon="x"]')).not.toBeNull();
+        expect(copy.classList.contains('copied')).toBe(false);
+
+        vi.advanceTimersByTime(1499);
+        expect(copy.querySelector('[data-icon="x"]')).not.toBeNull();
+        vi.advanceTimersByTime(1);
+        expect(copy.querySelector('[data-icon="clipboard"]')).not.toBeNull();
+        vi.useRealTimers();
+    });
+});
+
 describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（流式 finalizeStream）', () => {
     it('list 响应延迟返回期间连发新消息 → 旧快照不覆盖、done 后按钮即时复位', async () => {
         const { chat, tabs, api } = await loadChatModules();
@@ -594,7 +663,7 @@ describe('F-1 同 tab 连发：陈旧 list 快照不覆盖（流式 finalizeStre
         expect(listCalls).toBe(1);
 
         // done 后（list 未返回前）按钮即复位为发送态 — 无 ⏹→➤ UX 窗口
-        expect(chat.chatDom.btnSend.textContent).toBe('➤');
+        expect(chat.chatDom.btnSend.querySelector('[data-icon="send"]')).not.toBeNull();
         expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
 
         // 同 tab 连发第二条（isStreaming 已 false → 允许发送）
@@ -1140,12 +1209,16 @@ describe('abort 流式三连复用 abortStream（app.js 停止按钮 / tab-bar �
 
     it('停止按钮：活动 tab 流式中点击 → 经 abortStream 中止', async () => {
         globalThis.fetch = makeAppMock({ conversations: [...CONVS], messagesByConv: MSGS, deferGet: new Map() });
-        const { tabs } = await loadAppModules();
+        const { tabs, chat } = await loadAppModules();
         await waitFor(() => document.querySelectorAll('#conversation-list .conversation-item').length === 2);
         document.querySelector('#conversation-list .conversation-item[data-id="11"]').click();
         await sleep(30);
         const spy = vi.fn();
         tabs.updateTab(11, { isStreaming: true, activeStream: { abort: spy } });
+        chat.refreshSendButton();
+        expect(document.querySelector('#btn-send [data-icon="stop"]')).not.toBeNull();
+        expect(document.querySelector('#btn-send').title).toBe('停止生成');
+        expect(document.querySelector('#btn-send').classList.contains('btn-stop')).toBe(true);
         document.querySelector('#btn-send').click();
         await sleep(10);
         expect(spy).toHaveBeenCalledTimes(1);
@@ -1189,7 +1262,7 @@ describe('abort 流式三连复用 abortStream（app.js 停止按钮 / tab-bar �
         expect(tabs.getTabs()).toHaveLength(0);
         expect(tabs.getActiveTab()).toBeNull();
         expect(document.querySelector('#chat-messages').innerHTML).toContain('选择左侧对话');
-        expect(document.querySelector('#btn-send').textContent).toBe('➤');
+        expect(document.querySelector('#btn-send [data-icon="send"]')).not.toBeNull();
         // 列表高亮清除：不再有 active 项
         expect(document.querySelectorAll('#conversation-list .conversation-item.active')).toHaveLength(0);
     });
@@ -1368,7 +1441,7 @@ describe('流式 error 帧 → handleStreamError 错误分支（Falsify 失败�
         expect(tabs.getTab(11).phase).toBe('error');
         expect(tabs.getTab(11).isStreaming).toBe(false);
         expect(document.querySelector('#chat-messages').textContent).toContain('[错误] 模型超时');
-        expect(chat.chatDom.btnSend.textContent).toBe('➤');
+        expect(chat.chatDom.btnSend.querySelector('[data-icon="send"]')).not.toBeNull();
         expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
     });
 });
@@ -1417,7 +1490,7 @@ describe('getTabDisplay（展示契约派生 — ARC-5）', () => {
 });
 
 describe('tab-bar 消费 getTabDisplay（ARC-5 — 输出逐字节一致）', () => {
-    it('渲染输出与既有行为逐字节一致：标题转义/脉冲点/警示标记/激活高亮', async () => {
+    it('渲染标题/状态语义：标题转义、脉冲点、警示标记、激活高亮', async () => {
         vi.resetModules();
         document.body.innerHTML = CHAT_DOM_HTML;
         const tabs = await import('../js/tabs.js');
@@ -1426,55 +1499,22 @@ describe('tab-bar 消费 getTabDisplay（ARC-5 — 输出逐字节一致）', ()
         document.body.appendChild(container);
         initTabBar({ container, onActivate: () => {} });
 
-        // 空 title → 缺省「未命名会话」；活动 tab 高亮（active class）
         tabs.openTab(7);
-        expect(container.innerHTML).toBe(
-            '\n            <div class="chat-tab active" data-conv-id="7" title="未命名会话">' +
-            '\n                ' +
-            '\n                ' +
-            '\n                <span class="tab-title">未命名会话</span>' +
-            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
-            '\n            </div>'
-        );
+        expect(container.querySelector('.chat-tab.active')).not.toBeNull();
+        expect(container.querySelector('.tab-title').textContent).toBe('未命名会话');
+        expect(container.querySelector('.tab-close[title="关闭会话"] [data-icon="x"]')).not.toBeNull();
 
-        // 生成中（thinking）→ 标题前脉冲点
         tabs.updateTab(7, { title: '会话A', phase: 'thinking' });
-        expect(container.innerHTML).toBe(
-            '\n            <div class="chat-tab active" data-conv-id="7" title="会话A">' +
-            '\n                <span class="tab-dot" title="生成中"></span>' +
-            '\n                ' +
-            '\n                <span class="tab-title">会话A</span>' +
-            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
-            '\n            </div>'
-        );
+        expect(container.querySelector('.tab-dot[title="生成中"]')).not.toBeNull();
+        expect(container.querySelector('.tab-title').textContent).toBe('会话A');
 
-        // 出错（error）→ 警示标记
         tabs.updateTab(7, { phase: 'error' });
-        expect(container.innerHTML).toBe(
-            '\n            <div class="chat-tab active" data-conv-id="7" title="会话A">' +
-            '\n                ' +
-            '\n                <span class="tab-warn" title="生成出错/已停止">!</span>' +
-            '\n                <span class="tab-title">会话A</span>' +
-            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
-            '\n            </div>'
-        );
+        expect(container.querySelector('.tab-warn[title="生成出错/已停止"] [data-icon="warning"]')).not.toBeNull();
 
-        // 标题转义（< > &）；多 tab：激活高亮只落在活动 tab（8）
         tabs.updateTab(7, { title: '会话<A&B>', phase: 'done' });
         tabs.openTab(8);
-        expect(container.innerHTML).toBe(
-            '\n            <div class="chat-tab" data-conv-id="7" title="会话<A&amp;B>">' +
-            '\n                ' +
-            '\n                ' +
-            '\n                <span class="tab-title">会话&lt;A&amp;B&gt;</span>' +
-            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
-            '\n            </div>' +
-            '\n            <div class="chat-tab active" data-conv-id="8" title="未命名会话">' +
-            '\n                ' +
-            '\n                ' +
-            '\n                <span class="tab-title">未命名会话</span>' +
-            '\n                <button class="tab-close" title="关闭会话">✕</button>' +
-            '\n            </div>'
-        );
+        expect(container.querySelector('.chat-tab[data-conv-id="7"] .tab-title').textContent).toBe('会话<A&B>');
+        expect(container.querySelector('.chat-tab[data-conv-id="8"].active')).not.toBeNull();
+        expect(container.querySelector('.chat-tab[data-conv-id="7"] .tab-warn')).toBeNull();
     });
 });

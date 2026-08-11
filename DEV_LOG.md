@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-11）
+
+- **OPT-1 UI 克制化与图标协议收口（进行中）**：保留 Warm Stone 与现有应用壳，统一动态 SVG 图标 seam（`frontend/js/icons.js` 只暴露 `iconHtml`，`Object.hasOwn` 注册表 + 尺寸/class 白名单校验，未知/非法输入显式抛错）；清除应用自带 emoji 图标（`format.js`/`chat.js`/`tab-bar.js`/`modal.js`/`confirm-dialog.js`/`export-dialog.js`/`character-form.js`/`character-wizard.js`/`model-selector.js`/`model-utils.js`/`settings-panel.js`/`app.js`/`index.html`），用户数据中的 emoji 保留不过滤
+- **视觉底层**：深浅主题 token 单一来源收口到文件顶部（删除尾部补丁层），常驻 glow/渐变文字/负字距清零，助理消息开放阅读面、用户消息克制气泡、聊天宽度 920px、输入区底部写作工具条、`:focus-visible`/`prefers-reduced-motion`/精细指针 hover
+- **测试**：Vitest **186** 全绿（+9：icons 3 / components-icons 4 / tabs 语义 3 净增——复制竞态、send/stop、tab 图标、settings sun/moon/chevron）；pytest **188** 不变
+- **code-review（固定点 HEAD）→ 修复**：Falsify 实锤 `iconHtml` 原型链名称绕过 + 属性注入（Object.hasOwn + 白名单校验 + 红→绿测试）；复制反馈连续点击竞态（每按钮独立定时器 + WeakMap 收口）；Standards/Architecture 实锤 CSS 主题 token 双源（合并单一来源）；DEV_LOG 测试数过期（本次同步 183→186）
+- **GUI 黑盒回归（部分）**：桌面深浅主题切换、角色视图、创建角色向导 1-6 步、清空确认框（取消）、设置页、768px DOM（底部导航+空态）；**未完成**：375px、主导航侧栏折叠（浏览器运行时截图/点击超时阻断，非产品缺陷）
+- **安全提醒**：GUI 自动化 DOM 输出暴露了本机数据库中的真实 API Key 前缀（sk-1ZET…），已停止读取该区域；**建议用户立即轮换该 Key**（涉及 `https://api.kukuit.com`）
+
+---
+
 ## 滚动摘要（2026-08-10）
 
 - **架构深化 8 候选全部完成**（improve-codebase-architecture → 全自动 kickoff）：StreamSession 流式结算深模块 / 级联收口 / 标题收口 / api seam+超时 / 展示契约 / app.js 拆分 / testApiKeys 纯函数化 / __init__ 导出；期末三轴审核放行（Falsify 实锤 1 条 stale 回退修复）；Vitest **177** + pytest **188** 全绿
@@ -21,6 +32,18 @@
 ---
 
 ## 日志正文
+
+### 2026-08-11 | 实现 | OPT-1 UI 克制化与图标协议收口（进行中，未 commit）
+
+- **图标 seam**：新增 `frontend/js/icons.js`（协议表面 `iconHtml(name, options)`，`__all__` 声明为仓库协议元数据）；26 个注册图标（currentColor 线框 / data-icon / aria-hidden / viewBox 16）；评审后入口收口：`Object.hasOwn` 查注册表（防原型链 `constructor`/`__proto__`）、`size` 1–128 有限数字、`className` CSS 标识符白名单（防属性注入），全部非法输入显式抛错
+- **emoji 清除范围**：动态模板/状态（复制/温度/对话数/删除/搜索角色与会话标识/头像）→ SVG；复制反馈 `clipboard/check/x`；发送/停止 `send/stop`（活动 tab `isStreaming` 单一来源不变）；tab 关闭/警示 `x/warning`；模态框/确认框 `x/warning/info`；导出 `fileText/fileJson`；向导模式/章节/模板/解析状态全 SVG；主题 `sun/moon`、侧栏 `chevronLeft/Right`；指南页标题与操作说明去除 emoji 并改真实按钮名；`model-utils` 自定义模型选项与 `model-selector` 提示改纯文字。用户消息/角色设定中的 emoji 保留（有测试）
+- **行为契约**：`EMPTY_STATE_HTML`、DOM ID、事件委托 class、多 tab/防悬挂/流式结算、`data-streaming-live`、tab phase 全部保持；jsdom 集成 68 项含新语义断言全绿
+- **复制反馈竞态修复（评审实锤）**：每按钮独立恢复定时器（`WeakMap`），失败立即取消旧恢复并保持 `x`，防“先成功再失败被旧定时器覆盖”
+- **CSS 收口**：主题 token 单一来源（删除文件尾两套覆盖补丁，浅色仅系统+强制两处）；修复 `--panel-1`/`--radius-md`/`--accent-contrast` 未定义；深色/浅色收敛 Warm Stone 低饱和；负字距清零；`color-mix` 仅用于 surface 混合；`:focus-visible`/reduced-motion/hover 精细指针
+- **评审**：四轴 code-review（固定点 HEAD）实锤 3 条已修（图标注入、复制竞态、token 双源）+ 测试数同步；低优先建议（`__all__` 属协议元数据、DEV_LOG 同步）已处理
+- **GUI 黑盒（Playwright）**：桌面深浅主题、角色卡、向导 1-6 步（含用户 emoji 保留）、清空确认框取消、设置分组、768px 底部导航；375px 与主导航侧栏折叠被 IAB 运行时截图/点击超时阻断，**标记未验证**
+- **测试**：Vitest 183 → **186**；pytest **188** 不变；`git diff --check` 干净
+- **避坑**：① IAB 截图超时后同 tab 后续截图持续失败 → 关 tab 重建；② `getByRole` 名称不唯一时先查 DOM 快照再收缩作用域，不得 force；③ GUI DOM 输出会暴露本地库中的真实 API Key，设置页只验证结构不截图/不复述
 
 ### 2026-08-10 | 实现 | 架构深化 8 候选（improve-codebase-architecture 全自动 kickoff，merge 链 83bb9bf/3af9b61/1f2fdcc）
 

@@ -8,6 +8,7 @@
  */
 
 import { escapeHtml } from '../utils.js';
+import { iconHtml } from '../icons.js';
 
 /**
  * 打开一个模态框
@@ -61,7 +62,7 @@ export function openModal(options = {}) {
         <div class="modal ${modalClass}">
             <div class="modal-header">
                 <h3>${escapeHtml(title)}</h3>
-                <button class="btn-icon modal-close" title="关闭">✕</button>
+                <button class="btn-icon modal-close" title="关闭">${iconHtml('x')}</button>
             </div>
             <div class="modal-body">${body}</div>
             <div class="modal-footer">${actions}</div>

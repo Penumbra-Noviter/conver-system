@@ -19,6 +19,7 @@ import { settings, conversations } from '../api.js';
 import { showAlert, showConfirm } from './confirm-dialog.js';
 import { escapeHtml } from '../utils.js';
 import { fillModelSelect, createCustomModelHandler } from '../utils/model-utils.js';
+import { iconHtml } from '../icons.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -133,10 +134,10 @@ function updateThemeToggleIcon(mode) {
     const btn = $('#btn-theme-toggle');
     if (!btn) return;
     if (mode === 'light') {
-        btn.textContent = '☀️';
+        btn.innerHTML = iconHtml('sun');
         btn.title = '切换深色模式';
     } else {
-        btn.textContent = '🌙';
+        btn.innerHTML = iconHtml('moon');
         btn.title = '切换浅色模式';
     }
 }
@@ -155,12 +156,12 @@ function toggleSidebar() {
     const expandBtn = $('#btn-expand-sidebar');
     if (state.sidebarCollapsed) {
         sidebar.classList.add('sidebar-collapsed');
-        btn.textContent = '▶';
+        btn.innerHTML = iconHtml('chevronRight');
         btn.title = '展开侧栏';
         expandBtn.style.display = 'flex';
     } else {
         sidebar.classList.remove('sidebar-collapsed');
-        btn.textContent = '◀';
+        btn.innerHTML = iconHtml('chevronLeft');
         btn.title = '收起侧栏';
         expandBtn.style.display = 'none';
     }
@@ -176,12 +177,12 @@ function toggleChatSidebar() {
     const expandBtn = $('#btn-expand-chat');
     if (state.chatSidebarCollapsed) {
         sidebar.classList.add('chat-sidebar-collapsed');
-        btn.textContent = '▶';
+        btn.innerHTML = iconHtml('chevronRight');
         btn.title = '展开侧栏';
         expandBtn.style.display = 'flex';
     } else {
         sidebar.classList.remove('chat-sidebar-collapsed');
-        btn.textContent = '◀';
+        btn.innerHTML = iconHtml('chevronLeft');
         btn.title = '收起侧栏';
         expandBtn.style.display = 'none';
     }

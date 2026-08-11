@@ -43,7 +43,7 @@ export function showModelSelector(characterName) {
                     <input type="text" id="ms-custom-model" class="custom-model-input" style="display:none" placeholder="输入模型名称">
                 </div>
                 <div class="model-selector-info">
-                    ⚡ 可在设置中修改默认值
+                    可在设置中修改默认值
                 </div>
             `,
             actions: `

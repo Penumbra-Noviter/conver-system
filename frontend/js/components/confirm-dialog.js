@@ -7,6 +7,7 @@
 
 import { escapeHtml } from '../utils.js';
 import { openModal } from './modal.js';
+import { iconHtml } from '../icons.js';
 
 /**
  * 显示确认对话框
@@ -40,7 +41,7 @@ export function showConfirm(options = {}) {
             onClose: resolve,
             body: `
                 <div class="confirm-icon ${danger ? 'danger' : ''}">
-                    ${danger ? '⚠️' : 'ℹ️'}
+                    ${iconHtml(danger ? 'warning' : 'info', { size: 22 })}
                 </div>
                 <p class="confirm-message">${escapeHtml(message)}</p>
                 ${detail ? `<p class="confirm-detail">${escapeHtml(detail)}</p>` : ''}

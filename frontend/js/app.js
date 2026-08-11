@@ -28,6 +28,7 @@ import { state } from './state.js';
 import { chatDom, handleSend, refreshSendButton, setConversationsRefresher } from './chat.js';
 import { closeTabs, getActiveTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
+import { iconHtml } from './icons.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -459,10 +460,10 @@ function renderChatHeader(conversationId) {
     const modelLabel = conv.model_name || '';
     const providerLabel = providerDisplayName(state.models, conv.model_provider);
     chatDom.chatHeader.innerHTML = `
-        <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">☰</button>
+        <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">${iconHtml('menu')}</button>
         <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
         <span class="chat-model-badge">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</span>
-        <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">📥</button>
+        <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">${iconHtml('download')}</button>
     `;
     // 双击标题重命名
     const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
@@ -716,7 +717,7 @@ async function init() {
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）
 setConversationsRefresher(loadConversations);
 
-// 注入 tab 条激活处理器（P6.5-3）：组件内 ✕ 直接 closeTab（含 abort 流式），
+// 注入 tab 条激活处理器（P6.5-3）：组件内关闭按钮直接 closeTab（含 abort 流式），
 // 激活/联动一律经此回调走 P6.5-2 收敛的统一激活流程
 initTabBar({
     container: $('#chat-tabs'),

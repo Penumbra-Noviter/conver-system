@@ -15,6 +15,7 @@
 import { characters } from '../api.js';
 import { escapeHtml } from '../utils.js';
 import { CHARACTER_TEMPLATES } from '../data/character-templates.js';
+import { iconHtml } from '../icons.js';
 
 /**
  * 打开角色创建向导
@@ -55,7 +56,7 @@ export function showCharacterWizard(onSuccess = null) {
         <div class="modal wizard-modal">
             <div class="modal-header">
                 <h3>创建新角色</h3>
-                <button class="btn-icon modal-close" title="关闭">✕</button>
+                <button class="btn-icon modal-close" title="关闭">${iconHtml('x')}</button>
             </div>
             <div class="wizard-progress">
                 <div class="wizard-progress-bar" id="wizard-progress-bar" style="width: 16.6%"></div>
@@ -190,17 +191,17 @@ function renderStep1(state) {
             <p class="wizard-step-desc">选择一种方式开始创建你的角色：</p>
             <div class="wizard-mode-grid">
                 <div class="wizard-mode-card ${state.mode === 'import' ? 'selected' : ''}" data-mode="import">
-                    <div class="wizard-mode-icon">📄</div>
+                    <div class="wizard-mode-icon">${iconHtml('fileText')}</div>
                     <div class="wizard-mode-name">智能导入</div>
                     <div class="wizard-mode-desc">粘贴角色设定文档，AI 自动提取角色信息</div>
                 </div>
                 <div class="wizard-mode-card ${state.mode === 'template' ? 'selected' : ''}" data-mode="template">
-                    <div class="wizard-mode-icon">🎭</div>
+                    <div class="wizard-mode-icon">${iconHtml('character')}</div>
                     <div class="wizard-mode-name">从模板开始</div>
                     <div class="wizard-mode-desc">从预设角色模板中选择，快速入门</div>
                 </div>
                 <div class="wizard-mode-card ${state.mode === 'manual' ? 'selected' : ''}" data-mode="manual">
-                    <div class="wizard-mode-icon">✏️</div>
+                    <div class="wizard-mode-icon">${iconHtml('edit')}</div>
                     <div class="wizard-mode-name">手动创建</div>
                     <div class="wizard-mode-desc">从零开始，逐项填写角色信息</div>
                 </div>
@@ -221,12 +222,12 @@ function renderStep2(state) {
                     ">${escapeHtml(state.importText || '')}</textarea>
                 </div>
                 <div class="wizard-parse-status" id="wizard-parse-status">
-                    ${state.parsing ? '<span class="wizard-parsing">⏳ AI 正在解析文档…</span>' : ''}
-                    ${state.parseError ? `<span class="wizard-parse-error">❌ ${escapeHtml(state.parseError)}</span>` : ''}
-                    ${state.parsedFields.length > 0 ? `<span class="wizard-parse-success">✅ 已提取 ${state.parsedFields.length} 个字段</span>` : ''}
+                    ${state.parsing ? '<span class="wizard-parsing">正在解析文档…</span>' : ''}
+                    ${state.parseError ? `<span class="wizard-parse-error">${iconHtml('x', { size: 14 })} ${escapeHtml(state.parseError)}</span>` : ''}
+                    ${state.parsedFields.length > 0 ? `<span class="wizard-parse-success">${iconHtml('check', { size: 14 })} 已提取 ${state.parsedFields.length} 个字段</span>` : ''}
                 </div>
                 <button class="btn-secondary" id="wizard-parse-btn" ${state.parsing ? 'disabled' : ''}>
-                    ${state.parsing ? '解析中…' : '🤖 AI 智能解析'}
+                    ${state.parsing ? '解析中…' : 'AI 智能解析'}
                 </button>
                 <p class="field-hint" style="margin-top: 8px">需要先配置 API Key（设置 → 填写 Claude/OpenAI Key）</p>
             </div>
@@ -298,17 +299,17 @@ function renderStep4(state) {
             <div class="form-field">
                 <label for="wiz-personality">人格设定 <span class="required">*</span></label>
                 <textarea id="wiz-personality" rows="8" placeholder="描述角色的性格特征、说话方式、行为模式、背景故事等">${escapeHtml(state.personality)}</textarea>
-                <span class="field-hint">💡 <strong>这是最重要的字段</strong>。越详细，AI 对角色的扮演越精准。包括：性格特征、说话风格、行为习惯、背景故事、知识和能力等。</span>
+                <span class="field-hint"><strong>这是最重要的字段</strong>。越详细，AI 对角色的扮演越精准。包括：性格特征、说话风格、行为习惯、背景故事、知识和能力等。</span>
             </div>
             <div class="form-field">
                 <label for="wiz-scenario">场景设定</label>
                 <textarea id="wiz-scenario" rows="3" placeholder="对话发生的场景和环境描述">${escapeHtml(state.scenario)}</textarea>
-                <span class="field-hint">💡 描述对话发生的场景，如"午后的图书馆"或"星际飞船的舰桥"。支持模板变量：<code>{{user}}</code>、<code>{{char}}</code></span>
+                <span class="field-hint">描述对话发生的场景，如"午后的图书馆"或"星际飞船的舰桥"。支持模板变量：<code>{{user}}</code>、<code>{{char}}</code></span>
             </div>
             <div class="form-field">
                 <label for="wiz-system-prompt">自定义 System Prompt（可选）</label>
                 <textarea id="wiz-system-prompt" rows="3" placeholder="留空则使用人格设定作为 System Prompt">${escapeHtml(state.system_prompt)}</textarea>
-                <span class="field-hint">💡 如果填写，将<strong>覆盖</strong>人格设定作为系统提示词。通常留空即可。</span>
+                <span class="field-hint">如果填写，将<strong>覆盖</strong>人格设定作为系统提示词。通常留空即可。</span>
             </div>
         </div>
     `;
@@ -323,12 +324,12 @@ function renderStep5(state) {
             <div class="form-field">
                 <label for="wiz-first-mes">开场白 <span class="required">*</span></label>
                 <textarea id="wiz-first-mes" rows="3" placeholder="角色首次对话时自动发送的第一句话">${escapeHtml(state.first_mes)}</textarea>
-                <span class="field-hint">💡 开场白是用户对角色<strong>第一印象</strong>。好的开场白能立即展现角色性格。支持模板变量：<code>{{user}}</code>、<code>{{char}}</code></span>
+                <span class="field-hint">开场白是用户对角色<strong>第一印象</strong>。好的开场白能立即展现角色性格。支持模板变量：<code>{{user}}</code>、<code>{{char}}</code></span>
             </div>
             <div class="form-field">
                 <label for="wiz-mes-example">对话范例（可选）</label>
                 <textarea id="wiz-mes-example" rows="4" placeholder="<START>&#10;{{user}}: 你好&#10;{{char}}: 欢迎，我等你很久了">${escapeHtml(state.mes_example)}</textarea>
-                <span class="field-hint">💡 展示角色说话风格的示例对话，帮助 AI 理解角色的语气和表达方式。用 <code>&lt;START&gt;</code> 标记开始，用 <code>{{user}}</code> 和 <code>{{char}}</code> 表示对话双方。</span>
+                <span class="field-hint">展示角色说话风格的示例对话，帮助 AI 理解角色的语气和表达方式。用 <code>&lt;START&gt;</code> 标记开始，用 <code>{{user}}</code> 和 <code>{{char}}</code> 表示对话双方。</span>
             </div>
         </div>
     `;
@@ -343,24 +344,24 @@ function renderStep6(state) {
             <p class="wizard-step-desc">检查角色信息，确认无误后保存：</p>
             <div class="wizard-summary">
                 <div class="wizard-summary-section">
-                    <h4>📋 基本信息</h4>
+                    <h4>${iconHtml('fileText', { size: 16 })} 基本信息</h4>
                     <div class="wizard-summary-row"><span class="summary-label">名称</span><span class="summary-value">${escapeHtml(state.name) || '<span class="summary-empty">未填写</span>'}</span></div>
                     <div class="wizard-summary-row"><span class="summary-label">描述</span><span class="summary-value">${escapeHtml(state.description) || '<span class="summary-empty">未填写</span>'}</span></div>
                     <div class="wizard-summary-row"><span class="summary-label">标签</span><span class="summary-value">${tags.length ? tags.map(t => `<span class="summary-tag">${escapeHtml(t)}</span>`).join(' ') : '<span class="summary-empty">无</span>'}</span></div>
                 </div>
                 <div class="wizard-summary-section">
-                    <h4>🧠 人格设定</h4>
+                    <h4>${iconHtml('character', { size: 16 })} 人格设定</h4>
                     <div class="wizard-summary-row"><span class="summary-label">人格</span><span class="summary-value summary-text">${escapeHtml(state.personality) || '<span class="summary-empty">未填写</span>'}</span></div>
                     <div class="wizard-summary-row"><span class="summary-label">场景</span><span class="summary-value">${escapeHtml(state.scenario) || '<span class="summary-empty">未填写</span>'}</span></div>
                     ${state.system_prompt ? `<div class="wizard-summary-row"><span class="summary-label">系统提示</span><span class="summary-value summary-text">${escapeHtml(state.system_prompt)}</span></div>` : ''}
                 </div>
                 <div class="wizard-summary-section">
-                    <h4>💬 对话风格</h4>
+                    <h4>${iconHtml('chat', { size: 16 })} 对话风格</h4>
                     <div class="wizard-summary-row"><span class="summary-label">开场白</span><span class="summary-value">${escapeHtml(state.first_mes) || '<span class="summary-empty">未填写</span>'}</span></div>
                     <div class="wizard-summary-row"><span class="summary-label">对话范例</span><span class="summary-value summary-text">${escapeHtml(state.mes_example) || '<span class="summary-empty">未填写</span>'}</span></div>
                 </div>
                 <div class="wizard-summary-section">
-                    <h4>⚙️ 设置</h4>
+                    <h4>${iconHtml('settings', { size: 16 })} 设置</h4>
                     <div class="form-field">
                         <label for="wiz-temp">温度 (Temperature): <span id="wiz-temp-value">${state.temperature.toFixed(2)}</span></label>
                         <input type="range" id="wiz-temp" min="0" max="2" step="0.05" value="${state.temperature}">
@@ -369,7 +370,7 @@ function renderStep6(state) {
                             <span>平衡 (1.0)</span>
                             <span>创意 (2.0)</span>
                         </div>
-                        <span class="field-hint">💡 较低的值使回复更可控，较高的值使回复更有创意</span>
+                        <span class="field-hint">较低的值使回复更可控，较高的值使回复更有创意</span>
                     </div>
                 </div>
             </div>
@@ -617,7 +618,7 @@ async function handleSave(state, statusEl, submitBtn, close, onSuccess) {
 
     try {
         await characters.create(data);
-        statusEl.textContent = '✅ 创建成功';
+        statusEl.innerHTML = `${iconHtml('check', { size: 14 })} 创建成功`;
         statusEl.className = 'form-status success';
 
         setTimeout(() => {
@@ -625,7 +626,7 @@ async function handleSave(state, statusEl, submitBtn, close, onSuccess) {
             if (onSuccess) onSuccess();
         }, 600);
     } catch (err) {
-        statusEl.textContent = `❌ ${err.message}`;
+        statusEl.innerHTML = `${iconHtml('x', { size: 14 })} ${escapeHtml(err.message)}`;
         statusEl.className = 'form-status error';
         submitBtn.disabled = false;
         submitBtn.textContent = '保存角色';
@@ -649,11 +650,11 @@ function _applyCharacterData(state, data) {
 
 function getTemplateIcon(templateId) {
     const icons = {
-        senpai: '📚',
-        wanderer: '🌍',
-        tsundere: '🤖',
-        butler: '🍵',
-        nekomimi: '🐱',
+        senpai: 'fileText',
+        wanderer: 'sun',
+        tsundere: 'character',
+        butler: 'chat',
+        nekomimi: 'sparkles',
     };
-    return icons[templateId] || '🎭';
+    return iconHtml(icons[templateId] || 'character', { size: 24 });
 }

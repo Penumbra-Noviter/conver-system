@@ -6,6 +6,7 @@
 
 import { openModal } from './modal.js';
 import { downloadBlob } from '../utils.js';
+import { iconHtml } from '../icons.js';
 
 /**
  * 显示对话导出对话框
@@ -23,12 +24,12 @@ export function showExportDialog(conversationId) {
             <p class="export-hint">选择导出格式：</p>
             <div class="export-options">
                 <button class="export-option-btn" data-format="markdown">
-                    <span class="export-option-icon">📄</span>
+                    <span class="export-option-icon">${iconHtml('fileText')}</span>
                     <span class="export-option-label">Markdown (.md)</span>
                     <span class="export-option-desc">可读的纯文本格式，适合分享和查看</span>
                 </button>
                 <button class="export-option-btn" data-format="json">
-                    <span class="export-option-icon">📋</span>
+                    <span class="export-option-icon">${iconHtml('fileJson')}</span>
                     <span class="export-option-label">JSON (.json)</span>
                     <span class="export-option-desc">结构化数据格式，适合程序处理</span>
                 </button>

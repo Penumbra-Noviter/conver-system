@@ -4,7 +4,7 @@
  * 职责：
  *   1. 订阅 tabs.js 的 onTabsChanged，变更即重渲染 tab 条
  *   2. 事件委托：点击 tab → 经注入的 onActivate 处理器激活（app.js 注入，
- *      内部走 P6.5-2 收敛的统一激活流程）；点击 ✕ → 直接 closeTab
+ *      内部走 P6.5-2 收敛的统一激活流程）；点击关闭图标 → 直接 closeTab
  *   3. 状态指示：经 tabs.js 展示契约 getTabDisplay 取展示字段 —— 生成中
  *      （phase thinking/streaming）tab 标题前脉冲小圆点；出错/停止（phase error）
  *      警示标记；完成（phase done）无提示；title 缺省「未命名会话」
@@ -24,13 +24,14 @@
 
 import { getTabs, getActiveTab, getTabDisplay, closeTab, abortStream, onTabsChanged } from '../tabs.js';
 import { escapeHtml } from '../utils.js';
+import { iconHtml } from '../icons.js';
 
 /**
  * 初始化 tab 条组件
  * @param {object} options
  * @param {HTMLElement} options.container - #chat-tabs 容器
  * @param {Function} [options.onActivate] - 激活处理器 (convId, opts) => void；
- *   由 app.js 注入。opts.saveCurrent=false 表示 DOM 视图已过期（✕ 关闭活动 tab 联动）
+ *   由 app.js 注入。opts.saveCurrent=false 表示 DOM 视图已过期（关闭活动 tab 联动）
  * @returns {Function} 卸载函数（取消订阅 + 解绑事件）
  */
 export function initTabBar({ container, onActivate } = {}) {
@@ -72,9 +73,9 @@ export function initTabBar({ container, onActivate } = {}) {
                 return `
             <div class="chat-tab${isActive ? ' active' : ''}" data-conv-id="${t.conversationId}" title="${escapeHtml(display.title)}">
                 ${display.generating ? '<span class="tab-dot" title="生成中"></span>' : ''}
-                ${display.errored ? '<span class="tab-warn" title="生成出错/已停止">!</span>' : ''}
+                ${display.errored ? `<span class="tab-warn" title="生成出错/已停止">${iconHtml('warning', { size: 14 })}</span>` : ''}
                 <span class="tab-title">${escapeHtml(display.title)}</span>
-                <button class="tab-close" title="关闭会话">✕</button>
+                <button class="tab-close" title="关闭会话">${iconHtml('x', { size: 14 })}</button>
             </div>`;
             })
             .join('');

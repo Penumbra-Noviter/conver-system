@@ -25,6 +25,7 @@ Thumbs.db
 
 # Agent / IDE state
 .serena/
+.zcode/
 .claude/settings.local.json
 .playwright-mcp/
 

@@ -5,7 +5,7 @@
  *   1. 消息渲染（renderMessages / appendMessage / thinking / 头像 / 复制）
  *   2. 发送与流式交互（handleSend）
  *   3. 聊天域 DOM 引用（chatDom）
- *   4. 发送按钮两态（➤/⏹）— 由活动 tab 的 isStreaming 派生（refreshSendButton）
+ *   4. 发送按钮两态（send/stop）— 由活动 tab 的 isStreaming 派生（refreshSendButton）
  *
  * P6.5 多 tab 语义：
  *   - 消息渲染读活动 tab 缓存（messages/characterId），无活动 tab → 空态
@@ -31,6 +31,7 @@ import { buildMessagesHtml, assistantAvatarHtml, userAvatarHtml } from './format
 import { state } from './state.js';
 import { getActiveTab, getTab, updateTab } from './tabs.js';
 import { createStreamSession, mergeFreshList } from './stream-session.js';
+import { iconHtml } from './icons.js';
 
 // ══════════════════════════════════════════════════
 // 聊天域 DOM 引用
@@ -60,6 +61,7 @@ export function setConversationsRefresher(fn) {
 // 只发一次真实请求，完成/失败后经 finally 清除。流式连发语义不受影响 —— 流式由
 // tab.isStreaming + StreamSession onDone 即时复位管理，本守卫只拦截非流式提交。
 const nonStreamingInFlight = new Set();
+const copyFeedbackTimers = new WeakMap();
 
 // ══════════════════════════════════════════════════
 // 消息渲染
@@ -135,7 +137,7 @@ function appendMessage(role, content, meta = {}) {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'btn-copy-message';
     copyBtn.title = '复制消息';
-    copyBtn.textContent = '📋';
+    copyBtn.innerHTML = iconHtml('clipboard');
     copyBtn.dataset.content = content;
     attachCopyButton(copyBtn, content);
     div.appendChild(copyBtn);
@@ -199,24 +201,32 @@ function createAvatarElement(role) {
 }
 
 /**
- * 为消息复制按钮绑定点击事件（复制内容到剪贴板并给出 ✅/❌ 反馈）
+ * 为消息复制按钮绑定点击事件（复制内容到剪贴板并给出图标反馈）
  * @param {HTMLButtonElement} btn - 复制按钮元素
  * @param {string} content - 要复制的消息内容
  */
 function attachCopyButton(btn, content) {
     btn.addEventListener('click', async (e) => {
         e.stopPropagation();
+        const pendingTimer = copyFeedbackTimers.get(btn);
+        if (pendingTimer) clearTimeout(pendingTimer);
+
+        let feedbackIcon = 'check';
         try {
             await navigator.clipboard.writeText(content);
-            btn.textContent = '✅';
             btn.classList.add('copied');
-            setTimeout(() => {
-                btn.textContent = '📋';
-                btn.classList.remove('copied');
-            }, 1500);
         } catch {
-            btn.textContent = '❌';
+            feedbackIcon = 'x';
+            btn.classList.remove('copied');
         }
+
+        btn.innerHTML = iconHtml(feedbackIcon);
+        const timer = setTimeout(() => {
+            btn.innerHTML = iconHtml('clipboard');
+            btn.classList.remove('copied');
+            copyFeedbackTimers.delete(btn);
+        }, 1500);
+        copyFeedbackTimers.set(btn, timer);
     });
 }
 
@@ -224,7 +234,7 @@ function attachCopyButton(btn, content) {
 
 /**
  * 发送按钮两态 — 由活动 tab 的 isStreaming 派生（单一事实来源）
- * 活动 tab 流式生成中 → ⏹ 停止；否则 → ➤ 发送。切 tab 时由激活流程调用刷新。
+ * 活动 tab 流式生成中 → stop 停止；否则 → send 发送。切 tab 时由激活流程调用刷新。
  */
 export function refreshSendButton() {
     const btn = chatDom.btnSend;
@@ -232,12 +242,12 @@ export function refreshSendButton() {
     const streaming = getActiveTab()?.isStreaming ?? false;
     if (streaming) {
         btn.disabled = false;
-        btn.textContent = '⏹';
+        btn.innerHTML = iconHtml('stop');
         btn.title = '停止生成';
         btn.classList.add('btn-stop');
     } else {
         btn.disabled = false;
-        btn.textContent = '➤';
+        btn.innerHTML = iconHtml('send');
         btn.title = '发送';
         btn.classList.remove('btn-stop');
     }

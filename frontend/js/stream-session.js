@@ -15,8 +15,8 @@
  *   - streamSettled 终态守卫:错误帧后 SSE 流关闭会再触发 onDone(null),必须拦截,
  *     防止 phase 'done' 覆盖错误写回;settled 后 onToken/onDone/onError 一律忽略
  *   - 停止(AbortError)写回 phase 'error'(警示标记;气泡保持「已停止」语义),
- *     正常完成写回 phase 'done';refreshSendButton 在写回后立即调用(消除 ⏹→➤ 的
- *     UX 窗口;连发依赖此即时复位)
+ *     正常完成写回 phase 'done';refreshSendButton 在写回后立即调用（消除停止态到发送态的
+ *     UX 窗口;连发依赖此即时复位）
  *   - settleIndex:发起时刻尾消息位置(本流 streaming 占位位置),幂等 — 该位置仍
  *     streaming 才结算(stale 分支);失败写回改用 anchor(本流 user 消息对象引用,
  *     indexOf 定位不受插入漂移影响 — 回复永远插在自己的 user 之后,时间序不漂移)
@@ -228,7 +228,7 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
         streamSettled = true;
 
         updateTab(convId, { isStreaming: false, activeStream: null, phase: 'done' });
-        // 立即复位发送按钮 — 不等 list 重载完成(消除 ⏹→➤ 的 UX 窗口;连发依赖此即时复位)
+        // 立即复位发送按钮 — 不等 list 重载完成（消除停止态到发送态的 UX 窗口；连发依赖此即时复位）
         refreshBtn();
 
         if (messageId != null) {

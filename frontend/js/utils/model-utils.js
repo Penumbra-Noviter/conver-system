@@ -32,7 +32,7 @@ export function fillModelSelect(selectEl, provider, defaultModel, customInputEl,
     selectEl.innerHTML = provider.models
         .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
         .join('')
-        + '<option value="__custom__">✏️ 自定义模型</option>';
+        + '<option value="__custom__">自定义模型</option>';
 
     let isCustom = false;
 

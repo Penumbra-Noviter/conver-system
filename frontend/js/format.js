@@ -6,6 +6,7 @@
  */
 
 import { escapeHtml, getInitials, formatTags, renderMarkdown } from './utils.js';
+import { iconHtml } from './icons.js';
 
 /**
  * 高亮文本中的关键词（不区分大小写，只高亮第一个命中）
@@ -42,7 +43,7 @@ export function assistantAvatarHtml(characters, currentCharacterId) {
  * @returns {string}
  */
 export function userAvatarHtml() {
-    return `<div class="msg-avatar user-avatar">👤</div>`;
+    return `<div class="msg-avatar user-avatar">${iconHtml('user', { size: 18 })}</div>`;
 }
 
 /**
@@ -62,13 +63,13 @@ export function buildMessagesHtml(messages, context = {}) {
         <div class="message ${m.role}">
             ${m.role === 'assistant' ? assistantAvatarHtml(characters, currentCharacterId) : userAvatarHtml()}
             <div class="message-content">${m.role === 'assistant' ? renderMarkdown(m.content) : escapeHtml(m.content)}</div>
-            <button class="btn-copy-message" title="复制消息" data-content="${escapeHtml(m.content)}">📋</button>
+            <button class="btn-copy-message" title="复制消息" data-content="${escapeHtml(m.content)}">${iconHtml('clipboard')}</button>
         </div>
     `).join('');
 }
 
 // ══════════════════════════════════════════════════
-// 视图渲染模板纯函数（ARC-6 从 app.js 迁移 — 输出与迁移前逐字节一致）
+// 视图渲染模板纯函数（ARC-6 从 app.js 迁移）
 // ══════════════════════════════════════════════════
 
 /**
@@ -96,35 +97,14 @@ export function characterCardHtml(c) {
                 ${c.tags && c.tags.length ? `<div class="detail-item"><span class="detail-label">标签:</span> ${escapeHtml(formatTags(c.tags))}</div>` : ''}
             </div>
             <div class="character-card-meta">
-                <span class="meta-badge">🌡️ ${c.temperature?.toFixed(1) ?? '0.7'}</span>
-                <span class="meta-badge">💬 ${c.conversation_count ?? 0}</span>
+                <span class="meta-badge">${iconHtml('temperature', { size: 14 })} ${c.temperature?.toFixed(1) ?? '0.7'}</span>
+                <span class="meta-badge">${iconHtml('messages', { size: 14 })} ${c.conversation_count ?? 0}</span>
             </div>
             <div class="character-card-actions">
-                <button class="btn-icon chat-with" title="开始对话">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 4.5A1.5 1.5 0 014.5 3h7A1.5 1.5 0 0113 4.5v4A1.5 1.5 0 0111.5 10H8l-3 2v-2H4.5A1.5 1.5 0 013 8.5v-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                        <path d="M6 6.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                </button>
-                <button class="btn-icon edit-char" title="编辑">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M11.4 2.6a1.7 1.7 0 012.4 2.4L7.5 11.3 4 12l.7-3.5 6.7-5.9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <button class="btn-icon export-char" title="导出角色卡">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M13.5 10v3.5a1 1 0 01-1 1h-9a1 1 0 01-1-1V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M8 9.5V2.5M5.5 5L8 2.5 10.5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <button class="btn-icon delete-char" title="删除">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M2.5 4.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                        <path d="M12.7 4.5v9.3a1.3 1.3 0 01-1.3 1.3H4.6a1.3 1.3 0 01-1.3-1.3V4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M6.6 4.5V3.4a.9.9 0 01.9-.9h1a.9.9 0 01.9.9v1.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M6.6 7.5v4M9.4 7.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                </button>
+                <button class="btn-icon chat-with" title="开始对话">${iconHtml('chat')}</button>
+                <button class="btn-icon edit-char" title="编辑">${iconHtml('edit')}</button>
+                <button class="btn-icon export-char" title="导出角色卡">${iconHtml('export')}</button>
+                <button class="btn-icon delete-char" title="删除">${iconHtml('trash')}</button>
             </div>
         </div>
     `;
@@ -143,7 +123,7 @@ export function conversationItemHtml(c, { activeId = null } = {}) {
              data-id="${c.id}">
             <div class="title">${escapeHtml(c.title)}</div>
             <div class="meta">${c.message_count} 条消息 · ${escapeHtml(c.model_name || c.model_provider)}</div>
-            <button class="btn-icon btn-delete-conv" title="删除对话">✕</button>
+            <button class="btn-icon btn-delete-conv" title="删除对话">${iconHtml('x', { size: 14 })}</button>
         </div>
     `;
 }
@@ -156,7 +136,7 @@ export function conversationItemHtml(c, { activeId = null } = {}) {
  */
 export function searchResultItemHtml(r, query) {
     const roleLabel = r.role === 'user' ? '你' : escapeHtml(r.character_name);
-    const roleIcon = r.role === 'user' ? '👤' : '🎭';
+    const roleIcon = iconHtml(r.role === 'user' ? 'user' : 'character', { size: 14 });
     const time = r.created_at ? new Date(r.created_at).toLocaleString('zh-CN') : '';
     const escapedQuery = escapeHtml(query);
     const highlighted = highlightText(escapeHtml(r.content_preview), escapedQuery);
@@ -164,7 +144,7 @@ export function searchResultItemHtml(r, query) {
         <div class="search-result-item" data-conversation-id="${r.conversation_id}" data-message-id="${r.message_id}">
             <div class="search-result-header">
                 <span class="search-result-role">${roleIcon} ${escapeHtml(roleLabel)}</span>
-                <span class="search-result-conv">💬 ${escapeHtml(r.conversation_title || '未命名对话')}</span>
+                <span class="search-result-conv">${iconHtml('messages', { size: 14 })} ${escapeHtml(r.conversation_title || '未命名对话')}</span>
             </div>
             <div class="search-result-preview">${highlighted}</div>
             <div class="search-result-time">${escapeHtml(time)}</div>
