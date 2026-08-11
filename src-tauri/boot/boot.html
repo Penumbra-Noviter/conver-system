@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conver System — 启动中</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #fafafa;
+      color: #333;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1e1e1e; color: #ddd; }
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(120, 120, 120, 0.25);
+      border-top-color: #4a6cf7;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #status { font-size: 14px; opacity: 0.85; }
+    #error { color: #d64545; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="spinner" id="spinner"></div>
+  <div id="status">正在启动 Conver System…</div>
+  <div id="error" hidden></div>
+  <script>
+    // 就绪页（Tauri 资产页）：经 window.__TAURI_INTERNALS__ 调 Rust 命令 backend_status
+    // 轮询后端就绪；就绪后 location.replace 到 http://127.0.0.1:<port>，避免加载失败页。
+    (function () {
+      var internals = window.__TAURI_INTERNALS__ || {};
+      var invoke = internals.invoke;
+      if (typeof invoke !== 'function') {
+        document.getElementById('status').textContent = '运行环境异常：无法调用桌面端接口';
+        document.getElementById('spinner').hidden = true;
+        return;
+      }
+      var MAX_POLLS = 120;         // 120 × 500ms = 60s
+      var POLL_INTERVAL_MS = 500;
+      var attempts = 0;
+
+      function showError(msg) {
+        var el = document.getElementById('error');
+        el.hidden = false;
+        el.textContent = msg;
+      }
+
+      function poll() {
+        invoke('backend_status')
+          .then(function (status) {
+            if (status && status.ready && status.url) {
+              window.location.replace(status.url);
+              return;
+            }
+            if (status && status.error) {
+              showError(status.error);
+            }
+            if (++attempts >= MAX_POLLS) {
+              document.getElementById('status').textContent = '启动超时：后端未在预期时间内就绪';
+              document.getElementById('spinner').hidden = true;
+              return;
+            }
+            setTimeout(poll, POLL_INTERVAL_MS);
+          })
+          .catch(function () {
+            if (++attempts >= MAX_POLLS) {
+              document.getElementById('status').textContent = '启动检测异常，请重启应用';
+              document.getElementById('spinner').hidden = true;
+              return;
+            }
+            setTimeout(poll, POLL_INTERVAL_MS);
+          });
+      }
+
+      poll();
+    })();
+  </script>
+</body>
+</html>

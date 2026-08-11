@@ -1,0 +1,3 @@
+# Rust / Tauri build artifacts
+/target
+/gen/schemas

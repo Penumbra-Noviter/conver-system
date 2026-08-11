@@ -1,0 +1,17 @@
+[package]
+name = "conver-system"
+version = "0.1.0"
+description = "Conver System 桌面壳（Tauri v2）：动态端口子进程 + 就绪页"
+edition = "2021"
+
+[lib]
+name = "conver_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
