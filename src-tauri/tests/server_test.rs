@@ -126,27 +126,20 @@ fn parse_command_line_rejects_empty_or_blank() {
 }
 
 #[test]
-fn backend_config_from_env_defaults_to_dev_command() {
+fn backend_config_from_env_env_variants() {
+    // 顺序执行三组断言（同一测试内无并发），避免 CONVER_BACKEND_CMD 相关用例并行互踩环境变量。
+    assert_eq!(DEFAULT_DEV_BACKEND_CMD, "python -m uvicorn backend.app.main:app");
     with_env("CONVER_BACKEND_CMD", None, || {
         let cfg = backend_config_from_env().expect("默认配置应可解析");
         assert_eq!(cfg.program, "python");
         assert_eq!(cfg.args, vec!["-m", "uvicorn", "backend.app.main:app"]);
         assert_eq!(cfg.cwd, None);
     });
-    assert_eq!(DEFAULT_DEV_BACKEND_CMD, "python -m uvicorn backend.app.main:app");
-}
-
-#[test]
-fn backend_config_from_env_reads_override_with_quoted_path() {
     with_env("CONVER_BACKEND_CMD", Some("\"C:/Program Files/app.exe\" --flag"), || {
         let cfg = backend_config_from_env().expect("覆盖配置应可解析");
         assert_eq!(cfg.program, "C:/Program Files/app.exe");
         assert_eq!(cfg.args, vec!["--flag"]);
     });
-}
-
-#[test]
-fn backend_config_from_env_rejects_bad_command() {
     with_env("CONVER_BACKEND_CMD", Some("python \"unclosed"), || {
         assert!(backend_config_from_env().is_err(), "非法命令串应报错");
     });
@@ -362,6 +355,60 @@ fn runtime_json_corrupt_file_errors() {
     let path = dir.join("runtime.json");
     std::fs::write(&path, "not json {").unwrap();
     assert!(read_runtime_json(&path).is_err(), "损坏 JSON 应报错");
+    // 写中断场景：轮询方读到半截 JSON（尾部截断）同样应报错而非误判
+    std::fs::write(&path, "{\"port\": 8123, \"ready\": true,").unwrap();
+    assert!(read_runtime_json(&path).is_err(), "半截 JSON 应报错");
+}
+
+#[test]
+fn runtime_json_atomic_write_leaves_no_tmp() {
+    // 原子写（F2）：写后目标目录不应残留临时文件
+    let dir = tmp_dir("runtime-atomic");
+    let path = dir.join("runtime.json");
+    let info = RuntimeInfo {
+        port: 8123,
+        ready: true,
+        pid: Some(42),
+        error: None,
+    };
+    write_runtime_json(&path, &info).expect("写入应成功");
+    let leftovers: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name().to_string_lossy().contains(".tmp"))
+        .collect();
+    assert!(leftovers.is_empty(), "原子写后不应残留临时文件: {leftovers:?}");
+}
+
+#[test]
+fn runtime_json_atomic_write_replaces_existing() {
+    // 原子替换（F2）：旧值被完整替换为新值，读回始终是完整 JSON
+    let dir = tmp_dir("runtime-replace");
+    let path = dir.join("runtime.json");
+    write_runtime_json(
+        &path,
+        &RuntimeInfo {
+            port: 1,
+            ready: false,
+            pid: None,
+            error: Some("旧值".into()),
+        },
+    )
+    .expect("首次写入应成功");
+    write_runtime_json(
+        &path,
+        &RuntimeInfo {
+            port: 8123,
+            ready: true,
+            pid: Some(42),
+            error: None,
+        },
+    )
+    .expect("替换写入应成功");
+    let read = read_runtime_json(&path).expect("替换后应可完整读回");
+    assert_eq!(read.port, 8123);
+    assert!(read.ready);
+    assert!(read.error.is_none());
 }
 
 #[test]
@@ -390,16 +437,44 @@ fn data_dir_path_appends_conver_system() {
 }
 
 #[test]
-fn default_data_dir_uses_apdata_with_cwd_fallback() {
-    // 顺序执行两组断言（同一测试内无并发），避免 APPDATA 相关用例并行互踩环境变量。
-    with_env("APPDATA", Some("C:/Users/tester/AppData/Roaming"), || {
-        assert_eq!(
-            default_data_dir(),
-            PathBuf::from("C:/Users/tester/AppData/Roaming/ConverSystem")
-        );
+fn default_data_dir_env_priority() {
+    // 顺序执行四组断言（同一测试内无并发），避免环境变量用例并行互踩。
+    // 优先级契约（与迁移脚本 P6.4-3 对齐）：CONVER_DATA_DIR > APPDATA > CWD 兜底。
+    with_env("CONVER_DATA_DIR", Some("C:/custom/data"), || {
+        with_env("APPDATA", None, || {
+            assert_eq!(default_data_dir(), PathBuf::from("C:/custom/data"));
+        });
     });
-    with_env("APPDATA", None, || {
-        let dir = default_data_dir();
-        assert!(dir.ends_with("ConverSystem"), "无 APPDATA 时应回退到 CWD 下");
+    with_env("CONVER_DATA_DIR", Some("C:/custom/data"), || {
+        with_env("APPDATA", Some("C:/Users/tester/AppData/Roaming"), || {
+            assert_eq!(
+                default_data_dir(),
+                PathBuf::from("C:/custom/data"),
+                "CONVER_DATA_DIR 应优先于 APPDATA"
+            );
+        });
+    });
+    with_env("CONVER_DATA_DIR", Some(""), || {
+        with_env("APPDATA", Some("C:/Users/tester/AppData/Roaming"), || {
+            assert_eq!(
+                default_data_dir(),
+                PathBuf::from("C:/Users/tester/AppData/Roaming/ConverSystem"),
+                "CONVER_DATA_DIR 空串应视为未设置（与迁移脚本 falsy 语义一致）"
+            );
+        });
+    });
+    with_env("CONVER_DATA_DIR", None, || {
+        with_env("APPDATA", Some("C:/Users/tester/AppData/Roaming"), || {
+            assert_eq!(
+                default_data_dir(),
+                PathBuf::from("C:/Users/tester/AppData/Roaming/ConverSystem")
+            );
+        });
+    });
+    with_env("CONVER_DATA_DIR", None, || {
+        with_env("APPDATA", None, || {
+            let dir = default_data_dir();
+            assert!(dir.ends_with("ConverSystem"), "无任何变量时应回退到 CWD 下");
+        });
     });
 }

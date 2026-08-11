@@ -1,14 +1,17 @@
 //! Conver System — Tauri 桌面壳。
 //!
-//! 职责（spec D1 / 工单 03-P6.4-1）：
+//! 职责（spec D1 / 工单 03-P6.4-1 + 06-P6.4-4）：
 //! 1. 探测动态端口 → 以 CREATE_NO_WINDOW 启动后端子进程（dev = uvicorn 源码 / prod = 打包 exe）；
 //! 2. 注入 `DATABASE_URL` 指向 %APPDATA%\ConverSystem\conver_system.db（与网页版数据独立）；
 //! 3. 后台线程轮询 HTTP 就绪（GET /api/models 200），就绪后写 %APPDATA%\ConverSystem\runtime.json；
 //! 4. webview 加载 boot.html（Tauri 资产页）→ 经 `backend_status` 命令轮询 → `location.replace` 跳转；
-//! 5. 应用退出（含异常路径）kill 后端子进程，保证无残留。
+//! 5. 单实例（tauri-plugin-single-instance）：二次启动在插件 setup 中同步退出，不重复 spawn 后端；
+//! 6. 系统托盘（D5/D6）：关闭窗口 = 最小化到托盘；菜单 [显示/隐藏窗口、开机自启勾选、退出]；
+//! 7. 应用退出（含异常路径）kill 后端子进程，保证无残留。
 
 pub mod commands;
 pub mod server;
+pub mod tray;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
@@ -16,6 +19,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use server::{BackendConfig, BackendStatus, ManagedChild, ReadyOutcome, RuntimeInfo};
+use tauri::Manager;
 
 /// 桌面壳运行状态：动态端口、数据目录、子进程、就绪标记与最近错误。
 ///
@@ -198,19 +202,38 @@ fn ready_timeout_from_env() -> Duration {
         .unwrap_or(server::DEFAULT_READY_TIMEOUT)
 }
 
-/// 应用入口：启动壳 → 构建 Tauri 窗口 → 退出事件时清理子进程。
+/// 应用入口：挂载插件 → setup 启动壳与托盘 → 运行事件循环（关闭=托盘 / 退出清理子进程）。
 ///
-/// 窗口关闭 → ExitRequested → Exit：本工单只做基础生命周期（kill 子进程），
-/// 托盘常驻由 P6.4-4 接手（届时在 ExitRequested 中拦截）。
+/// 生命周期（D5）：窗口关闭 → CloseRequested 被拦截 → 隐藏窗口驻留托盘（不退出）；
+/// 托盘「退出」→ ExitRequested → Exit → kill 后端子进程（无残留）。
+///
+/// 单实例（D5）：tauri-plugin-single-instance 在插件 setup 中**同步**检查互斥量，
+/// 二次实例在应用 setup 执行前即退出 → 壳（后端 spawn）在应用 setup 中启动，
+/// 保证二次启动绝不重复拉起后端（防双 uvicorn 与 SQLite 并发写）。
 ///
 /// 自动化 seam：设置环境变量 `CONVER_EXIT_AFTER_SECS=<秒>` 时，应用在指定秒数后
 /// 走正常退出流程（ExitRequested → Exit → kill 子进程），供冒烟脚本自动化收尾。
 pub fn run() {
-    let shell = ShellState::launch();
     tauri::Builder::default()
-        .manage(shell)
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // 二次实例回调（只会在首个实例上触发）：聚焦已有实例主窗口
+            if let Some(window) = app.get_webview_window(tray::MAIN_WINDOW_LABEL) {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name("Conver System")
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![commands::backend_status])
         .setup(|app| {
+            // 壳在 setup 中启动：single-instance 插件已同步完成二次实例检查
+            let shell = ShellState::launch();
+            app.manage(shell);
+            tray::setup_tray(app.handle())?;
             if let Some(secs) = std::env::var("CONVER_EXIT_AFTER_SECS")
                 .ok()
                 .and_then(|v| v.parse::<u64>().ok())
@@ -225,11 +248,29 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("Conver System Tauri 应用构建失败")
-        .run(|app, event| {
-            if let tauri::RunEvent::Exit = event {
-                use tauri::Manager;
-                let shell = app.state::<ShellState>();
-                shell.kill_child();
+        .run(|app, event| match event {
+            // 关闭窗口 = 最小化到托盘（D5）；托盘「退出」走 ExitRequested → Exit
+            tauri::RunEvent::WindowEvent {
+                event: tauri::WindowEvent::CloseRequested { api, .. },
+                ..
+            } => {
+                api.prevent_close();
+                if let Some(window) = app.get_webview_window(tray::MAIN_WINDOW_LABEL) {
+                    let _ = window.hide();
+                }
+                if let Some(state) = app.try_state::<tray::TrayState>() {
+                    state
+                        .status
+                        .lock()
+                        .unwrap()
+                        .apply_window_intent(tray::WindowIntent::Hide);
+                }
             }
+            tauri::RunEvent::Exit => {
+                if let Some(shell) = app.try_state::<ShellState>() {
+                    shell.kill_child();
+                }
+            }
+            _ => {}
         });
 }
