@@ -149,6 +149,29 @@
 
 **不做清单（Out of Scope）**：新信息架构；向导状态机重写；聊天业务语义调整；流式生命周期优化；全新主题系统；品牌营销页面。
 
+## 13. Tauri 桌面版（P6.4，2026-08-11 立项）
+
+> 规格化表达见 `.scratch/p64-tauri/spec.md`（approved；D1-D10 为固定前提，spike 结论折回修订日志 v0.2）。桌面版以「壳」形态交付：前端/后端业务代码零改动，数据与网页版完全独立。
+
+**决策**：
+
+1. **D1 壳方案**：Tauri 主进程以 CREATE_NO_WINDOW 启动 PyInstaller 打包后端 exe（uvicorn 子进程，`TcpListener::bind(0)` 动态端口），webview 加载 `http://127.0.0.1:\<port\>`；前端/后端业务代码零改动。
+2. **D2 PyInstaller onedir**（优于 onefile：启动快、无重复解压）；入口为脚本启动器 `backend/run_backend.py`（uvicorn.run 直传 app 对象规避 frozen import-string 差异），spec `pathex` 指向仓库根（PEP 420 namespace package）。
+3. **D3 数据目录** `%APPDATA%\ConverSystem\`（`CONVER_DATA_DIR` 环境变量覆盖；壳/后端/迁移脚本三方同一契约）；数据库连接串由壳注入 `DATABASE_URL`（Windows 绝对路径，环境变量为权威通道——打包后 .env 相对路径语义失效）。
+4. **D4 迁移脚本**：复制非移动 + `.migrated` 完成标记 + 不删源 + 幂等 + 防覆盖（不一致须 `--force`）；独立命令行工具，不进产品 UI。
+5. **D5 托盘**：关闭窗口 = 最小化到托盘；菜单 [显示/隐藏窗口、开机自启勾选、退出]；单实例（二次启动同步退出，防双后端与 SQLite 并发写）。
+6. **D6 开机自启默认关** + 托盘菜单勾选。
+7. **D7 交付 NSIS .exe 安装器单产物**：`installMode: currentUser`（装到 `%LOCALAPPDATA%\Programs\`，免管理员）；卸载不动 `%APPDATA%` 数据（数据分离铁律）。
+8. **D8 测试**：cargo test 纯逻辑（Seam 1）+ 自动化冒烟（Seam 2）；tauri-driver E2E 本轮不做。
+9. **D9 图标**：内联 SVG logo → Playwright 渲染 1024px PNG → `tauri icon` 全套（含 .ico）。
+10. **D10 迁移脚本独立形态**（独立脚本 + 独立测试，pytest Seam 3）。
+
+**接口契约**：就绪契约 = 后端就绪后写 `%APPDATA%\ConverSystem\runtime.json`（port + ready 标记 + pid，原子写 F2）；就绪页（Tauri 资产页）经 `backend_status` 命令轮询就绪后 `location.replace` 到后端地址；壳-后端环境变量通道（DATABASE_URL / CONVER_BACKEND_CMD / CONVER_EXIT_AFTER_SECS 自动化 seam）；构建链必须在 cmd/PowerShell 执行（Git Bash link.exe 遮蔽 MSVC linker）；数据独立性（网页版根 DB + 8000 端口 ↔ 桌面版 %APPDATA% DB + 动态端口并存互不干扰）。
+
+**spike 结论**：SPK-R1 = PyInstaller onedir 一次成型（启动 2.27s、25M、零 hiddenimports；三项硬契约：脚本启动器入口 / pathex 仓库根 / DATABASE_URL 绝对路径 + 日志落盘）；SPK-R2 = WebView2 不拦截 blob:URL + a.click() 下载（三种机制全放行）→ **无导出回退条件分支**，验收 9 人工点一次导出闭合。
+
+**边界**：不重写 Rust 后端（Rust 仅作壳）；不改现有前端/后端业务代码；不做 tauri-driver E2E、自动更新、便携版、MSI、macOS/Linux；不删除网页版根数据库；不碰 Ollama（已封存）。
+
 ---
 
-> 更新记录：2026-07-30 初始版本，经 grilling skill 深度讨论后确认；2026-08-03 补充 P3.5（§4 标题自动生成、§6 停止生成）、P4.3（API Key 保存时测试连接）决策；2026-08-06 补充角色创建向导、LLM 文档智能解析、5 套内置模板；2026-08-10 补充 §11 多 tab 会话管理（P6.5，12 项决策）；2026-08-11 补充 §12 UI 克制化与动态 SVG 图标协议（OPT-1）
+> 更新记录：2026-07-30 初始版本，经 grilling skill 深度讨论后确认；2026-08-03 补充 P3.5（§4 标题自动生成、§6 停止生成）、P4.3（API Key 保存时测试连接）决策；2026-08-06 补充角色创建向导、LLM 文档智能解析、5 套内置模板；2026-08-10 补充 §11 多 tab 会话管理（P6.5，12 项决策）；2026-08-11 补充 §12 UI 克制化与动态 SVG 图标协议（OPT-1）；2026-08-11 补充 §13 Tauri 桌面版（P6.4，D1-D10 共识决策 + spike 结论 + 接口契约）

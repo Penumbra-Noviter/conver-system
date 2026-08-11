@@ -5,6 +5,19 @@
 
 ---
 
+## 滚动摘要（2026-08-11 — P6.4 Tauri 桌面版波次收官）
+
+- **P6.4 桌面版完成（8 工单全归档，merge 链 3823e76/97a2923/635104b/87ab288/a881d95）**：Tauri v2 壳（动态端口子进程 + 就绪页 + capabilities + 托盘/自启/单实例）、PyInstaller onedir 后端打包、数据迁移脚本、品牌图标、NSIS 安装器 + 一键构建 + 自动化冒烟；**前端/后端业务代码零改动**（打包专用入口 run_backend.py + main.py _MEIPASS 分支除外）
+- **spike 结论**：SPK-R1 PyInstaller onedir **一次成型**（2.27s 就绪、25M、零 hiddenimports；三项硬契约：脚本启动器入口 / spec pathex=仓库根 / DATABASE_URL 必须 Windows 绝对路径 + 日志落盘）；SPK-R2 WebView2 **不拦截** blob 下载（三种机制全放行）→ **无导出回退条件分支**，验收 9 人工点一次导出闭合
+- **波次遥测**：波 1 并行 4（2 spike + 2 implement）、波 2 并行 3、波 3 串行 1；merge **零回退冲突**；波 1 降配增量审核 5 findings（F1 CONVER_DATA_DIR 壳侧未对齐 / F2 runtime.json 非原子写 → 派回 P6.4-4 修复 `908ff5a`；F3 %APPDATA% 不可写 / F4 迁移边缘大小写 / F5 cli 网络依赖 → 非阻断）
+- **F1/F2 修复**：数据目录环境变量对齐（壳/后端/迁移三方 CONVER_DATA_DIR 同一契约）+ runtime.json 原子写（临时文件 + rename，与迁移脚本 `_write_marker` 同款）
+- **测试**：pytest **259 + 1 skip**（P6.4-2 +20 打包用例、P6.4-3 +71 迁移用例）/ Vitest **186** / cargo test **41**（壳 Seam 1 纯逻辑），全绿
+- **P6.4-6 交付**：`scripts/build-desktop.ps1`（cargo test → pytest → vitest → tauri build → 冒烟，Git Bash link.exe 警告，R4 NSIS/WebView2 下载失败自动重试 + `--no-bundle` 降级）、`scripts/smoke-desktop.ps1`（验收 1-7 自动化：runtime.json 就绪 → /api/models 200 → %APPDATA% DB 表结构 → 优雅退出 → 端口释放无残留）、`docs/tauri-desktop.md`（构建/冒烟/数据目录/迁移/环境注意/人工清单）；NSIS `installMode: currentUser`（免管理员，卸载不动 %APPDATA% 数据）
+- **P6.4-6 冒烟实测避坑（已修）**：① 端口释放检查必须用**同步** `TcpClient.Connect`——异步 `BeginConnect`+`WaitHandle` 在连接被拒（端口已关）时 WaitHandle 不触发，永远误判「仍占用」（首轮冒烟假失败根因）；② 残留检查严格限定冒烟自己的端口（`Get-NetTCPConnection`）——按全局进程名/命令行匹配曾误杀本机正在运行的网页版 uvicorn（已恢复服务），教训：冒烟脚本绝不清理非自己启动的进程；③ `Write-Host "..." -f $x` 的 `-f` 会被解析为 `-ForegroundColor` 缩写参数 → 必须 `("..." -f $x)` 括号包裹
+- **P6.4-6 遗留交接**：① 壳 prod 模式后端定位仍走环境变量通道（CONVER_BACKEND_CMD），双击直启零配置需 Rust prod 探测（resource_dir 随包资源，超本工单范围）；② 打包后端 `datas=[]` 不随包挂载前端 UI（webview 就绪跳转根路径 404，API 全正常）——两项均记录于 docs/tauri-desktop.md §5，留主会话决策；③ 人工验收 8/9 清单在 docs §6
+
+---
+
 ## 滚动摘要（2026-08-11）
 
 - **OPT-1 UI 克制化与图标协议收口（完成 + 归档）**：保留 Warm Stone 与现有应用壳，统一动态 SVG 图标 seam（`frontend/js/icons.js` 只暴露 `iconHtml`，`Object.hasOwn` 注册表 + 尺寸/class 白名单校验，未知/非法输入显式抛错）；清除应用自带 emoji 图标（用户数据中的 emoji 保留不过滤）；深浅主题 token 单一来源收口；复制反馈竞态修复（WeakMap）；**四轴 code-review + GUI 黑盒回归全部完成**（`8ce17bd`）
@@ -32,6 +45,15 @@
 ---
 
 ## 日志正文
+
+### 2026-08-11 | 实现 | P6.4-6 安装器 + 一键构建冒烟 + 文档归档（波 3 收官）
+
+- **NSIS 配置**（tauri.conf.json）：`bundle.active: true` + `targets: ["nsis"]` + `bundle.windows.nsis`（`installMode: currentUser`；实测安装到 **`%LOCALAPPDATA%\Conver System\`**——tauri 2.11 NSIS 模板路径，非 `Programs\` 子目录；`languages: ["SimpChinese", "English"]`；卸载不动 %APPDATA% 数据——数据在安装目录之外，数据分离铁律已实证：静默卸载后 `%APPDATA%\ConverSystem` 完好）
+- **build-desktop.ps1**：cargo test（src-tauri，41 用例）→ pytest（.venv，259+1skip）→ vitest（frontend，186）→ tauri build（NSIS）→ 冒烟（-SkipSmoke 可关）；tauri CLI 经 `frontend/node_modules/.bin/tauri`（只搜 cwd 及子目录，从仓库根调）；**R4**：build 失败自动重试 1 次 → 仍失败回退 `--no-bundle` 验证编译并记录；后端 exe 缺失自动调 build-backend.ps1 补齐；脚本头注释 Git Bash link.exe 遮蔽警告（必须在 cmd/PowerShell 运行）
+- **smoke-desktop.ps1**（Seam 2，验收 1-7）：环境变量通道 `CONVER_BACKEND_CMD` 指向打包后端 exe + `CONVER_EXIT_AFTER_SECS` 钩子优雅退出；轮询 runtime.json（容忍解析失败重试，**启动前删除陈旧 runtime.json 防假阳性**）；`GET /api/models` 200；DB 存在 + `GET /api/characters`（首启断言 `[]`，既有数据降级验结构并告警）；退出后**查端口释放而非 pid**（P6.4-1 遗留：venv python 重定向器孙进程）+ 无 conver_backend.exe/uvicorn 残留；异常路径 finally 兜底 force-kill + 按端口清后端；**守卫：数据目录落在项目根内直接拒绝**（绝不触碰项目根 DB）；`-UseInstaller` 静默安装路径 / `-RunMigrationCheck` 验收 7 轻量复跑 / `-CleanAppData` 显式清理
+- **真实运行验证**：完整跑通 build-desktop.ps1 等价命令链（cargo test / pytest / vitest / tauri build）+ smoke-desktop.ps1 全过；安装器产物路径/大小记录
+- **清理**：删除 frontend/conver_system.db 残留（36KB，SQLite 格式，无任何代码引用，.gitignore 已兜底；删除前确认无 SQLite 独占打开——网页版服务 8000 端口与项目根 DB 均未受影响）
+- **避坑**：① worktree 无 node_modules/.venv → node_modules 用 Junction 指向 p64-1（PS `New-Item -ItemType Junction`），.venv 直接调用主仓库绝对路径；② PowerShell 5.1 无 `??`/三元表达式，脚本须 PS 5.1 兼容；③ `Stop-Process` 是 TerminateProcess，不会走 Rust Drop/Exit 清理——**退出应用必须走壳的 CONVER_EXIT_AFTER_SECS 钩子**，force-kill 只作异常兜底；④ 残留检查查端口（TcpClient BeginConnect 探测）而非进程 pid
 
 ### 2026-08-11 | 验证+修复 | OPT-1 GUI 黑盒回归（375px / 侧栏折叠 / 多 tab 流式）+ 错误气泡 CSS 回归修复
 

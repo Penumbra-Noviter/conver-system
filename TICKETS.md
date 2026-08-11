@@ -13,17 +13,30 @@
 
 ## 活跃工单
 
-### P6.4 Tauri 桌面版
-
-- [ ] Tauri 项目初始化
-- [ ] Rust 后端作为 FastAPI 壳/替代
-- [ ] 系统托盘 / 开机自启
-
-> ⚠️ Ollama 本地模型支持 — **已封存**（2026-08-03 用户决定：发布获得用户反馈后再考虑）
+> 当前无未完成工单。P6.4 已全部归档（见下）。
 
 ---
 
 ## 已完成归档
+
+### P6.4 Tauri 桌面版（2026-08-11 波次收官）
+
+> 规格 `.scratch/p64-tauri/spec.md`（approved，D1-D10 共识 + spike 结论折回 v0.2）。三波执行：波 1 并行 4（SPK-R1/SPK-R2 spike + P6.4-1/P6.4-3）、波 2 并行 3（P6.4-2/P6.4-4/P6.4-5）、波 3 串行 1（P6.4-6）；merge 零回退冲突；波 1 降配增量审核 5 findings（F1/F2 派回修复，F3-F5 非阻断）。spike#01（PyInstaller onedir 一次成型 + 三项硬契约）、spike#02（WebView2 不拦截 blob 下载 → 无导出回退条件分支）。测试同步（文档规范 §三）：pytest **259 + 1 skip** / Vitest **186** / cargo test **41**，全部全绿。
+>
+> 人工项（R6）：验收 8（托盘/自启注册表）与验收 9（导出下载）由 docs/tauri-desktop.md §6 人工清单记录。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| SPK-R1 | PyInstaller onedir 打包可行性 spike（配方成品 backend/conver_backend.spec） | 2026-08-11 | `4226b27` |
+| SPK-R2 | WebView2 blob 下载拦截实测 spike（结论：不拦截，无导出回退） | 2026-08-11 | `691f658` |
+| P6.4-1 | Tauri v2 初始化 + Rust 壳（动态端口子进程/就绪页/capabilities，Seam 1） | 2026-08-11 | `4b56168` |
+| P6.4-3 | 数据迁移脚本（复制非移动+完成标记+幂等，Seam 3） | 2026-08-11 | `213f6b1` |
+| P6.4-2 | 后端 PyInstaller onedir 打包固化（启动器+spec+_MEIPASS+日志落盘契约） | 2026-08-11 | `b9e4eba` |
+| P6.4-4 | 托盘/开机自启/单实例 + 波 1 审核 F1/F2 修复（CONVER_DATA_DIR 对齐 + runtime.json 原子写） | 2026-08-11 | `e1fbc96` + `908ff5a` |
+| P6.4-5 | 品牌图标全套（SVG → Playwright 1024 PNG → tauri icons） | 2026-08-11 | `94f21c3` |
+| P6.4-6 | 安装器 + 一键构建冒烟 + 文档归档（NSIS currentUser；build-desktop.ps1/smoke-desktop.ps1；验收 1-7 自动化） | 2026-08-11 | `1e93a97` |
+
+> ⚠️ Ollama 本地模型支持 — **已封存**（2026-08-03 用户决定：发布获得用户反馈后再考虑）
 
 ### OPT-1 UI 克制化与图标协议收口（2026-08-11）
 
