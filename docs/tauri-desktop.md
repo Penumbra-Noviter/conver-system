@@ -17,8 +17,8 @@ powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 
 | 步骤 | 内容 | 产物/判据 |
 |------|------|-----------|
-| 1 | `cargo test`（src-tauri） | 壳纯逻辑 41 用例 |
-| 2 | `pytest`（backend，仓库根 .venv） | 259 用例 + 1 skip |
+| 1 | `cargo test`（src-tauri） | 壳纯逻辑 43 用例 |
+| 2 | `pytest`（backend，仓库根 .venv） | 261 用例 + 1 skip |
 | 3 | `vitest run`（frontend） | 186 用例 |
 | 4 | `tauri build`（NSIS） | 安装器 + 壳 exe |
 | 5 | `smoke-desktop.ps1` | 验收 1-7 自动化 |
@@ -132,7 +132,7 @@ $env:CONVER_DATA_DIR = "D:\conver-data"   # 覆盖后桌面版全部数据落此
 ## 5. 已知限制（P6.4-6 交接记录）
 
 1. ~~壳的生产模式后端定位依赖环境变量通道~~ —— **已修复**（2026-08-11 期末审核阻断 1）：`bundle.resources` 随包分发后端，壳 release 构建按候选探测定位随包 exe（`server.rs::prod_backend_exe_candidates`：`_up_/dist/conver_backend/` 实测布局 + 平铺兜底），`CONVER_BACKEND_CMD` 覆盖保留；冒烟 `-UseInstaller` 干净环境用例（不注入 env）纳入自动化闭环。
-2. **打包后端不随包挂载前端 UI**：PyInstaller 配方 `datas=[]`（main.py frozen 分支 exists() 守卫跳过挂载）——打包态下 webview 就绪后跳转 `http://127.0.0.1:\<port\>/` 会得到 404；API 全部正常。修复：在 `backend/conver_backend.spec` 的 `datas` 追加 `frontend` 目录（配方注释已写明方法）；冒烟已加 `GET /` 标记断言防复发（期末审核阻断 2，修复合并后必须 PASS）。
+2. ~~打包后端不随包挂载前端 UI~~ —— **已修复**（2026-08-11 期末审核阻断 2）：`backend/conver_backend.spec` 的 `datas` 已挂载 `frontend` 运行子集（index.html/css/js，排除 node_modules/tests，`_FRONTEND_RUNTIME` 接线，+364K），打包态下 webview 就绪后跳转 `http://127.0.0.1:\<port\>/` 返回 200 且含应用标记；冒烟 `GET /` 标记断言（阻断 2 回归）已 PASS。API 不受影响。
 3. **验收 8/9 人工项**：托盘/自启/导出下载由人工清单记录（见下节），自动化冒烟不覆盖 GUI 行为（R6）。
 
 ## 6. 人工验收清单（验收 8 / 9，R6）

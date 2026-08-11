@@ -29,16 +29,16 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 188）；`cd frontend && npm test`（Vitest 186）。
+测试：`cd backend && python -m pytest`（pytest 261+1skip）；`cd frontend && npm test`（Vitest 186）；`cd src-tauri && cargo test`（43）。
 
 ## 当前状态（2026-08-11）
 
-- ✅ Phase 1-5 + P6.1/6.2/6.3 + P2.5/3.5 + P4.3 全部完成
+- ✅ Phase 1-5 + P6.1/6.2/6.3 + P2.5/3.5 + P4.3 + P6.4 全部完成
 - ✅ 架构深化两波（ARC-1~8：StreamSession/级联/标题/export/api seam/展示契约/app 拆分/__init__）+ 架构摩擦 11 候选（前端模块化 + 服务层解耦）
 - ✅ P6.5 多 tab 会话管理（tabs 工作区深模块 + 防悬挂写回 + sessionStorage 恢复）
 - ✅ OPT-1 UI 克制化与图标协议收口（icons.js seam + emoji 清除 + 主题 token 单一来源），GUI 黑盒回归全过
-- ✅ 测试：pytest 188（后端）+ Vitest 186（前端）全绿；Rust 工具链已装（Tauri P6.4 前置就绪）
-- ⬜ 待办：P6.4 Tauri 桌面版（见 TICKETS）
+- ✅ P6.4 Tauri 桌面版已交付（8 工单归档，2026-08-11）：Tauri v2 壳 + PyInstaller 打包后端 + NSIS 安装器；期末 2 阻断（后端随包定位、前端随包挂载）已修复，安装器形态冒烟 5 项全过。详见 [docs/tauri-desktop.md](docs/tauri-desktop.md)
+- ✅ 测试：pytest 261+1skip（后端）+ Vitest 186（前端）+ cargo test 43（壳）全绿
 
 ## 待办管理
 

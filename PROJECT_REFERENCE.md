@@ -2,13 +2,13 @@
 
 > **一句话**：本地优先、多模型可切换的角色对话应用。创建带人设的虚拟角色，与不同角色进行 AI 驱动的对话。
 > **技术栈**：FastAPI + SQLAlchemy 2.0（**同步 ORM**）+ SQLite + pydantic-settings
-> **形态**：网页版 SPA（Vanilla JS ESM），扩展路径为 Tauri 桌面版
+> **形态**：网页版 SPA（Vanilla JS ESM）+ Tauri 桌面版（已交付，见 [docs/tauri-desktop.md](docs/tauri-desktop.md)）
 
 ---
 
 ## 一、项目概述
 
-**当前状态**：功能完整，架构已收敛（2026-08-11）。Phase 1-5 + P6.1/6.2/6.3 + P2.5/3.5/4.3 全部完成；架构深化两波（ARC-1~8）与架构摩擦 11 候选全部落地；P6.5 多 tab 会话管理 + OPT-1 UI 克制化/图标协议收口已归档。测试：pytest 188（后端）+ Vitest 186（前端）全绿。
+**当前状态**：功能完整，架构已收敛（2026-08-11）。Phase 1-5 + P6.1/6.2/6.3 + P2.5/3.5/4.3 全部完成；架构深化两波（ARC-1~8）与架构摩擦 11 候选全部落地；P6.5 多 tab 会话管理 + OPT-1 UI 克制化/图标协议收口 + **P6.4 Tauri 桌面版**（8 工单归档）已交付。测试：pytest 261+1skip（后端）+ Vitest 186（前端）+ cargo test 43（Tauri 壳）全绿。
 
 **核心能力**：
 - **角色管理** — 创建/编辑/删除角色，自定义人设、开场白、语气风格；六步创建向导（LLM 智能解析 + 内置模板）；支持 SillyTavern Character Card V2 格式导入/导出（JSON 卡，兼容 V1 旧卡与裸 data）。
@@ -40,11 +40,11 @@
 3. **JSON 列兼容**：Character 的 `tags`/`alternate_greetings` 等为 SQLAlchemy JSON 列，存量 TEXT 数据可无缝读出；`Message.role` 枚举按值存取，存量 VARCHAR 无需迁移。
 4. **SSE 停止语义**：停止生成 = 用户主动中止（`AbortController` 断开 + 后端 `is_disconnected()` 感知），气泡标记「（已停止）」而非错误；非流式不提供停止按钮。
 
-## 四、桌面端准备（Tauri 前置）
+## 四、桌面端（Tauri）已交付
 
-**当前状态**（2026-08-03）：✅ Rust 工具链 + MSVC + Windows SDK 已装，`cargo build` 冒烟通过。详见 [Tauri 环境搭建](docs/tauri-setup.md)。
+**当前状态**（2026-08-11）：✅ P6.4 Tauri 桌面版已交付（8 工单归档）——Tauri v2 壳 + PyInstaller 打包后端 + 原生前端零改动；期末审核 2 个阻断（后端随包定位、前端随包挂载）均已修复闭合。构建 / 冒烟 / 数据目录 / 已知限制见 [桌面版文档](docs/tauri-desktop.md)，工具链安装见 [tauri-setup.md](docs/tauri-setup.md)。
 
-**⚠️ 注意事项**：在 **cmd.exe** 或 **PowerShell** 中运行 `cargo build`（Git Bash 的 coreutils `link.exe` 会遮蔽 MSVC linker，详见 [tauri-setup.md](docs/tauri-setup.md)）。
+**⚠️ 注意事项**：在 **cmd.exe** 或 **PowerShell** 中运行 `cargo build` / `tauri build` / PyInstaller（Git Bash 的 coreutils `link.exe` 会遮蔽 MSVC linker，详见 [tauri-setup.md](docs/tauri-setup.md)）。
 
 ## 五、相关文档
 

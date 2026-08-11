@@ -41,6 +41,8 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 打开浏览器访问 **http://localhost:8000**（Swagger 接口文档：http://localhost:8000/docs）
 
+> **桌面版**：Windows 桌面应用（Tauri 壳 + 打包后端）已交付，一键构建与冒烟见 [桌面版文档](docs/tauri-desktop.md)。
+
 ## 开发文档
 
 - [文档规范](docs/documentation-standards.md) — 文档架构与单一事实来源规则
@@ -48,10 +50,12 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - [架构设计](docs/architecture.md) — 目录结构、数据流、数据库设计
 - [API 接口设计](docs/api-design.md) — 所有 REST API 定义
 - [LLM 集成设计](docs/llm-integration.md) — 多模型接入层架构
+- [桌面版构建与冒烟](docs/tauri-desktop.md) — Tauri 桌面版构建链、数据目录、已知限制
+- [Tauri 环境搭建](docs/tauri-setup.md) — Rust 工具链安装与构建注意事项
 
 ## 设计原则
 
 - **本地优先** — 所有数据存本地，不依赖云端服务
 - **Provider 透明** — LLM 接入层抽象化，切换模型不改业务代码
-- **渐进增强** — 网页版做扎实后再考虑桌面端
+- **渐进增强** — 网页版为先，桌面端已交付（Tauri 壳 + PyInstaller 打包后端，前端零改动）
 - **配置内聚** — API Keys 通过 settings 接口管理，不硬编码
