@@ -107,20 +107,36 @@ conver-system/
 │   ├── tests/                     # 前端单元测试（vitest run）
 │   │   ├── format.test.js
 │   │   ├── utils.test.js
-│   │   └── api.test.js
+│   │   ├── api.test.js
+│   │   ├── tabs.test.js           # tab 工作区深模块
+│   │   ├── stream-session.test.js # 流式回合结算状态机
+│   │   ├── icons.test.js / components-icons.test.js  # 图标 seam 语义
+│   │   └── conversation-activation.test.js
 │   ├── js/
 │   │   ├── app.js                 # 主入口（视图切换 / 业务协调 / 事件绑定）
-│   │   ├── state.js               # 全局状态 + 模块级状态
+│   │   ├── state.js               # 应用级全局状态（会话级字段已退役）
 │   │   ├── chat.js                # 聊天域渲染与交互（renderMessages / handleSend / chatDom）
 │   │   ├── api.js                 # API 调用层（含 setFetch 注入 seam）
-│   │   ├── format.js              # 数据→HTML 纯函数（highlightText / buildMessagesHtml）
+│   │   ├── format.js              # 数据→HTML 纯函数（highlightText / buildMessagesHtml / characterCardHtml）
+│   │   ├── tabs.js                # 会话 tab 工作区深模块（openTab/closeTabs/getTabDisplay/abortStream）
+│   │   ├── stream-session.js      # 流式回合结算深模块（createStreamSession + mergeFreshList）
+│   │   ├── conversation-activation.js # 激活编排深模块（F-2 守卫/草稿滚动/懒加载，setActivationHooks 注入）
+│   │   ├── icons.js               # SVG 图标工厂 seam（iconHtml，唯一动态图标来源）
 │   │   ├── components/
 │   │   │   ├── character-form.js  # 角色表单
+│   │   │   ├── character-wizard.js# 六步角色创建向导（LLM 智能解析 + 模板）
 │   │   │   ├── confirm-dialog.js  # 确认弹窗（showConfirm / showAlert，复用 openModal）
 │   │   │   ├── modal.js           # 通用模态框工厂（openModal）
 │   │   │   ├── model-selector.js  # 模型选择弹窗
-│   │   │   └── export-dialog.js   # 导出弹窗
-│   │   └── utils.js               # 工具函数（escapeHtml / downloadBlob / showToast）
+│   │   │   ├── export-dialog.js   # 导出弹窗
+│   │   │   ├── settings-panel.js  # 设置面板（initSettingsPanel / loadSettings）
+│   │   │   └── tab-bar.js         # tab 条 presentational 组件（消费 getTabDisplay 展示契约）
+│   │   ├── data/
+│   │   │   └── character-templates.js # 角色创建向导内置模板
+│   │   └── utils.js               # 工具函数（escapeHtml / downloadBlob / showToast / providerDisplayName）
+│   │   └── utils/
+│   │       ├── model-utils.js     # 模型选择逻辑（fillModelSelect / createCustomModelHandler）
+│   │       └── sse-reader.js      # SSE 流解析纯函数（parseSSEStream）
 │   └── assets/
 │
 ├── docs/                          # 核心文档
