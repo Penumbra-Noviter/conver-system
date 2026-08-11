@@ -86,6 +86,24 @@ Write-Host "Python : $Py"
 Write-Host "Tauri  : $TauriCli"
 Write-Host "根目录 : $Root"
 
+# ── 0. 后端打包产物前置（tauri-build 编译期校验 resources 路径）─────────────
+
+# tauri.conf.json 的 bundle.resources 指向 dist/conver_backend（期末审核阻断1 修复）：
+# tauri-build 在编译期校验该路径存在性——cargo test 即会失败（干净检出必挂），
+# 故后端打包必须早于任何 cargo 编译（复审整改：原步骤 4 前置）。
+
+if (-not (Test-Path $BackendExe)) {
+    if ($SkipBackendBuild) {
+        Write-Host "警告：后端打包产物缺失（$BackendExe），且 -SkipBackendBuild 已指定——cargo test 将因 tauri-build resources 校验失败" -ForegroundColor Yellow
+    } else {
+        Write-Host "后端打包产物缺失，先执行 build-backend.ps1（PyInstaller onedir）..."
+        & (Join-Path $PSScriptRoot "build-backend.ps1")
+        if (-not (Test-Path $BackendExe)) {
+            throw "build-backend.ps1 执行后仍未找到 $BackendExe"
+        }
+    }
+}
+
 # ── 1. cargo test（Seam 1：壳纯逻辑）───────────────────────────────────────
 
 if (-not $SkipTests) {
@@ -135,15 +153,8 @@ if (-not $SkipTests) {
 
 Write-Step "4/4 tauri build（NSIS 安装器；首次打包可能下载 NSIS/WebView2，耗时较长）"
 
-# 后端打包产物缺失时先补齐（冒烟依赖；安装器当前为壳单产物，见 docs/tauri-desktop.md）
-if (-not (Test-Path $BackendExe)) {
-    if ($SkipBackendBuild) {
-        Write-Host "警告：后端打包产物缺失（$BackendExe），且 -SkipBackendBuild 已指定，冒烟将无法通过" -ForegroundColor Yellow
-    } else {
-        Write-Host "后端打包产物缺失，先执行 build-backend.ps1（PyInstaller onedir）..."
-        & (Join-Path $PSScriptRoot "build-backend.ps1")
-    }
-}
+# 后端打包产物已在步骤 0 前置补齐（tauri-build resources 校验）；安装器随包分发
+# dist/conver_backend（约 24MB，含后端 + 前端运行子集，见 docs/tauri-desktop.md）
 
 Push-Location $Root
 try {

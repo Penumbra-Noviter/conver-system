@@ -194,6 +194,12 @@ try {
     Write-Host "    退出钩子：CONVER_EXIT_AFTER_SECS=$ExitAfterSecs" -ForegroundColor Cyan
 
     # 壳-后端环境变量通道（spec 接口契约）：条件注入后端命令 + 自动退出计时
+    # 安装态干净路径：主动清除父环境可能残留的 CONVER_BACKEND_CMD——残留会让
+    # 真实双击路径静默降级为 env 注入，回归用例假阳性（复审整改）
+    if (-not $injectBackendEnv -and $env:CONVER_BACKEND_CMD) {
+        Write-Host "    检测到父环境残留 CONVER_BACKEND_CMD，已清除（回归需真实 prod 随包路径）..." -ForegroundColor Yellow
+        Remove-Item Env:CONVER_BACKEND_CMD
+    }
     $origBackendCmd = $env:CONVER_BACKEND_CMD
     $origExitAfter = $env:CONVER_EXIT_AFTER_SECS
     if ($injectBackendEnv) {

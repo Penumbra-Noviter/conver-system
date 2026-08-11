@@ -274,6 +274,9 @@ class TestSpecFrontendPackaging:
     def test_spec_ships_frontend_runtime_assets(self) -> None:
         """datas 含 index.html 与 css/js 挂载，目标目录 frontend/ 与 _frontend_dir 对齐"""
         spec_text = self.SPEC_PATH.read_text(encoding="utf-8")
+        # 接线断言（复审强化）：datas 必须引用 _FRONTEND_RUNTIME——原始阻断形态
+        # `datas=[]` 不改定义、只改接线行，token 断言会漏报，此处锁定接线。
+        assert "datas=list(_FRONTEND_RUNTIME)" in spec_text, "spec datas 接线必须引用 _FRONTEND_RUNTIME"
         # datas 源码形态（Path 拼接）：运行子集必须全部挂载
         # （assets 为空目录 git 不跟踪，不在此列；有内容时 spec 需追加挂载并同步本断言）
         for token in (
