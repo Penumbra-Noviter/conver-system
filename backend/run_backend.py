@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-import os
 import traceback
 from pathlib import Path
 from typing import Sequence
@@ -25,10 +24,6 @@ import uvicorn
 
 __all__ = ["build_log_config", "build_parser", "data_dir", "log_file_path", "main"]
 
-#: 数据目录环境变量名（P6.4-3 迁移脚本同契约：覆盖 %APPDATA%\\ConverSystem 默认值）
-DATA_DIR_ENV = "CONVER_DATA_DIR"
-#: %APPDATA% 之下的数据目录名（与 Tauri 壳 src-tauri/src/server.rs 的 DATA_DIR_NAME 一致）
-DATA_DIR_NAME = "ConverSystem"
 #: 后端日志文件名（位于数据目录）
 LOG_FILE_NAME = "backend.log"
 #: 需要落盘的 uvicorn logger（uvicorn.error 无独立 handler，经 propagate 汇入 uvicorn，不重复挂）
@@ -36,16 +31,25 @@ _UVICORN_LOGGERS = ("uvicorn", "uvicorn.access")
 
 
 def data_dir() -> Path:
-    """桌面版数据目录：CONVER_DATA_DIR 覆盖 > %APPDATA%\\ConverSystem > 用户主目录\\ConverSystem。"""
-    if override := os.environ.get(DATA_DIR_ENV):
-        return Path(override)
-    base = os.environ.get("APPDATA") or str(Path.home())
-    return Path(base) / DATA_DIR_NAME
+    """桌面版数据目录：委托 `backend.app.services.data_dir`（同一契约，契约表 v1）。
+
+    覆盖链：`CONVER_DATA_DIR`（非空）→ `%APPDATA%\\ConverSystem` →
+    `home\\AppData\\Roaming\\ConverSystem`（决策 D1-D2 兜底统一）。
+    契约表 v1 全文见 backend/tests/test_data_dir.py；壳侧 Rust 镜像实现见
+    src-tauri/src/server.rs `default_data_dir`。
+    （延迟导入：直执行 `python backend/run_backend.py --help` 时仓库根不在 sys.path，
+    与下方 `from backend.app.main import app` 同一规避模式。）
+    """
+    from backend.app.services.data_dir import data_dir as resolve
+
+    return resolve()
 
 
 def log_file_path() -> Path:
-    """后端日志文件路径：数据目录\\backend.log。"""
-    return data_dir() / LOG_FILE_NAME
+    """后端日志文件路径：数据目录\\backend.log（委托 data_dir_file，同一契约）。"""
+    from backend.app.services.data_dir import data_dir_file
+
+    return data_dir_file(LOG_FILE_NAME)
 
 
 def build_parser() -> argparse.ArgumentParser:

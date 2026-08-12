@@ -27,6 +27,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
+if __package__ in (None, ""):
+    # 直执行形态（python backend/scripts/migrate_data.py）：仓库根不在 sys.path，
+    # 手工加入使 backend.app.services.data_dir（纯 stdlib 共享模块）可导入；
+    # python -m backend.scripts.migrate_data 形态由解释器把 cwd 置入 sys.path，无需此处处理。
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 __all__ = [
     "MigrationError",
     "MARKER_NAME",
@@ -65,14 +71,15 @@ def default_source_path() -> Path:
 def default_target_path() -> Path:
     """默认目标数据库路径：%APPDATA%\\ConverSystem\\conver_system.db
 
-    覆盖顺序：环境变量 CONVER_DATA_DIR（数据目录）→ %APPDATA% → 用户主目录兜底。
+    委托 `backend.app.services.data_dir.database_path`（同一契约，契约表 v1）：
+    覆盖链 `CONVER_DATA_DIR`（非空）→ `%APPDATA%` → `home\\AppData\\Roaming`，
+    均拼 `ConverSystem` 子目录（决策 D1-D2；本函数原兜底语义即契约默认）。
+    契约表 v1 全文见 backend/tests/test_data_dir.py；壳侧 Rust 镜像实现见
+    src-tauri/src/server.rs `default_data_dir`。
     """
-    data_dir = os.environ.get("CONVER_DATA_DIR")
-    if data_dir:
-        return Path(data_dir) / "conver_system.db"
-    appdata = os.environ.get("APPDATA")
-    base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
-    return base / "ConverSystem" / "conver_system.db"
+    from backend.app.services.data_dir import database_path
+
+    return database_path()
 
 
 def marker_path_for(target: Path) -> Path:

@@ -17,6 +17,7 @@ __all__ = [
     "chat",
     "conversation",
     "conversation_export",
+    "data_dir",
     "document_parser",
     "exceptions",
     "llm",
