@@ -138,6 +138,12 @@ class TestChatErrorResponse:
             "claude API Key 无效，请在设置中更新",
         )
 
+    def test_llm_auth_without_provider_no_leading_space(self) -> None:
+        """Falsify：LLMAuthError 不传 provider（空串）→ 401 + 基础文案，无前导空格"""
+        status_code, message = chat_service.chat_error_response(LLMAuthError("x"))
+        assert not message.startswith(" ")
+        assert (status_code, message) == (401, "API Key 无效，请在设置中更新")
+
     def test_llm_rate_limit_fixed_message(self) -> None:
         """LLMRateLimitError → 429 + 固定消息"""
         assert chat_service.chat_error_response(LLMRateLimitError("x"), "claude") == (

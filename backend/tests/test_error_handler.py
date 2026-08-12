@@ -141,9 +141,9 @@ class TestLLMErrorHandler:
     """
 
     def test_auth_401_defensive_template(self) -> None:
-        """LLMAuthError → 401 + 无 provider 前缀模板（防御性分支形态）"""
+        """LLMAuthError → 401 + 基础文案（无 provider 前缀，无前导空格；ARC10-1 缺陷修复后形态）"""
         exc = LLMAuthError("Claude API Key 无效或未配置")
-        assert _call_handler(llm_error_handler, exc) == (401, " API Key 无效，请在设置中更新")
+        assert _call_handler(llm_error_handler, exc) == (401, "API Key 无效，请在设置中更新")
 
     def test_rate_limit_429_fixed(self) -> None:
         """LLMRateLimitError → 429 + 固定消息"""
