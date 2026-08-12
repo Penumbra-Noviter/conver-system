@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-12 — 技术债区 TD-13~14 批次：2 做 + TD-9 闭环全自动 kickoff）
+
+- **TD-13~14 批次完成（merge 61f1721）**：TD-8~12 批次期末遗留 2 项清零（用户指令「继续完善这两个观察项」）。**TD-13** save 回调入口统一守卫（settings-panel.js：11 元素收集 + 任一缺失 console.warn 早退 + :339 `?.textContent.trim() ?? ''` 收口 + docstring；+2 用例⑦⑧ 先红后绿——先红证据：:334 value / :339 textContent 两条 unhandledrejection TypeError 路径实证；守卫不介入正常 DOM 零回归）**TD-14** 契约「逐字符一致」措辞澄清（data_dir.py:16 / test_data_dir.py:64 / tauri-desktop.md:112 三处补 pathlib 规范化注记——重复分隔符折叠/`.` 消除/尾分隔去除/`..` 保留四项边界 + UNC 前导特例；+1 契约锁用例 test_env_override_separators_normalized，基线绿非回归；v2 不变 Rust 镜像零改动）；**TD-9 顺带闭环**：getSelectedModel 由「复核确认维持」转「做」——TD-13 入口守卫覆盖其全部调用点（:340/:281），本体零改动
+- **过程遥测**：单波 2 并行（前端/后端+文档互斥无链）；merge 零回退冲突；范围核验 A 档（5 文件恰为声明）；波末降配审核 F1-F10 无阻断（F4 守卫过严收窄观察——customModelInput 无条件要求对「非 __custom__ + custom 缺」是行为回退边界，spec 背书）
+- **期末四轴：0 阻断**；10 项非阻断落技术债区（TD-15~24：守卫过严收窄/UNC 前导/尾分隔符锁缺口/docs 并置易误读/spy 卫生/夹具 replace 脆弱/getSelectedModel 隐式关联/:373 重复查询/计数口径微差/Rust 字面张力）
+- **4.5 运行态冒烟**：后端 GET / 200；GUI（Playwright）：设置面板完整渲染（11 元素齐备）→ 保存设置「设置已保存」弹窗全过（TD-13 正常路径零回归）；console 无错误
+- **G15 文档同步（本批次）**：TICKETS（TD-13/14 归档 + TD-9 闭环注记 + TD-15~24 落区）；CLAUDE.md（测试数 360/371 + 状态行）；DEV_LOG 本段
+- **测试**：pytest **360 + 1 skip** / Vitest **371** / cargo test **52** 全绿（基线 359+1skip/369/52 → 期末 +1/+2）
+
+---
+
 ## 滚动摘要（2026-08-12 — 技术债区 TD-8~12 批次：3 做 + 2 维持关闭全自动 kickoff）
 
 - **TD-8~12 批次完成（merge a12d48e）**：上批次期末遗留 5 项处置——3 做 + 2 复核确认维持（全自动档，用户显式指定）。**TD-8** save/clear 裸绑定 `?.` 化（settings-panel.js :332/:366，守卫体系绑定层完整收口——单元素 `?.`/双元素缺一不绑定/函数早退三形态统一；+1 用例⑥ 先红后绿：空 DOM 下 :332 null.addEventListener TypeError 实证；用例②⑤ 注释同步申报——旧行号 325/359 失效 +「必须存在」前提废止）**TD-10** POSIX 警告补「当前盘根」+ MSYS2 转换说明（tauri-desktop.md 单段；pathlib 实测：`Path('/c/...')` 为根相对路径按进程当前盘解析——旧措辞固定 `C:` 是隐含假设，修订准确）**TD-12** llm_error_response provider=None 契约锁用例（test_chat_service.py +1；基线绿非回归——锁「签名允许 None 的确定性」，模拟守卫被删必红验证有效；chat.py 零改动）；**TD-9 维持**（getSelectedModel 不加固——spec 明示 + TD-8 后触发路径不变复证）/ **TD-11 维持**（400 vs 422 函数级分歧——ARC10-4 规格背书 + 双向注释已在）

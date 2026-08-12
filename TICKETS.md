@@ -23,12 +23,31 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| TD-13 | settings-panel.js save 回调体裸读表单字段（:334-344 `$('#setting-claude-key').value` 等）：按钮在而字段缺（部分缺 DOM）+ 点击 → TypeError（与 TD-9 同族回调层守卫缺口；spec 明示不动回调故非缺陷）——未来回调层守卫批次一并处理 | TD-8~12 批次期末 Falsify F1 | Speculative | 📝 |
-| TD-14 | data_dir.py 契约「逐字符一致」声称的边界：`//` 重复分隔符被 pathlib 折叠、`..` 段由文件系统解析，含此类段的路径落位与「逐字」字面不符（既有表述，TD-10 未扩大）——契约表 v2 措辞补「分隔符按 pathlib 规范化」注记 | TD-8~12 批次期末 Falsify F3 | Speculative | 📝 |
+| TD-15 | settings-panel.js save 入口守卫过严收窄：customModelInput 无条件要求——`#setting-custom-model` 缺 + 非 `__custom__` 模型时拒绝本可成功的保存（守卫边界 > 旧崩溃边界，spec 背书；可改 providerSelect.value === '__custom__' 时方要求） | TD-13~14 批次波末 Falsify F4 | Worth exploring | 📝 |
+| TD-16 | data_dir.py docstring「重复分隔符折叠（`//` → `/`）」未注记 UNC 前导特例：`Path('//server/share/x')` 保留 UNC 前缀不折叠（Windows） | TD-13~14 批次期末 Standards | Speculative | 📝 |
+| TD-17 | 契约锁未钉「尾分隔符去除」边界（docstring 声称四项、锁钉三项——折叠+`.`、`..`；补一行断言即可） | TD-13~14 批次波末 Falsify F8 | Speculative | 📝 |
+| TD-18 | tauri-desktop.md:112「不做归一化」与「分隔符按 pathlib 规范化」并置易误读（实为「代码不改写路径整体」vs「Path 构造固有规范化」，建议加「路径形态」限定） | TD-13~14 批次波末 Falsify F10 | Speculative | 📝 |
+| TD-19 | settings-panel.test.js 用例⑦⑧ unhandledrejection/warn spy 未 restore（当前为文件末尾用例无影响；未来在 ⑦ 后新增用例会被 mock 吞 warn） | TD-13~14 批次波末 Falsify | Speculative | 📝 |
+| TD-20 | settings-panel.test.js 用例⑦ 夹具 replace 脆弱性：`SETTINGS_DOM_HTML.replace('<input id="setting-claude-key">', '')` 依赖字面串精确匹配——未来该 input 加属性则 replace 静默失效，用例失守；建议补「元素确实被删」防御断言 | TD-13~14 批次期末 Falsify | Speculative | 📝 |
+| TD-21 | getSelectedModel（settings-panel.js:87-94）与 save 入口守卫（TD-13）的关联是隐式的：未来在守卫外新增调用点会重新暴露裸读——建议 docstring 标注「调用方须经 save 回调入口守卫」或测试锁定调用点集合 | TD-13~14 批次期末 Architecture | Speculative | 📝 |
+| TD-22 | settings-panel.js save 回调 :373 重复 DOM 查询：守卫已持有 providerSelect（:344）却重新 `$('#setting-default-provider option:checked')`——可复用 `providerSelect.querySelector('option:checked')` | TD-13~14 批次期末 Standards | Speculative | 📝 |
+| TD-23 | settings-panel.js docstring「11 个表单元素引用」计数口径微差：守卫实际收集检查 10 个元素变量（第 11 次读取 `option:checked` 由 `?.` 收口而非守卫收集）——措辞微瑕 | TD-13~14 批次期末 Standards | Speculative | 📝 |
+| TD-24 | src-tauri Rust 侧契约字面张力：`default_data_dir` raw PathBuf 原样传递不做分隔符规范化，契约表 v2「双端同一契约」不再严格成立（物理一致性由 Win32 容错 + Python 侧规范化保证）——补注释说明 | TD-13~14 批次波末 Falsify F9 | Speculative | 📝 |
 
 ---
 
 ## 已完成归档
+
+### 技术债区 TD-13~14 批次（2026-08-12 全自动 kickoff）
+
+> 来源：TICKETS 技术债区 TD-13/TD-14 清零（TD-8~12 批次期末遗留，用户指令「继续完善这两个观察项」）。Grilling 共识（全自动档拍板）：**2 做 + TD-9 顺带闭环**——TD-13 做（save 回调入口统一守卫：11 元素收集 + 任一缺失 console.warn 早退 + :339 `?.textContent.trim() ?? ''` 收口；先红后绿 2 用例实证 :334 value / :339 textContent 两条 TypeError 路径）+ TD-14 做（三处「逐字符一致」措辞补 pathlib 规范化注记 + 1 契约锁用例；v2 不变 Rust 镜像零改动）；**TD-9 维持 → 做（顺带闭环）**——TD-13 入口守卫覆盖 getSelectedModel 全部调用点（:340/:281），本体零改动。规格 v1.0 无修订。单波 2 并行（TD-13 前端 / TD-14 后端+文档，文件互斥无链），merge `61f1721`；merge 零回退冲突。**期末四轴 code-review（固定点 b76cf7b）：0 阻断**——2 工单 10 项验收全达标、守卫三态实测（正常 DOM 保存全流程/11 元素逐一缺失/空下拉）、pathlib 声称实测一致（除 UNC 前导例外已记）、seam 选择正确（入口统一守卫 Leverage 高）；10 项非阻断观察落技术债区（TD-15~24）。运行态冒烟：后端 GET / 200；GUI：设置面板完整渲染（11 元素齐备）→ 保存设置「设置已保存」弹窗全过（TD-13 正常路径零回归）。测试同步：pytest **360 + 1 skip** / Vitest **371** / cargo test **52**，全部全绿。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| TD-13 | save 回调入口统一守卫收口裸读（11 元素收集 + :339 收口 + docstring；+2 用例⑦⑧ 先红后绿；testApiKeys/getSelectedModel 本体零改动） | 2026-08-12 | `a754a13` |
+| TD-14 | 契约「逐字符一致」措辞澄清（3 处补 pathlib 规范化注记）+ 契约锁用例（+1，基线绿非回归；v2 不变） | 2026-08-12 | `b284f78` |
+
+> ✅ 已结清（2026-08-12 TD-13~14 批次）：TD-13/TD-14 完成（上表）+ **TD-9 顺带闭环**——TD-9（getSelectedModel 未守卫）由「复核确认维持」转「做（顺带闭环）」：TD-13 入口守卫覆盖其全部调用点（:340/:281），本体零改动（延续 TD-5 Q4 不加固共识），缺口闭合。
 
 ### 技术债区 TD-8~12 批次（2026-08-12 全自动 kickoff）
 
