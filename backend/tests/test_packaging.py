@@ -73,7 +73,7 @@ class TestParser:
 
 
 class TestDataDir:
-    """数据目录契约（契约表 v1，委托 backend.app.services.data_dir；Rust 侧镜像见
+    """数据目录契约（契约表 v2，委托 backend.app.services.data_dir；Rust 侧镜像见
     src-tauri/tests/server_test.rs，同一版本号互引）：
     CONVER_DATA_DIR（非空）覆盖 > %APPDATA%\\ConverSystem > home\\AppData\\Roaming\\ConverSystem"""
 
@@ -95,7 +95,7 @@ class TestDataDir:
         assert data_dir() == tmp_path / "AppData" / "Roaming" / "ConverSystem"
 
     def test_empty_env_treated_as_unset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """契约表 v1：CONVER_DATA_DIR="" 视为未设置（与壳侧 var_os 非空判定对齐）"""
+        """契约表 v2：CONVER_DATA_DIR="" 视为未设置（与壳侧 var_os 非空判定对齐）"""
         monkeypatch.setenv("CONVER_DATA_DIR", "")
         monkeypatch.setenv("APPDATA", str(tmp_path))
         assert data_dir() == tmp_path / "ConverSystem"

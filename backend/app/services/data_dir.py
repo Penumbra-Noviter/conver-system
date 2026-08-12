@@ -1,5 +1,5 @@
 """
-数据目录共享模块（ARC9-T04 · 决策 D1-D1 / D1-D2，契约表 v1）
+数据目录共享模块（ARC9-T04 · 决策 D1-D1 / D1-D2，契约表 v2）
 
 统一桌面版数据目录解析，供后端启动器（run_backend.data_dir）、迁移脚本
 （migrate_data.default_target_path）与壳侧（src-tauri/server.rs，Rust 镜像实现）
@@ -9,10 +9,11 @@
     2. `%APPDATA%\\ConverSystem`（默认）；
     3. `home\\AppData\\Roaming\\ConverSystem`（APPDATA 缺失兜底，决策 D1-D2）。
 
-契约表 v1 全文见 `backend/tests/test_data_dir.py` 模块 docstring（双端镜像，
+契约表 v2 全文见 `backend/tests/test_data_dir.py` 模块 docstring（双端镜像，
 Rust 侧 `src-tauri/tests/server_test.rs` 互引同一版本号）；URL 编码（壳侧
-`database_url`）以 `urllib.parse.quote(s, safe="/:")` 为基准，Python 侧不做编码——
-resolve 返回的 Path 必须与用户给定值逐字符一致。
+`database_url`）编码集 = {`?` → `%3F`}，其余字符（含空格/中文/`#`/`%`）一律
+原样保留（`?` 是 SQLAlchemy URL 解析器的唯一实际分隔符，防御性编码）；Python
+侧不做编码——resolve 返回的 Path 必须与用户给定值逐字符一致。
 
 G4 约束：本模块**仅允许 stdlib import**（导入链已核实无副作用：
 `backend/app/__init__.py` 为空包、`backend/app/services/__init__.py` 为纯
@@ -43,9 +44,9 @@ DB_FILE = "conver_system.db"
 
 
 def data_dir() -> Path:
-    """桌面版数据目录（契约表 v1）：CONVER_DATA_DIR（非空）→ %APPDATA%\\ConverSystem → home\\AppData\\Roaming\\ConverSystem。
+    """桌面版数据目录（契约表 v2）：CONVER_DATA_DIR（非空）→ %APPDATA%\\ConverSystem → home\\AppData\\Roaming\\ConverSystem。
 
-    与迁移脚本 `default_target_path` / 壳侧 `default_data_dir` 同一契约（契约表 v1，
+    与迁移脚本 `default_target_path` / 壳侧 `default_data_dir` 同一契约（契约表 v2，
     见本模块 docstring）；APPDATA 缺失时兜底 home\\AppData\\Roaming（决策 D1-D2），
     与迁移脚本既有语义一致。
     """
