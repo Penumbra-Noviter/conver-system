@@ -23,17 +23,31 @@
 
 | 编号 | 遗留项 | 来源 | 推荐强度 |
 |------|--------|------|----------|
-| TD-1 | chat_error_response 新 DomainError→400 分支对 422 家族（CardFormatError/CardValidationError/DocParseError）语义分叉：经 chat 入口 400、经 api/errors.py 422+说明文案——两处均防御性不可达（chat_error_response 运行时仅收 LLMError）；未来合并单一映射表时纳入（关联 ARC10-4 关闭项） | 技术债批次期末 Falsify | Speculative |
-| TD-2 | data_dir.py 模块 docstring 契约版本标签漂移（仍写「契约表 v1」，实际 v2——docs/tauri-desktop.md 与 tests 均 v2）——行为一致，文档滞后 | 技术债批次波 2 Falsify | Speculative |
-| TD-3 | search-view.js 绑定守卫作用域未文档化：bound 为模块级标志（防不了跨实例双绑定）+ 模块级 DOM 引用 import 时冻结（DOM 后置不可绑定）——当前单调用点+静态 DOM 不可达；建议 initSearchView docstring 注明作用域与前提 | 技术债批次波 1 Falsify | Speculative |
-| TD-4 | settings-panel.js 守卫半兑现：initProviderDropdown 只挡 provider 缺失，provider 在/model 缺（refreshModelOptions→fillModelSelect→model-utils.js selectEl.innerHTML null）仍同步 TypeError——极端畸形 DOM 可达，非回归 | 技术债批次波 1 Falsify | Worth exploring |
-| TD-5 | settings-panel.js 事件期 null：`#setting-default-model` 在、`#setting-custom-model` 缺时选 `__custom__` → change 闭包 null.style 未捕获 TypeError（既有行为，`?.` 守卫不覆盖事件期） | 技术债批次波 1 Falsify | Worth exploring |
-| TD-6 | llm_error_response 参数 provider 标注 `str` 实际可收 None（stream_reply 传 model_provider，列无 NOT NULL）——修复后 None 语义安全，建议标注 `str \| None` 与真相一致 | 技术债批次期末 Standards | Speculative |
-| TD-7 | docs/tauri-desktop.md POSIX 警告措辞略绕（「`/c/...` 形态在 Windows 程序中的实际表现」），可精简为具体落位（`C:\c\...`） | 技术债批次波 2 Falsify | Speculative |
+| TD-8 | settings-panel.js `initSettingsPanel` 守卫覆盖不完整：save/clear 裸绑定（:332/:366）未纳入 no-op 守卫体系，全缺 DOM 下仍抛 TypeError（基线既有；测试⑤以提供按钮回避） | TD 批次波 1 Falsify | Worth exploring |
+| TD-9 | settings-panel.js `getSelectedModel`（:87-94）未守卫：model 缺时 save 流程抛 TypeError（spec 明示不加固——TD-4 守卫后保存路径不可达，防御性） | TD 批次波 1 Falsify | Speculative |
+| TD-10 | tauri-desktop.md POSIX 警告字面落位 `C:\c\Users\<name>\conver-data` 依赖进程当前盘符 + MSYS2 路径转换行为，确切落位两可（spec 固定文本即此措辞，实现逐字照办） | TD 批次波 1 Falsify | Speculative |
+| TD-11 | chat_error_response DomainError 兜底 400 vs api/errors.py 422 家族函数级分歧——合并单一映射表时需防分歧（TD-1 注释已指路 ARC10-2/ARC10-4 关联） | TD 批次波 2 Falsify | Speculative |
+| TD-12 | llm_error_response provider=None 路径缺显式契约测试（标注 str\|None 后行为安全，可选补一条锁无前缀文案） | TD 批次波 2 Falsify | Speculative |
 
 ---
 
 ## 已完成归档
+
+### 技术债区 TD-1~7 批次（2026-08-12 全自动 kickoff）
+
+> 来源：TICKETS 技术债区 TD-1~7 清零（上批次期末遗留）。Grilling 共识：**7 项全做，无关闭项**（Q1 TD-1 注释收窄 / Q2 TD-2 三文件全扫 / Q3 TD-4 调用侧守卫 / Q4 TD-5 绑定侧守卫不加固 getSelectedModel / Q5 TD-6 无新测试 / Q6 保守微调）。规格 v1.0 无修订。两波执行：波 1 前端+文档 3 并行（TD-3/TD-4→TD-5 链/TD-7，merge `053f949`）、波 2 后端 2 并行（TD-2/TD-1→TD-6 链，merge `3cae11d`）；merge 零回退冲突；波末降配增量审核两轮无阻断（波 1：F1-F6 含 save/clear 裸绑定基线遗留实证；波 2：F1-F13 含 `?` 分隔符实测、v1 历史叙述区分）。**期末四轴 code-review（固定点 bfe75f2）：0 阻断**——7 工单 Spec 意图全达标（TD-2 验收口径注记：`grep 契约表 v1` 字面未归零，5 处为历史叙述非漂移，意图达成）、Falsify 先红后绿实证齐全（TD-4 两路径 + TD-5 事件期）、守卫层级与 Seam 选择正确；5 项非阻断观察落技术债区（TD-8~12）。运行态冒烟：后端 GET / + /api/models 200；GUI：设置面板完整渲染 / provider 切换联动 / 自定义模型切换全过（TD-4/5 正常路径回归）。测试同步：pytest **358 + 1 skip** / Vitest **368** / cargo test **52**，全部全绿。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| TD-3 | initSearchView docstring 增补「作用域与前提」段（bound 模块级/DOM 冻结语义，纯注释） | 2026-08-12 | `2340db0` |
+| TD-4 | refreshModelOptions 三元素缺失守卫补全（provider/model/custom 任一缺 → no-op；+2 Falsify 用例先红后绿，model-utils.js 零改动） | 2026-08-12 | `03002a9` |
+| TD-5 | 模型联动 handler 缺一不绑定（model/custom 缺一不绑 change；docstring 同步；+1 用例先红后绿；getSelectedModel 不加固） | 2026-08-12 | `d3f3ffc` |
+| TD-7 | tauri-desktop.md POSIX 警告措辞具体化（`C:\c\...` 字面落位，单行） | 2026-08-12 | `f51c4cb` |
+| TD-2 | 契约表版本标签 v1→v2 全量同步（8 处目标文件 + 已申报 tests 扩展 4 处同类漂移；编码基准描述 v1 旧语义 → v2） | 2026-08-12 | `92789fd` |
+| TD-1 | chat_error_response 兜底分支注释补遗（422 家族不落此分支，ARC10-2/4 关联，纯注释） | 2026-08-12 | `d53b436` |
+| TD-6 | llm_error_response 参数标注 str → str \| None（运行时零变化，from __future__ annotations） | 2026-08-12 | `ccc5e25` |
+
+> ✅ 已结清（2026-08-12 TD 批次）：TD-1~7 全部完成（7 做 0 关闭）——其中 TD-2 验收口径注记：`grep -rn "契约表 v1" backend/` 字面未归零，残留 5 处为**历史叙述**（test_data_dir.py/test_data_dir_connection.py 描述旧编码与防回归锁），非漂移标签，改写会篡改历史语境；「版本标签归零」已达。
 
 ### 技术债区批次（2026-08-12 全自动 kickoff）
 

@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-12 — 技术债区 TD-1~7 批次：7 项清零全自动 kickoff）
+
+- **TD-1~7 批次完成（7 工单全归档，merge 链 053f949/3cae11d）**：上批次期末遗留 7 项（TD-1~7）全部「做」清零（0 关闭——均为可修项，无拍板维持项）。**TD-3** search-view docstring 增补作用域与前提段（bound 模块级防同模块重复调用不防跨实例；DOM import 时冻结）**TD-4** refreshModelOptions 三元素联合守卫（provider/model/custom 任一缺 → no-op；model-utils.js 零改动——共享工具边界保持；+2 用例先红后绿：model-utils.js:32 innerHTML / :57 style 两 TypeError 路径实证）**TD-5** 模型联动 handler 缺一不绑定（+1 用例先红后绿：model-utils.js:81 事件期 TypeError；getSelectedModel 不加固——TD-4 后不可达）**TD-7** POSIX 警告措辞具体化（`C:\c\...` 字面落位）**TD-2** 契约表 v1→v2 全量同步（8 处目标文件 + **已申报 tests 扩展 4 处**——「tests 已 v2 零改动」假设被证伪，plan-tickets 前提错误教训：同类漂移须全仓扫描；编码基准描述 v1 旧语义同步 v2；grep 归零口径注记：残留 5 处历史叙述非漂移）**TD-1** 兜底分支注释补遗（422 家族不落此分支，ARC10-2/4 指路）**TD-6** llm_error_response 标注 str|None（运行时零变化）
+- **过程遥测**：波 1 前端+文档 3 并行、波 2 后端 2 并行（TD-4→TD-5 / TD-1→TD-6 两条同代理串行链）；merge 零回退冲突；波末降配审核两轮无阻断（波 1：F1-F6，save/clear 裸绑定基线遗留实证；波 2：F1-F13，`?` 分隔符实测——SQLAlchemy make_url 验证 `?` 是唯一分隔符且编码是必需防御）；先红后绿硬验收三用例全部实证红→绿
+- **期末四轴：0 阻断**；5 项非阻断落技术债区（TD-8~12：save/clear 裸绑定/getSelectedModel 未守卫/盘符精度两可/400 vs 422 函数级分歧/provider=None 契约测试可选）
+- **4.5 运行态冒烟**：后端 GET / + /api/models 200；GUI（Playwright）：设置面板完整渲染（API 密钥/Provider 下拉/模型联动/主题/模板变量）→ provider 切换（Claude→自定义输入形态）→ 自定义模型切换（textbox 出现）全过——TD-4/5 正常 DOM 路径零回归；console 无错误
+- **G13 文档同步（本批次）**：TICKETS（TD-1~7 归档 7 做 0 关闭 + 落 TD-8~12 + TD-2 验收口径注记）；CLAUDE.md（测试数 368 + TD 批次状态行）；DEV_LOG 本段
+- **测试**：pytest **358 + 1 skip** / Vitest **368** / cargo test **52** 全绿（基线 358+1skip/365/52 → 期末 368，+3 均 TD-4/5 守卫用例）
+
+---
+
 ## 滚动摘要（2026-08-12 — 技术债区批次：16 项遗留清零全自动 kickoff）
 
 - **技术债区批次完成（6 工单全归档，merge 链 bd0eb81/ed7a3ac）**：TICKETS 技术债区 16 项（ARC9-1~8 + ARC10-1~5 + T-04~06）清零。Grilling 共识：4 做 + 2 拍板 + 10 项复核确认维持（审计快照复核惯例——逐项 git grep 核实「仍成立/已就绪」后判关闭，保留原始描述便于对照）。**T-A1** 搜索视图绑定守卫（模块级 bound 标志兑现 docstring 幂等声称；Falsify 发现防抖路径共享 searchTimeout 天然免疫双发、真实双发点在 Enter 立即搜索路径——测试锁定 Enter）**T-A2** 设置面板 no-op 守卫（initProviderDropdown 早退 + 两处 `?.` 对齐 314 行先例）**T-A3** 删除 toggleConvList 死代码（app.js -8 行，grep 零残留，活替代内联保留）**T-B1** 401 消息条件模板消除前导空格（provider 非空带前缀/空时基础文案；含 1 处已申报断言更新——test_error_handler.py 146 行期望值去空格，钉住缺陷形态的反例必要）**T-B2** 未知领域异常 400 对齐（chat.py 兜底 +1 行，与 api/errors.py handler 归一；422 家族防御性不可达）**T-B3** POSIX 路径警告文档（docs/tauri-desktop.md +2 行，代码零改动——不归一化是逐字符契约）
