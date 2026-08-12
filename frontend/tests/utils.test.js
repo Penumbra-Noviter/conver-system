@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, getInitials, formatTags, providerDisplayName } from '../js/utils.js';
+import { escapeHtml, getInitials, formatTags, providerDisplayName, autoResizeInput } from '../js/utils.js';
 
 describe('escapeHtml', () => {
     it('转义 < > &', () => {
@@ -80,5 +80,27 @@ describe('providerDisplayName', () => {
         expect(providerDisplayName(null, 'deepseek')).toBe('deepseek');
         expect(providerDisplayName(undefined, 'deepseek')).toBe('deepseek');
         expect(providerDisplayName({}, 'deepseek')).toBe('deepseek');
+    });
+});
+
+describe('autoResizeInput', () => {
+    it('先复位再按 scrollHeight 增高（150px 上限）', () => {
+        const el = document.createElement('textarea');
+        Object.defineProperty(el, 'scrollHeight', { value: 200, configurable: true });
+        el.style.height = '10px';
+
+        autoResizeInput(el);
+
+        expect(el.style.height).toBe('150px'); // Math.min(200, 150) + 'px'
+
+        Object.defineProperty(el, 'scrollHeight', { value: 40, configurable: true });
+        autoResizeInput(el);
+        expect(el.style.height).toBe('40px');
+    });
+
+    it('scrollHeight 为 0（jsdom 无布局）不抛错', () => {
+        const el = document.createElement('textarea');
+        el.style.height = '10px';
+        expect(() => autoResizeInput(el)).not.toThrow();
     });
 });

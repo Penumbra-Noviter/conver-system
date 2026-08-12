@@ -306,3 +306,21 @@ describe('handleSend — Falsify（no-op 路径）', () => {
         expect(fetchSpy).not.toHaveBeenCalled();
     });
 });
+
+describe('EMPTY_HEADER_HTML — 空态头部文案单一来源（ARC-10 C7）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('常量值逐字：「选择一个角色开始对话」', async () => {
+        const { chat } = await loadModules();
+        expect(chat.EMPTY_HEADER_HTML).toBe('<span class="chat-title">选择一个角色开始对话</span>');
+    });
+
+    it('showEmptyState 头部渲染 EMPTY_HEADER_HTML 常量（与消息区空态同源）', async () => {
+        const { chat } = await loadModules();
+        const activation = await import('../js/conversation-activation.js');
+        activation.showEmptyState();
+        expect(chat.chatDom.chatHeader.innerHTML).toBe(chat.EMPTY_HEADER_HTML);
+        expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+});

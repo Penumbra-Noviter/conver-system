@@ -20,7 +20,8 @@
  *   避免反向依赖 — 与 setConversationsRefresher 同模式）
  */
 
-import { chatDom, renderMessages, refreshSendButton, EMPTY_STATE_HTML } from './chat.js';
+import { chatDom, renderMessages, refreshSendButton, EMPTY_STATE_HTML, EMPTY_HEADER_HTML } from './chat.js';
+import { autoResizeInput } from './utils.js';
 import { state } from './state.js';
 import { conversations, messages } from './api.js';
 import { openTab, getTab, getActiveTab, updateTab } from './tabs.js';
@@ -55,8 +56,7 @@ export function saveTabViewState() {
 export function restoreTabViewState(tab) {
     if (!tab) return;
     chatDom.chatInput.value = tab.draft ?? '';
-    chatDom.chatInput.style.height = 'auto';
-    chatDom.chatInput.style.height = Math.min(chatDom.chatInput.scrollHeight, 150) + 'px';
+    autoResizeInput(chatDom.chatInput);
     chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
 }
 
@@ -65,7 +65,7 @@ export function restoreTabViewState(tab) {
  * 聊天区复用 chat.js 导出的共享常量（单一事实来源）
  */
 export function showEmptyState() {
-    chatDom.chatHeader.innerHTML = '<span class="chat-title">选择一个角色开始对话</span>';
+    chatDom.chatHeader.innerHTML = EMPTY_HEADER_HTML;
     chatDom.chatMessages.innerHTML = EMPTY_STATE_HTML;
 }
 

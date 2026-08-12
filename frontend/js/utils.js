@@ -162,6 +162,16 @@ export function formatTags(tags) {
 }
 
 /**
+ * 输入框自动增高（ARC-10 C7 收口：app.js 输入事件 / 激活模块恢复视图 / chat.js 发送后复位）
+ * 先复位 height='auto' 再按内容高度增高，上限 150px；调用时机差异留在调用方。
+ * @param {HTMLElement} el - 目标输入框元素
+ */
+export function autoResizeInput(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+}
+
+/**
  * 解析 Provider 显示名（provider key → 展示名）
  *
  * 对话记录只存 provider key（如 'deepseek'），展示名来自 /api/models 的
