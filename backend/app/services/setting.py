@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import settings
 from backend.app.models.setting import Setting
+from backend.app.services.model_data import AVAILABLE_MODELS
 
 __all__ = [
     "ALLOWED_KEYS",
@@ -47,16 +48,12 @@ ALLOWED_KEYS = {
     "user_name",
 }
 
-# Provider key → API 协议标识符映射
+# Provider key → API 协议标识符映射（从 AVAILABLE_MODELS 派生，单一声明源）
 # 多个第三方 provider 共享同一协议（如 DeepSeek/Qwen 使用 OpenAI 兼容 API）
-# 用于将 provider key 映射到对应的 API Key / base_url 存储键前缀
+# 用于将 provider key 映射到对应的 API Key / base_url 存储键前缀。
+# 仅收录 key != id 的协议共享者（claude / openai 自身走 _resolve_api_provider 回退）。
 _PROVIDER_API_MAP: dict[str, str] = {
-    "deepseek": "openai",
-    "qwen": "openai",
-    "kimi": "openai",
-    "glm": "openai",
-    "minimax": "openai",
-    "step": "openai",
+    p["key"]: p["id"] for p in AVAILABLE_MODELS["providers"] if p["key"] != p["id"]
 }
 
 # 凭证槽位：用户可填 claude / openai 任一字段，系统通用解析

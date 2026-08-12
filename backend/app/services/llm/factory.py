@@ -6,14 +6,28 @@ LLM Provider 工厂
     - 应用入口在启动时显式调用（见 main.py on_startup）
     - `get_provider` / `list_providers` 首次调用前会自动确保内置 Provider 已注册
 
+Provider 清单单一来源：注册从 `model_data.AVAILABLE_MODELS` 派生（新增 Provider
+只改模型数据文件）。派生规则：
+    - `_CLASS_OVERRIDES` 中的显式声明优先（支持未来独立实现类）
+    - 否则 `key == "claude"` → ClaudeProvider、`id == "openai"` → OpenAIProvider
+    - 不匹配任何规则（且无显式覆盖）时注册失败并报错，提示进 `_CLASS_OVERRIDES`
+
 扩展新 Provider 的步骤：
-    1. 在 services/llm/ 下创建新文件，实现 BaseLLM
-    2. 在 `register_builtin_providers()` 中导入并注册
+    1. 在 services/model_data.py 的 `AVAILABLE_MODELS["providers"]` 中登记 key / id / models
+    2. 默认规则匹配（claude / openai 兼容协议）时无需其他改动
+    3. 独立协议/实现类：在 services/llm/ 下创建新文件实现 BaseLLM，
+       并在 `_CLASS_OVERRIDES` 中登记 key → 实现类
 """
 
 from __future__ import annotations
 
 from backend.app.services.llm.base import BaseLLM
+from backend.app.services.model_data import AVAILABLE_MODELS
+
+__all__ = ["LLMFactory", "register_builtin_providers"]
+
+# 显式覆盖 dict：key → 实现类，优先于默认派生规则（支持未来独立实现类）
+_CLASS_OVERRIDES: dict[str, type[BaseLLM]] = {}
 
 
 class LLMFactory:
@@ -29,19 +43,31 @@ class LLMFactory:
 
     @classmethod
     def register_builtin_providers(cls) -> None:
-        """注册所有内置 Provider（claude / openai 及 OpenAI 兼容第三方）"""
+        """从 AVAILABLE_MODELS 派生注册所有内置 Provider
+
+        规则：`_CLASS_OVERRIDES` 显式声明优先；否则 `key == "claude"` → ClaudeProvider、
+        `id == "openai"` → OpenAIProvider（OpenAI 兼容第三方）；注册名 = key。
+        不匹配任何规则且无显式覆盖的条目直接报错（新增 Provider 必须可解析）。
+        """
         from backend.app.services.llm.claude import ClaudeProvider
         from backend.app.services.llm.openai import OpenAIProvider
 
-        cls.register("claude", ClaudeProvider)
-        cls.register("openai", OpenAIProvider)
-        # 第三方 OpenAI 兼容 Provider（key 在 models.py AVAILABLE_MODELS 中定义）
-        cls.register("deepseek", OpenAIProvider)
-        cls.register("qwen", OpenAIProvider)
-        cls.register("kimi", OpenAIProvider)
-        cls.register("glm", OpenAIProvider)
-        cls.register("minimax", OpenAIProvider)
-        cls.register("step", OpenAIProvider)
+        for provider in AVAILABLE_MODELS["providers"]:
+            key = provider.get("key")
+            if not key:
+                raise ValueError(f"AVAILABLE_MODELS provider 条目缺少 key 字段: {provider!r}")
+            provider_cls = _CLASS_OVERRIDES.get(key)
+            if provider_cls is None:
+                if key == "claude":
+                    provider_cls = ClaudeProvider
+                elif provider.get("id") == "openai":
+                    provider_cls = OpenAIProvider
+                else:
+                    raise ValueError(
+                        f"Provider '{key}' 无可用实现类：请设置 id='openai' "
+                        f"或在 _CLASS_OVERRIDES 中显式声明实现类"
+                    )
+            cls.register(key, provider_cls)
 
     @classmethod
     def _ensure_builtins(cls) -> None:
