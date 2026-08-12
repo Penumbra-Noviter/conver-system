@@ -72,7 +72,9 @@ class TestParser:
 
 
 class TestDataDir:
-    """数据目录契约：CONVER_DATA_DIR 覆盖 > %APPDATA%\\ConverSystem > 用户主目录兜底"""
+    """数据目录契约（契约表 v1，委托 backend.app.services.data_dir；Rust 侧镜像见
+    src-tauri/tests/server_test.rs，同一版本号互引）：
+    CONVER_DATA_DIR（非空）覆盖 > %APPDATA%\\ConverSystem > home\\AppData\\Roaming\\ConverSystem"""
 
     def test_env_override(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CONVER_DATA_DIR", str(tmp_path))
@@ -85,10 +87,16 @@ class TestDataDir:
         assert data_dir() == tmp_path / "ConverSystem"
 
     def test_home_fallback(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """APPDATA 缺失（罕见）→ 用户主目录\\ConverSystem"""
+        """APPDATA 缺失（罕见）→ home\\AppData\\Roaming\\ConverSystem（决策 D1-D2 兜底统一 = T-01 修复本身）"""
         monkeypatch.delenv("CONVER_DATA_DIR", raising=False)
         monkeypatch.delenv("APPDATA", raising=False)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        assert data_dir() == tmp_path / "AppData" / "Roaming" / "ConverSystem"
+
+    def test_empty_env_treated_as_unset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """契约表 v1：CONVER_DATA_DIR="" 视为未设置（与壳侧 var_os 非空判定对齐）"""
+        monkeypatch.setenv("CONVER_DATA_DIR", "")
+        monkeypatch.setenv("APPDATA", str(tmp_path))
         assert data_dir() == tmp_path / "ConverSystem"
 
     def test_log_file_path_under_data_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

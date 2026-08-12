@@ -10,10 +10,10 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use conver_app_lib::server::{
-    backend_config_from_env, data_dir_path, database_url, default_data_dir, find_prod_backend_exe,
-    http_probe, parse_command_line, probe_free_port, prod_backend_exe_candidates,
-    read_runtime_json, spawn_backend, wait_until_ready, write_runtime_json, BackendConfig,
-    ReadyOutcome, RuntimeInfo, DEFAULT_DEV_BACKEND_CMD,
+    backend_config_from_env, data_dir_path, database_url, default_data_dir, encode_url_path,
+    find_prod_backend_exe, http_probe, parse_command_line, probe_free_port,
+    prod_backend_exe_candidates, read_runtime_json, spawn_backend, wait_until_ready,
+    write_runtime_json, BackendConfig, ReadyOutcome, RuntimeInfo, DEFAULT_DEV_BACKEND_CMD,
 };
 
 // ── 测试辅助 ────────────────────────────────────────────────────────────────
@@ -233,6 +233,50 @@ fn database_url_points_at_data_dir_db_with_forward_slashes() {
     );
     assert_eq!(url, expected);
     assert!(!url.contains('\\'), "Windows 反斜杠应转换为正斜杠");
+}
+
+// ── 契约表 v1：URL 编码（镜像 backend/tests/test_data_dir.py，同一版本号互引）────
+
+#[test]
+fn encode_url_path_matches_contract_table_v1() {
+    // 契约表 v1：编码集 = Python quote(s, safe="/:") 的补集——
+    // # → %23、? → %3F、% → %25、空格 → %20、非 ASCII（中文）→ UTF-8 逐字节 %XX；
+    // 保留 A-Z a-z 0-9 _ - . ~ / :（含 ~，RFC3986 unreserved）。
+    assert_eq!(encode_url_path("a#b?c%d e"), "a%23b%3Fc%25d%20e");
+    assert_eq!(
+        encode_url_path("数据 目录"),
+        "%E6%95%B0%E6%8D%AE%20%E7%9B%AE%E5%BD%95"
+    );
+    assert_eq!(
+        encode_url_path("C:/Users/x/AppData/Roaming/Conver System"),
+        "C:/Users/x/AppData/Roaming/Conver%20System"
+    );
+    assert_eq!(encode_url_path("a~b.c-d_e"), "a~b.c-d_e", "~ 属 unreserved，不编码");
+}
+
+#[test]
+fn encode_url_path_ascii_boundary() {
+    // 逐字符钉住补集边界（ASCII 0x00-0x7F 全表）：
+    // 保留 = 字母数字 + "-_.~/:"，其余一律 %XX（大写十六进制）——防过编码也防漏编码。
+    let keep = |c: char| c.is_ascii_alphanumeric() || "-_.~/:".contains(c);
+    for code in 0u8..=127u8 {
+        let c = code as char;
+        let input = c.to_string();
+        let expected = if keep(c) { input.clone() } else { format!("%{code:02X}") };
+        assert_eq!(encode_url_path(&input), expected, "ASCII 0x{code:02X} 编码与契约表 v1 不符");
+    }
+}
+
+#[test]
+fn database_url_percent_encodes_special_chars() {
+    // 数据目录含 #/?/空格/中文：URL 不被截断，与迁移脚本 _open_readonly 的 URI 语义一致
+    let dir = Path::new(r"C:/Users/tester/AppData/Roaming/Conver 数据#目录?v1%");
+    let url = database_url(dir);
+    assert_eq!(
+        url,
+        "sqlite+aiosqlite:///C:/Users/tester/AppData/Roaming/Conver%20%E6%95%B0%E6%8D%AE%23%E7%9B%AE%E5%BD%95%3Fv1%25/conver_system.db"
+    );
+    assert!(!url.contains('\\'), "反斜杠应已转正斜杠");
 }
 
 // ── 子进程启停 ──────────────────────────────────────────────────────────────
@@ -515,7 +559,8 @@ fn data_dir_path_appends_conver_system() {
 #[test]
 fn default_data_dir_env_priority() {
     // 顺序执行四组断言（同一测试内无并发），避免环境变量用例并行互踩。
-    // 优先级契约（与迁移脚本 P6.4-3 对齐）：CONVER_DATA_DIR > APPDATA > CWD 兜底。
+    // 契约表 v1（与 backend/tests/test_data_dir.py 互引，同一版本号）：
+    // CONVER_DATA_DIR（非空）> APPDATA > USERPROFILE\AppData\Roaming > CWD 末位兜底（不可达）。
     with_env("CONVER_DATA_DIR", Some("C:/custom/data"), || {
         with_env("APPDATA", None, || {
             assert_eq!(default_data_dir(), PathBuf::from("C:/custom/data"));
@@ -535,7 +580,7 @@ fn default_data_dir_env_priority() {
             assert_eq!(
                 default_data_dir(),
                 PathBuf::from("C:/Users/tester/AppData/Roaming/ConverSystem"),
-                "CONVER_DATA_DIR 空串应视为未设置（与迁移脚本 falsy 语义一致）"
+                "CONVER_DATA_DIR 空串应视为未设置（契约表 v1：非空才生效）"
             );
         });
     });
@@ -547,10 +592,25 @@ fn default_data_dir_env_priority() {
             );
         });
     });
+    // APPDATA 缺失 → USERPROFILE\AppData\Roaming 兜底（决策 D1-D2，对齐 Python home 兜底）
     with_env("CONVER_DATA_DIR", None, || {
         with_env("APPDATA", None, || {
-            let dir = default_data_dir();
-            assert!(dir.ends_with("ConverSystem"), "无任何变量时应回退到 CWD 下");
+            with_env("USERPROFILE", Some("C:/Users/tester"), || {
+                assert_eq!(
+                    default_data_dir(),
+                    PathBuf::from("C:/Users/tester/AppData/Roaming/ConverSystem"),
+                    "USERPROFILE 兜底应对齐 Python 侧 home\\AppData\\Roaming 语义"
+                );
+            });
+        });
+    });
+    // USERPROFILE 也缺失的不可达场景：CWD 末位兜底保留（注释说明，正常 Windows 必有 USERPROFILE）
+    with_env("CONVER_DATA_DIR", None, || {
+        with_env("APPDATA", None, || {
+            with_env("USERPROFILE", None, || {
+                let dir = default_data_dir();
+                assert!(dir.ends_with("ConverSystem"), "无任何变量时应回退到 CWD 下");
+            });
         });
     });
 }

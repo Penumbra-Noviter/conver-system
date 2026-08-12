@@ -71,7 +71,11 @@ if (-not (Test-Path $AppExe)) {
     throw "未找到壳 exe：$AppExe。请先运行 scripts/build-desktop.ps1（或 tauri build）"
 }
 
-# 数据目录解析（与壳 server.rs default_data_dir / 后端 run_backend.data_dir 同一契约）
+# 数据目录解析（契约表 v1，与 backend/app/services/data_dir.py / 壳 server.rs
+# default_data_dir 同一契约：CONVER_DATA_DIR（非空）→ %APPDATA%\ConverSystem。
+# 显式例外（决策 D1-D4）：冒烟是断言环境而非解析器——APPDATA 缺失即环境错误，
+# 直接 throw，不参与「home\AppData\Roaming 兜底」的解析链（静默兜底会把测试数据
+# 写到错误位置）。契约表 v1 全文见 backend/tests/test_data_dir.py）
 $DataDir = ""
 if ($env:CONVER_DATA_DIR) {
     $DataDir = [System.IO.Path]::GetFullPath($env:CONVER_DATA_DIR)
