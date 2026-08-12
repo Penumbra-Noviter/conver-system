@@ -581,4 +581,23 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
         state.defaultModel = 'claude-sonnet-5';
         expect(() => panel.initProviderDropdown()).not.toThrow();
     });
+
+    // 用例 ⑤（TD-5）：#setting-default-model 在 + #setting-custom-model 缺（含
+    // save/clear 两未守卫绑定按钮）→ 旧实现 initSettingsPanel 仍绑定
+    // createCustomModelHandler(model, null)，选 __custom__ 触发 change →
+    // model-utils.js:81 闭包内 `customInputEl.style` null 抛 TypeError；
+    // 缺一不绑定后 no-op 不抛
+    it('缺 #setting-custom-model 下调 initSettingsPanel → 选 __custom__ 触发 change 不抛 TypeError', async () => {
+        vi.resetModules();
+        document.body.innerHTML = `
+            <select id="setting-default-model"><option value="__custom__">自定义模型</option></select>
+            <button id="btn-save-settings"></button>
+            <button id="btn-clear-all-convs"></button>
+        `;
+        const panel = await import('../js/components/settings-panel.js');
+        panel.initSettingsPanel({});
+        const modelSelect = document.querySelector('#setting-default-model');
+        modelSelect.value = '__custom__';
+        expect(() => modelSelect.dispatchEvent(new Event('change', { bubbles: true }))).not.toThrow();
+    });
 });

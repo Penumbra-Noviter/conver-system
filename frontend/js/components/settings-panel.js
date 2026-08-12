@@ -301,7 +301,7 @@ async function testApiKeys(data) {
 
 /**
  * 初始化设置面板：绑定所有事件监听器
- * Provider/Model 下拉元素缺失（index.html 契约被破坏的极端场景）→ 对应绑定 no-op 不抛错。
+ * Provider/模型下拉或自定义输入元素缺失（index.html 契约被破坏的极端场景）→ 对应绑定 no-op 不抛错。
  *
  * @param {object} [options]
  * @param {function} [options.onConversationsCleared] - 清空所有对话后的回调（刷新列表等）
@@ -310,10 +310,12 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
     // Provider 切换时动态更新模型列表
     $('#setting-default-provider')?.addEventListener('change', refreshModelOptions);
 
-    // 模型下拉切换时联动自定义输入框
-    $('#setting-default-model')?.addEventListener('change', createCustomModelHandler(
-        $('#setting-default-model'), $('#setting-custom-model'),
-    ));
+    // 模型下拉切换时联动自定义输入框（缺一不绑定：两元素任一缺失 → 该绑定 no-op 不抛错）
+    const modelSelect = $('#setting-default-model');
+    const customInput = $('#setting-custom-model');
+    if (modelSelect && customInput) {
+        modelSelect.addEventListener('change', createCustomModelHandler(modelSelect, customInput));
+    }
 
     // 主题切换按钮（全局 header）
     $('#btn-theme-toggle')?.addEventListener('click', toggleTheme);
