@@ -1,15 +1,18 @@
 """
 ARC9-T04 单元测试 — 数据目录共享模块契约（backend/app/services/data_dir.py）
 
-契约表 v1（双端镜像；Rust 侧 src-tauri/tests/server_test.rs 同一版本号互引，防漂移）：
+契约表 v2（双端镜像；Rust 侧 src-tauri/tests/server_test.rs 同一版本号互引，防漂移）：
 
     1. 解析链（resolve，三端一致）：
        CONVER_DATA_DIR（环境变量，**非空串才生效**，空串视为未设置）
        → %APPDATA%\\ConverSystem
        → home\\AppData\\Roaming\\ConverSystem（APPDATA 缺失兜底，决策 D1-D2）
-    2. URL 编码（壳侧 database_url 契约；Python 基准 = urllib.parse.quote(s, safe="/:")）：
-       # → %23、? → %3F、% → %25、空格 → %20、非 ASCII（中文）→ UTF-8 逐字节 %XX；
-       保留不编码：A-Z a-z 0-9 _ - . ~ / :（`~` 亦保留，属 RFC3986 unreserved）。
+    2. URL 编码（壳侧 database_url 契约）：编码集 = {`?` → `%3F`}，其余字符
+       （含空格/中文/`#`/`%`）一律原样保留。`?` 是 SQLAlchemy URL 解析器的唯一
+       实际分隔符（防御性编码，Windows 非法文件名不可达）；sqlite 方言对
+       DATABASE_URL 零解码，契约表 v1 的全量百分号编码（urllib.parse.quote
+       safe="/:" 口径）在真实消费者处报 OperationalError（期末审核 Falsify
+       阻断项修复；连接级验证见 test_data_dir_connection.py）。
     3. G4 守卫：data_dir 模块仅 stdlib import，导入链不得拉入其它 backend.app.* 模块。
 
 冒烟脚本（scripts/smoke-desktop.ps1 74-81 段）为显式例外（决策 D1-D4）：
@@ -21,7 +24,6 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 import pytest
 
@@ -33,8 +35,15 @@ __all__ = [
     "TestPureStdlibGuard",
 ]
 
-#: 契约表 v1 保留集（编码补集的边界，与 Rust 侧逐字符用例同一数据来源）
-_KEEP_SET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~/:"
+
+def _encode_url_path(path: str) -> str:
+    """契约表 v2 编码参考（镜像 Rust `encode_url_path`）：仅 `?` → `%3F`，其余原样。
+
+    契约表 v1 曾以 `urllib.parse.quote(s, safe="/:")` 为基准做全量百分号编码——
+    SQLAlchemy sqlite 方言零解码，`%XX` 被当字面文件名，真实消费者打不开数据库
+    （OperationalError，连接级复现见 test_data_dir_connection.py）。
+    """
+    return path.replace("?", "%3F")
 
 
 class TestResolveContract:
@@ -49,7 +58,7 @@ class TestResolveContract:
     def test_env_override_keeps_special_chars_verbatim(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """契约表 v1：resolve 不编码——含 #/?/空格/中文的 CONVER_DATA_DIR 原样返回
+        """契约表 v2：resolve 不编码——含 #/?/空格/中文的 CONVER_DATA_DIR 原样返回
 
         编码是壳侧 database_url 的职责（见 TestUrlEncodingReference 与 Rust 镜像用例）；
         resolve 返回的 Path 必须与用户给定值逐字符一致，否则迁移/日志会写到错误位置。
@@ -60,7 +69,7 @@ class TestResolveContract:
         assert data_dir_service.data_dir() == special
 
     def test_empty_env_treated_as_unset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """契约表 v1：CONVER_DATA_DIR="" 视为未设置（与壳侧 var_os 非空判定对齐）"""
+        """契约表 v2：CONVER_DATA_DIR="" 视为未设置（与壳侧 var_os 非空判定对齐）"""
         monkeypatch.setenv("CONVER_DATA_DIR", "")
         monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
         assert data_dir_service.data_dir() == tmp_path / "appdata" / "ConverSystem"
@@ -74,7 +83,7 @@ class TestResolveContract:
     def test_home_appdata_roaming_fallback(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """契约表 v1（决策 D1-D2）：APPDATA 缺失 → home\\AppData\\Roaming\\ConverSystem
+        """契约表 v2（决策 D1-D2）：APPDATA 缺失 → home\\AppData\\Roaming\\ConverSystem
 
         注意：兜底是 home\\AppData\\Roaming（不是 home 根）——兜底统一 = T-01 修复本身，
         与迁移脚本既有语义一致，评审按此口径。
@@ -114,31 +123,42 @@ class TestResolveContract:
 
 
 class TestUrlEncodingReference:
-    """契约表 v1 编码参考（Python 侧基准）：钉住 quote(safe="/:") 的补集边界。
+    """契约表 v2 编码参考（Python 侧基准）：编码集 = {`?` → `%3F`}，其余原样保留。
 
     这些字面量即 Rust 侧 encode_url_path 逐字符用例的期望值来源（镜像契约）；
-    若 stdlib 行为漂移，本组用例先红，双端同步修正契约表版本号。
+    若任一侧漂移，本组用例先红，双端同步修正契约表版本号。
+    连接级验证（真实 SQLAlchemy 消费者）见 test_data_dir_connection.py。
     """
 
     def test_headline_cases(self) -> None:
-        assert quote("a#b?c%d e", safe="/:") == "a%23b%3Fc%25d%20e"
-        assert quote("数据 目录", safe="/:") == "%E6%95%B0%E6%8D%AE%20%E7%9B%AE%E5%BD%95"
-        assert quote("C:/Users/x/AppData/Roaming/Conver System", safe="/:") == (
-            "C:/Users/x/AppData/Roaming/Conver%20System"
+        assert _encode_url_path("a#b?c%d e") == "a#b%3Fc%d e"
+        assert _encode_url_path("数据 目录") == "数据 目录"
+        assert _encode_url_path("C:/Users/x/AppData/Roaming/Conver System") == (
+            "C:/Users/x/AppData/Roaming/Conver System"
+        )
+        assert _encode_url_path("C:/Users/x/数据#目录%v1/") == (
+            "C:/Users/x/数据#目录%v1/"
         )
 
-    def test_ascii_keep_set_boundary(self) -> None:
-        """逐字符钉住补集边界：保留集 = _KEEP_SET，其余 ASCII 一律 %XX（大写字面量）"""
+    def test_only_question_mark_is_encoded(self) -> None:
+        """逐字符钉住 v2 编码集边界：ASCII 全表仅 `?` → %3F，其余原样保留（大写字面量）"""
         for code in range(128):
             char = chr(code)
-            if char in _KEEP_SET:
-                assert quote(char, safe="/:") == char, f"保留字符 {char!r} 不应被编码"
-            else:
-                assert quote(char, safe="/:") == f"%{code:02X}", f"字符 {char!r} 应编码为 %{code:02X}"
+            expected = "%3F" if char == "?" else char
+            assert _encode_url_path(char) == expected, (
+                f"字符 {char!r} 编码与契约表 v2 不符"
+            )
 
-    def test_tilde_is_kept(self) -> None:
-        """`~` 属 RFC3986 unreserved，Python quote 恒保留——Rust 侧必须同表（防过编码）"""
-        assert quote("a~z", safe="/:") == "a~z"
+    def test_question_mark_encoded_inside_path(self) -> None:
+        """`?` 编码：URL 解析器分隔符防御——字面 `?` 会使数据库路径被截断
+        （连接级截断行为见 test_data_dir_connection.py）"""
+        assert _encode_url_path("dir?v1") == "dir%3Fv1"
+        assert _encode_url_path("C:/a/b?c/d") == "C:/a/b%3Fc/d"
+
+    def test_non_question_mark_chars_kept_verbatim(self) -> None:
+        """非 `?` 字符一律原样：`~` 与空格/中文/#/% 同表（v2 无保留集概念，防过编码）"""
+        assert _encode_url_path("a~b.c-d_e") == "a~b.c-d_e"
+        assert _encode_url_path("a b#c%d~e") == "a b#c%d~e"
 
 
 class TestPureStdlibGuard:
