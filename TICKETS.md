@@ -23,16 +23,9 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| TD-15 | settings-panel.js save 入口守卫过严收窄：customModelInput 无条件要求——`#setting-custom-model` 缺 + 非 `__custom__` 模型时拒绝本可成功的保存（守卫边界 > 旧崩溃边界，spec 背书；可改 providerSelect.value === '__custom__' 时方要求） | TD-13~14 批次波末 Falsify F4 | Worth exploring | 📝 |
-| TD-16 | data_dir.py docstring「重复分隔符折叠（`//` → `/`）」未注记 UNC 前导特例：`Path('//server/share/x')` 保留 UNC 前缀不折叠（Windows） | TD-13~14 批次期末 Standards | Speculative | 📝 |
-| TD-17 | 契约锁未钉「尾分隔符去除」边界（docstring 声称四项、锁钉三项——折叠+`.`、`..`；补一行断言即可） | TD-13~14 批次波末 Falsify F8 | Speculative | 📝 |
-| TD-18 | tauri-desktop.md:112「不做归一化」与「分隔符按 pathlib 规范化」并置易误读（实为「代码不改写路径整体」vs「Path 构造固有规范化」，建议加「路径形态」限定） | TD-13~14 批次波末 Falsify F10 | Speculative | 📝 |
-| TD-19 | settings-panel.test.js 用例⑦⑧ unhandledrejection/warn spy 未 restore（当前为文件末尾用例无影响；未来在 ⑦ 后新增用例会被 mock 吞 warn） | TD-13~14 批次波末 Falsify | Speculative | 📝 |
-| TD-20 | settings-panel.test.js 用例⑦ 夹具 replace 脆弱性：`SETTINGS_DOM_HTML.replace('<input id="setting-claude-key">', '')` 依赖字面串精确匹配——未来该 input 加属性则 replace 静默失效，用例失守；建议补「元素确实被删」防御断言 | TD-13~14 批次期末 Falsify | Speculative | 📝 |
-| TD-21 | getSelectedModel（settings-panel.js:87-94）与 save 入口守卫（TD-13）的关联是隐式的：未来在守卫外新增调用点会重新暴露裸读——建议 docstring 标注「调用方须经 save 回调入口守卫」或测试锁定调用点集合 | TD-13~14 批次期末 Architecture | Speculative | 📝 |
-| TD-22 | settings-panel.js save 回调 :373 重复 DOM 查询：守卫已持有 providerSelect（:344）却重新 `$('#setting-default-provider option:checked')`——可复用 `providerSelect.querySelector('option:checked')` | TD-13~14 批次期末 Standards | Speculative | 📝 |
-| TD-23 | settings-panel.js docstring「11 个表单元素引用」计数口径微差：守卫实际收集检查 10 个元素变量（第 11 次读取 `option:checked` 由 `?.` 收口而非守卫收集）——措辞微瑕 | TD-13~14 批次期末 Standards | Speculative | 📝 |
-| TD-24 | src-tauri Rust 侧契约字面张力：`default_data_dir` raw PathBuf 原样传递不做分隔符规范化，契约表 v2「双端同一契约」不再严格成立（物理一致性由 Win32 容错 + Python 侧规范化保证）——补注释说明 | TD-13~14 批次波末 Falsify F9 | Speculative | 📝 |
+| TD-25 | test_data_dir.py `test_env_override_separators_normalized` 新增 UNC 断言是全测试套第一个平台硬依赖：POSIX 上 `Path('//server/share/x').parts[0]` ≠ `'\\\\server\\share\\'` 必挂；仓库无 CI、无平台 marker——修复方向：断言处加 `pytest.mark.skipif(sys.platform != 'win32')`（防未来 CI/跨平台开发机断裂，成本极低） | TD-15~24 批次期末 Falsify | Strong | 📝 |
+| TD-26 | settings-panel.js:371 退化状态语义：空模型下拉 + custom 缺从「warn 早退」变为「以 default_model:'' 放行保存」——属 Q2 决策字面内行为（非 __custom__ 不要求 custom），与用例⑧ 空 provider 下拉存空串先例一致；仅记录，无需动作 | TD-15~24 批次期末 Falsify | Worth exploring | 📝 |
+| TD-27 | UNC 事实三处复述（data_dir.py docstring / test_data_dir.py docstring / server.rs 注释）与 documentation-standards.md §一「单点化」原则的张力——受「双端镜像契约表」既有惯例 + TD-16 grep 验收双重约束，漂移风险已由新锁断言兜底；可考虑后续以引用替代复述 | TD-15~24 批次期末 Architecture | Speculative | 📝 |
 
 ---
 
@@ -48,6 +41,17 @@
 | TD-14 | 契约「逐字符一致」措辞澄清（3 处补 pathlib 规范化注记）+ 契约锁用例（+1，基线绿非回归；v2 不变） | 2026-08-12 | `b284f78` |
 
 > ✅ 已结清（2026-08-12 TD-13~14 批次）：TD-13/TD-14 完成（上表）+ **TD-9 顺带闭环**——TD-9（getSelectedModel 未守卫）由「复核确认维持」转「做（顺带闭环）」：TD-13 入口守卫覆盖其全部调用点（:340/:281），本体零改动（延续 TD-5 Q4 不加固共识），缺口闭合。
+
+### 技术债区 TD-15~24 批次（2026-08-12 全自动 kickoff）
+
+> 来源：TICKETS 技术债区 TD-15~24 清零（TD-13~14 批次期末遗留）。Grilling 共识（全自动档拍板）：**10 项全做，无关闭项**——TD-15 做（守卫条件化：`#setting-custom-model` 仅 `modelSelect.value === '__custom__'` 时要求；**票面建议 providerSelect 条件实证否定**——provider 下拉只填 providers key 永不为 '__custom__'，条件恒假会让守卫形同虚设；+2 用例 A 先红后绿 + B 基线绿）/ TD-16 做（UNC 前导特例注记，实测背书）/ TD-17 做（契约锁补尾分隔符+UNC 断言，基线绿非先红）/ TD-18 做（tauri-desktop.md「路径形态」限定）/ TD-19 做（warnSpy.mockRestore 惯例对齐——:529 afterEach 已兜底，属硬化非活 bug）/ TD-20 做（夹具 replace 防御断言）/ TD-21 做（getSelectedModel docstring 契约标注）/ TD-22 做（providerSelect.querySelector 复用）/ TD-23 做（计数口径修正，grep 归零）/ TD-24 做（server.rs 透传契约注释，注释-only）。规格 v1.0 无修订。小档 2 工单（TD-A 前端 6 项 / TD-B 后端+文档 4 项，文件互斥无链），单 Implement 直行（worktree `.worktrees/td15-24`），merge `0010f1b`；merge 零回退冲突。**期末四轴 code-review（固定点 3072346）：0 阻断**——2 工单 10 项验收全达标（grep 三项实测归零/带限定；pathlib 声称实测逐字一致）、守卫四态 Falsify 无击穿、安全红线全过；3 项非阻断观察落技术债区（TD-25~27）。运行态冒烟：后端 GET / 200；GUI：设置面板完整渲染（11 元素齐备）→ 保存设置「设置已保存」弹窗全过（TD-15 放行场景运行时实证——非 __custom__ 模型 + 无 custom 输入保存成功，旧守卫在此形态拒绝）。测试同步：pytest **360 + 1 skip** / Vitest **373** / cargo test **52**，全部全绿。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| TD-A | settings-panel 守卫收窄与卫生（TD-15/19/20/21/22/23：守卫条件化 modelSelect + 计数口径修正 + 契约标注 + 查询复用 + 防御断言 + restore 惯例；+2 用例 A 先红后绿 + B 基线绿；settings-panel.js 覆盖 100% 行） | 2026-08-12 | `85aca1b` |
+| TD-B | 路径契约注记与锁补强（TD-16/17/18/24：UNC 特例注记 + 尾分隔符/UNC 锁断言 + 「路径形态」限定 + Rust 透传注释；pytest/cargo 计数不变） | 2026-08-12 | `e16048f` |
+
+> ✅ 已结清（2026-08-12 TD-15~24 批次）：TD-15~24 全部完成（10 做 0 关闭），技术债区对应行移除（TD-25~27 为本批次新遗留，保留原位）。
 
 ### 技术债区 TD-8~12 批次（2026-08-12 全自动 kickoff）
 

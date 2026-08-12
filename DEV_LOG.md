@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-12 — 技术债区 TD-15~24 批次：10 项全做清零全自动 kickoff）
+
+- **TD-15~24 批次完成（merge 0010f1b）**：TD-13~14 批次期末遗留 10 项清零（小档 2 工单：TD-A 前端 `85aca1b` / TD-B 后端+文档 `e16048f`）。**TD-A** settings-panel 守卫收窄与卫生——TD-15 守卫条件化（`#setting-custom-model` 仅 `modelSelect.value === '__custom__'` 时要求；**票面建议 providerSelect 条件被实证否定**——provider 下拉只填 providers key 永不为 '__custom__'，条件恒假会让守卫形同虚设；+2 用例：A 先红后绿——旧实现守卫早退零 fetch、showAlert 超时红 1040ms、修复后 33 tests 全绿；B 基线绿钉保留边界）+ TD-23 计数口径修正（「11 个表单元素引用」→ 10 变量 + 第 11 次 `?.` 收口，grep 归零）+ TD-21 getSelectedModel docstring 契约标注（调用方须经入口守卫）+ TD-22 providerSelect.querySelector 复用（:373 重复查询消除）+ TD-20 用例⑦ 防御断言 + TD-19 warnSpy.mockRestore 惯例对齐（:529 afterEach 已兜底，属硬化非活 bug）；**TD-B** 路径契约注记与锁补强——TD-16 UNC 前导特例注记（`Path('//server/share/x')` 保留前缀不折叠，实测 parts[0] = `'\\\\server\\share\\'`）+ TD-17 契约锁扩展（尾分隔符 + UNC 两条断言并入 test_env_override_separators_normalized，基线绿非先红）+ TD-18 tauri-desktop.md「路径形态」限定（不做归一化 = 代码不改写路径整体）+ TD-24 server.rs default_data_dir 透传契约注释（注释-only 零 Rust 改动）
+- **过程遥测**：小档单 Implement 直行（两工单文件互斥无链，worktree `.worktrees/td15-24`）；merge 零回退冲突；文件范围核验 A 档（6 文件恰为声明）；Vitest 覆盖率 settings-panel.js 100% 行
+- **期末四轴（固定点 3072346）：0 阻断**——Spec 10/10 落地、验收全过（grep 三项实测归零/带限定；pathlib 声称实测逐字一致）；Falsify 守卫四态（modelSelect 缺/空下拉短路/__custom__ 早退/非 __custom__ 放行 + option:checked `?.` 收口）无击穿；Standards 安全红线三过（sk-/password/token 零命中）；3 项非阻断落技术债区（TD-25 平台硬断言缺守卫 Strong / TD-26 空下拉放行语义已被决策覆盖仅记录 / TD-27 UNC 三处复述与单点化张力）
+- **4.5 运行态冒烟**：后端 GET / 200；GUI（Playwright）：设置面板完整渲染（11 元素齐备）→ 保存设置「设置已保存」弹窗全过——TD-15 放行场景运行时实证（非 __custom__ 模型 + 无 custom 输入 → 保存成功，旧守卫在此形态拒绝）；console 仅 favicon 404 预存在
+- **G16 文档同步（本批次）**：TICKETS（TD-15~24 归档 + TD-25~27 落区）；CLAUDE.md（测试数 360/373 + 状态行）；PROJECT_REFERENCE.md（测试数漂移修复 261/186/43 → 360+1skip/373/52 + 状态更新至 2026-08-12）；DEV_LOG 本段
+- **测试**：pytest **360 + 1 skip** / Vitest **373** / cargo test **52** 全绿（基线 360+1skip/371/52 → 期末 +2，均 TD-A 守卫用例）
+
+---
+
 ## 滚动摘要（2026-08-12 — 技术债区 TD-13~14 批次：2 做 + TD-9 闭环全自动 kickoff）
 
 - **TD-13~14 批次完成（merge 61f1721）**：TD-8~12 批次期末遗留 2 项清零（用户指令「继续完善这两个观察项」）。**TD-13** save 回调入口统一守卫（settings-panel.js：11 元素收集 + 任一缺失 console.warn 早退 + :339 `?.textContent.trim() ?? ''` 收口 + docstring；+2 用例⑦⑧ 先红后绿——先红证据：:334 value / :339 textContent 两条 unhandledrejection TypeError 路径实证；守卫不介入正常 DOM 零回归）**TD-14** 契约「逐字符一致」措辞澄清（data_dir.py:16 / test_data_dir.py:64 / tauri-desktop.md:112 三处补 pathlib 规范化注记——重复分隔符折叠/`.` 消除/尾分隔去除/`..` 保留四项边界 + UNC 前导特例；+1 契约锁用例 test_env_override_separators_normalized，基线绿非回归；v2 不变 Rust 镜像零改动）；**TD-9 顺带闭环**：getSelectedModel 由「复核确认维持」转「做」——TD-13 入口守卫覆盖其全部调用点（:340/:281），本体零改动
