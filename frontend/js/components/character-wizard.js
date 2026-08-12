@@ -10,21 +10,23 @@
  *   Step 6: 预览保存
  *
  * 编辑已有角色仍使用现有的 character-form.js（简单表单）。
+ *
+ * 骨架（遮罩/标题/关闭按钮/遮罩点击/Escape）由通用模态框工厂 openModal 承担
+ * （ARC-10 C3 收口）；进度条与步骤指示器经工厂的 headerExtra 插槽挂载于
+ * header 与 body 之间（渲染位置与现状一致）。
  */
 
 import { characters } from '../api.js';
 import { escapeHtml } from '../utils.js';
 import { CHARACTER_TEMPLATES } from '../data/character-templates.js';
 import { iconHtml } from '../icons.js';
+import { openModal } from './modal.js';
 
 /**
  * 打开角色创建向导
  * @param {function} onSuccess - 创建成功后的回调
  */
 export function showCharacterWizard(onSuccess = null) {
-    const existing = document.querySelector('.modal-overlay');
-    if (existing) existing.remove();
-
     // ── 向导状态 ──
     const state = {
         step: 1,
@@ -49,113 +51,102 @@ export function showCharacterWizard(onSuccess = null) {
         parsedFields: [],
     };
 
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-
-    overlay.innerHTML = `
-        <div class="modal wizard-modal">
-            <div class="modal-header">
-                <h3>创建新角色</h3>
-                <button class="btn-icon modal-close" title="关闭">${iconHtml('x')}</button>
-            </div>
-            <div class="wizard-progress">
-                <div class="wizard-progress-bar" id="wizard-progress-bar" style="width: 16.6%"></div>
-            </div>
-            <div class="wizard-step-indicators" id="wizard-step-indicators">
-                <span class="wizard-step-dot active" data-step="1">1</span>
-                <span class="wizard-step-line"></span>
-                <span class="wizard-step-dot" data-step="2">2</span>
-                <span class="wizard-step-line"></span>
-                <span class="wizard-step-dot" data-step="3">3</span>
-                <span class="wizard-step-line"></span>
-                <span class="wizard-step-dot" data-step="4">4</span>
-                <span class="wizard-step-line"></span>
-                <span class="wizard-step-dot" data-step="5">5</span>
-                <span class="wizard-step-line"></span>
-                <span class="wizard-step-dot" data-step="6">6</span>
-            </div>
-            <div class="modal-body wizard-body" id="wizard-body">
-                ${renderStep1(state)}
-            </div>
-            <div class="modal-footer wizard-footer">
-                <span class="form-status" id="wizard-status"></span>
-                <button class="btn-secondary modal-cancel">取消</button>
-                <button class="btn-secondary" id="wizard-prev" style="visibility:hidden">上一步</button>
-                <button class="btn-primary" id="wizard-next">下一步</button>
-            </div>
+    // 进度条 + 步骤指示器（经工厂 headerExtra 插槽挂载，位于 header 与 body 之间）
+    const headerExtra = `
+        <div class="wizard-progress">
+            <div class="wizard-progress-bar" id="wizard-progress-bar" style="width: 16.6%"></div>
+        </div>
+        <div class="wizard-step-indicators" id="wizard-step-indicators">
+            <span class="wizard-step-dot active" data-step="1">1</span>
+            <span class="wizard-step-line"></span>
+            <span class="wizard-step-dot" data-step="2">2</span>
+            <span class="wizard-step-line"></span>
+            <span class="wizard-step-dot" data-step="3">3</span>
+            <span class="wizard-step-line"></span>
+            <span class="wizard-step-dot" data-step="4">4</span>
+            <span class="wizard-step-line"></span>
+            <span class="wizard-step-dot" data-step="5">5</span>
+            <span class="wizard-step-line"></span>
+            <span class="wizard-step-dot" data-step="6">6</span>
         </div>
     `;
 
-    document.body.appendChild(overlay);
+    const actions = `
+        <span class="form-status" id="wizard-status"></span>
+        <button class="btn-secondary modal-cancel">取消</button>
+        <button class="btn-secondary" id="wizard-prev" style="visibility:hidden">上一步</button>
+        <button class="btn-primary" id="wizard-next">下一步</button>
+    `;
 
-    // ── DOM 引用 ──
-    const body = overlay.querySelector('#wizard-body');
-    const prevBtn = overlay.querySelector('#wizard-prev');
-    const nextBtn = overlay.querySelector('#wizard-next');
-    const statusEl = overlay.querySelector('#wizard-status');
-    const progressBar = overlay.querySelector('#wizard-progress-bar');
-    const stepDots = overlay.querySelectorAll('.wizard-step-dot');
+    openModal({
+        title: '创建新角色',
+        modalClass: 'wizard-modal',
+        headerExtra,
+        body: `<div class="wizard-body" id="wizard-body">${renderStep1(state)}</div>`,
+        actions,
+        removeExisting: '.modal-overlay',
+        onOpen(overlay, close) {
+            // ── DOM 引用 ──
+            const body = overlay.querySelector('#wizard-body');
+            const prevBtn = overlay.querySelector('#wizard-prev');
+            const nextBtn = overlay.querySelector('#wizard-next');
+            const statusEl = overlay.querySelector('#wizard-status');
+            const progressBar = overlay.querySelector('#wizard-progress-bar');
+            const stepDots = overlay.querySelectorAll('.wizard-step-dot');
 
-    // ── 关闭 ──
-    const close = () => overlay.remove();
-    overlay.querySelector('.modal-close').addEventListener('click', close);
-    overlay.querySelector('.modal-cancel')?.addEventListener('click', close);
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) close();
-    });
+            // ── 关闭 ──
+            // 关闭路径（关闭按钮/遮罩点击/Escape）由工厂承担；取消按钮在此绑定
+            overlay.querySelector('.modal-cancel')?.addEventListener('click', close);
 
-    // ── 更新进度条 ──
-    function updateProgress() {
-        const pct = ((state.step - 1) / 5) * 100;
-        progressBar.style.width = `${pct}%`;
-        stepDots.forEach((dot) => {
-            const s = parseInt(dot.dataset.step);
-            dot.classList.toggle('active', s <= state.step);
-        });
-    }
+            // ── 更新进度条 ──
+            function updateProgress() {
+                const pct = ((state.step - 1) / 5) * 100;
+                progressBar.style.width = `${pct}%`;
+                stepDots.forEach((dot) => {
+                    const s = parseInt(dot.dataset.step);
+                    dot.classList.toggle('active', s <= state.step);
+                });
+            }
 
-    // ── 渲染当前步骤 ──
-    function render() {
-        body.innerHTML = renderStep(state.step, state);
-        updateProgress();
+            // ── 渲染当前步骤 ──
+            function render() {
+                body.innerHTML = renderStep(state.step, state);
+                updateProgress();
 
-        // 绑定步骤内事件
-        bindStepEvents(state.step, state, body, nextBtn, prevBtn, statusEl, close, render);
+                // 绑定步骤内事件
+                bindStepEvents(state.step, state, body, nextBtn, prevBtn, statusEl, close, render);
 
-        // 更新按钮状态
-        prevBtn.style.visibility = state.step > 1 ? 'visible' : 'hidden';
-        if (state.step === 6) {
-            nextBtn.textContent = '保存角色';
-        } else {
-            nextBtn.textContent = '下一步';
-        }
-    }
+                // 更新按钮状态
+                prevBtn.style.visibility = state.step > 1 ? 'visible' : 'hidden';
+                if (state.step === 6) {
+                    nextBtn.textContent = '保存角色';
+                } else {
+                    nextBtn.textContent = '下一步';
+                }
+            }
 
-    // ── 导航 ──
-    prevBtn.addEventListener('click', () => {
-        if (state.step > 1) {
-            state.step--;
+            // ── 导航 ──
+            prevBtn.addEventListener('click', () => {
+                if (state.step > 1) {
+                    state.step--;
+                    render();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (state.step === 6) {
+                    handleSave(state, statusEl, nextBtn, close, onSuccess);
+                } else {
+                    // 验证当前步骤
+                    if (!validateStep(state.step, state, statusEl)) return;
+                    state.step++;
+                    render();
+                }
+            });
+
             render();
-        }
+        },
     });
-
-    nextBtn.addEventListener('click', () => {
-        if (state.step === 6) {
-            handleSave(state, statusEl, nextBtn, close, onSuccess);
-        } else {
-            // 验证当前步骤
-            if (!validateStep(state.step, state, statusEl)) return;
-            state.step++;
-            render();
-        }
-    });
-
-    // 键盘事件
-    overlay.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') close();
-    });
-
-    render();
 }
 
 // ══════════════════════════════════════════════════

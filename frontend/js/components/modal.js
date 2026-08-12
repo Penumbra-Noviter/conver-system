@@ -15,6 +15,8 @@ import { iconHtml } from '../icons.js';
  * @param {object} options
  * @param {string} [options.title] - 弹窗标题（自动 HTML 转义）
  * @param {string} [options.modalClass] - 附加到 .modal 的 class（如 'confirm-modal'）
+ * @param {string} [options.headerExtra=''] - 渲染在 modal-header 之后、modal-body 之前的
+ *   额外 HTML（如向导的进度条/步骤指示器；调用方自行转义）
  * @param {string} [options.body=''] - modal-body 内容（原始 HTML，调用方自行转义）
  * @param {string} [options.actions=''] - modal-footer 内容（原始 HTML）
  * @param {string|null} [options.overlayId] - 遮罩元素 id（用于按 id 查重/定位）
@@ -34,6 +36,7 @@ export function openModal(options = {}) {
     const {
         title = '',
         modalClass = '',
+        headerExtra = '',
         body = '',
         actions = '',
         overlayId = null,
@@ -64,6 +67,7 @@ export function openModal(options = {}) {
                 <h3>${escapeHtml(title)}</h3>
                 <button class="btn-icon modal-close" title="关闭">${iconHtml('x')}</button>
             </div>
+            ${headerExtra}
             <div class="modal-body">${body}</div>
             <div class="modal-footer">${actions}</div>
         </div>
