@@ -64,7 +64,10 @@ class TestResolveContract:
         resolve 返回的 Path 必须与用户给定值**非分隔符字符**逐字符一致（空格/中文/`#`/`%`
         等一律原样），否则迁移/日志会写到错误位置；仅分隔符按 pathlib 规范化——重复
         分隔符折叠、`.` 段消除、尾分隔符去除，`..` 段原样保留由文件系统在访问时解析
-        （规范化边界见 test_env_override_separators_normalized）。
+        （规范化边界见 test_env_override_separators_normalized）。**UNC 前导特例
+        （TD-16）**：`Path('//server/share/x')` 保留 UNC 前缀**不折叠**（Windows；
+        实测背书：`parts == ('\\\\server\\share\\', 'x')`）——折叠只作用于路径分段
+        内部，不作用于盘符/UNC 前导。
         """
         special = tmp_path / "Conver 数据#目录?v1%"
         monkeypatch.setenv("CONVER_DATA_DIR", str(special))
@@ -80,12 +83,22 @@ class TestResolveContract:
         互为补集（后者钉非分隔符原样，本用例钉分隔符规范化）：
         重复分隔符折叠（`//` → `/`）与 `.` 段消除；`..` 段**不提前解析**，
         原样保留于 parts，由文件系统在访问时解析。
+        尾分隔符去除（实测：`Path('C:/a/b/') == Path('C:/a/b')`）；UNC 前导特例
+        （TD-16/17）：`Path('//server/share/x')` 保留 `\\\\server\\share\\` 前缀
+        **不折叠**（Windows；实测背书：`parts == ('\\\\server\\share\\', 'x')`）。
         """
         monkeypatch.setenv("CONVER_DATA_DIR", "C:/a//b/./c")
         monkeypatch.setenv("APPDATA", "C:/ignored")
         assert data_dir_service.data_dir() == Path("C:/a/b/c")
         monkeypatch.setenv("CONVER_DATA_DIR", "C:/a/../b")
         assert ".." in data_dir_service.data_dir().parts
+        # TD-17：尾分隔符去除——Path('C:/a/b/') == Path('C:/a/b')（pathlib 固有行为）
+        monkeypatch.setenv("CONVER_DATA_DIR", "C:/a/b/")
+        assert data_dir_service.data_dir() == Path("C:/a/b")
+        # TD-17：UNC 前导保留——parts 首段保留 '\\\\server\\share\\' 前缀，
+        # 未折叠为 '/server/share/'（折叠只作用于分段内部，不作用于 UNC 前导）
+        monkeypatch.setenv("CONVER_DATA_DIR", "//server/share/x")
+        assert data_dir_service.data_dir().parts[0] == "\\\\server\\share\\"
 
     def test_empty_env_treated_as_unset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """契约表 v2：CONVER_DATA_DIR="" 视为未设置（与壳侧 var_os 非空判定对齐）"""

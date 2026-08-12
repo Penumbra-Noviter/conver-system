@@ -109,7 +109,7 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-desktop.ps1 -UseInstaller
 $env:CONVER_DATA_DIR = "D:\conver-data"   # 覆盖后桌面版全部数据落此处
 ```
 
-**POSIX 路径警告**：`CONVER_DATA_DIR` 传 Git Bash 形态的 POSIX 路径（如 `/c/Users/<name>/conver-data`）时**不做归一化**——按逐字符契约（分隔符按 pathlib 规范化；契约表 v2，见上）直接落位，数据将落在字面路径 `<当前盘根>\c\Users\<name>\conver-data`（进程当前盘符为 C: 时即 `C:\c\Users\<name>\conver-data`；而非 `C:\Users\<name>\conver-data`）。若 Git Bash/MSYS2 的路径转换在参数传递边界生效（`CONVER_DATA_DIR` 未被排除时），实际落位可能随之转换；未转换时按字面拼接。Git Bash 环境部署请改用 Windows 风格路径（如 `C:\conver-data`）；代码不做归一化是契约行为，非缺陷。
+**POSIX 路径警告**：`CONVER_DATA_DIR` 传 Git Bash 形态的 POSIX 路径（如 `/c/Users/<name>/conver-data`）时**不做归一化**——**路径形态**限定（TD-18）：代码**不改写路径整体**（不绝对化、不折叠分段），仅 Path 构造固有的分隔符规范化（按逐字符契约；契约表 v2，见上）直接落位，数据将落在字面路径 `<当前盘根>\c\Users\<name>\conver-data`（进程当前盘符为 C: 时即 `C:\c\Users\<name>\conver-data`；而非 `C:\Users\<name>\conver-data`）。若 Git Bash/MSYS2 的路径转换在参数传递边界生效（`CONVER_DATA_DIR` 未被排除时），实际落位可能随之转换；未转换时按字面拼接。Git Bash 环境部署请改用 Windows 风格路径（如 `C:\conver-data`）；代码在**路径形态**上不做归一化是契约行为，非缺陷。
 
 ### 3.3 网页版 → 桌面版数据迁移（migrate_data.py）
 
