@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-12 — 技术债区 TD-8~12 批次：3 做 + 2 维持关闭全自动 kickoff）
+
+- **TD-8~12 批次完成（merge a12d48e）**：上批次期末遗留 5 项处置——3 做 + 2 复核确认维持（全自动档，用户显式指定）。**TD-8** save/clear 裸绑定 `?.` 化（settings-panel.js :332/:366，守卫体系绑定层完整收口——单元素 `?.`/双元素缺一不绑定/函数早退三形态统一；+1 用例⑥ 先红后绿：空 DOM 下 :332 null.addEventListener TypeError 实证；用例②⑤ 注释同步申报——旧行号 325/359 失效 +「必须存在」前提废止）**TD-10** POSIX 警告补「当前盘根」+ MSYS2 转换说明（tauri-desktop.md 单段；pathlib 实测：`Path('/c/...')` 为根相对路径按进程当前盘解析——旧措辞固定 `C:` 是隐含假设，修订准确）**TD-12** llm_error_response provider=None 契约锁用例（test_chat_service.py +1；基线绿非回归——锁「签名允许 None 的确定性」，模拟守卫被删必红验证有效；chat.py 零改动）；**TD-9 维持**（getSelectedModel 不加固——spec 明示 + TD-8 后触发路径不变复证）/ **TD-11 维持**（400 vs 422 函数级分歧——ARC10-4 规格背书 + 双向注释已在）
+- **过程遥测**：单波 3 并行（前端/文档/后端测试文件互斥无链）；merge 零回退冲突；波末降配审核 F1-F6 无阻断（TD-10 措辞精度 1 项非阻断）；**发现主工作树 TICKETS.md 未申报改动**（kickoff 期间某子代理越界修改：技术债区治理增强——状态列/读取契约/去重原则/复证标注）→ 内容合理、独立 commit `c933e8b` 并汇报，未混入工单归档
+- **期末四轴：0 阻断**；2 项非阻断落技术债区（TD-13 save 回调体裸读 / TD-14 逐字符契约 pathlib 规范化边界）
+- **4.5 运行态冒烟**：后端 GET / 200；GUI（Playwright）：设置面板渲染 → 保存设置弹窗「设置已保存」→ 清空对话确认弹窗「确定要清空全部 2 个对话吗？」全过（TD-8 save/clear 正常路径零回归，console 无错误）
+- **G14 文档同步（本批次）**：TICKETS（TD-8~12 归档 3 做 + 2 维持 + TD-13/14 落区）；CLAUDE.md（测试数 359/369 + 状态行）；DEV_LOG 本段
+- **测试**：pytest **359 + 1 skip** / Vitest **369** / cargo test **52** 全绿（基线 358+1skip/368/52 → 期末 +1/+1）
+
+---
+
 ## 滚动摘要（2026-08-12 — 技术债区 TD-1~7 批次：7 项清零全自动 kickoff）
 
 - **TD-1~7 批次完成（7 工单全归档，merge 链 053f949/3cae11d）**：上批次期末遗留 7 项（TD-1~7）全部「做」清零（0 关闭——均为可修项，无拍板维持项）。**TD-3** search-view docstring 增补作用域与前提段（bound 模块级防同模块重复调用不防跨实例；DOM import 时冻结）**TD-4** refreshModelOptions 三元素联合守卫（provider/model/custom 任一缺 → no-op；model-utils.js 零改动——共享工具边界保持；+2 用例先红后绿：model-utils.js:32 innerHTML / :57 style 两 TypeError 路径实证）**TD-5** 模型联动 handler 缺一不绑定（+1 用例先红后绿：model-utils.js:81 事件期 TypeError；getSelectedModel 不加固——TD-4 后不可达）**TD-7** POSIX 警告措辞具体化（`C:\c\...` 字面落位）**TD-2** 契约表 v1→v2 全量同步（8 处目标文件 + **已申报 tests 扩展 4 处**——「tests 已 v2 零改动」假设被证伪，plan-tickets 前提错误教训：同类漂移须全仓扫描；编码基准描述 v1 旧语义同步 v2；grep 归零口径注记：残留 5 处历史叙述非漂移）**TD-1** 兜底分支注释补遗（422 家族不落此分支，ARC10-2/4 指路）**TD-6** llm_error_response 标注 str|None（运行时零变化）

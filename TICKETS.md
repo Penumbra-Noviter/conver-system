@@ -23,15 +23,26 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| TD-8 | settings-panel.js `initSettingsPanel` 守卫覆盖不完整：save/clear 裸绑定（:332/:366）未纳入 no-op 守卫体系，全缺 DOM 下仍抛 TypeError（基线既有；测试⑤以提供按钮回避） | TD 批次波 1 Falsify（期末复证） | Worth exploring | 📝 |
-| TD-9 | settings-panel.js `getSelectedModel`（:87-94）未守卫：model 缺时 save 流程抛 TypeError（spec 明示不加固——TD-4 守卫后保存路径不可达，防御性） | TD 批次波 1 Falsify（期末复证） | Speculative | 📝 |
-| TD-10 | tauri-desktop.md POSIX 警告字面落位 `C:\c\Users\<name>\conver-data` 依赖进程当前盘符 + MSYS2 路径转换行为，确切落位两可（spec 固定文本即此措辞，实现逐字照办） | TD 批次波 1 Falsify（期末复证） | Speculative | 📝 |
-| TD-11 | chat_error_response DomainError 兜底 400 vs api/errors.py 422 家族函数级分歧——合并单一映射表时需防分歧（TD-1 注释已指路 ARC10-2/ARC10-4 关联） | TD 批次波 2 Falsify（期末复证） | Speculative | 📝 |
-| TD-12 | llm_error_response provider=None 路径缺显式契约测试（标注 str\|None 后行为安全，可选补一条锁无前缀文案） | TD 批次波 2 Falsify（期末复证） | Speculative | 📝 |
+| TD-13 | settings-panel.js save 回调体裸读表单字段（:334-344 `$('#setting-claude-key').value` 等）：按钮在而字段缺（部分缺 DOM）+ 点击 → TypeError（与 TD-9 同族回调层守卫缺口；spec 明示不动回调故非缺陷）——未来回调层守卫批次一并处理 | TD-8~12 批次期末 Falsify F1 | Speculative | 📝 |
+| TD-14 | data_dir.py 契约「逐字符一致」声称的边界：`//` 重复分隔符被 pathlib 折叠、`..` 段由文件系统解析，含此类段的路径落位与「逐字」字面不符（既有表述，TD-10 未扩大）——契约表 v2 措辞补「分隔符按 pathlib 规范化」注记 | TD-8~12 批次期末 Falsify F3 | Speculative | 📝 |
 
 ---
 
 ## 已完成归档
+
+### 技术债区 TD-8~12 批次（2026-08-12 全自动 kickoff）
+
+> 来源：TICKETS 技术债区 TD-8~12 清零（TD-1~7 批次期末遗留）。Grilling 共识（全自动档拍板）：**3 做 + 2 维持关闭**——TD-8 做（save/clear 裸绑定 `?.` 化收口守卫体系）/ TD-9 维持关闭（spec 明示不加固 + TD-8 实施后触发路径不变复证实证）/ TD-10 做（「当前盘根」+ MSYS2 转换说明）/ TD-11 维持关闭（ARC10-4「两路并存」规格背书 + 双向注释已在 chat.py:217-218 ↔ errors.py:49-50）/ TD-12 做（+1 契约锁测试）。规格 v1.0 无修订。单波 3 并行（TD-8 前端 / TD-10 文档 / TD-12 后端测试，文件互斥无链），merge `a12d48e`；merge 零回退冲突。**期末四轴 code-review（固定点 ab25867）：0 阻断**——3 工单 Spec 全达标（TD-8 用例⑥ 先红后绿实证：:332 null.addEventListener TypeError / TD-12 契约锁基线绿非先红语义正确）、TD-10「当前盘根」修订经 pathlib 实测验证准确、守卫体系绑定层完整收口；2 项非阻断观察落技术债区（TD-13/TD-14）。运行态冒烟：后端 GET / 200；GUI：设置面板渲染 / 保存设置弹窗 / 清空对话确认弹窗全过（TD-8 save/clear 正常路径回归）。测试同步：pytest **359 + 1 skip** / Vitest **369** / cargo test **52**，全部全绿。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| TD-8 | save/clear 按钮绑定纳入 no-op 守卫（:332/:366 `?.` 化 + docstring 同步；+1 用例⑥ 先红后绿；用例②⑤ 注释同步申报） | 2026-08-12 | `30bd2a0` |
+| TD-10 | tauri-desktop.md POSIX 警告补「当前盘根」+ MSYS2 转换说明（单段修订） | 2026-08-12 | `4108e49` |
+| TD-12 | llm_error_response provider=None 契约锁用例（+1 用例，基线绿非回归；chat.py 零改动） | 2026-08-12 | `a94b3ec` |
+
+> ✅ 已结清（2026-08-12 TD-8~12 批次）：TD-8~12 全部处置——3 做（上表）+ 2 **复核确认维持**（归档注记）：
+> - TD-9 `getSelectedModel`（settings-panel.js:87-94）未守卫：spec 明示不加固（TD-5 共识 Q4 背书）——save 回调触发前提 = UI 已渲染 + 按钮存在，model 下拉正常渲染下必在，防御性不可达；TD-8 实施后触发路径不变（调用点 :340/:281 零改动复证）
+> - TD-11 chat_error_response 400 vs api/errors.py 422 家族函数级分歧：合并单一映射表触及 ARC10-4「spec 明令两路并存」规格变更，非技术债清零可拍板；分歧已被双向注释显式标注（chat.py:217-218 ↔ errors.py:49-50），非静默假设，未来规格变更时按注释指路合并
 
 ### 技术债区 TD-1~7 批次（2026-08-12 全自动 kickoff）
 

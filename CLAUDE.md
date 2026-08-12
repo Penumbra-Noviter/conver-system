@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 358+1skip）；`cd frontend && npm test`（Vitest 368，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（52）。
+测试：`cd backend && python -m pytest`（pytest 359+1skip）；`cd frontend && npm test`（Vitest 369，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（52）。
 
 ## 当前状态（2026-08-12）
 
@@ -40,8 +40,8 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ P6.4 Tauri 桌面版已交付（8 工单归档，2026-08-11）：Tauri v2 壳 + PyInstaller 打包后端 + NSIS 安装器；期末 2 阻断（后端随包定位、前端随包挂载）已修复，安装器形态冒烟 5 项全过。详见 [docs/tauri-desktop.md](docs/tauri-desktop.md)
 - ✅ **ARC9 架构深化批次（6 Strong 候选，2026-08-12）**：T-01 搜索视图/级联删除收口 + T-02 settleTurn 统一结算 + T-03 complete_chat/chat_error_response + T-04 数据目录契约表 v2（期末 1 阻断修复）+ T-05 冒烟清理收口 + T-06 编排区测试挂网；期末四轴 1 阻断修复放行
 - ✅ **ARC10 架构深化批次（剩余 8 候选，2026-08-12）**：T-11 modal 骨架收口（C3-DEFER 兑现）+ T-12 character-submit 提交收敛 + T-13 微重复收口（resize/空态/onerror）+ T-14 Provider 清单单一来源（AVAILABLE_MODELS 派生 + 包导出收缩零 SDK 副作用）+ T-15 统一 exception handler（api/errors.py）+ T-16 style.css 覆盖区归位 + --on-danger token + T-17 schema 快照漂移检测 + T-18 聚焦序列收口；期末四轴 0 阻断放行；GUI 冒烟（modal 骨架/错误气泡深浅主题/输入框复位/级联）全过
-- ✅ **技术债区 TD-1~7 批次（2026-08-12 全自动 kickoff）**：TD-1~7 全部完成（7 做 0 关闭）——TD-3 docstring 作用域注记 / TD-4 refreshModelOptions 三元素守卫 / TD-5 模型联动缺一不绑定 / TD-7 POSIX 警告措辞 / TD-2 契约表 v1→v2 全量同步 / TD-1 兜底分支注释 / TD-6 标注 str|None；期末四轴 0 阻断；5 项新遗留（TD-8~12）入技术债区
-- ✅ 测试：pytest 358+1skip（后端）+ Vitest 368（前端）+ cargo test 52（壳）全绿
+- ✅ **技术债区 TD-8~12 批次（2026-08-12 全自动 kickoff）**：3 做 + 2 维持关闭——TD-8 save/clear 绑定 `?.` 化（守卫体系收口）/ TD-10 POSIX 警告当前盘根措辞 / TD-12 provider=None 契约锁测试；TD-9/TD-11 复核确认维持（spec 背书 + 双向注释已在）；期末四轴 0 阻断；2 项新遗留（TD-13~14）入技术债区
+- ✅ 测试：pytest 359+1skip（后端）+ Vitest 369（前端）+ cargo test 52（壳）全绿
 
 ## 待办管理
 
