@@ -42,6 +42,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 共享工具函数（ARC9-T05，决策 D2-D1 点源）：后端 exe 补齐 + 端口限定清理
+. (Join-Path $PSScriptRoot "lib\desktop-common.ps1")
+
 $Root = Split-Path -Parent $PSScriptRoot
 $Py = Join-Path $Root ".venv\Scripts\python.exe"
 $TauriCli = Join-Path $Root "frontend\node_modules\.bin\tauri.cmd"
@@ -91,18 +94,10 @@ Write-Host "根目录 : $Root"
 # tauri.conf.json 的 bundle.resources 指向 dist/conver_backend（期末审核阻断1 修复）：
 # tauri-build 在编译期校验该路径存在性——cargo test 即会失败（干净检出必挂），
 # 故后端打包必须早于任何 cargo 编译（复审整改：原步骤 4 前置）。
+# -SkipBackendBuild 语义不变（缺失时不自动打包）：原实现警告后继续、由 tauri-build
+# 资源校验失败兜底；现统一走 helper 提前明确报错——同一失败结果，信息更清晰。
 
-if (-not (Test-Path $BackendExe)) {
-    if ($SkipBackendBuild) {
-        Write-Host "警告：后端打包产物缺失（$BackendExe），且 -SkipBackendBuild 已指定——cargo test 将因 tauri-build resources 校验失败" -ForegroundColor Yellow
-    } else {
-        Write-Host "后端打包产物缺失，先执行 build-backend.ps1（PyInstaller onedir）..."
-        & (Join-Path $PSScriptRoot "build-backend.ps1")
-        if (-not (Test-Path $BackendExe)) {
-            throw "build-backend.ps1 执行后仍未找到 $BackendExe"
-        }
-    }
-}
+Assert-Or-Build-BackendExe -Path $BackendExe -SkipBackendBuild:$SkipBackendBuild
 
 # ── 1. cargo test（Seam 1：壳纯逻辑）───────────────────────────────────────
 

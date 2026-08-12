@@ -9,7 +9,7 @@
 #   验收 5：首次运行 %APPDATA%\ConverSystem\conver_system.db 存在、表结构完整
 #           （GET /api/characters 返回 []；数据目录已存在时只验结构并告警）
 #   验收 6：退出应用（壳 CONVER_EXIT_AFTER_SECS 钩子优雅退出）→ 端口释放
-#           + 无 conver_backend.exe / uvicorn 后端子进程残留
+#           + 端口无监听者（判据 = 端口限定，绝不按全局进程名；ARC9-T05）
 #   验收 7：迁移脚本幂等由 P6.4-3 的 pytest 用例覆盖（backend/tests/test_migrate_data.py），
 #           本脚本不重复实现；可在 -RunMigrationCheck 时做轻量复跑（构造临时源库）
 #
@@ -50,6 +50,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# 共享工具函数（ARC9-T05，决策 D2-D1 点源）：端口限定清理 + 后端 exe 补齐
+. (Join-Path $PSScriptRoot "lib\desktop-common.ps1")
 
 $Root = Split-Path -Parent $PSScriptRoot
 $Py = Join-Path $Root ".venv\Scripts\python.exe"
@@ -142,16 +145,8 @@ if ($BackendEnv) {
 
 if ($injectBackendEnv) {
     # ── 后端 exe 缺失时自动补齐（仅注入路径需要）────────────────────────
-    if (-not (Test-Path $BackendExe)) {
-        if ($SkipBackendBuild) {
-            throw "未找到后端打包 exe：$BackendExe（-SkipBackendBuild 已指定，不自动打包）"
-        }
-        Write-Host "后端打包 exe 缺失，调用 build-backend.ps1（PyInstaller onedir）..." -ForegroundColor Yellow
-        & (Join-Path $PSScriptRoot "build-backend.ps1")
-        if (-not (Test-Path $BackendExe)) {
-            throw "build-backend.ps1 执行后仍未找到 $BackendExe"
-        }
-    }
+    # -SkipBackendBuild 语义不变：缺失时不自动打包，直接报错
+    Assert-Or-Build-BackendExe -Path $BackendExe -SkipBackendBuild:$SkipBackendBuild
 }
 
 # ── 启动 ────────────────────────────────────────────────────────────────────
@@ -374,33 +369,17 @@ print('migrate-smoke-ok')
         }
     }
 
-    # 后端子进程残留检查——严格限定在冒烟自己的端口上（Get-NetTCPConnection），
-    # 绝不按全局进程名/命令行匹配（会误杀无关进程，如本机正在运行的网页版 uvicorn）
-    $backendProc = Get-Process -Name "conver_backend" -ErrorAction SilentlyContinue
-    # 端口持有者即冒烟后端（无论进程名是 conver_backend 还是 python*）
-    $smokeListeners = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty OwningProcess -Unique
-    $uvicornProc = @($smokeListeners | ForEach-Object {
-            Get-Process -Id $_ -ErrorAction SilentlyContinue
-        } | Where-Object { $_.ProcessName -like "python*" })
-    if ($backendProc) {
-        Write-Host "发现残留 conver_backend 进程（pid $($backendProc.Id -join ',')），清理..." -ForegroundColor Yellow
-        $backendProc | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-        $backendProc = Get-Process -Name "conver_backend" -ErrorAction SilentlyContinue
+    # 后端子进程残留清理——唯一手段：按端口监听者定位（Stop-ConverPortListeners），
+    # 绝不按全局进程名（Get-Process -Name）匹配——会误杀用户另开的同名后端实例
+    # （ARC9-T05 修复：端口持有者即冒烟后端，无论进程名是 conver_backend 还是 python*）。
+    # 端口已释放时 helper 幂等空转（无监听者则无动作）。
+    $residual = Stop-ConverPortListeners -Port $port
+    if ($residual.Count -gt 0) {
+        Write-Host "发现端口 $port 上的残留监听进程（pid $($residual -join ',')），已清理..." -ForegroundColor Yellow
     }
-    if ($uvicornProc) {
-        Write-Host "发现端口 $port 上的残留 python 进程（pid $($uvicornProc.Id -join ',')），清理..." -ForegroundColor Yellow
-        $uvicornProc | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-        $smokeListeners = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
-            Select-Object -ExpandProperty OwningProcess -Unique
-        $uvicornProc = @($smokeListeners | ForEach-Object {
-                Get-Process -Id $_ -ErrorAction SilentlyContinue
-            } | Where-Object { $_.ProcessName -like "python*" })
-    }
-    Add-Result "验收6-退出无残留" ($shellGone -and $portReleased -and -not $backendProc -and $uvicornProc.Count -eq 0) `
-        ("壳退出=$shellGone 端口$port释放=$portReleased 无conver_backend=$(-not $backendProc) 无端口残留python=$($uvicornProc.Count -eq 0)")
+    $portReleased = -not (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+    Add-Result "验收6-退出无残留" ($shellGone -and $portReleased) `
+        ("壳退出=$shellGone 端口$port无监听者=$portReleased（判据=端口无监听者，绝不按全局进程名）")
 
     # ── 可选清理 ─────────────────────────────────────────────────────────
     if ($CleanAppData) {
@@ -420,16 +399,14 @@ print('migrate-smoke-ok')
         exit 1
     }
 } finally {
-    # 异常路径兜底清理——只清理冒烟自己启动的进程（$startedShell 守卫），
-    # 绝不按全局进程名清理（防误杀用户正在运行的桌面版/网页版进程）
+    # 异常路径兜底清理——只清理冒烟自己启动的进程（$startedShell 守卫）：
+    # 壳实例按 pid 终止；后端子进程走 Stop-ConverPortListeners（端口限定），
+    # 绝不按全局进程名清理（防误杀用户正在运行的桌面版/网页版同名进程）
     if ($startedShell -and $ShellProc -and (Get-Process -Id $ShellProc.Id -ErrorAction SilentlyContinue)) {
         Stop-Process -Id $ShellProc.Id -Force -ErrorAction SilentlyContinue
     }
     if ($startedShell -and $port) {
-        $listeners = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-        foreach ($l in $listeners) {
-            Stop-Process -Id $l.OwningProcess -Force -ErrorAction SilentlyContinue
-        }
+        $null = Stop-ConverPortListeners -Port $port
     }
     if ($null -eq $origBackendCmd) { Remove-Item Env:CONVER_BACKEND_CMD -ErrorAction SilentlyContinue } else { $env:CONVER_BACKEND_CMD = $origBackendCmd }
     if ($null -eq $origExitAfter) { Remove-Item Env:CONVER_EXIT_AFTER_SECS -ErrorAction SilentlyContinue } else { $env:CONVER_EXIT_AFTER_SECS = $origExitAfter }
