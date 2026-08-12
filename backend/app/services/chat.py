@@ -214,6 +214,8 @@ def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int,
         return llm_error_response(e, provider or "")
     if isinstance(e, DomainError):
         # 未知领域异常子类：400 兜底（防御性；与 api/errors.py 未知分支语义对齐，ARC10-2）
+        # 422 家族（CardFormatError/CardValidationError/DocParseError）不落此分支——经
+        # api/errors.py 按 422 + 说明文案处理（关联 ARC10-2 / ARC10-4；合并单一映射表时纳入）
         return status.HTTP_400_BAD_REQUEST, str(e)
     return status.HTTP_502_BAD_GATEWAY, str(e)
 
