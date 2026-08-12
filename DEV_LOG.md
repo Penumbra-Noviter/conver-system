@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-13 — 技术债区 TD-25~27 批次：1 做 + 2 维持关闭全自动 kickoff）
+
+- **TD-25~27 批次完成（merge 8ae3801）**：TD-15~24 批次期末遗留 3 项处置——1 做 + 2 复核确认维持关闭（全自动档）。**TD-25** UNC 锁断言平台隔离（test_data_dir.py 唯一改动）：UNC 断言块拆独立用例 `test_env_override_unc_prefix_preserved` + `@pytest.mark.skipif(sys.platform != 'win32')`——**票面「断言级 skipif」实测不可表达**（装饰器无断言级形态，修正为函数级）；skipif 可见 skip 信号优于静默 `if sys.platform` 包裹（后者锁悄悄失效不可见）；skipif 逆条件探针实证（1 skipped → 还原 16 passed）；父函数剩余断言（折叠/`..`/尾分隔符）Windows+POSIX 双实测不受拆分影响；Windows 锁语义零变化（基线绿非先红）；**TD-26 维持关闭**（:371 空下拉放行存 `''` = TD-15 决策字面内行为，与用例⑧ 同构，零 TypeError 风险，不加锁测试）/ **TD-27 维持关闭**（UNC 复述 5 处/3 文件受双端镜像契约表惯例保护，跨文件引用已存在，漂移由 TD-25 锁兜底）
+- **过程遥测**：轻量档单 Implement 直行（主树独立分支 kickoff/td25-platform-guard，无 worktree/波次）；merge 零回退冲突；文件范围核验 A 档（1 文件恰为声明）
+- **期末四轴（固定点 aa3391f）：0 阻断**——验收①-⑤全过（361+1 skip / test_data_dir.py 16 passed / --co 362 / grep UNC 断言仅存于 skipif 函数内 / 锁语义独立实测不削弱）；POSIX 语义（PurePosixPath parts[0] == '//'）与 reason 措辞逐字吻合；4 项非阻断观察判断不落债（docstring 首行重复=spec 明示保留 / reason 行宽=无 lint 工具链 / skip 插件禁用=不可达 / 平台守卫模式=spec 已落盘）——技术债区零净增
+- **4.5 运行态冒烟**：后端 GET / 200（测试-only 改动零行为变化）；Vitest 373 / cargo 52 未受影响
+- **G17 文档同步（本批次）**：TICKETS（TD-25~27 归档 1 做 + 2 维持 + 技术债区清零）；CLAUDE.md（测试数 361 + 状态行）；PROJECT_REFERENCE.md（测试数 361）；DEV_LOG 本段
+- **测试**：pytest **361 + 1 skip** / Vitest **373** / cargo test **52** 全绿（基线 360+1skip/373/52 → 期末 +1）
+
+---
+
 ## 滚动摘要（2026-08-12 — 技术债区 TD-15~24 批次：10 项全做清零全自动 kickoff）
 
 - **TD-15~24 批次完成（merge 0010f1b）**：TD-13~14 批次期末遗留 10 项清零（小档 2 工单：TD-A 前端 `85aca1b` / TD-B 后端+文档 `e16048f`）。**TD-A** settings-panel 守卫收窄与卫生——TD-15 守卫条件化（`#setting-custom-model` 仅 `modelSelect.value === '__custom__'` 时要求；**票面建议 providerSelect 条件被实证否定**——provider 下拉只填 providers key 永不为 '__custom__'，条件恒假会让守卫形同虚设；+2 用例：A 先红后绿——旧实现守卫早退零 fetch、showAlert 超时红 1040ms、修复后 33 tests 全绿；B 基线绿钉保留边界）+ TD-23 计数口径修正（「11 个表单元素引用」→ 10 变量 + 第 11 次 `?.` 收口，grep 归零）+ TD-21 getSelectedModel docstring 契约标注（调用方须经入口守卫）+ TD-22 providerSelect.querySelector 复用（:373 重复查询消除）+ TD-20 用例⑦ 防御断言 + TD-19 warnSpy.mockRestore 惯例对齐（:529 afterEach 已兜底，属硬化非活 bug）；**TD-B** 路径契约注记与锁补强——TD-16 UNC 前导特例注记（`Path('//server/share/x')` 保留前缀不折叠，实测 parts[0] = `'\\\\server\\share\\'`）+ TD-17 契约锁扩展（尾分隔符 + UNC 两条断言并入 test_env_override_separators_normalized，基线绿非先红）+ TD-18 tauri-desktop.md「路径形态」限定（不做归一化 = 代码不改写路径整体）+ TD-24 server.rs default_data_dir 透传契约注释（注释-only 零 Rust 改动）

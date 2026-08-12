@@ -23,9 +23,8 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| TD-25 | test_data_dir.py `test_env_override_separators_normalized` 新增 UNC 断言是全测试套第一个平台硬依赖：POSIX 上 `Path('//server/share/x').parts[0]` ≠ `'\\\\server\\share\\'` 必挂；仓库无 CI、无平台 marker——修复方向：断言处加 `pytest.mark.skipif(sys.platform != 'win32')`（防未来 CI/跨平台开发机断裂，成本极低） | TD-15~24 批次期末 Falsify | Strong | 📝 |
-| TD-26 | settings-panel.js:371 退化状态语义：空模型下拉 + custom 缺从「warn 早退」变为「以 default_model:'' 放行保存」——属 Q2 决策字面内行为（非 __custom__ 不要求 custom），与用例⑧ 空 provider 下拉存空串先例一致；仅记录，无需动作 | TD-15~24 批次期末 Falsify | Worth exploring | 📝 |
-| TD-27 | UNC 事实三处复述（data_dir.py docstring / test_data_dir.py docstring / server.rs 注释）与 documentation-standards.md §一「单点化」原则的张力——受「双端镜像契约表」既有惯例 + TD-16 grep 验收双重约束，漂移风险已由新锁断言兜底；可考虑后续以引用替代复述 | TD-15~24 批次期末 Architecture | Speculative | 📝 |
+
+> 技术债区当前为空（TD-25~27 批次已清零，见下）。
 
 ---
 
@@ -52,6 +51,16 @@
 | TD-B | 路径契约注记与锁补强（TD-16/17/18/24：UNC 特例注记 + 尾分隔符/UNC 锁断言 + 「路径形态」限定 + Rust 透传注释；pytest/cargo 计数不变） | 2026-08-12 | `e16048f` |
 
 > ✅ 已结清（2026-08-12 TD-15~24 批次）：TD-15~24 全部完成（10 做 0 关闭），技术债区对应行移除（TD-25~27 为本批次新遗留，保留原位）。
+
+### 技术债区 TD-25~27 批次（2026-08-13 全自动 kickoff）
+
+> 来源：TICKETS 技术债区 TD-25~27（TD-15~24 批次期末遗留）。Grilling 共识（全自动档拍板）：**1 做 + 2 关闭（复核确认维持）**——TD-25 做（UNC 锁断言平台隔离：拆独立用例 `test_env_override_unc_prefix_preserved` + `@pytest.mark.skipif(sys.platform != 'win32')`；**票面「断言级 skipif」实测不可表达**——装饰器无断言级形态，修正为函数级；skipif 可见 skip 信号优于静默 `if sys.platform` 包裹——后者锁悄悄失效不可见；Windows 锁语义零变化照跑）/ **TD-26 关闭**（复核确认维持：:371 守卫条件化在，空模型下拉放行存 `''` 与用例⑧ 先例同构，零 TypeError 风险；决策内容在代码注释 + TICKETS 归档行双重可证，不加锁测试——超出票面「仅记录」范围）/ **TD-27 关闭**（复核确认维持：UNC 复述 5 处/3 文件现状成立，跨文件引用已存在（data_dir.py:12-13 / server.rs:401 互引），复述是决策出处上下文非纯冗余，漂移由 TD-25 锁兜底）。规格 v1.0 无修订。轻量档单 Implement 直行（主树独立分支，无 worktree），merge `8ae3801`；merge 零回退冲突。**期末四轴 code-review（固定点 aa3391f）：0 阻断**——验收①-⑤全过（361+1 skip / test_data_dir.py 16 passed / --co 362 / grep 无散落 / 锁语义独立实测不削弱）、POSIX 语义与 reason 措辞逐字吻合；4 项非阻断观察经评审判断不落债（docstring 首行重复 = spec 明示保留形态 / reason 行宽 = 无 lint 工具链取舍 / skip 插件禁用理论边角 = 现实不可达 / 平台守卫模式 = spec 已落盘）。运行态冒烟：后端 GET / 200（测试-only 改动零行为变化）。测试同步：pytest **361 + 1 skip** / Vitest **373** / cargo test **52**，全部全绿。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| TD-25 | UNC 锁断言平台隔离（拆独立用例 + 函数级 skipif + docstring 随迁；Windows 锁照跑 + POSIX 可见 skip） | 2026-08-13 | `ea222d3` |
+
+> ✅ 已结清（2026-08-13 TD-25~27 批次）：TD-25 完成（上表）+ TD-26/TD-27 **复核确认维持**关闭（归档注记：现状即设计意图——TD-26 空下拉放行是 TD-15 决策字面内行为；TD-27 复述受双端镜像契约表惯例保护且锁断言已兜底）。技术债区清零。
 
 ### 技术债区 TD-8~12 批次（2026-08-12 全自动 kickoff）
 
