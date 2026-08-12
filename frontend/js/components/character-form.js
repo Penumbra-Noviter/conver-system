@@ -15,6 +15,7 @@ import { showConfirm } from './confirm-dialog.js';
 import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
 import { splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit } from './character-submit.js';
+import { avatarImgHtml } from '../format.js';
 
 /**
  * 打开角色表单模态框
@@ -147,11 +148,11 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                 tempValue.textContent = parseFloat(tempSlider.value).toFixed(2);
             });
 
-            // 头像预览
+            // 头像预览（onerror 回退走渲染纯函数模块 avatarImgHtml 参数化复用）
             avatarInput.addEventListener('input', () => {
                 const val = avatarInput.value.trim();
                 if (val) {
-                    avatarPreview.innerHTML = `<img src="${escapeHtml(val)}" alt="头像预览" onerror="this.parentElement.innerHTML='<span class=\\'avatar-placeholder\\'>图片加载失败</span>'">`;
+                    avatarPreview.innerHTML = avatarImgHtml(val, '头像预览', "<span class='avatar-placeholder'>图片加载失败</span>");
                 } else {
                     avatarPreview.innerHTML = '<span class="avatar-placeholder">无头像</span>';
                 }

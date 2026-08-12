@@ -26,10 +26,10 @@ import { showModelSelector } from './components/model-selector.js';
 import { showExportDialog } from './components/export-dialog.js';
 import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
 import { initTabBar } from './components/tab-bar.js';
-import { escapeHtml, showToast, downloadBlob, providerDisplayName } from './utils.js';
+import { escapeHtml, showToast, downloadBlob, providerDisplayName, autoResizeInput } from './utils.js';
 import { characterCardHtml, conversationItemHtml } from './format.js';
 import { state } from './state.js';
-import { chatDom, handleSend, refreshSendButton, setConversationsRefresher } from './chat.js';
+import { chatDom, handleSend, refreshSendButton, setConversationsRefresher, EMPTY_HEADER_HTML } from './chat.js';
 import { getActiveTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 import { initSearchView } from './search-view.js';
@@ -456,7 +456,7 @@ function startRename(conv) {
 function renderChatHeader(conversationId) {
     const conv = state.conversations.find((c) => c.id === conversationId);
     if (!conv) {
-        chatDom.chatHeader.innerHTML = '<span class="chat-title">选择一个角色开始对话</span>';
+        chatDom.chatHeader.innerHTML = EMPTY_HEADER_HTML;
         return;
     }
     const modelLabel = conv.model_name || '';
@@ -512,8 +512,7 @@ chatDom.chatInput.addEventListener('keydown', (e) => {
 });
 
 chatDom.chatInput.addEventListener('input', () => {
-    chatDom.chatInput.style.height = 'auto';
-    chatDom.chatInput.style.height = Math.min(chatDom.chatInput.scrollHeight, 150) + 'px';
+    autoResizeInput(chatDom.chatInput);
 });
 
 // ══════════════════════════════════════════════════

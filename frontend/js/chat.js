@@ -26,7 +26,7 @@
  */
 
 import { chatStream, messages } from './api.js';
-import { renderMarkdown } from './utils.js';
+import { renderMarkdown, autoResizeInput } from './utils.js';
 import { buildMessagesHtml, assistantAvatarHtml, userAvatarHtml } from './format.js';
 import { state } from './state.js';
 import { getActiveTab, getTab, updateTab } from './tabs.js';
@@ -49,6 +49,9 @@ export const chatDom = {
 
 /** 无活动 tab 时的消息区空态（单一事实来源 — app.js showEmptyState 复用，禁止内联重复） */
 export const EMPTY_STATE_HTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
+
+/** 无会话时的头部空态文案（单一事实来源 — app.js renderChatHeader / 激活模块 showEmptyState 复用，禁止内联重复） */
+export const EMPTY_HEADER_HTML = '<span class="chat-title">选择一个角色开始对话</span>';
 
 // ── 对话列表刷新钩子（由 app.js 注入，避免反向依赖）──
 let refreshConversations = () => {};
@@ -304,7 +307,7 @@ export async function handleSend() {
     const isActiveStream = () => getActiveTab()?.conversationId === convId;
 
     chatDom.chatInput.value = '';
-    chatDom.chatInput.style.height = 'auto';
+    autoResizeInput(chatDom.chatInput);
 
     // 显示用户消息（DOM + 活动 tab 缓存同步）
     appendMessage('user', content);

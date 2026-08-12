@@ -22,6 +22,7 @@ import { CHARACTER_TEMPLATES } from '../data/character-templates.js';
 import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
 import { splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit } from './character-submit.js';
+import { avatarImgHtml } from '../format.js';
 
 /**
  * 打开角色创建向导
@@ -484,7 +485,8 @@ function bindStep3Events(state, body) {
             state.avatar = avatarInput.value.trim();
             if (avatarPreview) {
                 if (state.avatar) {
-                    avatarPreview.innerHTML = `<img src="${escapeHtml(state.avatar)}" alt="头像预览" onerror="this.parentElement.innerHTML='<span class=\\'avatar-placeholder\\'>图片加载失败</span>'">`;
+                    // onerror 回退走渲染纯函数模块 avatarImgHtml 参数化复用
+                    avatarPreview.innerHTML = avatarImgHtml(state.avatar, '头像预览', "<span class='avatar-placeholder'>图片加载失败</span>");
                 } else {
                     avatarPreview.innerHTML = '<span class="avatar-placeholder">无头像</span>';
                 }

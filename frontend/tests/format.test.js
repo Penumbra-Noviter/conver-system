@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { highlightText, buildMessagesHtml, assistantAvatarHtml, userAvatarHtml, characterCardHtml, conversationItemHtml, searchResultItemHtml } from '../js/format.js';
+import { highlightText, buildMessagesHtml, assistantAvatarHtml, userAvatarHtml, characterCardHtml, conversationItemHtml, searchResultItemHtml, avatarImgHtml } from '../js/format.js';
 
 describe('highlightText', () => {
     it('无关键词时原样返回', () => {
@@ -91,6 +91,47 @@ describe('assistantAvatarHtml', () => {
 describe('userAvatarHtml', () => {
     it('输出用户头像 div', () => {
         expect(userAvatarHtml()).toContain('msg-avatar user-avatar');
+    });
+});
+
+describe('avatarImgHtml — onerror 回退参数化（ARC-10 C7）', () => {
+    it('产出带 onerror 回退的 img（src/alt HTML 转义）', () => {
+        const html = avatarImgHtml('http://x/a.png', '角色<A>', "<span class='avatar-placeholder'>图片加载失败</span>");
+        expect(html).toContain('<img src="http://x/a.png"');
+        expect(html).toContain('alt="角色&lt;A&gt;"');
+        expect(html).toContain('onerror=');
+    });
+
+    it('onerror 内嵌单引号按 \\\' 转义形态生成', () => {
+        const fallback = "<div class='avatar-placeholder-xs'>AL</div>";
+        const html = avatarImgHtml('http://x/broken.png', 'Alice', fallback);
+        expect(html).toContain("this.parentElement.innerHTML='<div class=\\'avatar-placeholder-xs\\'>AL</div>'");
+    });
+
+    it('onerror 触发 → 父元素 innerHTML 替换为 fallback（行为等价）', () => {
+        const container = document.createElement('div');
+        container.innerHTML = avatarImgHtml('http://x/broken.png', 'Alice', "<div class='avatar-placeholder-xs'>AL</div>");
+        container.querySelector('img').dispatchEvent(new Event('error'));
+        expect(container.querySelector('.avatar-placeholder-xs')).not.toBeNull();
+        expect(container.textContent).toBe('AL');
+    });
+
+    it('fallback 含双引号 → 属性安全转义（&quot;），不破坏 img 属性', () => {
+        const html = avatarImgHtml('u', 'a', '<div class="x">y</div>');
+        expect(html).not.toContain('alt="a" onerror="this.parentElement.innerHTML=\'<div class="x"'); // 属性未中断
+        expect(html).toContain('&quot;');
+    });
+
+    it('assistantAvatarHtml 有头像时走 initials 回退（avatar-placeholder-xs）', () => {
+        const html = assistantAvatarHtml([{ id: 1, name: 'Alice', avatar: 'http://x/a.png' }], 1);
+        expect(html).toContain('onerror=');
+        expect(html).toContain("avatar-placeholder-xs");
+    });
+
+    it('characterCardHtml 有头像时走 initials 回退（avatar-placeholder-sm）', () => {
+        const html = characterCardHtml({ id: 1, name: '角色A', avatar: 'http://x/a.png' });
+        expect(html).toContain('onerror=');
+        expect(html).toContain("avatar-placeholder-sm");
     });
 });
 

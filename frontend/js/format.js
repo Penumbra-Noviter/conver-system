@@ -24,6 +24,26 @@ export function highlightText(text, keyword) {
 }
 
 /**
+ * 头像 img HTML（ARC-10 C7 收口：加载失败回退参数化复用）
+ *
+ * 产出 `<img src=… alt=… onerror="this.parentElement.innerHTML='…'">`；
+ * onerror 内嵌单引号按 `\'` 转义形态生成（行为等价 — 触发后父元素 innerHTML
+ * 替换为 fallbackHtml）。fallback 内的双引号转义为 &quot; 保证属性不中断。
+ *
+ * @param {string} src - 头像地址（自动 HTML 转义）
+ * @param {string} alt - 替代文本（自动 HTML 转义）
+ * @param {string} fallbackHtml - 加载失败回退 HTML（调用方传，如 initials 占位或「图片加载失败」）
+ * @returns {string} img HTML
+ */
+export function avatarImgHtml(src, alt, fallbackHtml) {
+    const onErrorJs = `this.parentElement.innerHTML='${fallbackHtml
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;')}'`;
+    return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" onerror="${onErrorJs}">`;
+}
+
+/**
  * 构造助手消息头像 HTML
  * @param {Array} characters - 角色列表
  * @param {number|null} currentCharacterId - 当前角色 id
@@ -32,7 +52,7 @@ export function highlightText(text, keyword) {
 export function assistantAvatarHtml(characters, currentCharacterId) {
     const char = (characters || []).find(c => c.id === currentCharacterId);
     if (char?.avatar) {
-        return `<div class="msg-avatar"><img src="${escapeHtml(char.avatar)}" alt="${escapeHtml(char.name || '角色')}" onerror="this.parentElement.innerHTML='<div class=\\'avatar-placeholder-xs\\'>${escapeHtml(getInitials(char.name || 'A'))}</div>'"></div>`;
+        return `<div class="msg-avatar">${avatarImgHtml(char.avatar, char.name || '角色', `<div class='avatar-placeholder-xs'>${escapeHtml(getInitials(char.name || 'A'))}</div>`)}</div>`;
     }
     const name = char?.name || 'AI';
     return `<div class="msg-avatar"><div class="avatar-placeholder-xs">${escapeHtml(getInitials(name))}</div></div>`;
@@ -83,7 +103,7 @@ export function characterCardHtml(c) {
             <div class="character-card-header">
                 <div class="character-avatar">
                     ${c.avatar
-                        ? `<img src="${escapeHtml(c.avatar)}" alt="${escapeHtml(c.name)}" onerror="this.parentElement.innerHTML='<div class=\'avatar-placeholder-sm\'>${escapeHtml(getInitials(c.name))}</div>'">`
+                        ? avatarImgHtml(c.avatar, c.name, `<div class='avatar-placeholder-sm'>${escapeHtml(getInitials(c.name))}</div>`)
                         : `<div class="avatar-placeholder-sm">${escapeHtml(getInitials(c.name))}</div>`
                     }
                 </div>
@@ -153,6 +173,6 @@ export function searchResultItemHtml(r, query) {
 }
 
 export const __all__ = [
-    'highlightText', 'assistantAvatarHtml', 'userAvatarHtml', 'buildMessagesHtml',
+    'highlightText', 'avatarImgHtml', 'assistantAvatarHtml', 'userAvatarHtml', 'buildMessagesHtml',
     'characterCardHtml', 'conversationItemHtml', 'searchResultItemHtml',
 ];
