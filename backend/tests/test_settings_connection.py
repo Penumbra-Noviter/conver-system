@@ -22,6 +22,7 @@ from backend.app.models.setting import Setting
 from backend.app.schemas.settings import ConnectionTestRequest
 from backend.app.api.routes import settings as settings_route
 from backend.app.services import setting as setting_service
+from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import LLMAuthError
 from backend.app.services.llm.factory import LLMFactory
@@ -275,12 +276,11 @@ class TestConnectionEndpoint:
         assert "无效" in exc.value.detail
 
     def test_unsupported_provider_returns_400(self, db_session) -> None:
-        """未知 Provider → 400，不构造 LLM 实例"""
+        """未知 Provider → ProviderNotSupportedError 上抛（统一 handler 转 400，wire 语义不变）"""
         req = ConnectionTestRequest(provider="gemini", api_key="key")
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(ProviderNotSupportedError) as exc:
             _run(req, db_session)
-        assert exc.value.status_code == 400
-        assert "不支持的 Provider" in exc.value.detail
+        assert "不支持的 Provider" in str(exc.value)
 
     def test_empty_key_and_no_saved_key_returns_400(self, db_session, monkeypatch) -> None:
         """请求无 Key 且库中无已存 Key → 400"""
