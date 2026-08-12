@@ -2,19 +2,23 @@
  * Conver System — 主入口（协调层）
  *
  * 职责：
- *   1. 视图切换（侧栏导航）
- *   2. 业务协调（角色 / 对话 / 搜索）
+ *   1. 视图切换（侧栏导航，含 switchView 内 100ms 搜索框聚焦时序）
+ *   2. 业务协调（角色 / 对话 / 删除确认弹窗与调用点 / 初始化接线）
  *   3. 事件绑定
  *
  * 模块结构：
  *   - ./state.js — 全局状态
  *   - ./chat.js  — 聊天域渲染与交互（renderMessages / handleSend / chatDom）
  *   - ./format.js — 渲染/格式化纯函数（highlightText / buildMessagesHtml）
+ *   - ./search-view.js — 搜索视图深模块（防抖 + 五态文案 + 渲染 + 结果跳转；
+ *     ARC-9 C1 迁出，经 initSearchView 注入跳转钩子接线）
+ *   - ./cascade.js — 级联关闭收口深模块（删角色/删对话/清空全部/关最后 tab
+ *     四入口共用；ARC-9 C1 迁出，依赖经 setCascadeHooks 注入接线）
  *   - ./components/settings-panel.js — 设置面板（Provider 下拉、主题、侧栏、保存、清空）
  *   - ./components/ — 模态框相关组件（modal 工厂 / confirm / model-selector / export / character-form）
  */
 
-import { characters, conversations, messages, models } from './api.js';
+import { characters, conversations, models } from './api.js';
 import { showCharacterForm } from './components/character-form.js';
 import { showCharacterWizard } from './components/character-wizard.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
@@ -23,11 +27,13 @@ import { showExportDialog } from './components/export-dialog.js';
 import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
 import { initTabBar } from './components/tab-bar.js';
 import { escapeHtml, showToast, downloadBlob, providerDisplayName } from './utils.js';
-import { characterCardHtml, conversationItemHtml, searchResultItemHtml } from './format.js';
+import { characterCardHtml, conversationItemHtml } from './format.js';
 import { state } from './state.js';
 import { chatDom, handleSend, refreshSendButton, setConversationsRefresher } from './chat.js';
-import { closeTabs, getActiveTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
+import { getActiveTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
+import { initSearchView } from './search-view.js';
+import { closeConversationsAndResettle, setCascadeHooks } from './cascade.js';
 import { iconHtml } from './icons.js';
 
 // ══════════════════════════════════════════════════
@@ -38,7 +44,6 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 // 模块级状态（UI 实现细节，不属于全局应用状态）
-let searchTimeout = null;
 
 const dom = {
     // 视图
@@ -57,11 +62,6 @@ const dom = {
     btnCreateCharacter: $('#btn-create-character'),
     btnImportCharacter: $('#btn-import-character'),
     characterImportInput: $('#character-import-input'),
-
-    // 搜索
-    searchInput: $('#search-input'),
-    searchResults: $('#search-results'),
-    btnSearchClear: $('#btn-search-clear'),
 };
 
 // ══════════════════════════════════════════════════
@@ -90,7 +90,9 @@ async function switchView(viewName) {
         initProviderDropdown();
     }
     if (viewName === 'search') {
-        setTimeout(() => dom.searchInput?.focus(), 100);
+        // 聚焦时序（ARC-9 C1）：100ms 延迟聚焦留在编排区 — 搜索视图事件绑定
+        // 与防抖逻辑在 search-view.js，本处只负责视图切换后的焦点引导
+        setTimeout(() => document.querySelector('#search-input')?.focus(), 100);
     }
 }
 
@@ -487,45 +489,6 @@ function renderChatHeader(conversationId) {
     }
 }
 
-/**
- * 级联关闭会话 tab 的统一收口（ARC-2 — 删角色级联 / 删会话 / 清空全部 /
- * tab-bar 关最后 tab 回调共用）：
- *   closeTabs 批量关闭（内部先 abort 各在途流式，单次 commit/notify）
- *   → 重定位活动 tab 视图 → refreshSendButton → reloadList 时 loadConversations
- *   （否则仅重渲染列表高亮/空态）。
- * 统一语义：仅当被关集合含活动 tab（wasActive）才重激活视图（saveCurrent:false —
- *   被关 tab 的 DOM 草稿/滚动不得污染新活动 tab 缓存；无剩余 tab → 空态）；
- *   活动 tab 未被关 → 不重激活，视图停留原地（消除删角色路径无条件重激活分歧）。
- *   已无任何 tab（tab-bar 已关最后 tab / 空集清空）→ 空态兜底（幂等）。
- * @param {object} [options]
- * @param {Array<number|string>|'all'} [options.ids='all'] - 要关闭的会话 id 列表；
- *   'all' 为当前全部 tab
- * @param {boolean} [options.reloadList=false] - 关闭后是否重新拉取对话列表
- *   （删会话/删角色路径；清空路径调用方已置空 state.conversations，仅重渲染即可）
- */
-async function closeConversationsAndResettle({ ids = 'all', reloadList = false } = {}) {
-    const doomed = ids === 'all'
-        ? getTabs().map((t) => t.conversationId)
-        : (Array.isArray(ids) ? ids : []);
-    const activeBefore = getActiveTab()?.conversationId ?? null;
-    const wasActive = activeBefore !== null && doomed.includes(activeBefore);
-    if (doomed.length > 0) closeTabs(doomed);
-    if (wasActive || getTabs().length === 0) {
-        const active = getActiveTab();
-        if (active) {
-            await activateConversation(active.conversationId, { saveCurrent: false });
-        } else {
-            showEmptyState();
-        }
-    }
-    refreshSendButton();
-    if (reloadList) {
-        await loadConversations();
-    } else {
-        renderConversations();
-    }
-}
-
 // ══════════════════════════════════════════════════
 // 输入框事件（发送/停止逻辑见 chat.js handleSend）
 // ══════════════════════════════════════════════════
@@ -564,110 +527,6 @@ async function loadModels() {
         console.error('加载模型列表失败:', err);
     }
 }
-
-// ══════════════════════════════════════════════════
-// 搜索
-// ══════════════════════════════════════════════════
-
-/**
- * 执行搜索并渲染结果
- * @param {string} query - 搜索关键词
- */
-async function performSearch(query) {
-    const resultsEl = dom.searchResults;
-    query = query.trim();
-
-    if (!query) {
-        resultsEl.innerHTML = '<p class="search-hint">输入关键词搜索所有对话中的消息</p>';
-        return;
-    }
-
-    if (query.length < 2) {
-        resultsEl.innerHTML = '<p class="search-status">至少输入 2 个字符</p>';
-        return;
-    }
-
-    resultsEl.innerHTML = '<p class="search-status">搜索中…</p>';
-
-    try {
-        const results = await messages.search(query);
-        renderSearchResults(results, query);
-    } catch (err) {
-        console.error('搜索失败:', err);
-        resultsEl.innerHTML = `<p class="search-status search-error">搜索失败: ${escapeHtml(err.message)}</p>`;
-    }
-}
-
-/**
- * 渲染搜索结果列表
- * @param {Array} results - 搜索结果数组
- * @param {string} query - 原始查询（用于高亮）
- */
-function renderSearchResults(results, query) {
-    const resultsEl = dom.searchResults;
-
-    if (!results || results.length === 0) {
-        resultsEl.innerHTML = '<p class="search-status">未找到匹配的消息</p>';
-        return;
-    }
-
-    const escapedQuery = escapeHtml(query);
-
-    resultsEl.innerHTML = `
-        <p class="search-count">共找到 ${results.length} 条匹配消息</p>
-        <div class="search-result-list">
-            ${results.map(r => searchResultItemHtml(r, query)).join('')}
-        </div>
-    `;
-
-    // 点击结果跳转到对应对话
-    resultsEl.querySelectorAll('.search-result-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const convId = parseInt(item.dataset.conversationId);
-            if (convId) {
-                navigateToConversation(convId);
-            }
-        });
-    });
-}
-
-/**
- * 跳转到指定对话（搜索结果点击）— 与侧栏点击/创建对话共用统一激活流程
- * @param {number} conversationId
- */
-async function navigateToConversation(conversationId) {
-    await activateConversation(conversationId);
-}
-
-// ── 搜索输入事件 ──
-
-dom.searchInput.addEventListener('input', () => {
-    clearTimeout(searchTimeout);
-    searchTimeout = null;
-    const q = dom.searchInput.value;
-    // 延迟搜索，避免每输入一个字就请求
-    searchTimeout = setTimeout(() => performSearch(q), 300);
-});
-
-dom.searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        clearTimeout(searchTimeout);
-        searchTimeout = null;
-        performSearch(dom.searchInput.value);
-    }
-    if (e.key === 'Escape') {
-        dom.searchInput.value = '';
-        dom.searchInput.blur();
-        performSearch('');
-    }
-});
-
-dom.btnSearchClear.addEventListener('click', () => {
-    dom.searchInput.value = '';
-    dom.searchInput.focus();
-    performSearch('');
-});
 
 // ══════════════════════════════════════════════════
 // 初始化
@@ -716,6 +575,22 @@ async function init() {
 
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）
 setConversationsRefresher(loadConversations);
+
+// 级联收口依赖注入（ARC-9 C1 — 删角色级联 / 删对话 / 清空全部 / tab-bar 关最后
+// tab 四入口共用统一收口；依赖经注入而非互相 import，G7）
+setCascadeHooks({
+    renderConversations,
+    loadConversations,
+    activateConversation,
+    showEmptyState,
+    refreshSendButton,
+});
+
+// 搜索视图初始化（ARC-9 C1 — 防抖 + 五态文案 + 渲染 + 结果跳转收口在 search-view.js；
+// 跳转钩子经注入走统一激活流程；100ms 聚焦时序在 switchView 内）
+initSearchView({
+    navigateToConversation: (conversationId) => activateConversation(conversationId),
+});
 
 // 注入 tab 条激活处理器（P6.5-3）：组件内关闭按钮直接 closeTab（含 abort 流式），
 // 激活/联动一律经此回调走 P6.5-2 收敛的统一激活流程
