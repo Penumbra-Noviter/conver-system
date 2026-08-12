@@ -407,6 +407,35 @@ describe('保存设置 — 表单收集 / testApiKeys / 持久化', () => {
         expect(document.documentElement.dataset.theme).toBe('dark');
     });
 
+    // 用例 A（TD-15，先红后绿）：#setting-custom-model 缺 + 模型下拉值非 __custom__
+    // → 旧实现（无条件守卫）守卫早退零 fetch；守卫条件化后放行 → fetch PUT + showAlert
+    it('缺 #setting-custom-model 且模型下拉值非 __custom__ → 保存成功（守卫条件化放行）', async () => {
+        const { panel, confirmModule, api } = await loadSaveable();
+        const alertSpy = vi.spyOn(confirmModule, 'showAlert');
+        const fetchSpy = vi.fn(async (url, options = {}) => {
+            const path = String(url).replace(/^.*\/api/, '/api');
+            if (path === '/api/settings' && options.method === 'PUT') {
+                return mockJson({ default_provider: 'claude', default_provider_name: 'Claude', default_model: 'claude-sonnet-5' });
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+        api.setFetch(fetchSpy);
+
+        // 模拟「自定义输入框缺失」的极端 DOM：移除元素（守卫仅对 __custom__ 模式要求它）
+        document.querySelector('#setting-custom-model').remove();
+        // 模型下拉为真实 option（非 __custom__，回填自后端 loadSettings 的形态）
+        document.querySelector('#setting-default-model').innerHTML =
+            '<option value="claude-sonnet-5">claude-sonnet-5</option>';
+        document.querySelector('#btn-save-settings').click();
+
+        await vi.waitFor(() => expect(alertSpy).toHaveBeenCalledWith('设置已保存'));
+        const putCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/settings') && o?.method === 'PUT');
+        expect(putCall).toBeDefined();
+        expect(JSON.parse(putCall[1].body).default_model).toBe('claude-sonnet-5');
+        // 无 Key → 跳过连接测试直接保存
+        expect(fetchSpy.mock.calls.some(([u, o]) => String(u).includes('/test-connection'))).toBe(false);
+    });
+
     it('有 Key：连接测试通过后保存（testApiKeys 委托 resolveCredentialTarget 取同协议槽位）', async () => {
         const { state, confirmModule, api } = await loadSaveable();
         const alertSpy = vi.spyOn(confirmModule, 'showAlert');
@@ -619,6 +648,8 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
     it('缺 #setting-claude-key 点击保存 → 入口守卫 console.warn 早退（零 fetch、无 rejection）', async () => {
         vi.resetModules();
         document.body.innerHTML = SETTINGS_DOM_HTML.replace('<input id="setting-claude-key">', '');
+        // TD-20 防御断言：钉住夹具替换确实生效（防夹具漂移导致用例失真）
+        expect(document.querySelector('#setting-claude-key')).toBeNull();
         const panel = await import('../js/components/settings-panel.js');
         const state = (await import('../js/state.js')).state;
         state.models.providers = PROVIDERS;
@@ -632,6 +663,33 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
 
         document.querySelector('#btn-save-settings').click();
         // 修复后：守卫早退 → console.warn 被调（确定性等待守卫执行完）
+        await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
+        expect(fetchSpy).not.toHaveBeenCalled(); // 零 fetch 调用（未触发保存）
+        expect(rejectionSpy).not.toHaveBeenCalled(); // 无 unhandledrejection
+        window.removeEventListener('unhandledrejection', rejectionSpy);
+        warnSpy.mockRestore(); // TD-19：显式 restore 惯例（对齐 :356/:519，失败路径硬化）
+    });
+
+    // 用例 B（TD-15，基线绿防回归锁）：#setting-custom-model 缺 + 模型下拉值 = __custom__
+    // → 守卫条件化后仍须早退——自定义模型模式裸读 customInput.value 会抛 TypeError，
+    // 该边界不得因守卫收窄而放开（getSelectedModel :90-91 裸读分支的守护）
+    it('缺 #setting-custom-model 且模型下拉值 = __custom__ → 仍 warn 早退（零 fetch、无 rejection）', async () => {
+        const { panel, state } = await loadPanel();
+        state.models.providers = PROVIDERS;
+        panel.initSettingsPanel({});
+        const api = await import('../js/api.js');
+        const fetchSpy = vi.fn(async () => mockJson({ ok: true }));
+        api.setFetch(fetchSpy);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const rejectionSpy = vi.fn();
+        window.addEventListener('unhandledrejection', rejectionSpy);
+
+        // 模型下拉切到 __custom__（有真实 option，模拟自定义模式）
+        document.querySelector('#setting-default-model').innerHTML =
+            '<option value="__custom__">自定义模型</option>';
+        document.querySelector('#setting-custom-model').remove();
+        document.querySelector('#btn-save-settings').click();
+
         await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
         expect(fetchSpy).not.toHaveBeenCalled(); // 零 fetch 调用（未触发保存）
         expect(rejectionSpy).not.toHaveBeenCalled(); // 无 unhandledrejection
