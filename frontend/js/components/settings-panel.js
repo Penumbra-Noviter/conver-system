@@ -302,6 +302,9 @@ async function testApiKeys(data) {
 /**
  * 初始化设置面板：绑定所有事件监听器
  * Provider/模型下拉、自定义输入元素或 save/clear 按钮缺失（index.html 契约被破坏的极端场景）→ 对应绑定 no-op 不抛错。
+ * save 回调另有入口统一守卫（TD-13）：11 个表单元素引用（9 个字段读取 +
+ * #setting-default-model / #setting-custom-model，后两者经 getSelectedModel 间接读取）
+ * 任一缺失 → console.warn + 早退 no-op（不执行保存、不发 fetch、不抛 TypeError）。
  *
  * @param {object} [options]
  * @param {function} [options.onConversationsCleared] - 清空所有对话后的回调（刷新列表等）
@@ -330,17 +333,48 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
 
     // ── 保存设置（按钮缺失 → 绑定 no-op 不抛错）──
     $('#btn-save-settings')?.addEventListener('click', async () => {
+        // ── 入口统一守卫（TD-13）：11 个元素引用任一缺失 → console.warn + 早退 no-op ──
+        // 9 个表单字段读取（#setting-default-provider 含 value / option:checked 两次读取）+
+        // #setting-default-model + #setting-custom-model（后两者经 getSelectedModel 间接读取）。
+        // 守卫在数据收集前拦截：不执行保存、不发 fetch、无 rejection、无 TypeError。
+        const claudeKeyInput = $('#setting-claude-key');
+        const claudeUrlInput = $('#setting-claude-url');
+        const openaiKeyInput = $('#setting-openai-key');
+        const openaiUrlInput = $('#setting-openai-url');
+        const providerSelect = $('#setting-default-provider');
+        const slidingWindowInput = $('#setting-sliding-window');
+        const themeSelect = $('#setting-theme');
+        const userNameInput = $('#setting-user-name');
+        const modelSelect = $('#setting-default-model');
+        const customModelInput = $('#setting-custom-model');
+        const missing = [
+            ['#setting-claude-key', claudeKeyInput],
+            ['#setting-claude-url', claudeUrlInput],
+            ['#setting-openai-key', openaiKeyInput],
+            ['#setting-openai-url', openaiUrlInput],
+            ['#setting-default-provider', providerSelect],
+            ['#setting-sliding-window', slidingWindowInput],
+            ['#setting-theme', themeSelect],
+            ['#setting-user-name', userNameInput],
+            ['#setting-default-model', modelSelect],
+            ['#setting-custom-model', customModelInput],
+        ].filter(([, el]) => !el).map(([sel]) => sel);
+        if (missing.length > 0) {
+            console.warn('设置面板元素缺失，跳过保存:', missing.join(', '));
+            return;
+        }
+
         const data = {
-            claude_api_key: $('#setting-claude-key').value,
-            claude_base_url: $('#setting-claude-url').value,
-            openai_api_key: $('#setting-openai-key').value,
-            openai_base_url: $('#setting-openai-url').value,
-            default_provider: $('#setting-default-provider').value,
-            default_provider_name: $('#setting-default-provider option:checked').textContent.trim(),
+            claude_api_key: claudeKeyInput.value,
+            claude_base_url: claudeUrlInput.value,
+            openai_api_key: openaiKeyInput.value,
+            openai_base_url: openaiUrlInput.value,
+            default_provider: providerSelect.value,
+            default_provider_name: $('#setting-default-provider option:checked')?.textContent.trim() ?? '',
             default_model: getSelectedModel(),
-            sliding_window_rounds: $('#setting-sliding-window').value,
-            theme_mode: $('#setting-theme').value,
-            user_name: $('#setting-user-name').value,
+            sliding_window_rounds: slidingWindowInput.value,
+            theme_mode: themeSelect.value,
+            user_name: userNameInput.value,
         };
 
         // P4.3：保存前测试已填写的 API Key 连接，失败由用户确认是否继续

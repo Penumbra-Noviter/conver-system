@@ -611,4 +611,61 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
         const panel = await import('../js/components/settings-panel.js');
         expect(() => panel.initSettingsPanel({})).not.toThrow();
     });
+
+    // 用例 ⑦（TD-13）：save 回调入口守卫 — 按钮在 + #setting-claude-key 缺（其余字段齐）
+    // + 点击保存 → 旧实现 :334 `$('#setting-claude-key').value` → null.value TypeError →
+    // async 回调 rejected promise → window unhandledrejection（保存静默失败）；
+    // 入口统一守卫后 → console.warn + 早退 no-op（零 fetch / 无 rejection / 无 TypeError）
+    it('缺 #setting-claude-key 点击保存 → 入口守卫 console.warn 早退（零 fetch、无 rejection）', async () => {
+        vi.resetModules();
+        document.body.innerHTML = SETTINGS_DOM_HTML.replace('<input id="setting-claude-key">', '');
+        const panel = await import('../js/components/settings-panel.js');
+        const state = (await import('../js/state.js')).state;
+        state.models.providers = PROVIDERS;
+        panel.initSettingsPanel({});
+        const api = await import('../js/api.js');
+        const fetchSpy = vi.fn(async () => mockJson({ ok: true }));
+        api.setFetch(fetchSpy);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const rejectionSpy = vi.fn();
+        window.addEventListener('unhandledrejection', rejectionSpy);
+
+        document.querySelector('#btn-save-settings').click();
+        // 修复后：守卫早退 → console.warn 被调（确定性等待守卫执行完）
+        await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
+        expect(fetchSpy).not.toHaveBeenCalled(); // 零 fetch 调用（未触发保存）
+        expect(rejectionSpy).not.toHaveBeenCalled(); // 无 unhandledrejection
+        window.removeEventListener('unhandledrejection', rejectionSpy);
+    });
+
+    // 用例 ⑧（TD-13）：:339 收口 — Provider 下拉为空（无 option）+ 其余字段齐 + 点击保存
+    // → 旧实现 `$('#setting-default-provider option:checked')` 为 null → null.textContent
+    // TypeError → unhandledrejection；`?.` 收口后 → default_provider_name 空串，正常完成保存
+    it('Provider 空下拉（无 option）点击保存 → :339 收口 default_provider_name 空串不抛 TypeError', async () => {
+        const env = await loadPanel(); // SETTINGS_DOM_HTML：provider 下拉原样为空（无 option），其余字段齐
+        env.state.models.providers = PROVIDERS;
+        env.state.defaultProvider = 'claude';
+        env.panel.initSettingsPanel({});
+        const confirmModule = await import('../js/components/confirm-dialog.js');
+        const alertSpy = vi.spyOn(confirmModule, 'showAlert');
+        const api = await import('../js/api.js');
+        const fetchSpy = vi.fn(async (url, options = {}) => {
+            const path = String(url).replace(/^.*\/api/, '/api');
+            if (path === '/api/settings' && options.method === 'PUT') {
+                return mockJson({ default_provider: 'claude', default_provider_name: '', default_model: '' });
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+        api.setFetch(fetchSpy);
+        const rejectionSpy = vi.fn();
+        window.addEventListener('unhandledrejection', rejectionSpy);
+
+        document.querySelector('#btn-save-settings').click();
+        await vi.waitFor(() => expect(alertSpy).toHaveBeenCalledWith('设置已保存'));
+        const putCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/settings') && o?.method === 'PUT');
+        expect(putCall).toBeDefined();
+        expect(JSON.parse(putCall[1].body).default_provider_name).toBe(''); // :339 收口空串
+        expect(rejectionSpy).not.toHaveBeenCalled();
+        window.removeEventListener('unhandledrejection', rejectionSpy);
+    });
 });
