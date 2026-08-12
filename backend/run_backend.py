@@ -31,11 +31,11 @@ _UVICORN_LOGGERS = ("uvicorn", "uvicorn.access")
 
 
 def data_dir() -> Path:
-    """桌面版数据目录：委托 `backend.app.services.data_dir`（同一契约，契约表 v1）。
+    """桌面版数据目录：委托 `backend.app.services.data_dir`（同一契约，契约表 v2）。
 
     覆盖链：`CONVER_DATA_DIR`（非空）→ `%APPDATA%\\ConverSystem` →
     `home\\AppData\\Roaming\\ConverSystem`（决策 D1-D2 兜底统一）。
-    契约表 v1 全文见 backend/tests/test_data_dir.py；壳侧 Rust 镜像实现见
+    契约表 v2 全文见 backend/tests/test_data_dir.py；壳侧 Rust 镜像实现见
     src-tauri/src/server.rs `default_data_dir`。
     （延迟导入：直执行 `python backend/run_backend.py --help` 时仓库根不在 sys.path，
     与下方 `from backend.app.main import app` 同一规避模式。）

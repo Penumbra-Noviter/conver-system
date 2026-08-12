@@ -71,10 +71,10 @@ def default_source_path() -> Path:
 def default_target_path() -> Path:
     """默认目标数据库路径：%APPDATA%\\ConverSystem\\conver_system.db
 
-    委托 `backend.app.services.data_dir.database_path`（同一契约，契约表 v1）：
+    委托 `backend.app.services.data_dir.database_path`（同一契约，契约表 v2）：
     覆盖链 `CONVER_DATA_DIR`（非空）→ `%APPDATA%` → `home\\AppData\\Roaming`，
     均拼 `ConverSystem` 子目录（决策 D1-D2；本函数原兜底语义即契约默认）。
-    契约表 v1 全文见 backend/tests/test_data_dir.py；壳侧 Rust 镜像实现见
+    契约表 v2 全文见 backend/tests/test_data_dir.py；壳侧 Rust 镜像实现见
     src-tauri/src/server.rs `default_data_dir`。
     """
     from backend.app.services.data_dir import database_path

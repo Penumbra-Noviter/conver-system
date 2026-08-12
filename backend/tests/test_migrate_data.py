@@ -653,7 +653,7 @@ class TestCli:
 
 
 class TestDefaultPaths:
-    """契约表 v1（委托 backend.app.services.data_dir.database_path；Rust 侧镜像见
+    """契约表 v2（委托 backend.app.services.data_dir.database_path；Rust 侧镜像见
     src-tauri/tests/server_test.rs，同一版本号互引）：
     CONVER_DATA_DIR（非空）→ %APPDATA% → home\\AppData\\Roaming，均拼 ConverSystem"""
 
@@ -674,7 +674,7 @@ class TestDefaultPaths:
         assert default_target_path() == tmp_path / "custom" / "conver_system.db"
 
     def test_default_target_empty_env_treated_as_unset(self, tmp_path, monkeypatch) -> None:
-        """契约表 v1：CONVER_DATA_DIR="" 视为未设置"""
+        """契约表 v2：CONVER_DATA_DIR="" 视为未设置"""
         monkeypatch.setenv("CONVER_DATA_DIR", "")
         monkeypatch.setenv("APPDATA", str(tmp_path / "AppData" / "Roaming"))
         assert default_target_path() == (
