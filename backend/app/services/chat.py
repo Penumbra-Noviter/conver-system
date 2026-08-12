@@ -220,7 +220,7 @@ def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int,
     return status.HTTP_502_BAD_GATEWAY, str(e)
 
 
-def llm_error_response(e: LLMError, provider: str) -> tuple[int, str]:
+def llm_error_response(e: LLMError, provider: str | None) -> tuple[int, str]:
     """将 LLMError 转为 (HTTP 状态码, 用户可见消息)（内部实现，chat_error_response 与 stream_reply 共用）"""
     for exc_type, (status_code, fixed_msg) in _LLM_ERROR_MAP.items():
         if isinstance(e, exc_type):
