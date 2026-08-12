@@ -45,6 +45,7 @@ conver-system/
 │   │   │
 │   │   ├── api/
 │   │   │   ├── __init__.py
+│   │   │   ├── errors.py          # 全局 exception handler（领域族 + LLM 族，_IMPORT_FORMAT_HINT 随迁）
 │   │   │   └── routes/
 │   │   │       ├── __init__.py
 │   │   │       ├── characters.py  # 角色 CRUD
@@ -91,6 +92,7 @@ conver-system/
 │   ├── requirements-dev.txt       # pytest / pytest-cov
 │   ├── tests/                     # 单元测试（pytest）
 │   │   ├── conftest.py            # 共享 fixture（db_session / make_character）
+│   │   ├── fixtures/schema.sql    # schema 快照（契约表；test_migrate_data 建库单一来源）
 │   │   ├── test_character_card.py
 │   │   ├── test_p35.py
 │   │   ├── test_prompt.py
@@ -101,6 +103,9 @@ conver-system/
 │   │   ├── test_data_dir.py           # 数据目录契约表 v2（Python 侧镜像）
 │   │   ├── test_data_dir_connection.py# 连接级消费者测试（空格/中文/#/% 路径真实建库连接）
 │   │   ├── test_migrate_data.py / test_packaging.py
+│   │   ├── test_schema_snapshot.py     # schema 快照漂移检测（快照 vs ORM）
+│   │   ├── test_error_handler.py       # 全局 exception handler wire 测试
+│   │   ├── test_provider_registry.py   # Provider 派生注册一致性
 │   │   └── test_package_exports.py
 │   └── .env.example
 │
@@ -134,10 +139,11 @@ conver-system/
 │   │   ├── conversation-activation.js # 激活编排深模块（F-2 守卫/草稿滚动/懒加载，setActivationHooks 注入）
 │   │   ├── icons.js               # SVG 图标工厂 seam（iconHtml，唯一动态图标来源）
 │   │   ├── components/
-│   │   │   ├── character-form.js  # 角色表单
-│   │   │   ├── character-wizard.js# 六步角色创建向导（LLM 智能解析 + 模板）
+│   │   │   ├── character-form.js  # 角色表单（骨架走 modal 工厂，提交走 character-submit）
+│   │   │   ├── character-wizard.js# 六步角色创建向导（LLM 智能解析 + 模板；headerExtra 插槽挂步骤指示器）
+│   │   │   ├── character-submit.js# 角色提交深模块（splitTags / buildCharacterPayload / 提交态状态机）
 │   │   │   ├── confirm-dialog.js  # 确认弹窗（showConfirm / showAlert，复用 openModal）
-│   │   │   ├── modal.js           # 通用模态框工厂（openModal）
+│   │   │   ├── modal.js           # 通用模态框工厂（openModal：遮罩/头部/三关闭路径/Escape/headerExtra/removeExisting）
 │   │   │   ├── model-selector.js  # 模型选择弹窗
 │   │   │   ├── export-dialog.js   # 导出弹窗
 │   │   │   ├── settings-panel.js  # 设置面板（initSettingsPanel / loadSettings）

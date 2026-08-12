@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-12 — ARC-10 架构深化批次：剩余 8 候选全自动 kickoff）
+
+- **ARC-10 完成（8 工单全归档，merge 链 4ffc1d2/241a7b6）**：用户下令「剩余候选也做完」——架构审查报告未选 8 候选全落地。**T-11** modal 骨架收口（character-form/wizard 手写骨架全走 openModal + headerExtra 插槽；**C3-DEFER 兑现**：character-modal.test.js 36 用例真实 modal.js 骨架级测试）**T-12** character-submit.js 角色域深模块（payload 11 字段/splitTags/提交态状态机 5 导出，form/wizard 各瘦身约 200 行）**T-13** 微重复收口（autoResizeInput×3/EMPTY_HEADER_HTML×2/avatarImgHtml×4 参数化；**注入三制统一明确不做**——共识 D-C7-1）**T-14** Provider 清单单一来源（AVAILABLE_MODELS 派生注册+setting 映射；**删 llm/__init__ 包级 provider 导出**——包导入零 SDK 副作用契约，main.py 消费点验证）**T-15** 统一 exception handler（api/errors.py 领域族+LLM 族两枚 handler，chat/characters/settings 路由薄化；test-connection 保 400 语义 D-B3-1）**T-16** style.css 无头覆盖区归位（70 规则零内容改动 + 37 项保序断言；新增 --on-danger token 勿并入 --danger-text）**T-17** schema 快照+漂移检测（19 列快照替换手抄 17 列——漂移实锤；漂移注入 9/9 捕获；spec 文本断言改行为断言）**T-18** 聚焦序列收口（focus_main_window）+ ready_timeout_from_env 契约测试（cfg(test) 6 用例含 0s 合法分支钉死）
+- **过程遥测**：波 1 并行 3（前端链同代理串行 3 张 + 后端 2 张并行）、波 2 并行 3；merge 零回退冲突；**T-16 首代理 setup 后空返回失败 → 降级重派复用 worktree**（崩溃恢复纪律：先盘 worktree 资产——分支已建、零改动、基于波 1 合并后 main，直接复用）；波末降配审核两轮均无阻断；T-15 含 1 处必要偏差（test_chat_service.py 3 处断言随路由薄化必改——波末审核判定语义等价）
+- **期末四轴：0 阻断**（vs ARC-9 的 1 阻断——本批镜像契约教训已内化，无新消费者盲区）；非阻断 5 项落技术债区（ARC10-1~5：401 前导空格防御分支/未知 DomainError 400 vs 502/wizard padding 掩蔽/领域映射双址 spec 背书/half-register fail-fast）
+- **GUI 冒烟（浏览器，隔离库）**：wizard/form modal 骨架（headerExtra 步骤指示器/Escape/预填）→ 创建/编辑提交（T-12）→ 错误气泡深浅主题（OPT-1-FIX 压制保持、--on-danger #fffdf8 生效）→ 输入框清空+高度复位 44px（T-13）→ 删除级联全过；computed style 验证替代视觉（模型无图像输入）
+- **G8 文档同步（本批次）**：CLAUDE.md（Provider 新增流程改 AVAILABLE_MODELS+_CLASS_OVERRIDES、测试数、ARC10 状态行）；CONTEXT（聊天回合行改 api/errors.py、Provider 行改派生注册、新增模态工厂术语；**防悬挂写回行二度误覆盖已恢复**——编辑纪律教训）；TICKETS（ARC10 归档 + 清 C3-DEFER/ARC9-9~15 + 落 ARC10-1~5）；DEV_LOG 本段；architecture.md 目录树
+- **测试**：pytest **356 + 1 skip** / Vitest **362** / cargo test **52** 全绿（基线 354+1skip/362/52 → 期末 356）
+
+---
+
 ## 滚动摘要（2026-08-12 — ARC-9 架构深化批次：6 Strong 候选全自动 kickoff）
 
 - **ARC-9 完成（6 工单全归档，merge 链 4e48750/dcff674 + 修复 2430bc6）**：由 /improve-codebase-architecture 审查报告（14 候选）→ 用户选中 6 Strong 全自动执行。**T-01** 搜索视图/级联删除收口（search-view.js/cascade.js 深模块 + 注入钩子；app.js 735→610 行；Falsify 发现 Escape 分支不清防抖定时器的既有怪癖并钉住原语义）**T-02** 流式/非流式统一结算入口 `settleTurn`（chat.js 结算 -14 行；非流式失败兜底不带 messageId 逐字复刻；「单次 vs 两次委托」措辞冲突裁定 consensus 为准）**T-03** 非流式回合收进 service（`complete_chat` + `chat_error_response` 单一错误源，路由薄壳；测试从绕过 prepare_chat 改为接口直测）**T-04** 数据目录四套统一（`services/data_dir.py` 纯 stdlib，兜底统一 `home\AppData\Roaming`；契约表 v1 双端镜像）**T-05** 冒烟清理收口（`scripts/lib/desktop-common.ps1`：`Stop-ConverPortListeners` 端口限定——T-03 全局名 kill 注释与代码矛盾实锤修复；grep 零残留）**T-06** 编排区测试挂网（+73 用例，vitest coverage 接线，涉改文件行覆盖全 ≥90%）

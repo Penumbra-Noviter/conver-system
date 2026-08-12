@@ -23,7 +23,6 @@
 
 | 编号 | 遗留项 | 来源 | 推荐强度 |
 |------|--------|------|----------|
-| C3-DEFER | character-form / character-wizard 骨架级测试推迟到 C3 批次（modal 工厂 seam 落地后补测；ARC-9 T-06 已按决策 C5-D1 登记，不手搓 DOM 夹具） | ARC-9 共识 C5-D1 | Strong |
 | ARC9-1 | search-view.js `initSearchView` docstring 声称幂等但实现无条件重复 addEventListener（重复调用双绑事件；当前 app.js 单调用点无实际影响）——改 docstring 或加绑定守卫 | ARC-9 期末 Standards | Worth exploring |
 | ARC9-2 | settings-panel.js `initProviderDropdown`/`initSettingsPanel` 缺 DOM 元素守卫（设置面板元素缺失时抛 TypeError，与 search-view 的 no-op 惯例不一致；基线既有） | ARC-9 T-06 记录 | Worth exploring |
 | ARC9-3 | build-desktop `-SkipBackendBuild` 由「警告后继续（tauri-build 资源校验兜底）」改为 helper 提前 throw——终态同为失败、注释已声明，但参数语义严格说微变 | ARC-9 期末 Standards | Speculative |
@@ -32,22 +31,37 @@
 | ARC9-6 | app.js `toggleConvList`/`convListToggle` 死代码（无调用方，基线既有；coverage 唯一未覆盖行）——清理 | ARC-9 T-06 记录 | Speculative |
 | ARC9-7 | settleTurn 五件套依赖参数（convId/getTab/updateTab/isActive/render）Data Clumps——可捆成 session-deps 对象，共识固定签名，不急于改 | ARC-9 期末 Architecture | Speculative |
 | ARC9-8 | `?` 编码跨平台边界：非 Windows 平台若真出现含 `?` 路径，SQLAlchemy 零解码会把 `%3F` 当字面文件名（Windows 下 `?` 非法不可达，防御编码非回归；部署前知晓） | ARC-9 T-04 修复说明 | Speculative |
-| ARC9-9 | 架构审查未选候选（用户本轮只取 Strong）：C4 角色表单两套平行实现（payload/提交态/tags 正则双份） | 架构审查报告 2026-08-12 | Worth exploring |
-| ARC9-10 | 架构审查未选候选：C6 style.css 无头覆盖区（2850-3287 无节标题重声明 + 1600 硬编码色值绕过 token） | 架构审查报告 2026-08-12 | Worth exploring |
-| ARC9-11 | 架构审查未选候选：B2 Provider 清单三处重复（model_data/factory/setting）+ llm/__init__ 包级导入击穿懒加载死路径 | 架构审查报告 2026-08-12 | Worth exploring |
-| ARC9-12 | 架构审查未选候选：B3 错误响应三轨并行（chat/characters/settings 各自映射）——可统一 exception handler | 架构审查报告 2026-08-12 | Worth exploring |
-| ARC9-13 | 架构审查未选候选：C7 微重复群（auto-resize×3/空态文案×2/avatar onerror×4/注入习语×3） | 架构审查报告 2026-08-12 | Speculative |
-| ARC9-14 | 架构审查未选候选：D3 测试替实现背复杂度（_make_db 手抄 schema + spec 文本断言） | 架构审查报告 2026-08-12 | Worth exploring |
-| ARC9-15 | 架构审查未选候选：D4 壳侧小瑕疵（窗口聚焦序列两处重复 + ready_timeout_from_env env 分支未测） | 架构审查报告 2026-08-12 | Speculative |
+| ARC10-1 | llm_error_handler 401 分支消息含前导空格（provider="" 模板形态）——当前无请求路径可达（parse_document 包 422/test-connection 局部 400/complete_chat 显式带 provider/stream 走 error 帧）；若未来新路径漏出 LLMError 会产出带空格消息——建议 handler 侧 strip 或占位 | ARC-10 期末 Falsify | Speculative |
+| ARC10-2 | 未知 DomainError 子类 → handler 400 vs `chat_error_response` 兜底 502 语义不一致（异常层次冻结声明下无生产者；未来新增异常需同步映射表） | ARC-10 期末 Falsify | Speculative |
+| ARC10-3 | wizard modal-body 嵌套结构（同元素双 class → modal-body > wizard-body）+40px padding 差，当前被 `.wizard-modal` min-height:480px 掩蔽——未来调整向导高度约束会显形（可留 CSS `:has()` 修复预案） | ARC-10 期末 Falsify | Speculative |
+| ARC10-4 | 领域错误映射双址（services/chat.py::chat_error_response 与 api/errors.py::_domain_error_response 同表维护 404/400）——spec 明令两路并存（B1 只读约束）为规格背书；未来可合并为单一映射表 | ARC-10 期末 Architecture | Speculative |
+| ARC10-5 | register_builtin_providers 派生中途抛错（数据畸形）留半注册状态（`_builtins_loaded=False`，下次调用重试补齐）——fail-fast 设计意图，当前数据合法 | ARC-10 波 1 Falsify | Speculative |
 | T-04 | run_backend 端口越界 SystemExit 在 try 外，CREATE_NO_WINDOW 下不留日志（经壳不可达，壳恒传合法 u16） | 波 2 降配审核遗留 5 | Speculative |
 | T-05 | setup_tray 失败即整体启动失败（响亮失败、低概率；图标产物齐全） | 波 2 降配审核遗留 4 | Speculative |
 | T-06 | CONVER_DATA_DIR 为 POSIX 路径（`/c/...`）不做归一化（三方行为自洽但落位不合预期；文档已警告） | 波 2 降配审核遗留 2 | Speculative |
 
 > ✅ 已结清（2026-08-12 ARC-9）：T-01 兜底三分歧 → 统一 `home\AppData\Roaming`（契约表 v2）；T-02 URL 编码 → 壳侧编码收窄至仅 `?`（SQLAlchemy 零解码语义，v1 全量编码为回归教训）；T-03 全局进程名清理 → `desktop-common.ps1::Stop-ConverPortListeners` 端口限定。
+>
+> ✅ 已结清（2026-08-12 ARC-10）：**C3-DEFER**（modal 工厂落地 + character-modal.test.js 36 用例骨架级测试兑现）；**ARC9-9~15**（未选候选 C4/C6/C7/B2/B3/D3/D4 全部落地为 T-12/T-16/T-13/T-14/T-15/T-17/T-18）。
 
 ---
 
 ## 已完成归档
+
+### ARC-10 架构深化批次：剩余 8 候选（2026-08-12 全自动 kickoff）
+
+> 来源：/improve-codebase-architecture 审查报告未选候选（用户下令「剩余候选也做完」）。规格 `.scratch/arc10/spec.md`（v1.0 无修订）+ 共识（13 项决策带推荐默认，含关键裁定：C7 注入三制统一明确不做、test-connection 保 400 语义、C3-DEFER 承诺纳入 T-11）。两波执行：波 1 并行 3（前端链 T-11→T-12→T-13 同代理 + T-14 + T-15，merge `4ffc1d2`）、波 2 并行 3（T-16/T-17/T-18，merge `241a7b6`）；merge 零回退冲突；T-16 首代理 setup 后空返回失败 → 降级重派复用 worktree 完成。波末降配增量审核两轮均无阻断（波 1：26 Falsify 构造 + 5/5 工单档 A；波 2：15 构造含 CSS 多重集对比/漂移注入 9/9 捕获）。**期末四轴 code-review（固定点 a453e75）：0 阻断**——8 工单 Spec 全过、深模块达标（character-submit.js/api/errors.py/factory 派生/modal.js）、Falsify 10 项构造无击穿；5 项非阻断观察落技术债区（ARC10-1~5）。GUI 冒烟（浏览器，隔离库）：wizard/form modal 骨架（headerExtra/Escape/预填）✓ 创建/编辑提交 ✓ 错误气泡深浅主题（OPT-1-FIX 压制保持 + --on-danger 生效）✓ 输入框复位 ✓ 删除级联 ✓。测试同步：pytest **356 + 1 skip** / Vitest **362** / cargo test **52**，全部全绿。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| T-11 | C3 modal 骨架收口到通用工厂 + C3-DEFER 兑现（openModal headerExtra 插槽；36 新用例，form/wizard 覆盖 ~100%） | 2026-08-12 | `8b690bf` |
+| T-12 | C4 角色提交逻辑收敛为角色域深模块（character-submit.js 5 导出；19 新用例） | 2026-08-12 | `0851379` |
+| T-13 | C7 微重复收口（auto-resize/空态文案/avatar onerror 参数化；注入三制不做；10 新用例） | 2026-08-12 | `24a678d` |
+| T-14 | B2 Provider 清单单一来源（AVAILABLE_MODELS 派生 + 包导出收缩零 SDK 副作用；17 新用例，覆盖 99.05%） | 2026-08-12 | `1854fb3` |
+| T-15 | B3 统一 exception handler（api/errors.py 两枚 handler + 路由薄化；27 新用例，涉改 100% 覆盖） | 2026-08-12 | `16efce2` |
+| T-16 | C6 style.css 覆盖区归位 + --on-danger token（70 规则归位零内容改动 + 37 项保序断言） | 2026-08-12 | `d5120bd` |
+| T-17 | D3 schema 快照 + 漂移检测（schema.sql 19 列快照 + 漂移 9/9 捕获 + spec 行为断言） | 2026-08-12 | `b980861` |
+| T-18 | D4 聚焦序列收口 + 就绪超时契约测试（focus_main_window + cfg(test) 6 用例） | 2026-08-12 | `26ea54a` |
 
 ### ARC-9 架构深化批次：6 Strong 候选（2026-08-12 全自动 kickoff）
 
