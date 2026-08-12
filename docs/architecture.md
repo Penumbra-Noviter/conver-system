@@ -72,9 +72,10 @@ conver-system/
 │   │       ├── __init__.py
 │   │       ├── character.py
 │   │       ├── character_card.py  # SillyTavern V2 卡转换层
-│   │       ├── chat.py            # 聊天回合编排（prepare_chat / stream_reply 深模块）
+│   │       ├── chat.py            # 聊天回合深模块（prepare_chat / complete_chat / chat_error_response / stream_reply）
 │   │       ├── conversation.py
 │   │       ├── conversation_export.py # 对话导出（json/markdown 深模块）
+│   │       ├── data_dir.py        # 数据目录解析（纯 stdlib，契约表 v2；run_backend / migrate_data 委托）
 │   │       ├── message.py
 │   │       ├── setting.py         # 运行时设置读写（白名单 + 回退链 + 整型容错）
 │   │       └── llm/
@@ -95,7 +96,12 @@ conver-system/
 │   │   ├── test_prompt.py
 │   │   ├── test_settings_connection.py
 │   │   ├── test_conversation_export.py
-│   │   └── test_search.py
+│   │   ├── test_search.py
+│   │   ├── test_chat_service.py       # 聊天回合 service 直测（prepare_chat / complete_chat / chat_error_response）
+│   │   ├── test_data_dir.py           # 数据目录契约表 v2（Python 侧镜像）
+│   │   ├── test_data_dir_connection.py# 连接级消费者测试（空格/中文/#/% 路径真实建库连接）
+│   │   ├── test_migrate_data.py / test_packaging.py
+│   │   └── test_package_exports.py
 │   └── .env.example
 │
 ├── frontend/
@@ -104,22 +110,27 @@ conver-system/
 │   │   └── style.css
 │   ├── package.json               # 前端测试基建（Vitest/jsdom，type: module）
 │   ├── vitest.config.js
-│   ├── tests/                     # 前端单元测试（vitest run）
+│   ├── tests/                     # 前端单元测试（vitest run；覆盖率 npm run test:coverage）
 │   │   ├── format.test.js
 │   │   ├── utils.test.js
 │   │   ├── api.test.js
 │   │   ├── tabs.test.js           # tab 工作区深模块
-│   │   ├── stream-session.test.js # 流式回合结算状态机
+│   │   ├── stream-session.test.js # 流式回合结算状态机（含 settleTurn 用例组）
 │   │   ├── icons.test.js / components-icons.test.js  # 图标 seam 语义
-│   │   └── conversation-activation.test.js
+│   │   ├── conversation-activation.test.js
+│   │   ├── search-view.test.js / cascade.test.js     # 搜索/级联深模块（T-01）
+│   │   ├── chat.test.js / app.test.js                # 编排薄集成（T-06）
+│   │   └── model-selector.test.js / settings-panel.test.js  # 组件 jsdom 联动（T-06）
 │   ├── js/
-│   │   ├── app.js                 # 主入口（视图切换 / 业务协调 / 事件绑定）
+│   │   ├── app.js                 # 主入口（接线/视图切换/初始化；搜索与级联已下沉 search-view.js/cascade.js）
 │   │   ├── state.js               # 应用级全局状态（会话级字段已退役）
-│   │   ├── chat.js                # 聊天域渲染与交互（renderMessages / handleSend / chatDom）
+│   │   ├── chat.js                # 聊天域渲染与交互（renderMessages / handleSend；结算委托 settleTurn）
 │   │   ├── api.js                 # API 调用层（含 setFetch 注入 seam）
 │   │   ├── format.js              # 数据→HTML 纯函数（highlightText / buildMessagesHtml / characterCardHtml）
+│   │   ├── search-view.js         # 搜索视图深模块（防抖/五态文案/渲染，initSearchView + 导航钩子注入）
+│   │   ├── cascade.js             # 级联删除深模块（批量原语+联动，setCascadeHooks 注入）
 │   │   ├── tabs.js                # 会话 tab 工作区深模块（openTab/closeTabs/getTabDisplay/abortStream）
-│   │   ├── stream-session.js      # 流式回合结算深模块（createStreamSession + mergeFreshList）
+│   │   ├── stream-session.js      # 流式回合结算深模块（createStreamSession + settleTurn + mergeFreshList）
 │   │   ├── conversation-activation.js # 激活编排深模块（F-2 守卫/草稿滚动/懒加载，setActivationHooks 注入）
 │   │   ├── icons.js               # SVG 图标工厂 seam（iconHtml，唯一动态图标来源）
 │   │   ├── components/

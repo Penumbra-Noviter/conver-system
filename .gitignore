@@ -35,6 +35,7 @@ build/
 
 # Node / frontend tooling
 node_modules/
+frontend/coverage/
 
 # GUI 测试截图
 /gui-test-screenshots/

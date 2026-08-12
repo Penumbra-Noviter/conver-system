@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-12 — ARC-9 架构深化批次：6 Strong 候选全自动 kickoff）
+
+- **ARC-9 完成（6 工单全归档，merge 链 4e48750/dcff674 + 修复 2430bc6）**：由 /improve-codebase-architecture 审查报告（14 候选）→ 用户选中 6 Strong 全自动执行。**T-01** 搜索视图/级联删除收口（search-view.js/cascade.js 深模块 + 注入钩子；app.js 735→610 行；Falsify 发现 Escape 分支不清防抖定时器的既有怪癖并钉住原语义）**T-02** 流式/非流式统一结算入口 `settleTurn`（chat.js 结算 -14 行；非流式失败兜底不带 messageId 逐字复刻；「单次 vs 两次委托」措辞冲突裁定 consensus 为准）**T-03** 非流式回合收进 service（`complete_chat` + `chat_error_response` 单一错误源，路由薄壳；测试从绕过 prepare_chat 改为接口直测）**T-04** 数据目录四套统一（`services/data_dir.py` 纯 stdlib，兜底统一 `home\AppData\Roaming`；契约表 v1 双端镜像）**T-05** 冒烟清理收口（`scripts/lib/desktop-common.ps1`：`Stop-ConverPortListeners` 端口限定——T-03 全局名 kill 注释与代码矛盾实锤修复；grep 零残留）**T-06** 编排区测试挂网（+73 用例，vitest coverage 接线，涉改文件行覆盖全 ≥90%）
+- **期末四轴 code-review：1 阻断 → 修复 → 复审放行**：T-04 URL 全量百分号编码破坏 SQLAlchemy 连接（**教训**：镜像契约必须对真实消费者做连接级验证——v1 契约表双端互相印证字符串级预期，从未实测 SQLAlchemy 对 `%XX` **零解码**；migrate_data `_open_readonly` 走 sqlite3 `uri=True` 会解码，两消费者解码语义不同，勿再对齐）→ `d3a833b` 编码收窄至仅 `?`→`%3F` + 契约表 v2 + `test_data_dir_connection.py` 连接级防复发（含「v1 全量编码必须 OperationalError」防回归锁）
+- **波次遥测**：波 1 并行 3、波 2 并行 2（T-04→T-05 同代理串行链）；merge 零回退冲突；波末降配增量审核两轮均无阻断（波 1：13 Falsify 全过；波 2：编码器双端 0 mismatch）；Implement 侧 1 例隔离纪律瑕疵（v2 docstring 落在主工作树而非 worktree——内容正确已并入，stash 冗余已清）；cargo 首跑因缺 `dist/conver_backend`（gitignored 构建前置）失败一次、`shell_state_test` 偶发 1 例失败（单独重跑 7/7 过）
+- **4.5 运行态冒烟（浏览器，隔离库）**：空态首启 → 6 步创建角色 → 模型选择（8 Provider）→ 非流式失败路径（400 错误气泡 + tab 标题自动更新 + 发送按钮复位，B1/C2 运行态）→ 搜索防抖 + mark 高亮 → 级联删除（确认框 → 角色清空 → tab 关闭 → 对话列表联动）全过；截图存档
+- **G10 文档同步（本批次）**：CONTEXT 术语表（聊天回合改 complete_chat/chat_error_response、流式结算登记 settleTurn、新增数据目录契约表 v2；防悬挂写回行曾误覆盖已恢复）；architecture.md 目录树（新模块 + 新测试登记）；tauri-desktop.md §3.2 契约 v2 + 编码语义；CLAUDE.md 测试数 310+1skip/297/46 + 状态行；TICKETS 归档 + 技术债清 T-01~T-03 + 落 15 项新债（ARC9-1~15 含未选候选）；.gitignore 补 frontend/coverage/
+- **测试**：pytest **310 + 1 skip** / Vitest **297** / cargo test **46** 全绿（基线 302+1skip/224/46 → 期末修复后 310）
+
+---
+
 ## 滚动摘要（2026-08-11 — P6.4 Tauri 桌面版波次收官）
 
 - **P6.4 桌面版完成（8 工单全归档，merge 链 3823e76/97a2923/635104b/87ab288/a881d95）**：Tauri v2 壳（动态端口子进程 + 就绪页 + capabilities + 托盘/自启/单实例）、PyInstaller onedir 后端打包、数据迁移脚本、品牌图标、NSIS 安装器 + 一键构建 + 自动化冒烟；**前端/后端业务代码零改动**（打包专用入口 run_backend.py + main.py _MEIPASS 分支除外）

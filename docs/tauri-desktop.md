@@ -101,7 +101,9 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-desktop.ps1 -UseInstaller
 
 ### 3.2 数据目录覆盖（CONVER_DATA_DIR）
 
-壳（`src-tauri/src/server.rs::default_data_dir`）、后端（`backend/run_backend.py::data_dir`）、迁移脚本（`backend/scripts/migrate_data.py::default_target_path`）三方同一契约：`CONVER_DATA_DIR`（环境变量，值即数据目录）→ `%APPDATA%\ConverSystem` → 主目录兜底。
+壳（`src-tauri/src/server.rs::default_data_dir`）、后端（`backend/run_backend.py::data_dir` → 委托 `backend/app/services/data_dir.py`）、迁移脚本（`backend/scripts/migrate_data.py` → 委托同模块）同一契约（**契约表 v2，2026-08-12**）：`CONVER_DATA_DIR`（环境变量，值即数据目录，空串视为未设置）→ `%APPDATA%\ConverSystem` → `home\AppData\Roaming\ConverSystem` 兜底统一（Rust 侧 `USERPROFILE\AppData\Roaming`，USERPROFILE 也缺失时 CWD 末位兜底）。双端镜像契约测试：`backend/tests/test_data_dir.py` + `test_data_dir_connection.py` ↔ `src-tauri/tests/server_test.rs`。
+
+**URL 编码（v2）**：壳注入 `DATABASE_URL` 仅对 `?` 编码为 `%3F`——SQLAlchemy sqlite 方言对 `%XX` **零解码**（v1 全量编码曾致含空格/中文路径 `unable to open database file`，2026-08-12 期末审核阻断修复）；空格/中文/`#`/`%` 一律原样。`migrate_data::_open_readonly` 走 `sqlite3.connect(uri=True)`（SQLite URI 规则**会**解码 `%XX`），其编码语义独立保留——两路径消费者解码语义不同，勿再对齐。
 
 ```powershell
 $env:CONVER_DATA_DIR = "D:\conver-data"   # 覆盖后桌面版全部数据落此处

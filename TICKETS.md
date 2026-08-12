@@ -24,16 +24,43 @@
 | 编号 | 遗留项 | 来源 | 推荐强度 |
 |------|--------|------|----------|
 | C3-DEFER | character-form / character-wizard 骨架级测试推迟到 C3 批次（modal 工厂 seam 落地后补测；ARC-9 T-06 已按决策 C5-D1 登记，不手搓 DOM 夹具） | ARC-9 共识 C5-D1 | Strong |
-| T-01 | 数据目录 APPDATA 缺失/空串兜底三分歧（壳 CWD vs run_backend `Path.home()` vs 迁移 `home\AppData\Roaming`）——建议统一同一兜底并补测试 | 波 2 降配审核遗留 1（期末复核仍成立） | Strong |
-| T-02 | DATABASE_URL 特殊字符（`#`/`?`）不编码：CONVER_DATA_DIR 含特殊字符时壳注入的 URL 截断失效（迁移脚本 `_open_readonly` 已 quote，壳侧未对齐） | 期末 Falsify 非阻断 1 | Worth exploring |
-| T-03 | smoke-desktop.ps1 按全局进程名 `conver_backend` 清理，与脚本自述「残留检查严格限定自己端口」原则不一致 | 期末 Falsify 非阻断 2 | Worth exploring |
+| ARC9-1 | search-view.js `initSearchView` docstring 声称幂等但实现无条件重复 addEventListener（重复调用双绑事件；当前 app.js 单调用点无实际影响）——改 docstring 或加绑定守卫 | ARC-9 期末 Standards | Worth exploring |
+| ARC9-2 | settings-panel.js `initProviderDropdown`/`initSettingsPanel` 缺 DOM 元素守卫（设置面板元素缺失时抛 TypeError，与 search-view 的 no-op 惯例不一致；基线既有） | ARC-9 T-06 记录 | Worth exploring |
+| ARC9-3 | build-desktop `-SkipBackendBuild` 由「警告后继续（tauri-build 资源校验兜底）」改为 helper 提前 throw——终态同为失败、注释已声明，但参数语义严格说微变 | ARC-9 期末 Standards | Speculative |
+| ARC9-4 | smoke 验收 6 清理后无复查等待窗口（force-kill 关闭 LISTEN 即时；若未来后端改多 worker/继承 socket 形态可能短暂假阴性） | ARC-9 波 2 Falsify F4 | Speculative |
+| ARC9-5 | run_backend.py 直执行形态 `log_file_path()` 在 try 外，ImportError 无 traceback 落盘（该形态本就不受支持，`python -m backend.run_backend` 正常） | ARC-9 波 2 Falsify F5 | Speculative |
+| ARC9-6 | app.js `toggleConvList`/`convListToggle` 死代码（无调用方，基线既有；coverage 唯一未覆盖行）——清理 | ARC-9 T-06 记录 | Speculative |
+| ARC9-7 | settleTurn 五件套依赖参数（convId/getTab/updateTab/isActive/render）Data Clumps——可捆成 session-deps 对象，共识固定签名，不急于改 | ARC-9 期末 Architecture | Speculative |
+| ARC9-8 | `?` 编码跨平台边界：非 Windows 平台若真出现含 `?` 路径，SQLAlchemy 零解码会把 `%3F` 当字面文件名（Windows 下 `?` 非法不可达，防御编码非回归；部署前知晓） | ARC-9 T-04 修复说明 | Speculative |
+| ARC9-9 | 架构审查未选候选（用户本轮只取 Strong）：C4 角色表单两套平行实现（payload/提交态/tags 正则双份） | 架构审查报告 2026-08-12 | Worth exploring |
+| ARC9-10 | 架构审查未选候选：C6 style.css 无头覆盖区（2850-3287 无节标题重声明 + 1600 硬编码色值绕过 token） | 架构审查报告 2026-08-12 | Worth exploring |
+| ARC9-11 | 架构审查未选候选：B2 Provider 清单三处重复（model_data/factory/setting）+ llm/__init__ 包级导入击穿懒加载死路径 | 架构审查报告 2026-08-12 | Worth exploring |
+| ARC9-12 | 架构审查未选候选：B3 错误响应三轨并行（chat/characters/settings 各自映射）——可统一 exception handler | 架构审查报告 2026-08-12 | Worth exploring |
+| ARC9-13 | 架构审查未选候选：C7 微重复群（auto-resize×3/空态文案×2/avatar onerror×4/注入习语×3） | 架构审查报告 2026-08-12 | Speculative |
+| ARC9-14 | 架构审查未选候选：D3 测试替实现背复杂度（_make_db 手抄 schema + spec 文本断言） | 架构审查报告 2026-08-12 | Worth exploring |
+| ARC9-15 | 架构审查未选候选：D4 壳侧小瑕疵（窗口聚焦序列两处重复 + ready_timeout_from_env env 分支未测） | 架构审查报告 2026-08-12 | Speculative |
 | T-04 | run_backend 端口越界 SystemExit 在 try 外，CREATE_NO_WINDOW 下不留日志（经壳不可达，壳恒传合法 u16） | 波 2 降配审核遗留 5 | Speculative |
 | T-05 | setup_tray 失败即整体启动失败（响亮失败、低概率；图标产物齐全） | 波 2 降配审核遗留 4 | Speculative |
 | T-06 | CONVER_DATA_DIR 为 POSIX 路径（`/c/...`）不做归一化（三方行为自洽但落位不合预期；文档已警告） | 波 2 降配审核遗留 2 | Speculative |
 
+> ✅ 已结清（2026-08-12 ARC-9）：T-01 兜底三分歧 → 统一 `home\AppData\Roaming`（契约表 v2）；T-02 URL 编码 → 壳侧编码收窄至仅 `?`（SQLAlchemy 零解码语义，v1 全量编码为回归教训）；T-03 全局进程名清理 → `desktop-common.ps1::Stop-ConverPortListeners` 端口限定。
+
 ---
 
 ## 已完成归档
+
+### ARC-9 架构深化批次：6 Strong 候选（2026-08-12 全自动 kickoff）
+
+> 来源：/improve-codebase-architecture 审查报告（14 候选）→ 用户选中 6 Strong 全自动执行。规格 `.scratch/arc-strongs/spec.md`（v1.0 无修订）+ 共识（17 项决策带推荐默认，frontier 空）。两波执行：波 1 并行 3（T-01/T-02/T-03，merge `4e48750`）、波 2 并行 2（T-04→T-05 同代理串行链 + T-06，merge `dcff674`）；merge 零回退冲突；波末降配增量审核两轮（Falsify + 文件范围三档核验）均无阻断。**期末四轴 code-review（固定点 b65e9b3）**：1 阻断——T-04 URL 全量百分号编码破坏 SQLAlchemy 连接（sqlite 方言零解码 `%XX` vs migrate_data sqlite3 URI 会解码——镜像契约盲点）→ `d3a833b` 修复（编码收窄至仅 `?` → `%3F`，契约表 v1→v2 双端同步 + 连接级消费者测试 `test_data_dir_connection.py`）→ 复审放行。运行态冒烟（浏览器，隔离库）：空态首启 / 6 步创建角色 / 模型选择 / 非流式失败路径（400 错误气泡 + 标题更新 + 按钮复位）/ 搜索防抖高亮 / 级联删除（确认框→tab 关闭→列表联动）全过。测试同步：pytest **310 + 1 skip** / Vitest **297** / cargo test **46**，全部全绿。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| T-01 | C1 搜索视图与级联删除收口为深模块（search-view.js/cascade.js，app.js 735→610 行，-125；26 新用例） | 2026-08-12 | `cef6ed9` |
+| T-02 | C2 流式/非流式统一结算入口 settleTurn（chat.js 结算 -14 行，12 新用例） | 2026-08-12 | `03d0163` |
+| T-03 | B1 非流式回合收进 service（complete_chat + chat_error_response 单一错误源；26 新用例，覆盖 97%） | 2026-08-12 | `9d6e579` |
+| T-04 | D1 数据目录四套统一 + URL 编码契约（data_dir.py 纯 stdlib + 契约表 v2 双端镜像 + 连接级测试；期末阻断修复 `d3a833b`） | 2026-08-12 | `6097a08` + `d3a833b` |
+| T-05 | D2 冒烟进程清理收口（desktop-common.ps1 端口限定 + 注释一致，grep 零残留） | 2026-08-12 | `ac8004e` |
+| T-06 | C5 编排区测试挂网 + coverage 接线（+73 用例，涉改文件行覆盖全 ≥90%，C3-DEFER 登记） | 2026-08-12 | `abdeb0f` |
 
 ### P6.4 Tauri 桌面版（2026-08-11 波次收官）
 
