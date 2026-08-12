@@ -31,3 +31,30 @@ def test_schemas_all_covers_actual_modules() -> None:
     assert actual.issubset(set(schemas.__all__)), (
         f"schemas.__all__ 缺模块: {actual - set(schemas.__all__)}"
     )
+
+
+def test_llm_all_covers_shrunk_exports() -> None:
+    """llm 包 __all__ 覆盖收缩后导出清单（工厂 + 注册入口 + prompt 纯函数）"""
+    from backend.app.services import llm
+
+    expected = {
+        "LLMFactory",
+        "register_builtin_providers",
+        "CharacterData",
+        "apply_template_vars",
+        "build_messages",
+        "parse_mes_example",
+    }
+    assert expected.issubset(set(llm.__all__)), (
+        f"llm.__all__ 缺导出: {expected - set(llm.__all__)}"
+    )
+
+
+def test_llm_all_excludes_provider_classes() -> None:
+    """llm 包级导出不得含 Provider 类 / BaseLLM（import 包不加载 SDK 的契约，防回退）"""
+    from backend.app.services import llm
+
+    banned = {"ClaudeProvider", "OpenAIProvider", "BaseLLM"}
+    assert not banned & set(llm.__all__), (
+        f"llm.__all__ 不得导出 Provider 类: {banned & set(llm.__all__)}"
+    )

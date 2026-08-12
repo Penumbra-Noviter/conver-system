@@ -1,0 +1,270 @@
+"""
+Provider 清单单一来源测试 — 工厂注册与设置映射均从 model_data.AVAILABLE_MODELS 派生
+
+覆盖：
+    1. register_builtin_providers() 从 AVAILABLE_MODELS 派生注册（类映射 / 顺序 / 幂等）
+    2. _CLASS_OVERRIDES 显式覆盖 dict 优先于默认规则
+    3. 模拟在 AVAILABLE_MODELS 新增 Provider → 派生注册自动生效（新增只改一处）
+    4. setting._PROVIDER_API_MAP 派生内容（与现状 6 项逐项一致）与 _resolve_api_provider 语义
+    5. 畸形数据（空清单 / 缺 key / 无可解析实现类）的行为
+
+依赖：pytest + monkeypatch（不建库、不发网络请求）。
+LLMFactory 类级状态（_providers / _builtins_loaded）跨测试共享，autouse fixture 负责恢复。
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from backend.app.services import setting as setting_service
+from backend.app.services.llm import factory as factory_module
+from backend.app.services.llm.base import BaseLLM
+from backend.app.services.llm.claude import ClaudeProvider
+from backend.app.services.llm.factory import LLMFactory
+from backend.app.services.llm.openai import OpenAIProvider
+from backend.app.services.model_data import AVAILABLE_MODELS
+
+__all__: list[str] = []
+
+# 注册顺序契约：与 AVAILABLE_MODELS["providers"] 声明顺序一致（现状逐项比对）
+EXPECTED_ORDER = ["claude", "openai", "deepseek", "qwen", "kimi", "glm", "minimax", "step"]
+
+
+class _OverrideProvider(BaseLLM):
+    """测试用假实现类：验证 _CLASS_OVERRIDES 显式覆盖生效"""
+
+    async def generate(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        model: str | None = None,
+    ) -> str:
+        """最小非流式实现"""
+        return ""
+
+    async def stream_generate(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        model: str | None = None,
+    ) -> object:
+        """最小流式实现（async generator）"""
+        yield ""
+
+
+@pytest.fixture(autouse=True)
+def _restore_factory_state() -> object:
+    """每个测试前后恢复 LLMFactory 类级注册状态，避免污染既有测试"""
+    providers = dict(LLMFactory._providers)
+    builtins_loaded = LLMFactory._builtins_loaded
+    yield
+    LLMFactory._providers = providers
+    LLMFactory._builtins_loaded = builtins_loaded
+
+
+def _reset_registry() -> None:
+    """清空注册状态，模拟冷启动"""
+    LLMFactory._providers = {}
+    LLMFactory._builtins_loaded = False
+
+
+class TestDerivedRegistration:
+    """派生注册：模型数据驱动 + 类映射 + 顺序 + 幂等"""
+
+    def test_registers_all_providers_from_available_models(self) -> None:
+        """AVAILABLE_MODELS 全量派生：8 家键集 + 类映射（claude 专属类、其余 OpenAI 兼容类）"""
+        _reset_registry()
+        LLMFactory.register_builtin_providers()
+
+        assert set(LLMFactory._providers) == set(EXPECTED_ORDER)
+        assert LLMFactory._providers["claude"] is ClaudeProvider
+        assert LLMFactory._providers["openai"] is OpenAIProvider
+        assert LLMFactory._providers["deepseek"] is OpenAIProvider
+        assert LLMFactory._providers["qwen"] is OpenAIProvider
+        assert LLMFactory._providers["kimi"] is OpenAIProvider
+        assert LLMFactory._providers["glm"] is OpenAIProvider
+        assert LLMFactory._providers["minimax"] is OpenAIProvider
+        assert LLMFactory._providers["step"] is OpenAIProvider
+
+    def test_list_providers_order_matches_available_models(self) -> None:
+        """list_providers() 顺序与 AVAILABLE_MODELS 声明顺序逐项一致"""
+        _reset_registry()
+        assert LLMFactory.list_providers() == EXPECTED_ORDER
+        # 懒加载兜底只注册一次：连续调用顺序与结果不变
+        assert LLMFactory.list_providers() == EXPECTED_ORDER
+
+    def test_registration_is_idempotent(self) -> None:
+        """连续两次注册：键集不变、不报错（幂等）"""
+        _reset_registry()
+        LLMFactory.register_builtin_providers()
+        first = dict(LLMFactory._providers)
+        LLMFactory.register_builtin_providers()
+        assert LLMFactory._providers == first
+        assert LLMFactory.list_providers() == EXPECTED_ORDER
+
+    def test_class_overrides_take_precedence(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """_CLASS_OVERRIDES 显式覆盖优先于默认派生规则"""
+        monkeypatch.setitem(factory_module._CLASS_OVERRIDES, "deepseek", _OverrideProvider)
+        _reset_registry()
+        LLMFactory.register_builtin_providers()
+
+        assert LLMFactory._providers["deepseek"] is _OverrideProvider
+        # 其余 Provider 仍走默认规则，不受覆盖影响
+        assert LLMFactory._providers["claude"] is ClaudeProvider
+        assert LLMFactory._providers["step"] is OpenAIProvider
+
+
+class TestNewProviderDerivation:
+    """边界验证：新增 Provider 只改 AVAILABLE_MODELS，派生注册自动生效"""
+
+    def test_new_openai_compatible_provider_auto_registers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """AVAILABLE_MODELS 新增 id=openai 的 Provider → 自动注册为 OpenAIProvider"""
+        data = {
+            "providers": AVAILABLE_MODELS["providers"]
+            + [{"key": "fake", "id": "openai", "name": "Fake", "models": []}],
+        }
+        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", data)
+        _reset_registry()
+        LLMFactory.register_builtin_providers()
+
+        assert LLMFactory._providers["fake"] is OpenAIProvider
+        assert LLMFactory.list_providers() == EXPECTED_ORDER + ["fake"]
+
+    def test_new_provider_with_class_override(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """key≠claude 且 id≠openai 的新 Provider 经 _CLASS_OVERRIDES 显式声明实现类"""
+        data = {
+            "providers": AVAILABLE_MODELS["providers"]
+            + [{"key": "fancy", "id": "proprietary", "name": "Fancy", "models": []}],
+        }
+        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", data)
+        monkeypatch.setitem(factory_module._CLASS_OVERRIDES, "fancy", _OverrideProvider)
+        _reset_registry()
+        LLMFactory.register_builtin_providers()
+
+        assert LLMFactory._providers["fancy"] is _OverrideProvider
+
+
+class TestGetProvider:
+    """get_provider 公共路径：注册名实例化 + 未注册名报错（懒加载兜底不变）"""
+
+    def test_get_provider_returns_instance_for_registered_name(self) -> None:
+        """注册名返回对应实现类实例（构造客户端不发网络请求）"""
+        _reset_registry()
+        provider = LLMFactory.get_provider("claude", "test-key")
+        assert type(provider) is ClaudeProvider
+
+    def test_get_provider_raises_for_unregistered_name(self) -> None:
+        """未注册名报 ValueError（消息与现状逐字一致）"""
+        _reset_registry()
+        with pytest.raises(ValueError, match="不支持的 Provider"):
+            LLMFactory.get_provider("bogus", "test-key")
+
+
+class TestMalformedData:
+    """Falsify：派生逻辑对畸形 AVAILABLE_MODELS 的行为必须明确、可诊断"""
+
+    def test_empty_providers_list_registers_nothing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """空清单：注册为无操作，不报错"""
+        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", {"providers": []})
+        _reset_registry()
+        LLMFactory.register_builtin_providers()
+
+        assert LLMFactory._providers == {}
+        assert LLMFactory.list_providers() == []
+
+    def test_provider_missing_key_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """条目缺 key 字段：显式报错（注册名依赖 key）"""
+        monkeypatch.setattr(
+            factory_module,
+            "AVAILABLE_MODELS",
+            {"providers": [{"id": "openai", "name": "X", "models": []}]},
+        )
+        _reset_registry()
+        with pytest.raises(ValueError, match="key"):
+            LLMFactory.register_builtin_providers()
+
+    def test_unresolvable_provider_raises_with_override_hint(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """key≠claude 且 id≠openai 且无覆盖：报错并提示 _CLASS_OVERRIDES 出路"""
+        monkeypatch.setattr(
+            factory_module,
+            "AVAILABLE_MODELS",
+            {"providers": [{"key": "weird", "id": "custom", "name": "W", "models": []}]},
+        )
+        _reset_registry()
+        with pytest.raises(ValueError, match="_CLASS_OVERRIDES"):
+            LLMFactory.register_builtin_providers()
+
+    def test_duplicate_protocol_id_registers_all_to_same_class(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """重复 id（多 Provider 共享协议）是合法形态：各自按 id 规则注册"""
+        monkeypatch.setattr(
+            factory_module,
+            "AVAILABLE_MODELS",
+            {
+                "providers": [
+                    {"key": "a", "id": "openai", "name": "A", "models": []},
+                    {"key": "b", "id": "openai", "name": "B", "models": []},
+                    {"key": "claude", "id": "claude", "name": "C", "models": []},
+                ]
+            },
+        )
+        _reset_registry()
+        LLMFactory.register_builtin_providers()
+
+        assert LLMFactory._providers == {
+            "a": OpenAIProvider,
+            "b": OpenAIProvider,
+            "claude": ClaudeProvider,
+        }
+
+    def test_duplicate_key_last_wins_without_crash(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """重复 key：注册不崩溃，后者覆盖前者（dict 语义）"""
+        monkeypatch.setattr(
+            factory_module,
+            "AVAILABLE_MODELS",
+            {
+                "providers": [
+                    {"key": "dup", "id": "openai", "name": "D1", "models": []},
+                    {"key": "dup", "id": "openai", "name": "D2", "models": []},
+                ]
+            },
+        )
+        _reset_registry()
+        LLMFactory.register_builtin_providers()
+
+        assert LLMFactory._providers["dup"] is OpenAIProvider
+
+
+class TestSettingApiMapDerivation:
+    """设置映射派生：内容与现状逐项一致，_resolve_api_provider 语义不变"""
+
+    def test_provider_api_map_matches_current_six(self) -> None:
+        """_PROVIDER_API_MAP 派生结果 == 现状 6 项（第三方 → openai）"""
+        assert setting_service._PROVIDER_API_MAP == {
+            "deepseek": "openai",
+            "qwen": "openai",
+            "kimi": "openai",
+            "glm": "openai",
+            "minimax": "openai",
+            "step": "openai",
+        }
+
+    def test_resolve_api_provider_semantics(self) -> None:
+        """claude/openai 回退自身；共享协议者映射到 openai；未知 Provider 原样返回"""
+        assert setting_service._resolve_api_provider("claude") == "claude"
+        assert setting_service._resolve_api_provider("openai") == "openai"
+        assert setting_service._resolve_api_provider("deepseek") == "openai"
+        assert setting_service._resolve_api_provider("unknown") == "unknown"
