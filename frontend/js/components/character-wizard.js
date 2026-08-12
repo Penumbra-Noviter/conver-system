@@ -21,6 +21,7 @@ import { escapeHtml } from '../utils.js';
 import { CHARACTER_TEMPLATES } from '../data/character-templates.js';
 import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
+import { splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit } from './character-submit.js';
 
 /**
  * 打开角色创建向导
@@ -476,7 +477,7 @@ function bindStep3Events(state, body) {
     if (nameInput) nameInput.addEventListener('input', () => { state.name = nameInput.value.trim(); });
     if (descInput) descInput.addEventListener('input', () => { state.description = descInput.value.trim(); });
     if (tagsInput) tagsInput.addEventListener('input', () => {
-        state.tags = tagsInput.value ? tagsInput.value.split(/[,，]/).map(t => t.trim()).filter(Boolean) : [];
+        state.tags = splitTags(tagsInput.value);
     });
     if (avatarInput) {
         avatarInput.addEventListener('input', () => {
@@ -588,39 +589,29 @@ async function handleSave(state, statusEl, submitBtn, close, onSuccess) {
         return;
     }
 
-    const data = {
+    // 11 字段 payload 组装收敛到角色提交域深模块（wizard 恒 create，creator 恒空）
+    const data = buildCharacterPayload({
         name: state.name,
-        description: state.description || '',
-        personality: state.personality || '',
-        scenario: state.scenario || '',
-        first_mes: state.first_mes || '',
-        mes_example: state.mes_example || '',
-        system_prompt: state.system_prompt || '',
-        tags: state.tags || [],
+        description: state.description,
+        personality: state.personality,
+        scenario: state.scenario,
+        first_mes: state.first_mes,
+        mes_example: state.mes_example,
+        system_prompt: state.system_prompt,
         temperature: state.temperature,
-        avatar: state.avatar || null,
+        avatar: state.avatar,
         creator: '',
-    };
+        tags: state.tags,
+    });
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = '保存中…';
-    statusEl.textContent = '';
-    statusEl.className = 'form-status';
+    // 提交态状态机（禁用/文案/状态栏/600ms 延时关窗/失败恢复收敛到深模块）
+    beginSubmit(submitBtn, statusEl);
 
     try {
         await characters.create(data);
-        statusEl.innerHTML = `${iconHtml('check', { size: 14 })} 创建成功`;
-        statusEl.className = 'form-status success';
-
-        setTimeout(() => {
-            close();
-            if (onSuccess) onSuccess();
-        }, 600);
+        succeedSubmit(statusEl, `${iconHtml('check', { size: 14 })} 创建成功`, close, onSuccess);
     } catch (err) {
-        statusEl.innerHTML = `${iconHtml('x', { size: 14 })} ${escapeHtml(err.message)}`;
-        statusEl.className = 'form-status error';
-        submitBtn.disabled = false;
-        submitBtn.textContent = '保存角色';
+        failSubmit(submitBtn, statusEl, err, '保存角色');
     }
 }
 

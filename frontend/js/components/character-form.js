@@ -14,6 +14,7 @@ import { escapeHtml } from '../utils.js';
 import { showConfirm } from './confirm-dialog.js';
 import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
+import { splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit } from './character-submit.js';
 
 /**
  * 打开角色表单模态框
@@ -188,8 +189,8 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                     if (!confirmed) return;
                 }
 
-                // 收集数据
-                const data = {
+                // 收集数据（11 字段 payload 组装收敛到角色提交域深模块）
+                const data = buildCharacterPayload({
                     name,
                     description: overlay.querySelector('#cf-description').value.trim(),
                     personality,
@@ -197,38 +198,26 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                     scenario: overlay.querySelector('#cf-scenario').value.trim(),
                     mes_example: overlay.querySelector('#cf-mes-example').value.trim(),
                     system_prompt: overlay.querySelector('#cf-system-prompt').value.trim(),
-                    temperature: parseFloat(tempSlider.value),
-                    avatar: avatarInput.value.trim() || null,
+                    temperature: tempSlider.value,
+                    avatar: avatarInput.value.trim(),
                     creator: overlay.querySelector('#cf-creator').value.trim(),
-                    tags: tagsToArray(overlay.querySelector('#cf-tags').value.trim()),
-                };
+                    tags: splitTags(overlay.querySelector('#cf-tags').value.trim()),
+                });
 
-                // 提交按钮状态
+                // 提交态状态机（禁用/文案/状态栏/600ms 延时关窗/失败恢复收敛到深模块）
                 const submitBtn = overlay.querySelector('#cf-submit');
-                submitBtn.disabled = true;
-                submitBtn.textContent = '保存中…';
-                statusEl.textContent = '';
-                statusEl.className = 'form-status';
+                beginSubmit(submitBtn, statusEl);
 
                 try {
                     if (isEdit) {
                         await characters.update(char.id, data);
-                        statusEl.innerHTML = `${iconHtml('check', { size: 14 })} 更新成功`;
+                        succeedSubmit(statusEl, `${iconHtml('check', { size: 14 })} 更新成功`, close, onSuccess);
                     } else {
                         await characters.create(data);
-                        statusEl.innerHTML = `${iconHtml('check', { size: 14 })} 创建成功`;
+                        succeedSubmit(statusEl, `${iconHtml('check', { size: 14 })} 创建成功`, close, onSuccess);
                     }
-                    statusEl.className = 'form-status success';
-
-                    setTimeout(() => {
-                        close();
-                        if (onSuccess) onSuccess();
-                    }, 600);
                 } catch (err) {
-                    statusEl.innerHTML = `${iconHtml('x', { size: 14 })} ${escapeHtml(err.message)}`;
-                    statusEl.className = 'form-status error';
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = isEdit ? '保存修改' : '创建角色';
+                    failSubmit(submitBtn, statusEl, err, isEdit ? '保存修改' : '创建角色');
                 }
             });
         },
@@ -236,17 +225,9 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
 }
 
 /**
- * 将标签数组转为逗号分隔字符串
+ * 将标签数组转为逗号分隔字符串（表单字段显示）
  */
 function tagsToComma(tags) {
     if (!Array.isArray(tags) || tags.length === 0) return '';
     return tags.join(', ');
-}
-
-/**
- * 将逗号分隔的标签文本转为标签数组
- */
-function tagsToArray(tags) {
-    if (!tags) return [];
-    return tags.split(/[,，]/).map(t => t.trim()).filter(Boolean);
 }
