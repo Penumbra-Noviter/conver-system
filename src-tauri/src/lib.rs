@@ -223,9 +223,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             // 二次实例回调（只会在首个实例上触发）：聚焦已有实例主窗口
             if let Some(window) = app.get_webview_window(tray::MAIN_WINDOW_LABEL) {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
+                tray::focus_main_window(&window);
             }
         }))
         .plugin(
@@ -279,4 +277,76 @@ pub fn run() {
             }
             _ => {}
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+
+    /// `CONVER_READY_TIMEOUT_SECS` 测试串行化互斥锁：
+    /// cargo test 默认多线程并行，`set_var` 竞争会让断言读到其他用例写入的值；
+    /// 用 std 互斥锁串行（不引 serial_test 依赖，D-D4-2）。
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    /// 契约（T-18）：合法值 → 对应秒数。
+    /// 读后即清理环境变量（断言失败也不污染其他用例）。
+    #[test]
+    fn ready_timeout_uses_valid_env_value() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("CONVER_READY_TIMEOUT_SECS", "5");
+        let got = ready_timeout_from_env();
+        std::env::remove_var("CONVER_READY_TIMEOUT_SECS");
+        assert_eq!(got, Duration::from_secs(5));
+    }
+
+    /// 契约：`0` 可被 `u64` 解析，属合法分支 → 0 秒（不是回退默认；
+    /// 产品逻辑零改动，行为与现状一致）。
+    #[test]
+    fn ready_timeout_zero_is_valid_immediate_timeout() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("CONVER_READY_TIMEOUT_SECS", "0");
+        let got = ready_timeout_from_env();
+        std::env::remove_var("CONVER_READY_TIMEOUT_SECS");
+        assert_eq!(got, Duration::from_secs(0));
+    }
+
+    /// 契约：非数字 → 默认 60s。
+    #[test]
+    fn ready_timeout_falls_back_on_non_numeric() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("CONVER_READY_TIMEOUT_SECS", "abc");
+        let got = ready_timeout_from_env();
+        std::env::remove_var("CONVER_READY_TIMEOUT_SECS");
+        assert_eq!(got, Duration::from_secs(60));
+    }
+
+    /// 契约：负数 → 默认 60s（`u64` 解析失败）。
+    #[test]
+    fn ready_timeout_falls_back_on_negative() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("CONVER_READY_TIMEOUT_SECS", "-5");
+        let got = ready_timeout_from_env();
+        std::env::remove_var("CONVER_READY_TIMEOUT_SECS");
+        assert_eq!(got, Duration::from_secs(60));
+    }
+
+    /// 契约：溢出 `u64` 的超长字符串 → 默认 60s（`u64::MAX + 1`）。
+    #[test]
+    fn ready_timeout_falls_back_on_overflow() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("CONVER_READY_TIMEOUT_SECS", "18446744073709551616");
+        let got = ready_timeout_from_env();
+        std::env::remove_var("CONVER_READY_TIMEOUT_SECS");
+        assert_eq!(got, Duration::from_secs(60));
+    }
+
+    /// 契约：缺失 → 默认 60s。
+    #[test]
+    fn ready_timeout_falls_back_when_missing() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::remove_var("CONVER_READY_TIMEOUT_SECS");
+        assert_eq!(ready_timeout_from_env(), Duration::from_secs(60));
+    }
 }
