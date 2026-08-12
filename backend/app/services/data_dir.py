@@ -16,7 +16,9 @@ Rust 侧 `src-tauri/tests/server_test.rs` 互引同一版本号）；URL 编码�
 侧不做编码——resolve 返回的 Path 必须与用户给定值**非分隔符字符**逐字符一致
 （空格/中文/`#`/`%` 等一律原样）；**仅分隔符按 pathlib 规范化**——重复分隔符
 折叠（`//` → `/`）、`.` 段消除、尾分隔符去除；`..` 段原样保留，由文件系统在
-访问时解析。
+访问时解析。**UNC 前导特例（TD-16）**：`Path('//server/share/x')` 保留 UNC
+前缀**不折叠**（Windows；实测背书：`parts == ('\\\\server\\share\\', 'x')`）——
+折叠只作用于路径分段内部，不作用于盘符/UNC 前导。
 
 G4 约束：本模块**仅允许 stdlib import**（导入链已核实无副作用：
 `backend/app/__init__.py` 为空包、`backend/app/services/__init__.py` 为纯

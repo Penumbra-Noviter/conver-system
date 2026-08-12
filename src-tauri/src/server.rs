@@ -400,6 +400,12 @@ pub fn data_dir_path(base: &Path) -> PathBuf {
 /// `%APPDATA%\ConverSystem` → `%USERPROFILE%\AppData\Roaming\ConverSystem`
 /// （对齐 Python 侧 `home\AppData\Roaming` 兜底，决策 D1-D2）。
 /// USERPROFILE 也缺失的不可达场景保留 CWD 末位兜底（正常 Windows 环境必有 USERPROFILE）。
+///
+/// 透传契约注记（TD-24）：CONVER_DATA_DIR 分支返回 raw PathBuf **有意为之**——
+/// resolve 链契约三端一致（壳 / 后端 / 迁移脚本），Rust 侧不做任何路径改写；
+/// 分隔符规范化（重复分隔符折叠 / 尾分隔符去除 / UNC 前缀保留）仅 Python 侧
+/// pathlib 构造的固有行为；物理一致性（大小写 / 8.3 短路径名）由 Win32 容错
+/// + Python 侧规范化保证。
 pub fn default_data_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("CONVER_DATA_DIR") {
         if !dir.is_empty() {
