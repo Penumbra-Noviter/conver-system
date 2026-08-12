@@ -16,14 +16,22 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from backend.app.api.errors import domain_error_handler, llm_error_handler
 from backend.app.api.routes import characters, chat, conversations, messages, models, settings
+from backend.app.services.exceptions import DomainError
 from backend.app.services.llm import LLMFactory
+from backend.app.services.llm.errors import LLMError
 
 app = FastAPI(
     title="Conver System",
     description="本地优先、多模型可切换的角色对话系统",
     version="0.1.0",
 )
+
+
+# ── 注册统一错误 handler（领域异常族 + LLM 异常族，Starlette 按 MRO 匹配子类）──
+app.add_exception_handler(DomainError, domain_error_handler)
+app.add_exception_handler(LLMError, llm_error_handler)
 
 
 # ── 注册 API 路由 ──

@@ -15,7 +15,6 @@ from backend.app.schemas.character import CharacterCreate, CharacterResponse, Ch
 from backend.app.services import character as service
 from backend.app.services.character_card import from_v2_card, to_v2_card
 from backend.app.services.document_parser import parse_document
-from backend.app.services.exceptions import CardFormatError, CardValidationError, DocParseError
 
 router = APIRouter(prefix="/api/characters", tags=["角色管理"])
 
@@ -81,21 +80,9 @@ async def parse_character_document(
 
     用户粘贴角色设定文档 → LLM 自动提取 name / personality / first_mes 等字段 → 返回结构化数据。
     前端可将结果预填入创建向导的各步骤。
+    DocParseError 上抛，由统一 exception handler 转 422 + 纯原因。
     """
-    try:
-        return await parse_document(db, request.text, request.provider, request.model)
-    except DocParseError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
-
-
-_IMPORT_FORMAT_HINT = (
-    "支持格式：SillyTavern V2 角色卡（spec=chara_card_v2）、data 信封、"
-    "裸 data（含 name 字段）、V1 旧卡（含 char_name 字段）；"
-    "也可改用「创建角色」向导（智能导入/模板/手动）"
-)
+    return await parse_document(db, request.text, request.provider, request.model)
 
 
 @router.post("/import", response_model=CharacterResponse, status_code=status.HTTP_201_CREATED)
@@ -104,18 +91,8 @@ def import_character(card: dict, db: Session = Depends(get_db)) -> CharacterResp
 
     流程：from_v2_card 归一化 → 直接新建落库（D3 允许重名），
     不校验完整性（D6 导入路径不参与完整性引导）。
-    无法识别的卡 / 缺 name → 422 友好报错（格式错误附带支持格式说明，引导改用向导）。
+    无法识别的卡 / 缺 name → CardFormatError / CardValidationError 上抛，
+    由统一 exception handler 转 422 友好报错（格式错误附带支持格式说明，引导改用向导）。
     """
-    try:
-        data = from_v2_card(card)
-    except CardFormatError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"导入失败：{exc}。{_IMPORT_FORMAT_HINT}",
-        ) from exc
-    except CardValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"导入失败：{exc}",
-        ) from exc
+    data = from_v2_card(card)
     return service.create_character(db, data)

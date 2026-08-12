@@ -6,7 +6,8 @@ T-03（ARC9-B1）聊天服务层直测 — chat_error_response / prepare_chat / 
     2. prepare_chat 直接测试（领域异常路径 + 正常路径 ChatContext 字段）
     3. complete_chat 正常路径（fake provider → ChatResponse + 落库）与
        LLM 错误路径（HTTPException 状态码/消息逐字，与路由旧行为等价）
-    4. 路由映射层薄壳（create_chat / _prepare_or_raise 退化后的行为等价）
+    4. 路由薄化后直测（create_chat / stream_chat：领域异常上抛由统一 handler 转 HTTP；
+       LLM 错误经 complete_chat 显式 raise HTTPException）
 
 依赖：pytest + SQLite 内存库（conftest.db_session）+ monkeypatch LLMFactory.get_provider。
 不构造真实网络请求；不手工构造 ChatContext（stream_reply 隔离测试留在 test_p35.py）。
@@ -311,7 +312,7 @@ class TestCompleteChat:
             await chat_service.complete_chat(db_session, req)
 
 
-# ── 4. 路由映射层薄壳（create_chat / _prepare_or_raise 退化后行为等价）──
+# ── 4. 路由薄化后直测（create_chat / stream_chat 领域异常上抛、LLM 错误转 HTTPException）──
 
 
 class _FakeRequest:
@@ -322,7 +323,7 @@ class _FakeRequest:
 
 
 class TestCreateChatRoute:
-    """POST /api/chats 路由退化为映射层：领域异常转 HTTP + 成功路径"""
+    """POST /api/chats 路由薄化后：领域异常上抛（统一 handler 转 404/400，wire 断言在 test_error_handler.py）+ 成功路径"""
 
     async def test_success(self, db_session, monkeypatch) -> None:
         """成功路径：响应体 {reply, message_id, conversation_id}（响应契约不变）"""
@@ -339,21 +340,19 @@ class TestCreateChatRoute:
         assert isinstance(resp.message_id, int)
 
     async def test_domain_error_404(self, db_session) -> None:
-        """领域异常（对话不存在）→ 404 + str(e) 逐字"""
+        """领域异常（对话不存在）→ 上抛 ConversationNotFoundError（统一 handler 转 404 + 逐字 detail）"""
         req = ChatRequest(conversation_id=99999, content="你好")
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(ConversationNotFoundError) as exc:
             await chat_route.create_chat(req, db_session)
-        assert exc.value.status_code == 404
-        assert exc.value.detail == "对话不存在"
+        assert str(exc.value) == "对话不存在"
 
     async def test_domain_error_400_missing_key(self, db_session) -> None:
-        """领域异常（无 API Key）→ 400 + str(e) 逐字"""
+        """领域异常（无 API Key）→ 上抛 ApiKeyMissingError（统一 handler 转 400 + 逐字 detail）"""
         conv = _create_conversation(db_session)
         req = ChatRequest(conversation_id=conv.id, content="你好")
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(ApiKeyMissingError) as exc:
             await chat_route.create_chat(req, db_session)
-        assert exc.value.status_code == 400
-        assert "API Key" in exc.value.detail
+        assert "API Key" in str(exc.value)
 
     async def test_llm_error_401(self, db_session, monkeypatch) -> None:
         """LLM 异常经 complete_chat 转 HTTPException 后穿透路由 → 401 逐字"""
@@ -369,9 +368,7 @@ class TestCreateChatRoute:
         assert exc.value.detail == "claude API Key 无效，请在设置中更新"
 
     async def test_stream_path_domain_error_404(self, db_session) -> None:
-        """流式路径 _prepare_or_raise 领域异常分支 → 404（统一走 chat_error_response）"""
+        """流式路径领域异常（对话不存在）→ 上抛 ConversationNotFoundError（统一 handler 转 404）"""
         req = ChatRequest(conversation_id=99999, content="你好")
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(ConversationNotFoundError):
             await chat_route.stream_chat(req, _FakeRequest(), db_session)
-        assert exc.value.status_code == 404
-        assert exc.value.detail == "对话不存在"

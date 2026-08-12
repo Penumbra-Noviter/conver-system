@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from backend.app.database import get_db
 from backend.app.schemas.settings import ConnectionTestRequest, ConnectionTestResponse
 from backend.app.services import setting as setting_service
+from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm.errors import LLMError
 from backend.app.services.llm.factory import LLMFactory
 
@@ -45,10 +46,12 @@ async def test_connection(
         - Key / URL → setting_service（provider 特定 → 同协议槽位 → 跨协议兜底）
         - 模型 → 当前默认模型（用户配置的），避免用硬编码模型导致误报
     失败返回 400 及用户可读的原因（Key 无效 / 网络不可达 / 模型无权限等）。
+    领域族（provider 校验）走统一 exception handler 转 400（D-B3-1：
+    test-connection 不走 LLM 族统一映射，LLMError/无 Key 保持局部 400 语义）。
     """
     provider = data.provider
     if provider not in LLMFactory.list_providers():
-        raise HTTPException(status_code=400, detail=f"不支持的 Provider: {provider}")
+        raise ProviderNotSupportedError(f"不支持的 Provider: {provider}")
 
     api_key = data.api_key or setting_service.api_key(db, provider)
     if not api_key:
