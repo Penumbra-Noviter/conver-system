@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-12 — 技术债区批次：16 项遗留清零全自动 kickoff）
+
+- **技术债区批次完成（6 工单全归档，merge 链 bd0eb81/ed7a3ac）**：TICKETS 技术债区 16 项（ARC9-1~8 + ARC10-1~5 + T-04~06）清零。Grilling 共识：4 做 + 2 拍板 + 10 项复核确认维持（审计快照复核惯例——逐项 git grep 核实「仍成立/已就绪」后判关闭，保留原始描述便于对照）。**T-A1** 搜索视图绑定守卫（模块级 bound 标志兑现 docstring 幂等声称；Falsify 发现防抖路径共享 searchTimeout 天然免疫双发、真实双发点在 Enter 立即搜索路径——测试锁定 Enter）**T-A2** 设置面板 no-op 守卫（initProviderDropdown 早退 + 两处 `?.` 对齐 314 行先例）**T-A3** 删除 toggleConvList 死代码（app.js -8 行，grep 零残留，活替代内联保留）**T-B1** 401 消息条件模板消除前导空格（provider 非空带前缀/空时基础文案；含 1 处已申报断言更新——test_error_handler.py 146 行期望值去空格，钉住缺陷形态的反例必要）**T-B2** 未知领域异常 400 对齐（chat.py 兜底 +1 行，与 api/errors.py handler 归一；422 家族防御性不可达）**T-B3** POSIX 路径警告文档（docs/tauri-desktop.md +2 行，代码零改动——不归一化是逐字符契约）
+- **过程遥测**：波 1 前端 3 并行、波 2 后端 2 并行（T-B1→T-B2 同代理串行链）；merge 零回退冲突；波末降配审核两轮无阻断（波 1：F1-F6，T-A2 守卫半兑现实证——provider 在/model 缺 refreshModelOptions 未守卫；波 2：F1-F10，test_error_handler 断言更新必要性 F8 实证）；T-A1 首版测试恒真教训——按工单字面用防抖路径红不起来，改锁 Enter 双发路径才可证伪
+- **期末四轴：0 阻断**；8 非阻断观察去重后 7 项落技术债区（TD-1~7：422 家族双址分叉/data_dir docstring 契约版本 v1 漂移/守卫作用域文档化/T-A2 半兑现/事件期 null/provider 类型标注/POSIX 措辞）
+- **4.5 运行态冒烟**：后端 uvicorn GET / + /docs + /api/models + /api/settings 全 200；GUI（Playwright 375px+桌面）：搜索防抖 1 次请求/Enter 无双发/结果跳转（XSS 消息安全渲染）→ 设置面板 8 Provider 联动 → 移动端侧栏 ☰ 展开收起往返（活替代路径回归）全过；console 无新错误（favicon 404 基线既有）；computed style 验证替代视觉（模型无图像输入）；测试中 Playwright 坐标 stale 现象（展开后按钮 rect 0×0 + 视图漂移）为工具问题，干净重测正常
+- **G12 文档同步（本批次）**：TICKETS（16 项清零：6 归档 + 10 关闭记录 + 落 TD-1~7）；CLAUDE.md（测试数 358+1skip/365/52 + 状态行）；DEV_LOG 本段
+- **测试**：pytest **358 + 1 skip** / Vitest **365** / cargo test **52** 全绿（基线 356+1skip/362/52 → 期末 +2/+3）
+
+---
+
 ## 滚动摘要（2026-08-12 — ARC-10 架构深化批次：剩余 8 候选全自动 kickoff）
 
 - **ARC-10 完成（8 工单全归档，merge 链 4ffc1d2/241a7b6）**：用户下令「剩余候选也做完」——架构审查报告未选 8 候选全落地。**T-11** modal 骨架收口（character-form/wizard 手写骨架全走 openModal + headerExtra 插槽；**C3-DEFER 兑现**：character-modal.test.js 36 用例真实 modal.js 骨架级测试）**T-12** character-submit.js 角色域深模块（payload 11 字段/splitTags/提交态状态机 5 导出，form/wizard 各瘦身约 200 行）**T-13** 微重复收口（autoResizeInput×3/EMPTY_HEADER_HTML×2/avatarImgHtml×4 参数化；**注入三制统一明确不做**——共识 D-C7-1）**T-14** Provider 清单单一来源（AVAILABLE_MODELS 派生注册+setting 映射；**删 llm/__init__ 包级 provider 导出**——包导入零 SDK 副作用契约，main.py 消费点验证）**T-15** 统一 exception handler（api/errors.py 领域族+LLM 族两枚 handler，chat/characters/settings 路由薄化；test-connection 保 400 语义 D-B3-1）**T-16** style.css 无头覆盖区归位（70 规则零内容改动 + 37 项保序断言；新增 --on-danger token 勿并入 --danger-text）**T-17** schema 快照+漂移检测（19 列快照替换手抄 17 列——漂移实锤；漂移注入 9/9 捕获；spec 文本断言改行为断言）**T-18** 聚焦序列收口（focus_main_window）+ ready_timeout_from_env 契约测试（cfg(test) 6 用例含 0s 合法分支钉死）
