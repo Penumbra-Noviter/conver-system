@@ -33,6 +33,7 @@
     --danger-soft: rgba(207, 116, 98, 0.13);
     --danger-bg: rgba(207, 116, 98, 0.15);
     --danger-text: #efb6aa;
+    --on-danger: #fffdf8;
     --warning: #d29a47;
     --warning-soft: rgba(210, 154, 71, 0.13);
 
@@ -104,6 +105,7 @@
         --accent-soft: rgba(169, 111, 29, 0.12);
         --accent-contrast: #fffbf4;
         --on-accent: var(--accent-contrast);
+        --on-danger: #fffdf8;
         --overlay: rgba(42, 33, 23, 0.42);
         --shadow-sm: 0 1px 3px rgba(63, 45, 27, 0.07);
         --shadow-md: 0 8px 24px rgba(63, 45, 27, 0.10);
@@ -131,6 +133,7 @@
     --accent-soft: rgba(169, 111, 29, 0.12);
     --accent-contrast: #fffbf4;
     --on-accent: var(--accent-contrast);
+    --on-danger: #fffdf8;
     --overlay: rgba(42, 33, 23, 0.42);
     --shadow-sm: 0 1px 3px rgba(63, 45, 27, 0.07);
     --shadow-md: 0 8px 24px rgba(63, 45, 27, 0.10);
@@ -412,6 +415,21 @@ body {
     background: var(--panel-4);
     color: var(--ink-1);
 }
+/* ── 侧栏 — 静态视觉覆盖补充 ──
+   （theme-toggle/.btn-collapse-* 为主归属；同条合写含 .btn-icon/.modal-close
+     最小点击尺寸，规则内容逐字保留不拆。） */
+.theme-toggle,
+.btn-collapse-sidebar,
+.btn-collapse-chat,
+.btn-icon,
+.modal-close {
+    min-width: 36px;
+    min-height: 36px;
+}
+
+.sidebar-footer {
+    padding: 12px 12px 14px;
+}
 
 /* ══════════════════════════════════════════════════
    主内容区
@@ -529,10 +547,6 @@ body {
     background: var(--panel-2);
 }
 
-.conversation-item.active {
-    background: var(--accent-soft);
-}
-
 .conversation-item .btn-delete-conv {
     position: absolute;
     top: 50%;
@@ -599,6 +613,32 @@ body {
     border-radius: var(--radius-xs);
     background: var(--panel-2);
     color: var(--ink-3);
+}
+/* ── 对话列表 — 静态视觉覆盖补充 ── */
+.conversation-list {
+    padding: 8px;
+}
+
+.empty-hint {
+    padding: 24px 12px;
+    color: var(--ink-4);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    text-align: center;
+}
+
+.conversation-item {
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 3px;
+}
+
+.conversation-item.active {
+    background: var(--accent-soft);
+}
+
+.conversation-item.active .title {
+    color: var(--ink-1);
 }
 
 /* 聊天主区域 */
@@ -757,6 +797,31 @@ body {
     line-height: 1;
     flex-shrink: 0;
 }
+/* ── 会话 tab 条 — 静态视觉覆盖补充 ── */
+.chat-tabs {
+    gap: 2px;
+    padding: 6px 12px 0;
+    align-items: flex-end;
+}
+
+.chat-tab {
+    min-height: 34px;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    border-bottom: 2px solid transparent;
+}
+
+.chat-tab.active {
+    background: var(--panel-1);
+    border-color: transparent transparent var(--accent);
+    color: var(--ink-1);
+}
+
+.chat-tab .tab-close {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-xs);
+}
 
 .chat-messages {
     flex: 1;
@@ -808,6 +873,13 @@ body {
     font-size: var(--text-sm);
     color: var(--ink-4);
     opacity: 0.7;
+}
+/* ── 消息滚动区 — 静态视觉覆盖补充 ── */
+.chat-messages {
+    width: min(100%, 920px);
+    margin: 0 auto;
+    padding: 28px max(24px, 5vw) 32px;
+    gap: 22px;
 }
 
 /* ══════════════════════════════════════════════════
@@ -1053,6 +1125,63 @@ body {
     font-style: italic;
     user-select: none;
 }
+/* ── 消息气泡 — 静态视觉覆盖补充 ──
+   保序铁律（OPT-1-FIX 教训）：本块 .message.assistant .message-content（0,3,0）
+   必须声明在 .message.assistant.message-error（0,4,0，上方错误气泡节）之后，
+   保持「后置覆盖 + 特异性压制」既有关系 —— 勿前移。 */
+.message {
+    max-width: min(88%, 760px);
+    animation: none;
+}
+
+.message.assistant {
+    max-width: min(100%, 760px);
+}
+
+.message-content {
+    padding: 12px 14px;
+    border-radius: var(--radius-bubble);
+    font-size: var(--text-md);
+    line-height: 1.78;
+}
+
+.message.assistant .message-content {
+    padding: 4px 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: var(--ink-2);
+    box-shadow: none;
+}
+
+.message.user .message-content {
+    background: var(--panel-3);
+    color: var(--ink-1);
+    border: 1px solid var(--border);
+    border-bottom-right-radius: var(--radius-bubble-tail);
+}
+
+.message.user .message-content a,
+.message.user .message-content strong {
+    color: var(--ink-1);
+}
+
+.msg-avatar {
+    margin-top: 4px;
+    border: 1px solid var(--border-strong);
+    box-shadow: none;
+}
+
+.msg-avatar.user-avatar {
+    background: var(--panel-4);
+    color: var(--ink-2);
+    border-color: var(--border-strong);
+}
+
+.message-content pre,
+.message-content code {
+    background: var(--panel-1);
+}
 
 /* ══════════════════════════════════════════════════
    输入区 — 聊天应用风格
@@ -1072,11 +1201,6 @@ body {
     border-radius: var(--radius-xl);
     padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.input-wrapper:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 #chat-input {
@@ -1165,6 +1289,46 @@ body {
 
 .option-toggle input[type="checkbox"] {
     accent-color: var(--accent);
+}
+/* ── 输入区 — 静态视觉覆盖补充 ──
+   （首条为聊天头部/视图头部/tab 条/输入区背景统一覆盖：.chat-input-area 原定义
+     在本节，覆盖须后置，故整块归输入区节。） */
+.chat-header,
+.chat-tabs,
+.chat-input-area,
+.view-header {
+    background: color-mix(in srgb, var(--bg) 94%, var(--page));
+}
+
+.chat-input-area {
+    padding: 12px max(16px, 4vw) 16px;
+}
+
+.input-wrapper {
+    max-width: 920px;
+    margin: 0 auto;
+    gap: 8px;
+    border-radius: var(--radius-md);
+    background: var(--panel-1);
+    padding: 6px 6px 6px 14px;
+    box-shadow: var(--shadow-sm);
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+#chat-input {
+    min-height: 44px;
+    padding: 10px 0;
+    line-height: 1.6;
+}
+
+.input-options {
+    max-width: 920px;
+    margin: 8px auto 0;
+    padding-left: 2px;
 }
 
 /* ══════════════════════════════════════════════════
@@ -1311,6 +1475,24 @@ body {
 .character-card-actions .btn-icon svg {
     width: 16px;
     height: 16px;
+}
+/* ── 角色卡片 — 静态视觉覆盖补充 ── */
+.character-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+    padding: 20px 24px 28px;
+}
+
+.character-card {
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    background: var(--bg);
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.character-card:hover {
+    box-shadow: none;
+    transform: none;
 }
 
 /* ══════════════════════════════════════════════════
@@ -1518,6 +1700,13 @@ input[type="range"]::-moz-range-thumb {
 .required {
     color: var(--danger);
 }
+/* ── 设置视图 — 静态视觉覆盖补充 ── */
+.settings-form {
+    width: min(100%, 720px);
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px;
+}
 
 /* ══════════════════════════════════════════════════
    通用按钮
@@ -1597,7 +1786,7 @@ input[type="range"]::-moz-range-thumb {
     border: none;
     border-radius: var(--radius);
     background: var(--danger);
-    color: #fffdf8;
+    color: var(--on-danger);
     font-family: var(--font-sans);
     font-size: var(--text-md);
     font-weight: 500;
@@ -1888,6 +2077,41 @@ input[type="range"]::-moz-range-thumb {
     font-size: 14px;
     flex-shrink: 0;
 }
+/* ── 模态框 — 静态视觉覆盖补充 ──
+   （.btn-send/.btn-primary/.btn-secondary/.btn-danger/.modal-cancel 最小尺寸覆盖归此节：
+     覆盖须后置 .modal-cancel 原定义 border-radius，故不能放通用按钮节。） */
+.btn-send,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.modal-cancel {
+    min-height: 44px;
+    border-radius: var(--radius-sm);
+}
+
+.btn-send {
+    width: 44px;
+    height: 44px;
+    background: var(--accent);
+    transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.btn-send:hover,
+.btn-primary:hover {
+    box-shadow: none;
+}
+
+.modal-overlay {
+    padding: 20px;
+    background: var(--overlay);
+    backdrop-filter: blur(3px);
+}
+
+.modal {
+    width: min(100%, 580px);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+}
 
 /* ══════════════════════════════════════════════════
    搜索视图
@@ -2129,6 +2353,36 @@ mark.search-highlight {
     border-radius: 3px;
     color: var(--accent);
 }
+/* ── 用户手册 — 静态视觉覆盖补充 ── */
+.guide-container {
+    width: min(100%, 760px);
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 24px;
+    gap: 28px;
+}
+
+.guide-section {
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.guide-section + .guide-section {
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+}
+
+.guide-section h3 {
+    font-size: var(--text-lg);
+    margin-bottom: 10px;
+}
+
+.guide-section p,
+.guide-section li {
+    line-height: 1.75;
+}
 
 /* ══════════════════════════════════════════════════
    思考指示器
@@ -2188,6 +2442,13 @@ mark.search-highlight {
 @keyframes dotPulse {
     0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
     40% { opacity: 1; transform: scale(1.1); }
+}
+/* ── 思考指示器 — 静态视觉覆盖补充 ── */
+.thinking-indicator {
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 
 /* ══════════════════════════════════════════════════
@@ -2770,295 +3031,10 @@ mark.search-highlight {
         padding: var(--space-3) var(--space-4) 0;
     }
 }
-
-/* ══════════════════════════════════════════════════
-   静态视觉底层：安静的私人写作工作台
-   ══════════════════════════════════════════════════ */
-
-html {
-    overflow-x: hidden;
-    background: var(--page);
-}
-
-html, body {
-    line-height: 1.6;
-}
-
-body {
-    min-width: 0;
-    background: var(--page);
-}
-
-button,
-input,
-textarea,
-select {
-    font: inherit;
-}
-
-button,
-[role="button"],
-input,
-textarea,
-select {
-    -webkit-tap-highlight-color: transparent;
-}
-
-:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-#sidebar,
-.chat-sidebar {
-    background: color-mix(in srgb, var(--bg) 92%, var(--page));
-}
-
-.sidebar-header {
-    padding: 22px 16px 14px;
-}
-
-.logo {
-    font-size: var(--text-xl);
-    font-weight: 650;
-    letter-spacing: 0;
-}
-
-.sidebar-nav {
-    padding: 10px 8px;
-    gap: 3px;
-}
-
-.nav-btn {
-    min-height: 44px;
-    padding: 10px 12px;
-    border-radius: var(--radius-sm);
-    transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.nav-btn.active {
-    background: var(--accent-soft);
-    color: var(--ink-1);
-    box-shadow: none;
-}
-
-.nav-btn.active::before {
-    left: 0;
-    width: 2px;
-    height: 18px;
-    border-radius: 0 2px 2px 0;
-    box-shadow: none;
-}
-
-.theme-toggle,
-.btn-collapse-sidebar,
-.btn-collapse-chat,
-.btn-icon,
-.modal-close {
-    min-width: 36px;
-    min-height: 36px;
-}
-
-.sidebar-footer {
-    padding: 12px 12px 14px;
-}
-
-.conversation-list {
-    padding: 8px;
-}
-
-.empty-hint {
-    padding: 24px 12px;
-    color: var(--ink-4);
-    font-size: var(--text-sm);
-    line-height: 1.6;
-    text-align: center;
-}
-
-.conversation-item {
-    padding: 10px 12px;
-    border-radius: var(--radius-sm);
-    margin-bottom: 3px;
-}
-
-.conversation-item.active {
-    background: var(--accent-soft);
-}
-
-.conversation-item.active .title {
-    color: var(--ink-1);
-}
-
-.chat-header,
-.chat-tabs,
-.chat-input-area,
-.view-header {
-    background: color-mix(in srgb, var(--bg) 94%, var(--page));
-}
-
-.chat-tabs {
-    gap: 2px;
-    padding: 6px 12px 0;
-    align-items: flex-end;
-}
-
-.chat-tab {
-    min-height: 34px;
-    padding: 7px 10px;
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    border-bottom: 2px solid transparent;
-}
-
-.chat-tab.active {
-    background: var(--panel-1);
-    border-color: transparent transparent var(--accent);
-    color: var(--ink-1);
-}
-
-.chat-tab .tab-close {
-    width: 24px;
-    height: 24px;
-    border-radius: var(--radius-xs);
-}
-
-.chat-messages {
-    width: min(100%, 920px);
-    margin: 0 auto;
-    padding: 28px max(24px, 5vw) 32px;
-    gap: 22px;
-}
-
-.message {
-    max-width: min(88%, 760px);
-    animation: none;
-}
-
-.message.assistant {
-    max-width: min(100%, 760px);
-}
-
-.message-content {
-    padding: 12px 14px;
-    border-radius: var(--radius-bubble);
-    font-size: var(--text-md);
-    line-height: 1.78;
-}
-
-.message.assistant .message-content {
-    padding: 4px 0;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    color: var(--ink-2);
-    box-shadow: none;
-}
-
-.message.user .message-content {
-    background: var(--panel-3);
-    color: var(--ink-1);
-    border: 1px solid var(--border);
-    border-bottom-right-radius: var(--radius-bubble-tail);
-}
-
-.message.user .message-content a,
-.message.user .message-content strong {
-    color: var(--ink-1);
-}
-
-.msg-avatar {
-    margin-top: 4px;
-    border: 1px solid var(--border-strong);
-    box-shadow: none;
-}
-
-.msg-avatar.user-avatar {
-    background: var(--panel-4);
-    color: var(--ink-2);
-    border-color: var(--border-strong);
-}
-
-.message-content pre,
-.message-content code {
-    background: var(--panel-1);
-}
-
-.thinking-indicator {
-    border-radius: var(--radius-sm);
-    background: transparent;
-    border: none;
-    box-shadow: none;
-}
-
-.chat-input-area {
-    padding: 12px max(16px, 4vw) 16px;
-}
-
-.input-wrapper {
-    max-width: 920px;
-    margin: 0 auto;
-    gap: 8px;
-    border-radius: var(--radius-md);
-    background: var(--panel-1);
-    padding: 6px 6px 6px 14px;
-    box-shadow: var(--shadow-sm);
-}
-
-.input-wrapper:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-#chat-input {
-    min-height: 44px;
-    padding: 10px 0;
-    line-height: 1.6;
-}
-
-.btn-send,
-.btn-primary,
-.btn-secondary,
-.btn-danger,
-.modal-cancel {
-    min-height: 44px;
-    border-radius: var(--radius-sm);
-}
-
-.btn-send {
-    width: 44px;
-    height: 44px;
-    background: var(--accent);
-    transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.btn-send:hover,
-.btn-primary:hover {
-    box-shadow: none;
-}
-
-.input-options {
-    max-width: 920px;
-    margin: 8px auto 0;
-    padding-left: 2px;
-}
-
-.character-grid {
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 12px;
-    padding: 20px 24px 28px;
-}
-
-.character-card {
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    background: var(--bg);
-    transition: border-color var(--transition-fast), background var(--transition-fast);
-}
-
-.character-card:hover {
-    box-shadow: none;
-    transform: none;
-}
-
+/* ── 角色创建向导 — 静态视觉覆盖补充 ──
+   （.character-card-meta/.template-card-tags/.meta-badge 组/.form-field input 组等
+     跨节覆盖的竞争原定义最靠后位于本节（.template-card-tags 2680 / .summary-tag 2745 /
+     .wizard-import-area textarea 2602），整块归此节保证覆盖后置。） */
 .character-card-meta,
 .template-card-tags {
     gap: 4px;
@@ -3071,43 +3047,6 @@ select {
     border-radius: var(--radius-xs);
 }
 
-.settings-form {
-    width: min(100%, 720px);
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 24px;
-}
-
-.guide-container {
-    width: min(100%, 760px);
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 24px;
-    gap: 28px;
-}
-
-.guide-section {
-    padding: 0;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-}
-
-.guide-section + .guide-section {
-    padding-top: 28px;
-    border-top: 1px solid var(--border);
-}
-
-.guide-section h3 {
-    font-size: var(--text-lg);
-    margin-bottom: 10px;
-}
-
-.guide-section p,
-.guide-section li {
-    line-height: 1.75;
-}
-
 .form-field input,
 .form-field select,
 .character-form-modal .form-field textarea,
@@ -3116,18 +3055,6 @@ select {
     min-height: 44px;
     border-radius: var(--radius-sm);
     background: var(--panel-1);
-}
-
-.modal-overlay {
-    padding: 20px;
-    background: var(--overlay);
-    backdrop-filter: blur(3px);
-}
-
-.modal {
-    width: min(100%, 580px);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
 }
 
 .wizard-modal {
@@ -3162,6 +3089,7 @@ select {
     box-shadow: none;
 }
 
+/* ── 响应式补充（hover/媒体查询块整块归位，块内顺序不拆散） ── */
 @media (hover: hover) and (pointer: fine) {
     .nav-btn:hover,
     .conversation-item:hover,
@@ -3284,4 +3212,83 @@ select {
     .settings-form {
         padding: 16px;
     }
+}
+
+/* ══════════════════════════════════════════════════
+   静态视觉底层：安静的私人写作工作台
+   ══════════════════════════════════════════════════ */
+
+html {
+    overflow-x: hidden;
+    background: var(--page);
+}
+
+html, body {
+    line-height: 1.6;
+}
+
+body {
+    min-width: 0;
+    background: var(--page);
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}
+
+button,
+[role="button"],
+input,
+textarea,
+select {
+    -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+#sidebar,
+.chat-sidebar {
+    background: color-mix(in srgb, var(--bg) 92%, var(--page));
+}
+
+.sidebar-header {
+    padding: 22px 16px 14px;
+}
+
+.logo {
+    font-size: var(--text-xl);
+    font-weight: 650;
+    letter-spacing: 0;
+}
+
+.sidebar-nav {
+    padding: 10px 8px;
+    gap: 3px;
+}
+
+.nav-btn {
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.nav-btn.active {
+    background: var(--accent-soft);
+    color: var(--ink-1);
+    box-shadow: none;
+}
+
+.nav-btn.active::before {
+    left: 0;
+    width: 2px;
+    height: 18px;
+    border-radius: 0 2px 2px 0;
+    box-shadow: none;
 }
