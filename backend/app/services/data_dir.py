@@ -13,7 +13,10 @@
 Rust 侧 `src-tauri/tests/server_test.rs` 互引同一版本号）；URL 编码（壳侧
 `database_url`）编码集 = {`?` → `%3F`}，其余字符（含空格/中文/`#`/`%`）一律
 原样保留（`?` 是 SQLAlchemy URL 解析器的唯一实际分隔符，防御性编码）；Python
-侧不做编码——resolve 返回的 Path 必须与用户给定值逐字符一致。
+侧不做编码——resolve 返回的 Path 必须与用户给定值**非分隔符字符**逐字符一致
+（空格/中文/`#`/`%` 等一律原样）；**仅分隔符按 pathlib 规范化**——重复分隔符
+折叠（`//` → `/`）、`.` 段消除、尾分隔符去除；`..` 段原样保留，由文件系统在
+访问时解析。
 
 G4 约束：本模块**仅允许 stdlib import**（导入链已核实无副作用：
 `backend/app/__init__.py` 为空包、`backend/app/services/__init__.py` 为纯

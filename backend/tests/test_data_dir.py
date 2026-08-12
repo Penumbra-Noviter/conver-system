@@ -61,12 +61,31 @@ class TestResolveContract:
         """契约表 v2：resolve 不编码——含 #/?/空格/中文的 CONVER_DATA_DIR 原样返回
 
         编码是壳侧 database_url 的职责（见 TestUrlEncodingReference 与 Rust 镜像用例）；
-        resolve 返回的 Path 必须与用户给定值逐字符一致，否则迁移/日志会写到错误位置。
+        resolve 返回的 Path 必须与用户给定值**非分隔符字符**逐字符一致（空格/中文/`#`/`%`
+        等一律原样），否则迁移/日志会写到错误位置；仅分隔符按 pathlib 规范化——重复
+        分隔符折叠、`.` 段消除、尾分隔符去除，`..` 段原样保留由文件系统在访问时解析
+        （规范化边界见 test_env_override_separators_normalized）。
         """
         special = tmp_path / "Conver 数据#目录?v1%"
         monkeypatch.setenv("CONVER_DATA_DIR", str(special))
         monkeypatch.setenv("APPDATA", str(tmp_path / "ignored"))
         assert data_dir_service.data_dir() == special
+
+    def test_env_override_separators_normalized(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """契约锁（基线即绿非先红，语义与 TD-12 先例一致）：resolve 仅分隔符按 pathlib 规范化
+
+        钉住 v2 契约边界，防实现漂移——与 test_env_override_keeps_special_chars_verbatim
+        互为补集（后者钉非分隔符原样，本用例钉分隔符规范化）：
+        重复分隔符折叠（`//` → `/`）与 `.` 段消除；`..` 段**不提前解析**，
+        原样保留于 parts，由文件系统在访问时解析。
+        """
+        monkeypatch.setenv("CONVER_DATA_DIR", "C:/a//b/./c")
+        monkeypatch.setenv("APPDATA", "C:/ignored")
+        assert data_dir_service.data_dir() == Path("C:/a/b/c")
+        monkeypatch.setenv("CONVER_DATA_DIR", "C:/a/../b")
+        assert ".." in data_dir_service.data_dir().parts
 
     def test_empty_env_treated_as_unset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """契约表 v2：CONVER_DATA_DIR="" 视为未设置（与壳侧 var_os 非空判定对齐）"""
