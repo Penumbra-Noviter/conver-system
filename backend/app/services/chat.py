@@ -195,7 +195,9 @@ def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int,
     两族映射并置于此（领域异常族 + LLM 异常族），状态码与消息与重构前逐字一致：
     - 领域异常族：ConversationNotFoundError→404、ApiKeyMissingError→400、
       ProviderNotSupportedError→400，detail=str(e)
-    - LLM 异常族：委托 llm_error_response（401 Auth 含 provider 模板、429/504 固定消息、400、502）
+    - LLM 异常族：委托 llm_error_response（401 Auth 含 provider 模板——provider 为空时
+      输出无前缀基础文案；429/504 固定消息、400、502）
+    - 未知领域异常（未入表子类）：400 + str(e)（与 api/errors.py 兜底语义对齐，ARC10-2）
     - 其余异常：502 + str(e) 兜底（防御性，当前调用方不会传入）
 
     Args:
@@ -210,6 +212,9 @@ def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int,
             return http_status, str(e)
     if isinstance(e, LLMError):
         return llm_error_response(e, provider or "")
+    if isinstance(e, DomainError):
+        # 未知领域异常子类：400 兜底（防御性；与 api/errors.py 未知分支语义对齐，ARC10-2）
+        return status.HTTP_400_BAD_REQUEST, str(e)
     return status.HTTP_502_BAD_GATEWAY, str(e)
 
 
@@ -220,7 +225,9 @@ def llm_error_response(e: LLMError, provider: str) -> tuple[int, str]:
             if fixed_msg is not None:
                 return status_code, fixed_msg
             if isinstance(e, LLMAuthError):
-                return status_code, f"{provider} API Key 无效，请在设置中更新"
+                # Provider 非空带前缀、为空时输出基础文案（按构造消除前导空格，ARC10-1）
+                prefix = f"{provider} " if provider else ""
+                return status_code, f"{prefix}API Key 无效，请在设置中更新"
             return status_code, str(e)
     return status.HTTP_502_BAD_GATEWAY, str(e)
 

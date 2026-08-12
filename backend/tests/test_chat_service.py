@@ -29,6 +29,7 @@ from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import (
     ApiKeyMissingError,
     ConversationNotFoundError,
+    DomainError,
     ProviderNotSupportedError,
 )
 from backend.app.services.llm.errors import (
@@ -138,6 +139,12 @@ class TestChatErrorResponse:
             "claude API Key 无效，请在设置中更新",
         )
 
+    def test_llm_auth_without_provider_no_leading_space(self) -> None:
+        """Falsify：LLMAuthError 不传 provider（空串）→ 401 + 基础文案，无前导空格"""
+        status_code, message = chat_service.chat_error_response(LLMAuthError("x"))
+        assert not message.startswith(" ")
+        assert (status_code, message) == (401, "API Key 无效，请在设置中更新")
+
     def test_llm_rate_limit_fixed_message(self) -> None:
         """LLMRateLimitError → 429 + 固定消息"""
         assert chat_service.chat_error_response(LLMRateLimitError("x"), "claude") == (
@@ -165,6 +172,15 @@ class TestChatErrorResponse:
     def test_unknown_exception_fallback_502(self) -> None:
         """Falsify：非领域非 LLM 异常 → 502 + str(e) 兜底（不抛错）"""
         assert chat_service.chat_error_response(RuntimeError("boom")) == (502, "boom")
+
+    def test_unknown_domain_subclass_fallback_400(self) -> None:
+        """Falsify：未知 DomainError 子类 → 400 + str(e)（与统一 handler 兜底语义对齐，ARC10-2）"""
+
+        class _MysteryDomainError(DomainError):
+            pass
+
+        exc = _MysteryDomainError("未知领域错误")
+        assert chat_service.chat_error_response(exc) == (400, "未知领域错误")
 
 
 # ── 2. prepare_chat 直接测试 ──
