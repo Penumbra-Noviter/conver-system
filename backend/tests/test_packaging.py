@@ -16,6 +16,7 @@ P6.4-2 单元测试 — 后端打包固化（backend/run_backend.py 启动器 + 
 
 from __future__ import annotations
 
+import ast
 import logging
 import logging.config
 import subprocess
@@ -303,3 +304,90 @@ class TestSpecFrontendPackaging:
         assert '"frontend"), "frontend"' not in spec_text
         assert '"frontend/node_modules"' not in spec_text
         assert '"frontend/tests"' not in spec_text
+
+    def test_runtime_datas_align_with_real_frontend_dir(self) -> None:
+        """行为级：_FRONTEND_RUNTIME 定义挂载的每个源路径真实存在于 frontend/ 运行子集
+
+        在 token/接线断言之上叠加：token 断言匹配「文本出现」，若定义漂移（变量
+        改名后接线同步改名、或定义指向不存在/错误路径）token 仍可能全匹配。
+        本测试解析定义本身（AST 提取 datas 元素）并与真实目录对齐——入口/样式/
+        脚本在列、node_modules/tests 不在列、index.html 挂 frontend/ 根。
+        """
+        datas = _spec_runtime_datas(self.SPEC_PATH)
+        assert datas, "_FRONTEND_RUNTIME 定义不得为空"
+        frontend = _frontend_dir()
+        assert frontend.is_dir(), f"frontend/ 目录不存在：{frontend}"
+        sources = [src for src, _ in datas]
+        for src in sources:
+            assert src.exists(), f"datas 挂载的源路径在 frontend/ 中不存在：{src}"
+            assert src.is_relative_to(frontend), f"datas 挂载源必须在 frontend/ 下：{src}"
+        # 入口/样式/脚本在列
+        for required in (frontend / "index.html", frontend / "css", frontend / "js"):
+            assert required in sources, f"datas 运行子集缺少 {required}"
+        # node_modules/tests 不在列
+        assert not any(s.is_relative_to(frontend / "node_modules") for s in sources)
+        assert not any(s.is_relative_to(frontend / "tests") for s in sources)
+        # 挂载目标对齐 _frontend_dir：index.html 必须落在 frontend/ 根（StaticFiles 入口）
+        targets = {t for _, t in datas}
+        assert {"frontend", "frontend/css", "frontend/js"} <= targets
+
+
+def _spec_runtime_datas(spec_path: Path) -> list[tuple[Path, str]]:
+    """解析 spec 文本中 _FRONTEND_RUNTIME 定义，返回 [(源路径, 挂载目标)]
+
+    AST 提取而非正则：变量改名（接线与定义同步改名）时找不到该名字 → 显式失败，
+    防「token 匹配但定义漂移」。源路径表达式为 `str(ROOT / "…" / "…")` 形态
+    （Path 拼接按字符串 token 归一），ROOT 按 spec 自身定义（Path(SPECPATH).parent）
+    绑定为 spec 所在目录的上级（仓库根）；不执行 spec 中的任意代码。
+    """
+    tree = ast.parse(spec_path.read_text(encoding="utf-8"))
+    root = spec_path.resolve().parent.parent
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == "_FRONTEND_RUNTIME":
+                if not isinstance(node.value, ast.Tuple):
+                    raise AssertionError("_FRONTEND_RUNTIME 定义必须是元组")
+                datas: list[tuple[Path, str]] = []
+                for el in node.value.elts:
+                    if not isinstance(el, ast.Tuple) or len(el.elts) != 2:
+                        raise AssertionError(
+                            f"_FRONTEND_RUNTIME 元素必须是 (源, 目标) 二元组：{ast.dump(el)}"
+                        )
+                    mount = el.elts[1]
+                    if not isinstance(mount, ast.Constant) or not isinstance(mount.value, str):
+                        raise AssertionError(f"挂载目标必须是字符串常量：{ast.dump(mount)}")
+                    datas.append((_datas_source_path(el.elts[0], root), mount.value))
+                return datas
+    raise AssertionError("spec 中未找到 _FRONTEND_RUNTIME 定义（变量被改名或删除？）")
+
+
+def _datas_source_path(expr: ast.expr, root: Path) -> Path:
+    """把 datas 源路径表达式还原为真实路径（Path 拼接形态按字符串 token 归一）
+
+    只接受 `str(ROOT / "…" / "…")` 形态（spec 既有写法）；其他形态显式失败，
+    提示同步本测试——防「token 匹配但定义漂移」。
+    """
+    if (
+        isinstance(expr, ast.Call)
+        and isinstance(expr.func, ast.Name)
+        and expr.func.id == "str"
+        and len(expr.args) == 1
+    ):
+        expr = expr.args[0]
+    tokens: list[str] = []
+
+    def walk(node: ast.AST) -> None:
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            walk(node.left)
+            walk(node.right)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            tokens.append(node.value)
+        elif isinstance(node, ast.Name) and node.id == "ROOT":
+            tokens.append(str(root))
+        else:
+            raise AssertionError(f"不支持的数据源表达式：{ast.dump(node)}")
+
+    walk(expr)
+    return Path(*tokens)

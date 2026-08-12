@@ -13,6 +13,8 @@ P6.4-3 单元测试 — 数据迁移脚本（backend/scripts/migrate_data.py）
     9. 路径含空格与中文
 
 依赖：纯 stdlib（sqlite3 + shutil），不依赖后端 app 代码。
+建表语句单一来源：backend/tests/fixtures/schema.sql 静态快照（快照即契约，
+漂移检测见 test_schema_snapshot.py——本文件不 import 应用代码，G4）。
 """
 
 from __future__ import annotations
@@ -41,6 +43,19 @@ from backend.scripts.migrate_data import (
 
 __all__: list[str] = []
 
+#: schema 静态快照（快照即契约，见 test_schema_snapshot.py 漂移检测）
+_SCHEMA_SNAPSHOT = Path(__file__).resolve().parent / "fixtures" / "schema.sql"
+
+#: 截断损坏形态 1：末页残缺——最后一页只留 1 字节（页头被毁，integrity_check 报问题行）
+TRUNCATED_1B = "partial-last-page"
+#: 截断损坏形态 2：整页丢失——截断至文件约 3/4（integrity_check 直接抛错）
+TRUNCATED_3Q = "quarter-file"
+#: 两种截断损坏形态 → 预期完整性错误文案（migrate 拒绝 / verify_database 报告共用）
+TRUNCATION_CASES = (
+    (TRUNCATED_1B, "完整性检查未通过"),
+    (TRUNCATED_3Q, "完整性检查失败"),
+)
+
 
 def _truncate_to(path: Path, new_size: int) -> None:
     """把数据库文件截断到指定字节数制造损坏（模拟末页残缺 / 整页丢失）"""
@@ -49,50 +64,38 @@ def _truncate_to(path: Path, new_size: int) -> None:
     path.write_bytes(data[:new_size])
 
 
+def _read_sqlite_page_size(path: Path) -> int:
+    """读取 SQLite 文件头声明的页大小（offset 16，大端 uint16；值 1 表示 64K）"""
+    page_size = int.from_bytes(path.read_bytes()[16:18], "big")
+    return 65536 if page_size == 1 else page_size
+
+
+def _make_truncated_db(tmp_path: Path, filename: str, damage: str) -> Path:
+    """构造一个被截断损坏的数据库文件（两种形态：末页残缺 / 整页丢失）
+
+    损坏量按真实页布局锚定（页大小取自库文件头）：末页残缺 = 最后一页只留
+    1 字节（integrity_check 报问题行）；整页丢失 = 截断至约 3/4 文件
+    （integrity_check 抛错）。历史「size-1」形态在真实 schema 下不再触发
+    损坏（末页是空闲空间），此处以页锚定重推导。
+    """
+    path = tmp_path / filename
+    _make_db(path)
+    page_size = _read_sqlite_page_size(path)
+    size = path.stat().st_size
+    if damage == TRUNCATED_1B:
+        _truncate_to(path, size - page_size + 1)
+    elif damage == TRUNCATED_3Q:
+        _truncate_to(path, size * 3 // 4)
+    else:
+        raise AssertionError(f"未知损坏形态：{damage}")
+    return path
+
+
 def _make_db(path: Path, name: str = "测试角色") -> None:
-    """用 sqlite3 直接构造一个合法的 Conver System 数据库（4 张核心表 + 数据）"""
+    """用 sqlite3 直接构造一个合法的 Conver System 数据库（schema 快照 + 数据）"""
     conn = sqlite3.connect(path)
     try:
-        conn.executescript(
-            """
-            CREATE TABLE characters (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name VARCHAR(100) NOT NULL,
-                description TEXT DEFAULT '',
-                personality TEXT DEFAULT '',
-                scenario TEXT DEFAULT '',
-                first_mes TEXT DEFAULT '',
-                mes_example TEXT DEFAULT '',
-                system_prompt TEXT DEFAULT '',
-                post_history_instructions TEXT DEFAULT '',
-                alternate_greetings TEXT DEFAULT '[]',
-                tags TEXT DEFAULT '[]',
-                creator TEXT DEFAULT '',
-                version TEXT DEFAULT '',
-                creator_notes TEXT DEFAULT '{}',
-                extensions TEXT DEFAULT '{}',
-                avatar TEXT,
-                temperature FLOAT DEFAULT 0.7
-            );
-            CREATE TABLE conversations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                character_id INTEGER,
-                title TEXT,
-                provider TEXT,
-                model TEXT
-            );
-            CREATE TABLE messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                conversation_id INTEGER,
-                role TEXT,
-                content TEXT
-            );
-            CREATE TABLE settings (
-                key TEXT PRIMARY KEY,
-                value TEXT
-            );
-            """
-        )
+        conn.executescript(_SCHEMA_SNAPSHOT.read_text(encoding="utf-8"))
         conn.execute("INSERT INTO characters (name) VALUES (?)", (name,))
         conn.execute(
             "INSERT INTO settings (key, value) VALUES (?, ?)",
@@ -189,20 +192,11 @@ class TestSourceErrors:
         with pytest.raises(MigrationError, match="缺少核心表"):
             migrate(source, tmp_path / "dst" / "conver_system.db")
 
-    def test_source_truncated_raises(self, tmp_path) -> None:
-        """文件被截断（末页残缺，integrity 报问题行）→ 完整性检查未通过，拒绝迁移"""
-        source = tmp_path / "truncated.db"
-        _make_db(source)
-        _truncate_to(source, source.stat().st_size - 1)  # 末页残缺 1 字节
-        with pytest.raises(MigrationError, match="完整性检查未通过"):
-            migrate(source, tmp_path / "dst" / "conver_system.db")
-
-    def test_source_truncated_hard_raises(self, tmp_path) -> None:
-        """文件被截断（整页丢失，integrity 直接报错）→ 完整性检查失败，拒绝迁移"""
-        source = tmp_path / "truncated3q.db"
-        _make_db(source)
-        _truncate_to(source, source.stat().st_size * 3 // 4)  # 缺失约 1/4 文件
-        with pytest.raises(MigrationError, match="完整性检查失败"):
+    @pytest.mark.parametrize(("damage", "error"), TRUNCATION_CASES)
+    def test_source_truncated_raises(self, tmp_path, damage, error) -> None:
+        """文件被截断（末页残缺 / 整页丢失）→ 完整性检查失败，拒绝迁移"""
+        source = _make_truncated_db(tmp_path, "truncated.db", damage)
+        with pytest.raises(MigrationError, match=error):
             migrate(source, tmp_path / "dst" / "conver_system.db")
 
     def test_source_symlink_followed(self, tmp_path) -> None:
@@ -507,21 +501,12 @@ class TestVerifyAndCompare:
         problems = verify_database(tmp_path)
         assert problems and "无法作为 SQLite 数据库打开" in problems[0]
 
-    def test_integrity_check_reports_truncated_db(self, tmp_path) -> None:
-        """末页残缺 → integrity_check 返回问题行而非 ok"""
-        db = tmp_path / "truncated.db"
-        _make_db(db)
-        _truncate_to(db, db.stat().st_size - 1)  # 截断 1 字节
+    @pytest.mark.parametrize(("damage", "error"), TRUNCATION_CASES)
+    def test_integrity_check_reports_truncated_db(self, tmp_path, damage, error) -> None:
+        """截断损坏（末页残缺 / 整页丢失）→ verify_database 报告对应完整性问题"""
+        db = _make_truncated_db(tmp_path, "truncated.db", damage)
         problems = verify_database(db)
-        assert any("完整性检查未通过" in p for p in problems)
-
-    def test_integrity_check_raises_on_truncated_db(self, tmp_path) -> None:
-        """整页缺失 → integrity_check 抛错，映射为「完整性检查失败」"""
-        db = tmp_path / "truncated3q.db"
-        _make_db(db)
-        _truncate_to(db, db.stat().st_size * 3 // 4)  # 截断至 3/4
-        problems = verify_database(db)
-        assert any("完整性检查失败" in p for p in problems)
+        assert any(error in p for p in problems)
 
     def test_verify_database_empty(self, tmp_path) -> None:
         empty = tmp_path / "empty.db"
