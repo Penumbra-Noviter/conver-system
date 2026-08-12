@@ -78,7 +78,7 @@
 
 ### P6.4 Tauri 桌面版（2026-08-11 波次收官）
 
-> 规格 `.scratch/p64-tauri/spec.md`（approved，D1-D10 共识 + spike 结论折回 v0.2）。三波执行：波 1 并行 4（SPK-R1/SPK-R2 spike + P6.4-1/P6.4-3）、波 2 并行 3（P6.4-2/P6.4-4/P6.4-5）、波 3 串行 1（P6.4-6）；merge 零回退冲突；波 1 降配增量审核 5 findings（F1/F2 派回修复，F3-F5 非阻断）。spike#01（PyInstaller onedir 一次成型 + 三项硬契约）、spike#02（WebView2 不拦截 blob 下载 → 无导出回退条件分支）。**期末四轴 code-review**：2 阻断（壳 prod 无条件 spawn python 干净机启动失败 → `722ba4c` 随包资源定位 + 干净环境冒烟回归；spec `datas=[]` 打包态 UI 404 → `a29c501` 前端运行子集随包挂载）→ 修复复审放行 + 整改三项（`217385f`：build-backend 前置 cargo test 前 / datas 接线断言 / smoke 清除残留 env）。安装器形态冒烟 5 项全过（prod 随包定位 + GET / 200 应用标记 + 空库首启 + 退出无残留）。测试同步（文档规范 §三）：pytest **261 + 1 skip** / Vitest **186** / cargo test **43**，全部全绿。
+> 规格 v0.2（approved，D1-D10 共识 + spike 结论折回；一次性产物已清场）。三波执行：波 1 并行 4（SPK-R1/SPK-R2 spike + P6.4-1/P6.4-3）、波 2 并行 3（P6.4-2/P6.4-4/P6.4-5）、波 3 串行 1（P6.4-6）；merge 零回退冲突；波 1 降配增量审核 5 findings（F1/F2 派回修复，F3-F5 非阻断）。spike#01（PyInstaller onedir 一次成型 + 三项硬契约）、spike#02（WebView2 不拦截 blob 下载 → 无导出回退条件分支）。**期末四轴 code-review**：2 阻断（壳 prod 无条件 spawn python 干净机启动失败 → `722ba4c` 随包资源定位 + 干净环境冒烟回归；spec `datas=[]` 打包态 UI 404 → `a29c501` 前端运行子集随包挂载）→ 修复复审放行 + 整改三项（`217385f`：build-backend 前置 cargo test 前 / datas 接线断言 / smoke 清除残留 env）。安装器形态冒烟 5 项全过（prod 随包定位 + GET / 200 应用标记 + 空库首启 + 退出无残留）。测试同步（文档规范 §三）：pytest **261 + 1 skip** / Vitest **186** / cargo test **43**，全部全绿。
 >
 > 人工项（R6）：验收 8（托盘/自启注册表）与验收 9（导出下载）由 docs/tauri-desktop.md §6 人工清单记录。
 
