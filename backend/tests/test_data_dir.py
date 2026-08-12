@@ -83,9 +83,7 @@ class TestResolveContract:
         互为补集（后者钉非分隔符原样，本用例钉分隔符规范化）：
         重复分隔符折叠（`//` → `/`）与 `.` 段消除；`..` 段**不提前解析**，
         原样保留于 parts，由文件系统在访问时解析。
-        尾分隔符去除（实测：`Path('C:/a/b/') == Path('C:/a/b')`）；UNC 前导特例
-        （TD-16/17）：`Path('//server/share/x')` 保留 `\\\\server\\share\\` 前缀
-        **不折叠**（Windows；实测背书：`parts == ('\\\\server\\share\\', 'x')`）。
+        尾分隔符去除（实测：`Path('C:/a/b/') == Path('C:/a/b')`）。
         """
         monkeypatch.setenv("CONVER_DATA_DIR", "C:/a//b/./c")
         monkeypatch.setenv("APPDATA", "C:/ignored")
@@ -95,8 +93,21 @@ class TestResolveContract:
         # TD-17：尾分隔符去除——Path('C:/a/b/') == Path('C:/a/b')（pathlib 固有行为）
         monkeypatch.setenv("CONVER_DATA_DIR", "C:/a/b/")
         assert data_dir_service.data_dir() == Path("C:/a/b")
-        # TD-17：UNC 前导保留——parts 首段保留 '\\\\server\\share\\' 前缀，
-        # 未折叠为 '/server/share/'（折叠只作用于分段内部，不作用于 UNC 前导）
+
+    @pytest.mark.skipif(
+        sys.platform != "win32",
+        reason='UNC 前导语义仅 Windows；POSIX 上 Path("//server/share/x").parts[0] 为 "//"，无 UNC 概念',
+    )
+    def test_env_override_unc_prefix_preserved(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """契约锁（基线即绿非先红，语义与 TD-12 先例一致）：UNC 前导特例（TD-16/17）
+
+        `Path('//server/share/x')` 保留 `\\\\server\\share\\` 前缀**不折叠**
+        （Windows；实测背书：`parts == ('\\\\server\\share\\', 'x')`）——折叠只作用于
+        分段内部，不作用于盘符/UNC 前导。POSIX 上 `parts[0]` 为 `'//'`（无 UNC 概念），
+        本用例经 skipif 呈现为可见 skip（计入 skip 计数），而非静默跳过或必挂红。
+        """
         monkeypatch.setenv("CONVER_DATA_DIR", "//server/share/x")
         assert data_dir_service.data_dir().parts[0] == "\\\\server\\share\\"
 
