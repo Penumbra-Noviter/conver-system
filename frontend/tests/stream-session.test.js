@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createStreamSession, mergeFreshList, __all__ } from '../js/stream-session.js';
+import { createStreamSession, mergeFreshList, settleTurn, __all__ } from '../js/stream-session.js';
 import { messages } from '../js/api.js';
 
 // ══════════════════════════════════════════════════════════════════
@@ -592,6 +592,183 @@ describe('createStreamSession — isSettled / 参数校验 / 协议表面', () =
     });
 
     it('__all__ 收口全部公开函数', () => {
-        expect(__all__.sort()).toEqual(['createStreamSession', 'mergeFreshList']);
+        expect(__all__.sort()).toEqual(['createStreamSession', 'mergeFreshList', 'settleTurn']);
+    });
+});
+
+// ══════════════════════════════════════════════════
+// settleTurn 统一结算入口(流式 onDone 正常完成段与非流式完成分支共用的
+// reload → mergeFreshList → 写回 → 条件渲染 段落;内部 try/catch 双分支)
+// ══════════════════════════════════════════════════
+
+/** settleTurn 测试台:内存 tab + vi.fn 注入;updateTab 就地合并模拟 tabs.js 语义 */
+function makeSettleHarness({ initial = [], active = true } = {}) {
+    const tab = { conversationId: 1, phase: 'thinking', isStreaming: true, messages: initial };
+    const deps = {
+        convId: 1,
+        getTab: vi.fn(() => tab),
+        updateTab: vi.fn((id, patch) => Object.assign(tab, patch)),
+        isActive: vi.fn(() => active),
+        render: vi.fn(),
+    };
+    const listSpy = vi.spyOn(messages, 'list');
+    return { deps, tab, listSpy };
+}
+
+describe('settleTurn — 统一结算入口（reload → mergeFreshList → 写回 → 条件渲染）', () => {
+    it('fresh：长度未变 → 整体替换 + 活动时渲染（updateTab 按 convId 写回）', async () => {
+        const fresh = [msg(1, 'user', 'hi'), msg(2, 'assistant', '你好')];
+        const { deps, tab, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi'), streaming('你好')] });
+        listSpy.mockResolvedValue(fresh);
+        await settleTurn({ ...deps, revision: 2, settleIndex: 1, anchor: tab.messages[0], messageId: 101, content: '你好' });
+        expect(tab.messages).toBe(fresh); // 直接采用服务端数组
+        expect(deps.updateTab).toHaveBeenLastCalledWith(1, { messages: fresh });
+        expect(deps.render).toHaveBeenCalledTimes(1);
+        expect(listSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('stale：list 在途期间同 tab 连发新消息 → 旧快照不覆盖，仅按位置结算本流 streaming 标记', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        const { deps, tab, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi'), streaming('你好')] });
+        listSpy.mockReturnValue(deferred.promise);
+        const p = settleTurn({ ...deps, revision: 2, settleIndex: 1, anchor: tab.messages[0], messageId: 101, content: '你好' });
+        // 连发:同 tab 追加新 user 消息(长度 2 → 3)
+        deps.updateTab(1, { messages: [...tab.messages, msg(3, 'user', 'again')] });
+        // 旧 list 快照返回(不含连发消息的陈旧状态)
+        deferred.resolve([msg(1, 'user', 'hi'), msg(2, 'assistant', '你好')]);
+        await p;
+        expect(tab.messages).toEqual([
+            msg(1, 'user', 'hi'),
+            { role: 'assistant', content: '你好', streaming: false, id: 101 },
+            msg(3, 'user', 'again'),
+        ]);
+        expect(deps.render).not.toHaveBeenCalled(); // stale 仅缓存结算
+    });
+
+    it('list 重载失败（流式参数）→ 位置感知写回（占位移除 + 原位插入 id）+ 活动渲染 + console.error', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { deps, tab, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi'), streaming('你好')] });
+        listSpy.mockRejectedValue(new Error('服务端故障'));
+        await settleTurn({ ...deps, revision: 2, settleIndex: 1, anchor: tab.messages[0], messageId: 101, content: '你好' });
+        expect(tab.messages).toEqual([
+            msg(1, 'user', 'hi'),
+            { role: 'assistant', content: '你好', id: 101 },
+        ]);
+        expect(deps.render).toHaveBeenCalledTimes(1);
+        expect(errorSpy).toHaveBeenCalledWith('重新加载消息列表失败:', expect.any(Error));
+        errorSpy.mockRestore();
+    });
+
+    it('非流式失败兜底（settleIndex:-1 + content，不带 messageId）→ 尾部追加无 id 消息（G1/C2-D2 行为保持）', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { deps, tab, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi')] });
+        listSpy.mockRejectedValue(new Error('服务端故障'));
+        await settleTurn({ ...deps, revision: 1, settleIndex: -1, content: '回复' });
+        expect(tab.messages).toEqual([msg(1, 'user', 'hi'), { role: 'assistant', content: '回复' }]);
+        expect(tab.messages[1].id).toBeUndefined(); // 不补 messageId —— 逐字复刻现状（决策 C2-D2）
+        expect(deps.render).toHaveBeenCalledTimes(1);
+        errorSpy.mockRestore();
+    });
+
+    it('非流式成功（settleIndex:-1，content 仅失败分支使用）→ fresh 整体替换（等价 {settleIndex:-1} 参数语义）', async () => {
+        const fresh = [msg(1, 'user', 'hi'), msg(2, 'assistant', '回复')];
+        const { deps, tab, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi')] });
+        listSpy.mockResolvedValue(fresh);
+        await settleTurn({ ...deps, revision: 1, settleIndex: -1, content: '回复' });
+        expect(tab.messages).toBe(fresh);
+        expect(deps.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('非流式 stale 边界现状钉住：revision 捕获后同 tab 连发（长度变化）→ 原样保留不覆盖（行为保持，不「顺手修好」）', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        const { deps, tab, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi')] });
+        listSpy.mockReturnValue(deferred.promise);
+        const p = settleTurn({ ...deps, revision: 1, settleIndex: -1, content: '回复' });
+        deps.updateTab(1, { messages: [...tab.messages, msg(3, 'user', '连发')] }); // 长度 1 → 2
+        deferred.resolve([msg(1, 'user', 'hi'), { id: 5, role: 'assistant', content: '回复' }]); // 陈旧快照
+        await p;
+        // stale + settleIndex=-1 + anchor=null → 无占位可结算、无 anchor 回退 → 原样
+        expect(tab.messages).toEqual([msg(1, 'user', 'hi'), msg(3, 'user', '连发')]);
+        expect(deps.render).not.toHaveBeenCalled();
+    });
+
+    it('并发插入后位置漂移：stale 失配（settleIndex 已非本流占位）→ 回退 anchor 位置写回本流内容（消息不丢失）', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        const { deps, tab, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'u1'), streaming('回复A')] });
+        listSpy.mockReturnValue(deferred.promise);
+        const p = settleTurn({ ...deps, revision: 2, settleIndex: 1, anchor: tab.messages[0], messageId: 101, content: '回复A' });
+        // 并发流 B 连发:u2 + token 替换位置 1 的占位(settleIndex 失配);u1 保持原对象引用
+        // (anchor 定位依赖引用 — 与既有 Falsify 用例同构)
+        deps.updateTab(1, { messages: [tab.messages[0], msg(3, 'user', 'u2'), streaming('回复B')] });
+        deferred.resolve([msg(1, 'user', 'u1'), { id: 101, role: 'assistant', content: '回复A' }]); // 陈旧快照(stale)
+        await p;
+        expect(tab.messages).toEqual([
+            msg(1, 'user', 'u1'),
+            { id: 101, role: 'assistant', content: '回复A' },
+            msg(3, 'user', 'u2'),
+            streaming('回复B'),
+        ]);
+        expect(deps.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('幂等：缓存已含同 id 消息（已被并发流结算）→ 失败兜底不重复插入', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { deps, tab, listSpy } = makeSettleHarness({
+            initial: [msg(1, 'user', 'hi'), { role: 'assistant', content: '你好', id: 101 }],
+        });
+        listSpy.mockRejectedValue(new Error('服务端故障'));
+        await settleTurn({ ...deps, revision: 2, settleIndex: 1, anchor: tab.messages[0], messageId: 101, content: '你好' });
+        expect(tab.messages).toEqual([msg(1, 'user', 'hi'), { role: 'assistant', content: '你好', id: 101 }]);
+        expect(tab.messages.filter((m) => m.id === 101)).toHaveLength(1); // 不重复插入
+        expect(deps.render).not.toHaveBeenCalled();
+        errorSpy.mockRestore();
+    });
+
+    it('非活动（后台流）→ 缓存照写，不渲染', async () => {
+        const fresh = [msg(1, 'user', 'hi'), msg(2, 'assistant', '你好')];
+        const { deps, tab, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi'), streaming('你好')], active: false });
+        listSpy.mockResolvedValue(fresh);
+        await settleTurn({ ...deps, revision: 2, settleIndex: 1, anchor: tab.messages[0], messageId: 101, content: '你好' });
+        expect(tab.messages).toBe(fresh); // 后台写回保持
+        expect(deps.render).not.toHaveBeenCalled();
+    });
+
+    it('防悬挂：发起 tab 已关闭（getTab 返回 undefined）→ resolve 无异常、无渲染、无 messages 写回', async () => {
+        const { deps, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi')] });
+        listSpy.mockResolvedValue([msg(1, 'user', 'hi'), msg(2, 'assistant', '你好')]);
+        deps.getTab.mockReturnValue(undefined);
+        await expect(settleTurn({ ...deps, revision: 1, settleIndex: -1 })).resolves.toBeUndefined();
+        expect(deps.updateTab.mock.calls.filter(([, patch]) => patch.messages)).toHaveLength(0);
+        expect(deps.render).not.toHaveBeenCalled();
+    });
+
+    it('防悬挂：tab 已关闭且 list 失败 → 仍 resolve 无异常（console.error 记录保持）', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { deps, listSpy } = makeSettleHarness({ initial: [msg(1, 'user', 'hi')] });
+        listSpy.mockRejectedValue(new Error('服务端故障'));
+        deps.getTab.mockReturnValue(undefined);
+        await expect(settleTurn({ ...deps, revision: 1, settleIndex: -1, content: '回复' })).resolves.toBeUndefined();
+        expect(deps.updateTab).not.toHaveBeenCalled();
+        expect(deps.render).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        errorSpy.mockRestore();
+    });
+
+    it('入参防御：isActive/render 缺省（非函数）→ 安全降级 no-op，不抛错', async () => {
+        const fresh = [msg(1, 'user', 'hi'), msg(2, 'assistant', '你好')];
+        const tab = { conversationId: 1, messages: [msg(1, 'user', 'hi')] };
+        const listSpy = vi.spyOn(messages, 'list').mockResolvedValue(fresh);
+        await expect(settleTurn({
+            convId: 1,
+            getTab: () => tab,
+            updateTab: (id, patch) => Object.assign(tab, patch),
+            revision: 1,
+            settleIndex: -1,
+        })).resolves.toBeUndefined();
+        expect(tab.messages).toEqual(fresh);
+        listSpy.mockRestore();
     });
 });

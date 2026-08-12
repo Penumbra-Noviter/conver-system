@@ -6,6 +6,9 @@
  *      完成/错误/停止按发起时捕获的 conversationId 写回(防悬挂)
  *   2. 完成后的消息列表重载合并(mergeFreshList 纯函数三分支):
  *      fresh 整体替换 / stale 仅位置结算 / 失败按位置追加(不清并发流占位 — 根治 R2)
+ *   3. 统一结算入口(settleTurn):流式 onDone 正常完成段与非流式完成(成功/失败兜底)
+ *      共用的 reload → mergeFreshList → 写回 → 条件渲染 段落,内部 try/catch 双分支
+ *      (成功重载 / 失败位置感知写回兜底);不内嵌 refreshList(两端调用点现状不同)
  *
  * P6.5 语义(chat.js 拆分后行为保持):
  *   - onToken:活动归属与 DOM 增量渲染(气泡复用 / data-streaming-live / thinking)
@@ -132,6 +135,51 @@ export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor =
 }
 
 /**
+ * 统一结算入口 — 完成后的消息列表重载合并写回（流式 onDone 正常完成段与非流式
+ * 完成分支共用）。内部完整复刻两端同构段：重新从服务端加载消息列表 → mergeFreshList
+ * 三分支合并 → updateTab(按发起时捕获的 convId 写回) → 条件渲染；try/catch 双分支 —
+ * 成功重载 / 失败以本地位置感知写回兜底（console.error 记录保持，消息不丢失、
+ * 不清并发流占位 — 根治 R2）。
+ * 防悬挂：只接受发起时捕获的 convId + getTab/updateTab 注入，绝不读「当前活动」；
+ * 发起 tab 已关闭（getTab 返回 undefined）→ 无异常无渲染（updateTab 幂等 no-op 兜底）。
+ * 不内嵌 refreshList —— 两端调用点现状不同（onDone 内嵌 / 非流式在发送流程末尾统一调用）。
+ * @param {object} opts
+ * @param {number|string} opts.convId - 发起时捕获的会话 id（防悬挂）
+ * @param {Function} opts.getTab - (convId) => tab|undefined，tabs.js 协议
+ * @param {Function} opts.updateTab - (convId, patch) => void，tabs.js 协议（不存在 id 幂等 no-op）
+ * @param {Function} [opts.isActive] - () => boolean，当前是否仍为活动 tab（决定是否渲染）
+ * @param {Function} [opts.render] - 活动时消息区渲染回调
+ * @param {number} opts.revision - 发起时刻缓存长度（list 前捕获；防止陈旧快照覆盖连发新消息 F-1）
+ * @param {number} [opts.settleIndex] - 发起时刻本流占位位置（stale 结算用）；无占位为 -1
+ * @param {object|null} [opts.anchor] - 本流 user 消息对象引用（失败/漂移写回用）；无 user 为 null
+ * @param {number|null} [opts.messageId] - 本流服务端消息 id（非流式失败兜底不带 — C2-D2 行为保持）
+ * @param {string} [opts.content] - 本流累积全文/回复内容（失败分支写回用）
+ * @returns {Promise<void>}
+ */
+export async function settleTurn({ convId, getTab, updateTab, isActive, render, revision, settleIndex = -1, anchor = null, messageId = null, content = '' }) {
+    const active = typeof isActive === 'function' ? isActive : () => false;
+    const doRender = typeof render === 'function' ? render : () => {};
+    try {
+        const msgs = await messages.list(convId);
+        const tab = getTab(convId);
+        if (tab) {
+            const merged = mergeFreshList(tab, revision, msgs, { settleIndex, anchor, messageId, content });
+            updateTab(convId, { messages: merged.messages });
+            if (merged.render && active()) doRender();
+        }
+    } catch (err) {
+        // 重新加载失败 — 退化为本地位置感知写回,避免消息丢失(不清并发流占位)
+        console.error('重新加载消息列表失败:', err);
+        const tab = getTab(convId);
+        if (tab) {
+            const merged = mergeFreshList(tab, revision, null, { settleIndex, anchor, messageId, content });
+            updateTab(convId, { messages: merged.messages });
+            if (merged.render && active()) doRender();
+        }
+    }
+}
+
+/**
  * 创建一条流式会话的生命周期控制器
  * @param {object} deps
  * @param {number|string} deps.convId - 发起时捕获的会话 id(防悬挂:后续写回一律按它定位)
@@ -232,30 +280,17 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
         refreshBtn();
 
         if (messageId != null) {
-            // 正常完成 — 重新从服务端加载消息列表(含角色开场白 greeting),保证 UI 与 DB 一致
-            // list 前捕获缓存 revision + 本流 streaming 消息位置:await 期间同 tab 可能连发
-            // 新消息(isStreaming 已 false),返回后经 mergeFreshList 三分支合并,防止陈旧
-            // 快照覆盖新消息(F-1)与并发流占位被清除(R2)
+            // 正常完成 — 统一结算入口 settleTurn:重新从服务端加载消息列表(含角色开场白
+            // greeting),保证 UI 与 DB 一致;内部 try/catch 双分支(成功重载 / 失败本地
+            // 位置感知写回兜底)。revision 在 list 前捕获:await 期间同 tab 可能连发新消息
+            // (isStreaming 已 false),返回后经 mergeFreshList 三分支合并,防止陈旧快照
+            // 覆盖新消息(F-1)与并发流占位被清除(R2)
             const revision = getTab(convId)?.messages.length ?? 0;
             const settleIndex = captureSettleIndex();
-            try {
-                const msgs = await messages.list(convId);
-                const tab = getTab(convId);
-                if (tab) {
-                    const merged = mergeFreshList(tab, revision, msgs, { settleIndex, anchor, messageId, content: fullContent });
-                    updateTab(convId, { messages: merged.messages });
-                    if (merged.render && isActive()) render();
-                }
-            } catch (err) {
-                // 重新加载失败 — 退化为本地位置感知写回,避免消息丢失(不清并发流占位)
-                console.error('重新加载消息列表失败:', err);
-                const tab = getTab(convId);
-                if (tab) {
-                    const merged = mergeFreshList(tab, revision, null, { anchor, messageId, content: fullContent });
-                    updateTab(convId, { messages: merged.messages });
-                    if (merged.render && isActive()) render();
-                }
-            }
+            await settleTurn({
+                convId, getTab, updateTab, isActive, render,
+                revision, settleIndex, anchor, messageId, content: fullContent,
+            });
         } else if (fullContent) {
             // 流中断但已有部分内容 — 位置感知写回(不清并发流占位)
             const tab = getTab(convId);
@@ -317,4 +352,5 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
 export const __all__ = [
     'createStreamSession',
     'mergeFreshList',
+    'settleTurn',
 ];
