@@ -547,4 +547,38 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
         const panel = await import('../js/components/settings-panel.js');
         expect(() => panel.initSettingsPanel({})).not.toThrow();
     });
+
+    // 用例 ③（TD-4）：provider 在 + #setting-default-model 缺、providers 非空且
+    // defaultProvider key 匹配 → 旧实现 refreshModelOptions 直入 fillModelSelect(null)，
+    // model-utils.js:32 `selectEl.innerHTML` 赋值 null 抛 TypeError；三元素联合守卫后 no-op
+    it('缺 #setting-default-model 下调 initProviderDropdown → 三元素联合守卫 no-op 不抛 TypeError', async () => {
+        vi.resetModules();
+        document.body.innerHTML = `
+            <select id="setting-default-provider"></select>
+            <input type="text" id="setting-custom-model" style="display:none">
+        `;
+        const panel = await import('../js/components/settings-panel.js');
+        const state = (await import('../js/state.js')).state;
+        state.models.providers = PROVIDERS;
+        state.defaultProvider = 'claude';
+        state.defaultModel = 'claude-sonnet-5';
+        expect(() => panel.initProviderDropdown()).not.toThrow();
+    });
+
+    // 用例 ④（TD-4）：provider/model 在 + #setting-custom-model 缺、默认模型命中列表 →
+    // 旧实现 fillModelSelect 落入「预选中」分支，model-utils.js:57 `customInputEl.style` null
+    // 抛 TypeError；三元素联合守卫后 no-op
+    it('缺 #setting-custom-model 下调 initProviderDropdown → 三元素联合守卫 no-op 不抛 TypeError', async () => {
+        vi.resetModules();
+        document.body.innerHTML = `
+            <select id="setting-default-provider"></select>
+            <select id="setting-default-model"></select>
+        `;
+        const panel = await import('../js/components/settings-panel.js');
+        const state = (await import('../js/state.js')).state;
+        state.models.providers = PROVIDERS;
+        state.defaultProvider = 'claude';
+        state.defaultModel = 'claude-sonnet-5';
+        expect(() => panel.initProviderDropdown()).not.toThrow();
+    });
 });

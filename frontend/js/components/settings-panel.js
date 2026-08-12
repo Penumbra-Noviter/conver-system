@@ -69,6 +69,8 @@ function refreshModelOptions() {
     const providerSelect = $('#setting-default-provider');
     const modelSelect = $('#setting-default-model');
     const customInput = $('#setting-custom-model');
+    // 三元素任一缺失（index.html 契约被破坏的极端场景）→ no-op 早退，不抛 TypeError
+    if (!providerSelect || !modelSelect || !customInput) return;
 
     const providers = state.models.providers || [];
     const selectedKey = providerSelect.value;
