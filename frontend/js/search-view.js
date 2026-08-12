@@ -48,6 +48,11 @@ let navigateToConversation = () => {};
  * 初始化搜索视图（绑定输入/键盘/清空事件 + 注入结果跳转钩子）。
  * 幂等：重复调用只更新钩子，不重复绑定事件。
  * DOM 元素缺失（index.html 契约被破坏的极端场景）→ no-op 不抛错。
+ * 作用域与前提：bound 为模块级标志 —— 防同模块重复调用（幂等），不防
+ *   跨模块实例双绑定（vi.resetModules 后重导模块实例各持独立 bound）；
+ *   DOM 引用为模块级 import 时冻结 —— DOM 后置（模块求值之后才出现）
+ *   不可绑定。模块求值于 DOM 就位之后（type=module 延迟执行）为模块头
+ *   docstring 已隐含前提，不重复。
  * @param {object} [options]
  * @param {Function} [options.navigateToConversation] - (conversationId) => void；
  *   搜索结果点击跳转（app.js 注入 activateConversation 统一激活流程）
