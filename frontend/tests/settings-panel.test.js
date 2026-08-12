@@ -519,3 +519,32 @@ describe('主题切换 — toggleTheme 持久化', () => {
         errorSpy.mockRestore();
     });
 });
+
+// ══════════════════════════════════════════════════
+// no-op 守卫 — DOM 契约被破坏时不抛 TypeError（ARC9-2）
+// ══════════════════════════════════════════════════
+
+describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    // 用例 ①：空 DOM（无任何设置元素）→ initProviderDropdown 顶部早退 no-op
+    it('空 DOM 下调 initProviderDropdown → no-op 不抛 TypeError', async () => {
+        vi.resetModules();
+        document.body.innerHTML = '';
+        const panel = await import('../js/components/settings-panel.js');
+        expect(() => panel.initProviderDropdown()).not.toThrow();
+    });
+
+    // 用例 ②：DOM 含 save/clear 两按钮（325/359 行未守卫绑定，必须存在）、
+    // 缺 Provider/Model 两元素 → initSettingsPanel 两处绑定守卫后 no-op
+    it('缺 #setting-default-provider/#setting-default-model 下调 initSettingsPanel → no-op 不抛 TypeError', async () => {
+        vi.resetModules();
+        document.body.innerHTML = `
+            <button id="btn-save-settings"></button>
+            <button id="btn-clear-all-convs"></button>
+        `;
+        const panel = await import('../js/components/settings-panel.js');
+        expect(() => panel.initSettingsPanel({})).not.toThrow();
+    });
+});
