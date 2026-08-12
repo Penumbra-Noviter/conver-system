@@ -50,7 +50,7 @@
 
 ### ARC-10 架构深化批次：剩余 8 候选（2026-08-12 全自动 kickoff）
 
-> 来源：/improve-codebase-architecture 审查报告未选候选（用户下令「剩余候选也做完」）。规格 `.scratch/arc10/spec.md`（v1.0 无修订）+ 共识（13 项决策带推荐默认，含关键裁定：C7 注入三制统一明确不做、test-connection 保 400 语义、C3-DEFER 承诺纳入 T-11）。两波执行：波 1 并行 3（前端链 T-11→T-12→T-13 同代理 + T-14 + T-15，merge `4ffc1d2`）、波 2 并行 3（T-16/T-17/T-18，merge `241a7b6`）；merge 零回退冲突；T-16 首代理 setup 后空返回失败 → 降级重派复用 worktree 完成。波末降配增量审核两轮均无阻断（波 1：26 Falsify 构造 + 5/5 工单档 A；波 2：15 构造含 CSS 多重集对比/漂移注入 9/9 捕获）。**期末四轴 code-review（固定点 a453e75）：0 阻断**——8 工单 Spec 全过、深模块达标（character-submit.js/api/errors.py/factory 派生/modal.js）、Falsify 10 项构造无击穿；5 项非阻断观察落技术债区（ARC10-1~5）。GUI 冒烟（浏览器，隔离库）：wizard/form modal 骨架（headerExtra/Escape/预填）✓ 创建/编辑提交 ✓ 错误气泡深浅主题（OPT-1-FIX 压制保持 + --on-danger 生效）✓ 输入框复位 ✓ 删除级联 ✓。测试同步：pytest **356 + 1 skip** / Vitest **362** / cargo test **52**，全部全绿。
+> 来源：/improve-codebase-architecture 审查报告未选候选（用户下令「剩余候选也做完」）。规格 v1.0 无修订（一次性产物已清场，决策见合并链 4ffc1d2/241a7b6 与共识要点）+ 共识（13 项决策带推荐默认，含关键裁定：C7 注入三制统一明确不做、test-connection 保 400 语义、C3-DEFER 承诺纳入 T-11）。两波执行：波 1 并行 3（前端链 T-11→T-12→T-13 同代理 + T-14 + T-15，merge `4ffc1d2`）、波 2 并行 3（T-16/T-17/T-18，merge `241a7b6`）；merge 零回退冲突；T-16 首代理 setup 后空返回失败 → 降级重派复用 worktree 完成。波末降配增量审核两轮均无阻断（波 1：26 Falsify 构造 + 5/5 工单档 A；波 2：15 构造含 CSS 多重集对比/漂移注入 9/9 捕获）。**期末四轴 code-review（固定点 a453e75）：0 阻断**——8 工单 Spec 全过、深模块达标（character-submit.js/api/errors.py/factory 派生/modal.js）、Falsify 10 项构造无击穿；5 项非阻断观察落技术债区（ARC10-1~5）。GUI 冒烟（浏览器，隔离库）：wizard/form modal 骨架（headerExtra/Escape/预填）✓ 创建/编辑提交 ✓ 错误气泡深浅主题（OPT-1-FIX 压制保持 + --on-danger 生效）✓ 输入框复位 ✓ 删除级联 ✓。测试同步：pytest **356 + 1 skip** / Vitest **362** / cargo test **52**，全部全绿。
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
@@ -65,7 +65,7 @@
 
 ### ARC-9 架构深化批次：6 Strong 候选（2026-08-12 全自动 kickoff）
 
-> 来源：/improve-codebase-architecture 审查报告（14 候选）→ 用户选中 6 Strong 全自动执行。规格 `.scratch/arc-strongs/spec.md`（v1.0 无修订）+ 共识（17 项决策带推荐默认，frontier 空）。两波执行：波 1 并行 3（T-01/T-02/T-03，merge `4e48750`）、波 2 并行 2（T-04→T-05 同代理串行链 + T-06，merge `dcff674`）；merge 零回退冲突；波末降配增量审核两轮（Falsify + 文件范围三档核验）均无阻断。**期末四轴 code-review（固定点 b65e9b3）**：1 阻断——T-04 URL 全量百分号编码破坏 SQLAlchemy 连接（sqlite 方言零解码 `%XX` vs migrate_data sqlite3 URI 会解码——镜像契约盲点）→ `d3a833b` 修复（编码收窄至仅 `?` → `%3F`，契约表 v1→v2 双端同步 + 连接级消费者测试 `test_data_dir_connection.py`）→ 复审放行。运行态冒烟（浏览器，隔离库）：空态首启 / 6 步创建角色 / 模型选择 / 非流式失败路径（400 错误气泡 + 标题更新 + 按钮复位）/ 搜索防抖高亮 / 级联删除（确认框→tab 关闭→列表联动）全过。测试同步：pytest **310 + 1 skip** / Vitest **297** / cargo test **46**，全部全绿。
+> 来源：/improve-codebase-architecture 审查报告（14 候选）→ 用户选中 6 Strong 全自动执行。规格 v1.0 无修订（一次性产物已清场，决策见 merge 链 4e48750/dcff674/2430bc6）+ 共识（17 项决策带推荐默认，frontier 空）。两波执行：波 1 并行 3（T-01/T-02/T-03，merge `4e48750`）、波 2 并行 2（T-04→T-05 同代理串行链 + T-06，merge `dcff674`）；merge 零回退冲突；波末降配增量审核两轮（Falsify + 文件范围三档核验）均无阻断。**期末四轴 code-review（固定点 b65e9b3）**：1 阻断——T-04 URL 全量百分号编码破坏 SQLAlchemy 连接（sqlite 方言零解码 `%XX` vs migrate_data sqlite3 URI 会解码——镜像契约盲点）→ `d3a833b` 修复（编码收窄至仅 `?` → `%3F`，契约表 v1→v2 双端同步 + 连接级消费者测试 `test_data_dir_connection.py`）→ 复审放行。运行态冒烟（浏览器，隔离库）：空态首启 / 6 步创建角色 / 模型选择 / 非流式失败路径（400 错误气泡 + 标题更新 + 按钮复位）/ 搜索防抖高亮 / 级联删除（确认框→tab 关闭→列表联动）全过。测试同步：pytest **310 + 1 skip** / Vitest **297** / cargo test **46**，全部全绿。
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
