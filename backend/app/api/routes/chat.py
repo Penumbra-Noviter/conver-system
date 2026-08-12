@@ -6,7 +6,7 @@
     - POST /api/chats/stream — 流式聊天（SSE）
 
 业务逻辑（聊天回合编排 / LLM 错误映射 / 流式持久化）收拢在 services/chat.py；
-本文件只做 HTTP 映射与 SSE data: 帧包装。
+本文件只做 HTTP 映射（领域异常 → HTTPException）与 SSE data: 帧包装。
 """
 
 from __future__ import annotations
@@ -14,68 +14,46 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.models.message import Role
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import chat as chat_service
-from backend.app.services import message as message_service
 from backend.app.services.exceptions import (
     ApiKeyMissingError,
     ConversationNotFoundError,
     ProviderNotSupportedError,
 )
-from backend.app.services.llm.errors import LLMError
 
 router = APIRouter(tags=["聊天"])
 
-
-# DomainError → HTTP 状态码映射
-_DOMAIN_ERROR_MAP: dict[type, int] = {
-    ConversationNotFoundError: status.HTTP_404_NOT_FOUND,
-    ApiKeyMissingError: status.HTTP_400_BAD_REQUEST,
-    ProviderNotSupportedError: status.HTTP_400_BAD_REQUEST,
-}
+#: 领域异常族（prepare_chat / complete_chat 上抛，路由层转 HTTP；映射表在服务层单一来源）
+_DOMAIN_ERRORS = (
+    ConversationNotFoundError,
+    ApiKeyMissingError,
+    ProviderNotSupportedError,
+)
 
 
 def _prepare_or_raise(db: Session, request: ChatRequest):
-    """调用 prepare_chat，捕获领域异常并转为 HTTPException"""
+    """调用 prepare_chat，捕获领域异常并转为 HTTPException（经服务层 chat_error_response）"""
     try:
         return chat_service.prepare_chat(db, request)
-    except tuple(_DOMAIN_ERROR_MAP) as e:
-        http_status = _DOMAIN_ERROR_MAP.get(type(e), status.HTTP_400_BAD_REQUEST)
-        raise HTTPException(status_code=http_status, detail=str(e))
+    except _DOMAIN_ERRORS as e:
+        status_code, message = chat_service.chat_error_response(e)
+        raise HTTPException(status_code=status_code, detail=message)
 
 
 @router.post("/api/chats", response_model=ChatResponse)
 async def create_chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
-    """非流式聊天 — 接入真实 LLM"""
-    ctx = _prepare_or_raise(db, request)
-
+    """非流式聊天 — 接入真实 LLM（回合业务在 services/chat.py complete_chat）"""
     try:
-        reply_text = await ctx.provider.generate(
-            ctx.messages,
-            temperature=ctx.temperature,
-            model=ctx.conversation.model_name,
-        )
-    except LLMError as e:
-        status_code, message = chat_service.llm_error_response(
-            e, ctx.conversation.model_provider
-        )
+        return await chat_service.complete_chat(db, request)
+    except _DOMAIN_ERRORS as e:
+        status_code, message = chat_service.chat_error_response(e)
         raise HTTPException(status_code=status_code, detail=message)
-
-    saved = message_service.create_message(
-        db, request.conversation_id, Role.ASSISTANT, reply_text
-    )
-
-    return ChatResponse(
-        reply=reply_text,
-        message_id=saved.id,
-        conversation_id=request.conversation_id,
-    )
 
 
 @router.post("/api/chats/stream")
