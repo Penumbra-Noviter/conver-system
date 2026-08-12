@@ -109,6 +109,8 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-desktop.ps1 -UseInstaller
 $env:CONVER_DATA_DIR = "D:\conver-data"   # 覆盖后桌面版全部数据落此处
 ```
 
+**POSIX 路径警告**：`CONVER_DATA_DIR` 传 Git Bash 形态的 POSIX 路径（如 `/c/Users/<name>/conver-data`）时**不做归一化**——按逐字符契约（契约表 v2，见上）直接落位，数据将落在字面 POSIX 路径（`/c/...` 形态在 Windows 程序中的实际表现，而非 `C:\Users\...`）。Git Bash 环境部署请改用 Windows 风格路径（如 `C:\conver-data`）；代码不做归一化是契约行为，非缺陷。
+
 ### 3.3 网页版 → 桌面版数据迁移（migrate_data.py）
 
 迁移脚本独立命令行工具（P6.4-3，不进产品 UI）：
