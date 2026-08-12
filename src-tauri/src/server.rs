@@ -185,8 +185,9 @@ pub fn find_prod_backend_exe(resource_dir: &Path) -> Option<PathBuf> {
 /// 后端 `config.py` 默认 `sqlite+aiosqlite:///./conver_system.db`（相对 CWD），
 /// 桌面版必须以环境变量改写为 %APPDATA% 绝对路径，保证与网页版数据相互独立。
 /// 反斜杠转正斜杠：SQLAlchemy 对 Windows 绝对路径统一按正斜杠解析；
-/// 随后做最小编百分号编码（契约表 v1，`encode_url_path`）——数据目录含
-/// `#`/`?`/空格/中文时保证 URL 不被截断，与迁移脚本 URI 语义一致（决策 D1-D3）。
+/// 随后做最小编百分号编码（契约表 v2，`encode_url_path`，仅 `?` → `%3F`）——
+/// SQLAlchemy sqlite 方言零解码，空格/中文/`#`/`%` 必须原样直连（基线实测可用），
+/// 仅 `?` 是 URL 解析器实际分隔符（防御性编码，Windows 非法文件名不可达）。
 pub fn database_url(data_dir: &Path) -> String {
     let db_path_buf = data_dir.join(DB_FILE);
     let db_path = db_path_buf.to_string_lossy();
@@ -393,7 +394,7 @@ pub fn data_dir_path(base: &Path) -> PathBuf {
     base.join(DATA_DIR_NAME)
 }
 
-/// 默认数据目录（契约表 v1，与后端 `run_backend.data_dir` / 迁移脚本
+/// 默认数据目录（契约表 v2，与后端 `run_backend.data_dir` / 迁移脚本
 /// `default_target_path` 同一契约；契约表全文见 backend/tests/test_data_dir.py）：
 /// `CONVER_DATA_DIR`（环境变量覆盖，值即数据目录；空串视为未设置）→
 /// `%APPDATA%\ConverSystem` → `%USERPROFILE%\AppData\Roaming\ConverSystem`
@@ -415,25 +416,22 @@ pub fn default_data_dir() -> PathBuf {
     data_dir_path(&std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
 }
 
-/// 最小编百分号编码（契约表 v1，镜像 Python `urllib.parse.quote(s, safe="/:")`）：
+/// 编码集收窄为仅 `?` → `%3F`（契约表 v2，期末审核 Falsify 阻断项修复）：
 ///
-/// 保留不编码：`A-Z a-z 0-9 _ - . ~ / :`（RFC3986 unreserved + `~` + `/` + `:`）；
-/// 其余一律按 UTF-8 逐字节编码为 `%XX`（大写十六进制）——`#`/`?`/`%`/空格/中文等
-/// 全部编码，保证注入的 DATABASE_URL 与迁移脚本 `_open_readonly` 的 URI 语义一致
-/// （SQLAlchemy URI 解析器会把未编码的 `#`/`?` 当分隔符，导致连接串被截断）。
+/// 其余字符（含空格/中文/`#`/`%`）一律原样保留，不做任何百分号编码。
+/// 依据（连接级实测，见 backend/tests/test_data_dir_connection.py）：
 ///
-/// 契约表 v1 逐字符用例见 src-tauri/tests/server_test.rs（与 Python 侧测试文件互引版本号）。
+/// - SQLAlchemy sqlite 方言对 DATABASE_URL **零解码**——`%20`/`%23` 等被当
+///   字面文件名传给 sqlite3，真实数据目录打不开（`OperationalError: unable to
+///   open database file`）。契约表 v1 的全量百分号编码（镜像
+///   `urllib.parse.quote(s, safe="/:")`）即因此阻断。
+/// - `?` 是 SQLAlchemy URL 解析器的**实际分隔符**：字面 `?` 使路径在 `?` 处截断
+///   （静默连到错误文件）。`?` 为 Windows 非法文件名，真实数据目录不可达，
+///   故编码仅为防御，不承载解码语义。
+/// - 迁移脚本 `_open_readonly` 走 `sqlite3.connect(uri=True)`（SQLite URI 规则
+///   会解码 `%XX`），路径语义与壳注入（SQLAlchemy 消费）不同，不受本契约约束。
+///
+/// 契约表 v2 逐字符用例见 src-tauri/tests/server_test.rs（与 Python 侧测试文件互引版本号）。
 pub fn encode_url_path(path: &str) -> String {
-    let mut out = String::with_capacity(path.len());
-    for c in path.chars() {
-        if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~' | '/' | ':') {
-            out.push(c);
-        } else {
-            let mut buf = [0u8; 4];
-            for byte in c.encode_utf8(&mut buf).as_bytes() {
-                out.push_str(&format!("%{byte:02X}"));
-            }
-        }
-    }
-    out
+    path.replace('?', "%3F")
 }
