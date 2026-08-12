@@ -301,7 +301,7 @@ async function testApiKeys(data) {
 
 /**
  * 初始化设置面板：绑定所有事件监听器
- * Provider/模型下拉或自定义输入元素缺失（index.html 契约被破坏的极端场景）→ 对应绑定 no-op 不抛错。
+ * Provider/模型下拉、自定义输入元素或 save/clear 按钮缺失（index.html 契约被破坏的极端场景）→ 对应绑定 no-op 不抛错。
  *
  * @param {object} [options]
  * @param {function} [options.onConversationsCleared] - 清空所有对话后的回调（刷新列表等）
@@ -328,8 +328,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
     $('#btn-expand-sidebar')?.addEventListener('click', toggleSidebar);
     $('#btn-expand-chat')?.addEventListener('click', toggleChatSidebar);
 
-    // ── 保存设置 ──
-    $('#btn-save-settings').addEventListener('click', async () => {
+    // ── 保存设置（按钮缺失 → 绑定 no-op 不抛错）──
+    $('#btn-save-settings')?.addEventListener('click', async () => {
         const data = {
             claude_api_key: $('#setting-claude-key').value,
             claude_base_url: $('#setting-claude-url').value,
@@ -362,8 +362,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
         }
     });
 
-    // ── 清空所有对话 ──
-    $('#btn-clear-all-convs').addEventListener('click', async () => {
+    // ── 清空所有对话（按钮缺失 → 绑定 no-op 不抛错）──
+    $('#btn-clear-all-convs')?.addEventListener('click', async () => {
         const convCount = state.conversations.length;
         if (convCount === 0) {
             showAlert('当前没有对话需要清空');

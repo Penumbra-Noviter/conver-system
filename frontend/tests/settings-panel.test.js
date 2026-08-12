@@ -536,8 +536,8 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
         expect(() => panel.initProviderDropdown()).not.toThrow();
     });
 
-    // 用例 ②：DOM 含 save/clear 两按钮（325/359 行未守卫绑定，必须存在）、
-    // 缺 Provider/Model 两元素 → initSettingsPanel 两处绑定守卫后 no-op
+    // 用例 ②：DOM 含 save/clear 两按钮（332/366 行绑定已 `?.` 守卫、按钮可缺省——
+    // 此按钮仅为模拟真实 DOM 形态）、缺 Provider/Model 两元素 → initSettingsPanel no-op
     it('缺 #setting-default-provider/#setting-default-model 下调 initSettingsPanel → no-op 不抛 TypeError', async () => {
         vi.resetModules();
         document.body.innerHTML = `
@@ -583,10 +583,10 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
     });
 
     // 用例 ⑤（TD-5）：#setting-default-model 在 + #setting-custom-model 缺（含
-    // save/clear 两未守卫绑定按钮）→ 旧实现 initSettingsPanel 仍绑定
-    // createCustomModelHandler(model, null)，选 __custom__ 触发 change →
-    // model-utils.js:81 闭包内 `customInputEl.style` null 抛 TypeError；
-    // 缺一不绑定后 no-op 不抛
+    // save/clear 两按钮——两处绑定已 `?.` 守卫，按钮仅为模拟真实 DOM）→
+    // 旧实现 initSettingsPanel 仍绑定 createCustomModelHandler(model, null)，
+    // 选 __custom__ 触发 change → model-utils.js:81 闭包内 `customInputEl.style` null
+    // 抛 TypeError；缺一不绑定后 no-op 不抛
     it('缺 #setting-custom-model 下调 initSettingsPanel → 选 __custom__ 触发 change 不抛 TypeError', async () => {
         vi.resetModules();
         document.body.innerHTML = `
@@ -599,5 +599,16 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
         const modelSelect = document.querySelector('#setting-default-model');
         modelSelect.value = '__custom__';
         expect(() => modelSelect.dispatchEvent(new Event('change', { bubbles: true }))).not.toThrow();
+    });
+
+    // 用例 ⑥（TD-8）：空 DOM（无任何设置元素）下调 initSettingsPanel → 旧实现
+    // :332 `$('#btn-save-settings').addEventListener(...)` 中 `$` 返回 null →
+    // null.addEventListener 抛 TypeError（Cannot read properties of null）；
+    // save/clear 两处裸绑定 `?.` 化（:332/:366）后对应绑定 no-op 不抛错
+    it('空 DOM 下调 initSettingsPanel → save/clear 绑定守卫后 no-op 不抛 TypeError', async () => {
+        vi.resetModules();
+        document.body.innerHTML = '';
+        const panel = await import('../js/components/settings-panel.js');
+        expect(() => panel.initSettingsPanel({})).not.toThrow();
     });
 });
