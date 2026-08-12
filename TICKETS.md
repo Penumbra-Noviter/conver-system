@@ -4,7 +4,7 @@
 >
 > 维护节奏（绑定现有流程节点，不新增习惯）：
 > 1. 开始实现某工单前：📝 已录入 → 🔄 进行中（认领）
-> 2. 每会话结束、commit 之前：完成 → ✅/❌ → 移入归档；新评审候选（含未拍板的 `Worth exploring` / `Speculative`）立即录入活跃表
+> 2. 每会话结束、commit 之前：完成 → ✅/❌ → 移入归档；新评审候选（含未拍板的 `Worth exploring` / `Speculative`）立即录入技术债区（= 活跃表的未立项子集，带 编号/来源/强度/状态）
 > 3. 待办**不得写在 memory / DEV_LOG / 个人笔记里**——不落 TICKETS 就不算数
 >
 > 状态：⬜ 待办 | 🔄 进行中 | ✅ 完成
@@ -19,15 +19,15 @@
 
 ## 技术债区
 
-> 期末/波次审核的非阻断发现落盘于此（带推荐强度），供未来会话与下一轮 kickoff 可见。修复时机自由，不影响当前交付。
+> 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-| 编号 | 遗留项 | 来源 | 推荐强度 |
-|------|--------|------|----------|
-| TD-8 | settings-panel.js `initSettingsPanel` 守卫覆盖不完整：save/clear 裸绑定（:332/:366）未纳入 no-op 守卫体系，全缺 DOM 下仍抛 TypeError（基线既有；测试⑤以提供按钮回避） | TD 批次波 1 Falsify | Worth exploring |
-| TD-9 | settings-panel.js `getSelectedModel`（:87-94）未守卫：model 缺时 save 流程抛 TypeError（spec 明示不加固——TD-4 守卫后保存路径不可达，防御性） | TD 批次波 1 Falsify | Speculative |
-| TD-10 | tauri-desktop.md POSIX 警告字面落位 `C:\c\Users\<name>\conver-data` 依赖进程当前盘符 + MSYS2 路径转换行为，确切落位两可（spec 固定文本即此措辞，实现逐字照办） | TD 批次波 1 Falsify | Speculative |
-| TD-11 | chat_error_response DomainError 兜底 400 vs api/errors.py 422 家族函数级分歧——合并单一映射表时需防分歧（TD-1 注释已指路 ARC10-2/ARC10-4 关联） | TD 批次波 2 Falsify | Speculative |
-| TD-12 | llm_error_response provider=None 路径缺显式契约测试（标注 str\|None 后行为安全，可选补一条锁无前缀文案） | TD 批次波 2 Falsify | Speculative |
+| 编号 | 遗留项 | 来源 | 强度 | 状态 |
+|------|--------|------|------|------|
+| TD-8 | settings-panel.js `initSettingsPanel` 守卫覆盖不完整：save/clear 裸绑定（:332/:366）未纳入 no-op 守卫体系，全缺 DOM 下仍抛 TypeError（基线既有；测试⑤以提供按钮回避） | TD 批次波 1 Falsify（期末复证） | Worth exploring | 📝 |
+| TD-9 | settings-panel.js `getSelectedModel`（:87-94）未守卫：model 缺时 save 流程抛 TypeError（spec 明示不加固——TD-4 守卫后保存路径不可达，防御性） | TD 批次波 1 Falsify（期末复证） | Speculative | 📝 |
+| TD-10 | tauri-desktop.md POSIX 警告字面落位 `C:\c\Users\<name>\conver-data` 依赖进程当前盘符 + MSYS2 路径转换行为，确切落位两可（spec 固定文本即此措辞，实现逐字照办） | TD 批次波 1 Falsify（期末复证） | Speculative | 📝 |
+| TD-11 | chat_error_response DomainError 兜底 400 vs api/errors.py 422 家族函数级分歧——合并单一映射表时需防分歧（TD-1 注释已指路 ARC10-2/ARC10-4 关联） | TD 批次波 2 Falsify（期末复证） | Speculative | 📝 |
+| TD-12 | llm_error_response provider=None 路径缺显式契约测试（标注 str\|None 后行为安全，可选补一条锁无前缀文案） | TD 批次波 2 Falsify（期末复证） | Speculative | 📝 |
 
 ---
 
