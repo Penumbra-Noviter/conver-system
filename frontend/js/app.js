@@ -55,7 +55,6 @@ const dom = {
     btnNewChat: $('#btn-new-chat'),
     // 移动端
     mobileNavBtns: $$('.mobile-nav-btn'),
-    convListToggle: null, // 将在初始化时创建
 
     // 角色
     characterGrid: $('#character-grid'),
@@ -104,13 +103,6 @@ dom.navBtns.forEach((btn) => {
 dom.mobileNavBtns.forEach((btn) => {
     btn.addEventListener('click', () => switchView(btn.dataset.view));
 });
-
-// 切换对话列表显示（移动端）
-function toggleConvList() {
-    const sidebar = document.querySelector('.chat-sidebar');
-    if (!sidebar) return;
-    sidebar.classList.toggle('mobile-expanded');
-}
 
 // ══════════════════════════════════════════════════
 // Toast 通知
