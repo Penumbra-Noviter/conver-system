@@ -30,7 +30,7 @@ import { renderMarkdown } from './utils.js';
 import { buildMessagesHtml, assistantAvatarHtml, userAvatarHtml } from './format.js';
 import { state } from './state.js';
 import { getActiveTab, getTab, updateTab } from './tabs.js';
-import { createStreamSession, mergeFreshList } from './stream-session.js';
+import { createStreamSession, settleTurn } from './stream-session.js';
 import { iconHtml } from './icons.js';
 
 // ══════════════════════════════════════════════════
@@ -285,9 +285,11 @@ function syncChatHeaderTitle() {
 //
 // 流式生命周期已收口到 stream-session.js（createStreamSession）：fullContent 累积、
 // streamSettled 终态守卫、按发起 tab 写回（防悬挂）、完成重载的 mergeFreshList
-// 三分支（fresh 整体替换 / stale 仅位置结算 / 失败位置感知追加 — 根治 R2）。
+// 三分支（fresh 整体替换 / stale 仅位置结算 / 失败位置感知追加 — 根治 R2）；
+// 流式 onDone 正常完成段与非流式完成分支（成功 + 失败兜底）都委托统一结算入口
+// settleTurn（reload → mergeFreshList → 写回 → 条件渲染，内部 try/catch 双分支）。
 // chat.js 只保留：DOM 增量渲染（气泡复用 / data-streaming-live / thinking）、
-// 非流式分支对 mergeFreshList 的复用、发送按钮两态与列表刷新注入。
+// 非流式特有交互（在途守卫 / 按钮禁用 / 失败气泡 / 按钮复位）、发送按钮两态与列表刷新注入。
 
 export async function handleSend() {
     const content = chatDom.chatInput.value.trim();
@@ -381,28 +383,14 @@ export async function handleSend() {
                 conversation_id: convId,
                 content,
             });
-            // 非流式完成 — 重新从服务端加载消息列表（含角色开场白 greeting），保证 UI 与 DB 一致
-            // 与流式同型守卫：list 在途时连发的新消息不被陈旧快照覆盖（F-1），
-            // 复用 mergeFreshList（settleIndex=-1：无占位可结算，纯 fresh/stale 分支）
+            // 非流式完成 — 统一结算入口 settleTurn（reload → merge → 写回 → 条件渲染，内部
+            // try/catch 双分支：成功重载 / 失败位置感知写回兜底）。settleIndex=-1 无占位可结算；
+            // content 供失败兜底写回（成功分支不使用）；防悬挂按发起时捕获的 convId 写回。
             const revision = getTab(convId)?.messages.length ?? 0;
-            try {
-                const msgs = await messages.list(convId);
-                const t = getTab(convId);
-                if (t) {
-                    const merged = mergeFreshList(t, revision, msgs, { settleIndex: -1 });
-                    updateTab(convId, { messages: merged.messages });
-                    if (merged.render && isActiveStream()) renderMessages();
-                }
-            } catch (err) {
-                // 重新加载失败 — 退化为本地增量渲染，避免消息丢失（位置感知追加尾部）
-                console.error('重新加载消息列表失败:', err);
-                const t = getTab(convId);
-                if (t) {
-                    const merged = mergeFreshList(t, revision, null, { settleIndex: -1, content: result.reply });
-                    updateTab(convId, { messages: merged.messages });
-                    if (merged.render && isActiveStream()) renderMessages();
-                }
-            }
+            await settleTurn({
+                convId, getTab, updateTab, isActive: isActiveStream, render: renderMessages,
+                revision, settleIndex: -1, content: result.reply,
+            });
         } catch (err) {
             appendMessage('system', `发送失败: ${err.message}`);
         } finally {
