@@ -1,11 +1,12 @@
 """
 聊天回合业务逻辑 — 流式/非流式聊天共用的深模块
 
-协议表面（__all__）：ChatContext / prepare_chat / llm_error_response / stream_reply。
+协议表面（__all__）：ChatContext / prepare_chat / complete_chat / chat_error_response / stream_reply。
 
 一次「聊天回合」的生命周期（插开场白 → 存用户消息 → 组装上下文 →
-取 Key 与 Provider → 生成 → 保存/保存部分）全部收拢于此；
-api/routes/chat.py 只保留 HTTP 映射与 SSE data: 帧包装。
+取 Key 与 Provider → 生成 → 错误映射 → 保存/保存部分）全部收拢于此；
+api/routes/chat.py 只保留 HTTP 映射（领域异常 → HTTPException）与 SSE data: 帧包装。
+领域 + LLM 两族错误映射并置为单一入口 chat_error_response（B1 共识 D2）。
 
 对比参照 services/character_card.py 的深模块形态：协议表面小、实现丰富，
 测试针对接口而非路由内部实现。
@@ -16,20 +17,21 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 
-from fastapi import status
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from starlette.requests import ClientDisconnect
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Role
-from backend.app.schemas.message import ChatRequest
+from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import (
     ApiKeyMissingError,
     ConversationNotFoundError,
+    DomainError,
     ProviderNotSupportedError,
 )
 from backend.app.services.llm.base import BaseLLM
@@ -42,7 +44,20 @@ from backend.app.services.llm.errors import (
 )
 from backend.app.services.llm.factory import LLMFactory
 
-__all__ = ["ChatContext", "prepare_chat", "llm_error_response", "stream_reply"]
+__all__ = [
+    "ChatContext",
+    "prepare_chat",
+    "complete_chat",
+    "chat_error_response",
+    "stream_reply",
+]
+
+# 领域异常 → HTTP 状态码 映射（detail 一律 str(e)；语义源自路由层原 _DOMAIN_ERROR_MAP，B1 迁入合一）
+_DOMAIN_ERROR_MAP: dict[type[DomainError], int] = {
+    ConversationNotFoundError: status.HTTP_404_NOT_FOUND,
+    ApiKeyMissingError: status.HTTP_400_BAD_REQUEST,
+    ProviderNotSupportedError: status.HTTP_400_BAD_REQUEST,
+}
 
 # LLM 错误 → (HTTP 状态码, 用户可见消息) 映射
 _LLM_ERROR_MAP: dict[type[LLMError], tuple[int, str | None]] = {
@@ -129,8 +144,77 @@ def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
     )
 
 
+async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
+    """非流式聊天回合深模块入口：prepare → generate → LLM 错误映射 → 持久化 → 响应构造
+
+    完整搬移原路由层 create_chat 的业务语义（B1）：领域异常经 prepare_chat 上抛
+    （由路由层转 HTTP），LLMError 在此映射为 HTTPException 上抛（FastAPI 会正确
+    处理请求路径中抛出的 HTTPException）。
+
+    Args:
+        db: 数据库会话
+        request: 聊天请求
+
+    Returns:
+        ChatResponse（reply / message_id / conversation_id）
+
+    Raises:
+        ConversationNotFoundError: 对话不存在
+        ApiKeyMissingError: 未配置 API Key
+        ProviderNotSupportedError: 不支持的 Provider
+        HTTPException: LLM 调用失败（401/429/504/400/502，经 chat_error_response 映射）
+    """
+    ctx = prepare_chat(db, request)
+
+    try:
+        reply_text = await ctx.provider.generate(
+            ctx.messages,
+            temperature=ctx.temperature,
+            model=ctx.conversation.model_name,
+        )
+    except LLMError as e:
+        status_code, message = chat_error_response(
+            e, ctx.conversation.model_provider
+        )
+        raise HTTPException(status_code=status_code, detail=message)
+
+    saved = message_service.create_message(
+        db, request.conversation_id, Role.ASSISTANT, reply_text
+    )
+
+    return ChatResponse(
+        reply=reply_text,
+        message_id=saved.id,
+        conversation_id=request.conversation_id,
+    )
+
+
+def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int, str]:
+    """领域/LLM 异常 → (HTTP 状态码, 用户可见消息) 单一映射入口
+
+    两族映射并置于此（领域异常族 + LLM 异常族），状态码与消息与重构前逐字一致：
+    - 领域异常族：ConversationNotFoundError→404、ApiKeyMissingError→400、
+      ProviderNotSupportedError→400，detail=str(e)
+    - LLM 异常族：委托 llm_error_response（401 Auth 含 provider 模板、429/504 固定消息、400、502）
+    - 其余异常：502 + str(e) 兜底（防御性，当前调用方不会传入）
+
+    Args:
+        e: 待映射的异常（领域异常或 LLM 异常）
+        provider: LLM 分支的 Provider 名（Auth 消息模板使用；领域分支不使用）
+
+    Returns:
+        (HTTP 状态码, 用户可见消息)
+    """
+    for exc_type, http_status in _DOMAIN_ERROR_MAP.items():
+        if isinstance(e, exc_type):
+            return http_status, str(e)
+    if isinstance(e, LLMError):
+        return llm_error_response(e, provider or "")
+    return status.HTTP_502_BAD_GATEWAY, str(e)
+
+
 def llm_error_response(e: LLMError, provider: str) -> tuple[int, str]:
-    """将 LLMError 转为 (HTTP 状态码, 用户可见消息)"""
+    """将 LLMError 转为 (HTTP 状态码, 用户可见消息)（内部实现，chat_error_response 与 stream_reply 共用）"""
     for exc_type, (status_code, fixed_msg) in _LLM_ERROR_MAP.items():
         if isinstance(e, exc_type):
             if fixed_msg is not None:
