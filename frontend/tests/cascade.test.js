@@ -180,6 +180,21 @@ describe('closeConversationsAndResettle — 四入口统一收口语义', () => 
         expect(hooks.renderConversations).toHaveBeenCalledTimes(1);
     });
 
+    it('Falsify:ids 含不存在的会话 id(列表重载失败场景的失配)→ 其余 tab 不动,wasActive 判定不受影响,不崩溃', async () => {
+        const { cascade, tabs, hooks } = await loadWithSpies();
+        openTabs(tabs, 2);
+        tabs.activateTab(1);
+
+        // 删会话请求成功但级联 ids 与 tab 集失配(如已被并发删除):仅关存在的 id
+        await cascade.closeConversationsAndResettle({ ids: [1, 999], reloadList: true });
+
+        expect(tabs.getTabs().map((t) => t.conversationId)).toEqual([2]);
+        expect(tabs.getActiveTab()?.conversationId).toBe(2);
+        expect(hooks.activateConversation).toHaveBeenCalledTimes(1);
+        expect(hooks.activateConversation).toHaveBeenCalledWith(2, { saveCurrent: false });
+        expect(hooks.loadConversations).toHaveBeenCalledTimes(1);
+    });
+
     it('Falsify:重激活目标在 await 前被并发关闭 → activateConversation 仍收到其 id(行为保持),不崩溃', async () => {
         const { cascade, tabs, hooks } = await loadWithSpies();
         openTabs(tabs, 2);

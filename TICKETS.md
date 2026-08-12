@@ -23,6 +23,7 @@
 
 | 编号 | 遗留项 | 来源 | 推荐强度 |
 |------|--------|------|----------|
+| C3-DEFER | character-form / character-wizard 骨架级测试推迟到 C3 批次（modal 工厂 seam 落地后补测；ARC-9 T-06 已按决策 C5-D1 登记，不手搓 DOM 夹具） | ARC-9 共识 C5-D1 | Strong |
 | T-01 | 数据目录 APPDATA 缺失/空串兜底三分歧（壳 CWD vs run_backend `Path.home()` vs 迁移 `home\AppData\Roaming`）——建议统一同一兜底并补测试 | 波 2 降配审核遗留 1（期末复核仍成立） | Strong |
 | T-02 | DATABASE_URL 特殊字符（`#`/`?`）不编码：CONVER_DATA_DIR 含特殊字符时壳注入的 URL 截断失效（迁移脚本 `_open_readonly` 已 quote，壳侧未对齐） | 期末 Falsify 非阻断 1 | Worth exploring |
 | T-03 | smoke-desktop.ps1 按全局进程名 `conver_backend` 清理，与脚本自述「残留检查严格限定自己端口」原则不一致 | 期末 Falsify 非阻断 2 | Worth exploring |

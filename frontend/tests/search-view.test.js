@@ -197,6 +197,24 @@ describe('search-view — 五态文案（逐字）与搜索流程', () => {
         expect(fetchSpy.mock.calls[0][0]).toContain('q=ab');
     });
 
+    it('防抖窗口：输入后 300ms 内不发起请求,超时后恰好请求一次', async () => {
+        const { searchView, api, input } = await loadModules();
+        const fetchSpy = mockSearch({ results: [] });
+        api.setFetch(fetchSpy);
+        searchView.initSearchView({ navigateToConversation: () => {} });
+
+        input.value = 'ab';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(200);
+        expect(fetchSpy).not.toHaveBeenCalled(); // 窗口内不请求
+        await vi.advanceTimersByTimeAsync(100);
+        expect(fetchSpy).toHaveBeenCalledTimes(1); // 超时后触发一次
+        expect(fetchSpy.mock.calls[0][0]).toContain('q=ab');
+        // 不再重复触发
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('Enter → 立即搜索（不等防抖）且不重复', async () => {
         const { searchView, api, input } = await loadModules();
         const fetchSpy = mockSearch({ results: [] });
