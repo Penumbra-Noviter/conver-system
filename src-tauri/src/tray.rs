@@ -8,7 +8,7 @@ use std::sync::Mutex;
 
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager, Wry};
+use tauri::{AppHandle, Manager, WebviewWindow, Wry};
 use tauri_plugin_autostart::ManagerExt;
 
 /// 主窗口 label（与 tauri.conf.json 的 windows[0].label 一致）。
@@ -58,6 +58,16 @@ pub fn decide_window_intent(window_visible: bool) -> WindowIntent {
     } else {
         WindowIntent::Show
     }
+}
+
+/// 聚焦主窗口：取消最小化 → 显示 → 聚焦（D4 收口，两处调用共用）。
+///
+/// 调用点：托盘「显示」分支（`handle_menu_event`）与单实例二次启动回调（`lib.rs`）。
+/// 失败忽略语义（`let _ =`）保持：聚焦是尽力而为，失败不影响调用方流程。
+pub(crate) fn focus_main_window(window: &WebviewWindow<Wry>) {
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 /// 自启切换意图。
@@ -204,9 +214,7 @@ fn handle_menu_event(app: &AppHandle<Wry>, menu_id: &str) {
                 }
                 WindowIntent::Show => {
                     if let Some(w) = &window {
-                        let _ = w.unminimize();
-                        let _ = w.show();
-                        let _ = w.set_focus();
+                        focus_main_window(w);
                     }
                 }
             }
