@@ -30,9 +30,11 @@ const $ = (sel) => document.querySelector(sel);
 /**
  * 初始化 Provider 下拉列表（仅重建选项，不操作模型列表）
  * 在 settings 视图切换时调用
+ * DOM 元素缺失（index.html 契约被破坏的极端场景）→ no-op 不抛错。
  */
 export function initProviderDropdown() {
     const providerSelect = $('#setting-default-provider');
+    if (!providerSelect) return;
     const providers = state.models.providers || [];
 
     providerSelect.innerHTML = providers
@@ -297,16 +299,17 @@ async function testApiKeys(data) {
 
 /**
  * 初始化设置面板：绑定所有事件监听器
+ * Provider/Model 下拉元素缺失（index.html 契约被破坏的极端场景）→ 对应绑定 no-op 不抛错。
  *
  * @param {object} [options]
  * @param {function} [options.onConversationsCleared] - 清空所有对话后的回调（刷新列表等）
  */
 export function initSettingsPanel({ onConversationsCleared } = {}) {
     // Provider 切换时动态更新模型列表
-    $('#setting-default-provider').addEventListener('change', refreshModelOptions);
+    $('#setting-default-provider')?.addEventListener('change', refreshModelOptions);
 
     // 模型下拉切换时联动自定义输入框
-    $('#setting-default-model').addEventListener('change', createCustomModelHandler(
+    $('#setting-default-model')?.addEventListener('change', createCustomModelHandler(
         $('#setting-default-model'), $('#setting-custom-model'),
     ));
 
