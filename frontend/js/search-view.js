@@ -37,6 +37,10 @@ const btnSearchClear = $('#btn-search-clear');
 /** 防抖计时器（模块级状态 — 原 app.js searchTimeout 迁入） */
 let searchTimeout = null;
 
+/** 事件绑定守卫（模块级状态）：首次 initSearchView 绑定三事件后置位，
+ *  重复调用仅更新跳转钩子、不再重复绑定 —— 兑现 docstring 幂等声称 */
+let bound = false;
+
 /** 结果点击跳转钩子（app.js 接线时注入；缺失时 no-op 兜底） */
 let navigateToConversation = () => {};
 
@@ -50,6 +54,7 @@ let navigateToConversation = () => {};
  */
 export function initSearchView({ navigateToConversation: nav } = {}) {
     if (typeof nav === 'function') navigateToConversation = nav;
+    if (bound) return; // 幂等守卫：已绑定则早退（钩子已在上方更新）
     if (!searchInput || !searchResults || !btnSearchClear) return;
 
     // ── 搜索输入事件（防抖 300ms）──
@@ -80,6 +85,8 @@ export function initSearchView({ navigateToConversation: nav } = {}) {
         searchInput.focus();
         performSearch('');
     });
+
+    bound = true; // 三事件绑定完成，置位守卫
 }
 
 /**

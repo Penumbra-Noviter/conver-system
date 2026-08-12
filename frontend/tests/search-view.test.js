@@ -282,4 +282,28 @@ describe('search-view — 五态文案（逐字）与搜索流程', () => {
         expect(() => searchView.initSearchView({ navigateToConversation: () => {} }))
             .not.toThrow();
     });
+
+    it('重复调用 initSearchView（ARC9-1）：不重复绑定事件 → 单次输入仅 1 次请求，且钩子更新为最新', async () => {
+        const { searchView, api, input, results } = await loadModules();
+        const fetchSpy = mockSearch({
+            results: [{ conversation_id: 11, message_id: 1, role: 'user', character_name: '', content_preview: 'hi', conversation_title: '会话A' }],
+        });
+        api.setFetch(fetchSpy);
+        const nav1 = vi.fn();
+        const nav2 = vi.fn();
+        searchView.initSearchView({ navigateToConversation: nav1 });
+        searchView.initSearchView({ navigateToConversation: nav2 }); // 重复调用：仅更新钩子
+
+        // 防抖路径：单次 input 输入推进防抖窗口 → 恰好 1 次请求
+        await typeAndWait({ input }, 'hi');
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        // Enter 立即搜索路径：单次按键 → 恰好 1 次请求（keydown 双绑定会双发 → 守卫缺失时红）
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(0); // 排空渲染微任务
+        // 重复调用仍更新跳转钩子（幂等语义：钩子始终取最新注入值）
+        results.querySelector('.search-result-item').click();
+        expect(nav2).toHaveBeenCalledTimes(1);
+        expect(nav1).not.toHaveBeenCalled();
+    });
 });
