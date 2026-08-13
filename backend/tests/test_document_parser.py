@@ -187,6 +187,27 @@ class TestParseDocument:
 
     @patch("backend.app.services.llm.resolver.LLMFactory.get_provider")
     @patch("backend.app.services.llm.resolver.setting_service")
+    async def test_parse_unsupported_provider(self, mock_setting, mock_factory) -> None:
+        """API Key 已配置 + Provider 不支持 → DocParseError：422 + 基线文案逐字
+
+        基线 wire：不支持的 Provider → 422「不支持的 Provider: {provider}」（旧
+        document_parser 捕获 ValueError 转 DocParseError）。Key 已配置时 resolver
+        抛 ProviderNotSupportedError，此处必须同样转 DocParseError，不得让
+        ProviderNotSupportedError 逃逸（那会经 handler 变 400）。
+        """
+        mock_setting.default_provider.return_value = "claude"
+        mock_setting.default_model.return_value = "claude-sonnet-5"
+        mock_setting.api_key.return_value = "sk-test"
+        mock_setting.base_url.return_value = ""
+        mock_factory.side_effect = ValueError("不支持的 Provider: foo")
+
+        with pytest.raises(DocParseError) as exc:
+            await parse_document(None, "测试", provider="foo")
+
+        assert str(exc.value) == "不支持的 Provider: foo"
+
+    @patch("backend.app.services.llm.resolver.LLMFactory.get_provider")
+    @patch("backend.app.services.llm.resolver.setting_service")
     async def test_parse_tags_as_list(self, mock_setting, mock_factory) -> None:
         """tags 字段应正确处理为列表"""
         mock_setting.default_provider.return_value = "claude"
