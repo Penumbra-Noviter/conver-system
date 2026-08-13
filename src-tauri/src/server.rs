@@ -31,6 +31,10 @@ pub const READY_POLL_INTERVAL: Duration = Duration::from_millis(500);
 /// 单次 HTTP 探测超时。
 pub const HTTP_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
+/// `ManagedChild::kill` 有界回收时限：终止动作后轮询 `try_wait` 至多等待该时长，
+/// 保证任何退出路径都不无限阻塞（taskkill 失败且进程仍存活时不再空等）。
+const KILL_RECLAIM_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// 就绪标记文件名（数据目录下）。
 pub const RUNTIME_JSON: &str = "runtime.json";
 
@@ -266,24 +270,58 @@ impl ManagedChild {
             .map(|status| status.code().unwrap_or(-1))
     }
 
-    /// 终止并回收子进程（幂等；已退出时无副作用）。
+    /// 终止并回收子进程（幂等；已退出时无副作用；任何路径等待有界，不无限阻塞）。
     ///
-    /// Windows：带树终止（`taskkill /PID <pid> /T /F`）——dev 态 venv 的 python
+    /// Windows：带树终止（`taskkill /PID <pid> /T /F`）先行——dev 态 venv 的 python
     /// 重定向器会 spawn 孙进程，只杀直接子进程会残留后端进程（RS-1 R2）；
-    /// taskkill 失败幂等忽略（进程可能已自行退出，清理路径不抛错）。
-    /// 非 Windows：直接 `child.kill()`。
+    /// taskkill 失败且进程仍存活时以句柄级 `child.kill()` 兜底（树终止语义已尽力）。
+    /// 任意路径不无限阻塞：进程已自行退出 → 直接返回；仍存活 → 有界轮询回收
+    /// （旧实现 taskkill 失败后无条件 `child.wait()`，进程存活时挂死）。
+    /// pid 复用竞态维持接受：taskkill 失败到兜底完成之间存在微秒级窗口，pid 可能被
+    /// 系统回收复用——实证不可复现，不做 pid 存在性二次校验（见 `kill_windows_tree`）。
+    /// 非 Windows：直接 `child.kill()`（机制不变）。
     pub fn kill(&mut self) {
         if let Some(mut child) = self.child.take() {
+            // 进程已自行退出 → 回收退出状态后直接返回：不再执行终止动作
+            // （taskkill 对已死 pid 报「not found」属预期，且避免终止动作落在复用 pid 上）
+            if child.try_wait().ok().flatten().is_some() {
+                return;
+            }
             #[cfg(windows)]
             kill_windows_tree(child.id());
             #[cfg(not(windows))]
             let _ = child.kill();
-            let _ = child.wait();
+            // Windows：taskkill 失败且进程仍存活 → 句柄级兜底（尽力终止直接子进程）
+            #[cfg(windows)]
+            if child.try_wait().ok().flatten().is_none() {
+                let _ = child.kill();
+            }
+            // 有界回收：轮询 try_wait 至多 KILL_RECLAIM_TIMEOUT 后放弃，任何路径
+            // 不无限阻塞（替换旧实现的无条件 child.wait()）
+            let deadline = Instant::now() + KILL_RECLAIM_TIMEOUT;
+            loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => break,
+                    Ok(None) => {
+                        if Instant::now() >= deadline {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(50));
+                    }
+                    // 句柄状态异常（如已被回收）——放弃等待，避免空转
+                    Err(_) => break,
+                }
+            }
         }
     }
 }
 
-/// Windows 带树终止：`taskkill /PID <pid> /T /F`（幂等，失败忽略）。
+/// Windows 带树终止：`taskkill /PID <pid> /T /F`（幂等，失败由调用方兜底——
+/// `ManagedChild::kill` 在进程仍存活时以句柄级 `child.kill()` 收尾）。
+///
+/// pid 复用竞态注记：本调用与系统回收 pid 之间存在微秒级窗口（进程恰在
+/// taskkill 前退出、pid 被复用），此时 taskkill 可能误杀无辜进程——窗口实证
+/// 不可复现，维持接受（TD-31 共识），不做二次校验。
 #[cfg(windows)]
 fn kill_windows_tree(pid: u32) {
     let _ = Command::new("taskkill")
@@ -389,8 +427,9 @@ pub struct BackendStatus {
     pub port: u16,
     /// 最近错误（无错误为 None）。
     pub error: Option<String>,
-    /// 就绪超时（毫秒；未启动为 None——引导页 `status.readyTimeoutMs ?? 60000`
-    /// 向后兼容派生轮询上限，RS-1 R3）。
+    /// 就绪超时（毫秒；未启动为 None——引导页按 `readyTimeoutMs > 0 ? 透传 :
+    /// DEFAULT_READY_TIMEOUT_MS` 派生轮询上限，0/null/undefined 一律视为未配置，
+    /// 回退默认 60000ms，RS-1 R3）。
     pub ready_timeout_ms: Option<u64>,
 }
 
