@@ -96,6 +96,22 @@ describe('renderMarkdown', () => {
             expect(renderMarkdown('[b](mailto:a@b.c)')).toContain('href="mailto:a@b.c"');
             expect(renderMarkdown('[c](/relative/path)')).toContain('href="/relative/path"');
         });
+
+        it('scheme 内嵌/前导控制字符变体被中和为纯文本（TD-28，XSS 边界）', () => {
+            expect(renderMarkdown('[x](java\tscript:alert(1))')).not.toContain('<a');
+            expect(renderMarkdown('[x](java\nscript:foo)')).toBe('x');
+            expect(renderMarkdown('[x](java\rscript:foo)')).toBe('x');
+            expect(renderMarkdown('[x](\x00javascript:foo)')).toBe('x');
+            expect(renderMarkdown('[x](java\tscript:foo)')).not.toContain('<a');
+        });
+
+        it('控制字符 Falsify：混合大小写/多组合/正常位置/纯控制字符不崩溃', () => {
+            expect(renderMarkdown('[x](JaVa\tScRiPt:foo)')).toBe('x');
+            expect(renderMarkdown('[x](j\ta\nv\ras\tr\nipt:foo)')).toBe('x');
+            expect(renderMarkdown('[x](https://a\tb.com)')).toContain('href="https://a\tb.com"');
+            expect(() => renderMarkdown('[x](\t)')).not.toThrow();
+            expect(() => renderMarkdown('[x](\x00)')).not.toThrow();
+        });
     });
 
     describe('列表状态机', () => {
