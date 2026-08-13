@@ -3,11 +3,11 @@ LLM 凭据解析 / 实例化收口 — 深函数 resolve_llm（B2 共识 D3）
 
 三处调用序列（聊天回合 / 文档解析 / 连接测试）同条件曾有三种错误语义：
 「未配置 API Key」在聊天回合抛领域异常、在文档解析被错误归类为解析失败 422、
-在连接测试为裸 400。本模块统一为同一种领域异常（ApiKeyMissingError），
-由各调用方按自身 wire 契约转换：
+在连接测试为裸 400。本模块统一为同一种领域异常族（ApiKeyMissingError /
+ProviderNotSupportedError），由各调用方按自身 wire 契约转换：
 
     - 聊天回合：直接使用（领域异常经统一 handler 转 400）
-    - 文档解析：调用处捕获 → 转 DocParseError（保持 422 + 既有文案 wire）
+    - 文档解析：调用处捕获两种异常 → 统一转 DocParseError（保持 422 + 既有文案逐字）
     - 连接测试：路由捕获 → 转 HTTPException(400)（保持 D-B3-1 局部语义）
 
 协议表面（__all__）：resolve_llm。

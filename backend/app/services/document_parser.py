@@ -18,7 +18,11 @@ logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 
 from backend.app.schemas.character import DocParseResponse
-from backend.app.services.exceptions import ApiKeyMissingError, DocParseError
+from backend.app.services.exceptions import (
+    ApiKeyMissingError,
+    DocParseError,
+    ProviderNotSupportedError,
+)
 from backend.app.services.llm.resolver import resolve_llm
 
 __all__ = ["parse_document"]
@@ -71,15 +75,20 @@ async def parse_document(
         解析后的角色字段（DocParseResponse）
 
     Raises:
-        DocParseError: LLM 调用失败 / 返回无法解析的响应 / 未配置 API Key
-            （未配置 Key 由 resolve_llm 抛 ApiKeyMissingError，此处按本模块
-            wire 契约转 DocParseError：422 + 既有文案逐字）
+        DocParseError: LLM 调用失败 / 返回无法解析的响应 / 未配置 API Key /
+            Provider 不支持（后两者由 resolve_llm 抛 ApiKeyMissingError /
+            ProviderNotSupportedError，此处按本模块 wire 契约统一转 DocParseError：
+            422 + 既有文案逐字）
     """
     # 1. 解析 provider / model 并解析 LLM 实例（凭据读取 + 实例化收口于 resolve_llm）
     try:
         _, mod, llm = resolve_llm(db, provider, model)
     except ApiKeyMissingError:
         raise DocParseError("未配置 API Key，请先在设置中填写") from None
+    except ProviderNotSupportedError as exc:
+        # 基线 wire：不支持的 Provider → 422 + 既有文案逐字（旧实现捕获
+        # ValueError 转 DocParseError；resolver 收口为领域异常后此处还原契约）
+        raise DocParseError(str(exc)) from None
 
     # 2. 构造消息并调用 LLM
     messages = [
