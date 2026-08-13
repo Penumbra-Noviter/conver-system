@@ -134,7 +134,7 @@ function renderShell(game) {
         </div>
         <div class="sim-run-body">
             <p class="sim-run-status">加载中…</p>
-            <iframe class="sim-run-frame sim-run-frame-hidden" title="${escapeHtml(name)}"></iframe>
+            <iframe class="sim-run-frame sim-run-frame-hidden"></iframe>
         </div>
     `;
     runPanel.querySelector('.sim-run-back').addEventListener('click', closeSimulator);
@@ -166,8 +166,12 @@ function renderError(reason) {
 // ══════════════════════════════════════════════════
 
 /** iframe load 事件 → loaded（清计时器、显示 iframe、移除加载占位） */
-function handleLoad() {
+function handleLoad(e) {
     if (state !== 'opening') return; // 兜底：close/超时后迟到的 load 忽略
+    // 事件源校验（load 竞态守卫）：旧 iframe 销毁后其监听仍在，向旧元素派发
+    // 的迟到 load 会误清新游戏超时守卫 + 提前显示新 iframe（新游戏永不 load
+    // 则永久空白无兜底）— 仅接受当前 frame 自身的事件
+    if (e?.target !== frame) return;
     clearTimer();
     state = 'loaded';
     if (frame) frame.classList.remove('sim-run-frame-hidden');
@@ -182,7 +186,7 @@ function handleTimeout() {
     renderError('加载超时（15 秒未收到响应）');
 }
 
-/** 进入 opening：渲染骨架（含新 iframe）→ 绑定 load → 设 src → 起超时守卫 */
+/** 进入 opening：渲染骨架（含新 iframe）→ 绑定 load → 设 src/title → 起超时守卫 */
 function startOpening(game) {
     destroyFrame(); // 重复 open：清理旧 iframe 与旧计时器（含残留 load 监听）
     state = 'opening';
@@ -190,6 +194,10 @@ function startOpening(game) {
     renderShell(game);
     frame = runPanel.querySelector('.sim-run-frame');
     frame.addEventListener('load', handleLoad);
+    // title 经 setAttribute 赋值（数据通道单一化纪律 — 属性值不嵌 HTML 字符串：
+    // escapeHtml 文本序列化不转义引号，字符串拼接 title 存在属性注入面；先例同
+    // simulators.js data-id dataset 通道）
+    frame.setAttribute('title', typeof game.name === 'string' ? game.name : '');
     frame.setAttribute('src', `${SIM_DIR}/${game.file}`);
     timeoutTimer = setTimeout(handleTimeout, TIMEOUT_MS);
 }
