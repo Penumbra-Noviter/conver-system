@@ -92,8 +92,12 @@ export function renderMessages() {
         currentCharacterId: tab.characterId,
     });
 
-    // 复制按钮事件（点击时读 dataset.content，与流式逐 token 更新兼容）
-    container.querySelectorAll('.btn-copy-message').forEach(btn => {
+    // 复制按钮事件 + 复制数据补写（FE-1 数据通道单一化：复制内容不经 HTML 属性 —
+    // escapeHtml 不实体化文本节点双引号，嵌 data-content 会解析截断 + 产生属性注入面；
+    // dataset 赋值天然安全。按钮顺序与缓存中非 system 消息一一对应，system 无按钮）
+    const copyMessages = tab.messages.filter((m) => m.role !== 'system');
+    container.querySelectorAll('.btn-copy-message').forEach((btn, i) => {
+        btn.dataset.content = copyMessages[i]?.content ?? '';
         attachCopyButton(btn);
     });
 
@@ -127,7 +131,11 @@ function appendMessage(role, content, meta = {}) {
     }));
     const bubble = container.lastElementChild;
     const copyBtn = bubble.querySelector('.btn-copy-message');
-    if (copyBtn) attachCopyButton(copyBtn);
+    if (copyBtn) {
+        // FE-1：复制内容经 dataset 赋值（天然安全），不嵌 HTML 属性（见 renderMessages 注释）
+        copyBtn.dataset.content = content;
+        attachCopyButton(copyBtn);
+    }
 
     scrollToBottom();
 

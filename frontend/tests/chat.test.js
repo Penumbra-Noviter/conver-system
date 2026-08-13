@@ -189,6 +189,31 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
         expect(tabs.getTab(11).messages).toEqual([msg(1, 'user', '你好'), msg(2, 'assistant', '好的')]);
         expect(chat.chatDom.chatMessages.textContent).toContain('好的');
     });
+
+    it('FE-1 复制数据不截断：renderMessages 全量重渲染含双引号缓存内容 → dataset.content 与原文一致', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [{ role: 'assistant', content: '他说 "你好" 和 "再见"' }] });
+        chat.renderMessages();
+        const copyBtn = chat.chatDom.chatMessages.querySelector('.message.assistant .btn-copy-message');
+        expect(copyBtn.dataset.content).toBe('他说 "你好" 和 "再见"');
+    });
+
+    it('FE-1 复制数据不截断：appendMessage 追加含双引号用户消息 → dataset.content 与原文一致', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        chat.chatDom.toggleStream.checked = false;
+        api.setFetch(makeApiMock({ chatResult: { reply: '好的' } }));
+        vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setConversationsRefresher(() => {});
+
+        chat.chatDom.chatInput.value = '他说 "你好" 和 "再见"';
+        await chat.handleSend();
+
+        const userCopyBtn = chat.chatDom.chatMessages.querySelector('.message.user .btn-copy-message');
+        expect(userCopyBtn).not.toBeNull();
+        expect(userCopyBtn.dataset.content).toBe('他说 "你好" 和 "再见"');
+    });
 });
 
 describe('handleSend — 流式（createStreamSession 委托链）', () => {
@@ -287,6 +312,15 @@ describe('handleSend — 流式（createStreamSession 委托链）', () => {
         // 复制行为正确：点击复制当前全文（读 dataset，非绑定时刻快照）
         copyBtn.click();
         await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('你好'));
+    });
+
+    it('FE-1 复制数据不截断：onToken 增量路径同步含双引号全文（dataset 赋值通道）', async () => {
+        const { chat, getCaptured } = await loadWithStreamHarness();
+        chat.chatDom.chatInput.value = '你好';
+        await chat.handleSend();
+        getCaptured().cbs.onToken('他说 "你好" 和 "再见"');
+        const copyBtn = chat.chatDom.chatMessages.querySelector('.message.assistant .btn-copy-message');
+        expect(copyBtn.dataset.content).toBe('他说 "你好" 和 "再见"');
     });
 
     it('F1 切回复用：renderMessages 重建 DOM 后 onToken 复用 live 气泡（不重复建泡）并同步 data-content', async () => {

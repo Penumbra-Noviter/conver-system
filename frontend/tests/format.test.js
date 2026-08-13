@@ -36,7 +36,8 @@ describe('messageBubbleHtml — 参数化气泡工厂（F1 三路径统一）', 
         expect(html).toContain('&lt;script&gt;');
         expect(html).not.toContain('<script>');
         expect(html).toContain('btn-copy-message');
-        expect(html).toContain('data-content="&lt;script&gt;x&lt;/script&gt;"');
+        // FE-1：复制内容不进 HTML 属性（数据通道单一化 — 由调用方经 dataset 赋值）
+        expect(html).not.toContain('data-content');
     });
 
     it('assistant 变体：角色头像 + Markdown 渲染 + 复制按钮', () => {
@@ -77,9 +78,30 @@ describe('messageBubbleHtml — 参数化气泡工厂（F1 三路径统一）', 
         expect(html).toContain('class="message assistant message-error"');
     });
 
-    it('复制按钮 data-content 转义（点击复制还原原始内容）', () => {
+    it('复制按钮不含 data-content 属性（复制内容由调用方经 dataset.content 补写 — FE-1）', () => {
         const html = messageBubbleHtml('user', 'a & b');
-        expect(html).toContain('data-content="a &amp; b"');
+        expect(html).toContain('btn-copy-message');
+        expect(html).not.toContain('data-content');
+    });
+
+    // ── FE-1 复制数据通道单一化（防复发回归断言）──
+    // 旧实现：escapeHtml 基于 textContent→innerHTML，文本节点双引号不实体化，
+    // 嵌入 data-content="…" 属性后解析即在首个引号处截断（复制数据损坏）。
+    // 修复：气泡 HTML 不再携带复制内容（由调用方经 btn.dataset.content 赋值）。
+    it('FE-1 复制内容不再嵌入 HTML 属性：内容含双引号解析后 data-content 不存在（不截断）', () => {
+        const container = document.createElement('div');
+        container.innerHTML = messageBubbleHtml('user', '他说 "你好" 和 "再见"');
+        const btn = container.querySelector('.btn-copy-message');
+        expect(btn.getAttribute('data-content')).toBeNull();
+        // 无对应属性时 dataset.content 为 undefined（attachCopyButton 读时以 ?? '' 兜底）
+        expect(btn.dataset.content).toBeUndefined();
+    });
+
+    it('FE-1 属性注入面关闭：内容含 hi" onclick="alert(2) 不产生 onclick 属性', () => {
+        const container = document.createElement('div');
+        container.innerHTML = messageBubbleHtml('user', 'hi" onclick="alert(2)');
+        const btn = container.querySelector('.btn-copy-message');
+        expect(btn.hasAttribute('onclick')).toBe(false);
     });
 });
 
@@ -110,9 +132,10 @@ describe('buildMessagesHtml', () => {
         expect(html).toContain('<img src="http://x/a.png"');
     });
 
-    it('复制按钮 data-content 转义', () => {
+    it('复制按钮不含 data-content 属性（FE-1 数据通道单一化）', () => {
         const html = buildMessagesHtml([{ role: 'user', content: 'a & b' }]);
-        expect(html).toContain('data-content="a &amp; b"');
+        expect(html).toContain('btn-copy-message');
+        expect(html).not.toContain('data-content');
     });
 });
 
