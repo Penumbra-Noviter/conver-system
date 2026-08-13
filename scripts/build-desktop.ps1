@@ -20,8 +20,10 @@
 #   - Rust 工具链（x86_64-pc-windows-msvc，见 docs/tauri-setup.md）
 #
 # 产物：
-#   - 安装器：src-tauri/target/release/bundle/nsis/Conver System_0.1.0_x64-setup.exe
-#     （NSIS installMode=currentUser → 安装到 %LOCALAPPDATA%\Programs\，免管理员；
+#   - 安装器：src-tauri/target/release/bundle/nsis/{productName}_{version}_x64-setup.exe
+#     （文件名由 tauri.conf.json 的 productName/version 经共享 helper
+#     Get-ConverInstallerPath 推导——见 scripts/lib/desktop-common.ps1，R4a 收口；
+#     NSIS installMode=currentUser → 安装到 %LOCALAPPDATA%\Programs\，免管理员；
 #     卸载不影响 %APPDATA%\ConverSystem 数据，见 docs/tauri-desktop.md）
 #   - 壳 exe：src-tauri/target/release/conver-system.exe
 #
@@ -173,7 +175,8 @@ try {
         Write-Host "警告：NSIS 安装器未产出（网络下载失败）。已生成 src-tauri/target/release/conver-system.exe。" -ForegroundColor Yellow
         Write-Host "修复后重跑本脚本即可补齐安装器；网络代理/镜像说明见 docs/tauri-desktop.md。" -ForegroundColor Yellow
     } else {
-        $Installer = Join-Path $Root "src-tauri\target\release\bundle\nsis\Conver System_0.1.0_x64-setup.exe"
+        # 安装器路径单一推导来源（R4a）：tauri.conf.json productName/version → 共享 helper
+        $Installer = Get-ConverInstallerPath -Root $Root
         if (Test-Path $Installer) {
             $Size = (Get-Item $Installer).Length / 1MB
             Write-Host ""
