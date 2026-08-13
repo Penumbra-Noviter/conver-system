@@ -63,6 +63,60 @@ describe('renderMarkdown', () => {
         });
     });
 
+    describe('占位符碰撞免疫（TD-38 防复发：碰撞计数器失同步阻断修复）', () => {
+        const NUL = '\u0000';
+        const nulCount = (s) => s.match(/\u0000/g) ?? [];
+
+        it('单块 + 用户内容含 \u0000MDCB0\u0000 → 碰撞跳号，代码块正确还原', () => {
+            const out = renderMarkdown(`\u0000MDCB0\u0000\n\n\`\`\`\ncode\n\`\`\``);
+            expect(out).toContain('<pre><code>code\n</code></pre>');
+            // 用户自带 NUL 占位符同形文本属用户内容，原样保留（非占位符泄漏）
+            expect(nulCount(out)).toHaveLength(2);
+        });
+
+        it('双块 + 用户内容含 \u0000MDCB0\u0000 → 两块各自独立还原（防复发：FIRST 不丢失、SECOND 不双份）', () => {
+            const out = renderMarkdown(
+                `\u0000MDCB0\u0000\n\n\`\`\`\nFIRST\n\`\`\`\n\n\`\`\`\nSECOND\n\`\`\``
+            );
+            // 审核实证：修复前 FIRST 完全丢失、SECOND 出现两次（计数器失同步 → 第二块复用
+            // 第一块占位符 → Map.set 覆盖首条记录 → 还原循环把两处占位符都替换为第二块 HTML）
+            expect(out).toContain('<pre><code>FIRST\n</code></pre>');
+            expect(out).toContain('<pre><code>SECOND\n</code></pre>');
+            // 无 NUL 残留（占位符不得泄漏）：输出仅含输入自带 \u0000MDCB0\u0000 字面量的
+            // 2 个 NUL，渲染器取号（MDCB1/MDCB2）必须全部还原，不得以占位符形态残留
+            expect(nulCount(out)).toHaveLength(2);
+        });
+
+        it('双块 + 用户内容含 \u0000MDCB0\u0000 与 \u0000MDCB1\u0000 → 三索引碰撞链后仍独立还原（防复发）', () => {
+            const out = renderMarkdown(
+                `\u0000MDCB0\u0000\u0000MDCB1\u0000\n\n\`\`\`\nFIRST\n\`\`\`\n\n\`\`\`\nSECOND\n\`\`\``
+            );
+            expect(out).toContain('<pre><code>FIRST\n</code></pre>');
+            expect(out).toContain('<pre><code>SECOND\n</code></pre>');
+            // 用户字面量 MDCB0/MDCB1 共 4 个 NUL；渲染器占位符全部还原
+            expect(nulCount(out)).toHaveLength(4);
+        });
+
+        it('三块 + 用户内容含 \u0000MDCB0\u0000 → 三块全部独立还原（防复发）', () => {
+            const out = renderMarkdown(
+                `\u0000MDCB0\u0000\n\n\`\`\`\nA\n\`\`\`\n\n\`\`\`\nB\n\`\`\`\n\n\`\`\`\nC\n\`\`\``
+            );
+            expect(out).toContain('<pre><code>A\n</code></pre>');
+            expect(out).toContain('<pre><code>B\n</code></pre>');
+            expect(out).toContain('<pre><code>C\n</code></pre>');
+            expect(nulCount(out)).toHaveLength(2);
+        });
+
+        it('块内容本身含碰撞索引文本（\u0000MDCB1\u0000 在首块内）→ 互不误替', () => {
+            const out = renderMarkdown(
+                `\`\`\`\n\u0000MDCB1\u0000\n\`\`\`\n\n\`\`\`\nSECOND\n\`\`\``
+            );
+            expect(out).toContain('<pre><code>\u0000MDCB1\u0000\n</code></pre>');
+            expect(out).toContain('<pre><code>SECOND\n</code></pre>');
+            expect(nulCount(out)).toHaveLength(2);
+        });
+    });
+
     describe('内联代码', () => {
         it('反引号包裹转 <code>', () => {
             expect(renderMarkdown('run `npm install` now')).toBe('run <code>npm install</code> now');
