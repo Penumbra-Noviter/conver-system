@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 412+1skip）；`cd frontend && npm test`（Vitest 436，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（56）。
+测试：`cd backend && python -m pytest`（pytest 412+1skip）；`cd frontend && npm test`（Vitest 438，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（56）。
 
 ## 当前状态（2026-08-12）
 
@@ -43,7 +43,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **技术债区 TD-13~14 批次（2026-08-12 全自动 kickoff）**：2 做 + TD-9 顺带闭环——TD-13 save 回调入口统一守卫（11 元素收集 + :339 收口；+2 用例先红后绿）/ TD-14 契约措辞 pathlib 规范化注记 + 契约锁用例；TD-9 维持→做（入口守卫覆盖其调用点，本体零改动）；期末四轴 0 阻断；10 项新遗留（TD-15~24）入技术债区
 - ✅ **技术债区 TD-15~24 批次（2026-08-12 全自动 kickoff）**：10 项全做清零（小档 2 工单，merge 0010f1b）——TD-A 守卫收窄与卫生（TD-15 守卫条件化 `modelSelect.value === '__custom__'`，票面 providerSelect 条件实证否定；+2 用例 A 先红后绿 + B 基线绿）+ TD-B 契约注记与锁补强（UNC 特例注记 / 尾分隔符+UNC 锁断言 / 「路径形态」限定 / Rust 透传注释）；期末四轴 0 阻断；3 项新遗留（TD-25~27）入技术债区
 - ✅ **技术债区 TD-25~27 批次（2026-08-13 全自动 kickoff）**：1 做 + 2 维持关闭（merge 8ae3801）——TD-25 UNC 锁断言平台隔离（拆独立用例 + 函数级 skipif，票面断言级形态实证不可表达；Windows 锁照跑 + POSIX 可见 skip）；TD-26/TD-27 复核确认维持关闭（现状即设计意图）；期末四轴 0 阻断，技术债区清零
-- ✅ 测试：pytest 412+1skip（后端）+ Vitest 436（前端）+ cargo test 56（壳）全绿
+- ✅ 测试：pytest 412+1skip（后端）+ Vitest 438（前端）+ cargo test 56（壳）全绿
 
 ## 待办管理
 
