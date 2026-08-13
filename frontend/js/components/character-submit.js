@@ -57,11 +57,14 @@ export const TEMP_SLIDER = Object.freeze({
 
 /**
  * 温度统一格式化（两位小数）：表单与向导初始显示/实时显示一致
- * @param {number|string|null|undefined} value - 温度值（缺省 → TEMP_SLIDER.default）
+ * 非数字输入（'abc'/NaN/Infinity 等）经 Number.isFinite 校验失败后回退
+ * TEMP_SLIDER.default（畸形存量数据编辑不显示 NaN）
+ * @param {number|string|null|undefined} value - 温度值（缺省/非法 → TEMP_SLIDER.default）
  * @returns {string} 两位小数字符串（如 '0.70'）
  */
 export function formatTemperature(value) {
-    return Number(value ?? TEMP_SLIDER.default).toFixed(2);
+    const num = Number(value ?? TEMP_SLIDER.default);
+    return (Number.isFinite(num) ? num : TEMP_SLIDER.default).toFixed(2);
 }
 
 /**

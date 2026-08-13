@@ -473,6 +473,14 @@ describe('renderMessages — 空态判定收口（F6 单一来源，format 两�
         expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
     });
 
+    it('Falsify:字符串 messages → 空态安全路径，不抛 TypeError（Array.isArray 守卫）', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: 'corrupt-cache-string' });
+        expect(() => chat.renderMessages()).not.toThrow();
+        expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+
     it('无活动 tab → EMPTY_STATE_HTML（既有 no-op 分支保持）', async () => {
         const { chat } = await loadModules();
         chat.renderMessages();
@@ -561,6 +569,14 @@ describe('聊天头部深模块（F4 收口 — renderChatHeader / startRename /
         const { chat } = await loadModules();
         chat.renderChatHeader(99);
         expect(chat.chatDom.chatHeader.innerHTML).toBe(chat.EMPTY_HEADER_HTML);
+    });
+
+    it('Falsify:startRename(undefined/null) → 静默返回不抛错（conv 守卫）', async () => {
+        const { chat } = await loadModules();
+        expect(() => chat.startRename(undefined)).not.toThrow();
+        expect(() => chat.startRename(null)).not.toThrow();
+        // 守卫后未进入编辑态（标题元素保持原状）
+        expect(chat.chatDom.chatHeader.querySelector('.chat-title-input')).toBeNull();
     });
 
     it('双击标题重命名：Enter 提交 → PUT → 头部/tab 同步 + 列表同步钩子收到 (id, title)', async () => {

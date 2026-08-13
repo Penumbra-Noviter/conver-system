@@ -69,6 +69,14 @@ describe('formatTemperature — 温度统一两位小数显示（toFixed(2)）',
         expect(formatTemperature(undefined)).toBe('0.70');
         expect(formatTemperature(null)).toBe('0.70');
     });
+
+    it('Falsify:非数字输入（abc/NaN/Infinity/对象）→ 兜底 0.70（Number.isFinite 校验）', () => {
+        expect(formatTemperature('abc')).toBe('0.70');
+        expect(formatTemperature('NaN')).toBe('0.70');
+        expect(formatTemperature(NaN)).toBe('0.70');
+        expect(formatTemperature(Infinity)).toBe('0.70');
+        expect(formatTemperature({})).toBe('0.70');
+    });
 });
 
 describe('avatarPreviewHtml — 头像预览单一实现（form/wizard 共用）', () => {

@@ -83,7 +83,8 @@ export function renderMessages() {
     const tab = getActiveTab();
     // 空态判定收口（F6）：无活动 tab 或消息为空 → 同一 EMPTY_STATE_HTML（单一来源，
     // 替代消息列表模板旧空态文案；format.js 不再承担空态分支）
-    if (!tab || !tab.messages?.length) {
+    // Array.isArray 守卫（TD-36）：字符串有 length 会误过空态判定，随后 .filter 抛 TypeError
+    if (!tab || !Array.isArray(tab.messages) || !tab.messages.length) {
         container.innerHTML = EMPTY_STATE_HTML;
         return;
     }
@@ -279,6 +280,8 @@ export function renderChatHeader(conversationId) {
  * @param {object} conv - 对话对象
  */
 export function startRename(conv) {
+    // TD-37 守卫：无对话对象（畸形调用）→ 静默返回（内部调用点恒传非空，防御性修复）
+    if (!conv) return;
     const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
     if (!titleEl) return;
 
