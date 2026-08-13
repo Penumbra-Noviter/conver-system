@@ -405,9 +405,10 @@ fn managed_child_kill_terminates_process() {
 
 /// 已退出进程 kill 不挂死（有界回收契约）：子进程自行退出后 kill() 必须即时返回。
 ///
-/// Windows 下 taskkill 对已死 pid 返回「not found」失败（天然触发 taskkill 失败分支），
-/// 实现必须以 try_wait 判定退出并跳过终止动作——任何路径不得无限阻塞
-/// （旧实现 taskkill 失败且进程存活时无条件 child.wait() 会挂死）。
+/// 实际覆盖路径：try_wait 早返回（early-return 先于 taskkill，taskkill 分支在此用例
+/// 中不会执行——注入失败分支无 seam，见 spec 风险清单）；已退出进程恒返回 Some 故
+/// early-return 恒生效，任何路径不得无限阻塞（旧实现 taskkill 失败且进程存活时
+/// 无条件 child.wait() 会挂死）。
 #[test]
 fn managed_child_kill_on_exited_process_returns_promptly() {
     if !python_available() {
