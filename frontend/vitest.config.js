@@ -18,6 +18,7 @@ export default defineConfig({
                 'js/cascade.js',
                 'js/components/settings-panel.js',
                 'js/components/model-selector.js',
+                'js/components/character-submit.js',
             ],
             reporter: ['text', 'html'],
             thresholds: {

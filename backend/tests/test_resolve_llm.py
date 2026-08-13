@@ -3,7 +3,7 @@ BE-1 单元测试 — resolve_llm 深函数（LLM 凭据解析/实例化收口�
 
 覆盖：
     1. 未配置 Key → ApiKeyMissingError（统一领域异常）
-    2. Provider 不合法（get_provider 抛 ValueError）→ ProviderNotSupportedError
+    2. Provider 不合法（get_provider 抛 ProviderNotSupportedError 领域异常）→ 统一映射
     3. 正常解析 → (provider, model, llm) 三元组 + 参数透传
     4. provider / model 缺省回退默认值
     5. 显式 api_key / base_url 覆盖优先（连接测试用）
