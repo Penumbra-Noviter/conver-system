@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { highlightText, buildMessagesHtml, assistantAvatarHtml, userAvatarHtml, characterCardHtml, conversationItemHtml, searchResultItemHtml, avatarImgHtml } from '../js/format.js';
+import { highlightText, buildMessagesHtml, messageBubbleHtml, assistantAvatarHtml, userAvatarHtml, characterCardHtml, conversationItemHtml, searchResultItemHtml, avatarImgHtml } from '../js/format.js';
 
 describe('highlightText', () => {
     it('无关键词时原样返回', () => {
@@ -28,15 +28,62 @@ describe('highlightText', () => {
     });
 });
 
+describe('messageBubbleHtml — 参数化气泡工厂（F1 三路径统一）', () => {
+    it('user 变体：用户头像 + 转义内容 + 复制按钮', () => {
+        const html = messageBubbleHtml('user', '<script>x</script>');
+        expect(html).toContain('<div class="message user">');
+        expect(html).toContain('msg-avatar user-avatar');
+        expect(html).toContain('&lt;script&gt;');
+        expect(html).not.toContain('<script>');
+        expect(html).toContain('btn-copy-message');
+        expect(html).toContain('data-content="&lt;script&gt;x&lt;/script&gt;"');
+    });
+
+    it('assistant 变体：角色头像 + Markdown 渲染 + 复制按钮', () => {
+        const html = messageBubbleHtml('assistant', 'Hello **world**', {
+            characters: [{ id: 1, name: '测试角色' }], currentCharacterId: 1,
+        });
+        expect(html).toContain('<div class="message assistant">');
+        expect(html).toContain('avatar-placeholder-xs');
+        expect(html).toContain('<strong>world</strong>');
+        expect(html).toContain('btn-copy-message');
+    });
+
+    it('system 变体：无头像 + 无复制按钮（产品微调 F1 — 与其他 system 形态一致）', () => {
+        const html = messageBubbleHtml('system', '发送失败: x');
+        expect(html).toContain('<div class="message system">');
+        expect(html).not.toContain('msg-avatar');
+        expect(html).not.toContain('btn-copy-message');
+        expect(html).toContain('发送失败: x');
+    });
+
+    it('streaming 变体：data-streaming-live 标记（onToken 复用定位）', () => {
+        const html = messageBubbleHtml('assistant', '部分', { streaming: true });
+        expect(html).toContain('data-streaming-live="1"');
+    });
+
+    it('非 streaming 变体无 data-streaming-live', () => {
+        expect(messageBubbleHtml('assistant', 'x')).not.toContain('data-streaming-live');
+    });
+
+    it('stopped 变体：追加「（已停止）」标记（用户主动停止语义）', () => {
+        const html = messageBubbleHtml('assistant', '内容', { stopped: true });
+        expect(html).toContain('message-stop-tag');
+        expect(html).toContain('（已停止）');
+    });
+
+    it('error 变体：追加 message-error 类', () => {
+        const html = messageBubbleHtml('assistant', '[错误] x', { error: true });
+        expect(html).toContain('class="message assistant message-error"');
+    });
+
+    it('复制按钮 data-content 转义（点击复制还原原始内容）', () => {
+        const html = messageBubbleHtml('user', 'a & b');
+        expect(html).toContain('data-content="a &amp; b"');
+    });
+});
+
 describe('buildMessagesHtml', () => {
-    it('空数组返回 empty-state', () => {
-        expect(buildMessagesHtml([])).toContain('empty-state');
-    });
-
-    it('非数组返回 empty-state', () => {
-        expect(buildMessagesHtml(null)).toContain('empty-state');
-    });
-
     it('用户消息内容被转义', () => {
         const html = buildMessagesHtml([{ role: 'user', content: '<script>x</script>' }]);
         expect(html).toContain('<div class="message user">');

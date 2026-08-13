@@ -609,11 +609,11 @@ describe('app.js 发送/输入接线', () => {
     });
 });
 
-describe('app.js 重命名与头部接线', () => {
+describe('app.js 重命名接线（F4 收口后 — 头部模块在 chat.test.js 直测，本处钉注入接线）', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
     afterEach(() => { vi.restoreAllMocks(); });
 
-    it('双击标题重命名：Enter 提交 → PUT → 列表/tab/头部同步', async () => {
+    it('重命名保存成功 → 注入的列表标题同步钩子更新对话列表 DOM（全流程走通）', async () => {
         const { tabs, fetchSpy } = await loadApp(makeRoute({
             conversations: [{ id: 11, title: '旧标题', character_id: 1, message_count: 2 }],
         }));
@@ -637,72 +637,9 @@ describe('app.js 重命名与头部接线', () => {
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
         await vi.waitFor(() => {
-            expect(tabs.getTab(11).title).toBe('新标题');
+            expect(document.querySelector('#conversation-list .title').textContent).toBe('新标题');
         });
-        expect(document.querySelector('#chat-title-text').textContent).toBe('新标题');
-        expect(document.querySelector('#conversation-list .title').textContent).toBe('新标题');
-    });
-
-    it('头部按钮：移动端列表切换 + 导出弹窗', async () => {
-        const { tabs } = await loadApp(makeRoute({
-            conversations: [{ id: 11, title: 'A', character_id: 1, message_count: 2 }],
-        }));
-        const activation = await import('../js/conversation-activation.js');
-        await activation.activateConversation(11);
-        await vi.waitFor(() => expect(tabs.getTab(11)?.messages).toBeDefined());
-
-        // 移动端切换对话列表
-        document.querySelector('#btn-toggle-conv-list').click();
-        expect(document.querySelector('.chat-sidebar').classList.contains('mobile-expanded')).toBe(true);
-        // 导出弹窗
-        document.querySelector('#btn-export-conv').click();
-        await vi.waitFor(() => expect(document.querySelector('.export-modal')).not.toBeNull());
-    });
-
-    it('Escape 取消重命名 → 恢复原标题', async () => {
-        const { tabs } = await loadApp(makeRoute({
-            conversations: [{ id: 11, title: '旧标题', character_id: 1, message_count: 2 }],
-        }));
-        const activation = await import('../js/conversation-activation.js');
-        await activation.activateConversation(11);
-        await vi.waitFor(() => expect(tabs.getTab(11)?.messages).toBeDefined());
-
-        document.querySelector('#chat-title-text').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-        const input = document.querySelector('.chat-title-input');
-        input.value = '不应生效';
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        await new Promise((r) => setTimeout(r, 0));
-
-        expect(tabs.getTab(11).title).toBe('旧标题');
-    });
-
-    it('Falsify:重命名保存失败 → console.error,输入框恢复但不污染 tab/列表', async () => {
-        const { tabs, fetchSpy } = await loadApp(makeRoute({
-            conversations: [{ id: 11, title: '旧标题', character_id: 1, message_count: 2 }],
-        }));
-        const activation = await import('../js/conversation-activation.js');
-        await activation.activateConversation(11);
-        await vi.waitFor(() => expect(tabs.getTab(11)?.messages).toBeDefined());
-        // PUT 失败
-        fetchSpy.mockImplementation((url, options = {}) => {
-            if (String(url).endsWith('/api/conversations/11') && options?.method === 'PUT') {
-                return Promise.resolve(mockJson({ detail: 'boom' }, 500));
-            }
-            return makeRoute({ conversations: [{ id: 11, title: '旧标题', character_id: 1 }] })(url, options);
-        });
-        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-        document.querySelector('#chat-title-text').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-        const input = document.querySelector('.chat-title-input');
-        input.value = '新标题';
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-
-        await vi.waitFor(() => expect(errorSpy).toHaveBeenCalledWith('重命名失败:', expect.any(Error)));
-        // 失败不污染：tab 与列表保持旧标题；输入框恢复显示（显示输入值,既有语义）
-        expect(tabs.getTab(11).title).toBe('旧标题');
-        expect(document.querySelector('#conversation-list .title').textContent).toBe('旧标题');
-        expect(document.querySelector('#chat-title-text').textContent).toBe('新标题');
-        errorSpy.mockRestore();
+        expect(tabs.getTab(11).title).toBe('新标题');
     });
 });
 

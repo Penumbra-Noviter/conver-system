@@ -55,16 +55,17 @@ describe('activateConversation — 统一激活流程', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
 
     it('已知对话:openTab 去重 + 补全 title/characterId + 懒加载消息 + 头部渲染 + 发送按钮', async () => {
-        const { activation, tabs, state } = await loadModules();
+        const { activation, tabs, state, chat } = await loadModules();
         state.conversations = [
             { id: 11, title: '对话A', character_id: 1, model_name: 'm', model_provider: 'p' },
         ];
         globalThis.fetch = makeMock({ messagesByConv: { 11: [msg(1, 'user', 'hi')] } });
         const renderConv = vi.fn();
-        const renderHeader = vi.fn();
         const switchView = vi.fn();
         const showError = vi.fn();
-        activation.setActivationHooks({ renderConversations: renderConv, renderChatHeader: renderHeader, switchView, showError });
+        // F4 收口后头部渲染直 import chat.js — 经模块 spy 断言调用
+        const renderHeader = vi.spyOn(chat, 'renderChatHeader');
+        activation.setActivationHooks({ renderConversations: renderConv, switchView, showError });
 
         await activation.activateConversation(11);
 
@@ -114,8 +115,7 @@ describe('activateConversation — 统一激活流程', () => {
             if (path.endsWith('/messages')) return mockJson([]);
             return mockJson({});
         };
-        const renderHeader = vi.fn();
-        activation.setActivationHooks({ renderConversations: () => {}, renderChatHeader: renderHeader, switchView: () => {} });
+        activation.setActivationHooks({ renderConversations: () => {}, switchView: () => {} });
 
         const p = activation.activateConversation(99);
         // 用户切走:激活另一个会话
@@ -154,8 +154,9 @@ describe('loadTabMessages — 懒加载与活动校验', () => {
         tabs.updateTab(11, { messages: [msg(1, 'user', 'cached')], scrollTop: 42 });
         const fetchSpy = vi.fn(makeMock({}));
         globalThis.fetch = fetchSpy;
-        const renderHeader = vi.fn();
-        activation.setActivationHooks({ renderChatHeader: renderHeader, showError: () => {} });
+        // F4 收口后头部渲染直 import chat.js — 经模块 spy 断言调用
+        const renderHeader = vi.spyOn(chat, 'renderChatHeader');
+        activation.setActivationHooks({ showError: () => {} });
         const renderSpy = vi.spyOn(chat, 'renderMessages');
 
         await activation.loadTabMessages(11);
@@ -169,8 +170,7 @@ describe('loadTabMessages — 懒加载与活动校验', () => {
         const { activation, tabs, chat } = await loadModules();
         tabs.openTab(11);
         const showError = vi.fn();
-        const renderHeader = vi.fn();
-        activation.setActivationHooks({ renderChatHeader: renderHeader, showError });
+        activation.setActivationHooks({ showError });
 
         // 成功路径
         globalThis.fetch = makeMock({ messagesByConv: { 11: [msg(1, 'user', 'fresh')] } });
@@ -197,8 +197,7 @@ describe('loadTabMessages — 懒加载与活动校验', () => {
             }
             return mockJson([]);
         };
-        const renderHeader = vi.fn();
-        activation.setActivationHooks({ renderChatHeader: renderHeader, showError: () => {} });
+        activation.setActivationHooks({ showError: () => {} });
         const renderSpy = vi.spyOn(chat, 'renderMessages');
 
         const p = activation.loadTabMessages(11); // 非活动请求

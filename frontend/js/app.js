@@ -8,7 +8,8 @@
  *
  * 模块结构：
  *   - ./state.js — 全局状态
- *   - ./chat.js  — 聊天域渲染与交互（renderMessages / handleSend / chatDom）
+ *   - ./chat.js  — 聊天域渲染与交互（renderMessages / handleSend / chatDom /
+ *     聊天头部深模块 renderChatHeader / startRename — F4 收口）
  *   - ./format.js — 渲染/格式化纯函数（highlightText / buildMessagesHtml）
  *   - ./search-view.js — 搜索视图深模块（防抖 + 五态文案 + 渲染 + 结果跳转；
  *     ARC-9 C1 迁出，经 initSearchView 注入跳转钩子接线）
@@ -23,19 +24,16 @@ import { showCharacterForm } from './components/character-form.js';
 import { showCharacterWizard } from './components/character-wizard.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
 import { showModelSelector } from './components/model-selector.js';
-import { showExportDialog } from './components/export-dialog.js';
 import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
 import { initTabBar } from './components/tab-bar.js';
-import { escapeHtml, showToast, downloadBlob, autoResizeInput } from './utils.js';
-import { providerDisplayName } from './utils/model-utils.js';
+import { showToast, downloadBlob, autoResizeInput } from './utils.js';
 import { characterCardHtml, conversationItemHtml } from './format.js';
 import { state } from './state.js';
-import { chatDom, handleSend, refreshSendButton, setConversationsRefresher, EMPTY_HEADER_HTML } from './chat.js';
-import { getActiveTab, getTabs, updateTab, abortStream, restoreFromStorage } from './tabs.js';
+import { chatDom, handleSend, refreshSendButton, setConversationsRefresher, setConversationListTitleSyncer } from './chat.js';
+import { getActiveTab, getTabs, abortStream, restoreFromStorage } from './tabs.js';
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 import { initSearchView } from './search-view.js';
 import { closeConversationsAndResettle, setCascadeHooks } from './cascade.js';
-import { iconHtml } from './icons.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -372,115 +370,11 @@ dom.btnNewChat.addEventListener('click', () => {
 });
 
 // ══════════════════════════════════════════════════
-// 消息 & 聊天（协调层 — 聊天域渲染/发送见 chat.js）
-// ══════════════════════════════════════════════════
-
-/**
- * 对话重命名 — 双击标题原地编辑
- * @param {object} conv - 对话对象
- */
-function startRename(conv) {
-    const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
-    if (!titleEl) return;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'chat-title-input';
-    input.value = conv.title;
-    input.maxLength = 200;
-
-    titleEl.replaceWith(input);
-    input.focus();
-    input.select();
-
-    async function save() {
-        const newTitle = input.value.trim() || conv.title;
-        try {
-            await conversations.update(conv.id, { title: newTitle });
-            conv.title = newTitle;
-            // P6.5-4 标题联动：同步对应 tab 的 title（tab 条随动；onTabsChanged 驱动重渲染）
-            updateTab(conv.id, { title: newTitle });
-            // 更新对话列表中的标题
-            const items = dom.conversationList.querySelectorAll('.conversation-item');
-            items.forEach(item => {
-                if (parseInt(item.dataset.id) === conv.id) {
-                    const titleDiv = item.querySelector('.title');
-                    if (titleDiv) titleDiv.textContent = newTitle;
-                }
-            });
-        } catch (err) {
-            console.error('重命名失败:', err);
-        }
-        // 恢复标题显示
-        const span = document.createElement('span');
-        span.className = 'chat-title';
-        span.id = 'chat-title-text';
-        span.textContent = newTitle;
-        span.title = '双击重命名';
-        input.replaceWith(span);
-        span.addEventListener('dblclick', () => startRename(conv));
-    }
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            input.blur();
-        }
-        if (e.key === 'Escape') {
-            input.value = conv.title;
-            input.blur();
-        }
-    });
-
-    input.addEventListener('blur', save);
-}
-
-// ══════════════════════════════════════════════════
 // 会话激活流程（ARC-6 移入 conversation-activation.js 深模块 —
 //   激活编排 / 草稿滚动保存恢复 / 懒加载 / F-2 守卫 / 空态 均由该模块持有，
-//   app.js 经 setActivationHooks 注入 DOM 渲染回调，本文件保留事件与协调）
+//   app.js 经 setActivationHooks 注入 DOM 渲染回调，本文件保留事件与协调；
+//   聊天域渲染/发送/头部深模块见 chat.js — 头部 F4 已收口，app.js 只留注入接线）
 // ══════════════════════════════════════════════════
-
-/**
- * 渲染聊天头部（标题 + 模型 badge + 导出/列表切换按钮 + 双击重命名绑定）
- * 按活动 tab 派生；对话数据以 conversations 列表为准（持久事实来源）
- * @param {number|string} conversationId - 活动 tab 的会话 id
- */
-function renderChatHeader(conversationId) {
-    const conv = state.conversations.find((c) => c.id === conversationId);
-    if (!conv) {
-        chatDom.chatHeader.innerHTML = EMPTY_HEADER_HTML;
-        return;
-    }
-    const modelLabel = conv.model_name || '';
-    const providerLabel = providerDisplayName(state.models, conv.model_provider);
-    chatDom.chatHeader.innerHTML = `
-        <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">${iconHtml('menu')}</button>
-        <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
-        <span class="chat-model-badge">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</span>
-        <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">${iconHtml('download')}</button>
-    `;
-    // 双击标题重命名
-    const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
-    titleEl.addEventListener('dblclick', () => startRename(conv));
-    // 移动端切换对话列表
-    const toggleBtn = chatDom.chatHeader.querySelector('#btn-toggle-conv-list');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', () => {
-            const sidebar = document.querySelector('.chat-sidebar');
-            if (sidebar) {
-                sidebar.classList.toggle('mobile-expanded');
-            }
-        });
-    }
-    // 导出按钮
-    const exportBtn = chatDom.chatHeader.querySelector('#btn-export-conv');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', () => {
-            showExportDialog(conversationId);
-        });
-    }
-}
 
 // ══════════════════════════════════════════════════
 // 输入框事件（发送/停止逻辑见 chat.js handleSend）
@@ -530,10 +424,10 @@ async function init() {
     await loadModels();
     await loadSettings();
 
-    // ARC-6：激活编排模块的 DOM 渲染回调注入（renderConversations/头部/视图切换/错误提示）
+    // ARC-6：激活编排模块的 DOM 渲染回调注入（renderConversations/视图切换/错误提示；
+    // 头部渲染 F4 已收口 chat.js — conversation-activation 直 import，不再经 hooks）
     setActivationHooks({
         renderConversations,
-        renderChatHeader,
         switchView: (viewName) => switchView(viewName),
         showError,
     });
@@ -567,6 +461,17 @@ async function init() {
 
 // 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）
 setConversationsRefresher(loadConversations);
+
+// 注入重命名后的对话列表标题同步（F4 — 头部模块经钩子更新列表项标题，避免反向依赖；
+// 只做 DOM 手术，不重渲染列表 — 与收口前行为一致）
+setConversationListTitleSyncer((convId, newTitle) => {
+    dom.conversationList.querySelectorAll('.conversation-item').forEach((item) => {
+        if (parseInt(item.dataset.id) === convId) {
+            const titleDiv = item.querySelector('.title');
+            if (titleDiv) titleDiv.textContent = newTitle;
+        }
+    });
+});
 
 // 级联收口依赖注入（ARC-9 C1 — 删角色级联 / 删对话 / 清空全部 / tab-bar 关最后
 // tab 四入口共用统一收口；依赖经注入而非互相 import，G7）

@@ -27,6 +27,7 @@ const CHAT_DOM_HTML = `
     <button id="btn-send"></button>
     <input type="checkbox" id="toggle-stream" checked>
     <div id="chat-header"><span class="chat-title" id="chat-title-text"></span></div>
+    <div class="chat-sidebar"></div>
 `;
 
 /** 加载全新 chat + tabs + api + stream-session 实例（DOM 先就位） */
@@ -160,6 +161,9 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
         const sys = chat.chatDom.chatMessages.querySelector('.message.system');
         expect(sys).not.toBeNull();
         expect(sys.textContent).toContain('发送失败: 网络错误');
+        // F1 产品微调：system 气泡统一无头像 + 无复制按钮（与其他 system 形态一致）
+        expect(sys.querySelector('.msg-avatar')).toBeNull();
+        expect(sys.querySelector('.btn-copy-message')).toBeNull();
         expect(settleSpy).not.toHaveBeenCalled();
         expect(refresh).toHaveBeenCalledTimes(1);
 
@@ -259,6 +263,97 @@ describe('handleSend — 流式（createStreamSession 委托链）', () => {
         // 同 onDone：session.onError 内嵌 refreshList + handleSend 末尾统一刷新
         expect(refresh).toHaveBeenCalledTimes(2);
     });
+
+    it('F1 流式气泡骨架即含复制按钮：onToken 逐 token 同步 data-content，点击复制当前全文', async () => {
+        const { chat, getCaptured } = await loadWithStreamHarness();
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+        chat.chatDom.chatInput.value = '你好';
+        await chat.handleSend();
+        const { cbs } = getCaptured();
+
+        // 首个 token 建泡 → 骨架含复制按钮（非 system 角色统一有复制按钮）
+        cbs.onToken('你');
+        const bubble = chat.chatDom.chatMessages.querySelector('.message.assistant');
+        const copyBtn = bubble.querySelector('.btn-copy-message');
+        expect(copyBtn).not.toBeNull();
+        expect(copyBtn.dataset.content).toBe('你');
+
+        // 流式 token 更新同步复制数据属性（复用既有挂载机制）
+        cbs.onToken('好');
+        expect(copyBtn.dataset.content).toBe('你好');
+
+        // 复制行为正确：点击复制当前全文（读 dataset，非绑定时刻快照）
+        copyBtn.click();
+        await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('你好'));
+    });
+
+    it('F1 切回复用：renderMessages 重建 DOM 后 onToken 复用 live 气泡（不重复建泡）并同步 data-content', async () => {
+        const { chat, getCaptured } = await loadWithStreamHarness();
+        chat.chatDom.chatInput.value = '你好';
+        await chat.handleSend();
+        const { cbs } = getCaptured();
+
+        cbs.onToken('你');
+        expect(chat.chatDom.chatMessages.querySelectorAll('.message.assistant')).toHaveLength(1);
+
+        // 切走再切回：renderMessages 从缓存重建 DOM（streaming 占位标记 live）
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.querySelectorAll('.message.assistant')).toHaveLength(1);
+        expect(chat.chatDom.chatMessages.querySelector('.message[data-streaming-live="1"]')).not.toBeNull();
+
+        // 旧 DOM 引用已失效 → 重新定位 live 气泡复用，不重复创建
+        cbs.onToken('好');
+        expect(chat.chatDom.chatMessages.querySelectorAll('.message.assistant')).toHaveLength(1);
+        expect(chat.chatDom.chatMessages.textContent).toContain('你好');
+        const asstCopyBtn = chat.chatDom.chatMessages.querySelector('.message.assistant .btn-copy-message');
+        expect(asstCopyBtn.dataset.content).toBe('你好');
+    });
+
+    it('F1 复制反馈：点击后 check 图标 + copied 类，1.5s 后恢复 clipboard 图标', async () => {
+        const { chat, getCaptured } = await loadWithStreamHarness();
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+        chat.chatDom.chatInput.value = '你好';
+        await chat.handleSend();
+        getCaptured().cbs.onToken('你');
+        const copyBtn = chat.chatDom.chatMessages.querySelector('.message.assistant .btn-copy-message');
+        expect(copyBtn.dataset.content).toBe('你');
+
+        vi.useFakeTimers();
+        copyBtn.click();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(writeText).toHaveBeenCalledWith('你');
+        expect(copyBtn.classList.contains('copied')).toBe(true);
+        expect(copyBtn.innerHTML).toContain('data-icon="check"');
+        vi.advanceTimersByTime(1500);
+        expect(copyBtn.classList.contains('copied')).toBe(false);
+        expect(copyBtn.innerHTML).toContain('data-icon="clipboard"');
+        vi.useRealTimers();
+    });
+
+    it('F1 Falsify:剪贴板不可用（writeText 拒绝）→ x 图标 + 无 copied 类（不崩溃）', async () => {
+        const { chat, getCaptured } = await loadWithStreamHarness();
+        const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+        chat.chatDom.chatInput.value = '你好';
+        await chat.handleSend();
+        getCaptured().cbs.onToken('你');
+        const copyBtn = chat.chatDom.chatMessages.querySelector('.message.assistant .btn-copy-message');
+
+        vi.useFakeTimers();
+        copyBtn.click();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(writeText).toHaveBeenCalledWith('你');
+        expect(copyBtn.classList.contains('copied')).toBe(false);
+        expect(copyBtn.innerHTML).toContain('data-icon="x"');
+        vi.useRealTimers();
+    });
 });
 
 describe('handleSend — Falsify（no-op 路径）', () => {
@@ -322,5 +417,165 @@ describe('EMPTY_HEADER_HTML — 空态头部文案单一来源（ARC-10 C7）', 
         activation.showEmptyState();
         expect(chat.chatDom.chatHeader.innerHTML).toBe(chat.EMPTY_HEADER_HTML);
         expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+});
+
+describe('renderMessages — 空态判定收口（F6 单一来源，format 两用例随迁）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('空数组（活动 tab 无消息）→ EMPTY_STATE_HTML（替代消息列表模板旧空态文案）', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+
+    it('非数组消息 → EMPTY_STATE_HTML 不崩溃', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: null });
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+
+    it('无活动 tab → EMPTY_STATE_HTML（既有 no-op 分支保持）', async () => {
+        const { chat } = await loadModules();
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+
+    it('有消息 → 渲染气泡不显示空态', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [{ role: 'user', content: '你好' }] });
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.innerHTML).not.toContain('empty-state');
+        expect(chat.chatDom.chatMessages.textContent).toContain('你好');
+    });
+});
+
+describe('renderMessages — 缓存变体标记还原（F1 工厂变体透传，切走再切回语义保持）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('stopped 缓存消息 → 「（已停止）」标记还原', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [{ role: 'assistant', content: '部分内容', stopped: true }] });
+        chat.renderMessages();
+        const bubble = chat.chatDom.chatMessages.querySelector('.message.assistant');
+        expect(bubble.querySelector('.message-stop-tag').textContent).toBe('（已停止）');
+    });
+
+    it('error 缓存消息 → message-error 类还原', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [{ role: 'assistant', content: '[错误] x', error: true }] });
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.querySelector('.message.assistant').classList.contains('message-error')).toBe(true);
+    });
+
+    it('streaming 缓存消息 → data-streaming-live 标记（切回后 onToken 复用该气泡）', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: '部分', streaming: true }] });
+        chat.renderMessages();
+        const live = chat.chatDom.chatMessages.querySelector('.message[data-streaming-live="1"]');
+        expect(live).not.toBeNull();
+        expect(live.textContent).toContain('部分');
+    });
+});
+
+describe('聊天头部深模块（F4 收口 — renderChatHeader / startRename / 标题同步，自 app.test.js 随迁）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 渲染头部（已知会话）+ 注入列表标题同步钩子 + PUT 路由 mock */
+    async function setupHeader({ title = '旧标题', putFail = false } = {}) {
+        const env = await loadModules();
+        env.state.conversations = [{ id: 11, title, character_id: 1, model_name: 'm', model_provider: 'claude' }];
+        env.state.models = { providers: [{ key: 'claude', name: 'Claude (Anthropic)', models: [] }] };
+        env.tabs.openTab(11);
+        env.tabs.updateTab(11, { title });
+        const fetchSpy = makeApiMock({});
+        fetchSpy.mockImplementation((url, options = {}) => {
+            if (String(url).endsWith('/api/conversations/11') && options?.method === 'PUT') {
+                return putFail
+                    ? mockJson({ detail: 'boom' }, 500)
+                    : mockJson({ id: 11, title: '新标题', character_id: 1 });
+            }
+            return makeApiMock({})(url, options);
+        });
+        env.api.setFetch(fetchSpy);
+        env.chat.renderChatHeader(11);
+        const listSync = vi.fn();
+        env.chat.setConversationListTitleSyncer(listSync);
+        return { ...env, listSync };
+    }
+
+    it('renderChatHeader：标题 + 模型 badge + 列表切换/导出按钮（按 conversations 列表派生）', async () => {
+        const { chat } = await setupHeader();
+        const header = chat.chatDom.chatHeader;
+        expect(header.querySelector('#chat-title-text').textContent).toBe('旧标题');
+        expect(header.querySelector('.chat-model-badge').textContent).toContain('Claude (Anthropic) · m');
+        expect(header.querySelector('#btn-toggle-conv-list')).not.toBeNull();
+        expect(header.querySelector('#btn-export-conv')).not.toBeNull();
+    });
+
+    it('Falsify:renderChatHeader 未知名会话 → EMPTY_HEADER_HTML（不崩溃）', async () => {
+        const { chat } = await loadModules();
+        chat.renderChatHeader(99);
+        expect(chat.chatDom.chatHeader.innerHTML).toBe(chat.EMPTY_HEADER_HTML);
+    });
+
+    it('双击标题重命名：Enter 提交 → PUT → 头部/tab 同步 + 列表同步钩子收到 (id, title)', async () => {
+        const { chat, tabs, listSync } = await setupHeader();
+        chat.chatDom.chatHeader.querySelector('#chat-title-text')
+            .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        const input = chat.chatDom.chatHeader.querySelector('.chat-title-input');
+        expect(input).not.toBeNull();
+        input.value = '新标题';
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        await vi.waitFor(() => expect(tabs.getTab(11).title).toBe('新标题'));
+        expect(chat.chatDom.chatHeader.querySelector('#chat-title-text').textContent).toBe('新标题');
+        expect(listSync).toHaveBeenCalledWith(11, '新标题');
+    });
+
+    it('头部按钮：移动端列表切换 + 导出弹窗', async () => {
+        const { chat } = await setupHeader();
+        chat.chatDom.chatHeader.querySelector('#btn-toggle-conv-list').click();
+        expect(document.querySelector('.chat-sidebar').classList.contains('mobile-expanded')).toBe(true);
+        chat.chatDom.chatHeader.querySelector('#btn-export-conv').click();
+        await vi.waitFor(() => expect(document.querySelector('.export-modal')).not.toBeNull());
+    });
+
+    it('Escape 取消重命名 → 恢复原标题', async () => {
+        const { chat, tabs } = await setupHeader();
+        chat.chatDom.chatHeader.querySelector('#chat-title-text')
+            .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        const input = chat.chatDom.chatHeader.querySelector('.chat-title-input');
+        input.value = '不应生效';
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await new Promise((r) => setTimeout(r, 0));
+
+        expect(tabs.getTab(11).title).toBe('旧标题');
+    });
+
+    it('Falsify:重命名保存失败 → console.error，tab 不污染、列表钩子不调、头部恢复输入值', async () => {
+        const { chat, tabs, listSync } = await setupHeader({ putFail: true });
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        chat.chatDom.chatHeader.querySelector('#chat-title-text')
+            .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        const input = chat.chatDom.chatHeader.querySelector('.chat-title-input');
+        input.value = '新标题';
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        await vi.waitFor(() => expect(errorSpy).toHaveBeenCalledWith('重命名失败:', expect.any(Error)));
+        expect(tabs.getTab(11).title).toBe('旧标题');
+        expect(listSync).not.toHaveBeenCalled();
+        expect(chat.chatDom.chatHeader.querySelector('#chat-title-text').textContent).toBe('新标题');
+        errorSpy.mockRestore();
     });
 });

@@ -68,25 +68,58 @@ export function userAvatarHtml() {
 }
 
 /**
+ * 参数化消息气泡工厂（F1 — 消息模板 / 命令式追加 / 流式增量三路径统一出口）
+ *
+ * 变体：streaming（data-streaming-live 标记，onToken 复用定位）/ stopped（「（已停止）」
+ * 标记）/ error（message-error 类）/ system（无头像 + 无复制按钮 — 产品微调 F1）。
+ * 纯函数：数据 → HTML 字符串，不接触 DOM；复制按钮 data-content 经 HTML 转义，
+ * 点击时由调用方绑定事件（attachCopyButton 读 dataset 还原原始内容）。
+ *
+ * @param {'user'|'assistant'|'system'} role - 消息角色
+ * @param {string} content - 消息内容（原始文本；assistant 渲染 Markdown，user/system 转义）
+ * @param {object} [opts]
+ * @param {boolean} [opts.streaming=false] - 流式进行中：气泡标记 data-streaming-live="1"
+ * @param {boolean} [opts.stopped=false] - 已停止：追加「（已停止）」标记（用户主动停止，非错误）
+ * @param {boolean} [opts.error=false] - 错误气泡：追加 message-error 类
+ * @param {Array} [opts.characters=[]] - 角色列表（assistant 头像来源）
+ * @param {number|null} [opts.currentCharacterId=null] - 当前角色 id（assistant 头像匹配）
+ * @returns {string} 气泡 HTML（system 角色无头像 + 无复制按钮）
+ */
+export function messageBubbleHtml(role, content, opts = {}) {
+    const { streaming = false, stopped = false, error = false, characters = [], currentCharacterId = null } = opts;
+    const classes = ['message', role];
+    if (error) classes.push('message-error');
+    const bubbleAttrs = streaming ? ' data-streaming-live="1"' : '';
+    const avatar = role === 'assistant'
+        ? assistantAvatarHtml(characters, currentCharacterId)
+        : (role === 'user' ? userAvatarHtml() : '');
+    const body = role === 'assistant' ? renderMarkdown(content) : escapeHtml(content);
+    const copyBtn = role === 'system'
+        ? ''
+        : `<button class="btn-copy-message" title="复制消息" data-content="${escapeHtml(content)}">${iconHtml('clipboard')}</button>`;
+    const stopTag = stopped ? '<div class="message-stop-tag">（已停止）</div>' : '';
+    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${stopTag}</div>`;
+}
+
+/**
  * 构造消息列表 HTML（纯函数，不操作 DOM）
+ * 空态判定由调用方负责（chat.js renderMessages 收口 — F6 单一来源），
+ * 本函数只做逐条气泡渲染；空数组输入返回空串。
  * @param {Array} messages - 消息数组
  * @param {object} [context]
  * @param {Array} [context.characters=[]] - 角色列表（用于 assistant 头像）
  * @param {number|null} [context.currentCharacterId=null] - 当前角色 id
- * @returns {string} 消息区域 HTML（空列表返回 empty-state）
+ * @returns {string} 消息区域 HTML
  */
 export function buildMessagesHtml(messages, context = {}) {
     const { characters = [], currentCharacterId = null } = context;
-    if (!Array.isArray(messages) || messages.length === 0) {
-        return '<div class="empty-state"><p>开始一段对话吧</p></div>';
-    }
-    return messages.map((m) => `
-        <div class="message ${m.role}">
-            ${m.role === 'assistant' ? assistantAvatarHtml(characters, currentCharacterId) : userAvatarHtml()}
-            <div class="message-content">${m.role === 'assistant' ? renderMarkdown(m.content) : escapeHtml(m.content)}</div>
-            <button class="btn-copy-message" title="复制消息" data-content="${escapeHtml(m.content)}">${iconHtml('clipboard')}</button>
-        </div>
-    `).join('');
+    return messages.map((m) => messageBubbleHtml(m.role, m.content, {
+        characters,
+        currentCharacterId,
+        streaming: m.streaming,
+        stopped: m.stopped,
+        error: m.error,
+    })).join('');
 }
 
 // ══════════════════════════════════════════════════
@@ -174,6 +207,6 @@ export function searchResultItemHtml(r, query) {
 }
 
 export const __all__ = [
-    'highlightText', 'avatarImgHtml', 'assistantAvatarHtml', 'userAvatarHtml', 'buildMessagesHtml',
+    'highlightText', 'avatarImgHtml', 'assistantAvatarHtml', 'userAvatarHtml', 'messageBubbleHtml', 'buildMessagesHtml',
     'characterCardHtml', 'conversationItemHtml', 'searchResultItemHtml',
 ];

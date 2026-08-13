@@ -2,10 +2,13 @@
  * Conver System — 聊天域
  *
  * 职责：
- *   1. 消息渲染（renderMessages / appendMessage / thinking / 头像 / 复制）
+ *   1. 消息渲染（renderMessages / appendMessage / thinking / 复制 — 气泡构建统一走
+ *      format.js 参数化工厂，本模块只留 DOM 挂载与事件绑定）
  *   2. 发送与流式交互（handleSend）
- *   3. 聊天域 DOM 引用（chatDom）
- *   4. 发送按钮两态（send/stop）— 由活动 tab 的 isStreaming 派生（refreshSendButton）
+ *   3. 聊天头部深模块（F4 收口：renderChatHeader / startRename / 标题同步；
+ *      app.js 只留注入接线）
+ *   4. 聊天域 DOM 引用（chatDom）
+ *   5. 发送按钮两态（send/stop）— 由活动 tab 的 isStreaming 派生（refreshSendButton）
  *
  * P6.5 多 tab 语义：
  *   - 消息渲染读活动 tab 缓存（messages/characterId），无活动 tab → 空态
@@ -20,15 +23,19 @@
  *   - 停止（AbortError）写回 phase 'error'（警示标记；气泡保持「已停止」语义），
  *     正常完成写回 phase 'done'
  *
- * 依赖方向：chat.js → state.js / api.js / utils.js / format.js / tabs.js / stream-session.js；
- * app.js → chat.js
- * 不反向引用 app.js 私有函数 — 对话列表刷新通过 setConversationsRefresher 注入。
+ * 依赖方向：chat.js → state.js / api.js / utils.js / format.js / tabs.js /
+ *   stream-session.js / components/export-dialog.js；
+ *   app.js → chat.js
+ * 不反向引用 app.js 私有函数 — 对话列表刷新通过 setConversationsRefresher 注入，
+ * 重命名后的列表标题同步经 setConversationListTitleSyncer 注入。
  */
 
-import { chatStream, messages } from './api.js';
-import { autoResizeInput } from './utils.js';
+import { chatStream, messages, conversations } from './api.js';
+import { escapeHtml, autoResizeInput } from './utils.js';
+import { providerDisplayName } from './utils/model-utils.js';
+import { showExportDialog } from './components/export-dialog.js';
 import { renderMarkdown } from './markdown.js';
-import { buildMessagesHtml, assistantAvatarHtml, userAvatarHtml } from './format.js';
+import { buildMessagesHtml, messageBubbleHtml } from './format.js';
 import { state } from './state.js';
 import { getActiveTab, getTab, updateTab } from './tabs.js';
 import { createStreamSession, settleTurn } from './stream-session.js';
@@ -51,7 +58,7 @@ export const chatDom = {
 /** 无活动 tab 时的消息区空态（单一事实来源 — app.js showEmptyState 复用，禁止内联重复） */
 export const EMPTY_STATE_HTML = '<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>';
 
-/** 无会话时的头部空态文案（单一事实来源 — app.js renderChatHeader / 激活模块 showEmptyState 复用，禁止内联重复） */
+/** 无会话时的头部空态文案（单一事实来源 — chat.js renderChatHeader / 激活模块 showEmptyState 复用，禁止内联重复） */
 export const EMPTY_HEADER_HTML = '<span class="chat-title">选择一个角色开始对话</span>';
 
 // ── 对话列表刷新钩子（由 app.js 注入，避免反向依赖）──
@@ -74,7 +81,9 @@ const copyFeedbackTimers = new WeakMap();
 export function renderMessages() {
     const container = chatDom.chatMessages;
     const tab = getActiveTab();
-    if (!tab) {
+    // 空态判定收口（F6）：无活动 tab 或消息为空 → 同一 EMPTY_STATE_HTML（单一来源，
+    // 替代消息列表模板旧空态文案；format.js 不再承担空态分支）
+    if (!tab || !tab.messages?.length) {
         container.innerHTML = EMPTY_STATE_HTML;
         return;
     }
@@ -83,32 +92,20 @@ export function renderMessages() {
         currentCharacterId: tab.characterId,
     });
 
-    // 复制按钮事件
+    // 复制按钮事件（点击时读 dataset.content，与流式逐 token 更新兼容）
     container.querySelectorAll('.btn-copy-message').forEach(btn => {
-        attachCopyButton(btn, btn.dataset.content);
+        attachCopyButton(btn);
     });
 
-    // 缓存渲染路径还原停止/错误标记（切走再切回后语义保持一致）
-    const bubbles = container.querySelectorAll('.message');
-    tab.messages.forEach((m, i) => {
-        const bubble = bubbles[i];
-        if (!bubble) return;
-        if (m.stopped) markStopped(bubble);
-        if (m.error) bubble.classList.add('message-error');
-    });
-
-    // 标记缓存中的流式中消息 — 切回后 onToken 复用该气泡继续增量渲染（不重复创建气泡）
-    const lastMsg = tab.messages[tab.messages.length - 1];
-    if (lastMsg?.streaming) {
-        const liveBubble = bubbles[bubbles.length - 1];
-        if (liveBubble) liveBubble.dataset.streamingLive = '1';
-    }
+    // 缓存变体标记（stopped/error/streaming）由 buildMessagesHtml 经工厂透传还原 —
+    // 切走再切回后停止/错误/流式语义保持一致（F1）；onToken 据此复用 live 气泡
 
     scrollToBottom();
 }
 
 /**
  * DOM 追加消息气泡；user/assistant 同步写入活动 tab 缓存（system 仅 DOM 提示，不落 tab 缓存）
+ * 气泡构建统一走 format.js 参数化工厂（F1 — 三路径收口；system 无头像 + 无复制按钮）
  * @param {'user'|'assistant'|'system'} role - 消息角色
  * @param {string} content - 消息内容
  * @param {object} [meta] - 附加字段（如 { stopped: true, error: true }）
@@ -122,34 +119,19 @@ function appendMessage(role, content, meta = {}) {
     const thinking = container.querySelector('.thinking-indicator');
     if (thinking) thinking.remove();
 
-    const div = document.createElement('div');
-    div.className = `message ${role}`;
+    container.insertAdjacentHTML('beforeend', messageBubbleHtml(role, content, {
+        characters: state.characters,
+        currentCharacterId: getActiveTab()?.characterId ?? null,
+        stopped: meta.stopped,
+        error: meta.error,
+    }));
+    const bubble = container.lastElementChild;
+    const copyBtn = bubble.querySelector('.btn-copy-message');
+    if (copyBtn) attachCopyButton(copyBtn);
 
-    // 头像
-    div.appendChild(createAvatarElement(role));
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    if (role === 'assistant') {
-        contentDiv.innerHTML = renderMarkdown(content);
-    } else {
-        contentDiv.textContent = content;
-    }
-    div.appendChild(contentDiv);
-
-    // 复制按钮
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'btn-copy-message';
-    copyBtn.title = '复制消息';
-    copyBtn.innerHTML = iconHtml('clipboard');
-    copyBtn.dataset.content = content;
-    attachCopyButton(copyBtn, content);
-    div.appendChild(copyBtn);
-
-    container.appendChild(div);
     scrollToBottom();
 
-    // 缓存同步（仅活动 tab 的 DOM 追加会经过本函数）
+    // 缓存同步（仅活动 tab 的 DOM 追加会经过本函数；system 不落缓存）
     if (role !== 'system') {
         const tab = getActiveTab();
         if (tab) {
@@ -175,41 +157,15 @@ function scrollToBottom() {
     chatDom.chatMessages.scrollTop = chatDom.chatMessages.scrollHeight;
 }
 
-// ── 头像渲染 ──
+// ── 复制按钮（气泡构建在 format.js 工厂；本处只做事件绑定）──
 
 /**
- * 获取当前活动 tab 对应角色的头像 HTML
- * @returns {string}
- */
-function getAssistantAvatarHtml() {
-    return assistantAvatarHtml(state.characters, getActiveTab()?.characterId ?? null);
-}
-
-/**
- * 获取默认用户头像 HTML
- * @returns {string}
- */
-function getUserAvatarHtml() {
-    return userAvatarHtml();
-}
-
-/**
- * 创建消息头像 DOM 元素（复用 HTML 字符串辅助函数）
- * @param {'assistant'|'user'} role - 消息角色
- * @returns {HTMLElement} 头像元素
- */
-function createAvatarElement(role) {
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = role === 'assistant' ? getAssistantAvatarHtml() : getUserAvatarHtml();
-    return wrapper.firstElementChild;
-}
-
-/**
- * 为消息复制按钮绑定点击事件（复制内容到剪贴板并给出图标反馈）
+ * 为消息复制按钮绑定点击事件（复制当前 data-content 到剪贴板并给出图标反馈）
+ * 点击时读取 btn.dataset.content —— 流式气泡逐 token 更新 data-content 后
+ * 复制行为仍正确（F1：骨架即含复制按钮，token 更新同步数据属性）
  * @param {HTMLButtonElement} btn - 复制按钮元素
- * @param {string} content - 要复制的消息内容
  */
-function attachCopyButton(btn, content) {
+function attachCopyButton(btn) {
     btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const pendingTimer = copyFeedbackTimers.get(btn);
@@ -217,7 +173,7 @@ function attachCopyButton(btn, content) {
 
         let feedbackIcon = 'check';
         try {
-            await navigator.clipboard.writeText(content);
+            await navigator.clipboard.writeText(btn.dataset.content ?? '');
             btn.classList.add('copied');
         } catch {
             feedbackIcon = 'x';
@@ -257,16 +213,111 @@ export function refreshSendButton() {
     }
 }
 
+// ══════════════════════════════════════════════════
+// 聊天头部深模块（F4 收口：渲染 / 重命名 / 标题同步 — 单一模块持有，
+// app.js 只留注入接线；会话列表标题更新经注入钩子，避免反向依赖）
+// ══════════════════════════════════════════════════
+
+/** 会话列表标题同步钩子（app.js 注入 — 重命名成功后手动更新列表项标题） */
+let syncConversationListTitle = () => {};
+export function setConversationListTitleSyncer(fn) {
+    syncConversationListTitle = typeof fn === 'function' ? fn : () => {};
+}
+
 /**
- * 给停止的 assistant 气泡追加「（已停止）」标记 — 语义为用户主动停止，非错误（P3.5）
- * @param {HTMLElement} assistantDiv - assistant 消息元素
+ * 渲染聊天头部（标题 + 模型 badge + 导出/列表切换按钮 + 双击重命名绑定）
+ * 按活动 tab 派生；对话数据以 conversations 列表为准（持久事实来源）
+ * @param {number|string} conversationId - 活动 tab 的会话 id
  */
-function markStopped(assistantDiv) {
-    const tag = document.createElement('div');
-    tag.className = 'message-stop-tag';
-    tag.textContent = '（已停止）';
-    assistantDiv.appendChild(tag);
-    scrollToBottom();
+export function renderChatHeader(conversationId) {
+    const conv = state.conversations.find((c) => c.id === conversationId);
+    if (!conv) {
+        chatDom.chatHeader.innerHTML = EMPTY_HEADER_HTML;
+        return;
+    }
+    const modelLabel = conv.model_name || '';
+    const providerLabel = providerDisplayName(state.models, conv.model_provider);
+    chatDom.chatHeader.innerHTML = `
+        <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">${iconHtml('menu')}</button>
+        <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
+        <span class="chat-model-badge">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</span>
+        <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">${iconHtml('download')}</button>
+    `;
+    // 双击标题重命名
+    const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
+    titleEl.addEventListener('dblclick', () => startRename(conv));
+    // 移动端切换对话列表
+    const toggleBtn = chatDom.chatHeader.querySelector('#btn-toggle-conv-list');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            const sidebar = document.querySelector('.chat-sidebar');
+            if (sidebar) {
+                sidebar.classList.toggle('mobile-expanded');
+            }
+        });
+    }
+    // 导出按钮
+    const exportBtn = chatDom.chatHeader.querySelector('#btn-export-conv');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            showExportDialog(conversationId);
+        });
+    }
+}
+
+/**
+ * 对话重命名 — 双击标题原地编辑
+ * 保存成功后：更新对话对象 / tab 标题（P6.5-4 标题联动）+ 经注入钩子同步对话列表标题
+ * @param {object} conv - 对话对象
+ */
+export function startRename(conv) {
+    const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
+    if (!titleEl) return;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'chat-title-input';
+    input.value = conv.title;
+    input.maxLength = 200;
+
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    async function save() {
+        const newTitle = input.value.trim() || conv.title;
+        try {
+            await conversations.update(conv.id, { title: newTitle });
+            conv.title = newTitle;
+            // P6.5-4 标题联动：同步对应 tab 的 title（tab 条随动；onTabsChanged 驱动重渲染）
+            updateTab(conv.id, { title: newTitle });
+            // 会话列表标题更新经注入钩子（app.js 接线 — 避免反向依赖）
+            syncConversationListTitle(conv.id, newTitle);
+        } catch (err) {
+            console.error('重命名失败:', err);
+        }
+        // 恢复标题显示
+        const span = document.createElement('span');
+        span.className = 'chat-title';
+        span.id = 'chat-title-text';
+        span.textContent = newTitle;
+        span.title = '双击重命名';
+        input.replaceWith(span);
+        span.addEventListener('dblclick', () => startRename(conv));
+    }
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        }
+        if (e.key === 'Escape') {
+            input.value = conv.title;
+            input.blur();
+        }
+    });
+
+    input.addEventListener('blur', save);
 }
 
 /**
@@ -332,6 +383,7 @@ export async function handleSend() {
 
         let assistantDiv = null;
         let assistantContentDiv = null;
+        let assistantCopyBtn = null;
 
         const stream = chatStream(
             { conversation_id: convId, content },
@@ -347,28 +399,35 @@ export async function handleSend() {
                     if (assistantDiv && !assistantDiv.isConnected) {
                         assistantDiv = null;
                         assistantContentDiv = null;
+                        assistantCopyBtn = null;
                     }
                     if (!assistantDiv) {
                         // 复用 renderMessages 标记的 live 气泡（切回场景，避免重复气泡）；
-                        // 无则新建（首个 token 替换 thinking 指示器）
+                        // 无则新建（首个 token 替换 thinking 指示器）— 骨架统一走工厂，
+                        // 即含复制按钮（F1：流式气泡骨架即有复制按钮）
                         const live = chatDom.chatMessages.querySelector('.message[data-streaming-live="1"]');
                         if (live) {
                             assistantDiv = live;
                             assistantContentDiv = live.querySelector('.message-content');
+                            assistantCopyBtn = live.querySelector('.btn-copy-message');
                         } else {
                             const thinking = chatDom.chatMessages.querySelector('.thinking-indicator');
                             if (thinking) thinking.remove();
 
-                            assistantDiv = document.createElement('div');
-                            assistantDiv.className = 'message assistant';
-                            assistantDiv.appendChild(createAvatarElement('assistant'));
-                            assistantContentDiv = document.createElement('div');
-                            assistantContentDiv.className = 'message-content';
-                            assistantDiv.appendChild(assistantContentDiv);
-                            chatDom.chatMessages.appendChild(assistantDiv);
+                            chatDom.chatMessages.insertAdjacentHTML('beforeend', messageBubbleHtml('assistant', content, {
+                                streaming: true,
+                                characters: state.characters,
+                                currentCharacterId: getActiveTab()?.characterId ?? null,
+                            }));
+                            assistantDiv = chatDom.chatMessages.lastElementChild;
+                            assistantContentDiv = assistantDiv.querySelector('.message-content');
+                            assistantCopyBtn = assistantDiv.querySelector('.btn-copy-message');
+                            if (assistantCopyBtn) attachCopyButton(assistantCopyBtn);
                         }
                     }
                     assistantContentDiv.innerHTML = renderMarkdown(content);
+                    // F1：流式 token 更新同步复制数据属性（点击时读 dataset.content）
+                    if (assistantCopyBtn) assistantCopyBtn.dataset.content = content;
                     scrollToBottom();
                 },
                 onDone: (messageId) => session.onDone(messageId),

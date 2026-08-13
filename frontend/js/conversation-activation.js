@@ -15,12 +15,14 @@
  *     一律校验活动性（后返回的响应不覆盖先返回的）
  *
  * 依赖方向：conversation-activation.js → chat.js（chatDom/renderMessages/
- *   refreshSendButton/EMPTY_STATE_HTML）/ tabs.js / state.js / api.js；
+ *   refreshSendButton/renderChatHeader/EMPTY_STATE_HTML）/ tabs.js / state.js / api.js；
  *   app.js → conversation-activation.js（经 setActivationHooks 注入 DOM 渲染回调，
- *   避免反向依赖 — 与 setConversationsRefresher 同模式）
+ *   避免反向依赖 — 与 setConversationsRefresher 同模式）。
+ *   F4 收口后头部渲染直 import chat.js renderChatHeader（依赖方向不变 — 本模块
+ *   本就依赖 chat.js；头部深模块归位 chat.js，无需再经 hooks 注入）。
  */
 
-import { chatDom, renderMessages, refreshSendButton, EMPTY_STATE_HTML, EMPTY_HEADER_HTML } from './chat.js';
+import { chatDom, renderMessages, refreshSendButton, renderChatHeader, EMPTY_STATE_HTML, EMPTY_HEADER_HTML } from './chat.js';
 import { autoResizeInput } from './utils.js';
 import { state } from './state.js';
 import { conversations, messages } from './api.js';
@@ -29,7 +31,6 @@ import { openTab, getTab, getActiveTab, updateTab } from './tabs.js';
 // ── DOM 渲染回调钩子（app.js 注入；缺失时 no-op 兜底）──
 let hooks = {
     renderConversations: () => {},
-    renderChatHeader: () => {},
     switchView: () => {},
     showError: () => {},
 };
@@ -84,7 +85,7 @@ export async function loadTabMessages(conversationId) {
             renderMessages();
             // renderMessages 内部 scrollToBottom — 此处恢复缓存中的滚动位置（切 tab 恢复）
             chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
-            hooks.renderChatHeader(conversationId);
+            renderChatHeader(conversationId);
         }
         return;
     }
@@ -93,14 +94,14 @@ export async function loadTabMessages(conversationId) {
         updateTab(conversationId, { messages: msgs });
         if (getActiveTab()?.conversationId === conversationId) {
             renderMessages();
-            hooks.renderChatHeader(conversationId);
+            renderChatHeader(conversationId);
         }
     } catch (err) {
         console.error('加载消息失败:', err);
         hooks.showError('加载消息失败');
         if (getActiveTab()?.conversationId === conversationId) {
             renderMessages();
-            hooks.renderChatHeader(conversationId);
+            renderChatHeader(conversationId);
         }
     }
 }
