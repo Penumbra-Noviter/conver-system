@@ -6,7 +6,8 @@
 一次「聊天回合」的生命周期（插开场白 → 存用户消息 → 组装上下文 →
 取 Key 与 Provider → 生成 → 错误映射 → 保存/保存部分）全部收拢于此；
 api/routes/chat.py 只保留 HTTP 映射（领域异常 → HTTPException）与 SSE data: 帧包装。
-领域 + LLM 两族错误映射并置为单一入口 chat_error_response（B1 共识 D2）。
+领域族错误映射委托 services/error_mapping.py 单一入口（ARC10-4「两路并存」合并完成）；
+LLM 族映射并置于 chat_error_response（B1 共识 D2）。
 
 对比参照 services/character_card.py 的深模块形态：协议表面小、实现丰富，
 测试针对接口而非路由内部实现。
@@ -28,11 +29,10 @@ from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
+from backend.app.services.error_mapping import domain_error_response
 from backend.app.services.exceptions import (
-    ApiKeyMissingError,
     ConversationNotFoundError,
     DomainError,
-    ProviderNotSupportedError,
 )
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import (
@@ -42,7 +42,7 @@ from backend.app.services.llm.errors import (
     LLMRateLimitError,
     LLMTimeoutError,
 )
-from backend.app.services.llm.factory import LLMFactory
+from backend.app.services.llm.resolver import resolve_llm
 
 __all__ = [
     "ChatContext",
@@ -51,13 +51,6 @@ __all__ = [
     "chat_error_response",
     "stream_reply",
 ]
-
-# 领域异常 → HTTP 状态码 映射（detail 一律 str(e)；语义源自路由层原 _DOMAIN_ERROR_MAP，B1 迁入合一）
-_DOMAIN_ERROR_MAP: dict[type[DomainError], int] = {
-    ConversationNotFoundError: status.HTTP_404_NOT_FOUND,
-    ApiKeyMissingError: status.HTTP_400_BAD_REQUEST,
-    ProviderNotSupportedError: status.HTTP_400_BAD_REQUEST,
-}
 
 # LLM 错误 → (HTTP 状态码, 用户可见消息) 映射
 _LLM_ERROR_MAP: dict[type[LLMError], tuple[int, str | None]] = {
@@ -120,21 +113,8 @@ def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
         db, conv, request.content, max_rounds=max_rounds, user_name=user_name,
     )
 
-    # 6. 获取 API Key
-    api_key = setting_service.api_key(db, conv.model_provider)
-    if not api_key:
-        raise ApiKeyMissingError(
-            f"未配置 {conv.model_provider} API Key，请在设置中填写",
-        )
-
-    # 7. 获取 Provider（含自定义 base_url）
-    try:
-        base_url = setting_service.base_url(db, conv.model_provider) or None
-        provider = LLMFactory.get_provider(conv.model_provider, api_key, base_url)
-    except ValueError:
-        raise ProviderNotSupportedError(
-            f"不支持的 Provider: {conv.model_provider}",
-        )
+    # 6. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
+    _, _, provider = resolve_llm(db, conv.model_provider, conv.model_name)
 
     return ChatContext(
         conversation=conv,
@@ -192,12 +172,14 @@ async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
 def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int, str]:
     """领域/LLM 异常 → (HTTP 状态码, 用户可见消息) 单一映射入口
 
-    两族映射并置于此（领域异常族 + LLM 异常族），状态码与消息与重构前逐字一致：
-    - 领域异常族：ConversationNotFoundError→404、ApiKeyMissingError→400、
-      ProviderNotSupportedError→400，detail=str(e)
+    状态码与消息与重构前逐字一致（除防御语义对齐项，见下）：
+    - 领域异常族：委托 services/error_mapping.py::domain_error_response 单一入口
+      （404/400/422 全家族 + 未知领域异常 400 兜底）。注：422 家族（CardFormatError /
+      CardValidationError / DocParseError）在聊天领域分支原映射 400，委托后变 422——
+      该分支生产路径不可达（仅非流式完整回合的 LLM 错误分支、LLM 异常处理器与直测
+      用例触达），属防御语义对齐（ARC10-2 / ARC10-4 合并单一映射表时纳入）
     - LLM 异常族：委托 llm_error_response（401 Auth 含 provider 模板——provider 为空时
       输出无前缀基础文案；429/504 固定消息、400、502）
-    - 未知领域异常（未入表子类）：400 + str(e)（与 api/errors.py 兜底语义对齐，ARC10-2）
     - 其余异常：502 + str(e) 兜底（防御性，当前调用方不会传入）
 
     Args:
@@ -207,16 +189,10 @@ def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int,
     Returns:
         (HTTP 状态码, 用户可见消息)
     """
-    for exc_type, http_status in _DOMAIN_ERROR_MAP.items():
-        if isinstance(e, exc_type):
-            return http_status, str(e)
+    if isinstance(e, DomainError):
+        return domain_error_response(e)
     if isinstance(e, LLMError):
         return llm_error_response(e, provider or "")
-    if isinstance(e, DomainError):
-        # 未知领域异常子类：400 兜底（防御性；与 api/errors.py 未知分支语义对齐，ARC10-2）
-        # 422 家族（CardFormatError/CardValidationError/DocParseError）不落此分支——经
-        # api/errors.py 按 422 + 说明文案处理（关联 ARC10-2 / ARC10-4；合并单一映射表时纳入）
-        return status.HTTP_400_BAD_REQUEST, str(e)
     return status.HTTP_502_BAD_GATEWAY, str(e)
 
 

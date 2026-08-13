@@ -26,12 +26,17 @@ from backend.app.services import chat as chat_service
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
+from backend.app.services.error_mapping import IMPORT_FORMAT_HINT
 from backend.app.services.exceptions import (
     ApiKeyMissingError,
+    CardFormatError,
+    CardValidationError,
     ConversationNotFoundError,
+    DocParseError,
     DomainError,
     ProviderNotSupportedError,
 )
+from backend.app.services.llm import resolver as llm_resolver
 from backend.app.services.llm.errors import (
     LLMAuthError,
     LLMContentFilterError,
@@ -112,8 +117,8 @@ class _FakeLLMFactory:
 
 
 def _patch_factory(monkeypatch, provider: _FakeProvider) -> None:
-    """让 chat_service.prepare_chat 的 LLMFactory.get_provider 返回指定假 Provider"""
-    monkeypatch.setattr(chat_service, "LLMFactory", _FakeLLMFactory(provider))
+    """让 llm_resolver.LLMFactory.get_provider 返回指定假 Provider"""
+    monkeypatch.setattr(llm_resolver, "LLMFactory", _FakeLLMFactory(provider))
 
 
 # ── 1. chat_error_response 全映射表直测（B1 审计点：状态码/消息逐字）──
@@ -190,6 +195,24 @@ class TestChatErrorResponse:
         exc = _MysteryDomainError("未知领域错误")
         assert chat_service.chat_error_response(exc) == (400, "未知领域错误")
 
+    def test_domain_422_card_format_with_hint(self) -> None:
+        """CardFormatError → 422 + 导入失败：{e}。{hint}（防御语义对齐：领域分支委托后 422 家族从 400 变 422）"""
+        exc = CardFormatError("无法识别的角色卡格式")
+        assert chat_service.chat_error_response(exc) == (
+            422,
+            f"导入失败：无法识别的角色卡格式。{IMPORT_FORMAT_HINT}",
+        )
+
+    def test_domain_422_card_validation_plain(self) -> None:
+        """CardValidationError → 422 + 导入失败：{e}（纯原因，不带格式说明）"""
+        exc = CardValidationError("角色名称不能为空")
+        assert chat_service.chat_error_response(exc) == (422, "导入失败：角色名称不能为空")
+
+    def test_domain_422_doc_parse_plain(self) -> None:
+        """DocParseError → 422 + str(e)（纯原因）"""
+        exc = DocParseError("未配置 API Key，请先在设置中填写")
+        assert chat_service.chat_error_response(exc) == (422, str(exc))
+
 
 # ── 2. prepare_chat 直接测试 ──
 
@@ -224,7 +247,7 @@ class TestPrepareChat:
             def get_provider(name: str, api_key: str, base_url: str | None = None) -> object:
                 raise ValueError(f"不支持的 Provider: {name}")
 
-        monkeypatch.setattr(chat_service, "LLMFactory", _RaisingFactory)
+        monkeypatch.setattr(llm_resolver, "LLMFactory", _RaisingFactory)
 
         with pytest.raises(ProviderNotSupportedError) as exc:
             chat_service.prepare_chat(db_session, req)

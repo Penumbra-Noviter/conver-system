@@ -19,6 +19,7 @@ __all__ = [
     "conversation_export",
     "data_dir",
     "document_parser",
+    "error_mapping",
     "exceptions",
     "llm",
     "message",

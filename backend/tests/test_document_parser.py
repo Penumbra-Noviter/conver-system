@@ -88,8 +88,8 @@ class MockLLM:
 class TestParseDocument:
     """测试 parse_document 主流程"""
 
-    @patch("backend.app.services.document_parser.LLMFactory.get_provider")
-    @patch("backend.app.services.document_parser.setting_service")
+    @patch("backend.app.services.llm.resolver.LLMFactory.get_provider")
+    @patch("backend.app.services.llm.resolver.setting_service")
     async def test_parse_success(self, mock_setting, mock_factory) -> None:
         """正常解析返回完整字段"""
         mock_setting.default_provider.return_value = "claude"
@@ -110,8 +110,8 @@ class TestParseDocument:
         assert "name" in result.parsed_fields
         assert "personality" in result.parsed_fields
 
-    @patch("backend.app.services.document_parser.LLMFactory.get_provider")
-    @patch("backend.app.services.document_parser.setting_service")
+    @patch("backend.app.services.llm.resolver.LLMFactory.get_provider")
+    @patch("backend.app.services.llm.resolver.setting_service")
     async def test_parse_empty_fields(self, mock_setting, mock_factory) -> None:
         """缺失字段应返回空字符串/空列表"""
         mock_setting.default_provider.return_value = "claude"
@@ -130,8 +130,8 @@ class TestParseDocument:
         assert result.tags == []
         assert result.parsed_fields == ["name"]
 
-    @patch("backend.app.services.document_parser.LLMFactory.get_provider")
-    @patch("backend.app.services.document_parser.setting_service")
+    @patch("backend.app.services.llm.resolver.LLMFactory.get_provider")
+    @patch("backend.app.services.llm.resolver.setting_service")
     async def test_parse_code_block(self, mock_setting, mock_factory) -> None:
         """LLM 返回代码块也能正确提取"""
         mock_setting.default_provider.return_value = "claude"
@@ -146,8 +146,8 @@ class TestParseDocument:
 
         assert result.name == "代码块角色"
 
-    @patch("backend.app.services.document_parser.LLMFactory.get_provider")
-    @patch("backend.app.services.document_parser.setting_service")
+    @patch("backend.app.services.llm.resolver.LLMFactory.get_provider")
+    @patch("backend.app.services.llm.resolver.setting_service")
     async def test_parse_non_json_response(self, mock_setting, mock_factory) -> None:
         """LLM 返回非 JSON 应抛 DocParseError"""
         mock_setting.default_provider.return_value = "claude"
@@ -161,8 +161,8 @@ class TestParseDocument:
         with pytest.raises(DocParseError, match="无法解析"):
             await parse_document(None, "测试")
 
-    @patch("backend.app.services.document_parser.LLMFactory.get_provider")
-    @patch("backend.app.services.document_parser.setting_service")
+    @patch("backend.app.services.llm.resolver.LLMFactory.get_provider")
+    @patch("backend.app.services.llm.resolver.setting_service")
     async def test_parse_llm_error(self, mock_setting, mock_factory) -> None:
         """LLM 调用失败应抛 DocParseError"""
         mock_setting.default_provider.return_value = "claude"
@@ -176,7 +176,7 @@ class TestParseDocument:
         with pytest.raises(DocParseError, match="LLM 调用失败"):
             await parse_document(None, "测试")
 
-    @patch("backend.app.services.document_parser.setting_service")
+    @patch("backend.app.services.llm.resolver.setting_service")
     async def test_parse_no_api_key(self, mock_setting) -> None:
         """未配置 API Key 应抛 DocParseError"""
         mock_setting.default_provider.return_value = "claude"
@@ -185,8 +185,8 @@ class TestParseDocument:
         with pytest.raises(DocParseError, match="未配置 API Key"):
             await parse_document(None, "测试")
 
-    @patch("backend.app.services.document_parser.LLMFactory.get_provider")
-    @patch("backend.app.services.document_parser.setting_service")
+    @patch("backend.app.services.llm.resolver.LLMFactory.get_provider")
+    @patch("backend.app.services.llm.resolver.setting_service")
     async def test_parse_tags_as_list(self, mock_setting, mock_factory) -> None:
         """tags 字段应正确处理为列表"""
         mock_setting.default_provider.return_value = "claude"
