@@ -114,6 +114,46 @@ describe('renderMarkdown', () => {
         });
     });
 
+    describe('属性注入面（TD-42）', () => {
+        it('双引号击穿 href 属性被中和为纯文本（防复发断言）', () => {
+            // 票面防复发断言：注入存活时输出含 onmouseover
+            expect(renderMarkdown('[x](" onmouseover="alert(1))')).not.toContain('onmouseover');
+            // 中和为纯文本（尾部 ) 为链接正则首个 ) 截断后的遗留字面量，与 javascript:alert(1) 变体同语义）
+            expect(renderMarkdown('[x](" onmouseover="alert(1))')).toBe('x)');
+            // 多属性注入同面（onclick）
+            expect(renderMarkdown('[x](" onclick="alert(1))')).toBe('x)');
+        });
+
+        it('单引号变体同样被中和（URL 安全性判定不依赖属性引号风格）', () => {
+            expect(renderMarkdown("[x](' onmouseover='alert(1))")).toBe('x)');
+            expect(renderMarkdown("[x](' onmouseover='alert(1))")).not.toContain('onmouseover');
+        });
+
+        it('引号位于 URL 中间/结尾同样拒绝', () => {
+            expect(renderMarkdown('[x](https://a.com/pa"th)')).toBe('x');
+            expect(renderMarkdown("[x](https://a.com/x')")).toBe('x');
+        });
+
+        it('正常含单引号 URL（RFC 3986 sub-delims）被中和为纯文本（裁决文档化）', () => {
+            expect(renderMarkdown("[b](mailto:foo'bar@x.com)")).toBe('b');
+        });
+
+        it('实体编码 &quot; 变体被 escapeHtml 双转义为惰性文本（不产生属性）', () => {
+            const out = renderMarkdown('[x](&quot; onmouseover=&quot;alert(1))');
+            expect(out).toContain('&amp;quot; onmouseover=&amp;quot;');
+            expect(out).not.toContain('onmouseover="');
+            const doc = new DOMParser().parseFromString(`<body>${out}</body>`, 'text/html');
+            expect(doc.querySelector('a').hasAttribute('onmouseover')).toBe(false);
+        });
+
+        it('反引号变体不产生属性（href 值内惰性文本）', () => {
+            const out = renderMarkdown('[x](` onmouseover=`alert(1))');
+            expect(out).toContain('<a');
+            const doc = new DOMParser().parseFromString(`<body>${out}</body>`, 'text/html');
+            expect(doc.querySelector('a').hasAttribute('onmouseover')).toBe(false);
+        });
+    });
+
     describe('列表状态机', () => {
         it('无序列表 - 连续行', () => {
             expect(renderMarkdown('- 甲\n- 乙')).toBe('<ul>\n<li>甲</li>\n<li>乙</li>\n</ul>');

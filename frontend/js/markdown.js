@@ -20,11 +20,20 @@ const SAFE_URL_SCHEMES = /^(https?|mailto|tel)$/i;
  * 这里先在 scheme 匹配前剔除 [\u0000-\u0020]（C0 控制字符 + 空格）再比对白名单，
  * 防止控制字符绕过；匹配通过时仍返回原始（trim 后）URL，正常 URL 逐字节不变。
  *
+ * TD-42（属性注入面）：href 属性以双引号包裹，URL 内任何裸引号（" 或 '）均可击穿
+ * 属性边界注入事件属性（`[x](" onmouseover="alert(1))` 实测产出 onmouseover 属性）。
+ * escapeHtml 不转义引号（textContent→innerHTML 引号原样通过），故在 trim 后直接拒绝
+ * 含引号 URL（返回 null → 调用方中和为纯文本）。单引号实测不击穿双引号属性边界
+ * （jsdom DOM 解析验证），但 URL 安全性判定不应依赖渲染模板的属性引号风格
+ * （防未来模板单引号化后静默复发），故一并拒绝；代价：RFC 3986 sub-delims 允许的
+ * 含 ' URL（如 mailto:foo'bar@x.com）被中和为纯文本，本仓库无真实用例，可接受。
+ *
  * @param {string} url - 原始链接地址（已 HTML 转义，可能含首尾空白）
- * @returns {string|null} 去首尾空白后的安全 URL；scheme 不在白名单时返回 null（调用方渲染为纯文本）
+ * @returns {string|null} 去首尾空白后的安全 URL；含引号或 scheme 不在白名单时返回 null（调用方渲染为纯文本）
  */
 function sanitizeUrl(url) {
     const trimmed = url.trim();
+    if (trimmed.includes('"') || trimmed.includes("'")) return null;
     const scheme = trimmed.replace(/[\u0000-\u0020]/g, '').match(/^([a-z][a-z0-9+.-]*):/i);
     if (scheme && !SAFE_URL_SCHEMES.test(scheme[1])) return null;
     return trimmed;
