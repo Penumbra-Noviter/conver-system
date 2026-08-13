@@ -11,7 +11,7 @@
 #   验收 6：退出应用（壳 CONVER_EXIT_AFTER_SECS 钩子优雅退出）→ 端口释放
 #           + 端口无监听者（判据 = 端口限定，绝不按全局进程名；ARC9-T05）
 #   验收 7：迁移脚本幂等由 P6.4-3 的 pytest 用例覆盖（backend/tests/test_migrate_data.py），
-#           本脚本不重复实现；可在 -RunMigrationCheck 时做轻量复跑（构造临时源库）
+#           本脚本不重复实现（R4b 收口）；-RunMigrationCheck 时委托该 pytest 套件跑迁移幂等
 #
 # 设计要点：
 #   - 壳-后端环境变量通道（spec 接口契约）：以 CONVER_BACKEND_CMD 指向 PyInstaller
@@ -31,7 +31,7 @@ param(
     [string]$BackendExe = "",
     # 安装器静默安装后启动（缺省直接运行构建产物 exe）
     [switch]$UseInstaller,
-    # 安装器路径（缺省按 tauri.conf.json 版本推导 NSIS 产物路径）
+    # 安装器路径（缺省经共享 helper Get-ConverInstallerPath 按 tauri.conf.json 推导 NSIS 产物路径）
     [string]$InstallerPath = "",
     # 后端 exe 缺失时不自动调用 build-backend.ps1（直接报错）
     [switch]$SkipBackendBuild,
@@ -41,7 +41,7 @@ param(
     [int]$ReadyTimeoutSec = 60,
     # 冒烟结束后清理数据目录 %APPDATA%\ConverSystem（危险：会删除既有数据，默认关）
     [switch]$CleanAppData,
-    # 轻量复跑迁移脚本幂等（验收 7，可选）
+    # 委托 pytest 跑迁移脚本幂等（验收 7，可选；backend/tests/test_migrate_data.py）
     [switch]$RunMigrationCheck,
     # 显式注入后端命令（CONVER_BACKEND_CMD）。缺省语义：
     #   安装态（-UseInstaller）= 不注入，壳按 prod 随包资源定位后端（真实用户路径回归，阻断 1）；
@@ -158,8 +158,8 @@ $ExitAfterSecs = $ReadyTimeoutSec + 45   # 壳自动退出计时必须大于就�
 try {
     if ($UseInstaller) {
         if (-not $InstallerPath) {
-            $Conf = Get-Content (Join-Path $Root "src-tauri\tauri.conf.json") -Raw | ConvertFrom-Json
-            $InstallerPath = Join-Path $Root ("src-tauri\target\release\bundle\nsis\Conver System_{0}_x64-setup.exe" -f $Conf.version)
+            # 安装器路径单一推导来源（R4a）：tauri.conf.json productName/version → 共享 helper
+            $InstallerPath = Get-ConverInstallerPath -Root $Root
         }
         if (-not (Test-Path $InstallerPath)) {
             throw "未找到安装器：$InstallerPath"
@@ -290,43 +290,25 @@ try {
         Add-Result "验收5-数据库存在" $false ("$DbPath 不存在（后端未建库？）")
     }
 
-    # ── 验收 7（可选）：迁移脚本幂等轻量复跑 ─────────────────────────────
+    # ── 验收 7（可选）：迁移脚本幂等 —— 委托既有 pytest 套件（R4b）──────────
+    # 历史实现内嵌 ~30 行 python 复刻迁移幂等断言，与既有 pytest 套件
+    # backend/tests/test_migrate_data.py 双份维护、必然漂移——已收口：
+    # -RunMigrationCheck 开启时委托该套件，关闭时跳过（开关语义保留）。
     if ($RunMigrationCheck) {
-        $tmpBase = Join-Path ([System.IO.Path]::GetTempPath()) ("conver-migrate-smoke-" + [guid]::NewGuid().ToString("N"))
-        try {
-            & $Py -c @"
-import sys
-from pathlib import Path
-sys.path.insert(0, r'$Root')
-from backend.scripts.migrate_data import migrate, verify_database
-base = Path(r'$tmpBase')
-src = base / 'src' / 'conver_system.db'; src.parent.mkdir(parents=True)
-import sqlite3
-conn = sqlite3.connect(src)
-# 源库须含全部核心表（migrate_data 的 check_source 契约：characters/conversations/messages/settings）
-conn.executescript('''
-CREATE TABLE characters (id INTEGER PRIMARY KEY, name TEXT);
-CREATE TABLE conversations (id INTEGER PRIMARY KEY, title TEXT);
-CREATE TABLE messages (id INTEGER PRIMARY KEY, content TEXT);
-CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
-INSERT INTO characters(name) VALUES ('smoke');
-''')
-conn.close()
-dst = base / 'dst' / 'conver_system.db'
-migrate(src, dst)
-assert dst.exists() and (dst.parent / '.migrated').exists(), '首次迁移失败'
-migrate(src, dst)  # 幂等复跑：目标带完成标记即跳过
-assert dst.exists(), '幂等复跑后目标丢失'
-problems = verify_database(dst)
-assert not problems, '目标库校验失败: ' + ';'.join(problems)
-print('migrate-smoke-ok')
-"@
-            $migExit = $LASTEXITCODE
-            if ($migExit -ne 0) { throw "迁移幂等复跑失败（退出码 $migExit）" }
-            Add-Result "验收7-迁移幂等轻量复跑" $true "源库保留/目标出现/完成标记/复跑跳过"
-        } finally {
-            if (Test-Path $tmpBase) { Remove-Item $tmpBase -Recurse -Force }
+        if (-not (Test-Path $Py)) {
+            throw "未找到 $Py，无法运行迁移幂等 pytest（backend/tests/test_migrate_data.py）"
         }
+        Push-Location $Root
+        try {
+            & $Py -m pytest -q backend/tests/test_migrate_data.py
+            $migExit = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+        if ($migExit -ne 0) {
+            throw "迁移幂等 pytest 失败（backend/tests/test_migrate_data.py，退出码 $migExit）"
+        }
+        Add-Result "验收7-迁移幂等(pytest委托)" $true "backend/tests/test_migrate_data.py 全部通过"
     }
 
     # ── 验收 6：优雅退出 + 无残留 ───────────────────────────────────────

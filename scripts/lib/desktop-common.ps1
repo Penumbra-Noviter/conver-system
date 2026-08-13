@@ -4,6 +4,9 @@
 #     . (Join-Path $PSScriptRoot "lib\desktop-common.ps1")
 #
 # 铁律（决策 D2-D1 / spec G5 冒烟纪律）：
+#   - 安装器路径**唯一推导来源** = tauri.conf.json 的 productName/version
+#     （Get-ConverInstallerPath）——build-desktop.ps1 与 smoke-desktop.ps1 共用，
+#     禁止任何脚本硬编码安装器文件名（R4a 收口）。
 #   - 后端进程清理**唯一手段** = 按「端口监听者」定位（Stop-ConverPortListeners），
 #     绝不按全局进程名（Get-Process -Name）清理——会误杀用户另开的同名后端实例。
 #   - 壳实例预清（conver-system）是显式例外：须 -ForceKillStale 显式授权（见
@@ -67,4 +70,38 @@ function Assert-Or-Build-BackendExe {
     if (-not (Test-Path $Path)) {
         throw "build-backend.ps1 执行后仍未找到 $Path"
     }
+}
+
+function Get-ConverInstallerPath {
+    <#
+    .SYNOPSIS
+        推导 NSIS 安装器产物完整路径（单一来源 = tauri.conf.json 的 productName/version）。
+    .DESCRIPTION
+        产物命名契约：src-tauri\target\release\bundle\nsis\{productName}_{version}_x64-setup.exe
+        （NSIS installMode=currentUser，见 tauri.conf.json bundle.windows.nsis）。
+        版本升级只需改 tauri.conf.json——build-desktop.ps1 与 smoke-desktop.ps1 共用本
+        helper（R4a 收口），禁止任何脚本硬编码安装器文件名（会随版本升级漂移）。
+        本 helper 只推导路径，不校验文件存在性（调用方按需 Test-Path）。
+    .PARAMETER Root
+        仓库根目录（内含 src-tauri\tauri.conf.json）。
+    .OUTPUTS
+        返回安装器完整路径字符串；tauri.conf.json 缺失/解析失败/缺字段时 throw。
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+    $TauriConfPath = Join-Path $Root "src-tauri\tauri.conf.json"
+    if (-not (Test-Path $TauriConfPath)) {
+        throw "未找到 tauri.conf.json：$TauriConfPath（安装器路径推导需要 productName/version）"
+    }
+    try {
+        $Conf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
+    } catch {
+        throw "tauri.conf.json 解析失败：$TauriConfPath（$($_.Exception.Message)）"
+    }
+    if (-not $Conf.productName -or -not $Conf.version) {
+        throw "tauri.conf.json 缺少 productName 或 version 字段，无法推导安装器路径：$TauriConfPath"
+    }
+    return Join-Path $Root ("src-tauri\target\release\bundle\nsis\{0}_{1}_x64-setup.exe" -f $Conf.productName, $Conf.version)
 }
