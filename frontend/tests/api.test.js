@@ -130,7 +130,7 @@ describe('requestBlob', () => {
     });
 
     it('文件名解析：无 filename* 回退 filename；无 Content-Disposition 返回 null', async () => {
-        // markdown 导出只有 filename（后端 format：filename="conversation-1.md"）
+        // markdown 导出带 filename*（RFC 5987，与 json 导出同契约；filename 仅作 ASCII 兜底）
         setFetch(vi.fn(async () => mockBlobResponse({ contentDisposition: 'attachment; filename="conversation-1.md"' })));
         expect((await requestBlob('/conversations/1/export/markdown')).filename).toBe('conversation-1.md');
 
