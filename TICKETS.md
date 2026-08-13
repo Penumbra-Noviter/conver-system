@@ -23,25 +23,9 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| TD-45 | markdown.js 变体回归网缺口——`%22`/`&QUOT;`/`&#34;`/全角引号（U+201C/201D）/反引号+javascript: 五类变体 Falsify 实证全安全但未入测试套件（TD-28 有 11 变体先例，TD-42 仅 6 用例）。可选补 `hasAttribute('onmouseover')=false` 类断言 | 期末四轴（TD-42 审核） | Worth exploring | 📝 |
-| TD-43 | markdown.test.js `[x](\x00javascript:foo)` 断言 'x' 依赖 jsdom 保留 U+0000——真实浏览器按 HTML 序列化规范替换为 U+FFFD 后渲染相对链接（均安全，行为不同）。修：测试注释锁定环境假设或断言放宽 `not.toContain('javascript')` | 期末四轴（TD-28 审核） | Worth exploring | 📝 |
-| TD-44 | frontend/vitest.config.js `coverage.include` 不含 js/markdown.js——「覆盖率 ≥90% 不下降」对涉改文件无 CI 门槛（当前靠人工口径 100%）。修：涉改文件动态纳入 include 或票面注明豁免 | 期末四轴（TD-28 审核） | Worth exploring | 📝 |
-| TD-29 | `formatTemperature('abc')` → `'NaN'`（character-submit.js）——畸形存量数据编辑时温度标签显示 NaN；null/undefined 兜底 0.70 正确。修：`Number.isFinite` 校验失败回退 `TEMP_SLIDER.default` | 波 2 Falsify | Worth exploring | 📝 |
-| TD-30 | boot.html `(status && status.readyTimeoutMs) ?? 60000` 不兜底 0——壳端若透传 0（当前转 None 不可达）则 maxPolls=0 首次轮询即判超时；修：`> 0 ? … : 60000` + 注释锁定契约 | 波 2 Falsify | Worth exploring | 📝 |
-| TD-31 | ManagedChild.kill Windows 分支 taskkill pid 复用理论竞态（take 与 taskkill 间 pid 被 OS 复用则误杀）——微秒级窗口不可复现；修：先 `child.kill()`（句柄级无竞态）再 taskkill 补树 | 波 2 Falsify | Speculative | 📝 |
-| TD-32 | `build_content_disposition` ascii_filename 无 latin-1 防御——非 ASCII 传入会 UnicodeEncodeError（headers.py:20 docstring 已声明契约，三调用点均传硬编码 ASCII）；未来调用方防御缺口 | 波 1 Falsify | Speculative | 📝 |
-| TD-33 | resolve_llm 对内置注册类 ValueError 误映射为「不支持的 Provider: x」消息失真（model_data 条目缺 key/无实现类场景，静态数据罕见）；修：区分 ProviderNotSupported 与其他 ValueError | 波 1 Falsify | Speculative | 📝 |
-| TD-34 | require_* + 服务内 get 双查询 TOCTOU 窗口（删于两查询间 → response_model 校验 500）——SQLite 单写者概率极低、基线同构；修：require 返回对象复用 | 波 1 Falsify | Speculative | 📝 |
-| TD-35 | 对话 json/md 导出 header 形状变更需知悉（md 导出新增 filename* 段、文件名从纯 id 变含角色名）——属 BE-2 三处统一申报意图，确认前端下载器兼容 | 波 1 Falsify | Speculative | 📝 |
-| TD-36 | renderMessages 对 `tab.messages` 为字符串无 Array.isArray 防御（TypeError）——当前注入路径不可达（tabs 初始化/API/缓存均数组）；一行防御 | 波 3 Falsify | Speculative | 📝 |
-| TD-37 | `startRename(undefined)` 导出 API 无守卫（内部唯一调用点已保证 conv 非空；空态头部无该 id 天然保护）——防御性 `if (!conv) return` | 波 3 Falsify | Speculative | 📝 |
-| TD-38 | markdown.js 代码块不原子——```` ``` `x` ``` ```` 嵌套 `<code>`、块内 `**x**` 变 `<strong>`（纯渲染保真无注入，转义优先已保证安全） | 期末四轴 | Speculative | 📝 |
-| TD-39 | resolve_llm provider 缺省且 default_provider 为 None →「不支持的 Provider: None」文案含 None（wire 合法但可读性差） | 期末四轴 | Speculative | 📝 |
-| TD-40 | BaseLLM._translate_error 未声明 abstract——未来 _CLASS_OVERRIDES Provider 忘实现 → AttributeError 穿透 500（非流式 complete_chat 仅捕 LLMError）；修：@abstractmethod 钉契约于类定义期 | 期末四轴（架构建议） | Worth exploring | 📝 |
-| TD-41 | api/errors.py 死导入（`IMPORT_FORMAT_HINT as _IMPORT_FORMAT_HINT` 未使用，B1 委托改造残留）——nit 顺手清 | 期末四轴 | Speculative | 📝 |
 | TD-46 | frontend/js/markdown.js:163-165 占位符还原逐块全文 split/join，多块大文本二次方级操作（聊天消息量级无感知）——未来大文本渲染性能候选 | 波 1 增量审核 Falsify | Speculative | 📝 |
 
-> 技术债区当前 **18 项**（TD-29~41/43~46：td-arch-health 批次 13 项 + TD-28 审核 3 项 + TD-42 审核 1 项 + 波 1 增量审核 1 项；TD-28/TD-42 已修归档见下）。
+> 技术债区当前 **1 项**（TD-46：波 1 增量审核遗留；TD-29~41/43~45 批次处置完毕见下）。
 
 ---
 
@@ -76,6 +60,22 @@
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
 | TD-42 | 链接属性注入面修复（sanitizeUrl 拒绝含引号 URL + 防复发断言 `not.toContain('onmouseover')`；6 用例先红后绿，行覆盖 100% 不下降） | 2026-08-13 | `a990d44` |
+
+### 技术债区 TD-29~41/43~45 批次（2026-08-13 标准档全自动 kickoff）
+
+> 来源：TICKETS 技术债区 17 项（TD-29~41/43~45：td-arch-health 批次 13 项 + TD-28 审核 3 项 + TD-42 审核 1 项）。Grilling 共识（全自动档，用户确认）：**11 做 + 5 关闭 + 1 票面修正**——做：TD-29（formatTemperature Number.isFinite 回退）/ TD-30（boot.html 就绪超时 >0 兜底）/ TD-31（**票面修正**：先 child.kill() 再 taskkill 实证自相矛盾——直接子进程死后 taskkill /T 找不到树，改 taskkill 先行 + 失败存活兜底 child.kill() + 5s 有界回收）/ TD-33（resolver 未注册名改捕 ProviderNotSupportedError，构造 ValueError 原样上抛）/ TD-36（renderMessages Array.isArray 守卫）/ TD-37（startRename conv 守卫）/ TD-38（代码块占位符原子化——块内标记渲染为可点击链接属真实交互缺陷）/ TD-40（_translate_error @abstractmethod 钉契约）/ TD-41（errors.py 死导入）/ TD-44（markdown.js 纳入 coverage.include）/ TD-45（XSS 五变体回归网补齐）；**关闭 5**（复核确认维持）：TD-32（latin-1 契约 docstring 已声明 + 三调用点均 ASCII）/ TD-34（SQLite 单写者 TOCTOU 不可达）/ TD-35（前端下载器已兼容 filename*，仅注释顺手修）/ TD-39（config DEFAULT_PROVIDER 常量兜底恒非空）/ TD-43（**票面机制实证否定**：jsdom v26 实测 NUL→U+FFFD 与真实浏览器一致，断言无需放宽）。
+>
+> 规格 v1.0 无修订。标准档 2 波（波 1：工单 01/02/03 并行 3；波 2：工单 04 单张），worktree `.worktrees/td0{1..4}-*`，merge 链 `b835210`+`615aba8`+`a5fe7b9`（波 1）+ `cef3fea`（波 2）；merge 零回退冲突。**波 1 增量审核（固定点 4a43b5b）：0 阻断**——文件范围 18 合规 / 1 记录警告（vitest.config.js 申报改动）/ 0 回退；4 项非阻断处置（960c9c4 修 2 项：character-submit.js 纳入 coverage.include + resolve_llm docstring 失真；93b51ab 落盘 TD-46；复核维持 1 项）。**波 2 增量审核（固定点 a5fe7b9）：0 阻断**——F6 测试注释如实化 + F8 TICKETS.md NUL 字节转义（649910c/d96b4ce）。**期末四轴 code-review（固定点 4a43b5b）：1 阻断已修复放行**——Falsify 抓到 TD-38 占位符碰撞循环计数器失同步（createCodeBlockToken do-while 碰撞消耗多序号 vs 调用方单次 tokenId++ → 多代码块 + 用户内容含 ` MDCB<n> ` 形文本时首块被覆盖丢失；碰撞免疫契约失效 + 套件零覆盖）→ daf5503 修复（返回 { token, nextId } 取号单一职责 + 5 防复发用例转正），merge `342382e`；复审 9 场景 Falsify 全过（无丢失/无双份/零占位符泄漏）、范围严格两文件、放行；Architecture Locality 注记与阻断同源一并修复；TD-46 期末复证（100 块 64KB 实测 1.7ms，不新开条目）。运行态冒烟：uvicorn 起服 /api/models 200 + test-connection 400「不支持的 Provider: gemini」+ /api/characters 200，端口停净。测试同步：pytest **413 + 1 skip**（基线 412+1，+1 构造 ValueError 透传用例）/ Vitest **460**（基线 444，+16：工单 01 +3 / 工单 02 +8 / 阻断修复 +5）/ cargo **58**（基线 56，+2）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| 01 | 前端防御性收口（TD-29/36/37 + api.test 注释修正；3 用例先红后绿，涉改文件 100% 覆盖） | 2026-08-13 | `f01560f` |
+| 02 | markdown 原子化 + 回归网（TD-38/44/45；8 用例，markdown.js 100% 覆盖） | 2026-08-13 | `ce943f3` |
+| 03 | 后端错误处理小改（TD-33/40/41 + 连带同步；llm+errors 97.45% 覆盖） | 2026-08-13 | `e18925c` |
+| 04 | 壳生命周期硬化（TD-30/31 票面修正；+2 用例，cargo 58） | 2026-08-13 | `a737d4a` |
+| 阻断修复 | markdown 占位符碰撞计数器失同步（5 防复发用例转正，markdown.js 100%） | 2026-08-13 | `daf5503` |
+
+> ✅ 已结清（2026-08-13 TD-29~41/43~45 批次）：17 项全部处置——11 做（含 TD-31 票面修正）+ 5 关闭（复核确认维持，各附实证理由）+ 1 新遗留 TD-46 入技术债区（markdown 还原性能 Speculative）。期末阻断修复防复发断言 5 用例落库。
 
 ### 技术债区 TD-13~14 批次（2026-08-12 全自动 kickoff）
 
