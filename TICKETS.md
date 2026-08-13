@@ -23,12 +23,40 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
+| TD-28 | markdown.js `sanitizeUrl` 控制字符绕过 scheme 白名单（`java\tscript:` 等 TAB/LF/CR 变体被浏览器剥离后解析为 javascript:）——当前仅硬编码 target=_blank+noopener 意外兜住，去掉 target 即成活 XSS；测试只覆盖 javascript:/data:/大小写未覆盖控制字符。修：scheme 匹配前剔除 `[\u0000-\u0020]` + 4 变体单测 | 波 2 Falsify（期末复证） | **Strong** | 📝 |
+| TD-29 | `formatTemperature('abc')` → `'NaN'`（character-submit.js）——畸形存量数据编辑时温度标签显示 NaN；null/undefined 兜底 0.70 正确。修：`Number.isFinite` 校验失败回退 `TEMP_SLIDER.default` | 波 2 Falsify | Worth exploring | 📝 |
+| TD-30 | boot.html `(status && status.readyTimeoutMs) ?? 60000` 不兜底 0——壳端若透传 0（当前转 None 不可达）则 maxPolls=0 首次轮询即判超时；修：`> 0 ? … : 60000` + 注释锁定契约 | 波 2 Falsify | Worth exploring | 📝 |
+| TD-31 | ManagedChild.kill Windows 分支 taskkill pid 复用理论竞态（take 与 taskkill 间 pid 被 OS 复用则误杀）——微秒级窗口不可复现；修：先 `child.kill()`（句柄级无竞态）再 taskkill 补树 | 波 2 Falsify | Speculative | 📝 |
+| TD-32 | `build_content_disposition` ascii_filename 无 latin-1 防御——非 ASCII 传入会 UnicodeEncodeError（headers.py:20 docstring 已声明契约，三调用点均传硬编码 ASCII）；未来调用方防御缺口 | 波 1 Falsify | Speculative | 📝 |
+| TD-33 | resolve_llm 对内置注册类 ValueError 误映射为「不支持的 Provider: x」消息失真（model_data 条目缺 key/无实现类场景，静态数据罕见）；修：区分 ProviderNotSupported 与其他 ValueError | 波 1 Falsify | Speculative | 📝 |
+| TD-34 | require_* + 服务内 get 双查询 TOCTOU 窗口（删于两查询间 → response_model 校验 500）——SQLite 单写者概率极低、基线同构；修：require 返回对象复用 | 波 1 Falsify | Speculative | 📝 |
+| TD-35 | 对话 json/md 导出 header 形状变更需知悉（md 导出新增 filename* 段、文件名从纯 id 变含角色名）——属 BE-2 三处统一申报意图，确认前端下载器兼容 | 波 1 Falsify | Speculative | 📝 |
+| TD-36 | renderMessages 对 `tab.messages` 为字符串无 Array.isArray 防御（TypeError）——当前注入路径不可达（tabs 初始化/API/缓存均数组）；一行防御 | 波 3 Falsify | Speculative | 📝 |
+| TD-37 | `startRename(undefined)` 导出 API 无守卫（内部唯一调用点已保证 conv 非空；空态头部无该 id 天然保护）——防御性 `if (!conv) return` | 波 3 Falsify | Speculative | 📝 |
+| TD-38 | markdown.js 代码块不原子——```` ``` `x` ``` ```` 嵌套 `<code>`、块内 `**x**` 变 `<strong>`（纯渲染保真无注入，转义优先已保证安全） | 期末四轴 | Speculative | 📝 |
+| TD-39 | resolve_llm provider 缺省且 default_provider 为 None →「不支持的 Provider: None」文案含 None（wire 合法但可读性差） | 期末四轴 | Speculative | 📝 |
+| TD-40 | BaseLLM._translate_error 未声明 abstract——未来 _CLASS_OVERRIDES Provider 忘实现 → AttributeError 穿透 500（非流式 complete_chat 仅捕 LLMError）；修：@abstractmethod 钉契约于类定义期 | 期末四轴（架构建议） | Worth exploring | 📝 |
+| TD-41 | api/errors.py 死导入（`IMPORT_FORMAT_HINT as _IMPORT_FORMAT_HINT` 未使用，B1 委托改造残留）——nit 顺手清 | 期末四轴 | Speculative | 📝 |
 
-> 技术债区当前为空（TD-25~27 批次已清零，见下）。
+> 技术债区当前 **14 项**（TD-28~41，td-arch-health 批次波末/期末非阻断观察，来源已标注；净增 14 vs 本轮清零 0——审核产出 > 修复容量信号，用户知悉）。
 
 ---
 
 ## 已完成归档
+
+### 架构深化批次 td-arch-health（2026-08-13 全自动 kickoff：8 工单 3 波）
+
+> 来源：/improve-codebase-architecture 三端 Explore 扫描 16 候选 + 1 附带（F1/F6 并入、B7 关闭）。Grilling 共识（全自动档拍板）：**13 做 + 3 关闭**——做：B1 领域错误映射双表合一（新 `services/error_mapping.py` 单一入口 + 422 detail 构造下沉，**ARC10-4「两路并存」由本批次取代**——TD-11 注释指路合并时机）+ B2 LLM 凭据解析/实例化收口（`resolve_llm` 深函数，三调用方同条件同语义；document_parser 无 Key 误归类 422 修复 + ProviderNotSupportedError 转 DocParseError 保 wire）/ B3 CRUD「不存在」语义收口（`require_conversation`/`require_character` 深函数 + CharacterNotFoundError，8 处守卫改调）/ B4 附件下载头收口（`build_content_disposition` ASCII 兜底 + RFC 5987 + safe=''）/ B5 Provider 骨架收口（base.py 共享 `_prepare_messages`/`_translated_call`，零 SDK import）/ F1 消息气泡三路径收口（`messageBubbleHtml` 工厂六变体；**system 变体行为微调：无头像 + 无复制按钮**——产品可见变化规格注记）/ F2 角色字段语义深模块（TEMP_SLIDER/formatTemperature 0.70 统一/avatarPreviewHtml/必填文案/tagsToComma 单源）/ F3 renderMarkdown 独立模块补测试（markdown.js + 25 用例 + XSS href scheme 白名单硬化）/ F6 空态文案单一来源 / F4 聊天头部深模块（renderChatHeader/startRename/标题同步收口 chat.js，app.js 只留注入接线）/ R1 壳↔后端启动契约显式化（BACKEND_HOST/READY_PROBE_PATH 常量 + `spawn_arguments` 纯函数）/ R2 dev 进程树残留（taskkill /T 零新 crate）/ R3 就绪超时单源（BackendStatus.ready_timeout_ms）/ R4a 安装器路径推导单源（desktop-common.ps1 helper）/ R4b smoke 内嵌迁移复刻委托 pytest。**关闭 3**：B6 search preview 纯函数（test_search.py 已精确覆盖无行为收益）/ B7 create_message 手动 updated_at（**票面「冗余」实证否定**——onupdate 不触发时它是对话列表排序唯一驱动）/ F5 model-selector 域接口（接口背后仍是同一 state 裸读，收益近零）。
+>
+> 规格 v1.0 无修订；2 处规格注记落实（ARC10-4 取代 / system 气泡微调）。**票面措辞修正记录**：BE-1 票面「test_connection 路由缩成两行」→ 实测为「凭据解析块收口为 resolve_llm 一行」（保持既有局部 400 语义为硬约束，路由仍 ~20 行）——归档时修正票面防后续误判。
+>
+> 标准档 3 波（并行上限 3）：波 1 后端三票（BE-1/BE-2/BE-3，merge 链 b4b0a31/ae8ba42/01cb36d）→ 波 2 前端二票+Rust 一票（FE-2/FE-3/RS-1，merge 链 a0fe574/5ed0bb8/688291e）→ 波 3 脚本+前端（RS-2/FE-1，merge 链 af3b7af/48447e6）；merge 零回退冲突，1 处 api/errors.py 冲突人工仲裁（CharacterNotFoundError→404 移植 error_mapping.py 单一入口）。**阻断修复 2 轮**：波 1 增量审核 1 阻断（parse-document 未知 Provider 422→400 wire 回归，BE-1 修复 `afda8d9` 先红后绿 + 防复发断言）+ 期末/波 3 同源 1 阻断（**复制按钮 data-content 属性注入面 + 引号截断**——messageBubbleHtml 数据通道单一化，chat.js 三调用点 dataset 补写，FE-1 修复 `9716c30`；流式路径从安全回归为不安全的本波引入点已闭环）。
+>
+> **期末四轴 code-review（固定点 2291298）：唯一阻断已修复复审，其余全过**——Standards 0 硬违规（安全红线三过：密钥零硬编码/.gitignore 全覆盖/无云依赖；2 nit：errors.py 死导入、JS __all__ 注释惯例）；Spec 8/8 工单全过 + 2 注记落实；Falsify 跨波边界 1 阻断（同波 3）+ 6 非阻断；Architecture 全正面（8 新模块全深、Locality 八项单点、删除测试全过；2 建议：_translate_error abstract 化、chat.js 三域拆分预警）。
+>
+> **4.5 运行态冒烟**（web-gui-tester GUI 走查）：T1 首页 200 ✓ / T2 创建向导（温度 0.70 统一 + 必填校验 + 头像空态 + 保存成功）✓ / T3 编辑表单（0.70 + 回填）✓ / T4 空态文案单源 ✓ / T5 错误路径（流式错误 = assistant message-error 既有设计；**非流式失败 = system 无头像无复制——规格注记 2 GUI 实证**）✓ / T6 复制按钮（含引号消息 dataset.content 62 字符完整不截断、无注入属性、14 按钮齐全）✓ / T7 markdown 渲染（粗体/列表/分隔线/代码块/标题）✓ / T8 设置面板回归 ✓。**冒烟记录 2 项**：① mock 拦截 glob `**/api/chats/**` 不匹配无尾路径段 `/api/chats` 漏拦 → 1 次真实外部 API 调用（api.kukuit.com）+ 对话「测试对话-重命名」写入 2 条真实测试消息（14→16 条，用户决定是否清理）——冒烟纪律失误如实记录；② 视觉验证降级（模型无图像输入能力）——截图存档 gui-t1-home.png / gui-t5-system-bubble.png 供用户查看，验证基于 DOM 结构化证据。
+>
+> 非阻断观察 **14 项落技术债区（TD-28~41）**（波 1 Falsify 4 / 波 2 Falsify 4 / 波 3 Falsify 2 / 期末四轴 4；TD-28 XSS 控制字符绕过 Strong）。测试同步：pytest **412 + 1 skip**（基线 362+1skip，+50）/ Vitest **431**（基线 373，+58）/ cargo **56**（基线 52，+4），全部全绿。
 
 ### 技术债区 TD-13~14 批次（2026-08-12 全自动 kickoff）
 

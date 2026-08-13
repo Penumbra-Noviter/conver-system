@@ -5,6 +5,17 @@
 
 ---
 
+## 滚动摘要（2026-08-13 — 架构深化批次 td-arch-health：8 工单 3 波全自动 kickoff）
+
+- **td-arch-health 批次完成（merge 链 b4b0a31→48447e6）**：/improve-codebase-architecture 三端扫描 16 候选 + 1 附带 → Grilling 全自动档拍板 13 做 + 3 关闭（标准档 3 波：波 1 后端三票 BE-1/BE-2/BE-3 → 波 2 前端二票+Rust 一票 FE-2/FE-3/RS-1 → 波 3 脚本+前端 RS-2/FE-1）。**后端**：错误映射双表合一（error_mapping.py 单入口，ARC10-4「两路并存」由本批次取代）+ resolve_llm 凭据解析收口（三调用方同条件同语义，document_parser 无 Key 误归类 422 修复）+ CRUD require 深函数 + CharacterNotFoundError + build_content_disposition 附件头收口 + Provider 骨架共享 helper 上移（零 SDK import）。**前端**：messageBubbleHtml 气泡工厂六变体（三路径收口；system 无头像无复制——产品微调规格注记）+ 角色字段语义深模块（温度 0.70 统一，0.7/0.70 漂移修复）+ renderMarkdown 独立 markdown.js + 25 用例（Falsify 发现 XSS href scheme 注入并白名单硬化）+ 空态文案单源 + 聊天头部深模块收口。**壳/脚本**：启动契约显式化（spawn_arguments + 常量 + 双端测试钉住）+ dev 进程树残留 taskkill /T + 就绪超时单源 + 安装器路径推导 helper + smoke 迁移复刻委托 pytest。
+- **过程遥测**：3 波并行上限 3；merge 零回退冲突、1 处 api/errors.py 冲突人工仲裁（CharacterNotFoundError→404 移植 error_mapping 单一入口）；波末降配增量审核 3 轮——波 1：1 阻断（parse-document 未知 Provider 422→400 wire 回归，BE-1 修复 afda8d9 先红后绿 + 防复发断言）+ 4 非阻断；波 2：0 阻断 + 4 非阻断（TD-28 XSS 控制字符绕过 Strong 等）；波 3：1 阻断（复制按钮 data-content 属性注入面 + 引号截断——**流式路径从安全回归为不安全的本波引入点**，数据通道单一化修复 9716c30）+ 2 非阻断；期末四轴（固定点 2291298）：唯一阻断（同波 3 源）已修复复审，Standards 0 硬违规、Spec 8/8、Architecture 全正面（2 建议：_translate_error abstract 化 / chat.js 三域拆分预警）
+- **预检召回轨迹**：persona.md 精读；经验笔记 23 篇扫摘要（预算内精读 2 篇：技术债票面修复建议须实证复核 / 审计快照过期需复核）；守卫反查全过
+- **4.5 运行态冒烟**（web-gui-tester）：T1-T8 全过（创建向导 0.70/必填校验/头像空态、编辑表单回填、空态单源、错误路径 system 变体 GUI 实证、复制按钮引号不截断、markdown 渲染、设置面板回归）；**冒烟记录**：mock 拦截 glob `**/api/chats/**` 不匹配 `/api/chats` 漏拦 → 1 次真实外部 API 调用 + 对话「测试对话-重命名」+2 条测试消息（14→16，用户决定清理）；视觉验证因模型无图像能力降级为 DOM 证据 + 截图存档
+- **G18 文档同步（本批次）**：TICKETS（批次归档 + 技术债区 14 项 TD-28~41 落盘 + 票面措辞修正注记）；CLAUDE.md（测试数 412+1skip/431/56）；PROJECT_REFERENCE.md（测试数同步）；DEV_LOG 本段
+- **测试**：pytest **412 + 1 skip** / Vitest **431** / cargo test **56** 全绿（基线 362+1skip/373/52 → 期末 +50/+58/+4）
+
+---
+
 ## 滚动摘要（2026-08-13 — 技术债区 TD-25~27 批次：1 做 + 2 维持关闭全自动 kickoff）
 
 - **TD-25~27 批次完成（merge 8ae3801）**：TD-15~24 批次期末遗留 3 项处置——1 做 + 2 复核确认维持关闭（全自动档）。**TD-25** UNC 锁断言平台隔离（test_data_dir.py 唯一改动）：UNC 断言块拆独立用例 `test_env_override_unc_prefix_preserved` + `@pytest.mark.skipif(sys.platform != 'win32')`——**票面「断言级 skipif」实测不可表达**（装饰器无断言级形态，修正为函数级）；skipif 可见 skip 信号优于静默 `if sys.platform` 包裹（后者锁悄悄失效不可见）；skipif 逆条件探针实证（1 skipped → 还原 16 passed）；父函数剩余断言（折叠/`..`/尾分隔符）Windows+POSIX 双实测不受拆分影响；Windows 锁语义零变化（基线绿非先红）；**TD-26 维持关闭**（:371 空下拉放行存 `''` = TD-15 决策字面内行为，与用例⑧ 同构，零 TypeError 风险，不加锁测试）/ **TD-27 维持关闭**（UNC 复述 5 处/3 文件受双端镜像契约表惯例保护，跨文件引用已存在，漂移由 TD-25 锁兜底）
