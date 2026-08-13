@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 import uvicorn
+from fastapi.testclient import TestClient
 
 from backend.app.main import _frontend_dir
 from backend.run_backend import build_log_config, build_parser, data_dir, log_file_path, main
@@ -37,6 +38,7 @@ __all__ = [
     "TestFrontendDir",
     "TestEntrypoint",
     "TestSpecFrontendPackaging",
+    "TestShellSpawnContract",
 ]
 
 
@@ -330,6 +332,39 @@ class TestSpecFrontendPackaging:
         # 挂载目标对齐 _frontend_dir：index.html 必须落在 frontend/ 根（StaticFiles 入口）
         targets = {t for _, t in datas}
         assert {"frontend", "frontend/css", "frontend/js"} <= targets
+
+
+class TestShellSpawnContract:
+    """壳追加 argv / 就绪路径契约（RS-1 R1，与壳侧互引）：
+
+    壳侧镜像实现见 src-tauri/src/server.rs `spawn_arguments` / `READY_PROBE_PATH`，
+    cargo 契约锁见 src-tauri/tests/server_test.rs——两端互引锁死同一契约。
+    票面修正注记：后端 `--host` 默认实为 127.0.0.1 与壳一致（0.0.0.0 只是
+    test_parse_custom_values 的测试样例）；真实缺口 = 契约无测试钉住。
+    """
+
+    def test_shell_argv_shape_parses(self) -> None:
+        """壳 spawn_arguments 精确形状（顺序敏感）喂 build_parser → 全部正确解析"""
+        args = build_parser().parse_args(
+            ["--host", "127.0.0.1", "--port", "8123", "--log-level", "warning"]
+        )
+        assert args.host == "127.0.0.1"
+        assert args.port == 8123
+        assert args.log_level == "warning"
+
+    def test_models_route_exists(self) -> None:
+        """就绪探测路径 /api/models 必须真实可 GET 200（壳 http_probe 的命中目标）
+
+        路由删除 / 前缀漂移都会让壳就绪探测永远失败（就绪页卡死）。
+        行为级断言（TestClient wire，仓库先例 test_error_handler.py）：
+        http_probe 的就绪判定条件就是「HTTP/1.x 200」——这里直接钉住该条件。
+        （注意：FastAPI 0.139 include_router 为惰性 _IncludedRouter，
+        app.routes 扫描不到扁平 path，故用真实请求验证而非路由表扫描。）
+        """
+        from backend.app.main import app
+
+        resp = TestClient(app).get("/api/models")
+        assert resp.status_code == 200, f"/api/models 应可 GET 200，实际 {resp.status_code}"
 
 
 def _spec_runtime_datas(spec_path: Path) -> list[tuple[Path, str]]:

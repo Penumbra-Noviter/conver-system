@@ -77,6 +77,36 @@ fn status_reports_url_when_port_known() {
     assert!(!s.ready);
 }
 
+/// R3：就绪超时经壳状态透传（status 契约）——try_start_with_timeout 的超时
+/// 必须在 status().ready_timeout_ms 可见（引导页据此派生轮询上限）。
+#[test]
+fn status_reports_ready_timeout_ms_from_launch() {
+    if !python_available() {
+        return;
+    }
+    let dir = tmp_dir("state-timeout-ms");
+    let state = ShellState::new(0, dir.clone());
+    // 未启动：None（引导页回退默认 60000ms，向后兼容）
+    assert!(state.status().ready_timeout_ms.is_none(), "未启动不应有超时");
+
+    let cfg = BackendConfig {
+        program: "python".into(),
+        args: sleep_child_script(300),
+        cwd: None,
+        extra_env: vec![],
+    };
+    state
+        .try_start_with_timeout(cfg, Duration::from_secs(7))
+        .expect("spawn 应成功");
+    assert_eq!(
+        state.status().ready_timeout_ms,
+        Some(7000),
+        "启动超时应透传到 status（毫秒）"
+    );
+
+    state.kill_child();
+}
+
 #[test]
 fn try_start_records_error_for_bad_command() {
     let dir = tmp_dir("state-badcmd");
