@@ -72,8 +72,10 @@ export function userAvatarHtml() {
  *
  * 变体：streaming（data-streaming-live 标记，onToken 复用定位）/ stopped（「（已停止）」
  * 标记）/ error（message-error 类）/ system（无头像 + 无复制按钮 — 产品微调 F1）。
- * 纯函数：数据 → HTML 字符串，不接触 DOM；复制按钮 data-content 经 HTML 转义，
- * 点击时由调用方绑定事件（attachCopyButton 读 dataset 还原原始内容）。
+ * 纯函数：数据 → HTML 字符串，不接触 DOM；复制内容不进 HTML 属性（FE-1 — escapeHtml
+ * 不实体化文本节点双引号，嵌 data-content 属性会截断 + 产生属性注入面），由调用方
+ * 在 DOM 落位后经 btn.dataset.content 赋值（数据集赋值天然安全），点击事件同样由
+ * 调用方绑定（attachCopyButton 读 dataset 还原原始内容）。
  *
  * @param {'user'|'assistant'|'system'} role - 消息角色
  * @param {string} content - 消息内容（原始文本；assistant 渲染 Markdown，user/system 转义）
@@ -96,7 +98,7 @@ export function messageBubbleHtml(role, content, opts = {}) {
     const body = role === 'assistant' ? renderMarkdown(content) : escapeHtml(content);
     const copyBtn = role === 'system'
         ? ''
-        : `<button class="btn-copy-message" title="复制消息" data-content="${escapeHtml(content)}">${iconHtml('clipboard')}</button>`;
+        : `<button class="btn-copy-message" title="复制消息">${iconHtml('clipboard')}</button>`;
     const stopTag = stopped ? '<div class="message-stop-tag">（已停止）</div>' : '';
     return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${stopTag}</div>`;
 }
