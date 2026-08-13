@@ -23,9 +23,9 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| TD-46 | frontend/js/markdown.js:163-165 占位符还原逐块全文 split/join，多块大文本二次方级操作（聊天消息量级无感知）——未来大文本渲染性能候选 | 波 1 增量审核 Falsify | Speculative | 📝 |
+| TD-47 | frontend/js/markdown.js:66-73 createCodeBlockToken 碰撞作用域仅限原始串——半形字面量两侧紧邻围栏时替换后边界拼接可新造完整 token 出现（两实现行为逐字节等价、jsdom-only、生产不可达，非回归）；修：碰撞检测对替换后串再验证或文档化注记 | 期末四轴（TD-46 审核） | Speculative | 📝 |
 
-> 技术债区当前 **1 项**（TD-46：波 1 增量审核遗留；TD-29~41/43~45 批次处置完毕见下）。
+> 技术债区当前 **1 项**（TD-47：TD-46 审核新发现；TD-46 已修归档见下）。
 
 ---
 
@@ -60,6 +60,16 @@
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
 | TD-42 | 链接属性注入面修复（sanitizeUrl 拒绝含引号 URL + 防复发断言 `not.toContain('onmouseover')`；6 用例先红后绿，行覆盖 100% 不下降） | 2026-08-13 | `a990d44` |
+
+### 技术债区 TD-46 批次（2026-08-13 轻量档全自动 kickoff）
+
+> 来源：TICKETS 技术债区 TD-46（TD-29~45 批次波 1 增量审核遗留 Speculative，用户指定「补 TD-46」）。票面：markdown.js 占位符还原逐块全文 split/join（O(块数×文本长度) 二次方级）→ alternation 正则单 pass（O(N)）。Grilling 共识（用户点名即共识）：1 做 0 关闭。轻量档单 Implement 直行（主树独立分支 kickoff/td46-markdown-restore，无 worktree），merge `868dd32`；merge 零冲突（注意：Implement 分支提交后未切回 main，主会话先 checkout main 再 merge——流程小坑已记）。**期末四轴 code-review（固定点 67f598e）：0 阻断放行**——Spec 5/5（alternation 单 pass + escapeRegExp + 契约保持 + 空 Map 守卫必需且正确——空 pattern 的 /g 正则命中空位回调会注入 "undefined" + 范围严格两文件）；Falsify 10/10 对抗用例与旧 split/join 实现逐字节差分对比全等（未登记形态 MDCB99/MDCB5/前导零/紧邻数字/碰撞跳号/同内容多块/块内 MDCB 形/拼接边界 A9——**A9 初判「alternation 非重叠扫描跳过重叠第二出现」被实测否定：JS split 同为左→右非重叠匹配，两实现逐字节等价**，等价论证成立且比声明更强，不依赖碰撞循环保证）；Architecture 全正面（复杂度真实下降、escapeRegExp 位置最优、Locality 保持）；1 项非阻断落技术债区（TD-47 碰撞作用域仅原始串注记）。运行态冒烟：markdown 渲染为纯函数测试覆盖（463 用例全绿），无需 GUI 冒烟（无 UI 行为变化——行为等价重构）。测试同步：Vitest **463**（基线 460，+3：未登记字面量契约锁 ×2 + 八块规模 Falsify）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| TD-46 | markdown 占位符还原 alternation 单 pass（行为等价重构；+3 用例基线绿锁定 + 463 全绿；markdown.js lines 100%） | 2026-08-13 | `1f8e71e` |
+
+> ✅ 已结清（2026-08-13 TD-46 批次）：TD-46 完成（上表），TD-47 入技术债区（Speculative，复核关闭候选）。
 
 ### 技术债区 TD-29~41/43~45 批次（2026-08-13 标准档全自动 kickoff）
 

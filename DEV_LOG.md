@@ -5,6 +5,16 @@
 
 ---
 
+## 滚动摘要（2026-08-13 — 技术债区 TD-46 批次：markdown 还原性能轻量档 kickoff）
+
+- **TD-46 完成（用户指定「补 TD-46」，merge 868dd32）**：票面 markdown.js 占位符还原逐块全文 split/join（O(K·N) 二次方级）→ alternation 正则单 pass（O(N)）。轻量档单 Implement 直行（主树独立分支 kickoff/td46-markdown-restore，无 worktree）：escapeRegExp 模块私有辅助 + 空 Map 守卫（空 pattern 的 /g 正则命中空位回调会注入 "undefined"，必需差异点）+ 3 契约锁用例基线绿锁定（未登记字面量 MDCB99/MDCB5 原样保留 + 八块规模）
+- **流程小坑**：Implement 分支提交后未切回 main，主会话 `git merge --no-ff` 时误在该分支上执行（"Already up to date"）——先 `git checkout main` 再合并
+- **期末四轴（固定点 67f598e）：0 阻断放行**——Spec 5/5、Falsify 10/10 与旧实现逐字节差分对比全等（A9 拼接边界初判「非重叠扫描差异」被实测否定：JS split 与 /g 正则同为左→右非重叠匹配，等价论证成立且更强）；1 项非阻断落技术债区（TD-47 碰撞作用域仅原始串注记，jsdom-only 生产不可达）
+- **G20 文档同步（本批次）**：TICKETS（TD-46 归档 + TD-47 落区，技术债区 1 项）；CLAUDE.md / PROJECT_REFERENCE.md（Vitest 460→463）；DEV_LOG 本段
+- **测试**：Vitest **463**（+3）；pytest 413+1skip / cargo 58 未受影响；markdown.js lines 100%
+
+---
+
 ## 滚动摘要（2026-08-13 — 技术债区 TD-29~41/43~45 批次：17 项标准档全自动 kickoff）
 
 - **TD-29~41/43~45 批次完成（用户指令「全自动完成技术债区任务」，merge 链 b835210/615aba8/a5fe7b9 + cef3fea + 342382e + 960c9c4/93b51ab/649910c/d96b4ce + 归档 de09509）**：Grilling 共识（用户确认）**11 做 + 5 关闭 + 1 票面修正**——做：TD-29 formatTemperature isFinite 回退 / TD-30 boot.html 就绪超时 >0 兜底 / TD-31 **票面修正**（先 kill 再 taskkill 实证自相矛盾 → taskkill 先行 + 存活兜底 + 5s 有界回收）/ TD-33 resolver 领域异常分类 / TD-36 renderMessages 守卫 / TD-37 startRename 守卫 / TD-38 代码块占位符原子化 / TD-40 _translate_error abstract 钉契约 / TD-41 死导入 / TD-44 coverage.include / TD-45 XSS 五变体回归网；关闭 5（复核确认维持，TD-43 票面机制实证否定）
