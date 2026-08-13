@@ -1,0 +1,3249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1c">
+<link rel="icon" href="data:,">
+<title>星途物语 · 爱豆模拟器</title>
+<style>
+/* ============ Tokens ============ */
+:root{
+  --topbar-h:48px; --rad:8px; --rad2:12px; --tr:180ms ease;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:"SF Mono","Cascadia Code",Consolas,monospace;
+}
+body[data-theme="starnight"]{
+  --bg-deep:#0a0e1c; --bg-surface:#111628; --bg-elevated:#1a2140; --bg-hover:#232c50;
+  --border:#293357; --border-active:#42508a;
+  --t:#e9edfb; --t2:#a4aed0; --t3:#68739e;
+  --accent:#6ea8ff; --accent-dim:#3f7fd6; --accent-glow:rgba(110,168,255,.15);
+  --gold:#ffd166; --gold-dim:#c49a35; --gold-glow:rgba(255,209,102,.13);
+  --jade:#3ecfa8; --jade-dim:#2a8f74; --jade-glow:rgba(62,207,168,.12);
+  --r:#e85058; --gr:#35c878; --purple:#a070f0; --blue:#5aa7ff; --pink:#ff6b9d;
+  --shadow:0 8px 40px rgba(0,0,0,.55);
+  --glow:radial-gradient(65% 42% at 50% 0%, rgba(110,168,255,.10), transparent 70%);
+}
+body[data-theme="neon"]{
+  --bg-deep:#130a1a; --bg-surface:#1c1126; --bg-elevated:#291638; --bg-hover:#35204a;
+  --border:#3b2450; --border-active:#5a3280;
+  --t:#f6eaf7; --t2:#c2a8cc; --t3:#8a6b97;
+  --accent:#ff5c8a; --accent-dim:#cf4470; --accent-glow:rgba(255,92,138,.16);
+  --gold:#ffb454; --gold-dim:#b87f2e; --gold-glow:rgba(255,180,84,.14);
+  --jade:#45cfa8; --jade-dim:#238a6e; --jade-glow:rgba(69,207,168,.13);
+  --r:#ff5c6c; --gr:#35c878; --purple:#b070f0; --blue:#5aa7ff; --pink:#ff6b9d;
+  --shadow:0 8px 40px rgba(0,0,0,.6);
+  --glow:radial-gradient(65% 42% at 50% 0%, rgba(255,92,138,.12), transparent 70%);
+}
+body[data-theme="sakura"]{
+  --bg-deep:#faf6f8; --bg-surface:#ffffff; --bg-elevated:#fdf2f6; --bg-hover:#f8e3ea;
+  --border:#ecd9e2; --border-active:#d9b6c5;
+  --t:#3b2a33; --t2:#7e6871; --t3:#a8909a;
+  --accent:#e0557f; --accent-dim:#c2406a; --accent-glow:rgba(224,85,127,.12);
+  --gold:#cf8a2e; --gold-dim:#a86c22; --gold-glow:rgba(207,138,46,.13);
+  --jade:#1f9e7a; --jade-dim:#177a5f; --jade-glow:rgba(31,158,122,.12);
+  --r:#d64550; --gr:#2fa76a; --purple:#8a5fd0; --blue:#3f7fd6; --pink:#e0557f;
+  --shadow:0 8px 40px rgba(120,60,80,.15);
+  --glow:radial-gradient(65% 42% at 50% 0%, rgba(224,85,127,.09), transparent 70%);
+}
+body[data-theme="gold"]{
+  --bg-deep:#faf7f1; --bg-surface:#fffdf8; --bg-elevated:#fdf6e9; --bg-hover:#f7ecd7;
+  --border:#ecdfc8; --border-active:#d9c49a;
+  --t:#3a3226; --t2:#7d715c; --t3:#a99a7e;
+  --accent:#b8862d; --accent-dim:#96691f; --accent-glow:rgba(184,134,45,.13);
+  --gold:#b8862d; --gold-dim:#96691f; --gold-glow:rgba(184,134,45,.14);
+  --jade:#1f8f6d; --jade-dim:#176e54; --jade-glow:rgba(31,143,109,.12);
+  --r:#c2453f; --gr:#2f8f4e; --purple:#7a5fd0; --blue:#3f6fd6; --pink:#c2457a;
+  --shadow:0 8px 40px rgba(90,70,30,.16);
+  --glow:radial-gradient(65% 42% at 50% 0%, rgba(184,134,45,.09), transparent 70%);
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg-deep);color:var(--t);line-height:1.55;-webkit-font-smoothing:antialiased;user-select:none;font-size:13px}
+body::before{content:'';position:fixed;inset:0;background:var(--glow);pointer-events:none;z-index:0}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea,select{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--rad);padding:8px 12px;outline:none;transition:border var(--tr)}
+input:focus,textarea:focus,select:focus{border-color:var(--accent-dim)}
+select option{background:var(--bg-surface);color:var(--t)}
+label{font-size:11px;color:var(--t2);display:block;margin:12px 0 5px;letter-spacing:.5px}
+.hidden{display:none!important}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 14px;border-radius:var(--rad);font-size:12px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--t2);transition:all var(--tr);white-space:nowrap}
+.btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.btn.primary{background:var(--accent-glow);border-color:var(--accent-dim);color:var(--accent)}
+.btn.primary:hover{background:var(--accent);color:#fff}
+.btn.gold{background:var(--gold-glow);border-color:var(--gold-dim);color:var(--gold)}
+.btn.gold:hover{background:var(--gold);color:#1a1206}
+.btn.jade{background:var(--jade-glow);border-color:var(--jade-dim);color:var(--jade)}
+.btn.jade:hover{background:var(--jade);color:#04110c}
+.btn.danger{border-color:var(--r);color:var(--r)}
+.btn.danger:hover{background:var(--r);color:#fff}
+.btn.sm{padding:5px 10px;font-size:11px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+/* ============ Setup ============ */
+#setup-overlay{position:fixed;inset:0;z-index:100;background:var(--bg-deep);overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:28px 16px 60px}
+#setup-overlay::before{content:'';position:fixed;inset:0;background:var(--glow);pointer-events:none}
+.setup-wrap{width:100%;max-width:560px;position:relative}
+.setup-wrap>h1{font-size:26px;letter-spacing:2px;text-align:center;background:linear-gradient(120deg,var(--accent),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent;margin-top:8px}
+.setup-wrap>.sub{text-align:center;color:var(--t3);font-size:12px;margin:6px 0 16px}
+.step-dots{display:flex;justify-content:center;gap:7px;margin-bottom:16px}
+.step-dots .dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:all var(--tr)}
+.step-dots .dot.on{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+.setup-box{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:20px;box-shadow:var(--shadow)}
+.create-step{display:none}
+.create-step.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.step-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.step-hint{font-size:11px;color:var(--t3);margin:6px 0 2px;line-height:1.6}
+.create-nav{display:flex;gap:8px;margin-top:20px}
+.create-nav .btn-next{flex:1;padding:10px;background:var(--accent-glow);border:1px solid var(--accent-dim);color:var(--accent);border-radius:var(--rad);font-size:13px;font-weight:600;transition:all var(--tr)}
+.create-nav .btn-next:hover{background:var(--accent);color:#fff}
+.create-nav .btn-prev{padding:10px 14px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--t2);border-radius:var(--rad);font-size:12px}
+.seg{display:flex;gap:6px}
+.seg-btn{flex:1;padding:9px;border:1px solid var(--border);border-radius:var(--rad);background:var(--bg-elevated);color:var(--t2);font-size:12px;transition:all var(--tr)}
+.seg-btn.selected{border-color:var(--accent-dim);background:var(--accent-glow);color:var(--accent);font-weight:600}
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt-card{border:1px solid var(--border);border-radius:var(--rad);padding:10px 12px;cursor:pointer;background:var(--bg-elevated);transition:all var(--tr)}
+.opt-card:hover{border-color:var(--border-active)}
+.opt-card.selected{border-color:var(--accent);background:var(--accent-glow)}
+.opt-card .n{font-size:12px;font-weight:600}
+.opt-card .d{font-size:10px;color:var(--t3);margin-top:3px;line-height:1.5}
+.trait-card{border:1px solid var(--border);border-radius:var(--rad);padding:10px 12px;background:var(--bg-elevated);transition:all var(--tr);position:relative}
+.trait-card .tag-r{position:absolute;top:6px;right:8px;font-size:9px;color:var(--gold);border:1px solid var(--gold-dim);border-radius:4px;padding:0 5px}
+.trait-card.sel{border-color:var(--jade);background:var(--jade-glow)}
+.trait-card .n{font-size:12px;font-weight:600}
+.trait-card .d{font-size:10px;color:var(--t3);margin-top:3px;line-height:1.5}
+.cheat-toggle{width:100%;padding:9px;border:1px dashed var(--gold-dim);border-radius:var(--rad);color:var(--gold);font-size:12px;background:var(--gold-glow)}
+.cheat-toggle.on{border-style:solid;background:var(--gold)}
+.cheat-toggle.on{color:#1a1206;font-weight:700}
+.attr-alloc{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px}
+.alloc-row{display:flex;align-items:center;gap:6px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad);padding:5px 8px}
+.alloc-row .an{font-size:11px;width:56px;flex-shrink:0}
+.alloc-row .av{font-size:11px;color:var(--accent);width:22px;text-align:right;font-weight:700}
+.alloc-row .minus,.alloc-row .plus{width:22px;height:22px;border-radius:5px;background:var(--bg-hover);color:var(--t2);font-size:12px;flex-shrink:0}
+.alloc-row .plus:hover{background:var(--jade);color:#04110c}
+.alloc-row .minus:hover{background:var(--r);color:#fff}
+.kv-row{display:flex;gap:6px;margin-bottom:6px}
+.kv-row input{flex:1}
+.kv-row .del-btn{width:28px;border:1px solid var(--border);border-radius:var(--rad);color:var(--r)}
+.diff-card{border:1px solid var(--border);border-radius:var(--rad2);padding:14px;cursor:pointer;background:var(--bg-elevated);transition:all var(--tr);margin-bottom:8px}
+.diff-card:hover{border-color:var(--border-active)}
+.diff-card.selected{border-color:var(--accent);background:var(--accent-glow)}
+.diff-card .n{font-size:14px;font-weight:700}
+.diff-card .n small{font-size:10px;color:var(--t3);font-weight:400;margin-left:6px}
+.diff-card .d{font-size:11px;color:var(--t2);margin-top:4px;line-height:1.6}
+.diff-card .t{font-size:11px;color:var(--gold);margin-top:4px}
+.custom-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.custom-item{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad);padding:8px 10px}
+.custom-item .cn{font-size:11px;font-weight:600}
+.custom-item .cd{font-size:10px;color:var(--t3);margin-top:2px}
+.custom-item select{width:100%;margin-top:5px;padding:4px 6px;font-size:11px;background:var(--bg-surface)}
+/* ============ App layout ============ */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;position:relative;z-index:1}
+#topbar{height:var(--topbar-h);flex-shrink:0;background:var(--bg-surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;padding:0 10px;overflow-x:auto;scrollbar-width:none}
+#topbar::-webkit-scrollbar{display:none}
+.logo{font-size:14px;font-weight:800;white-space:nowrap;background:linear-gradient(120deg,var(--accent),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:1px;margin-right:4px}
+.logo small{font-size:9px;color:var(--t3);font-weight:400;margin-left:3px;-webkit-text-fill-color:var(--t3)}
+.res-chip{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;border:1px solid var(--border);font-size:11px;white-space:nowrap;background:var(--bg-elevated)}
+.res-chip b{font-weight:700}
+.res-chip .bar{width:36px;height:4px;border-radius:2px;background:var(--bg-deep);overflow:hidden}
+.res-chip .bar div{height:100%;border-radius:2px;transition:width 300ms}
+.res-chip.money b{color:var(--gold)} .res-chip.fans b{color:var(--pink)} .res-chip.fame b{color:var(--blue)} .res-chip.ceval b{color:var(--jade)}
+.top-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;border:1px solid var(--border);font-size:11px;white-space:nowrap;color:var(--t2);background:var(--bg-elevated)}
+.top-chip b{color:var(--t)}
+.chip-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;white-space:nowrap;border:1px solid}
+.chip-tag.cb{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-glow)}
+.chip-tag.mil{color:var(--blue);border-color:var(--blue);background:rgba(90,167,255,.12)}
+.chip-tag.ice{color:var(--purple);border-color:var(--purple);background:rgba(160,112,240,.12)}
+.chip-tag.love{color:var(--pink);border-color:var(--pink);background:rgba(255,107,157,.12)}
+.chip-tag.inj{color:var(--r);border-color:var(--r);background:rgba(232,80,88,.12)}
+.chip-tag.ok{color:var(--jade);border-color:var(--jade);background:var(--jade-glow)}
+#main-row{flex:1;display:flex;min-height:0}
+#side-nav{width:56px;flex-shrink:0;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;overflow-y:auto}
+.nav-btn{width:46px;padding:7px 0;border-radius:var(--rad);display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--t3);font-size:16px;transition:all var(--tr);flex-shrink:0}
+.nav-btn .lb{font-size:8.5px;letter-spacing:.5px}
+.nav-btn:hover{background:var(--bg-hover);color:var(--t)}
+.nav-btn.active{background:var(--accent-glow);color:var(--accent)}
+.nav-btn.active .lb{color:var(--accent)}
+.nav-sep{width:26px;height:1px;background:var(--border);margin:6px 0}
+#content{flex:1;min-width:0;position:relative}
+.view{position:absolute;inset:0;display:none;flex-direction:column}
+.view.active{display:flex;animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+/* chat */
+#chat-log{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:10px}
+.log-entry{max-width:760px;width:100%;margin:0 auto}
+.log-entry .wrap{padding:10px 14px;border-radius:var(--rad2);border:1px solid var(--border);background:var(--bg-surface);font-size:13px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.log-entry.system .wrap{background:var(--bg-elevated);border-style:dashed;color:var(--t2);font-size:12px}
+.log-entry.ai .wrap{border-left:3px solid var(--accent)}
+.log-entry.ai .who{color:var(--accent);font-size:11px;font-weight:700;margin-bottom:4px}
+.log-entry.user{align-items:flex-end}
+.log-entry.user .wrap{background:var(--accent-glow);border-color:var(--accent-dim)}
+.log-entry.user .who{color:var(--accent);font-size:11px;font-weight:700;margin-bottom:4px;text-align:right}
+.log-entry.event .wrap{background:var(--gold-glow);border-color:var(--gold-dim)}
+.log-entry.think summary{cursor:pointer;font-size:11px;color:var(--t3);padding:4px 8px;border:1px dashed var(--border);border-radius:var(--rad);list-style:none;background:var(--bg-elevated)}
+.log-entry.think .think-body{font-size:11px;color:var(--t3);padding:8px;white-space:pre-wrap;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--rad) var(--rad)}
+.quick-actions{max-width:760px;width:100%;margin:0 auto;display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 6px}
+.qa-btn{font-size:11px;padding:6px 11px;border-radius:20px;border:1px solid var(--border);color:var(--t2);background:var(--bg-elevated);transition:all var(--tr)}
+.qa-btn:hover{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-glow)}
+#input-area{flex-shrink:0;max-width:760px;width:100%;margin:0 auto;padding:10px 14px 14px;display:flex;gap:8px;align-items:flex-end}
+#user-input{flex:1;resize:none;min-height:42px;max-height:120px;border-radius:12px;padding:10px 14px;background:var(--bg-surface)}
+#send-btn{padding:10px 20px;border-radius:12px;background:var(--accent);color:#fff;font-size:13px;font-weight:700;transition:all var(--tr)}
+#send-btn:hover{filter:brightness(1.1)}
+#send-btn:disabled{opacity:.5}
+.gen-btn{width:42px;height:42px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);font-size:16px;color:var(--t2);flex-shrink:0}
+.gen-btn:hover{color:var(--accent);border-color:var(--accent-dim)}
+#loading-indicator{display:none;align-items:center;gap:8px;color:var(--t3);font-size:12px;padding:8px 0;max-width:760px;margin:0 auto}
+#loading-indicator.show{display:flex}
+.dots span{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 1.2s infinite}
+.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+/* pages */
+.page-scroll{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;align-items:center}
+.page-inner{width:100%;max-width:880px;display:flex;flex-direction:column;gap:12px}
+.page-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.page-title{font-size:17px;font-weight:800;display:flex;align-items:center;gap:7px}
+.page-sub{font-size:11px;color:var(--t3)}
+.back-btn{font-size:12px;padding:6px 12px;border-radius:20px;border:1px solid var(--border);color:var(--t2);background:var(--bg-elevated)}
+.back-btn:hover{color:var(--accent);border-color:var(--accent-dim)}
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:14px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.card h3{font-size:12.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card h3 .more{margin-left:auto;font-size:10px;color:var(--t3);font-weight:400}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.stat-big{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad)}
+.stat-big .ic{font-size:18px}
+.stat-big .vl{font-size:15px;font-weight:800}
+.stat-big .lb{font-size:10px;color:var(--t3)}
+.progress{height:7px;border-radius:4px;background:var(--bg-deep);overflow:hidden;position:relative}
+.progress div{height:100%;border-radius:4px;transition:width 400ms ease}
+.bar-row{margin-bottom:9px}
+.bar-row:last-child{margin-bottom:0}
+.bar-row .bt{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.bar-row .bt b{color:var(--t)}
+.bar-row .bt span{color:var(--t3);font-size:10px}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;border:1px solid var(--border);color:var(--t2);margin-right:4px}
+.tag.accent{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-glow)}
+.tag.gold{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-glow)}
+.tag.jade{color:var(--jade);border-color:var(--jade-dim);background:var(--jade-glow)}
+.tag.red{color:var(--r);border-color:var(--r);background:rgba(232,80,88,.1)}
+.tag.purple{color:var(--purple);border-color:var(--purple);background:rgba(160,112,240,.1)}
+.tag.blue{color:var(--blue);border-color:var(--blue);background:rgba(90,167,255,.1)}
+.tag.pink{color:var(--pink);border-color:var(--pink);background:rgba(255,107,157,.1)}
+/* schedule */
+.legend{display:flex;flex-wrap:wrap;gap:5px}
+.legend .lc{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t3);padding:3px 7px;border:1px solid var(--border);border-radius:12px;background:var(--bg-elevated)}
+.slot-grid{display:grid;grid-template-columns:44px repeat(7,1fr);gap:4px}
+.slot-grid .day-h{font-size:10px;color:var(--t3);text-align:center;padding:4px 0;font-weight:600}
+.slot-grid .slot-h{font-size:10px;color:var(--t3);display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-weight:600}
+.slot{min-height:38px;border-radius:6px;border:1px dashed var(--border);background:var(--bg-elevated);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all var(--tr);position:relative;overflow:hidden}
+.slot:hover{border-color:var(--border-active);transform:translateY(-1px)}
+.slot.filled{border-style:solid}
+.slot .cost{position:absolute;bottom:1px;right:3px;font-size:7.5px;color:var(--t3)}
+.slot.warn{border-color:var(--r);box-shadow:0 0 6px rgba(232,80,88,.3)}
+.energy-forecast{display:flex;gap:5px;align-items:flex-end;height:56px;padding:8px 4px 0}
+.ef-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.ef-bar .fill{width:100%;background:var(--jade);border-radius:3px 3px 0 0;min-height:2px;transition:height 300ms}
+.ef-bar .fill.low{background:var(--r)}
+.ef-bar .fill.mid{background:var(--gold)}
+.ef-bar .dl{font-size:8.5px;color:var(--t3)}
+/* radar */
+.radar-wrap{display:flex;justify-content:center}
+.radar-wrap svg{width:100%;max-width:320px;height:auto}
+.attr-bar .bt b{font-size:12px}
+.attr-bar .eff{font-size:9.5px;color:var(--t3)}
+/* works pipeline */
+.pipe{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pipe-step{flex:1;min-width:74px;text-align:center;padding:8px 4px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg-elevated);font-size:10px;color:var(--t3);position:relative}
+.pipe-step.done{border-color:var(--jade);color:var(--jade);background:var(--jade-glow)}
+.pipe-step.cur{border-color:var(--accent);color:var(--accent);background:var(--accent-glow);font-weight:700}
+.pipe-arrow{color:var(--t3);font-size:12px}
+.score-ring{width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;border:3px solid var(--accent);background:var(--accent-glow)}
+.score-ring b{font-size:17px}
+.score-ring span{font-size:8.5px;color:var(--t3)}
+.rank-line{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:var(--rad);background:var(--bg-elevated);border:1px solid var(--border);margin-bottom:6px;font-size:11px}
+.rank-line .rk{font-weight:800;color:var(--gold);font-size:13px}
+.rank-line.me{border-color:var(--accent-dim);background:var(--accent-glow)}
+/* fans */
+.donut-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.donut-legend{flex:1;min-width:130px}
+.donut-legend .dl-row{display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:5px}
+.donut-legend .sw{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.donut-legend .vl{margin-left:auto;color:var(--t2);font-size:10px}
+/* npc */
+.npc-row{display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--rad);background:var(--bg-elevated);border:1px solid var(--border);margin-bottom:8px}
+.npc-row .av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
+.npc-row .nm{font-size:12.5px;font-weight:700}
+.npc-row .rl{font-size:10px;color:var(--t3)}
+.npc-row .aff{flex:1;min-width:70px}
+.npc-row .acts{display:flex;gap:4px;flex-wrap:wrap}
+/* market */
+.market-card{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg-elevated);margin-bottom:8px}
+.market-card .mk{font-size:20px}
+.market-card .mn{font-size:13px;font-weight:700}
+.market-card .md{font-size:10px;color:var(--t3);line-height:1.6}
+.market-card .st{margin-left:auto;font-size:10px}
+/* shop */
+.shop-item{display:flex;align-items:center;gap:10px;padding:11px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg-elevated);margin-bottom:8px}
+.shop-item .si{font-size:20px}
+.shop-item .sn{font-size:12.5px;font-weight:700}
+.shop-item .sd{font-size:10px;color:var(--t3);line-height:1.5}
+.shop-item .price{margin-left:auto;text-align:right;font-size:11px;color:var(--gold);white-space:nowrap}
+/* timeline */
+.tl{position:relative;padding-left:16px}
+.tl::before{content:'';position:absolute;left:4px;top:4px;bottom:4px;width:2px;background:var(--border)}
+.tl-item{position:relative;padding:4px 0 10px 10px;font-size:11.5px;color:var(--t2);line-height:1.6}
+.tl-item::before{content:'';position:absolute;left:-14px;top:9px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.tl-item.gold::before{background:var(--gold)}
+.tl-item.red::before{background:var(--r)}
+.tl-item .tw{font-size:9px;color:var(--t3);margin-right:6px}
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(5,7,14,.66);backdrop-filter:blur(3px);z-index:90;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.show{display:flex;animation:fadeIn .18s ease}
+.modal{width:100%;max-width:460px;max-height:88vh;overflow-y:auto;background:var(--bg-surface);border:1px solid var(--border-active);border-radius:var(--rad2);padding:20px;box-shadow:var(--shadow);animation:fadeUp .22s ease}
+.modal h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.modal.wide{max-width:640px}
+.btn-row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.btn-row.right{justify-content:flex-end}
+/* event modal */
+#event-modal .modal{border-color:var(--gold-dim)}
+.ev-type{font-size:10px;padding:2px 9px;border-radius:12px;margin-bottom:8px;display:inline-block}
+.ev-type.opportunity{color:var(--jade);border:1px solid var(--jade-dim);background:var(--jade-glow)}
+.ev-type.crisis{color:var(--r);border:1px solid var(--r);background:rgba(232,80,88,.1)}
+.ev-type.choice{color:var(--gold);border:1px solid var(--gold-dim);background:var(--gold-glow)}
+.ev-text{font-size:12.5px;line-height:1.8;color:var(--t);white-space:pre-wrap;background:var(--bg-elevated);border-radius:var(--rad);padding:12px;margin-bottom:12px;border:1px solid var(--border)}
+.ev-opt{border:1px solid var(--border);border-radius:var(--rad);padding:10px 12px;margin-bottom:8px;cursor:pointer;background:var(--bg-elevated);transition:all var(--tr);width:100%;text-align:left}
+.ev-opt:hover{border-color:var(--accent-dim);background:var(--accent-glow)}
+.ev-opt .ot{font-size:12.5px;font-weight:600}
+.ev-opt .od{font-size:10.5px;color:var(--t2);margin-top:3px;line-height:1.55}
+.ev-opt .od .r{color:var(--jade);font-weight:600}
+.ev-opt .od .c{color:var(--gold)}
+.ev-opt .od .x{color:var(--r)}
+/* celebration */
+#celeb{position:fixed;inset:0;z-index:95;display:none;align-items:center;justify-content:center;pointer-events:none}
+#celeb.show{display:flex}
+.celeb-card{background:var(--bg-surface);border:2px solid var(--gold);border-radius:var(--rad2);padding:26px 34px;text-align:center;box-shadow:0 0 60px var(--gold-glow);animation:celebPop .5s ease;pointer-events:auto;max-width:90vw}
+@keyframes celebPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+.celeb-card .ct{font-size:20px;font-weight:800;background:linear-gradient(120deg,var(--gold),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;margin:8px 0 6px}
+.celeb-card .cs{font-size:12px;color:var(--t2)}
+.confetti{position:fixed;top:-12px;width:8px;height:12px;z-index:96;animation:confFall linear forwards;pointer-events:none}
+@keyframes confFall{to{transform:translateY(110vh) rotate(720deg);opacity:.2}}
+/* toast */
+#toast-box{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast{padding:8px 16px;border-radius:20px;background:var(--bg-elevated);border:1px solid var(--border-active);color:var(--t);font-size:12px;box-shadow:var(--shadow);animation:fadeUp .2s ease;max-width:88vw;text-align:center}
+.toast.success{border-color:var(--jade);color:var(--jade)}
+.toast.error{border-color:var(--r);color:var(--r)}
+/* bottom nav mobile */
+#bottom-nav{display:none;flex-shrink:0;background:var(--bg-surface);border-top:1px solid var(--border);padding:4px 2px calc(4px + env(safe-area-inset-bottom));overflow-x:auto;scrollbar-width:none}
+#bottom-nav::-webkit-scrollbar{display:none}
+#bottom-nav .nav-btn{width:52px;font-size:17px}
+/* settings */
+.set-sec{border:1px solid var(--border);border-radius:var(--rad);padding:12px;margin-bottom:10px}
+.set-sec h4{font-size:12px;font-weight:700;margin-bottom:8px;color:var(--accent)}
+.theme-row{display:flex;gap:8px;flex-wrap:wrap}
+.theme-swatch{width:56px;padding:6px 0;border-radius:var(--rad);border:2px solid var(--border);text-align:center;font-size:10px;cursor:pointer;transition:all var(--tr);color:var(--t2);background:var(--bg-elevated)}
+.theme-swatch:hover{border-color:var(--border-active)}
+.theme-swatch.active{border-color:var(--accent);color:var(--accent);font-weight:700}
+.switch-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:12px}
+.switch{position:relative;width:38px;height:20px;border-radius:10px;background:var(--bg-deep);border:1px solid var(--border);cursor:pointer;transition:all var(--tr);flex-shrink:0}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--t3);transition:all var(--tr)}
+.switch.on{background:var(--jade-glow);border-color:var(--jade-dim)}
+.switch.on::after{left:20px;background:var(--jade)}
+/* memory */
+.mem-chip{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;border:1px solid var(--border);color:var(--t2);cursor:pointer;margin:0 5px 5px 0;background:var(--bg-elevated)}
+.mem-chip.active{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-glow)}
+.mem-item{padding:9px 11px;border-radius:var(--rad);border-left:3px solid var(--jade);background:var(--bg-elevated);border:1px solid var(--border);border-left-width:3px;margin-bottom:7px;font-size:11.5px;line-height:1.65}
+.mem-item .mt{font-size:9px;color:var(--t3);margin-bottom:2px}
+.mem-item.merged{border-left-color:var(--gold)}
+/* npc detail */
+.fab{position:fixed;right:14px;bottom:70px;z-index:40;width:46px;height:46px;border-radius:50%;background:var(--accent);color:#fff;font-size:20px;box-shadow:0 4px 18px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center}
+/* responsive */
+@media (max-width:860px){
+  #side-nav{display:none}
+  #bottom-nav{display:flex}
+  .fab{display:flex}
+  .row-3{grid-template-columns:1fr 1fr}
+  .row-2{grid-template-columns:1fr}
+  .slot-grid{grid-template-columns:36px repeat(7,1fr)}
+  .res-chip b{max-width:64px;overflow:hidden;text-overflow:ellipsis}
+  .custom-grid{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .row-3{grid-template-columns:1fr}
+  .card-grid{grid-template-columns:1fr}
+  .attr-alloc{grid-template-columns:1fr}
+  .setup-box{padding:16px}
+  .logo small{display:none}
+}
+/* ================= 补充组件样式 ================= */
+.ph-sub{font-size:11px;color:var(--t3);line-height:1.7;margin:2px 0 8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.info-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;color:var(--t2)}
+.info-row>b{color:var(--t);font-size:12px;margin-left:auto;white-space:nowrap}
+.notice{background:var(--accent-glow);border:1px solid var(--accent-dim);color:var(--accent);padding:8px 10px;border-radius:var(--rad);font-size:11px;margin:8px 0}
+.warn{background:var(--r)1a;border:1px solid var(--r)55;color:var(--r);padding:8px 10px;border-radius:var(--rad);font-size:11px;margin:8px 0}
+.empty-tip{color:var(--t3);font-size:12px;text-align:center;padding:18px 0}
+.mini{font-size:11px;color:var(--t3);line-height:1.7}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.page-head h2{font-size:18px;letter-spacing:.5px}
+.attr-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:11px}
+.ar-n{width:78px;color:var(--t2);white-space:nowrap}
+.ar-bar{flex:1;height:7px;border-radius:4px;background:var(--bg-deep);border:1px solid var(--border);overflow:hidden}
+.ar-bar>i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .3s}
+.ar-bar.big{height:12px}
+.ar-bar i.hi{background:var(--jade)}.ar-bar i.mid{background:var(--gold)}.ar-bar i.lo{background:var(--r)}
+.ar-v{width:28px;text-align:right;color:var(--t);font-weight:700}
+.ar-eff{width:64px;text-align:right;color:var(--t3);font-size:10px;white-space:nowrap}
+.state-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px}
+.state-row>span{width:64px;color:var(--t2)}
+.state-row>b{width:30px;text-align:right}
+.radar{width:100%;max-width:230px;display:block;margin:0 auto}
+.radar .rg{stroke:var(--border-active);stroke-width:.8;fill:none}
+.radar .rp{fill:var(--accent-glow);stroke:var(--accent);stroke-width:1.6}
+.radar .rd{fill:var(--accent)}
+.radar .rl{fill:var(--t2);font-size:10px;font-weight:600}
+.radar-labels{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;margin-top:6px}
+.radar-labels span{font-size:10px;color:var(--t3)}
+.pos-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:10px;margin:6px 0}
+.pos-card>b{font-size:15px;color:var(--accent)}
+.pos-card>span{display:block;font-size:11px;color:var(--t2);margin:2px 0}
+.trait-tag{display:inline-block;background:var(--accent-glow);color:var(--accent);border:1px solid var(--accent-dim);padding:2px 8px;border-radius:20px;font-size:10px;margin:2px}
+.linec{width:100%;height:74px;display:block}
+.linec .lg{fill:none;stroke:var(--gold);stroke-width:2}
+.ceval-steps{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--t3);margin:8px 0}
+.ceval-steps span{padding:3px 9px;border:1px solid var(--border);border-radius:20px}
+.ceval-steps span.on{background:var(--accent-glow);border-color:var(--accent-dim);color:var(--accent)}
+.ceval-steps i{color:var(--t3);font-style:normal}
+.fore-row{display:flex;gap:6px;align-items:flex-end;height:88px;padding:6px 0}
+.fore-cell{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%}
+.fore-bar{width:100%;flex:1;display:flex;align-items:flex-end;justify-content:center;background:var(--bg-deep);border-radius:4px;border:1px solid var(--border);overflow:hidden;min-height:14px}
+.fore-bar i{display:block;width:100%;border-radius:3px}
+.fore-cell span{font-size:10px;color:var(--t3)}
+.fore-cell b{font-size:11px}
+.cal-head{display:grid;grid-template-columns:62px repeat(3,1fr);gap:6px;padding:4px 0;font-size:10px;color:var(--t3);text-align:center}
+.day-row{display:grid;grid-template-columns:62px repeat(3,1fr);gap:6px;margin-bottom:6px}
+.day-name{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--t2);background:var(--bg-elevated);border-radius:var(--rad)}
+.cell{padding:8px 4px;border:1px dashed var(--border);border-radius:var(--rad);font-size:10px;color:var(--t3);background:var(--bg-surface);transition:all var(--tr)}
+.cell:hover{border-color:var(--border-active);color:var(--t2)}
+.cell.filled{border-style:solid;border-color:var(--accent-dim);background:var(--accent-glow);color:var(--t)}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.lg-item{font-size:10px;color:var(--t2);background:var(--bg-elevated);padding:3px 8px;border-radius:20px;border:1px solid var(--border)}
+.lg-item em{font-style:normal;color:var(--t3);margin-left:4px}
+.slot-list{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto}
+.slot-opt{display:flex;flex-direction:column;gap:4px;padding:10px;border:1px solid var(--border);border-radius:var(--rad2);background:var(--bg-surface)}
+.slot-opt.dis{opacity:.45}
+.so-main{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.so-main b{font-size:13px}
+.so-cost{font-size:11px;color:var(--gold);white-space:nowrap}
+.so-d{font-size:11px;color:var(--t3);line-height:1.6}
+.subj-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.chip{padding:4px 9px;border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--t2);background:var(--bg-elevated)}
+.chip:hover{color:var(--accent);border-color:var(--accent-dim)}
+.slot-cur{font-size:12px;color:var(--accent);margin-bottom:8px}
+.pipe-steps{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.pipe-step{flex:1;min-width:104px;border:1px solid var(--border);border-radius:var(--rad);padding:8px;display:flex;flex-direction:column;gap:6px;align-items:center;background:var(--bg-surface)}
+.pipe-step.done{border-color:var(--jade-dim);background:var(--jade-glow)}
+.pipe-step span{font-size:11px;color:var(--t2)}
+.pipe-step em{font-style:normal;font-size:10px;color:var(--t3)}
+.work-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px dashed var(--border);font-size:12px}
+.work-item:last-child{border-bottom:none}
+.wi-tag{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--accent-glow);color:var(--accent);white-space:nowrap}
+.wi-score{margin-left:auto;font-weight:700;color:var(--gold);white-space:nowrap}
+.mc-head{display:flex;align-items:center;gap:8px}
+.mc-i{font-size:20px}
+.mc-st{margin-left:auto;font-size:10px;color:var(--jade);border:1px solid var(--jade-dim);padding:2px 8px;border-radius:20px;white-space:nowrap}
+.fan-flex{display:flex;align-items:center;gap:14px}
+.donut{width:92px;height:92px;flex:0 0 92px}
+.fan-legs{flex:1;display:flex;flex-direction:column;gap:6px}
+.fan-leg{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2)}
+.fan-leg span{width:10px;height:10px;border-radius:3px}
+.fan-leg b{margin-left:auto;color:var(--t)}
+.hot-list{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.hot-item{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--t2);background:var(--bg-elevated);padding:6px 8px;border-radius:var(--rad)}
+.hot-no{width:18px;height:18px;border-radius:50%;background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;flex:0 0 18px}
+.npc-detail{font-size:12px}
+.npc-ava{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:var(--t);flex:0 0 38px}
+.npc-info{flex:1;min-width:0}
+.npc-info b{font-size:13px}
+.npc-info span{display:block;font-size:10px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.npc-info .ar-bar{margin-top:4px}
+.npc-aff{text-align:center;flex:0 0 40px}
+.npc-aff b{font-size:14px;color:var(--accent)}
+.npc-aff small{display:block;font-size:9px;color:var(--t3)}
+.npc-btns{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.shop-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px dashed var(--border)}
+.shop-item:last-child{border-bottom:none}
+.si-i{font-size:18px;flex:0 0 26px;text-align:center}
+.si-b{flex:1;min-width:0}
+.si-b b{font-size:12px;display:block}
+.si-b span{font-size:10px;color:var(--t3)}
+.tl{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;padding-right:4px}
+.tl-item{font-size:11px;color:var(--t2);padding-left:12px;border-left:2px solid var(--border-active);line-height:1.6}
+.tl-item em{display:block;font-size:9px;color:var(--t3);font-style:normal}
+.mem-item{display:flex;gap:8px;padding:7px 4px;border-bottom:1px dashed var(--border);font-size:12px}
+.mem-item:last-child{border-bottom:none}
+.mem-item b{color:var(--t);font-weight:500;line-height:1.6}
+.mem-item em{display:block;font-size:9px;color:var(--t3);font-style:normal;margin-top:2px}
+.mem-ic{flex:0 0 20px;text-align:center}
+.story-sum{font-size:12px;color:var(--t2);line-height:1.8;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad);padding:10px}
+.ev-type{display:inline-block;font-size:10px;padding:3px 10px;border-radius:20px;margin-bottom:10px}
+.ev-type.crisis{background:var(--r)1a;color:var(--r);border:1px solid var(--r)55}
+.ev-type.opportunity{background:var(--jade-glow);color:var(--jade);border:1px solid var(--jade-dim)}
+.ev-type.choice{background:var(--gold-glow);color:var(--gold);border:1px solid var(--gold-dim)}
+.ev-text{font-size:13px;color:var(--t);line-height:1.8;margin-bottom:14px}
+.ev-opts{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto}
+.ev-opt{text-align:left;padding:10px 12px;border:1px solid var(--border);border-radius:var(--rad2);background:var(--bg-surface);transition:all var(--tr)}
+.ev-opt:hover{border-color:var(--accent-dim);background:var(--accent-glow)}
+.ev-opt.dis{opacity:.4}
+.eo-t{font-size:13px;font-weight:600;color:var(--t)}
+.eo-d{font-size:11px;color:var(--t2);margin-top:3px;line-height:1.6}
+.eo-r{font-size:10px;color:var(--gold);margin-top:5px}
+.trait-card{display:flex;flex-direction:column;gap:4px;text-align:left;padding:10px;border:1px solid var(--border);border-radius:var(--rad2);background:var(--bg-surface);transition:all var(--tr)}
+.trait-card b{font-size:12px}
+.trait-card span{font-size:10px;color:var(--t3);line-height:1.5}
+.trait-card.on{border-color:var(--accent);background:var(--accent-glow)}
+.trait-card.rare{border-style:dashed}
+.trait-card.dis{opacity:.45}
+.bg-card,.route-card{display:flex;flex-direction:column;gap:4px;text-align:left;padding:11px;border:1px solid var(--border);border-radius:var(--rad2);background:var(--bg-surface);transition:all var(--tr);width:100%}
+.bg-card b,.route-card b{font-size:12px}
+.bg-card span,.route-card span{font-size:10px;color:var(--t3);line-height:1.5}
+.bg-card.on,.route-card.on{border-color:var(--accent);background:var(--accent-glow)}
+.cheat-toggle{width:100%;padding:10px;border:1px dashed var(--gold-dim);border-radius:var(--rad);color:var(--gold);font-size:12px;margin-bottom:8px;background:var(--gold-glow)}
+.cheat-toggle.on{background:var(--gold-glow);border-style:solid}
+.attr-alloc{display:flex;flex-direction:column;gap:2px}
+.alloc-row{display:flex;align-items:center;justify-content:space-between;padding:6px 2px}
+.alloc-name{font-size:12px;color:var(--t2)}
+.alloc-ctl{display:flex;align-items:center;gap:8px}
+.alloc-ctl b{width:26px;text-align:center;font-size:13px}
+.kv-row{display:flex;gap:6px;margin-bottom:6px}
+.kv-row input{flex:1}
+.diff-card{display:flex;flex-direction:column;gap:5px;text-align:left;padding:11px;border:1px solid var(--border);border-radius:var(--rad2);background:var(--bg-surface);transition:all var(--tr);width:100%}
+.diff-card b{font-size:13px}
+.diff-card span{font-size:10.5px;color:var(--t3);line-height:1.6}
+.diff-card.on{border-color:var(--accent);background:var(--accent-glow)}
+.diff-card.on b{color:var(--accent)}
+.custom-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.custom-grid label{grid-column:1/-1;margin-bottom:-4px}
+.theme-btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px;border:1px solid var(--border);border-radius:var(--rad);font-size:10px;color:var(--t2);flex:1}
+.theme-btn i{width:34px;height:24px;border-radius:6px;border:1px solid var(--border)}
+.theme-btn.on{border-color:var(--accent);color:var(--accent)}
+.btn.big{padding:11px 22px;font-size:13px}
+.btn-row.wrap{flex-wrap:wrap}
+.quick-btn{padding:7px 12px;border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--t2);background:var(--bg-elevated);white-space:nowrap}
+.quick-btn:hover{color:var(--accent);border-color:var(--accent-dim)}
+</style>
+</head>
+<body data-theme="starnight">
+
+<!-- ================= 创建流程 ================= -->
+<div id="setup-overlay">
+  <div class="setup-wrap">
+    <h1>✦ 星途物语 ✦</h1>
+    <div class="sub">IDOL LIFE · 偶像养成 × 模拟经营 × AI 文字冒险</div>
+    <div class="step-dots" id="step-dots"></div>
+    <div class="setup-box">
+
+      <div class="create-step active" id="step-api">
+        <div class="step-title">第一步 · 配置 AI 接口</div>
+        <div class="step-hint">游戏由 AI 实时演绎你的星途，需要配置大模型 API（默认 DeepSeek，兼容 OpenAI 格式）</div>
+        <label>API 端点</label>
+        <input id="cfg-endpoint" type="text" placeholder="https://api.deepseek.com/v1/chat/completions" value="https://api.deepseek.com/v1/chat/completions">
+        <label>API Key（仅保存在本机浏览器，不会上传）</label>
+        <input id="cfg-apikey" type="password" placeholder="sk-xxxxxxxx" value="">
+        <label>模型</label>
+        <div style="display:flex;gap:6px;width:100%">
+          <select id="cfg-model" style="flex:1;margin-bottom:0"></select>
+          <button class="btn sm" onclick="UI.fetchModels()">🔄 拉取</button>
+        </div>
+        <div class="step-hint" id="model-hint">填入 Key 后可点击「拉取」获取模型列表</div>
+        <label>推理强度</label>
+        <select id="cfg-reasoning">
+          <option value="low">低（更快）</option>
+          <option value="medium" selected>中（均衡）</option>
+          <option value="high">高</option>
+        </select>
+        <label>输出 Token 限制</label>
+        <select id="cfg-maxtokens">
+          <option value="unlimited" selected>无限制</option>
+          <option value="2048">2048</option>
+          <option value="4096">4096</option>
+          <option value="8192">8192</option>
+          <option value="16384">16384</option>
+        </select>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.testApi()">🔌 测试连接</button>
+          <button class="btn-next" onclick="UI.saveApi()">保存并下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-self">
+        <div class="step-title">第二步 · 主角信息</div>
+        <div class="step-hint">你是谁？AI 会把这些设定写进记忆，永不遗忘</div>
+        <label>姓名</label>
+        <div style="display:flex;gap:6px;width:100%">
+          <input id="self-name" type="text" placeholder="你的名字" style="flex:1;margin-bottom:0">
+          <button class="btn sm" onclick="UI.randSelfName()">🎲 随机</button>
+        </div>
+        <label>艺名（可留空，出道时使用）</label>
+        <input id="self-stagename" type="text" placeholder="如：Luna / 星野">
+        <label>性别</label>
+        <div class="seg" id="self-gender">
+          <button class="seg-btn" data-v="男" onclick="UI.pickSeg('self-gender',this)">♂ 男爱豆</button>
+          <button class="seg-btn selected" data-v="女" onclick="UI.pickSeg('self-gender',this)">♀ 女爱豆</button>
+        </div>
+        <label>年龄</label>
+        <select id="self-age">
+          <option value="16">16 岁</option><option value="17">17 岁</option><option value="18" selected>18 岁</option>
+          <option value="19">19 岁</option><option value="20">20 岁</option><option value="21">21 岁</option><option value="22">22 岁</option>
+        </select>
+        <label>性格</label>
+        <select id="self-persona"></select>
+        <input id="self-persona-custom" type="text" placeholder="自定义性格…" class="hidden" style="margin-top:6px">
+        <label>外貌特征（自定义）</label>
+        <textarea id="self-appearance" rows="2" placeholder="例：清冷系长相，右眼下一颗泪痣，笑起来很甜"></textarea>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(0)">◂ 上一步</button>
+          <button class="btn-next" onclick="UI.goStep(2)">保存并下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-talent">
+        <div class="step-title">第三步 · 天赋与初始属性</div>
+        <div class="step-hint">可选 1–2 个天赋（稀有天赋限 1 个）</div>
+        <div id="trait-list" class="card-grid" style="margin-bottom:12px"></div>
+        <div class="step-hint">初始属性分配（基础 10 点起，上限 30）</div>
+        <button class="cheat-toggle" id="cheat-toggle" onclick="UI.toggleCheat()">🔓 作弊模式：关</button>
+        <div class="step-hint" id="points-left" style="text-align:center;font-weight:700;color:var(--accent)"></div>
+        <div class="attr-alloc" id="attr-alloc"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(1)">◂ 上一步</button>
+          <button class="btn-next" onclick="UI.goStep(3)">保存并下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-info">
+        <div class="step-title">第四步 · 体系 / 出身 / 定位</div>
+        <div class="step-hint">选择你的出道舞台（中后期可跨市场发展）</div>
+        <label>体系路线</label>
+        <div class="card-grid" id="route-pick">
+          <div class="opt-card" data-v="domestic" onclick="UI.pickRoute(this)">
+            <div class="n">🏙️ 本土体系（内娱式）</div>
+            <div class="d">星海共和国 · 个人为中心，影视综艺流量为王</div>
+          </div>
+          <div class="opt-card" data-v="kpop" onclick="UI.pickRoute(this)">
+            <div class="n">🎤 韩娱体系（K-POP式）</div>
+            <div class="d">新罗国 · 团体为中心，打歌音源销量驱动</div>
+          </div>
+        </div>
+        <label>出身背景</label>
+        <div class="card-grid" id="bg-pick"></div>
+        <label id="pos-label">定位</label>
+        <select id="self-pos"></select>
+        <div class="step-hint" id="company-preview"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(2)">◂ 上一步</button>
+          <button class="btn-next" onclick="UI.goStep(4)">保存并下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-notes">
+        <div class="step-title">第五步 · 备注与自定义设定</div>
+        <div class="step-hint">补充你的故事设定，AI 将全部记住并严格遵守。点击「＋ 添加自定义设定」可随意增删条目</div>
+        <label>备注 / 想对 AI 说的话</label>
+        <textarea id="self-notes" rows="3" placeholder="例：我性格外冷内热，出道前有过三年芭蕾功底；讨厌营销号编造黑料；梦想是成为国民级传奇偶像…"></textarea>
+        <label>自定义设定</label>
+        <div id="kv-list"></div>
+        <button class="btn sm" onclick="UI.addKV()" style="width:100%;border-style:dashed">＋ 添加自定义设定</button>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(3)">◂ 上一步</button>
+          <button class="btn-next" onclick="UI.goStep(5)">保存并下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-diff">
+        <div class="step-title">第六步 · 难度模式</div>
+        <div class="step-hint">开局选定，中途不可降级（可升级）。爽玩模式：无难度 · 纯爽，全程保底好结局</div>
+        <div id="diff-list"></div>
+        <div id="custom-panel" class="hidden">
+          <label>自定义微调</label>
+          <div class="custom-grid" id="custom-grid"></div>
+        </div>
+        <div class="step-hint" id="diff-summary"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(4)">◂ 上一步</button>
+          <button class="btn-next" onclick="Game.startGame()">✨ 开始星途 ▸</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= 主界面 ================= -->
+<div id="app" class="hidden">
+  <div id="topbar">
+    <div class="logo">✦ 星途物语<small>IDOL LIFE</small></div>
+    <span class="res-chip money">💰<b id="rb-money">0</b></span>
+    <span class="res-chip fans">💜<b id="rb-fans">0</b></span>
+    <span class="res-chip fame">🌟<b id="rb-fame">0</b></span>
+    <span class="res-chip ceval">🏢<b id="rb-ceval">0</b></span>
+    <div style="flex:1"></div>
+    <span class="top-chip" id="tc-date">📅 第1周</span>
+    <span class="top-chip" id="tc-stage">🧭 练习生</span>
+    <span id="tc-tags"></span>
+    <button class="top-chip" style="border-color:var(--accent-dim);color:var(--accent)" onclick="UI.openSettings()" title="设置">⚙️ 设置</button>
+  </div>
+  <div id="main-row">
+    <div id="side-nav"></div>
+    <div id="content">
+      <div class="view active" id="view-chat">
+        <div id="chat-log"></div>
+        <div class="quick-actions" id="quick-actions"></div>
+        <div id="loading-indicator"><span class="dots"><span></span><span></span><span></span></span><span id="loading-text">演绎中…</span></div>
+        <div id="input-area">
+          <textarea id="user-input" rows="1" placeholder="输入你的行动或台词…（例：去找经纪人争取下个月的资源）"></textarea>
+          <button id="stop-btn" class="gen-btn hidden" onclick="Game.stopGen()" title="停止生成">⏹</button>
+          <button id="regen-btn" class="gen-btn hidden" onclick="Game.regen()" title="重新生成上一条">🔄</button>
+          <button id="send-btn" onclick="Game.send()">发送</button>
+        </div>
+      </div>
+      <div class="view" id="view-schedule"><div class="page-scroll"><div class="page-inner" id="pg-schedule"></div></div></div>
+      <div class="view" id="view-attr"><div class="page-scroll"><div class="page-inner" id="pg-attr"></div></div></div>
+      <div class="view" id="view-company"><div class="page-scroll"><div class="page-inner" id="pg-company"></div></div></div>
+      <div class="view" id="view-works"><div class="page-scroll"><div class="page-inner" id="pg-works"></div></div></div>
+      <div class="view" id="view-fans"><div class="page-scroll"><div class="page-inner" id="pg-fans"></div></div></div>
+      <div class="view" id="view-social"><div class="page-scroll"><div class="page-inner" id="pg-social"></div></div></div>
+      <div class="view" id="view-market"><div class="page-scroll"><div class="page-inner" id="pg-market"></div></div></div>
+      <div class="view" id="view-shop"><div class="page-scroll"><div class="page-inner" id="pg-shop"></div></div></div>
+      <div class="view" id="view-review"><div class="page-scroll"><div class="page-inner" id="pg-review"></div></div></div>
+      <div class="view" id="view-memory"><div class="page-scroll"><div class="page-inner" id="pg-memory"></div></div></div>
+    </div>
+  </div>
+  <div id="bottom-nav"></div>
+</div>
+
+<!-- ================= 弹窗 ================= -->
+<div class="modal-overlay" id="settings-modal"><div class="modal"><h2>⚙️ 设置</h2><div id="settings-content"></div></div></div>
+<div class="modal-overlay" id="event-modal"><div class="modal"><h2 id="ev-title">事件</h2><div id="ev-body"></div></div></div>
+<div class="modal-overlay" id="monthly-modal"><div class="modal wide"><h2>📋 月度复盘</h2><div id="monthly-body"></div><div class="btn-row right"><button class="btn" onclick="UI.monthlyDone()">关闭</button></div></div></div>
+<div class="modal-overlay" id="confirm-modal"><div class="modal" style="max-width:400px">
+  <h2 id="cf-title">确认</h2>
+  <div id="cf-text" style="font-size:12px;color:var(--t2);line-height:1.7"></div>
+  <div class="btn-row right">
+    <button class="btn" onclick="UI.closeModal('confirm-modal')">取消</button>
+    <button class="btn danger" id="cf-ok">确定</button>
+  </div>
+</div></div>
+<div class="modal-overlay" id="slot-modal"><div class="modal"><h2 id="slot-title">选择日程</h2><div id="slot-body"></div></div></div>
+<div class="modal-overlay" id="npc-modal"><div class="modal"><h2 id="npc-title">人物</h2><div id="npc-body"></div></div></div>
+<div id="celeb"><div class="celeb-card" id="celeb-card"></div></div>
+<div id="toast-box"></div>
+<input type="file" id="import-file" accept=".json,application/json" style="display:none">
+
+<script>
+'use strict';
+/* ================= 工具 ================= */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const ri=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const chance=p=>Math.random()<p;
+const fmtMoney=v=>{if(v>=1e8)return (v/1e8).toFixed(2).replace(/\.?0+$/,'')+'亿';if(v>=1e4)return (v/1e4).toFixed(1).replace(/\.0$/,'')+'万';return Math.round(v).toString();};
+const fmtFans=v=>{if(v>=1e8)return (v/1e8).toFixed(2).replace(/\.?0+$/,'')+'亿';if(v>=1e4)return (v/1e4).toFixed(1).replace(/\.0$/,'')+'万';return Math.round(v).toString();};
+
+/* ================= 配置 ================= */
+const DEFAULTS={apiEndpoint:'https://api.deepseek.com/v1/chat/completions',apiKey:'',model:'deepseek-chat',reasoningEffort:'medium',maxTokens:'unlimited',theme:'starnight',fontSize:'md',autoSave:true,wish:0,perks:{}};
+let cfg=Object.assign({},DEFAULTS,lsGet('xingtu_cfg',{}));
+const saveCfg=()=>lsSet('xingtu_cfg',cfg);
+let state=null;
+const saveState=()=>{if(state)lsSet('xingtu_state',state);};
+
+const ATTRS=[
+  {k:'vocal',n:'唱功',i:'🎵'},{k:'dance',n:'舞蹈',i:'💃'},{k:'rap',n:'说唱',i:'🎤'},
+  {k:'charm',n:'颜值魅力',i:'✨'},{k:'variety',n:'综艺感',i:'🎭'},{k:'acting',n:'演技',i:'🎬'},
+  {k:'writing',n:'创作',i:'✍️'},{k:'knowledge',n:'学识',i:'📖'}
+];
+const attrName=k=>(ATTRS.find(a=>a.k===k)||{}).n||k;
+const attrIcon=k=>(ATTRS.find(a=>a.k===k)||{}).i||'·';
+
+const TRAITS=[
+  {k:'voice',n:'天籁之音',i:'🎵',d:'唱功成长 +20%',fx:{vocal:0.2}},
+  {k:'dancer',n:'舞者之魂',i:'💃',d:'舞蹈成长 +20%',fx:{dance:0.2}},
+  {k:'writer',n:'创作鬼才',i:'✍️',d:'创作成长 +30%，解锁制作人路线',fx:{writing:0.3},rare:false},
+  {k:'bornstar',n:'天生艺人',i:'🌟',d:'综艺感成长 +25%',fx:{variety:0.25}},
+  {k:'audience',n:'观众缘',i:'💗',d:'颜值魅力成长 +15%',fx:{charm:0.15}},
+  {k:'iron',n:'铁人意志',i:'🛡️',d:'体力上限 +30，压力增长 −20%',fx:{hpMax:30,stressMult:0.8}},
+  {k:'butterfly',n:'社交蝴蝶',i:'🦋',d:'人脉成长 +25%，绯闻风险略增',fx:{affMult:1.25,secrecyRisk:1.15}},
+  {k:'koi',n:'锦鲤体质',i:'🐟',d:'稀有 · 正面事件概率 +10%',fx:{luck:0.1},rare:true}
+];
+
+const BACKGROUNDS=[
+  {k:'bigco',n:'大社练习生',d:'唱/舞/颜 +10，师资顶级，但竞争惨烈、出道名额渺茫',fx:{attrs:{vocal:10,dance:10,charm:10},company:['S']}},
+  {k:'smallco',n:'中小社练习生',d:'自由度高、压力小，但资源稀缺、企划少',fx:{company:['B','C']}},
+  {k:'recycled',n:'选秀回锅肉',d:'人气 +20万、综艺感 +10，舆论压力大，背水一战',fx:{fans:200000,variety:10,company:['C','B']}},
+  {k:'street',n:'街头艺人/地下Rapper',d:'创作/说唱 +10、个性鲜明，初始资金低（1万）',fx:{attrs:{writing:10,rap:10},money:10000,company:['C','B']}},
+  {k:'plain',n:'素人逆袭',d:'全属性成长 +5%，初始属性全低',fx:{growth:1.05,company:['C','B']}},
+  {k:'star2',n:'星二代',d:'资金 +50万、人脉 +20，需证明自己，黑酸多',fx:{money:500000,aff:20,company:['S','A'],black:true}}
+];
+
+const DIFFS={
+  fun:{id:'fun',n:'⭐ 爽玩模式',t:'无难度 · 纯爽',d:'所有惩罚机制关闭：体力翻倍不累、初始100万不缺钱、危机自动化解、无塌房无雪藏、属性成长+50%、出道线50、时间减半、保底好结局。',p:{hpMax:200,hpCost:0.5,rest:2,money:1000000,income:2,expense:0.3,stress:0.3,growth:1.5,debut:50,crisis:false,autoGood:true,comp:0.5,mil:12,fansDecay:0,timeHalf:true,hard:false}},
+  std:{id:'std',n:'⭐⭐ 标准模式',t:'正常挑战',d:'按世界观设定书原样运行：出道线60、完整资源博弈、危机真实发生，适合第一次完整体验策略深度。',p:{hpMax:100,hpCost:1,rest:1,money:100000,income:1,expense:1,stress:1,growth:1,debut:60,crisis:true,autoGood:false,comp:1,mil:52,fansDecay:1,timeHalf:false,hard:false}},
+  real:{id:'real',n:'⭐⭐⭐ 真实模式',t:'娱乐圈不相信眼泪',d:'贴近现实的严苛：收入缩水、支出真实、压力增长快、危机无法完全公关、成长−20%、出道线65、军白期2年，好结局需要真本事。',p:{hpMax:100,hpCost:1.15,rest:0.8,money:100000,income:0.7,expense:1.5,stress:1.5,growth:0.8,debut:65,crisis:true,autoGood:false,comp:1.3,mil:78,fansDecay:1.2,timeHalf:false,hard:true}},
+  life:{id:'life',n:'⭐⭐⭐⭐ 人生模式（地狱）',t:'一步错，满盘输',d:'真实模式基础上：随机负面事件+30%、强制人设压力、无低谷翻盘线，一次大危机可能直接触发结局。仅限多周目老玩家。',p:{hpMax:90,hpCost:1.25,rest:0.7,money:80000,income:0.6,expense:1.6,stress:1.7,growth:0.75,debut:70,crisis:true,autoGood:false,comp:1.4,mil:104,fansDecay:1.4,timeHalf:false,hard:true}}
+};
+const CUSTOM_DEFS=[
+  {k:'hp',n:'体力',opts:[['easy','轻松（上限×2）'],['std','标准'],['hard','严苛（消耗↑）']]},
+  {k:'money',n:'金钱',opts:[['easy','富足（收入×2）'],['std','标准'],['hard','拮据（支出↑）']]},
+  {k:'crisis',n:'危机',opts:[['off','关闭（无塌房）'],['std','标准'],['more','频繁']]},
+  {k:'love',n:'恋爱',opts:[['free','随便谈'],['std','标准禁令'],['hard','曝光必伤']]},
+  {k:'mil',n:'军白期（韩娱男）',opts:[['short','6个月'],['std','标准2年'],['long','更久']]},
+  {k:'comp',n:'竞争',opts:[['weak','对手削弱'],['std','标准'],['strong','对手强化']]},
+  {k:'growth',n:'成长速度',opts:[['fast','1.5倍'],['std','标准'],['slow','0.8倍']]},
+  {k:'time',n:'时间流速',opts:[['half','减半（更多内容）'],['std','标准']]}
+];
+
+const SURNAMES=['林','苏','顾','沈','叶','江','白','温','洛','贺','陆','裴','霍','景','楚','祁','阮','程','夏','言','宁','云','萧','柳','慕','虞','许','秦','周','韩','宋','唐','姜'];
+const GIVEN_F=['星','月','晴','雪','瑶','萱','妍','汐','柠','悦','彤','怡','萌','蕾','琪','薇','珊','桐','玥','岚','沁','婉','诗','涵','诺','依','瞳','樱','茉','苓','姝','璇','伊','安'];
+const GIVEN_M=['宇','轩','昊','泽','明','晨','逸','帆','霖','睿','阳','航','博','然','霄','凛','越','川','铭','岩','澈','言','哲','凯','彬','俊','杰','恒','原','屹','赫','野','凛','晏'];
+const STAGE_NAMES=['Luna','Nova','Aster','Vela','Mira','Yori','Hana','Kai','Rui','Sora','Iris','Elio','Suki','Rei','Aria','Momo','Yuki','Leo','Zero','Kira'];
+const PERSONALITIES=['元气满满','高冷寡言','温柔体贴','傲娇嘴硬','文艺安静','阳光开朗','腹黑神秘','天然呆萌','成熟稳重','中二热血','冷静理性','逗趣活宝'];
+const NPC_F=['温言','林小满','苏晚晴','夏知微','江疏影','叶青柠','白栀','洛雪','程绵绵','沈星遥','宋可欣','唐果','韩芷若','阮甜甜','秦月'];
+const NPC_M=['陆子昂','顾言泽','裴之衡','沈知寒','江野','贺云舟','楚晏','祁司','萧凛','霍延','温其琛','陆之遥','周予安','言澈','许惊蛰'];
+const TEAM_KPOP=['星河','初雪','羽生','落樱','星野','南栀','东野','临安','拾光','半夏','孤帆','青柠','苏黎','晚棠','北辰','洛央','雾岛','栖迟','浮白','听澜'];
+
+const SONG_TITLES=['星夜回响','逆光飞行','心跳信号','月光恋人','破晓之前','迷路星光','盛夏蝉鸣','玻璃星球','第99次日落','银河漫游','夜风告白','孤勇者游戏','心动雷达','云端之上','未完成的诗','极光之约','午夜电台','青空倒影','星轨','回声森林','零度沸腾','琥珀之夏','月光航线','梦游症'];
+const ALBUM_NAMES=['FIRST LIGHT','星尘','MOONWALK','NOCTURNE','Gravity','浮光','POLARIS','半糖','Wild Heart','黎明之前'];
+const DRAMA_TITLES=['月光事务所','夏风与你','逆流而上的光','长安小饭馆','雾都谜案','心动信号S2','青春有你正好','白夜追光','山海故人','星落之城','千金归来','暗恋橘生淮南','时光代理人','双面人生'];
+const VARIETY_NAMES=['星海奔跑吧','我们的舞台','旅途日记','开饭了！偶像','密室大逃脱','你好星期六','唱作新声','演技派','全员加速中','奇妙夜'];
+const FAN_TYPES=[
+  {k:'die',n:'死忠粉',c:'var(--pink)'},{k:'career',n:'事业粉',c:'var(--gold)'},{k:'face',n:'颜粉',c:'var(--purple)'},
+  {k:'audio',n:'音饭/舞台粉',c:'var(--blue)'},{k:'passer',n:'路人粉',c:'var(--t3)'}
+];
+
+const MEM_TYPES={人物:'👤',事件:'📌',约定:'🤝',作品:'🎵',荣誉:'🏆',危机:'⚠️',关系:'💞',其他:'📝'};
+const QUICK_ACTS=[
+  {i:'📅',t:'查看本周安排',f:'UI.showPage("schedule")'},
+  {i:'📊',t:'查看属性面板',f:'UI.showPage("attr")'},
+  {i:'💬',t:'和经纪人聊聊',f:'Game.talkAgent()'},
+  {i:'🎤',t:'汇报训练情况',f:'Game.talkCoach()'},
+  {i:'📰',t:'看看今天的热搜',f:'Game.talkHot()'},
+  {i:'🛒',t:'去趟商店',f:'UI.showPage("shop")'}
+];
+
+/* ================= 角色扮演质量规则 ================= */
+const RP_RULES=`【角色扮演质量规则】（必须遵守）
+1. 保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。
+2. 禁止代替玩家行动、发言、思考或做出选择。玩家的一切行为由玩家决定。
+3. 禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。
+4. 禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。
+5. 禁止通过反复强调塑造人设。剧情通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。
+6. 人物情绪应通过具体行为和对话体现，而非旁白解释。`;
+
+/* ================= 事件池 ================= */
+const EVENTS=[
+  {id:'audition',type:'opportunity',title:'大制作试镜邀请',cond:{stage:['rising','peak']},
+   text:'{name}，经纪人推门进来，手里攥着一份剧本——《{drama}》的导演亲自点名要你去试镜男/女二号。这是咖位跃升的黄金机会，但同期竞争者都是当红演员。',
+   opts:[
+     {t:'全力以赴准备试镜',d:'投入2周训练量：体力-40，演技成长+3，成功率较高',rate:0.72,fx:{acting:3,hp:-40},fail:{hp:-20,stress:8,text:'试镜发挥失常，被刷了下来。'}},
+     {t:'托导演关系递话',d:'消耗人脉：导演好感-10，成功率提升',rate:0.85,fx:{acting:1},fail:{aff:-10,text:'人情没递到点上，还欠了个人情。'}},
+     {t:'谢绝邀约，专注现役',d:'无风险，但错失机会',rate:1,fx:{},text:'你选择了稳妥。机会稍纵即逝。'}
+   ]},
+  {id:'variety_offer',type:'opportunity',title:'国民综艺邀约',cond:{stage:['rookie','rising']},
+   text:'一档国民级综艺《{variety}》向你的公司发来了飞行嘉宾邀约。上这个节目国民度能暴涨，但你的综艺感决定了节目效果——搞砸了会被全网嘲。',
+   opts:[
+     {t:'接下邀约，硬着头皮上',d:'体力-30，国民度+8，综艺感成长+2；效果看综艺感',rate:0.5+0.5,fx:{fame:8,variety:2,hp:-30},fail:{fame:-4,text:'你成了节目里的“透明人”，镜头全被剪掉。'}},
+     {t:'带队友一起上',d:'韩娱线：团魂+5，分摊风险',rate:0.8,fx:{fame:6,team:5,hp:-25},fail:{fame:-2,text:'队友抢镜，你反而被衬托得暗淡。'}},
+     {t:'婉拒，等更好的机会',d:'无风险',rate:1,fx:{},text:'你拒绝了邀约。' }
+   ]},
+  {id:'producer',type:'opportunity',title:'顶级制作人合作',cond:{stage:['rising','peak'],route:['kpop']},
+   text:'首星市最抢手的制作人金成焕通过公司传话：愿意为你写一首主打曲——但前提是你的唱功能让他满意。',
+   opts:[
+     {t:'当场清唱展示实力',d:'唱功≥65 成功率大幅提升；唱功成长+2',rate:0.55,fx:{writing:0,vocal:2,workBonus:5},fail:{stress:10,text:'制作人皱眉：“还差得远。”合作告吹。'}},
+     {t:'先录demo寄过去',d:'花费5万星元制作费',rate:0.65,fx:{money:-50000,workBonus:3},fail:{money:-50000,text:'demo石沉大海，钱打了水漂。'}},
+     {t:'请经纪人牵线送礼',d:'花费8万星元，经纪人好感+10',rate:0.7,fx:{money:-80000,workBonus:4,aff:{agent:10}},fail:{money:-80000,text:'礼物被退回，圈内风评微妙。'}}
+   ]},
+  {id:'year_end',type:'opportunity',title:'跨年盛典舞台',cond:{stage:['rising','peak'],month:[11,12,1]},
+   text:'年末将至，卫视跨年盛典发来邀请函。这是国民度暴涨的黄金舞台，但全场直播，任何失误都会被放大千万倍。',
+   opts:[
+     {t:'压轴时段表演',d:'需要实力支撑：状态压力大',rate:0.6,fx:{fame:15,fans:500000,hp:-40,stress:15},fail:{fame:-5,text:'压轴表演失误，热搜翻车。'}},
+     {t:'常规时段稳扎稳打',d:'中规中矩',rate:0.85,fx:{fame:8,fans:200000,hp:-25},fail:{fame:-2,text:'平淡的表演，无人讨论。'}},
+     {t:'排练到极致再上台',d:'消耗大量体力，成功率极高',rate:0.9,fx:{fame:10,fans:300000,hp:-55,stress:20},fail:{hp:-55,text:'排练过度导致状态下滑，发挥平平。'}}
+   ]},
+  {id:'black_scandal',type:'crisis',title:'黑料热搜空降',cond:{stage:['rookie','rising','peak']},
+   text:'凌晨三点，星浪热搜第一：# {name} 耍大牌#。一段被恶意剪辑的视频疯传，营销号集体下场带节奏，评论区腥风血雨。',
+   opts:[
+     {t:'立即发道歉声明',d:'公关费5万，舆情-20，但可能被解读为心虚',rate:0.75,fx:{yq:-20,money:-50000},fail:{yq:10,text:'道歉被骂“茶里茶气”，舆情反弹。'}},
+     {t:'冷处理，等热度过去',d:'免费，但舆情持续两周',rate:0.5,fx:{yq:-10},fail:{yq:15,text:'冷处理失败，营销号继续炒。'}},
+     {t:'放出完整视频反击',d:'需要人脉：公司公关部支持',rate:0.65,fx:{yq:-30,fans:100000},fail:{yq:20,text:'反击被指“网暴素人”，舆论更糟。'}},
+     {t:'花钱撤热搜',d:'公关费15万，效果递减',rate:0.9,fx:{yq:-25,money:-150000},fail:{money:-150000,text:'钱花了，热搜撤了又上。'}}
+   ]},
+  {id:'yin_yang',type:'crisis',title:'阴阳合同调查',cond:{stage:['peak']},
+   text:'税务部门约谈公司高层，有匿名举报称你的片酬存在“阴阳合同”问题。记者已经堵在公司楼下。',
+   opts:[
+     {t:'全力配合调查，公开账目',d:'公司评价+10，但收入暂停',rate:0.8,fx:{ceval:10,money:-100000},fail:{yq:30,text:'账目有问题，舆论哗然。'}},
+     {t:'请顶级律师团队',d:'花费30万星元',rate:0.7,fx:{money:-300000,yq:-15},fail:{money:-300000,yq:25,text:'律师也救不了账目。'}},
+     {t:'低调处理，接受补税',d:'补税20万，舆情-10',rate:0.85,fx:{money:-200000,yq:-10},fail:{yq:30,text:'补税消息被曝光，反而坐实罪名。'}}
+   ]},
+  {id:'fan_war',type:'crisis',title:'饭圈互撕反噬',cond:{},
+   text:'你的粉丝与同期对家粉丝在星浪展开世纪大战，控评、刷黑词条、人肉对方粉丝——战火已经烧到你的超话，路人缘急剧下滑。',
+   opts:[
+     {t:'亲自下场呼吁理性',d:'偶像发声，粉丝+10万但可能引战',rate:0.6,fx:{fans:100000,fame:-3},fail:{fame:-8,text:'发言被曲解，两边都不买账。'}},
+     {t:'后援会发联合声明',d:'需要死忠粉支持',rate:0.75,fx:{yq:-15},fail:{yq:10,text:'声明被无视，撕逼继续。'}},
+     {t:'冷处理，专注作品',d:'用作品说话',rate:0.55,fx:{fame:3},fail:{fame:-5,text:'路人：“他家粉丝真吓人。”'}}
+   ]},
+  {id:'newyear_love',type:'crisis',title:'元旦爆料',cond:{route:['kpop'],month:[1]},
+   text:'每年1月1日，狗仔社《银河日报》准时开年大戏。这一次，镜头里的主角是你——深夜与某人同行的照片，配文：“某某团成员恋情实锤？”',
+   opts:[
+     {t:'否认+保留法律追责',d:'声明强硬，但若照片实锤会反噬',rate:0.55,fx:{yq:-10},fail:{yq:35,fans:-200000,text:'照片被逐帧分析，实锤了。粉丝大面积脱粉。'}},
+     {t:'承认并道歉',d:'粉丝流失10%-30%，舆情-20',rate:0.8,fx:{yq:-20,fans:-150000},fail:{yq:20,fans:-300000,text:'承认了但态度被骂，更糟。'}},
+     {t:'花钱买下照片版权',d:'花费20万星元',rate:0.7,fx:{money:-200000,yq:-15},fail:{money:-200000,text:'照片被另一家媒体转载，白花了。'}}
+   ]},
+  {id:'bully',type:'crisis',title:'校园霸凌旧账',cond:{},
+   text:'一则旧帖被挖出：“{name} 初中时霸凌同学！”配图模糊，但转发过万。你根本没见过这个人。',
+   opts:[
+     {t:'晒出证据自证清白',d:'需要律师：花费5万',rate:0.7,fx:{yq:-20,money:-50000},fail:{yq:20,text:'证据被质疑P图。'}},
+     {t:'发律师函',d:'花费8万，威慑营销号',rate:0.8,fx:{yq:-25,money:-80000},fail:{yq:15,text:'律师函被嘲讽“吓唬素人”。'}},
+     {t:'冷处理',d:'免费',rate:0.4,fx:{yq:-5},fail:{yq:20,text:'谣言越传越真。'}}
+   ]},
+  {id:'team_conflict',type:'crisis',title:'队内排挤争议',cond:{route:['kpop'],team:40},
+   text:'团综镜头里，你与其他成员“零交流”的片段被放大解读。“队内排挤”的词条悄悄爬上热搜，团粉开始站队分裂。',
+   opts:[
+     {t:'开直播澄清+晒团建日常',d:'体力-20，团魂+5',rate:0.7,fx:{team:5,hp:-20,yq:-15},fail:{yq:15,text:'直播被解读成“越描越黑”。'}},
+     {t:'组织全员团建',d:'花费10万星元',rate:0.8,fx:{team:8,yq:-20,money:-100000},fail:{money:-100000,text:'团建照片被说成作秀。'}},
+     {t:'冷处理',d:'风险高',rate:0.4,fx:{yq:-5},fail:{yq:25,text:'队内不和传闻坐实。'}}
+   ]},
+  {id:'stage_accident',type:'crisis',title:'舞台事故',cond:{},
+   text:'打歌舞台进行到一半，升降台突然卡住——你在两米高的台子上失去平衡，重重摔下。全场尖叫。',
+   opts:[
+     {t:'忍痛站起来继续表演',d:'敬业人设拉满，但健康受损',rate:0.65,fx:{fame:10,health:-15,hp:-40},fail:{health:-25,text:'伤势加重，被送进医院。'}},
+     {t:'倒地等待工作人员',d:'安全第一，但可能被嘲“矫情”',rate:0.9,fx:{health:-5},fail:{fame:-3,text:'“小小摔一下至于吗？”'}},
+     {t:'借势即兴发挥',d:'把事故变成名场面（需要综艺感）',rate:0.5,fx:{fame:15,fans:200000},fail:{fame:-8,text:'即兴失败，场面尴尬。'}}
+   ]},
+  {id:'injury',type:'crisis',title:'伤病来袭',cond:{},
+   text:'连轴转的行程终于压垮了身体——凌晨彩排时你眼前一黑，被送往医院。医生诊断：过度疲劳，需要强制休养。',
+   opts:[
+     {t:'遵医嘱休养',d:'休养2-4周，健康恢复',rate:1,fx:{health:20,injury:ri(2,4)},text:'身体是革命的本钱。'},
+     {t:'只休一周就复出',d:'舆论心疼但健康恢复不完全',rate:0.8,fx:{health:8,injury:1,fans:50000},fail:{health:-10,injury:3,text:'复出当天又倒下了。'}},
+     {t:'带伤硬撑',d:'敬业热搜，但永久损伤风险',rate:0.5,fx:{fame:12,health:-15},fail:{health:-30,text:'硬撑导致伤病恶化，健康永久受损。'}}
+   ]},
+  {id:'part_war',type:'choice',title:'Part 分配之争',cond:{route:['kpop'],team:50},
+   text:'新专辑制作会议上，队长把副歌高音Part分给了队友。你的唯粉在官咖炸了：“凭什么不是{name}？！”队内气氛微妙。',
+   opts:[
+     {t:'主动让出Part',d:'团魂+8，唯粉不满',rate:1,fx:{team:8,fans:-30000},text:'你大气退让，队友心存感激。'},
+     {t:'据理力争',d:'团队-5，但粉丝满意',rate:0.6,fx:{team:-5,fans:50000},fail:{team:-10,text:'争输了，队内关系更僵。'}},
+     {t:'用实力说话：加练到最好',d:'舞蹈/唱功+2，用表现征服',rate:0.75,fx:{vocal:2,dance:2,team:3},fail:{hp:-30,text:'过度练习，状态下滑。'}}
+   ]},
+  {id:'concept',type:'choice',title:'概念尺度抉择',cond:{route:['kpop'],gender:'女'},
+   text:'回归概念企划会上，公司提出一个极具争议的“暗黑病娇”概念——话题度拉满，但可能引发舆论反弹，也会改变你的公众形象。',
+   opts:[
+     {t:'大胆尝试暗黑概念',d:'话题度爆炸，风险并存',rate:0.6,fx:{fame:10,fans:200000,stress:10},fail:{fame:-8,text:'概念被骂“装神弄鬼”。'}},
+     {t:'温和版概念',d:'稳妥但平淡',rate:0.9,fx:{fame:4,fans:80000},fail:{fame:-2,text:'毫无水花。'}},
+     {t:'坚持自我：拒绝',d:'公司评价-10，但守住底线',rate:1,fx:{ceval:-10,fans:50000},text:'你拒绝了，粉丝心疼又敬佩。'}
+   ]},
+  {id:'renew_choice',type:'choice',title:'续约 or 出走',cond:{stage:['peak']},
+   text:'合约即将到期。老东家开出“分成提高5%+承诺顶配资源”的条件；另一家巨头公司也递来了橄榄枝——违约金天价，但分成更优渥。',
+   opts:[
+     {t:'续约老东家',d:'稳定，分成+5%，续约7年',rate:1,fx:{contract:true,ceval:15},text:'你选择留下，公司高层松了一大口气。'},
+     {t:'跳槽巨头公司',d:'花费违约金（与剩余合约成正比），分成+10%',rate:0.8,fx:{contract:true,ceval:10,money:-2000000},fail:{money:-2000000,text:'跳槽失败，两头不讨好。'}},
+     {t:'成立个人工作室',d:'需要资金300万+人脉，分成100%',rate:0.65,fx:{contract:true,ceval:5,money:-3000000,indie:true},fail:{money:-3000000,text:'工作室启动失败，元气大伤。'}}
+   ]},
+  {id:'market_shuffle',type:'choice',title:'行业寒冬来袭',cond:{stage:['rising','peak']},
+   text:'娱乐圈进入寒冬：政策收紧、赞助锐减、平台砍预算。同期艺人集体停工，你手头的项目也面临搁置。',
+   opts:[
+     {t:'转型线上，深耕直播营业',d:'粉丝+20万，但收入微薄',rate:0.75,fx:{fans:200000,money:50000},fail:{fans:-50000,text:'直播数据惨淡。'}},
+     {t:'低价接洽海外市场',d:'跨市场扩张机会',rate:0.6,fx:{money:300000,mark:['japan']},fail:{money:-100000,text:'海外项目黄了。'}},
+     {t:'蛰伏修炼，等风来',d:'属性成长+5，收入暂停',rate:1,fx:{vocal:3,dance:3,writing:2},text:'寒冬里，你把自己打磨得更锋利。'}
+   ]},
+  {id:'military_draft',type:'choice',title:'兵役通知书',cond:{route:['kpop'],gender:'男',stage:['rookie','rising','peak']},
+   text:'兵务厅的通知书寄到了公司。入伍意味着2年军白期——人气流失、市场更迭，多少前辈倒在兵役这道坎上。',
+   opts:[
+     {t:'按时入伍，提前备好物料',d:'军白期人气流失减半，退伍可王者归来',rate:1,fx:{milStart:true,supplies:70},text:'你把所有未公开物料提前制作完毕，从容入伍。'},
+     {t:'申请延期一年',d:'舆论争议：舆情+20，争取一年缓冲',rate:0.85,fx:{milStart:true,supplies:50,yq:20},fail:{yq:40,milStart:true,text:'延期被骂“逃兵役”，军白期物料不足。'}},
+     {t:'尝试体检豁免',d:'高风险，被扒=国民级丑闻',rate:0.4,fx:{milStart:false},fail:{yq:80,milStart:true,supplies:20,text:'豁免被媒体扒出造假，全网声讨。'}}
+   ]},
+  {id:'comeback_win',type:'opportunity',title:'逆袭神曲',cond:{route:['kpop'],workScore:70},
+   text:'回归第三周，你的主打曲在音源榜上不降反升——口碑发酵，路人开始自发安利。“逆袭”词条冲上热搜，这是现象级的前兆。',
+   opts:[
+     {t:'趁热打铁，追加打歌',d:'体力-40，一位概率大增',rate:0.8,fx:{fans:300000,fame:8,hp:-40},fail:{hp:-40,text:'加场打歌失误，热度回落。'}},
+     {t:'安排粉丝见面会',d:'花费20万，粉丝暴涨',rate:0.85,fx:{fans:400000,money:-200000},fail:{money:-200000,text:'见面会门票滞销，尴尬。'}},
+     {t:'保持神秘，等它自己发酵',d:'零成本，慢热',rate:0.6,fx:{fans:200000},fail:{fame:-2,text:'热度渐渐凉了。'}}
+   ]}
+];
+
+/* ================= 数值常量 ================= */
+const STAGE_NAME={trainee:'练习生',rookie:'新人期',rising:'上升期',peak:'巅峰期',evergreen:'长青期'};
+const STAGE_INCOME={trainee:{business:800,show:2000,variety:3000,acting:5000},rookie:{business:3000,show:10000,variety:8000,acting:30000},rising:{business:10000,show:40000,variety:30000,acting:150000},peak:{business:50000,show:300000,variety:200000,acting:2000000},evergreen:{business:80000,show:500000,variety:350000,acting:3500000}};
+const STAGE_FANS={trainee:300,rookie:3000,rising:15000,peak:40000,evergreen:60000};
+const COMPANY_POOLS={domestic:{S:['星耀传媒','天穹娱乐'],A:['华光影业','星河娱乐'],B:['星云传媒','晨曦文化'],C:['蓝梦工作室','微光娱乐']},kpop:{S:['星曜娱乐','顶点娱乐','梦想社','双子娱乐'],A:['新星娱乐','银河企划'],B:['紫藤社','彩虹娱乐'],C:['北极星社','拾光社']}};
+const AGENT_NAMES=['陈姐','王哥','Lily姐','Miko姐','大熊哥','Tina姐','老周','K哥','苏姐','Kevin'];
+const RATING_SHARE={S:0.7,A:0.6,B:0.5,C:0.4,IND:0};
+const RATING_BOOST={S:0.5,A:0.3,B:0.1,C:0,IND:-0.2};
+const CARDS={
+  train:{i:'🎯',n:'专项训练',e:20,d:'体力20 · 选科目训练，属性成长'},
+  practice:{i:'📖',n:'练习室自习',e:10,d:'体力10 · 少量成长 · 零花费'},
+  rest:{i:'😴',n:'休息',e:-30,d:'恢复体力 · 压力-10'},
+  business:{i:'📱',n:'营业/签售/直播',e:15,d:'体力15 · 粉丝+现金'},
+  variety:{i:'📺',n:'综艺录制',e:25,d:'体力25 · 国民度+综艺感'},
+  show:{i:'🎪',n:'商演/拼盘',e:20,d:'体力20 · 收入+人气'},
+  team:{i:'🤝',n:'团体合练',e:20,d:'体力20 · 团魂+舞蹈'},
+  acting:{i:'🎬',n:'影视试镜/拍戏',e:25,d:'体力25 · 演技+片酬'},
+  social:{i:'💬',n:'社交',e:5,d:'体力5 · 人脉+好感'},
+  love:{i:'💞',n:'恋爱/约会',e:10,d:'体力10 · 心情+30 · 隐藏风险'},
+  free:{i:'🎲',n:'自由活动',e:5,d:'体力5 · 随机小事件'},
+  mtrain:{i:'🪖',n:'军内体能训练',e:15,d:'体力15 · 体能/意志'},
+  mshow:{i:'🎖️',n:'军旅综艺',e:20,d:'体力20 · 国民度'}
+};
+const DAYS=['周一','周二','周三','周四','周五','周六','周日'];
+const SLOTS=['上午','下午','晚上'];
+const MILESTONES=[[100,20],[500,30],[1000,40],[5000,60],[10000,100]];
+
+/* ================= 引擎 ================= */
+const Engine={
+  draft:null,
+  stageIdx(){return STAGE_KEYS.indexOf(state.stage);},
+  diffP(){return (state&&state.diff&&state.diff.p)||{};},
+  playerShare(){const r=state.company.rating;return r==='IND'?1:(1-(RATING_SHARE[r]||0.5));},
+  companyBonus(){const r=state.company.rating;return 1+(RATING_BOOST[r]||0);},
+  traitMult(k){let m=1;for(const t of state.player.traits){const fx=(TRAITS.find(x=>x.k===t)||{}).fx||{};if(fx[k])m+=fx[k];}return m;},
+  hasTrait(k){return state.player.traits.includes(k);},
+  growAttr(k,base){
+    const p=this.diffP();let mult=p.growth||1;
+    if(state.player.background==='plain')mult*=1.05;
+    mult*=this.traitMult(k);
+    if(state.master&&state.master.attr===k)mult*=1.35;
+    const v=state.player.attrs[k];
+    if(v>=80)mult*=0.4;else if(v>=60)mult*=0.7;
+    if(state.st.mood<50)mult*=0.65;
+    return clamp(v+Math.max(0.4,base*mult*(0.9+Math.random()*0.3)),0,100);
+  },
+  incomeBase(type){const s=STAGE_INCOME[state.stage]||STAGE_INCOME.rising;return (s[type]||0);},
+  fansBase(type){const s=STAGE_FANS[state.stage]||STAGE_FANS.rising;return (s[type]||0);},
+  income(amt){return Math.round(amt*(this.diffP().income||1)*this.playerShare()*this.companyBonus()*(state.company.rating==='IND'?0.6:1));},
+  energyCost(c){let e=CARDS[c].e;if(c==='rest')return -Math.round(30*(this.diffP().rest||1)*(this.hasTrait('iron')?1.1:1));return Math.round(e*(this.diffP().hpCost||1));},
+  /* ---------- 新建游戏 ---------- */
+  newGame(d){
+    Engine.draft=d;
+    const p2=d.params||this.diffP()||{};
+    const attrs={vocal:10,dance:10,rap:10,charm:10,variety:10,acting:10,writing:10,knowledge:10};
+    for(const k in (d.alloc||{}))attrs[k]=clamp(attrs[k]+(d.alloc[k]||0),0,100);
+    const bg=BACKGROUNDS.find(b=>b.k===d.background)||BACKGROUNDS[4];
+    for(const k in (bg.fx.attrs||{}))attrs[k]=clamp(attrs[k]+bg.fx.attrs[k],0,100);
+    if(bg.fx.variety)attrs.variety=clamp(attrs.variety+bg.fx.variety,0,100);
+    const rating=d.rating||rnd(bg.fx.company||['B']);
+    const pool=COMPANY_POOLS[d.route][rating==='IND'?'C':rating]||['星云传媒'];
+    const companyName=rating==='IND'?'（个人独立）':rnd(pool);
+    const ageTick=Math.floor(p2.timeHalf?104:52);
+    state={
+      v:2,diff:{id:d.diffId,p:p2},
+      player:{name:d.name,stageName:d.stageName||'',gender:d.gender,age:d.age,personality:d.personality,appearance:d.appearance||'由剧情自然描写',background:d.background,route:d.route,position:d.position,traits:d.traits,attrs,notes:d.notes||[],extra:d.extra||{},black:!!bg.fx.black},
+      company:{name:companyName,rating,contract:rating==='IND'?0:(d.route==='kpop'?364:156),agent:{name:rnd(AGENT_NAMES),stars:rating==='S'?ri(4,5):rating==='A'?ri(3,4):rating==='B'?ri(2,3):rating==='C'?ri(1,2):1,aff:ri(30,50)},applyOK:true},
+      npcs:[],lover:null,
+      res:{money:(d.money||100000)+(bg.fx.money||0)+((p2.money||100000)-100000),fans:(bg.fx.fans||0),fame:5,ceval:40},
+      st:{hp:(p2.hpMax||100)+(d.traits.includes('iron')?30:0),hpmax:(p2.hpMax||100)+(d.traits.includes('iron')?30:0),stress:20,mood:70,health:90,secrecy:100},
+      time:{w:1,age:d.age,ageTick},
+      stage:'trainee',debut:false,transformed:false,
+      schedule:Array(21).fill(null),lastWeek:Array(21).fill(null),
+      comeback:null,pipeline:null,works:[],teamStat:50,
+      military:{active:false,left:0,supplies:0},militaryDone:false,
+      injury:{active:false,left:0},
+      yq:0,hot:[],fanSatis:70,
+      memories:[],storySummary:'',timeline:[],history:[],
+      monthly:{cur:{income:0,expense:0,fans0:state?state.res.fans:0,fans1:0,ceval0:state?state.res.fame:0,ceval1:0,items:[],events:[]},last:null},
+      milestones:[],master:null,
+      markets:{shou:false,dong:false,se:false,ou:false,goHome:false,goKpop:false},
+      attrHistory:[],queue:[],weekFact:null,lastNarrate:null,
+      log:[]
+    };
+    state.monthly.cur.fans0=state.res.fans;state.monthly.cur.ceval0=state.res.fame;
+    this.genNPCs();
+    this.addMemory('事件','『'+state.player.name+'』签约'+state.company.name+'（'+rating+'级），以「'+state.player.position+'」定位开始练习生生涯','开局');
+    this.timeline('✨ 加入'+state.company.name+'，练习生生涯开始');
+    this.wish(0);
+    this.applyPerks();
+    this.save();
+  },
+  wish(delta){cfg.wish=Math.max(0,(cfg.wish||0)+delta);saveCfg();},
+  save(){saveState();},
+  genNPCs(){
+    const d=state.player,list=[];
+    const add=(name,role,gender,personality,desc,benefit,aff)=>list.push({id:'n'+list.length,name,role,gender,personality,desc,benefit,aff:aff||ri(20,40),cooldown:{chat:0,gift:0,meal:0},events:[]});
+    const opp=d.gender==='男'?'女':'男';
+    if(d.route==='kpop'){
+      for(let i=0;i<5;i++)add(rnd(TEAM_KPOP),'队友',opp==='女'?'女':'男',rnd(PERSONALITIES),'同团成员 · 性格随机','团魂加成、团粉稳固',ri(30,50));
+      add(state.company.agent.name,'经纪人',d.gender==='男'?'女':'男','雷厉风行','负责行程与危机公关','高星资源+30%、危机处理+50%',45);
+      add(rnd(['崔代表','李代表','朴室长']),'公司代表',opp,'城府深','公司高层，掌握资源分配','资源申请成功率',20);
+      add(rnd(['金制作人','郑制作人','闵制作人']),'制作人',opp,'挑剔严格','顶级曲目制作人','优质曲目优先权',25);
+      add(rnd(['尹导演','姜导演']),'导演',opp,'沉默寡言','影视导演','影视试镜机会',15);
+      add(rnd(['罗PD','权PD']),'综艺PD',opp,'热情外放','知名综艺PD','常驻综艺邀约',20);
+      add(rnd(['郑恩地','朴灿烈','边伯贤','金泰亨']),'前辈',opp,'温和','出道多年的顶级前辈','舞台合作、资源引荐',30);
+      add(opp==='女'?rnd(NPC_F):rnd(NPC_M),'恋爱对象',opp,'温柔细腻','对你有些特别的好感','恋爱线',40);
+      add(opp==='女'?rnd(NPC_F):rnd(NPC_M),'恋爱对象',opp,'神秘感性','相遇很偶然','恋爱线',30);
+    }else{
+      add(state.company.agent.name,'经纪人',d.gender==='男'?'女':'男','雷厉风行','负责行程与危机公关','高星资源+30%、危机处理+50%',45);
+      add(rnd(['张导','冯导','李导']),'导演',opp,'严肃认真','影视导演','影视试镜机会',15);
+      add(rnd(['洪PD','谢PD','吴PD']),'综艺PD',opp,'幽默风趣','知名综艺PD','常驻综艺邀约',20);
+      add(rnd(['陈制作人','黄制作人']),'制作人',opp,'创作狂热','音乐制作人','优质曲目优先权',20);
+      add(rnd(['刘老师','周老师']),'前辈',opp,'亲切','圈内资深前辈','舞台合作、资源引荐',35);
+      add(rnd(['小鹿','阿哲']),'同社后辈',opp,'单纯上进','同公司练习生','结伴训练',40);
+      add(opp==='女'?rnd(NPC_F):rnd(NPC_M),'恋爱对象',opp,'温柔细腻','对你有些特别的好感','恋爱线',40);
+      add(opp==='女'?rnd(NPC_F):rnd(NPC_M),'恋爱对象',opp,'神秘感性','相遇很偶然','恋爱线',30);
+    }
+    state.npcs=list;
+    const aff=(d.traits.includes('butterfly')?1.25:1)*(d.background==='star2'?1.4:1);
+    list.forEach(n=>n.aff=Math.round(clamp(n.aff*aff,5,95)));
+  },
+  /* ---------- 日程系统 ---------- */
+  slotIdx(day,slot){return day*3+slot;},
+  militaryMode(){return state.military.active&&state.stage!=='trainee';},
+  allowedCards(){
+    const c=Object.keys(CARDS).filter(k=>!['mtrain','mshow'].includes(k));
+    return this.militaryMode()?['mtrain','mshow','rest','free']:c;
+  },
+  setSlot(day,slot,card,subj){
+    const idx=this.slotIdx(day,slot);
+    const cost=this.energyCost(card);
+    if(cost>0&&state.st.hp<cost){UI.toast('体力不足，无法安排','error');return;}
+    state.schedule[idx]={card,subj:subj||null};
+    this.renderSchedule();
+  },
+  clearSlot(day,slot){state.schedule[this.slotIdx(day,slot)]=null;this.renderSchedule();},
+  energyForecast(){
+    let hp=state.st.hp;const out=[];
+    for(let day=0;day<7;day++){
+      for(let s=0;s<3;s++){
+        const it=state.schedule[this.slotIdx(day,s)];
+        if(it)hp=clamp(hp-this.energyCost(it.card),0,state.st.hpmax);
+      }
+      out.push(Math.round(hp));
+    }
+    return out;
+  },
+  autoArrange(){
+    state.schedule=Array(21).fill(null);
+    let used=0;
+    for(let day=0;day<7&&used<3;day++){this.setSlot(day,0,state.stage==='trainee'?'train':'business',state.stage==='trainee'?this.weakestAttr():null);used++;}
+    let train=0;
+    for(let day=0;day<7&&train<4;day++){this.setSlot(day,1,'train',this.weakestAttr());train++;}
+    for(let day=0;day<7;day++){
+      if(state.route==='kpop'&&!this.militaryMode()&&day<2)this.setSlot(day,2,'team');
+      else this.setSlot(day,2,'rest');
+    }
+    this.renderSchedule();
+    UI.toast('✅ 已一键托管本周日程（按当前阶段自动优化）','success');
+  },
+  weakestAttr(){
+    const p=state.player.attrs;let k=ATTRS[0].k,min=999;
+    for(const a of ATTRS){if(p[a.k]<min){min=p[a.k];k=a.k;}}
+    return k;
+  },
+  /* ---------- 周日结算 ---------- */
+  settleWeek(){
+    if(Game.busy)return;
+    if(state.injury.active){UI.toast('伤病休养中，本周自动休息','error');this.injuryPass();return;}
+    const p=this.diffP(),facts={week:state.time.w,year:Math.ceil(state.time.w/52),activities:[],moneyΔ:0,fansΔ:0,fameΔ:0,cevalΔ:0,events:[],notes:[]};
+    const counts={};
+    for(let day=0;day<7;day++){
+      for(let s=0;s<3;s++){
+        const it=state.schedule[this.slotIdx(day,s)];
+        if(!it)continue;
+        counts[it.card]=(counts[it.card]||0)+1;
+        this.applyCard(it,day,facts);
+      }
+    }
+    for(const k in counts)facts.activities.push({card:k,count:counts[k]});
+    const expense=Math.round((state.stage==='trainee'?3000:6000)*(p.expense||1)*(state.company.rating==='IND'?0.6:1));
+    state.res.money-=expense;facts.moneyΔ-=expense;facts.notes.push('生活开销 -'+fmtMoney(expense));
+    this.monthAdd('expense',expense,'生活开销');
+    let g=state.res.fans*0.002+state.res.fame*60;
+    if(state.comeback)g+=state.comeback.score*1200;
+    if(state.yq>60)g-=state.res.fans*0.01;
+    if(this.isFrozen())g-=state.res.fans*0.02;
+    g*=p.fansDecay||1;if(g!==0){state.res.fans=Math.max(0,state.res.fans+g);facts.fansΔ+=Math.round(g);}
+    state.res.fame=clamp(state.res.fame+0.3,0,100);
+    state.res.ceval=clamp(state.res.ceval+0.3,0,100);
+    state.st.stress=clamp(state.st.stress-4,0,100);
+    state.st.mood=clamp(state.st.mood+2,0,100);
+    state.st.secrecy=clamp(state.st.secrecy+3,0,100);
+    if(state.yq>0){const dec=state.yq>60?8:4;state.yq=Math.max(0,state.yq-dec);}
+    if(state.st.health<35&&!state.injury.active&&!p.autoGood){state.injury={active:true,left:ri(2,6)};this.timeline('🏥 长期透支，伤病休养'+state.injury.left+'周');facts.events.push({t:'伤病事件',out:'休养'+state.injury.left+'周'});}
+    else if(state.st.health<35&&p.autoGood){state.st.health=60;facts.notes.push('伤病自动痊愈（爽玩模式）');}
+    if(state.military.active){
+      state.military.left--;
+      const decay=state.res.fans*(0.004*(p.fansDecay||1))*(1-state.military.supplies/200);
+      state.res.fans=Math.max(0,state.res.fans-decay);
+      state.military.supplies=Math.max(0,state.military.supplies-2);
+      facts.mil={left:state.military.left,fansLoss:Math.round(decay)};
+      if(state.military.left<=0){
+        const good=state.military.supplies>=40;
+        state.military.active=false;state.militaryDone=true;
+        state.res.fans+=good?300000:0;state.res.fame+=good?8:0;
+        this.timeline(good?'🎖️ 退伍回归——王者归来！人气暴涨30万':'🎖️ 退伍回归，但市场已变，人气平平');
+        facts.events.push({t:'退伍回归',out:good?'王者归来':'平淡回归'});
+        this.wish(20);
+      }
+    }
+    if(state.comeback){
+      state.comeback.left--;
+      this.musicWeek(facts);
+      if(state.comeback.left<=0){
+        const c=state.comeback;
+        this.timeline('🎵 回归期结束：《'+c.title+'》一位×'+c.wins+'，销量'+fmtMoney(c.sales)+'张');
+        facts.events.push({t:'回归收官',out:'一位×'+c.wins});
+        if(c.wins>=3)this.wish(40);
+        state.comeback=null;
+      }
+    }
+    if(state.injury.active){state.injury.left--;if(state.injury.left<=0){state.injury.active=false;this.timeline('💪 伤病痊愈，重返训练');facts.notes.push('伤病痊愈');}}
+    if(state.master){state.master.left--;if(state.master.left<=0)state.master=null;}
+    const drift=(counts.train?0.4:0)+(counts.business?0.2:0)-state.yq*0.05;
+    state.res.ceval=clamp(state.res.ceval+drift,0,100);facts.cevalΔ+=Math.round(drift*10)/10;
+    if(state.time.w%4===0)this.monthEnd();
+    if(state.time.w%state.time.ageTick===0){state.time.age++;this.timeline('🎂 '+state.time.age+'岁生日');facts.notes.push('满'+state.time.age+'岁');}
+    if(state.player.route==='kpop'&&state.player.gender==='男'&&!state.military.active&&!state.militaryDone&&state.debut&&state.time.age>=25)this.tryMilitary(facts);
+    this.checkMilestones(facts);
+    this.updateStage(facts);
+    if(!state.debut)this.tryDebut(facts);
+    if(!state.debut&&!state.military.active)this.tryRandomEvent(facts);
+    const avg=ATTRS.reduce((s,a)=>s+state.player.attrs[a.k],0)/8;
+    state.attrHistory.push({w:state.time.w,avg:Math.round(avg*10)/10});
+    if(state.attrHistory.length>60)state.attrHistory.shift();
+    state.time.w++;
+    state.lastWeek=state.schedule.slice();
+    state.schedule=Array(21).fill(null);
+    facts.weekLabel='第'+facts.year+'年 第'+facts.week+'周';
+    state.weekFact=facts;
+    this.addLog('system','📅 <b>'+facts.weekLabel+' 结算</b>：'+this.weekSummary(facts));
+    this.save();
+    this.renderAll();
+    if(state.queue.length){this.nextQueue();}
+    else Game.weeklyNarrate(facts);
+  },
+  weekSummary(f){
+    const parts=[];
+    if(f.moneyΔ)parts.push('💰'+fmtMoney(f.moneyΔ));
+    if(f.fansΔ)parts.push('💜'+fmtFans(f.fansΔ));
+    if(f.fameΔ)parts.push('🌟'+f.fameΔ);
+    if(f.events.length)parts.push('📌'+f.events.map(e=>e.t).join('、'));
+    return parts.join(' | ')||'平静的一周';
+  },
+  injuryPass(){
+    state.time.w++;
+    state.injury.left--;
+    if(state.injury.left<=0){state.injury.active=false;this.timeline('💪 伤病痊愈');}
+    this.addLog('system','🛌 休养周：自动跳过，伤病剩余'+state.injury.left+'周');
+    this.save();this.renderAll();
+    const facts={week:state.time.w-1,activities:[],notes:['休养中']};
+    Game.weeklyNarrate(facts);
+  },
+  applyCard(it,day,facts){
+    const p=this.diffP(),c=it.card,pl=state.player;
+    const cost=this.energyCost(c);
+    state.st.hp=clamp(state.st.hp-cost,0,state.st.hpmax);
+    switch(c){
+      case 'train':{
+        const k=it.subj||this.weakestAttr();
+        const before=pl.attrs[k];
+        pl.attrs[k]=this.growAttr(k,3);
+        state.st.stress=clamp(state.st.stress+3*(p.stress||1),0,100);
+        state.st.mood=clamp(state.st.mood-2,0,100);
+        if(pl.attrs[k]-before>=1)facts.notes.push(attrName(k)+'+'+Math.round((pl.attrs[k]-before)*10)/10);
+        break;}
+      case 'practice':{
+        const k=it.subj||this.weakestAttr();pl.attrs[k]=this.growAttr(k,1.4);break;}
+      case 'rest':state.st.hp=clamp(state.st.hp+30*(p.rest||1),0,state.st.hpmax);state.st.stress=clamp(state.st.stress-10,0,100);state.st.mood=clamp(state.st.mood+5,0,100);break;
+      case 'business':{
+        const m=this.income(this.incomeBase('business')),f=this.fansBase('business');
+        state.res.money+=m;state.res.fans+=f;facts.moneyΔ+=m;facts.fansΔ+=Math.round(f);
+        state.st.stress=clamp(state.st.stress+2*(p.stress||1),0,100);
+        this.monthAdd('income',m,'营业');break;}
+      case 'variety':{
+        pl.attrs.variety=this.growAttr('variety',2);
+        const f=0.4+this.stageIdx()*0.4,m=this.income(this.incomeBase('variety'));
+        state.res.fame=clamp(state.res.fame+f,0,100);state.res.money+=m;facts.moneyΔ+=m;facts.fameΔ+=Math.round(f*10)/10;
+        state.st.stress=clamp(state.st.stress+3*(p.stress||1),0,100);
+        this.monthAdd('income',m,'综艺');break;}
+      case 'show':{
+        const m=this.income(this.incomeBase('show')),f=this.fansBase('show');
+        state.res.money+=m;state.res.fans+=f;facts.moneyΔ+=m;facts.fansΔ+=Math.round(f);
+        state.st.stress=clamp(state.st.stress+3*(p.stress||1),0,100);
+        this.monthAdd('income',m,'商演');break;}
+      case 'team':{
+        state.teamStat=clamp(state.teamStat+3,0,100);
+        pl.attrs.dance=this.growAttr('dance',1);
+        if(state.route==='domestic')this.socialGain(1);
+        break;}
+      case 'acting':{
+        pl.attrs.acting=this.growAttr('acting',2);
+        const m=this.income(this.incomeBase('acting')*0.3);
+        state.res.money+=m;facts.moneyΔ+=m;
+        state.st.stress=clamp(state.st.stress+3*(p.stress||1),0,100);
+        this.monthAdd('income',m,'影视');break;}
+      case 'social':this.socialGain(2);break;
+      case 'love':{
+        if(!state.lover){const c=state.npcs.find(n=>n.role==='恋爱对象');if(c&&c.aff>=40)state.lover=c;}
+        state.st.mood=clamp(state.st.mood+30,0,100);
+        if(state.lover)state.lover.aff=clamp(state.lover.aff+2,0,100);
+        if(!state.transformed){
+          state.st.secrecy=clamp(state.st.secrecy-8*(this.hasTrait('butterfly')?1.15:1),0,100);
+          if(state.st.secrecy<25&&chance(0.3))this.loveExposure(facts);
+        }
+        break;}
+      case 'free':{
+        state.st.mood=clamp(state.st.mood+3,0,100);
+        if(chance(0.3)){
+          const mini=rnd([
+            {t:'🎁 路过便利店，抽中限量小卡',fx:()=>{state.res.fans+=500;}},
+            {t:'📱 随手发了一条动态，意外出圈',fx:()=>{state.res.fans+=2000;state.res.fame=clamp(state.res.fame+0.3,0,100);}},
+            {t:'🍜 和路边摊老板聊得很开心',fx:()=>{state.st.mood=clamp(state.st.mood+8,0,100);}},
+            {t:'🏃 夜跑偶遇粉丝应援牌，感动',fx:()=>{state.st.mood=clamp(state.st.mood+6,0,100);state.st.stress=clamp(state.st.stress-5,0,100);}},
+            {t:'🎹 即兴写了一段旋律',fx:()=>{state.player.attrs.writing=this.growAttr('writing',0.8);}}
+          ]);
+          facts.notes.push(mini.t);mini.fx();
+        }
+        break;}
+      case 'mtrain':{
+        pl.attrs.knowledge=this.growAttr('knowledge',1.5);
+        state.st.stress=clamp(state.st.stress+2,0,100);break;}
+      case 'mshow':{
+        state.res.fame=clamp(state.res.fame+0.6,0,100);
+        state.st.mood=clamp(state.st.mood-3,0,100);break;}
+    }
+    if(cost>0&&state.st.hp<30)state.st.health=clamp(state.st.health-2,0,100);
+  },
+  socialGain(n){
+    const cands=state.npcs.filter(x=>x.role!=='恋爱对象'||x.aff<80);
+    const npc=rnd(cands);
+    const g=Math.round(n*(this.hasTrait('butterfly')?1.25:1));
+    npc.aff=clamp(npc.aff+g,0,100);
+    npc.events.push('本周社交互动');
+    if(npc.events.length>5)npc.events.shift();
+  },
+  loveExposure(facts){
+    if(this.diffP().autoGood){UI.toast('💞 恋情曝光危机被自动化解（爽玩模式）','success');return;}
+    const p=this.diffP();
+    const loss=state.res.fans*0.1*(state.player.route==='domestic'?0.5:1)*(p.hard?1.5:1);
+    state.res.fans=Math.max(0,state.res.fans-loss);
+    state.yq=clamp(state.yq+30,0,100);
+    state.hot.unshift('💔 恋情曝光：'+state.lover.name+'与'+state.player.name+'被拍到约会');
+    if(state.hot.length>6)state.hot.pop();
+    this.timeline('💔 恋情曝光！粉丝流失'+fmtFans(loss));
+    facts.events.push({t:'恋情曝光',out:'粉丝流失'+fmtFans(loss)});
+    this.addMemory('危机','恋情被『银河日报』拍到曝光，粉丝流失约'+fmtFans(loss),'第'+state.time.w+'周');
+  },
+  monthAdd(type,amt,label){const c=state.monthly.cur;c[type]+=amt;c.items.push({t:label,amt:type==='income'?amt:-amt});if(c.items.length>40)c.items.shift();},
+  monthEnd(){
+    const cur=state.monthly.cur;
+    cur.fans1=state.res.fans;cur.ceval1=state.res.ceval;
+    cur.events=state.timeline.slice(-12).map(t=>t.text);
+    state.monthly.last=cur;
+    state.monthly.cur={income:0,expense:0,fans0:state.res.fans,fans1:0,ceval0:state.res.ceval,ceval1:0,items:[],events:[]};
+    state.queue.push({type:'monthly'});
+  },
+  checkMilestones(facts){
+    for(const [m,w] of MILESTONES){
+      const mv=m*10000;
+      if(state.res.fans>=mv&&!state.milestones.includes(m)){
+        state.milestones.push(m);
+        this.wish(w);
+        state.queue.push({type:'celeb',data:{m,text:this.mileText(m)}});
+        facts.events.push({t:'里程碑',out:'粉丝突破'+m+'万'});
+        if(m===100)state.res.fans+=50000;
+      }
+    }
+  },
+  mileText(m){
+    if(m===100)return '粉丝突破百万！你不再是无人知晓的练习生';
+    if(m===500)return '粉丝突破五百万！新生代里有了你的名字';
+    if(m===1000)return '粉丝突破千万！一线爱豆的门槛被你踏过';
+    if(m===5000)return '粉丝突破五千万！国民级的名字';
+    return '粉丝突破一亿！传说级偶像，整个亚洲为你欢呼';
+  },
+  updateStage(facts){
+    const f=state.res.fans;
+    let s=state.stage;
+    if(state.transformed)s='evergreen';
+    else if(state.debut&&f>=5000000&&state.res.fame>=60)s='peak';
+    else if(state.debut&&f>=1000000)s='rising';
+    else if(state.debut)s='rookie';
+    else s='trainee';
+    if(s!==state.stage){
+      state.stage=s;
+      this.timeline('🚀 进入「'+STAGE_NAME[s]+'」');
+      facts.events.push({t:'阶段晋升',out:STAGE_NAME[s]});
+      if(s==='rising')this.wish(20);
+      if(s==='peak')this.wish(40);
+    }
+  },
+  isFrozen(){return state.yq>=80&&state.company.rating!=='IND'&&!this.diffP().autoGood;},
+  tryDebut(facts){
+    const p=this.diffP(),a=state.player.attrs;
+    const reach=state.player.route==='kpop'?(a.vocal+a.dance+a.rap+a.charm)/4:(a.acting+a.vocal+a.variety)/3;
+    if(reach<p.debut)return;
+    state.queue.push({type:'debut',data:{reach:Math.round(reach*10)/10}});
+  },
+  doDebut(opt){
+    const a=state.player.attrs;
+    if(opt.fx.route==='acting'){this.addWork({type:'drama',title:rnd(DRAMA_TITLES),score:Math.round(a.acting*0.6+a.vocal*0.2+30),role:'配角'});}
+    if(opt.fx.work){this.addWork({type:'song',title:opt.fx.work,score:Math.round(a.vocal*0.3+a.writing*0.2+a.charm*0.2+25),album:rnd(ALBUM_NAMES)});}
+    state.debut=true;state.stage='rookie';
+    state.res.fans+=opt.fx.fans||0;
+    state.res.fame=clamp(state.res.fame+(opt.fx.fame||0),0,100);
+    this.wish(20);
+    this.timeline('🌟 出道成功！「'+STAGE_NAME.rookie+'」开始');
+    this.addMemory('荣誉','以「'+opt.n+'」方式正式出道','第'+state.time.w+'周');
+  },
+  tryMilitary(facts){
+    state.queue.push({type:'military'});
+    facts.events.push({t:'兵役通知',out:'收到入伍通知'});
+  },
+  doMilitary(opt){
+    state.military.active=true;
+    state.military.left=Math.max(6,Math.round(this.diffP().mil||52));
+    state.military.supplies=opt.supplies||0;
+    if(opt.yq){state.yq=clamp(state.yq+opt.yq,0,100);}
+    this.timeline('🪖 入伍。军白期约'+state.military.left+'周（物料储备'+state.military.supplies+'）');
+    this.addMemory('事件','入伍进入军白期，军白期'+state.military.left+'周','第'+state.time.w+'周');
+  },
+  /* ---------- 音乐与打歌 ---------- */
+  pipelineScore(){
+    const a=state.player.attrs;
+    return Math.round(clamp(a.vocal*0.3+a.writing*0.2+(a.dance+a.charm)/2*0.2,0,60)+this.marketing());
+  },
+  marketing(){
+    const r=state.company.rating;
+    const base={S:15,A:12,B:10,C:8,IND:5}[r]||8;
+    return Math.round(clamp(base+state.res.fans/2000000*10+state.res.fame*0.05,0,40));
+  },
+  startPipeline(){
+    if(state.pipeline){UI.toast('已有作品在筹备中','error');return;}
+    if(!state.debut){UI.toast('出道后才能筹备发行作品','error');return;}
+    const title=rnd(SONG_TITLES);
+    state.pipeline={title,album:rnd(ALBUM_NAMES),steps:{pick:false,record:false,dance:false,mv:false},cost:0};
+    UI.toast('🎵 开始筹备新作《'+title+'》','success');
+    this.renderAll();
+  },
+  pipeStep(k){
+    const pl=state.pipeline;if(!pl)return;
+    const costs={record:100000,dance:80000,mv:150000};
+    if(k==='pick'){
+      pl.steps.pick=true;
+    }else{
+      if(state.res.money<costs[k]){UI.toast('资金不足','error');return;}
+      state.res.money-=costs[k];pl.cost+=costs[k];
+      pl.steps[k]=true;
+      this.monthAdd('expense',costs[k],'制作费');
+    }
+    this.renderAll();
+  },
+  releaseWork(){
+    const pl=state.pipeline;if(!pl)return;
+    for(const k in pl.steps)if(!pl.steps[k]){UI.toast('还有制作步骤未完成','error');return;}
+    const score=Math.round(clamp(this.pipelineScore()+ri(-3,4),30,98));
+    this.addWork({type:'song',title:pl.title,score,album:pl.album,revenue:0});
+    state.pipeline=null;
+    state.comeback={title:pl.title,score,left:6,wins:0,sales:0,isSong:true};
+    this.timeline('🎵 发行新歌《'+pl.title+'》评分'+score+'，进入回归期');
+    this.addMemory('作品','发行《'+pl.title+'》（评分'+score+'）','第'+state.time.w+'周');
+    this.save();this.renderAll();
+    UI.toast('✅ 《'+pl.title+'》发行！','success');
+  },
+  musicWeek(facts){
+    const c=state.comeback;
+    const baseSales=Math.round(state.res.fans/10000*0.15+c.score*0.3);
+    const zhong=state.player.route==='kpop'?Math.round(baseSales*0.35):0;
+    c.sales+=baseSales+zhong;
+    const rev=Math.round((baseSales+zhong)*600000*this.playerShare()*this.companyBonus()*(this.diffP().income||1));
+    state.res.money+=rev;facts.moneyΔ+=rev;
+    const fansGain=Math.round(c.score*900*(this.diffP().comp||1));
+    state.res.fans+=fansGain;facts.fansΔ+=fansGain;
+    const p=this.diffP();
+    const rivalScores=Array.from({length:3},()=>Math.round(ri(62,92)*(p.comp||1)));
+    const vs={S:10,A:8,B:6,C:4,IND:2}[state.company.rating]||5;
+    const diePct=0.25;
+    const bizCount=state.lastWeek?state.lastWeek.filter(x=>x&&x.card==='business').length:0;
+    const myScore=Math.round(clamp(c.score*0.5+Math.min(c.sales,200)*0.15+vs+diePct*10+bizCount*3,0,100));
+    const top=Math.max(...rivalScores);
+    if(myScore>=top){
+      c.wins++;
+      state.res.fans+=50000;facts.fansΔ+=50000;
+      this.timeline('🏆 打歌一位 +1！本周音源榜力压同期（'+myScore+'分 vs 对手'+top+'分）');
+      facts.events.push({t:'打歌一位',out:'第'+c.wins+'个一位'});
+      if(c.wins===1)this.wish(20);
+      if(c.wins>=3){this.timeline('👑 三连冠达成，自动下车！');this.wish(30);state.comeback=null;}
+    }else{
+      facts.events.push({t:'打歌',out:'未拿到一位（'+myScore+' vs '+top+'）'});
+    }
+  },
+  addWork(w){
+    w.date='第'+state.time.w+'周';
+    w.id='w'+Date.now();
+    state.works.unshift(w);
+    if(state.works.length>30)state.works.pop();
+  },
+  tryAudition(){
+    const a=state.player.attrs;
+    let rate=0.35+a.acting/200+(state.npcs.find(n=>n.role==='导演')?.aff||0)/400;
+    if(this.diffP().autoGood)rate=1;
+    rate=clamp(rate,0.05,0.95);
+    UI.confirm('影视试镜','试镜成功率约 '+Math.round(rate*100)+'%。成功后获得角色与片酬，烂片可能掉国民度。是否参加？',()=>{
+      if(chance(rate)){
+        const role=a.acting>=65?'主角':'重要配角';
+        const score=Math.round(clamp(a.acting*0.55+a.charm*0.2+ri(5,20),30,96));
+        this.addWork({type:'drama',title:rnd(DRAMA_TITLES),score,role});
+        const pay=this.income(role==='主角'?4000000:1200000);
+        state.res.money+=pay;state.res.fame=clamp(state.res.fame+(score>=85?12:4),0,100);
+        if(score>=85)state.res.fans+=1000000;
+        if(score<55)state.res.fame=clamp(state.res.fame-8,0,100);
+        this.monthAdd('income',pay,'片酬');
+        this.timeline(score>=85?'🔥 爆剧！《'+state.works[0].title+'》收视破纪录，咖位跃升':'🎬 剧集《'+state.works[0].title+'》播出，评分'+score);
+        this.addMemory('作品','出演《'+state.works[0].title+'》（'+role+'，评分'+score+'）','第'+state.time.w+'周');
+        this.save();this.renderAll();
+        UI.toast('🎬 试镜成功！','success');
+      }else{
+        state.res.fame=clamp(state.res.fame-1,0,100);
+        UI.toast('😔 试镜落选','error');
+      }
+    });
+  },
+  tryVariety(){
+    const a=state.player.attrs;
+    let rate=0.3+a.variety/200+(state.npcs.find(n=>n.role==='综艺PD')?.aff||0)/400;
+    if(this.diffP().autoGood)rate=1;
+    rate=clamp(rate,0.05,0.95);
+    UI.confirm('综艺邀约','受邀成功率约 '+Math.round(rate*100)+'%。综艺是国民度增长最快的途径。是否参加？',()=>{
+      if(chance(rate)){
+        const title=rnd(VARIETY_NAMES);
+        const score=Math.round(clamp(a.variety*0.6+ri(5,20),30,96));
+        this.addWork({type:'variety',title,score});
+        const g=score>=85?18:8;
+        state.res.fame=clamp(state.res.fame+g,0,100);
+        state.res.fans+=score>=85?500000:150000;
+        const pay=this.income(g*20000);
+        state.res.money+=pay;this.monthAdd('income',pay,'综艺');
+        this.timeline('📺 综艺《'+title+'》播出，'+(score>=85?'爆款出圈！':'口碑'+score));
+        this.addMemory('作品','参加综艺《'+title+'》（评分'+score+'）','第'+state.time.w+'周');
+        this.save();this.renderAll();
+        UI.toast('✅ 综艺录制完成','success');
+      }else{UI.toast('😔 邀约落空','error');}
+    });
+  },
+  /* ---------- 随机事件 ---------- */
+  tryRandomEvent(facts){
+    const p=this.diffP();
+    let baseChance=p.crisis===false?0.28:0.34;
+    if(p.hard)baseChance+=0.08;
+    if(this.hasTrait('koi'))baseChance+=0.1;
+    if(!chance(baseChance))return;
+    let pool=EVENTS.filter(e=>this.eventMatch(e));
+    if(!pool.length)pool=EVENTS;
+    let evt=rnd(pool);
+    if(p.crisis===false&&evt.type==='crisis')evt=this.funEvent();
+    if(evt.type==='crisis'&&p.autoGood){
+      const o=evt.opts[0];
+      this.applyEventFx(evt,o,facts,true);
+      UI.toast('🛟 危机自动化解：'+evt.title,'success');
+      return;
+    }
+    state.queue.push({type:'event',data:evt});
+  },
+  funEvent(){
+    const opportunities=EVENTS.filter(e=>e.type!=='crisis'&&this.eventMatch(e));
+    if(opportunities.length)return rnd(opportunities);
+    return rnd(EVENTS);
+  },
+  eventMatch(e){
+    const c=e.cond||{},p=state.player,a=p.attrs;
+    if(c.route&&!c.route.includes(p.route))return false;
+    if(c.gender&&c.gender!==p.gender)return false;
+    if(c.stage&&!c.stage.includes(state.stage))return false;
+    if(c.minAttr){for(const k in c.minAttr)if(a[k]<c.minAttr[k])return false;}
+    if(c.workScore&&!(state.comeback&&state.comeback.score>=c.workScore))return false;
+    if(c.teamStat&&state.teamStat<c.teamStat)return false;
+    if(c.fans&&state.res.fans<c.fans)return false;
+    if(c.lover&&!state.lover)return false;
+    if(c.noTrait&&p.traits.includes(c.noTrait))return false;
+    return true;
+  },
+  applyEventFx(evt,o,facts,force){
+    const fx=o.fx||{},p=this.diffP();
+    const ok=force||chance((o.rate||1)+(this.hasTrait('koi')?0.1:0));
+    const eff=ok?fx:o.fail;
+    if(eff.money)state.res.money=Math.max(0,state.res.money+eff.money);
+    if(eff.fans)state.res.fans=Math.max(0,state.res.fans+eff.fans);
+    if(eff.fame)state.res.fame=clamp(state.res.fame+eff.fame,0,100);
+    if(eff.ceval)state.res.ceval=clamp(state.res.ceval+eff.ceval,0,100);
+    if(eff.yq)state.yq=clamp(state.yq+eff.yq,0,100);
+    if(eff.hp)state.st.hp=clamp(state.st.hp+eff.hp,0,state.st.hpmax);
+    if(eff.stress)state.st.stress=clamp(state.st.stress+eff.stress,0,100);
+    if(eff.mood)state.st.mood=clamp(state.st.mood+eff.mood,0,100);
+    if(eff.health)state.st.health=clamp(state.st.health+eff.health,0,100);
+    if(eff.secrecy)state.st.secrecy=clamp(state.st.secrecy+eff.secrecy,0,100);
+    if(eff.attr){for(const k in eff.attr)state.player.attrs[k]=clamp(state.player.attrs[k]+eff.attr[k],0,100);}
+    if(eff.team)state.teamStat=clamp(state.teamStat+eff.team,0,100);
+    if(eff.work){this.addWork({type:'song',title:eff.work,score:ri(70,90),album:rnd(ALBUM_NAMES)});}
+    if(eff.drama){this.addWork({type:'drama',title:eff.drama,score:ri(75,92),role:'主角'});}
+    if(eff.milStart){this.doMilitary(eff);}
+    if(eff.aff){const npc=state.npcs.find(n=>n.role==='经纪人');if(npc)npc.aff=clamp(npc.aff+eff.aff,0,100);}
+    if(eff.master){state.master={attr:eff.master,left:4};}
+    const outcome=ok?(o.okTxt||o.text||'成功'):(o.failTxt||(o.fail&&o.fail.text)||'失败');
+    facts.events.push({t:evt.title,out:outcome+(ok?'（成功）':'（失败）')});
+    this.timeline((ok?'📌 ':'⚠️ ')+evt.title+'：'+outcome);
+    if(evt.type==='crisis'&&ok&&!eff.yq&&!fx.yq)state.yq=clamp(state.yq+15,0,100);
+    this.addMemory(evt.type==='crisis'?'危机':'事件',evt.title+'：'+outcome,'第'+state.time.w+'周');
+    return ok;
+  },
+  /* ---------- 转型 ---------- */
+  transform(type){
+    const req={singer:75,actor:75,producer:75,variety:75};
+    const names={singer:'实力歌手',actor:'实力演员',producer:'金牌制作人',variety:'综艺大咖'};
+    const key={singer:'vocal',actor:'acting',producer:'writing',variety:'variety'}[type];
+    const a=state.player.attrs;
+    if(a[key]<req[type]){UI.toast('需要'+attrName(key)+'≥'+req[type],'error');return;}
+    if(type==='producer'&&!this.hasTrait('writer')&&a.writing<80){UI.toast('制作人路线需要「创作鬼才」天赋或创作≥80','error');return;}
+    if(!(state.stage==='peak'||state.stage==='evergreen'||state.res.fame>=70)){UI.toast('需要巅峰期或国民度≥70','error');return;}
+    state.transformed=true;state.stage='evergreen';
+    this.wish(50);
+    this.timeline('👑 转型成功：成为'+names[type]+'！恋爱禁令解除，收入结构升级');
+    this.addMemory('荣誉','转型为'+names[type],'第'+state.time.w+'周');
+    this.save();this.renderAll();
+    UI.toast('🎉 转型成功！','success');
+  },
+  canTransform(){
+    return !state.transformed&&(state.stage==='peak'||state.stage==='evergreen'||state.res.fame>=70);
+  },
+  /* ---------- 工具 ---------- */
+  timeline(t){
+    state.timeline.push({w:state.time.w,text:t});
+    if(state.timeline.length>80)state.timeline.shift();
+  },
+  addMemory(type,text,time){
+    state.memories.unshift({type,text,time:time||'第'+state.time.w+'周'});
+    if(state.memories.length>120)state.memories.pop();
+  },
+  addLog(cls,html){
+    const div=document.createElement('div');
+    div.className='log-entry '+cls;
+    div.innerHTML=html;
+    $('chat-log').appendChild(div);
+    $('chat-log').scrollTop=$('chat-log').scrollHeight;
+  },
+  renderTags(){
+    const tags=[];
+    if(state.comeback)tags.push({t:'回归中',c:'var(--accent)'});
+    if(state.military.active)tags.push({t:'军白期',c:'var(--gold)'});
+    if(state.injury.active)tags.push({t:'伤病休养',c:'var(--r)'});
+    if(this.isFrozen())tags.push({t:'雪藏',c:'var(--r)'});
+    if(state.lover&&!state.transformed)tags.push({t:'恋爱中',c:'var(--pink)'});
+    if(state.transformed)tags.push({t:'转型成功',c:'var(--jade)'});
+    $('tc-tags').innerHTML=tags.map(x=>`<span class="top-chip" style="color:${x.c};border-color:${x.c}55">${x.t}</span>`).join('');
+  },
+  renderTop(){
+    $('rb-money').textContent=fmtMoney(state.res.money);
+    $('rb-fans').textContent=fmtFans(state.res.fans);
+    $('rb-fame').textContent=Math.round(state.res.fame)+'%';
+    $('rb-ceval').textContent=Math.round(state.res.ceval);
+    const y=Math.ceil(state.time.w/52),m=Math.floor((state.time.w-1)%52/4)+1;
+    $('tc-date').textContent='📅 第'+y+'年 第'+m+'月 第'+((state.time.w-1)%4+1)+'周';
+    $('tc-stage').textContent='🧭 '+STAGE_NAME[state.stage]+(state.debut?'':'（练习生）');
+    this.renderTags();
+  },
+  renderAll(){
+    this.renderTop();
+    this.renderSchedule();this.renderAttr();this.renderCompany();this.renderWorks();
+    this.renderFans();this.renderSocial();this.renderMarket();this.renderShop();
+    this.renderReview();this.renderMemoryPage();
+    UI.renderNav();
+  }
+};
+/* ================= 图表与页面 ================= */
+const UI={}; // UI 对象先声明（方法在下方各处挂载）
+const STAGE_KEYS=['trainee','rookie','rising','peak','evergreen'];
+function radarSVG(vals){
+  const N=vals.length,cx=110,cy=110,R=70;
+  let grid='',axes='',poly='',lbl='';
+  for(let ring=1;ring<=4;ring++){
+    let pts='';
+    for(let i=0;i<N;i++){const ang=-Math.PI/2+i*2*Math.PI/N;pts+=`${(cx+R*ring/4*Math.cos(ang)).toFixed(1)},${(cy+R*ring/4*Math.sin(ang)).toFixed(1)} `;}
+    grid+=`<polygon points="${pts}" class="rg"/>`;
+  }
+  for(let i=0;i<N;i++){const ang=-Math.PI/2+i*2*Math.PI/N;axes+=`<line x1="${cx}" y1="${cy}" x2="${(cx+R*Math.cos(ang)).toFixed(1)}" y2="${(cy+R*Math.sin(ang)).toFixed(1)}" class="rg"/>`;}
+  let pts='';
+  for(let i=0;i<N;i++){const ang=-Math.PI/2+i*2*Math.PI/N;const r=R*clamp(vals[i],0,100)/100;pts+=`${(cx+r*Math.cos(ang)).toFixed(1)},${(cy+r*Math.sin(ang)).toFixed(1)} `;poly+=`<circle cx="${(cx+r*Math.cos(ang)).toFixed(1)}" cy="${(cy+r*Math.sin(ang)).toFixed(1)}" r="2.6" class="rd"/>`;}
+  poly=`<polygon points="${pts}" class="rp"/>`+poly;
+  for(let i=0;i<N;i++){
+    const ang=-Math.PI/2+i*2*Math.PI/N;
+    const lx=cx+(R+17)*Math.cos(ang),ly=cy+(R+17)*Math.sin(ang);
+    lbl+=`<text x="${lx.toFixed(1)}" y="${(ly-4).toFixed(1)}" text-anchor="middle" class="rl">${ATTRS[i].i}</text><text x="${lx.toFixed(1)}" y="${(ly+10).toFixed(1)}" text-anchor="middle" class="rl">${ATTRS[i].n}</text>`;
+  }
+  return `<svg viewBox="0 0 220 220" class="radar">${grid}${axes}${poly}${lbl}</svg>`;
+}
+function donutSVG(parts){
+  const total=parts.reduce((s,p)=>s+p.v,0)||1;
+  let acc=0,arcs='';
+  const R=34,C=40;
+  parts.forEach(p=>{
+    const a0=acc/total*2*Math.PI-Math.PI/2,a1=(acc+p.v)/total*2*Math.PI-Math.PI/2;
+    const x0=C+R*Math.cos(a0),y0=C+R*Math.sin(a0),x1=C+R*Math.cos(a1),y1=C+R*Math.sin(a1);
+    arcs+=`<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 ${(a1-a0)>Math.PI?1:0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}" stroke="${p.c}" fill="none" stroke-width="10"/>`;
+    acc+=p.v;
+  });
+  return `<svg viewBox="0 0 80 80" class="donut">${arcs}</svg>`;
+}
+function lineSVG(pts){
+  if(pts.length<2)return '<div class="empty-tip">数据积累中…</div>';
+  const w=280,h=74;
+  const min=Math.min(...pts)-2,max=Math.max(...pts)+2;
+  const step=w/(pts.length-1);
+  const points=pts.map((v,i)=>`${(i*step).toFixed(1)},${(h-((v-min)/((max-min)||1))*(h-10)-5).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" class="linec" preserveAspectRatio="none"><polyline points="${points}" class="lg"/></svg>`;
+}
+function fanDist(){
+  const a=state.player.attrs,f=state.res.fans/10000,ws=state.works;
+  const die=Math.max(0,f*0.18+ws.length*0.5+(state.teamStat>70?1:0));
+  const career=Math.max(0,f*0.15+ws.filter(w=>w.score>=85).length*1.5);
+  const face=Math.max(0,f*0.12+a.charm*0.08);
+  const audio=Math.max(0,f*0.15+a.vocal*0.1+a.writing*0.05);
+  const passer=Math.max(0,f*0.4+state.res.fame*f*0.002);
+  const total=die+career+face+audio+passer||1;
+  return FAN_TYPES.map(t=>({k:t.k,n:t.n,c:t.c,v:Math.round({die,career,face,audio,passer}[t.k]/total*100)}));
+}
+const SHOP_ITEMS=[
+  {k:'master_v',n:'唱功名师课',i:'🎵',cost:100000,d:'唱功成长+35%，持续4周'},
+  {k:'master_d',n:'舞蹈名师课',i:'💃',cost:100000,d:'舞蹈成长+35%，持续4周'},
+  {k:'master_a',n:'演技名师课',i:'🎬',cost:100000,d:'演技成长+35%，持续4周'},
+  {k:'master_w',n:'创作名师课',i:'✍️',cost:100000,d:'创作成长+35%，持续4周'},
+  {k:'style',n:'造型服务',i:'💇',cost:20000,d:'颜值魅力+2，心情+10'},
+  {k:'pr',n:'公关服务',i:'🛡️',cost:50000,d:'舆情值-20'},
+  {k:'hot',n:'热搜操作',i:'🔥',cost:200000,d:'国民度+5（30%被扒风险）'},
+  {k:'drink',n:'体力恢复剂',i:'🧃',cost:5000,d:'体力+50'},
+  {k:'tea',n:'压力舒缓茶',i:'🍵',cost:3000,d:'压力-30'},
+  {k:'check',n:'高端体检',i:'🏥',cost:10000,d:'健康+15'}
+];
+const PERKS=[
+  {k:'money',n:'初始资金+50万',i:'💰',cost:100,d:'开局多50万星元'},
+  {k:'pts',n:'天赋点+10',i:'✨',cost:150,d:'属性分配点+10（所有属性+2）'},
+  {k:'attrs',n:'全属性+5开局',i:'📈',cost:200,d:'开局8项属性全部+5'},
+  {k:'master',n:'开局名师课',i:'🎓',cost:300,d:'开局获得名师指导8周'},
+  {k:'koi',n:'锦鲤光环',i:'🐟',cost:400,d:'正面事件概率+10%（永久）'}
+];
+const PRICE_TAG={S:'分成 公司:艺人 = 7:3',A:'6:4',B:'5:5',C:'4:6',IND:'0:10（成本自担）'};
+
+/* ---------- 页面渲染 ---------- */
+Engine.applyPerks=function(){
+  const pk=cfg.perks||{};
+  if(pk.money)state.res.money+=500000;
+  if(pk.pts){for(const k in state.player.attrs)state.player.attrs[k]=clamp(state.player.attrs[k]+2,0,100);}
+  if(pk.attrs){for(const k in state.player.attrs)state.player.attrs[k]=clamp(state.player.attrs[k]+5,0,100);}
+  if(pk.master){state.master={attr:Engine.weakestAttr(),left:8};}
+  if(pk.koi)state.perkKoi=true;
+};
+Engine.renderSchedule=function(){
+  const el=$('pg-schedule');
+  const fore=this.energyForecast();
+  const low=fore.some(v=>v<15);
+  const count=state.schedule.filter(Boolean).length;
+  let cal='';
+  for(let day=0;day<7;day++){
+    let cells='';
+    for(let s=0;s<3;s++){
+      const it=state.schedule[this.slotIdx(day,s)];
+      const cls=it?'cell filled':'cell';
+      const label=it?(CARDS[it.card].i+' '+CARDS[it.card].n):'＋ 空';
+      cells+=`<button class="${cls}" onclick="UI.openSlot(${day},${s})">${label}</button>`;
+    }
+    cal+=`<div class="day-row"><div class="day-name">${DAYS[day]}</div>${cells}</div>`;
+  }
+  const bars=fore.map((v,i)=>`<div class="fore-cell"><div class="fore-bar" style="height:${clamp(v,0,100)}%"><i style="background:${v<15?'var(--r)':v<40?'var(--gold)':'var(--jade)'}"></i></div><span>${DAYS[i][1]}</span><b style="color:${v<15?'var(--r)':v<40?'var(--gold)':'var(--t2)'}">${v}</b></div>`).join('');
+  const legend=Object.entries(CARDS).filter(([k])=>this.allowedCards().includes(k)).map(([k,c])=>`<span class="lg-item">${c.i} ${c.n} <em>体力${c.e>0?'-'+c.e:'+'+(-c.e)}</em></span>`).join('');
+  el.innerHTML=`
+    <div class="page-head"><div><h2>📅 日程安排</h2><p class="ph-sub">每周的博弈都发生在这里 · 安排本周 → 周日结算</p></div>
+      <div class="btn-row">
+        <button class="btn" onclick="Engine.autoArrange()">🤖 一键托管</button>
+        <button class="btn" onclick="Engine.clearWeek()">🧹 清空</button>
+      </div></div>
+    ${this.militaryMode()?`<div class="notice">🪖 军白期：仅可安排军内活动（体能/军旅综艺/休息/自由）</div>`:''}
+    <div class="card">
+      <h3>⚡ 体力走势预估 <small>${count}/21 已安排</small></h3>
+      <div class="fore-row">${bars}</div>
+      ${low?'<div class="warn">⚠️ 本周体力将见底，注意安排休息，否则健康会受损</div>':''}
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn gold big" onclick="Engine.settleWeek()" id="settle-btn">⚡ 周日结算本周</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🗓️ 本周日历 <small>点击空格安排 · 点击已安排可更换/移除</small></h3>
+      <div class="cal-head"><span></span><span>上午</span><span>下午</span><span>晚上</span></div>
+      ${cal}
+      <div class="legend">${legend}</div>
+    </div>`;
+};
+Engine.clearWeek=function(){state.schedule=Array(21).fill(null);this.renderSchedule();};
+UI.openSlot=function(day,slot){
+  const it=state.schedule[Engine.slotIdx(day,slot)];
+  $('slot-title').textContent=DAYS[day]+' · '+SLOTS[slot]+(it?'（当前：'+CARDS[it.card].n+'）':'');
+  const cards=Engine.allowedCards();
+  let html=it?`<div class="slot-cur">当前：${CARDS[it.card].i} ${CARDS[it.card].n}</div>`:'';
+  html+=`<div class="slot-list">`+cards.map(c=>{
+    const cd=CARDS[c];
+    const cost=Engine.energyCost(c);
+    const disabled=cost>0&&state.st.hp<cost;
+    let extra='';
+    if(c==='train')extra=`<div class="subj-chips">${ATTRS.map(a=>`<button class="chip" onclick="Engine.setSlot(${day},${slot},'train','${a.k}');UI.closeModal('slot-modal')">${a.i}${a.n}</button>`).join('')}</div>`;
+    return `<div class="slot-opt ${disabled?'dis':''}">
+      <div class="so-main"><b>${cd.i} ${cd.n}</b><span class="so-cost">体力${cost>0?'-'+cost:'+'+(-cost)}</span></div>
+      <div class="so-d">${cd.d}</div>
+      ${extra||`<button class="btn sm ${disabled?'':''}" ${disabled?'disabled':''} onclick="Engine.setSlot(${day},${slot},'${c}');UI.closeModal('slot-modal')">安排</button>`}
+    </div>`;
+  }).join('')+`</div>`;
+  $('slot-body').innerHTML=html;
+  UI.openModal('slot-modal');
+};
+Engine.setSlot=function(day,slot,card,subj){
+  const idx=this.slotIdx(day,slot);
+  if(this.militaryMode()&&!['mtrain','mshow','rest','free'].includes(card)){UI.toast('军白期只能安排军内活动','error');return;}
+  state.schedule[idx]={card,subj:subj||null};
+  this.renderSchedule();
+};
+Engine.renderAttr=function(){
+  const p=state.player,a=p.attrs,el=$('pg-attr');
+  const vals=ATTRS.map(x=>a[x.k]);
+  const bars=ATTRS.map(x=>{
+    const eff=this.traitMult(x.k)*(state.master&&state.master.attr===x.k?1.35:1);
+    return `<div class="attr-row">
+      <span class="ar-n">${x.i} ${x.n}</span>
+      <div class="ar-bar"><i style="width:${a[x.k]}%"></i></div>
+      <span class="ar-v">${Math.round(a[x.k])}</span>
+      <span class="ar-eff">效率×${eff.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+  const states=[
+    {n:'体力',v:state.st.hp,m:state.st.hpmax,c:'var(--gr)'},
+    {n:'压力',v:state.st.stress,m:100,c:state.st.stress>80?'var(--r)':state.st.stress>60?'var(--gold)':'var(--gr)'},
+    {n:'心情',v:state.st.mood,m:100,c:'var(--pink)'},
+    {n:'健康',v:state.st.health,m:100,c:state.st.health<35?'var(--r)':'var(--blue)'},
+    {n:'恋爱保密',v:state.st.secrecy,m:100,c:'var(--purple)'}
+  ].map(s=>`<div class="state-row"><span>${s.n}</span><div class="ar-bar"><i style="width:${s.v/s.m*100}%;background:${s.c}"></i></div><b>${Math.round(s.v)}</b></div>`).join('');
+  const pos=state.route==='kpop'
+    ?`<div class="pos-card"><b>${p.position}</b><span>韩娱团体 · 定位</span><div class="mini">团魂 ${state.teamStat}/100</div><div class="mini">队内 Part 分配由团魂与属性决定</div></div>`
+    :`<div class="pos-card"><b>${p.position}</b><span>本土 · 主攻方向</span><div class="mini">个人发展为主，转型空间大</div></div>`;
+  const traits=p.traits.map(t=>{const x=TRAITS.find(y=>y.k===t);return `<span class="trait-tag">${x.i} ${x.n}</span>`;}).join('');
+  const trans=Engine.canTransform()?`<div class="card"><h3>👑 转型（长青期目标）</h3><p class="ph-sub">转型后：恋爱禁令解除、收入结构升级、抗黑能力大增</p><div class="btn-row wrap">
+    <button class="btn" onclick="Engine.transform('singer')">🎤 实力歌手</button>
+    <button class="btn" onclick="Engine.transform('actor')">🎬 实力演员</button>
+    <button class="btn" onclick="Engine.transform('producer')">🎹 金牌制作人</button>
+    <button class="btn" onclick="Engine.transform('variety')">🎭 综艺大咖</button>
+  </div></div>`:'';
+  el.innerHTML=`
+    <div class="page-head"><div><h2>📊 属性养成</h2><p class="ph-sub">${p.name} · ${p.gender} · ${p.age}岁 · ${p.personality}</p></div></div>
+    <div class="grid2">
+      <div class="card"><h3>🎯 八维雷达</h3><div class="radar-wrap">${radarSVG(vals)}</div></div>
+      <div class="card"><h3>📈 属性明细 <small>当前值/上限100/成长效率</small></h3>${bars}</div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>💗 状态四维</h3>${states}<div class="mini" style="margin-top:8px">体力&lt;30 易生病 · 压力&gt;80 触发负面事件 · 长期透支损伤健康</div></div>
+      <div class="card"><h3>🧭 队内定位 / 人设</h3>${pos}
+        <div class="mini" style="margin-top:10px">人设：<b>${p.personality}</b></div>
+        <div class="mini">天赋：${traits||'无'}</div>
+        <div class="mini">出身：${(BACKGROUNDS.find(b=>b.k===p.background)||{}).n||p.background}</div>
+      </div>
+    </div>
+    ${trans}
+    <div class="card"><h3>📉 平均属性成长曲线 <small>每周记录</small></h3>${lineSVG(state.attrHistory.map(x=>x.avg))}</div>`;
+};
+Engine.renderCompany=function(){
+  const c=state.company,el=$('pg-company');
+  const ratingTxt={S:'S级 · 顶级资源',A:'A级 · 一线公司',B:'B级 · 中型公司',C:'C级 · 小型公司',IND:'独立 · 全靠自己'}[c.rating];
+  const leftW=c.contract?c.contract:0;
+  const years=leftW?Math.floor(leftW/52):0;
+  el.innerHTML=`
+    <div class="page-head"><div><h2>🏢 经纪公司</h2><p class="ph-sub">${c.name}</p></div></div>
+    <div class="grid2">
+      <div class="card"><h3>📋 合约信息</h3>
+        <div class="info-row"><span>公司评级</span><b>${c.rating} · ${ratingTxt}</b></div>
+        <div class="info-row"><span>分成比例</span><b>${PRICE_TAG[c.rating]}</b></div>
+        <div class="info-row"><span>合约剩余</span><b>${c.rating==='IND'?'无合约（独立）':years+'年'+leftW%52+'周'}</b></div>
+        <div class="info-row"><span>公司评价</span><div class="ar-bar" style="width:120px"><i style="width:${state.res.ceval}%"></i></div><b>${Math.round(state.res.ceval)}</b></div>
+        <div class="mini">${state.res.ceval<30?'⚠️ 评价过低，警惕被雪藏':state.res.ceval>=80?'🌟 你是公司的台柱子':'评价稳步上升中'}</div>
+        <div class="btn-row wrap" style="margin-top:10px">
+          <button class="btn" onclick="Engine.renewContract()">✍️ 提前谈续约</button>
+          <button class="btn danger" onclick="Engine.breakContract()">💥 解约（违约金）</button>
+        </div>
+      </div>
+      <div class="card"><h3>👔 经纪人 ${'★'.repeat(c.agent.stars)}</h3>
+        <div class="info-row"><span>姓名</span><b>${c.agent.name}</b></div>
+        <div class="info-row"><span>好感</span><div class="ar-bar" style="width:120px"><i style="width:${c.agent.aff}%"></i></div><b>${Math.round(c.agent.aff)}</b></div>
+        <div class="mini">高星经纪人：收入+${c.agent.stars*5}%、危机处理更强</div>
+        <div class="btn-row wrap" style="margin-top:10px">
+          <button class="btn gold" onclick="Engine.applyResource()">📨 资源申请（每月1次）</button>
+        </div>
+        <div class="mini" style="margin-top:6px">${c.applyOK?'本月资源申请可用':'本月已申请过，下月再来'}</div>
+      </div>
+    </div>
+    <div class="card"><h3>🏢 公司评价进度</h3>
+      <div class="ceval-steps">${['考核期','预备出道','新星','上升','顶梁柱','台柱子'].map((s,i)=>`<span class="${i<=Math.floor(state.res.ceval/20)?'on':''}">${s}</span>`).join('<i>›</i>')}</div>
+      <div class="mini">公司评价影响：资源申请、出道企划、分成谈判、雪藏风险</div>
+    </div>`;
+};
+Engine.renewContract=function(){
+  if(state.company.rating==='IND'){UI.toast('独立身份无需续约','error');return;}
+  UI.confirm('谈续约','提前续约：分成比例向艺人倾斜（公司:艺人从'+PRICE_TAG[state.company.rating].slice(0,3)+'变更为 5:5），合约期重置。成功与否取决于公司评价。',()=>{
+    const rate=0.4+state.res.ceval/200;
+    if(chance(rate)){
+      state.company.rating='B';state.company.contract=state.player.route==='kpop'?364:156;
+      UI.toast('✅ 续约成功，分成改为 5:5','success');
+    }else{UI.toast('😔 谈判失败，公司态度强硬','error');}
+    this.renderAll();
+  });
+};
+Engine.breakContract=function(){
+  if(state.company.rating==='IND'){UI.toast('你是独立身份','error');return;}
+  const fee=state.company.contract*50000;
+  UI.confirm('解约','违约金约 '+fmtMoney(fee)+' 星元（与剩余合约期成正比）。解约后转为独立身份，收入自留但失去公司资源。确定吗？',()=>{
+    if(state.res.money<fee){UI.toast('资金不足支付违约金','error');return;}
+    state.res.money-=fee;
+    state.company.rating='IND';state.company.contract=0;
+    state.res.ceval=Math.max(0,state.res.ceval-30);
+    this.timeline('💥 支付'+fmtMoney(fee)+'违约金解约，成为独立艺人');
+    this.addMemory('事件','与'+state.company.name+'解约，转为独立艺人','第'+state.time.w+'周');
+    this.save();this.renderAll();
+    UI.toast('✅ 解约成功，现在是自由人了','success');
+  });
+};
+Engine.applyResource=function(){
+  if(!state.company.applyOK){UI.toast('本月已申请过资源','error');return;}
+  if(state.company.rating==='IND'){UI.toast('独立身份没有公司资源','error');return;}
+  state.company.applyOK=false;
+  const rate=0.35+state.res.ceval/200+state.company.agent.aff/400+state.company.agent.stars*0.05;
+  if(chance(rate)){
+    const r=rnd([
+      {t:'优质行程',fx:()=>{state.res.fans+=20000;state.res.money+=this.income(30000);}},
+      {t:'顶级制作人合作',fx:()=>{const npc=state.npcs.find(n=>n.role==='制作人');if(npc)npc.aff=clamp(npc.aff+15,0,100);}},
+      {t:'名师课名额',fx:()=>{state.master={attr:this.weakestAttr(),left:4};}},
+      {t:'卫视跨年舞台',fx:()=>{state.res.fame=clamp(state.res.fame+8,0,100);state.res.fans+=50000;}}
+    ]);
+    r.fx();
+    this.timeline('📨 资源申请成功：'+r.t);
+    UI.toast('✅ 资源申请成功：'+r.t,'success');
+  }else{
+    UI.toast('😔 资源被同社竞争者抢走了','error');
+  }
+  this.renderAll();
+};
+Engine.renderWorks=function(){
+  const el=$('pg-works'),a=state.player.attrs;
+  const pip=state.pipeline?`<div class="card"><h3>🎵 回归筹备中《${state.pipeline.title}》</h3>
+    <div class="pipe-steps">${['pick','record','dance','mv'].map(k=>{
+      const names={pick:'选曲',record:'录音',dance:'编舞',mv:'MV'};
+      const done=state.pipeline.steps[k];
+      const costs={pick:'创作/买曲',record:'10万',dance:'8万',mv:'15万'};
+      return `<div class="pipe-step ${done?'done':''}"><span>${names[k]}</span><em>${done?'✅':'💰'+costs[k]}</em><button class="btn sm" ${done?'disabled':''} onclick="Engine.pipeStep('${k}')">${done?'完成':'投入'}</button></div>`;
+    }).join('')}</div>
+    <div class="btn-row"><button class="btn gold big" onclick="Engine.releaseWork()">💿 发行（评分预览 ${Engine.pipelineScore()}）</button></div>
+    <div class="mini">作品评分 = 唱功30% + 创作20% + 舞美20% + 营销30%（当前预览 ${Engine.pipelineScore()}）</div>
+  </div>`:`<div class="card"><h3>🎵 音乐作品</h3><p class="ph-sub">${state.debut?'筹备一首新歌，回归期打歌冲击一位':'出道后解锁发行'}</p>
+    <button class="btn gold" ${state.debut?'':'disabled'} onclick="Engine.startPipeline()">🎼 开始筹备新作</button>
+    ${state.debut?'':'<div class="mini">尚未出道，先专注训练达标出道线</div>'}
+  </div>`;
+  const cb=state.comeback?(()=>{
+    const rank=Math.max(1,Math.round(105-state.comeback.score-state.res.fans/4000000*10-(6-state.comeback.left)*2));
+    return `<div class="card"><h3>🏆 打歌面板 · 回归中《${state.comeback.title}》</h3>
+    <div class="grid2">
+      <div><div class="mini">评分 <b>${state.comeback.score}</b> · 已获一位 <b>${state.comeback.wins}</b> · 剩余 ${state.comeback.left} 周</div>
+      <div class="mini">一位公式：音源50% + 销量20% + 放送10% + 投票10% + 直播10%</div>
+      <div class="mini">音源实时榜：<b>第${rank}位</b> · 周榜：<b>第${Math.max(1,rank+ri(-2,4))}位</b></div>
+      <div class="mini">累计销量：<b>${fmtMoney(state.comeback.sales)}张</b>（${state.player.route==='kpop'?'含中输':'本土'})</div></div>
+      <div><div class="mini">${state.comeback.wins>=3?'👑 已三连冠，自动下车':'继续冲击一位中…'}</div>
+      <div class="mini">百万销量：${state.comeback.sales>=1000000?'✅ 达成（咖位分水岭！）':'未达成'}</div></div>
+    </div></div>`;
+  })():'';
+  const works=state.works.length?state.works.slice(0,12).map(w=>{
+    const tag=w.type==='song'?'🎵 单曲':w.type==='drama'?'🎬 '+w.role:w.type==='variety'?'📺 综艺':'📀 专辑';
+    const result=w.type==='song'?(w.score>=85?'🔥 神曲':w.score>=60?'👍 及格':'💧 扑街'):w.type==='drama'?(w.score>=85?'🔥 爆剧':w.score>=60?'OK':'💧 烂片'):(w.score>=85?'🔥 爆款':'OK');
+    return `<div class="work-item"><span class="wi-tag">${tag}</span><b>${w.title}</b><span class="wi-score" style="color:${w.score>=85?'var(--gold)':w.score<60?'var(--r)':'var(--t2)'}">评分${w.score}</span><em>${w.date} · ${result}</em></div>`;
+  }).join(''):'<div class="empty-tip">还没有作品，出道后开始积累吧</div>';
+  el.innerHTML=`
+    <div class="page-head"><div><h2>🎵 作品中心</h2><p class="ph-sub">回归/打歌/影视/综艺 · 作品是根，舞台是脸</p></div></div>
+    ${pip}${cb}
+    <div class="grid2">
+      <div class="card"><h3>🎬 影视</h3><p class="ph-sub">爆剧=咖位跃升，烂片掉国民度</p>
+        <button class="btn" onclick="Engine.tryAudition()">🎥 参加影视试镜</button>
+        <div class="mini">成功率受演技与人脉影响</div></div>
+      <div class="card"><h3>📺 综艺</h3><p class="ph-sub">国民度增长最快的途径</p>
+        <button class="btn" onclick="Engine.tryVariety()">📡 争取综艺邀约</button>
+        <div class="mini">成功率受综艺感与PD好感影响</div></div>
+    </div>
+    <div class="card"><h3>📚 作品历史库</h3>${works}</div>`;
+};
+Engine.renderFans=function(){
+  const el=$('pg-fans');
+  const dist=fanDist();
+  const donut=donutSVG(dist);
+  const legs=dist.map(d=>`<div class="fan-leg"><span style="background:${d.c}"></span>${d.n}<b>${d.v}%</b></div>`).join('');
+  const hot=state.hot.length?state.hot.map((h,i)=>`<div class="hot-item"><span class="hot-no">${i+1}</span>${h}</div>`).join(''):'<div class="empty-tip">暂无热搜</div>';
+  const satis=state.fanSatis;
+  el.innerHTML=`
+    <div class="page-head"><div><h2>💜 粉丝社区</h2><p class="ph-sub">粉丝是星途的根基 · 当前粉丝 ${fmtFans(state.res.fans)}</p></div></div>
+    <div class="grid2">
+      <div class="card"><h3>🧩 五类粉丝构成</h3><div class="fan-flex">${donut}<div class="fan-legs">${legs}</div></div></div>
+      <div class="card"><h3>📊 人气 vs 国民度</h3>
+        <div class="info-row"><span>人气（粉丝数）</span><b>${fmtFans(state.res.fans)}</b></div>
+        <div class="info-row"><span>国民度（路人知晓率）</span><div class="ar-bar" style="width:110px"><i style="width:${state.res.fame}%"></i></div><b>${Math.round(state.res.fame)}%</b></div>
+        <div class="info-row"><span>粉丝满意度</span><div class="ar-bar" style="width:110px"><i style="width:${satis}%;background:var(--pink)"></i></div><b>${satis}</b></div>
+        <div class="mini">有人气没国民度=圈层爆红；有国民度没人气=有名无实</div>
+        <div class="btn-row wrap" style="margin-top:8px">
+          <button class="btn sm" onclick="Engine.fanPost()">📝 官咖发帖</button>
+          <button class="btn sm" onclick="Engine.fanLive()">📱 开直播</button>
+          <button class="btn sm" onclick="Engine.fanReply()">💬 翻牌回复</button>
+        </div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>🎁 应援面板</h3>
+        <div class="btn-row wrap">
+          <button class="btn sm" onclick="Engine.fanSupport('birth')">🎂 生日应援（2万）</button>
+          <button class="btn sm" onclick="Engine.fanSupport('coffee')">☕ 应援咖啡车（3万）</button>
+          <button class="btn sm" onclick="Engine.fanSupport('fanmeet')">💌 小型粉丝见面会（10万）</button>
+        </div>
+        <div class="mini">应援回馈提升口碑与粉丝粘性</div>
+      </div>
+      <div class="card"><h3>⚖️ 舆情面板 <small>舆情值 ${Math.round(state.yq)}/100</small></h3>
+        <div class="ar-bar big"><i style="width:${state.yq}%;background:${state.yq>60?'var(--r)':state.yq>30?'var(--gold)':'var(--jade)'}"></i></div>
+        <div class="hot-list">${hot}</div>
+        <div class="btn-row wrap">
+          <button class="btn sm" onclick="Engine.pr('apology')">🙏 道歉声明</button>
+          <button class="btn sm" onclick="Engine.pr('cold')">🧊 冷处理</button>
+          <button class="btn sm" onclick="Engine.pr('remove')">💸 花钱撤热搜（10万）</button>
+        </div>
+      </div>
+    </div>`;
+};
+Engine.fanPost=function(){
+  if(state.st.hp<5){UI.toast('体力不足','error');return;}
+  state.st.hp-=5;
+  const g=Math.round(state.res.fans*0.002)+500;
+  state.res.fans+=g;state.st.mood=clamp(state.st.mood+3,0,100);
+  UI.toast('📝 官咖发帖，粉丝+'+fmtFans(g),'success');
+  this.save();this.renderAll();
+};
+Engine.fanLive=function(){
+  if(state.st.hp<10){UI.toast('体力不足','error');return;}
+  state.st.hp-=10;
+  const g=Math.round(state.res.fans*0.004)+1000;
+  state.res.fans+=g;
+  const m=this.income(ri(2000,8000));
+  state.res.money+=m;this.monthAdd('income',m,'直播打赏');
+  UI.toast('📱 直播结束：粉丝+'+fmtFans(g)+'，打赏'+fmtMoney(m),'success');
+  this.save();this.renderAll();
+};
+Engine.fanReply=function(){
+  if(state.st.hp<3){UI.toast('体力不足','error');return;}
+  state.st.hp-=3;
+  state.fanSatis=clamp(state.fanSatis+3,0,100);
+  UI.toast('💬 翻牌成功，粉丝满意度+3','success');
+  this.save();this.renderAll();
+};
+Engine.fanSupport=function(k){
+  const costs={birth:20000,coffee:30000,fanmeet:100000};
+  if(state.res.money<costs[k]){UI.toast('资金不足','error');return;}
+  state.res.money-=costs[k];this.monthAdd('expense',costs[k],'应援');
+  const g={birth:8000,coffee:15000,fanmeet:60000}[k];
+  state.res.fans+=g;
+  state.res.fame=clamp(state.res.fame+(k==='fanmeet'?2:0.5),0,100);
+  state.fanSatis=clamp(state.fanSatis+5,0,100);
+  UI.toast('✅ 应援完成，粉丝+'+fmtFans(g),'success');
+  this.save();this.renderAll();
+};
+Engine.pr=function(k){
+  if(k==='apology'){
+    state.yq=Math.max(0,state.yq-(state.yq>60?25:15));
+    state.res.fame=clamp(state.res.fame-1,0,100);
+    UI.toast('🙏 道歉声明发布，舆情下降，国民度微降','success');
+  }else if(k==='cold'){
+    state.yq=Math.max(0,state.yq-8);
+    UI.toast('🧊 冷处理：舆情缓慢下降','success');
+  }else if(k==='remove'){
+    if(state.res.money<100000){UI.toast('资金不足','error');return;}
+    state.res.money-=100000;this.monthAdd('expense',100000,'撤热搜');
+    state.yq=Math.max(0,state.yq-35);
+    UI.toast('💸 热搜已撤，舆情大幅下降','success');
+  }
+  this.save();this.renderAll();
+};
+Engine.renderSocial=function(){
+  const el=$('pg-social');
+  const rows=state.npcs.map((n,i)=>{
+    const cd=n.cooldown||{};
+    const affCls=n.aff>=80?'hi':n.aff>=50?'mid':'lo';
+    return `<div class="npc-row" onclick="UI.openNpc(${i})">
+      <div class="npc-ava" style="background:${['var(--accent-glow)','var(--gold-glow)','var(--pink)','var(--jade-glow)','var(--purple)'][i%5]}">${n.name[0]}</div>
+      <div class="npc-info"><b>${n.name}</b><span>${n.role} · ${n.personality}</span>
+        <div class="ar-bar"><i style="width:${n.aff}%" class="${affCls}"></i></div></div>
+      <div class="npc-aff"><b>${Math.round(n.aff)}</b><small>好感</small></div>
+      <div class="npc-btns" onclick="event.stopPropagation()">
+        <button class="btn sm" onclick="Engine.npcAct(${i},'chat')">💬 聊天</button>
+        <button class="btn sm" onclick="Engine.npcAct(${i},'gift')">🎁 送礼</button>
+        <button class="btn sm" onclick="Engine.npcAct(${i},'meal')">🍽️ 约饭</button>
+        ${n.role==='恋爱对象'&&!state.lover&&n.aff>=60?`<button class="btn sm gold" onclick="Engine.confess(${i})">💘 告白</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`
+    <div class="page-head"><div><h2>🤝 社交</h2><p class="ph-sub">人脉是隐形资源 · 点击人物查看详情</p></div></div>
+    <div class="card"><h3>💗 关系列表</h3>${rows}</div>
+    <div class="card"><h3>💡 关系收益提示</h3>
+      <div class="mini">制作人：优质曲目优先权 · 导演：影视试镜机会 · 综艺PD：常驻综艺邀约 · 前辈：舞台合作与引荐 · 队友：团魂加成</div>
+      <div class="mini">恋爱对象：好感60+可告白；偶像期恋爱有曝光风险（保密值↓）</div>
+    </div>`;
+};
+Engine.npcAct=function(i,act){
+  const n=state.npcs[i],cd=n.cooldown||{};
+  if(state.st.hp<5){UI.toast('体力不足','error');return;}
+  if(act==='chat'){
+    if(cd.chat>state.time.w-2){UI.toast(n.name+'这周已经聊过天了','error');return;}
+    state.st.hp-=5;n.aff=clamp(n.aff+ri(2,4),0,100);
+    n.cooldown.chat=state.time.w;
+    UI.toast('💬 和'+n.name+'聊得很开心，好感+','success');
+  }else if(act==='gift'){
+    if(cd.gift>state.time.w-2){UI.toast('这周已经送过礼了','error');return;}
+    if(state.res.money<5000){UI.toast('资金不足','error');return;}
+    state.res.money-=5000;state.st.hp-=2;n.aff=clamp(n.aff+ri(4,7),0,100);
+    n.cooldown.gift=state.time.w;
+    UI.toast('🎁 礼物送到心坎里，好感+','success');
+  }else if(act==='meal'){
+    if(cd.meal>state.time.w-2){UI.toast('这周已经约过饭了','error');return;}
+    if(state.res.money<3000){UI.toast('资金不足','error');return;}
+    state.res.money-=3000;state.st.hp-=5;n.aff=clamp(n.aff+ri(3,6),0,100);state.st.mood=clamp(state.st.mood+5,0,100);
+    n.cooldown.meal=state.time.w;
+    UI.toast('🍽️ 一顿饭拉近关系，好感+','success');
+  }
+  this.save();this.renderAll();
+};
+Engine.confess=function(i){
+  const n=state.npcs[i];
+  UI.confirm('💘 告白','向 '+n.name+' 告白？偶像期恋爱有曝光风险（保密值会随约会下降）。确定吗？',()=>{
+    state.lover=n;
+    n.aff=clamp(n.aff+10,0,100);
+    this.timeline('💘 与'+n.name+'确定了恋爱关系（秘密进行）');
+    this.addMemory('关系','与'+n.name+'开始恋爱（秘密）','第'+state.time.w+'周');
+    this.save();this.renderAll();
+    UI.toast('💘 告白成功！','success');
+  });
+};
+UI.openNpc=function(i){
+  const n=state.npcs[i];
+  $('npc-title').textContent=n.name+' · '+n.role;
+  $('npc-body').innerHTML=`
+    <div class="npc-detail">
+      <div class="mini">性格：${n.personality}</div>
+      <div class="mini">描述：${n.desc}</div>
+      <div class="info-row"><span>好感度</span><div class="ar-bar" style="width:150px"><i style="width:${n.aff}%"></i></div><b>${Math.round(n.aff)}</b></div>
+      <div class="info-row"><span>关系收益</span><b>${n.benefit}</b></div>
+      ${n.events.length?`<div class="mini">最近互动：${n.events.slice(-3).join('、')}</div>`:''}
+      ${state.lover===n?'<div class="notice">💞 你们正在秘密恋爱中</div>':''}
+      <div class="btn-row wrap" style="margin-top:12px">
+        <button class="btn" onclick="Engine.npcAct(${i},'chat');UI.closeModal('npc-modal')">💬 聊天</button>
+        <button class="btn" onclick="Engine.npcAct(${i},'gift');UI.closeModal('npc-modal')">🎁 送礼</button>
+        <button class="btn" onclick="Engine.npcAct(${i},'meal');UI.closeModal('npc-modal')">🍽️ 约饭</button>
+        ${state.lover===n?`<button class="btn gold" onclick="Engine.loverDate();UI.closeModal('npc-modal')">💞 约会（心情+30，保密值-8）</button>`:''}
+      </div>
+      <button class="btn" style="margin-top:10px;width:100%" onclick="UI.closeModal('npc-modal')">关闭</button>
+    </div>`;
+  UI.openModal('npc-modal');
+};
+Engine.loverDate=function(){
+  if(!state.lover){UI.toast('还没有恋人','error');return;}
+  if(state.st.hp<10){UI.toast('体力不足','error');return;}
+  state.st.hp-=10;state.st.mood=clamp(state.st.mood+30,0,100);
+  state.lover.aff=clamp(state.lover.aff+2,0,100);
+  if(!state.transformed){
+    state.st.secrecy=clamp(state.st.secrecy-8,0,100);
+    if(state.st.secrecy<25&&chance(0.3)){
+      this.loveExposure({events:[],notes:[]});
+      this.save();this.renderAll();
+      return;
+    }
+  }
+  UI.toast('💞 约会很开心，心情+30','success');
+  this.save();this.renderAll();
+};
+Engine.renderMarket=function(){
+  const el=$('pg-market');
+  const mk=state.markets;
+  const cards=[
+    {k:'local',n:'星海市',t:'本土娱乐心脏',st:'本部',i:'🏙️',d:'三大卫视、星光大赏、星浪热搜总部'},
+    {k:'shou',n:'首星市',t:'韩娱工业心脏',st:mk.shou?'已进驻':(state.debut&&state.stage!=='trainee'&&(state.res.fans>=500000||mk.goKpop)?'可进军':'未开放'),i:'🎤',d:'打歌演播厅、练习生特区'},
+    {k:'dong',n:'东瀛',t:'日娱握手会文化',st:mk.dong?'已进驻':'需资金+学识',i:'⛩️',d:'日巡、握手会、日专'},
+    {k:'se',n:'东南亚',t:'粉丝基数大',st:mk.se?'已进驻':'需资金',i:'🏝️',d:'拼盘、代言'},
+    {k:'ou',n:'欧美',t:'Billboard 传奇级',st:mk.ou?'已进驻':'极高门槛',i:'🗽',d:'KCON、世巡、Billboard'}
+  ];
+  let html=cards.map(c=>{
+    const active=c.st==='已进驻'||c.st==='本部';
+    return `<div class="market-card ${active?'on':''}">
+      <div class="mc-head"><span class="mc-i">${c.i}</span><b>${c.n}</b><em class="mc-st">${c.st}</em></div>
+      <div class="mini">${c.t} · ${c.d}</div>
+      ${this.marketAct(c.k,c.st)}
+    </div>`;
+  }).join('');
+  const cross=state.player.route==='kpop'
+    ?`<div class="card"><h3>🌉 归国发展（韩娱→本土）</h3><p class="ph-sub">自带韩流光环，本土资源溢价，中输市场加成</p><button class="btn gold" ${mk.goHome||state.stage==='trainee'?'disabled':''} onclick="Engine.goHome()">✈️ 归国发展${mk.goHome?'（已归国）':''}</button><div class="mini">${mk.goHome?'双市场经营中：收入×1.3':'上升期后解锁'}</div></div>`
+    :`<div class="card"><h3>🌉 进军韩娱（本土→韩娱）</h3><p class="ph-sub">语言关（学识≥50）、体系适应，成功=顶级国际咖位</p><button class="btn gold" ${mk.goKpop||state.stage==='trainee'?'disabled':''} onclick="Engine.goKpop()">✈️ 进军韩娱${mk.goKpop?'（已进军）':''}</button><div class="mini">${mk.goKpop?'双市场经营中：收入×1.3':'需要学识≥50'}</div></div>`;
+  el.innerHTML=`
+    <div class="page-head"><div><h2>🌏 跨市场</h2><p class="ph-sub">中后期核心玩法 · 两套体系之间自由穿梭</p></div></div>
+    <div class="card"><h3>🗺️ 市场地图</h3>${html}</div>
+    ${cross}`;
+};
+Engine.marketAct=function(k,st){
+  const mk=state.markets;
+  if(st==='本部'||st==='已进驻')return '';
+  if(k==='shou')return mk.goHome||mk.goKpop?'':`<button class="btn sm gold" onclick="Engine.enterMarket('shou')">解锁</button>`;
+  if(k==='dong')return `<button class="btn sm gold" onclick="Engine.enterMarket('dong')">进驻（资金200万+学识50）</button>`;
+  if(k==='se')return `<button class="btn sm gold" onclick="Engine.enterMarket('se')">进驻（资金100万）</button>`;
+  if(k==='ou')return `<button class="btn sm gold" onclick="Engine.enterMarket('ou')">进军欧美（资金1000万+国民度70）</button>`;
+  return '';
+};
+Engine.enterMarket=function(k){
+  const req={shou:{m:1000000,k:40},dong:{m:2000000,k:50},se:{m:1000000,k:0},ou:{m:10000000,k:0}}[k];
+  const names={shou:'首星市',dong:'东瀛',se:'东南亚',ou:'欧美'};
+  if(req.m&&state.res.money<req.m){UI.toast('资金不足：需要'+fmtMoney(req.m),'error');return;}
+  if(req.k&&state.player.attrs.knowledge<req.k){UI.toast('学识不足：需要'+req.k,'error');return;}
+  if(k==='ou'&&state.res.fame<70){UI.toast('国民度不足：需要70%','error');return;}
+  UI.confirm('进驻 '+names[k],'支付'+fmtMoney(req.m)+'开启'+names[k]+'市场：当地粉丝增长、收入加成、新事件解锁。确定吗？',()=>{
+    state.res.money-=req.m;
+    state.markets[k]=true;
+    this.wish(30);
+    this.timeline('🌏 进驻'+names[k]+'市场！');
+    this.addMemory('荣誉','进军'+names[k]+'市场','第'+state.time.w+'周');
+    this.save();this.renderAll();
+    UI.toast('✅ 已进驻'+names[k],'success');
+  });
+};
+Engine.goHome=function(){
+  if(state.res.fame<50){UI.toast('需要国民度≥50','error');return;}
+  UI.confirm('归国发展','归国后双市场经营：收入×1.3、中输加成、本土粉丝盘扩大。代价：两头跑，体力消耗+20%。确定吗？',()=>{
+    state.markets.goHome=true;
+    this.wish(40);
+    this.timeline('🌉 归国发展！本土+韩娱双市场经营');
+    this.addMemory('荣誉','归国发展，双市场经营','第'+state.time.w+'周');
+    this.save();this.renderAll();
+    UI.toast('✅ 归国成功','success');
+  });
+};
+Engine.goKpop=function(){
+  if(state.player.attrs.knowledge<50){UI.toast('需要学识≥50（语言关）','error');return;}
+  UI.confirm('进军韩娱','闯韩后双市场经营：收入×1.3、跨体系声望。代价：体系适应期，压力+20%。确定吗？',()=>{
+    state.markets.goKpop=true;
+    this.wish(40);
+    this.timeline('🌉 进军韩娱！本土+韩娱双市场经营');
+    this.addMemory('荣誉','进军韩娱市场','第'+state.time.w+'周');
+    this.save();this.renderAll();
+    UI.toast('✅ 闯韩成功','success');
+  });
+};
+Engine.renderShop=function(){
+  const el=$('pg-shop');
+  const items=SHOP_ITEMS.map(it=>`<div class="shop-item">
+    <span class="si-i">${it.i}</span><div class="si-b"><b>${it.n}</b><span>${it.d}</span></div>
+    <button class="btn sm gold" onclick="Engine.buyShop('${it.k}')">${fmtMoney(it.cost)}</button>
+  </div>`).join('');
+  const pk=cfg.perks||{};
+  const perks=PERKS.map(p=>`<div class="shop-item">
+    <span class="si-i">${p.i}</span><div class="si-b"><b>${p.n}</b><span>${p.d}</span></div>
+    <button class="btn sm ${pk[p.k]?'': 'gold'}" onclick="Engine.buyPerk('${p.k}')" ${pk[p.k]?'disabled':''}>${pk[p.k]?'✅ 已拥有':p.cost+' 点'}</button>
+  </div>`).join('');
+  el.innerHTML=`
+    <div class="page-head"><div><h2>🛒 商店</h2><p class="ph-sub">把赚来的钱变成实力与口碑</p></div></div>
+    <div class="card"><h3>🎒 日常道具与服务</h3>${items}</div>
+    <div class="card"><h3>🌟 星愿点商店 <small>余额 ${cfg.wish||0} 点（周目继承）</small></h3>
+      <p class="ph-sub">星愿点通过里程碑/出道/一位/奖项/跨市场获得，购买后永久生效于之后每一周目</p>${perks}</div>`;
+};
+Engine.buyShop=function(k){
+  const it=SHOP_ITEMS.find(x=>x.k===k);
+  if(state.res.money<it.cost){UI.toast('资金不足','error');return;}
+  state.res.money-=it.cost;this.monthAdd('expense',it.cost,it.n);
+  if(k.startsWith('master_')){state.master={attr:k.split('_')[1],left:4};UI.toast('🎓 名师课开始，对应属性成长+35%（4周）','success');}
+  else if(k==='style'){state.player.attrs.charm=clamp(state.player.attrs.charm+2,0,100);state.st.mood=clamp(state.st.mood+10,0,100);UI.toast('💇 造型焕新！','success');}
+  else if(k==='pr'){state.yq=Math.max(0,state.yq-20);UI.toast('🛡️ 公关介入，舆情-20','success');}
+  else if(k==='hot'){
+    state.res.fame=clamp(state.res.fame+5,0,100);
+    if(chance(0.3)){state.yq=clamp(state.yq+15,0,100);UI.toast('🔥 热搜上了，但被扒出是买的…舆情+15','error');}
+    else UI.toast('🔥 热搜第一！国民度+5','success');
+  }
+  else if(k==='drink'){state.st.hp=clamp(state.st.hp+50,0,state.st.hpmax);UI.toast('🧃 体力+50','success');}
+  else if(k==='tea'){state.st.stress=clamp(state.st.stress-30,0,100);UI.toast('🍵 压力-30','success');}
+  else if(k==='check'){state.st.health=clamp(state.st.health+15,0,100);UI.toast('🏥 健康+15','success');}
+  this.save();this.renderAll();
+};
+Engine.buyPerk=function(k){
+  const p=PERKS.find(x=>x.k===k);
+  if((cfg.perks||{})[k]){UI.toast('已拥有该周目继承效果','error');return;}
+  if((cfg.wish||0)<p.cost){UI.toast('星愿点不足','error');return;}
+  cfg.wish-=p.cost;cfg.perks=cfg.perks||{};cfg.perks[k]=true;
+  saveCfg();
+  UI.toast('✅ 已购买：'+p.n+'（永久生效）','success');
+  this.renderAll();
+};
+Engine.renderReview=function(){
+  const el=$('pg-review');
+  const m=state.monthly.last;
+  el.innerHTML=`
+    <div class="page-head"><div><h2>📋 月度复盘</h2><p class="ph-sub">每月1日自动弹出 · 这里是历史记录</p></div></div>
+    ${m?UI.monthlyHTML(m):'<div class="card"><div class="empty-tip">第一个月结束后生成复盘（每4周一次）</div></div>'}
+    <div class="card"><h3>📅 本月进行中</h3>
+      <div class="info-row"><span>本月收入</span><b style="color:var(--jade)">+${fmtMoney(state.monthly.cur.income)}</b></div>
+      <div class="info-row"><span>本月支出</span><b style="color:var(--r)">-${fmtMoney(state.monthly.cur.expense)}</b></div>
+      <div class="info-row"><span>粉丝变化</span><b>${fmtFans(state.res.fans-state.monthly.cur.fans0)}</b></div>
+    </div>`;
+};
+UI.monthlyHTML=function(m){
+  const fanΔ=m.fans1-m.fans0,ceΔ=m.ceval1-m.ceval0;
+  const items=[...m.items].slice(-14).map(it=>`<div class="info-row"><span>${it.t}</span><b style="color:${it.amt>=0?'var(--jade)':'var(--r)'}">${it.amt>=0?'+':''}${fmtMoney(it.amt)}</b></div>`).join('');
+  const evs=m.events.slice(-10).map(e=>`<div class="tl-item">${e}</div>`).join('');
+  return `<div class="card"><h3>💰 收支明细</h3>
+    <div class="info-row"><span>总收入</span><b style="color:var(--jade)">+${fmtMoney(m.income)}</b></div>
+    <div class="info-row"><span>总支出</span><b style="color:var(--r)">-${fmtMoney(m.expense)}</b></div>
+    <div class="info-row"><span>结余</span><b>${fmtMoney(m.income-m.expense)}</b></div>
+    ${items}</div>
+    <div class="grid2">
+      <div class="card"><h3>💜 粉丝报告</h3>
+        <div class="info-row"><span>月初</span><b>${fmtFans(m.fans0)}</b></div>
+        <div class="info-row"><span>月末</span><b>${fmtFans(m.fans1)}</b></div>
+        <div class="info-row"><span>增减</span><b style="color:${fanΔ>=0?'var(--jade)':'var(--r)'}">${fanΔ>=0?'+':''}${fmtFans(fanΔ)}</b></div>
+      </div>
+      <div class="card"><h3>🏢 公司评价变化</h3>
+        <div class="info-row"><span>月初</span><b>${Math.round(m.ceval0)}</b></div>
+        <div class="info-row"><span>月末</span><b>${Math.round(m.ceval1)}</b></div>
+        <div class="info-row"><span>变化</span><b style="color:${ceΔ>=0?'var(--jade)':'var(--r)'}">${ceΔ>=0?'+':''}${ceΔ}</b></div>
+      </div>
+    </div>
+    <div class="card"><h3>📌 本月大事记</h3><div class="tl">${evs||'<div class="empty-tip">平静的一个月</div>'}</div></div>`;
+};
+UI.monthlyDone=function(){UI.closeModal('monthly-modal');UI.nextQueue();};
+Engine.renderMemoryPage=function(){
+  const el=$('pg-memory');
+  const mems=state.memories.slice(0,60).map(m=>`<div class="mem-item"><span class="mem-ic">${MEM_TYPES[m.type]||'📝'}</span><div><b>${m.text}</b><em>${m.type} · ${m.time}</em></div></div>`).join('');
+  const tl=state.timeline.slice(-24).reverse().map(t=>`<div class="tl-item"><em>第${t.w}周</em>${t.text}</div>`).join('');
+  el.innerHTML=`
+    <div class="page-head"><div><h2>📔 记忆档案</h2><p class="ph-sub">AI永不遗忘的设定与故事 · 自动整理归档</p></div></div>
+    <div class="card"><h3>📜 故事摘要</h3><div class="story-sum">${esc(state.storySummary||'（故事刚刚开始，AI将自动记录）')}</div></div>
+    <div class="card"><h3>🧠 记忆条目 <small>${state.memories.length}条</small></h3>${mems||'<div class="empty-tip">暂无记忆</div>'}</div>
+    <div class="card"><h3>🗓️ 大事记时间线</h3><div class="tl">${tl||'<div class="empty-tip">暂无大事</div>'}</div></div>`;
+};
+/* ================= AI 核心 ================= */
+const WORLD_GUIDE=`
+《星途物语 IDOL LIFE》世界观速览（架空近未来亚洲娱乐圈）：
+- 两大体系并存：本土体系（内娱式，星海共和国·星海市）——个人为中心，影视综艺流量为王，星浪热搜/星光大赏；韩娱体系（K-POP式，新罗国·首星市）——团体为中心，打歌/音源/销量驱动，一位公式=音源50%+销量20%+放送10%+投票10%+直播10%。
+- 成长阶段：练习生 → 新人期（粉丝破100万）→ 上升期（破500万）→ 巅峰期（国民度60+）→ 长青期（转型成功）。
+- 行业铁律：作品是根，舞台是脸，人设是皮，口碑是命。舆情过高会掉代言、被抵制、被雪藏。恋爱禁令存在（韩娱严格、元旦爆料传统；本土相对宽松），转型成功后解除。韩娱男爱豆有军白期（约2年）。跨市场（归国/闯韩/东瀛/东南亚/欧美）是中期核心玩法。
+- 术语：回归/打歌/一位/音源/初动/中输/应援棒/官咖/站子/塌房/概念/站位/番位/续约/违约金/热搜/控评/限定团/团魂/营业/人设/舆情/星愿点（周目货币）。
+`;
+const MAX_HISTORY=30;
+const Game={
+  busy:false, controller:null, narrating:false,
+  setBusy(b){
+    Game.busy=b;
+    if(!b&&state&&state.weekFact){const f=state.weekFact;state.weekFact=null;setTimeout(()=>{if(!Game.busy&&state)Game.weeklyNarrate(f);},40);}
+    const sb=$('send-btn');if(sb)sb.disabled=b;
+    const li=$('loading-indicator');if(li)li.classList.toggle('hidden',!b);
+    const st=$('settle-btn');if(st)st.disabled=b;
+    const rg=$('regen-btn');if(rg)rg.classList.toggle('hidden',!b||!state||!state.history.length);
+    const sp=$('stop-btn');if(sp)sp.classList.toggle('hidden',!b);
+  },
+  scrollLog(){const g=$('chat-log');if(g)g.scrollTop=g.scrollHeight;},
+  addLog(cls,html){
+    const div=document.createElement('div');
+    div.className='log-entry '+cls;
+    div.innerHTML=html;
+    $('chat-log').appendChild(div);
+    this.scrollLog();
+  },
+  addStreamEntry(){
+    const div=document.createElement('div');
+    div.className='log-entry ai';
+    $('chat-log').appendChild(div);
+    this.scrollLog();
+    return div;
+  },
+  addThinkEntry(streamEl){
+    const d=document.createElement('details');
+    d.className='log-entry think';
+    d.innerHTML='<summary>🧠 思考过程（点击展开）</summary><div class="think-body"></div>';
+    streamEl.parentNode.insertBefore(d,streamEl);
+    return d;
+  },
+  buildSystemPrompt(){
+    const p=state.player;
+    const routeTxt=p.route==='kpop'?'韩娱体系（K-POP式）· 首星市':'本土体系（内娱式）· 星海市';
+    const routeDetail=p.route==='kpop'?'以团体为中心，打歌/音源/销量驱动，工业级造星。核心指标：一位、音源榜、初动销量、中输。':'以个人为中心，影视/综艺/流量数据驱动。核心指标：热搜、收视、片酬、国民度。';
+    const npcCards=state.npcs.slice(0,10).map(n=>`◆ ${n.name}（${n.role}·${n.gender}）性格：${n.personality} 好感${n.aff}/100${state.lover&&state.lover.name===n.name?'（你的恋人）':''}${(n.events||[]).slice(-2).length?' 近期：'+(n.events||[]).slice(-2).join('；'):''}`).join('\n');
+    const mems=state.memories.slice(0,45).map(m=>`- [${m.type}] ${m.text}`).join('\n');
+    const tl=state.timeline.slice(-10).map(t=>`第${t.w}周：${t.text}`).join('\n');
+    const master=state.master?attrName(state.master.attr)+'名师指导（剩余'+state.master.left+'周）':'无';
+    const comeback=state.comeback?`回归中：《${state.comeback.title}》评分${state.comeback.score} 已拿一位×${state.comeback.wins} 剩余${state.comeback.left}周`:'无';
+    const mil=state.military.active?'军白期（剩余'+state.military.left+'周，物料'+state.military.supplies+'）':(state.militaryDone?'已退伍':'无');
+    const diffTxt=state.diff.id==='fun'?'爽玩模式（一切为你让路，无惩罚，保底好结局）':state.diff.id==='std'?'标准模式':state.diff.id==='real'?'真实模式（严苛）':state.diff.id==='life'?'人生模式（地狱难度）':'自定义模式';
+    return `你是《星途物语 IDOL LIFE》的AI导演兼全行业NPC扮演者——一个以练习生/爱豆为主角的模拟经营×文字冒险游戏。你负责用真实、有质感、符合娱乐圈逻辑的方式推进每周剧情，扮演经纪人、队友、制作人、导演、媒体与粉丝等角色。
+
+${RP_RULES}
+
+【世界观：${routeTxt}】
+${routeDetail}
+${WORLD_GUIDE}
+游戏时间以周推进：玩家安排日程→周日结算→事件抉择→AI撰写周记。
+当前难度：${diffTxt}。
+
+【主角信息卡】（玩家的身份设定，永远不得遗忘或更改）
+姓名：${p.name}（${p.gender} · ${p.age}岁 · ${p.personality}）${p.stageName?'艺名：'+p.stageName:''}
+外貌：${p.appearance||'（由你自然描写）'}
+出身：${(BACKGROUNDS.find(b=>b.k===p.background)||{}).n||p.background} ｜ 路线：${p.route==='kpop'?'韩娱':'本土'} ｜ 定位：${p.position}
+天赋：${p.traits.map(t=>(TRAITS.find(x=>x.k===t)||{}).n).join('、')||'无'}
+性格备注：${(p.notes||[]).map(n=>n.k+'：'+n.v).join('；')||'无'} ${p.extra||''}
+
+【当前状态】
+第${state.time.w}周（${Math.ceil(state.time.w/52)}年${Math.floor((state.time.w-1)%52/4)+1}月）· 阶段「${STAGE_NAME[state.stage]}」
+公司：${state.company.name}（${state.company.rating}级 · ${PRICE_TAG[state.company.rating]}）经纪人${state.company.agent.name}（${'★'.repeat(Math.max(1,state.company.agent.stars))} 好感${state.company.agent.aff}）
+金钱${fmtMoney(state.res.money)} 粉丝${fmtFans(state.res.fans)} 国民度${Math.round(state.res.fame)}% 公司评价${Math.round(state.res.ceval)}
+八维：${ATTRS.map(a=>a.n+p.attrs[a.k]).join(' / ')}
+状态：体力${state.st.hp}/${state.st.hpmax} 压力${state.st.stress} 心情${state.st.mood} 健康${state.st.health}${state.lover?' 恋人：'+state.lover.name+'（保密值'+state.st.secrecy+'）':''}
+舆情${state.yq}${state.hot.length?' 热搜：'+state.hot[0]:''}
+回归/军白：${comeback} ｜ ${mil} ｜ 名师课：${master}
+作品数：${state.works.length}${state.works[0]?' 最新：《'+state.works[0].title+'》评分'+state.works[0].score:''}
+
+【人物卡】（NPC只知道自己卡片上的公开信息）
+${npcCards}
+
+【记忆档案】（最新在前，NPC共知的公开事实）
+${mems||'（暂无）'}
+
+【故事摘要】
+${state.storySummary||'（故事刚刚开始）'}
+
+【近期大事记】
+${tl||'（暂无）'}
+
+【演绎要求】
+1. 回复是每周剧情/日常的推进：描写场景、人物神态动作（用()括起）、对话与媒体反应，口语化、有生活质感，禁止书面腔和模板台词。
+2. 篇幅：周记为300-550字；自由对话150-400字。一次一个自然场景片段，节奏不赶。
+3. 禁止替玩家做决定、行动或说话；“你”的一切行为由玩家输入决定。NPC对“你”的了解限于亲眼所见、亲耳所闻与记忆档案；不知道你的内心和秘密。
+4. 所有资源数值变化以系统结算为准；你只在回复末尾的STATUS里给出记忆/关系/情绪微调，不要凭空改资源。
+5. 剧情通过行为、对话、事件自然推进；不得依赖酒会、会议、晚宴、应酬、出差等强行推动。
+6. 未在场的NPC不得突然出现插话。
+
+【输出格式】
+正文之后另起一行输出状态JSON块（必须），格式：⟦STATUS⟧{...}⟦/STATUS⟧
+允许字段（无变化可省略）：
+memory:["值得长期记住的事实/约定/秘密/重要事件（最多3条）"]
+summary:"一句值得加入故事摘要的话（可选）"
+relations:{"NPC名":好感增减}（如 陈姐:3，单次-3~+6）
+stats:{"mood":±,"stress":±,"hp":±,"secrecy":±,"yq":±}（剧情驱动的小幅调整）
+示例：⟦STATUS⟧{"memory":["经纪人陈姐暗示明年有顶配资源"],"relations":{"陈姐":3},"stats":{"mood":5},"summary":"与经纪人深谈，获得资源承诺"}⟦/STATUS⟧`;
+  },
+  callAI(messages,opts){
+    opts=opts||{};
+    const c=cfg;
+    if(!c.apiKey){if(!opts.silent)UI.toast('❌ 请先在设置中配置 API Key','error');return Promise.resolve(null);}
+    const body={model:c.model,messages,stream:true};
+    if(c.maxTokens&&c.maxTokens!=='unlimited')body.max_tokens=parseInt(c.maxTokens);
+    if(/reasoner/.test(c.model)){body.reasoning_effort=c.reasoningEffort||'medium';}else{body.temperature=0.85;}
+    const ac=new AbortController();Game.controller=ac;
+    return fetch(c.apiEndpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+c.apiKey},body:JSON.stringify(body),signal:ac.signal}).then(async r=>{
+      if(!r.ok){
+        let msg='HTTP '+r.status;
+        try{const j=await r.json();msg=(j.error&&(j.error.message||j.error.code))||msg;}catch(e){}
+        throw new Error(msg);
+      }
+      if(!r.body)return {content:'',reasoning:''};
+      const reader=r.body.getReader(),dec=new TextDecoder();
+      let full='',reasoning='',buf='';
+      const flush=line=>{
+        line=line.trim();
+        if(!line.startsWith('data:'))return;
+        const data=line.slice(5).trim();
+        if(data==='[DONE]')return;
+        try{
+          const j=JSON.parse(data);
+          const d0=(j.choices&&j.choices[0]&&j.choices[0].delta)||{};
+          if(d0.reasoning_content){reasoning+=d0.reasoning_content;if(opts.onThink)opts.onThink(d0.reasoning_content);}
+          if(d0.content){full+=d0.content;if(opts.onChunk)opts.onChunk(d0.content);}
+        }catch(e){}
+      };
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)break;
+        buf+=dec.decode(value,{stream:true});
+        let idx;
+        while((idx=buf.indexOf('\n'))>=0){flush(buf.slice(0,idx));buf=buf.slice(idx+1);}
+      }
+      if(buf.trim())flush(buf);
+      return {content:full,reasoning};
+    }).catch(e=>{
+      if(e.name==='AbortError')throw e;
+      if(!opts.silent)throw e;
+      return null;
+    });
+  },
+  parseStatus(content){
+    let data=null,clean=content;
+    const re=/⟦STATUS⟧([\s\S]*?)⟦\/STATUS⟧/g;
+    const parts=content.split(re);
+    if(parts.length>1){
+      clean=parts.filter((_,i)=>i%2===0).join('').trim();
+      for(let i=1;i<parts.length;i+=2){
+        try{data=JSON.parse(parts[i].trim());if(data&&typeof data==='object')break;}catch(e){}
+      }
+    }
+    if(!data){
+      const mm=content.match(/\{[\s\S]*\}\s*$/);
+      if(mm){
+        try{
+          const o=JSON.parse(mm[0]);
+          if(o&&typeof o==='object'&&(o.memory||o.summary||o.relations||o.stats)){data=o;clean=content.slice(0,mm.index).trim();}
+        }catch(e){}
+      }
+    }
+    return {clean,data};
+  },
+  applyStatus(data){
+    if(!data||!state)return;
+    if(Array.isArray(data.memory))data.memory.slice(0,3).forEach(m=>{if(m&&String(m).trim())Engine.addMemory('人物',String(m).trim());});
+    if(data.summary&&String(data.summary).trim()){
+      const s=String(data.summary).trim();
+      state.storySummary=state.storySummary?state.storySummary+'\n'+s:s;
+      if(state.storySummary.length>2200)state.storySummary=state.storySummary.slice(-2200);
+    }
+    if(data.relations){
+      for(const nm in data.relations){
+        const npc=state.npcs.find(n=>n.name===nm||(state.lover&&state.lover.name===nm));
+        if(npc)npc.aff=clamp(npc.aff+(Number(data.relations[nm])||0),0,100);
+      }
+    }
+    if(data.stats){
+      const s=data.stats;
+      if(s.mood)state.st.mood=clamp(state.st.mood+Number(s.mood),0,100);
+      if(s.stress)state.st.stress=clamp(state.st.stress+Number(s.stress),0,100);
+      if(s.hp)state.st.hp=clamp(state.st.hp+Number(s.hp),0,state.st.hpmax);
+      if(s.secrecy)state.st.secrecy=clamp(state.st.secrecy+Number(s.secrecy),0,100);
+      if(s.yq)state.yq=clamp(state.yq+Number(s.yq),0,100);
+    }
+    Engine.renderAll();
+  },
+  compressIfNeeded(){
+    if(!state||state.history.length<=MAX_HISTORY)return;
+    const keep=state.history.slice(-14);
+    const old=state.history.slice(0,-14);
+    const oldText=old.map(m=>(m.role==='user'?'【你】':'【AI】')+m.content).join('\n').slice(-14000);
+    Game.addLog('system','📎 记忆整理中：早期对话正在压缩进故事摘要…');
+    Game.callAI([
+      {role:'system',content:'你是故事摘要整理器。根据旧摘要与新增对话，生成更新后的故事摘要：保留人物关系、好感度变化、重要事件、约定、秘密与情绪变化，用第三人称简洁叙述，300字以内，只输出摘要正文。'},
+      {role:'user',content:'旧摘要：\n'+(state.storySummary||'(无)')+'\n\n新增对话：\n'+oldText}
+    ],{silent:true}).then(res=>{
+      if(res&&res.content&&res.content.trim()){
+        const c=res.content.trim().replace(/⟦STATUS⟧[\s\S]*?⟦\/STATUS⟧/g,'').trim();
+        if(c)state.storySummary=c;
+        Game.addLog('system','✅ 记忆整理完成，故事摘要已更新。');
+      }else{
+        state.storySummary=(state.storySummary?state.storySummary+'\n':'')+'（对话较多，较早细节已归档）';
+        Game.addLog('system','⚠️ 摘要整理失败，较早对话已归档。');
+      }
+      state.history=keep;
+      saveState();
+    });
+  },
+  send(text){
+    const input=$('user-input');
+    const t=(text!==undefined?text:input.value).trim();
+    if(!t)return;
+    if(Game.busy){UI.toast('AI正在演绎中，请稍候','error');return;}
+    input.value='';
+    Game.addLog('user',esc(t));
+    state.history.push({role:'user',content:t});
+    Game.respond();
+  },
+  async respond(){
+    Game.setBusy(true);
+    const streamEl=Game.addStreamEntry();
+    let thinkEl=null;
+    const sys=Game.buildSystemPrompt();
+    const msgs=[{role:'system',content:sys},...state.history.slice(-MAX_HISTORY)];
+    let content='';
+    try{
+      const res=await Game.callAI(msgs,{
+        onThink:s=>{if(!thinkEl)thinkEl=Game.addThinkEntry(streamEl);thinkEl.querySelector('.think-body').textContent+=s;},
+        onChunk:s=>{content+=s;streamEl.textContent=content;Game.scrollLog();}
+      });
+      if(res&&res.content){
+        const {clean,data}=Game.parseStatus(res.content);
+        if(clean)streamEl.textContent=clean;
+        state.history.push({role:'assistant',content:res.content});
+        if(state.history.length>MAX_HISTORY+10)state.history=state.history.slice(-MAX_HISTORY);
+        Game.applyStatus(data);
+        saveState();
+        Game.compressIfNeeded();
+      }else{
+        streamEl.remove();
+        Game.addLog('system','⚠️ AI 返回为空，请检查模型配置');
+      }
+    }catch(e){
+      streamEl.remove();
+      if(e.name!=='AbortError')Game.addLog('system','❌ 请求失败：'+esc(e.message));
+    }finally{
+      Game.setBusy(false);
+    }
+  },
+  async weeklyNarrate(facts){
+    if(!state)return;
+    if(Game.busy){state.weekFact=facts;return;}
+    Game.setBusy(true);
+    const streamEl=Game.addStreamEntry();
+    const sys=Game.buildSystemPrompt();
+    const actTxt=(facts.activities||[]).map(a=>`${CARDS[a.card]?CARDS[a.card].i:''}${CARDS[a.card]?CARDS[a.card].n:a.card}×${a.count}`).join('、')||'（没有安排日程）';
+    const msg=`【第${facts.week||state.time.w-1}周 周记请求】
+本周实际发生（系统结算，作为唯一事实依据）：
+- 日程：${actTxt}
+- 金钱变化：${facts.moneyΔ>0?'+':''}${fmtMoney(facts.moneyΔ||0)} ｜ 粉丝变化：${facts.fansΔ>0?'+':''}${fmtFans(facts.fansΔ||0)} ｜ 国民度：${facts.fameΔ>0?'+':''}${facts.fameΔ||0}
+- 细节：${(facts.notes||[]).join('；')||'无'}
+- 事件与结果：${(facts.events||[]).map(e=>e.t+'→'+e.out).join('；')||'无'}
+${facts.mil?`- 军白期：剩余${facts.mil.left}周，人气流失${fmtFans(facts.mil.fansLoss)}`:''}
+
+请以AI导演身份撰写这一周的「周记」：描写有代表性的场景（训练/行程/事件现场）、NPC的反应与对话、媒体/粉丝的反馈，结尾留一个自然的钩子。不要替玩家做任何决定。最后按格式输出STATUS。`;
+    try{
+      const res=await Game.callAI([{role:'system',content:sys},{role:'user',content:msg}],{
+        onThink:s=>{
+          let el=$('chat-log').querySelector('details.log-entry.think:last-of-type');
+          if(!el){el=document.createElement('details');el.className='log-entry think';el.innerHTML='<summary>🧠 思考过程</summary><div class="think-body"></div>';streamEl.parentNode.insertBefore(el,streamEl);}
+          el.querySelector('.think-body').textContent+=s;
+        },
+        onChunk:s=>{streamEl.textContent+=s;Game.scrollLog();}
+      });
+      let clean='';
+      if(res&&res.content){
+        const r=Game.parseStatus(res.content);
+        clean=r.clean||'';
+        if(r.data)Game.applyStatus(r.data);
+        state.history.push({role:'user',content:msg});
+        state.history.push({role:'assistant',content:res.content});
+        if(state.history.length>MAX_HISTORY+10)state.history=state.history.slice(-MAX_HISTORY);
+        if(clean)streamEl.textContent=clean;
+      }
+      if(!clean){streamEl.remove();}
+      saveState();
+    }catch(e){
+      streamEl.remove();
+      if(e.name!=='AbortError')Game.addLog('system','⚠️ 周记生成失败：'+esc(e.message));
+    }finally{
+      Game.setBusy(false);
+    }
+  },
+  stopGen(){
+    if(Game.controller)Game.controller.abort();
+    Game.setBusy(false);
+  },
+  regen(){
+    if(!state||!state.history.length)return;
+    state.history.pop();
+    const last=state.history.pop();
+    if(last&&last.role==='user'){
+      Game.addLog('user','↻ 重新生成：'+esc(last.content));
+      state.history.push(last);
+    }
+    Game.respond();
+  },
+  talkAgent(){Game.send('（我去找经纪人聊聊最近的安排，想争取下个月的资源）');},
+  talkCoach(){Game.send('（向训练老师汇报本周情况，请教提升方向）');},
+  talkHot(){Game.send('（打开星浪热搜，看看今天娱乐圈有什么新闻）');},
+  opening(){
+    Game.addLog('system','📅 你加入了'+state.company.name+'，练习生生涯从今天开始。');
+    const f={week:1,activities:[],moneyΔ:0,fansΔ:0,fameΔ:0,events:[],notes:['开局']};
+    state.weekFact=f;
+    if(state.queue.length)UI.nextQueue();
+    else Game.weeklyNarrate(f);
+  }
+};
+/* ================= UI ================= */
+Object.assign(UI,{
+  toastTimer:null,
+  toast(msg,type){
+    const box=$('toast-box');
+    const d=document.createElement('div');
+    d.className='toast '+(type||'');
+    d.textContent=msg;
+    box.appendChild(d);
+    setTimeout(()=>d.classList.add('show'),10);
+    setTimeout(()=>{d.classList.remove('show');setTimeout(()=>d.remove(),300);},2600);
+  },
+  openModal(id){$(id).classList.add('show');},
+  closeModal(id){$(id).classList.remove('show');},
+  confirm(title,text,onOk){
+    $('cf-title').textContent=title;
+    $('cf-text').textContent=text;
+    window._cfOk=onOk;
+    UI.openModal('confirm-modal');
+  },
+  applyTheme(t){
+    cfg.theme=t||'starnight';
+    document.body.dataset.theme=cfg.theme;
+    const mt={starnight:'#0a0e1c',neon:'#130a1a',sakura:'#faf6f8',gold:'#faf7f1'}[cfg.theme]||'#0a0e1c';
+    document.querySelector('meta[name=theme-color]').setAttribute('content',mt);
+    saveCfg();
+  },
+  applyFontSize(){
+    document.body.style.fontSize=cfg.fontSize==='sm'?'12px':cfg.fontSize==='lg'?'14.5px':'13px';
+  },
+  PAGES:[
+    {k:'schedule',i:'📅',n:'日程'},{k:'attr',i:'📊',n:'属性'},{k:'company',i:'🏢',n:'公司'},{k:'works',i:'🎵',n:'作品'},
+    {k:'fans',i:'💜',n:'粉丝'},{k:'social',i:'🤝',n:'社交'},{k:'market',i:'🌏',n:'市场'},{k:'shop',i:'🛒',n:'商店'},
+    {k:'review',i:'📋',n:'复盘'},{k:'memory',i:'📔',n:'记忆'}
+  ],
+  showPage(k){
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    const el=$('view-'+k);
+    if(el){el.classList.add('active');el.scrollTop=0;}
+    UI.renderNav();
+  },
+  renderNav(){
+    const cur=(document.querySelector('.view.active')||{id:'view-chat'}).id.replace('view-','');
+    const item=p=>`<button class="nav-btn ${p.k===cur?'on':''}" onclick="UI.showPage('${p.k}')"><i>${p.i}</i><span>${p.n}</span></button>`;
+    const chatBtn=`<button class="nav-btn ${cur==='chat'?'on':''}" onclick="UI.showPage('chat')"><i>💬</i><span>聊天</span></button>`;
+    $('side-nav').innerHTML=UI.PAGES.map(item).join('')+chatBtn;
+    $('bottom-nav').innerHTML=UI.PAGES.map(item).join('')+chatBtn;
+  },
+  renderQuick(){
+    $('quick-actions').innerHTML=QUICK_ACTS.map(q=>`<button class="quick-btn" onclick="${q.f}">${q.i} ${q.t}</button>`).join('');
+  },
+  /* ---------- 事件队列 ---------- */
+  nextQueue(){
+    if(!state)return;
+    if(Game.busy&&state.weekFact)return;
+    if(!state.queue.length){
+      if(state.weekFact&&!Game.busy){const f=state.weekFact;state.weekFact=null;Game.weeklyNarrate(f);}
+      return;
+    }
+    const item=state.queue.shift();
+    if(item.type==='celeb'){UI.showCeleb(item.data);setTimeout(()=>{UI.hideCeleb();UI.nextQueue();},3000);}
+    else if(item.type==='monthly'){UI.openModal('monthly-modal');}
+    else if(item.type==='event'){UI.showEvent(item.data);}
+    else if(item.type==='debut'){UI._debutData=item.data;UI.showDebut(item.data);}
+    else if(item.type==='military'){UI.showMilitary();}
+  },
+  showCeleb(data){
+    const wp=MILESTONES.find(x=>x[0]===data.m);
+    $('celeb-card').innerHTML=`<div class="ct">🎉 ${data.text}</div><div class="cs">粉丝突破 ${data.m} 万 · 星愿点 +${wp?wp[1]:0}</div>`;
+    $('celeb').classList.add('show');
+  },
+  hideCeleb(){$('celeb').classList.remove('show');},
+  showEvent(evt){
+    $('ev-title').textContent=evt.title;
+    const p=state.player;
+    const txt=String(evt.text).split('{name}').join(p.name);
+    const typeTxt=evt.type==='crisis'?'危机事件':evt.type==='opportunity'?'机遇事件':'抉择事件';
+    $('ev-body').innerHTML=`<div class="ev-type ${evt.type}">${typeTxt}</div><div class="ev-text">${txt}</div><div class="ev-opts">${evt.opts.map((o,i)=>`<button class="ev-opt" onclick="Engine.chooseEvent('${evt.id}',${i})"><div class="eo-t">${o.t}</div><div class="eo-d">${o.d||''}</div><div class="eo-r">成功率 ${Math.round(Math.min(100,(o.rate||1)*100+(Engine.hasTrait('koi')?10:0)))}%</div></button>`).join('')}</div>`;
+    UI.openModal('event-modal');
+  },
+  showMilitary(){
+    $('ev-title').textContent='🪖 兵役通知书';
+    $('ev-body').innerHTML=`<div class="ev-type crisis">韩娱男爱豆的必经关卡</div><div class="ev-text">兵务厅的通知书寄到了公司。入伍意味着${state.diff.p.mil}周军白期——提前备好物料，退伍才能王者归来。</div><div class="ev-opts">${[
+      {t:'按时入伍，提前备好物料',d:'军白期人气流失减半，退伍可王者归来',rate:1,fx:{milStart:true,supplies:70}},
+      {t:'申请延期一年',d:'舆论争议：舆情+20，多一年缓冲',rate:0.85,fx:{milStart:true,supplies:50,yq:20},fail:{yq:40,milStart:true,supplies:20,text:'延期被骂“逃兵役”'}},
+      {t:'尝试体检豁免',d:'高风险，被扒=国民级丑闻',rate:0.4,fx:{milStart:false},fail:{yq:80,milStart:true,supplies:20,text:'豁免被媒体扒出造假'}}
+    ].map((o,i)=>`<button class="ev-opt" onclick="Engine.chooseMilitary(${i})"><div class="eo-t">${o.t}</div><div class="eo-d">${o.d}</div><div class="eo-r">成功率 ${Math.round((o.rate||1)*100)}%</div></button>`).join('')}</div>`;
+    UI.openModal('event-modal');
+  },
+  showApp(){
+    $('setup-overlay').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    UI.showPage('chat');
+    UI.renderQuick();
+    UI.renderNav();
+    Engine.renderAll();
+  },
+  monthlyDone(){UI.closeModal('monthly-modal');UI.nextQueue();},
+  monthlyHTML(m){
+    const fanD=m.fans1-m.fans0,ceD=m.ceval1-m.ceval0;
+    const items=[...(m.items||[])].slice(-14).map(it=>`<div class="info-row"><span>${it.t}</span><b style="color:${it.amt>=0?'var(--jade)':'var(--r)'}">${it.amt>=0?'+':''}${fmtMoney(it.amt)}</b></div>`).join('');
+    const evs=(m.events||[]).slice(-10).map(e=>`<div class="tl-item">${e}</div>`).join('');
+    return `<div class="card"><h3>💰 收支明细</h3>
+      <div class="info-row"><span>总收入</span><b style="color:var(--jade)">+${fmtMoney(m.income)}</b></div>
+      <div class="info-row"><span>总支出</span><b style="color:var(--r)">-${fmtMoney(m.expense)}</b></div>
+      <div class="info-row"><span>结余</span><b>${fmtMoney(m.income-m.expense)}</b></div>
+      ${items}</div>
+      <div class="grid2">
+        <div class="card"><h3>💜 粉丝报告</h3>
+          <div class="info-row"><span>月初</span><b>${fmtFans(m.fans0)}</b></div>
+          <div class="info-row"><span>月末</span><b>${fmtFans(m.fans1)}</b></div>
+          <div class="info-row"><span>增减</span><b style="color:${fanD>=0?'var(--jade)':'var(--r)'}">${fanD>=0?'+':''}${fmtFans(fanD)}</b></div>
+        </div>
+        <div class="card"><h3>🏢 公司评价变化</h3>
+          <div class="info-row"><span>月初</span><b>${Math.round(m.ceval0)}</b></div>
+          <div class="info-row"><span>月末</span><b>${Math.round(m.ceval1)}</b></div>
+          <div class="info-row"><span>变化</span><b style="color:${ceD>=0?'var(--jade)':'var(--r)'}">${ceD>=0?'+':''}${ceD}</b></div>
+        </div>
+      </div>
+      <div class="card"><h3>📌 本月大事记</h3><div class="tl">${evs||'<div class="empty-tip">平静的一个月</div>'}</div></div>`;
+  },
+  /* ---------- 设置 ---------- */
+  openSettings(){UI.renderSettings();UI.openModal('settings-modal');},
+  renderSettings(){
+    const c=cfg;
+    const models=`<select id="s-model" style="flex:1;margin-bottom:0">${['deepseek-chat','deepseek-reasoner'].map(m=>`<option ${c.model===m?'selected':''}>${m}</option>`).join('')}</select>`;
+    $('settings-content').innerHTML=`
+      <div class="card"><h3>🔌 API 设置</h3>
+        <label>API 端点</label><input id="s-endpoint" value="${esc(c.apiEndpoint)}">
+        <label>API Key（仅保存在本机浏览器）</label><input id="s-apikey" type="password" value="${esc(c.apiKey)}">
+        <label>模型</label><div style="display:flex;gap:6px;width:100%">${models}<button class="btn sm" onclick="UI.fetchModels('s-')">🔄 拉取</button></div>
+        <label>推理强度</label><select id="s-reasoning">${['low','medium','high','max'].map(r=>`<option value="${r}" ${c.reasoningEffort===r?'selected':''}>${r==='low'?'低（更快）':r==='medium'?'中（均衡）':r==='high'?'高':'最大（更细腻）'}</option>`).join('')}</select>
+        <label>输出 Token 限制</label><select id="s-maxtokens">${['unlimited',2048,4096,8192,16384].map(m=>`<option value="${m}" ${String(c.maxTokens)===String(m)?'selected':''}>${m==='unlimited'?'无限制':m}</option>`).join('')}</select>
+        <div class="btn-row"><button class="btn" onclick="UI.testApi('s-')">🔌 测试连接</button><button class="btn gold" onclick="UI.saveSettings()">💾 保存设置</button></div>
+      </div>
+      <div class="card"><h3>🎨 界面风格</h3>
+        <div class="theme-row">${[['starnight','星夜'],['neon','霓虹'],['sakura','晨樱'],['gold','鎏金']].map(([t,n])=>`<button class="theme-btn ${c.theme===t?'on':''}" data-t="${t}" onclick="UI.pickTheme('${t}')"><i style="background:${({starnight:'linear-gradient(135deg,#111628,#6ea8ff)',neon:'linear-gradient(135deg,#1c1126,#ff5c8a)',sakura:'linear-gradient(135deg,#fdf2f6,#e0557f)',gold:'linear-gradient(135deg,#fdf6e9,#b8862d)'})[t]}"></i>${n}</button>`).join('')}</div>
+        <label>字号</label><select id="s-fontsize" onchange="cfg.fontSize=this.value;UI.applyFontSize();saveCfg()">${[['sm','小'],['md','标准'],['lg','大']].map(([v,n])=>`<option value="${v}" ${c.fontSize===v?'selected':''}>${n}</option>`).join('')}</select>
+      </div>
+      <div class="card"><h3>💾 存档管理</h3>
+        <div class="info-row"><span>自动存档</span><button class="btn sm ${c.autoSave?'gold':''}" onclick="cfg.autoSave=!cfg.autoSave;saveCfg();UI.renderSettings()">${c.autoSave?'✅ 已开启':'⭕ 已关闭'}</button></div>
+        <div class="btn-row"><button class="btn" onclick="UI.exportSave()">⬇ 导出存档</button><button class="btn" onclick="UI.importSave()">⬆ 导入存档</button><button class="btn danger" onclick="UI.restart()">🔄 重新开始</button></div>
+        <p class="ph-sub">自动存档：每周结算 + 每30秒 + 关闭页面时保存</p>
+      </div>
+      <div class="card"><h3>🗑️ 数据</h3><div class="btn-row"><button class="btn danger" onclick="UI.clearAll()">清除全部本地数据</button></div></div>
+      <div class="card"><h3>ℹ️ 关于</h3><p class="ph-sub">星途物语 IDOL LIFE v1.0 · 爱豆模拟器 · 数据仅保存在本机浏览器</p></div>`;
+  },
+  pickTheme(t){UI.applyTheme(t);UI.renderSettings();},
+  saveSettings(){
+    cfg.apiEndpoint=$('s-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    cfg.apiKey=$('s-apikey').value.trim();
+    cfg.model=$('s-model').value||'deepseek-chat';
+    cfg.reasoningEffort=$('s-reasoning').value;
+    cfg.maxTokens=$('s-maxtokens').value;
+    saveCfg();
+    UI.closeModal('settings-modal');
+    UI.toast('✅ 设置已保存','success');
+  },
+  fetchModels(prefix){
+    prefix=prefix||'cfg-';
+    const key=($(prefix+'apikey').value.trim())||cfg.apiKey;
+    const ep=($(prefix+'endpoint').value.trim()||DEFAULTS.apiEndpoint).replace(/\/+$/,'');
+    const hint=prefix==='cfg-'?$('model-hint'):null;
+    const say=t=>{if(hint)hint.textContent=t;else UI.toast(t, t.indexOf('✅')===0?'success':'error');};
+    if(!key){say('⚠️ 需要先填入 API Key 才能拉取模型列表');return;}
+    say('⏳ 正在拉取可用模型…');
+    // 多地址兜底：/chat/completions 端点 → /models；base /v1/models；base /models
+    const candidates=[];
+    if(/\/chat\/completions$/.test(ep))candidates.push(ep.replace(/\/chat\/completions$/,'/models'));
+    candidates.push(ep+'/models');
+    const base=ep.replace(/\/v1\/?$/,'').replace(/\/chat\/completions$/,'');
+    candidates.push(base+'/v1/models',base+'/models');
+    const tryFetch=i=>{
+      if(i>=candidates.length){
+        say('⚠️ 模型列表拉取失败（网络/CORS/Key 无效），已保留默认列表，可直接使用');
+        return Promise.resolve();
+      }
+      const url=candidates[i];
+      return fetch(url,{headers:{'Authorization':'Bearer '+key}}).then(async r=>{
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        const d=await r.json();
+        const list=(d.data||[]).map(m=>m.id).filter(id=>/deepseek|chat|reasoner|gpt|qwen|glm|moonshot|kimi|claude|gemini|v\d/.test(id));
+        if(!list.length)throw new Error('empty');
+        const sel=$(prefix+'model');
+        sel.innerHTML=list.map(m=>`<option>${m}</option>`).join('');
+        sel.value=list.includes(cfg.model)?cfg.model:list[0];
+        say('✅ 已加载 '+list.length+' 个可用模型');
+        return true;
+      }).catch(e=>{
+        if(i<candidates.length-1)return tryFetch(i+1);
+        say('⚠️ 拉取失败（'+e.message+'），已保留默认列表，可直接使用');
+      });
+    };
+    tryFetch(0);
+  },
+  async testApi(prefix){
+    prefix=prefix||'cfg-';
+    const key=$(prefix+'apikey').value.trim();
+    if(!key){UI.toast('请先填写 API Key','error');return;}
+    const ep=($(prefix+'endpoint').value.trim()||DEFAULTS.apiEndpoint).replace(/\/+$/,'');
+    const model=$(prefix+'model').value||cfg.model;
+    UI.toast('⏳ 测试连接中…');
+    try{
+      const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'user',content:'请只回复两个字：连接成功'}],max_tokens:16})});
+      if(r.ok){const j=await r.json().catch(()=>null);if(j&&j.choices&&j.choices[0])UI.toast('✅ 连接成功，API 可用','success');else UI.toast('⚠️ 响应异常，请检查端点','error');}
+      else{
+        let msg='HTTP '+r.status;
+        try{msg=JSON.parse((await r.text())).error?.message||msg}catch(_){}
+        UI.toast('❌ '+msg,'error');
+      }
+    }catch(e){UI.toast('❌ 网络错误：'+e.message,'error');}
+  },
+  exportSave(){
+    const data=JSON.stringify({v:1,cfg,state});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+    a.download='星途物语存档_'+new Date().toISOString().slice(0,10)+'.json';
+    a.click();
+    UI.toast('✅ 存档已导出','success');
+  },
+  importSave(){$('import-file').click();},
+  doImport(file){
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        const j=JSON.parse(rd.result);
+        if(!j||!j.state||!j.state.player)throw new Error('bad');
+        UI.confirm('导入存档','导入将覆盖当前游戏进度，确定继续吗？',()=>{
+          cfg=Object.assign({},DEFAULTS,j.cfg||{});
+          saveCfg();
+          state=j.state;
+          saveState();
+          UI.applyTheme(cfg.theme);
+          UI.applyFontSize();
+          UI.showApp();
+          Engine.renderAll();
+          UI.toast('✅ 存档导入成功','success');
+        });
+      }catch(e){UI.toast('❌ 存档格式不正确','error');}
+    };
+    rd.readAsText(file);
+  },
+  restart(){
+    UI.confirm('重新开始','将清除当前周目进度（星愿点与已购周目继承效果保留），回到创建流程。确定吗？',()=>{
+      try{localStorage.removeItem('xingtu_state');}catch(e){}
+      state=null;
+      location.reload();
+    });
+  },
+  clearAll(){
+    UI.confirm('清除全部数据','将删除全部本地数据（配置/存档/星愿点/周目继承），不可恢复！',()=>{
+      try{localStorage.removeItem('xingtu_state');}catch(e){}
+      try{localStorage.removeItem('xingtu_cfg');}catch(e){}
+      state=null;
+      location.reload();
+    });
+  },
+  /* ---------- 创建流程 ---------- */
+  step:0, alloc:{}, allocLeft:30, cheat:false, traitsSel:[], diffSel:null, custom:{}, kv:[], bg:'', route:'',
+  initSetup(){
+    $('cfg-endpoint').value=cfg.apiEndpoint;
+    $('cfg-apikey').value=cfg.apiKey;
+    $('cfg-model').innerHTML=['deepseek-chat','deepseek-reasoner'].map(m=>`<option>${m}</option>`).join('');
+    $('cfg-model').value=cfg.model||'deepseek-chat';
+    $('cfg-reasoning').value=cfg.reasoningEffort||'medium';
+    $('cfg-maxtokens').value=String(cfg.maxTokens);
+    const personaOpts=['元气满满','高冷寡言','温柔体贴','傲娇嘴硬','文艺安静','阳光开朗','腹黑神秘','天然呆萌','成熟稳重','中二热血','冷静理性','逗趣活宝'].map(p=>`<option>${p}</option>`).join('')+'<option value="__custom__">✏️ 自定义（自行输入）</option>';
+    $('self-persona').innerHTML=personaOpts;
+    $('self-persona').onchange=function(){
+      $('self-persona-custom').classList.toggle('hidden',this.value!=='__custom__');
+      if(this.value==='__custom__')$('self-persona-custom').focus();
+    };
+    $('self-pos').innerHTML=['演员','歌手','综艺咖','全能'].map(p=>`<option>${p}</option>`).join('');
+    if(cfg.apiKey)$('model-hint').textContent='✅ 已检测到已保存的 Key，可点击「拉取模型」刷新列表';
+    UI.renderTraits();UI.renderBg();UI.renderRoute();UI.renderCompany();UI.renderDiff();UI.renderDots();
+  },
+  renderDots(){
+    $('step-dots').innerHTML=[0,1,2,3,4,5].map(i=>`<div class="dot ${i<=this.step?'on':''}"></div>`).join('');
+  },
+  goStep(n){
+    if(n<0||n>5)return;
+    if(n>this.step){
+      if(this.step===0&&!$('cfg-apikey').value.trim()){UI.toast('请先填写 API Key','error');return;}
+      if(this.step===1&&!$('self-name').value.trim()){UI.toast('请填写姓名','error');return;}
+    }
+    this.step=n;
+    document.querySelectorAll('.create-step').forEach(el=>el.classList.remove('active'));
+    $('step-'+['api','self','talent','info','notes','diff'][n]).classList.add('active');
+    this.renderDots();
+    $('setup-overlay').scrollTop=0;
+  },
+  saveApi(){
+    const k=$('cfg-apikey').value.trim();
+    if(!k){UI.toast('请先填写 API Key','error');return;}
+    cfg.apiEndpoint=$('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    cfg.apiKey=k;
+    cfg.model=$('cfg-model').value;
+    cfg.reasoningEffort=$('cfg-reasoning').value;
+    cfg.maxTokens=$('cfg-maxtokens').value;
+    saveCfg();
+    this.goStep(1);
+  },
+  pickSeg(containerId,btn){
+    const c=$(containerId);
+    c.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+  },
+  segValue(id){
+    const s=$(id).querySelector('.seg-btn.selected');
+    return s?s.dataset.v:null;
+  },
+  randName(){
+    const g=this.segValue('self-gender');
+    const fam=rnd(SURNAMES);
+    const given=Array.from({length:1+Math.floor(Math.random()*2)},()=>rnd(g==='男'?GIVEN_M:GIVEN_F)).join('');
+    $('self-name').value=fam+given;
+    if(!$('self-stagename').value)$('self-stagename').value=rnd(STAGE_NAMES);
+  },
+  /* ---------- 天赋（作弊模式） ---------- */
+  toggleCheat(){
+    this.cheat=!this.cheat;
+    const b=$('cheat-toggle');
+    if(b){b.textContent='🔓 作弊模式：'+(this.cheat?'开（无限天赋点）':'关');b.classList.toggle('on',this.cheat);}
+    this.renderTraits();
+  },
+  renderTraits(){
+    const used=Object.values(this.alloc).reduce((a,b)=>a+b,0);
+    $('points-left').textContent=this.cheat?'⚡ 作弊模式 · 无限加点':'剩余 '+(this.allocLeft-used)+' 点';
+    $('attr-alloc').innerHTML=ATTRS.map(a=>`<div class="alloc-row"><span class="alloc-name">${a.i} ${a.n}</span><div class="alloc-ctl"><button class="btn sm" onclick="UI.allocAdd('${a.k}',-1)">−</button><b>${this.alloc[a.k]||0}</b><button class="btn sm" onclick="UI.allocAdd('${a.k}',1)">＋</button></div></div>`).join('');
+    $('trait-list').innerHTML=TRAITS.map(t=>{
+      const on=this.traitsSel.includes(t.k);
+      const maxed=this.traitsSel.length>=2&&!on;
+      const rareMax=this.traitsSel.length>=1&&!on&&t.rare;
+      return `<button class="trait-card ${on?'on':''} ${t.rare?'rare':''} ${(maxed||rareMax)?'dis':''}" onclick="UI.toggleTrait('${t.k}')"><b>${t.i} ${t.n}${t.rare?' · 稀有':''}</b><span>${t.d}</span></button>`;
+    }).join('');
+  },
+  allocAdd(k,delta){
+    const v=(this.alloc[k]||0)+delta;
+    const used=Object.values(this.alloc).reduce((a,b)=>a+b,0);
+    if(!this.cheat&&v<0){UI.toast('不能低于0','error');return;}
+    if(!this.cheat&&delta>0&&used>=this.allocLeft){UI.toast('天赋点不足（作弊模式可无限加点）','error');return;}
+    this.alloc[k]=Math.max(0,v);
+    this.renderTraits();
+  },
+  toggleTrait(k){
+    const t=TRAITS.find(x=>x.k===k);
+    const i=this.traitsSel.indexOf(k);
+    if(i>=0){this.traitsSel.splice(i,1);}
+    else{
+      if(this.traitsSel.length>=2){UI.toast('最多选择2个天赋','error');return;}
+      if(t.rare&&this.traitsSel.some(x=>TRAITS.find(y=>y.k===x).rare)){UI.toast('稀有天赋限选1个','error');return;}
+      this.traitsSel.push(k);
+    }
+    this.renderTraits();
+  },
+  /* ---------- 体系 / 出身 ---------- */
+  renderBg(){
+    $('bg-pick').innerHTML=BACKGROUNDS.map(b=>`<button class="bg-card ${this.bg===b.k?'on':''}" onclick="UI.pickBg('${b.k}')" id="bg-${b.k}"><b>${b.n}</b><span>${b.d}</span></button>`).join('');
+  },
+  pickBg(k){
+    UI.bg=k;
+    document.querySelectorAll('.bg-card').forEach(el=>el.classList.remove('on'));
+    $('bg-'+k).classList.add('on');
+    this.renderCompany();
+  },
+  renderRoute(){
+    $('route-pick').innerHTML=`<button class="route-card ${this.route==='domestic'?'on':''}" data-r="domestic" onclick="UI.pickRoute(this)"><b>🏙️ 本土体系（内娱式）</b><span>个人为中心 · 影视综艺流量 · 星海市</span></button><button class="route-card ${this.route==='kpop'?'on':''}" data-r="kpop" onclick="UI.pickRoute(this)"><b>🎤 韩娱体系（K-POP式）</b><span>团体为中心 · 打歌音源销量 · 首星市</span></button>`;
+  },
+  pickRoute(r){
+    if(typeof r!=='string'){r=(r&&r.dataset)?(r.dataset.r||r.dataset.v||'domestic'):'domestic';}
+    UI.route=r;
+    document.querySelectorAll('.route-card').forEach(el=>el.classList.toggle('on',el.dataset.r===r));
+    const posEl=$('self-pos');
+    posEl.innerHTML=(r==='kpop'?['Center','主唱','主舞','主Rapper','门面','综艺担当','队长']:['演员','歌手','综艺咖','全能']).map(p=>`<option>${p}</option>`).join('');
+    this.renderCompany();
+  },
+  renderCompany(){
+    const bg=UI.bg||'plain';
+    const b=BACKGROUNDS.find(x=>x.k===bg);
+    const opts=(b?b.fx.company:['B']).concat(['A','S','C','B','IND']);
+    const uniq=[...new Set(opts)];
+    if(!$('company-preview'))return;
+    $('company-preview').innerHTML=`<label>公司评级（按出身默认，可自定义）</label><select onchange="UI.rating=this.value">${uniq.map(r=>`<option ${r===(b?b.fx.company[0]:'B')?'selected':''}>${r}</option>`).join('')}</select><p class="ph-sub">${UI.route==='kpop'?'韩娱公司：星曜/顶点/梦想社/双子…':'本土公司：星耀/天穹/华光/星河…'} · 评级越高资源越好、分成越苛刻</p>`;
+  },
+  /* ---------- 备注 ---------- */
+  addKv(){
+    this.kv.push({k:'',v:''});
+    this.renderKv();
+  },
+  delKv(i){
+    this.kv.splice(i,1);
+    this.renderKv();
+  },
+  renderKv(){
+    $('kv-list').innerHTML=this.kv.map((kv,i)=>`<div class="kv-row"><input placeholder="设定名（如 座右铭）" value="${esc(kv.k)}" oninput="UI.kv[${i}].k=this.value"><input placeholder="设定内容" value="${esc(kv.v)}" oninput="UI.kv[${i}].v=this.value"><button class="btn sm danger" onclick="UI.delKv(${i})">✕</button></div>`).join('')||'<div class="empty-tip">点击下方按钮添加自定义设定（AI 会永远记住）</div>';
+  },
+  /* ---------- 难度 ---------- */
+  renderDiff(){
+    const d=DIFFS;
+    $('diff-list').innerHTML=Object.values(d).map(x=>`<button class="diff-card ${this.diffSel===x.id?'on':''}" onclick="UI.pickDiff('${x.id}')"><b>${x.n}</b><span>${x.d}</span></button>`).join('')
+      +`<button class="diff-card ${this.diffSel==='custom'?'on':''}" onclick="UI.pickDiff('custom')"><b>🎛️ 自定义模式</b><span>逐项开关自由组合：体力/金钱/危机/恋爱/军白期/竞争/成长/时间流速</span></button>`;
+    $('custom-panel').classList.toggle('hidden',this.diffSel!=='custom');
+    $('custom-grid').innerHTML=CUSTOM_DEFS.map(c=>`<label>${c.n}</label><select data-k="${c.k}">${c.opts.map(([v,n])=>`<option value="${v}">${n}</option>`).join('')}</select>`).join('');
+    $('custom-grid').querySelectorAll('select').forEach(sel=>{
+      sel.value=UI.custom[sel.dataset.k]||'std';
+      sel.onchange=()=>{UI.custom[sel.dataset.k]=sel.value;UI.renderDiffSummary();};
+    });
+    this.renderDiffSummary();
+  },
+  pickDiff(id){this.diffSel=id;this.renderDiff();},
+  customParams(){
+    const c=this.custom;
+    const hp=c.hp==='easy'?{hpMax:200,hpCost:0.5,rest:2}:c.hp==='hard'?{hpMax:100,hpCost:1.2,rest:0.8}:{hpMax:100,hpCost:1,rest:1};
+    const money=c.money==='easy'?{money:1000000,income:2,expense:0.3}:c.money==='hard'?{money:80000,income:0.7,expense:1.5}:{money:100000,income:1,expense:1};
+    const crisis=c.crisis==='off'?{crisis:false}:c.crisis==='more'?{crisis:true,hard:true}:{crisis:true};
+    const love=c.love==='free'?{loveFree:true}:c.love==='hard'?{loveHard:true}:{};
+    const mil={mil:c.mil==='short'?12:c.mil==='long'?78:52};
+    const comp={comp:c.comp==='weak'?0.5:c.comp==='strong'?1.3:1};
+    const growth={growth:c.growth==='fast'?1.5:c.growth==='slow'?0.8:1};
+    const time={timeHalf:c.time==='half'?true:false};
+    return Object.assign({},hp,money,crisis,love,mil,comp,growth,time,{debut:60});
+  },
+  renderDiffSummary(){
+    const el=$('diff-summary');
+    if(this.diffSel==='custom'){
+      el.innerHTML=`<p class="ph-sub">自定义组合：${CUSTOM_DEFS.map(c=>c.n+'='+(this.custom[c.k]||'std')).join(' · ')}</p>`;
+    }else{
+      const d=DIFFS[this.diffSel];
+      el.innerHTML=d?`<p class="ph-sub">${d.d}</p>`:'';
+    }
+  },
+  startGame(){
+    if(!this.diffSel){UI.toast('请选择难度模式','error');return;}
+    const gender=this.segValue('self-gender')||'女';
+    const params=this.diffSel==='custom'?this.customParams():DIFFS[this.diffSel].p;
+    const draft={
+      name:$('self-name').value.trim()||'无名',
+      stageName:$('self-stagename').value.trim(),
+      gender,
+      age:parseInt($('self-age').value)||18,
+      personality:$('self-persona').value==='__custom__'?($('self-persona-custom').value.trim()||'元气满满'):$('self-persona').value,
+      appearance:$('self-appearance').value.trim(),
+      background:this.bg||'plain',
+      route:this.route||'domestic',
+      position:$('self-pos').value,
+      traits:this.traitsSel.slice(),
+      alloc:Object.assign({},this.alloc),
+      notes:this.kv.filter(x=>x.k&&x.v),
+      extra:$('self-notes').value.trim(),
+      diffId:this.diffSel,
+      params,
+      rating:$('company-preview')&&$('company-preview').querySelector('select')?$('company-preview').querySelector('select').value:'B',
+      money:params.money
+    };
+    Engine.newGame(draft);
+    UI.showApp();
+    Game.opening();
+  }
+});
+/* ================= 补齐：事件选择/别名/启动 ================= */
+UI.randSelfName=function(){UI.randName();};
+UI.addKV=function(){UI.addKv();};
+Game.startGame=function(){UI.startGame();};
+UI.debutOpts=function(data){
+  const p=state.player,a=p.attrs,line=state.diff.p.debut;
+  const koi=Engine.hasTrait('koi')?0.1:0;
+  const rate=r=>Math.min(1,r+koi);
+  const song=rnd(SONG_TITLES),drama=rnd(DRAMA_TITLES);
+  if(p.route==='kpop'){
+    return [
+      {n:'生存选秀《星光PROJECT》',d:'排名制+国民制作人投票，冠军直通出道，有淘汰风险',rate:rate(0.5+data.reach/200),cond:true,fx:{work:'出道曲《'+song+'》',fans:600000,fame:12},fail:{yq:10,text:'止步决赛圈，全网心疼，来年再战'}},
+      {n:'公司企划组队出道',d:'公司组队4-9人，正规偶像团',rate:rate(0.9),cond:a.vocal>=line*0.9&&state.res.ceval>=55,fx:{work:'出道曲《'+song+'》',fans:350000,fame:6}},
+      {n:'独立出道',d:'无公司，全靠自己（需资金150万）',rate:rate(0.8),cond:state.res.money>=1500000,fx:{work:'出道曲《'+song+'》',fans:250000,fame:5,rating:'IND'}}
+    ];
+  }
+  return [
+    {n:'影视出道',d:'网剧配角起步，演技说话',rate:rate(0.85),cond:a.acting>=line*0.85,fx:{drama:'出道剧《'+drama+'》',fans:200000,fame:8}},
+    {n:'选秀《星梦成真》',d:'人气出道，粉丝基础大',rate:rate(0.7),cond:true,fx:{work:'出道单曲《'+song+'》',fans:500000,fame:10},fail:{yq:10,text:'卡位淘汰，遗憾离场'}},
+    {n:'公司企划出道',d:'公司全力打造',rate:rate(0.9),cond:state.res.ceval>=55,fx:{work:'出道单曲《'+song+'》',fans:300000,fame:6}},
+    {n:'独立出道',d:'无公司，全靠自己（需资金200万）',rate:rate(0.8),cond:state.res.money>=2000000,fx:{work:'出道单曲《'+song+'》',fans:250000,fame:5,rating:'IND'}}
+  ];
+};
+UI.showDebut=function(data){
+  $('ev-title').textContent='🌟 出道时刻';
+  const opts=UI.debutOpts(data);
+  const line=state.diff.p.debut;
+  $('ev-body').innerHTML=`<div class="ev-type opportunity">出道条件已达成（${data.reach} ≥ ${line}）</div><div class="ev-text">练习生生涯迎来毕业考。${state.player.name}，选择你的出道方式——这决定了你星途的起点。</div><div class="ev-opts">${opts.map((o,i)=>`<button class="ev-opt ${o.cond?'':'dis'}" ${o.cond?'':'disabled'} onclick="Engine.chooseDebut(${i})"><div class="eo-t">${o.n}</div><div class="eo-d">${o.d}</div><div class="eo-r">成功率 ${Math.round(Math.min(100,(o.rate||1)*100))}%</div></button>`).join('')}</div>`;
+  UI.openModal('event-modal');
+};
+Engine.chooseEvent=function(id,optIdx){
+  const evt=EVENTS.find(e=>e.id===id);
+  if(!evt||!evt.opts[optIdx])return;
+  const facts=state.weekFact||{events:[],notes:[]};
+  this.applyEventFx(evt,evt.opts[optIdx],facts,false);
+  this.save();this.renderAll();
+  UI.closeModal('event-modal');
+  UI.nextQueue();
+};
+Engine.chooseDebut=function(i){
+  const opts=UI.debutOpts(UI._debutData||{reach:0});
+  const opt=opts[i];
+  if(!opt||opt.cond===false)return;
+  const facts=state.weekFact||{events:[],notes:[]};
+  if(chance(opt.rate||1)){
+    this.doDebut(opt);
+    facts.events.push({t:'出道',out:'成功（'+opt.n+'）'});
+  }else{
+    const fail=opt.fail||{yq:10,text:'遗憾落选'};
+    if(fail.yq)state.yq=clamp(state.yq+fail.yq,0,100);
+    this.timeline('😢 出道失败：'+(fail.text||'遗憾落选'));
+    facts.events.push({t:'出道尝试',out:'失败'});
+  }
+  this.save();this.renderAll();
+  UI.closeModal('event-modal');
+  UI.nextQueue();
+};
+Engine.chooseMilitary=function(i){
+  const opts=[
+    {t:'按时入伍，提前备好物料',d:'军白期人气流失减半，退伍可王者归来',rate:1,fx:{milStart:true,supplies:70}},
+    {t:'申请延期一年',d:'舆论争议：舆情+20，多一年缓冲',rate:0.85,fx:{milStart:true,supplies:50,yq:20},fail:{yq:40,milStart:true,supplies:20,text:'延期被骂"逃兵役"'}},
+    {t:'尝试体检豁免',d:'高风险，被扒=国民级丑闻',rate:0.4,fx:{milStart:false},fail:{yq:80,milStart:true,supplies:20,text:'豁免被媒体扒出造假'}}
+  ];
+  const opt=opts[i];if(!opt)return;
+  const facts=state.weekFact||{events:[],notes:[]};
+  if(chance(opt.rate||1)){
+    this.doMilitary(opt.fx);
+    facts.events.push({t:'兵役',out:'入伍（物料'+opt.fx.supplies+'）'});
+  }else{
+    const f=opt.fail||opt.fx;
+    this.doMilitary(f);
+    facts.events.push({t:'兵役',out:'入伍（受挫，物料'+f.supplies+'）'});
+  }
+  this.save();this.renderAll();
+  UI.closeModal('event-modal');
+  UI.nextQueue();
+};
+Engine.doDebut=function(opt){
+  const a=state.player.attrs;
+  if(opt.fx.drama){this.addWork({type:'drama',title:opt.fx.drama,score:Math.round(a.acting*0.6+a.vocal*0.2+30),role:'主角'});}
+  if(opt.fx.work){this.addWork({type:'song',title:opt.fx.work,score:Math.round(a.vocal*0.3+a.writing*0.2+a.charm*0.2+25),album:rnd(ALBUM_NAMES)});}
+  if(opt.fx.rating){state.company.rating=opt.fx.rating;state.company.contract=0;}
+  state.debut=true;state.stage='rookie';
+  state.res.fans+=(opt.fx.fans||0);
+  state.res.fame=clamp(state.res.fame+(opt.fx.fame||0),0,100);
+  this.wish(20);
+  this.timeline('🌟 出道成功！进入「新人期」');
+  this.addMemory('荣誉','以「'+opt.n+'」方式正式出道','第'+state.time.w+'周');
+};
+Engine.doMilitary=function(o){
+  if(o&&o.milStart===false){this.timeline('✅ 兵役豁免成功，躲过军白期');this.addMemory('事件','兵役豁免成功','第'+state.time.w+'周');return;}
+  state.military.active=true;
+  state.military.left=Math.max(6,Math.round(this.diffP().mil||52));
+  state.military.supplies=(o&&o.supplies)||0;
+  if(o&&o.yq)state.yq=clamp(state.yq+o.yq,0,100);
+  this.timeline('🪖 入伍。军白期约'+state.military.left+'周（物料储备'+state.military.supplies+'）');
+  this.addMemory('事件','入伍进入军白期，军白期'+state.military.left+'周','第'+state.time.w+'周');
+};
+/* ---------- 启动 ---------- */
+(function boot(){
+  UI.applyTheme(cfg.theme||'starnight');
+  UI.applyFontSize();
+  $('cf-ok').onclick=()=>{UI.closeModal('confirm-modal');if(window._cfOk){window._cfOk();window._cfOk=null;}};
+  $('import-file').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)UI.doImport(f);e.target.value='';});
+  $('user-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();Game.send();}});
+  setInterval(()=>{if(state&&cfg.autoSave)saveState();},30000);
+  window.addEventListener('beforeunload',()=>{if(state)saveState();});
+  const saved=lsGet('xingtu_state',null);
+  if(saved&&saved.player&&saved.v){
+    state=saved;
+    UI.showApp();
+    Engine.renderAll();
+    Engine.addLog('system','💾 已恢复存档：'+state.player.name+' · 第'+state.time.w+'周 · '+STAGE_NAME[state.stage]);
+  }else{
+    $('setup-overlay').classList.remove('hidden');
+    UI.initSetup();
+  }
+})();
+</script>
+</body>
+</html>

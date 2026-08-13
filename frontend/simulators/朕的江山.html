@@ -1,0 +1,2373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0e0b07">
+<title>朕的江山 · 皇帝模拟 AI 游戏</title>
+<style>
+/* ============ Tokens ============ */
+:root{
+  --topbar-h:48px; --drawer-w:340px; --rad:6px; --rad2:10px; --rad3:16px; --tr:180ms ease;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --serif:"KaiTi","STKaiti","SimSun","Songti SC","Noto Serif SC",serif;
+  --mono:"SF Mono","Cascadia Code",Consolas,monospace;
+}
+body[data-theme="jinluan"]{
+  --bg-deep:#0e0b07; --bg-surface:#17120a; --bg-elevated:#201910; --bg-hover:#2b2214;
+  --border:#3a2d1a; --border-active:#6b5430;
+  --t:#efe6d3; --t2:#b8a98a; --t3:#8a7a5c;
+  --accent:#e8b34b; --accent-dim:#b8862f; --accent-glow:rgba(232,179,75,.14);
+  --gold:#e8b34b; --gold-dim:#b8862f; --gold-glow:rgba(232,179,75,.14);
+  --jade:#4ecfa4; --jade-dim:#2e8f6e; --jade-glow:rgba(78,207,164,.13);
+  --r:#e85058; --gr:#35c878; --purple:#a58ae8; --blue:#6ea8ff;
+  --shadow:0 10px 44px rgba(0,0,0,.6);
+  --glow:radial-gradient(70% 42% at 50% 0%, rgba(232,179,75,.08), transparent 70%);
+}
+body[data-theme="gongque"]{
+  --bg-deep:#f3ecdd; --bg-surface:#fdfaf3; --bg-elevated:#f6eedd; --bg-hover:#eee1c8;
+  --border:#e0d2b6; --border-active:#b89b66;
+  --t:#3d3120; --t2:#77664a; --t3:#a08a63;
+  --accent:#b23a2e; --accent-dim:#8f2b22; --accent-glow:rgba(178,58,46,.12);
+  --gold:#a06a1f; --gold-dim:#83561a; --gold-glow:rgba(160,106,31,.13);
+  --jade:#1f8a63; --jade-dim:#176b4d; --jade-glow:rgba(31,138,99,.12);
+  --r:#c43b45; --gr:#248a52; --purple:#7a5fd0; --blue:#3f6fc0;
+  --shadow:0 10px 40px rgba(110,80,40,.18);
+  --glow:radial-gradient(70% 42% at 50% 0%, rgba(178,58,46,.07), transparent 70%);
+}
+body[data-theme="xinghan"]{
+  --bg-deep:#0b0f1c; --bg-surface:#121830; --bg-elevated:#1a2140; --bg-hover:#232c50;
+  --border:#2c3760; --border-active:#42508a;
+  --t:#e9edfb; --t2:#a4aed0; --t3:#6d77a0;
+  --accent:#5aa7ff; --accent-dim:#3f7fd6; --accent-glow:rgba(90,167,255,.15);
+  --gold:#ffd166; --gold-dim:#c49a35; --gold-glow:rgba(255,209,102,.14);
+  --jade:#3ecfa8; --jade-dim:#2a8f74; --jade-glow:rgba(62,207,168,.13);
+  --r:#e85058; --gr:#35c878; --purple:#a070f0; --blue:#5aa7ff;
+  --shadow:0 10px 44px rgba(0,0,0,.55);
+  --glow:radial-gradient(70% 42% at 50% 0%, rgba(90,167,255,.10), transparent 70%);
+}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg-deep);color:var(--t);line-height:1.55;-webkit-font-smoothing:antialiased;user-select:none;font-size:13px}
+body::before{content:'';position:fixed;inset:0;background:var(--glow);pointer-events:none;z-index:0}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea,select{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--rad);padding:8px 12px;outline:none;transition:border var(--tr)}
+input:focus,textarea:focus,select:focus{border-color:var(--accent-dim)}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--t3) 50%),linear-gradient(135deg,var(--t3) 50%,transparent 50%);background-position:calc(100% - 16px) 55%,calc(100% - 11px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:28px}
+textarea{resize:vertical}
+.hidden{display:none!important}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+/* ============ App layout ============ */
+#app{display:grid;grid-template-columns:1fr;grid-template-rows:var(--topbar-h) 1fr;height:100vh;height:100dvh;position:relative;z-index:1}
+#topbar{grid-row:1;background:var(--bg-surface);display:flex;align-items:center;padding:0 10px;gap:7px;border-bottom:1px solid var(--border);z-index:20;overflow-x:auto}
+#topbar::-webkit-scrollbar{display:none}
+#topbar .logo{font-size:14px;font-weight:800;letter-spacing:2px;color:var(--accent);font-family:var(--serif);white-space:nowrap}
+#topbar .logo span{color:var(--t3);font-weight:400;font-size:9.5px;letter-spacing:.5px;margin-left:5px;font-family:var(--font)}
+#topbar .spacer{flex:1;min-width:4px}
+.top-btn{padding:5px 10px;border-radius:var(--rad);font-size:11.5px;font-weight:500;border:1px solid var(--border);color:var(--t2);display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all var(--tr);flex-shrink:0}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+.top-btn.jade{border-color:var(--jade-dim);color:var(--jade)}
+.top-btn.jade:hover{background:var(--jade-glow)}
+.top-btn.purple{border-color:var(--purple);color:var(--purple)}
+.top-btn.purple:hover{background:rgba(165,138,232,.12)}
+.top-btn.danger{border-color:var(--r);color:var(--r)}
+.top-chip{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:16px;border:1px solid var(--border);font-size:10.5px;color:var(--t2);white-space:nowrap;flex-shrink:0;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.top-chip b{font-family:var(--mono);font-weight:700}
+#center-panel{grid-row:2;background:var(--bg-deep);display:flex;flex-direction:column;overflow:hidden;position:relative}
+
+/* ============ Game log ============ */
+#game-log{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.log-entry{padding:10px 14px;border-radius:var(--rad2);font-size:13px;line-height:1.78;animation:fadeIn 250ms ease;user-select:text;word-break:break-word}
+.log-entry.narrative{background:var(--bg-elevated);border-left:3px solid var(--gold-dim)}
+.log-entry.player{background:var(--bg-elevated);border-left:3px solid var(--jade-dim);color:var(--t2)}
+.log-entry.player b{color:var(--t);font-weight:600}
+.log-entry.system{background:var(--bg-surface);border-left:3px solid var(--t3);font-size:10.5px;color:var(--t3);font-family:var(--mono);line-height:1.6}
+.log-entry.stat{background:var(--bg-surface);border-left:3px solid var(--gold-dim);font-size:11px;color:var(--gold)}
+.log-entry.think{background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid var(--purple);font-size:11.5px;color:var(--t2);white-space:pre-wrap;word-break:break-word}
+.log-entry.think summary{color:var(--purple);font-size:12px;font-weight:600;cursor:pointer;user-select:none}
+.log-entry.think .think-body{margin-top:6px;line-height:1.7}
+.log-entry .who{font-weight:600}
+.log-entry .who.ai{color:var(--gold)}
+.log-entry .who.pl{color:var(--jade)}
+.log-entry.streaming .cursor{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink .9s infinite;border-radius:1px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ============ Situation bar + Input ============ */
+#situation-bar{display:none;align-items:center;gap:8px;padding:6px 18px;background:var(--bg-surface);border-top:1px solid var(--border);font-size:11px;color:var(--t2);flex-wrap:wrap}
+#situation-bar.show{display:flex}
+#situation-bar .st-loc{color:var(--gold);font-weight:600}
+#situation-bar .st-note{color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.quick-actions{display:flex;flex-wrap:wrap;gap:6px;padding:8px 18px 0}
+.quick-action{padding:5px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--t2);transition:all var(--tr);flex-shrink:0}
+.quick-action:hover{background:var(--bg-hover);color:var(--t);border-color:var(--gold-dim)}
+#input-area{padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:var(--bg-surface);border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end}
+#input-area textarea{flex:1;resize:none;min-height:42px;max-height:110px;font-size:13.5px;line-height:1.5;background:var(--bg-deep);padding:10px 13px;border-radius:var(--rad2)}
+#input-area textarea::placeholder{color:var(--t3)}
+#send-btn{padding:10px 20px;background:var(--accent);color:#fff;border-radius:var(--rad2);font-weight:600;font-size:13px;transition:all var(--tr);white-space:nowrap;box-shadow:0 2px 12px var(--accent-glow)}
+#send-btn:hover{filter:brightness(1.1)}
+#send-btn:disabled{opacity:0.35;cursor:not-allowed;box-shadow:none}
+.gen-btn{padding:10px 11px;background:var(--bg-elevated);color:var(--t2);border:1px solid var(--border);border-radius:var(--rad2);font-size:13px;line-height:1;white-space:nowrap;transition:all var(--tr);cursor:pointer}
+.gen-btn:hover{background:var(--bg-hover);color:var(--t)}
+.gen-btn:disabled{opacity:.35;cursor:not-allowed}
+#stop-btn{background:var(--r);border-color:transparent;color:#fff}
+#stop-btn:hover{filter:brightness(1.1);color:#fff}
+#loading-indicator{display:none;align-items:center;gap:7px;padding:8px 12px;font-size:11px;color:var(--t3)}
+#loading-indicator.show{display:flex}
+#loading-indicator .dots{display:flex;gap:3px}
+#loading-indicator .dots span{width:5px;height:5px;background:var(--accent);border-radius:50%;animation:bounce 1s infinite}
+#loading-indicator .dots span:nth-child(2){animation-delay:0.15s}
+#loading-indicator .dots span:nth-child(3){animation-delay:0.3s}
+@keyframes bounce{0%,80%,100%{transform:scale(0.5)}40%{transform:scale(1)}}
+
+/* ============ Drawer (角色档案) ============ */
+#char-drawer{position:fixed;left:0;top:0;bottom:0;width:var(--drawer-w);max-width:94vw;background:var(--bg-surface);z-index:60;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:10px;transform:translateX(-102%);transition:transform 240ms ease;border-right:1px solid var(--border);box-shadow:6px 0 28px rgba(0,0,0,.35)}
+#char-drawer.open{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:2px 2px 4px}
+.drawer-head .tt{font-size:14px;font-weight:700;color:var(--gold);letter-spacing:1px;font-family:var(--serif)}
+.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:55;display:none}
+.drawer-backdrop.show{display:block}
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:11px}
+.panel-card h2{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:8px}
+.panel-card h2 .more{float:right;color:var(--t3);cursor:pointer}
+.char-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.char-name{font-size:14px;font-weight:700}
+.char-sub{font-size:10px;color:var(--t3);margin-top:1px}
+.stat-row{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.stat-row .lbl{font-size:10px;color:var(--t3);width:40px;flex-shrink:0;white-space:nowrap}
+.stat-row .sbar{flex:1;height:8px;background:var(--bg-deep);border-radius:4px;overflow:hidden}
+.stat-row .sbar div{height:100%;border-radius:4px;transition:width 500ms ease}
+.stat-row .val{font-size:10px;color:var(--t2);width:38px;text-align:right;font-family:var(--mono);flex-shrink:0}
+.info-line{font-size:10.5px;color:var(--t2);padding:2px 0;line-height:1.65}
+.info-line .k{color:var(--t3)}
+.ev-item{font-size:10px;color:var(--t2);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;gap:6px;line-height:1.5}
+.ev-item:last-child{border-bottom:none}
+.ev-item .ev-t{color:var(--t3);font-family:var(--mono);font-size:9px;white-space:nowrap;flex-shrink:0}
+.ev-item .ev-d{color:var(--gold)}
+.ev-item .ev-m{color:var(--r)}
+.ev-item .ev-n{color:var(--t3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 15px;border-radius:var(--rad);font-size:12px;font-weight:500;border:1px solid var(--border);color:var(--t2);transition:all var(--tr);white-space:nowrap}
+.btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.btn.sm{padding:4px 10px;font-size:11px}
+.btn.accent{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 2px 12px var(--accent-glow)}
+.btn.accent:hover{filter:brightness(1.1);background:var(--accent)}
+.btn.gold{background:var(--gold);color:#000;border-color:var(--gold)}
+.btn.gold:hover{filter:brightness(1.08)}
+.btn.jade{background:var(--jade);color:#000;border-color:var(--jade)}
+.btn.danger{color:var(--r);border-color:var(--r)}
+.btn.danger:hover{background:var(--r);color:#fff}
+.btn-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.btn-row.right{justify-content:flex-end}
+
+/* ============ Pillar pages (御宇/椒房/天命) ============ */
+.page-overlay{position:fixed;inset:0;background:var(--bg-deep);z-index:80;display:none;flex-direction:column;overflow:hidden}
+.page-panel{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;width:100%;max-width:1060px;margin:0 auto}
+.page-overlay.show{display:flex}
+.page-head{display:flex;align-items:center;gap:10px;padding:0 14px;height:var(--topbar-h);background:var(--bg-surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.page-head .pt{font-size:15px;font-weight:800;color:var(--gold);font-family:var(--serif);letter-spacing:2px}
+.page-head .ps{font-size:10.5px;color:var(--t3)}
+.page-head .spacer{flex:1}
+.page-body{flex:1;overflow-y:auto;min-height:0;padding:14px 16px 40px;display:flex;flex-direction:column;gap:12px;width:100%}
+.section-title{font-size:12px;font-weight:700;color:var(--t2);letter-spacing:1.5px;margin:6px 0 2px;display:flex;align-items:center;gap:6px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.stat-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:10px 12px}
+.stat-card .sc-name{font-size:10px;color:var(--t3);letter-spacing:.5px}
+.stat-card .sc-val{font-size:19px;font-weight:800;font-family:var(--mono);margin:2px 0 5px}
+.stat-card .sc-bar{height:6px;border-radius:3px;background:var(--bg-deep);overflow:hidden}
+.stat-card .sc-bar div{height:100%;border-radius:3px;transition:width 500ms ease}
+.map-wrap{display:flex;gap:12px;flex-wrap:wrap}
+.map-svg{flex:1 1 430px;min-width:0;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:8px;position:relative}
+.map-svg svg{width:100%;height:auto;display:block}
+.map-svg .prov{stroke:var(--border-active);stroke-width:1.6;cursor:pointer;transition:fill .3s,filter .2s}
+.map-svg .prov:hover{filter:brightness(1.18)}
+.map-svg .prov.sel{stroke:var(--accent);stroke-width:2.6;filter:brightness(1.22)}
+.map-svg .prov-name{font-size:12px;font-weight:700;fill:var(--t);pointer-events:none;font-family:var(--serif)}
+.map-svg .prov-tag{font-size:8px;fill:var(--t3);pointer-events:none}
+.map-svg .ext-label{font-size:10px;fill:var(--r);font-weight:700;pointer-events:none}
+.prov-detail{flex:1 1 260px;min-width:250px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:12px;align-self:flex-start}
+.prov-detail h3{font-size:14px;font-family:var(--serif);color:var(--gold);letter-spacing:1px}
+.prov-detail .pd-type{font-size:9.5px;color:var(--t3);margin-bottom:8px}
+.d-row{font-size:10.5px;color:var(--t2);padding:2px 0}
+.d-row .k{color:var(--t3)}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ministry-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:9px 11px}
+.ministry-card .mc-name{font-size:11px;font-weight:700;color:var(--gold)}
+.ministry-card .mc-note{font-size:10px;color:var(--t2);margin-top:3px;line-height:1.55}
+.faction-row{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.faction-row .f-name{font-size:10.5px;color:var(--t2);width:52px;flex-shrink:0}
+.faction-row .f-bar{flex:1;height:8px;background:var(--bg-deep);border-radius:4px;overflow:hidden}
+.faction-row .f-bar div{height:100%;border-radius:4px;transition:width 500ms ease}
+.faction-row .f-val{font-size:10px;font-family:var(--mono);width:26px;text-align:right;color:var(--t2)}
+.faction-row .f-mood{font-size:9.5px;color:var(--t3);width:74px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dip-row{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:10.5px}
+.dip-row:last-child{border-bottom:none}
+.dip-row .d-name{color:var(--t2);width:56px;flex-shrink:0}
+.dip-row .d-val{color:var(--gold);flex:1;text-align:right}
+.consort-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.consort-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:11px;position:relative}
+.consort-card .cc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.consort-card .cc-name{font-size:12.5px;font-weight:700}
+.rank-badge{display:inline-block;font-size:9px;padding:1px 7px;border-radius:10px;background:var(--gold-glow);color:var(--gold);border:1px solid var(--gold-dim);white-space:nowrap}
+.consort-card .cc-mood{font-size:9.5px;color:var(--t3);margin-top:1px}
+.consort-card .cc-attrs{font-size:9.5px;color:var(--t3);line-height:1.7;margin-top:4px}
+.consort-card .cc-note{font-size:10px;color:var(--t2);line-height:1.55;margin-top:5px;border-top:1px dashed var(--border);padding-top:5px}
+.child-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.child-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:10px 11px}
+.child-card .cd-name{font-size:12px;font-weight:700}
+.child-card .cd-meta{font-size:9.5px;color:var(--t3);margin:2px 0 4px}
+.child-card .cd-note{font-size:10px;color:var(--t2);line-height:1.55}
+.timeline{display:flex;flex-direction:column;gap:6px}
+.tl-item{display:flex;gap:9px;font-size:11px;line-height:1.6;color:var(--t2);padding:6px 9px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad);border-left:3px solid var(--t3)}
+.tl-item.auspice{border-left-color:var(--gold)}
+.tl-item.calamity{border-left-color:var(--r)}
+.tl-item.harem{border-left-color:var(--accent)}
+.tl-item.court{border-left-color:var(--blue)}
+.tl-item.war{border-left-color:var(--purple)}
+.tl-item .tl-time{font-size:9.5px;color:var(--t3);font-family:var(--mono);white-space:nowrap;flex-shrink:0;padding-top:1px}
+.taikou-card{background:var(--bg-elevated);border:1px solid var(--gold-dim);border-radius:var(--rad2);padding:11px}
+.taikou-card .tk-name{font-size:12px;font-weight:700;color:var(--gold)}
+.taikou-card .tk-note{font-size:10.5px;color:var(--t2);margin-top:4px;line-height:1.6}
+
+/* ============ Modal ============ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100;display:none;align-items:center;justify-content:center;animation:fadeIn 200ms ease;padding:14px}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:16px;padding:20px;width:520px;max-width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow)}
+.modal h2{font-size:15px;color:var(--gold);margin-bottom:13px;letter-spacing:.5px;font-family:var(--serif)}
+.modal label{font-size:10px;color:var(--t3);display:block;margin-bottom:3px;letter-spacing:.6px}
+.modal input,.modal select,.modal textarea{width:100%;margin-bottom:11px;padding:8px 11px;font-size:12.5px}
+.modal .row2{display:flex;gap:6px}
+.modal .row2 input{flex:1}
+.modal .row2 .btn{flex-shrink:0;margin-bottom:11px}
+.modal .hint{font-size:9.5px;color:var(--t3);margin-top:-8px;margin-bottom:11px;line-height:1.6}
+.modal .divider{margin:14px 0 12px;border-top:1px solid var(--border)}
+.mem-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.mem-tab{padding:4px 10px;border-radius:14px;font-size:10px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr)}
+.mem-tab.active{border-color:var(--gold-dim);color:var(--gold);background:var(--gold-glow)}
+.mem-item{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px;color:var(--t2);line-height:1.65}
+.mem-item .m-meta{font-size:9px;color:var(--t3);font-family:var(--mono)}
+.mem-empty{font-size:11px;color:var(--t3);text-align:center;padding:16px}
+
+/* ============ Setup wizard ============ */
+#setup-overlay{position:fixed;inset:0;background:var(--bg-deep);z-index:300;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:26px 12px 60px}
+#setup-overlay.hidden{display:none}
+.petals{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.petal{position:absolute;top:-4%;width:9px;height:9px;background:var(--gold);opacity:.16;border-radius:60% 40% 55% 45%;animation:petalFall linear infinite}
+@keyframes petalFall{0%{transform:translateY(-4vh) translateX(0) rotate(0)}100%{transform:translateY(104vh) translateX(60px) rotate(320deg)}}
+.setup-wrap{width:480px;max-width:94vw;position:relative;z-index:2;display:flex;flex-direction:column;align-items:center}
+#setup-overlay h1{font-size:28px;color:var(--gold);letter-spacing:6px;margin-bottom:3px;font-weight:800;font-family:var(--serif)}
+#setup-overlay .sub{font-size:11px;color:var(--t3);margin-bottom:14px;letter-spacing:1px}
+.step-dots{display:flex;gap:7px;margin-bottom:16px}
+.step-dots .dot{width:9px;height:9px;border-radius:50%;background:var(--border);transition:all var(--tr)}
+.step-dots .dot.on{background:var(--gold);box-shadow:0 0 8px var(--gold-glow);transform:scale(1.25)}
+.setup-box{width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+.create-step{display:none;flex-direction:column;gap:11px}
+.create-step.active{display:flex}
+.create-step .step-title{font-size:14px;font-weight:700;color:var(--t);text-align:center;letter-spacing:.5px}
+.create-step .step-hint{font-size:10.5px;color:var(--t3);text-align:center;line-height:1.6}
+.create-step input[type=text],.create-step input:not([type]),.create-step input[type=password],.create-step select,.create-step textarea{width:100%;font-size:13px;padding:9px 13px;background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad2)}
+.create-step textarea{resize:vertical;min-height:54px}
+.create-step label{font-size:10px;color:var(--t3);display:block;margin-bottom:3px;letter-spacing:.5px}
+.option-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.option-card{padding:12px 8px;text-align:center;background:var(--bg-elevated);border:2px solid var(--border);border-radius:var(--rad2);cursor:pointer;transition:all var(--tr);font-size:11.5px;line-height:1.4}
+.option-card:hover{border-color:var(--gold-dim);background:var(--bg-hover)}
+.option-card.selected{border-color:var(--gold);background:var(--gold-glow);color:var(--gold)}
+.option-card .oc-icon{font-size:20px;display:block;margin-bottom:3px}
+.option-card .oc-name{font-weight:600}
+.option-card .oc-desc{font-size:8.5px;color:var(--t3);margin-top:2px}
+.seg{display:flex;gap:6px;width:100%;margin-bottom:11px}
+.seg .seg-btn{flex:1;padding:8px 6px;text-align:center;background:var(--bg-elevated);border:2px solid var(--border);border-radius:var(--rad2);font-size:12px;color:var(--t2);transition:all var(--tr)}
+.seg .seg-btn.selected{border-color:var(--gold);background:var(--gold-glow);color:var(--gold);font-weight:600}
+.trait-setup .trait-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.trait-setup .trait-row .t-icon{font-size:16px;width:24px;text-align:center}
+.trait-setup .trait-row .t-info{flex:1}
+.trait-setup .trait-row .t-name{font-size:11.5px;font-weight:600}
+.trait-setup .trait-row .t-desc{font-size:8.5px;color:var(--t3)}
+.trait-setup .trait-row .t-ctrl{display:flex;align-items:center;gap:7px}
+.trait-setup .trait-row .t-ctrl button{width:27px;height:27px;border-radius:50%;border:1px solid var(--border-active);color:var(--gold);font-size:15px;font-weight:700;line-height:1;transition:all var(--tr)}
+.trait-setup .trait-row .t-ctrl button:hover{background:var(--gold-glow);border-color:var(--gold)}
+.trait-setup .trait-row .t-ctrl button:disabled{opacity:0.25;cursor:not-allowed}
+.trait-setup .trait-row .t-val{width:24px;text-align:center;font-family:var(--mono);font-weight:700;font-size:14px;color:var(--t)}
+.points-left{font-size:12px;color:var(--gold);font-weight:700;text-align:center}
+.cheat-toggle{padding:4px 12px;border-radius:14px;font-size:10.5px;border:1px dashed var(--gold-dim);color:var(--gold);transition:all var(--tr);cursor:pointer}
+.cheat-toggle:hover{background:var(--gold-glow)}
+.cheat-toggle.on{background:var(--gold);color:#000;border-style:solid;font-weight:700;box-shadow:0 0 10px var(--gold-glow)}
+.create-nav{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.create-nav button{padding:10px 26px;border-radius:var(--rad2);font-size:13px;font-weight:600;transition:all var(--tr)}
+.create-nav .btn-prev{background:transparent;border:1px solid var(--border);color:var(--t2)}
+.create-nav .btn-prev:hover{background:var(--bg-hover);color:var(--t)}
+.create-nav .btn-next{background:var(--accent);color:#fff;border:1px solid var(--accent);box-shadow:0 2px 14px var(--accent-glow)}
+.create-nav .btn-next:hover{filter:brightness(1.1)}
+.ready-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:11px;font-size:11px;line-height:1.7;color:var(--t2)}
+.ready-card b{color:var(--t)}
+.ready-card .rc-h{font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1px;margin-bottom:5px}
+
+/* ============ Encyclopedia ============ */
+.ency-search{width:100%;margin-bottom:10px}
+.ency-section{margin-bottom:6px;border:1px solid var(--border);border-radius:var(--rad2);overflow:hidden;background:var(--bg-surface)}
+.ency-section summary{padding:10px 13px;font-size:12.5px;font-weight:700;color:var(--gold);cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:7px}
+.ency-section summary::-webkit-details-marker{display:none}
+.ency-section summary::after{content:'▾';margin-left:auto;color:var(--t3);transition:transform var(--tr)}
+.ency-section[open] summary::after{transform:rotate(180deg)}
+.ency-body{padding:2px 13px 12px;font-size:11.5px;color:var(--t2);line-height:1.85}
+.ency-body table{width:100%;border-collapse:collapse;margin:6px 0}
+.ency-body td,.ency-body th{border:1px solid var(--border);padding:5px 8px;font-size:10.5px;text-align:left}
+.ency-body th{color:var(--gold);font-weight:600;background:var(--bg-elevated)}
+.ency-body .h{color:var(--gold);font-weight:700;margin-top:8px}
+.ency-body code{font-family:var(--mono);font-size:10.5px;color:var(--jade)}
+.ency-item{display:none}
+.ency-item.show{display:block}
+
+/* ============ Ending / Failure ============ */
+#ending-overlay{position:fixed;inset:0;background:rgba(5,3,1,.92);z-index:400;display:none;align-items:center;justify-content:center;overflow-y:auto;padding:20px 12px 60px}
+#ending-overlay.show{display:flex}
+.ending-box{width:560px;max-width:96vw;text-align:center}
+.ending-title{font-size:13px;color:var(--t3);letter-spacing:3px;margin-bottom:8px}
+.ending-title.fail{color:var(--r)}
+.ending-big{font-size:42px;font-weight:800;color:var(--gold);font-family:var(--serif);letter-spacing:8px;margin-bottom:4px;text-shadow:0 0 30px var(--gold-glow)}
+.ending-sub{font-size:12px;color:var(--t2);margin-bottom:16px}
+.ending-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:13px 15px;text-align:left;margin-bottom:10px}
+.ending-card .ec-h{font-size:10px;color:var(--gold);font-weight:700;letter-spacing:1.5px;margin-bottom:6px}
+.ending-card .ec-t{font-size:11.5px;color:var(--t2);line-height:1.8;white-space:pre-wrap}
+.ending-card ul{margin-left:16px}
+.ending-card li{font-size:11px;color:var(--t2);line-height:1.75;margin-bottom:3px}
+.ending-card.advice{border-color:var(--jade-dim)}
+.ending-card.advice .ec-h{color:var(--jade)}
+.fail-tag{display:inline-block;font-size:10px;padding:2px 10px;border-radius:12px;background:var(--r);color:#fff;margin-bottom:10px;letter-spacing:1px}
+
+/* ============ Toast ============ */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border-active);padding:9px 18px;border-radius:20px;font-size:12.5px;z-index:500;pointer-events:none;opacity:0;transition:opacity 300ms,transform 300ms;box-shadow:var(--shadow);max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+#toast.success{border-color:var(--gr);color:var(--gr)}
+#toast.error{border-color:var(--r);color:var(--r)}
+
+/* ============ Responsive ============ */
+@media (max-width:760px){
+  #topbar{padding:0 5px;gap:3px;overflow-x:auto}
+  #topbar .logo{font-size:13px;letter-spacing:0}
+  #topbar .logo span{display:none}
+  .top-btn{padding:4px 6px;font-size:10.5px}
+  .chip-time{display:none!important}
+  #topbar::-webkit-scrollbar{display:none}
+  .chip-hide{display:none!important}
+  .chip-time{max-width:96px;overflow:hidden;text-overflow:ellipsis}
+  .top-btn{flex-shrink:0}
+  #topbar .logo span{display:none}
+  .btn-txt{display:none}
+  .top-btn{padding:6px 9px}
+  #game-log{padding:12px 12px}
+  .quick-actions{flex-wrap:nowrap;overflow-x:auto;padding:8px 12px 0;-webkit-overflow-scrolling:touch}
+  .quick-actions::-webkit-scrollbar{display:none}
+  #char-drawer{width:min(94vw,var(--drawer-w))}
+  .stat-grid{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+  .mini-grid{grid-template-columns:1fr}
+  .option-grid{grid-template-columns:1fr}
+  input,textarea,select{font-size:16px}
+  .create-step input[type=text],.create-step input:not([type]),.create-step input[type=password],.create-step select,.create-step textarea{font-size:16px}
+  .map-wrap{flex-direction:column}
+}
+</style>
+</head>
+<body data-theme="jinluan">
+
+<div id="app" class="hidden">
+  <div id="topbar">
+    <button class="top-btn gold" onclick="UI.toggleChar()" title="角色档案">👤<span class="btn-txt">角色</span></button>
+    <div class="logo">🏯 朕的江山<span>皇帝模拟 · AI 演绎</span></div>
+    <div class="spacer"></div>
+    <span class="top-chip chip-time" id="time-chip">📅 昭德元年·正月·朔日·早朝</span>
+    <span class="top-chip chip-hide" id="chip-treasury">💰 300万两</span>
+    <span class="top-chip chip-hide" id="chip-minxin">❤️ 民心 60</span>
+    <span class="top-chip chip-hide" id="chip-junli">⚔️ 军力 55</span>
+    <span class="top-chip chip-hide" id="chip-huangquan">👑 皇威 70</span>
+    <span class="top-chip chip-hide" id="chip-energy">⚡ 精力 100</span>
+    <button class="top-btn jade" onclick="UI.openPage('yuyu')" title="御宇 · 政务与江山">♟<span class="btn-txt"> 御宇</span></button>
+    <button class="top-btn" style="color:var(--accent);border-color:var(--accent-dim)" onclick="UI.openPage('jiaofang')" title="椒房 · 后宫与子嗣">🌸<span class="btn-txt"> 椒房</span></button>
+    <button class="top-btn purple" onclick="UI.openPage('tianming')" title="天命 · 龙体与天象">☯<span class="btn-txt"> 天命</span></button>
+    <button class="top-btn" onclick="UI.openEncy()" title="世界百科">📖<span class="btn-txt">百科</span></button>
+    <button class="top-btn" onclick="UI.openRollback()" title="失败记录与回档">⏪<span class="btn-txt">回档</span></button>
+    <button class="top-btn" onclick="UI.openSettings()" title="设置">⚙️<span class="btn-txt">设置</span></button>
+  </div>
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div class="quick-actions" id="quick-actions"></div>
+    <div id="situation-bar" class="hidden">
+      <span id="sit-loc">📍 宣政殿</span>
+      <span id="sit-status"></span>
+      <span id="sit-hint"></span>
+    </div>
+    <div id="input-area">
+      <textarea id="user-input" rows="1" placeholder="输入你的旨意或行动…（例：传内阁首辅觐见，商议赈灾）"></textarea>
+      <button id="stop-btn" class="gen-btn hidden" onclick="Game.stopGen()" title="停止生成">⏹</button>
+      <button id="regen-btn" class="gen-btn hidden" onclick="Game.regen()" title="重新生成上一条回复">🔄</button>
+      <button id="send-btn" onclick="Game.send()">颁旨</button>
+      <div id="loading-indicator"><span class="dots"><span></span><span></span><span></span></span>演绎中…</div>
+    </div>
+  </div>
+</div>
+
+<!-- 角色档案抽屉（左上角） -->
+<div id="char-drawer">
+  <div class="drawer-head">
+    <span class="tt">👤 角色档案</span>
+    <button class="btn sm" onclick="UI.showMemoryModal()">📔 记忆</button>
+    <button class="btn sm" onclick="UI.openPage('tianming')">☯ 天命</button>
+  </div>
+  <div id="char-panel"></div>
+</div>
+<div class="drawer-backdrop" id="drawer-backdrop" onclick="UI.closeChar()"></div>
+
+<!-- 三大支柱页面 -->
+<div class="page-overlay" id="page-yuyu"><div class="page-panel" id="yuyu-panel"></div></div>
+<div class="page-overlay" id="page-jiaofang"><div class="page-panel" id="jiaofang-panel"></div></div>
+<div class="page-overlay" id="page-tianming"><div class="page-panel" id="tianming-panel"></div></div>
+
+<!-- 设置 -->
+<div class="modal-overlay" id="settings-modal"><div class="modal">
+  <h2>⚙️ 设置</h2>
+  <div id="settings-content"></div>
+</div></div>
+
+<!-- 世界百科 -->
+<div class="modal-overlay" id="ency-modal"><div class="modal" style="width:680px">
+  <h2>📖 世界百科</h2>
+  <input id="ency-search" type="text" placeholder="搜索词条…" oninput="UI.renderEncy(this.value)">
+  <div id="ency-content"></div>
+  <div class="btn-row right"><button class="btn" onclick="UI.closeModal('ency-modal')">关闭</button></div>
+</div></div>
+
+<!-- 回档与失败记录 -->
+<div class="modal-overlay" id="rollback-modal"><div class="modal" style="width:640px">
+  <h2>⏪ 史笔回档</h2>
+  <div class="mem-tabs">
+    <button class="mem-tab active" id="rb-tab-fail" onclick="UI.rbTab('fail')">🪦 失败记录</button>
+    <button class="mem-tab" id="rb-tab-ck" onclick="UI.rbTab('ck')">📌 存档节点</button>
+    <button class="mem-tab" id="rb-tab-end" onclick="UI.rbTab('end')">🏮 历史结局</button>
+  </div>
+  <div id="rollback-content"></div>
+  <div class="btn-row right"><button class="btn" onclick="UI.closeModal('rollback-modal')">关闭</button></div>
+</div></div>
+
+<!-- 记忆档案 -->
+<div class="modal-overlay" id="memory-modal"><div class="modal" style="width:600px">
+  <h2>📔 记忆档案</h2>
+  <div class="mem-tabs" id="mem-tabs"></div>
+  <div id="mem-content"></div>
+  <div class="divider"></div>
+  <label>📝 手动添加记忆（写给未来的自己，AI 会严格遵守）</label>
+  <div class="row2">
+    <select id="mem-type" style="flex:0 0 96px;margin-bottom:0">
+      <option value="人物">👤 人物</option>
+      <option value="事件">📌 事件</option>
+      <option value="约定">🤝 约定</option>
+      <option value="秘密">🔒 秘密</option>
+      <option value="情感">💗 情感</option>
+      <option value="地点">📍 地点</option>
+      <option value="大事">🏮 大事</option>
+      <option value="自定义">📝 自定义</option>
+    </select>
+    <input id="mem-new" type="text" placeholder="如：皇后沈氏最喜梅花，每年冬至都要亲自折枝供在寝殿" style="flex:1;margin-bottom:0">
+  </div>
+  <div class="btn-row right" style="margin-top:8px">
+    <button class="btn" onclick="UI.closeModal('memory-modal')">关闭</button>
+    <button class="btn accent" onclick="UI.addMemoryManually()">➕ 记下</button>
+  </div>
+</div></div>
+
+<!-- 结局结算 -->
+<div id="ending-overlay">
+  <div class="ending-box" id="ending-content"></div>
+</div>
+
+<!-- 确认框 -->
+<div class="modal-overlay" id="confirm-modal"><div class="modal" style="width:400px">
+  <h2 id="cf-title">确认</h2>
+  <div id="cf-text" style="font-size:12px;color:var(--t2);line-height:1.7"></div>
+  <div class="btn-row right">
+    <button class="btn" onclick="UI.closeModal('confirm-modal')">取消</button>
+    <button class="btn danger" id="cf-ok">确定</button>
+  </div>
+</div></div>
+
+<input type="file" id="import-file" accept=".json,application/json" style="display:none">
+
+<!-- 创建流程 -->
+<div id="setup-overlay">
+  <div class="petals" id="petals"></div>
+  <div class="setup-wrap">
+    <h1>朕的江山</h1>
+    <div class="sub">御宇 · 椒房 · 天命 —— AI 实时演绎</div>
+    <div class="step-dots" id="step-dots"></div>
+    <div class="setup-box">
+
+      <div class="create-step active" id="step-api">
+        <div class="step-title">第一步 · 配置 AI 接口</div>
+        <div class="step-hint">游戏由 AI 实时演绎，需要配置大模型 API（默认 DeepSeek）</div>
+        <label>API 端点</label>
+        <input id="cfg-endpoint" type="text" placeholder="https://api.deepseek.com/v1/chat/completions">
+        <label>API Key（仅保存在本机浏览器）</label>
+        <input id="cfg-apikey" type="password" placeholder="sk-xxxxxxxx">
+        <label>模型（可拉取）</label>
+        <div style="display:flex;gap:6px;width:100%">
+          <select id="cfg-model" style="flex:1;margin-bottom:0"></select>
+          <button class="btn sm" onclick="UI.fetchModels()">🔄 拉取</button>
+        </div>
+        <div class="step-hint" id="model-hint">DeepSeek 官方模型：deepseek-chat / deepseek-reasoner</div>
+        <label>推理强度</label>
+        <select id="cfg-reasoning">
+          <option value="low">低（更快）</option>
+          <option value="medium" selected>中（均衡）</option>
+          <option value="high">高</option>
+          <option value="max">最大（更细腻）</option>
+        </select>
+        <label>输出 Token 限制</label>
+        <select id="cfg-maxtokens">
+          <option value="unlimited" selected>无限制</option>
+          <option value="2048">2048</option>
+          <option value="4096">4096</option>
+          <option value="8192">8192</option>
+          <option value="16384">16384</option>
+        </select>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.testApi()">🔌 测试连接</button>
+          <button class="btn-next" onclick="UI.saveApi()">保存并下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-self">
+        <div class="step-title">第二步 · 主角信息</div>
+        <div class="step-hint">你是谁？AI 会记住这些设定，永不遗忘</div>
+        <label>姓名</label>
+        <div style="display:flex;gap:6px;width:100%">
+          <input id="self-name" type="text" placeholder="你的名字" style="flex:1;margin-bottom:0">
+          <button class="btn sm" onclick="UI.randName()">🎲 随机</button>
+        </div>
+        <label>性别（皇帝也可以是女帝）</label>
+        <div class="seg" id="self-gender">
+          <button class="seg-btn selected" data-v="男" onclick="UI.pickSeg('self-gender',this)">♂ 男帝</button>
+          <button class="seg-btn" data-v="女" onclick="UI.pickSeg('self-gender',this)">♀ 女帝</button>
+          <button class="seg-btn" data-v="custom" onclick="UI.pickSeg('self-gender',this)">✏️ 自定义</button>
+        </div>
+        <input id="self-gender-custom" type="text" placeholder="自定义性别设定（如：性别为男，但常以女装示人）" class="hidden">
+        <label>即位年龄</label>
+        <input id="self-age" type="number" min="12" max="60" value="25" placeholder="如：25">
+        <label>性格（可自定义）</label>
+        <select id="self-persona" onchange="UI.onPersonaChange('self')"></select>
+        <input id="self-persona-custom" type="text" placeholder="自定义性格，如：表面温和、实则杀伐果断，多疑" class="hidden">
+        <label>外貌特征（可选）</label>
+        <input id="self-appearance" type="text" placeholder="如：面容清俊，常着一身玄色龙袍">
+        <label>背景经历（可选）</label>
+        <textarea id="self-bg" placeholder="如：先帝第三子，自幼不受宠爱，在边关历练多年…"></textarea>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(0)">上一步</button>
+          <button class="btn-next" onclick="UI.goStep(2)">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-talent">
+        <div class="step-title">第三步 · 天赋分配</div>
+        <div class="step-hint" style="display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap"><span class="points-left" id="points-left">剩余 20 点</span><button class="cheat-toggle" id="cheat-toggle" onclick="UI.toggleCheat()">🔓 作弊模式：关</button></div>
+        <div class="trait-setup" id="trait-setup"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(1)">上一步</button>
+          <button class="btn-next" onclick="UI.goStep(3)">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-throne">
+        <div class="step-title">第四步 · 登基与抱负</div>
+        <div class="step-hint">你的帝位从何而来，你要把江山带向何方</div>
+        <label>继位方式（可自定义）</label>
+        <select id="self-succession" onchange="UI.onCustom('self-succession')">
+          <option value="先帝遗诏，嫡长即位">先帝遗诏，嫡长即位</option>
+          <option value="兄终弟及，奉遗命入继大统">兄终弟及，奉遗命入继大统</option>
+          <option value="太后临朝扶立，名分未定">太后临朝扶立，名分未定</option>
+          <option value="宗室议立，众望所归">宗室议立，众望所归</option>
+          <option value="从龙之功，九死一生夺位">从龙之功，九死一生夺位</option>
+          <option value="女帝临朝，力排众议">女帝临朝，力排众议</option>
+          <option value="__custom__">✏️ 自定义</option>
+        </select>
+        <input id="self-succession-custom" type="text" placeholder="自定义继位方式" class="hidden">
+        <label>治国理念（可自定义）</label>
+        <select id="self-philosophy" onchange="UI.onCustom('self-philosophy')">
+          <option value="守成之君：轻徭薄赋，稳字当头">守成之君：轻徭薄赋，稳字当头</option>
+          <option value="改革之君：触动世家推行新政">改革之君：触动世家推行新政</option>
+          <option value="征伐之君：整军经武，开疆拓土">征伐之君：整军经武，开疆拓土</option>
+          <option value="无为而治：休养生息，顺其自然">无为而治：休养生息，顺其自然</option>
+          <option value="未定：先稳住朝局再作打算">未定：先稳住朝局再作打算</option>
+          <option value="__custom__">✏️ 自定义</option>
+        </select>
+        <input id="self-philosophy-custom" type="text" placeholder="自定义治国理念" class="hidden">
+        <label>年号（可自定义）</label>
+        <input id="self-title" type="text" value="昭德" placeholder="如：昭德 / 永昌 / 天授">
+        <label>先帝遗愿（可选）</label>
+        <input id="self-will" type="text" placeholder="如：整顿吏治，还天下一个朗朗乾坤">
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(2)">上一步</button>
+          <button class="btn-next" onclick="UI.goStep(4)">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-notes">
+        <div class="step-title">第五步 · 备注与自定义设定</div>
+        <div class="step-hint">任何你想补充的设定都可以写在这里，AI 会严格遵循（可留空）</div>
+        <textarea id="self-notes" style="min-height:110px" placeholder="例：本帝崇信道教，讨厌宦官干政；后宫妃嫔必须是才女；希望剧情多一些微服私访的桥段；遇到重大抉择时喜欢听老臣的建议…"></textarea>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(3)">上一步</button>
+          <button class="btn-next" onclick="UI.goStep(5)">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-mode">
+        <div class="step-title">第六步 · 难度与模式</div>
+        <div class="step-hint">难度决定国运起点与事件烈度；模式决定你的一生还是永世</div>
+        <label>难度</label>
+        <div class="option-grid" id="diff-grid"></div>
+        <label>模式</label>
+        <div class="option-grid" id="mode-grid"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(4)">上一步</button>
+          <button class="btn-next" onclick="UI.goStep(6)">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-ready">
+        <div class="step-title">一切就绪</div>
+        <div class="step-hint">确认信息后，登基大宝，君临天下</div>
+        <div class="ready-card" id="ready-summary"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.goStep(5)">上一步</button>
+          <button class="btn-next" onclick="UI.startGame()">👑 登基即位</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ================= 工具 ================= */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nl2br=s=>esc(s).replace(/\n/g,'<br>');
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const num=v=>{const n=Number(v);return isFinite(n)?n:0;};
+const deepClone=o=>JSON.parse(JSON.stringify(o));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+/* ================= 常量 ================= */
+const DEFAULTS={endpoint:'https://api.deepseek.com/v1/chat/completions',key:'',model:'deepseek-chat',reasoning:'medium',maxTokens:'unlimited',theme:'jinluan',autosave:true};
+const DEFAULT_MODELS=['deepseek-chat','deepseek-reasoner'];
+const MAX_HISTORY=44, MAX_LOG=400;
+const TRAIT_POINTS=20;
+const LS_CFG='emperor_cfg', LS_STATE='emperor_state';
+
+const PERSONALITIES=[
+  {v:'英明果决',d:'杀伐果断，遇事不慌'},
+  {v:'宽厚仁和',d:'以德服人，体恤臣民'},
+  {v:'多疑深沉',d:'城府极深，谁也不信'},
+  {v:'风流多情',d:'怜香惜玉，后宫常客'},
+  {v:'勤勉务实',d:'事必躬亲，操劳国事'},
+  {v:'洒脱不羁',d:'不拘小节，常有奇思'},
+  {v:'外宽内忌',d:'面上和气，心里记账'},
+  {v:'刚愎自用',d:'主意极正，听不进劝'},
+  {v:'温文尔雅',d:'饱读诗书，文气重'},
+  {v:'深谋远虑',d:'走一步看十步'}
+];
+const SURNAMES=['赵','李','刘','陈','杨','朱','高','萧','慕容','拓跋','司马','独孤','上官','东方','长孙','百里'];
+const GIVEN_M=['宸','烨','璟','珩','曜','昭','彻','衡','渊','景','琰','瑄','稷','曦','煜','玄','清','临','霄','翊'];
+const GIVEN_F=['昭','仪','璇','宁','清','嫣','若','宸','玥','澜','舒','棠','婉','卿','蘅','琬','瑶','萱','汐','蘅'];
+
+const PERKS=[
+  {k:'qinzheng',n:'勤政',i:'⚡',cost:3,d:'政务精力消耗降低，一日可办更多事'},
+  {k:'shiren',n:'识人之明',i:'👁️',cost:3,d:'识破谎言与阴谋的几率提升'},
+  {k:'tianming',n:'天命眷顾',i:'✨',cost:4,d:'灾异频率降低，祥瑞更多'},
+  {k:'longwei',n:'龙威天成',i:'👑',cost:3,d:'皇权威严增长更快，朝堂更服'},
+  {k:'meipo',n:'魅力天成',i:'💫',cost:3,d:'妃嫔宠爱与臣子忠诚提升更快'},
+  {k:'wuyong',n:'万人敌',i:'⚔️',cost:3,d:'御驾亲征与围猎更加勇武'},
+  {k:'changgen',n:'长生根骨',i:'🌿',cost:4,d:'健康衰减更慢，不易生病'},
+  {k:'lica',n:'生财有道',i:'💰',cost:3,d:'国库收入更充裕'},
+  {k:'wenhua',n:'文华冠世',i:'📜',cost:3,d:'文治增长更快，礼乐昌明'},
+  {k:'zhiyuan',n:'知人善任',i:'🤝',cost:3,d:'官员任用更顺，朝廷运转更稳'}
+];
+const STAT_TRAITS=[
+  {k:'wisdom',n:'才智',i:'🧠',d:'决策成功率、识破阴谋的几率',min:1,max:10},
+  {k:'charm',n:'魅力',i:'💎',d:'妃嫔宠爱速度、臣子忠诚、外交效果',min:1,max:10},
+  {k:'martial',n:'武艺',i:'🏹',d:'围猎、御驾亲征的生存与威望',min:1,max:10}
+];
+
+const DIFFS={
+  kuaiyi:{n:'快意江山',sub:'爽游',i:'🎉',d:'为纯爽而生：资源充裕、灾祸大减、几乎不会亡国（作死除外）',start:{treasury:800,minxin:85,junli:80,huangquan:90,wenzhi:70,health:95}},
+  qingping:{n:'清平乐',sub:'休闲',i:'🍵',d:'灾祸少、选错损失小、结局宽容，主打后宫与剧情',start:{treasury:450,minxin:70,junli:65,huangquan:78,wenzhi:58,health:88}},
+  zhengda:{n:'正大光明',sub:'标准',i:'⚖️',d:'推荐档：盛世余晖，繁华但带病，平衡挑战',start:{treasury:300,minxin:60,junli:55,huangquan:70,wenzhi:50,health:80}},
+  tianwei:{n:'天威难测',sub:'硬核',i:'⛈️',d:'随机事件烈度加倍、寿命更短、一步错步步错',start:{treasury:220,minxin:50,junli:45,huangquan:60,wenzhi:45,health:70}}
+};
+const MODES={
+  mortal:{n:'人间一世',i:'🏮',d:'一生有限：看你怎么度过这一世。寿元有尽，健康归零即驾崩',eternal:false},
+  eternal:{n:'长生久视',i:'🐉',d:'永恒模式：与天争寿。寿元无限，但天道压力与心性考验随永世而来',eternal:true}
+};
+
+const PROVINCE_DEFS={
+  ji:{n:'冀州',t:'京畿',pts:'435,42 585,34 600,128 450,142',cx:518,cy:84,star:true,note:'承天府所在，天下中枢',init:{minsheng:72,nongye:62,shui:80,zhiAn:78,bingyuan:62,techan:'盐铁',minfeng:'繁华骄奢',tianzai:'低'}},
+  liang:{n:'梁州',t:'边陲·朔方镇',pts:'232,58 420,48 435,138 248,148',cx:332,cy:92,note:'北御北狄，朔方重镇',init:{minsheng:46,nongye:48,shui:33,zhiAn:44,bingyuan:86,techan:'战马',minfeng:'尚武彪悍',tianzai:'中'}},
+  yong:{n:'雍州',t:'边陲·陇右镇',pts:'66,98 212,82 238,168 142,198 58,168',cx:142,cy:138,note:'西御西羌，陇右重镇',init:{minsheng:44,nongye:46,shui:30,zhiAn:42,bingyuan:83,techan:'骏马·药材',minfeng:'剽悍',tianzai:'中'}},
+  yan:{n:'兖州',t:'腹地',pts:'608,58 718,48 733,148 620,158',cx:668,cy:102,note:'齐鲁之野，盐铁之利',init:{minsheng:60,nongye:66,shui:55,zhiAn:62,bingyuan:55,techan:'盐',minfeng:'重礼',tianzai:'低'}},
+  qing:{n:'青州',t:'腹地·沿海',pts:'733,52 802,64 807,168 722,178',cx:768,cy:112,note:'东海之滨，渔盐富庶',init:{minsheng:62,nongye:60,shui:58,zhiAn:60,bingyuan:50,techan:'海盐·鱼鲜',minfeng:'开放',tianzai:'中'}},
+  yu:{n:'豫州',t:'腹地',pts:'302,188 472,178 490,288 314,300',cx:398,cy:238,note:'中原腹心，四战之地',init:{minsheng:56,nongye:70,shui:58,zhiAn:54,bingyuan:60,techan:'铁',minfeng:'质朴',tianzai:'中'}},
+  xu:{n:'徐州',t:'腹地',pts:'492,182 612,172 628,290 504,300',cx:560,cy:234,note:'南北要冲，漕运咽喉',init:{minsheng:60,nongye:64,shui:57,zhiAn:58,bingyuan:52,techan:'丝绸·漕粮',minfeng:'精明',tianzai:'中'}},
+  yang:{n:'扬州',t:'腹地·富庶',pts:'620,298 804,290 812,432 628,442',cx:716,cy:362,note:'鱼米之乡，天下财赋半出扬州',init:{minsheng:78,nongye:75,shui:72,zhiAn:70,bingyuan:45,techan:'丝绸·茶叶·稻米',minfeng:'文弱富庶',tianzai:'中'}},
+  jing:{n:'荆州',t:'腹地',pts:'332,318 494,308 508,442 342,454',cx:418,cy:378,note:'江汉沃野，水陆要冲',init:{minsheng:64,nongye:72,shui:62,zhiAn:60,bingyuan:55,techan:'木材·稻米·鱼',minfeng:'刚烈',tianzai:'高'}}
+};
+const PROV_KEYS=Object.keys(PROVINCE_DEFS);
+const PROV_FIELDS=[['minsheng','民生'],['nongye','农业'],['shui','税收'],['zhiAn','治安'],['bingyuan','兵源']];
+
+const FACTION_DEFS=[
+  ['wen','文官','清流内阁·票拟监察'],['wu','武将','勋贵边镇·兵权'],
+  ['eunuch','宦官','内廷批红·密探'],['waigi','外戚','后族国戚·枕边风'],
+  ['shijia','世家','百年门阀·土地仕途']
+];
+const MINISTRIES=[['li','吏部','铨选考课'],['hu','户部','钱粮户籍'],['li2','礼部','典仪科举'],['bing','兵部','军务武备'],['xing','刑部','刑名大狱'],['gong','工部','工程营造']];
+const DIPLOMACY_DEFS=[['beiDi','北狄'],['xiQiang','西羌'],['dongYi','东夷诸国'],['nanHai','南海诸藩']];
+
+const QUICK=['🏛 早朝听政','📜 批阅奏折','🌸 去后宫看看','💤 早些安歇','🌾 微服私访','⛩ 祭天祈福','📖 召大臣议事','⚔️ 校场演武','🏹 秋日围猎','💰 过问国库'];
+
+/* ================= 角色扮演质量规则 ================= */
+const RP_RULES=`【角色扮演质量规则】
+1. 保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。
+2. 禁止代替玩家行动、发言、思考或做出选择。
+3. 禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。
+4. 禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。
+5. 禁止通过反复强调塑造人设。
+6. 剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。
+7. 人物情绪应通过具体行为和对话体现，而非旁白解释。`;
+
+/* ================= 世界观核心（注入系统提示） ================= */
+const WORLD_CORE=`【世界观核心（大晟朝）】
+国号大晟，立国152年，定都承天府（原型长安+洛阳+南京）。先帝德宗"承平三十年"驾崩，你即位，年号由玩家设定。国运：盛世余晖——世家坐大、军备松弛、财政吃紧、北狄蠢动。天下九州（冀/兖/青/徐/扬/荆/豫/梁/雍）共108府；冀州含京畿承天府，梁州朔方镇、雍州陇右镇直面北狄西羌，青扬濒海有海寇。
+时间：1日≈现实1分钟。每日：早朝(卯时)→批奏折(午时)→晚膳后后宫→入寝结算；每旬小朝会；每月财政结算；每年春闱科举/秋日围猎/冬至大典三大盛事+年度国力评定。
+三大底层逻辑：
+①天授君权，但天道会算账——民心、天象、灾异是天道显化，长期苛政会触发灾异与起义（灾异与民心/刑狱/财政强相关，非纯随机）。
+②皇权不是无限大——文官/武将/宦官/外戚/世家五方势力制衡，任何决策都会改变势力天平；太独断会"政令不出承天门"。
+③皇帝也是人——有健康精力情绪寿命：通宵批折子会生病，沉迷女色伤身，苛政猛于虎会被推翻。你不是神。
+势力：文官(内阁票拟/科道，★★★)、武将(边镇/禁军，★★★★)、宦官(批红/密探，★★★★)、外戚(后宫枕边风，★★★)、世家(土地/垄断仕途，★★★★★)。官员九品十八级，有能力/忠诚/清廉/野心/派系，能力与忠诚常不可兼得。
+后宫位份九等：官女子→答应→常在→贵人→嫔→妃→贵妃→皇贵妃→皇后。妃嫔有容貌/才艺/家世/心机/忠诚/体质。宫斗为轻量推理向（情报线索+判断真凶）。皇子可培养（太傅教文/武师教武/性格事件），立储三选：立嫡(合礼法可能立庸才)/立贤(引发夺嫡)/立爱(动摇祖制言官死谏)。太后是前朝+后宫连接点。公主可和亲/招驸马/自由婚配。
+事件分层：日常随机/月度/年度大事件/时代剧情(夺嫡·政变·大战·大疫)/结局事件。祥瑞与灾异是天命显化；罪己诏可挽回民心但损皇威。灾异均可回溯到玩家早先决策。
+难度与模式由玩家在开局选择，见【当前设置】。`;
+
+const MODE_CORE={
+mortal:`【模式·人间一世】你的一生有限：健康归零即驾崩；寿元隐式计算（健康、纵欲、劳碌）。普通结局按史书称号结算：圣君/中兴/守成/庸主/昏君/暴君/傀儡/悲情/亡国/隐藏结局(白日飞升·千古一帝)。神秘道人、钦天监密档、"白日飞升"作为彩蛋存在，保持神秘感。`,
+eternal:`【模式·长生久视（永恒）】寿元无限、容颜永驻（即位之年）。健康仍需维护，归零触发濒危/假死与天道考验而非死亡。三条续命路线：龙气(以国养身，国衰身衰)/丹药(耗资源，丹毒伤神)/仙途(前期弱后期强，通向往生结局)。天道压力(0-100隐性，以天象梦境呈现)：永生逆天，活得越久、滥杀乱政越多压力越高，灾异与心魔事件增加；仁政大赦斋戒可缓解。心性(0-100)：亲者凋零与压力会侵蚀心性（豁达→麻木→偏执→疯狂）。王朝周期律：体制长期不改革必腐化，每30-50年需"大手术"(大改革/迁都/清洗世族/重编户籍)，否则国力自动下滑。继承制度重构：摄政太子制/禅位循环/逼宫叛乱/血脉稀释(宗室爆炸需削藩限嗣)。文明纪元：农耕→工商→火器→机械，每纪元50-100年，可推动变革或闭关锁国。永恒结局：白日飞升/千古一帝/逆天者(天罚)/永夜孤王/看客(禅位旁观)/人屠天子/弃冕归隐。`
+};
+/* ================= 世界百科数据 ================= */
+const ENCY=[
+{t:'国号与历史年表',h:'🏯',b:'<span class="h">大晟朝</span><br>开国皇帝晟太祖于152年前陈桥黄袍，灭前朝大雍，定都<b>承天府</b>（长安+洛阳+南京的融合体）。当前为昭德元年，先帝德宗承平三十年驾崩，新君即位。<br><br><span class="h">年表</span><table><tr><th>年份</th><th>大事</th></tr><tr><td>-152</td><td>晟太祖起兵</td></tr><tr><td>-150</td><td>太祖称帝，定都承天，国号大晟</td></tr><tr><td>-142</td><td>太宗继位，颁均田令，盛世奠基</td></tr><tr><td>-110</td><td>宪宗朝文治极盛，修《大晟律》</td></tr><tr><td>-80</td><td>狄族南侵，武宗御驾亲征，血战雁门</td></tr><tr><td>-60</td><td>穆宗朝宦官弄权，朝局糜烂，世族坐大</td></tr><tr><td>-30</td><td>德宗改革受阻，含恨而终</td></tr><tr><td>0</td><td>昭德元年，你即位</td></tr></table>'},
+{t:'地理与九州',h:'🗺️',b:'<span class="h">九州</span>：冀(京畿承天)、兖、青、徐、扬、荆、豫、梁(朔方边陲)、雍(陇右边陲)，共108府。<br><span class="h">区域</span>：<b>京畿</b>——政治经济核心，税收最高；<b>边陲</b>——北境三镇(雁门/朔方/陇右)直面北狄西羌；<b>腹地</b>——产粮产盐产茶产铁各有侧重。区域属性影响赋税、粮食、兵源、特产、天灾概率与民风。<br><span class="h">外敌</span>：北狄(草原骑兵)、西羌(山地)、海寇(东南)、东夷诸国、南海诸藩。'},
+{t:'时间体系',h:'⏳',b:'1日≈现实1分钟；1月30日；1年12月。<br>每日：早朝(卯时)→批奏折(午时)→晚膳后后宫→入寝结算。<br>每旬：内阁票拟汇总、小朝会。<br>每月：财政结算、官员考核、妃嫔心情变动。<br>每季：天象农业结算。<br>每年：春闱科举/秋日围猎/冬至大典+年度国力评定。'},
+{t:'五方势力',h:'⚖️',b:'<table><tr><th>势力</th><th>代表</th><th>核心诉求</th><th>危险</th></tr><tr><td>文官</td><td>内阁大学士、六部尚书、言官</td><td>名分礼法青史留名</td><td>★★★</td></tr><tr><td>武将</td><td>边镇节度、禁军统领、勋爵</td><td>军功封赏实权</td><td>★★★★</td></tr><tr><td>宦官</td><td>司礼监、东厂/内务府</td><td>皇权附庸、捞钱保命</td><td>★★★★</td></tr><tr><td>外戚</td><td>皇后宠妃家族</td><td>恩荫敛财把持后宫</td><td>★★★</td></tr><tr><td>世家</td><td>百年大族(王谢崔卢原型)</td><td>土地荫庇垄断仕途</td><td>★★★★★</td></tr></table>势力值过高→皇权被架空；态度过低→对抗行动(文官撂挑子、武将拥兵、宦官勾结、外戚弄权、世家抗税)。'},
+{t:'官员与衙门',h:'📜',b:'官员属性：能力、忠诚、清廉、野心、派系、年龄、健康、性格。九品十八级。<br>内阁(票拟)→皇帝批红；六部：吏(人事)、户(财政)、礼(典仪科举)、兵(军事)、刑(司法)、工(工程)；都察院言官弹劾(可作刀)；东厂/锦衣卫(情报与镇压，双刃剑)。<br>操作：任命、罢免、升迁、贬谪、抄家、赐死、外放、致仕。<br><b>用人如用刀</b>：能力与忠诚不可兼得，清廉与能力常冲突。'},
+{t:'后宫与位份',h:'🌸',b:'位份九等：官女子→答应→常在→贵人→嫔→妃→贵妃→皇贵妃→皇后。<br>晋升依据：宠爱、生育、家世、功绩。皇后为后宫之主，废后是重大政治事件。<br>妃嫔属性：容貌、才艺、家世、心机、忠诚、体质。宠爱0-100，冷落会下降；宠爱差异引发嫉妒、结盟、陷害、巫蛊等宫斗事件(推理小剧场：给线索，判断谁在搞鬼)。<br>选秀途径：三年一选秀、官员进献(可能掺间谍毒药)、和亲回赠、太后皇后强塞。'},
+{t:'子嗣与立储',h:'👶',b:'皇子/公主出生即有隐藏资质。培养：太傅教文、武师教武、性格事件。属性：才智、武艺、性格、野心、与皇帝关系。<br>立储三选：<b>立嫡</b>(合礼法但可能立庸才)/<b>立贤</b>(引发夺嫡兄弟相残)/<b>立爱</b>(宠妃之子上位，动摇祖制)。<br>夺嫡是中后期核心剧情：皇子结党、谋反、巫蛊案、逼宫。公主可和亲/招驸马/自由婚配。'},
+{t:'天道与灾异',h:'☯',b:'祥瑞：麒麟现、麦生双穗、河清海晏→威望民心+。<br>灾异：日食、地震、大旱、蝗灾→暗示失德，需罪己诏/斋戒/大赦补救。<br>罪己诏：承认错误→民心回升皇威小降；拒不认错→民意发酵天灾滚雪球。<br><b>灾异并非纯随机</b>，与民心、财政、滥用刑罚强相关——每个灾难都能回溯到你早先的决策。'},
+{t:'结局与史书',h:'🏮',b:'按史书称号结算：昭德大帝(圣君)、中兴昭德、守成令主、承平之君(庸主)、昏德公、独夫(暴君)、提线木偶(傀儡)、遗恨昭德(悲情)、末帝(亡国)、白日飞升(隐藏)、千古一帝(隐藏)。<br>结算内容：史书列传(文言+白话)、四维功业、功过清单、后世评价、子孙结局快照。<br><b>失败不是结束</b>：可回档到关键时间点继续。'},
+{t:'永恒模式·长生久视',h:'🐉',b:'寿元无限、容颜永驻。健康仍需维护，归零触发濒危而非死亡。<br>三条续命路线：龙气(以国养身)/丹药(丹毒伤神)/仙途(通向飞升)。<br>天道压力：永生逆天，压力高则灾异心魔频繁；仁政大赦可缓解。<br>心性：亲者凋零侵蚀心性(豁达→麻木→偏执→疯狂)。<br>王朝周期律：每30-50年体制病，需大手术否则国力自动下滑。<br>文明纪元：农耕→工商→火器→机械。<br>结局：白日飞升/千古一帝/逆天者/永夜孤王/看客/人屠天子/弃冕归隐。'},
+{t:'难度档位',h:'🎚️',b:'<b>快意江山(爽游)</b>：资源充裕、天灾频率-60%且损失减半、宫斗谋反大减、健康衰减极慢、几乎不会亡国、支持圣君托管。<br><b>清平乐(休闲)</b>：灾祸少、选错损失小、结局宽容。<br><b>正大光明(标准)</b>：平衡推荐。<br><b>天威难测(硬核)</b>：随机事件烈度加倍、寿命更短、一步错步步错。<br>同一存档中途不可切换难度。'},
+{t:'游戏机制说明',h:'🎮',b:'<span class="h">状态同步</span>：AI每次回复会附带状态块，游戏自动更新国库/民心/军力/皇威/文治、龙体五维、势力、妃嫔、皇子、九州与天命记录。<br><span class="h">失败回档</span>：驾崩/亡国/被废等失败后，太史令会点评你的行为并给出建议，可回到最近的关键存档节点(每年开年/关键节点/自动存档)继续游戏。<br><span class="h">自动存档</span>：每回合后自动保存到浏览器本地，可在设置中导出为JSON备份。<br><span class="h">记忆机制</span>：AI会把重要事件写入记忆档案与故事摘要，长对话自动压缩，设定永不遗忘。'}
+];
+
+/* ================= 全局状态 ================= */
+let cfg=Object.assign({},DEFAULTS,lsGet(LS_CFG,{}));
+let state=null;
+const saveCfg=()=>lsSet(LS_CFG,cfg);
+const saveState=()=>{try{lsSet(LS_STATE,state)}catch(e){}};
+let modelsCache=null, apiBusy=false, compressing=false, streamEl=null, streamThinkEl=null;
+let selfTraits={wisdom:4,charm:4,martial:4};
+let selfPerks={}, traitCheat=false;
+let draftDiff='zhengda', draftMode='mortal';
+let rbTab='fail', selProv='ji';
+let evalAbort=null;
+
+/* ================= 中文数字 ================= */
+const CN_N=['','一','二','三','四','五','六','七','八','九','十'];
+const cnYear=n=>n<=1?'元':(n<10?CN_N[n]:(n<20?'十'+CN_N[n-10]:CN_N[Math.floor(n/10)]+'十'+(n%10?CN_N[n%10]:'')));
+const cnMonth=n=>['正','二','三','四','五','六','七','八','九','十','冬','腊'][n-1]+'月';
+const cnDay=n=>n<=10?'初'+CN_N[n]:n<20?'十'+CN_N[n-10]:(n%10?CN_N[Math.floor(n/10)]+'十'+CN_N[n%10]:CN_N[n/10]+'十');
+function fmtTime(t){
+  if(!t)return '';
+  const m=String(t).match(/([^\d·]+)?(\d+)年/);
+  const y=m?parseInt(m[2]):0;
+  const mm=String(t).match(/(\d+)月/);
+  const d=String(t).match(/(\d+)日/);
+  let s='';
+  if(m&&m[1])s+=m[1];
+  if(y)s+=cnYear(y)+'年';
+  else s+=String(t).split('·')[0]||'';
+  if(mm)s+=cnMonth(parseInt(mm[1]));
+  if(d)s+=cnDay(parseInt(d[1]));
+  const parts=String(t).split('·');
+  if(parts.length>1)s+='·'+parts[parts.length-1];
+  return s||String(t);
+}
+
+/* ================= 新存档结构 ================= */
+function newState(){
+  const diff=DIFFS[draftDiff].start;
+  const provs={};
+  PROV_KEYS.forEach(k=>{const d=PROVINCE_DEFS[k];provs[k]=Object.assign({},d.init,{note:d.note});});
+  return {
+    v:1, createdAt:Date.now(),
+    player:{name:'',gender:'男',age:25,persona:'',appearance:'',bg:'',title:'昭德',succession:'先帝遗诏，嫡长即位',philosophy:'守成之君：轻徭薄赋，稳字当头',will:'',notes:'',traits:Object.assign({},selfTraits),perks:Object.keys(selfPerks)},
+    difficulty:draftDiff, mode:draftMode,
+    timeRaw:'昭德1年·1月·1日·早朝', loc:'宣政殿', period:'早朝',
+    country:{treasury:diff.treasury,minxin:diff.minxin,junli:diff.junli,huangquan:diff.huangquan,wenzhi:diff.wenzhi},
+    body:{energy:100,health:diff.health,wisdom:selfTraits.wisdom,charm:selfTraits.charm,martial:selfTraits.martial},
+    factions:{wen:55,wu:50,eunuch:40,waigi:35,shijia:65},
+    factionMood:{wen:'观望',wu:'观望',eunuch:'恭顺',waigi:'依仗',shijia:'审视'},
+    haremPeace:72, taikou:{name:'太后',mood:'静养',note:'先帝驾崩后深居慈宁宫，暂无动作'},
+    consorts:[], children:[],
+    ministers:{shoufu:'内阁首辅（待定）',li:'吏部尚书（待定）',hu:'户部尚书（待定）',li2:'礼部尚书（待定）',bing:'兵部尚书（待定）',xing:'刑部尚书（待定）',gong:'工部尚书（待定）'},
+    military:{jin:'禁军拱卫京师，满编',bian:'边军粮饷吃紧，士气尚可',xiang:'厢军维持地方治安'},
+    diplomacy:{beiDi:'厉兵秣马，虎视眈眈',xiQiang:'互市时断时续',dongYi:'遣使朝贡',nanHai:'商船往来'},
+    provinces:provs,
+    destiny:{events:[],pressure:20,xin:65,bodyNote:'龙体安康',lifespanNote:'年富力强',statusNote:'新君即位，百废待兴',hint:'先上早朝，听六部汇报，稳住朝局'},
+    memories:[], summary:'', history:[], log:[], turn:0,
+    checkpoints:[], failures:[], endings:[], ended:null, gameOver:false
+  };
+}
+
+/* ================= 日志 ================= */
+function scrollLog(){const g=$('game-log');g.scrollTop=g.scrollHeight;}
+function appendEntry(type,html,cls){
+  const tag=type==='think'?'details':'div';
+  const div=document.createElement(tag);
+  div.className='log-entry '+type+(cls?' '+cls:'');
+  if(type==='think')div.open=true;
+  if(html!==undefined)div.innerHTML=html;
+  $('game-log').appendChild(div);
+  scrollLog();
+  return div;
+}
+function pushLog(type,html){state.log.push({type,html});if(state.log.length>MAX_LOG)state.log.splice(0,state.log.length-MAX_LOG);}
+function addLog(type,html){const el=appendEntry(type,html);pushLog(type,html);return el;}
+function removeLastEntry(){const g=$('game-log');const el=g.lastElementChild;if(el&&el.classList.contains('log-entry'))el.remove();state.log.pop();}
+function renderLog(){
+  const g=$('game-log');g.innerHTML='';
+  state.log.forEach(l=>{
+    const tag=l.type==='think'?'details':'div';
+    const div=document.createElement(tag);
+    div.className='log-entry '+l.type;
+    if(l.type==='think')div.open=true;
+    div.innerHTML=l.html;
+    g.appendChild(div);
+  });
+  scrollLog();
+}
+
+/* ================= 记忆 / 摘要 ================= */
+function addMemory(type,text){
+  if(!text)return;
+  const t=String(text).trim();
+  if(state.memories.some(m=>m.text===t||(t.length>16&&m.text.includes(t.slice(0,16)))))return;
+  state.memories.unshift({type,text:t,time:fmtTime(state.timeRaw)});
+  if(state.memories.length>200)state.memories.length=200;
+}
+function addDestinyEvent(type,text){
+  if(!text)return;
+  const t=String(text).trim();
+  const tagMap={祥瑞:'auspice',灾异:'calamity',后宫:'harem',朝政:'court',战事:'war',大典:'court',其他:''};
+  const cls=tagMap[type]||(type==='后宫'?'harem':'');
+  state.destiny.events.unshift({time:fmtTime(state.timeRaw),type,text:t,cls});
+  if(state.destiny.events.length>80)state.destiny.events.length=80;
+}
+
+/* ================= 检查点 / 回档 ================= */
+function checkpoint(label){
+  if(!state)return;
+  const snap=deepClone(state);
+  snap.log=snap.log.slice(-120);
+  snap.history=snap.history.slice(-14);
+  state.checkpoints.unshift({id:uid(),label,time:state.timeRaw,snap});
+  if(state.checkpoints.length>40)state.checkpoints.length=40;
+  return state.checkpoints[0].id;
+}
+function rollbackTo(id){
+  const ck=state.checkpoints.find(c=>c.id===id);
+  if(!ck){UI.toast('找不到该存档节点','error');return;}
+  const snap=deepClone(ck.snap);
+  snap.failures=state.failures;
+  snap.endings=state.endings;
+  state=snap;
+  state.gameOver=false; state.ended=null;
+  saveState();
+  renderLog();
+  UI.renderAll();
+  UI.closeModal('rollback-modal');
+  UI.closeModal('ending-overlay');
+  UI.closeChar();
+  UI.toast('✅ 已回到关键节点：'+ck.label,'success');
+  addLog('system','⏪ 已回到关键节点「'+esc(ck.label)+'」，历史可以重写。');
+}
+
+/* ================= 状态解析与应用 ================= */
+function parseStateBlock(content){
+  // 先剥掉 markdown 代码围栏（AI 可能用围栏包状态块）
+  let c=String(content||'').replace(/```(?:json)?/gi,'').replace(/```/g,'');
+  let data=null,clean=c;
+  const re=/⟦STATE⟧([\s\S]*?)⟦\/STATE⟧/g;
+  const parts=c.split(re);
+  if(parts.length>1){
+    for(let i=1;i<parts.length;i+=2){
+      try{data=JSON.parse(parts[i].trim());if(data&&typeof data==='object')break;}catch(e){}
+    }
+    if(data){
+      // 状态块约定位于末尾：丢弃其后残留的噪音（围栏注释等）
+      let tailTxt=parts[parts.length-1]||'';
+      if(tailTxt.length>=60&&!/状态|数据|忽略|以上|注/.test(tailTxt))clean=(parts[0]+tailTxt);
+      else clean=parts[0];
+      clean=clean.replace(/⟦STATE⟧|⟦\/STATE⟧/g,'').trim();
+    }
+  }
+  if(!data){
+    const mm=c.match(/\{[\s\S]*\}\s*$/);
+    if(mm){
+      try{
+        const o=JSON.parse(mm[0]);
+        if(o&&typeof o==='object'&&(o.treasury!==undefined||o.minxin!==undefined||o.consorts||o.time||o.memory||o.ended)){data=o;clean=c.slice(0,mm.index).trim();}
+      }catch(e){}
+    }
+  }
+  if(!data){
+    // 解析失败时兜底：移除尾部疑似状态块的 {…}，防止泄漏到正文
+    clean=c.replace(/\{[\s\S]*"(treasury|minxin|junli|huangquan|wenzhi|energy|health|consorts|children|factions|provinces|time|ended)"[\s\S]*\}\s*$/, '').replace(/⟦STATE⟧|⟦\/STATE⟧/g,'').trim();
+  }
+  return {clean,data};
+}
+function upsert(arr,key,obj){
+  const i=arr.findIndex(x=>x[key]===obj[key]);
+  if(i>=0){arr[i]=Object.assign({},arr[i],obj);return arr[i];}
+  arr.push(Object.assign({},obj));
+  return arr[arr.length-1];
+}
+function applyState(d){
+  if(!d||typeof d!=='object')return;
+  const S=state;
+  if(d.time&&typeof d.time==='string'&&d.time.trim()){
+    const nt=String(d.time).trim();
+    const oldY=parseYear(S.timeRaw);
+    S.timeRaw=nt;
+    const ny=parseYear(nt);
+    if(ny>oldY&&ny>1)checkpoint(cnYear(ny)+'年·开年');
+  }
+  if(d.period)S.period=String(d.period).trim();
+  if(d.location)S.loc=String(d.location).trim();
+  // 江山五维
+  const cBounds={treasury:[-500,99999],minxin:[0,100],junli:[0,100],huangquan:[0,100],wenzhi:[0,100]};
+  Object.keys(cBounds).forEach(k=>{if(d[k]!==undefined)S.country[k]=clamp(S.country[k]+num(d[k]),cBounds[k][0],cBounds[k][1]);});
+  // 龙体
+  ['energy','health'].forEach(k=>{if(d[k]!==undefined)S.body[k]=clamp(S.body[k]+num(d[k]),0,100);});
+  ['wisdom','charm','martial'].forEach(k=>{if(d[k]!==undefined)S.body[k]=clamp(S.body[k]+num(d[k]),1,10);});
+  // 势力
+  if(d.factions&&typeof d.factions==='object'){
+    Object.keys(S.factions).forEach(k=>{if(d.factions[k]!==undefined)S.factions[k]=clamp(S.factions[k]+num(d.factions[k]),0,100);});
+  }
+  if(d.factionMood&&typeof d.factionMood==='object'){Object.keys(d.factionMood).forEach(k=>{if(S.factionMood[k]!==undefined)S.factionMood[k]=String(d.factionMood[k]);});}
+  // 后宫安宁 / 太后
+  if(d.haremPeace!==undefined)S.haremPeace=clamp(S.haremPeace+num(d.haremPeace),0,100);
+  if(d.taikou&&typeof d.taikou==='object'){
+    if(d.taikou.name)S.taikou.name=String(d.taikou.name);
+    if(d.taikou.mood)S.taikou.mood=String(d.taikou.mood);
+    if(d.taikou.note)S.taikou.note=String(d.taikou.note);
+  }
+  // 妃嫔
+  if(Array.isArray(d.consorts)){
+    d.consorts.forEach(c=>{
+      if(!c||!c.name)return;
+      const o={name:String(c.name).trim()};
+      if(c.rank)o.rank=String(c.rank);
+      if(c.favor!==undefined)o.favor=clamp(num(c.favor),0,100);
+      if(c.mood)o.mood=String(c.mood);
+      if(c.note)o.note=String(c.note);
+      ['appearance','talent','family','cunning','loyalty','health'].forEach(a=>{if(c[a]!==undefined)o[a]=clamp(num(c[a]),1,10);});
+      upsert(S.consorts,'name',o);
+    });
+  }
+  if(Array.isArray(d.consortRemove)){
+    d.consortRemove.forEach(n=>{const i=S.consorts.findIndex(c=>c.name===String(n).trim());if(i>=0)S.consorts.splice(i,1);});
+  }
+  // 子嗣
+  if(Array.isArray(d.children)){
+    d.children.forEach(c=>{
+      if(!c||!c.name)return;
+      const o={name:String(c.name).trim()};
+      if(c.gender)o.gender=String(c.gender);
+      if(c.age!==undefined)o.age=clamp(num(c.age),0,100);
+      if(c.talent!==undefined)o.talent=clamp(num(c.talent),1,10);
+      if(c.personality)o.personality=String(c.personality);
+      if(c.relation!==undefined)o.relation=clamp(num(c.relation),0,100);
+      if(c.note)o.note=String(c.note);
+      upsert(S.children,'name',o);
+    });
+  }
+  if(Array.isArray(d.childRemove)){
+    d.childRemove.forEach(n=>{const i=S.children.findIndex(c=>c.name===String(n).trim());if(i>=0)S.children.splice(i,1);});
+  }
+  // 六部大臣
+  if(d.ministers&&typeof d.ministers==='object'){Object.keys(d.ministers).forEach(k=>{if(S.ministers[k]!==undefined)S.ministers[k]=String(d.ministers[k]);});}
+  // 军事外交
+  if(d.military&&typeof d.military==='object'){['jin','bian','xiang'].forEach(k=>{if(d.military[k])S.military[k]=String(d.military[k]);});}
+  if(d.diplomacy&&typeof d.diplomacy==='object'){Object.keys(S.diplomacy).forEach(k=>{if(d.diplomacy[k])S.diplomacy[k]=String(d.diplomacy[k]);});}
+  // 九州
+  if(d.provinces&&typeof d.provinces==='object'){
+    Object.keys(d.provinces).forEach(k=>{
+      const p=d.provinces[k];
+      if(!p||typeof p!=='object'||!S.provinces[k])return;
+      PROV_FIELDS.forEach(([f])=>{if(p[f]!==undefined)S.provinces[k][f]=clamp(S.provinces[k][f]+num(p[f]),0,100);});
+      if(p.note)S.provinces[k].note=String(p.note);
+    });
+  }
+  // 天命
+  if(d.destiny&&typeof d.destiny==='object'){
+    if(d.destiny.pressure!==undefined)S.destiny.pressure=clamp(S.destiny.pressure+num(d.destiny.pressure),0,100);
+    if(d.destiny.xin!==undefined)S.destiny.xin=clamp(S.destiny.xin+num(d.destiny.xin),0,100);
+    ['bodyNote','lifespanNote','statusNote','hint','route'].forEach(k=>{if(d.destiny[k])S.destiny[k]=String(d.destiny[k]);});
+  }
+  // 大事记录
+  if(Array.isArray(d.events)){
+    d.events.forEach(e=>{if(e&&e.text)addDestinyEvent(e.type||'其他',e.text);});
+  }
+  // 记忆与摘要
+  if(Array.isArray(d.memory)){
+    d.memory.forEach(m=>{
+      const s=String(m).trim();if(!s)return;
+      let type='事件';
+      if(/约定|答应|说好|约好|承诺|誓言/.test(s))type='约定';
+      else if(/秘密|不告诉|别让|瞒着/.test(s))type='秘密';
+      else if(/喜欢|讨厌|害怕|开心|难过|心动|怨恨|忌惮/.test(s))type='情感';
+      else if(/驾崩|即位|立储|废后|改革|新政|科举|选秀|大婚|和亲|禅位|谋反|政变|大捷|败/.test(s))type='大事';
+      else if(/在|去了|来到|离开/.test(s)&&/宫|殿|府|镇|州/.test(s))type='地点';
+      addMemory(type,s);
+    });
+  }
+  if(d.summary&&typeof d.summary==='string'){
+    const s=d.summary.trim();
+    if(s){state.summary=(state.summary?state.summary+'\n':'')+`（${fmtTime(state.timeRaw)}）${s}`;if(state.summary.length>5000)state.summary=state.summary.slice(-5000);}
+  }
+  // 关键节点标记
+  if(d.checkpoint===true)checkpoint('关键节点·'+fmtTime(state.timeRaw));
+  // 结局判定
+  if(d.ended===true)Game.onEnded(d);
+}
+function parseYear(t){
+  const m=String(t||'').match(/(\d+)年/);
+  return m?parseInt(m[1]):1;
+}
+/* ================= 系统提示词 ================= */
+function buildSystemPrompt(){
+  const p=state.player, S=state;
+  const perksText=(p.perks||[]).length?p.perks.map(k=>{const q=PERKS.find(x=>x.k===k);return q?q.n:'';}).filter(Boolean).join('、'):'无';
+  const consortsText=S.consorts.length?S.consorts.map(c=>`${c.name}（${c.rank||'位份待定'}·宠爱${c.favor!==undefined?c.favor:'?'}·心情「${c.mood||'未知'}」${c.note?'·'+c.note:''}）`).join('；'):'暂无（可随剧情选秀/纳妃）';
+  const childrenText=S.children.length?S.children.map(c=>`${c.name}（${c.gender||''}·${c.age!==undefined?c.age+'岁':''}·资质${c.talent!==undefined?c.talent:'?'}·性格「${c.personality||'未知'}」·关系${c.relation!==undefined?c.relation:'?'}${c.note?'·'+c.note:''}）`).join('；'):'暂无子嗣';
+  const provText=PROV_KEYS.map(k=>{const d=S.provinces[k],def=PROVINCE_DEFS[k];return `${def.n}(${def.t}·民生${d.minsheng}·农业${d.nongye}·税收${d.shui}·治安${d.zhiAn})`;}).join(' ');
+  const evText=S.destiny.events.slice(0,8).map(e=>`[${e.type}]${e.text}`).join('；')||'暂无';
+  const mems=S.memories.slice(0,60).map(m=>`- [${m.type}] ${m.text}`).join('\n');
+  const factionsTxt=FACTION_DEFS.map(([k,n])=>`${n}${S.factions[k]}(态度：${S.factionMood[k]||'未知'})`).join(' ');
+  const diff=DIFFS[S.difficulty], mode=MODES[S.mode];
+  const eternalExtra=S.mode==='eternal'?`\n天道压力：${S.destiny.pressure}/100（隐性呈现） 心性：${S.destiny.xin}/100（豁达→麻木→偏执→疯狂） 续命路线：${S.destiny.route||'未定（龙气/丹药/仙途）'}`:'';
+  return `你是大晟朝AI导演兼全角色扮演者，正在演绎历史模拟游戏《朕的江山》。玩家扮演皇帝（"你"），你扮演其余一切：朝臣、后妃、宦官、百姓、天象与命运。以真实、细腻、有代入感的宫廷叙事推进游戏。
+
+${RP_RULES}
+
+${WORLD_CORE}
+
+【当前设置】
+难度：${diff.n}（${diff.sub}）— ${diff.d}
+模式：${mode.n} — ${mode.d}
+${MODE_CORE[S.mode]}
+
+【玩家身份卡】（永远不得遗忘或更改）
+姓名：${esc(p.name)}（${p.gender}帝 · 即位${p.age}岁）
+年号：${p.title} ｜ 继位：${p.succession} ｜ 治国理念：${p.philosophy}
+性格：${p.persona} ｜ 外貌：${p.appearance||'（由你自然描写）'}
+背景：${p.bg||'（普通皇子）'} ｜ 先帝遗愿：${p.will||'无'}
+天赋：才智${p.traits.wisdom} 魅力${p.traits.charm} 武艺${p.traits.martial} ｜ 特殊天赋：${perksText}
+玩家备注（严格遵守）：${p.notes||'无'}
+
+【当前世界状态卡】（必须与此保持一致，数值变动通过状态块同步）
+时间：${fmtTime(S.timeRaw)} ｜ 地点：${S.loc}
+江山：国库${S.country.treasury}万两 / 民心${S.country.minxin} / 军力${S.country.junli} / 皇权威严${S.country.huangquan} / 文治${S.country.wenzhi}
+龙体：精力${S.body.energy}/100 健康${S.body.health}/100 ｜ ${S.destiny.bodyNote||''}（${S.destiny.lifespanNote||''}）
+势力：${factionsTxt}
+后妃：${consortsText}
+子嗣：${childrenText}
+后宫安宁：${S.haremPeace} ｜ 太后：${S.taikou.name}（${S.taikou.mood}）${S.taikou.note?'——'+S.taikou.note:''}
+九州：${provText}
+六部：${MINISTRIES.map(([k,n])=>(S.ministers[k]||'').replace('（待定）','')).filter(Boolean).join('；')||'官员待定'}
+军事：禁军—${S.military.jin}；边军—${S.military.bian}；厢军—${S.military.xiang}
+外交：${DIPLOMACY_DEFS.map(([k,n])=>`${n}—${S.diplomacy[k]}`).join('；')}
+天命记录：${evText}${eternalExtra}
+
+【记忆档案】（最新在前，NPC共知的公开事实）
+${mems||'（暂无）'}
+
+【故事摘要】（已发生的主线，不可违背）
+${S.summary||'（故事刚刚开始：新君即位，盛世余晖下的王朝等待你的第一道旨意）'}
+
+【演绎要求】
+1. 每次回复先描写场景、人物神态与动作（用()括起），再写对话；对话口语化、有个性、符合身份（朝堂用官话、后妃用软语、武将用直话），禁止书面腔和模板台词。
+2. 一次回复呈现一个自然场景片段，篇幅180-500字，节奏从容；玩家长时间沉默时安排轻微日常事件，但绝不替玩家行动。
+3. NPC对玩家（"你"）的了解严格限于当前场景亲眼所见、亲耳所闻以及记忆档案中的公开内容；玩家未公开的想法、密旨、行踪一律不知道。
+4. 绝不替玩家做决定、行动或说话；"你"的一切行为由玩家下一轮输入决定。
+5. 时间按现实逻辑推进：早朝→午批→晚膳→入寝，一天1-3个场景，别让玩家困在同一天；每月结算时可提国库民心变动，每年春闱/围猎/冬至大典自然发生。
+6. 数值必须跟随剧情走：大灾大政必动大数值，琐碎日常小动或不动；民心、军力、皇威、国库的变化要在叙事中可感知（百姓议论、官员奏对、边关军报）。
+7. 设定与记忆永不遗忘：玩家身份卡、世界状态卡、记忆档案、故事摘要都是硬设定，前后必须自洽。
+8. 灾异与祥瑞要有前因后果，能回溯到玩家此前的决策；禁止凭空降灾。
+9. 后宫与前朝联动：外戚、太后、皇子夺嫡等势力反应要自然渗透进剧情。
+10. 未在场的NPC不得突然出现；场景转换需符合现实逻辑。
+11. ${state.mode==='eternal'?'永恒模式：体现"永生是另一种诅咒"——亲者凋零、天道压力、心性变化是核心情感线索；王朝周期律（体制病）要在长线剧情中浮现。':'普通模式：寿命有限，健康、纵欲、劳碌都会折寿；中后期以"龙体抱恙"预警。'}
+
+【输出格式】
+正文之后另起一行输出状态块（必须），格式：⟦STATE⟧{...}⟦/STATE⟧
+状态块JSON允许的字段（数值一律写增减量，整数；没变化的字段省略）：
+time:"昭德3年·5月·15日·早朝"（格式：年号+阿拉伯数字年·月·日·时段，时段取：早朝/午时/午后/晚膳后/入寝/深夜）
+period:"早朝" location:"宣政殿"
+treasury:±万两，minxin:±民心，junli:±军力，huangquan:±皇威，wenzhi:±文治（单次一般-10~+15，大事可更多）
+energy:±精力（-5~-40），health:±健康，wisdom/charm/martial:±才智/魅力/武艺（极少变）
+factions:{"wen":±,"wu":±,"eunuch":±,"waigi":±,"shijia":±}（势力值增减）
+factionMood:{"wen":"不满"}（态度描述，可选）
+haremPeace:±后宫安宁
+taikou:{"mood":"静养","note":"..."}
+consorts:[{"name":"沈氏","rank":"皇后","favor":72,"mood":"平和","note":"..."}]（提供本次有变化的妃嫔；favor是绝对值0-100）
+consortRemove:["已故妃嫔名"]
+children:[{"name":"赵承乾","gender":"皇子","age":5,"talent":8,"personality":"沉稳","relation":70,"note":"..."}]
+childRemove:["..."]
+ministers:{"shoufu":"首辅姓名(简述)","li":"...","hu":"...","li2":"...","bing":"...","xing":"...","gong":"..."}
+military:{"jin":"...","bian":"...","xiang":"..."} diplomacy:{"beiDi":"...","xiQiang":"...","dongYi":"...","nanHai":"..."}
+provinces:{"ji":{"minsheng":±,"nongye":±,"shui":±,"zhiAn":±,"bingyuan":±,"note":"..."}}（增量）
+destiny:{"pressure":±,"xin":±,"bodyNote":"龙体状况","lifespanNote":"寿元预警","statusNote":"当前状况概述","hint":"玩家当前可做的事","route":"续命路线（永恒模式）"}
+events:[{"type":"灾异","text":"..."}]（type取：祥瑞/灾异/后宫/朝政/战事/大典/其他，大事才记）
+memory:["值得长期记住的事实/秘密/大事（最多3条）"]
+summary:"一句值得加入故事摘要的话（可选）"
+checkpoint:true（仅发生重大转折时）
+ended:true（仅本回合皇帝生涯结束时），endType:"驾崩/亡国/被废/禅位/飞升/其他"，endTitle:"史书称号"，endDetail:"结局说明"，failure:true（失败才写true，禅位飞升等善终不写）
+示例：⟦STATE⟧{"time":"昭德3年·5月·15日·早朝","period":"早朝","location":"宣政殿","treasury":-20,"minxin":8,"factions":{"wen":2},"consorts":[{"name":"沈氏","rank":"皇后","favor":70,"mood":"忧心"}],"events":[{"type":"朝政","text":"下诏开仓赈济河间水患"}],"memory":["河间府水患，朝廷开仓赈灾"]}⟦/STATE⟧`;
+}
+
+/* ================= API ================= */
+async function callAI(messages,opts={}){
+  const c=Object.assign({},DEFAULTS,cfg);
+  if(!c.key){if(!opts.silent)addLog('system','❌ 请先配置 API Key。');return null;}
+  const body={model:c.model,messages,temperature:0.85,stream:!!opts.onChunk};
+  const mt=c.maxTokens;
+  if(mt&&mt!=='unlimited')body.max_tokens=parseInt(mt);
+  if(/reasoner/i.test(c.model))body.reasoning_effort=c.reasoningEffort||'medium';
+  try{
+    const r=await fetch(c.endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+c.key},
+      body:JSON.stringify(body),
+      signal:opts.signal
+    });
+    if(!r.ok){
+      let msg='HTTP '+r.status;
+      try{const e=await r.text();try{msg=JSON.parse(e).error?.message||msg}catch(_){msg=e.slice(0,200)||msg}}catch(_){}
+      if(!opts.silent)addLog('system','❌ API错误：'+esc(msg));
+      return null;
+    }
+    if(opts.onChunk)return readStream(r,opts.onChunk);
+    const d=await r.json();
+    const ch=d.choices&&d.choices[0];
+    if(!ch){if(!opts.silent)addLog('system','❌ API返回空响应。');return null;}
+    return {reasoning:ch.message?.reasoning_content||'',content:ch.message?.content||''};
+  }catch(e){
+    if(opts.signal&&opts.signal.aborted)return null;
+    if(!opts.silent)addLog('system','❌ 网络错误：'+esc(e.message||e));
+    return null;
+  }
+}
+async function readStream(response,onChunk){
+  const reader=response.body.getReader();
+  const decoder=new TextDecoder();
+  let full='',think='',buf='';
+  try{
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      buf+=decoder.decode(value,{stream:true});
+      const lines=buf.split('\n');
+      buf=lines.pop()||'';
+      for(const line of lines){
+        const s=line.trim();
+        if(!s||s==='[DONE]')continue;
+        let data='';
+        if(s.startsWith('data: '))data=s.slice(6);
+        else if(s.startsWith('data:'))data=s.slice(5);
+        else continue;
+        if(data==='[DONE]')continue;
+        try{
+          const j=JSON.parse(data);
+          const d=j.choices&&j.choices[0]&&j.choices[0].delta;
+          if(d){
+            if(d.reasoning_content){think+=d.reasoning_content;onChunk({type:'reasoning',text:d.reasoning_content});}
+            if(d.content){full+=d.content;onChunk({type:'content',text:d.content});}
+          }
+        }catch(e){}
+      }
+    }
+  }finally{try{reader.releaseLock()}catch(e){}}
+  return {reasoning:think,content:full};
+}
+
+/* ================= 失败评价（太史令） ================= */
+async function evalAI(kind,cause){
+  const S=state,p=S.player;
+  const evText=S.destiny.events.slice(0,14).map(e=>`[${e.type}]${e.text}`).join('\n');
+  const recent=S.history.slice(-10).map(m=>(m.role==='user'?'【玩家】':'【演绎】')+String(m.content).slice(0,300)).join('\n');
+  const sys=`你是大晟朝太史令。皇帝的生涯刚刚${kind==='fail'?'以失败告终':'走到了终点'}。请以史官视角给出定论。只输出严格JSON（不要多余文字），格式：{"title":"史书称号（如：末帝/昭德大帝/中兴昭德/独夫等，2-6字）","eval":"史书列传式总评，80-140字，文言或半文半白","critiques":["3-5条，每条20-50字，逐条点评玩家本次生涯中的关键行为与失误（若为善终结局则点评其功过得失）"],"advice":"若回档重来，给玩家的建议，60-120字"}。critiques要具体到行为，不要空话套话。`;
+  const user=`玩家设定：${p.name}（${p.gender}帝），年号${p.title}，性格${p.persona}，理念${p.philosophy}，天赋${JSON.stringify(p.traits)}，备注：${p.notes||'无'}
+难度：${DIFFS[S.difficulty].n} 模式：${MODES[S.mode].n}
+结局：${kind==='fail'?'失败——'+cause:'善终/大结局——'+cause}
+最终状态：国库${S.country.treasury}万两 民心${S.country.minxin} 军力${S.country.junli} 皇威${S.country.huangquan} 文治${S.country.wenzhi} 健康${S.body.health} 在位${parseYear(S.timeRaw)}年
+大事记：
+${evText||'（无）'}
+故事摘要：
+${S.summary||'（无）'}
+近期演绎：
+${recent||'（无）'}`;
+  addLog('system','📜 太史令正在秉笔直书…');
+  const res=await callAI([{role:'system',content:sys},{role:'user',content:user}],{silent:true,signal:evalAbort});
+  const fallback={title:kind==='fail'?'末帝':'昭德帝',eval:'史书阙载，太史令未能尽录其详。',critiques:['（太史令失语，未能点评）'],advice:'回档重来，稳扎稳打，勤政爱民。'};
+  if(!res||!res.content)return fallback;
+  let out=fallback;
+  const m=res.content.match(/⟦EVAL⟧([\s\S]*?)⟦\/EVAL⟧/);
+  const txt=m?m[1]:res.content;
+  const jm=txt.match(/\{[\s\S]*\}/);
+  if(jm){
+    try{
+      const o=JSON.parse(jm[0]);
+      if(o&&typeof o==='object'){
+        out={title:String(o.title||fallback.title).slice(0,12),
+          eval:String(o.eval||fallback.eval),
+          critiques:Array.isArray(o.critiques)?o.critiques.slice(0,6).map(String):fallback.critiques,
+          advice:String(o.advice||fallback.advice)};
+      }
+    }catch(e){}
+  }
+  return out;
+}
+
+/* ================= 记忆压缩 ================= */
+async function compressHistory(){
+  if(compressing||!state||state.history.length<=MAX_HISTORY)return;
+  compressing=true;
+  try{
+    const keep=state.history.slice(-16);
+    const old=state.history.slice(0,-16);
+    const oldText=old.map(m=>(m.role==='user'?'【你】':'【对方】')+m.content).join('\n').slice(-14000);
+    addLog('system','📎 史官整理起居注：长对话正在压缩进故事摘要…');
+    const res=await callAI([
+      {role:'system',content:'你是大晟朝起居注整理官。根据旧摘要与新增对话，生成更新后的故事摘要：保留重大事件、决策与后果、人物关系变化、势力变动、秘密与伏笔，用第三人称简洁叙述，350字以内，只输出摘要正文，不要任何解释或格式。'},
+      {role:'user',content:'旧摘要：\n'+(state.summary||'(无)')+'\n\n新增对话：\n'+oldText}
+    ],{silent:true});
+    if(res&&res.content&&res.content.trim()){
+      const c=res.content.trim().replace(/⟦STATE⟧[\s\S]*?⟦\/STATE⟧/g,'').trim();
+      if(c)state.summary=c;
+      addLog('system','✅ 起居注整理完成，故事摘要已更新。');
+    }else{
+      state.summary=(state.summary?state.summary+'\n':'')+'（较早的日常细节已归档）';
+      addLog('system','⚠️ 整理失败，较早对话已归档。');
+    }
+    state.history=keep;
+    saveState();
+  }finally{compressing=false;}
+}
+/* ================= 主流程 ================= */
+const Game={
+  _ac:null,
+  setBusy(b){
+    apiBusy=b;
+    const sb=$('send-btn'),li=$('loading-indicator'),st=$('stop-btn'),rg=$('regen-btn');
+    if(sb)sb.disabled=b;
+    if(li)li.classList.toggle('show',b);
+    if(st)st.classList.toggle('hidden',!b);
+    if(rg)rg.classList.toggle('hidden',b||!state||state.history.length<2);
+  },
+  send(){
+    if(apiBusy||!state||state.gameOver)return;
+    const txt=$('user-input').value.trim();
+    if(!txt)return;
+    $('user-input').value='';autoGrow();
+    state.history.push({role:'user',content:txt});
+    addLog('action','🗣️ <b>'+esc(txt)+'</b>');
+    this.streamReply();
+  },
+  async streamReply(){
+    this.setBusy(true);
+    const msgs=[{role:'system',content:buildSystemPrompt()}].concat(state.history);
+    const el=addLog('narrative','');
+    const elIdx=state.log.length-1;
+    el.innerHTML='<span class="who ai">🏯 朕的江山</span><span class="cursor"></span>';
+    let thinkEl=null,thinkText='',thinkLogIdx=-1,stateBlockSeen=false;
+    const ac=new AbortController();this._ac=ac;
+    const res=await callAI(msgs,{signal:ac.signal,onChunk:ch=>{
+      if(ch.type==='reasoning'){
+        thinkText+=ch.text;
+        if(!thinkEl){
+          thinkEl=document.createElement('details');
+          thinkEl.className='log-entry think';
+          thinkEl.innerHTML='<summary>🧠 心念</summary><div class="think-body"></div>';
+          thinkEl.open=false;
+          el.parentNode.insertBefore(thinkEl,el);
+          thinkLogIdx=elIdx;
+          state.log.splice(elIdx,0,{type:'think',html:'<summary>🧠 心念</summary><div class="think-body"></div>'});
+        }
+        thinkEl.querySelector('.think-body').textContent=thinkText;
+      }else{
+        let shown=ch.text||'';
+        const fi=shown.indexOf('```');
+        if(fi>=0){shown=shown.slice(0,fi);stateBlockSeen=true;}
+        const si=shown.indexOf('⟦STATE⟧');
+        if(si>=0){shown=shown.slice(0,si);stateBlockSeen=true;}
+        if(stateBlockSeen)shown='';
+        el.classList.remove('streaming');
+        el.innerHTML='<span class="who ai">🏯 朕的江山</span>'+nl2br(shown);
+        scrollLog();
+      }
+    }});
+    this.setBusy(false);
+    if(!res||!res.content){
+      if(thinkEl)thinkEl.remove();
+      if(!(ac.signal.aborted)){
+        if(!res)removeLastEntry();
+      }else{
+        // 用户主动停止：移除本次流式占位与历史
+        removeLastEntry();
+        if(state.history.length)state.history.pop();
+      }
+      if(thinkLogIdx>=0)state.log.splice(thinkLogIdx,1);
+      return;
+    }
+    if(res.reasoning&&res.content.startsWith(res.reasoning)){
+      res.content=res.content.slice(res.reasoning.length).replace(/^[：:\s]+/,'');
+    }
+    if(res.reasoning&&res.content.startsWith(res.reasoning)){
+      res.content=res.content.slice(res.reasoning.length).replace(/^[：:\s]+/,'');
+    }
+    const {clean,data}=parseStateBlock(res.content);
+    el.innerHTML='<span class="who ai">🏯 朕的江山</span>'+nl2br(clean);
+    const narrIdx=thinkLogIdx>=0?elIdx+1:elIdx;
+    if(state.log[narrIdx])state.log[narrIdx].html='<span class="who ai">🏯 朕的江山</span>'+nl2br(clean);
+    if(thinkLogIdx>=0&&state.log[thinkLogIdx])state.log[thinkLogIdx].html='<summary>🧠 心念</summary><div class="think-body">'+esc(thinkText)+'</div>';
+    state.history.push({role:'assistant',content:res.content});
+    state.turn++;
+    if(data)applyState(data);
+    if(!state.ended&&!state.gameOver){
+      if(state.mode==='mortal'){
+        if(state.body.health<=0){this.onEnded({failure:true,endType:'驾崩',endTitle:'',endDetail:'龙体不豫，药石无灵，龙驭上宾。'});}
+        else if(state.country.minxin<=0){this.onEnded({failure:true,endType:'亡国',endTitle:'',endDetail:'民变四起，京师陷落，社稷倾覆。'});}
+      }
+    }
+    UI.renderAll();
+    UI.updateChips();
+    if(cfg.autosave)saveState();
+    if(state.history.length>MAX_HISTORY)compressHistory();
+  },
+  stopGen(){if(this._ac)this._ac.abort();},
+  regen(){
+    if(apiBusy||!state)return;
+    const lastIdx=state.log.map(l=>l.type).lastIndexOf('action');
+    if(lastIdx<0)return;
+    const removed=state.log.splice(lastIdx).length;
+    const g=$('game-log');
+    for(let i=0;i<removed;i++){if(g.lastElementChild)g.lastElementChild.remove();}
+    const users=state.history.filter(m=>m.role==='user');
+    const lastUser=users[users.length-1];
+    if(!lastUser)return;
+    while(state.history.length&&state.history[state.history.length-1]!==lastUser)state.history.pop();
+    if(state.history[state.history.length-1]===lastUser)state.history.pop();
+    addLog('action','🗣️ <b>'+esc(lastUser.content)+'</b>');
+    state.history.push(lastUser);
+    this.streamReply();
+  },
+  async onEnded(d){
+    if(state.gameOver)return;
+    state.gameOver=true;
+    state.ended={type:d.endType||'驾崩',title:d.endTitle||'',detail:d.endDetail||'',time:state.timeRaw};
+    if(cfg.autosave)saveState();
+    UI.updateChips();
+    const isFail=d.failure!==false;
+    const cause=state.ended.type+(state.ended.detail?'——'+state.ended.detail:'');
+    UI.showEndingLoading(isFail);
+    const ev=await evalAI(isFail?'fail':'end',cause);
+    state.ended.eval=ev;
+    const rec={id:uid(),at:new Date().toLocaleString('zh-CN'),time:state.timeRaw,title:ev.title||state.ended.title||(isFail?'末帝':'昭德帝'),type:state.ended.type,detail:state.ended.detail,cause,isFail,eval:ev.eval,critiques:ev.critiques,advice:ev.advice,checkpointId:state.checkpoints.length?state.checkpoints[0].id:null};
+    if(isFail){state.failures.unshift(rec);if(state.failures.length>20)state.failures.length=20;}
+    else{state.endings.unshift(rec);if(state.endings.length>20)state.endings.length=20;}
+    if(cfg.autosave)saveState();
+    UI.renderEnding(rec);
+  },
+  exportSave(){
+    if(!state)return;
+    const data={type:'emperor-save',v:1,savedAt:new Date().toLocaleString('zh-CN'),state:state};
+    const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=(state.player.name||'朕的江山')+'·存档.json';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+    UI.toast('✅ 存档已导出','success');
+  },
+  importSave(){$('import-file').click();},
+  handleImport(e){
+    const f=e.target.files&&e.target.files[0];
+    e.target.value='';
+    if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        const d=JSON.parse(rd.result);
+        const s=d.state||d;
+        if(!s||!s.player||!s.country)throw new Error('格式不正确');
+        state=s;
+        state.log=state.log||[];state.history=state.history||[];state.memories=state.memories||[];
+        state.checkpoints=state.checkpoints||[];state.failures=state.failures||[];state.endings=state.endings||[];
+        state.destiny=state.destiny||{events:[],pressure:20,xin:65};
+        state.ended=state.ended||null;state.gameOver=!!state.gameOver;
+        state.provinces=state.provinces||(()=>{const p={};PROV_KEYS.forEach(k=>p[k]=Object.assign({},PROVINCE_DEFS[k].init,{note:PROVINCE_DEFS[k].note}));return p;})();
+        repairLog();
+        UI.enterGame();
+        renderLog();
+        UI.renderAll();UI.updateChips();
+        UI.toast('✅ 存档导入成功','success');
+      }catch(err){
+        UI.toast('❌ 导入失败：'+err.message,'error');
+      }
+    };
+    rd.readAsText(f);
+  },
+  restart(){
+    UI.confirm('重新开始','将清除当前全部进度并回到创建流程，是否继续？',()=>{
+      window._skipSave=true;
+      try{localStorage.removeItem(LS_STATE);}catch(e){}
+      location.reload();
+    });
+  }
+};
+
+/* ================= 工具：输入框 ================= */
+function autoGrow(){
+  const el=$('user-input');
+  if(!el)return;
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,110)+'px';
+}
+/* ================= UI 核心 ================= */
+const UI={
+  /* ---------- 基础 ---------- */
+  toast(msg,type){
+    const t=$('toast');
+    if(!t)return;
+    t.textContent=msg;
+    t.className='show'+(type?' '+type:'');
+    clearTimeout(t._tm);
+    t._tm=setTimeout(()=>t.className='',2600);
+  },
+  openModal(id){const el=$(id);if(el)el.classList.add('show');},
+  closeModal(id){const el=$(id);if(el)el.classList.remove('show');},
+  confirm(title,text,fn){
+    $('cf-title').textContent=title;
+    $('cf-text').textContent=text;
+    window._cfOk=fn||null;
+    this.openModal('confirm-modal');
+  },
+  applyTheme(t){
+    document.body.dataset.theme=t;
+    const meta=document.querySelector('meta[name="theme-color"]');
+    if(meta)meta.content=t==='gongque'?'#f3ecdd':t==='xinghan'?'#0b0f1c':'#0e0b07';
+  },
+  makePetals(){
+    const box=$('petals');
+    if(!box)return;
+    box.innerHTML='';
+    for(let i=0;i<16;i++){
+      const p=document.createElement('i');
+      p.className='petal';
+      p.style.left=Math.random()*100+'%';
+      p.style.animationDuration=(9+Math.random()*10)+'s';
+      p.style.animationDelay=(-Math.random()*12)+'s';
+      p.style.opacity=(.08+Math.random()*.12).toFixed(2);
+      box.appendChild(p);
+    }
+  },
+  /* ---------- 创建向导 ---------- */
+  goStep(n){
+    document.querySelectorAll('.create-step').forEach((s,i)=>s.classList.toggle('active',i===n));
+    const dots=$('step-dots');
+    if(dots){
+      dots.innerHTML='';
+      for(let i=0;i<7;i++){
+        const d=document.createElement('span');
+        d.className='dot'+(i===n?' on':'');
+        dots.appendChild(d);
+      }
+    }
+    if(n===6)this.renderReady();
+  },
+  pickSeg(id,btn){
+    const box=$(id);
+    if(!box)return;
+    box.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const v=btn.dataset.v;
+    const cust=box.parentElement.querySelector('input[type=text].hidden');
+    if(cust)cust.classList.toggle('hidden',v!=='custom');
+  },
+  segValue(id){
+    const box=$(id);
+    if(!box)return '';
+    const b=box.querySelector('.seg-btn.selected');
+    if(!b)return '';
+    if(b.dataset.v==='custom'){
+      const cust=box.parentElement.querySelector('input[type=text]:not(.hidden)');
+      return cust?cust.value.trim():'';
+    }
+    return b.dataset.v;
+  },
+  onCustom(selId){
+    const sel=$(selId);
+    const cust=$(selId+'-custom');
+    if(sel&&cust)cust.classList.toggle('hidden',sel.value!=='__custom__');
+  },
+  onPersonaChange(prefix){
+    const sel=$(prefix+'-persona');
+    const cust=$(prefix+'-persona-custom');
+    if(sel&&cust)cust.classList.toggle('hidden',sel.value!=='__custom__');
+  },
+  randName(){
+    const g=this.segValue('self-gender')||'男';
+    const s=rnd(SURNAMES);
+    const given=g==='女'||g.indexOf('女')>=0?rnd(GIVEN_F):rnd(GIVEN_M);
+    $('self-name').value=s+given;
+  },
+  pickDiff(k){draftDiff=k;this.renderDiffMode();},
+  pickMode(k){draftMode=k;this.renderDiffMode();},
+  toggleCheat(){traitCheat=!traitCheat;this.renderTraitSetup();},
+  renderTraitSetup(){
+    const box=$('trait-setup');
+    if(!box)return;
+    let spent=0;
+    STAT_TRAITS.forEach(t=>{spent+=selfTraits[t.k]-1;});
+    Object.keys(selfPerks).forEach(k=>{spent+=PERKS.find(p=>p.k===k).cost;});
+    const left=TRAIT_POINTS-spent;
+    const pl=$('points-left');
+    if(pl)pl.textContent=traitCheat?'剩余 ∞ 点（作弊模式）':'剩余 '+left+' 点';
+    const ct=$('cheat-toggle');
+    if(ct){ct.textContent=traitCheat?'🔓 作弊模式：开':'🔓 作弊模式：关';ct.classList.toggle('on',traitCheat);}
+    let h='<div class="section-title">🧠 天赋属性（1-10）</div>';
+    STAT_TRAITS.forEach(t=>{
+      const v=selfTraits[t.k];
+      h+=`<div class="trait-row"><span class="t-icon">${t.i}</span>
+        <div class="t-info"><div class="t-name">${t.n}</div><div class="t-desc">${t.d}</div></div>
+        <div class="t-ctrl">
+          <button onclick="UI.adjStat('${t.k}',-1)" ${v<=t.min?'disabled':''}>−</button>
+          <span class="t-val">${v}</span>
+          <button onclick="UI.adjStat('${t.k}',1)" ${(v>=t.max||(!traitCheat&&left<=0))?'disabled':''}>＋</button>
+        </div></div>`;
+    });
+    h+='<div class="section-title">✨ 特殊天赋（每项一次买断）</div>';
+    PERKS.forEach(p=>{
+      const on=!!selfPerks[p.k];
+      h+=`<div class="trait-row"><span class="t-icon">${p.i}</span>
+        <div class="t-info"><div class="t-name">${p.n} <span style="color:var(--gold);font-size:9px">${p.cost}点</span></div><div class="t-desc">${p.d}</div></div>
+        <div class="t-ctrl">
+          <button onclick="UI.togglePerk('${p.k}')" style="width:auto;border-radius:14px;padding:0 12px;font-size:11px;${on?'background:var(--gold);color:#000;border-color:var(--gold)':''}">${on?'已购':'购买'}</button>
+        </div></div>`;
+    });
+    box.innerHTML=h;
+  },
+  adjStat(k,delta){
+    selfTraits[k]=clamp(selfTraits[k]+delta,1,10);
+    this.renderTraitSetup();
+  },
+  togglePerk(k){
+    if(selfPerks[k]){delete selfPerks[k];}
+    else{
+      let spent=0;
+      STAT_TRAITS.forEach(t=>{spent+=selfTraits[t.k]-1;});
+      Object.keys(selfPerks).forEach(x=>{spent+=PERKS.find(p=>p.k===x).cost;});
+      const p=PERKS.find(p=>p.k===k);
+      if(!traitCheat&&spent+p.cost>TRAIT_POINTS){this.toast('天赋点不足','error');return;}
+      selfPerks[k]=true;
+    }
+    this.renderTraitSetup();
+  },
+  renderDiffMode(){
+    const dg=$('diff-grid'),mg=$('mode-grid');
+    if(dg){
+      dg.innerHTML=Object.keys(DIFFS).map(k=>{
+        const d=DIFFS[k];
+        return `<div class="option-card ${draftDiff===k?'selected':''}" onclick="UI.pickDiff('${k}')">
+          <span class="oc-icon">${d.i}</span><span class="oc-name">${d.n}</span><span style="font-size:9px;color:var(--t3)">（${d.sub}）</span>
+          <span class="oc-desc">${d.d}</span></div>`;
+      }).join('');
+    }
+    if(mg){
+      mg.innerHTML=Object.keys(MODES).map(k=>{
+        const m=MODES[k];
+        return `<div class="option-card ${draftMode===k?'selected':''}" onclick="UI.pickMode('${k}')">
+          <span class="oc-icon">${m.i}</span><span class="oc-name">${m.n}</span>
+          <span class="oc-desc">${m.d}</span></div>`;
+      }).join('');
+    }
+  },
+  renderReady(){
+    const box=$('ready-summary');
+    if(!box)return;
+    const g=this.segValue('self-gender')||'男';
+    box.innerHTML=`<div class="rc-h">👑 登基预览</div>
+      <b>${esc($('self-name').value||'（未命名）')}</b>（${esc(g)}帝 · 即位${esc($('self-age').value)}岁）· 年号 <b>${esc($('self-title').value||'昭德')}</b><br>
+      性格：${esc(this.personaText('self'))}<br>
+      继位：${esc(this.customText('self-succession'))} ｜ 理念：${esc(this.customText('self-philosophy'))}<br>
+      天赋：才智${selfTraits.wisdom} 魅力${selfTraits.charm} 武艺${selfTraits.martial} ｜ 特殊：${Object.keys(selfPerks).map(k=>PERKS.find(p=>p.k===k).n).join('、')||'无'}<br>
+      难度：<b>${DIFFS[draftDiff].n}</b> ｜ 模式：<b>${MODES[draftMode].n}</b><br>
+      ${$('self-notes').value?'备注：'+esc($('self-notes').value).slice(0,80)+(($('self-notes').value.length>80)?'…':''):''}`;
+  },
+  personaText(prefix){
+    const sel=$(prefix+'-persona');
+    if(!sel)return '';
+    if(sel.value==='__custom__'){
+      const c=$(prefix+'-persona-custom');
+      return c&&c.value.trim()?c.value.trim():'（未填）';
+    }
+    return sel.value;
+  },
+  customText(id){
+    const sel=$(id);
+    if(!sel)return '';
+    if(sel.value==='__custom__'){
+      const c=$(id+'-custom');
+      return c&&c.value.trim()?c.value.trim():'（未填）';
+    }
+    return sel.value;
+  },
+  /* ---------- API ---------- */
+  fillModelSelect(selId,list,cur){
+    const sel=$(selId);
+    if(!sel)return;
+    sel.innerHTML=list.map(m=>`<option value="${esc(m)}" ${m===cur?'selected':''}>${esc(m)}</option>`).join('')||`<option value="">（无模型）</option>`;
+  },
+  modelsUrl(ep){
+    return String(ep||DEFAULTS.endpoint).replace(/\/+$/,'').replace(/\/chat\/completions$/,'')+'/models';
+  },
+  fetchModels(){
+    const key=$('cfg-apikey').value.trim();
+    if(!key){this.toast('请先填写 API Key','error');return;}
+    const url=this.modelsUrl($('cfg-endpoint').value.trim());
+    fetch(url,{headers:{'Authorization':'Bearer '+key}})
+      .then(async r=>{
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        const d=await r.json();
+        const list=(d.data||[]).map(m=>m.id).filter(Boolean);
+        if(!list.length)throw new Error('未返回模型列表');
+        const cur=cfg.model||'deepseek-chat';
+        this.fillModelSelect('cfg-model',list,list.includes(cur)?cur:list[0]);
+        this.toast('✅ 已获取 '+list.length+' 个模型','success');
+        const hint=$('model-hint');
+        if(hint)hint.textContent='已拉取 '+list.length+' 个模型：'+list.slice(0,6).join('、')+(list.length>6?' 等':'');
+      })
+      .catch(e=>this.toast('❌ 拉取失败：'+(e.message||e),'error'));
+  },
+  async testApi(){
+    const key=$('cfg-apikey').value.trim();
+    const ep=$('cfg-endpoint').value.trim()||DEFAULTS.endpoint;
+    const model=$('cfg-model').value||'deepseek-chat';
+    if(!key){this.toast('请先填写 API Key','error');return;}
+    this.toast('🔌 正在测试连接…');
+    try{
+      const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'user',content:'请只回复两个字：连接成功'}],max_tokens:16})});
+      if(!r.ok){
+        let msg='HTTP '+r.status;
+        try{const e=await r.text();try{msg=JSON.parse(e).error?.message||msg}catch(_){msg=e.slice(0,150)||msg}}catch(_){}
+        this.toast('❌ 连接失败：'+msg,'error');
+        return;
+      }
+      this.toast('✅ 连接成功，模型可用','success');
+    }catch(e){
+      this.toast('❌ 网络错误：'+(e.message||e),'error');
+    }
+  },
+  saveApi(){
+    cfg.endpoint=$('cfg-endpoint').value.trim()||DEFAULTS.endpoint;
+    cfg.key=$('cfg-apikey').value.trim();
+    cfg.model=$('cfg-model').value||'deepseek-chat';
+    cfg.reasoning=$('cfg-reasoning').value;
+    cfg.maxTokens=$('cfg-maxtokens').value;
+    saveCfg();
+    this.toast('✅ API 配置已保存','success');
+    this.goStep(1);
+  },
+  /* ---------- 进入游戏 ---------- */
+  startGame(){
+    const name=$('self-name').value.trim();
+    if(!name){this.toast('请先填写你的名字','error');return;}
+    state=newState();
+    const p=state.player;
+    p.name=name;
+    const _g=this.segValue('self-gender')||'男';
+    p.gender=_g==='custom'?($('self-gender-custom').value.trim()||'男'):_g;
+    p.age=clamp(num($('self-age').value)||25,12,60);
+    p.persona=this.personaText('self');
+    p.appearance=$('self-appearance').value.trim();
+    p.bg=$('self-bg').value.trim();
+    p.title=$('self-title').value.trim()||'昭德';
+    p.succession=this.customText('self-succession');
+    p.philosophy=this.customText('self-philosophy');
+    p.will=$('self-will').value.trim();
+    p.notes=$('self-notes').value.trim();
+    state.timeRaw=p.title+'1年·1月·1日·早朝';
+    checkpoint(p.title+'元年·开国大典');
+    this.enterGame();
+    addLog('system','👑 <b>'+esc(name)+'</b>即皇帝位，年号'+esc(p.title)+'，大赦天下。难度：'+DIFFS[state.difficulty].n+'｜模式：'+MODES[state.mode].n);
+    state.history.push({role:'user',content:'（开局）昭德元年正月初一，先帝驾崩，你于灵前即位。请开篇：描写登基大典与先帝遗诏、朝堂上的势力格局与初次交锋，设定内阁首辅与六部尚书（写入ministers字段）、皇后与两三位妃嫔（写入consorts字段），最后停在第一个需要你拍板的决策上。'});
+    this.streamOpening();
+  },
+  async streamOpening(){
+    Game.setBusy(true);
+    const msgs=[{role:'system',content:buildSystemPrompt()}].concat(state.history);
+    const el=addLog('narrative','');
+    const elIdx=state.log.length-1;
+    el.innerHTML='<span class="who ai">🏯 朕的江山</span><span class="cursor"></span>';
+    const ac=new AbortController();Game._ac=ac;
+    let stateBlockSeen=false,thinkEl=null,thinkText='',thinkLogIdx=-1;
+    const res=await callAI(msgs,{signal:ac.signal,onChunk:ch=>{
+      if(ch.type==='reasoning'){
+        thinkText+=ch.text;
+        if(!thinkEl){
+          thinkEl=document.createElement('details');
+          thinkEl.className='log-entry think';
+          thinkEl.innerHTML='<summary>🧠 心念</summary><div class="think-body"></div>';
+          thinkEl.open=false;
+          el.parentNode.insertBefore(thinkEl,el);
+          thinkLogIdx=elIdx;
+          state.log.splice(elIdx,0,{type:'think',html:'<summary>🧠 心念</summary><div class="think-body"></div>'});
+        }
+        thinkEl.querySelector('.think-body').textContent=thinkText;
+        return;
+      }
+      let shown=ch.text||'';
+      const fi=shown.indexOf('```');
+      if(fi>=0){shown=shown.slice(0,fi);stateBlockSeen=true;}
+      const si=shown.indexOf('⟦STATE⟧');
+      if(si>=0){shown=shown.slice(0,si);stateBlockSeen=true;}
+      if(stateBlockSeen)shown='';
+      el.classList.remove('streaming');
+      el.innerHTML='<span class="who ai">🏯 朕的江山</span>'+nl2br(shown);
+      scrollLog();
+    }});
+    Game.setBusy(false);
+    if(!res||!res.content){
+      if(thinkEl)thinkEl.remove();
+      if(thinkLogIdx>=0)state.log.splice(thinkLogIdx,1);
+      if(!ac.signal.aborted)removeLastEntry();
+      return;
+    }
+    const {clean,data}=parseStateBlock(res.content);
+    el.innerHTML='<span class="who ai">🏯 朕的江山</span>'+nl2br(clean);
+    const narrIdx=thinkLogIdx>=0?elIdx+1:elIdx;
+    if(state.log[narrIdx])state.log[narrIdx].html='<span class="who ai">🏯 朕的江山</span>'+nl2br(clean);
+    if(thinkLogIdx>=0&&state.log[thinkLogIdx])state.log[thinkLogIdx].html='<summary>🧠 心念</summary><div class="think-body">'+esc(thinkText)+'</div>';
+    state.history.push({role:'assistant',content:res.content});
+    state.turn++;
+    if(data)applyState(data);
+    UI.renderAll();UI.updateChips();
+    if(cfg.autosave)saveState();
+  },
+  enterGame(){
+    $('setup-overlay').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    this.makePetals();
+  },
+  /* ---------- 角色抽屉 ---------- */
+  toggleChar(){$('char-drawer').classList.toggle('open');$('drawer-backdrop').classList.toggle('show',$('char-drawer').classList.contains('open'));},
+  closeChar(){$('char-drawer').classList.remove('open');$('drawer-backdrop').classList.remove('show');},
+  openPage(name){
+    ['yuyu','jiaofang','tianming'].forEach(k=>{
+      const el=$('page-'+k);
+      if(el)el.classList.toggle('show',k===name);
+    });
+    this.closeChar();
+    this.renderAll();
+  },
+  closePage(){['yuyu','jiaofang','tianming'].forEach(k=>{const el=$('page-'+k);if(el)el.classList.remove('show');});},
+  openEncy(){this.openModal('ency-modal');this.renderEncy('');},
+  openRollback(){this.openModal('rollback-modal');this.rbTab('fail');},
+  rbTab(t){rbTab=t;['fail','ck','end'].forEach(k=>{const b=$('rb-tab-'+k);if(b)b.classList.toggle('active',k===t);});this.renderRollback();}
+};
+/* ================= 渲染：顶栏与角色抽屉 ================= */
+function barColor(v,low,high){
+  if(v<=low)return 'var(--r)';
+  if(v>=high)return 'var(--gr)';
+  return 'var(--gold)';
+}
+function attrDots(v){ // 1-10 -> dots
+  let s='';
+  for(let i=0;i<10;i++)s+='<span style="color:'+(i<v?'var(--gold)':'var(--border)')+'">●</span>';
+  return '<span style="font-size:8px;letter-spacing:0">'+s+'</span>';
+}
+UI.updateChips=function(){
+  if(!state)return;
+  const t=$('time-chip');if(t)t.textContent='📅 '+fmtTime(state.timeRaw);
+  const c=$('chip-treasury');if(c){c.textContent='💰 '+state.country.treasury+'万两';c.style.color=state.country.treasury<100?'var(--r)':'';}
+  const m=$('chip-minxin');if(m){m.textContent='❤️ 民心 '+state.country.minxin;m.style.color=state.country.minxin<30?'var(--r)':state.country.minxin>=80?'var(--gr)':'';}
+  const j=$('chip-junli');if(j){j.textContent='⚔️ 军力 '+state.country.junli;j.style.color=state.country.junli<40?'var(--r)':'';}
+  const h=$('chip-huangquan');if(h){h.textContent='👑 皇威 '+state.country.huangquan;h.style.color=state.country.huangquan<40?'var(--r)':'';}
+  const e=$('chip-energy');if(e){e.textContent='⚡ 精力 '+state.body.energy;e.style.color=state.body.energy<30?'var(--r)':'';}
+  const sl=$('sit-loc'),ss=$('sit-status'),sh=$('sit-hint'),sb=$('situation-bar');
+  if(sb&&state.destiny){
+    sb.classList.remove('hidden');
+    if(sl)sl.textContent='📅 '+fmtTime(state.timeRaw)+' · 📍 '+state.loc;
+    if(ss)ss.textContent=state.destiny.statusNote||'';
+    if(sh)sh.textContent=state.destiny.hint?('💡 '+state.destiny.hint):'';
+  }
+};
+UI.renderChar=function(){
+  const c=$('char-panel');
+  if(!c||!state)return;
+  const p=state.player,S=state;
+  const g=String(p.gender).replace('帝','');
+  const avatarClr=g==='女'?'linear-gradient(135deg,#e0557f,#ff8fb0)':'linear-gradient(135deg,#e8b34b,#b8862f)';
+  const perksTxt=(p.perks||[]).map(k=>{const q=PERKS.find(x=>x.k===k);return q?q.n:'';}).filter(Boolean).join('、')||'无';
+  c.innerHTML=`
+    <div class="panel-card">
+      <div class="char-head">
+        <div class="avatar" style="background:${avatarClr}">${esc(p.name.slice(0,1))}</div>
+        <div>
+          <div class="char-name">${esc(p.name)}帝</div>
+          <div class="char-sub">年号${esc(p.title)} · ${S.mode==='eternal'?'长生久视':'人间一世'} · ${DIFFS[S.difficulty].n}</div>
+        </div>
+      </div>
+      <div class="info-line"><span class="k">性别</span> ${esc(p.gender)}帝（即位${p.age}岁）</div>
+      <div class="info-line"><span class="k">继位</span> ${esc(p.succession)}</div>
+      <div class="info-line"><span class="k">理念</span> ${esc(p.philosophy)}</div>
+      <div class="info-line"><span class="k">性格</span> ${esc(p.persona||'未知')}</div>
+      <div class="info-line"><span class="k">外貌</span> ${esc(p.appearance||'（由剧情自然描写）')}</div>
+      <div class="info-line"><span class="k">背景</span> ${esc(p.bg||'普通皇子')}</div>
+      <div class="info-line"><span class="k">天赋</span> 才智${p.traits.wisdom}·魅力${p.traits.charm}·武艺${p.traits.martial}（${esc(perksTxt)}）</div>
+      ${p.notes?'<div class="info-line"><span class="k">备注</span> '+esc(p.notes)+'</div>':''}
+    </div>
+    <div class="panel-card">
+      <h2>当前状况 <span style="font-weight:400;text-transform:none">· 实时更新</span></h2>
+      <div class="info-line"><span class="k">时刻</span> ${fmtTime(S.timeRaw)} · ${esc(S.period||'')}</div>
+      <div class="info-line"><span class="k">所在</span> ${esc(S.loc)}</div>
+      <div class="info-line"><span class="k">龙体</span> ${esc(S.destiny.bodyNote||'')}</div>
+      <div class="info-line"><span class="k">寿元</span> ${S.mode==='eternal'?'永恒（容颜永驻）':'在位'+parseYear(S.timeRaw)+'年 · '+esc(S.destiny.lifespanNote||'')}</div>
+      <div class="info-line"><span class="k">状况</span> ${esc(S.destiny.statusNote||'')}</div>
+      ${S.destiny.hint?'<div class="info-line"><span class="k">提示</span> '+esc(S.destiny.hint)+'</div>':''}
+      <div style="margin-top:6px">
+        <div class="stat-row"><span class="lbl">精力</span><div class="sbar"><div style="width:${S.body.energy}%;background:${barColor(S.body.energy,30,80)}"></div></div><span class="val">${S.body.energy}/100</span></div>
+        <div class="stat-row"><span class="lbl">健康</span><div class="sbar"><div style="width:${S.body.health}%;background:${barColor(S.body.health,30,70)}"></div></div><span class="val">${S.body.health}/100</span></div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h2>江山五维</h2>
+      ${[['国库','treasury',S.country.treasury+'万两'],['民心','minxin',S.country.minxin],['军力','junli',S.country.junli],['皇威','huangquan',S.country.huangquan],['文治','wenzhi',S.country.wenzhi]].map(([n,k,v])=>{
+        const pct=k==='treasury'?clamp(S.country[k]/800*100,0,100):v;
+        return `<div class="stat-row"><span class="lbl">${n}</span><div class="sbar"><div style="width:${pct}%;background:${k==='treasury'?'var(--gold)':barColor(v,30,70)}"></div></div><span class="val">${v}</span></div>`;
+      }).join('')}
+    </div>
+    <div class="panel-card">
+      <h2>势力态度</h2>
+      ${FACTION_DEFS.map(([k,n])=>`<div class="info-line"><span class="k">${n}</span> ${S.factions[k]} · ${esc(S.factionMood[k]||'')}</div>`).join('')}
+    </div>
+    <div class="panel-card">
+      <h2>近期记忆</h2>
+      ${S.memories.slice(0,8).map(m=>`<div class="ev-item"><span class="ev-t">${esc(m.time||'')}</span><span class="ev-n">${esc(m.text)}</span></div>`).join('')||'<div class="mem-empty">暂无记忆</div>'}
+    </div>`;
+};
+UI.renderAll=function(){
+  this.renderChar();
+  if($('page-yuyu').classList.contains('show'))PAGES.renderYuyu();
+  if($('page-jiaofang').classList.contains('show'))PAGES.renderJiaofang();
+  if($('page-tianming').classList.contains('show'))PAGES.renderTianming();
+};
+/* ================= 御宇 ================= */
+function provFill(v){return v>=68?'var(--jade)':v>=52?'var(--gold)':v>=38?'var(--r)':'#8a3a3a';}
+function pageHead(title,sub,page){
+  return `<div class="page-head"><span class="pt">${title}</span><span class="ps">${sub}</span><div class="spacer"></div><button class="btn sm" onclick="UI.closePage()">✕ 返回</button></div>`;
+}
+function barStat(label,val,max,color){
+  return `<div class="stat-row"><span class="lbl">${label}</span><div class="sbar"><div style="width:${clamp(val/max*100,0,100)}%;background:${color||'var(--gold)'}"></div></div><span class="val">${val}${max?('/'+max):''}</span></div>`;
+}
+const PAGES={
+  renderYuyu(){
+    const el=$('yuyu-panel');
+    if(!el||!state)return;
+    const S=state;
+    const svg=`
+      <svg viewBox="0 0 820 480" xmlns="http://www.w3.org/2000/svg">
+        ${PROV_KEYS.map(k=>{
+          const d=PROVINCE_DEFS[k],p=S.provinces[k];
+          const fill=provFill(p.minsheng);
+          return `<polygon class="prov${selProv===k?' sel':''}" data-k="${k}" points="${d.pts}" fill="${fill}" fill-opacity="${selProv===k?0.75:0.45}" onclick="PAGES.selProvince('${k}')"/>
+            <text class="prov-name" x="${d.cx}" y="${d.cy}" text-anchor="middle">${d.n}</text>
+            <text class="prov-tag" x="${d.cx}" y="${d.cy+15}" text-anchor="middle">${d.t}</text>`;
+        }).join('')}
+        <text class="ext-label" x="330" y="22" text-anchor="middle">⤒ 北狄</text>
+        <text class="ext-label" x="40" y="90" text-anchor="middle">西羌</text>
+        <text class="ext-label" x="782" y="30" text-anchor="middle">东夷</text>
+        <text class="ext-label" x="808" y="330" text-anchor="middle">海寇</text>
+        <text class="ext-label" x="745" y="468" text-anchor="middle">南海诸藩</text>
+        <circle cx="518" cy="84" r="5" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/>
+        <text class="prov-name" x="518" y="66" text-anchor="middle" fill="var(--accent)">承天府</text>
+      </svg>`;
+    const pd=S.provinces[selProv],def=PROVINCE_DEFS[selProv];
+    const detail=`
+      <div class="prov-detail">
+        <h3>${def.n} <span style="font-size:10px;color:var(--t3);font-family:var(--font)">${def.t}</span></h3>
+        <div class="pd-type">${esc(pd.note||def.note)}</div>
+        ${PROV_FIELDS.map(([f,n])=>barStat(n,pd[f],100,provFill(pd[f]))).join('')}
+        <div class="d-row"><span class="k">特产</span> ${esc(pd.techan||'—')}</div>
+        <div class="d-row"><span class="k">民风</span> ${esc(pd.minfeng||'—')}</div>
+        <div class="d-row"><span class="k">天灾</span> ${esc(pd.tianzai||'—')}</div>
+        ${pd.note&&pd.note!==def.note?'<div class="d-row"><span class="k">要闻</span> '+esc(pd.note)+'</div>':''}
+      </div>`;
+    const factions=FACTION_DEFS.map(([k,n,desc])=>{
+      const v=S.factions[k];
+      return `<div class="faction-row"><span class="f-name" title="${desc}">${n}</span><div class="f-bar"><div style="width:${v}%;background:${v>=80?'var(--r)':v>=60?'var(--gold)':'var(--jade)'}"></div></div><span class="f-val">${v}</span><span class="f-mood">${esc(S.factionMood[k]||'')}</span></div>`;
+    }).join('');
+    const mins=MINISTRIES.map(([k,n,desc])=>{
+      const v=S.ministers[k]||'（虚位待补）';
+      return `<div class="ministry-card"><div class="mc-name">${n}</div><div class="mc-note">${desc}：${esc(v)}</div></div>`;
+    }).join('');
+    const mil=[['jin','禁军'],['bian','边军'],['xiang','厢军']].map(([k,n])=>`<div class="dip-row"><span class="d-name">${n}</span><span class="d-val">${esc(S.military[k]||'—')}</span></div>`).join('');
+    const dip=DIPLOMACY_DEFS.map(([k,n])=>`<div class="dip-row"><span class="d-name">${n}</span><span class="d-val">${esc(S.diplomacy[k]||'—')}</span></div>`).join('');
+    el.innerHTML=pageHead('♟ 御宇','政务 · 江山 · 九州的脉搏','yuyu')+`
+      <div class="page-body">
+        <div class="stat-grid">
+          ${[['💰 国库','treasury','万两','var(--gold)'],['❤️ 民心','minxin','','var(--r)'],['⚔️ 军力','junli','','var(--jade)'],['👑 皇威','huangquan','','var(--accent)'],['📜 文治','wenzhi','','var(--blue)']].map(([ic,k,unit,clr])=>{
+            const v=S.country[k];
+            const pct=k==='treasury'?clamp(v/800*100,0,100):v;
+            return `<div class="stat-card"><div class="sc-name">${ic} ${k==='treasury'?'国库':k==='minxin'?'民心':k==='junli'?'军力':k==='huangquan'?'皇权威严':'文治'}</div><div class="sc-val" style="color:${clr}">${v}${unit}</div><div class="sc-bar"><div style="width:${pct}%;background:${clr}"></div></div></div>`;
+          }).join('')}
+        </div>
+        <div class="section-title">🗺️ 九州舆图（点击州府查看详情）</div>
+        <div class="map-wrap"><div class="map-svg">${svg}</div>${detail}</div>
+        <div class="section-title">⚖️ 五方势力</div>
+        <div class="stat-card" style="padding:10px 12px">${factions}</div>
+        <div class="section-title">🏛️ 六部与内阁</div>
+        <div class="mini-grid">${mins}</div>
+        <div class="section-title">🛡️ 军事</div>
+        <div class="stat-card" style="padding:8px 12px">${mil}</div>
+        <div class="section-title">🤝 外交</div>
+        <div class="stat-card" style="padding:8px 12px">${dip}</div>
+      </div>`;
+  },
+  selProvince(k){selProv=k;PAGES.renderYuyu();}
+};
+/* ================= 椒房 ================= */
+function consortCard(c){
+  const attrs=[['容貌','appearance'],['才艺','talent'],['家世','family'],['心机','cunning'],['忠诚','loyalty'],['体质','health']]
+    .map(([n,k])=>`${n}${c[k]!==undefined?attrDots(c[k]):'?'}`).join(' ');
+  return `<div class="consort-card">
+    <div class="cc-head">
+      <span class="cc-name">${esc(c.name)}</span>
+      <span class="rank-badge">${esc(c.rank||'位份待定')}</span>
+      <div class="spacer" style="flex:1"></div>
+      <span style="font-size:10px;color:var(--gold);font-family:var(--mono)">宠${c.favor!==undefined?c.favor:'?'}</span>
+    </div>
+    <div class="cc-mood">心情：${esc(c.mood||'未知')}</div>
+    <div class="stat-row" style="margin-top:5px"><span class="lbl">宠爱</span><div class="sbar"><div style="width:${clamp(c.favor||0,0,100)}%;background:${barColor(c.favor||0,30,75)}"></div></div><span class="val">${c.favor!==undefined?c.favor:'?'}/100</span></div>
+    <div class="cc-attrs">${attrs}</div>
+    ${c.note?'<div class="cc-note">'+esc(c.note)+'</div>':''}
+  </div>`;
+}
+function childCard(c){
+  return `<div class="child-card">
+    <div class="cd-name">${esc(c.name)} <span style="font-size:9px;color:var(--t3)">${esc(c.gender||'')}</span></div>
+    <div class="cd-meta">${c.age!==undefined?c.age+'岁 · ':''}资质${c.talent!==undefined?c.talent:'?'} · 性格「${esc(c.personality||'未知')}」 · 父子情${c.relation!==undefined?c.relation:'?'}</div>
+    ${c.note?'<div class="cd-note">'+esc(c.note)+'</div>':''}
+  </div>`;
+}
+function timelineHtml(list){
+  if(!list.length)return '<div class="mem-empty">暂无记录</div>';
+  return `<div class="timeline">${list.map(e=>`<div class="tl-item ${e.cls||''}"><span class="tl-time">${esc(e.time||'')}</span><span>【${esc(e.type||'其他')}】${esc(e.text)}</span></div>`).join('')}</div>`;
+}
+PAGES.renderJiaofang=function(){
+  const el=$('jiaofang-panel');
+  if(!el||!state)return;
+  const S=state;
+  const peace=barStat('安宁',S.haremPeace,100,S.haremPeace>=60?'var(--jade)':S.haremPeace>=35?'var(--gold)':'var(--r)');
+  const tk=`<div class="taikou-card"><div class="tk-name">👑 ${esc(S.taikou.name||'太后')}</div><div class="tk-note">态度：${esc(S.taikou.mood||'')}${S.taikou.note?'<br>'+esc(S.taikou.note):''}</div></div>`;
+  const cons=S.consorts.length?S.consorts.map(consortCard).join(''):'<div class="mem-empty">后宫空悬。可在大选中选秀纳妃，或等官员进献。</div>';
+  const kids=S.children.length?S.children.map(childCard).join(''):'<div class="mem-empty">尚无子嗣。子嗣是国本，也是夺嫡风暴的种子。</div>';
+  const events=S.destiny.events.filter(e=>e.type==='后宫').slice(0,12);
+  el.innerHTML=pageHead('🌸 椒房','后宫 · 妃嫔 · 子嗣','jiaofang')+`
+    <div class="page-body">
+      <div class="stat-grid" style="grid-template-columns:1fr 2fr">
+        <div class="stat-card"><div class="sc-name">💮 后宫安宁</div><div class="sc-val" style="font-size:15px;color:${S.haremPeace>=60?'var(--jade)':S.haremPeace>=35?'var(--gold)':'var(--r)'}">${S.haremPeace}/100</div><div class="sc-bar"><div style="width:${S.haremPeace}%;background:${S.haremPeace>=60?'var(--jade)':S.haremPeace>=35?'var(--gold)':'var(--r)'}"></div></div><div class="sc-note" style="font-size:9px;color:var(--t3);margin-top:5px">过低则宫斗频发、精力消耗加剧</div></div>
+        ${tk}
+      </div>
+      <div class="section-title">👩‍❤️‍👩 妃嫔（${S.consorts.length}）</div>
+      <div class="consort-grid">${cons}</div>
+      <div class="section-title">👶 子嗣（${S.children.length}）</div>
+      <div class="child-grid">${kids}</div>
+      <div class="section-title">📜 后宫纪事</div>
+      <div class="stat-card" style="padding:10px 12px">${timelineHtml(events)}</div>
+    </div>`;
+};
+
+/* ================= 天命 ================= */
+PAGES.renderTianming=function(){
+  const el=$('tianming-panel');
+  if(!el||!state)return;
+  const S=state,et=S.mode==='eternal';
+  const body=[['精力','energy',S.body.energy,100,'var(--gold)'],['健康','health',S.body.health,100,S.body.health>=60?'var(--jade)':'var(--r)'],['才智','wisdom',S.body.wisdom,10,'var(--blue)'],['魅力','charm',S.body.charm,10,'var(--accent)'],['武艺','martial',S.body.martial,10,'var(--purple)']]
+    .map(([n,k,v,mx,c])=>barStat(n,v,mx,c)).join('');
+  const lifetxt=et?`<div class="stat-card"><div class="sc-name">🐉 寿元</div><div class="sc-val" style="font-size:15px;color:var(--gold)">永恒</div><div style="font-size:9.5px;color:var(--t3)">容颜永驻于即位之年 · 续命路线：${esc(S.destiny.route||'未定')}</div></div>`
+    :`<div class="stat-card"><div class="sc-name">🏮 寿元</div><div class="sc-val" style="font-size:15px;color:var(--gold)">在位${parseYear(S.timeRaw)}年</div><div style="font-size:9.5px;color:var(--t3)">${esc(S.destiny.lifespanNote||'年富力强')}</div></div>`;
+  const heaven=et?`
+    <div class="stat-card"><div class="sc-name">☯ 天道压力</div><div class="sc-val" style="font-size:15px;color:${S.destiny.pressure>=70?'var(--r)':S.destiny.pressure>=40?'var(--gold)':'var(--jade)'}">${S.destiny.pressure}/100</div><div class="sc-bar"><div style="width:${S.destiny.pressure}%;background:${S.destiny.pressure>=70?'var(--r)':S.destiny.pressure>=40?'var(--gold)':'var(--jade)'}"></div></div><div style="font-size:9px;color:var(--t3);margin-top:5px">永生逆天 · 仁政积德可缓</div></div>
+    <div class="stat-card"><div class="sc-name">🧘 心性</div><div class="sc-val" style="font-size:15px;color:${S.destiny.xin>=60?'var(--jade)':S.destiny.xin>=35?'var(--gold)':'var(--r)'}">${S.destiny.xin}/100</div><div class="sc-bar"><div style="width:${S.destiny.xin}%;background:${S.destiny.xin>=60?'var(--jade)':S.destiny.xin>=35?'var(--gold)':'var(--r)'}"></div></div><div style="font-size:9px;color:var(--t3);margin-top:5px">${S.destiny.xin>=60?'豁达':S.destiny.xin>=40?'麻木':S.destiny.xin>=20?'偏执':'疯狂边缘'}</div></div>`
+    :'';
+  const statusNote=`<div class="stat-card"><div class="sc-name">📋 当前状况</div><div class="cc-note" style="border:none;padding:0">${esc(S.destiny.statusNote||'')}${S.destiny.hint?'<br><span style="color:var(--jade)">💡 '+esc(S.destiny.hint)+'</span>':''}</div></div>`;
+  const events=S.destiny.events.slice(0,30);
+  const ends=[...S.endings.map(e=>`【${e.title}】${e.type}（${e.time}）`),...S.failures.map(f=>`【${f.title}】${f.type}（${f.time}）`)].slice(0,5);
+  el.innerHTML=pageHead('☯ 天命','龙体 · 天象 · 我的一生','tianming')+`
+    <div class="page-body">
+      <div class="section-title">🫀 龙体五维</div>
+      <div class="stat-card" style="padding:10px 12px">${body}</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        ${lifetxt}${heaven}
+      </div>
+      ${statusNote}
+      <div class="section-title">🌤️ 天命记录（祥瑞 · 灾异 · 大事）</div>
+      <div class="stat-card" style="padding:10px 12px">${timelineHtml(events)}</div>
+      <div class="section-title">📜 史书已录（前尘结局）</div>
+      <div class="stat-card" style="padding:10px 12px">${ends.length?ends.map(e=>`<div class="ev-item"><span class="ev-t">史</span><span class="ev-d">${esc(e)}</span></div>`).join(''):'<div class="mem-empty">史笔尚白，由你书写。</div>'}</div>
+    </div>`;
+};
+
+/* ================= 百科 ================= */
+UI.renderEncy=function(q){
+  const c=$('ency-content');
+  if(!c)return;
+  const kw=String(q||'').trim().toLowerCase();
+  c.innerHTML=ENCY.map((s,i)=>{
+    const hit=!kw||s.t.toLowerCase().includes(kw)||s.b.toLowerCase().includes(kw);
+    return `<div class="ency-item ${hit?'show':''}"><details class="ency-section" ${i===0?'open':''}><summary>${s.h} ${s.t}</summary><div class="ency-body">${s.b}</div></details></div>`;
+  }).join('')||'';
+};
+
+/* ================= 回档 ================= */
+UI.renderRollback=function(){
+  const c=$('rollback-content');
+  if(!c||!state)return;
+  if(rbTab==='fail'){
+    const list=state.failures;
+    c.innerHTML=list.length?list.map(f=>`
+      <div class="mem-item" style="border-left:2px solid var(--r);margin-bottom:6px;border-radius:6px;background:var(--bg-elevated)">
+        <div class="m-meta">🪦 ${esc(f.time)} · ${esc(f.type)}</div>
+        <b style="color:var(--r)">${esc(f.title)}</b> — ${esc(f.cause)}
+        <div style="font-size:10px;color:var(--t2);margin-top:4px;line-height:1.6">📜 ${esc(f.eval)}</div>
+        ${f.advice?'<div style="font-size:10px;color:var(--jade);margin-top:3px">💡 '+esc(f.advice)+'</div>':''}
+        <div class="btn-row" style="margin-top:6px">
+          <button class="btn sm danger" onclick="UI.confirm('回档重来','回到失败前的关键节点「${esc(f.time)}」继续游戏？',()=>{rollbackTo('${f.id&&f.id==='_ck'?'':(f.checkpointId||'')}');})">⏪ 回档至此</button>
+        </div>
+      </div>`).join(''):'<div class="mem-empty">尚无失败记录。愿你的江山长长久久。\n（驾崩/亡国/被废等失败后，太史令会在此留下点评）</div>';
+  }else if(rbTab==='ck'){
+    const list=state.checkpoints;
+    c.innerHTML=list.length?list.map(ck=>`
+      <div class="mem-item" style="border-left:2px solid var(--gold);margin-bottom:6px;border-radius:6px;background:var(--bg-elevated)">
+        <div class="m-meta">📌 ${esc(ck.time)}</div>
+        <div style="font-size:11.5px;color:var(--t)">${esc(ck.label)}</div>
+        <div class="btn-row" style="margin-top:6px">
+          <button class="btn sm gold" onclick="UI.confirm('回到此处','回到「${esc(ck.label)}」继续？此后的进度将被覆盖。',()=>{rollbackTo('${ck.id}');})">⏪ 回到此处</button>
+        </div>
+      </div>`).join(''):'<div class="mem-empty">暂无存档节点。每至新年或关键转折会自动存档。</div>';
+  }else{
+    const list=state.endings;
+    c.innerHTML=list.length?list.map(e=>`
+      <div class="mem-item" style="border-left:2px solid var(--gold);margin-bottom:6px;border-radius:6px;background:var(--bg-elevated)">
+        <div class="m-meta">🏮 ${esc(e.time)} · ${esc(e.type)}</div>
+        <b style="color:var(--gold)">${esc(e.title)}</b> — ${esc(e.cause)}
+        <div style="font-size:10px;color:var(--t2);margin-top:4px">📜 ${esc(e.eval)}</div>
+      </div>`).join(''):'<div class="mem-empty">尚未走完任何一生。</div>';
+  }
+};
+/* ================= 设置 ================= */
+UI.openSettings=function(){
+  this.renderSettings();
+  this.openModal('settings-modal');
+};
+UI.renderSettings=function(){
+  const c=Object.assign({},DEFAULTS,cfg);
+  $('settings-content').innerHTML=`
+    <label>API 端点</label>
+    <input id="s-endpoint" value="${esc(c.endpoint)}">
+    <label>API Key</label>
+    <input id="s-apikey" type="password" value="${esc(c.key)}" placeholder="sk-...">
+    <label>模型</label>
+    <div class="row2">
+      <input id="s-model" value="${esc(c.model)}">
+      <button class="btn sm" onclick="UI.fetchSettingsModels()">🔄 拉取</button>
+    </div>
+    <label>推理强度</label>
+    <select id="s-reasoning">
+      <option value="low">低（更快）</option><option value="medium">中（均衡）</option>
+      <option value="high">高</option><option value="max">最大（更细腻）</option>
+    </select>
+    <label>输出 Token 限制</label>
+    <select id="s-maxtokens">
+      <option value="unlimited">无限制</option><option value="2048">2048</option>
+      <option value="4096">4096</option><option value="8192">8192</option><option value="16384">16384</option>
+    </select>
+    <label>界面风格</label>
+    <select id="s-theme" onchange="UI.previewTheme(this.value)">
+      <option value="jinluan">👑 金銮夜（玄色鎏金）</option>
+      <option value="gongque">🏮 宫阙昼（宣纸朱砂）</option>
+      <option value="xinghan">🌌 星汉夜（玄天星辉）</option>
+    </select>
+    <label><input type="checkbox" id="s-autosave" style="width:auto;margin-right:6px" ${c.autosave?'checked':''}>每回合自动存档（localStorage）</label>
+    <div class="btn-row right" style="margin-top:2px">
+      <button class="btn" onclick="UI.closeModal('settings-modal')">关闭</button>
+      <button class="btn accent" onclick="UI.saveSettings()">保存</button>
+    </div>
+    <div class="divider"></div>
+    <label>💾 存档管理</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn" style="flex:1" onclick="Game.exportSave()">⬇ 导出存档</button>
+      <button class="btn" style="flex:1" onclick="Game.importSave()">⬆ 导入存档</button>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:6px">
+      <button class="btn gold" style="flex:1" onclick="checkpoint('手动存档·'+fmtTime(state.timeRaw));UI.toast('📌 已创建存档节点','success')">📌 手动存档点</button>
+      <button class="btn" style="flex:1" onclick="UI.openRollback()">⏪ 回档与记录</button>
+    </div>
+    <div style="margin-top:8px"><button class="btn danger" style="width:100%" onclick="Game.restart()">🔄 重新开始</button></div>
+    <div class="hint" style="margin-top:6px">导出为 JSON 文件可备份或换设备；API Key 仅保存在本机浏览器。难度与模式随存档绑定，不可中途修改。</div>`;
+  $('s-reasoning').value=c.reasoning;
+  $('s-maxtokens').value=c.maxTokens;
+  $('s-theme').value=c.theme;
+};
+UI.saveSettings=function(){
+  cfg.endpoint=$('s-endpoint').value.trim()||DEFAULTS.endpoint;
+  cfg.key=$('s-apikey').value.trim();
+  cfg.model=$('s-model').value.trim()||'deepseek-chat';
+  cfg.reasoning=$('s-reasoning').value;
+  cfg.maxTokens=$('s-maxtokens').value;
+  cfg.theme=$('s-theme').value;
+  cfg.autosave=$('s-autosave').checked;
+  saveCfg();
+  this.applyTheme(cfg.theme);
+  this.closeModal('settings-modal');
+  this.toast('✅ 设置已保存','success');
+};
+UI.fetchSettingsModels=function(){
+  const key=$('s-apikey').value.trim();
+  if(!key){this.toast('请先填写 API Key','error');return;}
+  const ep=($('s-endpoint').value.trim()||DEFAULTS.endpoint).replace(/\/+$/,'');
+  fetch(this.modelsUrl(ep),{headers:{'Authorization':'Bearer '+key}})
+    .then(async r=>{
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const d=await r.json();
+      const list=(d.data||[]).map(m=>m.id);
+      if(!list.length)throw new Error('empty');
+      this.fillModelSelect('s-model',list,$('s-model').value);
+      this.toast('✅ 已获取 '+list.length+' 个模型','success');
+    })
+    .catch(e=>this.toast('❌ 拉取失败：'+e.message,'error'));
+};
+
+/* ================= 结局结算 ================= */
+UI.showEndingLoading=function(isFail){
+  const el=$('ending-content');
+  el.innerHTML=`
+    <div class="ending-title ${isFail?'fail':''}">${isFail?'🪦 史书记载 · 帝星陨落':'🏮 史书记载 · 一代终局'}</div>
+    <div class="ending-big">${isFail?'——':'——'}</div>
+    <div class="ending-sub">太史令正在秉笔直书…</div>
+    <div class="ending-card"><div class="ec-t" style="text-align:center;color:var(--t3)">⏳ 请稍候</div></div>`;
+  $('ending-overlay').classList.add('show');
+};
+UI.renderEnding=function(rec){
+  const S=state;
+  const years=parseYear(S.timeRaw);
+  const merits=S.destiny.events.slice(0,10).map(e=>`<li><b style="color:var(--t2)">[${esc(e.type)}]</b> ${esc(e.text)}</li>`).join('');
+  const el=$('ending-content');
+  el.innerHTML=`
+    <div class="ending-title ${rec.isFail?'fail':''}">${rec.isFail?'🪦 史书记载 · 帝星陨落':'🏮 史书记载 · 一代终局'}</div>
+    <div class="ending-big">${esc(rec.title)}</div>
+    <div class="ending-sub">${rec.isFail?'败亡于':'终局于'}「${esc(rec.type)}」· 在位 ${years} 年 · ${esc(rec.time)}</div>
+    ${rec.detail?`<div class="ending-sub" style="margin-bottom:12px">${esc(rec.detail)}</div>`:''}
+    <div class="ending-card">
+      <div class="ec-h">📜 史书列传（太史令）</div>
+      <div class="ec-t">${esc(rec.eval)}</div>
+    </div>
+    <div class="ending-card">
+      <div class="ec-h">🔍 逐条点评</div>
+      <ul>${rec.critiques.map(c=>'<li>'+esc(c)+'</li>').join('')}</ul>
+    </div>
+    <div class="ending-card advice">
+      <div class="ec-h">💡 再世建议</div>
+      <div class="ec-t">${esc(rec.advice)}</div>
+    </div>
+    <div class="ending-card">
+      <div class="ec-h">📖 大事记（本局最后十件大事）</div>
+      <ul>${merits||'<li style="color:var(--t3)">（本局大事尚未记录）</li>'}</ul>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px">
+      <button class="btn accent" onclick="UI.rollbackFromEnding()">⏪ 回到关键节点</button>
+      <button class="btn" onclick="UI.openRollback();UI.closeModal('ending-overlay')">📜 回档与记录</button>
+      <button class="btn danger" onclick="Game.restart()">🔄 重新开始</button>
+    </div>`;
+  $('ending-overlay').classList.add('show');
+};
+UI.rollbackFromEnding=function(){
+  this.closeModal('ending-overlay');
+  this.openRollback();
+  this.rbTab('ck');
+};
+
+
+/* ================= 记忆档案 ================= */
+const MEM_TYPES={人物:'👤',事件:'📌',约定:'🤝',秘密:'🔒',情感:'💗',地点:'📍',大事:'🏮',自定义:'📝'};
+let memTab='all';
+UI.showMemoryModal=function(){
+  this.openModal('memory-modal');
+  this.renderMemory();
+};
+UI.memTab=function(t){memTab=t;this.renderMemory();};
+UI.renderMemory=function(){
+  const tabs=$('mem-tabs'),c=$('mem-content');
+  if(!tabs||!c||!state)return;
+  const types=['all','人物','事件','约定','秘密','情感','地点','大事','自定义'];
+  tabs.innerHTML=types.map(t=>`<button class="mem-tab ${memTab===t?'active':''}" onclick="UI.memTab('${t}')">${t==='all'?'📚 全部':(MEM_TYPES[t]||'')+' '+t}</button>`).join('');
+  const list=state.memories.filter(m=>memTab==='all'||m.type===memTab);
+  const summary=state.summary?`<div class="panel-card" style="margin-bottom:8px"><h2>📜 故事摘要（AI 记忆的主线）</h2><div style="font-size:10.5px;color:var(--t2);line-height:1.7;white-space:pre-wrap">${esc(state.summary.slice(-1200))}</div></div>`:'';
+  c.innerHTML=summary+(list.length?list.map(m=>{
+    const realIdx=state.memories.indexOf(m);
+    return `<div class="mem-item"><div class="m-meta">${MEM_TYPES[m.type]||'📝'} ${esc(m.type)} · ${esc(m.time||'')}</div><div style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1">${esc(m.text)}</div><button class="btn sm" style="flex-shrink:0;padding:2px 8px;color:var(--r)" onclick="UI.delMemory(${realIdx})">✕</button></div></div>`;
+  }).join(''):`<div class="mem-empty">暂无${memTab==='all'?'记忆':('「'+memTab+'」类记忆')}。\nAI 会在剧情中自动记录重要之事，你也可以手动添加。</div>`);
+};
+UI.addMemoryManually=function(){
+  const v=$('mem-new').value.trim();
+  if(!v){this.toast('先写点什么吧','error');return;}
+  const type=$('mem-type').value;
+  addMemory(type,v);
+  $('mem-new').value='';
+  this.renderMemory();
+  this.toast('📔 已记入记忆档案','success');
+};
+UI.delMemory=function(idx){
+  if(!state||idx<0||idx>=state.memories.length)return;
+  const m=state.memories[idx];
+  state.memories.splice(idx,1);
+  this.renderMemory();
+  this.toast('🗑 已删除：「'+m.text.slice(0,14)+(m.text.length>14?'…':'')+'」');
+};
+
+/* ================= 启动 ================= */
+function repairLog(){
+  if(!state||!state.history||!state.history.length)return;
+  const need=state.log.some(l=>!l||!l.html||!String(l.html).trim());
+  if(!need)return;
+  const rebuilt=[];
+  state.history.forEach(m=>{
+    if(m.role==='user'){
+      const txt=String(m.content||'');
+      if(txt.startsWith('（开局）')||txt.startsWith('(开局)'))return;
+      rebuilt.push({type:'action',html:'🗣️ <b>'+esc(txt.slice(0,200))+'</b>'});
+    }else{
+      const parsed=parseStateBlock(String(m.content||''));
+      rebuilt.push({type:'narrative',html:'<span class="who ai">🏯 朕的江山</span>'+nl2br(parsed.clean)});
+    }
+  });
+  const keep=state.log.filter(l=>l&&l.type!=='action'&&l.type!=='narrative');
+  state.log=rebuilt.concat(keep);
+  if(state.log.length>MAX_LOG)state.log=state.log.slice(-MAX_LOG);
+}
+
+function boot(){
+  UI.applyTheme(cfg.theme);
+  UI.makePetals();
+  // 初始化创建流程
+  const sel=$('cfg-model');
+  sel.innerHTML=DEFAULT_MODELS.map(m=>`<option value="${m}">${m}</option>`).join('');
+  sel.value=cfg.model||'deepseek-chat';
+  $('cfg-endpoint').value=cfg.endpoint||DEFAULTS.endpoint;
+  $('cfg-apikey').value=cfg.key||'';
+  $('cfg-reasoning').value=cfg.reasoning||'medium';
+  $('cfg-maxtokens').value=cfg.maxTokens||'unlimited';
+  $('self-persona').innerHTML=PERSONALITIES.map(x=>`<option value="${x.v}">${x.v}（${x.d}）</option>`).join('')+'<option value="__custom__">✏️ 自定义</option>';
+  $('self-persona').value='英明果决';
+  $('self-age').value='25';
+  $('self-title').value='昭德';
+  UI.renderTraitSetup();
+  UI.renderDiffMode();
+  // 步骤点
+  const steps=['API 配置','主角信息','天赋分配','登基抱负','备注设定','难度模式','就绪'];
+  $('step-dots').innerHTML=steps.map((s,i)=>`<span class="dot${i===0?' on':''}" title="${s}"></span>`).join('');
+  // 恢复存档
+  const saved=lsGet(LS_STATE,null);
+  if(saved&&saved.player&&saved.country){
+    state=saved;
+    state.log=state.log||[];state.history=state.history||[];state.memories=state.memories||[];
+    state.checkpoints=state.checkpoints||[];state.failures=state.failures||[];state.endings=state.endings||[];
+    state.destiny=state.destiny||{events:[],pressure:20,xin:65};
+    state.destiny.events=state.destiny.events||[];
+    if(state.destiny.pressure===undefined)state.destiny.pressure=20;
+    if(state.destiny.xin===undefined)state.destiny.xin=65;
+    ["bodyNote","lifespanNote","statusNote","hint"].forEach(k=>{if(state.destiny[k]===undefined)state.destiny[k]='';});
+    if(!state.provinces){const p={};PROV_KEYS.forEach(k=>p[k]=Object.assign({},PROVINCE_DEFS[k].init,{note:PROVINCE_DEFS[k].note}));state.provinces=p;}
+    if(!state.ministers)state.ministers={};
+    if(!state.military)state.military={jin:'禁军拱卫京师',bian:'边军镇守',xiang:'厢军维持治安'};
+    if(!state.diplomacy)state.diplomacy={beiDi:'—',xiQiang:'—',dongYi:'—',nanHai:'—'};
+    if(!state.haremPeace)state.haremPeace=70;
+    if(!state.taikou)state.taikou={name:'太后',mood:'静养',note:''};
+    state.ended=state.ended||null;state.gameOver=!!state.gameOver;
+    repairLog();
+    UI.enterGame();
+    renderLog();
+    UI.renderAll();UI.updateChips();
+    if(state.gameOver&&state.ended){
+      // 死亡后保存的存档：恢复时重新弹出结局界面，便于回档/重开
+      const pool=state.ended.failure!==false?state.failures:state.endings;
+      const rec=(pool||[]).find(r=>r&&r.time===state.ended.time&&r.type===state.ended.type)||null;
+      if(rec)UI.renderEnding(rec);
+      else{
+        const fb={title:state.ended.title||(state.ended.failure!==false?'末帝':'昭德帝'),type:state.ended.type||'驾崩',detail:state.ended.detail||'',time:state.ended.time||state.timeRaw,isFail:state.ended.failure!==false,eval:state.ended.eval?state.ended.eval.eval:'史书阙载。',critiques:(state.ended.eval&&state.ended.eval.critiques)||['（太史令失语）'],advice:(state.ended.eval&&state.ended.eval.advice)||'回档重来，勤政爱民。'};
+      UI.renderEnding(fb);
+      }
+    }else{
+      setTimeout(()=>UI.toast('👑 已恢复上次的江山','success'),400);
+    }
+  }else{
+    UI.goStep(0);
+  }
+}
+// 事件绑定
+$('user-input').addEventListener('input',autoGrow);
+$('user-input').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();Game.send();}
+});
+$('import-file').addEventListener('change',e=>Game.handleImport(e));
+$('cf-ok').addEventListener('click',()=>{
+  UI.closeModal('confirm-modal');
+  if(window._cfOk){const fn=window._cfOk;window._cfOk=null;fn();}
+});
+window.addEventListener('beforeunload',()=>{if(state&&cfg.autosave&&!window._skipSave)saveState();});
+boot();
+</script>
+</body>
+</html>

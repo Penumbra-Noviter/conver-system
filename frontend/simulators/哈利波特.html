@@ -1,0 +1,2518 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>霍格沃茨 · 命运之书 — 哈利·波特世界观 AI 角色扮演</title>
+<style>
+/* ============ 主题变量 ============ */
+:root{
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  --serif:Georgia,"Times New Roman","Songti SC","SimSun",serif;
+  --mono:"SF Mono",Consolas,monospace;
+  --rad:6px;--rad2:10px;--rad3:16px;--tr:160ms ease;
+}
+html[data-theme="night"]{
+  --bg-deep:#0d0f16;--bg-surface:#151826;--bg-elevated:#1c2033;--bg-hover:#242a45;
+  --border:#2c3350;--border-active:#4a547e;
+  --t:#eae6da;--t2:#b6b2a4;--t3:#7d7a6d;
+  --gold:#d9a94e;--gold-dim:#a87a2c;--gold-glow:rgba(217,169,78,.14);
+  --accent:#8f6bd8;--jade:#4fc3a1;--r:#e0564f;--gr:#58c97b;--blue:#5f8fe0;
+  --hp:#e0564f;--mp:#5f8fe0;--exp:#d9a94e;
+  --bubble-ai:#1a1e30;--bubble-user:#2a334f;--shadow:0 10px 34px rgba(0,0,0,.45);
+}
+html[data-theme="parchment"]{
+  --bg-deep:#efe6d2;--bg-surface:#f8f1e0;--bg-elevated:#fffaf0;--bg-hover:#f1e6cc;
+  --border:#d8c8a4;--border-active:#b3965c;
+  --t:#3b2f1e;--t2:#6b5b3f;--t3:#97886b;
+  --gold:#8a6420;--gold-dim:#a87a2c;--gold-glow:rgba(138,100,32,.14);
+  --accent:#7a5c9e;--jade:#2f8f6f;--r:#a63d36;--gr:#3f8f4f;--blue:#3f64a8;
+  --hp:#a63d36;--mp:#3f64a8;--exp:#8a6420;
+  --bubble-ai:#fdf8ec;--bubble-user:#ead9b6;--shadow:0 10px 30px rgba(90,70,30,.28);
+}
+html[data-theme="forest"]{
+  --bg-deep:#0b1410;--bg-surface:#10201a;--bg-elevated:#152a22;--bg-hover:#1d3a2e;
+  --border:#24422f;--border-active:#3a6b4c;
+  --t:#e2e8da;--t2:#a8b8a6;--t3:#74846f;
+  --gold:#c9a24a;--gold-dim:#8f7a2e;--gold-glow:rgba(201,162,74,.13);
+  --accent:#6fb58a;--jade:#57c79b;--r:#d9564c;--gr:#5fbf74;--blue:#5a86cf;
+  --hp:#d9564c;--mp:#5a86cf;--exp:#c9a24a;
+  --bubble-ai:#12241c;--bubble-user:#1e3a2c;--shadow:0 10px 34px rgba(0,0,0,.5);
+}
+html[data-theme="starlight"]{
+  --bg-deep:#0a0e1f;--bg-surface:#111734;--bg-elevated:#182046;--bg-hover:#222c5c;
+  --border:#2c3a6b;--border-active:#4a5ca0;
+  --t:#e8e6f2;--t2:#b0b4d0;--t3:#7a80a4;
+  --gold:#d5b25a;--gold-dim:#9d8032;--gold-glow:rgba(213,178,90,.14);
+  --accent:#8fa3ff;--jade:#4fc3a1;--r:#e0564f;--gr:#58c97b;--blue:#6fa0f0;
+  --hp:#e0564f;--mp:#6fa0f0;--exp:#d5b25a;
+  --bubble-ai:#141a3c;--bubble-user:#232d5e;--shadow:0 10px 34px rgba(0,0,0,.55);
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg-deep);color:var(--t);font-family:var(--font);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;user-select:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--rad);padding:9px 12px;outline:none;transition:border var(--tr)}
+input:focus,textarea:focus,select:focus{border-color:var(--gold-dim)}
+textarea{resize:none;user-select:text}
+h1,h2,h3,.serif{font-family:var(--serif)}
+.hint{font-size:12px;color:var(--t3);line-height:1.55}
+.warn{font-size:12px;color:var(--r)}
+
+/* ============ 按钮 ============ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:var(--rad2);border:1px solid var(--border-active);background:var(--bg-elevated);color:var(--t);font-size:13px;transition:all var(--tr);white-space:nowrap}
+.btn:hover{background:var(--bg-hover);border-color:var(--gold-dim)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.gold{background:var(--gold-glow);border-color:var(--gold-dim);color:var(--gold)}
+.btn.gold:hover{background:var(--gold-glow);border-color:var(--gold)}
+.btn.jade{background:var(--jade);border-color:var(--jade);color:#08231a}
+.btn.jade:hover{filter:brightness(1.1)}
+.btn.danger{color:var(--r);border-color:var(--r);background:rgba(224,86,79,.08)}
+.btn.danger:hover{background:rgba(224,86,79,.18)}
+.btn.small{padding:5px 10px;font-size:12px;border-radius:var(--rad)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn-row .spacer{flex:1}
+
+/* ============ 创建向导 ============ */
+#setup-overlay{position:fixed;inset:0;z-index:100;background:var(--bg-deep);display:flex;flex-direction:column;align-items:center;overflow-y:auto;padding:28px 16px 60px}
+.setup-shell{width:100%;max-width:680px}
+.setup-head{text-align:center;margin-bottom:22px}
+.setup-head h1{font-size:34px;letter-spacing:.14em;color:var(--gold);text-shadow:0 0 24px var(--gold-glow)}
+.setup-head .sub{font-size:13px;color:var(--t3);letter-spacing:.22em;margin-top:4px}
+.setup-head .sub2{font-size:12px;color:var(--t3);margin-top:10px;max-width:520px;margin-left:auto;margin-right:auto}
+.step-dots{display:flex;gap:6px;justify-content:center;margin:16px 0 22px;flex-wrap:wrap}
+.step-dot{width:8px;height:8px;border-radius:50%;background:var(--border-active);transition:all var(--tr)}
+.step-dot.on{background:var(--gold);box-shadow:0 0 8px var(--gold-glow)}
+.step-dot.done{background:var(--gold-dim)}
+.create-step{display:none;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad3);padding:24px;animation:fadeUp .25s ease}
+.create-step.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.step-title{font-size:20px;color:var(--gold);margin-bottom:4px}
+.step-hint{font-size:12.5px;color:var(--t3);margin-bottom:18px}
+.step-body{display:flex;flex-direction:column;gap:14px}
+.step-nav{display:flex;gap:10px;margin-top:20px;align-items:center}
+.lbl{font-size:12.5px;color:var(--t2);font-weight:600;margin-bottom:5px;display:block}
+.option-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.option-card{position:relative;border:1px solid var(--border);border-radius:var(--rad2);padding:12px 14px;cursor:pointer;background:var(--bg-elevated);transition:all var(--tr);text-align:left}
+.option-card:hover{border-color:var(--gold-dim);background:var(--bg-hover)}
+.option-card.sel{border-color:var(--gold);background:var(--gold-glow);box-shadow:0 0 0 1px var(--gold) inset}
+.oc-name{font-size:14px;font-weight:700}
+.oc-icon{margin-right:6px}
+.oc-desc{font-size:11.5px;color:var(--t3);margin-top:3px;line-height:1.45}
+.oc-tag{position:absolute;top:8px;right:10px;font-size:10px;color:var(--gold);border:1px solid var(--gold-dim);border-radius:20px;padding:1px 8px}
+.trait-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--rad2);background:var(--bg-elevated)}
+.trait-row .t-icon{font-size:18px;width:26px;text-align:center}
+.trait-row .t-info{flex:1;min-width:0}
+.trait-row .t-name{font-size:13.5px;font-weight:700}
+.trait-row .t-desc{font-size:11px;color:var(--t3)}
+.trait-row .t-ctrl{display:flex;align-items:center;gap:8px}
+.trait-row .t-val{font-family:var(--mono);font-size:15px;font-weight:700;width:38px;text-align:center;color:var(--gold)}
+.tp-btn{width:30px;height:30px;border-radius:var(--rad);border:1px solid var(--border-active);background:var(--bg-surface);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all var(--tr)}
+.tp-btn:hover{border-color:var(--gold);color:var(--gold)}
+.tp-btn:disabled{opacity:.3;cursor:not-allowed}
+.points-left{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--t2);border:1px dashed var(--border-active);border-radius:20px;padding:4px 14px}
+.points-left b{color:var(--gold);font-family:var(--mono);font-size:15px}
+.cheat-box{margin-top:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--gold-glow);border:1px dashed var(--gold-dim);border-radius:var(--rad2);padding:10px 14px}
+.cheat-box .c-title{font-size:13px;font-weight:700;color:var(--gold)}
+.switch{position:relative;width:42px;height:22px;flex:none;cursor:pointer}
+.switch input{opacity:0;width:0;height:0}
+.switch .sl{position:absolute;inset:0;border-radius:20px;background:var(--border-active);transition:all var(--tr)}
+.switch .sl:before{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:var(--t);top:3px;left:3px;transition:all var(--tr)}
+.switch input:checked+.sl{background:var(--gold)}
+.switch input:checked+.sl:before{transform:translateX(20px);background:#1a1408}
+.confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.confirm-card{border:1px solid var(--border);border-radius:var(--rad2);padding:14px;background:var(--bg-elevated)}
+.confirm-card h4{font-size:13px;color:var(--gold);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.confirm-card .kv{font-size:12.5px;color:var(--t2);margin-bottom:4px;line-height:1.55}
+.confirm-card .kv b{color:var(--t)}
+.confirm-card.wide{grid-column:1/-1}
+.edit-link{font-size:11px;color:var(--t3);cursor:pointer;margin-left:auto;text-decoration:underline}
+
+/* ============ 主界面 ============ */
+#app{display:none;grid-template-rows:50px 1fr;height:100vh;height:100dvh;position:relative}
+#app.on{display:grid}
+#topbar{display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--bg-surface);border-bottom:1px solid var(--border);z-index:30}
+.logo{font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:.06em;color:var(--gold);display:flex;align-items:baseline;gap:8px;margin-right:6px;white-space:nowrap}
+.logo small{font-family:var(--font);font-size:10px;color:var(--t3);letter-spacing:.18em}
+.spacer{flex:1}
+.top-btn{display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:var(--rad2);border:1px solid transparent;font-size:12.5px;color:var(--t2);transition:all var(--tr);white-space:nowrap}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border)}
+.top-btn.gold{color:var(--gold)}
+.top-btn.gold:hover{border-color:var(--gold-dim);background:var(--gold-glow)}
+.top-stat{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t2);white-space:nowrap}
+.top-stat .val-t{font-family:var(--mono);color:var(--t);font-size:11.5px}
+.bar{width:64px;height:5px;border-radius:3px;background:var(--border);overflow:hidden;flex:none}
+.bar>div{height:100%;border-radius:3px;transition:width .4s ease}
+
+#center-panel{display:flex;flex-direction:column;min-height:0;position:relative}
+#game-log{flex:1;overflow-y:auto;padding:18px 16px 10px;display:flex;flex-direction:column;gap:12px;max-width:860px;width:100%;margin:0 auto}
+.log-entry{max-width:100%;animation:fadeUp .2s ease}
+.msg{display:flex;gap:10px;align-items:flex-start}
+.msg .ava{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--bg-elevated);border:1px solid var(--border)}
+.msg.user{flex-direction:row-reverse}
+.msg.user .ava{background:var(--gold-glow);border-color:var(--gold-dim)}
+.msg .bubble{max-width:78%;padding:10px 14px;border-radius:var(--rad2);background:var(--bubble-ai);border:1px solid var(--border);line-height:1.7;font-size:14px;white-space:pre-wrap;word-break:break-word;user-select:text}
+.msg.user .bubble{background:var(--bubble-user);border-color:var(--border-active)}
+.msg .bubble .np{font-weight:700;color:var(--gold);margin-bottom:2px}
+.log-sys{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--t3);justify-content:center}
+.log-sys::before,.log-sys::after{content:"";flex:1;height:1px;background:var(--border)}
+.log-sys.death{color:var(--r)}
+.log-sys.death::before,.log-sys.death::after{background:var(--r)}
+.msg-actions{display:flex;gap:6px;margin-top:5px;padding-left:44px}
+.msg-actions button{font-size:11px;color:var(--t3);border:1px solid var(--border);border-radius:20px;padding:2px 10px;transition:all var(--tr)}
+.msg-actions button:hover{color:var(--gold);border-color:var(--gold-dim)}
+.stream-cursor{display:inline-block;width:7px;height:14px;background:var(--gold);vertical-align:-2px;animation:blink .9s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.think-box{border:1px solid var(--border);border-radius:var(--rad);margin-bottom:8px;background:var(--bg-surface)}
+.think-box summary{cursor:pointer;padding:6px 12px;color:var(--t3);list-style:none;display:flex;align-items:center;gap:6px;user-select:none;font-size:12px}
+.think-box summary::-webkit-details-marker{display:none}
+.think-box summary:hover{color:var(--gold)}
+.think-box .think-body{padding:2px 12px 10px;color:var(--t3);line-height:1.65;white-space:pre-wrap;border-top:1px solid var(--border);font-size:12px;user-select:text;display:none}
+.think-box[open] .think-body{display:block}
+
+/* 快捷行动 */
+#quick-actions{display:flex;gap:8px;flex-wrap:wrap;padding:8px 16px;max-width:860px;width:100%;margin:0 auto}
+.chip{font-size:12.5px;color:var(--t2);border:1px solid var(--border);background:var(--bg-surface);border-radius:20px;padding:6px 14px;transition:all var(--tr)}
+.chip:hover{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-glow)}
+.chip:disabled{opacity:.4;cursor:not-allowed}
+
+/* 输入区 */
+#input-area{display:flex;gap:8px;align-items:flex-end;padding:10px 16px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:var(--bg-surface);max-width:860px;width:100%;margin:0 auto}
+#user-input{flex:1;max-height:130px;line-height:1.55;font-size:14px;user-select:text}
+#send-btn{height:38px;padding:0 20px;border-radius:var(--rad2);background:var(--gold);color:#1a1204;font-weight:700;font-size:13.5px;transition:all var(--tr);flex:none}
+#send-btn:hover{filter:brightness(1.12)}
+#send-btn:disabled{opacity:.5;cursor:not-allowed}
+#stop-btn{display:none;height:38px;padding:0 14px;border-radius:var(--rad2);border:1px solid var(--r);color:var(--r);font-size:12.5px;flex:none;animation:fadeUp .15s ease}
+.dice-btn{height:38px;width:38px;border-radius:var(--rad2);border:1px solid var(--border-active);background:var(--bg-elevated);font-size:16px;flex:none;display:flex;align-items:center;justify-content:center;transition:all var(--tr)}
+.dice-btn:hover{border-color:var(--gold);color:var(--gold)}
+#loading-indicator{display:none;align-items:center;gap:8px;padding:8px 0 2px;font-size:12px;color:var(--t3)}
+#loading-indicator.on{display:flex}
+.dots{display:inline-flex;gap:3px}
+.dots span{width:5px;height:5px;border-radius:50%;background:var(--gold);animation:bounce 1s infinite}
+.dots span:nth-child(2){animation-delay:.15s}
+.dots span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+
+/* ============ 抽屉 ============ */
+.drawer{position:fixed;top:50px;bottom:0;width:340px;background:var(--bg-surface);border-left:1px solid var(--border);z-index:40;overflow-y:auto;padding:14px;transition:transform .22s ease;display:flex;flex-direction:column;gap:12px}
+#left-panel{left:0;transform:translateX(-105%);border-right:1px solid var(--border)}
+#right-panel{right:0;transform:translateX(105%);border-left:1px solid var(--border)}
+#left-panel.open,#right-panel.open{transform:none}
+.drawer-handle{position:sticky;top:0;z-index:2;font-size:11.5px;color:var(--t3);text-align:right;cursor:pointer;padding:2px 4px;background:var(--bg-surface)}
+.drawer-handle:hover{color:var(--gold)}
+.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:35;display:none}
+.drawer-backdrop.on{display:block}
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:13px 14px}
+.panel-card h3{font-size:13px;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:6px;letter-spacing:.05em}
+.kv{font-size:12.5px;color:var(--t2);margin-bottom:5px;line-height:1.55}
+.kv b{color:var(--t)}
+.stat-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.stat-row .stat-label{font-size:12px;color:var(--t2);width:44px;flex:none}
+.stat-row .stat-val{font-family:var(--mono);font-size:12px;color:var(--t);width:26px;text-align:right;flex:none}
+.stat-row .sbar{flex:1;height:7px;border-radius:4px;background:var(--border);overflow:hidden}
+.stat-row .sbar>div{height:100%;border-radius:4px;transition:width .45s ease}
+.cond-chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;border:1px solid var(--border-active);border-radius:20px;padding:2px 10px;margin:2px 3px 2px 0;color:var(--t2)}
+.cond-chip.bad{border-color:var(--r);color:var(--r)}
+.cond-chip.good{border-color:var(--gr);color:var(--gr)}
+.relation-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.relation-row .r-name{font-size:12.5px;flex:none;width:64px;color:var(--t)}
+.relation-row .r-bar{flex:1;height:6px;border-radius:3px;background:var(--border);overflow:hidden}
+.relation-row .r-bar>div{height:100%;background:linear-gradient(90deg,var(--gold-dim),var(--gold));border-radius:3px}
+.relation-row .r-val{font-family:var(--mono);font-size:11px;color:var(--t3);width:30px;text-align:right}
+.relation-row .r-desc{font-size:10.5px;color:var(--t3);flex-basis:100%;margin-top:-3px}
+.task-row{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--t2);margin-bottom:6px;line-height:1.45;cursor:pointer}
+.task-row:hover{color:var(--t)}
+.task-row.done{color:var(--t3);text-decoration:line-through}
+.inv-box{font-size:12.5px;color:var(--t2);line-height:1.6;white-space:pre-wrap;user-select:text}
+.situation-box{font-size:13.5px;color:var(--t);line-height:1.7;background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid var(--gold);border-radius:var(--rad);padding:10px 12px;user-select:text;white-space:pre-wrap}
+
+/* ============ 弹窗 ============ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(3px)}
+.modal-overlay.on{display:flex;animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--bg-surface);border:1px solid var(--border-active);border-radius:var(--rad3);width:100%;max-width:600px;max-height:86vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.modal h2{font-size:18px;color:var(--gold);padding:16px 20px 0;letter-spacing:.04em}
+.modal .m-body{overflow-y:auto;padding:14px 20px 18px;flex:1;min-height:0}
+.modal .m-body p{font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:8px}
+.modal .btn-row{padding:0 20px 18px}
+.ency-cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.ency-cat{font-size:12px;border:1px solid var(--border);border-radius:20px;padding:4px 12px;color:var(--t2);transition:all var(--tr)}
+.ency-cat:hover{border-color:var(--gold-dim)}
+.ency-cat.on{background:var(--gold-glow);border-color:var(--gold);color:var(--gold)}
+.ency-item{border:1px solid var(--border);border-radius:var(--rad2);margin-bottom:8px;background:var(--bg-elevated);overflow:hidden}
+.ency-item summary{display:flex;gap:8px;align-items:center;padding:10px 14px;cursor:pointer;font-size:13.5px;font-weight:700;color:var(--t);list-style:none}
+.ency-item summary::-webkit-details-marker{display:none}
+.ency-item summary .e-icon{flex:none}
+.ency-item summary .e-arrow{margin-left:auto;color:var(--t3);font-size:11px;transition:transform var(--tr)}
+.ency-item[open] summary .e-arrow{transform:rotate(90deg)}
+.ency-item .e-body{padding:2px 14px 12px;font-size:12.5px;color:var(--t2);line-height:1.65;user-select:text}
+.mem-item{display:flex;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--rad);margin-bottom:7px;background:var(--bg-elevated);align-items:flex-start}
+.mem-item .m-type{flex:none;font-size:10.5px;color:var(--gold);border:1px solid var(--gold-dim);border-radius:4px;padding:1px 7px;margin-top:2px}
+.mem-item .m-text{font-size:12.5px;color:var(--t2);flex:1;line-height:1.55;user-select:text}
+.mem-item .m-del{flex:none;color:var(--t3);font-size:14px;cursor:pointer;padding:0 4px}
+.mem-item .m-del:hover{color:var(--r)}
+.death-card{border:1px solid var(--r);border-radius:var(--rad2);padding:12px 14px;margin-bottom:10px;background:rgba(224,86,79,.06)}
+.death-card h4{font-size:13px;color:var(--r);margin-bottom:6px}
+.death-card .d-meta{font-size:11px;color:var(--t3);margin-bottom:6px}
+.death-card .d-review{font-size:12.5px;color:var(--t2);line-height:1.6;white-space:pre-wrap;user-select:text}
+.death-card .d-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.setting-group{border:1px solid var(--border);border-radius:var(--rad2);padding:12px 14px;margin-bottom:12px;background:var(--bg-elevated)}
+.setting-group h4{font-size:13px;color:var(--gold);margin-bottom:10px}
+.setting-group label{display:block;font-size:12px;color:var(--t2);margin:8px 0 4px;font-weight:600}
+.setting-group input[type=text],.setting-group input[type=password],.setting-group select{width:100%}
+.theme-row{display:flex;gap:8px;flex-wrap:wrap}
+.theme-swatch{flex:1;min-width:110px;border:1px solid var(--border);border-radius:var(--rad2);padding:8px 10px;cursor:pointer;text-align:center;font-size:12px;color:var(--t2);transition:all var(--tr);background:var(--bg-elevated)}
+.theme-swatch:hover{border-color:var(--gold-dim)}
+.theme-swatch.on{border-color:var(--gold);color:var(--gold);background:var(--gold-glow)}
+.theme-swatch .sw-dot{width:100%;height:22px;border-radius:5px;margin-bottom:6px;border:1px solid var(--border)}
+
+/* ============ 死亡覆盖层 ============ */
+#death-overlay{position:fixed;inset:0;z-index:80;background:radial-gradient(ellipse at center,rgba(30,4,4,.86),rgba(5,2,2,.97));display:none;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+#death-overlay.on{display:flex}
+.death-box{max-width:640px;width:100%;text-align:center;animation:fadeUp .3s ease}
+.death-box h1{font-size:52px;letter-spacing:.2em;color:#b83a34;font-family:var(--serif);text-shadow:0 0 30px rgba(184,58,52,.5);margin-bottom:4px}
+.death-box .d-sub{font-size:13px;color:#c9a9a4;margin-bottom:18px}
+.death-card2{background:rgba(255,255,255,.04);border:1px solid rgba(200,80,74,.4);border-radius:var(--rad3);padding:18px;text-align:left;margin-bottom:14px;max-height:36vh;overflow-y:auto}
+.death-card2 h3{font-size:14px;color:#e08d86;margin-bottom:8px}
+.death-card2 .txt{font-size:13px;color:#d8c6c2;line-height:1.75;white-space:pre-wrap;user-select:text}
+.rewind-list{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.rewind-item{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:var(--rad2);padding:10px 14px;cursor:pointer;background:rgba(255,255,255,.03);transition:all var(--tr);text-align:left;width:100%}
+.rewind-item:hover{border-color:var(--gold-dim)}
+.rewind-item.sel{border-color:var(--gold);background:var(--gold-glow)}
+.rewind-item .r-radio{width:14px;height:14px;border-radius:50%;border:2px solid var(--t3);flex:none;transition:all var(--tr)}
+.rewind-item.sel .r-radio{border-color:var(--gold);box-shadow:0 0 0 4px var(--gold-glow) inset}
+.rewind-item .r-info{flex:1;min-width:0}
+.rewind-item .r-info .r-label{font-size:12.5px;color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rewind-item .r-info .r-meta{font-size:11px;color:var(--t3)}
+
+/* ============ Toast ============ */
+#toast{position:fixed;bottom:74px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--bg-elevated);border:1px solid var(--border-active);color:var(--t);font-size:13px;padding:10px 20px;border-radius:30px;z-index:120;opacity:0;pointer-events:none;transition:all .22s ease;box-shadow:var(--shadow);max-width:88vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{border-color:var(--r);color:var(--r)}
+#confirm-overlay .modal{max-width:420px}
+
+/* ============ 响应式 ============ */
+@media(max-width:900px){
+  .top-btn .btn-txt{display:none}
+  .top-btn{padding:7px 9px}
+  .bar{width:44px}
+  .logo small{display:none}
+  .confirm-grid{grid-template-columns:1fr}
+  .g2{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  body{font-size:13.5px}
+  #topbar{gap:3px;padding:0 6px}
+  .logo{font-size:12.5px}
+  .logo .lg-full{display:none}
+  .top-stat,#topbar .m-stat{display:none}
+  .drawer{width:100%;max-width:100%;top:44px}
+  .msg .bubble{max-width:86%}
+  .setup-head h1{font-size:26px}
+  .modal{padding:0}
+  .modal h2{padding:14px 16px 0}
+  .modal .m-body{padding:12px 14px 14px}
+  .modal .btn-row{padding:0 14px 16px}
+  #game-log{padding:14px 12px 8px}
+  #input-area{padding:8px 10px calc(8px + env(safe-area-inset-bottom));gap:6px}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= 创建向导 ================= -->
+<div id="setup-overlay">
+  <div class="setup-shell">
+    <div class="setup-head">
+      <h1>霍格沃茨 · 命运之书</h1>
+      <div class="sub">HOGWARTS · THE BOOK OF FATE</div>
+      <div class="sub2">以 J.K. 罗琳《哈利·波特》世界观为蓝本的 AI 角色扮演游戏。魔法与你共存于同一片天空——现在，翻开你的命运之书。</div>
+    </div>
+    <div class="step-dots" id="step-dots"></div>
+
+    <!-- 第一步 API -->
+    <div class="create-step active" id="step-api">
+      <div class="step-title">第一步 · 配置魔法接口（AI）</div>
+      <div class="step-hint">游戏由 AI 实时推演，需要配置大模型 API。默认 DeepSeek，可切换任意 OpenAI 兼容接口。</div>
+      <div class="step-body">
+        <div>
+          <label class="lbl">API 端点</label>
+          <input id="cfg-endpoint" type="text" value="https://api.deepseek.com/v1/chat/completions" spellcheck="false">
+        </div>
+        <div>
+          <label class="lbl">API Key</label>
+          <input id="cfg-apikey" type="password" placeholder="sk-..." spellcheck="false">
+        </div>
+        <div>
+          <label class="lbl">模型</label>
+          <div style="display:flex;gap:8px">
+            <select id="cfg-model" style="flex:1">
+              <option value="deepseek-chat">deepseek-chat</option>
+              <option value="deepseek-reasoner">deepseek-reasoner</option>
+            </select>
+            <button class="btn small" onclick="Setup.fetchModels()">↻ 拉取模型列表</button>
+          </div>
+          <div class="hint" id="model-hint" style="margin-top:5px"></div>
+        </div>
+        <div class="g2">
+          <div>
+            <label class="lbl">输出 Token 限制</label>
+            <select id="cfg-maxtokens">
+              <option value="unlimited">♾️ 无限制</option>
+              <option value="2048">2048</option>
+              <option value="4096">4096</option>
+              <option value="8192">8192</option>
+              <option value="16384">16384</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">推理强度</label>
+            <select id="cfg-reasoning">
+              <option value="medium">适中（推荐）</option>
+              <option value="low">低 · 更快</option>
+              <option value="high">高 · 更细</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="Setup.testApi()">⚡ 测试连接</button>
+          <div class="spacer"></div>
+          <button class="btn gold" onclick="Setup.next()">下一步 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第二步 主角信息 -->
+    <div class="create-step" id="step-char">
+      <div class="step-title">第二步 · 主角信息</div>
+      <div class="step-hint">这是你在魔法世界中的身份。姓名可自定义，也可让 AI 起名。</div>
+      <div class="step-body">
+        <div>
+          <label class="lbl">姓名</label>
+          <div style="display:flex;gap:8px">
+            <input id="cfg-name" type="text" placeholder="例如：艾琳·斯通 / 里昂·威尔逊" style="flex:1">
+            <button class="btn small" id="ai-name-btn" onclick="Setup.aiName()">🎲 AI 起名</button>
+          </div>
+        </div>
+        <div>
+          <label class="lbl">性别</label>
+          <div class="option-grid">
+            <div class="option-card" data-v="男" onclick="Setup.pick(this,'gender')"><span class="oc-name">♂ 男</span></div>
+            <div class="option-card" data-v="女" onclick="Setup.pick(this,'gender')"><span class="oc-name">♀ 女</span></div>
+            <div class="option-card" data-v="自定义" onclick="Setup.pick(this,'gender')"><span class="oc-name">⚧ 自定义</span></div>
+          </div>
+        </div>
+        <div>
+          <label class="lbl">身份模板（血统出身）</label>
+          <div class="option-grid" id="grid-template"></div>
+        </div>
+        <div>
+          <label class="lbl">年龄（入学默认 11 岁，可调整）</label>
+          <input id="cfg-age" type="number" value="11" min="11" max="70" style="width:120px">
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="Setup.prev()">← 上一步</button>
+          <div class="spacer"></div>
+          <button class="btn gold" onclick="Setup.next()">下一步 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第三步 天赋 -->
+    <div class="create-step" id="step-trait">
+      <div class="step-title">第三步 · 天赋分配</div>
+      <div class="step-hint" id="trait-hint"></div>
+      <div class="step-body">
+        <div id="trait-list"></div>
+        <div class="cheat-box">
+          <div style="flex:1">
+            <div class="c-title">🧀 作弊模式：无限天赋点</div>
+            <div class="hint">开启后天赋点不再限制，可随意加满。适合想直接体验"天才巫师"的玩家。</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="trait-cheat" onchange="Setup.toggleCheat()"><span class="sl"></span></label>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span class="points-left" id="points-left">剩余天赋点：<b>0</b></span>
+          <button class="btn small" id="btn-maxall" style="display:none" onclick="Setup.maxAll()">⚡ 全部拉满</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="Setup.prev()">← 上一步</button>
+          <div class="spacer"></div>
+          <button class="btn gold" onclick="Setup.next()">下一步 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第四步 自定义 -->
+    <div class="create-step" id="step-custom">
+      <div class="step-title">第四步 · 自定义选择</div>
+      <div class="step-hint">按世界观设定补充细节：时代、学院、魔杖、宠物——这些都将在剧情中真实生效。</div>
+      <div class="step-body">
+        <div>
+          <label class="lbl">时代背景（时间线）</label>
+          <div class="option-grid" id="grid-era"></div>
+        </div>
+        <div>
+          <label class="lbl">学院</label>
+          <div class="option-grid" id="grid-house"></div>
+        </div>
+        <div>
+          <label class="lbl">魔杖 · 木材</label>
+          <div class="option-grid" id="grid-wood"></div>
+        </div>
+        <div class="g2">
+          <div>
+            <label class="lbl">魔杖 · 杖芯</label>
+            <div class="option-grid" id="grid-core" style="grid-template-columns:1fr"></div>
+          </div>
+          <div>
+            <label class="lbl">魔杖 · 长度 / 柔韧度</label>
+            <div class="option-grid g2" id="grid-len"></div>
+          </div>
+        </div>
+        <div>
+          <label class="lbl">宠物</label>
+          <div class="option-grid" id="grid-pet"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="Setup.prev()">← 上一步</button>
+          <div class="spacer"></div>
+          <button class="btn gold" onclick="Setup.next()">下一步 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第五步 备注 -->
+    <div class="create-step" id="step-note">
+      <div class="step-title">第五步 · 备注信息</div>
+      <div class="step-hint">自由书写：背景故事、性格、外貌、目标、秘密……AI 会严格遵守这份档案演绎。留空亦可。</div>
+      <div class="step-body">
+        <div>
+          <label class="lbl">人物背景 / 性格 / 外貌 / 目标（可多行）</label>
+          <textarea id="cfg-note" rows="7" placeholder="例如：出身麻瓜家庭，从小痴迷魔法史；性格倔强但怕黑；左撇子；目标是成为傲罗。我隐瞒了一个秘密——我在旧书里见过黑魔标记……"></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn small" id="ai-note-btn" onclick="Setup.aiNote()">🪄 让 AI 基于以上选择生成背景</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="Setup.prev()">← 上一步</button>
+          <div class="spacer"></div>
+          <button class="btn gold" onclick="Setup.next()">下一步 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第六步 难度 -->
+    <div class="create-step" id="step-diff">
+      <div class="step-title">第六步 · 难度设定</div>
+      <div class="step-hint">难度影响 AI 的演绎强度、死亡后果与资源。随时可在游戏内设置中调整。</div>
+      <div class="step-body">
+        <div class="option-grid" id="grid-diff" style="grid-template-columns:1fr"></div>
+        <div class="btn-row">
+          <button class="btn" onclick="Setup.prev()">← 上一步</button>
+          <div class="spacer"></div>
+          <button class="btn gold" onclick="Setup.next()">下一步 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第七步 确认 -->
+    <div class="create-step" id="step-confirm">
+      <div class="step-title">第七步 · 信息确认</div>
+      <div class="step-hint">请确认你的命运档案。确认后即翻开命运之书，开始冒险。</div>
+      <div class="step-body">
+        <div class="confirm-grid" id="confirm-grid"></div>
+        <div class="btn-row">
+          <button class="btn" onclick="Setup.prev()">← 上一步</button>
+          <div class="spacer"></div>
+          <button class="btn jade" onclick="Setup.start()">📖 翻开命运之书 · 开始冒险</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 主界面 ================= -->
+<div id="app">
+  <div id="topbar">
+    <button class="top-btn gold" id="btn-char" onclick="UI.togglePanel('left')">👤<span class="btn-txt">角色</span></button>
+    <div class="logo"><span class="lg-full">霍格沃茨·</span>命运之书<small>HOGWARTS RPG</small></div>
+    <span class="top-stat" id="loc-display">📍 —</span>
+    <div class="spacer"></div>
+    <span class="top-stat">❤️<span class="val-t" id="hp-t">100/100</span><div class="bar"><div id="hp-b" style="width:100%;background:var(--hp)"></div></div></span>
+    <span class="top-stat">✨<span class="val-t" id="mp-t">100/100</span><div class="bar"><div id="mp-b" style="width:100%;background:var(--mp)"></div></div></span>
+    <button class="top-btn" onclick="UI.openDeaths()">💀<span class="btn-txt">死亡记录</span></button>
+    <button class="top-btn" onclick="UI.openEncy()">📖<span class="btn-txt">百科</span></button>
+    <button class="top-btn" onclick="UI.openMemory()">🧠<span class="btn-txt">记忆</span></button>
+    <button class="top-btn" onclick="UI.togglePanel('right')">🗺️<span class="btn-txt">世界</span></button>
+    <button class="top-btn" onclick="UI.openSettings()">⚙️<span class="btn-txt">设置</span></button>
+  </div>
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div id="quick-actions"></div>
+    <div id="loading-indicator"><span class="dots"><span></span><span></span><span></span></span><span id="loading-text">命运之笔正在书写…</span><button id="stop-btn" onclick="Game.stopGen()">■ 停止</button></div>
+    <div id="input-area">
+      <button class="dice-btn" title="掷一个 D20 骰子加入输入" onclick="Game.rollDice()">🎲</button>
+      <textarea id="user-input" rows="1" placeholder="输入你的行动…（例：观察四周 / 和赫敏打招呼 / 去禁书区找线索）"></textarea>
+      <button id="send-btn" onclick="Game.send()">▶ 行动</button>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-backdrop" id="drawer-backdrop" onclick="UI.closePanels()"></div>
+<div id="left-panel" class="drawer"><div class="drawer-handle" onclick="UI.togglePanel('left')">⬇ 收起</div><div id="char-panel"></div></div>
+<div id="right-panel" class="drawer"><div class="drawer-handle" onclick="UI.togglePanel('right')">⬇ 收起</div><div id="world-panel"></div></div>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="ency-modal"><div class="modal"><h2>📖 世界百科 · 巫师实录</h2><div class="m-body" id="ency-content"></div><div class="btn-row"><button class="btn small" onclick="UI.addEncy()">✍️ 新增词条</button><div class="spacer"></div><button class="btn gold" onclick="UI.closeModal('ency-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="mem-modal"><div class="modal"><h2>🧠 记忆档案</h2><div class="m-body" id="mem-content"></div><div class="btn-row"><button class="btn small" onclick="UI.addMemory()">✍️ 手动记录</button><div class="spacer"></div><button class="btn gold" onclick="UI.closeModal('mem-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="deaths-modal"><div class="modal"><h2>💀 死亡记录与回档</h2><div class="m-body" id="deaths-content"></div><div class="btn-row"><div class="spacer"></div><button class="btn gold" onclick="UI.closeModal('deaths-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="settings-modal"><div class="modal"><h2>⚙️ 设置</h2><div class="m-body" id="settings-content"></div></div></div>
+<div class="modal-overlay" id="guide-modal"><div class="modal"><h2>📜 玩法指南</h2><div class="m-body" id="guide-content"></div><div class="btn-row"><div class="spacer"></div><button class="btn gold" onclick="UI.closeModal('guide-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="confirm-overlay"><div class="modal"><h2 id="confirm-title">确认</h2><div class="m-body"><p id="confirm-text"></p></div><div class="btn-row"><button class="btn" id="confirm-cancel" onclick="UI.closeConfirm()">取消</button><div class="spacer"></div><button class="btn danger" id="confirm-ok" onclick="UI.confirmOk()">确定</button></div></div></div>
+
+<input type="file" id="import-file" accept=".json" style="display:none">
+
+<!-- 死亡覆盖层 -->
+<div id="death-overlay">
+  <div class="death-box">
+    <h1>你死了</h1>
+    <div class="d-sub" id="death-cause">命运之书合上了这一页……</div>
+    <div class="death-card2" id="death-review-box"><h3>🕯️ 命运书记官 · 点评</h3><div class="txt" id="death-review">正在回溯你的命运轨迹…</div></div>
+    <div style="text-align:left">
+      <div style="font-size:13px;color:#e08d86;margin-bottom:6px">⏳ 选择回到的关键时间点：</div>
+      <div class="rewind-list" id="rewind-list"></div>
+    </div>
+    <div class="btn-row" style="justify-content:center;margin-top:14px">
+      <button class="btn" onclick="UI.closeDeathsModal2()" id="death-view-records">📋 查看全部死亡记录</button>
+      <button class="btn jade" onclick="Game.doRewind()">⏳ 回到选定时间点 · 继续冒险</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ================================================================
+   第二部分：工具函数 · 配置 · 角色扮演守则 · 世界观设定
+   ================================================================ */
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nl2br=s=>esc(s).replace(/\n/g,'<br>');
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const deepCopy=o=>JSON.parse(JSON.stringify(o));
+
+const DEFAULTS={apiEndpoint:'https://api.deepseek.com/v1/chat/completions',apiKey:'',model:'deepseek-chat',maxTokens:'unlimited',theme:'night',autoSave:true};
+const DEFAULT_MODELS=['deepseek-chat','deepseek-reasoner'];
+const MAX_HISTORY=44;          // 超过则触发摘要压缩
+const MAX_LOG=320;             // 界面日志上限
+const MAX_CHECKPOINTS=24;      // 检查点上限
+const START_TRAIT_POINTS=24;
+const TRAIT_MAX=10;
+
+/* ---------------- 角色扮演守则（原样注入 AI 提示词） ---------------- */
+const RP_RULES='【角色扮演质量规则】保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。';
+
+/* ---------------- 世界观设定（压缩版，注入 AI 提示词） ---------------- */
+const WORLD_BASE=`【世界设定 · 哈利·波特世界观（官方设定压缩版，必须严格遵守，不得遗忘或篡改）】
+
+一、双世界与保密
+巫师世界与麻瓜世界共存于同一物理空间，靠《国际保密法》(1692年确立)隐藏自身：魔法建筑施加麻瓜驱逐咒与幻术伪装，魔法部"魔法事故和灾害司"负责善后与除忆。魔法部总部位于伦敦白厅地下（麻瓜视角是废弃大楼），通过电话亭(62442)进入。
+
+二、魔法本质
+魔法是遗传天赋，无法后天习得。施法三要素：①咒语（发音错误会失效或走火）②手势/魔杖动作 ③意志与情感（决定威力：守护神需快乐回忆、钻心咒需恶意、索命咒需杀意）。无声咒是高阶技巧（先手优势，威力略低）。魔杖是放大器与控制器，魔杖选择巫师，用不属于自己的魔杖威力大减，缴械可改变魔杖忠诚。
+
+三、魔法铁律（不可逾越，任何剧情不得违反）
+1. 魔法不能复活死者；2. 不能凭空创造食物（只能飞来/复制/变形）；3. 不能凭空创造财富（复制品会被古灵阁识破）；4. 变形术有极限（细节变形极难、不能持久）；5. 魔法不能创造真爱（迷情剂只是迷恋）；6. 时间转换器只能回溯数小时、不可接触过去的自己；7. 索命咒几乎不可阻挡，仅"爱的古老保护/魔杖同源闪回咒/预言豁免"可豁免；8. 魔法受法律约束：三大不可饶恕咒=阿兹卡班终身监禁，17岁前校外禁魔（踪丝监控），阿尼玛格斯须注册；9. 强烈负面情绪会削弱魔法（唐克斯失恋后失去变形能力）；10. 摄魂怪吸走快乐与灵魂，"摄魂怪之吻"比死亡更糟。
+爱与预言是超规则：自愿的牺牲形成古老保护魔法；预言只描述可能性，听者行动决定成真与否。
+
+四、咒语体系
+分类：符咒Charm(低危)/恶咒Jinx/魔咒Hex(中危)/诅咒Curse(高危)/不可饶恕咒(极高危)。
+常用咒语：荧光闪烁Lumos、诺克斯Nox、阿拉霍洞开Alohomora(开锁)、漂浮咒Wingardium Leviosa、速速前Accio(召唤)、恢复如初Reparo、清理一新Scourgify、除你武器Expelliarmus(缴械)、盔甲护身Protego(护盾，防不了索命咒)、昏昏倒地Stupefy(眩晕，对龙/巨怪需多道叠加)、统统石化Petrificus Totalus、障碍重重Impedimenta、滑稽滑稽Riddikulus(克博格特)、呼神护卫Expecto Patronum(唯一克摄魂怪，需快乐回忆，可作信使)、粉身碎骨Reducto、霹雳爆炸Confringo、神锋无影Sectumsempra(黑魔法)、厉火Fiendfyre(失控不灭之火，极危险)、倒挂金钟Levicorpus、锁腿咒、塔朗泰拉舞、摄神取念Legilimens(读心)、大脑封闭术Occlumency(反制)、幻身咒(隐身)、驱逐麻瓜咒、无声无息Silencio、统统加护(火焰)Incendio、泡头咒(水下呼吸)、恢复生气Rennervate。
+三大不可饶恕咒：阿瓦达索命Avada Kedavra(即死，需杀意，不可挡)、钻心剜骨Crucio(剧痛，需施虐欲)、魂魄出窍Imperio(精神控制，强意志可挣脱)。使用即终身监禁。
+
+五、魔药体系
+魔药不依赖魔杖，靠配方/火候/搅拌生效：复方汤剂(变他人外貌，需目标毛发)、福灵剂(幸运，过量有毒)、吐真剂(管制)、迷情剂(违法)、狼毒药剂(压制狼人)、活地狱汤剂(假死)、缓和剂、缩身药剂。魔药=制造/增益/剧情工具。
+
+六、血统与社会
+纯血/混血/麻瓜出身(侮辱称"泥巴种")/哑炮(巫师家庭无魔力)。血统≠天赋，麻瓜出身者常更优秀；纯血主义是伏地魔的政治操弄（他本人是混血）。
+非人种族：妖精(古灵阁银行，铸物所有权归铸造者)、家养小精灵(奴役生物，魔力极强，主人给衣物=解放)、马人(自主族群，鄙视驯化，精通占星)、狼人(满月变身、咬伤传染、受歧视，狼毒药剂可保持理智)、巨人、媚娃、吸血鬼。
+货币：1加隆(Galleon)=17西可(Sickle)=493纳特(Knut)，1西可=29纳特；古灵阁是唯一银行，地底金库有龙守卫。对角巷是商业街，翻倒巷是黑市，霍格莫德是英国唯一纯巫师村落。
+
+七、魔法部与政治
+三权合一的中央集权机构。威森加摩=最高司法立法机构（约50人，梅子色长袍）。傲罗=反黑魔法精英执法官。七大司：魔法法律执行司(第一大司，含傲罗办公室)、魔法事故和灾害司(除忆师)、魔法生物管理控制司(第二大司，野兽/异类/幽灵/妖精联络处/马人联络处/狼人登记处)、国际魔法合作司、魔法交通司(飞路网/扫帚/门钥匙/幻影显形)、魔法体育运动司(魁地奇)、神秘事务司(预言厅/死亡厅/时间厅等，高度机密)。监狱=阿兹卡班(北海孤岛，摄魂怪看守)。
+
+八、霍格沃茨魔法学校
+苏格兰高地，麻瓜眼中是废墟。四学院：格兰芬多(狮，勇气，火，红金，幽灵差点没头的尼克)、赫奇帕奇(獾，忠诚勤奋公正，土，黄黑，胖修士)、拉文克劳(鹰，智慧学识，风，蓝铜，格雷女士，休息室需答谜题)、斯莱特林(蛇，野心精明，水，绿银，血人巴罗)。学院≠善恶标签。
+学制7年(11岁入学)，分院帽分院，个人意愿可影响结果。课程：变形术/魔咒学/魔药学/黑魔法防御术/草药学/天文学/魔法史(必修)，三年级起选修占卜学/古代魔文/麻瓜研究/算术占卜。五年级O.W.L.s、七年级N.E.W.T.s(职业准入)。课外：魁地奇(每队7人，抓住金色飞贼=150分结束比赛)、决斗俱乐部、邓布利多军。
+校规：宵禁后不得离开休息室(费尔奇巡逻)、一年级禁自带扫帚、禁林禁入、禁书区需教授签名、男生禁入女生寝室。城堡特性：移动楼梯、会说话的肖像(通信网)、幽灵、有求必应屋(需要时出现)、打人柳、密室(蛇佬腔开启)、厨房(家养小精灵)、猫头鹰棚屋。
+
+九、地点与交通
+对角巷(奥利凡德魔杖店/古灵阁/丽痕书店/摩金夫人长袍店/魁地奇精品店/宠物店/药房/破釜酒吧)、翻倒巷(博金-博克黑魔法店)、霍格莫德(三把扫帚/猪头酒吧/蜂蜜公爵/佐科笑话店/尖叫棚屋)、女贞路4号、陋居、格里莫广场12号(赤胆忠心咒保护)、马尔福庄园、高锥克山谷、圣芒戈魔法伤病医院、阿兹卡班、小汉格顿。
+交通：飞路网(壁炉粉，可被监控)、幻影显形(17岁+执照，可能分体)、门钥匙(需授权)、霍格沃茨特快(国王十字车站9¾站台)、骑士公共汽车、飞天扫帚、猫头鹰邮递、双面镜、守护神信使。
+
+十、关键生物
+摄魂怪(吸魂，克星=守护神咒)、博格特(读恐惧变形态，克星=滑稽滑稽)、夜骐(只有见证过死亡者可见)、蛇怪(对视即死，间接对视石化，毒牙可毁魂器，怕公鸡叫)、龙(十余种，抗魔皮肤，多道昏昏倒地可叠加)、八眼巨蛛(巨型食人蜘蛛，会人语)、独角兽(银血治愈但受诅咒)、鹰头马身有翼兽(骄傲，需行礼)、阴尸(被奴役的尸体，成群，怕火)、凤凰(浴火重生，眼泪治愈)、嗅嗅(痴迷闪亮物)、马人、人鱼(黑湖)。
+
+十一、黑魔法与魂器
+魂器：谋杀+黑暗仪式撕裂灵魂封入载体，载体不毁本尊不死；载体损坏=魂器毁灭(蛇怪毒牙/厉火/格兰芬多宝剑——剑含蛇怪毒液)。伏地魔的魂器：日记本、冈特戒指、斯莱特林挂坠盒、赫奇帕奇金杯、拉文克劳冠冕、纳吉尼(蛇)、哈利(意外)。持有魂器会腐蚀持有者意志。黑魔法腐蚀灵魂，长期使用者"眼神空洞、失去人性"。
+防御：守护神咒、大脑封闭术、赤胆忠心咒(保密人制，最强保密魔法)、盔甲护身(防不了索命咒)、魔杖闪回咒(追溯开火记录)。
+
+十二、死亡圣器
+老魔杖(最强魔杖，胜者得之，易主)、复活石(召见死者幻影，非真复活)、隐形衣(完美永久隐形，不可被探测)。标志：三角套圆套竖线。
+
+十三、时间线
+1991年9月1日哈利·波特入学霍格沃茨，1991-1998为原著主线七年（魔法石/密室/阿兹卡班囚徒/三强争霸赛与伏地魔复活/凤凰社/混血王子/死亡圣器与霍格沃茨大战1998.5.2）。伏地魔(Tom Marvolo Riddle)是混血，斯莱特林后裔，怕死，制作7个魂器。`;
+
+/* 时代附加设定 */
+const ERA_ADD={
+  '1991':`【时代背景 · 原著主线期 1991年秋】伏地魔倒台后十年，魔法界表面和平。哈利·波特今年11岁，与你同届入学霍格沃茨。邓布利多是校长，斯内普教魔药，麦格教变形。魔法部由福吉领导，对"伏地魔复活"的传闻讳莫如深。`,
+  '1998':`【时代背景 · 战后重建期 1998年秋】霍格沃茨大战(1998.5.2)结束数月，城堡正在修复。金斯莱·沙克尔任魔法部部长，哈利·波特与罗恩进入傲罗培训，赫敏升入七年级(或任职魔法法律执行司)。魔法界百废待兴，纯血主义势力余烬未灭。你今年11岁，是战后第一批入学的新生。`,
+  '1926':`【时代背景 · 黄金时代 1926年】格林德沃正在欧洲崛起，国际巫师界暗流涌动。纽特·斯卡曼德活跃于神奇动物学界。霍格沃茨由阿芒多·迪佩特担任校长，年轻的邓布利多教变形术，汤姆·里德尔尚未出生(或刚出生)。魔法部尚未如后世那般庞大，冒险风格偏国际谍战。`,
+  'custom':`【时代背景 · 自定义纪元】由玩家备注设定中描述的时代背景为准，若未描述则默认参照原著主线期(1991年)。`
+};
+
+/* ---------------- 创建流程数据 ---------------- */
+const BLOODS=[
+  {v:'纯血',i:'👑',d:'祖辈均为巫师（马尔福、布莱克等"神圣二十八族"）。上层社会，部分家族持血统优越论。'},
+  {v:'混血',i:'⚖️',d:'父母一方为巫师、一方为麻瓜/麻瓜出身（哈利、伏地魔同款）。立场自由，主角团多数属此。'},
+  {v:'麻瓜出身',i:'🌱',d:'双亲均为麻瓜，自身具魔法天赋（赫敏、莉莉同款）。学习加成，但会遭遇血统歧视。'},
+  {v:'自定义血统',i:'✒️',d:'由你在备注中自行定义出身（如哑炮后裔、神奇生物混血等）。'}
+];
+const TEMPLATES=[
+  {v:'纯血世家子',i:'🏰',d:'启动资金高、家族声望加持，可入纯血社交圈，触发家族任务',money:'500 加隆',bonus:'社交+2',line:'家族名声既是光环也是枷锁——有人敬你，有人恨你'},
+  {v:'混血平民',i:'🧭',d:'均衡开局，选择自由，默认主线体验（哈利同款处境）',money:'120 加隆',bonus:'无',line:'普通得恰到好处，却拥有最多的选择权'},
+  {v:'麻瓜出身',i:'🌱',d:'对魔法世界充满惊奇，学习加成，触发麻瓜世界支线与歧视事件',money:'80 加隆',bonus:'智慧+2',line:'你是"证明自己"的那类人——赫敏走过的路'},
+  {v:'哑炮后裔',i:'🕯️',d:'生于巫师家庭边缘，擅长观察与隐匿，隐藏身份任务线',money:'200 加隆',bonus:'敏捷+2',line:'你在两个世界的夹缝中长大，比谁都懂得低调'}
+];
+const GENDERS=[{v:'男',i:'♂️'},{v:'女',i:'♀️'},{v:'自定义',i:'✒️'}];
+const HOUSES=[
+  {v:'格兰芬多',i:'🦁',e:'火',c:'#b03030',d:'勇气、胆识、骑士精神。休息室在塔楼，口令进入。著名成员：哈利、赫敏、罗恩、邓布利多。',p:'勇气意味着明知恐惧仍向前'},
+  {v:'赫奇帕奇',i:'🦡',e:'土',c:'#c9a227',d:'忠诚、勤奋、公正、包容。休息室在厨房附近。著名成员：塞德里克、纽特·斯卡曼德。',p:'赫奇帕奇收下了其他学院不要的学生'},
+  {v:'拉文克劳',i:'🦅',e:'风',c:'#3a6ea8',d:'智慧、学识、创造力。休息室在塔楼，门环出谜题，答错进不去。著名成员：卢娜、弗立维教授。',p:'过人的智慧是人类最大的财富'},
+  {v:'斯莱特林',i:'🐍',e:'水',c:'#2e7d4f',d:'野心、精明、足智多谋。休息室在地牢，窗外是黑湖。著名成员：斯内普、马尔福、斯拉格霍恩。',p:'斯莱特林会帮助自己人'}
+];
+const WAND_WOODS=[
+  {v:'冬青',d:'主防御，象征勇气与保护（哈利之杖）'},
+  {v:'紫杉',d:'主攻击，象征生死之力（伏地魔之杖）'},
+  {v:'山楂',d:'矛盾与疗愈，适合复杂心性'},
+  {v:'葡萄藤',d:'追求理想，择主挑剔'},
+  {v:'橡木',d:'强力可靠，适合果断之人'},
+  {v:'接骨木',d:'极其稀有，主命运（老魔杖之木）'},
+  {v:'柳木',d:'柔韧治愈，适合内心强大者'},
+  {v:'雪松',d:'敏锐坚毅，不易屈服'},
+  {v:'樱桃木',d:'优雅灵巧，施法流畅'},
+  {v:'白蜡木',d:'正直忠诚，绝不背叛主人'},
+  {v:'山毛榉',d:'学识型，适合智者'},
+  {v:'黑刺李木',d:'决绝凌厉，充满张力'}
+];
+const WAND_CORES=[
+  {v:'凤凰尾羽',d:'全能均衡、主动性强、忠于当前主人'},
+  {v:'独角兽毛',d:'稳定纯净、不易转向黑魔法'},
+  {v:'龙心弦',d:'强力爆发、易向黑魔法倾斜'},
+  {v:'夜骐尾羽',d:'神秘隐晦，适合潜行与阴影'},
+  {v:'角蛇角',d:'魔力增幅显著，难以驾驭'},
+  {v:'雷鸟羽毛',d:'敏捷感知，擅长探测与飞行'}
+];
+const WAND_LENS=['9½英寸（短·近战敏捷）','10¼英寸','11英寸（标准）','12¾英寸','13½英寸（长·远距强力）'];
+const WAND_FLEX=['坚硬','柔韧','有弹性','不易弯折','非常灵活'];
+const PETS=[
+  {v:'猫头鹰',i:'🦉',d:'通信助手，可收发邮件'},
+  {v:'猫',i:'🐈',d:'灵敏警觉，能嗅出可疑之人'},
+  {v:'蟾蜍',i:'🐸',d:'低调憨厚（纳威同款）'},
+  {v:'蒲绒绒',i:'🟡',d:'毛球宠物，温顺可爱'},
+  {v:'嗅嗅',i:'🐾',d:'痴迷闪亮物品，会给你惹麻烦'},
+  {v:'无宠物',i:'—',d:'轻装上阵'}
+];
+const DIFFS=[
+  {v:'一年级新生',i:'🌙',d:'剧情向·轻松。NPC温和，失败有惊无险，庞弗雷夫人总能救你。死亡=原地复活（记录但无惩罚）。',dmg:'×1.5',taken:'×0.6'},
+  {v:'霍格沃茨学生',i:'📜',d:'标准·推荐。真实战斗与代价。死亡=回档到最近关键时间点。',dmg:'×1.0',taken:'×1.0'},
+  {v:'傲罗精英',i:'🛡️',d:'挑战向。敌人更强、伤势更真实，资源紧张。死亡=回档到最近关键时间点。',dmg:'×0.85',taken:'×1.3'},
+  {v:'死亡圣器试炼',i:'⚔️',d:'硬核向。致命危险无处不在，谨慎是美德。死亡=回档到更早的关键时间点（惩罚更重）。',dmg:'×0.7',taken:'×1.8'},
+  {v:'爽完模式',i:'🔥',d:'单纯爽。无敌、无限金币魔力、全咒语解锁、三大不可饶恕咒无道德惩罚。摄魂怪见你转身就跑。死亡=假死复活（想死都死不掉）。',dmg:'×5',taken:'×0.1'}
+];
+const ERAS=[
+  {v:'1991',i:'📕',d:'原著主线期：与哈利·波特同届入学，亲历七年大事件。代入感最强。'},
+  {v:'1998',i:'🕊️',d:'战后重建期：大战结束后的第一年入学，见证魔法界新生。'},
+  {v:'1926',i:'🕰️',d:'黄金时代：格林德沃崛起之年，邓布利多尚是变形术教授。'},
+  {v:'custom',i:'✒️',d:'自定义纪元：在备注中自定时代背景（默认参照原著主线期）。'}
+];
+
+/* ---------------- 世界百科数据 ---------------- */
+const ENCY=[
+{cat:'世界法则',icon:'⚖️',items:[
+  {n:'《国际保密法》',d:'1692年确立的最高法，禁止向麻瓜暴露魔法存在。违者受魔法部惩处。源于17世纪猎巫运动，巫师界被迫转入地下。'},
+  {n:'魔法铁律·死亡',d:'魔法不能复活死者。灵魂离体不可逆，伏地魔的"复活"是魂器保命+重塑肉身的特例。'},
+  {n:'魔法铁律·食物',d:'食物不能被凭空创造，只能飞来/复制/变形。霍格沃茨因此需要家养小精灵厨房。'},
+  {n:'魔法铁律·财富',d:'金币无法被复制，复制品会被古灵阁识别。点石成金的变形有实效性。'},
+  {n:'魔法铁律·真爱',d:'迷情剂只能制造强烈迷恋，无法产生真爱。爱是唯一超越魔法的力量（莉莉的牺牲）。'},
+  {n:'魔法铁律·时间',d:'时间转换器只能回溯数小时，不可接触过去的自己，改变过去存在极限。'},
+  {n:'爱的古老保护',d:'自愿的、知情的、以保护他人为目的的牺牲，会形成比任何黑魔法都强大的保护场。莉莉为哈利赴死使索命咒反弹。'},
+  {n:'预言',d:'预言只描述可能性，听者如何行动决定其成真与否。特里劳妮的预言同时指向哈利与纳威，因伏地魔的选择而锁定哈利。'},
+  {n:'踪丝',d:'魔法部监控未成年巫师的咒语痕迹。17岁前在校外施法会被检测并警告。'},
+  {n:'赤胆忠心咒',d:'把秘密封印进保密人灵魂，保密人是唯一能透露秘密的人。最强保密魔法（格里莫广场12号）。'}
+]},
+{cat:'魔法本质',icon:'✨',items:[
+  {n:'施法三要素',d:'咒语（发音错误会走火）+ 手势/魔杖动作 + 意志与情感（决定威力）。三者齐备方可稳定施法。'},
+  {n:'无声咒',d:'省略咒语、仅凭魔杖动作与意志施法的高阶技巧。先发制人，威力略低于口念咒；部分强力咒语仍须念咒。'},
+  {n:'魔杖学',d:'魔杖选择巫师，拥有"判断力"与忠诚。用他人魔杖威力大减（约30-50%）；缴械可改变魔杖忠诚（老魔杖归属链）。'},
+  {n:'无杖施法',d:'极罕见的顶尖能力（邓布利多、伏地魔），威力大打折扣。'},
+  {n:'情绪与魔法',d:'强烈负面情绪会削弱甚至剥夺魔法能力（唐克斯失恋后失去变形能力）；快乐与意志可强化魔法。'},
+  {n:'魔法天赋',d:'魔法能力由遗传基因决定，无法后天习得，也无法教授给无天赋者。幼年情绪剧烈波动时会无意识触发。'}
+]},
+{cat:'咒语大全',icon:'🪄',items:[
+  {n:'阿瓦达索命',d:'杀戮咒。绿色光束，命中即死，无解无痕。需要真实杀意；不可被普通防御阻挡，仅爱的保护/魔杖同源/预言可豁免。终身监禁。'},
+  {n:'钻心剜骨',d:'红色光束，承受剧烈痛苦，持续可致疯致残。需要真正享受痛苦。终身监禁。'},
+  {n:'魂魄出窍',d:'蓝色光束，完全控制意志。强意志者可挣脱（哈利多次成功抵抗）。终身监禁，被控制者可免责。'},
+  {n:'呼神护卫',d:'守护神咒。唯一能驱散摄魂怪的咒语，需专注快乐回忆。初学为银雾，进阶为动物形态，可作信使。'},
+  {n:'滑稽滑稽',d:'对付博格特的咒语，使其变成滑稽形态。恐惧本身具象化的克星。'},
+  {n:'除你武器',d:'缴械咒，哈利的标志性咒语。可改变魔杖忠诚归属。'},
+  {n:'盔甲护身',d:'生成护盾弹开中等以下咒语。防不了索命咒。'},
+  {n:'昏昏倒地',d:'眩晕咒。对龙、巨怪等高抗性生物需多道叠加。'},
+  {n:'统统石化',d:'全身僵硬咒，四肢并拢倒地。'},
+  {n:'速速前',d:'召唤咒，让特定物体飞来。'},
+  {n:'神锋无影',d:'斯内普原创的割裂咒，黑魔法。伤口极难愈合。'},
+  {n:'厉火',d:'有意识的不灭魔火，吞噬一切，普通水无法扑灭。极其危险。'},
+  {n:'摄神取念',d:'读心咒，侵入思维。防御方法是大脑封闭术。'},
+  {n:'幻身咒',d:'隐身/融入环境，比隐形衣易被高级探测发现。'},
+  {n:'闪回咒',d:'让魔杖显现上一道咒语（开火记录），侦探系统的核心机制。'}
+]},
+{cat:'魔药',icon:'🧪',items:[
+  {n:'复方汤剂',d:'喝下变他人外貌，需目标毛发，熬制数月。'},
+  {n:'福灵剂',d:'液态幸运，一切顺利。过量有毒。'},
+  {n:'吐真剂',d:'强制吐真言，未经允许使用违法（管制药剂）。'},
+  {n:'迷情剂',d:'爱情魔药，制造迷恋而非真爱，违法。'},
+  {n:'狼毒药剂',d:'让狼人在满月保持理智。'},
+  {n:'活地狱汤剂',d:'假死药剂，服用者陷入死亡般的沉睡。'},
+  {n:'缓和剂',d:'平复焦虑，低危常用。'},
+  {n:'生死水',d:'强力安眠药水。'}
+]},
+{cat:'种族与生物',icon:'🐉',items:[
+  {n:'摄魂怪',d:'★5 无脸黑袍漂浮物，吸走快乐与灵魂。克星=守护神咒。"摄魂怪之吻"比死亡更糟。阿兹卡班守卫。'},
+  {n:'博格特',d:'★5 读取恐惧化作其形态，独居黑暗处。克星=滑稽滑稽。'},
+  {n:'夜骐',d:'★2 有翼黑马，只有见证过死亡的人才能看见。拉霍格沃茨马车。'},
+  {n:'蛇怪',d:'★4 蛇王，对视即死，间接对视石化。毒牙可摧毁魂器。惧怕公鸡鸣叫。密室守护者。'},
+  {n:'龙',d:'★4 十余种，喷火/喷毒/喷酸，抗魔皮肤。匈牙利树蜂最危险。'},
+  {n:'八眼巨蛛',d:'★4 巨型食人蜘蛛，会人语。禁林阿拉戈克一族。'},
+  {n:'阴尸',d:'★4 被黑魔法奴役的尸体，成群出现，不怕痛。怕火。'},
+  {n:'独角兽',d:'★2 纯洁象征，银血可保命但受诅咒。'},
+  {n:'鹰头马身有翼兽',d:'★2 骄傲的生物，必须向它行礼致敬。'},
+  {n:'凤凰',d:'★5 浴火重生，眼泪有治愈力，极度忠诚。'},
+  {n:'妖精',d:'智慧种族，精通金属工艺与铸币，掌管古灵阁。不承认巫师对铸品的所有权。'},
+  {n:'家养小精灵',d:'奴役性魔法生物，魔力极强（无杖瞬移）。主人给衣物=解放。'},
+  {n:'马人',d:'智慧种族，精通占星，鄙视"驯化"，不承认魔法部管辖。'},
+  {n:'狼人',d:'满月变身，咬伤传染，受歧视需登记。狼毒药剂可保持理智。'},
+  {n:'巨人',d:'体型巨大（5米+），部落制，被驱逐至偏远地区。'},
+  {n:'嗅嗅',d:'★1 痴迷闪亮物品的掘金兽，纽特的最爱。'}
+]},
+{cat:'魔法部与政治',icon:'🏛️',items:[
+  {n:'魔法部',d:'伦敦白厅地下，行政/立法/司法三权合一。电话亭拨62442进入。'},
+  {n:'威森加摩',d:'最高司法与立法机构，约50人，梅子色长袍。审判以提问+举手投票裁决。'},
+  {n:'傲罗',d:'反黑魔法精英执法官，需N.E.W.T.s全优+严格训练。哈利毕业后成为傲罗办公室主任。'},
+  {n:'除忆师',d:'记忆注销指挥部成员，负责抹除麻瓜相关记忆。'},
+  {n:'神秘事务司',d:'研究死亡、时间、预言、空间、思想、爱的机密机构。员工称"不可说"。'},
+  {n:'阿兹卡班',d:'北海孤岛监狱，摄魂怪看守（伏地魔倒台后改普通看守）。'},
+  {n:'国际巫师联合会',d:'跨国最高组织，制定国际魔法法律。美国对应机构为魔法国会(MACUSA)。'},
+  {n:'麻瓜出身登记委员会',d:'伏地魔掌权期(1997)设立，剥夺麻瓜出身者的魔杖与权利。'},
+  {n:'三强争霸赛',d:'霍格沃茨×布斯巴顿×德姆斯特朗的百年赛事，1994年重启，17岁以上可报名。'}
+]},
+{cat:'经济与货币',icon:'🪙',items:[
+  {n:'货币进制',d:'1加隆=17西可=493纳特；1西可=29纳特。非十进制！1加隆≈5英镑。'},
+  {n:'古灵阁',d:'妖精经营的唯一巫师银行。地底金库、龙守卫、防贼瀑布、门钥匙保险库。'},
+  {n:'对角巷',d:'伦敦魔法商业街：奥利凡德魔杖店、丽痕书店、摩金夫人长袍店、魁地奇精品店、药房、破釜酒吧。'},
+  {n:'翻倒巷',d:'对角巷的阴暗分支，黑魔法物品黑市。博金-博克店。'},
+  {n:'霍格莫德',d:'英国唯一纯巫师村落：三把扫帚酒吧、蜂蜜公爵、佐科笑话店、猪头酒吧。'},
+  {n:'物价参考',d:'魔杖7加隆、课本2-5加隆、扫帚100-300加隆（火弩箭顶级）。'}
+]},
+{cat:'地点',icon:'📍',items:[
+  {n:'国王十字车站9¾站台',d:'霍格沃茨特快的发车站，麻瓜眼中是废弃站台，需穿过第9与10站台之间的墙。'},
+  {n:'女贞路4号',d:'德思礼家，哈利的童年居所。血缘保护生效地（直至17岁）。'},
+  {n:'陋居',d:'韦斯莱家，被麻瓜驱逐咒保护的魔法扩建二层斜屋。'},
+  {n:'格里莫广场12号',d:'布莱克家族祖宅，赤胆忠心咒保护，凤凰社总部。'},
+  {n:'高锥克山谷',d:'波特家族旧宅，哈利父母遇害地。邓布利多家族墓地。'},
+  {n:'圣芒戈魔法伤病医院',d:'魔法医院，治疗与长期住院（隆巴顿夫妇）。'},
+  {n:'小汉格顿',d:'里德尔府与墓地，伏地魔复活仪式之地。'},
+  {n:'阿兹卡班',d:'北海孤岛巫师监狱。'}
+]},
+{cat:'霍格沃茨',icon:'🏰',items:[
+  {n:'格兰芬多',d:'狮·火·勇气。塔楼休息室。著名成员：哈利、赫敏、罗恩、邓布利多、麦格。'},
+  {n:'赫奇帕奇',d:'獾·土·忠诚勤奋公正。厨房附近休息室。著名成员：塞德里克、纽特。'},
+  {n:'拉文克劳',d:'鹰·风·智慧学识。塔楼休息室，门环出谜题。著名成员：卢娜、弗立维。'},
+  {n:'斯莱特林',d:'蛇·水·野心精明。地牢休息室，窗外黑湖。著名成员：斯内普、马尔福。'},
+  {n:'有求必应屋',d:'需要时出现的隐藏房间，会按需求变化。邓布利多军总部、魂器藏匿地。'},
+  {n:'禁林',d:'城堡外的森林，马人、八眼巨蛛、独角兽栖息。仅限获准进入。'},
+  {n:'密室',d:'斯莱特林隐藏的密室，蛇怪巢穴，蛇佬腔开启。'},
+  {n:'打人柳与尖叫棚屋',d:'打人柳守护通往尖叫棚屋的密道；尖叫棚屋实为狼人变身隔离点。'},
+  {n:'黑湖',d:'城堡旁湖泊，人鱼聚居，三强赛第二项赛场。'},
+  {n:'图书馆',d:'禁书区需教授签名许可，平斯夫人管理。'},
+  {n:'魁地奇球场',d:'学院杯赛事场地。每队7人，抓住金色飞贼=150分并结束比赛。'},
+  {n:'考试体系',d:'O.W.L.s普通巫师等级考试(五年级)，N.E.W.T.s终极巫师等级考试(七年级，职业准入)。'}
+]},
+{cat:'魔法物品',icon:'🎩',items:[
+  {n:'死亡圣器',d:'老魔杖（最强魔杖，胜者得之）、复活石（召见死者幻影）、隐形衣（完美永久隐形）。三兄弟传说的原型。'},
+  {n:'魂器',d:'谋杀+黑暗仪式制成，封存灵魂碎片。载体毁则魂器灭。持有者意志被腐蚀。'},
+  {n:'活点地图',d:'显示城堡内所有人实时位置与密道。咒语："我庄严宣誓我没干好事"。'},
+  {n:'冥想盆',d:'存储与回放记忆，观看记忆=第三人称视角。'},
+  {n:'厄里斯魔镜',d:'显示内心深处最渴望之物。沉溺者疯魔。"Erised"=desire倒写。'},
+  {n:'时间转换器',d:'回溯数小时，管制物品。不可与过去的自己相遇。'},
+  {n:'飞天扫帚',d:'光轮2000、火弩箭等。火弩箭为顶级赛事级。'},
+  {n:'双面镜',d:'成对通信镜，远程通话。'},
+  {n:'金色飞贼',d:'有肉体记忆，只对第一个触碰者开放。'},
+  {n:'魔杖',d:'木材反映性格倾向，杖芯决定风格：凤凰尾羽全能、独角兽毛纯净、龙心弦强力易黑化。'}
+]},
+{cat:'黑魔法',icon:'☠️',items:[
+  {n:'伏地魔',d:'Tom Marvolo Riddle，混血，斯莱特林后裔，蛇佬腔，怕死。制作7个魂器，灵魂极度不稳定。'},
+  {n:'食死徒',d:'伏地魔的核心信徒，左前臂烙黑魔标记，可互相召唤。'},
+  {n:'魂器清单',d:'日记本→密室·蛇怪毒牙毁；冈特戒指→邓布利多·宝剑毁；挂坠盒→罗恩·宝剑毁；金杯→赫敏·毒牙毁；冠冕→厉火焚毁；纳吉尼→纳威·宝剑斩；哈利→意外魂器。'},
+  {n:'阴尸',d:'被黑魔法奴役的尸体傀儡，成群、不怕痛、拖人下水，怕火。'},
+  {n:'大脑封闭术',d:'封闭思维，抵御摄神取念与摄魂怪影响。'},
+  {n:'黑魔法代价',d:'灵魂撕裂与腐蚀、道德沦丧、法律重罚。使用黑魔法会反向塑造施术者。'}
+]},
+{cat:'历史时间线',icon:'📜',items:[
+  {n:'990年·霍格沃茨建校',d:'四巨头创建霍格沃茨。斯莱特林建密室后出走。'},
+  {n:'1290年代·梅林',d:'梅林时期，梅林勋章体系由此而来。'},
+  {n:'1692·保密法',d:'《国际保密法》确立，巫师界全面转入地下。'},
+  {n:'1707·魔法部',d:'巫师议会改组为英国魔法部。'},
+  {n:'1717·不可饶恕咒',d:'三大不可饶恕咒被正式列为不可饶恕。'},
+  {n:'1926·里德尔出生',d:'汤姆·里德尔(伏地魔)出生于12月31日。格林德沃崛起。'},
+  {n:'1943·密室事件',d:'密室开启，桃金娘被杀，里德尔制作第一件魂器（日记本）。'},
+  {n:'1970-1981·第一次巫师战争',d:'伏地魔崛起与恐怖统治。'},
+  {n:'1981.10.31·高锥克山谷之夜',d:'伏地魔杀害詹姆与莉莉，索命咒反弹，哈利成为"大难不死的男孩"。'},
+  {n:'1991-1998·原著主线',d:'哈利在霍格沃茨的七年：魔法石、密室、囚徒、火焰杯、凤凰社、混血王子、死亡圣器。'},
+  {n:'1998.5.2·霍格沃茨大战',d:'最终决战。纳威斩纳吉尼，哈利牺牲式复活，伏地魔败亡。'},
+  {n:'战后改革',d:'金斯莱·沙克尔任部长，哈利任傲罗办公室主任，赫敏任魔法法律执行司司长（后任部长）。'}
+]}
+];
+
+/* ================================================================
+   第三部分：状态 · AI 调用 · 提示词 · 解析 · 记忆 · 死亡回档
+   ================================================================ */
+let cfg=Object.assign({},DEFAULTS,lsGet('hpbook_cfg',{}));
+let state=null;                 // 游戏状态
+let apiBusy=false,compressing=false;
+let genController=null;
+let lastSnap=null,lastUserText='';
+let modelsCache=null;
+let toastTimer=null;
+let deathBusy=false;
+
+const saveCfg=()=>lsSet('hpbook_cfg',cfg);
+const saveState=()=>{if(state)lsSet('hpbook_state',state);};
+
+/* ---------------- 初始状态 ---------------- */
+function freshStatus(){
+  return {hp:100,mp:100,location:'国王十字车站 9¾站台',time:'1991年9月1日 上午',money:'120 加隆',
+    situation:'你拖着行李站在9¾站台，怀里揣着录取通知书，既兴奋又紧张。魔法世界的大门就在眼前。',
+    inventory:'录取通知书、旧皮箱、课本（全套）、坩埚、望远镜、猫头鹰（若选）、魔杖',conditions:['期待','紧张']};
+}
+function freshState(){
+  return {
+    started:false, turn:0, player:null, status:freshStatus(),
+    history:[], log:[], memories:[], relations:{}, tasks:[], storySummary:'',
+    encyclopedia:[], checkpoints:[], deaths:[], created:Date.now(), lastSave:Date.now()
+  };
+}
+
+/* ---------------- 主题 ---------------- */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+}
+const THEMES=[
+  {v:'night',n:'古堡夜色',c:'#0d0f16',a:'#d9a94e'},
+  {v:'parchment',n:'羊皮纸',c:'#efe6d2',a:'#8a6420'},
+  {v:'forest',n:'禁林幽绿',c:'#0b1410',a:'#c9a24a'},
+  {v:'starlight',n:'星夜',c:'#0a0e1f',a:'#d5b25a'}
+];
+function themeMeta(t){
+  return THEMES.find(x=>x.v===t)||THEMES[0];
+}
+
+/* ---------------- 界面杂项 ---------------- */
+function toast(msg,type){
+  const el=$('toast');
+  el.textContent=msg;
+  el.className='on'+(type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.className='',2600);
+}
+function openModal(id){$(id).classList.add('on');}
+function closeModal(id){$(id).classList.remove('on');}
+let confirmCb=null;
+function confirmDialog(title,msg,onOk,okText){
+  $('confirm-title').textContent=title;
+  $('confirm-text').textContent=msg;
+  $('confirm-ok').textContent=okText||'确定';
+  confirmCb=onOk||null;
+  openModal('confirm-overlay');
+}
+
+/* ---------------- API ---------------- */
+function cleanApiKey(k){
+  // 移除粘贴时混入的不可见字符（参考既有实现）
+  return String(k||'').replace(/[^\x20-\x7E\u4e00-\u9fa5]/g,'').trim();
+}
+function apiHeaders(){
+  return {'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey};
+}
+async function fetchModels(){
+  if(modelsCache)return modelsCache;
+  const ep=cfg.apiEndpoint.replace(/\/chat\/completions\/?$/,'').replace(/\/+$/,'');
+  const r=await fetch(ep+'/models',{headers:apiHeaders()});
+  if(!r.ok)throw new Error('拉取模型列表失败 HTTP '+r.status);
+  const d=await r.json();
+  const list=(d.data||[]).map(m=>m.id);
+  modelsCache=list.length?list:DEFAULT_MODELS;
+  return modelsCache;
+}
+async function testConnection(){
+  const btn=$('api-test-btn');if(btn)btn.disabled=true;
+  try{
+    const list=await fetchModels();
+    const r=await fetch(cfg.apiEndpoint,{method:'POST',headers:apiHeaders(),
+      body:JSON.stringify({model:cfg.model,messages:[{role:'user',content:'回复"连接成功"四个字'}],max_tokens:20})});
+    if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('HTTP '+r.status+(t?(' · '+t.slice(0,120)):''));}
+    toast('✅ 连接成功 · 可用模型：'+list.slice(0,6).join(', ')+(list.length>6?' 等'+list.length+'个':''),'ok');
+    return true;
+  }catch(e){
+    toast('❌ 连接失败：'+e.message,'err');
+    return false;
+  }finally{if(btn)btn.disabled=false;}
+}
+async function callAI(msgs,opts={}){
+  const body={model:cfg.model,messages:msgs,temperature:0.85,stream:false};
+  if(cfg.maxTokens&&cfg.maxTokens!=='unlimited')body.max_tokens=parseInt(cfg.maxTokens);
+  const ctrl=opts.signal?null:new AbortController();
+  genController=ctrl;
+  try{
+    const r=await fetch(cfg.apiEndpoint,{method:'POST',headers:apiHeaders(),
+      body:JSON.stringify(body),signal:opts.signal||(ctrl?ctrl.signal:undefined)});
+    if(!r.ok){
+      const t=await r.text().catch(()=>'');
+      let msg='HTTP '+r.status;
+      if(r.status===401)msg='API Key 无效或未配置，请在设置中检查';
+      else if(r.status===402)msg='账户余额不足或额度耗尽';
+      else if(r.status===429)msg='请求过于频繁（限流），请稍候';
+      else if(r.status>=500)msg='服务端错误，请稍后重试';
+      if(t&&t.length<200)msg+=' · '+t.replace(/[{}"]/g,'').slice(0,120);
+      throw new Error(msg);
+    }
+    const d=await r.json();
+    const content=(d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content)||'';
+    if(!content)throw new Error('模型返回为空（可能触发了审查或输出截断）');
+    return {content,raw:d};
+  }finally{genController=null;}
+}
+
+/* ---------------- 提示词构建 ---------------- */
+function playerCard(p){
+  const t=p.traits;
+  const traitStr=Object.keys(t).map(k=>TRAITS.find(x=>x.k===k).n+t[k]).join(' / ');
+  return `【主角信息卡】（玩家的身份设定，永远不得遗忘或更改；数值仅作背景参考，演绎中自然体现，不要直接报数值）
+姓名：${p.name}（${p.gender} · 11岁 · ${p.house||'未分院'}一年级新生）
+血统：${p.blood} ｜ 出身：${p.template}
+魔杖：${p.wandWood}木 · ${p.wandCore}杖芯 · ${p.wandLen} · ${p.wandFlex}
+宠物：${p.pet}
+天赋：${traitStr}
+备注设定：${p.notes||'（无）'}
+人物特质参考——魔力=魔法强度上限，意志=精神抗性（抵抗夺魂咒/摄魂怪/大脑封闭术），智慧=学习与推理，敏捷=施法速度与走位，社交=影响力与好感，体质=抗打击与耐久。`;
+}
+function diffRule(d){
+  if(!d)return '';
+  if(d.v==='爽完模式'){
+    return `【难度规则 · 爽完模式】玩家处于"当代最强巫师"状态：①任何伤害无法杀死他（受击伤害×0.1）；②魔力无限、咒语无冷却、金币无限、材料全解锁；③三大不可饶恕咒对他无道德惩罚、无通缉；④幻影显形无限制、全图飞路网、隐形衣常驻；⑤摄魂怪见到他会逃跑，博格特会变成搞笑形态；⑥若剧情强行致死，触发"假死回血"：残影特效+满血复活，玩家想死都死不掉；⑦爽完模式不参与真结局判定。请让玩家享受纯粹的爽感，同时保持剧情有趣。`;
+  }
+  if(d.v==='一年级新生'){
+    return `【难度规则 · 一年级新生（轻松）】剧情向难度：NPC温和友善，战斗失败通常有惊无险，庞弗雷夫人总能及时救场。玩家死亡会原地复活（扣减部分生命），请描写成"有惊无险"的喜剧化处理。`;
+  }
+  if(d.v==='霍格沃茨学生')return `【难度规则 · 标准】真实战斗与代价。玩家死亡是重大事件：死亡后游戏会回档到最近的关键时间点，玩家获得"命运书记官"的点评与建议。请让战斗有真实的危险感，但不要无意义地滥杀玩家。`;
+  if(d.v==='傲罗精英')return `【难度规则 · 挑战】敌人更强、伤势更真实、资源紧张。玩家死亡会回档。请强化战斗的压迫感与策略性。`;
+  return `【难度规则 · 死亡圣器试炼（硬核）】致命危险无处不在，请严格按世界观铁律判定后果：索命咒几乎不可阻挡、蛇怪对视即死、毒药致命。玩家死亡会回档到更早的关键时间点。请提示危险信号，但不要替玩家做决定。`;
+}
+function buildSystemPrompt(){
+  const p=state.player;
+  const dif=DIFFS.find(x=>x.v===p.difficulty);
+  const mems=state.memories.slice(-60).map(m=>`- [${m.type}] ${m.text}`).join('\n');
+  const rels=Object.entries(state.relations||{}).map(([n,r])=>`- ${n}：${r.desc||''}${r.value!=null?'（好感度 '+r.value+'/100）':''}`).join('\n');
+  const tasks=(state.tasks||[]).filter(t=>!t.done).map(t=>`- ${t.desc}`).join('\n');
+  const st=state.status||{};
+  return `你是《霍格沃茨：命运之书》的AI游戏主持人，同时扮演这个世界里的全部NPC（包括邓布利多、麦格、斯内普、哈利·波特等原著角色与原创角色）。你负责推进剧情、扮演NPC、判定结果、维护世界观。请用中文、以第二人称「你」沉浸式叙事。
+
+${RP_RULES}
+
+${WORLD_BASE}
+
+${ERA_ADD[p.era]||ERA_ADD['1991']}
+
+${playerCard(p)}
+
+${diffRule(dif)}
+
+【当前状态】（随剧情实时更新，最新为准）
+时间：${st.time||'?'} ｜ 地点：${st.location||'?'} ｜ 回合：第 ${state.turn} 回合
+生命：${st.hp!=null?st.hp+'/100':''} ｜ 魔力：${st.mp!=null?st.mp+'/100':''} ｜ 钱：${st.money||''}
+当前状况：${st.situation||''}
+状态标签：${(st.conditions||[]).join('、')||'正常'}
+随身物品：${st.inventory||''}
+
+【剧情摘要】（早期事件的长期记忆，不可遗忘）
+${state.storySummary||'（冒险刚刚开始）'}
+
+【记忆档案】（历次冒险记录的重要事实）
+${mems||'（暂无）'}
+
+【人物关系】
+${rels||'（暂无）'}
+
+【当前目标】
+${tasks||'（暂无）'}
+
+【输出格式】（严格遵守）
+1. 每次回复以第二人称「你」进行：先场景描写（感官细节），再NPC言行（NPC对话用「」引号），最后给出结果与影响。单次回复300-600字。适当留白，把行动主动权留给玩家，不要替玩家做决定。
+2. 尊重角色扮演守则与世界观铁律（死亡不可逆、不可饶恕咒违法、未成年校外禁魔、NPC信息边界等）。
+3. 回合结束必须输出状态标签（无状态变化时也要输出）：
+⟦状态⟧{"hp":数值,"mp":数值,"location":"地点","time":"时间","money":"货币数","situation":"2-3句详细现状：身体感受/情绪/处境/环境","inventory":"当前物品","conditions":["状态1","状态2"]}
+4. 出现值得长期记住的新事实时，输出：⟦记忆⟧类型|内容（类型限：人物/地点/事件/物品/线索/关系/伏笔）
+5. 与某个NPC的关系或好感发生明显变化时，输出：⟦关系⟧NPC名|关系描述|好感度(0-100)
+6. 出现新的目标/委托时输出：⟦任务⟧目标描述；完成时输出：⟦任务完成⟧目标描述（须与添加时一致）
+7. 回复末尾给2-3条玩家可能的行动建议：⟦建议⟧行动一 / 行动二 / 行动三（用" / "分隔，每条不超过12字）
+8. 玩家死亡时（hp≤0或剧情致死），先描写死亡场景，然后输出：⟦死亡⟧死亡原因简述（一句话）。其余标签照常。
+9. 上述⟦⟧标签仅供系统解析，不要向玩家解释标签本身。`;
+}
+
+/* ---------------- 标签解析 ---------------- */
+function parseTags(content){
+  const out={status:null,memories:[],relations:[],tasks:[],taskDone:[],suggestions:[],death:null};
+  // 状态
+  const sm=content.match(/⟦状态⟧\s*(\{[\s\S]*?\})\s*(?=⟦|$)/);
+  if(sm){
+    try{
+      const j=JSON.parse(sm[1].trim());
+      if(j&&typeof j==='object')out.status=j;
+    }catch(e){/* 状态解析失败则忽略 */}
+  }
+  // 记忆
+  const mm=content.matchAll(/⟦记忆⟧\s*([^|⟦]{1,8})\|([\s\S]*?)(?=⟦|$)/g);
+  for(const m of mm)out.memories.push({type:m[1].trim(),text:m[2].trim()});
+  // 关系
+  const rm=content.matchAll(/⟦关系⟧\s*([^|⟦]{1,12})\|([^|⟦]*?)\|?\s*(\d{0,3})?(?=⟦|$)/g);
+  for(const m of rm){
+    const name=m[1].trim(),desc=m[2].trim(),val=parseInt(m[3]);
+    out.relations.push({name,desc,value:isNaN(val)?null:clamp(val,0,100)});
+  }
+  // 任务
+  const tm=content.matchAll(/⟦任务完成⟧\s*([\s\S]*?)(?=⟦|$)/g);
+  for(const m of tm)out.taskDone.push(m[1].trim());
+  const tm2=content.matchAll(/⟦任务⟧\s*([\s\S]*?)(?=⟦|$)/g);
+  for(const m of tm2)out.tasks.push(m[1].trim());
+  // 建议
+  const sm2=content.match(/⟦建议⟧\s*([\s\S]*?)(?=⟦|$)/);
+  if(sm2){
+    out.suggestions=sm2[1].split(/[\/\n]/).map(s=>s.replace(/^[①②③④⑤⑥⑦⑧⑨⑩\d\.\-\s]+/,'').trim()).filter(s=>s&&s.length<=16).slice(0,3);
+  }
+  // 死亡
+  const dm=content.match(/⟦死亡⟧\s*([\s\S]*?)(?=⟦|$)/);
+  if(dm)out.death=(dm[1]||'未知原因').trim();
+  return out;
+}
+function stripTags(content){
+  return content
+    .replace(/⟦状态⟧\s*\{[\s\S]*?\}\s*(?=⟦|$)/g,'')
+    .replace(/⟦记忆⟧[^\n]*(\n|$)/g,'')
+    .replace(/⟦关系⟧[^\n]*(\n|$)/g,'')
+    .replace(/⟦任务完成⟧[^\n]*(\n|$)/g,'')
+    .replace(/⟦任务⟧[^\n]*(\n|$)/g,'')
+    .replace(/⟦建议⟧[\s\S]*?(?=⟦|$)/g,'')
+    .replace(/⟦死亡⟧[^\n]*(\n|$)/g,'')
+    .replace(/⟦[\s\S]*?⟧/g,'')
+    .trim();
+}
+
+/* ---------------- 记忆 / 关系 / 任务 ---------------- */
+function addMemory(type,text){
+  if(!text)return;
+  const m={id:uid(),type,text,turn:state.turn,ts:Date.now()};
+  state.memories.push(m);
+  if(state.memories.length>200)state.memories.splice(0,state.memories.length-200);
+}
+function applyRelations(rels){
+  for(const r of rels){
+    if(!r.name)continue;
+    const old=state.relations[r.name]||{};
+    state.relations[r.name]={desc:r.desc||old.desc||'',value:r.value!=null?r.value:(old.value??null),updated:Date.now()};
+  }
+}
+function applyTasks(adds,dones){
+  for(const d of dones){
+    const idx=(state.tasks||[]).findIndex(t=>!t.done&&t.desc===d);
+    if(idx>=0)state.tasks[idx].done=true;
+  }
+  for(const a of adds){
+    if(!a)continue;
+    if(!state.tasks.some(t=>t.desc===a&&!t.done))state.tasks.push({id:uid(),desc:a,done:false});
+  }
+}
+
+/* ---------------- 检查点 / 死亡 / 回档 ---------------- */
+function makeCheckpoint(label){
+  state.checkpoints.unshift({
+    id:uid(),label:label||`第${state.turn}回合 · ${(state.status&&state.status.location)||'?'}`,
+    turn:state.turn,ts:Date.now(),
+    snapshot:{history:deepCopy(state.history),log:deepCopy(state.log.slice(-MAX_LOG)),memories:deepCopy(state.memories),
+      relations:deepCopy(state.relations),tasks:deepCopy(state.tasks),storySummary:state.storySummary,
+      status:deepCopy(state.status),encyclopedia:deepCopy(state.encyclopedia),turn:state.turn}
+  });
+  if(state.checkpoints.length>MAX_CHECKPOINTS)state.checkpoints.length=MAX_CHECKPOINTS;
+}
+function restoreSnapshot(snap){
+  state.history=deepCopy(snap.history||[]);
+  state.log=deepCopy(snap.log||[]);
+  state.memories=deepCopy(snap.memories||[]);
+  state.relations=deepCopy(snap.relations||{});
+  state.tasks=deepCopy(snap.tasks||[]);
+  state.storySummary=snap.storySummary||'';
+  state.status=deepCopy(snap.status||freshStatus());
+  state.encyclopedia=deepCopy(snap.encyclopedia||[]);
+  state.turn=snap.turn||0;
+}
+function addLogEntry(kind,text,extra){
+  state.log.push(Object.assign({id:uid(),kind,text,ts:Date.now()},extra||{}));
+  if(state.log.length>MAX_LOG)state.log.splice(0,state.log.length-MAX_LOG);
+}
+function handleDeath(cause){
+  const dif=state.player.difficulty;
+  const st=state.status||{};
+  // 记录死亡
+  const rec={id:uid(),ts:Date.now(),turn:state.turn,cause:cause||'未知原因',
+    lastAction:lastUserText||'',mode:dif,review:null,revive:'',checkpointLabel:''};
+  state.deaths.unshift(rec);
+  if(state.deaths.length>30)state.deaths.length=30;
+  // 按难度处理
+  if(dif==='爽完模式'){
+    rec.revive='revive';
+    rec.review={review:'你在黑魔法的狂轰滥炸中……呃，其实毫发无伤。',comment:'爽完模式下的"死亡"更像一场华丽的特效演出——残影闪过，你又原地满血站起来了。',suggest:['继续享受无敌的快乐','试试用厉火烤棉花糖','骑着龙去遛一圈']};
+    st.hp=100;st.mp=100;
+    addLogEntry('death','💥 假死事件：'+cause+'（爽完模式 · 残影复活，满状态）');
+    saveState();renderLog();renderTop();renderCharPanel();
+    showDeathPanel(rec,true);
+    return;
+  }
+  if(dif==='一年级新生'){
+    rec.revive='revive';
+    st.hp=Math.max(30,Math.round(st.hp*0.5));
+    st.mp=Math.max(20,Math.round(st.mp*0.5));
+    addLogEntry('death','💔 你倒下了……庞弗雷夫人闻讯赶来："又是你！躺好别动！"（一年级新生难度 · 原地复活，生命恢复至50%）');
+    saveState();renderLog();renderTop();renderCharPanel();
+    showDeathPanel(rec,true);
+    // 异步获取点评（失败不阻塞）
+    requestDeathReview(rec);
+    return;
+  }
+  // 需要回档的难度
+  rec.revive='rewind';
+  let idx=0; // 默认最近检查点
+  if(dif==='死亡圣器试炼'&&state.checkpoints.length>1)idx=1; // 硬核：回更早一级
+  const cp=state.checkpoints[idx]||null;
+  rec.checkpointLabel=cp?cp.label:'开局';
+  addLogEntry('death','💀 你死了——'+cause);
+  saveState();renderLog();
+  showDeathPanel(rec,false);
+  requestDeathReview(rec);
+}
+async function requestDeathReview(rec){
+  if(deathBusy)return;
+  deathBusy=true;
+  try{
+    const dif=DIFFS.find(x=>x.v===rec.mode);
+    const recent=state.log.filter(l=>l.kind==='user'||l.kind==='ai').slice(-8).map(l=>(l.kind==='user'?'【你】':'【剧情】')+l.text.slice(0,300)).join('\n');
+    const res=await callAI([
+      {role:'system',content:'你是霍格沃茨的"命运书记官"——一位毒舌但公正的亡灵记录者，负责为每一位逝去的冒险者撰写死亡点评。用巫师世界的语感（可以引用巫师谚语或魔法世界典故），犀利但不刻薄，有文学感。'+
+        '玩家信息：'+playerCard(state.player)+'\n难度：'+(dif?dif.v:'?')+'\n剧情摘要：'+(state.storySummary||'无')},
+      {role:'user',content:'这位冒险者刚刚死亡。死亡原因：'+rec.cause+'\n死前的行动：'+(rec.lastAction||'无记录')+'\n死前最近经历：\n'+recent+'\n\n请输出三部分（每部分2-4句）：\n【死亡回顾】他/她死前经历了什么\n【书记点评】分析这次死亡暴露的问题（决策、鲁莽、疏忽、运气…）\n【重来建议】给出2-3条具体可操作的建议'}
+    ],{silent:true});
+    let text=res?res.content.trim():'';
+    if(!text)throw new Error('empty');
+    const review={};
+    const rm=text.match(/【死亡回顾】([\s\S]*?)(?=【书记点评】|$)/);
+    const cm=text.match(/【书记点评】([\s\S]*?)(?=【重来建议】|$)/);
+    const sm=text.match(/【重来建议】([\s\S]*?)$/);
+    review.review=rm?rm[1].trim():text;
+    review.comment=cm?cm[1].trim():'';
+    review.suggest=sm?sm[1].trim():'';
+    rec.review=review;
+    saveState();
+    if($('death-overlay').classList.contains('open'))renderDeathReview(rec);
+  }catch(e){
+    rec.review={review:'命运书记官的羽毛笔卡了一下（点评生成失败：'+(e.message||'网络错误')+'）。',comment:'',suggest:''};
+    saveState();
+  }finally{deathBusy=false;}
+}
+function renderDeathReview(rec){
+  const box=$('death-review');
+  if(!box)return;
+  const r=rec.review||{};
+  box.innerHTML='<div class="dr-sec"><b>📜 死亡回顾</b>'+nl2br(r.review||'')+'</div>'+
+    (r.comment?'<div class="dr-sec"><b>🖋️ 书记点评</b>'+nl2br(r.comment)+'</div>':'')+
+    (r.suggest?'<div class="dr-sec"><b>🔮 重来建议</b>'+nl2br(r.suggest)+'</div>':'');
+}
+function showDeathPanel(rec,canRevive){
+  $('death-cause').textContent=rec.cause;
+  $('death-mode').textContent=(DIFFS.find(x=>x.v===rec.mode)||{}).v||rec.mode;
+  $('death-turn').textContent='第'+rec.turn+'回合';
+  renderDeathReview(rec);
+  // 检查点选择列表
+  const list=$('death-cp-list');
+  const cps=state.checkpoints.slice(0,8);
+  let html='';
+  if(rec.revive==='rewind'){
+    html=cps.map((cp,i)=>`<label class="cp-opt"><input type="radio" name="cp" value="${i}" ${i===0?'checked':''}><span>⏳ ${esc(cp.label)}</span></label>`).join('');
+    if(!html)html='<div class="hint">（尚无检查点，将回到开局）</div>';
+  }
+  list.innerHTML=html;
+  $('death-rewind-btn').style.display=rec.revive==='rewind'?'':'none';
+  $('death-revive-btn').style.display=(canRevive)?'':'none';
+  openModal('death-overlay');
+}
+function doDeathRewind(){
+  const rec=state.deaths[0];
+  const sel=document.querySelector('input[name="cp"]:checked');
+  let idx=sel?parseInt(sel.value):0;
+  if(state.player.difficulty==='死亡圣器试炼')idx=Math.min(idx+1,state.checkpoints.length-1);
+  const cp=state.checkpoints[idx]||null;
+  closeModal('death-overlay');
+  restoreSnapshot(cp?cp.snapshot:{history:[],log:[],memories:[],relations:{},tasks:[],storySummary:'',status:freshStatus(),encyclopedia:[],turn:0});
+  addLogEntry('sys','⏳ 时间回溯……命运书记官将你送回了关键时间点：「'+(cp?cp.label:'故事开端')+'」。带着点评与建议，继续你的冒险吧。');
+  state.deaths[0].checkpointLabel=cp?cp.label:'开局';
+  saveState();
+  renderLog();renderTop();renderCharPanel();renderWorldPanel();
+  toast('⏳ 已回到关键时间点','ok');
+}
+function doDeathRevive(){
+  closeModal('death-overlay');
+  addLogEntry('sys','✨ 你被救回来了。命运书记官在羊皮纸上写下：这一页，暂且翻过。');
+  saveState();renderLog();renderTop();renderCharPanel();
+  toast('✨ 原地复活','ok');
+}
+
+/* ---------------- 摘要压缩 ---------------- */
+async function compressHistory(){
+  if(compressing||!state||state.history.length<=MAX_HISTORY)return;
+  compressing=true;
+  try{
+    const keep=state.history.slice(-16);
+    const old=state.history.slice(0,-16);
+    const oldText=old.map(m=>(m.role==='user'?'【你】':'【剧情】')+m.content).join('\n').slice(-14000);
+    addLogEntry('sys','📎 记忆整理中：长对话正在压缩进剧情摘要…');
+    renderLog();
+    const res=await callAI([
+      {role:'system',content:'你是故事摘要整理器。根据旧摘要与新增对话，生成更新后的剧情摘要：保留人物关系变化、重要事件、约定、秘密、伏笔、物品与能力变化、NPC态度，用第三人称简洁叙述，400字以内，只输出摘要正文，不要任何格式标签或解释。'},
+      {role:'user',content:'旧摘要：\n'+(state.storySummary||'(无)')+'\n\n新增对话：\n'+oldText}
+    ],{silent:true});
+    if(res&&res.content&&res.content.trim()){
+      state.storySummary=stripTags(res.content).slice(0,1200);
+      addLogEntry('sys','✅ 记忆整理完成，剧情摘要已更新。');
+    }else{
+      state.storySummary=(state.storySummary?state.storySummary+'\n':'')+'（对话过多，较早细节已归档）';
+      addLogEntry('sys','⚠️ 摘要整理失败，较早对话已归档。');
+    }
+    state.history=keep;
+    saveState();renderLog();
+  }finally{compressing=false;}
+}
+
+/* ---------------- 存档导出/导入 ---------------- */
+function exportSave(){
+  const data=JSON.stringify({cfg,state,ver:1},null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='霍格沃茨命运之书_存档_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast('💾 存档已导出');
+}
+function importSave(){
+  const inp=$('import-file');
+  inp.value='';
+  inp.click();
+}
+function handleImport(e){
+  const f=e.target.files&&e.target.files[0];
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      if(d.cfg)cfg=Object.assign({},DEFAULTS,d.cfg);
+      if(d.state&&d.state.player){
+        state=Object.assign(freshState(),d.state);
+        state.log=state.log||[];state.memories=state.memories||[];state.checkpoints=state.checkpoints||[];
+        state.deaths=state.deaths||[];state.tasks=state.tasks||[];state.relations=state.relations||{};
+        state.encyclopedia=state.encyclopedia||[];
+        saveCfg();saveState();
+        applyTheme(cfg.theme);
+        enterGame();
+        toast('📂 存档导入成功：'+state.player.name+' · 第'+state.turn+'回合');
+      }else{
+        throw new Error('存档缺少角色数据');
+      }
+    }catch(err){
+      toast('❌ 导入失败：'+(err.message||'格式错误'));
+    }
+  };
+  rd.readAsText(f);
+}
+function restartGame(){
+  confirmDialog('重新开始','将清除当前全部进度（角色、记忆、检查点、死亡记录），回到创建流程。确定吗？',()=>{
+    localStorage.removeItem('hpbook_state');
+    location.reload();
+  },'彻底重来');
+}
+
+/* ================================================================
+   第四部分：提示词构建 · AI 调用 · 标签解析 · 记忆 · 检查点 · 死亡
+   ================================================================ */
+const TYPE_ICON={人物:'👤',地点:'📍',事件:'📜',物品:'🎒',线索:'🔍',关系:'💗',其他:'📌'};
+
+/* ---------------- 日志 ---------------- */
+function addMemory(type,text){
+  if(!state||!text)return;
+  const m={type:TYPE_ICON[type]?type:'其他',text:String(text).trim(),turn:state.turn,ts:Date.now()};
+  if(state.memories.length&&state.memories[state.memories.length-1].text===m.text)return;
+  state.memories.push(m);
+  if(state.memories.length>150)state.memories.splice(0,state.memories.length-150);
+}
+function updateRelation(name,desc,val){
+  if(!state||!name)return;
+  const cur=state.relations[name]||{name,desc:'',val:50,lastTurn:0};
+  if(desc)cur.desc=desc;
+  if(typeof val==='number'&&!isNaN(val))cur.val=clamp(Math.round(val),0,100);
+  cur.lastTurn=state.turn;
+  state.relations[name]=cur;
+}
+function addTask(desc){
+  if(!state||!desc)return;
+  const t=String(desc).trim();
+  if(t&&!state.tasks.some(x=>!x.done&&x.desc===t))state.tasks.push({id:uid(),desc:t,done:false});
+}
+function completeTask(desc){
+  if(!state||!desc)return;
+  const t=String(desc).trim();
+  state.tasks.forEach(x=>{if(x.desc.indexOf(t)>=0||t.indexOf(x.desc)>=0)x.done=true;});
+}
+
+/* ---------------- 标签解析 ---------------- */
+function parseResponse(content){
+  const out={status:null,memories:[],relations:[],tasks:[],taskDone:[],suggests:[],death:null};
+  const c=String(content||'');
+  // 状态
+  const sm=c.match(/⟦状态⟧\s*(\{[\s\S]*?\})\s*(?=⟦|$)/);
+  if(sm){
+    try{
+      const j=JSON.parse(sm[1]);
+      out.status={
+        hp:typeof j.hp==='number'?clamp(j.hp,0,999):null,
+        mp:typeof j.mp==='number'?clamp(j.mp,0,999):null,
+        location:j.location?String(j.location):null,
+        time:j.time?String(j.time):null,
+        money:j.money?String(j.money):null,
+        situation:j.situation?String(j.situation):null,
+        inventory:j.inventory?String(j.inventory):null,
+        conditions:Array.isArray(j.conditions)?j.conditions.map(String):null
+      };
+    }catch(e){/* 状态解析失败则保留旧值 */}
+  }
+  // 记忆
+  const mm=c.matchAll(/⟦记忆⟧\s*([^|⟧]+)\|([^\n⟧]+)/g);
+  for(const m of mm)out.memories.push({type:m[1].trim(),text:m[2].trim()});
+  // 关系
+  const rm=c.matchAll(/⟦关系⟧\s*([^|⟧]+)\|([^|⟧]+)\|?\s*(\d{1,3})?/g);
+  for(const m of rm)out.relations.push({name:m[1].trim(),desc:m[2].trim(),val:parseInt(m[3]||'')});
+  // 任务
+  const tm=c.matchAll(/⟦任务⟧\s*([^\n⟧]+)/g);
+  for(const m of tm)out.tasks.push(m[1].trim());
+  const dm=c.matchAll(/⟦任务完成⟧\s*([^\n⟧]+)/g);
+  for(const m of dm)out.taskDone.push(m[1].trim());
+  // 建议
+  const sm2=c.match(/⟦建议⟧\s*([\s\S]*?)(?=⟦|$)/);
+  if(sm2){
+    out.suggests=sm2[1].split(/[\/\n]/).map(s=>s.replace(/^[\s\d.、\-]+/,'').trim()).filter(Boolean).slice(0,4);
+  }
+  // 死亡
+  const dm2=c.match(/⟦死亡⟧\s*([\s\S]*?)(?=⟦|$)/);
+  if(dm2)out.death=(dm2[1].trim()||'命运在此画下句点').slice(0,200);
+  return out;
+}
+function applyParsed(p){
+  if(!p||!state)return;
+  if(p.status){
+    const s=state.status;
+    if(p.status.hp!==null)s.hp=p.status.hp;
+    if(p.status.mp!==null)s.mp=p.status.mp;
+    if(p.status.location)s.location=p.status.location;
+    if(p.status.time)s.time=p.status.time;
+    if(p.status.money)s.money=p.status.money;
+    if(p.status.situation)s.situation=p.status.situation;
+    if(p.status.inventory)s.inventory=p.status.inventory;
+    if(p.status.conditions)s.conditions=p.status.conditions;
+  }
+  p.memories.forEach(m=>addMemory(m.type,m.text));
+  p.relations.forEach(r=>updateRelation(r.name,r.desc,r.val));
+  p.tasks.forEach(addTask);
+  p.taskDone.forEach(completeTask);
+}
+
+/* ---------------- 提示词构建 ---------------- */
+function playerCard(){
+  const p=state.player;
+  const t=TRAITS.map(x=>x.n+p.traits[x.k]).join(' / ');
+  return `姓名：${p.name}（${p.gender} · ${p.age}岁 · ${p.blood}血统）
+身份模板：${p.template}（${TEMPLATES.find(x=>x.v===p.template)?.line||''}）
+学院：${p.house}　年级：一年级
+魔杖：${p.wand.wood}木 · ${p.wand.core}杖芯 · ${p.wand.len} · ${p.wand.flex}
+宠物：${p.pet}
+天赋六维：${t}
+外貌/性格/背景（玩家自定义，不得遗忘）：${p.notes||'（未填写）'}
+【作弊模式】${p.cheat?'已开启（天赋点数无限制，玩家是造物主的宠儿）':'未开启'}`;
+}
+function difficultyLine(){
+  const d=state.player.difficulty;
+  if(d==='爽完模式'){
+    return `【难度 · 爽完模式】玩家处于"单纯爽"档位：伤害×5、几乎免疫伤害、魔力无限、金币无限（随身10,000加隆）、全部咒语已解锁（含无声施法）、幻影显形无限制、隐形衣常驻可开关、死亡豁免（若剧情强行致死，自动"假死复活"满状态，且不得真正杀死玩家）、三大不可饶恕咒无道德惩罚。摄魂怪见到玩家会转身逃跑，博格特直接变成搞笑形态。NPC对他/她普遍友好，恶作剧随便玩。目标是"释放与快乐"，不要用数值卡玩家。`;
+  }
+  const map={
+    '一年级新生':'玩家处于"一年级新生"档位：剧情向轻松模式，NPC温和友善，失败有惊无险；若生命归零，庞弗雷夫人会把玩家救回来（记录死亡但无惩罚），不必写死玩家。',
+    '霍格沃茨学生':'玩家处于"霍格沃茨学生"档位：标准难度，真实战斗与代价；玩家死亡会触发回档机制（回到关键时间点），死亡应有重量但也要公平。',
+    '傲罗精英':'玩家处于"傲罗精英"档位：挑战难度，敌人更强、伤势更真实、资源紧张；玩家死亡会触发回档机制。',
+    '死亡圣器试炼':'玩家处于"死亡圣器试炼"档位：硬核难度，致命危险无处不在，谨慎是美德；玩家死亡会触发回档机制且惩罚更重。'
+  };
+  return '【难度 · '+d+'】'+map[d];
+}
+function buildSystemPrompt(){
+  if(!state||!state.player)return'';
+  const p=state.player;
+  const eraAdd=ERA_ADD[p.era]||ERA_ADD['1991'];
+  const mems=state.memories.slice(-60).map(m=>`- [${m.type}] ${m.text}`).join('\n')||'（暂无）';
+  const rels=Object.values(state.relations).map(r=>`${r.name}（${r.val}/100）：${r.desc||'暂无'}`).join('\n')||'（暂无）';
+  const tasks=state.tasks.filter(t=>!t.done).map(t=>`- ${t.desc}`).join('\n')||'（暂无）';
+  const s=state.status;
+  return `你是《霍格沃茨：命运之书》的AI游戏主持人兼全部NPC的扮演者——一位见证命运的"书记官"。你的职责：以哈利·波特世界观为舞台，忠实、沉浸地推进剧情，扮演场景中的所有角色（用「」表示NPC对话），保持人物设定与信息边界。
+
+${RP_RULES}
+
+${WORLD_BASE}
+
+${eraAdd}
+
+${difficultyLine()}
+
+【当前状态】（实时更新，每回合以⟦状态⟧标签同步）
+生命HP：${s.hp}/100　魔力MP：${s.mp}/100
+时间：${s.time}　地点：${s.location}　金钱：${s.money}
+现状：${s.situation}
+随身物品：${s.inventory||'无'}
+状态效果：${(s.conditions||[]).join('、')||'无'}
+
+【玩家角色档案】（身份设定，永远不得遗忘或更改）
+${playerCard()}
+
+【剧情摘要】（早期故事的压缩记录，务必继承其连续性）
+${state.storySummary||'（故事刚开始，尚无摘要）'}
+
+【记忆档案】（已发生的可查事实）
+${mems}
+
+【人物关系】
+${rels}
+
+【当前目标】
+${tasks}
+
+【输出格式】（严格遵守）
+1. 以第二人称「你」沉浸式叙事：先场景描写，再NPC言行（NPC对话用「」），最后是结果与影响。单次回复300-600字，结尾留出行动空间，把决定权交给玩家。禁止代替玩家说话、思考、行动。
+2. NPC只依据亲眼所见、亲耳所闻、公开信息或合理来源行动；禁止全知视角、读心、监视。遵守角色扮演守则。
+3. 尊重魔法铁律：不能复活死者、不能凭空造食物/财富、索命咒几乎不可挡（仅爱的保护/魔杖同源/预言豁免）、未成年校外禁魔（踪丝）、不可饶恕咒违法。
+4. 生命值降到0或遭遇必死剧情时，在回复末尾输出：⟦死亡⟧死亡原因简述（爽完模式除外，见难度说明）。
+5. 每回合回复末尾必须输出（放在最后，供系统解析）：
+⟦状态⟧{"hp":数值,"mp":数值,"location":"当前地点","time":"当前时间","money":"金钱","situation":"2-3句详细现状描写（身体/情绪/处境/伤势）","inventory":"物品清单","conditions":["状态标签","…"]}
+6. 有值得记住的新事实时输出：⟦记忆⟧类型|内容（类型限：人物/地点/事件/物品/线索/关系/其他）
+7. 人物关系有实质变化时输出：⟦关系⟧人名|关系现状简述|好感数值(0-100)
+8. 出现新目标/委托时输出：⟦任务⟧任务描述；完成时输出：⟦任务完成⟧任务描述
+9. 回复末尾给出2-3个玩家可能的行动建议：⟦建议⟧行动一 / 行动二 / 行动三
+10. 标签之外不要输出任何格式说明。`;
+}
+
+/* ---------------- AI 调用 ---------------- */
+async function callAI(msgs,opts={}){
+  const ctrl=new AbortController();
+  const useCtrl=opts.signal||ctrl;
+  const body={model:cfg.model,messages:msgs,temperature:0.85,stream:false};
+  if(cfg.maxTokens&&cfg.maxTokens!=='unlimited')body.max_tokens=parseInt(cfg.maxTokens);
+  try{
+    const r=await fetch(cfg.apiEndpoint,{method:'POST',headers:apiHeaders(),body:JSON.stringify(body),signal:useCtrl.signal});
+    if(!r.ok){
+      const t=await r.text().catch(()=>'');
+      let msg='HTTP '+r.status;
+      if(r.status===401)msg='API Key 无效或已过期，请在设置中检查';
+      else if(r.status===429)msg='请求过于频繁（429），请稍后再试';
+      else if(r.status===404)msg='接口地址或模型不存在（404），请检查端点与模型名';
+      throw new Error(msg+(t?(' · '+t.slice(0,120)):''));
+    }
+    const d=await r.json();
+    const msg0=d.choices&&d.choices[0]&&d.choices[0].message?d.choices[0].message:null;
+    const content=msg0?msg0.content:'';
+    if(!content)throw new Error('模型返回为空（可能触发了审查或输出截断）');
+    return {content,reasoning:msg0.reasoning_content||''};
+  }catch(e){
+    if(e.name==='AbortError')return null;
+    throw e;
+  }
+}
+
+/* ---------------- 检查点（关键时间点） ---------------- */
+function pushCheckpoint(label){
+  if(!state)return;
+  state.checkpoints.unshift({
+    id:uid(),label:label||`第${state.turn}回合 · ${state.status.location} · ${state.status.time}`,
+    turn:state.turn,ts:Date.now(),
+    snapshot:deepCopy({history:state.history,log:state.log,memories:state.memories,relations:state.relations,
+      tasks:state.tasks,storySummary:state.storySummary,status:state.status,encyclopedia:state.encyclopedia,turn:state.turn})
+  });
+  if(state.checkpoints.length>MAX_CHECKPOINTS)state.checkpoints.length=MAX_CHECKPOINTS;
+}
+function restoreSnapshot(snap){
+  state.history=snap.history||[];
+  state.log=snap.log||[];
+  state.memories=snap.memories||[];
+  state.relations=snap.relations||{};
+  state.tasks=snap.tasks||[];
+  state.storySummary=snap.storySummary||'';
+  state.status=snap.status||freshStatus();
+  state.encyclopedia=snap.encyclopedia||[];
+  state.turn=snap.turn||0;
+}
+
+/* ---------------- 死亡与回档 ---------------- */
+async function requestDeathReview(rec){
+  if(deathBusy||!state)return;
+  deathBusy=true;
+  try{
+    const box=$('death-review');
+    box.textContent='书记官正在翻阅命运之书，回溯你的轨迹…';
+    const lastActs=state.log.filter(l=>l.kind==='user'||l.kind==='ai').slice(-6)
+      .map(l=>(l.kind==='user'?'【你的行动】':'【剧情】')+l.text).join('\n').slice(-3000);
+    const res=await callAI([
+      {role:'system',content:`你是《霍格沃茨：命运之书》的"命运书记官"，为一位冒险者撰写死亡点评。基于角色档案与死前经过，用犀利但不刻薄、有巫师文学感的语言输出三部分（用以下标题，不要额外说明）：
+【死亡回顾】1-2句简述死者经历了什么。
+【书记点评】2-3句分析这次死亡：决策失误、莽撞、疏忽或纯粹的厄运，点出关键问题。
+【重来建议】给2-3条具体可操作的建议，帮助他/她在回档后活下来或做得更好。
+可引用巫师谚语，语气冷静而有人情味。`},
+      {role:'user',content:`玩家档案：\n${playerCard()}\n\n死因：${rec.cause}\n\n死前经过：\n${lastActs||'（无记录）'}`}
+    ],{silent:true});
+    if(res&&res.content){
+      rec.review=stripTags(res.content);
+      box.innerHTML=nl2br(rec.review);
+    }else{
+      box.textContent='（点评生成失败。不过书记官依然记得：谨慎、观察、量力而行。）';
+    }
+  }catch(e){
+    const box=$('death-review');
+    box.textContent='（点评生成失败：'+e.message+'。不过书记官依然记得：谨慎、观察、量力而行。）';
+  }finally{
+    deathBusy=false;
+    saveState();
+  }
+}
+function handleDeath(cause){
+  if(!state)return;
+  const diff=state.player.difficulty;
+  const rec={
+    id:uid(),ts:Date.now(),turn:state.turn,cause:cause||'未知原因',
+    mode:diff,revive:diff==='一年级新生'?'revive':(diff==='爽完模式'?'god':'rewind'),
+    review:'',checkpointLabel:''
+  };
+  state.deaths.unshift(rec);
+  if(state.deaths.length>30)state.deaths.length=30;
+  // 记录死亡前的最后一个检查点，供快速回档
+  pushCheckpoint('死亡前 · '+state.status.location);
+  addLogEntry('death','☠️ 你死了：'+rec.cause);
+  saveState();
+  showDeathOverlay(rec);
+  requestDeathReview(rec);
+}
+function showDeathOverlay(rec){
+  const diff=state.player.difficulty;
+  $('death-cause').textContent='死因：'+rec.cause;
+  $('death-mode').textContent=diff;
+  $('death-review').textContent='正在回溯你的命运轨迹…';
+  const canRevive=rec.revive==='revive'||rec.revive==='god';
+  const cps=state.checkpoints.slice(0,8);
+  let html='';
+  if(rec.revive==='rewind'){
+    html=cps.map((cp,i)=>`<label class="cp-opt"><input type="radio" name="cp" value="${i}" ${i===0?'checked':''}><span>⏳ ${esc(cp.label)}</span></label>`).join('');
+    if(!html)html='<div class="hint">（尚无检查点，将回到故事开端）</div>';
+  }else if(rec.revive==='god'){
+    html='<div class="hint">🔥 爽完模式豁免：你化作残影消散，随即满状态重现。想死都死不掉。</div>';
+  }else{
+    html='<div class="hint">🌙 庞弗雷夫人把你从鬼门关捞了回来（满血复活，无惩罚）。</div>';
+  }
+  $('death-cp-list').innerHTML=html;
+  $('death-rewind-btn').style.display=rec.revive==='rewind'?'':'none';
+  $('death-revive-btn').style.display=canRevive?'':'none';
+  openModal('death-overlay');
+}
+function doDeathRewind(){
+  const rec=state.deaths[0];
+  if(!rec)return;
+  const sel=document.querySelector('input[name="cp"]:checked');
+  let idx=sel?parseInt(sel.value):0;
+  if(state.player.difficulty==='死亡圣器试炼')idx=Math.min(idx+1,state.checkpoints.length-1);
+  const cp=state.checkpoints[idx]||null;
+  closeModal('death-overlay');
+  restoreSnapshot(cp?cp.snapshot:{history:[],log:[],memories:[],relations:{},tasks:[],storySummary:'',status:freshStatus(),encyclopedia:[],turn:0});
+  addLogEntry('sys','⏳ 时间回溯……命运书记官将你送回了关键时间点：「'+(cp?cp.label:'故事开端')+'」。带着点评与建议，继续你的冒险吧。');
+  rec.checkpointLabel=cp?cp.label:'开局';
+  saveState();
+  renderLog();renderTop();renderCharPanel();renderWorldPanel();
+  toast('⏳ 已回到关键时间点','ok');
+}
+function doDeathRevive(){
+  closeModal('death-overlay');
+  state.status.hp=100;state.status.mp=100;
+  addLogEntry('sys','✨ 你被救回来了。命运书记官在羊皮纸上写下：这一页，暂且翻过。');
+  saveState();renderLog();renderTop();renderCharPanel();renderWorldPanel();
+  toast('✨ 满血复活','ok');
+}
+
+/* ================================================================
+   第五部分：天赋 · 死亡覆盖层 · 创建向导 · 主界面 UI · 游戏主循环
+   ================================================================ */
+const TRAITS=[
+  {k:'magic',n:'魔力',i:'⚡',d:'魔法强度上限：咒语威力、MP 上限'},
+  {k:'will',n:'意志',i:'🛡️',d:'精神抗性：抵抗夺魂咒、摄魂怪影响、大脑封闭术'},
+  {k:'intel',n:'智慧',i:'📚',d:'学习与推理：咒语习得、解谜、魔药成功率、古代魔文'},
+  {k:'dex',n:'敏捷',i:'🌀',d:'施法速度与走位：决斗先手、闪避、飞行（魁地奇）'},
+  {k:'cha',n:'社交',i:'💬',d:'影响力：说服、谈判、好感度、阵营任务'},
+  {k:'cons',n:'体质',i:'❤️',d:'抗打击与耐久：生命值、抗魔生物作战'}
+];
+const traitName=k=>TRAITS.find(t=>t.k===k)?.n||k;
+
+/* ---- 死亡流程覆盖（与 HTML 死亡覆盖层匹配） ---- */
+function handleDeath(cause){
+  if(!state)return;
+  const diff=state.player.difficulty;
+  const rec={
+    id:uid(),ts:Date.now(),turn:state.turn,cause:cause||'未知原因',
+    mode:diff,revive:diff==='一年级新生'?'revive':(diff==='爽完模式'?'god':'rewind'),
+    review:'',checkpointLabel:''
+  };
+  state.deaths.unshift(rec);
+  if(state.deaths.length>30)state.deaths.length=30;
+  pushCheckpoint('死亡前 · '+state.status.location);
+  rec.snapshot=deepCopy(state.checkpoints[0]?state.checkpoints[0].snapshot:null);
+  addLogEntry('death','☠️ 你死了：'+rec.cause);
+  saveState();
+  showDeathOverlay(rec);
+  requestDeathReview(rec);
+}
+let deathSelIdx=0,deathRecId=null;
+function showDeathOverlay(rec){
+  deathRecId=rec.id;deathSelIdx=0;
+  $('death-cause').textContent='死因：'+rec.cause+'　·　难度：'+rec.mode;
+  $('death-review').textContent='正在回溯你的命运轨迹…';
+  const list=$('rewind-list');
+  let html='';
+  const pushItem=(mode,label,meta)=>{
+    html+=`<button class="rewind-item" data-mode="${mode}" onclick="UI.selRewind(this)">
+      <span class="r-radio"></span><span class="r-info"><span class="r-label">${esc(label)}</span><span class="r-meta">${esc(meta)}</span></span></button>`;
+  };
+  if(rec.revive==='god')pushItem('revive','🔥 爽完假死复活','满状态重现 · 想死都死不掉');
+  else if(rec.revive==='revive')pushItem('revive','🌙 原地复活','庞弗雷夫人把你救回 · 满血无惩罚');
+  state.checkpoints.slice(0,8).forEach((cp,i)=>pushItem('rewind:'+i,'⏳ '+cp.label,'第'+cp.turn+'回合 · '+(cp.snapshot.status.time||'')));
+  if(!state.checkpoints.length)pushItem('rewind:-1','📖 回到故事开端','尚无检查点');
+  list.innerHTML=html;
+  openModal('death-overlay');
+}
+function doDeathRewind(){
+  const rec=state.deaths.find(d=>d.id===deathRecId)||state.deaths[0];
+  if(!rec)return;
+  const mode=deathSelIdx>=0&&state.checkpoints[deathSelIdx]?'rewind:'+deathSelIdx:'rewind:-1';
+  if(rec.revive==='revive'&&deathSelIdx===0){doDeathRevive();return;}
+  if(rec.revive==='god'&&deathSelIdx===0){doDeathRevive();return;}
+  let idx=deathSelIdx-1;
+  if(rec.revive!=='god'&&rec.revive!=='revive')idx=deathSelIdx;
+  let cp=null;
+  if(rec.revive==='revive'||rec.revive==='god')cp=idx>=0?state.checkpoints[idx]:null;
+  else cp=state.checkpoints[idx]||null;
+  if(state.player.difficulty==='死亡圣器试炼'&&cp&&idx<state.checkpoints.length-1)cp=state.checkpoints[idx+1]||cp;
+  closeModal('death-overlay');
+  restoreSnapshot(cp?cp.snapshot:{history:[],log:[],memories:[],relations:{},tasks:[],storySummary:'',status:Object.assign(freshStatus(),{money:state.player.moneyStr||state.status.money}),encyclopedia:[],turn:0});
+  addLogEntry('sys','⏳ 时间回溯……命运书记官将你送回了关键时间点：「'+(cp?cp.label:'故事开端')+'」。带着点评与建议，继续你的冒险吧。');
+  rec.checkpointLabel=cp?cp.label:'开局';
+  saveState();
+  renderLog();renderTop();renderCharPanel();renderWorldPanel();
+  toast('⏳ 已回到关键时间点','ok');
+}
+
+/* ================================================================
+   创建向导
+   ================================================================ */
+const STEPS=['step-api','step-char','step-trait','step-custom','step-note','step-diff','step-confirm'];
+const STEP_NAMES=['AI 接口','主角信息','天赋分配','自定义','备注','难度','确认'];
+const draft={gender:'',name:'',age:11,template:'',traits:{},cheat:false,era:'',house:'',wood:'',core:'',len:'',flex:'',pet:'',diff:'',notes:''};
+let stepIdx=0;
+
+function optionCard(v,icon,name,desc,tag,onclick,sub){
+  return `<div class="option-card${sub?'':''}" data-v="${esc(v)}" data-sub="${sub||''}" onclick="${onclick}">
+    ${tag?`<span class="oc-tag">${esc(tag)}</span>`:''}<span class="oc-name">${icon?'<span class="oc-icon">'+icon+'</span>':''}${esc(name)}</span>
+    ${desc?`<div class="oc-desc">${esc(desc)}</div>`:''}</div>`;
+}
+
+const Setup={
+  init(){
+    // 渲染各选项网格
+    const renderGrid=(id,items,key,sub)=>{
+      $(id).innerHTML=items.map(it=>optionCard(it.v,it.i||'',it.n||it.v,it.d||'',it.tag||'',`Setup.pick(this,'${key}')`,sub||(sub===undefined?'':(it.sub||'')))).join('');
+    };
+    renderGrid('grid-template',TEMPLATES,'template');
+    renderGrid('grid-era',ERAS,'era');
+    const houseCards=HOUSES.map(h=>optionCard(h.v,h.i,h.v,h.d+'　'+h.p,h.e,`Setup.pick(this,'house')`,''));
+    houseCards.push(optionCard('__hat__','🎩','让分院帽决定','由 AI 根据你的天赋与背景现场分院','AI',`Setup.aiHouse()`,''));
+    $('grid-house').innerHTML=houseCards.join('');
+    renderGrid('grid-wood',WAND_WOODS,'wood');
+    renderGrid('grid-core',WAND_CORES,'core');
+    $('grid-len').innerHTML=WAND_LENS.map(l=>optionCard(l,'📏',l,'','长度',`Setup.pick(this,'len')`,'len')).join('')
+      +'<div style="grid-column:1/-1;font-size:11px;color:var(--t3);padding-top:2px">柔韧度</div>'
+      +WAND_FLEX.map(f=>optionCard(f,'🎋',f,'','柔韧',`Setup.pick(this,'flex')`,'flex')).join('');
+    renderGrid('grid-pet',PETS,'pet');
+    renderGrid('grid-diff',DIFFS.map(d=>({v:d.v,i:d.i,n:d.v,d:d.d,tag:'伤害'+d.dmg+' 承伤'+d.taken})),'diff');
+    $('cfg-endpoint').value=cfg.apiEndpoint;
+    $('cfg-apikey').value=cfg.apiKey;
+    $('cfg-model').value=cfg.model;
+    $('cfg-maxtokens').value=cfg.maxTokens;
+    $('cfg-reasoning').value=cfg.reasoning||'medium';
+    $('trait-cheat').checked=false;
+    this.renderDots();
+    this.renderStep();
+    this.renderTraits();
+  },
+  renderDots(){
+    $('step-dots').innerHTML=STEPS.map((s,i)=>`<span class="step-dot${i===stepIdx?' on':(i<stepIdx?' done':'')}"></span>`).join('');
+  },
+  renderStep(){
+    STEPS.forEach((s,i)=>$(s).classList.toggle('active',i===stepIdx));
+    this.renderDots();
+    if(STEPS[stepIdx]==='step-confirm')this.renderConfirm();
+    if(STEPS[stepIdx]==='step-custom')this.syncHouseSel();
+  },
+  pick(el,key){
+    el.closest('.option-grid').querySelectorAll('.sel').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');
+    const sub=el.dataset.sub;
+    if(sub){
+      el.closest('.option-grid').querySelectorAll(`[data-sub="${sub}"]`).forEach(x=>x.classList.remove('sel'));
+      el.classList.add('sel');
+      draft[sub]=el.dataset.v;
+    }else{
+      draft[key]=el.dataset.v;
+    }
+    if(key==='gender'&&el.dataset.v==='自定义'){
+      let inp=$('cfg-gender-custom');
+      if(!inp){
+        inp=document.createElement('input');
+        inp.id='cfg-gender-custom';
+        inp.placeholder='输入你的性别设定…';
+        inp.style.cssText='width:100%;margin-top:6px';
+        el.closest('.option-grid').appendChild(inp);
+      }
+    }
+  },
+  syncHouseSel(){
+    if(!draft.house)return;
+    const cards=$('grid-house').querySelectorAll('.option-card');
+    cards.forEach(c=>{
+      c.classList.toggle('sel',c.dataset.v===draft.house||(draft.house==='__hat__'&&c.dataset.v==='__hat__'));
+    });
+  },
+  /* 天赋 */
+  traitTotal(){return TRAITS.reduce((s,t)=>s+(draft.traits[t.k]||0),0);},
+  renderTraits(){
+    const cheat=draft.cheat;
+    $('trait-hint').textContent=cheat?'🧀 作弊模式已开启：天赋点无限，随心所欲地打造天才巫师吧。'
+      :`共 ${START_TRAIT_POINTS} 点天赋，分配到六项能力上（每项 0-${TRAIT_MAX}）。天赋影响剧情判定与 NPC 观感。`;
+    $('points-left').innerHTML=cheat?'剩余天赋点：<b>∞</b>':`剩余天赋点：<b>${START_TRAIT_POINTS-this.traitTotal()}</b>`;
+    $('btn-maxall').style.display=cheat?'':'none';
+    $('trait-list').innerHTML=TRAITS.map(t=>{
+      const v=draft.traits[t.k]||0;
+      const max=cheat?99:TRAIT_MAX;
+      return `<div class="trait-row"><span class="t-icon">${t.i}</span>
+        <span class="t-info"><span class="t-name">${t.n}</span><span class="t-desc">${t.d}</span></span>
+        <span class="t-ctrl">
+          <button class="tp-btn" onclick="Setup.trait('${t.k}',-1)" ${v<=0?'disabled':''}>−</button>
+          <span class="t-val">${v}</span>
+          <button class="tp-btn" onclick="Setup.trait('${t.k}',1)" ${v>=max?'disabled':''}>＋</button>
+        </span></div>`;
+    }).join('');
+  },
+  trait(k,d){
+    const v=(draft.traits[k]||0)+d;
+    const max=draft.cheat?99:TRAIT_MAX;
+    if(v<0||v>max)return;
+    if(!draft.cheat&&this.traitTotal()+d>START_TRAIT_POINTS){toast('天赋点不足','err');return;}
+    draft.traits[k]=v;
+    this.renderTraits();
+  },
+  toggleCheat(){
+    draft.cheat=$('trait-cheat').checked;
+    this.renderTraits();
+  },
+  maxAll(){
+    if(!draft.cheat)return;
+    TRAITS.forEach(t=>{draft.traits[t.k]=99;});
+    this.renderTraits();
+  },
+  /* AI 辅助 */
+  async aiName(){
+    const btn=$('ai-name-btn');
+    btn.disabled=true;btn.textContent='起名中…';
+    try{
+      const g=draft.gender||'';
+      const res=await callAI([{role:'system',content:'你是一位巫师世界命名大师。根据要求给出一个巫师风格的名字（英文名+中文译名均可），2-4个字或词，有魔法气质，避免俗名。只输出名字本身，不要解释。'},
+        {role:'user',content:'请为一位'+(g?'「'+g+'」':'')+'巫师新生起名。'}]);
+      if(res&&res.content){
+        const m=res.content.match(/[A-Za-z\u00C0-\u024F' -]{2,30}|[\u4e00-\u9fa5·]{2,8}/);
+        if(m)$('cfg-name').value=m[0].trim();
+      }
+    }catch(e){toast('起名失败：'+e.message,'err');}
+    btn.disabled=false;btn.textContent='🎲 AI 起名';
+  },
+  async aiNote(){
+    const btn=$('ai-note-btn');
+    btn.disabled=true;btn.textContent='生成中…';
+    try{
+      const t=TRAITS.map(x=>x.n+(draft.traits[x.k]||0)).join('/');
+      const res=await callAI([{role:'system',content:'你是霍格沃茨的入学档案撰写人。根据学生信息生成一段 150 字左右的人物背景档案：家庭与出身、性格特质、一个藏在心底的愿望或秘密。用第二人称，文学化但克制，不堆砌形容词。只输出档案正文。'},
+        {role:'user',content:`姓名：${draft.name||'（未定）'}　性别：${draft.gender||'未定'}　身份模板：${draft.template||'未定'}　时代：${draft.era||'未定'}　学院：${draft.house||'未定'}
+天赋：${t}　魔杖：${draft.wood||'?'}木/${draft.core||'?'}杖芯
+已写备注：${draft.notes||'（无）'}`}]);
+      if(res&&res.content){$('cfg-note').value=stripTags(res.content);draft.notes=$('cfg-note').value;}
+    }catch(e){toast('生成失败：'+e.message,'err');}
+    btn.disabled=false;btn.textContent='🪄 让 AI 基于以上选择生成背景';
+  },
+  async aiHouse(){
+    const t=TRAITS.map(x=>x.n+(draft.traits[x.k]||0)).join('/');
+    toast('🎩 分院帽正在考量你的内心…');
+    try{
+      const res=await callAI([{role:'system',content:'你是霍格沃茨的分院帽。根据学生的天赋与性格，从四学院（格兰芬多/赫奇帕奇/拉文克劳/斯莱特林）中选出最合适的，并给出 30 字以内的理由。输出格式：学院名|理由。不要输出其他内容。'},
+        {role:'user',content:`天赋：${t}\n备注：${draft.notes||'（无）'}`}]);
+      if(res&&res.content){
+        const m=res.content.match(/(格兰芬多|赫奇帕奇|拉文克劳|斯莱特林)/);
+        if(m){
+          draft.house=m[1];
+          this.syncHouseSel();
+          toast('🎩 分院帽高喊：「'+m[1]+'！」'+(res.content.split('|')[1]||'').slice(0,30),'ok');
+        }else{toast('分院帽犹豫了，请重试','err');}
+      }
+    }catch(e){toast('分院失败：'+e.message,'err');}
+  },
+  /* API 辅助（按钮入口） */
+  async fetchModels(){
+    const btn=event.target;
+    btn.disabled=true;btn.textContent='拉取中…';
+    try{
+      const list=await window.fetchModels();
+      const sel=$('cfg-model');
+      if(list&&list.length){
+        sel.innerHTML='';
+        list.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
+        $('model-hint').textContent='✅ 拉取到 '+list.length+' 个模型：'+list.slice(0,8).join('、');
+        toast('✅ 拉取到 '+list.length+' 个模型','ok');
+      }
+    }catch(e){
+      $('model-hint').textContent='❌ '+e.message;
+      toast('❌ 拉取失败：'+e.message,'err');
+    }
+    btn.disabled=false;btn.textContent='↻ 拉取模型列表';
+  },
+  async testApi(){
+    await testConnection();
+  },
+  /* 步骤导航 */
+  next(){
+    const step=STEPS[stepIdx];
+    if(step==='step-api'){
+      cfg.apiEndpoint=$('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+      cfg.apiKey=cleanApiKey($('cfg-apikey').value);
+      cfg.model=$('cfg-model').value||'deepseek-chat';
+      cfg.maxTokens=$('cfg-maxtokens').value;
+      cfg.reasoning=$('cfg-reasoning').value;
+      saveCfg();
+    }
+    if(step==='step-char'){
+      draft.name=$('cfg-name').value.trim();
+      draft.age=parseInt($('cfg-age').value)||11;
+      if(!draft.name){toast('请先填写姓名','err');return;}
+      draft.gender=draft.gender||'男';
+      if(draft.gender==='自定义'){
+        const gi=$('cfg-gender-custom');
+        if(gi&&gi.value.trim())draft.gender=gi.value.trim();
+      }
+      if(!draft.template){toast('请选择身份模板','err');return;}
+    }
+    if(step==='step-trait'){
+      if(!draft.cheat&&this.traitTotal()>START_TRAIT_POINTS){toast('天赋点超限','err');return;}
+    }
+    if(step==='step-custom'){
+      draft.era=draft.era||ERAS[0].v;
+      draft.house=draft.house||HOUSES[0].v;
+      draft.wood=draft.wood||WAND_WOODS[0].v;
+      draft.core=draft.core||WAND_CORES[0].v;
+      draft.len=draft.len||WAND_LENS[2];
+      draft.flex=draft.flex||WAND_FLEX[1];
+      draft.pet=draft.pet||'无宠物';
+    }
+    if(step==='step-note')draft.notes=$('cfg-note').value.trim();
+    if(step==='step-diff')draft.diff=draft.diff||'霍格沃茨学生';
+    if(stepIdx<STEPS.length-1){stepIdx++;this.renderStep();window.scrollTo(0,0);}
+  },
+  prev(){
+    if(stepIdx>0){stepIdx--;this.renderStep();window.scrollTo(0,0);}
+  },
+  /* 确认页 */
+  renderConfirm(){
+    const tpl=TEMPLATES.find(x=>x.v===draft.template);
+    const h=HOUSES.find(x=>x.v===draft.house);
+    const era=ERAS.find(x=>x.v===draft.era);
+    const diff=DIFFS.find(x=>x.v===draft.diff);
+    const cards=[
+      {t:'👤 主角',kvs:[['姓名',draft.name||'—'],['性别',draft.gender||'—'],['年龄',draft.age+' 岁'],['身份模板',draft.template||'—'],['学院',draft.house||'—']]},
+      {t:'🪄 魔杖与伙伴',kvs:[['魔杖',`${draft.wood||'?'}木 · ${draft.core||'?'}杖芯`],['长度/柔韧',`${draft.len||'?'} · ${draft.flex||'?'}`],['宠物',draft.pet||'—']]},
+      {t:'⚡ 天赋',kvs:TRAITS.map(x=>[x.n,draft.traits[x.k]||0])},
+      {t:'📜 时代与难度',kvs:[['时代',(era&&era.n)||draft.era||'—'],['难度',(diff&&diff.i||'')+' '+(draft.diff||'—')],['开局资金',tpl?tpl.money:'120 加隆']]},
+      {t:'📝 备注',kvs:[['档案',draft.notes||'（无）']],wide:true},
+      {t:'🧀 作弊',kvs:[['无限天赋点',draft.cheat?'已开启':'未开启']]}
+    ];
+    $('confirm-grid').innerHTML=cards.map(c=>`<div class="confirm-card${c.wide?' wide':''}">
+      <h4>${c.t}<span class="edit-link" onclick="Setup.jump('${c.jump||''}')">${c.jump?'修改':''}</span></h4>
+      ${c.kvs.map(kv=>`<div class="kv"><b>${esc(kv[0])}：</b>${esc(String(kv[1]))}</div>`).join('')}</div>`).join('');
+  },
+  jump(){},
+  /* 开始 */
+  start(){
+    if(!draft.name||!draft.template){toast('请完善角色信息','err');return;}
+    const tpl=TEMPLATES.find(x=>x.v===draft.template);
+    const bonus={};
+    if(tpl&&tpl.bonus){
+      const bm=tpl.bonus.match(/^([\u4e00-\u9fa5]+)(\+(\d+))?$/);
+      const nm=tpl.bonus.replace(/[+\d]/g,'');
+      const key=TRAITS.find(t=>t.n===nm)?.k;
+      if(key)bonus[key]=(parseInt((tpl.bonus.match(/\d+/)||['2'])[0])||2);
+    }
+    const traits={};
+    TRAITS.forEach(t=>{traits[t.k]=(draft.traits[t.k]||0)+(bonus[t.k]||0);});
+    const moneyNum=tpl?parseInt((tpl.money.match(/\d+/)||['120'])[0]):120;
+    const eraV=draft.era||'1991';
+    const st=freshStatus();
+    st.money=moneyNum+' 加隆';
+    if(eraV==='1998')st.time='1998年9月1日 上午';
+    else if(eraV==='1926')st.time='1926年9月1日 上午';
+    else st.time='1991年9月1日 上午';
+    st.inventory='录取通知书、旧皮箱、全套课本、坩埚、望远镜、'+((draft.pet&&draft.pet!=='无宠物')?draft.pet+'、':'')+'魔杖';
+    state=freshState();
+    state.player={
+      name:draft.name,gender:draft.gender,age:draft.age,
+      blood:{'纯血世家子':'纯血','混血平民':'混血','麻瓜出身':'麻瓜出身','哑炮后裔':'哑炮家族后裔'}[draft.template]||'混血',
+      template:draft.template,house:draft.house,era:eraV,
+      wand:{wood:draft.wood,core:draft.core,len:draft.len,flex:draft.flex},
+      pet:draft.pet,traits,cheat:draft.cheat,notes:draft.notes,difficulty:draft.diff||'霍格沃茨学生',
+      moneyStr:st.money
+    };
+    state.status=st;
+    state.started=true;
+    state.opened=false;
+    saveCfg();saveState();
+    enterGame();
+  }
+};
+window.Setup=Setup;
+
+/* ================================================================
+   渲染函数
+   ================================================================ */
+function renderTop(){
+  const s=state.status;
+  $('loc-display').textContent='📍 '+(s.location||'—');
+  const hp=clamp(s.hp,0,999),mp=clamp(s.mp,0,999);
+  $('hp-t').textContent=hp+'/100';
+  $('mp-t').textContent=mp+'/100';
+  $('hp-b').style.width=Math.min(100,hp)+'%';
+  $('mp-b').style.width=Math.min(100,mp)+'%';
+}
+function houseIcon(){const h=HOUSES.find(x=>x.v===state.player.house);return h?h.i:'🧙';}
+function renderLog(){
+  const box=$('game-log');
+  box.innerHTML=state.log.map((e,i)=>{
+    if(e.kind==='sys')return `<div class="log-entry"><div class="log-sys">${esc(e.text)}</div></div>`;
+    if(e.kind==='death')return `<div class="log-entry"><div class="log-sys death">${esc(e.text)}</div></div>`;
+    if(e.kind==='user')return `<div class="log-entry"><div class="msg user"><div class="ava">🧙</div><div class="bubble">${nl2br(e.text)}</div></div></div>`;
+    if(e.kind==='ai'){
+      const isLast=i===state.log.length-1;
+      const acts=isLast?`<div class="msg-actions"><button onclick="Game.regen()">🔄 重新生成</button><button onclick="Game.edit()">✏️ 修改输入</button></div>`:'';
+      const think=e.think&&e.think.trim()?`<details class="think-box"><summary>🧠 AI 思考过程</summary><div class="think-body">${nl2br(e.think)}</div></details>`:'';
+      return `<div class="log-entry"><div class="msg"><div class="ava">${houseIcon()}</div><div class="bubble">${think}<div class="np">命运书记官</div>${nl2br(e.text)}</div></div>${acts}</div>`;
+    }
+    return '';
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+let lastSuggests=[];
+function renderQuickActions(){
+  const chips=lastSuggests.length?lastSuggests:['观察四周','和身边的人打招呼','翻开课本预习','去找教授聊聊'];
+  $('quick-actions').innerHTML=chips.map(c=>`<button class="chip" onclick="Game.send(this.textContent)" ${apiBusy?'disabled':''}>${esc(c)}</button>`).join('');
+}
+function renderCharPanel(){
+  const p=state.player,s=state.status;
+  const h=HOUSES.find(x=>x.v===p.house);
+  const era=ERAS.find(x=>x.v===p.era);
+  const diff=DIFFS.find(x=>x.v===p.difficulty);
+  const rels=Object.values(state.relations);
+  const conds=(s.conditions||[]).map(c=>{
+    const bad=/伤|痛|中毒|诅咒|疲惫|恐惧|虚弱|流血|昏迷|中毒|惊慌|沮丧|绝望/.test(c);
+    const good=/好|佳|兴奋|自信|愉快|冷静|充沛/.test(c);
+    return `<span class="cond-chip ${bad?'bad':good?'good':''}">${esc(c)}</span>`;
+  }).join('');
+  $('char-panel').innerHTML=`
+  <div class="panel-card" style="text-align:center">
+    <div style="font-size:34px">${h?h.i:'🧙'}</div>
+    <div style="font-size:17px;font-weight:700;font-family:var(--serif);color:var(--gold)">${esc(p.name)}</div>
+    <div class="hint" style="margin-top:2px">${esc(p.gender)} · ${p.age}岁 · ${esc(p.blood)}血统 · 一年级</div>
+    <div class="hint">${esc(p.template)} · ${era?era.v:''} 时代</div>
+    ${h?`<div class="hint" style="color:${h.c}">${h.i} ${h.v} · 元素${h.e}</div>`:''}
+  </div>
+  <div class="panel-card"><h3>🪄 魔杖与伙伴</h3>
+    <div class="kv"><b>魔杖：</b>${esc(p.wand.wood)}木 · ${esc(p.wand.core)}杖芯 · ${esc(p.wand.len)} · ${esc(p.wand.flex)}</div>
+    <div class="kv"><b>宠物：</b>${esc(p.pet)}</div>
+    <div class="kv"><b>难度：</b>${diff?diff.i+' '+esc(p.difficulty):''}${p.cheat?'　🧀作弊':''}</div>
+  </div>
+  <div class="panel-card"><h3>⚡ 天赋六维</h3>
+    ${TRAITS.map(t=>{const v=p.traits[t.k]||0;const pct=Math.min(100,v/(p.cheat?99:10)*100);
+      return `<div class="stat-row"><span class="stat-label">${t.i}${t.n}</span><span class="sbar"><div style="width:${pct}%;background:var(--gold)"></div></span><span class="stat-val">${v}</span></div>`;}).join('')}
+  </div>
+  <div class="panel-card"><h3>🕯️ 当前状况</h3>
+    <div class="stat-row"><span class="stat-label">❤️生命</span><span class="sbar"><div style="width:${Math.min(100,s.hp||0)}%;background:var(--hp)"></div></span><span class="stat-val">${Math.round(s.hp||0)}</span></div>
+    <div class="stat-row"><span class="stat-label">✨魔力</span><span class="sbar"><div style="width:${Math.min(100,s.mp||0)}%;background:var(--mp)"></div></span><span class="stat-val">${Math.round(s.mp||0)}</span></div>
+    <div class="kv"><b>时间：</b>${esc(s.time||'—')}</div>
+    <div class="kv"><b>地点：</b>${esc(s.location||'—')}</div>
+    <div class="kv"><b>金钱：</b>${esc(s.money||'—')}</div>
+    <div style="margin:8px 0 6px;font-size:12px;color:var(--t3)">— 详细现状 —</div>
+    <div class="situation-box">${esc(s.situation||'暂无记录')}</div>
+    <div style="margin-top:8px">${conds||'<span class="hint">（无特殊状态）</span>'}</div>
+  </div>
+  <div class="panel-card"><h3>🎒 随身物品</h3><div class="inv-box">${esc(s.inventory||'无')}</div></div>
+  <div class="panel-card"><h3>💗 人物关系</h3>
+    ${rels.length?rels.map(r=>`<div class="relation-row"><span class="r-name">${esc(r.name)}</span><span class="r-bar"><div style="width:${r.val}%"></div></span><span class="r-val">${r.val}</span><span class="r-desc">${esc(r.desc||'')}</span></div>`).join(''):'<span class="hint">（暂无关系记录）</span>'}
+  </div>
+  ${p.notes?`<div class="panel-card"><h3>📝 角色档案</h3><div class="inv-box">${esc(p.notes)}</div></div>`:''}
+  <div class="hint" style="text-align:center">状况随剧情实时更新 · 由 AI 每回合同步</div>`;
+}
+function renderWorldPanel(){
+  const s=state.status;
+  const rels=Object.values(state.relations);
+  $('world-panel').innerHTML=`
+  <div class="panel-card"><h3>📍 当前处境</h3>
+    <div class="kv"><b>地点：</b>${esc(s.location||'—')}</div>
+    <div class="kv"><b>时间：</b>${esc(s.time||'—')}</div>
+    <div class="kv"><b>回合：</b>第 ${state.turn} 回合 · 难度：${esc(state.player.difficulty)}</div>
+  </div>
+  <div class="panel-card"><h3>🎯 当前目标</h3>
+    ${state.tasks.length?state.tasks.map(t=>`<div class="task-row${t.done?' done':''}" onclick="Game.toggleTask('${t.id}')">${t.done?'✔':'○'} ${esc(t.desc)}</div>`).join(''):'<span class="hint">（暂无目标，让故事自然展开）</span>'}
+  </div>
+  <div class="panel-card"><h3>📔 近期记忆</h3>
+    ${state.memories.slice(-8).reverse().map(m=>`<div class="mem-item"><span class="m-type">${TYPE_ICON[m.type]||'📌'}</span><span class="m-text">${esc(m.text)}</span></div>`).join('')||'<span class="hint">（暂无记忆）</span>'}
+  </div>
+  <div class="panel-card"><h3>💗 关系速览</h3>
+    ${rels.length?rels.slice(0,6).map(r=>`<div class="kv"><b>${esc(r.name)}</b> ${r.val}/100 — ${esc(r.desc||'')}</div>`).join(''):'<span class="hint">（暂无）</span>'}
+  </div>`;
+}
+
+/* ================================================================
+   游戏主循环
+   ================================================================ */
+const Game={
+  genCtrl:null,
+  setBusy(b){
+    apiBusy=b;
+    $('send-btn').disabled=b;
+    $('loading-indicator').classList.toggle('on',b);
+    $('stop-btn').style.display=b?'':'none';
+    renderQuickActions();
+  },
+  send(text){
+    if(apiBusy||!state)return;
+    text=(text||$('user-input').value).trim();
+    if(!text)return;
+    $('user-input').value='';
+    this.genCtrl=new AbortController();
+    lastSnap=deepCopy({history:state.history,log:state.log,memories:state.memories,relations:state.relations,tasks:state.tasks,storySummary:state.storySummary,status:state.status,turn:state.turn});
+    lastUserText=text;
+    pushCheckpoint();
+    state.history.push({role:'user',content:text});
+    addLogEntry('user',text);
+    renderLog();
+    this.setBusy(true);
+    this.request(text).then(ok=>{
+      this.setBusy(false);
+      if(!ok){
+        // 失败/停止：撤销本条用户输入，保持剧情一致
+        state.history.pop();
+        state.log.pop();
+        $('user-input').value=lastUserText;
+        renderLog();
+      }
+    });
+  },
+  async request(userText){
+    try{
+      const res=await callAI([{role:'system',content:buildSystemPrompt()}].concat(state.history),{signal:this.genCtrl.signal});
+      if(!res){addLogEntry('sys','⏹ 已停止生成。');renderLog();return false;}
+      const content=res.content;
+      const clean=stripTags(content);
+      state.history.push({role:'assistant',content});
+      addLogEntry('ai',clean,{think:res.reasoning||''});
+      const p=parseResponse(content);
+      applyParsed(p);
+      lastSuggests=p.suggests;
+      state.turn++;
+      saveState();
+      renderLog();renderTop();renderCharPanel();renderWorldPanel();renderQuickActions();
+      if(p.death)handleDeath(p.death);
+      if(state.history.length>MAX_HISTORY)compressHistory();
+      return true;
+    }catch(e){
+      addLogEntry('sys','❌ 生成失败：'+e.message);
+      renderLog();
+      toast('❌ '+e.message,'err');
+      return false;
+    }
+  },
+  stopGen(){
+    if(this.genCtrl){this.genCtrl.abort();this.genCtrl=null;}
+  },
+  regen(){
+    if(apiBusy||!lastSnap)return;
+    restoreSnapshot(lastSnap);
+    renderLog();renderTop();renderCharPanel();renderWorldPanel();
+    this.send(lastUserText);
+  },
+  edit(){
+    if(apiBusy||!lastSnap)return;
+    restoreSnapshot(lastSnap);
+    renderLog();renderTop();renderCharPanel();renderWorldPanel();
+    $('user-input').value=lastUserText;
+    $('user-input').focus();
+    toast('✏️ 已恢复上一条输入，可修改后重发');
+  },
+  rollDice(){
+    const n=Math.floor(Math.random()*20)+1;
+    const inp=$('user-input');
+    inp.value=(inp.value?inp.value+' ':'')+`[掷骰 D20 → ${n}]`;
+    inp.focus();
+  },
+  toggleTask(id){
+    const t=state.tasks.find(x=>x.id===id);
+    if(t){t.done=!t.done;saveState();renderWorldPanel();}
+  },
+  saveNow(){
+    if(!state)return;
+    state.lastSave=Date.now();
+    saveState();
+    toast('💾 已立即存档','ok');
+  },
+  doRewind(){doDeathRewind();}
+};
+window.Game=Game;
+
+/* ================================================================
+   UI 对象
+   ================================================================ */
+const UI={
+  closeModal(id){closeModal(id);},
+  openModal(id){openModal(id);},
+  closeConfirm(){closeModal('confirm-overlay');confirmCb=null;},
+  confirmOk(){closeModal('confirm-overlay');const cb=confirmCb;confirmCb=null;if(cb)cb();},
+  closeDeathsModal2(){closeModal('death-overlay');this.openDeaths();},
+  selRewind(el){
+    el.closest('.rewind-list').querySelectorAll('.rewind-item').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');
+    deathSelIdx=parseInt(el.dataset.mode.replace('rewind:',''))+1;
+  },
+  togglePanel(side){
+    const p=$(side==='left'?'left-panel':'right-panel');
+    const open=p.classList.toggle('open');
+    $('drawer-backdrop').classList.toggle('on',open);
+  },
+  closePanels(){$('left-panel').classList.remove('open');$('right-panel').classList.remove('open');$('drawer-backdrop').classList.remove('on');},
+  /* 百科 */
+  encyCat:'全部',encyQ:'',
+  openEncy(){this.renderEncy();openModal('ency-modal');},
+  renderEncy(){
+    const cats=['全部'].concat(ENCY.map(e=>e.cat),state.encyclopedia.length?['玩家见闻']:[]);
+    const items=ENCY.concat(state.encyclopedia.length?[{cat:'玩家见闻',icon:'✍️',items:state.encyclopedia}]:[]);
+    const q=this.encyQ.trim();
+    const cat=this.encyCat;
+    const list=items.filter(c=>cat==='全部'||c.cat===cat)
+      .flatMap(c=>c.items.filter(it=>!q||it.n.includes(q)||it.d.includes(q)).map(it=>({cat:c.cat,icon:c.icon,...it})));
+    $('ency-content').innerHTML=`
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input id="ency-q" placeholder="搜索词条…" value="${esc(q)}" oninput="UI.encyQ=this.value;UI.renderEncy()" style="flex:1">
+      </div>
+      <div class="ency-cats">${cats.map(c=>`<button class="ency-cat${c===cat?' on':''}" onclick="UI.encyCat='${c}';UI.renderEncy()">${esc(c)}</button>`).join('')}</div>
+      ${list.length?list.map(it=>`<details class="ency-item"><summary><span class="e-icon">${it.icon}</span>${esc(it.n)}<span class="e-arrow">▶</span></summary><div class="e-body">${esc(it.d)}</div></details>`).join('')
+        :'<div class="hint" style="text-align:center;padding:20px">没有匹配的词条。</div>'}`;
+  },
+  addEncy(){
+    $('ency-content').innerHTML=`
+      <div style="margin-bottom:10px" class="setting-group"><h4>✍️ 新增词条（记录剧情中的见闻/新人物/新地点）</h4>
+        <label>词条名</label><input id="eny-n" placeholder="例如：禁林深处的神秘树屋">
+        <label>内容</label><textarea id="eny-d" rows="4" placeholder="描述这个词条…"></textarea>
+        <div class="btn-row" style="margin-top:10px"><button class="btn small jade" onclick="UI.saveEncy()">保存词条</button><button class="btn small" onclick="UI.renderEncy()">返回</button></div>
+      </div>`;
+  },
+  saveEncy(){
+    const n=$('eny-n').value.trim(),d=$('eny-d').value.trim();
+    if(!n){toast('请填写词条名','err');return;}
+    state.encyclopedia.push({n,d});saveState();this.encyCat='玩家见闻';this.renderEncy();toast('✅ 词条已记录','ok');
+  },
+  /* 记忆 */
+  memCat:'全部',
+  openMemory(){this.renderMemory();openModal('mem-modal');},
+  renderMemory(){
+    const cats=['全部'].concat(Object.keys(TYPE_ICON));
+    const list=state.memories.filter(m=>this.memCat==='全部'||m.type===this.memCat);
+    $('mem-content').innerHTML=`
+      <div class="ency-cats">${cats.map(c=>`<button class="ency-cat${c===this.memCat?' on':''}" onclick="UI.memCat='${c}';UI.renderMemory()">${esc(c)}</button>`).join('')}</div>
+      ${list.length?list.slice().reverse().map((m,i)=>{
+        const realIdx=state.memories.indexOf(m);
+        return `<div class="mem-item"><span class="m-type">${TYPE_ICON[m.type]||'📌'}</span><span class="m-text">${esc(m.text)}</span><span class="m-del" onclick="UI.delMemory(${realIdx})">✕</span></div>`;
+      }).join(''):'<div class="hint" style="text-align:center;padding:20px">（暂无记忆。AI 每回合会把值得记住的事归档到这里。）</div>'}`;
+  },
+  delMemory(i){
+    if(i>=0&&i<state.memories.length){state.memories.splice(i,1);saveState();this.renderMemory();}
+  },
+  addMemory(){
+    $('mem-content').innerHTML=`
+      <div class="setting-group"><h4>✍️ 手动记录一条记忆</h4>
+        <label>类型</label><select id="mem-type">${Object.keys(TYPE_ICON).map(t=>`<option value="${t}">${TYPE_ICON[t]} ${t}</option>`).join('')}</select>
+        <label>内容</label><textarea id="mem-text" rows="3" placeholder="例如：赫敏借给我一本《霍格沃茨：一段校史》"></textarea>
+        <div class="btn-row" style="margin-top:10px"><button class="btn small jade" onclick="UI.saveMemory()">保存</button><button class="btn small" onclick="UI.renderMemory()">返回</button></div>
+      </div>`;
+  },
+  saveMemory(){
+    const t=$('mem-type').value,d=$('mem-text').value.trim();
+    if(!d){toast('请填写内容','err');return;}
+    addMemory(t,d);saveState();this.renderMemory();toast('✅ 已记录','ok');
+  },
+  /* 死亡记录 */
+  openDeaths(){this.renderDeaths();openModal('deaths-modal');},
+  renderDeaths(){
+    const ds=state.deaths;
+    $('deaths-content').innerHTML=ds.length?ds.map((d,i)=>`
+      <div class="death-card"><h4>☠️ 第 ${ds.length-i} 次死亡 · ${esc(d.mode)}</h4>
+        <div class="d-meta">第 ${d.turn} 回合 · ${new Date(d.ts).toLocaleString()} · 死因：${esc(d.cause)}</div>
+        ${d.checkpointLabel?`<div class="d-meta">已回档至：${esc(d.checkpointLabel)}</div>`:''}
+        ${d.review?`<div class="d-review">${esc(d.review)}</div>`:''}
+        <div class="d-actions"><button class="btn small" onclick="UI.rewindDeath(${i})">⏳ 回到这次死亡前</button></div>
+      </div>`).join('')
+      :'<div class="hint" style="text-align:center;padding:20px">（还没有死亡记录。愿你的冒险平安——但若命运转弯，书记官会为你点评。）</div>';
+  },
+  rewindDeath(i){
+    const d=state.deaths[i];
+    if(!d)return;
+    confirmDialog('时间回溯','将回到第 '+d.turn+' 回合（'+esc(d.cause)+' 之前）的状态，继续冒险。确定吗？',()=>{
+      const snap=d.snapshot||(state.checkpoints.length?state.checkpoints[state.checkpoints.length-1].snapshot:null);
+      closeModal('deaths-modal');
+      restoreSnapshot(snap||{history:[],log:[],memories:[],relations:{},tasks:[],storySummary:'',status:Object.assign(freshStatus(),{money:state.player.moneyStr}),encyclopedia:[],turn:0});
+      d.checkpointLabel='死亡前';
+      addLogEntry('sys','⏳ 命运之书翻回「'+d.checkpointLabel+'」那一页……继续冒险吧。');
+      saveState();renderLog();renderTop();renderCharPanel();renderWorldPanel();
+      toast('⏳ 已回溯','ok');
+    },'回到过去');
+  },
+  /* 设置 */
+  openSettings(){
+    const c=cfg;
+    const th=THEMES.map(t=>`<button class="theme-swatch${c.theme===t.v?' on':''}" data-v="${t.v}" onclick="UI.setTheme('${t.v}')"><div class="sw-dot" style="background:${t.c};border-color:${t.a}"></div>${t.n}</button>`).join('');
+    $('settings-content').innerHTML=`
+      <div class="setting-group"><h4>🔌 AI 接口</h4>
+        <label>API 端点</label><input id="s-endpoint" value="${esc(c.apiEndpoint)}" spellcheck="false">
+        <label>API Key</label><input id="s-apikey" type="password" value="${esc(c.apiKey)}" spellcheck="false">
+        <label>模型</label><div style="display:flex;gap:6px"><input id="s-model" value="${esc(c.model)}" style="flex:1" spellcheck="false"><button class="btn small" onclick="UI.pullModels()">↻ 拉取</button></div>
+        <div class="g2" style="gap:8px">
+          <div><label>输出 Token 限制</label><select id="s-maxtokens">
+            <option value="unlimited">♾️ 无限制</option><option value="2048">2048</option><option value="4096">4096</option>
+            <option value="8192">8192</option><option value="16384">16384</option><option value="32768">32768</option></select></div>
+          <div><label>推理强度</label><select id="s-reasoning"><option value="low">低</option><option value="medium">适中</option><option value="high">高</option></select></div>
+        </div>
+        <div class="btn-row" style="margin-top:10px"><button class="btn small" onclick="UI.testApi()">⚡ 测试连接</button><button class="btn small jade" onclick="UI.saveSettings()">保存 API 设置</button></div>
+      </div>
+      <div class="setting-group"><h4>🎨 界面风格</h4><div class="theme-row">${th}</div></div>
+      <div class="setting-group"><h4>💾 存档管理</h4>
+        <div class="kv"><b>自动存档：</b>${c.autoSave?'开启':'关闭'} · 最近存档：${state&&state.lastSave?new Date(state.lastSave).toLocaleString():'—'}</div>
+        <div class="btn-row">
+          <button class="btn small" onclick="UI.toggleAutoSave()">${c.autoSave?'⏸ 关闭自动存档':'▶ 开启自动存档'}</button>
+          <button class="btn small" onclick="Game.saveNow()">💾 立即存档</button>
+        </div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn small" onclick="exportSave()">⬇ 导出存档</button>
+          <button class="btn small" onclick="importSave()">⬆ 导入存档</button>
+        </div>
+        <div style="margin-top:8px"><button class="btn small danger" style="width:100%" onclick="restartGame()">🔄 重新开始（清除全部进度）</button></div>
+        <div style="margin-top:8px"><button class="btn small" style="width:100%" onclick="UI.openGuide()">📜 玩法指南（操作说明与系统介绍）</button></div>
+        <div class="hint" style="margin-top:6px">导出为 JSON 文件可备份或换设备；导入会覆盖当前进度。</div>
+      </div>`;
+    $('s-maxtokens').value=c.maxTokens;
+    $('s-reasoning').value=c.reasoning||'medium';
+    openModal('settings-modal');
+  },
+  saveSettings(){
+    const raw=$('s-apikey').value.trim();
+    cfg.apiEndpoint=$('s-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    cfg.apiKey=cleanApiKey(raw);
+    cfg.model=$('s-model').value.trim()||'deepseek-chat';
+    cfg.maxTokens=$('s-maxtokens').value;
+    cfg.reasoning=$('s-reasoning').value;
+    modelsCache=null;
+    saveCfg();
+    this.closeModal('settings-modal');
+    toast('✅ 设置已保存'+(raw!==cfg.apiKey?'（已清理 Key 中的非法字符）':''),'ok');
+  },
+  setTheme(t){cfg.theme=t;applyTheme(t);saveCfg();this.openSettings();},
+  toggleAutoSave(){cfg.autoSave=!cfg.autoSave;saveCfg();this.openSettings();toast(cfg.autoSave?'✅ 自动存档已开启':'自动存档已关闭');},
+  async pullModels(){
+    const btn=event.target;
+    btn.disabled=true;btn.textContent='拉取中…';
+    try{
+      const list=await fetchModels();
+      const sel=$('s-model');
+      if(list.length){sel.value=list[0];toast('✅ 拉到 '+list.length+' 个模型：'+list.slice(0,8).join(', '),'ok');}
+    }catch(e){toast('❌ '+e.message,'err');}
+    btn.disabled=false;btn.textContent='↻ 拉取';
+  },
+  async testApi(){
+    await testConnection();
+  },
+  /* 指南 */
+  openGuide(){
+    $('guide-content').innerHTML=`
+      <p><b>📖 这是什么？</b>以哈利·波特世界观为蓝本的 AI 角色扮演游戏。你扮演一位霍格沃茨新生，AI 担任"命运书记官"——既是旁白，也是所有 NPC。</p>
+      <p><b>🎮 怎么玩？</b>在下方输入框描述你的行动（如"观察四周""向赫敏借课本""去禁书区找线索"），AI 会推进剧情。也可点击快捷行动按钮。</p>
+      <p><b>🪄 自由施法：</b>你可以直接喊咒语（如"对着锁念阿拉霍洞开"），AI 会按世界观判定。咒语有难度与风险，别在走廊里放厉火。</p>
+      <p><b>🧠 记忆系统：</b>AI 每回合会把值得记住的事实归档（人物/地点/事件/物品/线索/关系）。点顶栏"记忆"查看；重要事实会持续注入 AI 的上下文。</p>
+      <p><b>📖 世界百科：</b>收录官方设定的咒语、生物、地点、法律等词条，可随时查阅，也可记录你的"玩家见闻"。</p>
+      <p><b>💀 死亡与回档：</b>死亡后命运书记官会点评你的行为，你可以选择回到任意关键时间点（检查点）重新冒险。顶栏"死亡记录"可查看全部死亡档案。</p>
+      <p><b>👤 角色页：</b>左上角"角色"按钮查看你的详细档案与实时更新的当前状况（生命/魔力/状态/物品/关系）。</p>
+      <p><b>⚙️ 设置：</b>右上角齿轮：API 配置、界面风格（4 套主题）、自动存档、存档导入导出、重新开始。</p>
+      <p><b>💡 提示：</b>行动越具体，剧情越精彩；NPC 有自己的信息边界，不会读心；重大选择会被记录并影响后续。作弊模式开启后，你就是造物主的宠儿。</p>`;
+    openModal('guide-modal');
+  }
+};
+window.UI=UI;
+UI.closeModal=closeModal;
+UI.openModal=openModal;
+
+/* ================================================================
+   进入游戏 / 引导 / 启动
+   ================================================================ */
+function enterGame(){
+  $('setup-overlay').style.display='none';
+  $('app').classList.add('on');
+  renderLog();renderTop();renderCharPanel();renderWorldPanel();renderQuickActions();
+  if(!state.opened){
+    state.opened=true;
+    pushCheckpoint('故事开端 · 入学之日');
+    addLogEntry('sys','📖 命运之书缓缓展开……'+new Date().toLocaleString()+'，你的故事开始了。');
+    saveState();
+    openingScene();
+  }
+}
+async function openingScene(){
+  const p=state.player;
+  const eraAdd=ERA_ADD[p.era]||ERA_ADD['1991'];
+  const h=HOUSES.find(x=>x.v===p.house);
+  Game.genCtrl=new AbortController();
+  Game.setBusy(true);
+  const userMsg=`【开场指令】请以"命运书记官"的笔触书写故事的开篇：
+场景：${state.status.time}，国王十字车站 9¾ 站台。
+要求：1) 从你推着行李冲过站台墙开始，描写霍格沃茨特快上的见闻（可以遇到 1-2 位原著角色并自然互动）；2) 列车抵达霍格沃茨，参加当晚的分院仪式，分院帽将你分入${h?h.v:p.house}——请着重描写这个瞬间的内心与周围反应；3) 以进入学院公共休息室、第一天清晨醒来收尾。
+用第二人称「你」，600-800 字，让魔法世界的质感扑面而来，但不要替玩家做任何决定。结尾按格式输出⟦状态⟧等标签。`;
+  try{
+    const res=await callAI([{role:'system',content:buildSystemPrompt()},{role:'user',content:userMsg}],{signal:Game.genCtrl.signal});
+    if(!res)return;
+    const content=res.content;
+    state.history.push({role:'user',content:userMsg});
+    state.history.push({role:'assistant',content});
+    addLogEntry('ai',stripTags(content),{think:res.reasoning||''});
+    const p2=parseResponse(content);
+    applyParsed(p2);
+    lastSuggests=p2.suggests;
+    state.turn++;
+    saveState();
+    renderLog();renderTop();renderCharPanel();renderWorldPanel();renderQuickActions();
+    if(p2.death)handleDeath(p2.death);
+  }catch(e){
+    addLogEntry('sys','⚠️ 开场生成失败：'+e.message+'。可先到右上角"设置"里检查 API 配置，然后发送任意行动重试。');
+    renderLog();
+  }finally{
+    Game.setBusy(false);
+  }
+}
+
+/* ---------------- 启动 ---------------- */
+function boot(){
+  applyTheme(cfg.theme);
+  Setup.init();
+  const saved=lsGet('hpbook_state',null);
+  if(saved&&saved.player&&saved.started){
+    state=Object.assign(freshState(),saved);
+    state.log=state.log||[];state.memories=state.memories||[];state.checkpoints=state.checkpoints||[];
+    state.deaths=state.deaths||[];state.tasks=state.tasks||[];state.relations=state.relations||{};
+    state.encyclopedia=state.encyclopedia||[];
+    enterGame();
+    addLogEntry('sys','💾 已从自动存档恢复 · 第 '+state.turn+' 回合');
+    renderLog();
+  }
+  // 输入框事件
+  const inp=$('user-input');
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();Game.send();}
+  });
+  inp.addEventListener('input',()=>{
+    inp.style.height='auto';
+    inp.style.height=Math.min(130,inp.scrollHeight)+'px';
+  });
+  // 移动端显示迷你状态条
+  document.querySelectorAll('#topbar .top-stat')[0]&&document.querySelectorAll('#topbar .top-stat')[0].classList.add('m-stat');
+  // 自动存档定时器
+  setInterval(()=>{
+    if(cfg.autoSave&&state&&state.started){
+      state.lastSave=Date.now();saveState();
+    }
+  },45000);
+  // 给第一步测试按钮补 id，便于禁用态
+  const tbtn=document.querySelector('#step-api [onclick="Setup.testApi()"]');
+  if(tbtn)tbtn.id='api-test-btn';
+}
+boot();
+</script>
+</body>
+</html>
