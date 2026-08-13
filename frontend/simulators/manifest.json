@@ -6,9 +6,14 @@
       "id": "life-sim",
       "file": "人生模拟器v3.html",
       "name": "人生模拟器 v3",
-      "type": "local",
-      "description": "纯本地数值驱动的人生模拟（属性/事件/结局），存档走 localStorage（ls_ 前缀）",
-      "saveKeyPrefix": "ls_"
+      "type": "ai",
+      "description": "AI 驱动的生命模拟（天赋/事件/结局），需配置 AI 接口；存档走 localStorage（ls_ 前缀）",
+      "saveKeyPrefix": "ls_",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      }
     },
     {
       "id": "spider-shadow",
