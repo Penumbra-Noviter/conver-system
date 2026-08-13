@@ -42,7 +42,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **ARC10 架构深化批次（剩余 8 候选，2026-08-12）**：T-11 modal 骨架收口（C3-DEFER 兑现）+ T-12 character-submit 提交收敛 + T-13 微重复收口（resize/空态/onerror）+ T-14 Provider 清单单一来源（AVAILABLE_MODELS 派生 + 包导出收缩零 SDK 副作用）+ T-15 统一 exception handler（api/errors.py）+ T-16 style.css 覆盖区归位 + --on-danger token + T-17 schema 快照漂移检测 + T-18 聚焦序列收口；期末四轴 0 阻断放行；GUI 冒烟（modal 骨架/错误气泡深浅主题/输入框复位/级联）全过
 - ✅ **技术债区 TD-13~14 批次（2026-08-12 全自动 kickoff）**：2 做 + TD-9 顺带闭环——TD-13 save 回调入口统一守卫（11 元素收集 + :339 收口；+2 用例先红后绿）/ TD-14 契约措辞 pathlib 规范化注记 + 契约锁用例；TD-9 维持→做（入口守卫覆盖其调用点，本体零改动）；期末四轴 0 阻断；10 项新遗留（TD-15~24）入技术债区
 - ✅ **技术债区 TD-15~24 批次（2026-08-12 全自动 kickoff）**：10 项全做清零（小档 2 工单，merge 0010f1b）——TD-A 守卫收窄与卫生（TD-15 守卫条件化 `modelSelect.value === '__custom__'`，票面 providerSelect 条件实证否定；+2 用例 A 先红后绿 + B 基线绿）+ TD-B 契约注记与锁补强（UNC 特例注记 / 尾分隔符+UNC 锁断言 / 「路径形态」限定 / Rust 透传注释）；期末四轴 0 阻断；3 项新遗留（TD-25~27）入技术债区
-- ✅ **技术债区 TD-25~27 批次（2026-08-13 全自动 kickoff）**：1 做 + 2 维持关闭（merge 8ae3801）——TD-25 UNC 锁断言平台隔离（拆独立用例 + 函数级 skipif，票面断言级形态实证不可表达；Windows 锁照跑 + POSIX 可见 skip）；TD-26/TD-27 复核确认维持关闭（现状即设计意图）；期末四轴 0 阻断，技术债区清零
+- ✅ **技术债区 TD-25~27 批次（2026-08-13 全自动 kickoff）**：1 做 + 2 维持关闭（merge 8ae3801）——TD-25 UNC 锁断言平台隔离（拆独立用例 + 函数级 skipif，票面断言级形态实证不可表达；Windows 锁照跑 + POSIX 可见 skip）；TD-26/TD-27 复核确认维持关闭（现状即设计意图）；期末四轴 0 阻断（该批次后技术债区余 17 项，见 TD-29~45 批次）
 - ✅ 测试：pytest 413+1skip（后端）+ Vitest 460（前端）+ cargo test 58（壳）全绿
 
 ## 待办管理
