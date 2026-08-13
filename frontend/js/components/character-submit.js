@@ -9,6 +9,13 @@
  *   3. 提交态状态机 — 按钮禁用/「保存中…」/状态栏 class/成功 600ms 延时关窗/
  *      失败恢复
  *
+ * FE-2 字段语义收口（同域扩展，保持提交链路零改动）：温度滑块配置/格式化、
+ * 头像预览、名称必填文案、标签拼接与标签分割同置一处，表单与向导不可漂移：
+ *   - TEMP_SLIDER / formatTemperature — 滑块范围刻度 + 两位小数统一显示
+ *   - avatarPreviewHtml — 头像预览（img + 加载失败回退 / 「无头像」占位）
+ *   - NAME_REQUIRED_MESSAGE — 「角色名称不能为空」文案
+ *   - tagsToComma — 标签数组 → 逗号字符串（splitTags 逆操作）
+ *
  * form 的 isEdit 差异（update vs create + 成功文案 + 失败恢复文案）与 wizard
  * 恒 create 的差异保留在调用方：本模块不感知 isEdit，成功文案与失败恢复
  * 文案均由调用方传入（逐字保持）。
@@ -16,6 +23,7 @@
 
 import { escapeHtml } from '../utils.js';
 import { iconHtml } from '../icons.js';
+import { avatarImgHtml } from '../format.js';
 
 /**
  * 将逗号分隔的标签文本分割为标签数组（中英文逗号、trim、空项过滤）
@@ -25,6 +33,53 @@ import { iconHtml } from '../icons.js';
 export function splitTags(text) {
     return (text ?? '').split(/[,，]/).map((t) => t.trim()).filter(Boolean);
 }
+
+/**
+ * 将标签数组转为逗号分隔字符串（表单/向导字段显示；splitTags 的逆操作）
+ * @param {Array<string>|null|undefined} tags - 标签数组
+ * @returns {string} 逗号分隔字符串（空/非数组 → ''）
+ */
+export function tagsToComma(tags) {
+    if (!Array.isArray(tags) || tags.length === 0) return '';
+    return tags.join(', ');
+}
+
+/**
+ * 温度滑块配置常量（表单/向导共用单一来源）
+ * min/max/step 决定滑块范围与刻度，default 为温度缺省值（payload 与初始显示共用）
+ */
+export const TEMP_SLIDER = Object.freeze({
+    min: 0,
+    max: 2,
+    step: 0.05,
+    default: 0.7,
+});
+
+/**
+ * 温度统一格式化（两位小数）：表单与向导初始显示/实时显示一致
+ * @param {number|string|null|undefined} value - 温度值（缺省 → TEMP_SLIDER.default）
+ * @returns {string} 两位小数字符串（如 '0.70'）
+ */
+export function formatTemperature(value) {
+    return Number(value ?? TEMP_SLIDER.default).toFixed(2);
+}
+
+/**
+ * 头像预览 HTML（表单/向导共用单一实现）
+ * 非空 → avatarImgHtml 渲染（alt「头像预览」+ 加载失败回退「图片加载失败」）；
+ * 空 → 「无头像」占位（逐字保持既有形态）。
+ * @param {string|null|undefined} src - 头像地址
+ * @returns {string} 预览容器 HTML
+ */
+export function avatarPreviewHtml(src) {
+    if (!src) return '<span class="avatar-placeholder">无头像</span>';
+    return avatarImgHtml(src, '头像预览', "<span class='avatar-placeholder'>图片加载失败</span>");
+}
+
+/**
+ * 角色名称必填校验文案（表单/向导共用单一来源）
+ */
+export const NAME_REQUIRED_MESSAGE = '角色名称不能为空';
 
 /**
  * 从显式字段对象构造 11 字段角色 payload（API 请求体契约）
@@ -47,7 +102,7 @@ export function buildCharacterPayload(fields = {}) {
         scenario: fields.scenario ?? '',
         mes_example: fields.mes_example ?? '',
         system_prompt: fields.system_prompt ?? '',
-        temperature: Number(fields.temperature ?? 0.7),
+        temperature: Number(fields.temperature ?? TEMP_SLIDER.default),
         avatar: fields.avatar || null,
         creator: fields.creator ?? '',
         tags: Array.isArray(fields.tags) ? fields.tags : [],
@@ -98,5 +153,6 @@ export function failSubmit(btn, statusEl, err, restoreLabel) {
 }
 
 export const __all__ = [
-    'splitTags', 'buildCharacterPayload', 'beginSubmit', 'succeedSubmit', 'failSubmit',
+    'splitTags', 'tagsToComma', 'TEMP_SLIDER', 'formatTemperature', 'avatarPreviewHtml',
+    'NAME_REQUIRED_MESSAGE', 'buildCharacterPayload', 'beginSubmit', 'succeedSubmit', 'failSubmit',
 ];

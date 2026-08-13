@@ -21,8 +21,10 @@ import { escapeHtml } from '../utils.js';
 import { CHARACTER_TEMPLATES } from '../data/character-templates.js';
 import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
-import { splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit } from './character-submit.js';
-import { avatarImgHtml } from '../format.js';
+import {
+    splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit,
+    TEMP_SLIDER, formatTemperature, avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
+} from './character-submit.js';
 
 /**
  * 打开角色创建向导
@@ -46,7 +48,7 @@ export function showCharacterWizard(onSuccess = null) {
         system_prompt: '',
         tags: [],
         avatar: '',
-        temperature: 0.7,
+        temperature: TEMP_SLIDER.default,
         // 文档解析结果
         parsing: false,
         parseError: '',
@@ -271,12 +273,12 @@ function renderStep3(state) {
                 <label for="wiz-avatar">头像 URL</label>
                 <input type="text" id="wiz-avatar" placeholder="粘贴头像链接" value="${escapeHtml(state.avatar)}">
                 <div class="avatar-preview" id="wiz-avatar-preview">
-                    ${state.avatar ? `<img src="${escapeHtml(state.avatar)}" alt="头像预览">` : '<span class="avatar-placeholder">无头像</span>'}
+                    ${avatarPreviewHtml(state.avatar)}
                 </div>
             </div>
             <div class="form-field">
                 <label for="wiz-tags">标签（逗号分隔）</label>
-                <input type="text" id="wiz-tags" placeholder="如: 冒险, 奇幻, 可爱" value="${escapeHtml((state.tags || []).join(', '))}">
+                <input type="text" id="wiz-tags" placeholder="如: 冒险, 奇幻, 可爱" value="${escapeHtml(tagsToComma(state.tags))}">
                 <span class="field-hint">帮助其他用户发现你的角色</span>
             </div>
         </div>
@@ -356,8 +358,8 @@ function renderStep6(state) {
                 <div class="wizard-summary-section">
                     <h4>${iconHtml('settings', { size: 16 })} 设置</h4>
                     <div class="form-field">
-                        <label for="wiz-temp">温度 (Temperature): <span id="wiz-temp-value">${state.temperature.toFixed(2)}</span></label>
-                        <input type="range" id="wiz-temp" min="0" max="2" step="0.05" value="${state.temperature}">
+                        <label for="wiz-temp">温度 (Temperature): <span id="wiz-temp-value">${formatTemperature(state.temperature)}</span></label>
+                        <input type="range" id="wiz-temp" min="${TEMP_SLIDER.min}" max="${TEMP_SLIDER.max}" step="${TEMP_SLIDER.step}" value="${state.temperature}">
                         <div class="range-labels">
                             <span>精确 (0)</span>
                             <span>平衡 (1.0)</span>
@@ -484,12 +486,8 @@ function bindStep3Events(state, body) {
         avatarInput.addEventListener('input', () => {
             state.avatar = avatarInput.value.trim();
             if (avatarPreview) {
-                if (state.avatar) {
-                    // onerror 回退走渲染纯函数模块 avatarImgHtml 参数化复用
-                    avatarPreview.innerHTML = avatarImgHtml(state.avatar, '头像预览', "<span class='avatar-placeholder'>图片加载失败</span>");
-                } else {
-                    avatarPreview.innerHTML = '<span class="avatar-placeholder">无头像</span>';
-                }
+                // onerror 回退与空态占位收敛到字段语义共享函数
+                avatarPreview.innerHTML = avatarPreviewHtml(state.avatar);
             }
         });
     }
@@ -520,7 +518,7 @@ function bindStep6Events(state, body) {
     if (tempSlider && tempValue) {
         tempSlider.addEventListener('input', () => {
             state.temperature = parseFloat(tempSlider.value);
-            tempValue.textContent = state.temperature.toFixed(2);
+            tempValue.textContent = formatTemperature(state.temperature);
         });
     }
 }
@@ -558,7 +556,7 @@ function validateStep(step, state, statusEl) {
 
         case 3:
             if (!state.name) {
-                statusEl.textContent = '角色名称不能为空';
+                statusEl.textContent = NAME_REQUIRED_MESSAGE;
                 statusEl.className = 'form-status error';
                 const nameInput = document.querySelector('#wiz-name');
                 if (nameInput) nameInput.focus();
@@ -586,7 +584,7 @@ function validateStep(step, state, statusEl) {
 async function handleSave(state, statusEl, submitBtn, close, onSuccess) {
     // 最终校验
     if (!state.name) {
-        statusEl.textContent = '角色名称不能为空';
+        statusEl.textContent = NAME_REQUIRED_MESSAGE;
         statusEl.className = 'form-status error';
         return;
     }

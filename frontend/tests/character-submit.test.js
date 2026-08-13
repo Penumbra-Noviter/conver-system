@@ -3,6 +3,9 @@
  *
  * 覆盖：
  *   - splitTags：中英文逗号分割 / 空白过滤 / 空串 / null/undefined
+ *   - 字段语义共享（FE-2 收口）：TEMP_SLIDER 滑块常量、formatTemperature 统一
+ *     两位小数、avatarPreviewHtml 头像预览纯函数、NAME_REQUIRED_MESSAGE 必填
+ *     文案常量、tagsToComma 标签拼接（splitTags 逆操作）
  *   - buildCharacterPayload：11 字段集合 + 空值语义（avatar → null、creator 空串、
  *     temperature 数值类型、文本字段字符串、tags 数组）
  *   - 提交态状态机：beginSubmit（禁用 + 「保存中…」+ 清状态栏）、succeedSubmit
@@ -12,7 +15,10 @@
  *     请求体，断言 11 字段集与空值语义逐字（真实 modal.js + fetch 捕获）
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit } from '../js/components/character-submit.js';
+import {
+    splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit,
+    TEMP_SLIDER, formatTemperature, avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
+} from '../js/components/character-submit.js';
 
 const mockJson = (data, status = 200) =>
     Promise.resolve({ ok: status < 400, status, json: async () => data });
@@ -39,6 +45,67 @@ describe('splitTags — 中英文逗号分割单点', () => {
     it('null / undefined → []（不抛错）', () => {
         expect(splitTags(null)).toEqual([]);
         expect(splitTags(undefined)).toEqual([]);
+    });
+});
+
+describe('TEMP_SLIDER — 温度滑块配置单一来源（form/wizard 共用）', () => {
+    it('min/max/step/default 精确值（0 / 2 / 0.05 / 0.7）', () => {
+        expect(TEMP_SLIDER).toEqual({ min: 0, max: 2, step: 0.05, default: 0.7 });
+    });
+});
+
+describe('formatTemperature — 温度统一两位小数显示（toFixed(2)）', () => {
+    it('0.7 → 0.70（表单初始显示与向导一致）', () => {
+        expect(formatTemperature(0.7)).toBe('0.70');
+    });
+
+    it('字符串数值归一：1.5 → 1.50；边界 0 → 0.00、2 → 2.00', () => {
+        expect(formatTemperature('1.5')).toBe('1.50');
+        expect(formatTemperature(0)).toBe('0.00');
+        expect(formatTemperature(2)).toBe('2.00');
+    });
+
+    it('缺省 null/undefined → TEMP_SLIDER.default 的 0.70', () => {
+        expect(formatTemperature(undefined)).toBe('0.70');
+        expect(formatTemperature(null)).toBe('0.70');
+    });
+});
+
+describe('avatarPreviewHtml — 头像预览单一实现（form/wizard 共用）', () => {
+    it('空/null → 「无头像」占位（与现状逐字）', () => {
+        expect(avatarPreviewHtml('')).toBe('<span class="avatar-placeholder">无头像</span>');
+        expect(avatarPreviewHtml(null)).toBe('<span class="avatar-placeholder">无头像</span>');
+    });
+
+    it('有值 → img[alt=头像预览] + onerror 回退「图片加载失败」', () => {
+        const html = avatarPreviewHtml('http://x/a.png');
+        expect(html).toContain('<img src="http://x/a.png" alt="头像预览"');
+        expect(html).toContain('onerror=');
+        expect(html).toContain('图片加载失败');
+    });
+
+    it('src 特殊字符按 avatarImgHtml 语义转义（& / < 不注入 HTML）', () => {
+        expect(avatarPreviewHtml('http://x/a?b=1&c=2')).toContain('src="http://x/a?b=1&amp;c=2"');
+        expect(avatarPreviewHtml('http://x/<img>.png')).toContain('src="http://x/&lt;img&gt;.png"');
+    });
+});
+
+describe('NAME_REQUIRED_MESSAGE — 名称必填文案单一来源', () => {
+    it('逐字「角色名称不能为空」', () => {
+        expect(NAME_REQUIRED_MESSAGE).toBe('角色名称不能为空');
+    });
+});
+
+describe('tagsToComma — 标签数组转逗号字符串（splitTags 逆操作）', () => {
+    it('数组 → join(", ")', () => {
+        expect(tagsToComma(['冒险', '奇幻'])).toBe('冒险, 奇幻');
+    });
+
+    it('空数组 / null / undefined / 非数组 → 空串（不抛错）', () => {
+        expect(tagsToComma([])).toBe('');
+        expect(tagsToComma(null)).toBe('');
+        expect(tagsToComma(undefined)).toBe('');
+        expect(tagsToComma('not-array')).toBe('');
     });
 });
 

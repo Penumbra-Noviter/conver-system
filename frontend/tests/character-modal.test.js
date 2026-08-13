@@ -14,6 +14,7 @@
  * 断言走「DOM 存在性 + 关闭后 overlay 移除」。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { TEMP_SLIDER } from '../js/components/character-submit.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -235,6 +236,20 @@ describe('showCharacterForm — 字段交互与提交路径（组件级）', () 
         expect(value.textContent).toBe('1.25');
     });
 
+    it('温度初始显示统一 toFixed(2)：缺省 0.70 + 滑块 min/max/step 与 TEMP_SLIDER 一致', async () => {
+        const { form } = await loadModules();
+        form.showCharacterForm('create');
+        const slider = document.querySelector('#cf-temperature');
+        expect(document.querySelector('#cf-temp-value').textContent).toBe('0.70');
+        expect(slider.getAttribute('min')).toBe(String(TEMP_SLIDER.min));
+        expect(slider.getAttribute('max')).toBe(String(TEMP_SLIDER.max));
+        expect(slider.getAttribute('step')).toBe(String(TEMP_SLIDER.step));
+
+        // 编辑模式带温度 → 同样两位小数显示
+        form.showCharacterForm('edit', { id: 1, name: 'x', temperature: 1 });
+        expect(document.querySelector('#cf-temp-value').textContent).toBe('1.00');
+    });
+
     it('头像预览：输入 URL → img 渲染；清空 → 「无头像」', async () => {
         const { form } = await loadModules();
         form.showCharacterForm('create');
@@ -248,6 +263,14 @@ describe('showCharacterForm — 字段交互与提交路径（组件级）', () 
         avatarInput.value = '';
         avatarInput.dispatchEvent(new Event('input', { bubbles: true }));
         expect(preview.textContent).toContain('无头像');
+    });
+
+    it('头像预览初始回填：编辑模式带头像 → img + 加载失败回退（共享纯函数语义）', async () => {
+        const { form } = await loadModules();
+        form.showCharacterForm('edit', { id: 1, name: 'x', avatar: 'http://x/a.png' });
+        const preview = document.querySelector('#cf-avatar-preview');
+        expect(preview.querySelector('img[alt="头像预览"]')).not.toBeNull();
+        expect(preview.innerHTML).toContain('图片加载失败');
     });
 
     it('提交校验：名称为空 → 「角色名称不能为空」+ 不发请求', async () => {
@@ -568,6 +591,17 @@ describe('showCharacterWizard — 步骤流程（step2-6 / 解析 / 模板 / 保
         tempSlider.value = '1.5';
         tempSlider.dispatchEvent(new Event('input', { bubbles: true }));
         expect(overlay.querySelector('#wiz-temp-value').textContent).toBe('1.50');
+    });
+
+    it('step6 温度初始显示统一 toFixed(2)：0.70 + 滑块 min/max/step 与 TEMP_SLIDER 一致', async () => {
+        const { wizard } = await loadModules();
+        wizard.showCharacterWizard();
+        const overlay = await walkToStep(wizard, 6);
+        const slider = overlay.querySelector('#wiz-temp');
+        expect(overlay.querySelector('#wiz-temp-value').textContent).toBe('0.70');
+        expect(slider.getAttribute('min')).toBe(String(TEMP_SLIDER.min));
+        expect(slider.getAttribute('max')).toBe(String(TEMP_SLIDER.max));
+        expect(slider.getAttribute('step')).toBe(String(TEMP_SLIDER.step));
     });
 
     it('step6 保存成功：POST /characters → success → 600ms 延时关窗 + onSuccess', async () => {

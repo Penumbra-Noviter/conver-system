@@ -14,8 +14,10 @@ import { escapeHtml } from '../utils.js';
 import { showConfirm } from './confirm-dialog.js';
 import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
-import { splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit } from './character-submit.js';
-import { avatarImgHtml } from '../format.js';
+import {
+    splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit,
+    TEMP_SLIDER, formatTemperature, avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
+} from './character-submit.js';
 
 /**
  * 打开角色表单模态框
@@ -64,8 +66,8 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
         </div>
 
         <div class="form-field">
-            <label for="cf-temperature">温度 (Temperature): <span id="cf-temp-value">${char.temperature ?? 0.7}</span></label>
-            <input type="range" id="cf-temperature" min="0" max="2" step="0.05" value="${char.temperature ?? 0.7}">
+            <label for="cf-temperature">温度 (Temperature): <span id="cf-temp-value">${formatTemperature(char.temperature)}</span></label>
+            <input type="range" id="cf-temperature" min="${TEMP_SLIDER.min}" max="${TEMP_SLIDER.max}" step="${TEMP_SLIDER.step}" value="${char.temperature ?? TEMP_SLIDER.default}">
             <div class="range-labels">
                 <span>精确 (0)</span>
                 <span>平衡 (1.0)</span>
@@ -77,14 +79,14 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             <label for="cf-avatar">头像 URL / Base64</label>
             <input type="text" id="cf-avatar" placeholder="粘贴头像链接或 base64 数据" value="${escapeHtml(char.avatar || '')}">
             <div class="avatar-preview" id="cf-avatar-preview">
-                ${char.avatar ? `<img src="${escapeHtml(char.avatar)}" alt="头像预览">` : '<span class="avatar-placeholder">无头像</span>'}
+                ${avatarPreviewHtml(char.avatar)}
             </div>
         </div>
 
         <div class="form-row">
             <div class="form-field">
                 <label for="cf-tags">标签 (逗号分隔)</label>
-                <input type="text" id="cf-tags" placeholder="例如: 冒险, 奇幻, 可爱" value="${escapeHtml(tagsToComma(char.tags) || '')}">
+                <input type="text" id="cf-tags" placeholder="例如: 冒险, 奇幻, 可爱" value="${escapeHtml(tagsToComma(char.tags))}">
             </div>
         </div>
 
@@ -143,19 +145,14 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             // 关闭路径（关闭按钮/遮罩点击/Escape）由工厂承担；取消按钮在此绑定
             overlay.querySelector('.modal-cancel').addEventListener('click', close);
 
-            // 温度滑块实时显示
+            // 温度滑块实时显示（两位小数统一）
             tempSlider.addEventListener('input', () => {
-                tempValue.textContent = parseFloat(tempSlider.value).toFixed(2);
+                tempValue.textContent = formatTemperature(tempSlider.value);
             });
 
-            // 头像预览（onerror 回退走渲染纯函数模块 avatarImgHtml 参数化复用）
+            // 头像预览（onerror 回退与空态占位收敛到字段语义共享函数）
             avatarInput.addEventListener('input', () => {
-                const val = avatarInput.value.trim();
-                if (val) {
-                    avatarPreview.innerHTML = avatarImgHtml(val, '头像预览', "<span class='avatar-placeholder'>图片加载失败</span>");
-                } else {
-                    avatarPreview.innerHTML = '<span class="avatar-placeholder">无头像</span>';
-                }
+                avatarPreview.innerHTML = avatarPreviewHtml(avatarInput.value.trim());
             });
 
             // 完整性引导：关键字段输入时实时刷新提示
@@ -169,7 +166,7 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                 const name = nameInput.value.trim();
                 if (!name) {
                     const errorEl = overlay.querySelector('#cf-name-error');
-                    errorEl.textContent = '角色名称不能为空';
+                    errorEl.textContent = NAME_REQUIRED_MESSAGE;
                     nameInput.focus();
                     return;
                 }
@@ -223,12 +220,4 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             });
         },
     });
-}
-
-/**
- * 将标签数组转为逗号分隔字符串（表单字段显示）
- */
-function tagsToComma(tags) {
-    if (!Array.isArray(tags) || tags.length === 0) return '';
-    return tags.join(', ');
 }
