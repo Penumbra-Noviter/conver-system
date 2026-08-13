@@ -40,6 +40,31 @@ function sanitizeUrl(url) {
 }
 
 /**
+ * 生成与当前内容碰撞免疫的代码块占位符（TD-38 原子化）
+ *
+ * token 形如 \u0000MDCB<序号>\u0000，碰撞免疫由两层保证：
+ * 1) NUL 前缀：用户内容中出现裸 NUL 占位符同形文本的概率极低（jsdom
+ *    序列化实测保留 NUL、不替换为 U+FFFD——TD-43 的 U+FFFD 结论仅适用于
+ *    解析侧；真实浏览器序列化侧替换 NUL，两种环境均由碰撞循环兜底）；
+ * 2) 碰撞循环：候选 token 已存在于当前 HTML 时递增序号重试，实测覆盖
+ *    jsdom 保留 NUL 的场景（见 TD-38 自审）。
+ * 占位符不含 ` * [ ] ( ) 等行内标记字符、不匹配行首列表语法，行内 pass
+ * 与列表 pass 均无法触及。
+ *
+ * @param {string} html - 当前（已转义）HTML 字符串，用于碰撞检测
+ * @param {number} tokenId - 本批占位符序号（调用方递增）
+ * @returns {string} 唯一占位符
+ */
+function createCodeBlockToken(html, tokenId) {
+    let token;
+    do {
+        token = `\u0000MDCB${tokenId}\u0000`;
+        tokenId++;
+    } while (html.includes(token));
+    return token;
+}
+
+/**
  * 轻量 Markdown 渲染（安全 — 先转义再解析标记）
  * 支持：代码块、内联代码、粗体、斜体、链接、无序/有序列表
  * @param {string} text - 原始文本
@@ -51,10 +76,19 @@ export function renderMarkdown(text) {
     // 先转义 HTML，再解析 Markdown 标记
     let html = escapeHtml(text);
 
-    // ── 代码块 (```...```) — 必须在其他标记之前处理 ──
-    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    // ── 代码块 (```...```) — TD-38 占位符原子化 ──
+    // 先提取代码块为唯一占位符（内容 + 语言登记入 map），行内标记 pass
+    // （内联代码/粗体/斜体/链接/列表）全部在占位符之外进行，全部处理完毕
+    // 后统一还原为 <pre><code> HTML——块内 **x** / [x](y) / `x` 等标记
+    // 不再被误渲染（真实交互缺陷修复），块内容也不受列表 pass 行级拆解影响。
+    const codeBlocks = new Map();
+    let tokenId = 0;
+    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+        const token = createCodeBlockToken(html, tokenId);
+        tokenId++;
         const langClass = lang ? ` class="lang-${escapeHtml(lang)}"` : '';
-        return `<pre><code${langClass}>${code}</code></pre>`;
+        codeBlocks.set(token, `<pre><code${langClass}>${code}</code></pre>`);
+        return token;
     });
 
     // ── 内联代码 `code` ──
@@ -124,6 +158,11 @@ export function renderMarkdown(text) {
     if (inOl) result.push('</ol>');
 
     html = result.join('\n');
+
+    // ── 还原代码块（列表 pass 之后、返回之前完成，输出不残留占位符形态）──
+    for (const [token, blockHtml] of codeBlocks) {
+        html = html.split(token).join(blockHtml);
+    }
 
     return html;
 }

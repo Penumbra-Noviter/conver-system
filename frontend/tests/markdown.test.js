@@ -47,6 +47,20 @@ describe('renderMarkdown', () => {
         it('未闭合围栏原样输出不崩溃', () => {
             expect(renderMarkdown('```\nunclosed')).toBe('```\nunclosed');
         });
+
+        it('代码块内 **x** 保持字面，不被渲染为 strong（TD-38 防回归）', () => {
+            expect(renderMarkdown('```\n**x**\n```')).toBe('<pre><code>**x**\n</code></pre>');
+        });
+
+        it('代码块内 [x](y) 保持字面，不渲染出链接（TD-38 防回归）', () => {
+            const out = renderMarkdown('```\n[a](b)\n```');
+            expect(out).toBe('<pre><code>[a](b)\n</code></pre>');
+            expect(out).not.toContain('<a');
+        });
+
+        it('代码块内 `x` 保持字面，不渲染为内联代码（TD-38 防回归）', () => {
+            expect(renderMarkdown('```\n`x`\n```')).toBe('<pre><code>`x`\n</code></pre>');
+        });
     });
 
     describe('内联代码', () => {
@@ -151,6 +165,54 @@ describe('renderMarkdown', () => {
             expect(out).toContain('<a');
             const doc = new DOMParser().parseFromString(`<body>${out}</body>`, 'text/html');
             expect(doc.querySelector('a').hasAttribute('onmouseover')).toBe(false);
+        });
+
+        it('%22 百分号编码引号变体不产生事件属性（TD-45 回归网）', () => {
+            const out = renderMarkdown('[x](%22 onmouseover=%22alert(1))');
+            // %22 非属性边界字符：链接存活但 onmouseover 只能作为 href 值内惰性文本
+            expect(out).toContain('<a');
+            const doc = new DOMParser().parseFromString(`<body>${out}</body>`, 'text/html');
+            for (const el of doc.body.querySelectorAll('*')) {
+                expect(el.hasAttribute('onmouseover')).toBe(false);
+            }
+        });
+
+        it('&QUOT; 大写实体变体被 escapeHtml 双转义为惰性文本（TD-45 回归网）', () => {
+            const out = renderMarkdown('[x](&QUOT; onmouseover=&QUOT;alert(1))');
+            expect(out).toContain('&amp;QUOT;');
+            const doc = new DOMParser().parseFromString(`<body>${out}</body>`, 'text/html');
+            for (const el of doc.body.querySelectorAll('*')) {
+                expect(el.hasAttribute('onmouseover')).toBe(false);
+            }
+        });
+
+        it('&#34; 十进制实体变体被 escapeHtml 双转义为惰性文本（TD-45 回归网）', () => {
+            const out = renderMarkdown('[x](&#34; onmouseover=&#34;alert(1))');
+            expect(out).toContain('&amp;#34;');
+            const doc = new DOMParser().parseFromString(`<body>${out}</body>`, 'text/html');
+            for (const el of doc.body.querySelectorAll('*')) {
+                expect(el.hasAttribute('onmouseover')).toBe(false);
+            }
+        });
+
+        it('全角引号（U+201C/U+201D）不是属性边界字符，不产生事件属性（TD-45 回归网）', () => {
+            const out = renderMarkdown('[x](\u201C onmouseover=\u201Dalert(1))');
+            expect(out).toContain('<a');
+            const doc = new DOMParser().parseFromString(`<body>${out}</body>`, 'text/html');
+            for (const el of doc.body.querySelectorAll('*')) {
+                expect(el.hasAttribute('onmouseover')).toBe(false);
+            }
+        });
+
+        it('反引号 + javascript: 组合变体不产生事件属性、href 不以可执行 scheme 开头（TD-45 回归网）', () => {
+            const out = renderMarkdown('[x](` onmouseover=`javascript:alert(1))');
+            expect(out).toContain('<a');
+            const doc = new DOMParser().parseFromString(`<body>${out}</body>`, 'text/html');
+            for (const el of doc.body.querySelectorAll('*')) {
+                expect(el.hasAttribute('onmouseover')).toBe(false);
+            }
+            // href 值以反引号开头 → 浏览器按相对 URL 处理，javascript: 不处于 scheme 位置
+            expect(doc.querySelector('a').getAttribute('href')).not.toMatch(/^javascript:/i);
         });
     });
 
