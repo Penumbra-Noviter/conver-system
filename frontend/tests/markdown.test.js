@@ -178,7 +178,9 @@ describe('renderMarkdown', () => {
 
         it('用户右半形 MDCB0\u0000 紧邻代码块 → 字面量原样保留、块恰一次、无占位符泄漏', () => {
             const out = renderMarkdown(`\`\`\`\ncode\n\`\`\`MDCB0\u0000`);
-            // 修复前红：占位符尾 NUL 与用户右半形拼接出第二个完整 token 形态 → 误匹配
+            // 修复前绿（重叠遮蔽不可复现，docstring 已注明）：占位符尾 NUL 与用户右半形拼接
+            // 出第二个完整 token 形态的方向，当前单 pass 非重叠还原天然遮蔽——本用例为防御性
+            // 对称契约锁（还原实现变重叠匹配或占位符形态变化时红），非红测驱动
             expect(out).toContain('MDCB0\u0000');
             expect(exactlyOnce(out, blockHtml('code'))).toBe(1);
             expect(nulCount(out)).toHaveLength(1);
