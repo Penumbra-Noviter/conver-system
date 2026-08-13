@@ -17,9 +17,11 @@ from __future__ import annotations
 import pytest
 
 from backend.app.services import setting as setting_service
+from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm import factory as factory_module
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.claude import ClaudeProvider
+from backend.app.services.llm.errors import LLMError
 from backend.app.services.llm.factory import LLMFactory
 from backend.app.services.llm.openai import OpenAIProvider
 from backend.app.services.model_data import AVAILABLE_MODELS
@@ -32,6 +34,10 @@ EXPECTED_ORDER = ["claude", "openai", "deepseek", "qwen", "kimi", "glm", "minima
 
 class _OverrideProvider(BaseLLM):
     """测试用假实现类：验证 _CLASS_OVERRIDES 显式覆盖生效"""
+
+    def _translate_error(self, error: Exception) -> LLMError:
+        """stub：本测试不产生 SDK 调用，翻译仅满足抽象契约"""
+        return LLMError(str(error), error)
 
     async def generate(
         self,
@@ -160,9 +166,9 @@ class TestGetProvider:
         assert type(provider) is ClaudeProvider
 
     def test_get_provider_raises_for_unregistered_name(self) -> None:
-        """未注册名报 ValueError（消息与现状逐字一致）"""
+        """未注册名报 ProviderNotSupportedError（领域异常，消息与现状逐字一致）"""
         _reset_registry()
-        with pytest.raises(ValueError, match="不支持的 Provider"):
+        with pytest.raises(ProviderNotSupportedError, match="不支持的 Provider"):
             LLMFactory.get_provider("bogus", "test-key")
 
 

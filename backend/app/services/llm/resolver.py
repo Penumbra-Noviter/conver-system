@@ -69,7 +69,7 @@ def resolve_llm(
 
     try:
         llm = LLMFactory.get_provider(prov, key, url)
-    except ValueError:
+    except ProviderNotSupportedError:
         raise ProviderNotSupportedError(f"不支持的 Provider: {prov}")
 
     return prov, mod, llm

@@ -21,6 +21,7 @@ Provider 清单单一来源：注册从 `model_data.AVAILABLE_MODELS` 派生（�
 
 from __future__ import annotations
 
+from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.model_data import AVAILABLE_MODELS
 
@@ -78,10 +79,14 @@ class LLMFactory:
 
     @classmethod
     def get_provider(cls, name: str, api_key: str, base_url: str | None = None) -> BaseLLM:
-        """获取 Provider 实例"""
+        """获取 Provider 实例
+
+        Raises:
+            ProviderNotSupportedError: 未注册的 Provider 名（领域异常，非 ValueError）
+        """
         cls._ensure_builtins()
         if name not in cls._providers:
-            raise ValueError(f"不支持的 Provider: {name}")
+            raise ProviderNotSupportedError(f"不支持的 Provider: {name}")
         return cls._providers[name](api_key=api_key, base_url=base_url)
 
     @classmethod
