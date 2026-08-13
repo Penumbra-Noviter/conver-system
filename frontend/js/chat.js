@@ -26,7 +26,8 @@
  */
 
 import { chatStream, messages } from './api.js';
-import { renderMarkdown, autoResizeInput } from './utils.js';
+import { autoResizeInput } from './utils.js';
+import { renderMarkdown } from './markdown.js';
 import { buildMessagesHtml, assistantAvatarHtml, userAvatarHtml } from './format.js';
 import { state } from './state.js';
 import { getActiveTab, getTab, updateTab } from './tabs.js';
