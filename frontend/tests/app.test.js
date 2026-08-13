@@ -68,6 +68,7 @@ const APP_DOM_HTML = `
     <div id="search-results"></div>
 
     <div id="simulator-list-panel"></div>
+    <div id="simulator-run-panel" hidden></div>
 
     <select id="setting-default-provider"></select>
     <select id="setting-default-model"></select>
@@ -356,6 +357,74 @@ describe('app.js 视图切换 — 刷新分发', () => {
             expect(document.querySelector('#simulator-list-panel .sim-error')).not.toBeNull();
         });
         expect(document.querySelector('#simulator-list-panel .sim-retry-btn').textContent).toBe('重试');
+    });
+});
+
+describe('app.js 模拟器运行视图接线 — onOpenGame → openSimulator（U7-T4）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 进入模拟器视图并等待卡片渲染（manifest 单 ai 游戏） */
+    async function openListView() {
+        const env = await loadApp(makeRoute({
+            manifest: {
+                version: 1,
+                simulators: [{
+                    id: 'life-sim', file: '人生模拟器v3.html', name: '人生模拟器 v3',
+                    type: 'ai', description: 'AI 驱动的生命模拟',
+                }],
+            },
+        }));
+        document.querySelector('.nav-btn[data-view="simulators"]').click();
+        await vi.waitFor(() => {
+            expect(document.querySelector('#simulator-list-panel .sim-card')).not.toBeNull();
+        });
+        return env;
+    }
+
+    it('点击卡片 → onOpenGame 接线：运行面板显示、iframe 创建（src=simulators/<file>）、AI 提示条可见', async () => {
+        const { state } = await openListView();
+
+        document.querySelector('#simulator-list-panel .sim-card').click();
+
+        const runPanel = document.querySelector('#simulator-run-panel');
+        expect(runPanel.hidden).toBe(false);
+        expect(document.querySelector('#simulator-list-panel').hidden).toBe(true);
+        expect(runPanel.querySelector('.sim-run-name').textContent).toBe('人生模拟器 v3');
+        expect(runPanel.querySelector('.sim-run-hint').textContent).toBe('此游戏需自行配置 AI 接口');
+        const frame = runPanel.querySelector('iframe');
+        expect(frame).not.toBeNull();
+        expect(frame.getAttribute('src')).toBe('simulators/人生模拟器v3.html');
+        expect(state.currentView).toBe('simulators');
+    });
+
+    it('header 返回按钮 → closeSimulator 接线：运行面板隐藏、列表面板恢复、iframe 卸载', async () => {
+        await openListView();
+        document.querySelector('#simulator-list-panel .sim-card').click();
+        const runPanel = document.querySelector('#simulator-run-panel');
+
+        runPanel.querySelector('.sim-run-back').click();
+
+        expect(runPanel.hidden).toBe(true);
+        expect(document.querySelector('#simulator-list-panel').hidden).toBe(false);
+        expect(runPanel.querySelector('iframe')).toBeNull();
+    });
+
+    it('切走 simulators 视图 → closeSimulator 销毁 iframe（Grilling 共识：避免后台游戏继续跑）', async () => {
+        const { state } = await openListView();
+        document.querySelector('#simulator-list-panel .sim-card').click();
+        expect(document.querySelector('#simulator-run-panel iframe')).not.toBeNull();
+
+        document.querySelector('.nav-btn[data-view="characters"]').click();
+        expect(state.currentView).toBe('characters');
+        expect(document.querySelector('#simulator-run-panel iframe')).toBeNull();
+    });
+
+    it('Falsify:切换其他视图但运行视图未打开 → closeSimulator no-op 不抛错', async () => {
+        const { state } = await openListView();
+        expect(() => document.querySelector('.nav-btn[data-view="chat"]').click()).not.toThrow();
+        expect(state.currentView).toBe('chat');
+        expect(document.querySelector('#simulator-run-panel iframe')).toBeNull();
     });
 });
 

@@ -20,6 +20,7 @@ export default defineConfig({
                 'js/components/model-selector.js',
                 'js/components/character-submit.js',
                 'js/simulators.js',
+                'js/simulator-view.js',
             ],
             reporter: ['text', 'html'],
             thresholds: {
