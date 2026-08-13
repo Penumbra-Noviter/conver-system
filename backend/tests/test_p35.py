@@ -26,6 +26,7 @@ from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services import chat as chat_service
 from backend.app.services import setting as setting_service
+from backend.app.services.llm import resolver as llm_resolver
 from backend.app.api.routes import chat as chat_route
 
 __all__: list[str] = []
@@ -281,7 +282,7 @@ def _make_stream_context(db_session, monkeypatch, tokens, **kwargs):
 
     monkeypatch.setattr(setting_service, "api_key", lambda db, provider: "test-key")
     monkeypatch.setattr(
-        chat_service,
+        llm_resolver,
         "LLMFactory",
         type("_FakeLLMFactory", (), {"get_provider": staticmethod(lambda p, k, b=None: _StubProvider(tokens, **kwargs))}),
     )
@@ -412,7 +413,7 @@ def test_stream_llm_error_emits_error_event(db_session, monkeypatch) -> None:
     req = ChatRequest(conversation_id=conv.id, content="你好")
     monkeypatch.setattr(setting_service, "api_key", lambda db, provider: "test-key")
     monkeypatch.setattr(
-        chat_service,
+        llm_resolver,
         "LLMFactory",
         type("_FakeLLMFactory", (), {"get_provider": staticmethod(lambda p, k, b=None: _ErrorProvider([]))}),
     )

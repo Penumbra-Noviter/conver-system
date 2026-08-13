@@ -18,9 +18,8 @@ logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 
 from backend.app.schemas.character import DocParseResponse
-from backend.app.services import setting as setting_service
-from backend.app.services.exceptions import DocParseError
-from backend.app.services.llm.factory import LLMFactory
+from backend.app.services.exceptions import ApiKeyMissingError, DocParseError
+from backend.app.services.llm.resolver import resolve_llm
 
 __all__ = ["parse_document"]
 
@@ -72,24 +71,17 @@ async def parse_document(
         解析后的角色字段（DocParseResponse）
 
     Raises:
-        DocParseError: LLM 调用失败或返回无法解析的响应
+        DocParseError: LLM 调用失败 / 返回无法解析的响应 / 未配置 API Key
+            （未配置 Key 由 resolve_llm 抛 ApiKeyMissingError，此处按本模块
+            wire 契约转 DocParseError：422 + 既有文案逐字）
     """
-    # 1. 解析 provider / model / api_key / base_url
-    prov = provider or setting_service.default_provider(db)
-    mod = model or setting_service.default_model(db)
-    api_key = setting_service.api_key(db, prov)
-    base_url = setting_service.base_url(db, prov)
-
-    if not api_key:
-        raise DocParseError("未配置 API Key，请先在设置中填写")
-
-    # 2. 获取 Provider 实例
+    # 1. 解析 provider / model 并解析 LLM 实例（凭据读取 + 实例化收口于 resolve_llm）
     try:
-        llm = LLMFactory.get_provider(prov, api_key, base_url)
-    except ValueError as exc:
-        raise DocParseError(str(exc)) from exc
+        _, mod, llm = resolve_llm(db, provider, model)
+    except ApiKeyMissingError:
+        raise DocParseError("未配置 API Key，请先在设置中填写") from None
 
-    # 3. 构造消息并调用 LLM
+    # 2. 构造消息并调用 LLM
     messages = [
         {"role": "system", "content": _PARSE_SYSTEM_PROMPT},
         {"role": "user", "content": text},
@@ -100,12 +92,12 @@ async def parse_document(
     except Exception as exc:
         raise DocParseError(f"LLM 调用失败：{_truncate(str(exc), 200)}") from exc
 
-    # 4. 解析 JSON 响应
+    # 3. 解析 JSON 响应
     parsed = _extract_json(raw)
     if parsed is None:
         raise DocParseError("LLM 返回了无法解析的响应，请重试或手动创建")
 
-    # 5. 构建响应（只取白名单字段，容错处理）
+    # 4. 构建响应（只取白名单字段，容错处理）
     result: dict[str, object] = {}
     parsed_fields: list[str] = []
 
