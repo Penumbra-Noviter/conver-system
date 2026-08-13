@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>神明 · Urban God</title>
+<style>
+:root {
+  --bg: #0a0a14; --bg2: #121222; --bg3: #1a1a30;
+  --border: #2a2a48; --border2: #3a3a58;
+  --text: #e0e0f0; --text2: #a0a0c0; --text3: #6868a0;
+  --gold: #f0c040; --gold2: #c09020; --gold-glow: rgba(240,192,64,0.15);
+  --divine: #ffd700; --divine2: #b8960f;
+  --radius: 8px; --radius2: 12px;
+  --font: -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  --tr: 200ms ease;
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+button,input,textarea,select{font-family:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 12px;outline:none;font-size:13px}
+input:focus,textarea:focus{border-color:var(--gold2)}
+
+#app{display:flex;height:100vh;flex-direction:column}
+#topbar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--border);z-index:10;flex-shrink:0}
+#topbar .logo{font-size:16px;font-weight:700;color:var(--gold);white-space:nowrap;letter-spacing:1px}
+#topbar .spacer{flex:1}
+.top-btn{padding:6px 12px;border-radius:var(--radius);font-size:12px;border:1px solid var(--border);color:var(--text2);transition:all var(--tr);white-space:nowrap}
+.top-btn:hover{background:var(--bg3);border-color:var(--border2);color:var(--text)}
+.top-btn.gold{border-color:var(--gold2);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+.top-btn.gold.active{background:var(--gold);color:#000;font-weight:600}
+
+#main{flex:1;display:flex;overflow:hidden}
+
+/* Map */
+#map-panel{flex:1;position:relative;overflow:hidden;background:var(--bg);cursor:default}
+.map-zone{position:absolute;border:1px dashed rgba(255,255,255,0.05);border-radius:6px;transition:all var(--tr);cursor:pointer;display:flex;align-items:flex-start;justify-content:center;padding-top:8px}
+.map-zone:hover{background:rgba(255,215,0,0.05);border-color:rgba(255,215,0,0.2)}
+.map-zone span{font-size:9px;color:rgba(255,255,255,0.12);letter-spacing:2px;pointer-events:none}
+.map-zone .zone-name{font-size:12px;color:var(--text3);position:absolute;bottom:6px;letter-spacing:1px}
+.map-zone .zone-people{font-size:10px;color:var(--gold);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0;transition:opacity var(--tr)}
+.map-zone:hover .zone-people{opacity:1}
+.map-zone:hover .zone-name{color:var(--gold)}
+
+/* Side Panel */
+#side-panel{width:380px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+#side-panel h2{font-size:14px;padding:12px;border-bottom:1px solid var(--border);color:var(--gold);flex-shrink:0}
+#side-content{flex:1;overflow-y:auto;padding:10px}
+.person-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;cursor:pointer;transition:all var(--tr)}
+.person-card:hover{border-color:var(--gold2)}
+.person-card .name{font-weight:600;color:var(--gold);font-size:13px}
+.person-card .desire{font-size:11px;color:var(--gold2);margin-top:3px}
+.person-card .tags{font-size:10px;color:var(--text3);margin-top:4px}
+.person-card.strong{border-left:2px solid var(--gold)}
+.person-card.weak{border-left:2px solid var(--border2)}
+.person-card .rel-network{font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5}
+.person-card .rel-network span{cursor:pointer;color:var(--text2);text-decoration:underline}
+.person-card .rel-network span:hover{color:var(--gold)}
+
+/* Detail View */
+#detail-view{display:none;flex-direction:column;height:100%}
+#detail-view.active{display:flex}
+#detail-header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+#detail-header button{font-size:12px;color:var(--text3);padding:4px 8px}
+#detail-header button:hover{color:var(--gold)}
+#detail-scroll{flex:1;overflow-y:auto;padding:12px}
+.detail-section{margin-bottom:14px}
+.detail-section h3{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.detail-section p{font-size:12px;line-height:1.6;color:var(--text2)}
+#influence-input{width:100%;min-height:60px;resize:vertical;margin-top:8px}
+#influence-btn{width:100%;padding:10px;background:var(--gold);color:#000;border-radius:var(--radius);font-weight:600;margin-top:8px;font-size:13px}
+#influence-btn:hover{background:var(--divine)}
+#influence-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+/* Push Panel */
+#push-bar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--gold2);border-radius:var(--radius2);padding:10px 20px;display:flex;align-items:center;gap:14px;z-index:50;box-shadow:0 4px 24px rgba(0,0,0,0.5)}
+#push-bar .count{font-size:13px;color:var(--gold);font-weight:600}
+#push-btn{padding:8px 18px;background:var(--divine);color:#000;border-radius:var(--radius);font-weight:600;font-size:12px;white-space:nowrap}
+#push-btn:hover{background:#ffe44d}
+#clear-influences{font-size:11px;color:var(--text3);cursor:pointer}
+#clear-influences:hover{color:var(--gold)}
+
+/* Push Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:100;display:flex;align-items:center;justify-content:center;display:none}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius2);padding:20px;width:480px;max-width:95vw;max-height:85vh;overflow-y:auto}
+.modal h2{font-size:15px;color:var(--gold);margin-bottom:14px}
+.modal label{font-size:11px;color:var(--text3);display:block;margin-bottom:4px}
+.modal input,.modal select{width:100%;margin-bottom:12px}
+.modal .btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.modal .btn{padding:8px 16px;border-radius:var(--radius);font-size:12px;font-weight:500;border:1px solid var(--border)}
+.modal .btn.gold{background:var(--gold);color:#000;border-color:var(--gold)}
+.modal .btn:hover{opacity:0.8}
+.influence-list-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.influence-list-item button{color:var(--text3);font-size:10px;padding:2px 6px;border:1px solid var(--border);border-radius:4px}
+.influence-list-item button:hover{color:var(--gold);border-color:var(--gold)}
+
+/* Results */
+.result-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px}
+.result-card .r-name{font-weight:600;color:var(--gold)}
+.result-card .r-outcome{font-size:12px;line-height:1.6;color:var(--text2);margin-top:6px}
+.result-card .r-ripple{font-size:10px;color:var(--text3);margin-top:4px;font-style:italic}
+
+/* Toast */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border2);padding:8px 18px;border-radius:var(--radius);font-size:12px;z-index:200;opacity:0;transition:opacity 300ms;pointer-events:none}
+#toast.show{opacity:1}
+#toast.success{border-color:#28c860}
+#toast.error{border-color:#e84855}
+
+/* Settings */
+#settings-modal .modal{width:500px}
+.save-slot{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
+.save-slot span{color:var(--text2)}
+.save-slot button{font-size:10px;padding:3px 8px;border:1px solid var(--border);border-radius:4px;color:var(--text3)}
+.save-slot button:hover{color:var(--gold);border-color:var(--gold)}
+
+/* Floating Nav Buttons */
+#floating-nav{position:fixed;right:16px;bottom:50%;transform:translateY(50%);z-index:40;display:flex;flex-direction:column;gap:8px}
+.float-btn{width:44px;height:44px;border-radius:50%;background:var(--bg2);border:1px solid var(--border2);color:var(--gold);font-size:18px;cursor:pointer;transition:all var(--tr);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.4);position:relative}
+.float-btn:hover{background:var(--bg3);border-color:var(--gold);transform:scale(1.08);box-shadow:0 4px 20px var(--gold-glow)}
+.float-btn .badge{position:absolute;top:-4px;right:-4px;background:var(--divine);color:#000;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+/* Favorites Modal */
+#favorites-modal .modal{width:640px;max-width:95vw}
+.fav-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.fav-tab{padding:6px 14px;font-size:12px;color:var(--text3);border-bottom:2px solid transparent;cursor:pointer;transition:all var(--tr)}
+.fav-tab:hover{color:var(--text2)}
+.fav-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.fav-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;transition:all var(--tr)}
+.fav-card:hover{border-color:var(--gold2)}
+.fav-card .fav-info{flex:1;min-width:0}
+.fav-card .fav-name{font-weight:600;color:var(--gold);font-size:12px}
+.fav-card .fav-meta{font-size:10px;color:var(--text3);margin-top:2px}
+.fav-card .fav-actions{display:flex;gap:4px;flex-shrink:0}
+.fav-card .fav-actions button{font-size:10px;padding:4px 8px;border-radius:4px;border:1px solid var(--border);color:var(--text2);white-space:nowrap}
+.fav-card .fav-actions button:hover{border-color:var(--gold);color:var(--gold)}
+.fav-card .fav-actions button.chat-btn{background:var(--gold-glow);border-color:var(--gold2);color:var(--gold)}
+.fav-card .fav-actions button.chat-btn:hover{background:var(--gold);color:#000}
+
+/* Chat Panel inside Favorites */
+#chat-panel{display:none;flex-direction:column;height:380px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:8px}
+#chat-panel.active{display:flex}
+#chat-header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0}
+#chat-header .chat-name{font-weight:600;color:var(--gold);font-size:13px}
+#chat-header .chat-back{font-size:11px;color:var(--text3);cursor:pointer}
+#chat-header .chat-back:hover{color:var(--gold)}
+#chat-messages{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.chat-msg{max-width:85%;padding:8px 12px;border-radius:10px;font-size:11px;line-height:1.5;animation:fadeIn 200ms ease}
+.chat-msg.god{align-self:flex-end;background:var(--gold);color:#000;border-bottom-right-radius:3px}
+.chat-msg.mortal{align-self:flex-start;background:var(--bg3);border:1px solid var(--border);border-bottom-left-radius:3px}
+.chat-msg.system{align-self:center;font-size:10px;color:var(--text3);font-style:italic;max-width:100%}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+#chat-input-row{display:flex;gap:6px;padding:8px;border-top:1px solid var(--border);flex-shrink:0}
+#chat-input{flex:1;font-size:11px;padding:6px 10px}
+#chat-send{padding:6px 14px;background:var(--gold);color:#000;border-radius:var(--radius);font-weight:600;font-size:11px}
+#chat-send:hover{background:var(--divine)}
+#chat-send:disabled{opacity:0.4;cursor:not-allowed}
+
+/* Codex person cards */
+.codex-person{border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;margin-bottom:6px;background:var(--bg3);cursor:pointer;transition:all var(--tr);display:flex;align-items:center}
+.codex-person:hover{border-color:var(--gold2);background:var(--gold-glow)}
+.codex-person .cp-name{font-weight:600;color:var(--gold);font-size:12px}
+.codex-person .cp-job{font-size:10px;color:var(--text2)}
+.codex-person .cp-desire{font-size:10px;color:var(--gold2);margin-top:2px}
+
+@media(max-width:768px){
+  #topbar{padding:6px 8px;gap:5px}
+  #topbar .logo{font-size:13px}
+  .top-btn{padding:4px 8px;font-size:10px}
+  #main{flex-direction:column}
+  #map-panel{flex:none;height:35vh;min-height:180px}
+  .map-zone span{font-size:7px}
+  .map-zone .zone-name{font-size:10px}
+  #side-panel{width:100%!important;flex:1;border-left:none;border-top:1px solid var(--border)}
+  #side-panel h2{font-size:12px;padding:8px 10px}
+  #push-bar{bottom:10px;padding:8px 14px;gap:8px;font-size:11px}
+  #push-bar .count{font-size:11px}
+  #push-btn{font-size:10px;padding:6px 12px}
+  .modal{width:95vw;padding:12px}
+  .person-card{padding:10px}
+  #floating-nav{right:8px;gap:6px}
+  .float-btn{width:38px;height:38px;font-size:16px}
+  #chat-panel{height:280px}
+  #favorites-modal .modal{width:98vw;padding:10px}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="topbar">
+    <div class="logo">✨ 神明 · URBAN GOD</div>
+    <div class="spacer"></div>
+    <button class="top-btn" onclick="GodGame.showSettings()">⚙️ 设置</button>
+    <button class="top-btn gold" onclick="GodGame.exportSave()">💾 导出</button>
+    <button class="top-btn" onclick="GodGame.importSave()">📂 导入</button>
+  </div>
+  <div id="main">
+    <div id="map-panel"></div>
+    <div id="side-panel">
+      <h2 id="side-title">🏙️ 新京市</h2>
+      <div id="side-content"></div>
+    </div>
+  </div>
+  <div id="floating-nav">
+    <button class="float-btn" onclick="GodGame.showFavorites()" title="收藏夹">⭐<span class="badge" id="fav-badge" style="display:none">0</span></button>
+    <button class="float-btn" onclick="GodGame.showCodex()" title="世界百科">📖</button>
+  </div>
+  <div id="push-bar" style="display:none">
+    <span class="count" id="push-count">0 个影响待推演</span>
+    <button id="clear-influences" onclick="GodGame.clearInfluences()">清空</button>
+    <button id="push-btn" onclick="GodGame.openPushModal()">⚡ 推演</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="push-modal">
+  <div class="modal">
+    <h2>⚡ 神意推演</h2>
+    <label>推演时长</label>
+    <select id="push-duration">
+      <option value="1h">1 小时</option>
+      <option value="6h">6 小时</option>
+      <option value="1d" selected>1 天</option>
+      <option value="3d">3 天</option>
+      <option value="1w">1 周</option>
+      <option value="1m">1 个月</option>
+      <option value="3m">3 个月</option>
+      <option value="6m">6 个月</option>
+      <option value="1y">1 年</option>
+    </select>
+    <label>当前施加的影响（可在此修改或取消）</label>
+    <div id="influence-review" style="max-height:200px;overflow-y:auto"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="GodGame.closePushModal()">取消</button>
+      <button class="btn gold" onclick="GodGame.executePush()">✨ 确认推演</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h2>⚙️ 设置</h2>
+    <label>API 端点</label><input id="cfg-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+    <label>API Key</label><input id="cfg-apikey" type="password" placeholder="sk-xxx">
+    <label>模型 <span id="model-hint" style="font-size:9px;color:var(--text3)"></span></label><select id="cfg-model"><option value="deepseek-chat">deepseek-chat</option><option value="deepseek-reasoner">deepseek-reasoner</option></select>
+    <label>推理强度</label><select id="cfg-reasoning"><option value="max" selected>最大</option><option value="high">高</option><option value="medium">中</option></select>
+    <label>输出 Token 限制</label><select id="cfg-maxtokens"><option value="unlimited" selected>无限制</option><option value="2048">2048</option><option value="4096">4096</option><option value="8192">8192</option><option value="16384">16384</option></select>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn" onclick="GodGame.testConnection()">🔌 测试</button>
+      <button class="btn gold" onclick="GodGame.saveSettings()">保存设置</button>
+    </div>
+    <label>💾 存档管理</label>
+    <div style="display:flex;gap:4px;margin-bottom:6px">
+      <button class="btn" onclick="GodGame.saveSlot(0)" style="flex:1;font-size:10px">💾 存槽1</button>
+      <button class="btn" onclick="GodGame.saveSlot(1)" style="flex:1;font-size:10px">💾 存槽2</button>
+      <button class="btn" onclick="GodGame.saveSlot(2)" style="flex:1;font-size:10px">💾 存槽3</button>
+    </div>
+    <div id="save-slots"></div>
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn" onclick="GodGame.restart()" style="color:#e84855;border-color:#e84855">🔄 重新开始</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="result-modal">
+  <div class="modal" style="width:600px;max-width:95vw">
+    <h2>📜 推演结果</h2>
+    <div id="result-content" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="btn-row">
+      <button class="btn gold" onclick="document.getElementById('result-modal').classList.remove('show')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="codex-modal">
+  <div class="modal" style="width:550px;max-width:95vw">
+    <h2>📖 世界百科</h2>
+    <div id="codex-content"></div>
+    <div class="btn-row"><button class="btn gold" onclick="document.getElementById('codex-modal').classList.remove('show')">关闭</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="favorites-modal">
+  <div class="modal">
+    <h2>⭐ 收藏夹</h2>
+    <div class="fav-tabs">
+      <div class="fav-tab active" onclick="GodGame.switchFavTab('list')" id="fav-tab-list">📋 列表</div>
+      <div class="fav-tab" onclick="GodGame.switchFavTab('chat')" id="fav-tab-chat" style="display:none">💬 私聊</div>
+    </div>
+    <div id="fav-list-panel" style="max-height:50vh;overflow-y:auto"></div>
+    <div id="chat-panel">
+      <div id="chat-header">
+        <span class="chat-back" onclick="GodGame.closeChat()">← 返回列表</span>
+        <span class="chat-name" id="chat-partner-name"></span>
+        <span style="flex:1"></span>
+        <span style="font-size:10px;color:var(--text3)" id="chat-context-hint"></span>
+      </div>
+      <div id="chat-messages"></div>
+      <div id="chat-input-row">
+        <input id="chat-input" placeholder="以神明身份与ta对话…" onkeydown="if(event.key==='Enter')GodGame.sendChatMessage()">
+        <button id="chat-send" onclick="GodGame.sendChatMessage()">发送</button>
+      </div>
+    </div>
+    <div class="btn-row"><button class="btn" onclick="GodGame.closeFavorites()">关闭</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<input type="file" id="import-file" accept=".json" style="display:none" onchange="GodGame.handleImport(event)">
+
+<script>
+// ============================================================
+// 神明 · Urban God — Game Engine
+// ============================================================
+
+const D = { endpoint:'https://api.deepseek.com/v1/chat/completions', key:'', model:'deepseek-chat', reasoning:'max', maxTokens:'unlimited' };
+const QUALITY_RULES = '【角色扮演质量规则】保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设，剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。';
+function loadCfg(){ try{return JSON.parse(localStorage.getItem('god_config')||'{}');}catch(e){return{}} }
+function saveCfg(c){ localStorage.setItem('god_config',JSON.stringify(c)); }
+
+const DISTRICTS = [
+  { id:'west', name:'西城区', left:2, top:2, w:33, h:33, desc:'老城区，居民密集，市井气息浓厚' },
+  { id:'central', name:'中环区', left:35, top:2, w:30, h:28, desc:'商业核心，白领云集，觉醒者秘密聚点所在地' },
+  { id:'east', name:'东港区', left:65, top:2, w:33, h:33, desc:'港口新区，科技公司与地下黑市并存' },
+  { id:'south', name:'南湾区', left:2, top:36, w:33, h:28, desc:'大学城与住宅区，年轻人和知识分子聚集' },
+  { id:'downtown', name:'市中心', left:35, top:31, w:30, h:30, desc:'政府机构与商业广场，权力中心' },
+  { id:'devzone', name:'开发区', left:65, top:36, w:33, h:28, desc:'新兴工业区，工人和移民居多' },
+  { id:'oldtown', name:'旧城区', left:2, top:65, w:47, h:33, desc:'贫民区与流浪者聚集地，城市底层' },
+  { id:'underground', name:'地下街区', left:50, top:65, w:48, h:33, desc:'地下市场、觉醒者黑市，法外之地' }
+];
+
+const GodGame = {
+  state: {
+    currentDistrict: null,
+    people: [],
+    peopleCache: {},
+    keptPeople: [],
+    selectedPerson: null,
+    influences: [],
+    intervenedPeople: [],
+    worldMemory: [],
+    fusedMemory: [],
+    history: [],
+    worldTime: '2047年3月15日 08:00',
+    globalFlags: {},
+    favorites: [],
+    chatHistory: {},
+    currentChatPid: null
+  },
+  apiBusy: false,
+
+  init() {
+    // Always render map first, auto-save loading happens asynchronously
+    this.renderMap();
+    this.renderSaveSlots();
+    this.applyConfig();
+    
+    // Try loading auto-save (non-blocking, wrapped in safety)
+    setTimeout(() => {
+      try {
+        if (this.loadAutoSave()) {
+          this.renderMap();
+          this.updateFavBadge();
+          document.getElementById('side-content').innerHTML = '<div style="padding:12px;font-size:12px;color:var(--t2)"><b style="color:var(--g);font-size:14px">✨ 欢迎回来，神明</b><br><br>时间：'+this.state.worldTime+'<br>记忆：'+this.state.worldMemory.length+'条<br>干预：'+(this.state.intervenedPeople||[]).length+'人<br><br>👆 点击地图继续</div>';
+        }
+      } catch(_) {}
+    }, 100);
+    
+    document.getElementById('side-title').textContent = '🏙️ 新京市';
+    document.getElementById('side-content').innerHTML = '<div style="padding:12px;font-size:12px;color:var(--t2)"><b style="color:var(--g);font-size:14px">✨ 神明视角</b><br><br>新京市·2047年。表面正常的沿海大都市。约0.1%人有异能。<br>你是无所不能的神明，观察凡人，施加神意。<br><br><b>👆 点击地图区域开始</b></div>';
+    this.updateFavBadge();
+  },
+  restart() {
+    if (!confirm('确定重新开始吗？所有进度将被清除。')) return;
+    localStorage.removeItem('god_autosave');
+    this.state = {
+      currentDistrict: null, people: [], peopleCache: {}, keptPeople: [],
+      selectedPerson: null, influences: [], intervenedPeople: [],
+      worldMemory: [], fusedMemory: [], history: [],
+      worldTime: '2047年3月15日 08:00', globalFlags: {},
+      favorites: [], chatHistory: {}, currentChatPid: null
+    };
+    this.renderMap();
+    this.updatePushBar();
+    this.updateFavBadge();
+    document.getElementById('side-title').textContent = '🏙️ 新京市';
+    document.getElementById('side-content').innerHTML = '<div style="padding:12px;font-size:12px;color:var(--t2)"><b style="color:var(--g);font-size:14px">✨ 神明视角</b><br><br>新京市·2047年。表面正常的沿海大都市。约0.1%人有异能。<br>你是无所不能的神明，观察凡人，施加神意。<br><br><b>👆 点击地图区域开始</b></div>';
+    this.toast('世界已重置', 'success');
+  },
+  updateFavBadge() {
+    const badge = document.getElementById('fav-badge');
+    if (!badge) return;
+    const count = this.state.favorites.length;
+    if (count > 0) { badge.style.display = 'flex'; badge.textContent = count; }
+    else { badge.style.display = 'none'; }
+  },
+
+  renderMap() {
+    const map = document.getElementById('map-panel');
+    map.innerHTML = '';
+    DISTRICTS.forEach(d => {
+      const div = document.createElement('div');
+      div.className = 'map-zone';
+      div.style.cssText = `left:${d.left}%;top:${d.top}%;width:${d.w}%;height:${d.h}%`;
+      div.innerHTML = `<span>${d.name}</span><div class="zone-name">${d.name}</div><div class="zone-people">点击进入</div>`;
+      div.onclick = () => this.selectDistrict(d);
+      map.appendChild(div);
+    });
+  },
+
+  async selectDistrict(district) {
+    this.state.currentDistrict = district;
+    this.state.selectedPerson = null;
+    this.state.keptPeople = [];
+    document.getElementById('side-title').textContent = '🏙️ ' + district.name;
+    // Use cache if available
+    if (this.state.peopleCache[district.id]) {
+      this.state.people = JSON.parse(JSON.stringify(this.state.peopleCache[district.id]));
+      this.renderPeople();
+      return;
+    }
+    document.getElementById('side-content').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)">⏳ 正在感知此区域的凡人…</div>';
+    const prompt = `你是新京市${district.name}（${district.desc}）的观察者。随机生成4-6个此刻在这片区域的典型人物。**人物必须多样化：不同年龄（18-70岁）、不同职业、不同性别、不同社会阶层，不要重复。**格式：每行一个人物，使用以下格式：
+[PERSON:姓名|年龄|职业|愿望强度(strong/weak)|愿望描述|关系网(用逗号分隔，不含本人)]
+愿望强度规则：strong=有强烈未完成的愿望/目标/困境，weak=日常生活状态。
+
+例子：
+[PERSON:陈建国|52|退休工人|strong|想找到离家出走的女儿|妻子李秀兰,女儿陈小雨,邻居老王]
+[PERSON:张丽|28|咖啡店店员|weak|今天生意好一点就行|男朋友刘洋,常客老孙]
+
+直接输出人物列表，不要加其他解释。\n'+QUALITY_RULES+'`;
+    const result = await this.callAI(prompt);
+    if (!result) {
+      document.getElementById('side-content').innerHTML = '<div style="text-align:center;color:var(--text3);padding:20px">❌ 感知失败，请重试</div>';
+      return;
+    }
+    this.parsePeople(result.content);
+    // Cache the result
+    this.state.peopleCache[district.id] = JSON.parse(JSON.stringify(this.state.people));
+    this.renderPeople();
+  },
+
+  parsePeople(text) {
+    this.state.people = [];
+    const lines = text.split('\n');
+    lines.forEach(line => {
+      const m = line.match(/\[PERSON:(.+?)\]/);
+      if (!m) return;
+      const parts = m[1].split('|');
+      if (parts.length < 5) return;
+      this.state.people.push({
+        name: parts[0].trim(),
+        age: parts[1].trim(),
+        job: parts[2].trim(),
+        desireStrength: parts[3].trim() === 'strong' ? 'strong' : 'weak',
+        desire: parts[4].trim(),
+        relations: (parts[5]||'').split(',').map(s => s.trim()).filter(Boolean),
+        id: 'p'+Date.now()+Math.random().toString(36).slice(2,6)
+      });
+    });
+  },
+
+  renderPeople() {
+    const container = document.getElementById('side-content');
+    const people = this.state.people;
+    if (!people.length) {
+      container.innerHTML = '<div style="color:var(--text3);padding:20px;text-align:center">此区域暂无感知到的人</div>';
+      return;
+    }
+    const strong = people.filter(p => p.desireStrength === 'strong');
+    const weak = people.filter(p => p.desireStrength === 'weak');
+    let html = '';
+    if (strong.length) {
+      html += '<div style="font-size:11px;color:var(--gold);margin-bottom:6px">🔥 有强烈愿望 (' + strong.length + '人)</div>';
+      strong.forEach(p => html += this.personCardHTML(p));
+    }
+    if (weak.length) {
+      html += '<div style="font-size:11px;color:var(--text3);margin:10px 0 6px">😐 日常生活 (' + weak.length + '人)</div>';
+      weak.forEach(p => html += this.personCardHTML(p));
+    }
+    html += '<div style="margin-top:10px"><button onclick="GodGame.refreshPeople()" style="font-size:11px;color:var(--gold2);border:1px solid var(--border);border-radius:4px;padding:4px 10px">🔄 刷新' + (this.state.keptPeople.length ? '（保留' + this.state.keptPeople.length + '人）' : '') + '</button></div>';
+    container.innerHTML = html;
+  },
+
+  personCardHTML(p) {
+    const cls = p.desireStrength === 'strong' ? 'strong' : 'weak';
+    const kept = this.state.keptPeople.includes(p.id);
+    const favd = this.state.favorites.some(f => f.id === p.id);
+    const relHTML = p.relations.length ? '<div class="rel-network">👥 ' + p.relations.map((r,i) => '<span onclick="event.stopPropagation();GodGame.followPerson(\''+r+'\')">'+r+'</span>').join(' · ') + '</div>' : '';
+    return `<div class="person-card ${cls}" onclick="GodGame.selectPerson('${p.id}')">
+      <div class="name">${p.name} · ${p.age}岁 · ${p.job}
+        <span style="float:right;display:flex;gap:4px">
+          <button onclick="event.stopPropagation();GodGame.toggleFavorite('${p.id}')" style="font-size:10px;color:${favd?'var(--gold)':'var(--text3)'};border:1px solid ${favd?'var(--gold)':'var(--border)'};border-radius:3px;padding:1px 5px">${favd?'⭐':'☆ 收藏'}</button>
+          <button onclick="event.stopPropagation();GodGame.toggleKeep('${p.id}')" style="font-size:10px;color:${kept?'var(--gold)':'var(--text3)'};border:1px solid ${kept?'var(--gold)':'var(--border)'};border-radius:3px;padding:1px 5px">${kept?'★ 已保留':'☆ 保留'}</button>
+        </span>
+      </div>
+      <div class="desire">💭 ${p.desire}</div>
+      <div class="tags">${p.desireStrength==='strong'?'🔥 强烈愿望':'😐 日常'}</div>
+      ${relHTML}
+    </div>`;
+  },
+
+  selectPerson(pid) {
+    const p = this.state.people.find(x => x.id === pid);
+    if (!p) return;
+    this.state.selectedPerson = p;
+    // Check cache for detail
+    if (p._detail) { this.renderDetailView(p, p._detail); return; }
+    this.showDetailView();
+  },
+
+  followPerson(name) {
+    if (!name) return;
+    
+    const existing = this.state.people.find(p => p.name === name);
+    if (existing) {
+      this.selectPerson(existing.id);
+    } else {
+      // Search for this person globally via AI
+      this.searchPerson(name);
+    }
+  },
+
+  async searchPerson(name) {
+    const prompt = `请描述新京市中一位名叫"${name}"的人物。格式：
+[PERSON:${name}|年龄|职业|愿望强度(strong/weak)|愿望描述|关系网]
+尽量合理。直接输出，不要其他内容。\n'+QUALITY_RULES+'`;
+    const result = await this.callAI(prompt);
+    if (!result) return;
+    this.parsePeople(result.content);
+    const found = this.state.people.find(p => p.name === name);
+    if (found) {
+      this.state.people.push(found);
+      this.selectPerson(found.id);
+    }
+  },
+
+  async showDetailView() {
+    const p = this.state.selectedPerson;
+    if (!p) return;
+    const container = document.getElementById('side-content');
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)">⏳ 获取详细信息…</div>';
+    const prompt = `请为以下人物生成详细信息（JSON格式）：
+姓名：${p.name}，年龄：${p.age}，职业：${p.job}，愿望：${p.desire}
+请包含：
+1. 生平简介（2-3句话）
+2. 家庭情况（1-2句话）
+3. 当前要做的事情（今天/本周的实际行动计划，1-2句话）
+4. 愿望详情（为什么有这个愿望，以及实现障碍，2-3句话）
+5. 扩展关系网（列出2-4个相关人物及其关系）
+
+输出格式（JSON）：
+{
+  "bio": "生平简介",
+  "family": "家庭情况",
+  "currentAction": "当前要做的事",
+  "desireDetail": "愿望详情",
+  "extendedRelations": ["名字-关系", "名字-关系"]
+}
+只输出JSON，不要其他内容。\n'+QUALITY_RULES+'`;
+    
+    try {
+      const result = await this.callAI(prompt);
+      if (!result) { container.innerHTML = '<div style="color:var(--text3);padding:20px">获取失败</div>'; return; }
+      let detail;
+      try {
+        const jsonStr = result.content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        detail = JSON.parse(jsonStr);
+      } catch(e) {
+        detail = { bio: result.content, family:'未知', currentAction:'未知', desireDetail:'未知', extendedRelations:[] };
+      }
+      this.renderDetailView(p, detail);
+      // Cache detail on person object
+      p._detail = detail;
+    } catch(e) {
+      container.innerHTML = '<div style="color:var(--text3);padding:20px">获取失败</div>';
+    }
+  },
+
+  renderDetailView(person, detail) {
+    const container = document.getElementById('side-content');
+    const rels = [...person.relations, ...(detail.extendedRelations||[])];
+    const uniRels = [...new Set(rels)];
+    container.innerHTML = `
+      <button onclick="GodGame.backToPeople()" style="color:var(--gold);font-size:12px;margin-bottom:12px;display:block">← 返回人物列表</button>
+      <div class="detail-section"><h3>👤 基本信息</h3><p><b>${person.name}</b> · ${person.age}岁 · ${person.job}</p></div>
+      <div class="detail-section"><h3>📖 生平</h3><p>${detail.bio||'未知'}</p></div>
+      <div class="detail-section"><h3>👨‍👩‍👧 家庭</h3><p>${detail.family||'未知'}</p></div>
+      <div class="detail-section"><h3>💭 愿望</h3><p>${detail.desireDetail||person.desire}</p></div>
+      <div class="detail-section"><h3>📋 当下要做的事</h3><p>${detail.currentAction||'未知'}</p></div>
+      <div class="detail-section"><h3>👥 关系网</h3><p>${uniRels.map(r => '<span style="cursor:pointer;text-decoration:underline;color:var(--gold2)" onclick="GodGame.followPerson(\''+r.split('-')[0].trim()+'\')">'+r+'</span>').join(' · ') || '暂无'}</p></div>
+      <div class="detail-section">
+        <h3>✨ 施加影响</h3>
+        <textarea id="influence-input" placeholder="以神的身份对${person.name}施加影响…&#10;例如：让他在下班路上遇到一位老朋友&#10;或者：让他捡到一张中奖彩票">${this.getExistingInfluence(person.id)}</textarea>
+        <button id="influence-btn" onclick="GodGame.addInfluence('${person.id}')">💫 保存影响</button>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">影响不会立即生效，将在推演时统一处理</div>
+      </div>
+    `;
+    document.getElementById('side-title').textContent = '👤 ' + person.name;
+  },
+
+  getExistingInfluence(pid) {
+    const inf = this.state.influences.find(i => i.personId === pid);
+    return inf ? inf.text : '';
+  },
+
+  addInfluence(pid) {
+    const text = document.getElementById('influence-input').value.trim();
+    if (!text) { this.toast('请输入影响内容', 'error'); return; }
+    const person = this.state.people.find(p => p.id === pid);
+    if (!person) return;
+    const existing = this.state.influences.findIndex(i => i.personId === pid);
+    if (existing >= 0) {
+      this.state.influences[existing].text = text;
+    } else {
+      this.state.influences.push({ personId: pid, personName: person.name, text });
+    }
+    // Track as intervened person
+    if (!this.state.intervenedPeople.find(x => x.id === pid)) {
+      this.state.intervenedPeople.push({ id: pid, name: person.name, age: person.age, job: person.job, desire: person.desire, lastInfluence: text, time: this.state.worldTime });
+    }
+    this.updatePushBar();
+    this.toast('影响已保存：' + person.name, 'success');
+    this.autoSave();
+  },
+
+  toggleKeep(pid) {
+    const idx = this.state.keptPeople.indexOf(pid);
+    if (idx >= 0) this.state.keptPeople.splice(idx, 1);
+    else this.state.keptPeople.push(pid);
+    this.renderPeople();
+  },
+
+  refreshPeople() {
+    const d = this.state.currentDistrict;
+    if (!d) return;
+    // Keep only marked people, refresh the rest
+    const kept = this.state.people.filter(p => this.state.keptPeople.includes(p.id));
+    delete this.state.peopleCache[d.id];
+    this.selectDistrict(d).then(() => {
+      // Merge kept people back
+      if (kept.length) {
+        this.state.people = [...kept, ...this.state.people.filter(p => !kept.some(k => k.id === p.id))];
+        this.renderPeople();
+      }
+    });
+  },
+
+  updatePushBar() {
+    const bar = document.getElementById('push-bar');
+    const count = document.getElementById('push-count');
+    if (this.state.influences.length === 0) {
+      bar.style.display = 'none';
+    } else {
+      bar.style.display = 'flex';
+      count.textContent = this.state.influences.length + ' 个影响待推演';
+    }
+  },
+
+  clearInfluences() {
+    if (!confirm('确定清空所有未推演的影响吗？')) return;
+    this.state.influences = [];
+    this.updatePushBar();
+    this.toast('已清空', 'success');
+  },
+
+  openPushModal() {
+    document.getElementById('push-modal').classList.add('show');
+    this.renderInfluenceReview();
+  },
+
+  closePushModal() {
+    document.getElementById('push-modal').classList.remove('show');
+  },
+
+  renderInfluenceReview() {
+    const container = document.getElementById('influence-review');
+    if (this.state.influences.length === 0) {
+      container.innerHTML = '<div style="color:var(--text3);padding:10px">暂无影响</div>';
+      return;
+    }
+    container.innerHTML = this.state.influences.map((inf, i) => `
+      <div class="influence-list-item">
+        <span><b>${inf.personName}</b>：${inf.text.substring(0,50)}${inf.text.length>50?'…':''}</span>
+        <span>
+          <button onclick="GodGame.editInfluence(${i})">✏️</button>
+          <button onclick="GodGame.removeInfluence(${i})">✕</button>
+        </span>
+      </div>
+    `).join('');
+  },
+
+  editInfluence(idx) {
+    const inf = this.state.influences[idx];
+    if (!inf) return;
+    const newText = prompt('修改对' + inf.personName + '的影响：', inf.text);
+    if (newText && newText.trim()) {
+      inf.text = newText.trim();
+      this.renderInfluenceReview();
+    }
+    this.closePushModal();
+    setTimeout(() => this.openPushModal(), 100);
+  },
+
+  removeInfluence(idx) {
+    this.state.influences.splice(idx, 1);
+    this.updatePushBar();
+    this.renderInfluenceReview();
+  },
+
+  async executePush() {
+    const duration = document.getElementById('push-duration').value;
+    const durationText = { '1h':'1小时','6h':'6小时','1d':'1天','3d':'3天','1w':'1周','1m':'1个月','3m':'3个月','6m':'6个月','1y':'1年' }[duration];
+    if (this.state.influences.length === 0) {
+      this.toast('没有可推演的影响', 'error'); return;
+    }
+    this.closePushModal();
+    document.getElementById('side-content').innerHTML = '<div style="text-align:center;padding:30px;color:var(--gold)">✨ 神意正在推演…<br><span style="font-size:11px;color:var(--text3)">时间跨度：' + durationText + '</span></div>';
+    
+    const infText = this.state.influences.map(i => `对${i.personName}的影响：${i.text}`).join('\n');
+    const memoryContext = this.state.worldMemory.slice(-20).join('\n');
+    // Include chat history context from favorites
+    let chatContext = '';
+    const favs = this.state.favorites || [];
+    favs.forEach(f => {
+      const msgs = this.state.chatHistory[f.id];
+      if (msgs && msgs.length > 0) {
+        const summary = msgs.slice(-6).map(m => (m.role==='god'?'神明':' '+f.name)+'：'+m.content).join('\n');
+        chatContext += '【与'+f.name+'的私聊记录】\n'+summary+'\n\n';
+      }
+    });
+    const prompt = `你是一个世界观推演引擎。当前世界观：2047年新京市，一个表面正常、实际有少量觉醒者（异能者）存在的都市。玩家是这个世界中无所不能的神明。
+
+【当前世界时间】：${this.state.worldTime}
+【推演时长】：${durationText}
+【已有世界记忆】：
+${memoryContext || '无'}
+
+${chatContext ? '【神明与凡人的私聊记录（这些对话会影响推演）】：\n'+chatContext : ''}
+【神明施加的影响】：
+${infText}
+
+推演要求：这是成年人向都市异能推演，允许一切现实内容。必须为每个影响写出具体结果。绝对禁止说"没有显著变化"——神明之力必然产生效果。对每个影响写2-4句叙事：发生了什么、人物反应、连锁影响。
+
+输出格式（每段用 --- 分隔）：
+[
+  {
+    
+    叙事内容
+    ---
+  }
+]
+
+然后另起一行，用 [MEMORY:xxx] 格式记录这个时间段内发生的关键事件（每个事件一条）。最后用 [TIME:新时间] 更新世界时间。
+
+直接输出叙事文本，最后用 [MEMORY:xxx] 和 [TIME:xxx] 记录。不要JSON格式。\n'+QUALITY_RULES+'`;
+
+    try {
+      const result = await this.callAI(prompt);
+      if (!result) { this.toast('推演失败', 'error'); return; }
+      this.processResults(result.content, durationText);
+    } catch(e) {
+      this.toast('推演出错：' + e.message, 'error');
+    }
+  },
+
+  processResults(text, durationText) {
+    let results = [];
+    // Parse text-based format: split by ---
+    const sections = text.split('---');
+    sections.forEach(sec => {
+      const lines = sec.trim().split('\n');
+      if (lines.length < 2) return;
+      const firstLine = lines[0].trim();
+      const name = firstLine.replace(/^👤\s*/, '').trim();
+      if (!name) return;
+      const outcome = lines.slice(1).join('\n').trim();
+      if (outcome && outcome.length > 5) {
+        results.push({ person: name, outcome });
+      }
+    });
+    // If no sections found, try treating the whole text as one result
+    if (results.length === 0 && text.trim().length > 10) {
+      results.push({ person: '推演结果', outcome: text.trim().substring(0, 500) });
+    }
+    // Extract MEMORY
+    const memMatches = text.match(/\[MEMORY:(.+?)\]/g);
+    if (memMatches) {
+      memMatches.forEach(m => {
+        const content = m.slice(8,-1).trim();
+        if (!this.state.worldMemory.includes(content)) this.state.worldMemory.push(content);
+      });
+      while (this.state.worldMemory.length > 60) {
+        const old = this.state.worldMemory.splice(0,20);
+        if (!this.state.fusedMemory) this.state.fusedMemory = [];
+        this.state.fusedMemory.push(old.join('；'));
+        while (this.state.fusedMemory.length > 8) this.state.fusedMemory.shift();
+      }
+    }
+    // Extract TIME
+    const timeMatch = text.match(/\[TIME:(.+?)\]/);
+    if (timeMatch) this.state.worldTime = timeMatch[1].trim();
+    
+    // Clear influences and people cache (so re-clicking district shows updated world)
+    this.state.influences = [];
+    this.state.peopleCache = {};
+    this.state.people = [];
+    this.updatePushBar();
+    
+    // Show results
+    this.showResults(results, durationText);
+    // Update world display
+    const td = document.getElementById('world-time-display');
+    if (td) td.textContent = this.state.worldTime;
+    const md = document.getElementById('world-memory-display');
+    if (md) md.textContent = this.state.worldMemory.slice(-5).join(' | ') || '暂无记录';
+    // Reset side panel to district view
+    document.getElementById('side-title').textContent = '🏙️ ' + (this.state.currentDistrict?.name || '新京市');
+    document.getElementById('side-content').innerHTML = '<div style="text-align:center;color:var(--text3);padding:20px">推演完成。点击地图区域观察新变化。</div>';
+    this.autoSave();
+  },
+
+  showResults(results, durationText) {
+    const container = document.getElementById('result-content');
+    if (!results.length) {
+      container.innerHTML = '<div style="color:var(--text3);padding:20px;text-align:center">推演完成，但未产生显著结果。</div>';
+    } else {
+      container.innerHTML = results.map(r => `
+        <div class="result-card">
+          <div class="r-name">👤 ${r.person||'某人'}</div>
+          <div class="r-outcome">${r.outcome||''}</div>
+          ${(r.rippleEffects||[]).map(e => '<div class="r-ripple">🌊 ' + e + '</div>').join('')}
+        </div>
+      `).join('');
+      container.innerHTML += '<div style="font-size:10px;color:var(--text3);margin-top:10px">⏱ 推演时长：' + durationText + ' | 世界时间：' + this.state.worldTime + '</div>';
+    }
+    document.getElementById('result-modal').classList.add('show');
+  },
+
+  backToPeople() {
+    this.state.selectedPerson = null;
+    document.getElementById('side-title').textContent = '🏙️ ' + (this.state.currentDistrict?.name || '新京市');
+    if (!this.state.currentDistrict) {
+      const td = document.getElementById('world-time-display');
+      if (td) td.textContent = this.state.worldTime;
+      const md = document.getElementById('world-memory-display');
+      if (md) md.textContent = this.state.worldMemory.slice(-5).join(' | ') || '暂无记录';
+    }
+    this.renderPeople();
+    this.updatePushBar();
+    this.updateFavBadge();
+  },
+
+  /* ---- Favorites ---- */
+  toggleFavorite(pid) {
+    const p = this.state.people.find(x => x.id === pid);
+    if (!p) return;
+    const idx = this.state.favorites.findIndex(f => f.id === pid);
+    if (idx >= 0) {
+      this.state.favorites.splice(idx, 1);
+      this.toast('已取消收藏：' + p.name);
+    } else {
+      this.state.favorites.push({ id: p.id, name: p.name, age: p.age, job: p.job, desire: p.desire, desireStrength: p.desireStrength, relations: p.relations, _detail: p._detail || null });
+      this.toast('已收藏：' + p.name, 'success');
+    }
+    this.updateFavBadge();
+    this.renderPeople();
+    this.autoSave();
+  },
+  removeFavorite(pid) {
+    const idx = this.state.favorites.findIndex(f => f.id === pid);
+    if (idx >= 0) { this.state.favorites.splice(idx, 1); this.updateFavBadge(); this.renderFavList(); this.autoSave(); }
+  },
+  showFavorites() {
+    this.state.currentChatPid = null;
+    document.getElementById('chat-panel').classList.remove('active');
+    document.getElementById('fav-list-panel').style.display = 'block';
+    document.getElementById('fav-tab-chat').style.display = 'none';
+    document.getElementById('fav-tab-list').classList.add('active');
+    document.getElementById('fav-tab-chat').classList.remove('active');
+    this.renderFavList();
+    document.getElementById('favorites-modal').classList.add('show');
+  },
+  closeFavorites() {
+    document.getElementById('favorites-modal').classList.remove('show');
+  },
+  favViewDetail(pid) {
+    this.closeFavorites();
+    this.codexViewPerson(pid);
+  },
+  switchFavTab(tab) {
+    if (tab === 'list') {
+      this.closeChat();
+    }
+  },
+  renderFavList() {
+    const container = document.getElementById('fav-list-panel');
+    const favs = this.state.favorites;
+    if (!favs.length) {
+      container.innerHTML = '<div style="color:var(--text3);padding:20px;text-align:center">收藏夹为空<br><span style="font-size:10px">在人物卡片上点击 ☆收藏 即可添加</span></div>';
+      return;
+    }
+    container.innerHTML = favs.map(f => `
+      <div class="fav-card">
+        <div class="fav-info">
+          <div class="fav-name">${f.name} · ${f.age}岁 · ${f.job}</div>
+          <div class="fav-meta">💭 ${f.desire}</div>
+        </div>
+        <div class="fav-actions">
+          <button class="chat-btn" onclick="GodGame.openChat('${f.id}')">💬 私聊</button>
+          <button onclick="GodGame.favViewDetail('${f.id}')" style="font-size:10px;padding:4px 8px;border-radius:4px;border:1px solid var(--border);color:var(--text2);cursor:pointer">📋 详情</button>
+          <button onclick="GodGame.codexInfluence('${f.id}','${f.name.replace(/'/g,"\\'")}')">✨ 影响</button>
+          <button onclick="GodGame.removeFavorite('${f.id}')">✕</button>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  /* ---- Private Chat ---- */
+  openChat(pid) {
+    const f = this.state.favorites.find(x => x.id === pid);
+    if (!f) return;
+    this.state.currentChatPid = pid;
+    document.getElementById('fav-list-panel').style.display = 'none';
+    document.getElementById('chat-panel').classList.add('active');
+    document.getElementById('chat-partner-name').textContent = '💬 ' + f.name;
+    document.getElementById('chat-context-hint').textContent = f.job + ' · ' + f.age + '岁';
+    document.getElementById('fav-tab-list').classList.remove('active');
+    document.getElementById('fav-tab-chat').classList.add('active');
+    document.getElementById('fav-tab-chat').style.display = 'block';
+    this.renderChatMessages(pid);
+    document.getElementById('chat-input').focus();
+  },
+  closeChat() {
+    this.state.currentChatPid = null;
+    document.getElementById('chat-panel').classList.remove('active');
+    document.getElementById('fav-list-panel').style.display = 'block';
+    document.getElementById('fav-tab-chat').style.display = 'none';
+    document.getElementById('fav-tab-list').classList.add('active');
+    document.getElementById('fav-tab-chat').classList.remove('active');
+    this.renderFavList();
+  },
+  renderChatMessages(pid) {
+    const container = document.getElementById('chat-messages');
+    const msgs = this.state.chatHistory[pid] || [];
+    if (!msgs.length) {
+      const f = this.state.favorites.find(x => x.id === pid);
+      container.innerHTML = '<div class="chat-msg system">这是你与' + (f?f.name:'ta') + '的私聊。作为神明，你可以直接与ta对话、询问近况、给予暗示。对话内容将影响后续推演。</div>';
+      return;
+    }
+    container.innerHTML = msgs.map(m => {
+      if (m.role === 'system') return '<div class="chat-msg system">' + m.content + '</div>';
+      return '<div class="chat-msg ' + (m.role === 'god' ? 'god' : 'mortal') + '">' + m.content + '</div>';
+    }).join('');
+    container.scrollTop = container.scrollHeight;
+  },
+  async sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    const pid = this.state.currentChatPid;
+    if (!pid) return;
+    const f = this.state.favorites.find(x => x.id === pid);
+    if (!f) return;
+    // Add god message
+    if (!this.state.chatHistory[pid]) this.state.chatHistory[pid] = [];
+    this.state.chatHistory[pid].push({ role: 'god', content: text });
+    input.value = '';
+    this.renderChatMessages(pid);
+    document.getElementById('chat-send').disabled = true;
+    document.getElementById('chat-input').disabled = true;
+    // Build AI prompt for character response
+    const chatLog = this.state.chatHistory[pid].slice(-10).map(m => (m.role === 'god' ? '神明：' : '') + m.content).join('\n');
+    const prompt = `你正在扮演新京市的一位真实人物。你必须完全沉浸在这个角色中，像真人一样思考和说话。
+
+角色信息：
+- 姓名：${f.name}
+- 年龄：${f.age}岁
+- 职业：${f.job}
+- 愿望：${f.desire}
+- 背景：${f._detail ? (f._detail.bio||'') + ' ' + (f._detail.desireDetail||'') : '未知'}
+
+当前世界时间：${this.state.worldTime}
+
+你面前的是这个世界的神明。凡人虽然知道有神明存在，但神明以抽象的方式显现。用第一人称回复，像真实的人一样说话。回复要真实、有情感、符合角色设定。1-3句话，不要解释，不要描述动作。用中文。
+
+对话记录：
+${chatLog}
+${f.name}：
+
+'+QUALITY_RULES+'`;
+    try {
+      const result = await this.callAI(prompt);
+      if (result) {
+        this.state.chatHistory[pid].push({ role: 'mortal', content: result.content.trim() });
+        // Also track as intervened
+        if (!this.state.intervenedPeople.find(x => x.id === pid)) {
+          this.state.intervenedPeople.push({ id: pid, name: f.name, age: f.age, job: f.job, desire: f.desire, lastInfluence: '私聊：' + text, time: this.state.worldTime });
+        }
+      } else {
+        this.state.chatHistory[pid].push({ role: 'system', content: '对方没有回应…' });
+      }
+    } catch(e) {
+      this.state.chatHistory[pid].push({ role: 'system', content: '连接中断…' });
+    }
+    this.renderChatMessages(pid);
+    document.getElementById('chat-send').disabled = false;
+    document.getElementById('chat-input').disabled = false;
+    document.getElementById('chat-input').focus();
+    this.autoSave();
+  },
+
+  /* ---- Codex (updated) ---- */
+  showCodex() {
+    const ip = this.state.intervenedPeople || [];
+    const favs = this.state.favorites || [];
+    let html = '<div style="margin-bottom:12px"><b style="color:var(--gold)">🌃 新京市 2047</b><br><span style="font-size:10px;color:var(--text3)">阵营：异能者联盟 | 异能管理局 | 暗影商会 | 城市警方</span></div>';
+    html += '<div style="font-size:12px;color:var(--gold2);margin-bottom:4px">⭐ 收藏人物（' + favs.length + '人）<span style="font-size:10px;color:var(--text3)"> — 点击查看详情</span></div>';
+    if (favs.length === 0) {
+      html += '<div style="font-size:10px;color:var(--text3);padding:6px 0">暂无收藏，在人物卡片上点击 ☆收藏</div>';
+    } else {
+      favs.forEach(f => {
+        html += '<div class="codex-person" onclick="GodGame.codexViewPerson(\''+f.id+'\')"><div style="flex:1;pointer-events:none"><div class="cp-name">⭐ '+f.name+'</div><div class="cp-job">'+f.job+' · '+f.age+'岁</div><div class="cp-desire">💭 '+f.desire+'</div></div><button onclick="event.stopPropagation();GodGame.codexInfluence(\''+f.id+'\',\''+f.name.replace(/'/g,"\\'")+'\')" style="font-size:10px;padding:3px 8px;border:1px solid var(--gold2);border-radius:4px;color:var(--gold);background:transparent;cursor:pointer;flex-shrink:0;margin-left:8px">✨ 影响</button></div>';
+      });
+    }
+    html += '<div style="font-size:12px;color:var(--gold2);margin:8px 0 4px">✨ 干预人物（' + ip.length + '人）<span style="font-size:10px;color:var(--text3)"> — 点击查看详情</span></div>';
+    if (ip.length === 0) {
+      html += '<div style="font-size:10px;color:var(--text3);padding:6px 0">暂无，施加影响后自动记录</div>';
+    } else {
+      ip.forEach(p => {
+        html += '<div class="codex-person" onclick="GodGame.codexViewPerson(\''+p.id+'\')"><div style="flex:1;pointer-events:none"><div class="cp-name">'+p.name+'</div><div class="cp-job">'+p.job+'</div><div class="cp-desire">💭 '+p.desire+'</div></div><button onclick="event.stopPropagation();GodGame.codexInfluence(\''+p.id+'\',\''+p.name.replace(/'/g,"\\'")+'\')" style="font-size:10px;padding:3px 8px;border:1px solid var(--gold2);border-radius:4px;color:var(--gold);background:transparent;cursor:pointer;flex-shrink:0;margin-left:8px">✨ 影响</button></div>';
+      });
+    }
+    html += '<div style="font-size:10px;color:var(--text3);margin-top:8px">点击人物卡片查看详情 · 点击✨直接施加影响</div>';
+    document.getElementById('codex-content').innerHTML = html;
+    document.getElementById('codex-modal').classList.add('show');
+  },
+  codexInfluence(pid, name) {
+    const text = prompt('以神明的身份对' + name + '施加影响：\n（例如：让ta在下班路上遇到一位神秘人）');
+    if (!text || !text.trim()) return;
+    // Try to find person in any cache
+    let person = null;
+    // Check favorites
+    person = this.state.favorites.find(f => f.id === pid);
+    // Check people
+    if (!person) person = this.state.people.find(p => p.id === pid);
+    // Check intervened
+    if (!person) person = this.state.intervenedPeople.find(p => p.id === pid);
+    if (!person) return;
+    const existing = this.state.influences.findIndex(i => i.personId === pid);
+    if (existing >= 0) {
+      this.state.influences[existing].text = text.trim();
+    } else {
+      this.state.influences.push({ personId: pid, personName: name, text: text.trim() });
+    }
+    if (!this.state.intervenedPeople.find(x => x.id === pid)) {
+      this.state.intervenedPeople.push({ id: pid, name: name, age: person.age||'?', job: person.job||'?', desire: person.desire||'', lastInfluence: text.trim(), time: this.state.worldTime });
+    }
+    this.updatePushBar();
+    this.toast('影响已保存：' + name, 'success');
+    this.autoSave();
+    document.getElementById('codex-modal').classList.remove('show');
+  },
+
+  findPersonAnywhere(pid) {
+    let p = this.state.favorites.find(f => f.id === pid);
+    if (!p) p = this.state.people.find(x => x.id === pid);
+    if (!p) p = this.state.intervenedPeople.find(x => x.id === pid);
+    return p || null;
+  },
+
+  codexViewPerson(pid) {
+    const p = this.findPersonAnywhere(pid);
+    if (!p) return;
+    // Always open the modal first
+    document.getElementById('codex-modal').classList.add('show');
+    const container = document.getElementById('codex-content');
+    // If detail already cached, render immediately
+    if (p._detail) {
+      this.renderCodexDetail(p, p._detail);
+      return;
+    }
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)">⏳ 获取详细信息…</div>';
+    const prompt = '请为以下人物生成详细信息（JSON格式）：\n姓名：' + (p.name||'?') + '，年龄：' + (p.age||'?') + '，职业：' + (p.job||'?') + '，愿望：' + (p.desire||'?') + '\n请包含：\n1. 生平简介（2-3句话）\n2. 家庭情况（1-2句话）\n3. 当前要做的事情（今天/本周的实际行动计划，1-2句话）\n4. 愿望详情（为什么有这个愿望，以及实现障碍，2-3句话）\n5. 扩展关系网（列出2-4个相关人物及其关系）\n\n输出格式（JSON）：\n{\n  "bio": "生平简介",\n  "family": "家庭情况",\n  "currentAction": "当前要做的事",\n  "desireDetail": "愿望详情",\n  "extendedRelations": ["名字-关系", "名字-关系"]\n}\n只输出JSON，不要其他内容。\n'+QUALITY_RULES;
+    this.callAI(prompt).then(result => {
+      if (!result) { container.innerHTML = '<div style="color:var(--text3);padding:20px;text-align:center">获取失败</div>'; return; }
+      let detail;
+      try {
+        const jsonStr = result.content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        detail = JSON.parse(jsonStr);
+      } catch(e) { detail = { bio: result.content, family:'未知', currentAction:'未知', desireDetail:'未知', extendedRelations:[] }; }
+      p._detail = detail;
+      // Update cached copy in favorites too
+      const fav = this.state.favorites.find(f => f.id === pid);
+      if (fav) fav._detail = detail;
+      this.renderCodexDetail(p, detail);
+    }).catch(() => { container.innerHTML = '<div style="color:var(--text3);padding:20px;text-align:center">获取失败</div>'; });
+  },
+
+  renderCodexDetail(person, detail) {
+    const container = document.getElementById('codex-content');
+    const rels = [...(person.relations||[]), ...(detail.extendedRelations||[])];
+    const uniRels = [...new Set(rels)];
+    const existingInf = this.state.influences.find(i => i.personId === person.id);
+    container.innerHTML = '<button onclick="GodGame.codexBackToList()" style="color:var(--gold);font-size:12px;margin-bottom:12px;display:block">← 返回百科列表</button>' +
+      '<div class="detail-section"><h3>👤 基本信息</h3><p><b>' + person.name + '</b> · ' + person.age + '岁 · ' + person.job + '</p></div>' +
+      '<div class="detail-section"><h3>📖 生平</h3><p>' + (detail.bio||'未知') + '</p></div>' +
+      '<div class="detail-section"><h3>👨‍👩‍👧 家庭</h3><p>' + (detail.family||'未知') + '</p></div>' +
+      '<div class="detail-section"><h3>💭 愿望</h3><p>' + (detail.desireDetail||person.desire||'未知') + '</p></div>' +
+      '<div class="detail-section"><h3>📋 当下要做的事</h3><p>' + (detail.currentAction||'未知') + '</p></div>' +
+      '<div class="detail-section"><h3>👥 关系网</h3><p>' + (uniRels.length ? uniRels.map(r => '<span style="cursor:pointer;text-decoration:underline;color:var(--gold2)" onclick="GodGame.codexSearchPerson(\''+r.split("-")[0].trim().replace(/'/g,"\\'")+'\')">'+r+'</span>').join(' · ') : '暂无') + '</p></div>' +
+      '<div class="detail-section"><h3>✨ 施加影响</h3>' +
+      '<textarea id="codex-influence-input" style="width:100%;min-height:60px;resize:vertical;margin-top:8px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 12px;font-size:13px" placeholder="以神的身份对' + person.name + '施加影响…">' + (existingInf ? existingInf.text : '') + '</textarea>' +
+      '<button id="codex-influence-btn" onclick="GodGame.codexAddInfluence(\''+person.id+'\',\''+person.name.replace(/'/g,"\\'")+'\')" style="width:100%;padding:10px;background:var(--gold);color:#000;border-radius:var(--radius);font-weight:600;margin-top:8px;font-size:13px;cursor:pointer;border:none;">💫 保存影响</button>' +
+      '<div style="font-size:10px;color:var(--text3);margin-top:4px">影响不会立即生效，将在推演时统一处理</div></div>';
+  },
+
+  codexBackToList() { this.showCodex(); },
+
+  codexAddInfluence(pid, name) {
+    const text = document.getElementById('codex-influence-input').value.trim();
+    if (!text) { this.toast('请输入影响内容', 'error'); return; }
+    const p = this.findPersonAnywhere(pid);
+    if (!p) return;
+    const existing = this.state.influences.findIndex(i => i.personId === pid);
+    if (existing >= 0) { this.state.influences[existing].text = text; }
+    else { this.state.influences.push({ personId: pid, personName: name, text }); }
+    if (!this.state.intervenedPeople.find(x => x.id === pid)) {
+      this.state.intervenedPeople.push({ id: pid, name: name, age: p.age||'?', job: p.job||'?', desire: p.desire||'', lastInfluence: text, time: this.state.worldTime });
+    }
+    this.updatePushBar();
+    this.toast('影响已保存：' + name, 'success');
+    this.autoSave();
+  },
+
+  codexSearchPerson(name) {
+    if (!name) return;
+    document.getElementById('codex-content').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)">⏳ 搜索中…</div>';
+    this.searchPerson(name);
+    setTimeout(() => {
+      const p = this.state.people.find(x => x.name === name);
+      if (p) { this.codexViewPerson(p.id); }
+      else { document.getElementById('codex-content').innerHTML = '<div style="color:var(--text3);padding:20px;text-align:center">未找到 ' + name + '</div>'; }
+    }, 2000);
+  },
+
+  /* ---- API ---- */
+  async callAI(msg) {
+    const cfg = { ...D, ...loadCfg() };
+    if (!cfg.key) { this.toast('请先在设置中配置API Key', 'error'); return null; }
+    const body = { model:cfg.model, messages:[{role:'user', content:msg}], temperature:0.8, stream:false }; const mt = cfg.maxTokens; if(mt && mt!=='unlimited') body.max_tokens = parseInt(mt); if(cfg.reasoning) body.reasoning_effort = cfg.reasoning;
+    try {
+      const r = await fetch(cfg.endpoint, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key}, body:JSON.stringify(body) });
+      if (!r.ok) { const e = await r.text(); this.toast('API错误: '+r.status, 'error'); return null; }
+      const d = await r.json();
+      const c = d.choices?.[0];
+      return c ? { content: c.message?.content||'' } : null;
+    } catch(e) { this.toast('网络错误: '+e.message, 'error'); return null; }
+  },
+
+  /* ---- Save/Load ---- */
+  saveSlot(idx) {
+    const meta = { version:1, timestamp:new Date().toISOString(), worldTime:this.state.worldTime, memoryCount:this.state.worldMemory.length, state:JSON.parse(JSON.stringify(this.state)) };
+    localStorage.setItem('god_save_'+idx, JSON.stringify(meta));
+    this.toast('已保存到槽'+(idx+1), 'success');
+    this.renderSaveSlots();
+  },
+  loadSlot(idx) {
+    try {
+      const raw = localStorage.getItem('god_save_'+idx);
+      if (!raw) { this.toast('槽'+(idx+1)+'为空','error'); return; }
+      const m = JSON.parse(raw);
+      if (!confirm('加载槽'+(idx+1)+'？\n时间：'+m.worldTime+'\n记忆：'+(m.memoryCount||0)+'条')) return;
+      this.state = JSON.parse(JSON.stringify(m.state));
+      this.state.fusedMemory = this.state.fusedMemory || [];
+      this.state.worldMemory = this.state.worldMemory || [];
+      this.state.influences = this.state.influences || [];
+      this.state.favorites = this.state.favorites || [];
+      this.state.chatHistory = this.state.chatHistory || {};
+      this.state.currentChatPid = null;
+      this.renderMap();
+      this.updatePushBar();
+      this.toast('已加载', 'success');
+      document.getElementById('settings-modal').classList.remove('show');
+    } catch(e) { this.toast('加载失败', 'error'); }
+  },
+  deleteSlot(idx) {
+    if (!confirm('删除槽'+(idx+1)+'？')) return;
+    localStorage.removeItem('god_save_'+idx);
+    this.renderSaveSlots();
+  },
+  renderSaveSlots() {
+    const c = document.getElementById('save-slots');
+    if (!c) return;
+    let h = '';
+    for (let i=0;i<3;i++) {
+      const raw = localStorage.getItem('god_save_'+i);
+      if (raw) {
+        try {
+          const m = JSON.parse(raw);
+          h += '<div class="save-slot"><span>💾 槽'+(i+1)+'：'+m.worldTime+' | '+(m.memoryCount||0)+'条记忆</span><span><button onclick="GodGame.loadSlot('+i+')">加载</button> <button onclick="GodGame.deleteSlot('+i+')">删</button></span></div>';
+        } catch(_) { h += '<div class="save-slot"><span>💾 槽'+(i+1)+'：损坏</span><button onclick="GodGame.deleteSlot('+i+')">删</button></div>'; }
+      } else {
+        h += '<div class="save-slot"><span style="color:var(--text3)">💾 槽'+(i+1)+'：空</span></div>';
+      }
+    }
+    c.innerHTML = h;
+  },
+  exportSave() {
+    const d = { version:1, timestamp:new Date().toISOString(), state:JSON.parse(JSON.stringify(this.state)) };
+    const b = new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+    const u = URL.createObjectURL(b);
+    const a = document.createElement('a'); a.href=u; a.download='urban-god-save.json'; a.style.display='none';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(u); }, 2000);
+    this.toast('已导出','success');
+  },
+  importSave() { document.getElementById('import-file').click(); },
+  handleImport(e) {
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (!d.state) throw new Error('无效');
+        this.state = JSON.parse(JSON.stringify(d.state));
+        this.state.fusedMemory = this.state.fusedMemory || [];
+        this.state.worldMemory = this.state.worldMemory || [];
+        this.state.influences = this.state.influences || [];
+        this.state.favorites = this.state.favorites || [];
+        this.state.chatHistory = this.state.chatHistory || {};
+        this.state.currentChatPid = null;
+        this.renderMap();
+        this.updatePushBar();
+        this.toast('已导入', 'success');
+      } catch(_) { this.toast('无效存档', 'error'); }
+    };
+    r.readAsText(f);
+    e.target.value = '';
+  },
+
+  /* ---- Settings ---- */
+  showSettings() { this.applyConfig(); document.getElementById('settings-modal').classList.add('show'); this.renderSaveSlots(); this.fetchModels(); },
+  applyConfig() { const c={...D,...loadCfg()}; document.getElementById('cfg-endpoint').value=c.endpoint||D.endpoint; document.getElementById('cfg-apikey').value=c.key||''; document.getElementById('cfg-model').value=c.model||D.model; document.getElementById('cfg-reasoning').value=c.reasoning||'max'; document.getElementById('cfg-maxtokens').value=c.maxTokens||'unlimited'; },
+  modelsCache: null,
+  async fetchModels() {
+    const cfg = { ...D, ...loadCfg() };
+    if (!cfg.key) { document.getElementById('model-hint').textContent = ''; return; }
+    document.getElementById('model-hint').textContent = '(拉取中…)';
+    if (this.modelsCache && this.modelsCache.time > Date.now() - 300000) { this.popModels(this.modelsCache.data); return; }
+    try {
+      const r = await fetch(cfg.endpoint.replace('/chat/completions','/models'), { headers:{'Authorization':'Bearer '+cfg.key} });
+      if (r.ok) {
+        const d = await r.json();
+        const models = (d.data||[]).map(m=>m.id).filter(id=>id.includes('deepseek')||id.includes('chat')||id.includes('reasoner'));
+        this.modelsCache = { time:Date.now(), data:models };
+        this.popModels(models);
+      } else { document.getElementById('model-hint').textContent = ''; }
+    } catch(e) { document.getElementById('model-hint').textContent = ''; }
+  },
+  popModels(models) {
+    const sel = document.getElementById('cfg-model'); const cur = sel.value;
+    sel.innerHTML = '';
+    if (!models.length) { sel.innerHTML = '<option value="deepseek-chat">deepseek-chat</option><option value="deepseek-reasoner">deepseek-reasoner</option>'; }
+    else models.forEach(m => { const o = document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o); });
+    if ([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+    document.getElementById('model-hint').textContent = '(已加载'+sel.options.length+'个)';
+  },
+  saveSettings() {
+    const c = { endpoint:document.getElementById('cfg-endpoint').value.trim()||D.endpoint, key:document.getElementById('cfg-apikey').value.trim(), model:document.getElementById('cfg-model').value, reasoning:document.getElementById('cfg-reasoning').value, maxTokens:document.getElementById('cfg-maxtokens').value };
+    saveCfg(c); document.getElementById('settings-modal').classList.remove('show');
+    this.toast('设置已保存', 'success');
+  },
+  async testConnection() {
+    const key = document.getElementById('cfg-apikey').value.trim();
+    if (!key) { this.toast('请先输入Key', 'error'); return; }
+    this.toast('测试中…');
+    try {
+      const r = await fetch(document.getElementById('cfg-endpoint').value||D.endpoint, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+key}, body:JSON.stringify({model:document.getElementById('cfg-model').value,messages:[{role:'user',content:'回复OK'}],max_tokens:5}) });
+      if (r.ok) this.toast('连接成功', 'success');
+      else this.toast('失败: HTTP '+r.status, 'error');
+    } catch(e) { this.toast('失败: '+e.message, 'error'); }
+  },
+  toast(msg, type) {
+    const el = document.getElementById("toast");
+    el.textContent = msg; el.className = "show "+(type||"");
+    clearTimeout(el._t); el._t = setTimeout(()=>el.className="",2500);
+  },
+  autoSave() {
+    try { localStorage.setItem("god_autosave", JSON.stringify({ version:1, timestamp:new Date().toISOString(), worldTime:this.state.worldTime, state:JSON.parse(JSON.stringify(this.state)) })); } catch(_) {}
+  },
+  loadAutoSave() {
+    try {
+      const raw = localStorage.getItem("god_autosave");
+      if (!raw) return false;
+      const m = JSON.parse(raw);
+      const s = m.state || m;
+      if (!s.worldTime) return false;
+      this.state = JSON.parse(JSON.stringify(s));
+      this.state.fusedMemory = this.state.fusedMemory || [];
+      this.state.worldMemory = this.state.worldMemory || [];
+      this.state.influences = this.state.influences || [];
+      this.state.intervenedPeople = this.state.intervenedPeople || [];
+      this.state.favorites = this.state.favorites || [];
+      this.state.chatHistory = this.state.chatHistory || {};
+      this.state.currentChatPid = null;
+      this.toast("欢迎回来，神明", "success");
+      return true;
+    } catch(_) { return false; }
+  },
+  showCodex() {
+    const ip = this.state.intervenedPeople || [];
+    document.getElementById("codex-content").innerHTML = "<b>新京市 2047</b><br><br>阵营：异能者联盟 | 异能管理局 | 暗影商会 | 城市警方<br><br>干预人物("+ip.length+"人)："+(ip.length===0?"暂无":ip.map(p=>"<div><b>"+p.name+"</b> "+p.job+"<br>"+p.desire+"</div>").join(""));
+    document.getElementById("codex-modal").classList.add("show");
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => GodGame.init());
+document.getElementById('push-modal').addEventListener('click', function(e){ if(e.target===this) GodGame.closePushModal(); });
+document.getElementById('settings-modal').addEventListener('click', function(e){ if(e.target===this) document.getElementById('settings-modal').classList.remove('show'); });
+document.getElementById('favorites-modal').addEventListener('click', function(e){ if(e.target===this) GodGame.closeFavorites(); });
+document.getElementById('codex-modal').addEventListener('click', function(e){ if(e.target===this) document.getElementById('codex-modal').classList.remove('show'); });
+</script>
+</body>
+</html>

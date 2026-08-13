@@ -1,0 +1,1958 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="ink">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<title>江湖志 · 武侠人生 AI 角色扮演</title>
+<style>
+/* ============ 主题变量 ============ */
+:root[data-theme="ink"]{
+  --bg-deep:#0d0f14;--bg-surface:#141821;--bg-elevated:#1b212c;--bg-hover:#232b39;
+  --border:#2a3242;--border-active:#3d4a63;
+  --t:#e6e1d3;--t2:#a9a393;--t3:#6f6b5e;
+  --gold:#d8a24a;--gold-dim:#97702e;--gold-glow:rgba(216,162,74,.14);
+  --jade:#4db892;--jade-dim:#2e7a5f;--jade-glow:rgba(77,184,146,.12);
+  --red:#e0534f;--blue:#5b8dd9;--hp:#e0534f;--mp:#5b8dd9;
+  --serif:"Songti SC","STSong","SimSun","Noto Serif SC",serif;
+}
+:root[data-theme="jade"]{
+  --bg-deep:#0b1210;--bg-surface:#12201c;--bg-elevated:#182b25;--bg-hover:#203831;
+  --border:#24453b;--border-active:#35685a;
+  --t:#e2e9e2;--t2:#a3b3a9;--t3:#6d7d73;
+  --gold:#c9a25a;--gold-dim:#8a6d33;--gold-glow:rgba(201,162,90,.14);
+  --jade:#55c8a0;--jade-dim:#34896c;--jade-glow:rgba(85,200,160,.14);
+  --red:#e06050;--blue:#5b9dd9;--hp:#e06050;--mp:#5b9dd9;
+  --serif:"Songti SC","STSong","SimSun","Noto Serif SC",serif;
+}
+:root[data-theme="cinnabar"]{
+  --bg-deep:#120d0c;--bg-surface:#1c1513;--bg-elevated:#261c18;--bg-hover:#33251f;
+  --border:#3a2b24;--border-active:#5a4034;
+  --t:#ecdfd3;--t2:#b3a295;--t3:#7a6b60;
+  --gold:#e0a854;--gold-dim:#9c6f2e;--gold-glow:rgba(224,168,84,.14);
+  --jade:#c96f4a;--jade-dim:#8a4a2e;--jade-glow:rgba(201,111,74,.14);
+  --red:#e0534f;--blue:#5b8dd9;--hp:#e0534f;--mp:#c98a4a;
+  --serif:"Songti SC","STSong","SimSun","Noto Serif SC",serif;
+}
+:root[data-theme="paper"]{
+  --bg-deep:#efe8d8;--bg-surface:#f7f2e6;--bg-elevated:#efe6d2;--bg-hover:#e7dcc2;
+  --border:#d6c8a8;--border-active:#a8946a;
+  --t:#2e2920;--t2:#6d6450;--t3:#978d74;
+  --gold:#a06f26;--gold-dim:#7d551c;--gold-glow:rgba(160,111,38,.12);
+  --jade:#3d7a5c;--jade-dim:#2a5642;--jade-glow:rgba(61,122,92,.12);
+  --red:#b0403c;--blue:#3f6fb0;--hp:#b0403c;--mp:#3f6fb0;
+  --serif:"Songti SC","STSong","SimSun","Noto Serif SC",serif;
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg-deep);color:var(--t);line-height:1.6;-webkit-font-smoothing:antialiased;font-size:14px}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea,select{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:6px;padding:8px 11px;outline:none;transition:border 150ms ease;width:100%}
+input:focus,textarea:focus,select:focus{border-color:var(--gold-dim)}
+textarea{resize:vertical;min-height:64px;line-height:1.6}
+label{font-size:11px;color:var(--t3);display:block;margin:10px 0 4px;letter-spacing:.5px}
+h1,h2,h3{font-family:var(--serif);font-weight:700;letter-spacing:2px}
+::placeholder{color:var(--t3)}
+
+/* ============ 布局 ============ */
+#app{display:none;grid-template-columns:1fr;grid-template-rows:48px 1fr;height:100vh;height:100dvh;background:var(--bg-deep)}
+#app.on{display:grid}
+#topbar{grid-row:1;background:var(--bg-surface);display:flex;align-items:center;padding:0 10px;gap:6px;border-bottom:1px solid var(--border);z-index:30}
+#topbar .logo{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--gold);letter-spacing:3px;white-space:nowrap;margin-right:4px}
+#topbar .logo b{color:var(--t3);font-weight:400;font-size:10px;letter-spacing:1px;margin-left:3px}
+#topbar .spacer{flex:1}
+.top-btn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:6px;font-size:12px;border:1px solid var(--border);color:var(--t2);transition:all 150ms ease;white-space:nowrap;background:transparent}
+.top-btn .mini{display:none}
+.top-btn .lbl{display:inline}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+.top-btn.jade{border-color:var(--jade-dim);color:var(--jade)}
+.top-btn.jade:hover{background:var(--jade-glow)}
+.top-btn .dot{width:6px;height:6px;border-radius:50%;background:var(--jade);flex:none}
+#loc-chip{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);padding:4px 10px;border:1px solid var(--border);border-radius:20px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+#loc-chip .sep{color:var(--gold);font-family:var(--serif)}
+#mobile-loc{display:none;padding:5px 12px;font-size:11px;color:var(--t2);border-bottom:1px solid var(--border);background:var(--bg-elevated);text-align:center;letter-spacing:.5px}
+#center-panel{grid-row:2;display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--bg-deep)}
+#chat-log{flex:1;overflow-y:auto;padding:18px 14px 8px;scroll-behavior:smooth}
+.chat-inner{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.msg{display:flex;gap:10px;animation:msgIn 220ms ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg .avatar{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:14px;border:1px solid var(--gold-dim);color:var(--gold);background:var(--bg-elevated);user-select:none}
+.msg .body{flex:1;min-width:0}
+.msg .bubble{display:inline-block;max-width:100%;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.msg.ai .bubble{background:var(--bg-surface);border:1px solid var(--border);border-top-left-radius:4px}
+.msg.user{flex-direction:row-reverse}
+.msg.user .bubble{background:var(--gold-glow);border:1px solid var(--gold-dim);border-top-right-radius:4px;color:var(--t)}
+.msg.sys{justify-content:center}
+.msg.sys .bubble{background:transparent;border:1px dashed var(--border);color:var(--t3);font-size:11.5px;padding:6px 14px;border-radius:20px;text-align:center}
+.msg .meta{font-size:10.5px;color:var(--t3);margin:3px 6px 0;display:flex;gap:8px}
+.msg.user .meta{justify-content:flex-end}
+/* AI 思考过程（reasoner 模型的 reasoning_content） */
+.think-block{margin:0 0 9px;border:1px dashed var(--border-active);border-left:3px solid var(--jade-dim);border-radius:8px;background:var(--bg-elevated);font-size:11.5px;color:var(--t3);line-height:1.75;overflow:hidden}
+.think-block summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;padding:6px 11px;font-size:11px;color:var(--jade);letter-spacing:1px;user-select:none}
+.think-block summary::-webkit-details-marker{display:none}
+.think-block summary .tg{margin-left:auto;color:var(--t3);font-size:10px;font-style:normal;letter-spacing:0}
+.think-block:not([open]) summary .tg::after{content:"展开 ▼"}
+.think-block[open] summary .tg::after{content:"收起 ▲"}
+.think-body{padding:0 11px 9px;white-space:pre-wrap;color:var(--t3);font-style:italic;word-break:break-word}
+.think-body .note{color:var(--t3);opacity:.7;font-size:10.5px}
+.msg .think{display:none}
+.typing{display:inline-flex;gap:4px;align-items:center;padding:12px 16px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:tp 1s infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes tp{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+
+#input-area{background:var(--bg-surface);border-top:1px solid var(--border);padding:8px 12px calc(8px + env(safe-area-inset-bottom));z-index:10}
+.input-inner{max-width:880px;margin:0 auto}
+#quick-actions{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chip{padding:4px 11px;border-radius:20px;border:1px solid var(--border);color:var(--t2);font-size:11.5px;transition:all 150ms ease;background:transparent}
+.chip:hover{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-glow)}
+.input-row{display:flex;gap:8px;align-items:flex-end}
+#chat-input{flex:1;min-height:42px;max-height:140px;resize:none;background:var(--bg-elevated);border-color:var(--border-active);border-radius:10px;padding:10px 14px;font-size:13.5px}
+#send-btn,#stop-btn{height:42px;padding:0 20px;border-radius:10px;font-size:13px;flex:none}
+#send-btn{background:var(--gold);color:#1a1408;font-weight:700;letter-spacing:2px}
+#send-btn:hover{filter:brightness(1.1)}
+#send-btn:disabled{opacity:.45;cursor:not-allowed}
+#stop-btn{display:none;background:var(--red);color:#fff}
+#stop-btn.on{display:block}
+#input-hint{font-size:10.5px;color:var(--t3);margin-top:5px;text-align:center}
+
+/* ============ 侧栏(角色) ============ */
+#drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:40;opacity:0;pointer-events:none;transition:opacity 200ms ease}
+#drawer-backdrop.open{opacity:1;pointer-events:auto}
+#char-panel{position:fixed;left:0;top:0;bottom:0;width:320px;max-width:92vw;background:var(--bg-surface);z-index:50;transform:translateX(-102%);transition:transform 240ms ease;border-right:1px solid var(--border);overflow-y:auto;box-shadow:6px 0 30px rgba(0,0,0,.35)}
+#char-panel.open{transform:translateX(0)}
+.panel-head{position:sticky;top:0;background:var(--bg-surface);padding:14px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;z-index:2}
+.panel-head .avatar-lg{width:46px;height:46px;border-radius:50%;border:1.5px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:20px;color:var(--gold);background:var(--bg-elevated);flex:none}
+.panel-head .t{flex:1;min-width:0}
+.panel-head .t .nm{font-family:var(--serif);font-size:17px;font-weight:700;letter-spacing:2px}
+.panel-head .t .sub{font-size:11px;color:var(--t3);margin-top:1px}
+.panel-close{color:var(--t3);font-size:18px;padding:2px 6px}
+.panel-close:hover{color:var(--t)}
+.p-sec{padding:12px 16px;border-bottom:1px solid var(--border)}
+.p-sec h4{font-size:11px;color:var(--gold);letter-spacing:2px;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.p-sec h4::before{content:"✦";font-size:9px;color:var(--gold-dim)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--border);align-items:baseline}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--t3);flex:none}
+.kv .v{color:var(--t);text-align:right;word-break:break-word}
+.stat-row{margin-bottom:8px}
+.stat-row .lab{display:flex;justify-content:space-between;font-size:11px;color:var(--t2);margin-bottom:3px}
+.stat-row .lab b{color:var(--t)}
+.bar{height:6px;border-radius:3px;background:var(--bg-deep);overflow:hidden}
+.bar div{height:100%;border-radius:3px;transition:width 350ms ease}
+.bar.hp div{background:var(--hp)}.bar.mp div{background:var(--mp)}.bar.attr div{background:var(--gold)}
+.tag{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:12px;border:1px solid var(--border-active);color:var(--t2);margin:2px 3px 2px 0;background:var(--bg-elevated)}
+.tag.gold{color:var(--gold);border-color:var(--gold-dim)}
+.tag.red{color:var(--red);border-color:var(--red)}
+.tag.jade{color:var(--jade);border-color:var(--jade-dim)}
+.cheat-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:3px;background:linear-gradient(90deg,rgba(224,83,79,.18),rgba(216,162,74,.18));border:1px solid var(--red);color:var(--gold);letter-spacing:1px;margin-left:6px}
+.death-count{color:var(--red)}
+
+/* ============ 弹窗 ============ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:4vh 12px 20px}
+.modal-overlay.open{display:flex}
+.modal{width:560px;max-width:calc(100vw - 24px);background:var(--bg-surface);border:1px solid var(--border-active);border-radius:14px;padding:20px 22px;animation:msgIn 200ms ease;box-shadow:0 18px 60px rgba(0,0,0,.5)}
+.modal h2{font-size:16px;color:var(--gold);letter-spacing:3px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.modal .m-sub{font-size:11px;color:var(--t3);margin-bottom:14px}
+.modal .m-body{max-height:62vh;overflow-y:auto;padding-right:4px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:flex-end}
+.btn{padding:8px 16px;border-radius:8px;font-size:12.5px;border:1px solid var(--border-active);color:var(--t2);transition:all 150ms ease;background:var(--bg-elevated)}
+.btn:hover{background:var(--bg-hover);color:var(--t)}
+.btn.gold{background:var(--gold);color:#1a1408;border-color:var(--gold);font-weight:700}
+.btn.gold:hover{filter:brightness(1.08)}
+.btn.jade{background:var(--jade);color:#08140f;border-color:var(--jade);font-weight:700}
+.btn.jade:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--red);border-color:var(--red)}
+.btn.danger:hover{background:var(--red);color:#fff}
+.btn.sm{padding:4px 10px;font-size:11px;border-radius:6px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:12px;flex-wrap:wrap}
+.tab{padding:6px 14px;font-size:12px;color:var(--t3);border-bottom:2px solid transparent;border-radius:6px 6px 0 0}
+.tab:hover{color:var(--t)}
+.tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+.sec-title{font-family:var(--serif);font-size:12.5px;color:var(--gold);letter-spacing:2px;margin:14px 0 8px}
+.sec-title:first-child{margin-top:0}
+.ency-block{font-size:12.5px;color:var(--t2);line-height:1.8}
+.ency-block table{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:11.5px}
+.ency-block th,.ency-block td{border:1px solid var(--border);padding:5px 8px;text-align:left;vertical-align:top}
+.ency-block th{background:var(--bg-elevated);color:var(--gold);font-weight:600;white-space:nowrap}
+.ency-block td{color:var(--t2)}
+.ency-block ul{padding-left:18px;margin:4px 0}
+.ency-block li{margin:3px 0}
+.ency-block b{color:var(--t)}
+.mem-item{background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--gold-dim);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--t2);margin-bottom:8px}
+.mem-item .mt{font-size:10px;color:var(--t3);margin-bottom:2px}
+.death-item{background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:12px}
+.death-item .dt{font-size:10.5px;color:var(--t3);margin-bottom:3px}
+.death-item .eval{color:var(--t2);margin-top:6px;white-space:pre-wrap;line-height:1.75;border-top:1px dashed var(--border);padding-top:6px;display:none}
+.death-item.open .eval{display:block}
+.cp-item{display:flex;align-items:center;gap:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:12px}
+.cp-item .t{flex:1;min-width:0}
+.cp-item .t b{color:var(--jade);font-weight:600}
+.cp-item .t .s{font-size:10.5px;color:var(--t3)}
+
+/* ============ 设置 ============ */
+.set-sec{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.set-sec h4{font-size:12px;color:var(--gold);letter-spacing:2px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.set-sec h4::before{content:"❖";font-size:10px}
+.set-sec .row{display:flex;gap:8px;align-items:flex-end}
+.set-sec .row .grow{flex:1}
+.fld-label{font-size:10.5px;color:var(--t3);margin:8px 0 3px;display:block}
+.fld-label:first-child{margin-top:0}
+select{width:100%;appearance:auto}
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;font-size:12.5px;color:var(--t2)}
+.switch{position:relative;width:40px;height:22px;border-radius:12px;background:var(--bg-deep);border:1px solid var(--border-active);transition:all 150ms ease;flex:none;cursor:pointer}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--t3);transition:all 150ms ease}
+.switch.on{background:var(--jade-dim);border-color:var(--jade)}
+.switch.on::after{left:20px;background:#fff}
+.stat-mini{font-size:11px;color:var(--t3);line-height:1.8}
+.stat-mini b{color:var(--t2)}
+
+/* ============ 死亡界面 ============ */
+#death-overlay{position:fixed;inset:0;background:rgba(10,4,4,.88);z-index:80;display:none;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:24px 20px;text-align:center}
+#death-overlay.open{display:flex;animation:msgIn 300ms ease}
+#death-overlay .death-seal{margin-top:auto}
+#death-overlay #death-eval-box{margin-bottom:auto}
+.death-seal{width:96px;height:96px;border:3px solid var(--red);color:var(--red);font-family:var(--serif);font-size:52px;display:flex;align-items:center;justify-content:center;border-radius:8px;transform:rotate(-6deg);opacity:.9;margin-bottom:18px;box-shadow:0 0 40px rgba(224,83,79,.25)}
+.death-title{font-family:var(--serif);font-size:26px;letter-spacing:10px;color:var(--t);margin-bottom:8px}
+.death-sub{font-size:12.5px;color:var(--t3);max-width:520px;margin-bottom:22px;line-height:1.8}
+.death-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.death-btns .btn{padding:12px 22px;font-size:13.5px}
+#death-eval-box{margin-top:18px;max-width:640px;text-align:left;background:var(--bg-surface);border:1px solid var(--border-active);border-radius:10px;padding:16px 18px;font-size:12.5px;color:var(--t2);line-height:1.85;white-space:pre-wrap;display:none;max-height:38vh;overflow-y:auto}
+
+/* ============ 设置向导 ============ */
+#setup-overlay{position:fixed;inset:0;background:var(--bg-deep);z-index:90;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+#setup-overlay > div{width:100%;max-width:692px;display:flex;flex-direction:column;align-items:center;margin-top:auto;margin-bottom:auto}
+.setup-head{text-align:center;margin-bottom:14px}
+.setup-head h1{font-size:34px;color:var(--gold);letter-spacing:14px;text-shadow:0 0 30px var(--gold-glow)}
+.setup-head .sub{color:var(--t3);font-size:12px;letter-spacing:4px;margin-top:4px}
+.setup-dots{display:flex;gap:8px;justify-content:center;margin-top:14px}
+.sdot{width:26px;height:4px;border-radius:2px;background:var(--border)}
+.sdot.on{background:var(--gold)}
+.setup-box{width:660px;max-width:calc(100vw - 32px);background:var(--bg-surface);border:1px solid var(--border-active);border-radius:14px;padding:22px 24px;box-shadow:0 20px 70px rgba(0,0,0,.5)}
+.step{display:none}
+.step.on{display:block;animation:msgIn 200ms ease}
+.step-title{font-family:var(--serif);font-size:17px;color:var(--gold);letter-spacing:3px;margin-bottom:4px}
+.step-title .no{font-size:11px;color:var(--t3);margin-right:6px;letter-spacing:1px}
+.step-hint{font-size:11.5px;color:var(--t3);margin-bottom:14px;line-height:1.7}
+.create-nav{display:flex;gap:10px;margin-top:18px;justify-content:space-between;align-items:center}
+.create-nav .grp{display:flex;gap:8px}
+.option-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+.option-card{border:1px solid var(--border);border-radius:10px;padding:12px 10px;text-align:center;cursor:pointer;transition:all 150ms ease;background:var(--bg-elevated)}
+.option-card:hover{border-color:var(--border-active);transform:translateY(-1px)}
+.option-card.sel{border-color:var(--gold);background:var(--gold-glow);box-shadow:0 0 0 1px var(--gold-dim) inset}
+.option-card .oc-name{font-size:13px;font-weight:600;color:var(--t)}
+.option-card.sel .oc-name{color:var(--gold)}
+.option-card .oc-desc{font-size:10px;color:var(--t3);margin-top:3px;line-height:1.5}
+.option-card .oc-mark{font-family:var(--serif);font-size:16px;color:var(--gold-dim);margin-bottom:4px;display:block}
+.trait-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:7px;background:var(--bg-elevated)}
+.trait-row .nm{width:74px;font-size:12.5px;color:var(--t);flex:none}
+.trait-row .bar{flex:1}
+.trait-row .val{width:30px;text-align:center;font-size:12px;color:var(--gold);font-weight:700;flex:none}
+.trait-row .stp{width:26px;height:26px;border-radius:6px;border:1px solid var(--border-active);color:var(--gold);font-size:14px;display:flex;align-items:center;justify-content:center;flex:none}
+.trait-row .stp:hover{background:var(--gold-glow)}
+.trait-row .stp:disabled{opacity:.3;cursor:not-allowed}
+.talent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:10px}
+.talent-card{border:1px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;transition:all 150ms ease;background:var(--bg-elevated);position:relative}
+.talent-card:hover{border-color:var(--border-active)}
+.talent-card.sel{border-color:var(--jade);background:var(--jade-glow)}
+.talent-card .tk{font-size:12px;font-weight:600;color:var(--t)}
+.talent-card.sel .tk{color:var(--jade)}
+.talent-card .td{font-size:10px;color:var(--t3);margin-top:2px;line-height:1.45}
+.talent-card .tick{position:absolute;top:6px;right:8px;color:var(--jade);font-size:11px;display:none}
+.talent-card.sel .tick{display:block}
+.cheat-box{border:1px solid var(--red);border-radius:10px;padding:12px 14px;margin-top:4px;background:rgba(224,83,79,.05)}
+.cheat-box h4{font-size:12.5px;color:var(--red);letter-spacing:2px;margin-bottom:8px;font-family:var(--serif)}
+.cheat-sub{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}
+.cheat-sub label{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--t2);margin:0;padding:5px 8px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:var(--bg-elevated)}
+.cheat-sub input{width:auto;accent-color:var(--red)}
+.confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.confirm-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--bg-elevated)}
+.confirm-card.full{grid-column:1/-1}
+.confirm-card h5{font-size:11px;color:var(--gold);letter-spacing:2px;margin-bottom:7px}
+.confirm-card .kv{font-size:11.5px}
+.confirm-card .notes-text{font-size:11.5px;color:var(--t2);white-space:pre-wrap;line-height:1.7;max-height:90px;overflow-y:auto}
+
+/* ============ Toast ============ */
+#toast{position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:120;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast-item{background:var(--bg-surface);border:1px solid var(--border-active);color:var(--t);font-size:12px;padding:8px 18px;border-radius:20px;box-shadow:0 8px 30px rgba(0,0,0,.4);animation:msgIn 200ms ease;max-width:88vw}
+.toast-item.gold{border-color:var(--gold);color:var(--gold)}
+.toast-item.red{border-color:var(--red);color:var(--red)}
+
+/* ============ 响应式 ============ */
+@media (max-width:720px){
+  #topbar{padding:0 6px;gap:4px}
+  .top-btn{padding:5px 8px;font-size:11px}
+  .top-btn .lbl{display:none}
+  .top-btn .mini{display:inline}
+  #topbar .logo{font-size:13px;letter-spacing:2px}
+  #topbar .logo b{display:none}
+  #loc-chip{display:none}
+  #mobile-loc{display:block}
+  /* 防 iOS/微信自动缩放：输入控件字号不小于 16px */
+  input,select,textarea{font-size:16px}
+  #chat-input{font-size:16px}
+  #char-panel{width:min(320px,94vw)}
+  .modal{padding:16px;border-radius:12px}
+  .setup-box{padding:18px 14px}
+  .confirm-grid{grid-template-columns:1fr}
+  .msg .avatar{width:28px;height:28px;font-size:12px}
+  .msg .bubble{font-size:13px;padding:9px 12px}
+  #chat-log{padding:12px 8px 4px}
+  #input-area{padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+  .death-title{font-size:22px;letter-spacing:6px}
+  #app > *{min-width:0}
+}
+@media (max-width:420px){
+  .option-grid{grid-template-columns:repeat(2,1fr)}
+  .talent-grid{grid-template-columns:repeat(2,1fr)}
+  #topbar{padding:0 4px;gap:3px}
+  .top-btn{padding:4px 5px;font-size:10px;gap:2px}
+  #topbar .logo{font-size:12px;letter-spacing:1px}
+  #loc-chip{max-width:92px;font-size:9px;padding:3px 6px}
+  #chat-log,#input-area{overflow-x:hidden}
+}
+</style>
+</head>
+<body>
+
+<!-- 主界面 -->
+<div id="app">
+  <div id="topbar">
+    <button class="top-btn gold" id="btn-char" title="角色信息">◈<span class="lbl">角色</span></button>
+    <div class="logo">江湖志<b>武侠人生</b></div>
+    <div class="spacer"></div>
+    <div id="loc-chip"><span id="loc-txt">——</span></div>
+    <button class="top-btn jade" id="btn-ency" title="世界百科"><span class="lbl">百科</span><span class="mini">百</span></button>
+    <button class="top-btn jade" id="btn-mem" title="记忆档案"><span class="lbl">记忆</span><span class="mini">记</span></button>
+    <button class="top-btn" id="btn-death" title="死亡记录与回档"><span class="lbl">回档</span><span class="mini">档</span></button>
+    <button class="top-btn" id="btn-settings" title="设置"><span class="lbl">设置</span><span class="mini">设</span></button>
+  </div>
+  <div id="center-panel">
+    <div id="mobile-loc"><span id="mloc-txt">——</span></div>
+    <div id="chat-log"><div class="chat-inner" id="chat-inner"></div></div>
+    <div id="input-area">
+      <div class="input-inner">
+        <div id="quick-actions"></div>
+        <div class="input-row">
+          <textarea id="chat-input" placeholder="输入你的行动…（Enter 发送 / Shift+Enter 换行）" rows="1"></textarea>
+          <button id="send-btn">行动</button>
+          <button id="stop-btn">停止</button>
+        </div>
+        <div id="input-hint">江湖凶险，三思而行 —— 你的每个选择都会改变命运</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="drawer-backdrop"></div>
+<div id="char-panel">
+  <div class="panel-head">
+    <div class="avatar-lg" id="cp-avatar">侠</div>
+    <div class="t">
+      <div class="nm" id="cp-name">——</div>
+      <div class="sub" id="cp-meta">——</div>
+    </div>
+    <button class="panel-close" id="cp-close">✕</button>
+  </div>
+  <div class="p-sec">
+    <h4>当前状况</h4>
+    <div class="stat-row"><div class="lab"><span>气血</span><b id="st-hp-t">--/--</b></div><div class="bar hp"><div id="st-hp" style="width:0%"></div></div></div>
+    <div class="stat-row"><div class="lab"><span>内力</span><b id="st-mp-t">--/--</b></div><div class="bar mp"><div id="st-mp" style="width:0%"></div></div></div>
+    <div id="st-extra"></div>
+    <div id="st-tags"></div>
+    <div style="font-size:10px;color:var(--t3);margin-top:8px" id="st-update">状况尚未同步 · 等待说书人推演</div>
+  </div>
+  <div class="p-sec">
+    <h4>基本信息</h4>
+    <div class="kv"><span class="k">姓名</span><span class="v" id="b-name">——</span></div>
+    <div class="kv"><span class="k">性别 / 年龄</span><span class="v" id="b-gender">——</span></div>
+    <div class="kv"><span class="k">出身</span><span class="v" id="b-origin">——</span></div>
+    <div class="kv"><span class="k">难度</span><span class="v" id="b-diff">——</span></div>
+    <div class="kv"><span class="k">境界</span><span class="v" id="b-realm">——</span></div>
+    <div class="kv"><span class="k">外貌</span><span class="v" id="b-appear">——</span></div>
+    <div class="kv"><span class="k">性格</span><span class="v" id="b-persona">——</span></div>
+  </div>
+  <div class="p-sec">
+    <h4>六维资质</h4>
+    <div id="cp-attrs"></div>
+  </div>
+  <div class="p-sec">
+    <h4>天赋</h4>
+    <div id="cp-talents"></div>
+  </div>
+  <div class="p-sec">
+    <h4>武学 / 装备 / 物品</h4>
+    <div id="cp-loadout"></div>
+  </div>
+  <div class="p-sec">
+    <h4>人际与名声</h4>
+    <div id="cp-social"></div>
+  </div>
+  <div class="p-sec" style="text-align:center">
+    <button class="btn sm" id="cp-refresh">⟳ 刷新状况显示</button>
+  </div>
+</div>
+
+<!-- 设置弹窗 -->
+<div class="modal-overlay" id="settings-modal"><div class="modal">
+  <h2>设 置</h2>
+  <div class="m-sub">API 配置 · 存档管理 · 界面风格</div>
+  <div class="m-body">
+    <div class="set-sec">
+      <h3 class="set-h">AI 接口配置</h3>
+      <label class="fld-label">API 端点（OpenAI 兼容）</label>
+      <input id="s-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+      <label class="fld-label">API Key</label>
+      <input id="s-apikey" type="password" placeholder="sk-...">
+      <div class="row" style="margin-top:8px">
+        <div class="grow"><label class="fld-label">模型</label><select id="s-model"></select></div>
+        <button class="btn sm" id="s-fetch" style="margin-top:20px">🔄 拉取模型</button>
+      </div>
+      <div id="s-model-hint" style="font-size:10.5px;color:var(--t3);margin-top:5px"></div>
+      <div class="row">
+        <div class="grow"><label class="fld-label">输出 Token 限制</label><select id="s-maxtokens">
+          <option value="unlimited">无限制</option>
+          <option value="1024">1024</option><option value="2048">2048</option>
+          <option value="4096">4096</option><option value="8192">8192</option>
+        </select></div>
+        <div class="grow"><label class="fld-label">推理强度</label><select id="s-reasoning">
+          <option value="最大">最大（严谨推演）</option><option value="高">高</option>
+          <option value="中">中（均衡）</option><option value="低">低（放飞）</option>
+        </select></div>
+      </div>
+      <div class="btn-row" style="margin-top:10px"><button class="btn gold sm" id="s-saveapi">保存 API 设置</button></div>
+    </div>
+    <div class="set-sec">
+      <h4>界面风格</h4>
+      <select id="s-theme">
+        <option value="ink">墨夜（深色 · 玄金）</option>
+        <option value="jade">青衫（深色 · 碧玉）</option>
+        <option value="cinnabar">朱砂（深色 · 赤红）</option>
+        <option value="paper">月白（浅色 · 宣纸）</option>
+      </select>
+    </div>
+    <div class="set-sec">
+      <h4>自动存档</h4>
+      <div class="switch-row"><span>自动存档</span><div class="switch" id="s-autosave"></div></div>
+      <div class="switch-row"><span>每次 AI 回复后立即保存</span><div class="switch" id="s-autosave-msg"></div></div>
+      <label class="fld-label">定时存档间隔（秒）</label>
+      <select id="s-autosave-int"><option value="30">30 秒</option><option value="60">60 秒</option><option value="120">120 秒</option><option value="300">5 分钟</option></select>
+    </div>
+    <div class="set-sec">
+      <h4>存档管理</h4>
+      <div class="stat-mini" id="s-stats"></div>
+      <div class="btn-row" style="justify-content:flex-start">
+        <button class="btn sm gold" id="s-export">导出存档</button>
+        <button class="btn sm" id="s-import">导入存档</button>
+        <button class="btn sm" id="s-savenow">立即保存</button>
+        <button class="btn sm danger" id="s-restart">重新开始</button>
+      </div>
+      <div style="font-size:10.5px;color:var(--t3);margin-top:8px">存档自动保存在本机浏览器（localStorage），导出 JSON 可跨设备迁移。</div>
+    </div>
+    <div class="set-sec">
+      <h4>关于</h4>
+      <div class="stat-mini"><b>江湖志 · 武侠人生</b> —— AI 角色扮演游戏<br>
+      说书人由你配置的大模型 API 驱动；世界观基于《江湖志》设定集。<br>
+      死亡可回档、记忆自动整理、世界百科随时查阅。</div>
+    </div>
+  </div>
+  <div class="btn-row"><button class="btn gold" id="s-close">完成</button></div>
+</div></div>
+
+<!-- 百科弹窗 -->
+<div class="modal-overlay" id="ency-modal"><div class="modal" style="width:640px">
+  <h2>世界百科</h2>
+  <div class="m-sub">《江湖志》设定速查 · 可向说书人提问</div>
+  <div class="tabs" id="ency-tabs"></div>
+  <div class="m-body" id="ency-body"></div>
+  <div style="display:flex;gap:8px;margin-top:14px">
+    <input id="ency-q" placeholder="例如：七境大宗师有多强？血煞教是什么？" style="flex:1">
+    <button class="btn gold" id="ency-ask">提问</button>
+  </div>
+</div></div>
+
+<!-- 记忆弹窗 -->
+<div class="modal-overlay" id="mem-modal"><div class="modal" style="width:600px">
+  <h2>记忆档案</h2>
+  <div class="m-sub">说书人不会忘记你的故事</div>
+  <div class="tabs">
+    <div class="tab on" data-mt="summary">往事纪要</div>
+    <div class="tab" data-mt="entries">记忆条目</div>
+    <div class="tab" data-mt="nodes">关键节点</div>
+  </div>
+  <div class="m-body" id="mem-body"></div>
+  <div class="btn-row"><button class="btn gold" id="mem-close">关闭</button></div>
+</div></div>
+
+<!-- 死亡/回档弹窗 -->
+<div class="modal-overlay" id="death-modal"><div class="modal" style="width:620px">
+  <h2>死亡回档</h2>
+  <div class="m-sub">生死簿 · 每一死都有评析，每一次回档都是重来的机会</div>
+  <div class="tabs">
+    <div class="tab on" data-dt="deaths">死亡记录</div>
+    <div class="tab" data-dt="cps">存档点</div>
+  </div>
+  <div class="m-body" id="death-body"></div>
+  <div class="btn-row"><button class="btn gold" id="death-close">关闭</button></div>
+</div></div>
+
+<!-- 通用确认弹窗 -->
+<div class="modal-overlay" id="confirm-modal"><div class="modal" style="width:440px">
+  <h2 id="cf-title">确认</h2>
+  <div class="m-body" id="cf-text" style="font-size:12.5px;color:var(--t2);line-height:1.8"></div>
+  <div class="btn-row">
+    <button class="btn" id="cf-cancel">取消</button>
+    <button class="btn gold" id="cf-ok">确定</button>
+  </div>
+</div></div>
+
+<!-- 死亡全屏 -->
+<div id="death-overlay">
+  <div class="death-seal">逝</div>
+  <div class="death-title">江湖路断</div>
+  <div class="death-sub" id="death-why">你已命丧江湖。天机阁正在为你撰写命簿评析…</div>
+  <div class="death-btns">
+    <button class="btn gold" id="d-eval">查看命簿评析</button>
+    <button class="btn jade" id="d-revive">回到关键时间点</button>
+    <button class="btn" id="d-records">死亡记录</button>
+  </div>
+  <div id="death-eval-box"></div>
+</div>
+
+<!-- 设置向导 -->
+<div id="setup-overlay">
+  <div>
+    <div class="setup-head">
+      <h1>江湖志</h1>
+      <div class="sub">武侠人生 · AI 角色扮演</div>
+      <div class="setup-dots" id="setup-dots"></div>
+    </div>
+    <div class="setup-box">
+      <!-- 第一步 API -->
+      <div class="step on" id="st-api">
+        <div class="step-title"><span class="no">第一步</span>配置说书人（AI 接口）</div>
+        <div class="step-hint">游戏由大模型实时推演。默认 DeepSeek，也可填任意 OpenAI 兼容端点。</div>
+        <label class="fld-label">API 端点</label>
+        <input id="cfg-endpoint" value="https://api.deepseek.com/v1/chat/completions" placeholder="https://api.deepseek.com/v1/chat/completions">
+        <label class="fld-label">API Key（保存在本机）</label>
+        <input id="cfg-apikey" type="password" placeholder="sk-...">
+        <div class="row" style="margin-top:10px">
+          <div class="grow"><label class="fld-label">模型</label><select id="cfg-model"></select></div>
+          <button class="btn sm" id="cfg-fetch" style="margin-top:20px">🔄 拉取模型列表</button>
+        </div>
+        <div id="cfg-model-hint" style="font-size:10.5px;color:var(--t3);margin-top:5px"></div>
+        <div class="row">
+          <div class="grow"><label class="fld-label">输出 Token 限制</label><select id="cfg-maxtokens">
+            <option value="unlimited">无限制</option>
+            <option value="1024">1024</option><option value="2048">2048</option>
+            <option value="4096">4096</option><option value="8192">8192</option>
+          </select></div>
+          <div class="grow"><label class="fld-label">推理强度</label><select id="cfg-reasoning">
+            <option value="最大">最大（严谨推演）</option><option value="高">高</option>
+            <option value="中" selected>中（均衡）</option><option value="低">低（放飞）</option>
+          </select></div>
+        </div>
+        <div class="create-nav">
+          <div></div>
+          <div class="grp"><button class="btn gold" id="cfg-next">下一步 ▸</button></div>
+        </div>
+      </div>
+
+      <!-- 第二步 角色 -->
+      <div class="step" id="st-char">
+        <div class="step-title"><span class="no">第二步</span>江湖人（角色设定）</div>
+        <div class="step-hint">一切皆可自定义。天赋必选其一，作弊模式也在其中。</div>
+        <div class="row">
+          <div class="grow"><label class="fld-label">姓名</label><input id="cc-name" placeholder="输入姓名，或随机生成"></div>
+          <button class="btn sm" id="cc-randname" style="margin-top:24px">🎲 随机</button>
+        </div>
+        <div class="row">
+          <div class="grow"><label class="fld-label">性别</label>
+            <select id="cc-gender"><option value="男">男</option><option value="女">女</option></select>
+          </div>
+          <div class="grow"><label class="fld-label">年龄</label><input id="cc-age" type="number" value="18" min="10" max="80"></div>
+        </div>
+        <label class="fld-label">外貌（可自定义，留空由说书人描绘）</label>
+        <textarea id="cc-appear" placeholder="例如：眉目清朗，左眉一道旧疤，常年一袭洗得发白的青衫…"></textarea>
+        <label class="fld-label">性格（可自定义）</label>
+        <textarea id="cc-persona" placeholder="例如：重情重义却嘴硬，遇事先谋后动，见不得欺凌弱小…"></textarea>
+        <label class="fld-label">出身</label>
+        <div class="option-grid" id="cc-origin-grid"></div>
+        <div id="cc-sect-wrap" style="display:none"><label class="fld-label">门派</label>
+          <select id="cc-sect"><option value="少林">少林</option><option value="武当">武当</option><option value="峨眉">峨眉</option><option value="华山">华山</option><option value="青城">青城</option><option value="丐帮">丐帮</option></select>
+        </div>
+        <label class="fld-label">六维资质（共 60 点自由分配）<span id="cc-points" style="color:var(--gold);font-weight:700;margin-left:6px">剩余 60</span></label>
+        <div id="cc-attrs"></div>
+        <label class="fld-label">天赋（可多选）</label>
+        <div class="talent-grid" id="cc-talents"></div>
+        <label class="fld-label">自定义天赋（可选）</label>
+        <input id="cc-custom-talent" placeholder="例如：天生剑骨，幼时得异人传授半卷残经…">
+        <div class="cheat-box" id="cheat-box" style="display:none">
+          <h3 class="set-h">作弊模式 · 金手指</h3>
+          <div class="cheat-sub" id="cheat-subs"></div>
+        </div>
+        <div class="create-nav">
+          <div class="grp"><button class="btn" id="cc-prev">上一步</button></div>
+          <div class="grp"><button class="btn gold" id="cc-next">下一步 ▸</button></div>
+        </div>
+      </div>
+
+      <!-- 第三步 备注 -->
+      <div class="step" id="st-notes">
+        <div class="step-title"><span class="no">第三步</span>嘱托说书人（备注信息）</div>
+        <div class="step-hint">写下你对这场江湖的任何要求：风格偏好、剧情方向、禁忌、目标…</div>
+        <textarea id="cc-notes" style="min-height:150px" placeholder="例如：\n· 多写对话与细节，少写打斗流水账；\n· 希望有一段刻骨铭心的情缘；\n· 不要强行喂刀，人物行为要合理；\n· 我想一步步从无名小卒闯出名堂…"></textarea>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px" id="notes-chips">
+          <button class="chip" data-n="多写人物对话与心理细节，少写战斗流水账">细节流</button>
+          <button class="chip" data-n="节奏快一些，别在琐事上磨蹭">快节奏</button>
+          <button class="chip" data-n="我想要一段刻骨铭心的情缘线">情缘线</button>
+          <button class="chip" data-n="希望剧情有反转与阴谋，不要平铺直叙">反转控</button>
+          <button class="chip" data-n="从底层一步步崛起，不靠天降神功">苦修流</button>
+          <button class="chip" data-n="保持克制，不要动不动就死人">温和些</button>
+        </div>
+        <div class="create-nav">
+          <div class="grp"><button class="btn" id="cc2-prev">上一步</button></div>
+          <div class="grp"><button class="btn gold" id="cc2-next">下一步 ▸</button></div>
+        </div>
+      </div>
+
+      <!-- 第四步 难度 -->
+      <div class="step" id="st-diff">
+        <div class="step-title"><span class="no">第四步</span>江湖深浅（难度）</div>
+        <div class="step-hint">难度只改变挑战感，不锁任何剧情与结局。选错了随时可在设置中重开。</div>
+        <div class="option-grid" id="cc-diff-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))"></div>
+        <div class="create-nav">
+          <div class="grp"><button class="btn" id="cc3-prev">上一步</button></div>
+          <div class="grp"><button class="btn gold" id="cc3-next">下一步 ▸</button></div>
+        </div>
+      </div>
+
+      <!-- 第五步 确认 -->
+      <div class="step" id="st-confirm">
+        <div class="step-title"><span class="no">第五步</span>踏上江湖（信息确认）</div>
+        <div class="step-hint">确认以下信息，或返回修改。开始后随时可在右上角设置中调整。</div>
+        <div class="confirm-grid" id="cf-grid"></div>
+        <div class="create-nav">
+          <div class="grp"><button class="btn" id="cc4-prev">上一步</button></div>
+          <div class="grp"><button class="btn gold" id="cc4-start">✦ 踏入江湖</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="import-file" accept=".json" style="display:none">
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+ * 江湖志 · 武侠人生 AI 角色扮演
+ * ===================================================================== */
+const $ = id => document.getElementById(id);
+const LS_KEY = 'jianghu_state_v1';
+
+/* ---------------- 世界观（注入 AI 系统提示词） ---------------- */
+const SYS_WORLD = `## 《江湖志》世界观设定（唯一权威，不得违背）
+### 时代与基调
+- 架空王朝"大齐"，立国一百二十余年，以武立国，武风盛行，江湖与庙堂并存。风貌参考华夏中古（唐宋之交）。
+- 六大区域：中原腹地（少林、武当、六扇门总部）、江南水乡（龙门商帮、天机阁、峨眉）、塞北草原（塞北铁骑、修罗门）、西域大漠（密宗、弯刀）、南疆瘴林（五毒教、苗寨）、东海群岛（东海龙宫帮、隐世门派）。
+- 人间烟火气：江湖人也要吃饭、住店、赚钱、谈恋爱。低武写实：有内力轻功神功，无仙法、无飞天遁地、无长生不老；最强高手也挡不住千军万马、也怕毒药暗算。
+
+### 武道力量体系
+- 力量三要素：气（内力，根基）、技（招式，应用）、意（心境武意，升华）。只练气不成技则笨重，只练技不练气则无根，二者皆强而无"意"则终身卡在宗师门前。
+- 七大境界（每境分初期/中期/后期/圆满）：一境·淬体（入门，力能开碑）；二境·通脉（登堂，内气自生，可吐纳疗伤）；三境·凝气（入室，内力灌注兵器、隔空碎石）；四境·化劲（成名，以柔克刚、听劲辩位）；五境·先天（宗师门槛，真气周天自成、内力生生不息）；六境·宗师（开宗，悟出武意，可自创武学开宗立派）；七境·大宗师（超凡，武意圆满近天人，镇国级战力，数十年一出）。
+- 关键规则：境界≠战力，招式克制、兵器优劣、经验、地形、心态都会影响胜负，低境逆袭高境正是江湖精彩之处。强行修习超出自身境界的武学，轻则事倍功半，重则走火入魔。突破条件＝积累（苦修）+机缘（丹药/顿悟/生死战）+心性（执念与心魔会卡境界）。
+- 武学五系：内功心法（根基）、外功招式（拳掌指爪/刀剑枪棍钩鞭）、轻功身法、辅助之术（医道、毒术、阵法、机关、暗器、音律、易容）、奇门杂学（占卜、话术、驯兽、锻造、经商）。
+- 武学品阶：入门武学（大众货）、精要武学（门派不传之秘）、绝学武学（镇派之宝，非嫡传不授）、神功武学（天下至宝，出世即腥风血雨）。武学与修炼者存在契合度，契合则事半功倍，不契合则事倍功半甚至走火入魔。
+- 修行资源：丹药（疗伤/增益/突破辅助）、秘笈、名师、奇遇、历练（最重要）。
+
+### 江湖势力
+- 正道六大门派：少林（佛门武学之源，领袖正道）、武当（太极剑，与少林并称泰山北斗）、峨眉（剑法与医术并重）、华山（快剑，曾有剑宗气宗之争）、青城（剑法轻功俱佳，亦正亦邪）、丐帮（天下第一大帮，消息最灵通，打狗棒法与降龙掌）。
+- 魔道与旁门：血煞教（魔教之首，速成邪功血祭之法，有神秘圣主）、五毒教（南疆毒蛊之祖，亦正亦邪）、鬼影阁（天下第一刺客组织，只认钱不认人）、修罗门（塞北，以战养战，亡命之徒）。
+- 中立与灰色：唐门（暗器机关第一，富可敌国）、天机阁（天下情报中心，阁主"百晓生"发布天下榜单）、镖局联盟、龙门商帮（江南财阀）、六扇门（缉捕江湖凶徒）、东厂与锦衣卫（监视武林）。
+- 四角平衡：正道联盟 / 魔道 / 朝廷 / 中立灰色地带互相制衡，任何一方失衡江湖就会大乱——这是剧情发动机。
+
+### 地理
+- 主要城池：靖安（皇城，六扇门总部，规矩最多）、洛阳（千年古都，武林大会常办地）、金陵（六朝金粉，销金窟情报买卖）、扬州（盐商巨贾，龙门商帮总部）、长安（西域商路起点）、成都（蜀中，唐门与青城地盘）、大理（南疆门户）、渔阳（塞北苦寒边城，镖局歇脚马贼出没）。
+- 武林圣地与秘境：少林藏经阁、武当紫霄禁地、昆仑秘境（数十年一开）、南疆十万大山（五毒教老巢）、东海蓬莱、古战场·断魂谷（传说埋有神兵）。
+
+### 江湖法则与社会
+- 江湖规矩：比武点到为止认输即止；成名人物不可闭门不战；恩怨分明"冤有头债有主"祸不及妻儿，滥杀无辜者成江湖公敌；正道领袖联名可发英雄帖；一诺千金，背信弃义者寸步难行。
+- 声望榜单（天机阁发布）：侠名与恶名两套体系；兵器谱分天榜（宗师以上）、地榜（成名高手）、人榜（新秀）；另有美人榜、富豪榜、神兵榜、悬赏榜。
+- 经济：货币银两铜钱，大宗用银票（龙门商帮发行）。江湖人生计：走镖、护院、赏金、当铺、医馆、铸剑、酒肆、贩卖消息。"没钱寸步难行"。
+- 正邪观：没有绝对正邪，名门正派有伪君子，魔教有真性情；善恶由行为定义，放下屠刀或迷途知返都是故事。
+
+### 历史与当前局势
+- 约二百年前前朝暴政，江湖豪杰揭竿而起；一百二十年前太祖以武立国；百年前血煞教初立；六十年前正邪第一次大战，血煞教溃败教主伏诛；四十年前余孽潜藏南疆塞北；二十年前朝廷推行"禁武令"试点，江湖与朝廷关系紧张。
+- 现在：血煞教死灰复燃，多地出现血祭事件；天机阁传出《乾坤宝典》重现江湖，传闻得之可窥大宗师之境；朝廷借机发难欲收编各派；各派内部有主战、主和、自立分歧。天下将乱，英雄辈出。
+- 三大主线矛盾：正邪之争（血煞教复活阴谋，背后似有朝廷影子）、朝廷与江湖（禁武令与收编）、宝典争夺（是神功、是阴谋、还是诱饵？）。
+
+### 江湖黑话
+绿林（江湖）、踩盘子（踩点探查）、点子扎手（对手厉害）、风紧扯呼（快撤）、梁子（仇怨）、拜码头（到一方势力报到）、挂幌子（亮字号报身份）、盘缠（路费）、趟浑水（卷入麻烦）、金盆洗手（退出江湖）。`;
+
+const SYS_RP = `## 角色扮演守则（必须严格遵守）
+1. 保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。
+2. 禁止代替玩家行动、发言、思考或做出选择。
+3. 禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。
+4. 禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设。
+5. 剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。
+6. 人物情绪应通过具体行为和对话体现，而非旁白解释。
+7. 保持世界观设定一致：境界体系、武学品阶、势力关系、地理、年代都以上文设定为准，不得遗忘或矛盾。`;
+
+const SYS_PROTOCOL = `## 输出协议（必须严格遵守）
+1. 每回合以第二人称"你"叙述：先写行动结果与情境展开，再自然引出可行动方向，一般 250~500 字。用词克制写实、有烟火气，杜绝模板套路。
+2. 每条回复的末尾必须输出一行【状态】，格式：【状态】键=值;键=值;……
+   允许的键：地点、时辰、天气、气血（如 92/100）、内力（如 60/100）、银两、境界、状态（多个用、分隔，如 轻伤、饥饿）、伤势、心情、侠名、恶名、目标、关系（如 沈青(知己)，多个用、分隔）、同伴、物品、武学、装备。
+   只有发生变化或玩家可能关心的键才列出；未列出的键保持原值。不要编造数值变化。
+3. 需要长期记住的事实（重要人物、承诺、恩怨、线索、秘密）单独输出一行：【记忆】内容
+4. 剧情进入重大节点（关键事件、时间跳跃、场景切换）时，单独输出一行：【节点】节点名称
+5. 玩家确实死亡时，先完成死亡描写与【状态】行，再在回复最后单独输出一行：【玩家死亡】
+6. 【状态】【记忆】【节点】【玩家死亡】均为标记行，不计入正文，不要写进故事叙述里。
+7. 玩家消息以【百科问答】开头时，直接用设定知识回答，不要推进剧情。
+8. 若玩家陷入僵局，可借NPC之口给出线索，但绝不替玩家做决定。`;
+
+const DIFFS = [
+  {id:'爽玩', name:'快意恩仇', tag:'纯爽', desc:'无敌流、暴富、秒杀、躺赢。不为挑战，只为爽。', rules:'敌方属性×0.6（孱弱），修炼极快，银两与奇遇极其丰厚，初始即送绝学神兵。AI 以"畅快淋漓"为叙事基调，除非玩家主动找死，否则不得令玩家死亡；可略过枯燥日常直接推进精彩情节，爽点优先。'},
+  {id:'简单', name:'初入江湖', tag:'轻松', desc:'顺风顺水，有惊无险，适合初入江湖。', rules:'敌方属性×0.8，修炼较快，资源宽裕，敌人不主动追击，指引清晰。AI 让玩家少吃苦头，战斗以威压取胜为主，很少真正致命。'},
+  {id:'标准', name:'江湖历练', tag:'推荐', desc:'平衡真实，有惊无险，江湖的正常样子。', rules:'敌方属性×1.0，正常修炼速度，资源正常。AI 公平推演：战斗有胜有负，重伤可能，死亡需要玩家真正犯险。'},
+  {id:'困难', name:'刀口舔血', tag:'硬仗', desc:'步步为营，敌人狡猾，考验搭配与决策。', rules:'敌方属性×1.3，资源紧张，丹药昂贵。AI 会让敌人利用地形、克制关系、人数优势与骗招，战斗凶险，容易受伤，谨慎行事。'},
+  {id:'极难', name:'绝境求生', tag:'硬核', desc:'一步错满盘输，死亡是家常便饭。', rules:'敌方属性×1.6，资源极度匮乏，武学契合度极严（练错即走火入魔）。AI 毫不留情，会针对玩家弱点设局，危险无处不在，死亡是常态，慎重再慎重。'},
+];
+
+const CHEAT_OPTS = [
+  {k:'无敌金身', d:'不会死亡，致命伤改为重伤昏迷'},
+  {k:'欧皇附体', d:'奇遇触发率拉满，机缘不断'},
+  {k:'一击必杀', d:'暴击极高，伤害碾压'},
+  {k:'百无禁忌', d:'无视契合度，永不走火入魔'},
+  {k:'天降横财', d:'银两掉落极其丰厚'},
+  {k:'万人迷', d:'NPC 好感极高，愿意相助'},
+];
+
+const ORIGINS = [
+  {id:'草根孤儿', icon:'竹', desc:'福缘高、无根基，自由度高，从最底层开始', seed:{money:'5两', realm:'一境·淬体后期', loc:'洛阳城外·破庙', items:['破旧布衣','半块干粮'], skills:[], gear:['草鞋']}},
+  {id:'武馆学徒', icon:'拳', desc:'基础扎实，入门容易，受馆规约束', seed:{money:'10两', realm:'二境·通脉初期', loc:'洛阳·长风武馆', items:['金创药×2'], skills:['基础拳脚','入门刀法'], gear:['精钢刀']}},
+  {id:'世家子弟', icon:'府', desc:'银两多、人脉广，身负家族期望', seed:{money:'200两', realm:'二境·通脉中期', loc:'金陵·沈府', items:['银票×100两','玉佩'], skills:['家传剑法(精要)'], gear:['青锋剑','锦缎长衫']}},
+  {id:'门派弟子', icon:'门', desc:'直接拜师起步快，受门规约束', seed:{money:'15两', realm:'二境·通脉中期', loc:'嵩山·少林寺', items:['门派腰牌'], skills:['罗汉拳(入门)'], gear:['制式僧袍','戒刀']}},
+  {id:'将门之后', icon:'戈', desc:'武艺底子好，与朝廷天然有瓜葛', seed:{money:'80两', realm:'二境·通脉后期', loc:'靖安·将军府', items:['家传信物'], skills:['军中枪法'], gear:['雁翎刀','轻甲']}},
+  {id:'江湖遗孤', icon:'仇', desc:'自带仇怨剧情线，复仇开局', seed:{money:'30两', realm:'二境·通脉初期', loc:'渔阳·客栈', items:['半截断剑','仇家玉佩'], skills:['无名刀法'], gear:['旧皮袄']}},
+];
+
+const ATTRS = ['根骨','悟性','身法','臂力','内力','福缘'];
+const ATTR_DESC = {根骨:'体质气血修炼效率', 悟性:'学武速度与契合上限', 身法:'速度闪避轻功', 臂力:'攻击负重硬功', 内力:'内息总量与恢复', 福缘:'奇遇运气机缘'};
+
+const TALENTS = [
+  {k:'天生神力', d:'臂力+10，拳脚威力过人'},
+  {k:'过目不忘', d:'悟性+10，学武事半功倍'},
+  {k:'金刚不坏', d:'根骨+10，皮糙肉厚耐打'},
+  {k:'踏雪无痕', d:'身法+10，轻功天赋异禀'},
+  {k:'气海如渊', d:'内力+10，内息悠长'},
+  {k:'福星高照', d:'福缘+10，奇遇不断'},
+  {k:'剑心通明', d:'与剑类武学契合度大增'},
+  {k:'百毒不侵', d:'对毒与蛊天生抗性'},
+];
+
+/* ---------------- 状态 ---------------- */
+let state = null;
+let streaming = false, abortCtrl = null;
+let autosaveTimer = null;
+let deathEvalPending = null;
+let curTab = {mem:'summary', death:'deaths'};
+
+function freshState(){
+  return {
+    v:1, cfg:{endpoint:'https://api.deepseek.com/v1/chat/completions', apiKey:'', model:'deepseek-chat', maxTokens:'unlimited', reasoning:'中'},
+    theme:'ink', autoSave:true, autoSaveMsg:true, autoSaveInt:60,
+    player:null, notes:'', difficulty:'标准',
+    messages:[], status:{}, memory:{summary:'', entries:[]},
+    checkpoints:[], deaths:[], turn:0, dead:false,
+  };
+}
+
+/* ---------------- 工具 ---------------- */
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ toast('保存失败：存储空间不足','red'); } }
+function toast(msg, cls){ const t=document.createElement('div'); t.className='toast-item'+(cls?' '+cls:''); t.textContent=msg; $('toast').appendChild(t); setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity 300ms'; setTimeout(()=>t.remove(),320); }, 2600); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function mdLight(s){
+  return esc(s)
+    .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+    .replace(/\*([^*]+)\*/g,'<i>$1</i>')
+    .replace(/^### (.+)$/gm,'<div style="font-family:var(--serif);color:var(--gold);font-size:13px;margin:8px 0 2px">$1</div>')
+    .replace(/^## (.+)$/gm,'<div style="font-family:var(--serif);color:var(--gold);font-size:14px;margin:10px 0 2px">$1</div>');
+}
+function nowStr(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+function confirmBox(title, text, okLabel, cb){
+  $('cf-title').textContent = title;
+  $('cf-text').innerHTML = text;
+  const ok = $('cf-ok'); ok.textContent = okLabel||'确定';
+  ok.onclick = ()=>{ closeModal('confirm-modal'); cb&&cb(); };
+  $('cf-cancel').onclick = ()=>closeModal('confirm-modal');
+  openModal('confirm-modal');
+}
+function openModal(id){ $(id).classList.add('open'); }
+function closeModal(id){ $(id).classList.remove('open'); }
+const MODAL_IDS=['settings-modal','ency-modal','mem-modal','death-modal','confirm-modal'];
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ for(let i=MODAL_IDS.length-1;i>=0;i--){ if($(MODAL_IDS[i]).classList.contains('open')){ closeModal(MODAL_IDS[i]); break; } } }
+});
+MODAL_IDS.forEach(id=>{
+  const ov=$(id);
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) closeModal(id); });
+});
+
+/* ---------------- 主题 ---------------- */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t||'ink');
+  if(state) state.theme = t||'ink';
+}
+const THEMES = {ink:'墨夜', jade:'青衫', cinnabar:'朱砂', paper:'月白'};
+
+/* ---------------- 设置向导 ---------------- */
+const steps = ['st-api','st-char','st-notes','st-diff','st-confirm'];
+function showStep(i){
+  steps.forEach((s,idx)=>{ $(s).classList.toggle('on', idx===i); });
+  const dots = $('setup-dots'); dots.innerHTML='';
+  steps.forEach((_,idx)=>{ const d=document.createElement('div'); d.className='sdot'+(idx===i?' on':''); dots.appendChild(d); });
+}
+let wizardIdx = 0;
+
+function seedModelSelect(sel, cur){
+  const base = ['deepseek-chat','deepseek-reasoner'];
+  const list = base.concat([]);
+  if(cur && !list.includes(cur)) list.unshift(cur);
+  sel.innerHTML='';
+  list.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; if(m===cur) o.selected=true; sel.appendChild(o); });
+}
+async function fetchModels(endpoint, key, selEl, hintEl){
+  if(!endpoint){ toast('请先填写 API 端点','red'); return; }
+  hintEl.textContent = '正在拉取模型列表…';
+  const base = endpoint.replace(/\/chat\/completions\/?$/,'').replace(/\/+$/,'');
+  const cands = [base+'/models', base+'/v1/models', 'https://api.deepseek.com/models'];
+  for(const url of cands){
+    try{
+      const r = await fetch(url, {headers:{'Authorization':'Bearer '+(key||''), 'Accept':'application/json'}});
+      if(!r.ok) continue;
+      const j = await r.json();
+      const models = (j.data||[]).map(m=>m.id||m).filter(Boolean);
+      if(!models.length) continue;
+      const picked = models.filter(id=>/deepseek|chat|reasoner|gpt|qwen|glm/i.test(id));
+      const list = (picked.length? picked : models).sort();
+      selEl.innerHTML='';
+      list.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; selEl.appendChild(o); });
+      if(list.includes('deepseek-chat')) selEl.value='deepseek-chat';
+      hintEl.textContent = '已获取 '+list.length+' 个模型';
+      toast('模型列表已更新（'+list.length+' 个）','gold');
+      return;
+    }catch(e){ /* try next */ }
+  }
+  hintEl.textContent = '拉取失败，已保留默认模型（可手动输入模型名）';
+  toast('模型列表拉取失败，请检查端点与 Key','red');
+}
+function readCfgFromWizard(){
+  return { endpoint:$('cfg-endpoint').value.trim(), apiKey:$('cfg-apikey').value.trim(),
+    model:$('cfg-model').value, maxTokens:$('cfg-maxtokens').value, reasoning:$('cfg-reasoning').value };
+}
+
+/* 角色创建交互 */
+let ccAttrs = {}, ccTalents = [], ccCheat = [], ccCheatOn = false, ccOrigin = '草根孤儿';
+function initCharStep(){
+  ccAttrs = {}; ATTRS.forEach(a=>ccAttrs[a]=10);
+  ccTalents = []; ccCheat = []; ccCheatOn = false; ccOrigin = '草根孤儿';
+  $('cc-name').value = randName();
+  $('cc-gender').value = '男'; $('cc-age').value = 18;
+  $('cc-appear').value=''; $('cc-persona').value='';
+  $('cc-custom-talent').value=''; $('cc-notes').value='';
+  renderOriginGrid(); renderAttrRows(); renderTalentGrid(); renderCheatBox();
+}
+function randName(){
+  const sur=['林','沈','陆','萧','楚','顾','苏','叶','秦','白','洛','韩','江','宋','温','柳','陈','赵','周','燕','裴','谢'];
+  const giv=['长风','惊鸿','落尘','无涯','清歌','问剑','承影','慕白','云深','离火','千山','听雨','孤舟','怀瑾','藏锋','映雪','观澜','折柳','听雪','照夜','知秋','不归','青崖','逐月'];
+  return sur[Math.floor(Math.random()*sur.length)] + giv[Math.floor(Math.random()*giv.length)];
+}
+function renderOriginGrid(){
+  const g = $('cc-origin-grid'); g.innerHTML='';
+  ORIGINS.forEach(o=>{
+    const c=document.createElement('div'); c.className='option-card'+(ccOrigin===o.id?' sel':'');
+    c.innerHTML = '<span class="oc-mark">'+o.icon+'</span><div class="oc-name">'+o.id+'</div><div class="oc-desc">'+o.desc+'</div>';
+    c.onclick=()=>{ ccOrigin=o.id; renderOriginGrid();
+      $('cc-sect-wrap').style.display = o.id==='门派弟子' ? 'block':'none'; };
+    g.appendChild(c);
+  });
+}
+function renderAttrRows(){
+  const wrap=$('cc-attrs'); wrap.innerHTML='';
+  let pool = 60 - ATTRS.reduce((s,a)=>s+(ccAttrs[a]-10),0);
+  $('cc-points').textContent = '剩余 '+pool;
+  ATTRS.forEach(a=>{
+    const r=document.createElement('div'); r.className='trait-row';
+    r.innerHTML = '<span class="nm">'+a+'<br><span style="font-size:9px;color:var(--t3)">'+ATTR_DESC[a]+'</span></span>'+
+      '<button class="stp">−</button><div class="bar attr"><div style="width:'+(ccAttrs[a])+'%"></div></div>'+
+      '<span class="val">'+ccAttrs[a]+'</span><button class="stp">＋</button>';
+    const minus=r.querySelectorAll('.stp')[0], plus=r.querySelectorAll('.stp')[1];
+    minus.onclick=()=>{ if(ccAttrs[a]>1){ ccAttrs[a]--; renderAttrRows(); } };
+    plus.onclick=()=>{ const p=60-ATTRS.reduce((s,b)=>s+(ccAttrs[b]-10),0); if(p>0&&ccAttrs[a]<99){ ccAttrs[a]++; renderAttrRows(); } };
+    wrap.appendChild(r);
+  });
+}
+function renderTalentGrid(){
+  const g=$('cc-talents'); g.innerHTML='';
+  const all = TALENTS.concat([{k:'作弊模式', d:'金手指：无敌、暴富、欧皇…（勾选后配置）', cheat:true}]);
+  all.forEach(t=>{
+    const c=document.createElement('div'); c.className='talent-card'+(ccTalents.includes(t.k)?' sel':'');
+    c.innerHTML='<span class="tick">✔</span><div class="tk">'+(t.cheat?'☠ ':'')+t.k+'</div><div class="td">'+t.d+'</div>';
+    c.onclick=()=>{
+      if(t.cheat){
+        ccCheatOn = !ccCheatOn; renderTalentGrid(); renderCheatBox();
+      }else{
+        const i=ccTalents.indexOf(t.k);
+        if(i>=0) ccTalents.splice(i,1); else ccTalents.push(t.k);
+        renderTalentGrid();
+      }
+    };
+    g.appendChild(c);
+  });
+}
+function renderCheatBox(){
+  const box=$('cheat-box');
+  if(!ccCheatOn){ box.style.display='none'; return; }
+  box.style.display='block';
+  const s=$('cheat-subs'); s.innerHTML='';
+  CHEAT_OPTS.forEach(o=>{
+    const l=document.createElement('label');
+    l.innerHTML='<input type="checkbox" '+(ccCheat.includes(o.k)?'checked':'')+'> '+o.k+'<br><span style="font-size:9.5px;color:var(--t3)">'+o.d+'</span>';
+    l.querySelector('input').onchange=e=>{
+      if(e.target.checked){ if(!ccCheat.includes(o.k)) ccCheat.push(o.k); }
+      else ccCheat = ccCheat.filter(x=>x!==o.k);
+    };
+    s.appendChild(l);
+  });
+}
+
+/* 难度 */
+function renderDiffGrid(){
+  const g=$('cc-diff-grid'); g.innerHTML='';
+  DIFFS.forEach(d=>{
+    const c=document.createElement('div'); c.className='option-card'+(state.difficulty===d.id?' sel':'');
+    c.innerHTML='<span class="oc-mark">✦</span><div class="oc-name">'+d.name+'<br><span style="font-size:9px;color:var(--t3)">'+d.tag+'</span></div><div class="oc-desc">'+d.desc+'</div>';
+    c.onclick=()=>{ state.difficulty=d.id; renderDiffGrid(); };
+    g.appendChild(c);
+  });
+}
+
+/* 确认页 */
+function buildPlayer(){
+  const cheat = ccCheatOn ? ccCheat : [];
+  const attrs = {...ccAttrs};
+  ccTalents.forEach(t=>{
+    const map={天生神力:'臂力',过目不忘:'悟性',金刚不坏:'根骨',踏雪无痕:'身法',气海如渊:'内力',福星高照:'福缘'};
+    if(map[t]&&attrs[map[t]]<99) attrs[map[t]]=Math.min(99, attrs[map[t]]+10);
+  });
+  if(ccCheatOn) attrs['福缘']=Math.max(attrs['福缘'], 90);
+  const customTalent = $('cc-custom-talent').value.trim();
+  const p = {
+    name: $('cc-name').value.trim() || randName(),
+    gender: $('cc-gender').value,
+    age: parseInt($('cc-age').value)||18,
+    appear: $('cc-appear').value.trim(),
+    persona: $('cc-persona').value.trim(),
+    origin: ccOrigin,
+    sect: ccOrigin==='门派弟子' ? $('cc-sect').value : '',
+    attrs, talents: ccTalents.concat(customTalent?['自定义·'+customTalent]:[]),
+    customTalent,
+    cheat, cheatOn: ccCheatOn,
+    customNotes: $('cc-notes').value.trim(),
+  };
+  return p;
+}
+function renderConfirm(){
+  const p = buildPlayer();
+  const g=$('cf-grid'); g.innerHTML='';
+  const card=(title, rows, full)=>{
+    const d=document.createElement('div'); d.className='confirm-card'+(full?' full':'');
+    d.innerHTML='<div class="cc-title">'+title+'</div>'+rows.map(r=>'<div class="kv"><span class="k">'+r[0]+'</span><span class="v">'+r[1]+'</span></div>').join('');
+    return d;
+  };
+  g.appendChild(card('角色', [
+    ['姓名', p.name+'（'+p.gender+'，'+p.age+'岁）'],
+    ['出身', p.origin+(p.sect?' · '+p.sect:'')],
+    ['六维', ATTRS.map(a=>a+' '+p.attrs[a]).join(' / ')],
+    ['天赋', p.talents.length? p.talents.join('、') : '无'],
+  ]));
+  g.appendChild(card('金手指', p.cheatOn ? [['模式', '作弊模式开启'],['能力', p.cheat.length? p.cheat.join('、'):'未选（默认全开效果减半）']] : [['状态','未开启']]));
+  g.appendChild(card('难度', [[DIFFS.find(d=>d.id===state.difficulty).name, DIFFS.find(d=>d.id===state.difficulty).desc]]));
+  g.appendChild(card('AI 接口', [
+    ['模型', state.cfg.model],
+    ['Token 限制', state.cfg.maxTokens==='unlimited'?'无限制':state.cfg.maxTokens],
+    ['推理强度', state.cfg.reasoning],
+  ]));
+  const notes = p.customNotes || '（无）';
+  const nc = card('嘱托说书人（备注）', [['内容','']], true);
+  nc.querySelector('.kv').innerHTML='<span class="k" style="display:none"></span><span class="notes-text">'+esc(notes)+'</span>';
+  g.appendChild(nc);
+  if(p.appear||p.persona){
+    g.appendChild(card('外貌与性格', [
+      ['外貌', p.appear||'（由说书人描绘）'],
+      ['性格', p.persona||'（由说书人演绎）'],
+    ]));
+  }
+}
+
+/* ---------------- 存档 ---------------- */
+function saveGame(){
+  if(!state) return;
+  lsSet(LS_KEY, state);
+}
+function exportSave(){
+  const data = JSON.stringify(state, null, 1);
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '江湖志存档-'+nowStr().replace(/[:\s-]/g,'')+'.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('存档已导出','gold');
+}
+function importSave(file){
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const s = JSON.parse(rd.result);
+      if(!s || !s.player || !Array.isArray(s.messages)) throw new Error('bad');
+      state = s;
+      applyTheme(state.theme);
+      startGame();
+      closeModal('settings-modal');
+      toast('存档导入成功','gold');
+    }catch(e){ toast('存档文件无效','red'); }
+  };
+  rd.readAsText(file);
+}
+
+/* ---------------- 开场 ---------------- */
+function seedStatus(p){
+  const o = ORIGINS.find(x=>x.id===p.origin) || ORIGINS[0];
+  const st = {
+    location: o.seed.loc, time:'辰时', weather:'天朗气清',
+    hp:'100/100', mp:'100/100', money: o.seed.money, realm: o.seed.realm,
+    conditions: p.cheatOn&&p.cheat.includes('无敌金身')? ['气运护体'] : [],
+    wound:'无', mood:'平静', xia:'0', e:'0',
+    goal:'闯出名堂，在江湖立足',
+    relations: p.origin==='江湖遗孤'? ['灭门仇人(不明)'] : [],
+    companions:'无', items: o.seed.items.slice(), skills: o.seed.skills.slice(), gear: o.seed.gear.slice(),
+  };
+  if(p.cheatOn){
+    st.money = '1000两';
+    st.realm = '三境·凝气初期';
+    if(!st.skills.includes('降龙掌法(绝学)')) st.skills.push('降龙掌法(绝学)');
+    if(!st.gear.includes('神兵·寒光剑')) st.gear.push('神兵·寒光剑');
+    if(!st.items.includes('疗伤神丹×5')) st.items.push('疗伤神丹×5');
+    if(p.cheat.includes('欧皇附体')) st.conditions.push('气运冲天');
+  }
+  return st;
+}
+function openingScene(p){
+  const d = DIFFS.find(x=>x.id===state.difficulty);
+  const o = ORIGINS.find(x=>x.id===p.origin) || ORIGINS[0];
+  let txt = '【说书人开场】\n\n大齐一百二十一年，'+(state.status.time||'辰时')+'，'+(state.status.weather||'')+'。\n\n';
+  txt += '你叫'+p.name+'，'+(p.gender==='男'?'一个':'一个')+p.age+'岁的'+(p.origin==='门派弟子'?(p.sect+'外门弟子'):p.origin)+'。';
+  if(p.origin==='江湖遗孤') txt += '三年前的那场大火至今还烧在你梦里——满门三十七口，只剩你一人和一截断剑，还有一枚来路不明的玉佩。你活着，就是为了问一句"为什么"。';
+  if(p.origin==='草根孤儿') txt += '你无父无母，靠偷学、帮工、捡破烂活到今天，一身本事都是拿命换来的。江湖很大，你什么都没有，除了这身胆。';
+  if(p.origin==='武馆学徒') txt += '你在长风武馆练了五年拳脚，师傅说你是块料子，可江湖不是演武场——今天你终于要出馆了。';
+  if(p.origin==='世家子弟') txt += '金陵沈家的名头压得你喘不过气。族老们要你考取功名、联姻商户，可你夜里总是梦见一把剑。';
+  if(p.origin==='将门之后') txt += '靖安将军府的匾额挂了三代，到你这一代只剩空架子。边关的旧部还在等你，朝堂上却有人要收你家的兵权。';
+  if(p.origin==='门派弟子') txt += '你拜入'+(p.sect||'少林')+'门下三年，晨钟暮鼓，练的是最扎实的功夫。今日师父唤你下山历练，说是"江湖才是真正的道场"。';
+  if(p.cheatOn){
+    txt += '\n\n而你，是天命所钟之人——绝学降龙掌法已然在身，神兵寒光剑寒芒如月，腰缠千两纹银，'+(p.cheat.includes('欧皇附体')?'气运冲天，走到哪里都有机缘等着你。':'机缘亦比常人深厚。');
+    if(p.cheat.includes('无敌金身')) txt += '冥冥中似有天道护持，刀剑加身亦难伤你性命。';
+    txt += '这江湖，怕是要因你而热闹了。';
+  }
+  txt += '\n\n此刻，你正站在'+(state.status.location||'江湖某处')+'。';
+  if(p.origin==='草根孤儿') txt += '破庙檐下漏着天光，庙外传来市集的喧闹，你摸了摸怀里最后半块干粮。';
+  if(p.origin==='江湖遗孤') txt += '客栈二楼的窗正对着长街，楼下有人在谈论最近那桩灭门血案——你竖起了耳朵。';
+  if(p.origin==='门派弟子') txt += '山门外的石阶一望无际，师父的话还在耳边："山下人心比刀利，慎言，慎行。"';
+  txt += '\n\n'+(p.cheatOn?'（作弊模式已生效：'+ (p.cheat.length?p.cheat.join('、'):'全部') +'）':'')+'\n\n'+(d?('当前难度：'+d.name+'「'+d.id+'」——'+d.desc):'');
+  txt += '\n\n你打算——\n① 先四处看看，摸清此地情况\n② 直接打听最近江湖上的大事\n③ 依着性子，做你此刻最想做的事';
+  return txt;
+}
+
+/* ---------------- 系统提示词 ---------------- */
+function statusToLines(){
+  const m = {location:'地点', time:'时辰', weather:'天气', hp:'气血', mp:'内力', money:'银两', realm:'境界', conditions:'状态', wound:'伤势', mood:'心情', xia:'侠名', e:'恶名', goal:'目标', relations:'关系', companions:'同伴', items:'物品', skills:'武学', gear:'装备'};
+  const out=[];
+  Object.keys(m).forEach(k=>{ if(state.status[k]!=null && state.status[k]!=='') out.push(k+'='+state.status[k]); });
+  Object.keys(state.status).forEach(k=>{ if(!(k in m) && state.status[k]!=null) out.push(k+'='+state.status[k]); });
+  return out.join('; ');
+}
+function buildSystemPrompt(){
+  const p = state.player, d = DIFFS.find(x=>x.id===state.difficulty) || DIFFS[2];
+  let cheatTxt = '';
+  if(p.cheatOn){
+    cheatTxt = '\n\n## 作弊模式（金手指）生效中\n';
+    CHEAT_OPTS.forEach(o=>{
+      if(p.cheat.includes(o.k)) cheatTxt += '- '+o.k+'：'+o.d+'。\n';
+    });
+    if(!p.cheat.length) cheatTxt += '- 金手指全开：属性、气运、机缘全面增强。\n';
+    cheatTxt += '规则：无敌金身生效时，玩家受到致命伤害一律改为重伤昏迷（不输出【玩家死亡】）；其余作弊项正常生效，叙事保持"爽"但仍有波折。';
+  }
+  const sheet = [
+    '## 玩家角色档案',
+    '姓名：'+p.name+'（'+p.gender+'，'+p.age+'岁）',
+    '出身：'+p.origin+(p.sect?'·'+p.sect:'')+'    难度：'+d.id+'「'+d.name+'」',
+    '六维：'+ATTRS.map(a=>a+' '+p.attrs[a]).join(' / '),
+    '天赋：'+(p.talents.length? p.talents.join('、') : '无')+(p.cheatOn?'  【作弊模式】':''),
+    '外貌：'+(p.appear||'（由你描绘）'),
+    '性格：'+(p.persona||'（由你演绎）'),
+    '玩家嘱托（备注）：'+(p.customNotes||'无'),
+    '初始武学/装备：'+toList(state.status.skills).join('、')+' ／ '+toList(state.status.gear).join('、'),
+  ].join('\n');
+  const mem = '## 记忆档案\n- 往事纪要：'+(state.memory.summary||'（尚无）')+'\n- 记忆条目：\n'+(state.memory.entries.length? state.memory.entries.map(e=>'  · '+e).join('\n') : '  （无）');
+  return [
+    '你是《江湖志》武侠角色扮演游戏中的"说书人"兼天机阁主，为玩家推演一场完整的江湖人生。玩家会直接输入行动，你负责推演世界、NPC 与因果。以第二人称"你"叙述。',
+    SYS_WORLD,
+    SYS_RP,
+    sheet,
+    '## 当前状态\n'+statusToLines(),
+    mem,
+    '## 当前难度\n'+d.id+'「'+d.name+'」：'+d.rules,
+    cheatTxt,
+    SYS_PROTOCOL,
+  ].join('\n\n');
+}
+
+/* ---------------- 消息与聊天 ---------------- */
+function addMsg(role, text, opts){
+  opts = opts||{};
+  const wrap = document.createElement('div');
+  wrap.className = 'msg '+role;
+  const meta = document.createElement('div'); meta.className='meta';
+  meta.textContent = opts.meta || (role==='user' ? '你 · '+nowStr() : role==='sys' ? '' : '说书人 · '+nowStr());
+  if(role==='ai'){
+    const av = document.createElement('div'); av.className='avatar'; av.textContent = (state.player? state.player.name[0] : '侠');
+    const body = document.createElement('div'); body.className='body';
+    const b = document.createElement('div'); b.className='bubble';
+    let html = '';
+    if(opts.reasoning) html += '<details class="think-block" open><summary>✦ 说书人思量<span class="tg"></span></summary><div class="think-body">'+mdLight(opts.reasoning)+'</div></details>';
+    b.innerHTML = html + mdLight(text);
+    body.appendChild(b); body.appendChild(meta);
+    wrap.appendChild(av); wrap.appendChild(body);
+  }else if(role==='user'){
+    const av = document.createElement('div'); av.className='avatar'; av.style.borderColor='var(--border-active)'; av.style.color='var(--t2)'; av.textContent='你';
+    const body = document.createElement('div'); body.className='body';
+    const b = document.createElement('div'); b.className='bubble'; b.innerHTML = mdLight(text);
+    body.appendChild(b); body.appendChild(meta);
+    wrap.appendChild(body); wrap.appendChild(av);
+  }else{
+    const body = document.createElement('div'); body.className='body';
+    const b = document.createElement('div'); b.className='bubble'; b.textContent = text;
+    body.appendChild(b);
+    wrap.appendChild(body);
+  }
+  $('chat-inner').appendChild(wrap);
+  $('chat-log').scrollTop = $('chat-log').scrollHeight;
+  return wrap;
+}
+function renderChat(){
+  $('chat-inner').innerHTML='';
+  state.messages.forEach(m=>{
+    if(m.role==='system') addMsg('sys', m.content);
+    else if(m.role==='user') addMsg('user', m.content);
+    else addMsg('ai', m.content, {reasoning: m.reasoning});
+  });
+  $('chat-log').scrollTop = $('chat-log').scrollHeight;
+}
+
+/* ---------------- 状态解析与角色面板 ---------------- */
+const KEY_ALIAS = {地点:'location',所在地点:'location',时辰:'time',天气:'weather',气血:'hp',内力:'mp',银两:'money',境界:'realm',状态:'conditions',伤势:'wound',心情:'mood',侠名:'xia',恶名:'e',目标:'goal',关系:'relations',同伴:'companions',物品:'items',武学:'skills',装备:'gear'};
+const KEY_LABEL = {location:'地点', time:'时辰', weather:'天气', hp:'气血', mp:'内力', money:'银两', realm:'境界', conditions:'状态', wound:'伤势', mood:'心情', xia:'侠名', e:'恶名', goal:'目标', relations:'关系', companions:'同伴', items:'物品', skills:'武学', gear:'装备'};
+const LIST_KEYS = new Set(['skills','gear','items','conditions','relations']);
+function toList(v){ return Array.isArray(v)? v : (v? String(v).split(/[、,，]/).map(x=>x.trim()).filter(Boolean) : []); }
+function parseReply(raw){
+  const lines = raw.split('\n');
+  const kept = []; const mem=[]; const nodes=[]; let death=false, statusLine=null;
+  lines.forEach(ln=>{
+    const t = ln.trim();
+    if(t.startsWith('【状态】')){ statusLine = t.slice(4).trim(); return; }
+    if(t.startsWith('【记忆】')){ mem.push(t.slice(4).trim()); return; }
+    if(t.startsWith('【节点】')){ nodes.push(t.slice(4).trim()); return; }
+    if(t.startsWith('【玩家死亡】')){ death = true; return; }
+    kept.push(ln);
+  });
+  const status = {};
+  if(statusLine){
+    statusLine.split(';').forEach(kv=>{
+      const i = kv.indexOf('=');
+      if(i<1) return;
+      const k = kv.slice(0,i).trim(), v = kv.slice(i+1).trim();
+      if(!k||!v) return;
+      const key = KEY_ALIAS[k]||k;
+      status[key] = LIST_KEYS.has(key)? toList(v) : v;
+    });
+  }
+  return {text: kept.join('\n').trim(), mem, nodes, death, status};
+}
+function applyStatus(st){
+  Object.keys(st).forEach(k=>{ state.status[k] = st[k]; });
+  renderCharPanel();
+  const loc = state.status.location||'——', time = state.status.time||'';
+  $('loc-txt').textContent = loc + (time? ' · '+time : '');
+  $('mloc-txt').textContent = '✦ ' + loc + (time? ' · '+time : '');
+}
+function barVal(v){
+  const m = String(v).match(/([\d.]+)\s*\/\s*([\d.]+)/);
+  if(m) return {cur:parseFloat(m[1]), max:parseFloat(m[2])||100};
+  const n = parseFloat(v);
+  if(!isNaN(n)) return {cur:n, max:100};
+  return null;
+}
+function renderCharPanel(){
+  if(!state||!state.player) return;
+  const p = state.player, s = state.status;
+  $('cp-avatar').textContent = p.name[0]||'侠';
+  $('cp-name').textContent = p.name;
+  const diff = DIFFS.find(d=>d.id===state.difficulty);
+  $('cp-meta').textContent = (s.realm||'境界未知') + ' · ' + (diff?diff.id:'') + ' · 第'+state.turn+'回合';
+  $('b-name').textContent = p.name + (p.cheatOn?'<span class="cheat-badge">金手指</span>':'');
+  $('b-gender').textContent = p.gender + ' / ' + p.age + '岁';
+  $('b-origin').textContent = p.origin + (p.sect?' · '+p.sect:'');
+  $('b-diff').textContent = diff? diff.id+'「'+diff.name+'」' : '——';
+  $('b-realm').textContent = s.realm || '未知';
+  $('b-appear').textContent = p.appear || '由说书人描绘';
+  $('b-persona').textContent = p.persona || '由说书人演绎';
+  /* 气血内力 */
+  const hp = barVal(s.hp), mp = barVal(s.mp);
+  $('st-hp').style.width = hp? Math.max(0,Math.min(100,hp.cur/hp.max*100))+'%' : '0%';
+  $('st-hp-t').textContent = s.hp||'--';
+  $('st-mp').style.width = mp? Math.max(0,Math.min(100,mp.cur/mp.max*100))+'%' : '0%';
+  $('st-mp-t').textContent = s.mp||'--';
+  /* 额外键 */
+  const extraKeys = ['money','realm','goal','wound','mood','xia','e','weather'];
+  let html = '';
+  const kvMap = {money:'银两', realm:'境界', goal:'当前目标', wound:'伤势', mood:'心情', xia:'侠名', e:'恶名', weather:'天气'};
+  extraKeys.forEach(k=>{
+    if(s[k]!=null && s[k]!==''){
+      if(k==='xia'||k==='e') html += '<div class="kv"><span class="k">'+kvMap[k]+'</span><span class="v '+(k==='e'&&parseInt(s[k])>0?'': '')+'">'+esc(s[k])+'</span></div>';
+      else html += '<div class="kv"><span class="k">'+kvMap[k]+'</span><span class="v">'+esc(s[k])+'</span></div>';
+    }
+  });
+  $('st-extra').innerHTML = html;
+  /* 标签 */
+  let tags = '';
+  const cond = Array.isArray(s.conditions)? s.conditions : (s.conditions? String(s.conditions).split(/[、,，]/) : []);
+  cond.forEach(c=>{ if(c.trim()) tags += '<span class="tag '+(/(伤|毒|蛊|病|残|醉)/.test(c)?'red':'gold')+'">'+esc(c.trim())+'</span>'; });
+  if(state.deaths&&state.deaths.length) tags += '<span class="tag red">亡 '+state.deaths.length+' 次</span>';
+  $('st-tags').innerHTML = tags;
+  $('st-update').textContent = '状况由说书人实时同步 · 最后更新于第'+state.turn+'回合';
+  /* 六维 */
+  let attrs='';
+  ATTRS.forEach(a=>{
+    attrs += '<div class="stat-row"><div class="lab"><span>'+a+'</span><b>'+p.attrs[a]+'</b></div><div class="bar attr"><div style="width:'+Math.min(100,p.attrs[a])+'%"></div></div></div>';
+  });
+  $('cp-attrs').innerHTML = attrs;
+  /* 天赋 */
+  let tl='';
+  (p.talents||[]).forEach(t=>{ tl += '<span class="tag gold">'+esc(t)+'</span>'; });
+  if(p.cheatOn) tl += '<span class="tag red">☠ 作弊模式'+(p.cheat.length?'：'+esc(p.cheat.join('、')):'')+'</span>';
+  $('cp-talents').innerHTML = tl || '<span style="font-size:11px;color:var(--t3)">无</span>';
+  /* 武学装备 */
+  const sk = Array.isArray(s.skills)? s.skills : (s.skills? String(s.skills).split(/[、,，]/) : []);
+  const ge = Array.isArray(s.gear)? s.gear : (s.gear? String(s.gear).split(/[、,，]/) : []);
+  const it = Array.isArray(s.items)? s.items : (s.items? String(s.items).split(/[、,，]/) : []);
+  let lo = '';
+  if(sk.length) lo += '<div class="stat-mini"><b>武学：</b></div>'+sk.map(x=>'<span class="tag">'+esc(x)+'</span>').join('');
+  if(ge.length) lo += '<div class="stat-mini" style="margin-top:6px"><b>装备：</b></div>'+ge.map(x=>'<span class="tag jade">'+esc(x)+'</span>').join('');
+  if(it.length) lo += '<div class="stat-mini" style="margin-top:6px"><b>物品：</b></div>'+it.map(x=>'<span class="tag">'+esc(x)+'</span>').join('');
+  $('cp-loadout').innerHTML = lo || '<span style="font-size:11px;color:var(--t3)">空空如也</span>';
+  /* 人际 */
+  let so = '';
+  so += '<div class="kv"><span class="k">侠名</span><span class="v">'+(s.xia||'0')+'</span></div>';
+  so += '<div class="kv"><span class="k">恶名</span><span class="v">'+(s.e||'0')+'</span></div>';
+  so += '<div class="kv"><span class="k">同伴</span><span class="v">'+(s.companions&&s.companions!=='无'?esc(s.companions):'无')+'</span></div>';
+  const rel = Array.isArray(s.relations)? s.relations : (s.relations? String(s.relations).split(/[、,，]/) : []);
+  so += '<div class="kv"><span class="k">关系</span><span class="v">'+(rel.length? rel.map(esc).join('、'):'暂无')+'</span></div>';
+  $('cp-social').innerHTML = so;
+}
+
+/* ---------------- AI 调用 ---------------- */
+function apiBody(messages, extra){
+  const cfg = state.cfg;
+  const body = {model: cfg.model, messages, stream: extra.stream!==false};
+  if(cfg.maxTokens && cfg.maxTokens!=='unlimited') body.max_tokens = parseInt(cfg.maxTokens);
+  if(cfg.reasoning){
+    const t = {最大:0.3, 高:0.5, 中:0.8, 低:1.0}[cfg.reasoning];
+    if(!/reasoner/i.test(cfg.model)) body.temperature = t;
+  }
+  return body;
+}
+async function chatRequest(messages, onDelta, extra){
+  const cfg = state.cfg;
+  if(!cfg.apiKey){ toast('请先在设置中填写 API Key','red'); throw new Error('no-key'); }
+  abortCtrl = new AbortController();
+  const res = await fetch(cfg.endpoint, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},
+    body: JSON.stringify(apiBody(messages, extra||{})),
+    signal: abortCtrl.signal,
+  });
+  if(!res.ok){
+    let msg = 'HTTP '+res.status;
+    try{ const j = await res.json(); msg = (j.error&&j.error.message)||msg; }catch(e){}
+    throw new Error(msg);
+  }
+  if(extra && extra.stream===false){
+    const j = await res.json();
+    const txt = (j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||'';
+    onDelta(txt); return txt;
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', out = '', outThink = '';
+  while(true){
+    const {done, value} = await reader.read();
+    if(done) break;
+    buf += dec.decode(value, {stream:true});
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for(const ln of lines){
+      const t = ln.trim();
+      if(!t.startsWith('data:')) continue;
+      const payload = t.slice(5).trim();
+      if(payload === '[DONE]') continue;
+      try{
+        const j = JSON.parse(payload);
+        const delta = j.choices && j.choices[0] && j.choices[0].delta;
+        const think = (delta && delta.reasoning_content) || '';
+        const chunk = (delta && delta.content) || '';
+        if(think){ outThink += think; onDelta(chunk, think); }
+        else if(chunk){ out += chunk; onDelta(chunk, ''); }
+      }catch(e){}
+    }
+  }
+  return out;
+}
+
+/* ---------------- 发送 ---------------- */
+async function sendUser(text, opts){
+  opts = opts||{};
+  const t = (text||'').trim();
+  if(!t || streaming || state.dead) return;
+  addMsg('user', t);
+  state.messages.push({role:'user', content:t});
+  state.turn++;
+  $('chat-input').value='';
+  autoGrow();
+  await aiReply(opts);
+}
+async function aiReply(opts){
+  streaming = true;
+  $('send-btn').disabled = true;
+  $('stop-btn').classList.add('on');
+  const wrap = addMsg('ai','');
+  const bub = wrap.querySelector('.bubble');
+  bub.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+  let acc = '', think = '';
+  const renderLive = ()=>{
+    let html = '';
+    if(think.trim()) html += '<details class="think-block" open><summary>✦ 说书人思量<span class="tg"></span></summary><div class="think-body">'+mdLight(think)+'</div></details>';
+    html += acc.length>20 ? mdLight(acc) : '<span class="typing"><i></i><i></i><i></i></span>';
+    bub.innerHTML = html;
+    $('chat-log').scrollTop = $('chat-log').scrollHeight;
+  };
+  try{
+    const sys = buildSystemPrompt();
+    const msgs = [{role:'system', content:sys}].concat(state.messages.map(m=>({role:m.role, content:m.content})));
+    await chatRequest(msgs, (chunk, tchunk)=>{
+      if(tchunk) think += tchunk;
+      if(chunk) acc += chunk;
+      renderLive();
+    }, opts);
+    if(!acc.trim()) throw new Error('模型返回为空');
+    const parsed = parseReply(acc);
+    bub.innerHTML = (think.trim()? '<details class="think-block" open><summary>✦ 说书人思量<span class="tg"></span></summary><div class="think-body">'+mdLight(think)+'</div></details>' : '') + mdLight(parsed.text || '（说书人沉默片刻…）');
+    state.messages.push({role:'assistant', content:parsed.text, reasoning: think.trim()||undefined});
+    /* 状态 */
+    if(Object.keys(parsed.status).length) applyStatus(parsed.status);
+    /* 记忆 */
+    parsed.mem.forEach(m=>{
+      if(m && !state.memory.entries.includes(m)) state.memory.entries.push(m);
+    });
+    if(state.memory.entries.length>80) state.memory.entries = state.memory.entries.slice(-80);
+    /* 节点 */
+    parsed.nodes.forEach(n=>{ if(n) addCheckpoint('节点·'+n); });
+    /* 死亡 */
+    if(parsed.death && !(state.player.cheatOn && state.player.cheat.includes('无敌金身'))){
+      onDeath(parsed);
+      return;
+    }
+    /* 自动检查点 */
+    if(state.turn % 5 === 0) addCheckpoint('自动·第'+state.turn+'回合');
+    /* 自动压缩 */
+    if(state.messages.length > 70) compactMemory();
+    saveGame();
+    if(state.autoSaveMsg) toast('已自动存档','gold');
+  }catch(err){
+    if(err.name === 'AbortError'){
+      if(acc){ const parsed = parseReply(acc); bub.innerHTML = (think.trim()? '<details class="think-block" open><summary>✦ 说书人思量<span class="tg"></span></summary><div class="think-body">'+mdLight(think)+'</div></details>' : '') + mdLight(parsed.text); state.messages.push({role:'assistant', content:parsed.text, reasoning: think.trim()||undefined}); if(Object.keys(parsed.status).length) applyStatus(parsed.status); saveGame(); }
+      toast('已停止推演');
+    }else{
+      bub.innerHTML = (think.trim()? '<details class="think-block" open><summary>✦ 说书人思量<span class="tg"></span></summary><div class="think-body">'+mdLight(think)+'</div></details>' : '') + (mdLight(acc) || '<span style="color:var(--red)">推演失败：'+esc(err.message||'网络错误')+'</span>');
+      addMsg('sys', '说书人推演失败：'+(err.message||'未知错误')+'。可检查 API 设置后重试。');
+    }
+  }finally{
+    streaming = false;
+    $('send-btn').disabled = false;
+    $('stop-btn').classList.remove('on');
+    $('chat-log').scrollTop = $('chat-log').scrollHeight;
+  }
+}
+function autoGrow(){
+  const ta = $('chat-input');
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(140, Math.max(42, ta.scrollHeight)) + 'px';
+}
+
+/* ---------------- 检查点与死亡 ---------------- */
+function addCheckpoint(name){
+  const cp = {
+    id: 'cp'+Date.now()+Math.floor(Math.random()*999),
+    name, time: nowStr(), turn: state.turn,
+    msgCount: state.messages.length,
+    status: JSON.parse(JSON.stringify(state.status)),
+    summary: state.memory.summary, memCount: state.memory.entries.length,
+  };
+  state.checkpoints.push(cp);
+  const auto = state.checkpoints.filter(c=>c.name.startsWith('自动'));
+  while(auto.length > 8){
+    const i = state.checkpoints.indexOf(auto[0]);
+    state.checkpoints.splice(i,1); auto.shift();
+  }
+  if(state.checkpoints.length > 24) state.checkpoints = state.checkpoints.slice(-24);
+  saveGame();
+}
+function latestCheckpoint(){
+  if(!state.checkpoints.length) return null;
+  return state.checkpoints[state.checkpoints.length-1];
+}
+async function onDeath(parsed){
+  state.dead = true;
+  const cp = latestCheckpoint();
+  const rec = {
+    time: nowStr(), turn: state.turn,
+    cause: (state.messages[state.messages.length-2]||{}).content || '未知',
+    deathText: parsed.text,
+    cpName: cp? cp.name : '开局',
+    eval: '',
+  };
+  state.deaths.push(rec);
+  saveGame();
+  renderCharPanel();
+  $('death-why').textContent = '你'+(parsed.status.realm? '（'+parsed.status.realm+'）':'')+'命丧江湖。天机阁正在为你撰写命簿评析…';
+  $('death-eval-box').style.display='none';
+  $('d-eval').textContent='查看命簿评析';
+  openModal ? null : null;
+  $('death-overlay').classList.add('open');
+  /* 请求评析 */
+  requestDeathEval(rec);
+}
+async function requestDeathEval(rec){
+  try{
+    const p = state.player;
+    const sys = '你是《江湖志》的"天机阁主"，掌管生死簿。请为这位命丧江湖的侠客撰写一份"命簿评析"。要求：150~280字，说书人般犀利老辣的口吻，不鸡汤、不煽情、不自我感动。';
+    const prompt = '玩家档案：'+p.name+'（'+p.gender+'，'+p.age+'岁），出身'+p.origin+'，难度'+state.difficulty+'，境界'+(state.status.realm||'未知')+'。\n'+
+      '死亡前最后行动：'+(rec.cause||'无')+'\n'+
+      '死亡经过：'+(rec.deathText||'未知')+'\n\n'+
+      '请按以下格式输出：\n【死因】一句话点破死因\n【评点】对该玩家此前的行为给出3条具体点评（做对了什么、做错了什么、可以怎么改进），结合死前经过\n【忠告】一句针对"如何活着走下去"的实用建议';
+    const msgs = [{role:'system',content:sys},{role:'user',content:prompt}];
+    const box = $('death-eval-box');
+    box.style.display='block';
+    box.textContent = '天机阁主提笔中…';
+    let out='';
+    await chatRequest(msgs, c=>{ out+=c; box.textContent = out; }, {stream:true, maxTokensFallback:true});
+    rec.eval = out;
+    saveGame();
+    $('d-eval').textContent='查看命簿评析';
+  }catch(e){
+    const box=$('death-eval-box');
+    box.style.display='block';
+    box.textContent = '（命簿评析生成失败：'+(e.message||'网络错误')+'，可稍后从"回档"中重新生成）';
+  }
+}
+function reviveTo(cp){
+  if(!cp) cp = latestCheckpoint();
+  if(!cp) return;
+  state.messages = state.messages.slice(0, cp.msgCount);
+  state.status = JSON.parse(JSON.stringify(cp.status));
+  state.memory.summary = cp.summary;
+  state.memory.entries = state.memory.entries.slice(0, cp.memCount);
+  state.checkpoints = state.checkpoints.filter(c=>c.msgCount <= cp.msgCount);
+  state.dead = false;
+  state.turn = cp.turn;
+  renderChat();
+  applyStatus({});
+  addMsg('sys', '【天机改写】命运之线被拨回「'+cp.name+'」。你从那一刻重新踏入江湖——过去发生的事已成过眼云烟，但你心底隐约记得一些教训。说书人将继续推演。');
+  state.messages.push({role:'system', content:'（天机改写：玩家在'+(cp.time||'')+'的「'+cp.name+'」处重来。玩家知道"死亡教训"但角色处于该时间点，请正常推演，不要提前剧透未来。）'});
+  saveGame();
+  $('death-overlay').classList.remove('open');
+  closeModal('death-modal');
+  toast('已回到「'+cp.name+'」，继续江湖','gold');
+}
+
+/* ---------------- 记忆压缩 ---------------- */
+async function compactMemory(){
+  toast('说书人正在整理往事记忆…');
+  try{
+    const keep = state.messages.slice(-24);
+    const old = state.messages.slice(0, -24);
+    const sys = '你是《江湖志》游戏的说书人。请把以下"旧对话"压缩成一段 300 字以内的"往事纪要"，保留：重要人物与关系、承诺与恩怨、线索与秘密、关键事件、玩家当前目标。用第二人称"你"叙述，只写事实不写评价。';
+    const prompt = old.map(m=>(m.role==='user'?'【你】':'【说书人】')+m.content).join('\n');
+    let out='';
+    await chatRequest([{role:'system',content:sys},{role:'user',content:prompt}], c=>out+=c, {stream:false});
+    state.memory.summary = out.trim();
+    state.messages = keep;
+    /* 失效检查点：压缩后截断 */
+    const cap = state.messages.length;
+    state.checkpoints = state.checkpoints.filter(c=>c.msgCount<=cap);
+    saveGame();
+    toast('往事已整理入记忆档案','gold');
+  }catch(e){ toast('记忆整理失败（稍后自动重试）','red'); }
+}
+
+/* ---------------- 百科 ---------------- */
+const ENCY = {
+  '境界': `<div class="ency-block">
+    <b>武道三要素：</b>气（内力·根基）、技（招式·应用）、意（心境·升华）。只练气不成技则笨重，只练技不练气则无根，无"意"终身卡在宗师门前。<br><br>
+    <table><tr><th>境界</th><th>别称</th><th>标志能力</th><th>江湖地位</th></tr>
+    <tr><td>一境·淬体</td><td>入门</td><td>力能开碑、气血充盈</td><td>武馆弟子、镖师</td></tr>
+    <tr><td>二境·通脉</td><td>登堂</td><td>内气自生、吐纳疗伤</td><td>正式弟子、县城好手</td></tr>
+    <tr><td>三境·凝气</td><td>入室</td><td>灌注兵器、隔空碎石</td><td>门派精英、一方好手</td></tr>
+    <tr><td>四境·化劲</td><td>成名</td><td>以柔克刚、听劲辩位</td><td>长老、有名高手</td></tr>
+    <tr><td>五境·先天</td><td>宗师门槛</td><td>真气周天自成、内力不息</td><td>掌门级</td></tr>
+    <tr><td>六境·宗师</td><td>开宗</td><td>悟出武意、自创武学</td><td>屈指可数</td></tr>
+    <tr><td>七境·大宗师</td><td>超凡</td><td>武意圆满近天人、一人抵一军</td><td>数十年一出</td></tr></table>
+    <b>关键规则：</b>境界≠战力（克制、兵器、经验、地形、心态都影响胜负，低境可逆袭）；强行练高境界武学轻则事倍功半重则走火入魔；突破＝苦修＋机缘＋心性。<br>
+    <b>武学五系：</b>内功心法／外功招式（拳掌指爪·刀剑枪棍钩鞭）／轻功身法／辅助之术（医·毒·阵·机关·暗器·音律·易容）／奇门杂学。<br>
+    <b>品阶：</b>入门（大众货）→ 精要（门派不传）→ 绝学（镇派之宝）→ 神功（出世即腥风血雨）。武学有契合度，不契合事倍功半甚至走火入魔。</div>`,
+  '势力': `<div class="ency-block">
+    <b>正道六派：</b>少林（佛门武学之源，领袖正道）· 武当（太极剑，泰山北斗）· 峨眉（剑法医术并重）· 华山（快剑，剑宗气宗之争）· 青城（亦正亦邪）· 丐帮（天下第一大帮，消息最灵通）。<br><br>
+    <b>魔道旁门：</b>血煞教（魔教之首，速成邪功血祭，神秘圣主）· 五毒教（南疆毒蛊之祖）· 鬼影阁（天下第一刺客组织）· 修罗门（塞北亡命之徒）。<br><br>
+    <b>中立灰色：</b>唐门（暗器机关第一）· 天机阁（天下情报中心，百晓生发榜）· 镖局联盟 · 龙门商帮（江南财阀）· 六扇门 · 东厂锦衣卫。<br><br>
+    <b>四角平衡：</b>正道／魔道／朝廷／中立地带互相制衡，一方失衡则江湖大乱。<br><br>
+    <b>当前局势：</b>血煞教死灰复燃；《乾坤宝典》重现江湖（得之可窥大宗师之境）；朝廷借"禁武令"欲收编各派；各派主战主和分裂。</div>`,
+  '地理': `<div class="ency-block">
+    <table><tr><th>城池</th><th>区位</th><th>特色</th></tr>
+    <tr><td>靖安</td><td>皇城</td><td>六扇门总部，规矩最多</td></tr>
+    <tr><td>洛阳</td><td>中原</td><td>武林大会常办地</td></tr>
+    <tr><td>金陵</td><td>江南</td><td>销金窟、情报买卖</td></tr>
+    <tr><td>扬州</td><td>江南</td><td>龙门商帮总部</td></tr>
+    <tr><td>长安</td><td>关内</td><td>西域商路起点</td></tr>
+    <tr><td>成都</td><td>蜀中</td><td>唐门青城地盘</td></tr>
+    <tr><td>大理</td><td>南疆</td><td>苗疆门户</td></tr>
+    <tr><td>渔阳</td><td>塞北</td><td>镖局歇脚、马贼出没</td></tr></table>
+    <b>圣地秘境：</b>少林藏经阁（藏着不该练的武功）· 武当紫霄禁地 · 昆仑秘境（数十年一开）· 南疆十万大山（五毒教老巢）· 东海蓬莱 · 断魂谷（传说埋有神兵）。<br>
+    <b>区域事件：</b>塞北马贼袭商队 · 江南漕运之争 · 南疆蛊毒作乱 · 中原英雄大会。</div>`,
+  '规矩': `<div class="ency-block">
+    <b>江湖五规：</b><br>
+    ① 比武点到为止，认输即止；② 成名人物不可闭门不战；③ 冤有头债有主，祸不及妻儿，滥杀者成江湖公敌；④ 正道领袖联名可发英雄帖；⑤ 一诺千金，背信弃义者寸步难行。<br><br>
+    <b>声望榜单（天机阁）：</b>侠名／恶名双轨；兵器谱分天榜（宗师以上）、地榜（成名高手）、人榜（新秀）；另有美人榜、富豪榜、神兵榜、悬赏榜。<br><br>
+    <b>经济：</b>银两铜钱，大宗用银票（龙门商帮发行）。江湖人生计：走镖、护院、赏金、当铺、医馆、铸剑、酒肆、卖消息。<br><br>
+    <b>正邪观：</b>没有绝对正邪，善恶由行为定义。放下屠刀或迷途知返都是故事。<br><br>
+    <b>黑话：</b>绿林（江湖）· 踩盘子（踩点）· 点子扎手（对手厉害）· 风紧扯呼（快撤）· 梁子（仇怨）· 拜码头（报到）· 挂幌子（亮字号）· 盘缠（路费）· 趟浑水（卷入麻烦）· 金盆洗手（退隐）。</div>`,
+  '难度': `<div class="ency-block">
+    <table><tr><th>难度</th><th>定位</th><th>敌方强度</th><th>资源</th><th>死亡</th></tr>
+    <tr><td>快意恩仇（爽玩）</td><td>纯爽无敌流</td><td>×0.6</td><td>巨富+神功</td><td>几乎不会死</td></tr>
+    <tr><td>初入江湖（简单）</td><td>轻松惬意</td><td>×0.8</td><td>富足</td><td>很少</td></tr>
+    <tr><td>江湖历练（标准）</td><td>平衡推荐</td><td>×1.0</td><td>正常</td><td>有惊无险</td></tr>
+    <tr><td>刀口舔血（困难）</td><td>步步为营</td><td>×1.3</td><td>拮据</td><td>容易</td></tr>
+    <tr><td>绝境求生（极难）</td><td>硬核极限</td><td>×1.6</td><td>一贫如洗</td><td>家常便饭</td></tr></table>
+    难度只改变挑战感，不锁任何剧情与结局。<br><br>
+    <b>作弊模式（金手指）：</b>无敌金身／欧皇附体／一击必杀／百无禁忌／天降横财／万人迷，开局即送绝学·神兵·千两纹银·三境凝气。</div>`,
+};
+function renderEncy(tab){
+  const tabs = $('ency-tabs'); tabs.innerHTML='';
+  Object.keys(ENCY).forEach(k=>{
+    const t=document.createElement('div'); t.className='tab'+(k===tab?' on':'');
+    t.textContent=k;
+    t.onclick=()=>renderEncy(k);
+    tabs.appendChild(t);
+  });
+  $('ency-body').innerHTML = ENCY[tab]||'';
+}
+
+/* ---------------- 记忆弹窗 ---------------- */
+function renderMem(tab){
+  const tabs = $('mem-modal').querySelectorAll('.tab');
+  tabs.forEach(t=>t.classList.toggle('on', t.dataset.mt===tab));
+  const b = $('mem-body'); b.innerHTML='';
+  if(tab==='summary'){
+    if(state.memory.summary){
+      b.innerHTML='<div class="mem-item" style="border-left-color:var(--jade)"><div class="mt">往事纪要 · 自动整理</div>'+esc(state.memory.summary)+'</div>';
+    }else{
+      b.innerHTML='<div style="font-size:12px;color:var(--t3)">尚无往事纪要。对话超过一定长度后，说书人会自动把旧事整理到这里，确保不会忘记你的故事。</div>';
+    }
+    if(state.messages.length>0) b.innerHTML+='<div class="stat-mini" style="margin-top:8px">当前对话 '+state.messages.length+' 条 · 压缩阈值 70 条</div>';
+  }else if(tab==='entries'){
+    if(!state.memory.entries.length){ b.innerHTML='<div style="font-size:12px;color:var(--t3)">暂无记忆条目。说书人遇到重要的人物、承诺、恩怨、线索时，会通过【记忆】标记自动记录在这里。</div>'; }
+    state.memory.entries.slice().reverse().forEach(e=>{
+      b.innerHTML+='<div class="mem-item"><div class="mt">记忆 · '+nowStr()+'</div>'+esc(e)+'</div>';
+    });
+  }else{
+    if(!state.checkpoints.length){ b.innerHTML='<div style="font-size:12px;color:var(--t3)">暂无关键节点。说书人在重大剧情节点会通过【节点】标记自动存档。</div>'; }
+    state.checkpoints.slice().reverse().forEach(cp=>{
+      b.innerHTML+='<div class="cp-item"><div class="t"><b>'+esc(cp.name)+'</b><div class="s">'+cp.time+' · 第'+cp.turn+'回合 · 对话'+cp.msgCount+'条</div></div></div>';
+    });
+  }
+}
+
+/* ---------------- 死亡回档弹窗 ---------------- */
+function renderDeaths(tab){
+  const tabs = $('death-modal').querySelectorAll('.tab');
+  tabs.forEach(t=>t.classList.toggle('on', t.dataset.dt===tab));
+  const b = $('death-body'); b.innerHTML='';
+  if(tab==='deaths'){
+    if(!state.deaths.length){ b.innerHTML='<div style="font-size:12px;color:var(--t3)">生死簿空空如也。愿你永远用不上它。</div>'; }
+    state.deaths.slice().reverse().forEach((d,i)=>{
+      const idx = state.deaths.length - i;
+      const item = document.createElement('div'); item.className='death-item';
+      item.innerHTML = '<div class="dt">第 '+idx+' 次死亡 · '+d.time+' · 于「'+esc(d.cpName||'开局')+'」之前 · 第'+d.turn+'回合</div>'+
+        '<b>死前行动：</b>'+esc((d.cause||'').slice(0,80))+'<br>'+
+        '<b>死亡经过：</b>'+esc((d.deathText||'').slice(0,120))+'…'+
+        '<div class="eval">'+(d.eval? esc(d.eval) : '（评析未生成）')+'</div>';
+      const head = document.createElement('div');
+      head.style.cssText='display:flex;gap:8px;margin-top:8px';
+      const btn1=document.createElement('button'); btn1.className='btn sm gold'; btn1.textContent='查看评析';
+      btn1.onclick=()=>{ item.classList.toggle('open'); btn1.textContent = item.classList.contains('open')?'收起评析':'查看评析'; };
+      const btn2=document.createElement('button'); btn2.className='btn sm danger'; btn2.textContent='重新生成评析';
+      btn2.onclick=async ()=>{ btn2.disabled=true; btn2.textContent='生成中…'; const rec=state.deaths[state.deaths.indexOf(d)]; try{
+        const p=state.player;
+        const msgs=[{role:'system',content:'你是《江湖志》的"天机阁主"，掌管生死簿。为死者写一份150~280字命簿评析：犀利老辣，不鸡汤不煽情。'},{role:'user',content:'玩家：'+p.name+'（'+p.gender+'，'+p.age+'岁），出身'+p.origin+'，难度'+state.difficulty+'。\n死前行动：'+(rec.cause||'')+'\n死亡经过：'+(rec.deathText||'')+'\n\n格式：【死因】…\n【评点】…（3条）\n【忠告】…'}];
+        let out=''; await chatRequest(msgs, c=>out+=c, {stream:false}); rec.eval=out; saveGame(); renderDeaths(tab); toast('评析已更新','gold');
+      }catch(e){ btn2.disabled=false; btn2.textContent='重新生成评析'; toast('生成失败：'+(e.message||''),'red'); } };
+      head.appendChild(btn1); head.appendChild(btn2);
+      item.appendChild(head);
+      b.appendChild(item);
+    });
+  }else{
+    if(!state.checkpoints.length){ b.innerHTML='<div style="font-size:12px;color:var(--t3)">暂无存档点。游戏会自动记录，重大节点也会单独标记。</div>'; }
+    b.innerHTML += '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">回到存档点 = 命运拨回那一刻，从该点重新推演（死亡记录会保留）。</div>';
+    state.checkpoints.slice().reverse().forEach(cp=>{
+      const item = document.createElement('div'); item.className='cp-item';
+      item.innerHTML = '<div class="t"><b>'+esc(cp.name)+'</b><div class="s">'+cp.time+' · 第'+cp.turn+'回合 · 对话'+cp.msgCount+'条</div></div>';
+      const btn=document.createElement('button'); btn.className='btn sm jade'; btn.textContent='回到此处';
+      btn.onclick=()=>confirmBox('命运拨回','确定要回到「'+esc(cp.name)+'」吗？此后发生的对话将被抹去（死亡记录保留）。','回去', ()=>reviveTo(cp));
+      item.appendChild(btn);
+      b.appendChild(item);
+    });
+  }
+}
+
+/* ---------------- 设置弹窗 ---------------- */
+function renderSettings(){
+  const c = state.cfg;
+  $('s-endpoint').value = c.endpoint;
+  $('s-apikey').value = c.apiKey;
+  seedModelSelect($('s-model'), c.model);
+  $('s-maxtokens').value = c.maxTokens;
+  $('s-reasoning').value = c.reasoning;
+  $('s-theme').value = state.theme;
+  $('s-autosave').classList.toggle('on', state.autoSave);
+  $('s-autosave-msg').classList.toggle('on', state.autoSaveMsg);
+  $('s-autosave-int').value = String(state.autoSaveInt);
+  $('s-stats').innerHTML = '对话 '+state.messages.length+' 条 · 记忆条目 '+state.memory.entries.length+' 条 · 死亡 '+state.deaths.length+' 次 · 存档点 '+state.checkpoints.length+' 个<br>最后保存：'+(state.lastSave||'—');
+}
+function saveSettingsFromModal(){
+  const c = state.cfg;
+  c.endpoint = $('s-endpoint').value.trim();
+  c.apiKey = $('s-apikey').value.trim();
+  c.model = $('s-model').value;
+  c.maxTokens = $('s-maxtokens').value;
+  c.reasoning = $('s-reasoning').value;
+  state.theme = $('s-theme').value;
+  state.autoSave = $('s-autosave').classList.contains('on');
+  state.autoSaveMsg = $('s-autosave-msg').classList.contains('on');
+  state.autoSaveInt = parseInt($('s-autosave-int').value)||60;
+  applyTheme(state.theme);
+  restartAutosave();
+  saveGame();
+  toast('设置已保存','gold');
+  closeModal('settings-modal');
+}
+
+/* ---------------- 快速行动 ---------------- */
+const QUICK = ['环顾四周','打探消息','运功调息','逛市集','修炼武功','找个地方休息'];
+function renderQuick(){
+  const q = $('quick-actions'); q.innerHTML='';
+  QUICK.forEach(t=>{
+    const c=document.createElement('button'); c.className='chip'; c.textContent=t;
+    c.onclick=()=>sendUser(t);
+    q.appendChild(c);
+  });
+}
+
+/* ---------------- 主流程 ---------------- */
+function startGame(){
+  $('setup-overlay').style.display='none';
+  $('app').classList.add('on');
+  const fresh = !state.messages.length;
+  if(fresh){
+    state.status = seedStatus(state.player);
+  }
+  renderChat();
+  applyStatus({});
+  renderCharPanel();
+  renderQuick();
+  renderEncy('境界');
+  restartAutosave();
+  saveGame();
+  state.lastSave = nowStr();
+  if(fresh) generateOpening();
+}
+
+/* 开场白：由 AI 现场生成（说书人开篇），失败时回退本地模板 */
+async function generateOpening(){
+  const wrap = addMsg('ai','');
+  const bub = wrap.querySelector('.bubble');
+  bub.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+  streaming = true;
+  $('send-btn').disabled = true;
+  const p = state.player;
+  const d = DIFFS.find(x=>x.id===state.difficulty)||DIFFS[2];
+  const sys = '你是《江湖志》武侠角色扮演游戏的"说书人"，为一位刚刚踏入江湖的侠客开篇。\n\n' + SYS_WORLD + '\n\n' + SYS_RP + '\n\n' +
+    '玩家角色档案：\n姓名：'+p.name+'（'+p.gender+'，'+p.age+'岁）\n出身：'+p.origin+(p.sect?'·'+p.sect:'')+'\n六维：'+ATTRS.map(a=>a+' '+p.attrs[a]).join(' / ')+'\n天赋：'+(p.talents.length?p.talents.join('、'):'无')+(p.cheatOn?'　【作弊模式：'+(p.cheat.length?p.cheat.join('、'):'全开')+'】':'')+'\n外貌：'+(p.appear||'由你描绘')+'\n性格：'+(p.persona||'由你演绎')+'\n玩家嘱托：'+(p.customNotes||'无')+'\n\n' +
+    '当前难度：'+d.id+'「'+d.name+'」——'+d.desc;
+  const prompt = '请以第二人称"你"，为这位侠客写一段 300~500 字的江湖开篇：\n' +
+    '1. 交代他此刻的身份处境、所在场景与大致时代氛围（严格依据出身设定，地点可从设定城池中选择）；\n' +
+    '2. 描绘环境细节与当下氛围，并埋下一个小钩子（传闻、异象、人物或一件小事），让故事有出发的理由；\n' +
+    '3. 结尾自然给出 2~3 个可采取的行动方向；\n' +
+    '4. 最后一行必须按协议输出【状态】标记（地点/时辰/天气/气血/内力/银两/境界/状态/心情/目标等，银两与境界要与出身相符，作弊模式则按金手指设定）；\n' +
+    '5. 不要用"欢迎来到江湖"这类套话开头，直接入戏，文字要有烟火气。';
+  try{
+    if(!state.cfg.apiKey || !state.cfg.endpoint) throw new Error('no-api');
+    let acc = '', think = '';
+    const renderLive = ()=>{
+      let html = '';
+      if(think.trim()) html += '<details class="think-block" open><summary>✦ 说书人思量<span class="tg"></span></summary><div class="think-body">'+mdLight(think)+'</div></details>';
+      html += acc.length>20 ? mdLight(acc) : '<span class="typing"><i></i><i></i><i></i></span>';
+      bub.innerHTML = html;
+      $('chat-log').scrollTop = $('chat-log').scrollHeight;
+    };
+    await chatRequest([{role:'system', content:sys},{role:'user', content:prompt}], (chunk, tchunk)=>{
+      if(tchunk) think += tchunk;
+      if(chunk) acc += chunk;
+      renderLive();
+    });
+    if(!acc.trim()) throw new Error('empty');
+    const parsed = parseReply(acc);
+    bub.innerHTML = (think.trim()? '<details class="think-block" open><summary>✦ 说书人思量<span class="tg"></span></summary><div class="think-body">'+mdLight(think)+'</div></details>' : '') + mdLight(parsed.text || acc);
+    state.messages.push({role:'assistant', content: parsed.text || acc, reasoning: think.trim()||undefined});
+    if(Object.keys(parsed.status).length) applyStatus(parsed.status);
+    parsed.mem.forEach(m=>{ if(m && !state.memory.entries.includes(m)) state.memory.entries.push(m); });
+    parsed.nodes.forEach(n=>{ if(n) addCheckpoint('节点·'+n); });
+    addCheckpoint('开局·'+(state.status.location||'江湖'));
+    saveGame();
+  }catch(e){
+    const open = openingScene(p);
+    bub.innerHTML = mdLight(open);
+    state.messages.push({role:'assistant', content:open});
+    addCheckpoint('开局·'+(state.status.location||'江湖'));
+    saveGame();
+    if(e.message !== 'no-api') toast('AI 开篇失败，由说书人代笔开场','red');
+  }finally{
+    streaming = false;
+    $('send-btn').disabled = false;
+    $('chat-log').scrollTop = $('chat-log').scrollHeight;
+  }
+}
+function restartAutosave(){
+  if(autosaveTimer) clearInterval(autosaveTimer);
+  if(state.autoSave){
+    autosaveTimer = setInterval(()=>{ saveGame(); state.lastSave=nowStr(); }, Math.max(10, state.autoSaveInt)*1000);
+  }
+}
+function restartGame(){
+  const cfg = state.cfg;
+  state = freshState();
+  state.cfg = cfg;
+  applyTheme('ink');
+  $('app').classList.remove('on');
+  $('setup-overlay').style.display='flex';
+  seedModelSelect($('cfg-model'), cfg.model);
+  $('cfg-endpoint').value = cfg.endpoint;
+  $('cfg-apikey').value = cfg.apiKey;
+  $('cfg-maxtokens').value = cfg.maxTokens;
+  $('cfg-reasoning').value = cfg.reasoning;
+  state.difficulty = '标准';
+  initCharStep();
+  renderDiffGrid();
+  showStep(0);
+  toast('新的江湖，新的开始','gold');
+}
+
+/* ---------------- 事件绑定 ---------------- */
+function bindEvents(){
+  /* 顶栏 */
+  $('btn-char').onclick = ()=>{ $('char-panel').classList.add('open'); $('drawer-backdrop').classList.add('open'); };
+  $('cp-close').onclick = ()=>{ $('char-panel').classList.remove('open'); $('drawer-backdrop').classList.remove('open'); };
+  $('drawer-backdrop').onclick = ()=>{ $('char-panel').classList.remove('open'); $('drawer-backdrop').classList.remove('open'); };
+  $('btn-settings').onclick = ()=>{ renderSettings(); openModal('settings-modal'); };
+  $('btn-ency').onclick = ()=>{ renderEncy('境界'); openModal('ency-modal'); };
+  $('btn-mem').onclick = ()=>{ renderMem('summary'); openModal('mem-modal'); };
+  $('btn-death').onclick = ()=>{ renderDeaths('deaths'); openModal('death-modal'); };
+
+  /* 设置弹窗 */
+  $('s-close').onclick = ()=>saveSettingsFromModal();
+  $('s-saveapi').onclick = ()=>saveSettingsFromModal();
+  $('s-theme').onchange = ()=>{ applyTheme($('s-theme').value); saveGame(); };
+  $('s-autosave').onclick = ()=>{ $('s-autosave').classList.toggle('on'); };
+  $('s-autosave-msg').onclick = ()=>{ $('s-autosave-msg').classList.toggle('on'); };
+  $('s-fetch').onclick = ()=>fetchModels($('s-endpoint').value.trim(), $('s-apikey').value.trim(), $('s-model'), $('s-model-hint'));
+  $('s-export').onclick = ()=>exportSave();
+  $('s-import').onclick = ()=>$('import-file').click();
+  $('import-file').onchange = e=>{ if(e.target.files[0]) importSave(e.target.files[0]); e.target.value=''; };
+  $('s-savenow').onclick = ()=>{ saveGame(); state.lastSave=nowStr(); toast('已保存','gold'); };
+  $('s-restart').onclick = ()=>confirmBox('重新开始','确定要抹去当前江湖、重新创建角色吗？现有存档将被覆盖。','重新开始', ()=>{ lsSet(LS_KEY, null); restartGame(); });
+
+  /* 记忆弹窗 */
+  $('mem-modal').querySelectorAll('.tab').forEach(t=>{ t.onclick=()=>renderMem(t.dataset.mt); });
+  $('mem-close').onclick = ()=>closeModal('mem-modal');
+  /* 死亡弹窗 */
+  $('death-modal').querySelectorAll('.tab').forEach(t=>{ t.onclick=()=>renderDeaths(t.dataset.dt); });
+  $('death-close').onclick = ()=>closeModal('death-modal');
+  /* 百科 */
+  $('ency-ask').onclick = ()=>{
+    const q = $('ency-q').value.trim();
+    if(!q){ toast('先输入你的问题'); return; }
+    closeModal('ency-modal');
+    $('ency-q').value='';
+    sendUser('【百科问答】'+q);
+  };
+  $('ency-q').addEventListener('keydown', e=>{ if(e.key==='Enter') $('ency-ask').click(); });
+
+  /* 输入 */
+  $('chat-input').addEventListener('keydown', e=>{
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); $('send-btn').click(); }
+  });
+  $('chat-input').addEventListener('input', autoGrow);
+  $('send-btn').onclick = ()=>sendUser($('chat-input').value);
+  $('stop-btn').onclick = ()=>{ if(abortCtrl) abortCtrl.abort(); };
+
+  /* 死亡界面 */
+  $('d-eval').onclick = ()=>{
+    const box=$('death-eval-box');
+    const rec = state.deaths[state.deaths.length-1];
+    if(box.style.display==='none'||!box.style.display){
+      box.style.display='block';
+      box.textContent = rec && rec.eval ? rec.eval : '（评析尚未生成）';
+      $('d-eval').textContent='收起评析';
+    }else{
+      box.style.display='none';
+      $('d-eval').textContent='查看命簿评析';
+    }
+  };
+  $('d-revive').onclick = ()=>{
+    const cps = state.checkpoints;
+    if(!cps.length){ toast('暂无存档点'); return; }
+    const opts = cps.slice(-5).reverse().map(c=>c.name+'（第'+c.turn+'回合）');
+    confirmBox('回到关键时间点','选择命运拨回的时刻：', '回去', ()=>{});
+    /* 用列表方式选择：重写确认弹窗内容 */
+    const box=$('cf-text'); box.innerHTML='';
+    cps.slice(-6).reverse().forEach(cp=>{
+      const b=document.createElement('button');
+      b.className='btn sm'; b.style.cssText='display:block;width:100%;margin-bottom:6px;text-align:left';
+      b.textContent='◈ '+cp.name+' — '+cp.time+'（第'+cp.turn+'回合）';
+      b.onclick=()=>{ closeModal('confirm-modal'); reviveTo(cp); };
+      box.appendChild(b);
+    });
+    $('cf-ok').style.display='none';
+    $('cf-cancel').textContent='留在此处';
+    $('cf-cancel').onclick=()=>{ closeModal('confirm-modal'); $('cf-ok').style.display=''; };
+    openModal('confirm-modal');
+  };
+  $('d-records').onclick = ()=>{ renderDeaths('deaths'); openModal('death-modal'); };
+
+  /* 向导 */
+  $('cfg-fetch').onclick = ()=>fetchModels($('cfg-endpoint').value.trim(), $('cfg-apikey').value.trim(), $('cfg-model'), $('cfg-model-hint'));
+  $('cfg-next').onclick = ()=>{
+    const c = readCfgFromWizard();
+    if(!c.apiKey){ toast('请填写 API Key','red'); return; }
+    if(!c.endpoint){ toast('请填写 API 端点','red'); return; }
+    state.cfg = c;
+    initCharStep();
+    showStep(1);
+  };
+  $('cc-prev').onclick = ()=>showStep(0);
+  $('cc-randname').onclick = ()=>{ $('cc-name').value = randName(); };
+  $('cc-next').onclick = ()=>{
+    const name = $('cc-name').value.trim();
+    if(!name){ $('cc-name').value = randName(); }
+    showStep(2);
+  };
+  $('cc2-prev').onclick = ()=>showStep(1);
+  $('cc2-next').onclick = ()=>{
+    $('cc-notes').value = ($('cc-notes').value||'').trim();
+    renderDiffGrid();
+    showStep(3);
+  };
+  $('notes-chips').querySelectorAll('.chip').forEach(c=>{
+    c.onclick=()=>{
+      const ta=$('cc-notes');
+      const cur = ta.value.trim();
+      ta.value = cur? cur+'\n'+c.dataset.n : c.dataset.n;
+      autoGrowNotes(ta);
+    };
+  });
+  $('cc3-prev').onclick = ()=>showStep(2);
+  $('cc3-next').onclick = ()=>{ renderConfirm(); showStep(4); };
+  $('cc4-prev').onclick = ()=>showStep(3);
+  $('cc4-start').onclick = ()=>{
+    state.player = buildPlayer();
+    state.notes = state.player.customNotes;
+    state.messages = [];
+    state.memory = {summary:'', entries:[]};
+    state.checkpoints = []; state.deaths = []; state.turn = 0; state.dead = false;
+    startGame();
+    toast('江湖已开 · 说书人候命','gold');
+  };
+
+  window.addEventListener('beforeunload', ()=>{ saveGame(); });
+
+  /* 移动端键盘弹出时，确保输入框可见 */
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', ()=>{
+      const vh = window.visualViewport.height;
+      if(vh < window.innerHeight * 0.85 && document.activeElement === $('chat-input')){
+        $('chat-input').scrollIntoView({block:'nearest'});
+      }
+    });
+  }
+}
+function autoGrowNotes(ta){ ta.style.height='auto'; ta.style.height=Math.max(150, ta.scrollHeight)+'px'; }
+
+/* ---------------- 启动 ---------------- */
+(function boot(){
+  const saved = lsGet(LS_KEY);
+  if(saved && saved.player && Array.isArray(saved.messages)){
+    state = saved;
+    applyTheme(state.theme||'ink');
+    bindEvents();
+    startGame();
+    return;
+  }
+  state = freshState();
+  applyTheme('ink');
+  seedModelSelect($('cfg-model'), 'deepseek-chat');
+  initCharStep();
+  renderDiffGrid();
+  showStep(0);
+  bindEvents();
+})();
+</script>
+</body>
+</html>

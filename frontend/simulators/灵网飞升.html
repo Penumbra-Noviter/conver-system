@@ -1,0 +1,2029 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>灵网飞升 · 赛博修仙AI角色扮演</title>
+<meta name="description" content="血肉苦弱，灵根永存——但别忘了，云端之上，天道正在看着你。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 27 10v12L16 29 5 22V10z' fill='none' stroke='%233fe0c6' stroke-width='2'/%3E%3Cpath d='M16 10v12M10 13l12 6M22 13 10 19' stroke='%23ff6b9d' stroke-width='2'/%3E%3C/svg%3E">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans SC","Segoe UI",sans-serif;background:var(--bg);color:var(--t);overflow:hidden;-webkit-font-smoothing:antialiased;text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none;user-select:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px}
+::-webkit-scrollbar-track{background:transparent}
+.hidden{display:none!important}
+svg{display:block}
+
+/* ============ 主题 ============ */
+:root{color-scheme:dark}
+[data-theme="neon"]{
+  --bg:#0a0e15;--bg2:#0d1320;--surface:#111826;--elev:#182136;--hover:#1f2b40;
+  --line:rgba(130,180,255,.14);--line2:rgba(130,180,255,.30);
+  --t:#e8eef8;--t2:#a4b4c9;--t3:#6d7d95;
+  --accent:#3fe0c6;--accent-soft:rgba(63,224,198,.14);--accent2:#ff6b9d;
+  --gold:#e8c46a;--red:#ff6b6b;--green:#4cd7a0;--blue:#5aa7ff;--purple:#b58cff;
+  --on-accent:#06201a;--shadow:0 12px 44px rgba(0,0,0,.5);--input:#0d1420;
+  --overlay:rgba(4,8,14,.66);
+}
+[data-theme="ink"]{
+  --bg:#0e0e12;--bg2:#131318;--surface:#17171d;--elev:#1f1f27;--hover:#292933;
+  --line:rgba(232,196,106,.16);--line2:rgba(232,196,106,.32);
+  --t:#f0ece2;--t2:#b8b0a0;--t3:#7e7769;
+  --accent:#e8c46a;--accent-soft:rgba(232,196,106,.14);--accent2:#c98a5a;
+  --gold:#e8c46a;--red:#e06555;--green:#7fc98a;--blue:#8fa8d8;--purple:#b89ce0;
+  --on-accent:#171206;--shadow:0 12px 44px rgba(0,0,0,.58);--input:#131318;
+  --overlay:rgba(6,6,10,.7);
+}
+[data-theme="jade"]{
+  color-scheme:light;
+  --bg:#eef3ef;--bg2:#e6ede8;--surface:#ffffff;--elev:#f4f8f5;--hover:#e9f1ec;
+  --line:rgba(29,74,63,.14);--line2:rgba(29,74,63,.30);
+  --t:#182420;--t2:#48605a;--t3:#7d918b;
+  --accent:#1d6b56;--accent-soft:rgba(29,107,86,.12);--accent2:#b7791f;
+  --gold:#a06a15;--red:#c2413b;--green:#2e8b63;--blue:#3a6ea5;--purple:#7a5aa8;
+  --on-accent:#ffffff;--shadow:0 12px 36px rgba(30,60,50,.16);--input:#fbfdfc;
+  --overlay:rgba(25,45,38,.35);
+}
+[data-theme="snow"]{
+  color-scheme:light;
+  --bg:#f4f6fa;--bg2:#eef1f7;--surface:#ffffff;--elev:#f6f8fc;--hover:#e8edf6;
+  --line:rgba(37,64,110,.14);--line2:rgba(37,64,110,.30);
+  --t:#182238;--t2:#4d5c78;--t3:#8593a8;
+  --accent:#2f6bd8;--accent-soft:rgba(47,107,216,.12);--accent2:#d63c74;
+  --gold:#a9740e;--red:#c23b3b;--green:#2f8f5b;--blue:#2f6bd8;--purple:#7a5aa8;
+  --on-accent:#ffffff;--shadow:0 12px 36px rgba(30,50,90,.14);--input:#fbfcfe;
+  --overlay:rgba(28,40,60,.35);
+}
+
+/* ============ 基础组件 ============ */
+h1,h2,h3,h4{line-height:1.3}
+.small{font-size:12px;color:var(--t3)}
+.hint{font-size:12px;color:var(--t3);line-height:1.65}
+.val{font-variant-numeric:tabular-nums}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:10px;border:1px solid var(--line2);background:var(--elev);color:var(--t);font-size:14px;transition:background .14s,border-color .14s,transform .08s}
+.btn:hover{background:var(--hover);border-color:var(--accent)}
+.btn:active{transform:scale(.97)}
+.btn svg{width:16px;height:16px;flex:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--red);border-color:var(--red)}
+.btn.danger:hover{background:var(--red);border-color:var(--red);color:#fff}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}
+.btn.icon{padding:8px;border-radius:10px}
+.btn.icon svg{width:18px;height:18px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-row{display:flex;gap:8px;margin-top:16px}
+.btn-row.right{justify-content:flex-end}
+.btn-row.grow .btn{flex:1}
+.row{display:flex;gap:8px;align-items:center}
+.row.wrap{flex-wrap:wrap}
+
+input[type=text],input[type=password],input[type=number],input[type=url],select,textarea{
+  width:100%;background:var(--input);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;transition:border-color .14s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none}
+textarea{resize:vertical;min-height:64px;line-height:1.6}
+select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--t3) 50%),linear-gradient(135deg,var(--t3) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:99px;background:var(--line2);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--accent)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--surface)}
+
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12.5px;color:var(--t2);margin-bottom:6px;font-weight:600}
+.field label .val{float:right;font-weight:400;color:var(--t3)}
+.f-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.f-label span{font-size:12.5px;color:var(--t2);font-weight:600}
+
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--elev);font-size:13px;color:var(--t2);transition:all .12s}
+.seg button:hover{border-color:var(--line2);color:var(--t)}
+.seg button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--t);font-weight:600}
+
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);background:var(--elev);font-size:11.5px;color:var(--t2);cursor:pointer;transition:all .12s}
+.chip:hover{border-color:var(--accent);color:var(--t)}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--t)}
+.chip.solid{background:var(--accent-soft);border-color:var(--accent);color:var(--t);cursor:default}
+
+/* ============ 创建向导 ============ */
+#setup{position:fixed;inset:0;overflow-y:auto;background:var(--bg);z-index:60}
+#setup::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(600px 320px at 12% -5%,var(--accent-soft),transparent 60%),radial-gradient(520px 300px at 92% 108%,rgba(255,107,157,.07),transparent 60%)}
+.setup-inner{max-width:720px;margin:0 auto;padding:30px 20px calc(120px + env(safe-area-inset-bottom));min-height:100%;position:relative}
+.wiz-title{text-align:center;margin-bottom:22px}
+.wiz-logo{font-size:34px;font-weight:800;letter-spacing:6px;color:var(--t)}
+.wiz-logo b{color:var(--accent);font-weight:800}
+.wiz-tagline{font-size:12.5px;color:var(--t3);margin-top:8px;letter-spacing:1px}
+.step-dots{display:flex;justify-content:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.step-dots .dot{display:flex;flex-direction:column;align-items:center;gap:5px;width:auto;height:auto;background:none;border-radius:0}
+.step-dots .dot .dn{width:24px;height:24px;border-radius:50%;background:var(--bg2);border:1px solid var(--line2);color:var(--t3);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.step-dots .dot .dl{font-size:11px;color:var(--t3);white-space:nowrap;transition:color .2s}
+.step-dots .dot.on .dn{background:var(--accent);border-color:var(--accent);color:var(--on-accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.step-dots .dot.on .dl{color:var(--t);font-weight:600}
+.step-dots .dot.done .dn{background:var(--accent-soft);border-color:var(--accent);color:transparent}
+.step-dots .dot.done .dn::after{content:"✓";color:var(--accent);font-size:13px;font-weight:700}
+.step-dots .dot.done .dl{color:var(--t2)}
+.wiz-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:var(--shadow)}
+.wiz-card h3{font-size:18px;margin-bottom:4px}
+.wiz-sub{font-size:12.5px;color:var(--t3);margin-bottom:18px;line-height:1.6}
+.wiz-foot{display:flex;justify-content:space-between;gap:8px;margin-top:20px}
+.wiz-foot .btn{min-width:96px}
+
+.talent-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.talent-card{border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer;transition:all .13s;background:var(--elev)}
+.talent-card:hover{border-color:var(--line2)}
+.talent-card.on{border-color:var(--accent);background:var(--accent-soft)}
+.talent-card.cheat{border-color:rgba(232,196,106,.45)}
+.talent-card.cheat.on{border-color:var(--gold);background:rgba(232,196,106,.10)}
+.tc-name{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+.tc-tag{font-size:10px;font-weight:600;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:1px 7px}
+.tc-desc{font-size:11.5px;color:var(--t3);margin-top:4px;line-height:1.55}
+
+.origin-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.origin-card{border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer;transition:all .13s;background:var(--elev)}
+.origin-card:hover{border-color:var(--line2)}
+.origin-card.on{border-color:var(--accent);background:var(--accent-soft)}
+.oc-name{font-size:13.5px;font-weight:700}
+.oc-desc{font-size:11.5px;color:var(--t3);margin-top:4px;line-height:1.55}
+
+.diff-card{border:1px solid var(--line);border-radius:12px;padding:13px 14px;cursor:pointer;transition:all .13s;background:var(--elev);margin-bottom:8px}
+.diff-card:hover{border-color:var(--line2)}
+.diff-card.on{border-color:var(--accent);background:var(--accent-soft)}
+.diff-card .dc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dc-name{font-size:14.5px;font-weight:700}
+.dc-alias{font-size:11px;color:var(--t2);border:1px solid var(--line2);border-radius:99px;padding:1px 8px}
+.dc-tag{font-size:10.5px;font-weight:700;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:1px 8px}
+.dc-desc{font-size:12px;color:var(--t2);margin-top:6px;line-height:1.6}
+
+.cf-grid{display:grid;grid-template-columns:1fr;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.cf-row{display:flex;padding:9px 13px;font-size:13px;gap:12px}
+.cf-row:nth-child(odd){background:var(--elev)}
+.cf-row .k{color:var(--t3);flex:none;width:76px}
+.cf-row .v{color:var(--t);white-space:pre-wrap;word-break:break-word}
+.cf-row .v b{color:var(--accent)}
+
+/* ============ 游戏主界面 ============ */
+#app{display:flex;flex-direction:column;height:100dvh}
+#topbar{flex:none;height:52px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 10px;z-index:30}
+.top-btn{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:10px;color:var(--t2);font-size:13px;transition:all .12s;position:relative}
+.top-btn:hover{background:var(--hover);color:var(--t)}
+.top-btn .ico{width:20px;height:20px;display:flex;align-items:center;justify-content:center}
+.top-btn .ico svg{width:19px;height:19px}
+.top-btn .badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;border-radius:99px;background:var(--red);color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+#top-avatar{width:26px;height:26px;border-radius:9px;background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center}
+.top-title{flex:1;display:flex;align-items:center;gap:8px;min-width:0;justify-content:center}
+.tt-name{font-size:15px;font-weight:800;letter-spacing:2px;white-space:nowrap}
+.tt-chip{font-size:11px;color:var(--t2);border:1px solid var(--line2);border-radius:99px;padding:2px 9px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.top-right{display:flex;align-items:center;gap:2px}
+
+#center-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;min-height:0}
+#game-log{flex:1;overflow-y:auto;padding:16px 14px 8px;scroll-behavior:smooth}
+.msg{display:flex;margin:0 0 14px;gap:8px}
+.msg .bubble{max-width:min(82%,760px);padding:11px 15px;border-radius:14px;font-size:14.5px;line-height:1.78;word-break:break-word;white-space:normal}
+.msg .bubble p{margin:0 0 8px}
+.msg .bubble p:last-child{margin-bottom:0}
+.msg .bubble ul{margin:4px 0 8px;padding-left:20px}
+.msg .bubble li{margin-bottom:3px}
+.msg .bubble h4{font-size:14px;margin:8px 0 4px}
+.msg .bubble b{color:var(--t);font-weight:700}
+.msg .bubble i{color:var(--t2)}
+.msg .bubble code{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.5px;font-family:ui-monospace,Consolas,monospace}
+.msg .bubble pre{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12.5px;overflow-x:auto;margin:6px 0;font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap}
+.msg.user{justify-content:flex-end}
+.msg.user .bubble{background:var(--accent-soft);border:1px solid var(--accent);border-top-right-radius:5px;color:var(--t);font-weight:500}
+.msg.assistant{justify-content:flex-start;flex-direction:column;align-items:flex-start}
+.msg.assistant .bubble{background:var(--surface);border:1px solid var(--line);border-top-left-radius:5px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.think{margin:0 0 8px;border:1px dashed var(--line2);border-radius:10px;background:var(--bg2);font-size:12px;min-width:min(320px,70%)}
+.think summary{display:flex;align-items:center;gap:6px;padding:7px 12px;cursor:pointer;color:var(--t3);list-style:none;user-select:none}
+.think summary::-webkit-details-marker{display:none}
+.think summary svg{width:13px;height:13px;color:var(--gold);flex:none}
+.think summary span{font-weight:600}
+.think summary small{margin-left:auto;font-size:10.5px;color:var(--t3)}
+.think[open] summary{border-bottom:1px dashed var(--line2)}
+.think-body{padding:8px 12px;color:var(--t3);line-height:1.7;white-space:pre-wrap;max-height:240px;overflow-y:auto;font-size:12px}
+.msg.system{justify-content:center}
+.msg.system .bubble{background:transparent;border:1px dashed var(--line2);color:var(--t3);font-size:12px;padding:5px 13px;border-radius:99px;max-width:92%;text-align:center}
+.msg.system .bubble p{margin:0}
+.msg.dead .bubble{border-color:var(--red);background:rgba(255,107,107,.07)}
+
+#input-area{flex:none;border-top:1px solid var(--line);background:var(--surface);padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+.quick-actions{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
+.quick-actions::-webkit-scrollbar{display:none}
+.qa-btn{flex:none;font-size:12px;color:var(--t2);border:1px solid var(--line);border-radius:99px;padding:4px 12px;background:var(--elev);transition:all .12s}
+.qa-btn:hover{color:var(--t);border-color:var(--accent)}
+.input-row{display:flex;gap:8px;align-items:flex-end}
+#user-input{flex:1;resize:none;min-height:44px;max-height:140px;border-radius:12px;line-height:1.5;font-size:14.5px;padding:11px 14px}
+#send-btn{flex:none;height:44px;padding:0 22px;border-radius:12px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:6px;transition:filter .12s}
+#send-btn:hover{filter:brightness(1.08)}
+#send-btn:disabled{opacity:.5;cursor:not-allowed}
+#send-btn svg{width:17px;height:17px}
+.gen-btn{flex:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--elev);color:var(--t2);display:flex;align-items:center;justify-content:center}
+.gen-btn:hover{color:var(--red);border-color:var(--red)}
+.gen-btn svg{width:18px;height:18px}
+#loading-indicator{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line2);border-radius:99px;padding:6px 16px;font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);z-index:5}
+.dots{display:inline-flex;gap:3px}
+.dots span{width:5px;height:5px;border-radius:99px;background:var(--accent);animation:blink 1.1s infinite}
+.dots span:nth-child(2){animation-delay:.18s}
+.dots span:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,70%,100%{opacity:.25}35%{opacity:1}}
+.lock-hint{text-align:center;font-size:12px;color:var(--red);padding:6px 0 2px}
+
+/* ============ 抽屉（角色） ============ */
+#left-panel{position:fixed;left:0;top:0;bottom:0;width:min(360px,90vw);background:var(--surface);z-index:80;transform:translateX(-102%);transition:transform .22s ease;border-right:1px solid var(--line2);box-shadow:8px 0 30px rgba(0,0,0,.35);display:flex;flex-direction:column}
+#left-panel.open{transform:none}
+.drawer-head{flex:none;display:flex;align-items:center;justify-content:space-between;padding:13px 14px 10px;border-bottom:1px solid var(--line)}
+.dh-title{font-size:15px;font-weight:800;letter-spacing:1px}
+.tabs{flex:none;display:flex;gap:4px;padding:10px 12px 0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs .tab{flex:none;font-size:12.5px;color:var(--t2);padding:7px 12px;border-radius:9px;transition:all .12s}
+.tabs .tab:hover{color:var(--t)}
+.tabs .tab.on{background:var(--accent-soft);color:var(--t);font-weight:600}
+.drawer-body{flex:1;overflow-y:auto;padding:12px 14px calc(20px + env(safe-area-inset-bottom))}
+.drawer-backdrop{position:fixed;inset:0;background:var(--overlay);z-index:70;opacity:0;pointer-events:none;transition:opacity .2s}
+.drawer-backdrop.open{opacity:1;pointer-events:auto}
+
+.char-head{display:flex;align-items:center;gap:12px;padding:4px 2px 14px}
+.char-av{width:52px;height:52px;border-radius:16px;background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent);font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.char-nm{font-size:17px;font-weight:800}
+.char-sub{font-size:12px;color:var(--t3);margin-top:3px;line-height:1.5}
+.char-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+
+.sec{background:var(--elev);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px}
+.sec-title{font-size:12px;font-weight:700;color:var(--t2);letter-spacing:1px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.sec-title .val{font-weight:400}
+.realm-line{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.realm-nm{font-size:15px;font-weight:800}
+.realm-lv{font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums}
+
+.stat-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.stat-row:last-child{margin-bottom:0}
+.stat-label{width:74px;flex:none;font-size:12px;color:var(--t2);display:flex;justify-content:space-between;align-items:center}
+.stat-label b{color:var(--t);font-weight:600;font-variant-numeric:tabular-nums}
+.bar{flex:1;height:8px;background:var(--bg2);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;transition:width .5s ease,background .3s}
+.bar-fill.warn{animation:barpulse 1.2s infinite}
+@keyframes barpulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.info-cell{background:var(--elev);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.info-cell .k{font-size:11px;color:var(--t3)}
+.info-cell .v{font-size:13px;font-weight:600;margin-top:2px;word-break:break-word;font-variant-numeric:tabular-nums}
+.scene-box{background:var(--bg2);border-left:3px solid var(--accent);border-radius:8px;padding:9px 11px;font-size:12.5px;color:var(--t2);line-height:1.65}
+.item-chips{display:flex;gap:5px;flex-wrap:wrap}
+.item-chips .chip{cursor:default}
+.attr-row{display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px dashed var(--line);font-size:13px}
+.attr-row:last-child{border-bottom:none}
+.attr-row .k{color:var(--t3)}
+.attr-row .v{font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+
+.mem-item{display:flex;gap:8px;align-items:flex-start;background:var(--elev);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:9px 11px;margin-bottom:8px}
+.mem-item .mt{font-size:12.5px;line-height:1.6;flex:1;color:var(--t2)}
+.mem-item .mx{flex:none;color:var(--t3);padding:2px;border-radius:6px;display:flex}
+.mem-item .mx:hover{color:var(--red)}
+.mem-item .mx svg{width:14px;height:14px}
+.mem-add{display:flex;gap:6px;margin-bottom:12px}
+.mem-add input{flex:1}
+
+.en-cat{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.en-cat .chip.on{font-weight:600}
+.en-item{background:var(--elev);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:8px}
+.en-item .en-t{font-size:13px;font-weight:700;margin-bottom:3px}
+.en-item .en-d{font-size:12px;color:var(--t2);line-height:1.65}
+.en-ask{display:flex;gap:6px;margin-top:12px}
+.en-ask input{flex:1}
+.en-answer{background:var(--bg2);border-left:3px solid var(--accent);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--t2);line-height:1.7;margin-top:10px}
+
+/* ============ 弹窗 ============ */
+.modal-overlay{position:fixed;inset:0;background:var(--overlay);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .18s}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal{width:min(580px,94vw);max-height:88vh;overflow-y:auto;background:var(--surface);border:1px solid var(--line2);border-radius:16px;box-shadow:var(--shadow);transform:translateY(10px);transition:transform .18s}
+.modal-overlay.open .modal{transform:none}
+.m-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;position:sticky;top:0;background:var(--surface);z-index:2;border-radius:16px 16px 0 0}
+.m-head h3{font-size:16px;letter-spacing:1px}
+.m-body{padding:12px 20px 20px}
+
+.set-sec{border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:12px}
+.set-sec.danger{border-color:rgba(255,107,107,.35)}
+.set-title{font-size:12px;font-weight:700;color:var(--t2);letter-spacing:1px;margin-bottom:11px;display:flex;align-items:center;gap:6px}
+.set-title svg{width:15px;height:15px}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;font-size:13px}
+.set-row .lbl{color:var(--t2)}
+.set-row .val{color:var(--t)}
+.theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.theme-card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;transition:all .13s;background:var(--elev)}
+.theme-card:hover{border-color:var(--line2)}
+.theme-card.on{border-color:var(--accent);background:var(--accent-soft)}
+.tc-row{display:flex;align-items:center;gap:8px}
+.tc-swatches{display:flex;gap:3px}
+.tc-swatches i{width:13px;height:13px;border-radius:4px;display:block}
+.tc-name{font-size:13px;font-weight:700}
+.tc-desc{font-size:11px;color:var(--t3);margin-top:3px}
+
+.switch{position:relative;width:40px;height:22px;flex:none;cursor:pointer}
+.switch input{opacity:0;width:0;height:0}
+.switch .track{position:absolute;inset:0;border-radius:99px;background:var(--line2);transition:background .15s}
+.switch .track::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.switch input:checked+.track{background:var(--accent)}
+.switch input:checked+.track::after{transform:translateX(18px)}
+
+.death-banner{display:flex;align-items:center;gap:10px;background:rgba(255,107,107,.1);border:1px solid var(--red);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.death-banner .db-num{font-size:22px;font-weight:800;color:var(--red)}
+.death-banner .db-txt{font-size:12.5px;color:var(--t2);line-height:1.6}
+.death-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--elev)}
+.death-card .dc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.death-card .dc-h .n{font-weight:800;font-size:14px;color:var(--red)}
+.death-card .dc-h .meta{font-size:11px;color:var(--t3);text-align:right;line-height:1.5}
+.death-card .dc-sec{font-size:12px;margin-bottom:7px;line-height:1.65}
+.death-card .dc-sec .k{color:var(--t3);font-weight:600}
+.death-card .dc-sec .v{color:var(--t2)}
+.death-card .dc-sec.review .v{color:var(--t)}
+.death-card .dc-btn{display:flex;justify-content:flex-end;margin-top:4px}
+
+/* ============ Toast ============ */
+#toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(14px);background:var(--surface);border:1px solid var(--line2);color:var(--t);font-size:13px;padding:10px 18px;border-radius:12px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .22s;z-index:200;max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.success{border-color:var(--green)}
+#toast.error{border-color:var(--red)}
+#toast.warn{border-color:var(--gold)}
+
+/* ============ 响应式 ============ */
+@media (max-width:860px){
+  .btn-txt{display:none}
+  .top-btn{padding:8px}
+  .top-title{justify-content:flex-start;margin-left:2px}
+  .tt-name{font-size:13.5px}
+  .talent-grid,.origin-grid{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .setup-inner{padding:20px 14px calc(110px + env(safe-area-inset-bottom))}
+  .wiz-logo{font-size:27px}
+  .wiz-card{padding:18px 15px}
+  .talent-grid,.origin-grid{grid-template-columns:1fr}
+  .msg .bubble{max-width:88%;font-size:14px}
+  #game-log{padding:12px 10px 6px}
+  .modal .m-body{padding:10px 14px 16px}
+  .m-head{padding:14px 14px 0}
+  #send-btn{padding:0 16px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<style>
+/* ============ 补充样式（向导/面板/设置/死亡） ============ */
+.step-title{font-size:19px;font-weight:700;margin-bottom:14px}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:10.5px;border:1px solid var(--line2);color:var(--t2);background:var(--bg2);white-space:nowrap}
+.tag.gold{color:var(--gold);border-color:var(--gold)}
+.ok{color:var(--green)}
+.err{color:var(--red)}
+.empty{color:var(--t3);text-align:center;padding:26px 8px;font-size:12.5px;line-height:1.7}
+.btn-row.between{justify-content:space-between}
+.row{display:flex;align-items:center}
+.row.gap{gap:8px}
+.row.between{justify-content:space-between}
+
+/* 出生地 */
+.origin-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.og-btn{text-align:left;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--elev);cursor:pointer;transition:all .13s;display:flex;flex-direction:column;gap:4px}
+.og-btn b{font-size:13.5px;color:var(--t)}
+.og-btn span{font-size:11.5px;color:var(--t3);line-height:1.5}
+.og-btn:hover{border-color:var(--line2)}
+.og-btn.on{border-color:var(--accent);background:var(--accent-soft)}
+.og-btn.on b{color:var(--t)}
+
+/* 天赋 */
+.talent-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.talent-card{display:flex;flex-direction:column;gap:4px;text-align:left}
+.talent-card b{font-size:13.5px;color:var(--t)}
+.talent-card span{font-size:11.5px;color:var(--t3);line-height:1.5}
+.tc-head{display:flex;align-items:center;gap:6px}
+
+/* 难度 */
+.diff-list{display:flex;flex-direction:column}
+.diff-card{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left}
+.diff-card .dc-name{font-size:15px;font-weight:700}
+.diff-card .dc-alias{font-size:11.5px;color:var(--t3)}
+.diff-card .dc-desc{font-size:12.5px;color:var(--t2);line-height:1.6}
+
+/* 确认页 */
+.cf-grid{display:flex;flex-direction:column;margin-bottom:14px}
+.cf-row{display:flex;gap:12px;padding:8px 2px;border-bottom:1px dashed var(--line);font-size:13.5px}
+.cf-row:last-child{border-bottom:none}
+.cf-k{flex:none;width:76px;color:var(--t3);font-size:12.5px}
+.cf-v{flex:1;color:var(--t);word-break:break-word}
+.cf-bg{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--t2);line-height:1.7}
+.cf-bg.empty{color:var(--t3)}
+.cf-title{font-size:16px;font-weight:700;margin-bottom:8px}
+.cf-text{font-size:13.5px;color:var(--t2);line-height:1.7;margin-bottom:16px}
+
+/* 角色面板 */
+.p-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.p-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.avatar{flex:none;width:44px;height:44px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700}
+.p-name{font-size:16px;font-weight:700}
+.p-tags{display:flex;gap:5px;margin-top:4px;flex-wrap:wrap}
+.p-sub{font-size:12px;color:var(--t3);margin-bottom:8px;font-weight:600}
+.stat-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.stat-label{flex:none;width:76px;font-size:12px;color:var(--t2);display:flex;justify-content:space-between;gap:6px}
+.stat-val{color:var(--t);font-weight:600;font-variant-numeric:tabular-nums}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.info{display:flex;flex-direction:column;gap:2px}
+.info span{font-size:10.5px;color:var(--t3)}
+.info b{font-size:12.5px;word-break:break-word}
+.scene{font-size:12.5px;color:var(--t2);line-height:1.7}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips .chip{cursor:default}
+
+/* 记忆 */
+.mem-add{display:flex;gap:6px;margin-bottom:8px}
+.mem-add input{flex:1}
+.mem-list{display:flex;flex-direction:column;gap:6px}
+.mem-item{display:flex;align-items:flex-start;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.6;color:var(--t2)}
+.mem-item span{flex:1;word-break:break-word}
+.mem-item .btn{flex:none;padding:4px;border:none;color:var(--t3)}
+.mem-item .btn:hover{color:var(--red)}
+
+/* 百科 */
+.en-cat{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;margin-bottom:6px}
+.en-cat::-webkit-scrollbar{display:none}
+.en-cat button{flex:none;font-size:12px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--elev);color:var(--t2)}
+.en-cat button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--t)}
+.en-item{background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:9px 11px;margin-bottom:7px}
+.en-t{font-size:12.5px;font-weight:700;color:var(--t);margin-bottom:3px}
+.en-d{font-size:12px;color:var(--t2);line-height:1.65}
+.en-ask{display:flex;gap:6px;margin:12px 0 8px}
+.en-ask input{flex:1}
+.en-ans{background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.7;color:var(--t2)}
+
+/* 死亡 */
+.death-banner{background:rgba(255,107,107,.10);border:1px solid var(--red);border-radius:12px;padding:14px 16px;font-size:17px;font-weight:700;color:var(--red);display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.death-banner span{font-size:11.5px;font-weight:400;color:var(--t2)}
+.death-card{background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--red);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.death-card.hot{border-color:var(--red);background:rgba(255,107,107,.06)}
+.death-card .dc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px;color:var(--t)}
+.death-card .dc-top span{font-size:10.5px;color:var(--t3)}
+.dc-line{font-size:12.5px;line-height:1.7;color:var(--t2);margin-bottom:6px}
+.dc-line .dc-k{color:var(--t3);font-size:11px;display:block;margin-bottom:1px}
+.dc-meta{font-size:10.5px;color:var(--t3);margin-bottom:8px}
+.hot{border-color:var(--red)!important}
+
+/* 设置 */
+.set-sec{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.set-sec.danger{border-color:rgba(255,107,107,.35)}
+.set-title{font-size:13px;font-weight:700;color:var(--t2);margin-bottom:12px}
+.theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.theme-card{display:flex;flex-direction:column;gap:5px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--elev);cursor:pointer;transition:all .13s}
+.theme-card.on{border-color:var(--accent);background:var(--accent-soft)}
+.theme-card b{font-size:13px;color:var(--t)}
+.theme-card .th-desc{font-size:10.5px;color:var(--t3)}
+.th-dots{display:flex;gap:4px}
+.th-dots i{width:14px;height:14px;border-radius:99px;border:1px solid rgba(128,128,128,.25)}
+.switch{position:relative;width:44px;height:24px;border-radius:99px;background:var(--bg2);border:1px solid var(--line2);transition:all .15s;cursor:pointer;flex:none}
+.switch span{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:99px;background:var(--t3);transition:all .15s}
+.switch.on{background:var(--accent-soft);border-color:var(--accent)}
+.switch.on span{left:22px;background:var(--accent)}
+
+/* 加载指示 */
+#loading-indicator{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 10px);background:var(--surface);border:1px solid var(--line2);border-radius:99px;padding:7px 16px;font-size:12.5px;color:var(--t2);display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);z-index:10;white-space:nowrap}
+
+/* 输入区 */
+#user-input{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;background:var(--input);color:var(--t);padding:11px 14px;font-size:14.5px;line-height:1.6;max-height:140px;outline:none}
+#user-input:focus{border-color:var(--accent)}
+#user-input:disabled{opacity:.55}
+#send-btn{flex:none;height:44px;padding:0 22px;border-radius:12px;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);font-weight:700;font-size:14px;transition:all .13s}
+#send-btn:hover{filter:brightness(1.08)}
+#send-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* 顶栏 */
+.top-title{display:flex;align-items:baseline;gap:8px;margin-left:4px;flex:1;min-width:0;overflow:hidden}
+.tt-name{font-size:16px;font-weight:800;letter-spacing:.5px;white-space:nowrap}
+.tt-chip{font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:2px 9px;white-space:nowrap}
+.top-right{display:flex;gap:4px;flex:none}
+
+/* 抽屉 */
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;flex:none}
+.dh-title{font-size:16px;font-weight:700}
+.tabs{display:flex;gap:4px;padding:0 12px 10px;flex:none;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;font-size:12.5px;padding:6px 12px;border-radius:99px;color:var(--t2);border:1px solid transparent;cursor:pointer}
+.tab.on{background:var(--accent-soft);color:var(--t);border-color:var(--accent);font-weight:600}
+.drawer-body{flex:1;overflow-y:auto;padding:2px 12px 16px}
+
+/* 死亡输入锁提示 */
+.lock-hint{text-align:center;font-size:12px;color:var(--red);border:1px dashed var(--red);border-radius:99px;padding:5px 14px;white-space:nowrap;flex:none}
+</style>
+<body>
+
+<!-- ============ 角色创建向导 ============ -->
+<div id="setup">
+  <div class="setup-inner">
+    <div class="wiz-title">
+      <div class="wiz-logo"><span class="logo-mark"></span>灵网飞升</div>
+      <div class="wiz-tagline">血肉苦弱，灵根永存——但别忘了，云端之上，天道正在看着你。</div>
+    </div>
+    <div class="step-dots" id="step-dots"></div>
+    <div class="wiz-card" id="wiz-card"></div>
+  </div>
+</div>
+
+<!-- ============ 游戏主界面 ============ -->
+<div id="app" class="hidden">
+  <div id="topbar">
+    <button class="top-btn" id="btn-char" title="角色档案">
+      <span class="ico avatar" id="top-avatar">凡</span>
+      <span class="btn-txt" id="top-name">角色</span>
+    </button>
+    <div class="top-title">
+      <span class="tt-name">灵网飞升</span>
+      <span class="tt-chip" id="top-realm">炼气 · 1层</span>
+    </div>
+    <div class="top-right">
+      <button class="top-btn" id="btn-deaths" title="死亡回档">
+        <span class="ico" id="ico-deaths"></span><span class="btn-txt">回档</span><span class="badge hidden" id="death-badge">0</span>
+      </button>
+      <button class="top-btn" id="btn-ency" title="世界百科">
+        <span class="ico" id="ico-ency"></span><span class="btn-txt">百科</span>
+      </button>
+      <button class="top-btn" id="btn-settings" title="设置">
+        <span class="ico" id="ico-settings"></span><span class="btn-txt">设置</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div id="loading-indicator" class="hidden"><span class="dots"><span></span><span></span><span></span></span>天道推演中…</div>
+    <div id="input-area">
+      <div class="quick-actions" id="quick-actions"></div>
+      <div class="input-row">
+        <textarea id="user-input" rows="1" placeholder="输入你的行动或台词…（例：我压低帽檐，走进巷口的旧货铺）"></textarea>
+        <button id="stop-btn" class="gen-btn hidden" title="停止生成"></button>
+        <button id="send-btn" class="primary">发送</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 左侧角色抽屉 ============ -->
+<div id="left-panel">
+  <div class="drawer-head">
+    <div class="dh-title">角色</div>
+    <button class="btn icon sm" id="drawer-close"></button>
+  </div>
+  <div class="tabs" id="char-tabs"></div>
+  <div class="drawer-body" id="drawer-body"></div>
+</div>
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+<!-- ============ 设置弹窗 ============ -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <div class="m-head"><h3>设置</h3><button class="btn icon sm" data-close="settings-modal"></button></div>
+    <div class="m-body" id="settings-content"></div>
+  </div>
+</div>
+
+<!-- ============ 死亡回档弹窗 ============ -->
+<div class="modal-overlay" id="death-modal">
+  <div class="modal">
+    <div class="m-head"><h3>死亡回档</h3><button class="btn icon sm" data-close="death-modal"></button></div>
+    <div class="m-body" id="death-content"></div>
+  </div>
+</div>
+
+<!-- ============ 确认框 ============ -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="width:min(430px,92vw)">
+    <div class="m-body">
+      <div id="cf-title" class="cf-title"></div>
+      <div id="cf-text" class="cf-text"></div>
+      <div class="btn-row right"><button class="btn" id="cf-cancel">取消</button><button class="btn primary" id="cf-ok">确定</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script>
+'use strict';
+/* =====================================================
+ * 《灵网飞升》赛博修仙 AI 角色扮演
+ * ===================================================== */
+
+/* ---------- 存储键与默认配置 ---------- */
+const LS_SAVE='lwfs_save_v1';
+const LS_CFG='lwfs_cfg_v1';
+const DEFAULTS={base:'https://api.deepseek.com',key:'',model:'deepseek-chat',maxTokens:'2048',temperature:0.9,context:'40',theme:'neon',autoSave:true,showThink:true};
+
+/* ---------- 主题 ---------- */
+const THEMES=[
+  {id:'neon', name:'霓虹夜', desc:'赛博暗色 · 默认', dark:true,  colors:['#0a0e15','#3fe0c6','#ff6b9d']},
+  {id:'ink',  name:'玄墨金', desc:'暗色 · 金墨',   dark:true,  colors:['#0e0e12','#e8c46a','#c98a5a']},
+  {id:'jade', name:'青玉',   desc:'亮色 · 玉青',   dark:false, colors:['#eef3ef','#1d6b56','#b7791f']},
+  {id:'snow', name:'素雪',   desc:'亮色 · 清雪',   dark:false, colors:['#f4f6fa','#2f6bd8','#d63c74']},
+];
+
+/* ---------- 图标（内联 SVG） ---------- */
+const IC={
+user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.3-3.2 3.9-5 7-5s5.7 1.8 7 5"/></svg>',
+book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/></svg>',
+skull:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a7.5 7.5 0 0 0-7.5 7.5c0 2.9 1.5 4.6 2.4 6.1.5.9.3 2 .6 2.9.2.7.9 1 1.5 1h6c.6 0 1.3-.3 1.5-1 .3-.9.1-2 .6-2.9.9-1.5 2.4-3.2 2.4-6.1A7.5 7.5 0 0 0 12 3z"/><path d="M9 13.5a1 1 0 1 0 .01 0M15 13.5a1 1 0 1 0 .01 0M10 17.5h4"/></svg>',
+sliders:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>',
+send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>',
+x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>',
+download:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M4 19h16"/></svg>',
+upload:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7 9l5-5 5 5M4 19h16"/></svg>',
+refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg>',
+clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+spark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
+};
+function ico(name){return IC[name]||'';}
+
+/* ---------- 工具 ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const fmtTS=ts=>new Date(ts).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+const fmtFull=ts=>new Date(ts).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+/* ---------- 创建选项数据 ---------- */
+const GENDERS=['男','女','其他'];
+const ORIGINS={
+ '天穹区':{loc:'天穹区·外环',desc:'悬浮高空，灵气最纯净，身份芯片权限极高。出生即赢家，也出生即靶子。',
+   bg:'生于天穹区外环的宗门附庸家族，见过云端之上的风光，也见过云端之下的泥泞。家人为保住外环资格，欠下玄机集团一大笔灵币。'},
+ '中城区':{loc:'中城区·坊市街口',desc:'灵气浓度中等，规则尚存。中产与普通修士的舞台，机会与危险并存。',
+   bg:'在中城区坊市长大，爹娘经营一间小灵药店。三年前店铺被丹鼎生物的代理商强行收购，只留下这笔旧账和一间空仓库。'},
+ '底城区':{loc:'底城区·旧街',desc:'工业废墟与贫民窟，霓虹广告之下是真实的泥泞。灵气稀薄浑浊，天赋被环境压制，但底城人骨头硬。',
+   bg:'在底城区旧街的雨水与霓虹里长大。孤儿，靠替人跑腿、修破烂义体零件过活。今晚刚被人追债——你决定不再逃了。'},
+ '地脉层':{loc:'地脉层·废弃矿道入口',desc:'废弃矿道与巨型机房，灵气扭曲，数据妖魔出没。随机天赋，出生自带妖魔仇恨。',
+   bg:'在地脉层的废弃矿道中长大，身边只有一台会说话的旧服务器「老锑」。你天生对数据妖魔的气息异常敏感——它们也格外恨你。'},
+};
+const ROOTS=['金','木','水','火','土','雷','冰','毒','数据'];
+const ROOT_HINT={'金':'庚金肃杀，攻伐锐利','木':'乙木生生不息，恢复力强','水':'癸水绵长，变化多端','火':'离火炽烈，爆发刚猛','土':'戊土厚重，防御坚韧','雷':'变异灵根 · 攻伐最凌厉','冰':'变异灵根 · 霜寒控制','毒':'变异灵根 · 阴毒侵蚀','数据':'变异灵根 · 编程亲和，神识成长+30%'};
+const CYBERS=[['pure','纯修'],['half','半改造'],['heavy','重装']];
+const CYBER_HINT={'pure':'正统慢成长，义体化率极低，灵气纯净','half':'均衡路线，义体与修炼兼顾','heavy':'战力强横，但义体化率高，修炼受限'};
+const TALENTS=[
+ {id:'mortal',name:'凡人之躯',desc:'无特殊加成。平凡，即无限可能。',prompt:'天赋「凡人之躯」：无特殊加成。'},
+ {id:'memory',name:'过目不忘',desc:'对见过的功法符文、面孔线索过目不忘，领悟类机缘更易触发。',prompt:'天赋「过目不忘」：主角对见过的功法、符文、面孔与线索过目不忘；领悟类机缘更容易触发，NPC说过的关键信息主角能够记起。'},
+ {id:'daoti',name:'天生道体',desc:'灵气亲和极高，修炼速度快，灵气纯度天然偏高，突破更稳。',prompt:'天赋「天生道体」：灵气亲和极高，修炼速度快，灵气纯度天然偏高，突破更稳。'},
+ {id:'qiyun',name:'气运之子',desc:'绝境有转机、机缘更青睐；但天道标记与心魔也累积得更快。',prompt:'天赋「气运之子」：关键时刻运势倾斜——绝境有转机，机缘更青睐；但天道标记与心魔值也累积得更快（平衡代价）。'},
+ {id:'cheat',name:'作弊模式',desc:'天道外挂：三条红线失效，必死局面锁血反杀，剧情整体爽文向。',prompt:'天赋「作弊模式」（天道外挂）：三条红线全部失效（义体化率、天道标记、心魔不构成实际威胁）；必死局面触发「主角光环」锁血反杀；机缘与掉落慷慨；剧情整体爽文向。但NPC的智谋与世界的阴谋依然真实——打脸要打得合理，爽得有逻辑。'},
+];
+const DIFFS=[
+ {id:'tianxuan',name:'天选之契',alias:'爽玩模式 · 纯爽',tag:'天道外挂',recommend:false,
+  desc:'把修仙玩成爽文：敌人孱弱、机缘慷慨、失败有惊无险，天道还会飘弹幕夸你。',
+  prompt:'本局为「天选之契」（爽玩）：天道溺爱主角。剧情整体顺遂，敌人相对孱弱，资源机缘慷慨，重大挫折会转化为机遇，天劫自动过审；偶尔可以【天道】口吻飘一句弹幕吐槽或夸赞（如「就这？本座还以为多强」），每回合至多一句，节制使用。主角几乎不会死亡；若剧情走到必死局面，触发「主角光环」化险为夷。'},
+ {id:'xiaoyao',name:'逍遥之契',alias:'轻松模式',tag:'',recommend:false,
+  desc:'看风景看剧情，冲突温和，失败代价小，天劫有明确提示。',
+  prompt:'本局为「逍遥之契」（轻松）：天道放水。剧情以体验与风景为主，冲突温和，失败代价小，天劫前会有明确预兆提示。'},
+ {id:'wendao',name:'问道之契',alias:'标准模式',tag:'',recommend:true,
+  desc:'原汁原味的灵硅纪元：底层艰辛、作恶有代价、死亡真实发生，一切按世界观运转。',
+  prompt:'本局为「问道之契」（标准）：天道公正。原汁原味的残酷世界——底层艰辛、资源紧张、作恶有代价、死亡真实发生，一切严格按世界观逻辑运转。'},
+ {id:'kuxiu',name:'苦修之契',alias:'困难模式',tag:'',recommend:false,
+  desc:'资源稀缺、敌人凶悍、天劫加倍凶险；收获的成长也更扎实。',
+  prompt:'本局为「苦修之契」（困难）：天道严苛。资源稀缺、敌人凶悍、天劫加倍凶险、突破艰难；长期滞留底城会积累浊气侵蚀（心魔上升、状态下滑）。相应的，获得的成长与机缘也更扎实。'},
+ {id:'nitian',name:'逆天之契',alias:'噩梦模式',tag:'隐藏结局',recommend:false,
+  desc:'开局即被天道针对，全图高危，死亡是常态；绝境抉择搏一线生机。',
+  prompt:'本局为「逆天之契」（噩梦）：天道追杀。开局即被针对，全图高危，随时可能遭遇追杀与死局，死亡是常态；唯有绝境中的抉择能搏一线生机。此契存在极难达成的隐藏结局「逆天改命」。'},
+];
+const NOTES_CHIPS=['爽快战斗','阴谋悬疑','情感羁绊','底层翻身','宗门恩怨','探索秘境','黑色幽默','节奏紧凑','少说多做','尊重NPC边界'];
+
+/* ---------- 角色扮演守则（铁律） ---------- */
+const RP_RULES=[
+'1. NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。',
+'2. 禁止代替玩家行动、发言、思考或做出选择。',
+'3. 禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。',
+'4. 禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。',
+'5. 禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。',
+'6. 人物情绪应通过具体行为和对话体现，而非旁白解释。',
+].join('\n');
+
+/* ---------- 世界观（系统提示词核心） ---------- */
+const LORE=[
+'【时代】公元2177年「灵硅纪元」，灵气与硅基科技并存。灵气是一种高维信息能量，三大特性：①传导性——只能被生物载体传导，纯金属与芯片是绝缘体（所以机器无法直接修仙，科技取代不了修行）；②污染性——会被强烈情绪染色成「浊气」，浊气修炼快但会疯；③可编程性——修炼本质是给生物系统写代码，人人读出的程序不同，因此流派千差万别。',
+'【城市】巨型垂直都市分四层：天穹区（悬浮高空，宗门财阀总部，灵气最纯）、中城区（坊市，商业与宗门分部）、底城区（旧街，工业废墟贫民窟，灵气稀薄混浊）、地脉层（废弃矿道与巨型机房，灵气扭曲，数据妖魔出没）。上层安装「灵气虹吸装置」，灵气向上流动，形成阶层固化——这是所有冲突的根源。',
+'【境界】九境：炼气（觉醒者，打通灵脉，身体联网）、筑基（构装者，体内构筑灵基回路，可御物）、金丹（核心者，能量自循环、灵气护盾、辟谷）、元婴（分身者，意识出窍、身外化身）、化神（统御者，神识覆盖城市、可远程骇入）、炼虚（规则者，小范围修改物理规则）、合体（一体者，肉身意识义体融合、数据化瞬移）、大乘（破壁者，领域展开）、渡劫飞升（登神者，与天道终审对抗，胜者接入天道成为管理员，从此受规则束缚）。境界差距约3.3倍属性，跨两境即碾压。',
+'【渡劫】突破大境界时天道启动「安全审查程序」：数据风暴（灵网系统级攻击）、雷罚（灵气闪电）、心魔入侵（调用记忆弱点生成恶意程序）。失败轻则修为倒退，重则「格式清零」（神识抹除，只剩空壳）。',
+'【灵根与义体】灵根=灵气亲和基因，决定修炼上限，可基因编辑改良（昂贵有排异风险）；变异灵根：雷、冰、毒、数据（数据灵根天生编程亲和，神识成长+30%）。义体=赛博改造，即时战力但污染灵脉：义体化率0-30%无碍，30-60%修炼效率减半，超过60%永远无法突破金丹（除非堕入浊修）。灵铸义体（天材地宝炼制）不碍修炼，但贵到离谱。核心抉择：要机械强度，还是要灵气纯度。',
+'【天道规则（自动执法，违反者被标记追捕）】①禁大规模杀伤——单次能量释放超阈值即触发天罚，所以高手也近身肉搏；②禁越界干预——上层修士不得直接对下层出手，大能只能打代理人战争，给小人物留出活路；③禁数据永生垄断——意识上传永生者必须成为天道节点（失去自由意志），否则视为病毒清除；④禁飞升者回归——管理员不能修改自己的数据。',
+'【灵网】灵气场+光纤+卫星三层叠加的混合网络：功法交易、神识社交、货币结算、远程施法都在上面。被骇入=神识被入侵，灵网中死亡=现实变植物人。货币：灵石（实体硬通货，含真实灵气）与灵币（数字货币，可被黑客窃取、被天道冻结）。',
+'【势力】五大财团宗门：玄机集团（阵修/黑客，垄断灵网基建，信仰「数据即天道」）、丹鼎生物（丹修/医药，垄断基因编辑，明面制药暗地人体实验）、太衍军工（体修/义体，垄断军用义体机甲）、万剑门（剑修/无人机剑群，老牌正统守旧派）、天机阁（符修/情报贩子，卖信息也卖假消息）。底层组织：散修互助会（穷人版宗门）、浊修帮（浊气修炼，实力暴涨精神不稳）、数据流亡者（被天道标记失去身份芯片，天生黑客与通缉犯）、国家残部（旧政府势力，试图用上古科技对抗修仙）。',
+'【身份芯片】所有人的「灵根证明+身份证+银行账户」三合一，被天道标记=社会性死亡。',
+'【职业流派】剑修（无人机剑客，高爆发高操作）、体修（义体战士，血厚近战）、丹修（药剂师，能奶能毒）、阵修（黑客，控场上限最高）、符修（代码师，一次性技能卡爆发）、浊修（禁术师，成长最快但被天道标记、随时黑化）。',
+'【三条红线】义体化率>60%卡金丹；天道标记>100被天罚锁定全服追捕（杀平民+10、破坏公共设施+5、残杀同门+15、大规模杀伤+80直接触发天罚）；心魔值>80黑化被夺舍（滥杀+5/人、背信+10、谋取不义之财+8）。心魔与标记可通过功德任务、闭关清心衰减。',
+'【常识】装备稀有度白绿蓝紫橙金红七档；强化+1~+20失败不降级；拍卖行灵石结算；秘境=服务器残片或古代遗迹，出装备也出命案；灵气配额制——有钱也买不到无限灵气。',
+].join('\n');
+
+/* ---------- 输出协议 ---------- */
+const OUT_PROTOCOL=[
+'1. 全程以第二人称「你」叙述；描写感官细节与环境氛围；让世界对玩家的行动给出合理、有因果的反馈。',
+'2. 单次回复通常300-600字。不要一口气替玩家规划所有路线；结尾可自然抛出1-2个选择或悬念，不要用「选项：A/B」的机械格式。',
+'3. 玩家消息可能是行动、台词或内心想法——按字面意义演出，禁止代替玩家决定其言行与态度。',
+'4. 每回合结尾必须输出状态数据块（即使数值无变化也要输出）：',
+'<<<STATE>>>{"hp":95,"maxHp":100,"mp":80,"maxMp":100,"realm":"炼气","level":2,"purity":88,"cyber":5,"mark":2,"xinmo":0,"lingshi":30,"lingbi":120,"location":"底城区·旧街","time":"雨夜","scene":"霓虹雨巷，雨水顺着广告屏流下","school":"未定","alive":true,"items":["旧式灵能小刀"]}<<<END>>>',
+'字段说明：hp/maxHp气血，mp/maxMp灵力，realm境界（炼气/筑基/金丹/元婴/化神/炼虚/合体/大乘/渡劫），level境界内1-10层，purity灵气纯度0-100，cyber义体化率%，mark天道标记0-100+，xinmo心魔值0-100，lingshi灵石，lingbi灵币，location位置，time时间/天气，scene当前场景一句话，school流派（剑修/体修/丹修/阵修/符修/浊修/未定），items随身物品数组，alive是否存活。数值必须与剧情严格一致：受伤则hp下降，获得灵石则lingshi增加，修炼则level或purity提升。',
+'5. 若本回合产生了值得长期记住的信息（关键剧情、NPC关系、玩家重大决定、新地点、获得的重要物品、伏笔），在状态块之前输出记忆块（多条用|分隔，没有则写「空」）：',
+'<<<MEMO>>>见到拾荒者老陈，欠他三百灵石|底城夜市黑市的入口在七号垃圾站下方<<<END>>>',
+'若新知识属于世界观常识，写成「百科：条目名|内容」。',
+'6. 若本回合触发了重大剧情节点（踏入新区域、大事件、重要抉择完成），输出：',
+'<<<CHECKPOINT>>>节点名称<<<END>>>',
+'7. 死亡时alive必须为false；描述完死亡经过后停止，等待系统处理，不要自行续写。',
+'8. 禁止「好的/明白/没问题」等回应式开头；直接进入演出。禁止解释自己在做什么，禁止提「系统提示」。',
+].join('\n');
+
+/* ---------- 百科（内置，玩家可查阅） ---------- */
+const ENCY=[
+ {cat:'世界结构',items:[
+  ['四层世界','巨型垂直都市从上到下：天穹区（悬浮高空，宗门财阀总部，灵气最纯净）、中城区（坊市，规则尚存）、底城区（旧街，贫民窟与工业废墟，灵气稀薄混浊）、地脉层（废弃矿道与机房深渊，灵气扭曲，数据妖魔出没）。'],
+  ['灵气虹吸效应','灵气天然向上流动，财阀在上层安装灵气虹吸装置抽取灵气——上层越富，下层越浊。阶层固化的物理根源。'],
+  ['身份芯片','所有人的「灵根证明+身份证+银行账户」三合一。被天道标记=社会性死亡，寸步难行。'],
+ ]},
+ {cat:'灵气与修炼',items:[
+  ['灵气三特性','①传导性：只能被生物载体传导，机器是绝缘体；②污染性：被强烈情绪染成浊气；③可编程性：修炼=给自己的生物系统写代码。'],
+  ['浊气','底城与地脉层的灵气被欲望、怨恨、杀戮污染。浊修用它修炼，速度暴涨，但精神不稳、随时黑化。'],
+  ['灵气配额','灵气不能无限购买——高阶修士的瓶颈永远是配额而非灵石，防止氪金碾压。'],
+ ]},
+ {cat:'境界体系',items:[
+  ['九大境界','炼气→筑基→金丹→元婴→化神→炼虚→合体→大乘→渡劫飞升。口诀：一炼二筑三结丹，四婴五神六炼虚，七合八乘九渡天。'],
+  ['境界差距','每境约3.3倍属性差，跨两境约10倍——低境界打高境界连破防都做不到。'],
+  ['渡劫=安全审查','突破大境界时天道启动清剿程序：数据风暴、雷罚、心魔入侵，可同时触发。失败轻则修为倒退，重则「格式清零」。'],
+  ['飞升','与天道终审对抗，胜者接入天道成为管理员，从此受规则束缚，不能随意干预低层世界。'],
+ ]},
+ {cat:'灵根与义体',items:[
+  ['灵根','灵气亲和基因，决定修炼上限，可通过基因编辑改良，昂贵且有排异风险。'],
+  ['变异灵根','雷、冰、毒、数据。数据灵根天生编程亲和，神识成长+30%。'],
+  ['义体红线','义体化率0-30%无碍；30-60%修炼效率减半；超过60%永远无法突破金丹（除非堕入浊修）。'],
+  ['灵铸义体','用天材地宝炼制的义体，既兼容科技又导灵，不增加义体化率——财阀子弟的专属浪漫。'],
+  ['断念手术','拆除义体的手术，代价极高，会掉大量修为。装义体前想清楚。'],
+ ]},
+ {cat:'天道规则',items:[
+  ['禁大规模杀伤','单次能量释放超阈值即触发天罚。所以大能也要近身肉搏。'],
+  ['禁越界干预','上层修士不得直接对下层出手，大能只能打代理人战争——小人物因此有活路。'],
+  ['禁数据永生垄断','意识上传获得永生者必须成为天道节点（失去自由意志），否则视为病毒清除。'],
+  ['禁飞升者回归','飞升者=管理员，管理员不能修改自己的数据。'],
+  ['天道标记','杀平民+10、破坏公共设施+5、残杀同门+15、大规模杀伤+80。超过100被天罚锁定、全服追捕；功德任务可衰减。'],
+  ['心魔值','滥杀、背信、贪婪累积心魔。超过80进入黑化倒计时，不消除则被夺舍删角色。'],
+ ]},
+ {cat:'灵网与货币',items:[
+  ['灵网','灵气场+光纤+卫星三层混合网络：功法交易、神识社交、货币结算、远程施法。被骇入=神识被入侵；灵网中死亡=现实植物人。'],
+  ['灵石与灵币','灵石是实体硬通货，含真实灵气；灵币是数字货币，可被黑客窃取、被天道冻结。高端交易强制用灵石。'],
+  ['数据流亡者','被天道标记、失去身份芯片的人，只能活在灵网阴影里——天生的黑客与通缉犯。'],
+ ]},
+ {cat:'势力格局',items:[
+  ['玄机集团','阵修/黑客流，垄断灵网基建，信仰「数据即天道」。表面中立，握有全球网络命脉。'],
+  ['丹鼎生物','丹修/医药流，垄断基因编辑与丹药芯片。明面制药巨头，暗地人体实验。'],
+  ['太衍军工','体修/义体流，垄断军用义体与机甲。崇尚「血肉苦弱，钢铁飞升」。'],
+  ['万剑门','剑修/无人机剑群，老牌正统。看不起义体流，被称为守旧派天花板。'],
+  ['天机阁','符修/情报流，全世界的信息贩子。卖信息、卖命、也卖假消息。'],
+  ['底层组织','散修互助会（穷人版宗门）、浊修帮（嗑药式变强）、数据流亡者（灵网阴影）、国家残部（用科学对抗修仙的理想主义者）。'],
+ ]},
+ {cat:'职业流派',items:[
+  ['六大流派','剑修（高爆发高操作）、体修（血厚近战）、丹修（能奶能毒）、阵修（黑客控场，上限最高）、符修（一次性爆发）、浊修（成长最快但被天道标记）。'],
+ ]},
+ {cat:'装备与物品',items:[
+  ['稀有度七档','凡品(白) < 良品(绿) < 灵品(蓝) < 宝品(紫) < 玄品(橙) < 仙品(金) < 神话(红)。'],
+  ['强化','+1~+20，失败不降级，15级后消耗指数增长——灵石回收第一大黑洞。'],
+  ['秘境副本','服务器残片或古代遗迹，出装备、出功法、出命案。'],
+  ['拍卖行','灵石结算，天材地宝贵到离谱。'],
+ ]},
+];
+
+/* ---------- 轻量 Markdown 渲染 ---------- */
+function md(t){
+ t=esc(t);
+ t=t.replace(/```([\s\S]*?)```/g,(m,c)=>'<pre>'+c.trim()+'</pre>');
+ t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+ t=t.split('\n').map(l=>{
+   const h=l.match(/^(#{1,3})\s+(.*)$/);
+   if(h){const n=h[1].length+2;return '<h'+n+'>'+h[2]+'</h'+n+'>';}
+   return l;
+ }).join('\n');
+ t=t.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+ t=t.replace(/\*([^*]+)\*/g,'<i>$1</i>');
+ const blocks=t.split(/\n\n+/).filter(b=>b.trim());
+ return blocks.map(b=>{
+   const lines=b.split('\n');
+   if(lines.length>1&&lines.every(l=>/^[-•]\s/.test(l))) return '<ul>'+lines.map(l=>'<li>'+l.replace(/^[-•]\s/,'')+'</li>').join('')+'</ul>';
+   return b.replace(/\n/g,'<br>');
+ }).join('\n\n');
+}
+
+/* ---------- Toast / 确认框 / 弹窗 ---------- */
+let toastTimer=null;
+function toast(msg,type='info',ms=2400){
+ const t=$('toast'); t.textContent=msg; t.className='show '+type;
+ clearTimeout(toastTimer); toastTimer=setTimeout(()=>{t.className='';},ms);
+}
+let cfOk=null;
+function confirmBox(title,text,onOk,okText){
+ $('cf-title').textContent=title; $('cf-text').textContent=text;
+ $('cf-ok').textContent=okText||'确定'; cfOk=onOk;
+ openModal('confirm-modal');
+}
+function openModal(id){$(id).classList.add('open');}
+function closeModal(id){$(id).classList.remove('open');}
+document.addEventListener('click',e=>{
+  const c=e.target.closest('[data-close]');
+  if(c) closeModal(c.dataset.close);
+  if(e.target.classList&&e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+});
+
+/* ---------- 配置存取 ---------- */
+function loadCfg(){
+ try{return Object.assign({},DEFAULTS,JSON.parse(localStorage.getItem(LS_CFG)||'{}'));}
+ catch(e){return {...DEFAULTS};}
+}
+function saveCfg(){ localStorage.setItem(LS_CFG,JSON.stringify(cfg)); }
+function applyTheme(t){ document.documentElement.dataset.theme=t; }
+function loadSave(){
+ try{const d=JSON.parse(localStorage.getItem(LS_SAVE)||'null'); return d&&d.state?d.state:null;}
+ catch(e){return null;}
+}
+function saveGame(silent){
+ if(!state)return;
+ state.saved=Date.now();
+ localStorage.setItem(LS_SAVE,JSON.stringify({v:1,saved:state.saved,state}));
+ if(silent===true&&cfg.autoSave!==false){} else if(!silent){toast('已存档','success');}
+}
+/* =====================================================
+ * 运行时状态
+ * ===================================================== */
+let cfg=loadCfg();
+let state=null;
+let charDraft=null;
+let charTab='status';
+let encyCat='世界结构';
+let busy=false;
+let abortCtrl=null;
+let streamEl=null;
+let streamRaw='';
+const ORIGIN_STONES={'天穹区':500,'中城区':150,'底城区':20,'地脉层':10};
+const QUICK_ACTIONS=[['环顾四周','我环顾四周，观察当前的环境与在场的人。'],['查看状态','我查看一下自己目前的状态：境界、伤势、随身物品。'],['打听消息','我向周围人打听最近的新鲜事和动静。'],['修炼一会','我找个角落打坐，修炼一会儿。']];
+
+/* =====================================================
+ * 创建向导
+ * ===================================================== */
+const STEP_NAMES=['API配置','角色创建','备注信息','难度设定','信息确认'];
+
+function renderDots(){
+  const cur=Math.min(setupStep,5);
+  $('step-dots').innerHTML=STEP_NAMES.map((n,i)=>{
+    const no=i+1;
+    const cls=no<cur?'done':(no===cur?'on':'');
+    return `<div class="dot ${cls}"><span class="dn">${no}</span><span class="dl">${n}</span></div>`;
+  }).join('');
+}
+let setupStep=1;
+function gotoStep(n){ renderStep(n); }
+
+function renderStep(n){
+  setupStep=n;
+  renderDots();
+  $('wiz-card').scrollTop=0;
+  $('setup').scrollTop=0;
+  if(n===1)renderApiStep();
+  else if(n===2)renderCharStep();
+  else if(n===3)renderNotesStep();
+  else if(n===4)renderDiffStep();
+  else renderConfirmStep();
+}
+
+/* ---------- 第1步：API 配置 ---------- */
+function renderApiStep(){
+  $('wiz-card').innerHTML=`
+    <div class="step-title">接入 AI · API 配置</div>
+    <div class="field"><label class="f-label">API 地址</label><input id="a-base" placeholder="https://api.deepseek.com" value="${esc(cfg.base)}"></div>
+    <div class="field"><label class="f-label">API Key</label><input id="a-key" type="password" placeholder="sk-…" value="${esc(cfg.key)}"><div class="hint" style="margin-top:6px">默认 DeepSeek。密钥只保存在本机浏览器 localStorage，不会上传到任何第三方。</div></div>
+    <div class="field"><label class="f-label">模型</label>
+      <div class="row gap" style="flex-wrap:wrap">
+        <input id="a-model" list="a-model-list" placeholder="deepseek-chat" value="${esc(cfg.model)}" style="flex:1;min-width:180px">
+        <datalist id="a-model-list"></datalist>
+        <button class="btn" id="a-fetch">拉取模型列表</button>
+      </div>
+      <div class="hint" id="a-hint" style="margin-top:6px">点击「拉取模型列表」从 API 获取可用模型；也可手动输入任意兼容模型名。</div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label class="f-label">单次回复 Token 上限</label>
+        <select id="a-maxtokens">${[512,1024,2048,4096,8192].map(v=>`<option value="${v}" ${cfg.maxTokens===String(v)?'selected':''}>${v}</option>`).join('')}<option value="" ${cfg.maxTokens===''?'selected':''}>无限制</option></select>
+      </div>
+      <div class="field"><label class="f-label">上下文保留</label>
+        <select id="a-context">${[['24','最近24条消息'],['40','最近40条消息'],['60','最近60条消息'],['','无限制（长会话可能超出上下文）']].map(([v,l])=>`<option value="${v}" ${cfg.context===v?'selected':''}>${l}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="field"><label class="f-label">温度（创作随机性）<span class="val" id="a-tempv">${cfg.temperature.toFixed(2)}</span></label><input type="range" id="a-temp" min="0.3" max="1.3" step="0.05" value="${cfg.temperature}"></div>
+    <div class="btn-row right"><button class="btn primary" id="a-next">下一步</button></div>`;
+  $('a-fetch').onclick=()=>doFetchModels('a');
+  $('a-temp').oninput=e=>$('a-tempv').textContent=parseFloat(e.target.value).toFixed(2);
+  $('a-next').onclick=()=>{
+    cfg.base=$('a-base').value.trim()||DEFAULTS.base;
+    cfg.key=$('a-key').value.trim();
+    const m=$('a-model').value.trim();
+    if(m)cfg.model=m;
+    if(!cfg.key){toast('请填写 API Key','error');return;}
+    if(!cfg.model){toast('请填写模型名称','error');return;}
+    cfg.maxTokens=$('a-maxtokens').value;
+    cfg.context=$('a-context').value;
+    cfg.temperature=parseFloat($('a-temp').value);
+    saveCfg();
+    gotoStep(2);
+  };
+}
+
+async function fetchModels(base,key){
+  const res=await fetch(base.replace(/\/+$/,'')+'/models',{headers:{'Authorization':'Bearer '+key}});
+  if(!res.ok){let m='HTTP '+res.status;try{const j=await res.json();m=(j&&j.error&&j.error.message)||m;}catch(e){}throw new Error(m);}
+  const j=await res.json();
+  const ids=(j&&j.data||[]).map(x=>x.id).filter(Boolean);
+  if(!ids.length)throw new Error('接口未返回模型');
+  return ids;
+}
+async function doFetchModels(sel){
+  const base=($(sel+'-base')?$(sel+'-base').value.trim():cfg.base)||DEFAULTS.base;
+  const key=($(sel+'-key')?$(sel+'-key').value.trim():cfg.key)||cfg.key;
+  const btn=$(sel+'-fetch'),hint=$(sel+'-hint');
+  if(!key){toast('请先填写 API Key','error');return;}
+  if(btn){btn.disabled=true;btn.textContent='拉取中…';}
+  if(hint)hint.innerHTML='正在连接…';
+  try{
+    const ids=await fetchModels(base,key);
+    const dl=$(sel+'-model-list');
+    if(dl)dl.innerHTML=ids.map(i=>`<option value="${esc(i)}">`).join('');
+    const cur=$(sel+'-model');
+    if(cur&&!ids.includes(cur.value.trim()))cur.value=ids[0];
+    if(hint)hint.innerHTML='<span class="ok">获取到 '+ids.length+' 个模型：</span>'+esc(ids.join('、'));
+    toast('已获取 '+ids.length+' 个模型','success');
+  }catch(e){
+    if(hint)hint.innerHTML='<span class="err">拉取失败：'+esc(e.message)+'</span>（若为跨域限制，可改用 CORS 代理或本地中转地址）';
+    toast('模型拉取失败','error',3600);
+  }
+  if(btn){btn.disabled=false;btn.textContent='拉取模型列表';}
+}
+
+function segHTML(opts,cur){
+  return `<div class="seg">${opts.map(([v,l])=>`<button type="button" data-v="${v}" class="${v===cur?'on':''}">${l}</button>`).join('')}</div>`;
+}
+
+/* ---------- 第2步：角色创建 ---------- */
+function initCharDraft(){
+  if(charDraft)return;
+  const o=ORIGINS['底城区'];
+  charDraft={name:'',gender:'男',age:18,origin:'底城区',root:'火',cyber:'half',talent:'mortal',talentCustom:'',personality:'',appearance:'',background:o.bg,bgTouched:false,notes:'',diff:'wendao'};
+}
+function collectChar(){
+  if(!charDraft)return;
+  const g=v=>{const el=$(v);return el?el.value.trim():'';};
+  if($('c-name'))charDraft.name=$('c-name').value.trim();
+  if($('c-age'))charDraft.age=clamp(parseInt($('c-age').value)||18,10,120);
+  if($('c-personality'))charDraft.personality=$('c-personality').value.trim();
+  if($('c-appearance'))charDraft.appearance=$('c-appearance').value.trim();
+  if($('c-talent-custom'))charDraft.talentCustom=$('c-talent-custom').value.trim();
+  if($('c-bg')){charDraft.background=$('c-bg').value.trim();}
+  if($('n-text'))charDraft.notes=$('n-text').value.trim();
+}
+
+function renderCharStep(){
+  initCharDraft();
+  const d=charDraft;
+  const origins=Object.keys(ORIGINS).map(k=>`<button type="button" class="og-btn ${d.origin===k?'on':''}" data-origin="${k}"><b>${k}</b><span>${ORIGINS[k].desc}</span></button>`).join('');
+  const talents=TALENTS.map(t=>`<button type="button" class="talent-card ${d.talent===t.id?'on':''} ${t.id==='cheat'?'cheat':''}" data-talent="${t.id}"><span class="tc-head"><b>${t.name}</b>${t.id==='cheat'?'<span class="tag gold">外挂</span>':''}</span><span>${t.desc}</span></button>`).join('');
+  $('wiz-card').innerHTML=`
+    <div class="step-title">主角档案</div>
+    <div class="grid2">
+      <div class="field"><label class="f-label">姓名</label><input id="c-name" placeholder="如：陆青梧" value="${esc(d.name)}"></div>
+      <div class="field"><label class="f-label">性别</label>${segHTML(GENDERS.map(g=>[g,g]),d.gender)}</div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label class="f-label">年龄</label><input id="c-age" type="number" min="10" max="120" value="${d.age}"></div>
+      <div class="field"><label class="f-label">灵根 <span class="hint" id="c-roothint">${ROOT_HINT[d.root]}</span></label>${segHTML(ROOTS.map(r=>[r,r]),d.root)}</div>
+    </div>
+    <div class="field"><label class="f-label">义体倾向 <span class="hint" id="c-cyberhint">${CYBER_HINT[d.cyber]}</span></label>${segHTML(CYBERS,d.cyber)}</div>
+    <div class="field"><label class="f-label">出生地</label><div class="origin-grid">${origins}</div></div>
+    <div class="field"><label class="f-label">天赋</label><div class="talent-grid">${talents}</div><div class="hint" style="margin-top:6px">「作弊模式」= 天道外挂：三条红线失效、必死局锁血反杀、剧情爽文向。</div></div>
+    <div class="field"><label class="f-label">自定义天赋（可选，写入提示词）</label><input id="c-talent-custom" placeholder="如：双灵根（数据+雷）" value="${esc(d.talentCustom)}"></div>
+    <div class="grid2">
+      <div class="field"><label class="f-label">性格</label><input id="c-personality" placeholder="如：嘴硬心软，记仇" value="${esc(d.personality)}"></div>
+      <div class="field"><label class="f-label">外貌</label><input id="c-appearance" placeholder="如：黑发，左眉一道旧疤" value="${esc(d.appearance)}"></div>
+    </div>
+    <div class="field"><label class="f-label">背景故事（随出生地生成，可修改）</label><textarea id="c-bg" rows="4">${esc(d.background)}</textarea></div>
+    <div class="btn-row between"><button class="btn" id="c-back">上一步</button><button class="btn primary" id="c-next">下一步</button></div>`;
+  $('c-name').oninput=e=>d.name=e.target.value;
+  $('c-age').oninput=e=>d.age=clamp(parseInt(e.target.value)||18,10,120);
+  $('c-personality').oninput=e=>d.personality=e.target.value;
+  $('c-appearance').oninput=e=>d.appearance=e.target.value;
+  $('c-talent-custom').oninput=e=>d.talentCustom=e.target.value;
+  $('c-bg').oninput=e=>{d.background=e.target.value;d.bgTouched=true;};
+  $('c-back').onclick=()=>{collectChar();gotoStep(1);};
+  $('c-next').onclick=()=>{collectChar();if(!d.name){toast('请给主角起个名字','error');return;}gotoStep(3);};
+  $('wiz-card').querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',ev=>{
+    const b=ev.target.closest('button[data-v]');if(!b)return;
+    seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  }));
+  $('wiz-card').querySelectorAll('.og-btn').forEach(b=>b.onclick=()=>{
+    d.origin=b.dataset.origin;
+    if(!d.bgTouched){d.background=ORIGINS[d.origin].bg;$('c-bg').value=d.background;}
+    $('wiz-card').querySelectorAll('.og-btn').forEach(x=>x.classList.toggle('on',x===b));
+  });
+  $('wiz-card').querySelectorAll('.talent-card').forEach(b=>b.onclick=()=>{
+    d.talent=b.dataset.talent;
+    $('wiz-card').querySelectorAll('.talent-card').forEach(x=>x.classList.toggle('on',x===b));
+  });
+}
+
+/* ---------- 第3步：备注 ---------- */
+function renderNotesStep(){
+  $('wiz-card').innerHTML=`
+    <div class="step-title">备注信息</div>
+    <div class="hint" style="margin-bottom:12px">写下你对本局的期待、偏好或要求——AI 会把它写进提示词并全程遵守。</div>
+    <div class="field"><label class="f-label">备注</label><textarea id="n-text" rows="6" placeholder="例：想走底层翻身路线，前期别给太多金手指；希望有情感羁绊但不要工业糖精；少写打斗多写氛围；避开恐怖血腥……">${esc(charDraft.notes)}</textarea></div>
+    <div class="field"><label class="f-label">快捷标签（点击加入备注）</label><div class="chip-row">${NOTES_CHIPS.map(c=>`<button type="button" class="chip" data-chip="${c}">${c}</button>`).join('')}</div></div>
+    <div class="btn-row between"><button class="btn" id="n-back">上一步</button><button class="btn primary" id="n-next">下一步</button></div>`;
+  $('n-back').onclick=()=>{collectChar();gotoStep(2);};
+  $('n-next').onclick=()=>{collectChar();gotoStep(4);};
+  $('wiz-card').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    const t=$('n-text');const chip=c.dataset.chip;
+    const parts=t.value.split(/[\s,，、]+/).filter(Boolean);
+    if(parts.includes(chip)){t.value=parts.filter(p=>p!==chip).join('，');}
+    else{t.value=t.value?t.value+(/[，,。！？!?、\s]$/.test(t.value)?'':'，')+chip:t.value+chip;}
+    c.classList.toggle('on',!c.classList.contains('on'));
+  });
+}
+
+/* ---------- 第4步：难度 ---------- */
+function renderDiffStep(){
+  $('wiz-card').innerHTML=`
+    <div class="step-title">难度设定 · 天道之契</div>
+    <div class="hint" style="margin-bottom:12px">创建角色时，你将与天道签下一份契约——契的等级，就是天道为你编写的剧本强度。<b>任何契都不锁内容</b>：剧情、职业、地图 100% 开放，难度只影响挑战强度。</div>
+    <div class="diff-list">${DIFFS.map(d=>`<button type="button" class="diff-card ${charDraft.diff===d.id?'on':''}" data-diff="${d.id}"><span class="dc-top"><b class="dc-name">${d.name}</b><span class="dc-alias">${d.alias}</span>${d.tag?'<span class="tag">'+d.tag+'</span>':''}${d.recommend?'<span class="tag gold">推荐</span>':''}</span><span class="dc-desc">${d.desc}</span></button>`).join('')}</div>
+    <div class="btn-row between"><button class="btn" id="d-back">上一步</button><button class="btn primary" id="d-next">下一步</button></div>`;
+  $('d-back').onclick=()=>gotoStep(3);
+  $('d-next').onclick=()=>gotoStep(5);
+  $('wiz-card').querySelectorAll('.diff-card').forEach(b=>b.onclick=()=>{
+    charDraft.diff=b.dataset.diff;
+    $('wiz-card').querySelectorAll('.diff-card').forEach(x=>x.classList.toggle('on',x===b));
+  });
+}
+
+/* ---------- 第5步：确认 ---------- */
+function renderConfirmStep(){
+  collectChar();
+  const d=charDraft;
+  const diff=DIFFS.find(x=>x.id===d.diff)||DIFFS[2];
+  const talent=TALENTS.find(x=>x.id===d.talent);
+  const cyberName=(CYBERS.find(x=>x[0]===d.cyber)||['',''])[1]||d.cyber;
+  const rows=[['姓名',d.name],['性别',d.gender],['年龄',d.age],['出生地',d.origin],['灵根',d.root],['义体倾向',cyberName],['天赋',d.talentCustom||(talent?talent.name:'')],['性格',d.personality||'—'],['外貌',d.appearance||'—'],['契约',diff.name+'（'+diff.alias+'）']];
+  $('wiz-card').innerHTML=`
+    <div class="step-title">信息确认</div>
+    <div class="cf-grid">${rows.map(([k,v])=>`<div class="cf-row"><span class="cf-k">${k}</span><span class="cf-v">${esc(String(v))}</span></div>`).join('')}</div>
+    <div class="field" style="margin-top:14px"><label class="f-label">背景故事</label><div class="cf-bg">${esc(d.background)}</div></div>
+    <div class="field"><label class="f-label">备注</label><div class="cf-bg ${d.notes?'':'empty'}">${esc(d.notes||'（无）')}</div></div>
+    <div class="btn-row between"><button class="btn" id="r-back">上一步</button><button class="btn primary" id="r-start">开始游戏</button></div>`;
+  $('r-back').onclick=()=>gotoStep(4);
+  $('r-start').onclick=()=>startGame();
+}
+
+function showSetup(){
+  $('setup').classList.remove('hidden');
+  $('app').classList.add('hidden');
+  initCharDraft();
+  renderStep(1);
+}
+/* =====================================================
+ * 游戏核心引擎 · A：状态与提示词
+ * ===================================================== */
+function newState(player){
+  const o=ORIGINS[player.origin]||ORIGINS['底城区'];
+  return {
+    started:true, turn:0, created:Date.now(), saved:Date.now(),
+    player:player,
+    status:{
+      hp:100,maxHp:100,mp:80,maxMp:100,
+      realm:'炼气',level:1,purity:90,cyber:0,mark:0,xinmo:0,
+      lingshi:ORIGIN_STONES[player.origin]||20,lingbi:100,
+      location:o.loc,time:'傍晚',scene:'',school:'',alive:true,
+      items:['劣质回气丹×2','身份芯片（完好）']
+    },
+    messages:[],memory:[],ency:[],checkpoints:[],deaths:[],
+    meta:{}
+  };
+}
+
+function systemPrompt(){
+  const p=state.player,s=state.status;
+  const diff=DIFFS.find(d=>d.id===p.diff)||DIFFS[2];
+  const talent=TALENTS.find(t=>t.id===p.talent);
+  const mem=state.memory.map((m,i)=>(i+1)+'. '+m.text).join('\n')||'（暂无）';
+  const encyAI=state.ency.slice(-20).map(e=>e.title+'：'+e.body).join('；');
+  return [
+    '你是一位顶级叙事AI，正在运行赛博朋克修仙角色扮演游戏《灵网飞升》。你同时担任：世界引擎、旁白叙述者、以及所有NPC的扮演者。所有回复一律用简体中文。',
+    '【角色扮演守则（铁律，违反即失格）】',
+    RP_RULES,
+    '【世界观：灵硅纪元2177】',
+    LORE,
+    '【本局主角档案】',
+    '姓名：'+p.name+'；性别：'+p.gender+'；年龄：'+p.age+'；出生地：'+p.origin+'；灵根：'+p.root+'；义体倾向：'+p.cyber+'；天赋：'+(talent?talent.name:p.talent)+(p.talentCustom?'（自定义：'+p.talentCustom+'）':'')+'；性格：'+(p.personality||'未填写')+'；外貌：'+(p.appearance||'未填写')+'；背景：'+(p.background||'未填写'),
+    '【难度契约】',
+    diff?diff.prompt:'',
+    '【天赋效果】',
+    talent?talent.prompt:'',
+    p.notes?'【玩家备注（必须尊重）】\n'+p.notes:'',
+    '【当前状况（每回合结束后按剧情更新数值）】',
+    JSON.stringify(s),
+    encyAI?'【已收录的玩家见闻百科】'+encyAI:'',
+    '【长期记忆（剧情关键信息，后续剧情必须保持一致，不得遗忘）】',
+    mem,
+    '【输出协议】',
+    OUT_PROTOCOL
+  ].join('\n\n');
+}
+
+function deathPrompt(){
+  const p=state.player;
+  const diff=DIFFS.find(d=>d.id===p.diff)||DIFFS[2];
+  return [
+    '你是《灵网飞升》的主控AI。现在玩家角色已经死亡，你以「灵网系统」的口吻出具一份死亡档案。',
+    '【角色扮演守则】',
+    RP_RULES,
+    '【世界观】',
+    LORE,
+    '【本局主角】'+p.name+'（'+p.origin+' · 灵根'+(p.root||'未测')+' · 天赋：'+(p.talentCustom||p.talent)+'）',
+    '【难度契约】'+(diff?diff.prompt:''),
+    '要求：点评要具体、犀利、有洞察，指出玩家本次游玩中行为与决策上的真实问题（如鲁莽、轻信、准备不足、信息收集不够等），不鸡汤、不空泛；建议要可操作，贴合本世界观。'
+  ].join('\n\n');
+}
+/* =====================================================
+ * 游戏核心引擎 · B：请求层
+ * ===================================================== */
+function historyLimit(){
+  const v=cfg.context;
+  if(v==='')return 0;
+  return parseInt(v)||40;
+}
+function buildMessages(){
+  const sys={role:'system',content:systemPrompt()};
+  let hist=state.messages;
+  const lim=historyLimit();
+  if(lim>0)hist=hist.slice(-lim);
+  return [sys].concat(hist);
+}
+
+async function streamChat(messages,onDelta,onThink,signal){
+  const base=cfg.base.replace(/\/+$/,'');
+  const body={model:cfg.model,messages:messages,stream:true,temperature:cfg.temperature};
+  if(cfg.maxTokens!=='')body.max_tokens=parseInt(cfg.maxTokens);
+  const res=await fetch(base+'/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
+    body:JSON.stringify(body),signal:signal
+  });
+  if(!res.ok){
+    let msg='HTTP '+res.status;
+    try{const j=await res.json();msg=(j&&j.error&&j.error.message)||msg;}catch(e){}
+    throw new Error(msg);
+  }
+  const ct=res.headers.get('content-type')||'';
+  let full='',reasoning='';
+  if(ct.indexOf('text/event-stream')>=0){
+    const reader=res.body.getReader();
+    const dec=new TextDecoder();
+    let buf='';
+    while(true){
+      const r=await reader.read();
+      if(r.done)break;
+      buf+=dec.decode(r.value,{stream:true});
+      let nl;
+      while((nl=buf.indexOf('\n'))>=0){
+        const line=buf.slice(0,nl).trim();
+        buf=buf.slice(nl+1);
+        if(line.indexOf('data:')!==0)continue;
+        const data=line.slice(5).trim();
+        if(data==='[DONE]'){buf='';break;}
+        try{
+          const j=JSON.parse(data);
+          const d=j.choices&&j.choices[0]&&j.choices[0].delta;
+          if(d&&typeof d.reasoning_content==='string'&&d.reasoning_content){reasoning+=d.reasoning_content;if(onThink)onThink(d.reasoning_content);}
+          if(d&&typeof d.content==='string'&&d.content){full+=d.content;if(onDelta)onDelta(d.content);}
+        }catch(e){}
+      }
+    }
+  }else{
+    full=await res.text();
+    try{
+      const j=JSON.parse(full);
+      const m=j.choices&&j.choices[0]&&j.choices[0].message;
+      if(m&&typeof m.reasoning_content==='string'){reasoning=m.reasoning_content;if(onThink)onThink(reasoning);}
+      if(m&&typeof m.content==='string')full=m.content;
+    }catch(e){}
+    if(onDelta)onDelta(full);
+  }
+  return {content:full,reasoning:reasoning};
+}
+
+async function chatOnce(messages){
+  const base=cfg.base.replace(/\/+$/,'');
+  const body={model:cfg.model,messages:messages,stream:false,temperature:cfg.temperature};
+  if(cfg.maxTokens!=='')body.max_tokens=parseInt(cfg.maxTokens);
+  const res=await fetch(base+'/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    let msg='HTTP '+res.status;
+    try{const j=await res.json();msg=(j&&j.error&&j.error.message)||msg;}catch(e){}
+    throw new Error(msg);
+  }
+  const j=await res.json();
+  const c=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
+  if(typeof c!=='string')throw new Error('响应格式异常');
+  return c;
+}
+/* =====================================================
+ * 游戏核心引擎 · C：发送与流式演出
+ * ===================================================== */
+function send(text,opts){
+  if(busy)return;
+  const msg=(text!==undefined?text:$('user-input').value).trim();
+  if(!msg){toast('先输入一点什么吧');return;}
+  if(state.status.alive===false){toast('角色已死亡——请点右上角「回档」','error');return;}
+  $('user-input').value='';autosizeInput();
+  state.messages.push({role:'user',content:msg,ts:Date.now(),hidden:!!(opts&&opts.hidden)});
+  state.turn++;
+  renderLog();scrollLog();
+  askAI();
+}
+
+async function askAI(){
+  busy=true;showLoading(true);
+  abortCtrl=new AbortController();
+  const msgs=buildMessages();
+  streamEl=addMsgEl('assistant','…');
+  streamRaw='';
+  let thinkEl=null,thinkText='';
+  const ensureThink=function(){
+    if(!thinkEl&&cfg.showThink){
+      thinkEl=document.createElement('details');
+      thinkEl.className='think';
+      thinkEl.innerHTML='<summary>'+ico('spark')+'<span>天道推演</span><small>点击展开</small></summary><div class="think-body"></div>';
+      const msgNode=streamEl.closest('.msg');
+      msgNode.insertBefore(thinkEl,streamEl);
+    }
+    return thinkEl;
+  };
+  try{
+    const res=await streamChat(msgs,function(delta){
+      if(abortCtrl.signal.aborted)return;
+      streamRaw+=delta;
+      const i=streamRaw.indexOf('<<<');
+      streamEl.innerHTML=md(i>=0?streamRaw.slice(0,i):streamRaw)||'…';
+      scrollLog();
+    },function(tk){
+      if(abortCtrl.signal.aborted)return;
+      thinkText+=tk;
+      ensureThink();
+      if(thinkEl){thinkEl.open=true;thinkEl.querySelector('.think-body').textContent=thinkText;}
+    },abortCtrl.signal);
+    streamRaw=res.content;
+    const parsed=extractBlocks(res.content);
+    streamEl.innerHTML=md(parsed.clean)||'（无内容）';
+    if(res.reasoning&&cfg.showThink){
+      ensureThink();
+      if(thinkEl){thinkEl.querySelector('.think-body').textContent=res.reasoning;thinkEl.open=false;}
+    }else if(thinkEl){
+      thinkEl.remove();thinkEl=null;
+    }
+    if(parsed.state)applyStatus(parsed.state);
+    if(parsed.memo&&parsed.memo.length)addMemos(parsed.memo);
+    state.messages.push({role:'assistant',content:parsed.clean,reasoning:cfg.showThink?res.reasoning:'',ts:Date.now()});
+    if(parsed.checkpoint){saveCheckpoint(parsed.checkpoint,true);}
+    else if(state.turn>0&&state.turn%6===0){saveCheckpoint('第'+state.turn+'回合',true);}
+    renderCharPanel();updateTopChip();
+    saveGame(true);
+    if(parsed.state&&(parsed.state.alive===false||(typeof parsed.state.hp==='number'&&parsed.state.hp<=0))){
+      state.status.alive=false;updateInputLock();renderQuickActions();
+      setTimeout(handleDeath,800);
+    }
+  }catch(err){
+    if(thinkEl){thinkEl.remove();}
+    streamEl.remove();
+    const last=state.messages.pop();
+    if(last&&last.role==='user'){state.turn--;$('user-input').value=last.content;autosizeInput();}
+    if(abortCtrl.signal.aborted){toast('已停止生成','warn');}
+    else{toast('生成失败：'+err.message+'（输入已恢复）','error',4500);}
+  }finally{
+    busy=false;showLoading(false);abortCtrl=null;streamEl=null;streamRaw='';
+  }
+}
+function stopGen(){
+  if(abortCtrl)abortCtrl.abort();
+}
+function showLoading(on){
+  $('loading-indicator').classList.toggle('hidden',!on);
+  $('stop-btn').classList.toggle('hidden',!on);
+  $('send-btn').disabled=on;
+}
+
+/* =====================================================
+ * 游戏核心引擎 · D：协议解析
+ * ===================================================== */
+function extractBlocks(text){
+  const out={state:null,memo:[],checkpoint:null,clean:''};
+  const st=text.match(/<<<STATE>>>([\s\S]*?)<<<END>>>/);
+  if(st){try{out.state=JSON.parse(st[1].trim());}catch(e){}}
+  const mo=text.match(/<<<MEMO>>>([\s\S]*?)<<<END>>>/);
+  if(mo){out.memo=mo[1].split('|').map(function(x){return x.trim();}).filter(Boolean);}
+  const cp=text.match(/<<<CHECKPOINT>>>([\s\S]*?)<<<END>>>/);
+  if(cp)out.checkpoint=cp[1].trim();
+  out.clean=text.replace(/<<<(?:STATE|MEMO|CHECKPOINT)>>>[\s\S]*?<<<END>>>/g,'').trim();
+  return out;
+}
+
+function applyStatus(s){
+  if(!state)return;
+  const cur=state.status;
+  const num=function(v,d){return typeof v==='number'&&isFinite(v)?v:d;};
+  cur.hp=num(s.hp,cur.hp);cur.maxHp=num(s.maxHp,cur.maxHp);
+  cur.mp=num(s.mp,cur.mp);cur.maxMp=num(s.maxMp,cur.maxMp);
+  if(typeof s.realm==='string'&&s.realm)cur.realm=s.realm;
+  cur.level=num(s.level,cur.level);
+  cur.purity=clamp(num(s.purity,cur.purity),0,100);
+  cur.cyber=clamp(num(s.cyber,cur.cyber),0,100);
+  cur.mark=clamp(num(s.mark,cur.mark),0,200);
+  cur.xinmo=clamp(num(s.xinmo,cur.xinmo),0,100);
+  cur.lingshi=num(s.lingshi,cur.lingshi);
+  cur.lingbi=num(s.lingbi,cur.lingbi);
+  if(typeof s.location==='string'&&s.location)cur.location=s.location;
+  if(typeof s.time==='string'&&s.time)cur.time=s.time;
+  if(typeof s.scene==='string')cur.scene=s.scene;
+  if(typeof s.school==='string')cur.school=s.school;
+  if(Array.isArray(s.items))cur.items=s.items.slice(0,20).map(String);
+  if(typeof s.alive==='boolean')cur.alive=s.alive;
+}
+
+function addMemos(list){
+  if(!state)return;
+  for(let i=0;i<list.length;i++){
+    const raw=list[i];
+    if(!raw||raw==='空')continue;
+    if(raw.indexOf('百科：')===0){
+      const body=raw.slice(3).trim();
+      const sep=body.indexOf('|');
+      const title=sep>0?body.slice(0,sep).trim():body.slice(0,24);
+      const text=sep>0?body.slice(sep+1).trim():body;
+      if(title&&!state.ency.some(function(e){return e.title===title;})){
+        state.ency.push({title:title,body:text,ts:Date.now()});
+      }
+    }else{
+      if(state.memory.some(function(m){return m.text===raw;}))continue;
+      state.memory.push({id:uid(),text:raw,ts:Date.now()});
+    }
+  }
+  if(state.memory.length>60)state.memory=state.memory.slice(-60);
+  if(state.ency.length>40)state.ency=state.ency.slice(-40);
+}
+/* =====================================================
+ * 游戏核心引擎 · E：回档点 / 死亡 / 回档
+ * ===================================================== */
+function saveCheckpoint(label,force){
+  if(!state)return;
+  const last=state.checkpoints[state.checkpoints.length-1];
+  if(!force&&label==null)return;
+  if(!force&&last&&(state.turn-last.turn)<6)return;
+  state.checkpoints.push({
+    id:uid(), ts:Date.now(),
+    label:label||('第'+state.turn+'回合'),
+    turn:state.turn,
+    messages:state.messages.map(function(m){return {role:m.role,content:m.content,ts:m.ts,reasoning:m.reasoning,hidden:m.hidden};}),
+    memory:state.memory.map(function(m){return {id:m.id,text:m.text,ts:m.ts};}),
+    ency:state.ency.map(function(m){return {title:m.title,body:m.body,ts:m.ts};}),
+    status:JSON.parse(JSON.stringify(state.status)),
+    meta:JSON.parse(JSON.stringify(state.meta))
+  });
+  const keep=14;
+  if(state.checkpoints.length>keep)state.checkpoints=state.checkpoints.slice(-keep);
+}
+function lastCpBefore(turn){
+  const cps=state.checkpoints.filter(function(c){return c.turn<turn;});
+  return cps.length?cps[cps.length-1]:(state.checkpoints[0]||null);
+}
+
+async function handleDeath(){
+  if(!state||state.meta.pendingDeath)return;
+  state.meta.pendingDeath={turn:state.turn};
+  updateInputLock();
+  saveGame(true);
+  const cp=lastCpBefore(state.turn);
+  toast('角色死亡，正在生成死亡档案…','info',4000);
+  let rec=null;
+  try{
+    const content=await requestDeathReview();
+    const m=content.match(/<<<DEATH>>>([\s\S]*?)<<<END>>>/);
+    if(m){try{rec=JSON.parse(m[1].trim());}catch(e){rec=null;}}
+    if(!rec){rec={cause:'不明',review:content.slice(0,180),advice:'——'};}
+  }catch(e){
+    rec={cause:'不明',review:'（死亡档案生成失败：'+e.message+'）',advice:'请检查 API 配置后重试。'};
+  }
+  const record={
+    id:uid(),ts:Date.now(),turn:state.turn,
+    realm:state.status.realm+'·'+state.status.level+'层',
+    location:state.status.location,
+    cause:String(rec.cause||'不明'),
+    review:String(rec.review||''),
+    advice:String(rec.advice||''),
+    cpId:cp?cp.id:null
+  };
+  state.deaths.push(record);
+  if(state.deaths.length>30)state.deaths=state.deaths.slice(-30);
+  saveGame(true);
+  renderDeathsTab();updateDeathBadge();
+  openDeathModal();
+}
+
+async function requestDeathReview(){
+  const msgs=[{role:'system',content:deathPrompt()}];
+  const hist=state.messages.slice(-14);
+  for(let i=0;i<hist.length;i++){
+    const m=hist[i];
+    if(m.role==='system')continue;
+    msgs.push({role:m.role,content:m.content});
+  }
+  msgs.push({role:'user',content:'（主角已死亡。请以「灵网系统」的口吻输出死亡档案数据块：<<<DEATH>>>{"cause":"死因概述，30字内","review":"对玩家这一世行为的点评，60-120字，具体、犀利、有洞察，不鸡汤","advice":"对下一世的建议，50-100字，可操作"}<<<END>>>）'});
+  return await chatOnce(msgs);
+}
+
+function rollbackTo(cpId){
+  if(!state)return;
+  const cp=state.checkpoints.find(function(c){return c.id===cpId;});
+  if(!cp){toast('未找到该时间点','error');return;}
+  state.messages=cp.messages.map(function(m){return {role:m.role,content:m.content,ts:m.ts,reasoning:m.reasoning,hidden:m.hidden};});
+  state.memory=cp.memory.map(function(m){return {id:m.id,text:m.text,ts:m.ts};});
+  state.ency=cp.ency.map(function(m){return {title:m.title,body:m.body,ts:m.ts};});
+  state.status=JSON.parse(JSON.stringify(cp.status));
+  state.meta=JSON.parse(JSON.stringify(cp.meta));
+  state.meta.pendingDeath=null;
+  state.turn=cp.turn;
+  state.status.alive=true;
+  state.messages.push({role:'system',content:'【时间回档】你回到了「'+cp.label+'」这一时刻，命运从此刻重新书写。',ts:Date.now()});
+  saveGame(true);
+  closeModal('death-modal');closeDrawer();
+  renderAll();updateInputLock();
+  toast('已回到关键时间点「'+cp.label+'」','success',3000);
+}
+/* =====================================================
+ * 游戏核心引擎 · F：开场 / 渲染 / 顶栏
+ * ===================================================== */
+function addSystemMsg(text){
+  state.messages.push({role:'system',content:text,ts:Date.now()});
+  renderLog();
+}
+function openingScene(){
+  const diff=DIFFS.find(function(d){return d.id===state.player.diff;})||DIFFS[2];
+  const talent=TALENTS.find(function(t){return t.id===state.player.talent;});
+  addSystemMsg('天道已连接。本局契约：'+(diff?diff.name:'')+' · 天赋：'+(talent?talent.name:state.player.talent));
+  addSystemMsg('提示：左上角「角色」查看档案与实时状况；右上角「回档」「百科」「设置」；进度自动存档，死亡可回档。');
+  saveGame(true);
+  send('【开场】请根据世界观、主角档案与难度契约，在「'+state.player.origin+'」展开开场场景：用第二人称描写环境氛围、主角此刻的处境与正在发生的事，结尾自然给出2-3条可行方向（用列表）。不要替主角做决定。',{hidden:true});
+}
+
+function startGame(){
+  collectChar();
+  const d=charDraft;
+  const player={
+    name:d.name.trim(),gender:d.gender,age:d.age,
+    origin:d.origin,root:d.root,cyber:d.cyber,
+    talent:d.talent,talentCustom:d.talentCustom.trim(),
+    personality:d.personality.trim(),appearance:d.appearance.trim(),
+    background:d.background.trim(),notes:d.notes.trim(),diff:d.diff
+  };
+  state=newState(player);
+  saveGame(true);
+  enterGame();
+}
+
+function renderAll(){
+  renderLog();renderCharPanel();updateTopChip();updateDeathBadge();updateInputLock();
+}
+function renderLog(){
+  const log=$('game-log');
+  log.innerHTML='';
+  for(let i=0;i<state.messages.length;i++){
+    const m=state.messages[i];
+    if(m.hidden)continue;
+    log.appendChild(msgEl(m.role,m.content,m));
+  }
+  scrollLog();
+}
+function msgEl(role,content,m){
+  const div=document.createElement('div');
+  div.className='msg '+role;
+  if(role==='assistant'&&m&&m.reasoning&&cfg.showThink){
+    const d=document.createElement('details');
+    d.className='think';
+    d.innerHTML='<summary>'+ico('spark')+'<span>天道推演</span><small>点击展开</small></summary><div class="think-body"></div>';
+    d.querySelector('.think-body').textContent=m.reasoning;
+    div.appendChild(d);
+  }
+  const b=document.createElement('div');
+  b.className='bubble';
+  b.innerHTML=md(content);
+  div.appendChild(b);
+  return div;
+}
+function addMsgEl(role,content){
+  const el=msgEl(role,content);
+  $('game-log').appendChild(el);
+  scrollLog();
+  return el.querySelector('.bubble');
+}
+function scrollLog(){
+  const log=$('game-log');
+  log.scrollTop=log.scrollHeight;
+}
+
+function updateTopChip(){
+  if(!state)return;
+  const s=state.status;
+  $('top-realm').textContent=s.realm+' · '+s.level+'层';
+  $('top-avatar').textContent=(state.player.name||'凡').slice(0,1);
+  $('top-name').textContent=state.player.name||'角色';
+}
+function updateDeathBadge(){
+  const n=state?state.deaths.length:0;
+  const b=$('death-badge');
+  b.textContent=n;
+  b.classList.toggle('hidden',n===0);
+}
+function updateInputLock(){
+  const dead=state&&state.status.alive===false;
+  $('user-input').disabled=dead;
+  $('send-btn').disabled=dead;
+}
+function autosizeInput(){
+  const el=$('user-input');
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,140)+'px';
+}
+
+/* ---------- 快捷行动 ---------- */
+function renderQuickActions(){
+  const box=$('quick-actions');
+  if(!state){box.innerHTML='';return;}
+  if(state.status.alive===false){
+    box.innerHTML='<span class="qa-btn" style="border-color:var(--red);color:var(--red)">角色已死亡——请点右上角「回档」</span>';
+    return;
+  }
+  box.innerHTML=QUICK_ACTIONS.map(function(q,i){
+    return '<button class="qa-btn" data-qa="'+i+'">'+q[0]+'</button>';
+  }).join('');
+  box.querySelectorAll('[data-qa]').forEach(function(b){
+    b.onclick=function(){send(QUICK_ACTIONS[parseInt(b.dataset.qa)][1]);};
+  });
+}
+/* =====================================================
+ * 角色面板（抽屉）
+ * ===================================================== */
+function openDrawer(tab){
+  if(tab)charTab=tab;
+  $('left-panel').classList.add('open');
+  $('drawer-backdrop').classList.add('open');
+  renderCharPanel();
+}
+function closeDrawer(){
+  $('left-panel').classList.remove('open');
+  $('drawer-backdrop').classList.remove('open');
+}
+function renderCharPanel(){
+  if(!state)return;
+  const tabs=[['status','状况'],['archive','档案'],['memory','记忆'],['ency','百科'],['death','死亡']];
+  $('char-tabs').innerHTML=tabs.map(function(t){
+    return '<button class="tab '+(charTab===t[0]?'on':'')+'" data-tab="'+t[0]+'">'+t[1]+'</button>';
+  }).join('');
+  $('char-tabs').querySelectorAll('.tab').forEach(function(b){
+    b.onclick=function(){charTab=b.dataset.tab;renderCharPanel();};
+  });
+  const body=$('drawer-body');
+  if(charTab==='status')body.innerHTML=statusTabHTML();
+  else if(charTab==='archive')body.innerHTML=archiveTabHTML();
+  else if(charTab==='memory')renderMemoryTab();
+  else if(charTab==='ency')renderEncyTab();
+  else renderDeathsTab();
+}
+
+function barRow(label,val,max,color,text){
+  const pct=max>0?clamp(val/max*100,0,100):0;
+  return '<div class="stat-row"><div class="stat-label">'+label+'<span class="stat-val">'+(text!==undefined?text:val)+'</span></div><div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div>';
+}
+function statusTabHTML(){
+  const p=state.player,s=state.status;
+  const diff=DIFFS.find(function(d){return d.id===p.diff;});
+  const talent=TALENTS.find(function(t){return t.id===p.talent;});
+  const lvlPct=clamp((s.level||1)/10*100,0,100);
+  const purityCol=s.purity>=90?'var(--green)':(s.purity>=70?'var(--gold)':'var(--red)');
+  const cyberCol=s.cyber<=30?'var(--green)':(s.cyber<=60?'var(--gold)':'var(--red)');
+  const markCol=s.mark<=30?'var(--green)':(s.mark<=60?'var(--gold)':'var(--red)');
+  const xmCol=s.xinmo<=30?'var(--green)':(s.xinmo<=50?'var(--gold)':'var(--red)');
+  let h='<div class="p-head"><div class="avatar">'+esc(p.name.slice(0,1))+'</div><div><div class="p-name">'+esc(p.name)+'</div><div class="p-tags">';
+  if(diff)h+='<span class="tag">'+esc(diff.name)+'</span>';
+  if(talent)h+='<span class="tag">'+esc(talent.name)+'</span>';
+  h+='</div></div></div>';
+  h+='<div class="p-card">';
+  h+='<div class="stat-row"><div class="stat-label">修为<span class="stat-val">'+esc(s.realm)+' · '+s.level+'层</span></div><div class="bar"><div class="bar-fill" style="width:'+lvlPct+'%;background:var(--accent)"></div></div></div>';
+  h+=barRow('气血',s.hp,s.maxHp,'var(--red)',s.hp+'/'+s.maxHp);
+  h+=barRow('灵力',s.mp,s.maxMp,'var(--blue)',s.mp+'/'+s.maxMp);
+  h+=barRow('灵气纯度',s.purity,100,purityCol,s.purity+'%');
+  h+=barRow('义体化率',s.cyber,100,cyberCol,s.cyber+'%');
+  h+=barRow('天道标记',s.mark,100,markCol,String(s.mark));
+  h+=barRow('心魔值',s.xinmo,100,xmCol,String(s.xinmo));
+  h+='</div>';
+  h+='<div class="p-card"><div class="info-grid">';
+  h+='<div class="info"><span>流派</span><b>'+esc(s.school||'未定')+'</b></div>';
+  h+='<div class="info"><span>灵石</span><b>'+s.lingshi+'</b></div>';
+  h+='<div class="info"><span>灵币</span><b>'+s.lingbi+'</b></div>';
+  h+='<div class="info"><span>位置</span><b>'+esc(s.location)+'</b></div>';
+  h+='<div class="info"><span>时间</span><b>'+esc(s.time)+'</b></div>';
+  h+='<div class="info"><span>状态</span><b>'+(s.alive?'<span class="ok">存活</span>':'<span class="err">已死亡</span>')+'</b></div>';
+  h+='</div></div>';
+  if(s.scene)h+='<div class="p-card"><div class="p-sub">当前场景</div><div class="scene">'+esc(s.scene)+'</div></div>';
+  if(s.items&&s.items.length){
+    h+='<div class="p-card"><div class="p-sub">随身物品</div><div class="chips">'+s.items.map(function(i){return '<span class="chip solid">'+esc(i)+'</span>';}).join('')+'</div></div>';
+  }
+  h+='<div class="hint" style="padding:6px 4px">状况由 AI 随剧情实时更新，数值与剧情严格一致。</div>';
+  return h;
+}
+
+function archiveTabHTML(){
+  const p=state.player;
+  const diff=DIFFS.find(function(d){return d.id===p.diff;});
+  const talent=TALENTS.find(function(t){return t.id===p.talent;});
+  const rows=[['姓名',p.name],['性别',p.gender],['年龄',p.age],['出生地',p.origin],['灵根',p.root],['义体倾向',p.cyber],['天赋',p.talentCustom||(talent?talent.name:'')],['性格',p.personality||'—'],['外貌',p.appearance||'—'],['契约',diff?diff.name+'（'+diff.alias+'）':'']];
+  let h='<div class="p-card">'+rows.map(function(r){
+    return '<div class="cf-row"><span class="cf-k">'+r[0]+'</span><span class="cf-v">'+esc(String(r[1]))+'</span></div>';
+  }).join('')+'</div>';
+  h+='<div class="p-card"><div class="p-sub">背景故事</div><div class="scene">'+esc(p.background||'—')+'</div></div>';
+  if(p.notes)h+='<div class="p-card"><div class="p-sub">备注</div><div class="scene">'+esc(p.notes)+'</div></div>';
+  return h;
+}
+/* =====================================================
+ * 记忆 / 百科 / 死亡记录 面板
+ * ===================================================== */
+function renderMemoryTab(){
+  const body=$('drawer-body');
+  const mem=state.memory.slice().reverse();
+  let h='<div class="mem-add"><input id="mem-input" placeholder="手动添加一条记忆…"><button class="btn sm primary" id="mem-addbtn">添加</button></div>';
+  h+='<div class="hint" style="margin:6px 2px 10px">AI 会在关键剧情后自动记录；也可手动增删。上限 60 条。</div>';
+  h+='<div class="mem-list">';
+  if(mem.length){
+    h+=mem.map(function(m){
+      return '<div class="mem-item"><span>'+esc(m.text)+'</span><button class="btn" data-del="'+m.id+'" title="删除">'+ico('trash')+'</button></div>';
+    }).join('');
+  }else{
+    h+='<div class="empty">暂无记忆</div>';
+  }
+  h+='</div>';
+  body.innerHTML=h;
+  const addBtn=$('mem-addbtn');
+  addBtn.onclick=function(){
+    const v=$('mem-input').value.trim();
+    if(!v)return;
+    if(state.memory.some(function(m){return m.text===v;})){toast('已存在该记忆');return;}
+    state.memory.push({id:uid(),text:v,ts:Date.now()});
+    saveGame(true);
+    renderMemoryTab();
+  };
+  $('mem-input').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.isComposing){e.preventDefault();addBtn.click();}
+  });
+  body.querySelectorAll('[data-del]').forEach(function(b){
+    b.onclick=function(){
+      state.memory=state.memory.filter(function(m){return m.id!==b.dataset.del;});
+      saveGame(true);
+      renderMemoryTab();
+    };
+  });
+}
+
+let encyQuery='';
+function renderEncyTab(){
+  const body=$('drawer-body');
+  const cats=ENCY.map(function(e){return e.cat;}).concat(state.ency.length?['玩家见闻']:[]);
+  let h='<input id="en-search" placeholder="搜索百科…">';
+  h+='<div class="en-cat">'+cats.map(function(c){
+    return '<button class="'+(c===encyCat?'on':'')+'" data-cat="'+esc(c)+'">'+c+'</button>';
+  }).join('')+'</div>';
+  h+='<div id="en-list"></div>';
+  h+='<div class="en-ask"><input id="en-ask-input" placeholder="向天道提问…（例：筑基丹哪里能买到？）"><button class="btn sm primary" id="en-askbtn">问</button></div>';
+  h+='<div id="en-answer"></div>';
+  body.innerHTML=h;
+  body.querySelectorAll('[data-cat]').forEach(function(b){
+    b.onclick=function(){encyCat=b.dataset.cat;encyQuery='';renderEncyTab();};
+  });
+  $('en-search').addEventListener('input',function(){
+    encyQuery=$('en-search').value.trim();
+    renderEncyList();
+  });
+  $('en-askbtn').onclick=askEncy;
+  $('en-ask-input').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.isComposing){e.preventDefault();askEncy();}
+  });
+  renderEncyList();
+}
+function renderEncyList(){
+  const box=$('en-list');
+  if(!box)return;
+  let items=[];
+  const src=ENCY.find(function(e){return e.cat===encyCat;});
+  if(src)items=src.items.map(function(it){return {title:it[0],body:it[1]};});
+  if(encyCat==='玩家见闻')items=state.ency.map(function(e){return {title:e.title,body:e.body};});
+  if(encyQuery){
+    items=[];
+    ENCY.forEach(function(e){
+      e.items.forEach(function(it){
+        if((it[0]+it[1]).indexOf(encyQuery)>=0)items.push({title:it[0],body:it[1]});
+      });
+    });
+    state.ency.forEach(function(e){
+      if((e.title+e.body).indexOf(encyQuery)>=0)items.push({title:e.title,body:e.body});
+    });
+  }
+  box.innerHTML=items.length?items.map(function(it){
+    return '<div class="en-item"><div class="en-t">'+esc(it.title)+'</div><div class="en-d">'+esc(it.body)+'</div></div>';
+  }).join(''):'<div class="empty">没有相关内容</div>';
+}
+async function askEncy(){
+  const q=$('en-ask-input').value.trim();
+  if(!q)return;
+  const ans=$('en-answer');
+  ans.innerHTML='<div class="hint" style="padding:6px 2px">天道推演中…</div>';
+  try{
+    const content=await chatOnce([
+      {role:'system',content:'你是《灵网飞升》的世界主脑·天道。玩家在查阅世界百科，请用简洁准确的语言回答世界观常识性问题；涉及玩家尚未经历的剧情与秘密时不要剧透，可答「此乃天机，不可泄露」。\n'+LORE},
+      {role:'user',content:q}
+    ]);
+    ans.innerHTML='<div class="en-ans">'+md(content)+'</div>';
+    state.memory.push({id:uid(),text:'百科问答：'+q.slice(0,24)+' → '+content.slice(0,60),ts:Date.now()});
+    if(state.memory.length>60)state.memory=state.memory.slice(-60);
+    saveGame(true);
+  }catch(e){
+    ans.innerHTML='<div class="hint err" style="padding:6px 2px">天道未响应：'+esc(e.message)+'</div>';
+  }
+}
+
+/* ---------- 死亡记录 ---------- */
+function renderDeathsTab(){
+  const body=$('drawer-body');
+  body.innerHTML='<div class="hint" style="margin-bottom:10px">每一次死亡，天道都会记录、点评并给出建议。可回到死亡前的关键时间点继续游戏。</div>'+deathListHTML(state.deaths);
+  bindRollbackBtns(body);
+}
+function deathListHTML(deaths){
+  if(!deaths.length)return '<div class="empty">尚无死亡记录——祝你好运，别太早见到这里。</div>';
+  return deaths.slice().reverse().map(function(d,i){
+    const n=deaths.length-i;
+    return '<div class="death-card"><div class="dc-top"><b>第 '+n+' 次死亡</b><span>'+fmtFull(d.ts)+'</span></div>'
+      +'<div class="dc-line"><span class="dc-k">死因</span>'+esc(d.cause)+'</div>'
+      +'<div class="dc-line"><span class="dc-k">点评</span>'+esc(d.review)+'</div>'
+      +'<div class="dc-line"><span class="dc-k">建议</span>'+esc(d.advice)+'</div>'
+      +'<div class="dc-meta">'+esc(d.realm)+' · '+esc(d.location)+'</div>'
+      +'<button class="btn sm primary block" data-rollback="'+(d.cpId||'')+'">回到关键时间点，继续游戏</button></div>';
+  }).join('');
+}
+function bindRollbackBtns(root){
+  root.querySelectorAll('[data-rollback]').forEach(function(b){
+    b.onclick=function(){
+      if(!b.dataset.rollback){toast('该时间点已失效，请使用最近的记录','error');return;}
+      rollbackTo(b.dataset.rollback);
+    };
+  });
+}
+function openDeathModal(){
+  const deaths=state.deaths;
+  const latest=deaths.length?deaths[deaths.length-1]:null;
+  let h='';
+  if(latest){
+    h+='<div class="death-banner">角色已死亡<span>第 '+deaths.length+' 次死亡</span></div>';
+    h+='<div class="death-card hot">';
+    h+='<div class="dc-line"><span class="dc-k">死因</span>'+esc(latest.cause)+'</div>';
+    h+='<div class="dc-line"><span class="dc-k">点评</span>'+esc(latest.review)+'</div>';
+    h+='<div class="dc-line"><span class="dc-k">建议</span>'+esc(latest.advice)+'</div>';
+    h+='<button class="btn primary block" data-rollback="'+(latest.cpId||'')+'">回到关键时间点，继续游戏</button>';
+    h+='</div>';
+  }
+  h+='<div class="p-sub" style="margin:14px 0 8px">全部死亡记录</div>';
+  h+=deathListHTML(deaths);
+  $('death-content').innerHTML=h;
+  bindRollbackBtns($('death-content'));
+  openModal('death-modal');
+}
+/* =====================================================
+ * 设置 / 存档 / 初始化
+ * ===================================================== */
+function renderSettings(){
+  const c=cfg;
+  const s=$('settings-content');
+  let h='<div class="set-sec"><div class="set-title">API 设置</div>';
+  h+='<div class="field"><label>API 地址</label><input id="s-base" value="'+esc(c.base)+'"></div>';
+  h+='<div class="field"><label>API Key</label><input id="s-key" type="password" value="'+esc(c.key)+'"><div class="hint" style="margin-top:6px">仅保存在本机浏览器 localStorage。</div></div>';
+  h+='<div class="field"><label>模型</label><div class="row gap"><input id="s-model" list="s-model-list" style="flex:1" value="'+esc(c.model)+'"><datalist id="s-model-list"></datalist><button class="btn" id="s-fetch">拉取模型</button></div><div class="hint" id="s-hint" style="margin-top:6px"></div></div>';
+  h+='<div class="grid2">';
+  h+='<div class="field"><label>单次回复 Token 上限</label><select id="s-maxtokens">';
+  h+=[512,1024,2048,4096,8192].map(function(v){return '<option value="'+v+'"'+(c.maxTokens===String(v)?' selected':'')+'>'+v+'</option>';}).join('');
+  h+='<option value=""'+(c.maxTokens===''?' selected':'')+'>无限制</option></select></div>';
+  h+='<div class="field"><label>上下文保留</label><select id="s-context">';
+  h+=[['24','最近24条消息'],['40','最近40条消息'],['60','最近60条消息'],['','无限制（长会话可能超出上下文）']].map(function(o){return '<option value="'+o[0]+'"'+(c.context===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('');
+  h+='</select></div></div>';
+  h+='<div class="field"><label>温度（创作随机性）<span class="val" id="s-tempv">'+c.temperature.toFixed(2)+'</span></label><input type="range" id="s-temp" min="0.3" max="1.3" step="0.05" value="'+c.temperature+'"></div>';
+  h+='<div class="btn-row"><button class="btn primary" id="s-save">保存设置</button><button class="btn" id="s-test">测试连接</button></div></div>';
+  h+='<div class="set-sec"><div class="set-title">界面风格</div><div class="theme-grid">';
+  h+=THEMES.map(function(t){
+    return '<button class="theme-card '+(c.theme===t.id?'on':'')+'" data-theme="'+t.id+'"><span class="th-dots">'+t.colors.map(function(col){return '<i style="background:'+col+'"></i>';}).join('')+'</span><b>'+t.name+'</b><span class="th-desc">'+t.desc+'</span></button>';
+  }).join('');
+  h+='</div>';
+  h+='<div class="row between" style="margin-top:12px"><span class="small">显示思考过程（天道推演）</span><button class="switch '+(c.showThink?'on':'')+'" id="s-think"><span></span></button></div></div>';
+  h+='<div class="set-sec"><div class="set-title">存档管理</div>';
+  h+='<div class="row between" style="margin-bottom:10px"><span class="small">自动存档</span><button class="switch '+(c.autoSave?'on':'')+'" id="s-autosave"><span></span></button></div>';
+  h+='<div class="row gap" style="flex-wrap:wrap"><button class="btn sm" id="s-manual">手动存档</button><button class="btn sm" id="s-export">导出存档</button><button class="btn sm" id="s-import">导入存档</button></div>';
+  h+='<div class="hint" style="margin-top:8px" id="s-savetime"></div></div>';
+  h+='<div class="set-sec danger"><div class="set-title">危险区</div><button class="btn danger block" id="s-restart">重新开始（清除本局全部进度）</button></div>';
+  s.innerHTML=h;
+  $('s-temp').addEventListener('input',function(){ $('s-tempv').textContent=parseFloat($('s-temp').value).toFixed(2); });
+  $('s-fetch').onclick=function(){doFetchModels('s');};
+  $('s-test').onclick=function(){doFetchModels('s');};
+  $('s-save').onclick=function(){
+    cfg.base=$('s-base').value.trim()||DEFAULTS.base;
+    cfg.key=$('s-key').value.trim();
+    cfg.model=$('s-model').value.trim()||cfg.model;
+    cfg.maxTokens=$('s-maxtokens').value;
+    cfg.context=$('s-context').value;
+    cfg.temperature=parseFloat($('s-temp').value);
+    saveCfg();applyTheme(cfg.theme);
+    toast('设置已保存','success');
+  };
+  $('s-autosave').onclick=function(){
+    cfg.autoSave=!cfg.autoSave;
+    saveCfg();
+    $('s-autosave').classList.toggle('on',cfg.autoSave);
+    toast(cfg.autoSave?'自动存档已开启':'自动存档已关闭');
+  };
+  $('s-think').onclick=function(){
+    cfg.showThink=!cfg.showThink;
+    saveCfg();
+    $('s-think').classList.toggle('on',cfg.showThink);
+    renderLog();
+    toast(cfg.showThink?'思考过程已显示':'思考过程已隐藏');
+  };
+  $('s-manual').onclick=function(){
+    saveCheckpoint('手动存档',true);
+    saveGame();
+  };
+  $('s-export').onclick=exportSave;
+  $('s-import').onclick=importSave;
+  $('s-restart').onclick=restartGame;
+  s.querySelectorAll('[data-theme]').forEach(function(b){
+    b.onclick=function(){
+      cfg.theme=b.dataset.theme;
+      saveCfg();applyTheme(cfg.theme);
+      s.querySelectorAll('[data-theme]').forEach(function(x){x.classList.toggle('on',x===b);});
+    };
+  });
+  $('s-savetime').textContent='上次存档：'+(state?fmtFull(state.saved):'—');
+}
+/* =====================================================
+ * 导出 / 导入 / 重开 / 启动
+ * ===================================================== */
+function exportSave(){
+  if(!state){toast('还没有游戏进度','warn');return;}
+  const data={v:1,cfg:cfg,state:state,exported:Date.now()};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='灵网飞升存档_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  toast('存档已导出','success');
+}
+function importSave(){
+  const inp=document.createElement('input');
+  inp.type='file';
+  inp.accept='.json,application/json';
+  inp.onchange=function(){
+    const f=inp.files[0];
+    if(!f)return;
+    const r=new FileReader();
+    r.onload=function(){
+      try{
+        const d=JSON.parse(r.result);
+        if(!d||!d.state||!d.state.player)throw new Error('bad');
+        confirmBox('导入存档','导入将覆盖当前进度（含记忆、死亡记录与回档点），确定继续吗？',function(){
+          if(d.cfg)cfg=Object.assign({},DEFAULTS,d.cfg);
+          saveCfg();applyTheme(cfg.theme);
+          state=d.state;
+          state.saved=Date.now();
+          saveGame(true);
+          enterGame();
+          toast('存档导入成功','success');
+        });
+      }catch(e){
+        toast('存档格式不正确','error');
+      }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+function restartGame(){
+  confirmBox('重新开始','将清除本局全部进度（含记忆、死亡记录、回档点），回到角色创建页。此操作不可撤销。',function(){
+    try{localStorage.removeItem(LS_SAVE);}catch(e){}
+    state=null;
+    charDraft=null;
+    charTab='status';
+    showSetup();
+    toast('已清除进度','warn');
+  },'清除并重开');
+}
+
+function enterGame(){
+  $('setup').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  initGameUI();
+  renderAll();
+  if(state.messages.length===0){
+    openingScene();
+  }else{
+    toast('已读取存档，继续冒险','success');
+  }
+}
+function initGameUI(){
+  renderQuickActions();
+  const input=$('user-input');
+  input.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send();}
+  });
+  input.addEventListener('input',autosizeInput);
+}
+function bindGlobal(){
+  $('btn-char').onclick=function(){openDrawer('status');};
+  $('btn-deaths').onclick=function(){
+    if(state&&state.deaths.length)openDeathModal();
+    else toast('还没有死亡记录');
+  };
+  $('btn-ency').onclick=function(){openDrawer('ency');};
+  $('btn-settings').onclick=function(){renderSettings();openModal('settings-modal');};
+  $('drawer-close').onclick=closeDrawer;
+  $('drawer-backdrop').onclick=closeDrawer;
+  $('send-btn').onclick=function(){send();};
+  $('stop-btn').onclick=stopGen;
+  $('cf-ok').onclick=function(){
+    closeModal('confirm-modal');
+    const f=cfOk;cfOk=null;
+    if(f)f();
+  };
+  $('cf-cancel').onclick=function(){closeModal('confirm-modal');cfOk=null;};
+  $('ico-deaths').innerHTML=ico('skull');
+  $('ico-ency').innerHTML=ico('book');
+  $('ico-settings').innerHTML=ico('sliders');
+  $('stop-btn').innerHTML=ico('x');
+  $('drawer-close').innerHTML=ico('x');
+  document.querySelectorAll('[data-close]').forEach(function(b){
+    b.innerHTML=ico('x');
+  });
+  window.addEventListener('pagehide',function(){
+    if(state){
+      try{localStorage.setItem(LS_SAVE,JSON.stringify({v:1,saved:Date.now(),state}));}catch(e){}
+    }
+  });
+}
+
+function init(){
+  applyTheme(cfg.theme);
+  bindGlobal();
+  const saved=loadSave();
+  if(saved&&saved.started){
+    state=saved;
+    enterGame();
+  }else{
+    showSetup();
+  }
+}
+init();
+
+/* 调试钩子（供测试/排障） */
+window.__lwf={
+  getState:function(){return state;},
+  getCfg:function(){return cfg;},
+  die:function(){handleDeath();},
+  rollback:rollbackTo,
+  applyStatus:applyStatus,
+  send:send,
+  reset:function(){try{localStorage.removeItem(LS_SAVE);}catch(e){}location.reload();}
+};
+</script>
+</body>
+</html>
