@@ -12,6 +12,7 @@ export default defineConfig({
             include: [
                 'js/app.js',
                 'js/chat.js',
+                'js/markdown.js',
                 'js/stream-session.js',
                 'js/search-view.js',
                 'js/cascade.js',
