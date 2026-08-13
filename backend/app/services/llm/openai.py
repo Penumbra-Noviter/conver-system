@@ -56,22 +56,6 @@ class OpenAIProvider(BaseLLM):
             bad_request_cls=openai.BadRequestError,
         )
 
-    def _prepare_messages(
-        self, messages: list[dict]
-    ) -> tuple[dict | None, list[dict]]:
-        """从消息列表中提取 system prompt，返回 (system_dict, chat_messages)
-
-        OpenAI 使用 system 角色消息而非顶层参数，因此从列表中分离 system。
-        """
-        system = None
-        chat_messages = []
-        for msg in messages:
-            if msg["role"] == "system":
-                system = {"role": "system", "content": msg["content"]}
-            else:
-                chat_messages.append({"role": msg["role"], "content": msg["content"]})
-        return system, chat_messages
-
     async def generate(
         self,
         messages: list[dict],
@@ -83,9 +67,9 @@ class OpenAIProvider(BaseLLM):
         system, chat_messages = self._prepare_messages(messages)
         model = model or "gpt-4o"
         if system:
-            chat_messages.insert(0, system)
+            chat_messages.insert(0, {"role": "system", "content": system})
 
-        try:
+        async with self._translated_call():
             response = await self._async_client.chat.completions.create(
                 model=model,
                 messages=chat_messages,
@@ -93,8 +77,6 @@ class OpenAIProvider(BaseLLM):
                 max_tokens=max_tokens,
             )
             return response.choices[0].message.content or ""
-        except Exception as e:
-            raise self._translate_error(e)
 
     async def stream_generate(
         self,
@@ -107,9 +89,9 @@ class OpenAIProvider(BaseLLM):
         system, chat_messages = self._prepare_messages(messages)
         model = model or "gpt-4o"
         if system:
-            chat_messages.insert(0, system)
+            chat_messages.insert(0, {"role": "system", "content": system})
 
-        try:
+        async with self._translated_call():
             stream = await self._async_client.chat.completions.create(
                 model=model,
                 messages=chat_messages,
@@ -120,5 +102,3 @@ class OpenAIProvider(BaseLLM):
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
-        except Exception as e:
-            raise self._translate_error(e)
