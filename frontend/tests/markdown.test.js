@@ -115,6 +115,43 @@ describe('renderMarkdown', () => {
             expect(out).toContain('<pre><code>SECOND\n</code></pre>');
             expect(nulCount(out)).toHaveLength(2);
         });
+
+        // ── TD-46 契约锁：未登记字面量原样保留（alternation 单 pass 重构的
+        //    风险路径——split/join 只替换精确子串，alternation 不得误匹配
+        //    未登记的同形字面量；基线（split/join）与重构后（alternation）必须同绿）──
+
+        it('用户内容含未登记字面量 \u0000MDCB99\u0000 → 原样保留，已登记占位符正常还原（TD-46 契约锁）', () => {
+            const out = renderMarkdown(`\u0000MDCB99\u0000\n\n\`\`\`\ncode\n\`\`\``);
+            expect(out).toContain('<pre><code>code\n</code></pre>');
+            // 渲染器取号只到 MDCB0，\u0000MDCB99\u0000 不在 Map 中 → 不得被替换
+            expect(out).toContain('\u0000MDCB99\u0000');
+            expect(nulCount(out)).toHaveLength(2);
+        });
+
+        it('未登记字面量（\u0000MDCB99\u0000/\u0000MDCB5\u0000）+ 三块 → 已登记全部还原、未登记原样保留（TD-46）', () => {
+            const out = renderMarkdown(
+                `\u0000MDCB99\u0000 与 \u0000MDCB5\u0000\n\n\`\`\`\nFIRST\n\`\`\`\n\n\`\`\`\nSECOND\n\`\`\`\n\n\`\`\`\nTHIRD\n\`\`\``
+            );
+            expect(out).toContain('<pre><code>FIRST\n</code></pre>');
+            expect(out).toContain('<pre><code>SECOND\n</code></pre>');
+            expect(out).toContain('<pre><code>THIRD\n</code></pre>');
+            expect(out).toContain('\u0000MDCB99\u0000');
+            expect(out).toContain('\u0000MDCB5\u0000');
+            // 未登记字面量 2 个 × 各 2 个 NUL = 4；渲染器占位符（MDCB0/1/2）全部还原
+            expect(nulCount(out)).toHaveLength(4);
+        });
+
+        it('八块大文本（单块内容 2000 字符）→ 全还原、每块恰一份、无 NUL 泄漏（TD-46 规模 Falsify）', () => {
+            const longContent = 'x'.repeat(2000);
+            const blocks = [longContent, 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'];
+            const input = blocks.map((c) => `\`\`\`\n${c}\n\`\`\``).join('\n\n');
+            const out = renderMarkdown(input);
+            for (const c of blocks) {
+                const needle = `<pre><code>${c}\n</code></pre>`;
+                expect(out.split(needle).length - 1).toBe(1); // 每块恰一份：无双份、无丢失
+            }
+            expect(nulCount(out)).toHaveLength(0);
+        });
     });
 
     describe('内联代码', () => {

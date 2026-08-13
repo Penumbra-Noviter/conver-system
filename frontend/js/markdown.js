@@ -73,6 +73,22 @@ function createCodeBlockToken(html, tokenId) {
 }
 
 /**
+ * 转义正则元字符（TD-46 防御性辅助）
+ *
+ * 还原占位符需把 Map 中已登记的 token 拼为 alternation 正则。当前 token 形态
+ * （\u0000MDCB<序号>\u0000）仅含 NUL/字母/数字：NUL 在 JS 正则中为字面字符
+ * （正则字面量 /\u0000/ 与 RegExp 构造器均可直接匹配，无需转义），数字字母
+ * 均非元字符——本函数对当前形态是恒等变换；但为防御未来 token 形态变化
+ * （如引入 . * ( ) 等元字符），统一经此函数转义后再拼装。
+ *
+ * @param {string} str - 需要嵌入正则的字符串
+ * @returns {string} 元字符转义后的字符串（可安全用于 RegExp 构造器）
+ */
+function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * 轻量 Markdown 渲染（安全 — 先转义再解析标记）
  * 支持：代码块、内联代码、粗体、斜体、链接、无序/有序列表
  * @param {string} text - 原始文本
@@ -170,8 +186,19 @@ export function renderMarkdown(text) {
     html = result.join('\n');
 
     // ── 还原代码块（列表 pass 之后、返回之前完成，输出不残留占位符形态）──
-    for (const [token, blockHtml] of codeBlocks) {
-        html = html.split(token).join(blockHtml);
+    // TD-46 性能重构：原实现逐块 split/join（每块一次全文扫描 → O(块数 × 文本
+    // 长度)，多块大文本二次方级）；改为 alternation 单 pass 正则替换，一次扫描
+    // O(N + Σtoken 长度)。alternation 仅由 Map 中已登记的 token 字面量拼装，
+    // 用户内容中未登记的同形文本（如 \u0000MDCB99\u0000）不在匹配面内、原样
+    // 保留——与 split/join 的精确子串替换契约等价，防误匹配断言见
+    // tests/markdown.test.js「占位符碰撞免疫」describe 块 TD-46 契约锁用例。
+    // 空 Map 时跳过构造：空 pattern 的 /g 正则会命中每个空位并回调，必须避免。
+    if (codeBlocks.size > 0) {
+        const tokenPattern = new RegExp(
+            [...codeBlocks.keys()].map(escapeRegExp).join('|'),
+            'g'
+        );
+        html = html.replace(tokenPattern, (token) => codeBlocks.get(token));
     }
 
     return html;
