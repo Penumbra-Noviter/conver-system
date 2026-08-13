@@ -41,6 +41,11 @@
                 </svg>
                 <span class="nav-label">搜索</span>
             </button>
+            <button class="nav-btn" data-view="simulators" title="模拟器">
+                <!-- SVG 为 iconHtml('gamepad', { size: 20, className: 'nav-icon' }) 输出，与 icons.js ICON_PATHS 保持同步 -->
+                <svg class="nav-icon" width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-icon="gamepad" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="5" width="13" height="6" rx="2.5"/><path d="M5 6.75v2.5M3.75 8h2.5"/><path d="M10.5 7.25v.01M10.5 9v.01"/></svg>
+                <span class="nav-label">模拟器</span>
+            </button>
             <button class="nav-btn" data-view="settings" title="设置">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
                     <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
@@ -204,6 +209,15 @@
                     <p class="search-hint">输入关键词搜索所有对话中的消息</p>
                 </div>
             </div>
+        </section>
+
+        <!-- 模拟器视图（骨架：列表 / 运行两面板由 U7-T3/T4 模块渲染填充） -->
+        <section id="view-simulators" class="view">
+            <div class="view-header">
+                <h2>模拟器</h2>
+            </div>
+            <div id="simulator-list-panel"></div>
+            <div id="simulator-run-panel" hidden></div>
         </section>
 
         <!-- 设置视图 -->
@@ -399,6 +413,10 @@
                 <path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
             <span>搜索</span>
+        </button>
+        <button class="mobile-nav-btn" data-view="simulators">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-icon="gamepad" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="5" width="13" height="6" rx="2.5"/><path d="M5 6.75v2.5M3.75 8h2.5"/><path d="M10.5 7.25v.01M10.5 9v.01"/></svg>
+            <span>模拟器</span>
         </button>
         <button class="mobile-nav-btn" data-view="settings">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
