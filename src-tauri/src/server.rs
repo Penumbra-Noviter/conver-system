@@ -14,6 +14,14 @@ use serde::{Deserialize, Serialize};
 /// 开发态默认后端启动命令（uvicorn 源码模式；可用 `CONVER_BACKEND_CMD` 覆盖）。
 pub const DEFAULT_DEV_BACKEND_CMD: &str = "python -m uvicorn backend.app.main:app";
 
+/// 后端监听主机（壳追加参数与就绪探测共用；与后端 `run_backend.build_parser`
+/// 的 `--host` 默认一致——契约互引见 backend/tests/test_packaging.py）。
+pub const BACKEND_HOST: &str = "127.0.0.1";
+
+/// 就绪探测路径（壳 HTTP 就绪探测命中目标；与后端 models 路由前缀一致——
+/// backend/app/api/routes/models.py，契约互引见 backend/tests/test_packaging.py）。
+pub const READY_PROBE_PATH: &str = "/api/models";
+
 /// 就绪等待默认超时（秒级环境变量 `CONVER_READY_TIMEOUT_SECS` 可覆盖）。
 pub const DEFAULT_READY_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -93,7 +101,7 @@ pub fn parse_command_line(line: &str) -> Result<Vec<String>, String> {
 pub struct BackendConfig {
     /// 可执行程序路径或命令名。
     pub program: String,
-    /// 程序参数（壳会追加 `--host 127.0.0.1 --port <port> --log-level warning`）。
+    /// 程序参数（壳会追加 `spawn_arguments(port)`：`--host 127.0.0.1 --port <port> --log-level warning`）。
     pub args: Vec<String>,
     /// 工作目录（None = 继承壳进程）。
     pub cwd: Option<PathBuf>,
@@ -195,9 +203,25 @@ pub fn database_url(data_dir: &Path) -> String {
     format!("sqlite+aiosqlite:///{}", encode_url_path(&normalized))
 }
 
+/// 壳追加的后端启动参数精确形状（契约锁，顺序敏感）：
+/// `--host <BACKEND_HOST> --port <port> --log-level warning`。
+///
+/// 后端镜像契约：`backend/run_backend.py build_parser`（pytest 互引见
+/// backend/tests/test_packaging.py；cargo 契约锁见 tests/server_test.rs）。
+pub fn spawn_arguments(port: u16) -> Vec<String> {
+    vec![
+        "--host".into(),
+        BACKEND_HOST.into(),
+        "--port".into(),
+        port.to_string(),
+        "--log-level".into(),
+        "warning".into(),
+    ]
+}
+
 /// 以 CREATE_NO_WINDOW 方式启动后端子进程并注入环境变量。
 ///
-/// 追加参数：`--host 127.0.0.1 --port <port> --log-level warning`；
+/// 追加参数：`spawn_arguments(port)`（`--host 127.0.0.1 --port <port> --log-level warning`）；
 /// 注入环境：`DATABASE_URL`（指向数据目录）+ `extra_env`。
 pub fn spawn_backend(
     config: &BackendConfig,
@@ -206,9 +230,7 @@ pub fn spawn_backend(
 ) -> io::Result<ManagedChild> {
     let mut cmd = Command::new(&config.program);
     cmd.args(&config.args);
-    cmd.arg("--host").arg("127.0.0.1");
-    cmd.arg("--port").arg(port.to_string());
-    cmd.arg("--log-level").arg("warning");
+    cmd.args(spawn_arguments(port));
     cmd.env("DATABASE_URL", database_url(data_dir));
     for (key, value) in &config.extra_env {
         cmd.env(key, value);
@@ -245,12 +267,31 @@ impl ManagedChild {
     }
 
     /// 终止并回收子进程（幂等；已退出时无副作用）。
+    ///
+    /// Windows：带树终止（`taskkill /PID <pid> /T /F`）——dev 态 venv 的 python
+    /// 重定向器会 spawn 孙进程，只杀直接子进程会残留后端进程（RS-1 R2）；
+    /// taskkill 失败幂等忽略（进程可能已自行退出，清理路径不抛错）。
+    /// 非 Windows：直接 `child.kill()`。
     pub fn kill(&mut self) {
         if let Some(mut child) = self.child.take() {
+            #[cfg(windows)]
+            kill_windows_tree(child.id());
+            #[cfg(not(windows))]
             let _ = child.kill();
             let _ = child.wait();
         }
     }
+}
+
+/// Windows 带树终止：`taskkill /PID <pid> /T /F`（幂等，失败忽略）。
+#[cfg(windows)]
+fn kill_windows_tree(pid: u32) {
+    let _ = Command::new("taskkill")
+        .arg("/PID")
+        .arg(pid.to_string())
+        .arg("/T")
+        .arg("/F")
+        .status();
 }
 
 impl Drop for ManagedChild {
@@ -298,11 +339,11 @@ pub fn wait_until_ready(
     }
 }
 
-/// 单次 HTTP 就绪探测：`GET /api/models`，响应状态行以 `HTTP/1.x 200` 开头即就绪。
+/// 单次 HTTP 就绪探测：`GET {READY_PROBE_PATH}`，响应状态行以 `HTTP/1.x 200` 开头即就绪。
 ///
 /// 连接失败 / 非 200 / 读写超时均返回 false（探测本身不抛错）。
 pub fn http_probe(port: u16, timeout: Duration) -> bool {
-    let Ok(addr) = format!("127.0.0.1:{port}").parse::<SocketAddr>() else {
+    let Ok(addr) = format!("{BACKEND_HOST}:{port}").parse::<SocketAddr>() else {
         return false;
     };
     let Ok(mut stream) = TcpStream::connect_timeout(&addr, timeout) else {
@@ -310,7 +351,7 @@ pub fn http_probe(port: u16, timeout: Duration) -> bool {
     };
     let _ = stream.set_read_timeout(Some(timeout));
     let request = format!(
-        "GET /api/models HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+        "GET {READY_PROBE_PATH} HTTP/1.1\r\nHost: {BACKEND_HOST}:{port}\r\nConnection: close\r\n\r\n"
     );
     if stream.write_all(request.as_bytes()).is_err() {
         return false;
@@ -336,7 +377,7 @@ pub fn http_probe(port: u16, timeout: Duration) -> bool {
 
 // ── runtime.json 读写（就绪契约）────────────────────────────────────────────
 
-/// 后端状态（boot.html 轮询契约）：就绪标记 + 后端地址 + 端口 + 错误。
+/// 后端状态（boot.html 轮询契约）：就绪标记 + 后端地址 + 端口 + 错误 + 就绪超时。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackendStatus {
@@ -348,6 +389,9 @@ pub struct BackendStatus {
     pub port: u16,
     /// 最近错误（无错误为 None）。
     pub error: Option<String>,
+    /// 就绪超时（毫秒；未启动为 None——引导页 `status.readyTimeoutMs ?? 60000`
+    /// 向后兼容派生轮询上限，RS-1 R3）。
+    pub ready_timeout_ms: Option<u64>,
 }
 
 /// 就绪标记内容：端口 + 就绪标记 + 后端 pid + 错误信息（可选）。

@@ -12,8 +12,9 @@ use std::time::{Duration, Instant};
 use conver_app_lib::server::{
     backend_config_from_env, data_dir_path, database_url, default_data_dir, encode_url_path,
     find_prod_backend_exe, http_probe, parse_command_line, probe_free_port,
-    prod_backend_exe_candidates, read_runtime_json, spawn_backend, wait_until_ready,
-    write_runtime_json, BackendConfig, ReadyOutcome, RuntimeInfo, DEFAULT_DEV_BACKEND_CMD,
+    prod_backend_exe_candidates, read_runtime_json, spawn_arguments, spawn_backend,
+    wait_until_ready, write_runtime_json, BackendConfig, ReadyOutcome, RuntimeInfo,
+    DEFAULT_DEV_BACKEND_CMD,
 };
 
 // ── 测试辅助 ────────────────────────────────────────────────────────────────
@@ -77,6 +78,25 @@ fn stub_server_with_response(
             let Ok(mut stream) = stream else { break };
             let _ = stream.read(&mut [0u8; 512]);
             let _ = stream.write_all(response);
+        }
+    });
+    (handle, rx)
+}
+
+/// 在指定端口起一个「记录请求首行并返回 200」的 TCP stub 服务线程。
+///
+/// 监听器在主线程绑定（无「http_probe 先于 bind 连接」的竞态），
+/// 返回句柄与首行接收通道——用于钉就绪探测的请求形状（RS-1 R1 契约锁）。
+fn stub_server_capture(port: u16) -> (std::thread::JoinHandle<()>, mpsc::Receiver<String>) {
+    let listener = TcpListener::bind(("127.0.0.1", port)).expect("stub 绑定失败");
+    let (tx, rx) = mpsc::channel();
+    let handle = std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { break };
+            let mut buf = [0u8; 512];
+            let n = stream.read(&mut buf).unwrap_or(0);
+            let _ = tx.send(String::from_utf8_lossy(&buf[..n]).into_owned());
+            let _ = stream.write_all(b"HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n");
         }
     });
     (handle, rx)
@@ -283,6 +303,38 @@ fn database_url_keeps_special_chars_encodes_question_mark() {
 
 // ── 子进程启停 ──────────────────────────────────────────────────────────────
 
+// ── 壳追加参数契约（RS-1 R1：argv 精确形状）────────────────────────────────
+
+/// 契约锁：壳追加的后端启动参数精确形状（顺序敏感）——
+/// `--host <BACKEND_HOST> --port <port> --log-level warning`。
+/// 后端镜像契约：`run_backend.build_parser`（pytest 互引见 backend/tests/test_packaging.py）。
+#[test]
+fn spawn_arguments_exact_shape_with_order() {
+    assert_eq!(
+        spawn_arguments(8123),
+        vec![
+            "--host".to_string(),
+            "127.0.0.1".to_string(),
+            "--port".to_string(),
+            "8123".to_string(),
+            "--log-level".to_string(),
+            "warning".to_string(),
+        ]
+    );
+    // 边界：端口 0 也要能构成合法形状（参数键序不变）
+    assert_eq!(
+        spawn_arguments(0),
+        vec![
+            "--host".to_string(),
+            "127.0.0.1".to_string(),
+            "--port".to_string(),
+            "0".to_string(),
+            "--log-level".to_string(),
+            "warning".to_string(),
+        ]
+    );
+}
+
 #[test]
 fn spawn_backend_injects_env_and_database_url() {
     if !python_available() {
@@ -371,16 +423,69 @@ fn managed_child_drop_kills_process() {
     assert_process_gone(pid);
 }
 
-/// 断言指定 pid 已不在系统中（tasklist 过滤查询）。
-fn assert_process_gone(pid: u32) {
+/// R2（Windows）：带树终止——python 桩 spawn 孙进程后 kill 父进程，孙进程必须一并消失。
+///
+/// dev 态 venv 的 python 重定向器会 spawn 孙进程，只杀直接子进程会残留后端进程；
+/// taskkill /T 保证整树终止。非 Windows 分支无树终止语义，断言不可达属预期
+/// （平台守卫先例：TD-25 批次 skipif 隔离）。
+#[test]
+#[cfg(windows)]
+fn managed_child_kill_reaps_grandchild_tree_on_windows() {
+    if !python_available() {
+        return;
+    }
+    let dir = tmp_dir("kill-tree");
+    let out = dir.join("grandchild.pid");
+    // 父 python 桩：spawn 一个睡 300s 的孙进程 → 孙进程 pid 落盘 → 父进程长睡
+    // （sys.argv[1] = 输出路径；壳追加的 --host/--port 等参数排在更后面，不影响）
+    let script = "import subprocess, sys, time\n\
+        p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)'])\n\
+        open(sys.argv[1], 'w').write(str(p.pid))\n\
+        time.sleep(300)";
+    let cfg = BackendConfig {
+        program: "python".into(),
+        args: vec!["-c".into(), script.into(), out.to_string_lossy().into_owned()],
+        cwd: None,
+        extra_env: vec![],
+    };
+    let mut child = spawn_backend(&cfg, 8123, &dir).expect("spawn 应成功");
+    let parent_pid = child.pid().expect("父进程应有 pid");
+
+    // 等待孙进程 pid 落盘，并确认孙进程确实存活（kill 前先验条件）
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let grandchild_pid: u32 = loop {
+        if let Ok(text) = std::fs::read_to_string(&out) {
+            break text.trim().parse().expect("孙进程 pid 应为数字");
+        }
+        assert!(Instant::now() < deadline, "孙进程 pid 未在时限内写出");
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    assert!(process_alive(grandchild_pid), "孙进程 {grandchild_pid} 应存活于 kill 前");
+
+    // kill 父进程 → 树终止 → 孙进程一并消失（taskkill /F 异步终止，轮询等待退出）
+    child.kill();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while process_alive(grandchild_pid) {
+        assert!(Instant::now() < deadline, "孙进程 {grandchild_pid} 未在时限内退出");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert_process_gone(parent_pid);
+}
+
+/// 查询 pid 是否仍在系统中（tasklist 过滤查询）。
+fn process_alive(pid: u32) -> bool {
     let out = Command::new("tasklist")
         .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
         .output()
         .expect("tasklist 应可执行");
-    let text = String::from_utf8_lossy(&out.stdout);
+    String::from_utf8_lossy(&out.stdout).contains(&pid.to_string())
+}
+
+/// 断言指定 pid 已不在系统中（tasklist 过滤查询）。
+fn assert_process_gone(pid: u32) {
     assert!(
-        !text.contains(&pid.to_string()),
-        "pid {pid} 不应仍存活（tasklist 输出: {text}）"
+        !process_alive(pid),
+        "pid {pid} 不应仍存活（tasklist 应查无此进程）"
     );
 }
 
@@ -441,6 +546,26 @@ fn http_probe_false_for_non_200_response() {
     let (handle, rx) = stub_server_with_response(port, b"HTTP/1.0 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n");
     rx.recv_timeout(Duration::from_secs(2)).expect("stub 应就绪");
     assert!(!http_probe(port, Duration::from_secs(2)), "非 200 响应不应判定就绪");
+    drop(handle);
+}
+
+/// 契约锁（RS-1 R1）：就绪探测请求行必须命中就绪路径字面量 `GET /api/models HTTP/1.1`——
+/// 路径漂移会让壳就绪探测永远失败（后端 models 路由互引见
+/// backend/tests/test_packaging.py；实现用 `READY_PROBE_PATH` 常量）。
+#[test]
+fn http_probe_requests_ready_probe_path() {
+    let port = free_port();
+    let (handle, rx) = stub_server_capture(port);
+    assert!(http_probe(port, Duration::from_secs(2)), "200 响应应判定就绪");
+    let request = rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("stub 应收到探测请求");
+    let request_line = request.lines().next().unwrap_or("");
+    assert_eq!(
+        request_line,
+        "GET /api/models HTTP/1.1",
+        "请求行必须含就绪路径字面量，实际: {request_line:?}"
+    );
     drop(handle);
 }
 

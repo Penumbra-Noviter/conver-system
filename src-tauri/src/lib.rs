@@ -3,7 +3,7 @@
 //! 职责（spec D1 / 工单 03-P6.4-1 + 06-P6.4-4）：
 //! 1. 探测动态端口 → 以 CREATE_NO_WINDOW 启动后端子进程（dev = uvicorn 源码 / prod = 打包 exe）；
 //! 2. 注入 `DATABASE_URL` 指向 %APPDATA%\ConverSystem\conver_system.db（与网页版数据独立）；
-//! 3. 后台线程轮询 HTTP 就绪（GET /api/models 200），就绪后写 %APPDATA%\ConverSystem\runtime.json；
+//! 3. 后台线程轮询 HTTP 就绪（GET `server::READY_PROBE_PATH` 200），就绪后写 %APPDATA%\ConverSystem\runtime.json；
 //! 4. webview 加载 boot.html（Tauri 资产页）→ 经 `backend_status` 命令轮询 → `location.replace` 跳转；
 //! 5. 单实例（tauri-plugin-single-instance）：二次启动在插件 setup 中同步退出，不重复 spawn 后端；
 //! 6. 系统托盘（D5/D6）：关闭窗口 = 最小化到托盘；菜单 [显示/隐藏窗口、开机自启勾选、退出]；
@@ -14,7 +14,7 @@ pub mod server;
 pub mod tray;
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -35,6 +35,8 @@ struct ShellStateInner {
     child: Mutex<Option<ManagedChild>>,
     ready: AtomicBool,
     error: Mutex<Option<String>>,
+    /// 就绪超时（毫秒；0 = 尚未启动，status 上报 None）。
+    ready_timeout_ms: AtomicU64,
 }
 
 impl ShellState {
@@ -47,6 +49,7 @@ impl ShellState {
                 child: Mutex::new(None),
                 ready: AtomicBool::new(false),
                 error: Mutex::new(None),
+                ready_timeout_ms: AtomicU64::new(0),
             }),
         }
     }
@@ -98,6 +101,12 @@ impl ShellState {
 
     fn try_start_inner(&self, config: BackendConfig, timeout: Duration) -> Result<(), String> {
         let inner = &self.inner;
+        // R3：就绪超时随壳状态透传（status 契约），引导页据此派生轮询上限。
+        // 毫秒化（u128 → u64 饱和，防极端 Duration 截断）。
+        inner.ready_timeout_ms.store(
+            u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+            Ordering::SeqCst,
+        );
         std::fs::create_dir_all(&inner.data_dir)
             .map_err(|e| format!("创建数据目录失败: {e}"))?;
         let port = server::probe_free_port().map_err(|e| format!("端口探测失败: {e}"))?;
@@ -114,11 +123,13 @@ impl ShellState {
     pub fn status(&self) -> BackendStatus {
         let inner = &self.inner;
         let port = inner.port.load(Ordering::SeqCst);
+        let ready_timeout_ms = inner.ready_timeout_ms.load(Ordering::SeqCst);
         BackendStatus {
             ready: inner.ready.load(Ordering::SeqCst),
             url: (port != 0).then(|| format!("http://127.0.0.1:{port}")),
             port,
             error: inner.error.lock().unwrap().clone(),
+            ready_timeout_ms: (ready_timeout_ms != 0).then_some(ready_timeout_ms),
         }
     }
 

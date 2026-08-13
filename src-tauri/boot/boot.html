@@ -49,8 +49,12 @@
         document.getElementById('spinner').hidden = true;
         return;
       }
-      var MAX_POLLS = 120;         // 120 × 500ms = 60s
       var POLL_INTERVAL_MS = 500;
+      // 就绪超时单一来源（RS-1 R3）：壳端超时经 status.readyTimeoutMs 透传，
+      // 轮询上限据此派生；旧壳无此字段 / 未启动 → 回退默认 60000ms（120 × 500ms）。
+      var DEFAULT_READY_TIMEOUT_MS = 60000;
+      var readyTimeoutMs = null;
+      var maxPolls = Math.ceil(DEFAULT_READY_TIMEOUT_MS / POLL_INTERVAL_MS);
       var attempts = 0;
 
       function showError(msg) {
@@ -62,6 +66,10 @@
       function poll() {
         invoke('backend_status')
           .then(function (status) {
+            if (readyTimeoutMs === null) {
+              readyTimeoutMs = (status && status.readyTimeoutMs) ?? DEFAULT_READY_TIMEOUT_MS;
+              maxPolls = Math.ceil(readyTimeoutMs / POLL_INTERVAL_MS);
+            }
             if (status && status.ready && status.url) {
               window.location.replace(status.url);
               return;
@@ -69,7 +77,7 @@
             if (status && status.error) {
               showError(status.error);
             }
-            if (++attempts >= MAX_POLLS) {
+            if (++attempts >= maxPolls) {
               document.getElementById('status').textContent = '启动超时：后端未在预期时间内就绪';
               document.getElementById('spinner').hidden = true;
               return;
@@ -77,7 +85,7 @@
             setTimeout(poll, POLL_INTERVAL_MS);
           })
           .catch(function () {
-            if (++attempts >= MAX_POLLS) {
+            if (++attempts >= maxPolls) {
               document.getElementById('status').textContent = '启动检测异常，请重启应用';
               document.getElementById('spinner').hidden = true;
               return;
