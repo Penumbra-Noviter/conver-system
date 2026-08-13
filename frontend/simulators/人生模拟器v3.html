@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人生模拟器 · Life Simulator</title>
+<style>
+:root {
+  --bg-deep:#0a0a12; --bg-surface:#12121e; --bg-elevated:#1a1a2a; --bg-hover:#242438;
+  --border:#2a2a44; --border-active:#3a3a5a;
+  --t:#e8e8f4; --t2:#a0a0be; --t3:#6a6a8a;
+  --gold:#f0a828; --gold-dim:#b87818; --gold-glow:rgba(240,168,40,0.18);
+  --accent:#40c8a0; --accent-dim:#208060; --accent-glow:rgba(64,200,160,0.15);
+  --r:#e85058; --gr:#28d068; --purple:#a070f0; --blue:#5080e0;
+  --r:5px; --r2:9px; --r3:14px; --tr:180ms ease;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"SF Mono","Consolas",monospace;
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg-deep);color:var(--t);font-family:var(--font);font-size:13px}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--r);padding:8px 12px;outline:none}
+input:focus{border-color:var(--gold-dim)}
+
+#app{display:grid;grid-template-columns:1fr;grid-template-rows:44px 1fr;height:100vh;gap:1px;background:var(--border)}
+#topbar{grid-row:1;background:var(--bg-surface);display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid var(--border);z-index:20}
+#topbar .logo{font-size:14px;font-weight:700;color:var(--gold);white-space:nowrap}
+#topbar .spacer{flex:1}
+#age-badge{font-size:12px;color:var(--accent);border:1px solid var(--accent-dim);border-radius:var(--r);padding:2px 10px;font-weight:600}
+.top-btn{padding:4px 10px;border-radius:var(--r);font-size:11px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr);white-space:nowrap}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+
+#main{grid-row:2;display:flex;overflow:hidden}
+#narrative-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#game-log{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:7px;scroll-behavior:smooth}
+.log-entry{padding:10px 14px;border-radius:var(--r2);font-size:12.5px;line-height:1.75;animation:fade 250ms ease}
+.log-entry.narrative{background:var(--bg-elevated);border-left:3px solid var(--gold-dim)}
+.log-entry.system{background:var(--bg-surface);border-left:3px solid var(--t3);font-size:10px;color:var(--t3);font-family:var(--mono)}
+.log-entry.think{background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--purple);font-size:11px;color:var(--t2);white-space:pre-wrap}
+.log-entry.choice{background:rgba(240,168,40,0.08);border:1px solid var(--gold-dim);border-left:3px solid var(--gold)}
+.log-entry.death{background:rgba(232,80,88,0.08);border:1px solid var(--r);border-left:3px solid var(--r)}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+#action-bar{display:flex;gap:6px;padding:7px 14px;background:var(--bg-surface);border-top:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
+.action-btn{padding:6px 14px;border-radius:18px;font-size:11px;font-weight:500;border:1px solid var(--border);color:var(--t2);transition:all var(--tr)}
+.action-btn:hover{background:var(--bg-hover);border-color:var(--gold-dim);color:var(--gold)}
+.action-btn.primary{background:var(--gold);color:#000;border-color:var(--gold);font-weight:600}
+.action-btn.primary:hover{background:#ffc94a}
+.action-btn:disabled{opacity:0.35;cursor:not-allowed}
+.action-btn.choice-btn{background:var(--bg-elevated);border:1px solid var(--gold-dim);color:var(--t);text-align:left;padding:8px 12px;border-radius:var(--r2)}
+.action-btn.choice-btn:hover{background:var(--gold-glow);border-color:var(--gold)}
+
+#right-panel{width:270px;background:var(--bg-surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;gap:6px;padding:6px;flex-shrink:0}
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r2);padding:9px}
+.panel-card h3{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:6px}
+.stat-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.stat-row .lbl{font-size:10px;color:var(--t3);width:44px;flex-shrink:0}
+.stat-row .sbar{flex:1;height:8px;background:var(--bg-deep);border-radius:3px;overflow:hidden}
+.stat-row .sbar div{height:100%;border-radius:3px;transition:width 400ms}
+.stat-row .val{font-size:10px;color:var(--t2);width:22px;text-align:right;font-family:var(--mono);flex-shrink:0}
+.info-row{font-size:10.5px;color:var(--t2);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.info-row .k{color:var(--t3)}
+
+#seed-badge{font-size:9px;color:var(--t3);font-family:var(--mono);word-break:break-all;line-height:1.4}
+
+/* 开始界面 */
+#setup-overlay{position:fixed;inset:0;background:var(--bg-deep);z-index:300;display:flex;align-items:center;justify-content:center;overflow-y:auto}
+#setup-overlay.hidden{display:none}
+.setup-box{width:440px;max-width:92vw;padding:10px 0}
+.setup-box h1{font-size:24px;color:var(--gold);text-align:center;letter-spacing:2px;margin-bottom:4px}
+.setup-box .sub{font-size:11px;color:var(--t3);text-align:center;margin-bottom:18px}
+.setup-section{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-bottom:10px}
+.setup-section .sec-title{font-size:11px;font-weight:600;color:var(--accent);margin-bottom:8px;letter-spacing:0.5px}
+.setup-section label{font-size:10px;color:var(--t3);display:block;margin-bottom:4px}
+.seed-row{display:flex;gap:6px}
+.seed-row input{flex:1}
+.btn{padding:7px 14px;border-radius:var(--r);font-size:11px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr)}
+.btn:hover{background:var(--bg-hover);border-color:var(--border-active);color:var(--t)}
+.btn.gold{background:var(--gold);color:#000;border-color:var(--gold);font-weight:600}
+.btn.gold:hover{background:#ffc94a}
+.trait-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.trait-row .t-icon{font-size:18px;width:26px;text-align:center}
+.trait-row .t-info{flex:1}
+.trait-row .t-name{font-size:11px;font-weight:600}
+.trait-row .t-desc{font-size:9px;color:var(--t3)}
+.trait-row .t-ctrl{display:flex;align-items:center;gap:6px}
+.trait-row .t-ctrl button{width:26px;height:26px;border-radius:50%;border:1px solid var(--border-active);color:var(--gold);font-size:14px;font-weight:700;transition:all var(--tr)}
+.trait-row .t-ctrl button:hover{background:var(--gold-glow);border-color:var(--gold)}
+.trait-row .t-ctrl button:disabled{opacity:0.3;cursor:not-allowed}
+.trait-row .t-val{width:22px;text-align:center;font-family:var(--mono);font-weight:700;font-size:13px}
+.points-left{font-size:11px;color:var(--gold);font-weight:600}
+.points-left.over{color:var(--r)}
+.name-row{display:flex;gap:6px}
+.name-row input{flex:1}
+.gender-row{display:flex;gap:6px}
+.gender-row .btn{flex:1;text-align:center}
+.gender-row .btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+
+/* 总结界面 */
+#summary-overlay{position:fixed;inset:0;background:rgba(5,5,10,0.92);z-index:250;display:none;align-items:center;justify-content:center;overflow-y:auto}
+#summary-overlay.show{display:flex}
+.summary-box{width:520px;max-width:94vw;max-height:88vh;overflow-y:auto;background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--r3);padding:24px}
+.summary-box h2{text-align:center;color:var(--gold);font-size:20px;margin-bottom:4px}
+.summary-box .score-big{text-align:center;font-size:52px;font-weight:800;font-family:var(--mono);color:var(--accent);margin:10px 0}
+.summary-box .score-label{text-align:center;font-size:10px;color:var(--t3);margin-bottom:14px;letter-spacing:1px}
+.summary-section{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r2);padding:12px;margin-bottom:10px}
+.summary-section h4{font-size:11px;color:var(--gold);margin-bottom:6px}
+.summary-section p{font-size:11.5px;line-height:1.7;color:var(--t2)}
+.summary-stats{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.sm-stat{background:var(--bg-deep);border-radius:var(--r);padding:7px;text-align:center}
+.sm-stat .v{font-size:15px;font-weight:700;font-family:var(--mono);color:var(--gold)}
+.sm-stat .l{font-size:9px;color:var(--t3);margin-top:1px}
+
+#toast{position:fixed;top:52px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border-active);padding:8px 18px;border-radius:var(--r);font-size:12px;z-index:200;pointer-events:none;opacity:0;transition:opacity 300ms}
+#toast.show{opacity:1}#toast.error{border-color:var(--r)}
+#load-dot{display:none;font-size:10px;color:var(--t3)}
+
+@media(max-width:768px){
+  #topbar{padding:0 6px;gap:5px}
+  #main{flex-direction:column}
+  #right-panel{position:fixed;left:0;right:0;bottom:0;height:38vh;width:100%!important;border-top:1px solid var(--border-active);z-index:30;transform:translateY(102%);transition:transform 240ms ease;border-radius:14px 14px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,0.6)}
+  #right-panel.open{transform:translateY(0)}
+  #drawer-handle{display:block!important;text-align:center;padding:4px 0;font-size:10px;color:var(--t3);border-bottom:1px solid var(--border);cursor:pointer}
+  #panel-drawer-btn{display:inline-flex!important}
+  #game-log{padding:8px 10px}
+  .log-entry{font-size:13px;padding:9px 12px}
+  #action-bar{padding:6px 10px;gap:5px}
+  .action-btn{padding:7px 13px;font-size:12px;flex:1;text-align:center}
+  #age-badge{font-size:11px}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="topbar">
+    <div class="logo">🌱 人生模拟器</div>
+    <span id="age-badge">准备中</span>
+    <div class="spacer"></div>
+    <span style="font-size:10px;color:var(--t3)" id="name-display"></span>
+    <button class="top-btn" id="panel-drawer-btn" style="display:none" onclick="LS.togglePanel()">📊</button>
+    <button class="top-btn" onclick="LS.showSettings()">⚙️</button>
+    <span id="load-dot">⏳</span>
+  </div>
+  <div id="main">
+    <div id="narrative-panel">
+      <div id="game-log"></div>
+      <div id="action-bar">
+        <button class="action-btn" onclick="LS.liveYear(1)" id="btn-1y" disabled>⏭ 度过1年</button>
+        <button class="action-btn" onclick="LS.liveYear(5)" id="btn-5y" disabled>⏩ 快进5年</button>
+        <button class="action-btn primary" onclick="LS.startLife()" id="btn-start">✨ 开始人生</button>
+      </div>
+    </div>
+    <div id="right-panel">
+      <div id="drawer-handle" onclick="LS.togglePanel()" style="display:none">⬇ 收起 (X)</div>
+      <div class="panel-card"><h3>🧬 天赋</h3><div id="trait-bars"></div></div>
+      <div class="panel-card"><h3>📋 人生状况</h3><div id="life-info"></div></div>
+      <div class="panel-card"><h3>🌍 世界种子</h3><div id="seed-badge">—</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="setup-overlay">
+  <div class="setup-box">
+    <h1>🌱 人生模拟器</h1>
+    <div class="sub">每一次出生都是一段独一无二的人生</div>
+    <!-- 第一步：API 配置 -->
+    <div id="setup-step1">
+      <div class="setup-section">
+        <div class="sec-title">🤖 第一步 · 配置 AI 接口</div>
+        <label>API 端点</label>
+        <input id="cfg-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+        <label>API Key</label>
+        <input id="cfg-apikey" type="password" placeholder="sk-xxx">
+        <label>模型 <span id="model-hint" style="font-size:9px;color:var(--t3)"></span></label>
+        <div class="seed-row">
+          <select id="cfg-model" style="flex:1;background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--r);padding:8px 12px"><option value="deepseek-chat">deepseek-chat</option><option value="deepseek-reasoner">deepseek-reasoner</option></select>
+          <button class="btn" onclick="LS.fetchModels()">🔄 拉取</button>
+        </div>
+        <label>推理强度</label>
+        <select id="cfg-reasoning" style="width:100%;background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--r);padding:8px 12px">
+          <option value="max" selected>最大</option><option value="high">高</option><option value="medium">中</option>
+        </select>
+        <label>输出 Token 限制</label>
+        <select id="cfg-maxtokens" style="width:100%;background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--r);padding:8px 12px">
+          <option value="unlimited" selected>无限制</option><option value="2048">2048</option><option value="4096">4096</option><option value="8192">8192</option><option value="16384">16384</option>
+        </select>
+        <div style="display:flex;gap:6px;margin-top:12px">
+          <button class="btn gold" style="flex:1;padding:9px" onclick="LS.saveApiConfig()">✅ 保存并继续</button>
+          <button class="btn" id="btn-back-from-api" style="flex:1;padding:9px" onclick="LS.backFromApi()">⬅ 返回</button>
+        </div>
+      </div>
+    </div>
+    <!-- 第二步：出生设定 -->
+    <div id="setup-step2" style="display:none">
+      <div class="setup-section">
+        <div class="sec-title">🌍 世界种子</div>
+        <label>填入种子决定这个世界的走向（留空随机）</label>
+        <div class="seed-row">
+          <input id="seed-input" placeholder="例如：金色的秋天1998…">
+          <button class="btn" onclick="LS.randomSeed()" title="随机种子">🎲</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <div class="sec-title">👤 出生信息</div>
+        <label>姓名（AI生成，可手动修改）</label>
+        <div class="name-row">
+          <input id="name-input" placeholder="点击右侧生成姓名">
+          <button class="btn" onclick="LS.genName()">🎲 生成</button>
+        </div>
+        <label style="margin-top:8px">性别</label>
+        <div class="gender-row">
+          <button class="btn active" id="gender-m" onclick="LS.setGender('男')">👨 男</button>
+          <button class="btn" id="gender-f" onclick="LS.setGender('女')">👩 女</button>
+          <button class="btn" id="gender-r" onclick="LS.setGender('random')">🎲 随机</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <div class="sec-title">🎮 游戏模式</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" id="mode-normal" style="flex:1;text-align:center" onclick="LS.setCheatMode(false)">🌱 正常模式</button>
+          <button class="btn" id="mode-cheat" style="flex:1;text-align:center" onclick="LS.setCheatMode(true)">⚡ 作弊模式</button>
+        </div>
+        <div style="font-size:9px;color:var(--t3);margin-top:6px" id="mode-desc">正常模式：天赋共20点，每项1-10</div>
+      </div>
+      <div class="setup-section">
+        <div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🎯 天赋分配</span>
+          <span class="points-left" id="points-left">剩余 20 点</span>
+        </div>
+        <div id="trait-setup"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn" style="flex:1;padding:10px" onclick="LS.showApiStep()">⬅ 修改配置</button>
+        <button class="btn gold" style="flex:1;padding:10px;font-size:13px" onclick="LS.beginLife()">🌱 开始这段人生</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="summary-overlay">
+  <div class="summary-box" id="summary-content"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// 人生模拟器 · Life Simulator — AI叙事引擎
+// ============================================================
+
+const D = { endpoint:'https://api.deepseek.com/v1/chat/completions', key:'', model:'deepseek-chat', reasoning:'max', maxTokens:'unlimited' };
+const QUALITY_RULES = '【角色扮演质量规则】保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设，剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。';
+function cfg(){ try{return JSON.parse(localStorage.getItem('ls_cfg')||'{}');}catch(e){return{}} }
+function saveCfg(c){ localStorage.setItem('ls_cfg',JSON.stringify(c)); }
+
+// ── 种子 & PRNG ──
+function hashSeed(str){
+  let h = 2166136261;
+  for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h,16777619); }
+  return h>>>0;
+}
+function mulberry32(a){
+  return function(){
+    a|=0; a = a+0x6D2B79F5|0;
+    let t = Math.imul(a^a>>>15, 1|a);
+    t = t+Math.imul(t^t>>>7, 61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function randSeed(){ return '人生-'+Math.floor(Math.random()*999999); }
+
+// ── 天赋定义 ──
+const TRAITS = [
+  { key:'intel', name:'智力', icon:'🧠', desc:'学习能力·事业上限' },
+  { key:'phys',  name:'体质', icon:'💪', desc:'健康·寿命·抗病' },
+  { key:'charm', name:'魅力', icon:'✨', desc:'社交·婚恋·人脉' },
+  { key:'wealth',name:'家境', icon:'🏠', desc:'家庭条件·起跑线' },
+  { key:'luck',  name:'运气', icon:'🍀', desc:'随机事件偏向' }
+];
+
+// ── 状态 ──
+const LS = {
+  state: {
+    seed:'', world:null, name:'', gender:'男', traits:{ intel:4, phys:4, charm:4, wealth:4, luck:4 },
+    age:0, year:0, alive:false, busy:false,
+    job:'', married:false, spouse:'', children:[], money:0, health:100,
+    education:'', status:'婴儿',
+    history:[], events:[], life:[],
+    usedNames:[], totalYears:0, lastShownAge:-1,
+    cheatMode:false
+  },
+
+  init(){
+    this.state.usedNames = this.loadGlobalNames();
+    this.renderTraitSetup();
+    this.syncModeUI();
+    this.togglePanel = this.togglePanel.bind(this);
+    this.addLog('system','🌱 欢迎来到人生模拟器。填写出生信息，开始一段新的人生。');
+    this.setupShown = true;
+    this.applyApiConfig();
+  },
+
+  // ── API 配置步骤 ──
+  applyApiConfig(){
+    const c = { ...D, ...cfg() };
+    const e = document.getElementById('cfg-endpoint');
+    if(e && c.endpoint) e.value = c.endpoint;
+    const k = document.getElementById('cfg-apikey');
+    if(k && c.key) k.value = c.key;
+    const m = document.getElementById('cfg-model');
+    if(m && c.model) m.value = c.model;
+    const r = document.getElementById('cfg-reasoning');
+    if(r && c.reasoning) r.value = c.reasoning;
+    const mt = document.getElementById('cfg-maxtokens');
+    if(mt && c.maxTokens) mt.value = c.maxTokens;
+  },
+  saveApiConfig(){
+    const c = {
+      endpoint:document.getElementById('cfg-endpoint').value.trim()||D.endpoint,
+      key:document.getElementById('cfg-apikey').value.trim(),
+      model:document.getElementById('cfg-model').value,
+      reasoning:document.getElementById('cfg-reasoning').value,
+      maxTokens:document.getElementById('cfg-maxtokens').value
+    };
+    if(!c.key){ this.toast('请填写API Key','error'); return; }
+    saveCfg(c);
+    this.toast('配置已保存','success');
+    // 人生进行中：保存后回到游戏页面；否则进入出生设定
+    if(this.state.world || this.state.alive){
+      document.getElementById('setup-overlay').classList.add('hidden');
+    } else {
+      document.getElementById('setup-step1').style.display='none';
+      document.getElementById('setup-step2').style.display='block';
+    }
+  },
+  showApiStep(){
+    this.applyApiConfig();
+    document.getElementById('setup-step2').style.display='none';
+    document.getElementById('setup-step1').style.display='block';
+  },
+  modelsCache:null,
+  async fetchModels(){
+    const c = { ...D, ...cfg() };
+    c.key = document.getElementById('cfg-apikey').value.trim() || c.key;
+    c.endpoint = document.getElementById('cfg-endpoint').value.trim() || c.endpoint;
+    const hint = document.getElementById('model-hint');
+    if(!c.key){ hint.textContent = '⚠️ 先填写API Key再拉取'; return; }
+    hint.textContent = '⏳ 拉取中…';
+    if(this.modelsCache && this.modelsCache.time > Date.now()-300000){ this.populateModels(this.modelsCache.data); return; }
+    try{
+      const r = await fetch(c.endpoint.replace('/chat/completions','/models'), { headers:{'Authorization':'Bearer '+c.key} });
+      if(r.ok){
+        const d = await r.json();
+        const models = (d.data||[]).map(m=>m.id).filter(id=>id.includes('deepseek')||id.includes('chat')||id.includes('reasoner')||id.includes('gpt'));
+        this.modelsCache = { time:Date.now(), data:models };
+        this.populateModels(models);
+      } else { hint.textContent = '⚠️ 拉取失败 HTTP '+r.status; }
+    }catch(e){ hint.textContent = '⚠️ 网络错误'; }
+  },
+  populateModels(models){
+    const sel = document.getElementById('cfg-model');
+    const cur = sel.value;
+    sel.innerHTML = '';
+    if(!models.length) sel.innerHTML = '<option value="deepseek-chat">deepseek-chat</option><option value="deepseek-reasoner">deepseek-reasoner</option>';
+    else models.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o); });
+    if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+    else if(sel.options.length) sel.value = sel.options[0].value;
+    document.getElementById('model-hint').textContent = '✅ 已加载 '+sel.options.length+' 个模型';
+  },
+
+  // ── Setup UI ──
+  randomSeed(){ document.getElementById('seed-input').value = randSeed(); },
+  setGender(g){
+    this.state.gender = g==='random' ? (Math.random()<0.5?'男':'女') : g;
+    document.querySelectorAll('#gender-m,#gender-f,#gender-r').forEach(b=>b.classList.remove('active'));
+    if(this.state.gender==='男') document.getElementById('gender-m').classList.add('active');
+    else document.getElementById('gender-f').classList.add('active');
+  },
+  renderTraitSetup(){
+    const el = document.getElementById('trait-setup');
+    const cheat = this.state.cheatMode;
+    el.innerHTML = TRAITS.map(t=>`
+      <div class="trait-row">
+        <span class="t-icon">${t.icon}</span>
+        <div class="t-info"><div class="t-name">${t.name}</div><div class="t-desc">${t.desc}</div></div>
+        <div class="t-ctrl">
+          <button onclick="LS.traitChange('${t.key}',-1)">−</button>
+          <span class="t-val" id="tv-${t.key}" ${cheat?'style="color:var(--accent)"':''}>${this.state.traits[t.key]}</span>
+          <button onclick="LS.traitChange('${t.key}',1)">+</button>
+        </div>
+      </div>`).join('');
+    this.updatePointsLeft();
+  },
+  setCheatMode(v){
+    this.state.cheatMode = v;
+    const n = document.getElementById('mode-normal');
+    const c = document.getElementById('mode-cheat');
+    const desc = document.getElementById('mode-desc');
+    if(v){
+      n.classList.remove('active'); c.classList.add('active');
+      desc.innerHTML = '⚡ 作弊模式：天赋<b>无限制加点</b>，每项可加到99，无视20点上限';
+    } else {
+      c.classList.remove('active'); n.classList.add('active');
+      desc.innerHTML = '正常模式：天赋共20点，每项1-10';
+      // 切回正常模式时，把超出的属性压缩回10
+      for(const k in this.state.traits){ if(this.state.traits[k] > 10) this.state.traits[k] = 10; }
+    }
+    this.renderTraitSetup();
+  },
+  traitChange(key, d){
+    const cheat = this.state.cheatMode;
+    const total = Object.values(this.state.traits).reduce((a,b)=>a+b,0);
+    const cur = this.state.traits[key];
+    if(!cheat && d>0 && total>=20) return;
+    if(cur+d<1) return;
+    if(cur+d>(cheat?99:10)) return;
+    this.state.traits[key] = cur+d;
+    document.getElementById('tv-'+key).textContent = this.state.traits[key];
+    this.updatePointsLeft();
+  },
+  updatePointsLeft(){
+    const total = Object.values(this.state.traits).reduce((a,b)=>a+b,0);
+    const el = document.getElementById('points-left');
+    if(this.state.cheatMode){
+      el.textContent = '⚡ 作弊模式 · 已分配 '+total+' 点（无上限）';
+      el.classList.remove('over');
+    } else {
+      el.textContent = '剩余 '+(20-total)+' 点';
+      el.classList.toggle('over', total>20);
+    }
+  },
+
+  // ── 全局名字去重（跨人生持久化）──
+  loadGlobalNames(){
+    try{ return JSON.parse(localStorage.getItem('ls_used_names')||'[]'); }catch(e){ return []; }
+  },
+  saveGlobalNames(){
+    try{ localStorage.setItem('ls_used_names', JSON.stringify(this.state.usedNames)); }catch(e){}
+  },
+
+  async genName(){
+    const used = this.state.usedNames;
+    const c = { ...D, ...cfg() };
+    const btn = event && event.currentTarget || document.querySelector('.name-row .btn');
+    if(btn) btn.textContent='⏳';
+    if(!c.key){
+      // 本地姓名池（罕见诗意字，降低重复率）
+      const fam = ['林','陈','苏','顾','沈','叶','江','白','温','洛','贺','陆','裴','霍','景','楚','祁','阮','程','夏','言','宁','云','徐','秦','萧','柳','慕','许','江','封','魏','虞','严','宋','辛','黎','姜','阙','乔','池','闻'];
+      const given = ['珩','桉','洵','栖','棠','砚','粼','澈','霁','蘅','槿','屿','澜','玦','芃','燊','彧','翾','韫','荻','窈','婳','琬','瑭','簟','岫','岚','岄','苼','蘅','桡','柘','椋','杳','珝','瑀','璎','琤','璇','玙','窕','婧','婠','媞','宥','宸','彧','翊','翀','垚','堇','婳','汐','沐','衍','澄','涧','灏','珞','珀','琰','璟','稷','臻','睿','胥','溯','聿','绱','绫','绯','绛','缃','笺','笙','笛','箫','砚','笙','晗','晞','曈','曜','昕','旻','昶','晟','昀','昉','霓','霜','霰','霁','霆','霈','霖','蒹','葭','苇','芰','菡','蒴','蘅','蕖'];
+      let n;
+      let tries = 0;
+      do{ n = fam[Math.floor(Math.random()*fam.length)] + given[Math.floor(Math.random()*given.length)] + (Math.random()<0.55?given[Math.floor(Math.random()*given.length)]:''); tries++; }while(used.includes(n) && tries<80);
+      used.push(n); this.saveGlobalNames();
+      document.getElementById('name-input').value = n; if(btn) btn.textContent='🎲 生成'; return;
+    }
+    const res = await this.callAI([{role:'user',content:'请为一位即将出生的'+(this.state.gender==='男'?'男孩':'女孩')+'取一个中文名字（姓+名，2-3字）。要求：\n1. 用冷门而有韵味的字，例如：珩、桉、洵、栖、棠、砚、粼、澈、霁、蘅、槿、屿、澜、玦、芃、燊、彧、翾、琬、宸\n2. 绝对避免常见字：伟、强、军、丽、芳、敏、静、磊、勇、涛、斌、艳、娜、娟、杰、浩\n3. 名字要有画面感或书卷气，避免烂大街的网红名（梓、轩、涵、萱、睿、浩、宇、欣、怡、子墨等）\n'+(used.length?'4. 以下名字已经用过，严禁重复：'+used.join('、')+'\n':'')+'\n只输出一个名字本身，不要任何解释、标点或换行。'}], 0.9);
+    if(res){
+      const m = res.content.match(/[\u4e00-\u9fa5]{2,3}/);
+      const n = m ? m[0] : '';
+      if(n && n.length>=2 && !used.includes(n)){ used.push(n); this.saveGlobalNames(); document.getElementById('name-input').value=n; }
+    }
+    if(btn) btn.textContent='🎲 生成';
+  },
+
+  // ── 开始人生 ──
+  async beginLife(){
+    const seedRaw = document.getElementById('seed-input').value.trim() || randSeed();
+    const name = document.getElementById('name-input').value.trim();
+    const total = Object.values(this.state.traits).reduce((a,b)=>a+b,0);
+    if(!this.state.cheatMode && total !== 20){ this.toast('天赋必须正好分配20点（当前'+total+'点）','error'); return; }
+    if(!name){ this.toast('请先生成或输入姓名','error'); return; }
+    this.state.seed = seedRaw;
+    this.state.name = name;
+    this.state.usedNames = this.loadGlobalNames();
+    if(!this.state.usedNames.includes(name)){ this.state.usedNames.push(name); this.saveGlobalNames(); }
+    this.state.age = 0; this.state.year = 0;
+    this.state.alive = true;
+    this.state.job=''; this.state.married=false; this.state.spouse=''; this.state.children=[];
+    this.state.money = this.state.traits.wealth*2000; this.state.health = 100;
+    this.state.education=''; this.state.status='婴儿'; this.state.life=[];
+    this.state.history=[];
+    document.getElementById('setup-overlay').classList.add('hidden');
+    document.getElementById('btn-start').style.display='none';
+    document.getElementById('btn-1y').disabled=false;
+    document.getElementById('btn-5y').disabled=false;
+    document.getElementById('name-display').textContent = this.state.name + ' · ' + (this.state.gender==='男'?'♂':'♀');
+    this.renderAll();
+    this.addLog('system','🌍 世界种子：'+this.state.seed);
+    if(this.state.cheatMode) this.addLog('system','⚡ 作弊模式已开启：天赋属性大幅超越常人，命运将为之倾斜。');
+    document.getElementById('age-badge').textContent = '0岁';
+    // 全部由 AI 生成出生信息与第一句话（种子决定世界）
+    this.setLoading(true);
+    await this.generateBirth();
+    this.setLoading(false);
+    if(this.state.world){
+      this.state.year = this.state.world.year;
+      this.addLog('think','【世界背景】'+esc(this.state.world.worldDesc));
+      this.addLog('system','🏠 '+esc(this.state.world.familyDesc));
+      this.addLog('narrative',esc(this.state.world.birthScene));
+      this.state.life.push({age:0, text:this.state.world.birthScene});
+      this.state.lastShownAge = 0;
+      this.renderLifeInfo();
+      document.getElementById('age-badge').textContent = '0岁';
+      this.addLog('system','💡 点击「度过1年」或「快进5年」推进人生。遇到抉择时做出选择。');
+    } else {
+      this.addLog('system','❌ 出生信息生成失败，请检查API配置后重试。');
+      this.state.alive = false;
+    }
+    this.autoSave();
+  },
+
+  async generateBirth(){
+    const seed = this.state.seed;
+    const hashVal = hashSeed(seed);
+    const p = this.state;
+    const c = { ...D, ...cfg() };
+    if(!c.key){ this.buildWorldFallback(seed); return; }
+    const sys = '你是人生模拟器的世界主脑。种子决定了一个世界的命运。你负责为一位新生命生成出生信息。\n'+QUALITY_RULES;
+    const prompt = '世界种子：「'+seed+'」\n种子数值：'+hashVal+'\n\n出生者：'+p.name+'（'+(p.gender==='男'?'男':'女')+'）\n天赋：智力'+p.traits.intel+' 体质'+p.traits.phys+' 魅力'+p.traits.charm+' 家境'+p.traits.wealth+' 运气'+p.traits.luck+'\n\n请基于种子数值（它决定经济/社会/时代走向）生成真实中国背景的出生信息，严格输出JSON：\n{\n  "year": 1980到2005之间的整数,\n  "city": "真实城市名",\n  "worldDesc": "世界背景描述（经济形势、社会氛围、时代浪潮，80字内，由种子数值决定基调：数值大小影响繁荣程度）",\n  "familyDesc": "家庭状况（40字内，家境天赋影响富裕程度）",\n  "birthScene": "出生那一刻的场景描写（第一句话，50字内，要有画面感和真实感，如产房环境、窗外天气、父母反应）"\n}\n只输出JSON，不要其他内容。';
+    const res = await this.callAI([{role:'system',content:sys},{role:'user',content:prompt}]);
+    if(res){
+      try{
+        const raw = res.content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        const m = raw.match(/\{[\s\S]*\}/);
+        const d = JSON.parse(m?m[0]:raw);
+        if(d && d.year && d.city){
+          this.state.world = {
+            seed, year:parseInt(d.year), city:d.city,
+            worldDesc:d.worldDesc||'', familyDesc:d.familyDesc||'', birthScene:d.birthScene||'你出生了。'
+          };
+          return;
+        }
+      }catch(e){}
+    }
+    this.buildWorldFallback(seed);
+  },
+
+  buildWorldFallback(seed){
+    // 无API时：种子决定一切（确定性伪随机）
+    const rng = mulberry32(hashSeed(seed));
+    const economy = Math.floor(rng()*5)-2;
+    const society = Math.floor(rng()*5)-2;
+    const tech    = Math.floor(rng()*5)-2;
+    const year = 1980 + Math.floor(rng()*25);
+    const cities = ['北京','上海','广州','深圳','成都','杭州','武汉','西安','重庆','南京','苏州','长沙'];
+    const city = cities[Math.floor(rng()*cities.length)];
+    const events = ['国企改革','互联网浪潮','房地产腾飞','制造业转型','数字经济发展','乡村振兴','创业热潮'];
+    const eraEvent = events[Math.floor(rng()*events.length)];
+    const w = this.state.traits.wealth;
+    let worldDesc = year+'年的'+city+'，经济'+(['陷入低谷','略显疲软','平稳发展','快速增长','蓬勃腾飞'][economy+2])+'，社会'+(['保守压抑','平静稳定','积极向上','开放包容','充满活力'][society+2])+'，科技'+(['落后于时代','缓慢推进','稳步向前','日新月异','突飞猛进'][tech+2])+'。时代正处在'+eraEvent+'的浪潮之中。';
+    let familyDesc = w>=8?'你出生在一个富裕家庭，父母经营着不小的产业。':w>=6?'你出生在一个殷实的家庭，父母都是稳定工作的职工。':w>=4?'你出生在一个普通家庭，父母靠打工维持生计。':'你出生在一个贫寒的家庭，父母常年在外奔波。';
+    let birthScene = w>=7?'产房里灯火通明，护士抱着啼哭的你，窗外的城市夜色璀璨。':'狭小的产房里，窗外飘着细雨，母亲虚弱地抱着你，眼里满是希望。';
+    this.state.world = { seed, year, city, worldDesc, familyDesc, birthScene };
+  },
+
+  // ── 人生推进 ──
+  async liveYear(years, choiceNote){
+    if(!this.state.alive || this.state.busy) return;
+    if(this.state.age+years > 100){ years = 100-this.state.age; if(years<=0) return; }
+    this.state.busy = true;
+    this.setLoading(true);
+    try{
+      await this.liveYearCore(years, choiceNote);
+    }catch(e){
+      this.addLog('system','⚠️ 发生异常：'+e.message);
+    } finally {
+      // 无论如何都解锁，避免卡死
+      this.setLoading(false);
+      this.renderAll();
+      this.renderLifeInfo();
+      this.autoSave();
+      if(this.state.alive) this.state.busy = false;
+    }
+  },
+
+  async liveYearCore(years, choiceNote){
+    const p = this.state;
+    const y = this.state.age, to = y+years;
+    const sysPrompt = '你是人生模拟器的叙事引擎。玩家正在经历一段'+(this.state.world.year)+'年开始的真实世界人生。你负责以简洁、真实、有细节的笔触描述每年发生的事。\n'+QUALITY_RULES;
+    const worldCtx = this.state.world.worldDesc;
+    const statusCtx = '当前'+y+'岁：'+(this.state.status||'正常生活')+(this.state.job?'，职业：'+this.state.job:'')+(this.state.married?'，已婚（配偶：'+this.state.spouse+'）':'')+(this.state.children.length?'，子女：'+this.state.children.join('、'):'')+'，存款约'+this.state.money+'元，健康度'+this.state.health+'/100';
+    const traitsCtx = '天赋：智力'+p.traits.intel+' 体质'+p.traits.phys+' 魅力'+p.traits.charm+' 家境'+p.traits.wealth+' 运气'+p.traits.luck;
+    const recentCtx = this.state.life.slice(-8).map(e=>e.age+'岁：'+e.text).join('\n');
+    const choiceCtx = choiceNote ? '\n你刚刚做了一个重要抉择：「'+choiceNote+'」。请详细描述这个决定带来的直接后果和影响。\n' : '';
+    const prompt = '请描述'+this.state.name+'（'+(this.state.gender==='男'?'男':'女')+'）从'+y+'岁到'+to+'岁的人生经历。\n\n'+worldCtx+'\n'+traitsCtx+'\n'+statusCtx+choiceCtx+'\n\n近年经历：\n'+(recentCtx||'无')+'\n\n要求：\n1. 分年描述，每年1-2句，符合中国现实社会背景和该年龄段的真实人生（读书、升学、工作、结婚、生子、健康、父母等）。\n2. 每年单独一行，格式为「N岁|事件内容」，例如「7岁|你上小学了，成绩中等，喜欢和同桌下棋。」不要使用花括号、不要加Markdown格式。\n3. **必须经常给出抉择**：在升学、选专业、毕业去向、职业选择、跳槽、婚姻、生育、买房、投资、家庭矛盾、健康危机等人生关键节点都要给出抉择。平均每2-3年至少出现一次抉择机会，不要连续多年没有选择。每次最多一个，用 [CHOICE:选项A|选项B|选项C] 格式输出（2-3个选项）。\n4. 如果这些年内有人去世（自然死亡或意外），用 [DEATH:死因] 在最后输出（如 [DEATH:突发心脏病]）。\n5. 输出里不要包含年龄推算、不要总结。';
+    const res0 = await this.callAI([{role:'system',content:sysPrompt},{role:'user',content:prompt}]);
+    let res = res0;
+    // 空内容自动重试一次
+    if(res && !String(res.content||'').trim()) res = await this.callAI([{role:'system',content:sysPrompt},{role:'user',content:prompt}]);
+    if(!res || !String(res.content||'').trim()){
+      // 空内容：不推进任何状态，用户可直接重试
+      this.addLog('system','⚠️ AI返回了空内容，未推进。请再次点击推进。');
+      return;
+    }
+    const text = String(res.content);
+    // 平时跳过已显示的年份；选择后允许重述当年（显示选择后果）
+    const allowSame = !!choiceNote;
+    // 按年龄段解析事件（兼容 {1岁|..} / 1岁：.. / 1岁|.. 等格式）
+    const segRe = /^\{?(\d{1,3})岁[｜|:：]\s*(.+)$/;
+    const byAge = {};
+    text.split(/\n/).forEach(l=>{
+      const m = l.trim().match(segRe);
+      if(m){
+        const age = parseInt(m[1]);
+        const ev = m[2].trim();
+        if(!isNaN(age) && ev){
+          if(!byAge[age]) byAge[age] = [];
+          byAge[age].push(ev);
+        }
+      }
+    });
+    // 同一年龄的多条事件合并为一条显示
+    Object.keys(byAge).map(Number).sort((a,b)=>a-b).forEach(age=>{
+      const evs = byAge[age];
+      if(!evs.length) return;
+      // 跳过已经显示过的年份（避免重复展示上一年）；选择后果除外
+      if(age < this.state.lastShownAge) return;
+      if(age === this.state.lastShownAge && !allowSame) return;
+      this.state.lastShownAge = Math.max(this.state.lastShownAge, age);
+      if(!this.state.life.some(e=>e.age===age)) this.state.life.push({age, text: evs.join('；')});
+      this.addLog('narrative','<b style="color:var(--gold)">'+age+'岁</b>　'+evs.map(esc).join('<br>　'));
+      // 隐性状态更新：根据文本关键词
+      evs.forEach(ev=>this.inferState(ev, age));
+    });
+    if(Object.keys(byAge).length===0){
+      // 兜底：显示全文，但剔除 CHOICE/DEATH 标记
+      const cleanText = text.replace(/\[CHOICE:[^\]]*\]/g,'').replace(/\[DEATH:[^\]]*\]/g,'').trim();
+      if(cleanText) this.addLog('narrative',esc(cleanText));
+      else this.addLog('system','⚠️ AI返回了空内容，请重试。');
+      this.state.life.push({age:y,text:'第'+y+'年经历'});
+    }
+    this.state.age = Math.min(100, to);
+    this.state.totalYears++;
+    // 抉择
+    const choiceM = text.match(/\[CHOICE:([^\]]+)\]/);
+    if(choiceM){
+      const opts = choiceM[1].split('|').map(s=>s.trim()).filter(Boolean);
+      if(opts.length>=2){
+        this.addLog('choice','❓ 人生抉择：'+opts.map(esc).join(' / '));
+        this.showChoices(opts);
+      } else {
+        this.addLog('system','⚠️ AI给出的抉择选项不完整，继续推进。');
+      }
+    } else {
+      // 死亡
+      const deathM = text.match(/\[DEATH:([^\]]+)\]/);
+      if(deathM){
+        this.state.deathCause = deathM[1].trim();
+        this.state.age = Math.max(this.state.lastShownAge, y); // 死于最后显示的年份
+        this.die();
+      }
+    }
+  },
+
+  inferState(ev, age){
+    const p = this.state;
+    if(ev.includes('工作')||ev.includes('入职')||ev.includes('创业')||ev.includes('开店')||ev.includes('考公')||ev.includes('生意')) p.status='工作';
+    if(ev.includes('结婚')||ev.includes('婚礼')){ p.married=true; }
+    if(ev.includes('生子')||ev.includes('生了个')||ev.includes('生了')||ev.includes('女儿出生')||ev.includes('儿子出生')){ p.children.push('孩子'+p.children.length); }
+    if(ev.includes('生病')||ev.includes('住院')||ev.includes('确诊')) p.health = Math.max(20,p.health-15);
+    if(ev.includes('升职')||ev.includes('涨薪')||ev.includes('赚钱')||ev.includes('发财')) p.money += Math.floor(20000+Math.random()*80000);
+    if(ev.includes('破产')||ev.includes('赔钱')||ev.includes('失业')) p.money = Math.max(0,p.money-30000);
+    if(ev.includes('考上大学')||ev.includes('录取')) p.education='大学';
+    if(ev.includes('研究生')||ev.includes('博士')) p.education='研究生及以上';
+    if(ev.includes('高中毕业')&&!p.education) p.education='高中';
+    // 老年健康
+    if(age>=60 && Math.random()<0.15) p.health = Math.max(10,p.health-5);
+    if(age>=75 && Math.random()<0.25) p.health = Math.max(5,p.health-8);
+  },
+
+  showChoices(opts){
+    this.state.pendingChoices = opts;
+    const bar = document.getElementById('action-bar');
+    bar.innerHTML = opts.map((o,i)=>'<button class="action-btn choice-btn" onclick="LS.choose('+i+')">🔸 '+esc(o)+'</button>').join('');
+  },
+  async choose(i){
+    const opts = this.state.pendingChoices;
+    if(!opts) return;
+    const chosen = opts[i];
+    this.state.pendingChoices = null;
+    this.state.life.push({age:this.state.age, text:'抉择：选择了'+chosen});
+    this.addLog('narrative','<b style="color:var(--accent)">你的选择：</b>'+esc(chosen));
+    this.addLog('system','⚙️ 继续推进人生…');
+    this.resetActionBar();
+    // 让 AI 处理选择后果
+    await this.liveYear(1, chosen);
+  },
+
+  die(){
+    this.state.alive = false;
+    this.state.busy = false;
+    document.getElementById('btn-1y').disabled=true;
+    document.getElementById('btn-5y').disabled=true;
+    this.addLog('death','💀 <b>'+this.state.deathCause+'</b>');
+    this.addLog('system','🕊️ '+this.state.name+' 的生命定格在了'+this.state.age+'岁。');
+    this.genSummary();
+    this.autoSave();
+  },
+
+  // ── 总结 ──
+  async genSummary(){
+    this.setLoading(true);
+    const p = this.state;
+    const lifeStr = this.state.life.map(e=>e.age+'岁：'+e.text).join('\n');
+    const prompt = '请为'+p.name+'（'+(p.gender==='男'?'男':'女')+'）的一生写一份人生总结。\n\n出生：'+p.world.year+'年'+p.world.city+'。\n世界种子：'+p.seed+'\n世界背景：'+p.world.worldDesc+'\n天赋：智力'+p.traits.intel+' 体质'+p.traits.phys+' 魅力'+p.traits.charm+' 家境'+p.traits.wealth+' 运气'+p.traits.luck+'\n终年：'+p.age+'岁，死因：'+(p.deathCause||'自然终老')+'\n\n一生经历：\n'+lifeStr+'\n\n请输出（严格JSON）：\n{\n  "review":"200字内的人生回顾，真实、有温度，像一篇墓志铭+生平综述",\n  "score":0到100的整数评分,\n  "achievements":["3-5条人生成就"],\n  "regrets":["1-3条人生遗憾"],\n  "epitaph":"一句概括这人生的墓志铭"\n}\n只输出JSON，不要其他内容。\n'+QUALITY_RULES;
+    const res = await this.callAI([{role:'user',content:prompt}]);
+    this.setLoading(false);
+    let data = { review:'', score:60, achievements:[], regrets:[], epitaph:'' };
+    if(res){
+      try{
+        const raw = res.content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        const m = raw.match(/\{[\s\S]*\}/);
+        data = Object.assign(data, JSON.parse(m?m[0]:raw));
+      }catch(e){ data.review = res.content.substring(0,300); }
+    }
+    // 规则分修正
+    const baseScore = data.score;
+    const ageBonus = Math.min(30, this.state.age*0.5);
+    data.score = Math.max(0, Math.min(100, Math.round(baseScore*0.6 + (this.state.age*0.8) + (this.state.traits.luck*2))));
+    this.state.lastSummary = data;
+    this.showSummary(data);
+  },
+  showSummary(data){
+    const p = this.state;
+    const grade = data.score>=85?'S':data.score>=70?'A':data.score>=55?'B':data.score>=40?'C':'D';
+    document.getElementById('summary-content').innerHTML = `
+      <h2>${esc(p.name)}的一生</h2>
+      <div style="text-align:center;font-size:11px;color:var(--t3)">${p.world.year}年 - ${p.world.year+p.age}年 · 享年${p.age}岁</div>
+      <div class="score-big">${data.score}</div>
+      <div class="score-label">人生评分 · 等级 ${grade} · 死因：${esc(p.deathCause||'自然终老')}</div>
+      <div class="summary-section"><h4>🪦 墓志铭</h4><p style="font-style:italic;color:var(--gold)">「${esc(data.epitaph||'—')}」</p></div>
+      <div class="summary-section"><h4>📜 人生回顾</h4><p>${esc(data.review||'—')}</p></div>
+      <div class="summary-section"><h4>🏅 成就</h4><p>${(data.achievements||[]).map(a=>'· '+esc(a)).join('<br>')||'平凡亦是伟大'}</p></div>
+      <div class="summary-section"><h4>💭 遗憾</h4><p>${(data.regrets||[]).map(a=>'· '+esc(a)).join('<br>')||'此生无憾'}</p></div>
+      <div class="summary-section"><h4>📊 人生数据</h4>
+        <div class="summary-stats">
+          <div class="sm-stat"><div class="v">${p.age}</div><div class="l">享年</div></div>
+          <div class="sm-stat"><div class="v">${p.children.length}</div><div class="l">子女</div></div>
+          <div class="sm-stat"><div class="v">${p.married?'1':'0'}</div><div class="l">婚姻</div></div>
+          <div class="sm-stat"><div class="v">${(p.money/10000).toFixed(1)}w</div><div class="l">存款</div></div>
+        </div>
+      </div>
+      <div class="summary-section"><h4>🌍 世界种子</h4><p style="font-family:var(--mono);font-size:10px;color:var(--accent)">${p.seed}</p>
+        <div style="font-size:9px;color:var(--t3);margin-top:4px">复制种子，可以重新体验这个世界或分享给他人。</div></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn gold" style="flex:1;padding:10px" onclick="LS.newLife()">🌱 开启下一段人生</button>
+        <button class="btn" style="flex:1;padding:10px" onclick="LS.exportSave()">💾 导出存档</button>
+      </div>
+      <div style="text-align:center;margin-top:8px"><button class="btn" style="font-size:10px;color:var(--t3)" onclick="document.getElementById('summary-overlay').classList.remove('show')">继续查看</button></div>`;
+    document.getElementById('summary-overlay').classList.add('show');
+  },
+  newLife(){
+    document.getElementById('summary-overlay').classList.remove('show');
+    document.getElementById('game-log').innerHTML = '';
+    this.state.alive=false; this.state.life=[]; this.state.history=[]; this.state.lastSummary=null;
+    this.state.lastShownAge = -1; this.state.deathCause = null;
+    document.getElementById('btn-1y').disabled=true;
+    document.getElementById('btn-5y').disabled=true;
+    document.getElementById('btn-start').style.display='inline-block';
+    document.getElementById('name-display').textContent='';
+    document.getElementById('age-badge').textContent='准备中';
+    // 保持天赋和种子界面（API已配置，直接进入出生设定）
+    document.getElementById('seed-input').value = this.state.seed;
+    this.setupShown = true;
+    document.getElementById('setup-overlay').classList.remove('hidden');
+    document.getElementById('setup-step1').style.display='none';
+    document.getElementById('setup-step2').style.display='block';
+    // 重置部分状态（保持游戏模式选择）
+    this.state.traits = { intel:4, phys:4, charm:4, wealth:4, luck:4 };
+    this.renderTraitSetup();
+    this.renderAll();
+    this.syncModeUI();
+    this.addLog('system','🌱 一段人生结束，新的轮回开始。');
+  },
+
+  // ── 设置 ──
+  showSettings(){
+    // 直接打开 API 配置步骤（不打断游戏日志）
+    this.settingsModal();
+  },
+  settingsModal(){
+    // 显示 API 配置步骤
+    this.applyApiConfig();
+    document.getElementById('setup-overlay').classList.remove('hidden');
+    document.getElementById('setup-step1').style.display='block';
+    document.getElementById('setup-step2').style.display='none';
+    // 返回按钮：人生进行中→回游戏；未开始→回出生设定
+    const back = document.getElementById('btn-back-from-api');
+    if(this.state.world || this.state.alive){
+      back.textContent = '⬅ 返回游戏';
+    } else {
+      back.textContent = '⬅ 返回出生设定';
+    }
+  },
+  backFromApi(){
+    if(this.state.world || this.state.alive){
+      document.getElementById('setup-overlay').classList.add('hidden');
+    } else {
+      document.getElementById('setup-step1').style.display='none';
+      document.getElementById('setup-step2').style.display='block';
+      this.renderTraitSetup();
+      this.renderAll();
+      this.syncModeUI();
+    }
+  },
+  saveSettings(){
+    this.saveApiConfig();
+  },
+  backToSetup(){
+    document.getElementById('setup-overlay').classList.remove('hidden');
+    // 如果人生未开始，回到出生设定；否则显示配置步骤
+    if(!this.state.alive && !this.state.world){
+      document.getElementById('setup-step1').style.display='none';
+      document.getElementById('setup-step2').style.display='block';
+      this.renderTraitSetup();
+      this.renderAll();
+      this.syncModeUI();
+    } else {
+      this.applyApiConfig();
+      document.getElementById('setup-step1').style.display='block';
+      document.getElementById('setup-step2').style.display='none';
+    }
+  },
+  exportSave(){
+    const p = this.state;
+    const data = {
+      version:1,
+      timestamp:new Date().toISOString(),
+      type:'life-simulator-save',
+      name:p.name, gender:p.gender, seed:p.seed,
+      world:p.world?{year:p.world.year,city:p.world.city,worldDesc:p.world.worldDesc}:null,
+      traits:p.traits,
+      age:p.age, deathCause:p.deathCause||null,
+      life:p.life,
+      summary:p.lastSummary||null,
+      state:JSON.parse(JSON.stringify(p))
+    };
+    const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (p.name||'人生')+'-'+(p.seed||'无种子')+'-存档.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+    this.toast('存档已导出到本地','success');
+  },
+
+  // ── UI ──
+  resetActionBar(){
+    document.getElementById('action-bar').innerHTML = `
+      <button class="action-btn" onclick="LS.liveYear(1)" id="btn-1y">⏭ 度过1年</button>
+      <button class="action-btn" onclick="LS.liveYear(5)" id="btn-5y">⏩ 快进5年</button>`;
+    document.getElementById('btn-1y').disabled = !this.state.alive;
+    document.getElementById('btn-5y').disabled = !this.state.alive;
+  },
+  renderAll(){
+    this.renderTraitBars();
+    this.renderLifeInfo();
+    // 更新左上角年龄徽章
+    const badge = document.getElementById('age-badge');
+    if(this.state.alive) badge.textContent = this.state.age+'岁';
+    else if(this.state.age>0 || this.state.deathCause) badge.textContent = '已故';
+    else badge.textContent = '准备中';
+  },
+  renderTraitBars(){
+    const el = document.getElementById('trait-bars');
+    const colors = { intel:'var(--blue)', phys:'var(--r)', charm:'var(--purple)', wealth:'var(--gold)', luck:'var(--accent)' };
+    el.innerHTML = TRAITS.map(t=>`
+      <div class="stat-row"><span class="lbl">${t.icon}${t.name}</span>
+      <div class="sbar"><div style="width:${Math.min(100, this.state.traits[t.key]*10)}%;background:${colors[t.key]}"></div></div>
+      <span class="val">${this.state.traits[t.key]}</span></div>`).join('');
+  },
+  renderLifeInfo(){
+    const p = this.state;
+    document.getElementById('life-info').innerHTML = `
+      <div class="info-row"><span class="k">模式</span> ${p.cheatMode?'<b style="color:var(--accent)">⚡ 作弊模式</b>':'🌱 正常模式'}</div>
+      <div class="info-row"><span class="k">年龄</span> ${p.alive?p.age+'岁':'已故'}（${p.world?p.world.year+p.age+'年':''}）</div>
+      <div class="info-row"><span class="k">职业</span> ${p.job||'未定'}</div>
+      <div class="info-row"><span class="k">婚姻</span> ${p.married?p.spouse||'已婚':'未婚'}</div>
+      <div class="info-row"><span class="k">子女</span> ${p.children.length?p.children.length+'个':'无'}</div>
+      <div class="info-row"><span class="k">存款</span> ${(p.money/10000).toFixed(1)}万</div>
+      <div class="info-row"><span class="k">健康</span> ${p.health}/100</div>`;
+    if(p.seed) document.getElementById('seed-badge').textContent = p.seed;
+  },
+  syncModeUI(){
+    const n = document.getElementById('mode-normal');
+    const c = document.getElementById('mode-cheat');
+    const desc = document.getElementById('mode-desc');
+    if(!n || !c || !desc) return;
+    if(this.state.cheatMode){
+      n.classList.remove('active'); c.classList.add('active');
+      desc.innerHTML = '⚡ 作弊模式：天赋<b>无限制加点</b>，每项可加到99，无视20点上限';
+    } else {
+      c.classList.remove('active'); n.classList.add('active');
+      desc.innerHTML = '正常模式：天赋共20点，每项1-10';
+    }
+  },
+  togglePanel(){
+    const p = document.getElementById('right-panel');
+    p.classList.toggle('open');
+    document.getElementById('panel-drawer-btn').textContent = p.classList.contains('open')?'✕':'📊';
+  },
+  addLog(cls,text){
+    const log = document.getElementById('game-log');
+    const e = document.createElement('div');
+    e.className = 'log-entry '+cls;
+    e.innerHTML = text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    log.appendChild(e);
+    log.scrollTop = log.scrollHeight;
+  },
+  setLoading(v){
+    const dot = document.getElementById('load-dot');
+    dot.style.display = v?'inline':'none';
+    document.querySelectorAll('.action-btn').forEach(b=>b.disabled=v);
+  },
+  toast(msg,type){
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'show '+(type||'');
+    clearTimeout(el._t); el._t = setTimeout(()=>el.className='',2200);
+  },
+  autoSave(){
+    try{
+      const s = JSON.parse(JSON.stringify(this.state));
+      localStorage.setItem('ls_autosave', JSON.stringify({v:1,t:Date.now(),s}));
+    }catch(e){}
+  },
+
+  async callAI(msgs, temperature){
+    const c = { ...D, ...cfg() };
+    if(!c.key){ this.toast('请先在设置中配置API Key','error'); return null; }
+    try{
+      const body = { model:c.model, messages:msgs, temperature:(temperature||0.85), stream:false };
+      const mt = c.maxTokens;
+      if(mt && mt!=='unlimited') body.max_tokens = parseInt(mt);
+      if(c.reasoning) body.reasoning_effort = c.reasoning;
+      const r = await fetch(c.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+c.key},body:JSON.stringify(body)});
+      if(!r.ok){ this.toast('API错误: '+r.status,'error'); return null; }
+      const d = await r.json();
+      const msg = d.choices?.[0];
+      let content = msg?.message?.content || '';
+      // 兜底：正文为空时尝试使用推理内容
+      if(!content.trim() && msg?.message?.reasoning_content && String(msg.message.reasoning_content).length > 20){
+        content = String(msg.message.reasoning_content);
+      }
+      return content.trim() ? {content} : null;
+    }catch(e){ this.toast('网络错误','error'); return null; }
+  }
+};
+
+document.addEventListener('DOMContentLoaded',()=>LS.init());
+</script>
+</body>
+</html>

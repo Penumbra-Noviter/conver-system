@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "note": "PROTOTYPE manifest — 模拟器集成最小原型验证用（throwaway，非正式模块）",
+  "simulators": [
+    {
+      "id": "life-sim",
+      "file": "人生模拟器v3.html",
+      "name": "人生模拟器 v3",
+      "type": "local",
+      "description": "纯本地数值驱动的人生模拟（属性/事件/结局），存档走 localStorage（ls_ 前缀）",
+      "saveKeyPrefix": "ls_"
+    },
+    {
+      "id": "spider-shadow",
+      "file": "蛛网之影.html",
+      "name": "蛛网之影",
+      "type": "ai",
+      "description": "AI 驱动文字模拟，游戏内配置 OpenAI 兼容 endpoint/apiKey/model",
+      "config": {
+        "endpoint": "set-endpoint",
+        "apikey": "set-apikey",
+        "model": "set-model"
+      }
+    }
+  ]
+}

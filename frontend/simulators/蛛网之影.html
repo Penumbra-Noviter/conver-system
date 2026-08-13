@@ -1,0 +1,2047 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070a14">
+<title>蛛网之影 · 蜘蛛侠世界观AI角色扮演</title>
+<style>
+/* ============ 主题变量 ============ */
+:root{
+  --bg-deep:#070a14; --bg-surface:#0d1220; --bg-elevated:#141a2c; --bg-hover:#1d2540; --bg-inset:#0a0e1a;
+  --border:#253050; --border-active:#3c4f80;
+  --t:#e9edf9; --t2:#aab4d2; --t3:#6c7796;
+  --accent:#ff3b47; --accent-dim:#c22833; --accent-glow:rgba(255,59,71,.16);
+  --accent2:#38b6ff; --accent2-dim:#1f7fd0;
+  --gold:#f0a828; --gold-dim:#b87a1a;
+  --jade:#40c8a0; --jade-dim:#1f8a6e;
+  --danger:#ff4757; --success:#2fd06f; --purple:#a58bff; --blue:#4a8ff0;
+  --hp:#ff4757; --sp:#4a8ff0; --mp:#a58bff; --exp:#b0d838;
+  --rad:5px; --rad2:9px; --rad3:14px;
+  --shadow:0 8px 40px rgba(0,0,0,.6);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:"SF Mono",Consolas,"Cascadia Code","Courier New",monospace;
+}
+body[data-theme="crimson"]{
+  --bg-deep:#12060a; --bg-surface:#1c0b10; --bg-elevated:#261218; --bg-hover:#321a22; --bg-inset:#16080d;
+  --border:#3a1f28; --border-active:#5a2f3c;
+  --t:#f9e9ec; --t2:#d4aab4; --t3:#966e7a;
+  --accent:#ff2e4d; --accent-dim:#d11f3a; --accent-glow:rgba(255,46,77,.18);
+  --accent2:#ffa23c;
+  --gold:#f5b544; --gold-dim:#c2852a;
+  --jade:#43c8a3; --jade-dim:#21886e;
+  --hp:#ff3b52; --sp:#ffa23c; --mp:#ff7ab8; --exp:#e8d23c;
+}
+body[data-theme="sky"]{
+  --bg-deep:#071020; --bg-surface:#0c182c; --bg-elevated:#12203a; --bg-hover:#1a2c4d; --bg-inset:#091426;
+  --border:#1e3455; --border-active:#33609a;
+  --t:#eaf1fb; --t2:#a9bcd8; --t3:#6b80a0;
+  --accent:#00d4f0; --accent-dim:#00a0b8; --accent-glow:rgba(0,212,240,.16);
+  --accent2:#3b82f6;
+  --gold:#f0a828; --gold-dim:#b87a1a;
+  --jade:#40c8a0; --jade-dim:#1f8a6e;
+  --hp:#ff4757; --sp:#38b6ff; --mp:#a58bff; --exp:#b0d838;
+}
+body[data-theme="gold"]{
+  --bg-deep:#0a0812; --bg-surface:#12101e; --bg-elevated:#1a1730; --bg-hover:#242040; --bg-inset:#0d0b18;
+  --border:#32284e; --border-active:#4a3a70;
+  --t:#ece6f5; --t2:#b0a6c8; --t3:#7a6e9a;
+  --accent:#f0a828; --accent-dim:#b87818; --accent-glow:rgba(240,168,40,.15);
+  --accent2:#40c8a0;
+  --gold:#f0a828; --gold-dim:#b87818;
+  --jade:#40c8a0; --jade-dim:#208060;
+  --hp:#e85058; --sp:#5080e0; --mp:#a070f0; --exp:#a0d030;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg-deep);color:var(--t);
+  font-family:var(--font);font-size:13px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;user-select:none;
+}
+input,textarea{user-select:text}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}
+.hidden{display:none!important}
+button{font-family:var(--font);cursor:pointer}
+input,textarea,select{
+  background:var(--bg-surface);border:1px solid var(--border);color:var(--t);
+  border-radius:var(--rad);padding:8px 10px;font-size:12.5px;font-family:var(--font);outline:none;width:100%;
+}
+input:focus,textarea:focus,select:focus{border-color:var(--accent2-dim)}
+textarea{resize:vertical;min-height:60px;line-height:1.6}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--t3) 50%),linear-gradient(135deg,var(--t3) 50%,transparent 50%);background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:26px}
+label{font-size:12px;color:var(--t2)}
+fieldset{border:1px solid var(--border);border-radius:var(--rad2);padding:10px 12px;margin-bottom:10px}
+legend{font-size:11px;color:var(--t3);padding:0 6px;letter-spacing:1px}
+
+/* ============ 顶栏 ============ */
+#app{display:grid;grid-template-rows:46px 1fr;height:100vh;height:100dvh;overflow:hidden}
+#topbar{
+  display:flex;align-items:center;gap:6px;padding:0 10px;
+  background:var(--bg-surface);border-bottom:1px solid var(--border);z-index:20;
+}
+.logo{display:flex;align-items:center;gap:6px;font-weight:800;font-size:13.5px;letter-spacing:.5px;color:var(--t);white-space:nowrap}
+.logo .spider{color:var(--accent);font-size:15px}
+.logo small{font-size:9.5px;color:var(--t3);font-weight:400;letter-spacing:2px}
+.top-btn{
+  background:transparent;border:1px solid var(--border);color:var(--t2);
+  border-radius:var(--rad);padding:5px 10px;font-size:12px;white-space:nowrap;
+  transition:background .18s,border-color .18s,color .18s;
+}
+.top-btn:hover{background:var(--bg-hover);color:var(--t)}
+.top-btn.accent{border-color:var(--accent-dim);color:var(--accent)}
+.top-btn.accent:hover{background:var(--accent-glow);color:var(--accent)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--accent-glow);color:var(--gold)}
+.top-stat{
+  display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--t2);
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:20px;padding:2px 8px;white-space:nowrap;
+}
+.top-stat b{color:var(--t);font-weight:600}
+.mini-bar{width:42px;height:4px;background:var(--bg-inset);border-radius:2px;overflow:hidden}
+.mini-bar i{display:block;height:100%;background:var(--hp);border-radius:2px;transition:width .4s}
+.mini-bar.rep i{background:var(--gold)}
+.mini-bar.exp i{background:var(--accent)}
+.top-spacer{flex:1}
+
+/* ============ 主区 ============ */
+#center-panel{display:flex;flex-direction:column;min-height:0;background:var(--bg-deep)}
+#game-log{flex:1;overflow-y:auto;padding:14px 14px 6px;scroll-behavior:smooth}
+.log-entry{
+  position:relative;background:var(--bg-elevated);border:1px solid var(--border);
+  border-radius:var(--rad2);padding:9px 12px;margin-bottom:9px;font-size:12.8px;line-height:1.75;
+  animation:fade .25s ease;border-left:3px solid var(--t3);user-select:text;
+}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.log-entry .who{font-size:10.5px;letter-spacing:.5px;color:var(--t3);margin-bottom:2px;display:flex;gap:6px;align-items:center}
+.log-entry .who .opts{margin-left:auto;display:none;gap:6px}
+.log-entry:hover .who .opts{display:flex}
+.log-entry .who .opts button{background:none;border:none;color:var(--t3);font-size:10.5px;padding:0;cursor:pointer}
+.log-entry .who .opts button:hover{color:var(--accent)}
+.log-entry.narrative{border-left-color:var(--accent2-dim);background:var(--bg-elevated)}
+.log-entry.action{border-left-color:var(--gold-dim);font-style:italic;color:var(--t2)}
+.log-entry.system{border-left-color:var(--t3);background:var(--bg-surface);font-size:10.8px;font-family:var(--mono);color:var(--t3)}
+.log-entry.danger{border-left-color:var(--danger);background:linear-gradient(180deg,var(--bg-elevated),rgba(255,71,87,.07))}
+.log-entry.gold{border-left-color:var(--gold);background:linear-gradient(180deg,var(--bg-elevated),rgba(240,168,40,.07))}
+.log-entry.death{border-left-color:var(--danger);border-color:var(--danger);background:linear-gradient(180deg,rgba(255,71,87,.16),var(--bg-elevated))}
+.log-entry.thinking{border-left-color:var(--purple)}
+.log-entry.thinking details summary{cursor:pointer;font-size:11px;color:var(--purple);outline:none}
+.log-entry.thinking .tw{white-space:pre-wrap;font-size:11.5px;color:var(--t2);margin-top:6px;max-height:180px;overflow-y:auto}
+.log-entry .cursor{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:-2px;animation:blink .8s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.log-entry .note-tag{display:inline-block;font-size:9.5px;color:var(--t3);border:1px solid var(--border);border-radius:3px;padding:0 4px;margin-right:6px;vertical-align:1px}
+
+/* 快捷行动 */
+#quick-actions{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 2px}
+.quick-action{
+  background:var(--bg-elevated);border:1px solid var(--border);color:var(--t2);
+  border-radius:16px;padding:4px 12px;font-size:11.5px;transition:all .18s;
+}
+.quick-action:hover{border-color:var(--accent-dim);color:var(--accent)}
+.quick-action.cheat{display:none;border-style:dashed;border-color:var(--gold-dim);color:var(--gold)}
+body.cheat-on .quick-action.cheat{display:inline-block}
+
+/* 输入区 */
+#input-area{display:flex;gap:8px;align-items:flex-end;padding:8px 14px 12px}
+#input-area textarea{flex:1;min-height:42px;max-height:130px;font-size:13px;line-height:1.6;border-radius:var(--rad2)}
+#send-btn{
+  background:var(--accent);color:#0a0a0a;border:none;border-radius:var(--rad2);
+  padding:10px 20px;font-size:13px;font-weight:700;transition:filter .18s,opacity .18s;white-space:nowrap;
+}
+#send-btn:hover{filter:brightness(1.15)}
+#send-btn:disabled{opacity:.35;cursor:not-allowed}
+#stop-btn{display:none;background:var(--bg-elevated);border:1px solid var(--danger);color:var(--danger);border-radius:var(--rad2);padding:10px 14px;font-size:12px;font-weight:600;white-space:nowrap}
+#stop-btn.show{display:inline-block}
+.input-btns{display:flex;gap:6px;align-items:stretch}
+.input-btns .send-btn,.input-btns #send-btn{min-height:42px}
+.send-stop{background:var(--bg-elevated);border:1px solid var(--danger);color:var(--danger);border-radius:var(--rad2);padding:10px 14px;font-size:12px;font-weight:600;white-space:nowrap;display:none}
+.send-stop.show{display:inline-block}
+
+/* 加载指示 */
+#loading-indicator{display:none;align-items:center;gap:8px;padding:2px 14px;font-size:11.5px;color:var(--t3)}
+#loading-indicator.show{display:flex}
+#loading-indicator .dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:bounce 1s infinite}
+#loading-indicator .dot:nth-child(2){animation-delay:.15s}
+#loading-indicator .dot:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,100%{transform:scale(.5);opacity:.4}50%{transform:scale(1);opacity:1}}
+
+/* ============ 抽屉 ============ */
+.drawer{
+  position:fixed;top:0;height:100%;width:302px;background:var(--bg-surface);
+  border-left:1px solid var(--border);z-index:60;transition:transform .22s ease;display:flex;flex-direction:column;
+  box-shadow:var(--shadow);
+}
+#left-panel{left:0;transform:translateX(-102%);border-right:1px solid var(--border);border-left:none}
+#right-panel{right:0;transform:translateX(102%)}
+.drawer.open{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px}
+.drawer-head .close{margin-left:auto;background:none;border:none;color:var(--t3);font-size:14px}
+.drawer-head .close:hover{color:var(--t)}
+.drawer-body{flex:1;overflow-y:auto;padding:10px 12px 20px}
+#drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:55;opacity:0;pointer-events:none;transition:opacity .22s}
+#drawer-backdrop.show{opacity:1;pointer-events:auto}
+
+/* ============ 卡片与条目 ============ */
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:10px;margin-bottom:10px}
+.panel-card h3{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--t3);margin-bottom:8px;font-weight:600}
+.panel-card h3 .sub{float:right;letter-spacing:0;text-transform:none;color:var(--t2)}
+.stat-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11.5px}
+.stat-row .lbl{width:46px;color:var(--t2);flex:none}
+.stat-row .bar{flex:1;height:8px;background:var(--bg-inset);border-radius:4px;overflow:hidden}
+.stat-row .bar i{display:block;height:100%;border-radius:4px;transition:width .4s ease}
+.stat-row .val{width:44px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--t);flex:none}
+.attr-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+@media (max-width:560px){.attr-grid{grid-template-columns:1fr}}
+.attr-item{display:flex;align-items:center;justify-content:space-between;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad);padding:5px 8px;font-size:11.5px}
+.attr-item b{font-size:15px;font-family:var(--mono)}
+.kv{display:flex;justify-content:space-between;gap:8px;font-size:11.8px;padding:3px 0;border-bottom:1px dashed var(--border)}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--t3);flex:none}
+.kv .v{color:var(--t);text-align:right}
+.chip{display:inline-block;background:var(--bg-hover);border:1px solid var(--border);color:var(--t2);border-radius:5px;padding:2px 8px;font-size:11px;margin:0 5px 5px 0}
+.chip.hot{border-color:var(--gold-dim);color:var(--gold)}
+.chip.dead{border-color:var(--danger);color:var(--danger)}
+.chip.ok{border-color:var(--jade-dim);color:var(--jade)}
+.sect-title{font-size:10px;letter-spacing:1.2px;color:var(--t3);margin:12px 0 6px;font-weight:600}
+.fight-line{display:flex;justify-content:space-between;font-size:11.8px;padding:4px 0;color:var(--t2)}
+.fight-line b{color:var(--t);font-family:var(--mono)}
+
+/* ============ 模态框 ============ */
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px;animation:fade .2s ease}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad3);width:480px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.modal-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px}
+.modal-head .x{margin-left:auto;background:none;border:none;color:var(--t3);font-size:15px}
+.modal-head .x:hover{color:var(--t)}
+.modal-body{padding:14px 16px;overflow-y:auto}
+.modal-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border)}
+.btn{background:transparent;border:1px solid var(--border);color:var(--t2);border-radius:var(--rad);padding:7px 16px;font-size:12.5px;transition:all .18s}
+.btn:hover{background:var(--bg-hover);color:var(--t)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#1a1204;font-weight:700}
+.btn.gold:hover{filter:brightness(1.1)}
+.btn.jade{background:var(--jade);border-color:var(--jade);color:#04231a;font-weight:700}
+.btn.jade:hover{filter:brightness(1.1)}
+.btn.danger{background:transparent;border-color:var(--danger);color:var(--danger)}
+.btn.danger:hover{background:var(--danger);color:#fff}
+.btn.small{padding:4px 10px;font-size:11px}
+
+/* 设置页 */
+.set-group{border:1px solid var(--border);border-radius:var(--rad2);padding:12px;margin-bottom:12px}
+.set-group h4{font-size:11px;letter-spacing:1px;color:var(--gold);margin-bottom:10px;font-weight:700}
+.set-row{margin-bottom:9px}
+.set-row label{display:block;margin-bottom:3px}
+.set-row .hint{font-size:10.5px;color:var(--t3);margin-top:3px}
+.set-tools{display:flex;flex-wrap:wrap;gap:8px}
+.set-tools .btn{flex:1;min-width:120px;text-align:center}
+
+/* 标签页 */
+.tab-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tab-pills button{
+  background:var(--bg-surface);border:1px solid var(--border);color:var(--t2);
+  border-radius:14px;padding:4px 12px;font-size:11.5px;transition:all .18s;
+}
+.tab-pills button.on{border-color:var(--accent2-dim);color:var(--accent2);background:var(--accent-glow)}
+
+/* 百科条目 */
+.ency-item{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:10px 12px;margin-bottom:8px}
+.ency-item h4{font-size:13px;color:var(--accent2);margin-bottom:4px}
+.ency-item p{font-size:12px;color:var(--t2);line-height:1.7;white-space:pre-wrap}
+.ency-item .tag{font-size:9.5px;color:var(--t3);border:1px solid var(--border);border-radius:3px;padding:0 5px;margin-left:6px;vertical-align:2px}
+
+/* 记忆条目 */
+.mem-item{display:flex;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:8px 10px;margin-bottom:7px;font-size:12px;color:var(--t2)}
+.mem-item .mt{flex:none;font-size:9.5px;color:var(--gold);border:1px solid var(--gold-dim);border-radius:3px;padding:1px 6px;height:fit-content;margin-top:2px}
+.mem-item .mt.m-事件{color:var(--accent2);border-color:var(--accent2-dim)}
+.mem-item .mt.m-人物{color:var(--jade);border-color:var(--jade-dim)}
+.mem-item .mt.m-线索{color:var(--purple);border-color:var(--purple)}
+.mem-item .mt.m-物品{color:var(--gold);border-color:var(--gold-dim)}
+.mem-item .txt{flex:1}
+.mem-item .ts{flex:none;font-size:9.5px;color:var(--t3);font-family:var(--mono)}
+
+/* 死亡记录 */
+.death-card{border:1px solid var(--danger);border-radius:var(--rad2);background:linear-gradient(180deg,rgba(255,71,87,.1),transparent);padding:10px 12px;margin-bottom:10px}
+.death-card h5{color:var(--danger);font-size:12.5px;margin-bottom:4px}
+.death-card .dc-cause{font-size:11.5px;color:var(--t2);margin-bottom:6px}
+.death-card .dc-eval{font-size:11.8px;color:var(--t);background:var(--bg-surface);border-radius:var(--rad);padding:6px 8px;margin-bottom:6px}
+.death-card .dc-adv{font-size:11.8px;color:var(--jade);background:var(--bg-surface);border-radius:var(--rad);padding:6px 8px;margin-bottom:8px}
+.death-card .dc-foot{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--t3)}
+.ck-card{border:1px solid var(--border);border-radius:var(--rad2);background:var(--bg-surface);padding:8px 10px;margin-bottom:7px;display:flex;align-items:center;gap:8px}
+.ck-card .ck-info{flex:1;font-size:11.8px;color:var(--t2)}
+.ck-card .ck-info b{color:var(--t);font-size:12px}
+
+/* 死亡遮罩 */
+#death-overlay{position:fixed;inset:0;z-index:120;background:rgba(20,2,4,.88);display:none;align-items:center;justify-content:center;padding:20px}
+#death-overlay.show{display:flex}
+.death-box{background:var(--bg-elevated);border:1px solid var(--danger);border-radius:var(--rad3);max-width:520px;width:100%;padding:26px 24px;text-align:center;box-shadow:0 0 60px rgba(255,71,87,.25)}
+.death-box .skull{font-size:44px;line-height:1}
+.death-box h2{color:var(--danger);font-size:20px;margin:10px 0 4px;letter-spacing:2px}
+.death-box .db-sub{font-size:11.5px;color:var(--t3);margin-bottom:14px}
+.death-box .db-block{text-align:left;background:var(--bg-surface);border-radius:var(--rad2);padding:10px 12px;margin-bottom:10px;font-size:12.5px}
+.death-box .db-block .ttl{font-size:10px;letter-spacing:1px;color:var(--gold);margin-bottom:4px;font-weight:700}
+.death-box .db-block.eval .ttl{color:var(--accent2)}
+.death-box .db-block.adv .ttl{color:var(--jade)}
+.death-box .db-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:14px}
+.death-box .db-actions .btn{min-width:130px}
+
+/* ============ 向导 ============ */
+#setup-overlay{position:fixed;inset:0;z-index:200;background:radial-gradient(1200px 600px at 50% -10%,rgba(255,59,71,.12),transparent),var(--bg-deep);display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
+.setup-box{width:640px;max-width:100%;background:var(--bg-surface);border:1px solid var(--border-active);border-radius:var(--rad3);box-shadow:var(--shadow);display:flex;flex-direction:column;max-height:94vh}
+.setup-head{padding:16px 20px 8px;text-align:center}
+.setup-head .t1{font-size:21px;font-weight:800;letter-spacing:1px}
+.setup-head .t1 .sp{color:var(--accent)}
+.setup-head .t2{font-size:11px;color:var(--t3);letter-spacing:3px;margin-top:2px}
+.setup-progress{display:flex;gap:4px;padding:12px 20px 4px;justify-content:center}
+.setup-progress .sp-dot{flex:1;max-width:56px;height:4px;border-radius:2px;background:var(--bg-inset);transition:background .3s}
+.setup-progress .sp-dot.on{background:var(--accent)}
+.setup-progress .sp-dot.done{background:var(--accent-dim)}
+.setup-body{padding:14px 20px 6px;overflow-y:auto;flex:1}
+.setup-nav{display:flex;justify-content:space-between;gap:10px;padding:12px 20px 18px}
+.setup-nav .btn{min-width:110px}
+.wizard-h{font-size:15px;font-weight:700;margin-bottom:2px}
+.wizard-sub{font-size:11.5px;color:var(--t3);margin-bottom:12px}
+.wizard-h .step-tag{font-size:9.5px;color:var(--accent);border:1px solid var(--accent-dim);border-radius:3px;padding:1px 6px;margin-right:8px;vertical-align:2px;letter-spacing:1px}
+.mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.option-card{
+  background:var(--bg-elevated);border:2px solid var(--border);border-radius:var(--rad2);
+  padding:12px;cursor:pointer;transition:all .18s;
+}
+.option-card:hover{border-color:var(--border-active)}
+.option-card .oc-t{font-size:13px;font-weight:700;margin-bottom:3px}
+.option-card .oc-d{font-size:11px;color:var(--t3);line-height:1.5}
+.option-card.selected{border-color:var(--accent);background:var(--accent-glow)}
+.option-card.selected .oc-t{color:var(--accent)}
+.custom-input{border:1px dashed var(--gold-dim);background:var(--bg-surface);color:var(--gold);margin-top:8px;display:none}
+.custom-input.show{display:block}
+.attr-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.attr-ctrl{display:flex;align-items:center;gap:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:7px 10px}
+.attr-ctrl .an{width:34px;font-size:11px;color:var(--t2);flex:none}
+.attr-ctrl .av{width:40px;text-align:center;font-size:16px;font-weight:800;font-family:var(--mono);flex:none}
+.attr-ctrl .am{font-size:9.5px;color:var(--t3);width:44px;flex:none}
+.attr-ctrl button{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--bg-hover);color:var(--t);font-size:14px;line-height:1;flex:none}
+.attr-ctrl button:hover{border-color:var(--accent-dim);color:var(--accent)}
+.attr-ctrl button:disabled{opacity:.3;cursor:not-allowed}
+.pool-line{display:flex;align-items:center;gap:10px;margin:10px 0 6px;font-size:12px;color:var(--t2)}
+.pool-line b{font-size:15px;color:var(--gold);font-family:var(--mono)}
+.pool-line.warn b{color:var(--danger)}
+.trait-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.trait-chip{
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);
+  padding:8px 10px;cursor:pointer;transition:all .15s;position:relative;font-size:12px;
+}
+.trait-chip .tc-t{font-weight:700;font-size:12px}
+.trait-chip .tc-d{font-size:10.5px;color:var(--t3);margin-top:2px;line-height:1.5}
+.trait-chip:hover{border-color:var(--border-active)}
+.trait-chip.sel{border-color:var(--accent);background:var(--accent-glow)}
+.trait-chip.sel .tc-t{color:var(--accent)}
+.trait-chip.sel::after{content:"✓";position:absolute;top:6px;right:9px;color:var(--accent);font-weight:800}
+.trait-chip.weak.sel{border-color:var(--danger);background:rgba(255,71,87,.08)}
+.trait-chip.weak.sel .tc-t{color:var(--danger)}
+.trait-chip.weak.sel::after{color:var(--danger)}
+.skill-row{display:flex;align-items:center;gap:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad);padding:4px 10px;margin-bottom:5px}
+.skill-row .sk-n{flex:1;font-size:12px;color:var(--t2)}
+.skill-row .sk-n b{color:var(--t);font-weight:600}
+.skill-row .sk-lvl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t3)}
+.skill-row .sk-lvl button{width:20px;height:20px;border-radius:50%;border:1px solid var(--border);background:var(--bg-hover);color:var(--t);font-size:11px;line-height:1}
+.skill-row .sk-lvl button:hover{border-color:var(--gold-dim);color:var(--gold)}
+.skill-row .sk-lvl b{width:16px;text-align:center;font-family:var(--mono);color:var(--gold)}
+.chip-pick{display:inline-block;background:var(--bg-elevated);border:1px solid var(--border);border-radius:16px;padding:4px 13px;font-size:11.8px;color:var(--t2);cursor:pointer;margin:0 6px 7px 0;transition:all .15s}
+.chip-pick:hover{border-color:var(--border-active)}
+.chip-pick.sel{border-color:var(--accent);background:var(--accent-glow);color:var(--accent)}
+.radio-line{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.radio-card{flex:1;min-width:150px;background:var(--bg-elevated);border:2px solid var(--border);border-radius:var(--rad2);padding:10px 12px;cursor:pointer;transition:all .18s}
+.radio-card:hover{border-color:var(--border-active)}
+.radio-card .rc-t{font-weight:700;font-size:12.5px}
+.radio-card .rc-d{font-size:10.8px;color:var(--t3);margin-top:2px;line-height:1.5}
+.radio-card.sel{border-color:var(--accent);background:var(--accent-glow)}
+.radio-card.sel .rc-t{color:var(--accent)}
+.cheat-switch{display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(240,168,40,.12),transparent);border:1px dashed var(--gold-dim);border-radius:var(--rad2);padding:10px 12px;margin-bottom:12px}
+.cheat-switch .cs-t{flex:1;font-size:12.5px;color:var(--gold);font-weight:700}
+.cheat-switch .cs-d{font-size:10.5px;color:var(--t3)}
+.tgl{position:relative;width:42px;height:22px;flex:none}
+.tgl input{opacity:0;width:0;height:0}
+.tgl .sl{position:absolute;inset:0;background:var(--bg-inset);border:1px solid var(--border);border-radius:20px;transition:.25s;cursor:pointer}
+.tgl .sl::before{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:var(--t3);top:2px;left:2px;transition:.25s}
+.tgl input:checked+.sl{background:var(--gold-dim);border-color:var(--gold)}
+.tgl input:checked+.sl::before{transform:translateX(20px);background:var(--gold)}
+.confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.confirm-grid .panel-card{margin-bottom:0}
+.confirm-line{display:flex;justify-content:space-between;gap:8px;font-size:11.8px;padding:3px 0;border-bottom:1px dashed var(--border)}
+.confirm-line .k{color:var(--t3);flex:none}
+.confirm-line .v{color:var(--t);text-align:right;word-break:break-all}
+.confirm-note{background:var(--bg-surface);border-left:3px solid var(--gold-dim);border-radius:var(--rad);padding:8px 10px;font-size:11.5px;color:var(--t2);white-space:pre-wrap;margin-top:10px}
+
+/* ============ Toast ============ */
+#toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--bg-elevated);border:1px solid var(--border-active);color:var(--t);
+  padding:9px 18px;border-radius:20px;font-size:12.5px;z-index:300;opacity:0;pointer-events:none;
+  transition:all .25s;box-shadow:var(--shadow);max-width:88vw;text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:var(--jade)}
+#toast.err{border-color:var(--danger);color:#ffb3b8}
+
+/* ============ 补充样式(向导/状态/弹窗) ============ */
+.muted{color:var(--t3);font-size:11px}
+.small{font-size:10.5px}
+.hidden{display:none!important}
+.ok{color:var(--success)}
+.warn{color:var(--gold)}
+.bad{color:var(--danger)}
+.typing{color:var(--t3);font-style:italic}
+.nb{white-space:pre-wrap;line-height:1.7}
+/* 创建向导 */
+.setup-box{position:relative;width:min(680px,94vw);max-height:94vh;margin:2vh auto;background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad3);box-shadow:var(--shadow);display:flex;flex-direction:column}
+.setup-head{padding:16px 20px 6px;border-bottom:1px solid var(--border)}
+.sh-logo{font-size:20px;font-weight:800;color:var(--accent);letter-spacing:1px}
+.sh-sub{font-size:11px;color:var(--t3);margin-top:2px}
+.setup-progress{display:flex;gap:4px;padding:10px 20px 0;overflow-x:auto}
+.sp-dot{flex:1;min-width:52px;text-align:center;font-size:10px;color:var(--t3);padding:4px 2px;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface)}
+.sp-dot.on{border-color:var(--accent-dim);color:var(--t2)}
+.sp-dot.cur{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+.sp-dot span{display:block;font-size:13px;font-weight:700}
+.sp-dot em{font-style:normal}
+.setup-body{padding:14px 20px 10px;overflow-y:auto;flex:1}
+.step-title{font-size:16px;font-weight:800;color:var(--t)}
+.step-sub{font-size:11.5px;color:var(--t3);margin:4px 0 12px}
+.setup-nav{display:flex;justify-content:space-between;gap:10px;padding:12px 20px 16px;border-top:1px solid var(--border)}
+/* 表单 */
+.f-label{display:block;font-size:11px;color:var(--t2);margin:10px 0 4px;font-weight:600}
+input[type=text],input[type=password],textarea,select{width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad);color:var(--t);padding:8px 10px;font-size:13px;outline:none;box-sizing:border-box;font-family:var(--font)}
+input:focus,textarea:focus,select:focus{border-color:var(--accent-dim)}
+.f-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.f-col{flex:1;min-width:130px}
+.f-col.grow{flex:2}
+.check{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--t2);cursor:pointer}
+.check input{width:auto}
+/* 按钮 */
+.btn{background:var(--bg-hover);border:1px solid var(--border-active);color:var(--t);border-radius:var(--rad);padding:7px 14px;font-size:12.5px;cursor:pointer;font-weight:600;transition:all .15s;font-family:var(--font)}
+.btn:hover{background:var(--bg-hover);border-color:var(--t3)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#14100a}
+.btn.gold:hover{background:#ffc94a}
+.btn.jade{background:var(--jade);border-color:var(--jade);color:#04140f}
+.btn.jade:hover{background:#5fe0bc}
+.btn.danger{background:transparent;border-color:var(--danger);color:var(--danger)}
+.btn.danger:hover{background:var(--danger);color:#fff}
+.btn.small{padding:4px 10px;font-size:11px}
+.btn.big{padding:11px 20px;font-size:14px}
+.send-btn{background:var(--accent);border:none;color:#0d0506;border-radius:var(--rad2);padding:9px 22px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:var(--font);transition:all .15s}
+.send-btn:hover{filter:brightness(1.15)}
+.send-btn:disabled{opacity:.35;cursor:not-allowed}
+.send-stop{background:var(--bg-hover);border:1px solid var(--border-active);color:var(--t2);border-radius:var(--rad2);padding:9px 16px;font-size:12.5px;cursor:pointer;font-family:var(--font)}
+/* 顶栏 */
+.tb-left,.tb-right{display:flex;align-items:center;gap:6px}
+.tb-stats{display:flex;align-items:center;gap:6px;margin-left:auto;margin-right:8px}
+.tb-logo{display:flex;align-items:center;gap:5px;font-weight:800;color:var(--accent);cursor:pointer;font-size:15px;padding:0 6px}
+.tb-logo-txt{font-size:13.5px}
+/* 选项卡片 */
+.mode-cards,.trait-grid,.attr-row,.confirm-grid,.zone-grid,.diff-grid{display:grid;gap:8px}
+.mode-cards{grid-template-columns:1fr 1fr}
+.trait-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.attr-row{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.confirm-grid{grid-template-columns:1fr 1fr}
+.zone-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.diff-grid{grid-template-columns:repeat(3,1fr)}
+.option-card,.zone-card,.diff-card{border:1px solid var(--border);border-radius:var(--rad2);padding:10px 12px;cursor:pointer;background:var(--bg-surface);transition:all .15s;text-align:left;color:var(--t);font-family:var(--font)}
+.option-card:hover,.zone-card:hover,.diff-card:hover{border-color:var(--t3)}
+.option-card.selected,.zone-card.selected,.diff-card.selected{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 0 1px var(--accent) inset}
+.option-card .oc-name{font-weight:700;font-size:13px}
+.option-card .oc-desc{font-size:11px;color:var(--t3);margin-top:3px;line-height:1.5}
+.diff-card .dc-name{font-weight:800;font-size:14px;color:var(--gold)}
+.diff-card .dc-desc{font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5}
+/* 属性控制 */
+.attr-ctrl{display:flex;align-items:center;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:8px 10px}
+.attr-ctrl .am{width:24px;height:24px;border-radius:50%;border:1px solid var(--border-active);background:var(--bg-hover);color:var(--t);cursor:pointer;font-weight:800;line-height:1}
+.attr-ctrl .am:hover{border-color:var(--accent);color:var(--accent)}
+.attr-ctrl .av{font-family:var(--mono);font-size:15px;font-weight:700;min-width:26px;text-align:center;color:var(--accent)}
+.attr-ctrl .al{font-size:11px;color:var(--t2);flex:1}
+.attr-ctrl .amod{font-size:10px;color:var(--t3);font-family:var(--mono)}
+/* 特质/弱点/技能选择 */
+.trait-setup{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:8px 10px;cursor:pointer;transition:all .15s}
+.trait-setup:hover{border-color:var(--t3)}
+.trait-setup.sel{border-color:var(--gold);background:rgba(240,168,40,.08)}
+.trait-setup.sel .ts-name{color:var(--gold)}
+.trait-setup .ts-name{font-size:12.5px;font-weight:700}
+.trait-setup .ts-desc{font-size:10.5px;color:var(--t3);margin-top:2px}
+.trait-setup .t-ctrl{display:flex;align-items:center;gap:6px;margin-top:6px}
+.trait-setup .t-ctrl button{width:22px;height:22px;border-radius:50%;border:1px solid var(--border-active);background:var(--bg-hover);color:var(--jade);cursor:pointer;font-weight:800}
+.t-ctrl .slv{font-family:var(--mono);font-size:12px;color:var(--jade);min-width:18px;text-align:center}
+/* 徽章与芯片 */
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{background:var(--bg-hover);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--t2)}
+.chip em{font-style:normal;color:var(--jade);font-family:var(--mono)}
+.chip.gold{border-color:var(--gold-dim);color:var(--gold)}
+.chip.red{border-color:var(--danger);color:var(--danger)}
+.chip.blue{border-color:var(--accent2-dim);color:var(--accent2)}
+/* 角色页 */
+.hero-card{display:flex;align-items:center;gap:12px;background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad2);padding:14px;margin-bottom:10px}
+.hero-avatar{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-dim));display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.hero-name{font-size:18px;font-weight:800;color:var(--t)}
+.hero-sub{font-size:11px;color:var(--t2);margin-top:2px}
+.cond-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-top:8px}
+.cond-item{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad);padding:6px 8px;font-size:11px}
+.cond-item span{display:block;color:var(--t3);font-size:9.5px;margin-bottom:2px}
+.cond-item b{color:var(--t);font-weight:600}
+.sub-sec{font-size:10px;color:var(--t3);letter-spacing:1px;margin:10px 0 4px;text-transform:uppercase;font-weight:700}
+.q-item{font-size:11.5px;color:var(--t2);padding:4px 0;border-bottom:1px dashed var(--border)}
+.q-item.done{color:var(--t3);text-decoration:line-through}
+.mem-mini{font-size:10.5px;color:var(--t2);padding:3px 0;border-bottom:1px dashed var(--border)}
+.abil-item{font-size:11.5px;color:var(--t2);padding:4px 0}
+.lf-item{font-size:11.5px;color:var(--t2);padding:5px 0;border-bottom:1px dashed var(--border);line-height:1.5}
+.lf-item span{color:var(--t3);margin-right:6px;font-size:10px}
+.rel-item{font-size:11.5px;padding:5px 0;border-bottom:1px dashed var(--border)}
+.rel-item b{color:var(--t)}
+.rel-item span{margin-left:6px;font-weight:700}
+.rel-item em{display:block;font-style:normal;font-size:10.5px;color:var(--t3)}
+.zone-mini{display:flex;justify-content:space-between;font-size:11px;color:var(--t2);padding:4px 6px;border-radius:var(--rad);border:1px solid transparent}
+.zone-mini.cur{background:var(--accent-glow);border-color:var(--accent-dim);color:var(--t)}
+.zone-title{font-size:15px;font-weight:800;color:var(--t)}
+.danger-tag{color:var(--gold);font-size:11px}
+/* 百科 */
+.en-cat,.mem-filter{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.en-pill{border:1px solid var(--border);background:var(--bg-surface);color:var(--t2);border-radius:20px;padding:4px 12px;font-size:11.5px;cursor:pointer;font-family:var(--font);transition:all .15s}
+.en-pill:hover{border-color:var(--t3)}
+.en-pill.active{background:var(--jade);border-color:var(--jade);color:#04140f;font-weight:700}
+.en-list{display:flex;flex-direction:column;gap:6px;max-height:38vh;overflow-y:auto}
+.ency-entry{border:1px solid var(--border);border-radius:var(--rad2);background:var(--bg-surface)}
+.ency-entry summary{cursor:pointer;padding:8px 12px;font-size:12.5px;font-weight:700;color:var(--t);list-style:none;display:flex;justify-content:space-between;align-items:center}
+.ency-entry summary em{font-style:normal;font-size:10px;color:var(--jade);border:1px solid var(--jade-dim);border-radius:10px;padding:1px 8px}
+.ency-content{padding:0 12px 10px;font-size:11.5px;color:var(--t2);line-height:1.7;white-space:pre-wrap}
+.en-qa{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
+.en-qa-title{font-size:11.5px;color:var(--t2);font-weight:700;margin-bottom:6px}
+.en-qa-row{display:flex;gap:8px}
+.en-qa-row input{flex:1}
+.ency-ans{margin-top:8px;background:var(--bg-surface);border-left:3px solid var(--jade);border-radius:var(--rad);padding:10px 12px;font-size:12.5px;color:var(--t);line-height:1.7}
+.ency-ans.loading{color:var(--t3)}
+.ency-ans.err{border-left-color:var(--danger);color:var(--danger)}
+/* 记忆 */
+.mem-list{max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.mem-entry{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:8px 12px;font-size:12px;color:var(--t2);line-height:1.6}
+.mem-entry .mem-type{display:inline-block;font-size:10px;color:var(--jade);border:1px solid var(--jade-dim);border-radius:10px;padding:0 8px;margin-bottom:4px}
+.mem-entry em{display:block;font-style:normal;font-size:10px;color:var(--t3);margin-top:4px}
+/* 死亡回档 */
+.death-card{background:var(--bg-surface);border:1px solid var(--border-active);border-radius:var(--rad2);padding:10px 12px;margin-bottom:8px}
+.d-head{font-size:12.5px;font-weight:800;color:var(--danger);display:flex;justify-content:space-between}
+.d-head em{font-style:normal;font-size:10px;color:var(--t3);font-weight:400}
+.d-reason{font-size:12px;color:var(--t);margin-top:6px}
+.d-eval,.d-advice{font-size:11.5px;color:var(--t2);margin-top:4px;line-height:1.6}
+.d-advice{color:var(--jade)}
+.death-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+/* 死亡结算 */
+#death-overlay{position:fixed;inset:0;z-index:500;background:rgba(5,2,4,.92);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.death-box{width:min(560px,94vw);background:var(--bg-elevated);border:1px solid var(--danger);border-radius:var(--rad3);padding:28px 26px;box-shadow:0 0 60px rgba(255,71,87,.25);max-height:90vh;overflow-y:auto}
+.death-title{font-size:30px;font-weight:900;color:var(--danger);text-align:center;letter-spacing:4px;margin-bottom:14px}
+.death-reason{font-size:13px;color:var(--t);text-align:center;margin-bottom:12px;font-weight:600}
+.death-eval,.death-advice{background:var(--bg-surface);border-radius:var(--rad2);padding:10px 12px;font-size:12.5px;line-height:1.7;color:var(--t2);margin-bottom:8px}
+.death-advice{border-left:3px solid var(--jade)}
+/* 确认页 */
+.c-item{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad);padding:8px 10px;font-size:11.5px}
+.c-item span{display:block;font-size:9.5px;color:var(--t3);margin-bottom:2px;letter-spacing:1px}
+.c-item b{color:var(--t);font-weight:600;line-height:1.5;font-size:11.5px}
+.c-item.full{grid-column:1/-1}
+/* 日志流 */
+.log-entry{position:relative;padding:9px 12px 9px 16px;border-left:3px solid var(--t3);border-radius:0 var(--rad2) var(--rad2) 0;background:var(--bg-elevated);font-size:12.5px;line-height:1.7;color:var(--t);animation:fade .25s ease;word-break:break-word;margin-bottom:8px}
+.log-entry.narrative{border-left-color:var(--accent);background:var(--bg-elevated)}
+.log-entry.action{border-left-color:var(--gold);background:var(--bg-surface);color:var(--t2);font-style:italic}
+.log-entry.system{border-left-color:var(--t3);background:var(--bg-inset);color:var(--t3);font-family:var(--mono);font-size:10.5px}
+.log-entry.gold{border-left-color:var(--gold);background:linear-gradient(90deg,rgba(240,168,40,.1),transparent)}
+.log-entry.danger,.log-entry.death{border-left-color:var(--danger);background:linear-gradient(90deg,rgba(255,71,87,.12),transparent)}
+.log-entry.think{border-left-color:var(--purple)}
+details.think{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad);padding:6px 10px;margin-bottom:8px}
+details.think summary{cursor:pointer;font-size:10.5px;color:var(--purple);font-family:var(--mono)}
+details.think .nb{font-size:11px;color:var(--t3);font-family:var(--mono);white-space:pre-wrap}
+/* 抽屉 */
+.drawer{position:fixed;top:0;bottom:0;width:310px;background:var(--bg-elevated);border-left:1px solid var(--border-active);z-index:150;transition:transform .22s ease;display:flex;flex-direction:column}
+.drawer.left{left:0;transform:translateX(-102%);border-right:1px solid var(--border-active);border-left:none}
+.drawer.right{right:0;transform:translateX(102%)}
+#left-panel.open,#right-panel.open{transform:translateX(0)}
+.drawer-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);font-weight:800;color:var(--t);font-size:14px}
+.d-close{background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:4px 8px}
+.d-close:hover{color:var(--t)}
+.drawer-body{padding:12px;overflow-y:auto;flex:1}
+#drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:140;opacity:1;pointer-events:auto}
+/* 弹窗 */
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;animation:fade .18s ease}
+.modal{width:min(460px,96vw);max-height:90vh;background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad3);box-shadow:var(--shadow);display:flex;flex-direction:column}
+.modal.wide{width:min(680px,96vw)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);font-weight:800;color:var(--t);font-size:15px}
+.modal-body{padding:14px 18px;overflow-y:auto}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;border-top:1px solid var(--border)}
+.guide-text{font-size:12.5px;color:var(--t2);line-height:1.8;white-space:pre-wrap}
+/* 向导组件·JS类名补充 */
+.mode-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.mode-card{display:flex;flex-direction:column;gap:4px;border:2px solid var(--border);border-radius:var(--rad2);padding:12px;cursor:pointer;background:var(--bg-elevated);transition:all .15s;text-align:left;font-family:var(--font)}
+.mode-card:hover{border-color:var(--t3)}
+.mode-card.selected{border-color:var(--accent);background:var(--accent-glow)}
+.mode-card .oc-icon{font-size:26px}
+.oc-name{font-size:14px;font-weight:800;color:var(--t)}
+.oc-desc{font-size:11px;color:var(--t3);line-height:1.5}
+.cheat-bar{background:linear-gradient(90deg,rgba(240,168,40,.14),transparent);border:1px dashed var(--gold-dim);border-radius:var(--rad2);padding:9px 12px;margin-bottom:12px}
+.gold-txt{color:var(--gold);font-family:var(--mono);font-size:14px}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-glow);font-weight:700}
+.trait-chip{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:8px 10px;cursor:pointer;transition:all .15s;position:relative;font-size:12px;text-align:left;font-family:var(--font);color:var(--t2)}
+.trait-chip b{display:block;font-size:12.5px;color:var(--t)}
+.trait-chip span{font-size:10px;color:var(--t3);line-height:1.4}
+.trait-chip:hover{border-color:var(--t3)}
+.trait-chip.on{border-color:var(--gold);color:var(--gold);background:rgba(240,168,40,.1)}
+.trait-chip.on::after{content:'✓';position:absolute;top:4px;right:8px;color:var(--gold);font-weight:800}
+.trait-chip.wk.on{border-color:var(--danger);background:rgba(255,71,87,.1)}
+.trait-chip.wk.on::after{content:'✓';color:var(--danger)}
+.trait-chip.wk.on b{color:var(--danger)}
+.attr-ctrl .ac-name{font-size:11.5px;color:var(--t2);flex:1}
+.attr-ctrl .ac-val{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--accent);min-width:24px;text-align:center}
+.skill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
+.skill-ctrl{display:flex;align-items:center;gap:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad);padding:5px 10px;cursor:pointer;transition:all .15s}
+.skill-ctrl.on{border-color:var(--jade);background:rgba(64,200,160,.08)}
+.skill-ctrl .sk-name{flex:1;font-size:11.5px;color:var(--t2)}
+.skill-ctrl.on .sk-name{color:var(--jade);font-weight:700}
+.skill-ctrl .sm{width:20px;height:20px;border-radius:50%;border:1px solid var(--border-active);background:var(--bg-hover);color:var(--t);cursor:pointer;font-weight:800;line-height:1;font-size:11px}
+.skill-ctrl .sm:hover{border-color:var(--jade);color:var(--jade)}
+.zone-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.zone-card{border:1px solid var(--border);border-radius:var(--rad2);padding:9px 11px;cursor:pointer;background:var(--bg-elevated);transition:all .15s;text-align:left;font-family:var(--font);display:flex;flex-direction:column;gap:2px}
+.zone-card:hover{border-color:var(--t3)}
+.zone-card.selected{border-color:var(--accent);background:var(--accent-glow)}
+.zone-card b{font-size:12.5px;color:var(--t)}
+.zone-card .zd{font-size:10px;color:var(--gold)}
+.zone-card em{font-style:normal;font-size:10px;color:var(--t3);line-height:1.4}
+.diff-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.diff-card{border:2px solid var(--border);border-radius:var(--rad2);padding:11px 12px;cursor:pointer;background:var(--bg-elevated);transition:all .15s;text-align:left;font-family:var(--font);display:flex;flex-direction:column;gap:3px}
+.diff-card:hover{border-color:var(--t3)}
+.diff-card.selected{border-color:var(--gold);background:rgba(240,168,40,.1)}
+.diff-card b{font-size:14px;font-weight:800;color:var(--gold)}
+.diff-card .dd{font-size:10.5px;color:var(--t2)}
+.diff-card em{font-style:normal;font-size:10.5px;color:var(--t3);line-height:1.5}
+.custom-input{border:1px dashed var(--gold-dim);background:var(--bg-surface);color:var(--gold);margin-top:8px}
+.attr-grid .attr-ctrl .am{width:24px;height:24px;border-radius:50%;border:1px solid var(--border-active);background:var(--bg-hover);color:var(--t);cursor:pointer;font-weight:800;line-height:1}
+.attr-grid .attr-ctrl .am:hover{border-color:var(--accent);color:var(--accent)}
+.s-label{width:46px;color:var(--t2);flex:none;font-size:11px}
+.name-row{display:flex;gap:6px;align-items:center}
+.name-row input{flex:1;min-width:0}
+.name-row .btn{flex:none;white-space:nowrap}
+.hero-info{flex:1;min-width:0}
+.stat-row.big .bar{height:10px}
+.stat-row.big b{font-family:var(--mono)}
+/* 响应式 */
+@media (max-width:768px){
+  #topbar{gap:3px;padding:0 6px}
+  .top-btn{padding:5px 7px;font-size:11px}
+  .top-btn .lbl{display:none}
+  .tb-logo-txt{display:none}
+  .tb-logo{font-size:16px;padding:0 2px}
+  .top-stat{font-size:9.5px;padding:2px 6px}
+  .top-stat .mini-bar{display:none}
+  .top-stat b{font-size:9.5px}
+  .drawer{width:88vw}
+  .modal{max-height:92vh}
+  .mode-cards,.trait-grid,.attr-row,.confirm-grid,.mode-row{grid-template-columns:1fr}
+  .setup-box{max-height:96vh}
+  #game-log{padding:10px 10px 4px}
+  #input-area{padding:8px 10px 10px}
+  #quick-actions{padding:8px 10px 2px}
+  .log-entry{font-size:12.5px}
+  .radio-card{min-width:130px}
+  #chat-input{font-size:14px}
+  #send-btn{padding:10px 16px}
+  .quick-action{padding:5px 11px;font-size:11px}
+  .diff-row{grid-template-columns:1fr}
+  .zone-row{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  .tb-stats{gap:3px}
+}
+@media (max-width:480px){
+  .top-stat.rep,.top-stat.expo{display:none}
+  .top-btn{padding:5px 6px}
+  #topbar{gap:2px}
+  .death-btns{flex-direction:column}
+  .death-btns .btn{width:100%}
+  .confirm-grid{grid-template-columns:1fr}
+}
+@media (max-width:400px){
+  .top-stat.rep,.top-stat.expo{display:none}
+  .attr-ctrl .am{width:30px;height:30px;font-size:16px}
+  .setup-nav{flex-direction:column}
+  .setup-nav .btn{width:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body data-theme="night">
+
+<!-- ═══════════ 创建向导 ═══════════ -->
+<div id="setup-overlay" class="hidden">
+  <div class="setup-box">
+    <div class="setup-head">
+      <div class="sh-logo">🕷️ 蛛网之影</div>
+      <div class="sh-sub">蜘蛛侠世界观 · AI角色扮演游戏</div>
+    </div>
+    <div class="setup-progress" id="setup-progress"></div>
+    <div class="setup-body" id="setup-body"></div>
+    <div class="setup-nav">
+      <button class="btn" id="setup-prev" onclick="W.prev()">← 上一步</button>
+      <button class="btn gold" id="setup-next" onclick="W.next()">下一步 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 主游戏界面 ═══════════ -->
+<div id="app" class="hidden">
+  <div id="topbar">
+    <div class="tb-left">
+      <div class="tb-logo" onclick="UI.openGuide()">🕷️<span class="tb-logo-txt">蛛网之影</span></div>
+      <button class="top-btn" onclick="UI.openDrawer('left')">👤<span class="lbl"> 角色</span></button>
+      <button class="top-btn gold" onclick="UI.openDeath()">💀<span class="lbl"> 回档</span></button>
+    </div>
+    <div class="tb-stats">
+      <div class="top-stat hp"><span>❤</span><div class="mini-bar"><i id="tb-hp"></i></div><b id="tb-hp-txt">0/0</b></div>
+      <div class="top-stat rep"><span>⭐</span><div class="mini-bar"><i id="tb-rep"></i></div><b id="tb-rep-txt">0</b></div>
+      <div class="top-stat expo"><span>🎭</span><div class="mini-bar"><i id="tb-expo"></i></div><b id="tb-expo-txt">0</b></div>
+    </div>
+    <div class="tb-right">
+      <button class="top-btn jade" onclick="UI.openGuide()">📜<span class="lbl"> 攻略</span></button>
+      <button class="top-btn" onclick="UI.openEncy()">📖<span class="lbl"> 百科</span></button>
+      <button class="top-btn" onclick="UI.openMem()">🧠<span class="lbl"> 记忆</span></button>
+      <button class="top-btn" onclick="UI.openDrawer('right')">🗺️<span class="lbl"> 世界</span></button>
+      <button class="top-btn" onclick="UI.openSettings()">⚙️<span class="lbl"> 设置</span></button>
+    </div>
+  </div>
+
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div id="quick-actions" class="quick-actions"></div>
+    <div id="input-area">
+      <textarea id="chat-input" rows="1" placeholder="输入你的行动…(Enter发送 / Shift+Enter换行)"></textarea>
+      <div class="input-btns">
+        <button class="send-stop" id="stop-btn" onclick="Game.stopGen()">⏹ 停止</button>
+        <button class="send-btn" id="send-btn" onclick="Game.send()">▶ 行动</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 左侧抽屉 · 角色 ═══════════ -->
+<div id="left-panel" class="drawer left">
+  <div class="drawer-head"><span>👤 角色档案</span><button class="d-close" onclick="UI.closeDrawer('left')">✕</button></div>
+  <div class="drawer-body" id="char-body"></div>
+</div>
+
+<!-- ═══════════ 右侧抽屉 · 世界 ═══════════ -->
+<div id="right-panel" class="drawer right">
+  <div class="drawer-head"><span>🗺️ 纽约世界</span><button class="d-close" onclick="UI.closeDrawer('right')">✕</button></div>
+  <div class="drawer-body" id="world-body"></div>
+</div>
+<div id="drawer-backdrop" class="hidden" onclick="UI.closeAllDrawers()"></div>
+
+<!-- ═══════════ 设置弹窗 ═══════════ -->
+<div id="settings-modal" class="modal-mask hidden" onclick="if(event.target===this)UI.closeModal('settings-modal')">
+  <div class="modal">
+    <div class="modal-head"><span>⚙️ 设置</span><button class="d-close" onclick="UI.closeModal('settings-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="panel-card">
+        <h3>🔌 API 设置</h3>
+        <label class="f-label">API 端点</label>
+        <input id="set-endpoint" type="text" spellcheck="false">
+        <label class="f-label">API Key <span class="muted">(仅保存在本机浏览器)</span></label>
+        <input id="set-apikey" type="password" autocomplete="off" placeholder="sk-…">
+        <div class="f-row">
+          <div class="f-col">
+            <label class="f-label">模型</label>
+            <select id="set-model"></select>
+          </div>
+          <div class="f-col">
+            <label class="f-label">推理强度</label>
+            <select id="set-reasoning">
+              <option value="">关闭</option><option value="low">低</option>
+              <option value="medium" selected>中</option><option value="high">高</option>
+            </select>
+          </div>
+        </div>
+        <div class="f-row">
+          <div class="f-col">
+            <label class="f-label">输出 Token 限制</label>
+            <select id="set-maxtokens">
+              <option value="0" selected>无限制</option>
+              <option value="2048">2048</option>
+              <option value="4096">4096</option>
+              <option value="8192">8192</option>
+              <option value="16384">16384</option>
+            </select>
+          </div>
+          <div class="f-col">
+            <label class="f-label">界面风格</label>
+            <select id="set-theme" onchange="UI.previewTheme(this.value)">
+              <option value="night">🌃 夜巡(红蓝)</option>
+              <option value="crimson">🔴 猩红</option>
+              <option value="sky">🌊 青空</option>
+              <option value="gold">✨ 金辉</option>
+            </select>
+          </div>
+        </div>
+        <div class="f-row">
+          <button class="btn jade" onclick="UI.fetchSettingsModels()">🔄 拉取模型</button>
+          <button class="btn" onclick="UI.testApi()">🔌 测试连接</button>
+        </div>
+        <div class="f-row">
+          <label class="check"><input type="checkbox" id="set-autosave" checked> 自动存档(每回合)</label>
+        </div>
+      </div>
+      <div class="panel-card">
+        <h3>💾 存档管理</h3>
+        <div class="f-row">
+          <button class="btn gold" onclick="Game.exportSave()">⬇ 导出存档</button>
+          <button class="btn" onclick="Game.importSave()">⬆ 导入存档</button>
+          <button class="btn danger" onclick="Game.restartGame()">🔄 重新开始</button>
+        </div>
+        <p class="muted small">导出为 JSON 文件可备份或换设备;自动存档每回合写入本机浏览器。</p>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="UI.closeModal('settings-modal')">关闭</button>
+      <button class="btn gold" onclick="UI.saveSettings()">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 攻略弹窗 ═══════════ -->
+<div id="guide-modal" class="modal-mask hidden" onclick="if(event.target===this)UI.closeModal('guide-modal')">
+  <div class="modal wide">
+    <div class="modal-head"><span>📜 玩法攻略</span><button class="d-close" onclick="UI.closeModal('guide-modal')">✕</button></div>
+    <div class="modal-body" id="guide-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════ 世界百科弹窗 ═══════════ -->
+<div id="ency-modal" class="modal-mask hidden" onclick="if(event.target===this)UI.closeModal('ency-modal')">
+  <div class="modal wide">
+    <div class="modal-head"><span>📖 世界百科</span><button class="d-close" onclick="UI.closeModal('ency-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="en-cat" id="en-cat"></div>
+      <div class="en-list" id="en-list"></div>
+      <div class="en-qa">
+        <div class="en-qa-title">❓ 向AI提问(可问世界观/人物/规则)</div>
+        <div class="en-qa-row">
+          <input id="en-q" type="text" placeholder="例如:金并的犯罪帝国主要控制哪些区域?" onkeydown="if(event.key==='Enter')UI.encyAsk()">
+          <button class="btn jade" onclick="UI.encyAsk()">提问</button>
+        </div>
+        <div id="en-answer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 记忆档案弹窗 ═══════════ -->
+<div id="mem-modal" class="modal-mask hidden" onclick="if(event.target===this)UI.closeModal('mem-modal')">
+  <div class="modal wide">
+    <div class="modal-head"><span>🧠 记忆档案</span><button class="d-close" onclick="UI.closeModal('mem-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="mem-filter" id="mem-filter"></div>
+      <div class="mem-list" id="mem-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 死亡回档弹窗 ═══════════ -->
+<div id="death-modal" class="modal-mask hidden" onclick="if(event.target===this)UI.closeModal('death-modal')">
+  <div class="modal wide">
+    <div class="modal-head"><span>💀 死亡回档</span><button class="d-close" onclick="UI.closeModal('death-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="mem-filter" id="death-tabs">
+        <button class="en-pill active" onclick="UI.deathTab('deaths')">💀 死亡记录</button>
+        <button class="en-pill" onclick="UI.deathTab('checkpoints')">🕰️ 时间回溯点</button>
+      </div>
+      <div id="death-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 死亡结算全屏 ═══════════ -->
+<div id="death-overlay" class="hidden">
+  <div class="death-box">
+    <div class="death-title">💀 你死了</div>
+    <div class="death-reason" id="d-reason"></div>
+    <div class="death-eval" id="d-eval"></div>
+    <div class="death-advice" id="d-advice"></div>
+    <div class="death-btns">
+      <button class="btn gold big" onclick="Game.rollbackFromDeath()">⏪ 回档到关键时间点</button>
+      <button class="btn big" onclick="Game.rollbackFromDeath(true)">🕰️ 选择其他时间点</button>
+      <button class="btn big" onclick="Game.restartGame()">🔄 重新开始</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 通用组件 ═══════════ -->
+<div id="toast" class="hidden"></div>
+<div id="loading-indicator" class="hidden"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="li-text">AI 正在推演</span></div>
+<input type="file" id="import-file" accept=".json,application/json" class="hidden">
+
+<script>
+/*JS1*/
+'use strict';
+/* ================= 工具 ================= */
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){console.warn('localStorage 写入失败',e);}}
+function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function nowStr(){const d=new Date();return (d.getMonth()+1)+'月'+d.getDate()+'日 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function attrMod(v){return Math.floor((v-10)/2);}
+function toast(msg,type){const t=$('toast');t.textContent=msg;t.className='show'+(type?' '+type:'');clearTimeout(t._tm);t._tm=setTimeout(()=>t.className='hidden',2600);}
+function stripTags(h){const d=document.createElement('div');d.innerHTML=h;return d.textContent||'';}
+
+/* ================= 角色扮演守则(注入AI提示词) ================= */
+const RP_RULES=[
+'1. 保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报,禁止全知视角、读心、监视和未观察先知晓。',
+'2. 禁止代替玩家行动、发言、思考或做出选择。',
+'3. 禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。',
+'4. 禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。',
+'5. 禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进,不得依赖酒会、会议、晚宴、应酬、出差等强行推动。',
+'6. 人物情绪应通过具体行为和对话体现,而非旁白解释。'
+].join('\n');
+
+/* ================= 静态数据 ================= */
+const DEFAULT_MODELS=['deepseek-chat','deepseek-reasoner'];
+const DIFFS={
+  leisure:{name:'休闲',hp:4,dc:'所有判定DC−2',desc:'适合新手或想轻松体验剧情。英雄点每场4点。'},
+  standard:{name:'标准',hp:3,dc:'按规则书默认DC',desc:'推荐默认档位。英雄点每场3点。'},
+  hard:{name:'硬核',hp:2,dc:'所有判定DC+2',desc:'老手向,想要绝望感的战役。英雄点每场2点,重伤更容易发生。'}
+};
+const TRAITS=[
+ {name:'科学天才',desc:'科技/发明判定+2,可研发蛛网发射器升级'},
+ {name:'嘴炮专家',desc:'战斗中垃圾话安抚民众、激怒反派使其犯错'},
+ {name:'天生的领袖',desc:'团队行动时,全体队友判定+1'},
+ {name:'快速反应',desc:'先攻+2'},
+ {name:'钢铁之躯',desc:'受到的物理伤害−1(每回合限一次)'},
+ {name:'街头嗅觉',desc:'街头情报判定+2,可低价获取黑市装备'},
+ {name:'大众脸',desc:'戴上面具后,被平民认出的概率减半'},
+ {name:'摄影小能手',desc:'能用蛛丝挂手机自拍,靠卖照片给号角日报赚外快'}
+];
+const WEAKNESSES=[
+ {name:'家人暴露',desc:'家人/恋人被反派盯上,GM可随时制造剧情压力'},
+ {name:'身份被怀疑',desc:'某个NPC(记者/警察/同学)正在追查你的真实身份'},
+ {name:'感应不稳定',desc:'特定刺激下(巨响/闪光/气味)蜘蛛感应失灵'},
+ {name:'心理创伤',desc:'特定场景(火灾/坠落/密闭空间)触发恐惧判定'},
+ {name:'责任过剩',desc:'无法拒绝求助,容易耽误自己的正事'}
+];
+const SKILLS=['学术知识','科技/工程','医学急救','黑客','驾驶','谈判','表演/伪装','写作报道','商业经营','教育','格斗(徒手)','武器(器械)','潜行','运动/杂技','侦查','追踪','审讯','街头情报','电子战'];
+const EQUIP_LIST=[
+ {name:'凯夫拉战衣',desc:'轻武器伤害−1'},
+ {name:'变声器面具',desc:'身份暴露判定+2'},
+ {name:'蛛网发射器×2',desc:'基础丝+粘丝'},
+ {name:'追踪器/通讯器',desc:'追踪判定+2'},
+ {name:'相机',desc:'卖照片赚零花钱'},
+ {name:'自制滑索',desc:'快速移动/拉拽'},
+ {name:'医药包',desc:'急救判定+1'}
+];
+const ABIL_LIST=['生物蛛丝(变异,不可缴械)','电击丝','爆炸丝','纳米粘稠丝','高速射击模式','蛛网护盾'];
+const PLOT_LIST=['校园日常','街头打击','阴谋调查','都市浪漫','家人温情','多线并存'];
+const ZONES=[
+ {id:'queens',name:'皇后区',danger:'★',desc:'住宅区、学校、主角的"家";邻里纠纷多。',mark:'主角高中、社区超市'},
+ {id:'manhattan',name:'曼哈顿',danger:'★★',desc:'高楼林立、金融中心、号角日报所在;荡蛛丝经典场地。',mark:'奥斯本大厦、号角日报大楼'},
+ {id:'brooklyn',name:'布鲁克林',danger:'★★★',desc:'码头、仓库、地下势力活跃。',mark:'工业码头、废弃地铁'},
+ {id:'harlem',name:'上城/哈莱姆',danger:'★★★',desc:'社区英雄活跃、帮派冲突。',mark:'社区中心、教堂'},
+ {id:'bronx',name:'布朗克斯',danger:'★★★★',desc:'工业区、废弃工厂、反派藏身处。',mark:'发电厂、化学厂'}
+];
+const WIKI=[
+ {cat:'世界观',title:'时代与舞台',content:'现代纽约(2026)。超级英雄与超级罪犯的存在已是公开常识。市民态度两极分化。\n世界基调三条铁律:①双重生活永远冲突——你不是全职英雄,有学业、工作、家人、房租、考试;②脱下战衣你也是普通人——会被房东催租、被老板骂、被同学嘲笑;③选择比力量重要——不断面对"能力越大,责任越大"的道德抉择。'},
+ {cat:'世界观',title:'力量的三大起源',content:'A.生物变异系:基因突变/辐射/动物血清/基因工程,能力内生于身体,无法被缴械但可能失控。代表:蜘蛛侠、蜥蜴人。\nB.科技装备系:外骨骼/武器/无人机/智能系统,上限极高可升级,但会被损坏、被黑客入侵、被缴械。代表:钢铁侠、章鱼博士、蝎子。\nC.超自然/外星系:共生体/外星科技/魔法,力量强大但常伴随代价或不可控因素。代表:毒液、奇异博士。\n角色可混合来源(如"生物变异+科技装备")。'},
+ {cat:'世界观',title:'蜘蛛图腾与多元宇宙',content:'多元宇宙中存在一条"蜘蛛网络",所有获得蜘蛛之力的人都是网上的一根丝线。存在蜘蛛侠2099、暗影蜘蛛侠、蜘猪侠、终极蜘蛛侠等同位体。高级战役可引入"蛛网危机"多元宇宙事件。'},
+ {cat:'势力',title:'英雄阵营',content:'纽约英雄联盟(虚构互助组织):联合义警互帮互助,可求助但有条件。\n独立义警(其他蜘蛛英雄):各自为战,盟友或竞争者。\nNYPD特殊执法部(义警联络组):半官方,亦敌亦友,看声望。'},
+ {cat:'势力',title:'反派阵营',content:'街头帮派(金并控制的地狱厨房帮等):数量多、火力弱、情报多。\n超级罪犯(绿魔、章鱼博士等):单体威胁巨大,各有动机与据点。\n犯罪帝国(金并、奥斯本企业暗面):藏在幕后的黑手,政商勾结。'},
+ {cat:'势力',title:'中立势力',content:'媒体:《号角日报》,J·乔纳·詹姆森主编——著名的"蜘蛛侠职业黑粉",媒体决定舆论,舆论决定声望。\n企业:奥斯本工业(绿魔老巢)、斯塔克工业(科技盟友)、地平线实验室(科学合作/麻烦制造机)。\n秘密组织:神盾局(官方机构,可能招募你)、九头蛇残余(想利用你)。'},
+ {cat:'区域',title:'纽约五区',content:'曼哈顿★★ 高楼金融中心,荡蛛丝经典场地。\n皇后区★ 住宅区、学校、主角的家,邻里纠纷多。\n布鲁克林★★★ 码头仓库,地下势力活跃。\n布朗克斯★★★★ 工业区废弃工厂,反派藏身处。\n上城/哈莱姆★★★ 社区英雄活跃,帮派冲突。'},
+ {cat:'反派',title:'绿魔(诺曼·奥斯本)',content:'能力:飞行滑翔机、南瓜炸弹(爆炸/毒气/电击)、超人类体质、精神不稳定。\n风格:空袭轰炸、心理解压、攻击你最在乎的人。\n弱点:精神状态不稳定会犯错;滑翔机可被破坏。\n定位:灾变级终局BOSS,与玩家形成"双重身份"镜像。'},
+ {cat:'反派',title:'章鱼博士(奥托·奥克塔维斯)',content:'能力:四条机械臂(力量/精密操作/远程抓取)、天才智力。\n风格:以机械臂操控环境、制造陷阱、多线攻击。\n弱点:本体行动缓慢;机械臂可被逐一破坏(每条臂HP10)。\n定位:头目级,战斗核心是"拆臂"。'},
+ {cat:'反派',title:'毒液(共生体)',content:'能力:形态变化、拟态、超级力量、免疫蜘蛛感应预警(关键!)。\n风格:黑暗镜像,用你的能力对付你。\n弱点:怕声波与火焰(双倍伤害)。\n定位:灾变级;剧情上是"选择与代价"的试金石。'},
+ {cat:'反派',title:'其他反派速览',content:'秃鹫:飞行翼装、磁力爪,翼装损坏即失去机动性。\n电光人:全身电能,怕绝缘体和水短路。\n沙人:沙化身体免疫物理伤害,怕水(变泥)。\n蜥蜴人:超级力量+再生,怕血清解药和低温。\n猎人克莱文:无超能力但极强体术+追踪,傲慢会被挑衅犯错。\n神秘客:全息幻术+心理战,破坏装置即破。\n蝎子:机械尾(毒刺)、强化服,尾关节脆弱。\n犀牛人:重型装甲冲撞,转弯困难可诱入死角。\n金并:格斗大师+犯罪帝国资源,情感软肋是妻儿。\n屠杀:红色共生体,比毒液更狂暴。'},
+ {cat:'规则',title:'判定与难度',content:'核心判定:d20+属性修正+技能等级+环境加值 ≥ DC。\n难度:5轻松/10常规/15困难/20极难/25英雄壮举/30奇迹。\n环境:有利+2、非常有利+4、不利−2、恶劣−4、极限−6。\n对抗判定:双方投d20+修正比大小,平手防守方胜。\n自然20大成功,自然1大失败(痛但有趣,绝不致命)。\n属性修正=(属性−10)÷2向下取整。'},
+ {cat:'规则',title:'战斗规则',content:'先攻:d20+敏捷修正。\n回合:移动(可荡蛛丝)+1主要动作+1次要动作。\n攻击:d20+力/敏修正+格斗 ≥ 目标闪避DC(10+对方敏捷修正)。\n伤害:伤害骰+力量修正。\nHP=10+体质修正×2+等级×2。\n受伤等级:轻伤(无惩罚)→重伤(判定−2)→濒死(倒地需急救)。\n蜘蛛技巧:蛛网束缚、荡走、闪避姿态(+3)、救助(+1声望)、蛛网护盾(T2)。'},
+ {cat:'规则',title:'英雄点/声望/暴露值',content:'英雄点:每场3点(休闲4/硬核2)。1点重掷、2点自动成功或经典时刻、3点英雄壮举。无私选择、保护无辜者、幽默化解危机可获点。\n声望(−10~+10):+6城市英雄,民众掩护你;−6公敌,全城通缉。\n暴露值(0~10):露脸/留DNA/高辨识度战斗会判定,≥10身份暴露,生活线崩塌。'},
+ {cat:'术语',title:'术语表',content:'GM=主持人。d20=二十面骰。DC=目标难度。属性修正=(属性−10)÷2取整。蜘蛛感应=直觉预警。英雄点=扭转局面资源。声望=市民信任度。暴露值=身份识破进度。威胁等级:喽啰→精英→头目→灾变→传奇。T1/T2/T3=蜘蛛能力强度。双重生活=英雄与平民的时间冲突。'}
+];
+const GUIDE_HTML=[
+ {t:'🎮 怎么玩',h:'在输入框用自然语言行动,如"荡到皇后区看看""给梅姨回个电话""追那个劫匪"。也可以点快捷按钮。AI会推进剧情、掷骰判定、结算后果。你的每个选择都会影响声望、暴露值和身边人的命运。'},
+ {t:'🕷️ 双面生活',h:'游戏以周为单位推进。救一个人可能错过一场考试——这就是代价。完全履行承诺+1声望;因救急放鸽子,关系会受损。连续忽视平民生活会触发生活危机。'},
+ {t:'🎲 判定',h:'重要行动AI会说明判定(d20+加值 vs DC)。难度受你选择的档位影响。自然20大成功,自然1大失败。英雄点可以重掷、自动成功、触发经典时刻。'},
+ {t:'💀 死亡与回档',h:'死亡不是终点。每次死亡AI都会点评你的行为并给出建议,你可以回档到关键时间点重新来过。顶栏💀回档按钮可随时查看死亡记录与历史回溯点。'},
+ {t:'🧠 记忆与百科',h:'AI会自动把重要事件写入记忆档案;世界观资料在世界百科中随时查阅,也可以直接向AI提问。'},
+ {t:'✨ 小贴士',h:'蜘蛛侠的灵魂是嘴炮——幽默化解危机可以赚英雄点。战斗前先铺垫优势(荡蛛丝主场+2)。失败不是死路,是换条更麻烦的路。'}
+];
+/* 预设角色:彼得·帕克(模式A) */
+const PETER={
+ mode:'peter',name:'彼得·帕克',heroName:'蜘蛛侠',age:17,identity:'皇后区高中生 · 号角日报兼职摄影记者',
+ origin:'本叔叔临终前的话——"能力越大,责任越大"成为毕生信条。',
+ powerSource:'生物变异(放射性蜘蛛)+ 自制科技装备(蛛网发射器)',
+ attrs:{str:16,dex:18,con:14,int:18,per:16,cha:12},
+ skills:{'运动/杂技':5,'侦查':4,'科技/工程':5,'潜行':3,'格斗(徒手)':4,'学术知识':3,'写作报道':2,'医学急救':2,'街头情报':2,'谈判':1},
+ traits:['科学天才','嘴炮专家'],weaknesses:['责任过剩','家人暴露','身份被怀疑'],
+ abilities:['蜘蛛感应(被动预警+主动闪避+2)','蛛丝射击(束缚/荡丝/卸武器/救人)','爬墙与吸附','超级力量/敏捷(+2,约1吨)','治愈因子(战后每分钟回2HP)'],
+ equipment:['凯夫拉战衣','变声器面具','蛛网发射器×2','追踪器/通讯器','相机'],
+ lifeline:{family:'梅姨(抚养人,不知情)——房租、晚饭、唠叨都是牵挂',friends:'内德·利兹(死党,知道身份);玛丽·简·沃森(同班同学)',mentor:'本叔叔(已故)——"能力越大,责任越大"',employer:'皇后区高中(即将毕业);号角日报(兼职摄影)',secret:'本叔叔的死是他最大的愧疚——他本可以用能力阻止那场抢劫'},
+ rep:2,exposure:0,money:40,startZone:'queens',time:'周一 07:40'
+};
+
+/* ================= 全局状态 ================= */
+const LS_CFG='spiderweb_cfg',LS_STATE='spiderweb_state';
+let cfg=lsGet(LS_CFG,{endpoint:'https://api.deepseek.com/v1/chat/completions',apiKey:'',model:'deepseek-chat',reasoning:'medium',maxTokens:0,theme:'night',autoSave:true});
+let state=null;
+let busy=false,genController=null,streamEl=null;
+let encyCat='全部',memFilter='全部',deathTab='deaths';
+let modelCache={t:0,list:[]};
+
+function applyTheme(t){
+  document.body.dataset.theme=t;
+  const meta=document.querySelector('meta[name=theme-color]');
+  const c=getComputedStyle(document.body).getPropertyValue('--bg-deep').trim();
+  if(meta)meta.setAttribute('content',c||'#070a14');
+}
+
+/* ================= 创建向导 ================= */
+const W={
+ step:1,MAX:6,
+ draft:{},
+ init(){
+   this.draft={mode:'peter',attrs:{...PETER.attrs},skills:{...PETER.skills},traits:[...PETER.traits],weaknesses:[...PETER.weaknesses],
+     cheat:false,equip:[...PETER.equipment],abils:[],plots:[],zone:'queens',multiverse:false,
+     lifeline:{...PETER.lifeline},extraLifeline:{family:'',friends:'',mentor:'',secret:''},
+     name:PETER.name,heroName:PETER.heroName,age:17,identity:PETER.identity,origin:PETER.origin,
+     powerSource:PETER.powerSource,notes:''};
+   $('setup-overlay').classList.remove('hidden');
+   this.step=1;this.render();
+ },
+ render(){
+   const dots=['API配置','角色配置','补充自定义','备注信息','难度设定','信息确认'].map((n,i)=>
+     `<div class="sp-dot ${i+1<=this.step?'on':''} ${i+1===this.step?'cur':''}"><span>${i+1}</span><em>${n}</em></div>`).join('');
+   $('setup-progress').innerHTML=dots;
+   $('setup-body').innerHTML=this.htmlStep(this.step);
+   $('setup-prev').style.visibility=this.step===1?'hidden':'visible';
+   const next=$('setup-next');
+   next.textContent=this.step===this.MAX?'🚀 开始游戏':'下一步 →';
+   this.bindStep(this.step);
+ },
+ htmlStep(n){
+   const d=this.draft;
+   if(n===1)return this.h1(d);
+   if(n===2)return this.h2(d);
+   if(n===3)return this.h3(d);
+   if(n===4)return this.h4(d);
+   if(n===5)return this.h5(d);
+   return this.h6(d);
+ },
+ h1(d){return `
+  <div class="step-title">🔌 第1步 · API 配置</div>
+  <div class="step-sub">连接你的 AI 模型(默认 DeepSeek)。密钥仅保存在本机浏览器。</div>
+  <div class="panel-card">
+    <label class="f-label">API 端点</label>
+    <input id="w-endpoint" type="text" spellcheck="false" value="${esc(cfg.endpoint)}">
+    <label class="f-label">API Key</label>
+    <input id="w-apikey" type="password" autocomplete="off" placeholder="sk-…" value="${esc(cfg.apiKey)}">
+    <div class="f-row">
+      <div class="f-col grow">
+        <label class="f-label">模型 <span class="muted">(可点"拉取模型"从API获取)</span></label>
+        <select id="w-model"></select>
+      </div>
+      <div class="f-col">
+        <label class="f-label">推理强度</label>
+        <select id="w-reasoning">
+          <option value="">关闭</option><option value="low">低</option>
+          <option value="medium" ${cfg.reasoning==='medium'?'selected':''}>中</option>
+          <option value="high" ${cfg.reasoning==='high'?'selected':''}>高</option>
+        </select>
+      </div>
+    </div>
+    <div class="f-row">
+      <div class="f-col">
+        <label class="f-label">输出 Token 限制</label>
+        <select id="w-maxtokens">
+          <option value="0" ${cfg.maxTokens===0?'selected':''}>无限制</option>
+          <option value="2048" ${cfg.maxTokens===2048?'selected':''}>2048</option>
+          <option value="4096" ${cfg.maxTokens===4096?'selected':''}>4096</option>
+          <option value="8192" ${cfg.maxTokens===8192?'selected':''}>8192</option>
+          <option value="16384" ${cfg.maxTokens===16384?'selected':''}>16384</option>
+        </select>
+      </div>
+      <div class="f-col">
+        <label class="f-label">&nbsp;</label>
+        <button class="btn jade" onclick="W.saveApi();W.fetchModels()">🔄 拉取模型</button>
+      </div>
+    </div>
+    <div class="f-row">
+      <button class="btn" onclick="W.saveApi();W.testApi()">🔌 测试连接</button>
+      <span class="muted small" style="align-self:center">提示:点"下一步"也会自动保存配置</span>
+    </div>
+  </div>`;
+ },
+ h2(d){const pool=this.pool();return `
+  <div class="step-title">🦸 第2步 · 角色配置</div>
+  <div class="step-sub">选择扮演模式,自定义你的英雄。属性/天赋/技能全部可调。</div>
+  <div class="mode-row">
+    <button class="option-card mode-card ${d.mode==='peter'?'selected':''}" onclick="W.pickMode('peter')">
+      <div class="oc-icon">🕷️</div><div class="oc-name">扮演彼得·帕克</div>
+      <div class="oc-desc">开箱即用的经典蜘蛛侠(设定集模式A),仍可自由微调</div>
+    </button>
+    <button class="option-card mode-card ${d.mode==='custom'?'selected':''}" onclick="W.pickMode('custom')">
+      <div class="oc-icon">🦸</div><div class="oc-name">创建自己的英雄</div>
+      <div class="oc-desc">从零捏一个属于你的蜘蛛英雄(设定集模式B)</div>
+    </button>
+  </div>
+  <div class="cheat-bar">
+    <label class="check"><input type="checkbox" id="w-cheat" ${d.cheat?'checked':''} onchange="W.toggleCheat()"> 🐛 作弊模式:无限天赋点(可全选天赋/免弱点/+40属性点)</label>
+  </div>
+  <div class="panel-card">
+    <h3>📋 基本信息</h3>
+    <div class="f-row">
+      <div class="f-col grow"><label class="f-label">平民身份(面具之下是谁)</label>
+        <input id="w-identity" value="${esc(d.identity)}"></div>
+    </div>
+    <div class="f-row">
+      <div class="f-col grow"><label class="f-label">真名</label><input id="w-name" value="${esc(d.name)}"></div>
+      <div class="f-col"><label class="f-label">年龄</label><input id="w-age" type="number" min="14" max="60" value="${d.age}"></div>
+      <div class="f-col grow"><label class="f-label">英雄名</label>
+        <div class="name-row"><input id="w-hero" value="${esc(d.heroName)}"><button class="btn jade small" type="button" onclick="W.aiName()" id="w-ainame-btn">🎲 AI起名</button></div>
+      </div>
+    </div>
+    <label class="f-label">为什么成为英雄(动机)</label>
+    <textarea id="w-origin" rows="2">${esc(d.origin)}</textarea>
+    <label class="f-label">力量来源</label>
+    <div class="chip-row">
+      ${['生物变异(基因)','科技装备','超自然/外星','混合来源'].map(s=>`<button class="chip ${d.powerSource.includes(s.slice(0,2))?'on':''}" data-ps="${s}" onclick="W.pickPS(this)">${s}</button>`).join('')}
+      <input id="w-ps-custom" class="custom-input" placeholder="自定义来源(可留空)" value="${esc(d.powerSource.includes('混合')||d.powerSource.includes('生物')||d.powerSource.includes('科技')||d.powerSource.includes('超自然')?'':'')}">
+    </div>
+  </div>
+  <div class="panel-card">
+    <h3>💪 六项属性 <span class="muted small">剩余点数:<b class="gold-txt" id="w-pool">${pool}</b></span></h3>
+    <div class="attr-grid">
+      ${Object.entries(d.attrs).map(([k,v])=>`
+      <div class="attr-ctrl"><span class="ac-name" title="${ATTR_DESC[k]}">${ATTR_NAME[k]}</span>
+        <button class="am" onclick="W.attr('${k}',-1)">−</button>
+        <b class="ac-val">${v}</b>
+        <button class="am" onclick="W.attr('${k}',1)">+</button></div>`).join('')}
+    </div>
+  </div>
+  <div class="panel-card">
+    <h3>✨ 特质 <span class="muted small" id="w-trait-note">(选2个;作弊模式不限)</span></h3>
+    <div class="trait-grid" id="w-trait-list">${TRAITS.map(t=>`
+      <button class="trait-chip ${d.traits.includes(t.name)?'on':''}" data-t="${t.name}" onclick="W.toggleTrait(this)">
+        <b>${t.name}</b><span>${t.desc}</span></button>`).join('')}</div>
+    <div class="chip-row"><input id="w-trait-custom" class="custom-input" placeholder="自定义特质(输入后回车添加)"></div>
+  </div>
+  <div class="panel-card">
+    <h3>⚠️ 弱点 <span class="muted small" id="w-weak-note">(选1个;作弊模式可选0个)</span></h3>
+    <div class="trait-grid">${WEAKNESSES.map(t=>`
+      <button class="trait-chip wk ${d.weaknesses.includes(t.name)?'on':''}" data-t="${t.name}" onclick="W.toggleWeak(this)">
+        <b>${t.name}</b><span>${t.desc}</span></button>`).join('')}</div>
+  </div>
+  <div class="panel-card">
+    <h3>🎯 技能 <span class="muted small">(点击添加,再次点击移除;默认已配好)</span></h3>
+    <div class="skill-grid" id="w-skill-list">
+      ${SKILLS.map(s=>{const lv=d.skills[s]||0;return `
+      <div class="skill-ctrl ${lv?'on':''}" data-s="${s}" onclick="W.toggleSkill(this)">
+        <span class="sk-name">${s}</span>
+        <div class="sk-ctrl"><button class="am sm" onclick="event.stopPropagation();W.skillLv('${s}',-1)">−</button><b>${lv}</b><button class="am sm" onclick="event.stopPropagation();W.skillLv('${s}',1)">+</button></div>
+      </div>`;}).join('')}
+    </div>
+  </div>`;
+ },
+ h3(d){return `
+  <div class="step-title">🧩 第3步 · 补充自定义</div>
+  <div class="step-sub">按设定集可选项,补充你的起始配置。</div>
+  <div class="panel-card">
+    <h3>🎒 起始装备 <span class="muted small">(基础:战衣+发射器,可多选)</span></h3>
+    <div class="trait-grid">${EQUIP_LIST.map(e=>`
+      <button class="trait-chip ${d.equip.includes(e.name)?'on':''}" data-e="${e.name}" onclick="W.toggleEquip(this)">
+        <b>${e.name}</b><span>${e.desc}</span></button>`).join('')}</div>
+  </div>
+  <div class="panel-card">
+    <h3>🕸️ 蜘蛛能力补充</h3>
+    <div class="chip-row">${ABIL_LIST.map(a=>`
+      <button class="chip ${d.abils.includes(a)?'on':''}" data-a="${a}" onclick="W.toggleAbil(this)">${a}</button>`).join('')}</div>
+  </div>
+  <div class="panel-card">
+    <h3>📍 起始区域</h3>
+    <div class="zone-row">${ZONES.map(z=>`
+      <button class="zone-card ${d.zone===z.id?'selected':''}" data-z="${z.id}" onclick="W.pickZone(this)">
+        <b>${z.name}</b><span class="zd">${z.danger}</span><em>${z.mark}</em></button>`).join('')}</div>
+  </div>
+  <div class="panel-card">
+    <h3>🎭 剧情偏好 <span class="muted small">(多选)</span></h3>
+    <div class="chip-row">${PLOT_LIST.map(p=>`
+      <button class="chip ${d.plots.includes(p)?'on':''}" data-p="${p}" onclick="W.togglePlot(this)">${p}</button>`).join('')}</div>
+  </div>
+  <div class="panel-card">
+    <h3>🌌 多元宇宙扩展 <span class="muted small">(设定集1.5 可选)</span></h3>
+    <label class="check"><input type="checkbox" id="w-multi" ${d.multiverse?'checked':''}> 开启蜘蛛图腾与平行宇宙(蛛网危机事件)</label>
+  </div>
+  <div class="panel-card">
+    <h3>💞 关系补充 <span class="muted small">(留空则用默认/生成)</span></h3>
+    <div class="f-row"><div class="f-col grow"><label class="f-label">家人</label><input id="w-lf-family" value="${esc(d.extraLifeline.family)}" placeholder="如:梅姨(抚养人,不知情)"></div>
+    <div class="f-col grow"><label class="f-label">朋友/恋人</label><input id="w-lf-friends" value="${esc(d.extraLifeline.friends)}" placeholder="如:死党内德(知道身份)"></div></div>
+    <div class="f-row"><div class="f-col grow"><label class="f-label">导师/榜样</label><input id="w-lf-mentor" value="${esc(d.extraLifeline.mentor)}" placeholder="如:本叔叔(已故)"></div>
+    <div class="f-col grow"><label class="f-label">秘密</label><input id="w-lf-secret" value="${esc(d.extraLifeline.secret)}" placeholder="一个只有你知道的过去"></div></div>
+  </div>`;
+ },
+ h4(d){return `
+  <div class="step-title">📝 第4步 · 备注信息</div>
+  <div class="step-sub">自定义给AI导演的备注——剧情风格、禁用的内容、特别设定,都会写进AI提示词。</div>
+  <div class="panel-card">
+    <label class="f-label">备注(可选)</label>
+    <textarea id="w-notes" rows="8" placeholder="例如:&#10;· 希望剧情轻松幽默,校园戏多一点,少一点苦大仇深&#10;· 战斗描写要有画面感,适当让反派说垃圾话&#10;· 我不喜欢XX类型的剧情,不要出现&#10;· 希望梅姨多一些出场……">${esc(d.notes)}</textarea>
+  </div>`;
+ },
+ h5(d){return `
+  <div class="step-title">🎚️ 第5步 · 难度设定</div>
+  <div class="step-sub">选择整场游戏的体验档位(设定集3.8⑦)。</div>
+  <div class="diff-row">
+    ${Object.entries(DIFFS).map(([k,v])=>`
+    <button class="diff-card ${d.diff===k?'selected':''}" data-d="${k}" onclick="W.pickDiff(this)">
+      <b>${v.name}</b><span class="dd">${v.dc} · 英雄点${v.hp}点/场</span><em>${v.desc}</em></button>`).join('')}
+  </div>
+  <div class="panel-card"><p class="muted small">💀 死亡回档:死亡后AI会点评你的行为并给出建议,可回到关键时间点重来。自动存档每回合开启。</p></div>`;
+ },
+ h6(d){const pool0=Object.values(d.attrs).reduce((a,b)=>a+b,0);return `
+  <div class="step-title">✅ 第6步 · 信息确认</div>
+  <div class="step-sub">确认以下信息,开始你的纽约之夜。</div>
+  <div class="confirm-grid">
+    <div class="c-item"><span>模式</span><b>${d.mode==='peter'?'🕷️ 扮演彼得·帕克':'🦸 自定义英雄'} ${d.cheat?'🐛':''}</b></div>
+    <div class="c-item"><span>英雄</span><b>${esc(d.heroName)}</b></div>
+    <div class="c-item"><span>真名</span><b>${esc(d.name)} · ${d.age}岁</b></div>
+    <div class="c-item"><span>平民身份</span><b>${esc(d.identity)}</b></div>
+    <div class="c-item"><span>力量来源</span><b>${esc(d.powerSource)}</b></div>
+    <div class="c-item"><span>属性</span><b>力${d.attrs.str} 敏${d.attrs.dex} 体${d.attrs.con} 智${d.attrs.int} 感${d.attrs.per} 魅${d.attrs.cha}</b></div>
+    <div class="c-item"><span>特质</span><b>${d.traits.join('、')||'无'}</b></div>
+    <div class="c-item"><span>弱点</span><b>${d.weaknesses.join('、')||'无(作弊)'}</b></div>
+    <div class="c-item"><span>技能</span><b>${Object.keys(d.skills).map(s=>s+'(Lv'+d.skills[s]+')').join('、')||'无'}</b></div>
+    <div class="c-item"><span>装备</span><b>${d.equip.join('、')}</b></div>
+    <div class="c-item"><span>能力补充</span><b>${d.abils.join('、')||'无'}</b></div>
+    <div class="c-item"><span>起始区域</span><b>${(ZONES.find(z=>z.id===d.zone)||{}).name||''}</b></div>
+    <div class="c-item"><span>剧情偏好</span><b>${d.plots.join('、')||'随缘'}</b></div>
+    <div class="c-item"><span>多元宇宙</span><b>${d.multiverse?'开启':'关闭'}</b></div>
+    <div class="c-item"><span>难度</span><b>${DIFFS[d.diff].name}(${DIFFS[d.diff].dc})</b></div>
+    ${d.notes?`<div class="c-item full"><span>备注</span><b>${esc(d.notes)}</b></div>`:''}
+  </div>`;
+ },
+ pool(){const used=Object.values(this.draft.attrs).reduce((a,b)=>a+b,0);return (this.draft.mode==='peter'?94:75)+(this.draft.cheat?40:0)-used;},
+ bindStep(n){
+   if(n===1){const sel=$('w-model');sel.innerHTML=DEFAULT_MODELS.map(m=>`<option ${cfg.model===m?'selected':''}>${m}</option>`).join('');}
+   if(n===5&&!this.draft.diff)this.draft.diff='standard';
+   if(n===2){this.refreshCounts();}
+ },
+ saveApi(){cfg.endpoint=$('w-endpoint').value.trim()||cfg.endpoint;cfg.apiKey=$('w-apikey').value.trim();cfg.model=$('w-model')?$('w-model').value:cfg.model;cfg.reasoning=$('w-reasoning')?$('w-reasoning').value:cfg.reasoning;cfg.maxTokens=parseInt($('w-maxtokens')?$('w-maxtokens').value:cfg.maxTokens,10)||0;lsSet(LS_CFG,cfg);},
+ collectStep(n){
+   const d=this.draft;
+   if(n===2){d.identity=$('w-identity').value.trim();d.name=$('w-name').value.trim();d.age=parseInt($('w-age').value,10)||17;d.heroName=$('w-hero').value.trim()||'蜘蛛侠';d.origin=$('w-origin').value.trim();const ps=$('w-ps-custom').value.trim();d.powerSource=ps||d.powerSource;}
+   if(n===3){d.extraLifeline={family:$('w-lf-family').value.trim(),friends:$('w-lf-friends').value.trim(),mentor:$('w-lf-mentor').value.trim(),secret:$('w-lf-secret').value.trim()};d.multiverse=$('w-multi').checked;}
+   if(n===4){d.notes=$('w-notes').value.trim();}
+ },
+ valid(n){
+   if(n===1){const k=$('w-apikey').value.trim();if(!k){toast('请填写 API Key','error');return false;}this.saveApi();return true;}
+   if(n===2){
+     const d=this.draft;
+     if(!d.name.trim()||!d.heroName.trim()){toast('请填写真名与英雄名','error');return false;}
+     if(this.pool()<0){toast('属性点超支了,先减掉一些','error');return false;}
+     if(!d.cheat&&(d.traits.length<2||d.weaknesses.length<1)){toast('按设定需选2个特质+1个弱点(或开启作弊模式)','error');return false;}
+     this.collectStep(2);return true;
+   }
+   if(n===3){this.collectStep(3);return true;}
+   if(n===4){this.collectStep(4);return true;}
+   if(n===5){if(!this.draft.diff){toast('请选择难度','error');return false;}return true;}
+   return true;
+ },
+ next(){if(!this.valid(this.step))return;if(this.step<this.MAX){this.step++;this.render();}else{Game.startGame();}},
+ prev(){if(this.step>1){this.step--;this.render();}},
+ pickMode(m){this.draft.mode=m;this.render();},
+ toggleCheat(){this.draft.cheat=$('w-cheat').checked;this.render();},
+ attr(k,delta){
+   const d=this.draft;const max=d.cheat?30:20;
+   const nv=clamp(d.attrs[k]+delta,3,max);
+   if(nv>d.attrs[k]&&this.pool()<=0&&!d.cheat){toast('属性点不足(开启作弊模式可获得+40点)','error');return;}
+   d.attrs[k]=nv;this.render();
+ },
+ pickPS(btn){const d=this.draft;const v=btn.dataset.ps;const base=v==='混合来源'?'混合来源':v.slice(0,2);d.powerSource=v;d.psCustom='';this.render();},
+ toggleTrait(el){const d=this.draft;const t=el.dataset.t;
+   if(d.traits.includes(t))d.traits=d.traits.filter(x=>x!==t);
+   else if(!d.cheat&&d.traits.length>=2){toast('特质最多选2个(作弊模式可全选)','error');return;}
+   else d.traits.push(t);
+   this.render();},
+ toggleWeak(el){const d=this.draft;const t=el.dataset.t;
+   if(d.weaknesses.includes(t))d.weaknesses=d.weaknesses.filter(x=>x!==t);
+   else if(!d.cheat&&d.weaknesses.length>=3){toast('弱点最多选3个(作弊模式可选0个)','error');return;}
+   else d.weaknesses.push(t);
+   this.render();},
+ toggleSkill(el){const s=el.dataset.s;const d=this.draft;
+   if(d.skills[s])delete d.skills[s];else d.skills[s]=1;
+   this.render();},
+ skillLv(s,delta){const d=this.draft;d.skills[s]=clamp((d.skills[s]||0)+delta,1,5);this.render();},
+ toggleEquip(el){const d=this.draft;const e=el.dataset.e;
+   if(d.equip.includes(e))d.equip=d.equip.filter(x=>x!==e);else d.equip.push(e);
+   el.classList.toggle('on');},
+ toggleAbil(el){const d=this.draft;const a=el.dataset.a;
+   if(d.abils.includes(a))d.abils=d.abils.filter(x=>x!==a);else d.abils.push(a);
+   el.classList.toggle('on');},
+ togglePlot(el){const d=this.draft;const p=el.dataset.p;
+   if(d.plots.includes(p))d.plots=d.plots.filter(x=>x!==p);else d.plots.push(p);
+   el.classList.toggle('on');},
+ pickZone(el){this.draft.zone=el.dataset.z;document.querySelectorAll('.zone-card').forEach(x=>x.classList.toggle('selected',x===el));},
+ pickDiff(el){this.draft.diff=el.dataset.d;document.querySelectorAll('.diff-card').forEach(x=>x.classList.toggle('selected',x===el));},
+ refreshCounts(){const d=this.draft;
+   const tn=$('w-trait-note');if(tn)tn.textContent=d.cheat?'(作弊模式:不限)':`(已选${d.traits.length}/2)`;
+   const wn=$('w-weak-note');if(wn)wn.textContent=d.cheat?'(作弊模式:可选0个)':`(已选${d.weaknesses.length}/3)`;},
+ async fetchModels(){
+   const ep=($('w-endpoint').value.trim()||cfg.endpoint);
+   const key=($('w-apikey').value.trim()||cfg.apiKey);
+   const sel=$('w-model');if(!sel)return;
+   if(Date.now()-modelCache.t<5*60*1000&&modelCache.list.length){sel.innerHTML=modelCache.list.map(m=>`<option ${cfg.model===m?'selected':''}>${m}</option>`).join('');toast('模型列表已缓存','ok');return;}
+   try{
+     const base=ep.replace(/\/chat\/completions$/,'').replace(/\/$/,'');
+     const r=await fetch(base+'/models',{headers:{'Authorization':'Bearer '+key}});
+     if(!r.ok)throw new Error('HTTP '+r.status);
+     const j=await r.json();
+     let ids=(j.data||[]).map(m=>m.id).filter(id=>/deepseek|chat|reasoner|v\d|gpt|qwen|glm|moonshot|kimi|claude|gemini|spark|ernie|doubao|minimax|abab/i.test(id));
+     if(!ids.length)ids=(j.data||[]).map(m=>m.id).slice(0,20);
+     if(!ids.length)throw new Error('no models');
+     modelCache={t:Date.now(),list:ids};
+     sel.innerHTML=ids.map(m=>`<option ${cfg.model===m?'selected':''}>${m}</option>`).join('');
+     toast('拉取到 '+ids.length+' 个模型','ok');
+   }catch(e){toast('拉取模型失败,已保留默认: '+e.message,'error');sel.innerHTML=DEFAULT_MODELS.map(m=>`<option ${cfg.model===m?'selected':''}>${m}</option>`).join('');}
+ },
+ async testApi(){
+   toast('测试连接中…');
+   try{
+     const r=await fetch(cfg.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify({model:cfg.model,messages:[{role:'user',content:'只回复四个字:连接成功'}],max_tokens:16,stream:false})});
+     if(!r.ok){let m='HTTP '+r.status;try{const j=await r.json();m=(j.error&&(j.error.message||j.error.code))||m;}catch(e){}toast('连接失败: '+m,'error');return;}
+     toast('✅ 连接成功,模型可用','ok');
+   }catch(e){toast('连接失败: '+e.message,'error');}
+ },
+ async aiName(){
+   const btn=$('w-ainame-btn');if(!btn)return;
+   if(!cfg.apiKey){toast('请先在第1步填写API Key','error');return;}
+   const d=this.draft;
+   btn.disabled=true;btn.textContent='⏳ 生成中…';
+   const mode=d.mode==='peter'?'经典蜘蛛侠风格(彼得·帕克)':'全新原创英雄';
+   try{
+     const msgs=[
+       {role:'system',content:'你是《蛛网之影》蜘蛛侠世界观的起名AI。根据玩家设定,生成1个帅气英雄名+1个平民真名。英雄名要简短有力、贴合蜘蛛侠宇宙风格(如"蛛影""赤线""夜织者",不要直接用"蜘蛛侠");真名是普通美式人名。只输出JSON:{"hero":"英雄名","name":"真名"},不要多余文字。'},
+       {role:'user',content:'身份:'+d.identity+'\n力量来源:'+d.powerSource+'\n风格:'+mode}
+     ];
+     const raw=await Game.callAI(msgs,null,{onChunk:false});
+     const j=Game.tryJson(raw||'');
+     if(j&&j.hero){
+       d.heroName=String(j.hero).trim().slice(0,16);
+       if(j.name&&(d.mode==='custom'||d.name==='彼得·帕克'))d.name=String(j.name).trim().slice(0,16);
+       this.render();
+       toast('🎲 生成成功:'+d.heroName,'ok');
+     }else{
+       const line=(raw||'').split('\n').map(s=>s.trim()).filter(Boolean)[0]||'';
+       const clean=line.replace(/^["'【\[]|["'】\]]$/g,'').slice(0,16);
+       if(clean){d.heroName=clean;this.render();toast('🎲 生成成功:'+clean,'ok');}
+       else toast('起名失败,请重试','error');
+     }
+   }catch(e){toast('起名失败:'+e.message,'error');}
+   btn.disabled=false;btn.textContent='🎲 AI起名';
+ }
+};
+/* 属性显示 */
+const ATTR_NAME={str:'力量',dex:'敏捷',con:'体质',int:'智力',per:'感知',cha:'魅力'};
+const ATTR_DESC={str:'物理出力:举重、破门、肉搏',dex:'速度反应:闪避、攀爬、荡蛛丝',con:'耐力抗击打',int:'科学逻辑:发明、破译',per:'观察直觉:蜘蛛感应、识破伪装',cha:'社交气场:说服、安抚'};
+
+</script>
+<script>
+/*JS2*/
+/* ================= 状态与存档 ================= */
+const MAX_HISTORY=36,MAX_LOG=300,MAX_MEM=120,MAX_CP=12,MAX_DEATH=6;
+function cloneState(){const c=JSON.parse(JSON.stringify(state));delete c.checkpoints;if(c.deaths)c.deaths.forEach(d=>delete d.snapshot);return c;}
+function autosave(){if(cfg.autoSave)lsSet(LS_STATE,state);}
+function addCheckpoint(label){
+  state.checkpoints.push({id:uid(),ts:nowStr(),label:(label||'存档点').slice(0,36),state:cloneState()});
+  if(state.checkpoints.length>MAX_CP)state.checkpoints.shift();
+}
+function addMemory(type,text){
+  if(!text||!state)return;
+  const t=String(text).trim().slice(0,200);if(!t)return;
+  if(state.memories.some(m=>m.text===t))return;
+  state.memories.push({type:type||'事件',text:t,ts:nowStr()});
+  if(state.memories.length>MAX_MEM)state.memories.splice(0,state.memories.length-MAX_MEM);
+}
+function addWiki(title,content){
+  if(!title||!state)return;
+  const t=String(title).trim().slice(0,40);if(!t)return;
+  if(state.wikiExtra.some(w=>w.title===t))return;
+  state.wikiExtra.push({cat:'冒险记录',title:t,content:String(content||'').slice(0,600)});
+}
+function setBusy(b){
+  busy=b;
+  $('loading-indicator').classList.toggle('hidden',!b);
+  $('send-btn').disabled=b;
+  $('stop-btn').classList.toggle('show',b);
+  const inp=$('chat-input');if(inp)inp.disabled=b;
+}
+/* ================= 游戏主逻辑 ================= */
+const Game={
+  startGame(){
+    const d=W.draft;
+    const p={
+      heroName:d.heroName||'蜘蛛侠',name:d.name||'彼得·帕克',age:d.age||17,
+      identity:d.identity||'皇后区高中生',origin:d.origin||'',
+      powerSource:d.powerSource||'生物变异(放射性蜘蛛)',
+      attrs:{...d.attrs},skills:{...d.skills},traits:[...d.traits],weaknesses:[...d.weaknesses],
+      abilities:[...(d.mode==='peter'?PETER.abilities:['蜘蛛感应(被动预警)','蛛丝射击','爬墙与吸附','超级力量/敏捷']),...(d.abils||[])],
+      equipment:[...(d.equip||[])],
+      lifeline:d.mode==='peter'?{...PETER.lifeline}:{
+        family:d.extraLifeline.family||'未设定',friends:d.extraLifeline.friends||'未设定',
+        mentor:d.extraLifeline.mentor||'未设定',employer:d.identity||'未设定',secret:d.extraLifeline.secret||'未设定'
+      },
+      notes:d.notes||'',plots:d.plots||[],multiverse:d.multiverse||false,level:1
+    };
+    const s={
+      hp:16,maxhp:16,wound:'健康',conds:[],location:d.mode==='peter'?'皇后区·帕克家':'街头',zone:d.zone||'queens',
+      time:PETER.time||'周一 07:40',day:1,
+      rep:d.mode==='peter'?PETER.rep:0,exposure:0,heroPoints:DIFFS[d.diff].hp,money:d.mode==='peter'?PETER.money:40,xp:0
+    };
+    state={v:1,player:p,status:s,difficulty:d.diff,cheat:d.cheat,dead:false,
+      quests:[],relations:d.mode==='peter'?{
+        梅姨:{rel:'+5',note:'等你回家吃饭'},内德·利兹:{rel:'+5',note:'知道你身份的死党'},玛丽·简:{rel:'+3',note:'同班同学'},
+        詹姆森:{rel:'-2',note:'号角日报主编,职业黑粉'},本叔叔:{rel:'∞',note:'已故的导师'}
+      }:{},inventory:[...(d.equip||[])],memories:[],wikiExtra:[],history:[],summary:'',
+      log:[],checkpoints:[],deaths:[],startedAt:Date.now()};
+    if(d.notes)addMemory('备注','玩家备注:'+d.notes);
+    autosave();
+    addCheckpoint('游戏开始');
+    this.enterGame(false);
+    this.opening();
+  },
+  enterGame(restored){
+    $('setup-overlay').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    UI.renderAll();
+    if(restored){UI.appendLog('system','🕐 已读取自动存档,继续游戏。');}
+    if(state.dead&&state.deaths.length){const r=state.deaths[state.deaths.length-1];UI.showDeathOverlay(r);}
+  },
+  opening(){
+    UI.appendLog('system','🕷️ 游戏开始 · 纽约,2026年');
+    state.history.push({role:'user',content:'【开场】请根据我的角色卡和当前时间地点(现在是'+state.status.time+',第'+state.status.day+'天)撰写开场场景(150-300字):我正在'+state.status.location+'。请自然描写周围环境与正在发生的事情,给出两三个具体的选择方向,但不要替我做决定。'});
+    this.callTurn();
+  },
+  send(){
+    if(busy)return;
+    if(state.dead){toast('你已死亡,请先回档或重新开始','error');return;}
+    const inp=$('chat-input');const text=inp.value.trim();
+    if(!text)return;
+    inp.value='';autoGrow();
+    this.pushAction(text);
+    state.history.push({role:'user',content:text});
+    this.callTurn();
+  },
+  pushAction(t){UI.appendLog('action','🧑 '+state.player.heroName+': '+esc(t));},
+  quick(id){
+    const QA={patrol:'换上战衣出去巡逻街区',school:'去学校上课',phone:'看看手机上的消息',home:'回家看看',bugle:'去号角日报交照片',rest:'找个地方休息一会儿'};
+    if(id==='save'){autosave();addCheckpoint('手动存档');toast('已保存','ok');return;}
+    if(id==='heal'){state.status.hp=state.status.maxhp;state.status.wound='健康';state.status.conds=[];UI.appendLog('system','🐛 金手指:伤势全愈');UI.renderAll();autosave();return;}
+    if(id==='hp'){state.status.heroPoints=Math.min(6,state.status.heroPoints+1);UI.appendLog('system','🐛 金手指:英雄点+1');UI.renderAll();autosave();return;}
+    if(id==='rep'){state.status.rep=Math.min(10,state.status.rep+1);UI.appendLog('system','🐛 金手指:声望+1');UI.renderAll();autosave();return;}
+    if(QA[id]){this.pushAction(QA[id]);state.history.push({role:'user',content:QA[id]});this.callTurn();}
+  },
+  stopGen(){if(genController)genController.abort();},
+  async callAI(messages,onChunk,opts){
+    const body={model:cfg.model,messages,stream:!!opts.onChunk};
+    if(cfg.maxTokens>0)body.max_tokens=cfg.maxTokens;
+    if(/reasoner/i.test(cfg.model)&&cfg.reasoning)body.reasoning_effort=cfg.reasoning;
+    const res=await fetch(cfg.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify(body),signal:genController?genController.signal:undefined});
+    if(!res.ok){let m='HTTP '+res.status;try{const j=await res.json();m=(j.error&&(j.error.message||j.error.code))||m;}catch(e){}throw new Error(m);}
+    if(!opts.onChunk){const j=await res.json();return (j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||'';}
+    return this.readStream(res,onChunk);
+  },
+  async readStream(res,onChunk){
+    const reader=res.body.getReader();const dec=new TextDecoder();let buf='',full='';
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      let i;
+      while((i=buf.indexOf('\n'))>=0){
+        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+        if(!line.startsWith('data:'))continue;
+        const data=line.slice(5).trim();
+        if(data==='[DONE]')return full;
+        try{
+          const j=JSON.parse(data);
+          const d=j.choices&&j.choices[0]&&j.choices[0].delta;
+          if(!d)continue;
+          if(d.reasoning_content){onChunk({type:'reasoning',text:d.reasoning_content});}
+          if(d.content){full+=d.content;onChunk({type:'content',text:d.content});}
+        }catch(e){}
+      }
+    }
+    return full;
+  },
+  buildSystemPrompt(){
+    const p=state.player,s=state.status,d=DIFFS[state.difficulty];
+    const tLv=p.level<=3?'T1':p.level<=7?'T2':'T3';
+    const attrTxt=Object.keys(p.attrs).map(k=>ATTR_NAME[k]+' '+p.attrs[k]+'('+(attrMod(p.attrs[k])>=0?'+':'')+attrMod(p.attrs[k])+')').join('、');
+    const skillTxt=Object.entries(p.skills).map(([k,v])=>k+' Lv'+v).join('、')||'无';
+    const memTxt=state.memories.slice(-40).map(m=>'['+m.type+']'+m.text).join('\n')||'(暂无)';
+    const questTxt=state.quests.map(q=>(q.done?'[已完成]':'[进行中]')+q.text).join('\n')||'无';
+    const relTxt=Object.entries(state.relations).map(([k,v])=>k+':'+(v.rel||'')+' '+(v.note||'')).join('\n')||'暂无';
+    const zoneObj=ZONES.find(z=>z.id===s.zone);
+    return [
+      '你是《蛛网之影》——漫威蜘蛛侠世界观文字角色扮演游戏的AI导演兼GM。你负责描述世界、扮演所有NPC、执行判定规则、结算后果,推动故事前进。使用中文,以第二人称"你"称呼玩家。',
+      '【角色扮演守则·最高优先级】\n'+RP_RULES,
+      '【世界观】2026年,美国纽约。超级英雄与超级罪犯的存在已是公开常识,市民态度两极分化。三条铁律:1)双重生活永远冲突——你不是全职英雄,有学业、工作、家人、房租、考试;2)脱下战衣你也是普通人——会被房东催租、被老板骂、被同学嘲笑;3)选择比力量重要——不断面对"能力越大,责任越大"的道德抉择。\n力量来源三大系:生物变异(内生于身体,不可缴械)、科技装备(可升级但可损坏/被缴械)、超自然/外星(强大但有代价)。\n主要势力:纽约英雄联盟(互助组织)、独立义警、NYPD特殊执法部;街头帮派(金并控制)、超级罪犯(绿魔/章鱼博士/毒液等)、犯罪帝国(金并/奥斯本暗面);媒体《号角日报》詹姆森是著名的"蜘蛛侠职业黑粉",舆论决定声望。\n'+(p.multiverse?'已开启蜘蛛图腾与多元宇宙扩展:存在平行宇宙蜘蛛侠同位体,可引入"蛛网危机"事件。':'蜘蛛图腾/多元宇宙为可选扩展,当前未开启。'),
+      '【玩家角色卡·永远不得遗忘或更改】\n英雄名:'+p.heroName+' | 真名:'+p.name+' | 年龄:'+p.age+'\n平民身份:'+p.identity+'\n力量来源:'+p.powerSource+'\n成为英雄的动机:'+(p.origin||'未设定')+'\n能力强度:'+tLv+' (等级Lv'+p.level+')\n属性:'+attrTxt+'\n技能:'+skillTxt+'\n特质:'+(p.traits.join('、')||'无')+'\n弱点:'+(p.weaknesses.join('、')||'无')+'\n装备:'+(p.equipment.join('、')||'无')+'\n蜘蛛能力:'+(p.abilities.join(';')||'无')+'\n生活线:家人:'+p.lifeline.family+' | 朋友/恋人:'+p.lifeline.friends+' | 导师:'+p.lifeline.mentor+' | 雇主/学校:'+p.lifeline.employer+' | 秘密:'+p.lifeline.secret+'\n剧情偏好:'+(p.plots.join('、')||'随缘'),
+      '【当前状况·实时,必须准确延续】\n第'+s.day+'天 '+s.time+' | 位置:'+s.location+(zoneObj?' ('+zoneObj.name+' 危险度'+zoneObj.danger+')':'')+'\n生命:HP '+s.hp+'/'+s.maxhp+' | 伤势:'+s.wound+(s.conds.length?' | 状态:'+s.conds.join('、'):'')+'\n声望:'+s.rep+' (−10~+10) | 暴露值:'+s.exposure+'/10 | 英雄点:'+s.heroPoints+' | 金钱:$'+s.money+' | XP:'+s.xp+' | Lv'+p.level+'\n当前任务:\n'+questTxt+'\n关键关系:\n'+relTxt,
+      '【记忆档案】\n'+memTxt,
+      (state.summary?'【故事摘要·已发生的重要剧情】\n'+state.summary:''),
+      '【游戏规则·难度:'+d.name+'】\n判定:d20+属性修正+技能等级 ≥ DC(难度)。DC大致:10常规/15困难/20极难/25英雄壮举/30奇迹。本档位难度调整:'+d.dc+'。英雄点'+d.hp+'点/场:1点重掷失败判定,2点自动成功或触发"经典时刻",3点完成英雄壮举。自然20大成功,自然1大失败。\n战斗:先攻d20+敏捷修正;攻击= d20+力/敏修正+格斗 ≥ 对方闪避DC(10+对方敏修正);伤害=伤害骰+力量修正。蛛网束缚需对方力量判定挣脱。\n蜘蛛能力:'+tLv+'基础能力(蜘蛛感应被动预警/蛛丝射击/爬墙/超级力量敏捷/治愈因子)随等级成长,T2需Lv4,T3需Lv8。\n声望影响市民态度(+6城市英雄/-6公敌);暴露值到10身份暴露。\n双重生活:以周为单位,平民事件与英雄事件会撞车,让玩家二选一并承担代价。',
+      (p.notes?'【玩家备注·必须尊重】\n'+p.notes:''),
+      '【演绎要求】\n1) 正文120~450字,以"你"第二人称叙事,自然推进。\n2) 每次回复末尾输出状态标记⟦STATUS⟧{...}⟦/STATUS⟧(见下),标记是系统数据,不要写进叙事正文。\n3) 需要记忆的长期信息输出⟦MEMORY⟧{"type":"事件","text":"..."}⟦/MEMORY⟧(可多条)。\n4) 出现新的世界观名词(组织/地点/反派)时输出⟦WIKI⟧{"title":"词条名","content":"简要词条"}⟦/WIKI⟧。\n5) 重要行动明确掷骰并说明结果,例如"骰:d20+4 vs DC15 → 16,成功";数值计算要准确。\n6) 不要替玩家做决定、行动或说话;NPC只按自己知道的信息行事,禁止全知视角。\n7) 玩家死亡或遭遇无法挽回的失败时,输出⟦DEATH⟧{"reason":"死亡原因","evaluation":"对玩家本次行为的点评","advice":"给玩家的具体建议"}⟦/DEATH⟧,正文自然描写结局。\n8) 让生活介入战斗(手机响了、外卖到了),让反派有动机,奖励嘴炮幽默。\n9) 保持设定连续:时间、地点、人物、伤势、关系、记忆都要与上述状态一致,不得遗忘或篡改。',
+      '【⟦STATUS⟧字段说明】\n{"hp":数值,"maxhp":数值,"wound":"健康|轻伤|重伤|濒死","conds":["状态1","状态2"],"location":"具体地点","zone":"皇后区|曼哈顿|布鲁克林|布朗克斯|上城/哈莱姆","time":"周X HH:MM","day":天数,"rep":声望,"exposure":暴露值,"heroPoints":英雄点,"money":金额,"xp":经验,"quests":[{"text":"任务内容","done":false}],"inventory":["物品1","物品2"],"relations":{"人名":{"rel":"关系程度","note":"一句话现状"}}}\n每次回复都必须输出⟦STATUS⟧块,状态没变化也要输出当前值。'
+    ].join('\n\n');
+  },
+  async callTurn(){
+    if(busy)return;
+    if(!cfg.apiKey){toast('请先在设置中配置 API Key','error');return;}
+    const msgs=[{role:'system',content:this.buildSystemPrompt()}].concat(state.history.slice(-MAX_HISTORY));
+    const entry=UI.appendLog('narrative','<span class="typing">✍️ AI 正在推演…</span>');
+    const bodyEl=entry.querySelector('.nb');
+    let reasoning='',content='';
+    setBusy(true);
+    genController=new AbortController();
+    try{
+      const full=await this.callAI(msgs,(c)=>{
+        if(c.type==='reasoning'){reasoning+=c.text;if(bodyEl)bodyEl.textContent='🧠 思考中…';}
+        else{content+=c.text;if(bodyEl)bodyEl.textContent=content;}
+        const log=$('game-log');if(log)log.scrollTop=log.scrollHeight;
+      },{onChunk:true});
+      const parsed=this.parseMarkers(full);
+      let finalText=parsed.clean||content||'(空回复)';
+      const finalBody=document.createElement('div');
+      finalBody.className='nb';
+      finalBody.innerHTML=UI.formatText(finalText);
+      let det=null;
+      if(reasoning.trim()){
+        det=document.createElement('details');
+        det.className='think';
+        det.innerHTML='<summary>🧠 AI 思考过程</summary><div class="nb">'+esc(reasoning)+'</div>';
+      }
+      entry.innerHTML='';
+      if(det)entry.appendChild(det);
+      entry.appendChild(finalBody);
+      state.log[state.log.length-1].html=entry.innerHTML;
+      if(parsed.status)this.applyStatus(parsed.status);
+      (parsed.memories||[]).forEach(m=>addMemory(m.type,m.text));
+      (parsed.wikis||[]).forEach(w=>addWiki(w.title,w.content));
+      state.history.push({role:'assistant',content:full||content});
+      if(parsed.deaths&&parsed.deaths.length){this.handleDeath(parsed.deaths[0]);}
+      else{
+        addCheckpoint('「'+stripTags(state.history[state.history.length-2]?state.history[state.history.length-2].content.slice(0,24):'回合')+'」');
+        if(state.history.length>MAX_HISTORY)this.compressHistory();
+      }
+      autosave();
+      UI.renderAll();
+    }catch(e){
+      entry.remove();
+      state.log.pop();
+      if(state.history.length&&state.history[state.history.length-1].role==='user')state.history.pop();
+      UI.appendLog('system','⚠️ 出错了:'+esc(e.message)+' (已回滚,可重试)');
+      toast('AI 调用失败:'+e.message,'error');
+    }
+    genController=null;
+    setBusy(false);
+  },
+  parseMarkers(t){
+    const out={clean:t||'',status:null,deaths:[],memories:[],wikis:[]};
+    let m;
+    m=t.match(/⟦STATUS⟧([\s\S]*?)⟦\/STATUS⟧/);
+    if(m)out.status=this.tryJson(m[1]);
+    m=t.match(/⟦DEATH⟧([\s\S]*?)⟦\/DEATH⟧/);
+    if(m){const j=this.tryJson(m[1]);if(j)out.deaths.push(j);}
+    const mm=[...t.matchAll(/⟦MEMORY⟧([\s\S]*?)⟦\/MEMORY⟧/g)];
+    mm.forEach(x=>{const j=this.tryJson(x[1]);if(j&&j.text)out.memories.push(j);});
+    const wm=[...t.matchAll(/⟦WIKI⟧([\s\S]*?)⟦\/WIKI⟧/g)];
+    wm.forEach(x=>{const j=this.tryJson(x[1]);if(j&&j.title)out.wikis.push(j);});
+    out.clean=t.replace(/⟦(STATUS|DEATH|MEMORY|WIKI)⟧[\s\S]*?⟦\/\1⟧/g,'').replace(/\n{3,}/g,'\n\n').trim();
+    return out;
+  },
+  tryJson(s){
+    try{const a=s.indexOf('{'),b=s.lastIndexOf('}');if(a<0||b<=a)return null;return JSON.parse(s.slice(a,b+1));}
+    catch(e){return null;}
+  },
+  applyStatus(j){
+    const s=state.status;
+    if(j.hp!=null)s.hp=clamp(Math.round(j.hp),0,s.maxhp);
+    if(j.maxhp!=null)s.maxhp=Math.max(1,Math.round(j.maxhp));
+    if(j.wound)s.wound=j.wound;
+    if(Array.isArray(j.conds))s.conds=j.conds;
+    if(j.location)s.location=j.location;
+    if(j.zone&&ZONES.some(z=>z.id===j.zone))s.zone=j.zone;
+    if(j.time)s.time=j.time;
+    if(j.day!=null)s.day=Math.max(1,Math.round(j.day));
+    if(j.rep!=null)s.rep=clamp(Math.round(j.rep),-10,10);
+    if(j.exposure!=null)s.exposure=clamp(Math.round(j.exposure),0,10);
+    if(j.heroPoints!=null)s.heroPoints=clamp(Math.round(j.heroPoints),0,6);
+    if(j.money!=null)s.money=Math.round(j.money);
+    if(j.xp!=null){s.xp=Math.max(0,Math.round(j.xp));const lv=1+Math.floor(s.xp/10);if(lv!==state.player.level){state.player.level=lv;UI.appendLog('gold','🎉 升级!现在是 Lv'+lv+',能力强度'+(lv<=3?'T1':lv<=7?'T2':'T3'));}}
+    if(Array.isArray(j.quests)){j.quests.forEach(q=>{if(!q.text)return;const ex=state.quests.find(x=>x.text===q.text);if(ex){if(q.done!=null)ex.done=!!q.done;}else state.quests.push({text:String(q.text).slice(0,80),done:!!q.done});});}
+    if(Array.isArray(j.inventory)){j.inventory.forEach(it=>{if(it&&!state.inventory.includes(it))state.inventory.push(String(it).slice(0,40));});}
+    if(j.relations&&typeof j.relations==='object'){Object.entries(j.relations).forEach(([k,v])=>{if(v&&typeof v==='object'){const ex=state.relations[k]||{};state.relations[k]={rel:v.rel!==undefined?v.rel:ex.rel,note:v.note!==undefined?v.note:ex.note};}});}
+    if(j.note)addMemory('事件',j.note);
+    if(s.hp<=0&&!state.dead){s.wound='濒死';}
+  },
+  handleDeath(d){
+    state.dead=true;
+    if(!state.deaths)state.deaths=[];
+    if(!state.checkpoints)state.checkpoints=[];
+    const snap=cloneState();
+    if(snap.history.length>=2)snap.history=snap.history.slice(0,-2);
+    const rec={id:uid(),ts:nowStr(),reason:d.reason||'未知原因',evaluation:d.evaluation||'(AI未给出点评)',advice:d.advice||'',snapshot:JSON.stringify(snap)};
+    state.deaths.push(rec);
+    if(state.deaths.length>MAX_DEATH)state.deaths.shift();
+    UI.appendLog('death','💀 死亡记录已保存:'+esc(rec.reason));
+    if(rec.evaluation)UI.appendLog('system','🧾 AI点评:'+esc(rec.evaluation));
+    if(rec.advice)UI.appendLog('system','💡 AI建议:'+esc(rec.advice));
+    addMemory('事件','💀 死亡:'+rec.reason);
+    autosave();
+    UI.showDeathOverlay(rec);
+  },
+  rollbackFromDeath(pick){
+    if(state.deaths.length===0)return;
+    const r=state.deaths[state.deaths.length-1];
+    UI.hideDeathOverlay();
+    if(pick){UI.openDeath();return;}
+    this.rollbackTo(r.snapshot,'死亡回档点');
+  },
+  rollbackTo(snap,label){
+    try{
+      const s=JSON.parse(snap);
+      if(!s.player||!s.status)throw new Error('存档损坏');
+      const curDeaths=(state&&state.deaths)?state.deaths:[];
+      const curCps=(state&&state.checkpoints)?state.checkpoints:[];
+      state=s;
+      state.dead=false;
+      if(!state.deaths)state.deaths=[];
+      if(!state.checkpoints)state.checkpoints=[];
+      if(!state.log)state.log=[];
+      if(!state.memories)state.memories=[];
+      if(!state.wikiExtra)state.wikiExtra=[];
+      if(!state.quests)state.quests=[];
+      if(!state.relations)state.relations={};
+      if(!state.inventory)state.inventory=[];
+      if(!state.history)state.history=[];
+      // 保留死亡记录:快照中的 + 当前尚未丢失的
+      const seen={};
+      state.deaths.forEach(d=>seen[d.id]=1);
+      curDeaths.forEach(d=>{if(!seen[d.id]){state.deaths.push(d);seen[d.id]=1;}});
+      if(state.deaths.length>MAX_DEATH)state.deaths.splice(0,state.deaths.length-MAX_DEATH);
+      // 保留时间回溯点
+      const seenCp={};
+      state.checkpoints.forEach(c=>seenCp[c.id]=1);
+      curCps.forEach(c=>{if(!seenCp[c.id]){state.checkpoints.push(c);seenCp[c.id]=1;}});
+      if(state.checkpoints.length>MAX_CP)state.checkpoints.splice(0,state.checkpoints.length-MAX_CP);
+      UI.renderAll();
+      UI.appendLog('system','🕰️ 已回档至「'+(label||'关键时间点')+'」,继续游戏。');
+      toast('已回档','ok');
+      autosave();
+    }catch(e){toast('回档失败:'+e.message,'error');}
+  },
+  regen(){
+    if(busy)return;
+    if(state.history.length<2)return;
+    const last=state.history[state.history.length-1];
+    if(last.role!=='assistant')return;
+    state.history.pop();
+    while(state.log.length&&['narrative','death'].includes(state.log[state.log.length-1].type))state.log.pop();
+    UI.renderLog();
+    this.callTurn();
+  },
+  async compressHistory(){
+    if(state.history.length<8)return;
+    const keep=14;
+    const old=state.history.slice(0,-keep);
+    const sys='你是故事摘要器。把下面的对话压缩成要点式故事摘要,保留:关键事件、未完成目标、重要线索、人物关系变化、承诺与代价。300-500字,只输出摘要正文。';
+    const msgs=[{role:'system',content:sys}].concat(old);
+    try{
+      const res=await this.callAI(msgs,null,{onChunk:false});
+      const txt=(res||'').replace(/⟦[\s\S]*?⟧/g,'').trim();
+      if(txt){state.summary=(state.summary?state.summary+'\n':'')+txt.slice(0,1500);}
+      state.history=state.history.slice(-keep);
+      addMemory('事件','(旧对话已自动压缩进故事摘要)');
+      autosave();
+    }catch(e){/* 压缩失败不阻塞游戏 */state.history=state.history.slice(-keep);}
+  },
+  exportSave(){
+    if(!state)return;
+    const data={app:'蛛网之影',version:1,exportedAt:nowStr(),cfg:cfg,state:state};
+    const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='蛛网之影_存档_'+new Date().toISOString().slice(0,10)+'.json';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    toast('存档已导出','ok');
+  },
+  importSave(){$('import-file').click();},
+  handleImport(file){
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        const j=JSON.parse(rd.result);
+        const st=j.state||j;
+        if(!st.player||!st.status)throw new Error('存档格式不正确');
+        state=st;
+        if(j.cfg){Object.assign(cfg,j.cfg);lsSet(LS_CFG,cfg);applyTheme(cfg.theme);}
+        autosave();
+        UI.closeModal('settings-modal');
+        Game.enterGame(true);
+        toast('存档导入成功','ok');
+      }catch(e){toast('导入失败:'+e.message,'error');}
+    };
+    rd.readAsText(file);
+  },
+  restartGame(){
+    if(!confirm('确定重新开始?当前进度会被清除(可先导出存档备份)。'))return;
+    window.__restarting=true; // 阻止 beforeunload 自动存档把旧进度写回
+    lsDel(LS_STATE);
+    localStorage.removeItem(LS_STATE);
+    location.reload();
+  }
+};
+/* ================= UI 渲染 ================= */
+const UI={
+  renderAll(){this.renderTop();this.renderLog();this.renderChar();this.renderWorld();this.renderQuick();},
+  renderTop(){
+    const s=state.status;
+    const pct=Math.round(s.hp/s.maxhp*100);
+    $('tb-hp').style.width=pct+'%';
+    $('tb-hp').style.background=s.hp/s.maxhp>0.3?'var(--hp)':'var(--gold)';
+    $('tb-hp-txt').textContent=s.hp+'/'+s.maxhp;
+    $('tb-rep').style.width=((s.rep+10)/20*100)+'%';
+    $('tb-rep-txt').textContent=(s.rep>=0?'+':'')+s.rep;
+    $('tb-expo').style.width=(s.exposure/10*100)+'%';
+    $('tb-expo-txt').textContent=s.exposure+'/10';
+  },
+  renderLog(){
+    const log=$('game-log');log.innerHTML='';
+    state.log.forEach(e=>{const div=document.createElement('div');div.className='log-entry '+e.type;div.innerHTML=e.html;log.appendChild(div);});
+    log.scrollTop=log.scrollHeight;
+  },
+  appendLog(type,html){
+    if(!state)return null;
+    state.log.push({type,html,ts:nowStr()});
+    if(state.log.length>MAX_LOG)state.log.shift();
+    const log=$('game-log');
+    const div=document.createElement('div');div.className='log-entry '+type;div.innerHTML=html;
+    log.appendChild(div);
+    while(log.children.length>MAX_LOG)log.removeChild(log.firstChild);
+    log.scrollTop=log.scrollHeight;
+    return div;
+  },
+  formatText(t){
+    let h=esc(t);
+    h=h.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+    h=h.replace(/\*([^*]+)\*/g,'<i>$1</i>');
+    h=h.replace(/`([^`]+)`/g,'<code>$1</code>');
+    h=h.replace(/\n/g,'<br>');
+    return h;
+  },
+  renderChar(){
+    const p=state.player,s=state.status;
+    const zoneObj=ZONES.find(z=>z.id===s.zone)||{};
+    const tLv=p.level<=3?'T1':p.level<=7?'T2':'T3';
+    const hpPct=Math.round(s.hp/s.maxhp*100);
+    const repDesc=s.rep>=6?'城市英雄':s.rep>=1?'受欢迎的义警':s.rep===0?'中立':s.rep>=-5?'嫌疑犯':'公敌';
+    const attrs=Object.keys(p.attrs).map(k=>{
+      const v=p.attrs[k],mod=attrMod(v);
+      const col={str:'var(--hp)',dex:'var(--gold)',con:'var(--success)',int:'var(--blue)',per:'var(--accent2)',cha:'var(--purple)'}[k];
+      return `<div class="stat-row"><span class="s-label">${ATTR_NAME[k]}</span>
+        <div class="bar"><i style="width:${v/30*100}%;background:${col}"></i></div>
+        <b style="color:${col}">${v}<small>${mod>=0?'+':''}${mod}</small></b></div>`;
+    }).join('');
+    const skillHtml=Object.entries(p.skills).map(([k,v])=>`<span class="chip">${k} <em>Lv${v}</em></span>`).join('')||'<span class="muted">未选择</span>';
+    const memLast=state.memories.slice(-3).map(m=>`<div class="mem-mini">[${m.type}] ${esc(m.text)}</div>`).join('');
+    const questHtml=state.quests.length?state.quests.slice(0,5).map(q=>`<div class="q-item ${q.done?'done':''}">${q.done?'✅':'🕐'} ${esc(q.text)}</div>`).join(''):'<div class="muted">暂无任务</div>';
+    $('char-body').innerHTML=`
+      <div class="hero-card">
+        <div class="hero-avatar">🕷️</div>
+        <div class="hero-info">
+          <div class="hero-name">${esc(p.heroName)}</div>
+          <div class="hero-sub">${esc(p.name)} · ${p.age}岁 · Lv${p.level} ${tLv}</div>
+        </div>
+      </div>
+      <div class="panel-card">
+        <h3>❤️ 当前状况(实时)</h3>
+        <div class="stat-row big"><span class="s-label">生命</span>
+          <div class="bar"><i style="width:${hpPct}%;background:var(--hp)"></i></div>
+          <b>${s.hp}/${s.maxhp}</b></div>
+        <div class="cond-grid">
+          <div class="cond-item"><span>伤势</span><b class="${s.wound==='健康'?'ok':s.wound==='轻伤'?'warn':'bad'}">${s.wound}</b></div>
+          <div class="cond-item"><span>状态</span><b>${s.conds.length?s.conds.join('、'):'无'}</b></div>
+          <div class="cond-item"><span>位置</span><b>${esc(s.location)}</b></div>
+          <div class="cond-item"><span>时间</span><b>第${s.day}天 ${esc(s.time)}</b></div>
+          <div class="cond-item"><span>区域</span><b>${esc(zoneObj.name||'')} ${zoneObj.danger||''}</b></div>
+          <div class="cond-item"><span>声望</span><b class="${s.rep>=0?'ok':'bad'}">${s.rep>=0?'+':''}${s.rep} (${repDesc})</b></div>
+          <div class="cond-item"><span>暴露值</span><b class="${s.exposure>=8?'bad':s.exposure>=4?'warn':''}">${s.exposure}/10</b></div>
+          <div class="cond-item"><span>英雄点</span><b>${'●'.repeat(s.heroPoints)}${'○'.repeat(Math.max(0,6-s.heroPoints))}</b></div>
+          <div class="cond-item"><span>金钱</span><b>$${s.money}</b></div>
+          <div class="cond-item"><span>经验</span><b>${s.xp} XP</b></div>
+        </div>
+        <div class="sub-sec">当前任务</div>
+        ${questHtml}
+        <div class="sub-sec">最近动态</div>
+        ${memLast||'<div class="muted">暂无</div>'}
+      </div>
+      <div class="panel-card">
+        <h3>⚡ 属性</h3>${attrs}
+      </div>
+      <div class="panel-card">
+        <h3>🕸️ 蜘蛛能力 (${tLv})</h3>
+        ${p.abilities.map(a=>`<div class="abil-item">🕸️ ${esc(a)}</div>`).join('')}
+      </div>
+      <div class="panel-card">
+        <h3>📚 技能</h3><div class="chips">${skillHtml}</div>
+      </div>
+      <div class="panel-card">
+        <h3>✨ 特质与弱点</h3>
+        <div class="chips">${p.traits.map(t=>`<span class="chip gold">${esc(t)}</span>`).join('')}</div>
+        <div class="chips" style="margin-top:6px">${p.weaknesses.map(w=>`<span class="chip red">弱点·${esc(w)}</span>`).join('')||'<span class="muted">无弱点(作弊)</span>'}</div>
+      </div>
+      <div class="panel-card">
+        <h3>🎒 装备</h3>
+        <div class="chips">${p.equipment.map(e=>`<span class="chip blue">${esc(e)}</span>`).join('')}</div>
+      </div>
+      <div class="panel-card">
+        <h3>🏠 生活线</h3>
+        <div class="lf-item"><span>家人</span>${esc(p.lifeline.family)}</div>
+        <div class="lf-item"><span>朋友/恋人</span>${esc(p.lifeline.friends)}</div>
+        <div class="lf-item"><span>导师</span>${esc(p.lifeline.mentor)}</div>
+        <div class="lf-item"><span>雇主/学校</span>${esc(p.lifeline.employer)}</div>
+        <div class="lf-item"><span>秘密</span>${esc(p.lifeline.secret)}</div>
+      </div>
+      ${p.notes?`<div class="panel-card"><h3>📝 备注</h3><div class="muted">${esc(p.notes)}</div></div>`:''}`;
+  },
+  renderWorld(){
+    const s=state.status;
+    const zoneObj=ZONES.find(z=>z.id===s.zone)||{};
+    const questHtml=state.quests.map(q=>`<div class="q-item ${q.done?'done':''}">${q.done?'✅':'🕐'} ${esc(q.text)}</div>`).join('')||'<div class="muted">暂无任务</div>';
+    const relHtml=Object.entries(state.relations).map(([k,v])=>`<div class="rel-item"><b>${esc(k)}</b><span class="${(v.rel||'').startsWith('-')?'bad':'ok'}">${esc(v.rel||'')}</span><em>${esc(v.note||'')}</em></div>`).join('')||'<div class="muted">暂无关系记录</div>';
+    $('world-body').innerHTML=`
+      <div class="panel-card">
+        <h3>📍 当前位置</h3>
+        <div class="zone-title">${esc(zoneObj.name||'')} <span class="danger-tag">${zoneObj.danger||''}</span></div>
+        <div class="muted">${esc(zoneObj.desc||'')}</div>
+        <div class="muted small" style="margin-top:4px">地标:${esc(zoneObj.mark||'')}</div>
+      </div>
+      <div class="panel-card">
+        <h3>🗺️ 纽约五区</h3>
+        ${ZONES.map(z=>`<div class="zone-mini ${z.id===s.zone?'cur':''}"><span>${esc(z.name)}</span><em>${z.danger}</em></div>`).join('')}
+      </div>
+      <div class="panel-card">
+        <h3>⚔️ 任务列表</h3>${questHtml}
+      </div>
+      <div class="panel-card">
+        <h3>🤝 关系网络</h3>${relHtml}
+      </div>
+      <div class="panel-card">
+        <h3>🏙️ 纽约势力</h3>
+        <div class="lf-item"><span>英雄阵营</span>纽约英雄联盟 · 独立义警 · NYPD特殊执法部</div>
+        <div class="lf-item"><span>反派阵营</span>街头帮派(金并) · 超级罪犯 · 犯罪帝国</div>
+        <div class="lf-item"><span>中立势力</span>号角日报(詹姆森) · 奥斯本工业 · 斯塔克工业</div>
+      </div>`;
+  },
+  renderQuick(){
+    const cheat=state.cheat;
+    const qs=[['patrol','🕷️ 巡逻'],['phone','📱 手机'],['school','🏫 学校'],['home','🏠 回家'],['bugle','📰 号角日报'],['rest','💤 休息'],['save','💾 存档']];
+    if(cheat)qs.push(['heal','🐛 治疗'],['hp','🐛 英雄点'],['rep','🐛 声望']);
+    $('quick-actions').innerHTML=qs.map(([id,label])=>`<button class="quick-action" onclick="Game.quick('${id}')">${label}</button>`).join('');
+  },
+  openDrawer(which){
+    const p=$('left-panel'),r=$('right-panel'),bd=$('drawer-backdrop');
+    if(which==='left'){p.classList.add('open');}else{r.classList.add('open');}
+    bd.classList.remove('hidden');
+  },
+  closeDrawer(which){$('left-panel').classList.remove('open');$('right-panel').classList.remove('open');$('drawer-backdrop').classList.add('hidden');},
+  closeAllDrawers(){this.closeDrawer();},
+  openModal(id){$(id).classList.remove('hidden');},
+  closeModal(id){$(id).classList.add('hidden');},
+  openSettings(){
+    $('set-endpoint').value=cfg.endpoint;
+    $('set-apikey').value=cfg.apiKey;
+    $('set-reasoning').value=cfg.reasoning;
+    $('set-maxtokens').value=String(cfg.maxTokens);
+    $('set-theme').value=cfg.theme;
+    $('set-autosave').checked=!!cfg.autoSave;
+    this.fillModelSelect('set-model',cfg.model);
+    this.openModal('settings-modal');
+  },
+  fillModelSelect(id,cur){
+    const sel=$(id);if(!sel)return;
+    const list=modelCache.list.length?modelCache.list:DEFAULT_MODELS;
+    sel.innerHTML=list.map(m=>`<option ${m===cur?'selected':''}>${esc(m)}</option>`).join('');
+  },
+  saveSettings(){
+    cfg.endpoint=$('set-endpoint').value.trim()||cfg.endpoint;
+    cfg.apiKey=$('set-apikey').value.trim();
+    cfg.model=$('set-model').value;
+    cfg.reasoning=$('set-reasoning').value;
+    cfg.maxTokens=parseInt($('set-maxtokens').value,10)||0;
+    cfg.theme=$('set-theme').value;
+    cfg.autoSave=$('set-autosave').checked;
+    lsSet(LS_CFG,cfg);
+    applyTheme(cfg.theme);
+    toast('设置已保存','ok');
+    this.closeModal('settings-modal');
+  },
+  async fetchSettingsModels(){
+    const ep=$('set-endpoint').value.trim()||cfg.endpoint;
+    const key=$('set-apikey').value.trim()||cfg.apiKey;
+    if(!key){toast('请先填写 API Key','error');return;}
+    try{
+      const base=ep.replace(/\/chat\/completions$/,'').replace(/\/$/,'');
+      const r=await fetch(base+'/models',{headers:{'Authorization':'Bearer '+key}});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const j=await r.json();
+      let ids=(j.data||[]).map(m=>m.id).filter(id=>/deepseek|chat|reasoner|v\d|gpt|qwen|glm|moonshot|kimi|claude|gemini|spark|ernie|doubao|minimax|abab/i.test(id));
+      if(!ids.length)ids=(j.data||[]).map(m=>m.id).slice(0,20);
+      if(!ids.length)throw new Error('未找到模型');
+      modelCache={t:Date.now(),list:ids};
+      this.fillModelSelect('set-model',cfg.model);
+      toast('拉取到 '+ids.length+' 个模型','ok');
+    }catch(e){toast('拉取失败:'+e.message,'error');}
+  },
+  async testApi(){
+    const ep=$('set-endpoint').value.trim()||cfg.endpoint;
+    const key=$('set-apikey').value.trim()||cfg.apiKey;
+    const model=$('set-model')?$('set-model').value:cfg.model;
+    if(!key){toast('请先填写 API Key','error');return;}
+    toast('测试连接中…');
+    try{
+      const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'user',content:'只回复四个字:连接成功'}],max_tokens:16,stream:false})});
+      if(!r.ok){let m='HTTP '+r.status;try{const j=await r.json();m=(j.error&&(j.error.message||j.error.code))||m;}catch(e){}toast('连接失败: '+m,'error');return;}
+      toast('✅ 连接成功,模型可用','ok');
+    }catch(e){toast('连接失败: '+e.message,'error');}
+  },
+  previewTheme(t){applyTheme(t);},
+  openGuide(){
+    $('guide-body').innerHTML=GUIDE_HTML.map(g=>`<div class="panel-card"><h3>${g.t}</h3><div class="guide-text">${esc(g.h)}</div></div>`).join('');
+    this.openModal('guide-modal');
+  },
+  openEncy(){this.renderEncy('全部');this.openModal('ency-modal');},
+  renderEncy(cat){
+    encyCat=cat;
+    const all=WIKI.concat(state?state.wikiExtra:[]);
+    const cats=['全部'].concat([...new Set(all.map(w=>w.cat))]);
+    $('en-cat').innerHTML=cats.map(c=>`<button class="en-pill ${c===cat?'active':''}" onclick="UI.renderEncy('${esc(c)}')">${esc(c)}</button>`).join('');
+    const list=cat==='全部'?all:all.filter(w=>w.cat===cat);
+    $('en-list').innerHTML=list.length?list.map(w=>`
+      <details class="ency-entry"><summary>${esc(w.title)} <em>${esc(w.cat)}</em></summary>
+      <div class="ency-content">${esc(w.content).replace(/\n/g,'<br>')}</div></details>`).join(''):'<div class="muted">暂无词条</div>';
+  },
+  async encyAsk(){
+    const q=$('en-q').value.trim();if(!q)return;
+    const ans=$('en-answer');
+    ans.innerHTML='<div class="ency-ans loading">AI 正在查阅…</div>';
+    try{
+      const base=WIKI.concat(state?state.wikiExtra:[]).slice(-8).map(w=>'词条['+w.title+']:'+w.content.slice(0,150)).join('\n');
+      const msgs=[{role:'system',content:'你是《蛛网之影》蜘蛛侠世界观的百科AI。用简洁准确的中文回答玩家关于世界观、人物、规则的问题,100-200字。可参考以下词条:\n'+base}];
+      const txt=await Game.callAI(msgs.concat([{role:'user',content:q}]),null,{onChunk:false});
+      ans.innerHTML='<div class="ency-ans">'+UI.formatText((txt||'未得到回答').trim())+'</div>';
+      addMemory('线索','百科问答:'+q.slice(0,20)+' → '+(txt||'').slice(0,80));
+      autosave();
+    }catch(e){ans.innerHTML='<div class="ency-ans err">回答失败:'+esc(e.message)+'</div>';}
+  },
+  openMem(){this.renderMem('全部');this.openModal('mem-modal');},
+  renderMem(f){
+    memFilter=f;
+    const types=['全部','事件','人物','地点','线索','物品','恩怨','其他'];
+    $('mem-filter').innerHTML=types.map(t=>`<button class="en-pill ${t===f?'active':''}" onclick="UI.renderMem('${t}')">${t}</button>`).join('');
+    const list=state?state.memories.filter(m=>f==='全部'||m.type===f):[];
+    $('mem-list').innerHTML=list.length?list.slice().reverse().map(m=>`
+      <div class="mem-entry"><span class="mem-type">${esc(m.type)}</span><div>${esc(m.text)}</div><em>${esc(m.ts)}</em></div>`).join(''):'<div class="muted">暂无记忆</div>';
+  },
+  openDeath(){this.deathTab(deathTab);this.openModal('death-modal');},
+  deathTab(t){
+    deathTab=t;
+    document.querySelectorAll('#death-tabs .en-pill').forEach((b,i)=>b.classList.toggle('active',(i===0&&t==='deaths')||(i===1&&t==='checkpoints')));
+    const box=$('death-list');
+    if(t==='deaths'){
+      if(!state||!state.deaths.length){box.innerHTML='<div class="muted">暂无死亡记录。在游戏中阵亡后,AI会点评你的表现并生成回档点。</div>';return;}
+      box.innerHTML=state.deaths.slice().reverse().map((d,i)=>`
+        <div class="death-card">
+          <div class="d-head">💀 第${state.deaths.length-i}次死亡 <em>${esc(d.ts)}</em></div>
+          <div class="d-reason">原因:${esc(d.reason)}</div>
+          <div class="d-eval">🧾 点评:${esc(d.evaluation)}</div>
+          ${d.advice?`<div class="d-advice">💡 建议:${esc(d.advice)}</div>`:''}
+          <button class="btn gold small" onclick="Game.rollbackTo(deathSnap('${d.id}'),'第${state.deaths.length-i}次死亡回档点')">⏪ 回档到此处</button>
+        </div>`).join('');
+    }else{
+      if(!state||!state.checkpoints.length){box.innerHTML='<div class="muted">暂无时间回溯点。每回合结束会自动生成。</div>';return;}
+      box.innerHTML=state.checkpoints.slice().reverse().map((c,i)=>`
+        <div class="death-card">
+          <div class="d-head">🕰️ ${esc(c.label)} <em>${esc(c.ts)}</em></div>
+          <button class="btn jade small" onclick="Game.rollbackTo(cpSnap('${c.id}'),'${esc(c.label)}')">⏪ 回溯到此处</button>
+        </div>`).join('');
+    }
+  },
+  showDeathOverlay(rec){
+    $('d-reason').textContent='死因:'+(rec.reason||'未知');
+    $('d-eval').innerHTML='🧾 <b>AI 点评:</b>'+esc(rec.evaluation||'(无)');
+    $('d-advice').innerHTML='💡 <b>建议:</b>'+esc(rec.advice||'(无)');
+    $('death-overlay').classList.remove('hidden');
+  },
+  hideDeathOverlay(){$('death-overlay').classList.add('hidden');}
+};
+function deathSnap(id){const r=state.deaths.find(d=>d.id===id);return r?r.snapshot:'';}
+function cpSnap(id){const c=state.checkpoints.find(c=>c.id===id);return c?JSON.stringify(c.state):'';}
+/* ================= 启动 ================= */
+function autoGrow(){
+  const t=$('chat-input');
+  t.style.height='auto';
+  t.style.height=Math.min(110,t.scrollHeight)+'px';
+}
+function boot(){
+  applyTheme(cfg.theme);
+  $('chat-input').addEventListener('input',autoGrow);
+  $('chat-input').addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();Game.send();}
+  });
+  $('import-file').addEventListener('change',e=>{
+    if(e.target.files&&e.target.files[0])Game.handleImport(e.target.files[0]);
+    e.target.value='';
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){
+      if(!$('death-overlay').classList.contains('hidden')){UI.hideDeathOverlay();}
+      else if(!$('settings-modal').classList.contains('hidden')){UI.closeModal('settings-modal');}
+      else if(!$('guide-modal').classList.contains('hidden')){UI.closeModal('guide-modal');}
+      else if(!$('ency-modal').classList.contains('hidden')){UI.closeModal('ency-modal');}
+      else if(!$('mem-modal').classList.contains('hidden')){UI.closeModal('mem-modal');}
+      else if(!$('death-modal').classList.contains('hidden')){UI.closeModal('death-modal');}
+      else{UI.closeAllDrawers();}
+    }
+    if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();if(state){Game.exportSave();}}
+  });
+  window.addEventListener('beforeunload',()=>{if(state&&!window.__restarting)autosave();});
+  const saved=lsGet(LS_STATE,null);
+  if(saved&&saved.player&&saved.status){
+    state=saved;
+    if(!state.deaths)state.deaths=[];
+    if(!state.checkpoints)state.checkpoints=[];
+    if(!state.log)state.log=[];
+    if(!state.memories)state.memories=[];
+    if(!state.wikiExtra)state.wikiExtra=[];
+    if(!state.quests)state.quests=[];
+    if(!state.relations)state.relations={};
+    if(!state.inventory)state.inventory=[];
+    if(!state.history)state.history=[];
+    if(!state.summary)state.summary='';
+    Game.enterGame(true);
+  }else{
+    W.init();
+  }
+}
+boot();
+</script>
+</body>
+</html>

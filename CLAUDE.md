@@ -48,3 +48,5 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ## 待办管理
 
 唯一待办事实来源：`TICKETS.md`。DEV_LOG 只记"已做"，不存储待办。
+
+- DEV_LOG 滚动摘要窗口上限 **12 条**：文档同步时若超限，把最旧一批折叠为一条「阶段摘要」（日期范围 + 每批次一行，置于日志正文顶部），窗口回落至 6~8 条；不拆 docs/——避坑细节已蒸馏 persona/经验笔记，批次细节 git log 可溯
