@@ -4,7 +4,7 @@
  * 职责：提供模型下拉填充、自定义模型切换的共享函数，
  *       消除 app.js（settings-panel）与 model-selector.js 之间的重复。
  *
- * 协议表面（__all__）：fillModelSelect / createCustomModelHandler。
+ * 协议表面（__all__）：fillModelSelect / createCustomModelHandler / providerDisplayName（FE-3 归位）。
  */
 
 import { escapeHtml } from '../utils.js';
@@ -85,4 +85,22 @@ export function createCustomModelHandler(selectEl, customInputEl) {
             customInputEl.style.display = 'none';
         }
     };
+}
+
+/**
+ * 解析 Provider 显示名（provider key → 展示名）
+ *
+ * 对话记录只存 provider key（如 'deepseek'），展示名来自 /api/models 的
+ * providers 元数据（key/name 映射）。未匹配时回退为原始 key，避免硬编码
+ * 二元映射导致 deepseek/qwen 等第三方 provider 被误显示为 Claude。
+ *
+ * @param {{providers?: Array<{key: string, name: string}>} | Array | null | undefined} modelData - 模型数据（state.models 或 providers 数组）
+ * @param {string | null | undefined} providerKey - 对话记录中的 provider key
+ * @returns {string} 显示名；providerKey 为空返回空串
+ */
+export function providerDisplayName(modelData, providerKey) {
+    if (!providerKey) return '';
+    const providers = Array.isArray(modelData) ? modelData : modelData?.providers;
+    const found = (providers || []).find((p) => p && p.key === providerKey);
+    return found?.name || providerKey;
 }

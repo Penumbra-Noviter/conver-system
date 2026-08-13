@@ -5,7 +5,8 @@
  * 只做「数据 → HTML 字符串」的映射，不接触 DOM（appendChild / innerHTML 写入留在调用方）。
  */
 
-import { escapeHtml, getInitials, formatTags, renderMarkdown } from './utils.js';
+import { escapeHtml, getInitials, formatTags } from './utils.js';
+import { renderMarkdown } from './markdown.js';
 import { iconHtml } from './icons.js';
 
 /**

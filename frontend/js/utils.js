@@ -17,91 +17,6 @@ export function escapeHtml(str) {
 }
 
 /**
- * 轻量 Markdown 渲染（安全 — 先转义再解析标记）
- * 支持：代码块、内联代码、粗体、斜体、链接、无序/有序列表
- * @param {string} text - 原始文本
- * @returns {string} 渲染后的 HTML
- */
-export function renderMarkdown(text) {
-    if (typeof text !== 'string' || !text) return '';
-
-    // 先转义 HTML，再解析 Markdown 标记
-    let html = escapeHtml(text);
-
-    // ── 代码块 (```...```) — 必须在其他标记之前处理 ──
-    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
-        const langClass = lang ? ` class="lang-${escapeHtml(lang)}"` : '';
-        return `<pre><code${langClass}>${code}</code></pre>`;
-    });
-
-    // ── 内联代码 `code` ──
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    // ── 粗体 **text** ──
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-    // ── 斜体 *text* ──
-    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-    // ── 链接 [text](url) ──
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-
-    // ── 列表（行级处理） — 将行首的 - / * / 1. 转为 HTML 列表 ──
-    const lines = html.split('\n');
-    const result = [];
-    let inUl = false;
-    let inOl = false;
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        // 处理水平分割线
-        if (/^[-*_]{3,}$/.test(line.trim())) {
-            if (inUl) { result.push('</ul>'); inUl = false; }
-            if (inOl) { result.push('</ol>'); inOl = false; }
-            result.push('<hr>');
-            continue;
-        }
-
-        // 无序列表 - 或 *
-        const ulMatch = line.match(/^(\s*)[*\-]\s+(.*)$/);
-        if (ulMatch) {
-            if (inOl) { result.push('</ol>'); inOl = false; }
-            if (!inUl) { result.push('<ul>'); inUl = true; }
-            result.push(`<li>${ulMatch[2]}</li>`);
-            continue;
-        }
-
-        // 有序列表 1. 2.
-        const olMatch = line.match(/^(\s*)\d+\.\s+(.*)$/);
-        if (olMatch) {
-            if (inUl) { result.push('</ul>'); inUl = false; }
-            if (!inOl) { result.push('<ol>'); inOl = true; }
-            result.push(`<li>${olMatch[2]}</li>`);
-            continue;
-        }
-
-        // 关闭打开的列表
-        if (inUl) { result.push('</ul>'); inUl = false; }
-        if (inOl) { result.push('</ol>'); inOl = false; }
-
-        // 空行 → 段落分隔
-        if (line.trim() === '') {
-            result.push('<p></p>');
-        } else {
-            result.push(line);
-        }
-    }
-
-    if (inUl) result.push('</ul>');
-    if (inOl) result.push('</ol>');
-
-    html = result.join('\n');
-
-    return html;
-}
-
-/**
  * 显示 Toast 通知（自动 5 秒后消失）
  * @param {string} message - 提示内容
  * @param {'success'|'error'} type - 类型（影响样式）
@@ -169,22 +84,4 @@ export function formatTags(tags) {
 export function autoResizeInput(el) {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 150) + 'px';
-}
-
-/**
- * 解析 Provider 显示名（provider key → 展示名）
- *
- * 对话记录只存 provider key（如 'deepseek'），展示名来自 /api/models 的
- * providers 元数据（key/name 映射）。未匹配时回退为原始 key，避免硬编码
- * 二元映射导致 deepseek/qwen 等第三方 provider 被误显示为 Claude。
- *
- * @param {{providers?: Array<{key: string, name: string}>} | Array | null | undefined} modelData - 模型数据（state.models 或 providers 数组）
- * @param {string | null | undefined} providerKey - 对话记录中的 provider key
- * @returns {string} 显示名；providerKey 为空返回空串
- */
-export function providerDisplayName(modelData, providerKey) {
-    if (!providerKey) return '';
-    const providers = Array.isArray(modelData) ? modelData : modelData?.providers;
-    const found = (providers || []).find((p) => p && p.key === providerKey);
-    return found?.name || providerKey;
 }
