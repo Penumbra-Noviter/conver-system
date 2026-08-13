@@ -36,8 +36,9 @@
 | D4 | **世界书 MVP 字段** | 七件套先行：key / content / constant / order / probability / group(+groupWeight) / disable；正则、keysecondary 四态、递归扫描、定时效果、向量、characterFilter 等后置到玩法层阶段 |
 | D5 | **玩家状态** | 数据层预留（World 实体上留 JSON 状态字段），里程碑一不实现玩法逻辑 |
 | D6 | **存量兼容** | 角色可选挂世界；没挂世界的角色行为与现在完全一致；对话仍属于角色，不新建「世界对话」类型 |
+| D7 | **模拟器集成模块（用户原始想法，原型已验证）** | 独立于角色对话的「模拟器」模块：静态托管单文件 HTML 模拟器 + manifest 元数据 + iframe 运行容器，供用户选择使用。2026-08-13 最小原型验证：网页版 + Tauri 桌面版全链路跑通（见 4.5） |
 
-> 注：用户对「大世界」方案（D2 形态）表示「与我的想法有出入，但也是一个很好的点」——出入点未展开，见未决事项 U1。
+> 注：D2「大世界」与 D7「模拟器集成」是两条并行方向：D7 集成现成完整玩法（用户最初想法），D2 是用户自定义玩法（后续续谈，见未决事项 U1）。
 
 ## 四、设计草案（待后续确认，非正式规格）
 
@@ -87,16 +88,39 @@ World（世界：设定文本 + 世界书条目表 + 预留玩家状态 JSON）
 
 - 现有 `character_card.py` 把 `character_book` 作为非 V2 标准字段存 `extensions.conver_system` 命名空间**往返保真**（导入保留/导出带回，有测试锁定）——但**无任何代码消费**（不能编辑、不注入）。做 World 实体时条目字段语义直接对齐 SillyTavern lorebook，角色卡带的世界书可原样解析进世界书编辑器。
 
+### 4.5 模拟器集成最小原型（2026-08-13 验证完成，throwaway 分支 prototype/simulators-integration）
+
+**形态**：用户下载的 22 个单文件 HTML 模拟器（50~330KB，`C:\Users\Administrator\Downloads\最新版本游戏本体\`）——100% 自包含（唯一外部引用是 data: favicon），两类驱动：
+- **AI 驱动**（约半数）：游戏内置 `endpoint/apiKey/model` 配置面板（DOM id 模式 `*-endpoint`/`*-apikey`/`*-model`，如蛛网之影 `set-*`、人生模拟器 `cfg-*`），直连 OpenAI 兼容接口，key 用户自填
+- **纯本地**：数值驱动，存档走 localStorage（游戏前缀隔离，如 `ls_`/`god_`/`urban_`）
+
+**验证链路（全部实测通过）**：
+1. 静态托管：游戏 HTML + manifest.json 放 `frontend/simulators/`，被现有根静态挂载（main.py:64）自动覆盖，后端**零改动**
+2. 前端：`frontend/prototype-simulators.html`（throwaway 原型页）——列表（读 manifest）+ iframe 运行容器 + 验证状态面板
+3. 网页版（Playwright）：列表渲染 ✓ / iframe 加载游戏 ✓ / **同源 DOM 直读**（游戏内部控件可探测）✓ / **同源 localStorage 读写**（游戏存档可用）✓ / AI 配置面板控件探测 ✓
+4. **Tauri 桌面版**（tauri dev + WebView2 CDP 自动化）：完整链路重跑全通过——boot.html → 动态端口后端 → 同一套静态托管；**WebView2 无 CSP 拦截**（tauri.conf.json 未配 csp，内联脚本 + iframe 正常）
+
+**桌面版 dev 模式坑（已实测，正式开发时注意）**：
+- `CONVER_BACKEND_CMD` 覆盖后端命令时，**路径含空格必须用双引号包裹**（`set "CONVER_BACKEND_CMD="D:\...\python.exe" -m uvicorn ..."`，cmd 的 set 保留内部引号）；反斜杠转义 `\"` 会被 cmd 当字面量 → parse_command_line 拆出坏路径（os error 2 / "program path has no file name"）
+- dev 模式壳的 cwd 是 src-tauri → 需 `CONVER_BACKEND_CWD` 指向仓库根；`python` 需解析到 venv（PATH 或 CONVER_BACKEND_CMD 显式指定）
+- 壳用**动态端口**拉起后端（非固定 8000）；`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` 可开 WebView2 CDP 调试口（playwright-core connectOverCDP 可自动化驱动窗口）
+
+**原型产物**：`frontend/simulators/`（2 个示例游戏 + manifest.json）、`frontend/prototype-simulators.html`、`.scratch/` 下启动/验证脚本——提交在 throwaway 分支，主分支不含。
+
 ## 五、未决事项（后续讨论入口）
 
 | # | 事项 | 说明 |
 |---|------|------|
-| U1 | **用户想法出入点** | 用户表示「大世界」方案与自己的想法有出入（未展开）——下次续谈首先对齐此处 |
+| U1 | **用户想法 vs 大世界方案** | 已澄清（2026-08-13）：用户最初想法 = 集成现成完整模拟器（D7，原型已验证）；「大世界/世界书」是用户认可的另一条方向，待后续展开 |
 | U2 | probability 与 group 交互语义 | 建议对齐 SillyTavern 原版（group=权重抽选互斥事件池 / probability=独立概率随机事件），未拍板 |
 | U3 | 玩法层（rules）架构 | 事件表格式、境界/属性系统的通用建模（D1 混合驱动的落地形态） |
 | U4 | 玩家视角 | 修仙/人生模拟需要「玩家状态」（用户作为主角），World 数据层已预留，具体形态待玩法层讨论 |
 | U5 | 玩法包生态 | 玩法包导入的 UI 整合形态（「整合 UI」诉求的落地方案） |
 | U6 | 世界书字段全集 | 后置字段（正则/递归/定时/向量）在玩法层阶段的补入顺序 |
+| U7 | 模拟器模块正式形态 | 原型已验证链路 → 正式模块：导航集成（独立 tab/入口）、卡片列表页、22 个游戏全量入包、manifest 字段完善（标签/分类/封面） |
+| U8 | 模拟器 LLM key 整合 | 现状各游戏内自填 key；可选二期：复用 Conver System key 管理（同源 postMessage/注入），游戏内「用主应用 Key」 |
+| U9 | 模拟器存档管理 | 各游戏 localStorage 前缀存档现状独立；可选二期：存档导出/导入/管理面板 |
+| U10 | 内容授权 | 第三方模拟器作者授权——个人自用无碍，开源分发前需确认（22 个游戏） |
 
 ## 六、下一步
 

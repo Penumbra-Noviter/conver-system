@@ -13,6 +13,15 @@
 
 ---
 
+## 滚动摘要（2026-08-14 — 模拟器集成最小原型验证（prototype skill））
+
+- **背景（用户原始想法澄清）**：用户最初想法 = 新加独立于角色对话的「模拟器」模块，集成下载的 22 个成熟单文件 HTML 模拟器（`C:\Users\Administrator\Downloads\最新版本游戏本体\`）供选择使用——与 D2「大世界/世界书」是并行方向（U1 已澄清）
+- **原型验证（网页版 + Tauri 桌面版全链路跑通）**：静态托管（游戏 HTML + manifest.json 放 `frontend/simulators/`，被根静态挂载 main.py:64 覆盖，**后端零改动**）+ 原型页（列表 + iframe 容器 + 验证状态面板）+ 同源 DOM 直读/localStorage 读写（游戏存档可用）+ AI 配置面板控件探测（`*-endpoint/apikey/model` 模式）；桌面版经 tauri dev + WebView2 CDP（playwright-core connectOverCDP）自动化重跑全过——boot.html → 动态端口后端 → 同一套静态托管，**WebView2 无 CSP 拦截**
+- **实测坑（正式开发注意）**：CONVER_BACKEND_CMD 路径含空格须双引号包裹（`set "VAR="D:\...\python.exe" -m ..."`，cmd set 保留内部引号；`\"` 是字面量 → parse_command_line 坏路径 os error 2）；dev 模式壳 cwd=src-tauri 须 CONVER_BACKEND_CWD 指仓库根 + python 解析到 venv；壳用动态端口拉起后端；`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` 开 WebView2 CDP 调试口；MSYS_NO_PATHCONV=1 会禁用 `//c` 转换（cmd 进交互模式）
+- **发现**：人生模拟器v3 实测为 AI 驱动（内置 deepseek 配置面板，非纯本地）；22 个游戏 ≈ 半数 AI 驱动（游戏内自填 key）+ 半数纯本地（localStorage 前缀存档）
+- **归档**：探索文档 `docs/world-simulation-exploration.md` §4.5 + D7 + U7-U10；原型产物提交 throwaway 分支 `prototype/simulators-integration`（主分支不含）
+- **无正式代码改动、无待办录入**（原型验证非工单；正式模块立项待用户决定）
+
 ## 滚动摘要（2026-08-13 — 大版本方向探讨：世界模拟扩展 · 存档待续）
 
 - **探讨（非工单，用户要求先存档后续续谈）**：大版本更新方向「角色对话 → 世界模拟平台」首轮探讨——子智能体网络调研（类型命名 / SillyTavern 世界书 / 角色卡 v2 / lifeRestart 数据表驱动 / 市场空白）+ 用户拍板 6 项决策（D1 混合驱动：规则在数据层、叙事归 LLM；D2 世界为一等公民、角色归入世界；D3 里程碑一=世界书+导入导出闭环；D4 世界书 MVP 七件套字段；D5 玩家状态数据层预留；D6 存量兼容：角色可选挂世界、对话仍属角色）
