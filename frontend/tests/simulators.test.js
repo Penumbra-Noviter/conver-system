@@ -281,6 +281,40 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
         expect(panel.querySelector('.sim-type-tag').textContent).toBe('AI 驱动');
     });
 
+    it('Falsify:游戏 id 含双引号（属性值注入面 — escapeHtml 不转义引号）→ data-id 经 dataset 赋值，无额外属性且完整回传', async () => {
+        const { sim, panel } = await loadModules();
+        const evilId = 'life-sim" onclick="alert(1)';
+        sim.setFetch(makeFetch({ result: mockManifest({
+            version: 1,
+            simulators: [{ id: evilId, file: 'x.html', name: 'N', type: 'ai' }],
+        }) }));
+        const openSpy = vi.fn();
+        sim.initSimulatorsView({ container: panel, onOpenGame: openSpy });
+        await sim.refreshSimulators();
+
+        const card = panel.querySelector('.sim-card');
+        expect(card.hasAttribute('onclick')).toBe(false); // 无注入属性（旧实现：引号截断 + onclick 成真属性）
+        expect(card.dataset.id).toBe(evilId); // dataset 通道完整往返（无引号截断）
+        card.click();
+        expect(openSpy).toHaveBeenCalledTimes(1);
+        expect(openSpy).toHaveBeenCalledWith(expect.objectContaining({ id: evilId }));
+    });
+
+    it('游戏名含双引号（文本上下文 — escapeHtml 文本通道）→ 名称以文本渲染，不产生属性', async () => {
+        const { sim, panel } = await loadModules();
+        const evilName = 'A" onmouseover="x';
+        sim.setFetch(makeFetch({ result: mockManifest({
+            version: 1,
+            simulators: [{ id: 'a', file: 'x.html', name: evilName, type: 'ai' }],
+        }) }));
+        sim.initSimulatorsView({ container: panel });
+        await sim.refreshSimulators();
+
+        const nameEl = panel.querySelector('.sim-card-name');
+        expect(nameEl.textContent).toBe(evilName);
+        expect(nameEl.hasAttribute('onmouseover')).toBe(false);
+    });
+
     it('loading 态：请求挂起期间展示「加载中…」（渲染先于 await）', async () => {
         const { sim, panel } = await loadModules();
         const pending = { resolve: null, promise: null };

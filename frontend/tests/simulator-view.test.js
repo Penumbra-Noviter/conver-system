@@ -322,4 +322,35 @@ describe('simulator-view — closeSimulator 返回与守卫', () => {
         expect(frame.classList.contains('sim-run-frame-hidden')).toBe(false);
         expect(runPanel.querySelector('.sim-run-error')).toBeNull();
     });
+
+    it('Falsify:游戏名含双引号（iframe title 属性注入面 — escapeHtml 不转义引号）→ title 经 setAttribute 赋值，无注入属性', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const evilName = 'X" onload="alert(1)';
+        view.openSimulator({ file: 'x.html', name: evilName, type: 'ai' });
+
+        const frame = frameEl();
+        expect(frame.hasAttribute('onload')).toBe(false); // 无注入属性（旧实现：引号截断 + onload 成真属性）
+        expect(frame.getAttribute('title')).toBe(evilName); // setAttribute 通道完整往返
+    });
+
+    it('Falsify:load 竞态 — 旧 iframe 销毁后迟到 load 事件不污染新游戏（超时守卫保留）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        view.openSimulator(GAME_AI);
+        const oldFrame = frameEl();
+        view.openSimulator(GAME_LOCAL); // API 层替换（旧 iframe 已从 DOM 移除）
+        expect(oldFrame.isConnected).toBe(false);
+
+        // 迟到事件：旧元素监听仍在，向已销毁的旧 iframe 派发 load
+        oldFrame.dispatchEvent(new Event('load'));
+
+        // 新游戏不被污染：仍 opening（加载占位 + iframe 隐藏）
+        expect(runPanel.querySelector('.sim-run-status').textContent).toBe('加载中…');
+        const newFrame = frameEl();
+        expect(newFrame.classList.contains('sim-run-frame-hidden')).toBe(true);
+        // 新游戏超时守卫未被清除：推进 15s → error（若守卫被清则永不 load 时永久空白无兜底）
+        vi.advanceTimersByTime(15000);
+        expect(runPanel.querySelector('.sim-run-error')).not.toBeNull();
+    });
 });

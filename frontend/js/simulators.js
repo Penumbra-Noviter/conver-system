@@ -228,7 +228,7 @@ function renderList() {
     }
 
     const cards = filtered.map((game) => `
-        <article class="sim-card" data-id="${escapeHtml(game.id)}">
+        <article class="sim-card">
             <div class="sim-card-icon">${iconHtml('gamepad', { size: 20 })}</div>
             <div class="sim-card-body">
                 <div class="sim-card-title">
@@ -240,6 +240,13 @@ function renderList() {
         </article>
     `).join('');
     stateEl.innerHTML = `<div class="sim-grid">${cards}</div>`;
+    // data-id 经 DOM dataset 赋值（数据通道单一化纪律 — 属性值不嵌 HTML 字符串：
+    // escapeHtml 文本序列化不转义引号，字符串拼接 data-id 存在属性注入面 +
+    // 引号截断；dataset 赋值天然安全且完整往返，先例：format.js messageBubbleHtml
+    // 复制数据通道，CONTEXT.md message bubble factory）
+    stateEl.querySelectorAll('.sim-card').forEach((el, i) => {
+        el.dataset.id = filtered[i].id;
+    });
 }
 
 /**
