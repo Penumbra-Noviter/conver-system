@@ -24,7 +24,7 @@ from backend.app.api.routes import settings as settings_route
 from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm.base import BaseLLM
-from backend.app.services.llm.errors import LLMAuthError
+from backend.app.services.llm.errors import LLMAuthError, LLMError
 from backend.app.services.llm.factory import LLMFactory
 from backend.app.services.llm.openai import _normalize_base_url
 
@@ -46,6 +46,10 @@ class _RecordingProvider(BaseLLM):
     def __init__(self) -> None:
         super().__init__(api_key="test-key")
         self.called: tuple | None = None
+
+    def _translate_error(self, error: Exception) -> LLMError:
+        """stub：本测试不产生 SDK 调用，翻译仅满足抽象契约"""
+        return LLMError(str(error), error)
 
     async def generate(
         self,

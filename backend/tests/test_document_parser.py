@@ -18,7 +18,7 @@ import pytest
 
 from backend.app.schemas.character import DocParseResponse
 from backend.app.services.document_parser import _extract_json, parse_document
-from backend.app.services.exceptions import DocParseError
+from backend.app.services.exceptions import DocParseError, ProviderNotSupportedError
 
 __all__: list[str] = []
 
@@ -199,7 +199,7 @@ class TestParseDocument:
         mock_setting.default_model.return_value = "claude-sonnet-5"
         mock_setting.api_key.return_value = "sk-test"
         mock_setting.base_url.return_value = ""
-        mock_factory.side_effect = ValueError("不支持的 Provider: foo")
+        mock_factory.side_effect = ProviderNotSupportedError("不支持的 Provider: foo")
 
         with pytest.raises(DocParseError) as exc:
             await parse_document(None, "测试", provider="foo")

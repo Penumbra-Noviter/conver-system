@@ -235,17 +235,17 @@ class TestPrepareChat:
         assert "API Key" in str(exc.value)
 
     def test_unsupported_provider_raises(self, db_session, monkeypatch) -> None:
-        """Provider 未注册（get_provider 抛 ValueError）→ ProviderNotSupportedError"""
+        """Provider 未注册（get_provider 抛 ProviderNotSupportedError）→ 原样上抛"""
         _patch_api_key(monkeypatch)
         conv = _create_conversation(db_session, provider="gemini")
         req = ChatRequest(conversation_id=conv.id, content="你好")
 
         class _RaisingFactory:
-            """get_provider 恒抛 ValueError 的假工厂（模拟未注册 Provider）"""
+            """get_provider 恒抛 ProviderNotSupportedError 的假工厂（模拟未注册 Provider）"""
 
             @staticmethod
             def get_provider(name: str, api_key: str, base_url: str | None = None) -> object:
-                raise ValueError(f"不支持的 Provider: {name}")
+                raise ProviderNotSupportedError(f"不支持的 Provider: {name}")
 
         monkeypatch.setattr(llm_resolver, "LLMFactory", _RaisingFactory)
 

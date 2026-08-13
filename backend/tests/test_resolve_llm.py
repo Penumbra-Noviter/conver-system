@@ -66,12 +66,12 @@ class TestResolveLlm:
         assert "API Key" in str(exc.value)
 
     def test_unsupported_provider_raises(self, db_session, monkeypatch) -> None:
-        """Provider 不合法（get_provider 抛 ValueError）→ ProviderNotSupportedError"""
+        """Provider 不合法（get_provider 抛 ProviderNotSupportedError）→ 原样上抛"""
 
         class _RaisingFactory:
             @staticmethod
             def get_provider(name: str, api_key: str, base_url: str | None = None) -> object:
-                raise ValueError(f"不支持的 Provider: {name}")
+                raise ProviderNotSupportedError(f"不支持的 Provider: {name}")
 
         _patch_api_key(monkeypatch)
         monkeypatch.setattr(resolver, "LLMFactory", _RaisingFactory)
@@ -79,6 +79,21 @@ class TestResolveLlm:
         with pytest.raises(ProviderNotSupportedError) as exc:
             resolve_llm(db_session, "gemini", "gemini-test")
         assert "gemini" in str(exc.value)
+
+    def test_constructor_value_error_passes_through(self, db_session, monkeypatch) -> None:
+        """注册类构造抛 ValueError（注册数据缺陷）→ 原样上抛，不误映射为「不支持的 Provider」"""
+
+        class _BrokenConstructorFactory:
+            @staticmethod
+            def get_provider(name: str, api_key: str, base_url: str | None = None) -> object:
+                raise ValueError(f"{name} 注册数据缺陷: model_data 条目缺实现")
+
+        _patch_api_key(monkeypatch)
+        monkeypatch.setattr(resolver, "LLMFactory", _BrokenConstructorFactory)
+
+        with pytest.raises(ValueError, match="注册数据缺陷") as exc:
+            resolve_llm(db_session, "claude", "claude-test")
+        assert "不支持的 Provider" not in str(exc.value)
 
     def test_resolve_returns_triple(self, db_session, monkeypatch) -> None:
         """正常解析 → (provider, model, llm) 三元组，构造参数透传"""

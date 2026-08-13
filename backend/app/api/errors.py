@@ -22,10 +22,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from backend.app.services import chat as chat_service
-from backend.app.services.error_mapping import (
-    IMPORT_FORMAT_HINT as _IMPORT_FORMAT_HINT,
-    domain_error_response,
-)
+from backend.app.services.error_mapping import domain_error_response
 from backend.app.services.exceptions import DomainError
 from backend.app.services.llm.errors import LLMError
 

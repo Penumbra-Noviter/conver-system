@@ -33,6 +33,10 @@ class _MinimalProvider(BaseLLM):
         super().__init__(api_key, base_url)
         self.generate_calls: list[dict] = []
 
+    def _translate_error(self, error: Exception) -> LLMError:
+        """stub：本测试不产生 SDK 调用，翻译仅满足抽象契约"""
+        return LLMError(str(error), error)
+
     async def generate(
         self,
         messages: list[dict],

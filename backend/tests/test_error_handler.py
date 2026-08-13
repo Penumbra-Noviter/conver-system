@@ -35,10 +35,10 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 from backend.app.api.errors import (
-    _IMPORT_FORMAT_HINT,
     domain_error_handler,
     llm_error_handler,
 )
+from backend.app.services.error_mapping import IMPORT_FORMAT_HINT as _IMPORT_FORMAT_HINT
 from backend.app.api.routes import chat as chat_route
 from backend.app.api.routes import characters as characters_route
 from backend.app.api.routes import conversations as conversations_route

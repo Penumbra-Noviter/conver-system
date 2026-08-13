@@ -17,6 +17,8 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+from backend.app.services.llm.errors import LLMError
+
 
 class BaseLLM(ABC):
     """所有 LLM Provider 的抽象基类"""
@@ -24,6 +26,23 @@ class BaseLLM(ABC):
     def __init__(self, api_key: str, base_url: str | None = None):
         self.api_key = api_key
         self.base_url = base_url
+
+    @abstractmethod
+    def _translate_error(self, error: Exception) -> LLMError:
+        """将 SDK 异常统一映射为 LLMError 层级（抽象契约，必须实现）
+
+        generate / stream_generate 经 _translated_call 骨架捕获的任意异常
+        统一交给本方法翻译后再上抛；抽象方法强制子类实现，漏实现者无法
+        实例化（TypeError），杜绝未来 Provider 忘实现时 AttributeError 穿透 500。
+        参照实现：openai.py / claude.py（translate_sdk_error 适配各自 SDK）。
+
+        Args:
+            error: SDK 抛出的原始异常
+
+        Returns:
+            映射后的 LLMError（消息带 Provider 名，wire 语义由 LLMError 族决定）
+        """
+        ...
 
     def _prepare_messages(self, messages: list[dict]) -> tuple[str | None, list[dict]]:
         """从消息列表提取 system prompt，返回 (system_content, chat_messages)
