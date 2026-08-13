@@ -50,8 +50,10 @@
         return;
       }
       var POLL_INTERVAL_MS = 500;
-      // 就绪超时单一来源（RS-1 R3）：壳端超时经 status.readyTimeoutMs 透传，
-      // 轮询上限据此派生；旧壳无此字段 / 未启动 → 回退默认 60000ms（120 × 500ms）。
+      // 就绪超时单一来源（RS-1 R3）：壳端超时经 status.readyTimeoutMs 透传，轮询上限据此派生。
+      // 取值契约（TD-30）：readyTimeoutMs > 0 → 透传；0 / null / undefined 一律视为
+      // 未配置 → 回退默认 60000ms（120 × 500ms）。0 必须走默认——否则 maxPolls = 0，
+      // 首次轮询即判超时。
       var DEFAULT_READY_TIMEOUT_MS = 60000;
       var readyTimeoutMs = null;
       var maxPolls = Math.ceil(DEFAULT_READY_TIMEOUT_MS / POLL_INTERVAL_MS);
@@ -67,7 +69,10 @@
         invoke('backend_status')
           .then(function (status) {
             if (readyTimeoutMs === null) {
-              readyTimeoutMs = (status && status.readyTimeoutMs) ?? DEFAULT_READY_TIMEOUT_MS;
+              readyTimeoutMs =
+                status && status.readyTimeoutMs > 0
+                  ? status.readyTimeoutMs
+                  : DEFAULT_READY_TIMEOUT_MS;
               maxPolls = Math.ceil(readyTimeoutMs / POLL_INTERVAL_MS);
             }
             if (status && status.ready && status.url) {

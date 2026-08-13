@@ -403,6 +403,41 @@ fn managed_child_kill_terminates_process() {
     assert_process_gone(pid);
 }
 
+/// 已退出进程 kill 不挂死（有界回收契约）：子进程自行退出后 kill() 必须即时返回。
+///
+/// Windows 下 taskkill 对已死 pid 返回「not found」失败（天然触发 taskkill 失败分支），
+/// 实现必须以 try_wait 判定退出并跳过终止动作——任何路径不得无限阻塞
+/// （旧实现 taskkill 失败且进程存活时无条件 child.wait() 会挂死）。
+#[test]
+fn managed_child_kill_on_exited_process_returns_promptly() {
+    if !python_available() {
+        return;
+    }
+    let dir = tmp_dir("kill-exited");
+    let cfg = BackendConfig {
+        program: "python".into(),
+        args: vec!["-c".into(), "import sys; sys.exit(0)".into()],
+        cwd: None,
+        extra_env: vec![],
+    };
+    let mut child = spawn_backend(&cfg, 8123, &dir).expect("spawn 应成功");
+    let pid = child.pid().expect("应有 pid");
+    // 等子进程自行退出（不回收句柄，模拟「已退出未回收」状态）
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while process_alive(pid) {
+        assert!(Instant::now() < deadline, "子进程未在时限内自行退出");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    // kill() 必须即时返回（有界 wait 契约：已退出路径不得挂死）
+    let start = Instant::now();
+    child.kill();
+    assert!(
+        start.elapsed() < Duration::from_secs(5),
+        "已退出进程的 kill() 应即时返回（实测 {:?}）",
+        start.elapsed()
+    );
+}
+
 #[test]
 fn managed_child_drop_kills_process() {
     if !python_available() {

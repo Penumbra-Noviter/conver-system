@@ -272,3 +272,38 @@ fn kill_child_terminates_backend_process() {
         "kill_child 后 pid {pid} 应已退出（输出: {text}）"
     );
 }
+
+/// 双重 kill 幂等：第二次 kill_child 时子进程槽已空，必须无副作用快速返回
+/// （不 panic、不挂死、不再触发任何终止动作）。
+#[test]
+fn kill_child_twice_is_idempotent() {
+    if !python_available() {
+        return;
+    }
+    let dir = tmp_dir("state-kill-twice");
+    let state = ShellState::new(0, dir);
+    let cfg = BackendConfig {
+        program: "python".into(),
+        args: sleep_child_script(300),
+        cwd: None,
+        extra_env: vec![],
+    };
+    state
+        .try_start_with_timeout(cfg, Duration::from_millis(500))
+        .expect("spawn 应成功");
+    let pid = state.child_pid().expect("应有子进程 pid");
+
+    state.kill_child();
+    state.kill_child(); // 幂等：第二次调用无副作用
+    std::thread::sleep(Duration::from_millis(300));
+
+    let out = Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+        .output()
+        .expect("tasklist 应可执行");
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        !text.contains(&pid.to_string()),
+        "双重 kill 后 pid {pid} 应已退出（输出: {text}）"
+    );
+}
