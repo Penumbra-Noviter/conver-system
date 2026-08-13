@@ -6,7 +6,7 @@ JSON 响应（状态码 + detail 与现状逐字一致），路由层不再各�
 
 - 领域族：委托 services/error_mapping.py::domain_error_response 单一入口
   （404/400/422 全家族 + 未知领域异常 400 兜底；映射表不再双份维护，
-  ARC10-4「两路并存」合并完成）
+  ARC10-4「两路并存」合并完成；CharacterNotFoundError→404 随 BE-2 并入）
 - LLM 族：委托 services/chat.py::chat_error_response 映射（401/429/504/400/502；
   防御性注册——请求路径上的 LLM 错误实际先经 complete_chat 显式 raise
   HTTPException 并携带 provider 上下文）
@@ -24,13 +24,12 @@ from fastapi.responses import JSONResponse
 from backend.app.services import chat as chat_service
 from backend.app.services.error_mapping import (
     IMPORT_FORMAT_HINT as _IMPORT_FORMAT_HINT,
+    domain_error_response,
 )
-from backend.app.services.error_mapping import domain_error_response
 from backend.app.services.exceptions import DomainError
 from backend.app.services.llm.errors import LLMError
 
 __all__ = ["domain_error_handler", "llm_error_handler"]
-
 
 async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     """领域异常统一映射（404/400/422，detail 与现状逐字；委托服务层单一入口）

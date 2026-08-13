@@ -20,6 +20,7 @@ from backend.app.services.exceptions import (
     ApiKeyMissingError,
     CardFormatError,
     CardValidationError,
+    CharacterNotFoundError,
     ConversationNotFoundError,
     DocParseError,
     DomainError,
@@ -39,8 +40,8 @@ IMPORT_FORMAT_HINT = (
 def domain_error_response(exc: DomainError) -> tuple[int, str]:
     """领域异常 → (HTTP 状态码, 用户可见消息) 单一映射入口
 
-    - ConversationNotFoundError→404、ApiKeyMissingError/ProviderNotSupportedError→400，
-      detail 一律 str(exc)
+    - ConversationNotFoundError/CharacterNotFoundError→404、
+      ApiKeyMissingError/ProviderNotSupportedError→400，detail 一律 str(exc)
     - 422 家族：CardFormatError→422 + 导入失败：{e}。{hint}（含支持格式说明）、
       CardValidationError→422 + 导入失败：{e}（纯原因）、DocParseError→422 + str(e)（纯原因）
     - 未知 DomainError 子类 → 400 + str(e) 兜底（防御性；异常层次冻结，当前无生产者）
@@ -51,7 +52,7 @@ def domain_error_response(exc: DomainError) -> tuple[int, str]:
     Returns:
         (HTTP 状态码, 用户可见消息)
     """
-    if isinstance(exc, ConversationNotFoundError):
+    if isinstance(exc, (ConversationNotFoundError, CharacterNotFoundError)):
         return status.HTTP_404_NOT_FOUND, str(exc)
     if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError)):
         return status.HTTP_400_BAD_REQUEST, str(exc)
