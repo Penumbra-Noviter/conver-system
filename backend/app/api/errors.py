@@ -4,7 +4,7 @@
 领域异常族（DomainError）与 LLM 异常族（LLMError）在应用级统一映射为
 JSON 响应（状态码 + detail 与现状逐字一致），路由层不再各自 try/except：
 
-- 领域族：ConversationNotFoundError→404、ApiKeyMissingError→400、
+- 领域族：ConversationNotFoundError→404、CharacterNotFoundError→404、ApiKeyMissingError→400、
   ProviderNotSupportedError→400、CardFormatError→422（含支持格式说明）、
   CardValidationError→422（纯原因）、DocParseError→422（纯原因）
 - LLM 族：委托 services/chat.py::chat_error_response 映射（401/429/504/400/502；
@@ -26,6 +26,7 @@ from backend.app.services.exceptions import (
     ApiKeyMissingError,
     CardFormatError,
     CardValidationError,
+    CharacterNotFoundError,
     ConversationNotFoundError,
     DocParseError,
     DomainError,
@@ -55,7 +56,7 @@ def _domain_error_response(exc: DomainError) -> tuple[int, str]:
     Returns:
         (HTTP 状态码, 用户可见消息)
     """
-    if isinstance(exc, ConversationNotFoundError):
+    if isinstance(exc, (ConversationNotFoundError, CharacterNotFoundError)):
         return status.HTTP_404_NOT_FOUND, str(exc)
     if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError)):
         return status.HTTP_400_BAD_REQUEST, str(exc)

@@ -14,6 +14,7 @@ from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
 from backend.app.schemas.conversation import ConversationCreate, ConversationUpdate
 from backend.app.services import setting as setting_service
+from backend.app.services.exceptions import ConversationNotFoundError
 
 
 def list_conversations(db: Session, character_id: Optional[int] = None) -> list[Conversation]:
@@ -38,6 +39,18 @@ def list_conversations(db: Session, character_id: Optional[int] = None) -> list[
 def get_conversation(db: Session, conversation_id: int) -> Optional[Conversation]:
     """获取单个对话"""
     return db.query(Conversation).filter(Conversation.id == conversation_id).first()
+
+
+def require_conversation(db: Session, conversation_id: int) -> Conversation:
+    """获取对话，不存在时抛 ConversationNotFoundError（深函数）
+
+    路由层「不存在」守卫统一走此处：内部 get + 领域异常上抛，
+    由统一 exception handler 转 404，不再各写各的 HTTPException。
+    """
+    conv = get_conversation(db, conversation_id)
+    if not conv:
+        raise ConversationNotFoundError("对话不存在")
+    return conv
 
 
 def _default_title_for_character(char_name: str | None) -> str:

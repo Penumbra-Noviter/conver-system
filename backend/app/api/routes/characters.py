@@ -4,12 +4,11 @@
 
 from __future__ import annotations
 
-from urllib.parse import quote
-
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from backend.app.api.headers import build_content_disposition
 from backend.app.database import get_db
 from backend.app.schemas.character import CharacterCreate, CharacterResponse, CharacterUpdate, DocParseRequest, DocParseResponse
 from backend.app.services import character as service
@@ -28,10 +27,7 @@ def list_characters(db: Session = Depends(get_db)) -> list[CharacterResponse]:
 @router.get("/{character_id}", response_model=CharacterResponse)
 def get_character(character_id: int, db: Session = Depends(get_db)) -> CharacterResponse:
     """获取单个角色"""
-    char = service.get_character_with_count(db, character_id)
-    if not char:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="角色不存在")
-    return char
+    return service.require_character(db, character_id)
 
 
 @router.post("", response_model=CharacterResponse, status_code=status.HTTP_201_CREATED)
@@ -43,31 +39,30 @@ def create_character(data: CharacterCreate, db: Session = Depends(get_db)) -> Ch
 @router.put("/{character_id}", response_model=CharacterResponse)
 def update_character(character_id: int, data: CharacterUpdate, db: Session = Depends(get_db)) -> CharacterResponse:
     """更新角色"""
-    char = service.update_character(db, character_id, data)
-    if not char:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="角色不存在")
-    return char
+    service.require_character(db, character_id)
+    return service.update_character(db, character_id, data)
 
 
 @router.delete("/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_character(character_id: int, db: Session = Depends(get_db)) -> None:
     """删除角色（级联删除关联对话和消息）"""
-    if not service.delete_character(db, character_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="角色不存在")
+    service.require_character(db, character_id)
+    service.delete_character(db, character_id)
 
 
 @router.get("/{character_id}/export")
 def export_character(character_id: int, db: Session = Depends(get_db)) -> JSONResponse:
     """导出角色为 SillyTavern V2 角色卡（JSON 附件下载）"""
-    char = service.get_character(db, character_id)
-    if not char:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="角色不存在")
-
-    filename = quote(f"{char.name}.json")
+    char = service.require_character(db, character_id)
     return JSONResponse(
         content=to_v2_card(char),
         media_type="application/json",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+        headers={
+            "Content-Disposition": build_content_disposition(
+                f"character-{character_id}.json",
+                f"{char.name}.json",
+            )
+        },
     )
 
 

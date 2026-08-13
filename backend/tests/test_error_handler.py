@@ -14,6 +14,10 @@ ARC-10 T-15（B3）统一错误响应 exception handler 测试
        LLM 错误帧仍由服务层 stream_reply 产出，见 test_p35.py）
     6. 真实 app（main.py）注册生效：统一 handler 装配于生产应用（wire 单测 + import 级执行）
     7. characters CRUD 路由 wire 直测（本工单涉改文件覆盖率门 G2：路由层公开行为钉死）
+    8. CharacterNotFoundError 映射（BE-2 新增异常 → 404 逐字，不落未知子类兜底）
+    9. conversations CRUD 路由 wire 直测（BE-2：404 逐字 + 正常路径 + 删除/清空边界 +
+       消息历史正常路径；独立 conversation_wire_app fixture，不动既有 wire_app）
+    10. 三处导出附件头统一（BE-2：ASCII 兜底 + RFC 5987 并存；导出哨兵 404 逐字钉死）
 
 依赖：pytest + SQLite 内存库（conftest.db_session）+ TestClient（httpx）。
 不构造真实网络请求。
@@ -37,12 +41,17 @@ from backend.app.api.errors import (
 )
 from backend.app.api.routes import chat as chat_route
 from backend.app.api.routes import characters as characters_route
+from backend.app.api.routes import conversations as conversations_route
+from backend.app.api.routes import messages as messages_route
 from backend.app.api.routes import settings as settings_route
 from backend.app.database import get_db
+from backend.app.models.conversation import Conversation
+from backend.app.models.message import Message, Role
 from backend.app.services.exceptions import (
     ApiKeyMissingError,
     CardFormatError,
     CardValidationError,
+    CharacterNotFoundError,
     ConversationNotFoundError,
     DocParseError,
     DomainError,
@@ -366,3 +375,188 @@ class TestCharactersRouteCrud:
             )
         assert resp.status_code == 201
         assert resp.json()["name"] == "导入角色"
+
+
+# ── 6. CharacterNotFoundError 映射（BE-2 新增异常）──
+
+
+class TestCharacterNotFoundMapping:
+    """CharacterNotFoundError → 404 + str(e) 逐字（经统一 handler；wire 见 TestCharactersRouteCrud）"""
+
+    def test_character_not_found_404(self) -> None:
+        """CharacterNotFoundError → 404 + 逐字文案（不落未知子类 400 兜底）"""
+        exc = CharacterNotFoundError("角色不存在")
+        assert _call_handler(domain_error_handler, exc) == (404, "角色不存在")
+
+
+# ── 7. conversations CRUD 路由 wire 直测（BE-2 新增）──
+
+
+@pytest.fixture
+def conversation_wire_app(db_session) -> FastAPI:
+    """对话/消息/角色路由 + 统一 handler 的最小应用（独立 fixture，不动既有 wire_app）"""
+    app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
+    app.add_exception_handler(LLMError, llm_error_handler)
+    app.include_router(conversations_route.router)
+    app.include_router(messages_route.router)
+    app.include_router(characters_route.router)
+    app.dependency_overrides[get_db] = lambda: db_session
+    return app
+
+
+class TestConversationsRouteCrud:
+    """conversations 路由公开行为钉死（CRUD + 清空边界；404 分支经统一 handler 转领域异常）"""
+
+    def test_list_returns_empty(self, conversation_wire_app) -> None:
+        """GET /api/conversations 空库 → 200 空列表"""
+        with TestClient(conversation_wire_app) as client:
+            resp = client.get("/api/conversations")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_create_and_get(self, conversation_wire_app) -> None:
+        """POST 创建 → 201；GET 详情 → 200 回读；GET 不存在 → 404 对话不存在"""
+        with TestClient(conversation_wire_app) as client:
+            created = client.post(
+                "/api/conversations",
+                json={"character_id": 1, "title": "新对话", "model_provider": "claude", "model_name": "claude-sonnet-5"},
+            )
+            assert created.status_code == 201
+            conv_id = created.json()["id"]
+
+            got = client.get(f"/api/conversations/{conv_id}")
+            assert got.status_code == 200
+            assert got.json()["title"] == "新对话"
+
+            missing = client.get("/api/conversations/99999")
+        assert missing.status_code == 404
+        assert missing.json() == {"detail": "对话不存在"}
+
+    def test_update_and_delete(self, conversation_wire_app) -> None:
+        """PUT 更新 → 200；DELETE → 204；对不存在 id 均 404"""
+        with TestClient(conversation_wire_app) as client:
+            created = client.post(
+                "/api/conversations",
+                json={"character_id": 1, "title": "待更新"},
+            )
+            conv_id = created.json()["id"]
+
+            updated = client.put(f"/api/conversations/{conv_id}", json={"title": "已更新"})
+            assert updated.status_code == 200
+            assert updated.json()["title"] == "已更新"
+
+            deleted = client.delete(f"/api/conversations/{conv_id}")
+            assert deleted.status_code == 204
+
+            not_found_put = client.put("/api/conversations/99999", json={"title": "x"})
+            assert not_found_put.status_code == 404
+
+            not_found_del = client.delete("/api/conversations/99999")
+        assert not_found_del.status_code == 404
+
+    def test_delete_all_clears(self, conversation_wire_app) -> None:
+        """DELETE "" 清空 → 204；再次列表 → 空（清空边界）"""
+        with TestClient(conversation_wire_app) as client:
+            client.post("/api/conversations", json={"character_id": 1, "title": "甲"})
+            client.post("/api/conversations", json={"character_id": 1, "title": "乙"})
+
+            cleared = client.delete("/api/conversations")
+            assert cleared.status_code == 204
+
+            listed = client.get("/api/conversations")
+        assert listed.status_code == 200
+        assert listed.json() == []
+
+    def test_messages_route_missing_conversation_404(self, conversation_wire_app) -> None:
+        """GET 不存在对话的消息历史 → 404 对话不存在（消息路由守卫同语义）"""
+        with TestClient(conversation_wire_app) as client:
+            resp = client.get("/api/conversations/99999/messages")
+        assert resp.status_code == 404
+        assert resp.json() == {"detail": "对话不存在"}
+
+    def test_messages_route_returns_history(self, conversation_wire_app, db_session) -> None:
+        """GET 存在对话的消息历史 → 200 消息列表（消息路由正常路径）"""
+        # 消息仅由聊天回合创建、无直连创建端点，故经 ORM 落库
+        conv = Conversation(character_id=1, title="历史对话")
+        db_session.add(conv)
+        db_session.commit()
+        db_session.refresh(conv)
+        db_session.add(Message(conversation_id=conv.id, role=Role.USER, content="你好"))
+        db_session.commit()
+
+        with TestClient(conversation_wire_app) as client:
+            resp = client.get(f"/api/conversations/{conv.id}/messages")
+        assert resp.status_code == 200
+        assert resp.json()[0]["content"] == "你好"
+
+
+# ── 8. 三处导出附件头统一（BE-2：ASCII 兜底 + RFC 5987 并存）──
+
+
+class TestExportHeadersWire:
+    """导出附件头经单一 helper 构造：filename= ASCII 兜底 + filename*= UTF-8 编码并存"""
+
+    def test_character_export_ascii_fallback_plus_rfc5987(self, conversation_wire_app) -> None:
+        """角色卡导出：ASCII 兜底 + filename* 并存；中文名走百分号编码段"""
+        with TestClient(conversation_wire_app) as client:
+            created = client.post("/api/characters", json={"name": "测试·毒舌助手"})
+            char_id = created.json()["id"]
+
+            exported = client.get(f"/api/characters/{char_id}/export")
+        assert exported.status_code == 200
+        header = exported.headers["Content-Disposition"]
+        assert 'filename="character-' in header
+        assert "filename*=UTF-8''" in header
+        assert "filename*=UTF-8''%E6%B5%8B" in header  # 「测」UTF-8 编码进 filename*
+
+    def test_markdown_export_filename_star_carries_chinese_name(self, conversation_wire_app) -> None:
+        """Markdown 导出：filename* 携带中文角色名（不再纯 ASCII 丢失）"""
+        with TestClient(conversation_wire_app) as client:
+            char = client.post("/api/characters", json={"name": "中文名"})
+            conv = client.post("/api/conversations", json={"character_id": char.json()["id"]})
+
+            exported = client.get(f"/api/conversations/{conv.json()['id']}/export/markdown")
+        assert exported.status_code == 200
+        header = exported.headers["Content-Disposition"]
+        assert 'filename="conversation-' in header
+        assert "filename*=UTF-8''conversation-" in header
+        assert "%E4%B8%AD%E6%96%87" in header  # 「中文」UTF-8 编码进 filename*
+
+    def test_json_export_filename_star_carries_chinese_name(self, conversation_wire_app) -> None:
+        """JSON 导出：ASCII 兜底 + filename* 携带中文角色名（三处导出同形态）"""
+        with TestClient(conversation_wire_app) as client:
+            char = client.post("/api/characters", json={"name": "艾莉"})
+            conv = client.post("/api/conversations", json={"character_id": char.json()["id"]})
+
+            exported = client.get(f"/api/conversations/{conv.json()['id']}/export/json")
+        assert exported.status_code == 200
+        header = exported.headers["Content-Disposition"]
+        assert 'filename="conversation-' in header
+        assert "filename*=UTF-8''conversation-" in header
+        assert "%E8%89%BE%E8%8E%89" in header  # 「艾莉」UTF-8 编码进 filename*
+
+    def test_json_export_dangling_character_falls_back_to_id(self, conversation_wire_app) -> None:
+        """JSON 导出：对话悬挂 character_id（角色已删）→ 200 + 文件名回退对话 id"""
+        with TestClient(conversation_wire_app) as client:
+            conv = client.post("/api/conversations", json={"character_id": 99999})
+
+            exported = client.get(f"/api/conversations/{conv.json()['id']}/export/json")
+        assert exported.status_code == 200
+        assert exported.json()["character"] is None
+        header = exported.headers["Content-Disposition"]
+        assert f"filename*=UTF-8''conversation-{conv.json()['id']}-{conv.json()['id']}.json" in header
+
+    def test_export_json_missing_conversation_404(self, conversation_wire_app) -> None:
+        """JSON 导出哨兵：对话不存在 → 404 + 逐字（哨兵语义保留，不改调 require）"""
+        with TestClient(conversation_wire_app) as client:
+            resp = client.get("/api/conversations/99999/export/json")
+        assert resp.status_code == 404
+        assert resp.json() == {"detail": "对话不存在"}
+
+    def test_export_markdown_missing_conversation_404(self, conversation_wire_app) -> None:
+        """Markdown 导出哨兵：对话不存在 → 404 + 逐字（哨兵语义保留，不改调 require）"""
+        with TestClient(conversation_wire_app) as client:
+            resp = client.get("/api/conversations/99999/export/markdown")
+        assert resp.status_code == 404
+        assert resp.json() == {"detail": "对话不存在"}

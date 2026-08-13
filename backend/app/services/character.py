@@ -12,6 +12,7 @@ from sqlalchemy.orm import Query, Session
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.schemas.character import CharacterCreate, CharacterUpdate
+from backend.app.services.exceptions import CharacterNotFoundError
 
 
 # ── 共享查询基座 ──
@@ -57,6 +58,18 @@ def get_character_with_count(db: Session, character_id: int) -> Optional[Charact
     if not result:
         return None
     return _attach_count(*result)
+
+
+def require_character(db: Session, character_id: int) -> Character:
+    """获取角色（附带对话数量），不存在时抛 CharacterNotFoundError（深函数）
+
+    路由层「不存在」守卫统一走此处：内部 get + 领域异常上抛，
+    由统一 exception handler 转 404，不再各写各的 HTTPException。
+    """
+    char = get_character_with_count(db, character_id)
+    if not char:
+        raise CharacterNotFoundError("角色不存在")
+    return char
 
 
 def create_character(db: Session, data: CharacterCreate) -> Character:

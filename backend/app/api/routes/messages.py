@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
@@ -25,9 +25,7 @@ router = APIRouter(tags=["消息"])
 )
 def get_messages(conversation_id: int, db: Session = Depends(get_db)) -> list[MessageResponse]:
     """获取对话的消息历史（按时间正序）"""
-    conv = conversation_service.get_conversation(db, conversation_id)
-    if not conv:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
+    conversation_service.require_conversation(db, conversation_id)
     return message_service.get_messages(db, conversation_id)
 
 

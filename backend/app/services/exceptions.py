@@ -4,14 +4,15 @@ Conver System — 领域异常
 服务层抛出的领域异常，由路由层捕获并转换为 HTTP 响应。
 保持服务层与 HTTP 协议解耦，提升可测试性。
 
-协议表面（__all__）：ConversationNotFoundError / ApiKeyMissingError / ProviderNotSupportedError /
-CardFormatError / CardValidationError
+协议表面（__all__）：ConversationNotFoundError / CharacterNotFoundError / ApiKeyMissingError /
+ProviderNotSupportedError / CardFormatError / CardValidationError
 """
 
 from __future__ import annotations
 
 __all__ = [
     "ConversationNotFoundError",
+    "CharacterNotFoundError",
     "ApiKeyMissingError",
     "ProviderNotSupportedError",
     "CardFormatError",
@@ -27,6 +28,10 @@ class DomainError(Exception):
 
 class ConversationNotFoundError(DomainError):
     """对话不存在"""
+
+
+class CharacterNotFoundError(DomainError):
+    """角色不存在"""
 
 
 class ApiKeyMissingError(DomainError):
