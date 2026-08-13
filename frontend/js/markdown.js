@@ -40,7 +40,7 @@ function sanitizeUrl(url) {
 }
 
 /**
- * 生成与当前内容碰撞免疫的代码块占位符（TD-38 原子化）
+ * 生成与当前内容碰撞免疫的代码块占位符（TD-38 原子化；TD-47 碰撞作用域扩展）
  *
  * token 形如 \u0000MDCB<序号>\u0000，碰撞免疫由两层保证：
  * 1) NUL 前缀：用户内容中出现裸 NUL 占位符同形文本的概率极低（jsdom
@@ -50,6 +50,23 @@ function sanitizeUrl(url) {
  *    jsdom 保留 NUL 的场景（见 TD-38 自审）。
  * 占位符不含 ` * [ ] ( ) 等行内标记字符、不匹配行首列表语法，行内 pass
  * 与列表 pass 均无法触及。
+ *
+ * 碰撞作用域（TD-47 扩展）：仅查提取前原始串的完整形态不够——用户半形
+ * 字面量（\u0000MDCBn 缺尾 NUL / MDCBn\u0000 缺首 NUL）紧邻代码块时，
+ * 提取替换后经占位符边界拼接出新完整 token 形态，还原时被误匹配（用户
+ * 内容替换成块 HTML、块双份）。故每个候选序号同时检查三种形态，任一
+ * 存在即跳过该序号：
+ *   a) 完整形态 \u0000MDCBn\u0000（原有检查）；
+ *   b) 左半形 \u0000MDCBn——「用户左半形 + 占位符首 NUL」拼接方向，
+ *      命中则 Map 中无 n，还原不误匹配；
+ *   c) 右半形 MDCBn\u0000——「占位符尾 NUL + 用户右半形」拼接方向，
+ *      同上（当前单 pass 非重叠还原下右半形拼接被重叠遮蔽、不可复现，
+ *      属防御性对称检查，防还原实现/占位符形态未来变化后复发）。
+ * 数字边界（如用户文本含 \u0000MDCB01\u0000）：候选 0 左半形 \u0000MDCB0
+ * 命中（前缀）→ 跳过 MDCB0，MDCB1 三种形态均不命中 → 安全占用（拼接
+ * 产物与 \u0000MDCB1\u0000 不同，不误匹配）。正常文本（无任何 MDCB 形
+ * 文本）三种检查均不命中，序号分配与原实现逐号一致。防复发断言见
+ * tests/markdown.test.js「占位符拼接防护（TD-47）」describe 块。
  *
  * 取号单一职责（期末 Falsify 阻断修复）：碰撞循环内部可能消耗多个序号
  * （如用户内容占用 MDCB0/MDCB1 时，一次取号实际消耗 0/1/2 三个序号），
@@ -68,7 +85,11 @@ function createCodeBlockToken(html, tokenId) {
     do {
         token = `\u0000MDCB${tokenId}\u0000`;
         tokenId++;
-    } while (html.includes(token));
+    } while (
+        html.includes(token) ||                        // 完整形态（原有）
+        html.includes(`\u0000MDCB${tokenId - 1}`) ||   // 左半形：半形+占位符首NUL 拼接方向
+        html.includes(`MDCB${tokenId - 1}\u0000`)      // 右半形：占位符尾NUL+半形 拼接方向
+    );
     return { token, nextId: tokenId };
 }
 

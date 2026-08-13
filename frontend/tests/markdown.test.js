@@ -154,6 +154,48 @@ describe('renderMarkdown', () => {
         });
     });
 
+    describe('占位符拼接防护（TD-47）', () => {
+        const NUL = '\u0000';
+        const nulCount = (s) => s.match(/\u0000/g) ?? [];
+        const blockHtml = (content) => `<pre><code>${content}\n</code></pre>`;
+        const exactlyOnce = (s, needle) => s.split(needle).length - 1;
+
+        // TD-47：碰撞检测作用域扩展。缺陷：碰撞仅查提取前原始串的完整 token 形态
+        // （\u0000MDCBn\u0000），用户半形字面量（\u0000MDCBn 缺尾 NUL / MDCBn\u0000
+        // 缺首 NUL）紧邻代码块时，提取替换后经占位符边界拼接出新完整 token 形态，
+        // 还原时被误匹配（用户内容替换成块 HTML + 块双份）。修复：候选序号同时检查
+        // 左半形（\u0000MDCBn）+ 右半形（MDCBn\u0000）+ 完整形态，任一存在即跳过。
+
+        it('用户左半形 \u0000MDCB0 紧邻代码块 → 字面量原样保留、块恰一次、无占位符泄漏', () => {
+            const out = renderMarkdown(`\u0000MDCB0\`\`\`\ncode\n\`\`\``);
+            // 修复前红：候选 0 完整形态不命中 → 占位符 \u0000MDCB0\u0000 插入后与用户
+            // 左半形拼接出第二个完整 token 形态 → 还原把字面量与占位符一并替换为块 HTML
+            expect(out).toContain('\u0000MDCB0');
+            expect(exactlyOnce(out, blockHtml('code'))).toBe(1);
+            // 仅用户字面量的 1 个 NUL；渲染器占位符全部还原（无泄漏）
+            expect(nulCount(out)).toHaveLength(1);
+        });
+
+        it('用户右半形 MDCB0\u0000 紧邻代码块 → 字面量原样保留、块恰一次、无占位符泄漏', () => {
+            const out = renderMarkdown(`\`\`\`\ncode\n\`\`\`MDCB0\u0000`);
+            // 修复前红：占位符尾 NUL 与用户右半形拼接出第二个完整 token 形态 → 误匹配
+            expect(out).toContain('MDCB0\u0000');
+            expect(exactlyOnce(out, blockHtml('code'))).toBe(1);
+            expect(nulCount(out)).toHaveLength(1);
+        });
+
+        it('用户左半形 + 双块 → 两块各自独立还原、字面量原样保留', () => {
+            const out = renderMarkdown(
+                `\u0000MDCB0\`\`\`\nFIRST\n\`\`\`\n\n\`\`\`\nSECOND\n\`\`\``
+            );
+            // 修复前红：首块占位符与左半形拼接出第二个完整 token 形态 → FIRST 双份、字面量丢失
+            expect(out).toContain('\u0000MDCB0');
+            expect(exactlyOnce(out, blockHtml('FIRST'))).toBe(1);
+            expect(exactlyOnce(out, blockHtml('SECOND'))).toBe(1);
+            expect(nulCount(out)).toHaveLength(1);
+        });
+    });
+
     describe('内联代码', () => {
         it('反引号包裹转 <code>', () => {
             expect(renderMarkdown('run `npm install` now')).toBe('run <code>npm install</code> now');
