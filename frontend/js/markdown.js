@@ -51,9 +51,17 @@ function sanitizeUrl(url) {
  * 占位符不含 ` * [ ] ( ) 等行内标记字符、不匹配行首列表语法，行内 pass
  * 与列表 pass 均无法触及。
  *
+ * 取号单一职责（期末 Falsify 阻断修复）：碰撞循环内部可能消耗多个序号
+ * （如用户内容占用 MDCB0/MDCB1 时，一次取号实际消耗 0/1/2 三个序号），
+ * 故返回值携带 nextId（取号后下一个可用序号），调用方必须回写
+ * tokenId = nextId 而非自增——否则内外计数器失同步，后续代码块会复用已
+ * 占用占位符 → Map.set 覆盖首条记录 → 还原循环把多处占位符替换为同一块
+ * HTML（首块内容丢失、尾块双份）。防复发断言见 tests/markdown.test.js
+ * 「占位符碰撞免疫」describe 块。
+ *
  * @param {string} html - 当前（已转义）HTML 字符串，用于碰撞检测
- * @param {number} tokenId - 本批占位符序号（调用方递增）
- * @returns {string} 唯一占位符
+ * @param {number} tokenId - 本次取号起始序号（调用方维护）
+ * @returns {{ token: string, nextId: number }} token: 唯一占位符；nextId: 本次取号消耗后的下一可用序号（调用方回写）
  */
 function createCodeBlockToken(html, tokenId) {
     let token;
@@ -61,7 +69,7 @@ function createCodeBlockToken(html, tokenId) {
         token = `\u0000MDCB${tokenId}\u0000`;
         tokenId++;
     } while (html.includes(token));
-    return token;
+    return { token, nextId: tokenId };
 }
 
 /**
@@ -84,8 +92,10 @@ export function renderMarkdown(text) {
     const codeBlocks = new Map();
     let tokenId = 0;
     html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
-        const token = createCodeBlockToken(html, tokenId);
-        tokenId++;
+        // 取号在 createCodeBlockToken 内完成（碰撞循环可能消耗多个序号），
+        // 计数器同步以返回值 nextId 回写为准，此处不得再自增（TD-38 阻断修复）
+        const { token, nextId } = createCodeBlockToken(html, tokenId);
+        tokenId = nextId;
         const langClass = lang ? ` class="lang-${escapeHtml(lang)}"` : '';
         codeBlocks.set(token, `<pre><code${langClass}>${code}</code></pre>`);
         return token;
