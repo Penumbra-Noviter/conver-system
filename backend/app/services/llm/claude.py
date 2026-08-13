@@ -33,19 +33,6 @@ class ClaudeProvider(BaseLLM):
             bad_request_cls=anthropic.BadRequestError,
         )
 
-    def _prepare_messages(
-        self, messages: list[dict]
-    ) -> tuple[str | None, list[dict]]:
-        """从消息列表中提取 system prompt，返回 (system, chat_messages)"""
-        system = None
-        chat_messages = []
-        for msg in messages:
-            if msg["role"] == "system":
-                system = msg["content"]
-            else:
-                chat_messages.append({"role": msg["role"], "content": msg["content"]})
-        return system, chat_messages
-
     async def generate(
         self,
         messages: list[dict],
@@ -57,7 +44,7 @@ class ClaudeProvider(BaseLLM):
         system, chat_messages = self._prepare_messages(messages)
         model = model or "claude-sonnet-5"
 
-        try:
+        async with self._translated_call():
             response = await self._async_client.messages.create(
                 model=model,
                 system=system or [],
@@ -70,8 +57,6 @@ class ClaudeProvider(BaseLLM):
                 if block.type == "text":
                     return block.text
             return ""
-        except Exception as e:
-            raise self._translate_error(e)
 
     async def stream_generate(
         self,
@@ -84,7 +69,7 @@ class ClaudeProvider(BaseLLM):
         system, chat_messages = self._prepare_messages(messages)
         model = model or "claude-sonnet-5"
 
-        try:
+        async with self._translated_call():
             async with self._async_client.messages.stream(
                 model=model,
                 system=system or [],
@@ -94,5 +79,3 @@ class ClaudeProvider(BaseLLM):
             ) as stream:
                 async for text in stream.text_stream:
                     yield text
-        except Exception as e:
-            raise self._translate_error(e)

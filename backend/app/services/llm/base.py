@@ -4,11 +4,17 @@ LLM 抽象基类 — 所有 Provider 实现此接口
 定义两个核心方法：
     - generate(): 非流式生成
     - stream_generate(): 流式生成（AsyncIterator）
+
+共享骨架（Provider 不再各自实现）：
+    - _prepare_messages(): 消息准备（system 分离 + 消息逐条重建）
+    - _translated_call(): generate / stream_generate 的 try/except 骨架
+      （SDK 异常统一经 Provider._translate_error 映射为 LLMError）
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 
@@ -18,6 +24,35 @@ class BaseLLM(ABC):
     def __init__(self, api_key: str, base_url: str | None = None):
         self.api_key = api_key
         self.base_url = base_url
+
+    def _prepare_messages(self, messages: list[dict]) -> tuple[str | None, list[dict]]:
+        """从消息列表提取 system prompt，返回 (system_content, chat_messages)
+
+        system 以纯文本内容返回：Claude 侧直接用作顶层 system 参数，
+        OpenAI 侧需在调用处包装回 {"role": "system", "content": ...} 再插入消息列表。
+        非 system 消息逐条重建为 {"role", "content"} 字典（不持有外部引用）。
+        """
+        system = None
+        chat_messages = []
+        for msg in messages:
+            if msg["role"] == "system":
+                system = msg["content"]
+            else:
+                chat_messages.append({"role": msg["role"], "content": msg["content"]})
+        return system, chat_messages
+
+    @asynccontextmanager
+    async def _translated_call(self) -> AsyncIterator[None]:
+        """generate / stream_generate 共享 try/except 骨架
+
+        Provider 将 SDK 调用体放入 `async with self._translated_call():` 块内，
+        块内任何异常统一经 Provider._translate_error（子类实现，见 openai.py /
+        claude.py）映射为 LLMError 上抛。基类零 SDK 依赖，不承担具体翻译。
+        """
+        try:
+            yield
+        except Exception as e:
+            raise self._translate_error(e) from e
 
     @abstractmethod
     async def generate(
