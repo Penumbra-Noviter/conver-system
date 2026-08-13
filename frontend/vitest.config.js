@@ -19,6 +19,7 @@ export default defineConfig({
                 'js/components/settings-panel.js',
                 'js/components/model-selector.js',
                 'js/components/character-submit.js',
+                'js/simulators.js',
             ],
             reporter: ['text', 'html'],
             thresholds: {

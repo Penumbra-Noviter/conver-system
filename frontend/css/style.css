@@ -3292,3 +3292,198 @@ select {
     border-radius: 0 2px 2px 0;
     box-shadow: none;
 }
+
+/* ══════════════════════════════════════════════════
+   模拟器列表视图（U7-T3 — 卡片网格 / 类型筛选 / 四态）
+   样式全部走主题 token（--bg/--panel-*/--border/--ink-*/--accent/--radius/--text-*），
+   不引入硬编码色值；图标经 icons.js seam（gamepad/warning），无手写 emoji 碎片。
+   ══════════════════════════════════════════════════ */
+.sim-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.sim-filters {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.sim-filter-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg);
+    color: var(--ink-3);
+    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+    user-select: none;
+}
+
+.sim-filter-btn:hover {
+    border-color: var(--border-strong);
+    color: var(--ink-2);
+}
+
+.sim-filter-btn.active {
+    background: var(--accent-soft);
+    border-color: var(--accent-soft);
+    color: var(--accent);
+}
+
+.sim-count {
+    font-size: var(--text-xs);
+    color: var(--ink-4);
+    white-space: nowrap;
+}
+
+.sim-state {
+    padding: var(--space-4);
+    min-height: 180px;
+}
+
+.sim-status {
+    padding: var(--space-8) var(--space-4);
+    text-align: center;
+    color: var(--ink-4);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+}
+
+.sim-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-3);
+}
+
+.sim-card {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--panel-1);
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+    user-select: none;
+}
+
+.sim-card:hover {
+    background: var(--panel-2);
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+}
+
+.sim-card-icon {
+    flex-shrink: 0;
+    color: var(--accent);
+    display: flex;
+    align-items: flex-start;
+    padding-top: 2px;
+}
+
+.sim-card-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.sim-card-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.sim-card-name {
+    font-size: var(--text-md);
+    font-weight: 500;
+    color: var(--ink-1);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sim-type-tag {
+    flex-shrink: 0;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    white-space: nowrap;
+}
+
+.sim-type-ai {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.sim-type-local {
+    background: var(--panel-2);
+    color: var(--ink-3);
+    border: 1px solid var(--border);
+}
+
+.sim-card-desc {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--ink-3);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.sim-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-8) var(--space-4);
+    text-align: center;
+}
+
+.sim-error-icon {
+    color: var(--warning);
+}
+
+.sim-error-msg {
+    margin: 0;
+    font-size: var(--text-md);
+    color: var(--ink-1);
+}
+
+.sim-error-reason {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--ink-4);
+}
+
+.sim-retry-btn {
+    margin-top: var(--space-2);
+    padding: 7px 20px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-sans);
+    font-size: var(--text-md);
+    line-height: 1.4;
+    cursor: pointer;
+    transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+    user-select: none;
+}
+
+.sim-retry-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 0 12px var(--accent-soft);
+}

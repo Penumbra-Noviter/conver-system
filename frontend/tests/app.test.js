@@ -6,7 +6,8 @@
  *     （无记录 → 空态；有记录 → activateConversation(saveCurrent:false)）→
  *     initProviderDropdown → initSettingsPanel（清空回调触发级联收口）
  *   - 视图切换刷新分发：characters→loadCharacters、chat→loadConversations、
- *     settings→loadSettings+initProviderDropdown、search→100ms 聚焦
+ *     settings→loadSettings+initProviderDropdown、search→100ms 聚焦、
+ *     simulators→refreshSimulators（U7-T3，manifest fetch + 卡片渲染接线）
  *   - 级联四入口触发：删角色 / 删对话 / 清空全部（settings）/ tab-bar 关最后 tab
  *     —— 均断言经注入钩子触发 closeConversationsAndResettle 的正确参数
  *   - 搜索视图接线：输入 → 防抖搜索 → 结果点击经激活流程打开会话
@@ -31,18 +32,21 @@ const APP_DOM_HTML = `
     <section id="view-search" class="view"></section>
     <section id="view-settings" class="view"></section>
     <section id="view-guide" class="view"></section>
+    <section id="view-simulators" class="view"></section>
 
     <button class="nav-btn" data-view="chat"></button>
     <button class="nav-btn" data-view="characters"></button>
     <button class="nav-btn" data-view="search"></button>
     <button class="nav-btn" data-view="settings"></button>
     <button class="nav-btn" data-view="guide"></button>
+    <button class="nav-btn" data-view="simulators"></button>
 
     <button class="mobile-nav-btn" data-view="chat"></button>
     <button class="mobile-nav-btn" data-view="characters"></button>
     <button class="mobile-nav-btn" data-view="search"></button>
     <button class="mobile-nav-btn" data-view="settings"></button>
     <button class="mobile-nav-btn" data-view="guide"></button>
+    <button class="mobile-nav-btn" data-view="simulators"></button>
 
     <div id="conversation-list"></div>
     <button id="btn-new-chat"></button>
@@ -62,6 +66,8 @@ const APP_DOM_HTML = `
     <input type="text" id="search-input" class="search-input" autocomplete="off">
     <button id="btn-search-clear"></button>
     <div id="search-results"></div>
+
+    <div id="simulator-list-panel"></div>
 
     <select id="setting-default-provider"></select>
     <select id="setting-default-model"></select>
@@ -104,11 +110,12 @@ const PROVIDERS = [
  * @param {Array} [opts.searchResults] - GET /api/messages/search 返回
  * @param {object} [opts.importResult] - POST /api/characters/import 返回（成功）或 {fail: Error}
  * @param {boolean} [opts.failReloadAfterDelete] - 删除后列表重载（第 2 次 GET conversations）返回 500
+ * @param {object} [opts.manifest] - simulators/manifest.json 返回（模拟器列表视图 fetch；默认空列表）
  */
 function makeRoute({ characters = [], characterGet = null,
     conversations = [], createdConv = null, providers = PROVIDERS,
     settings = {}, messagesByConv = {}, searchResults = [], importResult = null,
-    failReloadAfterDelete = false } = {}) {
+    failReloadAfterDelete = false, manifest = { version: 1, simulators: [] } } = {}) {
     let convListCalls = 0;
     return async (url, options = {}) => {
         const path = String(url).replace(/^.*\/api/, '/api');
@@ -145,6 +152,10 @@ function makeRoute({ characters = [], characterGet = null,
         if (path.startsWith('/api/messages/search') && method === 'GET') return mockJson(searchResults);
         if (path === '/api/models' && method === 'GET') return mockJson({ providers });
         if (path === '/api/settings' && method === 'GET') return mockJson(settings);
+        // 模拟器 manifest（静态文件，非 /api 路径 — simulators.js fetch seam 消费 text()）
+        if (path === 'simulators/manifest.json' && method === 'GET') {
+            return { ok: true, status: 200, text: async () => JSON.stringify(manifest) };
+        }
         throw new Error(`未 mock 的请求: ${path}`);
     };
 }
@@ -300,6 +311,51 @@ describe('app.js 视图切换 — 刷新分发', () => {
 
         await sleep(150);
         expect(document.activeElement).toBe(document.querySelector('#search-input'));
+    });
+
+    it('simulators → refreshSimulators：进入视图 fetch manifest 并渲染卡片网格（U7-T3 接线）', async () => {
+        const { state, fetchSpy } = await loadApp(makeRoute({
+            manifest: {
+                version: 1,
+                simulators: [{
+                    id: 'life-sim', file: '人生模拟器v3.html', name: '人生模拟器 v3',
+                    type: 'ai', description: 'AI 驱动的生命模拟',
+                }],
+            },
+        }));
+
+        document.querySelector('.nav-btn[data-view="simulators"]').click();
+        expect(state.currentView).toBe('simulators');
+        expect(document.querySelector('#view-simulators').classList.contains('active')).toBe(true);
+
+        // manifest fetch 经 fetch seam 发出（simulators.js fetchImpl 为 null → 回落全局 fetch）
+        await vi.waitFor(() => {
+            expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('simulators/manifest.json')))
+                .toBe(true);
+        });
+        // 列表渲染接线：卡片网格 + 名称 + 类型标签
+        await vi.waitFor(() => {
+            expect(document.querySelector('#simulator-list-panel .sim-card')).not.toBeNull();
+        });
+        expect(document.querySelector('#simulator-list-panel .sim-card-name').textContent).toBe('人生模拟器 v3');
+        expect(document.querySelector('#simulator-list-panel .sim-type-tag').textContent).toBe('AI 驱动');
+    });
+
+    it('Falsify:进入 simulators 视图但 manifest fetch 失败 → 错误态渲染，无未捕获异常', async () => {
+        const { fetchSpy } = await loadApp(makeRoute({}));
+        fetchSpy.mockImplementationOnce((url) => {
+            if (String(url).includes('simulators/manifest.json')) {
+                return Promise.reject(new Error('网络错误'));
+            }
+            return makeRoute({})(url);
+        });
+
+        expect(() => document.querySelector('.nav-btn[data-view="simulators"]').click()).not.toThrow();
+
+        await vi.waitFor(() => {
+            expect(document.querySelector('#simulator-list-panel .sim-error')).not.toBeNull();
+        });
+        expect(document.querySelector('#simulator-list-panel .sim-retry-btn').textContent).toBe('重试');
     });
 });
 

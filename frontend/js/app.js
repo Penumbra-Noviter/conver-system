@@ -15,6 +15,9 @@
  *     ARC-9 C1 迁出，经 initSearchView 注入跳转钩子接线）
  *   - ./cascade.js — 级联关闭收口深模块（删角色/删对话/清空全部/关最后 tab
  *     四入口共用；ARC-9 C1 迁出，依赖经 setCascadeHooks 注入接线）
+ *   - ./simulators.js — 模拟器列表视图深模块（manifest 解析 + 卡片网格 +
+ *     类型筛选 + 四态；U7-T3，进入视图经 refreshSimulators 刷新，打开回调
+ *     经 initSimulatorsView 注入 — U7-T4 将接入 openSimulator）
  *   - ./components/settings-panel.js — 设置面板（Provider 下拉、主题、侧栏、保存、清空）
  *   - ./components/ — 模态框相关组件（modal 工厂 / confirm / model-selector / export / character-form）
  */
@@ -34,6 +37,7 @@ import { getActiveTab, getTabs, abortStream, restoreFromStorage } from './tabs.j
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 import { initSearchView } from './search-view.js';
 import { closeConversationsAndResettle, setCascadeHooks } from './cascade.js';
+import { initSimulatorsView, refreshSimulators } from './simulators.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -92,6 +96,9 @@ async function switchView(viewName) {
         // 与防抖逻辑在 search-view.js，本处只负责视图切换后的焦点引导
         setTimeout(() => document.querySelector('#search-input')?.focus(), 100);
     }
+    // 模拟器视图：进入即刷新列表（懒加载 — 未进入不发请求；fetch 在
+    // simulators.js 内部走 setFetch seam，协调层只负责触发）
+    if (viewName === 'simulators') refreshSimulators();
 }
 
 dom.navBtns.forEach((btn) => {
@@ -488,6 +495,10 @@ setCascadeHooks({
 initSearchView({
     navigateToConversation: (conversationId) => activateConversation(conversationId),
 });
+
+// 模拟器列表视图初始化（U7-T3 — 挂载列表 UI 到 #simulator-list-panel；
+// onOpenGame 暂不注入（未注入时点击为空操作），U7-T4 将接入 openSimulator）
+initSimulatorsView({ container: $('#simulator-list-panel') });
 
 // 注入 tab 条激活处理器（P6.5-3）：组件内关闭按钮直接 closeTab（含 abort 流式），
 // 激活/联动一律经此回调走 P6.5-2 收敛的统一激活流程
