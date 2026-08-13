@@ -4,7 +4,7 @@
 #     powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 #
 # 构建链（spec「构建链」契约）：cargo test → pytest → vitest → tauri build（NSIS 安装器）
-#     → 冒烟（可选，默认开启；-SkipSmoke 跳过）
+#     → dist 测试包（壳复制到 dist/ 根，双击即用）→ 冒烟（可选，默认开启；-SkipSmoke 跳过）
 #
 # 铁律（spec 环境事实）：
 #   - 必须在 cmd/PowerShell 执行——Git Bash 自带的 /usr/bin/link.exe（GNU coreutils）
@@ -26,6 +26,9 @@
 #     NSIS installMode=currentUser → 安装到 %LOCALAPPDATA%\Programs\，免管理员；
 #     卸载不影响 %APPDATA%\ConverSystem 数据，见 docs/tauri-desktop.md）
 #   - 壳 exe：src-tauri/target/release/conver-system.exe
+#   - dist 测试包：dist/conver-system.exe（release 壳复制到 dist/ 根，与后端包同布局，
+#     双击即用——壳 prod 后端探测候选 2 命中 dist/conver_backend，见 src-tauri/src/server.rs
+#     prod_backend_exe_candidates）
 #
 # 冒烟依赖后端打包产物 dist/conver_backend/conver_backend.exe（build-backend.ps1 产出）；
 # 缺失时冒烟脚本会自动调用 build-backend.ps1 补齐（-SkipBackendBuild 可关闭）。
@@ -104,7 +107,7 @@ Assert-Or-Build-BackendExe -Path $BackendExe -SkipBackendBuild:$SkipBackendBuild
 # ── 1. cargo test（Seam 1：壳纯逻辑）───────────────────────────────────────
 
 if (-not $SkipTests) {
-    Write-Step "1/4 cargo test（src-tauri，Seam 1 壳纯逻辑）"
+    Write-Step "1/5 cargo test（src-tauri，Seam 1 壳纯逻辑）"
     Push-Location (Join-Path $Root "src-tauri")
     try {
         & cargo test
@@ -119,7 +122,7 @@ if (-not $SkipTests) {
 # ── 2. pytest（Seam 3 迁移脚本 + Seam 4 基线）───────────────────────────────
 
 if (-not $SkipTests) {
-    Write-Step "2/4 pytest（backend，Seam 3 迁移 + Seam 4 基线）"
+    Write-Step "2/5 pytest（backend，Seam 3 迁移 + Seam 4 基线）"
     Push-Location $Root
     try {
         & $Py -m pytest -q
@@ -134,7 +137,7 @@ if (-not $SkipTests) {
 # ── 3. vitest（Seam 4 前端基线）─────────────────────────────────────────────
 
 if (-not $SkipTests) {
-    Write-Step "3/4 vitest（frontend，Seam 4 前端基线）"
+    Write-Step "3/5 vitest（frontend，Seam 4 前端基线）"
     Push-Location (Join-Path $Root "frontend")
     try {
         & npm.cmd test
@@ -148,7 +151,7 @@ if (-not $SkipTests) {
 
 # ── 4. tauri build（NSIS 安装器，R4 超时/重试）──────────────────────────────
 
-Write-Step "4/4 tauri build（NSIS 安装器；首次打包可能下载 NSIS/WebView2，耗时较长）"
+Write-Step "4/5 tauri build（NSIS 安装器；首次打包可能下载 NSIS/WebView2，耗时较长）"
 
 # 后端打包产物已在步骤 0 前置补齐（tauri-build resources 校验）；安装器随包分发
 # dist/conver_backend（约 24MB，含后端 + 前端运行子集，见 docs/tauri-desktop.md）
@@ -190,7 +193,36 @@ try {
     Pop-Location
 }
 
-# ── 5. 冒烟（可选）──────────────────────────────────────────────────────────
+# ── 5. dist 测试包（release 壳复制到 dist/ 根，双击即用）────────────────────
+
+# 用户惯例：dist/ 是最终产物目录（双击即用）。tauri build 的壳在 target/release/，
+# 复制到 dist/ 根后，壳的 prod 后端探测候选 2（resource_dir/conver_backend/conver_backend.exe）
+# 命中 dist/conver_backend——无安装器即可测试（见 src-tauri/src/server.rs prod_backend_exe_candidates）。
+# release 壳为 windows 子系统（main.rs cfg_attr），无终端窗口；后端由壳以 CREATE_NO_WINDOW 拉起。
+
+Write-Step "5/5 dist 测试包（复制壳到 dist/ 根）"
+
+$DistShell = Join-Path $Root "dist\conver-system.exe"
+$ReleaseShell = Join-Path $Root "src-tauri\target\release\conver-system.exe"
+if (-not (Test-Path $ReleaseShell)) {
+    throw "未找到 release 壳（$ReleaseShell），tauri build 应已产出"
+}
+if (-not (Test-Path (Join-Path $Root "dist"))) {
+    New-Item -ItemType Directory -Path (Join-Path $Root "dist") | Out-Null
+}
+try {
+    Copy-Item -Path $ReleaseShell -Destination $DistShell -Force
+    $ShellSize = (Get-Item $DistShell).Length / 1MB
+    # 注意：-f 必须作用于括号内字符串（同步骤 4 惯例，裸写 -f 会被解析为 -ForegroundColor 缩写）
+    Write-Host ("dist 测试包产出：$DistShell（{0:N1} MB，双击即用，无终端窗口）" -f $ShellSize) -ForegroundColor Green
+} catch [System.IO.IOException] {
+    # Windows 锁定正在运行的可执行文件——用户很可能开着旧版测试包（R5 容错，不阻塞其余交付）
+    Write-Host "警告：dist\conver-system.exe 正被占用（可能正在运行），无法覆盖。" -ForegroundColor Yellow
+    Write-Host "请先退出正在运行的 Conver System，再重跑本脚本（或手动复制 target\release\conver-system.exe 到 dist\）。" -ForegroundColor Yellow
+    Write-Host "安装器与 release 壳已就绪，不受影响。" -ForegroundColor Yellow
+}
+
+# ── 6. 冒烟（可选）──────────────────────────────────────────────────────────
 
 if ($SkipSmoke) {
     Write-Host "（-SkipSmoke 跳过冒烟）" -ForegroundColor Yellow

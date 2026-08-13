@@ -5,6 +5,12 @@
 
 ---
 
+## 滚动摘要（2026-08-13 — 打包流程：dist 测试包步骤固化）
+
+- **build-desktop.ps1 固化「dist 测试包」步骤（用户要求，非工单）**：tauri build 后自动把 release 壳复制到 `dist\conver-system.exe`——dist/ 根即「双击即用」最终产物（用户惯例），壳 prod 后端探测候选 2（`server.rs prod_backend_exe_candidates`）命中 `dist\conver_backend`；release 壳为 windows 子系统（`main.rs` cfg_attr）无终端窗口，后端 CREATE_NO_WINDOW 拉起。构建链 4 步 → 5 步（冒烟顺延 6），产物注释同步
+- **R5 容错（实测）**：dist exe 正被运行占用时（Windows 锁定可执行文件——用户开着旧版测试包重跑构建即复现），Copy-Item 抛 IOException → 黄字警告「请先退出正在运行的 Conver System」且不中断构建，其余产物不受影响
+- **验证**：PSParser 语法通过；`-SkipTests -SkipSmoke -SkipBackendBuild` 端到端两跑——成功路径 + 占用容错路径均实测；release 壳 11MB、NSIS 安装器 23.7MB 顺带产出
+
 ## 滚动摘要（2026-08-13 — 技术债区 TD-47 批次：占位符碰撞作用域扩展轻量档 kickoff）
 
 - **TD-47 完成（用户指定「补 TD-47」，merge ffe185a）**：票面 createCodeBlockToken 碰撞作用域仅限原始串——半形字面量紧邻围栏时替换后边界拼接可新造完整 token 形态（jsdom-only 生产不可达、与旧实现行为等价非回归）。修法：碰撞循环对候选序号检查 3 形态（完整 + 左半形 `\x00MDCBn` + 右半形 `MDCBn\x00`），任一存在即跳过——取号层枚举拼接产物形态，不依赖替换时序（比票面「替换后串再验证」更强）。轻量档单 Implement 直行（主树独立分支，无 worktree）
