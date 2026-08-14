@@ -18,7 +18,7 @@
  *     → 「重新同步」按钮）；load 自动同步（openai → 面板已填值（endpointMode
  *     口径转换 / 受管 model option）/ claude·none → 按钮自动禁用 + 文案 /
  *     凭证失败 → 静默）；点击手动重新同步（「已填入」2s 反馈）；配置控件重建
- *     观察者（防抖再同步 / 写回环冷却 / 无关变更过滤 / close 断开）
+ *     观察者（防抖再同步 / 触发时机 — 冷却/熔断语义见 key-injector 状态机用例）
  *
  * 测试即模块接口契约：公开面 __all__ = initSimulatorRun / openSimulator /
  *   closeSimulator。jsdom 不自动触发 iframe load（已探测）——load 事件由
