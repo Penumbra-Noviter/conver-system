@@ -24,6 +24,7 @@ export default defineConfig({
                 'js/key-injector.js',
                 'js/save-manager.js',
                 'js/save-key-meta.js', // TD-67/68 存档键契约单一来源（契约之家，per-file ≥90% 口径）
+                'js/fetch-seam.js', // TD-51/55/60 fetch 注入点单一来源（per-file ≥90% 口径）
             ],
             reporter: ['text', 'html'],
             thresholds: {

@@ -22,9 +22,9 @@
  *     getGames() 公开读取游戏列表缓存（存档面板数据源）、幂等钩子更新
  *
  * 测试即模块接口契约：公开面 __all__ = initSimulatorsView / refreshSimulators /
- *   parseManifest / filterGames / setFetch（fetch seam 与 api.js setFetch
- *   同构 — api.js 的 fetchImpl 为模块私有不可读，本模块镜像同一 seam 模式；
- *   setFetch(null) 恢复回落全局 fetch）。
+ *   parseManifest / filterGames / getGames / setFetch（fetch 注入点单一来源
+ *   js/fetch-seam.js（TD-51/55/60）— api.js 与 simulators.js 共享同一
+ *   setFetch/doFetch，一次注入两模块同时生效；setFetch(null) 恢复回落全局 fetch）。
  * 挂载模式：jsdom + vi.resetModules()（每用例全新模块状态）+ 内联 mock
  *   manifest（不依赖真实 simulators/ 数据文件）。
  */
@@ -688,5 +688,158 @@ describe('simulators — 存档管理按钮与 getGames（U9-T2）', () => {
     it('Falsify:未 init 调 getGames → 空数组不炸', async () => {
         const { sim } = await loadModules();
         expect(sim.getGames()).toEqual([]);
+    });
+});
+
+describe('simulators — 清单加载超时与并发守卫（TD-51/55/60）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+
+    it('清单加载挂起 15s → 超时错误态含原因与重试按钮，重试可重新加载', async () => {
+        const { sim, panel } = await loadModules();
+        const pending = { resolve: null, promise: null };
+        pending.promise = new Promise((r) => { pending.resolve = r; });
+        const fetchSpy = makeFetch({ pending });
+        sim.setFetch(fetchSpy);
+        sim.initSimulatorsView({ container: panel });
+
+        vi.useFakeTimers();
+        try {
+            const refreshPromise = sim.refreshSimulators();
+            expect(panel.querySelector('.sim-state').innerHTML).toContain('加载中…');
+            await vi.advanceTimersByTimeAsync(15000);
+            expect(panel.querySelector('.sim-error-msg').textContent).toBe('模拟器列表加载失败');
+            expect(panel.querySelector('.sim-error-reason').textContent).toBe('模拟器清单加载超时（15 秒未收到响应）');
+            expect(panel.querySelector('.sim-retry-btn')).not.toBeNull();
+            await refreshPromise;
+        } finally {
+            vi.useRealTimers();
+        }
+
+        // 重试出口：点重试 → 重新 fetch → ready（真实计时器 + 既有 waitFor 模式）
+        fetchSpy.mockImplementation(() => Promise.resolve(mockManifest(MANIFEST_OK)));
+        panel.querySelector('.sim-retry-btn').click();
+        await vi.waitFor(() => expect(panel.querySelectorAll('.sim-card')).toHaveLength(2));
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('双 refresh 并发：慢旧请求后到不覆盖新渲染（seq 守卫 await 出口）', async () => {
+        const { sim, panel } = await loadModules();
+        const OLD = { version: 1, simulators: [{ id: 'old-game', file: 'old.html', name: '旧数据', type: 'ai' }] };
+        const NEW = { version: 1, simulators: [{ id: 'new-game', file: 'new.html', name: '新数据', type: 'ai' }] };
+        let resolveOld;
+        const oldPending = new Promise((r) => { resolveOld = r; });
+        let calls = 0;
+        const fetchSpy = vi.fn(() => {
+            calls += 1;
+            return calls === 1 ? oldPending : Promise.resolve(mockManifest(NEW));
+        });
+        sim.setFetch(fetchSpy);
+        sim.initSimulatorsView({ container: panel });
+
+        const first = sim.refreshSimulators();
+        const second = sim.refreshSimulators();
+        await second;
+        expect(panel.querySelector('.sim-card-name').textContent).toBe('新数据');
+
+        resolveOld(mockManifest(OLD)); // 旧请求迟到 → 不得覆盖新渲染
+        await first;
+        expect(panel.querySelector('.sim-card-name').textContent).toBe('新数据');
+        expect(panel.querySelectorAll('.sim-card')).toHaveLength(1);
+    });
+
+    it('双 refresh 并发：慢旧请求错误后到不覆盖新渲染（seq 守卫 catch 出口）', async () => {
+        const { sim, panel } = await loadModules();
+        let rejectOld;
+        const oldPending = new Promise((_, r) => { rejectOld = r; });
+        let calls = 0;
+        const fetchSpy = vi.fn(() => {
+            calls += 1;
+            return calls === 1 ? oldPending : Promise.resolve(mockManifest(MANIFEST_OK));
+        });
+        sim.setFetch(fetchSpy);
+        sim.initSimulatorsView({ container: panel });
+
+        const first = sim.refreshSimulators();
+        const second = sim.refreshSimulators();
+        await second;
+        expect(panel.querySelectorAll('.sim-card')).toHaveLength(2);
+
+        rejectOld(new Error('迟到的错误')); // 旧请求迟到失败 → 不得覆盖新渲染
+        await first;
+        expect(panel.querySelectorAll('.sim-card')).toHaveLength(2);
+        expect(panel.querySelector('.sim-error-msg')).toBeNull();
+    });
+
+    it('超时后迟到响应不覆盖错误态', async () => {
+        const { sim, panel } = await loadModules();
+        const pending = { resolve: null, promise: null };
+        pending.promise = new Promise((r) => { pending.resolve = r; });
+        sim.setFetch(makeFetch({ pending }));
+        sim.initSimulatorsView({ container: panel });
+
+        vi.useFakeTimers();
+        try {
+            const refreshPromise = sim.refreshSimulators();
+            await vi.advanceTimersByTimeAsync(15000);
+            expect(panel.querySelector('.sim-error-reason').textContent).toBe('模拟器清单加载超时（15 秒未收到响应）');
+
+            pending.resolve(mockManifest(MANIFEST_OK)); // 超时后迟到响应
+            await refreshPromise;
+            await vi.advanceTimersByTimeAsync(0); // 冲刷微任务
+            expect(panel.querySelector('.sim-error-reason').textContent).toBe('模拟器清单加载超时（15 秒未收到响应）');
+            expect(panel.querySelectorAll('.sim-card')).toHaveLength(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('Falsify:注入 fetch 同步抛错 → error 态兜底（超时计时器路径不泄漏）', async () => {
+        const { sim, panel } = await loadModules();
+        sim.setFetch(() => { throw new Error('同步爆炸'); });
+        sim.initSimulatorsView({ container: panel });
+
+        await sim.refreshSimulators();
+        expect(panel.querySelector('.sim-error-msg').textContent).toBe('模拟器列表加载失败');
+        expect(panel.querySelector('.sim-error-reason').textContent).toBe('同步爆炸');
+        expect(panel.querySelector('.sim-retry-btn')).not.toBeNull();
+    });
+});
+
+describe('fetch-seam — 单源直测契约（TD-51/55/60）', () => {
+    afterEach(() => { vi.useRealTimers(); });
+
+    /** 加载全新 fetch-seam 模块（resetModules 保证每用例独立状态） */
+    async function loadSeam() {
+        vi.resetModules();
+        return import('../js/fetch-seam.js');
+    }
+
+    it('setFetch 注入生效：doFetch 路由到注入实现（参数含 init 对象透传）', async () => {
+        const seam = await loadSeam();
+        const spy = vi.fn(async () => ({ ok: true }));
+        seam.setFetch(spy);
+        await seam.doFetch('https://example.com/x', { method: 'GET', signal: undefined });
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy).toHaveBeenCalledWith('https://example.com/x', { method: 'GET', signal: undefined });
+        seam.setFetch(null); // 收尾恢复（跨用例不泄漏注入）
+    });
+
+    it('setFetch(null) 回落全局 fetch；非函数入参同回落（契约锁）', async () => {
+        const seam = await loadSeam();
+        const globalSpy = vi.fn(async () => ({ ok: true }));
+        vi.stubGlobal('fetch', globalSpy);
+        seam.setFetch(null);
+        await seam.doFetch('/fallback');
+        expect(globalSpy).toHaveBeenCalledTimes(1);
+        expect(globalSpy).toHaveBeenCalledWith('/fallback');
+
+        // Falsify:非函数入参（字符串）→ 与 null 同语义，回落全局 fetch
+        seam.setFetch('not-a-function');
+        await seam.doFetch('/fallback-2');
+        expect(globalSpy).toHaveBeenCalledTimes(2);
+
+        seam.setFetch(null);
+        vi.unstubAllGlobals();
     });
 });
