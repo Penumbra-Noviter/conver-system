@@ -13,7 +13,7 @@
 1. 可以自己添加世界设定、玩法
 2. 可以导入这种世界玩法，包括整合 UI 的功能
 
-产品现状（2026-08-14）：本地优先角色对话应用（FastAPI + SQLAlchemy 同步 + SQLite + Vanilla JS ESM + Tauri 桌面壳），已支持 SillyTavern Character Card V2 导入/导出与 22 款模拟器集成模块（U7 批次交付 + U8/U9 二期完成：凭证注入/存档管理），测试基线 pytest 429+1skip + Vitest 683 + cargo test 58 全绿，无活跃待办。
+产品现状（2026-08-14）：本地优先角色对话应用（FastAPI + SQLAlchemy 同步 + SQLite + Vanilla JS ESM + Tauri 桌面壳），已支持 SillyTavern Character Card V2 导入/导出与 22 款模拟器集成模块（U7 批次交付 + U8/U9 二期完成：凭证注入/存档管理 + TD-57 信任边界文档化），测试基线 pytest 433+1skip + Vitest 690 + cargo test 58 全绿，无活跃待办。
 
 ## 二、调研结论（2026-08-13，子智能体网络调研）
 
