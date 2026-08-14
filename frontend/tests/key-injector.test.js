@@ -241,7 +241,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         expect(seen['cfg-apikey']).toEqual(['input', 'change']);
         expect(seen['cfg-endpoint']).toEqual(['input', 'change']);
         expect(seen['cfg-model']).toEqual(['input', 'change']);
-        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [] });
+        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
     });
 
     it("endpointMode='full' → endpoint 注入为 base + /chat/completions（模型/Key 不受影响）", async () => {
@@ -252,7 +252,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
-        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [] });
+        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
     });
 
     it("endpointMode='base' → 完整地址剥除 /chat/completions 后注入", async () => {
@@ -280,7 +280,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
         expect(doc.getElementById('cfg-endpoint').value).toBe('game-default-endpoint');
         expect(doc.getElementById('cfg-model').value).toBe('game-default-model');
-        expect(result).toEqual({ filled: ['apikey'], skipped: ['endpoint', 'model'] });
+        expect(result).toEqual({ filled: ['apikey'], skipped: ['endpoint', 'model'], written: ['apikey'] });
     });
 
     it('白名单：只触碰 manifest 声明 id — 文档中其他控件不被写入（无控件探测）', async () => {
@@ -305,7 +305,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
 
         expect(doc.getElementById('cfg-endpoint').textContent).toBe('');
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
-        expect(result).toEqual({ filled: ['apikey'], skipped: ['endpoint', 'model'] });
+        expect(result).toEqual({ filled: ['apikey'], skipped: ['endpoint', 'model'], written: ['apikey'] });
     });
 
     it('SIM-API-1:select 无匹配 option → 追加受管 option 并选中（主应用模型名可进入 select）、派发事件、filled 含 model', async () => {
@@ -329,7 +329,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         expect(optValues).toContain('deepseek-r1'); // 受管 option 已在选项集
         expect(optValues).toHaveLength(3); // 原 2 + 受管 1
         expect(seen).toEqual(['input', 'change']);
-        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [] });
+        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
     });
 
     it('SIM-API-1:select 无任何 option → 追加受管 option 后选中并派发事件（apikey/endpoint 控件缺失照常跳过）', async () => {
@@ -350,7 +350,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         // → 值已匹配会落入幂等分支静默 —— 追加导致的选中也必须派发事件，
         // 否则依赖 change 保存状态的游戏存旧值
         expect(seen).toEqual(['input', 'change']);
-        expect(result).toEqual({ filled: ['model'], skipped: ['apikey', 'endpoint'] });
+        expect(result).toEqual({ filled: ['model'], skipped: ['apikey', 'endpoint'], written: ['model'] });
     });
 
     it('Falsify:空 select 追加 option 后自动选中（值未写即匹配）→ 仍派发事件（不落入幂等静默）', async () => {
@@ -408,39 +408,39 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         const doc = makeGameDoc('<textarea id="cfg-apikey">orig</textarea>');
         const result = injectCredentialsIntoGame({ doc, config: CONFIG, credentials: CRED_OPENAI });
         expect(doc.getElementById('cfg-apikey').value).toBe('orig');
-        expect(result).toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+        expect(result).toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
     });
 
     it('降级：doc 缺失（null / 无 getElementById）→ 全 skipped 不抛错', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
         expect(injectCredentialsIntoGame({ doc: null, config: CONFIG, credentials: CRED_OPENAI }))
-            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
         expect(injectCredentialsIntoGame({ doc: {}, config: CONFIG, credentials: CRED_OPENAI }))
-            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
     });
 
     it('降级：config 缺失 / config 字段非字符串 → 跳过该字段不抛错', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
         const doc = makePanelDoc();
         expect(injectCredentialsIntoGame({ doc, config: null, credentials: CRED_OPENAI }))
-            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
         // endpoint 字段非字符串 → 仅该字段跳过；apikey/model 声明 id 正常注入
         expect(injectCredentialsIntoGame({ doc, config: { endpoint: 42, apikey: 'cfg-apikey', model: 'cfg-model' }, credentials: CRED_OPENAI }))
-            .toEqual({ filled: ['apikey', 'model'], skipped: ['endpoint'] });
+            .toEqual({ filled: ['apikey', 'model'], skipped: ['endpoint'], written: ['apikey', 'model'] });
     });
 
     it('降级：凭证缺失（null / 字段非字符串）→ 全 skipped 不抛错', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
         const doc = makePanelDoc();
         expect(injectCredentialsIntoGame({ doc, config: CONFIG, credentials: null }))
-            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
         expect(injectCredentialsIntoGame({ doc, config: CONFIG, credentials: { key: 7 } }))
-            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
     });
 
     it('防御：整包参数缺失 → 全 skipped 不抛错', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
-        expect(injectCredentialsIntoGame()).toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+        expect(injectCredentialsIntoGame()).toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
     });
 });
 
@@ -467,7 +467,7 @@ describe('key-injector — syncGameCredentials 同步编排核心（SIM-API-1）
 
         const result = await mod.syncGameCredentials({ doc, config: CONFIG, endpointMode: null });
 
-        expect(result).toEqual({ enabled: false, reason: 'claude', filled: [], skipped: [] });
+        expect(result).toEqual({ enabled: false, reason: 'claude', filled: [], skipped: [], written: [] });
         expect(doc.getElementById('cfg-apikey').value).toBe(''); // 未写入
         expect(doc.getElementById('cfg-endpoint').value).toBe('game-default-endpoint');
     });
@@ -477,7 +477,7 @@ describe('key-injector — syncGameCredentials 同步编排核心（SIM-API-1）
         mod.initKeyInjector({ getCredentials: vi.fn(async () => CRED_NONE) });
         const doc = makePanelDoc();
         const result = await mod.syncGameCredentials({ doc, config: CONFIG });
-        expect(result).toEqual({ enabled: false, reason: 'none', filled: [], skipped: [] });
+        expect(result).toEqual({ enabled: false, reason: 'none', filled: [], skipped: [], written: [] });
         expect(doc.getElementById('cfg-apikey').value).toBe('');
     });
 

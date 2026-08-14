@@ -257,16 +257,20 @@ function ensureSelectOption(selectEl, value) {
  * @param {object|null} [params.credentials] - 凭证端点响应（key/endpoint/model）
  * @param {string|null} [params.endpointMode] - manifest endpointMode（'base' |
  *   'full'；null/undefined 不转换 — 兼容旧数据）
- * @returns {{filled: string[], skipped: string[]}} 按字段名（apikey/endpoint/
- *   model）分别列出已处于目标值（含本次写入）与跳过的字段；filled 为空即
- *   未同步任何值
+ * @returns {{filled: string[], skipped: string[], written: string[]}}
+ *   按字段名（apikey/endpoint/model）：filled = 已处于目标值（含本次写入与
+ *   幂等匹配）；skipped = 跳过的字段；written = 本次真正写入并派发事件的
+ *   字段（filled 的子集 — 期末评审修正：熔断/反馈类消费方须用 written 判定
+ *   「宿主真改了游戏配置」，filled 的幂等匹配不计入）。filled 为空即未同步
+ *   任何值
  */
 export function injectCredentialsIntoGame({ doc, config, credentials, endpointMode } = {}) {
     const filled = [];
     const skipped = [];
+    const written = [];
     if (!doc || typeof doc.getElementById !== 'function') {
         skipped.push(...CONFIG_FIELDS);
-        return { filled, skipped };
+        return { filled, skipped, written };
     }
     const creds = credentials ?? {};
     for (const field of CONFIG_FIELDS) {
@@ -299,8 +303,9 @@ export function injectCredentialsIntoGame({ doc, config, credentials, endpointMo
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         filled.push(field);
+        written.push(field);
     }
-    return { filled, skipped };
+    return { filled, skipped, written };
 }
 
 // ══════════════════════════════════════════════════
@@ -320,15 +325,15 @@ export function injectCredentialsIntoGame({ doc, config, credentials, endpointMo
  * @param {object|null} [params.config] - manifest config 三元组
  * @param {string|null} [params.endpointMode] - manifest endpointMode
  * @returns {Promise<null|{enabled: boolean, reason: 'claude'|'none'|null,
- *   filled: string[], skipped: string[]}>}
- *   null = 未初始化；enabled=false 时 filled/skipped 恒为空数组
+ *   filled: string[], skipped: string[], written: string[]}>}
+ *   null = 未初始化；enabled=false 时 filled/skipped/written 恒为空数组
  */
 export async function syncGameCredentials({ doc, config, endpointMode } = {}) {
     if (typeof fetchCredentials !== 'function') return null; // 未初始化 → 无操作
     const creds = await fetchCredentials();
     const state = resolveButtonState(creds);
     if (!state.enabled) {
-        return { enabled: false, reason: state.reason, filled: [], skipped: [] };
+        return { enabled: false, reason: state.reason, filled: [], skipped: [], written: [] };
     }
     const result = injectCredentialsIntoGame({ doc, config, credentials: creds, endpointMode });
     return { enabled: true, reason: null, ...result };

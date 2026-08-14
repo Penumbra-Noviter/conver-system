@@ -917,4 +917,89 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
         expect(fetchMockNew).toHaveBeenCalledTimes(2); // 观察者重新挂载后恢复再同步
         expect(frame.contentDocument.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
     });
+
+    it('期末 F1:配置控件自身 class 属性翻转（attributeFilter 外属性）→ 不触发同步、不熔断', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // 配置控件自身的良性属性翻转（class — attributeFilter 外）连续 3 次
+        // （间隔越过冷却）→ 不触发同步（fetch 不增）、strike 不累积 → 不熔断
+        const apikeyEl = doc.getElementById('cfg-apikey');
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            apikeyEl.setAttribute('class', `state-${i}`);
+            await vi.advanceTimersByTimeAsync(2000);
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 属性翻转从未触发同步
+
+        // 熔断未发生：随后真实重建（恢复默认值）仍能再同步
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(2); // 观察者仍响应 — 未误熔断
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+    });
+
+    it('期末 F2:重建后控件保持目标值（同步幂等匹配）→ 多次重建不累计熔断计数', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // 游戏重建面板但控件值已保持主应用配置（重建不重置值 — select 经
+        // option selected 属性保持选中态）→ 同步幂等匹配（written 为空）→
+        // 熔断计数不累计；连续 5 次重建后观察者仍响应
+        for (let i = 0; i < 5; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            doc.body.innerHTML = `
+                <input id="cfg-endpoint" value="https://api.example.com/v1/chat/completions">
+                <input id="cfg-apikey" value="sk-smoke-openai">
+                <select id="cfg-model">
+                    <option value="game-default-model">game-default-model</option>
+                    <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+                </select>
+            `;
+            await vi.advanceTimersByTimeAsync(500);
+            await vi.advanceTimersByTimeAsync(0);
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(6); // load 1 + 观察者同步 5（幂等匹配 — 未熔断）
+
+        // 仍能响应真实重建（游戏重置值 → 真写入 → 同步生效）
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(7);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+    });
+
+    it('期末 F3:load 注入追加受管 option（自写 mutation）→ 冷却判定移位生效，无幽灵再同步', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        // seed 面板 model select 不含凭证 model → load 注入会追加受管 option
+        // （自写 mutation — 注入续体置冷却晚于该 mutation 的观察者回调）
+        const { fetchMock, doc } = await openWithInject(
+            view,
+            GAME_AI_CONFIG,
+            { ...CRED_OPENAI, model: 'smoke-test-model' },
+            (frame) => seedGamePanel(frame, { modelDefault: 'game-default-model' }),
+        );
+        await vi.advanceTimersByTimeAsync(0); // load 自动同步 + 自写 mutation 回调
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 无幽灵再同步（冷却判定在防抖到期时已生效）
+        expect(doc.getElementById('cfg-model').value).toBe('smoke-test-model'); // 受管 option 已注入
+
+        // 冷却窗内自写 mutation 的防抖到期 → 跳过（不误刷新冷却压制后续真实重建）
+        await vi.advanceTimersByTimeAsync(500);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // 冷却过后真实重建（控件恢复默认）→ 正常再同步
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
 });

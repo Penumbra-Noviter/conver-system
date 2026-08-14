@@ -32,19 +32,22 @@
  *   重新同步，主应用设置保持唯一事实来源」）：iframe load 进入 loaded 后对
  *   contentDocument.body 挂 MutationObserver（childList + subtree +
  *   attributes；childList 覆盖结构重建（innerHTML 替换），attributes 覆盖
- *   属性重建（setAttribute 重置控件值 — TD-75：目标元素自身 id ∈ 三元组才
- *   处理，运行期无关属性变更（class/style 等）经 id 过滤不触发；宿主注入
- *   走 property 赋值与事件派发，不产生 attribute mutation — 无自触发面）。
+ *   属性重建（setAttribute 重置控件值 — TD-75：attributeFilter 收窄到票面
+ *   目标属性 value/hidden，配置控件自身 class/disabled 等运行期翻转不触发
+ *   （期末评审 F1 修复 — 防良性变更累积误熔断）；宿主注入走 property 赋值
+ *   与事件派发，不产生 attribute mutation — 无自触发面）。
  *   只处理触及 config 三元组 id 的变更（id 命中 / 变更子树含控件 — 游戏
  *   运行期高频 DOM 更新不触发）；防抖 500ms 合并连续重建；注入后 1s 冷却
  *   （写回环守卫：宿主写入派发的 change 若被游戏同步重建面板，冷却窗口内
  *   不重复同步 — key-injector 幂等写入已收敛常规场景，冷却为假设性循环的
  *   兜底）。冷却判定在防抖到期时执行（注入续体更新冷却时间戳晚于 option
  *   追加等自写 mutation 回调，mutation 时判定会失真 — TD-76 实测钉死）。
- *   写回环熔断（TD-76）：观察者路径触发的再同步实际写入字段（filled > 0）
- *   连续达 SYNC_MAX_STRIKES 次 → 熔断 disconnect（停止自动再同步；手动
- *   「重新同步」按钮路径不受影响）；load 路径自动同步不计数；destroyFrame
- *   （关闭 / 重开游戏）复位计数 — 重开游戏观察者重新挂载、自动同步恢复。
+ *   写回环熔断（TD-76）：观察者路径触发的再同步**真正写入**字段
+ *   （written > 0 — key-injector 返回的真写入信号，filled 含幂等匹配不计入
+ *   （期末评审 F1/F2 修复））连续达 SYNC_MAX_STRIKES 次 → 熔断 disconnect
+ *   （停止自动再同步；手动「重新同步」按钮路径不受影响）；load 路径自动
+ *   同步不计数；destroyFrame（关闭 / 重开游戏）复位计数 — 重开游戏观察者
+ *   重新挂载、自动同步恢复。
  *   观察者随 iframe 卸载 disconnect（destroyFrame），无跨游戏残留。
  *
  * 错误检测基线（spec Implementation Decisions）：同源 404 仍触发 load 事件，
@@ -79,9 +82,10 @@ const OBSERVER_DEBOUNCE_MS = 500;
 const SYNC_COOLDOWN_MS = 1000;
 
 /** 观察者路径写回环熔断阈值（TD-76）：连续 SYNC_MAX_STRIKES 次观察者再同步
- * 实际写入字段（filled > 0 — 每次同步后游戏又重建面板恢复默认值 = 游戏在
+ * 真正写入字段（written > 0 — 每次同步后游戏又重建面板恢复默认值 = 游戏在
  * 重置主应用配置的病理循环）→ 熔断断开观察者，终止自动再同步；正常场景
- * （单次重建后收敛）再同步至多写入 1 次，恒低于阈值不误熔断 */
+ * （重建后收敛，或重建保持目标值幂等匹配）不达阈值不误熔断（期末评审
+ * F1/F2 修复：熔断信号为真写入 written，filled 的幂等匹配不计入） */
 const SYNC_MAX_STRIKES = 3;
 
 // ══════════════════════════════════════════════════
@@ -165,11 +169,12 @@ function disconnectObserver() {
 /**
  * 变更是否触及 config 三元组控件（SIM-API-1 观察者过滤 — 游戏运行期高频
  * DOM 更新（状态渲染等）不得触发同步；只有 id 命中或变更子树含控件才算）。
- * 语义：childList 变更（节点增删）— 目标元素自身 id ∈ 三元组，或新增/移除
- * 子树内任一元素 id ∈ 三元组（游戏整段重建配置面板时命中；子树元素遍历用
- * id 成员判定，无选择器转义面）；attributes 变更（TD-75 — 游戏以
- * setAttribute 重建控件）— 仅目标元素自身 id ∈ 三元组视为触及（运行期无关
- * 属性变更（class/style 等）经 id 过滤不触发同步）。
+ * 语义：目标元素自身 id ∈ 三元组（childList 与 attributes 变更共用判定 —
+ * 期末评审去重）；或 childList 新增/移除子树内任一元素 id ∈ 三元组（游戏
+ * 整段重建配置面板时命中；子树元素遍历用 id 成员判定，无选择器转义面）。
+ * attributes 变更（TD-75 — 游戏以 setAttribute 重建控件）仅目标元素自身
+ * 判定；运行期无关属性变更（class/style 等）由 observe 的 attributeFilter
+ * 先行拦截（期末评审 F1 修复 — 只监听 value/hidden 票面目标属性）。
  * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
  * @param {object|null} config - manifest config 三元组（endpoint/apikey/model）
  * @returns {boolean} 任一变更触及配置控件为 true
@@ -179,13 +184,8 @@ function mutationTouchesConfig(mutations, config) {
         .filter((v) => typeof v === 'string' && v !== '');
     if (ids.length === 0) return false;
     for (const m of mutations ?? []) {
-        if (m?.type === 'attributes') {
-            // TD-75：属性变更仅当目标元素自身是配置控件才触及（游戏运行期
-            // 高频的无关属性变更（class/style 等）经 id 过滤不触发同步）
-            if (typeof m?.target?.id === 'string' && ids.includes(m.target.id)) return true;
-            continue;
-        }
         if (typeof m?.target?.id === 'string' && ids.includes(m.target.id)) return true;
+        if (m?.type === 'attributes') continue; // 属性变更仅目标自身判定（上）
         const nodes = [...(m?.addedNodes ?? [])];
         if (m?.removedNodes?.length) nodes.push(...m.removedNodes);
         for (const node of nodes) {
@@ -200,21 +200,31 @@ function mutationTouchesConfig(mutations, config) {
 }
 
 /**
- * 观察者回调：变更触及配置控件 → 防抖 500ms → 自动同步。写回环冷却判定在
- * 防抖到期时执行（TD-76 实测：注入续体更新冷却时间戳晚于自写 mutation
- * （select option 追加等）的观察者回调 — mutation 时判定读到旧时间戳会
- * 失真，产生幽灵再同步并误刷新冷却，压制后续真实重建的响应）。
+ * 观察者回调：变更触及配置控件 → 防抖 500ms → 自动同步（观察者路径）。
+ * 写回环冷却判定在防抖到期时执行（TD-76 实测：注入续体更新冷却时间戳晚于
+ * 自写 mutation（select option 追加等）的观察者回调 — mutation 时判定读到
+ * 旧时间戳会失真，产生幽灵再同步并误刷新冷却，压制后续真实重建的响应）。
+ * 写回环熔断（TD-76）：本次同步**真正写入**字段（written > 0 — 宿主改了
+ * 游戏配置，说明游戏在重置主应用配置的病理循环）→ 熔断计数 +1，连续达
+ * SYNC_MAX_STRIKES 次 → disconnectObserver 熔断（停止自动再同步；手动
+ * 「重新同步」按钮路径不经本回调不受影响）。幂等匹配（filled 含匹配但不
+ * 写入 — 游戏重建后保持目标值）不计数（期末评审 F1/F2 修复：filled 语义
+ * 含幂等匹配，熔断须用 written 真写入信号）。
  * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
  */
 function handleConfigMutation(mutations) {
     if (state !== 'loaded' || !frame) return;
     if (!mutationTouchesConfig(mutations, currentGame?.config)) return;
     if (observerTimer) clearTimeout(observerTimer);
-    observerTimer = setTimeout(() => {
+    observerTimer = setTimeout(async () => {
         observerTimer = null;
         if (state !== 'loaded' || !frame) return;
         if (Date.now() < syncCooldownUntil) return; // 自注入冷却（写回环守卫 — 防抖到期时判定）
-        autoSyncAfterLoad(true); // 观察者路径 — 写入计熔断 strike（TD-76）
+        const result = await autoSyncAfterLoad();
+        if (result?.enabled && result.written.length > 0) {
+            syncStrikes += 1;
+            if (syncStrikes >= SYNC_MAX_STRIKES) disconnectObserver(); // 熔断：终止自动再同步
+        }
     }, OBSERVER_DEBOUNCE_MS);
 }
 
@@ -234,45 +244,47 @@ function observeConfigControls() {
     // TD-75：childList（结构重建）+ attributes（setAttribute 重建 — 属性变更
     // 路径）。写回环安全前提：宿主注入用 property 赋值（el.value = value）
     // 与事件派发，不产生 attribute mutation — attributes 监听不新增自触发
-    // 面；游戏运行期频繁的无关属性变更（class 等）经 mutationTouchesConfig
-    // 的 id 过滤不触发同步
-    configObserver.observe(doc.body, { childList: true, subtree: true, attributes: true });
+    // 面；attributeFilter 收窄到票面目标属性（value/hidden，期末评审 F1
+    // 修复 — 配置控件自身 class/disabled 等运行期翻转不触发同步，防良性
+    // 变更累积误熔断）；mutationTouchesConfig 的 id 过滤兜底
+    configObserver.observe(doc.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['value', 'hidden'],
+    });
 }
 
 /**
  * 自动同步入口（SIM-API-1）：iframe load 后静默取主应用凭证 → 注入当前
  * 游戏配置面板（key-injector autoSyncIntoGame；claude/none 由 key-injector
- * 禁用按钮条 + 原因文案）。同步实际写入过字段 → 置观察者写回环冷却（宿主
- * 写入派发的 change 若被游戏同步重建面板，冷却窗口内不重复同步）；未写入
- * （控件未就位 — 游戏延迟渲染配置面板的主场景）→ 不冷却，观察者及时再同步。
- * 写回环熔断（TD-76）：countStrike=true（观察者防抖路径）且本次实际写入
- * 字段 → 熔断计数 +1，连续达 SYNC_MAX_STRIKES 次 → disconnectObserver
- * 熔断（停止自动再同步；手动「重新同步」按钮路径不经本函数不受影响）。
- * load 路径（handleLoad 直调，countStrike 默认 false）不计数 — 正常场景
- * 每次 load 的自动同步恒定可用。
- * 仅 ai + 完整三元组执行；bar 缺失 / 视图已关闭 → no-op 不抛错。
- * @param {boolean} [countStrike] - true 为观察者路径（写入计熔断 strike）；
- *   false（默认）为 load 路径（不计数）
+ * 禁用按钮条 + 原因文案）。同步**真正写入**过字段（written > 0）→ 置观察者
+ * 写回环冷却（宿主写入派发的 change 若被游戏同步重建面板，冷却窗口内不重复
+ * 同步）；未写入（控件未就位 — 游戏延迟渲染配置面板的主场景，或幂等匹配）
+ * → 不冷却，观察者及时再同步。熔断计数不在本函数（观察者回调持有 —
+ * 期末评审 Architecture 修复：load 路径不计数、语义由调用方显式表达）。
+ * 返回同步结果供观察者回调消费（written 判定熔断）；load 路径（handleLoad
+ * 直调）忽略返回值。
+ * 仅 ai + 完整三元组执行；bar 缺失 / 视图已关闭 → 返回 undefined 不抛错。
+ * @returns {Promise<object|undefined>} autoSyncIntoGame 结果（含 written；
+ *   bar 缺失等早退路径返回 undefined）
  */
-async function autoSyncAfterLoad(countStrike = false) {
-    if (state !== 'loaded' || !frame) return;
+async function autoSyncAfterLoad() {
+    if (state !== 'loaded' || !frame) return undefined;
     const game = currentGame;
-    if (!game || game.type !== 'ai' || !hasConfigTriplet(game.config)) return;
+    if (!game || game.type !== 'ai' || !hasConfigTriplet(game.config)) return undefined;
     const bar = runPanel?.querySelector('.sim-key-bar');
-    if (!bar) return;
+    if (!bar) return undefined;
     const result = await autoSyncIntoGame({
         bar,
         getDoc: () => frame?.contentDocument ?? null,
         getConfig: () => currentGame?.config ?? null,
         getEndpointMode: () => currentGame?.endpointMode ?? null,
     });
-    if (result?.enabled && result.filled.length > 0) {
+    if (result?.enabled && result.written.length > 0) {
         syncCooldownUntil = Date.now() + SYNC_COOLDOWN_MS;
-        if (countStrike) {
-            syncStrikes += 1;
-            if (syncStrikes >= SYNC_MAX_STRIKES) disconnectObserver(); // 熔断：终止自动再同步
-        }
     }
+    return result;
 }
 
 /**
