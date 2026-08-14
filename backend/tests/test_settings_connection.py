@@ -477,6 +477,48 @@ class TestCredentialsService:
         assert result["protocol"] == "none"
         assert result["model"] == ""
 
+    def test_model_empty_when_openai_provider_and_model_not_explicitly_configured(self, db_session, monkeypatch) -> None:
+        """默认 provider 为 openai 协议族（deepseek）且未显式配置默认模型 → .env 默认模型
+        不属于 openai 协议模型集时 model 空串（TD-66：注入不再混入 claude 模型名）"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "default_provider", "deepseek")
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+        monkeypatch.setattr(settings, "DEFAULT_MODEL", "claude-sonnet-4-20250514")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["key"]
+        assert result["model"] == ""
+
+    def test_model_explicit_config_outside_openai_set_returned(self, db_session, monkeypatch) -> None:
+        """显式配置 default_model（openai 集外值）→ 原样返回（TD-66：显式配置不误伤）"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "default_provider", "openai")
+        _save_setting(db_session, "default_model", "claude-sonnet-4-20250514")
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["model"] == "claude-sonnet-4-20250514"
+
+    def test_model_falls_back_to_env_when_in_openai_set(self, db_session, monkeypatch) -> None:
+        """.env 默认模型属于 openai 协议模型集（gpt-4o）→ 未显式配置时回退该值（TD-66 不误伤）"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "default_provider", "openai")
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+        monkeypatch.setattr(settings, "DEFAULT_MODEL", "gpt-4o")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["model"] == "gpt-4o"
+
+    def test_model_env_fallback_in_openai_set_any_openai_protocol_provider(self, db_session, monkeypatch) -> None:
+        """openai 协议族任一 provider（deepseek）+ .env 默认模型在集内 → 回退该值"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "default_provider", "deepseek")
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+        monkeypatch.setattr(settings, "DEFAULT_MODEL", "qwen-max")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["model"] == "qwen-max"
+
 
 class TestCredentialsEndpoint:
     """GET /api/settings/credentials 端点（直接驱动路由函数）"""
