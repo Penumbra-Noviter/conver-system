@@ -24,7 +24,9 @@
  *     localStorage，避免后台游戏继续跑）
  *   - ./key-injector.js — 模拟器 Key 注入深模块（U8-T2：「使用主应用 Key」
  *     按钮交互 + 注入 + 反馈状态机；凭证获取经 initKeyInjector 钩子接线
- *     settings.credentials()，按钮条由 simulator-view.js 渲染挂接）
+ *     settings.credentials()，按钮条由 simulator-view.js 渲染挂接；
+ *     TD-71：none 态「前往设置页配置」链接经 onNavigateSettings 钩子接
+ *     switchView('settings')）
  *   - ./save-manager.js — 存档管理面板深模块（列表/导出/导入/删除；U9-T2，
  *     工具条按钮接到 openSavePanel，游戏列表经 getGames 钩子注入，
  *     切走 simulators 视图时 closeSavePanel 复位）
@@ -84,6 +86,9 @@ const dom = {
 // ══════════════════════════════════════════════════
 
 async function switchView(viewName) {
+    // TD-53：捕获须在赋值 state.currentView 之前 — 否则 prevView 恒等于
+    // viewName，运行中再点导航的 closeSimulator 永不触发
+    const prevView = state.currentView;
     state.currentView = viewName;
 
     dom.views.forEach((v) => v.classList.remove('active'));
@@ -110,8 +115,14 @@ async function switchView(viewName) {
         setTimeout(() => document.querySelector('#search-input')?.focus(), 100);
     }
     // 模拟器视图：进入即刷新列表（懒加载 — 未进入不发请求；fetch 在
-    // simulators.js 内部走 setFetch seam，协调层只负责触发）
-    if (viewName === 'simulators') refreshSimulators();
+    // simulators.js 内部走 setFetch seam，协调层只负责触发）。TD-53：运行
+    // 中再点导航 = 返回列表（closeSimulator 卸载 iframe、列表面板恢复 —
+    // 与「返回」同语义；idle 时 closeSimulator no-op），随后仍走既有
+    // 刷新语义；非运行态重复进入保持幂等刷新不变。
+    if (viewName === 'simulators') {
+        if (prevView === viewName) closeSimulator();
+        refreshSimulators();
+    }
     // 切走模拟器视图 → 销毁运行中的 iframe + 存档面板复位（Grilling 共识：
     // 状态全在游戏自身 localStorage，无丢失风险；避免后台游戏继续跑；
     // closeSimulator / closeSavePanel 未打开时 no-op — 沿用运行视图销毁纪律）
@@ -534,8 +545,12 @@ initSimulatorRun({
 
 // 模拟器 Key 注入初始化（U8-T2 — 凭证获取经注入钩子（G7）；点击/注入/
 // 反馈状态机收口在 key-injector.js，按钮条由 simulator-view.js 渲染挂接；
-// 凭证请求复用 api.js setFetch seam）
-initKeyInjector({ getCredentials: () => settings.credentials() });
+// 凭证请求复用 api.js setFetch seam；TD-71：none 禁用态「前往设置页配置」
+// 链接点击 → 切设置视图（与侧栏导航同语义））
+initKeyInjector({
+    getCredentials: () => settings.credentials(),
+    onNavigateSettings: () => switchView('settings'),
+});
 // 存档管理面板初始化（U9-T2 — 绑定三面板 + getGames 钩子（数据源为
 // simulators.js 缓存，不重复 fetch manifest）；返回按钮 → closeSavePanel；
 // 切走 simulators 视图时 switchView 调用 closeSavePanel 复位）

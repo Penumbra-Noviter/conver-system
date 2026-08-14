@@ -8,6 +8,8 @@
  *   → 注入（U8-T2：预置 openai 凭证 → 点击「使用主应用 Key」→ 游戏配置
  *     面板已填值 → 游戏自身保存路径接受注入值 → 恢复原设置）
  *   → 返回列表（iframe 卸载）→ 重进游戏 localStorage 存档保留
+ *   → 运行中再点导航回列表（TD-53：再点侧栏「模拟器」= 返回列表，
+ *     iframe 卸载、列表面板恢复，与「返回」同语义）
  *   → 纯本地游戏路径（manifest 驱动：无 local 条目时 SKIP 并报偏离说明）
  *   → 存档面板（U9-T2）：导出 → 清档 → 导入恢复（localStorage 键值断言）。
  *
@@ -591,7 +593,10 @@ async function smokeSteps(page, manifest, baseUrl) {
     });
 
     // 5. 存档保留：游戏内写探针 → 返回（iframe 卸载）→ 重进 → 探针仍在 → 清理
-    const probeKey = `${aiGame.saveKeyPrefix ?? 'smoke_'}u7t5_probe_${Date.now()}`;
+    // 探针键前缀固定 'smoke_'（TD-48 关闭配套清理：manifest 已 v2 化无
+    // saveKeyPrefix 字段，遗留表达式移除；键不在任何 saveKeys 白名单内，
+    // 冒烟结束后删除不留痕）
+    const probeKey = `smoke_u7t5_probe_${Date.now()}`;
     const probeValue = 'u7t5-smoke-probe';
     await runStep('存档保留：写探针 → 返回 → 重进 → 仍在', async () => {
         const frame = await waitForGameFrame(page, aiGame.file, WAIT_MS);
@@ -649,6 +654,40 @@ async function smokeSteps(page, manifest, baseUrl) {
         );
         await waitForCount(page.locator('.sim-card'), total, WAIT_MS, '返回列表后列表卡片');
         return `探针键 ${probeKey} 重进后仍存在（同源 localStorage 保留），已清理探针；返回列表`;
+    });
+
+    // 5.5 运行中再点导航回列表（TD-53）：运行中的游戏再点侧栏「模拟器」
+    // = 返回列表（iframe 卸载、列表面板恢复），与「返回」同语义；随后
+    // 视图内重复进入仍走既有刷新语义（列表重新渲染）。
+    await runStep('运行中再点导航：返回列表（TD-53）', async () => {
+        const card = page.locator(`.sim-card[data-id="${aiGame.id}"]`);
+        await waitVisible(card, WAIT_MS, `卡片 ${aiGame.id}`);
+        await card.click();
+        await waitVisible(page.locator('.sim-run-hint'), WAIT_MS, '运行中提示条');
+        await waitForGameFrame(page, aiGame.file, WAIT_MS);
+        if ((await page.locator('.sim-run-frame').count()) !== 1) {
+            throw new Error(`前置：运行中 iframe 未就绪（.sim-run-frame 数量 ${await page.locator('.sim-run-frame').count()}）`);
+        }
+
+        const nav = page.locator('.nav-btn[data-view="simulators"]');
+        await nav.click();
+
+        await waitForCondition(
+            () => page.evaluate(() => {
+                const run = document.querySelector('#simulator-run-panel');
+                const list = document.querySelector('#simulator-list-panel');
+                return run?.hasAttribute('hidden') === true
+                    && list?.hasAttribute('hidden') === false;
+            }),
+            WAIT_MS,
+            '运行中再点导航后运行面板未隐藏 / 列表面板未恢复',
+        );
+        if ((await page.locator('.sim-run-frame').count()) !== 0) {
+            throw new Error('运行中再点导航后 iframe 未卸载（.sim-run-frame 仍存在）');
+        }
+        // 视图内重复进入保持刷新语义：列表卡片重新渲染
+        await waitForCount(page.locator('.sim-card'), total, WAIT_MS, '再点导航后列表卡片');
+        return '运行中再点「模拟器」导航 → iframe 卸载、列表面板恢复（与「返回」同语义），列表已刷新';
     });
 
     // 6. 纯本地游戏：无提示条（manifest 驱动；全 AI 时 SKIP 并报偏离说明）

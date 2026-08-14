@@ -107,15 +107,18 @@ function destroyFrame() {
 }
 
 /**
- * 打开参数校验：game 须为对象且 file 为非空字符串、不含路径分隔符
- * （iframe src 注入守卫 — file 来自 manifest 第三方数据，防御越界/外链）。
+ * 打开参数校验：game 须为对象且 file 为非空字符串、不含路径分隔符、不含
+ * 百分号编码（iframe src 注入守卫 — file 来自 manifest 第三方数据，防御
+ * 越界/外链；TD-56：manifest 22 文件实测无 %，单点拒绝整个百分号编码面 —
+ * Starlette 遍历防护与 manifest 可信资产为既有兜底，本判定为纵深加固）。
  * @param {unknown} game - openSimulator 入参
  * @returns {boolean}
  */
 function isValidGame(game) {
     return game !== null && typeof game === 'object'
         && typeof game.file === 'string' && game.file !== ''
-        && !game.file.includes('/') && !game.file.includes('\\');
+        && !game.file.includes('/') && !game.file.includes('\\')
+        && !game.file.includes('%');
 }
 
 /** 显示运行面板、隐藏列表面板 */

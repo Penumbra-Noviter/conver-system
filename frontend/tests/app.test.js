@@ -430,6 +430,24 @@ describe('app.js 模拟器运行视图接线 — onOpenGame → openSimulator（
         expect(document.querySelector('#simulator-run-panel iframe')).toBeNull();
     });
 
+    it('TD-53:运行视图中再点导航「模拟器」→ 返回列表（iframe 卸载、列表面板恢复，与「返回」同语义）', async () => {
+        const { state } = await openListView();
+        document.querySelector('#simulator-list-panel .sim-card').click();
+        expect(document.querySelector('#simulator-run-panel iframe')).not.toBeNull();
+
+        document.querySelector('.nav-btn[data-view="simulators"]').click();
+
+        // 与「返回」同语义：iframe 卸载、运行面板隐藏、列表面板恢复
+        expect(document.querySelector('#simulator-run-panel iframe')).toBeNull();
+        expect(document.querySelector('#simulator-run-panel').hidden).toBe(true);
+        expect(document.querySelector('#simulator-list-panel').hidden).toBe(false);
+        expect(state.currentView).toBe('simulators');
+        // 视图内重复进入仍走刷新语义：列表重新渲染出卡片
+        await vi.waitFor(() => {
+            expect(document.querySelector('#simulator-list-panel .sim-card')).not.toBeNull();
+        });
+    });
+
     it('Falsify:切换其他视图但运行视图未打开 → closeSimulator no-op 不抛错', async () => {
         const { state } = await openListView();
         expect(() => document.querySelector('.nav-btn[data-view="chat"]').click()).not.toThrow();
@@ -519,6 +537,35 @@ describe('app.js 模拟器 Key 注入接线 — initKeyInjector（U8-T2）', () 
         expect(document.querySelector('.sim-key-btn').textContent).toBe('使用主应用 Key');
         expect(doc.getElementById('cfg-apikey').value).toBe('');
         expect(document.querySelector('.sim-key-msg').hidden).toBe(true);
+    });
+
+    it('TD-71 接线:none 态提示点击「前往设置页配置」链接 → 切到设置视图（state.currentView === "settings"）', async () => {
+        const { env } = await openGameWithPanel(makeRoute({
+            manifest: KEY_MANIFEST,
+            credentials: { key: '', endpoint: '', model: '', protocol: 'none' },
+        }));
+        const state = env.state;
+
+        document.querySelector('.sim-key-btn').click();
+        await vi.waitFor(() => {
+            expect(document.querySelector('.sim-key-msg .sim-key-nav-settings')).not.toBeNull();
+        });
+        expect(document.querySelector('.sim-key-msg').textContent).toContain('前往设置页配置');
+
+        document.querySelector('.sim-key-msg .sim-key-nav-settings').click();
+
+        // switchView('settings') 时序：state 同步置位 → closeSimulator + closeSavePanel
+        // → loadSettings/initProviderDropdown（fetch 路由已 mock，等待续体完成）
+        await vi.waitFor(() => {
+            expect(state.currentView).toBe('settings');
+        });
+        await sleep(20);
+        expect(document.querySelector('#view-settings').classList.contains('active')).toBe(true);
+        expect(document.querySelector('#simulator-run-panel iframe')).toBeNull();
+        expect(document.querySelector('#simulator-run-panel').hidden).toBe(true);
+        expect(document.querySelector('#simulator-list-panel').hidden).toBe(false);
+        expect(document.querySelector('#simulator-save-panel').hidden).toBe(true);
+        expect(env.fetchSpy.mock.calls.some(([url]) => String(url).endsWith('/api/settings'))).toBe(true);
     });
 });
 

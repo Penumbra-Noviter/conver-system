@@ -316,7 +316,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
 
         expect(btn.disabled).toBe(true);
         expect(msg.hidden).toBe(false);
-        expect(msg.textContent).toBe('游戏仅支持 OpenAI 兼容 Key');
+        expect(msg.textContent).toContain('游戏仅支持 OpenAI 兼容 Key');
     });
 
     it('none → 按钮禁用 + 文案「未配置 OpenAI 兼容 Key」', async () => {
@@ -326,7 +326,72 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
 
         expect(btn.disabled).toBe(true);
         expect(msg.hidden).toBe(false);
-        expect(msg.textContent).toBe('未配置 OpenAI 兼容 Key');
+        expect(msg.textContent).toContain('未配置 OpenAI 兼容 Key');
+    });
+
+    it('TD-71:none 态提示含「前往设置页配置」链接，点击触发 onNavigateSettings；未注入钩子时点击 no-op 不抛错', async () => {
+        const navigate = vi.fn();
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_NONE);
+        mod.initKeyInjector({ getCredentials: fetchMock, onNavigateSettings: navigate });
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG });
+        const btn = bar.querySelector('.sim-key-btn');
+        const msg = bar.querySelector('.sim-key-msg');
+
+        btn.click();
+        await vi.advanceTimersByTimeAsync(0);
+
+        // none 态文案 = 常量 + 链接（纯常量拼接，无用户数据）
+        expect(msg.hidden).toBe(false);
+        expect(msg.textContent).toContain('未配置 OpenAI 兼容 Key');
+        expect(msg.textContent).toContain('前往设置页配置');
+        const link = msg.querySelector('.sim-key-nav-settings');
+        expect(link).not.toBeNull();
+
+        link.click();
+        expect(navigate).toHaveBeenCalledTimes(1);
+        // 重复点击链接 → 钩子再次触发（委托在 bar 上，不重复绑定）
+        link.click();
+        expect(navigate).toHaveBeenCalledTimes(2);
+
+        // 未注入 onNavigateSettings（非函数）→ 点击 no-op 不抛错。
+        // 沿用本文件既有多 bar 模式（同模块实例重初始化钩子 — 与
+        // 「旧 bar 挂起中新建 bar」用例同构；二次 loadInjector 在本
+        // 环境不可靠，不采用）
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const bar2 = makeBar();
+        // 注意：attachKeyInject 契约参数名是 bar — 对象字面量须用 { bar: bar2 }
+        // （shorthand { bar2 } 会生成名为 bar2 的属性，attach 将 no-op）
+        mod.attachKeyInject({ bar: bar2, getDoc: () => makePanelDoc(), getConfig: () => CONFIG });
+        bar2.querySelector('.sim-key-btn').click();
+        await vi.advanceTimersByTimeAsync(0);
+        const link2 = bar2.querySelector('.sim-key-msg .sim-key-nav-settings');
+        expect(link2).not.toBeNull();
+        expect(() => link2.click()).not.toThrow();
+    });
+
+    it('TD-71:disableBar 在同一 bar 上多次调用（openai 全跳过 → none 换态）→ 链接点击只触发一次钩子（无重复监听）', async () => {
+        const navigate = vi.fn();
+        const mod = await loadInjector();
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(CRED_OPENAI)
+            .mockResolvedValueOnce(CRED_NONE);
+        mod.initKeyInjector({ getCredentials: fetchMock, onNavigateSettings: navigate });
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => makeGameDoc('<div></div>'), getConfig: () => CONFIG });
+        const btn = bar.querySelector('.sim-key-btn');
+
+        btn.click(); // openai 但控件全缺失 → 静默 resetBar（按钮恢复可点）
+        await vi.advanceTimersByTimeAsync(0);
+        expect(btn.disabled).toBe(false);
+
+        btn.click(); // 同 bar 再次点击 → none → disableBar 第二次渲染禁用文案
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bar.querySelector('.sim-key-msg .sim-key-nav-settings')).not.toBeNull();
+
+        bar.querySelector('.sim-key-msg .sim-key-nav-settings').click();
+        expect(navigate).toHaveBeenCalledTimes(1); // 委托一次性绑定 → 只触发一次
     });
 
     it('请求失败（fetch 拒绝）→ 静默降级：无抛错、按钮恢复可点、无禁用文案', async () => {
