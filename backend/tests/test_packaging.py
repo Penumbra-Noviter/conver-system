@@ -294,6 +294,7 @@ class TestSpecFrontendPackaging:
             '"frontend" / "index.html"',
             '"frontend" / "css"',
             '"frontend" / "js"',
+            '"frontend" / "simulators"',
         ):
             assert token in spec_text, f"spec datas 缺少前端子集 {token}"
         # 挂载目标目录：index.html 必须落在 frontend/ 根（StaticFiles html=True 的入口）

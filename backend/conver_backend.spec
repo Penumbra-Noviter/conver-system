@@ -26,15 +26,18 @@ from pathlib import Path
 
 ROOT = Path(SPECPATH).parent  # SPECPATH = spec 所在目录（backend/），ROOT = 仓库根
 
-# 前端运行子集：index.html + css/js（js 含子目录，PyInstaller 递归收集）。
+# 前端运行子集：index.html + css/js + simulators（js/simulators 含子目录，PyInstaller 递归收集）。
 # 目标目录均相对 _MEIPASS，与 main.py _frontend_dir() 的 /frontend 对齐。
 # 禁止改为整目录打包 frontend/（node_modules 55M 会被拖入）。
 # 注：frontend/assets 当前为空目录（git 不跟踪），不挂载；未来有内容时在此追加
 #     (str(ROOT / "frontend" / "assets"), "frontend/assets")。
+# simulators/ 随 U7 模块（2026-08-14）加入打包面：22 款游戏 HTML + manifest.json
+#     （桌面版运行视图经 /simulators/… 静态加载；漏打包则应用内游戏列表为空）。
 _FRONTEND_RUNTIME = (
     (str(ROOT / "frontend" / "index.html"), "frontend"),
     (str(ROOT / "frontend" / "css"), "frontend/css"),
     (str(ROOT / "frontend" / "js"), "frontend/js"),
+    (str(ROOT / "frontend" / "simulators"), "frontend/simulators"),
 )
 
 a = Analysis(
