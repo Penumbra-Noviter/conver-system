@@ -23,6 +23,7 @@ export default defineConfig({
                 'js/simulator-view.js',
                 'js/key-injector.js',
                 'js/save-manager.js',
+                'js/save-key-meta.js', // TD-67/68 存档键契约单一来源（契约之家，per-file ≥90% 口径）
             ],
             reporter: ['text', 'html'],
             thresholds: {

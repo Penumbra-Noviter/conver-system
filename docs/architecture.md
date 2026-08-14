@@ -273,3 +273,34 @@ conver-system/
 | **SSE 而非 WebSocket** | 单方向推送（服务器→客户端）足够，实现简单 |
 | **Factory 模式接入 LLM** | 新增 Provider 只需加一个新类，不改业务 |
 | **personality 单独字段** | 与 name/avatar 等元数据分离，语义清晰 |
+
+## 模拟器信任边界（TD-57）
+
+22 款第三方模拟器与主应用**同源**（同协议/主机/端口，静态托管于 `frontend/simulators/`）运行。以下为该同源信任边界的权威文档：威胁模型、已接受风险、现有收缩措施清单、未来方向与加固不可行论证。未来涉及模拟器安全决策时以此为准（共识记录见 [CONSENSUS.md](../CONSENSUS.md) §2；探索跟踪见 [world-simulation-exploration.md](world-simulation-exploration.md) 未决事项 U11）。
+
+### 威胁模型声明
+
+- 22 款游戏与主应用同源运行，**游戏脚本可读主应用 localStorage 全部键**（含用户自填的 API Key 等敏感配置）；
+- 游戏脚本可**调用 /api 任意端点**（后端无鉴权，含 `GET /api/settings/credentials` 只读凭证端点）。
+
+### 已接受风险
+
+- 自用单机、单用户、无多租户 —— 同源互读的实际暴露面仅为用户本人；
+- 跨源沙箱 / postMessage 隔离改造**不在当前范围**（仅文档化评估，见「未来方向」）。
+
+### 现有收缩措施清单（代码已实现）
+
+- **key-injector 注入模块**（`frontend/js/key-injector.js`）：ESM 模块私有（不挂 window / globalThis）；注入目标限 manifest 声明的 config 三元组 id 白名单（无控件探测 / 自动发现）；只写三个字段（key/endpoint/model）；select 目标校验值在选项集内（不在选项集则跳过该字段）；claude key 值绝不进入游戏；
+- **credentials 端点契约**：`GET /api/settings/credentials` 在 protocol=claude/none 时 key 恒为空串（**claude key 绝不回传游戏**）；
+- **saveKeys 存档白名单**：cfg 键（含 API Key）被 saveKeys 白名单天然排除出存档管理 —— 导出导不出来、导入写不进去；
+- **运行视图打开参数校验**（`frontend/js/simulator-view.js`）：iframe src 注入守卫 —— 非法 file 直接 error 态不创建 iframe；file 含路径分隔符（`/` `\`）拒绝；
+- **相关待立项加固引用**：其余加固候选见 TICKETS 技术债区（TD-70 等，仅文档引用，不在本小节范围）。
+
+### 未来方向
+
+- 跨源沙箱 / postMessage 隔离探索（模拟器集成探索 U8 已启动；跟踪项 U11，见探索文档未决事项表）。
+
+### 加固不可行论证（避免未来重复论证成本）
+
+- **同源 HTTP 下 iframe 无法真沙箱化**：浏览器沙箱化 iframe（`sandbox` 属性）依赖受限资源语义，同源 HTTP 静态托管下游戏内容与主应用同源互信，无跨源边界可隔离；真正隔离需跨源或专用响应头（如同源策略拆分），当前静态托管形态不可行；
+- **跨源则破坏 manifest 相对资源加载**：游戏 HTML 以相对路径引用自身资源、主应用向 iframe 注入 DOM（`contentDocument` 通道），跨源后相对资源加载与注入通道全部失效，需整体重构游戏托管方式。

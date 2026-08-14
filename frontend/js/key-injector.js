@@ -10,10 +10,13 @@
  *   2s / claude·none 禁用文案 / 失败静默降级），attachKeyInject 把交互挂到
  *   simulator-view.js 渲染的按钮条（.sim-key-bar）上。
  *
- * 注入安全（TD-57 信任边界评估 — spec「U8 注入交互」决策 D 落点）：
+ * 注入安全（TD-57 信任边界评估 — spec「U8 注入交互」决策 D 落点；权威文档：
+ *   docs/architecture.md「模拟器信任边界（TD-57）」小节 — 威胁模型 / 已接受
+ *   风险 / 收缩措施 / 加固不可行论证以此为准）：
  *   威胁模型：22 款游戏与主应用同源运行，游戏脚本可读主应用 localStorage
  *   （含用户自填的 key）并可调 /api 任意端点（后端无鉴权）；跨源沙箱 /
- *   postMessage 隔离改造不在本波范围（TD-57 仅文档化评估）。
+ *   postMessage 隔离改造不在本波范围（TD-57 仅文档化评估，探索跟踪见
+ *   探索文档未决事项 U11）。
  *   本模块的收缩措施：
  *     1. 模块私有：ESM 作用域，不挂 window / globalThis，不扩大暴露面；
  *     2. 注入目标限 manifest 声明的 config 三元组 id（白名单），不做控件

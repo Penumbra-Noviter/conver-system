@@ -54,9 +54,23 @@ ALLOWED_KEYS = {
 # 多个第三方 provider 共享同一协议（如 DeepSeek/Qwen 使用 OpenAI 兼容 API）
 # 用于将 provider key 映射到对应的 API Key / base_url 存储键前缀。
 # 仅收录 key != id 的协议共享者（claude / openai 自身走 _resolve_api_provider 回退）。
+# 注：openai 协议族模型集由 _OPENAI_PROTOCOL_MODELS 另行派生（见下），本映射
+# 键集不可作其数据源 —— openai 自身不在本映射内。
 _PROVIDER_API_MAP: dict[str, str] = {
     p["key"]: p["id"] for p in AVAILABLE_MODELS["providers"] if p["key"] != p["id"]
 }
+
+# OpenAI 协议族模型集（TD-66）：由 AVAILABLE_MODELS 中协议 id == "openai" 的
+# 全部 provider 的 models 字段并集派生（含 openai 自身与 deepseek / qwen /
+# kimi / glm / minimax / step 族）。新增 openai 协议族 provider 时模型集自动
+# 并入，credentials() 的 model 门控据此判定 .env 回退值是否可用于 openai
+# 协议（注入三元组不混入 claude 模型名）。
+_OPENAI_PROTOCOL_MODELS: frozenset[str] = frozenset(
+    model
+    for p in AVAILABLE_MODELS["providers"]
+    if p["id"] == "openai"
+    for model in p["models"]
+)
 
 # 凭证槽位：用户可填 claude / openai 任一字段，系统通用解析
 _CRED_SLOTS = ("claude", "openai")
@@ -205,7 +219,13 @@ def credentials(db: Session) -> dict[str, str]:
 
     provider = default_provider(db)
     if openai_key and _resolve_api_provider(provider) == "openai":
-        model = default_model(db)
+        # model 门控（TD-66）：仅「default_model 显式配置（DB 非空）」或「解析出的
+        # 模型名属于 openai 协议模型集」时返回解析值 —— .env 默认值（如 claude
+        # 模型名）不得混入 openai 三元组（注入后游戏拿 claude 模型名打 openai
+        # 端点必失败）；显式配置的任意值原样返回（用户意图不误伤）。
+        configured_model = get_value(db, "default_model")
+        resolved_model = default_model(db)
+        model = resolved_model if (configured_model or resolved_model in _OPENAI_PROTOCOL_MODELS) else ""
     else:
         model = ""
 

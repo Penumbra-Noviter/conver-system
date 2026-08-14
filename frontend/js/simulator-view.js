@@ -27,9 +27,9 @@
  *
  * wg_ 族会话注记（U8-T2 验收 4）：小马宝莉 / 高中生模拟器无保存按钮，
  *   注入仅会话内生效 — 成功注入后按钮旁显示「重进游戏需再次点击」小字。
- *   识别方式：spec 明示两游戏（manifest 无会话内标志字段），id 集合硬编码；
- *   U9-T2 存档面板「仅会话内生效」注记同源（协调点 — 若未来新增该族游戏
- *   须同步两处）。
+ *   识别方式：spec 明示两游戏（manifest 无会话内标志字段），id 集合单一来源
+ *   js/save-key-meta.js（WG_SESSION_ONLY_IDS，契约之家，TD-67/68；存档面板
+ *   「仅会话内生效」注记同源消费，新增该族游戏只改契约之家一处）。
  *
  * 错误检测基线（spec Implementation Decisions）：同源 404 仍触发 load 事件，
  *   错误态主要依赖超时守卫（15s 未收到 load）+ 打开参数校验；iframe 元素
@@ -41,6 +41,7 @@
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
 import { attachKeyInject, hasConfigTriplet, TEXT_KEY_INJECT } from './key-injector.js';
+import { WG_SESSION_ONLY_IDS } from './save-key-meta.js';
 
 // ══════════════════════════════════════════════════
 // 常量（UI 契约 — 文案/时长与 spec 对齐）
@@ -59,8 +60,8 @@ const HINT_AI = '此游戏需自行配置 AI 接口';
 const NOTE_SESSION_ONLY = '重进游戏需再次点击';
 
 /** wg_ 族游戏 id 集合（spec 明示：小马宝莉 / 高中生模拟器；manifest 无
- *  会话内标志字段 — 硬编码识别，U9-T2 存档面板注记同源，见模块头 docstring） */
-const SESSION_ONLY_IDS = new Set(['my-little-pony', 'high-school-sim']);
+ *  会话内标志字段 — 集合单一来源 js/save-key-meta.js：WG_SESSION_ONLY_IDS，
+ *  契约之家，TD-67/68；存档面板注记同源消费，见模块头 docstring） */
 
 // ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
@@ -154,7 +155,7 @@ function renderShell(game) {
         ? `<div class="sim-key-bar">
             <button type="button" class="sim-key-btn">${TEXT_KEY_INJECT}</button>
             <span class="sim-key-msg" role="status" hidden></span>
-            ${SESSION_ONLY_IDS.has(g.id) ? `<span class="sim-key-note" hidden>${NOTE_SESSION_ONLY}</span>` : ''}
+            ${WG_SESSION_ONLY_IDS.has(g.id) ? `<span class="sim-key-note" hidden>${NOTE_SESSION_ONLY}</span>` : ''}
         </div>`
         : '';
     runPanel.innerHTML = `
@@ -176,7 +177,7 @@ function renderShell(game) {
     if (bar) {
         attachKeyInject({
             bar,
-            sessionOnly: SESSION_ONLY_IDS.has(g.id),
+            sessionOnly: WG_SESSION_ONLY_IDS.has(g.id),
             getDoc: () => frame?.contentDocument ?? null,
             getConfig: () => currentGame?.config ?? null,
         });

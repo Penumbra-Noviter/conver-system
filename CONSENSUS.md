@@ -18,6 +18,8 @@
 - API Key 通过 UI 设置面板写入 DB（settings 表），运行时可修改立即生效
 - SQLite 数据库文件仅存本地，不上传/不共享
 - `.env` 仅作配置模板，不存储真实密钥
+- **模拟器同源信任边界已接受并文档化**（TD-57）：22 款模拟器与主应用同源运行、游戏可互读 localStorage 与调用 /api 端点 —— 自用威胁模型可接受，威胁模型 / 收缩措施 / 加固不可行论证见 [docs/architecture.md](docs/architecture.md)「模拟器信任边界（TD-57）」小节
+- **跨源沙箱 / postMessage 隔离**列入探索文档未决事项 U11 跟踪（仅探索不立项，见 [docs/world-simulation-exploration.md](docs/world-simulation-exploration.md)）
 
 ## 3. 角色管理策略
 
