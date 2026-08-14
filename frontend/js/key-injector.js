@@ -8,7 +8,10 @@
  *   面板填值 + 派发 input/change（injectCredentialsIntoGame 纯函数 — 只
  *   依赖文档参数，不依赖 iframe 元素）、按钮反馈状态机（成功「已填入」
  *   2s / claude·none 禁用文案 / 失败静默降级），attachKeyInject 把交互挂到
- *   simulator-view.js 渲染的按钮条（.sim-key-bar）上。
+ *   simulator-view.js 渲染的按钮条（.sim-key-bar）上。TD-71：none 禁用态
+ *   附带「前往设置页配置」链接（纯常量拼接），点击经 bar 一次性委托
+ *   preventDefault + 调 onNavigateSettings 钩子（initKeyInjector 注入；
+ *   app.js 接 switchView('settings')；非函数时点击 no-op）。
  *
  * 注入安全（TD-57 信任边界评估 — spec「U8 注入交互」决策 D 落点；权威文档：
  *   docs/architecture.md「模拟器信任边界（TD-57）」小节 — 威胁模型 / 已接受
@@ -59,6 +62,12 @@ const MSG_CLAUDE_ONLY = '游戏仅支持 OpenAI 兼容 Key';
 /** none 禁用文案（spec 逐字：未配置任何 OpenAI 兼容 Key） */
 const MSG_NO_CREDENTIALS = '未配置 OpenAI 兼容 Key';
 
+/** none 禁用态设置入口链接文案（TD-71 — 点击触发 onNavigateSettings 钩子） */
+const LINK_NAV_SETTINGS = '前往设置页配置';
+
+/** none 禁用态链接选择器（事件委托锚点；纯常量拼接，无用户数据，无 XSS 面） */
+const SEL_NAV_SETTINGS = '.sim-key-nav-settings';
+
 /** 「已填入」反馈时长（毫秒；到期按钮恢复「使用主应用 Key」可点） */
 const FEEDBACK_MS = 2000;
 
@@ -78,6 +87,10 @@ const TARGET_TAGS = new Set(['INPUT', 'SELECT']);
 /** 凭证获取函数（initKeyInjector 注入；未注入时点击静默恢复可点） */
 let fetchCredentials = null;
 
+/** 设置页导航钩子（initKeyInjector 注入 onNavigateSettings；TD-71 —
+ * none 态「前往设置页配置」链接点击调用；非函数时点击 no-op） */
+let navigateSettings = null;
+
 /** 当前活动按钮条（attach 时更新；异步续体以身份守卫避免污染新 bar） */
 let activeBar = null;
 
@@ -87,7 +100,8 @@ const busyBars = new WeakSet();
 /** 「已填入」反馈计时器（无在途反馈时为 null） */
 let feedbackTimer = null;
 
-/** 已绑定交互的按钮条（幂等守卫 — 同 bar 重复 attach 不重复绑监听） */
+/** 已绑定交互的按钮条（幂等守卫 — 同 bar 重复 attach 不重复绑监听；
+ * 设置链接点击委托随 attach 一次性绑定，同受本守卫约束） */
 const boundBars = new WeakSet();
 
 /** bar → 点击时取用的提供方（{sessionOnly, getDoc, getConfig}；attach 时登记） */
@@ -246,15 +260,36 @@ function resetBar(bar) {
     }
 }
 
-/** 进入禁用态：按钮禁用 + 原因文案（claude-only 与 none 文案区分） */
+/** 进入禁用态：按钮禁用 + 原因文案（claude-only 与 none 文案区分）。
+ * none 分支渲染「未配置 OpenAI 兼容 Key · 前往设置页配置（链接）」——
+ * 纯常量拼接（无用户数据，无 XSS 面）；链接点击经 bar 上的一次性委托
+ * 路由（handleBarClick），preventDefault + 调 onNavigateSettings 钩子
+ * （未注入钩子时点击 no-op）。 */
 function disableBar(bar, reason) {
     const btn = bar.querySelector('.sim-key-btn');
     if (btn) btn.disabled = true;
     const msg = bar.querySelector('.sim-key-msg');
     if (msg) {
-        msg.textContent = reason === 'claude' ? MSG_CLAUDE_ONLY : MSG_NO_CREDENTIALS;
+        if (reason === 'claude') {
+            msg.textContent = MSG_CLAUDE_ONLY;
+        } else {
+            msg.innerHTML = `${MSG_NO_CREDENTIALS} · <a href="#" class="sim-key-nav-settings">${LINK_NAV_SETTINGS}</a>`;
+        }
         msg.hidden = false;
     }
+}
+
+/**
+ * 按钮条点击委托（TD-71）：命中「前往设置页配置」链接 → preventDefault
+ * （拦截 href="#" 默认跳转）+ 调 onNavigateSettings 钩子；非函数时点击
+ * no-op 不抛错。绑定在 bar 上一次（attachKeyInject 的 boundBars 幂等
+ * 守卫）—— disableBar 多次调用重建链接元素也不产生重复监听。
+ * @param {Event} e - 按钮条内任意 click 事件（委托冒泡）
+ */
+function handleBarClick(e) {
+    if (!e.target?.closest?.(SEL_NAV_SETTINGS)) return;
+    e.preventDefault();
+    if (typeof navigateSettings === 'function') navigateSettings();
 }
 
 /** 注入成功反馈：按钮「已填入」→ FEEDBACK_MS 后恢复可点（身份 + 连接双守卫） */
@@ -354,6 +389,9 @@ export function attachKeyInject(params = {}) {
     if (!bar || typeof bar.querySelector !== 'function') return;
     if (boundBars.has(bar)) return; // 幂等守卫
     boundBars.add(bar);
+    // 设置链接点击委托：随按钮交互一次性绑定（TD-71 — 避免 disableBar
+    // 多次调用时链接点击重复触发钩子；同受 boundBars 幂等守卫约束）
+    bar.addEventListener('click', handleBarClick);
     barProviders.set(bar, { sessionOnly, getDoc, getConfig });
     activeBar = bar;
     clearFeedbackTimer();
@@ -362,17 +400,22 @@ export function attachKeyInject(params = {}) {
 }
 
 /**
- * 初始化注入模块：注入凭证获取函数（G7 注入钩子 — app.js 接线
- *   settings.credentials()；测试注入 mock）。
+ * 初始化注入模块：注入凭证获取函数与设置页导航钩子（G7 注入钩子 —
+ * app.js 接线 settings.credentials() 与 switchView('settings')；测试注入
+ * mock）。
  *
- * 幂等：重复调用仅更新获取函数。传 null/非函数 → 恢复未初始化态
- *   （点击静默恢复可点）。凭证获取走 api.js 既有 setFetch seam，无新 seam。
+ * 幂等：重复调用仅更新函数。传 null/非函数 → 恢复未初始化态（凭证点击
+ * 静默恢复可点；设置链接点击 no-op）。凭证获取走 api.js 既有 setFetch
+ * seam，无新 seam。
  * @param {object} [options]
  * @param {Function} [options.getCredentials] - () => Promise<{key, endpoint,
  *   model, protocol}>；凭证端点响应
+ * @param {Function} [options.onNavigateSettings] - () => void；none 态
+ *   「前往设置页配置」链接点击时调用（TD-71；非函数时点击 no-op）
  */
-export function initKeyInjector({ getCredentials } = {}) {
+export function initKeyInjector({ getCredentials, onNavigateSettings } = {}) {
     fetchCredentials = typeof getCredentials === 'function' ? getCredentials : null;
+    navigateSettings = typeof onNavigateSettings === 'function' ? onNavigateSettings : null;
 }
 
 // ══════════════════════════════════════════════════

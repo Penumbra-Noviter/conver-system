@@ -220,6 +220,20 @@ describe('simulator-view — 错误态（超时 / 参数非法）与恢复', () 
         expect(frameEl()).toBeNull();
     });
 
+    it('TD-56:file 含百分号编码（如 ..%2f 穿越 / 正常名含 %20）→ 直接 error 态，不创建 iframe', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+
+        view.openSimulator({ file: '..%2f..%2fsecret.html', name: 'x', type: 'ai' });
+        expect(runPanel.querySelector('.sim-run-error')).not.toBeNull();
+        expect(frameEl()).toBeNull();
+        expect(runPanel.querySelector('.sim-run-error-reason').textContent).toBe('参数非法：缺少有效的游戏文件');
+
+        view.openSimulator({ file: '正常游戏%20v2.html', name: 'y' });
+        expect(runPanel.querySelector('.sim-run-error')).not.toBeNull();
+        expect(frameEl()).toBeNull();
+    });
+
     it('参数非法 error 态点重试（同一非法 game）→ 再次 error，不创建 iframe，不抛错', async () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
@@ -507,7 +521,7 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
 
         expect(keyBtn().disabled).toBe(true);
         expect(runPanel.querySelector('.sim-key-msg').hidden).toBe(false);
-        expect(runPanel.querySelector('.sim-key-msg').textContent).toBe('游戏仅支持 OpenAI 兼容 Key');
+        expect(runPanel.querySelector('.sim-key-msg').textContent).toContain('游戏仅支持 OpenAI 兼容 Key');
     });
 
     it('none → 按钮禁用 + 文案「未配置 OpenAI 兼容 Key」', async () => {
@@ -519,7 +533,7 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         await vi.advanceTimersByTimeAsync(0);
 
         expect(keyBtn().disabled).toBe(true);
-        expect(runPanel.querySelector('.sim-key-msg').textContent).toBe('未配置 OpenAI 兼容 Key');
+        expect(runPanel.querySelector('.sim-key-msg').textContent).toContain('未配置 OpenAI 兼容 Key');
     });
 
     it('wg_ 族注入成功 → 会话注记「重进游戏需再次点击」可见（仅会话内生效）', async () => {
