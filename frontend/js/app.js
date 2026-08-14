@@ -22,11 +22,14 @@
  *     + 返回；U7-T4，onOpenGame 接到 openSimulator，切走 simulators 视图时
  *     closeSimulator 销毁 iframe — Grilling 共识：状态全在游戏自身
  *     localStorage，避免后台游戏继续跑）
+ *   - ./key-injector.js — 模拟器 Key 注入深模块（U8-T2：「使用主应用 Key」
+ *     按钮交互 + 注入 + 反馈状态机；凭证获取经 initKeyInjector 钩子接线
+ *     settings.credentials()，按钮条由 simulator-view.js 渲染挂接）
  *   - ./components/settings-panel.js — 设置面板（Provider 下拉、主题、侧栏、保存、清空）
  *   - ./components/ — 模态框相关组件（modal 工厂 / confirm / model-selector / export / character-form）
  */
 
-import { characters, conversations, models } from './api.js';
+import { characters, conversations, models, settings } from './api.js';
 import { showCharacterForm } from './components/character-form.js';
 import { showCharacterWizard } from './components/character-wizard.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
@@ -43,6 +46,7 @@ import { initSearchView } from './search-view.js';
 import { closeConversationsAndResettle, setCascadeHooks } from './cascade.js';
 import { initSimulatorsView, refreshSimulators } from './simulators.js';
 import { initSimulatorRun, openSimulator, closeSimulator } from './simulator-view.js';
+import { initKeyInjector } from './key-injector.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -515,6 +519,11 @@ initSimulatorRun({
     listPanel: $('#simulator-list-panel'),
     runPanel: $('#simulator-run-panel'),
 });
+
+// 模拟器 Key 注入初始化（U8-T2 — 凭证获取经注入钩子（G7）；点击/注入/
+// 反馈状态机收口在 key-injector.js，按钮条由 simulator-view.js 渲染挂接；
+// 凭证请求复用 api.js setFetch seam）
+initKeyInjector({ getCredentials: () => settings.credentials() });
 
 // 注入 tab 条激活处理器（P6.5-3）：组件内关闭按钮直接 closeTab（含 abort 流式），
 // 激活/联动一律经此回调走 P6.5-2 收敛的统一激活流程

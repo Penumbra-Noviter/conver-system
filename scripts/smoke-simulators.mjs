@@ -5,6 +5,8 @@
  * 覆盖真实用户路径（spec U7「端到端冒烟」验收，T4 选择器清单复用）：
  *   入口（侧栏模拟器导航）→ 列表 22 卡 + 计数 → 类型筛选（AI 驱动 / 全部）
  *   → 打开 AI 游戏（提示条 + iframe 加载 + 游戏内配置面板控件可见）
+ *   → 注入（U8-T2：预置 openai 凭证 → 点击「使用主应用 Key」→ 游戏配置
+ *     面板已填值 → 游戏自身保存路径接受注入值 → 恢复原设置）
  *   → 返回列表（iframe 卸载）→ 重进游戏 localStorage 存档保留
  *   → 纯本地游戏路径（manifest 驱动：无 local 条目时 SKIP 并报偏离说明）。
  *
@@ -64,6 +66,10 @@ const PROBE_MS = 5000;
 const HINT_AI = '此游戏需自行配置 AI 接口';
 /** spec 契约：入包模拟器总款数（与 T2 数据完整性测试同源） */
 const EXPECTED_TOTAL = 22;
+/** 「使用主应用 Key」按钮初始文案（与 key-injector.js TEXT_KEY_INJECT 一致） */
+const TEXT_KEY_INJECT = '使用主应用 Key';
+/** 注入成功反馈文案（与 key-injector.js TEXT_INJECTED 一致） */
+const TEXT_INJECTED = '已填入';
 
 /** 环境失败（退出码 2）：运行前提缺失，非被测应用缺陷 */
 class EnvError extends Error {}
@@ -462,6 +468,111 @@ async function smokeSteps(page, manifest) {
             );
         }
         return `提示条「${hint}」可见；iframe 已加载（${aiGame.file}）；配置面板控件 ${ids.join(' / ')} 可见`;
+    });
+
+    // 4.5 注入（U8-T2）：预置 openai 凭证 → 点击「使用主应用 Key」→ 游戏配置
+    // 面板已填值 → 游戏自身保存路径接受注入值（可发起对话）。预置步骤负责
+    // 恢复原设置（finally — 无论预置/断言成败）；断言步骤只读凭证端点。
+    // 注：步骤 4 结束时游戏视图仍打开，本段复用其 iframe 上下文。
+    const smokeApiKey = `sk-smoke-u8t2-${Date.now()}`;
+    await runStep('注入：预置 openai 凭证（settings 写入 + 凭证端点复核）', async () => {
+        let settingsBefore = null;
+        let firstError = null;
+        try {
+            const getRes = await fetch(`${baseUrl}/api/settings`, { signal: AbortSignal.timeout(PROBE_MS) });
+            if (!getRes.ok) throw new Error(`读取现有设置失败 HTTP ${getRes.status}`);
+            settingsBefore = await getRes.json();
+            const put = await fetch(`${baseUrl}/api/settings`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...settingsBefore,
+                    openai_api_key: smokeApiKey,
+                    default_provider: 'openai',
+                    default_model: 'smoke-test-model',
+                }),
+            });
+            if (!put.ok) throw new Error(`预置 openai_api_key 失败 HTTP ${put.status}`);
+            const creds = await (await fetch(`${baseUrl}/api/settings/credentials`, { signal: AbortSignal.timeout(PROBE_MS) })).json();
+            if (creds.protocol !== 'openai' || !creds.key) {
+                throw new Error(`凭证端点未返回 openai 凭证（protocol=${creds.protocol}）—— 预置未生效`);
+            }
+            return `openai_api_key 已预置（${smokeApiKey.slice(0, 12)}…），凭证端点 protocol=openai`;
+        } catch (err) {
+            firstError = err;
+            throw err;
+        } finally {
+            // 恢复原设置（预置前快照；失败时保留原始错误并附加恢复失败原因）
+            if (settingsBefore !== null) {
+                const put = await fetch(`${baseUrl}/api/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settingsBefore),
+                });
+                if (!put.ok) {
+                    throw new Error(`${firstError ? `${firstError.message}；且` : ''}恢复原设置失败 HTTP ${put.status}`);
+                }
+            }
+        }
+    });
+
+    await runStep('注入：点击「使用主应用 Key」→ 配置面板已填值', async () => {
+        const creds = await (await fetch(`${baseUrl}/api/settings/credentials`, { signal: AbortSignal.timeout(PROBE_MS) })).json();
+        if (creds.protocol !== 'openai' || !creds.key) {
+            throw new Error(`凭证端点未返回 openai 凭证（protocol=${creds.protocol}）`);
+        }
+
+        const btn = page.locator('.sim-key-btn');
+        await waitVisible(btn, WAIT_MS, '「使用主应用 Key」按钮');
+        if ((await btn.innerText()).trim() !== TEXT_KEY_INJECT) {
+            throw new Error(`按钮文案不符：期望「${TEXT_KEY_INJECT}」，实际「${(await btn.innerText()).trim()}」`);
+        }
+        await btn.click();
+        await waitForText(btn, TEXT_INJECTED, WAIT_MS, '按钮「已填入」反馈');
+
+        const frame = await waitForGameFrame(page, aiGame.file, WAIT_MS);
+        const cfg = aiGame.config ?? {};
+        const details = [];
+        const apikeyVal = await frame.locator(`#${cfg.apikey}`).inputValue();
+        if (apikeyVal !== creds.key) {
+            throw new Error(`注入后 #${cfg.apikey} 值「${apikeyVal}」≠ 凭证 key「${creds.key.slice(0, 8)}…」`);
+        }
+        details.push(`#${cfg.apikey} 已填主应用 key`);
+        if (creds.endpoint) {
+            const epVal = await frame.locator(`#${cfg.endpoint}`).inputValue();
+            if (epVal !== creds.endpoint) {
+                throw new Error(`注入后 #${cfg.endpoint} 值「${epVal}」≠ 凭证 endpoint「${creds.endpoint}」`);
+            }
+            details.push(`endpoint 已填（${creds.endpoint}）`);
+        } else {
+            details.push('endpoint 为空 → 保持游戏默认');
+        }
+        if (creds.model) {
+            const mVal = await frame.locator(`#${cfg.model}`).inputValue();
+            if (mVal !== creds.model) {
+                throw new Error(`注入后 #${cfg.model} 值「${mVal}」≠ 凭证 model「${creds.model}」`);
+            }
+            details.push(`model 已填（${creds.model}）`);
+        } else {
+            details.push('model 为空 → 保持游戏默认');
+        }
+
+        // 可发起对话：走游戏自身保存路径（cfg-* 族保存按钮落盘 — 注入值经游戏
+        // 自身读取链路进入其聊天配置；life-sim 保存路径已知，其它游戏无统一
+        // 保存入口 → 该断言 SKIP 并报偏离说明，由单测覆盖）
+        if (aiGame.id === 'life-sim') {
+            const saved = await frame.evaluate(() => {
+                LS.saveApiConfig();
+                return localStorage.getItem('ls_cfg') ?? '';
+            });
+            if (!saved.includes(smokeApiKey)) {
+                throw new Error('游戏自身保存路径未接受注入 key（ls_cfg 未含 smoke key）—— 可对话性未达');
+            }
+            details.push('游戏保存路径接受注入值（ls_cfg 已含 key，可直接对话）');
+        } else {
+            details.push(`游戏 ${aiGame.id} 非 life-sim — 保存路径断言 SKIP（单测覆盖）`);
+        }
+        return details.join('；');
     });
 
     // 5. 存档保留：游戏内写探针 → 返回（iframe 卸载）→ 重进 → 探针仍在 → 清理

@@ -21,6 +21,7 @@ export default defineConfig({
                 'js/components/character-submit.js',
                 'js/simulators.js',
                 'js/simulator-view.js',
+                'js/key-injector.js',
             ],
             reporter: ['text', 'html'],
             thresholds: {

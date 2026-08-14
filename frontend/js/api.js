@@ -301,4 +301,7 @@ export const settings = {
     update: (data) => request('PUT', '/settings', data),
     /** 测试指定 Provider 的 API Key 连接（P4.3）；失败时后端返回 400 及原因 */
     testConnection: (data) => request('POST', '/settings/test-connection', data),
+    /** 主应用可用的 OpenAI 兼容凭证（只读，U8-T2 运行视图注入用）：
+     *  返回 {key, endpoint, model, protocol} — protocol ∈ openai | claude | none */
+    credentials: () => request('GET', '/settings/credentials'),
 };
