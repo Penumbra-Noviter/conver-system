@@ -15,7 +15,8 @@
       "saveKeys": [
         "ls_autosave",
         "ls_used_names"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "spider-shadow",
@@ -30,7 +31,8 @@
       },
       "saveKeys": [
         "spiderweb_state"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "ido-idol-sim",
@@ -45,7 +47,8 @@
       },
       "saveKeys": [
         "xingtu_state"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "xiantu",
@@ -60,7 +63,8 @@
       },
       "saveKeys": [
         "xiantu_autosave"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "fake-wechat",
@@ -76,7 +80,8 @@
       "saveKeys": [
         "wxai_state_v1",
         "wxai_state_prev"
-      ]
+      ],
+      "endpointMode": "base"
     },
     {
       "id": "detective-sim",
@@ -91,7 +96,8 @@
       },
       "saveKeys": [
         "detective-ai-save-v1"
-      ]
+      ],
+      "endpointMode": "base"
     },
     {
       "id": "cthulhu-rpg",
@@ -106,7 +112,8 @@
       },
       "saveKeys": [
         "coc_autosave"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "harry-potter",
@@ -121,7 +128,8 @@
       },
       "saveKeys": [
         "hpbook_state"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "my-little-pony",
@@ -136,7 +144,8 @@
       },
       "saveKeys": [
         "wg_xiaomabaoli_save"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "sakura-academy",
@@ -151,7 +160,8 @@
       },
       "saveKeys": [
         "sakura_state"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "endless-sea",
@@ -166,7 +176,8 @@
       },
       "saveKeys": [
         "endless_sea_save"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "infinite-loop",
@@ -181,7 +192,8 @@
       },
       "saveKeys": [
         "il_autosave"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "twilight-witch",
@@ -199,7 +211,8 @@
         "twilight_cps",
         "twilight_deaths",
         "twilight_slot_\\d+"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "my-empire",
@@ -214,7 +227,8 @@
       },
       "saveKeys": [
         "emperor_state"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "jianghu",
@@ -229,7 +243,8 @@
       },
       "saveKeys": [
         "jianghu_state_v1"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "spirit-net-ascension",
@@ -244,7 +259,8 @@
       },
       "saveKeys": [
         "lwfs_save_v1"
-      ]
+      ],
+      "endpointMode": "base"
     },
     {
       "id": "society-sim",
@@ -259,7 +275,8 @@
       },
       "saveKeys": [
         "hsh_save_v1"
-      ]
+      ],
+      "endpointMode": "base"
     },
     {
       "id": "urban-god",
@@ -275,7 +292,8 @@
       "saveKeys": [
         "god_autosave",
         "god_save_\\d+"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "wishing-willow",
@@ -291,7 +309,8 @@
       "saveKeys": [
         "xuyangliu_save_v1",
         "xuyangliu_ui_v1"
-      ]
+      ],
+      "endpointMode": "base"
     },
     {
       "id": "urban-awakening",
@@ -307,7 +326,8 @@
       "saveKeys": [
         "urban_awakening_autosave",
         "urban_save_\\d+"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "high-school-sim",
@@ -322,7 +342,8 @@
       },
       "saveKeys": [
         "wg_gaozhongsheng_save"
-      ]
+      ],
+      "endpointMode": "full"
     },
     {
       "id": "madoka-magica",
@@ -337,7 +358,8 @@
       },
       "saveKeys": [
         "madoka_state_v1"
-      ]
+      ],
+      "endpointMode": "full"
     }
   ]
 }

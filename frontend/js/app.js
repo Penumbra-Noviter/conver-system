@@ -22,11 +22,11 @@
  *     + 返回；U7-T4，onOpenGame 接到 openSimulator，切走 simulators 视图时
  *     closeSimulator 销毁 iframe — Grilling 共识：状态全在游戏自身
  *     localStorage，避免后台游戏继续跑）
- *   - ./key-injector.js — 模拟器 Key 注入深模块（U8-T2：「使用主应用 Key」
- *     按钮交互 + 注入 + 反馈状态机；凭证获取经 initKeyInjector 钩子接线
- *     settings.credentials()，按钮条由 simulator-view.js 渲染挂接；
- *     TD-71：none 态「前往设置页配置」链接经 onNavigateSettings 钩子接
- *     switchView('settings')）
+ *   - ./key-injector.js — 模拟器配置同步深模块（U8-T2/SIM-API-1：load 自动
+ *     同步 + 「重新同步」按钮手动兜底 + 端点口径转换 + 受管模型 option；凭证
+ *     获取经 initKeyInjector 钩子接线 settings.credentials()，按钮条由
+ *     simulator-view.js 渲染挂接；TD-71：none 态「前往设置页配置」链接经
+ *     onNavigateSettings 钩子接 switchView('settings')）
  *   - ./save-manager.js — 存档管理面板深模块（列表/导出/导入/删除；U9-T2，
  *     工具条按钮接到 openSavePanel，游戏列表经 getGames 钩子注入，
  *     切走 simulators 视图时 closeSavePanel 复位）

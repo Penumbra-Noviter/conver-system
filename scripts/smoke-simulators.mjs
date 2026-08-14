@@ -4,9 +4,11 @@
  *
  * 覆盖真实用户路径（spec U7「端到端冒烟」验收，T4 选择器清单复用）：
  *   入口（侧栏模拟器导航）→ 列表 22 卡 + 计数 → 类型筛选（AI 驱动 / 全部）
- *   → 打开 AI 游戏（提示条 + iframe 加载 + 游戏内配置面板控件可见）
- *   → 注入（U8-T2：预置 openai 凭证 → 点击「使用主应用 Key」→ 游戏配置
- *     面板已填值 → 游戏自身保存路径接受注入值 → 恢复原设置）
+ *   → 预置 openai 凭证 → 打开 AI 游戏（提示条 + iframe 加载 + 游戏内配置
+ *     面板控件可见）→ SIM-API-1 配置同步（load 自动同步已填主应用
+ *     key/endpoint/model：端点按 manifest endpointMode 口径转换 / 受管
+ *     model option 追加 → 点击「重新同步」手动路径「已填入」→ 游戏自身
+ *     保存路径接受注入值 → 恢复原设置）
  *   → 返回列表（iframe 卸载）→ 重进游戏 localStorage 存档保留
  *   → 运行中再点导航回列表（TD-53：再点侧栏「模拟器」= 返回列表，
  *     iframe 卸载、列表面板恢复，与「返回」同语义）
@@ -76,8 +78,8 @@ const PROBE_MS = 5000;
 const HINT_AI = '此游戏需自行配置 AI 接口';
 /** spec 契约：入包模拟器总款数（与 T2 数据完整性测试同源） */
 const EXPECTED_TOTAL = 22;
-/** 「使用主应用 Key」按钮初始文案（与 key-injector.js TEXT_KEY_INJECT 一致） */
-const TEXT_KEY_INJECT = '使用主应用 Key';
+/** 「重新同步」按钮初始文案（与 key-injector.js TEXT_RESYNC 一致） */
+const TEXT_RESYNC = '重新同步';
 /** 注入成功反馈文案（与 key-injector.js TEXT_INJECTED 一致） */
 const TEXT_INJECTED = '已填入';
 // 正则元字符集（存档面板种子键须选精确键）：单一来源 frontend/js/save-key-meta.js
@@ -455,7 +457,39 @@ async function smokeSteps(page, manifest, baseUrl) {
         return `卡片恢复 ${total} 张，计数「${t}」`;
     });
 
-    // 4. 打开 AI 游戏：提示条 + iframe 加载 + 游戏内配置面板控件（manifest config 三元组）
+    // 4. 预置 openai 凭证（SIM-API-1：先于打开游戏 — load 自动同步需要
+    // openai 凭证在 iframe load 时已就位；与旧「点击注入」流程顺序相反）。
+    // 预置步骤负责写入 smoke key + 端点 + 默认模型并复核凭证端点；恢复原
+    // 设置延迟到全部步骤结束后（main 尾部）执行 —— 若过早恢复，自动同步
+    // 会拿到回退链（.env / 残留）的旧 key，注入保存路径断言必挂；且
+    // get_all 只回读 DB 已存在的键、set_many 只增改不删，过早恢复还会让
+    // DB 残留 smoke key 污染后续运行。
+    const smokeApiKey = `sk-smoke-u8t2-${Date.now()}`;
+    let preloadedSettings = null;
+    await runStep('注入：预置 openai 凭证（settings 写入 + 凭证端点复核）', async () => {
+        const getRes = await fetch(`${baseUrl}/api/settings`, { signal: AbortSignal.timeout(PROBE_MS) });
+        if (!getRes.ok) throw new Error(`读取现有设置失败 HTTP ${getRes.status}`);
+        preloadedSettings = await getRes.json();
+        const put = await fetch(`${baseUrl}/api/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ...preloadedSettings,
+                openai_api_key: smokeApiKey,
+                openai_base_url: 'https://api.smoke-test.com/v1', // 端点口径转换断言确定性
+                default_provider: 'openai',
+                default_model: 'smoke-test-model',
+            }),
+        });
+        if (!put.ok) throw new Error(`预置 openai_api_key 失败 HTTP ${put.status}`);
+        const creds = await (await fetch(`${baseUrl}/api/settings/credentials`, { signal: AbortSignal.timeout(PROBE_MS) })).json();
+        if (creds.protocol !== 'openai' || !creds.key) {
+            throw new Error(`凭证端点未返回 openai 凭证（protocol=${creds.protocol}）—— 预置未生效`);
+        }
+        return `openai_api_key 已预置（${smokeApiKey.slice(0, 12)}…），凭证端点 protocol=openai`;
+    });
+
+    // 5. 打开 AI 游戏：提示条 + iframe 加载 + 游戏内配置面板控件（manifest config 三元组）
     await runStep(`打开 AI 游戏：${aiGame.name}`, async () => {
         const card = page.locator(`.sim-card[data-id="${aiGame.id}"]`);
         await waitVisible(card, WAIT_MS, `卡片 ${aiGame.id}`);
@@ -482,97 +516,69 @@ async function smokeSteps(page, manifest, baseUrl) {
         return `提示条「${hint}」可见；iframe 已加载（${aiGame.file}）；配置面板控件 ${ids.join(' / ')} 可见`;
     });
 
-    // 4.5 注入（U8-T2）：预置 openai 凭证 → 点击「使用主应用 Key」→ 游戏配置
-    // 面板已填值 → 游戏自身保存路径接受注入值（可发起对话）。预置步骤负责
-    // 写入 smoke key 并复核凭证端点；恢复原设置延迟到全部步骤结束后（main
-    // 尾部）执行 —— 若在预置步骤末尾即恢复，点击步骤会拿到回退链（.env /
-    // 残留）的旧 key，注入保存路径断言必挂；且 get_all 只回读 DB 已存在的
-    // 键、set_many 只增改不删，过早恢复还会让 DB 残留 smoke key 污染后续运行。
-    const smokeApiKey = `sk-smoke-u8t2-${Date.now()}`;
-    let preloadedSettings = null;
-    await runStep('注入：预置 openai 凭证（settings 写入 + 凭证端点复核）', async () => {
-        const getRes = await fetch(`${baseUrl}/api/settings`, { signal: AbortSignal.timeout(PROBE_MS) });
-        if (!getRes.ok) throw new Error(`读取现有设置失败 HTTP ${getRes.status}`);
-        preloadedSettings = await getRes.json();
-        const put = await fetch(`${baseUrl}/api/settings`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ...preloadedSettings,
-                openai_api_key: smokeApiKey,
-                default_provider: 'openai',
-                default_model: 'smoke-test-model',
-            }),
-        });
-        if (!put.ok) throw new Error(`预置 openai_api_key 失败 HTTP ${put.status}`);
-        const creds = await (await fetch(`${baseUrl}/api/settings/credentials`, { signal: AbortSignal.timeout(PROBE_MS) })).json();
-        if (creds.protocol !== 'openai' || !creds.key) {
-            throw new Error(`凭证端点未返回 openai 凭证（protocol=${creds.protocol}）—— 预置未生效`);
-        }
-        return `openai_api_key 已预置（${smokeApiKey.slice(0, 12)}…），凭证端点 protocol=openai`;
-    });
-
-    await runStep('注入：点击「使用主应用 Key」→ 配置面板已填值', async () => {
+    // 6. 配置同步（SIM-API-1）：load 自动同步已填值（端点口径转换 + 受管
+    // model option）→ 点击「重新同步」手动路径 → 游戏自身保存路径接受注入值
+    await runStep('配置同步：load 自动同步 + 手动重新同步（SIM-API-1）', async () => {
         const creds = await (await fetch(`${baseUrl}/api/settings/credentials`, { signal: AbortSignal.timeout(PROBE_MS) })).json();
         if (creds.protocol !== 'openai' || !creds.key) {
             throw new Error(`凭证端点未返回 openai 凭证（protocol=${creds.protocol}）`);
         }
 
-        const btn = page.locator('.sim-key-btn');
-        await waitVisible(btn, WAIT_MS, '「使用主应用 Key」按钮');
-        if ((await btn.innerText()).trim() !== TEXT_KEY_INJECT) {
-            throw new Error(`按钮文案不符：期望「${TEXT_KEY_INJECT}」，实际「${(await btn.innerText()).trim()}」`);
-        }
-        await btn.click();
-        await waitForText(btn, TEXT_INJECTED, WAIT_MS, '按钮「已填入」反馈');
-
         const frame = await waitForGameFrame(page, aiGame.file, WAIT_MS);
         const cfg = aiGame.config ?? {};
         const details = [];
-        const apikeyVal = await frame.locator(`#${cfg.apikey}`).inputValue();
-        if (apikeyVal !== creds.key) {
-            throw new Error(`注入后 #${cfg.apikey} 值「${apikeyVal}」≠ 凭证 key「${creds.key.slice(0, 8)}…」`);
-        }
-        details.push(`#${cfg.apikey} 已填主应用 key`);
+
+        // load 自动同步是异步的（load 后取凭证）→ 以 apikey 填值为就绪信号等待
+        await waitForCondition(
+            async () => (await frame.locator(`#${cfg.apikey}`).inputValue()) === creds.key,
+            WAIT_MS,
+            'load 自动同步未生效（apikey 未填主应用 key）',
+        );
+        details.push(`load 自动同步已生效：#${cfg.apikey} = 主应用 key`);
+
+        // 端点口径按 manifest endpointMode 转换（凭证端点恒为 base URL）
         if (creds.endpoint) {
+            const expectedEndpoint = aiGame.endpointMode === 'full'
+                ? `${creds.endpoint.replace(/\/+$/, '')}/chat/completions`
+                : creds.endpoint.replace(/\/+$/, '');
             const epVal = await frame.locator(`#${cfg.endpoint}`).inputValue();
-            if (epVal !== creds.endpoint) {
-                throw new Error(`注入后 #${cfg.endpoint} 值「${epVal}」≠ 凭证 endpoint「${creds.endpoint}」`);
+            if (epVal !== expectedEndpoint) {
+                throw new Error(`端点口径转换失败：期望「${expectedEndpoint}」（endpointMode=${aiGame.endpointMode}），实际「${epVal}」`);
             }
-            details.push(`endpoint 已填（${creds.endpoint}）`);
+            details.push(`endpoint 已按 ${aiGame.endpointMode} 口径转换（${epVal}）`);
         } else {
-            details.push('endpoint 为空 → 保持游戏默认');
+            details.push('endpoint 为空 → 保持游戏默认（口径转换未断言）');
         }
-        if (creds.model) {
-            const modelLoc = frame.locator(`#${cfg.model}`);
-            const mVal = await modelLoc.inputValue();
-            // model 控件为 select 时（life-sim：#cfg-model 仅 deepseek-chat /
-            // deepseek-reasoner）：凭证 model 不在选项集 → select.value 赋值静默
-            // 无效，注入按纪律跳过该字段（F1 修复：不进 filled 不误报），断言
-            // 保持游戏默认；值在选项集内才断言已填
-            const tag = await modelLoc.evaluate((el) => el.tagName);
-            if (tag === 'SELECT') {
-                const opts = await modelLoc.locator('option').evaluateAll((els) => els.map((o) => o.value));
-                if (!opts.includes(creds.model)) {
-                    if (mVal === creds.model) {
-                        throw new Error(`注入后 #${cfg.model} 出现选项集外值「${mVal}」（select 无匹配选项应静默跳过）`);
-                    }
-                    details.push(`model 为 select 且凭证 model「${creds.model}」不在选项集 → 静默跳过，保持游戏默认「${mVal}」`);
-                } else {
-                    if (mVal !== creds.model) {
-                        throw new Error(`注入后 #${cfg.model} 值「${mVal}」≠ 凭证 model「${creds.model}」`);
-                    }
-                    details.push(`model 已填（${creds.model}）`);
-                }
-            } else {
-                if (mVal !== creds.model) {
-                    throw new Error(`注入后 #${cfg.model} 值「${mVal}」≠ 凭证 model「${creds.model}」`);
-                }
-                details.push(`model 已填（${creds.model}）`);
+
+        // 模型名取自主应用设置（默认模型）：select 缺目标 option → 受管 option 追加
+        const modelLoc = frame.locator(`#${cfg.model}`);
+        const mVal = await modelLoc.inputValue();
+        const tag = await modelLoc.evaluate((el) => el.tagName);
+        if (tag === 'SELECT') {
+            const opts = await modelLoc.locator('option').evaluateAll((els) => els.map((o) => o.value));
+            if (mVal !== creds.model) {
+                throw new Error(`model 未同步：期望「${creds.model}」，实际「${mVal}」`);
             }
+            if (!opts.includes(creds.model)) {
+                throw new Error(`受管 option 缺失：select 已选中「${creds.model}」但选项集无此项（宿主未追加受管 option）`);
+            }
+            details.push(`model 已同步（${creds.model}；受管 option 已追加，选项集 ${opts.length} 项）`);
         } else {
-            details.push('model 为空 → 保持游戏默认');
+            if (mVal !== creds.model) {
+                throw new Error(`model 未同步：期望「${creds.model}」，实际「${mVal}」`);
+            }
+            details.push(`model 已同步（${creds.model}）`);
         }
+
+        // 手动重新同步路径：按钮「重新同步」→「已填入」反馈 → 值幂等保持
+        const btn = page.locator('.sim-key-btn');
+        await waitVisible(btn, WAIT_MS, '「重新同步」按钮');
+        if ((await btn.innerText()).trim() !== TEXT_RESYNC) {
+            throw new Error(`按钮文案不符：期望「${TEXT_RESYNC}」，实际「${(await btn.innerText()).trim()}」`);
+        }
+        await btn.click();
+        await waitForText(btn, TEXT_INJECTED, WAIT_MS, '按钮「已填入」反馈');
+        details.push('手动「重新同步」点击 → 「已填入」反馈（值幂等保持）');
 
         // 可发起对话：走游戏自身保存路径（cfg-* 族保存按钮落盘 — 注入值经游戏
         // 自身读取链路进入其聊天配置；life-sim 保存路径已知，其它游戏无统一
@@ -592,7 +598,7 @@ async function smokeSteps(page, manifest, baseUrl) {
         return details.join('；');
     });
 
-    // 5. 存档保留：游戏内写探针 → 返回（iframe 卸载）→ 重进 → 探针仍在 → 清理
+    // 7. 存档保留：游戏内写探针 → 返回（iframe 卸载）→ 重进 → 探针仍在 → 清理
     // 探针键前缀固定 'smoke_'（TD-48 关闭配套清理：manifest 已 v2 化无
     // saveKeyPrefix 字段，遗留表达式移除；键不在任何 saveKeys 白名单内，
     // 冒烟结束后删除不留痕）
@@ -656,7 +662,7 @@ async function smokeSteps(page, manifest, baseUrl) {
         return `探针键 ${probeKey} 重进后仍存在（同源 localStorage 保留），已清理探针；返回列表`;
     });
 
-    // 5.5 运行中再点导航回列表（TD-53）：运行中的游戏再点侧栏「模拟器」
+    // 7.5 运行中再点导航回列表（TD-53）：运行中的游戏再点侧栏「模拟器」
     // = 返回列表（iframe 卸载、列表面板恢复），与「返回」同语义；随后
     // 视图内重复进入仍走既有刷新语义（列表重新渲染）。
     await runStep('运行中再点导航：返回列表（TD-53）', async () => {
@@ -690,7 +696,7 @@ async function smokeSteps(page, manifest, baseUrl) {
         return '运行中再点「模拟器」导航 → iframe 卸载、列表面板恢复（与「返回」同语义），列表已刷新';
     });
 
-    // 6. 纯本地游戏：无提示条（manifest 驱动；全 AI 时 SKIP 并报偏离说明）
+    // 8. 纯本地游戏：无提示条（manifest 驱动；全 AI 时 SKIP 并报偏离说明）
     await runStep('纯本地游戏：无提示条', async () => {
         if (localGames.length === 0) {
             return {
@@ -715,7 +721,7 @@ async function smokeSteps(page, manifest, baseUrl) {
         return `本地游戏 ${g.name}：iframe 加载成功且无提示条，返回列表正常`;
     });
 
-    // 7. 存档面板：导出 → 清档（删除）→ 导入恢复（localStorage 断言）
+    // 9. 存档面板：导出 → 清档（删除）→ 导入恢复（localStorage 断言）
     //    种子写入 saveKeys 白名单精确键 → 面板导出 Blob 下载 → 删除（确认弹窗）
     //    → 键清除 → 导入下载文件 → 键恢复 → 清理探针键。
     const saveGame = manifest.simulators.find((g) => Array.isArray(g.saveKeys)
@@ -737,7 +743,7 @@ async function smokeSteps(page, manifest, baseUrl) {
         }
 
         // 前置（F2 修复）：存档面板入口按钮（.sim-save-manage-btn）位于列表
-        // 面板内 —— 步骤 5 末已返回列表，此处断言列表可见，防御未来步骤
+        // 面板内 —— 步骤 7 末已返回列表，此处断言列表可见，防御未来步骤
         // 顺序变化再次踩 hidden 元素 actionability 超时
         await waitForCondition(
             () => page.evaluate(() => document.querySelector('#simulator-list-panel')?.hasAttribute('hidden') === false),

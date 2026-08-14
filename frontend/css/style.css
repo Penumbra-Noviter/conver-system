@@ -3610,16 +3610,6 @@ select {
     white-space: nowrap;
 }
 
-.sim-key-note {
-    font-size: var(--text-xs);
-    color: var(--ink-4);
-    white-space: nowrap;
-}
-
-.sim-key-note[hidden] {
-    display: none;
-}
-
 .sim-run-body {
     flex: 1;
     min-height: 0;

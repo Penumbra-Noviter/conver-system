@@ -144,6 +144,38 @@ describe('parseManifest — 纯函数（合法/结构错误/条目级降级）',
         expect(result.games).toEqual([]);
     });
 
+    it('endpointMode 透传：base/full 字符串 → 条目带 endpointMode（SIM-API-1 端点口径契约）', async () => {
+        const { sim } = await loadModules();
+        const data = {
+            version: 2,
+            simulators: [
+                { id: 'a', file: 'a.html', type: 'ai', name: 'A', endpointMode: 'full', config: { endpoint: 'e', apikey: 'k', model: 'm' } },
+                { id: 'b', file: 'b.html', type: 'ai', name: 'B', endpointMode: 'base', config: { endpoint: 'e', apikey: 'k', model: 'm' } },
+            ],
+        };
+        const result = sim.parseManifest(JSON.stringify(data));
+        expect(result.ok).toBe(true);
+        expect(result.games[0].endpointMode).toBe('full');
+        expect(result.games[1].endpointMode).toBe('base');
+    });
+
+    it('endpointMode 非法值 / 缺失 → 条目级降级（剔除该字段 — 注入按不转换处理，不整体失败）', async () => {
+        const { sim } = await loadModules();
+        const data = {
+            version: 2,
+            simulators: [
+                { id: 'a', file: 'a.html', type: 'ai', name: 'A', endpointMode: 'weird', config: { endpoint: 'e', apikey: 'k', model: 'm' } },
+                { id: 'b', file: 'b.html', type: 'ai', name: 'B', endpointMode: 42, config: { endpoint: 'e', apikey: 'k', model: 'm' } },
+                { id: 'c', file: 'c.html', type: 'ai', name: 'C', config: { endpoint: 'e', apikey: 'k', model: 'm' } },
+            ],
+        };
+        const result = sim.parseManifest(JSON.stringify(data));
+        expect(result.ok).toBe(true);
+        for (const game of result.games) {
+            expect('endpointMode' in game, `endpointMode 剔除: ${game.id}`).toBe(false);
+        }
+    });
+
     it('畸形 JSON → ok:false，错误文案「manifest 不是合法 JSON」', async () => {
         const { sim } = await loadModules();
         const result = sim.parseManifest('not-json{{{');

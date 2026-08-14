@@ -158,7 +158,7 @@ function makeRoute({ characters = [], characterGet = null,
         if (path.startsWith('/api/messages/search') && method === 'GET') return mockJson(searchResults);
         if (path === '/api/models' && method === 'GET') return mockJson({ providers });
         if (path === '/api/settings' && method === 'GET') return mockJson(settings);
-        // 凭证端点（U8-T2 — 运行视图「使用主应用 Key」按钮点击时经 api.js seam 消费）
+        // 凭证端点（U8-T2/SIM-API-1 — 运行视图「重新同步」按钮点击与 load 自动同步经 api.js seam 消费）
         if (path === '/api/settings/credentials' && method === 'GET') {
             if (credentialsFail) return mockJson({ detail: 'boom' }, 500);
             return mockJson(credentials);
@@ -496,7 +496,7 @@ describe('app.js 模拟器 Key 注入接线 — initKeyInjector（U8-T2）', () 
         return { env, doc };
     }
 
-    it('点击「使用主应用 Key」→ 经凭证端点接线 → iframe 配置面板已填值 + 「已填入」反馈', async () => {
+    it('点击「重新同步」→ 经凭证端点接线 → iframe 配置面板已填值 + 「已填入」反馈', async () => {
         const { doc, env } = await openGameWithPanel(makeRoute({ manifest: KEY_MANIFEST, credentials: KEY_CRED_OPENAI }));
 
         document.querySelector('.sim-key-btn').click();
@@ -534,7 +534,7 @@ describe('app.js 模拟器 Key 注入接线 — initKeyInjector（U8-T2）', () 
         await vi.waitFor(() => {
             expect(document.querySelector('.sim-key-btn').disabled).toBe(false);
         });
-        expect(document.querySelector('.sim-key-btn').textContent).toBe('使用主应用 Key');
+        expect(document.querySelector('.sim-key-btn').textContent).toBe('重新同步');
         expect(doc.getElementById('cfg-apikey').value).toBe('');
         expect(document.querySelector('.sim-key-msg').hidden).toBe(true);
     });

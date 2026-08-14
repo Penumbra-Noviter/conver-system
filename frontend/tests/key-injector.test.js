@@ -1,30 +1,41 @@
 /**
- * 模拟器 Key 注入模块测试（U8-T2）。
+ * 模拟器配置同步模块测试（U8-T2 + SIM-API-1）。
  *
  * 覆盖：
  *   - 模块私有性：ESM 深模块，不挂 window / globalThis（注入模块不出主应用作用域）
  *   - resolveButtonState 三态：openai（key 非空）→ 可注入；claude / none →
  *     禁用（含防御分支：openai 但 key 空串、未知 protocol、null 输入）
  *   - hasConfigTriplet：config 三元组完整性（三个非空字符串 id）
- *   - injectCredentialsIntoGame 核心：填值 + 派发 input/change；空值跳过
- *     （不覆盖游戏默认）；白名单（非声明 id 不触碰）；元素类型校验
+ *   - convertEndpoint（SIM-API-1）：endpointMode 'full' 追加 /chat/completions
+ *     （尾斜杠归一 + 双重追加防护）；'base' 剥除后缀；未声明原样
+ *   - injectCredentialsIntoGame 核心：填值 + 派发 input/change；endpointMode
+ *     口径转换；select 缺目标 option → 追加受管 option（SIM-API-1 取代旧
+ *     F1 静默跳过）；幂等写入（值已为目标 → 不写不派发、不重复追加 option）；
+ *     空值跳过（不覆盖游戏默认）；白名单（非声明 id 不触碰）；元素类型校验
  *     （input/select 才写）；控件缺失 / 文档缺失静默降级；返回 filled/skipped
- *   - attachKeyInject 交互：点击 → 凭证获取 → 注入 → 「已填入」2s 反馈；
- *     claude/none 禁用态 + 文案；请求失败 / 全跳过静默恢复；sessionOnly 注记；
- *     幂等 attach；重复点击只发一次请求；在途视图销毁后不污染新 bar
+ *   - syncGameCredentials（SIM-API-1 编排核心）：openai → 注入；claude/none →
+ *     不注入返回禁用原因；未初始化 → null
+ *   - autoSyncIntoGame（SIM-API-1 自动同步）：openai → 静默注入（无「已填入」
+ *     反馈、按钮保持可点）；claude/none → 自动禁用按钮条 + 文案；未初始化 →
+ *     bar 保持现状；同步在途 bar 被移除 → 不抛错
+ *   - attachKeyInject 交互（手动重新同步）：点击 → 凭证获取 → 注入 → 「已填入」
+ *     2s 反馈；claude/none 禁用态 + 文案；请求失败 / 全跳过静默恢复；幂等
+ *     attach；重复点击只发一次请求；在途视图销毁后不污染新 bar
  *   - Falsify：未 initKeyInjector 点击静默；getDoc/getConfig 缺失防御
  *
  * 测试即模块接口契约：公开面 __all__ = initKeyInjector / attachKeyInject /
- *   resolveButtonState / hasConfigTriplet / injectCredentialsIntoGame /
- *   TEXT_KEY_INJECT / TEXT_INJECTED。
+ *   resolveButtonState / hasConfigTriplet / convertEndpoint /
+ *   injectCredentialsIntoGame / syncGameCredentials / autoSyncIntoGame /
+ *   TEXT_RESYNC / TEXT_INJECTED。
  * 挂载模式：jsdom + vi.resetModules()；按钮条 fixture 与 simulator-view.js
  *   renderShell 渲染的 DOM 契约一致（.sim-key-bar / .sim-key-btn /
- *   .sim-key-msg / .sim-key-note）；注入目标文档用 createHTMLDocument 构造
- *   （注入核心只依赖文档参数 — spec「U8 注入交互」seam 清单）。
+ *   .sim-key-msg）；注入目标文档用 createHTMLDocument 构造（注入核心只依赖
+ *   文档参数 — spec「U8 注入交互」seam 清单）。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-/** 凭证端点三态 fixture（与后端 CredentialsResponse 契约一致） */
+/** 凭证端点三态 fixture（与后端 CredentialsResponse 契约一致；
+ * endpoint 为 base URL 形态 — 凭证端点契约） */
 const CRED_OPENAI = { key: 'sk-smoke-openai', endpoint: 'https://api.example.com/v1', model: 'gpt-4o-mini', protocol: 'openai' };
 const CRED_CLAUDE = { key: '', endpoint: '', model: '', protocol: 'claude' };
 const CRED_NONE = { key: '', endpoint: '', model: '', protocol: 'none' };
@@ -33,13 +44,12 @@ const CRED_NONE = { key: '', endpoint: '', model: '', protocol: 'none' };
 const CONFIG = { endpoint: 'cfg-endpoint', apikey: 'cfg-apikey', model: 'cfg-model' };
 
 /** 按钮条 fixture — 与 simulator-view.js renderShell 渲染结构一致（DOM 契约） */
-function makeBar({ sessionOnly = false } = {}) {
+function makeBar() {
     const bar = document.createElement('div');
     bar.className = 'sim-key-bar';
     bar.innerHTML = `
-        <button type="button" class="sim-key-btn">使用主应用 Key</button>
+        <button type="button" class="sim-key-btn">重新同步</button>
         <span class="sim-key-msg" role="status" hidden></span>
-        ${sessionOnly ? '<span class="sim-key-note" hidden>重进游戏需再次点击</span>' : ''}
     `;
     document.body.appendChild(bar);
     return bar;
@@ -72,31 +82,32 @@ async function loadInjector() {
     return mod;
 }
 
-/** 组装：bar + initKeyInjector(mock) + attach；返回 {mod, bar, btn, msg, note, fetchMock} */
-async function setupBar({ sessionOnly = false, credentials = CRED_OPENAI, getDoc = null, getConfig = null } = {}) {
+/** 组装：bar + initKeyInjector(mock) + attach；返回 {mod, bar, btn, msg, fetchMock} */
+async function setupBar({ credentials = CRED_OPENAI, getDoc = null, getConfig = null, getEndpointMode = null } = {}) {
     const mod = await loadInjector();
     const fetchMock = vi.fn(async () => credentials);
     mod.initKeyInjector({ getCredentials: fetchMock });
-    const bar = makeBar({ sessionOnly });
+    const bar = makeBar();
     const btn = bar.querySelector('.sim-key-btn');
     const msg = bar.querySelector('.sim-key-msg');
-    const note = bar.querySelector('.sim-key-note');
     mod.attachKeyInject({
         bar,
-        sessionOnly,
         getDoc: getDoc ?? (() => makePanelDoc()),
         getConfig: getConfig ?? (() => CONFIG),
+        getEndpointMode: getEndpointMode ?? (() => null),
     });
-    return { mod, bar, btn, msg, note, fetchMock };
+    return { mod, bar, btn, msg, fetchMock };
 }
 
 describe('key-injector — 协议表面 __all__ 与模块私有性', () => {
     it('__all__ 收口公开函数', async () => {
         const mod = await loadInjector();
         expect(mod.__all__.sort()).toEqual([
-            'TEXT_INJECTED', 'TEXT_KEY_INJECT',
-            'attachKeyInject', 'hasConfigTriplet', 'initKeyInjector',
+            'TEXT_INJECTED', 'TEXT_RESYNC',
+            'attachKeyInject', 'autoSyncIntoGame', 'convertEndpoint',
+            'hasConfigTriplet', 'initKeyInjector',
             'injectCredentialsIntoGame', 'resolveButtonState',
+            'syncGameCredentials',
         ]);
     });
 
@@ -159,6 +170,58 @@ describe('key-injector — hasConfigTriplet 三元组校验', () => {
     });
 });
 
+describe('key-injector — convertEndpoint 端点口径转换（SIM-API-1）', () => {
+    it("mode='full'：base URL → 追加 /chat/completions", async () => {
+        const { convertEndpoint } = await loadInjector();
+        expect(convertEndpoint('https://api.example.com/v1', 'full'))
+            .toBe('https://api.example.com/v1/chat/completions');
+    });
+
+    it("mode='full'：尾斜杠先归一再追加（不产生 //）", async () => {
+        const { convertEndpoint } = await loadInjector();
+        expect(convertEndpoint('https://api.example.com/v1/', 'full'))
+            .toBe('https://api.example.com/v1/chat/completions');
+    });
+
+    it("mode='full'：已含 /chat/completions → 原样（不双重追加）", async () => {
+        const { convertEndpoint } = await loadInjector();
+        expect(convertEndpoint('https://api.example.com/v1/chat/completions', 'full'))
+            .toBe('https://api.example.com/v1/chat/completions');
+    });
+
+    it("mode='base'：完整 /chat/completions 地址 → 剥除后缀", async () => {
+        const { convertEndpoint } = await loadInjector();
+        expect(convertEndpoint('https://api.example.com/v1/chat/completions', 'base'))
+            .toBe('https://api.example.com/v1');
+        expect(convertEndpoint('https://api.example.com/v1/chat/completions/', 'base'))
+            .toBe('https://api.example.com/v1');
+    });
+
+    it("mode='base'：已是 base 形态 → 原样", async () => {
+        const { convertEndpoint } = await loadInjector();
+        expect(convertEndpoint('https://api.example.com/v1', 'base'))
+            .toBe('https://api.example.com/v1');
+    });
+
+    it('mode 未声明 / 未知值 → 原样返回（兼容旧数据不转换）', async () => {
+        const { convertEndpoint } = await loadInjector();
+        expect(convertEndpoint('https://api.example.com/v1', undefined))
+            .toBe('https://api.example.com/v1');
+        expect(convertEndpoint('https://api.example.com/v1', 'weird'))
+            .toBe('https://api.example.com/v1');
+        expect(convertEndpoint('https://api.example.com/v1', null))
+            .toBe('https://api.example.com/v1');
+    });
+
+    it('非字符串 / 空串 → 原样返回', async () => {
+        const { convertEndpoint } = await loadInjector();
+        expect(convertEndpoint('', 'full')).toBe('');
+        expect(convertEndpoint(null, 'full')).toBeNull();
+        expect(convertEndpoint(42, 'full')).toBe(42);
+        expect(convertEndpoint(undefined, 'full')).toBeUndefined();
+    });
+});
+
 describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () => {
     it('openai 凭证 → 三控件填值（apikey←key；endpoint/model 同名）且各自收到 input 与 change', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
@@ -179,6 +242,30 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         expect(seen['cfg-endpoint']).toEqual(['input', 'change']);
         expect(seen['cfg-model']).toEqual(['input', 'change']);
         expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [] });
+    });
+
+    it("endpointMode='full' → endpoint 注入为 base + /chat/completions（模型/Key 不受影响）", async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makePanelDoc();
+        const result = injectCredentialsIntoGame({ doc, config: CONFIG, credentials: CRED_OPENAI, endpointMode: 'full' });
+
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+        expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
+        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [] });
+    });
+
+    it("endpointMode='base' → 完整地址剥除 /chat/completions 后注入", async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makePanelDoc();
+        injectCredentialsIntoGame({
+            doc,
+            config: CONFIG,
+            credentials: { ...CRED_OPENAI, endpoint: 'https://api.example.com/v1/chat/completions' },
+            endpointMode: 'base',
+        });
+
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
     });
 
     it('endpoint/model 为空 → 跳过该字段保持游戏默认（spec：不覆盖游戏默认），key 仍注入', async () => {
@@ -221,32 +308,74 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         expect(result).toEqual({ filled: ['apikey'], skipped: ['endpoint', 'model'] });
     });
 
-    it('F1:select 无匹配 option（凭证 model 不在游戏选项集）→ model 跳过不进 filled、保持原值、不派发事件', async () => {
+    it('SIM-API-1:select 无匹配 option → 追加受管 option 并选中（主应用模型名可进入 select）、派发事件、filled 含 model', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
         const doc = makePanelDoc(); // select 选项集：game-default-model / gpt-4o-mini
+        const modelEl = doc.getElementById('cfg-model');
         const seen = [];
-        doc.getElementById('cfg-model').addEventListener('input', () => seen.push('input'));
-        doc.getElementById('cfg-model').addEventListener('change', () => seen.push('change'));
+        modelEl.addEventListener('input', () => seen.push('input'));
+        modelEl.addEventListener('change', () => seen.push('change'));
 
         const result = injectCredentialsIntoGame({
             doc,
             config: CONFIG,
-            credentials: { ...CRED_OPENAI, model: 'deepseek-r1' }, // 不在选项集 → 赋值静默无效
+            credentials: { ...CRED_OPENAI, model: 'deepseek-r1' }, // 不在选项集 → 宿主追加受管 option
         });
 
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
         expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
-        expect(doc.getElementById('cfg-model').value).toBe('game-default-model'); // 保持游戏默认
-        expect(seen).toEqual([]); // 未派发 input/change（未写入）
-        expect(result).toEqual({ filled: ['apikey', 'endpoint'], skipped: ['model'] });
+        expect(modelEl.value).toBe('deepseek-r1'); // 受管 option 已选中
+        const optValues = [...modelEl.options].map((o) => o.value);
+        expect(optValues).toContain('deepseek-r1'); // 受管 option 已在选项集
+        expect(optValues).toHaveLength(3); // 原 2 + 受管 1
+        expect(seen).toEqual(['input', 'change']);
+        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [] });
     });
 
-    it('Falsify:select 无任何 option → 无匹配值 → 跳过该字段不抛错', async () => {
+    it('SIM-API-1:select 无任何 option → 追加受管 option 后选中（不抛错；apikey/endpoint 控件缺失照常跳过）', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
         const doc = makeGameDoc('<select id="cfg-model"></select>');
-        const result = injectCredentialsIntoGame({ doc, config: CONFIG, credentials: CRED_OPENAI });
-        expect(doc.getElementById('cfg-model').value).toBe('');
-        expect(result).toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+        const result = injectCredentialsIntoGame({
+            doc,
+            config: CONFIG,
+            credentials: { ...CRED_OPENAI, model: 'deepseek-r1' },
+        });
+        expect(doc.getElementById('cfg-model').value).toBe('deepseek-r1');
+        expect([...doc.getElementById('cfg-model').options].map((o) => o.value)).toEqual(['deepseek-r1']);
+        expect(result).toEqual({ filled: ['model'], skipped: ['apikey', 'endpoint'] });
+    });
+
+    it('SIM-API-1 幂等:值已为目标值 → 不写不派发、不重复追加受管 option（写回环守卫）', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makePanelDoc();
+        const modelEl = doc.getElementById('cfg-model');
+        const seen = [];
+        for (const id of ['cfg-endpoint', 'cfg-apikey', 'cfg-model']) {
+            doc.getElementById(id).addEventListener('input', () => seen.push(`input:${id}`));
+            doc.getElementById(id).addEventListener('change', () => seen.push(`change:${id}`));
+        }
+        const credentials = { ...CRED_OPENAI, model: 'deepseek-r1' };
+
+        const first = injectCredentialsIntoGame({ doc, config: CONFIG, credentials });
+        expect(first.filled.sort()).toEqual(['apikey', 'endpoint', 'model']);
+        expect(seen.length).toBe(6); // 三字段各 input+change
+        const optionCount = modelEl.options.length; // 原 2 + 受管 1
+        expect(optionCount).toBe(3);
+
+        const second = injectCredentialsIntoGame({ doc, config: CONFIG, credentials });
+        expect(second.filled.sort()).toEqual(['apikey', 'endpoint', 'model']); // 已处于目标值
+        expect(seen.length).toBe(6); // 幂等：无新增事件
+        expect(modelEl.options.length).toBe(optionCount); // 无重复受管 option
+        expect(modelEl.value).toBe('deepseek-r1');
+    });
+
+    it('model 已在选项集 → 不追加 option（直接选中原 option）', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makePanelDoc(); // 选项集含 gpt-4o-mini
+        const modelEl = doc.getElementById('cfg-model');
+        injectCredentialsIntoGame({ doc, config: CONFIG, credentials: CRED_OPENAI });
+        expect(modelEl.options.length).toBe(2); // 未新增
+        expect(modelEl.value).toBe('gpt-4o-mini');
     });
 
     it('文本域（textarea）不算注入目标 → 跳过（目标限 input/select）', async () => {
@@ -290,11 +419,61 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
     });
 });
 
-describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈）', () => {
+describe('key-injector — syncGameCredentials 同步编排核心（SIM-API-1）', () => {
+    it('openai → 注入 doc 并返回 { enabled: true, reason: null, filled, skipped }', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+
+        const result = await mod.syncGameCredentials({ doc, config: CONFIG, endpointMode: null });
+
+        expect(result.enabled).toBe(true);
+        expect(result.reason).toBeNull();
+        expect(result.filled.sort()).toEqual(['apikey', 'endpoint', 'model']);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+    });
+
+    it("claude → 不注入（claude key 绝不进入游戏）返回 { enabled: false, reason: 'claude' }", async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_CLAUDE);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+
+        const result = await mod.syncGameCredentials({ doc, config: CONFIG, endpointMode: null });
+
+        expect(result).toEqual({ enabled: false, reason: 'claude', filled: [], skipped: [] });
+        expect(doc.getElementById('cfg-apikey').value).toBe(''); // 未写入
+        expect(doc.getElementById('cfg-endpoint').value).toBe('game-default-endpoint');
+    });
+
+    it("none → 不注入返回 { enabled: false, reason: 'none' }", async () => {
+        const mod = await loadInjector();
+        mod.initKeyInjector({ getCredentials: vi.fn(async () => CRED_NONE) });
+        const doc = makePanelDoc();
+        const result = await mod.syncGameCredentials({ doc, config: CONFIG });
+        expect(result).toEqual({ enabled: false, reason: 'none', filled: [], skipped: [] });
+        expect(doc.getElementById('cfg-apikey').value).toBe('');
+    });
+
+    it('未初始化（initKeyInjector 未接线）→ 返回 null（调用方静默保持现状）', async () => {
+        const mod = await loadInjector(); // 不 init
+        expect(await mod.syncGameCredentials({ doc: makePanelDoc(), config: CONFIG })).toBeNull();
+    });
+
+    it('凭证获取失败 → 拒绝（调用方按路径降级）', async () => {
+        const mod = await loadInjector();
+        mod.initKeyInjector({ getCredentials: vi.fn(async () => { throw new Error('网络错误'); }) });
+        await expect(mod.syncGameCredentials({ doc: makePanelDoc(), config: CONFIG }))
+            .rejects.toThrow('网络错误');
+    });
+});
+
+describe('key-injector — attachKeyInject 交互（手动重新同步）', () => {
     beforeEach(() => { vi.useFakeTimers(); });
     afterEach(() => { vi.useRealTimers(); document.body.innerHTML = ''; });
 
-    it('点击 → 调凭证获取 → 注入 getDoc() 文档 → 按钮「已填入」→ 2s 后恢复「使用主应用 Key」可点', async () => {
+    it('点击 → 调凭证获取 → 注入 getDoc() 文档 → 按钮「已填入」→ 2s 后恢复「重新同步」可点', async () => {
         const { bar, btn, msg, fetchMock } = await setupBar();
         btn.click();
         await vi.advanceTimersByTimeAsync(0); // 冲刷 fetch/inject 微任务
@@ -305,7 +484,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         expect(msg.hidden).toBe(true);
 
         await vi.advanceTimersByTimeAsync(2000);
-        expect(btn.textContent).toBe('使用主应用 Key');
+        expect(btn.textContent).toBe('重新同步');
         expect(btn.disabled).toBe(false);
     });
 
@@ -335,7 +514,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         const fetchMock = vi.fn(async () => CRED_NONE);
         mod.initKeyInjector({ getCredentials: fetchMock, onNavigateSettings: navigate });
         const bar = makeBar();
-        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG });
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
         const btn = bar.querySelector('.sim-key-btn');
         const msg = bar.querySelector('.sim-key-msg');
 
@@ -363,7 +542,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         const bar2 = makeBar();
         // 注意：attachKeyInject 契约参数名是 bar — 对象字面量须用 { bar: bar2 }
         // （shorthand { bar2 } 会生成名为 bar2 的属性，attach 将 no-op）
-        mod.attachKeyInject({ bar: bar2, getDoc: () => makePanelDoc(), getConfig: () => CONFIG });
+        mod.attachKeyInject({ bar: bar2, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
         bar2.querySelector('.sim-key-btn').click();
         await vi.advanceTimersByTimeAsync(0);
         const link2 = bar2.querySelector('.sim-key-msg .sim-key-nav-settings');
@@ -379,7 +558,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
             .mockResolvedValueOnce(CRED_NONE);
         mod.initKeyInjector({ getCredentials: fetchMock, onNavigateSettings: navigate });
         const bar = makeBar();
-        mod.attachKeyInject({ bar, getDoc: () => makeGameDoc('<div></div>'), getConfig: () => CONFIG });
+        mod.attachKeyInject({ bar, getDoc: () => makeGameDoc('<div></div>'), getConfig: () => CONFIG, getEndpointMode: () => null });
         const btn = bar.querySelector('.sim-key-btn');
 
         btn.click(); // openai 但控件全缺失 → 静默 resetBar（按钮恢复可点）
@@ -401,7 +580,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         await expect(vi.advanceTimersByTimeAsync(0)).resolves.not.toThrow();
 
         expect(btn.disabled).toBe(false);
-        expect(btn.textContent).toBe('使用主应用 Key');
+        expect(btn.textContent).toBe('重新同步');
         expect(msg.hidden).toBe(true);
     });
 
@@ -410,11 +589,11 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         btn.click();
         await vi.advanceTimersByTimeAsync(0);
 
-        expect(btn.textContent).toBe('使用主应用 Key');
+        expect(btn.textContent).toBe('重新同步');
         expect(btn.disabled).toBe(false);
     });
 
-    it('F1 交互:select 无匹配 option → model 静默跳过（未写入未派发），key 已注入 → 按钮「已填入」如实反馈', async () => {
+    it('SIM-API-1 交互:select 无匹配 option → 受管 option 追加 + 选中 + 派发事件 → 按钮「已填入」如实反馈', async () => {
         const doc = makePanelDoc();
         const modelEl = doc.getElementById('cfg-model');
         const events = [];
@@ -427,32 +606,17 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         btn.click();
         await vi.advanceTimersByTimeAsync(0);
 
-        expect(btn.textContent).toBe('已填入'); // key/endpoint 注入成功 → 反馈如实
+        expect(btn.textContent).toBe('已填入'); // key/endpoint/model 均注入成功 → 反馈如实
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
-        expect(modelEl.value).toBe('game-default-model'); // model 未被误填
-        expect(events).toEqual([]); // 未派发事件
-    });
-
-    it('sessionOnly（wg_ 族）注入成功 → 注记「重进游戏需再次点击」可见；非 sessionOnly 无注记', async () => {
-        const { bar, btn, note } = await setupBar({ sessionOnly: true });
-        btn.click();
-        await vi.advanceTimersByTimeAsync(0);
-        expect(note).not.toBeNull();
-        expect(note.hidden).toBe(false);
-        expect(note.textContent).toBe('重进游戏需再次点击');
-
-        // 非 sessionOnly：bar 无注记元素
-        const { bar: bar2, btn: btn2, note: note2 } = await setupBar({ sessionOnly: false });
-        expect(note2).toBeNull();
-        btn2.click();
-        await vi.advanceTimersByTimeAsync(0);
-        expect(bar2.querySelector('.sim-key-note')).toBeNull();
+        expect(modelEl.value).toBe('deepseek-r1'); // 受管 option 已选中
+        expect([...modelEl.options].map((o) => o.value)).toContain('deepseek-r1');
+        expect(events).toEqual(['input', 'change']); // 事件已派发
     });
 
     it('幂等 attach：同一 bar 重复 attach → 点击只触发一次凭证获取（无重复监听）', async () => {
         const { mod, bar, btn, fetchMock } = await setupBar();
-        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG });
-        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG });
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
 
         btn.click();
         await vi.advanceTimersByTimeAsync(0);
@@ -473,7 +637,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         expect(btn.textContent).toBe('已填入');
         // 反馈结束后按钮恢复
         await vi.advanceTimersByTimeAsync(2000);
-        expect(btn.textContent).toBe('使用主应用 Key');
+        expect(btn.textContent).toBe('重新同步');
     });
 
     it('Falsify:凭证获取挂起中 bar 被移除（视图关闭/重建）→ resolve 后不抛错、不写已移除 DOM', async () => {
@@ -487,7 +651,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         await expect(vi.advanceTimersByTimeAsync(0)).resolves.not.toThrow();
         await vi.advanceTimersByTimeAsync(2000); // 反馈计时器到期 → 已移除 bar 不更新
         // 旧 bar 保持断开前状态（点击后禁用、未进「已填入」反馈）— 无抛错、无污染
-        expect(btn.textContent).toBe('使用主应用 Key');
+        expect(btn.textContent).toBe('重新同步');
         expect(btn.disabled).toBe(true);
     });
 
@@ -499,7 +663,7 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
 
         // 视图重建：新 bar + 重新 attach（同一模块实例）
         const newBar = makeBar();
-        mod.attachKeyInject({ bar: newBar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG });
+        mod.attachKeyInject({ bar: newBar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
         const newBtn = newBar.querySelector('.sim-key-btn');
         const newFetch = vi.fn(async () => CRED_OPENAI);
         mod.initKeyInjector({ getCredentials: newFetch });
@@ -522,25 +686,25 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
 
         // 视图重建：attach 新 bar → 清理在途反馈计时器 + 活动 bar 切换
         const barB = makeBar();
-        expect(() => mod.attachKeyInject({ bar: barB, getDoc: () => makePanelDoc(), getConfig: () => CONFIG })).not.toThrow();
+        expect(() => mod.attachKeyInject({ bar: barB, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null })).not.toThrow();
         await vi.advanceTimersByTimeAsync(2000);
 
         // 旧 bar 不恢复（计时器已清，不残留「已填入」翻转）；新 bar 保持初始态
         expect(btnA.textContent).toBe('已填入');
-        expect(barB.querySelector('.sim-key-btn').textContent).toBe('使用主应用 Key');
+        expect(barB.querySelector('.sim-key-btn').textContent).toBe('重新同步');
         expect(barB.querySelector('.sim-key-btn').disabled).toBe(false);
     });
 
     it('Falsify:未 initKeyInjector（凭证获取未注入）→ 点击静默恢复可点，不抛错', async () => {
         const mod = await loadInjector();
         const bar = makeBar();
-        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG });
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
         const btn = bar.querySelector('.sim-key-btn');
 
         btn.click();
         await expect(vi.advanceTimersByTimeAsync(0)).resolves.not.toThrow();
         expect(btn.disabled).toBe(false);
-        expect(btn.textContent).toBe('使用主应用 Key');
+        expect(btn.textContent).toBe('重新同步');
     });
 
     it('Falsify:attachKeyInject 缺 bar / 缺 getDoc getConfig → 点击不抛错（防御）', async () => {
@@ -557,5 +721,113 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
         btn.click();
         await expect(vi.advanceTimersByTimeAsync(0)).resolves.not.toThrow();
         expect(btn.disabled).toBe(false);
+    });
+});
+
+describe('key-injector — autoSyncIntoGame 自动同步（SIM-API-1）', () => {
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); document.body.innerHTML = ''; });
+
+    it('openai → 静默注入：游戏面板填值、无「已填入」反馈、按钮保持「重新同步」可点', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        const btn = bar.querySelector('.sim-key-btn');
+
+        await mod.autoSyncIntoGame({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
+        expect(btn.textContent).toBe('重新同步'); // 静默：不闪「已填入」
+        expect(btn.disabled).toBe(false);
+        expect(bar.querySelector('.sim-key-msg').hidden).toBe(true);
+    });
+
+    it('openai + endpointMode=full → 端点按游戏口径转换后静默注入', async () => {
+        const mod = await loadInjector();
+        mod.initKeyInjector({ getCredentials: vi.fn(async () => CRED_OPENAI) });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => 'full' });
+
+        await mod.autoSyncIntoGame({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => 'full' });
+
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+    });
+
+    it('claude → 自动禁用按钮条 + 文案「游戏仅支持 OpenAI 兼容 Key」（不注入游戏）', async () => {
+        const mod = await loadInjector();
+        mod.initKeyInjector({ getCredentials: vi.fn(async () => CRED_CLAUDE) });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+
+        await mod.autoSyncIntoGame({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+
+        const btn = bar.querySelector('.sim-key-btn');
+        expect(btn.disabled).toBe(true);
+        expect(bar.querySelector('.sim-key-msg').hidden).toBe(false);
+        expect(bar.querySelector('.sim-key-msg').textContent).toContain('游戏仅支持 OpenAI 兼容 Key');
+        expect(doc.getElementById('cfg-apikey').value).toBe(''); // claude key 绝不进入游戏
+    });
+
+    it('none → 自动禁用 + 「未配置 OpenAI 兼容 Key」文案（含设置页链接 — TD-71 语义随自动同步生效）', async () => {
+        const mod = await loadInjector();
+        mod.initKeyInjector({ getCredentials: vi.fn(async () => CRED_NONE) });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+
+        await mod.autoSyncIntoGame({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+
+        const msg = bar.querySelector('.sim-key-msg');
+        expect(bar.querySelector('.sim-key-btn').disabled).toBe(true);
+        expect(msg.hidden).toBe(false);
+        expect(msg.textContent).toContain('未配置 OpenAI 兼容 Key');
+        expect(msg.querySelector('.sim-key-nav-settings')).not.toBeNull();
+    });
+
+    it('未初始化（initKeyInjector 未接线）→ bar 保持现状（不显示误导性禁用文案）', async () => {
+        const mod = await loadInjector(); // 不 init
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
+        const btn = bar.querySelector('.sim-key-btn');
+
+        await mod.autoSyncIntoGame({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
+
+        expect(btn.disabled).toBe(false);
+        expect(btn.textContent).toBe('重新同步');
+        expect(bar.querySelector('.sim-key-msg').hidden).toBe(true);
+    });
+
+    it('Falsify:同步在途 bar 被移除（视图关闭/重建）→ resolve 后不抛错、不写已移除 DOM', async () => {
+        let resolveFetch;
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(() => new Promise((r) => { resolveFetch = r; }));
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+
+        const pending = mod.autoSyncIntoGame({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        bar.remove(); // 模拟 closeSimulator / renderShell 重建
+        resolveFetch(CRED_OPENAI);
+        await expect(pending).resolves.not.toThrow();
+        // 已移除 bar 无注入反馈、无禁用文案变更（不污染新视图）
+        expect(bar.querySelector('.sim-key-btn').textContent).toBe('重新同步');
+        expect(bar.querySelector('.sim-key-msg').hidden).toBe(true);
+    });
+
+    it('Falsify:autoSyncIntoGame 缺 bar → no-op 不抛错', async () => {
+        const mod = await loadInjector();
+        mod.initKeyInjector({ getCredentials: vi.fn(async () => CRED_OPENAI) });
+        await expect(mod.autoSyncIntoGame()).resolves.not.toThrow();
+        await expect(mod.autoSyncIntoGame(null)).resolves.not.toThrow();
+        await expect(mod.autoSyncIntoGame({})).resolves.not.toThrow();
     });
 });

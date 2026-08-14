@@ -1,5 +1,5 @@
 /**
- * 模拟器运行视图模块测试（U7-T4）。
+ * 模拟器运行视图模块测试（U7-T4 + U8-T2 + SIM-API-1）。
  *
  * 覆盖：
  *   - 状态机全迁移：open → opening（加载中占位 + iframe 隐藏）→ 派发 load
@@ -14,6 +14,11 @@
  *   - XSS：game.name 来自 manifest 第三方数据 → header 渲染经 escapeHtml 转义
  *   - Falsify：未 init 调 open/close no-op 不抛错；重复 init 幂等；重复 open
  *     只留最新 iframe 且计时器单一；open 中 close 后推进超时无残留错误
+ *   - 配置同步（U8-T2 + SIM-API-1）：按钮条渲染条件（ai + 完整 config 三元组
+ *     → 「重新同步」按钮）；load 自动同步（openai → 面板已填值（endpointMode
+ *     口径转换 / 受管 model option）/ claude·none → 按钮自动禁用 + 文案 /
+ *     凭证失败 → 静默）；点击手动重新同步（「已填入」2s 反馈）；配置控件重建
+ *     观察者（防抖再同步 / 写回环冷却 / 无关变更过滤 / close 断开）
  *
  * 测试即模块接口契约：公开面 __all__ = initSimulatorRun / openSimulator /
  *   closeSimulator。jsdom 不自动触发 iframe load（已探测）——load 事件由
@@ -33,19 +38,16 @@ const PANELS_DOM_HTML = `
 const GAME_AI = { id: 'life-sim', file: '人生模拟器v3.html', name: '人生模拟器 v3', type: 'ai', description: 'AI 驱动的生命模拟' };
 const GAME_LOCAL = { id: 'spider-shadow', file: '蛛网之影.html', name: '蛛网之影', type: 'local' };
 
-/** ai 游戏 + 完整 config 三元组（U8-T2 按钮渲染条件；manifest config 契约） */
+/** ai 游戏 + 完整 config 三元组（U8-T2 按钮渲染条件；manifest config 契约；
+ * endpointMode='full' 与真实 manifest life-sim 条目一致 — SIM-API-1 端点
+ * 口径转换契约） */
 const GAME_AI_CONFIG = {
     id: 'life-sim', file: '人生模拟器v3.html', name: '人生模拟器 v3', type: 'ai',
     config: { endpoint: 'cfg-endpoint', apikey: 'cfg-apikey', model: 'cfg-model' },
+    endpointMode: 'full',
 };
 
-/** wg_ 族游戏（小马宝莉 — spec 明示：无保存按钮，注入仅会话内生效） */
-const GAME_AI_WG = {
-    id: 'my-little-pony', file: '小马宝莉.html', name: '小马宝莉', type: 'ai',
-    config: { endpoint: 'cfg-endpoint', apikey: 'cfg-apikey', model: 'cfg-model' },
-};
-
-/** openai 凭证响应（凭证端点契约；endpoint/model 为空时游戏保持默认） */
+/** openai 凭证响应（凭证端点契约；endpoint 为 base URL 形态） */
 const CRED_OPENAI = { key: 'sk-smoke-openai', endpoint: 'https://api.example.com/v1', model: 'gpt-4o-mini', protocol: 'openai' };
 
 /** 加载全新 simulator-view 模块（DOM 先就位；返回模块 + 双面板引用） */
@@ -384,7 +386,7 @@ describe('simulator-view — closeSimulator 返回与守卫', () => {
     });
 });
 
-describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
+describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-API-1）', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         vi.restoreAllMocks();
@@ -392,15 +394,18 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
     });
     afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
-    /** 加载模块 + init 双面板 + initKeyInjector(mock) + open 游戏并派发 load */
-    async function openWithInject(view, game, credentials = CRED_OPENAI) {
+    /** 加载模块 + init 双面板 + initKeyInjector(mock) + open 游戏并派发 load。
+     * seed 在派发 load 前调用 → 观察者挂到已就位的配置面板（模拟真实
+     * load 时文档已解析）；不传 seed → load 时文档为空（auto-sync 全跳过）。 */
+    async function openWithInject(view, game, credentials = CRED_OPENAI, seed = null) {
         const injector = await import('../js/key-injector.js');
         const fetchMock = vi.fn(async () => credentials);
         injector.initKeyInjector({ getCredentials: fetchMock });
         view.openSimulator(game);
         const frame = frameEl();
+        const doc = seed ? seed(frame) : frame.contentDocument;
         frame.dispatchEvent(new Event('load'));
-        return { injector, fetchMock, frame };
+        return { injector, fetchMock, frame, doc };
     }
 
     /** 向 iframe contentDocument 写入游戏配置面板（同源直读 — U8 基线事实） */
@@ -421,7 +426,7 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
 
     const keyBtn = () => document.querySelector('#simulator-run-panel .sim-key-btn');
 
-    it('渲染条件：ai + 完整 config 三元组 → 按钮「使用主应用 Key」+ 提示条仍在 + msg/note 隐藏', async () => {
+    it('渲染条件：ai + 完整 config 三元组 → 按钮「重新同步」+ 提示条仍在 + msg 隐藏（无会话注记元素）', async () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
         view.openSimulator(GAME_AI_CONFIG);
@@ -429,12 +434,12 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         expect(runPanel.querySelector('.sim-run-hint').textContent).toBe('此游戏需自行配置 AI 接口');
         const btn = keyBtn();
         expect(btn).not.toBeNull();
-        expect(btn.textContent).toBe('使用主应用 Key');
+        expect(btn.textContent).toBe('重新同步');
         expect(btn.disabled).toBe(false);
         const msg = runPanel.querySelector('.sim-key-msg');
-        const note = runPanel.querySelector('.sim-key-note');
         expect(msg.hidden).toBe(true);
-        expect(note).toBeNull(); // life-sim 非 wg_ 族 → 无会话注记元素
+        // SIM-API-1：会话注记已退役（自动同步每次 load 重放，无需「重进需再次点击」提示）
+        expect(runPanel.querySelector('.sim-key-note')).toBeNull();
     });
 
     it('渲染条件：local 游戏 → 无按钮（无 config 的 ai 游戏提示条维持现状 — 按钮不渲染）', async () => {
@@ -460,21 +465,99 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         expect(keyBtn()).toBeNull();
     });
 
-    it('wg_ 族游戏（my-little-pony）→ 按钮条含隐藏的会话注记元素', async () => {
+    it('SIM-API-1:load 自动同步（openai）→ 面板已填值、无「已填入」反馈、按钮保持可点', async () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
-        view.openSimulator(GAME_AI_WG);
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0); // 冲刷自动同步微任务
 
-        const note = runPanel.querySelector('.sim-key-note');
-        expect(note).not.toBeNull();
-        expect(note.textContent).toBe('重进游戏需再次点击');
-        expect(note.hidden).toBe(true); // 注入成功后才显示
+        expect(fetchMock).toHaveBeenCalledTimes(1); // load 自动同步一次凭证获取
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+        // endpointMode=full：endpoint 注入为 base + /chat/completions
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
+        const btn = keyBtn();
+        expect(btn.textContent).toBe('重新同步'); // 静默：无「已填入」反馈
+        expect(btn.disabled).toBe(false);
+        expect(runPanel.querySelector('.sim-key-msg').hidden).toBe(true);
     });
 
-    it('点击接线：凭证获取 → 注入 iframe 配置面板（值 + input/change 事件）→ 「已填入」→ 2s 后恢复', async () => {
+    it('SIM-API-1:load 自动同步（model 不在选项集）→ 受管 option 追加并选中', async () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
-        const { fetchMock, frame } = await openWithInject(view, GAME_AI_CONFIG);
+        const { doc } = await openWithInject(
+            view,
+            GAME_AI_CONFIG,
+            { ...CRED_OPENAI, model: 'smoke-test-model' }, // 不在 life-sim 选项集（deepseek 两选项）
+            seedGamePanel,
+        );
+        await vi.advanceTimersByTimeAsync(0);
+
+        const modelEl = doc.getElementById('cfg-model');
+        expect(modelEl.value).toBe('smoke-test-model');
+        expect([...modelEl.options].map((o) => o.value)).toContain('smoke-test-model');
+        expect(modelEl.options.length).toBe(3); // 原 2 + 受管 1
+    });
+
+    it('SIM-API-1:load 自动同步（claude）→ 按钮自动禁用 + 文案「游戏仅支持 OpenAI 兼容 Key」、游戏不被注入', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { doc } = await openWithInject(
+            view,
+            GAME_AI_CONFIG,
+            { key: '', endpoint: '', model: '', protocol: 'claude' },
+            seedGamePanel,
+        );
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(keyBtn().disabled).toBe(true);
+        expect(runPanel.querySelector('.sim-key-msg').hidden).toBe(false);
+        expect(runPanel.querySelector('.sim-key-msg').textContent).toContain('游戏仅支持 OpenAI 兼容 Key');
+        expect(doc.getElementById('cfg-apikey').value).toBe(''); // claude key 绝不进入游戏
+    });
+
+    it('SIM-API-1:load 自动同步（none）→ 按钮自动禁用 + 「未配置 OpenAI 兼容 Key」含设置链接', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        await openWithInject(
+            view,
+            GAME_AI_CONFIG,
+            { key: '', endpoint: '', model: '', protocol: 'none' },
+            seedGamePanel,
+        );
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(keyBtn().disabled).toBe(true);
+        const msg = runPanel.querySelector('.sim-key-msg');
+        expect(msg.hidden).toBe(false);
+        expect(msg.textContent).toContain('未配置 OpenAI 兼容 Key');
+        expect(msg.querySelector('.sim-key-nav-settings')).not.toBeNull();
+    });
+
+    it('SIM-API-1:load 自动同步（凭证获取失败）→ 静默：按钮保持可点、无禁用文案', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        // 自始拒绝的凭证 mock（load 自动同步即走失败路径）
+        const injector = await import('../js/key-injector.js');
+        injector.initKeyInjector({ getCredentials: vi.fn(async () => { throw new Error('网络错误'); }) });
+        view.openSimulator(GAME_AI_CONFIG);
+        const frame = frameEl();
+        seedGamePanel(frame);
+        frame.dispatchEvent(new Event('load'));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(keyBtn().disabled).toBe(false);
+        expect(keyBtn().textContent).toBe('重新同步');
+        expect(runPanel.querySelector('.sim-key-msg').hidden).toBe(true);
+    });
+
+    it('点击接线（seed 在 load 后 — auto-sync 空文档全跳过）：凭证获取 → 注入面板（值 + input/change 事件）→ 「已填入」→ 2s 后恢复', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, frame } = await openWithInject(view, GAME_AI_CONFIG); // 不 seed → load 时空文档
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // load 自动同步已发一次请求（全跳过）
+
         const doc = seedGamePanel(frame);
         const seen = [];
         doc.getElementById('cfg-apikey').addEventListener('input', () => seen.push('input'));
@@ -483,16 +566,16 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         keyBtn().click();
         await vi.advanceTimersByTimeAsync(0);
 
-        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledTimes(2); // 自动同步 1 + 点击 1
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions'); // endpointMode=full 转换
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
         expect(seen).toEqual(['input', 'change']);
         expect(keyBtn().textContent).toBe('已填入');
         expect(keyBtn().disabled).toBe(true);
 
         await vi.advanceTimersByTimeAsync(2000);
-        expect(keyBtn().textContent).toBe('使用主应用 Key');
+        expect(keyBtn().textContent).toBe('重新同步');
         expect(keyBtn().disabled).toBe(false);
     });
 
@@ -500,6 +583,7 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
         const { frame } = await openWithInject(view, GAME_AI_CONFIG, { ...CRED_OPENAI, endpoint: '', model: '' });
+        await vi.advanceTimersByTimeAsync(0);
         const doc = seedGamePanel(frame);
 
         keyBtn().click();
@@ -511,57 +595,18 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         expect(keyBtn().textContent).toBe('已填入');
     });
 
-    it('claude-only → 按钮禁用 + 文案「游戏仅支持 OpenAI 兼容 Key」', async () => {
-        const { view, runPanel } = await loadModules();
-        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
-        await openWithInject(view, GAME_AI_CONFIG, { key: '', endpoint: '', model: '', protocol: 'claude' });
-
-        keyBtn().click();
-        await vi.advanceTimersByTimeAsync(0);
-
-        expect(keyBtn().disabled).toBe(true);
-        expect(runPanel.querySelector('.sim-key-msg').hidden).toBe(false);
-        expect(runPanel.querySelector('.sim-key-msg').textContent).toContain('游戏仅支持 OpenAI 兼容 Key');
-    });
-
-    it('none → 按钮禁用 + 文案「未配置 OpenAI 兼容 Key」', async () => {
-        const { view, runPanel } = await loadModules();
-        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
-        await openWithInject(view, GAME_AI_CONFIG, { key: '', endpoint: '', model: '', protocol: 'none' });
-
-        keyBtn().click();
-        await vi.advanceTimersByTimeAsync(0);
-
-        expect(keyBtn().disabled).toBe(true);
-        expect(runPanel.querySelector('.sim-key-msg').textContent).toContain('未配置 OpenAI 兼容 Key');
-    });
-
-    it('wg_ 族注入成功 → 会话注记「重进游戏需再次点击」可见（仅会话内生效）', async () => {
-        const { view, runPanel } = await loadModules();
-        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
-        const { frame } = await openWithInject(view, GAME_AI_WG);
-        seedGamePanel(frame);
-
-        keyBtn().click();
-        await vi.advanceTimersByTimeAsync(0);
-
-        const note = runPanel.querySelector('.sim-key-note');
-        expect(note.hidden).toBe(false);
-        expect(note.textContent).toBe('重进游戏需再次点击');
-        expect(keyBtn().textContent).toBe('已填入');
-    });
-
     it('请求失败（凭证端点不可达）→ 静默降级：无弹窗不抛错、按钮恢复可点', async () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
         const { fetchMock } = await openWithInject(view, GAME_AI_CONFIG);
-        fetchMock.mockRejectedValueOnce(new Error('网络错误'));
+        await vi.advanceTimersByTimeAsync(0);
+        fetchMock.mockRejectedValue(new Error('网络错误'));
 
         expect(() => keyBtn().click()).not.toThrow();
         await expect(vi.advanceTimersByTimeAsync(0)).resolves.not.toThrow();
 
         expect(keyBtn().disabled).toBe(false);
-        expect(keyBtn().textContent).toBe('使用主应用 Key');
+        expect(keyBtn().textContent).toBe('重新同步');
         expect(runPanel.querySelector('.sim-key-msg').hidden).toBe(true);
     });
 
@@ -569,6 +614,7 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
         const { frame } = await openWithInject(view, GAME_AI_CONFIG);
+        await vi.advanceTimersByTimeAsync(0);
         const doc = frame.contentDocument;
         doc.open();
         doc.write('<html><body><div id="cfg-apikey"></div></body></html>');
@@ -578,7 +624,7 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         await vi.advanceTimersByTimeAsync(0);
 
         expect(keyBtn().disabled).toBe(false);
-        expect(keyBtn().textContent).toBe('使用主应用 Key');
+        expect(keyBtn().textContent).toBe('重新同步');
         expect(runPanel.querySelector('.sim-key-msg').hidden).toBe(true);
     });
 
@@ -586,14 +632,16 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
         const { fetchMock, frame } = await openWithInject(view, GAME_AI_CONFIG);
+        await vi.advanceTimersByTimeAsync(0);
         seedGamePanel(frame); // 注入目标面板就位
         let resolveFetch;
+        // 自动同步已消费首调用 → 点击路径从第二次调用起挂起
         fetchMock.mockImplementationOnce(() => new Promise((r) => { resolveFetch = r; }));
 
         keyBtn().click();
         keyBtn().click();
         keyBtn().click();
-        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledTimes(2); // 自动同步 1 + 首个点击 1（后两个在途守卫拦截）
 
         resolveFetch(CRED_OPENAI);
         await vi.advanceTimersByTimeAsync(0);
@@ -604,24 +652,117 @@ describe('simulator-view — 使用主应用 Key 按钮（U8-T2）', () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
         await openWithInject(view, GAME_AI_CONFIG); // open 后未 seed 面板（模拟 iframe 未加载）
+        await vi.advanceTimersByTimeAsync(0);
         frameEl().contentDocument.open();
         frameEl().contentDocument.close(); // 空文档 — 无 config 控件
 
         expect(() => keyBtn().click()).not.toThrow();
         await expect(vi.advanceTimersByTimeAsync(0)).resolves.not.toThrow();
         expect(keyBtn().disabled).toBe(false);
-        expect(keyBtn().textContent).toBe('使用主应用 Key');
+        expect(keyBtn().textContent).toBe('重新同步');
     });
 
-    it('Falsify:未 initKeyInjector（app.js 未接线）→ 点击不抛错、按钮静默恢复', async () => {
+    it('Falsify:未 initKeyInjector（app.js 未接线）→ 点击不抛错、按钮静默恢复、无误导性禁用文案', async () => {
         const { view, runPanel } = await loadModules();
         view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
         view.openSimulator(GAME_AI_CONFIG); // 不 init injector
         const frame = frameEl();
         frame.dispatchEvent(new Event('load'));
+        await vi.advanceTimersByTimeAsync(0); // load 自动同步：未初始化 → bar 保持现状
+
+        expect(keyBtn().disabled).toBe(false);
+        expect(runPanel.querySelector('.sim-key-msg').hidden).toBe(true);
 
         expect(() => keyBtn().click()).not.toThrow();
         await expect(vi.advanceTimersByTimeAsync(0)).resolves.not.toThrow();
         expect(keyBtn().disabled).toBe(false);
+    });
+
+    it('SIM-API-1 观察者:游戏重建配置面板（控件恢复默认值）→ 防抖后自动再同步', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai'); // load 自动同步已填
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // 越过写回环冷却（load 自动同步写入后 1s 内的重建属自写入反应，跳过）
+        await vi.advanceTimersByTimeAsync(1000);
+        // 游戏重建配置面板（innerHTML 替换 — 控件恢复默认值）
+        doc.body.innerHTML = `
+            <input id="cfg-endpoint" value="game-default-endpoint">
+            <input id="cfg-apikey">
+            <select id="cfg-model">
+                <option value="game-default-model">game-default-model</option>
+            </select>
+        `;
+        await vi.advanceTimersByTimeAsync(500); // 观察者防抖到期
+        await vi.advanceTimersByTimeAsync(0); // 再同步微任务
+
+        expect(fetchMock).toHaveBeenCalledTimes(2); // 重建触发再同步
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai'); // 主应用配置重新生效
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+    });
+
+    it('SIM-API-1 观察者:写回环冷却 — 自动同步写入后 1s 内的面板重建跳过再同步；冷却后再重建恢复', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // 冷却窗口内（未推进时间）：重建面板 → 观察者跳过（自写入反应）
+        doc.body.innerHTML = `
+            <input id="cfg-apikey">
+            <input id="cfg-endpoint">
+            <select id="cfg-model"><option value="game-default-model">game-default-model</option></select>
+        `;
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 冷却内重建未触发再同步
+
+        // 冷却已过：再次重建 → 防抖后自动再同步
+        doc.body.innerHTML = `
+            <input id="cfg-apikey">
+            <input id="cfg-endpoint">
+            <select id="cfg-model"><option value="game-default-model">game-default-model</option></select>
+        `;
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+    });
+
+    it('SIM-API-1 观察者:与配置控件无关的变更（游戏状态渲染）→ 不触发再同步', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        // 游戏运行期高频 DOM 更新（状态渲染 — 不触及 config 控件）
+        doc.body.insertAdjacentHTML('beforeend', '<div class="game-ui">第 3 天 · 体力 78</div>');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 未触发再同步
+    });
+
+    it('SIM-API-1 观察者:closeSimulator → 观察者断开（关闭后游戏文档变更不再触发）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        view.closeSimulator(); // 卸载 iframe → 观察者 disconnect
+        await vi.advanceTimersByTimeAsync(1000);
+        // 对已卸载的游戏文档做配置控件变更（引用仍在 — 观察者已断开不响应）
+        doc.body.innerHTML = `
+            <input id="cfg-apikey">
+            <input id="cfg-endpoint">
+            <select id="cfg-model"><option value="game-default-model">game-default-model</option></select>
+        `;
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 断开后不触发
     });
 });

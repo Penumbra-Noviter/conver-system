@@ -35,7 +35,8 @@
  *   version 不兼容 / 顶层非对象 / simulators 缺失或非数组 / id 缺失或重复 /
  *   file 缺失 / type 非法 / 条目非对象）→ 整体判定失败，列表进入错误态
  *   （含重试）；条目级字段缺失（name / description / saveKeyPrefix /
- *   config / saveKeys）→ 宽容降级（该字段不渲染/剔除，不整体失败）。
+ *   config / saveKeys / endpointMode）→ 宽容降级（该字段不渲染/剔除，
+ *   不整体失败；endpointMode 非 'base'/'full' 剔除，注入时按不转换处理）。
  *
  * saveKeys 契约（U9-T1，与 U9-T2 共享 — 契约常量单一来源见
  *   js/save-key-meta.js（TD-67/68 契约之家））：v2 条目声明存档键白名单，
@@ -207,7 +208,8 @@ export function parseManifest(rawJson) {
         seen.add(entry.id);
         // 条目级宽容降级：name/description 缺失 → 空串（不渲染）；
         // saveKeyPrefix/config 非合法类型 → 剔除（不渲染）；
-        // saveKeys 结构非法 → 无 saveKeys 属性（「无存档管理」降级信号）
+        // saveKeys 结构非法 → 无 saveKeys 属性（「无存档管理」降级信号）；
+        // endpointMode 非 'base'/'full' → 剔除（注入时按不转换处理）
         const game = {
             id: entry.id,
             file: entry.file,
@@ -218,6 +220,9 @@ export function parseManifest(rawJson) {
         if (typeof entry.saveKeyPrefix === 'string') game.saveKeyPrefix = entry.saveKeyPrefix;
         if (entry.config !== null && typeof entry.config === 'object' && !Array.isArray(entry.config)) {
             game.config = entry.config;
+        }
+        if (entry.endpointMode === 'base' || entry.endpointMode === 'full') {
+            game.endpointMode = entry.endpointMode;
         }
         const saveKeys = normalizeSaveKeys(entry.saveKeys);
         if (saveKeys) game.saveKeys = saveKeys;

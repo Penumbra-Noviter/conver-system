@@ -1,17 +1,35 @@
 /**
- * Conver System — 模拟器 Key 注入模块（深模块，U8-T2）
+ * Conver System — 模拟器配置同步模块（深模块，U8-T2 + SIM-API-1）
  *
- * 职责：运行视图「使用主应用 Key」按钮的注入交互收口 —— 凭证获取（经
- *   initKeyInjector 注入钩子，G7 模式：app.js 接 settings.credentials()）、
- *   按钮态解析（resolveButtonState：openai / claude / none 三态纯函数）、
- *   config 三元组完整性校验（hasConfigTriplet 纯函数）、同源 iframe 配置
- *   面板填值 + 派发 input/change（injectCredentialsIntoGame 纯函数 — 只
- *   依赖文档参数，不依赖 iframe 元素）、按钮反馈状态机（成功「已填入」
- *   2s / claude·none 禁用文案 / 失败静默降级），attachKeyInject 把交互挂到
- *   simulator-view.js 渲染的按钮条（.sim-key-bar）上。TD-71：none 禁用态
- *   附带「前往设置页配置」链接（纯常量拼接），点击经 bar 一次性委托
- *   preventDefault + 调 onNavigateSettings 钩子（initKeyInjector 注入；
- *   app.js 接 switchView('settings')；非函数时点击 no-op）。
+ * 职责：主应用对模拟器配置的单一事实来源同步 —— iframe 加载后自动使用主
+ *   应用 OpenAI 兼容凭证（key/endpoint/model）、按钮「重新同步」手动兜底、
+ *   动态配置控件持续同步（观察者触发，见 simulator-view.js）三通道共用
+ *   同一同步核心（syncGameCredentials → injectCredentialsIntoGame）：
+ *   - 凭证获取经 initKeyInjector 注入钩子（G7 模式：app.js 接
+ *     settings.credentials()；测试注入 mock）；
+ *   - 按钮态解析（resolveButtonState：openai / claude / none 三态纯函数）、
+ *     config 三元组完整性校验（hasConfigTriplet 纯函数）、同源 iframe 配置
+ *     面板填值 + 派发 input/change（injectCredentialsIntoGame 纯函数 — 只
+ *     依赖文档参数，不依赖 iframe 元素）、按钮反馈状态机（成功「已填入」
+ *     2s / claude·none 禁用文案 / 失败静默降级），attachKeyInject 把交互挂到
+ *     simulator-view.js 渲染的按钮条（.sim-key-bar）上。TD-71：none 禁用态
+ *     附带「前往设置页配置」链接（纯常量拼接），点击经 bar 一次性委托
+ *     preventDefault + 调 onNavigateSettings 钩子（initKeyInjector 注入；
+ *     app.js 接 switchView('settings')；非函数时点击 no-op）。
+ *
+ * SIM-API-1（ADR-0001「模拟器 API 配置由主应用单一控制」方案 2：宿主 iframe
+ *   统一同步，第三方 HTML 零修改）落点：
+ *   - 端点口径转换：manifest 条目声明 endpointMode（'full' 游戏字段要完整
+ *     /chat/completions 地址 / 'base' 游戏自行拼接），凭证端点的 base URL
+ *     按 mode 转换为游戏所需形态（避免启发式猜测；双重追加防护）；
+ *   - 受管模型 option：模型 select 缺少主应用默认模型 option 时由宿主追加
+ *     （浏览器 select.value 只在选项集内生效 — 旧 F1 静默跳过改为主应用模型
+ *     可进入 select），再派发 input/change；
+ *   - 幂等写入：字段值已等于目标值时不写不派发（持续同步的写回环守卫 —
+ *     重复同步不再触发游戏 change 处理，动态重建场景收敛）；
+ *   - 自动同步通道：simulator-view.js 在 iframe load / 配置控件重建后调
+ *     autoSyncIntoGame（静默，不闪「已填入」）；按钮点击走同一核心 +
+ *     反馈状态机。
  *
  * 注入安全（TD-57 信任边界评估 — spec「U8 注入交互」决策 D 落点；权威文档：
  *   docs/architecture.md「模拟器信任边界（TD-57）」小节 — 威胁模型 / 已接受
@@ -27,31 +45,33 @@
  *        manifest 第三方数据亦无 HTML 字符串拼接面）；
  *     3. 只写三个字段（key/endpoint/model），不读取游戏内任何其他数据；
  *     4. 目标元素必须是 input/select 且存在，否则该字段跳过并静默降级
- *        （不报错不中断）；
- *     5. select 目标额外校验：凭证值必须在 options 选项集内（select.value
- *        赋值只在选项集内生效），不匹配 → 跳过该字段不进 filled —— 避免
- *        赋值静默无效却误报「已填入」（F1 修复）；
+ *        （不报错不中断）；select 目标缺主应用模型 option 时由宿主追加
+ *        受管 option（SIM-API-1）—— 不依赖游戏预置选项集；
+ *     5. 幂等写入：值与目标一致时不写不派发（写回环守卫）；
  *     6. claude key 值绝不进入游戏（凭证端点契约：protocol=claude/none 时
- *        key 为空串 — 本模块只转发端点返回值，不做任何跨协议兜底）。
+ *        key 为空串 — 本模块只转发端点返回值，不做任何跨协议兜底；
+ *        syncGameCredentials 对 claude/none 不注入，仅返回禁用原因）。
  *   残余风险（文档化）：注入的 openai key 必然进入游戏自身 DOM 与脚本
  *   内存（这是功能本义 — key 供游戏调用其配置的 OpenAI 兼容端点）；同源
  *   游戏间可互读属 TD-57 既有自用威胁模型，本模块不新增暴露。
  *
  * 依赖方向：key-injector.js →（无 — 纯函数 + DOM，凭证获取经注入钩子）；
- *   simulator-view.js → key-injector.js（attachKeyInject / hasConfigTriplet /
- *   文案常量）；app.js → key-injector.js（initKeyInjector 接线）。
+ *   simulator-view.js → key-injector.js（attachKeyInject / autoSyncIntoGame /
+ *   hasConfigTriplet / 文案常量）；app.js → key-injector.js（initKeyInjector
+ *   接线）。
  *
  * 协议表面（__all__）：initKeyInjector / attachKeyInject / resolveButtonState /
- *   hasConfigTriplet / injectCredentialsIntoGame / TEXT_KEY_INJECT /
- *   TEXT_INJECTED。
+ *   hasConfigTriplet / injectCredentialsIntoGame / syncGameCredentials /
+ *   autoSyncIntoGame / TEXT_RESYNC / TEXT_INJECTED。
  */
 
 // ══════════════════════════════════════════════════
 // 常量（UI 契约 — 文案/时长与 spec 对齐）
 // ══════════════════════════════════════════════════
 
-/** 按钮初始文案（simulator-view.js renderShell 复用同一常量渲染） */
-export const TEXT_KEY_INJECT = '使用主应用 Key';
+/** 按钮初始文案（simulator-view.js renderShell 复用同一常量渲染；
+ * SIM-API-1 起自动同步为常态，按钮语义为手动重新同步） */
+export const TEXT_RESYNC = '重新同步';
 
 /** 注入成功后的短暂反馈文案 */
 export const TEXT_INJECTED = '已填入';
@@ -68,7 +88,7 @@ const LINK_NAV_SETTINGS = '前往设置页配置';
 /** none 禁用态链接选择器（事件委托锚点；纯常量拼接，无用户数据，无 XSS 面） */
 const SEL_NAV_SETTINGS = '.sim-key-nav-settings';
 
-/** 「已填入」反馈时长（毫秒；到期按钮恢复「使用主应用 Key」可点） */
+/** 「已填入」反馈时长（毫秒；到期按钮恢复「重新同步」可点） */
 const FEEDBACK_MS = 2000;
 
 /** config 三元组字段顺序（注入顺序即此序；apikey 先于 endpoint/model） */
@@ -76,6 +96,9 @@ const CONFIG_FIELDS = ['apikey', 'endpoint', 'model'];
 
 /** config 字段 → 凭证字段取值映射（apikey ← key；endpoint/model 同名） */
 const FIELD_VALUE_KEYS = { apikey: 'key', endpoint: 'endpoint', model: 'model' };
+
+/** OpenAI 兼容协议聊天补全路径后缀（endpointMode 口径转换用） */
+const ENDPOINT_SUFFIX = '/chat/completions';
 
 /** 注入目标元素白名单标签（其余标签一律跳过 — 无控件探测） */
 const TARGET_TAGS = new Set(['INPUT', 'SELECT']);
@@ -104,11 +127,11 @@ let feedbackTimer = null;
  * 设置链接点击委托随 attach 一次性绑定，同受本守卫约束） */
 const boundBars = new WeakSet();
 
-/** bar → 点击时取用的提供方（{sessionOnly, getDoc, getConfig}；attach 时登记） */
+/** bar → 点击时取用的提供方（{getDoc, getConfig, getEndpointMode}；attach 时登记） */
 const barProviders = new WeakMap();
 
 // ══════════════════════════════════════════════════
-// 纯函数：按钮态解析 / 三元组校验
+// 纯函数：按钮态解析 / 三元组校验 / 端点口径转换
 // ══════════════════════════════════════════════════
 
 /**
@@ -136,7 +159,7 @@ export function resolveButtonState(credentials) {
  * 校验 manifest config 三元组完整性（三个字段均为非空字符串 DOM id）。
  *
  * 渲染条件（spec「U8 注入交互」）：仅 ai 游戏且 manifest 含完整 config
- *   三元组时渲染「使用主应用 Key」按钮；三元组不完整视为无 config
+ *   三元组时渲染「重新同步」按钮条；三元组不完整视为无 config
  *   （提示条维持现状）。
  *
  * @param {unknown} config - manifest 条目的 config 字段（endpoint/apikey/model）
@@ -149,22 +172,81 @@ export function hasConfigTriplet(config) {
         && typeof config.model === 'string' && config.model !== '';
 }
 
+/**
+ * 按 manifest endpointMode 把凭证端点 base URL 转换为游戏所需形态
+ * （SIM-API-1 — 各游戏端点字段分别接受 API Base URL 或完整 /chat/completions
+ * 地址，直接注入同一字符串不能保证可用；口径转换避免启发式猜测）。
+ *
+ * 契约：'full' → 追加 /chat/completions（尾斜杠先归一；已含后缀不重复追加）；
+ *   'base' → 剥除 /chat/completions 后缀（已是 base 形态保持原样）；
+ *   其他值（含 undefined — manifest 未声明）→ 原样返回（兼容旧数据）。
+ *
+ * @param {unknown} endpoint - 凭证端点响应中的 endpoint（base URL）
+ * @param {unknown} mode - manifest 条目的 endpointMode（'base' | 'full'）
+ * @returns {unknown} 转换后的端点值（非字符串原样返回）
+ */
+export function convertEndpoint(endpoint, mode) {
+    if (typeof endpoint !== 'string' || endpoint === '') return endpoint;
+    const trimmed = endpoint.replace(/\/+$/, '');
+    if (mode === 'full') {
+        return trimmed.endsWith(ENDPOINT_SUFFIX) ? trimmed : `${trimmed}${ENDPOINT_SUFFIX}`;
+    }
+    if (mode === 'base') {
+        return trimmed.endsWith(ENDPOINT_SUFFIX) ? trimmed.slice(0, -ENDPOINT_SUFFIX.length) : trimmed;
+    }
+    return endpoint;
+}
+
 // ══════════════════════════════════════════════════
 // 纯函数：注入核心（填值 + 派发事件）
 // ══════════════════════════════════════════════════
 
 /**
- * 按 manifest config 三元组把凭证非空字段填入游戏配置面板并派发事件。
+ * select 是否含匹配 value 的 option（无匹配时由 ensureSelectOption 追加受管
+ * option — HTMLSelectElement.value 只在选项集内生效，SIM-API-1 起宿主保证
+ * 主应用模型名可进入 select，不再依赖游戏预置选项集）。
+ *
+ * @param {HTMLSelectElement} selectEl - 目标 select 元素（已确认 tagName=SELECT）
+ * @param {string} value - 拟写入的凭证值（非空字符串）
+ * @returns {boolean} 选项集中存在匹配值为 true
+ */
+function hasSelectOption(selectEl, value) {
+    for (const opt of selectEl.options) {
+        if (opt.value === value) return true;
+    }
+    return false;
+}
+
+/**
+ * 追加受管 option（select 缺目标值时）：经 ownerDocument.createElement 创建
+ * （无 HTML 字符串拼接面，option 文本/值同为目标值 — 值即文本，无注入面）。
+ *
+ * @param {HTMLSelectElement} selectEl - 目标 select 元素
+ * @param {string} value - 拟写入的凭证值（非空字符串）
+ * @returns {boolean} 本次新增了 option 为 true（已存在为 false）
+ */
+function ensureSelectOption(selectEl, value) {
+    if (hasSelectOption(selectEl, value)) return false;
+    const opt = selectEl.ownerDocument.createElement('option');
+    opt.value = value;
+    opt.textContent = value;
+    selectEl.add(opt);
+    return true;
+}
+
+/**
+ * 按 manifest config 三元组把凭证非空字段同步到游戏配置面板并派发事件。
  *
  * 逐字段处理（顺序 apikey → endpoint → model）：字段 id 为 config 中声明
  *   的非空字符串，且凭证对应值（apikey←key；endpoint/model 同名）为非空
- *   字符串时才尝试写入；目标元素经 getElementById 查找（白名单 — 不做控件
- *   探测 / 自动发现），须存在且为 input/select，否则该字段跳过并静默降级
- *   （不报错不中断，其余字段继续）。select 元素额外校验：凭证值须在 options
- *   选项集内（select.value 赋值只在选项集内生效），不匹配 → 该字段跳过不进
- *   filled（避免赋值静默无效却误报「已填入」，游戏保持自身默认）。写入后对
- *   元素派发 input 与 change 事件（各游戏监听不一，spec 决策 A：两事件都派发，
- *   不做 per-game 适配）。
+ *   字符串时才尝试写入；endpoint 值先按 endpointMode 做口径转换（SIM-API-1）。
+ *   目标元素经 getElementById 查找（白名单 — 不做控件探测 / 自动发现），
+ *   须存在且为 input/select，否则该字段跳过并静默降级（不报错不中断，其余
+ *   字段继续）。select 元素：目标值不在选项集时追加受管 option（主应用模型
+ *   名可进入 select — SIM-API-1 取代旧 F1 静默跳过）。幂等写入：元素当前值
+ *   已等于目标值 → 不写不派发（记入 filled — 字段已处于目标态；持续同步的
+ *   写回环守卫）。写入后对元素派发 input 与 change 事件（各游戏监听不一，
+ *   spec 决策 A：两事件都派发，不做 per-game 适配）。
  *   endpoint/model 凭证值为空 → 跳过该字段（游戏保持自身默认）。
  *   本函数不读取游戏内任何其他数据；不写任何未声明 id。
  *
@@ -173,10 +255,13 @@ export function hasConfigTriplet(config) {
  *   只依赖文档参数 — iframe 未加载 / 缺失时全跳过不抛错）
  * @param {object|null} [params.config] - manifest config 三元组（DOM id 白名单）
  * @param {object|null} [params.credentials] - 凭证端点响应（key/endpoint/model）
+ * @param {string|null} [params.endpointMode] - manifest endpointMode（'base' |
+ *   'full'；null/undefined 不转换 — 兼容旧数据）
  * @returns {{filled: string[], skipped: string[]}} 按字段名（apikey/endpoint/
- *   model）分别列出实际写入与跳过的字段；filled 为空即未注入任何值
+ *   model）分别列出已处于目标值（含本次写入）与跳过的字段；filled 为空即
+ *   未同步任何值
  */
-export function injectCredentialsIntoGame({ doc, config, credentials } = {}) {
+export function injectCredentialsIntoGame({ doc, config, credentials, endpointMode } = {}) {
     const filled = [];
     const skipped = [];
     if (!doc || typeof doc.getElementById !== 'function') {
@@ -190,7 +275,8 @@ export function injectCredentialsIntoGame({ doc, config, credentials } = {}) {
             skipped.push(field);
             continue;
         }
-        const value = creds[FIELD_VALUE_KEYS[field]];
+        const rawValue = creds[FIELD_VALUE_KEYS[field]];
+        const value = field === 'endpoint' ? convertEndpoint(rawValue, endpointMode) : rawValue;
         if (typeof value !== 'string' || value === '') {
             skipped.push(field); // 空值不覆盖游戏默认
             continue;
@@ -200,11 +286,11 @@ export function injectCredentialsIntoGame({ doc, config, credentials } = {}) {
             skipped.push(field); // 控件缺失 / 类型不符 → 静默降级
             continue;
         }
-        if (el.tagName === 'SELECT' && !hasSelectOption(el, value)) {
-            // select 赋值静默无效（F1 修复）：select.value 只接受 option 集内
-            // 值，凭证值不在选项集 → 写入无效但若进 filled 会误报「已填入」。
-            // 跳过该字段不进 filled（静默降级，游戏保持自身默认，不中断其余字段）。
-            skipped.push(field);
+        if (el.tagName === 'SELECT') {
+            ensureSelectOption(el, value); // 缺目标 option → 追加受管 option
+        }
+        if (el.value === value) {
+            filled.push(field); // 幂等：已为目标值 → 不写不派发（写回环守卫）
             continue;
         }
         el.value = value;
@@ -215,28 +301,36 @@ export function injectCredentialsIntoGame({ doc, config, credentials } = {}) {
     return { filled, skipped };
 }
 
-/**
- * select 是否含匹配 value 的 option（HTMLSelectElement.value 只在选项集内生效 —
- * 注入前校验，避免赋值静默无效后仍计入 filled 误报「已填入」）。
- *
- * 匹配语义与 select.value 赋值一致：option 的 value 属性缺失时取文本
- * （option.value 由 DOM 规范回退文本，这里直接比对 option.value 即覆盖两种）。
- * 无 option 的 select → 无匹配 → 跳过（调用方静默降级，不抛错）。
- *
- * @param {HTMLSelectElement} selectEl - 目标 select 元素（已确认 tagName=SELECT）
- * @param {string} value - 拟写入的凭证值（非空字符串）
- * @returns {boolean} 选项集中存在匹配值为 true
- */
-function hasSelectOption(selectEl, value) {
-    for (const opt of selectEl.options) {
-        if (opt.value === value) return true;
-    }
-    return false;
-}
+// ══════════════════════════════════════════════════
+// 同步编排（自动同步 / 按钮点击共用核心）
+// ══════════════════════════════════════════════════
 
-// ══════════════════════════════════════════════════
-// 交互：按钮反馈状态机
-// ══════════════════════════════════════════════════
+/**
+ * 同步编排核心：取凭证 → 三态分流 → 注入（SIM-API-1 自动同步与按钮点击
+ * 共用）。claude / none → 不注入（claude key 绝不进入游戏），返回禁用原因；
+ * openai → 注入 getDoc()/config/endpointMode 提供的文档与三元组。
+ * 未初始化（app.js 未接线 initKeyInjector）→ 返回 null（调用方静默保持
+ * 现状，不显示误导性禁用文案）。
+ * 凭证获取失败 → 拒绝（调用方按路径降级：按钮点击静默复位 / 自动同步保持）。
+ *
+ * @param {object} [params]
+ * @param {Document|null} [params.doc] - 同源 iframe contentDocument
+ * @param {object|null} [params.config] - manifest config 三元组
+ * @param {string|null} [params.endpointMode] - manifest endpointMode
+ * @returns {Promise<null|{enabled: boolean, reason: 'claude'|'none'|null,
+ *   filled: string[], skipped: string[]}>}
+ *   null = 未初始化；enabled=false 时 filled/skipped 恒为空数组
+ */
+export async function syncGameCredentials({ doc, config, endpointMode } = {}) {
+    if (typeof fetchCredentials !== 'function') return null; // 未初始化 → 无操作
+    const creds = await fetchCredentials();
+    const state = resolveButtonState(creds);
+    if (!state.enabled) {
+        return { enabled: false, reason: state.reason, filled: [], skipped: [] };
+    }
+    const result = injectCredentialsIntoGame({ doc, config, credentials: creds, endpointMode });
+    return { enabled: true, reason: null, ...result };
+}
 
 /** 清理在途反馈计时器（幂等；attach / 视图重建时调用） */
 function clearFeedbackTimer() {
@@ -251,7 +345,7 @@ function resetBar(bar) {
     const btn = bar.querySelector('.sim-key-btn');
     if (btn) {
         btn.disabled = false;
-        btn.textContent = TEXT_KEY_INJECT;
+        btn.textContent = TEXT_RESYNC;
     }
     const msg = bar.querySelector('.sim-key-msg');
     if (msg) {
@@ -304,95 +398,144 @@ function showInjectedFeedback(bar) {
         // 视图已重建 / 关闭（bar 被替换或移除）→ 丢弃反馈恢复
         if (bar !== activeBar || !bar.isConnected) return;
         btn.disabled = false;
-        btn.textContent = TEXT_KEY_INJECT;
+        btn.textContent = TEXT_RESYNC;
     }, FEEDBACK_MS);
 }
 
 /**
- * 按钮点击编排：获取凭证 → 三态分流 → 注入 / 禁用。
+ * 同步执行核心（自动同步 / 按钮点击共用；feedback 区分反馈状态机）。
  *
- * claude / none → 按钮永久禁用（本视图生命周期内）+ 对应文案；
- * openai → 注入 getDoc()/getConfig() 提供方的文档与三元组；filled > 0 →
- *   「已填入」反馈（sessionOnly 时同时显示「重进游戏需再次点击」注记）；
- *   filled = 0（控件全缺失）→ 静默恢复可点（用户可手动配置）；
- * 凭证获取失败 / 未初始化 → 静默恢复可点，不弹错不中断。
+ * 取提供方 → syncGameCredentials 三态分流 → bar 状态机：
+ *   未初始化（返回 null）→ bar 保持现状（静默，不显示误导性禁用文案）；
+ *   claude / none → 按钮永久禁用（本视图生命周期内）+ 对应文案；
+ *   openai → 注入 getDoc()/getConfig()/getEndpointMode() 提供方的文档与
+ *     三元组；feedback 时 filled > 0 → 「已填入」反馈，filled = 0（控件全
+ *     缺失）→ 静默恢复可点（用户可手动配置）；feedback=false（自动同步）
+ *     静默注入不闪反馈。
+ * 凭证获取失败 → 请求失败静默降级：feedback 时按钮恢复可点；自动同步路径
+ *   保持现状不弹错不中断。
  * 异步续体以「bar === activeBar && bar.isConnected」守卫：视图在途关闭 /
- *   重建时丢弃 UI 更新，不污染新 bar。
+ *   重建时丢弃 UI 更新，不污染新 bar（同步结果仍返回 — 调用方按需消费）。
+ *
+ * @param {object} [params]
+ * @param {HTMLElement|null} [params.bar] - 按钮条容器（.sim-key-bar）
+ * @param {Function} [params.getDoc] - () => Document|null；同步时取同源
+ *   iframe contentDocument（动态取 — iframe 异步加载）
+ * @param {Function} [params.getConfig] - () => object|null；同步时取当前
+ *   游戏的 manifest config 三元组
+ * @param {Function} [params.getEndpointMode] - () => string|null；同步时取
+ *   当前游戏的 manifest endpointMode
+ * @param {boolean} [params.feedback] - true 为按钮点击路径（「已填入」反馈 /
+ *   失败复位）；false 为自动同步路径（静默）
+ * @returns {Promise<null|{enabled: boolean, reason: 'claude'|'none'|null,
+ *   filled: string[], skipped: string[]}>} 同步结果（同 syncGameCredentials；
+ *   未初始化 / 视图关闭早退 / 请求失败 → null）
+ */
+async function runSync({ bar, getDoc, getConfig, getEndpointMode, feedback }) {
+    if (!bar || bar !== activeBar) return null;
+    if (busyBars.has(bar)) return null; // 在途守卫：凭证获取挂起中忽略该 bar 的重复点击
+    const btn = bar.querySelector('.sim-key-btn');
+    if (!btn || btn.disabled) return null;
+    if (feedback) {
+        busyBars.add(bar);
+        btn.disabled = true;
+    }
+    try {
+        const result = await syncGameCredentials({
+            doc: typeof getDoc === 'function' ? getDoc() : null,
+            config: typeof getConfig === 'function' ? getConfig() : null,
+            endpointMode: typeof getEndpointMode === 'function' ? getEndpointMode() : null,
+        });
+        if (result === null) {
+            // 未初始化（app.js 未接线）→ 点击路径静默复位可点；自动同步路径保持现状
+            if (feedback) resetBar(bar);
+            return null;
+        }
+        if (bar !== activeBar || !bar.isConnected) return result; // 视图已关闭 → 丢弃 UI 更新
+        if (!result.enabled) {
+            disableBar(bar, result.reason);
+            return result;
+        }
+        if (feedback) {
+            if (result.filled.length > 0) {
+                showInjectedFeedback(bar);
+            } else {
+                resetBar(bar); // 未同步任何字段 → 静默恢复可点（用户可手动配置）
+            }
+        }
+        return result;
+    } catch {
+        if (feedback && bar === activeBar && bar.isConnected) {
+            resetBar(bar); // 请求失败 → 静默降级
+        }
+        return null;
+    } finally {
+        if (feedback) busyBars.delete(bar);
+    }
+}
+
+/**
+ * 按钮点击编排（手动重新同步）：走 runSync 反馈路径（「已填入」2s 反馈 /
+ * claude·none 禁用文案 / 失败复位）。
  * @param {Event} e - 按钮 click 事件（currentTarget 所在 bar 为操作目标）
  */
 async function handleKeyClick(e) {
     const bar = e.currentTarget?.closest?.('.sim-key-bar');
     if (!bar || bar !== activeBar) return;
-    if (busyBars.has(bar)) return; // 在途守卫：凭证获取挂起中忽略该 bar 的重复点击
+    if (busyBars.has(bar)) return;
     const btn = bar.querySelector('.sim-key-btn');
     if (!btn || btn.disabled) return;
-    const { sessionOnly = false, getDoc, getConfig } = barProviders.get(bar) ?? {};
-    busyBars.add(bar);
-    btn.disabled = true;
-    try {
-        if (typeof fetchCredentials !== 'function') {
-            resetBar(bar); // 未初始化（app.js 未接线）→ 静默恢复
-            return;
-        }
-        const creds = await fetchCredentials();
-        const state = resolveButtonState(creds);
-        if (!state.enabled) {
-            if (bar !== activeBar || !bar.isConnected) return;
-            disableBar(bar, state.reason);
-            return;
-        }
-        const result = injectCredentialsIntoGame({
-            doc: typeof getDoc === 'function' ? getDoc() : null,
-            config: typeof getConfig === 'function' ? getConfig() : null,
-            credentials: creds,
-        });
-        if (bar !== activeBar || !bar.isConnected) return; // 视图已关闭 → 丢弃
-        if (result.filled.length > 0) {
-            const msg = bar.querySelector('.sim-key-msg');
-            if (msg) {
-                msg.textContent = '';
-                msg.hidden = true;
-            }
-            if (sessionOnly) {
-                const note = bar.querySelector('.sim-key-note');
-                if (note) note.hidden = false;
-            }
-            showInjectedFeedback(bar);
-        } else {
-            resetBar(bar); // 未注入任何字段 → 静默恢复可点（用户可手动配置）
-        }
-    } catch {
-        if (bar === activeBar && bar.isConnected) {
-            resetBar(bar); // 请求失败 → 静默降级
-        }
-    } finally {
-        busyBars.delete(bar);
-    }
+    const { getDoc, getConfig, getEndpointMode } = barProviders.get(bar) ?? {};
+    await runSync({ bar, getDoc, getConfig, getEndpointMode, feedback: true });
 }
 
 /**
- * 把注入交互挂到按钮条（simulator-view.js renderShell 渲染后调用）。
+ * 自动同步入口（SIM-API-1）：静默取凭证 → 注入当前游戏配置面板（iframe
+ * load / 配置控件动态重建后由 simulator-view.js 调用；不闪「已填入」反馈）。
+ * claude / none → 按钮条禁用 + 原因文案（UI 显示原因并引导前往主应用设置）；
+ * 未初始化 → bar 保持现状。返回同步结果（simulator-view 据 filled 决定
+ * 观察者写回环冷却 — 见该模块 autoSyncAfterLoad）。
+ * @param {object} [params]
+ * @param {HTMLElement|null} [params.bar] - 按钮条容器（.sim-key-bar）
+ * @param {Function} [params.getDoc] - () => Document|null；同步时取同源
+ *   iframe contentDocument
+ * @param {Function} [params.getConfig] - () => object|null；同步时取当前
+ *   游戏的 manifest config 三元组
+ * @param {Function} [params.getEndpointMode] - () => string|null；同步时取
+ *   当前游戏的 manifest endpointMode
+ * @returns {Promise<null|{enabled: boolean, reason: 'claude'|'none'|null,
+ *   filled: string[], skipped: string[]}>} 同步结果（同 syncGameCredentials；
+ *   未初始化 / 视图关闭早退 / 请求失败 → null）
+ */
+export async function autoSyncIntoGame(params = {}) {
+    const { bar, getDoc, getConfig, getEndpointMode } = params ?? {};
+    if (!bar) return null;
+    return runSync({ bar, getDoc, getConfig, getEndpointMode, feedback: false });
+}
+
+/**
+ * 把同步交互挂到按钮条（simulator-view.js renderShell 渲染后调用）。
  *
  * 幂等：同一 bar 重复 attach 只绑定一次（WeakSet 守卫）。bar 缺失 /
  *   getDoc/getConfig 未提供时点击静默降级不抛错（Falsify 防御）。
  * @param {object} [params]
  * @param {HTMLElement|null} [params.bar] - 按钮条容器（.sim-key-bar）
- * @param {boolean} [params.sessionOnly] - wg_ 族游戏（无保存按钮，注入仅
- *   会话内生效）→ 成功注入后显示「重进游戏需再次点击」注记
  * @param {Function} [params.getDoc] - () => Document|null；点击时取同源
  *   iframe contentDocument（动态取 — iframe 异步加载）
  * @param {Function} [params.getConfig] - () => object|null；点击时取当前
  *   游戏的 manifest config 三元组
+ * @param {Function} [params.getEndpointMode] - () => string|null；点击时取
+ *   当前游戏的 manifest endpointMode
  */
 export function attachKeyInject(params = {}) {
-    const { bar, sessionOnly = false, getDoc, getConfig } = params ?? {};
+    const { bar, getDoc, getConfig, getEndpointMode } = params ?? {};
     if (!bar || typeof bar.querySelector !== 'function') return;
     if (boundBars.has(bar)) return; // 幂等守卫
     boundBars.add(bar);
     // 设置链接点击委托：随按钮交互一次性绑定（TD-71 — 避免 disableBar
     // 多次调用时链接点击重复触发钩子；同受 boundBars 幂等守卫约束）
     bar.addEventListener('click', handleBarClick);
-    barProviders.set(bar, { sessionOnly, getDoc, getConfig });
+    barProviders.set(bar, { getDoc, getConfig, getEndpointMode });
     activeBar = bar;
     clearFeedbackTimer();
     const btn = bar.querySelector('.sim-key-btn');
@@ -400,13 +543,13 @@ export function attachKeyInject(params = {}) {
 }
 
 /**
- * 初始化注入模块：注入凭证获取函数与设置页导航钩子（G7 注入钩子 —
+ * 初始化同步模块：注入凭证获取函数与设置页导航钩子（G7 注入钩子 —
  * app.js 接线 settings.credentials() 与 switchView('settings')；测试注入
  * mock）。
  *
- * 幂等：重复调用仅更新函数。传 null/非函数 → 恢复未初始化态（凭证点击
- * 静默恢复可点；设置链接点击 no-op）。凭证获取走 api.js 既有 setFetch
- * seam，无新 seam。
+ * 幂等：重复调用仅更新函数。传 null/非函数 → 恢复未初始化态（同步静默
+ * 保持现状；设置链接点击 no-op）。凭证获取走 api.js 既有 setFetch seam，
+ * 无新 seam。
  * @param {object} [options]
  * @param {Function} [options.getCredentials] - () => Promise<{key, endpoint,
  *   model, protocol}>；凭证端点响应
@@ -427,7 +570,10 @@ export const __all__ = [
     'attachKeyInject',
     'resolveButtonState',
     'hasConfigTriplet',
+    'convertEndpoint',
     'injectCredentialsIntoGame',
-    'TEXT_KEY_INJECT',
+    'syncGameCredentials',
+    'autoSyncIntoGame',
+    'TEXT_RESYNC',
     'TEXT_INJECTED',
 ];

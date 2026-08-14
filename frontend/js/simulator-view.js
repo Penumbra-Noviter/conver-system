@@ -1,19 +1,22 @@
 /**
- * Conver System — 模拟器运行视图（深模块，U7-T4 / U8-T2）
+ * Conver System — 模拟器运行视图（深模块，U7-T4 / U8-T2 / SIM-API-1）
  *
  * 职责：运行视图的全部逻辑收口 —— iframe 状态机（idle → opening → loaded |
  *   error，含 15s 超时守卫）、AI 提示条（type === 'ai' 渲染固定文案 +
- *   U8-T2 起 ai 且 manifest 含完整 config 三元组时附「使用主应用 Key」
- *   按钮条）、「返回」回列表（卸载 iframe；游戏存档在游戏自身 localStorage
- *   前缀隔离保存，重进自动恢复，卸载不丢进度）。打开参数校验（非法 file →
- *   直接 error 态，不创建 iframe；file 含路径分隔符 → 拒绝 — iframe src
- *   注入守卫，src 永远形如 simulators/<file> 同源加载）。
+ *   ai 且 manifest 含完整 config 三元组时附「重新同步」按钮条）、
+ *   SIM-API-1 配置持续同步（iframe load 后自动同步主应用凭证/端点/模型 +
+ *   MutationObserver 监听配置控件动态重建后再同步）、「返回」回列表
+ *   （卸载 iframe；游戏存档在游戏自身 localStorage 前缀隔离保存，重进自动
+ *   恢复，卸载不丢进度）。打开参数校验（非法 file → 直接 error 态，不创建
+ *   iframe；file 含路径分隔符 → 拒绝 — iframe src 注入守卫，src 永远形如
+ *   simulators/<file> 同源加载）。
  *
  * 依赖方向：simulator-view.js → icons.js（iconHtml）/ utils.js（escapeHtml，
  *   game.name 来自 manifest 第三方数据，header 渲染必须转义）/
- *   key-injector.js（U8-T2：attachKeyInject 挂按钮交互 + hasConfigTriplet
- *   三元组校验 + TEXT_KEY_INJECT 按钮文案 — 点击/注入逻辑收口在注入模块，
- *   凭证获取经 key-injector initKeyInjector 钩子由 app.js 接线）；
+ *   key-injector.js（U8-T2/SIM-API-1：attachKeyInject 挂按钮交互 +
+ *   autoSyncIntoGame 自动同步编排 + hasConfigTriplet 三元组校验 +
+ *   TEXT_RESYNC 按钮文案 — 同步/注入逻辑收口在 key-injector.js，凭证获取
+ *   经 initKeyInjector 钩子由 app.js 接线；本模块只负责触发时机与观察者）；
  *   app.js → simulator-view.js（initSimulatorRun 接线 + onOpenGame 接到
  *   openSimulator + 切走 simulators 视图时 closeSimulator 销毁 iframe —
  *   Grilling 共识：状态全在游戏自身 localStorage，避免后台游戏继续跑）。
@@ -23,13 +26,17 @@
  *   no-op 不抛错）；运行面板内容全部由本模块渲染。面板显隐走 hidden 属性
  *   （style.css 对 #simulator-run-panel 设 display 时须补 [hidden] 覆盖 —
  *   见 T4 样式契约）。按钮条 DOM 契约（.sim-key-bar / .sim-key-btn /
- *   .sim-key-msg / .sim-key-note）与 key-injector.js attachKeyInject 对齐。
+ *   .sim-key-msg）与 key-injector.js attachKeyInject 对齐。
  *
- * wg_ 族会话注记（U8-T2 验收 4）：小马宝莉 / 高中生模拟器无保存按钮，
- *   注入仅会话内生效 — 成功注入后按钮旁显示「重进游戏需再次点击」小字。
- *   识别方式：spec 明示两游戏（manifest 无会话内标志字段），id 集合单一来源
- *   js/save-key-meta.js（WG_SESSION_ONLY_IDS，契约之家，TD-67/68；存档面板
- *   「仅会话内生效」注记同源消费，新增该族游戏只改契约之家一处）。
+ * 持续同步观察者（SIM-API-1 — ADR-0001 方案 2「用户或游戏重建配置控件后
+ *   重新同步，主应用设置保持唯一事实来源」）：iframe load 进入 loaded 后对
+ *   contentDocument.body 挂 MutationObserver（childList + subtree，属性变更
+ *   不监听 — 游戏重建面板走 innerHTML 替换）。只处理触及 config 三元组 id
+ *   的变更（id 命中 / 变更子树含控件 — 游戏运行期高频 DOM 更新不触发）；
+ *   防抖 500ms 合并连续重建；注入后 1s 冷却（写回环守卫：宿主写入派发的
+ *   change 若被游戏同步重建面板，冷却窗口内不重复同步 — key-injector 幂等
+ *   写入已收敛常规场景，冷却为假设性循环的兜底）。观察者随 iframe 卸载
+ *   disconnect（destroyFrame），无跨游戏残留。
  *
  * 错误检测基线（spec Implementation Decisions）：同源 404 仍触发 load 事件，
  *   错误态主要依赖超时守卫（15s 未收到 load）+ 打开参数校验；iframe 元素
@@ -40,8 +47,7 @@
 
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
-import { attachKeyInject, hasConfigTriplet, TEXT_KEY_INJECT } from './key-injector.js';
-import { WG_SESSION_ONLY_IDS } from './save-key-meta.js';
+import { attachKeyInject, hasConfigTriplet, autoSyncIntoGame, TEXT_RESYNC } from './key-injector.js';
 
 // ══════════════════════════════════════════════════
 // 常量（UI 契约 — 文案/时长与 spec 对齐）
@@ -56,12 +62,12 @@ const TIMEOUT_MS = 15000;
 /** AI 游戏提示条固定文案（spec 逐字） */
 const HINT_AI = '此游戏需自行配置 AI 接口';
 
-/** wg_ 族会话注记文案（U8-T2 验收 4 — 注入仅会话内生效） */
-const NOTE_SESSION_ONLY = '重进游戏需再次点击';
+/** 配置控件重建观察者防抖时长（毫秒；连续重建合并为一次同步） */
+const OBSERVER_DEBOUNCE_MS = 500;
 
-/** wg_ 族游戏 id 集合（spec 明示：小马宝莉 / 高中生模拟器；manifest 无
- *  会话内标志字段 — 集合单一来源 js/save-key-meta.js：WG_SESSION_ONLY_IDS，
- *  契约之家，TD-67/68；存档面板注记同源消费，见模块头 docstring） */
+/** 注入后写回环冷却时长（毫秒；宿主写入派发的 change 若被游戏同步重建
+ * 面板，冷却窗口内不重复同步 — 幂等写入已收敛常规场景，此为兜底） */
+const SYNC_COOLDOWN_MS = 1000;
 
 // ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
@@ -85,6 +91,15 @@ let frame = null;
 /** 超时守卫计时器（无在途超时守卫时为 null） */
 let timeoutTimer = null;
 
+/** 配置控件重建观察者（loaded 后挂游戏文档；destroyFrame 时 disconnect） */
+let configObserver = null;
+
+/** 观察者防抖计时器（无在途防抖时为 null） */
+let observerTimer = null;
+
+/** 注入写回环冷却截止时间戳（Date.now()；未冷却为 0） */
+let syncCooldownUntil = 0;
+
 // ══════════════════════════════════════════════════
 // 内部工具
 // ══════════════════════════════════════════════════
@@ -100,9 +115,117 @@ function clearTimer() {
 /** 卸载 iframe 并清理计时器（幂等；close / 超时 / 重复 open 共用） */
 function destroyFrame() {
     clearTimer();
+    disconnectObserver();
+    syncCooldownUntil = 0; // 冷却属当前视图生命周期 — 跨游戏不残留（防新游戏观察者被旧冷却误伤）
     if (frame) {
         frame.remove();
         frame = null;
+    }
+}
+
+// ══════════════════════════════════════════════════
+// 配置控件持续同步（SIM-API-1 — MutationObserver + 防抖 + 冷却）
+// ══════════════════════════════════════════════════
+
+/**
+ * 断开配置控件观察者 + 清理防抖计时器（幂等；destroyFrame / 重新 observe /
+ * closeSimulator 共用）。
+ */
+function disconnectObserver() {
+    if (configObserver) {
+        configObserver.disconnect();
+        configObserver = null;
+    }
+    if (observerTimer) {
+        clearTimeout(observerTimer);
+        observerTimer = null;
+    }
+}
+
+/**
+ * 变更是否触及 config 三元组控件（SIM-API-1 观察者过滤 — 游戏运行期高频
+ * DOM 更新（状态渲染等）不得触发同步；只有 id 命中或变更子树含控件才算）。
+ * 语义：目标元素自身 id ∈ 三元组，或新增/移除子树内任一元素 id ∈ 三元组
+ * （游戏整段重建配置面板时命中；子树元素遍历用 id 成员判定，无选择器
+ * 转义面）。
+ * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
+ * @param {object|null} config - manifest config 三元组（endpoint/apikey/model）
+ * @returns {boolean} 任一变更触及配置控件为 true
+ */
+function mutationTouchesConfig(mutations, config) {
+    const ids = [config?.endpoint, config?.apikey, config?.model]
+        .filter((v) => typeof v === 'string' && v !== '');
+    if (ids.length === 0) return false;
+    for (const m of mutations ?? []) {
+        if (typeof m?.target?.id === 'string' && ids.includes(m.target.id)) return true;
+        const nodes = [...(m?.addedNodes ?? [])];
+        if (m?.removedNodes?.length) nodes.push(...m.removedNodes);
+        for (const node of nodes) {
+            if (node?.nodeType !== 1) continue;
+            if (ids.includes(node.id)) return true;
+            for (const el of node.querySelectorAll?.('*') ?? []) {
+                if (ids.includes(el.id)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * 观察者回调：变更触及配置控件 → 防抖 500ms → 自动同步（冷却窗口内的
+ * 变更跳过 — 写回环守卫；防抖到期时校验视图仍 loaded 且 iframe 在位）。
+ * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
+ */
+function handleConfigMutation(mutations) {
+    if (state !== 'loaded' || !frame) return;
+    if (!mutationTouchesConfig(mutations, currentGame?.config)) return;
+    if (Date.now() < syncCooldownUntil) return; // 自注入冷却（写回环守卫）
+    if (observerTimer) clearTimeout(observerTimer);
+    observerTimer = setTimeout(() => {
+        observerTimer = null;
+        if (state !== 'loaded' || !frame) return;
+        autoSyncAfterLoad();
+    }, OBSERVER_DEBOUNCE_MS);
+}
+
+/**
+ * 对 loaded 游戏文档挂配置控件观察者（幂等：先 disconnect 再挂）。
+ * 仅 ai + 完整 config 三元组的游戏观察；contentDocument 不可用（测试
+ * 空文档等）→ no-op 不抛错。
+ */
+function observeConfigControls() {
+    disconnectObserver();
+    if (state !== 'loaded' || !frame?.contentDocument) return;
+    const game = currentGame;
+    if (!game || game.type !== 'ai' || !hasConfigTriplet(game.config)) return;
+    const doc = frame.contentDocument;
+    if (!doc.body || typeof doc.body.addEventListener !== 'function') return;
+    configObserver = new MutationObserver(handleConfigMutation);
+    configObserver.observe(doc.body, { childList: true, subtree: true });
+}
+
+/**
+ * 自动同步入口（SIM-API-1）：iframe load 后静默取主应用凭证 → 注入当前
+ * 游戏配置面板（key-injector autoSyncIntoGame；claude/none 由 key-injector
+ * 禁用按钮条 + 原因文案）。同步实际写入过字段 → 置观察者写回环冷却（宿主
+ * 写入派发的 change 若被游戏同步重建面板，冷却窗口内不重复同步）；未写入
+ * （控件未就位 — 游戏延迟渲染配置面板的主场景）→ 不冷却，观察者及时再同步。
+ * 仅 ai + 完整三元组执行；bar 缺失 / 视图已关闭 → no-op 不抛错。
+ */
+async function autoSyncAfterLoad() {
+    if (state !== 'loaded' || !frame) return;
+    const game = currentGame;
+    if (!game || game.type !== 'ai' || !hasConfigTriplet(game.config)) return;
+    const bar = runPanel?.querySelector('.sim-key-bar');
+    if (!bar) return;
+    const result = await autoSyncIntoGame({
+        bar,
+        getDoc: () => frame?.contentDocument ?? null,
+        getConfig: () => currentGame?.config ?? null,
+        getEndpointMode: () => currentGame?.endpointMode ?? null,
+    });
+    if (result?.enabled && result.filled.length > 0) {
+        syncCooldownUntil = Date.now() + SYNC_COOLDOWN_MS;
     }
 }
 
@@ -139,9 +262,9 @@ function showListPanel() {
 
 /**
  * 渲染运行视图骨架：header（返回按钮 + 游戏名（转义）+ AI 提示条 + 可选
- * 「使用主应用 Key」按钮条）+ body。ai 游戏且 manifest 含完整 config 三元组
- * 时渲染按钮条（U8-T2；三元组不完整视为无 config — 提示条维持现状）；wg_
- * 族游戏（无保存按钮）按钮条内含隐藏的会话注记元素（成功注入后显示）。
+ * 「重新同步」按钮条）+ body。ai 游戏且 manifest 含完整 config 三元组
+ * 时渲染按钮条（U8-T2/SIM-API-1；三元组不完整视为无 config — 提示条维持
+ * 现状；按钮条语义为手动重新同步，自动同步在 load 后静默执行）。
  * iframe 与加载占位一起渲染于 body；src 留待 openSimulator 绑定 load
  * 监听后设置（jsdom 不自动触发 load，测试手动派发）。
  * @param {object} game - 已通过参数校验的游戏条目
@@ -153,12 +276,11 @@ function renderShell(game) {
     const isAi = g.type === 'ai';
     const hint = isAi
         ? `<span class="sim-run-hint">${HINT_AI}</span>` : '';
-    // 按钮条仅 ai + 完整 config 三元组渲染；会话注记仅 wg_ 族渲染（隐藏，注入成功后才显示）
+    // 按钮条仅 ai + 完整 config 三元组渲染
     const keyBar = isAi && hasConfigTriplet(g.config)
         ? `<div class="sim-key-bar">
-            <button type="button" class="sim-key-btn">${TEXT_KEY_INJECT}</button>
+            <button type="button" class="sim-key-btn">${TEXT_RESYNC}</button>
             <span class="sim-key-msg" role="status" hidden></span>
-            ${WG_SESSION_ONLY_IDS.has(g.id) ? `<span class="sim-key-note" hidden>${NOTE_SESSION_ONLY}</span>` : ''}
         </div>`
         : '';
     runPanel.innerHTML = `
@@ -175,14 +297,14 @@ function renderShell(game) {
     `;
     runPanel.querySelector('.sim-run-back').addEventListener('click', closeSimulator);
     // 按钮交互挂到 key-injector（点击/注入/反馈状态机收口在注入模块；
-    // getDoc/getConfig 动态取 — iframe 异步加载，点击时再取当前值）
+    // getDoc/getConfig/getEndpointMode 动态取 — iframe 异步加载，点击时再取当前值）
     const bar = runPanel.querySelector('.sim-key-bar');
     if (bar) {
         attachKeyInject({
             bar,
-            sessionOnly: WG_SESSION_ONLY_IDS.has(g.id),
             getDoc: () => frame?.contentDocument ?? null,
             getConfig: () => currentGame?.config ?? null,
+            getEndpointMode: () => currentGame?.endpointMode ?? null,
         });
     }
 }
@@ -212,7 +334,8 @@ function renderError(reason) {
 // 状态机迁移
 // ══════════════════════════════════════════════════
 
-/** iframe load 事件 → loaded（清计时器、显示 iframe、移除加载占位） */
+/** iframe load 事件 → loaded（清计时器、显示 iframe、移除加载占位、
+ * SIM-API-1 自动同步 + 挂配置控件重建观察者） */
 function handleLoad(e) {
     if (state !== 'opening') return; // 兜底：close/超时后迟到的 load 忽略
     // 事件源校验（load 竞态守卫）：旧 iframe 销毁后其监听仍在，向旧元素派发
@@ -223,6 +346,8 @@ function handleLoad(e) {
     state = 'loaded';
     if (frame) frame.classList.remove('sim-run-frame-hidden');
     runPanel.querySelector('.sim-run-status')?.remove();
+    autoSyncAfterLoad();
+    observeConfigControls();
 }
 
 /** 超时守卫到期（15s 未收到 load）→ error（卸载 iframe，展示重试/返回） */

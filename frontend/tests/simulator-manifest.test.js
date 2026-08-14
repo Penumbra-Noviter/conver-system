@@ -33,8 +33,9 @@ const SIM_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 's
 
 const manifest = JSON.parse(readFileSync(path.join(SIM_DIR, 'manifest.json'), 'utf8'));
 
-/** 条目允许出现的字段（v2 schema 锁；saveKeyPrefix 已退役 — TD-48） */
-const ALLOWED_ENTRY_KEYS = ['id', 'file', 'name', 'type', 'description', 'saveKeys', 'config'];
+/** 条目允许出现的字段（v2 schema 锁；saveKeyPrefix 已退役 — TD-48；
+ * endpointMode 为 SIM-API-1 端点口径声明） */
+const ALLOWED_ENTRY_KEYS = ['id', 'file', 'name', 'type', 'description', 'saveKeys', 'config', 'endpointMode'];
 
 const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -149,6 +150,40 @@ describe('条目 schema', () => {
                 }
             } else {
                 expect(entry.config, `local 游戏不带 config: ${entry.id}`).toBeUndefined();
+            }
+        }
+    });
+
+    it('ai 游戏必带 endpointMode ∈ {base, full}；local 游戏必不带 endpointMode（SIM-API-1 端点口径契约）', () => {
+        for (const entry of manifest.simulators) {
+            if (entry.type === 'ai') {
+                expect(entry.endpointMode, `ai 游戏 endpointMode 存在: ${entry.id}`).toBeDefined();
+                expect(['base', 'full'], `endpointMode 取值合法: ${entry.id}`).toContain(entry.endpointMode);
+            } else {
+                expect(entry.endpointMode, `local 游戏不带 endpointMode: ${entry.id}`).toBeUndefined();
+            }
+        }
+    });
+
+    it('endpointMode 与游戏端点字段口径一致（full → 控件默认即完整 /chat/completions 地址；base → 游戏自行拼接后缀）', () => {
+        for (const entry of manifest.simulators) {
+            if (entry.type !== 'ai') continue;
+            const html = readGameHtml(entry);
+            const id = entry.config.endpoint;
+            // 口径溯源：endpoint 控件标签内默认值（value= / placeholder= 首个 URL）
+            const m = html.match(new RegExp(`id="${escapeRegExp(id)}"[^>]*(?:value|placeholder)="(https?://[^"]+)"`));
+            if (m) {
+                if (entry.endpointMode === 'full') {
+                    expect(m[1], `${entry.id} full 口径默认应为完整地址（${id} 标签默认值）`).toMatch(/\/chat\/completions$/);
+                } else {
+                    expect(m[1], `${entry.id} base 口径默认不应含 /chat/completions（${id} 标签默认值）`).not.toMatch(/\/chat\/completions$/);
+                }
+            } else if (entry.endpointMode === 'full') {
+                // 控件默认值在脚本内（如 D.endpoint）→ full 游戏 HTML 必含完整地址使用
+                expect(html, `${entry.id} full 口径 HTML 应含完整地址使用`).toContain('/chat/completions');
+            } else {
+                // base 游戏在 fetch 处拼接后缀
+                expect(html, `${entry.id} base 口径 HTML 应含拼接后缀`).toContain("'/chat/completions'");
             }
         }
     });
