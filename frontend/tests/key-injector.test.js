@@ -18,6 +18,14 @@
  *   - autoSyncIntoGame（SIM-API-1 自动同步）：openai → 静默注入（无「已填入」
  *     反馈、按钮保持可点）；claude/none → 自动禁用按钮条 + 文案；未初始化 →
  *     bar 保持现状；同步在途 bar 被移除 → 不抛错
+ *   - 写回环状态机（sync loop state machine）：冷却/熔断状态迁移收口在
+ *     key-injector 单一状态机；autoSyncIntoGame(path) 一次调用原子完成
+ *     同步执行 + 冷却判定 + 置冷却 + 观察者计数 + 熔断判定；resetSyncLoop()
+ *     幂等清零；熔断权优先于冷却；冷却仅真写入 written > 0 置位
+ *   - 状态机用例：path 默认 load 语义（置冷却不计数）/ observer 熔断达阈值
+ *     （3 次真写入 → breaker: true）/ 幂等兜底（漏断后仍返回 breaker）/
+ *     收敛（幂等匹配不计数不熔断）/ 冷却（observer/load 冷却中跳过）/
+ *     冷却仅真写入置位 / resetSyncLoop 幂等清零 / 按钮路径完全不经状态机
  *   - attachKeyInject 交互（手动重新同步）：点击 → 凭证获取 → 注入 → 「已填入」
  *     2s 反馈；claude/none 禁用态 + 文案；请求失败 / 全跳过静默恢复；幂等
  *     attach；重复点击只发一次请求；在途视图销毁后不污染新 bar
@@ -26,7 +34,7 @@
  * 测试即模块接口契约：公开面 __all__ = initKeyInjector / attachKeyInject /
  *   resolveButtonState / hasConfigTriplet / convertEndpoint /
  *   injectCredentialsIntoGame / syncGameCredentials / autoSyncIntoGame /
- *   TEXT_RESYNC / TEXT_INJECTED。
+ *   TEXT_RESYNC / TEXT_INJECTED / resetSyncLoop（11 项）。
  * 挂载模式：jsdom + vi.resetModules()；按钮条 fixture 与 simulator-view.js
  *   renderShell 渲染的 DOM 契约一致（.sim-key-bar / .sim-key-btn /
  *   .sim-key-msg）；注入目标文档用 createHTMLDocument 构造（注入核心只依赖
