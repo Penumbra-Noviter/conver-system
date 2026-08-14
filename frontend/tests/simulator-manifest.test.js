@@ -9,7 +9,9 @@
  * local 游戏不带 config、v2 条目必带 saveKeys 且键可溯源至 HTML 源码、
  * cfg 键（含 API Key）不收录进任何 saveKeys。
  *
- * saveKeys 契约（U9-T1，与 U9-T2 共享）：
+ * saveKeys 契约（U9-T1，与 U9-T2 共享 — 契约常量单一来源见
+ *   js/save-key-meta.js（TD-67/68 契约之家：SAVE_KEY_META_RE / escapeRegExp /
+ *   WG_SESSION_ONLY_IDS））：
  *   - 元素为字符串；不含正则元字符的字符串 = 精确键名；含正则元字符的
  *     字符串 = 正则模式（匹配时锚定完整键名 ^…$）。
  *   - 数据不变量：模式字符串不得自含 ^ / $（锚定由匹配方统一加）；
@@ -25,6 +27,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parseManifest } from '../js/simulators.js';
+import { SAVE_KEY_META_RE, escapeRegExp } from '../js/save-key-meta.js';
 
 const SIM_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'simulators');
 
@@ -33,9 +36,6 @@ const manifest = JSON.parse(readFileSync(path.join(SIM_DIR, 'manifest.json'), 'u
 /** 条目允许出现的字段（v2 schema 锁；saveKeyPrefix 已退役 — TD-48） */
 const ALLOWED_ENTRY_KEYS = ['id', 'file', 'name', 'type', 'description', 'saveKeys', 'config'];
 
-/** 正则元字符集：saveKeys 元素含任一字符即按正则模式处理（与实现共享的数据契约） */
-const SAVE_KEY_META_RE = /[.*+?^${}()|[\]\\]/;
-
 const KEBAB_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** 读取某条目对应游戏 HTML 全文（config id / saveKeys 溯源断言用） */
@@ -43,9 +43,9 @@ function readGameHtml(entry) {
     return readFileSync(path.join(SIM_DIR, entry.file), 'utf8');
 }
 
-/** 在 HTML 中查找形如 id="xxx" 的属性出现次数 */
+/** 在 HTML 中查找形如 id="xxx" 的属性出现次数（转义消费契约之家的 escapeRegExp） */
 function countIdOccurrences(html, id) {
-    const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = escapeRegExp(id);
     const matches = html.match(new RegExp(`id="${escaped}"`, 'g'));
     return matches ? matches.length : 0;
 }

@@ -31,13 +31,14 @@
  *   （含重试）；条目级字段缺失（name / description / saveKeyPrefix /
  *   config / saveKeys）→ 宽容降级（该字段不渲染/剔除，不整体失败）。
  *
- * saveKeys 契约（U9-T1，与 U9-T2 共享）：v2 条目声明存档键白名单，数组元素
- *   为字符串 —— 不含正则元字符的字符串 = 精确键名；含正则元字符的字符串 =
- *   正则模式（白名单匹配时锚定完整键名 ^…$）。归一化：结构非法（非数组 /
- *   元素非字符串 / 模式自含 ^ $ 锚点）→ 条目级降级（该游戏无 saveKeys 属性 =
- *   「无存档管理」信号）；模式无法编译 / 空串元素 → 元素级剔除。v1 条目缺
- *   saveKeys → 无 saveKeys 属性（同样降级信号）；saveKeyPrefix 已退役
- *   （TD-48）：v1 数据仅兼容透传，不参与任何存档语义。
+ * saveKeys 契约（U9-T1，与 U9-T2 共享 — 契约常量单一来源见
+ *   js/save-key-meta.js（TD-67/68 契约之家））：v2 条目声明存档键白名单，
+ *   数组元素为字符串 —— 不含正则元字符的字符串 = 精确键名；含正则元字符的
+ *   字符串 = 正则模式（白名单匹配时锚定完整键名 ^…$）。归一化：结构非法
+ *   （非数组 / 元素非字符串 / 模式自含 ^ $ 锚点）→ 条目级降级（该游戏无
+ *   saveKeys 属性 = 「无存档管理」信号）；模式无法编译 / 空串元素 → 元素级
+ *   剔除。v1 条目缺 saveKeys → 无 saveKeys 属性（同样降级信号）；saveKeyPrefix
+ *   已退役（TD-48）：v1 数据仅兼容透传，不参与任何存档语义。
  *
  * 协议表面（__all__）：initSimulatorsView / refreshSimulators /
  *   parseManifest / filterGames / getGames / setFetch。
@@ -45,6 +46,7 @@
 
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
+import { SAVE_KEY_META_RE } from './save-key-meta.js';
 
 // ══════════════════════════════════════════════════
 // fetch seam（与 api.js setFetch 同构 — 见模块头 docstring）
@@ -103,8 +105,8 @@ const FILTERS = [
 // 纯函数：manifest 解析（校验 + 归一化）
 // ══════════════════════════════════════════════════
 
-/** 正则元字符集：saveKeys 元素含任一字符即按正则模式处理（精确键名不得含这些字符） */
-const SAVE_KEY_META_RE = /[.*+?^${}()|[\]\\]/;
+/** 正则元字符集：saveKeys 元素含任一字符即按正则模式处理（精确键名不得含这些字符） —
+ *  单一来源：js/save-key-meta.js（契约之家，TD-67/68） */
 
 /**
  * 归一化 saveKeys（U9-T1 v2 契约，与 U9-T2 共享）。

@@ -14,11 +14,13 @@
  *   视图销毁纪律）。游戏列表经注入 getGames 钩子获取（G7 注入钩子模式，
  *   先例 onOpenGame），不重复 fetch manifest。
  *
- * saveKeys 白名单契约（U9-T1，与 simulators.js 共享）：v2 条目声明存档键
- *   白名单，数组元素为字符串 —— 不含正则元字符的字符串 = 精确键名（=== 匹配）；
- *   含正则元字符的字符串 = 正则模式（锚定完整键名 ^…$ 匹配）。收集 / 导出 /
- *   校验 / 应用四步共用同一匹配语义（whitelistHits 内部助手）。白名单条目
- *   非字符串 / 不可编译 → 跳过（防御 parseManifest 之外的原始数据）。
+ * saveKeys 白名单契约（U9-T1，与 simulators.js 共享 — 契约常量单一来源见
+ *   js/save-key-meta.js（TD-67/68 契约之家：SAVE_KEY_META_RE / escapeRegExp /
+ *   WG_SESSION_ONLY_IDS））：v2 条目声明存档键白名单，数组元素为字符串 ——
+ *   不含正则元字符的字符串 = 精确键名（=== 匹配）；含正则元字符的字符串 =
+ *   正则模式（锚定完整键名 ^…$ 匹配）。收集 / 导出 / 校验 / 应用四步共用
+ *   同一匹配语义（whitelistHits 内部助手）。白名单条目非字符串 / 不可编译 →
+ *   跳过（防御 parseManifest 之外的原始数据）。
  *
  * 排除面（spec 决策 E）：cfg 键（含 API Key）与主应用自身键由 saveKeys
  *   白名单天然排除 —— 导出导不出来、导入写不进去；主应用当前零
@@ -51,13 +53,14 @@
 
 import { escapeHtml, showToast } from './utils.js';
 import { showConfirm } from './components/confirm-dialog.js';
+import { SAVE_KEY_META_RE, WG_SESSION_ONLY_IDS } from './save-key-meta.js';
 
 // ══════════════════════════════════════════════════
 // 常量（UI 契约 — 文案/上限与 spec 对齐）
 // ══════════════════════════════════════════════════
 
-/** 正则元字符集：saveKeys 元素含任一字符即按正则模式处理（与 simulators.js 共享契约） */
-const SAVE_KEY_META_RE = /[.*+?^${}()|[\]\\]/;
+/** 正则元字符集：saveKeys 元素含任一字符即按正则模式处理 — 单一来源：
+ *  js/save-key-meta.js（契约之家，TD-67/68） */
 
 /** 面板固定提示：导出可能包含游戏内配置数据（仿微 wxai_state_v1 单键混装注记） */
 const EXPORT_HINT = '导出文件可能包含游戏内配置数据（如 API Key），请妥善保管';
@@ -68,8 +71,8 @@ const NO_SAVE_TEXT = '无存档管理';
 /** wg_ 族（仅会话内生效）注记文案（spec 逐字） */
 const WG_NOTE = '仅会话内生效，重进需重注';
 
-/** wg_ 族游戏 id 集（小马宝莉 / 高中生模拟器 — 键形 'wg_' + CFG.id + '_save'） */
-const WG_IDS = new Set(['my-little-pony', 'high-school-sim']);
+/** wg_ 族游戏 id 集（小马宝莉 / 高中生模拟器 — 键形 'wg_' + CFG.id + '_save'）：
+ *  单一来源 js/save-key-meta.js（WG_SESSION_ONLY_IDS，契约之家，TD-67/68） */
 
 /** 导入文件大小守卫上限（字节；localStorage 同源总量约 5MB，单文件不超此限） */
 const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
@@ -366,7 +369,7 @@ function renderGameRow(game) {
     }
     const keys = collectGameKeys(g, window.localStorage);
     const totalChars = keys.reduce((n, k) => n + String(localStorage.getItem(k) ?? '').length, 0);
-    const wgNote = typeof g.id === 'string' && WG_IDS.has(g.id)
+    const wgNote = typeof g.id === 'string' && WG_SESSION_ONLY_IDS.has(g.id)
         ? `<span class="sim-save-note sim-save-wg-note">${WG_NOTE}</span>` : '';
     const disabled = keys.length === 0 ? ' disabled' : '';
     return `<article class="sim-save-game">

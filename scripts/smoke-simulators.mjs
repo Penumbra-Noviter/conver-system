@@ -56,6 +56,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { SAVE_KEY_META_RE } from '../frontend/js/save-key-meta.js';
 
 // ══════════════════════════════════════════════════
 // 常量与路径
@@ -77,8 +78,8 @@ const EXPECTED_TOTAL = 22;
 const TEXT_KEY_INJECT = '使用主应用 Key';
 /** 注入成功反馈文案（与 key-injector.js TEXT_INJECTED 一致） */
 const TEXT_INJECTED = '已填入';
-/** 正则元字符集：saveKeys 元素含任一字符即按正则模式处理（存档面板种子键须选精确键 — 与实现共享契约） */
-const SAVE_KEY_META_RE = /[.*+?^${}()|[\]\\]/;
+// 正则元字符集（存档面板种子键须选精确键）：单一来源 frontend/js/save-key-meta.js
+// （契约之家，TD-67/68）—— SAVE_KEY_META_RE 由上方 import 消费，本脚本不持副本。
 
 /** 环境失败（退出码 2）：运行前提缺失，非被测应用缺陷 */
 class EnvError extends Error {}
