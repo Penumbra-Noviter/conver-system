@@ -10,22 +10,12 @@
 const API_BASE = '/api';
 
 import { parseSSEStream } from './utils/sse-reader.js';
+import { doFetch } from './fetch-seam.js';
 
-// ── fetch seam ──
+// ── fetch seam（单一来源 js/fetch-seam.js — TD-51/55/60）──
 // 允许测试注入自定义 fetch 实现；浏览器环境默认使用全局 fetch。
-let fetchImpl = null;
-
-/**
- * 注入自定义 fetch 实现（测试用，避免真实网络）。传 null/非函数恢复默认全局 fetch。
- * @param {Function|null} fn - fetch 兼容函数 (url, options) => Promise<Response>
- */
-export function setFetch(fn) {
-    fetchImpl = typeof fn === 'function' ? fn : null;
-}
-
-function doFetch(...args) {
-    return (fetchImpl ?? globalThis.fetch)(...args);
-}
+// 注入/回落契约见 fetch-seam.js（setFetch 与 simulators.js 共享同一注入点）。
+export { setFetch } from './fetch-seam.js';
 
 // ── URL 策略（唯一来源：API_BASE + 路径拼接）──
 // 兼容调用方传入的旧式 '/api' 前缀（downloadBlob 既有调用点），自动归一化。

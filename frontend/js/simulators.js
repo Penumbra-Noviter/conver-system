@@ -14,10 +14,10 @@
  *   refreshSimulators 接线）。打开回调经注入钩子（G7 注入钩子模式）：
  *   app.js 初始化时传入 onOpenGame（U7-T4 将接入 openSimulator）。
  *
- * fetch seam：manifest 为静态文件（非 /api 端点），api.js 不提供任意 URL
- *   的 fetch 执行入口（其 fetchImpl 为模块私有、不可读），故本模块镜像
- *   api.js setFetch 同一 seam 模式 —— 测试注入 mock（setFetch(fn)），
- *   传 null/非函数恢复回落全局 fetch；与 app.test.js 既有
+ * fetch seam（单一来源 js/fetch-seam.js，TD-51/55/60）：fetch 注入点由
+ *   api.js 与 simulators.js 共享 —— 两模块均 `export { setFetch } from
+ *   './fetch-seam.js'` 并内部统一走 doFetch（setFetch(mock) 一次注入对两
+ *   模块同时生效）；传 null/非函数恢复回落全局 fetch；与 app.test.js 既有
  *   globalThis.fetch mock 路由兼容（fetchImpl 为 null 时走全局 fetch）。
  *
  * DOM 契约：本模块持有自身 DOM 引用（#simulator-list-panel 挂载点），
@@ -47,21 +47,13 @@
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
 import { SAVE_KEY_META_RE } from './save-key-meta.js';
+import { doFetch } from './fetch-seam.js';
 
 // ══════════════════════════════════════════════════
-// fetch seam（与 api.js setFetch 同构 — 见模块头 docstring）
+// fetch seam（单一来源 js/fetch-seam.js — 见模块头 docstring；TD-51/55/60）
 // ══════════════════════════════════════════════════
 
-/** 测试注入的 fetch 实现（null → 回落全局 fetch；api.js seam 模式镜像） */
-let fetchImpl = null;
-
-/**
- * 注入自定义 fetch 实现（测试用，避免真实网络）。传 null/非函数恢复默认全局 fetch。
- * @param {Function|null} fn - fetch 兼容函数 (url, options) => Promise<Response>
- */
-export function setFetch(fn) {
-    fetchImpl = typeof fn === 'function' ? fn : null;
-}
+export { setFetch } from './fetch-seam.js';
 
 // ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
@@ -69,6 +61,12 @@ export function setFetch(fn) {
 
 /** manifest 静态目录相对路径（后端静态托管覆盖） */
 const MANIFEST_URL = 'simulators/manifest.json';
+
+/** 清单加载超时守卫时长（镜像 simulator-view.js TIMEOUT_MS=15000 先例） */
+const TIMEOUT_MS = 15000;
+
+/** 超时进入错误态的原因文案（spec D1 逐字） */
+const TIMEOUT_REASON = '模拟器清单加载超时（15 秒未收到响应）';
 
 /** 列表挂载容器（initSimulatorsView 注入；未 init 时为 null） */
 let container = null;
@@ -90,6 +88,9 @@ let currentFilter = 'all';
 
 /** 事件绑定守卫：首次 initSimulatorsView 绑定后置位，重复调用仅更新钩子 */
 let bound = false;
+
+/** 请求序号守卫：只认最新一次刷新（迟到响应/迟到错误一律丢弃，TD-51/55/60） */
+let fetchSeq = 0;
 
 /** type → 类型标签文案（UI 契约） */
 const TYPE_LABELS = { ai: 'AI 驱动', local: '纯本地' };
@@ -388,35 +389,54 @@ function bindEvents() {
 }
 
 /**
- * 获取 manifest 文本（经 fetch seam：fetchImpl ?? 全局 fetch）。
+ * 获取 manifest 文本（经 fetch seam：fetch-seam.js doFetch → 注入实现 ?? 全局 fetch）。
  * 响应非 2xx → 抛错（HTTP 状态码入原因）；响应形状异常 → 抛错入 catch 兜底。
+ * 15s 超时守卫：挂起请求到点后独立驱动拒绝（不依赖 fetch 是否响应 signal），
+ * 同时 abort 通知真实 fetch 断开；正常完成路径 finally 清理计时器。
  * @returns {Promise<string>} manifest 原始 JSON 文本
  */
 async function fetchManifestText() {
-    const res = await (fetchImpl ?? globalThis.fetch)(MANIFEST_URL);
-    if (res?.ok === false) {
-        throw new Error(`加载失败 (${res.status})`);
+    const controller = new AbortController();
+    let timer = null;
+    const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+            controller.abort(); // 通知真实 fetch 断开（迟到的 AbortError 由下方吞掉兜底）
+            reject(new Error(TIMEOUT_REASON));
+        }, TIMEOUT_MS);
+    });
+    try {
+        const fetchPromise = doFetch(MANIFEST_URL, { signal: controller.signal });
+        fetchPromise.catch(() => {}); // 超时后迟到响应/拒绝不产生未处理拒绝（一律丢弃）
+        const res = await Promise.race([fetchPromise, timeoutPromise]);
+        if (res?.ok === false) {
+            throw new Error(`加载失败 (${res.status})`);
+        }
+        if (!res || typeof res.text !== 'function') {
+            throw new Error('模拟器清单响应无效');
+        }
+        return res.text();
+    } finally {
+        clearTimeout(timer); // 正常完成 / 同步抛错路径均清理计时器
     }
-    if (!res || typeof res.text !== 'function') {
-        throw new Error('模拟器清单响应无效');
-    }
-    return res.text();
 }
 
 /**
  * 重新 fetch manifest + 重渲染（供协调层「进入 simulators 视图」钩子调用）。
  *
- * 状态机：loading → ready（解析成功）| error（fetch 失败 / 解析结构错误，
- *   含重试按钮）| empty（manifest 无条目）。解析结构性错误整体进错误态，
- *   条目级缺陷由 parseManifest 降级不炸。未 init（container 缺失）→
- *   no-op 不抛错（Falsify 兜底）。
+ * 状态机：loading → ready（解析成功）| error（fetch 失败 / 解析结构错误 /
+ *   15s 超时，均含重试按钮）| empty（manifest 无条目）。解析结构性错误整体
+ *   进错误态，条目级缺陷由 parseManifest 降级不炸。请求序号守卫：并发刷新
+ *   只认最新一次 —— await 之后与 catch 分支均先判 seq，迟到响应/迟到错误
+ *   一律丢弃不渲染。未 init（container 缺失）→ no-op 不抛错（Falsify 兜底）。
  * @returns {Promise<void>}
  */
 export async function refreshSimulators() {
     if (!container) return;
+    const seq = ++fetchSeq;
     renderLoading();
     try {
         const raw = await fetchManifestText();
+        if (seq !== fetchSeq) return; // 旧请求迟到 → 丢弃（并发刷新只认最新）
         const parsed = parseManifest(raw);
         if (!parsed.ok) {
             renderError(parsed.error);
@@ -425,6 +445,7 @@ export async function refreshSimulators() {
         games = parsed.games;
         renderList();
     } catch (err) {
+        if (seq !== fetchSeq) return; // 旧请求迟到错误 → 丢弃
         renderError(err instanceof Error ? err.message : String(err));
     }
 }
