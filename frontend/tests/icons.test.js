@@ -56,7 +56,10 @@ describe('iconHtml', () => {
             .map((match) => match[1]);
         const factoryInner = iconHtml('gamepad').match(/<svg[^>]*>([\s\S]*?)<\/svg>/)[1];
 
-        expect(inlineCopies).toHaveLength(2); // 锁现存双副本：侧栏 :46 区 + 移动端 :419 区
+        // 下限锁现存双副本：误删任一副本仍红（侧栏 :46 区 + 移动端 :419 区）。
+        // 新增副本合法但须与 factory 输出逐字节一致 — 防漂移由下方逐字节
+        // 比对承担，数量不设上限（数量锁边际价值≈0 且让合法新增误红）。
+        expect(inlineCopies.length).toBeGreaterThanOrEqual(2);
         for (const inner of inlineCopies) {
             expect(inner).toBe(factoryInner);
         }
