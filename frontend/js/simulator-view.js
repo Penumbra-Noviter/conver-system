@@ -37,18 +37,13 @@
  *   （期末评审 F1 修复 — 防良性变更累积误熔断）；宿主注入走 property 赋值
  *   与事件派发，不产生 attribute mutation — 无自触发面）。
  *   只处理触及 config 三元组 id 的变更（id 命中 / 变更子树含控件 — 游戏
- *   运行期高频 DOM 更新不触发）；防抖 500ms 合并连续重建；注入后 1s 冷却
- *   （写回环守卫：宿主写入派发的 change 若被游戏同步重建面板，冷却窗口内
- *   不重复同步 — key-injector 幂等写入已收敛常规场景，冷却为假设性循环的
- *   兜底）。冷却判定在防抖到期时执行（注入续体更新冷却时间戳晚于 option
- *   追加等自写 mutation 回调，mutation 时判定会失真 — TD-76 实测钉死）。
- *   写回环熔断（TD-76）：观察者路径触发的再同步**真正写入**字段
- *   （written > 0 — key-injector 返回的真写入信号，filled 含幂等匹配不计入
- *   （期末评审 F1/F2 修复））连续达 SYNC_MAX_STRIKES 次 → 熔断 disconnect
- *   （停止自动再同步；手动「重新同步」按钮路径不受影响）；load 路径自动
- *   同步不计数；destroyFrame（关闭 / 重开游戏）复位计数 — 重开游戏观察者
- *   重新挂载、自动同步恢复。
- *   观察者随 iframe 卸载 disconnect（destroyFrame），无跨游戏残留。
+ *   运行期高频 DOM 更新不触发）；防抖 500ms 合并连续重建。写回环冷却/熔断
+ *   状态迁移已收口到 key-injector 单一状态机（autoSyncIntoGame 原子完成
+ *   「同步执行 + 冷却判定 + 置冷却 + 观察者计数 + 熔断判定」，返回值经
+ *   cooled/breaker 信号传达；冷却仅真写入 written > 0 置位，熔断达阈值
+ *   后返回 breaker: true）。本模块只保留触发时机（load/
+ *   防抖到期）与观察者生命周期（挂载 / disconnect / destroyFrame 复位）。
+ *   冷却判定在状态机函数调用时执行（防抖到期执行点）。
  *
  * 错误检测基线（spec Implementation Decisions）：同源 404 仍触发 load 事件，
  *   错误态主要依赖超时守卫（15s 未收到 load）+ 打开参数校验；iframe 元素
@@ -77,17 +72,6 @@ const HINT_AI = '此游戏需自行配置 AI 接口';
 /** 配置控件重建观察者防抖时长（毫秒；连续重建合并为一次同步） */
 const OBSERVER_DEBOUNCE_MS = 500;
 
-/** 注入后写回环冷却时长（毫秒；宿主写入派发的 change 若被游戏同步重建
- * 面板，冷却窗口内不重复同步 — 幂等写入已收敛常规场景，此为兜底） */
-const SYNC_COOLDOWN_MS = 1000;
-
-/** 观察者路径写回环熔断阈值（TD-76）：连续 SYNC_MAX_STRIKES 次观察者再同步
- * 真正写入字段（written > 0 — 每次同步后游戏又重建面板恢复默认值 = 游戏在
- * 重置主应用配置的病理循环）→ 熔断断开观察者，终止自动再同步；正常场景
- * （重建后收敛，或重建保持目标值幂等匹配）不达阈值不误熔断（期末评审
- * F1/F2 修复：熔断信号为真写入 written，filled 的幂等匹配不计入） */
-const SYNC_MAX_STRIKES = 3;
-
 // ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
 // ══════════════════════════════════════════════════
@@ -115,13 +99,6 @@ let configObserver = null;
 
 /** 观察者防抖计时器（无在途防抖时为 null） */
 let observerTimer = null;
-
-/** 注入写回环冷却截止时间戳（Date.now()；未冷却为 0） */
-let syncCooldownUntil = 0;
-
-/** 观察者路径写回环熔断计数（TD-76：连续写入次数；达到 SYNC_MAX_STRIKES
- * 熔断断开观察者；destroyFrame 复位 — 重开游戏观察者重新挂载） */
-let syncStrikes = 0;
 
 // ══════════════════════════════════════════════════
 // 内部工具
@@ -200,15 +177,8 @@ function mutationTouchesConfig(mutations, config) {
 
 /**
  * 观察者回调：变更触及配置控件 → 防抖 500ms → 自动同步（观察者路径）。
- * 写回环冷却判定在防抖到期时执行（TD-76 实测：注入续体更新冷却时间戳晚于
- * 自写 mutation（select option 追加等）的观察者回调 — mutation 时判定读到
- * 旧时间戳会失真，产生幽灵再同步并误刷新冷却，压制后续真实重建的响应）。
- * 写回环熔断（TD-76）：本次同步**真正写入**字段（written > 0 — 宿主改了
- * 游戏配置，说明游戏在重置主应用配置的病理循环）→ 熔断计数 +1，连续达
- * SYNC_MAX_STRIKES 次 → disconnectObserver 熔断（停止自动再同步；手动
- * 「重新同步」按钮路径不经本回调不受影响）。幂等匹配（filled 含匹配但不
- * 写入 — 游戏重建后保持目标值）不计数（期末评审 F1/F2 修复：filled 语义
- * 含幂等匹配，熔断须用 written 真写入信号）。
+ * 冷却/熔断判定已收口到 key-injector 状态机，本模块只消费返回值
+ * breaker 信号决定观察者断连。
  * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
  */
 function handleConfigMutation(mutations) {
@@ -218,12 +188,9 @@ function handleConfigMutation(mutations) {
     observerTimer = setTimeout(async () => {
         observerTimer = null;
         if (state !== 'loaded' || !frame) return;
-        if (Date.now() < syncCooldownUntil) return; // 自注入冷却（写回环守卫 — 防抖到期时判定）
         const result = await autoSyncAfterLoad();
-        if (result?.enabled && result.written.length > 0) {
-            syncStrikes += 1;
-            if (syncStrikes >= SYNC_MAX_STRIKES) disconnectObserver(); // 熔断：终止自动再同步
-        }
+        // 熔断判定在状态机内完成，本模块仅消费 breaker 信号决定观察者生命周期
+        if (result?.breaker === true) disconnectObserver(); // 熔断：断开观察者，终止自动再同步
     }, OBSERVER_DEBOUNCE_MS);
 }
 
@@ -255,17 +222,13 @@ function observeConfigControls() {
 }
 
 /**
- * 自动同步入口（SIM-API-1）：iframe load 后静默取主应用凭证 → 注入当前
- * 游戏配置面板（key-injector autoSyncIntoGame；claude/none 由 key-injector
- * 禁用按钮条 + 原因文案）。同步**真正写入**过字段（written > 0）→ 置观察者
- * 写回环冷却（宿主写入派发的 change 若被游戏同步重建面板，冷却窗口内不重复
- * 同步）；未写入（控件未就位 — 游戏延迟渲染配置面板的主场景，或幂等匹配）
- * → 不冷却，观察者及时再同步。熔断计数不在本函数（观察者回调持有 —
- * 期末评审 Architecture 修复：load 路径不计数、语义由调用方显式表达）。
- * 返回同步结果供观察者回调消费（written 判定熔断）；load 路径（handleLoad
- * 直调）忽略返回值。
+ * 自动同步入口（SIM-API-1）：观察者防抖到期后调用，以 observer 路径同步。
+ *
+ * 冷却/熔断判定已收口到 key-injector 状态机，本函数仅负责触发时机与
+ * 观察者生命周期（熔断后 disconnectObserver）。返回同步结果供调用方
+ * 消费（breaker 信号决定观察者断连）。
  * 仅 ai + 完整三元组执行；bar 缺失 / 视图已关闭 → 返回 undefined 不抛错。
- * @returns {Promise<object|undefined>} autoSyncIntoGame 结果（含 written；
+ * @returns {Promise<object|undefined>} autoSyncIntoGame 结果（含 cooled/breaker；
  *   bar 缺失等早退路径返回 undefined）
  */
 async function autoSyncAfterLoad() {
@@ -274,16 +237,13 @@ async function autoSyncAfterLoad() {
     if (!game || game.type !== 'ai' || !hasConfigTriplet(game.config)) return undefined;
     const bar = runPanel?.querySelector('.sim-key-bar');
     if (!bar) return undefined;
-    const result = await autoSyncIntoGame({
+    return autoSyncIntoGame({
         bar,
         getDoc: () => frame?.contentDocument ?? null,
         getConfig: () => currentGame?.config ?? null,
         getEndpointMode: () => currentGame?.endpointMode ?? null,
+        path: 'observer',
     });
-    if (result?.enabled && result.written.length > 0) {
-        syncCooldownUntil = Date.now() + SYNC_COOLDOWN_MS;
-    }
-    return result;
 }
 
 /**
@@ -403,7 +363,13 @@ function handleLoad(e) {
     state = 'loaded';
     if (frame) frame.classList.remove('sim-run-frame-hidden');
     runPanel.querySelector('.sim-run-status')?.remove();
-    autoSyncAfterLoad();
+    // Load 自动同步（默认 path='load'：置冷却不计数）
+    autoSyncIntoGame({
+        bar: runPanel?.querySelector('.sim-key-bar'),
+        getDoc: () => frame?.contentDocument ?? null,
+        getConfig: () => currentGame?.config ?? null,
+        getEndpointMode: () => currentGame?.endpointMode ?? null,
+    });
     observeConfigControls();
 }
 
