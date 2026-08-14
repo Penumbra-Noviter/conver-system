@@ -28,15 +28,26 @@
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
 | TD-50 | T2 commit message 声称「覆盖 2 个示例」实际 git 零变化——md5 复核源目录与仓库内人生模拟器v3/蛛网之影一致，无内容漂移，仅措辞失实 | 波 1 Falsify | 低 | ❌ 复核关闭（2026-08-14 md5 比对一致，无漂移） |
-| TD-75 | 配置控件重建观察者（simulator-view.js）仅监听 childList——游戏若以属性变更（setAttribute('value') / hidden 切换）重建配置控件则不触发再同步；与 ADR-0001「重建配置控件后重新同步」承诺存在窄缺口 | SIM-API-1 期末 Spec 轴 | 低 | ⬜ 待立项 |
-| TD-76 | 写回环冷却只节流不终止——病理假设：游戏每次 change 后延迟重建面板并恢复默认值（重建落在 1s 冷却窗外），同步循环以 ~0.5Hz 永续（每周期 1 次凭证 fetch）；现有测试仅覆盖「冷却窗内重建被跳过」的收敛路径 | SIM-API-1 期末 Falsify 轴 | 低 | ⬜ 待立项 |
+| TD-75 | 配置控件重建观察者（simulator-view.js）仅监听 childList——游戏若以属性变更（setAttribute('value') / hidden 切换）重建配置控件则不触发再同步；与 ADR-0001「重建配置控件后重新同步」承诺存在窄缺口 | SIM-API-1 期末 Spec 轴 | 低 | ✅ 已修（18b96ce：attributes 监听 + attributeFilter 收窄 value/hidden） |
+| TD-76 | 写回环冷却只节流不终止——病理假设：游戏每次 change 后延迟重建面板并恢复默认值（重建落在 1s 冷却窗外），同步循环以 ~0.5Hz 永续（每周期 1 次凭证 fetch）；现有测试仅覆盖「冷却窗内重建被跳过」的收敛路径 | SIM-API-1 期末 Falsify 轴 | 低 | ✅ 已修（26b6af6 熔断 + 829f387 真写入信号修正） |
 
 
-> 技术债区当前 **2 项**（TD-75/76 于 2026-08-14 SIM-API-1 期末评审录入；TD-72/73/74 已于同日批次完成，TD-50 已复核关闭）。
+> 技术债区当前 **0 项**（TD-75/76 已于 2026-08-14 kickoff 批次修复归档；TD-50 已复核关闭；TD-72/73/74 已于同日完成）。技术债区**清零**。
 
 ---
 
 ## 已完成归档
+
+### 技术债区 TD-75/76 批次（2026-08-14 kickoff 全自动档：小档 2 工单）
+
+> 来源：SIM-API-1 期末评审非阻断发现（Spec 轴 + Falsify 轴），用户指令「开始修复，全自动」。
+> 提交：18b96ce（TD-75）→ 26b6af6（TD-76）→ merge fbdaec8 → 829f387（期末四轴修复）。
+
+- **TD-75**（18b96ce）——观察者补 attributes 监听：`observeConfigControls` 增 `attributes: true`，`mutationTouchesConfig` 属性变更按目标元素 id 判定；期末四轴 F1 修复（829f387）收窄 `attributeFilter: ['value','hidden']`（票面目标属性——配置控件自身 class/disabled 等运行期翻转不再触发同步，防良性变更累积误熔断）
+- **TD-76**（26b6af6）——观察者熔断终止写回环病理循环：观察者路径再同步真写入字段连续达 SYNC_MAX_STRIKES(3) → disconnectObserver；load 路径不计数；destroyFrame 复位；手动「重新同步」不受影响；冷却判定移到防抖到期时（实测：注入续体置冷却晚于自写 mutation 回调，mutation 时判定失真产生幽灵再同步）
+- **期末四轴修复**（829f387，固定点 cb21c92）——Falsify F1/F2 实证：熔断计数原用 filled>0 误含幂等匹配（值已处于目标态），良性属性翻转/分散重建可累积至熔断、静默压制合法重建。修复：key-injector 返回增 `written`（真写入字段，filled 子集），熔断改用 written；熔断计数移入观察者回调（autoSyncAfterLoad 去布尔参）；mutationTouchesConfig id 判定去重；先红后绿 +3 用例（F1 class 翻转不触发不熔断 / F2 幂等匹配不累计 / F3 冷却移位钉住）
+- **测试**：Vitest 746 → **755**（+9：TD-75 2 + TD-76 4 + 期末 3）；pytest 434+1skip 未受影响
+- **真实冒烟**：13 项 12 PASS / 0 FAIL / 1 SKIP（两轮复跑全绿）
 
 ### SIM-API-1 批次（2026-08-14 用户需求）
 

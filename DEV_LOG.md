@@ -6,6 +6,19 @@
 
 ---
 
+## 滚动摘要（2026-08-14 — 技术债区 TD-75/76 批次：kickoff 全自动档小档 2 工单 + 期末四轴修复）
+
+- **来源**：SIM-API-1 期末评审非阻断发现（Spec 轴 TD-75 观察者 childList 窄缺口 + Falsify 轴 TD-76 写回环只节流不终止），用户指令「开始修复，全自动」
+- **TD-75（18b96ce）**：观察者补 attributes 监听（setAttribute 重建配置控件触发再同步）；期末 F1 修复（829f387）收窄 `attributeFilter: ['value','hidden']`——配置控件自身 class/disabled 等运行期翻转不触发同步
+- **TD-76（26b6af6）**：观察者熔断终止病理循环——真写入字段连续 3 次 → disconnectObserver；冷却判定移到防抖到期时（实测：注入续体置冷却晚于自写 mutation 回调，mutation 时判定失真产生幽灵再同步）
+- **期末四轴 code-review（固定点 cb21c92）**：0 崩溃 0 安全红线，但 **Falsify F1/F2 实证命中真实缺陷**——熔断计数用 `filled > 0` 误含幂等匹配（filled 语义 = 已处于目标值含匹配），配置控件良性属性翻转 3 次 / 分散重建即可累积至熔断、**静默压制合法重建**（ADR-0001 承诺失效）；Architecture 轴定性为跨模块语义漂移（simulator-view 把 key-injector 的 filled 解读为「实际写入」）
+- **修复（829f387，先红后绿 +3 用例）**：key-injector 返回增 `written`（真写入字段，filled 子集——**熔断/反馈类消费方须用真写入信号**，filled 的幂等匹配不计入）；熔断条件改用 written；熔断计数移入观察者回调（autoSyncAfterLoad 去布尔参——Architecture 布尔参耦合消解）；mutationTouchesConfig id 判定去重
+- **教训（已蒸馏）**：聚合语义字段（filled 含幂等匹配）跨模块复用作「真写入」信号前须核对语义——两模块对同一字段语义漂移只有 Falsify 实证能暴露（F1 场景：setAttribute class 3 次即熔断）
+- **测试**：Vitest 746 → **755**（+9）；pytest 434+1skip 未受影响；冒烟 13 项 12 PASS（两轮复跑全绿）
+- **文档同步**：TICKETS（TD-75/76 归档 + **技术债区清零**）；CLAUDE（批次行 + 基线 746→755）；DEV_LOG 本段
+
+---
+
 ## 滚动摘要（2026-08-14 — SIM-API-1：22 款模拟器 API/模型配置统一由主应用控制）
 
 - **用户需求**：所有模拟器的 API 统一由主应用控制，模型名也来自主应用设置——22 款游戏各自带 API 配置面板、主应用只做手动「使用主应用 Key」注入的现状要改为单一事实来源。方案经 **ADR-0001**（CONSENSUS.md）定稿：**方案 2 宿主 iframe 统一同步**（key-injector 已是注入 choke point 扩展为自动同步；manifest 声明 endpointMode 做端点口径转换；宿主为模型 select 补受管 option；第三方 HTML 零修改）

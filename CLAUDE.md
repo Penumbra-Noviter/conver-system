@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 434+1skip）；`cd frontend && npm test`（Vitest 746，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（58）。
+测试：`cd backend && python -m pytest`（pytest 434+1skip）；`cd frontend && npm test`（Vitest 755，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（58）。
 
 ## 当前状态（2026-08-14）
 
@@ -49,7 +49,8 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **技术债区 TD-48~71 余项批次（2026-08-14 全自动 kickoff）**：4 工单 2 波完成——fetch-seam 单源 + 15s 超时守卫 + seq 守卫（TD-51/55/60）/ 运行中再点导航回列表 + file 百分号拒绝 + none 态设置链接（TD-53/56/71）/ 存档管理健壮性五连（TD-63/64/65/69/70）/ 图标单源一致性（TD-58/59）；4 票复核关闭（TD-48/49/52/62）；期末四轴 0 阻断；技术债区 17→3 项待立项
 - ✅ **技术债区 TD-72/73/74 批次（2026-08-14 全自动 kickoff）**：轻量档 1 工单 3 提交完成——超时守卫延展覆盖响应体读取（TD-72，await race 两阶段）/ 导入回滚尽力而为（TD-73，per-key try/catch 错误同一性）/ 一致性锁数量断言放宽（TD-74，票面修正）；期末四轴 0 阻断；**技术债区清零（TD-1~74 全部处置完毕）**
 - ✅ **SIM-API-1 批次（2026-08-14 用户需求，ADR-0001 方案 2）**：22 款模拟器 API/模型配置统一由主应用控制——manifest 增 endpointMode（17 full / 5 base，HTML 口径溯源锁）；key-injector 扩展（convertEndpoint 端点口径转换 / 受管 model option / 幂等写入 / syncGameCredentials + autoSyncIntoGame 编排核心 / 按钮改「重新同步」）；simulator-view load 自动同步 + MutationObserver 配置控件重建再同步（防抖 500ms + 写入后 1s 写回环冷却）；wg_ 会话注记退役（自动同步每次 load 重放）；parseManifest endpointMode 透传；第三方 HTML 零修改；真实冒烟 13 项 12 PASS/0 FAIL/1 SKIP
-- ✅ 测试：pytest 434+1skip（后端）+ Vitest 746（前端）+ cargo test 58（壳）全绿
+- ✅ **技术债区 TD-75/76 批次（2026-08-14 kickoff 全自动档）**：观察者 attributes 监听（TD-75，attributeFilter 收窄 value/hidden）+ 写回环熔断（TD-76，SYNC_MAX_STRIKES=3 真写入信号 written）；期末四轴 F1/F2 实证修复（filled 含幂等匹配误当真写入 → 返回增 written 字段）；先红后绿 +9 用例（Vitest 746→755）；冒烟 13 项 12 PASS；**技术债区清零**
+- ✅ 测试：pytest 434+1skip（后端）+ Vitest 755（前端）+ cargo test 58（壳）全绿
 
 ## 待办管理
 
