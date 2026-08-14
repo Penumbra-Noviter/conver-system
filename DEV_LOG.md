@@ -6,6 +6,16 @@
 
 ---
 
+## 滚动摘要（2026-08-14 — 技术债区 TD-48~71 余项批次：标准档 4 工单 2 波全自动 kickoff）
+
+- **TD-48~71 余项批次完成（commit 链 dbcc15c → 9c70f13 → f068417 → bad8006，merge 链 bcd582c → 4fd123f → 78071e2 → 543f67a）**：技术债区剩余 17 项清理（用户指令「继续补技术债区」全自动档）——**13 做 + 4 关闭 + 0 票面修正**。工单 01 fetch seam 单源 + 15s 超时守卫 + seq 守卫（TD-51/55/60，新深模块 fetch-seam.js 消除双 seam 副本）/ 工单 02 运行中再点导航回列表 + file 百分号拒绝 + none 态设置链接（TD-53/56/71，冒烟新增步骤真实运行 PASS）/ 工单 03 导入回滚事务性 + pendingGameId 清理 + 文件名净化 + 存储降级 + 无原型累积器（TD-63/64/65/69/70，TD-63 裁定修法=回滚非容量预检）/ 工单 04 play 图标下架 + gamepad 一致性锁（TD-58/59，index.html 零修改）；关闭 4 票复核确认维持（TD-48 manifest v2 无 saveKeyPrefix / TD-49 四态已实现 / TD-52 空态正确 / TD-62 唯一调用点）
+- **期末四轴 code-review（固定点 86c3991）：0 阻断放行**——Spec 13 票 + 4 关闭全达成；Falsify 0 击穿（波末增量审核 F1 超时不覆盖响应体读取 / F2 回滚双重失败遮蔽复核成立 → 落债 TD-72/73；AR-2 一致性锁钉死双副本 → 落债 TD-74；F3/ST-1/ST-2 维持现状）；Architecture 全正面（fetch-seam 消除 Duplicated Code）
+- **4.5 运行态冒烟**：后端 GET / 200 + smoke-simulators.mjs 真实运行 12 项 11 PASS/0 FAIL/1 SKIP 退出码 0（含 TD-53 运行中再点导航步骤）；冒烟后端口已释放
+- **文档同步（本批次）**：TICKETS（17 项→4 工单归档 + 4 关闭 + 3 新债 TD-72/73/74）；CONSENSUS §2（nav 再点语义收敛 + none 态设置链接两行决策）；DEV_LOG 本段
+- **测试**：Vitest **711**（基线 690，+21）；pytest 433+1skip / cargo 58 未受影响
+
+---
+
 ## 滚动摘要（2026-08-14 — 技术债区 TD-57/66/67/68 批次：3 工单小档全自动 kickoff）
 
 - **TD-57/66/67/68 批次完成（commit 链 75d9d5c → 6665dff → 7d803d0，merge 1a7270b，非阻断修复 37a3b5e）**：技术债区 4 项中强度清理（用户点名全自动档）——TD-66 credentials model 门控盲区（setting.py 新增 `_OPENAI_PROTOCOL_MODELS` 由 AVAILABLE_MODELS 派生 + 门控收紧为「显式配置或解析值 ∈ 集」，先红后绿 4 用例；票面措辞修正：示例模型名以 .env 实际值 claude-sonnet-4-20250514 为准）/ TD-67+68 存档键契约单一来源（新建 frontend/js/save-key-meta.js 深模块三件套单源，五处消费点迁移含 smoke 脚本，vitest.config.js coverage.include 唯一共享改动；契约锁基线绿 6 用例）/ TD-57 同源 iframe 信任边界文档化（architecture.md 五要素小节 + CONSENSUS §2 两行 + 探索文档 U11 + key-injector 指针）

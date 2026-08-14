@@ -20,6 +20,8 @@
 - `.env` 仅作配置模板，不存储真实密钥
 - **模拟器同源信任边界已接受并文档化**（TD-57）：22 款模拟器与主应用同源运行、游戏可互读 localStorage 与调用 /api 端点 —— 自用威胁模型可接受，威胁模型 / 收缩措施 / 加固不可行论证见 [docs/architecture.md](docs/architecture.md)「模拟器信任边界（TD-57）」小节
 - **跨源沙箱 / postMessage 隔离**列入探索文档未决事项 U11 跟踪（仅探索不立项，见 [docs/world-simulation-exploration.md](docs/world-simulation-exploration.md)）
+- **运行中再点「模拟器」导航 = 返回列表**（TD-53，2026-08-14）：运行视图内再点侧栏/底部导航「模拟器」销毁 iframe 回列表，与「返回」按钮同语义；非运行态重复进入保持幂等刷新
+- **未配置 Key 的禁用提示指向设置页**（TD-71，2026-08-14）：none 态提示含「前往设置页配置」链接（onNavigateSettings 钩子 → switchView('settings')），claude-only 文案不变
 
 ## 3. 角色管理策略
 

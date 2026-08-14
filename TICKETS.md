@@ -23,30 +23,33 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| TD-48 | manifest saveKeyPrefix 不唯一（wg_ 出现 2 次：小马宝莉/高中生模拟器，实际键靠 CFG.id 区分 `wg_xiaomabaoli_*`/`wg_gaozhongsheng_*` 无运行时冲突）——消费方不得假设前缀全局唯一；未来存档管理按完整键而非前缀分桶（波 2 Falsify 复证：审核一度推断「存档串档」，深挖证伪——实际键不同，无串档） | 波 1 Falsify（波 2 复证） | 低 | 📝 待立项 |
-| TD-49 | T3 落地前 `#simulator-list-panel` 无占位空态，点击「模拟器」呈现空白视图（UX 缺口，无崩溃）——T3 四态实现后复核 | 波 1 Falsify | 低 | 📝 待立项 |
 | TD-50 | T2 commit message 声称「覆盖 2 个示例」实际 git 零变化——md5 复核源目录与仓库内人生模拟器v3/蛛网之影一致，无内容漂移，仅措辞失实 | 波 1 Falsify | 低 | ❌ 复核关闭（2026-08-14 md5 比对一致，无漂移） |
-| TD-51 | T3 列表 fetch 无超时守卫（simulators.js:342-357；T4 有 15s）——manifest fetch 挂起 → 永久 loading 无重试出口（期末四轴复证：simulators.js:330 同问题，行号随修复漂移） | 波 2 Falsify（期末四轴复证） | 低 | 📝 待立项 |
-| TD-52 | manifest 22 条全 ai、无 local——「纯本地」筛选档永远空态（T2 实测判定非缺陷；未来入包 local 游戏自然消失）（期末四轴复证：UI 档位与数据现状张力，空态文案正确呈现） | 波 2 Falsify（期末四轴复证） | 低 | 📝 待立项 |
-| TD-53 | 运行视图中再点 nav「模拟器」：仅刷新隐藏列表、不销毁 iframe 不回列表（app.js:106-109）——与「返回」按钮语义分工但未提示用户 | 波 2 Falsify | 低 | 📝 待立项 |
-| TD-55 | refreshSimulators 并发陈旧响应覆盖（进→出→快速重进双 fetch，慢旧响应后到覆盖新渲染，simulators.js:349-364）——静态 manifest 内容相同，实际影响可忽略 | 期末四轴 | 低 | 📝 待立项 |
-| TD-56 | isValidGame src 注入守卫不覆盖百分号编码（`%2e%2e`/`%2f`，simulator-view.js:95-99）——WHATWG URL 解析可绕过字面 `/` `\` 检查；受 Starlette 遍历防护 + manifest 可信资产双兜底，实际不可达，加固建议 | 期末四轴 Falsify | 低 | 📝 待立项 |
-| TD-58 | play 图标注册未使用（icons.js:36，仅测试断言可渲染）——使用或移除 | 期末四轴 | 低 | 📝 待立项 |
-| TD-59 | index.html 内联 gamepad SVG（侧栏:44 + 移动端:417）与 icons.js ICON_PATHS 双源，防漂移仅靠注释——加一致性测试锁 | 期末四轴 | 低 | 📝 待立项 |
-| TD-60 | api.js / simulators.js 双 setFetch seam 协议面重复（simulators.js:42-51 镜像 api.js:16-28，docstring 已论证）——抽共享 seam 模块或 api.js 增 fetchUrl | 期末四轴 | 低 | 📝 待立项 |
-| TD-62 | initSimulatorsView 二次 init 异容器时 stateEl 陈旧（simulators.js:285-295）——app.js 只 init 一次不可达；同容器幂等有测试 | 期末四轴 | 低 | 📝 待立项 |
-| TD-63 | applyImportPayload 无事务性（save-manager.js:491）：localStorage 近 5MB 上限时导入多键包，第 N 键 QuotaExceededError → 前 N-1 键已部分写入 + 无 toast；整包拒绝闸门只防内容不防容量 | 波 2 Falsify | 中 | 📝 待立项 |
-| TD-64 | pendingGameId 残留（save-manager.js:463-473）：文件选择取消早退发生在 pendingGameId 清理前，残留至下次导入覆盖或 closeSavePanel 复位；实际触发面低 | 波 2 Falsify | 低 | 📝 待立项 |
-| TD-65 | 导出文件名注入面（save-manager.js:419 `${gameId}-saves.json`）：gameId 来自 manifest 第三方数据，含引号/控制字符可产生怪异文件名（无路径逃逸，download 语义限制） | 波 2 Falsify | 低 | 📝 待立项 |
-| TD-69 | save-manager.js 渲染路径直接访问 window.localStorage（renderGameRow/renderSavePanel）无 try/catch——浏览器存储禁用/隐私模式抛 SecurityError 时 openSavePanel 整体崩溃（纯函数层有判空防御，渲染层无）；修复：渲染路径 try/catch 降级「0 个存档」 | 期末四轴 Falsify | 低 | 📝 待立项 |
-| TD-70 | validateImportPayload 用普通对象字面量累积——白名单存在 `__proto__` 键时 `valid['__proto__'] = value` 走原型 setter 静默丢失该键（导入报告成功但键不写入）；当前 22 游戏无此类键实际不可达；修复 Object.create(null) | 期末四轴 Falsify | 低 | 📝 待立项 |
-| TD-71 | U8-T2 验收 4 未完全达成：none 态提示「未配置 OpenAI 兼容 Key」未「指向设置页」（spec US4 要求 none 态提示前往设置页配置；实现无链接）；claude-only 文案已达标 | 期末四轴 Spec | 低 | 📝 待立项 |
 
-> 技术债区当前 **17 项**（TD-48/49/51/52/53/55/56/58/59/60/62/63/64/65/69/70/71 待立项；TD-50 已复核关闭；TD-57/66/67/68 已于 2026-08-14 批次完成，见归档）。
+| TD-72 | 15s 超时守卫不覆盖响应体读取（simulators.js:408-420）：Promise.race 只竞到 headers，`return res.text()` 在超时外裸等——注入 `{ok:true, text:()=>new Promise(()=>{})}` 可致永久 loading（超时与 abort 均不再生效）；生产受限于同源静态 manifest 不可达；修复：race 延展覆盖 res.text() 或 clearTimeout 移到 text() 完成后 | 期末四轴 Falsify（F1，TD-remain 批次） | 中 | 📝 待立项 |
+| TD-73 | 导入回滚自身失败时错误遮蔽（save-manager.js:307-315）：回滚循环无 try/catch——第 N 键抛错且回滚写再抛错（配额一次性耗尽）时回滚异常遮蔽原始 QuotaExceededError 且剩余键不还原，docstring「失败已回滚并抛错」过度承诺；修复：回滚循环包 try/catch 继续尝试其余键并上抛原始 err | 期末四轴 Falsify（F2，TD-remain 批次） | 低 | 📝 待立项 |
+| TD-74 | 图标一致性锁钉死「恰好 2 副本」（icons.test.js:57-66 toHaveLength(2)）：未来合法新增第三处 data-icon="gamepad" 内联副本会误红；当前按 spec「锁现存双副本」为设计意图，需在锁注释或本区注记约束 | 期末四轴 Architecture（AR-2，TD-remain 批次） | 低 | 📝 待立项 |
+
+> 技术债区当前 **3 项**（TD-72/73/74 待立项，本批次期末四轴非阻断发现；TD-50 已复核关闭；TD-57/66/67/68 与 TD-48~71 余项已于 2026-08-14 批次处置，见归档）。
 
 ---
 
 ## 已完成归档
+
+### 技术债区 TD-48~71 余项批次（2026-08-14 全自动 kickoff：标准档 4 工单 2 波）
+
+> 来源：TICKETS 技术债区剩余 17 项待立项（TD-57/66/67/68 批次后遗留），用户指令「继续补技术债区」，全自动档。
+>
+> Grilling 共识（全自动档）：**13 做（合并 4 工单）+ 4 关闭（TD-48/49/52/62 复核确认维持）+ 0 票面修正**——关闭票各附一句话实证（TD-48 manifest v2 无 saveKeyPrefix + schema 锁 / TD-49 四态已实现有测试 / TD-52 22 条全 ai 空态正确 / TD-62 initSimulatorsView 唯一调用点）。
+>
+> 工单（commit 链 dbcc15c → 9c70f13 → f068417 → bad8006，merge 链 bcd582c → 4fd123f → 78071e2 → 543f67a）：
+> - **工单 01**（TD-51/55/60，`dbcc15c`）——新深模块 fetch-seam.js（fetchImpl/setFetch/doFetch 单源，消除 api.js/simulators.js 双 seam 副本）+ fetchManifestText 15s 超时守卫（AbortController + finally 清计时器，错误态含重试按钮）+ refreshSimulators seq 请求序号守卫（await/catch 双出口）；vitest.config.js coverage.include 增补（唯一申报共享改动）；+7 用例，fetch-seam 100% 覆盖
+> - **工单 02**（TD-53/56/71，`9c70f13`）——switchView 赋值前捕获 prevView + 运行中再点 nav 回列表（closeSimulator 再 refreshSimulators，与「返回」同语义）；isValidGame 增 `!file.includes('%')` 单点拒绝百分号编码面；key-injector.js onNavigateSettings 钩子 + none 态「前往设置页配置」链接（preventDefault + 调钩子，claude 文案逐字不动）；冒烟脚本新增「运行中再点导航回列表」步骤 + :594 saveKeyPrefix 遗留清理（申报共享改动）；+5 用例；**冒烟真实运行 12 项 11 PASS/0 FAIL/1 SKIP 退出码 0**
+> - **工单 03**（TD-63/64/65/69/70，`f068417`）——导入写前快照+逆序回滚+上抛（TD-63 中强度，裁定修法=回滚非容量预检）+ UI catch toast「导入失败：存储空间不足或写入失败」；pendingGameId capture-then-clear 全路径清理；导出文件名净化 sanitizeFilename；渲染路径存储禁用降级「0 个存档」（collectKeysSafely）；validateImportPayload 无原型累积器（__proto__ 键全链路写回）；+8 用例，save-manager.js 99.08% 覆盖
+> - **工单 04**（TD-58/59，`bad8006`）——ICON_PATHS.play 条目删除 + 断言翻转（iconHtml('play') 抛「未知图标: play」）；icons.test.js 一致性锁（fs 读 index.html 提取 gamepad 内联副本与工厂归一化比对，三向漂移可红）；index.html 零修改；+1 净增用例
+>
+> **波末增量审核（波 1）：0 阻断**——Falsify 5 项指定交互全过 + 2 新发现（F1 超时不覆盖响应体读取 / F2 回滚双重失败遮蔽，均非阻断）；文件范围 0 回退（9 合规 + 5 测试文件记录警告）。
+>
+> **期末四轴 code-review（固定点 86c3991）：0 阻断放行**——Spec 13 票 + 4 关闭全达成；Falsify 0 击穿（F1 强度中/F2 强度低-中复核成立 → 落技术债区 TD-72/73；F3 维持现状）；Standards 0 硬违规（ST-1 fetchImpl 可变更导出为刻意设计 / ST-2 助手不进 __all__ 符合深模块）；Architecture 全正面（fetch-seam 消除 Duplicated Code、AR-2 一致性锁钉死双副本 → 落债 TD-74）。运行态冒烟：后端 GET / 200 + smoke 真实运行 12 项 11 PASS 退出码 0（冒烟后端口已释放）。测试同步：Vitest **711**（基线 690，+21），pytest 433+1skip 未受影响。技术债区 17 项待立项 → **3 项**（TD-72/73/74）。
 
 ### 技术债区 TD-57/66/67/68 批次（2026-08-14 全自动 kickoff：3 工单小档）
 
