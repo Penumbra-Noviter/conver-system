@@ -1,5 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { iconHtml, __all__ } from '../js/icons.js';
+
+const INDEX_HTML = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'index.html');
 
 describe('iconHtml', () => {
     it('按名称生成可由 CSS 着色的装饰性 SVG', () => {
@@ -41,13 +46,20 @@ describe('iconHtml', () => {
         expect(html).toContain('<path');
     });
 
-    it('U7 新增 play 图标：注册可渲染（默认尺寸）', () => {
-        const html = iconHtml('play');
+    it('play 图标已下架：调用抛「未知图标: play」', () => {
+        expect(() => iconHtml('play')).toThrow('未知图标: play');
+    });
 
-        expect(html).toContain('data-icon="play"');
-        expect(html).toContain('aria-hidden="true"');
-        expect(html).toContain('stroke="currentColor"');
-        expect(html).toContain('viewBox="0 0 16 16"');
+    it('index.html 内联 gamepad 副本与 iconHtml(\'gamepad\') 一致（归一化内部标记）', () => {
+        const html = fs.readFileSync(INDEX_HTML, 'utf8');
+        const inlineCopies = [...html.matchAll(/<svg[^>]*data-icon="gamepad"[^>]*>([\s\S]*?)<\/svg>/g)]
+            .map((match) => match[1]);
+        const factoryInner = iconHtml('gamepad').match(/<svg[^>]*>([\s\S]*?)<\/svg>/)[1];
+
+        expect(inlineCopies).toHaveLength(2); // 锁现存双副本：侧栏 :46 区 + 移动端 :419 区
+        for (const inner of inlineCopies) {
+            expect(inner).toBe(factoryInner);
+        }
     });
 
     it('__all__ 收口协议表面注册（U7 新增图标不改导出面）', () => {
