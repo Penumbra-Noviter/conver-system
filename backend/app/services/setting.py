@@ -69,7 +69,7 @@ _OPENAI_PROTOCOL_MODELS: frozenset[str] = frozenset(
     model
     for p in AVAILABLE_MODELS["providers"]
     if p["id"] == "openai"
-    for model in p["models"]
+    for model in p.get("models", [])
 )
 
 # 凭证槽位：用户可填 claude / openai 任一字段，系统通用解析
@@ -195,8 +195,9 @@ def credentials(db: Session) -> dict[str, str]:
       违反「仅 claude key 时 key 返回空串」契约（Anthropic 协议对游戏不可用）。
     - endpoint：复用 base_url() 链（openai_base_url → 跨协议 claude_base_url 兜底）。
     - model：仅当存在 openai key 且默认 provider 解析为 openai 协议时返回
-      default_model，否则空串（游戏保持默认模型；「完整凭证仅 openai 槽位
-      有可用 key 时返回」）。
+      default_model，且仅当「default_model 显式配置」或「解析值 ∈
+      _OPENAI_PROTOCOL_MODELS（openai 协议模型集）」时返回，否则空串
+      （游戏保持默认模型；防 .env 默认 claude 模型名混入 openai 三元组）。
     - protocol：openai（有 openai key）/ claude（仅 claude key）/ none（皆无）。
 
     返回 dict 键：key / endpoint / model / protocol。

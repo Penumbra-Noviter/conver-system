@@ -17,6 +17,11 @@
  * 硬约束（Node ESM 真实消费者兼容 — 冒烟脚本直接 import）：模块顶层零 DOM /
  *   零浏览器 API / 零副作用，仅语言内建（RegExp / Set / String.prototype）。
  *
+ * 已知同字符类异语义例外（不并入本模块，防误迁移）：markdown.js 的
+ *   escapeRegExp（TD-46 占位符还原域，其单一来源是 ECMAScript 语言定义）与
+ *   第三方游戏资产 frontend/simulators/仿微.html 内联脚本（vendored，Out of
+ *   Scope）——两处与存档键契约判定互不传导，改 SAVE_KEY_META_RE 不得联动。
+ *
  * saveKeys 契约（U9-T1）：v2 条目声明存档键白名单，数组元素为字符串 ——
  *   不含正则元字符的字符串 = 精确键名（=== 匹配）；含正则元字符的字符串 =
  *   正则模式（锚定完整键名 ^…$ 匹配）。正则元字符集定义见 SAVE_KEY_META_RE。
