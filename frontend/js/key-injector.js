@@ -29,7 +29,11 @@
  *     重复同步不再触发游戏 change 处理，动态重建场景收敛）；
  *   - 自动同步通道：simulator-view.js 在 iframe load / 配置控件重建后调
  *     autoSyncIntoGame（静默，不闪「已填入」）；按钮点击走同一核心 +
- *     反馈状态机。
+ *     反馈状态机。写回环状态机（冷却/熔断）收口在本模块：
+ *     autoSyncIntoGame 一次调用原子完成同步执行 + 冷却判定 + 置冷却 +
+ *     观察者计数 + 熔断判定（path: 'load' | 'observer' 区分 load 不计数 /
+ *     observer 计数熔断）；复位经 resetSyncLoop()（simulator-view
+ *     destroyFrame 调用）。
  *
  * 注入安全（TD-57 信任边界评估 — spec「U8 注入交互」决策 D 落点；权威文档：
  *   docs/architecture.md「模拟器信任边界（TD-57）」小节 — 威胁模型 / 已接受

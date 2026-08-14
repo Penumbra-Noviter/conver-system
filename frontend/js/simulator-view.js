@@ -5,7 +5,9 @@
  *   error，含 15s 超时守卫）、AI 提示条（type === 'ai' 渲染固定文案 +
  *   ai 且 manifest 含完整 config 三元组时附「重新同步」按钮条）、
  *   SIM-API-1 配置持续同步（iframe load 后自动同步主应用凭证/端点/模型 +
- *   MutationObserver 监听配置控件动态重建后再同步）、「返回」回列表
+ *   MutationObserver 监听配置控件动态重建后再同步 — 冷却/熔断状态迁移收口
+ *   在 key-injector 单一状态机，本模块只保留触发时机（load / 防抖到期）与
+ *   观察者生命周期（挂载 / disconnect / destroyFrame 复位））、「返回」回列表
  *   （卸载 iframe；游戏存档在游戏自身 localStorage 前缀隔离保存，重进自动
  *   恢复，卸载不丢进度）。打开参数校验（非法 file → 直接 error 态，不创建
  *   iframe；file 含路径分隔符 → 拒绝 — iframe src 注入守卫，src 永远形如
@@ -15,8 +17,9 @@
  *   game.name 来自 manifest 第三方数据，header 渲染必须转义）/
  *   key-injector.js（U8-T2/SIM-API-1：attachKeyInject 挂按钮交互 +
  *   autoSyncIntoGame 自动同步编排 + hasConfigTriplet 三元组校验 +
- *   TEXT_RESYNC 按钮文案 — 同步/注入逻辑收口在 key-injector.js，凭证获取
- *   经 initKeyInjector 钩子由 app.js 接线；本模块只负责触发时机与观察者）；
+ *   resetSyncLoop 写回环复位 + TEXT_RESYNC 按钮文案 — 同步/注入逻辑收口
+ *   在 key-injector.js，凭证获取经 initKeyInjector 钩子由 app.js 接线；
+ *   本模块只负责触发时机与观察者）；
  *   app.js → simulator-view.js（initSimulatorRun 接线 + onOpenGame 接到
  *   openSimulator + 切走 simulators 视图时 closeSimulator 销毁 iframe —
  *   Grilling 共识：状态全在游戏自身 localStorage，避免后台游戏继续跑）。
