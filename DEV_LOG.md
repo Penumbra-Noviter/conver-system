@@ -14,6 +14,7 @@
 - **测试**：先红后绿；Vitest **745**（基线 714，+31）；pytest 434+1skip 未受影响（后端零改动）
 - **真实冒烟（smoke-simulators.mjs 重排）**：预置步骤移至打开游戏前（load 自动同步需 openai 凭证在 load 时已就位）+ 断言重写（自动同步填值 / endpoint full 口径转换 / 受管 option / 手动「重新同步」）；13 项 **12 PASS / 0 FAIL / 1 SKIP** 退出码 0，冒烟后端口已释放
 - **文档同步（本批次）**：TICKETS（SIM-API-1 归档 + 活跃表清零）；CONSENSUS（ADR-0001）；CLAUDE（批次行 + Vitest 基线 714→745）；DEV_LOG 本段
+- **期末三轴 code-review（固定点 9141035）**：Standards 1 硬违规（docs/architecture.md 收缩措施与模块职责两处未同步——漏改权威文档，随 fix 提交修复）；Spec 0 阻断（4 条微小偏差观察：手动「重新同步」/load 首同步各一次幂等冗余再同步、childList 窄缺口、disabled 早退边界）；**Falsify 1 真实缺口已修复（先红后绿）**——空 select 追加受管 option 后浏览器自动选中 → `el.value === value` 幂等分支成立导致**零事件派发**（依赖 change 保存状态的游戏存旧值）；修复：`ensureSelectOption` 返回 added，本次追加的选中强制走写+派发路径，幂等跳过仅限「option 已存在且值匹配」；+1 用例净增（Vitest 745→746）；2 项低强度理论发现落技术债区（TD-75 属性变更重建不触发观察者 / TD-76 写回环冷却只节流不终止）；冒烟 13 项 12 PASS 复跑全绿
 
 ---
 

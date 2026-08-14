@@ -286,11 +286,13 @@ export function injectCredentialsIntoGame({ doc, config, credentials, endpointMo
             skipped.push(field); // 控件缺失 / 类型不符 → 静默降级
             continue;
         }
-        if (el.tagName === 'SELECT') {
-            ensureSelectOption(el, value); // 缺目标 option → 追加受管 option
-        }
-        if (el.value === value) {
-            filled.push(field); // 幂等：已为目标值 → 不写不派发（写回环守卫）
+        // select 缺目标 option → 追加受管 option；added=true 时浏览器自动选中
+        // 新 option（空 select 场景 el.value 可能未写即匹配）—— 该选中是本次
+        // 追加的副作用，也必须派发事件（否则依赖 change 保存状态的游戏存旧值，
+        // Falsify 修复：幂等跳过仅限「option 已存在且值已匹配」）
+        const added = el.tagName === 'SELECT' ? ensureSelectOption(el, value) : false;
+        if (!added && el.value === value) {
+            filled.push(field); // 幂等：已为目标值且非本次追加 → 不写不派发（写回环守卫）
             continue;
         }
         el.value = value;

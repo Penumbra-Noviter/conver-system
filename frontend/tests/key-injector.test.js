@@ -332,9 +332,13 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [] });
     });
 
-    it('SIM-API-1:select 无任何 option → 追加受管 option 后选中（不抛错；apikey/endpoint 控件缺失照常跳过）', async () => {
+    it('SIM-API-1:select 无任何 option → 追加受管 option 后选中并派发事件（apikey/endpoint 控件缺失照常跳过）', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
         const doc = makeGameDoc('<select id="cfg-model"></select>');
+        const modelEl = doc.getElementById('cfg-model');
+        const seen = [];
+        modelEl.addEventListener('input', () => seen.push('input'));
+        modelEl.addEventListener('change', () => seen.push('change'));
         const result = injectCredentialsIntoGame({
             doc,
             config: CONFIG,
@@ -342,7 +346,28 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         });
         expect(doc.getElementById('cfg-model').value).toBe('deepseek-r1');
         expect([...doc.getElementById('cfg-model').options].map((o) => o.value)).toEqual(['deepseek-r1']);
+        // Falsify 修复（评审 F1）：空 select 追加首个 option 时浏览器自动选中
+        // → 值已匹配会落入幂等分支静默 —— 追加导致的选中也必须派发事件，
+        // 否则依赖 change 保存状态的游戏存旧值
+        expect(seen).toEqual(['input', 'change']);
         expect(result).toEqual({ filled: ['model'], skipped: ['apikey', 'endpoint'] });
+    });
+
+    it('Falsify:空 select 追加 option 后自动选中（值未写即匹配）→ 仍派发事件（不落入幂等静默）', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makeGameDoc('<select id="cfg-model"></select>');
+        const modelEl = doc.getElementById('cfg-model');
+        const seen = [];
+        modelEl.addEventListener('input', () => seen.push('input'));
+        modelEl.addEventListener('change', () => seen.push('change'));
+        injectCredentialsIntoGame({ doc, config: CONFIG, credentials: { ...CRED_OPENAI, model: 'm1' } });
+        expect(seen).toEqual(['input', 'change']); // 追加+自动选中 → 必须派发
+
+        // 幂等复查：值已为目标且 option 已存在 → 不再派发（写回环守卫不变）
+        seen.length = 0;
+        injectCredentialsIntoGame({ doc, config: CONFIG, credentials: { ...CRED_OPENAI, model: 'm1' } });
+        expect(seen).toEqual([]);
+        expect(modelEl.options.length).toBe(1); // 无重复受管 option
     });
 
     it('SIM-API-1 幂等:值已为目标值 → 不写不派发、不重复追加受管 option（写回环守卫）', async () => {

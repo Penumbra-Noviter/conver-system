@@ -142,7 +142,7 @@ conver-system/
 │   │   ├── icons.js               # SVG 图标工厂 seam（iconHtml，唯一动态图标来源）
 │   │   ├── simulators.js          # 模拟器列表页深模块（parseManifest / filterGames / 四态渲染 / 类型筛选，initSimulatorsView + onOpenGame 注入钩子）
 │   │   ├── simulator-view.js      # 模拟器运行视图状态机（initSimulatorRun / openSimulator / closeSimulator / 15s 超时 / 事件源校验 / AI 提示条）
-│   │   ├── key-injector.js        # 主应用 Key 一键注入（U8-T2：拉取 credentials + 游戏 AI 配置面板注入）
+│   │   ├── key-injector.js        # 模拟器配置同步深模块（SIM-API-1：load 自动同步 + 「重新同步」按钮 + endpointMode 口径转换 + 受管模型 option；凭证经 initKeyInjector 钩子）
 │   │   ├── save-manager.js        # 存档管理面板（U9-T2：存档列表/导出/导入/删除 + 校验）
 │   │   ├── components/
 │   │   │   ├── character-form.js  # 角色表单（骨架走 modal 工厂，提交走 character-submit）
@@ -290,7 +290,7 @@ conver-system/
 
 ### 现有收缩措施清单（代码已实现）
 
-- **key-injector 注入模块**（`frontend/js/key-injector.js`）：ESM 模块私有（不挂 window / globalThis）；注入目标限 manifest 声明的 config 三元组 id 白名单（无控件探测 / 自动发现）；只写三个字段（key/endpoint/model）；select 目标校验值在选项集内（不在选项集则跳过该字段）；claude key 值绝不进入游戏；
+- **key-injector 注入模块**（`frontend/js/key-injector.js`）：ESM 模块私有（不挂 window / globalThis）；注入目标限 manifest 声明的 config 三元组 id 白名单（无控件探测 / 自动发现）；只写三个字段（key/endpoint/model）；select 目标缺主应用模型 option 时由宿主追加受管 option 再选中（SIM-API-1 — 主应用模型名可进入 select）；幂等写入（值已为目标且非本次追加则不写不派发，持续同步写回环守卫）；claude key 值绝不进入游戏；
 - **credentials 端点契约**：`GET /api/settings/credentials` 在 protocol=claude/none 时 key 恒为空串（**claude key 绝不回传游戏**）；
 - **saveKeys 存档白名单**：cfg 键（含 API Key）被 saveKeys 白名单天然排除出存档管理 —— 导出导不出来、导入写不进去；
 - **运行视图打开参数校验**（`frontend/js/simulator-view.js`）：iframe src 注入守卫 —— 非法 file 直接 error 态不创建 iframe；file 含路径分隔符（`/` `\`）拒绝；
