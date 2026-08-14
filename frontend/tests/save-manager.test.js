@@ -478,6 +478,41 @@ describe('applyImportPayload — 写前快照 + 失败回滚（TD-63）', () => 
         expect(storage.getItem('ls_used_names')).toBe('keep');
         expect(storage.getItem('ls_bomb_key')).toBeNull();
     });
+
+    it('回滚自身失败不遮蔽原始错误：单个键还原失败继续还原其余键（尽力而为，TD-73）', async () => {
+        const { sim } = await loadModules();
+        const game = { ...GAME_EXACT, saveKeys: ['ls_key_a', 'ls_key_b', 'ls_key_c', 'ls_bomb'] };
+        const originalErr = new Error('QuotaExceededError: 写入失败');
+        const map = new Map([['ls_key_b', 'old-b']]); // 仅 b 写前存在（a / c 为新增键）
+        const storage = {
+            getItem: (k) => (map.has(k) ? map.get(k) : null),
+            setItem: (k, v) => {
+                if (k === 'ls_bomb') throw originalErr; // 第 4 键写入失败（原始错误）
+                map.set(k, String(v));
+            },
+            removeItem: (k) => {
+                if (k === 'ls_key_c') throw new Error('回滚也失败'); // c 还原失败（回滚异常）
+                map.delete(k);
+            },
+        };
+        const keys = {
+            ls_key_a: '"new-a"', // 写前不存在 → 回滚应 removeItem 移除
+            ls_key_b: '"new-b"', // 写前 old-b → 回滚应还原原值
+            ls_key_c: '"new-c"', // 写前不存在 → 回滚应移除，但 removeItem 抛错 → 残留新值
+            ls_bomb: 'boom',     // 抛错键本身未写入，无需回滚
+        };
+
+        let caught;
+        try {
+            sim.applyImportPayload(game, keys, storage);
+        } catch (e) {
+            caught = e;
+        }
+        expect(caught).toBe(originalErr);            // 原始错误同一性：回滚异常不遮蔽（TD-73）
+        expect(map.get('ls_key_a')).toBeUndefined(); // 已写新键仍被 removeItem 还原（continue 语义）
+        expect(map.get('ls_key_b')).toBe('old-b');   // 更早写入的旧键继续还原为原值
+        expect(map.get('ls_key_c')).toBe('"new-c"'); // 回滚也失败的键保持新值（尽力而为的既定残留）
+    });
 });
 
 // ══════════════════════════════════════════════════

@@ -278,16 +278,18 @@ function isJsonString(value) {
  *
  * 失败回滚（TD-63 裁定修法 = 写前快照，非容量预检 — localStorage 无剩余
  *   容量 API）：每个待写键先记录快照 {key, prev: getItem(key)} 再 setItem；
- *   任一键写入抛异常 → 已写键逆序回滚（prev 为 null/undefined →
- *   removeItem，否则 setItem 还原原值）→ 异常上抛（失败已回滚并抛错，
- *   调用方可安全提示用户）。抛错键本身未写入（setItem 原子性），无需
- *   回滚该键。快照仅覆盖实际写入路径（白名单命中且值为字符串的键），
- *   守卫先行、被跳过键不触碰 storage。
+ *   任一键写入抛异常 → 已写键逆序尽力回滚（prev 为 null/undefined →
+ *   removeItem，否则 setItem 还原原值）→ 异常上抛（调用方可安全提示
+ *   用户）。回滚为尽力而为（TD-73）：单个键还原失败（如存储仍不可写）
+ *   不中断循环 — 继续尝试还原其余键，失败键残留新值；循环结束统一抛
+ *   原始 err（回滚异常不遮蔽写入异常）。抛错键本身未写入（setItem
+ *   原子性），无需回滚该键。快照仅覆盖实际写入路径（白名单命中且值为
+ *   字符串的键），守卫先行、被跳过键不触碰 storage。
  *
  * @param {unknown} game - 游戏条目（saveKeys 为白名单）
  * @param {unknown} keys - {键: 值} 映射（validateImportPayload 产物）
  * @param {unknown} storage - Storage 兼容对象
- * @returns {number} 实际写入的键数；写入失败时回滚并抛错（不返回）
+ * @returns {number} 实际写入的键数；写入失败时尽力回滚并抛原始错（不返回）
  */
 export function applyImportPayload(game, keys, storage) {
     if (game === null || typeof game !== 'object' || Array.isArray(game)) return 0;
@@ -305,11 +307,17 @@ export function applyImportPayload(game, keys, storage) {
             written.push({ key, prev });
         }
     } catch (err) {
-        // 逆序回滚：新增键移除，旧值还原（失败已回滚并抛错）
+        // 尽力而为回滚（TD-73）：已写键逆序逐个还原（新增键移除 / 旧值
+        // 还原）。单个键还原失败（如存储仍不可写）不中断循环、不遮蔽原始
+        // err — 其余键继续尝试还原；循环结束统一抛原始异常（同一性保留）。
         for (let i = written.length - 1; i >= 0; i--) {
             const { key, prev } = written[i];
-            if (prev === null || prev === undefined) storage.removeItem(key);
-            else storage.setItem(key, prev);
+            try {
+                if (prev === null || prev === undefined) storage.removeItem(key);
+                else storage.setItem(key, prev);
+            } catch {
+                // 单个键还原失败 → 继续尝试其余键（尽力而为，失败键残留新值）
+            }
         }
         throw err;
     }
