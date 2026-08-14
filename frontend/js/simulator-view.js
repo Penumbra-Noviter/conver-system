@@ -30,13 +30,16 @@
  *
  * 持续同步观察者（SIM-API-1 — ADR-0001 方案 2「用户或游戏重建配置控件后
  *   重新同步，主应用设置保持唯一事实来源」）：iframe load 进入 loaded 后对
- *   contentDocument.body 挂 MutationObserver（childList + subtree，属性变更
- *   不监听 — 游戏重建面板走 innerHTML 替换）。只处理触及 config 三元组 id
- *   的变更（id 命中 / 变更子树含控件 — 游戏运行期高频 DOM 更新不触发）；
- *   防抖 500ms 合并连续重建；注入后 1s 冷却（写回环守卫：宿主写入派发的
- *   change 若被游戏同步重建面板，冷却窗口内不重复同步 — key-injector 幂等
- *   写入已收敛常规场景，冷却为假设性循环的兜底）。观察者随 iframe 卸载
- *   disconnect（destroyFrame），无跨游戏残留。
+ *   contentDocument.body 挂 MutationObserver（childList + subtree +
+ *   attributes；childList 覆盖结构重建（innerHTML 替换），attributes 覆盖
+ *   属性重建（setAttribute 重置控件值 — TD-75：目标元素自身 id ∈ 三元组才
+ *   处理，运行期无关属性变更（class/style 等）经 id 过滤不触发；宿主注入
+ *   走 property 赋值与事件派发，不产生 attribute mutation — 无自触发面）。
+ *   只处理触及 config 三元组 id 的变更（id 命中 / 变更子树含控件 — 游戏
+ *   运行期高频 DOM 更新不触发）；防抖 500ms 合并连续重建；注入后 1s 冷却
+ *   （写回环守卫：宿主写入派发的 change 若被游戏同步重建面板，冷却窗口内
+ *   不重复同步 — key-injector 幂等写入已收敛常规场景，冷却为假设性循环的
+ *   兜底）。观察者随 iframe 卸载 disconnect（destroyFrame），无跨游戏残留。
  *
  * 错误检测基线（spec Implementation Decisions）：同源 404 仍触发 load 事件，
  *   错误态主要依赖超时守卫（15s 未收到 load）+ 打开参数校验；iframe 元素
@@ -145,9 +148,11 @@ function disconnectObserver() {
 /**
  * 变更是否触及 config 三元组控件（SIM-API-1 观察者过滤 — 游戏运行期高频
  * DOM 更新（状态渲染等）不得触发同步；只有 id 命中或变更子树含控件才算）。
- * 语义：目标元素自身 id ∈ 三元组，或新增/移除子树内任一元素 id ∈ 三元组
- * （游戏整段重建配置面板时命中；子树元素遍历用 id 成员判定，无选择器
- * 转义面）。
+ * 语义：childList 变更（节点增删）— 目标元素自身 id ∈ 三元组，或新增/移除
+ * 子树内任一元素 id ∈ 三元组（游戏整段重建配置面板时命中；子树元素遍历用
+ * id 成员判定，无选择器转义面）；attributes 变更（TD-75 — 游戏以
+ * setAttribute 重建控件）— 仅目标元素自身 id ∈ 三元组视为触及（运行期无关
+ * 属性变更（class/style 等）经 id 过滤不触发同步）。
  * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
  * @param {object|null} config - manifest config 三元组（endpoint/apikey/model）
  * @returns {boolean} 任一变更触及配置控件为 true
@@ -157,6 +162,12 @@ function mutationTouchesConfig(mutations, config) {
         .filter((v) => typeof v === 'string' && v !== '');
     if (ids.length === 0) return false;
     for (const m of mutations ?? []) {
+        if (m?.type === 'attributes') {
+            // TD-75：属性变更仅当目标元素自身是配置控件才触及（游戏运行期
+            // 高频的无关属性变更（class/style 等）经 id 过滤不触发同步）
+            if (typeof m?.target?.id === 'string' && ids.includes(m.target.id)) return true;
+            continue;
+        }
         if (typeof m?.target?.id === 'string' && ids.includes(m.target.id)) return true;
         const nodes = [...(m?.addedNodes ?? [])];
         if (m?.removedNodes?.length) nodes.push(...m.removedNodes);
@@ -201,7 +212,12 @@ function observeConfigControls() {
     const doc = frame.contentDocument;
     if (!doc.body || typeof doc.body.addEventListener !== 'function') return;
     configObserver = new MutationObserver(handleConfigMutation);
-    configObserver.observe(doc.body, { childList: true, subtree: true });
+    // TD-75：childList（结构重建）+ attributes（setAttribute 重建 — 属性变更
+    // 路径）。写回环安全前提：宿主注入用 property 赋值（el.value = value）
+    // 与事件派发，不产生 attribute mutation — attributes 监听不新增自触发
+    // 面；游戏运行期频繁的无关属性变更（class 等）经 mutationTouchesConfig
+    // 的 id 过滤不触发同步
+    configObserver.observe(doc.body, { childList: true, subtree: true, attributes: true });
 }
 
 /**

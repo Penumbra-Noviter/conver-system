@@ -765,4 +765,46 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
         await vi.advanceTimersByTimeAsync(2000);
         expect(fetchMock).toHaveBeenCalledTimes(1); // 断开后不触发
     });
+
+    it('TD-75:游戏以属性变更（setAttribute(value)）重建配置控件 → 防抖后自动再同步', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai'); // load 自动同步已填
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // 越过写回环冷却（load 自动同步写入后 1s 内的重建属自写入反应，跳过）
+        await vi.advanceTimersByTimeAsync(1000);
+        // 游戏以属性变更重建配置控件（value attribute 重置为默认 — 无 DOM 结构变更，
+        // childList 观察不到；ADR-0001「重建配置控件后重新同步」承诺的窄缺口）
+        doc.getElementById('cfg-apikey').setAttribute('value', '');
+        doc.getElementById('cfg-endpoint').setAttribute('value', 'game-default-endpoint');
+        doc.getElementById('cfg-model').setAttribute('value', 'game-default-model');
+        await vi.advanceTimersByTimeAsync(500); // 观察者防抖到期
+        await vi.advanceTimersByTimeAsync(0); // 再同步微任务
+
+        expect(fetchMock).toHaveBeenCalledTimes(2); // 属性变更重建触发再同步
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai'); // 主应用配置重新生效
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+    });
+
+    it('TD-75:与配置控件无关的属性变更（class/style — 游戏状态渲染）→ 不触发再同步', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // 游戏状态元素（非配置控件 — id 不在三元组）运行期高频属性变更
+        const statusEl = doc.createElement('div');
+        statusEl.className = 'game-ui';
+        doc.body.appendChild(statusEl);
+        await vi.advanceTimersByTimeAsync(1000);
+        statusEl.setAttribute('class', 'game-ui game-day-3');
+        statusEl.setAttribute('style', 'color: red');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 无关属性变更不触发再同步
+    });
 });
