@@ -31,6 +31,22 @@
 
 ## 已完成归档
 
+### C1 写回环状态机收口（2026-08-15 kickoff 全自动档：串行链 4 工单）
+
+> 来源：/improve-codebase-architecture 架构评审报告候选 C1（Worth exploring）。Grilling 共识（全自动档按推荐拍板 Q1=A1/Q2=B1/Q3=C1/Q4=D1）：**把模拟器配置同步的写回环状态（冷却/熔断）从 simulator-view.js 收进 key-injector.js 成为单一状态机**；Q5 附带：不新加熔断 UI 提示（范围克制）、`autoSyncIntoGame` 加 `path:'load'|'observer'` 参数（默认 load，10 处调用零改动）、新导出 `resetSyncLoop()`、`__all__` 10→11、测试迁移（状态机用例归 key-injector.test.js / 触发时机留 simulator-view.test.js）。
+
+- **工单 01（18300a1，feat）**——key-injector 熔断/冷却单一状态机：新增 `SYNC_COOLDOWN_MS(1000)`/`SYNC_MAX_STRIKES(3)` 常量 + `syncCooldownUntil`/`syncStrikes` 状态；`autoSyncIntoGame` 原子完成冷却判定→同步→置冷却（仅真写入 `written>0`）→观察者计数→熔断判定；熔断权优先于冷却、幂等兜底（漏断后后续 observer 调用仍返回 breaker:true）；`resetSyncLoop()` 导出；`__all__` 10→11；runSync JSDoc 补 written 语义；11 个状态机 TDD 用例先红后绿
+- **工单 02（b45e917，refactor）**——simulator-view 收口：删冷却/熔断状态与常量（grep 零残留）；`handleConfigMutation` 改消费 `result.breaker === true` → disconnectObserver（熔断动作留在拥有观察者的模块，依赖方向不破）；`autoSyncAfterLoad` 变薄封装传 `path:'observer'`；`handleLoad` 直调 `autoSyncIntoGame`（默认 load）；`destroyFrame` 两行清零换 `resetSyncLoop()`（复位唯一触发点；observeConfigControls 开头 disconnectObserver 不得顺带复位）
+- **工单 03（030b1d4，docs）**——测试头注释同步：key-injector.test.js 覆盖清单增写回环状态机条目 + `__all__` 11 项；simulator-view.test.js 写回环冷却/熔断改指向 key-injector 状态机
+- **工单 04（922f03d，docs）**——文档同步：两模块头注释职责段改述（key-injector 单一持有者 / simulator-view 只留触发时机）+ CONTEXT.md 新增「写回环状态机(sync loop state machine)」术语行
+- **merge（b0a2fcc）** + 非阻断修复（b8c1f05）：doc_sync 刷新测试数/行数机械标记（total 1201→1259）
+
+**期末四轴 code-review（固定点 3c129e1）：0 阻断放行**——Standards 0 硬违规（__all__ 11 项同步、JSDoc 齐全、安全红线零命中）；Spec 9 条语义约束 + 4 条验收清单全达标（written vs filled 判据、冷却判定时机、路径计数 load 不计数/observer 计数、冷却中返回 cooled:true、复位唯一触发点 destroyFrame、runSync 不动、path 默认 load、跨游戏不残留、熔断权优先）；Falsify 8 组对抗构造全过（熔断后按钮仍可注入、冷却中双路径跳过、熔断幂等兜底、resetSyncLoop 幂等、written=0 不置冷却、path 非法值降级 load 语义、跨游戏复位、TD-76/F1/F2 语义仍被覆盖）；Architecture 全正面（状态机收口消除「写回环决策劈两模块」，key-injector 实现 +60 行/接口 +1 符号仍深，simulator-view 减薄到触发时机）。1 项非阻断：CODE_WIKI 测试总数漂移（doc_sync 未跑，随 b8c1f05 修复）。
+
+**运行态冒烟**：smoke-simulators 13 项 **12 PASS / 0 FAIL / 1 SKIP** 退出码 0——load 自动同步 / 手动重新同步 / 幂等保持 / 受管 option / 存档保留全过，端口已释放。
+
+**测试同步**：Vitest **766**（基线 755，+11）；pytest 434+1skip / cargo 58 未受影响。
+
 ### 技术债区 TD-75/76 批次（2026-08-14 kickoff 全自动档：小档 2 工单）
 
 > 来源：SIM-API-1 期末评审非阻断发现（Spec 轴 + Falsify 轴），用户指令「开始修复，全自动」。

@@ -762,7 +762,7 @@ conver system/
 
 ### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~608 行<!--/AUTO-->）
 
-**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + 写回环熔断 TD-76）。
+**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。
 
 | 元素 | 说明 |
 |------|------|
@@ -773,7 +773,8 @@ conver system/
 | <!--AUTO:sig:frontend/js/key-injector.js:injectCredentialsIntoGame-->`injectCredentialsIntoGame({ doc, config, credentials, endpointMode } = {})`<!--/AUTO--> | 向游戏文档注入凭证 |
 | <!--AUTO:sig:frontend/js/key-injector.js:syncGameCredentials-->`syncGameCredentials({ doc, config, endpointMode } = {})`<!--/AUTO--> | 同步游戏凭证 |
 | <!--AUTO:sig:frontend/js/key-injector.js:runSync-->`runSync({ bar, getDoc, getConfig, getEndpointMode, feedback })`<!--/AUTO--> | 执行同步（状态栏驱动） |
-| <!--AUTO:sig:frontend/js/key-injector.js:autoSyncIntoGame-->`autoSyncIntoGame(params = {})`<!--/AUTO--> | 自动同步编排（load 重放） |
+| <!--AUTO:sig:frontend/js/key-injector.js:autoSyncIntoGame-->`autoSyncIntoGame(params = {})`<!--/AUTO--> | 自动同步状态机（path load/observer + cooled/breaker） |
+| <!--AUTO:sig:frontend/js/key-injector.js:resetSyncLoop-->`resetSyncLoop()`<!--/AUTO--> | 复位写回环状态（冷却+熔断） |
 | <!--AUTO:sig:frontend/js/key-injector.js:attachKeyInject-->`attachKeyInject(params = {})`<!--/AUTO--> | 注入按钮接线 |
 | <!--AUTO:sig:frontend/js/key-injector.js:handleKeyClick-->`handleKeyClick(e)`<!--/AUTO--> | 注入按钮点击 |
 

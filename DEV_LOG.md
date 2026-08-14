@@ -6,6 +6,20 @@
 
 ---
 
+## 滚动摘要（2026-08-15 — C1 写回环状态机收口：kickoff 全自动档串行链 4 工单）
+
+- **来源**：/improve-codebase-architecture 架构评审报告候选 C1（Worth exploring），用户挑中 → kickoff 全自动档。病灶：模拟器配置同步的写回环状态（冷却 `syncCooldownUntil`/熔断 `syncStrikes`）劈在 simulator-view.js，同步执行在 key-injector.js——写回环决策被拆散到两个文件。
+- **Grilling 共识（Q1-Q5 全按推荐拍板）**：Q1=A1 一体状态机 API（`autoSyncIntoGame` 加 `path:'load'|'observer'`，一次调用原子完成冷却判定→同步→置冷却→观察者计数→熔断判定）/ Q2=B1 熔断经返回值 `breaker:true` 传达（熔断动作 disconnectObserver 留在拥有观察者的模块）/ Q3=C1 新导出 `resetSyncLoop()`（复位唯一触发点 = destroyFrame）/ Q4=D1 path 限定自动路径（load 不计数 / observer 计数+熔断 / 手动按钮完全不经状态机）/ Q5 不加熔断 UI 提示（范围克制）、`__all__` 10→11、测试迁移、文档同步
+- **串行链 4 工单（单 Implement 一次调用连续完成，独立 worktree + 分支 kickoff/c1-sync-state-machine）**：01 key-injector 状态机（18300a1，+96/-20，11 个 TDD 用例先红后绿）/ 02 simulator-view 收口（b45e917，删状态与常量零残留 + breaker 消费）/ 03 测试头注释同步（030b1d4）/ 04 文档同步（922f03d，头注释 + CONTEXT 术语表）；merge b0a2fcc；非阻断修复 b8c1f05（doc_sync 刷新 total 1201→1259）
+- **范围核验**：6 文件 +428/-86 全部合规（CODE_WIKI 已申报 doc_sync 机械同步）；0 回退 0 警告
+- **期末四轴 code-review（固定点 3c129e1）：0 阻断放行**——Spec 9 条语义约束全达标（written vs filled 判据、冷却判定时机、路径计数、冷却中 cooled:true、复位唯一触发点、runSync 不动、path 默认 load、跨游戏不残留、熔断权优先）；Falsify 8 组对抗构造全过（熔断后按钮仍可注入 / 冷却双路径跳过 / 熔断幂等兜底 / resetSyncLoop 幂等 / written=0 不置冷却 / path 非法值降级 load 语义 / 跨游戏复位 / TD-76+F1/F2 语义仍覆盖）；Architecture 全正面（状态机收口消除劈两模块，key-injector 实现 +60/接口 +1 仍深，simulator-view 减薄到触发时机）。1 项非阻断（CODE_WIKI 计数漂移）随 b8c1f05 修复
+- **运行态冒烟**：smoke-simulators 13 项 12 PASS / 0 FAIL / 1 SKIP 退出码 0；端口已释放
+- **测试**：Vitest **766**（基线 755，+11）；pytest 434+1skip / cargo 58 未受影响
+- **知识库预检召回**：精读「无框架前端 fetch seam」（同族注入 seam 惯例，本批经 initKeyInjector 延续应用）「聚合语义字段跨模块复用须核对语义」（**written vs filled 判据直接本源——TD-75/76 F1/F2 教训的迁移红线**）「Falsify测试要钉住缺陷所在层」（熔断测试用显式 3 轮步数钉住熔断层）；本次无新教训蒸馏（收口重构，既有教训已覆盖）
+- **文档同步**：TICKETS（C1 批次归档）；CLAUDE（批次行 + 基线 755→766）；DEV_LOG 本段
+
+---
+
 ## 滚动摘要（2026-08-14 — 技术债区 TD-75/76 批次：kickoff 全自动档小档 2 工单 + 期末四轴修复）
 
 - **来源**：SIM-API-1 期末评审非阻断发现（Spec 轴 TD-75 观察者 childList 窄缺口 + Falsify 轴 TD-76 写回环只节流不终止），用户指令「开始修复，全自动」
