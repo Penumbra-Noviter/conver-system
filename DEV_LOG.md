@@ -6,7 +6,14 @@
 
 ---
 
-## 滚动摘要（2026-08-14 — Release 打包 + 安装器产物回收）
+## 滚动摘要（2026-08-14 — 桌面版游戏列表为空：打包面漏同步修复 + 教训闭环）
+
+- **用户反馈**：桌面版应用内看不到集成的 22 款游戏（网页版正常）。根因双重：①dist/conver_backend/ 后端包陈旧（08-13 构建，早于模拟器模块加入）；②**backend/conver_backend.spec 的 _FRONTEND_RUNTIME 从未包含 frontend/simulators/**——模拟器模块加入时未同步打包清单，即使重建后端包仍缺游戏。
+- **修复（commit 71f34b7）**：spec 增补 `(frontend/simulators, frontend/simulators)` + 注释（漏打包则游戏列表为空）+ test_packaging token 断言同步；重建后端包（包内 22 款游戏 + manifest 22 条）；桌面冒烟 5 项全过；孤儿后端进程清理（ForceKillStale 强杀壳后后端子进程残留，taskkill 树杀后 PyInstaller 才可清旧包）
+- **教训闭环（commit 5e29f89 + 知识库 + persona）**：新增前端运行目录必须同步打包面——单向「spec 声明的都存在」拦不住「新增未声明」方向；防复发 = **反向差集锁**（test_packaging.py::test_frontend_runtime_dirs_all_shipped：枚举 frontend/ 实际目录与 spec datas 差集，新增目录未打包即红——探针目录证伪实验已验红）；「网页版能跑不证明打包态能跑」——桌面端变更必跑 smoke-desktop 打包态冒烟；经验笔记《新增前端运行目录必须同步打包面》+ persona 稳定模式更新
+- **build-desktop.ps1 加 -SkipInstaller 开关（commit 2f3dc7e）**：常规打包 --no-bundle 仅编译壳，不产 NSIS 安装器（用户惯例：安装包仅在明确提需求时打包）；实跑验证：开关生效/无 NSIS/测试全绿/冒烟 5 项全过
+
+---
 
 - **release 打包（build-desktop.ps1 全链）**：cargo test 全绿 + pytest 433+1skip + Vitest 714 + tauri build（NSIS 安装器 23.7MB）+ dist 测试包（conver-system.exe 10.5MB）+ 冒烟 5 项全过（runtime.json 就绪 / /api/models 200 / 前端挂载 200 / 表结构 / 退出无残留）
 - **安装器产物回收（用户明确指令）**：NSIS 安装器（`Conver System_0.1.0_x64-setup.exe`）已删除——用户重申「安装包只在明确提需求时才打包」；**dist/ 根「双击即用」测试包（conver-system.exe + conver_backend/）为常规打包产物**，保留。注意：build-desktop.ps1 构建链固定含 tauri build（必产 NSIS），未来常规打包若需跳过安装器应调整脚本加开关（未做，等用户提需求时一并处理）
