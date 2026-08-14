@@ -13,7 +13,7 @@
 1. 可以自己添加世界设定、玩法
 2. 可以导入这种世界玩法，包括整合 UI 的功能
 
-产品现状（2026-08-13）：本地优先角色对话应用（FastAPI + SQLAlchemy 同步 + SQLite + Vanilla JS ESM + Tauri 桌面壳），已支持 SillyTavern Character Card V2 导入/导出，测试基线 pytest 413+1skip + Vitest 466 + cargo test 58 全绿，无活跃待办。
+产品现状（2026-08-14）：本地优先角色对话应用（FastAPI + SQLAlchemy 同步 + SQLite + Vanilla JS ESM + Tauri 桌面壳），已支持 SillyTavern Character Card V2 导入/导出与 22 款模拟器集成模块（U7 批次交付），测试基线 pytest 413+1skip + Vitest 551 + cargo test 58 全绿，无活跃待办。
 
 ## 二、调研结论（2026-08-13，子智能体网络调研）
 
@@ -117,7 +117,7 @@ World（世界：设定文本 + 世界书条目表 + 预留玩家状态 JSON）
 | U4 | 玩家视角 | 修仙/人生模拟需要「玩家状态」（用户作为主角），World 数据层已预留，具体形态待玩法层讨论 |
 | U5 | 玩法包生态 | 玩法包导入的 UI 整合形态（「整合 UI」诉求的落地方案） |
 | U6 | 世界书字段全集 | 后置字段（正则/递归/定时/向量）在玩法层阶段的补入顺序 |
-| U7 | 模拟器模块正式形态 | 原型已验证链路 → 正式模块：导航集成（独立 tab/入口）、卡片列表页、22 个游戏全量入包、manifest 字段完善（标签/分类/封面） |
+| U7 | 模拟器模块正式形态 | ✅ **已完成**（2026-08-14 U7 kickoff 交付：5 工单 3 波——侧栏入口/22 游戏入包/列表页/运行视图/冒烟脚本，见 [TICKETS.md](TICKETS.md) 归档） |
 | U8 | 模拟器 LLM key 整合 | 现状各游戏内自填 key；可选二期：复用 Conver System key 管理（同源 postMessage/注入），游戏内「用主应用 Key」 |
 | U9 | 模拟器存档管理 | 各游戏 localStorage 前缀存档现状独立；可选二期：存档导出/导入/管理面板 |
 | U10 | 内容授权 | 第三方模拟器作者授权——个人自用无碍，开源分发前需确认（22 个游戏） |

@@ -23,13 +23,40 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
+| TD-48 | manifest saveKeyPrefix 不唯一（wg_ 出现 2 次：小马宝莉/高中生模拟器，实际键靠 CFG.id 区分 `wg_xiaomabaoli_*`/`wg_gaozhongsheng_*` 无运行时冲突）——消费方不得假设前缀全局唯一；未来存档管理按完整键而非前缀分桶（波 2 Falsify 复证：审核一度推断「存档串档」，深挖证伪——实际键不同，无串档） | 波 1 Falsify（波 2 复证） | 低 | 📝 待立项 |
+| TD-49 | T3 落地前 `#simulator-list-panel` 无占位空态，点击「模拟器」呈现空白视图（UX 缺口，无崩溃）——T3 四态实现后复核 | 波 1 Falsify | 低 | 📝 待立项 |
+| TD-50 | T2 commit message 声称「覆盖 2 个示例」实际 git 零变化——md5 复核源目录与仓库内人生模拟器v3/蛛网之影一致，无内容漂移，仅措辞失实 | 波 1 Falsify | 低 | ❌ 复核关闭（2026-08-14 md5 比对一致，无漂移） |
+| TD-51 | T3 列表 fetch 无超时守卫（simulators.js:342-357；T4 有 15s）——manifest fetch 挂起 → 永久 loading 无重试出口（期末四轴复证：simulators.js:330 同问题，行号随修复漂移） | 波 2 Falsify（期末四轴复证） | 低 | 📝 待立项 |
+| TD-52 | manifest 22 条全 ai、无 local——「纯本地」筛选档永远空态（T2 实测判定非缺陷；未来入包 local 游戏自然消失）（期末四轴复证：UI 档位与数据现状张力，空态文案正确呈现） | 波 2 Falsify（期末四轴复证） | 低 | 📝 待立项 |
+| TD-53 | 运行视图中再点 nav「模拟器」：仅刷新隐藏列表、不销毁 iframe 不回列表（app.js:106-109）——与「返回」按钮语义分工但未提示用户 | 波 2 Falsify | 低 | 📝 待立项 |
+| TD-55 | refreshSimulators 并发陈旧响应覆盖（进→出→快速重进双 fetch，慢旧响应后到覆盖新渲染，simulators.js:349-364）——静态 manifest 内容相同，实际影响可忽略 | 期末四轴 | 低 | 📝 待立项 |
+| TD-56 | isValidGame src 注入守卫不覆盖百分号编码（`%2e%2e`/`%2f`，simulator-view.js:95-99）——WHATWG URL 解析可绕过字面 `/` `\` 检查；受 Starlette 遍历防护 + manifest 可信资产双兜底，实际不可达，加固建议 | 期末四轴 Falsify | 低 | 📝 待立项 |
+| TD-57 | **同源 iframe 信任边界**：22 游戏同源运行，游戏间 localStorage key 可互读（含用户自填 API key）+ 可调 /api 任意端点（后端无鉴权）——自用威胁模型可接受，但应文档化；U8 探索跨源沙箱/postMessage | 期末四轴 Falsify | 中 | 📝 待立项 |
+| TD-58 | play 图标注册未使用（icons.js:36，仅测试断言可渲染）——使用或移除 | 期末四轴 | 低 | 📝 待立项 |
+| TD-59 | index.html 内联 gamepad SVG（侧栏:44 + 移动端:417）与 icons.js ICON_PATHS 双源，防漂移仅靠注释——加一致性测试锁 | 期末四轴 | 低 | 📝 待立项 |
+| TD-60 | api.js / simulators.js 双 setFetch seam 协议面重复（simulators.js:42-51 镜像 api.js:16-28，docstring 已论证）——抽共享 seam 模块或 api.js 增 fetchUrl | 期末四轴 | 低 | 📝 待立项 |
+| TD-62 | initSimulatorsView 二次 init 异容器时 stateEl 陈旧（simulators.js:285-295）——app.js 只 init 一次不可达；同容器幂等有测试 | 期末四轴 | 低 | 📝 待立项 |
 
-
-> 技术债区当前 **0 项**（全部清零；TD-46/TD-47 已修归档见下）。
+> 技术债区当前 **12 项**（TD-48/49/51/52/53/55/56/57/58/59/60/62 待立项；TD-50 已复核关闭）。
 
 ---
 
 ## 已完成归档
+
+### U7 模拟器模块批次（2026-08-14 全自动 kickoff：5 工单标准档 3 波）
+
+> 来源：docs/world-simulation-exploration.md U7 未决事项（2026-08-13 原型验证通过）→ 2026-08-14 正式立项（用户确认 kickoff）。
+>
+> 工单（merge 链 37affb8 → 48e6e6c → 3ab60e6 → e4b6129 → 7e5ea15）：
+> - **T1 模拟器入口**（`0e19f50`，merge `37affb8`，波 1）——侧栏/移动端导航按钮 + view-simulators 骨架 + gamepad/play 图标（零接线切换）
+> - **T2 22 游戏数据**（`f768afe`，merge `48e6e6c`，波 1）——22 款模拟器全量入包 + manifest v1 元数据补全（数据工单）
+> - **T3 列表页**（`8d7a52a`，merge `3ab60e6`，波 2）——manifest 解析 + 卡片网格 + 类型筛选 + 四态
+> - **T4 运行视图**（`7b81172`，merge `3ab60e6`，波 2）——iframe 状态机 + AI 提示条 + 返回
+> - **T5 冒烟脚本**（`72af4f4`，merge `7e5ea15`，波 3）——模拟器端到端冒烟（Playwright：网页 7 PASS/1 SKIP + 桌面 CDP 5 PASS）
+>
+> **波 2 审核修复**（`8d266f9`，merge `e4b6129`）：属性注入面关闭（data-id/title 走 DOM 通道）+ iframe load 竞态守卫（先红后绿实证）。
+>
+> **期末四轴 code-review：0 阻断**；12 项非阻断观察落技术债区（TD-48~62 待立项，TD-50 复核关闭，详见上方技术债区表）。测试同步：Vitest **551**（基线 466，+85）；pytest 413+1skip / cargo 58 未受影响，全部全绿。
 
 ### 架构深化批次 td-arch-health（2026-08-13 全自动 kickoff：8 工单 3 波）
 

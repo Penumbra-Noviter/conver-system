@@ -125,7 +125,8 @@ conver-system/
 │   │   ├── conversation-activation.test.js
 │   │   ├── search-view.test.js / cascade.test.js     # 搜索/级联深模块（T-01）
 │   │   ├── chat.test.js / app.test.js                # 编排薄集成（T-06）
-│   │   └── model-selector.test.js / settings-panel.test.js  # 组件 jsdom 联动（T-06）
+│   │   ├── model-selector.test.js / settings-panel.test.js  # 组件 jsdom 联动（T-06）
+│   │   └── simulator-manifest.test.js / simulators.test.js / simulator-view.test.js  # 模拟器列表/运行视图（U7）
 │   ├── js/
 │   │   ├── app.js                 # 主入口（接线/视图切换/初始化；搜索与级联已下沉 search-view.js/cascade.js）
 │   │   ├── state.js               # 应用级全局状态（会话级字段已退役）
@@ -138,6 +139,8 @@ conver-system/
 │   │   ├── stream-session.js      # 流式回合结算深模块（createStreamSession + settleTurn + mergeFreshList）
 │   │   ├── conversation-activation.js # 激活编排深模块（F-2 守卫/草稿滚动/懒加载，setActivationHooks 注入）
 │   │   ├── icons.js               # SVG 图标工厂 seam（iconHtml，唯一动态图标来源）
+│   │   ├── simulators.js          # 模拟器列表页深模块（parseManifest / filterGames / 四态渲染 / 类型筛选，initSimulatorsView + onOpenGame 注入钩子）
+│   │   ├── simulator-view.js      # 模拟器运行视图状态机（initSimulatorRun / openSimulator / closeSimulator / 15s 超时 / 事件源校验 / AI 提示条）
 │   │   ├── components/
 │   │   │   ├── character-form.js  # 角色表单（骨架走 modal 工厂，提交走 character-submit）
 │   │   │   ├── character-wizard.js# 六步角色创建向导（LLM 智能解析 + 模板；headerExtra 插槽挂步骤指示器）
@@ -154,8 +157,10 @@ conver-system/
 │   │   └── utils/
 │   │       ├── model-utils.js     # 模型选择逻辑（fillModelSelect / createCustomModelHandler）
 │   │       └── sse-reader.js      # SSE 流解析纯函数（parseSSEStream）
-│   └── assets/
+│   ├── assets/
+│   └── simulators/                # 22 款第三方单文件模拟器 + manifest.json v1（静态托管，main.py 根挂载自动覆盖）
 │
+├── scripts/                       # 构建/冒烟脚本（build-desktop.ps1 / smoke-desktop.ps1 / smoke-simulators.mjs 等）
 ├── docs/                          # 核心文档
 │   ├── architecture.md
 │   ├── api-design.md

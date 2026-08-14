@@ -6,10 +6,21 @@
 
 ---
 
+## 滚动摘要（2026-08-14 — U7 模拟器模块批次：5 工单标准档 3 波全自动 kickoff）
+
+- **U7 批次完成（merge 链 37affb8 → 48e6e6c → 3ab60e6 → e4b6129 → 7e5ea15）**：模拟器模块正式落地（2026-08-13 原型验证 → 2026-08-14 正式立项，来源 docs/world-simulation-exploration.md U7 未决事项）。标准档 3 波——波 1：T1 模拟器入口（侧栏/移动端导航按钮 + view-simulators 骨架 + gamepad/play 图标，零接线切换，merge 37affb8）+ T2 22 款模拟器全量入包 + manifest v1 元数据补全（数据工单，merge 48e6e6c）；波 2：T3 列表页（manifest 解析 + 卡片网格 + 类型筛选 + 四态，8d7a52a）+ T4 运行视图（iframe 状态机 + AI 提示条 + 返回，7b81172），merge 3ab60e6；波 2 审核 2 修复（8d266f9，merge e4b6129）——**属性注入面关闭**（data-id/title 走 DOM 通道）+ **iframe load 竞态守卫**；波 3：T5 端到端冒烟脚本（Playwright，72af4f4，merge 7e5ea15）
+- **数据判定**：manifest 22/22 全 ai（实测无 local 条目——「纯本地」筛选档为空态属现状张力，落 TD-52）
+- **期末四轴 code-review：0 阻断**；12 项非阻断观察落技术债区（TD-48~62 待立项，TD-50 复核关闭，见 TICKETS 技术债区）
+- **4.5 运行态冒烟**：网页端模拟器冒烟 7 PASS/1 SKIP（SKIP：manifest 无 local 条目 → 纯本地路径按设计跳过并报偏离说明）+ 桌面 WebView2 CDP 5 PASS
+- **文档同步（本批次）**：TICKETS（U7 归档 + TD-48~62 落区）；CLAUDE.md / PROJECT_REFERENCE.md（Vitest 466→551 + 状态更新）；README / docs/architecture.md（模拟器模块入册）；docs/world-simulation-exploration.md（U7 未决事项标已完成）；DEV_LOG 本段 + 首次滚动摘要折叠
+- **测试**：Vitest **551**（+85）；pytest 413+1skip / cargo 58 未受影响
+
+---
+
 ## 滚动摘要（2026-08-14 — DEV_LOG 滚动摘要折叠规则确立）
 
 - **规则确立（用户确认 N=12）**：滚动摘要窗口上限 12 条，超限在文档同步时把最旧一批折叠为一条「阶段摘要」（日期范围 + 每批次一行，置于日志正文顶部），窗口回落 6~8 条；不拆 docs/——避坑已蒸馏 persona/经验笔记、批次细节 git log 可溯。落点：CLAUDE.md「待办管理」+ DEV_LOG 头注
-- **现状**：摘要区 20 条（含本段，≈215 行），已超触发线；首次折叠留待下次 G20 文档同步执行（按确认口径）
+- **已执行**：2026-08-14 文档同步完成首次折叠（最旧 15 批 → 阶段摘要，见日志正文顶部；摘要区回落至 7 条，含本段与 U7 批次）
 
 ---
 
@@ -55,180 +66,29 @@
 
 ---
 
-## 滚动摘要（2026-08-13 — 技术债区 TD-29~41/43~45 批次：17 项标准档全自动 kickoff）
-
-- **TD-29~41/43~45 批次完成（用户指令「全自动完成技术债区任务」，merge 链 b835210/615aba8/a5fe7b9 + cef3fea + 342382e + 960c9c4/93b51ab/649910c/d96b4ce + 归档 de09509）**：Grilling 共识（用户确认）**11 做 + 5 关闭 + 1 票面修正**——做：TD-29 formatTemperature isFinite 回退 / TD-30 boot.html 就绪超时 >0 兜底 / TD-31 **票面修正**（先 kill 再 taskkill 实证自相矛盾 → taskkill 先行 + 存活兜底 + 5s 有界回收）/ TD-33 resolver 领域异常分类 / TD-36 renderMessages 守卫 / TD-37 startRename 守卫 / TD-38 代码块占位符原子化 / TD-40 _translate_error abstract 钉契约 / TD-41 死导入 / TD-44 coverage.include / TD-45 XSS 五变体回归网；关闭 5（复核确认维持，TD-43 票面机制实证否定）
-- **标准档 2 波 4 工单**：波 1 三并行（01 前端防御 02 markdown 原子化 03 后端错误处理）+ 波 2 单张（04 壳生命周期）；波 1/2 增量审核均 0 阻断
-- **过程遥测**：并行 3；回退 0；空返回重开 1（期末四轴首代理空返回）；范围核验波 1 合规 18/警告 1（vitest.config.js 申报）/波 2 全合规 + 波 1 收尾 2 警告；增量审核 Falsify findings：波 1 4 项（0 阻断）、波 2 4 项（0 阻断）
-- **期末四轴（固定点 4a43b5b）：1 阻断已修复放行**——Falsify 抓到 TD-38 占位符碰撞循环计数器失同步（createCodeBlockToken do-while 碰撞消耗多序号 vs 调用方单次 tokenId++ → 多代码块 + 用户内容含 \x00MDCB<n>\x00 形文本时首块被覆盖丢失；碰撞免疫契约失效 + 套件零覆盖）→ daf5503 修复（返回 {token, nextId} 取号单一职责 + 5 防复发用例转正）→ merge 342382e → 复审 9 场景全过放行；教训：**Falsify 对抗输入必须覆盖防御机制自身实现完整性（碰撞消耗 vs 外部推进同步），Implement 自审「碰撞循环实测兜底」未测多块场景是盲区**
-- **运行态冒烟**：uvicorn /api/models 200 + test-connection 400「不支持的 Provider: gemini」+ /api/characters 200；端口停净（taskkill 树杀 + netstat 复核）
-- **G20 文档同步（本批次）**：TICKETS（17 项归档 + TD-46 落区，技术债区 1 项）；CLAUDE.md（pytest 412→413 / Vitest 444→460 / cargo 56→58）；TICKETS.md NUL 字节转义修复（d96b4ce，恢复纯文本 diff）；DEV_LOG 本段
-- **测试**：pytest **413 + 1 skip**（+1 构造 ValueError 透传用例）/ Vitest **460**（+16：工单 01 +3 + 工单 02 +8 + 阻断修复 +5）/ cargo **58**（+2）
-
----
-
-## 滚动摘要（2026-08-13 — 技术债区 TD-42 批次：链接属性注入面修复轻量档 kickoff）
-
-- **TD-42 批次完成（merge a6fba3b）**：用户指定「继续 TD-42」（TD-28 审核新发现 Strong）。票面：markdown.js 链接正则允许引号 + escapeHtml 不转义引号 → `[x](" onmouseover="alert(1))` 事件属性注入存活（target=_blank 对此面无防护——TD-28 票面描述不完整的实证）。轻量档单 Implement 直行（主树独立分支 kickoff/td42-attr-injection）：sanitizeUrl 拒绝含引号 URL（与 scheme/控制字符判定同 choke point）；先红后绿实证（基线仿真复现 onmouseover 属性注入存活）；444 passed（+6）零回归、markdown.js 行覆盖 100% 不下降（branch 95.12% 为既有列表状态机）
-- **过程遥测**：轻量档单工单直行；merge 零回退冲突；范围核验 A 档（2 文件恰为声明）
-- **期末四轴（固定点 c18399c）：0 阻断**——Spec 6/6、Falsify 27 变体 0 击穿（%22/实体族/全角引号正确放行/反引号+javascript: WHATWG 验证不执行/组合变体/非字符串入参不崩溃）、Architecture 全过（单引号拒绝保守性：不依赖模板引号风格防未来单引号化复发，JSDoc+测试双层防线）；1 项非阻断落技术债区（TD-45 变体回归网缺口）；空白 URL/反引号拒绝为既有行为不落债
-- **4.5 运行态冒烟**：Vitest 444 全绿 + Falsify 27 变体实测（危险链接变体 GUI 不可构造，跳过 GUI 冒烟同 TD-28 理由）
-- **G20 文档同步（本批次）**：TICKETS（TD-42 归档 + TD-45 落区，技术债区 17 项）；CLAUDE.md / PROJECT_REFERENCE.md（Vitest 438→444）；DEV_LOG 本段
-- **测试**：Vitest **444**（基线 438，+6）；pytest 412+1skip / cargo 56 未受影响
-
----
-
-## 滚动摘要（2026-08-13 — 技术债区 TD-28 批次：sanitizeUrl 控制字符绕过修复轻量档 kickoff）
-
-- **TD-28 批次完成（merge 890aa97）**：用户指定「TD-28 是下轮技术债首选」（td-arch-health 期末 Strong 项）。票面：markdown.js `sanitizeUrl` 控制字符绕过 scheme 白名单（`java	script:` 等 TAB/LF/CR 变体被浏览器剥离后解析为 javascript:，仅 target=_blank 意外兜住）。轻量档单 Implement 直行（主树独立分支 kickoff/td28-sanitize-control-chars）：scheme 匹配前剔除 `[\x00- ]` + 4 变体单测（TAB/LF/CR/NUL 前导）；先红后绿实证（修复前 `java	script:` 放行产出 href）；27/27 用例、全量 vitest 438（+2）零回归、markdown.js 行覆盖 100% 不下降（branch 94.73% 为既有列表状态机分支）
-- **过程遥测**：轻量档单工单直行；merge 零回退冲突；范围核验 A 档（2 文件恰为声明）
-- **期末四轴（固定点 22a0c01）：0 阻断**——Spec 4/4、Falsify 11 变体无击穿（大小写混合/多控制字符/冒号前/前导空格+控制字符/NUL/实体编码双转义/百分号编码/Unicode 空白 NBSP/纯控制字符不崩溃）、Architecture 全过（判定用净化副本、返回原文——安全输出模式）；**3 项非阻断落技术债区**：TD-42 [Strong] escapeHtml 不转义引号 + 链接正则允许引号 → 事件属性注入存活（**TD-28 票面「target=_blank 意外兜住」描述不完整**——target 对此面无防护，既有基线 XSS 面）/ TD-43 jsdom 保留 U+0000 vs 浏览器 U+FFFD 环境差异 / TD-44 vitest coverage.include 不含 markdown.js（覆盖率验收无 CI 门槛）
-- **4.5 运行态冒烟**：Vitest 438 全绿 + Falsify 实测；危险 scheme 变体在 GUI 正常消息流不可构造，跳过 GUI 冒烟（正常 URL 渲染零变化已由 td-arch-health 批次 T7 覆盖）
-- **G19 文档同步（本批次）**：TICKETS（TD-28 归档 + TD-42/43/44 落区，技术债区 16 项）；CLAUDE.md / PROJECT_REFERENCE.md（Vitest 436→438）；DEV_LOG 本段
-- **测试**：Vitest **438**（基线 436，+2）；pytest 412+1skip / cargo 56 未受影响
-
----
-
-## 滚动摘要（2026-08-13 — 架构深化批次 td-arch-health：8 工单 3 波全自动 kickoff）
-
-- **td-arch-health 批次完成（merge 链 b4b0a31→48447e6）**：/improve-codebase-architecture 三端扫描 16 候选 + 1 附带 → Grilling 全自动档拍板 13 做 + 3 关闭（标准档 3 波：波 1 后端三票 BE-1/BE-2/BE-3 → 波 2 前端二票+Rust 一票 FE-2/FE-3/RS-1 → 波 3 脚本+前端 RS-2/FE-1）。**后端**：错误映射双表合一（error_mapping.py 单入口，ARC10-4「两路并存」由本批次取代）+ resolve_llm 凭据解析收口（三调用方同条件同语义，document_parser 无 Key 误归类 422 修复）+ CRUD require 深函数 + CharacterNotFoundError + build_content_disposition 附件头收口 + Provider 骨架共享 helper 上移（零 SDK import）。**前端**：messageBubbleHtml 气泡工厂六变体（三路径收口；system 无头像无复制——产品微调规格注记）+ 角色字段语义深模块（温度 0.70 统一，0.7/0.70 漂移修复）+ renderMarkdown 独立 markdown.js + 25 用例（Falsify 发现 XSS href scheme 注入并白名单硬化）+ 空态文案单源 + 聊天头部深模块收口。**壳/脚本**：启动契约显式化（spawn_arguments + 常量 + 双端测试钉住）+ dev 进程树残留 taskkill /T + 就绪超时单源 + 安装器路径推导 helper + smoke 迁移复刻委托 pytest。
-- **过程遥测**：3 波并行上限 3；merge 零回退冲突、1 处 api/errors.py 冲突人工仲裁（CharacterNotFoundError→404 移植 error_mapping 单一入口）；波末降配增量审核 3 轮——波 1：1 阻断（parse-document 未知 Provider 422→400 wire 回归，BE-1 修复 afda8d9 先红后绿 + 防复发断言）+ 4 非阻断；波 2：0 阻断 + 4 非阻断（TD-28 XSS 控制字符绕过 Strong 等）；波 3：1 阻断（复制按钮 data-content 属性注入面 + 引号截断——**流式路径从安全回归为不安全的本波引入点**，数据通道单一化修复 9716c30）+ 2 非阻断；期末四轴（固定点 2291298）：唯一阻断（同波 3 源）已修复复审，Standards 0 硬违规、Spec 8/8、Architecture 全正面（2 建议：_translate_error abstract 化 / chat.js 三域拆分预警）
-- **预检召回轨迹**：persona.md 精读；经验笔记 23 篇扫摘要（预算内精读 2 篇：技术债票面修复建议须实证复核 / 审计快照过期需复核）；守卫反查全过
-- **4.5 运行态冒烟**（web-gui-tester）：T1-T8 全过（创建向导 0.70/必填校验/头像空态、编辑表单回填、空态单源、错误路径 system 变体 GUI 实证、复制按钮引号不截断、markdown 渲染、设置面板回归）；**冒烟记录**：mock 拦截 glob `**/api/chats/**` 不匹配 `/api/chats` 漏拦 → 1 次真实外部 API 调用 + 对话「测试对话-重命名」+2 条测试消息（14→16，用户决定清理）；视觉验证因模型无图像能力降级为 DOM 证据 + 截图存档
-- **G18 文档同步（本批次）**：TICKETS（批次归档 + 技术债区 14 项 TD-28~41 落盘 + 票面措辞修正注记）；CLAUDE.md（测试数 412+1skip/431/56）；PROJECT_REFERENCE.md（测试数同步）；DEV_LOG 本段
-- **测试**：pytest **412 + 1 skip** / Vitest **436** / cargo test **56** 全绿（基线 362+1skip/373/52 → 期末 +50/+63/+4）
-
----
-
-## 滚动摘要（2026-08-13 — 技术债区 TD-25~27 批次：1 做 + 2 维持关闭全自动 kickoff）
-
-- **TD-25~27 批次完成（merge 8ae3801）**：TD-15~24 批次期末遗留 3 项处置——1 做 + 2 复核确认维持关闭（全自动档）。**TD-25** UNC 锁断言平台隔离（test_data_dir.py 唯一改动）：UNC 断言块拆独立用例 `test_env_override_unc_prefix_preserved` + `@pytest.mark.skipif(sys.platform != 'win32')`——**票面「断言级 skipif」实测不可表达**（装饰器无断言级形态，修正为函数级）；skipif 可见 skip 信号优于静默 `if sys.platform` 包裹（后者锁悄悄失效不可见）；skipif 逆条件探针实证（1 skipped → 还原 16 passed）；父函数剩余断言（折叠/`..`/尾分隔符）Windows+POSIX 双实测不受拆分影响；Windows 锁语义零变化（基线绿非先红）；**TD-26 维持关闭**（:371 空下拉放行存 `''` = TD-15 决策字面内行为，与用例⑧ 同构，零 TypeError 风险，不加锁测试）/ **TD-27 维持关闭**（UNC 复述 5 处/3 文件受双端镜像契约表惯例保护，跨文件引用已存在，漂移由 TD-25 锁兜底）
-- **过程遥测**：轻量档单 Implement 直行（主树独立分支 kickoff/td25-platform-guard，无 worktree/波次）；merge 零回退冲突；文件范围核验 A 档（1 文件恰为声明）
-- **期末四轴（固定点 aa3391f）：0 阻断**——验收①-⑤全过（361+1 skip / test_data_dir.py 16 passed / --co 362 / grep UNC 断言仅存于 skipif 函数内 / 锁语义独立实测不削弱）；POSIX 语义（PurePosixPath parts[0] == '//'）与 reason 措辞逐字吻合；4 项非阻断观察判断不落债（docstring 首行重复=spec 明示保留 / reason 行宽=无 lint 工具链 / skip 插件禁用=不可达 / 平台守卫模式=spec 已落盘）——技术债区零净增
-- **4.5 运行态冒烟**：后端 GET / 200（测试-only 改动零行为变化）；Vitest 373 / cargo 52 未受影响
-- **G17 文档同步（本批次）**：TICKETS（TD-25~27 归档 1 做 + 2 维持 + 技术债区清零）；CLAUDE.md（测试数 361 + 状态行）；PROJECT_REFERENCE.md（测试数 361）；DEV_LOG 本段
-- **测试**：pytest **361 + 1 skip** / Vitest **373** / cargo test **52** 全绿（基线 360+1skip/373/52 → 期末 +1）
-
----
-
-## 滚动摘要（2026-08-12 — 技术债区 TD-15~24 批次：10 项全做清零全自动 kickoff）
-
-- **TD-15~24 批次完成（merge 0010f1b）**：TD-13~14 批次期末遗留 10 项清零（小档 2 工单：TD-A 前端 `85aca1b` / TD-B 后端+文档 `e16048f`）。**TD-A** settings-panel 守卫收窄与卫生——TD-15 守卫条件化（`#setting-custom-model` 仅 `modelSelect.value === '__custom__'` 时要求；**票面建议 providerSelect 条件被实证否定**——provider 下拉只填 providers key 永不为 '__custom__'，条件恒假会让守卫形同虚设；+2 用例：A 先红后绿——旧实现守卫早退零 fetch、showAlert 超时红 1040ms、修复后 33 tests 全绿；B 基线绿钉保留边界）+ TD-23 计数口径修正（「11 个表单元素引用」→ 10 变量 + 第 11 次 `?.` 收口，grep 归零）+ TD-21 getSelectedModel docstring 契约标注（调用方须经入口守卫）+ TD-22 providerSelect.querySelector 复用（:373 重复查询消除）+ TD-20 用例⑦ 防御断言 + TD-19 warnSpy.mockRestore 惯例对齐（:529 afterEach 已兜底，属硬化非活 bug）；**TD-B** 路径契约注记与锁补强——TD-16 UNC 前导特例注记（`Path('//server/share/x')` 保留前缀不折叠，实测 parts[0] = `'\\\\server\\share\\'`）+ TD-17 契约锁扩展（尾分隔符 + UNC 两条断言并入 test_env_override_separators_normalized，基线绿非先红）+ TD-18 tauri-desktop.md「路径形态」限定（不做归一化 = 代码不改写路径整体）+ TD-24 server.rs default_data_dir 透传契约注释（注释-only 零 Rust 改动）
-- **过程遥测**：小档单 Implement 直行（两工单文件互斥无链，worktree `.worktrees/td15-24`）；merge 零回退冲突；文件范围核验 A 档（6 文件恰为声明）；Vitest 覆盖率 settings-panel.js 100% 行
-- **期末四轴（固定点 3072346）：0 阻断**——Spec 10/10 落地、验收全过（grep 三项实测归零/带限定；pathlib 声称实测逐字一致）；Falsify 守卫四态（modelSelect 缺/空下拉短路/__custom__ 早退/非 __custom__ 放行 + option:checked `?.` 收口）无击穿；Standards 安全红线三过（sk-/password/token 零命中）；3 项非阻断落技术债区（TD-25 平台硬断言缺守卫 Strong / TD-26 空下拉放行语义已被决策覆盖仅记录 / TD-27 UNC 三处复述与单点化张力）
-- **4.5 运行态冒烟**：后端 GET / 200；GUI（Playwright）：设置面板完整渲染（11 元素齐备）→ 保存设置「设置已保存」弹窗全过——TD-15 放行场景运行时实证（非 __custom__ 模型 + 无 custom 输入 → 保存成功，旧守卫在此形态拒绝）；console 仅 favicon 404 预存在
-- **G16 文档同步（本批次）**：TICKETS（TD-15~24 归档 + TD-25~27 落区）；CLAUDE.md（测试数 360/373 + 状态行）；PROJECT_REFERENCE.md（测试数漂移修复 261/186/43 → 360+1skip/373/52 + 状态更新至 2026-08-12）；DEV_LOG 本段
-- **测试**：pytest **360 + 1 skip** / Vitest **373** / cargo test **52** 全绿（基线 360+1skip/371/52 → 期末 +2，均 TD-A 守卫用例）
-
----
-
-## 滚动摘要（2026-08-12 — 技术债区 TD-13~14 批次：2 做 + TD-9 闭环全自动 kickoff）
-
-- **TD-13~14 批次完成（merge 61f1721）**：TD-8~12 批次期末遗留 2 项清零（用户指令「继续完善这两个观察项」）。**TD-13** save 回调入口统一守卫（settings-panel.js：11 元素收集 + 任一缺失 console.warn 早退 + :339 `?.textContent.trim() ?? ''` 收口 + docstring；+2 用例⑦⑧ 先红后绿——先红证据：:334 value / :339 textContent 两条 unhandledrejection TypeError 路径实证；守卫不介入正常 DOM 零回归）**TD-14** 契约「逐字符一致」措辞澄清（data_dir.py:16 / test_data_dir.py:64 / tauri-desktop.md:112 三处补 pathlib 规范化注记——重复分隔符折叠/`.` 消除/尾分隔去除/`..` 保留四项边界 + UNC 前导特例；+1 契约锁用例 test_env_override_separators_normalized，基线绿非回归；v2 不变 Rust 镜像零改动）；**TD-9 顺带闭环**：getSelectedModel 由「复核确认维持」转「做」——TD-13 入口守卫覆盖其全部调用点（:340/:281），本体零改动
-- **过程遥测**：单波 2 并行（前端/后端+文档互斥无链）；merge 零回退冲突；范围核验 A 档（5 文件恰为声明）；波末降配审核 F1-F10 无阻断（F4 守卫过严收窄观察——customModelInput 无条件要求对「非 __custom__ + custom 缺」是行为回退边界，spec 背书）
-- **期末四轴：0 阻断**；10 项非阻断落技术债区（TD-15~24：守卫过严收窄/UNC 前导/尾分隔符锁缺口/docs 并置易误读/spy 卫生/夹具 replace 脆弱/getSelectedModel 隐式关联/:373 重复查询/计数口径微差/Rust 字面张力）
-- **4.5 运行态冒烟**：后端 GET / 200；GUI（Playwright）：设置面板完整渲染（11 元素齐备）→ 保存设置「设置已保存」弹窗全过（TD-13 正常路径零回归）；console 无错误
-- **G15 文档同步（本批次）**：TICKETS（TD-13/14 归档 + TD-9 闭环注记 + TD-15~24 落区）；CLAUDE.md（测试数 360/371 + 状态行）；DEV_LOG 本段
-- **测试**：pytest **360 + 1 skip** / Vitest **371** / cargo test **52** 全绿（基线 359+1skip/369/52 → 期末 +1/+2）
-
----
-
-## 滚动摘要（2026-08-12 — 技术债区 TD-8~12 批次：3 做 + 2 维持关闭全自动 kickoff）
-
-- **TD-8~12 批次完成（merge a12d48e）**：上批次期末遗留 5 项处置——3 做 + 2 复核确认维持（全自动档，用户显式指定）。**TD-8** save/clear 裸绑定 `?.` 化（settings-panel.js :332/:366，守卫体系绑定层完整收口——单元素 `?.`/双元素缺一不绑定/函数早退三形态统一；+1 用例⑥ 先红后绿：空 DOM 下 :332 null.addEventListener TypeError 实证；用例②⑤ 注释同步申报——旧行号 325/359 失效 +「必须存在」前提废止）**TD-10** POSIX 警告补「当前盘根」+ MSYS2 转换说明（tauri-desktop.md 单段；pathlib 实测：`Path('/c/...')` 为根相对路径按进程当前盘解析——旧措辞固定 `C:` 是隐含假设，修订准确）**TD-12** llm_error_response provider=None 契约锁用例（test_chat_service.py +1；基线绿非回归——锁「签名允许 None 的确定性」，模拟守卫被删必红验证有效；chat.py 零改动）；**TD-9 维持**（getSelectedModel 不加固——spec 明示 + TD-8 后触发路径不变复证）/ **TD-11 维持**（400 vs 422 函数级分歧——ARC10-4 规格背书 + 双向注释已在）
-- **过程遥测**：单波 3 并行（前端/文档/后端测试文件互斥无链）；merge 零回退冲突；波末降配审核 F1-F6 无阻断（TD-10 措辞精度 1 项非阻断）；**发现主工作树 TICKETS.md 未申报改动**（kickoff 期间某子代理越界修改：技术债区治理增强——状态列/读取契约/去重原则/复证标注）→ 内容合理、独立 commit `c933e8b` 并汇报，未混入工单归档
-- **期末四轴：0 阻断**；2 项非阻断落技术债区（TD-13 save 回调体裸读 / TD-14 逐字符契约 pathlib 规范化边界）
-- **4.5 运行态冒烟**：后端 GET / 200；GUI（Playwright）：设置面板渲染 → 保存设置弹窗「设置已保存」→ 清空对话确认弹窗「确定要清空全部 2 个对话吗？」全过（TD-8 save/clear 正常路径零回归，console 无错误）
-- **G14 文档同步（本批次）**：TICKETS（TD-8~12 归档 3 做 + 2 维持 + TD-13/14 落区）；CLAUDE.md（测试数 359/369 + 状态行）；DEV_LOG 本段
-- **测试**：pytest **359 + 1 skip** / Vitest **369** / cargo test **52** 全绿（基线 358+1skip/368/52 → 期末 +1/+1）
-
----
-
-## 滚动摘要（2026-08-12 — 技术债区 TD-1~7 批次：7 项清零全自动 kickoff）
-
-- **TD-1~7 批次完成（7 工单全归档，merge 链 053f949/3cae11d）**：上批次期末遗留 7 项（TD-1~7）全部「做」清零（0 关闭——均为可修项，无拍板维持项）。**TD-3** search-view docstring 增补作用域与前提段（bound 模块级防同模块重复调用不防跨实例；DOM import 时冻结）**TD-4** refreshModelOptions 三元素联合守卫（provider/model/custom 任一缺 → no-op；model-utils.js 零改动——共享工具边界保持；+2 用例先红后绿：model-utils.js:32 innerHTML / :57 style 两 TypeError 路径实证）**TD-5** 模型联动 handler 缺一不绑定（+1 用例先红后绿：model-utils.js:81 事件期 TypeError；getSelectedModel 不加固——TD-4 后不可达）**TD-7** POSIX 警告措辞具体化（`C:\c\...` 字面落位）**TD-2** 契约表 v1→v2 全量同步（8 处目标文件 + **已申报 tests 扩展 4 处**——「tests 已 v2 零改动」假设被证伪，plan-tickets 前提错误教训：同类漂移须全仓扫描；编码基准描述 v1 旧语义同步 v2；grep 归零口径注记：残留 5 处历史叙述非漂移）**TD-1** 兜底分支注释补遗（422 家族不落此分支，ARC10-2/4 指路）**TD-6** llm_error_response 标注 str|None（运行时零变化）
-- **过程遥测**：波 1 前端+文档 3 并行、波 2 后端 2 并行（TD-4→TD-5 / TD-1→TD-6 两条同代理串行链）；merge 零回退冲突；波末降配审核两轮无阻断（波 1：F1-F6，save/clear 裸绑定基线遗留实证；波 2：F1-F13，`?` 分隔符实测——SQLAlchemy make_url 验证 `?` 是唯一分隔符且编码是必需防御）；先红后绿硬验收三用例全部实证红→绿
-- **期末四轴：0 阻断**；5 项非阻断落技术债区（TD-8~12：save/clear 裸绑定/getSelectedModel 未守卫/盘符精度两可/400 vs 422 函数级分歧/provider=None 契约测试可选）
-- **4.5 运行态冒烟**：后端 GET / + /api/models 200；GUI（Playwright）：设置面板完整渲染（API 密钥/Provider 下拉/模型联动/主题/模板变量）→ provider 切换（Claude→自定义输入形态）→ 自定义模型切换（textbox 出现）全过——TD-4/5 正常 DOM 路径零回归；console 无错误
-- **G13 文档同步（本批次）**：TICKETS（TD-1~7 归档 7 做 0 关闭 + 落 TD-8~12 + TD-2 验收口径注记）；CLAUDE.md（测试数 368 + TD 批次状态行）；DEV_LOG 本段
-- **测试**：pytest **358 + 1 skip** / Vitest **368** / cargo test **52** 全绿（基线 358+1skip/365/52 → 期末 368，+3 均 TD-4/5 守卫用例）
-
----
-
-## 滚动摘要（2026-08-12 — 技术债区批次：16 项遗留清零全自动 kickoff）
-
-- **技术债区批次完成（6 工单全归档，merge 链 bd0eb81/ed7a3ac）**：TICKETS 技术债区 16 项（ARC9-1~8 + ARC10-1~5 + T-04~06）清零。Grilling 共识：4 做 + 2 拍板 + 10 项复核确认维持（审计快照复核惯例——逐项 git grep 核实「仍成立/已就绪」后判关闭，保留原始描述便于对照）。**T-A1** 搜索视图绑定守卫（模块级 bound 标志兑现 docstring 幂等声称；Falsify 发现防抖路径共享 searchTimeout 天然免疫双发、真实双发点在 Enter 立即搜索路径——测试锁定 Enter）**T-A2** 设置面板 no-op 守卫（initProviderDropdown 早退 + 两处 `?.` 对齐 314 行先例）**T-A3** 删除 toggleConvList 死代码（app.js -8 行，grep 零残留，活替代内联保留）**T-B1** 401 消息条件模板消除前导空格（provider 非空带前缀/空时基础文案；含 1 处已申报断言更新——test_error_handler.py 146 行期望值去空格，钉住缺陷形态的反例必要）**T-B2** 未知领域异常 400 对齐（chat.py 兜底 +1 行，与 api/errors.py handler 归一；422 家族防御性不可达）**T-B3** POSIX 路径警告文档（docs/tauri-desktop.md +2 行，代码零改动——不归一化是逐字符契约）
-- **过程遥测**：波 1 前端 3 并行、波 2 后端 2 并行（T-B1→T-B2 同代理串行链）；merge 零回退冲突；波末降配审核两轮无阻断（波 1：F1-F6，T-A2 守卫半兑现实证——provider 在/model 缺 refreshModelOptions 未守卫；波 2：F1-F10，test_error_handler 断言更新必要性 F8 实证）；T-A1 首版测试恒真教训——按工单字面用防抖路径红不起来，改锁 Enter 双发路径才可证伪
-- **期末四轴：0 阻断**；8 非阻断观察去重后 7 项落技术债区（TD-1~7：422 家族双址分叉/data_dir docstring 契约版本 v1 漂移/守卫作用域文档化/T-A2 半兑现/事件期 null/provider 类型标注/POSIX 措辞）
-- **4.5 运行态冒烟**：后端 uvicorn GET / + /docs + /api/models + /api/settings 全 200；GUI（Playwright 375px+桌面）：搜索防抖 1 次请求/Enter 无双发/结果跳转（XSS 消息安全渲染）→ 设置面板 8 Provider 联动 → 移动端侧栏 ☰ 展开收起往返（活替代路径回归）全过；console 无新错误（favicon 404 基线既有）；computed style 验证替代视觉（模型无图像输入）；测试中 Playwright 坐标 stale 现象（展开后按钮 rect 0×0 + 视图漂移）为工具问题，干净重测正常
-- **G12 文档同步（本批次）**：TICKETS（16 项清零：6 归档 + 10 关闭记录 + 落 TD-1~7）；CLAUDE.md（测试数 358+1skip/365/52 + 状态行）；DEV_LOG 本段
-- **测试**：pytest **358 + 1 skip** / Vitest **365** / cargo test **52** 全绿（基线 356+1skip/362/52 → 期末 +2/+3）
-
----
-
-## 滚动摘要（2026-08-12 — ARC-10 架构深化批次：剩余 8 候选全自动 kickoff）
-
-- **ARC-10 完成（8 工单全归档，merge 链 4ffc1d2/241a7b6）**：用户下令「剩余候选也做完」——架构审查报告未选 8 候选全落地。**T-11** modal 骨架收口（character-form/wizard 手写骨架全走 openModal + headerExtra 插槽；**C3-DEFER 兑现**：character-modal.test.js 36 用例真实 modal.js 骨架级测试）**T-12** character-submit.js 角色域深模块（payload 11 字段/splitTags/提交态状态机 5 导出，form/wizard 各瘦身约 200 行）**T-13** 微重复收口（autoResizeInput×3/EMPTY_HEADER_HTML×2/avatarImgHtml×4 参数化；**注入三制统一明确不做**——共识 D-C7-1）**T-14** Provider 清单单一来源（AVAILABLE_MODELS 派生注册+setting 映射；**删 llm/__init__ 包级 provider 导出**——包导入零 SDK 副作用契约，main.py 消费点验证）**T-15** 统一 exception handler（api/errors.py 领域族+LLM 族两枚 handler，chat/characters/settings 路由薄化；test-connection 保 400 语义 D-B3-1）**T-16** style.css 无头覆盖区归位（70 规则零内容改动 + 37 项保序断言；新增 --on-danger token 勿并入 --danger-text）**T-17** schema 快照+漂移检测（19 列快照替换手抄 17 列——漂移实锤；漂移注入 9/9 捕获；spec 文本断言改行为断言）**T-18** 聚焦序列收口（focus_main_window）+ ready_timeout_from_env 契约测试（cfg(test) 6 用例含 0s 合法分支钉死）
-- **过程遥测**：波 1 并行 3（前端链同代理串行 3 张 + 后端 2 张并行）、波 2 并行 3；merge 零回退冲突；**T-16 首代理 setup 后空返回失败 → 降级重派复用 worktree**（崩溃恢复纪律：先盘 worktree 资产——分支已建、零改动、基于波 1 合并后 main，直接复用）；波末降配审核两轮均无阻断；T-15 含 1 处必要偏差（test_chat_service.py 3 处断言随路由薄化必改——波末审核判定语义等价）
-- **期末四轴：0 阻断**（vs ARC-9 的 1 阻断——本批镜像契约教训已内化，无新消费者盲区）；非阻断 5 项落技术债区（ARC10-1~5：401 前导空格防御分支/未知 DomainError 400 vs 502/wizard padding 掩蔽/领域映射双址 spec 背书/half-register fail-fast）
-- **GUI 冒烟（浏览器，隔离库）**：wizard/form modal 骨架（headerExtra 步骤指示器/Escape/预填）→ 创建/编辑提交（T-12）→ 错误气泡深浅主题（OPT-1-FIX 压制保持、--on-danger #fffdf8 生效）→ 输入框清空+高度复位 44px（T-13）→ 删除级联全过；computed style 验证替代视觉（模型无图像输入）
-- **G8 文档同步（本批次）**：CLAUDE.md（Provider 新增流程改 AVAILABLE_MODELS+_CLASS_OVERRIDES、测试数、ARC10 状态行）；CONTEXT（聊天回合行改 api/errors.py、Provider 行改派生注册、新增模态工厂术语；**防悬挂写回行二度误覆盖已恢复**——编辑纪律教训）；TICKETS（ARC10 归档 + 清 C3-DEFER/ARC9-9~15 + 落 ARC10-1~5）；DEV_LOG 本段；architecture.md 目录树
-- **测试**：pytest **356 + 1 skip** / Vitest **362** / cargo test **52** 全绿（基线 354+1skip/362/52 → 期末 356）
-
----
-
-## 滚动摘要（2026-08-12 — ARC-9 架构深化批次：6 Strong 候选全自动 kickoff）
-
-- **ARC-9 完成（6 工单全归档，merge 链 4e48750/dcff674 + 修复 2430bc6）**：由 /improve-codebase-architecture 审查报告（14 候选）→ 用户选中 6 Strong 全自动执行。**T-01** 搜索视图/级联删除收口（search-view.js/cascade.js 深模块 + 注入钩子；app.js 735→610 行；Falsify 发现 Escape 分支不清防抖定时器的既有怪癖并钉住原语义）**T-02** 流式/非流式统一结算入口 `settleTurn`（chat.js 结算 -14 行；非流式失败兜底不带 messageId 逐字复刻；「单次 vs 两次委托」措辞冲突裁定 consensus 为准）**T-03** 非流式回合收进 service（`complete_chat` + `chat_error_response` 单一错误源，路由薄壳；测试从绕过 prepare_chat 改为接口直测）**T-04** 数据目录四套统一（`services/data_dir.py` 纯 stdlib，兜底统一 `home\AppData\Roaming`；契约表 v1 双端镜像）**T-05** 冒烟清理收口（`scripts/lib/desktop-common.ps1`：`Stop-ConverPortListeners` 端口限定——T-03 全局名 kill 注释与代码矛盾实锤修复；grep 零残留）**T-06** 编排区测试挂网（+73 用例，vitest coverage 接线，涉改文件行覆盖全 ≥90%）
-- **期末四轴 code-review：1 阻断 → 修复 → 复审放行**：T-04 URL 全量百分号编码破坏 SQLAlchemy 连接（**教训**：镜像契约必须对真实消费者做连接级验证——v1 契约表双端互相印证字符串级预期，从未实测 SQLAlchemy 对 `%XX` **零解码**；migrate_data `_open_readonly` 走 sqlite3 `uri=True` 会解码，两消费者解码语义不同，勿再对齐）→ `d3a833b` 编码收窄至仅 `?`→`%3F` + 契约表 v2 + `test_data_dir_connection.py` 连接级防复发（含「v1 全量编码必须 OperationalError」防回归锁）
-- **波次遥测**：波 1 并行 3、波 2 并行 2（T-04→T-05 同代理串行链）；merge 零回退冲突；波末降配增量审核两轮均无阻断（波 1：13 Falsify 全过；波 2：编码器双端 0 mismatch）；Implement 侧 1 例隔离纪律瑕疵（v2 docstring 落在主工作树而非 worktree——内容正确已并入，stash 冗余已清）；cargo 首跑因缺 `dist/conver_backend`（gitignored 构建前置）失败一次、`shell_state_test` 偶发 1 例失败（单独重跑 7/7 过）
-- **4.5 运行态冒烟（浏览器，隔离库）**：空态首启 → 6 步创建角色 → 模型选择（8 Provider）→ 非流式失败路径（400 错误气泡 + tab 标题自动更新 + 发送按钮复位，B1/C2 运行态）→ 搜索防抖 + mark 高亮 → 级联删除（确认框 → 角色清空 → tab 关闭 → 对话列表联动）全过；截图存档
-- **G10 文档同步（本批次）**：CONTEXT 术语表（聊天回合改 complete_chat/chat_error_response、流式结算登记 settleTurn、新增数据目录契约表 v2；防悬挂写回行曾误覆盖已恢复）；architecture.md 目录树（新模块 + 新测试登记）；tauri-desktop.md §3.2 契约 v2 + 编码语义；CLAUDE.md 测试数 310+1skip/297/46 + 状态行；TICKETS 归档 + 技术债清 T-01~T-03 + 落 15 项新债（ARC9-1~15 含未选候选）；.gitignore 补 frontend/coverage/
-- **测试**：pytest **310 + 1 skip** / Vitest **297** / cargo test **46** 全绿（基线 302+1skip/224/46 → 期末修复后 310）
-
----
-
-## 滚动摘要（2026-08-11 — P6.4 Tauri 桌面版波次收官）
-
-- **P6.4 桌面版完成（8 工单全归档，merge 链 3823e76/97a2923/635104b/87ab288/a881d95）**：Tauri v2 壳（动态端口子进程 + 就绪页 + capabilities + 托盘/自启/单实例）、PyInstaller onedir 后端打包、数据迁移脚本、品牌图标、NSIS 安装器 + 一键构建 + 自动化冒烟；**前端/后端业务代码零改动**（打包专用入口 run_backend.py + main.py _MEIPASS 分支除外）
-- **spike 结论**：SPK-R1 PyInstaller onedir **一次成型**（2.27s 就绪、25M、零 hiddenimports；三项硬契约：脚本启动器入口 / spec pathex=仓库根 / DATABASE_URL 必须 Windows 绝对路径 + 日志落盘）；SPK-R2 WebView2 **不拦截** blob 下载（三种机制全放行）→ **无导出回退条件分支**，验收 9 人工点一次导出闭合
-- **波次遥测**：波 1 并行 4（2 spike + 2 implement）、波 2 并行 3、波 3 串行 1；merge **零回退冲突**；波 1 降配增量审核 5 findings（F1 CONVER_DATA_DIR 壳侧未对齐 / F2 runtime.json 非原子写 → 派回 P6.4-4 修复 `908ff5a`；F3 %APPDATA% 不可写 / F4 迁移边缘大小写 / F5 cli 网络依赖 → 非阻断）
-- **F1/F2 修复**：数据目录环境变量对齐（壳/后端/迁移三方 CONVER_DATA_DIR 同一契约）+ runtime.json 原子写（临时文件 + rename，与迁移脚本 `_write_marker` 同款）
-- **测试**：pytest **261 + 1 skip**（P6.4-2 +22 打包用例、P6.4-3 +71 迁移用例）/ Vitest **186** / cargo test **43**（壳 Seam 1 纯逻辑），全绿
-- **P6.4-6 交付**：`scripts/build-desktop.ps1`（cargo test → pytest → vitest → tauri build → 冒烟，Git Bash link.exe 警告，R4 NSIS/WebView2 下载失败自动重试 + `--no-bundle` 降级）、`scripts/smoke-desktop.ps1`（验收 1-7 自动化：runtime.json 就绪 → /api/models 200 → %APPDATA% DB 表结构 → 优雅退出 → 端口释放无残留）、`docs/tauri-desktop.md`（构建/冒烟/数据目录/迁移/环境注意/人工清单）；NSIS `installMode: currentUser`（免管理员，卸载不动 %APPDATA% 数据）
-- **P6.4-6 冒烟实测避坑（已修）**：① 端口释放检查必须用**同步** `TcpClient.Connect`——异步 `BeginConnect`+`WaitHandle` 在连接被拒（端口已关）时 WaitHandle 不触发，永远误判「仍占用」（首轮冒烟假失败根因）；② 残留检查严格限定冒烟自己的端口（`Get-NetTCPConnection`）——按全局进程名/命令行匹配曾误杀本机正在运行的网页版 uvicorn（已恢复服务），教训：冒烟脚本绝不清理非自己启动的进程；③ `Write-Host "..." -f $x` 的 `-f` 会被解析为 `-ForegroundColor` 缩写参数 → 必须 `("..." -f $x)` 括号包裹
-- **期末四轴 code-review（2 阻断 → 修复 → 复审放行 → 冒烟闭合）**：① 阻断 1 壳 prod 无条件 spawn python（冒烟注入 env 掩盖）→ `722ba4c` 三优先级（env 覆盖 > 随包 exe 候选探测 > dev python）+ `tauri.conf.json` `bundle.resources`（安装器 2.3MB → 23.7MB）；Tauri Windows 实测 resources 装在 `%LOCALAPPDATA%\Conver System\_up_\dist\conver_backend\`（保留相对结构）——候选探测覆盖 `_up_`/平铺/无布局三分支；② 阻断 2 spec `datas=[]` 打包态 `GET /` 404 → `a29c501` `_FRONTEND_RUNTIME` 挂载 index.html/css/js 运行子集（排除 node_modules/tests，+364K）；③ 复审整改 `217385f`：build-backend 前置到 cargo test 前（tauri-build 编译期校验 resources 路径，干净检出必挂）/ datas 接线断言（原始形态 `datas=[]` 不改定义只改接线行，token 断言漏报）/ 冒烟安装态清除父环境残留 CONVER_BACKEND_CMD（防假干净）；④ **安装器形态冒烟 5 项全过**（prod 随包定位不注入 env + GET / 200 含应用标记 + 空库首启 + 退出无残留）——真实双击路径纳入自动化闭环
-- **P6.4 遗留交接**：期末审核 2 阻断已修复闭合（见上）；人工验收 8/9 清单在 docs/tauri-desktop.md §6；非阻断遗留入 TICKETS 技术债区（T-01~T-06）
-
----
-
-## 滚动摘要（2026-08-11）
-
-- **OPT-1 UI 克制化与图标协议收口（完成 + 归档）**：保留 Warm Stone 与现有应用壳，统一动态 SVG 图标 seam（`frontend/js/icons.js` 只暴露 `iconHtml`，`Object.hasOwn` 注册表 + 尺寸/class 白名单校验，未知/非法输入显式抛错）；清除应用自带 emoji 图标（用户数据中的 emoji 保留不过滤）；深浅主题 token 单一来源收口；复制反馈竞态修复（WeakMap）；**四轴 code-review + GUI 黑盒回归全部完成**（`8ce17bd`）
-- **GUI 验证（补 375px / 侧栏折叠 / 多 tab 流式回归，全部通过）**：375px 无横向滚动（`scrollWidth==clientWidth` 双视图核验 + vision）；主导航侧栏折叠/展开（DOM 几何 aside 208→0→208px + 视觉）；多 tab 流式停止（stop↔send 图标两态 +「已停止」+ 部分内容保留）、错误路径（HTTP 422 / 流中 error 帧 → 错误气泡 + tab-warn）、复制反馈（clipboard→check→还原 + 连点竞态）；全程无 JS 错误（仅存量 favicon 404 + 错误测试的 HTTP 422 资源日志）
-- **GUI 验证发现并修复 1 条回归（OPT-1-FIX）**：CSS 顶层新增 `.message.assistant .message-content`（`background:transparent;border:none`，style.css:2945）位于 `.message.message-error`（:922）之后，同特异性 (0,3,0) 覆盖错误气泡警示样式（深浅主题均受影响）→ 错误规则改 `.message.assistant.message-error` 特异性 (0,4,0)，GUI 深浅主题复验 + Vitest 186 仍全绿
-- **验证方法**：本地 mock SSE 服务器（网络层 `page.route` 拦截 `/api/chats/stream` → 慢速 token/422/error 帧三端点，未触发真实外部 API）；IAB webview 本会话未就绪 → 切换 Playwright MCP 通道（DEV_LOG 记录的既有通道）
-- **测试**：Vitest **186** 全绿（+9：icons 3 / components-icons 4 / tabs 语义 3 净增——复制竞态、send/stop、tab 图标、settings sun/moon/chevron）；pytest **188** 不变
-- **安全提醒（已结案）**：GUI 自动化 DOM 输出曾暴露本机数据库中的真实 API Key 前缀（sk-1ZET…）；用户确认该 Key **早已过期**，无需轮换；GUI 验证继续遵守「设置页只验证结构、不读取密钥值」约束
-
----
-
-## 滚动摘要（2026-08-10）
-
-- **架构深化 8 候选全部完成**（improve-codebase-architecture → 全自动 kickoff）：StreamSession 流式结算深模块 / 级联收口 / 标题收口 / api seam+超时 / 展示契约 / app.js 拆分 / testApiKeys 纯函数化 / __init__ 导出；期末三轴审核放行（Falsify 实锤 1 条 stale 回退修复）；Vitest **177** + pytest **188** 全绿
-- **P6.5 多 tab 会话管理（5 票串行，独立 worktree `.worktrees/p65-tabs`）**：应用内多会话工作区——tab 条切换、后台流式照跑、完成/停止/出错一律按发起时捕获的 conversation id 写回（防悬挂核心）、刷新后 sessionStorage 恢复（只存 ids+activeId）
-- **防悬挂写回设计**：`handleSend` 发送时捕获 convId；`onToken` 按活动归属分流（活动 tab DOM 增量 + 缓存同步，后台只累积 per-tab 缓存不碰 DOM）；`onDone`/`onError` 经 `updateTab(捕获 id)` 写回发起 tab，绝不读「当前活动」；发起 tab 可能已被关闭 → updateTab 幂等 no-op 兜底
-- **关键避坑**：① SSE 错误帧后流关闭会再触发 `onDone(null)` 覆盖 phase 'done' → `streamSettled` 终态守卫（onError 后一律忽略后续回调）；② 流式中切走再切回 DOM 重建会重复气泡 → `data-streaming-live` 标记 + onToken 复用；③ 缓存渲染路径 `renderMessages` 的 scrollToBottom 覆盖滚动恢复 → 渲染后回填缓存 scrollTop；④ 删活动 tab 时被删会话的 DOM 草稿/滚动会污染新活动 tab 缓存 → 先保存再 closeTab + 激活流程 `saveCurrent:false`
-- **restore 时序契约**：init 在 conversations 加载完成后调 `restoreFromStorage`，isValidId 以已加载列表判定（过滤已删会话）；无记录/损坏/全失效 → 空态不报错；恢复 tab 天然非流式
-- **联动**：删会话（开着）先 abort 流式再关 tab；清空所有对话 → closeAllTabs + 存储空集；✕ 关流式 tab = 显式停止（abort）；关活动 tab 激活右邻居（无则左），关最后 → 空态
-- **测试**：pytest **181** 全绿（后端零改动；本机需 `pip install pytest-asyncio`——缺失插件会误报 7 个 async 用例失败）；Vitest **91**（37 既有 + tabs 54）；jsdom 集成冒烟 **81 项**全过（无 JS 错误）
-- **code-review 三轴审核 + 修复**（固定点 d228fa8）：Falsify 轴发现 2 个阻断竞态（同 tab 连发陈旧 list 快照绝对覆盖新消息 → revision 守卫；activateConversation await 期间切走/关 tab 无守卫 → 续体双活动校验）→ 修复 + 复现测试红→绿实证 + Falsify 对抗补充；低成本项 6 件（abortStream 协议收口/EMPTY_STATE_HTML 共享/清空 abort/删角色级联关 tab/无效写移除/stale 注释）；复审放行（唯一新发现：同内容双流误结算边缘，建议 settle 改按消息位置匹配，不阻塞）
-- **P6.5 遗留修复**（commit 6e0489a/2f26a85/b16c097/acb144d，merge `0116650`）：FIX-A settle 按消息位置匹配（同字节双流不误结算）；FIX-B 非流式在途守卫（双击只发一次真实请求）；FIX-C 通知分类节流（纯内容 patch 不触发 tab 条重渲染）；**发现并恢复 FIX-C 误删的 error 帧 Falsify 测试**；轻量复审可放行（3 Standards + 2 Falsify 非阻断 → TICKETS P6.5-R1~R3）
-- **VERIFY-D 黑盒验证**（Playwright MCP，双流并发 + <768px）：双 tab 同时流式（各自脉冲点/⏹/后台累积/完成复位）；<768px tab 条 display:none 隐藏、tab 状态保留、侧栏切换行为不变；流式/后台写回全程无 JS 错误
-
----
-
 ## 日志正文
+
+### 阶段摘要（2026-08-10 ~ 2026-08-13）
+
+> 折叠说明：2026-08-14 文档同步按 [CLAUDE.md](CLAUDE.md)「待办管理」滚动摘要折叠规则执行（摘要区超 12 条上限）——最旧 15 批折叠为一条阶段摘要；逐批次明细 git log 可溯。
+
+- **2026-08-10** | 架构深化 8 候选 + P6.5 多 tab 会话管理（独立 worktree `.worktrees/p65-tabs`）
+- **2026-08-11** | OPT-1 UI 克制化与图标协议收口（icons.js seam + emoji 清除 + 主题 token 单源）
+- **2026-08-11** | P6.4 Tauri 桌面版波次收官（8 工单归档，merge 链 3823e76/97a2923/635104b/87ab288/a881d95）
+- **2026-08-12** | ARC-9 架构深化批次：6 Strong 候选（T-01~T-06，merge 链 4e48750/dcff674 + 修复 2430bc6/d3a833b）
+- **2026-08-12** | ARC-10 架构深化批次：剩余 8 候选（T-11~T-18，merge 链 4ffc1d2/241a7b6）
+- **2026-08-12** | 技术债区批次：16 项遗留清零（6 工单归档，merge 链 bd0eb81/ed7a3ac）
+- **2026-08-12** | TD-1~7 批次：7 项清零（merge 链 053f949/3cae11d）
+- **2026-08-12** | TD-8~12 批次：3 做 + 2 维持关闭（merge a12d48e）
+- **2026-08-12** | TD-13~14 批次：2 做 + TD-9 闭环（merge 61f1721）
+- **2026-08-12** | TD-15~24 批次：10 项全做清零（merge 0010f1b）
+- **2026-08-13** | TD-25~27 批次：1 做 + 2 维持关闭（merge 8ae3801）
+- **2026-08-13** | td-arch-health 批次：8 工单 3 波（merge 链 b4b0a31→48447e6）
+- **2026-08-13** | TD-28 批次：sanitizeUrl 控制字符绕过修复（merge 890aa97）
+- **2026-08-13** | TD-42 批次：链接属性注入面修复（merge a6fba3b）
+- **2026-08-13** | TD-29~41/43~45 批次：17 项标准档（11 做 + 5 关闭 + 1 票面修正，merge 链 b835210/615aba8/a5fe7b9 + cef3fea + 342382e + 960c9c4/93b51ab/649910c/d96b4ce + 归档 de09509）
+
+---
 
 ### 2026-08-11 | 修复 | P6.4-6 期末审核阻断 1：壳 prod 模式定位随包后端 + 干净环境冒烟
 
