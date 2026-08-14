@@ -13,7 +13,11 @@
 
 ## 活跃工单
 
-> 当前无未完成工单。技术债区批次已全部归档（见下）。期末审核遗留见下方技术债区。
+> 当前无进行中工单。
+
+| Ticket | 标题 | 状态 | 验收摘要 |
+|--------|------|------|----------|
+| — | — | — | — |
 
 ---
 
@@ -31,6 +35,21 @@
 ---
 
 ## 已完成归档
+
+### SIM-API-1 批次（2026-08-14 用户需求）
+
+> 来源：用户需求「所有模拟器的 API 统一由主应用控制，模型名也来自主应用设置」；方案经 CONSENSUS.md ADR-0001 定稿（方案 2：宿主 iframe 统一同步，第三方 HTML 零修改）。2026-08-14 认领 🔄，当日完成。
+
+> 提交：feat `2fdfd5e` + 本文档同步（docs 提交）。
+
+- **SIM-API-1**（feat 提交）——22 款模拟器自动同步主应用 API 与默认模型（验收全达成）：
+  - **manifest**：22 条增 `endpointMode`（17 full / 5 base——17 款端点字段要完整 `/chat/completions` 地址；5 款 base：仿微/侦探模拟/灵网飞升/社会/许愿柳自行拼接），simulator-manifest 数据完整性锁（取值域 + 与 HTML 端点默认口径双向溯源）；
+  - **key-injector 扩展**（协议表面 +4：convertEndpoint / syncGameCredentials / autoSyncIntoGame / TEXT_RESYNC）：端点口径按 manifest 转换（full 追加 /chat/completions 含尾斜杠归一与双重追加防护；base 剥除后缀）；select 缺主应用模型 option → 宿主追加受管 option（取代旧 F1 静默跳过）；幂等写入（值已为目标不写不派发——持续同步写回环守卫）；syncGameCredentials 三态编排 + autoSyncIntoGame 静默自动同步；按钮「使用主应用 Key」→「重新同步」（自动同步为常态，手动兜底）；
+  - **simulator-view**：iframe load 后自动同步（openai 注入 / claude·none 自动禁用 + 原因文案 + 设置页链接）；MutationObserver 配置控件重建再同步（仅 config id 触及变更触发；防抖 500ms；写入后 1s 写回环冷却）；wg_ 会话注记退役（自动同步每次 load 重放，无需「重进需再次点击」）；
+  - **simulators.js**：parseManifest endpointMode 透传（非 base/full 条目级降级）；
+  - **第三方 HTML 零修改**（22 款游戏文件 0 改动）；
+  - **测试**：先红后绿；Vitest 714 → **745**（+31：key-injector +16 / simulator-view +13 / simulators +2 / manifest 完整性 +2）；pytest 434+1skip 未受影响；
+  - **真实冒烟**（smoke-simulators.mjs 重排：预置步骤移至打开游戏前）：13 项 **12 PASS / 0 FAIL / 1 SKIP**（load 自动同步填值 / endpoint full 口径转换 / 受管 model option / 手动「重新同步」已填入 / 游戏保存路径接受注入值全过）。
 
 ### 技术债区 TD-72/73/74 批次（2026-08-14 全自动 kickoff：轻量档 1 工单 3 提交）
 

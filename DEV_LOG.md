@@ -6,6 +6,17 @@
 
 ---
 
+## 滚动摘要（2026-08-14 — SIM-API-1：22 款模拟器 API/模型配置统一由主应用控制）
+
+- **用户需求**：所有模拟器的 API 统一由主应用控制，模型名也来自主应用设置——22 款游戏各自带 API 配置面板、主应用只做手动「使用主应用 Key」注入的现状要改为单一事实来源。方案经 **ADR-0001**（CONSENSUS.md）定稿：**方案 2 宿主 iframe 统一同步**（key-injector 已是注入 choke point 扩展为自动同步；manifest 声明 endpointMode 做端点口径转换；宿主为模型 select 补受管 option；第三方 HTML 零修改）
+- **实现（工单 SIM-API-1）**：manifest 22 条增 `endpointMode`（17 full / 5 base：仿微/侦探模拟/灵网飞升/社会/许愿柳——按各游戏端点字段默认形态逐款实测分类，simulator-manifest 加双向口径溯源锁）；key-injector 扩展（`convertEndpoint` 口径转换 / select 缺主应用模型 option 追加受管 option（取代旧 F1 静默跳过）/ **幂等写入**（值已为目标不写不派发——持续同步写回环守卫）/ `syncGameCredentials` + `autoSyncIntoGame` 编排核心 / 按钮改「重新同步」）；simulator-view **load 自动同步**（openai 静默注入 / claude·none 自动禁用 + 文案 + 设置链接）+ **MutationObserver 配置控件重建再同步**（仅 config id 触及变更触发、防抖 500ms、写入后 1s 冷却）；wg_ 会话注记退役（自动同步每次 load 重放）；parseManifest endpointMode 透传；**22 款第三方 HTML 零修改**
+- **避坑（冷却设计迭代）**：写回环冷却必须只在「实际写入过字段」后置位——若在每次同步尝试后置冷却，游戏 load 后延迟渲染配置面板（观察者的主场景）会被 1s 冷却误伤，面板重建后永远等不到再同步；未写入（控件未就位）不冷却，观察者及时补同步
+- **测试**：先红后绿；Vitest **745**（基线 714，+31）；pytest 434+1skip 未受影响（后端零改动）
+- **真实冒烟（smoke-simulators.mjs 重排）**：预置步骤移至打开游戏前（load 自动同步需 openai 凭证在 load 时已就位）+ 断言重写（自动同步填值 / endpoint full 口径转换 / 受管 option / 手动「重新同步」）；13 项 **12 PASS / 0 FAIL / 1 SKIP** 退出码 0，冒烟后端口已释放
+- **文档同步（本批次）**：TICKETS（SIM-API-1 归档 + 活跃表清零）；CONSENSUS（ADR-0001）；CLAUDE（批次行 + Vitest 基线 714→745）；DEV_LOG 本段
+
+---
+
 ## 滚动摘要（2026-08-14 — 桌面版游戏列表为空：打包面漏同步修复 + 教训闭环）
 
 - **用户反馈**：桌面版应用内看不到集成的 22 款游戏（网页版正常）。根因双重：①dist/conver_backend/ 后端包陈旧（08-13 构建，早于模拟器模块加入）；②**backend/conver_backend.spec 的 _FRONTEND_RUNTIME 从未包含 frontend/simulators/**——模拟器模块加入时未同步打包清单，即使重建后端包仍缺游戏。
