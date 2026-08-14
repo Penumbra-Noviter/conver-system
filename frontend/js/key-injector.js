@@ -61,8 +61,9 @@
  *   接线）。
  *
  * 协议表面（__all__）：initKeyInjector / attachKeyInject / resolveButtonState /
- *   hasConfigTriplet / injectCredentialsIntoGame / syncGameCredentials /
- *   autoSyncIntoGame / TEXT_RESYNC / TEXT_INJECTED。
+ *   hasConfigTriplet / convertEndpoint / injectCredentialsIntoGame /
+ *   syncGameCredentials / autoSyncIntoGame / TEXT_RESYNC / TEXT_INJECTED /
+ *   resetSyncLoop。
  */
 
 // ══════════════════════════════════════════════════
@@ -104,6 +105,17 @@ const ENDPOINT_SUFFIX = '/chat/completions';
 const TARGET_TAGS = new Set(['INPUT', 'SELECT']);
 
 // ══════════════════════════════════════════════════
+// 写回环状态机常量
+// ══════════════════════════════════════════════════
+
+/** 写回环冷却时长（毫秒；注入后冷却窗口内不重复同步 — 幂等写入已收敛常规场景，此为兜底） */
+const SYNC_COOLDOWN_MS = 1000;
+
+/** 观察者路径写回环熔断阈值：连续 SYNC_MAX_STRIKES 次真写入（written.length > 0）后熔断；
+ * 熔断后 observer 调用恒返回 breaker: true，终止自动再同步 */
+const SYNC_MAX_STRIKES = 3;
+
+// ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
 // ══════════════════════════════════════════════════
 
@@ -129,6 +141,17 @@ const boundBars = new WeakSet();
 
 /** bar → 点击时取用的提供方（{getDoc, getConfig, getEndpointMode}；attach 时登记） */
 const barProviders = new WeakMap();
+
+// ══════════════════════════════════════════════════
+// 写回环状态机状态
+// ══════════════════════════════════════════════════
+
+/** 写回环冷却截止时间戳（Date.now()；未冷却为 0 — 与 resetSyncLoop 初始值一致） */
+let syncCooldownUntil = 0;
+
+/** 观察者路径写回环熔断计数（连续真写入次数；达到 SYNC_MAX_STRIKES 后熔断；
+ * 熔断后 observer 调用恒返回 breaker: true；resetSyncLoop 清零） */
+let syncStrikes = 0;
 
 // ══════════════════════════════════════════════════
 // 纯函数：按钮态解析 / 三元组校验 / 端点口径转换
@@ -435,7 +458,7 @@ function showInjectedFeedback(bar) {
  * @param {boolean} [params.feedback] - true 为按钮点击路径（「已填入」反馈 /
  *   失败复位）；false 为自动同步路径（静默）
  * @returns {Promise<null|{enabled: boolean, reason: 'claude'|'none'|null,
- *   filled: string[], skipped: string[]}>} 同步结果（同 syncGameCredentials；
+ *   filled: string[], skipped: string[], written: string[]}>} 同步结果（同 syncGameCredentials；
  *   未初始化 / 视图关闭早退 / 请求失败 → null）
  */
 async function runSync({ bar, getDoc, getConfig, getEndpointMode, feedback }) {
@@ -500,8 +523,15 @@ async function handleKeyClick(e) {
  * 自动同步入口（SIM-API-1）：静默取凭证 → 注入当前游戏配置面板（iframe
  * load / 配置控件动态重建后由 simulator-view.js 调用；不闪「已填入」反馈）。
  * claude / none → 按钮条禁用 + 原因文案（UI 显示原因并引导前往主应用设置）；
- * 未初始化 → bar 保持现状。返回同步结果（simulator-view 据 filled 决定
- * 观察者写回环冷却 — 见该模块 autoSyncAfterLoad）。
+ * 未初始化 → bar 保持现状。返回同步结果（simulator-view 据返回值决定
+ * 观察者写回环冷却/熔断 — 见该模块 autoSyncAfterLoad）。
+ *
+ * 写回环状态机（冷却/熔断）收口在本函数：一次调用原子完成同步执行 +
+ * 冷却判定（冷却中返回 cooled: true）+ 置冷却 + 观察者真写入计数 +
+ * 熔断判定（达 SYNC_MAX_STRIKES 次返回 breaker: true）。
+ * path 参数区分 load 路径（置冷却不计数）与 observer 路径（置冷却+计数+
+ * 熔断判定）。手动按钮路径（feedback=true）完全不经本函数，不受状态机影响。
+ *
  * @param {object} [params]
  * @param {HTMLElement|null} [params.bar] - 按钮条容器（.sim-key-bar）
  * @param {Function} [params.getDoc] - () => Document|null；同步时取同源
@@ -510,14 +540,55 @@ async function handleKeyClick(e) {
  *   游戏的 manifest config 三元组
  * @param {Function} [params.getEndpointMode] - () => string|null；同步时取
  *   当前游戏的 manifest endpointMode
+ * @param {'load'|'observer'} [params.path='load'] - 同步路径：'load' 置冷却
+ *   不计数（默认）；'observer' 置冷却+计数+熔断判定
  * @returns {Promise<null|{enabled: boolean, reason: 'claude'|'none'|null,
- *   filled: string[], skipped: string[]}>} 同步结果（同 syncGameCredentials；
- *   未初始化 / 视图关闭早退 / 请求失败 → null）
+ *   filled: string[], skipped: string[], written: string[],
+ *   cooled?: boolean, breaker?: boolean}>} 同步结果；冷却中返回 cooled: true；
+ *   熔断达阈值或已熔断返回 breaker: true；未初始化/bar 缺失返回 null
  */
 export async function autoSyncIntoGame(params = {}) {
-    const { bar, getDoc, getConfig, getEndpointMode } = params ?? {};
+    const { bar, getDoc, getConfig, getEndpointMode, path = 'load' } = params ?? {};
+
+    // 熔断权优先于冷却：已熔断的 observer 调用恒返回 breaker（constraint 9）
+    if (path === 'observer' && syncStrikes >= SYNC_MAX_STRIKES) {
+        return { enabled: false, reason: null, filled: [], skipped: [], written: [], breaker: true };
+    }
+
+    // 冷却判定在状态机函数调用时执行（防抖到期执行点，非 mutation 回调 — TD-76）
+    if (Date.now() < syncCooldownUntil) {
+        return { enabled: false, reason: null, filled: [], skipped: [], written: [], cooled: true };
+    }
+
     if (!bar) return null;
-    return runSync({ bar, getDoc, getConfig, getEndpointMode, feedback: false });
+    const result = await runSync({ bar, getDoc, getConfig, getEndpointMode, feedback: false });
+
+    // 后同步状态迁移：仅真写入（written > 0）时置冷却；observer 额外计数 + 熔断判定
+    if (result && result.enabled) {
+        if (result.written.length > 0) {
+            syncCooldownUntil = Date.now() + SYNC_COOLDOWN_MS;
+            if (path === 'observer') {
+                syncStrikes += 1;
+                if (syncStrikes >= SYNC_MAX_STRIKES) {
+                    result.breaker = true;
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+/**
+ * 复位写回环状态机（幂等清冷却 + 清熔断计数）。
+ *
+ * 未冷却 / 未熔断时调用无副作用（幂等 — destroyFrame 每次调用都安全）。
+ * 复位唯一触发点：simulator-view.js destroyFrame（关闭/重开游戏）。
+ * observeConfigControls 开头 disconnectObserver 不得顺带复位。
+ */
+export function resetSyncLoop() {
+    syncCooldownUntil = 0;
+    syncStrikes = 0;
 }
 
 /**
@@ -583,4 +654,5 @@ export const __all__ = [
     'autoSyncIntoGame',
     'TEXT_RESYNC',
     'TEXT_INJECTED',
+    'resetSyncLoop',
 ];

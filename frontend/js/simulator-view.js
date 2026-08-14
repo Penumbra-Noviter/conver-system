@@ -59,7 +59,7 @@
 
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
-import { attachKeyInject, hasConfigTriplet, autoSyncIntoGame, TEXT_RESYNC } from './key-injector.js';
+import { attachKeyInject, hasConfigTriplet, autoSyncIntoGame, resetSyncLoop, TEXT_RESYNC } from './key-injector.js';
 
 // ══════════════════════════════════════════════════
 // 常量（UI 契约 — 文案/时长与 spec 对齐）
@@ -139,8 +139,7 @@ function clearTimer() {
 function destroyFrame() {
     clearTimer();
     disconnectObserver();
-    syncCooldownUntil = 0; // 冷却属当前视图生命周期 — 跨游戏不残留（防新游戏观察者被旧冷却误伤）
-    syncStrikes = 0; // 熔断计数复位 — 重开游戏观察者重新挂载、自动同步恢复（TD-76）
+    resetSyncLoop(); // 复位写回环状态机（冷却+熔断清零；跨游戏不残留 — 熔断计数复位唯一触发点）
     if (frame) {
         frame.remove();
         frame = null;

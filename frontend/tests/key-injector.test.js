@@ -106,8 +106,8 @@ describe('key-injector — 协议表面 __all__ 与模块私有性', () => {
             'TEXT_INJECTED', 'TEXT_RESYNC',
             'attachKeyInject', 'autoSyncIntoGame', 'convertEndpoint',
             'hasConfigTriplet', 'initKeyInjector',
-            'injectCredentialsIntoGame', 'resolveButtonState',
-            'syncGameCredentials',
+            'injectCredentialsIntoGame', 'resetSyncLoop',
+            'resolveButtonState', 'syncGameCredentials',
         ]);
     });
 
@@ -854,5 +854,294 @@ describe('key-injector — autoSyncIntoGame 自动同步（SIM-API-1）', () => 
         await expect(mod.autoSyncIntoGame()).resolves.not.toThrow();
         await expect(mod.autoSyncIntoGame(null)).resolves.not.toThrow();
         await expect(mod.autoSyncIntoGame({})).resolves.not.toThrow();
+    });
+});
+
+describe('key-injector — sync loop state machine', () => {
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); document.body.innerHTML = ''; });
+
+    it('path 默认 (load): autoSyncIntoGame() 不带 path = load 语义（置冷却不计数）', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null };
+
+        // 1st call: default path = load, inject + set cooldown, no count
+        const r1 = await mod.autoSyncIntoGame(opts);
+        expect(r1.enabled).toBe(true);
+        expect(r1.written.length).toBe(3);
+        expect(r1.cooled).toBeUndefined();
+        expect(r1.breaker).toBeUndefined();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // Immediate call within cooldown → cooled
+        const r2 = await mod.autoSyncIntoGame(opts);
+        expect(r2.cooled).toBe(true);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // no additional fetch
+
+        // After cooldown expires, normal inject resumes
+        await vi.advanceTimersByTimeAsync(1000);
+        const r3 = await mod.autoSyncIntoGame(opts);
+        expect(r3.enabled).toBe(true);
+        expect(r3.cooled).toBeUndefined();
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('observer 路径: 连续真写入达 SYNC_MAX_STRIKES 次后第 3 次返回 breaker: true', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null, path: 'observer' };
+
+        const r1 = await mod.autoSyncIntoGame(opts);
+        expect(r1.breaker).toBeUndefined();
+        expect(r1.enabled).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        const r2 = await mod.autoSyncIntoGame(opts);
+        expect(r2.breaker).toBeUndefined();
+        expect(r2.enabled).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        const r3 = await mod.autoSyncIntoGame(opts);
+        expect(r3.breaker).toBe(true);
+        expect(r3.enabled).toBe(true); // threshold-crossing call still injects
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('幂等兜底: 漏断后后续 observer 调用仍返回 breaker: true', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null, path: 'observer' };
+
+        // Trip breaker with 3 observer calls
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            await mod.autoSyncIntoGame(opts);
+        }
+
+        // 4th call: still returns breaker, no sync
+        fetchMock.mockClear();
+        const r4 = await mod.autoSyncIntoGame(opts);
+        expect(r4.breaker).toBe(true);
+        expect(r4.enabled).toBe(false); // no sync happened
+        expect(fetchMock).not.toHaveBeenCalled(); // no additional fetch
+
+        // 5th call: still returns breaker
+        const r5 = await mod.autoSyncIntoGame(opts);
+        expect(r5.breaker).toBe(true);
+        expect(r5.enabled).toBe(false);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('收敛: 幂等匹配（written 空）不计数', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        // Doc with all values already matching credentials
+        const doc = makeGameDoc(`
+            <input id="cfg-endpoint" value="https://api.example.com/v1">
+            <input id="cfg-apikey" value="sk-smoke-openai">
+            <select id="cfg-model">
+                <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+            </select>
+        `);
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null, path: 'observer' };
+
+        for (let i = 0; i < 5; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            const r = await mod.autoSyncIntoGame(opts);
+            expect(r.breaker).toBeUndefined(); // not broken after 5 calls
+            expect(r.enabled).toBe(true); // sync still happens (though idempotent)
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(5);
+    });
+
+    it('冷却: observer 返回 cooled: true, 不注入不置冷却不计数', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null, path: 'observer' };
+
+        // 1st call: inject + set cooldown
+        const r1 = await mod.autoSyncIntoGame(opts);
+        expect(r1.enabled).toBe(true);
+        expect(r1.cooled).toBeUndefined();
+
+        // 2nd call within cooldown: cooled
+        const r2 = await mod.autoSyncIntoGame(opts);
+        expect(r2.cooled).toBe(true);
+        expect(r2.enabled).toBe(false); // no sync
+        expect(fetchMock).toHaveBeenCalledTimes(1); // no additional fetch
+
+        // After cooldown, 3rd call: inject normally
+        await vi.advanceTimersByTimeAsync(1000);
+        const r3 = await mod.autoSyncIntoGame(opts);
+        expect(r3.cooled).toBeUndefined();
+        expect(r3.enabled).toBe(true);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('冷却: load 冷却中同样跳过 (no-op)', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null };
+
+        // 1st load call: inject + set cooldown
+        const r1 = await mod.autoSyncIntoGame(opts);
+        expect(r1.enabled).toBe(true);
+
+        // 2nd load call within cooldown: cooled
+        const r2 = await mod.autoSyncIntoGame(opts);
+        expect(r2.cooled).toBe(true);
+        expect(r2.enabled).toBe(false);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('冷却由 load 与 observer 真写入置位: 写入后 0ms 调用 → cooled, 1000ms 后 → 正常', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        const loadOpts = { bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null };
+        const obsOpts = { ...loadOpts, path: 'observer' };
+
+        // Load path: inject + set cooldown
+        await mod.autoSyncIntoGame(loadOpts);
+
+        // 0ms later: observer call → cooled
+        const r1 = await mod.autoSyncIntoGame(obsOpts);
+        expect(r1.cooled).toBe(true);
+
+        // 1000ms later: observer call → normal
+        await vi.advanceTimersByTimeAsync(1000);
+        const r2 = await mod.autoSyncIntoGame(obsOpts);
+        expect(r2.cooled).toBeUndefined();
+        expect(r2.enabled).toBe(true);
+    });
+
+    it('resetSyncLoop: 幂等清零后 observer 重新从 1 开始计数', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null, path: 'observer' };
+
+        // Trip breaker with 3 observer calls
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            await mod.autoSyncIntoGame(opts);
+        }
+
+        // Verify breaker is tripped
+        const r0 = await mod.autoSyncIntoGame(opts);
+        expect(r0.breaker).toBe(true);
+
+        // Reset
+        mod.resetSyncLoop();
+
+        // After reset, observer should start from 1
+        await vi.advanceTimersByTimeAsync(1000);
+        const r1 = await mod.autoSyncIntoGame(opts);
+        expect(r1.breaker).toBeUndefined();
+        expect(r1.enabled).toBe(true);
+
+        // 2 more calls should trip breaker again
+        await vi.advanceTimersByTimeAsync(1000);
+        const r2 = await mod.autoSyncIntoGame(opts);
+        expect(r2.breaker).toBeUndefined();
+
+        await vi.advanceTimersByTimeAsync(1000);
+        const r3 = await mod.autoSyncIntoGame(opts);
+        expect(r3.breaker).toBe(true);
+    });
+
+    it('resetSyncLoop: 未冷却/未熔断时调用无副作用（幂等）', async () => {
+        const mod = await loadInjector();
+        // Call before any state is set
+        expect(() => mod.resetSyncLoop()).not.toThrow();
+        // Call twice
+        expect(() => mod.resetSyncLoop()).not.toThrow();
+
+        // Verify state is clean: first observer call works normally
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const doc = makePanelDoc();
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null, path: 'observer' };
+
+        const r = await mod.autoSyncIntoGame(opts);
+        expect(r.enabled).toBe(true);
+        expect(r.breaker).toBeUndefined();
+    });
+
+    it('按钮路径: 熔断达阈值后点击仍可注入', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
+        const btn = bar.querySelector('.sim-key-btn');
+        const opts = { bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null, path: 'observer' };
+
+        // Trip breaker with 3 observer calls
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            await mod.autoSyncIntoGame(opts);
+        }
+
+        // Verify breaker is tripped
+        const r = await mod.autoSyncIntoGame(opts);
+        expect(r.breaker).toBe(true);
+
+        // Button click should still work (bypasses state machine)
+        fetchMock.mockClear();
+        btn.click();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(btn.textContent).toBe('已填入');
+    });
+
+    it('熔断权优先于冷却: 已熔断后 observer 恒返回 breaker, 不再走冷却判定', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const bar = makeBar();
+        mod.attachKeyInject({ bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null });
+        const opts = { bar, getDoc: () => makePanelDoc(), getConfig: () => CONFIG, getEndpointMode: () => null, path: 'observer' };
+
+        // Trip breaker with 3 observer calls
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            await mod.autoSyncIntoGame(opts);
+        }
+
+        // Immediately call observer (within cooldown from 3rd call)
+        // Should return breaker, not cooled
+        const r = await mod.autoSyncIntoGame(opts);
+        expect(r.breaker).toBe(true);
+        expect(r.cooled).toBeUndefined(); // breaker takes priority
     });
 });
