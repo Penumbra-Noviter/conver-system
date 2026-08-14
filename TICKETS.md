@@ -25,15 +25,25 @@
 |------|--------|------|------|------|
 | TD-50 | T2 commit message 声称「覆盖 2 个示例」实际 git 零变化——md5 复核源目录与仓库内人生模拟器v3/蛛网之影一致，无内容漂移，仅措辞失实 | 波 1 Falsify | 低 | ❌ 复核关闭（2026-08-14 md5 比对一致，无漂移） |
 
-| TD-72 | 15s 超时守卫不覆盖响应体读取（simulators.js:408-420）：Promise.race 只竞到 headers，`return res.text()` 在超时外裸等——注入 `{ok:true, text:()=>new Promise(()=>{})}` 可致永久 loading（超时与 abort 均不再生效）；生产受限于同源静态 manifest 不可达；修复：race 延展覆盖 res.text() 或 clearTimeout 移到 text() 完成后 | 期末四轴 Falsify（F1，TD-remain 批次） | 中 | 📝 待立项 |
-| TD-73 | 导入回滚自身失败时错误遮蔽（save-manager.js:307-315）：回滚循环无 try/catch——第 N 键抛错且回滚写再抛错（配额一次性耗尽）时回滚异常遮蔽原始 QuotaExceededError 且剩余键不还原，docstring「失败已回滚并抛错」过度承诺；修复：回滚循环包 try/catch 继续尝试其余键并上抛原始 err | 期末四轴 Falsify（F2，TD-remain 批次） | 低 | 📝 待立项 |
-| TD-74 | 图标一致性锁钉死「恰好 2 副本」（icons.test.js:57-66 toHaveLength(2)）：未来合法新增第三处 data-icon="gamepad" 内联副本会误红；当前按 spec「锁现存双副本」为设计意图，需在锁注释或本区注记约束 | 期末四轴 Architecture（AR-2，TD-remain 批次） | 低 | 📝 待立项 |
 
-> 技术债区当前 **3 项**（TD-72/73/74 待立项，本批次期末四轴非阻断发现；TD-50 已复核关闭；TD-57/66/67/68 与 TD-48~71 余项已于 2026-08-14 批次处置，见归档）。
+> 技术债区当前 **0 项**（TD-72/73/74 已于 2026-08-14 批次完成，见归档；TD-50 已复核关闭）。技术债区**清零**。
 
 ---
 
 ## 已完成归档
+
+### 技术债区 TD-72/73/74 批次（2026-08-14 全自动 kickoff：轻量档 1 工单 3 提交）
+
+> 来源：TICKETS 技术债区最后 3 项（TD-remain 批次期末四轴非阻断发现），用户指令「补技术债区」，全自动档。
+>
+> Grilling 共识（全自动档）：**3 做 0 关闭，TD-74 票面修正**（改断言放宽而非纯文档注记——数量锁边际价值≈0 且让合法新增误红，真正防漂移契约是逐字节比对）。
+>
+> 提交（commit 链 942ffb9 → b49deae → 5435ea5，merge `6ab4cb5`，N1 措辞修复 `e6a18a9`）：
+> - **TD-72**（`942ffb9`，中）——超时守卫延展覆盖响应体读取：`return res.text()` → `return await Promise.race([res.text(), timeoutPromise])`（await 语义载重：finally 等第二 race 结算后才清计时器，headers 与响应体两阶段共享 15s 总预算）；docstring 两阶段守卫语义同步；先红后绿 +2 用例（响应体挂起进超时错误态 / abort 触发断开真实 fetch）
+> - **TD-73**（`b49deae`）——导入回滚 per-key try/catch：单键还原失败不中断继续逆序尝试，循环结束统一抛原始 err（错误同一性）；docstring 改「尽力而为回滚」；先红后绿 +1 用例（回滚写再失败 → 原始错误不遮蔽 + 剩余键继续回滚）
+> - **TD-74**（`5435ea5`，票面修正）——图标一致性锁数量断言 `toBe(2)` → `toBeGreaterThanOrEqual(2)`（下限锁双副本防误删，上限放开防合法新增误红），逐字节比对循环保留承担防漂移；仅测试文件，index.html 零修改；契约锁基线绿
+>
+> **期末四轴 code-review（固定点 6196990）：0 阻断放行，3/3 达成**——Falsify 13 组对抗构造全过（TD-72 exp2 反向实证 await 语义载重：无 await 形态守卫失效；TD-73 错误同一性引用相等；TD-74 删一副本仍红/新增漂移副本仍红）；Standards 0 硬违规；Architecture 全正面（Locality 保持、职责分离正确）。3 项非阻断：N1 docstring 措辞歧义（「同时覆盖」→「总预算 15s」）随 `e6a18a9` 顺手修复；N2 回滚失败可观测性（增强非缺陷）观察不落债；N3 锁正则单引号盲区（基线既有）不落债。运行态冒烟：smoke 真实运行 12 项 11 PASS/0 FAIL/1 SKIP 退出码 0（前端改动零后端影响，冒烟后端口已释放）。测试同步：Vitest **714**（基线 711，+3），pytest 433+1skip 未受影响。技术债区 **清零**（3 项 → 0 项）。
 
 ### 技术债区 TD-48~71 余项批次（2026-08-14 全自动 kickoff：标准档 4 工单 2 波）
 

@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 433+1skip）；`cd frontend && npm test`（Vitest 711，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（58）。
+测试：`cd backend && python -m pytest`（pytest 433+1skip）；`cd frontend && npm test`（Vitest 714，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（58）。
 
 ## 当前状态（2026-08-14）
 
@@ -46,7 +46,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **U7 模拟器模块批次（2026-08-14 全自动 kickoff）**：5 工单标准档 3 波完成——入口/22 游戏数据/列表页/运行视图/冒烟；期末四轴 0 阻断；技术债区 +12 项待立项（TD-48~62）
 - ✅ **U8+U9 模拟器二期批次（2026-08-14 全自动 kickoff）**：4 工单 2 波完成——U8-T1 凭证端点/U9-T1 manifest v2/U8-T2 注入按钮/U9-T2 存档面板（merge 链 9aa6cfd/3df82d8/455b308/a918067/79598c2 + 波末修复 4a38400）；期末四轴 0 阻断；技术债区 21 项待立项（TD-48~71）
 - ✅ **技术债区 TD-57/66/67/68 批次（2026-08-14 全自动 kickoff）**：3 工单小档完成——TD-66 credentials model 门控收紧（`_OPENAI_PROTOCOL_MODELS` 单源派生，先红后绿）/ TD-67+68 存档键契约单一来源（save-key-meta.js 深模块，五处消费点迁移）/ TD-57 同源 iframe 信任边界文档化（architecture.md 五要素小节）（commit 链 75d9d5c/6665dff/7d803d0，merge 1a7270b + 非阻断修复 37a3b5e）；期末四轴 0 阻断；技术债区 21→17 项待立项
-- ✅ 测试：pytest 433+1skip（后端）+ Vitest 711（前端）+ cargo test 58（壳）全绿
+- ✅ 测试：pytest 433+1skip（后端）+ Vitest 714（前端）+ cargo test 58（壳）全绿
 
 ## 待办管理
 
