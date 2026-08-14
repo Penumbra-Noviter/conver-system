@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { characters, conversations, messages, request, requestBlob, setFetch } from '../js/api.js';
+import { characters, conversations, messages, request, requestBlob, setFetch, settings } from '../js/api.js';
 import { downloadBlob } from '../js/utils.js';
 
 /**
@@ -259,6 +259,31 @@ describe('requestBlob', () => {
     } finally {
         vi.useRealTimers();
     }
+});
+
+describe('api.js settings.credentials — U8-T2 凭证端点入口', () => {
+    afterEach(() => {
+        setFetch(null);
+    });
+
+    it('credentials() 请求 GET /api/settings/credentials 并解析返回数据（复用 setFetch seam）', async () => {
+        const payload = { key: 'sk-smoke', endpoint: 'https://api.example.com/v1', model: 'gpt-4o-mini', protocol: 'openai' };
+        const fetchMock = vi.fn(async () => mockResponse({ data: payload }));
+        setFetch(fetchMock);
+
+        const data = await settings.credentials();
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith('/api/settings/credentials', expect.objectContaining({ method: 'GET' }));
+        expect(data).toEqual(payload);
+    });
+
+    it('非 2xx 响应抛出带 detail 的 Error（与 settings.get 同契约）', async () => {
+        const fetchMock = vi.fn(async () => mockResponse({ ok: false, status: 500, data: { detail: '服务器错误' } }));
+        setFetch(fetchMock);
+
+        await expect(settings.credentials()).rejects.toThrow('服务器错误');
+    });
 });
 
 describe('downloadBlob 薄包装', () => {

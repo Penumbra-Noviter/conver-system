@@ -112,11 +112,15 @@ const PROVIDERS = [
  * @param {object} [opts.importResult] - POST /api/characters/import 返回（成功）或 {fail: Error}
  * @param {boolean} [opts.failReloadAfterDelete] - 删除后列表重载（第 2 次 GET conversations）返回 500
  * @param {object} [opts.manifest] - simulators/manifest.json 返回（模拟器列表视图 fetch；默认空列表）
+ * @param {object} [opts.credentials] - GET /api/settings/credentials 返回（U8-T2；默认 protocol=none）
+ * @param {boolean} [opts.credentialsFail] - GET /api/settings/credentials 返回 500（注入失败路径）
  */
 function makeRoute({ characters = [], characterGet = null,
     conversations = [], createdConv = null, providers = PROVIDERS,
     settings = {}, messagesByConv = {}, searchResults = [], importResult = null,
-    failReloadAfterDelete = false, manifest = { version: 1, simulators: [] } } = {}) {
+    failReloadAfterDelete = false, manifest = { version: 1, simulators: [] },
+    credentials = { key: '', endpoint: '', model: '', protocol: 'none' },
+    credentialsFail = false } = {}) {
     let convListCalls = 0;
     return async (url, options = {}) => {
         const path = String(url).replace(/^.*\/api/, '/api');
@@ -153,6 +157,11 @@ function makeRoute({ characters = [], characterGet = null,
         if (path.startsWith('/api/messages/search') && method === 'GET') return mockJson(searchResults);
         if (path === '/api/models' && method === 'GET') return mockJson({ providers });
         if (path === '/api/settings' && method === 'GET') return mockJson(settings);
+        // 凭证端点（U8-T2 — 运行视图「使用主应用 Key」按钮点击时经 api.js seam 消费）
+        if (path === '/api/settings/credentials' && method === 'GET') {
+            if (credentialsFail) return mockJson({ detail: 'boom' }, 500);
+            return mockJson(credentials);
+        }
         // 模拟器 manifest（静态文件，非 /api 路径 — simulators.js fetch seam 消费 text()）
         if (path === 'simulators/manifest.json' && method === 'GET') {
             return { ok: true, status: 200, text: async () => JSON.stringify(manifest) };
@@ -425,6 +434,90 @@ describe('app.js 模拟器运行视图接线 — onOpenGame → openSimulator（
         expect(() => document.querySelector('.nav-btn[data-view="chat"]').click()).not.toThrow();
         expect(state.currentView).toBe('chat');
         expect(document.querySelector('#simulator-run-panel iframe')).toBeNull();
+    });
+});
+
+describe('app.js 模拟器 Key 注入接线 — initKeyInjector（U8-T2）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** manifest fixture：ai 游戏 + 完整 config 三元组（按钮渲染条件） */
+    const KEY_MANIFEST = {
+        version: 2,
+        simulators: [{
+            id: 'life-sim', file: '人生模拟器v3.html', name: '人生模拟器 v3',
+            type: 'ai', description: 'AI 驱动的生命模拟',
+            config: { endpoint: 'cfg-endpoint', apikey: 'cfg-apikey', model: 'cfg-model' },
+        }],
+    };
+
+    /** openai 凭证端点响应（契约：protocol=openai 时三元组非空） */
+    const KEY_CRED_OPENAI = { key: 'sk-app-openai', endpoint: 'https://api.example.com/v1', model: 'gpt-4o-mini', protocol: 'openai' };
+
+    /** 进入模拟器视图 → 打开游戏 → 向同源 iframe contentDocument 写入配置面板 */
+    async function openGameWithPanel(route) {
+        const env = await loadApp(route);
+        document.querySelector('.nav-btn[data-view="simulators"]').click();
+        await vi.waitFor(() => {
+            expect(document.querySelector('#simulator-list-panel .sim-card')).not.toBeNull();
+        });
+        document.querySelector('#simulator-list-panel .sim-card').click();
+        const frame = document.querySelector('#simulator-run-panel iframe');
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write(`<html><body>
+            <input id="cfg-endpoint" value="game-default-endpoint">
+            <input id="cfg-apikey">
+            <select id="cfg-model">
+                <option value="game-default-model">game-default-model</option>
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
+            </select>
+        </body></html>`);
+        doc.close();
+        return { env, doc };
+    }
+
+    it('点击「使用主应用 Key」→ 经凭证端点接线 → iframe 配置面板已填值 + 「已填入」反馈', async () => {
+        const { doc, env } = await openGameWithPanel(makeRoute({ manifest: KEY_MANIFEST, credentials: KEY_CRED_OPENAI }));
+
+        document.querySelector('.sim-key-btn').click();
+
+        await vi.waitFor(() => {
+            expect(doc.getElementById('cfg-apikey').value).toBe('sk-app-openai');
+        });
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
+        expect(document.querySelector('.sim-key-btn').textContent).toBe('已填入');
+        // 凭证请求确经 api.js seam 发往端点（initKeyInjector 接线 settings.credentials）
+        expect(env.fetchSpy.mock.calls.some(([url]) => String(url).includes('/api/settings/credentials'))).toBe(true);
+    });
+
+    it('claude-only 凭证 → 按钮禁用 + 「游戏仅支持 OpenAI 兼容 Key」（接线端到端）', async () => {
+        const { doc } = await openGameWithPanel(makeRoute({
+            manifest: KEY_MANIFEST,
+            credentials: { key: '', endpoint: '', model: '', protocol: 'claude' },
+        }));
+
+        document.querySelector('.sim-key-btn').click();
+
+        // 禁用态文案在凭证获取完成后设置 — 以其为就绪信号（disabled 在点击瞬间已置位）
+        await vi.waitFor(() => {
+            expect(document.querySelector('.sim-key-msg').textContent).toBe('游戏仅支持 OpenAI 兼容 Key');
+        });
+        expect(document.querySelector('.sim-key-btn').disabled).toBe(true);
+        expect(doc.getElementById('cfg-apikey').value).toBe(''); // 未注入任何值
+    });
+
+    it('凭证端点失败（500）→ 静默降级：按钮恢复可点、无禁用文案、无弹错', async () => {
+        const { doc } = await openGameWithPanel(makeRoute({ manifest: KEY_MANIFEST, credentialsFail: true }));
+
+        expect(() => document.querySelector('.sim-key-btn').click()).not.toThrow();
+        await vi.waitFor(() => {
+            expect(document.querySelector('.sim-key-btn').disabled).toBe(false);
+        });
+        expect(document.querySelector('.sim-key-btn').textContent).toBe('使用主应用 Key');
+        expect(doc.getElementById('cfg-apikey').value).toBe('');
+        expect(document.querySelector('.sim-key-msg').hidden).toBe(true);
     });
 });
 

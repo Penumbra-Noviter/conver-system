@@ -3565,6 +3565,61 @@ select {
     white-space: nowrap;
 }
 
+/* ══════════════════════════════════════════════════
+   模拟器 Key 注入按钮条（U8-T2 — .sim-key-* 段；DOM 契约与
+   key-injector.js attachKeyInject 对齐，勿改名） */
+
+.sim-key-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+    margin-left: var(--space-2);
+}
+
+.sim-key-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg);
+    color: var(--ink-2);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.sim-key-btn:hover:not(:disabled) {
+    background: var(--panel-2);
+    border-color: var(--border-strong);
+    color: var(--ink-1);
+}
+
+.sim-key-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.sim-key-msg {
+    font-size: var(--text-xs);
+    color: var(--warning);
+    white-space: nowrap;
+}
+
+.sim-key-note {
+    font-size: var(--text-xs);
+    color: var(--ink-4);
+    white-space: nowrap;
+}
+
+.sim-key-note[hidden] {
+    display: none;
+}
+
 .sim-run-body {
     flex: 1;
     min-height: 0;

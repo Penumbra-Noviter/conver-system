@@ -1,15 +1,19 @@
 /**
- * Conver System — 模拟器运行视图（深模块，U7-T4）
+ * Conver System — 模拟器运行视图（深模块，U7-T4 / U8-T2）
  *
  * 职责：运行视图的全部逻辑收口 —— iframe 状态机（idle → opening → loaded |
- *   error，含 15s 超时守卫）、AI 提示条（type === 'ai' 渲染固定文案）、
- *   「返回」回列表（卸载 iframe；游戏存档在游戏自身 localStorage 前缀隔离
- *   保存，重进自动恢复，卸载不丢进度）。打开参数校验（非法 file → 直接
- *   error 态，不创建 iframe；file 含路径分隔符 → 拒绝 — iframe src 注入守卫，
- *   src 永远形如 simulators/<file> 同源加载）。
+ *   error，含 15s 超时守卫）、AI 提示条（type === 'ai' 渲染固定文案 +
+ *   U8-T2 起 ai 且 manifest 含完整 config 三元组时附「使用主应用 Key」
+ *   按钮条）、「返回」回列表（卸载 iframe；游戏存档在游戏自身 localStorage
+ *   前缀隔离保存，重进自动恢复，卸载不丢进度）。打开参数校验（非法 file →
+ *   直接 error 态，不创建 iframe；file 含路径分隔符 → 拒绝 — iframe src
+ *   注入守卫，src 永远形如 simulators/<file> 同源加载）。
  *
  * 依赖方向：simulator-view.js → icons.js（iconHtml）/ utils.js（escapeHtml，
- *   game.name 来自 manifest 第三方数据，header 渲染必须转义）；
+ *   game.name 来自 manifest 第三方数据，header 渲染必须转义）/
+ *   key-injector.js（U8-T2：attachKeyInject 挂按钮交互 + hasConfigTriplet
+ *   三元组校验 + TEXT_KEY_INJECT 按钮文案 — 点击/注入逻辑收口在注入模块，
+ *   凭证获取经 key-injector initKeyInjector 钩子由 app.js 接线）；
  *   app.js → simulator-view.js（initSimulatorRun 接线 + onOpenGame 接到
  *   openSimulator + 切走 simulators 视图时 closeSimulator 销毁 iframe —
  *   Grilling 共识：状态全在游戏自身 localStorage，避免后台游戏继续跑）。
@@ -18,7 +22,14 @@
  *   index.html U7-T1 骨架，经 initSimulatorRun 注入绑定（未注入时 open/close
  *   no-op 不抛错）；运行面板内容全部由本模块渲染。面板显隐走 hidden 属性
  *   （style.css 对 #simulator-run-panel 设 display 时须补 [hidden] 覆盖 —
- *   见 T4 样式契约）。
+ *   见 T4 样式契约）。按钮条 DOM 契约（.sim-key-bar / .sim-key-btn /
+ *   .sim-key-msg / .sim-key-note）与 key-injector.js attachKeyInject 对齐。
+ *
+ * wg_ 族会话注记（U8-T2 验收 4）：小马宝莉 / 高中生模拟器无保存按钮，
+ *   注入仅会话内生效 — 成功注入后按钮旁显示「重进游戏需再次点击」小字。
+ *   识别方式：spec 明示两游戏（manifest 无会话内标志字段），id 集合硬编码；
+ *   U9-T2 存档面板「仅会话内生效」注记同源（协调点 — 若未来新增该族游戏
+ *   须同步两处）。
  *
  * 错误检测基线（spec Implementation Decisions）：同源 404 仍触发 load 事件，
  *   错误态主要依赖超时守卫（15s 未收到 load）+ 打开参数校验；iframe 元素
@@ -29,6 +40,7 @@
 
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
+import { attachKeyInject, hasConfigTriplet, TEXT_KEY_INJECT } from './key-injector.js';
 
 // ══════════════════════════════════════════════════
 // 常量（UI 契约 — 文案/时长与 spec 对齐）
@@ -42,6 +54,13 @@ const TIMEOUT_MS = 15000;
 
 /** AI 游戏提示条固定文案（spec 逐字） */
 const HINT_AI = '此游戏需自行配置 AI 接口';
+
+/** wg_ 族会话注记文案（U8-T2 验收 4 — 注入仅会话内生效） */
+const NOTE_SESSION_ONLY = '重进游戏需再次点击';
+
+/** wg_ 族游戏 id 集合（spec 明示：小马宝莉 / 高中生模拟器；manifest 无
+ *  会话内标志字段 — 硬编码识别，U9-T2 存档面板注记同源，见模块头 docstring） */
+const SESSION_ONLY_IDS = new Set(['my-little-pony', 'high-school-sim']);
 
 // ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
@@ -115,7 +134,10 @@ function showListPanel() {
 // ══════════════════════════════════════════════════
 
 /**
- * 渲染运行视图骨架：header（返回按钮 + 游戏名（转义）+ AI 提示条）+ body。
+ * 渲染运行视图骨架：header（返回按钮 + 游戏名（转义）+ AI 提示条 + 可选
+ * 「使用主应用 Key」按钮条）+ body。ai 游戏且 manifest 含完整 config 三元组
+ * 时渲染按钮条（U8-T2；三元组不完整视为无 config — 提示条维持现状）；wg_
+ * 族游戏（无保存按钮）按钮条内含隐藏的会话注记元素（成功注入后显示）。
  * iframe 与加载占位一起渲染于 body；src 留待 openSimulator 绑定 load
  * 监听后设置（jsdom 不自动触发 load，测试手动派发）。
  * @param {object} game - 已通过参数校验的游戏条目
@@ -124,13 +146,23 @@ function renderShell(game) {
     // 防御归一化：参数非法分支可能收到 null/非对象（error 态仍需 header 返回按钮）
     const g = game !== null && typeof game === 'object' ? game : {};
     const name = typeof g.name === 'string' ? g.name : '';
-    const hint = g.type === 'ai'
+    const isAi = g.type === 'ai';
+    const hint = isAi
         ? `<span class="sim-run-hint">${HINT_AI}</span>` : '';
+    // 按钮条仅 ai + 完整 config 三元组渲染；会话注记仅 wg_ 族渲染（隐藏，注入成功后才显示）
+    const keyBar = isAi && hasConfigTriplet(g.config)
+        ? `<div class="sim-key-bar">
+            <button type="button" class="sim-key-btn">${TEXT_KEY_INJECT}</button>
+            <span class="sim-key-msg" role="status" hidden></span>
+            ${SESSION_ONLY_IDS.has(g.id) ? `<span class="sim-key-note" hidden>${NOTE_SESSION_ONLY}</span>` : ''}
+        </div>`
+        : '';
     runPanel.innerHTML = `
         <div class="sim-run-header">
             <button type="button" class="sim-run-back">${iconHtml('chevronLeft', { size: 14 })}<span>返回</span></button>
             <h3 class="sim-run-name">${escapeHtml(name)}</h3>
             ${hint}
+            ${keyBar}
         </div>
         <div class="sim-run-body">
             <p class="sim-run-status">加载中…</p>
@@ -138,6 +170,17 @@ function renderShell(game) {
         </div>
     `;
     runPanel.querySelector('.sim-run-back').addEventListener('click', closeSimulator);
+    // 按钮交互挂到 key-injector（点击/注入/反馈状态机收口在注入模块；
+    // getDoc/getConfig 动态取 — iframe 异步加载，点击时再取当前值）
+    const bar = runPanel.querySelector('.sim-key-bar');
+    if (bar) {
+        attachKeyInject({
+            bar,
+            sessionOnly: SESSION_ONLY_IDS.has(g.id),
+            getDoc: () => frame?.contentDocument ?? null,
+            getConfig: () => currentGame?.config ?? null,
+        });
+    }
 }
 
 /**
