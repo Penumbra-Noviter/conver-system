@@ -21,6 +21,7 @@ export default defineConfig({
                 'js/components/character-submit.js',
                 'js/simulators.js',
                 'js/simulator-view.js',
+                'js/save-manager.js',
             ],
             reporter: ['text', 'html'],
             thresholds: {

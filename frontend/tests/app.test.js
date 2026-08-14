@@ -69,6 +69,7 @@ const APP_DOM_HTML = `
 
     <div id="simulator-list-panel"></div>
     <div id="simulator-run-panel" hidden></div>
+    <div id="simulator-save-panel" hidden></div>
 
     <select id="setting-default-provider"></select>
     <select id="setting-default-model"></select>
@@ -892,5 +893,68 @@ describe('app.js 数据加载失败 — Falsify 兜底', () => {
         await vi.waitFor(() => expect(errorSpy).toHaveBeenCalledWith('加载模型列表失败:', expect.any(Error)));
         expect(state.models).toEqual({ providers: [] });
         errorSpy.mockRestore();
+    });
+});
+
+describe('app.js 存档面板接线 — 工具条按钮 → 存档面板（U9-T2）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 进入模拟器视图并等待卡片渲染（manifest v2 带 saveKeys 的游戏） */
+    async function openListView() {
+        const env = await loadApp(makeRoute({
+            manifest: {
+                version: 2,
+                simulators: [{
+                    id: 'life-sim', file: '人生模拟器v3.html', name: '人生模拟器 v3',
+                    type: 'ai', description: 'AI 驱动的生命模拟',
+                    saveKeys: ['ls_autosave', 'ls_used_names'],
+                }],
+            },
+        }));
+        document.querySelector('.nav-btn[data-view="simulators"]').click();
+        await vi.waitFor(() => {
+            expect(document.querySelector('#simulator-list-panel .sim-card')).not.toBeNull();
+        });
+        return env;
+    }
+
+    it('工具条「存档管理」按钮 → 存档面板显示、列表隐藏、游戏行渲染（getGames 钩子数据源）', async () => {
+        localStorage.setItem('ls_autosave', '{"v":1}');
+        await openListView();
+
+        document.querySelector('#simulator-list-panel .sim-save-manage-btn').click();
+
+        const savePanel = document.querySelector('#simulator-save-panel');
+        expect(savePanel.hidden).toBe(false);
+        expect(document.querySelector('#simulator-list-panel').hidden).toBe(true);
+        expect(document.querySelector('#simulator-run-panel').hidden).toBe(true);
+        expect(savePanel.querySelector('.sim-save-game-name').textContent).toBe('人生模拟器 v3');
+        expect(savePanel.querySelector('.sim-save-meta').textContent).toContain('1 个存档');
+    });
+
+    it('返回按钮 → closeSavePanel 接线：存档面板隐藏、列表面板恢复', async () => {
+        await openListView();
+        document.querySelector('#simulator-list-panel .sim-save-manage-btn').click();
+        document.querySelector('#simulator-save-panel .sim-save-back').click();
+
+        expect(document.querySelector('#simulator-save-panel').hidden).toBe(true);
+        expect(document.querySelector('#simulator-list-panel').hidden).toBe(false);
+    });
+
+    it('切走 simulators 视图 → 存档面板复位（隐藏 + 内容清空）', async () => {
+        await openListView();
+        document.querySelector('#simulator-list-panel .sim-save-manage-btn').click();
+        expect(document.querySelector('#simulator-save-panel').innerHTML).not.toBe('');
+
+        document.querySelector('.nav-btn[data-view="characters"]').click();
+        expect(document.querySelector('#simulator-save-panel').hidden).toBe(true);
+        expect(document.querySelector('#simulator-save-panel').innerHTML).toBe('');
+    });
+
+    it('Falsify:切换其他视图但存档面板未打开 → closeSavePanel no-op 不抛错', async () => {
+        await openListView();
+        expect(() => document.querySelector('.nav-btn[data-view="chat"]').click()).not.toThrow();
+        expect(document.querySelector('#simulator-save-panel').hidden).toBe(true);
     });
 });

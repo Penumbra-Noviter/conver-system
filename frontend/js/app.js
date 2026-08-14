@@ -22,6 +22,9 @@
  *     + 返回；U7-T4，onOpenGame 接到 openSimulator，切走 simulators 视图时
  *     closeSimulator 销毁 iframe — Grilling 共识：状态全在游戏自身
  *     localStorage，避免后台游戏继续跑）
+ *   - ./save-manager.js — 存档管理面板深模块（列表/导出/导入/删除；U9-T2，
+ *     工具条按钮接到 openSavePanel，游戏列表经 getGames 钩子注入，
+ *     切走 simulators 视图时 closeSavePanel 复位）
  *   - ./components/settings-panel.js — 设置面板（Provider 下拉、主题、侧栏、保存、清空）
  *   - ./components/ — 模态框相关组件（modal 工厂 / confirm / model-selector / export / character-form）
  */
@@ -41,8 +44,9 @@ import { getActiveTab, getTabs, abortStream, restoreFromStorage } from './tabs.j
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 import { initSearchView } from './search-view.js';
 import { closeConversationsAndResettle, setCascadeHooks } from './cascade.js';
-import { initSimulatorsView, refreshSimulators } from './simulators.js';
+import { initSimulatorsView, refreshSimulators, getGames } from './simulators.js';
 import { initSimulatorRun, openSimulator, closeSimulator } from './simulator-view.js';
+import { initSaveManager, openSavePanel, closeSavePanel } from './save-manager.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用
@@ -104,10 +108,13 @@ async function switchView(viewName) {
     // 模拟器视图：进入即刷新列表（懒加载 — 未进入不发请求；fetch 在
     // simulators.js 内部走 setFetch seam，协调层只负责触发）
     if (viewName === 'simulators') refreshSimulators();
-    // 切走模拟器视图 → 销毁运行中的 iframe（Grilling 共识：状态全在游戏
-    // 自身 localStorage，无丢失风险；避免后台游戏继续跑；closeSimulator
-    // 未打开时 no-op）
-    if (viewName !== 'simulators') closeSimulator();
+    // 切走模拟器视图 → 销毁运行中的 iframe + 存档面板复位（Grilling 共识：
+    // 状态全在游戏自身 localStorage，无丢失风险；避免后台游戏继续跑；
+    // closeSimulator / closeSavePanel 未打开时 no-op — 沿用运行视图销毁纪律）
+    if (viewName !== 'simulators') {
+        closeSimulator();
+        closeSavePanel();
+    }
 }
 
 dom.navBtns.forEach((btn) => {
@@ -506,14 +513,29 @@ initSearchView({
 });
 
 // 模拟器列表视图初始化（U7-T3 — 挂载列表 UI 到 #simulator-list-panel；
-// onOpenGame 接入 openSimulator：点击卡片 → 运行视图，U7-T4）
-initSimulatorsView({ container: $('#simulator-list-panel'), onOpenGame: openSimulator });
+// onOpenGame 接入 openSimulator：点击卡片 → 运行视图，U7-T4；
+// onOpenSaveManager 接入 openSavePanel：工具条「存档管理」按钮 → 存档面板，U9-T2）
+initSimulatorsView({
+    container: $('#simulator-list-panel'),
+    onOpenGame: openSimulator,
+    onOpenSaveManager: openSavePanel,
+});
 
 // 模拟器运行视图初始化（U7-T4 — 绑定列表/运行两面板；iframe 状态机 +
 // AI 提示条 + 返回收口在 simulator-view.js）
 initSimulatorRun({
     listPanel: $('#simulator-list-panel'),
     runPanel: $('#simulator-run-panel'),
+});
+
+// 存档管理面板初始化（U9-T2 — 绑定三面板 + getGames 钩子（数据源为
+// simulators.js 缓存，不重复 fetch manifest）；返回按钮 → closeSavePanel；
+// 切走 simulators 视图时 switchView 调用 closeSavePanel 复位）
+initSaveManager({
+    savePanel: $('#simulator-save-panel'),
+    listPanel: $('#simulator-list-panel'),
+    runPanel: $('#simulator-run-panel'),
+    getGames,
 });
 
 // 注入 tab 条激活处理器（P6.5-3）：组件内关闭按钮直接 closeTab（含 abort 流式），
