@@ -20,12 +20,12 @@ powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 | 1 | `cargo test`（src-tauri） | 壳纯逻辑 43 用例 |
 | 2 | `pytest`（backend，仓库根 .venv） | 261 用例 + 1 skip |
 | 3 | `vitest run`（frontend） | 186 用例 |
-| 4 | `tauri build`（NSIS） | 安装器 + 壳 exe |
+| 4 | `tauri build`（默认 NSIS；`-SkipInstaller` 时 `--no-bundle` 仅编译壳） | 安装器 + 壳 exe（SkipInstaller 时仅壳） |
 | 5 | `smoke-desktop.ps1` | 验收 1-7 自动化 |
 
 产物：
 
-- 安装器：`src-tauri/target/release/bundle/nsis/Conver System_0.1.0_x64-setup.exe`（**内含后端随包资源** `dist/conver_backend`，经 `bundle.resources` 分发——安装后即可双击直启，无需 python）
+- 安装器（仅未加 `-SkipInstaller` 时产出）：`src-tauri/target/release/bundle/nsis/Conver System_0.1.0_x64-setup.exe`（**内含后端随包资源** `dist/conver_backend`，经 `bundle.resources` 分发——安装后即可双击直启，无需 python）
 - 壳 exe：`src-tauri/target/release/conver-system.exe`
 - 后端打包 exe：`dist/conver_backend/conver_backend.exe`（build-backend.ps1 产出；构建时缺失自动补齐——tauri build 的 resources 依赖它）
 
@@ -81,6 +81,7 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-desktop.ps1 -UseInstaller
 | `-ForceKillStale` | 强制清理残留壳实例（单实例机制会拦截新实例；默认遇到即报错） |
 | `-CleanAppData` | 冒烟后删除数据目录（**危险**，会删除既有数据，默认关） |
 | `-SkipBackendBuild` | 后端 exe 缺失时不自动打包（直接报错） |
+| `-SkipInstaller` | tauri build 改 `--no-bundle` 仅编译壳，不产 NSIS 安装器（常规打包默认加——用户惯例：安装包仅在明确提需求时打包） |
 
 安全边界（脚本内显式守卫）：
 
