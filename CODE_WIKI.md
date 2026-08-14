@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1201<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->435<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->766<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1259<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->435<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->766<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
 
 ---
 
@@ -760,7 +760,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/icons.js:iconHtml-->`iconHtml(name, options = {})`<!--/AUTO--> | 图标 HTML 生成（名称 + 选项） |
 
-### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~604 行<!--/AUTO-->）
+### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~608 行<!--/AUTO-->）
 
 **职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + 写回环熔断 TD-76）。
 
@@ -829,7 +829,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/search-view.js:performSearch-->`performSearch(query)`<!--/AUTO--> | 执行搜索 |
 | <!--AUTO:sig:frontend/js/search-view.js:renderSearchResults-->`renderSearchResults(results, query)`<!--/AUTO--> | 渲染搜索结果 |
 
-### 4.56 `frontend/js/simulator-view.js` — 模拟器运行视图（<!--AUTO:lines:frontend/js/simulator-view.js-->~457 行<!--/AUTO-->）
+### 4.56 `frontend/js/simulator-view.js` — 模拟器运行视图（<!--AUTO:lines:frontend/js/simulator-view.js-->~430 行<!--/AUTO-->）
 
 **职责**：模拟器 iframe 运行视图（U7/U8）——加载/超时/错误态、配置控件 MutationObserver 重建再同步（TD-75 attributeFilter 收窄）、load 自动同步。
 
@@ -1133,7 +1133,7 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1201<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1259<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->435<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->766<!--/AUTO-->
