@@ -6,6 +6,16 @@
 
 ---
 
+## 滚动摘要（2026-08-14 — U8+U9 模拟器二期批次：4 工单 2 波全自动 kickoff）
+
+- **U8+U9 批次完成（merge 链 9aa6cfd → 3df82d8 → 455b308 → a918067 → 79598c2，波末修复 4a38400）**：模拟器二期 4 工单 2 波——波 1：U8-T1 只读凭证端点 GET /api/settings/credentials（openai 协议槽位解析、claude key 绝不回传，merge 9aa6cfd）+ U9-T1 manifest v2（22 游戏 saveKeys：精确键/正则锚定 + parseManifest 兼容，merge 3df82d8）；波 2：U8-T2「使用主应用 Key」一键注入按钮（merge 455b308）+ U9-T2 存档管理面板（列表/导出/导入/删除，merge a918067，人工仲裁 5 冲突块）；波末审核修复 F1/F2/F3（4a38400，merge 79598c2——select 注入匹配校验 + smoke 步骤间视图恢复 + 冒烟阻塞点）
+- **期末四轴 code-review：0 阻断**；9 项非阻断观察落技术债区（TD-63~71 待立项，技术债区累计 21 项 TD-48~71）
+- **4.5 运行态冒烟**：模拟器冒烟 11 PASS/1 SKIP + 桌面 WebView2 CDP 4 PASS
+- **文档同步（本批次）**：TICKETS（U8+U9 归档 + TD-63~71 落区）；CLAUDE.md / PROJECT_REFERENCE.md（pytest 413→429+1skip / Vitest 551→683 + 状态更新）；README / docs/architecture.md（注入与存档管理入册）；docs/api-design.md（credentials 端点）；docs/world-simulation-exploration.md（U8/U9 标已完成）
+- **测试**：pytest **429 + 1 skip**（+16）；Vitest **683**（+132）；cargo 58 未受影响
+
+---
+
 ## 滚动摘要（2026-08-14 — U7 模拟器模块批次：5 工单标准档 3 波全自动 kickoff）
 
 - **U7 批次完成（merge 链 37affb8 → 48e6e6c → 3ab60e6 → e4b6129 → 7e5ea15）**：模拟器模块正式落地（2026-08-13 原型验证 → 2026-08-14 正式立项，来源 docs/world-simulation-exploration.md U7 未决事项）。标准档 3 波——波 1：T1 模拟器入口（侧栏/移动端导航按钮 + view-simulators 骨架 + gamepad/play 图标，零接线切换，merge 37affb8）+ T2 22 款模拟器全量入包 + manifest v1 元数据补全（数据工单，merge 48e6e6c）；波 2：T3 列表页（manifest 解析 + 卡片网格 + 类型筛选 + 四态，8d7a52a）+ T4 运行视图（iframe 状态机 + AI 提示条 + 返回，7b81172），merge 3ab60e6；波 2 审核 2 修复（8d266f9，merge e4b6129）——**属性注入面关闭**（data-id/title 走 DOM 通道）+ **iframe load 竞态守卫**；波 3：T5 端到端冒烟脚本（Playwright，72af4f4，merge 7e5ea15）

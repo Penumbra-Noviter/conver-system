@@ -36,12 +36,35 @@
 | TD-59 | index.html 内联 gamepad SVG（侧栏:44 + 移动端:417）与 icons.js ICON_PATHS 双源，防漂移仅靠注释——加一致性测试锁 | 期末四轴 | 低 | 📝 待立项 |
 | TD-60 | api.js / simulators.js 双 setFetch seam 协议面重复（simulators.js:42-51 镜像 api.js:16-28，docstring 已论证）——抽共享 seam 模块或 api.js 增 fetchUrl | 期末四轴 | 低 | 📝 待立项 |
 | TD-62 | initSimulatorsView 二次 init 异容器时 stateEl 陈旧（simulators.js:285-295）——app.js 只 init 一次不可达；同容器幂等有测试 | 期末四轴 | 低 | 📝 待立项 |
+| TD-63 | applyImportPayload 无事务性（save-manager.js:491）：localStorage 近 5MB 上限时导入多键包，第 N 键 QuotaExceededError → 前 N-1 键已部分写入 + 无 toast；整包拒绝闸门只防内容不防容量 | 波 2 Falsify | 中 | 📝 待立项 |
+| TD-64 | pendingGameId 残留（save-manager.js:463-473）：文件选择取消早退发生在 pendingGameId 清理前，残留至下次导入覆盖或 closeSavePanel 复位；实际触发面低 | 波 2 Falsify | 低 | 📝 待立项 |
+| TD-65 | 导出文件名注入面（save-manager.js:419 `${gameId}-saves.json`）：gameId 来自 manifest 第三方数据，含引号/控制字符可产生怪异文件名（无路径逃逸，download 语义限制） | 波 2 Falsify | 低 | 📝 待立项 |
+| TD-66 | credentials 端点 model 门控盲区（setting.py:204-208）：provider=openai 且 default_model 未显式配置时，default_model() 回退 .env 默认 claude-sonnet-5 混入 openai 三元组 → 注入后游戏拿 claude 模型名打 openai 端点必失败（波 1 审核 F-1；U8-T2 前端无法处理，后端补强：model 仅当显式配置或属于 openai 协议模型集时返回） | 波 1 Falsify（波 2 复证） | 中 | 📝 待立项 |
+| TD-67 | SAVE_KEY_META_RE 四处复制（simulators.js:107 / save-manager.js:60 / smoke:75 / simulator-manifest.test.js:37）——契约常量未单一来源，一处改动即静默分叉收集与校验语义（期末四轴补记测试文件第 4 处副本） | 波 2 Falsify（期末四轴补记） | 中 | 📝 待立项 |
+| TD-68 | wg_ 族 id 集合双处硬编码（simulator-view.js:63 / save-manager.js:72），漂移风险已 docstring 文档化但无单一来源 | 波 2 Falsify | 中 | 📝 待立项 |
+| TD-69 | save-manager.js 渲染路径直接访问 window.localStorage（renderGameRow/renderSavePanel）无 try/catch——浏览器存储禁用/隐私模式抛 SecurityError 时 openSavePanel 整体崩溃（纯函数层有判空防御，渲染层无）；修复：渲染路径 try/catch 降级「0 个存档」 | 期末四轴 Falsify | 低 | 📝 待立项 |
+| TD-70 | validateImportPayload 用普通对象字面量累积——白名单存在 `__proto__` 键时 `valid['__proto__'] = value` 走原型 setter 静默丢失该键（导入报告成功但键不写入）；当前 22 游戏无此类键实际不可达；修复 Object.create(null) | 期末四轴 Falsify | 低 | 📝 待立项 |
+| TD-71 | U8-T2 验收 4 未完全达成：none 态提示「未配置 OpenAI 兼容 Key」未「指向设置页」（spec US4 要求 none 态提示前往设置页配置；实现无链接）；claude-only 文案已达标 | 期末四轴 Spec | 低 | 📝 待立项 |
 
-> 技术债区当前 **12 项**（TD-48/49/51/52/53/55/56/57/58/59/60/62 待立项；TD-50 已复核关闭）。
+> 技术债区当前 **21 项**（TD-48/49/51/52/53/55/56/57/58/59/60/62/63/64/65/66/67/68/69/70/71 待立项；TD-50 已复核关闭）。
 
 ---
 
 ## 已完成归档
+
+### U8+U9 模拟器二期批次（2026-08-14 全自动 kickoff：4 工单 2 波）
+
+> 来源：docs/world-simulation-exploration.md U8/U9 未决事项（2026-08-13 原型验证）→ 2026-08-14 正式立项（用户确认 kickoff，全自动档）。
+>
+> 工单（merge 链 9aa6cfd → 3df82d8 → 455b308 → a918067 → 79598c2）：
+> - **U8-T1 凭证端点**（merge `9aa6cfd`，波 1）——GET /api/settings/credentials 只读端点（CredentialsResponse：{key, endpoint, model, protocol: openai|claude|none}；openai 协议槽位解析、claude key 绝不回传、无写入副作用）
+> - **U9-T1 manifest v2**（merge `3df82d8`，波 1）——manifest v2：22 游戏 saveKeys 精确键/正则锚定 + parseManifest 兼容
+> - **U8-T2 Key 一键注入**（merge `455b308`，波 2）——运行视图「使用主应用 Key」注入按钮
+> - **U9-T2 存档管理面板**（merge `a918067`，波 2，人工仲裁 5 冲突块：docstring/import/coverage 常量并列段两边保留）——存档列表/导出/导入/删除
+>
+> **波末审核修复**（`4a38400`，merge `79598c2`）：F1/F2/F3——select 注入匹配校验 + smoke 步骤间视图恢复 + 冒烟阻塞点。
+>
+> **期末四轴 code-review：0 阻断**；9 项非阻断观察落技术债区（TD-63~71，技术债区累计 21 项待立项 TD-48~71）。测试同步：pytest **429 + 1 skip**（基线 413+1skip，+16）/ Vitest **683**（基线 551，+132），全部全绿。
 
 ### U7 模拟器模块批次（2026-08-14 全自动 kickoff：5 工单标准档 3 波）
 

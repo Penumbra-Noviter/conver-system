@@ -445,6 +445,32 @@ POST /api/settings/test-connection
 
 **错误** `400` — 不支持的 Provider / 未提供 Key / Key 无效 / 网络不可达（detail 为可读原因）
 
+### 获取模拟器凭证（只读）
+
+```
+GET /api/settings/credentials
+```
+
+**响应** `200` — 只读凭证查询（无写入副作用），供模拟器「使用主应用 Key」注入用
+
+```json
+{
+  "key": "",
+  "endpoint": "",
+  "model": "",
+  "protocol": "none"
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| key | openai 协议槽位解析到的 key；仅 `protocol=openai` 时非空（claude key 值**绝不回传**） |
+| endpoint | openai 协议槽位 base_url（复用跨协议兜底链）；为空时前端保持游戏默认地址 |
+| model | 默认 provider 为 openai 协议且存在 openai key 时返回，否则空串（游戏保持默认模型） |
+| protocol | 协议能力标志 ∈ `openai` \| `claude` \| `none`（供前端按钮禁用 / 提示文案判断） |
+
+> 解析链复用设置服务既有语义（openai 协议槽位优先，DB → .env）；无 openai key 时 key/endpoint/model 均为空串，只读查询不报错（非 404/401）。
+
 ---
 
 ## 错误响应格式
