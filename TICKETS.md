@@ -31,7 +31,6 @@
 | TD-53 | 运行视图中再点 nav「模拟器」：仅刷新隐藏列表、不销毁 iframe 不回列表（app.js:106-109）——与「返回」按钮语义分工但未提示用户 | 波 2 Falsify | 低 | 📝 待立项 |
 | TD-55 | refreshSimulators 并发陈旧响应覆盖（进→出→快速重进双 fetch，慢旧响应后到覆盖新渲染，simulators.js:349-364）——静态 manifest 内容相同，实际影响可忽略 | 期末四轴 | 低 | 📝 待立项 |
 | TD-56 | isValidGame src 注入守卫不覆盖百分号编码（`%2e%2e`/`%2f`，simulator-view.js:95-99）——WHATWG URL 解析可绕过字面 `/` `\` 检查；受 Starlette 遍历防护 + manifest 可信资产双兜底，实际不可达，加固建议 | 期末四轴 Falsify | 低 | 📝 待立项 |
-| TD-57 | **同源 iframe 信任边界**：22 游戏同源运行，游戏间 localStorage key 可互读（含用户自填 API key）+ 可调 /api 任意端点（后端无鉴权）——自用威胁模型可接受，但应文档化；U8 探索跨源沙箱/postMessage | 期末四轴 Falsify | 中 | 📝 待立项 |
 | TD-58 | play 图标注册未使用（icons.js:36，仅测试断言可渲染）——使用或移除 | 期末四轴 | 低 | 📝 待立项 |
 | TD-59 | index.html 内联 gamepad SVG（侧栏:44 + 移动端:417）与 icons.js ICON_PATHS 双源，防漂移仅靠注释——加一致性测试锁 | 期末四轴 | 低 | 📝 待立项 |
 | TD-60 | api.js / simulators.js 双 setFetch seam 协议面重复（simulators.js:42-51 镜像 api.js:16-28，docstring 已论证）——抽共享 seam 模块或 api.js 增 fetchUrl | 期末四轴 | 低 | 📝 待立项 |
@@ -39,18 +38,28 @@
 | TD-63 | applyImportPayload 无事务性（save-manager.js:491）：localStorage 近 5MB 上限时导入多键包，第 N 键 QuotaExceededError → 前 N-1 键已部分写入 + 无 toast；整包拒绝闸门只防内容不防容量 | 波 2 Falsify | 中 | 📝 待立项 |
 | TD-64 | pendingGameId 残留（save-manager.js:463-473）：文件选择取消早退发生在 pendingGameId 清理前，残留至下次导入覆盖或 closeSavePanel 复位；实际触发面低 | 波 2 Falsify | 低 | 📝 待立项 |
 | TD-65 | 导出文件名注入面（save-manager.js:419 `${gameId}-saves.json`）：gameId 来自 manifest 第三方数据，含引号/控制字符可产生怪异文件名（无路径逃逸，download 语义限制） | 波 2 Falsify | 低 | 📝 待立项 |
-| TD-66 | credentials 端点 model 门控盲区（setting.py:204-208）：provider=openai 且 default_model 未显式配置时，default_model() 回退 .env 默认 claude-sonnet-5 混入 openai 三元组 → 注入后游戏拿 claude 模型名打 openai 端点必失败（波 1 审核 F-1；U8-T2 前端无法处理，后端补强：model 仅当显式配置或属于 openai 协议模型集时返回） | 波 1 Falsify（波 2 复证） | 中 | 📝 待立项 |
-| TD-67 | SAVE_KEY_META_RE 四处复制（simulators.js:107 / save-manager.js:60 / smoke:75 / simulator-manifest.test.js:37）——契约常量未单一来源，一处改动即静默分叉收集与校验语义（期末四轴补记测试文件第 4 处副本） | 波 2 Falsify（期末四轴补记） | 中 | 📝 待立项 |
-| TD-68 | wg_ 族 id 集合双处硬编码（simulator-view.js:63 / save-manager.js:72），漂移风险已 docstring 文档化但无单一来源 | 波 2 Falsify | 中 | 📝 待立项 |
 | TD-69 | save-manager.js 渲染路径直接访问 window.localStorage（renderGameRow/renderSavePanel）无 try/catch——浏览器存储禁用/隐私模式抛 SecurityError 时 openSavePanel 整体崩溃（纯函数层有判空防御，渲染层无）；修复：渲染路径 try/catch 降级「0 个存档」 | 期末四轴 Falsify | 低 | 📝 待立项 |
 | TD-70 | validateImportPayload 用普通对象字面量累积——白名单存在 `__proto__` 键时 `valid['__proto__'] = value` 走原型 setter 静默丢失该键（导入报告成功但键不写入）；当前 22 游戏无此类键实际不可达；修复 Object.create(null) | 期末四轴 Falsify | 低 | 📝 待立项 |
 | TD-71 | U8-T2 验收 4 未完全达成：none 态提示「未配置 OpenAI 兼容 Key」未「指向设置页」（spec US4 要求 none 态提示前往设置页配置；实现无链接）；claude-only 文案已达标 | 期末四轴 Spec | 低 | 📝 待立项 |
 
-> 技术债区当前 **21 项**（TD-48/49/51/52/53/55/56/57/58/59/60/62/63/64/65/66/67/68/69/70/71 待立项；TD-50 已复核关闭）。
+> 技术债区当前 **17 项**（TD-48/49/51/52/53/55/56/58/59/60/62/63/64/65/69/70/71 待立项；TD-50 已复核关闭；TD-57/66/67/68 已于 2026-08-14 批次完成，见归档）。
 
 ---
 
 ## 已完成归档
+
+### 技术债区 TD-57/66/67/68 批次（2026-08-14 全自动 kickoff：3 工单小档）
+
+> 来源：TICKETS 技术债区 4 项中强度（TD-57 信任边界 / TD-66 model 门控 / TD-67+68 常量单源），用户点名清理，全自动档。
+>
+> Grilling 共识（全自动档）：**3 做 0 关闭，TD-67/68 合并**——TD-66 票面机制实证成立（运行级复现：openai key + provider=deepseek + 未配 model → credentials() 返回 claude 模型名），**票面措辞修正**（示例模型名以 .env 实际值 claude-sonnet-4-20250514 为准）；TD-67/68 合并（文件范围重叠 + 同主题，一次建模块一次收副本）；TD-57 纯文档化（加固不可行硬论证：同源 HTTP 无法真沙箱化）。
+>
+> 工单（commit 链 75d9d5c → 6665dff → 7d803d0，merge `1a7270b`，非阻断修复 `37a3b5e`）：
+> - **TD-66**（`75d9d5c`）——setting.py 新增 `_OPENAI_PROTOCOL_MODELS`（由 AVAILABLE_MODELS 中协议 id=="openai" 的 provider 模型并集派生，含 openai 自身）+ credentials() model 门控收紧（显式配置或解析值 ∈ 集才返回）；先红后绿 4 用例；pytest 433+1skip（基线 429+1skip，+4）
+> - **TD-67/68**（`6665dff`）——新建 frontend/js/save-key-meta.js 深模块（SAVE_KEY_META_RE / escapeRegExp / WG_SESSION_ONLY_IDS 三件套单源）；simulators/save-manager/simulator-view/smoke-simulators.mjs/simulator-manifest.test.js 五处消费点迁移；vitest.config.js coverage.include 增补（唯一申报共享改动）；契约锁基线绿 6 用例；Vitest 690（基线 683）；**smoke-simulators.mjs 真实运行 11 PASS/0 FAIL/1 SKIP 退出码 0**
+> - **TD-57**（`7d803d0`）——docs/architecture.md「模拟器信任边界」小节（威胁模型/已接受风险/现有收缩措施清单/未来方向/加固不可行论证五要素）+ CONSENSUS.md §2 两行决策 + 探索文档 U11 行 + key-injector.js docstring 指针同步；零行为变化
+>
+> **期末四轴 code-review（固定点 bc68aeb）：0 阻断放行**——Spec 三工单验收全达成（TD-66 红态在基线 worktree 复现 + 门控三分支；TD-67/68 五处副本 grep 归零 + fuzz 5000 轮逐字节等价 + markdown.js:109 同字符类判定不落债（语义域不同，合并即伪单源）+ save-key-meta docstring 已补例外注记；TD-57 四链接可跳转）；Falsify 0 击穿（跨协议模型名重叠实测无重叠）；Architecture 全正面（深模块 + Leverage 提升 + Locality 恰当）。3 项非阻断发现随 `37a3b5e` 顺手修复（credentials docstring 新门控语义 / 派生 `p.get("models", [])` KeyError 防御 / 例外注记）；导出可变对象（RegExp/Set）契约声明可接受不修；仿微.html:1688 第三方资产 Out of Scope 不处置。运行态冒烟：后端 GET / 200 + credentials 端点 + smoke 脚本真实运行全绿（冒烟后端口已释放）。测试同步：pytest **433 + 1 skip** / Vitest **690**，全部全绿。技术债区 21 项待立项 → **17 项**。
 
 ### U8+U9 模拟器二期批次（2026-08-14 全自动 kickoff：4 工单 2 波）
 

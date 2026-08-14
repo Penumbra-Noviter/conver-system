@@ -6,6 +6,16 @@
 
 ---
 
+## 滚动摘要（2026-08-14 — 技术债区 TD-57/66/67/68 批次：3 工单小档全自动 kickoff）
+
+- **TD-57/66/67/68 批次完成（commit 链 75d9d5c → 6665dff → 7d803d0，merge 1a7270b，非阻断修复 37a3b5e）**：技术债区 4 项中强度清理（用户点名全自动档）——TD-66 credentials model 门控盲区（setting.py 新增 `_OPENAI_PROTOCOL_MODELS` 由 AVAILABLE_MODELS 派生 + 门控收紧为「显式配置或解析值 ∈ 集」，先红后绿 4 用例；票面措辞修正：示例模型名以 .env 实际值 claude-sonnet-4-20250514 为准）/ TD-67+68 存档键契约单一来源（新建 frontend/js/save-key-meta.js 深模块三件套单源，五处消费点迁移含 smoke 脚本，vitest.config.js coverage.include 唯一共享改动；契约锁基线绿 6 用例）/ TD-57 同源 iframe 信任边界文档化（architecture.md 五要素小节 + CONSENSUS §2 两行 + 探索文档 U11 + key-injector 指针）
+- **期末四轴 code-review：0 阻断放行**——Spec 三工单验收全达成；Falsify 0 击穿（TD-66 红态基线复现、TD-67/68 fuzz 5000 轮逐字节等价、markdown.js:109 同字符类判定不落债=语义域不同合并即伪单源）；Architecture 全正面；3 项非阻断随 37a3b5e 顺手修复（credentials docstring 新门控语义 / 派生 `p.get("models", [])` KeyError 防御 / save-key-meta 例外注记）
+- **4.5 运行态冒烟**：后端 GET / 200 + credentials 端点 + smoke-simulators.mjs 真实运行 11 PASS/0 FAIL/1 SKIP 退出码 0（存档面板导出→清档→导入恢复路径）；冒烟后端口已释放
+- **文档同步（本批次）**：TICKETS（TD-57/66/67/68 归档 + 技术债区 21→17 项待立项）；DEV_LOG 本段
+- **测试**：pytest **433 + 1 skip**（基线 429+1skip，+4）；Vitest **690**（基线 683，+7）；cargo 58 未受影响
+
+---
+
 ## 滚动摘要（2026-08-14 — U8+U9 模拟器二期批次：4 工单 2 波全自动 kickoff）
 
 - **U8+U9 批次完成（merge 链 9aa6cfd → 3df82d8 → 455b308 → a918067 → 79598c2，波末修复 4a38400）**：模拟器二期 4 工单 2 波——波 1：U8-T1 只读凭证端点 GET /api/settings/credentials（openai 协议槽位解析、claude key 绝不回传，merge 9aa6cfd）+ U9-T1 manifest v2（22 游戏 saveKeys：精确键/正则锚定 + parseManifest 兼容，merge 3df82d8）；波 2：U8-T2「使用主应用 Key」一键注入按钮（merge 455b308）+ U9-T2 存档管理面板（列表/导出/导入/删除，merge a918067，人工仲裁 5 冲突块）；波末审核修复 F1/F2/F3（4a38400，merge 79598c2——select 注入匹配校验 + smoke 步骤间视图恢复 + 冒烟阻塞点）
