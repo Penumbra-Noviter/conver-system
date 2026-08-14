@@ -1,10 +1,13 @@
 """
-P4.3 单元测试 — API Key 保存时测试连接
+P4.3 单元测试 — API Key 保存时测试连接 + U8-T1 只读凭证端点
 
 覆盖：
     1. BaseLLM.test_connection() 默认实现：以最小请求调用 generate（max_tokens=1）
     2. POST /api/settings/test-connection 端点：成功 / 鉴权失败 / 不支持 provider /
        未提供 Key / 空 Key 回退已存 Key / base_url 透传 / 通用异常
+    3. GET /api/settings/credentials 端点（U8-T1）：openai 协议槽位优先 /
+       claude-only 标志 / 无 Key 标志 / model 协议判定 / .env 回退 /
+       跨协议 endpoint 兜底 / 协议混配（见文件末尾 TestCredentials* 用例）
 
 依赖：pytest + SQLite 内存库（StaticPool 保证同一连接，避免 threading 限制）。
 端点测试通过 monkeypatch LLMFactory.get_provider 返回 stub，不发起真实网络请求。
@@ -348,3 +351,162 @@ class TestConnectionEndpoint:
             _run(req, db_session)
         assert exc.value.status_code == 400
         assert "连接失败" in exc.value.detail
+
+
+# ── 5. GET /api/settings/credentials 凭证端点（U8-T1，只读）──
+#
+# 契约（spec「U8 凭证端点契约」/ 工单 U8-T1）：
+#   - 解析链复用运行设置服务既有语义，openai 协议槽位优先（DB → .env）
+#   - 仅 claude key → protocol=claude 且 key 为空串（claude key 值绝不回传游戏）
+#   - 两者皆无 → protocol=none，key/endpoint/model 全空串（只读查询不报错）
+#   - endpoint/model 为空时交由前端保持游戏默认
+# 断言纪律：key 只断言存在性/非空（不断言 key 值明文）；仅「不回传 claude key」
+# 的防泄漏断言使用测试假值比较。
+
+
+class TestCredentialsService:
+    """setting_service.credentials()：OpenAI 兼容凭证三元组 + 协议能力标志"""
+
+    def test_empty_db_and_env_returns_none(self, db_session, monkeypatch) -> None:
+        """DB 与 .env 全空 → protocol=none，key/endpoint/model 全空串"""
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+        monkeypatch.setattr(settings, "CLAUDE_API_KEY", "")
+        assert setting_service.credentials(db_session) == {
+            "key": "",
+            "endpoint": "",
+            "model": "",
+            "protocol": "none",
+        }
+
+    def test_openai_key_from_db(self, db_session) -> None:
+        """DB openai_api_key → protocol=openai + 非空 key"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["key"]
+        assert result["endpoint"] == ""
+
+    def test_claude_only_key_not_returned(self, db_session) -> None:
+        """仅 claude key → protocol=claude，key/endpoint/model 全空（claude key 值绝不回传）"""
+        _save_setting(db_session, "claude_api_key", "sk-ant-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "claude"
+        assert result["key"] == ""
+        assert result["endpoint"] == ""
+        assert result["model"] == ""
+
+    def test_openai_key_preferred_over_claude(self, db_session) -> None:
+        """双协议 key → openai 槽位优先，key 非空且不是 claude 槽位值"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "claude_api_key", "sk-ant-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["key"]
+        assert result["key"] != "sk-ant-test"
+
+    def test_env_openai_key_fallback(self, db_session, monkeypatch) -> None:
+        """DB 无 openai key → .env OPENAI_API_KEY 兜底（同协议 .env 回退）"""
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-env-openai-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["key"]
+
+    def test_env_openai_key_not_overridden_by_db_claude_key(self, db_session, monkeypatch) -> None:
+        """DB 仅 claude key + .env openai key → protocol=openai 且 key 非 DB claude 值"""
+        _save_setting(db_session, "claude_api_key", "sk-ant-test")
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-env-openai-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["key"]
+        assert result["key"] != "sk-ant-test"
+
+    def test_env_claude_key_only(self, db_session, monkeypatch) -> None:
+        """仅 .env CLAUDE_API_KEY → protocol=claude，key 空串"""
+        monkeypatch.setattr(settings, "CLAUDE_API_KEY", "sk-ant-env-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "claude"
+        assert result["key"] == ""
+
+    def test_base_url_only_no_key_returns_none(self, db_session) -> None:
+        """仅 openai_base_url 无任何 key → protocol=none，endpoint 也为空"""
+        _save_setting(db_session, "openai_base_url", "https://api.example.com/v1")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "none"
+        assert result["endpoint"] == ""
+
+    def test_endpoint_cross_protocol_fallback(self, db_session) -> None:
+        """openai key + 仅 claude_base_url → endpoint 走既有跨协议兜底（复用 base_url 链）"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "claude_base_url", "https://relay.example.com")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["endpoint"] == "https://relay.example.com"
+
+    def test_claude_key_with_openai_base_url_endpoint_empty(self, db_session) -> None:
+        """协议混配：仅 claude key + openai_base_url → protocol=claude 且 endpoint 空"""
+        _save_setting(db_session, "claude_api_key", "sk-ant-test")
+        _save_setting(db_session, "openai_base_url", "https://api.example.com/v1")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "claude"
+        assert result["endpoint"] == ""
+
+    def test_model_returned_when_openai_key_and_openai_provider(self, db_session) -> None:
+        """openai key + 默认 provider=openai → 返回 default_model"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "default_provider", "openai")
+        _save_setting(db_session, "default_model", "gpt-4o-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["model"] == "gpt-4o-test"
+
+    def test_model_empty_when_default_provider_claude(self, db_session) -> None:
+        """openai key 存在但默认 provider=claude → model 空串（游戏保持默认模型）"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "default_provider", "claude")
+        _save_setting(db_session, "default_model", "gpt-4o-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "openai"
+        assert result["key"]
+        assert result["model"] == ""
+
+    def test_model_empty_when_no_openai_key(self, db_session) -> None:
+        """默认 provider 为 openai 协议但无 openai key → model 仍空（完整凭证仅 openai 槽位有 key 时返回）"""
+        _save_setting(db_session, "default_provider", "deepseek")
+        _save_setting(db_session, "default_model", "deepseek-v4-test")
+        result = setting_service.credentials(db_session)
+        assert result["protocol"] == "none"
+        assert result["model"] == ""
+
+
+class TestCredentialsEndpoint:
+    """GET /api/settings/credentials 端点（直接驱动路由函数）"""
+
+    def test_no_credentials_returns_200_shape(self, db_session, monkeypatch) -> None:
+        """无凭证 → 正常返回（非 404/401）：protocol=none + 全字段空串"""
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+        monkeypatch.setattr(settings, "CLAUDE_API_KEY", "")
+        resp = settings_route.get_credentials(db_session)
+        assert resp.protocol == "none"
+        assert resp.key == ""
+        assert resp.endpoint == ""
+        assert resp.model == ""
+
+    def test_with_openai_credentials_returns_triple(self, db_session) -> None:
+        """openai key + base_url + 默认 provider=openai → 三元组 + protocol=openai"""
+        _save_setting(db_session, "openai_api_key", "sk-openai-test")
+        _save_setting(db_session, "openai_base_url", "https://api.example.com/v1")
+        _save_setting(db_session, "default_provider", "openai")
+        _save_setting(db_session, "default_model", "gpt-4o-test")
+        resp = settings_route.get_credentials(db_session)
+        assert resp.protocol == "openai"
+        assert resp.key
+        assert resp.endpoint == "https://api.example.com/v1"
+        assert resp.model == "gpt-4o-test"
+
+    def test_claude_only_key_returns_claude_flag(self, db_session) -> None:
+        """仅 claude key → protocol=claude 且 key 空串（端点不回传 claude key）"""
+        _save_setting(db_session, "claude_api_key", "sk-ant-test")
+        resp = settings_route.get_credentials(db_session)
+        assert resp.protocol == "claude"
+        assert resp.key == ""
+        assert resp.endpoint == ""

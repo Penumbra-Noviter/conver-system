@@ -13,7 +13,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.schemas.settings import ConnectionTestRequest, ConnectionTestResponse
+from backend.app.schemas.settings import (
+    ConnectionTestRequest,
+    ConnectionTestResponse,
+    CredentialsResponse,
+)
 from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import ApiKeyMissingError, ProviderNotSupportedError
 from backend.app.services.llm.errors import LLMError
@@ -21,6 +25,18 @@ from backend.app.services.llm.factory import LLMFactory
 from backend.app.services.llm.resolver import resolve_llm
 
 router = APIRouter(prefix="/api/settings", tags=["设置管理"])
+
+
+@router.get("/credentials", response_model=CredentialsResponse)
+def get_credentials(db: Session = Depends(get_db)) -> CredentialsResponse:
+    """返回主应用可用的 OpenAI 兼容凭证（只读，无写入副作用）
+
+    解析链复用 setting_service 既有语义（openai 协议槽位优先，DB → .env）：
+        - 有 openai key → protocol=openai，返回 key / endpoint / model 三元组
+        - 仅 claude key → protocol=claude，key 为空串（claude key 值绝不回传）
+        - 两者皆无 → protocol=none，全字段空串（只读查询不报错，非 404/401）
+    """
+    return CredentialsResponse(**setting_service.credentials(db))
 
 
 @router.get("")

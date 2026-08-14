@@ -2,7 +2,8 @@
 运行时设置读写 — 深模块
 
 协议表面（__all__）：get_value / get_int / get_all / set_many / api_key /
-user_name / sliding_window_rounds / default_provider / default_model。
+base_url / user_name / sliding_window_rounds / default_provider / default_model /
+credentials。
 
 将「运行时设置」从三处手写点收拢于此：
     - api/routes/chat.py（_get_api_key / _get_sliding_window_rounds / _get_user_name）
@@ -32,6 +33,7 @@ __all__ = [
     "sliding_window_rounds",
     "default_provider",
     "default_model",
+    "credentials",
 ]
 
 # 允许前端读写的配置键白名单
@@ -166,3 +168,45 @@ def default_provider(db: Session) -> str:
 def default_model(db: Session) -> str:
     """返回默认模型（DB settings → config 默认值回退链）"""
     return get_value(db, "default_model") or settings.DEFAULT_MODEL
+
+
+def credentials(db: Session) -> dict[str, str]:
+    """OpenAI 兼容凭证三元组 + 协议能力标志（只读，无写入副作用）
+
+    供运行视图「使用主应用 Key」注入使用，语义与主应用既有解析链一致，
+    openai 协议槽位优先（DB → .env）：
+
+    - key：openai 协议槽位（openai_api_key → .env OPENAI_API_KEY）。
+      不复用 api_key()：其跨协议兜底会在 openai 槽位为空时回传 claude key 值，
+      违反「仅 claude key 时 key 返回空串」契约（Anthropic 协议对游戏不可用）。
+    - endpoint：复用 base_url() 链（openai_base_url → 跨协议 claude_base_url 兜底）。
+    - model：仅当存在 openai key 且默认 provider 解析为 openai 协议时返回
+      default_model，否则空串（游戏保持默认模型；「完整凭证仅 openai 槽位
+      有可用 key 时返回」）。
+    - protocol：openai（有 openai key）/ claude（仅 claude key）/ none（皆无）。
+
+    返回 dict 键：key / endpoint / model / protocol。
+    """
+    openai_key = get_value(db, "openai_api_key") or settings.OPENAI_API_KEY
+    claude_key = get_value(db, "claude_api_key") or settings.CLAUDE_API_KEY
+
+    if openai_key:
+        protocol = "openai"
+        key = openai_key
+        endpoint = base_url(db, "openai")
+    elif claude_key:
+        protocol = "claude"
+        key = ""
+        endpoint = ""
+    else:
+        protocol = "none"
+        key = ""
+        endpoint = ""
+
+    provider = default_provider(db)
+    if openai_key and _resolve_api_provider(provider) == "openai":
+        model = default_model(db)
+    else:
+        model = ""
+
+    return {"key": key, "endpoint": endpoint, "model": model, "protocol": protocol}
