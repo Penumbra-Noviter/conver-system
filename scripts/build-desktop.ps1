@@ -2,8 +2,10 @@
 #
 # 用法（仓库根或任意目录，**cmd / PowerShell**，勿用 Git Bash）：
 #     powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
+#     powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1 -SkipInstaller   # 常规打包（不产 NSIS 安装器）
 #
-# 构建链（spec「构建链」契约）：cargo test → pytest → vitest → tauri build（NSIS 安装器）
+# 构建链（spec「构建链」契约）：cargo test → pytest → vitest → tauri build
+#     （默认 NSIS 安装器；-SkipInstaller 时 --no-bundle 仅编译壳）
 #     → dist 测试包（壳复制到 dist/ 根，双击即用）→ 冒烟（可选，默认开启；-SkipSmoke 跳过）
 #
 # 铁律（spec 环境事实）：
@@ -20,7 +22,7 @@
 #   - Rust 工具链（x86_64-pc-windows-msvc，见 docs/tauri-setup.md）
 #
 # 产物：
-#   - 安装器：src-tauri/target/release/bundle/nsis/{productName}_{version}_x64-setup.exe
+#   - 安装器（仅未加 -SkipInstaller 时）：src-tauri/target/release/bundle/nsis/{productName}_{version}_x64-setup.exe
 #     （文件名由 tauri.conf.json 的 productName/version 经共享 helper
 #     Get-ConverInstallerPath 推导——见 scripts/lib/desktop-common.ps1，R4a 收口；
 #     NSIS installMode=currentUser → 安装到 %LOCALAPPDATA%\Programs\，免管理员；
@@ -39,6 +41,9 @@ param(
     [switch]$SkipTests,
     # 构建完成后不执行冒烟
     [switch]$SkipSmoke,
+    # 跳过 NSIS 安装器产出（tauri build 改 --no-bundle，仅生成 release 壳供 dist 测试包）。
+    # 用户惯例（2026-08-14）：安装包仅在明确提需求时才打包——常规打包默认加此开关。
+    [switch]$SkipInstaller,
     # 后端打包产物缺失时不自动调用 build-backend.ps1（冒烟将报错退出）
     [switch]$SkipBackendBuild,
     # 透传给冒烟脚本的额外参数（如 -UseInstaller、-ReadyTimeoutSec）
@@ -149,44 +154,59 @@ if (-not $SkipTests) {
     Write-Host "（-SkipTests 跳过 vitest）" -ForegroundColor Yellow
 }
 
-# ── 4. tauri build（NSIS 安装器，R4 超时/重试）──────────────────────────────
+# ── 4. tauri build（NSIS 安装器默认；-SkipInstaller 时仅编译壳，R4 超时/重试）──
 
-Write-Step "4/5 tauri build（NSIS 安装器；首次打包可能下载 NSIS/WebView2，耗时较长）"
+if ($SkipInstaller) {
+    Write-Step "4/5 tauri build --no-bundle（-SkipInstaller：仅编译 release 壳，不产 NSIS 安装器）"
+} else {
+    Write-Step "4/5 tauri build（NSIS 安装器；首次打包可能下载 NSIS/WebView2，耗时较长）"
+}
 
 # 后端打包产物已在步骤 0 前置补齐（tauri-build resources 校验）；安装器随包分发
 # dist/conver_backend（约 24MB，含后端 + 前端运行子集，见 docs/tauri-desktop.md）
 
 Push-Location $Root
 try {
-    $bundleOk = $false
-    foreach ($attempt in 1..2) {
-        if ($attempt -gt 1) {
-            Write-Host "tauri build 第 $attempt 次尝试（前次失败，通常为 NSIS/WebView2 下载超时）..." -ForegroundColor Yellow
-        }
-        & $TauriCli build
-        if ($LASTEXITCODE -eq 0) {
-            $bundleOk = $true
-            break
-        }
-    }
-    if (-not $bundleOk) {
-        # R4 降级：NSIS 下载失败不阻塞其余交付，回退 --no-bundle 验证编译
-        Write-Host "tauri build（含 NSIS 打包）两次尝试失败，回退 --no-bundle 仅验证编译并记录..." -ForegroundColor Yellow
+    if ($SkipInstaller) {
+        # 常规打包（用户惯例：安装包仅在明确提需求时打包）：--no-bundle 跳过
+        # NSIS/WebView2 下载与 makensis，仅产出 target/release/conver-system.exe
+        # 供步骤 5 dist 测试包复制；R4 重试逻辑不适用（无网络依赖）。
         & $TauriCli build --no-bundle
-        Assert-ExitOk "tauri build --no-bundle" $LASTEXITCODE
+        Assert-ExitOk "tauri build --no-bundle（-SkipInstaller）" $LASTEXITCODE
         Write-Host ""
-        Write-Host "警告：NSIS 安装器未产出（网络下载失败）。已生成 src-tauri/target/release/conver-system.exe。" -ForegroundColor Yellow
-        Write-Host "修复后重跑本脚本即可补齐安装器；网络代理/镜像说明见 docs/tauri-desktop.md。" -ForegroundColor Yellow
+        Write-Host "已按 -SkipInstaller 跳过 NSIS 安装器；release 壳已产出（步骤 5 复制到 dist/）。" -ForegroundColor Green
+        Write-Host "如需安装包：重跑本脚本不加 -SkipInstaller。" -ForegroundColor Cyan
     } else {
-        # 安装器路径单一推导来源（R4a）：tauri.conf.json productName/version → 共享 helper
-        $Installer = Get-ConverInstallerPath -Root $Root
-        if (Test-Path $Installer) {
-            $Size = (Get-Item $Installer).Length / 1MB
+        $bundleOk = $false
+        foreach ($attempt in 1..2) {
+            if ($attempt -gt 1) {
+                Write-Host "tauri build 第 $attempt 次尝试（前次失败，通常为 NSIS/WebView2 下载超时）..." -ForegroundColor Yellow
+            }
+            & $TauriCli build
+            if ($LASTEXITCODE -eq 0) {
+                $bundleOk = $true
+                break
+            }
+        }
+        if (-not $bundleOk) {
+            # R4 降级：NSIS 下载失败不阻塞其余交付，回退 --no-bundle 验证编译
+            Write-Host "tauri build（含 NSIS 打包）两次尝试失败，回退 --no-bundle 仅验证编译并记录..." -ForegroundColor Yellow
+            & $TauriCli build --no-bundle
+            Assert-ExitOk "tauri build --no-bundle" $LASTEXITCODE
             Write-Host ""
-            # 注意：-f 必须作用于括号内字符串——裸写 -f 会被解析为 -ForegroundColor 缩写
-            Write-Host ("安装器产出：$Installer（{0:N1} MB）" -f $Size) -ForegroundColor Green
+            Write-Host "警告：NSIS 安装器未产出（网络下载失败）。已生成 src-tauri/target/release/conver-system.exe。" -ForegroundColor Yellow
+            Write-Host "修复后重跑本脚本即可补齐安装器；网络代理/镜像说明见 docs/tauri-desktop.md。" -ForegroundColor Yellow
         } else {
-            Write-Host "警告：tauri build 成功但未找到预期安装器路径：$Installer" -ForegroundColor Yellow
+            # 安装器路径单一推导来源（R4a）：tauri.conf.json productName/version → 共享 helper
+            $Installer = Get-ConverInstallerPath -Root $Root
+            if (Test-Path $Installer) {
+                $Size = (Get-Item $Installer).Length / 1MB
+                Write-Host ""
+                # 注意：-f 必须作用于括号内字符串——裸写 -f 会被解析为 -ForegroundColor 缩写
+                Write-Host ("安装器产出：$Installer（{0:N1} MB）" -f $Size) -ForegroundColor Green
+            } else {
+                Write-Host "警告：tauri build 成功但未找到预期安装器路径：$Installer" -ForegroundColor Yellow
+            }
         }
     }
 } finally {
