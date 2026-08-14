@@ -221,6 +221,34 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         expect(result).toEqual({ filled: ['apikey'], skipped: ['endpoint', 'model'] });
     });
 
+    it('F1:select 无匹配 option（凭证 model 不在游戏选项集）→ model 跳过不进 filled、保持原值、不派发事件', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makePanelDoc(); // select 选项集：game-default-model / gpt-4o-mini
+        const seen = [];
+        doc.getElementById('cfg-model').addEventListener('input', () => seen.push('input'));
+        doc.getElementById('cfg-model').addEventListener('change', () => seen.push('change'));
+
+        const result = injectCredentialsIntoGame({
+            doc,
+            config: CONFIG,
+            credentials: { ...CRED_OPENAI, model: 'deepseek-r1' }, // 不在选项集 → 赋值静默无效
+        });
+
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-model').value).toBe('game-default-model'); // 保持游戏默认
+        expect(seen).toEqual([]); // 未派发 input/change（未写入）
+        expect(result).toEqual({ filled: ['apikey', 'endpoint'], skipped: ['model'] });
+    });
+
+    it('Falsify:select 无任何 option → 无匹配值 → 跳过该字段不抛错', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makeGameDoc('<select id="cfg-model"></select>');
+        const result = injectCredentialsIntoGame({ doc, config: CONFIG, credentials: CRED_OPENAI });
+        expect(doc.getElementById('cfg-model').value).toBe('');
+        expect(result).toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'] });
+    });
+
     it('文本域（textarea）不算注入目标 → 跳过（目标限 input/select）', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
         const doc = makeGameDoc('<textarea id="cfg-apikey">orig</textarea>');
@@ -319,6 +347,25 @@ describe('key-injector — attachKeyInject 交互（点击 → 注入 → 反馈
 
         expect(btn.textContent).toBe('使用主应用 Key');
         expect(btn.disabled).toBe(false);
+    });
+
+    it('F1 交互:select 无匹配 option → model 静默跳过（未写入未派发），key 已注入 → 按钮「已填入」如实反馈', async () => {
+        const doc = makePanelDoc();
+        const modelEl = doc.getElementById('cfg-model');
+        const events = [];
+        modelEl.addEventListener('input', () => events.push('input'));
+        modelEl.addEventListener('change', () => events.push('change'));
+        const { bar, btn } = await setupBar({
+            credentials: { ...CRED_OPENAI, model: 'deepseek-r1' },
+            getDoc: () => doc,
+        });
+        btn.click();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(btn.textContent).toBe('已填入'); // key/endpoint 注入成功 → 反馈如实
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+        expect(modelEl.value).toBe('game-default-model'); // model 未被误填
+        expect(events).toEqual([]); // 未派发事件
     });
 
     it('sessionOnly（wg_ 族）注入成功 → 注记「重进游戏需再次点击」可见；非 sessionOnly 无注记', async () => {
