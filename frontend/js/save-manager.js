@@ -213,6 +213,8 @@ export function buildExportPayload(game, keyNames, storage, now = new Date().toI
  *   game_id / game_name / saved_at 为元数据不校验（白名单是安全边界）。
  *   keys 缺失 / 非普通对象 → 拒绝；keys 为空对象 → 合法空包（应用 no-op）。
  *   game 无 saveKeys → 整体拒绝（「无存档管理」游戏不可导入）。
+ *   累积器为无原型对象（TD-70）：合法键含 '__proto__' 时按普通自有属性
+ *   累积，不被原型 setter 吞掉 — 白名单命中即可完整写出。
  *
  * @param {unknown} payload - JSON.parse 后的导入载荷
  * @param {unknown} game - 目标游戏条目（saveKeys 为白名单）
@@ -234,7 +236,7 @@ export function validateImportPayload(payload, game) {
     }
 
     const problems = [];
-    const valid = {};
+    const valid = Object.create(null); // TD-70：无原型累积器（__proto__ 键不被原型吞掉）
     for (const [key, value] of Object.entries(payload.keys)) {
         if (!whitelistHits(saveKeys, key)) {
             problems.push(`键「${key}」不在该游戏存档键白名单内`);
@@ -272,26 +274,46 @@ function isJsonString(value) {
  * 防御（导出/导入排除面收口）：仅写入命中 saveKeys 白名单的键 — 直接
  *   调用本函数传入非白名单键也不写入（「导入写不进去」）；值非字符串
  *   跳过。validateImportPayload 是 UI 边界的整包拒绝闸门，本函数为
- *   应用层防御。空对象 / 无 saveKeys / storage 缺失 → no-op。
+ *   应用层防御。空对象 / 无 saveKeys / storage 缺失 → no-op 返回 0。
+ *
+ * 失败回滚（TD-63 裁定修法 = 写前快照，非容量预检 — localStorage 无剩余
+ *   容量 API）：每个待写键先记录快照 {key, prev: getItem(key)} 再 setItem；
+ *   任一键写入抛异常 → 已写键逆序回滚（prev 为 null/undefined →
+ *   removeItem，否则 setItem 还原原值）→ 异常上抛（失败已回滚并抛错，
+ *   调用方可安全提示用户）。抛错键本身未写入（setItem 原子性），无需
+ *   回滚该键。快照仅覆盖实际写入路径（白名单命中且值为字符串的键），
+ *   守卫先行、被跳过键不触碰 storage。
  *
  * @param {unknown} game - 游戏条目（saveKeys 为白名单）
  * @param {unknown} keys - {键: 值} 映射（validateImportPayload 产物）
  * @param {unknown} storage - Storage 兼容对象
- * @returns {number} 实际写入的键数
+ * @returns {number} 实际写入的键数；写入失败时回滚并抛错（不返回）
  */
 export function applyImportPayload(game, keys, storage) {
     if (game === null || typeof game !== 'object' || Array.isArray(game)) return 0;
     if (!Array.isArray(game.saveKeys)) return 0;
     if (keys === null || typeof keys !== 'object' || Array.isArray(keys)) return 0;
     if (storage === null || typeof storage !== 'object' || typeof storage.setItem !== 'function') return 0;
-    let written = 0;
-    for (const [key, value] of Object.entries(keys)) {
-        if (!whitelistHits(game.saveKeys, key)) continue; // 防御：非白名单不写入
-        if (typeof value !== 'string') continue;
-        storage.setItem(key, value);
-        written++;
+    /** 已成功写入键的快照（{key, prev} — 回滚依据；prev null/undefined = 写前不存在） */
+    const written = [];
+    try {
+        for (const [key, value] of Object.entries(keys)) {
+            if (!whitelistHits(game.saveKeys, key)) continue; // 防御：非白名单不写入
+            if (typeof value !== 'string') continue;
+            const prev = storage.getItem(key); // 写前快照（TD-63）
+            storage.setItem(key, value);
+            written.push({ key, prev });
+        }
+    } catch (err) {
+        // 逆序回滚：新增键移除，旧值还原（失败已回滚并抛错）
+        for (let i = written.length - 1; i >= 0; i--) {
+            const { key, prev } = written[i];
+            if (prev === null || prev === undefined) storage.removeItem(key);
+            else storage.setItem(key, prev);
+        }
+        throw err;
     }
-    return written;
+    return written.length;
 }
 
 /**
@@ -352,6 +374,25 @@ function renderSavePanel() {
 }
 
 /**
+ * 安全键收集 + 大小统计（TD-69）：window.localStorage 访问抛错（如存储被
+ *   禁用 SecurityError）→ 降级 {keys: [], totalChars: 0} — 渲染「0 个存档」
+ *   + 导出/删除按钮禁用，面板打开不崩（操作路径健壮性不在本批范围）。
+ * @param {unknown} game - 游戏条目（saveKeys 为白名单）
+ * @returns {{keys: string[], totalChars: number}} 收集结果或降级空结果
+ */
+function collectKeysSafely(game) {
+    try {
+        const keys = collectGameKeys(game, window.localStorage);
+        const totalChars = keys.reduce(
+            (n, k) => n + String(window.localStorage.getItem(k) ?? '').length, 0,
+        );
+        return { keys, totalChars };
+    } catch {
+        return { keys: [], totalChars: 0 };
+    }
+}
+
+/**
  * 渲染单个游戏行（内部：renderSavePanel 使用；game 非对象防御 → 空串行）。
  * @param {unknown} game - 游戏条目
  * @returns {string} 行 HTML
@@ -367,8 +408,7 @@ function renderGameRow(game) {
             <span class="sim-save-note">${NO_SAVE_TEXT}</span>
         </article>`;
     }
-    const keys = collectGameKeys(g, window.localStorage);
-    const totalChars = keys.reduce((n, k) => n + String(localStorage.getItem(k) ?? '').length, 0);
+    const { keys, totalChars } = collectKeysSafely(g); // TD-69：存储异常降级空结果
     const wgNote = typeof g.id === 'string' && WG_SESSION_ONLY_IDS.has(g.id)
         ? `<span class="sim-save-note sim-save-wg-note">${WG_NOTE}</span>` : '';
     const disabled = keys.length === 0 ? ' disabled' : '';
@@ -389,9 +429,23 @@ function renderGameRow(game) {
 // ══════════════════════════════════════════════════
 
 /**
+ * 导出文件名净化（TD-65）：控制字符（\x00-\x1f\x7f）/ 引号 / 反斜杠 / 正斜杠 /
+ *  冒号 / 星号 / 问号 / 尖括号 / 竖线 / 百分号 → '_'；trim 尾部点与空格；
+ *  空结果兜底 'game'。正常 id 经净化后不变（既有契约断言
+ *  `<gameId>-saves.json` 保持绿）。
+ * @param {unknown} name - 待净化文件名（非字符串 → 'game' 防御）
+ * @returns {string} 净化后的文件名
+ */
+function sanitizeFilename(name) {
+    if (typeof name !== 'string') return 'game';
+    const cleaned = name.replace(/[\x00-\x1f\x7f"\\/:*?<>|%]/g, '_').replace(/[. ]+$/, '');
+    return cleaned === '' ? 'game' : cleaned;
+}
+
+/**
  * Blob JSON 下载（客户端导出 — 不走 api.js requestBlob：数据在本地 localStorage，
  * 无服务端导出面）。URL.createObjectURL 缺失（jsdom / 极旧环境）→ toast 降级
- * 不抛错。文件名 `${gameId}-saves.json`。
+ * 不抛错。文件名 `${sanitizeFilename(gameId)}-saves.json`（TD-65 净化）。
  * @param {object} payload - buildExportPayload 产物
  * @param {string} filename - 下载文件名
  */
@@ -419,7 +473,7 @@ function exportGame(gameId) {
         return;
     }
     const payload = buildExportPayload(game, keyNames, window.localStorage);
-    downloadJson(payload, `${gameId}-saves.json`);
+    downloadJson(payload, `${sanitizeFilename(gameId)}-saves.json`); // TD-65：文件名净化
 }
 
 /**
@@ -461,19 +515,24 @@ function readFileText(file) {
 /**
  * 导入文件处理（隐藏 input change）：大小守卫 → JSON.parse → 白名单校验
  * （任一非法整包拒绝，不写任何键）→ 应用（同名键替换）→ toast + 刷新列表。
- * 文件选择后清空 input.value（允许重复选择同一文件）。
+ * 文件选择后清空 input.value（允许重复选择同一文件）。导入目标在进入处理
+ * 的第一时间清空（TD-64：capture-then-clear 置于所有早退路径之前 — 取消 /
+ * 超限不残留目标，下次导入不会应用到错误的游戏）。应用写入失败（TD-63，
+ * 如存储配额）→ 已回滚 + toast「导入失败：存储空间不足或写入失败」+
+ * 刷新面板，不残留半截数据。
  */
 async function handleImportChange(e) {
     const input = e?.target;
     const file = input?.files?.[0];
+    const gameId = pendingGameId; // TD-64：先捕获…
+    pendingGameId = null;         // …再清空（置于所有早退路径之前）
     if (input) input.value = '';
     if (!file) return;
     if (file.size > MAX_IMPORT_BYTES) {
         showToast(`存档文件过大（上限 ${MAX_IMPORT_BYTES / 1024 / 1024}MB）`, 'error');
         return;
     }
-    const game = pendingGameId ? getGameById(pendingGameId) : null;
-    pendingGameId = null;
+    const game = gameId ? getGameById(gameId) : null;
     if (!game || !Array.isArray(game.saveKeys)) {
         showToast('该游戏无存档管理，无法导入', 'error');
         return;
@@ -491,7 +550,15 @@ async function handleImportChange(e) {
         showToast(result.error, 'error');
         return;
     }
-    const written = applyImportPayload(game, result.keys, window.localStorage);
+    let written;
+    try {
+        written = applyImportPayload(game, result.keys, window.localStorage);
+    } catch {
+        // TD-63：写入失败已回滚 — 错误提示 + 刷新面板（不残留半截数据）
+        showToast('导入失败：存储空间不足或写入失败', 'error');
+        renderSavePanel();
+        return;
+    }
     showToast(`已恢复 ${written} 个存档键`, 'success');
     renderSavePanel();
 }
