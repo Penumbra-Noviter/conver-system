@@ -42,7 +42,7 @@
 ---
 
 - **release 打包（build-desktop.ps1 全链）**：cargo test 全绿 + pytest 433+1skip + Vitest 714 + tauri build（NSIS 安装器 23.7MB）+ dist 测试包（conver-system.exe 10.5MB）+ 冒烟 5 项全过（runtime.json 就绪 / /api/models 200 / 前端挂载 200 / 表结构 / 退出无残留）
-- **安装器产物回收（用户明确指令）**：NSIS 安装器（`Conver System_0.1.0_x64-setup.exe`）已删除——用户重申「安装包只在明确提需求时才打包」；**dist/ 根「双击即用」测试包（conver-system.exe + conver_backend/）为常规打包产物**，保留。注意：build-desktop.ps1 构建链固定含 tauri build（必产 NSIS），未来常规打包若需跳过安装器应调整脚本加开关（未做，等用户提需求时一并处理）
+- **安装器产物回收（用户明确指令）**：NSIS 安装器（`Conver System_0.1.0_x64-setup.exe`）已删除——用户重申「安装包只在明确提需求时才打包」；**dist/ 根「双击即用」测试包（conver-system.exe + conver_backend/）为常规打包产物**，保留。后续已实现 `-SkipInstaller` 开关（commit 2f3dc7e，见上段）承接此需求，此后常规打包不再产安装器。
 
 ---
 
@@ -113,36 +113,14 @@
 - **归档**：探索文档 `docs/world-simulation-exploration.md` §4.5 + D7 + U7-U10；原型产物提交 throwaway 分支 `prototype/simulators-integration`（主分支不含）
 - **无正式代码改动、无待办录入**（原型验证非工单；正式模块立项待用户决定）
 
-## 滚动摘要（2026-08-13 — 大版本方向探讨：世界模拟扩展 · 存档待续）
+## 滚动摘要（2026-08-13 — 阶段摘要：方向探讨 + 打包流程 + TD-46/47）
 
-- **探讨（非工单，用户要求先存档后续续谈）**：大版本更新方向「角色对话 → 世界模拟平台」首轮探讨——子智能体网络调研（类型命名 / SillyTavern 世界书 / 角色卡 v2 / lifeRestart 数据表驱动 / 市场空白）+ 用户拍板 6 项决策（D1 混合驱动：规则在数据层、叙事归 LLM；D2 世界为一等公民、角色归入世界；D3 里程碑一=世界书+导入导出闭环；D4 世界书 MVP 七件套字段；D5 玩家状态数据层预留；D6 存量兼容：角色可选挂世界、对话仍属角色）
-- **现状衔接点（代码确认）**：`character_book` 目前仅经 `extensions.conver_system` 命名空间往返保真（character_card.py:26），无任何消费代码——世界书数据结构已在角色卡管道过境，World 实体字段语义对齐 SillyTavern lorebook 即可原样解析
-- **存档**：`docs/world-simulation-exploration.md`（方向草案 + 未决事项 U1-U6）；用户表示「大世界」方案与自己的想法有出入但认可该方向——U1 为下次续谈首项
-- **知识库预检召回轨迹**：读了 `项目/Conver System/persona.md`；经验笔记仅 frontmatter 扫描（26 条 project: Conver System）未精读——探讨会话无编码，跳过精读，下次开工前按需补读
-- **无代码改动、无待办录入**（未立项；正式立项走 CONSENSUS + TICKETS）
+> 折叠说明：2026-08-15 按滚动摘要折叠规则执行（超 12 条上限）——最旧 4 批折叠为一条阶段摘要。
 
-## 滚动摘要（2026-08-13 — 打包流程：dist 测试包步骤固化）
-
-- **build-desktop.ps1 固化「dist 测试包」步骤（用户要求，非工单）**：tauri build 后自动把 release 壳复制到 `dist\conver-system.exe`——dist/ 根即「双击即用」最终产物（用户惯例），壳 prod 后端探测候选 2（`server.rs prod_backend_exe_candidates`）命中 `dist\conver_backend`；release 壳为 windows 子系统（`main.rs` cfg_attr）无终端窗口，后端 CREATE_NO_WINDOW 拉起。构建链 4 步 → 5 步（冒烟顺延 6），产物注释同步
-- **R5 容错（实测）**：dist exe 正被运行占用时（Windows 锁定可执行文件——用户开着旧版测试包重跑构建即复现），Copy-Item 抛 IOException → 黄字警告「请先退出正在运行的 Conver System」且不中断构建，其余产物不受影响
-- **验证**：PSParser 语法通过；`-SkipTests -SkipSmoke -SkipBackendBuild` 端到端两跑——成功路径 + 占用容错路径均实测；release 壳 11MB、NSIS 安装器 23.7MB 顺带产出
-
-## 滚动摘要（2026-08-13 — 技术债区 TD-47 批次：占位符碰撞作用域扩展轻量档 kickoff）
-
-- **TD-47 完成（用户指定「补 TD-47」，merge ffe185a）**：票面 createCodeBlockToken 碰撞作用域仅限原始串——半形字面量紧邻围栏时替换后边界拼接可新造完整 token 形态（jsdom-only 生产不可达、与旧实现行为等价非回归）。修法：碰撞循环对候选序号检查 3 形态（完整 + 左半形 `\x00MDCBn` + 右半形 `MDCBn\x00`），任一存在即跳过——取号层枚举拼接产物形态，不依赖替换时序（比票面「替换后串再验证」更强）。轻量档单 Implement 直行（主树独立分支，无 worktree）
-- **期末四轴（固定点 ccab8a3）：0 阻断放行**——Falsify 对抗矩阵全过 + 序号分配逐号一致两重实证（5000 随机串函数级 + 17 组渲染级逐字节）；右半形用例「修复前红」注释被实测否定（重叠遮蔽不可复现）→ 1 行注释 nit 已修（bb62a2c）；Architecture 取号层防护+还原层匹配双保险
-- **G20 文档同步（本批次）**：TICKETS（TD-47 归档，**技术债区清零**——TD-1~47 全部处置完毕）；CLAUDE.md / PROJECT_REFERENCE.md（Vitest 463→466）；DEV_LOG 本段
-- **测试**：Vitest **466**（+3）；pytest 413+1skip / cargo 58 未受影响；markdown.js lines 100%
-
----
-
-## 滚动摘要（2026-08-13 — 技术债区 TD-46 批次：markdown 还原性能轻量档 kickoff）
-
-- **TD-46 完成（用户指定「补 TD-46」，merge 868dd32）**：票面 markdown.js 占位符还原逐块全文 split/join（O(K·N) 二次方级）→ alternation 正则单 pass（O(N)）。轻量档单 Implement 直行（主树独立分支 kickoff/td46-markdown-restore，无 worktree）：escapeRegExp 模块私有辅助 + 空 Map 守卫（空 pattern 的 /g 正则命中空位回调会注入 "undefined"，必需差异点）+ 3 契约锁用例基线绿锁定（未登记字面量 MDCB99/MDCB5 原样保留 + 八块规模）
-- **流程小坑**：Implement 分支提交后未切回 main，主会话 `git merge --no-ff` 时误在该分支上执行（"Already up to date"）——先 `git checkout main` 再合并
-- **期末四轴（固定点 67f598e）：0 阻断放行**——Spec 5/5、Falsify 10/10 与旧实现逐字节差分对比全等（A9 拼接边界初判「非重叠扫描差异」被实测否定：JS split 与 /g 正则同为左→右非重叠匹配，等价论证成立且更强）；1 项非阻断落技术债区（TD-47 碰撞作用域仅原始串注记，jsdom-only 生产不可达）
-- **G20 文档同步（本批次）**：TICKETS（TD-46 归档 + TD-47 落区，技术债区 1 项）；CLAUDE.md / PROJECT_REFERENCE.md（Vitest 460→463）；DEV_LOG 本段
-- **测试**：Vitest **463**（+3）；pytest 413+1skip / cargo 58 未受影响；markdown.js lines 100%
+- **大版本方向探讨：世界模拟扩展 · 存档待续**（非工单，用户要求存档后续续谈）：角色对话→世界模拟平台首轮探讨，用户拍板 6 项决策（D1-D6）；存档 `docs/world-simulation-exploration.md`（未决事项 U1-U6）；无代码改动
+- **打包流程：dist 测试包步骤固化**（用户要求，非工单）：build-desktop.ps1 固化 dist 测试包步骤（release 壳复制到 `dist\conver-system.exe`，`-SkipTests -SkipSmoke -SkipBackendBuild` 端到端两跑）；R5 容错实测（占用时 IOException 不中断构建）
+- **TD-46 markdown 还原性能**（merge 868dd32）：占位符还原 O(K·N)→O(N) 优化；Vitest 460→463
+- **TD-47 占位符碰撞作用域扩展**（merge ffe185a）：碰撞循环 3 形态检查；Vitest 463→466，技术债区清零
 
 ---
 
