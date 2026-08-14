@@ -3675,3 +3675,191 @@ select {
     gap: var(--space-2);
     margin-top: var(--space-3);
 }
+
+/* ══════════════════════════════════════════════════
+   模拟器存档管理（U9-T2 — 列表工具条按钮 + 存档面板 .sim-save-* 段）
+   面板显隐走 hidden 属性 — 本元素设 display:flex 会覆盖 UA [hidden] 规则，
+   必须补 #simulator-save-panel[hidden] 显式隐藏；样式全走主题 token。
+   ══════════════════════════════════════════════════ */
+.sim-save-manage-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg);
+    color: var(--ink-3);
+    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.sim-save-manage-btn:hover {
+    border-color: var(--border-strong);
+    color: var(--ink-2);
+}
+
+#simulator-save-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--page);
+    overflow-y: auto;
+}
+
+#simulator-save-panel[hidden] {
+    display: none;
+}
+
+.sim-save-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    min-height: 44px;
+    flex-shrink: 0;
+}
+
+.sim-save-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--ink-2);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.sim-save-back:hover {
+    background: var(--panel-2);
+    border-color: var(--border-strong);
+    color: var(--ink-1);
+}
+
+.sim-save-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: var(--text-md);
+    font-weight: 500;
+    color: var(--ink-1);
+}
+
+.sim-save-hint {
+    margin: 0;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-xs);
+    color: var(--ink-4);
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.sim-save-list {
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.sim-save-empty {
+    padding: var(--space-5) 0;
+    text-align: center;
+    font-size: var(--text-sm);
+    color: var(--ink-4);
+    margin: 0;
+}
+
+.sim-save-game {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+}
+
+.sim-save-game-name {
+    font-size: var(--text-md);
+    font-weight: 500;
+    color: var(--ink-1);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sim-save-meta {
+    font-size: var(--text-xs);
+    color: var(--ink-4);
+    white-space: nowrap;
+}
+
+.sim-save-note {
+    font-size: var(--text-xs);
+    color: var(--ink-4);
+    white-space: nowrap;
+}
+
+.sim-save-wg-note {
+    color: var(--warning, #b45309);
+}
+
+.sim-save-degraded {
+    opacity: 0.8;
+}
+
+.sim-save-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.sim-save-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--ink-2);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.sim-save-btn:hover {
+    background: var(--panel-2);
+    border-color: var(--border-strong);
+    color: var(--ink-1);
+}
+
+.sim-save-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.sim-save-delete {
+    color: var(--danger);
+}
+
+.sim-save-delete:hover {
+    background: var(--danger-soft, var(--panel-2));
+    border-color: var(--danger);
+    color: var(--danger);
+}

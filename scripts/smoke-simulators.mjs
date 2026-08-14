@@ -8,7 +8,8 @@
  *   → 注入（U8-T2：预置 openai 凭证 → 点击「使用主应用 Key」→ 游戏配置
  *     面板已填值 → 游戏自身保存路径接受注入值 → 恢复原设置）
  *   → 返回列表（iframe 卸载）→ 重进游戏 localStorage 存档保留
- *   → 纯本地游戏路径（manifest 驱动：无 local 条目时 SKIP 并报偏离说明）。
+ *   → 纯本地游戏路径（manifest 驱动：无 local 条目时 SKIP 并报偏离说明）
+ *   → 存档面板（U9-T2）：导出 → 清档 → 导入恢复（localStorage 键值断言）。
  *
  * 运行前提（后端静态托管在线 — spec：后端零改动，静态挂载已覆盖）：
  *   .venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
@@ -70,6 +71,8 @@ const EXPECTED_TOTAL = 22;
 const TEXT_KEY_INJECT = '使用主应用 Key';
 /** 注入成功反馈文案（与 key-injector.js TEXT_INJECTED 一致） */
 const TEXT_INJECTED = '已填入';
+/** 正则元字符集：saveKeys 元素含任一字符即按正则模式处理（存档面板种子键须选精确键 — 与实现共享契约） */
+const SAVE_KEY_META_RE = /[.*+?^${}()|[\]\\]/;
 
 /** 环境失败（退出码 2）：运行前提缺失，非被测应用缺陷 */
 class EnvError extends Error {}
@@ -640,6 +643,105 @@ async function smokeSteps(page, manifest) {
             '本地游戏返回后列表面板未恢复',
         );
         return `本地游戏 ${g.name}：iframe 加载成功且无提示条，返回列表正常`;
+    });
+
+    // 7. 存档面板：导出 → 清档（删除）→ 导入恢复（localStorage 断言）
+    //    种子写入 saveKeys 白名单精确键 → 面板导出 Blob 下载 → 删除（确认弹窗）
+    //    → 键清除 → 导入下载文件 → 键恢复 → 清理探针键。
+    const saveGame = manifest.simulators.find((g) => Array.isArray(g.saveKeys)
+        && g.saveKeys.some((k) => !SAVE_KEY_META_RE.test(k)));
+    if (!saveGame) {
+        throw new EnvError('manifest 无带精确键 saveKeys 的游戏条目，无法执行存档面板冒烟路径');
+    }
+    const saveKey = saveGame.saveKeys.find((k) => !SAVE_KEY_META_RE.test(k));
+    const saveValue = '{"smoke":"u9t2-save-panel"}';
+    await runStep(`存档面板：导出 → 清档 → 导入恢复（${saveGame.id}）`, async () => {
+        // 种子：白名单精确键写入（全新浏览器上下文，键不存在）
+        const seeded = await page.evaluate(([k, v]) => {
+            const existed = localStorage.getItem(k);
+            localStorage.setItem(k, v);
+            return existed;
+        }, [saveKey, saveValue]);
+        if (seeded !== null) {
+            throw new Error(`探针键 ${saveKey} 在全新浏览器上下文（无痕）中应不存在，实际值「${seeded}」`);
+        }
+
+        // 打开存档面板：列表隐藏、存档面板可见、游戏行含键数
+        await page.locator('.sim-save-manage-btn').click();
+        await waitVisible(page.locator('#simulator-save-panel'), WAIT_MS, '存档面板');
+        await waitForCondition(
+            () => page.evaluate(() => document.querySelector('#simulator-list-panel')?.hasAttribute('hidden') === true
+                && document.querySelector('#simulator-save-panel')?.hasAttribute('hidden') === false),
+            WAIT_MS,
+            '打开存档面板后列表未隐藏 / 存档面板未显示',
+        );
+        const row = page.locator(`#simulator-save-panel .sim-save-game[data-id="${saveGame.id}"]`);
+        await waitVisible(row, WAIT_MS, `存档面板游戏行 ${saveGame.id}`);
+        await waitForCondition(
+            () => row.locator('.sim-save-meta').innerText().then((t) => t.includes('1 个存档')).catch(() => false),
+            WAIT_MS,
+            '种子写入后游戏行键数未显示「1 个存档」',
+        );
+
+        // 导出：捕获 Blob 下载 → 断言 JSON 形状（game_id + 键值对，键值原样）
+        const downloadPromise = page.waitForEvent('download');
+        await row.locator('[data-action="export"]').click();
+        const download = await downloadPromise;
+        const dlPath = await download.path();
+        if (!dlPath) throw new Error('导出下载未产生本地文件（download.path() 为空）');
+        if (download.suggestedFilename() !== `${saveGame.id}-saves.json`) {
+            throw new Error(`导出文件名不符：期望「${saveGame.id}-saves.json」，实际「${download.suggestedFilename()}」`);
+        }
+        const exported = JSON.parse(fs.readFileSync(dlPath, 'utf8'));
+        if (exported.game_id !== saveGame.id) {
+            throw new Error(`导出 game_id 不符：期望「${saveGame.id}」，实际「${exported.game_id}」`);
+        }
+        if (exported.keys[saveKey] !== saveValue) {
+            throw new Error(`导出键值不符：期望 ${saveKey}=「${saveValue}」，实际「${exported.keys[saveKey]}」`);
+        }
+
+        // 清档：删除（确认弹窗）→ localStorage 键清除 + 行键数归零
+        await row.locator('[data-action="delete"]').click();
+        await waitVisible(page.locator('.modal-overlay .confirm-ok'), WAIT_MS, '删除确认弹窗');
+        await page.locator('.modal-overlay .confirm-ok').click();
+        await waitForCondition(
+            () => page.evaluate((k) => localStorage.getItem(k) === null, saveKey),
+            WAIT_MS,
+            '删除确认后存档键未清除',
+        );
+        await waitForCondition(
+            () => row.locator('.sim-save-meta').innerText().then((t) => t.includes('0 个存档')).catch(() => false),
+            WAIT_MS,
+            '删除后游戏行键数未归零',
+        );
+
+        // 导入恢复：文件选择器选择下载的导出文件 → 键恢复 + 行键数回 1
+        const [chooser] = await Promise.all([
+            page.waitForEvent('filechooser'),
+            row.locator('[data-action="import"]').click(),
+        ]);
+        await chooser.setFiles(dlPath);
+        await waitForCondition(
+            () => page.evaluate((k) => localStorage.getItem(k) === saveValue, saveKey),
+            WAIT_MS,
+            '导入后存档键未恢复（localStorage 值不符）',
+        );
+        await waitForCondition(
+            () => row.locator('.sim-save-meta').innerText().then((t) => t.includes('1 个存档')).catch(() => false),
+            WAIT_MS,
+            '导入后游戏行键数未回「1 个存档」',
+        );
+
+        // 清理探针键 + 返回列表（不留痕）
+        await page.evaluate((k) => localStorage.removeItem(k), saveKey);
+        await page.locator('#simulator-save-panel .sim-save-back').click();
+        await waitForCondition(
+            () => page.evaluate(() => document.querySelector('#simulator-save-panel')?.hasAttribute('hidden') === true
+                && document.querySelector('#simulator-list-panel')?.hasAttribute('hidden') === false),
+            WAIT_MS,
+            '存档面板返回后列表未恢复',
+        );
+        return `导出 JSON（${exported.game_id}，${Object.keys(exported.keys).length} 键）→ 删除清档 → 导入恢复，localStorage 键值断言通过，探针已清理`;
     });
 }
 

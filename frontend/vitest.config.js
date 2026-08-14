@@ -22,6 +22,7 @@ export default defineConfig({
                 'js/simulators.js',
                 'js/simulator-view.js',
                 'js/key-injector.js',
+                'js/save-manager.js',
             ],
             reporter: ['text', 'html'],
             thresholds: {

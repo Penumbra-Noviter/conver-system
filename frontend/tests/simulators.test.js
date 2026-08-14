@@ -18,6 +18,8 @@
  *   - 卡片点击：注入 onOpenGame 收到完整 game；未注入 no-op 不抛错
  *   - Falsify：无 container no-op / 未 init 调 refresh no-op / 重复 init 幂等
  *     （钩子取最新）/ setFetch(null) 回落全局 fetch
+ *   - U9-T2：工具条「存档管理」按钮渲染与点击钩子（onOpenSaveManager）、
+ *     getGames() 公开读取游戏列表缓存（存档面板数据源）、幂等钩子更新
  *
  * 测试即模块接口契约：公开面 __all__ = initSimulatorsView / refreshSimulators /
  *   parseManifest / filterGames / setFetch（fetch seam 与 api.js setFetch
@@ -103,10 +105,11 @@ function makeFetch({ result = null, fail = null, pending = null } = {}) {
 }
 
 describe('simulators — 协议表面 __all__', () => {
-    it('__all__ 收口公开函数与 fetch seam', async () => {
+    it('__all__ 收口公开函数与 fetch seam（含 U9-T2 getGames）', async () => {
         const { sim } = await loadModules();
         expect(sim.__all__.sort()).toEqual([
             'filterGames',
+            'getGames',
             'initSimulatorsView',
             'parseManifest',
             'refreshSimulators',
@@ -627,5 +630,63 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
         expect(globalSpy).toHaveBeenCalledTimes(1);
         expect(globalSpy.mock.calls[0][0]).toContain('simulators/manifest.json');
         vi.unstubAllGlobals();
+    });
+});
+
+describe('simulators — 存档管理按钮与 getGames（U9-T2）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('工具条渲染「存档管理」按钮（与筛选按钮/计数同工具条）', async () => {
+        const { sim, panel } = await loadModules();
+        sim.initSimulatorsView({ container: panel });
+
+        const btn = panel.querySelector('.sim-save-manage-btn');
+        expect(btn).not.toBeNull();
+        expect(btn.textContent).toBe('存档管理');
+        expect(panel.querySelector('.sim-count')).not.toBeNull();
+    });
+
+    it('点击「存档管理」按钮 → 注入的 onOpenSaveManager 钩子被调用', async () => {
+        const { sim, panel } = await loadModules();
+        const saveSpy = vi.fn();
+        sim.initSimulatorsView({ container: panel, onOpenSaveManager: saveSpy });
+
+        panel.querySelector('.sim-save-manage-btn').click();
+        expect(saveSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('Falsify:未注入 onOpenSaveManager → 点击 no-op 不抛错', async () => {
+        const { sim, panel } = await loadModules();
+        sim.initSimulatorsView({ container: panel });
+
+        expect(() => panel.querySelector('.sim-save-manage-btn').click()).not.toThrow();
+    });
+
+    it('重复 init：onOpenSaveManager 取最新注入值（幂等钩子更新）', async () => {
+        const { sim, panel } = await loadModules();
+        const hook1 = vi.fn();
+        const hook2 = vi.fn();
+        sim.initSimulatorsView({ container: panel, onOpenSaveManager: hook1 });
+        sim.initSimulatorsView({ container: panel, onOpenSaveManager: hook2 });
+
+        panel.querySelector('.sim-save-manage-btn').click();
+        expect(hook2).toHaveBeenCalledTimes(1);
+        expect(hook1).not.toHaveBeenCalled();
+    });
+
+    it('getGames：refresh 后返回最近一次解析的游戏列表（存档面板数据源）', async () => {
+        const { sim, panel } = await loadModules();
+        sim.setFetch(makeFetch({ result: mockManifest(MANIFEST_OK) }));
+        sim.initSimulatorsView({ container: panel });
+        expect(sim.getGames()).toEqual([]); // 未加载 → 空数组
+
+        await sim.refreshSimulators();
+        expect(sim.getGames().map((g) => g.id)).toEqual(['life-sim', 'spider-shadow']);
+    });
+
+    it('Falsify:未 init 调 getGames → 空数组不炸', async () => {
+        const { sim } = await loadModules();
+        expect(sim.getGames()).toEqual([]);
     });
 });

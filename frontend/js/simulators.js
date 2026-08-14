@@ -4,7 +4,10 @@
  * 职责：模拟器列表页的全部逻辑收口 —— manifest 获取/解析校验（parseManifest
  *   纯函数）、卡片网格渲染、类型筛选（filterGames 纯函数）、列表四态
  *   （loading / ready / error / empty）、错误态重试。点击卡片经注入的
- *   onOpenGame 钩子交给协调层（未注入时为空操作不报错）。
+ *   onOpenGame 钩子交给协调层（未注入时为空操作不报错）。工具条「存档管理」
+ *   按钮（U9-T2）经注入的 onOpenSaveManager 钩子交给存档面板模块；游戏列表
+ *   缓存经 getGames() 公开读取（存档面板 getGames 钩子的数据源 — 不重复
+ *   fetch manifest，G7）。
  *
  * 依赖方向：simulators.js → icons.js（iconHtml 图标 seam）/ utils.js
  *   （escapeHtml）；app.js → simulators.js（initSimulatorsView /
@@ -37,7 +40,7 @@
  *   （TD-48）：v1 数据仅兼容透传，不参与任何存档语义。
  *
  * 协议表面（__all__）：initSimulatorsView / refreshSimulators /
- *   parseManifest / filterGames / setFetch。
+ *   parseManifest / filterGames / getGames / setFetch。
  */
 
 import { iconHtml } from './icons.js';
@@ -73,6 +76,9 @@ let stateEl = null;
 
 /** 卡片点击打开钩子（app.js 注入；未注入时 no-op 兜底） */
 let onOpenGame = () => {};
+
+/** 工具条「存档管理」按钮钩子（app.js 注入 → save-manager.openSavePanel；未注入时 no-op 兜底） */
+let onOpenSaveManager = () => {};
 
 /** 最近一次解析成功的完整游戏列表（筛选基于缓存，不重复 fetch） */
 let games = [];
@@ -239,7 +245,7 @@ export function filterGames(games, type) {
 // ══════════════════════════════════════════════════
 
 /**
- * 渲染工具条（筛选三档按钮 + 计数）与状态区骨架（四态渲染目标）。
+ * 渲染工具条（筛选三档按钮 + 计数 + 存档管理按钮）与状态区骨架（四态渲染目标）。
  * 只渲染一次（initSimulatorsView 时），refresh/筛选仅重渲染状态区。
  */
 function renderShell() {
@@ -249,6 +255,7 @@ function renderShell() {
     container.innerHTML = `
         <div class="sim-toolbar">
             <div class="sim-filters" role="group" aria-label="类型筛选">${filterButtons}</div>
+            <button type="button" class="sim-save-manage-btn" data-action="open-save-manager">存档管理</button>
             <span class="sim-count"></span>
         </div>
         <div class="sim-state"></div>
@@ -323,19 +330,22 @@ function renderError(reason) {
  * 初始化模拟器列表视图：挂载工具条与状态区骨架，渲染初始 loading 态，
  * 绑定筛选按钮与卡片/重试事件委托。
  *
- * 幂等：重复调用仅更新 onOpenGame 钩子、不重复绑定事件（search-view
- * 先例）。container 缺失（index.html 契约被破坏的极端场景）→ no-op
+ * 幂等：重复调用仅更新 onOpenGame / onOpenSaveManager 钩子、不重复绑定事件
+ * （search-view 先例）。container 缺失（index.html 契约被破坏的极端场景）→ no-op
  * 不抛错。加载不发请求 —— 首次 fetch 由协调层「进入 simulators 视图」
  * 调 refreshSimulators() 触发（懒加载）。
  * @param {object} [options]
  * @param {HTMLElement} [options.container] - 列表挂载容器（#simulator-list-panel）
  * @param {Function} [options.onOpenGame] - (game) => void；点击卡片触发，
  *   game 为 parseManifest 归一化条目（未注入时点击为空操作不报错）
+ * @param {Function} [options.onOpenSaveManager] - () => void；工具条「存档
+ *   管理」按钮触发（未注入时点击为空操作不报错）
  */
-export function initSimulatorsView({ container: el, onOpenGame: hook } = {}) {
+export function initSimulatorsView({ container: el, onOpenGame: hook, onOpenSaveManager: saveHook } = {}) {
     if (!el) return;
     container = el;
     if (typeof hook === 'function') onOpenGame = hook;
+    if (typeof saveHook === 'function') onOpenSaveManager = saveHook;
     if (bound) return; // 幂等守卫：已绑定则早退（钩子已在上方更新）
 
     renderShell();
@@ -355,6 +365,10 @@ function bindEvents() {
             renderList();
         });
     });
+
+    // 工具条「存档管理」按钮 → 存档面板钩子（U9-T2；未注入时 no-op 不报错；
+    // 点击时读取模块变量 — 重复 init 更新钩子后取最新值，先例同卡片委托）
+    container.querySelector('.sim-save-manage-btn')?.addEventListener('click', () => onOpenSaveManager());
 
     // 事件委托：卡片点击 → onOpenGame(game)；重试按钮 → refreshSimulators。
     // 委托挂在持久状态区元素上，重渲染不丢监听（search-view 结果跳转先例）
@@ -413,6 +427,15 @@ export async function refreshSimulators() {
     }
 }
 
+/**
+ * 读取最近一次解析成功的完整游戏列表（存档面板 getGames 钩子的数据源 —
+ *   不重复 fetch manifest）。未加载 / 未 init → 空数组。
+ * @returns {Array<object>} parseManifest 归一化游戏条目数组
+ */
+export function getGames() {
+    return Array.isArray(games) ? games : [];
+}
+
 // ══════════════════════════════════════════════════
 // 协议表面收口（深模块：外部只通过这些函数与 simulators.js 交互）
 // ══════════════════════════════════════════════════
@@ -422,5 +445,6 @@ export const __all__ = [
     'refreshSimulators',
     'parseManifest',
     'filterGames',
+    'getGames',
     'setFetch',
 ];
