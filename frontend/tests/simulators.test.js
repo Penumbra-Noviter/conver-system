@@ -2,9 +2,14 @@
  * 模拟器列表模块测试（U7-T3）。
  *
  * 覆盖：
- *   - parseManifest 纯函数：合法归一化 / 畸形 JSON / 非字符串输入 / 顶层非对象 /
- *     version 不兼容 / simulators 缺失或非数组 / id 缺失或重复 / file 缺失 /
- *     type 非法 / 条目非对象 / 条目级字段缺失宽容降级 / 空列表
+ *   - parseManifest 纯函数：合法归一化（v1/v2）/ 畸形 JSON / 非字符串输入 /
+ *     顶层非对象 / version 不兼容（仅接受 1/2）/ simulators 缺失或非数组 /
+ *     id 缺失或重复 / file 缺失 / type 非法 / 条目非对象 /
+ *     条目级字段缺失宽容降级 / 空列表
+ *   - parseManifest v2 saveKeys（U9-T1）：v2 归一化透出 / v1 缺 saveKeys 降级
+ *     （无 saveKeys 属性 = 「无存档管理」信号）/ saveKeyPrefix 仅 v1 兼容透传 /
+ *     saveKeys 结构非法条目级降级 / 模式不可编译与空串元素级剔除 /
+ *     模式自含 ^$ 锚点条目级降级 / 清洗后空数组保留 / 混合 v1+v2 条目
  *   - filterGames 纯函数三档：全部（含未知 type 计入全部）/ AI / 纯本地 /
  *     未知筛选类型返回全部 / 非数组输入
  *   - 四态渲染（fetch 经 setFetch seam 注入）：loading / ready（卡片网格）/
@@ -45,6 +50,31 @@ const MANIFEST_OK = {
             name: '蛛网之影',
             type: 'local',
             description: '纯本地角色扮演',
+        },
+    ],
+};
+
+/** v2 合法 manifest（U9-T1）：saveKeys 字符串数组 = 精确键 + 锚定正则模式（与 U9-T2 共享契约） */
+const MANIFEST_V2 = {
+    version: 2,
+    simulators: [
+        {
+            id: 'life-sim',
+            file: '人生模拟器v3.html',
+            name: '人生模拟器 v3',
+            type: 'ai',
+            description: 'AI 驱动的生命模拟',
+            saveKeys: ['ls_autosave', 'ls_used_names'],
+            config: { endpoint: 'cfg-endpoint', apikey: 'cfg-apikey', model: 'cfg-model' },
+        },
+        {
+            id: 'urban-god',
+            file: '神明v3.html',
+            name: '神明 v3',
+            type: 'ai',
+            description: 'AI 驱动的都市神明模拟',
+            saveKeys: ['god_autosave', 'god_save_\\d+'],
+            config: { endpoint: 'cfg-endpoint', apikey: 'cfg-apikey', model: 'cfg-model' },
         },
     ],
 };
@@ -132,10 +162,11 @@ describe('parseManifest — 纯函数（合法/结构错误/条目级降级）',
         expect(sim.parseManifest('null').ok).toBe(false);
     });
 
-    it('version 不兼容（缺失 / 非 1）→ ok:false，「manifest 版本不兼容」', async () => {
+    it('version 不兼容（缺失 / 非 1 或 2）→ ok:false，「manifest 版本不兼容」', async () => {
         const { sim } = await loadModules();
         expect(sim.parseManifest(JSON.stringify({ simulators: [] })).error).toBe('manifest 版本不兼容');
-        expect(sim.parseManifest(JSON.stringify({ version: 2, simulators: [] })).error).toBe('manifest 版本不兼容');
+        expect(sim.parseManifest(JSON.stringify({ version: 0, simulators: [] })).error).toBe('manifest 版本不兼容');
+        expect(sim.parseManifest(JSON.stringify({ version: 3, simulators: [] })).error).toBe('manifest 版本不兼容');
     });
 
     it('simulators 缺失 / 非数组 → ok:false', async () => {
@@ -191,6 +222,90 @@ describe('parseManifest — 纯函数（合法/结构错误/条目级降级）',
         expect(result.ok).toBe(true);
         expect(result.games[0].saveKeyPrefix).toBeUndefined();
         expect(result.games[0].config).toBeUndefined();
+    });
+});
+
+describe('parseManifest — v2 saveKeys 归一化 / v1 降级兼容（U9-T1）', () => {
+    it('v2 合法 manifest → saveKeys 原样透出（精确键与正则模式字符串），无 saveKeyPrefix', async () => {
+        const { sim } = await loadModules();
+        const result = sim.parseManifest(JSON.stringify(MANIFEST_V2));
+        expect(result.ok).toBe(true);
+        expect(result.games[0].saveKeys).toEqual(['ls_autosave', 'ls_used_names']);
+        expect(result.games[1].saveKeys).toEqual(['god_autosave', 'god_save_\\d+']);
+        expect('saveKeyPrefix' in result.games[0]).toBe(false);
+    });
+
+    it('v1 条目缺 saveKeys → 归一化条目无 saveKeys 属性（降级信号 = undefined，「无存档管理」）', async () => {
+        const { sim } = await loadModules();
+        const result = sim.parseManifest(JSON.stringify(MANIFEST_OK));
+        expect(result.ok).toBe(true);
+        expect('saveKeys' in result.games[0]).toBe(false);
+        expect(result.games[0].saveKeys).toBeUndefined();
+    });
+
+    it('v1 条目带 saveKeyPrefix → 兼容透传（退役字段仅 v1 数据携带，不参与存档语义）', async () => {
+        const { sim } = await loadModules();
+        const result = sim.parseManifest(JSON.stringify(MANIFEST_OK));
+        expect(result.games[0].saveKeyPrefix).toBe('ls_');
+    });
+
+    it('混合 v1/v2 条目 → 各自归一化：v2 透出 saveKeys，v1 无 saveKeys 属性', async () => {
+        const { sim } = await loadModules();
+        const mixed = { version: 2, simulators: [MANIFEST_V2.simulators[0], MANIFEST_OK.simulators[1]] };
+        const result = sim.parseManifest(JSON.stringify(mixed));
+        expect(result.ok).toBe(true);
+        expect(result.games[0].saveKeys).toEqual(['ls_autosave', 'ls_used_names']);
+        expect('saveKeys' in result.games[1]).toBe(false);
+        expect(result.games[1].id).toBe('spider-shadow');
+    });
+
+    it('Falsify:saveKeys 非数组 → 条目级降级（saveKeys 剔除），不整体失败', async () => {
+        const { sim } = await loadModules();
+        const bad = { ...MANIFEST_V2.simulators[0], saveKeys: 'ls_autosave' };
+        const result = sim.parseManifest(JSON.stringify({ version: 2, simulators: [bad] }));
+        expect(result.ok).toBe(true);
+        expect('saveKeys' in result.games[0]).toBe(false);
+        expect(result.games[0].id).toBe('life-sim');
+    });
+
+    it('Falsify:saveKeys 元素非字符串（含 null）→ 条目级降级', async () => {
+        const { sim } = await loadModules();
+        const bad = { ...MANIFEST_V2.simulators[0], saveKeys: ['ls_autosave', null] };
+        const result = sim.parseManifest(JSON.stringify({ version: 2, simulators: [bad] }));
+        expect(result.ok).toBe(true);
+        expect('saveKeys' in result.games[0]).toBe(false);
+    });
+
+    it('Falsify:模式元素无法编译 → 剔除该项，其余元素保留（元素级降级）', async () => {
+        const { sim } = await loadModules();
+        const bad = { ...MANIFEST_V2.simulators[1], saveKeys: ['god_autosave', 'god_save_[', 'god_save_\\d+'] };
+        const result = sim.parseManifest(JSON.stringify({ version: 2, simulators: [bad] }));
+        expect(result.ok).toBe(true);
+        expect(result.games[0].saveKeys).toEqual(['god_autosave', 'god_save_\\d+']);
+    });
+
+    it('Falsify:空字符串元素 → 剔除该项（元素级降级）', async () => {
+        const { sim } = await loadModules();
+        const bad = { ...MANIFEST_V2.simulators[0], saveKeys: ['ls_autosave', ''] };
+        const result = sim.parseManifest(JSON.stringify({ version: 2, simulators: [bad] }));
+        expect(result.ok).toBe(true);
+        expect(result.games[0].saveKeys).toEqual(['ls_autosave']);
+    });
+
+    it('Falsify:模式自含 ^ / $ 锚点 → 条目级降级（锚定由匹配方统一加，数据不得自锚定）', async () => {
+        const { sim } = await loadModules();
+        const bad = { ...MANIFEST_V2.simulators[1], saveKeys: ['^god_autosave$'] };
+        const result = sim.parseManifest(JSON.stringify({ version: 2, simulators: [bad] }));
+        expect(result.ok).toBe(true);
+        expect('saveKeys' in result.games[0]).toBe(false);
+    });
+
+    it('Falsify:清洗后为空数组 → 保留空数组（结构性合法，非降级信号）', async () => {
+        const { sim } = await loadModules();
+        const bad = { ...MANIFEST_V2.simulators[1], saveKeys: ['god_save_[', ''] };
+        const result = sim.parseManifest(JSON.stringify({ version: 2, simulators: [bad] }));
+        expect(result.ok).toBe(true);
+        expect(result.games[0].saveKeys).toEqual([]);
     });
 });
 
@@ -363,7 +478,7 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
 
     it('refresh 解析结构错误（version 不兼容）→ error 态（解析原因透出）', async () => {
         const { sim, panel } = await loadModules();
-        sim.setFetch(makeFetch({ result: mockManifest({ version: 2, simulators: [] }) }));
+        sim.setFetch(makeFetch({ result: mockManifest({ version: 3, simulators: [] }) }));
         sim.initSimulatorsView({ container: panel });
         await sim.refreshSimulators();
 

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "simulators": [
     {
       "id": "life-sim",
@@ -7,12 +7,15 @@
       "name": "人生模拟器 v3",
       "type": "ai",
       "description": "AI 驱动的生命模拟（天赋/事件/结局），需配置 AI 接口；存档走 localStorage（ls_ 前缀）",
-      "saveKeyPrefix": "ls_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "ls_autosave",
+        "ls_used_names"
+      ]
     },
     {
       "id": "spider-shadow",
@@ -20,12 +23,14 @@
       "name": "蛛网之影",
       "type": "ai",
       "description": "AI 驱动的蜘蛛侠世界观角色扮演，需配置 AI 接口；存档走 localStorage（spiderweb_ 前缀）",
-      "saveKeyPrefix": "spiderweb_",
       "config": {
         "endpoint": "set-endpoint",
         "apikey": "set-apikey",
         "model": "set-model"
-      }
+      },
+      "saveKeys": [
+        "spiderweb_state"
+      ]
     },
     {
       "id": "ido-idol-sim",
@@ -33,12 +38,14 @@
       "name": "星途物语 · 爱豆模拟器",
       "type": "ai",
       "description": "AI 驱动的偶像养成模拟（星途物语：出道/通告/粉丝），需配置 AI 接口；存档走 localStorage（xingtu_ 前缀）",
-      "saveKeyPrefix": "xingtu_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "xingtu_state"
+      ]
     },
     {
       "id": "xiantu",
@@ -46,12 +53,14 @@
       "name": "仙途",
       "type": "ai",
       "description": "AI 驱动的修仙模拟（玄元大陆：境界/奇遇/宗门），需配置 AI 接口；存档走 localStorage（xiantu_ 前缀）",
-      "saveKeyPrefix": "xiantu_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "xiantu_autosave"
+      ]
     },
     {
       "id": "fake-wechat",
@@ -59,12 +68,15 @@
       "name": "仿微 · 微信 AI",
       "type": "ai",
       "description": "AI 驱动的微信界面社交模拟（仿微：聊天/朋友圈），需配置 AI 接口；存档走 localStorage（wxai_ 前缀）",
-      "saveKeyPrefix": "wxai_",
       "config": {
         "endpoint": "inpBase",
         "apikey": "inpKey",
         "model": "inpModel"
-      }
+      },
+      "saveKeys": [
+        "wxai_state_v1",
+        "wxai_state_prev"
+      ]
     },
     {
       "id": "detective-sim",
@@ -72,12 +84,14 @@
       "name": "迷雾侦探 v3",
       "type": "ai",
       "description": "AI 驱动的推理探案（迷雾侦探：现场/线索/结案），需配置 AI 接口；存档走 localStorage（detective-ai- 前缀）",
-      "saveKeyPrefix": "detective-ai-",
       "config": {
         "endpoint": "api-base",
         "apikey": "api-key",
         "model": "api-model"
-      }
+      },
+      "saveKeys": [
+        "detective-ai-save-v1"
+      ]
     },
     {
       "id": "cthulhu-rpg",
@@ -85,12 +99,14 @@
       "name": "克苏鲁跑团 v2",
       "type": "ai",
       "description": "AI 守秘人的克苏鲁跑团（CoC 7e：调查/检定/理智），需配置 AI 接口；存档走 localStorage（coc_ 前缀）",
-      "saveKeyPrefix": "coc_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "coc_autosave"
+      ]
     },
     {
       "id": "harry-potter",
@@ -98,12 +114,14 @@
       "name": "霍格沃茨 · 命运之书",
       "type": "ai",
       "description": "哈利·波特世界观 AI 角色扮演（霍格沃茨命运之书），需配置 AI 接口；存档走 localStorage（hpbook_ 前缀）",
-      "saveKeyPrefix": "hpbook_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "hpbook_state"
+      ]
     },
     {
       "id": "my-little-pony",
@@ -111,12 +129,14 @@
       "name": "小马宝莉",
       "type": "ai",
       "description": "小马宝莉世界观 AI 角色扮演，需配置 AI 接口；存档走 localStorage（wg_ 前缀）",
-      "saveKeyPrefix": "wg_",
       "config": {
         "endpoint": "s-endpoint",
         "apikey": "s-key",
         "model": "s-model"
-      }
+      },
+      "saveKeys": [
+        "wg_xiaomabaoli_save"
+      ]
     },
     {
       "id": "sakura-academy",
@@ -124,12 +144,14 @@
       "name": "恋樱学园 v2",
       "type": "ai",
       "description": "AI 驱动的校园恋爱模拟（恋樱学园），需配置 AI 接口；存档走 localStorage（sakura_ 前缀）",
-      "saveKeyPrefix": "sakura_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "sakura_state"
+      ]
     },
     {
       "id": "endless-sea",
@@ -137,12 +159,14 @@
       "name": "无尽之海",
       "type": "ai",
       "description": "AI 驱动的航海冒险模拟（无尽之海：航行/贸易/探险），需配置 AI 接口；存档走 localStorage（endless_sea_ 前缀）",
-      "saveKeyPrefix": "endless_sea_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "endless_sea_save"
+      ]
     },
     {
       "id": "infinite-loop",
@@ -150,12 +174,14 @@
       "name": "无限流 v2",
       "type": "ai",
       "description": "AI 驱动的无限流副本轮回模拟（无限轮回），需配置 AI 接口；存档走 localStorage（il_ 前缀）",
-      "saveKeyPrefix": "il_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "il_autosave"
+      ]
     },
     {
       "id": "twilight-witch",
@@ -163,12 +189,17 @@
       "name": "暮色女巫 v2",
       "type": "ai",
       "description": "AI 驱动的女巫生存模拟（灰溪村的冬天：痕迹/搜查/审判），需配置 AI 接口；存档走 localStorage（twilight_ 前缀）",
-      "saveKeyPrefix": "twilight_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "twilight_autosave",
+        "twilight_cps",
+        "twilight_deaths",
+        "twilight_slot_\\d+"
+      ]
     },
     {
       "id": "my-empire",
@@ -176,12 +207,14 @@
       "name": "朕的江山",
       "type": "ai",
       "description": "AI 驱动的皇帝治国模拟（朝政/选妃/天下），需配置 AI 接口；存档走 localStorage（emperor_ 前缀）",
-      "saveKeyPrefix": "emperor_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "emperor_state"
+      ]
     },
     {
       "id": "jianghu",
@@ -189,12 +222,14 @@
       "name": "江湖志 v2",
       "type": "ai",
       "description": "AI 驱动的武侠人生角色扮演（江湖志：闯荡/门派/恩怨），需配置 AI 接口；存档走 localStorage（jianghu_ 前缀）",
-      "saveKeyPrefix": "jianghu_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "jianghu_state_v1"
+      ]
     },
     {
       "id": "spirit-net-ascension",
@@ -202,12 +237,14 @@
       "name": "灵网飞升",
       "type": "ai",
       "description": "AI 驱动的赛博修仙角色扮演（灵网飞升：灵网/飞升），需配置 AI 接口；存档走 localStorage（lwfs_ 前缀）",
-      "saveKeyPrefix": "lwfs_",
       "config": {
         "endpoint": "a-base",
         "apikey": "a-key",
         "model": "a-model"
-      }
+      },
+      "saveKeys": [
+        "lwfs_save_v1"
+      ]
     },
     {
       "id": "society-sim",
@@ -215,12 +252,14 @@
       "name": "混社会模拟器",
       "type": "ai",
       "description": "AI 驱动的混社会人生角色扮演（《混社会模拟器》），需配置 AI 接口；存档走 localStorage（hsh_ 前缀）",
-      "saveKeyPrefix": "hsh_",
       "config": {
         "endpoint": "w-endpoint",
         "apikey": "w-apikey",
         "model": "w-model"
-      }
+      },
+      "saveKeys": [
+        "hsh_save_v1"
+      ]
     },
     {
       "id": "urban-god",
@@ -228,12 +267,15 @@
       "name": "神明 v3",
       "type": "ai",
       "description": "AI 驱动的都市神明模拟（Urban God），需配置 AI 接口；存档走 localStorage（god_ 前缀）",
-      "saveKeyPrefix": "god_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "god_autosave",
+        "god_save_\\d+"
+      ]
     },
     {
       "id": "wishing-willow",
@@ -241,12 +283,15 @@
       "name": "许愿柳",
       "type": "ai",
       "description": "AI 驱动的沉浸式角色扮演（许愿柳），需配置 AI 接口；存档走 localStorage（xuyangliu_ 前缀）",
-      "saveKeyPrefix": "xuyangliu_",
       "config": {
         "endpoint": "api-base",
         "apikey": "api-key",
         "model": "api-model"
-      }
+      },
+      "saveKeys": [
+        "xuyangliu_save_v1",
+        "xuyangliu_ui_v1"
+      ]
     },
     {
       "id": "urban-awakening",
@@ -254,12 +299,15 @@
       "name": "都市异能 v2",
       "type": "ai",
       "description": "AI 驱动的都市异能角色扮演（Urban Awakening），需配置 AI 接口；存档走 localStorage（urban_ 前缀）",
-      "saveKeyPrefix": "urban_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "urban_awakening_autosave",
+        "urban_save_\\d+"
+      ]
     },
     {
       "id": "high-school-sim",
@@ -267,12 +315,14 @@
       "name": "高中生模拟器",
       "type": "ai",
       "description": "AI 驱动的高中校园生活角色扮演，需配置 AI 接口；存档走 localStorage（wg_ 前缀）",
-      "saveKeyPrefix": "wg_",
       "config": {
         "endpoint": "s-endpoint",
         "apikey": "s-key",
         "model": "s-model"
-      }
+      },
+      "saveKeys": [
+        "wg_gaozhongsheng_save"
+      ]
     },
     {
       "id": "madoka-magica",
@@ -280,12 +330,14 @@
       "name": "魔法少女小圆",
       "type": "ai",
       "description": "魔法少女小圆世界观 TRPG（见泷原），AI 驱动，需配置 AI 接口；存档走 localStorage（madoka_ 前缀）",
-      "saveKeyPrefix": "madoka_",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
         "model": "cfg-model"
-      }
+      },
+      "saveKeys": [
+        "madoka_state_v1"
+      ]
     }
   ]
 }

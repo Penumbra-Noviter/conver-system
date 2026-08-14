@@ -26,7 +26,15 @@
  *   version 不兼容 / 顶层非对象 / simulators 缺失或非数组 / id 缺失或重复 /
  *   file 缺失 / type 非法 / 条目非对象）→ 整体判定失败，列表进入错误态
  *   （含重试）；条目级字段缺失（name / description / saveKeyPrefix /
- *   config）→ 宽容降级（该字段不渲染/剔除，不整体失败）。
+ *   config / saveKeys）→ 宽容降级（该字段不渲染/剔除，不整体失败）。
+ *
+ * saveKeys 契约（U9-T1，与 U9-T2 共享）：v2 条目声明存档键白名单，数组元素
+ *   为字符串 —— 不含正则元字符的字符串 = 精确键名；含正则元字符的字符串 =
+ *   正则模式（白名单匹配时锚定完整键名 ^…$）。归一化：结构非法（非数组 /
+ *   元素非字符串 / 模式自含 ^ $ 锚点）→ 条目级降级（该游戏无 saveKeys 属性 =
+ *   「无存档管理」信号）；模式无法编译 / 空串元素 → 元素级剔除。v1 条目缺
+ *   saveKeys → 无 saveKeys 属性（同样降级信号）；saveKeyPrefix 已退役
+ *   （TD-48）：v1 数据仅兼容透传，不参与任何存档语义。
  *
  * 协议表面（__all__）：initSimulatorsView / refreshSimulators /
  *   parseManifest / filterGames / setFetch。
@@ -89,15 +97,54 @@ const FILTERS = [
 // 纯函数：manifest 解析（校验 + 归一化）
 // ══════════════════════════════════════════════════
 
+/** 正则元字符集：saveKeys 元素含任一字符即按正则模式处理（精确键名不得含这些字符） */
+const SAVE_KEY_META_RE = /[.*+?^${}()|[\]\\]/;
+
+/**
+ * 归一化 saveKeys（U9-T1 v2 契约，与 U9-T2 共享）。
+ *
+ * 输入为原始条目字段值，输出清洗后的字符串数组（元素语义：不含正则元字符
+ * = 精确键名；含正则元字符 = 锚定完整键名的正则模式）。降级分级：
+ *   - 结构非法（非数组 / 元素非字符串 / 模式自含 ^ $ 锚点）→ 返回 undefined
+ *     （条目级降级：该游戏无 saveKeys 属性 = 「无存档管理」信号）；
+ *   - 模式无法编译 / 空串元素 → 元素级剔除（该项不进入白名单）。
+ * 清洗后为空数组时保留空数组（结构性合法，非降级信号）。
+ *
+ * @param {unknown} value - manifest 条目的原始 saveKeys 字段值
+ * @returns {string[]|undefined} 清洗后的白名单数组；结构非法返回 undefined
+ */
+function normalizeSaveKeys(value) {
+    if (!Array.isArray(value)) return undefined;
+    const keys = [];
+    for (const item of value) {
+        if (typeof item !== 'string') return undefined; // 元素类型非法 → 条目级降级
+        if (item.includes('^') || item.includes('$')) return undefined; // 自锚定 → 条目级降级
+        if (item === '') continue; // 空串 → 元素级剔除
+        if (SAVE_KEY_META_RE.test(item)) {
+            try {
+                new RegExp(`^${item}$`); // 锚定完整键名试编译（匹配语义：^…$）
+            } catch {
+                continue; // 不可编译 → 元素级剔除
+            }
+        }
+        keys.push(item);
+    }
+    return keys;
+}
+
 /**
  * 解析并校验 manifest 原始 JSON 文本，归一化为游戏列表。
  *
  * 结构性错误（畸形 JSON / 非字符串输入 / 顶层非对象 / version 不兼容 /
  * simulators 缺失或非数组 / 条目非对象 / id 缺失或重复 / file 缺失 /
  * type 非法）→ 整体失败（{ ok:false, error }），列表进入错误态；
- * 条目级字段缺失（name / description / saveKeyPrefix / config）→
- * 宽容降级（name/description 归一化为空串，saveKeyPrefix/config 非法
- * 类型剔除），不整体失败。
+ * 条目级字段缺失（name / description / saveKeyPrefix / config / saveKeys）→
+ * 宽容降级（name/description 归一化为空串，saveKeyPrefix/config/saveKeys
+ * 非法类型剔除或归一化），不整体失败。
+ *
+ * version 仅接受 1 / 2（v1 数据兼容解析：条目无 saveKeys → 无 saveKeys 属性，
+ * 即「无存档管理」降级信号；saveKeyPrefix 仅 v1 数据携带并透传，已退役不参与
+ * 存档语义）。saveKeys 归一化语义见 normalizeSaveKeys 与模块头 docstring。
  *
  * @param {string} rawJson - manifest.json 的原始文本
  * @returns {{ok: true, games: Array<object>}|{ok: false, error: string}}
@@ -119,7 +166,7 @@ export function parseManifest(rawJson) {
     if (data === null || typeof data !== 'object' || Array.isArray(data)) {
         return { ok: false, error: 'manifest 顶层必须是对象' };
     }
-    if (data.version !== 1) {
+    if (data.version !== 1 && data.version !== 2) {
         return { ok: false, error: 'manifest 版本不兼容' };
     }
     if (!Array.isArray(data.simulators)) {
@@ -144,7 +191,8 @@ export function parseManifest(rawJson) {
 
         seen.add(entry.id);
         // 条目级宽容降级：name/description 缺失 → 空串（不渲染）；
-        // saveKeyPrefix/config 非合法类型 → 剔除（不渲染）
+        // saveKeyPrefix/config 非合法类型 → 剔除（不渲染）；
+        // saveKeys 结构非法 → 无 saveKeys 属性（「无存档管理」降级信号）
         const game = {
             id: entry.id,
             file: entry.file,
@@ -156,6 +204,8 @@ export function parseManifest(rawJson) {
         if (entry.config !== null && typeof entry.config === 'object' && !Array.isArray(entry.config)) {
             game.config = entry.config;
         }
+        const saveKeys = normalizeSaveKeys(entry.saveKeys);
+        if (saveKeys) game.saveKeys = saveKeys;
         games.push(game);
     }
 
