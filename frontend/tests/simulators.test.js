@@ -723,6 +723,47 @@ describe('simulators — 清单加载超时与并发守卫（TD-51/55/60）', ()
         expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
+    it('响应体读取挂起（headers 已到，text() 永不结算）→ 15s 仍进超时错误态（两阶段守卫覆盖读取阶段，TD-72）', async () => {
+        const { sim, panel } = await loadModules();
+        // 响应头阶段正常完成（ok:true 立即到达），但响应体 text() 永久挂起 —
+        // 旧实现 return res.text() 在返回求值处即清计时器，读取阶段不受守卫
+        const fetchSpy = makeFetch({ result: Promise.resolve({ ok: true, status: 200, text: () => new Promise(() => {}) }) });
+        sim.setFetch(fetchSpy);
+        sim.initSimulatorsView({ container: panel });
+
+        vi.useFakeTimers();
+        try {
+            const refreshPromise = sim.refreshSimulators();
+            expect(panel.querySelector('.sim-state').innerHTML).toContain('加载中…');
+            await vi.advanceTimersByTimeAsync(15000);
+            expect(panel.querySelector('.sim-error-msg').textContent).toBe('模拟器列表加载失败');
+            expect(panel.querySelector('.sim-error-reason').textContent).toBe('模拟器清单加载超时（15 秒未收到响应）');
+            expect(panel.querySelector('.sim-retry-btn')).not.toBeNull();
+            await refreshPromise;
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('响应体读取阶段超时 → abort 已触发（signal.aborted 为真）且同超时文案（TD-72）', async () => {
+        const { sim, panel } = await loadModules();
+        // 记录 doFetch 收到的 AbortSignal — 读取阶段挂起到点后必须通知真实 fetch 断开
+        const fetchSpy = vi.fn(() => Promise.resolve({ ok: true, status: 200, text: () => new Promise(() => {}) }));
+        sim.setFetch(fetchSpy);
+        sim.initSimulatorsView({ container: panel });
+
+        vi.useFakeTimers();
+        try {
+            const refreshPromise = sim.refreshSimulators();
+            await vi.advanceTimersByTimeAsync(15000);
+            expect(panel.querySelector('.sim-error-reason').textContent).toBe('模拟器清单加载超时（15 秒未收到响应）');
+            expect(fetchSpy.mock.calls[0][1].signal.aborted).toBe(true); // abort 通知真实 fetch 断开
+            await refreshPromise;
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('双 refresh 并发：慢旧请求后到不覆盖新渲染（seq 守卫 await 出口）', async () => {
         const { sim, panel } = await loadModules();
         const OLD = { version: 1, simulators: [{ id: 'old-game', file: 'old.html', name: '旧数据', type: 'ai' }] };
