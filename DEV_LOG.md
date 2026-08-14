@@ -6,6 +6,13 @@
 
 ---
 
+## 滚动摘要（2026-08-14 — Release 打包 + 安装器产物回收）
+
+- **release 打包（build-desktop.ps1 全链）**：cargo test 全绿 + pytest 433+1skip + Vitest 714 + tauri build（NSIS 安装器 23.7MB）+ dist 测试包（conver-system.exe 10.5MB）+ 冒烟 5 项全过（runtime.json 就绪 / /api/models 200 / 前端挂载 200 / 表结构 / 退出无残留）
+- **安装器产物回收（用户明确指令）**：NSIS 安装器（`Conver System_0.1.0_x64-setup.exe`）已删除——用户重申「安装包只在明确提需求时才打包」；**dist/ 根「双击即用」测试包（conver-system.exe + conver_backend/）为常规打包产物**，保留。注意：build-desktop.ps1 构建链固定含 tauri build（必产 NSIS），未来常规打包若需跳过安装器应调整脚本加开关（未做，等用户提需求时一并处理）
+
+---
+
 ## 滚动摘要（2026-08-14 — 技术债区 TD-72/73/74 批次：轻量档 1 工单 3 提交全自动 kickoff）
 
 - **TD-72/73/74 批次完成（commit 链 942ffb9 → b49deae → 5435ea5，merge 6ab4cb5，N1 措辞修复 e6a18a9）**：技术债区最后 3 项清理（用户指令「补技术债区」全自动档）——**3 做 0 关闭，TD-74 票面修正**。TD-72 超时守卫延展覆盖响应体读取（`await Promise.race([res.text(), timeoutPromise])`，await 语义载重：finally 等第二 race 结算才清计时器，headers 与响应体共享 15s 总预算；+2 用例先红后绿）/ TD-73 导入回滚 per-key try/catch 尽力而为（单键还原失败不中断继续逆序尝试，循环结束统一抛原始 err 错误同一性；+1 用例先红后绿）/ TD-74 图标一致性锁数量断言放宽（`toBe(2)` → `≥2` 下限防误删 + 逐字节比对承担防漂移，票面修正：数量锁边际价值≈0 且让合法新增误红）
