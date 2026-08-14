@@ -385,6 +385,29 @@ describe('validateImportPayload — 白名单校验（任一非法整包拒绝�
 });
 
 // ══════════════════════════════════════════════════
+// validateImportPayload — __proto__ 键（TD-70 无原型累积器）
+// ══════════════════════════════════════════════════
+
+describe('validateImportPayload — __proto__ 键（TD-70 无原型累积器）', () => {
+    it('__proto__ 白名单键：validateImportPayload → applyImportPayload 全链路完整写回', async () => {
+        const { sim } = await loadModules();
+        const game = { ...GAME_EXACT, saveKeys: [...GAME_EXACT.saveKeys, '__proto__'] };
+        // 对象字面量 __proto__ 语法会设原型；JSON.parse 才产生自有 __proto__ 属性（导入真实路径）
+        const payload = JSON.parse('{"keys":{"ls_autosave":"\\"a\\"","__proto__":"\\"p\\""}}');
+
+        const result = sim.validateImportPayload(payload, game);
+        expect(result.ok).toBe(true);
+        expect(Object.keys(result.keys).sort()).toEqual(['__proto__', 'ls_autosave']);
+        expect(result.keys['__proto__']).toBe('"p"');
+
+        const written = sim.applyImportPayload(game, result.keys, localStorage);
+        expect(written).toBe(2);
+        expect(localStorage.getItem('__proto__')).toBe('"p"');
+        expect(localStorage.getItem('ls_autosave')).toBe('"a"');
+    });
+});
+
+// ══════════════════════════════════════════════════
 // applyImportPayload — 应用（同名替换写回）
 // ══════════════════════════════════════════════════
 
@@ -423,6 +446,37 @@ describe('applyImportPayload — 白名单键同名替换写回', () => {
         expect(sim.applyImportPayload(GAME_NO_SAVE, { spiderweb_state: 'x' }, storage)).toBe(0);
         expect(sim.applyImportPayload(GAME_EXACT, 'x', storage)).toBe(0);
         expect(sim.applyImportPayload(GAME_EXACT, { ls_autosave: 'x' }, null)).toBe(0);
+    });
+});
+
+// ══════════════════════════════════════════════════
+// applyImportPayload — 写前快照 + 失败回滚（TD-63 裁定修法，非容量预检）
+// ══════════════════════════════════════════════════
+
+describe('applyImportPayload — 写前快照 + 失败回滚（TD-63）', () => {
+    it('第 N 键 setItem 抛错 → 前 N-1 键逆序回滚（原值还原 / 新增键移除）且异常上抛', async () => {
+        const { sim } = await loadModules();
+        const game = { ...GAME_EXACT, saveKeys: ['ls_new_key', 'ls_autosave', 'ls_used_names', 'ls_bomb_key'] };
+        const map = new Map([['ls_autosave', 'old'], ['ls_used_names', 'keep']]);
+        const storage = {
+            getItem: (k) => (map.has(k) ? map.get(k) : null),
+            setItem: (k, v) => {
+                if (k === 'ls_bomb_key') throw new Error('QuotaExceededError'); // 第 4 键写入失败
+                map.set(k, String(v));
+            },
+            removeItem: (k) => { map.delete(k); },
+        };
+        const keys = {
+            ls_new_key: '"new"',       // 写前不存在 → 回滚应移除（新增键）
+            ls_autosave: '{"v":2}',    // 写前 old → 回滚应还原原值
+            ls_used_names: '["b"]',    // 写前 keep → 回滚应还原原值
+            ls_bomb_key: 'boom',       // 抛错键本身未写入，无需回滚
+        };
+        expect(() => sim.applyImportPayload(game, keys, storage)).toThrow('QuotaExceededError');
+        expect(storage.getItem('ls_new_key')).toBeNull();
+        expect(storage.getItem('ls_autosave')).toBe('old');
+        expect(storage.getItem('ls_used_names')).toBe('keep');
+        expect(storage.getItem('ls_bomb_key')).toBeNull();
     });
 });
 
@@ -676,6 +730,102 @@ describe('save-manager 面板 — 导出（Blob 下载）', () => {
     });
 });
 
+// ══════════════════════════════════════════════════
+// 面板：导出文件名净化（TD-65 — 非法字符替换 / 尾部修剪 / 空结果兜底）
+// ══════════════════════════════════════════════════
+
+describe('save-manager 面板 — 导出文件名净化（TD-65）', () => {
+    afterEach(() => {
+        delete URL.createObjectURL;
+        delete URL.revokeObjectURL;
+    });
+
+    it('含引号/路径分隔符/控制字符/% 的 id → 下载文件名被净化（a.download 断言）', async () => {
+        const { sim, savePanel } = await loadModules();
+        const evilId = 'a"b\\c/d\x01e%f'; // " \ / 控制字符 % — 全部应替换为 _
+        const evil = { ...GAME_EXACT, id: evilId };
+        localStorage.setItem('ls_autosave', '{"v":1}');
+        initPanel(sim, { savePanel }, { games: [evil] });
+        sim.openSavePanel();
+
+        URL.createObjectURL = vi.fn(() => 'blob:mock');
+        URL.revokeObjectURL = vi.fn();
+        const clickSpy = vi.fn();
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(clickSpy);
+
+        savePanel.querySelector('[data-action="export"]').click();
+
+        expect(clickSpy).toHaveBeenCalledTimes(1);
+        expect(clickSpy.mock.instances[0].download).toBe('a_b_c_d_e_f-saves.json');
+    });
+
+    it('Falsify:空 id → 文件名兜底「game-saves.json」（净化边界：空结果兜底 game）', async () => {
+        const { sim, savePanel } = await loadModules();
+        localStorage.setItem('ls_autosave', '{"v":1}');
+        initPanel(sim, { savePanel }, { games: [{ ...GAME_EXACT, id: '' }] });
+        sim.openSavePanel();
+
+        URL.createObjectURL = vi.fn(() => 'blob:mock');
+        URL.revokeObjectURL = vi.fn();
+        const clickSpy = vi.fn();
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(clickSpy);
+
+        savePanel.querySelector('[data-action="export"]').click();
+
+        expect(clickSpy.mock.instances[0].download).toBe('game-saves.json');
+    });
+
+    it('Falsify:id 尾部带点与空格 → trim 后下载（净化边界：尾部点空格修剪）', async () => {
+        const { sim, savePanel } = await loadModules();
+        localStorage.setItem('ls_autosave', '{"v":1}');
+        initPanel(sim, { savePanel }, { games: [{ ...GAME_EXACT, id: 'trail. ' }] });
+        sim.openSavePanel();
+
+        URL.createObjectURL = vi.fn(() => 'blob:mock');
+        URL.revokeObjectURL = vi.fn();
+        const clickSpy = vi.fn();
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(clickSpy);
+
+        savePanel.querySelector('[data-action="export"]').click();
+
+        expect(clickSpy.mock.instances[0].download).toBe('trail-saves.json');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// 面板：存储禁用降级（TD-69 — SecurityError 时渲染不崩，操作路径不在本票）
+// ══════════════════════════════════════════════════
+
+describe('save-manager 面板 — 存储禁用（SecurityError）降级（TD-69）', () => {
+    let originalStorageDescriptor = null;
+    afterEach(() => {
+        // 还原描述符 — 不污染其他用例（jsdom localStorage 为 configurable 访问器）
+        if (originalStorageDescriptor) Object.defineProperty(window, 'localStorage', originalStorageDescriptor);
+        originalStorageDescriptor = null;
+    });
+
+    it('window.localStorage getter 抛 SecurityError → openSavePanel 降级「0 个存档」不崩 + 导出/删除按钮禁用', async () => {
+        const { sim, savePanel } = await loadModules();
+        localStorage.setItem('ls_autosave', '{"v":1}'); // 正常态应显示 1 个存档
+        initPanel(sim, { savePanel }, { games: [GAME_EXACT] });
+        sim.openSavePanel();
+        expect(savePanel.querySelector('.sim-save-meta').textContent).toContain('1 个存档');
+
+        originalStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+        Object.defineProperty(window, 'localStorage', {
+            configurable: true,
+            get() { throw new Error('SecurityError: The operation is insecure.'); },
+        });
+
+        expect(() => sim.openSavePanel()).not.toThrow();
+        const row = savePanel.querySelector('.sim-save-game');
+        expect(row.querySelector('.sim-save-meta').textContent).toBe('0 个存档 · 0 字符');
+        expect(row.querySelector('[data-action="export"]').disabled).toBe(true);
+        expect(row.querySelector('[data-action="delete"]').disabled).toBe(true);
+        expect(row.querySelector('[data-action="import"]').disabled).toBe(false);
+    });
+});
+
 describe('save-manager 面板 — 导入（文件选择器 → 校验 → 恢复）', () => {
     /** 构造导入 File 并注入隐藏 input.files 后派发 change */
     function dispatchImport(savePanel, content, { size = null, name = 'save.json' } = {}) {
@@ -771,6 +921,101 @@ describe('save-manager 面板 — 导入（文件选择器 → 校验 → 恢复
         await vi.waitFor(() => expect(toastSpy).toHaveBeenCalled());
         expect(toastSpy.mock.calls[0][0]).toContain('键「ls_autosave」的值不是合法 JSON 字符串');
         expect(localStorage.getItem('ls_autosave')).toBeNull();
+    });
+});
+
+// ══════════════════════════════════════════════════
+// 面板：导入配额失败（TD-63 UI 层收口 — 回滚 + toast + 刷新）
+// ══════════════════════════════════════════════════
+
+describe('save-manager 面板 — 导入配额失败回滚（TD-63）', () => {
+    let originalStorageDescriptor = null;
+    afterEach(() => {
+        if (originalStorageDescriptor) Object.defineProperty(window, 'localStorage', originalStorageDescriptor);
+        originalStorageDescriptor = null;
+    });
+
+    /** 构造导入 File 并注入隐藏 input.files 后派发 change（复用既有 dispatchImport 模式） */
+    function dispatchImport(savePanel, content, { size = null, name = 'save.json' } = {}) {
+        const file = new File([content], name, { type: 'application/json' });
+        if (size !== null) Object.defineProperty(file, 'size', { value: size });
+        const input = savePanel.querySelector('.sim-save-file-input');
+        Object.defineProperty(input, 'files', { value: [file], configurable: true });
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    it('导入配额失败（setItem 抛错）→ 已写键回滚 + toast「导入失败：存储空间不足或写入失败」+ 面板刷新', async () => {
+        const { sim, savePanel } = await loadModules();
+        const games = [GAME_EXACT];
+        const getGamesSpy = vi.fn(() => games);
+        initPanel(sim, { savePanel }, { games, getGames: getGamesSpy });
+        sim.openSavePanel();
+        const utils = await import('../js/utils.js');
+        const toastSpy = vi.spyOn(utils, 'showToast');
+
+        // 配额受限存储：ls_used_names 写入抛错（回滚须真实还原 ls_autosave 原值）
+        const map = new Map([['ls_autosave', 'old']]);
+        originalStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+        Object.defineProperty(window, 'localStorage', {
+            configurable: true,
+            value: {
+                get length() { return map.size; },
+                key: (i) => [...map.keys()][i] ?? null,
+                getItem: (k) => (map.has(k) ? map.get(k) : null),
+                setItem: (k, v) => {
+                    if (k === 'ls_used_names') throw new Error('QuotaExceededError');
+                    map.set(k, String(v));
+                },
+                removeItem: (k) => { map.delete(k); },
+                clear: () => { map.clear(); },
+            },
+        });
+        const rendersBefore = getGamesSpy.mock.calls.length;
+
+        savePanel.querySelector('[data-action="import"]').click();
+        dispatchImport(savePanel, JSON.stringify({
+            keys: { ls_autosave: '{"v":2}', ls_used_names: '["b"]' },
+        }));
+
+        await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith('导入失败：存储空间不足或写入失败', 'error'));
+        expect(map.get('ls_autosave')).toBe('old');     // 已写键回滚：原值还原
+        expect(map.has('ls_used_names')).toBe(false);   // 抛错键未写入
+        expect(getGamesSpy.mock.calls.length).toBeGreaterThan(rendersBefore); // 面板刷新（经注入钩子重取数据）
+        expect(savePanel.querySelector('.sim-save-file-input').value).toBe(''); // input 已清空
+    });
+});
+
+// ══════════════════════════════════════════════════
+// 面板：导入目标清空（TD-64 — capture-then-clear 置于所有早退路径之前）
+// ══════════════════════════════════════════════════
+
+describe('save-manager 面板 — 导入目标清空（TD-64）', () => {
+    /** 构造导入 File 并注入隐藏 input.files 后派发 change（复用既有 dispatchImport 模式） */
+    function dispatchImport(savePanel, content, { size = null, name = 'save.json' } = {}) {
+        const file = new File([content], name, { type: 'application/json' });
+        if (size !== null) Object.defineProperty(file, 'size', { value: size });
+        const input = savePanel.querySelector('.sim-save-file-input');
+        Object.defineProperty(input, 'files', { value: [file], configurable: true });
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    it('超限早退后 pendingGameId 已清空不误恢复：再直接派发合法文件（不经按钮点击）不应用到任何游戏', async () => {
+        const { sim, savePanel } = await loadModules();
+        localStorage.setItem('ls_autosave', 'keep');
+        initPanel(sim, { savePanel }, { games: [GAME_EXACT] });
+        sim.openSavePanel();
+        const utils = await import('../js/utils.js');
+        const toastSpy = vi.spyOn(utils, 'showToast');
+
+        savePanel.querySelector('[data-action="import"]').click(); // pendingGameId → life-sim
+        dispatchImport(savePanel, 'x', { size: 5 * 1024 * 1024 + 1 }); // 超限 → 早退
+        await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith('存档文件过大（上限 5MB）', 'error'));
+
+        // 直接派发合法导入文件（不经按钮点击）→ pendingGameId 已清空 → 目标游戏为空 → 不误恢复
+        dispatchImport(savePanel, JSON.stringify({ keys: { ls_autosave: '{"v":9}' } }));
+        await vi.waitFor(() => expect(toastSpy.mock.calls.length).toBe(2));
+        expect(toastSpy.mock.calls[1][0]).toBe('该游戏无存档管理，无法导入');
+        expect(localStorage.getItem('ls_autosave')).toBe('keep'); // 未误恢复到错误游戏
     });
 });
 
