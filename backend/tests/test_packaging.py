@@ -334,6 +334,32 @@ class TestSpecFrontendPackaging:
         targets = {t for _, t in datas}
         assert {"frontend", "frontend/css", "frontend/js"} <= targets
 
+    def test_frontend_runtime_dirs_all_shipped(self) -> None:
+        """反向防漂移：frontend/ 下新增运行目录必须进 _FRONTEND_RUNTIME 打包面
+
+        教训（2026-08-14）：simulators/ 模块加入 frontend/ 时未同步打包清单，
+        桌面版（PyInstaller 打包态）应用内游戏列表为空，网页版正常——单向校验
+        （spec 声明的源路径都存在）拦不住「新增目录未声明」方向。本测试枚举
+        frontend/ 实际目录与 spec datas 源路径做差集，新增运行目录漏打包即红。
+        """
+        datas = _spec_runtime_datas(self.SPEC_PATH)
+        frontend = _frontend_dir()
+        assert frontend.is_dir(), f"frontend/ 目录不存在：{frontend}"
+        sources = {src for src, _ in datas}
+        # 打包面排除：构建/测试/生成物目录
+        excluded = {"node_modules", "tests", "coverage"}
+        for d in frontend.iterdir():
+            if not d.is_dir() or d.name in excluded:
+                continue
+            if d.name == "assets":
+                # assets 为空目录（git 不跟踪）不挂载；有内容时必须进 spec
+                if not any(d.iterdir()):
+                    continue
+            assert d in sources, (
+                f"frontend/{d.name} 目录未进 _FRONTEND_RUNTIME 打包面——新增运行资源目录"
+                f"必须同步 spec（教训 2026-08-14：simulators 漏打包致桌面版游戏列表为空）"
+            )
+
 
 class TestShellSpawnContract:
     """壳追加 argv / 就绪路径契约（RS-1 R1，与壳侧互引）：
