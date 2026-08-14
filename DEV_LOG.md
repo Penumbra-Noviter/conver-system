@@ -15,6 +15,7 @@
 - **修复（829f387，先红后绿 +3 用例）**：key-injector 返回增 `written`（真写入字段，filled 子集——**熔断/反馈类消费方须用真写入信号**，filled 的幂等匹配不计入）；熔断条件改用 written；熔断计数移入观察者回调（autoSyncAfterLoad 去布尔参——Architecture 布尔参耦合消解）；mutationTouchesConfig id 判定去重
 - **教训（已蒸馏）**：聚合语义字段（filled 含幂等匹配）跨模块复用作「真写入」信号前须核对语义——两模块对同一字段语义漂移只有 Falsify 实证能暴露（F1 场景：setAttribute class 3 次即熔断）
 - **测试**：Vitest 746 → **755**（+9）；pytest 434+1skip 未受影响；冒烟 13 项 12 PASS（两轮复跑全绿）
+- **知识库预检召回**：精读「Conver System 高频小坑汇总」（本批不相关，跳过应用）「Falsify测试要钉住缺陷所在层」（TD-76 熔断测试用显式 3 轮步数钉住熔断层）；蒸馏《聚合语义字段跨模块复用须核对语义》（provenance: 本段 + 829f387）
 - **文档同步**：TICKETS（TD-75/76 归档 + **技术债区清零**）；CLAUDE（批次行 + 基线 746→755）；DEV_LOG 本段
 
 ---
