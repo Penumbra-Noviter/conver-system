@@ -19,8 +19,9 @@
  *   './fetch-seam.js'` 并内部统一走 doFetch（setFetch(mock) 一次注入对两
  *   模块同时生效）；传 null/非函数恢复回落全局 fetch；与 app.test.js 既有
  *   globalThis.fetch mock 路由兼容（fetchImpl 为 null 时走全局 fetch）。
- *   清单加载超时守卫（TD-72 两阶段）：15s 超时同时覆盖 headers（fetch
- *   promise 竞速）与响应体读取（res.text() 竞速）两阶段 —— 到点 abort
+ *   清单加载超时守卫（TD-72 两阶段）：15s 总预算覆盖 headers（fetch
+ *   promise 竞速）与响应体读取（res.text() 竞速）两阶段（两阶段共享同一
+ *   计时器，headers 耗时扣减 text() 预算）—— 到点 abort
  *   通知真实 fetch 断开 + 独立拒绝驱动错误态；第二 race 的 await 是语义
  *   载重，保证 text() 结算后才清理计时器（未 await 则计时器在读取开始前
  *   已清，响应体挂起时守卫失效）。
@@ -397,7 +398,8 @@ function bindEvents() {
  * 获取 manifest 文本（经 fetch seam：fetch-seam.js doFetch → 注入实现 ?? 全局 fetch）。
  * 响应非 2xx → 抛错（HTTP 状态码入原因）；响应形状异常 → 抛错入 catch 兜底。
  * 15s 超时守卫（两阶段，TD-72）：headers 阶段（fetch promise 竞速）与响应体
- * 读取阶段（res.text() 竞速）均纳入守卫 —— 任一阶段挂起到点后独立驱动拒绝
+ * 读取阶段（res.text() 竞速）均纳入同一 15s 总预算（共享计时器，headers
+ * 耗时扣减 text() 预算）—— 任一阶段挂起到点后独立驱动拒绝
  * （不依赖 fetch 是否响应 signal），同时 abort 通知真实 fetch 断开；第二
  * race 的 await 是语义载重：finally 须等 text() 结算后才清计时器，否则
  * 读取阶段挂起时守卫与 abort 均失效。
