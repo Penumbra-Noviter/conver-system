@@ -22,7 +22,10 @@
  *     3. 只写三个字段（key/endpoint/model），不读取游戏内任何其他数据；
  *     4. 目标元素必须是 input/select 且存在，否则该字段跳过并静默降级
  *        （不报错不中断）；
- *     5. claude key 值绝不进入游戏（凭证端点契约：protocol=claude/none 时
+ *     5. select 目标额外校验：凭证值必须在 options 选项集内（select.value
+ *        赋值只在选项集内生效），不匹配 → 跳过该字段不进 filled —— 避免
+ *        赋值静默无效却误报「已填入」（F1 修复）；
+ *     6. claude key 值绝不进入游戏（凭证端点契约：protocol=claude/none 时
  *        key 为空串 — 本模块只转发端点返回值，不做任何跨协议兜底）。
  *   残余风险（文档化）：注入的 openai key 必然进入游戏自身 DOM 与脚本
  *   内存（这是功能本义 — key 供游戏调用其配置的 OpenAI 兼容端点）；同源
@@ -140,8 +143,11 @@ export function hasConfigTriplet(config) {
  *   的非空字符串，且凭证对应值（apikey←key；endpoint/model 同名）为非空
  *   字符串时才尝试写入；目标元素经 getElementById 查找（白名单 — 不做控件
  *   探测 / 自动发现），须存在且为 input/select，否则该字段跳过并静默降级
- *   （不报错不中断，其余字段继续）。写入后对元素派发 input 与 change 事件
- *   （各游戏监听不一，spec 决策 A：两事件都派发，不做 per-game 适配）。
+ *   （不报错不中断，其余字段继续）。select 元素额外校验：凭证值须在 options
+ *   选项集内（select.value 赋值只在选项集内生效），不匹配 → 该字段跳过不进
+ *   filled（避免赋值静默无效却误报「已填入」，游戏保持自身默认）。写入后对
+ *   元素派发 input 与 change 事件（各游戏监听不一，spec 决策 A：两事件都派发，
+ *   不做 per-game 适配）。
  *   endpoint/model 凭证值为空 → 跳过该字段（游戏保持自身默认）。
  *   本函数不读取游戏内任何其他数据；不写任何未声明 id。
  *
@@ -177,12 +183,38 @@ export function injectCredentialsIntoGame({ doc, config, credentials } = {}) {
             skipped.push(field); // 控件缺失 / 类型不符 → 静默降级
             continue;
         }
+        if (el.tagName === 'SELECT' && !hasSelectOption(el, value)) {
+            // select 赋值静默无效（F1 修复）：select.value 只接受 option 集内
+            // 值，凭证值不在选项集 → 写入无效但若进 filled 会误报「已填入」。
+            // 跳过该字段不进 filled（静默降级，游戏保持自身默认，不中断其余字段）。
+            skipped.push(field);
+            continue;
+        }
         el.value = value;
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         filled.push(field);
     }
     return { filled, skipped };
+}
+
+/**
+ * select 是否含匹配 value 的 option（HTMLSelectElement.value 只在选项集内生效 —
+ * 注入前校验，避免赋值静默无效后仍计入 filled 误报「已填入」）。
+ *
+ * 匹配语义与 select.value 赋值一致：option 的 value 属性缺失时取文本
+ * （option.value 由 DOM 规范回退文本，这里直接比对 option.value 即覆盖两种）。
+ * 无 option 的 select → 无匹配 → 跳过（调用方静默降级，不抛错）。
+ *
+ * @param {HTMLSelectElement} selectEl - 目标 select 元素（已确认 tagName=SELECT）
+ * @param {string} value - 拟写入的凭证值（非空字符串）
+ * @returns {boolean} 选项集中存在匹配值为 true
+ */
+function hasSelectOption(selectEl, value) {
+    for (const opt of selectEl.options) {
+        if (opt.value === value) return true;
+    }
+    return false;
 }
 
 // ══════════════════════════════════════════════════

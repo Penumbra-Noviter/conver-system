@@ -41,6 +41,12 @@
  *     停止后 netstat -ano 复核目标端口无 LISTENING（先于启动的空闲预检，
  *     端口判据安全）。
  *   - localStorage 探针：写入游戏前缀下的探针键，验证后删除（不留痕）。
+ *   - settings 预置/恢复（U8-T2 注入段）：预置 smoke key 后**不**在预置步骤内
+ *     恢复 —— 恢复统一在全部步骤结束后执行（main 尾部）。原因：get_all 只回读
+ *     DB 已存在的键、set_many 只增改不删，步骤内恢复会让 DB 残留 smoke key
+ *     污染后续运行；恢复过早则点击步骤拿到回退链（.env/残留）旧 key，注入
+ *     保存路径断言必挂。恢复时对快照缺失/冒烟残留键显式置空（空串与无键对
+ *     解析链行为等价），用户真实配置保留。
  *
  * 桌面壳复核：本脚本覆盖网页版链路；桌面壳（tauri dev + WebView2 CDP）
  * 为一次性复核流程（见工单 U7-T5），不固化进本脚本。
@@ -399,7 +405,7 @@ async function runStep(name, fn) {
 // 冒烟步骤（真实用户路径，T4 选择器清单）
 // ══════════════════════════════════════════════════
 
-async function smokeSteps(page, manifest) {
+async function smokeSteps(page, manifest, baseUrl) {
     const total = manifest.simulators.length;
     const aiGames = manifest.simulators.filter((g) => g.type === 'ai');
     const localGames = manifest.simulators.filter((g) => g.type === 'local');
@@ -475,48 +481,32 @@ async function smokeSteps(page, manifest) {
 
     // 4.5 注入（U8-T2）：预置 openai 凭证 → 点击「使用主应用 Key」→ 游戏配置
     // 面板已填值 → 游戏自身保存路径接受注入值（可发起对话）。预置步骤负责
-    // 恢复原设置（finally — 无论预置/断言成败）；断言步骤只读凭证端点。
-    // 注：步骤 4 结束时游戏视图仍打开，本段复用其 iframe 上下文。
+    // 写入 smoke key 并复核凭证端点；恢复原设置延迟到全部步骤结束后（main
+    // 尾部）执行 —— 若在预置步骤末尾即恢复，点击步骤会拿到回退链（.env /
+    // 残留）的旧 key，注入保存路径断言必挂；且 get_all 只回读 DB 已存在的
+    // 键、set_many 只增改不删，过早恢复还会让 DB 残留 smoke key 污染后续运行。
     const smokeApiKey = `sk-smoke-u8t2-${Date.now()}`;
+    let preloadedSettings = null;
     await runStep('注入：预置 openai 凭证（settings 写入 + 凭证端点复核）', async () => {
-        let settingsBefore = null;
-        let firstError = null;
-        try {
-            const getRes = await fetch(`${baseUrl}/api/settings`, { signal: AbortSignal.timeout(PROBE_MS) });
-            if (!getRes.ok) throw new Error(`读取现有设置失败 HTTP ${getRes.status}`);
-            settingsBefore = await getRes.json();
-            const put = await fetch(`${baseUrl}/api/settings`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...settingsBefore,
-                    openai_api_key: smokeApiKey,
-                    default_provider: 'openai',
-                    default_model: 'smoke-test-model',
-                }),
-            });
-            if (!put.ok) throw new Error(`预置 openai_api_key 失败 HTTP ${put.status}`);
-            const creds = await (await fetch(`${baseUrl}/api/settings/credentials`, { signal: AbortSignal.timeout(PROBE_MS) })).json();
-            if (creds.protocol !== 'openai' || !creds.key) {
-                throw new Error(`凭证端点未返回 openai 凭证（protocol=${creds.protocol}）—— 预置未生效`);
-            }
-            return `openai_api_key 已预置（${smokeApiKey.slice(0, 12)}…），凭证端点 protocol=openai`;
-        } catch (err) {
-            firstError = err;
-            throw err;
-        } finally {
-            // 恢复原设置（预置前快照；失败时保留原始错误并附加恢复失败原因）
-            if (settingsBefore !== null) {
-                const put = await fetch(`${baseUrl}/api/settings`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(settingsBefore),
-                });
-                if (!put.ok) {
-                    throw new Error(`${firstError ? `${firstError.message}；且` : ''}恢复原设置失败 HTTP ${put.status}`);
-                }
-            }
+        const getRes = await fetch(`${baseUrl}/api/settings`, { signal: AbortSignal.timeout(PROBE_MS) });
+        if (!getRes.ok) throw new Error(`读取现有设置失败 HTTP ${getRes.status}`);
+        preloadedSettings = await getRes.json();
+        const put = await fetch(`${baseUrl}/api/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ...preloadedSettings,
+                openai_api_key: smokeApiKey,
+                default_provider: 'openai',
+                default_model: 'smoke-test-model',
+            }),
+        });
+        if (!put.ok) throw new Error(`预置 openai_api_key 失败 HTTP ${put.status}`);
+        const creds = await (await fetch(`${baseUrl}/api/settings/credentials`, { signal: AbortSignal.timeout(PROBE_MS) })).json();
+        if (creds.protocol !== 'openai' || !creds.key) {
+            throw new Error(`凭证端点未返回 openai 凭证（protocol=${creds.protocol}）—— 预置未生效`);
         }
+        return `openai_api_key 已预置（${smokeApiKey.slice(0, 12)}…），凭证端点 protocol=openai`;
     });
 
     await runStep('注入：点击「使用主应用 Key」→ 配置面板已填值', async () => {
@@ -551,11 +541,32 @@ async function smokeSteps(page, manifest) {
             details.push('endpoint 为空 → 保持游戏默认');
         }
         if (creds.model) {
-            const mVal = await frame.locator(`#${cfg.model}`).inputValue();
-            if (mVal !== creds.model) {
-                throw new Error(`注入后 #${cfg.model} 值「${mVal}」≠ 凭证 model「${creds.model}」`);
+            const modelLoc = frame.locator(`#${cfg.model}`);
+            const mVal = await modelLoc.inputValue();
+            // model 控件为 select 时（life-sim：#cfg-model 仅 deepseek-chat /
+            // deepseek-reasoner）：凭证 model 不在选项集 → select.value 赋值静默
+            // 无效，注入按纪律跳过该字段（F1 修复：不进 filled 不误报），断言
+            // 保持游戏默认；值在选项集内才断言已填
+            const tag = await modelLoc.evaluate((el) => el.tagName);
+            if (tag === 'SELECT') {
+                const opts = await modelLoc.locator('option').evaluateAll((els) => els.map((o) => o.value));
+                if (!opts.includes(creds.model)) {
+                    if (mVal === creds.model) {
+                        throw new Error(`注入后 #${cfg.model} 出现选项集外值「${mVal}」（select 无匹配选项应静默跳过）`);
+                    }
+                    details.push(`model 为 select 且凭证 model「${creds.model}」不在选项集 → 静默跳过，保持游戏默认「${mVal}」`);
+                } else {
+                    if (mVal !== creds.model) {
+                        throw new Error(`注入后 #${cfg.model} 值「${mVal}」≠ 凭证 model「${creds.model}」`);
+                    }
+                    details.push(`model 已填（${creds.model}）`);
+                }
+            } else {
+                if (mVal !== creds.model) {
+                    throw new Error(`注入后 #${cfg.model} 值「${mVal}」≠ 凭证 model「${creds.model}」`);
+                }
+                details.push(`model 已填（${creds.model}）`);
             }
-            details.push(`model 已填（${creds.model}）`);
         } else {
             details.push('model 为空 → 保持游戏默认');
         }
@@ -617,7 +628,26 @@ async function smokeSteps(page, manifest) {
             throw new Error(`重进后探针键丢失：期望「${probeValue}」，实际「${after}」（同源 localStorage 未保留）`);
         }
         await frame2.evaluate((k) => localStorage.removeItem(k), probeKey);
-        return `探针键 ${probeKey} 重进后仍存在（同源 localStorage 保留），已清理探针`;
+
+        // 返回列表（F2 修复）：步骤 5 若以重进后的运行面板状态结束，后续步骤
+        // 会被卡住 —— 全 AI 时步骤 6 SKIP 不经过返回，步骤 7 在隐藏的列表
+        // 面板内点击 .sim-save-manage-btn 触发 actionability 超时。故重进验证
+        // 后显式返回列表（运行面板隐藏、列表卡片可见）再结束本步骤。
+        const back2 = page.locator('.sim-run-back');
+        await waitVisible(back2, WAIT_MS, '重进后返回按钮');
+        await back2.click();
+        await waitForCondition(
+            () => page.evaluate(() => {
+                const run = document.querySelector('#simulator-run-panel');
+                const list = document.querySelector('#simulator-list-panel');
+                return run?.hasAttribute('hidden') === true
+                    && list?.hasAttribute('hidden') === false;
+            }),
+            WAIT_MS,
+            '重进后返回：运行面板未隐藏 / 列表面板未恢复',
+        );
+        await waitForCount(page.locator('.sim-card'), total, WAIT_MS, '返回列表后列表卡片');
+        return `探针键 ${probeKey} 重进后仍存在（同源 localStorage 保留），已清理探针；返回列表`;
     });
 
     // 6. 纯本地游戏：无提示条（manifest 驱动；全 AI 时 SKIP 并报偏离说明）
@@ -665,6 +695,15 @@ async function smokeSteps(page, manifest) {
         if (seeded !== null) {
             throw new Error(`探针键 ${saveKey} 在全新浏览器上下文（无痕）中应不存在，实际值「${seeded}」`);
         }
+
+        // 前置（F2 修复）：存档面板入口按钮（.sim-save-manage-btn）位于列表
+        // 面板内 —— 步骤 5 末已返回列表，此处断言列表可见，防御未来步骤
+        // 顺序变化再次踩 hidden 元素 actionability 超时
+        await waitForCondition(
+            () => page.evaluate(() => document.querySelector('#simulator-list-panel')?.hasAttribute('hidden') === false),
+            WAIT_MS,
+            '存档面板步骤前置：列表面板不可见（步骤顺序被破坏？）',
+        );
 
         // 打开存档面板：列表隐藏、存档面板可见、游戏行含键数
         await page.locator('.sim-save-manage-btn').click();
@@ -722,7 +761,7 @@ async function smokeSteps(page, manifest) {
         ]);
         await chooser.setFiles(dlPath);
         await waitForCondition(
-            () => page.evaluate((k) => localStorage.getItem(k) === saveValue, saveKey),
+            () => page.evaluate(([k, expected]) => localStorage.getItem(k) === expected, [saveKey, saveValue]),
             WAIT_MS,
             '导入后存档键未恢复（localStorage 值不符）',
         );
@@ -743,11 +782,54 @@ async function smokeSteps(page, manifest) {
         );
         return `导出 JSON（${exported.game_id}，${Object.keys(exported.keys).length} 键）→ 删除清档 → 导入恢复，localStorage 键值断言通过，探针已清理`;
     });
+
+    return { preloadedSettings };
 }
 
 // ══════════════════════════════════════════════════
 // 主流程
 // ══════════════════════════════════════════════════
+
+/** 冒烟预置 key 前缀（恢复时识别前轮残留，避免污染持续） */
+const SMOKE_KEY_PREFIX = 'sk-smoke-u8t2-';
+
+/**
+ * 恢复预置步骤写入的设置（全部冒烟步骤结束后、后端停止前调用）。
+ *
+ * 预置新增键（openai_api_key / default_provider / default_model）在快照中
+ * 缺失时显式置空：settings API 只增改不删（set_many 无删除语义），而空串与
+ * 「无键」对解析链行为等价（get_value 空值回退默认 / .env）—— 不置空会让
+ * DB 残留 smoke key，污染后续运行（凭证端点回传上一轮 key，注入保存路径
+ * 断言必挂）。快照中若含冒烟残留（sk-smoke-u8t2- 前缀 key / smoke-test-model
+ * 默认模型 —— 前轮预置未清干净的历史污染），同样置空；用户真实配置保留。
+ * @param {string} baseUrl - 后端地址
+ * @param {object} snapshot - 预置前 get_all 快照（smokeSteps 返回）
+ * @returns {Promise<boolean>} 恢复成功为 true；失败已记录 [FAIL] 清理步骤
+ */
+async function restorePreloadedSettings(baseUrl, snapshot) {
+    try {
+        const body = { ...snapshot };
+        const polluted = (typeof body.openai_api_key === 'string' && body.openai_api_key.startsWith(SMOKE_KEY_PREFIX))
+            || body.default_model === 'smoke-test-model';
+        for (const key of ['openai_api_key', 'default_provider', 'default_model']) {
+            if (!(key in snapshot) || polluted) body[key] = '';
+        }
+        const put = await fetch(`${baseUrl}/api/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!put.ok) {
+            record('清理：恢复预置设置', 'FAIL', `恢复失败 HTTP ${put.status}`);
+            return false;
+        }
+        record('清理：恢复预置设置', 'PASS', `settings 已恢复（${polluted ? '含前轮残留已清除，' : ''}后端将停止）`);
+        return true;
+    } catch (err) {
+        record('清理：恢复预置设置', 'FAIL', err instanceof Error ? err.message : String(err));
+        return false;
+    }
+}
 
 async function main() {
     const args = parseArgs(process.argv.slice(2));
@@ -797,11 +879,16 @@ async function main() {
                 if (m.type() === 'error') pageErrors.push(`console.error: ${m.text()}`);
             });
             await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            await smokeSteps(page, manifest);
+            const stepOut = await smokeSteps(page, manifest, baseUrl);
             if (pageErrors.length > 0) {
                 logEnv(`页面报错 ${pageErrors.length} 条（仅记录，不判失败）：\n${pageErrors.slice(0, 10).join('\n')}`);
             }
             await context.close();
+            // 恢复预置设置（后端仍在线）：预置快照缺失（预置步骤未执行）→ 跳过
+            if (stepOut?.preloadedSettings) {
+                const ok = await restorePreloadedSettings(baseUrl, stepOut.preloadedSettings);
+                if (!ok) process.exitCode = 1;
+            }
         } finally {
             await browser.close();
         }
