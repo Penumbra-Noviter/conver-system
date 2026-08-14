@@ -39,7 +39,13 @@
  *   运行期高频 DOM 更新不触发）；防抖 500ms 合并连续重建；注入后 1s 冷却
  *   （写回环守卫：宿主写入派发的 change 若被游戏同步重建面板，冷却窗口内
  *   不重复同步 — key-injector 幂等写入已收敛常规场景，冷却为假设性循环的
- *   兜底）。观察者随 iframe 卸载 disconnect（destroyFrame），无跨游戏残留。
+ *   兜底）。冷却判定在防抖到期时执行（注入续体更新冷却时间戳晚于 option
+ *   追加等自写 mutation 回调，mutation 时判定会失真 — TD-76 实测钉死）。
+ *   写回环熔断（TD-76）：观察者路径触发的再同步实际写入字段（filled > 0）
+ *   连续达 SYNC_MAX_STRIKES 次 → 熔断 disconnect（停止自动再同步；手动
+ *   「重新同步」按钮路径不受影响）；load 路径自动同步不计数；destroyFrame
+ *   （关闭 / 重开游戏）复位计数 — 重开游戏观察者重新挂载、自动同步恢复。
+ *   观察者随 iframe 卸载 disconnect（destroyFrame），无跨游戏残留。
  *
  * 错误检测基线（spec Implementation Decisions）：同源 404 仍触发 load 事件，
  *   错误态主要依赖超时守卫（15s 未收到 load）+ 打开参数校验；iframe 元素
@@ -72,6 +78,12 @@ const OBSERVER_DEBOUNCE_MS = 500;
  * 面板，冷却窗口内不重复同步 — 幂等写入已收敛常规场景，此为兜底） */
 const SYNC_COOLDOWN_MS = 1000;
 
+/** 观察者路径写回环熔断阈值（TD-76）：连续 SYNC_MAX_STRIKES 次观察者再同步
+ * 实际写入字段（filled > 0 — 每次同步后游戏又重建面板恢复默认值 = 游戏在
+ * 重置主应用配置的病理循环）→ 熔断断开观察者，终止自动再同步；正常场景
+ * （单次重建后收敛）再同步至多写入 1 次，恒低于阈值不误熔断 */
+const SYNC_MAX_STRIKES = 3;
+
 // ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
 // ══════════════════════════════════════════════════
@@ -103,6 +115,10 @@ let observerTimer = null;
 /** 注入写回环冷却截止时间戳（Date.now()；未冷却为 0） */
 let syncCooldownUntil = 0;
 
+/** 观察者路径写回环熔断计数（TD-76：连续写入次数；达到 SYNC_MAX_STRIKES
+ * 熔断断开观察者；destroyFrame 复位 — 重开游戏观察者重新挂载） */
+let syncStrikes = 0;
+
 // ══════════════════════════════════════════════════
 // 内部工具
 // ══════════════════════════════════════════════════
@@ -120,6 +136,7 @@ function destroyFrame() {
     clearTimer();
     disconnectObserver();
     syncCooldownUntil = 0; // 冷却属当前视图生命周期 — 跨游戏不残留（防新游戏观察者被旧冷却误伤）
+    syncStrikes = 0; // 熔断计数复位 — 重开游戏观察者重新挂载、自动同步恢复（TD-76）
     if (frame) {
         frame.remove();
         frame = null;
@@ -183,19 +200,21 @@ function mutationTouchesConfig(mutations, config) {
 }
 
 /**
- * 观察者回调：变更触及配置控件 → 防抖 500ms → 自动同步（冷却窗口内的
- * 变更跳过 — 写回环守卫；防抖到期时校验视图仍 loaded 且 iframe 在位）。
+ * 观察者回调：变更触及配置控件 → 防抖 500ms → 自动同步。写回环冷却判定在
+ * 防抖到期时执行（TD-76 实测：注入续体更新冷却时间戳晚于自写 mutation
+ * （select option 追加等）的观察者回调 — mutation 时判定读到旧时间戳会
+ * 失真，产生幽灵再同步并误刷新冷却，压制后续真实重建的响应）。
  * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
  */
 function handleConfigMutation(mutations) {
     if (state !== 'loaded' || !frame) return;
     if (!mutationTouchesConfig(mutations, currentGame?.config)) return;
-    if (Date.now() < syncCooldownUntil) return; // 自注入冷却（写回环守卫）
     if (observerTimer) clearTimeout(observerTimer);
     observerTimer = setTimeout(() => {
         observerTimer = null;
         if (state !== 'loaded' || !frame) return;
-        autoSyncAfterLoad();
+        if (Date.now() < syncCooldownUntil) return; // 自注入冷却（写回环守卫 — 防抖到期时判定）
+        autoSyncAfterLoad(true); // 观察者路径 — 写入计熔断 strike（TD-76）
     }, OBSERVER_DEBOUNCE_MS);
 }
 
@@ -226,9 +245,16 @@ function observeConfigControls() {
  * 禁用按钮条 + 原因文案）。同步实际写入过字段 → 置观察者写回环冷却（宿主
  * 写入派发的 change 若被游戏同步重建面板，冷却窗口内不重复同步）；未写入
  * （控件未就位 — 游戏延迟渲染配置面板的主场景）→ 不冷却，观察者及时再同步。
+ * 写回环熔断（TD-76）：countStrike=true（观察者防抖路径）且本次实际写入
+ * 字段 → 熔断计数 +1，连续达 SYNC_MAX_STRIKES 次 → disconnectObserver
+ * 熔断（停止自动再同步；手动「重新同步」按钮路径不经本函数不受影响）。
+ * load 路径（handleLoad 直调，countStrike 默认 false）不计数 — 正常场景
+ * 每次 load 的自动同步恒定可用。
  * 仅 ai + 完整三元组执行；bar 缺失 / 视图已关闭 → no-op 不抛错。
+ * @param {boolean} [countStrike] - true 为观察者路径（写入计熔断 strike）；
+ *   false（默认）为 load 路径（不计数）
  */
-async function autoSyncAfterLoad() {
+async function autoSyncAfterLoad(countStrike = false) {
     if (state !== 'loaded' || !frame) return;
     const game = currentGame;
     if (!game || game.type !== 'ai' || !hasConfigTriplet(game.config)) return;
@@ -242,6 +268,10 @@ async function autoSyncAfterLoad() {
     });
     if (result?.enabled && result.filled.length > 0) {
         syncCooldownUntil = Date.now() + SYNC_COOLDOWN_MS;
+        if (countStrike) {
+            syncStrikes += 1;
+            if (syncStrikes >= SYNC_MAX_STRIKES) disconnectObserver(); // 熔断：终止自动再同步
+        }
     }
 }
 

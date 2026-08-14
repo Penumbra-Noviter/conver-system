@@ -807,4 +807,114 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
 
         expect(fetchMock).toHaveBeenCalledTimes(1); // 无关属性变更不触发再同步
     });
+
+    /** 游戏重建配置面板（innerHTML 替换 — 控件恢复默认值；病理循环重置动作） */
+    function rebuildPanel(doc) {
+        doc.body.innerHTML = `
+            <input id="cfg-endpoint" value="game-default-endpoint">
+            <input id="cfg-apikey">
+            <select id="cfg-model"><option value="game-default-model">game-default-model</option></select>
+        `;
+    }
+
+    it('TD-76:病理循环（每次同步后重建+恢复默认，重建都在冷却窗外）→ 第 3 次观察者同步后熔断，后续重建不再 fetch', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // load 自动同步（非观察者路径 — 不计数）
+
+        // 显式 3 轮钉住熔断层：每轮越过冷却 → 重建（恢复默认值）→ 防抖 → 同步写入 → strike+1
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000); // 越过写回环冷却（重建落在冷却窗外）
+            rebuildPanel(doc);
+            await vi.advanceTimersByTimeAsync(500); // 观察者防抖
+            await vi.advanceTimersByTimeAsync(0); // 再同步微任务
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(4); // load 1 + 观察者同步 3（第 3 次后熔断）
+
+        // 熔断后：游戏继续重建 → 不再触发再同步（fetch 数封顶）
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetchMock).toHaveBeenCalledTimes(4); // 熔断后重建不再 fetch
+    });
+
+    it('TD-76:正常场景（单次重建同步后不再重建）→ 不熔断，后续再次重建仍能再同步', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // 单次重建 → 再同步写入（strike=1）→ 游戏不再重建（正常收敛）
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+
+        // 稍后游戏再次重建（strike=2 < 3）→ 仍能再同步，未熔断
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(3); // 未熔断 — 观察者仍响应
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+    });
+
+    it('TD-76:熔断后点击「重新同步」按钮仍可注入（手动路径与观察者熔断无关）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+
+        // 病理循环 3 轮 → 观察者熔断（fetch = load 1 + 观察者 3）
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            rebuildPanel(doc);
+            await vi.advanceTimersByTimeAsync(500);
+            await vi.advanceTimersByTimeAsync(0);
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+
+        // 熔断后手动「重新同步」仍可注入（按钮路径不经过观察者）
+        keyBtn().click();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(5); // 手动路径可用
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai'); // 值恢复
+    });
+
+    it('TD-76:熔断后 closeSimulator → 重开游戏（新 load）→ 观察者重新挂载、自动同步恢复', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { fetchMock, doc } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+
+        // 病理循环 3 轮 → 观察者熔断
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            rebuildPanel(doc);
+            await vi.advanceTimersByTimeAsync(500);
+            await vi.advanceTimersByTimeAsync(0);
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+
+        // 关闭并重开游戏（新 iframe + 新文档）→ 熔断计数复位、观察者重新挂载；
+        // openWithInject 重新 initKeyInjector（新凭证 mock 独立计数 — 旧 mock
+        // 停在熔断时的 4 次）
+        view.closeSimulator();
+        const { fetchMock: fetchMockNew, frame } = await openWithInject(view, GAME_AI_CONFIG, CRED_OPENAI, seedGamePanel);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMockNew).toHaveBeenCalledTimes(1); // 新 load 自动同步
+
+        // 新游戏重建面板 → 观察者恢复工作（自动再同步）
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(frame.contentDocument);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMockNew).toHaveBeenCalledTimes(2); // 观察者重新挂载后恢复再同步
+        expect(frame.contentDocument.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+    });
 });
