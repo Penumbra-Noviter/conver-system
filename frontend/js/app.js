@@ -44,7 +44,7 @@ import { initTabBar } from './components/tab-bar.js';
 import { showToast, downloadBlob, autoResizeInput } from './utils.js';
 import { characterCardHtml, conversationItemHtml } from './format.js';
 import { state } from './state.js';
-import { chatDom, handleSend, refreshSendButton, setConversationsRefresher, setConversationListTitleSyncer } from './chat.js';
+import { chatDom, handleSend, refreshSendButton, setChatHooks } from './chat.js';
 import { getActiveTab, getTabs, abortStream, restoreFromStorage } from './tabs.js';
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 import { initSearchView } from './search-view.js';
@@ -462,14 +462,6 @@ async function init() {
     await loadModels();
     await loadSettings();
 
-    // ARC-6：激活编排模块的 DOM 渲染回调注入（renderConversations/视图切换/错误提示；
-    // 头部渲染 F4 已收口 chat.js — conversation-activation 直 import，不再经 hooks）
-    setActivationHooks({
-        renderConversations,
-        switchView: (viewName) => switchView(viewName),
-        showError,
-    });
-
     // P6.5-4 恢复时序契约：conversations 加载完成后才 restore；
     // isValidId 以已加载列表判定（过滤已删会话）；恢复的 tab 一律非流式，
     // 消息在激活时懒加载（走统一激活流程）
@@ -497,18 +489,32 @@ async function init() {
     });
 }
 
-// 注入对话列表刷新钩子 — chat.js 在发送/停止后刷新对话列表（避免反向 import）
-setConversationsRefresher(loadConversations);
+// ══════════════════════════════════════════════════
+// 模块级注入区（G7 注入钩子模式 — 全部注入同处同相；renderConversations /
+//   switchView / showError / loadConversations 均为函数声明，可 hoisting 直接引用）
+// ══════════════════════════════════════════════════
 
-// 注入重命名后的对话列表标题同步（F4 — 头部模块经钩子更新列表项标题，避免反向依赖；
-// 只做 DOM 手术，不重渲染列表 — 与收口前行为一致）
-setConversationListTitleSyncer((convId, newTitle) => {
-    dom.conversationList.querySelectorAll('.conversation-item').forEach((item) => {
-        if (parseInt(item.dataset.id) === convId) {
-            const titleDiv = item.querySelector('.title');
-            if (titleDiv) titleDiv.textContent = newTitle;
-        }
-    });
+// 激活编排模块注入（ARC-6 — DOM 渲染回调 renderConversations/视图切换/错误提示；
+// 头部渲染 F4 已收口 chat.js — conversation-activation 直 import，不再经 hooks）
+setActivationHooks({
+    renderConversations,
+    switchView: (viewName) => switchView(viewName),
+    showError,
+});
+
+// 聊天域注入钩子（setChatHooks — 发送/停止后刷新对话列表（refreshConversations）
+// + 重命名成功后列表标题同步 DOM 手术（syncConversationListTitle）；避免反向
+// import；标题同步只更新匹配会话项 .title 文本，不重渲染列表 — 与收口前行为一致）
+setChatHooks({
+    refreshConversations: loadConversations,
+    syncConversationListTitle: (convId, newTitle) => {
+        dom.conversationList.querySelectorAll('.conversation-item').forEach((item) => {
+            if (parseInt(item.dataset.id) === convId) {
+                const titleDiv = item.querySelector('.title');
+                if (titleDiv) titleDiv.textContent = newTitle;
+            }
+        });
+    },
 });
 
 // 级联收口依赖注入（ARC-9 C1 — 删角色级联 / 删对话 / 清空全部 / tab-bar 关最后

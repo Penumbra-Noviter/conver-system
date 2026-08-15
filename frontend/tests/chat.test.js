@@ -66,6 +66,32 @@ function makeApiMock({ chatResult = null, messagesByConv = {} } = {}) {
 
 const msg = (id, role, content) => ({ id, role, content });
 
+/**
+ * 渲染聊天头部（已知会话）+ 注入列表标题同步钩子 + PUT 路由 mock
+ * 供「聊天头部深模块」与「setChatHooks 方言契约」两组用例共用
+ */
+async function setupHeader({ title = '旧标题', putFail = false } = {}) {
+    const env = await loadModules();
+    env.state.conversations = [{ id: 11, title, character_id: 1, model_name: 'm', model_provider: 'claude' }];
+    env.state.models = { providers: [{ key: 'claude', name: 'Claude (Anthropic)', models: [] }] };
+    env.tabs.openTab(11);
+    env.tabs.updateTab(11, { title });
+    const fetchSpy = makeApiMock({});
+    fetchSpy.mockImplementation((url, options = {}) => {
+        if (String(url).endsWith('/api/conversations/11') && options?.method === 'PUT') {
+            return putFail
+                ? mockJson({ detail: 'boom' }, 500)
+                : mockJson({ id: 11, title: '新标题', character_id: 1 });
+        }
+        return makeApiMock({})(url, options);
+    });
+    env.api.setFetch(fetchSpy);
+    env.chat.renderChatHeader(11);
+    const listSync = vi.fn();
+    env.chat.setChatHooks({ syncConversationListTitle: listSync });
+    return { ...env, listSync };
+}
+
 describe('handleSend — 非流式（settleTurn 委托链）', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
     afterEach(() => { vi.restoreAllMocks(); });
@@ -77,7 +103,7 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
         api.setFetch(makeApiMock({ chatResult: { reply: '好的' } }));
         const settleSpy = vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
         const refresh = vi.fn();
-        chat.setConversationsRefresher(refresh);
+        chat.setChatHooks({ refreshConversations: refresh });
 
         chat.chatDom.chatInput.value = '你好';
         await chat.handleSend();
@@ -104,7 +130,7 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
         state.conversations = [{ id: 11, title: '与 角色A 的对话' }];
         api.setFetch(makeApiMock({ chatResult: { reply: '好的' } }));
         vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
-        chat.setConversationsRefresher(() => {});
+        chat.setChatHooks({ refreshConversations: () => {} });
 
         chat.chatDom.chatInput.value = '你好';
         await chat.handleSend();
@@ -153,7 +179,7 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
         api.setFetch(fetchSpy);
         const settleSpy = vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
         const refresh = vi.fn();
-        chat.setConversationsRefresher(refresh);
+        chat.setChatHooks({ refreshConversations: refresh });
 
         chat.chatDom.chatInput.value = '你好';
         await chat.handleSend();
@@ -181,7 +207,7 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
             chatResult: { reply: '好的' },
             messagesByConv: { 11: [msg(1, 'user', '你好'), msg(2, 'assistant', '好的')] },
         }));
-        chat.setConversationsRefresher(() => {});
+        chat.setChatHooks({ refreshConversations: () => {} });
 
         chat.chatDom.chatInput.value = '你好';
         await chat.handleSend();
@@ -205,7 +231,7 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
         chat.chatDom.toggleStream.checked = false;
         api.setFetch(makeApiMock({ chatResult: { reply: '好的' } }));
         vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
-        chat.setConversationsRefresher(() => {});
+        chat.setChatHooks({ refreshConversations: () => {} });
 
         chat.chatDom.chatInput.value = '他说 "你好" 和 "再见"';
         await chat.handleSend();
@@ -233,7 +259,7 @@ describe('handleSend — 流式（createStreamSession 委托链）', () => {
             messagesByConv: { 11: [msg(1, 'user', '你好'), msg(2, 'assistant', '好的')] },
         }));
         const refresh = vi.fn();
-        env.chat.setConversationsRefresher(refresh);
+        env.chat.setChatHooks({ refreshConversations: refresh });
         return { ...env, refresh, getCaptured: () => captured };
     }
 
@@ -399,7 +425,7 @@ describe('handleSend — Falsify（no-op 路径）', () => {
         const fetchSpy = makeApiMock({});
         api.setFetch(fetchSpy);
         const refresh = vi.fn();
-        chat.setConversationsRefresher(refresh);
+        chat.setChatHooks({ refreshConversations: refresh });
 
         chat.chatDom.chatInput.value = '你好';
         await chat.handleSend();
@@ -413,7 +439,7 @@ describe('handleSend — Falsify（no-op 路径）', () => {
         tabs.openTab(11);
         const fetchSpy = makeApiMock({});
         api.setFetch(fetchSpy);
-        chat.setConversationsRefresher(() => {});
+        chat.setChatHooks({ refreshConversations: () => {} });
 
         chat.chatDom.chatInput.value = '   ';
         await chat.handleSend();
@@ -427,12 +453,78 @@ describe('handleSend — Falsify（no-op 路径）', () => {
         tabs.updateTab(11, { isStreaming: true });
         const fetchSpy = makeApiMock({});
         api.setFetch(fetchSpy);
-        chat.setConversationsRefresher(() => {});
+        chat.setChatHooks({ refreshConversations: () => {} });
 
         chat.chatDom.chatInput.value = '你好';
         await chat.handleSend();
 
         expect(fetchSpy).not.toHaveBeenCalled();
+    });
+});
+
+describe('setChatHooks — options-object 方言契约（C3 统一注入面）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('按 key 合并：注入 refreshConversations 后已注入的 syncConversationListTitle 不被覆盖（重命名仍走钩子）', async () => {
+        const env = await setupHeader({});
+        env.chat.setChatHooks({ refreshConversations: () => {} }); // 只注入另一键 — 合并语义
+
+        env.chat.chatDom.chatHeader.querySelector('#chat-title-text')
+            .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        const input = env.chat.chatDom.chatHeader.querySelector('.chat-title-input');
+        input.value = '新标题';
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        // 既有 syncConversationListTitle 钩子仍在（收到 (id, newTitle)）
+        await vi.waitFor(() => expect(env.listSync).toHaveBeenCalledWith(11, '新标题'));
+    });
+
+    it('Falsify:键非函数不覆盖 → 既有函数钩子保留（重命名仍同步），非函数值不抛错', async () => {
+        const env = await setupHeader({});
+        env.chat.setChatHooks({ refreshConversations: 42, syncConversationListTitle: 'not-a-function' });
+
+        env.chat.chatDom.chatHeader.querySelector('#chat-title-text')
+            .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        const input = env.chat.chatDom.chatHeader.querySelector('.chat-title-input');
+        input.value = '新标题';
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        await vi.waitFor(() => expect(env.listSync).toHaveBeenCalledWith(11, '新标题'));
+    });
+
+    it('缺省默认 no-op 兜底：不注入 syncConversationListTitle → 重命名成功不抛错', async () => {
+        const env = await loadModules();
+        env.state.conversations = [{ id: 11, title: '旧标题', character_id: 1, model_name: 'm', model_provider: 'claude' }];
+        env.state.models = { providers: [{ key: 'claude', name: 'Claude (Anthropic)', models: [] }] };
+        env.tabs.openTab(11);
+        env.tabs.updateTab(11, { title: '旧标题' });
+        const fetchSpy = makeApiMock({});
+        fetchSpy.mockImplementation((url, options = {}) => {
+            if (String(url).endsWith('/api/conversations/11') && options?.method === 'PUT') {
+                return mockJson({ id: 11, title: '新标题', character_id: 1 });
+            }
+            return makeApiMock({})(url, options);
+        });
+        env.api.setFetch(fetchSpy);
+        env.chat.renderChatHeader(11);
+
+        env.chat.chatDom.chatHeader.querySelector('#chat-title-text')
+            .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        const input = env.chat.chatDom.chatHeader.querySelector('.chat-title-input');
+        input.value = '新标题';
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        // 未注入键走 no-op 兜底 — 保存链路正常完成
+        await vi.waitFor(() => expect(env.tabs.getTab(11).title).toBe('新标题'));
+        expect(env.chat.chatDom.chatHeader.querySelector('#chat-title-text').textContent).toBe('新标题');
+    });
+
+    it('Falsify:setChatHooks() 无参 / null / 非对象 → 不抛错，钩子保持缺省 no-op', async () => {
+        const { chat } = await loadModules();
+        expect(() => chat.setChatHooks()).not.toThrow();
+        expect(() => chat.setChatHooks(null)).not.toThrow();
+        expect(() => chat.setChatHooks('corrupt')).not.toThrow();
     });
 });
 
@@ -532,29 +624,6 @@ describe('renderMessages — 缓存变体标记还原（F1 工厂变体透传，
 describe('聊天头部深模块（F4 收口 — renderChatHeader / startRename / 标题同步，自 app.test.js 随迁）', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
     afterEach(() => { vi.restoreAllMocks(); });
-
-    /** 渲染头部（已知会话）+ 注入列表标题同步钩子 + PUT 路由 mock */
-    async function setupHeader({ title = '旧标题', putFail = false } = {}) {
-        const env = await loadModules();
-        env.state.conversations = [{ id: 11, title, character_id: 1, model_name: 'm', model_provider: 'claude' }];
-        env.state.models = { providers: [{ key: 'claude', name: 'Claude (Anthropic)', models: [] }] };
-        env.tabs.openTab(11);
-        env.tabs.updateTab(11, { title });
-        const fetchSpy = makeApiMock({});
-        fetchSpy.mockImplementation((url, options = {}) => {
-            if (String(url).endsWith('/api/conversations/11') && options?.method === 'PUT') {
-                return putFail
-                    ? mockJson({ detail: 'boom' }, 500)
-                    : mockJson({ id: 11, title: '新标题', character_id: 1 });
-            }
-            return makeApiMock({})(url, options);
-        });
-        env.api.setFetch(fetchSpy);
-        env.chat.renderChatHeader(11);
-        const listSync = vi.fn();
-        env.chat.setConversationListTitleSyncer(listSync);
-        return { ...env, listSync };
-    }
 
     it('renderChatHeader：标题 + 模型 badge + 列表切换/导出按钮（按 conversations 列表派生）', async () => {
         const { chat } = await setupHeader();
