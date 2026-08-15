@@ -25,5 +25,6 @@ __all__ = [
     "llm",
     "message",
     "model_data",
+    "provider_registry",
     "setting",
 ]
