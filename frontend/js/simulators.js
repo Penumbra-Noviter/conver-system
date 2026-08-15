@@ -53,7 +53,7 @@
 
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
-import { SAVE_KEY_META_RE } from './save-key-meta.js';
+import { saveKeyIsValidPattern } from './save-key-meta.js';
 import { doFetch } from './fetch-seam.js';
 
 // ══════════════════════════════════════════════════
@@ -136,12 +136,8 @@ function normalizeSaveKeys(value) {
         if (typeof item !== 'string') return undefined; // 元素类型非法 → 条目级降级
         if (item.includes('^') || item.includes('$')) return undefined; // 自锚定 → 条目级降级
         if (item === '') continue; // 空串 → 元素级剔除
-        if (SAVE_KEY_META_RE.test(item)) {
-            try {
-                new RegExp(`^${item}$`); // 锚定完整键名试编译（匹配语义：^…$）
-            } catch {
-                continue; // 不可编译 → 元素级剔除
-            }
+        if (!saveKeyIsValidPattern(item)) {
+            continue; // 不可编译 → 元素级剔除
         }
         keys.push(item);
     }

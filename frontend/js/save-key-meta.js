@@ -26,7 +26,8 @@
  *   不含正则元字符的字符串 = 精确键名（=== 匹配）；含正则元字符的字符串 =
  *   正则模式（锚定完整键名 ^…$ 匹配）。正则元字符集定义见 SAVE_KEY_META_RE。
  *
- * 协议表面（__all__）：SAVE_KEY_META_RE / escapeRegExp / WG_SESSION_ONLY_IDS。
+ * 协议表面（__all__）：SAVE_KEY_META_RE / escapeRegExp / WG_SESSION_ONLY_IDS /
+ *   saveKeyIsPattern / saveKeyIsValidPattern / saveKeyMatches。
  */
 
 // ══════════════════════════════════════════════════
@@ -55,6 +56,66 @@ export function escapeRegExp(str) {
 export const WG_SESSION_ONLY_IDS = new Set(['my-little-pony', 'high-school-sim']);
 
 // ══════════════════════════════════════════════════
+// 匹配语义函数（U9-T1 saveKeys 白名单匹配 — 三处消费方联合收口）
+// ══════════════════════════════════════════════════
+
+/**
+ * 判定 saveKeys 条目是否为正则模式（含正则元字符）。
+ *
+ * 不含正则元字符的字符串 = 精确键名（=== 匹配）；含正则元字符的字符串 =
+ * 正则模式（锚定完整键名 ^…$ 匹配）。
+ *
+ * @param {unknown} entry - saveKeys 白名单条目
+ * @returns {boolean} 非字符串/空串 → false；含正则元字符 → true；否则 false
+ */
+export function saveKeyIsPattern(entry) {
+    if (typeof entry !== 'string' || entry === '') return false;
+    return SAVE_KEY_META_RE.test(entry);
+}
+
+/**
+ * 验证 saveKeys 条目是否为合法的可编译模式。
+ *
+ * 精确键名（不含正则元字符）→ true（无需编译）；含正则元字符 + 可编译 →
+ * true；不可编译 → false。
+ *
+ * @param {unknown} entry - saveKeys 白名单条目
+ * @returns {boolean} 非字符串/空串 → false；精确键名 → true；可编译模式 → true；
+ *   不可编译模式 → false
+ */
+export function saveKeyIsValidPattern(entry) {
+    if (typeof entry !== 'string' || entry === '') return false;
+    if (!SAVE_KEY_META_RE.test(entry)) return true; // 精确键名，无需编译
+    try {
+        new RegExp(`^${entry}$`);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * saveKeys 白名单条目是否匹配给定键名（锚定完整键名匹配）。
+ *
+ * 精确键名 → === 匹配；正则模式 → ^…$ 锚定 RegExp 匹配。防御：非字符串
+ * entry / 空串 / 不可编译模式 / 非字符串 keyName → false。
+ *
+ * @param {unknown} entry - saveKeys 白名单条目（精确键名或正则模式字符串）
+ * @param {unknown} keyName - 待匹配的键名
+ * @returns {boolean} 命中 → true；不命中 / 非法输入 → false
+ */
+export function saveKeyMatches(entry, keyName) {
+    if (typeof entry !== 'string' || entry === '') return false;
+    if (typeof keyName !== 'string') return false;
+    if (!SAVE_KEY_META_RE.test(entry)) return entry === keyName;
+    try {
+        return new RegExp(`^${entry}$`).test(keyName);
+    } catch {
+        return false;
+    }
+}
+
+// ══════════════════════════════════════════════════
 // 协议表面收口（深模块：外部只通过这些符号与 save-key-meta.js 交互）
 // ══════════════════════════════════════════════════
 
@@ -62,4 +123,7 @@ export const __all__ = [
     'SAVE_KEY_META_RE',
     'escapeRegExp',
     'WG_SESSION_ONLY_IDS',
+    'saveKeyIsPattern',
+    'saveKeyIsValidPattern',
+    'saveKeyMatches',
 ];
