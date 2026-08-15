@@ -27,6 +27,18 @@
 
 > 技术债区当前 **0 项**（TD-75/76 已于 2026-08-14 kickoff 批次修复归档；TD-50 已复核关闭；TD-72/73/74 已于同日完成）。技术债区**清零**。
 
+> **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
+
+| 编号 | 遗留项 | 来源 | 强度 | 状态 |
+|------|--------|------|------|------|
+| C2 | frontend saveKeys 匹配语义双份（simulators.js normalizeSaveKeys / save-manager.js whitelistHits）→ 收成 save-key-meta 完整深模块 | 架构报告 | Strong | 📝 待立项 |
+| C3 | 前端注入钩子两种方言 + activation 时序迟到 → 统一为 options-object 方言，全部接线同相 | 架构报告 | Worth exploring | 📝 待立项 |
+| C4 | 角色/对话列表视图渲染内联在 app.js（160-403 行）→ 下沉为视图深模块，跟上 search-view 先例 | 架构报告 | Worth exploring | 📝 待立项 |
+| C5 | 后端角色字段知识 8 处重复（model/schema/card/parser/prompt/message）→ 收敛为单一映射深模块 | 架构报告 | Strong | 📝 待立项 |
+| C6 | 后端 LLM 派生链四份遍历（factory/setting ×2/models）→ 单一提供者清单 + 派生存取器 | 架构报告 | Strong | 📝 待立项 |
+| C7 | 后端对话导出序列化双轨（conversation_export.py 手写 dict vs schema from_attributes）→ 复用 schema，兑现「service 层零手写 dict」声明 | 架构报告 | Worth exploring | 📝 待立项 |
+| C8 | 模拟器 file 安全判据/路径前缀/超时常量/wg_ 消费方清单散落 → 收进 simulator-contracts 契约深模块 | 架构报告 | Speculative | 📝 待立项 |
+
 ---
 
 ## 已完成归档
