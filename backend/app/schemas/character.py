@@ -13,11 +13,11 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-# ── 请求体 ──
+# ── 基类（16 个 V2 内容字段 ── 单一来源）──
 
 
-class CharacterCreate(BaseModel):
-    """创建角色请求"""
+class CharacterBase(BaseModel):
+    """角色 V2 内容字段基类（16 字段，所有 Schema 从此派生，消除字段清单重复重声明）"""
     name: str = Field(..., min_length=1, max_length=100, description="角色名称")
     description: str = Field("", description="角色简短描述")
     personality: str = Field("", description="人格设定（核心 system prompt）")
@@ -36,7 +36,15 @@ class CharacterCreate(BaseModel):
     temperature: float = Field(0.7, ge=0.0, le=2.0, description="LLM 温度参数")
 
 
-class CharacterUpdate(BaseModel):
+# ── 请求体（继承基类，字段清单由 CharacterBase 唯一定义）──
+
+
+class CharacterCreate(CharacterBase):
+    """创建角色请求（继承 CharacterBase 16 字段）"""
+    pass
+
+
+class CharacterUpdate(CharacterBase):
     """更新角色请求（所有字段可选）"""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = None
@@ -56,28 +64,12 @@ class CharacterUpdate(BaseModel):
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
 
 
-# ── 响应体 ──
+# ── 响应体（继承基类 + 元数据字段）──
 
 
-class CharacterResponse(BaseModel):
-    """角色响应体"""
+class CharacterResponse(CharacterBase):
+    """角色响应体（继承 CharacterBase 16 字段 + 元数据）"""
     id: int
-    name: str
-    description: str
-    personality: str
-    scenario: str
-    first_mes: str
-    mes_example: str
-    system_prompt: str
-    post_history_instructions: str
-    alternate_greetings: list[str]
-    tags: list[str]
-    creator: str
-    version: str
-    creator_notes: dict
-    extensions: dict
-    avatar: Optional[str] = None
-    temperature: float
     conversation_count: int = 0
     created_at: datetime.datetime
     updated_at: datetime.datetime

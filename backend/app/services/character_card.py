@@ -15,6 +15,7 @@ import binascii
 
 from backend.app.models.character import Character
 from backend.app.schemas.character import CharacterCreate
+from backend.app.services.character_fields import CHARACTER_V2_FIELDS, V2_KEY_MAP, V1_TO_V2_MAP
 from backend.app.services.exceptions import CardFormatError, CardValidationError
 
 __all__ = ["to_v2_card", "from_v2_card"]
@@ -27,18 +28,6 @@ SPEC_VERSION = "2.0"
 _NS = "conver_system"
 
 # V1 旧卡字段 → V2/DB 字段映射
-_V1_TO_V2 = {
-    "char_name": "name",
-    "char_persona": "personality",
-    "char_greeting": "first_mes",
-    "example_dialogue": "mes_example",
-    "world_scenario": "scenario",
-    "creatorcomment": "creator_notes",
-    "char_version": "character_version",
-    "description": "description",  # 与 V2 同名，直通保留
-}
-
-
 def to_v2_card(char: Character) -> dict:
     """角色 ORM → V2 信封 dict（导出用）
 
@@ -124,7 +113,7 @@ def from_v2_card(card: dict) -> CharacterCreate:
     elif isinstance(card.get("data"), dict) and "name" in card["data"]:
         data = card["data"]
     elif "char_name" in card:
-        data = _normalize_v1(card)
+        data = _normalize_v1(card)  # V1_TO_V2_MAP imported from character_fields
     elif "name" in card:
         data = card
     else:
@@ -134,11 +123,12 @@ def from_v2_card(card: dict) -> CharacterCreate:
 
 
 def _normalize_v1(card: dict) -> dict:
-    """V1 旧卡字段名 → V2/DB 字段名"""
-    return {v2: card[v1] for v1, v2 in _V1_TO_V2.items() if card.get(v1) is not None}
+    """V1 旧卡字段名 → V2/DB 字段名（V1_TO_V2_MAP 来自 character_fields.py 单一来源）"""
+    return {v2: card[v1] for v1, v2 in V1_TO_V2_MAP.items() if card.get(v1) is not None}
 
 
 def _build_create(data: dict) -> CharacterCreate:
+    """归一化后的 data dict → CharacterCreate（字段清单由 CHARACTER_V2_FIELDS 定义，C5 单一映射深模块）"""
     """归一化后的 data dict → CharacterCreate（含类型容错与边界裁剪）"""
     name = str(data.get("name") or "").strip()[:100]
     if not name:

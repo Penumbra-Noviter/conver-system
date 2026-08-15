@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 
 from backend.app.schemas.character import DocParseResponse
+from backend.app.services.character_fields import PARSE_FIELDS
 from backend.app.services.exceptions import (
     ApiKeyMissingError,
     DocParseError,
@@ -28,11 +29,8 @@ from backend.app.services.llm.resolver import resolve_llm
 __all__ = ["parse_document"]
 
 # 提取字段白名单：LLM 可能返回额外字段，只取此集合内的
-_PARSED_FIELDS = frozenset({
-    "name", "description", "personality", "scenario",
-    "first_mes", "mes_example", "system_prompt",
-    "post_history_instructions", "tags", "creator",
-})
+# 从 backend/app/services/character_fields.py 单一来源（C5 架构评审）
+_PARSED_FIELDS = frozenset(PARSE_FIELDS)
 
 _PARSE_SYSTEM_PROMPT = """你是一个角色卡解析器。用户会提供一段关于角色的文字描述（可能是小说片段、设定文档、角色简介等），请从中提取以下字段并以 JSON 格式返回：
 
