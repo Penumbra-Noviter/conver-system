@@ -6,6 +6,20 @@
 
 ---
 
+## 滚动摘要（2026-08-15 — C2 saveKeys 匹配语义收口：kickoff 全自动档轻量档 1 工单）
+
+- **来源**：/improve-codebase-architecture 架构评审报告候选 C2（Strong），用户挑中 → kickoff 全自动档。病灶：saveKeys 白名单匹配语义（精确键名 === / 正则模式 ^…$ 锚定匹配）三处分散（simulators.js normalizeSaveKeys 模式编译验证 / save-manager.js whitelistHits 键名匹配 / simulator-manifest.test.js saveKeyHits 测试辅助）——匹配语义内部实现行重复，改匹配方式需改 3 文件。
+- **Grilling 共识（全自动档按推荐拍板）**：C2 做——`save-key-meta.js` 从常量契约之家扩为完整深模块，新增 `saveKeyIsPattern`（SAVE_KEY_META_RE 判定的具名导出）/ `saveKeyIsValidPattern`（模式编译验证，供 normalizeSaveKeys 条目级剔除）/ `saveKeyMatches`（白名单匹配单一来源），三消费方对标；规模判定：轻量档（1 工单，收敛型内部重构零新行为）。
+- **轻量档 1 工单（b60520d，独立 worktree + 分支 kickoff/c2-savekey-matching）**：save-key-meta 新增 3 导出 + `__all__` 3→6；normalizeSaveKeys 对标（SAVE_KEY_META_RE.test + new RegExp try/catch → saveKeyIsValidPattern）；whitelistHits 对标（inline 匹配 → saveKeyMatches）；saveKeyHits/isPattern 测试内联删除改用导入；+18 契约锁用例（三函数全 Falsify 边界）。merge 79d5799；期末非阻断修复随 CODE_WIKI 补录（§4.53 签名表 3 行 + doc_sync tests_total 1219→1277）
+- **范围核验**：6 文件 +213/-42 全部合规（5 声明范围内 + CODE_WIKI doc_sync 机械刷新记录警告）；0 回退 0 冲突
+- **期末四轴 code-review（固定点 8c6888d）：0 阻断放行**——Spec 9/9 验收全达标 + 行为等价零变化（784 全绿 vs 基线 766 +18）；Falsify 9 组对抗构造全过（非法输入全部优雅 false 不抛；`a$b` 字面 `$` 语义边界由 normalizeSaveKeys 自锚定拒绝兜底，非缺陷）；Architecture 全正面（协议表面 6 导出隐藏 ~60 行实现、三处重复归 Locality 单点、Leverage 高）；1 项非阻断（CODE_WIKI 签名表缺 3 导出）随补录修复
+- **运行态冒烟**：smoke-simulators 13 项 12 PASS / 0 FAIL / 1 SKIP 退出码 0（存档面板导出→清档→导入恢复 saveKeys 匹配核心路径 PASS）；端口已释放
+- **测试**：Vitest **784**（基线 766，+18）；pytest 434+1skip / cargo 58 未受影响
+- **知识库预检召回**：精读「聚合语义字段跨模块复用须核对语义」（前置 TD-75/76 教训——本批 saveKeyMatches 单源化消除跨模块语义漂移面）；本次无新教训蒸馏（收敛型重构，既有教训已覆盖）
+- **文档同步**：TICKETS（C2 批次归档 + 技术债区 C2 行移除）；CODE_WIKI（§4.53 签名补录 + tests_total 刷新）；CLAUDE 基线 766→784；DEV_LOG 本段
+
+---
+
 ## 滚动摘要（2026-08-15 — C1 写回环状态机收口：kickoff 全自动档串行链 4 工单）
 
 - **来源**：/improve-codebase-architecture 架构评审报告候选 C1（Worth exploring），用户挑中 → kickoff 全自动档。病灶：模拟器配置同步的写回环状态（冷却 `syncCooldownUntil`/熔断 `syncStrikes`）劈在 simulator-view.js，同步执行在 key-injector.js——写回环决策被拆散到两个文件。

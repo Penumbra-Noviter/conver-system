@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1219<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->435<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->784<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1277<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->435<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->784<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
 
 ---
 
@@ -796,6 +796,9 @@ conver system/
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:frontend/js/save-key-meta.js:escapeRegExp-->`escapeRegExp(str)`<!--/AUTO--> | 键名正则转义 |
+| <!--AUTO:sig:frontend/js/save-key-meta.js:saveKeyIsPattern-->`saveKeyIsPattern(entry)`<!--/AUTO--> | 判定 saveKeys 条目是否正则模式 |
+| <!--AUTO:sig:frontend/js/save-key-meta.js:saveKeyIsValidPattern-->`saveKeyIsValidPattern(entry)`<!--/AUTO--> | 验证 saveKeys 条目为可编译模式 |
+| <!--AUTO:sig:frontend/js/save-key-meta.js:saveKeyMatches-->`saveKeyMatches(entry, keyName)`<!--/AUTO--> | saveKeys 白名单条目匹配键名 |
 
 ### 4.54 `frontend/js/save-manager.js` — 存档管理器（<!--AUTO:lines:frontend/js/save-manager.js-->~608 行<!--/AUTO-->）
 
@@ -1134,7 +1137,7 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1219<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1277<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->435<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->784<!--/AUTO-->

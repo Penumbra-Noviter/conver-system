@@ -31,7 +31,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| C2 | frontend saveKeys 匹配语义双份（simulators.js normalizeSaveKeys / save-manager.js whitelistHits）→ 收成 save-key-meta 完整深模块 | 架构报告 | Strong | 📝 待立项 |
 | C3 | 前端注入钩子两种方言 + activation 时序迟到 → 统一为 options-object 方言，全部接线同相 | 架构报告 | Worth exploring | 📝 待立项 |
 | C4 | 角色/对话列表视图渲染内联在 app.js（160-403 行）→ 下沉为视图深模块，跟上 search-view 先例 | 架构报告 | Worth exploring | 📝 待立项 |
 | C5 | 后端角色字段知识 8 处重复（model/schema/card/parser/prompt/message）→ 收敛为单一映射深模块 | 架构报告 | Strong | 📝 待立项 |
@@ -42,6 +41,19 @@
 ---
 
 ## 已完成归档
+
+### C2 saveKeys 匹配语义收口（2026-08-15 kickoff 全自动档：轻量档 1 工单）
+
+> 来源：/improve-codebase-architecture 架构评审报告候选 C2（Strong）。Grilling 共识（全自动档按推荐拍板）：**saveKeys 白名单匹配语义（精确键名 === / 正则模式 ^…$ 锚定匹配）从三处分散实现收进 save-key-meta.js 完整深模块**，新增 `saveKeyIsPattern`/`saveKeyIsValidPattern`/`saveKeyMatches` 三个导出，三消费方对标调用。
+
+- **工单 01（b60520d，feat）**——save-key-meta 完整深模块：新增 `saveKeyIsPattern(entry)`（SAVE_KEY_META_RE 判定的具名导出）/ `saveKeyIsValidPattern(entry)`（模式编译验证，供 normalizeSaveKeys 条目级剔除）/ `saveKeyMatches(entry, keyName)`（白名单匹配单一来源，try/catch 防御不可编译）；`__all__` 3→6；`simulators.js normalizeSaveKeys` 对标（SAVE_KEY_META_RE.test + new RegExp try/catch → saveKeyIsValidPattern）；`save-manager.js whitelistHits` 对标（inline 匹配 → saveKeyMatches）；`simulator-manifest.test.js saveKeyHits/isPattern` 内联删除改用导入；`save-key-meta.test.js` +18 契约锁用例
+- **merge（79d5799）** + 期末非阻断修复（CODE_WIKI §4.53 签名表补录 3 导出 + doc_sync 刷新 tests_total 1219→1277）
+
+**期末四轴 code-review（固定点 8c6888d）：0 阻断放行**——Standards 0 硬违规（JSDoc 齐全、`__all__` 同步、安全红线零命中）；Spec 9 项验收全达标（三函数语义、三消费方对标、行为等价零变化，784 全绿 vs 基线 766 +18）；Falsify 9 组对抗构造全过（非字符串/空串/不可编译模式/非字符串 keyName 全部优雅返回 false 不抛；`a.b`→`axb`/`acb` true、`\\d+`→`123` true；`a$b` 字面 `$` 语义边界由 normalizeSaveKeys 自锚定拒绝兜底）；Architecture 全正面（深模块协议表面 6 导出隐藏 ~60 行实现、三处重复消除归 Locality 单点、Leverage 高、纯 JS 无副作用 Seam 可测）。1 项非阻断：CODE_WIKI §4.53 签名表缺 3 新导出（doc_sync 只刷机械标记，随补录修复）。
+
+**运行态冒烟**：smoke-simulators 13 项 **12 PASS / 0 FAIL / 1 SKIP** 退出码 0——存档面板「导出 → 清档 → 导入恢复」saveKeys 白名单匹配核心消费路径 PASS，端口已释放。
+
+**测试同步**：Vitest **784**（基线 766，+18）；pytest 434+1skip / cargo 58 未受影响。
 
 ### C1 写回环状态机收口（2026-08-15 kickoff 全自动档：串行链 4 工单）
 
