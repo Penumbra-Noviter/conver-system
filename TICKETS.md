@@ -33,14 +33,29 @@
 |------|--------|------|------|------|
 | C3 | 前端注入钩子两种方言 + activation 时序迟到 → 统一为 options-object 方言，全部接线同相 | 架构报告 | Worth exploring | 📝 待立项 |
 | C4 | 角色/对话列表视图渲染内联在 app.js（160-403 行）→ 下沉为视图深模块，跟上 search-view 先例 | 架构报告 | Worth exploring | 📝 待立项 |
-| C5 | 后端角色字段知识 8 处重复（model/schema/card/parser/prompt/message）→ 收敛为单一映射深模块 | 架构报告 | Strong | 📝 待立项 |
 | C6 | 后端 LLM 派生链四份遍历（factory/setting ×2/models）→ 单一提供者清单 + 派生存取器 | 架构报告 | Strong | 📝 待立项 |
-| C7 | 后端对话导出序列化双轨（conversation_export.py 手写 dict vs schema from_attributes）→ 复用 schema，兑现「service 层零手写 dict」声明 | 架构报告 | Worth exploring | 📝 待立项 |
+| C7 | 后端对话导出序列化双轨（conversation_export.py 手写 dict vs schema from_attributes）→ 复用 schema，兑现「service 层零手写 dict」声明 | 架构报告 | Worth exploring | ❌ 复核关闭（2026-08-15：conversation_export.py:37 已 model_validate+model_dump 驱动，C5 批次复核现状成立；MD 段 3 个内联属性访问属渲染逻辑非序列化） |
 | C8 | 模拟器 file 安全判据/路径前缀/超时常量/wg_ 消费方清单散落 → 收进 simulator-contracts 契约深模块 | 架构报告 | Speculative | 📝 待立项 |
 
 ---
 
 ## 已完成归档
+
+### C5 角色字段知识收敛（2026-08-15 kickoff 全自动档：标准档 2 工单串行链）
+
+> 来源：/improve-codebase-architecture 架构评审报告候选 C5（Strong）。Grilling 共识（全自动档按推荐拍板）：**后端角色字段清单（16 个 V2 内容字段）从 8 处重复硬编码收敛为单一映射深模块**——新建 `character_fields.py` 常量之家 + schemas 基类继承。
+
+- **工单 01（4556492 + a930396）**——character_fields.py 深模块（CHARACTER_V2_FIELDS 16 字段全集 + PROMPT_FIELDS/PARSE_FIELDS/EXPORT_FIELDS 投影子集 + V2_KEY_MAP/V1_TO_V2_MAP，`__all__` 6 符号；`services/__init__.py` 登记）+ schemas/character.py CharacterBase 继承体系（CharacterCreate/Update/Response 派生，Response 保元数据字段）+ 契约锁 test_character_fields.py（26 用例，含与 ORM Column 集合比对防漂移）
+- **工单 02（fdf0179）**——消费者对标：character_card.py（V1_TO_V2_MAP 迁入 + _normalize_v1 用导入常量）、document_parser.py（_PARSED_FIELDS → PARSE_FIELDS 导入 + prompt 模板补 post_history_instructions 遗漏）、prompt.py（CharacterData 引用 PROMPT_FIELDS）、message.py（build_message_list 按 PROMPT_FIELDS 提取）
+- **merge（06c0e8f）** + doc_sync 子编号支持（e46ab09：HEADING_RE 支持 4.13.5 + CODE_WIKI §4.13.5 增补）
+
+**期末 code-review（固定点 826108d）：0 阻断**——Spec 验收全达标（V2 协议层 character_version/temperature 命名空间逐字节不变；test_character_card 56 用例全绿）；Falsify 对抗构造全过（CharacterBase 缺 name 抛 ValidationError、getattr 回退空串、doc_sync HEADING_RE 旧格式不回归）；Architecture 全正面（8 处重复归 Locality 单点、Leverage 高）。3 项非阻断如实评估不修：① CharacterResponse 字段序 id 后移（基类继承自然结果，前端按 key 访问无契约影响）② ConversationExportCharacter 独立声明未派生（继承带全 16 字段，独立+契约锁更合理，spec 偏差记录在案）③ V2_KEY_MAP/CHARACTER_V2_FIELDS 伪死导出（契约文档用途，测试锁定）。
+
+**运行态冒烟**：后端 GET / 200 + /api/models 200 + /api/characters 200，端口已释放。
+
+**测试同步**：pytest **460 + 1 skip**（基线 434+1skip，+26 契约锁）；Vitest 784 / cargo 58 未受影响。
+
+**连带复核**：C7 复核关闭（conversation_export.py:37 已 model_validate+model_dump 驱动，C5 批次复核现状成立）——技术债区 7 项 → C3/C4/C6 待立项 3 项 + C7 关闭。
 
 ### C2 saveKeys 匹配语义收口（2026-08-15 kickoff 全自动档：轻量档 1 工单）
 

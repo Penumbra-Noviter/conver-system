@@ -6,6 +6,20 @@
 
 ---
 
+## 滚动摘要（2026-08-15 — C5 角色字段知识收敛：kickoff 全自动档标准档 2 工单串行链）
+
+- **来源**：/improve-codebase-architecture 架构评审报告候选 C5（Strong），用户挑中 → kickoff 全自动档。病灶：后端角色字段清单（16 个 V2 内容字段）在 8 处重复硬编码（models Column / schemas 三份 / character_card 两份 / document_parser 两份 / prompt+message 一份），改字段需改多文件。
+- **Grilling 共识（全自动档按推荐拍板）**：C5 做——新建 `backend/app/services/character_fields.py` 单一映射深模块（CHARACTER_V2_FIELDS 全集 + 4 投影子集 + V2_KEY_MAP/V1_TO_V2_MAP）+ schemas 基类继承（CharacterBase → Create/Update/Response）；档位：标准档 2 工单串行链。
+- **实现（3 提交 + merge）**：C5-01 character_fields.py + CharacterBase 继承 + 契约锁 26 用例（4556492/a930396）；C5-02 消费者对标（fdf0179：character_card V1_TO_V2_MAP 迁入 / document_parser PARSE_FIELDS + prompt 补 post_history_instructions 遗漏 / prompt+message PROMPT_FIELDS）；merge 06c0e8f；doc_sync 子编号支持 + CODE_WIKI §4.13.5（e46ab09）
+- **过程坑（senior 直做）**：C5-01 首派 3 次空返回（连续网关层无 usage），按重开上限报人工裁决前用户 retry → 主会话直做剩余（worktree 保留第一批提交）；worktree 内 git commit 被 doc_sync pre-commit 钩子拦截（worktree 无前端依赖，vitest 收集失败 → 试 --no-verify 绕过）
+- **期末 code-review（固定点 826108d）：0 阻断**——Spec 验收全达标（V2 协议层逐字节不变）；Falsify 对抗全过；Architecture 全正面（8 处重复归 Locality 单点）。3 非阻断如实评估不修（CharacterResponse 字段序 id 后移无契约影响 / ExportCharacter 独立声明合理 / V2_KEY_MAP 伪死导出契约用途）
+- **连带复核**：C7 复核关闭（conversation_export.py 已 model_validate 驱动，C5 复核现状成立）——审计快照复核惯例落地
+- **测试**：pytest **460 + 1 skip**（基线 434+1skip，+26）；Vitest 784 / cargo 58 未受影响；后端冒烟 200 端口已释放
+- **知识库预检召回**：精读「聚合语义字段跨模块复用须核对语义」（本批 V1_TO_V2_MAP 迁入时核对 V2 协议层语义逐字节不变）；本次无新教训蒸馏（收敛型重构 + 已有空返回降级规则覆盖）
+- **文档同步**：TICKETS（C5 批次归档 + C7 复核关闭）；CODE_WIKI（§4.13.5 + doc_sync 子编号）；CLAUDE/PROJECT_REFERENCE 基线 784→460+26；DEV_LOG 本段
+
+---
+
 ## 滚动摘要（2026-08-15 — C2 saveKeys 匹配语义收口：kickoff 全自动档轻量档 1 工单）
 
 - **来源**：/improve-codebase-architecture 架构评审报告候选 C2（Strong），用户挑中 → kickoff 全自动档。病灶：saveKeys 白名单匹配语义（精确键名 === / 正则模式 ^…$ 锚定匹配）三处分散（simulators.js normalizeSaveKeys 模式编译验证 / save-manager.js whitelistHits 键名匹配 / simulator-manifest.test.js saveKeyHits 测试辅助）——匹配语义内部实现行重复，改匹配方式需改 3 文件。
