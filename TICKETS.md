@@ -25,20 +25,43 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-> 技术债区当前 **3 项已立项**（C3/C4/C8 已立项 + C7 复核关闭；C6 已于 2026-08-15 kickoff 批次修复归档）。
+> 技术债区当前 **4 项待立项**（F-1~F-4：C3/C4/C8 批次波 1 增量审核 + 期末四轴复证的非阻断发现；C3/C4/C8 三项已立项候选已于 2026-08-15 kickoff 批次修复归档）。
 
 > **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| C3 | 前端注入钩子两种方言 + activation 时序迟到 → 统一为 options-object 方言，全部接线同相 | 架构报告 | Worth exploring | 🔄 已立项 |
-| C4 | 角色/对话列表视图渲染内联在 app.js（160-403 行）→ 下沉为视图深模块，跟上 search-view 先例 | 架构报告 | Worth exploring | 🔄 已立项 |
+| C3 | 前端注入钩子两种方言 + activation 时序迟到 → 统一为 options-object 方言，全部接线同相 | 架构报告 | Worth exploring | ✅ 已修（2026-08-15：setChatHooks options-object + setActivationHooks 归位模块级，commit 43474eb） |
+| C4 | 角色/对话列表视图渲染内联在 app.js（160-403 行）→ 下沉为视图深模块，跟上 search-view 先例 | 架构报告 | Worth exploring | ✅ 已修（2026-08-15：list-views.js 深模块 5 导出，commit 10a0093） |
 | C7 | 后端对话导出序列化双轨（conversation_export.py 手写 dict vs schema from_attributes）→ 复用 schema，兑现「service 层零手写 dict」声明 | 架构报告 | Worth exploring | ❌ 复核关闭（2026-08-15：conversation_export.py:37 已 model_validate+model_dump 驱动，C5 批次复核现状成立；MD 段 3 个内联属性访问属渲染逻辑非序列化） |
-| C8 | 模拟器 file 安全判据/路径前缀/超时常量/wg_ 消费方清单散落 → 收进 simulator-contracts 契约深模块 | 架构报告 | Speculative | 🔄 已立项 |
+| C8 | 模拟器 file 安全判据/路径前缀/超时常量/wg_ 消费方清单散落 → 收进 simulator-contracts 契约深模块 | 架构报告 | Speculative | ✅ 已修（2026-08-15：simulator-contracts.js 5 符号契约深模块，commit 7cb64f8） |
+| F-1 | `frontend/js/cascade.js:20` / `frontend/js/conversation-activation.js:20` docstring 旧 setter 名 `setConversationsRefresher` 残留（历史模式引用，C3 工单声明出范围；建议改述为引用 setChatHooks） | 波 1 Falsify（期末复证） | Worth exploring | 📝 待立项 |
+| F-2 | `frontend/js/simulator-contracts.js:19` / `frontend/js/simulator-view.js:382` 超时秒数 `TIMEOUT_MS/1000` 派生——若毫秒数改非 1000 整数倍将出现小数秒（当前 15000→15 无漂移；契约锁 toContain 派生断言锁不住 UI 小数形态） | 波 1 Falsify（期末复证） | Speculative | 📝 待立项 |
+| F-3 | 本地过期 coverage 产物残留（`frontend/coverage/` 已入 .gitignore，纯本地卫生项） | 波 1 Falsify（期末复证） | Speculative | 📝 待立项（复核关闭候选） |
+| F-4 | `scripts/smoke-simulators.mjs:72` `DEFAULT_BASE_URL = 'http://127.0.0.1:8000'` 字面量（本地开发地址、`--base-url` 可覆盖、非外部服务） | 波 1 Falsify（期末复证） | Speculative | 📝 待立项（复核关闭候选） |
 
 ---
 
 ## 已完成归档
+
+### C3/C4/C8 技术债批次（2026-08-15 kickoff 全自动档：标准档 2 波 3 工单）
+
+> 来源：/improve-codebase-architecture 架构评审报告未选候选 C3/C4/C8（用户立项「全自动修补技术债区」）。Grilling 共识（全自动档）：3 项全做，四项默认决策按推荐（setChatHooks 合并命名 / showError+showSuccess 迁 utils.js / 超时文案按域各留共享数值 / MANIFEST_URL 由 SIM_DIR 派生）。
+
+- **工单 01（43474eb）**——C3：chat 域注入钩子统一 options-object 方言 + activation 注入时序归位。chat.js 两单函数 setter（setConversationsRefresher/setConversationListTitleSyncer）合并为 `setChatHooks({refreshConversations,syncConversationListTitle})`（按 key 合并、键非函数不覆盖、缺省 no-op）；app.js 两处调用合并为一次 + setActivationHooks 从 init() 内四路 await 之后移至模块级注入区（时序迟到修复）；conversation-activation.js API 零改动。chat.test.js 10 处改写 + 4 新契约/Falsify 用例。CODE_WIKI §4.36 两 stale sig 行替换（经主会话批准纳入）。
+- **工单 02（7cb64f8）**——C8：simulator-contracts 契约深模块。新建 simulator-contracts.js（SIM_DIR/MANIFEST_URL 由 SIM_DIR 派生/TIMEOUT_MS/TIMEOUT_REASON 秒数派生/isValidSimulatorFile，`__all__` 5 符号，零 DOM 零副作用 Node ESM 可导入）；simulator-view.js 删本地 SIM_DIR/TIMEOUT_MS、isValidGame 委托 isValidSimulatorFile、iframe 超时文案保留自身语义秒数共享派生；simulators.js 删本地 MANIFEST_URL/TIMEOUT_MS/TIMEOUT_REASON 改 import；save-key-meta.js docstring 消费方清单修正（删失真 simulator-view 行、补契约锁测试行，常量本体零改动）。+15 契约锁用例。
+- **工单 03（10a0093）**——C4：角色/对话列表视图下沉 list-views 深模块（search-view 先例）。新建 list-views.js（持有 6 DOM 引用，5 导出 + `__all__`，initListViews 钩子面仅 `{switchView}`，394 行/5 导出深模块）；app.js 退化为纯编排（585→274 行，dom 仅留 views/navBtns/mobileNavBtns，三组注入改接 list-views 导出）；utils.js 新增 showError/showSuccess 薄封装；app.test.js 迁移 17 用例至 list-views.test.js（+4 新增=21，含删对话重载失败 Falsify）。
+- **merge（8ff067b + cce05aa + 5266496 + 04f4980）**——波 1（C3∥C8）合并 + 波 2（C4）合并。CODE_WIKI 冲突处理两次：波 1 双 markers（788/799）→ 取 C8 侧补回 C3 §4.36 行 doc_sync 收敛 803；波 2 迁 8 个 app.js sig 至 list-views/utils + §3 文件树 + §4.36.5 新章节 + §5 测试表，doc_sync 收敛 807。
+
+**波末增量审核（固定点 ca8c67c→cce05aa）：0 阻断**——Falsify 对抗构造全过（setActivationHooks 上移时序无缺口、openSimulator 非法入参矩阵等价、MANIFEST_URL 派生逐字相同、无新循环依赖）；文件范围 11/11 合规、0 回退。
+
+**期末四轴 code-review（固定点 ca8c67c）：0 阻断放行**——Standards 0 硬违规 / 0 安全红线命中（唯一 token 命中为 CODE_WIKI SSE 回调 docstring）；Spec 23/23 验收全达成（C3 8/8、C8 7/7、C4 8/8，测试迁移与共识枚举逐项吻合）；Falsify 0 击穿（list-views DOM 契约破坏/initListViews 幂等/setChatHooks 对抗入参/startChatWithCharacter 取消路径/导入三路径/isValidSimulatorFile 矩阵补集全过）；Architecture 全正面（list-views.js 394 行/5 导出与 simulator-contracts.js 5 符号零副作用双深模块、无循环依赖、Locality/Leverage/Seam 恰当）。4 项非阻断落技术债区（F-1~F-4，波 1 增量审核发现 + 期末复证标注）。
+
+**运行态冒烟**：smoke-simulators 13 项 **12 PASS / 0 FAIL / 1 SKIP** 退出码 0（入口/列表/筛选/打开 AI 游戏/配置同步/存档保留/运行中再点导航/存档面板全过；manifest 22/22 全 AI 无纯本地 SKIP 申报）；后端 GET / 200 + /api/characters 200 + /api/conversations 200 + /api/models 200；端口已释放（taskkill 树杀 + netstat 复核）。
+
+**测试同步**：Vitest **807**（基线 784，+23：C3 +4 / C8 +15 / C4 +4）；pytest **469 + 1 skip** / cargo 58 未受影响（零后端/Rust 改动）。
+
+**技术债区**：C3/C4/C8 归档（✅ 已修）→ 4 项待立项（F-1~F-4）。
 
 ### C6 后端 LLM 派生链收敛（2026-08-15 kickoff 全自动档：小档 3 工单 + F4 修复）
 

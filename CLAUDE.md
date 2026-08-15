@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 469+1skip）；`cd frontend && npm test`（Vitest 784，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（58）。
+测试：`cd backend && python -m pytest`（pytest 469+1skip）；`cd frontend && npm test`（Vitest 807，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（58）。
 
 ## 当前状态（2026-08-14）
 
@@ -53,7 +53,8 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **C1 写回环状态机收口（2026-08-15 kickoff 全自动档：串行链 4 工单）**：模拟器配置同步写回环状态（冷却/熔断）从 simulator-view 收进 key-injector 单一状态机——`autoSyncIntoGame` 加 path:'load'|'observer'（一次调用原子完成冷却判定→同步→置冷却→观察者计数→熔断判定；熔断权优先于冷却、幂等兜底）+ 新导出 `resetSyncLoop()`（复位唯一触发点 destroyFrame）+ `__all__` 10→11；simulator-view 只留触发时机（load/观察者防抖/按钮）与观察者生命周期；期末四轴 0 阻断放行；冒烟 13 项 12 PASS；Vitest 746→766
 - ✅ **C2 saveKeys 匹配语义收口（2026-08-15 kickoff 全自动档：轻量档 1 工单）**：saveKeys 白名单匹配语义（精确键名 === / 正则模式 ^…$ 锚定匹配）从三处分散实现收进 save-key-meta 完整深模块——新增 `saveKeyIsPattern`/`saveKeyIsValidPattern`/`saveKeyMatches` 三导出（`__all__` 3→6）；normalizeSaveKeys/whitelistHits/saveKeyHits 三消费方对标；期末四轴 0 阻断放行；冒烟 13 项 12 PASS；Vitest 766→784
 - ✅ **C5 角色字段知识收敛（2026-08-15 kickoff 全自动档：标准档 2 工单串行链）**：后端角色字段清单（16 个 V2 内容字段）从 8 处重复硬编码收敛为 character_fields.py 单一映射深模块（CHARACTER_V2_FIELDS 全集 + PROMPT/PARSE/EXPORT 投影 + V2_KEY_MAP/V1_TO_V2_MAP）+ schemas CharacterBase 继承体系；character_card/document_parser/prompt/message 四消费者对标；附带 doc_sync 子编号支持；期末四轴 0 阻断；连带复核 C7 关闭；pytest 434→460+1skip（+26 契约锁）
-- ✅ 测试：pytest 469+1skip（后端）+ Vitest 784（前端）+ cargo test 58（壳）全绿
+- ✅ **C3/C4/C8 技术债批次（2026-08-15 kickoff 全自动档：标准档 2 波 3 工单）**：C3 注入钩子方言统一——chat.js 两单函数 setter 合并 `setChatHooks({refreshConversations,syncConversationListTitle})` options-object + setActivationHooks 从 init() 内移模块级注入区（时序迟到修复）；C8 simulator-contracts 契约深模块——SIM_DIR/MANIFEST_URL（派生）/TIMEOUT_MS/TIMEOUT_REASON（秒数派生）/isValidSimulatorFile 单一来源，simulator-view/simulators 对标消费；C4 列表视图下沉——角色/对话列表下沉 list-views.js 深模块（6 DOM + 5 导出，app.js 585→274 纯编排），utils.js 增 showError/showSuccess；波末增量审核 0 阻断 + 期末四轴 0 阻断；冒烟 13 项 12 PASS；技术债区 C3/C4/C8 归档 + 4 项待立项（F-1~F-4）；Vitest 784→807（+23）
+- ✅ 测试：pytest 469+1skip（后端）+ Vitest 807（前端）+ cargo test 58（壳）全绿
 
 ## 待办管理
 
