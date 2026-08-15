@@ -72,8 +72,9 @@ MARKER_RE = re.compile(
 )
 
 # §4 模块标题，如 `### 4.1 `backend/app/main.py` — 程序入口（~56 行）`
+# 支持子编号（如 `### 4.13.5`）：子编号用非捕获组，文件名恒为 group(1)
 HEADING_RE = re.compile(
-    r"^### 4\.\d+ .*?`([A-Za-z0-9_./-]+\.(?:py|js|rs))`", re.MULTILINE
+    r"^### 4\.\d+(?:\.\d+)? .*?`([A-Za-z0-9_./-]+\.(?:py|js|rs))`", re.MULTILINE
 )
 
 # 叙述中反引号引用的源文件路径，如 `backend/app/main.py`、`frontend/js/chat.js`

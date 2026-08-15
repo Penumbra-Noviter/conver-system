@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1277<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->435<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->784<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1303<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->461<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->784<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
 
 ---
 
@@ -108,6 +108,7 @@ conver system/
 │   │       ├── __init__.py
 │   │       ├── character.py        ← 角色服务
 │   │       ├── character_card.py   ← Character Card V2 转换（导出/导入）
+│   │       ├── character_fields.py   ← 角色字段常量映射深模块（C5）
 │   │       ├── chat.py             ← 对话编排（准备/完成/流式/错误响应）
 │   │       ├── conversation.py     ← 会话服务（标题生成/滑窗）
 │   │       ├── conversation_export.py ← 会话 JSON/Markdown 导出
@@ -325,7 +326,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/character.py:update_character-->`update_character(db, character_id, data)`<!--/AUTO--> | 更新角色 |
 | <!--AUTO:sig:backend/app/services/character.py:delete_character-->`delete_character(db, character_id)`<!--/AUTO--> | 删除角色 |
 
-### 4.13 `backend/app/services/character_card.py` — 角色卡 V2 转换（<!--AUTO:lines:backend/app/services/character_card.py-->~198 行<!--/AUTO-->）
+### 4.13 `backend/app/services/character_card.py` — 角色卡 V2 转换（<!--AUTO:lines:backend/app/services/character_card.py-->~190 行<!--/AUTO-->）
 
 **职责**：SillyTavern Character Card V2 信封导出/导入——兼容 V1 旧卡与裸 data；非 V2 标准字段存 `extensions.conver_system.*` 命名空间保证往返保真；头像 data URI 规范化。
 
@@ -337,6 +338,19 @@ conver system/
 | <!--AUTO:sig:backend/app/services/character_card.py:_build_create-->`_build_create(data)`<!--/AUTO--> | 提取标准字段为创建数据 |
 | <!--AUTO:sig:backend/app/services/character_card.py:_conver_system-->`_conver_system(extensions)`<!--/AUTO--> | 读写 `extensions.conver_system.*` 命名空间 |
 | <!--AUTO:sig:backend/app/services/character_card.py:_clamp_temperature-->`_clamp_temperature(value)`<!--/AUTO--> | 温度值收敛到合法区间 |
+
+### 4.13.5 `backend/app/services/character_fields.py` — 角色字段常量映射（<!--AUTO:lines:backend/app/services/character_fields.py-->~101 行<!--/AUTO-->）
+
+**职责**：角色 V2 字段清单单一映射深模块（C5 架构评审）——CHARACTER_V2_FIELDS 16 字段全集 + 4 个具名投影子集 + V2_KEY_MAP / V1_TO_V2_MAP 映射。
+
+| 元素 | 说明 |
+|------|------|
+| `CHARACTER_V2_FIELDS` | V2 内容字段全集（16 项） |
+| `PROMPT_FIELDS` | Prompt 组装投影（6 字段） |
+| `PARSE_FIELDS` | 文档解析投影（10 字段） |
+| `EXPORT_FIELDS` | 导出投影（9 字段，含 id） |
+| `V2_KEY_MAP` | DB 名 → V2 协议键名映射 |
+| `V1_TO_V2_MAP` | V1 旧卡名 → DB 名映射 |
 
 ### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~235 行<!--/AUTO-->）
 
@@ -386,7 +400,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/data_dir.py:data_dir_file-->`data_dir_file(file_name)`<!--/AUTO--> | 目录内文件路径 |
 | <!--AUTO:sig:backend/app/services/data_dir.py:database_path-->`database_path()`<!--/AUTO--> | SQLite 文件路径 |
 
-### 4.18 `backend/app/services/document_parser.py` — 文档智能解析（<!--AUTO:lines:backend/app/services/document_parser.py-->~163 行<!--/AUTO-->）
+### 4.18 `backend/app/services/document_parser.py` — 文档智能解析（<!--AUTO:lines:backend/app/services/document_parser.py-->~161 行<!--/AUTO-->）
 
 **职责**：六步向导第一步——LLM 从用户文档提取角色字段（JSON 抽取 + 字段兜底 + 截断）。
 
@@ -411,7 +425,7 @@ conver system/
 
 > 无公开函数（异常类层次）。
 
-### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~147 行<!--/AUTO-->）
+### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~145 行<!--/AUTO-->）
 
 **职责**：消息读取/写入/开场白自动插入/上下文构建（滑窗）/跨对话搜索。
 
@@ -501,7 +515,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 非流式生成 |
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成 |
 
-### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~136 行<!--/AUTO-->）
+### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~137 行<!--/AUTO-->）
 
 **职责**：模板变量替换（`{{user}}`/`{{char}}`）、mes_example 解析、system prompt 组装（角色设定注入）。
 
@@ -1037,6 +1051,7 @@ conver system/
 | 文件 | 用例数 | 覆盖主题 |
 |------|--------|----------|
 | `backend/tests/test_character_card.py` | <!--AUTO:tests:backend/tests/test_character_card.py-->56<!--/AUTO--> | 角色卡 V2 导入导出/往返保真 |
+| `backend/tests/test_character_fields.py` | <!--AUTO:tests:backend/tests/test_character_fields.py-->26<!--/AUTO--> | 角色字段常量映射契约锁 |
 | `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->32<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->17<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->11<!--/AUTO--> | 会话服务/标题生成 |
@@ -1137,9 +1152,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1277<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1303<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->435<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->461<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->784<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->58<!--/AUTO-->
 
