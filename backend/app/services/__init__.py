@@ -14,6 +14,7 @@
 __all__ = [
     "character",
     "character_card",
+    "character_fields",
     "chat",
     "conversation",
     "conversation_export",
