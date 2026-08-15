@@ -53,7 +53,7 @@
 
 import { escapeHtml, showToast } from './utils.js';
 import { showConfirm } from './components/confirm-dialog.js';
-import { SAVE_KEY_META_RE, WG_SESSION_ONLY_IDS } from './save-key-meta.js';
+import { saveKeyMatches, WG_SESSION_ONLY_IDS } from './save-key-meta.js';
 
 // ══════════════════════════════════════════════════
 // 常量（UI 契约 — 文案/上限与 spec 对齐）
@@ -121,16 +121,7 @@ let pendingGameId = null;
 function whitelistHits(saveKeys, keyName) {
     if (!Array.isArray(saveKeys) || typeof keyName !== 'string') return false;
     for (const entry of saveKeys) {
-        if (typeof entry !== 'string' || entry === '') continue;
-        if (SAVE_KEY_META_RE.test(entry)) {
-            try {
-                if (new RegExp(`^${entry}$`).test(keyName)) return true;
-            } catch {
-                continue; // 不可编译 → 跳过该条目
-            }
-        } else if (entry === keyName) {
-            return true;
-        }
+        if (saveKeyMatches(entry, keyName)) return true;
     }
     return false;
 }

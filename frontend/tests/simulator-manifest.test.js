@@ -27,7 +27,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parseManifest } from '../js/simulators.js';
-import { SAVE_KEY_META_RE, escapeRegExp } from '../js/save-key-meta.js';
+import { SAVE_KEY_META_RE, escapeRegExp, saveKeyIsPattern, saveKeyMatches } from '../js/save-key-meta.js';
 
 const SIM_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'simulators');
 
@@ -51,24 +51,13 @@ function countIdOccurrences(html, id) {
     return matches ? matches.length : 0;
 }
 
-/** saveKeys 元素是否为正则模式（含正则元字符） */
-function isPattern(element) {
-    return SAVE_KEY_META_RE.test(element);
-}
-
-/** saveKeys 元素（精确键或锚定模式）是否命中给定键名（导入白名单判定语义 — 与 U9-T2 同构） */
-function saveKeyHits(element, key) {
-    if (!isPattern(element)) return element === key;
-    return new RegExp(`^${element}$`).test(key);
-}
-
 /**
  * 溯源断言：元素整体字面（模式元素取其字面前缀 — 首个正则元字符之前的部分）
  * 须在 HTML 中出现；常量拼接键（字面无完整键名）按 '_' 拆段，各段须均在
  * HTML 中出现（U9-T1 提取方法学）。
  */
 function assertKeyTraceable(html, entry, key) {
-    const probe = isPattern(key) ? key.slice(0, key.search(SAVE_KEY_META_RE)) : key;
+    const probe = saveKeyIsPattern(key) ? key.slice(0, key.search(SAVE_KEY_META_RE)) : key;
     expect(probe.length, `${entry.id} ${key} 溯源探针非空`).toBeGreaterThan(0);
     if (html.includes(probe)) return;
     const segments = probe.split('_').filter(Boolean);
@@ -204,7 +193,7 @@ describe('saveKeys 数据完整性（U9-T1）', () => {
     it('模式元素（含正则元字符）锚定完整键名编译合法，且不自含 ^ $ 锚点', () => {
         for (const entry of manifest.simulators) {
             for (const key of entry.saveKeys) {
-                if (!isPattern(key)) continue;
+                if (!saveKeyIsPattern(key)) continue;
                 expect(key, `模式不得自含 ^: ${entry.id}`).not.toContain('^');
                 expect(key, `模式不得自含 $: ${entry.id}`).not.toContain('$');
                 expect(() => new RegExp(`^${key}$`), `模式可编译: ${entry.id} ${key}`).not.toThrow();
@@ -225,7 +214,7 @@ describe('saveKeys 数据完整性（U9-T1）', () => {
         for (const entry of manifest.simulators) {
             for (const key of entry.saveKeys) {
                 for (const cfgKey of CFG_KEYS) {
-                    expect(saveKeyHits(key, cfgKey), `${entry.id} saveKeys ${key} 不得命中 cfg 键 ${cfgKey}`).toBe(false);
+                    expect(saveKeyMatches(key, cfgKey), `${entry.id} saveKeys ${key} 不得命中 cfg 键 ${cfgKey}`).toBe(false);
                 }
             }
         }
