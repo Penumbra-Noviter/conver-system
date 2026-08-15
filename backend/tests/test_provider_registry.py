@@ -14,8 +14,6 @@ LLMFactory 类级状态（_providers / _builtins_loaded）跨测试共享，auto
 
 from __future__ import annotations
 
-import importlib
-
 import pytest
 
 from backend.app.services import provider_registry as provider_registry_module
@@ -213,16 +211,40 @@ class TestMalformedData:
         with pytest.raises(ValueError, match="_CLASS_OVERRIDES"):
             LLMFactory.register_builtin_providers()
 
+    def _load_registry_isolated(self, monkeypatch: pytest.MonkeyPatch, bad: dict) -> object:
+        """独立加载 provider_registry 模块（假名 + 缓存隔离），不污染 sys.modules 与既有模块。
+
+        畸形数据测试用 spec_from_file_location 加载新实例，验证后原模块引用不受影响，
+        避免 importlib.reload 对同文件后续测试的模块对象污染。
+        """
+        import importlib.util
+
+        from backend.app.services import model_data as model_data_module
+
+        monkeypatch.setattr(model_data_module, "AVAILABLE_MODELS", bad)
+        spec = importlib.util.spec_from_file_location(
+            "_isolated_provider_registry",
+            provider_registry_module.__file__,
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
     def test_missing_key_in_registry_raises(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """provider_registry 派生时条目缺 key：显式 ValueError（与既有注册语义对齐）"""
-        from backend.app.services import model_data as model_data_module
-
         bad = {"providers": [{"id": "openai", "name": "X", "models": []}]}
-        monkeypatch.setattr(model_data_module, "AVAILABLE_MODELS", bad)
         with pytest.raises(ValueError, match="key"):
-            importlib.reload(provider_registry_module)
+            self._load_registry_isolated(monkeypatch, bad)
+
+    def test_missing_id_in_registry_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """provider_registry 派生时 key≠id 条目缺 id：显式 ValueError（与缺 key 对称）"""
+        bad = {"providers": [{"key": "solo", "name": "X", "models": []}]}
+        with pytest.raises(ValueError, match="id"):
+            self._load_registry_isolated(monkeypatch, bad)
 
     def test_duplicate_protocol_id_registers_all_to_same_class(
         self, monkeypatch: pytest.MonkeyPatch
