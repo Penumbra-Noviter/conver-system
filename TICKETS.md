@@ -25,7 +25,7 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-> 技术债区当前 **0 项**（TD-75/76 已于 2026-08-14 kickoff 批次修复归档；TD-50 已复核关闭；TD-72/73/74 已于同日完成）。技术债区**清零**。
+> 技术债区当前 **3 项**（C3/C4/C8 待立项 + C7 复核关闭；C6 已于 2026-08-15 kickoff 批次修复归档，技术债区 C6 清零）。
 
 > **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
 
@@ -33,13 +33,31 @@
 |------|--------|------|------|------|
 | C3 | 前端注入钩子两种方言 + activation 时序迟到 → 统一为 options-object 方言，全部接线同相 | 架构报告 | Worth exploring | 📝 待立项 |
 | C4 | 角色/对话列表视图渲染内联在 app.js（160-403 行）→ 下沉为视图深模块，跟上 search-view 先例 | 架构报告 | Worth exploring | 📝 待立项 |
-| C6 | 后端 LLM 派生链四份遍历（factory/setting ×2/models）→ 单一提供者清单 + 派生存取器 | 架构报告 | Strong | 📝 待立项 |
 | C7 | 后端对话导出序列化双轨（conversation_export.py 手写 dict vs schema from_attributes）→ 复用 schema，兑现「service 层零手写 dict」声明 | 架构报告 | Worth exploring | ❌ 复核关闭（2026-08-15：conversation_export.py:37 已 model_validate+model_dump 驱动，C5 批次复核现状成立；MD 段 3 个内联属性访问属渲染逻辑非序列化） |
 | C8 | 模拟器 file 安全判据/路径前缀/超时常量/wg_ 消费方清单散落 → 收进 simulator-contracts 契约深模块 | 架构报告 | Speculative | 📝 待立项 |
 
 ---
 
 ## 已完成归档
+
+### C6 后端 LLM 派生链收敛（2026-08-15 kickoff 全自动档：小档 3 工单 + F4 修复）
+
+> 来源：/improve-codebase-architecture 架构评审报告候选 C6（Strong）。Grilling 共识（全自动档按推荐拍板，主会话直做因 Grilling/plan-tickets/code-review 子智能体连续网关空返回）：**后端 LLM 派生链四处遍历（factory 注册 / setting._PROVIDER_API_MAP + _OPENAI_PROTOCOL_MODELS / models 透传）收敛为单一提供者清单 + 派生存取器深模块**——新建 `provider_registry.py`（C5 character_fields 同构先例）。
+
+- **工单 01（f4a76f4）**——provider_registry.py 深模块：PROVIDER_KEYS（tuple 声明序）/ API_PROVIDER_MAP（key→协议 id 仅 key≠id）/ OPENAI_PROTOCOL_MODELS（frozenset）/ resolve_api_provider（纯函数）+ `_require_key`/`_require_id` 私有校验（缺 key/id 均显式 ValueError），`__all__` 4 符号；services/__init__.py 登记；契约锁 8 用例（含与 AVAILABLE_MODELS 防漂移比对）+ 既有注册测试保留
+- **工单 02（0d611c4）**——factory.py 对标：注册循环改消费 PROVIDER_KEYS，协议判定用 resolve_api_provider，_CLASS_OVERRIDES 留守，缺 key 校验迁入派生模块；7 个动态派生测试改 monkeypatch provider_registry seam（simm 语义「新增 Provider 自动生效」保持）
+- **工单 03（73d32e6）**——setting.py 对标：删 _PROVIDER_API_MAP/_OPENAI_PROTOCOL_MODELS 两私有派生，consumer 直连公共符号；_resolve_api_provider 薄壳删除；TD-66 语义注释保留；CODE_WIKI §4.13.6 增补 + services 索引行
+- **补漏（a10345f）**——C6-02 时漏提交 provider_registry.py 的 `_require_key` 前置定义改动（worktree 未提交即 merge，主分支旧版缺校验）→ 补 commit 后主分支 reset 重合并
+- **merge（eee399f）**——主分支合并 C6 批次
+- **F4 修复（8b82da7）**——Falsify 发现缺口：缺 id 条目原为裸 KeyError（filter 先于 _require_id 解包）→ filter 先查 _require_id 对称 ValueError；契约锁缺 key/缺 id 用例改独立加载（spec_from_file_location）防 importlib.reload 模块污染
+
+**期末 code-review（固定点 597508d，主会话四轴直做因 code-review 子智能体空返回）：0 阻断**——Standards 0 硬违规（__all__ 4 符号与公共面一致、安全红线零命中、无 except: pass）；Spec 验收红线全达标（私有派生零残留、AVAILABLE_MODELS 直接遍历零残留、models 透传保持）；Falsify 对抗构造（F1 缺 key ValueError / F2 空清单 / F3 key==id 合法 / F4 缺 id 对称校验 / F5 resolve 语义）全过，F4 为真实发现的对称性缺口已修复 + 契约锁锁定；Architecture 全正面（80 行实现 / 4 导出深模块、factory/setting 两消费方从遍历收敛为导入、Locality 单点、Leverage 每个导出代表一处独立遍历逻辑）。
+
+**运行态冒烟**：GET / 200 + /api/models 200（完整 8 provider）+ /api/characters 200，端口已释放。
+
+**测试同步**：pytest **469 + 1 skip**（基线 460+1skip，+8 契约锁 +1 缺 id 契约锁）；Vitest 784 / cargo 58 未受影响。
+
+**技术债区**：C6 归档 → C3/C4/C8 待立项 3 项 + C7 关闭。
 
 ### C5 角色字段知识收敛（2026-08-15 kickoff 全自动档：标准档 2 工单串行链）
 
