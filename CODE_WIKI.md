@@ -353,7 +353,7 @@ conver system/
 | `V2_KEY_MAP` | DB 名 → V2 协议键名映射 |
 | `V1_TO_V2_MAP` | V1 旧卡名 → DB 名映射 |
 
-### 4.13.6 `backend/app/services/provider_registry.py` — Provider 派生元数据（<!--AUTO:lines:backend/app/services/provider_registry.py-->~47 行<!--/AUTO-->）
+### 4.13.6 `backend/app/services/provider_registry.py` — Provider 派生元数据（<!--AUTO:lines:backend/app/services/provider_registry.py-->~62 行<!--/AUTO-->）
 
 **职责**：Provider 清单的派生视图单一来源深模块（C6 架构评审）——协议映射 / 协议族模型集 / key 声明序在此收敛，替代 factory/setting 对 `AVAILABLE_MODELS["providers"]` 的多处独立遍历。
 
@@ -455,7 +455,7 @@ conver system/
 
 > 无公开函数（数据表 + 派生逻辑）。
 
-### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~186 行<!--/AUTO-->）
+### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~172 行<!--/AUTO-->）
 
 **职责**：DB settings 表读写——凭证槽位（按 Provider 存取 Key/base_url）、滑窗轮数、用户名、默认模型；凭证通用解析（填任一 key 全局可用）。
 
@@ -505,7 +505,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/errors.py:LLMError.__init__-->`__init__(message, original_error=None)`<!--/AUTO--> | 构造（保留原始异常） |
 | <!--AUTO:sig:backend/app/services/llm/errors.py:translate_sdk_error-->`translate_sdk_error(error, provider_label, *, auth_cls, rate_cls, timeout_cls, bad_request_cls)`<!--/AUTO--> | SDK 异常 → LLMError 分类映射 |
 
-### 4.27 `backend/app/services/llm/factory.py` — Provider 工厂（<!--AUTO:lines:backend/app/services/llm/factory.py-->~80 行<!--/AUTO-->）
+### 4.27 `backend/app/services/llm/factory.py` — Provider 工厂（<!--AUTO:lines:backend/app/services/llm/factory.py-->~78 行<!--/AUTO-->）
 
 **职责**：`LLMFactory` 注册表——显式注册 + 内置 Provider 批量注册 + 懒加载兜底 + 清单查询。
 

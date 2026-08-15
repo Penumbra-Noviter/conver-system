@@ -19,7 +19,6 @@ import importlib
 import pytest
 
 from backend.app.services import provider_registry as provider_registry_module
-from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm import factory as factory_module
 from backend.app.services.llm.base import BaseLLM
@@ -261,11 +260,11 @@ class TestMalformedData:
 
 
 class TestSettingApiMapDerivation:
-    """设置映射派生：内容与现状逐项一致，_resolve_api_provider 语义不变"""
+    """协议映射派生（C6 收敛至 provider_registry）：内容与现状逐项一致，resolve_api_provider 语义不变"""
 
     def test_provider_api_map_matches_current_six(self) -> None:
-        """_PROVIDER_API_MAP 派生结果 == 现状 6 项（第三方 → openai）"""
-        assert setting_service._PROVIDER_API_MAP == {
+        """API_PROVIDER_MAP 派生结果 == 现状 6 项（第三方 → openai）"""
+        assert provider_registry_module.API_PROVIDER_MAP == {
             "deepseek": "openai",
             "qwen": "openai",
             "kimi": "openai",
@@ -276,10 +275,10 @@ class TestSettingApiMapDerivation:
 
     def test_resolve_api_provider_semantics(self) -> None:
         """claude/openai 回退自身；共享协议者映射到 openai；未知 Provider 原样返回"""
-        assert setting_service._resolve_api_provider("claude") == "claude"
-        assert setting_service._resolve_api_provider("openai") == "openai"
-        assert setting_service._resolve_api_provider("deepseek") == "openai"
-        assert setting_service._resolve_api_provider("unknown") == "unknown"
+        assert provider_registry_module.resolve_api_provider("claude") == "claude"
+        assert provider_registry_module.resolve_api_provider("openai") == "openai"
+        assert provider_registry_module.resolve_api_provider("deepseek") == "openai"
+        assert provider_registry_module.resolve_api_provider("unknown") == "unknown"
 
 
 class TestProviderRegistryMeta:
