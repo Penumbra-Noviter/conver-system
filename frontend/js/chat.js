@@ -26,8 +26,9 @@
  * 依赖方向：chat.js → state.js / api.js / utils.js / format.js / tabs.js /
  *   stream-session.js / components/export-dialog.js；
  *   app.js → chat.js
- * 不反向引用 app.js 私有函数 — 对话列表刷新通过 setConversationsRefresher 注入，
- * 重命名后的列表标题同步经 setConversationListTitleSyncer 注入。
+ * 不反向引用 app.js 私有函数 — 对话列表刷新（refreshConversations）与重命名后
+ * 列表标题同步（syncConversationListTitle）经 setChatHooks 注入（options-object
+ * 方言：按 key 合并、键非函数不覆盖、缺省默认 no-op 兜底）。
  */
 
 import { chatStream, messages, conversations } from './api.js';
@@ -61,10 +62,25 @@ export const EMPTY_STATE_HTML = '<div class="empty-state"><p>选择左侧对话�
 /** 无会话时的头部空态文案（单一事实来源 — chat.js renderChatHeader / 激活模块 showEmptyState 复用，禁止内联重复） */
 export const EMPTY_HEADER_HTML = '<span class="chat-title">选择一个角色开始对话</span>';
 
-// ── 对话列表刷新钩子（由 app.js 注入，避免反向依赖）──
-let refreshConversations = () => {};
-export function setConversationsRefresher(fn) {
-    refreshConversations = typeof fn === 'function' ? fn : () => {};
+// ── 注入钩子（app.js 注入，避免反向依赖 — options-object 方言：按 key 合并、
+//    键非函数不覆盖、缺省默认 no-op 兜底）──
+const hooks = {
+    refreshConversations: () => {},
+    syncConversationListTitle: () => {},
+};
+
+/**
+ * 注入聊天域跨模块钩子（app.js 初始化时调用；按 key 合并，键非函数时不覆盖 —
+ *   缺省默认 no-op 兜底，未接线时调用不抛错）
+ * @param {object} h - 钩子集合（仅函数值键生效）
+ * @param {Function} [h.refreshConversations] - 重新拉取对话列表（发送/停止后刷新消息数）
+ * @param {Function} [h.syncConversationListTitle] - 重命名成功后同步对话列表项标题
+ *   （只做 DOM 手术 — 更新匹配会话项 .title 文本，不重渲染列表）
+ */
+export function setChatHooks(h) {
+    for (const [key, value] of Object.entries(h ?? {})) {
+        if (typeof value === 'function') hooks[key] = value;
+    }
 }
 
 // ── 非流式在途守卫（FIX-B）──
@@ -227,12 +243,6 @@ export function refreshSendButton() {
 // app.js 只留注入接线；会话列表标题更新经注入钩子，避免反向依赖）
 // ══════════════════════════════════════════════════
 
-/** 会话列表标题同步钩子（app.js 注入 — 重命名成功后手动更新列表项标题） */
-let syncConversationListTitle = () => {};
-export function setConversationListTitleSyncer(fn) {
-    syncConversationListTitle = typeof fn === 'function' ? fn : () => {};
-}
-
 /**
  * 渲染聊天头部（标题 + 模型 badge + 导出/列表切换按钮 + 双击重命名绑定）
  * 按活动 tab 派生；对话数据以 conversations 列表为准（持久事实来源）
@@ -303,7 +313,7 @@ export function startRename(conv) {
             // P6.5-4 标题联动：同步对应 tab 的 title（tab 条随动；onTabsChanged 驱动重渲染）
             updateTab(conv.id, { title: newTitle });
             // 会话列表标题更新经注入钩子（app.js 接线 — 避免反向依赖）
-            syncConversationListTitle(conv.id, newTitle);
+            hooks.syncConversationListTitle(conv.id, newTitle);
         } catch (err) {
             console.error('重命名失败:', err);
         }
@@ -389,7 +399,7 @@ export async function handleSend() {
             isActiveStream,
             renderMessages,
             refreshSendButton,
-            refreshConversations,
+            refreshConversations: hooks.refreshConversations,
         });
 
         let assistantDiv = null;
@@ -475,7 +485,23 @@ export async function handleSend() {
     }
 
     // 刷新对话列表（更新消息数量）
-    await refreshConversations();
+    await hooks.refreshConversations();
     // 首条 user 消息后后端已自动替换占位标题 → 同步头部标题（P3.5 标题联动）
     syncChatHeaderTitle();
 }
+
+// ══════════════════════════════════════════════════
+// 协议表面收口（深模块：外部只通过这些函数与 chat.js 交互）
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'chatDom',
+    'EMPTY_STATE_HTML',
+    'EMPTY_HEADER_HTML',
+    'setChatHooks',
+    'renderMessages',
+    'refreshSendButton',
+    'renderChatHeader',
+    'startRename',
+    'handleSend',
+];

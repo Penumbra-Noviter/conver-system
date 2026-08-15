@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1312<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->470<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->784<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1316<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->470<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->788<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
 
 ---
 
@@ -586,7 +586,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~511 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~517 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、角色/会话列表加载、设置面板/搜索/模拟器装配、导入失败引导。
 
@@ -613,7 +613,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~434 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~458 行<!--/AUTO-->）
 
 **职责**：消息渲染（气泡/思考指示/复制按钮）、发送流程（handleSend → StreamSession）、标题同步、重命名。
 
@@ -628,8 +628,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/chat.js:syncChatHeaderTitle-->`syncChatHeaderTitle()`<!--/AUTO--> | 标题同步（tab 视图联动） |
 | <!--AUTO:sig:frontend/js/chat.js:startRename-->`startRename(conv)`<!--/AUTO--> | 重命名会话 |
 | <!--AUTO:sig:frontend/js/chat.js:save-->`save()`<!--/AUTO--> | 保存当前状态（TD-13 守卫入口） |
-| <!--AUTO:sig:frontend/js/chat.js:setConversationsRefresher-->`setConversationsRefresher(fn)`<!--/AUTO--> | 注入会话列表刷新器 |
-| <!--AUTO:sig:frontend/js/chat.js:setConversationListTitleSyncer-->`setConversationListTitleSyncer(fn)`<!--/AUTO--> | 注入标题同步器 |
+| <!--AUTO:sig:frontend/js/chat.js:setChatHooks-->`setChatHooks(h)`<!--/AUTO--> | 注入聊天域钩子（列表刷新/标题同步） |
 | <!--AUTO:sig:frontend/js/chat.js:scrollToBottom-->`scrollToBottom()`<!--/AUTO--> | 滚动到底部 |
 | <!--AUTO:sig:frontend/js/chat.js:attachCopyButton-->`attachCopyButton(btn)`<!--/AUTO--> | 复制按钮接线 |
 
@@ -1094,7 +1093,7 @@ conver system/
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
-| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->34<!--/AUTO--> | 对话视图 |
+| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->38<!--/AUTO--> | 对话视图 |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->12<!--/AUTO--> | 会话激活 |
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->36<!--/AUTO--> | 展示契约 |
@@ -1164,10 +1163,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1312<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1316<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->470<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->784<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->788<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->58<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

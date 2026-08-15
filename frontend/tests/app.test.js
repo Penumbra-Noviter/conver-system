@@ -2,8 +2,9 @@
  * app.js 编排薄集成测试（ARC-9 C5 — C1/C2 seam 挂网后的编排区接线）
  *
  * 覆盖：
- *   - init 接线序列：四路数据加载 → setActivationHooks → restoreFromStorage
- *     （无记录 → 空态；有记录 → activateConversation(saveCurrent:false)）→
+ *   - init 接线序列：模块级注入区（setActivationHooks / setChatHooks /
+ *     setCascadeHooks / init* 系列先行接线）→ init 四路数据加载 →
+ *     restoreFromStorage（无记录 → 空态；有记录 → activateConversation(saveCurrent:false)）→
  *     initProviderDropdown → initSettingsPanel（清空回调触发级联收口）
  *   - 视图切换刷新分发：characters→loadCharacters、chat→loadConversations、
  *     settings→loadSettings+initProviderDropdown、search→100ms 聚焦、
@@ -194,8 +195,10 @@ async function loadApp(route, { seedStorage = null, setup = null, waitInit = tru
     if (setup) setup({ app, chat, state, tabs, cascade, api, utils, fetchSpy });
     if (!waitInit) return { app, chat, state, tabs, cascade, api, utils, fetchSpy };
 
-    // 等 4 路数据加载（characters/conversations/models/settings）完成 + 同步接线
-    // 段（setActivationHooks/restore/initProviderDropdown/initSettingsPanel）执行完毕
+    // 等 4 路数据加载（characters/conversations/models/settings）完成 + init 内
+    // 同步接线段（restore/initProviderDropdown/initSettingsPanel）执行完毕
+    // （模块级注入区 — setActivationHooks/setChatHooks/setCascadeHooks/init* —
+    //  在模块求值时已先行接线）
     await vi.waitFor(() => {
         expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
     });
