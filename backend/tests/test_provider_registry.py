@@ -14,8 +14,11 @@ LLMFactory 类级状态（_providers / _builtins_loaded）跨测试共享，auto
 
 from __future__ import annotations
 
+import importlib
+
 import pytest
 
+from backend.app.services import provider_registry as provider_registry_module
 from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm import factory as factory_module
@@ -25,6 +28,7 @@ from backend.app.services.llm.errors import LLMError
 from backend.app.services.llm.factory import LLMFactory
 from backend.app.services.llm.openai import OpenAIProvider
 from backend.app.services.model_data import AVAILABLE_MODELS
+from backend.app.services.provider_registry import resolve_api_provider
 
 __all__: list[str] = []
 
@@ -128,12 +132,17 @@ class TestNewProviderDerivation:
     def test_new_openai_compatible_provider_auto_registers(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AVAILABLE_MODELS 新增 id=openai 的 Provider → 自动注册为 OpenAIProvider"""
-        data = {
-            "providers": AVAILABLE_MODELS["providers"]
-            + [{"key": "fake", "id": "openai", "name": "Fake", "models": []}],
-        }
-        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", data)
+        """PROVIDER_KEYS 新增 openai 协议项 → 自动注册为 OpenAIProvider"""
+        monkeypatch.setattr(
+            factory_module,
+            "PROVIDER_KEYS",
+            tuple(EXPECTED_ORDER) + ("fake",),
+        )
+        monkeypatch.setattr(
+            factory_module,
+            "resolve_api_provider",
+            lambda key: "openai" if key == "fake" else resolve_api_provider(key),
+        )
         _reset_registry()
         LLMFactory.register_builtin_providers()
 
@@ -143,12 +152,17 @@ class TestNewProviderDerivation:
     def test_new_provider_with_class_override(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """key≠claude 且 id≠openai 的新 Provider 经 _CLASS_OVERRIDES 显式声明实现类"""
-        data = {
-            "providers": AVAILABLE_MODELS["providers"]
-            + [{"key": "fancy", "id": "proprietary", "name": "Fancy", "models": []}],
-        }
-        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", data)
+        """key≠claude 且协议非 openai 的新 Provider 经 _CLASS_OVERRIDES 显式声明实现类"""
+        monkeypatch.setattr(
+            factory_module,
+            "PROVIDER_KEYS",
+            tuple(EXPECTED_ORDER) + ("fancy",),
+        )
+        monkeypatch.setattr(
+            factory_module,
+            "resolve_api_provider",
+            lambda key: "proprietary" if key == "fancy" else resolve_api_provider(key),
+        )
         monkeypatch.setitem(factory_module._CLASS_OVERRIDES, "fancy", _OverrideProvider)
         _reset_registry()
         LLMFactory.register_builtin_providers()
@@ -173,57 +187,53 @@ class TestGetProvider:
 
 
 class TestMalformedData:
-    """Falsify：派生逻辑对畸形 AVAILABLE_MODELS 的行为必须明确、可诊断"""
+    """Falsify：派生逻辑对畸形输入的行为必须明确、可诊断"""
 
     def test_empty_providers_list_registers_nothing(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """空清单：注册为无操作，不报错"""
-        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", {"providers": []})
+        """PROVIDER_KEYS 空：注册为无操作，不报错"""
+        monkeypatch.setattr(factory_module, "PROVIDER_KEYS", ())
         _reset_registry()
         LLMFactory.register_builtin_providers()
 
         assert LLMFactory._providers == {}
         assert LLMFactory.list_providers() == []
 
-    def test_provider_missing_key_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """条目缺 key 字段：显式报错（注册名依赖 key）"""
-        monkeypatch.setattr(
-            factory_module,
-            "AVAILABLE_MODELS",
-            {"providers": [{"id": "openai", "name": "X", "models": []}]},
-        )
-        _reset_registry()
-        with pytest.raises(ValueError, match="key"):
-            LLMFactory.register_builtin_providers()
-
     def test_unresolvable_provider_raises_with_override_hint(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """key≠claude 且 id≠openai 且无覆盖：报错并提示 _CLASS_OVERRIDES 出路"""
+        """key≠claude 且协议非 openai 且无覆盖：报错并提示 _CLASS_OVERRIDES 出路"""
+        monkeypatch.setattr(factory_module, "PROVIDER_KEYS", ("weird",))
         monkeypatch.setattr(
             factory_module,
-            "AVAILABLE_MODELS",
-            {"providers": [{"key": "weird", "id": "custom", "name": "W", "models": []}]},
+            "resolve_api_provider",
+            lambda key: "custom",
         )
         _reset_registry()
         with pytest.raises(ValueError, match="_CLASS_OVERRIDES"):
             LLMFactory.register_builtin_providers()
 
+    def test_missing_key_in_registry_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """provider_registry 派生时条目缺 key：显式 ValueError（与既有注册语义对齐）"""
+        from backend.app.services import model_data as model_data_module
+
+        bad = {"providers": [{"id": "openai", "name": "X", "models": []}]}
+        monkeypatch.setattr(model_data_module, "AVAILABLE_MODELS", bad)
+        with pytest.raises(ValueError, match="key"):
+            importlib.reload(provider_registry_module)
+
     def test_duplicate_protocol_id_registers_all_to_same_class(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """重复 id（多 Provider 共享协议）是合法形态：各自按 id 规则注册"""
+        """重复 id（多 Provider 共享协议）是合法形态：各自按协议规则注册"""
+        monkeypatch.setattr(factory_module, "PROVIDER_KEYS", ("a", "b", "claude"))
         monkeypatch.setattr(
             factory_module,
-            "AVAILABLE_MODELS",
-            {
-                "providers": [
-                    {"key": "a", "id": "openai", "name": "A", "models": []},
-                    {"key": "b", "id": "openai", "name": "B", "models": []},
-                    {"key": "claude", "id": "claude", "name": "C", "models": []},
-                ]
-            },
+            "resolve_api_provider",
+            lambda key: "claude" if key == "claude" else "openai",
         )
         _reset_registry()
         LLMFactory.register_builtin_providers()
@@ -237,16 +247,12 @@ class TestMalformedData:
     def test_duplicate_key_last_wins_without_crash(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """重复 key：注册不崩溃，后者覆盖前者（dict 语义）"""
+        """PROVIDER_KEYS 重复 key：注册不崩溃，后者覆盖前者（dict 语义）"""
+        monkeypatch.setattr(factory_module, "PROVIDER_KEYS", ("dup", "dup"))
         monkeypatch.setattr(
             factory_module,
-            "AVAILABLE_MODELS",
-            {
-                "providers": [
-                    {"key": "dup", "id": "openai", "name": "D1", "models": []},
-                    {"key": "dup", "id": "openai", "name": "D2", "models": []},
-                ]
-            },
+            "resolve_api_provider",
+            lambda key: "openai",
         )
         _reset_registry()
         LLMFactory.register_builtin_providers()
