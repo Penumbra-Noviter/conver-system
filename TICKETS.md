@@ -25,7 +25,7 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-> 技术债区当前 **4 项待立项**（F-1~F-4：C3/C4/C8 批次波 1 增量审核 + 期末四轴复证的非阻断发现；C3/C4/C8 三项已立项候选已于 2026-08-15 kickoff 批次修复归档）。
+> 技术债区当前 **3 项待立项 + 1 复核关闭**（F-1~F-4：C3/C4/C8 批次波 1 增量审核 + 期末四轴复证的非阻断发现；F-3 已随 Neat 清场复核关闭；C3/C4/C8 三项已立项候选已于 2026-08-15 kickoff 批次修复归档）。
 
 > **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
 
@@ -37,7 +37,7 @@
 | C8 | 模拟器 file 安全判据/路径前缀/超时常量/wg_ 消费方清单散落 → 收进 simulator-contracts 契约深模块 | 架构报告 | Speculative | ✅ 已修（2026-08-15：simulator-contracts.js 5 符号契约深模块，commit 7cb64f8） |
 | F-1 | `frontend/js/cascade.js:20` / `frontend/js/conversation-activation.js:20` docstring 旧 setter 名 `setConversationsRefresher` 残留（历史模式引用，C3 工单声明出范围；建议改述为引用 setChatHooks） | 波 1 Falsify（期末复证） | Worth exploring | 📝 待立项 |
 | F-2 | `frontend/js/simulator-contracts.js:19` / `frontend/js/simulator-view.js:382` 超时秒数 `TIMEOUT_MS/1000` 派生——若毫秒数改非 1000 整数倍将出现小数秒（当前 15000→15 无漂移；契约锁 toContain 派生断言锁不住 UI 小数形态） | 波 1 Falsify（期末复证） | Speculative | 📝 待立项 |
-| F-3 | 本地过期 coverage 产物残留（`frontend/coverage/` 已入 .gitignore，纯本地卫生项） | 波 1 Falsify（期末复证） | Speculative | 📝 待立项（复核关闭候选） |
+| F-3 | 本地过期 coverage 产物残留（`frontend/coverage/` 已入 .gitignore，纯本地卫生项） | 波 1 Falsify（期末复证） | Speculative | ❌ 复核关闭（2026-08-15：Neat 清场删除 frontend/coverage/，已入 .gitignore 可再生成，现状成立） |
 | F-4 | `scripts/smoke-simulators.mjs:72` `DEFAULT_BASE_URL = 'http://127.0.0.1:8000'` 字面量（本地开发地址、`--base-url` 可覆盖、非外部服务） | 波 1 Falsify（期末复证） | Speculative | 📝 待立项（复核关闭候选） |
 
 ---
