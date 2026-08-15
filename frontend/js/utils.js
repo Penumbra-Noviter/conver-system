@@ -30,6 +30,22 @@ export function showToast(message, type = 'success') {
 }
 
 /**
+ * 显示错误 Toast（C4 薄封装 — showToast(message, 'error')，语义单点）
+ * @param {string} message - 提示内容
+ */
+export function showError(message) {
+    showToast(message, 'error');
+}
+
+/**
+ * 显示成功 Toast（C4 薄封装 — showToast(message, 'success')，语义单点）
+ * @param {string} message - 提示内容
+ */
+export function showSuccess(message) {
+    showToast(message, 'success');
+}
+
+/**
  * 通用 Blob 下载 — 委托 api.requestBlob（走 doFetch seam）→ blob → <a download> 触发浏览器保存
  * 对话导出与角色卡导出共用（P2.5.5）。签名与行为保持（app.js / export-dialog.js 调用点无需改）；
  * URL 策略单一来源：一律经 requestBlob 拼接（旧式 '/api' 前缀自动归一化）。
