@@ -17,7 +17,7 @@
  * 依赖方向：conversation-activation.js → chat.js（chatDom/renderMessages/
  *   refreshSendButton/renderChatHeader/EMPTY_STATE_HTML）/ tabs.js / state.js / api.js；
  *   app.js → conversation-activation.js（经 setActivationHooks 注入 DOM 渲染回调，
- *   避免反向依赖 — 与 setConversationsRefresher 同模式）。
+ *   避免反向依赖 — 与 setChatHooks 同模式）。
  *   F4 收口后头部渲染直 import chat.js renderChatHeader（依赖方向不变 — 本模块
  *   本就依赖 chat.js；头部深模块归位 chat.js，无需再经 hooks 注入）。
  */

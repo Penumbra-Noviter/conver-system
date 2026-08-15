@@ -17,7 +17,7 @@
  * 依赖方向：cascade.js → tabs.js（getTabs/closeTabs/getActiveTab，只读消费）；
  *   其余依赖（renderConversations / loadConversations / activateConversation /
  *   showEmptyState / refreshSendButton）经 setCascadeHooks 注入 —— 避免反向
- *   import 编排区（G7 注入钩子模式，与 setActivationHooks / setConversationsRefresher
+ *   import 编排区（G7 注入钩子模式，与 setActivationHooks / setChatHooks
  *   同构）。注入钩子默认 no-op 兜底：未接线时调用不抛错，关 tab 本身仍生效。
  *
  * 协议表面（__all__）：setCascadeHooks / closeConversationsAndResettle。
