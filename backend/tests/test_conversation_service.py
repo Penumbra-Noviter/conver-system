@@ -159,3 +159,45 @@ class TestBuildContentDisposition:
         """产出字符串恒为 latin-1 可编码（HTTP header 契约，中文只出现在 filename* 编码段）"""
         header = build_content_disposition("character-7.json", "角色卡-测试·毒舌助手.json")
         header.encode("latin-1")  # 不抛 UnicodeEncodeError 即通过
+
+
+# ── 4. create_conversation 预插开场白（2026-08-15 修复回归）──
+
+
+class TestCreateConversation:
+    def test_preinserts_first_mes_when_character_has_greeting(self, db_session) -> None:
+        """角色有 first_mes → 创建对话后立即存在首条 assistant 开场白（模板变量已替换）"""
+        char = _create_character(db_session, first_mes="你好，{{user}}！我是{{char}}。")
+        from backend.app.schemas.conversation import ConversationCreate
+        from backend.app.models.message import Message, Role
+
+        conv = conversation_service.create_conversation(
+            db_session, ConversationCreate(character_id=char.id)
+        )
+
+        messages = (
+            db_session.query(Message)
+            .filter(Message.conversation_id == conv.id)
+            .order_by(Message.id.asc())
+            .all()
+        )
+        assert len(messages) == 1
+        assert messages[0].role == Role.ASSISTANT
+        assert messages[0].content == "你好，User！我是测试角色。"
+
+    def test_no_message_when_character_has_no_first_mes(self, db_session) -> None:
+        """角色无 first_mes → 创建对话不插入任何消息"""
+        char = _create_character(db_session, first_mes="")
+        from backend.app.schemas.conversation import ConversationCreate
+        from backend.app.models.message import Message
+
+        conv = conversation_service.create_conversation(
+            db_session, ConversationCreate(character_id=char.id)
+        )
+
+        count = (
+            db_session.query(Message)
+            .filter(Message.conversation_id == conv.id)
+            .count()
+        )
+        assert count == 0

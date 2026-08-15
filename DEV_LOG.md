@@ -6,6 +6,16 @@
 
 ---
 
+## 滚动摘要（2026-08-15 — 会话交付：模拟器获取列表修复 + 开场白预插 + 桌面版重新打包）
+
+- **模拟器「获取列表」网络错误修复**——根因（实证）：主应用 `openai_base_url` 缺 `/v1`，模拟器浏览器直连 `{base}/models` 命中 relay 管理面板 HTML（非 JSON）；真实 API 在 `/v1` 下。修复：DB `openai_base_url` 统一为 `https://api.kukuit.com/v1`（模拟器经 key-injector 自动跟随主应用设置）；Playwright 端到端验证「获取 → 已选择模型」。附带实证：relay 拒 `Python-urllib` UA（403），Chrome/SDK UA 正常。
+- **开场白预插修复**——根因：`auto_insert_greeting` 仅首条用户消息时触发，创建对话不预插。修复：`create_conversation` 预插 `first_mes` 为首条 assistant 消息（`create_message` 函数内延迟导入解 conversation↔message 循环导入）；+2 回归用例（`TestCreateConversation`），pytest **471 + 1 skip**。
+- **桌面版重新打包**——build-desktop.ps1 首轮全链通过但 PyInstaller 跳过已存在旧后端包（产物时间戳复核发现），单独重跑 build-backend.ps1 后冒烟 5 项 PASS；dist 测试包 `dist/conver-system.exe` + `dist/conver_backend/` 就绪。
+- **测试同步**：pytest **471 + 1 skip**（+2）；Vitest 807 / cargo 41 未受影响。
+- **知识库预检召回**：无新教训（「base_url 需带 /v1 才能命中 OpenAI 兼容端点」已入 TICKETS 归档记录）。
+
+---
+
 ## 滚动摘要（2026-08-13 ~ 08-14 — 阶段摘要：U7/U8+U9/TD 批次 + 折叠规则 + 原型 + 08-09）
 
 - **技术债区 TD-57/66/67/68 批次（3 工单小档全自动）**：TD-66 credentials model 门控收紧（_OPENAI_PROTOCOL_MODELS 单源派生，先红后绿）/ TD-67+68 存档键契约单一来源（save-key-meta.js 深模块三件套单源，五处消费点迁移）/ TD-57 同源 iframe 信任边界文档化（architecture.md 五要素）；期末四轴 0 阻断；技术债区 21→17 项待立项

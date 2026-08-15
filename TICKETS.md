@@ -44,6 +44,17 @@
 
 ## 已完成归档
 
+### 会话交付：模拟器获取列表修复 + 开场白预插（2026-08-15，无工单 bug 修复）
+
+> 来源：用户实测反馈——「模拟器里用主应用 key 点获取 → 网络错误（CORS/地址）」，聊天正常；「角色开场白一开始不弹出或太慢」。按第一性原理逐条实证定位，非猜测。
+
+- **修复 1（模拟器获取列表）**——根因：主应用 DB `openai_base_url` 存的是 `https://api.kukuit.com`（缺 /v1），模拟器（仿微等）「获取列表」浏览器直连 `{baseUrl}/models` → 实测 relay 的 `/models`（无 /v1）返回管理面板 HTML（`Content-Type: text/html`）而非 JSON；真实 API 只在 `/v1` 下（`/v1/models` 返回标准 JSON）。主应用聊天正常是因为后端 `llm/openai.py::_normalize_base_url` 自动补 /v1。修复：`openai_base_url` 统一改为 `https://api.kukuit.com/v1`（DB 数据，单一事实来源；模拟器经 key-injector 自动跟随主应用设置）。Playwright 端到端验证：模拟器 iframe 自动注入 key/endpoint/model → 点「获取」→ 「已选择模型：deepseek-v4-flash」。附带发现：relay 拒绝 `Python-urllib` 默认 UA（403），浏览器 Chrome UA / OpenAI SDK UA 均正常——浏览器直连不受影响。
+- **修复 2（开场白预插）**——根因：`message.py::auto_insert_greeting` 只在用户发送首条消息时插入开场白，创建对话时不预插（`conversation.py::create_conversation` 无消息插入逻辑），新对话打开时消息列表为空。修复：`create_conversation` 创建对话时把角色 `first_mes` 预插为首条 assistant 消息（`apply_template_vars` 模板替换 + `create_message`；`auto_insert_greeting` 已有「已有消息不重复插入」守卫，无重复风险）。循环导入处理：`message.create_message` 改为函数内延迟导入（conversation ↔ message 双向依赖）。回归测试：`TestCreateConversation` 2 用例（有 first_mes → 预插且模板变量已替换；无 first_mes → 不插消息），pytest 13 passed。
+
+**验证链**：pytest 全量 + Vitest 807 + cargo 41 全绿；build-desktop.ps1 全链通过 + 冒烟 5 项 PASS；后端 PyInstaller 重新打包（首轮 build-desktop 跳过已存在的旧后端包，产物时间戳复核发现后单独重打，冒烟复核通过）。
+
+**测试同步**：pytest 469 + 1 skip → **471 + 1 skip**（+2 回归用例）。
+
 ### 技术债区 F-1/F-2/F-4 批次（2026-08-15 kickoff 全自动档：轻量档 1 工单）
 
 > 来源：C3/C4/C8 批次波 1 增量审核 + 期末四轴复证非阻断发现（F-1~F-4）。Grilling 共识（全自动档拍板）：**F-1 做 + F-2 关闭 + F-4 关闭**，各附一句话实证理由。
