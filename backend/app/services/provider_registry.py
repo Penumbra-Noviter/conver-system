@@ -27,9 +27,18 @@ __all__ = [
     "resolve_api_provider",
 ]
 
+def _require_key(provider: dict) -> str:
+    """校验 provider 条目含非空 key 字段，返回该 key（缺则显式 ValueError）"""
+    key = provider.get("key")
+    if not key:
+        raise ValueError(f"AVAILABLE_MODELS provider 条目缺少 key 字段: {provider!r}")
+    return key
+
+
 # Provider key 声明序（与 AVAILABLE_MODELS["providers"] 顺序一致，注册顺序契约）
+# 条目缺 key 时显式 ValueError（注册名依赖 key，与既有校验语义对齐）
 PROVIDER_KEYS: tuple[str, ...] = tuple(
-    p["key"] for p in AVAILABLE_MODELS["providers"]
+    _require_key(p) for p in AVAILABLE_MODELS["providers"]
 )
 
 # Provider key → API 协议标识符映射（key != id 的协议共享者）
@@ -48,6 +57,16 @@ OPENAI_PROTOCOL_MODELS: frozenset[str] = frozenset(
 
 
 def resolve_api_provider(provider: str) -> str:
+    """将 provider key 映射到同协议的凭证槽位（claude / openai）
+
+    Args:
+        provider: Provider key（如 "deepseek"）
+
+    Returns:
+        协议 id：在 API_PROVIDER_MAP 中返回其协议，否则返回自身（claude /
+        openai 直接透传为凭证槽位名）。
+    """
+    return API_PROVIDER_MAP.get(provider, provider)
     """将 provider key 映射到同协议的凭证槽位（claude / openai）
 
     Args:
