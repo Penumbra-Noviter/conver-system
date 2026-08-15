@@ -3,13 +3,16 @@
  *
  * 职责：
  *   1. 视图切换（侧栏导航，含 switchView 内 100ms 搜索框聚焦时序）
- *   2. 业务协调（角色 / 对话 / 删除确认弹窗与调用点 / 初始化接线）
- *   3. 事件绑定
+ *   2. 业务协调（初始化数据加载序列 / 删除/清空联动调用点 / 注入接线）
+ *   3. 事件绑定（导航 / 聊天输入发送）
  *
  * 模块结构：
  *   - ./state.js — 全局状态
  *   - ./chat.js  — 聊天域渲染与交互（renderMessages / handleSend / chatDom /
  *     聊天头部深模块 renderChatHeader / startRename — F4 收口）
+ *   - ./list-views.js — 角色/对话列表视图深模块（C4 下沉：渲染 + 四类按钮
+ *     事件委托 + 导入 + 开始对话 + 级联删除入口 + 列表标题同步 DOM 手术；
+ *     持有自身 DOM 引用，仅经 initListViews({ switchView }) 依赖本协调层）
  *   - ./format.js — 渲染/格式化纯函数（highlightText / buildMessagesHtml）
  *   - ./search-view.js — 搜索视图深模块（防抖 + 五态文案 + 渲染 + 结果跳转；
  *     ARC-9 C1 迁出，经 initSearchView 注入跳转钩子接线）
@@ -34,18 +37,13 @@
  *   - ./components/ — 模态框相关组件（modal 工厂 / confirm / model-selector / export / character-form）
  */
 
-import { characters, conversations, models, settings } from './api.js';
-import { showCharacterForm } from './components/character-form.js';
-import { showCharacterWizard } from './components/character-wizard.js';
-import { showConfirm, showAlert } from './components/confirm-dialog.js';
-import { showModelSelector } from './components/model-selector.js';
+import { models, settings } from './api.js';
 import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
 import { initTabBar } from './components/tab-bar.js';
-import { showToast, downloadBlob, autoResizeInput } from './utils.js';
-import { characterCardHtml, conversationItemHtml } from './format.js';
+import { showError, autoResizeInput } from './utils.js';
 import { state } from './state.js';
 import { chatDom, handleSend, refreshSendButton, setChatHooks } from './chat.js';
-import { getActiveTab, getTabs, abortStream, restoreFromStorage } from './tabs.js';
+import { getActiveTab, abortStream, restoreFromStorage } from './tabs.js';
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 import { initSearchView } from './search-view.js';
 import { closeConversationsAndResettle, setCascadeHooks } from './cascade.js';
@@ -53,9 +51,10 @@ import { initSimulatorsView, refreshSimulators, getGames } from './simulators.js
 import { initSimulatorRun, openSimulator, closeSimulator } from './simulator-view.js';
 import { initKeyInjector } from './key-injector.js';
 import { initSaveManager, openSavePanel, closeSavePanel } from './save-manager.js';
+import { loadCharacters, loadConversations, renderConversations, syncConversationListTitle, initListViews } from './list-views.js';
 
 // ══════════════════════════════════════════════════
-// DOM 引用
+// DOM 引用（协调层只保留视图与导航按钮 — 列表/角色 DOM 由 list-views.js 持有）
 // ══════════════════════════════════════════════════
 
 const $ = (sel) => document.querySelector(sel);
@@ -67,18 +66,8 @@ const dom = {
     // 视图
     views: $$('.view'),
     navBtns: $$('.nav-btn'),
-
-    // 聊天（聊天域 DOM 引用见 chat.js chatDom）
-    conversationList: $('#conversation-list'),
-    btnNewChat: $('#btn-new-chat'),
     // 移动端
     mobileNavBtns: $$('.mobile-nav-btn'),
-
-    // 角色
-    characterGrid: $('#character-grid'),
-    btnCreateCharacter: $('#btn-create-character'),
-    btnImportCharacter: $('#btn-import-character'),
-    characterImportInput: $('#character-import-input'),
 };
 
 // ══════════════════════════════════════════════════
@@ -102,7 +91,7 @@ async function switchView(viewName) {
     if (btn) btn.classList.add('active');
     if (mobileBtn) mobileBtn.classList.add('active');
 
-    // 进入视图时刷新数据
+    // 进入视图时刷新数据（角色/对话列表渲染与事件委托在 list-views.js — 本处只触发）
     if (viewName === 'characters') loadCharacters();
     if (viewName === 'chat') loadConversations();
     if (viewName === 'settings') {
@@ -139,272 +128,6 @@ dom.navBtns.forEach((btn) => {
 // 移动端导航事件
 dom.mobileNavBtns.forEach((btn) => {
     btn.addEventListener('click', () => switchView(btn.dataset.view));
-});
-
-// ══════════════════════════════════════════════════
-// Toast 通知
-// ══════════════════════════════════════════════════
-
-function showError(message) {
-    showToast(message, 'error');
-}
-
-function showSuccess(message) {
-    showToast(message, 'success');
-}
-
-// ══════════════════════════════════════════════════
-// 角色管理
-// ══════════════════════════════════════════════════
-
-async function loadCharacters() {
-    try {
-        state.characters = await characters.list();
-        renderCharacters();
-    } catch (err) {
-        console.error('加载角色失败:', err);
-        showError('加载角色列表失败');
-    }
-}
-
-async function renderCharacters() {
-    const grid = dom.characterGrid;
-    if (state.characters.length === 0) {
-        grid.innerHTML = '<p class="empty-hint">暂无角色，点击上方按钮创建</p>';
-        return;
-    }
-
-    grid.innerHTML = state.characters.map((c) => characterCardHtml(c)).join('');
-
-    // 事件委托：开始对话
-    grid.querySelectorAll('.chat-with').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = parseInt(btn.closest('.character-card').dataset.id);
-            startChatWithCharacter(id);
-        });
-    });
-
-    // 事件委托：编辑
-    grid.querySelectorAll('.edit-char').forEach((btn) => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = parseInt(btn.closest('.character-card').dataset.id);
-            try {
-                const char = await characters.get(id);
-                showCharacterForm('edit', char, () => loadCharacters());
-            } catch (err) {
-                console.error('加载角色详情失败:', err);
-                showAlert('加载角色信息失败: ' + err.message);
-            }
-        });
-    });
-
-    // 事件委托：导出角色卡（P2.5.5）
-    grid.querySelectorAll('.export-char').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = parseInt(btn.closest('.character-card').dataset.id);
-            const char = state.characters.find((c) => c.id === id);
-            downloadBlob(`/api/characters/${id}/export`, `${char?.name || 'character'}.json`);
-        });
-    });
-
-    // 事件委托：删除
-    grid.querySelectorAll('.delete-char').forEach((btn) => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = parseInt(btn.closest('.character-card').dataset.id);
-            const char = state.characters.find(c => c.id === id);
-            const convCount = char?.conversation_count ?? 0;
-
-            const confirmed = await showConfirm({
-                title: '删除角色',
-                message: `确定要删除角色「${char?.name || '未知'}」吗？`,
-                detail: convCount > 0
-                    ? `该角色关联了 ${convCount} 个对话，删除后所有相关对话和消息也将被删除。`
-                    : '此操作不可撤销。',
-                confirmText: '删除',
-                cancelText: '取消',
-                danger: true,
-            });
-
-            if (confirmed) {
-                try {
-                    await characters.delete(id);
-                    await loadCharacters();
-                    // 联动：角色删除级联删除其全部对话 — 统一收口关闭对应会话 tab
-                    //（closeTabs 内部先 abort 在途流式；仅被删会话含活动 tab 才重定位视图）
-                    const doomed = getTabs()
-                        .filter((t) => t.characterId === id)
-                        .map((t) => t.conversationId);
-                    await closeConversationsAndResettle({ ids: doomed, reloadList: true });
-                } catch (err) {
-                    showAlert('删除失败: ' + err.message);
-                }
-            }
-        });
-    });
-}
-
-dom.btnCreateCharacter.addEventListener('click', () => {
-    showCharacterWizard(() => loadCharacters());
-});
-
-// ══════════════════════════════════════════════════
-// 角色导入（P2.5.4）
-// ══════════════════════════════════════════════════
-
-/**
- * 导入失败后的引导：询问是否改用「创建角色」向导
- * （向导支持智能导入/内置模板/手动创建，比调试角色卡 JSON 更省力）
- */
-async function promptUseWizardAfterImportFail() {
-    const useWizard = await showConfirm({
-        title: '导入失败',
-        message: '是否改用「创建角色」向导？',
-        detail: '向导支持智能导入（粘贴文档，AI 自动提取）、内置模板或手动创建。',
-        confirmText: '打开向导',
-        cancelText: '取消',
-    });
-    if (useWizard) showCharacterWizard();
-}
-
-/**
- * 处理导入角色文件：读取 → JSON.parse → POST /api/characters/import
- * JSON.parse 失败 → 前端直接提示，不发请求。
- */
-async function handleCharacterImport() {
-    const file = dom.characterImportInput.files?.[0];
-    if (!file) return;
-
-    let card;
-    try {
-        const text = await file.text();
-        card = JSON.parse(text);
-    } catch {
-        showError('不是有效的 JSON 文件');
-        dom.characterImportInput.value = '';
-        await promptUseWizardAfterImportFail();
-        return;
-    }
-
-    try {
-        const created = await characters.import(card);
-        showSuccess(`成功导入角色「${created.name}」`);
-        await loadCharacters();
-    } catch (err) {
-        // 后端 422 已带「导入失败：<原因> + 支持格式说明」，直接展示避免重复
-        showError(err.message);
-        await promptUseWizardAfterImportFail();
-    } finally {
-        // 清空 input，允许重复选择同一文件
-        dom.characterImportInput.value = '';
-    }
-}
-
-dom.btnImportCharacter.addEventListener('click', () => {
-    dom.characterImportInput.click();
-});
-dom.characterImportInput.addEventListener('change', handleCharacterImport);
-
-// ══════════════════════════════════════════════════
-// 模型选择 & 开始对话
-// ══════════════════════════════════════════════════
-
-async function startChatWithCharacter(characterId) {
-    const char = state.characters.find(c => c.id === characterId);
-    const charName = char?.name || '未知角色';
-
-    // 弹出模型选择器
-    const selection = await showModelSelector(charName);
-    if (!selection) return; // 用户取消
-
-    try {
-        const conv = await conversations.create({
-            character_id: characterId,
-            model_provider: selection.provider,
-            model_name: selection.model,
-            // 标题不传：后端默认「与 {角色名} 的对话」，首条消息后自动替换（P3.5）
-        });
-        switchView('chat');
-        await loadConversations();
-        // 创建即打开 tab（激活流程会以已知对话数据补全 title/characterId）
-        await activateConversation(conv.id);
-        chatDom.chatInput.focus();
-    } catch (err) {
-        showAlert('创建对话失败: ' + err.message);
-    }
-}
-
-// ══════════════════════════════════════════════════
-// 对话列表
-// ══════════════════════════════════════════════════
-
-async function loadConversations() {
-    try {
-        state.conversations = await conversations.list();
-        renderConversations();
-    } catch (err) {
-        console.error('加载对话列表失败:', err);
-        showError('加载对话列表失败');
-    }
-}
-
-function renderConversations() {
-    const list = dom.conversationList;
-    if (state.conversations.length === 0) {
-        list.innerHTML = '<p class="empty-hint">暂无对话</p>';
-        return;
-    }
-
-    // 列表高亮按活动 tab 判定（单一事实来源）
-    const activeConvId = getActiveTab()?.conversationId ?? null;
-
-    list.innerHTML = state.conversations
-        .map((c) => conversationItemHtml(c, { activeId: activeConvId }))
-        .join('');
-
-    list.querySelectorAll('.conversation-item').forEach((item) => {
-        item.addEventListener('click', (e) => {
-            // 忽略删除按钮点击
-            if (e.target.closest('.btn-delete-conv')) return;
-            // 打开或激活对应会话 tab（统一激活流程）
-            activateConversation(parseInt(item.dataset.id));
-        });
-    });
-
-    // 删除对话事件
-    list.querySelectorAll('.btn-delete-conv').forEach((btn) => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = parseInt(btn.closest('.conversation-item').dataset.id);
-            const conv = state.conversations.find(c => c.id === id);
-            const confirmed = await showConfirm({
-                title: '删除对话',
-                message: `确定要删除对话「${conv?.title || '未知'}」吗？`,
-                detail: `该对话共 ${conv?.message_count ?? 0} 条消息，删除后不可恢复。`,
-                confirmText: '删除',
-                danger: true,
-            });
-            if (confirmed) {
-                try {
-                    await conversations.delete(id);
-                    // 联动：统一收口（closeTabs 内部先中止在途流式再关 tab；
-                    // 被删 tab 为活动时才重定位渲染 — saveCurrent:false；
-                    // 被删会话的 tab 缓存（草稿/滚动）随关闭一并销毁 — 无需预先保存）
-                    await closeConversationsAndResettle({ ids: [id], reloadList: true });
-                } catch (err) {
-                    showAlert('删除失败: ' + err.message);
-                }
-            }
-        });
-    });
-}
-
-dom.btnNewChat.addEventListener('click', () => {
-    // 切换到角色视图让用户选角色
-    switchView('characters');
 });
 
 // ══════════════════════════════════════════════════
@@ -453,7 +176,7 @@ async function loadModels() {
 }
 
 // ══════════════════════════════════════════════════
-// 初始化
+// 初始化（数据加载序列 — 角色/对话加载在 list-views.js）
 // ══════════════════════════════════════════════════
 
 async function init() {
@@ -491,7 +214,8 @@ async function init() {
 
 // ══════════════════════════════════════════════════
 // 模块级注入区（G7 注入钩子模式 — 全部注入同处同相；renderConversations /
-//   switchView / showError / loadConversations 均为函数声明，可 hoisting 直接引用）
+//   loadConversations / syncConversationListTitle 为 list-views.js 深模块导出，
+//   showError 为 utils.js 导出 — 不再依赖本文件函数声明）
 // ══════════════════════════════════════════════════
 
 // 激活编排模块注入（ARC-6 — DOM 渲染回调 renderConversations/视图切换/错误提示；
@@ -507,14 +231,7 @@ setActivationHooks({
 // import；标题同步只更新匹配会话项 .title 文本，不重渲染列表 — 与收口前行为一致）
 setChatHooks({
     refreshConversations: loadConversations,
-    syncConversationListTitle: (convId, newTitle) => {
-        dom.conversationList.querySelectorAll('.conversation-item').forEach((item) => {
-            if (parseInt(item.dataset.id) === convId) {
-                const titleDiv = item.querySelector('.title');
-                if (titleDiv) titleDiv.textContent = newTitle;
-            }
-        });
-    },
+    syncConversationListTitle,
 });
 
 // 级联收口依赖注入（ARC-9 C1 — 删角色级联 / 删对话 / 清空全部 / tab-bar 关最后
@@ -525,6 +242,13 @@ setCascadeHooks({
     activateConversation,
     showEmptyState,
     refreshSendButton,
+});
+
+// 列表视图深模块初始化（C4 — 角色/对话列表渲染与事件委托收口在 list-views.js；
+// 唯一协调层钩子 switchView：btnNewChat 切角色视图、startChatWithCharacter
+// 创建对话后切 chat 视图）
+initListViews({
+    switchView: (viewName) => switchView(viewName),
 });
 
 // 搜索视图初始化（ARC-9 C1 — 防抖 + 五态文案 + 渲染 + 结果跳转收口在 search-view.js；

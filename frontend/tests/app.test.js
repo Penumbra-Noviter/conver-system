@@ -1,29 +1,31 @@
 /**
  * app.js 编排薄集成测试（ARC-9 C5 — C1/C2 seam 挂网后的编排区接线）
  *
- * 覆盖：
+ * 覆盖（C4 下沉后 — 角色/对话列表视图已迁至 list-views.test.js）：
  *   - init 接线序列：模块级注入区（setActivationHooks / setChatHooks /
- *     setCascadeHooks / init* 系列先行接线）→ init 四路数据加载 →
- *     restoreFromStorage（无记录 → 空态；有记录 → activateConversation(saveCurrent:false)）→
+ *     setCascadeHooks / initListViews / init* 系列先行接线）→ init 四路数据
+ *     加载（角色/对话列表经 list-views.js）→ restoreFromStorage（无记录 →
+ *     空态；有记录 → activateConversation(saveCurrent:false)）→
  *     initProviderDropdown → initSettingsPanel（清空回调触发级联收口）
- *   - 视图切换刷新分发：characters→loadCharacters、chat→loadConversations、
- *     settings→loadSettings+initProviderDropdown、search→100ms 聚焦、
- *     simulators→refreshSimulators（U7-T3，manifest fetch + 卡片渲染接线）
- *   - 级联四入口触发：删角色 / 删对话 / 清空全部（settings）/ tab-bar 关最后 tab
- *     —— 均断言经注入钩子触发 closeConversationsAndResettle 的正确参数
+ *   - 视图切换刷新分发：characters→loadCharacters、chat→loadConversations
+ *     （list-views 导出）、settings→loadSettings+initProviderDropdown、
+ *     search→100ms 聚焦、simulators→refreshSimulators（U7-T3）
+ *   - 级联入口：tab-bar 关最后 tab（删角色/删对话入口用例已随 list-views 下沉迁移）
  *   - 搜索视图接线：输入 → 防抖搜索 → 结果点击经激活流程打开会话
- *   - Falsify：删对话后列表重载失败 → 无 unhandled rejection + 错误 toast + tab 已关
+ *   - 重命名接线：列表标题同步钩子（syncConversationListTitle 在 list-views.js）
+ *   - Falsify：模型列表加载失败 → console.error（init 不崩溃）
  *
  * 断言纪律：优先 spy 模块边界/注入钩子的调用序列与参数（cascade 收口参数、
- * api 层调用、utils.showToast），DOM 断言仅限关键类名/文案（empty-hint /
- * 空态 / 弹窗确认按钮）。内部逻辑（防抖细节 / mergeFreshList / 激活编排）由
- * search-view/cascade/stream-session/conversation-activation 直测钉住，不重复。
+ * api 层调用），DOM 断言仅限关键类名/文案（empty-hint / 空态 / 弹窗确认按钮）。
+ * 内部逻辑（防抖细节 / mergeFreshList / 激活编排 / 列表委托）由
+ * search-view/cascade/stream-session/conversation-activation/list-views 直测钉住。
  *
- * 挂载模式：jsdom + vi.resetModules() + 内联最小 DOM 子集（index.html id 契约）
+ * 挂载模式：jsdom + vi.resetModules() + 内联最小 DOM 子集（index.html id 契约；
+ * 列表/角色 DOM 保留供 init/switchView 空态渲染断言 — 绑定已随 C4 下沉）
  * + globalThis.fetch mock 路由；与 conversation-activation.test.js 同构。
  * 注意：app.js 模块求值即触发 init()（浮空 promise）—— 以 fetch 调用数等待其完成。
  */
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /** 最小 DOM 子集 — 覆盖 app.js / chat.js / search-view.js / settings-panel.js /
  * tab-bar.js 在模块求值期绑定的全部 id/class 契约（只读契约，取自 index.html） */
@@ -102,51 +104,34 @@ const PROVIDERS = [
  * fetch mock 路由（globalThis.fetch — api.js doFetch seam 消费）
  * @param {object} opts
  * @param {Array} [opts.characters] - GET /api/characters 返回
- * @param {boolean} [opts.charactersFail] - GET /api/characters 返回 500（init 加载失败路径）
- * @param {object} [opts.characterGet] - GET /api/characters/{id} 返回（编辑委托）
  * @param {Array} [opts.conversations] - GET /api/conversations 返回
- * @param {object} [opts.createdConv] - POST /api/conversations 返回（chat-with 创建）
  * @param {Array} [opts.providers] - GET /api/models 返回的 providers
- * @param {boolean} [opts.modelsFail] - GET /api/models 返回 500
  * @param {object} [opts.settings] - GET /api/settings 返回
  * @param {object} [opts.messagesByConv] - 各会话消息列表
  * @param {Array} [opts.searchResults] - GET /api/messages/search 返回
- * @param {object} [opts.importResult] - POST /api/characters/import 返回（成功）或 {fail: Error}
- * @param {boolean} [opts.failReloadAfterDelete] - 删除后列表重载（第 2 次 GET conversations）返回 500
  * @param {object} [opts.manifest] - simulators/manifest.json 返回（模拟器列表视图 fetch；默认空列表）
  * @param {object} [opts.credentials] - GET /api/settings/credentials 返回（U8-T2；默认 protocol=none）
  * @param {boolean} [opts.credentialsFail] - GET /api/settings/credentials 返回 500（注入失败路径）
  */
-function makeRoute({ characters = [], characterGet = null,
-    conversations = [], createdConv = null, providers = PROVIDERS,
-    settings = {}, messagesByConv = {}, searchResults = [], importResult = null,
-    failReloadAfterDelete = false, manifest = { version: 1, simulators: [] },
+function makeRoute({ characters = [],
+    conversations = [], providers = PROVIDERS,
+    settings = {}, messagesByConv = {}, searchResults = [],
+    manifest = { version: 1, simulators: [] },
     credentials = { key: '', endpoint: '', model: '', protocol: 'none' },
     credentialsFail = false } = {}) {
-    let convListCalls = 0;
     return async (url, options = {}) => {
         const path = String(url).replace(/^.*\/api/, '/api');
         const method = options.method || 'GET';
 
         if (path === '/api/characters' && method === 'GET') return mockJson(characters);
         if (path === '/api/characters' && method === 'POST') return mockJson({});
-        if (path === '/api/characters/import' && method === 'POST') {
-            if (importResult?.fail) return mockJson({ detail: importResult.fail }, 400);
-            return mockJson(importResult ?? { id: 9, name: '新角色' });
-        }
         const charMatch = path.match(/^\/api\/characters\/(\d+)$/);
         if (charMatch) {
             if (method === 'DELETE') return mockJson(null, 204);
-            if (characterGet === null) return mockJson({ detail: 'not found' }, 404);
-            return mockJson(characterGet);
+            return mockJson({ detail: 'not found' }, 404);
         }
 
-        if (path === '/api/conversations' && method === 'GET') {
-            convListCalls++;
-            if (failReloadAfterDelete && convListCalls > 1) return mockJson({ detail: 'boom' }, 500);
-            return mockJson(conversations);
-        }
-        if (path === '/api/conversations' && method === 'POST') return mockJson(createdConv);
+        if (path === '/api/conversations' && method === 'GET') return mockJson(conversations);
         if (path === '/api/conversations' && method === 'DELETE') return mockJson(null, 204);
         const convMatch = path.match(/^\/api\/conversations\/(\d+)$/);
         if (convMatch) {
@@ -572,41 +557,9 @@ describe('app.js 模拟器 Key 注入接线 — initKeyInjector（U8-T2）', () 
     });
 });
 
-describe('app.js 级联四入口 — 触发行为', () => {
+describe('app.js 级联收口 — tab-bar 关最后 tab（删角色/删对话入口已随 list-views 下沉迁移）', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
     afterEach(() => { vi.restoreAllMocks(); });
-
-    it('删角色入口：确认后 closeConversationsAndResettle 收到该角色全部会话 ids + reloadList:true', async () => {
-        const { cascade, tabs, fetchSpy } = await loadApp(makeRoute({
-            characters: [{ id: 1, name: '角色A', conversation_count: 1 }],
-        }));
-        tabs.openTab(11);
-        tabs.updateTab(11, { characterId: 1 });
-        const cascadeSpy = vi.spyOn(cascade, 'closeConversationsAndResettle').mockResolvedValue(undefined);
-
-        document.querySelector('#character-grid .delete-char').click();
-        document.querySelector('.modal-overlay .confirm-ok').click();
-
-        await vi.waitFor(() => expect(cascadeSpy).toHaveBeenCalledTimes(1));
-        expect(cascadeSpy).toHaveBeenCalledWith({ ids: [11], reloadList: true });
-        expect(fetchSpy.mock.calls.some(([url, opts]) =>
-            String(url).endsWith('/api/characters/1') && opts?.method === 'DELETE')).toBe(true);
-    });
-
-    it('删对话入口：确认后 closeConversationsAndResettle 收到 {ids:[11],reloadList:true}', async () => {
-        const { cascade, fetchSpy } = await loadApp(makeRoute({
-            conversations: [{ id: 11, title: 'A', message_count: 2 }],
-        }));
-        const cascadeSpy = vi.spyOn(cascade, 'closeConversationsAndResettle').mockResolvedValue(undefined);
-
-        document.querySelector('#conversation-list .btn-delete-conv').click();
-        document.querySelector('.modal-overlay .confirm-ok').click();
-
-        await vi.waitFor(() => expect(cascadeSpy).toHaveBeenCalledTimes(1));
-        expect(cascadeSpy).toHaveBeenCalledWith({ ids: [11], reloadList: true });
-        expect(fetchSpy.mock.calls.some(([url, opts]) =>
-            String(url).endsWith('/api/conversations/11') && opts?.method === 'DELETE')).toBe(true);
-    });
 
     it('tab-bar 关最后 tab：onActivate(null) → closeConversationsAndResettle 收到 {ids:[],reloadList:false}', async () => {
         const { cascade, tabs } = await loadApp(makeRoute({}));
@@ -618,25 +571,6 @@ describe('app.js 级联四入口 — 触发行为', () => {
         await vi.waitFor(() => expect(cascadeSpy).toHaveBeenCalledTimes(1));
         expect(cascadeSpy).toHaveBeenCalledWith({ ids: [], reloadList: false });
         expect(tabs.getTabs()).toHaveLength(0);
-    });
-
-    it('Falsify:删对话后列表重载失败 → 无 unhandled rejection + 错误 toast + tab 已关（真实级联）', async () => {
-        const { utils, tabs, fetchSpy } = await loadApp(makeRoute({
-            conversations: [{ id: 11, title: 'A', message_count: 2 }],
-            failReloadAfterDelete: true,
-        }));
-        const toastSpy = vi.spyOn(utils, 'showToast');
-
-        document.querySelector('#conversation-list .btn-delete-conv').click();
-        document.querySelector('.modal-overlay .confirm-ok').click();
-
-        await vi.waitFor(() => expect(toastSpy).toHaveBeenCalled());
-        expect(toastSpy).toHaveBeenCalledWith('加载对话列表失败', 'error');
-        // 真实级联收口已生效：tab 关闭（不依赖列表重载成功）
-        expect(tabs.getTabs()).toHaveLength(0);
-        // 删除本身已发出（列表重载失败发生在删除之后）
-        expect(fetchSpy.mock.calls.some(([url, opts]) =>
-            String(url).endsWith('/api/conversations/11') && opts?.method === 'DELETE')).toBe(true);
     });
 });
 
@@ -684,147 +618,6 @@ describe('app.js 搜索接线 — 输入→防抖→结果跳转', () => {
         // 未知名分支渲染 <span class="chat-title"> 无 id）
         expect(document.querySelector('#chat-header').textContent)
             .toContain('选择一个角色开始对话');
-    });
-});
-
-describe('app.js 角色管理委托 — 四类按钮与失败兜底', () => {
-    beforeEach(() => { vi.restoreAllMocks(); });
-    afterEach(() => { vi.restoreAllMocks(); });
-
-    it('chat-with 委托：模型选择器 → 创建对话 → 切 chat 视图 → 激活会话 + 输入聚焦', async () => {
-        const { tabs, state, fetchSpy } = await loadApp(makeRoute({
-            characters: [{ id: 1, name: '角色A', conversation_count: 0 }],
-            conversations: [{ id: 21, title: '与 角色A 的对话', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' }],
-            createdConv: { id: 21, title: '与 角色A 的对话', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' },
-        }));
-
-        document.querySelector('#character-grid .chat-with').click();
-        // 模型选择器（真实 modal）→ 默认选中 → 开始对话
-        await vi.waitFor(() => expect(document.querySelector('.modal-overlay')).not.toBeNull());
-        document.querySelector('.modal-overlay .ms-start').click();
-
-        await vi.waitFor(() => expect(tabs.getTab(21)?.messages).toBeDefined());
-        expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations') && o?.method === 'POST'))
-            .toBe(true);
-        expect(state.currentView).toBe('chat');
-        expect(tabs.getActiveTab()?.conversationId).toBe(21);
-        expect(tabs.getTab(21).characterId).toBe(1);
-        expect(document.activeElement).toBe(document.querySelector('#chat-input')); // 创建即聚焦
-    });
-
-    it('chat-with 取消模型选择 → 不创建对话（no-op）', async () => {
-        const { fetchSpy } = await loadApp(makeRoute({
-            characters: [{ id: 1, name: '角色A', conversation_count: 0 }],
-        }));
-        document.querySelector('#character-grid .chat-with').click();
-        await vi.waitFor(() => expect(document.querySelector('.modal-overlay')).not.toBeNull());
-        document.querySelector('.modal-overlay .ms-cancel').click();
-        await new Promise((r) => setTimeout(r, 0));
-
-        expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations') && o?.method === 'POST'))
-            .toBe(false);
-    });
-
-    it('Falsify:创建对话失败 → showAlert「创建对话失败: <原因>」', async () => {
-        const { fetchSpy } = await loadApp(makeRoute({
-            characters: [{ id: 1, name: '角色A', conversation_count: 0 }],
-        }));
-        fetchSpy.mockImplementationOnce((url, options = {}) => {
-            if (String(url).endsWith('/api/conversations') && options?.method === 'POST') {
-                return Promise.resolve(mockJson({ detail: 'boom' }, 500));
-            }
-            return makeRoute({})(url, options);
-        });
-        const confirmModule = await import('../js/components/confirm-dialog.js');
-        const alertSpy = vi.spyOn(confirmModule, 'showAlert');
-
-        document.querySelector('#character-grid .chat-with').click();
-        await vi.waitFor(() => expect(document.querySelector('.modal-overlay')).not.toBeNull());
-        document.querySelector('.modal-overlay .ms-start').click();
-
-        await vi.waitFor(() => expect(alertSpy).toHaveBeenCalledWith('创建对话失败: boom'));
-    });
-
-    it('edit-char 委托：加载角色 → 打开编辑表单', async () => {
-        const { fetchSpy } = await loadApp(makeRoute({
-            characters: [{ id: 1, name: '角色A', conversation_count: 0 }],
-            characterGet: { id: 1, name: '角色A', personality: 'p' },
-        }));
-
-        document.querySelector('#character-grid .edit-char').click();
-        await vi.waitFor(() => expect(document.querySelector('.character-form-modal')).not.toBeNull());
-        expect(fetchSpy.mock.calls.some(([u]) => String(u).endsWith('/api/characters/1'))).toBe(true);
-        expect(document.querySelector('.character-form-modal').textContent).toContain('编辑角色');
-        document.querySelector('.character-form-modal .modal-close').click();
-    });
-
-    it('Falsify:edit-char 加载失败 → showAlert「加载角色信息失败」', async () => {
-        await loadApp(makeRoute({
-            characters: [{ id: 1, name: '角色A', conversation_count: 0 }],
-        }));
-        const confirmModule = await import('../js/components/confirm-dialog.js');
-        const alertSpy = vi.spyOn(confirmModule, 'showAlert');
-
-        document.querySelector('#character-grid .edit-char').click();
-        await vi.waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
-        expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('加载角色信息失败'));
-    });
-
-    it('export-char 委托：downloadBlob 收到导出地址与文件名', async () => {
-        const { utils } = await loadApp(makeRoute({
-            characters: [{ id: 1, name: '角色A', conversation_count: 0 }],
-        }));
-        const downloadSpy = vi.spyOn(utils, 'downloadBlob');
-
-        document.querySelector('#character-grid .export-char').click();
-
-        expect(downloadSpy).toHaveBeenCalledWith('/api/characters/1/export', '角色A.json');
-    });
-
-    it('Falsify:删角色 API 失败 → showAlert「删除失败: <原因>」', async () => {
-        const { fetchSpy } = await loadApp(makeRoute({
-            characters: [{ id: 1, name: '角色A', conversation_count: 1 }],
-        }));
-        fetchSpy.mockImplementationOnce((url) => {
-            if (String(url).endsWith('/api/characters/1')) return Promise.resolve(mockJson({ detail: 'boom' }, 500));
-            return Promise.resolve(mockJson([{ id: 1, name: '角色A', conversation_count: 1 }]));
-        });
-        const confirmModule = await import('../js/components/confirm-dialog.js');
-        const alertSpy = vi.spyOn(confirmModule, 'showAlert');
-
-        document.querySelector('#character-grid .delete-char').click();
-        document.querySelector('.modal-overlay .confirm-ok').click();
-        await vi.waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
-
-        expect(alertSpy).toHaveBeenCalledWith('删除失败: boom');
-    });
-
-    it('Falsify:删对话 API 失败 → showAlert「删除失败: <原因>」', async () => {
-        const { fetchSpy } = await loadApp(makeRoute({
-            conversations: [{ id: 11, title: 'A', message_count: 2 }],
-        }));
-        fetchSpy.mockImplementationOnce((url) => {
-            if (String(url).endsWith('/api/conversations/11')) return Promise.resolve(mockJson({ detail: 'boom' }, 500));
-            return Promise.resolve(mockJson([{ id: 11, title: 'A', message_count: 2 }]));
-        });
-        const confirmModule = await import('../js/components/confirm-dialog.js');
-        const alertSpy = vi.spyOn(confirmModule, 'showAlert');
-
-        document.querySelector('#conversation-list .btn-delete-conv').click();
-        document.querySelector('.modal-overlay .confirm-ok').click();
-        await vi.waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
-
-        expect(alertSpy).toHaveBeenCalledWith('删除失败: boom');
-    });
-
-    it('btn-create-character → 打开创建向导弹窗；btn-new-chat → 切到角色视图', async () => {
-        const { state } = await loadApp(makeRoute({}));
-
-        document.querySelector('#btn-create-character').click();
-        await vi.waitFor(() => expect(document.querySelector('.wizard-modal')).not.toBeNull());
-
-        document.querySelector('#btn-new-chat').click();
-        expect(state.currentView).toBe('characters');
     });
 });
 
@@ -912,107 +705,9 @@ describe('app.js 重命名接线（F4 收口后 — 头部模块在 chat.test.js
     });
 });
 
-describe('app.js 导入接线', () => {
-    beforeEach(() => { vi.restoreAllMocks(); });
-    afterEach(() => { vi.restoreAllMocks(); });
-
-    /** jsdom 26 未实现 Blob.text()/File.text()（真实浏览器标准 API）—
-     *  经 FileReader 补齐，使 handleCharacterImport 的 file.text() 路径可测 */
-    beforeAll(() => {
-        if (!window.File.prototype.text) {
-            window.File.prototype.text = function () {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = () => reject(reader.error);
-                    reader.readAsText(this);
-                });
-            };
-        }
-    });
-
-    /** 构造 File 并注入 #character-import-input.files 后派发 change */
-    function dispatchImportFile(content, name = 'card.json') {
-        const file = new File([content], name, { type: 'application/json' });
-        const input = document.querySelector('#character-import-input');
-        Object.defineProperty(input, 'files', { value: [file], configurable: true });
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    it('导入成功：JSON 卡 → POST import → toast 成功 + 列表刷新 + 输入清空', async () => {
-        const { utils, fetchSpy } = await loadApp(makeRoute({
-            importResult: { id: 5, name: '新角色' },
-        }));
-        const toastSpy = vi.spyOn(utils, 'showToast');
-
-        dispatchImportFile(JSON.stringify({ name: '新角色' }));
-
-        await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith('成功导入角色「新角色」', 'success'));
-        expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/characters/import') && o?.method === 'POST'))
-            .toBe(true);
-        expect(document.querySelector('#character-import-input').value).toBe(''); // finally 清空
-    });
-
-    it('Falsify:JSON 解析失败 → 错误 toast + 引导到创建向导', async () => {
-        const { utils } = await loadApp(makeRoute({}));
-        const toastSpy = vi.spyOn(utils, 'showToast');
-
-        dispatchImportFile('not-json{{{');
-
-        await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith('不是有效的 JSON 文件', 'error'));
-        // 引导弹窗 → 确认「打开向导」→ 创建向导弹窗
-        await vi.waitFor(() => expect(document.querySelector('.modal-overlay')).not.toBeNull());
-        document.querySelector('.modal-overlay .confirm-ok').click();
-        await vi.waitFor(() => expect(document.querySelector('.wizard-modal')).not.toBeNull());
-    });
-
-    it('Falsify:导入 API 失败 → 错误 toast（含后端原因）+ 引导到创建向导', async () => {
-        const { utils } = await loadApp(makeRoute({
-            importResult: { fail: '卡格式不受支持' },
-        }));
-        const toastSpy = vi.spyOn(utils, 'showToast');
-
-        dispatchImportFile(JSON.stringify({ name: 'x' }));
-
-        await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith('卡格式不受支持', 'error'));
-        await vi.waitFor(() => expect(document.querySelector('.modal-overlay')).not.toBeNull());
-        document.querySelector('.modal-overlay .confirm-ok').click();
-        await vi.waitFor(() => expect(document.querySelector('.wizard-modal')).not.toBeNull());
-    });
-
-    it('btn-import-character 点击 → 触发文件选择器（no-op 不抛错）', () => {
-        return loadApp(makeRoute({})).then(() => {
-            expect(() => document.querySelector('#btn-import-character').click()).not.toThrow();
-        });
-    });
-});
-
 describe('app.js 数据加载失败 — Falsify 兜底', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
     afterEach(() => { vi.restoreAllMocks(); });
-
-    it('角色列表加载失败 → 错误 toast（init 不崩溃）', async () => {
-        // 路由 gate：首个角色列表请求挂起 → setup 挂 spy → 放行触发失败续体
-        let release;
-        const gate = new Promise((r) => { release = r; });
-        const base = makeRoute({});
-        const gated = async (url, options = {}) => {
-            const path = String(url).replace(/^.*\/api/, '/api');
-            if (path === '/api/characters' && (options.method || 'GET') === 'GET') {
-                await gate;
-                return mockJson({ detail: 'boom' }, 500);
-            }
-            return base(url, options);
-        };
-        let toastSpy = null;
-        await loadApp(gated, {
-            waitInit: false,
-            setup: ({ utils }) => { toastSpy = vi.spyOn(utils, 'showToast'); },
-        });
-        release();
-
-        await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith('加载角色列表失败', 'error'));
-    });
 
     it('模型列表加载失败 → console.error（init 不崩溃,Provider 下拉空）', async () => {
         let release;
