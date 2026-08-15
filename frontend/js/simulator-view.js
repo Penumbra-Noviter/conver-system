@@ -15,6 +15,9 @@
  *
  * 依赖方向：simulator-view.js → icons.js（iconHtml）/ utils.js（escapeHtml，
  *   game.name 来自 manifest 第三方数据，header 渲染必须转义）/
+ *   simulator-contracts.js（C8 契约深模块：SIM_DIR 静态目录 / TIMEOUT_MS
+ *   超时毫秒 / isValidSimulatorFile file 判据 — 模拟器域事实单一来源，
+ *   本视图不持副本）/
  *   key-injector.js（U8-T2/SIM-API-1：attachKeyInject 挂按钮交互 +
  *   autoSyncIntoGame 自动同步编排 + hasConfigTriplet 三元组校验 +
  *   resetSyncLoop 写回环复位 + TEXT_RESYNC 按钮文案 — 同步/注入逻辑收口
@@ -58,16 +61,14 @@
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
 import { attachKeyInject, hasConfigTriplet, autoSyncIntoGame, resetSyncLoop, TEXT_RESYNC } from './key-injector.js';
+import { SIM_DIR, TIMEOUT_MS, isValidSimulatorFile } from './simulator-contracts.js';
 
 // ══════════════════════════════════════════════════
 // 常量（UI 契约 — 文案/时长与 spec 对齐）
 // ══════════════════════════════════════════════════
-
-/** 模拟器静态目录（与列表模块 MANIFEST_URL 同源约定；T2 静态托管根挂载覆盖） */
-const SIM_DIR = 'simulators';
-
-/** 加载超时守卫时长（spec 建议 15s） */
-const TIMEOUT_MS = 15000;
+// 模拟器域事实常量（SIM_DIR 静态目录 / TIMEOUT_MS 超时毫秒 / isValidSimulatorFile
+// file 判据）单一来源为 js/simulator-contracts.js（C8 契约深模块）—— 本视图不持
+// 副本，改目录 / 超时只改契约模块；iframe 超时文案秒数由共享 TIMEOUT_MS 派生。
 
 /** AI 游戏提示条固定文案（spec 逐字） */
 const HINT_AI = '此游戏需自行配置 AI 接口';
@@ -250,18 +251,17 @@ async function autoSyncAfterLoad() {
 }
 
 /**
- * 打开参数校验：game 须为对象且 file 为非空字符串、不含路径分隔符、不含
- * 百分号编码（iframe src 注入守卫 — file 来自 manifest 第三方数据，防御
- * 越界/外链；TD-56：manifest 22 文件实测无 %，单点拒绝整个百分号编码面 —
- * Starlette 遍历防护与 manifest 可信资产为既有兜底，本判定为纵深加固）。
+ * 打开参数校验：game 须为对象且 file 字段通过安全判据（iframe src 注入
+ * 守卫 — file 来自 manifest 第三方数据，防御越界/外链）。file 级判据
+ * （非空字符串 + 不含 / \ %）委托契约模块 isValidSimulatorFile（单一来源
+ * js/simulator-contracts.js，C8）；对象判定与「参数非法：缺少有效的游戏
+ * 文件」错误文案留本视图层。
  * @param {unknown} game - openSimulator 入参
  * @returns {boolean}
  */
 function isValidGame(game) {
     return game !== null && typeof game === 'object'
-        && typeof game.file === 'string' && game.file !== ''
-        && !game.file.includes('/') && !game.file.includes('\\')
-        && !game.file.includes('%');
+        && isValidSimulatorFile(game.file);
 }
 
 /** 显示运行面板、隐藏列表面板 */
@@ -376,12 +376,14 @@ function handleLoad(e) {
     observeConfigControls();
 }
 
-/** 超时守卫到期（15s 未收到 load）→ error（卸载 iframe，展示重试/返回） */
+/** 超时守卫到期（TIMEOUT_MS 内未收到 load）→ error（卸载 iframe，展示重试/返回）。
+ * 文案保留运行视图自身语义（非清单域 TIMEOUT_REASON），秒数由共享
+ * TIMEOUT_MS 派生（改超时常量必联动文案秒数）。 */
 function handleTimeout() {
     if (state !== 'opening') return; // 兜底：已 loaded/closed 的残留计时器忽略
     state = 'error';
     destroyFrame();
-    renderError('加载超时（15 秒未收到响应）');
+    renderError(`加载超时（${TIMEOUT_MS / 1000} 秒未收到响应）`);
 }
 
 /** 进入 opening：渲染骨架（含新 iframe）→ 绑定 load → 设 src/title → 起超时守卫 */
