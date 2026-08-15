@@ -13,6 +13,7 @@ from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
 from backend.app.schemas.message import SearchResult
 from backend.app.services import conversation as conversation_service
+from backend.app.services.character_fields import PROMPT_FIELDS
 from backend.app.services.llm.prompt import CharacterData, apply_template_vars, build_messages
 
 
@@ -104,14 +105,11 @@ def build_message_list(
     if not character:
         raise ValueError(f"角色不存在: {conversation.character_id}")
 
-    char_data = CharacterData(
-        name=character.name or "",
-        system_prompt=character.system_prompt or "",
-        personality=character.personality or "",
-        scenario=character.scenario or "",
-        mes_example=character.mes_example or "",
-        post_history_instructions=character.post_history_instructions or "",
-    )
+    # 按 PROMPT_FIELDS 从 ORM 提取（单一映射深模块，C5 架构评审）
+    char_data = CharacterData(**{
+        field: getattr(character, field, "") or ""
+        for field in PROMPT_FIELDS
+    })
     history = get_messages(db, conversation.id)
 
     return build_messages(

@@ -15,6 +15,7 @@ Prompt 组装 — LLM 消息列表的纯函数组装层
 from __future__ import annotations
 
 from collections.abc import Sequence
+from backend.app.services.character_fields import PROMPT_FIELDS
 from dataclasses import dataclass
 
 __all__ = ["CharacterData", "apply_template_vars", "parse_mes_example", "build_messages"]
