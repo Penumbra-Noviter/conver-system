@@ -44,6 +44,16 @@
 
 ## 已完成归档
 
+### 会话交付：关闭行为偏好 D11（2026-08-15，用户实测反馈无工单）
+
+> 来源：用户实测反馈——「关闭桌面应用窗口后程序仍挂托盘后台运行，用户不知情；最好初始时让用户选择默认关闭行为」。单会话小特性直接实现（模式同下方「模拟器获取列表修复 + 开场白预插」）。
+
+- **Rust**：新增 `src-tauri/src/settings.rs` 深模块（`CloseAction` tray/quit + `decide_close` 决策 + settings.json 原子读写，Seam 1 纯逻辑可测）；`lib.rs` CloseRequested 按偏好分流（quit → 放行关闭走正常退出流，Exit 清理子进程；tray/未设置 → 保持 D5 隐藏驻留托盘）；`ShellState::data_dir()` 访问器；`commands.rs` 增 `get_close_action` / `set_close_action`（非法取值拒绝）。
+- **前端**：新增 `frontend/js/desktop-settings.js` 深模块（Tauri 桥检测 + 读写 + 首次运行选择弹窗 + 设置页分组即时保存；无桥全模块 no-op）；index.html 设置页「关闭窗口」分组（网页版隐藏）；app.js 接线；CSS（radio-row / close-action 弹窗）。
+- **测试**：Rust `settings_test.rs` 12 用例（解析/决策/读写往返/损坏自愈）；前端 `desktop-settings.test.js` 19 用例（桥检测/读写/首次弹窗两按钮必选/设置页切换保存/失败路径不抛错）。
+- **验证链**：cargo 70 全绿（基线 58 + 12）；Vitest 826 全绿（基线 807 + 19）；pytest 471 不受影响（零后端改动）。
+- **决策落盘**：CONSENSUS §13 新增 D11；docs/tauri-desktop.md 目录布局 + 人工验收清单同步（settings.json 行 + 验收 8 新检查项）。
+
 ### 会话交付：模拟器获取列表修复 + 开场白预插（2026-08-15，无工单 bug 修复）
 
 > 来源：用户实测反馈——「模拟器里用主应用 key 点获取 → 网络错误（CORS/地址）」，聊天正常；「角色开场白一开始不弹出或太慢」。按第一性原理逐条实证定位，非猜测。

@@ -296,6 +296,25 @@
                     </div>
                 </div>
 
+                <!-- 关闭窗口行为（桌面壳专属，纯网页模式隐藏；desktop-settings.js 回填与即时保存） -->
+                <div class="settings-group" id="group-close-action" hidden>
+                    <h3>关闭窗口</h3>
+                    <div class="form-field">
+                        <label>关闭主窗口时</label>
+                        <div class="radio-row">
+                            <label class="radio-item">
+                                <input type="radio" name="close-action" value="tray">
+                                最小化到托盘（后台继续运行）
+                            </label>
+                            <label class="radio-item">
+                                <input type="radio" name="close-action" value="quit">
+                                直接退出程序
+                            </label>
+                        </div>
+                        <p class="settings-hint">最小化到托盘后程序继续在后台运行，可从系统托盘图标恢复或退出；直接退出将结束全部进程。</p>
+                    </div>
+                </div>
+
                 <div class="settings-group">
                     <h3>模板变量</h3>
                     <div class="form-field">

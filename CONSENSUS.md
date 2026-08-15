@@ -169,6 +169,7 @@
 8. **D8 测试**：cargo test 纯逻辑（Seam 1）+ 自动化冒烟（Seam 2）；tauri-driver E2E 本轮不做。
 9. **D9 图标**：内联 SVG logo → Playwright 渲染 1024px PNG → `tauri icon` 全套（含 .ico）。
 10. **D10 迁移脚本独立形态**（独立脚本 + 独立测试，pytest Seam 3）。
+11. **D11 关闭行为偏好**（2026-08-15，用户实测反馈「关窗后驻留托盘用户不知情」）：首次运行弹窗让用户选择关闭主窗口时的默认行为（最小化到托盘 / 直接退出），持久化到 `%APPDATA%\ConverSystem\settings.json`（`close_action` 字段，原子写；壳/后端业务零耦合）；设置页「关闭窗口」分组可随时更改（即时保存，不经后端 settings API）。未设置 / 文件损坏回退 D5 默认最小化到托盘；选「直接退出」后关窗走正常退出流（Exit 清理后端子进程）；纯网页模式无此设置（托盘是桌面壳概念，无 Tauri 桥时全模块 no-op）。
 
 **接口契约**：就绪契约 = 后端就绪后写 `%APPDATA%\ConverSystem\runtime.json`（port + ready 标记 + pid，原子写 F2）；就绪页（Tauri 资产页）经 `backend_status` 命令轮询就绪后 `location.replace` 到后端地址；壳-后端环境变量通道（DATABASE_URL / CONVER_BACKEND_CMD / CONVER_EXIT_AFTER_SECS 自动化 seam）；构建链必须在 cmd/PowerShell 执行（Git Bash link.exe 遮蔽 MSVC linker）；数据独立性（网页版根 DB + 8000 端口 ↔ 桌面版 %APPDATA% DB + 动态端口并存互不干扰）。
 

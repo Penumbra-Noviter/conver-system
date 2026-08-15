@@ -52,6 +52,7 @@ import { initSimulatorRun, openSimulator, closeSimulator } from './simulator-vie
 import { initKeyInjector } from './key-injector.js';
 import { initSaveManager, openSavePanel, closeSavePanel } from './save-manager.js';
 import { loadCharacters, loadConversations, renderConversations, syncConversationListTitle, initListViews } from './list-views.js';
+import { ensureCloseActionChoice, initCloseActionSetting } from './desktop-settings.js';
 
 // ══════════════════════════════════════════════════
 // DOM 引用（协调层只保留视图与导航按钮 — 列表/角色 DOM 由 list-views.js 持有）
@@ -210,6 +211,10 @@ async function init() {
             closeConversationsAndResettle({ ids: 'all', reloadList: false });
         },
     });
+
+    // 桌面壳设置（D11）：设置页「关闭窗口」分组回填 + 首次运行选择弹窗（纯网页模式 no-op）
+    initCloseActionSetting();
+    ensureCloseActionChoice();
 }
 
 // ══════════════════════════════════════════════════

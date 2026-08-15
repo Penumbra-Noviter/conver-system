@@ -1584,6 +1584,48 @@ body {
     font-size: 0.9em;
 }
 
+/* 关闭窗口行为选项（D11，桌面壳设置分组） */
+.radio-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+/* 特异性高于 .form-field label（0,2,0 > 0,1,1），无需 !important */
+.form-field .radio-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--page);
+    cursor: pointer;
+}
+
+.radio-item:hover {
+    border-color: var(--accent);
+}
+
+.radio-item input[type="radio"] {
+    width: auto;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+/* 首次关闭行为选择弹窗（desktop-settings.js） */
+.close-action-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.close-action-modal .settings-hint {
+    margin-top: var(--space-3);
+}
+
 /* 温度滑块 */
 input[type="range"] {
     -webkit-appearance: none;

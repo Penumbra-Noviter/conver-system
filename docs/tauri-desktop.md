@@ -97,6 +97,7 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-desktop.ps1 -UseInstaller
 |------|------|
 | `conver_system.db` | 桌面版数据库（与网页版根数据库完全独立，互不干扰，D3/数据分离铁律） |
 | `runtime.json` | 就绪契约：port + ready 标记 + pid（壳原子写，就绪页与冒烟轮询） |
+| `settings.json` | 壳级用户设置：关闭行为偏好 `close_action`（tray/quit，D11；缺失/损坏回退默认 tray） |
 | `backend.log` | 后端子进程日志（uvicorn 落盘契约，CREATE_NO_WINDOW 下 stdout 无处可去） |
 | `.migrated` | 迁移完成标记（migrate_data.py 写入） |
 
@@ -148,6 +149,7 @@ $env:CONVER_DATA_DIR = "D:\conver-data"   # 覆盖后桌面版全部数据落此
 | 8 | 托盘菜单：显示/隐藏窗口、开机自启勾选（默认关） | ☐ | | |
 | 8 | 勾选自启后注册表 `HKCU\...\Run` 出现条目；取消后消失 | ☐ | | |
 | 8 | 二次启动（应用已运行）聚焦已有窗口，不重复拉起后端 | ☐ | | |
+| 8 | 关闭行为偏好（D11）：首次运行弹窗选择；设置页「关闭窗口」分组可改；选「直接退出」后关窗即退（无残留） | ☐ | | |
 | 9 | 对话导出 JSON/Markdown 下载到 Downloads（WebView2 不拦截，SPK-R2 结论） | ☐ | | |
 | 9 | 角色卡导出下载正常 | ☐ | | |
 

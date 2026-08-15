@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1337<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->472<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->807<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1368<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->472<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->826<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -175,7 +175,7 @@ conver system/
 │   │   └── utils/
 │   │       ├── model-utils.js      ← 模型下拉填充工具
 │   │       └── sse-reader.js       ← SSE 流解析
-│   ├── tests/                      ← Vitest（25 个文件，见 §5.2）
+│   ├── tests/                      ← Vitest（26 个文件，见 §5.2）
 │   ├── vitest.config.js
 │   ├── package.json
 │   └── simulators/                 ← 22 款第三方单文件模拟器（HTML，非源码）
@@ -189,10 +189,11 @@ conver system/
 │   ├── src/
 │   │   ├── lib.rs                  ← ShellState 状态机（端口/数据目录/子进程）
 │   │   ├── server.rs               ← 后端进程管理（探测/spawn/探活/runtime.json）
-│   │   ├── commands.rs             ← Tauri 命令（backend_status）
+│   │   ├── commands.rs             ← Tauri 命令（backend_status / 关闭行为偏好读写）
+│   │   ├── settings.rs             ← 壳级用户设置（关闭行为偏好 settings.json，D11）
 │   │   ├── tray.rs                 ← 系统托盘（菜单路由/自启状态机）
 │   │   └── main.rs                 ← 壳入口
-│   └── tests/                      ← 集成测试（3 个文件，见 §5.3）
+│   └── tests/                      ← 集成测试（4 个文件，见 §5.3）
 ├── docs/                           ← 设计文档（架构/API/LLM/Tauri，见 PROJECT_REFERENCE §五）
 ├── CLAUDE.md                       ← 项目规则与当前状态
 ├── PROJECT_REFERENCE.md            ← 项目介绍书（介绍/决策/坑点）
@@ -588,7 +589,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~274 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~278 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）。
 
@@ -991,7 +992,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/utils/sse-reader.js:parseSSEStream-->`parseSSEStream(reader, { onToken, onDone, onError })`<!--/AUTO--> | 解析 SSE 流 |
 
-### 4.64 `src-tauri/src/lib.rs` — 壳状态机（<!--AUTO:lines:src-tauri/src/lib.rs-->~336 行<!--/AUTO-->）
+### 4.64 `src-tauri/src/lib.rs` — 壳状态机（<!--AUTO:lines:src-tauri/src/lib.rs-->~357 行<!--/AUTO-->）
 
 **职责**：`ShellState`——动态端口、数据目录、后端子进程生命周期（Drop 兜底无残留）、就绪轮询线程、就绪超时（环境变量可配）、`run()` 装配（含单实例/托盘）。
 
@@ -1031,7 +1032,7 @@ conver system/
 | <!--AUTO:sig:src-tauri/src/server.rs:default_data_dir-->`default_data_dir() -> PathBuf`<!--/AUTO--> | 默认数据目录（%APPDATA% 优先） |
 | <!--AUTO:sig:src-tauri/src/server.rs:encode_url_path-->`encode_url_path(path: &str) -> String`<!--/AUTO--> | URL 路径编码（契约表 v2） |
 
-### 4.66 `src-tauri/src/commands.rs` — Tauri 命令（<!--AUTO:lines:src-tauri/src/commands.rs-->~12 行<!--/AUTO-->）
+### 4.66 `src-tauri/src/commands.rs` — Tauri 命令（<!--AUTO:lines:src-tauri/src/commands.rs-->~27 行<!--/AUTO-->）
 
 **职责**：Tauri 命令——`backend_status` 状态查询（boot.html 轮询用）。
 
@@ -1063,11 +1064,33 @@ conver system/
 |------|------|
 | <!--AUTO:sig:src-tauri/src/main.rs:main-->`main()`<!--/AUTO--> | 壳入口 |
 
+### 4.69 `frontend/js/desktop-settings.js` — 桌面壳设置（<!--AUTO:lines:frontend/js/desktop-settings.js-->~137 行<!--/AUTO-->）
+
+**职责**：D11 关闭行为偏好——Tauri 桥检测 + 偏好读写（settings.json）+ 首次运行选择弹窗 + 设置页「关闭窗口」分组即时保存；无桥（纯网页模式）全模块 no-op。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/desktop-settings.js:hasDesktopBridge-->`hasDesktopBridge()`<!--/AUTO--> | Tauri 桥可用性检测 |
+| <!--AUTO:sig:frontend/js/desktop-settings.js:getCloseAction-->`getCloseAction()`<!--/AUTO--> | 读取关闭行为偏好（null=未设置） |
+| <!--AUTO:sig:frontend/js/desktop-settings.js:setCloseAction-->`setCloseAction(action)`<!--/AUTO--> | 写入关闭行为偏好（非法取值忽略） |
+| <!--AUTO:sig:frontend/js/desktop-settings.js:ensureCloseActionChoice-->`ensureCloseActionChoice()`<!--/AUTO--> | 首次运行引导（未设置 → 弹窗选择并持久化） |
+| <!--AUTO:sig:frontend/js/desktop-settings.js:initCloseActionSetting-->`initCloseActionSetting()`<!--/AUTO--> | 设置页分组回填 + 即时保存绑定 |
+
+### 4.70 `src-tauri/src/settings.rs` — 壳级用户设置（<!--AUTO:lines:src-tauri/src/settings.rs-->~81 行<!--/AUTO-->）
+
+**职责**：D11 关闭行为偏好持久化——`CloseAction` 枚举（Tray/Quit）解析/`decide_close` 决策纯逻辑（Seam 1 可注入测试）+ settings.json 原子读写（镜像 `server.rs::write_runtime_json`）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:src-tauri/src/settings.rs:decide_close-->`decide_close(action: Option<CloseAction>) -> CloseDecision`<!--/AUTO--> | 偏好 → 关闭决策（未设置/损坏回退托盘） |
+| <!--AUTO:sig:src-tauri/src/settings.rs:load_close_action-->`load_close_action(data_dir: &Path) -> Option<CloseAction>`<!--/AUTO--> | 读取偏好（缺失/损坏 → None） |
+| <!--AUTO:sig:src-tauri/src/settings.rs:save_close_action-->`save_close_action(data_dir: &Path, action: CloseAction) -> Result<(), String>`<!--/AUTO--> | 原子写入偏好 |
+
 ---
 
 ## 五、测试
 
-三层测试体系：后端 pytest（19 文件）、前端 Vitest（25 文件）、壳 cargo test（3 集成文件 + lib.rs 单元）。覆盖率基线：后端 `pytest --cov`（目标 ≥90%）、前端 `npm run test:coverage`。
+三层测试体系：后端 pytest（19 文件）、前端 Vitest（26 文件）、壳 cargo test（4 集成文件 + lib.rs 单元）。覆盖率基线：后端 `pytest --cov`（目标 ≥90%）、前端 `npm run test:coverage`。
 
 ### 5.1 后端 pytest（backend/tests）
 
@@ -1108,6 +1131,7 @@ conver system/
 | `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->38<!--/AUTO--> | 对话视图 |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->12<!--/AUTO--> | 会话激活 |
+| `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->19<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->36<!--/AUTO--> | 展示契约 |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->69<!--/AUTO--> | Key 注入/端点口径 |
@@ -1135,6 +1159,7 @@ conver system/
 | 文件 | 用例数 | 覆盖主题 |
 |------|--------|----------|
 | `src-tauri/tests/server_test.rs` | <!--AUTO:tests:src-tauri/tests/server_test.rs-->35<!--/AUTO--> | 端口探测/命令行/启停/探活/runtime.json |
+| `src-tauri/tests/settings_test.rs` | <!--AUTO:tests:src-tauri/tests/settings_test.rs-->12<!--/AUTO--> | 关闭行为偏好解析/决策/settings.json 读写（D11） |
 | `src-tauri/tests/tray_test.rs` | <!--AUTO:tests:src-tauri/tests/tray_test.rs-->8<!--/AUTO--> | 菜单路由/窗口显隐/自启状态机 |
 | `src-tauri/tests/shell_state_test.rs` | <!--AUTO:tests:src-tauri/tests/shell_state_test.rs-->9<!--/AUTO--> | ShellState 状态机/完整启动链 |
 | `src-tauri/src/lib.rs`（`mod tests` 单元） | <!--AUTO:tests:src-tauri/src/lib.rs-->6<!--/AUTO--> | 就绪超时环境变量解析 |
@@ -1177,11 +1202,11 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1337<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1368<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->472<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->807<!--/AUTO-->
-> - cargo test（壳）：<!--AUTO:tests_total:cargo-->58<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->826<!--/AUTO-->
+> - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
 

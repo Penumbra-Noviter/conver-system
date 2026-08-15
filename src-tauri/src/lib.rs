@@ -6,11 +6,12 @@
 //! 3. 后台线程轮询 HTTP 就绪（GET `server::READY_PROBE_PATH` 200），就绪后写 %APPDATA%\ConverSystem\runtime.json；
 //! 4. webview 加载 boot.html（Tauri 资产页）→ 经 `backend_status` 命令轮询 → `location.replace` 跳转；
 //! 5. 单实例（tauri-plugin-single-instance）：二次启动在插件 setup 中同步退出，不重复 spawn 后端；
-//! 6. 系统托盘（D5/D6）：关闭窗口 = 最小化到托盘；菜单 [显示/隐藏窗口、开机自启勾选、退出]；
+//! 6. 系统托盘（D5/D6）：关闭窗口按 D11 偏好（默认最小化到托盘，可在首次运行/设置页选择直接退出）；菜单 [显示/隐藏窗口、开机自启勾选、退出]；
 //! 7. 应用退出（含异常路径）kill 后端子进程，保证无残留。
 
 pub mod commands;
 pub mod server;
+pub mod settings;
 pub mod tray;
 
 use std::path::PathBuf;
@@ -133,6 +134,11 @@ impl ShellState {
         }
     }
 
+    /// 当前数据目录（壳级文件 settings.json 等所在，见 `server::default_data_dir`）。
+    pub fn data_dir(&self) -> PathBuf {
+        self.inner.data_dir.clone()
+    }
+
     /// 当前后端子进程 pid（无子进程时为 None）。
     pub fn child_pid(&self) -> Option<u32> {
         self.inner
@@ -242,7 +248,11 @@ pub fn run() {
                 .app_name("Conver System")
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![commands::backend_status])
+        .invoke_handler(tauri::generate_handler![
+            commands::backend_status,
+            commands::get_close_action,
+            commands::set_close_action
+        ])
         .setup(|app| {
             // 壳在 setup 中启动：single-instance 插件已同步完成二次实例检查；
             // 打包态资源目录用于定位随包后端 exe（US-1 双击直启，阻断 1 修复）
@@ -264,11 +274,23 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("Conver System Tauri 应用构建失败")
         .run(|app, event| match event {
-            // 关闭窗口 = 最小化到托盘（D5）；托盘「退出」走 ExitRequested → Exit
+            // 关闭窗口行为（D11）：偏好 quit → 放行关闭（窗口关闭后应用走正常退出流，
+            // Exit 事件清理后端子进程）；偏好 tray / 未设置（首次运行）→ 拦截并
+            // 隐藏窗口驻留托盘（D5 既有默认）。读取失败按未设置处理，行为不回退。
             tauri::RunEvent::WindowEvent {
                 event: tauri::WindowEvent::CloseRequested { api, .. },
                 ..
             } => {
+                let quit_on_close = app
+                    .try_state::<ShellState>()
+                    .map(|shell| {
+                        settings::decide_close(settings::load_close_action(&shell.data_dir()))
+                    })
+                    .unwrap_or(settings::CloseDecision::MinimizeToTray)
+                    == settings::CloseDecision::Quit;
+                if quit_on_close {
+                    return;
+                }
                 api.prevent_close();
                 if let Some(window) = app.get_webview_window(tray::MAIN_WINDOW_LABEL) {
                     let _ = window.hide();

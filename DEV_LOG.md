@@ -6,6 +6,15 @@
 
 ---
 
+## 滚动摘要（2026-08-15 — 关闭行为偏好 D11：首次运行选择关窗行为 + 设置页可改）
+
+- **来源**：用户实测反馈——「关闭桌面应用窗口后程序仍挂托盘后台运行，用户不知情；最好初始时让用户选择默认关闭行为」。单会话小特性直接实现（无工单，模式同模拟器修复批次）。
+- **Rust（settings.rs 深模块 + 接线）**：`CloseAction`（tray/quit）+ `decide_close`（未设置/损坏回退 D5 默认托盘）+ settings.json 原子读写（镜像 write_runtime_json 临时文件+rename）；`lib.rs` CloseRequested 按偏好分流（quit → 放行关闭，Exit 清理子进程；tray → 保持隐藏驻留托盘）；`commands.rs` 增 get/set_close_action（非法取值拒绝）；`ShellState::data_dir()` 访问器。
+- **前端（desktop-settings.js 深模块 + 接线）**：Tauri 桥检测（无桥全模块 no-op，网页版零影响）+ 首次运行弹窗（两按钮必选其一，Escape/遮罩回退默认托盘）+ 设置页「关闭窗口」分组即时保存（独立于后端 settings API，不随「保存设置」提交）；index.html 分组（网页版 hidden）+ app.js init 接线 + CSS。
+- **测试**：Rust `settings_test.rs` 12 用例 / 前端 `desktop-settings.test.js` 19 用例（桥检测/读写/弹窗选择持久化+表单同步/切换保存/写盘失败不抛错）。时序教训：`vi.waitFor` 首轮同步断言会早于微任务链结算——invoke 调用与 showAlert 两断言须合并进同一 waitFor。
+- **验证链**：cargo **70** 全绿（基线 58 + 12）；Vitest **826** 全绿（基线 807 + 19）；pytest 471 不受影响（零后端改动）。
+- **决策落盘**：CONSENSUS §13 新增 **D11**（偏好持久化 settings.json、回退语义、网页版无此设置）；docs/tauri-desktop.md 目录布局表 + 人工验收清单（验收 8 新增检查项）；TICKETS 归档批次。
+
 ## 滚动摘要（2026-08-15 — 会话交付：模拟器获取列表修复 + 开场白预插 + 桌面版重新打包）
 
 - **模拟器「获取列表」网络错误修复**——根因（实证）：主应用 `openai_base_url` 缺 `/v1`，模拟器浏览器直连 `{base}/models` 命中 relay 管理面板 HTML（非 JSON）；真实 API 在 `/v1` 下。修复：DB `openai_base_url` 统一为 `https://api.kukuit.com/v1`（模拟器经 key-injector 自动跟随主应用设置）；Playwright 端到端验证「获取 → 已选择模型」。附带实证：relay 拒 `Python-urllib` UA（403），Chrome/SDK UA 正常。
