@@ -337,36 +337,77 @@
             <div class="guide-container">
                 <div class="guide-section">
                     <h3>快速开始</h3>
-                    <p>Conver System 是一个角色对话系统，让你与 AI 驱动的虚拟角色进行多轮对话。整体流程：<strong>创建角色 → 开启对话 → 开始聊天</strong>。</p>
+                    <p>Conver System 是一个本地优先的 AI 角色对话与模拟器平台：创建角色、开启对话、玩 AI 模拟器，所有数据保存在本地。整体流程：<strong>配置 AI 接口 → 创建角色 → 开始聊天（或打开模拟器）</strong>。</p>
                     <ol>
-                        <li><strong>配置 API 密钥</strong> — 首次使用，先点击侧栏「设置」，填入你的 Claude / OpenAI 兼容 API Key 和地址，保存即可。</li>
-                        <li><strong>创建角色</strong> — 点击「角色」视图的「创建角色」按钮，填写角色姓名、人格设定、开场白等信息。</li>
-                        <li><strong>开始对话</strong> — 在角色卡片上点击「对话」按钮，系统自动创建新对话，在输入框中打字发送即可。</li>
+                        <li><strong>配置 AI 接口</strong> — 首次使用，先点击侧栏「设置」，填入你的 Claude 或 OpenAI 兼容 API Key（详细教程见下方「配置你的 AI 接口」）。</li>
+                        <li><strong>创建角色</strong> — 点击「角色」视图的「创建角色」按钮，跟随 6 步引导向导创建（也可选内置模板）。</li>
+                        <li><strong>开始对话</strong> — 在角色卡片上点击「对话」按钮，系统自动创建新对话并立即显示角色开场白，在输入框中打字发送即可。</li>
+                        <li><strong>玩模拟器</strong> — 点击侧栏「模拟器」，选择一款 AI 游戏开始体验（AI 游戏需先完成第 1 步配置，见「模拟器使用指南」）。</li>
                     </ol>
+                </div>
+
+                <div class="guide-section">
+                    <h3>配置你的 AI 接口（新手必读）</h3>
+                    <p>所有 AI 功能（角色对话、AI 模拟器）共用同一套接口配置，<strong>只需配置一次，全局生效</strong>。</p>
+                    <ol>
+                        <li><strong>准备 API Key</strong>：在模型服务商官网注册并创建密钥。任选一个服务即可：
+                            <ul>
+                                <li><strong>Anthropic Claude</strong> — Key 以 <code>sk-ant-</code> 开头</li>
+                                <li><strong>OpenAI 兼容服务</strong> — OpenAI、DeepSeek、通义千问、Kimi、智谱 GLM 等（Key 以 <code>sk-</code> 开头）</li>
+                            </ul>
+                        </li>
+                        <li><strong>填入设置页</strong>：进入「设置」，在「API 密钥」区把 Key 填入「Claude API Key」或「OpenAI / 国产模型 API Key」任一栏。系统会先按所选模型的协议匹配，未匹配时自动使用另一栏——所以只填一栏就能用，两栏都填也行。</li>
+                        <li><strong>兼容服务地址（可选）</strong>：使用官方服务时地址留空即可；使用第三方兼容服务时，在对应的「兼容 API 地址」填入 base_url（例如 DeepSeek 填 <code>https://api.deepseek.com/v1</code>）。</li>
+                        <li><strong>选择默认模型</strong>：在「默认模型」区选择 Provider 和模型；若列表里没有你想要的，在底部选择「自定义模型」并手动输入模型名称（如 <code>deepseek-chat</code>、<code>qwen-plus</code>）。</li>
+                        <li><strong>保存</strong>：点击「保存设置」。API Key 仅存储于本地数据库，不会上传。</li>
+                    </ol>
+                    <p><strong>怎么判断配置成功？</strong>回到聊天视图，给任意角色发一条消息即可验证。模拟器游戏则在运行页点「重新同步」让新配置生效。</p>
                 </div>
 
                 <div class="guide-section">
                     <h3>角色管理</h3>
                     <p>角色是对话的核心，每个角色拥有独立的人设、语气和知识设定。</p>
                     <ul>
-                        <li><strong>创建角色</strong>：填写姓名、人格设定（系统提示词）、开场白、语气风格、标签等信息。带 <span class="required">*</span> 的为必填项。</li>
-                        <li><strong>编辑角色</strong>：点击角色卡片上的「编辑」按钮修改已有角色。</li>
+                        <li><strong>创建角色（引导向导）</strong>：点击「创建角色」后，向导分 6 步引导完成：选择创建方式（文档导入 / 模板 / 手动）→ 导入文档或选择模板 → 基本信息（姓名 / 头像 / 描述 / 标签）→ 人格设定 → 对话风格（开场白 / 示例对话）→ 预览保存。带 <span class="required">*</span> 的为必填项。</li>
+                        <li><strong>内置模板</strong>：向导内置 5 个通用角色模板（知性学姐、神秘旅人等），选择后可直接使用，也可以在其基础上修改。</li>
+                        <li><strong>文档导入</strong>：在向导第一步选择「文档导入」，把角色设定文档、小说片段或简介粘贴进去，点击解析，AI 会自动提取角色信息填入后续表单（此功能需要已配置 AI 接口）。</li>
+                        <li><strong>编辑角色</strong>：点击角色卡片上的「编辑」按钮修改已有角色（使用简洁表单）。</li>
                         <li><strong>删除角色</strong>：点击角色卡片上的「删除」按钮。如果有进行中的对话，系统会提示关联对话数量。</li>
-                        <li><strong>导入角色</strong>：点击「导入角色」按钮，选择 SillyTavern V2 格式的角色卡 JSON 文件（兼容 V1 旧卡与裸 data 格式）。</li>
-                        <li><strong>导出角色</strong>：点击角色卡片上的「导出」按钮，导出为 V2 格式的角色卡 JSON。</li>
+                        <li><strong>导入角色卡</strong>：点击「导入角色」按钮，选择 SillyTavern V2 格式的角色卡 JSON 文件（兼容 V1 旧卡与裸 data 格式）。</li>
+                        <li><strong>导出角色卡</strong>：点击角色卡片上的「导出」按钮，导出为 V2 格式的角色卡 JSON，方便备份或分享。</li>
                     </ul>
                 </div>
 
                 <div class="guide-section">
                     <h3>对话功能</h3>
                     <ul>
+                        <li><strong>多会话标签页</strong>：可以同时打开多个对话，聊天区顶部的标签条随时切换。每个标签独立记忆输入草稿、滚动位置和生成状态——切到别的对话后，原对话的 AI 回复会继续在后台生成。</li>
                         <li><strong>发送消息</strong>：在输入框输入文字，按 <kbd>Enter</kbd> 发送，<kbd>Shift+Enter</kbd> 换行。</li>
                         <li><strong>流式输出</strong>：默认开启，AI 回复会逐字显示（打字机效果）。可在输入框下方取消勾选「流式输出」切换为一次性输出。</li>
                         <li><strong>停止生成</strong>：流式输出时，「发送」按钮会切换为红色「停止生成」按钮，点击即可中断 AI 回复，已生成的内容会保留。</li>
                         <li><strong>复制消息</strong>：鼠标悬停在消息气泡上，右上角会显示「复制消息」按钮，点击即可复制该条消息内容。</li>
-                        <li><strong>对话标题</strong>：发送首条消息后，系统自动生成标题（格式：与 {角色名} 的对话）。你也可以点击头部标题直接编辑。</li>
+                        <li><strong>对话标题</strong>：创建对话时角色开场白立即显示；发送首条消息后自动生成标题（格式：与 {角色名} 的对话），你也可以点击头部标题直接编辑。</li>
                         <li><strong>删除对话</strong>：在对话列表中，鼠标悬停显示「删除」按钮，点击即可删除。</li>
                         <li><strong>导出对话</strong>：在聊天头部点击「导出」按钮，可选择 JSON 或 Markdown 格式导出完整对话记录。</li>
+                    </ul>
+                </div>
+
+                <div class="guide-section">
+                    <h3>模拟器使用指南</h3>
+                    <p>「模拟器」板块提供多款 AI 驱动的沉浸式游戏（人生模拟器、仙途、仿微微信 AI、克苏鲁跑团、侦探模拟等），游戏在应用内部打开，存档保存在浏览器本地。</p>
+                    <ul>
+                        <li><strong>游戏列表</strong>：进入模拟器视图即显示全部游戏卡片，顶部可按「全部 / AI 驱动 / 纯本地」筛选。</li>
+                        <li><strong>开始与退出游戏</strong>：点击任意卡片即可进入游戏；点击左上角「返回」回到列表，进度不会丢失（存档自动保存，重进自动恢复）。</li>
+                        <li><strong>AI 游戏需要配置接口</strong>：AI 驱动游戏会提示「此游戏需自行配置 AI 接口」。先在「设置」页配置好 API Key（见「配置你的 AI 接口」），再回到游戏点击「重新同步」，配置会自动写入游戏；也可以先配好设置再打开游戏，加载后会自动同步。游戏运行中重建了配置控件也会自动再同步。</li>
+                        <li><strong>存档管理</strong>：列表右上角「存档管理」按钮可查看每个游戏的存档情况（存档键数 / 总大小），并支持：
+                            <ul>
+                                <li><strong>导出</strong>：把某游戏的全部存档下载为 JSON 文件做备份（注意：导出文件可能包含游戏内配置数据，如 API Key，请妥善保管）。</li>
+                                <li><strong>导入</strong>：把之前导出的 JSON 存档恢复到浏览器（仅接受该游戏的合法存档键，其他内容会被拒绝）。</li>
+                                <li><strong>删除</strong>：清除某游戏的全部存档（删除前需要确认，且不可恢复）。</li>
+                            </ul>
+                        </li>
+                        <li><strong>存档位置</strong>：存档保存在浏览器的 localStorage 中，按游戏前缀隔离。换浏览器或清理浏览器数据会导致存档丢失，重要进度建议用「存档管理」导出备份。</li>
+                        <li><strong>特别说明</strong>：小马宝莉、高中生模拟器两款游戏的存档仅会话内生效，重进需要重新注入；个别游戏没有存档管理功能，属正常现象。</li>
                     </ul>
                 </div>
 
@@ -378,11 +419,13 @@
                 <div class="guide-section">
                     <h3>设置说明</h3>
                     <ul>
-                        <li><strong>API 密钥</strong>：填入 Claude 或 OpenAI 兼容 API 的 Key 和地址。只需填任一栏（Claude 或 OpenAI），系统即可全局使用——选择任意模型时自动匹配对应协议。</li>
-                        <li><strong>默认模型</strong>：选择默认的 Provider 和模型。自定义模型可在下拉列表底部选择「自定义模型」手动输入。</li>
-                        <li><strong>上下文轮数</strong>：控制 AI 能记住的对话轮数（默认 30 轮）。轮数越多，AI 对上下文的记忆越好，但 Token 消耗也越大。</li>
+                        <li><strong>API 密钥</strong>：Claude 与 OpenAI 兼容两栏，填任一栏即可全局生效（系统按所选模型的协议自动匹配，未匹配时使用另一栏）。第三方服务需同时填写对应「兼容 API 地址」。</li>
+                        <li><strong>默认模型</strong>：选择默认的 Provider 和模型；列表底部可选「自定义模型」手动输入名称。</li>
+                        <li><strong>上下文轮数</strong>：控制 AI 能记住的对话轮数（默认 30 轮，可调范围 5–100）。轮数越多，AI 对上下文的记忆越好，但 Token 消耗也越大。</li>
                         <li><strong>模板变量</strong>：在角色设定中使用 <code>{{user}}</code>（自动替换为用户昵称）和 <code>{{char}}</code>（自动替换为角色名），让角色设定更生动自然。</li>
-                        <li><strong>主题模式</strong>：支持跟随系统、深色模式、浅色模式三种选择。</li>
+                        <li><strong>主题模式</strong>：支持跟随系统、浅色、深色三种选择；侧栏底部的太阳按钮可快速切换。</li>
+                        <li><strong>关闭窗口行为（仅桌面版）</strong>：首次运行会询问关闭主窗口时的行为，之后可在设置页随时修改——「最小化到托盘（后台继续运行）」或「直接退出程序」。选择最小化后，可从系统托盘图标恢复或退出程序。</li>
+                        <li><strong>清空所有对话</strong>（危险操作）：将删除所有对话和消息记录，此操作不可撤销，请谨慎使用。</li>
                     </ul>
                 </div>
 
@@ -391,11 +434,21 @@
                     <p>系统通过统一的 Provider 抽象层支持多种模型服务，当前已内置：</p>
                     <ul>
                         <li><strong>Claude</strong>（Anthropic）— Claude Sonnet 5、Claude Opus 4.8 等</li>
-                        <li><strong>OpenAI</strong> — GPT-4o、GPT-4-turbo 等</li>
-                        <li><strong>DeepSeek</strong> — deepseek-v4-flash 等</li>
-                        <li><strong>通义千问（Qwen）</strong>、<strong>Kimi</strong>、<strong>智谱（GLM）</strong>、<strong>Moonshot</strong> 等国产模型</li>
+                        <li><strong>OpenAI</strong> — GPT-4o、GPT-5 系列等</li>
+                        <li><strong>DeepSeek</strong> — deepseek-v4-flash、deepseek-v4-pro 等</li>
+                        <li><strong>通义千问（Qwen）</strong>、<strong>Kimi（Moonshot）</strong>、<strong>智谱（GLM）</strong>、<strong>MiniMax</strong>、<strong>阶跃星辰（Step）</strong> 等国产模型</li>
                     </ul>
-                    <p>所有兼容 OpenAI 接口的服务均可通过填入对应 <code>base_url</code> 使用。</p>
+                    <p>所有兼容 OpenAI 接口的服务均可通过在设置页填入对应 <code>base_url</code> 使用；列表里没有的模型可选「自定义模型」手动输入。</p>
+                </div>
+
+                <div class="guide-section">
+                    <h3>常见问题</h3>
+                    <ul>
+                        <li><strong>AI 不回复或报错？</strong>先到「设置」确认 API Key 已保存且格式正确；模拟器游戏请在运行页点击「重新同步」让配置生效。使用第三方服务时，还需确认 base_url 与模型名称填写正确。</li>
+                        <li><strong>模拟器提示「游戏加载失败」？</strong>通常是页面加载超时（15 秒）或参数异常，点击「重试」即可；游戏文件就在本地，不会丢失。</li>
+                        <li><strong>游戏存档会丢吗？</strong>正常使用不会丢（保存在浏览器 localStorage）。清理浏览器数据、换浏览器或换电脑前，建议先用「存档管理」导出备份。</li>
+                        <li><strong>数据安全吗？</strong>角色、对话、API Key 全部保存在本地，只有聊天内容会发送给你自己配置的模型服务商。</li>
+                    </ul>
                 </div>
 
                 <div class="guide-section">
@@ -404,7 +457,7 @@
                         <li>角色的人格设定越详细，AI 的角色扮演效果越好。建议包含：性格特征、说话风格、背景故事、知识范围。</li>
                         <li>开场白（<code>first_mes</code>）是角色与用户的第一句话，好的开场白能立刻建立角色氛围。</li>
                         <li>使用 <code>{{user}}</code> 和 <code>{{char}}</code> 模板变量时，确保已在设置中填写了用户昵称。</li>
-                        <li>API Key 仅存储在本地 SQLite 数据库中，不会上传到任何服务器。</li>
+                        <li>侧栏可以收起（侧栏底部按钮），收起后点击左上角悬浮按钮展开；聊天列表也可单独收起，腾出更多聊天空间。</li>
                         <li>遇到问题可以先查看浏览器开发者工具的控制台（F12）是否有错误提示。</li>
                     </ul>
                 </div>
