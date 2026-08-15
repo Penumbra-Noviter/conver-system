@@ -6,10 +6,11 @@ LLM Provider 工厂
     - 应用入口在启动时显式调用（见 main.py on_startup）
     - `get_provider` / `list_providers` 首次调用前会自动确保内置 Provider 已注册
 
-Provider 清单单一来源：注册从 `model_data.AVAILABLE_MODELS` 派生（新增 Provider
-只改模型数据文件）。派生规则：
+Provider 清单单一来源：注册从 `provider_registry.PROVIDER_KEYS` / `resolve_api_provider`
+派生（源头为 `model_data.AVAILABLE_MODELS`，新增 Provider 只改模型数据文件）。
+派生规则：
     - `_CLASS_OVERRIDES` 中的显式声明优先（支持未来独立实现类）
-    - 否则 `key == "claude"` → ClaudeProvider、`id == "openai"` → OpenAIProvider
+    - 否则 `key == "claude"` → ClaudeProvider、协议为 openai → OpenAIProvider
     - 不匹配任何规则（且无显式覆盖）时注册失败并报错，提示进 `_CLASS_OVERRIDES`
 
 扩展新 Provider 的步骤：
@@ -23,7 +24,7 @@ from __future__ import annotations
 
 from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm.base import BaseLLM
-from backend.app.services.model_data import AVAILABLE_MODELS
+from backend.app.services.provider_registry import PROVIDER_KEYS, resolve_api_provider
 
 __all__ = ["LLMFactory", "register_builtin_providers"]
 
@@ -53,15 +54,12 @@ class LLMFactory:
         from backend.app.services.llm.claude import ClaudeProvider
         from backend.app.services.llm.openai import OpenAIProvider
 
-        for provider in AVAILABLE_MODELS["providers"]:
-            key = provider.get("key")
-            if not key:
-                raise ValueError(f"AVAILABLE_MODELS provider 条目缺少 key 字段: {provider!r}")
+        for key in PROVIDER_KEYS:
             provider_cls = _CLASS_OVERRIDES.get(key)
             if provider_cls is None:
                 if key == "claude":
                     provider_cls = ClaudeProvider
-                elif provider.get("id") == "openai":
+                elif resolve_api_provider(key) == "openai":
                     provider_cls = OpenAIProvider
                 else:
                     raise ValueError(

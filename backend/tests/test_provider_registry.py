@@ -14,9 +14,11 @@ LLMFactory 类级状态（_providers / _builtins_loaded）跨测试共享，auto
 
 from __future__ import annotations
 
+import importlib
+
 import pytest
 
-from backend.app.services import setting as setting_service
+from backend.app.services import provider_registry as provider_registry_module
 from backend.app.services.exceptions import ProviderNotSupportedError
 from backend.app.services.llm import factory as factory_module
 from backend.app.services.llm.base import BaseLLM
@@ -25,6 +27,7 @@ from backend.app.services.llm.errors import LLMError
 from backend.app.services.llm.factory import LLMFactory
 from backend.app.services.llm.openai import OpenAIProvider
 from backend.app.services.model_data import AVAILABLE_MODELS
+from backend.app.services.provider_registry import resolve_api_provider
 
 __all__: list[str] = []
 
@@ -128,12 +131,17 @@ class TestNewProviderDerivation:
     def test_new_openai_compatible_provider_auto_registers(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """AVAILABLE_MODELS 新增 id=openai 的 Provider → 自动注册为 OpenAIProvider"""
-        data = {
-            "providers": AVAILABLE_MODELS["providers"]
-            + [{"key": "fake", "id": "openai", "name": "Fake", "models": []}],
-        }
-        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", data)
+        """PROVIDER_KEYS 新增 openai 协议项 → 自动注册为 OpenAIProvider"""
+        monkeypatch.setattr(
+            factory_module,
+            "PROVIDER_KEYS",
+            tuple(EXPECTED_ORDER) + ("fake",),
+        )
+        monkeypatch.setattr(
+            factory_module,
+            "resolve_api_provider",
+            lambda key: "openai" if key == "fake" else resolve_api_provider(key),
+        )
         _reset_registry()
         LLMFactory.register_builtin_providers()
 
@@ -143,12 +151,17 @@ class TestNewProviderDerivation:
     def test_new_provider_with_class_override(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """key≠claude 且 id≠openai 的新 Provider 经 _CLASS_OVERRIDES 显式声明实现类"""
-        data = {
-            "providers": AVAILABLE_MODELS["providers"]
-            + [{"key": "fancy", "id": "proprietary", "name": "Fancy", "models": []}],
-        }
-        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", data)
+        """key≠claude 且协议非 openai 的新 Provider 经 _CLASS_OVERRIDES 显式声明实现类"""
+        monkeypatch.setattr(
+            factory_module,
+            "PROVIDER_KEYS",
+            tuple(EXPECTED_ORDER) + ("fancy",),
+        )
+        monkeypatch.setattr(
+            factory_module,
+            "resolve_api_provider",
+            lambda key: "proprietary" if key == "fancy" else resolve_api_provider(key),
+        )
         monkeypatch.setitem(factory_module._CLASS_OVERRIDES, "fancy", _OverrideProvider)
         _reset_registry()
         LLMFactory.register_builtin_providers()
@@ -173,57 +186,53 @@ class TestGetProvider:
 
 
 class TestMalformedData:
-    """Falsify：派生逻辑对畸形 AVAILABLE_MODELS 的行为必须明确、可诊断"""
+    """Falsify：派生逻辑对畸形输入的行为必须明确、可诊断"""
 
     def test_empty_providers_list_registers_nothing(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """空清单：注册为无操作，不报错"""
-        monkeypatch.setattr(factory_module, "AVAILABLE_MODELS", {"providers": []})
+        """PROVIDER_KEYS 空：注册为无操作，不报错"""
+        monkeypatch.setattr(factory_module, "PROVIDER_KEYS", ())
         _reset_registry()
         LLMFactory.register_builtin_providers()
 
         assert LLMFactory._providers == {}
         assert LLMFactory.list_providers() == []
 
-    def test_provider_missing_key_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """条目缺 key 字段：显式报错（注册名依赖 key）"""
-        monkeypatch.setattr(
-            factory_module,
-            "AVAILABLE_MODELS",
-            {"providers": [{"id": "openai", "name": "X", "models": []}]},
-        )
-        _reset_registry()
-        with pytest.raises(ValueError, match="key"):
-            LLMFactory.register_builtin_providers()
-
     def test_unresolvable_provider_raises_with_override_hint(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """key≠claude 且 id≠openai 且无覆盖：报错并提示 _CLASS_OVERRIDES 出路"""
+        """key≠claude 且协议非 openai 且无覆盖：报错并提示 _CLASS_OVERRIDES 出路"""
+        monkeypatch.setattr(factory_module, "PROVIDER_KEYS", ("weird",))
         monkeypatch.setattr(
             factory_module,
-            "AVAILABLE_MODELS",
-            {"providers": [{"key": "weird", "id": "custom", "name": "W", "models": []}]},
+            "resolve_api_provider",
+            lambda key: "custom",
         )
         _reset_registry()
         with pytest.raises(ValueError, match="_CLASS_OVERRIDES"):
             LLMFactory.register_builtin_providers()
 
+    def test_missing_key_in_registry_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """provider_registry 派生时条目缺 key：显式 ValueError（与既有注册语义对齐）"""
+        from backend.app.services import model_data as model_data_module
+
+        bad = {"providers": [{"id": "openai", "name": "X", "models": []}]}
+        monkeypatch.setattr(model_data_module, "AVAILABLE_MODELS", bad)
+        with pytest.raises(ValueError, match="key"):
+            importlib.reload(provider_registry_module)
+
     def test_duplicate_protocol_id_registers_all_to_same_class(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """重复 id（多 Provider 共享协议）是合法形态：各自按 id 规则注册"""
+        """重复 id（多 Provider 共享协议）是合法形态：各自按协议规则注册"""
+        monkeypatch.setattr(factory_module, "PROVIDER_KEYS", ("a", "b", "claude"))
         monkeypatch.setattr(
             factory_module,
-            "AVAILABLE_MODELS",
-            {
-                "providers": [
-                    {"key": "a", "id": "openai", "name": "A", "models": []},
-                    {"key": "b", "id": "openai", "name": "B", "models": []},
-                    {"key": "claude", "id": "claude", "name": "C", "models": []},
-                ]
-            },
+            "resolve_api_provider",
+            lambda key: "claude" if key == "claude" else "openai",
         )
         _reset_registry()
         LLMFactory.register_builtin_providers()
@@ -237,16 +246,12 @@ class TestMalformedData:
     def test_duplicate_key_last_wins_without_crash(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """重复 key：注册不崩溃，后者覆盖前者（dict 语义）"""
+        """PROVIDER_KEYS 重复 key：注册不崩溃，后者覆盖前者（dict 语义）"""
+        monkeypatch.setattr(factory_module, "PROVIDER_KEYS", ("dup", "dup"))
         monkeypatch.setattr(
             factory_module,
-            "AVAILABLE_MODELS",
-            {
-                "providers": [
-                    {"key": "dup", "id": "openai", "name": "D1", "models": []},
-                    {"key": "dup", "id": "openai", "name": "D2", "models": []},
-                ]
-            },
+            "resolve_api_provider",
+            lambda key: "openai",
         )
         _reset_registry()
         LLMFactory.register_builtin_providers()
@@ -255,11 +260,11 @@ class TestMalformedData:
 
 
 class TestSettingApiMapDerivation:
-    """设置映射派生：内容与现状逐项一致，_resolve_api_provider 语义不变"""
+    """协议映射派生（C6 收敛至 provider_registry）：内容与现状逐项一致，resolve_api_provider 语义不变"""
 
     def test_provider_api_map_matches_current_six(self) -> None:
-        """_PROVIDER_API_MAP 派生结果 == 现状 6 项（第三方 → openai）"""
-        assert setting_service._PROVIDER_API_MAP == {
+        """API_PROVIDER_MAP 派生结果 == 现状 6 项（第三方 → openai）"""
+        assert provider_registry_module.API_PROVIDER_MAP == {
             "deepseek": "openai",
             "qwen": "openai",
             "kimi": "openai",
@@ -270,7 +275,96 @@ class TestSettingApiMapDerivation:
 
     def test_resolve_api_provider_semantics(self) -> None:
         """claude/openai 回退自身；共享协议者映射到 openai；未知 Provider 原样返回"""
-        assert setting_service._resolve_api_provider("claude") == "claude"
-        assert setting_service._resolve_api_provider("openai") == "openai"
-        assert setting_service._resolve_api_provider("deepseek") == "openai"
-        assert setting_service._resolve_api_provider("unknown") == "unknown"
+        assert provider_registry_module.resolve_api_provider("claude") == "claude"
+        assert provider_registry_module.resolve_api_provider("openai") == "openai"
+        assert provider_registry_module.resolve_api_provider("deepseek") == "openai"
+        assert provider_registry_module.resolve_api_provider("unknown") == "unknown"
+
+
+class TestProviderRegistryMeta:
+    """provider_registry 深模块契约锁：派生视图与 AVAILABLE_MODELS 源头防漂移比对"""
+
+    def test_provider_keys_match_declaration_order(self) -> None:
+        """PROVIDER_KEYS 与 AVAILABLE_MODELS provider 声明序逐项一致（防漂移根 1）"""
+        from backend.app.services import provider_registry as registry
+
+        expected = tuple(p["key"] for p in AVAILABLE_MODELS["providers"])
+        assert registry.PROVIDER_KEYS == expected
+        assert isinstance(registry.PROVIDER_KEYS, tuple)
+
+    def test_api_provider_map_matches_derivation(self) -> None:
+        """API_PROVIDER_MAP 与 AVAILABLE_MODELS 派生（key≠id 过滤）逐项一致（防漂移根 2）"""
+        from backend.app.services import provider_registry as registry
+
+        expected = {
+            p["key"]: p["id"]
+            for p in AVAILABLE_MODELS["providers"]
+            if p["key"] != p["id"]
+        }
+        assert registry.API_PROVIDER_MAP == expected
+
+    def test_api_provider_map_excludes_own_protocol(self) -> None:
+        """映射不收录 key==id 的自身协议（claude/openai 不在此映射）"""
+        from backend.app.services import provider_registry as registry
+
+        assert "claude" not in registry.API_PROVIDER_MAP
+        assert "openai" not in registry.API_PROVIDER_MAP
+
+    def test_openai_protocol_models_matches_union(self) -> None:
+        """OPENAI_PROTOCOL_MODELS 与 AVAILABLE_MODELS 手工并集逐项一致（防漂移根 3）"""
+        from backend.app.services import provider_registry as registry
+
+        expected = frozenset(
+            model
+            for p in AVAILABLE_MODELS["providers"]
+            if p["id"] == "openai"
+            for model in p.get("models", [])
+        )
+        assert registry.OPENAI_PROTOCOL_MODELS == expected
+        assert isinstance(registry.OPENAI_PROTOCOL_MODELS, frozenset)
+
+    def test_openai_protocol_models_is_nonempty_and_sensible(self) -> None:
+        """openai 协议族模型集非空且含各主流族成员（现状事实锁定）"""
+        from backend.app.services import provider_registry as registry
+
+        assert len(registry.OPENAI_PROTOCOL_MODELS) > 10
+        assert "deepseek-v4-flash" in registry.OPENAI_PROTOCOL_MODELS
+        assert "qwen-max" in registry.OPENAI_PROTOCOL_MODELS
+        assert "gpt-5.6-sol" in registry.OPENAI_PROTOCOL_MODELS
+        # claude 模型（claude 协议）不得混入 openai 族
+        assert not any(m.startswith("claude") for m in registry.OPENAI_PROTOCOL_MODELS)
+
+    def test_resolve_api_provider_semantics(self) -> None:
+        """resolve_api_provider：映射者返回协议 id；claude/openai/未知回退自身"""
+        from backend.app.services import provider_registry as registry
+
+        assert registry.resolve_api_provider("deepseek") == "openai"
+        assert registry.resolve_api_provider("claude") == "claude"
+        assert registry.resolve_api_provider("openai") == "openai"
+        assert registry.resolve_api_provider("unknown") == "unknown"
+
+    def test_registry_all_exports_are_public(self) -> None:
+        """provider_registry __all__ 恰好列出 4 个导出符号（深模块协议表面收缩）"""
+        from backend.app.services import provider_registry as registry
+
+        assert sorted(registry.__all__) == [
+            "API_PROVIDER_MAP",
+            "OPENAI_PROTOCOL_MODELS",
+            "PROVIDER_KEYS",
+            "resolve_api_provider",
+        ]
+
+    def test_registry_derived_at_import_time_and_consistent(self) -> None:
+        """派生视图在 import 时固定：模块属性与源头重复读取一致（无懒加载分叉）"""
+        from backend.app.services import provider_registry as registry
+
+        assert registry.PROVIDER_KEYS[0] == "claude"
+        assert registry.PROVIDER_KEYS[-1] == "step"
+        assert list(registry.API_PROVIDER_MAP) == [
+            "deepseek",
+            "qwen",
+            "kimi",
+            "glm",
+            "minimax",
+            "step",
+        ]

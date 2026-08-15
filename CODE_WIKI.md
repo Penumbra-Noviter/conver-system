@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1303<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->461<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->784<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->469<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->469<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->784<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
 
 ---
 
@@ -118,6 +118,7 @@ conver system/
 │   │       ├── exceptions.py       ← 领域异常定义
 │   │       ├── message.py          ← 消息服务（开场白/上下文构建/搜索）
 │   │       ├── model_data.py       ← Provider/模型清单单一来源（AVAILABLE_MODELS）
+│   │       ├── provider_registry.py ← Provider 派生元数据深模块（C6）
 │   │       ├── setting.py          ← 设置服务（凭证槽位/滑窗轮数）
 │   │       └── llm/                ← LLM 接入层（深模块）
 │   │           ├── __init__.py     ← 包级导出零 SDK 副作用契约
@@ -352,6 +353,17 @@ conver system/
 | `V2_KEY_MAP` | DB 名 → V2 协议键名映射 |
 | `V1_TO_V2_MAP` | V1 旧卡名 → DB 名映射 |
 
+### 4.13.6 `backend/app/services/provider_registry.py` — Provider 派生元数据（<!--AUTO:lines:backend/app/services/provider_registry.py-->~62 行<!--/AUTO-->）
+
+**职责**：Provider 清单的派生视图单一来源深模块（C6 架构评审）——协议映射 / 协议族模型集 / key 声明序在此收敛，替代 factory/setting 对 `AVAILABLE_MODELS["providers"]` 的多处独立遍历。
+
+| 元素 | 说明 |
+|------|------|
+| `PROVIDER_KEYS` | Provider key 声明序（tuple，注册顺序契约） |
+| `API_PROVIDER_MAP` | key → 协议 id（仅 key≠id 的协议共享者） |
+| `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
+| `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
+
 ### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~235 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response` / `llm_error_response`，ARC10 T-03 收口）。
@@ -443,7 +455,7 @@ conver system/
 
 > 无公开函数（数据表 + 派生逻辑）。
 
-### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~186 行<!--/AUTO-->）
+### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~172 行<!--/AUTO-->）
 
 **职责**：DB settings 表读写——凭证槽位（按 Provider 存取 Key/base_url）、滑窗轮数、用户名、默认模型；凭证通用解析（填任一 key 全局可用）。
 
@@ -493,7 +505,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/errors.py:LLMError.__init__-->`__init__(message, original_error=None)`<!--/AUTO--> | 构造（保留原始异常） |
 | <!--AUTO:sig:backend/app/services/llm/errors.py:translate_sdk_error-->`translate_sdk_error(error, provider_label, *, auth_cls, rate_cls, timeout_cls, bad_request_cls)`<!--/AUTO--> | SDK 异常 → LLMError 分类映射 |
 
-### 4.27 `backend/app/services/llm/factory.py` — Provider 工厂（<!--AUTO:lines:backend/app/services/llm/factory.py-->~80 行<!--/AUTO-->）
+### 4.27 `backend/app/services/llm/factory.py` — Provider 工厂（<!--AUTO:lines:backend/app/services/llm/factory.py-->~78 行<!--/AUTO-->）
 
 **职责**：`LLMFactory` 注册表——显式注册 + 内置 Provider 批量注册 + 懒加载兜底 + 清单查询。
 
@@ -1065,7 +1077,7 @@ conver system/
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
 | `backend/tests/test_prompt.py` | <!--AUTO:tests:backend/tests/test_prompt.py-->26<!--/AUTO--> | 提示词构建/模板变量 |
-| `backend/tests/test_provider_registry.py` | <!--AUTO:tests:backend/tests/test_provider_registry.py-->15<!--/AUTO--> | Provider 注册表 |
+| `backend/tests/test_provider_registry.py` | <!--AUTO:tests:backend/tests/test_provider_registry.py-->23<!--/AUTO--> | Provider 注册表 |
 | `backend/tests/test_resolve_llm.py` | <!--AUTO:tests:backend/tests/test_resolve_llm.py-->7<!--/AUTO--> | LLM 解析器 |
 | `backend/tests/test_schema_snapshot.py` | <!--AUTO:tests:backend/tests/test_schema_snapshot.py-->1<!--/AUTO--> | schema 快照漂移检测（T-17） |
 | `backend/tests/test_search.py` | <!--AUTO:tests:backend/tests/test_search.py-->13<!--/AUTO--> | 跨对话搜索 |
@@ -1152,9 +1164,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1303<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->469<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->461<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->469<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->784<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->58<!--/AUTO-->
 
