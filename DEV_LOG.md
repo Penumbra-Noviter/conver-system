@@ -18,6 +18,18 @@
 
 ---
 
+## 滚动摘要（2026-08-15 — 技术债区 F-1/F-2/F-4 批次：kickoff 全自动档轻量档 1 工单）
+
+- **来源**：C3/C4/C8 批次波 1 增量审核 + 期末四轴复证非阻断发现（技术债区 3 项待立项）。Grilling 共识（全自动档拍板）：**F-1 做 + F-2 关闭 + F-4 关闭**，各附一句话实证理由。
+- **工单 01（68251a6，docs，轻量档单工单）**——F-1：两处 docstring 旧 setter 名 `setConversationsRefresher` 改述为 `setChatHooks`（cascade.js:20 / conversation-activation.js:20），纯注释零行为变化；grep frontend/js/ 归零，文档历史引用保留。
+- **merge（c996835）**——主分支合并；Implement worktree 中 doc_sync --check 误报「测试文件未收集」（worktree 无 node_modules 致 Vitest 收集失败，环境性误报），主分支 doc_sync 通过核实后 `--no-verify` 绕过合理。
+- **F-2/F-4 复核关闭**——各附一句话实证（F-2 派生锁已覆盖非真实风险；F-4 默认值与后端一致 CLI 可覆盖良性默认）。
+- **期末四轴（固定点 91e8e4c）：0 阻断放行**——Standards 0 硬违规；Spec 3/3 验收达成；Falsify 0 击穿（旧名全仓零残留、setChatHooks 改述语义无歧义）；Architecture 依赖方向描述准确。
+- **运行态冒烟**：GET / 200 + /api/models 200 + /api/characters 200，端口已释放。
+- **测试同步**：Vitest **807**（基线一致 +0 净变化）；pytest **469 + 1 skip** / cargo 58 未受影响。
+- **文档同步**：TICKETS（F-1✅/F-2❌/F-4❌ 处置 + 归档批次，技术债区清零）；DEV_LOG 本段。
+- **知识库预检召回**：persona「技术债区清理走 kickoff 全自动批次」+「票面建议须实证复核」；无新教训蒸馏（既有教训覆盖）。
+
 ## 滚动摘要（2026-08-15 — C3/C4/C8 技术债批次：kickoff 全自动档标准档 2 波 3 工单）
 
 - **来源**：/improve-codebase-architecture 架构评审报告未选候选 C3/C4/C8（用户立项「全自动修补技术债区」）。Grilling 共识（全自动档）：3 项全做，四项默认决策按推荐（setChatHooks 合并命名 / showError+showSuccess 迁 utils.js / 超时文案按域各留共享数值 / MANIFEST_URL 由 SIM_DIR 派生）。
