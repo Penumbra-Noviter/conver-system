@@ -25,16 +25,16 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-> 技术债区当前 **3 项**（C3/C4/C8 待立项 + C7 复核关闭；C6 已于 2026-08-15 kickoff 批次修复归档，技术债区 C6 清零）。
+> 技术债区当前 **3 项已立项**（C3/C4/C8 已立项 + C7 复核关闭；C6 已于 2026-08-15 kickoff 批次修复归档）。
 
 > **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| C3 | 前端注入钩子两种方言 + activation 时序迟到 → 统一为 options-object 方言，全部接线同相 | 架构报告 | Worth exploring | 📝 待立项 |
-| C4 | 角色/对话列表视图渲染内联在 app.js（160-403 行）→ 下沉为视图深模块，跟上 search-view 先例 | 架构报告 | Worth exploring | 📝 待立项 |
+| C3 | 前端注入钩子两种方言 + activation 时序迟到 → 统一为 options-object 方言，全部接线同相 | 架构报告 | Worth exploring | 🔄 已立项 |
+| C4 | 角色/对话列表视图渲染内联在 app.js（160-403 行）→ 下沉为视图深模块，跟上 search-view 先例 | 架构报告 | Worth exploring | 🔄 已立项 |
 | C7 | 后端对话导出序列化双轨（conversation_export.py 手写 dict vs schema from_attributes）→ 复用 schema，兑现「service 层零手写 dict」声明 | 架构报告 | Worth exploring | ❌ 复核关闭（2026-08-15：conversation_export.py:37 已 model_validate+model_dump 驱动，C5 批次复核现状成立；MD 段 3 个内联属性访问属渲染逻辑非序列化） |
-| C8 | 模拟器 file 安全判据/路径前缀/超时常量/wg_ 消费方清单散落 → 收进 simulator-contracts 契约深模块 | 架构报告 | Speculative | 📝 待立项 |
+| C8 | 模拟器 file 安全判据/路径前缀/超时常量/wg_ 消费方清单散落 → 收进 simulator-contracts 契约深模块 | 架构报告 | Speculative | 🔄 已立项 |
 
 ---
 
