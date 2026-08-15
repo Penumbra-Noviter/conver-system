@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1331<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->470<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->803<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1335<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->470<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->807<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->58<!--/AUTO-->）
 
 ---
 
@@ -148,6 +148,7 @@ conver system/
 │   │   ├── format.js               ← 展示契约（气泡/卡片/列表 HTML 生成）
 │   │   ├── icons.js                ← 图标 seam（iconHtml 单源）
 │   │   ├── key-injector.js         ← 模拟器 Key/模型注入（SIM-API-1）
+│   │   ├── list-views.js           ← 角色/对话列表视图深模块（C4）
 │   │   ├── markdown.js             ← Markdown 渲染（XSS 消毒）
 │   │   ├── save-key-meta.js        ← 存档键契约单一来源（TD-67/68）
 │   │   ├── save-manager.js         ← 模拟器存档管理（导出/导入/删除）
@@ -587,23 +588,15 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~517 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~274 行<!--/AUTO-->）
 
-**职责**：初始化接线（init）——视图切换、角色/会话列表加载、设置面板/搜索/模拟器装配、导入失败引导。
+**职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:frontend/js/app.js:init-->`init()`<!--/AUTO--> | 应用初始化（模块接线） |
 | <!--AUTO:sig:frontend/js/app.js:switchView-->`switchView(viewName)`<!--/AUTO--> | 视图切换 |
-| <!--AUTO:sig:frontend/js/app.js:loadCharacters-->`loadCharacters()`<!--/AUTO--> | 加载角色列表 |
-| <!--AUTO:sig:frontend/js/app.js:renderCharacters-->`renderCharacters()`<!--/AUTO--> | 渲染角色列表 |
-| <!--AUTO:sig:frontend/js/app.js:loadConversations-->`loadConversations()`<!--/AUTO--> | 加载会话列表 |
 | <!--AUTO:sig:frontend/js/app.js:loadModels-->`loadModels()`<!--/AUTO--> | 加载模型清单 |
-| <!--AUTO:sig:frontend/js/app.js:startChatWithCharacter-->`startChatWithCharacter(characterId)`<!--/AUTO--> | 发起角色对话 |
-| <!--AUTO:sig:frontend/js/app.js:handleCharacterImport-->`handleCharacterImport()`<!--/AUTO--> | 角色卡导入处理 |
-| <!--AUTO:sig:frontend/js/app.js:promptUseWizardAfterImportFail-->`promptUseWizardAfterImportFail()`<!--/AUTO--> | 导入失败 → 引导使用向导 |
-| <!--AUTO:sig:frontend/js/app.js:showError-->`showError(message)`<!--/AUTO--> | 错误提示 |
-| <!--AUTO:sig:frontend/js/app.js:showSuccess-->`showSuccess(message)`<!--/AUTO--> | 成功提示 |
 
 ### 4.35 `frontend/js/cascade.js` — 级联收口（<!--AUTO:lines:frontend/js/cascade.js-->~88 行<!--/AUTO-->）
 
@@ -632,6 +625,22 @@ conver system/
 | <!--AUTO:sig:frontend/js/chat.js:setChatHooks-->`setChatHooks(h)`<!--/AUTO--> | 注入会话列表刷新器与标题同步器（options-object 方言） |
 | <!--AUTO:sig:frontend/js/chat.js:scrollToBottom-->`scrollToBottom()`<!--/AUTO--> | 滚动到底部 |
 | <!--AUTO:sig:frontend/js/chat.js:attachCopyButton-->`attachCopyButton(btn)`<!--/AUTO--> | 复制按钮接线 |
+
+### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~355 行<!--/AUTO-->）
+
+**职责**：角色/对话两个列表视图深模块（C4，search-view 先例）——角色网格渲染与四类按钮事件委托、对话列表渲染与打开/删除委托、角色导入（含失败引导向导）、开始对话全流程（模型选择→创建→切视图→激活→聚焦）、列表标题同步 DOM 手术；协调层经 `initListViews({ switchView })` 接线。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/list-views.js:initListViews-->`initListViews({ switchView: sw } = {})`<!--/AUTO--> | 初始化列表视图（注入 switchView） |
+| <!--AUTO:sig:frontend/js/list-views.js:loadCharacters-->`loadCharacters()`<!--/AUTO--> | 加载角色列表 |
+| <!--AUTO:sig:frontend/js/list-views.js:renderCharacters-->`renderCharacters()`<!--/AUTO--> | 渲染角色列表 |
+| <!--AUTO:sig:frontend/js/list-views.js:loadConversations-->`loadConversations()`<!--/AUTO--> | 加载会话列表 |
+| <!--AUTO:sig:frontend/js/list-views.js:renderConversations-->`renderConversations()`<!--/AUTO--> | 渲染会话列表 |
+| <!--AUTO:sig:frontend/js/list-views.js:syncConversationListTitle-->`syncConversationListTitle(convId, newTitle)`<!--/AUTO--> | 重命名后列表标题同步（DOM 手术） |
+| <!--AUTO:sig:frontend/js/list-views.js:startChatWithCharacter-->`startChatWithCharacter(characterId)`<!--/AUTO--> | 发起角色对话 |
+| <!--AUTO:sig:frontend/js/list-views.js:handleCharacterImport-->`handleCharacterImport()`<!--/AUTO--> | 角色卡导入处理 |
+| <!--AUTO:sig:frontend/js/list-views.js:promptUseWizardAfterImportFail-->`promptUseWizardAfterImportFail()`<!--/AUTO--> | 导入失败 → 引导使用向导 |
 
 ### 4.37 `frontend/js/components/character-form.js` — 角色编辑表单（<!--AUTO:lines:frontend/js/components/character-form.js-->~198 行<!--/AUTO-->）
 
@@ -949,7 +958,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/tabs.js:persist-->`persist()`<!--/AUTO--> | 写 sessionStorage |
 | <!--AUTO:sig:frontend/js/tabs.js:commit-->`commit()`<!--/AUTO--> | 提交（持久化 + 通知） |
 
-### 4.61 `frontend/js/utils.js` — 通用工具（<!--AUTO:lines:frontend/js/utils.js-->~80 行<!--/AUTO-->）
+### 4.61 `frontend/js/utils.js` — 通用工具（<!--AUTO:lines:frontend/js/utils.js-->~94 行<!--/AUTO-->）
 
 **职责**：通用工具——HTML 转义、Toast、Blob 下载、头像首字母、标签格式化、输入框自适应。
 
@@ -957,6 +966,8 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/utils.js:escapeHtml-->`escapeHtml(str)`<!--/AUTO--> | HTML 转义 |
 | <!--AUTO:sig:frontend/js/utils.js:showToast-->`showToast(message, type = 'success')`<!--/AUTO--> | Toast 提示 |
+| <!--AUTO:sig:frontend/js/utils.js:showError-->`showError(message)`<!--/AUTO--> | 错误提示（showToast 薄封装） |
+| <!--AUTO:sig:frontend/js/utils.js:showSuccess-->`showSuccess(message)`<!--/AUTO--> | 成功提示（showToast 薄封装） |
 | <!--AUTO:sig:frontend/js/utils.js:downloadBlob-->`downloadBlob(url, filename, errorPrefix = '导出失败')`<!--/AUTO--> | Blob 下载 |
 | <!--AUTO:sig:frontend/js/utils.js:getInitials-->`getInitials(name)`<!--/AUTO--> | 首字母 |
 | <!--AUTO:sig:frontend/js/utils.js:formatTags-->`formatTags(tags)`<!--/AUTO--> | 标签格式化 |
@@ -1090,7 +1101,7 @@ conver system/
 | 文件 | 用例数 | 覆盖主题 |
 |------|--------|----------|
 | `frontend/tests/api.test.js` | <!--AUTO:tests:frontend/tests/api.test.js-->16<!--/AUTO--> | 请求层/超时/SSE/Blob |
-| `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->47<!--/AUTO--> | 应用编排接线 |
+| `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->30<!--/AUTO--> | 应用编排接线 |
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
@@ -1100,6 +1111,7 @@ conver system/
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->36<!--/AUTO--> | 展示契约 |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->69<!--/AUTO--> | Key 注入/端点口径 |
+| `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->8<!--/AUTO--> | 模型选择 |
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
@@ -1165,10 +1177,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1331<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1335<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->470<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->803<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->807<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->58<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
