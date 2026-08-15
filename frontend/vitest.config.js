@@ -25,6 +25,7 @@ export default defineConfig({
                 'js/save-manager.js',
                 'js/save-key-meta.js', // TD-67/68 存档键契约单一来源（契约之家，per-file ≥90% 口径）
                 'js/fetch-seam.js', // TD-51/55/60 fetch 注入点单一来源（per-file ≥90% 口径）
+                'js/simulator-contracts.js', // C8 模拟器域契约单一来源（契约深模块，per-file ≥90% 口径）
             ],
             reporter: ['text', 'html'],
             thresholds: {

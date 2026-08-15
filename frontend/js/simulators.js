@@ -10,7 +10,9 @@
  *   fetch manifest，G7）。
  *
  * 依赖方向：simulators.js → icons.js（iconHtml 图标 seam）/ utils.js
- *   （escapeHtml）；app.js → simulators.js（initSimulatorsView /
+ *   （escapeHtml）/ simulator-contracts.js（C8 契约深模块：MANIFEST_URL 清单
+ *   URL / TIMEOUT_MS 超时毫秒 / TIMEOUT_REASON 清单域超时文案 — 模拟器域
+ *   事实单一来源，本视图不持副本）；app.js → simulators.js（initSimulatorsView /
  *   refreshSimulators 接线）。打开回调经注入钩子（G7 注入钩子模式）：
  *   app.js 初始化时传入 onOpenGame（U7-T4 将接入 openSimulator）。
  *
@@ -55,6 +57,7 @@ import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
 import { saveKeyIsValidPattern } from './save-key-meta.js';
 import { doFetch } from './fetch-seam.js';
+import { MANIFEST_URL, TIMEOUT_MS, TIMEOUT_REASON } from './simulator-contracts.js';
 
 // ══════════════════════════════════════════════════
 // fetch seam（单一来源 js/fetch-seam.js — 见模块头 docstring；TD-51/55/60）
@@ -65,15 +68,9 @@ export { setFetch } from './fetch-seam.js';
 // ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
 // ══════════════════════════════════════════════════
-
-/** manifest 静态目录相对路径（后端静态托管覆盖） */
-const MANIFEST_URL = 'simulators/manifest.json';
-
-/** 清单加载超时守卫时长（镜像 simulator-view.js TIMEOUT_MS=15000 先例） */
-const TIMEOUT_MS = 15000;
-
-/** 超时进入错误态的原因文案（spec D1 逐字） */
-const TIMEOUT_REASON = '模拟器清单加载超时（15 秒未收到响应）';
+// 模拟器域事实常量（MANIFEST_URL 清单 URL / TIMEOUT_MS 超时毫秒 /
+// TIMEOUT_REASON 清单域超时文案）单一来源为 js/simulator-contracts.js
+// （C8 契约深模块）—— 本视图不持副本，改路径 / 超时只改契约模块。
 
 /** 列表挂载容器（initSimulatorsView 注入；未 init 时为 null） */
 let container = null;

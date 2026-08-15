@@ -7,10 +7,10 @@
  *   五处消费点全部 import 本模块，不再各自持有字面量副本：
  *     - frontend/js/simulators.js      （列表解析归一化：正则元字符判定）
  *     - frontend/js/save-manager.js    （存档面板：白名单匹配 + wg_ 注记集合）
- *     - frontend/js/simulator-view.js  （运行视图：wg_ 会话注记集合）
  *     - scripts/smoke-simulators.mjs   （冒烟脚本：存档面板种子键精确键判定）
  *     - frontend/tests/simulator-manifest.test.js（数据完整性：判定 + 溯源探针 +
  *       内联转义变体）
+ *     - frontend/tests/save-key-meta.test.js（契约锁：常量断言 + 匹配语义函数矩阵）
  *   维护约定：新增 / 修改存档键契约常量只改本模块；各消费文件 docstring 的
  *   共享契约段指向本模块（不复制常量定义）。
  *
