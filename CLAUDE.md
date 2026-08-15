@@ -53,7 +53,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **C1 写回环状态机收口（2026-08-15 kickoff 全自动档：串行链 4 工单）**：模拟器配置同步写回环状态（冷却/熔断）从 simulator-view 收进 key-injector 单一状态机——`autoSyncIntoGame` 加 path:'load'|'observer'（一次调用原子完成冷却判定→同步→置冷却→观察者计数→熔断判定；熔断权优先于冷却、幂等兜底）+ 新导出 `resetSyncLoop()`（复位唯一触发点 destroyFrame）+ `__all__` 10→11；simulator-view 只留触发时机（load/观察者防抖/按钮）与观察者生命周期；期末四轴 0 阻断放行；冒烟 13 项 12 PASS；Vitest 746→766
 - ✅ **C2 saveKeys 匹配语义收口（2026-08-15 kickoff 全自动档：轻量档 1 工单）**：saveKeys 白名单匹配语义（精确键名 === / 正则模式 ^…$ 锚定匹配）从三处分散实现收进 save-key-meta 完整深模块——新增 `saveKeyIsPattern`/`saveKeyIsValidPattern`/`saveKeyMatches` 三导出（`__all__` 3→6）；normalizeSaveKeys/whitelistHits/saveKeyHits 三消费方对标；期末四轴 0 阻断放行；冒烟 13 项 12 PASS；Vitest 766→784
 - ✅ **C5 角色字段知识收敛（2026-08-15 kickoff 全自动档：标准档 2 工单串行链）**：后端角色字段清单（16 个 V2 内容字段）从 8 处重复硬编码收敛为 character_fields.py 单一映射深模块（CHARACTER_V2_FIELDS 全集 + PROMPT/PARSE/EXPORT 投影 + V2_KEY_MAP/V1_TO_V2_MAP）+ schemas CharacterBase 继承体系；character_card/document_parser/prompt/message 四消费者对标；附带 doc_sync 子编号支持；期末四轴 0 阻断；连带复核 C7 关闭；pytest 434→460+1skip（+26 契约锁）
-- ✅ 测试：pytest 460+1skip（后端）+ Vitest 784（前端）+ cargo test 58（壳）全绿
+- ✅ 测试：pytest 469+1skip（后端）+ Vitest 784（前端）+ cargo test 58（壳）全绿
 
 ## 待办管理
 
