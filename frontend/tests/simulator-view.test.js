@@ -1003,3 +1003,105 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 });
+
+describe('simulator-view — PC 阅读覆盖层注入（方案 A / T2 — injectPcOverlay）', () => {
+    beforeEach(() => { vi.useFakeTimers(); vi.restoreAllMocks(); });
+    afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+    /** 覆盖层 link 选择器（与注入 href 单点常量一致） */
+    const OVERLAY_HREF = '../css/simulator-pc.css';
+    const overlayLinks = (doc) => doc?.head?.querySelectorAll(`link[href="${OVERLAY_HREF}"]`) ?? [];
+
+    /** open 游戏并把 iframe 文档种子化为带 <head> 的游戏文档，再派发 load */
+    function openAndLoadSeeded(view, game = GAME_AI) {
+        view.openSimulator(game);
+        const frame = frameEl();
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write('<html><head><title>game</title></head><body><div id="game-log"></div></body></html>');
+        doc.close();
+        frame.dispatchEvent(new Event('load'));
+        return { frame, doc };
+    }
+
+    it('loaded 后 contentDocument.head 出现 link[href="../css/simulator-pc.css"]（rel=stylesheet，追加于 head 末尾）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { doc } = openAndLoadSeeded(view);
+
+        const links = overlayLinks(doc);
+        expect(links).toHaveLength(1);
+        expect(links[0].rel).toBe('stylesheet');
+        expect(links[0].getAttribute('href')).toBe('../css/simulator-pc.css');
+        expect(doc.head.lastElementChild).toBe(links[0]); // 追加于 head 末尾 → 同特异性优先级最高
+    });
+
+    it('幂等：游戏文档已含同 href link → load 后不重复注入（querySelectorAll 长度 1）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        view.openSimulator(GAME_AI);
+        const frame = frameEl();
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write('<html><head><link rel="stylesheet" href="../css/simulator-pc.css"></head><body></body></html>');
+        doc.close();
+        frame.dispatchEvent(new Event('load'));
+
+        expect(overlayLinks(doc)).toHaveLength(1); // 已存在 → no-op，不重复
+    });
+
+    it('Falsify:contentDocument 为 null（destroyFrame 后迟到 load）→ 不抛错、无副作用', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        view.openSimulator(GAME_AI);
+        const frame = frameEl();
+        vi.spyOn(frame, 'contentDocument', 'get').mockReturnValue(null);
+        // 模拟器域事实：同源 iframe src 形如 simulators/<file>，load 与内容文档
+        // 生命周期分离 — contentDocument 不可用时注入必须 no-op
+        expect(() => frame.dispatchEvent(new Event('load'))).not.toThrow();
+        expect(frame.classList.contains('sim-run-frame-hidden')).toBe(false); // loaded 态正常推进
+    });
+
+    it('Falsify:doc 存在但 head 缺失 → 不抛错、不注入', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        view.openSimulator(GAME_AI);
+        const frame = frameEl();
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write('<html><body><div id="game-log"></div></body></html>');
+        doc.close();
+        doc.head?.remove(); // 强制 head 缺失（jsdom 下 head 为 live 派生）
+
+        expect(() => frame.dispatchEvent(new Event('load'))).not.toThrow();
+        expect(overlayLinks(doc)).toHaveLength(0);
+    });
+
+    it('opening 态（load 前）不注入；loaded 后才出现 link', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        view.openSimulator(GAME_AI);
+        const frame = frameEl();
+
+        // load 前（opening）：游戏文档无覆盖层 link
+        expect(overlayLinks(frame.contentDocument)).toHaveLength(0);
+
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write('<html><head><title>game</title></head><body></body></html>');
+        doc.close();
+        frame.dispatchEvent(new Event('load'));
+
+        expect(overlayLinks(doc)).toHaveLength(1); // load 后才注入
+    });
+
+    it('Falsify:loaded 后重复派发 load → 状态守卫忽略，link 不重复（仍 1 个）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { frame, doc } = openAndLoadSeeded(view);
+        expect(overlayLinks(doc)).toHaveLength(1);
+
+        expect(() => frame.dispatchEvent(new Event('load'))).not.toThrow();
+        expect(overlayLinks(doc)).toHaveLength(1);
+    });
+});
