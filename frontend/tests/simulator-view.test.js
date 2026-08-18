@@ -1008,7 +1008,9 @@ describe('simulator-view — PC 阅读覆盖层注入（方案 A / T2 — inject
     beforeEach(() => { vi.useFakeTimers(); vi.restoreAllMocks(); });
     afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
-    /** 覆盖层 link 选择器（与注入 href 单点常量一致） */
+    /** 覆盖层 link 选择器（与 js 内 PC_OVERLAY_HREF 常量契约对偶——T2 验收
+     * 「href 在 js 中唯一出现」要求内部函数不可导出，测试只能持有字符串副本；
+     * 改动 href 必须同步两处，simulator-pc-css.test.js 的契约锁已覆盖） */
     const OVERLAY_HREF = '../css/simulator-pc.css';
     const overlayLinks = (doc) => doc?.head?.querySelectorAll(`link[href="${OVERLAY_HREF}"]`) ?? [];
 
