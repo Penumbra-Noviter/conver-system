@@ -1,0 +1,132 @@
+/**
+ * Conver System — 模拟器 PC 阅读共享覆盖层（方案 A，T1）
+ *
+ * 职责：22 个模拟器游戏（frontend/simulators/*.html 自包含单文件，内联 CSS
+ *   以移动端紧凑基调设计）在主机 iframe 中打开时的 PC 阅读适配。由
+ *   simulator-view.js 在 iframe load 后以 <link> 追加到游戏文档 <head>
+ *   末尾（同特异性下优先级最高）注入；游戏独立打开不受影响，零改动
+ *   22 个游戏 HTML。
+ *
+ * 覆盖策略：全部规则只作用于通用容器/条目类名与 CSS 变量；游戏 DOM
+ *   缺某类名 → 该规则优雅降级不报错（CSS 天然无异常面）。
+ * 变量覆盖沿用游戏自身变量体系（同名覆盖 + 同特异性后加载序胜出）；
+ *   分区 3 的私有变量映射组按源文件逐组核对（见各分组注释）。
+ *
+ * 结构：分区 1 排版基线 / 分区 2 A 类变量覆盖 / 分区 3 B 类私有变量映射 /
+ *   分区 4 状态面板密度 / 分区 5 滚动条 / 分区 6 弹窗与输入区 + 窄屏降级。
+ */
+
+/* 分区 1 · 排版基线（22 游戏通用，零变量依赖） */
+html, body { font-size: 15px !important; }
+#game-log, #chat-log, #log { gap: 12px; padding: 20px 4vw; }
+.log-entry, .chat-msg, .msg, .ency-entry, .mem-entry {
+    font-size: 15px !important;
+    line-height: 1.85 !important;
+    max-width: 68ch;
+    padding: 14px 18px;
+}
+/* 次级文本档（系统提示/思考/理由类） */
+.log-entry.system, .log-entry.think, .chat-msg.system, .msg.sys,
+.reason-ai, .mem-entry, .ency-entry { font-size: 13px; }
+/* 允许选中复制（原 user-select:none 妨碍摘抄） */
+#game-log, #chat-log, #log, .log-entry, .msg, .chat-msg { user-select: text; }
+
+/* 分区 2 · A 类变量覆盖（15 个统一体系游戏）
+ *
+ * 源文件核对偏差（以源码为准）：工单称 A 类 15 游戏变量体系完全一致且
+ *   定义于 :root —— 实际 13 游戏定义于 :root，但哈利波特/暮色女巫v2 的
+ *   第二主题块在 html[data-theme]（特异性 0,1,1），无尽之海/魔法少女小圆
+ *   在 body[data-theme]（0,1,1），江湖志v2 在 :root[data-theme]（0,2,0），
+ *   灵网飞升/社会在 [data-theme]（0,1,0）。:root 单一选择器（0,1,0）对
+ *   主题块定义会级联失败，故选择器集覆盖全部定义位置 —— 同特异性 +
+ *   后加载序（覆盖层追加于 head 末尾）胜出，值不变。
+ */
+:root, [data-theme], html[data-theme], body[data-theme], :root[data-theme] {
+    --t2: #c2c2d8;   /* 原 #a0a0be，对比度 ≥ 4.5:1 */
+    --t3: #8e8ea8;   /* 原 #6a6a8a，对比度 ≥ 4.5:1 */
+    --bg-deep: #0e0e18;   /* 原 #0a0a12，减压迫 */
+    --border: #333350;    /* 微提亮分隔 */
+}
+/* A 类体系变体（都市异能v2 / 魔法少女小圆 — 源文件核对：此二游戏以
+ * --text-primary/--text-secondary/--text-muted 命名，非工单所述
+ * --t/--t2/--t3；同值覆盖，源码为准。都市异能v2 定义于 :root，
+ * 魔法少女小圆定义于 body[data-theme] 块 — 选择器集覆盖两者） */
+:root, [data-theme], html[data-theme], body[data-theme], :root[data-theme] {
+    --text-secondary: #c2c2d8;   /* 同 --t2 值（对比度 ≥ 4.5:1） */
+    --text-muted: #8e8ea8;       /* 同 --t3 值（对比度 ≥ 4.5:1） */
+}
+
+/* 分区 3 · B 类私有变量映射（7 个游戏按体系分组；变量名逐组与源文件核对一致） */
+
+/* ── B 类组 1：小马宝莉 / 高中生模拟器（--bg/--card/--text/--muted/--panel）──
+ * --muted 定义于 :root 及各 html[data-theme] 主题块（重定义同名变量）——
+ * 覆盖选择器须含 html[data-theme] 才在非默认主题生效 */
+:root, html[data-theme] { --muted: #a0a0b0; }   /* 原 #93a2bd，提亮 */
+/* 卡片间距 gap 增大（原 .status-grid/.cp-list gap:8px；.grid2 gap:0 14px）；
+ * 正文行宽 max-width: 68ch 由分区 1 .msg 规则承担（原 max-width:92%） */
+.status-grid, .cp-list { gap: 12px; }
+.grid2 { gap: 14px 20px; }
+
+/* ── B 类组 2：仿微（--text/--sub/--bubble-mine/--bubble-other/--chat-bg）──
+ * --sub 源文件核对偏差：默认浅色主题 #888 on #ededed ≈ 3.05:1，不达
+ * 4.5:1（工单背景目标）；"提亮"会进一步恶化（#a0a0b0 → ≈ 2.2:1），故按
+ * 目标压深一档至 #5f5f5f（≈ 5.5:1）。深色主题（html.dark）原值 #8e8e93
+ * （≈ 5.7:1 已达标）由 html.dark 特异性（0,1,1 > :root 0,1,0）自动保留 */
+:root { --sub: #5f5f5f; }
+/* 气泡 max-width: 60ch（原 .m-main max-width:70%）；气泡内文字 14px
+ * （工单指定值，原文 .bubble 16px） */
+.msg .m-main { max-width: 60ch; }
+.msg .bubble { font-size: 14px; }
+
+/* ── B 类组 3：灵网飞升（--t/--t2/--t3/--bg/--surface/--elev）──
+ * --t2/--t3 定义于 [data-theme] 主题块（0,1,0）——同特异性选择器覆盖 */
+[data-theme] { --t2: #c2c2d8; --t3: #8e8ea8; }   /* 提亮同 A 类值 */
+
+/* ── B 类组 4：社会（--t/--t2/--t3/--bg/--bg2/--card/--panel）──
+ * --t2/--t3 定义于 :root,[data-theme=...] 与各 [data-theme] 主题块（0,1,0） */
+[data-theme] { --t2: #c2c2d8; --t3: #8e8ea8; }   /* 提亮同 A 类值 */
+/* 卡片 padding 增加（原 .ai-body 13px 16px / .cp-sec 12px 14px） */
+.ai-body, .cp-sec { padding: 16px 20px; }
+
+/* ── B 类组 5：神明v3（--text/--text2/--text3/--bg/--bg2/--bg3）──
+ * 定义于 :root（0,1,0）——同特异性后加载序胜出 */
+:root { --text2: #b8b8d8; --text3: #8a8ab0; }   /* 提亮（原 #a0a0c0 / #6868a0） */
+
+/* ── B 类组 6：许愿柳（--tx/--tx2/--tx3/--fs-s/--fs-m/--fs-l/--fs-xl/--fs-xxl）──
+ * --fs-* 阶梯定义于 :root（0,1,0）：抬升一档（12.5→14 / 14→16 / 16→19），
+ * 游戏内部字号引用自动随变量变化 —— 覆盖层只改变量不改选择器 */
+:root { --fs-s: 14px; --fs-m: 16px; --fs-l: 19px; }
+/* --tx2/--tx3 定义于 body[data-theme=...] 主题块（0,1,1 > :root 0,1,0）——
+ * 覆盖须同特异性选择器 + 后加载序压过主题块（夜柳默认主题为目标，
+ * 亮色主题下提亮对比下降为已知取舍，见工单汇报） */
+body[data-theme] { --tx2: #a5b8ac; --tx3: #7d948a; }   /* 提亮（原 #97ada1 / #64796d） */
+
+/* 分区 4 · 状态面板密度（#right-panel + #side-panel）
+ * #side-panel 为神明v3 状态面板（源文件核对：非 right-panel） */
+#right-panel, #side-panel { width: 300px; padding: 12px; gap: 12px; }
+.panel-card { padding: 14px; }
+.panel-card h3 { font-size: 11px; letter-spacing: 1.5px; }
+.stat-row { gap: 8px; margin-bottom: 5px; }
+.stat-row .lbl { font-size: 12px; width: 56px; }
+.stat-row .sbar { height: 10px; }
+.stat-row .val { font-size: 12px; width: 40px; }
+.info-row { font-size: 12.5px; padding: 5px 0; }
+
+/* 分区 5 · 滚动条 */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+::-webkit-scrollbar-thumb { background: var(--border-active, #3a3a5a); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--t3, #6a6a8a); }
+
+/* 分区 6 · 弹窗与输入区 */
+.setup-box, .create-step { width: min(560px, 92vw); }
+.summary-box, .modal { width: min(640px, 94vw); }
+.setup-section, .summary-section { padding: 18px; }
+#input-area textarea { font-size: 14px; line-height: 1.6; min-height: 44px; }
+.quick-action, .action-btn { font-size: 12px; padding: 7px 14px; }
+
+/* 窄屏降级（<1100px 回到紧凑基调：字号回落、行宽不限） */
+@media (max-width: 1100px) {
+    html, body { font-size: 14px; }
+    .log-entry, .chat-msg, .msg, .ency-entry, .mem-entry { max-width: none; }
+}

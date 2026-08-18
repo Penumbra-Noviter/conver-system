@@ -4,6 +4,9 @@
  * 职责：运行视图的全部逻辑收口 —— iframe 状态机（idle → opening → loaded |
  *   error，含 15s 超时守卫）、AI 提示条（type === 'ai' 渲染固定文案 +
  *   ai 且 manifest 含完整 config 三元组时附「重新同步」按钮条）、
+ *   PC 阅读覆盖层注入（方案 A — iframe load 后把 frontend/css/
+ *   simulator-pc.css 以 link 追加到游戏文档 head 末尾，幂等空安全，
+ *   零改动 22 个游戏 HTML）、
  *   SIM-API-1 配置持续同步（iframe load 后自动同步主应用凭证/端点/模型 +
  *   MutationObserver 监听配置控件动态重建后再同步 — 冷却/熔断状态迁移收口
  *   在 key-injector 单一状态机，本模块只保留触发时机（load / 防抖到期）与
@@ -125,6 +128,33 @@ function destroyFrame() {
         frame.remove();
         frame = null;
     }
+}
+
+// ══════════════════════════════════════════════════
+// PC 阅读覆盖层注入（方案 A — T1 共享覆盖层 simulator-pc.css）
+// ══════════════════════════════════════════════════
+
+/** PC 阅读覆盖层样式表 href（静态相对路径常量 — 相对 simulators/<file>.html
+ *  → frontend/css/；注入 href 单点，不拼接任何外部输入 — 无注入面） */
+const PC_OVERLAY_HREF = '../css/simulator-pc.css';
+
+/**
+ * 向游戏文档注入 PC 阅读覆盖层（方案 A — T1 共享覆盖层）。
+ * iframe load 后把 <link rel="stylesheet"> 追加到游戏文档 <head> 末尾
+ * （同特异性下优先级最高，覆盖游戏内联样式；游戏独立打开不受影响 —
+ * 零改动 22 个游戏 HTML）。href 为 PC_OVERLAY_HREF 常量（注入 href
+ * 单点，见上）。
+ * 幂等：head 已含同 href link → no-op；doc?.head 不可用（jsdom 空文档 /
+ * destroyFrame 后迟到 load）→ no-op 不抛错。href 为模块常量，无外部输入面。
+ * @param {Document|null|undefined} doc - iframe contentDocument（可空）
+ */
+function injectPcOverlay(doc) {
+    if (!doc?.head) return;
+    if (doc.head.querySelector(`link[href="${PC_OVERLAY_HREF}"]`)) return;
+    const link = doc.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = PC_OVERLAY_HREF;
+    doc.head.appendChild(link);
 }
 
 // ══════════════════════════════════════════════════
@@ -366,6 +396,9 @@ function handleLoad(e) {
     state = 'loaded';
     if (frame) frame.classList.remove('sim-run-frame-hidden');
     runPanel.querySelector('.sim-run-status')?.remove();
+    // PC 阅读覆盖层注入（方案 A — T1；load 后追加共享样式表，幂等空安全；
+    // 位于自动同步之前 — 覆盖层先行就位不影响同步路径）
+    injectPcOverlay(frame?.contentDocument ?? null);
     // Load 自动同步（默认 path='load'：置冷却不计数）
     autoSyncIntoGame({
         bar: runPanel?.querySelector('.sim-key-bar'),
