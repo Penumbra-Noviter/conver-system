@@ -44,6 +44,17 @@
 
 ## 已完成归档
 
+### 会话交付：模拟器 PC 阅读优化（2026-08-19，kickoff 小档 2 工单）
+
+> 来源：用户需求——「优化模拟器板块游戏本体的 UI，适配电脑阅读，读起来不累」；Grilling 共识方案 A（共享覆盖层注入，零改动 22 游戏 HTML）；用户确认「视觉验证全量审查不抽查，游戏特异化逐个验证」。
+
+- **T1（857d14b）**——新增 `frontend/css/simulator-pc.css`（132 行 6 分区覆盖层：排版基线 15px/1.85/68ch、A 类 15 游戏统一变量覆盖、B 类 7 游戏私有变量映射、状态面板 300px、滚动条 8px、弹窗输入区 + <1100px 窄屏降级）。B 类变量名逐组与源文件核对，6 条偏差以源码为准（A 类变量挂载点多态——:root/[data-theme]/html[data-theme]/body[data-theme]/:root[data-theme] 选择器集扩展；都市异能/魔法少女小圆用 --text-* 命名体系；仿微 --sub 提亮方向与 4.5:1 目标冲突改压深 #5f5f5f；许愿柳 --tx2/3 定义于 body[data-theme] 同特异性覆盖）。
+- **T2（1edf945）**——simulator-view.js 新增 `injectPcOverlay`（幂等 + 空安全，PC_OVERLAY_HREF 常量单点）+ handleLoad 接线（autoSyncIntoGame 之前）；+6 用例（注入/幂等/null 文档/head 缺失/opening 不注入/__all__ 不含）；simulator-view.js lines 覆盖率 99.6%。
+- **merge（42e4af9）**——CODE_WIKI doc_sync 机械标记随批次刷新。
+- **验证链**：Vitest **832** 全绿（基线 826，+6）；**全量 22/22 游戏浏览器实测**（1920×1080：注入 link + html 15px + 条目 15px/1.85 + 68ch≈550–598px + #right-panel/#side-panel 300px + B 类 7 游戏私有变量全生效）；22 张截图存档 `.scratch/sim-pc-reading/shots/`。
+- **已知取舍**：多主题游戏亮色主题下提亮值对比度下降（工单目标为暗色默认主题）；<1100px 窄 iframe 视口回落到紧凑基调（降级块）；游戏自身 768px 移动断点在窄 iframe 下仍触发移动布局（桌面窗口 ≥1280 正常）。
+- **期末四轴审核（固定点 e3cd85b）0 阻断放行 + 2 中项当场修复**：F1 降级块 `font-size:14px` 被分区 1 的 15px !important 压死（死代码）→ 降级块字号补 !important（含内层文本档）；F2 内层正文（.msg .m-text/.bubble/.wrap 体系，≥10 游戏显式字号阻断继承）实际 13–14.5px → 分区 1 追加内层正文 15px !important 规则 + 仿微组 14px 双源删除。修复落 `tests/simulator-pc-css.test.js`（13 用例：T1 验收标准 8 条 + F1/F2 回归锁 4 条），浏览器重验 6 个代表游戏内层文本 15px/1.85 全过；Vitest **845** 全绿（832 + 13）。
+
 ### 会话交付：关闭行为偏好 D11（2026-08-15，用户实测反馈无工单）
 
 > 来源：用户实测反馈——「关闭桌面应用窗口后程序仍挂托盘后台运行，用户不知情；最好初始时让用户选择默认关闭行为」。单会话小特性直接实现（模式同下方「模拟器获取列表修复 + 开场白预插」）。

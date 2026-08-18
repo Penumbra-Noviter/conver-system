@@ -28,6 +28,14 @@ html, body { font-size: 15px !important; }
 /* 次级文本档（系统提示/思考/理由类） */
 .log-entry.system, .log-entry.think, .chat-msg.system, .msg.sys,
 .reason-ai, .mem-entry, .ency-entry { font-size: 13px; }
+/* 内层正文文本（期末四轴 Falsify F2 修复 — 各 .msg/.bubble/.m-text/.wrap
+ * 体系游戏给内层元素显式 font-size/line-height 阻断继承，覆盖层只作用
+ * 于条目容器时用户实际看到的正文仍为 13-14.5px 移动端字号，须显式覆盖） */
+.msg .m-text, .msg .m-bubble, .msg .bubble, .msg .wrap,
+.log-entry .wrap, .log-entry .bubble, .chat-msg .bubble {
+    font-size: 15px !important;
+    line-height: 1.85 !important;
+}
 /* 允许选中复制（原 user-select:none 妨碍摘抄） */
 #game-log, #chat-log, #log, .log-entry, .msg, .chat-msg { user-select: text; }
 
@@ -73,10 +81,10 @@ html, body { font-size: 15px !important; }
  * 目标压深一档至 #5f5f5f（≈ 5.5:1）。深色主题（html.dark）原值 #8e8e93
  * （≈ 5.7:1 已达标）由 html.dark 特异性（0,1,1 > :root 0,1,0）自动保留 */
 :root { --sub: #5f5f5f; }
-/* 气泡 max-width: 60ch（原 .m-main max-width:70%）；气泡内文字 14px
- * （工单指定值，原文 .bubble 16px） */
+/* 气泡 max-width: 60ch（原 .m-main max-width:70%）；气泡内文字字号由
+ * 分区 1 内层正文规则统一承担（F2 修复后 .msg .bubble 15px !important，
+ * 本组原 14px 规则删除避免双源） */
 .msg .m-main { max-width: 60ch; }
-.msg .bubble { font-size: 14px; }
 
 /* ── B 类组 3：灵网飞升（--t/--t2/--t3/--bg/--surface/--elev）──
  * --t2/--t3 定义于 [data-theme] 主题块（0,1,0）——同特异性选择器覆盖 */
@@ -125,8 +133,15 @@ body[data-theme] { --tx2: #a5b8ac; --tx3: #7d948a; }   /* 提亮（原 #97ada1 /
 #input-area textarea { font-size: 14px; line-height: 1.6; min-height: 44px; }
 .quick-action, .action-btn { font-size: 12px; padding: 7px 14px; }
 
-/* 窄屏降级（<1100px 回到紧凑基调：字号回落、行宽不限） */
+/* 窄屏降级（<1100px 回到紧凑基调：字号回落、行宽不限）——
+ * font-size 须带 !important 才能压过分区 1 的 15px !important（期末四轴
+ * Falsify F1 修复：原 normal 声明被 !important 压死，降级块 50% 死代码） */
 @media (max-width: 1100px) {
-    html, body { font-size: 14px; }
+    html, body { font-size: 14px !important; }
     .log-entry, .chat-msg, .msg, .ency-entry, .mem-entry { max-width: none; }
+    .msg .m-text, .msg .m-bubble, .msg .bubble, .msg .wrap,
+    .log-entry .wrap, .log-entry .bubble, .chat-msg .bubble {
+        font-size: 14px !important;
+        line-height: 1.75 !important;
+    }
 }
