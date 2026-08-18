@@ -29,9 +29,9 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 469+1skip）；`cd frontend && npm test`（Vitest 807，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（58）。
+测试：`cd backend && python -m pytest`（pytest 472 含 1 skip）；`cd frontend && npm test`（Vitest 845，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。
 
-## 当前状态（2026-08-14）
+## 当前状态（2026-08-19）
 
 - ✅ Phase 1-5 + P6.1/6.2/6.3 + P2.5/3.5 + P4.3 + P6.4 全部完成
 - ✅ 架构深化两波（ARC-1~8：StreamSession/级联/标题/export/api seam/展示契约/app 拆分/__init__）+ 架构摩擦 11 候选（前端模块化 + 服务层解耦）
@@ -54,7 +54,10 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **C2 saveKeys 匹配语义收口（2026-08-15 kickoff 全自动档：轻量档 1 工单）**：saveKeys 白名单匹配语义（精确键名 === / 正则模式 ^…$ 锚定匹配）从三处分散实现收进 save-key-meta 完整深模块——新增 `saveKeyIsPattern`/`saveKeyIsValidPattern`/`saveKeyMatches` 三导出（`__all__` 3→6）；normalizeSaveKeys/whitelistHits/saveKeyHits 三消费方对标；期末四轴 0 阻断放行；冒烟 13 项 12 PASS；Vitest 766→784
 - ✅ **C5 角色字段知识收敛（2026-08-15 kickoff 全自动档：标准档 2 工单串行链）**：后端角色字段清单（16 个 V2 内容字段）从 8 处重复硬编码收敛为 character_fields.py 单一映射深模块（CHARACTER_V2_FIELDS 全集 + PROMPT/PARSE/EXPORT 投影 + V2_KEY_MAP/V1_TO_V2_MAP）+ schemas CharacterBase 继承体系；character_card/document_parser/prompt/message 四消费者对标；附带 doc_sync 子编号支持；期末四轴 0 阻断；连带复核 C7 关闭；pytest 434→460+1skip（+26 契约锁）
 - ✅ **C3/C4/C8 技术债批次（2026-08-15 kickoff 全自动档：标准档 2 波 3 工单）**：C3 注入钩子方言统一——chat.js 两单函数 setter 合并 `setChatHooks({refreshConversations,syncConversationListTitle})` options-object + setActivationHooks 从 init() 内移模块级注入区（时序迟到修复）；C8 simulator-contracts 契约深模块——SIM_DIR/MANIFEST_URL（派生）/TIMEOUT_MS/TIMEOUT_REASON（秒数派生）/isValidSimulatorFile 单一来源，simulator-view/simulators 对标消费；C4 列表视图下沉——角色/对话列表下沉 list-views.js 深模块（6 DOM + 5 导出，app.js 585→274 纯编排），utils.js 增 showError/showSuccess；波末增量审核 0 阻断 + 期末四轴 0 阻断；冒烟 13 项 12 PASS；技术债区 C3/C4/C8 归档 + 4 项待立项（F-1~F-4）；Vitest 784→807（+23）
-- ✅ 测试：pytest 469+1skip（后端）+ Vitest 807（前端）+ cargo test 58（壳）全绿
+- ✅ **会话交付修复（2026-08-15）**：模拟器「获取列表」base_url 补 `/v1`（真实 API 在 /v1 下，relay 管理面板 HTML 非 JSON）+ 开场白预插（create_conversation 预插 first_mes，延迟导入解循环）+ 桌面版重新打包（PyInstaller 跳过旧包产物时间戳复核）；pytest 471+1skip
+- ✅ **D11 关闭行为偏好（2026-08-15 单会话直做）**：首次运行选择关窗行为（托盘/退出）+ 设置页可改；Rust settings.rs 深模块（CloseAction/decide_close/原子写）+ desktop-settings.js 深模块（无 Tauri 桥全模块 no-op，网页版零影响）；cargo 58→70 + Vitest 807→826；决策落盘 CONSENSUS §13 D11
+- ✅ **模拟器 PC 阅读覆盖层批次（2026-08-19 kickoff 小档 2 工单）**：T1 simulator-pc.css 六分区共享覆盖层（排版基线 15px/1.85/68ch + A 类 15 游戏变量覆盖 + B 类 7 游戏私有变量映射 + 面板 300px + 滚动条 + 弹窗输入区 + <1100px 降级）+ T2 simulator-view.js injectPcOverlay 注入（幂等空安全，零改动 22 游戏 HTML）；期末四轴 F1/F2 当场修复（降级块 !important + 内层正文 15px 规则）+ 契约测试 simulator-pc-css.test.js 13 用例；全量 22/22 游戏浏览器实测（截图存 .scratch/sim-pc-reading/shots/）；Vitest 826→845；技术债区 F-5 落盘（Speculative 明确接受）
+- ✅ 测试：pytest 472（含 1 skip）（后端）+ Vitest 845（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
 
 ## 待办管理
 

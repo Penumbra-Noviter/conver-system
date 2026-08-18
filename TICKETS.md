@@ -25,7 +25,7 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-> 技术债区当前 **0 项待立项**（F-1~F-4 全部处置完毕：F-1 已修 / F-2·F-3·F-4 复核关闭，2026-08-15 F-1 批次归档，见下方「已完成归档」）。
+> 技术债区当前 **1 项待立项**（F-1~F-4 处置完毕：F-1 已修 / F-2·F-3·F-4 复核关闭，2026-08-15 F-1 批次归档；F-5 为 2026-08-19 模拟器覆盖层批次期末四轴新增）。
 
 > **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
 
@@ -39,6 +39,7 @@
 | F-2 | `frontend/js/simulator-contracts.js:19` / `frontend/js/simulator-view.js:382` 超时秒数 `TIMEOUT_MS/1000` 派生——若毫秒数改非 1000 整数倍将出现小数秒（当前 15000→15 无漂移；契约锁 toContain 派生断言锁不住 UI 小数形态） | 波 1 Falsify（期末复证） | Speculative | ❌ 复核关闭（2026-08-15：现有派生关系锁已覆盖——simulator-contracts.test.js:49-52 toContain 断言 `${TIMEOUT_MS/1000} 秒未收到响应` + 模块 docstring「改毫秒数必联动两处文案秒数」；小数秒语义正确非真实风险，克制原则不追加） |
 | F-3 | 本地过期 coverage 产物残留（`frontend/coverage/` 已入 .gitignore，纯本地卫生项） | 波 1 Falsify（期末复证） | Speculative | ❌ 复核关闭（2026-08-15：Neat 清场删除 frontend/coverage/，已入 .gitignore 可再生成，现状成立） |
 | F-4 | `scripts/smoke-simulators.mjs:72` `DEFAULT_BASE_URL = 'http://127.0.0.1:8000'` 字面量（本地开发地址、`--base-url` 可覆盖、非外部服务） | 波 1 Falsify（期末复证） | Speculative | ❌ 复核关闭（2026-08-15：默认值与后端自身默认配置逐字一致 backend/app/config.py:29-30、`--base-url` CLI 可覆盖、仅本地冒烟脚本用，良性默认值） |
+| F-5 | 仙途/暮色女巫v2 移动断点（≤768px）下 `#right-panel` 原 `88vw/max-width:340px`（非 important，同特异性）被覆盖层 `300px` 压过（后载序胜出）——与游戏移动意图约 300 vs 330px 轻微偏离，桌面 ≥1280 视口不受影响，视觉影响小，明确接受 | 期末四轴 Falsify F4 | Speculative | 📝 待立项 |
 
 ---
 
