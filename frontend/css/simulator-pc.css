@@ -16,7 +16,8 @@
  *   分区 3 的私有变量映射组按源文件逐组核对（见各分组注释）。
  *
  * 结构：分区 1 排版基线 / 分区 2 A 类变量覆盖 / 分区 3 B 类私有变量映射 /
- *   分区 4 状态面板密度 / 分区 5 滚动条 / 分区 6 弹窗与输入区 + 窄屏降级。
+ *   分区 4 状态面板密度 / 分区 5 滚动条 / 分区 6 弹窗与输入区 /
+ *   分区 7 AI 配置面板基线 + 窄屏降级。
  */
 
 /* 分区 1 · 排版基线（22 游戏通用，零变量依赖） */
@@ -79,11 +80,13 @@ html, body { font-size: 15px !important; }
 .grid2 { gap: 14px 20px; }
 
 /* ── B 类组 2：仿微（--text/--sub/--bubble-mine/--bubble-other/--chat-bg）──
- * --sub 源文件核对偏差：默认浅色主题 #888 on #ededed ≈ 3.05:1，不达
+ * 源文件核对偏差：默认浅色主题 --sub #888 on #ededed ≈ 3.05:1，不达
  * 4.5:1（工单背景目标）；"提亮"会进一步恶化（#a0a0b0 → ≈ 2.2:1），故按
- * 目标压深一档至 #5f5f5f（≈ 5.5:1）。深色主题（html.dark）原值 #8e8e93
- * （≈ 5.7:1 已达标）由 html.dark 特异性（0,1,1 > :root 0,1,0）自动保留 */
-:root { --sub: #5f5f5f; }
+ * 目标压深一档。注意：不覆盖 --sub 变量本身 —— :root 覆盖会注入给全部
+ * 22 游戏（混社会等无 --sub 的游戏会落上 #5f5f5f 暗灰，深底更不可读，
+ * 2026-08-19 分区 7 实测发现）；改为对仿微说明文字类显式压深（见分区 7
+ * 的 .pc-note 等规则）。深色主题（html.dark）原值 #8e8e93（≈5.7:1 已
+ * 达标）不受影响 */
 /* 气泡 max-width: 60ch（原 .m-main max-width:70%）；气泡内文字字号由
  * 分区 1 内层正文规则统一承担（F2 修复后 .msg .bubble 15px !important，
  * 本组原 14px 规则删除避免双源） */
@@ -135,6 +138,49 @@ body[data-theme] { --tx2: #a5b8ac; --tx3: #7d948a; }   /* 提亮（原 #97ada1 /
 .setup-section, .summary-section { padding: 18px; }
 #input-area textarea { font-size: 14px; line-height: 1.6; min-height: 44px; }
 .quick-action, .action-btn { font-size: 12px; padding: 7px 14px; }
+
+/* 分区 7 · AI 配置面板基线（第一屏 —— 2026-08-19 用户反馈「部分模拟器
+ * 反人类」+ vision 全量诊断 22/22 命中：所有 AI 游戏打开后首先面对 API
+ * 配置面板，其表单标签 10-12px / 说明文字 8.5-12px / 占位符过浅，字号
+ * 与可读性双不足。本分区抬字号 + 按变量体系兜底提亮颜色 —— 颜色用
+ * 多级变量链（A 类 --t2/--t3 → 神明 --text2/--text3 → 许愿柳 --tx2/--tx3
+ * → 仿微 --text/--sub），暗色体系提亮、浅色主题维持自身深色文字。配置
+ * 容器选择器覆盖各游戏实际类名（.setup-box/.setup-wrap/.setup-inner/
+ * .wizard/.wizard-card/.trait-setup/.panel-card/.field-label） */
+.setup-box label, .setup-wrap label, .setup-section label,
+.setup-inner label, .setup-body label, .setup-head label,
+.wizard label, .wizard-card label, .trait-setup label, .panel-card label {
+    font-size: 13px !important;
+    /* 颜色链浅色体系优先（--text/--sub）：分区 2 会给无 --t2 定义的游戏
+     * 注入 --t2=#c2c2d8，浅色主题（仿微）若落第一级会变浅灰不可读；
+     * --text 为仿微/小马宝莉/神明正文色（深底浅字/浅底深字各自正确）。
+     * 注意：仿微 .field-label 不在此集 —— 其原文 15px 已达标，勿缩小 */
+    color: var(--text, var(--t2, var(--text2, var(--tx2)))) !important;
+}
+.setup-box .hint, .setup-wrap .hint, .setup-inner .hint,
+.setup-section .hint, .setup-body .hint, .wizard .hint,
+.wizard-card .hint, .hint, .note, .tip, .desc, .sub, small,
+.wiz-desc, .wiz-sub, .cp-sub, .rel-note, .diff-desc {
+    font-size: 12.5px !important;
+    color: var(--sub, var(--t3, var(--text3, var(--tx3)))) !important;
+}
+/* 仿微说明文字（浅色主题）显式压深 —— 全局 --sub 覆盖已删除（会污染
+ * 其他游戏），此处直接给仿微说明类显式色 #5f5f5f（浅底 ≈5.5:1） */
+.pc-note, .reg-note, .rec-tip, .qr-note, .sc-desc {
+    font-size: 12.5px !important;
+    color: #5f5f5f !important;
+}
+input, textarea, select { font-size: 14px !important; }
+input::placeholder, textarea::placeholder {
+    color: var(--t3, #8e8ea8) !important;
+    opacity: 1;
+}
+/* 配置卡片居中修正（部分游戏容器未居中导致视觉偏右 —— vision 诊断
+ * 江湖志/暮色女巫「内容挤右下」；flex 容器内 margin auto 无效但无害，
+ * block 容器生效） */
+.setup-box, .setup-wrap, .setup-inner, .wizard, .wizard-card {
+    margin-inline: auto !important;
+}
 
 /* 窄屏降级（<1100px 回到紧凑基调：字号回落、行宽不限）——
  * font-size 须带 !important 才能压过分区 1 的 15px !important（期末四轴

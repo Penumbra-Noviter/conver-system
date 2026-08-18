@@ -61,8 +61,8 @@ describe('simulator-pc.css 契约（T1 验收标准）', () => {
         expect(ast.nodes.length).toBeGreaterThan(0);
     });
 
-    test('6 分区注释锚点各出现一次', () => {
-        for (let i = 1; i <= 6; i++) {
+    test('7 分区注释锚点各出现一次', () => {
+        for (let i = 1; i <= 7; i++) {
             const matches = css.match(new RegExp(`/\\* 分区 ${i} ·`, 'g')) ?? [];
             expect(matches.length).toBe(1);
         }
@@ -82,10 +82,14 @@ describe('simulator-pc.css 契约（T1 验收标准）', () => {
         expect(decls).toEqual(expect.arrayContaining(['--t2', '--t3', '--bg-deep', '--border']));
     });
 
-    test('B 类 7 组私有变量锚全部存在', () => {
-        for (const v of ['--muted', '--sub', '--text2', '--text3', '--tx2', '--tx3', '--fs-s']) {
+    test('B 类 7 组私有变量锚全部存在（仿微 --sub 为显式类色等价实现）', () => {
+        for (const v of ['--muted', '--text2', '--text3', '--tx2', '--tx3', '--fs-s']) {
             expect(css).toContain(`${v}:`);
         }
+        // --sub 变量覆盖已废弃（全局 :root 注入会污染无 --sub 的游戏，
+        // 2026-08-19 分区 7 实测）—— 仿微说明类显式压深为其等价物
+        expect(css).toContain('.pc-note');
+        expect(css).toContain('#5f5f5f');
     });
 
     test('#side-panel 与 #right-panel 并列于状态面板规则', () => {
@@ -103,8 +107,46 @@ describe('simulator-pc.css 契约（T1 验收标准）', () => {
     });
 });
 
-describe('simulator-pc.css 期末四轴修复回归锁（Falsify F1/F2）', () => {
-    test('F1：降级块内 html,body 字号必须带 !important（否则被分区 1 压死）', () => {
+describe('simulator-pc.css 分区 7 契约（AI 配置面板基线）', () => {
+    test('分区 7 注释锚点存在', () => {
+        expect(css).toContain('/* 分区 7 · AI 配置面板基线');
+    });
+
+    test('配置面板 label 字号抬升为 13px !important', () => {
+        const labelRule = ruleWithAll('.setup-box label', '.wizard label', '.panel-card label');
+        expect(labelRule).toBeTruthy();
+        const fs = labelRule.nodes.find((n) => n.type === 'decl' && n.prop === 'font-size');
+        expect(fs.value).toBe('13px');
+        expect(fs.important).toBe(true);
+    });
+
+    test('说明文字 .hint/.note 字号抬升为 12.5px !important', () => {
+        const hintRule = ruleWithAll('.setup-box .hint', '.wizard .hint');
+        expect(hintRule).toBeTruthy();
+        const fs = hintRule.nodes.find((n) => n.type === 'decl' && n.prop === 'font-size');
+        expect(fs.value).toBe('12.5px');
+        expect(fs.important).toBe(true);
+    });
+
+    test('输入控件字号 14px + 占位符提亮', () => {
+        const inputRule = allRules.find((r) => (r.selectors ?? []).includes('input'));
+        const fs = inputRule.nodes.find((n) => n.type === 'decl' && n.prop === 'font-size');
+        expect(fs.value).toBe('14px');
+        const phRule = allRules.find((r) => (r.selectors ?? []).some((s) => s.includes('::placeholder')));
+        expect(phRule).toBeTruthy();
+        const phColor = phRule.nodes.find((n) => n.type === 'decl' && n.prop === 'color');
+        expect(phColor.value).toContain('#8e8ea8');
+    });
+
+    test('配置卡片居中规则（margin-inline: auto）', () => {
+        const centerRule = ruleWithAll('.setup-box', '.setup-wrap', '.wizard');
+        expect(centerRule).toBeTruthy();
+        const mi = centerRule.nodes.find((n) => n.type === 'decl' && n.prop === 'margin-inline');
+        expect(mi.value).toBe('auto');
+    });
+});
+
+describe('simulator-pc.css 期末四轴修复回归锁（Falsify F1/F2）', () => {    test('F1：降级块内 html,body 字号必须带 !important（否则被分区 1 压死）', () => {
         const media = collectAtRules(ast.nodes).find((a) => a.params.includes('max-width: 1100px'));
         const htmlBody = media.nodes.find((n) => n.type === 'rule' && (n.selectors ?? []).some((s) => s.includes('html')));
         expect(htmlBody).toBeTruthy();

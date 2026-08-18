@@ -3599,11 +3599,13 @@ select {
 
 .sim-run-hint {
     flex-shrink: 0;
-    font-size: var(--text-xs);
+    font-size: 12.5px;
     padding: 3px 10px;
     border-radius: var(--radius-pill);
     background: var(--warning-soft);
-    color: var(--warning);
+    /* 2026-08-19 用户反馈提示条几乎不可见：--warning (#d29a47) 在
+       --warning-soft 淡黄底上对比度约 2.5:1 —— 加深为深橙棕（≈5:1） */
+    color: #8a5a1a;
     white-space: nowrap;
 }
 
