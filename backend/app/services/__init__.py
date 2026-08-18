@@ -27,4 +27,5 @@ __all__ = [
     "model_data",
     "provider_registry",
     "setting",
+    "simulator_store",
 ]

@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1392<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->472<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->850<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1407<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->487<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->850<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -207,13 +207,13 @@ conver system/
 
 ## 四、核心模块详细说明
 
-### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~56 行<!--/AUTO-->）
+### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~76 行<!--/AUTO-->）
 
-**职责**：FastAPI 应用装配——注册统一异常处理器、on_startup 注册内置 Provider、API 路由挂载（须 `/api` 前缀且在静态挂载前）、前端静态文件挂载。
+**职责**：FastAPI 应用装配——注册统一异常处理器、on_startup 注册内置 Provider、API 路由挂载（须 `/api` 前缀且在静态挂载前）、`/simulators` 挂载（数据目录 simulators，T-02 外置，先于根挂载）、前端静态文件挂载。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:backend/app/main.py:on_startup-->`on_startup()`<!--/AUTO--> | 启动钩子：`LLMFactory.register_builtin_providers()` + `init_db()` |
+| <!--AUTO:sig:backend/app/main.py:on_startup-->`on_startup()`<!--/AUTO--> | 启动钩子：`LLMFactory.register_builtin_providers()` + `init_db()` + 模拟器首启种子 |
 | <!--AUTO:sig:backend/app/main.py:_frontend_dir-->`_frontend_dir()`<!--/AUTO--> | 定位前端静态目录（打包与源码双形态） |
 
 ### 4.2 `backend/app/config.py` — 配置单源（<!--AUTO:lines:backend/app/config.py-->~27 行<!--/AUTO-->）
@@ -405,15 +405,16 @@ conver system/
 | <!--AUTO:sig:backend/app/services/conversation_export.py:export_conversation_json-->`export_conversation_json(db, conversation_id)`<!--/AUTO--> | JSON 导出（结构化消息 + 角色元数据） |
 | <!--AUTO:sig:backend/app/services/conversation_export.py:export_conversation_markdown-->`export_conversation_markdown(db, conversation_id)`<!--/AUTO--> | Markdown 导出（对话记录可读化） |
 
-### 4.17 `backend/app/services/data_dir.py` — 数据目录契约（<!--AUTO:lines:backend/app/services/data_dir.py-->~56 行<!--/AUTO-->）
+### 4.17 `backend/app/services/data_dir.py` — 数据目录契约（<!--AUTO:lines:backend/app/services/data_dir.py-->~67 行<!--/AUTO-->）
 
-**职责**：数据目录路径单源（本地优先，桌面版重定向到 %APPDATA%）——目录解析、文件路径拼接、DB 路径。
+**职责**：数据目录路径单源（本地优先，桌面版重定向到 %APPDATA%）——目录解析、文件路径拼接、DB 路径、模拟器子目录（T-02 外置）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:backend/app/services/data_dir.py:data_dir-->`data_dir()`<!--/AUTO--> | 数据目录（自动创建） |
 | <!--AUTO:sig:backend/app/services/data_dir.py:data_dir_file-->`data_dir_file(file_name)`<!--/AUTO--> | 目录内文件路径 |
 | <!--AUTO:sig:backend/app/services/data_dir.py:database_path-->`database_path()`<!--/AUTO--> | SQLite 文件路径 |
+| <!--AUTO:sig:backend/app/services/data_dir.py:simulators_dir-->`simulators_dir()`<!--/AUTO--> | 模拟器游戏子目录（纯路径解析，创建归首启种子） |
 
 ### 4.18 `backend/app/services/document_parser.py` — 文档智能解析（<!--AUTO:lines:backend/app/services/document_parser.py-->~161 行<!--/AUTO-->）
 
@@ -1086,6 +1087,16 @@ conver system/
 | <!--AUTO:sig:src-tauri/src/settings.rs:load_close_action-->`load_close_action(data_dir: &Path) -> Option<CloseAction>`<!--/AUTO--> | 读取偏好（缺失/损坏 → None） |
 | <!--AUTO:sig:src-tauri/src/settings.rs:save_close_action-->`save_close_action(data_dir: &Path, action: CloseAction) -> Result<(), String>`<!--/AUTO--> | 原子写入偏好 |
 
+### 4.71 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~80 行<!--/AUTO-->）
+
+**职责**：T-02 首启种子 + manifest 读写工具（工单 03 导入族继续扩展）——数据目录 simulators 缺 manifest 时从内置目录整目录拷贝（幂等；已存在绝不改动，数据目录为唯一事实来源；种子源缺失降级不崩溃）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/services/simulator_store.py:ensure_seeded-->`ensure_seeded(builtin_dir, target_dir)`<!--/AUTO--> | 首启种子（路径参数化；返回 True=本次拷贝 / False=已种子或源缺失） |
+| <!--AUTO:sig:backend/app/services/simulator_store.py:read_manifest-->`read_manifest(sim_dir)`<!--/AUTO--> | 读取 manifest.json → dict（缺失抛 FileNotFoundError） |
+| <!--AUTO:sig:backend/app/services/simulator_store.py:write_manifest-->`write_manifest(sim_dir, manifest)`<!--/AUTO--> | 原子写 manifest（同目录临时文件 + os.replace，中文保真） |
+
 ---
 
 ## 五、测试
@@ -1101,7 +1112,7 @@ conver system/
 | `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->32<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->17<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
-| `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->16<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
+| `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->19<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
 | `backend/tests/test_data_dir_connection.py` | <!--AUTO:tests:backend/tests/test_data_dir_connection.py-->7<!--/AUTO--> | 数据目录/DB 连接集成 |
 | `backend/tests/test_document_parser.py` | <!--AUTO:tests:backend/tests/test_document_parser.py-->15<!--/AUTO--> | 文档智能解析 |
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->40<!--/AUTO--> | 统一异常处理器 |
@@ -1116,6 +1127,7 @@ conver system/
 | `backend/tests/test_schema_snapshot.py` | <!--AUTO:tests:backend/tests/test_schema_snapshot.py-->1<!--/AUTO--> | schema 快照漂移检测（T-17） |
 | `backend/tests/test_search.py` | <!--AUTO:tests:backend/tests/test_search.py-->13<!--/AUTO--> | 跨对话搜索 |
 | `backend/tests/test_settings_connection.py` | <!--AUTO:tests:backend/tests/test_settings_connection.py-->55<!--/AUTO--> | 设置/凭证/连接测试 |
+| `backend/tests/test_simulator_store.py` | <!--AUTO:tests:backend/tests/test_simulator_store.py-->12<!--/AUTO--> | 模拟器首启种子矩阵 + manifest 工具 |
 
 运行：`cd backend && python -m pytest`（pytest.ini 在根：`testpaths = backend/tests`，`pythonpath = .`；共享夹具见 `backend/tests/conftest.py`）。
 
@@ -1203,9 +1215,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1392<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1407<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->472<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->487<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->850<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

@@ -35,9 +35,11 @@ __all__ = [
     "DATA_DIR_ENV",
     "DATA_DIR_NAME",
     "DB_FILE",
+    "SIMULATORS_DIR",
     "data_dir",
     "data_dir_file",
     "database_path",
+    "simulators_dir",
 ]
 
 #: 数据目录环境变量名（值即数据目录；空串视为未设置）
@@ -46,6 +48,8 @@ DATA_DIR_ENV = "CONVER_DATA_DIR"
 DATA_DIR_NAME = "ConverSystem"
 #: 数据库文件名（与壳侧 src-tauri/src/server.rs 的 DB_FILE 一致）
 DB_FILE = "conver_system.db"
+#: 数据目录下模拟器游戏子目录名（T-02 外置；前端 MANIFEST_URL 恒为 simulators/manifest.json）
+SIMULATORS_DIR = "simulators"
 
 
 def data_dir() -> Path:
@@ -69,3 +73,13 @@ def data_dir_file(file_name: str) -> Path:
 def database_path() -> Path:
     """数据目录下数据库文件的路径（%DATA_DIR%\\conver_system.db）。"""
     return data_dir_file(DB_FILE)
+
+
+def simulators_dir() -> Path:
+    """数据目录下模拟器游戏目录（<数据目录>\\simulators，T-02 外置）。
+
+    继承 data_dir() 的 CONVER_DATA_DIR 非空生效语义；纯路径解析**不做 mkdir**
+    ——目录创建由首启种子（simulator_store.ensure_seeded）负责，保证缺目录时
+    挂载（check_dir=False）与种子（startup 事件）分离的时序。
+    """
+    return data_dir() / SIMULATORS_DIR
