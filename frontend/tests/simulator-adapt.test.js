@@ -257,6 +257,27 @@ describe('compareCoverage：覆盖判定', () => {
         expect(items).toEqual([{ kind: 'record', item: '新游戏' }]);
     });
 
+    test('F3 回归：game 为 null / undefined → 不抛，仅报记录缺失（空输入防护）', () => {
+        const coverage = parseCoverageRecords(baseCss);
+        expect(compareCoverage(null, '新游戏', coverage)).toEqual([{ kind: 'record', item: '新游戏' }]);
+        expect(compareCoverage(undefined, '新游戏', coverage)).toEqual([{ kind: 'record', item: '新游戏' }]);
+    });
+
+    test('F3 回归：coverage 为 null / undefined / 畸形对象（缺 games/covered）→ 不抛，按空覆盖判定', () => {
+        // 无覆盖层信息 = 与「覆盖层为空」同语义：记录缺失 + 三面全报
+        const game = extractGameClasses('<style>.log-entry { font-size: 12px; }</style><div class="log-entry">x</div>');
+        const expected = [
+            { kind: 'record', item: '新游戏' },
+            { kind: 'class', item: 'log-entry' },
+            { kind: 'font', item: '.log-entry', size: '12px' },
+        ];
+        expect(compareCoverage(game, '新游戏', null)).toEqual(expected);
+        expect(compareCoverage(game, '新游戏', undefined)).toEqual(expected);
+        expect(compareCoverage(game, '新游戏', {})).toEqual(expected);
+        expect(compareCoverage(game, '新游戏', { games: [] })).toEqual(expected);
+        expect(compareCoverage(game, '新游戏', { games: [], covered: {} })).toEqual(expected);
+    });
+
     test('证伪：`.log-entry .content` 显式 12px 且无记录 → 输出该未覆盖项（font + record）', () => {
         const html = `<!doctype html><html><head><style>.log-entry .content { font-size: 12px; }</style></head>
 <body><div class="log-entry"><div class="content">x</div></div></body></html>`;

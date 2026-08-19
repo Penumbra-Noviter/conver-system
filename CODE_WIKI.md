@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1539<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->567<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->902<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1594<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->567<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->957<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -600,7 +600,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~278 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~292 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）。
 
@@ -903,13 +903,13 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:isValidGame-->`isValidGame(game)`<!--/AUTO--> | 游戏合法性校验 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:clearTimer-->`clearTimer()`<!--/AUTO--> | 清理超时定时器 |
 
-### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~440 行<!--/AUTO-->）
+### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~459 行<!--/AUTO-->）
 
 **职责**：模拟器列表视图（U7）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/simulators.js:initSimulatorsView-->`initSimulatorsView({ container: el, onOpenGame: hook, onOpenSaveManager: saveHook } = {})`<!--/AUTO--> | 列表视图初始化 |
+| <!--AUTO:sig:frontend/js/simulators.js:initSimulatorsView-->`initSimulatorsView({ container: el, onOpenGame: hook, onOpenSaveManager: saveHook, onImportGame: importHook } = {})`<!--/AUTO--> | 列表视图初始化 |
 | <!--AUTO:sig:frontend/js/simulators.js:parseManifest-->`parseManifest(rawJson)`<!--/AUTO--> | manifest 解析（v1/v2） |
 | <!--AUTO:sig:frontend/js/simulators.js:normalizeSaveKeys-->`normalizeSaveKeys(value)`<!--/AUTO--> | 存档键归一化 |
 | <!--AUTO:sig:frontend/js/simulators.js:filterGames-->`filterGames(games, type)`<!--/AUTO--> | 类型筛选 |
@@ -1097,7 +1097,7 @@ conver system/
 | <!--AUTO:sig:src-tauri/src/settings.rs:decide_close-->`decide_close(action: Option<CloseAction>) -> CloseDecision`<!--/AUTO--> | 偏好 → 关闭决策（未设置/损坏回退托盘） |
 | <!--AUTO:sig:src-tauri/src/settings.rs:load_close_action-->`load_close_action(data_dir: &Path) -> Option<CloseAction>`<!--/AUTO--> | 读取偏好（缺失/损坏 → None） |
 | <!--AUTO:sig:src-tauri/src/settings.rs:save_close_action-->`save_close_action(data_dir: &Path, action: CloseAction) -> Result<(), String>`<!--/AUTO--> | 原子写入偏好 |
-### 4.71 `frontend/js/simulator-adapt.js` — 适配分析共享模块（<!--AUTO:lines:frontend/js/simulator-adapt.js-->~390 行<!--/AUTO-->）
+### 4.71 `frontend/js/simulator-adapt.js` — 适配分析共享模块（<!--AUTO:lines:frontend/js/simulator-adapt.js-->~404 行<!--/AUTO-->）
 
 **职责**：新游戏接入覆盖层把关的分析逻辑（T-01）——映射记录解析 / 游戏 HTML 三面提取（日志条目类名 / CSS 变量体系 / 显式字号声明）/ 覆盖比对输出「未覆盖清单」。CLI 消费者 `scripts/check-simulator-css.mjs` 与工单 04 导入未覆盖提示共用；顶层零 DOM（Node ESM 直 import，冒烟先例）。
 
@@ -1138,6 +1138,20 @@ conver system/
 | <!--AUTO:sig:backend/app/services/simulator_store.py:probe_config-->`probe_config(html_text)`<!--/AUTO--> | cfg- 三元组探测（齐全 → ai+config；否则 local 无 config 降级） |
 | <!--AUTO:sig:backend/app/services/simulator_store.py:scan_suspicious-->`scan_suspicious(html_text)`<!--/AUTO--> | 恶意模式粗筛（SUSPICIOUS_PATTERNS 键集，不拦截） |
 | <!--AUTO:sig:backend/app/services/simulator_store.py:import_game-->`import_game(sim_dir, filename, content)`<!--/AUTO--> | 导入编排（校验→净化→去重→改名→探测→粗筛→落盘→注册） |
+
+---
+
+
+### 4.75 `frontend/js/simulator-import.js` — 模拟器导入（<!--AUTO:lines:frontend/js/simulator-import.js-->~394 行<!--/AUTO-->）
+
+**职责**：列表页导入游戏（工单 04，T-02 决策 9/11）——安全警告确认（「第三方游戏可读取本地数据并调用 API」）、文件选择 + 拖拽双通道、multipart 上传（fetch-seam + FormData 字段 `file`，对接 03 端点）、不确定态「正在导入…」、结果反馈（成功 toast + 改名提示 / 409-400 detail 原样 / warnings 警告不拦截 / 未覆盖适配提示 + per-game CSS 引导）。未覆盖分析复用 `frontend/js/simulator-adapt.js` 共享模块（同源 fetch 覆盖层 CSS 文本 + 已上传 HTML 文本比对；映射记录缺失项为导入预期状态，过滤不计入）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/simulator-import.js:initSimulatorImport-->`initSimulatorImport({ container: el, onImported: hook } = {})`<!--/AUTO--> | 导入初始化（文件选择器 + 拖拽绑定） |
+| <!--AUTO:sig:frontend/js/simulator-import.js:openImportFlow-->`openImportFlow()`<!--/AUTO--> | 按钮入口（警告确认 → 文件选择器） |
+| <!--AUTO:sig:frontend/js/simulator-import.js:importFile-->`importFile(file)`<!--/AUTO--> | 拖拽入口（校验 → 警告确认 → 上传） |
+| <!--AUTO:sig:frontend/js/simulator-import.js:resetSimulatorImport-->`resetSimulatorImport()`<!--/AUTO--> | 切走视图复位（导入中状态 / 拖拽高亮） |
 
 ---
 
@@ -1198,12 +1212,13 @@ conver system/
 | `frontend/tests/save-manager.test.js` | <!--AUTO:tests:frontend/tests/save-manager.test.js-->64<!--/AUTO--> | 存档管理 |
 | `frontend/tests/search-view.test.js` | <!--AUTO:tests:frontend/tests/search-view.test.js-->17<!--/AUTO--> | 搜索视图 |
 | `frontend/tests/settings-panel.test.js` | <!--AUTO:tests:frontend/tests/settings-panel.test.js-->33<!--/AUTO--> | 设置面板 |
-| `frontend/tests/simulator-contracts.test.js` | <!--AUTO:tests:frontend/tests/simulator-contracts.test.js-->15<!--/AUTO--> | 模拟器域契约 |
-| `frontend/tests/simulator-adapt.test.js` | <!--AUTO:tests:frontend/tests/simulator-adapt.test.js-->37<!--/AUTO--> | 适配分析共享模块 + 核对脚本 CLI（T-01） |
+| `frontend/tests/simulator-contracts.test.js` | <!--AUTO:tests:frontend/tests/simulator-contracts.test.js-->20<!--/AUTO--> | 模拟器域契约 |
+| `frontend/tests/simulator-import.test.js` | <!--AUTO:tests:frontend/tests/simulator-import.test.js-->40<!--/AUTO--> | 模拟器导入（工单 04） |
+| `frontend/tests/simulator-adapt.test.js` | <!--AUTO:tests:frontend/tests/simulator-adapt.test.js-->39<!--/AUTO--> | 适配分析共享模块 + 核对脚本 CLI（T-01） |
 | `frontend/tests/simulator-manifest.test.js` | <!--AUTO:tests:frontend/tests/simulator-manifest.test.js-->19<!--/AUTO--> | manifest 解析 |
 | `frontend/tests/simulator-pc-css.test.js` | <!--AUTO:tests:frontend/tests/simulator-pc-css.test.js-->24<!--/AUTO--> | 模拟器 PC 覆盖层契约（验收标准 + F1/F2 回归锁） |
 | `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->67<!--/AUTO--> | 模拟器运行视图 |
-| `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->68<!--/AUTO--> | 模拟器列表 |
+| `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->76<!--/AUTO--> | 模拟器列表 |
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
 | `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->53<!--/AUTO--> | 流式会话结算 |
 | `frontend/tests/tabs.test.js` | <!--AUTO:tests:frontend/tests/tabs.test.js-->68<!--/AUTO--> | tab 工作区 |
@@ -1259,10 +1274,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1539<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1594<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->567<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->902<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->957<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

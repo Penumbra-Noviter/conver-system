@@ -27,6 +27,7 @@ export default defineConfig({
                 'js/fetch-seam.js', // TD-51/55/60 fetch 注入点单一来源（per-file ≥90% 口径）
                 'js/simulator-contracts.js', // C8 模拟器域契约单一来源（契约深模块，per-file ≥90% 口径）
                 'js/simulator-adapt.js', // T-01 适配分析共享模块（映射记录解析/三面提取/覆盖比对，per-file ≥90% 口径）
+                'js/simulator-import.js', // 工单 04 导入深模块（警告确认/双通道上传/反馈/未覆盖提示，per-file ≥90% 口径）
                 // scripts/check-simulator-css.mjs 不在此列：v8 provider 无法
                 // 采集项目根外文件（实测空报告）——其全部代码行由
                 // simulator-adapt.test.js 直调（runCheck/main/renderItem）+ 

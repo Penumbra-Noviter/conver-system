@@ -51,6 +51,7 @@ import { initSimulatorsView, refreshSimulators, getGames } from './simulators.js
 import { initSimulatorRun, openSimulator, closeSimulator } from './simulator-view.js';
 import { initKeyInjector } from './key-injector.js';
 import { initSaveManager, openSavePanel, closeSavePanel } from './save-manager.js';
+import { initSimulatorImport, openImportFlow, resetSimulatorImport } from './simulator-import.js';
 import { loadCharacters, loadConversations, renderConversations, syncConversationListTitle, initListViews } from './list-views.js';
 import { ensureCloseActionChoice, initCloseActionSetting } from './desktop-settings.js';
 
@@ -113,12 +114,15 @@ async function switchView(viewName) {
         if (prevView === viewName) closeSimulator();
         refreshSimulators();
     }
-    // 切走模拟器视图 → 销毁运行中的 iframe + 存档面板复位（Grilling 共识：
-    // 状态全在游戏自身 localStorage，无丢失风险；避免后台游戏继续跑；
-    // closeSimulator / closeSavePanel 未打开时 no-op — 沿用运行视图销毁纪律）
+    // 切走模拟器视图 → 销毁运行中的 iframe + 存档面板复位 + 导入状态复位
+    // （Grilling 共识：状态全在游戏自身 localStorage，无丢失风险；避免后台
+    // 游戏继续跑；closeSimulator / closeSavePanel / resetSimulatorImport
+    // 未打开时 no-op — 沿用运行视图销毁纪律；导入复位 = 导入中标志复位 +
+    // 按钮恢复可用 + 拖拽高亮移除）
     if (viewName !== 'simulators') {
         closeSimulator();
         closeSavePanel();
+        resetSimulatorImport();
     }
 }
 
@@ -264,11 +268,22 @@ initSearchView({
 
 // 模拟器列表视图初始化（U7-T3 — 挂载列表 UI 到 #simulator-list-panel；
 // onOpenGame 接入 openSimulator：点击卡片 → 运行视图，U7-T4；
-// onOpenSaveManager 接入 openSavePanel：工具条「存档管理」按钮 → 存档面板，U9-T2）
+// onOpenSaveManager 接入 openSavePanel：工具条「存档管理」按钮 → 存档面板，U9-T2；
+// onImportGame 接入 openImportFlow：工具条「导入游戏」按钮 → 导入流程，工单 04）
 initSimulatorsView({
     container: $('#simulator-list-panel'),
     onOpenGame: openSimulator,
     onOpenSaveManager: openSavePanel,
+    onImportGame: openImportFlow,
+});
+
+// 模拟器导入初始化（工单 04 — 隐藏文件选择器 + 列表面板拖拽绑定收口在
+// simulator-import.js；onImported 接入 refreshSimulators：导入成功 → 列表
+// 刷新出现新卡片（带「已导入」badge）；切走 simulators 视图时 switchView
+// 调用 resetSimulatorImport 复位）
+initSimulatorImport({
+    container: $('#simulator-list-panel'),
+    onImported: () => refreshSimulators(),
 });
 
 // 模拟器运行视图初始化（U7-T4 — 绑定列表/运行两面板；iframe 状态机 +

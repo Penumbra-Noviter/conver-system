@@ -13,7 +13,10 @@
  *   → 运行中再点导航回列表（TD-53：再点侧栏「模拟器」= 返回列表，
  *     iframe 卸载、列表面板恢复，与「返回」同语义）
  *   → 纯本地游戏路径（manifest 驱动：无 local 条目时 SKIP 并报偏离说明）
- *   → 存档面板（U9-T2）：导出 → 清档 → 导入恢复（localStorage 键值断言）。
+ *   → 存档面板（U9-T2）：导出 → 清档 → 导入恢复（localStorage 键值断言）
+ *   → 导入路径（工单 04）：上传 .html（警告确认文案断言 → 文件选择器）→
+ *     新卡片「已导入」badge + 计数 +1 → 打开导入游戏 → 共享覆盖层注入生效
+ *     （iframe head 含 simulator-pc.css link）→ 返回列表。
  *
  * 运行前提（后端静态托管在线 — spec：后端零改动，静态挂载已覆盖）：
  *   .venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
@@ -837,6 +840,92 @@ async function smokeSteps(page, manifest, baseUrl) {
             '存档面板返回后列表未恢复',
         );
         return `导出 JSON（${exported.game_id}，${Object.keys(exported.keys).length} 键）→ 删除清档 → 导入恢复，localStorage 键值断言通过，探针已清理`;
+    });
+
+    // 10. 导入路径（工单 04）：警告确认 → 文件选择器上传 .html → 新卡片
+    //     「已导入」badge + 计数 +1 → 打开导入游戏 → 共享覆盖层注入生效。
+    //     冒烟测试 HTML 刻意规避 warnings 命中（无 eval/cookie/跨域 fetch）
+    //     且仅用 .log-entry 类（覆盖层已覆盖 → 无未覆盖提示弹窗）——warnings
+    //     弹窗与未覆盖提示分支由 simulator-import.test.js 单测覆盖；步骤仍
+    //     对意外弹窗做「点确定关闭」兜底（不拦截断言）。
+    const smokeImportFile = path.join(os.tmpdir(), `conver-smoke-import-${Date.now()}.html`);
+    fs.writeFileSync(smokeImportFile,
+        `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>冒烟导入游戏</title></head>\n`
+        + `<body><div class="log-entry">smoke import</div></body></html>`, 'utf8');
+    const smokeImportName = path.basename(smokeImportFile);
+    await runStep('导入：警告确认 → 上传 .html → 新卡片「已导入」', async () => {
+        // 复用实例兜底：manifest 已含本步骤导入条目（上轮残留）→ 直接走卡片断言
+        const existing = manifest.simulators.find((g) => g.file === smokeImportName);
+        if (existing) {
+            const card = page.locator(`.sim-card[data-id="${existing.id}"]`);
+            await waitVisible(card, WAIT_MS, '复用实例既有导入卡片');
+            return { skip: `复用实例 manifest 已含导入条目（${existing.file}）— 跳过上传断言` };
+        }
+
+        // 按钮路径：点「导入游戏」→ 安全警告确认弹窗（文案断言）→ 确认 → 文件选择器
+        const importBtn = page.locator('.sim-import-btn');
+        await waitVisible(importBtn, WAIT_MS, '「导入游戏」按钮');
+        await importBtn.click();
+        await waitVisible(page.locator('.modal-overlay .confirm-modal'), WAIT_MS, '导入安全警告弹窗');
+        const warnMessage = (await page.locator('.modal-overlay .confirm-message').innerText()).trim();
+        if (!warnMessage.includes('第三方游戏可读取本地数据并调用 API')) {
+            throw new Error(`导入警告文案不符：期望含「第三方游戏可读取本地数据并调用 API」，实际「${warnMessage}」`);
+        }
+        const [chooser] = await Promise.all([
+            page.waitForEvent('filechooser'),
+            page.locator('.modal-overlay .confirm-ok').click(),
+        ]);
+        await chooser.setFiles(smokeImportFile);
+
+        // 结果等待：新卡片出现（总数 +1）或 409 已存在 toast（复用实例重复导入）
+        const cards = page.locator('.sim-card');
+        await waitForCondition(async () => {
+            if ((await cards.count()) === total + 1) return true;
+            const toasts = page.locator('.toast-error');
+            if ((await toasts.count()) > 0) {
+                const text = (await toasts.first().innerText()).trim();
+                if (text.includes('已存在')) return true; // 409 重复（上轮残留未清）
+            }
+            return false;
+        }, WAIT_MS, '导入后新卡片出现（或 409 已存在提示）');
+        await waitForText(page.locator('.sim-count'), `共 ${total + 1} 款`, WAIT_MS, '导入后计数');
+
+        // 关闭可能出现的提示弹窗（warnings 警告 / 未覆盖提示 — 冒烟 HTML 无命中则不弹）
+        for (let i = 0; i < 3; i++) {
+            const ok = page.locator('.modal-overlay .confirm-ok');
+            if ((await ok.count()) === 0) break;
+            await ok.first().click();
+            await sleep(200);
+        }
+
+        // 「已导入」badge：source: imported 条目的卡片标识（内置卡片无此标记）
+        const imported = page.locator('.sim-card:has(.sim-source-tag)');
+        await waitForCount(imported, 1, WAIT_MS, '「已导入」badge 卡片');
+        const badgeText = (await imported.first().locator('.sim-source-tag').innerText()).trim();
+        if (badgeText !== '已导入') {
+            throw new Error(`「已导入」badge 文案不符：期望「已导入」，实际「${badgeText}」`);
+        }
+        return `警告确认 → 上传成功（计数 ${total + 1} 款）；新卡片带「已导入」badge`;
+    });
+    await runStep('导入：打开导入游戏 → 共享覆盖层注入生效', async () => {
+        const imported = page.locator('.sim-card:has(.sim-source-tag)');
+        await waitForCount(imported, 1, WAIT_MS, '「已导入」卡片');
+        await imported.first().click();
+        const frame = await waitForGameFrame(page, smokeImportName, WAIT_MS);
+        // 共享覆盖层（simulator-pc.css）注入于 iframe head（per-game CSS 404
+        // 静默 — 导入游戏无 <id>.css 属预期，浏览器静默不阻塞）
+        const overlayCount = await frame.locator('link[href*="simulator-pc.css"]').count();
+        if (overlayCount < 1) {
+            throw new Error(`共享覆盖层 link 未注入 iframe head（实际 ${overlayCount} 个）`);
+        }
+        // 返回列表（运行面板隐藏、列表恢复）
+        await page.locator('.sim-run-back').click();
+        await waitForCondition(
+            () => page.evaluate(() => document.querySelector('#simulator-list-panel')?.hasAttribute('hidden') === false),
+            WAIT_MS,
+            '导入游戏返回后列表面板未恢复',
+        );
+        return `导入游戏 iframe 已加载，共享覆盖层 link 注入生效（simulator-pc.css）`;
     });
 
     return { preloadedSettings };

@@ -777,6 +777,17 @@ describe('simulators — 清单加载超时与并发守卫（TD-51/55/60）', ()
         }
     });
 
+    it('清单 fetch 携带 cache:no-store（导入后刷新必须拿到新鲜 manifest — 静态挂载带 ETag/Last-Modified，浏览器条件请求 304 会用缓存旧数据，新导入卡片不出现）', async () => {
+        const { sim, panel } = await loadModules();
+        const fetchSpy = makeFetch({ result: mockManifest(MANIFEST_OK) });
+        sim.setFetch(fetchSpy);
+        sim.initSimulatorsView({ container: panel });
+        await sim.refreshSimulators();
+
+        expect(fetchSpy.mock.calls[0][1].cache).toBe('no-store');
+        expect(panel.querySelectorAll('.sim-card')).toHaveLength(2);
+    });
+
     it('响应体读取阶段超时 → abort 已触发（signal.aborted 为真）且同超时文案（TD-72）', async () => {
         const { sim, panel } = await loadModules();
         // 记录 doFetch 收到的 AbortSignal — 读取阶段挂起到点后必须通知真实 fetch 断开
@@ -876,6 +887,100 @@ describe('simulators — 清单加载超时与并发守卫（TD-51/55/60）', ()
         expect(panel.querySelector('.sim-error-msg').textContent).toBe('模拟器列表加载失败');
         expect(panel.querySelector('.sim-error-reason').textContent).toBe('同步爆炸');
         expect(panel.querySelector('.sim-retry-btn')).not.toBeNull();
+    });
+});
+
+describe('simulators — source 标识与导入入口（工单 04）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('parseManifest：source 为字符串 \'imported\' → 透传 source 字段（白名单）', async () => {
+        const { sim } = await loadModules();
+        const data = {
+            version: 2,
+            simulators: [
+                { id: 'a', file: 'a.html', name: 'A', type: 'local', source: 'imported' },
+                { id: 'b', file: 'b.html', name: 'B', type: 'local' },
+            ],
+        };
+        const result = sim.parseManifest(JSON.stringify(data));
+        expect(result.ok).toBe(true);
+        expect(result.games[0].source).toBe('imported');
+        expect('source' in result.games[1]).toBe(false); // 内置条目无 source 字段
+    });
+
+    it('parseManifest：source 非 \'imported\'（builtin / 数字 / null）→ 条目级降级剔除（白名单）', async () => {
+        const { sim } = await loadModules();
+        const data = {
+            version: 2,
+            simulators: [
+                { id: 'a', file: 'a.html', name: 'A', type: 'local', source: 'builtin' },
+                { id: 'b', file: 'b.html', name: 'B', type: 'local', source: 42 },
+                { id: 'c', file: 'c.html', name: 'C', type: 'local', source: null },
+            ],
+        };
+        const result = sim.parseManifest(JSON.stringify(data));
+        expect(result.ok).toBe(true);
+        for (const game of result.games) {
+            expect('source' in game, `source 剔除: ${game.id}`).toBe(false);
+        }
+    });
+
+    it('ready 渲染：source=imported 卡片带「已导入」badge；内置卡片无 badge', async () => {
+        const { sim, panel } = await loadModules();
+        const data = {
+            version: 2,
+            simulators: [
+                { id: 'built-in', file: 'b.html', name: '内置', type: 'ai' },
+                { id: 'imported-x', file: 'x.html', name: '第三方', type: 'local', source: 'imported' },
+            ],
+        };
+        sim.setFetch(makeFetch({ result: mockManifest(data) }));
+        sim.initSimulatorsView({ container: panel });
+        await sim.refreshSimulators();
+
+        const importedCard = panel.querySelector('.sim-card[data-id="imported-x"]');
+        expect(importedCard.querySelector('.sim-source-tag')).not.toBeNull();
+        expect(importedCard.querySelector('.sim-source-tag').textContent).toBe('已导入');
+        const builtinCard = panel.querySelector('.sim-card[data-id="built-in"]');
+        expect(builtinCard.querySelector('.sim-source-tag')).toBeNull();
+    });
+
+    it('工具条渲染「导入游戏」按钮（与筛选/存档管理按钮同工具条）', async () => {
+        const { sim, panel } = await loadModules();
+        sim.initSimulatorsView({ container: panel });
+
+        const btn = panel.querySelector('.sim-import-btn');
+        expect(btn).not.toBeNull();
+        expect(btn.textContent).toBe('导入游戏');
+    });
+
+    it('点击「导入游戏」→ 注入的 onImportGame 钩子被调用', async () => {
+        const { sim, panel } = await loadModules();
+        const importSpy = vi.fn();
+        sim.initSimulatorsView({ container: panel, onImportGame: importSpy });
+
+        panel.querySelector('.sim-import-btn').click();
+        expect(importSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('Falsify:未注入 onImportGame → 点击 no-op 不抛错', async () => {
+        const { sim, panel } = await loadModules();
+        sim.initSimulatorsView({ container: panel });
+
+        expect(() => panel.querySelector('.sim-import-btn').click()).not.toThrow();
+    });
+
+    it('重复 init：onImportGame 取最新注入值（幂等钩子更新）', async () => {
+        const { sim, panel } = await loadModules();
+        const hook1 = vi.fn();
+        const hook2 = vi.fn();
+        sim.initSimulatorsView({ container: panel, onImportGame: hook1 });
+        sim.initSimulatorsView({ container: panel, onImportGame: hook2 });
+
+        panel.querySelector('.sim-import-btn').click();
+        expect(hook2).toHaveBeenCalledTimes(1);
+        expect(hook1).not.toHaveBeenCalled();
     });
 });
 
