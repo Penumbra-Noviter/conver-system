@@ -69,6 +69,8 @@ describe('simulator-adapt.js 顶层约束', () => {
         expect(VARS_FAMILY).toContain('--sub'); // 刻意不覆盖的决策面（分区 7 注释）
         expect(VARS_FAMILY).toContain('--tx2');
         expect(VARS_FAMILY).toContain('--fs-m');
+        expect(VARS_FAMILY).toContain('--text2'); // 期末四轴 F-7：B 类组 5（神明v3）成员——漏列则变量面盲区 + 死记录
+        expect(VARS_FAMILY).toContain('--text3');
         expect(FONT_SCAN_THRESHOLD_PX).toBe(14);
     });
 });

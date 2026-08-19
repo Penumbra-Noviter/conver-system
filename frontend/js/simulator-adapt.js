@@ -58,6 +58,7 @@ export const VARS_FAMILY = [
     '--t2', '--t3', '--bg-deep', '--border',
     '--text-secondary', '--text-muted',
     '--muted', '--fs-s', '--fs-m', '--fs-l', '--tx2', '--tx3',
+    '--text2', '--text3', // B 类组 5（神明v3 体系；期末四轴 F-7：漏列致变量面盲区 + 死记录）
     '--sub',
 ];
 
