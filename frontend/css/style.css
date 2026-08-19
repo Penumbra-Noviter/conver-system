@@ -2018,6 +2018,8 @@ input[type="range"]::-moz-range-thumb {
     font-size: var(--text-sm);
     color: var(--ink-3);
     line-height: 1.5;
+    /* 多行详情展示（导入 warnings 命中项 / 未覆盖清单逐项换行）— 单行内容不受影响 */
+    white-space: pre-line;
 }
 
 /* ── 角色表单模态框 ── */
@@ -3732,6 +3734,56 @@ select {
 .sim-save-manage-btn:hover {
     border-color: var(--border-strong);
     color: var(--ink-2);
+}
+
+/* ══════════════════════════════════════════════════
+   模拟器导入（工单 04 — 工具条「导入游戏」按钮 .sim-import-btn /
+   拖拽高亮 .sim-drop-active / 卡片「已导入」badge .sim-source-tag）
+   ══════════════════════════════════════════════════ */
+.sim-import-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 14px;
+    border: none;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.sim-import-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+    box-shadow: 0 0 10px var(--accent-soft);
+}
+
+.sim-import-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 拖拽 .html 到列表区的高亮反馈（拖入悬停期间 dragover 加类） */
+.sim-drop-active {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+    background: var(--accent-soft);
+}
+
+/* 卡片「已导入」badge（source: imported 条目；内置卡片无此标记） */
+.sim-source-tag {
+    padding: 1px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 #simulator-save-panel {

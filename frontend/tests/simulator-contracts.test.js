@@ -12,6 +12,10 @@
  *      simulator-view.js 内联判据；# 为 URL fragment 分隔符，iframe src 截断
  *      防线）；null / undefined / 数字 / 空串 → false；
  *      'a.html' → true；含路径分隔符 / 百分号编码 / # → false。
+ *   4. 导入契约（工单 04）：IMPORT_URL 与后端 03 端点契约逐字一致
+ *      （POST /api/simulators/import）；WARNING_LABELS 键集与后端
+ *      SUSPICIOUS_PATTERNS 键集锚定一致（eval / document.cookie /
+ *      cross-origin-fetch），文案为中文映射（前端展示单一来源）。
  *
  * 本测试文件是契约锁的锚点：产品代码（simulator-contracts.js 之外）不得再出现
  * 模拟器域常量字面量 / file 判据内联实现（运行视图与列表视图均须 import 本模块）。
@@ -23,6 +27,8 @@ import {
     TIMEOUT_MS,
     TIMEOUT_REASON,
     isValidSimulatorFile,
+    IMPORT_URL,
+    WARNING_LABELS,
     __all__,
 } from '../js/simulator-contracts.js';
 
@@ -31,6 +37,11 @@ const LEGACY_SIM_DIR = 'simulators';
 const LEGACY_MANIFEST_URL = 'simulators/manifest.json';
 const LEGACY_TIMEOUT_MS = 15000;
 const LEGACY_TIMEOUT_REASON = '模拟器清单加载超时（15 秒未收到响应）';
+
+// 导入契约锚点（与后端工单 03 端点契约逐字一致 — backend/app/api/routes/simulators.py）
+const BACKEND_IMPORT_URL = '/api/simulators/import';
+// 后端 SUSPICIOUS_PATTERNS 键集锚点（simulator_store.py 常量单源；前端映射以此为键集）
+const BACKEND_WARNING_KEYS = ['eval', 'document.cookie', 'cross-origin-fetch'];
 
 describe('simulator-contracts 常量契约（C8 单一来源）', () => {
     it('SIM_DIR 与迁移前运行视图字面量逐字等价', () => {
@@ -105,13 +116,48 @@ describe('isValidSimulatorFile — file 安全判据纯函数', () => {
     });
 });
 
+describe('IMPORT_URL — 导入端点契约（工单 04，锚定后端 03 端点）', () => {
+    it('与后端 POST /api/simulators/import 逐字一致', () => {
+        expect(IMPORT_URL).toBe(BACKEND_IMPORT_URL);
+    });
+
+    it('以 /api 前缀开头（前端 API 统一前缀约定，api.js API_BASE）', () => {
+        expect(IMPORT_URL.startsWith('/api/')).toBe(true);
+    });
+});
+
+describe('WARNING_LABELS — 恶意模式键集中文映射（键集锚定后端 SUSPICIOUS_PATTERNS）', () => {
+    it('键集与后端 SUSPICIOUS_PATTERNS 完全一致（增删键必联动后端）', () => {
+        expect(Object.keys(WARNING_LABELS).sort()).toEqual([...BACKEND_WARNING_KEYS].sort());
+    });
+
+    it('每个键的中文文案为非空字符串（提示弹窗直接消费）', () => {
+        for (const key of BACKEND_WARNING_KEYS) {
+            expect(typeof WARNING_LABELS[key]).toBe('string');
+            expect(WARNING_LABELS[key].length).toBeGreaterThan(0);
+        }
+    });
+
+    it('文案包含安全语义关键词（第三方可读取本地数据并调用 API 的威胁模型传达）', () => {
+        // 威胁模型衔接（spec：明显恶意模式粗筛命中弹警告不拦截，定位知情提示）——
+        // 各文案须传达「本地数据/会话/外部发送」任一风险面，防止退化成语焉不详
+        const riskMarkers = ['本地', '会话', '外部', '数据'];
+        for (const key of BACKEND_WARNING_KEYS) {
+            const hasRisk = riskMarkers.some((m) => WARNING_LABELS[key].includes(m));
+            expect(hasRisk, `WARNING_LABELS[${key}] 文案未传达风险面：${WARNING_LABELS[key]}`).toBe(true);
+        }
+    });
+});
+
 describe('simulator-contracts __all__ 协议表面', () => {
     it('__all__ 收口全部常量与纯函数', () => {
         expect(__all__.sort()).toEqual([
+            'IMPORT_URL',
             'MANIFEST_URL',
             'SIM_DIR',
             'TIMEOUT_MS',
             'TIMEOUT_REASON',
+            'WARNING_LABELS',
             'isValidSimulatorFile',
         ]);
     });

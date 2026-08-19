@@ -24,7 +24,7 @@
  *   （String.prototype）。
  *
  * 协议表面（__all__）：SIM_DIR / MANIFEST_URL / TIMEOUT_MS / TIMEOUT_REASON /
- *   isValidSimulatorFile。
+ *   IMPORT_URL / WARNING_LABELS / isValidSimulatorFile。
  */
 
 // ══════════════════════════════════════════════════
@@ -42,6 +42,25 @@ export const TIMEOUT_MS = 15000;
 
 /** 清单域超时文案（spec D1 逐字；秒数由 TIMEOUT_MS 派生，非硬编码 — 改毫秒数必联动秒数） */
 export const TIMEOUT_REASON = `模拟器清单加载超时（${TIMEOUT_MS / 1000} 秒未收到响应）`;
+
+/**
+ * 导入端点 URL（工单 04；与后端 03 端点契约逐字一致 — POST /api/simulators/import，
+ * multipart 字段名 `file`）。单一来源：导入流程只消费本常量，后端改路径只改一处。
+ */
+export const IMPORT_URL = '/api/simulators/import';
+
+/**
+ * 恶意模式粗筛键集中文文案映射（工单 04；键集锚定后端
+ * simulator_store.SUSPICIOUS_PATTERNS 常量单源 — eval / document.cookie /
+ * cross-origin-fetch，增删键必联动后端）。导入成功且 warnings 非空时前端
+ * 弹警告不拦截，按本映射逐项展示中文文案；未知键（后端新增未联动）兜底
+ * 展示原始键名，不炸。
+ */
+export const WARNING_LABELS = {
+    eval: '使用 eval() 动态执行任意代码（同源可调用 API / 读取本地数据）',
+    'document.cookie': '读取 document.cookie（可访问本地会话数据）',
+    'cross-origin-fetch': '跨域 fetch 请求（可能向外部发送本地数据）',
+};
 
 // ══════════════════════════════════════════════════
 // 纯函数：file 安全判据（iframe src 注入守卫）
@@ -76,5 +95,7 @@ export const __all__ = [
     'MANIFEST_URL',
     'TIMEOUT_MS',
     'TIMEOUT_REASON',
+    'IMPORT_URL',
+    'WARNING_LABELS',
     'isValidSimulatorFile',
 ];

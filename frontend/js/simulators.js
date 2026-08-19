@@ -5,7 +5,10 @@
  *   纯函数）、卡片网格渲染、类型筛选（filterGames 纯函数）、列表四态
  *   （loading / ready / error / empty）、错误态重试。点击卡片经注入的
  *   onOpenGame 钩子交给协调层（未注入时为空操作不报错）。工具条「存档管理」
- *   按钮（U9-T2）经注入的 onOpenSaveManager 钩子交给存档面板模块；游戏列表
+ *   按钮（U9-T2）经注入的 onOpenSaveManager 钩子交给存档面板模块；工具条
+ *   「导入游戏」按钮（工单 04）经注入的 onImportGame 钩子交给导入模块
+ *   （simulator-import.openImportFlow）。卡片「已导入」badge：parseManifest
+ *   透传 source 白名单字段（仅 'imported'，T-02 决策 10）。游戏列表
  *   缓存经 getGames() 公开读取（存档面板 getGames 钩子的数据源 — 不重复
  *   fetch manifest，G7）。
  *
@@ -83,6 +86,9 @@ let onOpenGame = () => {};
 
 /** 工具条「存档管理」按钮钩子（app.js 注入 → save-manager.openSavePanel；未注入时 no-op 兜底） */
 let onOpenSaveManager = () => {};
+
+/** 工具条「导入游戏」按钮钩子（app.js 注入 → simulator-import.openImportFlow；未注入时 no-op 兜底） */
+let onImportGame = () => {};
 
 /** 最近一次解析成功的完整游戏列表（筛选基于缓存，不重复 fetch） */
 let games = [];
@@ -202,7 +208,9 @@ export function parseManifest(rawJson) {
         // 条目级宽容降级：name/description 缺失 → 空串（不渲染）；
         // saveKeyPrefix/config 非合法类型 → 剔除（不渲染）；
         // saveKeys 结构非法 → 无 saveKeys 属性（「无存档管理」降级信号）；
-        // endpointMode 非 'base'/'full' → 剔除（注入时按不转换处理）
+        // endpointMode 非 'base'/'full' → 剔除（注入时按不转换处理）；
+        // source 白名单（T-02 决策 10）：仅接受字符串 'imported'（导入条目
+        // 标识），其余值/缺失 → 不设 source（内置条目无此字段 → 无 badge）
         const game = {
             id: entry.id,
             file: entry.file,
@@ -210,6 +218,7 @@ export function parseManifest(rawJson) {
             type: entry.type,
             description: typeof entry.description === 'string' ? entry.description : '',
         };
+        if (entry.source === 'imported') game.source = 'imported';
         if (typeof entry.saveKeyPrefix === 'string') game.saveKeyPrefix = entry.saveKeyPrefix;
         if (entry.config !== null && typeof entry.config === 'object' && !Array.isArray(entry.config)) {
             game.config = entry.config;
@@ -262,6 +271,7 @@ function renderShell() {
     container.innerHTML = `
         <div class="sim-toolbar">
             <div class="sim-filters" role="group" aria-label="类型筛选">${filterButtons}</div>
+            <button type="button" class="sim-import-btn" data-action="import-game">导入游戏</button>
             <button type="button" class="sim-save-manage-btn" data-action="open-save-manager">存档管理</button>
             <span class="sim-count"></span>
         </div>
@@ -298,6 +308,7 @@ function renderList() {
                 <div class="sim-card-title">
                     ${game.name ? `<h3 class="sim-card-name">${escapeHtml(game.name)}</h3>` : ''}
                     <span class="sim-type-tag sim-type-${game.type}">${TYPE_LABELS[game.type]}</span>
+                    ${game.source === 'imported' ? '<span class="sim-source-tag">已导入</span>' : ''}
                 </div>
                 ${game.description ? `<p class="sim-card-desc">${escapeHtml(game.description)}</p>` : ''}
             </div>
@@ -337,22 +348,25 @@ function renderError(reason) {
  * 初始化模拟器列表视图：挂载工具条与状态区骨架，渲染初始 loading 态，
  * 绑定筛选按钮与卡片/重试事件委托。
  *
- * 幂等：重复调用仅更新 onOpenGame / onOpenSaveManager 钩子、不重复绑定事件
- * （search-view 先例）。container 缺失（index.html 契约被破坏的极端场景）→ no-op
- * 不抛错。加载不发请求 —— 首次 fetch 由协调层「进入 simulators 视图」
- * 调 refreshSimulators() 触发（懒加载）。
+ * 幂等：重复调用仅更新 onOpenGame / onOpenSaveManager / onImportGame 钩子、
+ * 不重复绑定事件（search-view 先例）。container 缺失（index.html 契约被破坏的
+ * 极端场景）→ no-op 不抛错。加载不发请求 —— 首次 fetch 由协调层「进入
+ * simulators 视图」调 refreshSimulators() 触发（懒加载）。
  * @param {object} [options]
  * @param {HTMLElement} [options.container] - 列表挂载容器（#simulator-list-panel）
  * @param {Function} [options.onOpenGame] - (game) => void；点击卡片触发，
  *   game 为 parseManifest 归一化条目（未注入时点击为空操作不报错）
  * @param {Function} [options.onOpenSaveManager] - () => void；工具条「存档
  *   管理」按钮触发（未注入时点击为空操作不报错）
+ * @param {Function} [options.onImportGame] - () => void；工具条「导入游戏」
+ *   按钮触发（工单 04；未注入时点击为空操作不报错）
  */
-export function initSimulatorsView({ container: el, onOpenGame: hook, onOpenSaveManager: saveHook } = {}) {
+export function initSimulatorsView({ container: el, onOpenGame: hook, onOpenSaveManager: saveHook, onImportGame: importHook } = {}) {
     if (!el) return;
     container = el;
     if (typeof hook === 'function') onOpenGame = hook;
     if (typeof saveHook === 'function') onOpenSaveManager = saveHook;
+    if (typeof importHook === 'function') onImportGame = importHook;
     if (bound) return; // 幂等守卫：已绑定则早退（钩子已在上方更新）
 
     renderShell();
@@ -376,6 +390,9 @@ function bindEvents() {
     // 工具条「存档管理」按钮 → 存档面板钩子（U9-T2；未注入时 no-op 不报错；
     // 点击时读取模块变量 — 重复 init 更新钩子后取最新值，先例同卡片委托）
     container.querySelector('.sim-save-manage-btn')?.addEventListener('click', () => onOpenSaveManager());
+
+    // 工具条「导入游戏」按钮 → 导入流程钩子（工单 04；未注入时 no-op 不报错）
+    container.querySelector('.sim-import-btn')?.addEventListener('click', () => onImportGame());
 
     // 事件委托：卡片点击 → onOpenGame(game)；重试按钮 → refreshSimulators。
     // 委托挂在持久状态区元素上，重渲染不丢监听（search-view 结果跳转先例）
@@ -413,7 +430,11 @@ async function fetchManifestText() {
         }, TIMEOUT_MS);
     });
     try {
-        const fetchPromise = doFetch(MANIFEST_URL, { signal: controller.signal });
+        // cache: 'no-store' — manifest 是易变数据（导入成功后刷新须拿到新鲜
+        // 内容）：静态挂载带 ETag/Last-Modified，无 Cache-Control，浏览器
+        // 二次 fetch 条件请求 304 会用缓存旧数据，导入新卡不出现（冒烟实测
+        // 定位，2026-08-19）
+        const fetchPromise = doFetch(MANIFEST_URL, { signal: controller.signal, cache: 'no-store' });
         fetchPromise.catch(() => {}); // 超时后迟到响应/拒绝不产生未处理拒绝（一律丢弃）
         const res = await Promise.race([fetchPromise, timeoutPromise]);
         if (res?.ok === false) {

@@ -364,22 +364,36 @@ export function extractGameClasses(htmlText) {
  *   important?: boolean}>} 未覆盖清单（全绿返回空数组）
  */
 export function compareCoverage(game, gameName, coverage) {
+    // 空输入防护（波末审核 F3）：消费方可能传入 null/undefined/畸形对象
+    // （如导入流程经部分失败路径进入）—— 一律按「无信息」归一化，不抛
+    // TypeError：game 缺失 → 仅报记录缺失；coverage 缺失/畸形 → 按空
+    // 覆盖层判定（与 parseCoverageRecords('') 输出同语义）
+    const { classes = [], vars = [], fonts = [] } = game ?? {};
+    const cov = coverage && typeof coverage === 'object'
+        ? coverage
+        : { games: [], covered: emptyCovered() };
+    const covered = cov.covered && typeof cov.covered === 'object'
+        ? cov.covered
+        : emptyCovered();
     const items = [];
-    const { classes = [], vars = [], fonts = [] } = game;
-    const record = coverage.games.find((g) => g.name === gameName);
+    const record = Array.isArray(cov.games) ? cov.games.find((g) => g.name === gameName) : undefined;
     if (!record) {
         items.push({ kind: 'record', item: gameName });
     }
     const recordClasses = record ? record.classes : [];
     for (const cls of classes) {
-        if (!coverage.covered.classes.includes(cls) && !recordClasses.includes(cls)) {
-            items.push({ kind: 'class', item: cls });
+        if (!Array.isArray(covered.classes) || !covered.classes.includes(cls)) {
+            if (!recordClasses.includes(cls)) {
+                items.push({ kind: 'class', item: cls });
+            }
         }
     }
     const recordVars = record ? record.vars : [];
     for (const v of vars) {
-        if (!coverage.covered.vars.includes(v) && !recordVars.some((e) => e.name === v)) {
-            items.push({ kind: 'var', item: v });
+        if (!Array.isArray(covered.vars) || !covered.vars.includes(v)) {
+            if (!recordVars.some((e) => e.name === v)) {
+                items.push({ kind: 'var', item: v });
+            }
         }
     }
     const recordFonts = record ? record.fonts : [];
@@ -391,7 +405,7 @@ export function compareCoverage(game, gameName, coverage) {
             items.push({ kind: 'font', item: f.selector, size: f.size, important: true });
             continue;
         }
-        const coveredByRule = coverage.covered.fontRules.some((rule) =>
+        const coveredByRule = Array.isArray(covered.fontRules) && covered.fontRules.some((rule) =>
             selectorMatches(rule.chain, parseSelectorChain(f.selector))
             && (rule.imp || specificityGte(specificityOf(rule.chain), specificityOf(parseSelectorChain(f.selector)))));
         if (!coveredByRule) {
