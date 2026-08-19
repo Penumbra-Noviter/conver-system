@@ -288,6 +288,9 @@ def next_available_filename(sim_dir: Path, desired: str) -> str:
     组件上限 → 落盘 OSError 500；F-14 起因即 250 字节 stem 拼 -2 得 257 字节
     溢出 255 组件上限，现上限收紧为 120 后触发面收窄、机制不变）。
     目录不存在视为无冲突（导入会在落盘前创建目录）。
+    入参契约：desired 应传入完整文件名（含扩展名），且调用方须保证 stem 非空
+    ——空 stem（如 ".html"）冲突时产出 "-N.html" 畸形名，本函数不兜底
+    （空名兜底由 sanitize_filename 的 imported-game 承担）。
     """
     stem, ext = desired.rsplit(".", 1)
     existing = (
