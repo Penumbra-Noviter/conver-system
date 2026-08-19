@@ -2,7 +2,7 @@
 
 > Conver System 桌面版 = Tauri v2 壳（Rust）+ PyInstaller 打包后端 + 原生前端（零改动）。
 > 工具链安装见 [tauri-setup.md](tauri-setup.md)（本文档不重复）。
-> 规格与决策见 `.scratch/p64-tauri/spec.md`（P6.4 工单波次）。
+> 规格与决策：P6.4 工单波次规格结论折入 TICKETS.md P6.4 归档与 CONSENSUS.md 决策条目（一次性产物已清场）。
 
 ---
 
