@@ -139,10 +139,43 @@ class TestSanitizeFilename:
             ("  My Game v1.html  ", "My Game v1.html"),
             ("..", "imported-game.html"),  # 纯点 → 保底名
             (".hidden.html", "hidden.html"),  # 隐藏文件点前缀剔除
+            # Windows 保留设备名（大小写不敏感、± .html）：加 _ 前缀（_con 非保留名；
+            # 大小写保留——净化不重写既有大小写语义，与 "My Game v1" 一致）
+            ("con.html", "_con.html"),
+            ("con", "_con.html"),
+            ("CON.HTML", "_CON.html"),
+            ("CoN", "_CoN.html"),
+            ("prn.html", "_prn.html"),
+            ("PRN", "_PRN.html"),
+            ("aux.html", "_aux.html"),
+            ("Aux", "_Aux.html"),
+            ("nul.html", "_nul.html"),
+            ("NUL", "_NUL.html"),
+            ("com1.html", "_com1.html"),
+            ("COM1", "_COM1.html"),
+            ("com9.html", "_com9.html"),
+            ("Com9", "_Com9.html"),
+            ("lpt1.html", "_lpt1.html"),
+            ("LPT1", "_LPT1.html"),
+            ("lpt9.html", "_lpt9.html"),
+            ("Lpt9", "_Lpt9.html"),
+            # 非保留邻近名不受影响（非精确匹配）
+            ("mycon.html", "mycon.html"),
+            ("com10.html", "com10.html"),
+            ("lpt10.html", "lpt10.html"),
+            ("console.html", "console.html"),
+            ("printer.html", "printer.html"),
+            ("auxiliary.html", "auxiliary.html"),
+            ("conman.html", "conman.html"),
+            # 255 字节上限（含 .html 后缀）：>255 按字节截断 stem，不劈裂多字节字符
+            ("a" * 260 + ".html", "a" * 250 + ".html"),  # ASCII 260 字节 → 截 250，总长 255
+            ("中" * 90 + ".html", "中" * 83 + ".html"),  # 中文 270 字节 → 截 249（整字符），总长 254
+            ("😀" * 63 + ".html", "😀" * 62 + ".html"),  # 4 字节 emoji 252 字节 → 劈裂回退整字符，总长 253
+            ("a" * 250 + ".html", "a" * 250 + ".html"),  # 恰好 255 字节 → 不截断
         ],
     )
     def test_sanitize_matrix(self, raw: str, expected: str) -> None:
-        """净化矩阵：穿越/非法字符/空名全部收敛为安全名"""
+        """净化矩阵：穿越/非法字符/空名/保留设备名/超长名全部收敛为安全名"""
         assert sanitize_filename(raw) == expected
 
     def test_sanitize_never_contains_forbidden_chars(self) -> None:
@@ -150,6 +183,14 @@ class TestSanitizeFilename:
         for raw in ["..\\..\\x.html", "a/b%c<d.html", "game#1.html", "..", ".", ""]:
             name = sanitize_filename(raw)
             assert "/" not in name and "\\" not in name and "%" not in name and "#" not in name
+
+    def test_sanitize_reserved_name_writable(self, tmp_path: Path) -> None:
+        """保留设备名净化结果可真实落盘（Windows 上 con.html 写盘 OSError，_con.html 可写）"""
+        safe = sanitize_filename("con.html")
+        assert safe == "_con.html"
+        target = tmp_path / safe
+        target.write_text("<html>x</html>", encoding="utf-8")
+        assert target.read_text(encoding="utf-8") == "<html>x</html>"
 
 
 class TestSlugify:
