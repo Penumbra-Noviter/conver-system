@@ -8,8 +8,9 @@
     2. 全新目录：从内置目录整目录拷贝（html + manifest 字节一致）。
     3. manifest **最后**落盘：中断于 manifest 之前 → 下次启动重种；中断于
        manifest 之后 → 视为已种子（标记语义，不逐文件修复）。
-    4. 种子源缺失（打包态文件缺失）→ 降级不崩溃（返回 False，不建目录）；
-       数据目录不可写 → 抛出带路径的明确 OSError（启动期可闻，不静默吞掉）。
+    4. 种子源缺失（打包态文件缺失：目录整体缺失或目录内缺 manifest.json）→
+       降级不崩溃（返回 False，不建目录）；数据目录不可写 → 抛出带路径的
+       明确 OSError（启动期可闻，不静默吞掉）。
 
 manifest 工具（工单 02 声明底座，工单 03 读-改-写原子追加复用）：
     `read_manifest` 读取解析；`write_manifest` 同目录临时文件 + os.replace
@@ -48,12 +49,16 @@ def ensure_seeded(builtin_dir: Path, target_dir: Path) -> bool:
     """首启种子：target_dir 缺 manifest → 从 builtin_dir 整目录拷贝（含 manifest）。
 
     返回 True 表示本次执行了种子拷贝；False 表示已种子（标记存在）或种子源缺失
-    （降级不崩溃，不创建 target_dir）。数据目录不可写 → 抛明确 OSError（含路径）。
+    （目录缺失或目录内缺 manifest.json，降级不崩溃，不创建 target_dir）。
+    数据目录不可写 → 抛明确 OSError（含路径）。
     拷贝范围：builtin_dir 下的文件条目（html + manifest；目录条目跳过——
     内置种子源当前纯文件形态）。
     """
     if not builtin_dir.is_dir():
         logger.warning("模拟器种子源缺失，跳过首启种子：%s", builtin_dir)
+        return False
+    if not (builtin_dir / MANIFEST_FILE).is_file():
+        logger.warning("模拟器种子源 manifest 缺失，跳过首启种子：%s", builtin_dir / MANIFEST_FILE)
         return False
     if (target_dir / MANIFEST_FILE).exists():
         return False
@@ -84,10 +89,13 @@ def read_manifest(sim_dir: Path) -> dict:
 def write_manifest(sim_dir: Path, manifest: dict) -> None:
     """原子写 sim_dir/manifest.json：同目录临时文件 + os.replace（UTF-8 明文，中文保真）。
 
-    目录缺失自动创建（parents）；manifest 非 dict → TypeError（json.dumps 语义，
-    调用方契约）；写入失败时旧 manifest 保持原样（os.replace 原子替换保证），
-    临时文件残留无害（读取方只消费 manifest.json）。
+    目录缺失自动创建（parents）；manifest 非 dict → TypeError（显式 isinstance
+    校验，与 docstring 契约一致——json.dumps 对字符串等类型不抛，须前置拦截）；
+    写入失败时旧 manifest 保持原样（os.replace 原子替换保证），临时文件残留
+    无害（读取方只消费 manifest.json）。
     """
+    if not isinstance(manifest, dict):
+        raise TypeError(f"manifest 必须是 dict，收到 {type(manifest).__name__}")
     sim_dir.mkdir(parents=True, exist_ok=True)
     tmp = sim_dir / (MANIFEST_FILE + MANIFEST_TMP_SUFFIX)
     tmp.write_text(
