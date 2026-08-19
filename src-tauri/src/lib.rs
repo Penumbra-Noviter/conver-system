@@ -179,39 +179,37 @@ fn readiness_loop(inner: Arc<ShellStateInner>, timeout: Duration) {
         server::READY_POLL_INTERVAL,
     );
     let info = match outcome {
-        ReadyOutcome::Ready => {
-            inner.ready.store(true, Ordering::SeqCst);
-            RuntimeInfo {
-                port,
-                ready: true,
-                pid,
-                error: None,
-            }
-        }
-        ReadyOutcome::TimedOut => {
-            let e = format!("等待后端就绪超时（{timeout:?}）");
-            *inner.error.lock().unwrap() = Some(e.clone());
-            RuntimeInfo {
-                port,
-                ready: false,
-                pid,
-                error: Some(e),
-            }
-        }
-        ReadyOutcome::ChildExited(code) => {
-            let e = format!("后端进程提前退出（退出码 {code}）");
-            *inner.error.lock().unwrap() = Some(e.clone());
-            RuntimeInfo {
-                port,
-                ready: false,
-                pid,
-                error: Some(e),
-            }
-        }
+        ReadyOutcome::Ready => RuntimeInfo {
+            port,
+            ready: true,
+            pid,
+            error: None,
+        },
+        ReadyOutcome::TimedOut => RuntimeInfo {
+            port,
+            ready: false,
+            pid,
+            error: Some(format!("等待后端就绪超时（{timeout:?}）")),
+        },
+        ReadyOutcome::ChildExited(code) => RuntimeInfo {
+            port,
+            ready: false,
+            pid,
+            error: Some(format!("后端进程提前退出（退出码 {code}）")),
+        },
     };
     let path = inner.data_dir.join(server::RUNTIME_JSON);
     if let Err(e) = server::write_runtime_json(&path, &info) {
         eprintln!("[conver-shell] 写入 runtime.json 失败: {e}");
+    }
+    // 终态发布契约：runtime.json 落盘之后才置 ready/error 标志——若先置标志再写盘，
+    // 轮询方看到终态时文件可能尚未写出（shell_state_test 全链实测竞态：error/ready
+    // 可见但 runtime.json NotFound，全量 2/10 + 串行 3/20 复现）。写盘失败不阻断
+    // 状态推进（磁盘级故障下轮询方仍能读到错误标志）。
+    if info.ready {
+        inner.ready.store(true, Ordering::SeqCst);
+    } else if let Some(e) = &info.error {
+        *inner.error.lock().unwrap() = Some(e.clone());
     }
 }
 

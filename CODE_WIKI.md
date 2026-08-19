@@ -1004,7 +1004,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/utils/sse-reader.js:parseSSEStream-->`parseSSEStream(reader, { onToken, onDone, onError })`<!--/AUTO--> | 解析 SSE 流 |
 
-### 4.64 `src-tauri/src/lib.rs` — 壳状态机（<!--AUTO:lines:src-tauri/src/lib.rs-->~357 行<!--/AUTO-->）
+### 4.64 `src-tauri/src/lib.rs` — 壳状态机（<!--AUTO:lines:src-tauri/src/lib.rs-->~355 行<!--/AUTO-->）
 
 **职责**：`ShellState`——动态端口、数据目录、后端子进程生命周期（Drop 兜底无残留）、就绪轮询线程、就绪超时（环境变量可配）、`run()` 装配（含单实例/托盘）。
 
