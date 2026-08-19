@@ -393,3 +393,17 @@ class TestManifestStructureSelfHeal:
         assert json.loads(raw) == rebuilt
         assert [p.name for p in sim_dir.iterdir()] == ["manifest.json", "seed.html"], "无 .tmp 残留"
 
+    def test_read_manifest_or_rebuild_heals_dir_as_manifest(self, tmp_path: Path) -> None:
+        """manifest.json 被同名目录顶替（读取路径 OSError 族：open 目录 → 跨平台
+        抛 IsADirectoryError/PermissionError）→ 视为损坏自愈重建，返回合法 dict
+        且重建条目正确（F-15）"""
+        sim_dir = tmp_path / "simulators"
+        sim_dir.mkdir()
+        (sim_dir / "seed.html").write_text("<html>seed</html>", encoding="utf-8")
+        (sim_dir / "manifest.json").mkdir()  # 同名目录顶替 manifest.json
+        rebuilt = simulator_store._read_manifest_or_rebuild(sim_dir)
+        assert rebuilt["version"] == 2
+        assert rebuilt["simulators"] == [
+            {"id": "seed", "file": "seed.html", "name": "seed", "type": "local"}
+        ]
+

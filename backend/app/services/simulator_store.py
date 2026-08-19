@@ -29,9 +29,11 @@ manifest 工具（工单 02 声明底座，工单 03 读-改-写原子追加复�
     并按现存 id 集唯一化（-2/-3 后缀，manifest 结构性唯一）。
     文件名净化规则（定版）：取最后路径段 + 剔除 Windows 非法字符/%/#（# 为
     URL fragment 分隔符，iframe src 截断风险）+ 首尾点剔除，空名回退
-    imported-game（防目录穿越，Windows 路径安全）；stem 精确命中 Windows
-    保留设备名（con/prn/aux/nul/com1-9/lpt1-9）加 `_` 前缀、总名 UTF-8 超
-    255 字节按字节截断不劈裂多字节字符（F-9 定版，落盘 OSError 预拦截）。
+    imported-game（防目录穿越，Windows 路径安全）；stem 按「首点前组件」
+    判定命中 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，带任意扩展
+    名仍视为保留，F-13 定版）加 `_` 前缀、总名 UTF-8 超 120 字节按字节截断
+    不劈裂多字节字符（F-17 定版：Windows MAX_PATH = 260 全路径上限兼容，
+    落盘 OSError 预拦截）。
 
 G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/json/
 logging/os/pathlib/re/shutil），与 data_dir 同层——工单 03 导入族在此继续
@@ -92,8 +94,12 @@ _WINDOWS_RESERVED_NAMES = frozenset(
     | {f"lpt{i}" for i in range(1, 10)}
 )
 
-#: 文件名 UTF-8 字节上限（含 .html 后缀；Windows 路径组件上限 255 字节，F-9 定版）
-_MAX_FILENAME_BYTES = 255
+#: 文件名 UTF-8 字节上限（含 .html 后缀；F-17 定版 120 字节——Windows MAX_PATH
+#: = 260 全路径上限且 Python open 无 `\\?\` 前缀：默认数据目录（%APPDATA%/
+#: ConverSystem/simulators ~55 字符前缀）下 205-255 字节名全长 260+ 仍落盘失败，
+#: 255 组件上限在真实路径不可达；120 = 260 - 常见数据目录前缀余量，超长名截断
+#: 静默收敛）
+_MAX_FILENAME_BYTES = 120
 
 #: 恶意模式粗筛常量清单（键 + 正则，常量单源——前端 warnings 文案映射以此为键集锚点；
 #: 命中仅收集返回，绝不拦截；静态审查不承诺防住，定位知情提示）
@@ -189,19 +195,42 @@ def sha256_bytes(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def _truncate_utf8_bytes(s: str, max_bytes: int) -> str:
+    """UTF-8 字节截断（不劈裂多字节字符；sanitize 与改名路径共用）。
+
+    仅当 s 编码后字节数超 max_bytes 才截断（未超原样返回）；截断点若落在
+    多字节字符中间（末字节为 UTF-8 尾随字节 10xxxxxx）回退到完整字符边界，
+    避免乱码半字符；截断后复用净化链的首尾点/空格剔除（防截出尾随点等
+    非法形态）。截断为空时返回空串，兜底回退由调用方决定。
+    """
+    data = s.encode("utf-8")
+    if len(data) <= max_bytes:
+        return s
+    data = data[:max_bytes]
+    while data and (data[-1] & 0xC0) == 0x80:
+        data = data[:-1]
+    return data.decode("utf-8", errors="ignore").strip(" .")
+
+
 def sanitize_filename(raw: str) -> str:
     """净化上传文件名 → 安全落盘名（防目录穿越 + Windows 非法字符 + %/# +
-    保留设备名 + 255 字节上限）。
+    保留设备名 + 120 字节上限）。
 
     定版规则：取最后路径段（`/` 与 `\\` 皆按分隔符，杜绝穿越）、剔除 Windows
     非法字符与控制字符、剔除 `%` 与 `#`（前端 isValidSimulatorFile 单点拒绝，
     落盘名必须兼容——`#` 为 URL fragment 分隔符，入 iframe src 会截断请求）、
     剔除首尾点与空格（防隐藏文件与 `..` 段）；空名回退 `imported-game`；
-    扩展名归一化为小写 `.html`。stem（去 .html 后的主名）大小写不敏感精确
-    命中 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，带任意扩展名仍
-    视为保留）→ 加 `_` 前缀（`_con` 非保留名）；非精确匹配（mycon/com10/
-    lpt10 等）不受影响。总名（含 .html 后缀）UTF-8 编码超 255 字节 → 按字节
-    截断 stem 且不劈裂多字节字符（截断后复用首尾点剔除与空名回退兜底链）。
+    扩展名归一化为小写 `.html`。stem（去 .html 后的主名）按「首点前组件」
+    大小写不敏感判定 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，
+    带任意扩展名仍视为保留——F-13 定版：MSDN 判定取首点前组件，NUL.tar.gz
+    等价 NUL，双扩展形态 con.txt.html 同样拦截）→ 加 `_` 前缀（`_con` 非
+    保留名）；非精确匹配（mycon/com10/lpt10 等）不受影响。总名（含 .html
+    后缀）UTF-8 编码超 120 字节 → 按字节截断 stem 且不劈裂多字节字符（截断
+    后复用首尾点剔除与空名回退兜底链）。上限定版依据（F-17）：Windows
+    MAX_PATH = 260 全路径上限，Python open 无 `\\?\` 前缀——255 组件上限在
+    真实数据目录路径下不可达（默认 %APPDATA%/ConverSystem/simulators ~55
+    字符前缀 + 205-255 字节名全长 260+ 即 FileNotFoundError），120 = 260 -
+    常见数据目录前缀余量，保证净化结果在真实路径可落盘；超长名截断静默收敛。
     净化静默收敛不报错——校验失败仅限 400 矩阵（非 .html / 超 5MB / 空文件，
     见 import_game）。
     """
@@ -214,19 +243,12 @@ def sanitize_filename(raw: str) -> str:
         stem = name[:-5]
     else:
         stem = name
-    if stem.lower() in _WINDOWS_RESERVED_NAMES:
+    if stem.split(".", 1)[0].lower() in _WINDOWS_RESERVED_NAMES:
         stem = "_" + stem
     suffix = ".html"
-    stem_bytes = stem.encode("utf-8")
-    if len(stem_bytes) > _MAX_FILENAME_BYTES - len(suffix):
-        stem_bytes = stem_bytes[: _MAX_FILENAME_BYTES - len(suffix)]
-        # 截断点若落在多字节字符中间（末字节为 UTF-8 尾随字节 10xxxxxx），
-        # 回退到完整字符边界，避免产生乱码半字符
-        while stem_bytes and (stem_bytes[-1] & 0xC0) == 0x80:
-            stem_bytes = stem_bytes[:-1]
-        stem = stem_bytes.decode("utf-8", errors="ignore").strip(" .")
-        if not stem:
-            stem = "imported-game"
+    stem = _truncate_utf8_bytes(stem, _MAX_FILENAME_BYTES - len(suffix))
+    if not stem:
+        stem = "imported-game"
     return stem + suffix
 
 
@@ -260,6 +282,11 @@ def find_duplicate(sim_dir: Path, content: bytes) -> str | None:
 def next_available_filename(sim_dir: Path, desired: str) -> str:
     """文件名冲突自动改名：xxx-2.html 递增；冲突判定大小写不敏感（Windows 定版）。
 
+    改名路径保证总名（含 -N 后缀与扩展名）UTF-8 不超过 _MAX_FILENAME_BYTES
+    字节：拼 -N 后缀前按余量对 stem 重做字节截断（复用 _truncate_utf8_bytes，
+    不劈裂多字节字符）——杜绝 NAME_MAX/MAX_PATH 顶破（长 stem 拼 -2 溢出
+    组件上限 → 落盘 OSError 500；F-14 起因即 250 字节 stem 拼 -2 得 257 字节
+    溢出 255 组件上限，现上限收紧为 120 后触发面收窄、机制不变）。
     目录不存在视为无冲突（导入会在落盘前创建目录）。
     """
     stem, ext = desired.rsplit(".", 1)
@@ -271,7 +298,8 @@ def next_available_filename(sim_dir: Path, desired: str) -> str:
     candidate = desired
     n = 2
     while candidate.lower() in existing:
-        candidate = f"{stem}-{n}.{ext}"
+        suffix = f"-{n}.{ext}"
+        candidate = _truncate_utf8_bytes(stem, _MAX_FILENAME_BYTES - len(suffix)) + suffix
         n += 1
     return candidate
 
@@ -327,16 +355,19 @@ def _read_manifest_or_rebuild(sim_dir: Path, persist: bool = False) -> dict:
 
     损坏口径（F-8 定版）：非法 JSON / 非 UTF-8 / 合法 JSON 但结构非预期
     （顶层非 dict 或 simulators 非 list——如字符串/字典/None）一律视为损坏
-    重建，否则 `_existing_ids` 迭代 dict/str 抛 TypeError、`append_manifest_entry`
-    的 `.append` 抛 AttributeError → 500（原子写保证正常运行不产生此类
-    损坏，需手工损坏 manifest 触发；条目级字段不做校验，范围收敛）。
-    persist=True 时重建结果立即原子落盘（import_game 先自愈再算 id：避免
-    「id 唯一化用瞬态重建、append 用磁盘重建（此时已含新落盘文件）」两次
-    重建口径不一致产生退化重复条目）。
+    重建；F-15 定版：读取路径 OSError 族（manifest.json 被替换为同名目录 →
+    open 抛 IsADirectoryError、不可读 → PermissionError——读不了即损坏语义）
+    同样并入自愈，否则 `_existing_ids` 迭代 dict/str 抛 TypeError、
+    `append_manifest_entry` 的 `.append` 抛 AttributeError → 500（原子写保证
+    正常运行不产生此类损坏，需手工损坏 manifest 触发；条目级字段不做校验，
+    范围收敛）。persist=True 时重建结果立即原子落盘（import_game 先自愈再算
+    id：避免「id 唯一化用瞬态重建、append 用磁盘重建（此时已含新落盘文件）」
+    两次重建口径不一致产生退化重复条目）；落盘写失败（如目录形态仍阻挡
+    os.replace）按既有契约抛出明确 OSError——写路径在 except 之外不受影响。
     """
     try:
         manifest = read_manifest(sim_dir)
-    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         manifest = None
     if not isinstance(manifest, dict) or not isinstance(manifest.get("simulators"), list):
         rebuilt = _rebuild_manifest(sim_dir)
