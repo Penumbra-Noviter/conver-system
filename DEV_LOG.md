@@ -6,7 +6,15 @@
 
 ---
 
-## 滚动摘要（2026-08-19 — 技术债区批次 2：F-13/F-14/F-15/F-17 做 + F-16 复核关闭，commit 链 d295c76 → 3111036）
+## 滚动摘要（2026-08-19 — 技术债区批次 3：F-21 docstring 契约 + F-20 复核关闭，技术债区清零，commit 链 08e860f → 2b29865）
+
+- **来源**：用户指令「继续修补技术债区」（技术债区最后 2 项：F-20/F-21）。预检：基线 01ec572；F-20 注记三处闭环确认、F-21 docstring 契约缺声明确认
+- **F-21 docstring 入参契约（08e860f，merge 2fb25df）**：`next_available_filename` 补契约声明——desired 须完整文件名且 stem 非空、空 stem 冲突产 "-N.html" 畸形名不兜底（兜底归 sanitize_filename 的 imported-game）；期末四轴提示「无点/空串 rsplit ValueError」后果顺手补入（+1 行）；零行为变化、零测试改动，147→全量 621+1skip 无回归
+- **F-20 复核关闭（零代码）**：F-13 票面前提与本机实测不符的注记已三处闭环（F-13 归档行引用 + F-20 行本体 + 批次 2 DEV_LOG 遥测），行为随 Windows 版本变化属信息性记录，零代码动作合理
+- **验证链**：pytest **621 + 1 skip**；Vitest **958**；cargo **70**；smoke-simulators **14 PASS / 0 FAIL / 1 SKIP**（端口释放复核）；doc_sync 全绿
+- **期末四轴 code-review（固定点 01ec572）0 阻断放行**：Standards 0 硬违规 / 0 安全红线（提示：commit message 声称的 .gitignore 追加实际未发生——.worktrees/ 自 33efd09 已在 gitignore，状态正确消息误导，不修历史）；Spec F-21 契约声明与行为逐字对应（实证 -2.html）+ F-20 三落点全在；Falsify 0 击穿（无点/空串直调 ValueError 实证——契约外行为声明补入）；Architecture 全正面（契约落行为所在处、兜底职责单点指向唯一所有者）
+- **技术债区**：F-20 ❌ 复核关闭、F-21 ✅ 已修、F-22 ✅ 已修（归档流程项）→ **技术债区清零**
+- **过程遥测**：轻量档单工单（纯 docstring，Implement 单调用 11 工具调用约 2.5 分钟）；Implement 汇报的「147 passed」为范围测试数，全量口径 621+1skip（评审核对后修正记录口径）
 
 - **来源**：用户指令「继续修补技术债区」。预检：基线 cf933fb；F-13~F-17 现状 git grep 复核全部与票面一致
 - **F-13 首点前组件设备名判定（d295c76，merge 3111036）**：`sanitize_filename` 判定改 `stem.split(".",1)[0].lower()`——双扩展形态（con.txt.html）此前绕过；先红后绿 +5 用例。**实测注记（F-20 落债）**：Win11 26100 下绝对路径子目录末组件设备名可正常落盘，票面「写盘 OSError」前提本机不复现；裸 `nul` 静默丢弃形态仍被防住，修复正确（MSDN 对齐 + 防御纵深）

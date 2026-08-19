@@ -291,6 +291,7 @@ def next_available_filename(sim_dir: Path, desired: str) -> str:
     入参契约：desired 应传入完整文件名（含扩展名），且调用方须保证 stem 非空
     ——空 stem（如 ".html"）冲突时产出 "-N.html" 畸形名，本函数不兜底
     （空名兜底由 sanitize_filename 的 imported-game 承担）。
+    无点或空串输入为契约外行为（rsplit 直接 ValueError），违约后果自负。
     """
     stem, ext = desired.rsplit(".", 1)
     existing = (
