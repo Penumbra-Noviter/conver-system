@@ -8,7 +8,8 @@ T-02 单元测试 — 模拟器数据存储（backend/app/services/simulator_sto
     2. 全新目录：从内置目录整目录拷贝（html + manifest 字节一致），返回 True。
     3. 二次启动 / 半损坏（manifest 在、文件缺）：返回 False，绝不触碰已有内容。
     4. 半拷无 manifest：按标记语义整体重种（manifest 最后落盘，标记最晚生效）。
-    5. 种子源缺失（打包态文件缺失）：降级不崩溃（返回 False，不建目录）。
+    5. 种子源缺失（打包态文件缺失：目录整体缺失或目录内缺 manifest.json）：
+       降级不崩溃（返回 False，不建目录）。
     6. 数据目录不可写：明确报错（不静默吞掉，启动期可闻）。
 
 manifest 读写工具（工单 02 声明，工单 03 导入族继续扩展）：
@@ -65,7 +66,7 @@ def _make_builtin(tmp_path: Path, files: dict[str, str] | None = None) -> Path:
 
 
 class TestEnsureSeeded:
-    """种子矩阵：全新目录 / 二次启动幂等 / 半损坏 / 种子源缺失 / 不可写"""
+    """种子矩阵：全新目录 / 二次启动幂等 / 半损坏 / 种子源缺失（目录缺或缺 manifest） / 不可写"""
 
     def test_fresh_dir_seeds_all_files(
         self, tmp_path: Path
@@ -147,6 +148,15 @@ class TestEnsureSeeded:
         assert simulator_store.ensure_seeded(missing, target) is False
         assert not target.exists()
 
+    def test_builtin_dir_without_manifest_degrades(self, tmp_path: Path) -> None:
+        """种子源目录在但 manifest.json 缺失（打包损坏）→ 降级不崩溃：返回 False 且不建目标目录"""
+        builtin = tmp_path / "builtin-no-manifest"
+        builtin.mkdir()
+        (builtin / "人生模拟器v3.html").write_text("<html>x</html>", encoding="utf-8")
+        target = tmp_path / "out" / "simulators"
+        assert simulator_store.ensure_seeded(builtin, target) is False
+        assert not target.exists()
+
     def test_target_unwritable_raises_clear_error(self, tmp_path: Path) -> None:
         """数据目录不可写（父路径被文件占位）→ 明确报错，不静默吞掉"""
         builtin = _make_builtin(tmp_path)
@@ -200,3 +210,10 @@ class TestManifestTools:
         sim_dir = tmp_path / "a" / "b" / "simulators"
         simulator_store.write_manifest(sim_dir, {"version": 2, "simulators": []})
         assert (sim_dir / "manifest.json").is_file()
+
+    def test_write_manifest_non_dict_raises_type_error(self, tmp_path: Path) -> None:
+        """manifest 非 dict → TypeError（docstring 契约）；不得静默落盘为 JSON 字符串"""
+        sim_dir = tmp_path / "simulators"
+        with pytest.raises(TypeError, match="manifest"):
+            simulator_store.write_manifest(sim_dir, "not-a-dict")
+        assert not (sim_dir / "manifest.json").exists()
