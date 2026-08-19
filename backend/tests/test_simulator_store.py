@@ -33,6 +33,7 @@ __all__ = [
     "TestEnsureSeeded",
     "TestManifestTools",
     "TestAppendManifestEntry",
+    "TestManifestStructureSelfHeal",
 ]
 
 #: 种子矩阵内置目录最小样本（html + manifest；真实 22 款由冒烟脚本覆盖）
@@ -299,4 +300,96 @@ class TestAppendManifestEntry:
         data = json.loads((sim_dir / "manifest.json").read_text(encoding="utf-8"))
         assert data["version"] == 2
         assert [g["id"] for g in data["simulators"]] == ["seed", "imported-1"]
+
+
+class TestManifestStructureSelfHeal:
+    """manifest 合法 JSON 但结构损坏（simulators 非 list）→ 自愈重建（F-8）"""
+
+    @pytest.mark.parametrize("bad_simulators", ["oops", {"a": 1}, None])
+    def test_append_entry_heals_non_list_simulators(
+        self, tmp_path: Path, bad_simulators: object
+    ) -> None:
+        """simulators 为 str/dict/None → 追加不抛异常，重建后再追加（磁盘为唯一事实来源）"""
+        sim_dir = tmp_path / "simulators"
+        sim_dir.mkdir()
+        (sim_dir / "Alpha.html").write_text("<html>A</html>", encoding="utf-8")
+        (sim_dir / "manifest.json").write_text(
+            json.dumps({"version": 2, "simulators": bad_simulators}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        entry = {
+            "id": "new-game",
+            "file": "new.html",
+            "name": "new",
+            "type": "local",
+            "source": "imported",
+        }
+        simulator_store.append_manifest_entry(sim_dir, entry)
+        data = json.loads((sim_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert data["version"] == 2
+        assert data["simulators"][-1] == entry
+        assert data["simulators"][0] == {
+            "id": "alpha",
+            "file": "Alpha.html",
+            "name": "Alpha",
+            "type": "local",
+        }
+
+    @pytest.mark.parametrize("bad_simulators", ["oops", {"a": 1}, None])
+    def test_read_manifest_or_rebuild_heals_structure_corruption(
+        self, tmp_path: Path, bad_simulators: object
+    ) -> None:
+        """_read_manifest_or_rebuild 对结构损坏（simulators 非 list）返回自愈 dict"""
+        sim_dir = tmp_path / "simulators"
+        sim_dir.mkdir()
+        (sim_dir / "seed.html").write_text("<html>seed</html>", encoding="utf-8")
+        (sim_dir / "manifest.json").write_text(
+            json.dumps({"version": 2, "simulators": bad_simulators}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        rebuilt = simulator_store._read_manifest_or_rebuild(sim_dir)
+        assert rebuilt["version"] == 2
+        assert isinstance(rebuilt["simulators"], list)
+        assert [g["id"] for g in rebuilt["simulators"]] == ["seed"]
+
+    @pytest.mark.parametrize("payload", ["[1, 2]", '"str"', "42", "true", "null"])
+    def test_top_level_non_dict_rebuilds(self, tmp_path: Path, payload: str) -> None:
+        """顶层非 dict（合法 JSON 的 list/str/数字/布尔/空值）→ 同样走重建兜底（票面「任一不满足」）"""
+        sim_dir = tmp_path / "simulators"
+        sim_dir.mkdir()
+        (sim_dir / "seed.html").write_text("<html>seed</html>", encoding="utf-8")
+        (sim_dir / "manifest.json").write_text(payload, encoding="utf-8")
+        rebuilt = simulator_store._read_manifest_or_rebuild(sim_dir)
+        assert rebuilt["version"] == 2
+        assert isinstance(rebuilt["simulators"], list)
+        assert [g["id"] for g in rebuilt["simulators"]] == ["seed"]
+
+    @pytest.mark.parametrize("bad_simulators", ["oops", {"a": 1}, None])
+    def test_existing_ids_survives_structure_corruption(
+        self, tmp_path: Path, bad_simulators: object
+    ) -> None:
+        """simulators 为 str/dict/None → _existing_ids 不再抛 TypeError（id 唯一化依赖）"""
+        sim_dir = tmp_path / "simulators"
+        sim_dir.mkdir()
+        (sim_dir / "seed.html").write_text("<html>seed</html>", encoding="utf-8")
+        (sim_dir / "manifest.json").write_text(
+            json.dumps({"version": 2, "simulators": bad_simulators}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        assert simulator_store._existing_ids(sim_dir) == {"seed"}
+
+    def test_persist_true_rewrites_corrupt_file_atomically(self, tmp_path: Path) -> None:
+        """persist=True → 结构损坏文件被原子重写为合法 manifest，无临时文件残留"""
+        sim_dir = tmp_path / "simulators"
+        sim_dir.mkdir()
+        (sim_dir / "seed.html").write_text("<html>seed</html>", encoding="utf-8")
+        corrupt = json.dumps({"version": 2, "simulators": "oops"}, ensure_ascii=False)
+        (sim_dir / "manifest.json").write_text(corrupt, encoding="utf-8")
+
+        rebuilt = simulator_store._read_manifest_or_rebuild(sim_dir, persist=True)
+        assert rebuilt["version"] == 2
+        raw = (sim_dir / "manifest.json").read_text(encoding="utf-8")
+        assert raw != corrupt, "persist=True 必须把自愈结果原子落盘"
+        assert json.loads(raw) == rebuilt
+        assert [p.name for p in sim_dir.iterdir()] == ["manifest.json", "seed.html"], "无 .tmp 残留"
 

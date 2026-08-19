@@ -289,19 +289,27 @@ def append_manifest_entry(sim_dir: Path, entry: dict) -> None:
 
 
 def _read_manifest_or_rebuild(sim_dir: Path, persist: bool = False) -> dict:
-    """读取 manifest；缺失或内容损坏（非法 JSON / 非 UTF-8）→ 磁盘重建兜底。
+    """读取 manifest；缺失或损坏 → 磁盘重建兜底。
 
+    损坏口径（F-8 定版）：非法 JSON / 非 UTF-8 / 合法 JSON 但结构非预期
+    （顶层非 dict 或 simulators 非 list——如字符串/字典/None）一律视为损坏
+    重建，否则 `_existing_ids` 迭代 dict/str 抛 TypeError、`append_manifest_entry`
+    的 `.append` 抛 AttributeError → 500（原子写保证正常运行不产生此类
+    损坏，需手工损坏 manifest 触发；条目级字段不做校验，范围收敛）。
     persist=True 时重建结果立即原子落盘（import_game 先自愈再算 id：避免
     「id 唯一化用瞬态重建、append 用磁盘重建（此时已含新落盘文件）」两次
     重建口径不一致产生退化重复条目）。
     """
     try:
-        return read_manifest(sim_dir)
+        manifest = read_manifest(sim_dir)
     except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
+        manifest = None
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("simulators"), list):
         rebuilt = _rebuild_manifest(sim_dir)
         if persist:
             write_manifest(sim_dir, rebuilt)
         return rebuilt
+    return manifest
 
 
 def _rebuild_manifest(sim_dir: Path) -> dict:
