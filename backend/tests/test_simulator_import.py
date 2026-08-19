@@ -134,6 +134,7 @@ class TestSanitizeFilename:
             ("a\\b\\c.html", "c.html"),
             ("..\\..\\escape.html", "escape.html"),
             ("bad%name.html", "badname.html"),  # % 在前端 file 判据中整体拒绝，必须剔除
+            ("game#1.html", "game1.html"),  # # 是 URL fragment 分隔符（iframe src 截断 → 404），必须剔除
             ("a<b>c:d|e?f*.html", "abcdef.html"),  # Windows 非法字符剔除
             ("  My Game v1.html  ", "My Game v1.html"),
             ("..", "imported-game.html"),  # 纯点 → 保底名
@@ -144,11 +145,11 @@ class TestSanitizeFilename:
         """净化矩阵：穿越/非法字符/空名全部收敛为安全名"""
         assert sanitize_filename(raw) == expected
 
-    def test_sanitize_never_contains_separator_or_percent(self) -> None:
-        """不变量：净化结果不含 / \\ % 与 Windows 非法字符（与前端 isValidSimulatorFile 兼容）"""
-        for raw in ["..\\..\\x.html", "a/b%c<d.html", "..", ".", ""]:
+    def test_sanitize_never_contains_forbidden_chars(self) -> None:
+        """不变量：净化结果不含 / \\ % # 与 Windows 非法字符（与前端 isValidSimulatorFile 兼容）"""
+        for raw in ["..\\..\\x.html", "a/b%c<d.html", "game#1.html", "..", ".", ""]:
             name = sanitize_filename(raw)
-            assert "/" not in name and "\\" not in name and "%" not in name
+            assert "/" not in name and "\\" not in name and "%" not in name and "#" not in name
 
 
 class TestSlugify:
@@ -190,6 +191,16 @@ class TestDedup:
         (sim / "内置游戏.html").write_bytes(b"<html>seed</html>")
         with pytest.raises(SimulatorDuplicateError, match="内置游戏.html"):
             import_game(sim, "other.html", b"<html>seed</html>")
+
+    def test_duplicate_ignores_non_html_files(self, tmp_path: Path) -> None:
+        """去重仅比对 *.html：与现存 .css（per-game 覆盖层）字节相同 → 不命中 409，正常导入"""
+        sim = tmp_path / "sim"
+        sim.mkdir(parents=True)
+        css_content = b"body { color: red; }"
+        (sim / "tricky.css").write_bytes(css_content)
+        result = import_game(sim, "tricky.html", css_content)
+        assert result.game["file"] == "tricky.html"
+        assert (sim / "tricky.html").read_bytes() == css_content
 
     def test_different_content_not_duplicate(self, tmp_path: Path) -> None:
         """同名不同内容 → 非重复（走改名路径）"""

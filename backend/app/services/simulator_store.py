@@ -27,8 +27,9 @@ manifest 工具（工单 02 声明底座，工单 03 读-改-写原子追加复�
     （eval / document.cookie / cross-origin-fetch，命中不拦截）；id 由最终
     文件名干 slug 生成（仅保留 [a-z0-9-]、折叠分隔符、空回退 imported-game）
     并按现存 id 集唯一化（-2/-3 后缀，manifest 结构性唯一）。
-    文件名净化规则（定版）：取最后路径段 + 剔除 Windows 非法字符/% + 首尾
-    点剔除，空名回退 imported-game（防目录穿越，Windows 路径安全）。
+    文件名净化规则（定版）：取最后路径段 + 剔除 Windows 非法字符/%/#（# 为
+    URL fragment 分隔符，iframe src 截断风险）+ 首尾点剔除，空名回退
+    imported-game（防目录穿越，Windows 路径安全）。
 
 G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/json/
 logging/os/pathlib/re/shutil），与 data_dir 同层——工单 03 导入族在此继续
@@ -77,8 +78,9 @@ MANIFEST_FILE = "manifest.json"
 MANIFEST_TMP_SUFFIX = ".tmp"
 #: 导入文件大小上限（≤5MB；spec T-02 决策 5「校验与去重」）
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
-#: 文件名净化剔除字符：Windows 非法字符 + 路径分隔符 + 前端 file 判据拒绝的 % + 控制字符
-_FORBIDDEN_FILENAME_CHARS = frozenset('<>:"/\\|?*%') | frozenset(chr(i) for i in range(32))
+#: 文件名净化剔除字符：Windows 非法字符 + 路径分隔符 + 前端 file 判据拒绝的 % 与
+#: #（URL fragment 分隔符——iframe src 遇 # 截断请求 → 404，落盘名必须兼容）+ 控制字符
+_FORBIDDEN_FILENAME_CHARS = frozenset('<>:"/\\|?*%#') | frozenset(chr(i) for i in range(32))
 
 #: 恶意模式粗筛常量清单（键 + 正则，常量单源——前端 warnings 文案映射以此为键集锚点；
 #: 命中仅收集返回，绝不拦截；静态审查不承诺防住，定位知情提示）
@@ -175,11 +177,12 @@ def sha256_bytes(content: bytes) -> str:
 
 
 def sanitize_filename(raw: str) -> str:
-    """净化上传文件名 → 安全落盘名（防目录穿越 + Windows 非法字符 + %）。
+    """净化上传文件名 → 安全落盘名（防目录穿越 + Windows 非法字符 + % 与 #）。
 
     定版规则：取最后路径段（`/` 与 `\\` 皆按分隔符，杜绝穿越）、剔除 Windows
-    非法字符与控制字符、剔除 `%`（前端 isValidSimulatorFile 对 `%` 单点拒绝，
-    落盘名必须兼容）、剔除首尾点与空格（防隐藏文件与 `..` 段）；空名回退
+    非法字符与控制字符、剔除 `%` 与 `#`（前端 isValidSimulatorFile 单点拒绝，
+    落盘名必须兼容——`#` 为 URL fragment 分隔符，入 iframe src 会截断请求）、
+    剔除首尾点与空格（防隐藏文件与 `..` 段）；空名回退
     `imported-game`；扩展名归一化为小写 `.html`。净化静默收敛不报错——
     校验失败仅限 400 矩阵（非 .html / 超 5MB / 空文件，见 import_game）。
     """
@@ -201,8 +204,10 @@ def slugify(stem: str) -> str:
 
 
 def find_duplicate(sim_dir: Path, content: bytes) -> str | None:
-    """SHA-256 去重：与 sim_dir 现存文件（除 manifest）比对，命中返回文件名。
+    """SHA-256 去重：与 sim_dir 现存 *.html 文件比对，命中返回文件名。
 
+    仅比对 .html（后缀大小写不敏感）：per-game CSS 等非游戏文件是内容独立
+    资产（数据目录 <game-id>.css 覆盖层），字节相同不得误报「游戏已存在」。
     种子后内置游戏即数据目录内容（spec 决策 5），重复判定自然覆盖内置重复。
     """
     digest = sha256_bytes(content)
@@ -210,6 +215,8 @@ def find_duplicate(sim_dir: Path, content: bytes) -> str | None:
         return None
     for path in sim_dir.iterdir():
         if not path.is_file() or path.name == MANIFEST_FILE:
+            continue
+        if path.suffix.lower() != ".html":
             continue
         if sha256_bytes(path.read_bytes()) == digest:
             return path.name

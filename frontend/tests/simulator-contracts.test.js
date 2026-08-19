@@ -8,9 +8,10 @@
  *   2. 加载超时毫秒数（TIMEOUT_MS = 15000）与清单域超时文案（TIMEOUT_REASON）：
  *      文案与 spec 逐字一致，且文案中秒数由 TIMEOUT_MS 派生（非硬编码 15 —
  *      改毫秒数必改文案秒数）；
- *   3. isValidSimulatorFile 纯函数矩阵：非空字符串 + 不含 / \ %（等价迁移前
- *      simulator-view.js 内联判据）；null / undefined / 数字 / 空串 → false；
- *      'a.html' → true；含路径分隔符 / 百分号编码 → false。
+ *   3. isValidSimulatorFile 纯函数矩阵：非空字符串 + 不含 / \ % #（等价迁移前
+ *      simulator-view.js 内联判据；# 为 URL fragment 分隔符，iframe src 截断
+ *      防线）；null / undefined / 数字 / 空串 → false；
+ *      'a.html' → true；含路径分隔符 / 百分号编码 / # → false。
  *
  * 本测试文件是契约锁的锚点：产品代码（simulator-contracts.js 之外）不得再出现
  * 模拟器域常量字面量 / file 判据内联实现（运行视图与列表视图均须 import 本模块）。
@@ -97,6 +98,10 @@ describe('isValidSimulatorFile — file 安全判据纯函数', () => {
 
     it("'a%b.html'（含百分号编码）→ false", () => {
         expect(isValidSimulatorFile('a%b.html')).toBe(false);
+    });
+
+    it("'a#b.html'（含 # fragment 分隔符）→ false", () => {
+        expect(isValidSimulatorFile('a#b.html')).toBe(false);
     });
 });
 
