@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1451<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->489<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->892<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1452<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->489<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->893<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -1181,7 +1181,7 @@ conver system/
 | `frontend/tests/search-view.test.js` | <!--AUTO:tests:frontend/tests/search-view.test.js-->17<!--/AUTO--> | 搜索视图 |
 | `frontend/tests/settings-panel.test.js` | <!--AUTO:tests:frontend/tests/settings-panel.test.js-->33<!--/AUTO--> | 设置面板 |
 | `frontend/tests/simulator-contracts.test.js` | <!--AUTO:tests:frontend/tests/simulator-contracts.test.js-->15<!--/AUTO--> | 模拟器域契约 |
-| `frontend/tests/simulator-adapt.test.js` | <!--AUTO:tests:frontend/tests/simulator-adapt.test.js-->36<!--/AUTO--> | 适配分析共享模块 + 核对脚本 CLI（T-01） |
+| `frontend/tests/simulator-adapt.test.js` | <!--AUTO:tests:frontend/tests/simulator-adapt.test.js-->37<!--/AUTO--> | 适配分析共享模块 + 核对脚本 CLI（T-01） |
 | `frontend/tests/simulator-manifest.test.js` | <!--AUTO:tests:frontend/tests/simulator-manifest.test.js-->19<!--/AUTO--> | manifest 解析 |
 | `frontend/tests/simulator-pc-css.test.js` | <!--AUTO:tests:frontend/tests/simulator-pc-css.test.js-->24<!--/AUTO--> | 模拟器 PC 覆盖层契约（验收标准 + F1/F2 回归锁） |
 | `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->58<!--/AUTO--> | 模拟器运行视图 |
@@ -1241,10 +1241,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1451<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1452<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->489<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->892<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->893<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

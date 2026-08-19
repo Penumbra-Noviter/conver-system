@@ -113,6 +113,7 @@ export function main(argv = process.argv.slice(2)) {
     return 1;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+const entryPath = process.argv[1];
+if (entryPath && import.meta.url === pathToFileURL(entryPath).href) {
     process.exitCode = main();
 }

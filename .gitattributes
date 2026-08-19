@@ -12,6 +12,8 @@
 *.html text
 *.css text
 *.js text
+# ESM 脚本：保 shebang 可执行 + esbuild/vitest 直 import 不因 CRLF 崩溃
+*.mjs text eol=lf
 
 # Config
 *.json text

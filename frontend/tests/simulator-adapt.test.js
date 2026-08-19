@@ -21,7 +21,7 @@
 import { describe, it as test, expect } from 'vitest';
 import { readFileSync, readdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 
@@ -428,5 +428,17 @@ describe('check-simulator-css.mjs 直调（覆盖 CLI 输出分支）', () => {
         const { items } = runCheck([sample], '# sim-pc:');
         expect(items.map((i) => i.kind).sort()).toEqual(['class', 'font', 'record', 'var']);
         expect(items.find((i) => i.kind === 'font').item).toBe('.msg');
+    });
+
+    test('node -e 直 import：argv[1] 缺失不抛 TypeError（CLI 自执行判定容错）', () => {
+        const nodeBin = process.execPath;
+        const cliUrl = pathToFileURL(CLI_PATH).href;
+        const r = spawnSync(nodeBin, ['-e', `import(${JSON.stringify(cliUrl)}).then(() => console.log('imported'))`], {
+            encoding: 'utf8',
+            cwd: path.resolve(here, '..'),
+        });
+        expect(r.stderr).not.toContain('TypeError');
+        expect(r.stdout).toContain('imported');
+        expect(r.status).toBe(0);
     });
 });
