@@ -29,9 +29,10 @@ manifest 工具（工单 02 声明底座，工单 03 读-改-写原子追加复�
     并按现存 id 集唯一化（-2/-3 后缀，manifest 结构性唯一）。
     文件名净化规则（定版）：取最后路径段 + 剔除 Windows 非法字符/%/#（# 为
     URL fragment 分隔符，iframe src 截断风险）+ 首尾点剔除，空名回退
-    imported-game（防目录穿越，Windows 路径安全）；stem 精确命中 Windows
-    保留设备名（con/prn/aux/nul/com1-9/lpt1-9）加 `_` 前缀、总名 UTF-8 超
-    255 字节按字节截断不劈裂多字节字符（F-9 定版，落盘 OSError 预拦截）。
+    imported-game（防目录穿越，Windows 路径安全）；stem 按「首点前组件」
+    判定命中 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，带任意扩展
+    名仍视为保留，F-13 定版）加 `_` 前缀、总名 UTF-8 超 255 字节按字节截断
+    不劈裂多字节字符（F-9 定版，落盘 OSError 预拦截）。
 
 G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/json/
 logging/os/pathlib/re/shutil），与 data_dir 同层——工单 03 导入族在此继续
@@ -197,11 +198,13 @@ def sanitize_filename(raw: str) -> str:
     非法字符与控制字符、剔除 `%` 与 `#`（前端 isValidSimulatorFile 单点拒绝，
     落盘名必须兼容——`#` 为 URL fragment 分隔符，入 iframe src 会截断请求）、
     剔除首尾点与空格（防隐藏文件与 `..` 段）；空名回退 `imported-game`；
-    扩展名归一化为小写 `.html`。stem（去 .html 后的主名）大小写不敏感精确
-    命中 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，带任意扩展名仍
-    视为保留）→ 加 `_` 前缀（`_con` 非保留名）；非精确匹配（mycon/com10/
-    lpt10 等）不受影响。总名（含 .html 后缀）UTF-8 编码超 255 字节 → 按字节
-    截断 stem 且不劈裂多字节字符（截断后复用首尾点剔除与空名回退兜底链）。
+    扩展名归一化为小写 `.html`。stem（去 .html 后的主名）按「首点前组件」
+    大小写不敏感判定 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，
+    带任意扩展名仍视为保留——F-13 定版：MSDN 判定取首点前组件，NUL.tar.gz
+    等价 NUL，双扩展形态 con.txt.html 同样拦截）→ 加 `_` 前缀（`_con` 非
+    保留名）；非精确匹配（mycon/com10/lpt10 等）不受影响。总名（含 .html
+    后缀）UTF-8 编码超 255 字节 → 按字节截断 stem 且不劈裂多字节字符（截断
+    后复用首尾点剔除与空名回退兜底链）。
     净化静默收敛不报错——校验失败仅限 400 矩阵（非 .html / 超 5MB / 空文件，
     见 import_game）。
     """
@@ -214,7 +217,7 @@ def sanitize_filename(raw: str) -> str:
         stem = name[:-5]
     else:
         stem = name
-    if stem.lower() in _WINDOWS_RESERVED_NAMES:
+    if stem.split(".", 1)[0].lower() in _WINDOWS_RESERVED_NAMES:
         stem = "_" + stem
     suffix = ".html"
     stem_bytes = stem.encode("utf-8")

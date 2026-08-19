@@ -159,6 +159,12 @@ class TestSanitizeFilename:
             ("LPT1", "_LPT1.html"),
             ("lpt9.html", "_lpt9.html"),
             ("Lpt9", "_Lpt9.html"),
+            # 首点前组件匹配（F-13 定版）：双扩展形态 NUL.tar.gz 等价 NUL——判定取
+            # 首点前组件，带任意扩展名仍视为保留（MSDN：设备名后跟任意扩展仍保留）
+            ("con.txt.html", "_con.txt.html"),
+            ("com1.foo.html", "_com1.foo.html"),
+            ("lpt2.bar.html", "_lpt2.bar.html"),
+            ("CON.TXT", "_CON.TXT.html"),  # 无 .html 后缀 + 首点前组件大写 → 加前缀
             # 非保留邻近名不受影响（非精确匹配）
             ("mycon.html", "mycon.html"),
             ("com10.html", "com10.html"),
@@ -167,6 +173,7 @@ class TestSanitizeFilename:
             ("printer.html", "printer.html"),
             ("auxiliary.html", "auxiliary.html"),
             ("conman.html", "conman.html"),
+            ("mycon.txt.html", "mycon.txt.html"),  # 首组件 mycon 非精确 → 原样
             # 255 字节上限（含 .html 后缀）：>255 按字节截断 stem，不劈裂多字节字符
             ("a" * 260 + ".html", "a" * 250 + ".html"),  # ASCII 260 字节 → 截 250，总长 255
             ("中" * 90 + ".html", "中" * 83 + ".html"),  # 中文 270 字节 → 截 249（整字符），总长 254
