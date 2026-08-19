@@ -25,7 +25,7 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-> 技术债区当前 **5 项待立项**（F-13~F-17：2026-08-19 F-8/F-9/F-12 批次期末四轴非阻断发现 + MAX_PATH 实测；F-5/F-6 复核关闭、F-8/F-9/F-12 已修见下）。
+> 技术债区当前 **2 项待立项**（F-20/F-21：2026-08-19 批次 2 期末四轴非阻断发现；F-13~F-17 已全部处置完毕见下）。
 
 > **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
 
@@ -43,15 +43,19 @@
 | F-6 | 模拟器配置面板功能细节（vision 终检 2026-08-19）：API Key 无明文/隐藏切换图标、部分按钮无禁用态/间距过近易误触（仿微「获取」/混社会「刷新」）、人生模拟器「拉取」按钮图标语义模糊——游戏自身设计/功能范畴，覆盖层全局干预会破坏各游戏设计，维持现状 | 用户反馈批次 vision 终检 | Speculative | ❌ 复核关闭（2026-08-19：覆盖层 simulator-pc.css 仅排版/可读性干预（字号/行宽/面板密度/滚动条/弹窗），无按钮禁用态/间距/API Key 可见性等功能类规则；游戏自身设计范畴，覆盖层全局干预会破坏各游戏设计，维持现状） |
 | F-7 | `VARS_FAMILY`（simulator-adapt.js:57）漏 B 类组 5 成员 `--text2/--text3`（神明v3 体系）→ 变量面核对盲区 + 神明v3 记录行为死记录、删组 5 规则核对不红 | 期末四轴 Falsify F1 | Worth exploring | ✅ 已修（2026-08-19：VARS_FAMILY 补两成员 + 成员完整性回归断言，22 款核对复跑全绿） |
 | F-8 | `_read_manifest_or_rebuild` 自愈仅覆盖缺失/非法 JSON/非 UTF-8；合法 JSON 但 `simulators` 非 list → `_existing_ids` TypeError / append AttributeError → 500（原子写保证正常运行不产生，需手工损坏触发） | 期末四轴 Falsify F2 | Speculative | ✅ 已修（2026-08-19：isinstance 结构校验并入自愈（顶层非 dict / simulators 非 list 统一重建，persist 语义保持），先红后绿 10 红 32 绿，commit 412b2d7 merge 500b1d3） |
-| F-9 | `sanitize_filename` 未剔除 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9）与 >255 字节文件名 → 落盘 OSError 裸 500（spec 已声明 500 语义，体验可优化） | 期末四轴 Falsify F3 | Speculative | ✅ 已修（2026-08-19：保留设备名 stem 加 `_` 前缀（大小写不敏感）+ UTF-8 255 字节整字符截断，docstring 定版条款同步；先红后绿 21 红 139 绿，commit 8d2d751 merge 500b1d3） |
+| F-9 | `sanitize_filename` 未剔除 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9）与 >255 字节文件名 → 落盘 OSError 裸 500（spec 已声明 500 语义，体验可优化） | 期末四轴 Falsify F3 | Speculative | ✅ 已修（2026-08-19：保留设备名 stem 加 `_` 前缀（大小写不敏感）+ UTF-8 255 字节整字符截断，docstring 定版条款同步；先红后绿 21 红 139 绿，commit 8d2d751 merge 500b1d3；**F-17 修订（同批次 2）**：上限 255→120 字节——Windows MAX_PATH=260 全路径上限下 255 组件在真实路径不可达） |
 | F-10 | `docs/architecture.md` TD-57 信任边界小节未补「导入把第三方文件引入同源区域」一句 + 首句仍称「22 款第三方模拟器」——程序内手册已写、权威文档未同步 | 期末四轴 Spec S1 | Speculative | ✅ 已修（2026-08-19 Neat 收尾：架构目录树 simulators/ 改注「内置种子源 + 数据目录挂载」；信任边界首句改「22 款内置第三方模拟器与用户导入的游戏同源，托管于数据目录 simulators/」；威胁模型增「用户导入游戏同权」一条；收缩措施增「导入校验链」一条） |
 | F-11 | simulator-adapt.js docstring「协议表面」列 6 符号实际 `__all__` 8 符号（漏 INNER_CLASSES/RECORD_MARKER）+ TICKETS 归档 merge 链「当前 HEAD = ba33895」stale（06 文档 commit a38feb9 在后） | 期末四轴 Standards N1/N2 | Speculative | ✅ 已修（2026-08-19 Neat 收尾：docstring 协议表面补 INNER_CLASSES/RECORD_MARKER 至 8 符号；归档 merge 链「当前 HEAD」改注文档收尾 commit a38feb9/262fe88） |
 | F-12 | `src-tauri/src/lib.rs` readiness_loop 就绪终态发布顺序竞态：先置 ready/error 标志、后写 runtime.json → 轮询方看到终态时文件未写出（shell_state_test 全量 2/10 + 串行 3/20 复现 5 次，失败输出全部捕获：runtime.json NotFound，三个 full_chain 测试各中；handoff 猜测的「端口冲突/超时边界」被实测否定） | T-01/T-02 批次遥测（2026-08-19 调查立项） | Worth exploring | ✅ 已修（2026-08-19：先 write_runtime_json 落盘再置标志，写盘失败不阻断状态推进，终态发布契约注释；修复后复现循环 10 全量 + 20 串行归零，commit 7f93af2 merge 66001a8） |
-| F-13 | `sanitize_filename` 设备名判定按整串精确匹配，双扩展形态绕过（`con.txt.html` → stem `con.txt` 不命中）——MSDN 规则取首点前组件（`NUL.tar.gz` 等价 `NUL`），真实 Windows 写盘仍 OSError 500，F-9 同类残边 | 期末四轴 Falsify 1（2026-08-19） | Speculative | 📝 待立项 |
-| F-14 | `next_available_filename` 拼 `-N` 后缀顶破 NAME_MAX：250 字节 stem 冲突时 `-2` 追加 → 257 字节 > 255（NTFS/POSIX 均 255）→ 落盘 OSError 500（F-9 的 255 上限被改名路径顶破） | 期末四轴 Falsify 2（2026-08-19） | Speculative | 📝 待立项 |
-| F-15 | manifest 损坏形态补集：条目级非 dict 元素（`g["id"]` 遇 int → TypeError，F-8 票面明确收敛不修）+ manifest.json 为目录/不可读（OSError 族未入 except 元组，前在） | 期末四轴 Falsify 3/4（2026-08-19） | Speculative | 📝 待立项 |
-| F-16 | `simulators: []` 空 list 视为合法不重建——磁盘有 .html 但清单空时条目永不出现（陈旧清单，F-8 口径内设计） | 期末四轴 Falsify 5（2026-08-19） | Speculative | 📝 待立项 |
-| F-17 | Windows MAX_PATH（260 字符全路径上限）：F-9 净化后的 255 字节组件名在深路径数据目录下仍落盘失败（实测：前缀 74 字符 + 190 字节名全长 270 即 FileNotFoundError，Python 无 `\\?\` 前缀）→ 建议净化层更保守上限（≤120 字节）或落盘层长路径支持 | F-9 批次实测（2026-08-19，Implement 上报 + 主会话复核） | Speculative | 📝 待立项 |
+| F-13 | `sanitize_filename` 设备名判定按整串精确匹配，双扩展形态绕过（`con.txt.html` → stem `con.txt` 不命中）——MSDN 规则取首点前组件（`NUL.tar.gz` 等价 `NUL`），真实 Windows 写盘仍 OSError 500，F-9 同类残边 | 期末四轴 Falsify 1（2026-08-19） | Speculative | ✅ 已修（2026-08-19：判定改首点前组件 `stem.split(".",1)[0].lower()`，先红后绿 +5 用例，commit d295c76 merge 3111036；本机实测注记见 F-20） |
+| F-14 | `next_available_filename` 拼 `-N` 后缀顶破 NAME_MAX：250 字节 stem 冲突时 `-2` 追加 → 257 字节 > 255（NTFS/POSIX 均 255）→ 落盘 OSError 500（F-9 的 255 上限被改名路径顶破） | 期末四轴 Falsify 2（2026-08-19） | Speculative | ✅ 已修（2026-08-19：拼后缀前按余量重做字节截断，提取私有 `_truncate_utf8_bytes` 供 sanitize/改名两处复用，先红后绿 +2 用例，commit 56e7454 merge 3111036） |
+| F-15 | manifest 损坏形态补集：条目级非 dict 元素（`g["id"]` 遇 int → TypeError，F-8 票面明确收敛不修）+ manifest.json 为目录/不可读（OSError 族未入 except 元组，前在） | 期末四轴 Falsify 3/4（2026-08-19） | Speculative | ✅ 已修（2026-08-19：except 并入 OSError 族，目录/权限形态读取自愈，写路径 persist 落盘保持契约抛错，先红后绿 +1 用例，commit b431974 merge 3111036；条目级非 dict 元素维持 F-8 收敛声明 ❌ 复核关闭） |
+| F-16 | `simulators: []` 空 list 视为合法不重建——磁盘有 .html 但清单空时条目永不出现（陈旧清单，F-8 口径内设计） | 期末四轴 Falsify 5（2026-08-19） | Speculative | ❌ 复核关闭（2026-08-19：F-8 验收锚「空 list 合法不重建」已审结，import_game 注册路径必然写 manifest 不会自然产生陈旧清单；修改会推翻 F-8 锚，克制原则维持） |
+| F-17 | Windows MAX_PATH（260 字符全路径上限）：F-9 净化后的 255 字节组件名在深路径数据目录下仍落盘失败（实测：前缀 74 字符 + 190 字节名全长 270 即 FileNotFoundError，Python 无 `\\?\` 前缀）→ 建议净化层更保守上限（≤120 字节）或落盘层长路径支持 | F-9 批次实测（2026-08-19，Implement 上报 + 主会话复核） | Speculative | ✅ 已修（2026-08-19：`_MAX_FILENAME_BYTES` 255→120（=260-常见前缀余量），F-9 矩阵 255 边界用例全部改 120 口径，先红后绿 +3 用例，commit 987ddeb merge 3111036；F-9 归档注记修订见下行） |
+| F-18 | 批次归档流程项——F-13/F-14/F-15/F-17 移入已完成、F-9 归档注记补 F-17 修订说明（255→120） | 期末四轴 Spec（2026-08-19 批次 2） | Speculative | ✅ 已修（2026-08-19：随批次归档 commit 一并处理，F-9 注记已补修订说明） |
+| F-19 | `_WINDOWS_RESERVED_NAMES` 常量注释仍标「F-9 定版——精确匹配才拦截」，F-13 已改首点前组件语义，并置易误导 | 期末四轴 Standards（2026-08-19 批次 2） | Speculative | ✅ 已修（2026-08-19：注释补 F-13 修订注记「判定取首点前组件」，commit 随归档） |
+| F-20 | F-13 票面「真实 Windows 写盘 OSError 500」实证基础与本机（Win11 26100）行为不符——绝对路径子目录末组件设备名（con.txt 等）可正常落盘，失败形态仅在相对路径/裸名/尾点形态复现（裸 `nul` 静默丢弃、`con.` 规范化冲突）；F-13 修复仍正确（防住裸 nul 静默丢弃），建议票面补实测注记或未来落盘层 `\\?\` 长路径支持时一并复核 | 期末四轴 Falsify 信息性（2026-08-19 批次 2） | Speculative | 📝 待立项 |
+| F-21 | `next_available_filename` 直调空 stem（`.html`）冲突时产出 `-2.html` 畸形名——生产不可达（import_game 必经 sanitize 空名兜底 `imported-game`），可在 docstring 声明入参契约或加显式校验 | 期末四轴 Falsify 提示级（2026-08-19 批次 2） | Speculative | 📝 待立项 |
 
 ---
 

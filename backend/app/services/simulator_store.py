@@ -86,8 +86,8 @@ MAX_IMPORT_BYTES = 5 * 1024 * 1024
 #: #（URL fragment 分隔符——iframe src 遇 # 截断请求 → 404，落盘名必须兼容）+ 控制字符
 _FORBIDDEN_FILENAME_CHARS = frozenset('<>:"/\\|?*%#') | frozenset(chr(i) for i in range(32))
 
-#: Windows 保留设备名（大小写不敏感、带任意扩展名仍视为保留；F-9 定版——
-#: 精确匹配才拦截，mycon/com10/lpt10 等邻近名不受影响）
+#: Windows 保留设备名（大小写不敏感、带任意扩展名仍视为保留；F-9 定版精确匹配，F-13 修订——
+#: 判定取首点前组件（NUL.tar.gz 等价 NUL，见 sanitize_filename），mycon/com10/lpt10 等邻近名不受影响）
 _WINDOWS_RESERVED_NAMES = frozenset(
     {"con", "prn", "aux", "nul"}
     | {f"com{i}" for i in range(1, 10)}

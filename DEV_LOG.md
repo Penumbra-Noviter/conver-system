@@ -6,7 +6,18 @@
 
 ---
 
-## 滚动摘要（2026-08-19 — 技术债区 F-5/F-6/F-8/F-9/F-12 批次：kickoff 全自动档小档，commit 链 412b2d7 → ffc54b2）
+## 滚动摘要（2026-08-19 — 技术债区批次 2：F-13/F-14/F-15/F-17 做 + F-16 复核关闭，commit 链 d295c76 → 3111036）
+
+- **来源**：用户指令「继续修补技术债区」。预检：基线 cf933fb；F-13~F-17 现状 git grep 复核全部与票面一致
+- **F-13 首点前组件设备名判定（d295c76，merge 3111036）**：`sanitize_filename` 判定改 `stem.split(".",1)[0].lower()`——双扩展形态（con.txt.html）此前绕过；先红后绿 +5 用例。**实测注记（F-20 落债）**：Win11 26100 下绝对路径子目录末组件设备名可正常落盘，票面「写盘 OSError」前提本机不复现；裸 `nul` 静默丢弃形态仍被防住，修复正确（MSDN 对齐 + 防御纵深）
+- **F-14 改名后缀字节截断（56e7454，merge 3111036）**：`next_available_filename` 拼 -N 前按余量重截，提取私有 `_truncate_utf8_bytes` 供 sanitize/改名两处复用（Locality）；先红后绿 +2 用例（Windows 物理限制下 ASCII 满长用例用常量 monkeypatch 同构构造，docstring 注明）
+- **F-15 OSError 族自愈（b431974，merge 3111036）**：`_read_manifest_or_rebuild` except 并入 OSError——manifest.json 为同名目录/不可读读取自愈，写路径（persist 落盘）保持契约抛错；先红后绿 +1 用例；条目级非 dict 元素维持 F-8 收敛声明（❌ 复核关闭）
+- **F-17 上限 255→120（987ddeb，merge 3111036）**：Windows MAX_PATH=260 全路径（UTF-16 单元计）下 255 组件在默认数据目录即落盘失败——120 = 260 - 常见前缀余量；F-9 矩阵 255 边界用例全部改 120 口径；先红后绿 +3 用例
+- **F-16 复核关闭（零代码）**：simulators 空 list 视为合法不重建 = F-8 验收锚已审结语义，修改会推翻锚，克制维持
+- **验证链**：pytest **621 + 1 skip**（613+1skip，+8）；Vitest **958** 零改动；cargo **70**；smoke-simulators **14 PASS / 0 FAIL / 1 SKIP**（端口 8000 释放复核）；doc_sync 重算 4ac2bbb
+- **期末四轴 code-review（固定点 cf933fb）0 阻断放行**：Standards 0 硬违规 / 0 安全红线（1 非阻断：常量注释 F-13 未同步 → F-19 顺手修）；Spec 4/4 验收锚达成（F-17×F-14 交互实测最坏 120 字节）；Falsify 0 击穿、21 种文件名形态本机实测（1 信息性：F-13 票面前提与本机不符 → F-20 落债）；Architecture 全正面（_truncate_utf8_bytes 真消除重复、读/写路径 Seam 边界文档化）
+- **技术债区**：F-13/F-14/F-15/F-17 ✅ 已修、F-16 ❌ 复核关闭、F-18/F-19 ✅ 已修（归档流程项 + 注释同步）；新落债 **F-20/F-21**（票面前提实测注记 / 空 stem 直调畸形名，均 Speculative）
+- **过程遥测**：Implement 单次调用完成 4 工单（96 工具调用，约 21 分钟，零回退零冲突零重开）；F-14 用例受 Windows MAX_PATH 物理限制的 monkeypatch 同构构造先例
 
 - **来源**：handoff（T-01/T-02 批次后）技术债区清理：F-5/F-6 复核关闭、F-8/F-9 做、F-12 候选立项调查。预检：基线 d1f0bb3；persona + 3 条经验精读（审计快照复核 / 票面建议实证 / 回归锁真实路径）
 - **F-5/F-6 复核关闭（零代码）**：git grep 实证——simulator-pc.css:120 分区 4 `300px` 规则与仙途.html:170 / 暮色女巫v2.html:283 移动块（88vw/340/350px，均非 important）现状仍成立；覆盖层无按钮/API Key 可见性等功能类规则。各附一句话实证入 TICKETS
