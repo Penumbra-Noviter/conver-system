@@ -31,8 +31,9 @@ manifest 工具（工单 02 声明底座，工单 03 读-改-写原子追加复�
     URL fragment 分隔符，iframe src 截断风险）+ 首尾点剔除，空名回退
     imported-game（防目录穿越，Windows 路径安全）；stem 按「首点前组件」
     判定命中 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，带任意扩展
-    名仍视为保留，F-13 定版）加 `_` 前缀、总名 UTF-8 超 255 字节按字节截断
-    不劈裂多字节字符（F-9 定版，落盘 OSError 预拦截）。
+    名仍视为保留，F-13 定版）加 `_` 前缀、总名 UTF-8 超 120 字节按字节截断
+    不劈裂多字节字符（F-17 定版：Windows MAX_PATH = 260 全路径上限兼容，
+    落盘 OSError 预拦截）。
 
 G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/json/
 logging/os/pathlib/re/shutil），与 data_dir 同层——工单 03 导入族在此继续
@@ -93,8 +94,12 @@ _WINDOWS_RESERVED_NAMES = frozenset(
     | {f"lpt{i}" for i in range(1, 10)}
 )
 
-#: 文件名 UTF-8 字节上限（含 .html 后缀；Windows 路径组件上限 255 字节，F-9 定版）
-_MAX_FILENAME_BYTES = 255
+#: 文件名 UTF-8 字节上限（含 .html 后缀；F-17 定版 120 字节——Windows MAX_PATH
+#: = 260 全路径上限且 Python open 无 `\\?\` 前缀：默认数据目录（%APPDATA%/
+#: ConverSystem/simulators ~55 字符前缀）下 205-255 字节名全长 260+ 仍落盘失败，
+#: 255 组件上限在真实路径不可达；120 = 260 - 常见数据目录前缀余量，超长名截断
+#: 静默收敛）
+_MAX_FILENAME_BYTES = 120
 
 #: 恶意模式粗筛常量清单（键 + 正则，常量单源——前端 warnings 文案映射以此为键集锚点；
 #: 命中仅收集返回，绝不拦截；静态审查不承诺防住，定位知情提示）
@@ -209,7 +214,7 @@ def _truncate_utf8_bytes(s: str, max_bytes: int) -> str:
 
 def sanitize_filename(raw: str) -> str:
     """净化上传文件名 → 安全落盘名（防目录穿越 + Windows 非法字符 + %/# +
-    保留设备名 + 255 字节上限）。
+    保留设备名 + 120 字节上限）。
 
     定版规则：取最后路径段（`/` 与 `\\` 皆按分隔符，杜绝穿越）、剔除 Windows
     非法字符与控制字符、剔除 `%` 与 `#`（前端 isValidSimulatorFile 单点拒绝，
@@ -220,8 +225,12 @@ def sanitize_filename(raw: str) -> str:
     带任意扩展名仍视为保留——F-13 定版：MSDN 判定取首点前组件，NUL.tar.gz
     等价 NUL，双扩展形态 con.txt.html 同样拦截）→ 加 `_` 前缀（`_con` 非
     保留名）；非精确匹配（mycon/com10/lpt10 等）不受影响。总名（含 .html
-    后缀）UTF-8 编码超 255 字节 → 按字节截断 stem 且不劈裂多字节字符（截断
-    后复用首尾点剔除与空名回退兜底链）。
+    后缀）UTF-8 编码超 120 字节 → 按字节截断 stem 且不劈裂多字节字符（截断
+    后复用首尾点剔除与空名回退兜底链）。上限定版依据（F-17）：Windows
+    MAX_PATH = 260 全路径上限，Python open 无 `\\?\` 前缀——255 组件上限在
+    真实数据目录路径下不可达（默认 %APPDATA%/ConverSystem/simulators ~55
+    字符前缀 + 205-255 字节名全长 260+ 即 FileNotFoundError），120 = 260 -
+    常见数据目录前缀余量，保证净化结果在真实路径可落盘；超长名截断静默收敛。
     净化静默收敛不报错——校验失败仅限 400 矩阵（非 .html / 超 5MB / 空文件，
     见 import_game）。
     """
@@ -275,8 +284,9 @@ def next_available_filename(sim_dir: Path, desired: str) -> str:
 
     改名路径保证总名（含 -N 后缀与扩展名）UTF-8 不超过 _MAX_FILENAME_BYTES
     字节：拼 -N 后缀前按余量对 stem 重做字节截断（复用 _truncate_utf8_bytes，
-    不劈裂多字节字符）——杜绝 NAME_MAX 顶破（250 字节 stem 拼 -2 溢出 255
-    字节 → 落盘 OSError 500）。
+    不劈裂多字节字符）——杜绝 NAME_MAX/MAX_PATH 顶破（长 stem 拼 -2 溢出
+    组件上限 → 落盘 OSError 500；F-14 起因即 250 字节 stem 拼 -2 得 257 字节
+    溢出 255 组件上限，现上限收紧为 120 后触发面收窄、机制不变）。
     目录不存在视为无冲突（导入会在落盘前创建目录）。
     """
     stem, ext = desired.rsplit(".", 1)

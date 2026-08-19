@@ -174,11 +174,13 @@ class TestSanitizeFilename:
             ("auxiliary.html", "auxiliary.html"),
             ("conman.html", "conman.html"),
             ("mycon.txt.html", "mycon.txt.html"),  # 首组件 mycon 非精确 → 原样
-            # 255 字节上限（含 .html 后缀）：>255 按字节截断 stem，不劈裂多字节字符
-            ("a" * 260 + ".html", "a" * 250 + ".html"),  # ASCII 260 字节 → 截 250，总长 255
-            ("中" * 90 + ".html", "中" * 83 + ".html"),  # 中文 270 字节 → 截 249（整字符），总长 254
-            ("😀" * 63 + ".html", "😀" * 62 + ".html"),  # 4 字节 emoji 252 字节 → 劈裂回退整字符，总长 253
-            ("a" * 250 + ".html", "a" * 250 + ".html"),  # 恰好 255 字节 → 不截断
+            # 120 字节上限（F-17 定版，含 .html 后缀；Windows MAX_PATH = 260 全路径
+            # 上限，Python open 无 \\?\ 前缀——255 组件上限在真实路径下不可达，120 =
+            # 260 - 常见数据目录前缀余量）：>120 按字节截断 stem，不劈裂多字节字符
+            ("a" * 260 + ".html", "a" * 115 + ".html"),  # ASCII 260 字节 → 截 115，总长 120
+            ("中" * 90 + ".html", "中" * 38 + ".html"),  # 中文 270 字节 → 截 114（整字符），总长 119
+            ("😀" * 63 + ".html", "😀" * 28 + ".html"),  # 4 字节 emoji 252 字节 → 劈裂回退整字符，总长 117
+            ("a" * 115 + ".html", "a" * 115 + ".html"),  # 恰好 120 字节 → 不截断
         ],
     )
     def test_sanitize_matrix(self, raw: str, expected: str) -> None:
@@ -319,7 +321,8 @@ class TestRenameConflict:
         无乱码半字符），总长 ≤ 上限且 -N 后缀完整"""
         sim = tmp_path / "sim"
         sim.mkdir()
-        long_name = "中" * 83 + ".html"  # 249 字节 + 5 = 254（≤255，sanitize 不截）
+        long_name = "中" * 83 + ".html"  # 249 字节 + 5 = 254（超 120 上限；直调被测函数
+        # 不经过 sanitize，desired 原样入参，截断按当前常量余量执行）
         (sim / long_name).write_bytes(b"<html>A</html>")
         result = next_available_filename(sim, long_name)
         data = result.encode("utf-8")
