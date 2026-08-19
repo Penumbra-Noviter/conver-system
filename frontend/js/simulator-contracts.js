@@ -48,21 +48,23 @@ export const TIMEOUT_REASON = `模拟器清单加载超时（${TIMEOUT_MS / 1000
 // ══════════════════════════════════════════════════
 
 /**
- * file 字段安全判据：非空字符串且不含路径分隔符 / 百分号编码。
+ * file 字段安全判据：非空字符串且不含路径分隔符 / 百分号编码 / #。
  *
  * iframe src 注入守卫（等价迁移前运行视图内联判据）：file 来自 manifest
  * 第三方数据，防御越界 / 外链 —— 含 `/` `\` 路径分隔符（TD-56：拒绝穿越与
- * 子路径）或 `%` 百分号编码（TD-56：单点拒绝整个百分号编码面 — Starlette
- * 遍历防护与 manifest 可信资产为既有兜底，本判定为纵深加固）一律拒绝。
- * 对象判定与「参数非法：缺少有效的游戏文件」错误文案留在运行视图层。
+ * 子路径）、`%` 百分号编码（TD-56：单点拒绝整个百分号编码面 — Starlette
+ * 遍历防护与 manifest 可信资产为既有兜底，本判定为纵深加固）或 `#`（URL
+ * fragment 分隔符 — iframe src 遇 # 请求截断 → 404，per-game CSS href
+ * 同理截断）一律拒绝。对象判定与「参数非法：缺少有效的游戏文件」错误文案
+ * 留在运行视图层。
  *
  * @param {unknown} file - 游戏条目的 file 字段值
- * @returns {boolean} 非空字符串且不含 / \ % 为 true；否则 false
+ * @returns {boolean} 非空字符串且不含 / \ % # 为 true；否则 false
  */
 export function isValidSimulatorFile(file) {
     return typeof file === 'string' && file !== ''
         && !file.includes('/') && !file.includes('\\')
-        && !file.includes('%');
+        && !file.includes('%') && !file.includes('#');
 }
 
 // ══════════════════════════════════════════════════
