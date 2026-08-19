@@ -13,26 +13,58 @@
 
 manifest 工具（工单 02 声明底座，工单 03 读-改-写原子追加复用）：
     `read_manifest` 读取解析；`write_manifest` 同目录临时文件 + os.replace
-    原子替换（ensure_ascii=False 中文保真，version 字段由调用方保持）。
+    原子替换（ensure_ascii=False 中文保真，version 字段由调用方保持）；
+    `append_manifest_entry` 追加注册，manifest 缺失/损坏以磁盘现存 .html
+    自愈重建（数据目录为唯一事实来源）。
     单用户桌面应用串行（spec Further Notes：并发导入不引入锁，记录判断）。
 
-G4 约束：本模块仅 stdlib import（json/logging/os/shutil/pathlib），与 data_dir
-同层——工单 03 导入族在此继续扩展，不引入 app 业务代码。
+导入族（工单 03，spec T-02 决策 4-8 契约锚点）：
+    `import_game` 为服务编排（校验 → 净化 → SHA-256 去重 → 冲突改名 → cfg-
+    三元组探测 → 恶意模式粗筛 → 落盘 → manifest 原子注册）；校验失败
+    SimulatorImportError（400 语义）、重复 SimulatorDuplicateError（409 语义、
+    文案含「已存在」）；warnings 键集 = SUSPICIOUS_PATTERNS 常量单源
+    （eval / document.cookie / cross-origin-fetch，命中不拦截）；id 由最终
+    文件名干 slug 生成（仅保留 [a-z0-9-]、折叠分隔符、空回退 imported-game）
+    并按现存 id 集唯一化（-2/-3 后缀，manifest 结构性唯一）。
+    文件名净化规则（定版）：取最后路径段 + 剔除 Windows 非法字符/% + 首尾
+    点剔除，空名回退 imported-game（防目录穿越，Windows 路径安全）。
+
+G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/json/
+logging/os/pathlib/re/shutil），与 data_dir 同层——工单 03 导入族在此继续
+扩展，不引入 app 业务代码。
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+import re
 import shutil
+from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
 
 __all__ = [
     "MANIFEST_FILE",
     "MANIFEST_TMP_SUFFIX",
+    "MAX_IMPORT_BYTES",
+    "SUSPICIOUS_PATTERNS",
+    "ImportResult",
+    "SimulatorDuplicateError",
+    "SimulatorImportError",
+    "append_manifest_entry",
     "ensure_seeded",
+    "find_duplicate",
+    "import_game",
+    "next_available_filename",
+    "probe_config",
     "read_manifest",
+    "sanitize_filename",
+    "scan_suspicious",
+    "sha256_bytes",
+    "slugify",
     "write_manifest",
 ]
 
@@ -42,6 +74,35 @@ logger = logging.getLogger(__name__)
 MANIFEST_FILE = "manifest.json"
 #: 原子写临时文件后缀（同目录临时文件 + os.replace；固定名，单用户串行无锁）
 MANIFEST_TMP_SUFFIX = ".tmp"
+#: 导入文件大小上限（≤5MB；spec T-02 决策 5「校验与去重」）
+MAX_IMPORT_BYTES = 5 * 1024 * 1024
+#: 文件名净化剔除字符：Windows 非法字符 + 路径分隔符 + 前端 file 判据拒绝的 % + 控制字符
+_FORBIDDEN_FILENAME_CHARS = frozenset('<>:"/\\|?*%') | frozenset(chr(i) for i in range(32))
+
+#: 恶意模式粗筛常量清单（键 + 正则，常量单源——前端 warnings 文案映射以此为键集锚点；
+#: 命中仅收集返回，绝不拦截；静态审查不承诺防住，定位知情提示）
+SUSPICIOUS_PATTERNS: dict[str, re.Pattern[str]] = {
+    "eval": re.compile(r"eval\s*\("),
+    "document.cookie": re.compile(r"document\s*\.\s*cookie"),
+    "cross-origin-fetch": re.compile(r"""fetch\s*\(\s*["'`]\s*(?:https?://|//)"""),
+}
+
+
+class SimulatorImportError(Exception):
+    """导入校验失败（非 .html / 超 5MB / 空文件 / 缺文件名）→ 路由映射 400"""
+
+
+class SimulatorDuplicateError(Exception):
+    """SHA-256 内容重复（文案含「已存在」）→ 路由映射 409"""
+
+
+@dataclass(frozen=True)
+class ImportResult:
+    """导入成功结果：game 为 manifest 条目字典；renamed 是否自动改名；warnings 粗筛键集"""
+
+    game: dict
+    renamed: bool
+    warnings: list[str]
 
 
 def ensure_seeded(builtin_dir: Path, target_dir: Path) -> bool:
@@ -95,3 +156,231 @@ def write_manifest(sim_dir: Path, manifest: dict) -> None:
         encoding="utf-8",
     )
     os.replace(tmp, sim_dir / MANIFEST_FILE)
+
+
+# ── 导入族（工单 03：校验 / 净化 / 去重 / 改名 / 探测 / 粗筛 / manifest 注册）──
+
+
+def sha256_bytes(content: bytes) -> str:
+    """内容字节的 SHA-256 十六进制摘要（去重主键）。"""
+    return hashlib.sha256(content).hexdigest()
+
+
+def sanitize_filename(raw: str) -> str:
+    """净化上传文件名 → 安全落盘名（防目录穿越 + Windows 非法字符 + %）。
+
+    定版规则：取最后路径段（`/` 与 `\\` 皆按分隔符，杜绝穿越）、剔除 Windows
+    非法字符与控制字符、剔除 `%`（前端 isValidSimulatorFile 对 `%` 单点拒绝，
+    落盘名必须兼容）、剔除首尾点与空格（防隐藏文件与 `..` 段）；空名回退
+    `imported-game`；扩展名归一化为小写 `.html`。净化静默收敛不报错——
+    校验失败仅限 400 矩阵（非 .html / 超 5MB / 空文件，见 import_game）。
+    """
+    name = raw.strip().replace("\\", "/").rsplit("/", 1)[-1]
+    name = "".join(ch for ch in name if ch not in _FORBIDDEN_FILENAME_CHARS)
+    name = name.strip(" .")
+    if not name:
+        name = "imported-game"
+    if name.lower().endswith(".html"):
+        return name[:-5] + ".html"
+    return name + ".html"
+
+
+def slugify(stem: str) -> str:
+    """id slug（定版规则，工单 03/04 共享）：仅保留 [a-z0-9-]、分隔符折叠、
+    无 ASCII 回退 `imported-game`。"""
+    slug = re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-")
+    return slug or "imported-game"
+
+
+def find_duplicate(sim_dir: Path, content: bytes) -> str | None:
+    """SHA-256 去重：与 sim_dir 现存文件（除 manifest）比对，命中返回文件名。
+
+    种子后内置游戏即数据目录内容（spec 决策 5），重复判定自然覆盖内置重复。
+    """
+    digest = sha256_bytes(content)
+    if not sim_dir.is_dir():
+        return None
+    for path in sim_dir.iterdir():
+        if not path.is_file() or path.name == MANIFEST_FILE:
+            continue
+        if sha256_bytes(path.read_bytes()) == digest:
+            return path.name
+    return None
+
+
+def next_available_filename(sim_dir: Path, desired: str) -> str:
+    """文件名冲突自动改名：xxx-2.html 递增；冲突判定大小写不敏感（Windows 定版）。
+
+    目录不存在视为无冲突（导入会在落盘前创建目录）。
+    """
+    stem, ext = desired.rsplit(".", 1)
+    existing = (
+        {p.name.lower() for p in sim_dir.iterdir() if p.is_file()}
+        if sim_dir.is_dir()
+        else set()
+    )
+    candidate = desired
+    n = 2
+    while candidate.lower() in existing:
+        candidate = f"{stem}-{n}.{ext}"
+        n += 1
+    return candidate
+
+
+class _InputIdScanner(HTMLParser):
+    """扫描 input 元素 id（stdlib HTMLParser；script/注释内容不解析——实测语义）。"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.ids: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() != "input":
+            return
+        for key, value in attrs:
+            if key.lower() == "id" and value:
+                self.ids.append(value.strip())
+
+
+def probe_config(html_text: str) -> tuple[str, dict | None]:
+    """元数据探测：cfg- 前缀 input id 三元组（cfg-endpoint/cfg-apikey/cfg-model）
+    齐全 → ('ai', config 三元组)；否则 ('local', None)——三元组不完整即降级，
+    不保留部分 config（spec 决策 6 条目级降级兜底）。
+
+    config 值为输入框 id（key-injector 契约：按 id 定位输入框注入凭证）。
+    """
+    scanner = _InputIdScanner()
+    scanner.feed(html_text)
+    cfg_ids = {i for i in scanner.ids if i.startswith("cfg-")}
+    if {"cfg-endpoint", "cfg-apikey", "cfg-model"} <= cfg_ids:
+        return ("ai", {"endpoint": "cfg-endpoint", "apikey": "cfg-apikey", "model": "cfg-model"})
+    return ("local", None)
+
+
+def scan_suspicious(html_text: str) -> list[str]:
+    """恶意模式粗筛：按 SUSPICIOUS_PATTERNS 常量清单命中收集键集（排序确定，不拦截）。
+
+    静态审查不承诺防住（spec 决策 7 定位为知情提示）；误报不拦截导入。
+    """
+    return sorted(key for key, pattern in SUSPICIOUS_PATTERNS.items() if pattern.search(html_text))
+
+
+def append_manifest_entry(sim_dir: Path, entry: dict) -> None:
+    """manifest 读-改-写原子追加：合法则既有条目原样保留；缺失/损坏 → 以磁盘
+    现存 .html 自愈重建（version=2，type=local 降级）再追加。"""
+    manifest = _read_manifest_or_rebuild(sim_dir)
+    manifest["simulators"].append(entry)
+    write_manifest(sim_dir, manifest)
+
+
+def _read_manifest_or_rebuild(sim_dir: Path, persist: bool = False) -> dict:
+    """读取 manifest；缺失或内容损坏（非法 JSON / 非 UTF-8）→ 磁盘重建兜底。
+
+    persist=True 时重建结果立即原子落盘（import_game 先自愈再算 id：避免
+    「id 唯一化用瞬态重建、append 用磁盘重建（此时已含新落盘文件）」两次
+    重建口径不一致产生退化重复条目）。
+    """
+    try:
+        return read_manifest(sim_dir)
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
+        rebuilt = _rebuild_manifest(sim_dir)
+        if persist:
+            write_manifest(sim_dir, rebuilt)
+        return rebuilt
+
+
+def _rebuild_manifest(sim_dir: Path) -> dict:
+    """以现存 .html 文件重建 manifest（自愈：数据目录为唯一事实来源）。
+
+    条目：id=文件名干 slug（冲突 -2/-3 唯一化，保证结构性唯一）、file/name
+    取实际文件名、type=local（重建为降级态，不逐文件探测）。"""
+    sim_dir.mkdir(parents=True, exist_ok=True)
+    simulators: list[dict] = []
+    seen: set[str] = set()
+    for path in sorted(p for p in sim_dir.iterdir() if p.is_file() and p.suffix.lower() == ".html"):
+        stem = path.stem
+        base = slugify(stem)
+        gid = base
+        n = 2
+        while gid in seen:
+            gid = f"{base}-{n}"
+            n += 1
+        seen.add(gid)
+        simulators.append({"id": gid, "file": path.name, "name": stem, "type": "local"})
+    return {"version": 2, "simulators": simulators}
+
+
+def _existing_ids(sim_dir: Path) -> set[str]:
+    """现存 manifest 条目 id 集（缺失/损坏按磁盘重建口径，与 append 自愈一致）。"""
+    return {g["id"] for g in _read_manifest_or_rebuild(sim_dir).get("simulators", [])}
+
+
+def _unique_game_id(sim_dir: Path, base: str) -> str:
+    """id 按现存 id 集唯一化（-2/-3 后缀）——id 重复是 manifest 结构性错误
+    （前端 parseManifest 整体失败），必须保证唯一。"""
+    existing = _existing_ids(sim_dir)
+    gid = base
+    n = 2
+    while gid in existing:
+        gid = f"{base}-{n}"
+        n += 1
+    return gid
+
+
+def import_game(sim_dir: Path, filename: str, content: bytes) -> ImportResult:
+    """导入单文件 HTML 模拟器游戏（服务编排：校验 → 净化 → 去重 → 改名 →
+    探测 → 粗筛 → 落盘 → manifest 注册）。
+
+    Args:
+        sim_dir: 数据目录 simulators（请求期解析，调用方负责；不缓存于 import 期）
+        filename: 上传文件名（原始值，扩展名校验与净化均在此进行）
+        content: 上传文件字节
+
+    Raises:
+        SimulatorImportError: 非 .html / 超 5MB / 空文件 / 缺文件名（400 语义）
+        SimulatorDuplicateError: SHA-256 与现存文件重复（409 语义，文案含「已存在」）
+        OSError: 数据目录不可写等落盘失败（500 语义，不静默吞掉）
+
+    顺序保证：校验先于一切副作用（校验失败零落盘）；去重在改名之前（重复即
+    409，不产生改名条目）；manifest 注册失败回滚已落盘文件（不遗留孤儿文件）。
+    单用户桌面应用串行（spec Further Notes：并发导入不引入锁）。
+    """
+    if not filename.strip():
+        raise SimulatorImportError("未提供文件名")
+    if not filename.lower().endswith(".html"):
+        raise SimulatorImportError(f"仅支持 .html 文件（当前：{filename}）")
+    if len(content) > MAX_IMPORT_BYTES:
+        raise SimulatorImportError("文件超过 5MB 上限")
+    if not content:
+        raise SimulatorImportError("文件内容为空")
+
+    safe_name = sanitize_filename(filename)
+    if dup := find_duplicate(sim_dir, content):
+        raise SimulatorDuplicateError(f"游戏已存在（内容与现有文件相同）：{dup}")
+
+    final_name = next_available_filename(sim_dir, safe_name)
+    renamed = final_name != safe_name
+    stem = final_name.rsplit(".", 1)[0]
+
+    # manifest 缺失/损坏先自愈落盘（口径一致见 _read_manifest_or_rebuild persist）
+    _read_manifest_or_rebuild(sim_dir, persist=True)
+    text = content.decode("utf-8", errors="replace")
+    game_type, config = probe_config(text)
+    entry: dict = {
+        "id": _unique_game_id(sim_dir, slugify(stem)),
+        "file": final_name,
+        "name": stem,
+        "type": game_type,
+        "source": "imported",
+    }
+    if config is not None:
+        entry["config"] = config
+
+    sim_dir.mkdir(parents=True, exist_ok=True)
+    (sim_dir / final_name).write_bytes(content)
+    try:
+        append_manifest_entry(sim_dir, entry)
+    except Exception:
+        (sim_dir / final_name).unlink(missing_ok=True)
+        raise
+    return ImportResult(game=entry, renamed=renamed, warnings=scan_suspicious(text))
