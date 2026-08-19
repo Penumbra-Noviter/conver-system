@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1449<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->487<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->892<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1458<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->487<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->901<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 > （合并冲突标记待 doc_sync 重算：波1-01 前端 +42、波1-02 后端 +15）
 
 ---
@@ -873,9 +873,9 @@ conver system/
 | <!--AUTO:sig:frontend/js/search-view.js:performSearch-->`performSearch(query)`<!--/AUTO--> | 执行搜索 |
 | <!--AUTO:sig:frontend/js/search-view.js:renderSearchResults-->`renderSearchResults(results, query)`<!--/AUTO--> | 渲染搜索结果 |
 
-### 4.56 `frontend/js/simulator-view.js` — 模拟器运行视图（<!--AUTO:lines:frontend/js/simulator-view.js-->~464 行<!--/AUTO-->）
+### 4.56 `frontend/js/simulator-view.js` — 模拟器运行视图（<!--AUTO:lines:frontend/js/simulator-view.js-->~505 行<!--/AUTO-->）
 
-**职责**：模拟器 iframe 运行视图（U7/U8）——加载/超时/错误态、配置控件 MutationObserver 重建再同步（TD-75 attributeFilter 收窄）、load 自动同步。
+**职责**：模拟器 iframe 运行视图（U7/U8）——加载/超时/错误态、配置控件 MutationObserver 重建再同步（TD-75 attributeFilter 收窄）、load 自动同步、PC 阅读共享覆盖层 + per-game CSS 覆盖注入（T-02 决策 12：共享层先、per-game 后，数据目录 `<game-id>.css` 经 /simulators 挂载同源提供）。
 
 | 元素 | 说明 |
 |------|------|
@@ -890,6 +890,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:mutationTouchesConfig-->`mutationTouchesConfig(mutations, config)`<!--/AUTO--> | 变更是否触及配置 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:handleConfigMutation-->`handleConfigMutation(mutations)`<!--/AUTO--> | 配置变更处理（再同步） |
 | <!--AUTO:sig:frontend/js/simulator-view.js:disconnectObserver-->`disconnectObserver()`<!--/AUTO--> | 断开观察者 |
+| <!--AUTO:sig:frontend/js/simulator-view.js:injectPerGameCss-->`injectPerGameCss(doc)`<!--/AUTO--> | per-game CSS 覆盖注入（共享层之后） |
 | <!--AUTO:sig:frontend/js/simulator-view.js:renderShell-->`renderShell(game)`<!--/AUTO--> | 渲染运行壳 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:isValidGame-->`isValidGame(game)`<!--/AUTO--> | 游戏合法性校验 |
@@ -1184,7 +1185,7 @@ conver system/
 | `frontend/tests/simulator-adapt.test.js` | <!--AUTO:tests:frontend/tests/simulator-adapt.test.js-->36<!--/AUTO--> | 适配分析共享模块 + 核对脚本 CLI（T-01） |
 | `frontend/tests/simulator-manifest.test.js` | <!--AUTO:tests:frontend/tests/simulator-manifest.test.js-->19<!--/AUTO--> | manifest 解析 |
 | `frontend/tests/simulator-pc-css.test.js` | <!--AUTO:tests:frontend/tests/simulator-pc-css.test.js-->24<!--/AUTO--> | 模拟器 PC 覆盖层契约（验收标准 + F1/F2 回归锁） |
-| `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->58<!--/AUTO--> | 模拟器运行视图 |
+| `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->67<!--/AUTO--> | 模拟器运行视图 |
 | `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->68<!--/AUTO--> | 模拟器列表 |
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
 | `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->53<!--/AUTO--> | 流式会话结算 |
@@ -1241,10 +1242,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1449<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1458<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->487<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->892<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->901<!--/AUTO-->
 > （合并冲突标记待 doc_sync 重算）
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

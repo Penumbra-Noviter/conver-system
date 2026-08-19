@@ -14,6 +14,10 @@
  *   - XSS：game.name 来自 manifest 第三方数据 → header 渲染经 escapeHtml 转义
  *   - Falsify：未 init 调 open/close no-op 不抛错；重复 init 幂等；重复 open
  *     只留最新 iframe 且计时器单一；open 中 close 后推进超时无残留错误
+ *   - per-game CSS 覆盖注入（T-02 决策 12）：共享覆盖层之后注入 /simulators/
+ *     <id>.css（DOM 顺序断言）；幂等（同 href 跳过 / 重复 load / 重进）；id
+ *     守卫（含 / \ % 或空 → 不注入不抛错）；空文档 / head 缺失空安全；缺失
+ *     对应 CSS 文件 404 由浏览器静默（无 fetch 无 JS 错误，不报错不阻塞）
  *   - 配置同步（U8-T2 + SIM-API-1）：按钮条渲染条件（ai + 完整 config 三元组
  *     → 「重新同步」按钮）；load 自动同步（openai → 面板已填值（endpointMode
  *     口径转换 / 受管 model option）/ claude·none → 按钮自动禁用 + 文案 /
@@ -1035,7 +1039,10 @@ describe('simulator-view — PC 阅读覆盖层注入（方案 A / T2 — inject
         expect(links).toHaveLength(1);
         expect(links[0].rel).toBe('stylesheet');
         expect(links[0].getAttribute('href')).toBe('../css/simulator-pc.css');
-        expect(doc.head.lastElementChild).toBe(links[0]); // 追加于 head 末尾 → 同特异性优先级最高
+        // 共享覆盖层追加于游戏文档原有 head 内容之后（同特异性下晚于游戏内联
+        // 样式生效；head 末尾现为 per-game link — 顺序断言见 per-game 用例）
+        const children = [...doc.head.children];
+        expect(children.indexOf(links[0])).toBeGreaterThan(children.indexOf(doc.head.querySelector('title')));
     });
 
     it('幂等：游戏文档已含同 href link → load 后不重复注入（querySelectorAll 长度 1）', async () => {
@@ -1105,5 +1112,146 @@ describe('simulator-view — PC 阅读覆盖层注入（方案 A / T2 — inject
 
         expect(() => frame.dispatchEvent(new Event('load'))).not.toThrow();
         expect(overlayLinks(doc)).toHaveLength(1);
+    });
+});
+
+describe('simulator-view — per-game CSS 覆盖注入（T-02 决策 12 — injectPerGameCss）', () => {
+    beforeEach(() => { vi.useFakeTimers(); vi.restoreAllMocks(); });
+    afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+    /** per-game link href 形态（与 js 内 SIM_DIR 派生形态对偶：/simulators/<id>.css
+     * — spec 决策 12 定版；注入函数内部化不可导出，测试持字符串副本） */
+    const perGameHref = (id) => `/simulators/${id}.css`;
+    const perGameLinks = (doc) => doc?.head?.querySelectorAll('link[href^="/simulators/"]') ?? [];
+
+    /** open 游戏并把 iframe 文档种子化为带 <head> 的游戏文档，再派发 load */
+    function openAndLoadSeeded(view, game = GAME_AI) {
+        view.openSimulator(game);
+        const frame = frameEl();
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write('<html><head><title>game</title></head><body><div id="game-log"></div></body></html>');
+        doc.close();
+        frame.dispatchEvent(new Event('load'));
+        return { frame, doc };
+    }
+
+    it('load 后注入 per-game link（href=/simulators/<id>.css，rel=stylesheet），位于共享覆盖层 link 之后（DOM 顺序 — 同特异性后加载序胜出）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { doc } = openAndLoadSeeded(view, GAME_AI);
+
+        const links = perGameLinks(doc);
+        expect(links).toHaveLength(1);
+        expect(links[0].rel).toBe('stylesheet');
+        expect(links[0].getAttribute('href')).toBe(perGameHref('life-sim'));
+        // 共享覆盖层先、per-game 后：per-game link 为 head 末尾元素且位于覆盖层之后
+        const overlay = doc.head.querySelector('link[href="../css/simulator-pc.css"]');
+        expect(overlay).not.toBeNull();
+        const children = [...doc.head.children];
+        expect(children.indexOf(links[0])).toBeGreaterThan(children.indexOf(overlay));
+        expect(doc.head.lastElementChild).toBe(links[0]);
+    });
+
+    it('幂等：游戏文档已含同 href per-game link → load 后不重复注入（仍 1 个）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        view.openSimulator(GAME_AI);
+        const frame = frameEl();
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write(`<html><head><link rel="stylesheet" href="${perGameHref('life-sim')}"></head><body></body></html>`);
+        doc.close();
+        frame.dispatchEvent(new Event('load'));
+
+        expect(perGameLinks(doc)).toHaveLength(1); // 已存在 → no-op，不重复
+    });
+
+    it('守卫：id 缺失 / 空串 / 含 / \\ %（manifest 第三方数据 — 越界/外链面）→ 不注入不抛错，loaded 正常推进且共享覆盖层照常注入', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+
+        for (const badId of [undefined, '', 'a/b', 'a\\b', 'a%b']) {
+            const game = badId === undefined ? { file: 'x.html', name: 'X' } : { id: badId, file: 'x.html', name: 'X' };
+            const { frame, doc } = openAndLoadSeeded(view, game);
+
+            expect(perGameLinks(doc)).toHaveLength(0); // 非法 id → 不注入
+            expect(doc.head.querySelector('link[href="../css/simulator-pc.css"]')).not.toBeNull(); // 共享层不受影响
+            expect(frame.classList.contains('sim-run-frame-hidden')).toBe(false); // loaded 正常推进
+            expect(runPanel.querySelector('.sim-run-error')).toBeNull();
+            expect(runPanel.querySelector('.sim-run-status')).toBeNull();
+        }
+    });
+
+    it('Falsify:id 含引号（守卫放行字符集外的合法 id — 选择器无插值面）→ 不抛错、href 原样注入', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { frame, doc } = openAndLoadSeeded(view, { id: 'a"b', file: 'x.html', name: 'X' });
+
+        expect(() => frame.dispatchEvent(new Event('load'))).not.toThrow();
+        const links = perGameLinks(doc);
+        expect(links).toHaveLength(1);
+        expect(links[0].getAttribute('href')).toBe(perGameHref('a"b')); // href 经属性赋值，无 HTML 注入面
+    });
+
+    it('Falsify:contentDocument 为 null（destroyFrame 后迟到 load）→ per-game 注入不抛错、无副作用', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        view.openSimulator(GAME_AI);
+        const frame = frameEl();
+        vi.spyOn(frame, 'contentDocument', 'get').mockReturnValue(null);
+
+        expect(() => frame.dispatchEvent(new Event('load'))).not.toThrow();
+        expect(frame.classList.contains('sim-run-frame-hidden')).toBe(false); // loaded 态正常推进
+    });
+
+    it('Falsify:doc 存在但 head 缺失 → per-game 注入不抛错、不注入', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        view.openSimulator(GAME_AI);
+        const frame = frameEl();
+        const doc = frame.contentDocument;
+        doc.open();
+        doc.write('<html><body><div id="game-log"></div></body></html>');
+        doc.close();
+        doc.head?.remove(); // 强制 head 缺失（jsdom 下 head 为 live 派生）
+
+        expect(() => frame.dispatchEvent(new Event('load'))).not.toThrow();
+        expect(perGameLinks(doc)).toHaveLength(0);
+    });
+
+    it('缺失对应 CSS 文件（数据目录无 <game-id>.css）→ link 照常注入，404 由浏览器静默处理（无 fetch 无 JS 错误），不报错不阻塞', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { doc } = openAndLoadSeeded(view, GAME_LOCAL); // 无 spider-shadow.css 的游戏
+
+        // 注入不依赖文件存在性（客户端不做存在性探测 — spec 决策 12 无 fetch）；
+        // jsdom 不执行样式表网络请求 — 404 静默语义由浏览器保证
+        expect(perGameLinks(doc)).toHaveLength(1);
+        expect(perGameLinks(doc)[0].getAttribute('href')).toBe(perGameHref('spider-shadow'));
+        expect(runPanel.querySelector('.sim-run-error')).toBeNull(); // 不报错不阻塞
+    });
+
+    it('Falsify:loaded 后重复派发 load → 状态守卫忽略，per-game link 不重复（仍 1 个）', async () => {
+        const { view, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel: runPanel.parentElement.querySelector('#simulator-list-panel'), runPanel });
+        const { frame, doc } = openAndLoadSeeded(view, GAME_AI);
+        expect(perGameLinks(doc)).toHaveLength(1);
+
+        expect(() => frame.dispatchEvent(new Event('load'))).not.toThrow();
+        expect(perGameLinks(doc)).toHaveLength(1);
+    });
+
+    it('重进（close → 再 open → load）：新 iframe 新文档重新注入恰 1 个 per-game link', async () => {
+        const { view, listPanel, runPanel } = await loadModules();
+        view.initSimulatorRun({ listPanel, runPanel });
+        const first = openAndLoadSeeded(view, GAME_AI);
+        expect(perGameLinks(first.doc)).toHaveLength(1);
+
+        view.closeSimulator();
+        const second = openAndLoadSeeded(view, GAME_AI);
+
+        expect(perGameLinks(second.doc)).toHaveLength(1); // 重进后重新注入（每 iframe 独立文档）
+        expect(second.doc.head.lastElementChild.getAttribute('href')).toBe(perGameHref('life-sim'));
     });
 });

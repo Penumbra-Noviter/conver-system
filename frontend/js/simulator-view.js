@@ -7,6 +7,9 @@
  *   PC 阅读覆盖层注入（方案 A — iframe load 后把 frontend/css/
  *   simulator-pc.css 以 link 追加到游戏文档 head 末尾，幂等空安全，
  *   零改动 22 个游戏 HTML）、
+ *   per-game CSS 覆盖注入（T-02 决策 12 — iframe load 后把数据目录
+ *   <game-id>.css 以 link 追加于共享覆盖层之后 — 同特异性后加载序胜出，
+ *   按游戏微调样式；幂等空安全，缺失 CSS 的 404 由浏览器静默处理）、
  *   SIM-API-1 配置持续同步（iframe load 后自动同步主应用凭证/端点/模型 +
  *   MutationObserver 监听配置控件动态重建后再同步 — 冷却/熔断状态迁移收口
  *   在 key-injector 单一状态机，本模块只保留触发时机（load / 防抖到期）与
@@ -140,10 +143,10 @@ const PC_OVERLAY_HREF = '../css/simulator-pc.css';
 
 /**
  * 向游戏文档注入 PC 阅读覆盖层（方案 A — T1 共享覆盖层）。
- * iframe load 后把 <link rel="stylesheet"> 追加到游戏文档 <head> 末尾
- * （同特异性下优先级最高，覆盖游戏内联样式；游戏独立打开不受影响 —
- * 零改动 22 个游戏 HTML）。href 为 PC_OVERLAY_HREF 常量（注入 href
- * 单点，见上）。
+ * iframe load 后把 <link rel="stylesheet"> 追加到游戏文档 <head>（晚于游戏
+ * 内联样式生效 — 同特异性下覆盖之；per-game CSS 注入于本层之后，见
+ * injectPerGameCss；游戏独立打开不受影响 — 零改动 22 个游戏 HTML）。
+ * href 为 PC_OVERLAY_HREF 常量（注入 href 单点，见上）。
  * 幂等：head 已含同 href link → no-op；doc?.head 不可用（jsdom 空文档 /
  * destroyFrame 后迟到 load）→ no-op 不抛错。href 为模块常量，无外部输入面。
  * @param {Document|null|undefined} doc - iframe contentDocument（可空）
@@ -154,6 +157,44 @@ function injectPcOverlay(doc) {
     const link = doc.createElement('link');
     link.rel = 'stylesheet';
     link.href = PC_OVERLAY_HREF;
+    doc.head.appendChild(link);
+}
+
+// ══════════════════════════════════════════════════
+// per-game CSS 覆盖注入（T-02 决策 12 — 数据目录 <game-id>.css）
+// ══════════════════════════════════════════════════
+
+/** per-game 覆盖层 URL 前缀（绝对路径 — /simulators 静态挂载指向数据目录；
+ * 与共享覆盖层相对路径（../css/simulator-pc.css）混用，同源下等价 — per-game
+ * 文件在数据目录（与游戏文件同目录），不在 css/ 相邻目录，选择绝对路径；
+ * 前缀由 SIM_DIR 派生（契约单一来源 — 改目录只改契约模块） */
+const PER_GAME_CSS_PREFIX = `/${SIM_DIR}`;
+
+/**
+ * 向游戏文档注入 per-game CSS 覆盖层（T-02 决策 12 — 数据目录 <game-id>.css
+ * 针对单个游戏覆盖共享层样式；同特异性下后加载序胜出）。
+ * handleLoad 中 injectPcOverlay 之后调用（共享层先、per-game 后，顺序保证）。
+ * href = /simulators/<game.id>.css；id 经 isValidSimulatorFile 守卫（manifest
+ * 第三方数据 — id 非法含 / \ % 或空 → 不注入不抛错；守卫放行字符集外的
+ * 字符仅经属性赋值进 href 属性，无 HTML/选择器注入面）。
+ * 幂等：head 已含同 href link → no-op；doc?.head 不可用（jsdom 空文档 /
+ * destroyFrame 后迟到 load）→ no-op 不抛错。缺失 CSS 的 404 由浏览器静默
+ * 处理（link 404 不产生 JS 错误 — 无 fetch 无错误处理）。
+ * @param {Document|null|undefined} doc - iframe contentDocument（可空）
+ */
+function injectPerGameCss(doc) {
+    if (!doc?.head) return;
+    const id = currentGame?.id;
+    if (!isValidSimulatorFile(id)) return;
+    const href = `${PER_GAME_CSS_PREFIX}/${id}.css`;
+    // 幂等判定用属性值比较遍历（不把 id 插值进选择器 — 守卫只拒绝 / \ % 与空，
+    // 引号等字符仍可能进入 id，选择器插值存在解析崩溃面）
+    for (const el of doc.head.querySelectorAll('link')) {
+        if (el.getAttribute('href') === href) return;
+    }
+    const link = doc.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
     doc.head.appendChild(link);
 }
 
@@ -399,6 +440,9 @@ function handleLoad(e) {
     // PC 阅读覆盖层注入（方案 A — T1；load 后追加共享样式表，幂等空安全；
     // 位于自动同步之前 — 覆盖层先行就位不影响同步路径）
     injectPcOverlay(frame?.contentDocument ?? null);
+    // per-game CSS 覆盖注入（T-02 决策 12 — 数据目录 <game-id>.css 覆盖共享层；
+    // 位于共享覆盖层之后 — 同特异性后加载序胜出；缺失 404 浏览器静默不阻塞）
+    injectPerGameCss(frame?.contentDocument ?? null);
     // Load 自动同步（默认 path='load'：置冷却不计数）
     autoSyncIntoGame({
         bar: runPanel?.querySelector('.sim-key-bar'),
