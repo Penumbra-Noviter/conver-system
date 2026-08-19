@@ -13,7 +13,7 @@
 
 ## 活跃工单
 
-> 当前 0 项待办（T-01/T-02 批次已于 2026-08-19 完成归档，见下方「已完成归档」；技术债区 F-5/F-6 待立项见下节）。
+> 当前 0 项待办（T-01/T-02 批次已于 2026-08-19 完成归档，见下方「已完成归档」；技术债区 F-5/F-6/F-8/F-9 待立项见下节）。
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
@@ -25,7 +25,7 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-> 技术债区当前 **6 项待立项**（F-1~F-4 处置完毕；F-5/F-6 为模拟器批次新发现保留；F-7 已修；F-8~F-11 为 2026-08-19 期末四轴新增）。
+> 技术债区当前 **4 项待立项**（F-1~F-4 处置完毕；F-5/F-6 为模拟器批次新发现保留；F-7/F-10/F-11 已修；F-8/F-9 待立项）。
 
 > **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
 
@@ -44,8 +44,8 @@
 | F-7 | `VARS_FAMILY`（simulator-adapt.js:57）漏 B 类组 5 成员 `--text2/--text3`（神明v3 体系）→ 变量面核对盲区 + 神明v3 记录行为死记录、删组 5 规则核对不红 | 期末四轴 Falsify F1 | Worth exploring | ✅ 已修（2026-08-19：VARS_FAMILY 补两成员 + 成员完整性回归断言，22 款核对复跑全绿） |
 | F-8 | `_read_manifest_or_rebuild` 自愈仅覆盖缺失/非法 JSON/非 UTF-8；合法 JSON 但 `simulators` 非 list → `_existing_ids` TypeError / append AttributeError → 500（原子写保证正常运行不产生，需手工损坏触发） | 期末四轴 Falsify F2 | Speculative | 📝 待立项 |
 | F-9 | `sanitize_filename` 未剔除 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9）与 >255 字节文件名 → 落盘 OSError 裸 500（spec 已声明 500 语义，体验可优化） | 期末四轴 Falsify F3 | Speculative | 📝 待立项 |
-| F-10 | `docs/architecture.md` TD-57 信任边界小节未补「导入把第三方文件引入同源区域」一句 + 首句仍称「22 款第三方模拟器」——程序内手册已写、权威文档未同步 | 期末四轴 Spec S1 | Speculative | 📝 待立项 |
-| F-11 | simulator-adapt.js docstring「协议表面」列 6 符号实际 `__all__` 8 符号（漏 INNER_CLASSES/RECORD_MARKER）+ TICKETS 归档 merge 链「当前 HEAD = ba33895」stale（06 文档 commit a38feb9 在后） | 期末四轴 Standards N1/N2 | Speculative | 📝 待立项 |
+| F-10 | `docs/architecture.md` TD-57 信任边界小节未补「导入把第三方文件引入同源区域」一句 + 首句仍称「22 款第三方模拟器」——程序内手册已写、权威文档未同步 | 期末四轴 Spec S1 | Speculative | ✅ 已修（2026-08-19 Neat 收尾：架构目录树 simulators/ 改注「内置种子源 + 数据目录挂载」；信任边界首句改「22 款内置第三方模拟器与用户导入的游戏同源，托管于数据目录 simulators/」；威胁模型增「用户导入游戏同权」一条；收缩措施增「导入校验链」一条） |
+| F-11 | simulator-adapt.js docstring「协议表面」列 6 符号实际 `__all__` 8 符号（漏 INNER_CLASSES/RECORD_MARKER）+ TICKETS 归档 merge 链「当前 HEAD = ba33895」stale（06 文档 commit a38feb9 在后） | 期末四轴 Standards N1/N2 | Speculative | ✅ 已修（2026-08-19 Neat 收尾：docstring 协议表面补 INNER_CLASSES/RECORD_MARKER 至 8 符号；归档 merge 链「当前 HEAD」改注文档收尾 commit a38feb9/262fe88） |
 
 ---
 
@@ -60,7 +60,7 @@
 - **T-02 工单 03（08b83a2 + 波2修复 88deec9）**——导入端点 POST /api/simulators/import：校验（.html / ≤5MB / 非空）→ 净化（sanitize_filename 剔非法字符与 %#，`#` fragment 截断双侧收口）→ SHA-256 去重（find_duplicate 仅比对 *.html，命中 409「已存在」，覆盖内置重复；per-game CSS 不误报）→ 冲突改名（next_available_filename `xxx-2.html` 递增）→ cfg- 三元组探测 → 恶意模式粗筛（scan_suspicious：eval / document.cookie / cross-origin-fetch，命中警告不拦截）→ manifest 原子注册（缺失/损坏自愈重建）；导入族 75 用例 + append 自愈 3 用例，工单文件范围覆盖 100%。
 - **T-02 工单 04（b83cd3c）**——前端导入 UI：列表页「导入游戏」按钮 + 拖拽 .html 双通道（安全警告确认「第三方游戏可读取本地数据并调用 API」→ FormData 经 fetch-seam 上传 → 不确定态「正在导入…」→ 成功 toast+改名提示 / 409-400 detail 原样 / warnings 中文映射弹窗不拦截 / 未覆盖清单适配提示引导 `<id>.css`）；parseManifest source 白名单 + 卡片「已导入」badge；manifest 刷新 cache:no-store（304 缓存旧数据致新卡不出现，冒烟实测修复）；冒烟 +导入步骤全过。
 - **T-02 工单 05（78ad707）**——per-game CSS 覆盖注入：数据目录 `<game-id>.css` 以 link 注入于共享覆盖层之后（同特异性后加载序胜出）+ isValidSimulatorFile 守卫（id 含 / \ % 或空不注入不抛错）+ 幂等（同 href 跳过）+ 缺失 404 浏览器静默；9 用例。
-- **merge 链（ed3e9d9 波1-01 → ea13dbf 波1-02 修复 → b1173b9 波2-05 → 6c80cb6 波2-03 → 7978ddc 波2修复 → ba33895 波3-04）**——CODE_WIKI/test 冲突手工合并 + doc_sync 重算，当前 HEAD = ba33895。
+- **merge 链（ed3e9d9 波1-01 → ea13dbf 波1-02 修复 → b1173b9 波2-05 → 6c80cb6 波2-03 → 7978ddc 波2修复 → ba33895 波3-04）**——CODE_WIKI/test 冲突手工合并 + doc_sync 重算；文档收尾接续：a38feb9（工单 06 手册+归档）+ 262fe88（期末四轴 F-7~F-11 落盘）。
 - **验证链**：Vitest **958** 全绿（基线 845，+113）；pytest **569 + 1 skip**（基线 471+1skip，+98）；cargo 70 未受影响（零 Rust 改动）；smoke-simulators **14 项**全过（新增 2 导入步骤：警告确认 → 上传 .html → 新卡片「已导入」→ 打开导入游戏共享覆盖层注入生效）。
 - **安全边界**：粗筛定位知情提示不拦截（静态审查不承诺防住，spec 决策 3）；导入内容仅 file.text() 纯文本读取供未覆盖分析，绝不 eval / 绝不渲染进 DOM；claude key 绝不回传游戏（key-injector 契约延续）；仅本地文件导入（无网络拉取/URL 导入）。
 - **文档收尾（工单 06）**：程序内手册「模拟器使用指南」增补导入小节 + 新增「导入游戏与安全须知」guide-section（警告文案与工单 04 弹窗逐字一致：第三方游戏可读取本地数据并调用 API；含风险边界 / 恶意模式扫描不拦截 / 重复与改名行为 / `<game-id>.css` per-game 适配引导）→ 本归档 → CODE_WIKI doc_sync --check 全绿。

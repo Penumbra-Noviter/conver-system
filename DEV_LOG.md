@@ -6,6 +6,16 @@
 
 ---
 
+## 滚动摘要（2026-08-19 — T-01/T-02 模拟器接入契约 + 外置数据目录与用户导入：kickoff 批次 5 工单 3 波，commit 链 c7e5b29 → 262fe88）
+
+- **T-01 接入契约（c710eb5 + 波末修复 0ec509e，merge ed3e9d9）**：simulator-pc.css 覆盖层映射记录结构化（`# sim-pc:` 标记行 + 每游戏一行机器可解析「已核对映射」）+ 核对脚本 `scripts/check-simulator-css.mjs`（游戏 HTML 三面提取 vs 覆盖层已覆盖集合比对 → 未覆盖清单，退出码 0=全绿）+ 共享分析模块 simulator-adapt.js（parseCoverageRecords/extractGameClasses/compareCoverage，工单 04 未覆盖提示复用）；波末修复 *.mjs 固定 LF checkout（CRLF shebang 致 esbuild/vitest 直 import 崩溃）+ CLI argv[1] 缺失容错
+- **T-02 工单 02 数据目录外置（52fd8bd + 波末修复 117fc41）**：/simulators 静态挂载改指数据目录（CONVER_DATA_DIR 可覆盖，默认 `%APPDATA%/ConverSystem/simulators/`；两版过渡：本版仍随包带 22 款种子，停止线性膨胀）+ 首启种子幂等（manifest 存在为标记，种子源缺 manifest 降级不崩溃）+ 冒烟隔离数据目录注入
+- **T-02 工单 03 导入端点（08b83a2 + 波2修复 88deec9，merge 6c80cb6）**：POST /api/simulators/import——校验（.html/≤5MB/非空）→ 净化（sanitize_filename，# fragment 双侧收口）→ SHA-256 去重（仅比对 *.html，per-game CSS 不误报 409）→ 冲突改名 xxx-2.html → cfg- 三元组探测 → 恶意模式粗筛（eval/document.cookie/cross-origin-fetch，命中警告不拦截）→ manifest 原子注册自愈；导入族 75 用例 + append 自愈 3 用例
+- **T-02 工单 04 前端导入 UI（b83cd3c，merge ba33895）**：按钮/拖拽双通道 + 安全警告确认（「第三方游戏可读取本地数据并调用 API」）→ FormData 经 fetch-seam 上传 → 不确定态「正在导入…」→ toast / 409-400 detail 原样 / warnings 中文映射弹窗不拦截 / 未覆盖清单引导 `<id>.css`；parseManifest source 白名单 + 「已导入」badge；manifest 刷新 cache:no-store（304 缓存旧数据致新卡不出现，冒烟实测修复）
+- **T-02 工单 05 per-game CSS（78ad707，merge b1173b9）**：数据目录 `<game-id>.css` 以 link 注入于共享覆盖层之后（同特异性后加载序胜出）+ isValidSimulatorFile 守卫（id 含 / \ % 或空不注入不抛错）+ 幂等（同 href 跳过）+ 缺失 404 浏览器静默；9 用例
+- **工单 06 文档收尾（a38feb9）+ 期末四轴（262fe88）**：程序内手册「模拟器使用指南」导入小节 + 新增「导入游戏与安全须知」guide-section（警告文案与工单 04 弹窗逐字一致）+ TICKETS 归档（5 工单 3 波 commit 链 + 验收摘要）；期末四轴 F-7 当场修（VARS_FAMILY 补 B 类组 5 --text2/--text3 + 成员完整性回归断言），F-8~F-11 落债
+- **验证链**：Vitest **958**（845→958）；pytest **569 + 1 skip**（471+1skip，+98）；cargo 70 零改动；smoke-simulators **14 项**全过（新增 2 导入步骤：警告确认 → 上传 .html → 新卡片「已导入」→ 打开导入游戏共享覆盖层注入生效）；doc_sync --check 全绿
+
 ## 滚动摘要（2026-08-09 ~ 08-15 — 阶段摘要：模拟器三期 + 技术债 TD 系列 + 桌面打包 + C1/C2 收口）
 
 - **2026-08-09 GUI 全功能验证 + 08-13 方向/打包 + TD-46/47**：Playwright 黑盒 + vision 视觉核验 4 bug 全修（停止内容未落库 / JSON 导出 500 / badge / 480px），全部先复现再修；方向探讨 + 打包流程（细节 git log 可溯）

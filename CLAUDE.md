@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 472 含 1 skip）；`cd frontend && npm test`（Vitest 845，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。
+测试：`cd backend && python -m pytest`（pytest 569 含 1 skip）；`cd frontend && npm test`（Vitest 958，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。
 
 ## 当前状态（2026-08-19）
 
@@ -57,7 +57,9 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **会话交付修复（2026-08-15）**：模拟器「获取列表」base_url 补 `/v1`（真实 API 在 /v1 下，relay 管理面板 HTML 非 JSON）+ 开场白预插（create_conversation 预插 first_mes，延迟导入解循环）+ 桌面版重新打包（PyInstaller 跳过旧包产物时间戳复核）；pytest 471+1skip
 - ✅ **D11 关闭行为偏好（2026-08-15 单会话直做）**：首次运行选择关窗行为（托盘/退出）+ 设置页可改；Rust settings.rs 深模块（CloseAction/decide_close/原子写）+ desktop-settings.js 深模块（无 Tauri 桥全模块 no-op，网页版零影响）；cargo 58→70 + Vitest 807→826；决策落盘 CONSENSUS §13 D11
 - ✅ **模拟器 PC 阅读覆盖层批次（2026-08-19 kickoff 小档 2 工单）**：T1 simulator-pc.css 六分区共享覆盖层（排版基线 15px/1.85/68ch + A 类 15 游戏变量覆盖 + B 类 7 游戏私有变量映射 + 面板 300px + 滚动条 + 弹窗输入区 + <1100px 降级）+ T2 simulator-view.js injectPcOverlay 注入（幂等空安全，零改动 22 游戏 HTML）；期末四轴 F1/F2 当场修复（降级块 !important + 内层正文 15px 规则）+ 契约测试 simulator-pc-css.test.js 13 用例；全量 22/22 游戏浏览器实测（截图存 .scratch/sim-pc-reading/shots/）；Vitest 826→845；技术债区 F-5 落盘（Speculative 明确接受）
-- ✅ 测试：pytest 472（含 1 skip）（后端）+ Vitest 845（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
+- ✅ **模拟器配置面板可读性修复（2026-08-19，vision 全量诊断）**：覆盖层新增分区 7（配置面板基线 label 13px/hint 12.5px/input 14px/占位符提亮/卡片居中）+ 主应用提示条对比度修复 + 两处变量注入副作用当场修掉（颜色兜底链反转 + 删除全局 --sub 覆盖）；契约测试 +5 用例；vision 终检 4 游戏达标；Vitest 845→850；F-6 落债（游戏自身设计范畴，维持现状）
+- ✅ **T-01/T-02 模拟器接入契约 + 外置数据目录与用户导入（2026-08-19 kickoff 批次 5 工单 3 波，commit 链 c7e5b29 → 262fe88）**：T-01 接入契约（sim-pc: 映射记录结构化 + scripts/check-simulator-css.mjs 核对脚本 + simulator-adapt.js 共享分析模块）；T-02 数据目录外置（/simulators 挂载改指 CONVER_DATA_DIR 下 simulators/，首启种子幂等）+ 导入端点 POST /api/simulators/import（校验/净化/SHA-256 去重/改名/cfg-探测/恶意粗筛不拦截/manifest 原子注册）+ 前端导入 UI（按钮/拖拽双通道 + 安全警告 + 已导入 badge）+ per-game CSS 注入（数据目录 <game-id>.css 后载序胜出）；期末四轴 F-7 当场修（VARS_FAMILY 补 --text2/--text3），F-8~F-11 落债；Vitest 850→958（+108）、pytest 471+1skip→569+1skip（+98）、cargo 70 零改动；smoke-simulators 14 项全过
+- ✅ 测试：pytest 569（含 1 skip）（后端）+ Vitest 958（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
 
 ## 待办管理
 

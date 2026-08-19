@@ -471,6 +471,33 @@ GET /api/settings/credentials
 
 > 解析链复用设置服务既有语义（openai 协议槽位优先，DB → .env）；无 openai key 时 key/endpoint/model 均为空串，只读查询不报错（非 404/401）。
 
+### 导入模拟器
+
+```
+POST /api/simulators/import
+```
+
+multipart 表单字段 `file`（单文件 `.html`）上传第三方模拟器游戏到数据目录（T-02 外置：`CONVER_DATA_DIR` 可覆盖，默认 `%APPDATA%\ConverSystem\simulators\`）。处理链：校验（.html / ≤5MB / 非空）→ 文件名净化（`sanitize_filename` 剔非法字符与 `%`/`#`）→ SHA-256 去重 → 冲突改名 `xxx-2.html` 递增 → cfg- 配置三元组探测 → 恶意模式静态粗筛（eval / document.cookie / cross-origin-fetch，命中仅警告不拦截）→ manifest 原子注册（缺失/损坏自愈重建）。
+
+**响应** `200`
+
+```json
+{
+  "ok": true,
+  "game": { "id": "<game-id>", "file": "xxx.html", "name": "游戏名", "type": "类型", "config": {} },
+  "renamed": false,
+  "warnings": []
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| game | 注册后的游戏条目（manifest 原子注册产物；config 为 cfg- 探测到的配置三元组，无则缺省） |
+| renamed | 文件名冲突时是否已自动改名为 `xxx-2.html` 递增后缀 |
+| warnings | 恶意模式粗筛命中集 ∈ `eval` \| `document.cookie` \| `cross-origin-fetch`（知情提示，不拦截导入） |
+
+**错误** `400` — 非 .html / 超过 5MB / 空文件（detail 为可读原因）；`409` — SHA-256 内容与已有游戏重复（detail 含「已存在」）；`500` — 落盘失败（如数据目录不可写）。
+
 ---
 
 ## 错误响应格式

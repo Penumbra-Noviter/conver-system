@@ -34,9 +34,9 @@
  *   零 DOM / 零浏览器 API / 零副作用，仅语言内建正则与字符串操作；
  *   对游戏内容只做纯文本解析，无 eval / 无任意代码执行面。
  *
- * 协议表面（__all__）：ENTRY_CLASSES / VARS_FAMILY /
- *   FONT_SCAN_THRESHOLD_PX / parseCoverageRecords / extractGameClasses /
- *   compareCoverage。
+ * 协议表面（__all__）：ENTRY_CLASSES / INNER_CLASSES / VARS_FAMILY /
+ *   FONT_SCAN_THRESHOLD_PX / RECORD_MARKER / parseCoverageRecords /
+ *   extractGameClasses / compareCoverage。
  */
 
 // ══════════════════════════════════════════════════

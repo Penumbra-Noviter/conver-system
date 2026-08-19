@@ -100,6 +100,7 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-desktop.ps1 -UseInstaller
 | `settings.json` | 壳级用户设置：关闭行为偏好 `close_action`（tray/quit，D11；缺失/损坏回退默认 tray） |
 | `backend.log` | 后端子进程日志（uvicorn 落盘契约，CREATE_NO_WINDOW 下 stdout 无处可去） |
 | `.migrated` | 迁移完成标记（migrate_data.py 写入） |
+| `simulators/` | 模拟器游戏数据目录（T-02 外置：首启从随包种子复制内置 22 款，用户导入的第三方游戏也落此；后端 `/simulators` 静态挂载指向它，随包种子源在安装目录 `frontend/simulators/`） |
 
 ### 3.2 数据目录覆盖（CONVER_DATA_DIR）
 

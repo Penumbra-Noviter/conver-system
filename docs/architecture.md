@@ -161,7 +161,7 @@ conver-system/
 │   │       ├── model-utils.js     # 模型选择逻辑（fillModelSelect / createCustomModelHandler）
 │   │       └── sse-reader.js      # SSE 流解析纯函数（parseSSEStream）
 │   ├── assets/
-│   └── simulators/                # 22 款第三方单文件模拟器 + manifest.json v2（22 游戏 saveKeys：精确键/正则锚定；静态托管，main.py 根挂载自动覆盖）
+│   └── simulators/                # 内置模拟器种子源（22 款随包 + manifest.json v2；T-02 外置后 /simulators 挂载数据目录 simulators/，用户导入游戏落数据目录）
 │
 ├── scripts/                       # 构建/冒烟脚本（build-desktop.ps1 / smoke-desktop.ps1 / smoke-simulators.mjs 等）
 ├── docs/                          # 核心文档
@@ -276,12 +276,13 @@ conver-system/
 
 ## 模拟器信任边界（TD-57）
 
-22 款第三方模拟器与主应用**同源**（同协议/主机/端口，静态托管于 `frontend/simulators/`）运行。以下为该同源信任边界的权威文档：威胁模型、已接受风险、现有收缩措施清单、未来方向与加固不可行论证。未来涉及模拟器安全决策时以此为准（共识记录见 [CONSENSUS.md](../CONSENSUS.md) §2；探索跟踪见 [world-simulation-exploration.md](world-simulation-exploration.md) 未决事项 U11）。
+22 款内置第三方模拟器与用户导入的游戏（T-02 `/api/simulators/import`）与主应用**同源**（同协议/主机/端口，静态托管于数据目录 `simulators/`）运行。以下为该同源信任边界的权威文档：威胁模型、已接受风险、现有收缩措施清单、未来方向与加固不可行论证。未来涉及模拟器安全决策时以此为准（共识记录见 [CONSENSUS.md](../CONSENSUS.md) §2；探索跟踪见 [world-simulation-exploration.md](world-simulation-exploration.md) 未决事项 U11）。
 
 ### 威胁模型声明
 
 - 22 款游戏与主应用同源运行，**游戏脚本可读主应用 localStorage 全部键**（含用户自填的 API Key 等敏感配置）；
-- 游戏脚本可**调用 /api 任意端点**（后端无鉴权，含 `GET /api/settings/credentials` 只读凭证端点）。
+- 游戏脚本可**调用 /api 任意端点**（后端无鉴权，含 `GET /api/settings/credentials` 只读凭证端点）；
+- **用户导入的第三方游戏（T-02 导入功能）与内置 22 款同权**——同源运行、可读 localStorage 全部键、可调用 /api 任意端点；导入仅做静态关键词粗筛（eval / document.cookie / cross-origin-fetch）知情提示不拦截，不承诺防住恶意游戏。
 
 ### 已接受风险
 
@@ -294,6 +295,7 @@ conver-system/
 - **credentials 端点契约**：`GET /api/settings/credentials` 在 protocol=claude/none 时 key 恒为空串（**claude key 绝不回传游戏**）；
 - **saveKeys 存档白名单**：cfg 键（含 API Key）被 saveKeys 白名单天然排除出存档管理 —— 导出导不出来、导入写不进去；
 - **运行视图打开参数校验**（`frontend/js/simulator-view.js`）：iframe src 注入守卫 —— 非法 file 直接 error 态不创建 iframe；file 含路径分隔符（`/` `\`）拒绝；
+- **导入校验链**（T-02 `/api/simulators/import`）：仅本地 .html（≤5MB/非空）→ 文件名净化（`sanitize_filename` 剔非法字符与 `%`/`#`）→ SHA-256 去重 → cfg- 三元组探测 → 静态粗筛（命中警告不拦截）；per-game `<game-id>.css` 注入带 `isValidSimulatorFile` 守卫（id 含 `/` `\` `%` 或空不注入不抛错）；
 - **相关待立项加固引用**：其余加固候选见 TICKETS 技术债区（TD-70 等，仅文档引用，不在本小节范围）。
 
 ### 未来方向
