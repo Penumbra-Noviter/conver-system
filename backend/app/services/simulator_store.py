@@ -345,16 +345,19 @@ def _read_manifest_or_rebuild(sim_dir: Path, persist: bool = False) -> dict:
 
     损坏口径（F-8 定版）：非法 JSON / 非 UTF-8 / 合法 JSON 但结构非预期
     （顶层非 dict 或 simulators 非 list——如字符串/字典/None）一律视为损坏
-    重建，否则 `_existing_ids` 迭代 dict/str 抛 TypeError、`append_manifest_entry`
-    的 `.append` 抛 AttributeError → 500（原子写保证正常运行不产生此类
-    损坏，需手工损坏 manifest 触发；条目级字段不做校验，范围收敛）。
-    persist=True 时重建结果立即原子落盘（import_game 先自愈再算 id：避免
-    「id 唯一化用瞬态重建、append 用磁盘重建（此时已含新落盘文件）」两次
-    重建口径不一致产生退化重复条目）。
+    重建；F-15 定版：读取路径 OSError 族（manifest.json 被替换为同名目录 →
+    open 抛 IsADirectoryError、不可读 → PermissionError——读不了即损坏语义）
+    同样并入自愈，否则 `_existing_ids` 迭代 dict/str 抛 TypeError、
+    `append_manifest_entry` 的 `.append` 抛 AttributeError → 500（原子写保证
+    正常运行不产生此类损坏，需手工损坏 manifest 触发；条目级字段不做校验，
+    范围收敛）。persist=True 时重建结果立即原子落盘（import_game 先自愈再算
+    id：避免「id 唯一化用瞬态重建、append 用磁盘重建（此时已含新落盘文件）」
+    两次重建口径不一致产生退化重复条目）；落盘写失败（如目录形态仍阻挡
+    os.replace）按既有契约抛出明确 OSError——写路径在 except 之外不受影响。
     """
     try:
         manifest = read_manifest(sim_dir)
-    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         manifest = None
     if not isinstance(manifest, dict) or not isinstance(manifest.get("simulators"), list):
         rebuilt = _rebuild_manifest(sim_dir)
