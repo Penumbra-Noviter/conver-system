@@ -6,6 +6,18 @@
 
 ---
 
+## 滚动摘要（2026-08-19 — 技术债区 F-5/F-6/F-8/F-9/F-12 批次：kickoff 全自动档小档，commit 链 412b2d7 → ffc54b2）
+
+- **来源**：handoff（T-01/T-02 批次后）技术债区清理：F-5/F-6 复核关闭、F-8/F-9 做、F-12 候选立项调查。预检：基线 d1f0bb3；persona + 3 条经验精读（审计快照复核 / 票面建议实证 / 回归锁真实路径）
+- **F-5/F-6 复核关闭（零代码）**：git grep 实证——simulator-pc.css:120 分区 4 `300px` 规则与仙途.html:170 / 暮色女巫v2.html:283 移动块（88vw/340/350px，均非 important）现状仍成立；覆盖层无按钮/API Key 可见性等功能类规则。各附一句话实证入 TICKETS
+- **F-8 manifest 结构自愈（412b2d7，merge 500b1d3）**：`_read_manifest_or_rebuild` 损坏口径扩展为「非法 JSON / 非 UTF-8 / 顶层非 dict / simulators 非 list」统一重建（persist 语义保持）；先红后绿（红=10 failed，AttributeError/TypeError 与票面逐字吻合）；store 测试 17→32
+- **F-9 sanitize_filename 收敛（8d2d751，merge 500b1d3）**：Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，大小写不敏感）stem 加 `_` 前缀 + UTF-8 255 字节整字符截断（不劈裂多字节）；docstring 定版条款同步；先红后绿（红=21 failed）；矩阵 29 新用例 + 写盘回归断言；import 测试 77→107
+- **F-12 就绪终态发布顺序竞态（7f93af2，merge 66001a8）**：复现循环（10 全量 + 20 串行）**捕获 5 次失败，失败消息全部拿到**（此前 13 次全量 2 次失败消息未捕获的空白补上）——真实根因 = readiness_loop 先置 ready/error 标志、后写 runtime.json（三个 full_chain 测试各中 `runtime.json NotFound`）；**handoff 猜测的「端口冲突/超时边界」被实测否定**；修复 = 先落盘再置标志（终态发布契约注释）；修复后复现循环 30 次归零
+- **验证链**：pytest **613 + 1 skip**（569+1skip，+44）；Vitest **958** 零改动；cargo **70**（修复后复现循环 30 次 + 全量 1 次全绿）；smoke-simulators **14 PASS / 0 FAIL / 1 SKIP**（端口 8000 释放复核）；doc_sync 重算 ffc54b2
+- **期末四轴 code-review（固定点 d1f0bb3）0 阻断放行**：Standards 0 硬违规 / 0 安全红线；Spec 三工单验收锚全达成（F-9 票面「带任意扩展名」仅单扩展兑现 → 入 F-13）；Falsify 主矩阵 0 击穿、2 实质缺口（F-13 双扩展设备名绕过 / F-14 改名后缀溢出 NAME_MAX）+ 2 确认性记录（F-15/F-16）；Architecture 全正面（readiness_loop 三分支置位收敛为单点发布序列）
+- **技术债区**：F-5/F-6 ❌ 复核关闭、F-8/F-9/F-12 ✅ 已修；新落债 **F-13~F-17**（期末四轴非阻断 4 项 + F-17 Windows MAX_PATH 实测：前缀 74 字符 + 190 字节名全长 270 即落盘失败）
+- **过程遥测**：Implement 首派空返回（网关层无 usage，246s 后断）→ 现场核查 worktree 干净复用重开成功；F-9 实名上报 MAX_PATH 平台限制（票面锚达成、落盘层问题入债）；批内零回退零冲突
+
 ## 滚动摘要（2026-08-19 — T-01/T-02 模拟器接入契约 + 外置数据目录与用户导入：kickoff 批次 5 工单 3 波，commit 链 c7e5b29 → 262fe88）
 
 - **T-01 接入契约（c710eb5 + 波末修复 0ec509e，merge ed3e9d9）**：simulator-pc.css 覆盖层映射记录结构化（`# sim-pc:` 标记行 + 每游戏一行机器可解析「已核对映射」）+ 核对脚本 `scripts/check-simulator-css.mjs`（游戏 HTML 三面提取 vs 覆盖层已覆盖集合比对 → 未覆盖清单，退出码 0=全绿）+ 共享分析模块 simulator-adapt.js（parseCoverageRecords/extractGameClasses/compareCoverage，工单 04 未覆盖提示复用）；波末修复 *.mjs 固定 LF checkout（CRLF shebang 致 esbuild/vitest 直 import 崩溃）+ CLI argv[1] 缺失容错
