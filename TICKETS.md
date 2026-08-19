@@ -25,7 +25,7 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 推荐强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 
-> 技术债区当前 **2 项待立项**（F-1~F-4 处置完毕：F-1 已修 / F-2·F-3·F-4 复核关闭，2026-08-15 F-1 批次归档；F-5/F-6 为 2026-08-19 模拟器批次新增）。
+> 技术债区当前 **6 项待立项**（F-1~F-4 处置完毕；F-5/F-6 为模拟器批次新发现保留；F-7 已修；F-8~F-11 为 2026-08-19 期末四轴新增）。
 
 > **架构评审未选候选**（2026-08-15 /improve-codebase-architecture 报告；来源标注为架构报告，C1 已选做 kickoff 全自动档，其余未选候选落盘于此供后续 kickoff 预检可见）
 
@@ -41,6 +41,11 @@
 | F-4 | `scripts/smoke-simulators.mjs:72` `DEFAULT_BASE_URL = 'http://127.0.0.1:8000'` 字面量（本地开发地址、`--base-url` 可覆盖、非外部服务） | 波 1 Falsify（期末复证） | Speculative | ❌ 复核关闭（2026-08-15：默认值与后端自身默认配置逐字一致 backend/app/config.py:29-30、`--base-url` CLI 可覆盖、仅本地冒烟脚本用，良性默认值） |
 | F-5 | 仙途/暮色女巫v2 移动断点（≤768px）下 `#right-panel` 原 `88vw/max-width:340px`（非 important，同特异性）被覆盖层 `300px` 压过（后载序胜出）——与游戏移动意图约 300 vs 330px 轻微偏离，桌面 ≥1280 视口不受影响，视觉影响小，明确接受 | 期末四轴 Falsify F4 | Speculative | 📝 待立项 |
 | F-6 | 模拟器配置面板功能细节（vision 终检 2026-08-19）：API Key 无明文/隐藏切换图标、部分按钮无禁用态/间距过近易误触（仿微「获取」/混社会「刷新」）、人生模拟器「拉取」按钮图标语义模糊——游戏自身设计/功能范畴，覆盖层全局干预会破坏各游戏设计，维持现状 | 用户反馈批次 vision 终检 | Speculative | 📝 待立项 |
+| F-7 | `VARS_FAMILY`（simulator-adapt.js:57）漏 B 类组 5 成员 `--text2/--text3`（神明v3 体系）→ 变量面核对盲区 + 神明v3 记录行为死记录、删组 5 规则核对不红 | 期末四轴 Falsify F1 | Worth exploring | ✅ 已修（2026-08-19：VARS_FAMILY 补两成员 + 成员完整性回归断言，22 款核对复跑全绿） |
+| F-8 | `_read_manifest_or_rebuild` 自愈仅覆盖缺失/非法 JSON/非 UTF-8；合法 JSON 但 `simulators` 非 list → `_existing_ids` TypeError / append AttributeError → 500（原子写保证正常运行不产生，需手工损坏触发） | 期末四轴 Falsify F2 | Speculative | 📝 待立项 |
+| F-9 | `sanitize_filename` 未剔除 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9）与 >255 字节文件名 → 落盘 OSError 裸 500（spec 已声明 500 语义，体验可优化） | 期末四轴 Falsify F3 | Speculative | 📝 待立项 |
+| F-10 | `docs/architecture.md` TD-57 信任边界小节未补「导入把第三方文件引入同源区域」一句 + 首句仍称「22 款第三方模拟器」——程序内手册已写、权威文档未同步 | 期末四轴 Spec S1 | Speculative | 📝 待立项 |
+| F-11 | simulator-adapt.js docstring「协议表面」列 6 符号实际 `__all__` 8 符号（漏 INNER_CLASSES/RECORD_MARKER）+ TICKETS 归档 merge 链「当前 HEAD = ba33895」stale（06 文档 commit a38feb9 在后） | 期末四轴 Standards N1/N2 | Speculative | 📝 待立项 |
 
 ---
 
