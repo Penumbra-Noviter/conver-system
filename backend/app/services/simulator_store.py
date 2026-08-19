@@ -29,7 +29,9 @@ manifest 工具（工单 02 声明底座，工单 03 读-改-写原子追加复�
     并按现存 id 集唯一化（-2/-3 后缀，manifest 结构性唯一）。
     文件名净化规则（定版）：取最后路径段 + 剔除 Windows 非法字符/%/#（# 为
     URL fragment 分隔符，iframe src 截断风险）+ 首尾点剔除，空名回退
-    imported-game（防目录穿越，Windows 路径安全）。
+    imported-game（防目录穿越，Windows 路径安全）；stem 精确命中 Windows
+    保留设备名（con/prn/aux/nul/com1-9/lpt1-9）加 `_` 前缀、总名 UTF-8 超
+    255 字节按字节截断不劈裂多字节字符（F-9 定版，落盘 OSError 预拦截）。
 
 G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/json/
 logging/os/pathlib/re/shutil），与 data_dir 同层——工单 03 导入族在此继续
@@ -81,6 +83,17 @@ MAX_IMPORT_BYTES = 5 * 1024 * 1024
 #: 文件名净化剔除字符：Windows 非法字符 + 路径分隔符 + 前端 file 判据拒绝的 % 与
 #: #（URL fragment 分隔符——iframe src 遇 # 截断请求 → 404，落盘名必须兼容）+ 控制字符
 _FORBIDDEN_FILENAME_CHARS = frozenset('<>:"/\\|?*%#') | frozenset(chr(i) for i in range(32))
+
+#: Windows 保留设备名（大小写不敏感、带任意扩展名仍视为保留；F-9 定版——
+#: 精确匹配才拦截，mycon/com10/lpt10 等邻近名不受影响）
+_WINDOWS_RESERVED_NAMES = frozenset(
+    {"con", "prn", "aux", "nul"}
+    | {f"com{i}" for i in range(1, 10)}
+    | {f"lpt{i}" for i in range(1, 10)}
+)
+
+#: 文件名 UTF-8 字节上限（含 .html 后缀；Windows 路径组件上限 255 字节，F-9 定版）
+_MAX_FILENAME_BYTES = 255
 
 #: 恶意模式粗筛常量清单（键 + 正则，常量单源——前端 warnings 文案映射以此为键集锚点；
 #: 命中仅收集返回，绝不拦截；静态审查不承诺防住，定位知情提示）
@@ -177,14 +190,20 @@ def sha256_bytes(content: bytes) -> str:
 
 
 def sanitize_filename(raw: str) -> str:
-    """净化上传文件名 → 安全落盘名（防目录穿越 + Windows 非法字符 + % 与 #）。
+    """净化上传文件名 → 安全落盘名（防目录穿越 + Windows 非法字符 + %/# +
+    保留设备名 + 255 字节上限）。
 
     定版规则：取最后路径段（`/` 与 `\\` 皆按分隔符，杜绝穿越）、剔除 Windows
     非法字符与控制字符、剔除 `%` 与 `#`（前端 isValidSimulatorFile 单点拒绝，
     落盘名必须兼容——`#` 为 URL fragment 分隔符，入 iframe src 会截断请求）、
-    剔除首尾点与空格（防隐藏文件与 `..` 段）；空名回退
-    `imported-game`；扩展名归一化为小写 `.html`。净化静默收敛不报错——
-    校验失败仅限 400 矩阵（非 .html / 超 5MB / 空文件，见 import_game）。
+    剔除首尾点与空格（防隐藏文件与 `..` 段）；空名回退 `imported-game`；
+    扩展名归一化为小写 `.html`。stem（去 .html 后的主名）大小写不敏感精确
+    命中 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9，带任意扩展名仍
+    视为保留）→ 加 `_` 前缀（`_con` 非保留名）；非精确匹配（mycon/com10/
+    lpt10 等）不受影响。总名（含 .html 后缀）UTF-8 编码超 255 字节 → 按字节
+    截断 stem 且不劈裂多字节字符（截断后复用首尾点剔除与空名回退兜底链）。
+    净化静默收敛不报错——校验失败仅限 400 矩阵（非 .html / 超 5MB / 空文件，
+    见 import_game）。
     """
     name = raw.strip().replace("\\", "/").rsplit("/", 1)[-1]
     name = "".join(ch for ch in name if ch not in _FORBIDDEN_FILENAME_CHARS)
@@ -192,8 +211,23 @@ def sanitize_filename(raw: str) -> str:
     if not name:
         name = "imported-game"
     if name.lower().endswith(".html"):
-        return name[:-5] + ".html"
-    return name + ".html"
+        stem = name[:-5]
+    else:
+        stem = name
+    if stem.lower() in _WINDOWS_RESERVED_NAMES:
+        stem = "_" + stem
+    suffix = ".html"
+    stem_bytes = stem.encode("utf-8")
+    if len(stem_bytes) > _MAX_FILENAME_BYTES - len(suffix):
+        stem_bytes = stem_bytes[: _MAX_FILENAME_BYTES - len(suffix)]
+        # 截断点若落在多字节字符中间（末字节为 UTF-8 尾随字节 10xxxxxx），
+        # 回退到完整字符边界，避免产生乱码半字符
+        while stem_bytes and (stem_bytes[-1] & 0xC0) == 0x80:
+            stem_bytes = stem_bytes[:-1]
+        stem = stem_bytes.decode("utf-8", errors="ignore").strip(" .")
+        if not stem:
+            stem = "imported-game"
+    return stem + suffix
 
 
 def slugify(stem: str) -> str:
