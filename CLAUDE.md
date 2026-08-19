@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 613 + 1 skip）；`cd frontend && npm test`（Vitest 958，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。
+测试：`cd backend && python -m pytest`（pytest 621 + 1 skip）；`cd frontend && npm test`（Vitest 958，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。
 
 ## 当前状态（2026-08-19）
 
@@ -60,7 +60,8 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **模拟器配置面板可读性修复（2026-08-19，vision 全量诊断）**：覆盖层新增分区 7（配置面板基线 label 13px/hint 12.5px/input 14px/占位符提亮/卡片居中）+ 主应用提示条对比度修复 + 两处变量注入副作用当场修掉（颜色兜底链反转 + 删除全局 --sub 覆盖）；契约测试 +5 用例；vision 终检 4 游戏达标；Vitest 845→850；F-6 落债（游戏自身设计范畴，维持现状）
 - ✅ **T-01/T-02 模拟器接入契约 + 外置数据目录与用户导入（2026-08-19 kickoff 批次 5 工单 3 波，commit 链 c7e5b29 → 262fe88）**：T-01 接入契约（sim-pc: 映射记录结构化 + scripts/check-simulator-css.mjs 核对脚本 + simulator-adapt.js 共享分析模块）；T-02 数据目录外置（/simulators 挂载改指 CONVER_DATA_DIR 下 simulators/，首启种子幂等）+ 导入端点 POST /api/simulators/import（校验/净化/SHA-256 去重/改名/cfg-探测/恶意粗筛不拦截/manifest 原子注册）+ 前端导入 UI（按钮/拖拽双通道 + 安全警告 + 已导入 badge）+ per-game CSS 注入（数据目录 <game-id>.css 后载序胜出）；期末四轴 F-7 当场修（VARS_FAMILY 补 --text2/--text3），F-8~F-11 落债；Vitest 850→958（+108）、pytest 471+1skip→569+1skip（+98）、cargo 70 零改动；smoke-simulators 14 项全过
 - ✅ **技术债区 F-5/F-6/F-8/F-9/F-12 批次（2026-08-19 kickoff 全自动档小档，commit 链 412b2d7 → ffc54b2）**：F-5/F-6 复核关闭（各附实证）；F-8 manifest 结构校验并入自愈（simulators 非 list 统一重建）+ F-9 sanitize_filename 保留设备名/255 字节收敛（先红后绿 + Falsify 矩阵全过）；F-12 就绪终态发布顺序竞态修复（runtime.json 先落盘再置标志，复现循环 30 次归零）；期末四轴 0 阻断放行；新落债 F-13~F-17（5 项待立项，唯一待办来源 TICKETS.md）
-- ✅ 测试：pytest 613 + 1 skip（后端）+ Vitest 958（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
+- ✅ **技术债区 F-13~F-17 批次（2026-08-19 kickoff 全自动档，commit 链 d295c76 → 3111036）**：F-13 设备名判定改首点前组件（+5 用例）/ F-14 改名后缀字节截断复用 `_truncate_utf8_bytes`（+2）/ F-15 OSError 族读取自愈（+1）/ F-17 总名上限 255→120 字节（Windows MAX_PATH 实测，F-9 矩阵改 120 口径，+3）/ F-16 复核关闭（零代码）；F-18/F-19 归档流程项已修（F-9 注记补 F-17 修订 / F-13 常量注释语义同步）；期末四轴 0 阻断放行；新落债 F-20/F-21 待立项（唯一待办来源 TICKETS.md）
+- ✅ 测试：pytest 621 + 1 skip（后端）+ Vitest 958（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
 
 ## 待办管理
 

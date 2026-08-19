@@ -227,7 +227,7 @@ def sanitize_filename(raw: str) -> str:
     保留名）；非精确匹配（mycon/com10/lpt10 等）不受影响。总名（含 .html
     后缀）UTF-8 编码超 120 字节 → 按字节截断 stem 且不劈裂多字节字符（截断
     后复用首尾点剔除与空名回退兜底链）。上限定版依据（F-17）：Windows
-    MAX_PATH = 260 全路径上限，Python open 无 `\\?\` 前缀——255 组件上限在
+    MAX_PATH = 260 全路径上限，Python open 无 `\\?` 前缀——255 组件上限在
     真实数据目录路径下不可达（默认 %APPDATA%/ConverSystem/simulators ~55
     字符前缀 + 205-255 字节名全长 260+ 即 FileNotFoundError），120 = 260 -
     常见数据目录前缀余量，保证净化结果在真实路径可落盘；超长名截断静默收敛。
