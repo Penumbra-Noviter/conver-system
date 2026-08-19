@@ -874,7 +874,7 @@ conver system/
 
 ### 4.56 `frontend/js/simulator-view.js` — 模拟器运行视图（<!--AUTO:lines:frontend/js/simulator-view.js-->~505 行<!--/AUTO-->）
 
-**职责**：模拟器 iframe 运行视图（U7/U8）——加载/超时/错误态、配置控件 MutationObserver 重建再同步（TD-75 attributeFilter 收窄）、load 自动同步。
+**职责**：模拟器 iframe 运行视图（U7/U8）——加载/超时/错误态、配置控件 MutationObserver 重建再同步（TD-75 attributeFilter 收窄）、load 自动同步、PC 阅读共享覆盖层 + per-game CSS 覆盖注入（T-02 决策 12：共享层先、per-game 后，数据目录 `<game-id>.css` 经 /simulators 挂载同源提供）。
 
 | 元素 | 说明 |
 |------|------|
@@ -889,6 +889,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:mutationTouchesConfig-->`mutationTouchesConfig(mutations, config)`<!--/AUTO--> | 变更是否触及配置 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:handleConfigMutation-->`handleConfigMutation(mutations)`<!--/AUTO--> | 配置变更处理（再同步） |
 | <!--AUTO:sig:frontend/js/simulator-view.js:disconnectObserver-->`disconnectObserver()`<!--/AUTO--> | 断开观察者 |
+| <!--AUTO:sig:frontend/js/simulator-view.js:injectPerGameCss-->`injectPerGameCss(doc)`<!--/AUTO--> | per-game CSS 覆盖注入（共享层之后） |
 | <!--AUTO:sig:frontend/js/simulator-view.js:renderShell-->`renderShell(game)`<!--/AUTO--> | 渲染运行壳 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:isValidGame-->`isValidGame(game)`<!--/AUTO--> | 游戏合法性校验 |
