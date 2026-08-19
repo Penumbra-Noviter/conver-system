@@ -31,6 +31,7 @@ from backend.app.services import data_dir as data_dir_service
 
 __all__ = [
     "TestResolveContract",
+    "TestSimulatorsDir",
     "TestUrlEncodingReference",
     "TestPureStdlibGuard",
 ]
@@ -163,6 +164,36 @@ class TestResolveContract:
         assert data_dir_service.DATA_DIR_NAME == "ConverSystem"
         assert data_dir_service.DATA_DIR_ENV == "CONVER_DATA_DIR"
         assert data_dir_service.DB_FILE == "conver_system.db"
+
+
+class TestSimulatorsDir:
+    """T-02：simulators 子目录访问器——<数据目录>/simulators，继承 CONVER_DATA_DIR 非空生效语义"""
+
+    def test_simulators_dir_under_env_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CONVER_DATA_DIR 非空 → simulators_dir() = <数据目录>\\simulators"""
+        monkeypatch.setenv("CONVER_DATA_DIR", str(tmp_path / "custom"))
+        monkeypatch.setenv("APPDATA", str(tmp_path / "ignored"))
+        assert data_dir_service.simulators_dir() == tmp_path / "custom" / "simulators"
+
+    def test_simulators_dir_under_appdata_default(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """无覆盖 → %APPDATA%\\ConverSystem\\simulators（继承默认解析链）"""
+        monkeypatch.delenv("CONVER_DATA_DIR", raising=False)
+        monkeypatch.setenv("APPDATA", str(tmp_path / "AppData" / "Roaming"))
+        assert (
+            data_dir_service.simulators_dir()
+            == tmp_path / "AppData" / "Roaming" / "ConverSystem" / "simulators"
+        )
+
+    def test_simulators_dir_derived_from_data_dir_constant(self) -> None:
+        """simulators_dir() == data_dir() / SIMULATORS_DIR，且目录名常量为 'simulators'"""
+        assert data_dir_service.SIMULATORS_DIR == "simulators"
+        assert data_dir_service.simulators_dir() == (
+            data_dir_service.data_dir() / data_dir_service.SIMULATORS_DIR
+        )
 
 
 class TestUrlEncodingReference:

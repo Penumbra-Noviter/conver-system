@@ -21,6 +21,10 @@
  *   未运行 → 自动拉起 uvicorn（退出时 taskkill /T /F 树杀 + netstat 复核
  *   端口无 LISTENING）。参考先例：scripts/smoke-desktop.ps1 的端口限定
  *   启停纪律（ARC9-T05：清理按端口判据，绝不按全局进程名）。
+ *   自动拉起时注入 CONVER_DATA_DIR=系统临时目录下新建的隔离目录（T-02 外置：
+ *   首启种子写入隔离目录，防污染真实 %APPDATA%/ConverSystem；冒烟结束后连同
+ *   后端停止一并删除）；复用运行实例时其数据目录由启动方配置，本脚本无法隔离
+ *   （仅记录，不判失败）。
  *
  * 用法：
  *   node scripts/smoke-simulators.mjs [--base-url http://127.0.0.1:8000]
@@ -58,6 +62,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SAVE_KEY_META_RE } from '../frontend/js/save-key-meta.js';
@@ -248,11 +253,15 @@ async function ensureBackend(baseUrl, noStart, backendTimeoutMs) {
 
     const url = new URL(baseUrl);
     const python = resolvePython();
+    // T-02 外置：自动拉起时注入隔离数据目录（首启种子写入此处，防污染真实
+    // %APPDATA%/ConverSystem；冒烟结束由 main 清理删除）
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'conver-smoke-'));
+    logEnv(`冒烟隔离数据目录：${dataDir}（CONVER_DATA_DIR 注入，防污染真实数据目录）`);
     logEnv(`后端未运行，自动拉起 uvicorn（${python} -m uvicorn backend.app.main:app --port ${url.port}）`);
     const child = spawn(
         python,
         ['-m', 'uvicorn', 'backend.app.main:app', '--host', url.hostname, '--port', url.port],
-        { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+        { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, CONVER_DATA_DIR: dataDir } },
     );
     const outBuf = [];
     const errBuf = [];
@@ -275,6 +284,7 @@ async function ensureBackend(baseUrl, noStart, backendTimeoutMs) {
     const ready = await backendReady(baseUrl, backendTimeoutMs);
     if (!ready) {
         killTree(child.pid);
+        fs.rmSync(dataDir, { recursive: true, force: true });
         const why = exited
             ? (exited.error ? `spawn 失败：${exited.error.message}`
                 : `进程提前退出（code=${exited.code}）`)
@@ -287,7 +297,7 @@ async function ensureBackend(baseUrl, noStart, backendTimeoutMs) {
         );
     }
     logEnv(`后端就绪：${baseUrl}（本脚本拉起 pid=${child.pid}，冒烟结束将停止并复核端口）`);
-    return { pid: child.pid, port: Number(url.port) };
+    return { pid: child.pid, port: Number(url.port), dataDir };
 }
 
 /** 停止本脚本拉起的后端：树杀 → 端口无 LISTENING 复核（失败补杀残留 PID） */
@@ -941,8 +951,17 @@ async function main() {
     } finally {
         if (backendHandle && !backendHandle.reuse) {
             await stopBackend(backendHandle);
+            // 清理隔离数据目录（后端已树杀，文件句柄应已释放；失败仅记录不判失败）
+            if (backendHandle.dataDir) {
+                try {
+                    fs.rmSync(backendHandle.dataDir, { recursive: true, force: true });
+                    logEnv(`已清理冒烟隔离数据目录：${backendHandle.dataDir}`);
+                } catch (err) {
+                    logEnv(`冒烟隔离数据目录清理失败（残留于系统临时目录）：${backendHandle.dataDir} — ${err instanceof Error ? err.message : String(err)}`);
+                }
+            }
         } else if (backendHandle) {
-            logEnv('后端为运行前已存在实例，本脚本不停止');
+            logEnv('后端为运行前已存在实例，本脚本不停止（其数据目录由启动方配置，无法隔离）');
         }
     }
 
