@@ -32,6 +32,7 @@ from backend.app.services import simulator_store
 __all__ = [
     "TestEnsureSeeded",
     "TestManifestTools",
+    "TestAppendManifestEntry",
 ]
 
 #: 种子矩阵内置目录最小样本（html + manifest；真实 22 款由冒烟脚本覆盖）
@@ -217,3 +218,85 @@ class TestManifestTools:
         with pytest.raises(TypeError, match="manifest"):
             simulator_store.write_manifest(sim_dir, "not-a-dict")
         assert not (sim_dir / "manifest.json").exists()
+
+class TestAppendManifestEntry:
+    """manifest 读-改-写原子追加（工单 03 导入族）：往返保真 / 损坏自愈"""
+
+    def test_append_roundtrip_preserves_existing_and_chinese(self, tmp_path: Path) -> None:
+        """追加往返：既有条目原样保留、中文保真、version=2、新条目在尾部"""
+        sim_dir = tmp_path / "simulators"
+        simulator_store.write_manifest(
+            sim_dir,
+            {
+                "version": 2,
+                "simulators": [
+                    {
+                        "id": "life-sim",
+                        "file": "人生模拟器v3.html",
+                        "name": "人生模拟器 v3",
+                        "type": "ai",
+                    }
+                ],
+            },
+        )
+        entry = {
+            "id": "my-game",
+            "file": "我的游戏.html",
+            "name": "我的游戏",
+            "type": "local",
+            "source": "imported",
+        }
+        simulator_store.append_manifest_entry(sim_dir, entry)
+        raw = (sim_dir / "manifest.json").read_text(encoding="utf-8")
+        assert "我的游戏" in raw, "manifest 必须以 UTF-8 明文保存中文（ensure_ascii=False）"
+        data = json.loads(raw)
+        assert data["version"] == 2
+        assert data["simulators"][0]["id"] == "life-sim", "既有条目不得被改动"
+        assert data["simulators"][1] == entry
+
+    def test_append_corrupt_manifest_self_heals(self, tmp_path: Path) -> None:
+        """manifest 损坏（非法 JSON）→ 以现存 .html 重建（type=local 降级）+ 追加，version=2"""
+        sim_dir = tmp_path / "simulators"
+        sim_dir.mkdir()
+        (sim_dir / "Alpha.html").write_text("<html>A</html>", encoding="utf-8")
+        (sim_dir / "游戏.html").write_text("<html>游戏</html>", encoding="utf-8")
+        (sim_dir / "贝塔.html").write_text("<html>贝塔</html>", encoding="utf-8")
+        (sim_dir / "manifest.json").write_text("{ 这不是合法 JSON", encoding="utf-8")
+
+        entry = {
+            "id": "new-game",
+            "file": "new.html",
+            "name": "new",
+            "type": "local",
+            "source": "imported",
+        }
+        simulator_store.append_manifest_entry(sim_dir, entry)
+
+        data = json.loads((sim_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert data["version"] == 2
+        assert data["simulators"][-1] == entry
+        # 重建条目：slug 唯一化（中文无 ASCII 回退 imported-game）+ type=local
+        assert data["simulators"][0] == {
+            "id": "alpha",
+            "file": "Alpha.html",
+            "name": "Alpha",
+            "type": "local",
+        }
+        ids = [g["id"] for g in data["simulators"]]
+        assert len(ids) == len(set(ids)), "重建后 id 必须唯一（manifest 结构性约束）"
+        assert {"imported-game", "imported-game-2"} <= set(ids), "空 slug 回退 imported-game 并唯一化"
+
+    def test_append_missing_manifest_rebuilds_from_disk(self, tmp_path: Path) -> None:
+        """manifest 缺失 → 以现存 .html 重建 + 追加（自愈语义，数据目录为唯一事实来源）"""
+        sim_dir = tmp_path / "simulators"
+        sim_dir.mkdir()
+        (sim_dir / "seed.html").write_text("<html>seed</html>", encoding="utf-8")
+
+        simulator_store.append_manifest_entry(
+            sim_dir,
+            {"id": "imported-1", "file": "imported-1.html", "name": "imported-1", "type": "local", "source": "imported"},
+        )
+        data = json.loads((sim_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert data["version"] == 2
+        assert [g["id"] for g in data["simulators"]] == ["seed", "imported-1"]
+
