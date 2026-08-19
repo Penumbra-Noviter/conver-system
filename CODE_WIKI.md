@@ -3,7 +3,6 @@
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
 > 测试状态：<!--AUTO:tests_total:total-->1449<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->487<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->892<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
-> （合并冲突标记待 doc_sync 重算：波1-01 前端 +42、波1-02 后端 +15）
 
 ---
 
@@ -1112,7 +1111,7 @@ conver system/
 3. **04 导入提示**：工单 04 导入成功后以同一分析模块对已上传 HTML 运行比对，未覆盖清单非空则提示并引导 per-game CSS 微调。
 
 
-### 4.71 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~80 行<!--/AUTO-->）
+### 4.74 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~80 行<!--/AUTO-->）
 
 **职责**：T-02 首启种子 + manifest 读写工具（工单 03 导入族继续扩展）——数据目录 simulators 缺 manifest 时从内置目录整目录拷贝（幂等；已存在绝不改动，数据目录为唯一事实来源；种子源缺失降级不崩溃）。
 
@@ -1245,7 +1244,6 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->487<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->892<!--/AUTO-->
-> （合并冲突标记待 doc_sync 重算）
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
