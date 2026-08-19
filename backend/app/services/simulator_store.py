@@ -190,6 +190,23 @@ def sha256_bytes(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def _truncate_utf8_bytes(s: str, max_bytes: int) -> str:
+    """UTF-8 字节截断（不劈裂多字节字符；sanitize 与改名路径共用）。
+
+    仅当 s 编码后字节数超 max_bytes 才截断（未超原样返回）；截断点若落在
+    多字节字符中间（末字节为 UTF-8 尾随字节 10xxxxxx）回退到完整字符边界，
+    避免乱码半字符；截断后复用净化链的首尾点/空格剔除（防截出尾随点等
+    非法形态）。截断为空时返回空串，兜底回退由调用方决定。
+    """
+    data = s.encode("utf-8")
+    if len(data) <= max_bytes:
+        return s
+    data = data[:max_bytes]
+    while data and (data[-1] & 0xC0) == 0x80:
+        data = data[:-1]
+    return data.decode("utf-8", errors="ignore").strip(" .")
+
+
 def sanitize_filename(raw: str) -> str:
     """净化上传文件名 → 安全落盘名（防目录穿越 + Windows 非法字符 + %/# +
     保留设备名 + 255 字节上限）。
@@ -220,16 +237,9 @@ def sanitize_filename(raw: str) -> str:
     if stem.split(".", 1)[0].lower() in _WINDOWS_RESERVED_NAMES:
         stem = "_" + stem
     suffix = ".html"
-    stem_bytes = stem.encode("utf-8")
-    if len(stem_bytes) > _MAX_FILENAME_BYTES - len(suffix):
-        stem_bytes = stem_bytes[: _MAX_FILENAME_BYTES - len(suffix)]
-        # 截断点若落在多字节字符中间（末字节为 UTF-8 尾随字节 10xxxxxx），
-        # 回退到完整字符边界，避免产生乱码半字符
-        while stem_bytes and (stem_bytes[-1] & 0xC0) == 0x80:
-            stem_bytes = stem_bytes[:-1]
-        stem = stem_bytes.decode("utf-8", errors="ignore").strip(" .")
-        if not stem:
-            stem = "imported-game"
+    stem = _truncate_utf8_bytes(stem, _MAX_FILENAME_BYTES - len(suffix))
+    if not stem:
+        stem = "imported-game"
     return stem + suffix
 
 
@@ -263,6 +273,10 @@ def find_duplicate(sim_dir: Path, content: bytes) -> str | None:
 def next_available_filename(sim_dir: Path, desired: str) -> str:
     """文件名冲突自动改名：xxx-2.html 递增；冲突判定大小写不敏感（Windows 定版）。
 
+    改名路径保证总名（含 -N 后缀与扩展名）UTF-8 不超过 _MAX_FILENAME_BYTES
+    字节：拼 -N 后缀前按余量对 stem 重做字节截断（复用 _truncate_utf8_bytes，
+    不劈裂多字节字符）——杜绝 NAME_MAX 顶破（250 字节 stem 拼 -2 溢出 255
+    字节 → 落盘 OSError 500）。
     目录不存在视为无冲突（导入会在落盘前创建目录）。
     """
     stem, ext = desired.rsplit(".", 1)
@@ -274,7 +288,8 @@ def next_available_filename(sim_dir: Path, desired: str) -> str:
     candidate = desired
     n = 2
     while candidate.lower() in existing:
-        candidate = f"{stem}-{n}.{ext}"
+        suffix = f"-{n}.{ext}"
+        candidate = _truncate_utf8_bytes(stem, _MAX_FILENAME_BYTES - len(suffix)) + suffix
         n += 1
     return candidate
 

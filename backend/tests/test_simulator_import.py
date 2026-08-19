@@ -294,6 +294,39 @@ class TestRenameConflict:
         sim = tmp_path / "sim"
         assert next_available_filename(sim, "a.html") == "a.html"
 
+    def test_rename_truncates_stem_bytes_within_limit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """拼 -N 后缀顶破字节上限 → 按余量重做字节截断（F-14）。
+
+        250 字节 ASCII stem 拼 -2 后 257 字节 > 255 NAME_MAX（NTFS/POSIX 组件
+        上限）→ 落盘 OSError 500。Windows 深前缀下 255 字节 ASCII 组件名物理
+        不可创建（MAX_PATH 260 UTF-16 单元），故将模块常量调小为 40，用可落盘
+        长度构造同构场景：stem 35 字节 + 后缀 7 字节 = 42 字节顶破 40——截断
+        机制与真实 255 上限完全同路径（同一 _truncate_utf8_bytes 调用）。
+        """
+        monkeypatch.setattr(simulator_store, "_MAX_FILENAME_BYTES", 40)
+        sim = tmp_path / "sim"
+        sim.mkdir()
+        long_name = "a" * 35 + ".html"  # 40 字节：恰等于上限（sanitize 语义不截）
+        (sim / long_name).write_bytes(b"<html>A</html>")
+        result = next_available_filename(sim, long_name)
+        assert len(result.encode("utf-8")) <= 40
+        assert result.endswith("-2.html")
+
+    def test_rename_utf8_truncation_keeps_whole_chars(self, tmp_path: Path) -> None:
+        """UTF-8 多字节 stem 冲突 → 截断不劈裂多字节字符（编码-解码回环无损，
+        无乱码半字符），总长 ≤ 上限且 -N 后缀完整"""
+        sim = tmp_path / "sim"
+        sim.mkdir()
+        long_name = "中" * 83 + ".html"  # 249 字节 + 5 = 254（≤255，sanitize 不截）
+        (sim / long_name).write_bytes(b"<html>A</html>")
+        result = next_available_filename(sim, long_name)
+        data = result.encode("utf-8")
+        assert len(data) <= simulator_store._MAX_FILENAME_BYTES
+        assert data.decode("utf-8") == result, "截断不得产生乱码半字符"
+        assert result.endswith("-2.html")
+
 
 class TestProbeConfig:
     """元数据探测矩阵：cfg- 三元组齐全 → ai + config；否则 local 无 config（条目级降级）"""
