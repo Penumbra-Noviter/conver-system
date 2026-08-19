@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1392<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->472<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->850<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1434<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->472<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->892<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -154,6 +154,7 @@ conver system/
 │   │   ├── save-manager.js         ← 模拟器存档管理（导出/导入/删除）
 │   │   ├── search-view.js          ← 跨对话搜索视图
 │   │   ├── simulator-contracts.js  ← 模拟器域契约单一来源（C8）
+│   │   ├── simulator-adapt.js      ← 适配分析共享模块（映射记录/三面提取/覆盖比对，T-01）
 │   │   ├── simulator-view.js       ← 模拟器运行视图（iframe/观察者/自动同步）
 │   │   ├── simulators.js           ← 模拟器列表视图（manifest 解析/筛选）
 │   │   ├── state.js                ← 全局 DOM 引用缓存
@@ -175,11 +176,12 @@ conver system/
 │   │   └── utils/
 │   │       ├── model-utils.js      ← 模型下拉填充工具
 │   │       └── sse-reader.js       ← SSE 流解析
-│   ├── tests/                      ← Vitest（26 个文件，见 §5.2）
+│   ├── tests/                      ← Vitest（27 个文件，见 §5.2）
 │   ├── vitest.config.js
 │   ├── package.json
 │   └── simulators/                 ← 22 款第三方单文件模拟器（HTML，非源码）
 ├── scripts/                        ← [F-01 文档同步工具链]（本仓库）
+│   ├── check-simulator-css.mjs     ← 模拟器接入契约核对脚本（T-01，退出码 0=全绿）
 │   ├── doc_sync.py                 ← CODE_WIKI 机械标记生成/校验（三渠道）
 │   ├── pre-commit.sh               ← pre-commit 钩子源：跑 `doc_sync.py --check`
 │   └── install-hooks.bat           ← 把 pre-commit.sh 复制到 `.git/hooks/pre-commit`
@@ -1085,12 +1087,34 @@ conver system/
 | <!--AUTO:sig:src-tauri/src/settings.rs:decide_close-->`decide_close(action: Option<CloseAction>) -> CloseDecision`<!--/AUTO--> | 偏好 → 关闭决策（未设置/损坏回退托盘） |
 | <!--AUTO:sig:src-tauri/src/settings.rs:load_close_action-->`load_close_action(data_dir: &Path) -> Option<CloseAction>`<!--/AUTO--> | 读取偏好（缺失/损坏 → None） |
 | <!--AUTO:sig:src-tauri/src/settings.rs:save_close_action-->`save_close_action(data_dir: &Path, action: CloseAction) -> Result<(), String>`<!--/AUTO--> | 原子写入偏好 |
+### 4.71 `frontend/js/simulator-adapt.js` — 适配分析共享模块（<!--AUTO:lines:frontend/js/simulator-adapt.js-->~390 行<!--/AUTO-->）
+
+**职责**：新游戏接入覆盖层把关的分析逻辑（T-01）——映射记录解析 / 游戏 HTML 三面提取（日志条目类名 / CSS 变量体系 / 显式字号声明）/ 覆盖比对输出「未覆盖清单」。CLI 消费者 `scripts/check-simulator-css.mjs` 与工单 04 导入未覆盖提示共用；顶层零 DOM（Node ESM 直 import，冒烟先例）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/simulator-adapt.js:parseCoverageRecords-->`parseCoverageRecords(cssText)`<!--/AUTO--> | 解析 `# sim-pc:` 映射记录 + 推导已覆盖集合（类/变量/字号规则） |
+| <!--AUTO:sig:frontend/js/simulator-adapt.js:extractGameClasses-->`extractGameClasses(htmlText)`<!--/AUTO--> | 游戏三面提取（classes/vars/fonts，零 DOM 正则） |
+| <!--AUTO:sig:frontend/js/simulator-adapt.js:compareCoverage-->`compareCoverage(game, gameName, coverage)`<!--/AUTO--> | 覆盖比对 → 未覆盖清单（记录缺失必报） |
+
+### 4.72 `scripts/check-simulator-css.mjs` 接入契约核对脚本（T-01）
+
+**职责**：新游戏接入把关 CLI（T-01）——对指定游戏 HTML（默认 `frontend/simulators/` 全部 22 款）运行适配分析，输出「未覆盖清单」；退出码 0 = 全绿、非 0 = 有未覆盖（含映射记录缺失）。分析逻辑全部委托 `simulator-adapt.js`（`runCheck` / `main` 为导出 seam，Node 直调测试覆盖），本文件仅 CLI 编排。
+
+### 4.73 模拟器新游戏接入流程（T-01 强制校验）
+
+新游戏接入把关注入点：`node scripts/check-simulator-css.mjs <新游戏>.html` —— 脚本解析 `simulator-pc.css` 的映射记录（`# sim-pc:` 段）后与该游戏 HTML 三面提取结果比对：
+
+1. **补映射记录**：在 `simulator-pc.css` 末尾 `# sim-pc:` 段按语法加一行（游戏名 = HTML 文件干名）；日志条目类/变量/字号覆盖项须与覆盖层实际规则一致（契约测试锁）；刻意保留的原始样式（元数据/标签小字号、决策面变量）以豁免项 `选择器:字号!` / `--变量!` 记录在案。
+2. **跑核对**：`check-simulator-css` 全绿（退出码 0、输出无「未覆盖」）方可放行；无记录 = 未接入核对必红（适配盲区强制校验，T-01 补的短板）。
+3. **04 导入提示**：工单 04 导入成功后以同一分析模块对已上传 HTML 运行比对，未覆盖清单非空则提示并引导 per-game CSS 微调。
+
 
 ---
 
 ## 五、测试
 
-三层测试体系：后端 pytest（19 文件）、前端 Vitest（26 文件）、壳 cargo test（4 集成文件 + lib.rs 单元）。覆盖率基线：后端 `pytest --cov`（目标 ≥90%）、前端 `npm run test:coverage`。
+三层测试体系：后端 pytest（19 文件）、前端 Vitest（27 文件）、壳 cargo test（4 集成文件 + lib.rs 单元）。覆盖率基线：后端 `pytest --cov`（目标 ≥90%）、前端 `npm run test:coverage`。
 
 ### 5.1 后端 pytest（backend/tests）
 
@@ -1144,8 +1168,9 @@ conver system/
 | `frontend/tests/search-view.test.js` | <!--AUTO:tests:frontend/tests/search-view.test.js-->17<!--/AUTO--> | 搜索视图 |
 | `frontend/tests/settings-panel.test.js` | <!--AUTO:tests:frontend/tests/settings-panel.test.js-->33<!--/AUTO--> | 设置面板 |
 | `frontend/tests/simulator-contracts.test.js` | <!--AUTO:tests:frontend/tests/simulator-contracts.test.js-->15<!--/AUTO--> | 模拟器域契约 |
+| `frontend/tests/simulator-adapt.test.js` | <!--AUTO:tests:frontend/tests/simulator-adapt.test.js-->36<!--/AUTO--> | 适配分析共享模块 + 核对脚本 CLI（T-01） |
 | `frontend/tests/simulator-manifest.test.js` | <!--AUTO:tests:frontend/tests/simulator-manifest.test.js-->19<!--/AUTO--> | manifest 解析 |
-| `frontend/tests/simulator-pc-css.test.js` | <!--AUTO:tests:frontend/tests/simulator-pc-css.test.js-->18<!--/AUTO--> | 模拟器 PC 覆盖层契约（验收标准 + F1/F2 回归锁） |
+| `frontend/tests/simulator-pc-css.test.js` | <!--AUTO:tests:frontend/tests/simulator-pc-css.test.js-->24<!--/AUTO--> | 模拟器 PC 覆盖层契约（验收标准 + F1/F2 回归锁） |
 | `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->58<!--/AUTO--> | 模拟器运行视图 |
 | `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->68<!--/AUTO--> | 模拟器列表 |
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
@@ -1203,10 +1228,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1392<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1434<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->472<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->850<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->892<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

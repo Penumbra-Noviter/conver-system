@@ -194,3 +194,46 @@ input::placeholder, textarea::placeholder {
         line-height: 1.75 !important;
     }
 }
+
+/* ══════════════════════════════════════════════════
+ * 映射记录（机器契约 `# sim-pc:` — scripts/check-simulator-css.mjs /
+ * frontend/js/simulator-adapt.js parseCoverageRecords 共用解析；工单 04
+ * 导入未覆盖提示复用同一语法）
+ *
+ * 语法：# sim-pc: <游戏名> | classes=<类名,...> | vars=<--变量,...> |
+ *        fonts=<选择器:字号,...>
+ *   - 每游戏一行；游戏名与 frontend/simulators/<游戏名>.html 文件干名
+ *     一致（一一对应，契约测试双向校验）
+ *   - classes/vars/fonts 为「已核对映射」覆盖项；契约测试断言覆盖项与
+ *     实际 CSS 规则一致（删除规则必须同步删除记录）
+ *   - 豁免项后缀 `!`（vars=--sub! / fonts=.msg code:13px!）：源文件核对
+ *     后刻意保留游戏原始样式（覆盖层明确不覆盖的元数据/标签/正文微调
+ *     面——.who/.nm/.tag/.meta/.think-body 等小字号与 --sub 变量），记录
+ *     在案防误报
+ *   - 字段可省略；新游戏接入：先加记录行再跑核对脚本（无记录 = 未核对
+ *     必红——适配盲区强制校验）
+ * ══════════════════════════════════════════════════
+# sim-pc:
+ido偶像模拟器 | classes=log-entry | fonts=.log-entry.ai .who:11px!,.log-entry.user .who:11px!,.log-entry.think summary:11px!,.log-entry.think .think-body:11px!
+人生模拟器v3 | classes=log-entry
+仙途 | classes=log-entry
+仿微 | classes=msg | vars=--sub!
+侦探模拟v3 | classes=msg | fonts=.msg .m-head:10.5px!,.msg .m-meta:9.5px!,.msg .m-time:9px!
+克苏鲁跑团AIv2 | classes=log-entry | fonts=.log-entry.narrative .tag:9.5px!,.log-entry.action .who:10px!,.log-entry.thinking summary:10.5px!
+哈利波特 | classes=log-entry,msg | fonts=.mem-item .m-text:12.5px!
+小马宝莉 | classes=msg | vars=--muted | fonts=.msg code:13px!,.msg .r-box:12.5px!
+恋樱学园v2 | classes=log-entry | fonts=.log-entry.think summary:12px!
+无尽之海 | classes=msg | fonts=.msg .nm:10px!,.msg .nm .tm:9px!,.msg .txt:13px!,.msg .txt .md-h2:13px!,.msg .txt code:11px!,.msg .txt table:11px!,.msg.sys .txt:11px!,.msg .think:10.5px!
+无限流v2 | classes=log-entry
+暮色女巫v2 | classes=log-entry | fonts=.log-entry.thinking summary:12.5px!
+朕的江山 | classes=log-entry | fonts=.log-entry.think summary:12px!
+江湖志v2 | classes=msg | fonts=.msg .meta:10.5px!,.msg .avatar:12px!
+灵网飞升 | classes=msg | vars=--t2,--t3 | fonts=.msg .bubble code:12.5px!,.msg .bubble pre:12.5px!
+社会 | classes=msg | vars=--t2,--t3 | fonts=.msg.ai .tag:10.5px!,.msg.ai .ai-body:13.5px!,.msg.ai .ai-body code:12px!,.msg.sys div:11.5px!
+神明v3 | classes=chat-msg | vars=--text2,--text3
+蛛网之影 | classes=log-entry,ency-entry,mem-entry | fonts=.log-entry .who:10.5px!,.log-entry .who .opts button:10.5px!,.log-entry.thinking details summary:11px!,.log-entry.thinking .tw:11.5px!,.log-entry .note-tag:9.5px!,.ency-entry summary:12.5px!,.ency-entry summary em:10px!,.mem-entry .mem-type:10px!,.mem-entry em:10px!
+许愿柳 | classes=msg | vars=--fs-s,--fs-m,--fs-l,--tx2,--tx3
+都市异能v2 | classes=log-entry | fonts=.log-entry.thinking summary:13px!
+高中生模拟器 | classes=msg | vars=--muted | fonts=.msg code:13px!,.msg .r-box:12.5px!
+魔法少女小圆 | classes=msg | fonts=.msg details.reasoning:11px!,.msg details.reasoning summary:11px!
+*/

@@ -17,10 +17,11 @@
  */
 
 import { describe, it as test, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import postcss from 'postcss';
+import { parseCoverageRecords } from '../js/simulator-adapt.js';
 
 const cssPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../css/simulator-pc.css');
 const css = readFileSync(cssPath, 'utf8');
@@ -179,6 +180,85 @@ describe('simulator-pc.css 期末四轴修复回归锁（Falsify F1/F2）', () =
         for (const r of bubbleRules) {
             const fs = r.nodes.find((n) => n.type === 'decl' && n.prop === 'font-size');
             if (fs) expect(fs.value).not.toBe('14px');
+        }
+    });
+});
+
+describe('simulator-pc.css 映射记录契约（T-01 结构化）', () => {
+    const coverage = parseCoverageRecords(css);
+    const simDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../simulators');
+    const gameNames = readdirSync(simDir)
+        .filter((f) => f.endsWith('.html'))
+        .map((f) => f.slice(0, -'.html'.length))
+        .sort();
+
+    test('`# sim-pc:` 标记行出现一次且 postcss 可解析（注释块内不产生规则）', () => {
+        const markerLines = css.split(/\r?\n/).filter((l) => l.trim() === '# sim-pc:');
+        expect(markerLines).toHaveLength(1);
+        expect(ast.nodes.length).toBeGreaterThan(0);
+        expect(css).toContain('映射记录（机器契约');
+        expect(css).toContain('# sim-pc:');
+    });
+
+    test('记录 22 款游戏与 frontend/simulators/*.html 文件干名一一对应（双向）', () => {
+        const recordNames = coverage.games.map((g) => g.name).sort();
+        expect(recordNames).toHaveLength(gameNames.length);
+        expect(recordNames).toEqual(gameNames);
+        expect(new Set(recordNames).size).toBe(recordNames.length);
+    });
+
+    test('记录 classes 项全部出现在覆盖层实际规则选择器类名中', () => {
+        for (const g of coverage.games) {
+            for (const cls of g.classes) {
+                expect(coverage.covered.classes, `${g.name} 记录类名 ${cls} 应存在对应规则`).toContain(cls);
+            }
+        }
+    });
+
+    test('记录 vars 非豁免项全部有覆盖层变量声明；豁免项仅 --sub（决策面单源）', () => {
+        for (const g of coverage.games) {
+            for (const v of g.vars) {
+                if (v.exempt) {
+                    expect(v.name).toBe('--sub'); // 唯一决策面豁免（分区 7 注释在案）
+                } else {
+                    expect(coverage.covered.vars, `${g.name} 记录变量 ${v.name} 应存在对应声明`).toContain(v.name);
+                }
+            }
+        }
+        // --sub 豁免恰好一次（仿微）
+        const subExempts = coverage.games.flatMap((g) => g.vars.filter((v) => v.exempt));
+        expect(subExempts).toHaveLength(1);
+        expect(subExempts[0].name).toBe('--sub');
+    });
+
+    test('记录 fonts 项格式合法且豁免项未被覆盖层规则选择器覆盖（豁免不冗余）', () => {
+        const ruleSelectors = new Set(coverage.covered.fontRules.map((r) => r.selector));
+        for (const g of coverage.games) {
+            for (const f of g.fonts) {
+                expect(f.size).toMatch(/^\d+(\.\d+)?px$/);
+                expect(f.selector).toMatch(/^([.#]?[a-zA-Z][a-zA-Z0-9_-]*)+([ ]([.#]?[a-zA-Z][a-zA-Z0-9_-]*)+)*$/);
+                if (f.exempt) {
+                    // 豁免 = 覆盖层明确不覆盖：选择器不得与任何覆盖层字号规则
+                    // 选择器完全相同（否则豁免冗余）。祖先选择器前缀不算冗余
+                    // —— 规则命中容器元素而非被修饰元素本身（如
+                    // `.log-entry.think summary` 与规则 `.log-entry.think`）
+                    expect(ruleSelectors.has(f.selector), `${g.name} 豁免项 ${f.selector} 不应与规则重复`).toBe(false);
+                }
+            }
+        }
+        // 全部 22 款记录 fonts 均为豁免项（当前覆盖层无逐游戏非豁免字号记录）
+        const allFonts = coverage.games.flatMap((g) => g.fonts);
+        expect(allFonts.length).toBeGreaterThan(0);
+        expect(allFonts.every((f) => f.exempt)).toBe(true);
+    });
+
+    test('记录 fonts 豁免项的选择器含日志体系类（核对面自洽）', () => {
+        const logClasses = ['log-entry', 'chat-msg', 'msg', 'ency-entry', 'mem-entry', 'm-text', 'm-bubble', 'bubble', 'wrap', 'm-main'];
+        for (const g of coverage.games) {
+            for (const f of g.fonts) {
+                expect(logClasses.some((c) => f.selector.split(/\s+/).some((part) => part.split('.').includes(c))),
+                    `${g.name} 豁免选择器 ${f.selector} 应含日志体系类`).toBe(true);
+            }
         }
     });
 });
