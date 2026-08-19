@@ -1090,7 +1090,6 @@ conver system/
 | <!--AUTO:sig:src-tauri/src/settings.rs:save_close_action-->`save_close_action(data_dir: &Path, action: CloseAction) -> Result<(), String>`<!--/AUTO--> | 原子写入偏好 |
 ### 4.71 `frontend/js/simulator-adapt.js` — 适配分析共享模块（<!--AUTO:lines:frontend/js/simulator-adapt.js-->~390 行<!--/AUTO-->）
 
-<<<<<<< HEAD
 **职责**：新游戏接入覆盖层把关的分析逻辑（T-01）——映射记录解析 / 游戏 HTML 三面提取（日志条目类名 / CSS 变量体系 / 显式字号声明）/ 覆盖比对输出「未覆盖清单」。CLI 消费者 `scripts/check-simulator-css.mjs` 与工单 04 导入未覆盖提示共用；顶层零 DOM（Node ESM 直 import，冒烟先例）。
 
 | 元素 | 说明 |
