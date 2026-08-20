@@ -22,6 +22,21 @@ function installBridge(value = null) {
     return invoke;
 }
 
+/** 造一个带状态的假桥：get_close_action 返回存储值，set_close_action 存入并返回值，模拟真实 Rust 行为 */
+function installStatefulBridge(initial = null) {
+    let stored = initial;
+    const invoke = vi.fn().mockImplementation(async (cmd, args) => {
+        if (cmd === 'get_close_action') return stored;
+        if (cmd === 'set_close_action') {
+            stored = args.action;
+            return args.action;
+        }
+        return null;
+    });
+    window.__TAURI_INTERNALS__ = { invoke };
+    return invoke;
+}
+
 /** 造一个可捕获事件回调的假 overlay（模拟 openModal 的 onOpen 参数） */
 function fakeOverlay() {
     const handlers = {};
@@ -89,10 +104,19 @@ describe('getCloseAction', () => {
 });
 
 describe('setCloseAction', () => {
-    it('有桥 + 合法取值 → invoke 携带 action', async () => {
-        const invoke = installBridge();
+    it('有桥 + 合法取值 → 写入并读回验证通过，invoke 携带 action', async () => {
+        // installBridge('tray')：set_close_action 与读回 get_close_action 均返回 'tray'
+        const invoke = installBridge('tray');
         await setCloseAction('tray');
         expect(invoke).toHaveBeenCalledWith('set_close_action', { action: 'tray' });
+        expect(invoke).toHaveBeenCalledWith('get_close_action');
+    });
+
+    it('保存后读回不匹配 → 抛错（Rust 侧未实际落盘场景）', async () => {
+        // set_close_action 返回 'tray'，但读回 get_close_action 返回 null → 抛错
+        const invoke = installBridge(null);
+        invoke.mockResolvedValueOnce('tray'); // set_close_action
+        await expect(setCloseAction('quit')).rejects.toThrow(/读回不匹配/);
     });
 
     it('非法取值 → 忽略，不发命令', async () => {
@@ -130,7 +154,7 @@ describe('ensureCloseActionChoice（首次运行引导）', () => {
     });
 
     it('偏好未设置（null）→ 弹窗且两按钮必选其一，选择后持久化并同步表单', async () => {
-        const invoke = installBridge(null);
+        const invoke = installStatefulBridge(null);
         const { getOpts, overlay } = captureModal();
         const promise = ensureCloseActionChoice();
 
@@ -143,13 +167,15 @@ describe('ensureCloseActionChoice（首次运行引导）', () => {
         await promise;
 
         expect(invoke).toHaveBeenCalledWith('set_close_action', { action: 'quit' });
+        // 写盘后读回验证：get_close_action 应返回 'quit'（状态桥自动保持）
+        expect(invoke).toHaveBeenCalledWith('get_close_action');
         // 表单同步：quit 单选选中
         const radios = [...document.querySelectorAll('input[name="close-action"]')];
         expect(radios.find((r) => r.value === 'quit').checked).toBe(true);
         expect(radios.find((r) => r.value === 'tray').checked).toBe(false);
     });
 
-    it('保存失败 → 不抛错（console.error），关闭语义保持默认', async () => {
+    it('保存失败 → 显示可见告警且不抛错，关闭语义保持默认', async () => {
         installBridge(null);
         window.__TAURI_INTERNALS__.invoke.mockResolvedValueOnce(null);
         window.__TAURI_INTERNALS__.invoke.mockRejectedValueOnce(new Error('写盘失败'));
@@ -158,6 +184,7 @@ describe('ensureCloseActionChoice（首次运行引导）', () => {
         await vi.waitFor(() => expect(getOpts()).not.toBeNull());
         overlay.handlers['close-action-tray']();
         await expect(promise).resolves.toBeUndefined();
+        await vi.waitFor(() => expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('关闭行为保存失败')));
     });
 });
 
@@ -194,8 +221,8 @@ describe('initCloseActionSetting（设置页分组）', () => {
         expect([...group.querySelectorAll('input[name="close-action"]')].some((r) => r.checked)).toBe(false);
     });
 
-    it('切换单选 → 即时保存 + 提示', async () => {
-        const invoke = installBridge('tray');
+    it('切换单选 → 即时保存 + 读回验证 + 提示', async () => {
+        const invoke = installStatefulBridge('tray');
         await initCloseActionSetting();
         const quitRadio = document.querySelector('input[name="close-action"][value="quit"]');
         quitRadio.checked = true;
@@ -203,7 +230,8 @@ describe('initCloseActionSetting（设置页分组）', () => {
         // 等待异步保存完成（invoke 调用是同步发生的，showAlert 在其后微任务——合并断言轮询到两者齐备）
         await vi.waitFor(() => {
             expect(invoke).toHaveBeenCalledWith('set_close_action', { action: 'quit' });
-            expect(showAlert).toHaveBeenCalled();
+            expect(invoke).toHaveBeenCalledWith('get_close_action');
+            expect(showAlert).toHaveBeenCalledWith('关闭行为已保存');
         });
     });
 

@@ -185,6 +185,10 @@ async function loadModels() {
 // ══════════════════════════════════════════════════
 
 async function init() {
+    // 桌面壳设置：首次运行选择弹窗尽早执行（不依赖数据加载），
+    // 确保 init 内任何异常都不会阻塞首次引导
+    ensureCloseActionChoice();
+
     await loadCharacters();
     await loadConversations();
     await loadModels();
@@ -216,9 +220,8 @@ async function init() {
         },
     });
 
-    // 桌面壳设置（D11）：设置页「关闭窗口」分组回填 + 首次运行选择弹窗（纯网页模式 no-op）
+    // 桌面壳设置（D11）：设置页「关闭窗口」分组回填（首次引导已在 init 最前执行）
     initCloseActionSetting();
-    ensureCloseActionChoice();
 }
 
 // ══════════════════════════════════════════════════

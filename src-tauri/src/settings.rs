@@ -77,6 +77,8 @@ pub fn load_close_action(data_dir: &Path) -> Option<CloseAction> {
 /// 与 `server::write_runtime_json` 同款，防半截文件被读作损坏）。
 pub fn save_close_action(data_dir: &Path, action: CloseAction) -> Result<(), String> {
     let path = settings_file(data_dir);
+    // 防御性确保目录存在（调用方通常已创建，但首次写入前或数据目录被清理时可兜底）
+    std::fs::create_dir_all(data_dir).map_err(|e| format!("创建设置目录失败: {e}"))?;
     let json = serde_json::json!({ "close_action": action.as_str() });
     let text =
         serde_json::to_string_pretty(&json).map_err(|e| format!("序列化 settings.json 失败: {e}"))?;

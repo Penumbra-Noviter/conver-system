@@ -24,9 +24,11 @@ pub fn get_close_action(state: State<'_, ShellState>) -> Option<String> {
 }
 
 /// 写入关闭行为偏好（D11）：非法取值拒绝，防前端 bug 覆盖用户偏好。
+/// 返回持久化后的取值（前端据此做读回验证，防静默写入失败）。
 #[tauri::command]
-pub fn set_close_action(state: State<'_, ShellState>, action: String) -> Result<(), String> {
+pub fn set_close_action(state: State<'_, ShellState>, action: String) -> Result<String, String> {
     let parsed =
         CloseAction::parse(&action).ok_or_else(|| format!("非法关闭行为取值: {action}"))?;
-    settings::save_close_action(&state.data_dir(), parsed)
+    settings::save_close_action(&state.data_dir(), parsed)?;
+    Ok(parsed.as_str().to_string())
 }

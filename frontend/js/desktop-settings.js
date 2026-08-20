@@ -41,13 +41,21 @@ export async function getCloseAction() {
 }
 
 /**
- * 写入关闭行为偏好（非法取值忽略，不发命令）
+ * 写入关闭行为偏好（非法取值忽略，不发命令）。
+ * 保存后自动读回验证，不一致时抛错。
  * @param {'tray'|'quit'} action
  * @returns {Promise<void>}
  */
 export async function setCloseAction(action) {
     if (!hasDesktopBridge() || !CLOSE_ACTIONS.includes(action)) return;
-    await window.__TAURI_INTERNALS__.invoke('set_close_action', { action });
+    const persisted = await window.__TAURI_INTERNALS__.invoke('set_close_action', { action });
+    // 读回验证：确保 Rust 侧实际落盘的值与预期一致
+    const readback = await getCloseAction();
+    if (readback !== action) {
+        throw new Error(
+            `关闭行为保存后读回不匹配: 期望 "${action}", 读回 "${readback || 'null'}"`
+        );
+    }
 }
 
 /**
@@ -86,7 +94,7 @@ function showCloseActionChoice() {
 
 /**
  * 首次运行引导：偏好未设置 → 弹出选择并持久化（已设置 / 纯网页模式 no-op）。
- * 保存失败不阻塞使用——关闭语义保持默认托盘，下次启动可重试。
+ * 保存失败时显示可见告警，不阻塞使用——关闭语义保持默认托盘，下次启动可重试。
  * @returns {Promise<void>}
  */
 export async function ensureCloseActionChoice() {
@@ -99,6 +107,7 @@ export async function ensureCloseActionChoice() {
         syncCloseActionSetting(chosen);
     } catch (err) {
         console.error('保存关闭行为偏好失败:', err);
+        showAlert('关闭行为保存失败，请重试: ' + err.message);
     }
 }
 
