@@ -18,6 +18,7 @@ import { state } from '../state.js';
 import { settings, conversations } from '../api.js';
 import { showAlert, showConfirm } from './confirm-dialog.js';
 import { escapeHtml } from '../utils.js';
+import { beginButtonLoading } from './loading-button.js';
 import { fillModelSelect, createCustomModelHandler } from '../utils/model-utils.js';
 import { iconHtml } from '../icons.js';
 
@@ -122,10 +123,14 @@ async function toggleTheme() {
     const current = root.getAttribute('data-theme') || 'dark';
     const next = current === 'dark' ? 'light' : 'dark';
     applyTheme(next);
+    const btn = $('#btn-theme-toggle');
+    if (btn) btn.disabled = true;
     try {
         await settings.update({ theme_mode: next });
     } catch (err) {
         console.error('保存主题设置失败:', err);
+    } finally {
+        if (btn) btn.disabled = false;
     }
     // 更新主题按钮图标
     updateThemeToggleIcon(next);
@@ -390,11 +395,13 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
             user_name: userNameInput.value,
         };
 
-        // P4.3：保存前测试已填写的 API Key 连接，失败由用户确认是否继续
-        const canSave = await testApiKeys(data);
-        if (!canSave) return;
-
+        const btn = $('#btn-save-settings');
+        const restore = beginButtonLoading(btn, '保存中…');
         try {
+            // P4.3：保存前测试已填写的 API Key 连接，失败由用户确认是否继续
+            const canSave = await testApiKeys(data);
+            if (!canSave) return; // finally 恢复按钮
+
             const result = await settings.update(data);
             // 更新本地状态
             state.defaultProvider = result.default_provider || data.default_provider;
@@ -406,6 +413,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
             showAlert('设置已保存');
         } catch (err) {
             showAlert('保存失败: ' + err.message);
+        } finally {
+            restore();
         }
     });
 
@@ -427,6 +436,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
         });
 
         if (confirmed) {
+            const btn = $('#btn-clear-all-convs');
+            const restore = beginButtonLoading(btn, '清空中…');
             try {
                 await conversations.deleteAll();
                 state.conversations = [];
@@ -436,6 +447,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
                 showAlert(`已清空 ${convCount} 个对话`);
             } catch (err) {
                 showAlert('清空失败: ' + err.message);
+            } finally {
+                restore();
             }
         }
     });

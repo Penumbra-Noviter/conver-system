@@ -34,6 +34,7 @@ import { showCharacterWizard } from './components/character-wizard.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
 import { showModelSelector } from './components/model-selector.js';
 import { downloadBlob, showError, showSuccess } from './utils.js';
+import { beginButtonLoading } from './components/loading-button.js';
 import { characterCardHtml, conversationItemHtml } from './format.js';
 import { state } from './state.js';
 import { chatDom } from './chat.js';
@@ -108,23 +109,31 @@ function renderCharacters() {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const id = parseInt(btn.closest('.character-card').dataset.id);
+            const restore = beginButtonLoading(btn, '加载中…');
             try {
                 const char = await characters.get(id);
                 showCharacterForm('edit', char, () => loadCharacters());
             } catch (err) {
                 console.error('加载角色详情失败:', err);
                 showAlert('加载角色信息失败: ' + err.message);
+            } finally {
+                restore();
             }
         });
     });
 
     // 事件委托：导出角色卡（P2.5.5）
     grid.querySelectorAll('.export-char').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const id = parseInt(btn.closest('.character-card').dataset.id);
             const char = state.characters.find((c) => c.id === id);
-            downloadBlob(`/api/characters/${id}/export`, `${char?.name || 'character'}.json`);
+            const restore = beginButtonLoading(btn, '导出中…');
+            try {
+                await downloadBlob(`/api/characters/${id}/export`, `${char?.name || 'character'}.json`);
+            } finally {
+                restore();
+            }
         });
     });
 
@@ -148,6 +157,7 @@ function renderCharacters() {
             });
 
             if (confirmed) {
+                const restore = beginButtonLoading(btn, '删除中…');
                 try {
                     await characters.delete(id);
                     await loadCharacters();
@@ -159,6 +169,8 @@ function renderCharacters() {
                     await closeConversationsAndResettle({ ids: doomed, reloadList: true });
                 } catch (err) {
                     showAlert('删除失败: ' + err.message);
+                } finally {
+                    restore();
                 }
             }
         });
@@ -311,6 +323,7 @@ export function renderConversations() {
                 danger: true,
             });
             if (confirmed) {
+                const restore = beginButtonLoading(btn, '删除中…');
                 try {
                     await conversations.delete(id);
                     // 联动：统一收口（closeTabs 内部先中止在途流式再关 tab；
@@ -319,6 +332,8 @@ export function renderConversations() {
                     await closeConversationsAndResettle({ ids: [id], reloadList: true });
                 } catch (err) {
                     showAlert('删除失败: ' + err.message);
+                } finally {
+                    restore();
                 }
             }
         });

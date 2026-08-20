@@ -1865,6 +1865,36 @@ input[type="range"]::-moz-range-thumb {
     color: var(--ink-1);
 }
 
+/* 次要/危险/图标按钮禁用态（与 .btn-primary:disabled 语义对齐） */
+.btn-secondary:disabled,
+.btn-danger:disabled,
+.btn-icon:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* 按钮 loading 态（beginButtonLoading 挂 .is-loading + 内联 .btn-spinner） */
+.btn.is-loading {
+    cursor: wait;
+}
+
+.btn-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* ══════════════════════════════════════════════════
    模态框
    ══════════════════════════════════════════════════ */
@@ -2543,6 +2573,10 @@ mark.search-highlight {
 
 .toast-success {
     background: var(--success);
+}
+
+.toast-info {
+    background: var(--accent);
 }
 
 @keyframes toastIn {

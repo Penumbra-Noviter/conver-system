@@ -5,7 +5,7 @@
  */
 
 import { openModal } from './modal.js';
-import { downloadBlob } from '../utils.js';
+import { downloadBlob, showToast } from '../utils.js';
 import { iconHtml } from '../icons.js';
 
 /**
@@ -52,13 +52,14 @@ export function showExportDialog(conversationId) {
 }
 
 /**
- * 按导出格式触发 Blob 下载
+ * 按导出格式触发 Blob 下载（异步导出期间显示进度提示）
  * @param {number} conversationId - 对话 ID
  * @param {'markdown'|'json'} format - 导出格式
  */
-function downloadExport(conversationId, format) {
+async function downloadExport(conversationId, format) {
+    showToast('正在导出对话…', 'info');
     const ext = format === 'markdown' ? '.md' : '.json';
-    downloadBlob(
+    await downloadBlob(
         `/api/conversations/${conversationId}/export/${format}`,
         `conversation-${conversationId}${ext}`
     );
