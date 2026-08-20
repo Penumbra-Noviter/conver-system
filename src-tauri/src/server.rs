@@ -26,14 +26,14 @@ pub const READY_PROBE_PATH: &str = "/api/models";
 pub const DEFAULT_READY_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// 就绪轮询间隔。
-pub const READY_POLL_INTERVAL: Duration = Duration::from_millis(500);
+pub const READY_POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 /// 单次 HTTP 探测超时。
 pub const HTTP_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// `ManagedChild::kill` 有界回收时限：终止动作后轮询 `try_wait` 至多等待该时长，
 /// 保证任何退出路径都不无限阻塞（taskkill 失败且进程仍存活时不再空等）。
-const KILL_RECLAIM_TIMEOUT: Duration = Duration::from_secs(5);
+const KILL_RECLAIM_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// 就绪标记文件名（数据目录下）。
 pub const RUNTIME_JSON: &str = "runtime.json";

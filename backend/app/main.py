@@ -21,7 +21,6 @@ from backend.app.api.routes import characters, chat, conversations, messages, mo
 from backend.app.services import data_dir as data_dir_service
 from backend.app.services import simulator_store
 from backend.app.services.exceptions import DomainError
-from backend.app.services.llm import LLMFactory
 from backend.app.services.llm.errors import LLMError
 
 app = FastAPI(
@@ -88,8 +87,12 @@ if FRONTEND_DIR.exists():
 # ── 启动事件 ──
 @app.on_event("startup")
 def on_startup() -> None:
-    """应用启动时注册内置 LLM Provider、初始化数据库并执行模拟器首启种子"""
-    LLMFactory.register_builtin_providers()
+    """应用启动时初始化数据库并执行模拟器首启种子
+
+    LLM Provider 不在启动时注册（懒加载）：SDK 导入（anthropic/openai，合计
+    ~1.8s）推迟到首次 get_provider / list_providers 调用（`_ensure_builtins`），
+    启动路径只保留 DB 与种子初始化。
+    """
     from backend.app.database import init_db
     init_db()
     # 首启种子：数据目录 simulators 缺 manifest → 从内置目录整目录拷贝；

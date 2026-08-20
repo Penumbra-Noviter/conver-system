@@ -49,10 +49,10 @@
         document.getElementById('spinner').hidden = true;
         return;
       }
-      var POLL_INTERVAL_MS = 500;
+      var POLL_INTERVAL_MS = 200;
       // 就绪超时单一来源（RS-1 R3）：壳端超时经 status.readyTimeoutMs 透传，轮询上限据此派生。
       // 取值契约（TD-30）：readyTimeoutMs > 0 → 透传；0 / null / undefined 一律视为
-      // 未配置 → 回退默认 60000ms（120 × 500ms）。0 必须走默认——否则 maxPolls = 0，
+      // 未配置 → 回退默认 60000ms（300 × 200ms）。0 必须走默认——否则 maxPolls = 0，
       // 首次轮询即判超时。
       var DEFAULT_READY_TIMEOUT_MS = 60000;
       var readyTimeoutMs = null;
