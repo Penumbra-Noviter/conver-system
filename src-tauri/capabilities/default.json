@@ -6,5 +6,10 @@
   "remote": {
     "urls": ["http://127.0.0.1:*"]
   },
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "allow-backend-status",
+    "allow-get-close-action",
+    "allow-set-close-action"
+  ]
 }

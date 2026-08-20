@@ -107,7 +107,7 @@ export async function ensureCloseActionChoice() {
         syncCloseActionSetting(chosen);
     } catch (err) {
         console.error('保存关闭行为偏好失败:', err);
-        showAlert('关闭行为保存失败，请重试: ' + err.message);
+        showAlert('关闭行为保存失败，请重试: ' + (err?.message ?? err));
     }
 }
 
@@ -131,7 +131,7 @@ export async function initCloseActionSetting() {
                 showAlert('关闭行为已保存');
             } catch (err) {
                 console.error('保存关闭行为偏好失败:', err);
-                showAlert('保存失败: ' + err.message);
+                showAlert('保存失败: ' + (err?.message ?? err));
             }
         });
     });

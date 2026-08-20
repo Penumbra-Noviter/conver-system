@@ -62,7 +62,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **技术债区 F-5/F-6/F-8/F-9/F-12 批次（2026-08-19 kickoff 全自动档小档，commit 链 412b2d7 → ffc54b2）**：F-5/F-6 复核关闭（各附实证）；F-8 manifest 结构校验并入自愈（simulators 非 list 统一重建）+ F-9 sanitize_filename 保留设备名/255 字节收敛（先红后绿 + Falsify 矩阵全过）；F-12 就绪终态发布顺序竞态修复（runtime.json 先落盘再置标志，复现循环 30 次归零）；期末四轴 0 阻断放行；新落债 F-13~F-17（5 项待立项，唯一待办来源 TICKETS.md）
 - ✅ **技术债区 F-13~F-17 批次（2026-08-19 kickoff 全自动档，commit 链 d295c76 → 3111036）**：F-13 设备名判定改首点前组件（+5 用例）/ F-14 改名后缀字节截断复用 `_truncate_utf8_bytes`（+2）/ F-15 OSError 族读取自愈（+1）/ F-17 总名上限 255→120 字节（Windows MAX_PATH 实测，F-9 矩阵改 120 口径，+3）/ F-16 复核关闭（零代码）；F-18/F-19 归档流程项已修（F-9 注记补 F-17 修订 / F-13 常量注释语义同步）；期末四轴 0 阻断放行；新落债 F-20/F-21 待立项（唯一待办来源 TICKETS.md）
 - ✅ **技术债区 F-20/F-21 批次 3（2026-08-19 kickoff 全自动档）**：F-21 入参契约声明（`next_available_filename` docstring——desired 须完整文件名且 stem 非空，空 stem 冲突产 -N.html 不兜底，无点/空串 ValueError 后果补句；零行为变化，commit 08e860f merge 2fb25df）/ F-20 复核关闭（票面实测注记三处闭环，零代码）；F-22 归档流程项；期末四轴 0 阻断放行；零测试改动（621+1skip）；**技术债区清零（F-1~F-22 全部处置完毕）**
-- ✅ 测试：pytest 621 + 1 skip（后端）+ Vitest 958（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
+- ✅ 测试：pytest 622（含 1 skip，后端）+ Vitest 966（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
 
 ## 待办管理
 
