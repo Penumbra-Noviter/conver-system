@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1650<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->622<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->958<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1658<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->622<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->966<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -167,6 +167,7 @@ conver system/
 │   │   │   ├── character-wizard.js ← 六步创建向导
 │   │   │   ├── confirm-dialog.js   ← 确认/提示对话框
 │   │   │   ├── export-dialog.js    ← 会话导出对话框
+│   │   │   ├── loading-button.js  ← 按钮 loading 态工具（spinner + 禁用 + restore）
 │   │   │   ├── modal.js            ← 模态骨架（骨架收口 C3-DEFER）
 │   │   │   ├── model-selector.js   ← 模型选择弹层
 │   │   │   ├── settings-panel.js   ← 设置面板（Key/主题/侧栏）
@@ -209,7 +210,7 @@ conver system/
 
 ## 四、核心模块详细说明
 
-### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~77 行<!--/AUTO-->）
+### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~79 行<!--/AUTO-->）
 
 **职责**：FastAPI 应用装配——注册统一异常处理器、on_startup 注册内置 Provider、API 路由挂载（须 `/api` 前缀且在静态挂载前）、`/simulators` 挂载（数据目录 simulators，T-02 外置，先于根挂载）、前端静态文件挂载。
 
@@ -600,7 +601,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~292 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~294 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）。
 
@@ -638,7 +639,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/chat.js:scrollToBottom-->`scrollToBottom()`<!--/AUTO--> | 滚动到底部 |
 | <!--AUTO:sig:frontend/js/chat.js:attachCopyButton-->`attachCopyButton(btn)`<!--/AUTO--> | 复制按钮接线 |
 
-### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~355 行<!--/AUTO-->）
+### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~370 行<!--/AUTO-->）
 
 **职责**：角色/对话两个列表视图深模块（C4，search-view 先例）——角色网格渲染与四类按钮事件委托、对话列表渲染与打开/删除委托、角色导入（含失败引导向导）、开始对话全流程（模型选择→创建→切视图→激活→聚焦）、列表标题同步 DOM 手术；协调层经 `initListViews({ switchView })` 接线。
 
@@ -704,7 +705,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/confirm-dialog.js:showConfirm-->`showConfirm(options = {})`<!--/AUTO--> | 确认对话框（resolve 布尔） |
 | <!--AUTO:sig:frontend/js/components/confirm-dialog.js:showAlert-->`showAlert(message)`<!--/AUTO--> | 提示对话框 |
 
-### 4.41 `frontend/js/components/export-dialog.js` — 导出对话框（<!--AUTO:lines:frontend/js/components/export-dialog.js-->~61 行<!--/AUTO-->）
+### 4.41 `frontend/js/components/export-dialog.js` — 导出对话框（<!--AUTO:lines:frontend/js/components/export-dialog.js-->~62 行<!--/AUTO-->）
 
 **职责**：会话导出格式选择 + 下载。
 
@@ -729,7 +730,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/components/model-selector.js:showModelSelector-->`showModelSelector(characterName)`<!--/AUTO--> | 打开模型选择（按角色） |
 
-### 4.44 `frontend/js/components/settings-panel.js` — 设置面板（<!--AUTO:lines:frontend/js/components/settings-panel.js-->~404 行<!--/AUTO-->）
+### 4.44 `frontend/js/components/settings-panel.js` — 设置面板（<!--AUTO:lines:frontend/js/components/settings-panel.js-->~417 行<!--/AUTO-->）
 
 **职责**：设置面板——Provider 下拉初始化、模型联动、凭证测试（testApiKeys）、主题切换、侧栏开关、清空会话接线。
 
@@ -746,6 +747,17 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleTheme-->`toggleTheme()`<!--/AUTO--> | 切换主题 |
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleSidebar-->`toggleSidebar()`<!--/AUTO--> | 侧栏开关 |
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleChatSidebar-->`toggleChatSidebar()`<!--/AUTO--> | 会话侧栏开关 |
+
+### 4.44.1 `frontend/js/components/loading-button.js` — 按钮 loading 态工具（<!--AUTO:lines:frontend/js/components/loading-button.js-->~59 行<!--/AUTO-->）
+
+**职责**：异步操作按钮的统一「执行中」反馈 —— 禁用 + 内联 spinner + 文字切换，
+按 HTML 快照还原（含 SVG icon）。用于 `settings-panel`（保存/清空）、
+`list-views`（编辑/导出/删除角色、删除对话）等异步按钮的防双击与进度反馈。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/components/loading-button.js:beginButtonLoading-->`beginButtonLoading(btn, loadingText = '')`<!--/AUTO--> | 置 loading 态，返回 restore |
+| <!--AUTO:sig:frontend/js/components/loading-button.js:clearButtonLoading-->`clearButtonLoading(btn)`<!--/AUTO--> | 未持 restore 引用时的还原 |
 
 ### 4.45 `frontend/js/components/tab-bar.js` — 会话 tab 栏（<!--AUTO:lines:frontend/js/components/tab-bar.js-->~86 行<!--/AUTO-->）
 
@@ -1044,7 +1056,7 @@ conver system/
 | <!--AUTO:sig:src-tauri/src/server.rs:default_data_dir-->`default_data_dir() -> PathBuf`<!--/AUTO--> | 默认数据目录（%APPDATA% 优先） |
 | <!--AUTO:sig:src-tauri/src/server.rs:encode_url_path-->`encode_url_path(path: &str) -> String`<!--/AUTO--> | URL 路径编码（契约表 v2） |
 
-### 4.66 `src-tauri/src/commands.rs` — Tauri 命令（<!--AUTO:lines:src-tauri/src/commands.rs-->~27 行<!--/AUTO-->）
+### 4.66 `src-tauri/src/commands.rs` — Tauri 命令（<!--AUTO:lines:src-tauri/src/commands.rs-->~29 行<!--/AUTO-->）
 
 **职责**：Tauri 命令——`backend_status` 状态查询（boot.html 轮询用）。
 
@@ -1076,7 +1088,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:src-tauri/src/main.rs:main-->`main()`<!--/AUTO--> | 壳入口 |
 
-### 4.69 `frontend/js/desktop-settings.js` — 桌面壳设置（<!--AUTO:lines:frontend/js/desktop-settings.js-->~137 行<!--/AUTO-->）
+### 4.69 `frontend/js/desktop-settings.js` — 桌面壳设置（<!--AUTO:lines:frontend/js/desktop-settings.js-->~146 行<!--/AUTO-->）
 
 **职责**：D11 关闭行为偏好——Tauri 桥检测 + 偏好读写（settings.json）+ 首次运行选择弹窗 + 设置页「关闭窗口」分组即时保存；无桥（纯网页模式）全模块 no-op。
 
@@ -1088,7 +1100,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/desktop-settings.js:ensureCloseActionChoice-->`ensureCloseActionChoice()`<!--/AUTO--> | 首次运行引导（未设置 → 弹窗选择并持久化） |
 | <!--AUTO:sig:frontend/js/desktop-settings.js:initCloseActionSetting-->`initCloseActionSetting()`<!--/AUTO--> | 设置页分组回填 + 即时保存绑定 |
 
-### 4.70 `src-tauri/src/settings.rs` — 壳级用户设置（<!--AUTO:lines:src-tauri/src/settings.rs-->~81 行<!--/AUTO-->）
+### 4.70 `src-tauri/src/settings.rs` — 壳级用户设置（<!--AUTO:lines:src-tauri/src/settings.rs-->~83 行<!--/AUTO-->）
 
 **职责**：D11 关闭行为偏好持久化——`CloseAction` 枚举（Tray/Quit）解析/`decide_close` 决策纯逻辑（Seam 1 可注入测试）+ settings.json 原子读写（镜像 `server.rs::write_runtime_json`）。
 
@@ -1200,7 +1212,8 @@ conver system/
 | `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->38<!--/AUTO--> | 对话视图 |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->12<!--/AUTO--> | 会话激活 |
-| `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->19<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
+| `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
+| `frontend/tests/loading-button.test.js` | <!--AUTO:tests:frontend/tests/loading-button.test.js-->7<!--/AUTO--> | 按钮 loading 态工具 |
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->36<!--/AUTO--> | 展示契约 |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->69<!--/AUTO--> | Key 注入/端点口径 |
@@ -1274,10 +1287,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1650<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1658<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->622<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->958<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->966<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

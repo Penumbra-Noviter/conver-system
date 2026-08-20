@@ -6,6 +6,17 @@
 
 ---
 
+---
+
+## 滚动摘要（2026-08-20 — 三问题修复：关闭行为偏好、启动/关闭性能、loading 按钮，commit 链 436964b → [当前]）
+
+- **来源**：用户反馈三个问题：①「提醒关闭」设置选什么都不生效始终最小化托盘；②启动和关闭时间太长；③需要 loading 按钮反馈
+- **问题① 关闭行为偏好（fix）**：根因——保存失败路径完全静默（`ensureCloseActionChoice` 的 catch 只 `console.error`），用户选了「直接退出」静默回退托盘默认。`settings.json` 从未被创建（`%APPDATA%\ConverSystem` 只有 runtime.json）。修复：`setCloseAction` 保存后读回验证（再调 `get_close_action` 比对，不一致即抛错）；Rust 侧 `set_close_action` 返回持久化值；`ensureCloseActionChoice` catch 调用 `showAlert` 可见告警；`app.js` 首次引导提前到 `init()` 最前执行；Rust `save_close_action` 写前防御性 `create_dir_all`；测试 19→20 用例（含保存失败可见告警）
+- **问题② 启动/关闭性能（perf）**：根因——`on_startup()` 中 `LLMFactory.register_builtin_providers()` 预热导入 anthropic（1.1s）+ openai（0.95s）≈ **1.77s**，是主瓶颈。工厂已有懒加载（`_ensure_builtins()` 在首次 `get_provider`/`list_providers` 自动注册），无启动路径依赖。修复：`main.py` 删除启动预热；壳侧 `READY_POLL_INTERVAL` 500ms→200ms、`KILL_RECLAIM_TIMEOUT` 5s→2s；`boot.html` 轮询间隔 500ms→200ms。实测：`import backend.app.main` 0.73s→0.51s，SDK 推迟到首次 LLM 调用，启动省 **~2.0s**
+- **问题③ loading 按钮（feat）**：新工具 `frontend/js/components/loading-button.js`（`beginButtonLoading`/`clearButtonLoading`，innerHTML 快照还原含 SVG icon）；CSS 补 `@keyframes spin` + `.btn-spinner` + `.btn-secondary/.btn-danger/.btn-icon:disabled` + `.btn.is-loading`。应用到缺口按钮：settings-panel（保存/清空/主题）、export-dialog（导出中 toast）、list-views（编辑/导出/删除角色、删除对话）。新增 7 用例测试
+- **验证链**：pytest **621 + 1 skip**（零回归）；Vitest **966**（+7 新用例）；cargo **70**；doc_sync 全绿
+- **技术债区**：无新增
+
 ## 滚动摘要（2026-08-19 — 技术债区批次 3：F-21 docstring 契约 + F-20 复核关闭，技术债区清零，commit 链 08e860f → 2b29865）
 
 - **来源**：用户指令「继续修补技术债区」（技术债区最后 2 项：F-20/F-21）。预检：基线 01ec572；F-20 注记三处闭环确认、F-21 docstring 契约缺声明确认
