@@ -48,7 +48,7 @@ export async function getCloseAction() {
  */
 export async function setCloseAction(action) {
     if (!hasDesktopBridge() || !CLOSE_ACTIONS.includes(action)) return;
-    const persisted = await window.__TAURI_INTERNALS__.invoke('set_close_action', { action });
+    await window.__TAURI_INTERNALS__.invoke('set_close_action', { action });
     // 读回验证：确保 Rust 侧实际落盘的值与预期一致
     const readback = await getCloseAction();
     if (readback !== action) {
