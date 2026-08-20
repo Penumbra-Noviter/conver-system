@@ -16,7 +16,7 @@
 - 路由不直接操作 ORM，走 service 层
 - 所有包 `__init__.py` 必须有 `__all__`
 - 模块要"深"：协议表面小但实现丰富
-- 新增 Provider：在 `app/services/model_data.py` 的 `AVAILABLE_MODELS` 登记（唯一声明源，factory 注册与 setting API map 自动派生）；独立实现类时在 `app/services/llm/factory.py::_CLASS_OVERRIDES` 挂覆盖（注册在 `register_builtin_providers()`，`main.py` on_startup 调用，懒加载兜底；Provider 类不从 `llm/__init__.py` 包路径导入——包级导入零 SDK 副作用契约）
+- 新增 Provider：在 `app/services/model_data.py` 的 `AVAILABLE_MODELS` 登记（唯一声明源，factory 注册与 setting API map 自动派生）；独立实现类时在 `app/services/llm/factory.py::_CLASS_OVERRIDES` 挂覆盖（注册在 `register_builtin_providers()`，首次 `get_provider`/`list_providers` 时经 factory 懒加载自动触发——启动不预热 SDK，SDK 推迟到首次 LLM 调用；Provider 类不从 `llm/__init__.py` 包路径导入——包级导入零 SDK 副作用契约）
 - 前端动态模板/状态图标一律走 `js/icons.js` 的 `iconHtml()` seam（不手写 emoji/SVG 碎片）
 - 公开函数必须有 type hints + docstring
 

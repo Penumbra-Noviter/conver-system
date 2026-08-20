@@ -32,7 +32,7 @@
                                │ HTTP / SSE
 ┌──────────────────────────────┴─────────────────────────────────────┐
 │                    后端（backend/app/，FastAPI）                     │
-│  main.py 装配（on_startup 注册 Provider）→ api/routes/* 路由        │
+│  main.py 装配（on_startup 初始化 DB + 模拟器种子，Provider 懒注册）→ api/routes/* 路由│
 │  → services/* 业务服务（无手写 dict，response_model 驱动序列化）    │
 │  → services/llm/* Provider 工厂（Claude / OpenAI 兼容）             │
 │  → models/* ORM（SQLAlchemy 2.0 同步模式）→ SQLite                 │
@@ -63,7 +63,7 @@
 ### 2.3 架构不变量
 
 - 路由只做 HTTP 映射，ORM 操作在 service 层；`response_model + from_attributes` 统一驱动序列化
-- Provider 显式注册：`register_builtin_providers()`（`main.py` on_startup 调用，`factory.py` 懒加载兜底）
+- Provider 懒注册：`register_builtin_providers()` 由 `factory.py` 在首次 `get_provider`/`list_providers` 时经 `_ensure_builtins` 自动触发（启动不预热，SDK 推迟到首次 LLM 调用）
 - 前端动态模板/状态图标一律走 `frontend/js/icons.js` 的 `iconHtml()` seam
 - 静态挂载契约：API 路由须 `/api` 前缀且在静态挂载前注册
 - 所有包 `__init__.py` 必须有 `__all__`；公开函数必须 type hints + docstring
@@ -212,11 +212,11 @@ conver system/
 
 ### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~79 行<!--/AUTO-->）
 
-**职责**：FastAPI 应用装配——注册统一异常处理器、on_startup 注册内置 Provider、API 路由挂载（须 `/api` 前缀且在静态挂载前）、`/simulators` 挂载（数据目录 simulators，T-02 外置，先于根挂载）、前端静态文件挂载。
+**职责**：FastAPI 应用装配——注册统一异常处理器、on_startup 初始化 DB 与模拟器首启种子（Provider 懒注册，不预热 SDK）、API 路由挂载（须 `/api` 前缀且在静态挂载前）、`/simulators` 挂载（数据目录 simulators，T-02 外置，先于根挂载）、前端静态文件挂载。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:backend/app/main.py:on_startup-->`on_startup()`<!--/AUTO--> | 启动钩子：`LLMFactory.register_builtin_providers()` + `init_db()` + 模拟器首启种子 |
+| <!--AUTO:sig:backend/app/main.py:on_startup-->`on_startup()`<!--/AUTO--> | 启动钩子：`init_db()` + 模拟器首启种子（Provider 懒注册，不预热 SDK） |
 | <!--AUTO:sig:backend/app/main.py:_frontend_dir-->`_frontend_dir()`<!--/AUTO--> | 定位前端静态目录（打包与源码双形态） |
 
 ### 4.2 `backend/app/config.py` — 配置单源（<!--AUTO:lines:backend/app/config.py-->~27 行<!--/AUTO-->）
@@ -527,7 +527,7 @@ conver system/
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.register-->`register(name, provider_cls)`<!--/AUTO--> | 注册 Provider 类 |
-| <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.register_builtin_providers-->`register_builtin_providers()`<!--/AUTO--> | 批量注册内置 Provider（on_startup 调用） |
+| <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.register_builtin_providers-->`register_builtin_providers()`<!--/AUTO--> | 批量注册内置 Provider（首次 `get_provider`/`list_providers` 时经 `_ensure_builtins` 懒触发） |
 | <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.get_provider-->`get_provider(name, api_key, base_url=None)`<!--/AUTO--> | 按名取实例（未注册则懒加载兜底） |
 | <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.list_providers-->`list_providers()`<!--/AUTO--> | 已注册 Provider 清单 |
 
