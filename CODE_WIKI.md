@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1658<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->622<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->966<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1728<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->679<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -319,7 +319,7 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/settings.py:update_settings-->`update_settings(data, db)`<!--/AUTO--> | PUT 批量更新设置 |
 | <!--AUTO:sig:backend/app/api/routes/settings.py:test_connection-->`test_connection(data, db)`<!--/AUTO--> | POST 连接测试（保存时校验 Key） |
 
-### 4.11.5 `backend/app/api/routes/simulators.py` — 模拟器导入路由（工单 03）（<!--AUTO:lines:backend/app/api/routes/simulators.py-->~37 行<!--/AUTO-->）
+### 4.11.5 `backend/app/api/routes/simulators.py` — 模拟器导入路由（工单 03）（<!--AUTO:lines:backend/app/api/routes/simulators.py-->~84 行<!--/AUTO-->）
 
 **职责**：POST /api/simulators/import 单文件 HTML 游戏导入（multipart 字段名 `file`）——仅 HTTP 映射（状态码 + 响应形状）；校验/去重/改名/探测/粗筛/manifest 注册全部委托 `services/simulator_store` 导入族（本文件无文件系统业务调用，grep 口径可验）。数据目录请求期解析（可 monkeypatch CONVER_DATA_DIR）。契约：200 `{ok, game{id,file,name,type,config?}, renamed, warnings}`；400（非 .html/超 5MB/空文件）；409（SHA-256 重复，文案含「已存在」）；warnings 键集 eval/document.cookie/cross-origin-fetch（常量单源，不拦截）。
 
@@ -601,7 +601,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~294 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~303 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）。
 
@@ -759,6 +759,18 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/loading-button.js:beginButtonLoading-->`beginButtonLoading(btn, loadingText = '')`<!--/AUTO--> | 置 loading 态，返回 restore |
 | <!--AUTO:sig:frontend/js/components/loading-button.js:clearButtonLoading-->`clearButtonLoading(btn)`<!--/AUTO--> | 未持 restore 引用时的还原 |
 
+
+### 4.44.2 `frontend/js/components/game-generator.js` — AI 游戏生成器（<!--AUTO:lines:frontend/js/components/game-generator.js-->~342 行<!--/AUTO-->）
+
+**职责**：从用户提供的世界观文本（textarea 粘贴或 .txt/.md 文件上传）生成 HTML 模拟器游戏。模态框输入 → POST /api/simulators/generate → 成功自动刷新列表 / 失败显示错误与重试按钮。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/components/game-generator.js:initGameGenerator-->`initGameGenerator({ onGenerated: hook } = {})`<!--/AUTO--> | 注册 onGenerated 钩子（幂等） |
+| <!--AUTO:sig:frontend/js/components/game-generator.js:openGenerateFlow-->`openGenerateFlow()`<!--/AUTO--> | 打开生成模态框（工具栏/菜单入口） |
+| <!--AUTO:sig:frontend/js/components/game-generator.js:resetGameGenerator-->`resetGameGenerator()`<!--/AUTO--> | 切走视图复位 |
+
+
 ### 4.45 `frontend/js/components/tab-bar.js` — 会话 tab 栏（<!--AUTO:lines:frontend/js/components/tab-bar.js-->~86 行<!--/AUTO-->）
 
 **职责**：会话 tab 栏组件（容器 + 激活回调，渲染/点击分发）。
@@ -811,7 +823,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/format.js:assistantAvatarHtml-->`assistantAvatarHtml(characters, currentCharacterId)`<!--/AUTO--> | 助手头像 |
 | <!--AUTO:sig:frontend/js/format.js:userAvatarHtml-->`userAvatarHtml()`<!--/AUTO--> | 用户头像 |
 
-### 4.50 `frontend/js/icons.js` — 图标 seam（<!--AUTO:lines:frontend/js/icons.js-->~59 行<!--/AUTO-->）
+### 4.50 `frontend/js/icons.js` — 图标 seam（<!--AUTO:lines:frontend/js/icons.js-->~60 行<!--/AUTO-->）
 
 **职责**：动态模板/状态图标单源（OPT-1 图标协议收口）——`iconHtml` seam，禁止手写 emoji/SVG 碎片。
 
@@ -915,13 +927,13 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:isValidGame-->`isValidGame(game)`<!--/AUTO--> | 游戏合法性校验 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:clearTimer-->`clearTimer()`<!--/AUTO--> | 清理超时定时器 |
 
-### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~459 行<!--/AUTO-->）
+### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~470 行<!--/AUTO-->）
 
 **职责**：模拟器列表视图（U7）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/simulators.js:initSimulatorsView-->`initSimulatorsView({ container: el, onOpenGame: hook, onOpenSaveManager: saveHook, onImportGame: importHook } = {})`<!--/AUTO--> | 列表视图初始化 |
+| <!--AUTO:sig:frontend/js/simulators.js:initSimulatorsView-->`initSimulatorsView({ container: el, onOpenGame: hook, onOpenSaveManager: saveHook, onImportGame: importHook, onGenerateGame: generateHook } = {})`<!--/AUTO--> | 列表视图初始化 |
 | <!--AUTO:sig:frontend/js/simulators.js:parseManifest-->`parseManifest(rawJson)`<!--/AUTO--> | manifest 解析（v1/v2） |
 | <!--AUTO:sig:frontend/js/simulators.js:normalizeSaveKeys-->`normalizeSaveKeys(value)`<!--/AUTO--> | 存档键归一化 |
 | <!--AUTO:sig:frontend/js/simulators.js:filterGames-->`filterGames(games, type)`<!--/AUTO--> | 类型筛选 |
@@ -1132,7 +1144,7 @@ conver system/
 3. **04 导入提示**：工单 04 导入成功后以同一分析模块对已上传 HTML 运行比对，未覆盖清单非空则提示并引导 per-game CSS 微调。
 
 
-### 4.74 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~401 行<!--/AUTO-->）
+### 4.74 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~415 行<!--/AUTO-->）
 
 **职责**：T-02 首启种子 + manifest 工具 + 工单 03 导入族——数据目录 simulators 缺 manifest 时从内置目录整目录拷贝（幂等；已存在绝不改动，数据目录为唯一事实来源；种子源缺失降级不崩溃）；导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名冲突改名（xxx-2.html）、cfg- 三元组探测、恶意模式粗筛（不拦截）、manifest 原子追加（缺失/损坏自愈重建）；id 由最终文件名干 slug 生成（[a-z0-9-] 折叠、空回退 imported-game）并按现存 id 集唯一化。
 
@@ -1149,7 +1161,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/simulator_store.py:find_duplicate-->`find_duplicate(sim_dir, content)`<!--/AUTO--> | SHA-256 去重（仅比对 *.html，命中返回现存文件名，覆盖内置重复；per-game CSS 不误报） |
 | <!--AUTO:sig:backend/app/services/simulator_store.py:probe_config-->`probe_config(html_text)`<!--/AUTO--> | cfg- 三元组探测（齐全 → ai+config；否则 local 无 config 降级） |
 | <!--AUTO:sig:backend/app/services/simulator_store.py:scan_suspicious-->`scan_suspicious(html_text)`<!--/AUTO--> | 恶意模式粗筛（SUSPICIOUS_PATTERNS 键集，不拦截） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:import_game-->`import_game(sim_dir, filename, content)`<!--/AUTO--> | 导入编排（校验→净化→去重→改名→探测→粗筛→落盘→注册） |
+| <!--AUTO:sig:backend/app/services/simulator_store.py:import_game-->`import_game(sim_dir, filename, content, source='imported')`<!--/AUTO--> | 导入编排（校验→净化→去重→改名→探测→粗筛→落盘→注册） |
 
 ---
 
@@ -1164,6 +1176,28 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-import.js:openImportFlow-->`openImportFlow()`<!--/AUTO--> | 按钮入口（警告确认 → 文件选择器） |
 | <!--AUTO:sig:frontend/js/simulator-import.js:importFile-->`importFile(file)`<!--/AUTO--> | 拖拽入口（校验 → 警告确认 → 上传） |
 | <!--AUTO:sig:frontend/js/simulator-import.js:resetSimulatorImport-->`resetSimulatorImport()`<!--/AUTO--> | 切走视图复位（导入中状态 / 拖拽高亮） |
+
+
+### 4.75.1 `backend/app/services/game_generator.py` — AI 游戏生成编排（<!--AUTO:lines:backend/app/services/game_generator.py-->~455 行<!--/AUTO-->）
+
+**职责**：AI 文本 → HTML 模拟器游戏的主编排——构造 prompt（种子模板 + 用户描述 + 重试反馈）→ resolve_llm 获取 LLM → 生成 → 6 项校验闸门（结构/模板标记/cfg 契约/可解析性/安全/游戏数据）→ 通过复用 `simulator_store.import_game(source="generated")` 落盘；失败返回结构化错误 + 重试建议（最多 3 次自动重试）。
+
+| 元素 | 说明 |
+|------|------|
+| `MAX_RETRIES` | 最大重试次数（常量，3） |
+| <!--AUTO:sig:backend/app/services/game_generator.py:generate_game-->`generate_game(db, description, title=None, *, previous_html=None, previous_errors=None, previous_suggestion=None, retries_left=MAX_RETRIES, attempted=0)`<!--/AUTO--> | 生成主编排（异步，含校验重试循环） |
+| <!--AUTO:sig:backend/app/services/game_generator.py:validate_generated_html-->`validate_generated_html(html)`<!--/AUTO--> | 校验闸门：6 项检查返回错误列表 |
+
+
+### 4.75.2 `backend/app/services/game_template.py` — 叙事游戏种子模板（<!--AUTO:lines:backend/app/services/game_template.py-->~209 行<!--/AUTO-->）
+
+**职责**：自包含 HTML 叙事选择游戏种子模板，LLM 通过替换两个模板标记（`<!-- GEN:config -->` / `<!-- GEN:scenes -->`）填充数据。`MARKER_PATTERN` 供校验闸门检测替换完整性。
+
+| 元素 | 说明 |
+|------|------|
+| `MARKER_PATTERN` | 模板标记正则（常量，校验闸门复用） |
+| `SEED_TEMPLATE` | 种子模板 HTML 全文（常量） |
+
 
 ---
 
@@ -1184,6 +1218,7 @@ conver system/
 | `backend/tests/test_data_dir_connection.py` | <!--AUTO:tests:backend/tests/test_data_dir_connection.py-->7<!--/AUTO--> | 数据目录/DB 连接集成 |
 | `backend/tests/test_document_parser.py` | <!--AUTO:tests:backend/tests/test_document_parser.py-->15<!--/AUTO--> | 文档智能解析 |
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->40<!--/AUTO--> | 统一异常处理器 |
+| `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->54<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
 | `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->15<!--/AUTO--> | LLM 基类共享行为 |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
@@ -1195,7 +1230,7 @@ conver system/
 | `backend/tests/test_schema_snapshot.py` | <!--AUTO:tests:backend/tests/test_schema_snapshot.py-->1<!--/AUTO--> | schema 快照漂移检测（T-17） |
 | `backend/tests/test_search.py` | <!--AUTO:tests:backend/tests/test_search.py-->13<!--/AUTO--> | 跨对话搜索 |
 | `backend/tests/test_settings_connection.py` | <!--AUTO:tests:backend/tests/test_settings_connection.py-->55<!--/AUTO--> | 设置/凭证/连接测试 |
-| `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->114<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
+| `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->117<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
 | `backend/tests/test_simulator_store.py` | <!--AUTO:tests:backend/tests/test_simulator_store.py-->33<!--/AUTO--> | 模拟器首启种子矩阵 + manifest 工具 + append 原子写/损坏自愈 |
 
 运行：`cd backend && python -m pytest`（pytest.ini 在根：`testpaths = backend/tests`，`pythonpath = .`；共享夹具见 `backend/tests/conftest.py`）。
@@ -1215,6 +1250,7 @@ conver system/
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
 | `frontend/tests/loading-button.test.js` | <!--AUTO:tests:frontend/tests/loading-button.test.js-->7<!--/AUTO--> | 按钮 loading 态工具 |
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->36<!--/AUTO--> | 展示契约 |
+| `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->13<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->69<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
@@ -1287,10 +1323,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1658<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1728<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->622<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->966<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->679<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->979<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

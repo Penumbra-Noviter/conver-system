@@ -894,22 +894,24 @@ describe('simulators — source 标识与导入入口（工单 04）', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
     afterEach(() => { vi.restoreAllMocks(); });
 
-    it('parseManifest：source 为字符串 \'imported\' → 透传 source 字段（白名单）', async () => {
+    it('parseManifest：source 为字符串 \'imported\' 或 \'generated\' → 透传 source 字段（白名单）', async () => {
         const { sim } = await loadModules();
         const data = {
             version: 2,
             simulators: [
                 { id: 'a', file: 'a.html', name: 'A', type: 'local', source: 'imported' },
                 { id: 'b', file: 'b.html', name: 'B', type: 'local' },
+                { id: 'c', file: 'c.html', name: 'C', type: 'local', source: 'generated' },
             ],
         };
         const result = sim.parseManifest(JSON.stringify(data));
         expect(result.ok).toBe(true);
         expect(result.games[0].source).toBe('imported');
         expect('source' in result.games[1]).toBe(false); // 内置条目无 source 字段
+        expect(result.games[2].source).toBe('generated');
     });
 
-    it('parseManifest：source 非 \'imported\'（builtin / 数字 / null）→ 条目级降级剔除（白名单）', async () => {
+    it('parseManifest：source 非白名单（builtin / 数字 / null）→ 条目级降级剔除（白名单限 imported/generated）', async () => {
         const { sim } = await loadModules();
         const data = {
             version: 2,
@@ -926,13 +928,14 @@ describe('simulators — source 标识与导入入口（工单 04）', () => {
         }
     });
 
-    it('ready 渲染：source=imported 卡片带「已导入」badge；内置卡片无 badge', async () => {
+    it('ready 渲染：source=imported 卡片带「已导入」badge；source=generated 卡片带「AI 生成」badge；内置卡片无 badge', async () => {
         const { sim, panel } = await loadModules();
         const data = {
             version: 2,
             simulators: [
                 { id: 'built-in', file: 'b.html', name: '内置', type: 'ai' },
                 { id: 'imported-x', file: 'x.html', name: '第三方', type: 'local', source: 'imported' },
+                { id: 'generated-y', file: 'y.html', name: 'AI 作品', type: 'ai', source: 'generated' },
             ],
         };
         sim.setFetch(makeFetch({ result: mockManifest(data) }));
@@ -942,6 +945,10 @@ describe('simulators — source 标识与导入入口（工单 04）', () => {
         const importedCard = panel.querySelector('.sim-card[data-id="imported-x"]');
         expect(importedCard.querySelector('.sim-source-tag')).not.toBeNull();
         expect(importedCard.querySelector('.sim-source-tag').textContent).toBe('已导入');
+        const generatedCard = panel.querySelector('.sim-card[data-id="generated-y"]');
+        expect(generatedCard.querySelector('.sim-source-tag')).not.toBeNull();
+        expect(generatedCard.querySelector('.sim-source-tag').textContent).toBe('AI 生成');
+        expect(generatedCard.querySelector('.sim-source-generated')).not.toBeNull();
         const builtinCard = panel.querySelector('.sim-card[data-id="built-in"]');
         expect(builtinCard.querySelector('.sim-source-tag')).toBeNull();
     });

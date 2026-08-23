@@ -52,6 +52,7 @@ import { initSimulatorRun, openSimulator, closeSimulator } from './simulator-vie
 import { initKeyInjector } from './key-injector.js';
 import { initSaveManager, openSavePanel, closeSavePanel } from './save-manager.js';
 import { initSimulatorImport, openImportFlow, resetSimulatorImport } from './simulator-import.js';
+import { initGameGenerator, openGenerateFlow, resetGameGenerator } from './components/game-generator.js';
 import { loadCharacters, loadConversations, renderConversations, syncConversationListTitle, initListViews } from './list-views.js';
 import { ensureCloseActionChoice, initCloseActionSetting } from './desktop-settings.js';
 
@@ -123,6 +124,7 @@ async function switchView(viewName) {
         closeSimulator();
         closeSavePanel();
         resetSimulatorImport();
+        resetGameGenerator();
     }
 }
 
@@ -272,12 +274,14 @@ initSearchView({
 // 模拟器列表视图初始化（U7-T3 — 挂载列表 UI 到 #simulator-list-panel；
 // onOpenGame 接入 openSimulator：点击卡片 → 运行视图，U7-T4；
 // onOpenSaveManager 接入 openSavePanel：工具条「存档管理」按钮 → 存档面板，U9-T2；
-// onImportGame 接入 openImportFlow：工具条「导入游戏」按钮 → 导入流程，工单 04）
+// onImportGame 接入 openImportFlow：工具条「导入游戏」按钮 → 导入流程，工单 04；
+// onGenerateGame 接入 openGenerateFlow：工具条「AI 生成」按钮 → 游戏生成器）
 initSimulatorsView({
     container: $('#simulator-list-panel'),
     onOpenGame: openSimulator,
     onOpenSaveManager: openSavePanel,
     onImportGame: openImportFlow,
+    onGenerateGame: openGenerateFlow,
 });
 
 // 模拟器导入初始化（工单 04 — 隐藏文件选择器 + 列表面板拖拽绑定收口在
@@ -303,6 +307,12 @@ initSimulatorRun({
 initKeyInjector({
     getCredentials: () => settings.credentials(),
     onNavigateSettings: () => switchView('settings'),
+});
+
+// 游戏生成器初始化（AI 生成按钮 → 模态框 → POST /api/simulators/generate；
+// onGenerated 接入 refreshSimulators：生成成功 → 列表刷新出现新卡片）
+initGameGenerator({
+    onGenerated: () => refreshSimulators(),
 });
 // 存档管理面板初始化（U9-T2 — 绑定三面板 + getGames 钩子（数据源为
 // simulators.js 缓存，不重复 fetch manifest）；返回按钮 → closeSavePanel；

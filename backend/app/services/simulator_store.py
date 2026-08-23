@@ -68,7 +68,9 @@ __all__ = [
     "probe_config",
     "read_manifest",
     "sanitize_filename",
+    "scan_input_ids",
     "scan_suspicious",
+    "CFG_REQUIRED_IDS",
     "sha256_bytes",
     "slugify",
     "write_manifest",
@@ -108,6 +110,10 @@ SUSPICIOUS_PATTERNS: dict[str, re.Pattern[str]] = {
     "document.cookie": re.compile(r"document\s*\.\s*cookie"),
     "cross-origin-fetch": re.compile(r"""fetch\s*\(\s*["'`]\s*(?:https?://|//)"""),
 }
+
+
+#: cfg- 契约所需的三元组 input id（key-injector 探测用，常量单源——generator 校验层复用）
+CFG_REQUIRED_IDS: frozenset[str] = frozenset({"cfg-endpoint", "cfg-apikey", "cfg-model"})
 
 
 class SimulatorImportError(Exception):
@@ -323,6 +329,17 @@ class _InputIdScanner(HTMLParser):
                 self.ids.append(value.strip())
 
 
+def scan_input_ids(html_text: str) -> set[str]:
+    """扫描 HTML 中所有 input 元素的 id 集合（为 cfg- 契约校验提供单源扫描器）
+
+    返回 set 而非 list，便于子集/差集运算（game_generator._check_cfg_contract
+    和 probe_config 均做集合运算，无需保留顺序）。
+    """
+    scanner = _InputIdScanner()
+    scanner.feed(html_text)
+    return set(scanner.ids)
+
+
 def probe_config(html_text: str) -> tuple[str, dict | None]:
     """元数据探测：cfg- 前缀 input id 三元组（cfg-endpoint/cfg-apikey/cfg-model）
     齐全 → ('ai', config 三元组)；否则 ('local', None)——三元组不完整即降级，
@@ -330,10 +347,8 @@ def probe_config(html_text: str) -> tuple[str, dict | None]:
 
     config 值为输入框 id（key-injector 契约：按 id 定位输入框注入凭证）。
     """
-    scanner = _InputIdScanner()
-    scanner.feed(html_text)
-    cfg_ids = {i for i in scanner.ids if i.startswith("cfg-")}
-    if {"cfg-endpoint", "cfg-apikey", "cfg-model"} <= cfg_ids:
+    cfg_ids = {i for i in scan_input_ids(html_text) if i.startswith("cfg-")}
+    if CFG_REQUIRED_IDS <= cfg_ids:
         return ("ai", {"endpoint": "cfg-endpoint", "apikey": "cfg-apikey", "model": "cfg-model"})
     return ("local", None)
 
@@ -419,7 +434,9 @@ def _unique_game_id(sim_dir: Path, base: str) -> str:
     return gid
 
 
-def import_game(sim_dir: Path, filename: str, content: bytes) -> ImportResult:
+def import_game(
+    sim_dir: Path, filename: str, content: bytes, source: str = "imported"
+) -> ImportResult:
     """导入单文件 HTML 模拟器游戏（服务编排：校验 → 净化 → 去重 → 改名 →
     探测 → 粗筛 → 落盘 → manifest 注册）。
 
@@ -427,6 +444,8 @@ def import_game(sim_dir: Path, filename: str, content: bytes) -> ImportResult:
         sim_dir: 数据目录 simulators（请求期解析，调用方负责；不缓存于 import 期）
         filename: 上传文件名（原始值，扩展名校验与净化均在此进行）
         content: 上传文件字节
+        source: manifest 条目 source 标记（默认 imported；AI 生成游戏传
+            generated——game_generator 消费，`source` 白名单见前端 parseManifest）
 
     Raises:
         SimulatorImportError: 非 .html / 超 5MB / 空文件 / 缺文件名（400 语义）
@@ -463,7 +482,7 @@ def import_game(sim_dir: Path, filename: str, content: bytes) -> ImportResult:
         "file": final_name,
         "name": stem,
         "type": game_type,
-        "source": "imported",
+        "source": source,
     }
     if config is not None:
         entry["config"] = config
