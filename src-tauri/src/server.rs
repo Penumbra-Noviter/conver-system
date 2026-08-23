@@ -319,16 +319,21 @@ impl ManagedChild {
 /// Windows 带树终止：`taskkill /PID <pid> /T /F`（幂等，失败由调用方兜底——
 /// `ManagedChild::kill` 在进程仍存活时以句柄级 `child.kill()` 收尾）。
 ///
+/// CREATE_NO_WINDOW 与后端 spawn 同款：windows 子系统壳拉起控制台程序
+/// （taskkill）时系统会分配新控制台——不挂标志则用户每次退出都见黑框闪烁。
+///
 /// pid 复用竞态注记：本调用与系统回收 pid 之间存在微秒级窗口（进程恰在
 /// taskkill 前退出、pid 被复用），此时 taskkill 可能误杀无辜进程——窗口实证
 /// 不可复现，维持接受（TD-31 共识），不做二次校验。
 #[cfg(windows)]
 fn kill_windows_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
     let _ = Command::new("taskkill")
         .arg("/PID")
         .arg(pid.to_string())
         .arg("/T")
         .arg("/F")
+        .creation_flags(CREATE_NO_WINDOW)
         .status();
 }
 

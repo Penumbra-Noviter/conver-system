@@ -1046,7 +1046,7 @@ conver system/
 | <!--AUTO:sig:src-tauri/src/lib.rs:ready_timeout_from_env-->`ready_timeout_from_env() -> Duration`<!--/AUTO--> | 就绪超时（环境变量） |
 | <!--AUTO:sig:src-tauri/src/lib.rs:run-->`run()`<!--/AUTO--> | 壳入口（Tauri 装配） |
 
-### 4.65 `src-tauri/src/server.rs` — 后端进程管理（<!--AUTO:lines:src-tauri/src/server.rs-->~482 行<!--/AUTO-->）
+### 4.65 `src-tauri/src/server.rs` — 后端进程管理（<!--AUTO:lines:src-tauri/src/server.rs-->~487 行<!--/AUTO-->）
 
 **职责**：壳的后端托管——空闲端口探测、命令行解析、生产 exe 定位（目录形态回退）、`DATABASE_URL` 注入、子进程启停（Windows 进程树收割）、HTTP 就绪探测、runtime.json 原子读写、数据目录/URL 编码工具。
 
