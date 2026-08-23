@@ -27,6 +27,8 @@
     --accent-soft: rgba(210, 154, 71, 0.13);
     --accent-contrast: #21180d;
     --on-accent: var(--accent-contrast);
+    --accent-gen: #a855f7;
+    --accent-gen-soft: rgba(168, 85, 247, 0.15);
 
     --success: #79a781;
     --danger: #cf7462;
@@ -105,6 +107,8 @@
         --accent-soft: rgba(169, 111, 29, 0.12);
         --accent-contrast: #fffbf4;
         --on-accent: var(--accent-contrast);
+        --accent-gen: #9333ea;
+        --accent-gen-soft: rgba(147, 51, 234, 0.15);
         --on-danger: #fffdf8;
         --overlay: rgba(42, 33, 23, 0.42);
         --shadow-sm: 0 1px 3px rgba(63, 45, 27, 0.07);
@@ -133,6 +137,8 @@
     --accent-soft: rgba(169, 111, 29, 0.12);
     --accent-contrast: #fffbf4;
     --on-accent: var(--accent-contrast);
+    --accent-gen: #9333ea;
+    --accent-gen-soft: rgba(147, 51, 234, 0.15);
     --on-danger: #fffdf8;
     --overlay: rgba(42, 33, 23, 0.42);
     --shadow-sm: 0 1px 3px rgba(63, 45, 27, 0.07);
@@ -2095,6 +2101,97 @@ input[type="range"]::-moz-range-thumb {
     text-align: center;
 }
 
+/* ── AI 游戏生成器 ── */
+.game-gen-modal {
+    max-width: 620px;
+}
+
+.game-gen-modal .form-field textarea {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--page);
+    color: var(--ink-1);
+    font-family: var(--font-sans);
+    font-size: var(--text-md);
+    resize: vertical;
+    outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    line-height: 1.6;
+    min-height: 140px;
+}
+
+.game-gen-modal .form-field textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* 生成结果区域 */
+#gg-result-area {
+    margin-top: var(--space-3);
+}
+
+#gg-result-area.gg-error {
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    padding: var(--space-3) var(--space-4);
+}
+
+.gg-error-header {
+    font-weight: 600;
+    color: var(--danger);
+    margin-bottom: var(--space-2);
+    font-size: var(--text-md);
+}
+
+.gg-error-message {
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    margin-bottom: var(--space-3);
+}
+
+.gg-error-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-3);
+}
+
+.gg-error-list li {
+    padding: 4px 0;
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    line-height: 1.5;
+}
+
+.gg-error-list li strong {
+    color: var(--danger);
+}
+
+.gg-suggestion {
+    font-size: var(--text-sm);
+    color: var(--ink-3);
+    line-height: 1.5;
+    margin-bottom: var(--space-3);
+    padding: var(--space-2);
+    background: var(--bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+#gg-retry-btn {
+    margin-top: var(--space-2);
+}
+
+/* 上传文件按钮区 */
+#gg-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
 /* ── 导出对话框 ── */
 .export-modal {
     max-width: 400px;
@@ -3802,6 +3899,33 @@ select {
     cursor: not-allowed;
 }
 
+/* 工具条「AI 生成」按钮（game-generator.js — 紫色调 token 驱动，与导入按钮视觉区分；
+   --accent-gen 深/浅主题各有定义，随 [data-theme] 切换） */
+.sim-generate-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg);
+    color: var(--accent-gen);
+    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.sim-generate-btn:hover {
+    background: var(--accent-gen);
+    color: var(--on-accent);
+    border-color: var(--accent-gen);
+    box-shadow: 0 0 8px var(--accent-gen-soft);
+}
+
 /* 拖拽 .html 到列表区的高亮反馈（拖入悬停期间 dragover 加类） */
 .sim-drop-active {
     outline: 2px dashed var(--accent);
@@ -3818,6 +3942,12 @@ select {
     font-size: var(--text-xs);
     font-weight: 500;
     white-space: nowrap;
+}
+
+/* 卡片「AI 生成」badge（source: generated 条目 — 与已导入 badge 色系区分） */
+.sim-source-generated {
+    background: var(--accent-gen-soft);
+    color: var(--accent-gen);
 }
 
 #simulator-save-panel {

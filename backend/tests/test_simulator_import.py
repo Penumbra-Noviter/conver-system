@@ -41,6 +41,7 @@ from backend.app.services.simulator_store import (
     next_available_filename,
     probe_config,
     sanitize_filename,
+    scan_input_ids,
     scan_suspicious,
     slugify,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "TestDedup",
     "TestRenameConflict",
     "TestProbeConfig",
+    "TestScanInputIds",
     "TestScanSuspicious",
     "TestImportGame",
     "TestImportEndpointWire",
@@ -329,6 +331,31 @@ class TestRenameConflict:
         assert len(data) <= simulator_store._MAX_FILENAME_BYTES
         assert data.decode("utf-8") == result, "截断不得产生乱码半字符"
         assert result.endswith("-2.html")
+
+
+class TestScanInputIds:
+    """scan_input_ids 公共 API"""
+
+    def test_returns_set_of_input_ids(self) -> None:
+        """合法 HTML → 返回所有 input 元素 id 的集合"""
+        html = '<input id="a"><input id="b"><input id="a">'
+        ids = scan_input_ids(html)
+        assert ids == {"a", "b"}
+
+    def test_script_and_comment_ignored(self) -> None:
+        """script 字符串 / 注释内的 input id 不参与（HTMLParser 语义）"""
+        html = (
+            '<script>var x = "<input id=cfg-endpoint>";</script>'
+            '<!-- <input id="cfg-apikey"> -->'
+            '<input id="cfg-model">'
+        )
+        ids = scan_input_ids(html)
+        assert ids == {"cfg-model"}
+
+    def test_no_input_elements(self) -> None:
+        """无 input 元素 → 空集合"""
+        ids = scan_input_ids("<html><body><p>no inputs</p></body></html>")
+        assert ids == set()
 
 
 class TestProbeConfig:

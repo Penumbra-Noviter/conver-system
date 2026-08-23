@@ -50,6 +50,13 @@ export const TIMEOUT_REASON = `模拟器清单加载超时（${TIMEOUT_MS / 1000
 export const IMPORT_URL = '/api/simulators/import';
 
 /**
+ * AI 生成游戏端点 URL（JSON POST — { description, title? }）。
+ * 成功 200：{ ok: true, game: {...}, retries }
+ * 校验失败 422：{ ok: false, errors: [{field, message}], suggestion, retries }
+ */
+export const GENERATE_URL = '/api/simulators/generate';
+
+/**
  * 恶意模式粗筛键集中文文案映射（工单 04；键集锚定后端
  * simulator_store.SUSPICIOUS_PATTERNS 常量单源 — eval / document.cookie /
  * cross-origin-fetch，增删键必联动后端）。导入成功且 warnings 非空时前端
@@ -96,6 +103,7 @@ export const __all__ = [
     'TIMEOUT_MS',
     'TIMEOUT_REASON',
     'IMPORT_URL',
+    'GENERATE_URL',
     'WARNING_LABELS',
     'isValidSimulatorFile',
 ];

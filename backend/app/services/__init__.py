@@ -22,6 +22,8 @@ __all__ = [
     "document_parser",
     "error_mapping",
     "exceptions",
+    "game_generator",
+    "game_template",
     "llm",
     "message",
     "model_data",
