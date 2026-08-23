@@ -12,8 +12,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 from backend.app.services.game_generator import (
     MAX_RETRIES,
@@ -35,6 +37,7 @@ __all__ = [
     "TestBuildSuggestion",
     "TestPromptConstruction",
     "TestGenerateGame",
+    "TestGenerateEndpointWire",
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -559,3 +562,123 @@ class TestGenerateGame:
         # 应触发重试（第二次调用时通过），最终成功
         assert result.ok is True
         assert result.game is not None
+
+
+# ═══════════════════════════════════════════════════════════
+# Wire: POST /api/simulators/generate（TestClient）
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGenerateEndpointWire:
+    """路由 wire（TestClient）：状态码 + 响应形状契约（spec 生成接口）"""
+
+    @pytest.fixture
+    def generate_app(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
+        """最小应用（仅模拟器路由 + 错误处理器）；CONVER_DATA_DIR 指向临时目录"""
+        monkeypatch.setenv("CONVER_DATA_DIR", str(tmp_path))
+        from fastapi import FastAPI
+        from backend.app.api.routes import simulators as simulators_route
+        from backend.app.api.errors import llm_error_handler
+        from backend.app.services.llm.errors import LLMError
+
+        app = FastAPI()
+        app.include_router(simulators_route.router)
+        app.add_exception_handler(LLMError, llm_error_handler)
+        return app
+
+    @pytest.fixture
+    def mock_llm(self) -> _MockLLM:
+        """返回合法 HTML 的 MockLLM（_make_valid_html 是模块级辅助函数）"""
+        return _MockLLM(result=_make_valid_html())
+
+    def _post(self, client: TestClient, description: str = "test world",
+              title: str | None = None) -> object:
+        body = {"description": description}
+        if title:
+            body["title"] = title
+        return client.post("/api/simulators/generate", json=body)
+
+    def test_happy_path_response_shape(self, generate_app: FastAPI,
+                                        db_session, monkeypatch,
+                                        mock_llm) -> None:
+        """合法描述 → 200 + {ok, game{source:generated}, retries}"""
+        monkeypatch.setattr(
+            "backend.app.services.game_generator.resolve_llm",
+            lambda db, provider: ("test", "test-model", mock_llm),
+        )
+        from backend.app.database import get_db
+        generate_app.dependency_overrides[get_db] = lambda: db_session
+
+        with TestClient(generate_app) as client:
+            resp = self._post(client, "一个赛博朋克世界")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["game"]["source"] == "generated"
+        assert "id" in body["game"]
+        assert "file" in body["game"]
+        assert "retries" in body
+
+    def test_validation_failure_422(self, generate_app: FastAPI,
+                                     db_session, monkeypatch) -> None:
+        """LLM 返回无场景 HTML → 422 + 结构化错误"""
+        mock_llm = _MockLLM(result="<html><body>no scene data</body></html>")
+        monkeypatch.setattr(
+            "backend.app.services.game_generator.resolve_llm",
+            lambda db, provider: ("test", "test-model", mock_llm),
+        )
+        from backend.app.database import get_db
+        generate_app.dependency_overrides[get_db] = lambda: db_session
+
+        with TestClient(generate_app) as client:
+            resp = self._post(client, "测试描述")
+
+        assert resp.status_code == 422
+        body = resp.json()
+        detail = body["detail"]
+        assert detail["ok"] is False
+        assert isinstance(detail["errors"], list)
+        assert len(detail["errors"]) > 0
+        assert "suggestion" in detail
+        assert "retries" in detail
+
+    def test_llm_returns_none_422(self, generate_app: FastAPI,
+                                   db_session, monkeypatch) -> None:
+        """LLM 返回 None → 422（非字符串类型错误），不崩溃"""
+        mock_llm = _MockLLM(result=None)
+        monkeypatch.setattr(
+            "backend.app.services.game_generator.resolve_llm",
+            lambda db, provider: ("test", "test-model", mock_llm),
+        )
+        from backend.app.database import get_db
+        generate_app.dependency_overrides[get_db] = lambda: db_session
+
+        with TestClient(generate_app) as client:
+            resp = self._post(client, "测试描述")
+
+        assert resp.status_code == 422
+        detail = resp.json()["detail"]
+        assert detail["ok"] is False
+        assert any("非字符串" in e["message"] for e in detail["errors"])
+
+    def test_duplicate_409(self, generate_app: FastAPI,
+                            db_session, monkeypatch,
+                            mock_llm, tmp_path: Path) -> None:
+        """相同内容两次生成 → 第二次 409（SHA-256 重复，detail 含「已存在」）"""
+        monkeypatch.setattr(
+            "backend.app.services.game_generator.resolve_llm",
+            lambda db, provider: ("test", "test-model", mock_llm),
+        )
+        from backend.app.database import get_db
+        generate_app.dependency_overrides[get_db] = lambda: db_session
+
+        with TestClient(generate_app) as client:
+            # 第一次：成功
+            resp1 = self._post(client, "世界描述")
+            assert resp1.status_code == 200
+
+            # 第二次：相同内容 → 重复
+            resp2 = self._post(client, "世界描述")
+            assert resp2.status_code == 409
+            assert "已存在" in resp2.json()["detail"]
