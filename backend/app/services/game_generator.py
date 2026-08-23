@@ -553,6 +553,9 @@ def _persist_generated_game(html: str, title: str | None) -> dict:
 
 
 def _sanitize_title(title: str) -> str:
-    """将游戏标题转换为安全的文件名干（仅保留中文/字母/数字/下划线/空格/连字符）"""
-    cleaned = re.sub(r'[^\u4e00-\u9fff\w\s-]', '', title).strip()
+    """将游戏标题转换为可读文件名干（只保留 Unicode 文字字符、空格、连字符）。
+    这是「可读性」层（剔除标点/emoji 等装饰字符），不是安全层——下游
+    import_game 内部的 sanitize_filename 会再做保留名/字节截断等安全净化。
+    """
+    cleaned = re.sub(r'[^\w\s-]', '', title).strip()
     return cleaned or _FALLBACK_NAME

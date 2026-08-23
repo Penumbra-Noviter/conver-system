@@ -31,6 +31,7 @@ __all__ = [
     "TestValidateGeneratedHtml",
     "TestTryExtractScenes",
     "TestSanitizeTitle",
+    "TestSanitizeTitleFalsify",
     "TestBuildSuggestion",
     "TestPromptConstruction",
     "TestGenerateGame",
@@ -328,6 +329,30 @@ class TestSanitizeTitle:
     def test_title_with_underscore(self) -> None:
         """含下划线 → 保留"""
         assert _sanitize_title("test_game") == "test_game"
+
+
+class TestSanitizeTitleFalsify:
+    """标题净化 — Falsify 边界（证伪：让函数崩溃的输入）"""
+
+    def test_title_with_colon_and_exclamation(self) -> None:
+        """标题含冒号、感叹号、括号 → 剔除（保留 Unicode 文字字符）"""
+        assert _sanitize_title("Game: V2!") == "Game V2"
+
+    def test_title_all_punctuation(self) -> None:
+        """标题全为标点 → 回退"""
+        assert _sanitize_title("!!!：（）") == "generated-game"
+
+    def test_title_only_hyphens(self) -> None:
+        """标题仅含连字符 → 保留（- 在白名单内）"""
+        assert _sanitize_title("---") == "---"
+
+    def test_title_with_emoji(self) -> None:
+        """标题含 emoji → 剔除"""
+        assert _sanitize_title("🎮 游戏测试") == "游戏测试"
+
+    def test_title_with_leading_trailing_whitespace(self) -> None:
+        """标题首尾空白 → 剔除"""
+        assert _sanitize_title("  我的游戏  ") == "我的游戏"
 
 
 # ═══════════════════════════════════════════════════════════
