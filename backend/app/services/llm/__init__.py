@@ -5,9 +5,8 @@ LLM Provider 包
 经 `LLMFactory.register_builtin_providers()` 显式注册，**不从包路径导入**——
 保证「import 本包」不触发任何 LLM SDK 加载（显式注册无副作用，懒加载价值成立）。
 
-    - 内置 Provider 通过 `LLMFactory.register_builtin_providers()` 注册
-    - 应用入口（main.py on_startup）在启动时显式调用
-    - 也可依赖 `get_provider` / `list_providers` 首次调用时的自动注册（懒加载兜底）
+    - 内置 Provider 在首次调用 `get_provider` / `list_providers` 时通过
+      `_ensure_builtins` 自动注册（懒加载兜底）
 
 Provider 清单单一来源为 `services/model_data.py` 的 `AVAILABLE_MODELS`，
 新增 Provider 只改模型数据文件（必要时在 factory._CLASS_OVERRIDES 声明实现类）。
