@@ -13,6 +13,11 @@
  *   - 级联入口：tab-bar 关最后 tab（删角色/删对话入口用例已随 list-views 下沉迁移）
  *   - 搜索视图接线：输入 → 防抖搜索 → 结果点击经激活流程打开会话
  *   - 重命名接线：列表标题同步钩子（syncConversationListTitle 在 list-views.js）
+ *   - 手册侧栏滚动高亮接线（switchView('guide') → initGuideSidebarScroll）：
+ *     滚到底强制末章 / 中部滚动正确章节 / 无 guide DOM 空安全早退 /
+ *     重复进入视图仅一份 scroll handler —— 几何属性经 Object.defineProperty +
+ *     getBoundingClientRect 覆写注入（jsdom 无布局；还原描述符防污染，
+ *     先例 utils.test.js scrollHeight 注入、save-manager.test.js files 注入）
  *   - Falsify：模型列表加载失败 → console.error（init 不崩溃）
  *
  * 断言纪律：优先 spy 模块边界/注入钩子的调用序列与参数（cascade 收口参数、
@@ -34,7 +39,22 @@ const APP_DOM_HTML = `
     <section id="view-characters" class="view"></section>
     <section id="view-search" class="view"></section>
     <section id="view-settings" class="view"></section>
-    <section id="view-guide" class="view"></section>
+    <section id="view-guide" class="view">
+        <div class="guide-layout">
+            <aside class="guide-sidebar">
+                <nav>
+                    <a href="#guide-alpha">第一章</a>
+                    <a href="#guide-beta">第二章</a>
+                    <a href="#guide-gamma">第三章</a>
+                </nav>
+            </aside>
+            <div class="guide-container">
+                <div class="guide-section" id="guide-alpha"></div>
+                <div class="guide-section" id="guide-beta"></div>
+                <div class="guide-section" id="guide-gamma"></div>
+            </div>
+        </div>
+    </section>
     <section id="view-simulators" class="view"></section>
 
     <button class="nav-btn" data-view="chat"></button>
@@ -794,5 +814,142 @@ describe('app.js 存档面板接线 — 工具条按钮 → 存档面板（U9-T2
         await openListView();
         expect(() => document.querySelector('.nav-btn[data-view="chat"]').click()).not.toThrow();
         expect(document.querySelector('#simulator-save-panel').hidden).toBe(true);
+    });
+});
+
+// ══════════════════════════════════════════════════
+// 手册侧栏滚动高亮接线（switchView('guide') → initGuideSidebarScroll）
+//
+// jsdom 无布局：offsetTop / getBoundingClientRect().top 恒 0。滚动高亮的
+// 行为断言依赖几何注入 —— 对容器以 Object.defineProperty 覆写
+// scrollTop/clientHeight/scrollHeight、对容器与章节元素覆写
+// getBoundingClientRect()（返回 { top } 形状对象），测试后删除实例属性
+// 回落原型描述符，避免污染同文件其他用例（先例：utils.test.js 的
+// scrollHeight 注入、save-manager.test.js 的 files/size 注入）。
+// ══════════════════════════════════════════════════
+
+/**
+ * 注入手册滚动几何 stub 并返回还原函数。
+ *
+ * @param {object} geo - 几何参数
+ * @param {number} geo.scrollTop - 容器滚动位置
+ * @param {number} geo.clientHeight - 容器可视高度（阈值 = ×0.2）
+ * @param {number} geo.scrollHeight - 容器内容总高（底部判定）
+ * @param {number} geo.containerTop - 容器 getBoundingClientRect().top（视口坐标）
+ * @param {number[]} geo.sectionTops - 各章节 getBoundingClientRect().top（文档序）
+ * @returns {() => void} 还原函数：删除注入的实例属性，回落 jsdom 原型描述符
+ */
+function installGuideGeometry({ scrollTop, clientHeight, scrollHeight, containerTop, sectionTops }) {
+    const container = document.querySelector('.guide-container');
+    const sections = [...container.querySelectorAll('.guide-section[id^="guide-"]')];
+    const restore = [];
+
+    for (const [prop, value] of [
+        ['scrollTop', scrollTop], ['clientHeight', clientHeight], ['scrollHeight', scrollHeight],
+    ]) {
+        const original = Object.getOwnPropertyDescriptor(container, prop);
+        Object.defineProperty(container, prop, { value, configurable: true });
+        restore.push(() => {
+            if (original) Object.defineProperty(container, prop, original);
+            else delete container[prop];
+        });
+    }
+
+    for (const [el, top] of [[container, containerTop], ...sections.map((s, i) => [s, sectionTops[i]])]) {
+        el.getBoundingClientRect = () => ({ top });
+        restore.push(() => { delete el.getBoundingClientRect; });
+    }
+    return () => restore.forEach((fn) => fn());
+}
+
+describe('app.js 手册侧栏滚动高亮接线 — switchView("guide") → initGuideSidebarScroll', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => {
+        if (restoreGuideGeometry) { restoreGuideGeometry(); restoreGuideGeometry = null; }
+        vi.restoreAllMocks();
+    });
+
+    /** 几何 stub 清理钩子（afterEach 统一还原，防泄漏到同文件其他用例） */
+    let restoreGuideGeometry = null;
+
+    /**
+     * 注入几何后经导航按钮进入手册视图（switchView 同步段完成初始化注册）
+     * @param {object} geo - 见 installGuideGeometry
+     * @returns {Element} 手册滚动容器
+     */
+    function enterGuide(geo) {
+        restoreGuideGeometry = installGuideGeometry(geo);
+        document.querySelector('.nav-btn[data-view="guide"]').click();
+        return document.querySelector('.guide-container');
+    }
+
+    /** 当前高亮的侧栏链接（无高亮时为 null） */
+    const activeLink = () => document.querySelector('.guide-sidebar a.active');
+
+    it('滚到底（scrollTop+clientHeight ≥ scrollHeight−2）→ 最后一章 active（2px 容差边界命中强制分支）', async () => {
+        const { state } = await loadApp(makeRoute({}));
+        // 边界构造：1498+500 = 2000 = scrollHeight−2 → 强制末章；
+        // 自然路径此几何只会选到第二章（alpha/beta 过阈值 100，gamma 500 中断）
+        // —— 断言 gamma 即证明走的是底部强制分支
+        const container = enterGuide({
+            scrollTop: 1498, clientHeight: 500, scrollHeight: 2000,
+            containerTop: 0, sectionTops: [20, 80, 500],
+        });
+        container._guideScrollHandler();
+
+        expect(state.currentView).toBe('guide');
+        expect(activeLink()?.getAttribute('href')).toBe('#guide-gamma');
+        expect(activeLink()?.textContent).toBe('第三章');
+    });
+
+    it('中部滚动 → 正确中间章节 active（视口差值坐标回归 — 旧 offsetTop 逻辑在 jsdom 恒选末章必红）', async () => {
+        await loadApp(makeRoute({}));
+        // 非底部（200+500=700 < 1998）；阈值 = 500×0.2 = 100：
+        // 视口差值 alpha 20 / beta 80 过阈值，gamma 500 中断 → 高亮第二章。
+        // 未修复实现：offsetTop 全 0 → 三章全过「offsetTop−100 ≤ scrollTop+阈值」→ 恒选末章
+        const container = enterGuide({
+            scrollTop: 200, clientHeight: 500, scrollHeight: 2000,
+            containerTop: 100, sectionTops: [120, 180, 600],
+        });
+        container._guideScrollHandler();
+
+        expect(activeLink()?.getAttribute('href')).toBe('#guide-beta');
+        expect(activeLink()?.textContent).toBe('第二章');
+        expect(document.querySelector('.guide-sidebar a[href="#guide-gamma"].active')).toBeNull();
+    });
+
+    it('Falsify:无 guide DOM → switchView("guide") 空安全早退不抛错', async () => {
+        const { state } = await loadApp(makeRoute({}));
+        document.querySelector('.guide-layout').remove();
+
+        expect(() => document.querySelector('.nav-btn[data-view="guide"]').click()).not.toThrow();
+        // 早退为同步路径；await 后无未处理 rejection（vitest 会将其计为失败）即无崩溃
+        await sleep(10);
+        expect(state.currentView).toBe('guide');
+        expect(document.querySelector('#view-guide').classList.contains('active')).toBe(true);
+    });
+
+    it('连续两次进入手册视图 → 防重复注册：removeEventListener 摘旧，仅一份 scroll handler 生效', async () => {
+        await loadApp(makeRoute({}));
+        const container = document.querySelector('.guide-container');
+        const added = [];
+        const removed = [];
+        const origAdd = container.addEventListener.bind(container);
+        const origRemove = container.removeEventListener.bind(container);
+        vi.spyOn(container, 'addEventListener').mockImplementation((...a) => { added.push(a); origAdd(...a); });
+        vi.spyOn(container, 'removeEventListener').mockImplementation((...a) => { removed.push(a); origRemove(...a); });
+
+        document.querySelector('.nav-btn[data-view="guide"]').click();
+        expect(added.filter(([type]) => type === 'scroll')).toHaveLength(1);
+        const firstHandler = container._guideScrollHandler;
+        expect(firstHandler).toBeTypeOf('function');
+
+        document.querySelector('.nav-btn[data-view="characters"]').click();
+        document.querySelector('.nav-btn[data-view="guide"]').click();
+
+        // 二次进入：先按引用摘除旧 handler 再挂新 — 任一时刻容器上仅一份生效
+        expect(removed.some(([type, handler]) => type === 'scroll' && handler === firstHandler)).toBe(true);
+        expect(added.filter(([type]) => type === 'scroll')).toHaveLength(2);
+        expect(container._guideScrollHandler).not.toBe(firstHandler);
     });
 });
