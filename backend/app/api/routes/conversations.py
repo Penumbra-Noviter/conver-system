@@ -12,23 +12,11 @@ from sqlalchemy.orm import Session
 
 from backend.app.api.headers import build_content_disposition
 from backend.app.database import get_db
-from backend.app.models.character import Character
 from backend.app.schemas.conversation import ConversationCreate, ConversationResponse, ConversationUpdate
 from backend.app.services import conversation as service
 from backend.app.services import conversation_export as export_service
 
 router = APIRouter(prefix="/api/conversations", tags=["对话管理"])
-
-
-def _export_character_name(db: Session, conversation_id: int) -> str:
-    """导出文件名中的角色名（空格折叠为下划线；无角色 / 无名回退对话 id）"""
-    conv = service.get_conversation(db, conversation_id)
-    if conv is None:
-        return str(conversation_id)
-    char = db.query(Character).filter(Character.id == conv.character_id).first()
-    if char is None or not char.name:
-        return str(conversation_id)
-    return char.name.replace(" ", "_")
 
 
 @router.get("", response_model=list[ConversationResponse])
@@ -79,7 +67,7 @@ def export_conversation_json(conversation_id: int, db: Session = Depends(get_db)
     if not data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
 
-    character_name = _export_character_name(db, conversation_id)
+    character_name = export_service.character_export_filename(db, conversation_id)
     return JSONResponse(
         content=data,
         media_type="application/json",
@@ -99,7 +87,7 @@ def export_conversation_markdown(conversation_id: int, db: Session = Depends(get
     if not md:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="对话不存在")
 
-    character_name = _export_character_name(db, conversation_id)
+    character_name = export_service.character_export_filename(db, conversation_id)
     return PlainTextResponse(
         content=md,
         media_type="text/markdown; charset=utf-8",
