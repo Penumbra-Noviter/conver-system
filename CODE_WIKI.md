@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1763<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->714<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1767<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->714<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->983<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -601,7 +601,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~368 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~380 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）。
 
@@ -1266,7 +1266,7 @@ conver system/
 | 文件 | 用例数 | 覆盖主题 |
 |------|--------|----------|
 | `frontend/tests/api.test.js` | <!--AUTO:tests:frontend/tests/api.test.js-->16<!--/AUTO--> | 请求层/超时/SSE/Blob |
-| `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->30<!--/AUTO--> | 应用编排接线 |
+| `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->34<!--/AUTO--> | 应用编排接线 |
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
@@ -1349,10 +1349,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1763<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1767<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->714<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->979<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->983<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

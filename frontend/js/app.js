@@ -365,6 +365,13 @@ let guideActiveLink = null;
 /**
  * 初始化手册侧边栏滚动高亮：监听 guide-container 滚动，
  * 根据当前可见区域高亮对应侧边栏条目。
+ *
+ * 坐标基准为「视口差值」：章节与滚动容器各自 getBoundingClientRect().top
+ * 的差值随滚动自适应，无需在坐标系间换算（旧实现混用文档坐标 offsetTop
+ * 与容器内部 scrollTop，两套坐标系互不随滚动换算导致高亮错位）。
+ * 高亮阈值统一为容器高度的 20%；滚动到底（含 2px 容差）时强制高亮最后
+ * 一章 —— 否则短小的末章节在「顶部 20%」规则下永远不可达。
+ *
  * 每次切入手册视图时调用，防重复注册。
  */
 function initGuideSidebarScroll() {
@@ -387,18 +394,24 @@ function initGuideSidebarScroll() {
     }
 
     const handler = () => {
-        const scrollTop = container.scrollTop;
-        const containerHeight = container.clientHeight;
-        const offset = 100; // 偏移量，让 section 顶部进入可视区即触发
+        // 视口差值坐标：章节顶部相对容器顶部的偏移（随滚动自动正确）
+        const containerTop = container.getBoundingClientRect().top;
+        const threshold = container.clientHeight * 0.2;
 
         let currentId = null;
         for (const section of guideSections) {
-            const sectionTop = section.offsetTop;
-            if (sectionTop - offset <= scrollTop + containerHeight * 0.2) {
+            if (section.getBoundingClientRect().top - containerTop <= threshold) {
                 currentId = section.id;
             } else {
                 break;
             }
+        }
+
+        // 末章可达性：滚到底（含 2px 容差）→ 强制高亮最后一章
+        const lastSection = guideSections[guideSections.length - 1];
+        if (lastSection &&
+            container.scrollTop + container.clientHeight >= container.scrollHeight - 2) {
+            currentId = lastSection.id;
         }
 
         if (currentId) {

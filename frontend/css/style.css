@@ -2438,16 +2438,19 @@ mark.search-highlight {
 /* ══════════════════════════════════════════════════
    用户手册视图
    ══════════════════════════════════════════════════ */
+/* 滚动容器唯一定义（原三处级联合并，取最终生效值；响应式媒体查询中的
+   分组 padding 覆盖为合法例外）—— 章节间距全部由 gap 承担，相邻章节仅保留
+   border-top 分隔线，不与 padding 叠加 */
 .guide-container {
-    max-width: 1000px;
-    width: 100%;
-    margin: 0 auto;
-    padding: var(--space-6);
-    overflow-y: auto;
     flex: 1;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: var(--space-6);
+    gap: 32px;
 }
 
 .guide-section {
@@ -2525,39 +2528,6 @@ mark.search-highlight {
     color: var(--accent);
 }
 
-/* ── 用户手册 — 目录栏 ── */
-.guide-toc {
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4) var(--space-5);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-3);
-    font-size: var(--text-sm);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-.guide-toc-label {
-    font-weight: 600;
-    color: var(--ink-1);
-    padding-right: var(--space-2);
-    white-space: nowrap;
-}
-.guide-toc a {
-    color: var(--accent);
-    text-decoration: none;
-    padding: 2px 6px;
-    border-radius: var(--radius-xs);
-    transition: background var(--transition-fast);
-    white-space: nowrap;
-}
-.guide-toc a:hover {
-    background: var(--hover-bg);
-    text-decoration: underline;
-}
-
 /* ── 用户手册 — 左侧边栏布局 ── */
 .guide-layout {
     display: flex;
@@ -2617,19 +2587,6 @@ mark.search-highlight {
     padding-left: calc(var(--space-4) + var(--space-4));
 }
 
-/* ── 用户手册 — 右侧内容区 ── */
-.guide-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: var(--space-6);
-    max-width: 1000px;
-    width: 100%;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-}
-
 /* ── 用户手册 — 锚点链接 ── */
 .guide-section h3 .section-anchor {
     opacity: 0;
@@ -2655,14 +2612,6 @@ mark.search-highlight {
     text-decoration: underline;
 }
 /* ── 用户手册 — 静态视觉覆盖补充 ── */
-.guide-container {
-    width: auto;
-    max-width: none;
-    margin: 0;
-    padding: var(--space-6);
-    gap: 32px;
-}
-
 .guide-section {
     padding: 0;
     background: transparent;
@@ -2670,8 +2619,8 @@ mark.search-highlight {
     border-radius: 0;
 }
 
+/* 章节间距由容器 gap（32px）单独承担，此处仅保留分隔线 */
 .guide-section + .guide-section {
-    padding-top: 28px;
     border-top: 1px solid var(--border);
 }
 
