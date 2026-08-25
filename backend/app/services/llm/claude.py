@@ -20,7 +20,6 @@ class ClaudeProvider(BaseLLM):
         client_kwargs = {"api_key": api_key}
         if base_url:
             client_kwargs["base_url"] = base_url
-        self._client = anthropic.Anthropic(**client_kwargs)
         self._async_client = anthropic.AsyncAnthropic(**client_kwargs)
 
     def _translate_error(self, error: Exception) -> LLMError:
