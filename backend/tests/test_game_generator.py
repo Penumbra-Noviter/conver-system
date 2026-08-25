@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from backend.app.services.game_generator import (
     MAX_RETRIES,
     ScanResult,
-    ValidationError,
+    GenValidationError,
     _build_suggestion,
     _build_system_prompt,
     _build_user_prompt,
@@ -447,39 +447,39 @@ class TestBuildSuggestion:
 
     def test_structure_error(self) -> None:
         """structure 错误 → 对应建议"""
-        suggestion = _build_suggestion([ValidationError(field="structure", message="缺少 <!DOCTYPE html>")])
+        suggestion = _build_suggestion([GenValidationError(field="structure", message="缺少 <!DOCTYPE html>")])
         assert "DOCTYPE" in suggestion
 
     def test_template_error(self) -> None:
         """template 错误 → 对应建议"""
-        suggestion = _build_suggestion([ValidationError(field="template", message="模板标记未填充")])
+        suggestion = _build_suggestion([GenValidationError(field="template", message="模板标记未填充")])
         assert "GEN" in suggestion
 
     def test_cfg_error(self) -> None:
         """cfg 错误 → 对应建议"""
-        suggestion = _build_suggestion([ValidationError(field="cfg", message="缺少 cfg-endpoint")])
+        suggestion = _build_suggestion([GenValidationError(field="cfg", message="缺少 cfg-endpoint")])
         assert "cfg" in suggestion
 
     def test_syntax_error(self) -> None:
         """syntax 错误 → 对应建议"""
-        suggestion = _build_suggestion([ValidationError(field="syntax", message="未闭合标签")])
+        suggestion = _build_suggestion([GenValidationError(field="syntax", message="未闭合标签")])
         assert "语法" in suggestion
 
     def test_data_error(self) -> None:
         """data 错误 → 对应建议"""
-        suggestion = _build_suggestion([ValidationError(field="data", message="场景数据无效")])
+        suggestion = _build_suggestion([GenValidationError(field="data", message="场景数据无效")])
         assert "场景数据" in suggestion
 
     def test_security_error(self) -> None:
         """security 错误 → 对应建议"""
-        suggestion = _build_suggestion([ValidationError(field="security", message="检测到 eval")])
+        suggestion = _build_suggestion([GenValidationError(field="security", message="检测到 eval")])
         assert "可疑" in suggestion
 
     def test_multiple_errors(self) -> None:
         """多个错误 → 合并建议"""
         errors = [
-            ValidationError(field="structure", message="缺少 DOCTYPE"),
-            ValidationError(field="cfg", message="缺少 cfg-endpoint"),
+            GenValidationError(field="structure", message="缺少 DOCTYPE"),
+            GenValidationError(field="cfg", message="缺少 cfg-endpoint"),
         ]
         suggestion = _build_suggestion(errors)
         assert "DOCTYPE" in suggestion
@@ -611,7 +611,7 @@ class TestGenerateGame:
         )
 
         # 重试时 previous_html=""（空字符串）—— 应走 retry prompt 路径
-        errors = [ValidationError(field="data", message="场景数据异常")]
+        errors = [GenValidationError(field="data", message="场景数据异常")]
         # 令 validate_generated_html 首次返回错误，第二次返回空（通过）
         call_count = 0
 
