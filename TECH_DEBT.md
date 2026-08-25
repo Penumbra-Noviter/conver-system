@@ -17,11 +17,13 @@
 
 ## 技术债候选区
 
-> 当前 1 项待立项（F-45：O2 一致性缺口，**明确不在本批修复范围**）。
+> 当前 3 项待立项（F-45：O2 一致性缺口 / F-47：滚动高亮缺 type hints / F-48：ScrollSpy 提取候选）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| F-45 | O2 一致性缺口（**明确不在本批修复范围**）：chat 流式中途出错时 DB 已落库部分生成内容而 UI 渲染错误气泡——`chat.py:184` `stream_reply` 错误帧产出后 finally 兜底仍保存 partial content（:247-249 错误帧、:254 起兜底落库；docstring「兜底……尽力保存已生成部分」背书行为），前端 stream-session.js 普通错误写回 phase 'error' 并渲染错误气泡（:308-317）；下次加载历史时已存内容重现，与错误气泡呈现不一致 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-45 | O2 一致性缺口（**明确不在本批修复范围**）：chat 流式中途出错时 DB 已落库部分生成内容而 UI 渲染错误气泡 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-47 | `initGuideSidebarScroll` 缺 type hints（`app.js:377`），违反 CLAUDE.md「公开函数必须有 type hints + docstring」约定；模块为 `__all__=[]` 纯编排，影响有限 | 2026-08-26 期末四轴（Standards ST-1） | Worth exploring | 📝 待立项 |
+| F-48 | Scroll handler 对 container/sidebar 几何属性的访问构成 Feature Envy，建议提取为 `ScrollSpy` 类（依赖注入容器和侧栏引用） | 2026-08-26 期末四轴（Architecture A6） | Speculative | 📝 待立项 |
 
 ## 技术债处置记录
 
