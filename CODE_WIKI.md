@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->714<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->714<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1693<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->714<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -586,7 +586,7 @@ conver system/
 | <!--AUTO:sig:backend/scripts/migrate_data.py:migrate-->`migrate(source, target, force=False)`<!--/AUTO--> | 执行迁移（幂等 + 标记） |
 | <!--AUTO:sig:backend/scripts/migrate_data.py:main-->`main(argv=None)`<!--/AUTO--> | CLI 入口 |
 
-### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~258 行<!--/AUTO-->）
+### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~272 行<!--/AUTO-->）
 
 **职责**：Fetch 封装——超时守卫（AbortController + 15s 兜底，TD-51/55/72）、错误归一化、SSE 流式、Blob 下载（Content-Disposition 文件名解析）。
 
@@ -601,7 +601,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~303 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~307 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）。
 
@@ -655,7 +655,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/list-views.js:handleCharacterImport-->`handleCharacterImport()`<!--/AUTO--> | 角色卡导入处理 |
 | <!--AUTO:sig:frontend/js/list-views.js:promptUseWizardAfterImportFail-->`promptUseWizardAfterImportFail()`<!--/AUTO--> | 导入失败 → 引导使用向导 |
 
-### 4.37 `frontend/js/components/character-form.js` — 角色编辑表单（<!--AUTO:lines:frontend/js/components/character-form.js-->~198 行<!--/AUTO-->）
+### 4.37 `frontend/js/components/character-form.js` — 角色编辑表单（<!--AUTO:lines:frontend/js/components/character-form.js-->~204 行<!--/AUTO-->）
 
 **职责**：创建/编辑模式的角色表单（含完整性提示）。
 
@@ -678,7 +678,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/character-submit.js:succeedSubmit-->`succeedSubmit(statusEl, successMsgHtml, close, onSuccess = null)`<!--/AUTO--> | 提交成功态 |
 | <!--AUTO:sig:frontend/js/components/character-submit.js:failSubmit-->`failSubmit(btn, statusEl, err, restoreLabel)`<!--/AUTO--> | 提交失败态（恢复按钮） |
 
-### 4.39 `frontend/js/components/character-wizard.js` — 六步创建向导（<!--AUTO:lines:frontend/js/components/character-wizard.js-->~578 行<!--/AUTO-->）
+### 4.39 `frontend/js/components/character-wizard.js` — 六步创建向导（<!--AUTO:lines:frontend/js/components/character-wizard.js-->~584 行<!--/AUTO-->）
 
 **职责**：六步创建向导（模板选择/文档导入/自定义…）——步骤渲染 + 事件绑定 + 校验 + 保存；6 步渲染函数分离。
 
@@ -696,7 +696,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/character-wizard.js:updateProgress-->`updateProgress()`<!--/AUTO--> | 进度更新 |
 | <!--AUTO:sig:frontend/js/components/character-wizard.js:_applyCharacterData-->`_applyCharacterData(state, data)`<!--/AUTO--> | 文档解析结果回填 |
 
-### 4.40 `frontend/js/components/confirm-dialog.js` — 确认对话框（<!--AUTO:lines:frontend/js/components/confirm-dialog.js-->~75 行<!--/AUTO-->）
+### 4.40 `frontend/js/components/confirm-dialog.js` — 确认对话框（<!--AUTO:lines:frontend/js/components/confirm-dialog.js-->~82 行<!--/AUTO-->）
 
 **职责**：确认/提示对话框（Promise 化）。
 
@@ -705,7 +705,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/confirm-dialog.js:showConfirm-->`showConfirm(options = {})`<!--/AUTO--> | 确认对话框（resolve 布尔） |
 | <!--AUTO:sig:frontend/js/components/confirm-dialog.js:showAlert-->`showAlert(message)`<!--/AUTO--> | 提示对话框 |
 
-### 4.41 `frontend/js/components/export-dialog.js` — 导出对话框（<!--AUTO:lines:frontend/js/components/export-dialog.js-->~62 行<!--/AUTO-->）
+### 4.41 `frontend/js/components/export-dialog.js` — 导出对话框（<!--AUTO:lines:frontend/js/components/export-dialog.js-->~68 行<!--/AUTO-->）
 
 **职责**：会话导出格式选择 + 下载。
 
@@ -714,7 +714,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/export-dialog.js:showExportDialog-->`showExportDialog(conversationId)`<!--/AUTO--> | 打开导出对话框 |
 | <!--AUTO:sig:frontend/js/components/export-dialog.js:downloadExport-->`downloadExport(conversationId, format)`<!--/AUTO--> | 按格式下载导出 |
 
-### 4.42 `frontend/js/components/modal.js` — 模态骨架（<!--AUTO:lines:frontend/js/components/modal.js-->~92 行<!--/AUTO-->）
+### 4.42 `frontend/js/components/modal.js` — 模态骨架（<!--AUTO:lines:frontend/js/components/modal.js-->~98 行<!--/AUTO-->）
 
 **职责**：模态骨架（ARC10 T-11 收口）——打开/关闭/结果传递；`close` 为对象方法（骨架内部）。
 
@@ -722,7 +722,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/components/modal.js:openModal-->`openModal(options = {})`<!--/AUTO--> | 打开模态（返回结果 Promise） |
 
-### 4.43 `frontend/js/components/model-selector.js` — 模型选择（<!--AUTO:lines:frontend/js/components/model-selector.js-->~94 行<!--/AUTO-->）
+### 4.43 `frontend/js/components/model-selector.js` — 模型选择（<!--AUTO:lines:frontend/js/components/model-selector.js-->~100 行<!--/AUTO-->）
 
 **职责**：切换角色对话模型的弹层。
 
@@ -792,7 +792,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/conversation-activation.js:showEmptyState-->`showEmptyState()`<!--/AUTO--> | 空态显示 |
 | <!--AUTO:sig:frontend/js/conversation-activation.js:setActivationHooks-->`setActivationHooks(h)`<!--/AUTO--> | 注入激活钩子 |
 
-### 4.47 `frontend/js/data/character-templates.js` — 角色模板数据（<!--AUTO:lines:frontend/js/data/character-templates.js-->~88 行<!--/AUTO-->）
+### 4.47 `frontend/js/data/character-templates.js` — 角色模板数据（<!--AUTO:lines:frontend/js/data/character-templates.js-->~94 行<!--/AUTO-->）
 
 **职责**：六步向导的 5 套内置角色模板（纯数据模块）。
 
@@ -946,7 +946,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulators.js:renderLoading-->`renderLoading()`<!--/AUTO--> | 加载态渲染 |
 | <!--AUTO:sig:frontend/js/simulators.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
 
-### 4.58 `frontend/js/state.js` — 全局状态（<!--AUTO:lines:frontend/js/state.js-->~27 行<!--/AUTO-->）
+### 4.58 `frontend/js/state.js` — 全局状态（<!--AUTO:lines:frontend/js/state.js-->~33 行<!--/AUTO-->）
 
 **职责**：全局 DOM 引用缓存（P6.5 后字段退役，仅存 DOM 句柄）。
 
@@ -995,7 +995,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/tabs.js:persist-->`persist()`<!--/AUTO--> | 写 sessionStorage |
 | <!--AUTO:sig:frontend/js/tabs.js:commit-->`commit()`<!--/AUTO--> | 提交（持久化 + 通知） |
 
-### 4.61 `frontend/js/utils.js` — 通用工具（<!--AUTO:lines:frontend/js/utils.js-->~94 行<!--/AUTO-->）
+### 4.61 `frontend/js/utils.js` — 通用工具（<!--AUTO:lines:frontend/js/utils.js-->~107 行<!--/AUTO-->）
 
 **职责**：通用工具——HTML 转义、Toast、Blob 下载、头像首字母、标签格式化、输入框自适应。
 
@@ -1349,7 +1349,7 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->714<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1693<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->714<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->979<!--/AUTO-->
