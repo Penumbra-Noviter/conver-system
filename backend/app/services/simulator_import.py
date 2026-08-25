@@ -44,6 +44,7 @@ __all__ = [
     "MAX_IMPORT_BYTES",
     "SUSPICIOUS_PATTERNS",
     "ImportResult",
+    "ScanResult",
     "SimulatorDuplicateError",
     "SimulatorImportError",
     "find_duplicate",
@@ -103,6 +104,20 @@ class ImportResult:
 
     game: dict
     renamed: bool
+    warnings: list[str]
+
+
+@dataclass(frozen=True)
+class ScanResult:
+    """预计算扫描结果（避免生成器路径双重扫描：T-03 消除 import_game 内部的 probe_config / scan_suspicious 重复计算）
+
+    game_type: probe_config 判定的游戏类型（"ai" / "local"）
+    config: ai 时三元组 dict，local 时 None
+    warnings: scan_suspicious 命中的 SUSPICIOUS_PATTERNS 键集
+    """
+
+    game_type: str
+    config: dict | None
     warnings: list[str]
 
 
@@ -301,10 +316,15 @@ def _unique_game_id(sim_dir: Path, base: str) -> str:
 
 
 def import_game(
-    sim_dir: Path, filename: str, content: bytes, source: str = "imported"
+    sim_dir: Path, filename: str, content: bytes, source: str = "imported",
+    *, precomputed_scan: ScanResult | None = None,
 ) -> ImportResult:
     """导入单文件 HTML 模拟器游戏（服务编排：校验 → 净化 → 去重 → 改名 →
     探测 → 粗筛 → 落盘 → manifest 注册）。
+
+    precomputed_scan 用于生成器路径（T-03）：传值时跳过 probe_config 与
+    scan_suspicious 的结果计算，直接使用预计算值（game_type/config/warnings）；
+    不传时行为与现状逐字一致（import 路由路径不传）。
 
     Args:
         sim_dir: 数据目录 simulators（请求期解析，调用方负责；不缓存于 import 期）
@@ -312,6 +332,7 @@ def import_game(
         content: 上传文件字节
         source: manifest 条目 source 标记（默认 imported；AI 生成游戏传
             generated——game_generator 消费，`source` 白名单见前端 parseManifest）
+        precomputed_scan: 预计算扫描结果（T-03 双重扫描消除）；keyword-only
 
     Raises:
         SimulatorImportError: 非 .html / 超 5MB / 空文件 / 缺文件名（400 语义）
@@ -341,8 +362,15 @@ def import_game(
 
     # manifest 缺失/损坏先自愈落盘（口径一致见 _read_manifest_or_rebuild persist）
     _read_manifest_or_rebuild(sim_dir, persist=True)
-    text = content.decode("utf-8", errors="replace")
-    game_type, config = probe_config(text)
+
+    if precomputed_scan is not None:
+        game_type = precomputed_scan.game_type
+        config = precomputed_scan.config
+        warnings = precomputed_scan.warnings
+    else:
+        text = content.decode("utf-8", errors="replace")
+        game_type, config = probe_config(text)
+        warnings = scan_suspicious(text)
     entry: dict = {
         "id": _unique_game_id(sim_dir, slugify(stem)),
         "file": final_name,
@@ -360,4 +388,4 @@ def import_game(
     except Exception:
         (sim_dir / final_name).unlink(missing_ok=True)
         raise
-    return ImportResult(game=entry, renamed=renamed, warnings=scan_suspicious(text))
+    return ImportResult(game=entry, renamed=renamed, warnings=warnings)
