@@ -112,6 +112,50 @@ POST /api/characters/import
 
 **响应** `201` — 导入后的角色对象；非法卡 → `422`「导入失败：<原因>」
 
+### 智能解析角色文档
+
+```
+POST /api/characters/parse-document
+```
+
+**请求体**
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| text | str | 是 | 角色设定文档文本（1-50000 字符） |
+| provider | str? | 否 | LLM Provider（留空用默认） |
+| model | str? | 否 | LLM 模型名（留空用默认） |
+
+```json
+{
+  "text": "林墨，一位流浪诗人。他常年行走在……",
+  "provider": null,
+  "model": null
+}
+```
+
+**响应** `200` — 未提取到的字段为空串/空数组；`parsed_fields` 列出成功提取的字段名
+```json
+{
+  "name": "林墨",
+  "description": "一位流浪诗人",
+  "personality": "你是林墨，一位流浪诗人……",
+  "scenario": "",
+  "first_mes": "",
+  "mes_example": "",
+  "system_prompt": "",
+  "post_history_instructions": "",
+  "tags": [],
+  "creator": "",
+  "parsed_fields": ["name", "description", "personality"]
+}
+```
+
+**错误**
+| 状态码 | 条件 |
+|--------|------|
+| 422 | 解析失败：LLM 调用失败 / 返回无法解析的响应 / 未配置 API Key / 不支持的 Provider（统一为 `{"detail": "<可读原因>"}`） |
+| 422 | 请求体校验失败（FastAPI 原生校验，`detail` 为数组） |
+
 ---
 
 ## 对话 API
@@ -135,13 +179,44 @@ GET /api/conversations?character_id=1
     "character_id": 1,
     "title": "关于诗歌的讨论",
     "model_provider": "claude",
-    "model_name": "claude-sonnet-4-20250514",
+    "model_name": "claude-sonnet-5",
     "message_count": 12,
     "created_at": "2026-07-30T10:00:00",
     "updated_at": "2026-07-30T11:30:00"
   }
 ]
 ```
+
+### 获取单个对话
+
+```
+GET /api/conversations/{conversation_id}
+```
+
+**路径参数**
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| conversation_id | int | 对话 ID |
+
+**响应** `200`
+```json
+{
+  "id": 1,
+  "character_id": 1,
+  "title": "关于诗歌的讨论",
+  "model_provider": "claude",
+  "model_name": "claude-sonnet-5",
+  "message_count": 12,
+  "created_at": "2026-07-30T10:00:00",
+  "updated_at": "2026-07-30T11:30:00"
+}
+```
+
+**错误**
+| 状态码 | 条件 |
+|--------|------|
+| 404 | 对话不存在（`detail`: `"对话不存在"`） |
+| 422 | `conversation_id` 非整数（FastAPI 原生校验，`detail` 为数组） |
 
 ### 创建对话
 
@@ -155,7 +230,7 @@ POST /api/conversations
   "character_id": 1,
   "title": "关于诗歌的讨论",
   "model_provider": "claude",
-  "model_name": "claude-sonnet-4-20250514"
+  "model_name": "claude-sonnet-5"
 }
 ```
 
@@ -168,7 +243,7 @@ POST /api/conversations
   "character_id": 1,
   "title": "关于诗歌的讨论",
   "model_provider": "claude",
-  "model_name": "claude-sonnet-4-20250514",
+  "model_name": "claude-sonnet-5",
   "created_at": "2026-07-30T10:00:00"
 }
 ```
@@ -343,28 +418,38 @@ GET /api/models
 {
   "providers": [
     {
+      "key": "claude",
       "id": "claude",
       "name": "Claude (Anthropic)",
       "models": [
-        "claude-sonnet-4-20250514",
-        "claude-opus-4-8-20250514",
-        "claude-haiku-4-5-20251001"
+        "claude-sonnet-5",
+        "claude-fable-5",
+        "claude-mythos-5",
+        "claude-opus-4-8",
+        "claude-opus-4-7",
+        "claude-mythos-preview",
+        "claude-opus-4-6",
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5",
+        "claude-opus-4-5",
+        "claude-sonnet-4-5"
       ]
     },
     {
+      "key": "openai",
       "id": "openai",
-      "name": "OpenAI / 兼容 API",
+      "name": "OpenAI",
       "models": [
-        "gpt-4o",
-        "gpt-4o-mini",
-        "gpt-4-turbo"
+        "gpt-5.6-sol",
+        "gpt-5.4",
+        "gpt-4o"
       ]
     }
   ]
 }
 ```
 
-> 可用模型列表可以硬编码在后端配置中，前端只做展示。
+> 可用模型清单硬编码于 `backend/app/services/model_data.py::AVAILABLE_MODELS`（单一来源，上为节选；其余 Provider：deepseek / qwen / kimi / glm / minimax / step），前端只做展示。
 > 未来可考虑通过 SDK 实时查询各 Provider 的可用模型。
 
 ---
@@ -384,7 +469,7 @@ GET /api/settings
   "openai_api_key": "sk-...",
   "openai_base_url": "https://api.example.com/v1",
   "default_provider": "claude",
-  "default_model": "claude-sonnet-4-20250514",
+  "default_model": "claude-sonnet-5",
   "sliding_window_rounds": "30",
   "theme_mode": "auto",
   "user_name": "User"
@@ -404,7 +489,7 @@ PUT /api/settings
   "claude_api_key": "sk-ant-...",
   "openai_api_key": "sk-...",
   "default_provider": "claude",
-  "default_model": "claude-sonnet-4-20250514"
+  "default_model": "claude-sonnet-5"
 }
 ```
 
@@ -498,6 +583,49 @@ multipart 表单字段 `file`（单文件 `.html`）上传第三方模拟器游�
 
 **错误** `400` — 非 .html / 超过 5MB / 空文件（detail 为可读原因）；`409` — SHA-256 内容与已有游戏重复（detail 含「已存在」）；`500` — 落盘失败（如数据目录不可写）。
 
+### AI 生成模拟器游戏
+
+```
+POST /api/simulators/generate
+```
+
+**请求体**
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| description | str | 是 | 世界观描述文本（1-10000 字符） |
+| title | str? | 否 | 游戏标题（≤100 字符，用于生成文件名） |
+
+```json
+{
+  "description": "一个发生在魔法学院的冒险故事，学生发现了一个秘密通道",
+  "title": "魔法学院秘道探险"
+}
+```
+
+**响应** `200` — 生成的 HTML 通过校验闸门后落盘并注册 manifest
+```json
+{
+  "ok": true,
+  "game": { "id": "<game-id>", "file": "xxx.html", "name": "魔法学院秘道探险", "type": "类型", "source": "generated", "config": {} },
+  "retries": 0
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| game | 注册后的游戏条目（字段同导入接口；`source` 固定为 `"generated"`；`config` 为 cfg- 探测到的配置三元组，无则缺省） |
+| retries | 重试计数：`200` 中为通过校验前已用的重试次数（首次即过为 `0`）；`422` 中为总尝试次数 |
+
+**错误**
+| 状态码 | 条件 | detail 形状 |
+|--------|------|-------------|
+| 422 | 请求体校验失败（FastAPI 原生） | 数组 |
+| 422 | 生成的 HTML 未通过校验闸门（自动重试耗尽后返回） | 对象：`{"ok": false, "errors": [{"field", "message"}], "suggestion", "retries"}`；`field` ∈ `structure` \| `template` \| `cfg` \| `syntax` \| `security` \| `data` |
+| 409 | SHA-256 内容与已有游戏重复 | 字符串（含「已存在」） |
+| 400 | 未配置 API Key / 不支持的 Provider | 字符串（可读原因） |
+| 401 / 429 / 504 / 400 / 502 | LLM 调用失败（鉴权失败 / 频率超限 / 超时 / 内容过滤 / 其他），走统一 LLM 错误映射 | 字符串 |
+| 500 | 数据目录不可写等落盘失败 | — |
+
 ---
 
 ## 错误响应格式
@@ -509,6 +637,8 @@ multipart 表单字段 `file`（单文件 `.html`）上传第三方模拟器游�
   "detail": "错误描述信息"
 }
 ```
+
+> 例外：请求路径/请求体不合法时 FastAPI 原生校验错误（`422`）的 `detail` 为对象数组；个别端点返回结构化 `detail`（如 `POST /api/simulators/generate` 校验闸门失败为对象），见各端点契约。
 
 | HTTP 状态码 | 含义 |
 |-------------|------|
