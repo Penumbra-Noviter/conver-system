@@ -441,6 +441,28 @@ async def generate_game(
     db: Session,
     description: str,
     title: str | None = None,
+) -> GenerateResult:
+    """生成游戏（主编排入口）
+
+    Args:
+        db: 数据库会话
+        description: 用户输入的世界观描述
+        title: 可选游戏标题
+
+    Returns:
+        GenerateResult（ok=True 表示成功，game 为 manifest 条目）
+
+    Raises:
+        LLMError: LLM 调用失败（由调用方统一处理）
+    """
+    # T-04：内部递归委托 _generate_with_retry，重试参数不再暴露给调用方
+    return await _generate_with_retry(db, description, title)
+
+
+async def _generate_with_retry(
+    db: Session,
+    description: str,
+    title: str | None = None,
     *,
     previous_html: str | None = None,
     previous_errors: list[ValidationError] | None = None,
@@ -448,7 +470,7 @@ async def generate_game(
     retries_left: int = MAX_RETRIES,
     attempted: int = 0,
 ) -> GenerateResult:
-    """生成游戏（主编排入口）
+    """生成游戏内部递归辅助（重试参数仅服务于自递归，不对外暴露）
 
     Args:
         db: 数据库会话
@@ -505,7 +527,7 @@ async def generate_game(
                 suggestion="请重试",
                 retries=attempted + 1,
             )
-        return await generate_game(
+        return await _generate_with_retry(
             db=db,
             description=description,
             title=title,
@@ -540,7 +562,7 @@ async def generate_game(
         )
 
     # 继续重试
-    return await generate_game(
+    return await _generate_with_retry(
         db=db,
         description=description,
         title=title,
