@@ -194,6 +194,8 @@ async def stream_reply(
     - 停止语义为「用户主动停止」，非错误；路由层只做 data: 帧包装。
     - 兜底：生成器被取消（GeneratorExit / CancelledError，Starlette 在客户端
       断开时取消 SSE 生成器的真实路径）时，finally 中仍尽力保存已生成部分。
+    - 零 token 流不落库：Provider 正常结束但未产出任何 token（full_content 为
+      空串）时，跳过持久化、不留空 assistant 消息，done 帧 message_id 为 None。
 
     Args:
         db: 数据库会话
@@ -222,13 +224,16 @@ async def stream_reply(
             full_content += token
             yield {"type": "token", "content": token}
 
-        # 流结束，保存完整回复到 DB
-        if not saved:
+        # 流结束，保存完整回复到 DB；零 token 空流不落库（O1：空 assistant
+        # 消息会污染历史），done 帧 message_id 置 None，不引用未保存消息 id
+        message_id: int | None = None
+        if not saved and full_content:
             saved_msg = message_service.create_message(
                 db, conversation_id, Role.ASSISTANT, full_content
             )
             saved = True
-        yield {"type": "done", "message_id": saved_msg.id}
+            message_id = saved_msg.id
+        yield {"type": "done", "message_id": message_id}
 
     except ClientDisconnect:
         # 客户端在发送过程中断开 — 尽力保存已生成部分
@@ -243,6 +248,8 @@ async def stream_reply(
         _, message = llm_error_response(e, ctx.conversation.model_provider)
         yield {"type": "error", "message": message}
     except Exception as e:
+        # O3：泛化异常属未预期路径，错误帧产出前先落 ERROR 日志（含堆栈）便于线上排障
+        logger.exception("流式生成回复失败")
         yield {"type": "error", "message": f"生成回复失败: {e}"}
     finally:
         # 生成器被取消（GeneratorExit / CancelledError）→ 兜底保存已生成部分。
