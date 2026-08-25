@@ -27,7 +27,7 @@ from backend.app.services import data_dir as data_dir_service
 from backend.app.services import simulator_store
 from backend.app.services.game_template import MARKER_PATTERN, SEED_TEMPLATE
 from backend.app.services.llm.resolver import resolve_llm
-from backend.app.services.simulator_store import CFG_REQUIRED_IDS, scan_input_ids
+from backend.app.services.simulator_import import CFG_REQUIRED_IDS, scan_input_ids
 
 __all__ = [
     "MAX_RETRIES",
