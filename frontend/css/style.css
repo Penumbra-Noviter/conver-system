@@ -2558,6 +2558,78 @@ mark.search-highlight {
     text-decoration: underline;
 }
 
+/* ── 用户手册 — 左侧边栏布局 ── */
+.guide-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+.guide-sidebar {
+    width: 220px;
+    min-width: 220px;
+    overflow-y: auto;
+    padding: var(--space-5) 0;
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-height: calc(100vh - 120px);
+}
+.guide-sidebar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.guide-sidebar .sidebar-section-group {
+    margin-bottom: var(--space-2);
+}
+.guide-sidebar .sidebar-section-group .group-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: var(--space-2) var(--space-4) var(--space-1);
+}
+.guide-sidebar a {
+    display: block;
+    padding: 6px var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    text-decoration: none;
+    border-radius: 0;
+    transition: background var(--transition-fast), color var(--transition-fast);
+    line-height: 1.4;
+}
+.guide-sidebar a:hover {
+    background: var(--hover-bg);
+    color: var(--ink-1);
+}
+.guide-sidebar a.active {
+    color: var(--accent);
+    background: var(--accent-bg);
+    font-weight: 500;
+}
+.guide-sidebar a.indent {
+    padding-left: calc(var(--space-4) + var(--space-4));
+}
+
+/* ── 用户手册 — 右侧内容区 ── */
+.guide-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-6);
+    max-width: 1000px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
 /* ── 用户手册 — 锚点链接 ── */
 .guide-section h3 .section-anchor {
     opacity: 0;
@@ -2584,11 +2656,11 @@ mark.search-highlight {
 }
 /* ── 用户手册 — 静态视觉覆盖补充 ── */
 .guide-container {
-    width: min(100%, 760px);
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 24px;
-    gap: 28px;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: var(--space-6);
+    gap: 32px;
 }
 
 .guide-section {

@@ -106,6 +106,10 @@ async function switchView(viewName) {
         // 与防抖逻辑在 search-view.js，本处只负责视图切换后的焦点引导
         setTimeout(() => document.querySelector('#search-input')?.focus(), 100);
     }
+    // 用户手册视图：初始化侧边栏滚动高亮
+    if (viewName === 'guide') {
+        initGuideSidebarScroll();
+    }
     // 模拟器视图：进入即刷新列表（懒加载 — 未进入不发请求；fetch 在
     // simulators.js 内部走 setFetch seam，协调层只负责触发）。TD-53：运行
     // 中再点导航 = 返回列表（closeSimulator 卸载 iframe、列表面板恢复 —
@@ -346,3 +350,69 @@ init();
 // ══════════════════════════════════════════════════
 
 export const __all__ = [];
+
+// ══════════════════════════════════════════════════
+// 用户手册侧边栏滚动高亮
+// ══════════════════════════════════════════════════
+
+/** 手册侧边栏中所有锚点链接 */
+let guideSidebarLinks = null;
+/** 手册内所有带 id 的 section 元素 */
+let guideSections = null;
+/** 当前高亮的链接元素 */
+let guideActiveLink = null;
+
+/**
+ * 初始化手册侧边栏滚动高亮：监听 guide-container 滚动，
+ * 根据当前可见区域高亮对应侧边栏条目。
+ * 每次切入手册视图时调用，防重复注册。
+ */
+function initGuideSidebarScroll() {
+    const container = document.querySelector('.guide-container');
+    const sidebar = document.querySelector('.guide-sidebar');
+    if (!container || !sidebar) return;
+
+    // 首次初始化时收集引用
+    if (!guideSidebarLinks) {
+        guideSidebarLinks = sidebar.querySelectorAll('a[href^="#guide-"]');
+    }
+    if (!guideSections) {
+        guideSections = container.querySelectorAll('.guide-section[id^="guide-"]');
+    }
+
+    // 移除旧 listener（防重复注册）
+    const oldHandler = container._guideScrollHandler;
+    if (oldHandler) {
+        container.removeEventListener('scroll', oldHandler);
+    }
+
+    const handler = () => {
+        const scrollTop = container.scrollTop;
+        const containerHeight = container.clientHeight;
+        const offset = 100; // 偏移量，让 section 顶部进入可视区即触发
+
+        let currentId = null;
+        for (const section of guideSections) {
+            const sectionTop = section.offsetTop;
+            if (sectionTop - offset <= scrollTop + containerHeight * 0.2) {
+                currentId = section.id;
+            } else {
+                break;
+            }
+        }
+
+        if (currentId) {
+            const newActive = sidebar.querySelector(`a[href="#${currentId}"]`);
+            if (newActive && newActive !== guideActiveLink) {
+                if (guideActiveLink) guideActiveLink.classList.remove('active');
+                newActive.classList.add('active');
+                guideActiveLink = newActive;
+            }
+        }
+    };
+
+    container._guideScrollHandler = handler;
+    container.addEventListener('scroll', handler, { passive: true });
+    // 初始触发一次
+    setTimeout(handler, 50);
+}
