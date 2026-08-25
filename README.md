@@ -21,7 +21,7 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/user/conver-system.git
+git clone https://github.com/Penumbra-Noviter/conver-system.git
 cd conver-system
 
 # 2. 创建虚拟环境
