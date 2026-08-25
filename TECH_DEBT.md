@@ -17,11 +17,7 @@
 
 ## 技术债候选区
 
-> 当前 1 项待立项（F-45：O2 一致性缺口，**明确不在本批修复范围**）。
-
-| 编号 | 遗留项 | 来源 | 强度 | 状态 |
-|------|--------|------|------|------|
-| F-45 | O2 一致性缺口（**明确不在本批修复范围**）：chat 流式中途出错时 DB 已落库部分生成内容而 UI 渲染错误气泡 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+> 当前 0 项待立项。技术债区清零。
 
 ## 技术债处置记录
 
@@ -56,6 +52,7 @@
 | F-46 | 空串 token-only 流的前端占位残留（空气泡） | 期末四轴 Falsify | Speculative | ❌ 复核关闭（2026-08-26：纯前端化妆级问题，后端零污染） |
 | F-47 | `initGuideSidebarScroll` 缺 type hints（`app.js:377`） | 2026-08-26 期末四轴（Standards ST-1） | Worth exploring | ✅ 已修（2026-08-26：补 `@returns {void}` 类型标注到 JSDoc） |
 | F-48 | Scroll handler Feature Envy，建议提取 ScrollSpy 类 | 2026-08-26 期末四轴（Architecture A6） | Speculative | ❌ 复核关闭（2026-08-26：git grep 零命中 ScrollSpy，当前唯一滚动高亮逻辑在 55 行深模块内，无第二消费方 → Speculative Generality） |
+| F-45 | O2 一致性缺口：chat 流式中途出错时 DB 落库 partial content 与 UI 错误气泡不一致 | 2026-08-25 全量审查 | Worth exploring | ✅ 已修（2026-08-26：error 路径设 saved=True 阻止 finally 保存幽灵内容，测试 713 全绿） |
 
 ### 2026-08-25（全量审查批次）
 

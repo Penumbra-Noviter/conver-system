@@ -568,11 +568,11 @@ class TestStreamReplyZeroTokenAndErrorLog:
         assert events == [{"type": "token", "content": ""}]
         assert _assistant_contents(db_session, conv.id) == []
 
-    def test_generic_exception_after_partial_tokens_still_saves_partial(
+    def test_generic_exception_after_partial_tokens_does_not_save_partial(
         self, db_session
     ) -> None:
-        """Falsify（错误帧后继续迭代 + 部分内容守卫）：中途泛化异常 → 错误帧后生成器
-        自然终止，finally 兜底仍按「有部分内容才保存」落库部分内容（O3 改动不影响该守卫）"""
+        """F-45（O2 一致性缺口）：中途泛化异常 → 错误帧后 partial content 不落库。
+        防止 reload 后幽灵内容与错误气泡呈现不一致。"""
         conv, ctx = _make_stream_pair(
             db_session,
             _StreamStubProvider(tokens=["你好"], error_after=RuntimeError("mid-boom")),
@@ -582,5 +582,5 @@ class TestStreamReplyZeroTokenAndErrorLog:
 
         assert [e["type"] for e in events] == ["token", "error"]
         assert events[-1]["message"] == "生成回复失败: mid-boom"
-        # 错误帧消费完后继续迭代已自然终止（async-for 正常收尾），部分内容已兜底落库
-        assert _assistant_contents(db_session, conv.id) == ["你好"]
+        # F-45：错误帧后不保存部分内容，reload 后无幽灵内容
+        assert _assistant_contents(db_session, conv.id) == []

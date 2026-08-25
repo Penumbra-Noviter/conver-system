@@ -194,6 +194,8 @@ async def stream_reply(
     - 停止语义为「用户主动停止」，非错误；路由层只做 data: 帧包装。
     - 兜底：生成器被取消（GeneratorExit / CancelledError，Starlette 在客户端
       断开时取消 SSE 生成器的真实路径）时，finally 中仍尽力保存已生成部分。
+    - 错误不保存：LLMError / 泛化异常等错误路径下，partial content 不落库
+      （F-45），避免 reload 后幽灵内容与错误气泡不一致。
     - 零 token 流不落库：Provider 正常结束但未产出任何 token（full_content 为
       空串）时，跳过持久化、不留空 assistant 消息，done 帧 message_id 为 None。
 
@@ -246,10 +248,12 @@ async def stream_reply(
 
     except LLMError as e:
         _, message = llm_error_response(e, ctx.conversation.model_provider)
+        saved = True  # F-45：错误帧后不再保存部分内容，防止 reload 后幽灵内容与错误气泡不一致
         yield {"type": "error", "message": message}
     except Exception as e:
         # O3：泛化异常属未预期路径，错误帧产出前先落 ERROR 日志（含堆栈）便于线上排障
         logger.exception("流式生成回复失败")
+        saved = True  # F-45：错误帧后不再保存部分内容，防止 reload 后幽灵内容与错误气泡不一致
         yield {"type": "error", "message": f"生成回复失败: {e}"}
     finally:
         # 生成器被取消（GeneratorExit / CancelledError）→ 兜底保存已生成部分。
