@@ -2524,6 +2524,64 @@ mark.search-highlight {
     border-radius: 3px;
     color: var(--accent);
 }
+
+/* ── 用户手册 — 目录栏 ── */
+.guide-toc {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.guide-toc-label {
+    font-weight: 600;
+    color: var(--ink-1);
+    padding-right: var(--space-2);
+    white-space: nowrap;
+}
+.guide-toc a {
+    color: var(--accent);
+    text-decoration: none;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    transition: background var(--transition-fast);
+    white-space: nowrap;
+}
+.guide-toc a:hover {
+    background: var(--hover-bg);
+    text-decoration: underline;
+}
+
+/* ── 用户手册 — 锚点链接 ── */
+.guide-section h3 .section-anchor {
+    opacity: 0;
+    color: var(--ink-3);
+    text-decoration: none;
+    margin-left: var(--space-1);
+    font-size: 0.85em;
+    font-weight: 400;
+    transition: opacity var(--transition-fast);
+}
+.guide-section h3:hover .section-anchor {
+    opacity: 1;
+}
+.guide-section h3 .section-anchor:hover {
+    color: var(--accent);
+}
+
+.guide-section a {
+    color: var(--accent);
+    text-decoration: none;
+}
+.guide-section a:hover {
+    text-decoration: underline;
+}
 /* ── 用户手册 — 静态视觉覆盖补充 ── */
 .guide-container {
     width: min(100%, 760px);

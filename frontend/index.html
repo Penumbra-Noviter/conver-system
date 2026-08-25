@@ -68,7 +68,7 @@
                     <path d="M9 3L5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </button>
-            <span class="version">v0.1.0</span>
+            <span class="version">v0.2.0</span>
             <button class="theme-toggle" id="btn-theme-toggle" title="切换主题">
                 <svg viewBox="0 0 16 16" fill="none">
                     <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/>
@@ -334,20 +334,36 @@
             <div class="view-header">
                 <h2>用户手册</h2>
             </div>
+            <div class="guide-toc">
+                <span class="guide-toc-label">📖 目录</span>
+                <a href="#guide-quick-start">快速开始</a>
+                <a href="#guide-configure-ai">配置 AI 接口</a>
+                <a href="#guide-character">角色管理</a>
+                <a href="#guide-chat">对话功能</a>
+                <a href="#guide-simulator">模拟器指南</a>
+                <a href="#guide-ai-game">AI 生成游戏</a>
+                <a href="#guide-import">导入与安全</a>
+                <a href="#guide-search">搜索消息</a>
+                <a href="#guide-settings">设置说明</a>
+                <a href="#guide-desktop">桌面版</a>
+                <a href="#guide-models">支持的模型</a>
+                <a href="#guide-faq">常见问题</a>
+                <a href="#guide-tips">小贴士</a>
+            </div>
             <div class="guide-container">
-                <div class="guide-section">
-                    <h3>快速开始</h3>
+                <div class="guide-section" id="guide-quick-start">
+                    <h3>快速开始 <a class="section-anchor" href="#guide-quick-start" title="复制链接">¶</a></h3>
                     <p>Conver System 是一个本地优先的 AI 角色对话与模拟器平台：创建角色、开启对话、玩 AI 模拟器，所有数据保存在本地。整体流程：<strong>配置 AI 接口 → 创建角色 → 开始聊天（或打开模拟器）</strong>。</p>
                     <ol>
-                        <li><strong>配置 AI 接口</strong> — 首次使用，先点击侧栏「设置」，填入你的 Claude 或 OpenAI 兼容 API Key（详细教程见下方「配置你的 AI 接口」）。</li>
+                        <li><strong>配置 AI 接口</strong> — 首次使用，先点击侧栏「设置」，填入你的 Claude 或 OpenAI 兼容 API Key（详细教程见下方 <a href="#guide-configure-ai">「配置你的 AI 接口」</a>）。</li>
                         <li><strong>创建角色</strong> — 点击「角色」视图的「创建角色」按钮，跟随 6 步引导向导创建（也可选内置模板或用文档导入由 AI 自动解析）。</li>
                         <li><strong>开始对话</strong> — 在角色卡片上点击「对话」按钮，系统自动创建新对话并立即显示角色开场白，在输入框中打字发送即可。</li>
-                        <li><strong>玩模拟器</strong> — 点击侧栏「模拟器」，选择一款内置 AI 游戏开始体验，或点击「AI 生成」用你的世界观描述让 AI 生成专属游戏（AI 游戏需先完成第 1 步配置，见「模拟器使用指南」）。</li>
+                        <li><strong>玩模拟器</strong> — 点击侧栏「模拟器」，选择一款内置 AI 游戏开始体验，或点击「AI 生成」用你的世界观描述让 AI 生成专属游戏（AI 游戏需先完成第 1 步配置，见 <a href="#guide-simulator">「模拟器使用指南」</a>）。</li>
                     </ol>
                 </div>
 
-                <div class="guide-section">
-                    <h3>配置你的 AI 接口（新手必读）</h3>
+                <div class="guide-section" id="guide-configure-ai">
+                    <h3>配置你的 AI 接口（新手必读） <a class="section-anchor" href="#guide-configure-ai" title="复制链接">¶</a></h3>
                     <p>所有 AI 功能（角色对话、AI 模拟器）共用同一套接口配置，<strong>只需配置一次，全局生效</strong>。</p>
                     <ol>
                         <li><strong>准备 API Key</strong>：在模型服务商官网注册并创建密钥。任选一个服务即可：
@@ -364,8 +380,8 @@
                     <p><strong>怎么判断配置成功？</strong>回到聊天视图，给任意角色发一条消息即可验证。模拟器游戏则在运行页点「重新同步」让新配置生效。</p>
                 </div>
 
-                <div class="guide-section">
-                    <h3>角色管理</h3>
+                <div class="guide-section" id="guide-character">
+                    <h3>角色管理 <a class="section-anchor" href="#guide-character" title="复制链接">¶</a></h3>
                     <p>角色是对话的核心，每个角色拥有独立的人设、语气和知识设定。</p>
                     <ul>
                         <li><strong>创建角色（引导向导）</strong>：点击「创建角色」后，向导分 6 步引导完成：选择创建方式（文档导入 / 模板 / 手动）→ 导入文档或选择模板 → 基本信息（姓名 / 头像 / 描述 / 标签）→ 人格设定 → 对话风格（开场白 / 示例对话）→ 预览保存。带 <span class="required">*</span> 的为必填项。</li>
@@ -378,8 +394,8 @@
                     </ul>
                 </div>
 
-                <div class="guide-section">
-                    <h3>对话功能</h3>
+                <div class="guide-section" id="guide-chat">
+                    <h3>对话功能 <a class="section-anchor" href="#guide-chat" title="复制链接">¶</a></h3>
                     <ul>
                         <li><strong>多会话标签页</strong>：可以同时打开多个对话，聊天区顶部的标签条随时切换。每个标签独立记忆输入草稿、滚动位置和生成状态——切到别的对话后，原对话的 AI 回复会继续在后台生成。</li>
                         <li><strong>发送消息</strong>：在输入框输入文字，按 <kbd>Enter</kbd> 发送，<kbd>Shift+Enter</kbd> 换行。</li>
@@ -392,14 +408,14 @@
                     </ul>
                 </div>
 
-                <div class="guide-section">
-                    <h3>模拟器使用指南</h3>
+                <div class="guide-section" id="guide-simulator">
+                    <h3>模拟器使用指南 <a class="section-anchor" href="#guide-simulator" title="复制链接">¶</a></h3>
                     <p>「模拟器」板块提供多款 AI 驱动的沉浸式游戏（人生模拟器、仙途、仿微微信 AI、克苏鲁跑团、侦探模拟等），游戏在应用内部打开，存档保存在浏览器本地。</p>
                     <ul>
-                        <li><strong>游戏列表</strong>：进入模拟器视图即显示全部游戏卡片，顶部可按「全部 / AI 驱动 / 纯本地」筛选。卡片右下角标注「AI 生成」徽标的为通过 AI 生成功能创建的游戏。点击顶部工具栏的 Sparkles 图标可打开生成对话框（详见「AI 生成游戏」章节）。</li>
-                        <li><strong>导入游戏</strong>：点击列表右上角「导入游戏」按钮选择文件，或直接把 <code>.html</code> 文件拖入列表区域，即可把第三方游戏加入列表（仅支持本地 <code>.html</code> 文件，≤5MB，一次一个）。内容与已有游戏相同的文件会自动识别并提示（SHA-256 去重）；文件名冲突时自动改名为 <code>xxx-2.html</code> 等递增后缀。导入成功的游戏会自动注入 PC 阅读覆盖层并做覆盖适配分析，未覆盖项会提示——详见下方「导入游戏与安全须知」。</li>
+                        <li><strong>游戏列表</strong>：进入模拟器视图即显示全部游戏卡片，顶部可按「全部 / AI 驱动 / 纯本地」筛选。卡片右下角标注「AI 生成」徽标的为通过 AI 生成功能创建的游戏。点击顶部工具栏的 Sparkles 图标可打开生成对话框（详见 <a href="#guide-ai-game">「AI 生成游戏」</a>）。</li>
+                        <li><strong>导入游戏</strong>：点击列表右上角「导入游戏」按钮选择文件，或直接把 <code>.html</code> 文件拖入列表区域，即可把第三方游戏加入列表（仅支持本地 <code>.html</code> 文件，≤5MB，一次一个）。内容与已有游戏相同的文件会自动识别并提示（SHA-256 去重）；文件名冲突时自动改名为 <code>xxx-2.html</code> 等递增后缀。导入成功的游戏会自动注入 PC 阅读覆盖层并做覆盖适配分析，未覆盖项会提示——详见下方 <a href="#guide-import">「导入游戏与安全须知」</a>。</li>
                         <li><strong>开始与退出游戏</strong>：点击任意卡片即可进入游戏；点击左上角「返回」回到列表，进度不会丢失（存档自动保存，重进自动恢复）。</li>
-                        <li><strong>AI 游戏需要配置接口</strong>：AI 驱动游戏会提示「此游戏需自行配置 AI 接口」。先在「设置」页配置好 API Key（见「配置你的 AI 接口」），再回到游戏点击「重新同步」，配置会自动写入游戏；也可以先配好设置再打开游戏，加载后会自动同步。游戏运行中重建了配置控件也会自动再同步。</li>
+                        <li><strong>AI 游戏需要配置接口</strong>：AI 驱动游戏会提示「此游戏需自行配置 AI 接口」。先在「设置」页配置好 API Key（见 <a href="#guide-configure-ai">「配置你的 AI 接口」</a>），再回到游戏点击「重新同步」，配置会自动写入游戏；也可以先配好设置再打开游戏，加载后会自动同步。游戏运行中重建了配置控件也会自动再同步。</li>
                         <li><strong>存档管理</strong>：列表右上角「存档管理」按钮可查看每个游戏的存档情况（存档键数 / 总大小），并支持：
                             <ul>
                                 <li><strong>导出</strong>：把某游戏的全部存档下载为 JSON 文件做备份（注意：导出文件可能包含游戏内配置数据，如 API Key，请妥善保管）。</li>
@@ -412,21 +428,21 @@
                     </ul>
                 </div>
 
-                <div class="guide-section">
-                    <h3>AI 生成游戏</h3>
+                <div class="guide-section" id="guide-ai-game">
+                    <h3>AI 生成游戏 <a class="section-anchor" href="#guide-ai-game" title="复制链接">¶</a></h3>
                     <p>输入世界观描述，AI 自动生成完整的 HTML 模拟器游戏。生成的游戏与其他模拟器一样运行，支持存档、覆盖层适配和 per-game CSS。</p>
                     <ul>
                         <li><strong>进入方式</strong>：在模拟器列表页，点击顶部工具栏的「AI 生成」按钮（Sparkles 图标）打开生成对话框。</li>
                         <li><strong>编写世界观</strong>：在对话框中填写「世界观设定」（必填），描述你的世界背景、氛围、核心冲突等。越详细，生成的游戏越丰富。也可以上传 <code>.txt</code> / <code>.md</code> 文件代替粘贴。可选填「游戏名称」。</li>
                         <li><strong>生成流程</strong>：点击「生成游戏」后，后端 AI 会根据你的描述填充种子模板，生成完整的 HTML 游戏文件，并通过六项校验闸门（结构完整性 / 模板标记 / 配置契约 / HTML 可解析性 / 安全性 / 游戏数据完整性）。校验失败时自动重试打磨（最多 3 次），并显示具体错误和建议。</li>
                         <li><strong>生成完成</strong>：成功生成的游戏会出现在模拟器列表中，卡片右下角标注「AI 生成」徽标。与导入的游戏一样，打开后自动注入 PC 阅读覆盖层，支持存档和 AI 配置同步。</li>
-                        <li><strong>需先配置 AI 接口</strong>：游戏生成功能依赖后端 AI 推理，需要先在「设置」页配置好 API Key（见「配置你的 AI 接口」）。</li>
+                        <li><strong>需先配置 AI 接口</strong>：游戏生成功能依赖后端 AI 推理，需要先在「设置」页配置好 API Key（见 <a href="#guide-configure-ai">「配置你的 AI 接口」</a>）。</li>
                         <li><strong>生成限制</strong>：世界观描述最多 10000 字符；上传文件最大 10MB；生成请求超时 2 分钟。</li>
                     </ul>
                 </div>
 
-                <div class="guide-section">
-                    <h3>导入游戏与安全须知</h3>
+                <div class="guide-section" id="guide-import">
+                    <h3>导入游戏与安全须知 <a class="section-anchor" href="#guide-import" title="复制链接">¶</a></h3>
                     <p><strong>安全警告</strong>：第三方游戏可读取本地数据并调用 API。导入的游戏与内置游戏同处本地同源区域运行，<strong>可读取本应用本地数据（含你配置的 API 凭证）并调用本应用 API 端点</strong>——请仅导入你信任的文件。导入前程序会弹出同样的警告并需要你确认。</p>
                     <ul>
                         <li><strong>恶意模式扫描</strong>：导入时程序会扫描明显恶意模式——<code>eval()</code> 动态执行、读取 <code>document.cookie</code>、跨域 <code>fetch</code> 请求等，命中会弹出「安全警告」提示，但<strong>不会拦截导入</strong>（静态审查不承诺防住一切，仅作知情提示）。</li>
@@ -437,13 +453,13 @@
                     </ul>
                 </div>
 
-                <div class="guide-section">
-                    <h3>搜索消息</h3>
+                <div class="guide-section" id="guide-search">
+                    <h3>搜索消息 <a class="section-anchor" href="#guide-search" title="复制链接">¶</a></h3>
                     <p>在「搜索」视图中输入关键词，系统会跨所有对话搜索匹配的消息。搜索结果会显示消息内容预览、角色归属和对话名称，点击结果可跳转到对应对话。</p>
                 </div>
 
-                <div class="guide-section">
-                    <h3>设置说明</h3>
+                <div class="guide-section" id="guide-settings">
+                    <h3>设置说明 <a class="section-anchor" href="#guide-settings" title="复制链接">¶</a></h3>
                     <ul>
                         <li><strong>API 密钥</strong>：Claude 与 OpenAI 兼容两栏，填任一栏即可全局生效（系统按所选模型的协议自动匹配，未匹配时使用另一栏）。第三方服务需同时填写对应「兼容 API 地址」。</li>
                         <li><strong>默认模型</strong>：选择默认的 Provider 和模型；列表底部可选「自定义模型」手动输入名称。</li>
@@ -455,8 +471,8 @@
                     </ul>
                 </div>
 
-                <div class="guide-section">
-                    <h3>桌面版功能（Tauri）</h3>
+                <div class="guide-section" id="guide-desktop">
+                    <h3>桌面版功能（Tauri） <a class="section-anchor" href="#guide-desktop" title="复制链接">¶</a></h3>
                     <p>Conver System 提供基于 Tauri 的桌面应用程序，支持 Windows 原生体验。桌面版与网页版功能一致，额外提供以下特性：</p>
                     <ul>
                         <li><strong>随包运行</strong>：桌面版内置 Python 后端，启动时自动拉起服务，关闭时自动清理。无需手动启动 uvicorn 或维护两个窗口。</li>
@@ -467,8 +483,8 @@
                     </ul>
                 </div>
 
-                <div class="guide-section">
-                    <h3>支持的模型</h3>
+                <div class="guide-section" id="guide-models">
+                    <h3>支持的模型 <a class="section-anchor" href="#guide-models" title="复制链接">¶</a></h3>
                     <p>系统通过统一的 Provider 抽象层支持多种模型服务，当前已内置：</p>
                     <ul>
                         <li><strong>Claude</strong>（Anthropic）— Claude Sonnet 5、Claude Opus 4.8 等</li>
@@ -479,8 +495,8 @@
                     <p>所有兼容 OpenAI 接口的服务均可通过在设置页填入对应 <code>base_url</code> 使用；列表里没有的模型可选「自定义模型」手动输入。</p>
                 </div>
 
-                <div class="guide-section">
-                    <h3>常见问题</h3>
+                <div class="guide-section" id="guide-faq">
+                    <h3>常见问题 <a class="section-anchor" href="#guide-faq" title="复制链接">¶</a></h3>
                     <ul>
                         <li><strong>AI 不回复或报错？</strong>先到「设置」确认 API Key 已保存且格式正确；模拟器游戏请在运行页点击「重新同步」让配置生效。使用第三方服务时，还需确认 base_url 与模型名称填写正确。</li>
                         <li><strong>模拟器提示「游戏加载失败」？</strong>通常是页面加载超时（15 秒）或参数异常，点击「重试」即可；游戏文件就在本地，不会丢失。</li>
@@ -489,8 +505,8 @@
                     </ul>
                 </div>
 
-                <div class="guide-section">
-                    <h3>小贴士</h3>
+                <div class="guide-section" id="guide-tips">
+                    <h3>小贴士 <a class="section-anchor" href="#guide-tips" title="复制链接">¶</a></h3>
                     <ul>
                         <li>角色的人格设定越详细，AI 的角色扮演效果越好。建议包含：性格特征、说话风格、背景故事、知识范围。</li>
                         <li>开场白（<code>first_mes</code>）是角色与用户的第一句话，好的开场白能立刻建立角色氛围。</li>
@@ -498,7 +514,7 @@
                         <li>侧栏可以收起（侧栏底部按钮），收起后点击左上角悬浮按钮展开；聊天列表也可单独收起，腾出更多聊天空间。</li>
                         <li>聊天标签页支持多会话同时打开，切换标签后原对话的 AI 回复会继续在后台生成，切换回来时内容已自动更新。</li>
                         <li>生成 AI 游戏时，世界观描述越具体（氛围、时代、核心冲突、角色关系），生成的游戏越丰富有趣。同一描述可以多次生成，每次结果不同。</li>
-                        <li>导入的第三方游戏如果排版不理想，可制作 <code>&lt;game-id&gt;.css</code> 放入数据目录覆盖默认样式（见「导入游戏与安全须知」）。</li>
+                        <li>导入的第三方游戏如果排版不理想，可制作 <code>&lt;game-id&gt;.css</code> 放入数据目录覆盖默认样式（见 <a href="#guide-import">「导入游戏与安全须知」</a>）。</li>
                         <li>遇到问题可以先查看浏览器开发者工具的控制台（<kbd>F12</kbd>）是否有错误提示。</li>
                     </ul>
                 </div>
