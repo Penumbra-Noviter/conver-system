@@ -13,6 +13,7 @@ from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
 from backend.app.schemas.conversation import ConversationCreate, ConversationUpdate
+from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import ConversationNotFoundError
 from backend.app.services.llm.prompt import apply_template_vars
@@ -143,10 +144,9 @@ def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
 
     # 预插开场白：创建对话时把角色的 first_mes 插入为首条 assistant 消息
     if character and character.first_mes:
-        from backend.app.services.message import create_message as _create_message
         user_name = (setting_service.get_value(db, 'user_name') or 'User')
         greeting = apply_template_vars(character.first_mes, user_name, character.name)
-        _create_message(db, conv.id, Role.ASSISTANT, greeting)
+        message_service.create_message(db, conv.id, Role.ASSISTANT, greeting)
 
     db.refresh(conv)
     return conv

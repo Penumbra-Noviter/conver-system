@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->691<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->691<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->705<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->705<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -500,7 +500,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成（迭代器） |
 | <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.test_connection-->`test_connection(model=None)`<!--/AUTO--> | 连接测试（保存 Key 时校验） |
 
-### 4.25 `backend/app/services/llm/claude.py` — Claude Provider（<!--AUTO:lines:backend/app/services/llm/claude.py-->~69 行<!--/AUTO-->）
+### 4.25 `backend/app/services/llm/claude.py` — Claude Provider（<!--AUTO:lines:backend/app/services/llm/claude.py-->~68 行<!--/AUTO-->）
 
 **职责**：`ClaudeProvider(BaseLLM)`——anthropic SDK 实现（generate/stream_generate + 错误翻译）。
 
@@ -531,7 +531,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.get_provider-->`get_provider(name, api_key, base_url=None)`<!--/AUTO--> | 按名取实例（未注册则懒加载兜底） |
 | <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.list_providers-->`list_providers()`<!--/AUTO--> | 已注册 Provider 清单 |
 
-### 4.28 `backend/app/services/llm/openai.py` — OpenAI Provider（<!--AUTO:lines:backend/app/services/llm/openai.py-->~88 行<!--/AUTO-->）
+### 4.28 `backend/app/services/llm/openai.py` — OpenAI Provider（<!--AUTO:lines:backend/app/services/llm/openai.py-->~87 行<!--/AUTO-->）
 
 **职责**：`OpenAIProvider(BaseLLM)`——openai SDK 实现（兼容 base_url 聚合平台，`_normalize_base_url` 端点形态归一）。
 
@@ -1144,7 +1144,7 @@ conver system/
 3. **04 导入提示**：工单 04 导入成功后以同一分析模块对已上传 HTML 运行比对，未覆盖清单非空则提示并引导 per-game CSS 微调。
 
 
-### 4.74 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~415 行<!--/AUTO-->）
+### 4.74 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~112 行<!--/AUTO-->）
 
 **职责**：T-02 首启种子 + manifest 工具 + 工单 03 导入族——数据目录 simulators 缺 manifest 时从内置目录整目录拷贝（幂等；已存在绝不改动，数据目录为唯一事实来源；种子源缺失降级不崩溃）；导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名冲突改名（xxx-2.html）、cfg- 三元组探测、恶意模式粗筛（不拦截）、manifest 原子追加（缺失/损坏自愈重建）；id 由最终文件名干 slug 生成（[a-z0-9-] 折叠、空回退 imported-game）并按现存 id 集唯一化。
 
@@ -1178,15 +1178,15 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-import.js:resetSimulatorImport-->`resetSimulatorImport()`<!--/AUTO--> | 切走视图复位（导入中状态 / 拖拽高亮） |
 
 
-### 4.75.1 `backend/app/services/game_generator.py` — AI 游戏生成编排（<!--AUTO:lines:backend/app/services/game_generator.py-->~455 行<!--/AUTO-->）
+### 4.75.1 `backend/app/services/game_generator.py` — AI 游戏生成编排（<!--AUTO:lines:backend/app/services/game_generator.py-->~513 行<!--/AUTO-->）
 
 **职责**：AI 文本 → HTML 模拟器游戏的主编排——构造 prompt（种子模板 + 用户描述 + 重试反馈）→ resolve_llm 获取 LLM → 生成 → 6 项校验闸门（结构/模板标记/cfg 契约/可解析性/安全/游戏数据）→ 通过复用 `simulator_store.import_game(source="generated")` 落盘；失败返回结构化错误 + 重试建议（最多 3 次自动重试）。
 
 | 元素 | 说明 |
 |------|------|
 | `MAX_RETRIES` | 最大重试次数（常量，3） |
-| <!--AUTO:sig:backend/app/services/game_generator.py:generate_game-->`generate_game(db, description, title=None, *, previous_html=None, previous_errors=None, previous_suggestion=None, retries_left=MAX_RETRIES, attempted=0)`<!--/AUTO--> | 生成主编排（异步，含校验重试循环） |
-| <!--AUTO:sig:backend/app/services/game_generator.py:validate_generated_html-->`validate_generated_html(html)`<!--/AUTO--> | 校验闸门：6 项检查返回错误列表 |
+| <!--AUTO:sig:backend/app/services/game_generator.py:generate_game-->`generate_game(db, description, title=None)`<!--/AUTO--> | 生成主编排（异步，含校验重试循环） |
+| <!--AUTO:sig:backend/app/services/game_generator.py:validate_generated_html-->`validate_generated_html(html, *, precomputed_scan=None)`<!--/AUTO--> | 校验闸门：6 项检查返回错误列表 |
 
 
 ### 4.75.2 `backend/app/services/game_template.py` — 叙事游戏种子模板（<!--AUTO:lines:backend/app/services/game_template.py-->~209 行<!--/AUTO-->）
@@ -1219,7 +1219,7 @@ conver system/
 | `backend/tests/test_document_parser.py` | <!--AUTO:tests:backend/tests/test_document_parser.py-->15<!--/AUTO--> | 文档智能解析 |
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->40<!--/AUTO--> | 统一异常处理器 |
 | `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->12<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
-| `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->54<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
+| `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->62<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
 | `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->15<!--/AUTO--> | LLM 基类共享行为 |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
@@ -1231,7 +1231,7 @@ conver system/
 | `backend/tests/test_schema_snapshot.py` | <!--AUTO:tests:backend/tests/test_schema_snapshot.py-->1<!--/AUTO--> | schema 快照漂移检测（T-17） |
 | `backend/tests/test_search.py` | <!--AUTO:tests:backend/tests/test_search.py-->13<!--/AUTO--> | 跨对话搜索 |
 | `backend/tests/test_settings_connection.py` | <!--AUTO:tests:backend/tests/test_settings_connection.py-->55<!--/AUTO--> | 设置/凭证/连接测试 |
-| `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->117<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
+| `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->123<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
 | `backend/tests/test_simulator_store.py` | <!--AUTO:tests:backend/tests/test_simulator_store.py-->33<!--/AUTO--> | 模拟器首启种子矩阵 + manifest 工具 + append 原子写/损坏自愈 |
 
 运行：`cd backend && python -m pytest`（pytest.ini 在根：`testpaths = backend/tests`，`pythonpath = .`；共享夹具见 `backend/tests/conftest.py`）。
@@ -1324,9 +1324,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->691<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->705<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->691<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->705<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->979<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
