@@ -19,6 +19,16 @@
 - **流程遥测**：3 波 9 票零回退零冲突合并（merge 链 74c2b37→df97b2a / 7d1488b→3505e2a / a6e6aa3→2794b84）；T-01/T-08 各网关空返回重开 1 次（均半成品现场续用成功零返工）；范围偏差 1 起（T-01 commit 内含 doc_sync 钩子强制的 CODE_WIKI 机械标记刷新——裁决记录警告档，偏差反馈拆票校准）；worktree doc_sync 钩子环境性误报贯穿全批（裸 worktree 无 vitest/cargo 收集器），全部文档票 --no-verify + 主树统一重算兜底
 - **技术债区**：候选区净增 +9（F-38~F-46 待立项共 24 项）；B2 复核关闭入处置记录
 
+## 滚动摘要（2026-08-23 ~ 08-24 — 阶段摘要：游戏生成交付 + 架构深化四波 + 技术债区 F-23~F-37 落盘，细节 git log 可溯）
+
+- **game-generator-fix 批次（08-23，dedup/Falsify/wire 测试，commit 链 58e1d43→068e8a9）**：_sanitize_title regex 精简 + Falsify 命名边界测试；CfgIdScanner + cfg-triplet 常量去重；Wire tests for /generate endpoint；TECH_DEBT 计数 15 项待立项
+- **ARC 波 1（T-01 错误映射迁移，08-24，861fd00）**：LLM 错误映射迁移至 error_mapping.py（错误映射协议表面单源）
+- **ARC 波 2（T-02 simulator_store 拆分，08-24，075174d）**：simulator_store 拆为 manifest/import/种子三模块
+- **ARC 波 3（T-03 生成器双重扫描消除，08-24，a6bc4ef）**：import_game precomputed_scan 参数
+- **ARC 波 4（T-05 删除未用同步 LLM 客户端 + T-04 生成器重试参数内化，08-24，6f14bf2→d4b4d1a）**：删除未用同步 LLM 客户端 + llm 包 docstring 懒加载化；_generate_with_retry 重试参数内化
+- **ARC 波 5（T-07 conversation↔message 双向模块级循环导入消除，08-24，6288f75）**：函数级 import → 顶层模块级 import
+- **期末四轴 F-37 落盘（08-25，789602c）**：T-07 循环导入 + TECH_DEBT 计数 15 项待立项（F-23~F-37）；CODE_WIKI 章节更新（simulator_store 拆分 + doc_sync 收敛）；TICKETS 技术债区迁移指向
+
 ## 修复：D11 关闭行为偏好保存失败（Tauri ACL 拒绝，2026-08-20）
 
 - **根因**：Tauri v2.11.5 ACL 系统在远程来源（`http://127.0.0.1:<port>`）拦截三个自定义命令 `backend_status`/`get_close_action`/`set_close_action`——`capabilities/default.json` 仅 `core:default`，缺自定义命令 allow 权限。报错 `"关闭行为保存失败，请重试: undefined"`：Tauri `invoke` 拒绝值为裸字符串，`err.message` 为 `undefined`。证据：`%APPDATA%\ConverSystem\` 从未出现 `settings.json`（DB 与 runtime.json 均正常落盘），`set_close_action` 从未执行到 Rust 业务逻辑。

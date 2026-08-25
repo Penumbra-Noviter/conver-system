@@ -31,7 +31,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 测试：`cd backend && python -m pytest`（pytest 713 + 1 skip）；`cd frontend && npm test`（Vitest 979，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
 
-## 当前状态（2026-08-19）
+## 当前状态（2026-08-26）
 
 - ✅ Phase 1-5 + P6.1/6.2/6.3 + P2.5/3.5 + P4.3 + P6.4 全部完成
 - ✅ 架构深化两波（ARC-1~8：StreamSession/级联/标题/export/api seam/展示契约/app 拆分/__init__）+ 架构摩擦 11 候选（前端模块化 + 服务层解耦）
@@ -61,7 +61,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **T-01/T-02 模拟器接入契约 + 外置数据目录与用户导入（2026-08-19 kickoff 批次 5 工单 3 波，commit 链 c7e5b29 → 262fe88）**：T-01 接入契约（sim-pc: 映射记录结构化 + scripts/check-simulator-css.mjs 核对脚本 + simulator-adapt.js 共享分析模块）；T-02 数据目录外置（/simulators 挂载改指 CONVER_DATA_DIR 下 simulators/，首启种子幂等）+ 导入端点 POST /api/simulators/import（校验/净化/SHA-256 去重/改名/cfg-探测/恶意粗筛不拦截/manifest 原子注册）+ 前端导入 UI（按钮/拖拽双通道 + 安全警告 + 已导入 badge）+ per-game CSS 注入（数据目录 <game-id>.css 后载序胜出）；期末四轴 F-7 当场修（VARS_FAMILY 补 --text2/--text3），F-8~F-11 落债；Vitest 850→958（+108）、pytest 471+1skip→569+1skip（+98）、cargo 70 零改动；smoke-simulators 14 项全过
 - ✅ **技术债区 F-5/F-6/F-8/F-9/F-12 批次（2026-08-19 kickoff 全自动档小档，commit 链 412b2d7 → ffc54b2）**：F-5/F-6 复核关闭（各附实证）；F-8 manifest 结构校验并入自愈（simulators 非 list 统一重建）+ F-9 sanitize_filename 保留设备名/255 字节收敛（先红后绿 + Falsify 矩阵全过）；F-12 就绪终态发布顺序竞态修复（runtime.json 先落盘再置标志，复现循环 30 次归零）；期末四轴 0 阻断放行；新落债 F-13~F-17（5 项待立项，唯一待办来源 TICKETS.md）
 - ✅ **技术债区 F-13~F-17 批次（2026-08-19 kickoff 全自动档，commit 链 d295c76 → 3111036）**：F-13 设备名判定改首点前组件（+5 用例）/ F-14 改名后缀字节截断复用 `_truncate_utf8_bytes`（+2）/ F-15 OSError 族读取自愈（+1）/ F-17 总名上限 255→120 字节（Windows MAX_PATH 实测，F-9 矩阵改 120 口径，+3）/ F-16 复核关闭（零代码）；F-18/F-19 归档流程项已修（F-9 注记补 F-17 修订 / F-13 常量注释语义同步）；期末四轴 0 阻断放行；新落债 F-20/F-21 待立项（唯一待办来源 TICKETS.md）
-- ✅ **技术债区 F-20/F-21 批次 3（2026-08-19 kickoff 全自动档）**：F-21 入参契约声明（`next_available_filename` docstring——desired 须完整文件名且 stem 非空，空 stem 冲突产 -N.html 不兜底，无点/空串 ValueError 后果补句；零行为变化，commit 08e860f merge 2fb25df）/ F-20 复核关闭（票面实测注记三处闭环，零代码）；F-22 归档流程项；期末四轴 0 阻断放行；零测试改动（621+1skip）；**技术债区清零（F-1~F-22 全部处置完毕）**
+- ✅ **全量审查修复批次（2026-08-25~26 kickoff 全自动档标准档 9 工单 3 波，commit 链 789602c → b63f169）**：三轴评审（根提交→HEAD）12 发现全部修复——W1 代码四票（S1 路由 ORM 清零 / B1 非 ASCII avatar 500 修复 先红后绿 / O1+O3 流式空守卫与异常日志 / S2+S3 包 __all__ 与 PRAGMA docstring）+ W2 文档三票（P1+P5 api-design 补端点契约与模型名换族 / P2 architecture 目录树补 23 文件 / P4 测试基线对齐权威标记）+ W3 登记两票（P3 游戏生成功能四处登记 / E 落债 F-38~F-45 + B2 复核关闭）；期末四轴 0 阻断放行；安全红线 0 违例；冒烟 713+1skip 绿；技术债区 24 项待立项（F-23~F-46）
 - ✅ 测试：pytest 713 + 1 skip（后端）+ Vitest 979（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
 
 ## 待办管理
