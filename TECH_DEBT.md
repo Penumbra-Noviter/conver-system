@@ -17,7 +17,7 @@
 
 ## 技术债候选区
 
-> 当前 14 项待立项（F-23~F-36：架构深化批次波 1/2/3 增量审核发现，2026-08-25）。
+> 当前 15 项待立项（F-23~F-37：架构深化批次波 1/2/3 增量审核 + 期末四轴发现，2026-08-25）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
@@ -35,6 +35,7 @@
 | F-34 | `game_generator.py:286` `validate_generated_html` 循环中通过函数对象身份比较（`if check is _check_security`）特殊处理检查 5；若重构（重命名/提取列表到变量/动态顺序）则静默失效，`_check_security` 将收到 `html` 单参数而非 `(html, precomputed_warnings)`，导致退化为回扫（双重扫描再现） | 波 3 增量审核（Falsify 轴） | Speculative | 📝 待立项 |
 | F-35 | `game_generator.py:302-312` `scan_generated_html`（含 `ScanResult`）被导出到 `__all__`，扩展了模块公共 API 表面。该函数仅被 `generate_game` 内部调用（1 处），外部调用方依赖此函数后未来重构时有兼容成本 | 波 3 增量审核（Falsify 轴） | Speculative | 📝 待立项 |
 | F-36 | `game_generator.py:522-528` `generate_game` 中 `scan_generated_html` 的扫描结果在 `validate_generated_html` 和 `_persist_generated_game` 之间以 `precomputed_scan` 参数传递；若校验失败（`errors` 非空），`scan` 结果被丢弃但不落盘，每次重试（上限 3 次）都重新扫描，但 LLM 回复 HTML 较大时影响可忽略 | 波 3 增量审核（Falsify 轴） | Speculative | 📝 待立项 |
+| F-37 | `conversation.py:16` + `message.py:15` 双向模块级循环 import（T-07 方案 D 副作用）——conversation 模块级 import message，message 模块级 import conversation。Python 属性访问延迟到函数体执行实测通过，但任一模块添加模块级属性访问会触发 `AttributeError: partially initialized module`；静态分析器会报告双向循环依赖 | 期末四轴（Standards / Falsify / Architecture 三联） | Worth exploring | 📝 待立项 |
 
 ## 技术债处置记录（迁移存档）
 
