@@ -8,18 +8,24 @@ T-03（ARC9-B1）聊天服务层直测 — chat_error_response / prepare_chat / 
        LLM 错误路径（HTTPException 状态码/消息逐字，与路由旧行为等价）
     4. 路由薄化后直测（create_chat / stream_chat：领域异常上抛由统一 handler 转 HTTP；
        LLM 错误经 complete_chat 显式 raise HTTPException）
+    5. stream_reply 直测（T-03 O1+O3）：零 token 空流不落库且 done 帧无新建消息 id；
+       泛化异常错误帧前补含堆栈的 ERROR 日志；空流+断连竞态与部分内容保存守卫
 
 依赖：pytest + SQLite 内存库（conftest.db_session）+ monkeypatch LLMFactory.get_provider。
-不构造真实网络请求；不手工构造 ChatContext（stream_reply 隔离测试留在 test_p35.py）。
+不构造真实网络请求。§1-4 不手工构造 ChatContext（stream_reply 常规隔离测试留在
+test_p35.py）；§5 为 T-03 指定用例，手工构造 ChatContext 直调 stream_reply。
 """
 
 from __future__ import annotations
+
+import asyncio
+import logging
 
 import pytest
 from fastapi import HTTPException
 
 from backend.app.api.routes import chat as chat_route
-from backend.app.models.message import Role
+from backend.app.models.message import Message, Role
 from backend.app.schemas.conversation import ConversationCreate
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import chat as chat_service
@@ -419,3 +425,162 @@ class TestCreateChatRoute:
         req = ChatRequest(conversation_id=99999, content="你好")
         with pytest.raises(ConversationNotFoundError):
             await chat_route.stream_chat(req, _FakeRequest(), db_session)
+
+
+# ── 5. stream_reply 直测（T-03：O1 零 token 空流守卫 + O3 泛化异常日志）──
+
+
+class _StreamStubProvider:
+    """流式桩 Provider：逐 token 产出；全部产出后可抛指定异常（泛化/LLM 均可）"""
+
+    def __init__(self, tokens: list[str], error_after: Exception | None = None) -> None:
+        self.tokens = tokens
+        self.error_after = error_after
+
+    async def stream_generate(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        model: str | None = None,
+    ):
+        for tok in self.tokens:
+            yield tok
+        if self.error_after is not None:
+            raise self.error_after
+
+
+async def _never_disconnected() -> bool:
+    """is_disconnected 桩：永远返回 False"""
+    return False
+
+
+async def _always_disconnected() -> bool:
+    """is_disconnected 桩：首次轮询即视为已断开"""
+    return True
+
+
+def _disconnect_after_call(n: int):
+    """is_disconnected 桩工厂：第 n 次调用之后恒返回 True（与 test_p35._FakeRequest 同语义）"""
+
+    async def _is_disconnected() -> bool:
+        _is_disconnected.calls += 1  # type: ignore[attr-defined]
+        return _is_disconnected.calls > n  # type: ignore[attr-defined]
+
+    _is_disconnected.calls = 0  # type: ignore[attr-defined]
+    return _is_disconnected
+
+
+def _make_stream_pair(db_session, provider):
+    """落库一个无 greeting 对话并手工组装 ChatContext，返回 (conv, ctx)"""
+    conv = _create_conversation(db_session)
+    ctx = chat_service.ChatContext(
+        conversation=conv,
+        temperature=0.7,
+        messages=[{"role": "user", "content": "你好"}],
+        provider=provider,
+    )
+    return conv, ctx
+
+
+def _collect_stream_events(db_session, conv_id: int, ctx) -> list[dict]:
+    """驱动 stream_reply 至自然结束（含错误帧后继续迭代），收集全部事件 dict"""
+
+    async def _run() -> list[dict]:
+        return [
+            event
+            async for event in chat_service.stream_reply(
+                db_session, conv_id, ctx, is_disconnected=_never_disconnected
+            )
+        ]
+
+    return asyncio.run(_run())
+
+
+def _assistant_contents(db_session, conv_id: int) -> list[str]:
+    rows = (
+        db_session.query(Message)
+        .filter(Message.conversation_id == conv_id, Message.role == Role.ASSISTANT)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+    return [row.content for row in rows]
+
+
+class TestStreamReplyZeroTokenAndErrorLog:
+    """T-03 验收：零 token 流不落库、done 帧不引用未保存 id；泛化异常帧前补日志"""
+
+    def test_zero_token_stream_skips_persist_done_without_new_id(
+        self, db_session
+    ) -> None:
+        """(a) 零 token 流：无 assistant 消息落库，done 帧 message_id 为 None（字段在、值 null）"""
+        conv, ctx = _make_stream_pair(db_session, _StreamStubProvider(tokens=[]))
+
+        events = _collect_stream_events(db_session, conv.id, ctx)
+
+        assert events == [{"type": "done", "message_id": None}]
+        assert _assistant_contents(db_session, conv.id) == []
+
+    def test_generic_exception_error_frame_and_stack_log(
+        self, db_session, caplog
+    ) -> None:
+        """(b) 非 LLM 泛化异常：错误帧文案语义不变，yield 前落含堆栈的 ERROR 日志"""
+        conv, ctx = _make_stream_pair(
+            db_session,
+            _StreamStubProvider(tokens=[], error_after=RuntimeError("boom")),
+        )
+
+        with caplog.at_level(logging.ERROR, logger="backend.app.services.chat"):
+            events = _collect_stream_events(db_session, conv.id, ctx)
+
+        # 错误帧文案与改动前逐字一致
+        assert events == [{"type": "error", "message": "生成回复失败: boom"}]
+        assert _assistant_contents(db_session, conv.id) == []
+        records = [r for r in caplog.records if r.name == "backend.app.services.chat"]
+        assert len(records) == 1
+        rec = records[0]
+        assert rec.levelno == logging.ERROR
+        # 含异常栈：exc_info 非空且指向原始异常类型
+        assert rec.exc_info is not None
+        assert rec.exc_info[0] is RuntimeError
+
+    def test_zero_token_disconnect_race_saves_nothing(self, db_session) -> None:
+        """Falsify（空流+断连竞态）：内容为空串的流中断开 → 守卫生效，不落库、不发 done
+
+        构造：provider 只产空串 token（full_content 恒为空），第 1 次断开检查后即断开。
+        断开检查先于本迭代 token 产出，故第 2 次轮询为 True 时仅第 1 个空串 token 已发出。
+        """
+        conv, ctx = _make_stream_pair(db_session, _StreamStubProvider(tokens=["", ""]))
+
+        async def _run() -> list[dict]:
+            return [
+                event
+                async for event in chat_service.stream_reply(
+                    db_session, conv.id, ctx,
+                    is_disconnected=_disconnect_after_call(1),
+                )
+            ]
+
+        events = asyncio.run(_run())
+
+        # 首个空串 token 在断开检查之后产出（既有语义）；随后断开 → 提前返回，
+        # full_content 为空 → 不保存、无 done 帧
+        assert events == [{"type": "token", "content": ""}]
+        assert _assistant_contents(db_session, conv.id) == []
+
+    def test_generic_exception_after_partial_tokens_still_saves_partial(
+        self, db_session
+    ) -> None:
+        """Falsify（错误帧后继续迭代 + 部分内容守卫）：中途泛化异常 → 错误帧后生成器
+        自然终止，finally 兜底仍按「有部分内容才保存」落库部分内容（O3 改动不影响该守卫）"""
+        conv, ctx = _make_stream_pair(
+            db_session,
+            _StreamStubProvider(tokens=["你好"], error_after=RuntimeError("mid-boom")),
+        )
+
+        events = _collect_stream_events(db_session, conv.id, ctx)
+
+        assert [e["type"] for e in events] == ["token", "error"]
+        assert events[-1]["message"] == "生成回复失败: mid-boom"
+        # 错误帧消费完后继续迭代已自然终止（async-for 正常收尾），部分内容已兜底落库
+        assert _assistant_contents(db_session, conv.id) == ["你好"]
