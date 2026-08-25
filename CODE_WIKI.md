@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->705<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->705<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1754<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->705<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -1146,22 +1146,46 @@ conver system/
 
 ### 4.74 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~112 行<!--/AUTO-->）
 
-**职责**：T-02 首启种子 + manifest 工具 + 工单 03 导入族——数据目录 simulators 缺 manifest 时从内置目录整目录拷贝（幂等；已存在绝不改动，数据目录为唯一事实来源；种子源缺失降级不崩溃）；导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名冲突改名（xxx-2.html）、cfg- 三元组探测、恶意模式粗筛（不拦截）、manifest 原子追加（缺失/损坏自愈重建）；id 由最终文件名干 slug 生成（[a-z0-9-] 折叠、空回退 imported-game）并按现存 id 集唯一化。
+**职责**：T-02 拆分后保留 `ensure_seeded`（首启种子）+ 顶层 re-export（`__all__` 21 符号不变，`from simulator_store import sanitize_filename` 等仍可用）。manifest 工具与导入族已迁入 `simulator_manifest.py` / `simulator_import.py`（见 §4.74.1 / §4.74.2）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:backend/app/services/simulator_store.py:ensure_seeded-->`ensure_seeded(builtin_dir, target_dir)`<!--/AUTO--> | 首启种子（路径参数化；返回 True=本次拷贝 / False=已种子或源缺失） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:read_manifest-->`read_manifest(sim_dir)`<!--/AUTO--> | 读取 manifest.json → dict（缺失抛 FileNotFoundError） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:write_manifest-->`write_manifest(sim_dir, manifest)`<!--/AUTO--> | 原子写 manifest（同目录临时文件 + os.replace，中文保真） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:append_manifest_entry-->`append_manifest_entry(sim_dir, entry)`<!--/AUTO--> | manifest 原子追加（缺失/损坏 → 磁盘 .html 自愈重建后追加） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:sha256_bytes-->`sha256_bytes(content)`<!--/AUTO--> | 内容 SHA-256 摘要（去重主键） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:sanitize_filename-->`sanitize_filename(raw)`<!--/AUTO--> | 文件名净化（取末段/剔非法字符与 %#/空名回退，防穿越；# 为 fragment 截断防线） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:next_available_filename-->`next_available_filename(sim_dir, desired)`<!--/AUTO--> | 冲突自动改名 xxx-2.html（大小写不敏感） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:slugify-->`slugify(stem)`<!--/AUTO--> | id slug（[a-z0-9-] 折叠，空回退 imported-game，03/04 共享定版） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:find_duplicate-->`find_duplicate(sim_dir, content)`<!--/AUTO--> | SHA-256 去重（仅比对 *.html，命中返回现存文件名，覆盖内置重复；per-game CSS 不误报） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:probe_config-->`probe_config(html_text)`<!--/AUTO--> | cfg- 三元组探测（齐全 → ai+config；否则 local 无 config 降级） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:scan_suspicious-->`scan_suspicious(html_text)`<!--/AUTO--> | 恶意模式粗筛（SUSPICIOUS_PATTERNS 键集，不拦截） |
-| <!--AUTO:sig:backend/app/services/simulator_store.py:import_game-->`import_game(sim_dir, filename, content, source='imported')`<!--/AUTO--> | 导入编排（校验→净化→去重→改名→探测→粗筛→落盘→注册） |
+
+### 4.74.1 `backend/app/services/simulator_manifest.py` — manifest 读写工具（<!--AUTO:lines:backend/app/services/simulator_manifest.py-->~109 行<!--/AUTO-->）
+
+**职责**：T-02 从 `simulator_store` 拆分。manifest.json 读取/原子写入/追加（缺失/损坏自愈重建）。stdlib only。
+
+| 元素 | 说明 |
+|------|------|
+| `MANIFEST_FILE` | manifest.json 文件名 |
+| `MANIFEST_TMP_SUFFIX` | 原子写临时文件后缀 |
+| <!--AUTO:sig:backend/app/services/simulator_manifest.py:read_manifest-->`read_manifest(sim_dir)`<!--/AUTO--> | 读取 manifest.json → dict（缺失抛 FileNotFoundError） |
+| <!--AUTO:sig:backend/app/services/simulator_manifest.py:write_manifest-->`write_manifest(sim_dir, manifest)`<!--/AUTO--> | 原子写 manifest（同目录临时文件 + os.replace，中文保真） |
+| <!--AUTO:sig:backend/app/services/simulator_manifest.py:append_manifest_entry-->`append_manifest_entry(sim_dir, entry)`<!--/AUTO--> | manifest 原子追加（缺失/损坏 → 磁盘 .html 自愈重建后追加） |
+
+### 4.74.2 `backend/app/services/simulator_import.py` — 模拟器导入管线（<!--AUTO:lines:backend/app/services/simulator_import.py-->~320 行<!--/AUTO-->）
+
+**职责**：T-02 从 `simulator_store` 拆分。导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名净化/冲突改名、cfg- 三元组探测、恶意模式粗筛（不拦截）、manifest 追加注册；T-03 新增 `ScanResult` / `scan_generated_html` 单次扫描（消除生成路径双重扫描）。stdlib only。
+
+| 元素 | 说明 |
+|------|------|
+| `MAX_IMPORT_BYTES` | 导入文件大小上限（5MB） |
+| `SUSPICIOUS_PATTERNS` | 恶意模式键集（eval/document.cookie/cross-origin-fetch） |
+| `ImportResult` | 导入结果 dataclass（game 条目 + warnings/rename） |
+| `ScanResult` | 预计算扫描结果 dataclass（game_type/config/warnings，T-03） |
+| `SimulatorDuplicateError` | 内容重复异常（→ 409） |
+| `SimulatorImportError` | 导入校验失败异常（→ 400） |
+| `CFG_REQUIRED_IDS` | cfg- 三元组必需 id 集 |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:sha256_bytes-->`sha256_bytes(content)`<!--/AUTO--> | 内容 SHA-256 摘要（去重主键） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:sanitize_filename-->`sanitize_filename(raw)`<!--/AUTO--> | 文件名净化（取末段/剔非法字符与 %#/空名回退，防穿越） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:slugify-->`slugify(stem)`<!--/AUTO--> | id slug（[a-z0-9-] 折叠，空回退 imported-game） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:find_duplicate-->`find_duplicate(sim_dir, content)`<!--/AUTO--> | SHA-256 去重（仅比对 *.html，命中返回现存文件名） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:next_available_filename-->`next_available_filename(sim_dir, desired)`<!--/AUTO--> | 冲突自动改名 xxx-2.html（大小写不敏感） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:probe_config-->`probe_config(html_text)`<!--/AUTO--> | cfg- 三元组探测（齐全 → ai+config；否则 local 无 config 降级） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:scan_suspicious-->`scan_suspicious(html_text)`<!--/AUTO--> | 恶意模式粗筛（SUSPICIOUS_PATTERNS 键集，不拦截） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:scan_input_ids-->`scan_input_ids(html_text)`<!--/AUTO--> | 输入 id 扫描（cfg- 三元组 + 输入控件 id 收集） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:import_game-->`import_game(sim_dir, filename, content, source='imported', *, precomputed_scan=None)`<!--/AUTO--> | 导入编排（校验→净化→去重→改名→探测→粗筛→落盘→注册） |
 
 ---
 
@@ -1180,7 +1204,7 @@ conver system/
 
 ### 4.75.1 `backend/app/services/game_generator.py` — AI 游戏生成编排（<!--AUTO:lines:backend/app/services/game_generator.py-->~513 行<!--/AUTO-->）
 
-**职责**：AI 文本 → HTML 模拟器游戏的主编排——构造 prompt（种子模板 + 用户描述 + 重试反馈）→ resolve_llm 获取 LLM → 生成 → 6 项校验闸门（结构/模板标记/cfg 契约/可解析性/安全/游戏数据）→ 通过复用 `simulator_store.import_game(source="generated")` 落盘；失败返回结构化错误 + 重试建议（最多 3 次自动重试）。
+**职责**：AI 文本 → HTML 模拟器游戏的主编排——构造 prompt（种子模板 + 用户描述 + 重试反馈）→ resolve_llm 获取 LLM → 生成 → 6 项校验闸门（结构/模板标记/cfg 契约/可解析性/安全/游戏数据）→ 通过复用 `simulator_import.import_game`（经 `simulator_store` re-export）落盘；失败返回结构化错误 + 重试建议（最多 3 次自动重试）。T-04 重试参数内化为私有辅助。
 
 | 元素 | 说明 |
 |------|------|
@@ -1324,7 +1348,7 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->705<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1754<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->705<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->979<!--/AUTO-->
