@@ -143,7 +143,7 @@ class TestDomainErrorHandler:
 
 
 class TestLLMErrorHandler:
-    """LLM 异常族：经 services/chat.py::chat_error_response 映射（401/429/504/400/502）
+    """LLM 异常族：直调 llm_error_handler（handler 委托 services/error_mapping.py::llm_error_response）
 
     注：401 分支为防御性注册形态——请求路径上的 LLM 错误实际先经 complete_chat
     显式 raise HTTPException（携带 provider 上下文），handler 侧 provider 未知。
