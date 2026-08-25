@@ -132,7 +132,7 @@ conver system/
 │   ├── run_backend.py              ← 独立启动脚本（日志/数据目录/端口）
 │   ├── scripts/
 │   │   └── migrate_data.py         ← 数据目录迁移工具（校验/标记/幂等）
-│   ├── tests/                      ← pytest（19 个文件，见 §5.1）
+│   ├── tests/                      ← pytest（25 个文件，见 §5.1）
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   ├── conver_backend.spec         ← PyInstaller 打包配置
@@ -177,7 +177,7 @@ conver system/
 │   │   └── utils/
 │   │       ├── model-utils.js      ← 模型下拉填充工具
 │   │       └── sse-reader.js       ← SSE 流解析
-│   ├── tests/                      ← Vitest（27 个文件，见 §5.2）
+│   ├── tests/                      ← Vitest（33 个文件，见 §5.2）
 │   ├── vitest.config.js
 │   ├── package.json
 │   └── simulators/                 ← 22 款第三方单文件模拟器（HTML，非源码）

@@ -36,7 +36,7 @@
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
-| T-08 | AI 游戏生成功能三处登记：CONSENSUS.md 新增 §14 决策小节（为什么做 + 功能定位，决策侧面）+ PROJECT_REFERENCE.md 当前状态追加交付记录一句（交付侧面，含测试增量口径：pytest test_game_generator.py 62 用例 + Vitest game-generator.test.js 13 用例，均已计入当前基线）+ 本归档条；CODE_WIKI.md / DEV_LOG.md / docs/api-design.md 零改动 | 2026-08-25 | 见 DEV_LOG 本批次 |
+| T-08 | AI 游戏生成功能三处登记：CONSENSUS.md 新增 §14 决策小节（为什么做 + 功能定位，决策侧面）+ PROJECT_REFERENCE.md 当前状态追加交付记录一句（交付侧面，含测试增量口径：pytest test_game_generator.py 62 用例 + Vitest game-generator.test.js 13 用例，均已计入当前基线）+ 本归档条；CODE_WIKI.md / DEV_LOG.md / docs/api-design.md 零改动 | 2026-08-25 | 3c06fa0（merge 2794b84，批次链见 DEV_LOG） |
 
 ### 会话交付：模拟器接入契约 + 外置数据目录与用户导入（T-01/T-02，2026-08-19，5 工单 3 波）
 
