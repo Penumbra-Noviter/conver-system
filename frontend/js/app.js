@@ -373,6 +373,7 @@ let guideActiveLink = null;
  * 一章 —— 否则短小的末章节在「顶部 20%」规则下永远不可达。
  *
  * 每次切入手册视图时调用，防重复注册。
+ * @returns {void}
  */
 function initGuideSidebarScroll() {
     const container = document.querySelector('.guide-container');
