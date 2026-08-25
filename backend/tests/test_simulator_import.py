@@ -31,7 +31,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.app.api.routes import simulators as simulators_route
-from backend.app.services import simulator_store
+from backend.app.services import simulator_import, simulator_store
+from backend.app.services.simulator_import import ScanResult
 from backend.app.services.simulator_store import (
     MAX_IMPORT_BYTES,
     SimulatorDuplicateError,
@@ -57,6 +58,7 @@ __all__ = [
     "TestScanSuspicious",
     "TestImportGame",
     "TestImportEndpointWire",
+    "TestImportGamePrecomputedScan",
 ]
 
 #: 含 cfg- 三元组的样本 HTML（key-injector 契约：input id 即 config 值）
@@ -674,3 +676,102 @@ class TestImportEndpointWire:
         assert resp.status_code == 200
         assert "config" not in resp.json()["game"]
         assert resp.json()["game"]["type"] == "local"
+
+
+class TestImportGamePrecomputedScan:
+    """import_game precomputed_scan 参数（T-03 双重扫描消除）
+
+    契约：keyword-only 参数 `precomputed_scan: ScanResult | None = None`；
+    传值时跳过 import_game 内部 probe_config / scan_suspicious 结果计算，
+    game_type/config/warnings 直接取自预计算结果；不传时行为与现状逐字一致。
+    """
+
+    PRE_AI = ScanResult(
+        game_type="ai",
+        config={"endpoint": "cfg-endpoint", "apikey": "cfg-apikey", "model": "cfg-model"},
+        warnings=[],
+    )
+
+    def test_precomputed_ai_config_used(self, tmp_path: Path) -> None:
+        """precomputed_scan（ai 三元组）→ 条目 type/config 取自预计算而非重探
+        （HTML 实际无输入框，重探会得到 local——观测值证明走了预计算路径）"""
+        sim = tmp_path / "sim"
+        result = import_game(
+            sim, "game.html", "<html>无任何 input</html>".encode("utf-8"), precomputed_scan=self.PRE_AI
+        )
+        assert result.game["type"] == "ai"
+        assert result.game["config"] == {
+            "endpoint": "cfg-endpoint",
+            "apikey": "cfg-apikey",
+            "model": "cfg-model",
+        }
+
+    def test_precomputed_local_no_config(self, tmp_path: Path) -> None:
+        """precomputed_scan（local）→ type=local 且无 config 字段（HTML 实际含三元组，
+        重探会得到 ai——观测值证明走了预计算路径）"""
+        sim = tmp_path / "sim"
+        pre = ScanResult(game_type="local", config=None, warnings=[])
+        result = import_game(
+            sim, "local.html",
+            b'<html><input id="cfg-endpoint"><input id="cfg-apikey"><input id="cfg-model"></html>',
+            precomputed_scan=pre,
+        )
+        assert result.game["type"] == "local"
+        assert "config" not in result.game
+
+    def test_precomputed_warnings_used(self, tmp_path: Path) -> None:
+        """warnings 取自 precomputed（HTML 实际无恶意模式，重扫会得空——观测值证明走了预计算路径）"""
+        sim = tmp_path / "sim"
+        pre = ScanResult(game_type="local", config=None, warnings=["eval"])
+        result = import_game(sim, "risky.html", b"<html>clean</html>", precomputed_scan=pre)
+        assert result.warnings == ["eval"]
+
+    def test_precomputed_skips_internal_probe_and_scan(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """mock 计数：传 precomputed → import_game 内部 probe_config / scan_suspicious 各 0 次"""
+        sim = tmp_path / "sim"
+        calls = {"probe": 0, "scan": 0}
+        real_probe, real_scan = simulator_import.probe_config, simulator_import.scan_suspicious
+
+        def counting_probe(text: str) -> object:
+            calls["probe"] += 1
+            return real_probe(text)
+
+        def counting_scan(text: str) -> object:
+            calls["scan"] += 1
+            return real_scan(text)
+
+        monkeypatch.setattr(simulator_import, "probe_config", counting_probe)
+        monkeypatch.setattr(simulator_import, "scan_suspicious", counting_scan)
+        import_game(sim, "game.html", b"<html>some game</html>", precomputed_scan=self.PRE_AI)
+        assert calls == {"probe": 0, "scan": 0}
+
+    def test_no_precomputed_still_scans_internally(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """不传 precomputed → import_game 内部 probe_config / scan_suspicious 各恰好 1 次（现状逐字一致）"""
+        calls = {"probe": 0, "scan": 0}
+        real_probe, real_scan = simulator_import.probe_config, simulator_import.scan_suspicious
+
+        def counting_probe(text: str) -> object:
+            calls["probe"] += 1
+            return real_probe(text)
+
+        def counting_scan(text: str) -> object:
+            calls["scan"] += 1
+            return real_scan(text)
+
+        monkeypatch.setattr(simulator_import, "probe_config", counting_probe)
+        monkeypatch.setattr(simulator_import, "scan_suspicious", counting_scan)
+        import_game(tmp_path / "sim", "game.html", b"<html>game</html>")
+        assert calls == {"probe": 1, "scan": 1}
+
+    def test_precomputed_path_matches_computed_path(self, tmp_path: Path) -> None:
+        """同一 HTML：预计算路径与未传路径（真实计算）产物逐字一致（双能一致性锚）"""
+        content = CFG_TRIPLET_HTML.encode("utf-8")
+        computed = import_game(tmp_path / "a", "same.html", content)
+        precomputed = import_game(tmp_path / "b", "same.html", content, precomputed_scan=self.PRE_AI)
+        assert precomputed.game == computed.game
+        assert precomputed.renamed == computed.renamed
+        assert precomputed.warnings == computed.warnings

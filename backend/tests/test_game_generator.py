@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.services.game_generator import (
     MAX_RETRIES,
+    ScanResult,
     ValidationError,
     _build_suggestion,
     _build_system_prompt,
@@ -26,6 +27,7 @@ from backend.app.services.game_generator import (
     _sanitize_title,
     _try_extract_scenes,
     generate_game,
+    scan_generated_html,
     validate_generated_html,
 )
 
@@ -38,6 +40,7 @@ __all__ = [
     "TestPromptConstruction",
     "TestGenerateGame",
     "TestGenerateEndpointWire",
+    "TestScanGeneratedHtml",
 ]
 
 # ═══════════════════════════════════════════════════════════
@@ -195,6 +198,81 @@ class TestValidateGeneratedHtml:
         assert "structure" in fields
         # 也可能同时检出 template（没有 GEN: = 通过）/ cfg（没有 input = 失败）
         assert "cfg" in fields
+
+    # ── precomputed_scan 参数（T-03 双重扫描消除）──
+
+    def test_precomputed_warnings_used_for_security(self) -> None:
+        """precomputed_scan 传入 → 检查 5 采用预计算 warnings（HTML 实际干净但 precomputed 报 eval → 报 security）"""
+        scan = ScanResult(game_type="ai", config=None, warnings=["eval"])
+        html = _make_valid_html()  # 实际无 eval
+        errors = validate_generated_html(html, precomputed_scan=scan)
+        assert "security" in {e.field for e in errors}
+
+    def test_precomputed_empty_warnings_suppress_rescan(self) -> None:
+        """precomputed warnings=[] 而 HTML 实际含 eval → 不报 security（证明检查 5 未重扫）"""
+        html = _make_valid_html().replace("</script>", 'eval("x");\n</script>')
+        scan = ScanResult(game_type="ai", config=None, warnings=[])
+        errors = validate_generated_html(html, precomputed_scan=scan)
+        assert "security" not in {e.field for e in errors}
+        assert "data" not in {e.field for e in errors}  # 其余检查不受干扰
+
+    def test_no_precomputed_still_scans_security(self) -> None:
+        """不传 precomputed → 检查 5 自行扫描（现状逐字一致；HTML 含 eval → security 错误）"""
+        html = _make_valid_html().replace("</script>", 'eval("x");\n</script>')
+        errors = validate_generated_html(html)
+        assert "security" in {e.field for e in errors}
+
+
+# ═══════════════════════════════════════════════════════════
+# Test: scan_generated_html（T-03 单次扫描打包）
+# ═══════════════════════════════════════════════════════════
+
+
+class TestScanGeneratedHtml:
+    """scan_generated_html（T-03：单次扫描打包 ScanResult，供校验闸门与导入复用）"""
+
+    def test_valid_html_ai(self) -> None:
+        """合法生成 HTML → ai + config 三元组 + 无警告"""
+        scan = scan_generated_html(_make_valid_html())
+        assert scan.game_type == "ai"
+        assert scan.config == {
+            "endpoint": "cfg-endpoint",
+            "apikey": "cfg-apikey",
+            "model": "cfg-model",
+        }
+        assert scan.warnings == []
+
+    def test_suspicious_html_warnings(self) -> None:
+        """含 eval / document.cookie → warnings 键集（排序确定，不拦截）"""
+        html = _make_valid_html().replace("</script>", 'eval("x"); document.cookie;\n</script>')
+        scan = scan_generated_html(html)
+        assert scan.game_type == "ai"  # cfg 三元组仍然命中
+        assert scan.warnings == ["document.cookie", "eval"]
+
+    def test_local_html_no_cfg(self) -> None:
+        """无 cfg 三元组 → local + config None"""
+        scan = scan_generated_html("<html><body>纯本地</body></html>")
+        assert scan.game_type == "local"
+        assert scan.config is None
+
+    def test_probe_and_scan_called_exactly_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """mock 计数：probe_config / scan_suspicious 各恰好 1 次（单次扫描契约）"""
+        from backend.app.services import game_generator as gg
+        calls = {"probe": 0, "scan": 0}
+        real_probe, real_scan = gg.probe_config, gg.scan_suspicious
+
+        def counting_probe(text: str) -> object:
+            calls["probe"] += 1
+            return real_probe(text)
+
+        def counting_scan(text: str) -> object:
+            calls["scan"] += 1
+            return real_scan(text)
+
+        monkeypatch.setattr(gg, "probe_config", counting_probe)
+        monkeypatch.setattr(gg, "scan_suspicious", counting_scan)
+        scan_generated_html(_make_valid_html())
+        assert calls == {"probe": 1, "scan": 1}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -488,7 +566,7 @@ class TestGenerateGame:
         )
         monkeypatch.setattr(
             "backend.app.services.game_generator._persist_generated_game",
-            lambda html, title: {"id": "test", "file": "test.html"},
+            lambda html, title, **kwargs: {"id": "test", "file": "test.html"},
         )
 
         result = await generate_game(db=db_session, description="test world")
@@ -508,7 +586,7 @@ class TestGenerateGame:
         )
         monkeypatch.setattr(
             "backend.app.services.game_generator._persist_generated_game",
-            lambda html, title: {"id": "test", "file": "test.html"},
+            lambda html, title, **kwargs: {"id": "test", "file": "test.html"},
         )
 
         result = await generate_game(db=db_session, description="test world")
@@ -528,7 +606,7 @@ class TestGenerateGame:
         )
         monkeypatch.setattr(
             "backend.app.services.game_generator._persist_generated_game",
-            lambda html, title: {"id": "test", "file": "test.html"},
+            lambda html, title, **kwargs: {"id": "test", "file": "test.html"},
         )
 
         # 重试时 previous_html=""（空字符串）—— 应走 retry prompt 路径
@@ -536,7 +614,7 @@ class TestGenerateGame:
         # 令 validate_generated_html 首次返回错误，第二次返回空（通过）
         call_count = 0
 
-        def _validate(html: str) -> list:
+        def _validate(html: str, **kwargs: object) -> list:
             nonlocal call_count
             call_count += 1
             if call_count <= 1:
@@ -562,6 +640,46 @@ class TestGenerateGame:
         # 应触发重试（第二次调用时通过），最终成功
         assert result.ok is True
         assert result.game is not None
+
+    async def test_generation_path_scans_only_once(
+        self, db_session, monkeypatch, tmp_path: Path
+    ) -> None:
+        """生成路径单次扫描（T-03 核心验收）：import_game 内部不再重复 probe/scan——
+        全链路（真实校验 + 真实落盘）下，simulator_import 层的 probe_config /
+        scan_suspicious 调用次数为 0（precomputed 路径生效）
+        """
+        from backend.app.services import simulator_import as sim_import
+
+        monkeypatch.setenv("CONVER_DATA_DIR", str(tmp_path))
+        monkeypatch.setattr(
+            "backend.app.services.game_generator.resolve_llm",
+            lambda db, provider: ("test", "test-model", _MockLLM(result=_make_valid_html())),
+        )
+
+        calls = {"probe": 0, "scan": 0}
+        real_probe, real_scan = sim_import.probe_config, sim_import.scan_suspicious
+
+        def counting_probe(text: str) -> object:
+            calls["probe"] += 1
+            return real_probe(text)
+
+        def counting_scan(text: str) -> object:
+            calls["scan"] += 1
+            return real_scan(text)
+
+        monkeypatch.setattr(sim_import, "probe_config", counting_probe)
+        monkeypatch.setattr(sim_import, "scan_suspicious", counting_scan)
+
+        result = await generate_game(db=db_session, description="test world")
+
+        assert result.ok is True
+        # 关键验收：probe/scan 在 import_game 内部各 0 次（precomputed 路径生效，
+        # 生成路径的扫描由 scan_generated_html 完成，import_game 不再重复）
+        assert calls == {"probe": 0, "scan": 0}
+        # 产物落盘（真实 persist 路径）
+        assert result.game is not None
+        assert result.game["source"] == "generated"
+        assert (tmp_path / "simulators").is_dir()
 
 
 # ═══════════════════════════════════════════════════════════

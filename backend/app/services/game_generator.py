@@ -24,14 +24,22 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.app.services import data_dir as data_dir_service
-from backend.app.services import simulator_store
 from backend.app.services.game_template import MARKER_PATTERN, SEED_TEMPLATE
 from backend.app.services.llm.resolver import resolve_llm
-from backend.app.services.simulator_import import CFG_REQUIRED_IDS, scan_input_ids
+from backend.app.services.simulator_import import (
+    CFG_REQUIRED_IDS,
+    ScanResult,
+    import_game,
+    probe_config,
+    scan_input_ids,
+    scan_suspicious,
+)
 
 __all__ = [
     "MAX_RETRIES",
+    "ScanResult",
     "generate_game",
+    "scan_generated_html",
     "validate_generated_html",
 ]
 
@@ -133,9 +141,10 @@ def _check_html_parseability(html: str) -> ValidationError | None:
     return None
 
 
-def _check_security(html: str) -> list[ValidationError]:
-    """检查 5：安全扫描（复用 simulator_store.scan_suspicious）"""
-    warnings = simulator_store.scan_suspicious(html)
+def _check_security(html: str, precomputed_warnings: list[str] | None = None) -> list[ValidationError]:
+    """检查 5：安全扫描（复用 scan_suspicious；precomputed_warnings 传入时
+    直接使用预计算结果——T-03 生成路径单次扫描）"""
+    warnings = precomputed_warnings if precomputed_warnings is not None else scan_suspicious(html)
     if warnings:
         return [ValidationError(field="security", message=f"检测到可疑模式：{'、'.join(warnings)}")]
     return []
@@ -246,8 +255,15 @@ def _check_game_data(html: str) -> ValidationError | None:
     return None
 
 
-def validate_generated_html(html: str) -> list[ValidationError]:
+def validate_generated_html(
+    html: str,
+    *,
+    precomputed_scan: ScanResult | None = None,
+) -> list[ValidationError]:
     """校验闸门：对 LLM 生成的 HTML 执行六项检查
+
+    precomputed_scan 传入时，检查 5（安全扫描）直接采用其 warnings 结果，
+    不再调用 scan_suspicious（T-03 双重扫描消除）；不传时检查 5 按现状自行扫描。
 
     检查项：
         1. HTML 骨架完整性（<!DOCTYPE html> 或 <html>）
@@ -261,17 +277,39 @@ def validate_generated_html(html: str) -> list[ValidationError]:
         错误列表（空列表表示全部通过）
     """
     errors: list[ValidationError] = []
+    precomputed_warnings = precomputed_scan.warnings if precomputed_scan is not None else None
 
     # 按顺序检查，前面的失败不阻断后续检查（收集全部错误以利于重试）
     for check in [_check_html_structure, _check_template_completeness,
                   _check_cfg_contract, _check_html_parseability,
                   _check_security, _check_game_data]:
-        result = check(html)
+        if check is _check_security:
+            result = _check_security(html, precomputed_warnings)
+        else:
+            result = check(html)
         if isinstance(result, list):
             errors.extend(result)
         elif result is not None:
             errors.append(result)
     return errors
+
+
+# ═══════════════════════════════════════════════════════════
+# 单次扫描（T-03 双重扫描消除）
+# ═══════════════════════════════════════════════════════════
+
+
+def scan_generated_html(html: str) -> ScanResult:
+    """对生成的 HTML 执行元数据探测与恶意模式粗筛，打包为 ScanResult
+    （T-03 单次扫描：生成路径由此单点计算一次，结果供校验闸门检查 5 与
+    import_game 的 precomputed_scan 复用，消除双重扫描）。
+
+    game_type/config 来自 probe_config（cfg- 三元组探测）；warnings 来自
+    scan_suspicious（SUSPICIOUS_PATTERNS 粗筛，命中不拦截）。
+    """
+    game_type, config = probe_config(html)
+    warnings = scan_suspicious(html)
+    return ScanResult(game_type=game_type, config=config, warnings=warnings)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -478,13 +516,16 @@ async def generate_game(
             attempted=attempted + 1,
         )
 
-    # 4. 校验闸门
-    errors = validate_generated_html(reply)
+    # 4. 校验闸门（T-03 生成路径单次扫描：先 scan_generated_html 一次打包
+    # probe_config + scan_suspicious 结果，校验检查 5 与落盘的 import_game
+    # 复用同一扫描结果，import_game 内部不再重复计算）
+    scan = scan_generated_html(reply)
+    errors = validate_generated_html(reply, precomputed_scan=scan)
 
     if not errors:
         # 校验通过 → 落盘
         logger.info("游戏生成校验通过，准备落盘：title=%s", title or _FALLBACK_NAME)
-        game = _persist_generated_game(reply, title)
+        game = _persist_generated_game(reply, title, precomputed_scan=scan)
         return GenerateResult(ok=True, game=game, retries=attempted)
 
     # 5. 校验失败 → 重试或返回错误
@@ -530,12 +571,16 @@ def _build_suggestion(errors: list[ValidationError]) -> str:
     return "；".join(suggestions) if suggestions else "请重新生成，确保模板标记被正确替换。"
 
 
-def _persist_generated_game(html: str, title: str | None) -> dict:
+def _persist_generated_game(
+    html: str, title: str | None, *, precomputed_scan: ScanResult | None = None
+) -> dict:
     """将生成的 HTML 游戏写入数据目录并注册 manifest
 
     Args:
         html: 生成的完整 HTML 文本
         title: 游戏标题（用于生成文件名）
+        precomputed_scan: 校验闸门已计算的扫描结果（T-03），非 None 时
+            import_game 跳过内部 probe_config / scan_suspicious 重复计算
 
     Returns:
         manifest 条目 dict
@@ -548,7 +593,9 @@ def _persist_generated_game(html: str, title: str | None) -> dict:
     filename = f"{name}.html"
     content = html.encode("utf-8")
 
-    result = simulator_store.import_game(sim_dir, filename, content, source=GENERATED_SOURCE)
+    result = import_game(
+        sim_dir, filename, content, source=GENERATED_SOURCE, precomputed_scan=precomputed_scan
+    )
     return result.game
 
 
