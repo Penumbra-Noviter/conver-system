@@ -17,7 +17,7 @@
 
 ## 技术债候选区
 
-> 当前 15 项待立项（F-23~F-37：架构深化批次波 1/2/3 增量审核 + 期末四轴发现，2026-08-25）。
+> 当前 23 项待立项（F-23~F-45：架构深化批次波 1/2/3 增量审核 + 期末四轴发现 + 全量审查，2026-08-25）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
@@ -36,6 +36,14 @@
 | F-35 | `game_generator.py:302-312` `scan_generated_html`（含 `ScanResult`）被导出到 `__all__`，扩展了模块公共 API 表面。该函数仅被 `generate_game` 内部调用（1 处），外部调用方依赖此函数后未来重构时有兼容成本 | 波 3 增量审核（Falsify 轴） | Speculative | 📝 待立项 |
 | F-36 | `game_generator.py:522-528` `generate_game` 中 `scan_generated_html` 的扫描结果在 `validate_generated_html` 和 `_persist_generated_game` 之间以 `precomputed_scan` 参数传递；若校验失败（`errors` 非空），`scan` 结果被丢弃但不落盘，每次重试（上限 3 次）都重新扫描，但 LLM 回复 HTML 较大时影响可忽略 | 波 3 增量审核（Falsify 轴） | Speculative | 📝 待立项 |
 | F-37 | `conversation.py:16` + `message.py:15` 双向模块级循环 import（T-07 方案 D 副作用）——conversation 模块级 import message，message 模块级 import conversation。Python 属性访问延迟到函数体执行实测通过，但任一模块添加模块级属性访问会触发 `AttributeError: partially initialized module`；静态分析器会报告双向循环依赖 | 期末四轴（Standards / Falsify / Architecture 三联） | Worth exploring | 📝 待立项 |
+| F-38 | simulator_store 兼容 shim 私有名跨模块 + 循环 import 函数级补丁（T-02 拆分遗留双软约束）：①`simulator_store.py:38,52` 顶层 re-export shim 携带 `_existing_ids` / `_read_manifest_or_rebuild` 私有名（注释声明「回归锚测试直接访问，非 `__all__` 但保持模块属性」，测试 monkeypatch 命名空间绑定 store）；②循环 import 函数级补丁三处——`simulator_manifest.py:49,119` / `simulator_import.py:130` 函数体内延迟 import 规避模块级循环引用（store↔manifest、manifest↔import 双向边仍在）。当前正确但属「测试耦合驱动代码组织」的软约束（与 F-31 同族） | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-39 | `_current_write_manifest()` 测试耦合间接层：`simulator_manifest.py:42` 定义、`:83/:108` 调用点按调用期从 simulator_store 重新解析 write_manifest——仅为让回归锚 monkeypatch `simulator_store.write_manifest` 生效；功能正确但属测试耦合驱动代码组织的软约束（与 F-31/F-38 同族） | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-40 | game_generator `err.field` if/elif 级联：`game_generator.py:581-591` `_build_suggestion` 按 field 六分支级联（structure/template/cfg/syntax/data/security）——新增检查项须同步扩展级联，未知 field 静默跳过不产出建议、全部未知时落通用兜底文案，无编译期/测试期防漏信号 | 2026-08-25 全量审查 | Speculative | 📝 待立项 |
+| F-41 | 局部 `ValidationError` 命名遮蔽 pydantic：`game_generator.py:64` 自定义 `ValidationError` dataclass 与 pydantic 同名类型生态冲突（本模块未 import pydantic 无运行时遮蔽，但阅读者对 ValidationError 的第一联想是 pydantic 校验异常，存在语义误读风险） | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-42 | setting.py `_CRED_SLOTS` provider 键知识外泄：`setting.py:64` `_CRED_SLOTS = ("claude", "openai")` 将协议槽位键名单硬编码在本模块，同文件 :58 注释声明 provider 知识已收敛于 provider_registry.py「本模块仅消费不派生」——该常量构成第二事实源，新增协议槽位需两处同步 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-43 | 前端 11 模块缺 `__all__` 导出声明清单（api.js / app.js / state.js / utils.js / components/modal.js / components/model-selector.js / components/confirm-dialog.js / components/export-dialog.js / components/character-form.js / components/character-wizard.js / data/character-templates.js）——兄弟模块（cascade.js / chat.js / list-views.js 等）已用 `__all__` 声明导出面，此 11 文件导出面为 ESM 具名 export 隐式形态，grep 无单一权威清单可机械校验 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-44 | game_generator docstring 协议表面(3) 与 `__all__`(5) 不一致：`game_generator.py:12` 列 3 符号（MAX_RETRIES / generate_game / validate_generated_html），`:38` `__all__` 实为 5 符号（另含 ScanResult / scan_generated_html，后者即 F-35 所述公共面扩张）——文档与代码表面漂移 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-45 | O2 一致性缺口（**明确不在本批修复范围**）：chat 流式中途出错时 DB 已落库部分生成内容而 UI 渲染错误气泡——`chat.py:184` `stream_reply` 错误帧产出后 finally 兜底仍保存 partial content（:247-249 错误帧、:254 起兜底落库；docstring「兜底……尽力保存已生成部分」背书行为），前端 stream-session.js 普通错误写回 phase 'error' 并渲染错误气泡（:308-317）；下次加载历史时已存内容重现，与错误气泡呈现不一致 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
 
 ## 技术债处置记录（迁移存档）
 
@@ -69,3 +77,4 @@
 | F-20 | F-13 票面「真实 Windows 写盘 OSError 500」实证基础与本机（Win11 26100）行为不符——绝对路径子目录末组件设备名（con.txt 等）可正常落盘，失败形态仅在相对路径/裸名/尾点形态复现（裸 `nul` 静默丢弃、`con.` 规范化冲突）；F-13 修复仍正确（防住裸 nul 静默丢弃），建议票面补实测注记或未来落盘层 `\\?\` 长路径支持时一并复核 | 期末四轴 Falsify 信息性（2026-08-19 批次 2） | Speculative | ❌ 复核关闭（2026-08-19 批次 3：实测注记已三处闭环——F-13 归档行引用「本机实测注记见 F-20」+ 本行本体 + DEV_LOG 批次 2 遥测；行为随 Windows 版本变化属信息性记录，零代码动作合理） |
 | F-21 | `next_available_filename` 直调空 stem（`.html`）冲突时产出 `-2.html` 畸形名——生产不可达（import_game 必经 sanitize 空名兜底 `imported-game`），可在 docstring 声明入参契约或加显式校验 | 期末四轴 Falsify 提示级（2026-08-19 批次 2） | Speculative | ✅ 已修（2026-08-19 批次 3：docstring 补入参契约声明——desired 须完整文件名且 stem 非空、空 stem 冲突产 -N.html 不兜底、无点/空串为契约外行为 rsplit ValueError；零行为变化，commit 08e860f merge 2fb25df） |
 | F-22 | 批次 3 归档流程项——F-20/F-21 状态流转、头部计数清零、DEV_LOG 批次 3 滚动摘要 | 期末四轴 Standards N2（2026-08-19 批次 3） | Speculative | ✅ 已修（2026-08-19：随批次 3 归档 commit 一并处理，技术债区清零） |
+| B2 | manifest 条目级字段不做校验（条目非 dict / 字段缺失等形态）复核维持关闭 | 2026-08-25 全量审查 | Speculative | ❌ 复核关闭（2026-08-25：系 simulator_manifest.py `_read_manifest_or_rebuild` docstring 文档化定版——损坏口径经 F-8/F-15 两次范围决策收敛，「条目级字段不做校验，范围收敛」（simulator_manifest.py:89-96）；原子写保证正常运行不产生此类损坏，需手工损坏 manifest 才触发；复核维持关闭） |
