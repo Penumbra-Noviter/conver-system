@@ -53,7 +53,8 @@ conver-system/
 │   │   │       ├── conversations.py # 对话管理
 │   │   │       ├── messages.py    # 消息检索（GET 历史 + 搜索）
 │   │   │       ├── models.py      # 可用模型列表
-│   │   │       └── settings.py    # 配置管理 + GET /credentials 只读凭证端点（U8 模拟器注入）
+│   │   │       ├── settings.py    # 配置管理 + GET /credentials 只读凭证端点（U8 模拟器注入）
+│   │   │       └── simulators.py  # 模拟器路由（T-02：import 单文件导入 + generate AI 生成游戏）
 │   │   │
 │   │   ├── models/                # SQLAlchemy ORM
 │   │   │   ├── __init__.py
@@ -73,12 +74,23 @@ conver-system/
 │   │       ├── __init__.py
 │   │       ├── character.py
 │   │       ├── character_card.py  # SillyTavern V2 卡转换层
+│   │       ├── character_fields.py # 角色字段常量映射深模块（V2 字段清单 + 各视角投影子集）
 │   │       ├── chat.py            # 聊天回合深模块（prepare_chat / complete_chat / chat_error_response / stream_reply）
 │   │       ├── conversation.py
 │   │       ├── conversation_export.py # 对话导出（json/markdown 深模块）
 │   │       ├── data_dir.py        # 数据目录解析（纯 stdlib，契约表 v2；run_backend / migrate_data 委托）
+│   │       ├── document_parser.py # 文档智能解析深模块（用户配置 LLM 从自由文本提取角色卡字段）
+│   │       ├── error_mapping.py   # 领域/LLM 异常 → (HTTP 状态码, 用户可见消息) 映射单一入口（B1 D2）
+│   │       ├── exceptions.py      # 服务层领域异常族（由路由层捕获转 HTTP 响应）
+│   │       ├── game_generator.py  # 游戏生成服务（AI 文本 → 可运行 HTML 模拟器的编排深模块）
+│   │       ├── game_template.py   # 叙事游戏种子模板（自包含 HTML，LLM 替换两个模板标记）
 │   │       ├── message.py
+│   │       ├── model_data.py      # 可用模型硬编码清单（后续可扩展为动态查询）
+│   │       ├── provider_registry.py # Provider 派生元数据单一来源（协议映射 / 协议族模型集 / key 顺序）
 │   │       ├── setting.py         # 运行时设置读写（白名单 + 回退链 + 整型容错）
+│   │       ├── simulator_import.py # 模拟器导入族（T-02：文件名净化 / SHA-256 去重 / cfg 探测 / 静态粗筛）
+│   │       ├── simulator_manifest.py # manifest.json 读写工具（首启种子后幂等标记）
+│   │       ├── simulator_store.py # 模拟器数据存储（首启种子契约；manifest / 导入族已拆分独立模块）
 │   │       └── llm/
 │   │           ├── __init__.py
 │   │           ├── base.py        # BaseLLM 抽象基类（含 test_connection）
@@ -86,6 +98,7 @@ conver-system/
 │   │           ├── openai.py      # OpenAI Provider
 │   │           ├── factory.py     # Provider 工厂
 │   │           ├── prompt.py      # Prompt 组装纯函数（apply_template_vars / build_messages）
+│   │           ├── resolver.py    # 凭据解析/实例化收口 resolve_llm（三调用序列统一领域异常语义，B2 D3）
 │   │           └── errors.py      # LLM 异常定义
 │   │
 │   ├── requirements.txt
@@ -133,17 +146,25 @@ conver-system/
 │   │   ├── state.js               # 应用级全局状态（会话级字段已退役）
 │   │   ├── chat.js                # 聊天域渲染与交互（renderMessages / handleSend；结算委托 settleTurn）
 │   │   ├── api.js                 # API 调用层（含 setFetch 注入 seam）
+│   │   ├── fetch-seam.js          # fetch 注入点单一来源（TD-51/55/60：api.js 与模拟器域共用唯一 seam）
 │   │   ├── format.js              # 数据→HTML 纯函数（highlightText / buildMessagesHtml / characterCardHtml）
+│   │   ├── markdown.js            # 轻量 Markdown 渲染（renderMarkdown，FE-3 自 utils.js 迁出）
 │   │   ├── search-view.js         # 搜索视图深模块（防抖/五态文案/渲染，initSearchView + 导航钩子注入）
 │   │   ├── cascade.js             # 级联删除深模块（批量原语+联动，setCascadeHooks 注入）
+│   │   ├── list-views.js          # 角色/对话列表视图深模块（C4 从 app.js 下沉：网格渲染/四类按钮）
 │   │   ├── tabs.js                # 会话 tab 工作区深模块（openTab/closeTabs/getTabDisplay/abortStream）
 │   │   ├── stream-session.js      # 流式回合结算深模块（createStreamSession + settleTurn + mergeFreshList）
 │   │   ├── conversation-activation.js # 激活编排深模块（F-2 守卫/草稿滚动/懒加载，setActivationHooks 注入）
 │   │   ├── icons.js               # SVG 图标工厂 seam（iconHtml，唯一动态图标来源）
 │   │   ├── simulators.js          # 模拟器列表页深模块（parseManifest / filterGames / 四态渲染 / 类型筛选，initSimulatorsView + onOpenGame 注入钩子）
 │   │   ├── simulator-view.js      # 模拟器运行视图状态机（initSimulatorRun / openSimulator / closeSimulator / 15s 超时 / 事件源校验 / AI 提示条）
+│   │   ├── simulator-contracts.js # 模拟器域契约单一来源（C8：域事实常量 + file 安全判据纯函数，零副作用）
+│   │   ├── simulator-adapt.js     # 模拟器适配分析共享深模块（T-01：覆盖层映射记录解析与把关）
+│   │   ├── simulator-import.js    # 列表页导入游戏逻辑收口（T-02 决策 9/11：警告确认 → 选文件 → 上传 → 刷新）
 │   │   ├── key-injector.js        # 模拟器配置同步深模块（SIM-API-1：load 自动同步 + 「重新同步」按钮 + endpointMode 口径转换 + 受管模型 option；凭证经 initKeyInjector 钩子）
 │   │   ├── save-manager.js        # 存档管理面板（U9-T2：存档列表/导出/导入/删除 + 校验）
+│   │   ├── save-key-meta.js       # 存档键契约常量单一来源（TD-67/68：正则元字符集，纯常量零副作用）
+│   │   ├── desktop-settings.js    # 桌面壳设置（D11：关闭行为偏好）
 │   │   ├── components/
 │   │   │   ├── character-form.js  # 角色表单（骨架走 modal 工厂，提交走 character-submit）
 │   │   │   ├── character-wizard.js# 六步角色创建向导（LLM 智能解析 + 模板；headerExtra 插槽挂步骤指示器）
@@ -152,15 +173,16 @@ conver-system/
 │   │   │   ├── modal.js           # 通用模态框工厂（openModal：遮罩/头部/三关闭路径/Escape/headerExtra/removeExisting）
 │   │   │   ├── model-selector.js  # 模型选择弹窗
 │   │   │   ├── export-dialog.js   # 导出弹窗
+│   │   │   ├── game-generator.js  # AI 游戏生成器深模块（世界观文本/.txt 上传 → 游戏生成流程 UI）
+│   │   │   ├── loading-button.js  # 按钮 loading 态工具（禁用 + 内联 spinner 统一异步反馈）
 │   │   │   ├── settings-panel.js  # 设置面板（initSettingsPanel / loadSettings）
 │   │   │   └── tab-bar.js         # tab 条 presentational 组件（消费 getTabDisplay 展示契约）
 │   │   ├── data/
 │   │   │   └── character-templates.js # 角色创建向导内置模板
-│   │   └── utils.js               # 工具函数（escapeHtml / downloadBlob / showToast / providerDisplayName）
+│   │   ├── utils.js               # 工具函数（escapeHtml / downloadBlob / showToast / providerDisplayName）
 │   │   └── utils/
 │   │       ├── model-utils.js     # 模型选择逻辑（fillModelSelect / createCustomModelHandler）
 │   │       └── sse-reader.js      # SSE 流解析纯函数（parseSSEStream）
-│   ├── assets/
 │   └── simulators/                # 内置模拟器种子源（22 款随包 + manifest.json v2；T-02 外置后 /simulators 挂载数据目录 simulators/，用户导入游戏落数据目录）
 │
 ├── scripts/                       # 构建/冒烟脚本（build-desktop.ps1 / smoke-desktop.ps1 / smoke-simulators.mjs 等）
