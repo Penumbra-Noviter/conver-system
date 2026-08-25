@@ -21,7 +21,7 @@
 
 ```bash
 # 1. 克隆项目
-git clone <repo-url>
+git clone https://github.com/user/conver-system.git
 cd conver-system
 
 # 2. 创建虚拟环境
@@ -53,6 +53,12 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - [LLM 集成设计](docs/llm-integration.md) — 多模型接入层架构
 - [桌面版构建与冒烟](docs/tauri-desktop.md) — Tauri 桌面版构建链、数据目录、已知限制
 - [Tauri 环境搭建](docs/tauri-setup.md) — Rust 工具链安装与构建注意事项
+
+## 许可
+
+本程序采用 **MIT 许可协议**，详见 [LICENSE](LICENSE) 文件。
+
+内置的 22 款文字模拟器为第三方作者作品，其授权范围见 [NOTICE.md](NOTICE.md)。
 
 ## 设计原则
 
