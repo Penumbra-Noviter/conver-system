@@ -206,11 +206,13 @@ GET /api/conversations/{conversation_id}
   "title": "关于诗歌的讨论",
   "model_provider": "claude",
   "model_name": "claude-sonnet-5",
-  "message_count": 12,
+  "message_count": 0,
   "created_at": "2026-07-30T10:00:00",
   "updated_at": "2026-07-30T11:30:00"
 }
 ```
+
+> 注：单查端点返回裸 Conversation，`message_count` 恒为 schema 默认值 `0`；真实聚合计数仅在列表端点（`GET /api/conversations`）填充。
 
 **错误**
 | 状态码 | 条件 |

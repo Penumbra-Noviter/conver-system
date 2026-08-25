@@ -8,6 +8,17 @@
 
 ---
 
+## 全量审查修复批次（2026-08-25 ~ 08-26 — kickoff 全自动档标准档：9 工单 3 波，commit 链 789602c → 2794b84 + 文档同步）
+
+- **来源**：用户「全量审查」（固定点=根提交，三轴并行评审：Standards 3 硬违规 / Spec 6 项文档漂移 / Falsify 2 BREAKS）→「进入 kick 全自动流程开始修复」。Grilling 共识 12 发现全属实，5 决策按推荐拍板（B2 复核关闭不重开定版、smell 落债不修、基线实跑仲裁）。
+- **W1 代码四票**：T-01 导出文件名辅助下沉 `conversation_export.character_export_filename`（S1 路由 ORM 违规清零，覆盖率 100%，6cb9825）/ T-02 `_infer_mime` except 扩 `(binascii.Error, ValueError)` 先红后绿——非 ASCII avatar 500 → 201 容错入库（B1，ba43dc2+1598561）/ T-03 `stream_reply` 零 token 不落库 + done 帧 `message_id:null`（前端消费者容忍验证）+ 泛化异常 `logger.exception`（O1/O3，54a118b）/ T-04 三包 `__all__` + PRAGMA docstring（S2/S3，8b2bf0b）
+- **W2 文档三票**：T-05 api-design 补三端点契约 + 模型名换族 claude-sonnet-5（顺带修正三处文档-vs-代码偏差：models 示例清单/retries 双语义/错误格式例外，d7186cb）/ T-06 architecture 目录树补 23 条 + 删 assets 死条目（df06f55）/ T-07 测试基线四处对齐 CODE_WIKI §5 权威标记（实跑仲裁 pytest 713+1skip、Vitest 979、cargo 70 全部吻合权威源，f53bf58）
+- **W3 登记两票**：T-08 游戏生成功能 CONSENSUS §14 决策 + PROJECT_REFERENCE 交付记录 + TICKETS 归档（契约侧面归 T-05，3c06fa0）/ T-09 TECH_DEBT 落债 F-38~F-45 + B2 复核关闭（候选区 15→23，3fcceea）
+- **审核链**：W1 波末 Falsify 5 探针全 HOLDS（含 T-01×T-03 共享文件共存 wire 级验证）；W2 轻量审计 6 PASS；期末四轴（789602c...2794b84）**0 阻断放行**——Standards 0 硬违规 / Spec 1 处契约示例失真（单查 message_count 示例值失真，当场修正）/ Falsify 5 探针 HOLDS + 新发现空串 token 前端占位残留（落债 F-46）/ Architecture 正面（T-01 locality 实质改善）；安全红线 0 违例
+- **运行态冒烟**：主树 pytest **713 passed + 1 skipped**（基线 704+1 + 9 新用例）；uvicorn 实启 GET models/characters/conversations 全 200 + POST generate 空体 422 契约符合；进程树杀净（shim 双层坑 `$!` 只杀一层，按 netstat 实际 PID 补杀，端口复核释放）
+- **流程遥测**：3 波 9 票零回退零冲突合并（merge 链 74c2b37→df97b2a / 7d1488b→3505e2a / a6e6aa3→2794b84）；T-01/T-08 各网关空返回重开 1 次（均半成品现场续用成功零返工）；范围偏差 1 起（T-01 commit 内含 doc_sync 钩子强制的 CODE_WIKI 机械标记刷新——裁决记录警告档，偏差反馈拆票校准）；worktree doc_sync 钩子环境性误报贯穿全批（裸 worktree 无 vitest/cargo 收集器），全部文档票 --no-verify + 主树统一重算兜底
+- **技术债区**：候选区净增 +9（F-38~F-46 待立项共 24 项）；B2 复核关闭入处置记录
+
 ## 修复：D11 关闭行为偏好保存失败（Tauri ACL 拒绝，2026-08-20）
 
 - **根因**：Tauri v2.11.5 ACL 系统在远程来源（`http://127.0.0.1:<port>`）拦截三个自定义命令 `backend_status`/`get_close_action`/`set_close_action`——`capabilities/default.json` 仅 `core:default`，缺自定义命令 allow 权限。报错 `"关闭行为保存失败，请重试: undefined"`：Tauri `invoke` 拒绝值为裸字符串，`err.message` 为 `undefined`。证据：`%APPDATA%\ConverSystem\` 从未出现 `settings.json`（DB 与 runtime.json 均正常落盘），`set_close_action` 从未执行到 Rust 业务逻辑。
@@ -111,54 +122,11 @@
 - **验证链**：cargo **70** 全绿（基线 58 + 12）；Vitest **826** 全绿（基线 807 + 19）；pytest 471 不受影响（零后端改动）。
 - **决策落盘**：CONSENSUS §13 新增 **D11**（偏好持久化 settings.json、回退语义、网页版无此设置）；docs/tauri-desktop.md 目录布局表 + 人工验收清单（验收 8 新增检查项）；TICKETS 归档批次。
 
-## 滚动摘要（2026-08-15 — 会话交付：模拟器获取列表修复 + 开场白预插 + 桌面版重新打包）
+## 滚动摘要（2026-08-15 — 阶段摘要：C5/C6/C3-C4-C8 架构收敛 + F-1 技术债小批 + 模拟器交付修复，细节 git log 可溯）
 
-- **模拟器「获取列表」网络错误修复**——根因（实证）：主应用 `openai_base_url` 缺 `/v1`，模拟器浏览器直连 `{base}/models` 命中 relay 管理面板 HTML（非 JSON）；真实 API 在 `/v1` 下。修复：DB `openai_base_url` 统一为 `https://api.kukuit.com/v1`（模拟器经 key-injector 自动跟随主应用设置）；Playwright 端到端验证「获取 → 已选择模型」。附带实证：relay 拒 `Python-urllib` UA（403），Chrome/SDK UA 正常。
-- **开场白预插修复**——根因：`auto_insert_greeting` 仅首条用户消息时触发，创建对话不预插。修复：`create_conversation` 预插 `first_mes` 为首条 assistant 消息（`create_message` 函数内延迟导入解 conversation↔message 循环导入）；+2 回归用例（`TestCreateConversation`），pytest **471 + 1 skip**。
-- **桌面版重新打包**——build-desktop.ps1 首轮全链通过但 PyInstaller 跳过已存在旧后端包（产物时间戳复核发现），单独重跑 build-backend.ps1 后冒烟 5 项 PASS；dist 测试包 `dist/conver-system.exe` + `dist/conver_backend/` 就绪。
-- **测试同步**：pytest **471 + 1 skip**（+2）；Vitest 807 / cargo 41 未受影响。
-- **知识库预检召回**：无新教训（「base_url 需带 /v1 才能命中 OpenAI 兼容端点」已入 TICKETS 归档记录）。
-
-## 滚动摘要（2026-08-15 — 技术债区 F-1/F-2/F-4 批次：kickoff 全自动档轻量档 1 工单）
-
-- **来源**：C3/C4/C8 批次波 1 增量审核 + 期末四轴复证非阻断发现（技术债区 3 项待立项）。Grilling 共识（全自动档拍板）：**F-1 做 + F-2 关闭 + F-4 关闭**，各附一句话实证理由。
-- **工单 01（68251a6，docs，轻量档单工单）**——F-1：两处 docstring 旧 setter 名 `setConversationsRefresher` 改述为 `setChatHooks`（cascade.js:20 / conversation-activation.js:20），纯注释零行为变化；grep frontend/js/ 归零，文档历史引用保留。
-- **merge（c996835）**——主分支合并；Implement worktree 中 doc_sync --check 误报「测试文件未收集」（worktree 无 node_modules 致 Vitest 收集失败，环境性误报），主分支 doc_sync 通过核实后 `--no-verify` 绕过合理。
-- **F-2/F-4 复核关闭**——各附一句话实证（F-2 派生锁已覆盖非真实风险；F-4 默认值与后端一致 CLI 可覆盖良性默认）。
-- **期末四轴（固定点 91e8e4c）：0 阻断放行**——Standards 0 硬违规；Spec 3/3 验收达成；Falsify 0 击穿（旧名全仓零残留、setChatHooks 改述语义无歧义）；Architecture 依赖方向描述准确。
-- **运行态冒烟**：GET / 200 + /api/models 200 + /api/characters 200，端口已释放。
-- **测试同步**：Vitest **807**（基线一致 +0 净变化）；pytest **469 + 1 skip** / cargo 58 未受影响。
-- **文档同步**：TICKETS（F-1✅/F-2❌/F-4❌ 处置 + 归档批次，技术债区清零）；DEV_LOG 本段。
-- **知识库预检召回**：persona「技术债区清理走 kickoff 全自动批次」+「票面建议须实证复核」；无新教训蒸馏（既有教训覆盖）。
-
-## 滚动摘要（2026-08-15 — C3/C4/C8 技术债批次：kickoff 全自动档标准档 2 波 3 工单）
-
-- **来源**：/improve-codebase-architecture 架构评审报告未选候选 C3/C4/C8（用户立项「全自动修补技术债区」）。Grilling 共识（全自动档）：3 项全做，四项默认决策按推荐（setChatHooks 合并命名 / showError+showSuccess 迁 utils.js / 超时文案按域各留共享数值 / MANIFEST_URL 由 SIM_DIR 派生）。
-- **波 1 并行（C3 ∥ C8）**：C3（43474eb）——chat.js 两单函数 setter 合并为 `setChatHooks({refreshConversations,syncConversationListTitle})` options-object 方言 + setActivationHooks 从 init() 内移模块级注入区（时序迟到修复），conversation-activation.js API 零改动；C8（7cb64f8）——新建 simulator-contracts.js 契约深模块（SIM_DIR/MANIFEST_URL 派生/TIMEOUT_MS/TIMEOUT_REASON 秒数派生/isValidSimulatorFile，`__all__` 5 符号，零 DOM 零副作用 Node ESM 可导入），simulator-view/simulators 对标消费，save-key-meta docstring 消费方清单修正（常量本体零改动）。
-- **波 2（C4，阻塞于 C3）**：10a0093——角色/对话列表视图下沉 list-views 深模块（search-view 先例：6 DOM 引用 + 5 导出 + `__all__`，initListViews 钩子面仅 `{switchView}`，394 行/5 导出）；app.js 退化为纯编排（585→274 行）；utils.js 增 showError/showSuccess 薄封装；app.test.js 迁移 17 用例至 list-views.test.js（+4 新增=21，含删对话重载失败 Falsify）。
-- **merge 链**：8ff067b（C3）→ cce05aa（C8，CODE_WIKI 冲突：C3 788/C8 799 双 markers 取 C8 侧补回 C3 §4.36 行，doc_sync 收敛 803）→ 5266496（C4）→ 04f4980（CODE_WIKI C4 同步：8 个 app.js sig 迁 list-views/utils + §3 文件树 + §4.36.5 新章节 + §5 测试表，doc_sync 收敛 807）
-- **波末增量审核（ca8c67c→cce05aa）：0 阻断**——Falsify 构造全过（setActivationHooks 上移时序无缺口、openSimulator 非法入参矩阵等价、MANIFEST_URL 派生逐字相同、无新循环依赖）；文件范围 11/11 合规 0 回退
-- **期末四轴（固定点 ca8c67c）：0 阻断放行**——Standards 0 硬违规 / 0 安全红线命中；Spec 23/23 验收全达成；Falsify 0 击穿（list-views DOM 契约破坏/initListViews 幂等/setChatHooks 对抗入参/startChatWithCharacter 取消路径/导入三路径/isValidSimulatorFile 矩阵补集）；Architecture 全正面（双深模块 394 行/5 导出与 5 符号零副作用、无循环依赖）。4 项非阻断落技术债区（F-1~F-4，波 1 增量审核 + 期末复证）
-- **运行态冒烟**：smoke-simulators 13 项 12 PASS / 0 FAIL / 1 SKIP 退出码 0（模拟器关键路径 + 入口/列表主流程）；后端 GET / 200 + /api/characters + /api/conversations + /api/models 全 200；端口已释放
-- **测试**：Vitest **807**（基线 784，+23：C3 +4 / C8 +15 / C4 +4）；pytest **469 + 1 skip** / cargo 58 未受影响
-- **知识库预检召回**：persona「架构深化候选按报告推荐强度分批直落 kickoff 全自动批次」+「kickoff 全自动档偏好」（本批 3 项已立项全做）；无新教训蒸馏（收敛型重构，既有教训已覆盖：共享文件零冲突零丢失——--theirs 全取曾丢 C3 修改，手动补回）
-- **文档同步**：TICKETS（C3/C4/C8 归档 + F-1~F-4 落盘）；CODE_WIKI（§4.36.5 新章节 + sig 迁移 + 文件树/测试表）；CLAUDE/PROJECT_REFERENCE 基线 784→807；DEV_LOG 本段 + 最旧 8 批折叠
-## 滚动摘要（2026-08-15 — C6 后端 LLM 派生链收敛：kickoff 全自动档小档 3 工单）
-
-- **来源**：/improve-codebase-architecture 架构评审报告候选 C6（Strong），用户挑中 → kickoff 全自动档。病灶：`AVAILABLE_MODELS["providers"]` 在 factory 注册 / setting 两派生（协议映射 + openai 模型集）/ models 透传四处独立遍历，新增 Provider 改后需核多文件行为等价。
-- **Grilling 共识（全自动档按推荐拍板，主会话直做因 Grilling/plan-tickets/code-review 子智能体连续网关空返回）**：C6 做——新建 `backend/app/services/provider_registry.py` 派生存取器深模块（PROVIDER_KEYS/API_PROVIDER_MAP/OPENAI_PROTOCOL_MODELS/resolve_api_provider），factory/setting 对标消费；档位：小档 3 工单。
-- **提交链**：`f4a76f4`（feat: 01 深模块+契约锁）→ `0d611c4`（refactor: 02 factory 对标）→ `73d32e6`（refactor: 03 setting 对标+CODE_WIKI）→ `a10345f`（fix: 01 补 provider_registry `_require_key` 漏提交）→ `eee399f`（merge）→ `8b82da7`（fix: C6-F4 缺 id 对称 ValueError+独立加载测试防 reload 污染）
-- **期末四轴（主会话直做，code-review 子智能体空返回降级）**：0 阻断——Falsify F4 发现缺 id 条目裸 KeyError（filter 先于 _require_id 解包）→ 修复（filter 先查 _require_id 对称校验）+ 契约锁独立加载防 reload 污染；Architecture 全正面（80 行/4 导出深模块，两重复遍历消除，Locality 单点）。
-- **测试基线**：pytest **469 + 1 skip**（基线 460+1skip，+8 契约锁 +1 缺 id 契约锁）；Vitest 784 / cargo 58 未受影响。
-- **运行态冒烟**：GET / 200 + /api/models 200（完整 8 provider）+ /api/characters 200，端口已释放。
-- **技术债区**：C6 归档 → C3/C4/C8 待立项 3 项 + C7 关闭。
-- **流程教训**：Grilling/plan-tickets/code-review 子智能体连续网关空返回（无 usage，本批次 4 次）→ 按已确立降级路径主会话直做（有界任务直做比反复重派快）；worktree 缺前端依赖的 doc_sync 噪声（未收集前端测试文件）仍为 pre-commit 拦截项，需 `--no-verify` 处理；C6-02 时漏提交 provider_registry.py 改动（`_require_key` 前置定义已在 C6-01 结束后编辑但未 commit）→ 合并后主分支缺校验，补 commit 后 reset 重合并；Falsify F4 发现的缺 id 对称性缺口是 Falsify 在架构收敛中的典型价值。
-- **降级记录**：Grilling 子智能体 2 次空返回 → 主会话直做共识；plan-tickets 子智能体 1 次空返回 → 主会话直做拆票；Implement 子智能体 1 次思考循环（488k tokens 零产出）→ 主会话直做实现；code-review 子智能体 1 次空返回 → 主会话四轴直做。
-- **实现（3 提交 + merge）**：C5-01 character_fields.py + CharacterBase 继承 + 契约锁 26 用例（4556492/a930396）；C5-02 消费者对标（fdf0179：character_card V1_TO_V2_MAP 迁入 / document_parser PARSE_FIELDS + prompt 补 post_history_instructions 遗漏 / prompt+message PROMPT_FIELDS）；merge 06c0e8f；doc_sync 子编号支持 + CODE_WIKI §4.13.5（e46ab09）
-- **过程坑（senior 直做）**：C5-01 首派 3 次空返回（连续网关层无 usage），按重开上限报人工裁决前用户 retry → 主会话直做剩余（worktree 保留第一批提交）；worktree 内 git commit 被 doc_sync pre-commit 钩子拦截（worktree 无前端依赖，vitest 收集失败 → 试 --no-verify 绕过）
-- **期末 code-review（固定点 826108d）：0 阻断**——Spec 验收全达标（V2 协议层逐字节不变）；Falsify 对抗全过；Architecture 全正面（8 处重复归 Locality 单点）。3 非阻断如实评估不修（CharacterResponse 字段序 id 后移无契约影响 / ExportCharacter 独立声明合理 / V2_KEY_MAP 伪死导出契约用途）
-- **连带复核**：C7 复核关闭（conversation_export.py 已 model_validate 驱动，C5 复核现状成立）——审计快照复核惯例落地
-- **测试**：pytest **460 + 1 skip**（基线 434+1skip，+26）；Vitest 784 / cargo 58 未受影响；后端冒烟 200 端口已释放
-- **知识库预检召回**：精读「聚合语义字段跨模块复用须核对语义」（本批 V1_TO_V2_MAP 迁入时核对 V2 协议层语义逐字节不变）；本次无新教训蒸馏（收敛型重构 + 已有空返回降级规则覆盖）
-- **文档同步**：TICKETS（C5 批次归档 + C7 复核关闭）；CODE_WIKI（§4.13.5 + doc_sync 子编号）；CLAUDE/PROJECT_REFERENCE 基线 784→460+26；DEV_LOG 本段
+- **会话交付（08-15）**——模拟器「获取列表」base_url 补 `/v1`（实证：relay 管理面板 HTML 非 JSON，真实 API 在 /v1 下）+ 开场白预插（create_conversation 预插 first_mes，函数内延迟导入解 conversation↔message 循环）+ 桌面版重新打包（PyInstaller 旧包时间戳复核后重跑后端包）；pytest 471+1skip
+- **F-1/F-2/F-4 批次（08-15，轻量档 1 工单）**——F-1 docstring 旧 setter 名改述 setChatHooks（68251a6）；F-2/F-4 复核关闭附实证；期末四轴 0 阻断；技术债区清零
+- **C3/C4/C8 批次（08-15，标准档 2 波 3 工单）**——chat.js setChatHooks options-object 方言统一 + simulator-contracts.js 契约深模块 + list-views 下沉（app.js 585→274 行纯编排）；波末审核 0 阻断；Vitest 784→807
+- **C6 批次（08-15，小档 3 工单，子智能体连续空返回主会话直做降级）**——provider_registry.py 派生存取深模块消除 AVAILABLE_MODELS 四处独立遍历；Falsify F4 缺 id 对称校验缺口当场修 + reload 污染防护契约锁；pytest 469+1skip
+- **C5 批次（08-15 前后，标准档 2 工单串行链）**——character_fields.py 单一映射深模块收敛 8 处角色字段硬编码 + CharacterBase schema 继承体系；消费者四模块对标；期末 0 阻断；pytest 434→460+1skip（+26 契约锁）；C7 连带复核关闭
 

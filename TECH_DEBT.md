@@ -17,7 +17,7 @@
 
 ## 技术债候选区
 
-> 当前 23 项待立项（F-23~F-45：架构深化批次波 1/2/3 增量审核 + 期末四轴发现 + 全量审查，2026-08-25）。
+> 当前 24 项待立项（F-23~F-46：架构深化批次波 1/2/3 增量审核 + 期末四轴发现 + 全量审查，2026-08-25~26）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
@@ -44,6 +44,7 @@
 | F-43 | 前端 11 模块缺 `__all__` 导出声明清单（api.js / app.js / state.js / utils.js / components/modal.js / components/model-selector.js / components/confirm-dialog.js / components/export-dialog.js / components/character-form.js / components/character-wizard.js / data/character-templates.js）——兄弟模块（cascade.js / chat.js / list-views.js 等）已用 `__all__` 声明导出面，此 11 文件导出面为 ESM 具名 export 隐式形态，grep 无单一权威清单可机械校验 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
 | F-44 | game_generator docstring 协议表面(3) 与 `__all__`(5) 不一致：`game_generator.py:12` 列 3 符号（MAX_RETRIES / generate_game / validate_generated_html），`:38` `__all__` 实为 5 符号（另含 ScanResult / scan_generated_html，后者即 F-35 所述公共面扩张）——文档与代码表面漂移 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
 | F-45 | O2 一致性缺口（**明确不在本批修复范围**）：chat 流式中途出错时 DB 已落库部分生成内容而 UI 渲染错误气泡——`chat.py:184` `stream_reply` 错误帧产出后 finally 兜底仍保存 partial content（:247-249 错误帧、:254 起兜底落库；docstring「兜底……尽力保存已生成部分」背书行为），前端 stream-session.js 普通错误写回 phase 'error' 并渲染错误气泡（:308-317）；下次加载历史时已存内容重现，与错误气泡呈现不一致 | 2026-08-25 全量审查 | Worth exploring | 📝 待立项 |
+| F-46 | 空串 token-only 流的前端占位残留：provider 只产空串 token 时后端守卫正确不落库（按 full_content 判空），但仍发 `content:""` token 帧——前端 stream-session.js:258-270 onToken("") 在 tab 缓存建 `{content:'', streaming:true}` 占位，done(null) 空内容路径不清该占位，空气泡残留至下次重载/结算；纯前端化妆级问题，后端零污染 | 期末四轴 Falsify（2026-08-26） | Speculative | 📝 待立项 |
 
 ## 技术债处置记录（迁移存档）
 
