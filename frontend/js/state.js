@@ -27,3 +27,11 @@ export const state = {
     sidebarCollapsed: false,
     chatSidebarCollapsed: false,
 };
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'state',
+];

@@ -640,3 +640,11 @@ function getTemplateIcon(templateId) {
     };
     return iconHtml(icons[templateId] || 'character', { size: 24 });
 }
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'showCharacterWizard',
+];

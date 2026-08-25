@@ -64,3 +64,11 @@ async function downloadExport(conversationId, format) {
         `conversation-${conversationId}${ext}`
     );
 }
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'showExportDialog',
+];
