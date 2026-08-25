@@ -17,17 +17,15 @@
     不劈裂多字节字符（F-17 定版：Windows MAX_PATH = 260 全路径上限兼容，
     落盘 OSError 预拦截）。
 
-G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/json/
-logging/os/pathlib/re），与 data_dir 同层——不引入 app 业务代码。
+G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/
+logging/pathlib/re），与 data_dir 同层——不引入 app 业务代码。
 """
 
 from __future__ import annotations
 
 import hashlib
 import html.parser
-import json
 import logging
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
