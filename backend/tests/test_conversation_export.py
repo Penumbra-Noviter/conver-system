@@ -8,6 +8,8 @@
        角色信息为空回退「无」
     3. 模板变量：MD 导出「角色信息」段替换 {{char}}/{{user}}（未配置 user_name 回退默认）；
        JSON 导出保留字面量（往返保真，防回归）
+    4. 导出文件名角色名 character_export_filename：对话不存在 / 角色缺失或名为空 →
+       回退对话 id 字符串；角色名空格折叠为下划线
 
 依赖：pytest + SQLite 内存库（conftest.db_session，StaticPool 保证同一连接）。
 """
@@ -21,6 +23,7 @@ from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
 from backend.app.services import setting as setting_service
 from backend.app.services.conversation_export import (
+    character_export_filename,
     export_conversation_json,
     export_conversation_markdown,
 )
@@ -388,3 +391,29 @@ class TestExportRouteHeaders:
         resp = export_conversation_markdown(conv.id, db_session)
         assert resp.status_code == 200
         assert "attachment" in resp.headers["Content-Disposition"]
+
+
+# ── 5. 导出文件名角色名（character_export_filename 边界语义，自路由层下沉） ──
+
+
+class TestCharacterExportFilename:
+    def test_missing_conversation_falls_back_to_id(self, db_session) -> None:
+        """对话不存在 → 回退对话 id 字符串"""
+        assert character_export_filename(db_session, 99999) == "99999"
+
+    def test_missing_or_unnamed_character_falls_back_to_id(self, db_session) -> None:
+        """角色缺失 / 角色名为空 → 均回退对话 id 字符串"""
+        # 角色不存在（FK 未强制时的悬挂 character_id）
+        conv = _create_conversation(db_session, 99999)
+        assert character_export_filename(db_session, conv.id) == str(conv.id)
+
+        # 角色存在但名为空
+        char = _create_character(db_session, name="")
+        conv2 = _create_conversation(db_session, char.id)
+        assert character_export_filename(db_session, conv2.id) == str(conv2.id)
+
+    def test_spaces_in_name_collapsed_to_underscores(self, db_session) -> None:
+        """角色名含空格 → 空格折叠为下划线"""
+        char = _create_character(db_session, name="Poison Tongue Assistant")
+        conv = _create_conversation(db_session, char.id)
+        assert character_export_filename(db_session, conv.id) == "Poison_Tongue_Assistant"

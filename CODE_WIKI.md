@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1754<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->705<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1757<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->708<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -276,7 +276,7 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/chat.py:create_chat-->`create_chat(request, db)`<!--/AUTO--> | POST 非流式对话（prepare + complete） |
 | <!--AUTO:sig:backend/app/api/routes/chat.py:stream_chat-->`stream_chat(request, raw_request, db)`<!--/AUTO--> | POST SSE 流式对话（断开感知 is_disconnected） |
 
-### 4.8 `backend/app/api/routes/conversations.py` — 会话路由（<!--AUTO:lines:backend/app/api/routes/conversations.py-->~87 行<!--/AUTO-->）
+### 4.8 `backend/app/api/routes/conversations.py` — 会话路由（<!--AUTO:lines:backend/app/api/routes/conversations.py-->~77 行<!--/AUTO-->）
 
 **职责**：会话 CRUD + 清空 + JSON/Markdown 导出端点。
 
@@ -406,7 +406,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/conversation.py:delete_conversation-->`delete_conversation(db, conversation_id)`<!--/AUTO--> | 删除会话 |
 | <!--AUTO:sig:backend/app/services/conversation.py:delete_all_conversations-->`delete_all_conversations(db)`<!--/AUTO--> | 清空全部会话 |
 
-### 4.16 `backend/app/services/conversation_export.py` — 会话导出（<!--AUTO:lines:backend/app/services/conversation_export.py-->~119 行<!--/AUTO-->）
+### 4.16 `backend/app/services/conversation_export.py` — 会话导出（<!--AUTO:lines:backend/app/services/conversation_export.py-->~136 行<!--/AUTO-->）
 
 **职责**：会话导出 JSON/Markdown 两种格式（含角色信息头）。
 
@@ -1236,7 +1236,7 @@ conver system/
 | `backend/tests/test_character_card.py` | <!--AUTO:tests:backend/tests/test_character_card.py-->56<!--/AUTO--> | 角色卡 V2 导入导出/往返保真 |
 | `backend/tests/test_character_fields.py` | <!--AUTO:tests:backend/tests/test_character_fields.py-->26<!--/AUTO--> | 角色字段常量映射契约锁 |
 | `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->32<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
-| `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->17<!--/AUTO--> | 会话 JSON/Markdown 导出 |
+| `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->20<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
 | `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->19<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
 | `backend/tests/test_data_dir_connection.py` | <!--AUTO:tests:backend/tests/test_data_dir_connection.py-->7<!--/AUTO--> | 数据目录/DB 连接集成 |
@@ -1348,9 +1348,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1754<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1757<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->705<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->708<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->979<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

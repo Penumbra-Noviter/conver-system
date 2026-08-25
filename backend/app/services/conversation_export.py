@@ -1,8 +1,9 @@
 """
 对话导出业务逻辑（JSON / Markdown）
 
-深模块：协议表面仅两个导出函数（export_conversation_json / export_conversation_markdown），
-实现内收拢对话 + 角色 + 消息的组装。
+深模块：协议表面仅三个公开函数（export_conversation_json / export_conversation_markdown /
+character_export_filename），实现内收拢对话 + 角色 + 消息的组装与导出文件名的角色名生成
+（路由只调服务，不直接操作 ORM）。
 
 character 段复用 `schemas/conversation.py::ConversationExportCharacter`（from_attributes）驱动序列化，
 Schema 即导出契约（字段名/顺序/类型唯一定义于此），service 层零手写字段映射。
@@ -25,7 +26,11 @@ from backend.app.schemas.conversation import ConversationExportCharacter
 from backend.app.services import setting as setting_service
 from backend.app.services.llm.prompt import apply_template_vars
 
-__all__ = ["export_conversation_json", "export_conversation_markdown"]
+__all__ = [
+    "character_export_filename",
+    "export_conversation_json",
+    "export_conversation_markdown",
+]
 
 
 def _character_export_data(character: Character) -> dict:
@@ -147,3 +152,18 @@ def export_conversation_markdown(db: Session, conversation_id: int) -> str | Non
         lines.append("")
 
     return "\n".join(lines)
+
+
+def character_export_filename(db: Session, conversation_id: int) -> str:
+    """导出文件名中的角色名（空格折叠为下划线；无角色 / 无名回退对话 id）
+
+    语义自路由层原样搬迁：对话不存在 / 角色缺失 / 角色名为空 → 回退对话 id 字符串；
+    否则返回角色名并将空格折叠为下划线（下载文件名友好）。
+    """
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if conv is None:
+        return str(conversation_id)
+    char = db.query(Character).filter(Character.id == conv.character_id).first()
+    if char is None or not char.name:
+        return str(conversation_id)
+    return char.name.replace(" ", "_")
