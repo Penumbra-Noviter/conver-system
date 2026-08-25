@@ -8,6 +8,17 @@
 
 ---
 
+## 分享前准备批次（2026-08-26 — MIT LICENSE + NOTICE + 版本号 0.3.0 + 构建修复，commit 链 62ed29d → def028a）
+
+- **来源**：用户「准备分享给他人」，审查清单确认无密钥泄露/数据库未入库/.env 未入库，补文件级分享三件套。
+- **LICENSE + NOTICE**：`LICENSE` 写 MIT（用户拍板）；`NOTICE.md` 落 22 款第三方模拟器授权声明（作者 2026-08-14 确认：可转发分享、不可商用，随包分发保留）。README 增「许可」章节 + 修 `<repo-url>` 占位。
+- **版本号 0.2.0 → 0.3.0**：8 处全升（index.html/package.json/package-lock 两处/main.py/Cargo.toml/Cargo.lock/tauri.conf.json/tauri-desktop.md）。**发现记忆清单漏 `tauri.conf.json`**（控制安装器文件名，与 Cargo.toml 独立）——清单已补第 8 处，本次安装器因它先出 0.2.0 后纠正 0.3.0。
+- **构建修复（分享暴露）**：完整构建链暴露两个环境缺失——`python-multipart` 未进 requirements（FastAPI Form 依赖，PyInstaller 打包后运行时 500）→ `conver_backend.spec` 加 `hiddenimports=["python_multipart"]` + requirements 补依赖；pytest 需 `requirements-dev.txt`（含 pytest/pytest-cov）。
+- **全链验证**：cargo test 43 用例 + pytest 261+1skip + vitest 186 + PyInstaller 打包 + tauri build NSIS + 冒烟 5 项全 PASS（验收 4a/4b/5/6 + 阻断2 前端挂载）。产物 `Conver System_0.3.0_x64-setup.exe`（24.6MB）。
+- **README 占位提醒**：`git clone` URL 暂用 `https://github.com/user/conver-system.git` 占位，公开仓库地址确定后需替换。
+
+---
+
 ## 全量审查修复批次（2026-08-25 ~ 08-26 — kickoff 全自动档标准档：9 工单 3 波，commit 链 789602c → 2794b84 + 文档同步）
 
 - **来源**：用户「全量审查」（固定点=根提交，三轴并行评审：Standards 3 硬违规 / Spec 6 项文档漂移 / Falsify 2 BREAKS）→「进入 kick 全自动流程开始修复」。Grilling 共识 12 发现全属实，5 决策按推荐拍板（B2 复核关闭不重开定版、smell 落债不修、基线实跑仲裁）。
