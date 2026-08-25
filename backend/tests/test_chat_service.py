@@ -26,7 +26,7 @@ from backend.app.services import chat as chat_service
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
-from backend.app.services.error_mapping import IMPORT_FORMAT_HINT
+from backend.app.services.error_mapping import IMPORT_FORMAT_HINT, llm_error_response
 from backend.app.services.exceptions import (
     ApiKeyMissingError,
     CardFormatError,
@@ -154,7 +154,7 @@ class TestChatErrorResponse:
         """契约锁：签名允许 None 的确定性——锁 provider=None 时无前缀基础文案；
         行为已安全（TD-6 标注 str|None 后），非回归锁（与
         test_llm_auth_without_provider_no_leading_space 入口路径形成双面锁定）"""
-        assert chat_service.llm_error_response(
+        assert llm_error_response(
             LLMAuthError("Claude API Key 无效或未配置"), None
         ) == (401, "API Key 无效，请在设置中更新")
 

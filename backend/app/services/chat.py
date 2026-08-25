@@ -6,8 +6,8 @@
 一次「聊天回合」的生命周期（插开场白 → 存用户消息 → 组装上下文 →
 取 Key 与 Provider → 生成 → 错误映射 → 保存/保存部分）全部收拢于此；
 api/routes/chat.py 只保留 HTTP 映射（领域异常 → HTTPException）与 SSE data: 帧包装。
-领域族错误映射委托 services/error_mapping.py 单一入口（ARC10-4「两路并存」合并完成）；
-LLM 族映射并置于 chat_error_response（B1 共识 D2）。
+领域族与 LLM 族错误映射统一委托 services/error_mapping.py 单一入口
+（ARC10-4「两路并存」合并完成；LLM 族迁入随 T-01）。
 
 对比参照 services/character_card.py 的深模块形态：协议表面小、实现丰富，
 测试针对接口而非路由内部实现。
@@ -29,19 +29,13 @@ from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
-from backend.app.services.error_mapping import domain_error_response
+from backend.app.services.error_mapping import domain_error_response, llm_error_response
 from backend.app.services.exceptions import (
     ConversationNotFoundError,
     DomainError,
 )
 from backend.app.services.llm.base import BaseLLM
-from backend.app.services.llm.errors import (
-    LLMAuthError,
-    LLMContentFilterError,
-    LLMError,
-    LLMRateLimitError,
-    LLMTimeoutError,
-)
+from backend.app.services.llm.errors import LLMError
 from backend.app.services.llm.resolver import resolve_llm
 
 __all__ = [
@@ -51,15 +45,6 @@ __all__ = [
     "chat_error_response",
     "stream_reply",
 ]
-
-# LLM 错误 → (HTTP 状态码, 用户可见消息) 映射
-_LLM_ERROR_MAP: dict[type[LLMError], tuple[int, str | None]] = {
-    LLMAuthError: (status.HTTP_401_UNAUTHORIZED, None),
-    LLMRateLimitError: (status.HTTP_429_TOO_MANY_REQUESTS, "API 请求频率超限，请稍后再试"),
-    LLMTimeoutError: (status.HTTP_504_GATEWAY_TIMEOUT, "API 请求超时，请检查网络后重试"),
-    LLMContentFilterError: (status.HTTP_400_BAD_REQUEST, None),
-    LLMError: (status.HTTP_502_BAD_GATEWAY, None),
-}
 
 
 import logging
@@ -178,8 +163,8 @@ def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int,
       CardValidationError / DocParseError）在聊天领域分支原映射 400，委托后变 422——
       该分支生产路径不可达（仅非流式完整回合的 LLM 错误分支、LLM 异常处理器与直测
       用例触达），属防御语义对齐（ARC10-2 / ARC10-4 合并单一映射表时纳入）
-    - LLM 异常族：委托 llm_error_response（401 Auth 含 provider 模板——provider 为空时
-      输出无前缀基础文案；429/504 固定消息、400、502）
+    - LLM 异常族：委托 error_mapping.llm_error_response（401 Auth 含 provider 模板——
+      provider 为空时输出无前缀基础文案；429/504 固定消息、400、502）
     - 其余异常：502 + str(e) 兜底（防御性，当前调用方不会传入）
 
     Args:
@@ -193,20 +178,6 @@ def chat_error_response(e: Exception, provider: str | None = None) -> tuple[int,
         return domain_error_response(e)
     if isinstance(e, LLMError):
         return llm_error_response(e, provider or "")
-    return status.HTTP_502_BAD_GATEWAY, str(e)
-
-
-def llm_error_response(e: LLMError, provider: str | None) -> tuple[int, str]:
-    """将 LLMError 转为 (HTTP 状态码, 用户可见消息)（内部实现，chat_error_response 与 stream_reply 共用）"""
-    for exc_type, (status_code, fixed_msg) in _LLM_ERROR_MAP.items():
-        if isinstance(e, exc_type):
-            if fixed_msg is not None:
-                return status_code, fixed_msg
-            if isinstance(e, LLMAuthError):
-                # Provider 非空带前缀、为空时输出基础文案（按构造消除前导空格，ARC10-1）
-                prefix = f"{provider} " if provider else ""
-                return status_code, f"{prefix}API Key 无效，请在设置中更新"
-            return status_code, str(e)
     return status.HTTP_502_BAD_GATEWAY, str(e)
 
 

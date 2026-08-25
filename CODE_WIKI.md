@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1728<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->679<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->691<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->691<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->979<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -235,7 +235,7 @@ conver system/
 | <!--AUTO:sig:backend/app/database.py:get_db-->`get_db()`<!--/AUTO--> | FastAPI 依赖：每请求会话（yield + 关闭） |
 | <!--AUTO:sig:backend/app/database.py:init_db-->`init_db()`<!--/AUTO--> | 建表（`Base.metadata.create_all`） |
 
-### 4.4 `backend/app/api/errors.py` — 统一异常处理器（<!--AUTO:lines:backend/app/api/errors.py-->~45 行<!--/AUTO-->）
+### 4.4 `backend/app/api/errors.py` — 统一异常处理器（<!--AUTO:lines:backend/app/api/errors.py-->~44 行<!--/AUTO-->）
 
 **职责**：两路异常处理器（ARC10 T-15）——领域异常 → 业务错误响应；LLM 异常 → Provider 标签化错误响应。
 
@@ -378,7 +378,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~235 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~209 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response` / `llm_error_response`，ARC10 T-03 收口）。
 
@@ -387,7 +387,6 @@ conver system/
 | <!--AUTO:sig:backend/app/services/chat.py:prepare_chat-->`prepare_chat(db, request)`<!--/AUTO--> | 构建对话上下文（角色/历史/滑窗） |
 | <!--AUTO:sig:backend/app/services/chat.py:complete_chat-->`complete_chat(db, request)`<!--/AUTO--> | 非流式完成：生成 + 落库（含标题自动生成） |
 | <!--AUTO:sig:backend/app/services/chat.py:chat_error_response-->`chat_error_response(e, provider=None)`<!--/AUTO--> | 对话异常 → 响应统一出口 |
-| <!--AUTO:sig:backend/app/services/chat.py:llm_error_response-->`llm_error_response(e, provider)`<!--/AUTO--> | LLM 异常 → 带 Provider 标签的响应 |
 | <!--AUTO:sig:backend/app/services/chat.py:stream_reply-->`stream_reply(db, conversation_id, ctx, is_disconnected)`<!--/AUTO--> | SSE 逐块生成（断开感知，部分内容落库） |
 
 ### 4.15 `backend/app/services/conversation.py` — 会话服务（<!--AUTO:lines:backend/app/services/conversation.py-->~144 行<!--/AUTO-->）
@@ -438,13 +437,14 @@ conver system/
 | <!--AUTO:sig:backend/app/services/document_parser.py:_default_for-->`_default_for(field)`<!--/AUTO--> | 缺失字段兜底默认值 |
 | <!--AUTO:sig:backend/app/services/document_parser.py:_truncate-->`_truncate(msg, max_len)`<!--/AUTO--> | 错误消息截断 |
 
-### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~52 行<!--/AUTO-->）
+### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~98 行<!--/AUTO-->）
 
-**职责**：领域异常 → 标准错误响应结构（错误码/消息）单源。
+**职责**：领域与 LLM 异常 → 标准错误响应结构（错误码/消息）单源（T-01 迁入 LLM 映射）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:backend/app/services/error_mapping.py:domain_error_response-->`domain_error_response(exc)`<!--/AUTO--> | 领域异常 → 响应 dict |
+| <!--AUTO:sig:backend/app/services/error_mapping.py:llm_error_response-->`llm_error_response(e, provider)`<!--/AUTO--> | LLM 异常 → (HTTP 状态码, 消息)（映射表单源） |
 
 ### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~34 行<!--/AUTO-->）
 
@@ -1218,6 +1218,7 @@ conver system/
 | `backend/tests/test_data_dir_connection.py` | <!--AUTO:tests:backend/tests/test_data_dir_connection.py-->7<!--/AUTO--> | 数据目录/DB 连接集成 |
 | `backend/tests/test_document_parser.py` | <!--AUTO:tests:backend/tests/test_document_parser.py-->15<!--/AUTO--> | 文档智能解析 |
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->40<!--/AUTO--> | 统一异常处理器 |
+| `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->12<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
 | `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->54<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
 | `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->15<!--/AUTO--> | LLM 基类共享行为 |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
@@ -1323,9 +1324,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1728<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->691<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->679<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->691<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->979<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
