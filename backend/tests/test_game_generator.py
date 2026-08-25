@@ -24,6 +24,7 @@ from backend.app.services.game_generator import (
     _build_suggestion,
     _build_system_prompt,
     _build_user_prompt,
+    _generate_with_retry,
     _sanitize_title,
     _try_extract_scenes,
     generate_game,
@@ -627,7 +628,10 @@ class TestGenerateGame:
             _validate,
         )
 
-        result = await generate_game(
+        # T-04：重试参数已内化为 _generate_with_retry 的私有签名，
+        # 公开 generate_game 不再接受 keyword-only 重试参数——本用例直接
+        # 在内部辅助 seam 上验证空字符串 previous_html 语义（is not None 判定）
+        result = await _generate_with_retry(
             db=db_session,
             description="test world",
             previous_html="",  # 空字符串，非 None
