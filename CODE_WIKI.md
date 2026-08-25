@@ -1164,7 +1164,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/simulator_manifest.py:write_manifest-->`write_manifest(sim_dir, manifest)`<!--/AUTO--> | 原子写 manifest（同目录临时文件 + os.replace，中文保真） |
 | <!--AUTO:sig:backend/app/services/simulator_manifest.py:append_manifest_entry-->`append_manifest_entry(sim_dir, entry)`<!--/AUTO--> | manifest 原子追加（缺失/损坏 → 磁盘 .html 自愈重建后追加） |
 
-### 4.74.2 `backend/app/services/simulator_import.py` — 模拟器导入管线（<!--AUTO:lines:backend/app/services/simulator_import.py-->~320 行<!--/AUTO-->）
+### 4.74.2 `backend/app/services/simulator_import.py` — 模拟器导入管线（<!--AUTO:lines:backend/app/services/simulator_import.py-->~318 行<!--/AUTO-->）
 
 **职责**：T-02 从 `simulator_store` 拆分。导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名净化/冲突改名、cfg- 三元组探测、恶意模式粗筛（不拦截）、manifest 追加注册；T-03 新增 `ScanResult` / `scan_generated_html` 单次扫描（消除生成路径双重扫描）。stdlib only。
 
