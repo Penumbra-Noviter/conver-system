@@ -187,7 +187,9 @@ def _infer_mime(raw_base64: str) -> str:
     """按 base64 解码后的魔数推断 MIME 类型，失败默认 png"""
     try:
         head = base64.b64decode(raw_base64[:32])
-    except binascii.Error:
+    except (binascii.Error, ValueError):
+        # ValueError：b64decode 对非 ASCII str 抛普通 ValueError（非 binascii.Error），
+        # 与模块容错哲学一致——脏头像默认 png，不使导入请求 500
         return "png"
     if head.startswith(b"\x89PNG"):
         return "png"
