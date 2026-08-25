@@ -102,3 +102,11 @@ export function showModelSelector(characterName) {
         });
     });
 }
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'showModelSelector',
+];

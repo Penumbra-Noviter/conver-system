@@ -221,3 +221,11 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
         },
     });
 }
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'showCharacterForm',
+];

@@ -17,7 +17,7 @@ import simulator_store` 下的所有旧符号仍可用）。
        降级不崩溃（返回 False，不建目录）；数据目录不可写 → 抛出带路径的
        明确 OSError（启动期可闻，不静默吞掉）。
 
-G4 约束：本模块仅 stdlib import（os/pathlib/shutil）——manifest 工具与导入族
+G4 约束：本模块仅 stdlib import（logging/shutil/pathlib）——manifest 工具与导入族
 的 stdlib 依赖随拆分已移入各自模块；与 data_dir 同层，不引入 app 业务代码。
 """
 

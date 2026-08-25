@@ -101,3 +101,18 @@ export function autoResizeInput(el) {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 150) + 'px';
 }
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'escapeHtml',
+    'showToast',
+    'showError',
+    'showSuccess',
+    'downloadBlob',
+    'getInitials',
+    'formatTags',
+    'autoResizeInput',
+];

@@ -9,7 +9,7 @@ Conver System — 游戏生成服务（AI 文本 → 可运行 HTML 模拟器）
     5. 通过 → 复用 simulator_store 导入管线落盘 + 注册 manifest
     6. 失败 → 返回结构化错误 + 重试建议（最多 3 次重试）
 
-协议表面（__all__）：MAX_RETRIES / generate_game / validate_generated_html
+协议表面（__all__）：MAX_RETRIES / ScanResult / generate_game / scan_generated_html / validate_generated_html
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ GENERATED_SOURCE = "generated"
 
 
 @dataclass(frozen=True)
-class ValidationError:
+class GenValidationError:
     """校验闸门单项错误"""
     field: str
     message: str
@@ -80,7 +80,7 @@ class GenerateResult:
     """
     ok: bool
     game: dict | None = None
-    errors: list[ValidationError] | None = None
+    errors: list[GenValidationError] | None = None
     suggestion: str | None = None
     retries: int = 0
 
@@ -90,28 +90,28 @@ class GenerateResult:
 # ═══════════════════════════════════════════════════════════
 
 
-def _check_html_structure(html: str) -> ValidationError | None:
+def _check_html_structure(html: str) -> GenValidationError | None:
     """检查 1：HTML 骨架完整性（含 <!DOCTYPE html> 或 <html>）"""
     lower = html.lower().strip()
     if lower.startswith("<!doctype html") or "<html" in lower[:200]:
         return None
-    return ValidationError(field="structure", message="生成的 HTML 缺少 <!DOCTYPE html> 或 <html> 标签")
+    return GenValidationError(field="structure", message="生成的 HTML 缺少 <!DOCTYPE html> 或 <html> 标签")
 
 
-def _check_template_completeness(html: str) -> ValidationError | None:
+def _check_template_completeness(html: str) -> GenValidationError | None:
     """检查 2：模板标记完整性（无剩余 <!-- GEN: 标记）"""
     if MARKER_PATTERN.search(html):
-        return ValidationError(field="template", message="模板标记未完全填充（仍有 <!-- GEN: --> 未替换）")
+        return GenValidationError(field="template", message="模板标记未完全填充（仍有 <!-- GEN: --> 未替换）")
     return None
 
 
-def _check_cfg_contract(html: str) -> ValidationError | None:
+def _check_cfg_contract(html: str) -> GenValidationError | None:
     """检查 3：cfg- 契约完整性（cfg-endpoint / cfg-apikey / cfg-model 三个 input 存在）"""
     ids = scan_input_ids(html)
     missing = CFG_REQUIRED_IDS - {i for i in ids if i.startswith("cfg-")}
     if missing:
         names = "、".join(sorted(missing))
-        return ValidationError(field="cfg", message=f"缺少 AI 配置输入框：{names}")
+        return GenValidationError(field="cfg", message=f"缺少 AI 配置输入框：{names}")
     return None
 
 
@@ -128,25 +128,25 @@ class _ParseabilityChecker(HTMLParser):
         self.errors.append(message)
 
 
-def _check_html_parseability(html: str) -> ValidationError | None:
+def _check_html_parseability(html: str) -> GenValidationError | None:
     """检查 4：基础 HTML 可解析性（html.parser 能解析）"""
     checker = _ParseabilityChecker()
     try:
         checker.feed(html)
         checker.close()
     except Exception as exc:
-        return ValidationError(field="syntax", message=f"HTML 语法错误：{exc}")
+        return GenValidationError(field="syntax", message=f"HTML 语法错误：{exc}")
     if checker.errors:
-        return ValidationError(field="syntax", message=f"HTML 解析警告：{'；'.join(checker.errors[:3])}")
+        return GenValidationError(field="syntax", message=f"HTML 解析警告：{'；'.join(checker.errors[:3])}")
     return None
 
 
-def _check_security(html: str, precomputed_warnings: list[str] | None = None) -> list[ValidationError]:
+def _check_security(html: str, precomputed_warnings: list[str] | None = None) -> list[GenValidationError]:
     """检查 5：安全扫描（复用 scan_suspicious；precomputed_warnings 传入时
     直接使用预计算结果——T-03 生成路径单次扫描）"""
     warnings = precomputed_warnings if precomputed_warnings is not None else scan_suspicious(html)
     if warnings:
-        return [ValidationError(field="security", message=f"检测到可疑模式：{'、'.join(warnings)}")]
+        return [GenValidationError(field="security", message=f"检测到可疑模式：{'、'.join(warnings)}")]
     return []
 
 
@@ -246,12 +246,12 @@ def _try_extract_scenes(html: str) -> tuple[list[dict] | None, str | None]:
     return scenes, None
 
 
-def _check_game_data(html: str) -> ValidationError | None:
+def _check_game_data(html: str) -> GenValidationError | None:
     """检查 6：游戏数据有效性（场景 JSON 可解析、至少一个场景、每场景有叙事与 choices、
     id 唯一、选项引用完整）"""
     scenes, error = _try_extract_scenes(html)
     if error:
-        return ValidationError(field="data", message=error)
+        return GenValidationError(field="data", message=error)
     return None
 
 
@@ -259,7 +259,7 @@ def validate_generated_html(
     html: str,
     *,
     precomputed_scan: ScanResult | None = None,
-) -> list[ValidationError]:
+) -> list[GenValidationError]:
     """校验闸门：对 LLM 生成的 HTML 执行六项检查
 
     precomputed_scan 传入时，检查 5（安全扫描）直接采用其 warnings 结果，
@@ -276,7 +276,7 @@ def validate_generated_html(
     Returns:
         错误列表（空列表表示全部通过）
     """
-    errors: list[ValidationError] = []
+    errors: list[GenValidationError] = []
     precomputed_warnings = precomputed_scan.warnings if precomputed_scan is not None else None
 
     # 按顺序检查，前面的失败不阻断后续检查（收集全部错误以利于重试）
@@ -400,7 +400,7 @@ def _build_user_prompt(description: str, title: str | None = None) -> str:
 
 
 def _build_retry_prompt(description: str, title: str | None,
-                        errors: list[ValidationError], suggestion: str,
+                        errors: list[GenValidationError], suggestion: str,
                         previous_html: str) -> str:
     """构造重试提示词（包含原始描述 + 校验错误 + 修正建议）"""
     error_lines = []
@@ -465,7 +465,7 @@ async def _generate_with_retry(
     title: str | None = None,
     *,
     previous_html: str | None = None,
-    previous_errors: list[ValidationError] | None = None,
+    previous_errors: list[GenValidationError] | None = None,
     previous_suggestion: str | None = None,
     retries_left: int = MAX_RETRIES,
     attempted: int = 0,
@@ -523,7 +523,7 @@ async def _generate_with_retry(
         if retries_left <= 0:
             return GenerateResult(
                 ok=False,
-                errors=[ValidationError(field="data", message=f"LLM 返回了非字符串类型：{type(reply).__name__}")],
+                errors=[GenValidationError(field="data", message=f"LLM 返回了非字符串类型：{type(reply).__name__}")],
                 suggestion="请重试",
                 retries=attempted + 1,
             )
@@ -532,7 +532,7 @@ async def _generate_with_retry(
             description=description,
             title=title,
             previous_html=str(reply) if reply is not None else None,
-            previous_errors=[ValidationError(field="data", message=f"LLM 返回非字符串类型：{type(reply).__name__}")],
+            previous_errors=[GenValidationError(field="data", message=f"LLM 返回非字符串类型：{type(reply).__name__}")],
             previous_suggestion="请确保 LLM 配置正确并重试",
             retries_left=retries_left - 1,
             attempted=attempted + 1,
@@ -574,7 +574,7 @@ async def _generate_with_retry(
     )
 
 
-def _build_suggestion(errors: list[ValidationError]) -> str:
+def _build_suggestion(errors: list[GenValidationError]) -> str:
     """根据校验错误生成修正建议"""
     suggestions = []
     for err in errors:

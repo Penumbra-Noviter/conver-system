@@ -87,3 +87,11 @@ export const CHARACTER_TEMPLATES = [
         system_prompt: '',
     },
 ];
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'CHARACTER_TEMPLATES',
+];

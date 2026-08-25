@@ -293,5 +293,21 @@ export const settings = {
     testConnection: (data) => request('POST', '/settings/test-connection', data),
     /** 主应用可用的 OpenAI 兼容凭证（只读，U8-T2 运行视图注入用）：
      *  返回 {key, endpoint, model, protocol} — protocol ∈ openai | claude | none */
-    credentials: () => request('GET', '/settings/credentials'),
-};
+credentials: () => request('GET', '/settings/credentials'),
+	};
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'setFetch',
+    'request',
+    'requestBlob',
+    'characters',
+    'conversations',
+    'messages',
+    'chatStream',
+    'models',
+    'settings',
+];

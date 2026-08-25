@@ -77,3 +77,12 @@ export function showAlert(message) {
         danger: false,
     }).then(() => {});  // 始终 resolve 为 undefined
 }
+
+// ══════════════════════════════════════════════════
+// 协议表面收口
+// ══════════════════════════════════════════════════
+
+export const __all__ = [
+    'showConfirm',
+    'showAlert',
+];
