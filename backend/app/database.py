@@ -29,6 +29,12 @@ engine = create_engine(
 # 默认 SQLite 不强制 FK，需 PRAGMA 开启以支持 ON DELETE CASCADE
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_connection: object, connection_record: object) -> None:
+    """在每个新 SQLite 连接上开启外键约束。
+
+    默认 SQLite 不强制外键，必须执行 ``PRAGMA foreign_keys=ON`` 后
+    外键约束与 ON DELETE CASCADE 才会生效；挂在 connect 事件上，
+    确保连接池取出的每条连接都已开启。
+    """
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
