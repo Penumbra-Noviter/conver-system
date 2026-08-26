@@ -220,9 +220,14 @@ function appendMessage(role, content, meta = {}) {
     // 移除空状态
     const empty = container.querySelector('.empty-state');
     if (empty) empty.remove();
-    // 移除 thinking 指示器
-    const thinking = container.querySelector('.thinking-indicator');
-    if (thinking) thinking.remove();
+    // 移除 thinking 指示器（F-59 会话隔离：只移除本会话（活动 tab）的指示器 —
+    // 不误删其他会话在途指示器；无活动 tab 时回落移除全部 — 与既有行为一致）
+    const activeConvId = getActiveTab()?.conversationId;
+    if (activeConvId != null) {
+        removeThinkingIndicator(container, activeConvId);
+    } else {
+        container.querySelectorAll('.thinking-indicator').forEach((el) => el.remove());
+    }
 
     container.insertAdjacentHTML('beforeend', messageBubbleHtml(role, content, {
         characters: state.characters,
@@ -249,14 +254,31 @@ function appendMessage(role, content, meta = {}) {
     }
 }
 
-function showThinkingIndicator() {
+/**
+ * 移除容器内属于指定会话的 thinking 指示器（F-59 会话隔离 — 只删匹配 data-conv-id 的，
+ * 不误删其他会话在途指示器）
+ * @param {HTMLElement} container - 目标容器（消息区 DOM）
+ * @param {string|number} convId - 会话身份（与指示器 data-conv-id 比对）
+ */
+function removeThinkingIndicator(container, convId) {
+    container.querySelectorAll('.thinking-indicator').forEach((el) => {
+        if (el.dataset.convId === String(convId)) el.remove();
+    });
+}
+
+/**
+ * 显示会话 thinking 指示器（F-59 会话隔离：指示器携带 data-conv-id 属性，
+ * 创建前仅移除本会话已有的指示器，不触碰其他会话在途指示器）
+ * @param {string|number} convId - 会话身份（写入指示器 data-conv-id 属性）
+ */
+function showThinkingIndicator(convId) {
     const container = chatDom.chatMessages;
-    // 移除已有 thinking
-    const existing = container.querySelector('.thinking-indicator');
-    if (existing) existing.remove();
+    // 移除本会话已有 thinking（防重复创建 — 只针对同会话，F-59 会话隔离）
+    removeThinkingIndicator(container, convId);
 
     const div = document.createElement('div');
     div.className = 'thinking-indicator';
+    div.dataset.convId = String(convId);
     div.innerHTML = '<span class="dot-pulse"></span> 思考中…';
     container.appendChild(div);
     scrollToBottom();
@@ -574,9 +596,12 @@ export async function handleSend() {
     if (!content || !tab || tab.isStreaming) return;
     const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
     const useStream = chatDom.toggleStream.checked;
-    // FIX-B：非流式在途守卫 — 同 tab 非流式请求在途时拒绝重复提交（双击只发一次真实请求；
-    // 拒绝发生在清空输入之前，草稿保留）。流式提交不受影响（isStreaming 已拦并发）。
-    if (!useStream && nonStreamingInFlight.has(convId)) return;
+    // FIX-B + F-57：在途守卫 — 同会话非流式请求 / 重生成在途时拒绝任何提交（非流式发送与
+    // 重生成共用此集合：重生成进行中 isStreaming 未置位，若流式发送不查本集合，同一会话将
+    // 并发双请求，违反「同对话互斥」承诺。统一在此拦截；不复用 isStreaming，避免发送按钮
+    // 误变「停止」态）。流式自身在途由 tab.isStreaming 拦并发（发送按钮为「停止」态）。
+    // 拒绝发生在清空输入之前，草稿保留。
+    if (nonStreamingInFlight.has(convId)) return;
     // 该请求是否归属当前活动 tab（DOM 增量只给活动 tab；后台只累积缓存）
     const isActiveStream = () => getActiveTab()?.conversationId === convId;
 
@@ -591,7 +616,7 @@ export async function handleSend() {
         // streamSettled 终态守卫 / revision 守卫 / 位置结算 / 失败位置感知写回）
         updateTab(convId, { phase: 'thinking', isStreaming: true });
         refreshSendButton();
-        showThinkingIndicator();
+        showThinkingIndicator(convId);
 
         const session = createStreamSession({
             convId,
@@ -662,7 +687,7 @@ export async function handleSend() {
     } else {
         // 非流式模式 — 置在途标记（FIX-B：双击连发守卫，finally 清除）
         nonStreamingInFlight.add(convId);
-        showThinkingIndicator();
+        showThinkingIndicator(convId);
         try {
             chatDom.btnSend.disabled = true;
             const result = await messages.chat({
@@ -727,7 +752,7 @@ export async function regenerateLastReply() {
     const assistantBubbles = chatDom.chatMessages.querySelectorAll('.message.assistant');
     const regenButton = assistantBubbles[assistantBubbles.length - 1]?.querySelector('.btn-regenerate') ?? null;
     if (regenButton) regenButton.disabled = true;
-    showThinkingIndicator();
+    showThinkingIndicator(convId);
 
     try {
         const result = await conversations.regenerate(convId);
@@ -744,10 +769,11 @@ export async function regenerateLastReply() {
         renderSendError(err, '重生成失败', convId);
     } finally {
         // 完成/失败均清除在途标记；恢复按钮与 thinking（成功路径 settle 已重建 DOM —
-        //   旧引用 isConnected 兜底跳过；失败路径复原）
+        //   旧引用 isConnected 兜底跳过；失败路径复原）。F-59 会话隔离：只移除本会话
+        //   （convId）的 thinking 指示器 — 不误删其他会话在途指示器
         nonStreamingInFlight.delete(convId);
         if (regenButton && regenButton.isConnected) regenButton.disabled = false;
-        chatDom.chatMessages.querySelector('.thinking-indicator')?.remove();
+        removeThinkingIndicator(chatDom.chatMessages, convId);
         refreshSendButton();
     }
 
