@@ -5,8 +5,8 @@
  *   1. 消息渲染（renderMessages / appendMessage / thinking / 复制 — 气泡构建统一走
  *      format.js 参数化工厂，本模块只留 DOM 挂载与事件绑定）
  *   2. 发送与流式交互（handleSend）
- *   3. 聊天头部深模块（F4 收口：renderChatHeader / startRename / 标题同步；
- *      app.js 只留注入接线）
+ *   3. 聊天头部深模块（F4 收口：renderChatHeader / startRename / 标题同步 / T3
+ *      对话内模型切换 openModelSwitch；app.js 只留注入接线）
  *   4. 聊天域 DOM 引用（chatDom）
  *   5. 发送按钮两态（send/stop）— 由活动 tab 的 isStreaming 派生（refreshSendButton）
  *
@@ -42,6 +42,8 @@ import { getActiveTab, getTab, updateTab } from './tabs.js';
 import { createStreamSession, settleTurn } from './stream-session.js';
 import { renderErrorBar } from './error-bar.js';
 import { iconHtml } from './icons.js';
+import { showModelSelector } from './components/model-selector.js';
+import { showConfirm } from './components/confirm-dialog.js';
 
 // ══════════════════════════════════════════════════
 // 聊天域 DOM 引用
@@ -334,7 +336,7 @@ export function renderChatHeader(conversationId) {
     chatDom.chatHeader.innerHTML = `
         <button class="btn-toggle-conv-list" id="btn-toggle-conv-list" title="切换对话列表">${iconHtml('menu')}</button>
         <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
-        <span class="chat-model-badge">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</span>
+        <button class="chat-model-badge" id="chat-model-badge" title="切换模型">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</button>
         <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">${iconHtml('download')}</button>
     `;
     // 双击标题重命名
@@ -356,6 +358,80 @@ export function renderChatHeader(conversationId) {
         exportBtn.addEventListener('click', () => {
             showExportDialog(conversationId);
         });
+    }
+    // T3 模型切换：模型徽标 → 打开模型选择器（预选当前 provider/model）
+    const badge = chatDom.chatHeader.querySelector('#chat-model-badge');
+    if (badge) {
+        badge.addEventListener('click', () => openModelSwitch(conv));
+    }
+}
+
+/**
+ * 会话模型切换前判定凭证是否可能不可用（需要确认提示）。
+ * T3 语义（spec）：凭证协议三态为唯一事实来源 — none（无任何 Key）恒提示；
+ * claude（仅 Claude Key）且目标 provider 非 claude（OpenAI 兼容族）→ 提示；
+ * openai 态直接保存。返回提示原因（'none' | 'claude'），无需提示返回 null。
+ * @param {string} selectedProvider - 目标 provider key
+ * @returns {'none'|'claude'|null}
+ */
+function credentialWarnReason(selectedProvider) {
+    if (state.credentialsProtocol === 'none') return 'none';
+    if (state.credentialsProtocol === 'claude' && selectedProvider !== 'claude') return 'claude';
+    return null;
+}
+
+/**
+ * 对话内模型切换（T3 — .chat-model-badge 点击入口；P3 前部）：
+ *   1. 打开模型选择器并预选当前 conv 的 provider/model（showModelSelector 扩展签名）
+ *   2. 凭证不可用（none 恒提示 / claude 切非 claude）→ showConfirm 确认提示但允许保存
+ *   3. 确认后 conversations.update(convId, { model_provider, model_name })（PUT 已存在）
+ *   4. 保存成功 → 就地更新 state.conversations（头部/列表渲染单一事实来源）+
+ *      重渲染头部徽标（活动 tab 同步）+ 经注入钩子 refreshConversations 同步对话列表
+ *
+ * 切换只影响后续发送：在途流式由后端在请求时捕获 provider/model，天然免疫 ——
+ * 本函数不触碰任何流式句柄（不 abort / 不终止），见 chat.test.js 在途流式场景。
+ * @param {object} conv - 对话对象（state.conversations 中的引用或等价物）
+ */
+export async function openModelSwitch(conv) {
+    if (!conv) return;
+    const selection = await showModelSelector(conv.title || '', {
+        preselected: { provider: conv.model_provider, model: conv.model_name },
+        title: '切换模型',
+    });
+    if (!selection) return; // 用户取消
+
+    // 凭证不可用确认（none 恒提示 / claude 切非 claude）— 确认后仍允许保存
+    const warnReason = credentialWarnReason(selection.provider);
+    if (warnReason) {
+        const confirmed = await showConfirm({
+            title: '模型可能不可用',
+            message: warnReason === 'none'
+                ? '尚未配置 API Key，发送消息可能失败。仍要切换模型吗？'
+                : '当前仅配置了 Claude Key，所选 Provider 可能不可用。仍要切换吗？',
+            detail: `目标：${selection.model}（${selection.provider}）`,
+            confirmText: '仍要切换',
+            cancelText: '取消',
+        });
+        if (!confirmed) return; // 确认取消 → 不保存
+    }
+
+    try {
+        await conversations.update(conv.id, {
+            model_provider: selection.provider,
+            model_name: selection.model,
+        });
+        // 就地更新 state.conversations（单一事实来源 — 头部徽标 / 对话列表渲染共用）
+        const stored = state.conversations.find((c) => c.id === conv.id);
+        if (stored) {
+            stored.model_provider = selection.provider;
+            stored.model_name = selection.model;
+        }
+        // 同步聊天头部徽标（重渲染基于 state，活动 tab 数据同步）
+        renderChatHeader(conv.id);
+        // 对话列表同步（复用注入钩子 refreshConversations — loadConversations 重渲染）
+        await hooks.refreshConversations();
+    } catch (err) {
+        console.error('切换模型失败:', err);
     }
 }
 
@@ -608,5 +684,6 @@ export const __all__ = [
     'refreshSendButton',
     'renderChatHeader',
     'startRename',
+    'openModelSwitch',
     'handleSend',
 ];

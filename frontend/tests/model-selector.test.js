@@ -155,3 +155,91 @@ describe('showModelSelector — 打开 / 选择 / 取消', () => {
         await expect(promise).resolves.toBeNull();
     });
 });
+
+describe('showModelSelector — T3 扩展签名（预选当前 provider/model + 可定制标题）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('preselected:预选 provider → 打开即选中该 provider 并联动其模型（非默认 provider）', async () => {
+        const { selector, state } = await loadSelector();
+        state.models.providers = PROVIDERS;
+        state.defaultProvider = 'claude';
+        state.defaultModel = 'claude-sonnet-5';
+
+        const promise = selector.showModelSelector('角色A', {
+            preselected: { provider: 'deepseek', model: 'deepseek-chat' },
+        });
+
+        const overlay = document.querySelector('.modal-overlay');
+        const providerSelect = overlay.querySelector('#ms-provider');
+        expect(providerSelect.value).toBe('deepseek'); // 预选覆盖默认 provider
+        const modelSelect = overlay.querySelector('#ms-model');
+        expect(modelSelect.value).toBe('deepseek-chat');
+        expect([...modelSelect.options].map((o) => o.value)).toEqual(['deepseek-chat', '__custom__']);
+        promise.then(() => {});
+    });
+
+    it('preselected:预选模型不在 Provider 列表 → 打开即自定义模式并回填预选模型', async () => {
+        const { selector, state } = await loadSelector();
+        state.models.providers = PROVIDERS;
+        state.defaultProvider = 'claude';
+        state.defaultModel = 'claude-sonnet-5';
+
+        const promise = selector.showModelSelector('角色A', {
+            preselected: { provider: 'claude', model: 'claude-3-custom-v1' },
+        });
+
+        const overlay = document.querySelector('.modal-overlay');
+        const providerSelect = overlay.querySelector('#ms-provider');
+        const modelSelect = overlay.querySelector('#ms-model');
+        const customInput = overlay.querySelector('#ms-custom-model');
+        expect(providerSelect.value).toBe('claude'); // 预选 provider 生效
+        expect(modelSelect.value).toBe('__custom__');
+        expect(customInput.value).toBe('claude-3-custom-v1');
+        promise.then(() => {});
+    });
+
+    it('title 覆盖:自定义标题生效（默认「开始对话 · 角色名」被替换）', async () => {
+        const { selector, state } = await loadSelector();
+        state.models.providers = PROVIDERS;
+        state.defaultProvider = 'claude';
+        state.defaultModel = 'claude-sonnet-5';
+
+        const promise = selector.showModelSelector('角色A', { title: '切换模型' });
+
+        const overlay = document.querySelector('.modal-overlay');
+        expect(overlay.textContent).toContain('切换模型');
+        expect(overlay.textContent).not.toContain('开始对话 · 角色A');
+        promise.then(() => {});
+    });
+
+    it('确认后回传预选 provider/model（选择器打开即默认选中的即为当前值）', async () => {
+        const { selector, state } = await loadSelector();
+        state.models.providers = PROVIDERS;
+        state.defaultProvider = 'claude';
+        state.defaultModel = 'claude-sonnet-5';
+
+        const promise = selector.showModelSelector('角色A', {
+            preselected: { provider: 'deepseek', model: 'deepseek-chat' },
+        });
+
+        const overlay = document.querySelector('.modal-overlay');
+        overlay.querySelector('.ms-start').click();
+
+        await expect(promise).resolves.toEqual({ provider: 'deepseek', model: 'deepseek-chat' });
+    });
+
+    it('无 options 调用 → 行为与既有签名完全一致（默认 provider/model/标题）', async () => {
+        const { selector, state } = await loadSelector();
+        state.models.providers = PROVIDERS;
+        state.defaultProvider = 'claude';
+        state.defaultModel = 'claude-sonnet-5';
+
+        const promise = selector.showModelSelector('角色A');
+
+        const overlay = document.querySelector('.modal-overlay');
+        expect(overlay.textContent).toContain('开始对话 · 角色A');
+        expect(overlay.querySelector('#ms-provider').value).toBe('claude');
+        promise.then(() => {});
+    });
+});

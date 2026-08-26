@@ -11,17 +11,28 @@ import { fillModelSelect, createCustomModelHandler } from '../utils/model-utils.
 
 /**
  * 显示模型选择对话框 — 创建对话时让用户选择 Provider 和模型
+ *
+ * T3 扩展：支持预选当前 provider/model（切换对话内模型复用本选择器）与
+ * 可定制标题。签名向后兼容 —— 不传 options（或 options 为空对象）时行为
+ * 与既有版本完全一致（默认凭 state.defaultProvider / state.defaultModel）。
+ *
  * @param {string} characterName - 角色名称（用于展示）
+ * @param {object} [options]
+ * @param {{provider: string, model: string}} [options.preselected] - 预选值
+ *   （覆盖 state 默认值；model 不在该 provider 列表时自动进入自定义模式回填）
+ * @param {string} [options.title] - 弹窗标题覆盖（缺省 `开始对话 · ${characterName}`）
  * @returns {Promise<{provider: string, model: string}|null>} 选择的配置，取消返回 null
  */
-export function showModelSelector(characterName) {
+export function showModelSelector(characterName, options = {}) {
     return new Promise((resolve) => {
         const providers = state.models.providers || [];
-        const defaultProviderId = state.defaultProvider;
-        const defaultModelName = state.defaultModel;
+        // T3 预选语义：preselected 覆盖默认（缺省回落到全局默认，保持向后兼容）
+        const defaultProviderId = options.preselected?.provider ?? state.defaultProvider;
+        const defaultModelName = options.preselected?.model ?? state.defaultModel;
+        const titleText = options.title ?? `开始对话 · ${characterName}`;
 
         openModal({
-            title: `开始对话 · ${characterName}`,
+            title: titleText,
             modalClass: 'model-selector-modal',
             removeExisting: '.modal-overlay',
             focusSelector: '.ms-start',
