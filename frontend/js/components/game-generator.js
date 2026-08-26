@@ -23,8 +23,9 @@ import { doFetch } from '../fetch-seam.js';
 import { GENERATE_URL } from '../simulator-contracts.js';
 import { iconHtml } from '../icons.js';
 import { showSuccess, escapeHtml } from '../utils.js';
-// T4 凭证预检：复用 key-injector 既有引导链接文案/选择器常量（避免复制）
-import { LINK_NAV_SETTINGS, SEL_NAV_SETTINGS } from '../key-injector.js';
+// T4 凭证预检：复用 key-injector 引导链接文案常量（文本一致、语义中性）；
+// 链接类名使用生成器自有中性命名，不从模拟器同步模块借用专属选择器（F-63）。
+import { LINK_NAV_SETTINGS } from '../key-injector.js';
 
 // ══════════════════════════════════════════════════
 // fetch seam（单一来源 js/fetch-seam.js）
@@ -62,6 +63,9 @@ let navigateSettings = null;
 
 /** 凭证预检（T4）：none/claude 态模态框顶部提示文案 */
 const MSG_NEED_OPENAI_KEY = '需先配置 OpenAI 兼容 Key';
+
+/** 凭证提示「前往设置」导航链接类名（生成器自有中性命名，F-63） */
+const SEL_GG_WARNING_NAV = '.gg-config-warning-nav';
 
 // ══════════════════════════════════════════════════
 // 内部工具
@@ -321,8 +325,9 @@ export function openGenerateFlow() {
         onOpen: (el, close) => {
 
             // T4 凭证预检：后台读取凭证端点，none/claude 态注入顶部提示 +
-            // 设置链接（复用 key-injector 常量与引导模式）；openai 态无提示；
-            // 请求失败静默降级（不阻塞打开、不弹错 — 标注以实测为准）。
+            // 设置链接（文案复用 key-injector LINK_NAV_SETTINGS，类名用生成器自有
+            // 中性命名 SEL_GG_WARNING_NAV，与模拟器专属选择器解耦 — F-63）；
+            // openai 态无提示；请求失败静默降级（不阻塞打开、不弹错 — 标注以实测为准）。
             if (typeof fetchCredentials === 'function') {
                 fetchCredentials()
                     .then((creds) => {
@@ -332,10 +337,10 @@ export function openGenerateFlow() {
                         if (protocol === 'none' || protocol === 'claude') {
                             const warning = el.querySelector('#gg-cred-warning');
                             if (!warning) return;
-                            const navClass = SEL_NAV_SETTINGS.slice(1);
+                            const navClass = SEL_GG_WARNING_NAV.slice(1);
                             warning.hidden = false;
                             warning.innerHTML = `${escapeHtml(MSG_NEED_OPENAI_KEY)} <a href="#" class="${navClass}">${escapeHtml(LINK_NAV_SETTINGS)}</a>`;
-                            warning.querySelector(SEL_NAV_SETTINGS)?.addEventListener('click', (e) => {
+                            warning.querySelector(SEL_GG_WARNING_NAV)?.addEventListener('click', (e) => {
                                 e.preventDefault();
                                 if (typeof navigateSettings === 'function') navigateSettings();
                             });

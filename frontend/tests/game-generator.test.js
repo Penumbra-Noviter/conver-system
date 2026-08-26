@@ -350,7 +350,7 @@ describe('openGenerateFlow — 凭证预检（T4）', () => {
         });
         const warning = document.querySelector('#gg-cred-warning');
         expect(warning.textContent).toContain('需先配置 OpenAI 兼容 Key');
-        const link = warning.querySelector('.sim-key-nav-settings');
+        const link = warning.querySelector('.gg-config-warning-nav');
         expect(link).not.toBeNull();
         expect(link.textContent).toBe('前往设置页配置'); // 复用 key-injector LINK_NAV_SETTINGS
 
@@ -374,7 +374,7 @@ describe('openGenerateFlow — 凭证预检（T4）', () => {
         });
         const warning = document.querySelector('#gg-cred-warning');
         expect(warning.textContent).toContain('需先配置 OpenAI 兼容 Key');
-        warning.querySelector('.sim-key-nav-settings').click();
+        warning.querySelector('.gg-config-warning-nav').click();
         expect(navigate).toHaveBeenCalledTimes(1);
     });
 
