@@ -402,4 +402,63 @@ describe('openGenerateFlow — 凭证预检（T4）', () => {
             expect(document.querySelector('#gg-cred-warning').hidden).toBe(true);
         });
     });
+
+    it('竞态守卫: 提交生成后迟到的凭证预检响应不注入提示（生成中状态不被覆盖）', async () => {
+        const { gen } = await loadModules();
+
+        // 凭证预检与生成请求均挂起可手动放行：先生成进行中（generating=true），
+        // 再让凭证预检响应迟到到达（none 态，本应注入顶部提示）
+        let resolveCreds;
+        const credsPromise = new Promise((r) => { resolveCreds = r; });
+        let resolveGenerate;
+        const generatePromise = new Promise((r) => { resolveGenerate = r; });
+
+        gen.setFetch(() => generatePromise);
+        gen.initGameGenerator({
+            getCredentials: vi.fn(() => credsPromise),
+        });
+        gen.openGenerateFlow();
+
+        // 提交生成 → generating 置 true（executeGenerate 首条语句，同步生效）
+        document.querySelector('#gg-description').value = '赛博朋克';
+        document.querySelector('#gg-submit-btn').click();
+
+        // 凭证预检响应此刻到达（none 态）
+        resolveCreds({ key: '', endpoint: '', model: '', protocol: 'none' });
+
+        // 提示必须保持隐藏：生成中状态不被「需配置」提示覆盖
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-cred-warning').hidden).toBe(true);
+        });
+        expect(document.querySelector('#gg-cred-warning').textContent).not.toContain('需先配置');
+        // 生成仍进行中：模态框未关闭、结果区无错误
+        expect(document.querySelector('.modal-overlay')).not.toBeNull();
+        expect(document.querySelector('#gg-result-area').className).not.toBe('gg-error');
+
+        // 收尾：放行生成请求（避免挂起），成功关闭模态框
+        resolveGenerate(mockJson({ ok: true, game: { id: 'g1', file: 'g1.html' } }));
+        await vi.waitFor(() => expect(document.querySelector('.modal-overlay')).toBeNull());
+    });
+
+    it('竞态守卫: 模态框关闭后到达的凭证预检响应被丢弃（不注入提示）', async () => {
+        const { gen } = await loadModules();
+
+        let resolveCreds;
+        const credsPromise = new Promise((r) => { resolveCreds = r; });
+        gen.initGameGenerator({
+            getCredentials: vi.fn(() => credsPromise),
+        });
+        gen.openGenerateFlow();
+
+        // 关闭模态框（el.isConnected 变 false）后凭证预检响应才到达
+        document.querySelector('.modal-overlay .modal-close').click();
+        expect(document.querySelector('.modal-overlay')).toBeNull();
+
+        resolveCreds({ key: '', endpoint: '', model: '', protocol: 'none' });
+        // 迟到响应被丢弃：不抛错、不复活模态框、无提示注入
+        await new Promise((r) => setTimeout(r, 0));
+        expect(document.querySelector('.modal-overlay')).toBeNull();
+        const stale = document.querySelector('#gg-cred-warning');
+        expect(stale).toBeNull(); // 模态框 DOM 已整体移除
+    });
 });
