@@ -780,7 +780,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/loading-button.js:clearButtonLoading-->`clearButtonLoading(btn)`<!--/AUTO--> | 未持 restore 引用时的还原 |
 
 
-### 4.44.2 `frontend/js/components/game-generator.js` — AI 游戏生成器（<!--AUTO:lines:frontend/js/components/game-generator.js-->~381 行<!--/AUTO-->）
+### 4.44.2 `frontend/js/components/game-generator.js` — AI 游戏生成器（<!--AUTO:lines:frontend/js/components/game-generator.js-->~385 行<!--/AUTO-->）
 
 **职责**：从用户提供的世界观文本（textarea 粘贴或 .txt/.md 文件上传）生成 HTML 模拟器游戏。模态框输入 → POST /api/simulators/generate → 成功自动刷新列表 / 失败显示错误与重试按钮。T4 凭证预检：`openGenerateFlow` 打开时后台读取凭证端点，none/claude 态模态框顶部提示「需先配置 OpenAI 兼容 Key」+ 设置链接（复用 key-injector 的 `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS` 常量，点击经 `onNavigateSettings` 钩子 → `switchView('settings')`）；openai 态无提示；请求失败静默降级（不阻塞打开）。
 
