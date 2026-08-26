@@ -1245,6 +1245,80 @@ describe('T6 重生成 — 末条 assistant 气泡重生成闭环', () => {
         expect(regenSpy).toHaveBeenCalledTimes(2);
     });
 
+    // ── S-08（F-57 + F-59）──
+
+    it('F-57:重生成在途 → 流式发送被拦截（chatStream 不调用、草稿保留）；重生成完成后流式发送正常发起', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS });
+
+        let resolveRegen;
+        const regenSpy = vi.spyOn(api.conversations, 'regenerate')
+            .mockReturnValue(new Promise((r) => { resolveRegen = r; }));
+        const streamSpy = vi.spyOn(api, 'chatStream').mockImplementation(() => ({
+            abort: vi.fn(), done: Promise.resolve(),
+        }));
+        const settleSpy = vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderMessages();
+        chat.chatDom.chatMessages.querySelector('.btn-regenerate').click(); // 重生成在途（isStreaming 未置位）
+
+        // 流式发送（toggle-stream 默认 checked）被 F-57 守卫拦截 — 不发起请求、草稿保留
+        chat.chatDom.chatInput.value = '并发测试';
+        await chat.handleSend();
+        expect(streamSpy).not.toHaveBeenCalled();
+        expect(chat.chatDom.chatInput.value).toBe('并发测试'); // 拒绝发生在清空之前
+        expect(chat.chatDom.chatMessages.querySelectorAll('.message')).toHaveLength(2); // 无重复追加
+        expect(regenSpy).toHaveBeenCalledTimes(1); // 在途重生成不受影响
+
+        // 重生成完成（在途标记清除）→ 流式发送正常发起
+        resolveRegen({ reply: '新回复', message_id: 3, conversation_id: 11 });
+        await vi.waitFor(() => expect(settleSpy).toHaveBeenCalledTimes(1));
+        chat.chatDom.chatInput.value = '好了';
+        await chat.handleSend();
+        expect(streamSpy).toHaveBeenCalledTimes(1);
+        expect(streamSpy.mock.calls[0][0]).toEqual({ conversation_id: 11, content: '好了' });
+    });
+
+    it('F-59:thinking 指示器携带 data-conv-id；A 重生成完成只移除 A 的指示器（appendMessage 与 finally 双向隔离）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS });
+
+        // B 会话（22）发送所需的流式句柄
+        let captured22 = null;
+        vi.spyOn(api, 'chatStream').mockImplementation((data, cbs) => {
+            captured22 = { data, cbs };
+            return { abort: vi.fn(), done: Promise.resolve() };
+        });
+        let resolveRegen;
+        const regenSpy = vi.spyOn(api.conversations, 'regenerate')
+            .mockReturnValue(new Promise((r) => { resolveRegen = r; }));
+        const settleSpy = vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderMessages();
+
+        // 会话 A（11）重生成在途 → 指示器携带 data-conv-id="11"
+        chat.chatDom.chatMessages.querySelector('.btn-regenerate').click();
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="11"]')).not.toBeNull();
+
+        // 切到会话 B（22）发送 → 创建 data-conv-id="22" 指示器；
+        // appendMessage 只移除同会话（22）指示器，A（11）的保留
+        tabs.openTab(22);
+        tabs.updateTab(22, { messages: [msg(1, 'user', 'B你好')] });
+        chat.chatDom.chatInput.value = 'B你好';
+        await chat.handleSend();
+        expect(captured22.data).toEqual({ conversation_id: 22, content: 'B你好' });
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="22"]')).not.toBeNull();
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="11"]')).not.toBeNull(); // A 不被 appendMessage 误删
+
+        // A 重生成完成 → finally 只移除 data-conv-id="11"，B（22）的保持
+        resolveRegen({ reply: '新回复', message_id: 3, conversation_id: 11 });
+        await vi.waitFor(() => expect(settleSpy).toHaveBeenCalledTimes(1));
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="11"]')).toBeNull();
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="22"]')).not.toBeNull();
+    });
+
     it('Falsify:无活动 tab → no-op 不调 regenerate、不调刷新', async () => {
         const { chat, api } = await loadModules();
         const regenSpy = vi.spyOn(api.conversations, 'regenerate');
