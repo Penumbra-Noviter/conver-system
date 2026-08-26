@@ -111,12 +111,22 @@ describe('key-injector — 协议表面 __all__ 与模块私有性', () => {
     it('__all__ 收口公开函数', async () => {
         const mod = await loadInjector();
         expect(mod.__all__.sort()).toEqual([
+            'LINK_NAV_SETTINGS', 'MSG_CLAUDE_ONLY', 'MSG_NO_CREDENTIALS',
+            'SEL_NAV_SETTINGS',
             'TEXT_INJECTED', 'TEXT_RESYNC',
             'attachKeyInject', 'autoSyncIntoGame', 'convertEndpoint',
             'hasConfigTriplet', 'initKeyInjector',
             'injectCredentialsIntoGame', 'resetSyncLoop',
             'resolveButtonState', 'syncGameCredentials',
         ]);
+    });
+
+    it('导出禁用文案/引导链接常量（供生成器复用 — T4 避免复制）', async () => {
+        const mod = await loadInjector();
+        expect(mod.MSG_CLAUDE_ONLY).toBe('游戏仅支持 OpenAI 兼容 Key');
+        expect(mod.MSG_NO_CREDENTIALS).toBe('未配置 OpenAI 兼容 Key');
+        expect(mod.LINK_NAV_SETTINGS).toBe('前往设置页配置');
+        expect(mod.SEL_NAV_SETTINGS).toBe('.sim-key-nav-settings');
     });
 
     it('模块私有：import 后 window / globalThis 无注入模块挂载（不扩大同源暴露面）', async () => {

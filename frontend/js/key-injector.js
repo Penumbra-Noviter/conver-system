@@ -67,6 +67,7 @@
  * 协议表面（__all__）：initKeyInjector / attachKeyInject / resolveButtonState /
  *   hasConfigTriplet / convertEndpoint / injectCredentialsIntoGame /
  *   syncGameCredentials / autoSyncIntoGame / TEXT_RESYNC / TEXT_INJECTED /
+ *   MSG_CLAUDE_ONLY / MSG_NO_CREDENTIALS / LINK_NAV_SETTINGS / SEL_NAV_SETTINGS /
  *   resetSyncLoop。
  */
 
@@ -82,16 +83,16 @@ export const TEXT_RESYNC = '重新同步';
 export const TEXT_INJECTED = '已填入';
 
 /** claude-only 禁用文案（spec 逐字：主应用仅有 Claude Key 时） */
-const MSG_CLAUDE_ONLY = '游戏仅支持 OpenAI 兼容 Key';
+export const MSG_CLAUDE_ONLY = '游戏仅支持 OpenAI 兼容 Key';
 
 /** none 禁用文案（spec 逐字：未配置任何 OpenAI 兼容 Key） */
-const MSG_NO_CREDENTIALS = '未配置 OpenAI 兼容 Key';
+export const MSG_NO_CREDENTIALS = '未配置 OpenAI 兼容 Key';
 
 /** none 禁用态设置入口链接文案（TD-71 — 点击触发 onNavigateSettings 钩子） */
-const LINK_NAV_SETTINGS = '前往设置页配置';
+export const LINK_NAV_SETTINGS = '前往设置页配置';
 
 /** none 禁用态链接选择器（事件委托锚点；纯常量拼接，无用户数据，无 XSS 面） */
-const SEL_NAV_SETTINGS = '.sim-key-nav-settings';
+export const SEL_NAV_SETTINGS = '.sim-key-nav-settings';
 
 /** 「已填入」反馈时长（毫秒；到期按钮恢复「重新同步」可点） */
 const FEEDBACK_MS = 2000;
@@ -658,5 +659,9 @@ export const __all__ = [
     'autoSyncIntoGame',
     'TEXT_RESYNC',
     'TEXT_INJECTED',
+    'MSG_CLAUDE_ONLY',
+    'MSG_NO_CREDENTIALS',
+    'LINK_NAV_SETTINGS',
+    'SEL_NAV_SETTINGS',
     'resetSyncLoop',
 ];

@@ -190,3 +190,216 @@ describe('resetGameGenerator — 复位', () => {
         expect(() => gen.resetGameGenerator()).not.toThrow();
     });
 });
+
+describe('game-generator — 上传/校验/错误分支（覆盖率收口）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); });
+
+    it('上传 .txt 文件 → 填入 textarea + 自动生成标题', async () => {
+        const { gen } = await loadModules();
+        gen.openGenerateFlow();
+        const fileInput = document.querySelector('#gg-file-input');
+        const file = new File(['霓虹都市'], '赛博追迹.txt', { type: 'text/plain' });
+        Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+
+        fileInput.dispatchEvent(new Event('change'));
+
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-description').value).toBe('霓虹都市');
+        });
+        expect(document.querySelector('#gg-title').value).toBe('赛博追迹'); // 文件名去扩展名
+    });
+
+    it('上传非文本文件 → 错误提示「仅支持 .txt、.md、.text 文件」', async () => {
+        const { gen } = await loadModules();
+        gen.openGenerateFlow();
+        const fileInput = document.querySelector('#gg-file-input');
+        Object.defineProperty(fileInput, 'files', { value: [new File(['x'], 'game.html', { type: 'text/html' })], configurable: true });
+
+        fileInput.dispatchEvent(new Event('change'));
+
+        const descError = document.querySelector('#gg-desc-error');
+        await vi.waitFor(() => expect(descError.hidden).toBe(false));
+        expect(descError.textContent).toBe('仅支持 .txt、.md、.text 文件');
+    });
+
+    it('上传无文件（files 为空）→ no-op 不抛错', async () => {
+        const { gen } = await loadModules();
+        gen.openGenerateFlow();
+        const fileInput = document.querySelector('#gg-file-input');
+        Object.defineProperty(fileInput, 'files', { value: [], configurable: true });
+        expect(() => fileInput.dispatchEvent(new Event('change'))).not.toThrow();
+    });
+
+    it('描述超长（> 10000 字）→ 错误提示', async () => {
+        const { gen } = await loadModules();
+        gen.openGenerateFlow();
+        document.querySelector('#gg-description').value = 'x'.repeat(10001);
+        document.querySelector('#gg-submit-btn').click();
+
+        const descError = document.querySelector('#gg-desc-error');
+        expect(descError.hidden).toBe(false);
+        expect(descError.textContent).toContain('不能超过 10000 字');
+    });
+
+    it('输入时清除错误提示（input 事件）', async () => {
+        const { gen } = await loadModules();
+        gen.openGenerateFlow();
+        const descError = document.querySelector('#gg-desc-error');
+        // 先触发空描述错误
+        document.querySelector('#gg-submit-btn').click();
+        expect(descError.hidden).toBe(false);
+        // 输入 → 清除
+        document.querySelector('#gg-description').value = '有内容';
+        document.querySelector('#gg-description').dispatchEvent(new Event('input'));
+        expect(descError.hidden).toBe(true);
+    });
+
+    it('其他 HTTP 错误（500 + 字符串 detail）→ 「生成失败」错误消息 + 重试按钮，不关闭', async () => {
+        const { gen } = await loadModules();
+        gen.setFetch(() => mockJson({ detail: '服务器繁忙' }, 500));
+        gen.initGameGenerator({ onGenerated: vi.fn() });
+        gen.openGenerateFlow();
+        document.querySelector('#gg-description').value = '测试';
+        document.querySelector('#gg-submit-btn').click();
+
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-result-area').className).toBe('gg-error');
+        });
+        expect(document.querySelector('#gg-result-area').textContent).toContain('生成失败');
+        expect(document.querySelector('#gg-result-area').textContent).toContain('服务器繁忙');
+        expect(document.querySelector('#gg-retry-btn')).not.toBeNull();
+        expect(document.querySelector('.modal-overlay')).not.toBeNull();
+    });
+
+    it('网络错误（fetch 拒绝）→ 「请求失败」错误消息', async () => {
+        const { gen } = await loadModules();
+        gen.setFetch(() => { throw new Error('网络中断'); });
+        gen.initGameGenerator({ onGenerated: vi.fn() });
+        gen.openGenerateFlow();
+        document.querySelector('#gg-description').value = '测试';
+        document.querySelector('#gg-submit-btn').click();
+
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-result-area').className).toBe('gg-error');
+        });
+        expect(document.querySelector('#gg-result-area').textContent).toContain('请求失败');
+        expect(document.querySelector('#gg-result-area').textContent).toContain('网络中断');
+    });
+
+    it('重试按钮点击 → 重新发起生成请求', async () => {
+        const { gen } = await loadModules();
+        const fetchMock = vi.fn()
+            .mockImplementationOnce(() => mockJson({ detail: { ok: false, errors: [{ field: 'data', message: '无效' }] } }, 422))
+            .mockImplementationOnce(() => mockJson({ ok: true, game: { id: 'g2', file: 'g2.html' } }));
+        gen.setFetch(fetchMock);
+        const hook = vi.fn();
+        gen.initGameGenerator({ onGenerated: hook });
+        gen.openGenerateFlow();
+        document.querySelector('#gg-description').value = '测试';
+        document.querySelector('#gg-submit-btn').click();
+
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-retry-btn')).not.toBeNull();
+        });
+        document.querySelector('#gg-retry-btn').click();
+        await vi.waitFor(() => expect(hook).toHaveBeenCalledTimes(1));
+        expect(fetchMock).toHaveBeenCalledTimes(2); // 首次 + 重试
+        expect(document.querySelector('.modal-overlay')).toBeNull(); // 重试成功关闭
+    });
+
+    it('上传按钮点击 → 触发隐藏文件输入选择器（fileInput.click）', async () => {
+        const { gen } = await loadModules();
+        gen.openGenerateFlow();
+        const fileInput = document.querySelector('#gg-file-input');
+        const clickSpy = vi.spyOn(fileInput, 'click').mockImplementation(() => {});
+        document.querySelector('#gg-upload-btn').click();
+        expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('openGenerateFlow — 凭证预检（T4）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); });
+
+    it('openai 态 → 无顶部提示（#gg-cred-warning 保持隐藏）', async () => {
+        const { gen } = await loadModules();
+        gen.initGameGenerator({
+            getCredentials: vi.fn(async () => ({ key: 'sk-x', endpoint: 'e', model: 'm', protocol: 'openai' })),
+        });
+        gen.openGenerateFlow();
+
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-cred-warning')).not.toBeNull();
+        });
+        expect(document.querySelector('#gg-cred-warning').hidden).toBe(true);
+        expect(document.querySelector('#gg-cred-warning').textContent).not.toContain('需先配置');
+    });
+
+    it('none 态 → 顶部提示「需先配置 OpenAI 兼容 Key」+ 设置链接（复用 key-injector 常量），点击跳转', async () => {
+        const navigate = vi.fn();
+        const { gen } = await loadModules();
+        gen.initGameGenerator({
+            getCredentials: vi.fn(async () => ({ key: '', endpoint: '', model: '', protocol: 'none' })),
+            onNavigateSettings: navigate,
+        });
+        gen.openGenerateFlow();
+
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-cred-warning').hidden).toBe(false);
+        });
+        const warning = document.querySelector('#gg-cred-warning');
+        expect(warning.textContent).toContain('需先配置 OpenAI 兼容 Key');
+        const link = warning.querySelector('.sim-key-nav-settings');
+        expect(link).not.toBeNull();
+        expect(link.textContent).toBe('前往设置页配置'); // 复用 key-injector LINK_NAV_SETTINGS
+
+        link.click();
+        expect(navigate).toHaveBeenCalledTimes(1); // 点击 → switchView('settings')
+        link.click();
+        expect(navigate).toHaveBeenCalledTimes(2);
+    });
+
+    it('claude 态 → 同样顶部提示 + 设置链接', async () => {
+        const navigate = vi.fn();
+        const { gen } = await loadModules();
+        gen.initGameGenerator({
+            getCredentials: vi.fn(async () => ({ key: '', endpoint: '', model: '', protocol: 'claude' })),
+            onNavigateSettings: navigate,
+        });
+        gen.openGenerateFlow();
+
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-cred-warning').hidden).toBe(false);
+        });
+        const warning = document.querySelector('#gg-cred-warning');
+        expect(warning.textContent).toContain('需先配置 OpenAI 兼容 Key');
+        warning.querySelector('.sim-key-nav-settings').click();
+        expect(navigate).toHaveBeenCalledTimes(1);
+    });
+
+    it('Falsify: 凭证请求失败 → 不阻塞打开（模态框已打开、无提示）', async () => {
+        const { gen } = await loadModules();
+        gen.initGameGenerator({
+            getCredentials: vi.fn(async () => { throw new Error('网络错误'); }),
+        });
+        expect(() => gen.openGenerateFlow()).not.toThrow();
+        // 模态框立即打开（凭证检查非阻塞）
+        expect(document.querySelector('.modal-overlay')).not.toBeNull();
+
+        await vi.waitFor(() => {
+            // 请求失败降级：无提示（warning 保持隐藏）
+            expect(document.querySelector('#gg-cred-warning').hidden).toBe(true);
+        });
+        expect(document.querySelector('.modal-overlay')).not.toBeNull(); // 仍打开
+    });
+
+    it('Falsify: 未注入 getCredentials → 打开不报错、无提示', async () => {
+        const { gen } = await loadModules();
+        expect(() => gen.openGenerateFlow()).not.toThrow();
+        expect(document.querySelector('.modal-overlay')).not.toBeNull();
+        await vi.waitFor(() => {
+            expect(document.querySelector('#gg-cred-warning').hidden).toBe(true);
+        });
+    });
+});
