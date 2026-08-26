@@ -183,6 +183,7 @@ function makeHarness({ initial = [], active = true, withListSpy = false } = {}) 
         renderMessages: vi.fn(),
         refreshSendButton: vi.fn(),
         refreshConversations: vi.fn(),
+        onError: vi.fn(),
     };
     const listSpy = withListSpy ? vi.spyOn(messages, 'list') : null;
     const session = createStreamSession(deps);
@@ -479,18 +480,22 @@ describe('createStreamSession — onDone(完成/终态写回/三分支)', () => 
 describe('createStreamSession — onError(错误/停止,终态守卫)', () => {
     const abortError = () => Object.assign(new Error('aborted'), { name: 'AbortError' });
 
-    it('普通错误 → phase error + 错误气泡(清本流占位)+ 活动渲染 + 按钮/列表刷新', () => {
-        const { session, deps, tab } = makeHarness({
-            initial: [msg(1, 'user', 'hi'), streaming('部分')],
-        });
+    it('普通错误 → 错误经注入回调上抛 + 不写 [错误] 进消息缓存 + 部分内容保留为普通消息', () => {
+        const { session, deps, tab } = makeHarness({ initial: [msg(1, 'user', 'hi')] });
+        session.onToken('部分'); // 经 seam 累积
         session.onError(new Error('模型超时'));
         expect(tab.phase).toBe('error');
         expect(tab.isStreaming).toBe(false);
         expect(tab.activeStream).toBeNull();
+        // 错误不写入消息缓存 — 经注入回调上抛给聊天域渲染错误条
         expect(tab.messages).toEqual([
             msg(1, 'user', 'hi'),
-            { role: 'assistant', content: '[错误] 模型超时', error: true },
+            { role: 'assistant', content: '部分' },
         ]);
+        expect(tab.messages.some((m) => m.content?.includes('[错误]'))).toBe(false);
+        expect(tab.messages.filter((m) => m.error)).toHaveLength(0);
+        // 注入回调接收错误对象
+        expect(deps.onError).toHaveBeenCalledWith(expect.objectContaining({ message: '模型超时' }));
         expect(deps.renderMessages).toHaveBeenCalledTimes(1);
         expect(deps.refreshSendButton).toHaveBeenCalledTimes(1);
         expect(deps.refreshConversations).toHaveBeenCalledTimes(1);
@@ -513,13 +518,14 @@ describe('createStreamSession — onError(错误/停止,终态守卫)', () => {
         expect(tab.messages).toEqual([msg(1, 'user', 'hi')]);
     });
 
-    it('终态守卫:错误帧后流关闭补发 onDone(null) → 拦截,phase 保持 error、错误气泡不被覆盖', async () => {
+    it('终态守卫:错误帧后流关闭补发 onDone(null) → 拦截,phase 保持 error、消息列表不含错误气泡', async () => {
         const { session, tab } = makeHarness({ initial: [msg(1, 'user', 'hi')] });
         session.onError(new Error('模型超时'));
         await session.onDone(null);
         expect(tab.phase).toBe('error');
-        expect(tab.messages.filter((m) => m.error)).toHaveLength(1);
+        expect(tab.messages.filter((m) => m.error)).toHaveLength(0);
         expect(tab.messages.some((m) => m.role === 'assistant' && !m.error)).toBe(false);
+        expect(tab.messages).toEqual([msg(1, 'user', 'hi')]);
     });
 
     it('终态守卫:onError 二次调用 → 忽略', () => {
@@ -527,7 +533,8 @@ describe('createStreamSession — onError(错误/停止,终态守卫)', () => {
         session.onError(new Error('a'));
         session.onError(new Error('b'));
         expect(deps.updateTab.mock.calls.filter(([, patch]) => patch.phase)).toHaveLength(1);
-        expect(tab.messages.filter((m) => m.error)).toHaveLength(1);
+        expect(tab.messages.filter((m) => m.error)).toHaveLength(0);
+        expect(tab.messages).toEqual([msg(1, 'user', 'hi')]); // 错误不落缓存
     });
 });
 

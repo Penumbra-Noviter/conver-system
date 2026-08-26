@@ -170,7 +170,7 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
         expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
-    it('失败：system 气泡「发送失败: <原因>」逐字 + settleTurn 不调用 + 在途清除 + 刷新仍被调', async () => {
+    it('失败：渲染错误条（不再写 system 失败消息）+ settleTurn 不调用 + 在途清除 + 刷新仍被调', async () => {
         const { chat, tabs, api, ss } = await loadModules();
         tabs.openTab(11);
         chat.chatDom.toggleStream.checked = false;
@@ -184,12 +184,12 @@ describe('handleSend — 非流式（settleTurn 委托链）', () => {
         chat.chatDom.chatInput.value = '你好';
         await chat.handleSend();
 
-        const sys = chat.chatDom.chatMessages.querySelector('.message.system');
-        expect(sys).not.toBeNull();
-        expect(sys.textContent).toContain('发送失败: 网络错误');
-        // F1 产品微调：system 气泡统一无头像 + 无复制按钮（与其他 system 形态一致）
-        expect(sys.querySelector('.msg-avatar')).toBeNull();
-        expect(sys.querySelector('.btn-copy-message')).toBeNull();
+        // 消息列表不再写入 system 失败气泡 — 错误经 error-bar 深模块渲染（挂 #chat-messages 父级）
+        expect(chat.chatDom.chatMessages.querySelector('.message.system')).toBeNull();
+        expect(chat.chatDom.chatMessages.querySelector('.message.error')).toBeNull();
+        const bar = chat.chatDom.chatMessages.parentElement.querySelector('.chat-error-bar');
+        expect(bar).not.toBeNull();
+        expect(bar.textContent).toContain('网络错误');
         expect(settleSpy).not.toHaveBeenCalled();
         expect(refresh).toHaveBeenCalledTimes(1);
 
@@ -301,7 +301,7 @@ describe('handleSend — 流式（createStreamSession 委托链）', () => {
         expect(refresh).toHaveBeenCalledTimes(2);
     });
 
-    it('onError 接线：错误 → phase error + 错误气泡渲染 + 按钮/列表刷新', async () => {
+    it('onError 接线：错误 → phase error + 错误条渲染（消息列表无错误）+ 按钮/列表刷新', async () => {
         const { chat, tabs, refresh, getCaptured } = await loadWithStreamHarness();
 
         chat.chatDom.chatInput.value = '你好';
@@ -310,7 +310,11 @@ describe('handleSend — 流式（createStreamSession 委托链）', () => {
 
         expect(tabs.getTab(11).phase).toBe('error');
         expect(tabs.getTab(11).isStreaming).toBe(false);
-        expect(chat.chatDom.chatMessages.textContent).toContain('[错误] 模型超时');
+        expect(tabs.getTab(11).messages.some((m) => m.error)).toBe(false);
+        expect(chat.chatDom.chatMessages.textContent).not.toContain('[错误]');
+        const bar = chat.chatDom.chatMessages.parentElement.querySelector('.chat-error-bar');
+        expect(bar).not.toBeNull();
+        expect(bar.textContent).toContain('模型超时');
         // 同 onDone：session.onError 内嵌 refreshList + handleSend 末尾统一刷新
         expect(refresh).toHaveBeenCalledTimes(2);
     });
@@ -543,6 +547,42 @@ describe('EMPTY_HEADER_HTML — 空态头部文案单一来源（ARC-10 C7）', 
         activation.showEmptyState();
         expect(chat.chatDom.chatHeader.innerHTML).toBe(chat.EMPTY_HEADER_HTML);
         expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+});
+
+describe('首启引导卡 — 凭证协议 none 空态引导卡（T1）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('none 态空态渲染引导卡（含「前往设置」按钮）+ EMPTY_STATE_HTML 保留非 none 文案', async () => {
+        const { chat, tabs, state } = await loadModules();
+        state.credentialsProtocol = 'none';
+        tabs.openTab(11); // 活动 tab 无消息 → 空态
+        chat.renderMessages();
+        const guideBtn = chat.chatDom.chatMessages.querySelector('.empty-state-guide-btn');
+        expect(guideBtn).not.toBeNull();
+        expect(chat.chatDom.chatMessages.textContent).toContain('先配置 AI 接口');
+        // 引导卡不在非 none 态出现
+        state.credentialsProtocol = 'openai';
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.querySelector('.empty-state-guide-btn')).toBeNull();
+        expect(chat.chatDom.chatMessages.innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+
+    it('引导卡「前往设置」点击 → 调注入 navigateToSettings 钩子（复用视图切换）', async () => {
+        const { chat, tabs, state } = await loadModules();
+        state.credentialsProtocol = 'none';
+        tabs.openTab(11);
+        const nav = vi.fn();
+        chat.setChatHooks({ navigateToSettings: nav });
+        chat.renderMessages();
+        chat.chatDom.chatMessages.querySelector('.empty-state-guide-btn').click();
+        expect(nav).toHaveBeenCalledTimes(1);
+    });
+
+    it('EMPTY_STATE_HTML 常量保留非 none 文案（引导卡不覆盖常量）', async () => {
+        const { chat } = await loadModules();
+        expect(chat.EMPTY_STATE_HTML).toBe('<div class="empty-state"><p>选择左侧对话或创建新对话开始聊天</p></div>');
     });
 });
 
