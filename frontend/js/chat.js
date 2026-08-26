@@ -117,7 +117,9 @@ const nonStreamingInFlight = new Set();
  * nonStreamingInFlight 永久锁定该会话的发送/重生成。
  */
 function cleanupStaleInFlight() {
-    for (const convId of nonStreamingInFlight) {
+    // F-72：Array.from 快照迭代 — 迭代中删除 Set 元素虽在纯删除场景安全，但并发
+    // re-add 时行为未定义；快照迭代保证确定语义。行为结果不变（清除已关闭会话 stale）。
+    for (const convId of Array.from(nonStreamingInFlight)) {
         if (!getTab(convId)) nonStreamingInFlight.delete(convId);
     }
 }
@@ -152,7 +154,11 @@ function locateAndHighlight(messageId) {
         highlightEl.classList.remove('search-highlight');
         highlightEl = null;
     }
-    const target = chatDom.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
+    // F-69：不再用 `[data-message-id="<raw>"]` 选择器裸插值（含引号/畸形 messageId 会抛
+    // SyntaxError）—— 改为遍历气泡按 data-message-id 归一后精确比对。id 为 DB 数值
+    // 不可达，此处为防御；无匹配回落 scrollToBottom 语义不变。
+    const target = [...chatDom.chatMessages.children]
+        .find((el) => el.dataset.messageId === String(messageId));
     if (!target) { scrollToBottom(); return; }
     target.scrollIntoView({ block: 'center' });
     target.classList.add('search-highlight');
@@ -414,16 +420,26 @@ export function renderChatHeader(conversationId) {
  * T3 语义（spec）：凭证协议三态为唯一事实来源 — none（无任何 Key）恒提示；
  * claude（仅 Claude Key）且目标 provider 非 claude（OpenAI 兼容族）→ 提示；
  * openai（仅 OpenAI 兼容 Key）且目标 provider 为 claude → 提示（F-54 对称化）；
- * openai 态切向其他 Provider 无提示。返回提示原因（'none' | 'claude' | 'openai'），
- * 无需提示返回 null。
+ * openai 态切向其他 Provider 无提示。返回提示原因（'none' | 'claude' | 'openai' |
+ * 'unknown'），无需提示返回 null。
+ * F-71：未知/异常 credentialsProtocol 由 fail-open（return null 静默放行）改为
+ * fail-closed —— default 返回 'unknown' 提示原因，交由 openModelSwitch 弹不可用提示，
+ * 不再无提示静默保存。
  * @param {string} selectedProvider - 目标 provider key
- * @returns {'none'|'claude'|'openai'|null}
+ * @returns {'none'|'claude'|'openai'|'unknown'|null}
  */
 function credentialWarnReason(selectedProvider) {
-    if (state.credentialsProtocol === 'none') return 'none';
-    if (state.credentialsProtocol === 'claude' && selectedProvider !== 'claude') return 'claude';
-    if (state.credentialsProtocol === 'openai' && selectedProvider === 'claude') return 'openai';
-    return null;
+    switch (state.credentialsProtocol) {
+        case 'none':
+            return 'none';
+        case 'claude':
+            return selectedProvider !== 'claude' ? 'claude' : null;
+        case 'openai':
+            return selectedProvider === 'claude' ? 'openai' : null;
+        default:
+            // F-71 fail-closed：未知协议 → 返回提示原因（不静默放行保存）
+            return 'unknown';
+    }
 }
 
 /**
@@ -456,7 +472,9 @@ export async function openModelSwitch(conv) {
                 ? '尚未配置 API Key，发送消息可能失败。仍要切换模型吗？'
                 : warnReason === 'openai'
                     ? '当前仅配置了 OpenAI 兼容 Key，所选 Claude Provider 可能不可用。仍要切换吗？'
-                    : '当前仅配置了 Claude Key，所选 Provider 可能不可用。仍要切换吗？',
+                    : warnReason === 'unknown'
+                        ? '凭证协议状态未知，所选模型可能不可用。仍要切换吗？'
+                        : '当前仅配置了 Claude Key，所选 Provider 可能不可用。仍要切换吗？',
             detail: `目标：${selection.model}（${selection.provider}）`,
             confirmText: '仍要切换',
             cancelText: '取消',
@@ -464,22 +482,30 @@ export async function openModelSwitch(conv) {
         if (!confirmed) return; // 确认取消 → 不保存
     }
 
+    // F-70：conversations.update（PUT）为唯一「保存」步骤 — PUT 成功即保存成功。
+    // state 就地更新与 renderChatHeader 移出 save try（独立 try）—— 二者抛错仅记录
+    // 更新侧日志（「更新失败」），不归因「切换模型失败」，也不阻断后续列表刷新。
     try {
         await conversations.update(conv.id, {
             model_provider: selection.provider,
             model_name: selection.model,
         });
-        // 就地更新 state.conversations（单一事实来源 — 头部徽标 / 对话列表渲染共用）
+    } catch (err) {
+        console.error('切换模型失败:', err);
+        return; // 保存失败 → 不继续列表刷新
+    }
+    // 保存成功 → 就地更新 state.conversations（单一事实来源 — 头部徽标 / 对话列表渲染共用）
+    // + 同步聊天头部徽标（重渲染基于 state，活动 tab 数据同步）；独立 try：更新侧失败
+    // 仅记日志，不影响「保存成功」语义，也不阻断 refreshConversations。
+    try {
         const stored = state.conversations.find((c) => c.id === conv.id);
         if (stored) {
             stored.model_provider = selection.provider;
             stored.model_name = selection.model;
         }
-        // 同步聊天头部徽标（重渲染基于 state，活动 tab 数据同步）
         renderChatHeader(conv.id);
     } catch (err) {
-        console.error('切换模型失败:', err);
-        return; // 保存失败 → 不继续列表刷新
+        console.error('更新失败:', err);
     }
     // 对话列表同步（F-53 语义分离：独立 try/catch — 刷新失败记录独立日志，不干扰已成功的保存）
     try {

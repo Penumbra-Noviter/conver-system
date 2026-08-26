@@ -736,6 +736,15 @@ describe('T2 搜索定位 — renderMessages 高亮与定位（scrollIntoView / 
         expect(container.scrollTop).toBe(container.scrollHeight);
     });
 
+    it('F-69:含引号/畸形 messageId 调用定位不抛 SyntaxError，无匹配回落 scrollToBottom', async () => {
+        const { chat, tabs } = await loadModules();
+        const container = setupTarget({ chat, tabs });
+        // 裸插值选择器遇到引号会抛 SyntaxError —— 归一/遍历比对后不抛、回落滚动到底
+        expect(() => chat.renderMessages({ messageId: '202" onmouseover="x' })).not.toThrow();
+        expect(container.querySelectorAll('.search-highlight')).toHaveLength(0);
+        expect(container.scrollTop).toBe(container.scrollHeight); // 回落语义保持
+    });
+
     it('第二次定位清理旧定时器：旧 3s 定时器不误清除第二次定位的高亮', async () => {
         vi.useFakeTimers();
         const { chat, tabs } = await loadModules();
@@ -959,6 +968,21 @@ describe('T3 对话内模型切换 — 头部徽标可点击 → 保存 → 同�
         expect(chat.chatDom.chatHeader.querySelector('.chat-model-badge').textContent).toContain('DeepSeek · deepseek-chat');
         errorSpy.mockRestore();
     });
+
+    it('F-70:PUT 成功但 renderChatHeader 抛错 → 日志记「更新失败」非「切换模型失败」，且 refreshConversations 仍被调用', async () => {
+        const { chat, state, refresh } = await setupModelSwitch();
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        pickDeepseek(); // 同步点击 → PUT 异步在途
+        chat.chatDom.chatHeader = null; // 保存成功后 renderChatHeader 抛 TypeError（DOM 更新失败）
+        await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+        // 更新侧日志，不得归因「切换模型失败」
+        expect(errorSpy).toHaveBeenCalledWith('更新失败:', expect.any(Error));
+        expect(errorSpy).not.toHaveBeenCalledWith('切换模型失败:', expect.any(Error));
+        // PUT 成功即保存成功：state 就地更新仍生效；更新失败不阻断列表刷新
+        expect(state.conversations[0].model_provider).toBe('deepseek');
+        expect(state.conversations[0].model_name).toBe('deepseek-chat');
+        errorSpy.mockRestore();
+    });
 });
 
 describe('T3 对话内模型切换 — 凭证不可用确认提示（none/claude 态）', () => {
@@ -1065,6 +1089,23 @@ describe('T3 对话内模型切换 — 凭证不可用确认提示（none/claude
         overlay.querySelector('.ms-start').click();
         await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
         expect(document.querySelector('.confirm-modal')).toBeNull();
+    });
+
+    it('F-71:凭证协议未知值 → fail-closed 弹确认提示（不静默保存），确认后仍可保存', async () => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol: 'weird-unknown' });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        const overlay = document.querySelector('.modal-overlay');
+        const prov = overlay.querySelector('#ms-provider');
+        prov.value = 'deepseek';
+        prov.dispatchEvent(new Event('change', { bubbles: true }));
+        overlay.querySelector('#ms-model').value = 'deepseek-chat';
+        overlay.querySelector('.ms-start').click();
+        // 未知协议 → 返回提示原因而非 null → 出现确认弹窗（未静默放行保存）
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).not.toBeNull());
+        expect(document.querySelector('.confirm-modal').textContent).toContain('凭证协议状态未知');
+        expect(hasPut(fetchSpy)).toBe(false); // 未确认 → 未保存
+        document.querySelector('.confirm-modal .confirm-ok').click();
+        await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
     });
 });
 
@@ -1385,6 +1426,39 @@ describe('T6 重生成 — 末条 assistant 气泡重生成闭环', () => {
         await chat.handleSend();
         expect(fetchSpy).toHaveBeenCalledTimes(2); // 第二次真实发起
         expect(chat.chatDom.chatInput.value).toBe(''); // 已发起（输入被清空）
+    });
+
+    it('F-72:cleanupStaleInFlight 清除多个已关闭会话的 stale 在途条目（快照迭代回归钉住）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        chat.chatDom.toggleStream.checked = false;
+        vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        const fetchSpy = makeApiMock({ chatResult: { reply: '回复' } });
+        fetchSpy.mockImplementationOnce(async () => new Promise(() => {})); // 会话11挂死
+        fetchSpy.mockImplementationOnce(async () => new Promise(() => {})); // 会话12挂死
+        api.setFetch(fetchSpy);
+        chat.setChatHooks({ refreshConversations: () => {} });
+
+        // 两个会话各挂死一个在途请求（在途条目永驻，finally 不执行）
+        tabs.openTab(11);
+        chat.chatDom.chatInput.value = 'a';
+        chat.handleSend();
+        tabs.openTab(12);
+        chat.chatDom.chatInput.value = 'b';
+        chat.handleSend();
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+        // 两会话都关闭 → 各自触发 onTabsChanged cleanup，逐个清除 stale 条目
+        tabs.closeTab(11);
+        tabs.closeTab(12);
+
+        // 重开 → stale 均已清除 → 两会话均可再次真实发起
+        tabs.openTab(11);
+        chat.chatDom.chatInput.value = 'a2';
+        await chat.handleSend();
+        tabs.openTab(12);
+        chat.chatDom.chatInput.value = 'b2';
+        await chat.handleSend();
+        expect(fetchSpy).toHaveBeenCalledTimes(4); // 两个挂死 + 两个恢复
     });
 
     // ── S-09（F-58）重生成顶替语义 ──
