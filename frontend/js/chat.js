@@ -126,7 +126,7 @@ const HIGHLIGHT_DURATION = 3000;
 /**
  * 定位目标消息 + 应用 search-highlight + 约 3s 自动清除。
  * 与既有 scrollToBottom 互斥调用（调用方 messageId 存在时走本路径，跳过滚动到底），
- * 保证定位不被滚动到底覆盖。目标不存在（陈旧 messageId）→ no-op 不抛错。
+ * 保证定位不被滚动到底覆盖。目标不存在（陈旧 messageId）→ 回落 scrollToBottom。
  * @param {number|string} messageId - 目标消息 id（匹配气泡 data-message-id）
  */
 function locateAndHighlight(messageId) {
@@ -139,7 +139,7 @@ function locateAndHighlight(messageId) {
         highlightEl = null;
     }
     const target = chatDom.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
-    if (!target) return;
+    if (!target) { scrollToBottom(); return; }
     target.scrollIntoView({ block: 'center' });
     target.classList.add('search-highlight');
     highlightEl = target;
