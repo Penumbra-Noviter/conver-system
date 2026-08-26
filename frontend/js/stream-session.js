@@ -44,22 +44,36 @@ import { messages } from './api.js';
 // ══════════════════════════════════════════════════
 
 /**
- * 位置感知写回本流消息:移除本流 streaming 占位(幂等),把最终消息插入到发起位置。
+ * 位置感知写回本流消息:移除本流 streaming 占位(幂等),把最终消息插入到发起位置;
+ * 重生成失败兜底按被顶替旧消息身份(replaceId)原位替换,不尾部追加(F-58)。
  * 幂等规则:
  *   - 缓存已含同 id 消息(被并发流的 fresh 替换结算)→ 不动
+ *   - replaceId(被顶替旧消息服务端 id,重生成路径):缓存含同 id 消息 → 原位替换
+ *     (旧回复已截断、新回复顶替其位置 — 不落尾部追加,消「顶替」语义残留)
  *   - anchor(本流 user 消息对象引用):位置 anchor 之后插入本流回复 — anchor 用
  *     对象引用 + indexOf 定位,插入/删除导致的索引漂移不影响定位(根治 R2,
  *     不清并发流占位;user 消息本身不被删除,引用永有效)
  * @param {object} tab - 会话 tab(getTab 返回的对象)
  * @param {object|null} anchor - 本流 user 消息对象引用;无 user 消息为 null(追加尾部)
  * @param {object} message - 要写回的消息(role: 'assistant', content, id?)
+ * @param {number|string|null} [replaceId] - 被顶替旧消息的服务端 id(F-58 重生成失败兜底);
+ *   null 时回落 anchor/尾部路径
  * @returns {{messages: Array, render: boolean}} 新缓存与是否需活动渲染
  */
-function settleByPosition(tab, anchor, message) {
+function settleByPosition(tab, anchor, message, replaceId = null) {
     const next = [...tab.messages];
     // 幂等:缓存已含本流消息(带 id 匹配)— 已被并发流的 fresh 替换结算,不重复插入
     if (message.id != null && next.some((m) => m.id === message.id)) {
         return { messages: tab.messages, render: false };
+    }
+    // F-58:重生成失败兜底 — 按被顶替旧消息身份原位替换(后端已截断旧回复,顶替而非尾部追加)。
+    // 缓存中无该 id(旧消息已被并发结算移除)→ 落到 anchor/尾部常规路径。
+    if (replaceId != null) {
+        const replaceIdx = next.findIndex((m) => m.id === replaceId);
+        if (replaceIdx >= 0) {
+            next[replaceIdx] = message;
+            return { messages: next, render: true };
+        }
     }
     const anchorIdx = anchor ? next.indexOf(anchor) : -1;
     const insertAt = anchorIdx >= 0 ? anchorIdx + 1 : next.length;
@@ -96,19 +110,24 @@ function settleByPosition(tab, anchor, message) {
  * @param {object|null} [opts.anchor] - 本流 user 消息对象引用(失败写回用);无 user 为 null
  * @param {number|null} [opts.messageId] - 本流服务端消息 id
  * @param {string} [opts.content] - 本流累积全文(失败分支写回用)
+ * @param {number|string|null} [opts.replaceId] - 被顶替旧消息服务端 id(F-58 重生成失败兜底:
+ *   失败分支按此 id 原位替换,不尾部追加)
  * @returns {{messages: Array, render: boolean}} 新缓存与是否需活动渲染
  */
-export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor = null, messageId = null, content = '' } = {}) {
+export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor = null, messageId = null, content = '', replaceId = null } = {}) {
     if (!tab || !Array.isArray(tab.messages)) {
         return { messages: [], render: false };
     }
-    // 失败分支:重载失败 — anchor 位置感知写回本流内容(插在本流 user 之后,不清并发流占位 — 根治 R2)
+    // 失败分支:重载失败 — 按身份/位置写回本流内容。
+    // F-58:replaceId(被顶替旧消息)提供时按 id 原位替换,不尾部追加(重生成失败兜底 —
+    // 后端已截断旧回复,顶替而非追加);无 replaceId 时回退 anchor 位置感知写回
+    // (插在本流 user 之后,不清并发流占位 — 根治 R2)
     if (msgs == null) {
         return settleByPosition(tab, anchor, {
             role: 'assistant',
             content,
             ...(messageId != null ? { id: messageId } : {}),
-        });
+        }, replaceId);
     }
     // fresh:长度未变 → 整体替换 + 活动渲染
     if (tab.messages.length === revision) {
@@ -133,7 +152,19 @@ export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor =
             role: 'assistant',
             content,
             ...(messageId != null ? { id: messageId } : {}),
-        });
+        }, replaceId);
+    }
+    // F-60:stale + anchor=null — 重生成/并发漂移结果不得静默丢弃。
+    // messageId/content 非空时:本地缓存已有同 id 消息 → 原位替换(content + 清 streaming,幂等);
+    // 找不到同 id(重生成场景,本地仍是被顶替的旧回复)→ 至少渲染服务端列表(权威)。
+    if (messageId != null && content) {
+        const matchIdx = tab.messages.findIndex((m) => m.id === messageId);
+        if (matchIdx >= 0) {
+            const next = [...tab.messages];
+            next[matchIdx] = { ...next[matchIdx], content, streaming: false };
+            return { messages: next, render: true };
+        }
+        return { messages: msgs, render: true };
     }
     return { messages: tab.messages, render: false };
 }
@@ -158,25 +189,28 @@ export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor =
  * @param {object|null} [opts.anchor] - 本流 user 消息对象引用（失败/漂移写回用）；无 user 为 null
  * @param {number|null} [opts.messageId] - 本流服务端消息 id（非流式失败兜底不带 — C2-D2 行为保持）
  * @param {string} [opts.content] - 本流累积全文/回复内容（失败分支写回用）
+ * @param {number|string|null} [opts.replaceId] - 被顶替旧消息服务端 id（F-58 重生成失败兜底：
+ *   失败分支按此 id 原位替换，不尾部追加）；非重生成路径缺省 null
  * @returns {Promise<void>}
  */
-export async function settleTurn({ convId, getTab, updateTab, isActive, render, revision, settleIndex = -1, anchor = null, messageId = null, content = '' }) {
+export async function settleTurn({ convId, getTab, updateTab, isActive, render, revision, settleIndex = -1, anchor = null, messageId = null, content = '', replaceId = null }) {
     const active = typeof isActive === 'function' ? isActive : () => false;
     const doRender = typeof render === 'function' ? render : () => {};
     try {
         const msgs = await messages.list(convId);
         const tab = getTab(convId);
         if (tab) {
-            const merged = mergeFreshList(tab, revision, msgs, { settleIndex, anchor, messageId, content });
+            const merged = mergeFreshList(tab, revision, msgs, { settleIndex, anchor, messageId, content, replaceId });
             updateTab(convId, { messages: merged.messages });
             if (merged.render && active()) doRender();
         }
     } catch (err) {
-        // 重新加载失败 — 退化为本地位置感知写回,避免消息丢失(不清并发流占位)
+        // 重新加载失败 — 退化为本地位置/身份感知写回,避免消息丢失(不清并发流占位;
+        // F-58 重生成失败按 replaceId 原位替换,不尾部追加)
         console.error('重新加载消息列表失败:', err);
         const tab = getTab(convId);
         if (tab) {
-            const merged = mergeFreshList(tab, revision, null, { settleIndex, anchor, messageId, content });
+            const merged = mergeFreshList(tab, revision, null, { settleIndex, anchor, messageId, content, replaceId });
             updateTab(convId, { messages: merged.messages });
             if (merged.render && active()) doRender();
         }

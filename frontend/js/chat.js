@@ -728,6 +728,9 @@ export async function handleSend() {
  * 时间线截断后按既有非流式路径重发），成功后经统一结算入口 `settleTurn` 从服务端
  * 重载消息列表并渲染新回复 —— fresh 整体替换使**新消息携带服务端 message_id 进入
  * tab 缓存**（W2 增量审核 #2；失败兜底位置感知写回同样携带 messageId 透传）。
+ * F-58：发起前捕获被顶替旧回复的服务端 id（lastAssistantId）随 `settleTurn` 一并传递
+ * —— 失败兜底按身份原位替换（顶替语义，不尾部追加）；本地缓存无旧 id 时回落既有
+ * 位置/追加路径。
  * 失败走既有错误条通道（`renderSendError` — 与 `messages.chat` 同一 catch 路径，
  * 不各自为政），**不写进消息列表**。
  *
@@ -744,6 +747,13 @@ export async function regenerateLastReply() {
     const isActive = () => getActiveTab()?.conversationId === convId;
     // FIX-B 同源在途守卫：非流式发送 / 重生成共用 — 同一对话重复触发只发一次真实请求
     if (nonStreamingInFlight.has(convId)) return;
+
+    // F-58：发起前捕获被顶替旧回复（末条 assistant 消息）的服务端 id — 失败兜底按身份原位
+    // 替换，不尾部追加。无 id（本地暂存消息）回落既有追加语义。
+    const lastAssistant = Array.isArray(tab.messages)
+        ? [...tab.messages].reverse().find((m) => m?.role === 'assistant')
+        : null;
+    const replaceId = lastAssistant?.id ?? null;
 
     nonStreamingInFlight.add(convId);
 
@@ -763,6 +773,7 @@ export async function regenerateLastReply() {
         await settleTurn({
             convId, getTab, updateTab, isActive, render: renderMessages,
             revision, settleIndex: -1, messageId: result.message_id, content: result.reply,
+            replaceId,  // F-58:被顶替旧回复身份 — 失败兜底按此 id 原位替换(不尾部追加)
         });
     } catch (err) {
         // 失败 — 与 messages.chat 同一错误通道（T1 错误条）：不写进消息列表

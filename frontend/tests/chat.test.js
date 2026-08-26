@@ -1319,6 +1319,65 @@ describe('T6 重生成 — 末条 assistant 气泡重生成闭环', () => {
         expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="22"]')).not.toBeNull();
     });
 
+    // ── S-09（F-58）重生成顶替语义 ──
+
+    it('F-58:settleTurn 收到被顶替旧回复身份 replaceId（发起前捕获末条 assistant id）+ 新 messageId 透传', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS }); // REGEN_MSGS[1] = assistant id 2（被顶替旧回复）
+        const regenSpy = vi.spyOn(api.conversations, 'regenerate')
+            .mockResolvedValue({ reply: '新回复', message_id: 3, conversation_id: 11 });
+        const settleSpy = vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderMessages();
+
+        await chat.regenerateLastReply();
+
+        expect(regenSpy).toHaveBeenCalledTimes(1);
+        expect(settleSpy).toHaveBeenCalledTimes(1);
+        const call = settleSpy.mock.calls[0][0];
+        expect(call.convId).toBe(11);
+        expect(call.replaceId).toBe(2);   // 被顶替旧回复 id（F-58）
+        expect(call.messageId).toBe(3);   // 新回复 id
+        expect(call.content).toBe('新回复');
+        expect(call.settleIndex).toBe(-1);
+    });
+
+    it('F-58:重生成成功但消息列表重载失败 → 本地旧 assistant 被新回复原位替换（无旧残留、无尾部追加）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS });
+        // regenerate 端点成功；GET messages 列表重载失败 → 走 settleTurn 失败兜底（mergeFreshList 失败分支）
+        const base = makeApiMock({ regenerateResult: { reply: '新回复', message_id: 3, conversation_id: 11 } });
+        const fetchMock = vi.fn(async (url, options = {}) => {
+            const path = String(url).replace(/^.*\/api/, '/api');
+            if (path.match(/^\/api\/conversations\/\d+\/messages$/) && (options.method || 'GET') === 'GET') {
+                throw new Error('列表加载失败');
+            }
+            return base(url, options);
+        });
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        api.setFetch(fetchMock);
+        const refresh = vi.fn();
+        chat.setChatHooks({ refreshConversations: refresh });
+        chat.renderMessages();
+
+        await chat.regenerateLastReply();
+
+        // 原位替换：缓存无旧回复残留、无额外追加、新回复在正确位置
+        expect(tabs.getTab(11).messages).toEqual([
+            msg(1, 'user', '你好'),
+            { id: 3, role: 'assistant', content: '新回复' },
+        ]);
+        expect(tabs.getTab(11).messages).toHaveLength(2);
+        // DOM 已渲染新回复（settle 失败兜底 render:true 触发活动渲染）
+        expect(chat.chatDom.chatMessages.textContent).toContain('新回复');
+        expect(chat.chatDom.chatMessages.textContent).not.toContain('旧回复');
+        expect(errorSpy).toHaveBeenCalledWith('重新加载消息列表失败:', expect.any(Error));
+        expect(refresh).toHaveBeenCalled(); // 末尾列表刷新注入仍执行
+        errorSpy.mockRestore();
+    });
+
     it('Falsify:无活动 tab → no-op 不调 regenerate、不调刷新', async () => {
         const { chat, api } = await loadModules();
         const regenSpy = vi.spyOn(api.conversations, 'regenerate');
