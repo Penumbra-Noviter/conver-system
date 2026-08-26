@@ -942,6 +942,23 @@ describe('T3 对话内模型切换 — 头部徽标可点击 → 保存 → 同�
         expect(refresh).not.toHaveBeenCalled();
         errorSpy.mockRestore();
     });
+
+    it('F-53:保存成功 + 列表刷新失败 → 日志记「刷新对话列表失败」而非「切换模型失败」，state/头部仍已更新', async () => {
+        const { chat, state, refresh } = await setupModelSwitch();
+        refresh.mockRejectedValueOnce(new Error('network down'));
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        pickDeepseek();
+
+        await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+        await vi.waitFor(() => expect(errorSpy).toHaveBeenCalledWith('刷新对话列表失败:', expect.any(Error)));
+        // 保存成功不被误记为「切换模型失败」（语义分离）
+        expect(errorSpy).not.toHaveBeenCalledWith('切换模型失败:', expect.any(Error));
+        // 保存结果不受刷新失败影响：state 就地更新 + 头部徽标重渲染
+        expect(state.conversations[0].model_provider).toBe('deepseek');
+        expect(state.conversations[0].model_name).toBe('deepseek-chat');
+        expect(chat.chatDom.chatHeader.querySelector('.chat-model-badge').textContent).toContain('DeepSeek · deepseek-chat');
+        errorSpy.mockRestore();
+    });
 });
 
 describe('T3 对话内模型切换 — 凭证不可用确认提示（none/claude 态）', () => {
@@ -1017,10 +1034,35 @@ describe('T3 对话内模型切换 — 凭证不可用确认提示（none/claude
         expect(document.querySelector('.confirm-modal')).toBeNull();
     });
 
-    it('凭证 openai 态 → 直接保存无确认提示', async () => {
+    it('F-54:凭证 openai 态 + 目标 claude → 弹对称确认提示（仅 OpenAI Key → Claude 可能不可用），确认后保存', async () => {
         const { chat, fetchSpy } = await setupSwitch({ protocol: 'openai' });
         chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
-        document.querySelector('.modal-overlay .ms-start').click();
+        document.querySelector('.modal-overlay .ms-start').click(); // 目标保持 claude
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).not.toBeNull());
+        expect(document.querySelector('.confirm-modal').textContent).toContain('当前仅配置了 OpenAI 兼容 Key');
+        document.querySelector('.confirm-modal .confirm-ok').click();
+        await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
+    });
+
+    it('F-54:凭证 openai 态 + 目标 claude + 确认弹窗取消 → 不保存', async () => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol: 'openai' });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        document.querySelector('.modal-overlay .ms-start').click(); // 目标保持 claude
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).not.toBeNull());
+        document.querySelector('.confirm-modal .confirm-cancel').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(hasPut(fetchSpy)).toBe(false);
+    });
+
+    it('凭证 openai 态 + 目标非 claude → 直接保存无确认提示（保持既有行为）', async () => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol: 'openai' });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        const overlay = document.querySelector('.modal-overlay');
+        const prov = overlay.querySelector('#ms-provider');
+        prov.value = 'deepseek';
+        prov.dispatchEvent(new Event('change', { bubbles: true }));
+        overlay.querySelector('#ms-model').value = 'deepseek-chat';
+        overlay.querySelector('.ms-start').click();
         await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
         expect(document.querySelector('.confirm-modal')).toBeNull();
     });
