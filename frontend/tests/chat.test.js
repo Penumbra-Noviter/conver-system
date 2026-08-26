@@ -661,6 +661,110 @@ describe('renderMessages — 缓存变体标记还原（F1 工厂变体透传，
     });
 });
 
+describe('T2 搜索定位 — renderMessages 高亮与定位（scrollIntoView / scrollTop 时序）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    const TARGET_MSGS = [
+        { id: 101, role: 'user', content: '你好' },
+        { id: 202, role: 'assistant', content: '好的' },
+    ];
+
+    /** 建活动 tab + 带 id 消息；jsdom 无 scrollHeight 语义 → 固定一个值以便检测滚动到底 */
+    function setupTarget({ chat, tabs }, { scrollHeight = 1000 } = {}) {
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: TARGET_MSGS });
+        Object.defineProperty(chat.chatDom.chatMessages, 'scrollHeight', { value: scrollHeight, configurable: true });
+        return chat.chatDom.chatMessages;
+    }
+
+    /** jsdom 无 scrollIntoView → 在 Element.prototype 挂 mock（renderMessages 经原型链调用） */
+    function mockScrollIntoView() {
+        const fn = vi.fn();
+        Object.defineProperty(Element.prototype, 'scrollIntoView', {
+            value: fn, configurable: true, writable: true,
+        });
+        return fn;
+    }
+
+    it('携带 messageId → 目标气泡 scrollIntoView({block:"center"}) + search-highlight，且不被滚动到底覆盖', async () => {
+        const { chat, tabs } = await loadModules();
+        const container = setupTarget({ chat, tabs });
+        const scrollIntoView = mockScrollIntoView();
+        chat.renderMessages({ messageId: 202 });
+        const target = container.querySelector('[data-message-id="202"]');
+        expect(target).not.toBeNull();
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+        expect(target.classList.contains('search-highlight')).toBe(true);
+        expect(container.scrollTop).not.toBe(container.scrollHeight); // 定位路径不滚动到底
+    });
+
+    it('无 messageId → 既有滚动到底保持（scrollTop 置 scrollHeight）', async () => {
+        const { chat, tabs } = await loadModules();
+        const container = setupTarget({ chat, tabs });
+        chat.renderMessages();
+        expect(container.scrollTop).toBe(container.scrollHeight);
+    });
+
+    it('search-highlight 约 3s 后自动清除', async () => {
+        vi.useFakeTimers();
+        const { chat, tabs } = await loadModules();
+        const container = setupTarget({ chat, tabs });
+        mockScrollIntoView();
+        chat.renderMessages({ messageId: 202 });
+        const target = container.querySelector('[data-message-id="202"]');
+        expect(target.classList.contains('search-highlight')).toBe(true);
+        vi.advanceTimersByTime(2999);
+        expect(target.classList.contains('search-highlight')).toBe(true);
+        vi.advanceTimersByTime(1);
+        expect(target.classList.contains('search-highlight')).toBe(false);
+        vi.useRealTimers();
+    });
+
+    it('Falsify:目标消息不存在（messageId 无匹配）→ 不崩溃、不高亮、不滚动到底', async () => {
+        const { chat, tabs } = await loadModules();
+        const container = setupTarget({ chat, tabs });
+        expect(() => chat.renderMessages({ messageId: 999 })).not.toThrow();
+        expect(container.querySelectorAll('.search-highlight')).toHaveLength(0);
+        expect(container.scrollTop).not.toBe(container.scrollHeight);
+    });
+
+    it('第二次定位清理旧定时器：旧 3s 定时器不误清除第二次定位的高亮', async () => {
+        vi.useFakeTimers();
+        const { chat, tabs } = await loadModules();
+        const container = setupTarget({ chat, tabs });
+        mockScrollIntoView();
+        chat.renderMessages({ messageId: 101 }); // t=0 定位 101 → 定时器 0→3000
+        expect(container.querySelector('[data-message-id="101"]').classList.contains('search-highlight')).toBe(true);
+        vi.advanceTimersByTime(2500); // t=2500（旧定时器未到期）
+        chat.renderMessages({ messageId: 202 }); // 第二次定位 → 清理旧定时器；新定时器 2500→5500
+        const secondEl = container.querySelector('[data-message-id="202"]');
+        expect(secondEl.classList.contains('search-highlight')).toBe(true);
+        expect(container.querySelector('[data-message-id="101"]').classList.contains('search-highlight')).toBe(false);
+        vi.advanceTimersByTime(500); // t=3000：旧定时器若未被清理将在此触发 → 误清除新高亮
+        expect(secondEl.classList.contains('search-highlight')).toBe(true); // 新高亮保持
+        vi.advanceTimersByTime(2500); // t=5500：新定时器到期
+        expect(secondEl.classList.contains('search-highlight')).toBe(false);
+        vi.useRealTimers();
+    });
+
+    it('渲染重建（消息重载）后：新 DOM 无残留 search-highlight，旧定时器触发不崩溃', async () => {
+        vi.useFakeTimers();
+        const { chat, tabs } = await loadModules();
+        const container = setupTarget({ chat, tabs });
+        mockScrollIntoView();
+        chat.renderMessages({ messageId: 202 });
+        expect(container.querySelector('[data-message-id="202"]').classList.contains('search-highlight')).toBe(true);
+        // 消息重载触发完整重建（renderMessages 无 messageId）
+        chat.renderMessages();
+        expect(container.querySelector('[data-message-id="202"]').classList.contains('search-highlight')).toBe(false);
+        // 旧的 3s 定时器触发（引用已卸载旧节点）→ 不崩溃，新 DOM 无残留
+        expect(() => vi.advanceTimersByTime(4000)).not.toThrow();
+        expect(container.querySelector('[data-message-id="202"]').classList.contains('search-highlight')).toBe(false);
+        vi.useRealTimers();
+    });
+});
+
 describe('聊天头部深模块（F4 收口 — renderChatHeader / startRename / 标题同步，自 app.test.js 随迁）', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
     afterEach(() => { vi.restoreAllMocks(); });

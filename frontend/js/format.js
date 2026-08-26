@@ -85,13 +85,18 @@ export function userAvatarHtml() {
  * @param {boolean} [opts.error=false] - 错误气泡：追加 message-error 类
  * @param {Array} [opts.characters=[]] - 角色列表（assistant 头像来源）
  * @param {number|null} [opts.currentCharacterId=null] - 当前角色 id（assistant 头像匹配）
+ * @param {number|string|null} [opts.messageId=null] - 消息 id（非空时外层气泡补
+ *   data-message-id 属性，供 T2 搜索定位按 id 选中目标气泡）
  * @returns {string} 气泡 HTML（system 角色无头像 + 无复制按钮）
  */
 export function messageBubbleHtml(role, content, opts = {}) {
-    const { streaming = false, stopped = false, error = false, characters = [], currentCharacterId = null } = opts;
+    const { streaming = false, stopped = false, error = false, characters = [], currentCharacterId = null, messageId } = opts;
     const classes = ['message', role];
     if (error) classes.push('message-error');
-    const bubbleAttrs = streaming ? ' data-streaming-live="1"' : '';
+    let bubbleAttrs = streaming ? ' data-streaming-live="1"' : '';
+    if (messageId !== undefined && messageId !== null) {
+        bubbleAttrs += ` data-message-id="${messageId}"`;
+    }
     const avatar = role === 'assistant'
         ? assistantAvatarHtml(characters, currentCharacterId)
         : (role === 'user' ? userAvatarHtml() : '');
@@ -121,6 +126,7 @@ export function buildMessagesHtml(messages, context = {}) {
         streaming: m.streaming,
         stopped: m.stopped,
         error: m.error,
+        messageId: m.id,
     })).join('');
 }
 

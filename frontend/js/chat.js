@@ -114,7 +114,49 @@ const copyFeedbackTimers = new WeakMap();
 // 消息渲染
 // ══════════════════════════════════════════════════
 
-export function renderMessages() {
+/** T2 搜索定位：高亮气泡元素（模块级 — 二次定位/渲染重建时先清旧态，防串扰） */
+let highlightEl = null;
+/** T2 搜索定位：高亮清除定时器（约 3s） */
+let highlightTimer = null;
+/** T2 搜索定位：高亮持续时长（ms） */
+const HIGHLIGHT_DURATION = 3000;
+
+/**
+ * 定位目标消息 + 应用 search-highlight + 约 3s 自动清除。
+ * 与既有 scrollToBottom 互斥调用（调用方 messageId 存在时走本路径，跳过滚动到底），
+ * 保证定位不被滚动到底覆盖。目标不存在（陈旧 messageId）→ no-op 不抛错。
+ * @param {number|string} messageId - 目标消息 id（匹配气泡 data-message-id）
+ */
+function locateAndHighlight(messageId) {
+    if (highlightTimer) {
+        clearTimeout(highlightTimer);
+        highlightTimer = null;
+    }
+    if (highlightEl) {
+        highlightEl.classList.remove('search-highlight');
+        highlightEl = null;
+    }
+    const target = chatDom.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
+    if (!target) return;
+    target.scrollIntoView({ block: 'center' });
+    target.classList.add('search-highlight');
+    highlightEl = target;
+    highlightTimer = setTimeout(() => {
+        target.classList.remove('search-highlight');
+        highlightTimer = null;
+        highlightEl = null;
+    }, HIGHLIGHT_DURATION);
+}
+
+/**
+ * 渲染聊天区消息列表（读活动 tab 缓存）。
+ * 空态判定收口（F6）；T2 搜索定位：传入 { messageId } 时渲染后定位目标消息到视口中央
+ * + 短暂高亮，并跳过既有滚动到底（scrollToBottom 与定位互斥，定位不被覆盖）。
+ * @param {object} [opts]
+ * @param {number|string|null} [opts.messageId=null] - 目标消息 id（激活流程经
+ *   conversation-activation 透传；无 id 时保持既有滚动到底语义）
+ */
+export function renderMessages({ messageId } = {}) {
     const container = chatDom.chatMessages;
     const tab = getActiveTab();
     // 空态判定收口（F6）：无活动 tab 或消息为空 → 同一 EMPTY_STATE_HTML（单一来源，
@@ -149,7 +191,12 @@ export function renderMessages() {
     // 缓存变体标记（stopped/error/streaming）由 buildMessagesHtml 经工厂透传还原 —
     // 切走再切回后停止/错误/流式语义保持一致（F1）；onToken 据此复用 live 气泡
 
-    scrollToBottom();
+    // T2 搜索定位：messageId 存在 → 定位 + 高亮，跳过滚动到底（互斥，定位不被覆盖）
+    if (messageId !== undefined && messageId !== null) {
+        locateAndHighlight(messageId);
+    } else {
+        scrollToBottom();
+    }
 }
 
 /**

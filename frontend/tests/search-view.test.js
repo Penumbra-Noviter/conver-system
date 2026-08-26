@@ -120,7 +120,7 @@ describe('search-view — 五态文案（逐字）与搜索流程', () => {
         expect(results.innerHTML).toContain('<mark class="search-highlight">世界</mark>');
     });
 
-    it('结果点击 → 经注入的 navigateToConversation 钩子跳转（收到 conversationId）', async () => {
+    it('结果点击 → 经注入的 navigateToConversation 钩子跳转（收到 conversationId + { messageId }）', async () => {
         const { searchView, api, input, results } = await loadModules();
         api.setFetch(mockSearch({
             results: [{ conversation_id: 11, message_id: 1, role: 'user', character_name: '', content_preview: 'hi', conversation_title: '会话A' }],
@@ -131,7 +131,22 @@ describe('search-view — 五态文案（逐字）与搜索流程', () => {
         await typeAndWait({ input }, 'hi');
         results.querySelector('.search-result-item').click();
         expect(nav).toHaveBeenCalledTimes(1);
-        expect(nav).toHaveBeenCalledWith(11);
+        // T2：跳转钩子签名扩展为 (conversationId, { messageId }) — 消费 dataset.messageId
+        expect(nav).toHaveBeenCalledWith(11, { messageId: 1 });
+    });
+
+    it('T2:结果 messageId 为 0/缺失 → 跳转仍调用（messageId 独立于 convId 守卫，透传 undefined）', async () => {
+        const { searchView, api, input, results } = await loadModules();
+        api.setFetch(mockSearch({
+            results: [{ conversation_id: 11, message_id: 0, role: 'user', character_name: '', content_preview: 'hi', conversation_title: '会话A' }],
+        }));
+        const nav = vi.fn();
+        searchView.initSearchView({ navigateToConversation: nav });
+
+        await typeAndWait({ input }, 'hi');
+        results.querySelector('.search-result-item').click();
+        expect(nav).toHaveBeenCalledTimes(1);
+        expect(nav).toHaveBeenCalledWith(11, { messageId: 0 });
     });
 
     it('结果点击 conversationId 为 0/空 → 不跳转（Falsify:parseInt 假值守卫）', async () => {

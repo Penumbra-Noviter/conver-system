@@ -76,16 +76,22 @@ export function showEmptyState() {
  * （快速连续切 tab 时各响应写各自 tab 缓存，后返回的响应不覆盖先返回的；
  * 缓存分支同样须校验活动性 —— F-2：await 期间切走时旧续体不得把 A 渲染进 B 的视图）
  * @param {number|string} conversationId - 会话 id
+ * @param {object} [options]
+ * @param {number|string|null} [options.messageId=null] - T2 搜索定位：目标消息 id，
+ *   非空时传给 renderMessages 触发 scrollIntoView + 高亮（缓存命中时覆盖滚动恢复）
  */
-export async function loadTabMessages(conversationId) {
+export async function loadTabMessages(conversationId, { messageId } = {}) {
     const tab = getTab(conversationId);
     if (!tab) return;
     // 已有缓存（含流式中断后的部分内容）→ 不重复请求，直接渲染
     if (tab.messages.length > 0) {
         if (getActiveTab()?.conversationId === conversationId) {
-            renderMessages();
-            // renderMessages 内部 scrollToBottom — 此处恢复缓存中的滚动位置（切 tab 恢复）
-            chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
+            renderMessages(messageId === undefined || messageId === null ? undefined : { messageId });
+            // renderMessages 内部 scrollToBottom — 此处恢复缓存中的滚动位置（切 tab 恢复）；
+            // T2 搜索定位：messageId 存在时定位语义覆盖滚动恢复（否则覆盖 scrollIntoView）
+            if (messageId === undefined || messageId === null) {
+                chatDom.chatMessages.scrollTop = tab.scrollTop ?? 0;
+            }
             renderChatHeader(conversationId);
         }
         return;
@@ -94,14 +100,14 @@ export async function loadTabMessages(conversationId) {
         const msgs = await messages.list(conversationId);
         updateTab(conversationId, { messages: msgs });
         if (getActiveTab()?.conversationId === conversationId) {
-            renderMessages();
+            renderMessages(messageId === undefined || messageId === null ? undefined : { messageId });
             renderChatHeader(conversationId);
         }
     } catch (err) {
         console.error('加载消息失败:', err);
         hooks.showError('加载消息失败');
         if (getActiveTab()?.conversationId === conversationId) {
-            renderMessages();
+            renderMessages(messageId === undefined || messageId === null ? undefined : { messageId });
             renderChatHeader(conversationId);
         }
     }
@@ -115,8 +121,10 @@ export async function loadTabMessages(conversationId) {
  * @param {object} [options]
  * @param {boolean} [options.saveCurrent=true] - 切换前保存当前活动 tab 的草稿/滚动。
  *   删除会话联动场景调用方已预先保存，传 false 防止旧视图 DOM 状态污染新活动 tab 缓存。
+ * @param {number|string|null} [options.messageId=null] - T2 搜索定位：目标消息 id，
+ *   非空时经 loadTabMessages 传给 renderMessages 触发 scrollIntoView + 高亮
  */
-export async function activateConversation(conversationId, { saveCurrent = true } = {}) {
+export async function activateConversation(conversationId, { saveCurrent = true, messageId } = {}) {
     // 1) 保存当前活动 tab 的草稿与滚动位置（切换前）
     if (saveCurrent) saveTabViewState();
     // 2) 打开/激活 tab（已存在仅激活，不重复开）
@@ -140,7 +148,7 @@ export async function activateConversation(conversationId, { saveCurrent = true 
     // 4) 恢复新 tab 的草稿与滚动位置
     restoreTabViewState(getTab(conversationId));
     // 5) 懒加载消息（缓存为空才请求）+ 头部渲染
-    await loadTabMessages(conversationId);
+    await loadTabMessages(conversationId, { messageId });
     if (getActiveTab()?.conversationId !== conversationId) return;
     // 6) 刷新发送按钮两态 + 列表高亮 + 视图（已在聊天视图则跳过 switchView 的重复 loadConversations）
     refreshSendButton();

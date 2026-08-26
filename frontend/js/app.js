@@ -284,7 +284,7 @@ initListViews({
 // 搜索视图初始化（ARC-9 C1 — 防抖 + 五态文案 + 渲染 + 结果跳转收口在 search-view.js；
 // 跳转钩子经注入走统一激活流程；100ms 聚焦时序在 switchView 内）
 initSearchView({
-    navigateToConversation: (conversationId) => activateConversation(conversationId),
+    navigateToConversation: (conversationId, { messageId } = {}) => activateConversation(conversationId, { messageId }),
 });
 
 // 模拟器列表视图初始化（U7-T3 — 挂载列表 UI 到 #simulator-list-panel；
