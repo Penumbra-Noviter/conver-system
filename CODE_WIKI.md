@@ -782,7 +782,7 @@ conver system/
 
 ### 4.44.2 `frontend/js/components/game-generator.js` — AI 游戏生成器（<!--AUTO:lines:frontend/js/components/game-generator.js-->~385 行<!--/AUTO-->）
 
-**职责**：从用户提供的世界观文本（textarea 粘贴或 .txt/.md 文件上传）生成 HTML 模拟器游戏。模态框输入 → POST /api/simulators/generate → 成功自动刷新列表 / 失败显示错误与重试按钮。T4 凭证预检：`openGenerateFlow` 打开时后台读取凭证端点，none/claude 态模态框顶部提示「需先配置 OpenAI 兼容 Key」+ 设置链接（复用 key-injector 的 `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS` 常量，点击经 `onNavigateSettings` 钩子 → `switchView('settings')`）；openai 态无提示；请求失败静默降级（不阻塞打开）。
+**职责**：从用户提供的世界观文本（textarea 粘贴或 .txt/.md 文件上传）生成 HTML 模拟器游戏。模态框输入 → POST /api/simulators/generate → 成功自动刷新列表 / 失败显示错误与重试按钮。T4 凭证预检：`openGenerateFlow` 打开时后台读取凭证端点，none/claude 态模态框顶部提示「需先配置 OpenAI 兼容 Key」+ 设置链接（沿用 key-injector 的 `LINK_NAV_SETTINGS` 文案常量，类名用生成器自有 `SEL_GG_WARNING_NAV`——F-63 已与模拟器专属 `SEL_NAV_SETTINGS` 解耦，点击经 `onNavigateSettings` 钩子 → `switchView('settings')`）；openai 态无提示；请求失败静默降级（不阻塞打开）。F-55：预检续体带提交态守卫（已提交生成则丢弃迟到响应）。
 
 | 元素 | 说明 |
 |------|------|
@@ -853,7 +853,7 @@ conver system/
 
 ### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~613 行<!--/AUTO-->）
 
-**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，供游戏生成器凭证预检复用（避免复制）。
+**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，`LINK_NAV_SETTINGS` 文案由游戏生成器凭证预检复用（`SEL_NAV_SETTINGS` 自 F-63 起为模拟器专属，生成器不再借用）。
 
 | 元素 | 说明 |
 |------|------|
