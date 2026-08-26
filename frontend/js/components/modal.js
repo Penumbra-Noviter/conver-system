@@ -11,7 +11,34 @@ import { escapeHtml } from '../utils.js';
 import { iconHtml } from '../icons.js';
 
 /**
+ * 焦点陷阱可聚焦元素选择器（T4 — Tab 循环不跳出框）。
+ * 覆盖 button/input/select/textarea/a[href]/显式 tabindex；disabled 在收集后
+ * 过滤（css 无法表达 :not([disabled]) 组合与 hidden 判断，统一在收集时过滤）。
+ */
+export const FOCUSABLE_SELECTOR = 'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])';
+
+/**
+ * 收集模态框内可聚焦元素（过滤 disabled / hidden / aria-hidden — jsdom 友好，
+ * 不依赖 offsetParent/getClientRects 布局度量）。
+ * @param {HTMLElement} overlay - 模态框遮罩
+ * @returns {HTMLElement[]}
+ */
+function collectFocusables(overlay) {
+    return [...overlay.querySelectorAll(FOCUSABLE_SELECTOR)].filter((el) => {
+        if (el.disabled) return false;
+        if (el.closest('[hidden]') !== null) return false;
+        if (el.getAttribute('aria-hidden') === 'true') return false;
+        return true;
+    });
+}
+
+/**
  * 打开一个模态框
+ *
+ * T4 快赢（焦点卫生）：打开时记录 `document.activeElement`；框内
+ *   Tab/Shift+Tab 焦点循环（不跳出框，可聚焦元素见 FOCUSABLE_SELECTOR，
+ *   hidden/disabled 过滤）；三条关闭路径（关闭按钮/遮罩/Escape）关闭后
+ *   焦点还原到打开前元素（该元素已脱离 DOM 则跳过还原）。
  * @param {object} options
  * @param {string} [options.title] - 弹窗标题（自动 HTML 转义）
  * @param {string} [options.modalClass] - 附加到 .modal 的 class（如 'confirm-modal'）
@@ -49,6 +76,9 @@ export function openModal(options = {}) {
         onClose = null,
     } = options;
 
+    // T4 — 记录打开前焦点元素（关闭后还原）
+    const previouslyFocused = document.activeElement;
+
     // 移除已存在的弹窗（按选择器定位首个匹配项所在的遮罩）
     if (removeExisting) {
         const existing = document.querySelector(removeExisting);
@@ -78,7 +108,36 @@ export function openModal(options = {}) {
     const close = (result = cancelResult) => {
         overlay.remove();
         if (onClose) onClose(result);
+        // T4 — 关闭后焦点还原到打开前元素（已脱离 DOM 则跳过）
+        if (previouslyFocused && typeof previouslyFocused.focus === 'function' && previouslyFocused.isConnected) {
+            previouslyFocused.focus();
+        }
     };
+
+    // T4 — 焦点陷阱：Tab / Shift+Tab 在框内循环（不跳出框）。
+    // focusables 在按键时收集（动态内容安全 — onOpen 中新增/移除控件也能正确循环）。
+    overlay.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab') return;
+        const focusables = collectFocusables(overlay);
+        if (focusables.length === 0) {
+            e.preventDefault();
+            return;
+        }
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey) {
+            if (active === first || !focusables.includes(active)) {
+                e.preventDefault();
+                last.focus();
+            }
+        } else {
+            if (active === last || !focusables.includes(active)) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    });
 
     // 通用关闭路径：关闭按钮 / 点击遮罩 / Escape
     overlay.querySelector('.modal-close').addEventListener('click', () => close());
@@ -108,4 +167,5 @@ export function openModal(options = {}) {
 
 export const __all__ = [
     'openModal',
+    'FOCUSABLE_SELECTOR',
 ];

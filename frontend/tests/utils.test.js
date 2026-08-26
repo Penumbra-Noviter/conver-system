@@ -1,5 +1,62 @@
-import { describe, it, expect } from 'vitest';
-import { escapeHtml, getInitials, formatTags, autoResizeInput } from '../js/utils.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { escapeHtml, getInitials, formatTags, autoResizeInput, showToast, showSuccess, showError, MAX_TOASTS } from '../js/utils.js';
+
+describe('showToast — 队列上限', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        // 清理遗留定时器
+        vi.useFakeTimers();
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+        document.body.innerHTML = '';
+    });
+
+    it('MAX_TOASTS 常量约等于 3', () => {
+        expect(MAX_TOASTS).toBeGreaterThanOrEqual(2);
+        expect(MAX_TOASTS).toBeLessThanOrEqual(4);
+    });
+
+    it('显示 1 条 toast → DOM 中 1 条', () => {
+        showToast('消息1');
+        expect(document.body.querySelectorAll('.toast').length).toBe(1);
+    });
+
+    it('4 条 toast ≥ MAX_TOASTS 时移除最旧一条', () => {
+        showToast('消息1');
+        showToast('消息2');
+        showToast('消息3');
+        showToast('消息4'); // 第 4 条 → 挤掉最旧
+
+        const toasts = document.body.querySelectorAll('.toast');
+        expect(toasts.length).toBe(MAX_TOASTS);
+        // 最旧一条（消息1）已被移除
+        expect([...toasts].map((t) => t.textContent)).not.toContain('消息1');
+        // 新条（消息4）存在
+        expect([...toasts].map((t) => t.textContent)).toContain('消息4');
+    });
+
+    it('showError / showSuccess 薄封装行为一致（队列上限 + 5s 自动消失）', async () => {
+        showError('错误1');
+        showSuccess('成功1');
+        showError('错误2');
+        showSuccess('成功2'); // 第4条 → 挤掉最旧
+
+        const toasts = document.body.querySelectorAll('.toast');
+        expect(toasts.length).toBe(MAX_TOASTS);
+        // 最旧一条（错误1）已被移除
+        expect([...toasts].map((t) => t.textContent)).not.toContain('错误1');
+        showSuccess('成功3'); // 第5条 → 挤掉最旧（成功1）
+        expect([...document.body.querySelectorAll('.toast')].map((t) => t.textContent)).not.toContain('成功1');
+    });
+
+    it('定时器到期后 toast 自动移除', () => {
+        showToast('自动消失');
+        expect(document.body.querySelectorAll('.toast').length).toBe(1);
+        vi.advanceTimersByTime(5000);
+        expect(document.body.querySelectorAll('.toast').length).toBe(0);
+    });
+});
 
 describe('escapeHtml', () => {
     it('转义 < > &', () => {

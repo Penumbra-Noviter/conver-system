@@ -326,9 +326,13 @@ initKeyInjector({
 });
 
 // 游戏生成器初始化（AI 生成按钮 → 模态框 → POST /api/simulators/generate；
-// onGenerated 接入 refreshSimulators：生成成功 → 列表刷新出现新卡片）
+// onGenerated 接入 refreshSimulators：生成成功 → 列表刷新出现新卡片。
+// T4 凭证预检：getCredentials 接入 settings.credentials() 读取凭证端点；
+// onNavigateSettings 接入 switchView('settings') 导航设置页）
 initGameGenerator({
     onGenerated: () => refreshSimulators(),
+    getCredentials: () => settings.credentials(),
+    onNavigateSettings: () => switchView('settings'),
 });
 // 存档管理面板初始化（U9-T2 — 绑定三面板 + getGames 钩子（数据源为
 // simulators.js 缓存，不重复 fetch manifest）；返回按钮 → closeSavePanel；

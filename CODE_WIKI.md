@@ -2,8 +2,8 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1879<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->788<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1021<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
-> 测试状态：<!--AUTO:tests_total:total-->1879<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->788<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1021<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1844<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->788<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1056<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1844<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->788<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1056<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -609,7 +609,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~392 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~396 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）、T1 凭证协议检测（init 数据加载序列后调 `settings.credentials()`，结果缓存到 `state.credentialsProtocol` 供引导卡判定）。
 
@@ -732,13 +732,13 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/export-dialog.js:showExportDialog-->`showExportDialog(conversationId)`<!--/AUTO--> | 打开导出对话框 |
 | <!--AUTO:sig:frontend/js/components/export-dialog.js:downloadExport-->`downloadExport(conversationId, format)`<!--/AUTO--> | 按格式下载导出 |
 
-### 4.42 `frontend/js/components/modal.js` — 模态骨架（<!--AUTO:lines:frontend/js/components/modal.js-->~98 行<!--/AUTO-->）
+### 4.42 `frontend/js/components/modal.js` — 模态骨架（<!--AUTO:lines:frontend/js/components/modal.js-->~149 行<!--/AUTO-->）
 
-**职责**：模态骨架（ARC10 T-11 收口）——打开/关闭/结果传递；`close` 为对象方法（骨架内部）。
+**职责**：模态骨架（ARC10 T-11 收口）——打开/关闭/结果传递；`close` 为对象方法（骨架内部）。T4 快赢：打开时记录 `document.activeElement`，三条关闭路径（关闭按钮/遮罩/Escape）关闭后焦点还原到打开前元素；框内 Tab/Shift+Tab 焦点循环不跳出框（可聚焦元素 button/input/select/textarea/a[href]/tabindex，hidden/disabled 过滤）。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/components/modal.js:openModal-->`openModal(options = {})`<!--/AUTO--> | 打开模态（返回结果 Promise） |
+| <!--AUTO:sig:frontend/js/components/modal.js:openModal-->`openModal(options = {})`<!--/AUTO--> | 打开模态（返回结果 Promise；含焦点陷阱 + 关闭焦点还原） |
 
 ### 4.43 `frontend/js/components/model-selector.js` — 模型选择（<!--AUTO:lines:frontend/js/components/model-selector.js-->~100 行<!--/AUTO-->）
 
@@ -778,14 +778,14 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/loading-button.js:clearButtonLoading-->`clearButtonLoading(btn)`<!--/AUTO--> | 未持 restore 引用时的还原 |
 
 
-### 4.44.2 `frontend/js/components/game-generator.js` — AI 游戏生成器（<!--AUTO:lines:frontend/js/components/game-generator.js-->~342 行<!--/AUTO-->）
+### 4.44.2 `frontend/js/components/game-generator.js` — AI 游戏生成器（<!--AUTO:lines:frontend/js/components/game-generator.js-->~380 行<!--/AUTO-->）
 
-**职责**：从用户提供的世界观文本（textarea 粘贴或 .txt/.md 文件上传）生成 HTML 模拟器游戏。模态框输入 → POST /api/simulators/generate → 成功自动刷新列表 / 失败显示错误与重试按钮。
+**职责**：从用户提供的世界观文本（textarea 粘贴或 .txt/.md 文件上传）生成 HTML 模拟器游戏。模态框输入 → POST /api/simulators/generate → 成功自动刷新列表 / 失败显示错误与重试按钮。T4 凭证预检：`openGenerateFlow` 打开时后台读取凭证端点，none/claude 态模态框顶部提示「需先配置 OpenAI 兼容 Key」+ 设置链接（复用 key-injector 的 `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS` 常量，点击经 `onNavigateSettings` 钩子 → `switchView('settings')`）；openai 态无提示；请求失败静默降级（不阻塞打开）。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/components/game-generator.js:initGameGenerator-->`initGameGenerator({ onGenerated: hook } = {})`<!--/AUTO--> | 注册 onGenerated 钩子（幂等） |
-| <!--AUTO:sig:frontend/js/components/game-generator.js:openGenerateFlow-->`openGenerateFlow()`<!--/AUTO--> | 打开生成模态框（工具栏/菜单入口） |
+| <!--AUTO:sig:frontend/js/components/game-generator.js:initGameGenerator-->`initGameGenerator({ onGenerated: hook, getCredentials, onNavigateSettings } = {})`<!--/AUTO--> | 注册钩子（onGenerated / getCredentials 凭证预检 / onNavigateSettings 设置导航，幂等） |
+| <!--AUTO:sig:frontend/js/components/game-generator.js:openGenerateFlow-->`openGenerateFlow()`<!--/AUTO--> | 打开生成模态框（工具栏/菜单入口；含凭证预检） |
 | <!--AUTO:sig:frontend/js/components/game-generator.js:resetGameGenerator-->`resetGameGenerator()`<!--/AUTO--> | 切走视图复位 |
 
 
@@ -849,9 +849,9 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/icons.js:iconHtml-->`iconHtml(name, options = {})`<!--/AUTO--> | 图标 HTML 生成（名称 + 选项） |
 
-### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~608 行<!--/AUTO-->）
+### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~613 行<!--/AUTO-->）
 
-**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。
+**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，供游戏生成器凭证预检复用（避免复制）。
 
 | 元素 | 说明 |
 |------|------|
@@ -1014,14 +1014,14 @@ conver system/
 | <!--AUTO:sig:frontend/js/tabs.js:persist-->`persist()`<!--/AUTO--> | 写 sessionStorage |
 | <!--AUTO:sig:frontend/js/tabs.js:commit-->`commit()`<!--/AUTO--> | 提交（持久化 + 通知） |
 
-### 4.61 `frontend/js/utils.js` — 通用工具（<!--AUTO:lines:frontend/js/utils.js-->~107 行<!--/AUTO-->）
+### 4.61 `frontend/js/utils.js` — 通用工具（<!--AUTO:lines:frontend/js/utils.js-->~120 行<!--/AUTO-->）
 
-**职责**：通用工具——HTML 转义、Toast、Blob 下载、头像首字母、标签格式化、输入框自适应。
+**职责**：通用工具——HTML 转义、Toast（T4 队列上限：`MAX_TOASTS≈3`，新条挤最旧）、Blob 下载、头像首字母、标签格式化、输入框自适应。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:frontend/js/utils.js:escapeHtml-->`escapeHtml(str)`<!--/AUTO--> | HTML 转义 |
-| <!--AUTO:sig:frontend/js/utils.js:showToast-->`showToast(message, type = 'success')`<!--/AUTO--> | Toast 提示 |
+| <!--AUTO:sig:frontend/js/utils.js:showToast-->`showToast(message, type = 'success')`<!--/AUTO--> | Toast 提示（队列上限，新条挤最旧） |
 | <!--AUTO:sig:frontend/js/utils.js:showError-->`showError(message)`<!--/AUTO--> | 错误提示（showToast 薄封装） |
 | <!--AUTO:sig:frontend/js/utils.js:showSuccess-->`showSuccess(message)`<!--/AUTO--> | 成功提示（showToast 薄封装） |
 | <!--AUTO:sig:frontend/js/utils.js:downloadBlob-->`downloadBlob(url, filename, errorPrefix = '导出失败')`<!--/AUTO--> | Blob 下载 |
@@ -1300,11 +1300,12 @@ conver system/
 | `frontend/tests/error-bar.test.js` | <!--AUTO:tests:frontend/tests/error-bar.test.js-->11<!--/AUTO--> | 错误条渲染/交互/生命周期（T1） |
 | `frontend/tests/loading-button.test.js` | <!--AUTO:tests:frontend/tests/loading-button.test.js-->7<!--/AUTO--> | 按钮 loading 态工具 |
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->42<!--/AUTO--> | 展示契约 |
-| `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->13<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试） |
+| `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->27<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
-| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->69<!--/AUTO--> | Key 注入/端点口径 |
+| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->70<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
+| `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态骨架（焦点陷阱/关闭还原，T4） |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->8<!--/AUTO--> | 模型选择 |
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
 | `frontend/tests/save-key-meta.test.js` | <!--AUTO:tests:frontend/tests/save-key-meta.test.js-->25<!--/AUTO--> | 存档键契约 |
@@ -1321,7 +1322,7 @@ conver system/
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
 | `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->53<!--/AUTO--> | 流式会话结算 |
 | `frontend/tests/tabs.test.js` | <!--AUTO:tests:frontend/tests/tabs.test.js-->68<!--/AUTO--> | tab 工作区 |
-| `frontend/tests/utils.test.js` | <!--AUTO:tests:frontend/tests/utils.test.js-->10<!--/AUTO--> | 通用工具 |
+| `frontend/tests/utils.test.js` | <!--AUTO:tests:frontend/tests/utils.test.js-->15<!--/AUTO--> | 通用工具（含 toast 队列上限，T4） |
 
 运行：`cd frontend && npm test`（= `vitest run`）。
 
@@ -1373,10 +1374,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1879<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1844<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->788<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1021<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1056<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

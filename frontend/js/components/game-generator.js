@@ -23,6 +23,8 @@ import { doFetch } from '../fetch-seam.js';
 import { GENERATE_URL } from '../simulator-contracts.js';
 import { iconHtml } from '../icons.js';
 import { showSuccess, escapeHtml } from '../utils.js';
+// T4 凭证预检：复用 key-injector 既有引导链接文案/选择器常量（避免复制）
+import { LINK_NAV_SETTINGS, SEL_NAV_SETTINGS } from '../key-injector.js';
 
 // ══════════════════════════════════════════════════
 // fetch seam（单一来源 js/fetch-seam.js）
@@ -51,6 +53,15 @@ let generating = false;
 
 /** 生成完成钩子（app.js 注入 → refreshSimulators） */
 let onGenerated = () => {};
+
+/** 凭证获取函数（initGameGenerator 注入 getCredentials；T4 凭证预检） */
+let fetchCredentials = null;
+
+/** 设置页导航钩子（initGameGenerator 注入 onNavigateSettings；T4 凭证预检设置链接点击） */
+let navigateSettings = null;
+
+/** 凭证预检（T4）：none/claude 态模态框顶部提示文案 */
+const MSG_NEED_OPENAI_KEY = '需先配置 OpenAI 兼容 Key';
 
 // ══════════════════════════════════════════════════
 // 内部工具
@@ -118,7 +129,8 @@ function renderErrors(errors, suggestion) {
 function buildModalBody(initialDescription, initialTitle) {
     const desc = initialDescription ? escapeHtml(initialDescription) : '';
     const title = initialTitle ? escapeHtml(initialTitle) : '';
-    return `<div class="form-field">
+    return `<div class="gg-cred-warning" id="gg-cred-warning" hidden></div>
+        <div class="form-field">
         <label for="gg-title">游戏名称 <span class="field-hint">（可选）</span></label>
         <input type="text" id="gg-title" maxlength="100" placeholder="例如：霓虹追迹"
             value="${title}">
@@ -271,14 +283,21 @@ async function executeGenerate({ overlay, close, description, title }) {
 // ══════════════════════════════════════════════════
 
 /**
- * 初始化游戏生成器（注册 onGenerated 钩子）。
+ * 初始化游戏生成器（注册 onGenerated 钩子 + T4 凭证预检钩子）。
  * 幂等：重复调用仅更新钩子。
  * @param {object} [options]
  * @param {Function} [options.onGenerated] - () => Promise<void>；生成成功后
  *   调用（app.js 注入 → refreshSimulators）
+ * @param {Function} [options.getCredentials] - () => Promise<{protocol}>；
+ *   T4 凭证预检：打开时读取凭证端点（none/claude 态顶部提示；openai 态无提示；
+ *   失败降级不阻塞）
+ * @param {Function} [options.onNavigateSettings] - () => void；none/claude 态
+ *   「前往设置页配置」链接点击时调用（点击 → switchView('settings')）
  */
-export function initGameGenerator({ onGenerated: hook } = {}) {
+export function initGameGenerator({ onGenerated: hook, getCredentials, onNavigateSettings } = {}) {
     if (typeof hook === 'function') onGenerated = hook;
+    if (typeof getCredentials === 'function') fetchCredentials = getCredentials;
+    if (typeof onNavigateSettings === 'function') navigateSettings = onNavigateSettings;
 }
 
 /**
@@ -300,6 +319,29 @@ export function openGenerateFlow() {
         removeExisting: '.modal-overlay',
         focusSelector: '#gg-description',
         onOpen: (el, close) => {
+
+            // T4 凭证预检：后台读取凭证端点，none/claude 态注入顶部提示 +
+            // 设置链接（复用 key-injector 常量与引导模式）；openai 态无提示；
+            // 请求失败静默降级（不阻塞打开、不弹错 — 标注以实测为准）。
+            if (typeof fetchCredentials === 'function') {
+                fetchCredentials()
+                    .then((creds) => {
+                        if (!el.isConnected) return; // 模态框已关闭 → 丢弃
+                        const protocol = creds?.protocol;
+                        if (protocol === 'none' || protocol === 'claude') {
+                            const warning = el.querySelector('#gg-cred-warning');
+                            if (!warning) return;
+                            const navClass = SEL_NAV_SETTINGS.slice(1);
+                            warning.hidden = false;
+                            warning.innerHTML = `${escapeHtml(MSG_NEED_OPENAI_KEY)} <a href="#" class="${navClass}">${escapeHtml(LINK_NAV_SETTINGS)}</a>`;
+                            warning.querySelector(SEL_NAV_SETTINGS)?.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                if (typeof navigateSettings === 'function') navigateSettings();
+                            });
+                        }
+                    })
+                    .catch(() => { /* 降级：静默（不提示、不阻塞、不弹错） */ });
+            }
 
             // 取消按钮绑定关闭
             el.querySelector('.modal-cancel')?.addEventListener('click', () => close());

@@ -17,7 +17,15 @@ export function escapeHtml(str) {
 }
 
 /**
- * 显示 Toast 通知（自动 5 秒后消失）
+ * Toast 队列上限（快赢 T4 — 连续触发不无限叠加，新条挤掉最旧一条）
+ * 约 3 条：屏幕同时可见的 toast 数不超过此值。
+ */
+export const MAX_TOASTS = 3;
+
+/**
+ * 显示 Toast 通知（自动 5 秒后消失）。
+ * 队列上限：DOM 中已存在 MAX_TOASTS 条 toast 时，移除最早挂载的一条
+ * （appendChild 追加到 body 末尾，故 body 中第一个 .toast 即最旧）。
  * @param {string} message - 提示内容
  * @param {'success'|'error'} type - 类型（影响样式）
  */
@@ -26,6 +34,13 @@ export function showToast(message, type = 'success') {
     toast.className = `toast toast-${type}`;
     toast.textContent = message;
     document.body.appendChild(toast);
+
+    // 新条挤最旧：超过上限移除最旧（最前）一条
+    const toasts = document.body.querySelectorAll('.toast');
+    for (let i = 0; i < toasts.length - MAX_TOASTS; i++) {
+        toasts[i].remove();
+    }
+
     setTimeout(() => toast.remove(), 5000);
 }
 
@@ -111,6 +126,7 @@ export const __all__ = [
     'showToast',
     'showError',
     'showSuccess',
+    'MAX_TOASTS',
     'downloadBlob',
     'getInitials',
     'formatTags',
