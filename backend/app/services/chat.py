@@ -110,10 +110,15 @@ def assemble_chat_context(
     else:
         # 重生成路径：不追加当前输入。build_message_list 末尾恒追加输入，
         # 此处用空串追加后丢弃，使历史末条 user 即为待回复目标（不重复）。
+        # 带 post_history_instructions（PHI）的角色：build_message_list 在最后
+        # user 之后追加 PHI（system）再追加 "" user，故丢弃 "" user 后需再移除
+        # 末尾 system（PHI），使末尾 user 恢复为触发源（W2 增量审核 BREAKS-高）。
         messages = message_service.build_message_list(
             db, conv, "", max_rounds=max_rounds, user_name=user_name,
         )
         messages = messages[:-1]
+        while messages and messages[-1].get("role") == "system":
+            messages.pop()
 
     # 4. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
     _, _, provider = resolve_llm(db, conv.model_provider, conv.model_name)
@@ -307,19 +312,28 @@ async def regenerate_chat(
     if _last_user_before(db, conversation_id, target.id) is None:
         raise InvalidRegenerateTargetError("没有可重生成的用户消息")
 
-    # 4. 截断（删除 target 及其后全部，不 commit，LLM 失败可回滚）
+    # 4. 截断（删除 target 及其后全部，不 commit；截断后任何异常均回滚，
+    #    防半截断持久化——W2 增量审核 BREAKS-中：不止 LLMError，resolve_llm
+    #    的 ApiKeyMissing/ProviderNotSupported 等异常同样须回滚）
     message_service.delete_messages_from(db, conversation_id, target.id)
 
-    # 5. 组装上下文（不插入 user；历史末条 user 即触发源）
-    ctx = assemble_chat_context(db, conversation_id, current_input=None)
-
-    # 6. 生成回复
+    # 5-6. 组装上下文 + 生成回复（同一原子的异常边界）
     try:
+        ctx = assemble_chat_context(db, conversation_id, current_input=None)
         reply_text = await ctx.provider.generate(
             ctx.messages,
             temperature=ctx.temperature,
             model=ctx.conversation.model_name,
         )
+    except LLMError as e:
+        db.rollback()
+        status_code, message = chat_error_response(
+            e, ctx.conversation.model_provider
+        )
+        raise HTTPException(status_code=status_code, detail=message)
+    except Exception:
+        db.rollback()
+        raise
     except LLMError as e:
         db.rollback()
         status_code, message = chat_error_response(

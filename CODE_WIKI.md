@@ -2,8 +2,8 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1879<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->788<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1021<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
-> 测试状态：<!--AUTO:tests_total:total-->1879<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->788<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1021<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1881<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->790<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1021<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1881<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->790<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1021<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -382,7 +382,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~376 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~391 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -1273,7 +1273,7 @@ conver system/
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
 | `backend/tests/test_prompt.py` | <!--AUTO:tests:backend/tests/test_prompt.py-->26<!--/AUTO--> | 提示词构建/模板变量 |
 | `backend/tests/test_provider_registry.py` | <!--AUTO:tests:backend/tests/test_provider_registry.py-->24<!--/AUTO--> | Provider 注册表 |
-| `backend/tests/test_regenerate.py` | <!--AUTO:tests:backend/tests/test_regenerate.py-->26<!--/AUTO--> | regenerate 端点（截断/事务/错误矩阵） |
+| `backend/tests/test_regenerate.py` | <!--AUTO:tests:backend/tests/test_regenerate.py-->28<!--/AUTO--> | regenerate 端点（截断/事务/错误矩阵） |
 | `backend/tests/test_regenerate_spike.py` | <!--AUTO:tests:backend/tests/test_regenerate_spike.py-->22<!--/AUTO--> | regenerate truncation×滑窗边界实证（T0 spike） |
 | `backend/tests/test_resolve_llm.py` | <!--AUTO:tests:backend/tests/test_resolve_llm.py-->7<!--/AUTO--> | LLM 解析器 |
 | `backend/tests/test_schema_snapshot.py` | <!--AUTO:tests:backend/tests/test_schema_snapshot.py-->1<!--/AUTO--> | schema 快照漂移检测（T-17） |
@@ -1373,9 +1373,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1879<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1881<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->788<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->790<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1021<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

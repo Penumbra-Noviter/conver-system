@@ -44,7 +44,12 @@ __all__: list[str] = []
 # ── 测试基础设施（与 test_chat_service.py 同模式）──
 
 
-def _create_character(db: Session, first_mes: str = "", temperature: float = 0.7) -> int:
+def _create_character(
+    db: Session,
+    first_mes: str = "",
+    temperature: float = 0.7,
+    post_history_instructions: str = "",
+) -> int:
     """落库一个角色（默认无 greeting），返回 id"""
     from backend.app.models.character import Character
 
@@ -53,6 +58,7 @@ def _create_character(db: Session, first_mes: str = "", temperature: float = 0.7
         personality="冷静、睿智",
         first_mes=first_mes,
         temperature=temperature,
+        post_history_instructions=post_history_instructions,
     )
     db.add(char)
     db.commit()
@@ -431,6 +437,62 @@ class TestRegenerateChatService:
 
         assert exc.value.status_code == 401
         # 截断回滚：原始时间线完整保留
+        assert _contents(db_session, conv.id) == [
+            "第一轮问", "第一轮答", "第二轮问", "第二轮答",
+        ]
+
+    async def test_phi_role_trigger_is_last_user_not_phi(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """带 post_history_instructions（PHI）的角色重生成：generate 收到的末条必须
+        是触发 user（第二轮问），而非 PHI（system）——W2 增量审核 BREAKS-高修复：
+        `messages[:-1]` 丢弃 "" user 后须再移除末尾 system（PHI）恢复触发源"""
+        fake = _FakeProvider(reply="新的回复")
+        _patch_api_key(monkeypatch)
+        char_id = _create_character(
+            db_session, post_history_instructions="请始终保持角色人设与第一人称。"
+        )
+        conv = _create_conversation(db_session, character_id=char_id)
+        _add_messages(
+            db_session, conv.id,
+            ("user", "第一轮问"), ("assistant", "第一轮答"),
+            ("user", "第二轮问"), ("assistant", "第二轮答"),
+        )
+        _patch_factory(monkeypatch, fake)
+
+        await chat_service.regenerate_chat(db_session, conv.id)
+
+        messages, _, _, _ = fake.calls[0]
+        # 末条 = 触发 user（非 PHI/system）；触发 user 在列表中只出现一次
+        assert messages[-1] == {"role": "user", "content": "第二轮问"}
+        trigger_occurrences = [
+            m for m in messages if m["role"] == "user" and m["content"] == "第二轮问"
+        ]
+        assert len(trigger_occurrences) == 1
+
+    async def test_non_llm_error_after_truncation_rolls_back(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """截断后 resolve_llm/组装抛非 LLMError（如 ProviderNotSupportedError）→
+        同样回滚截断（不落半截断）——W2 增量审核 BREAKS-中修复：异常边界扩到
+        截断后全部 Exception，不只 LLMError"""
+        from backend.app.services.exceptions import ProviderNotSupportedError
+
+        _patch_api_key(monkeypatch)
+        fake = _FakeProvider()
+        conv, _ = _setup_regenerate_pair(db_session, monkeypatch, fake)
+
+        # 让截断后（步骤 5）的 assemble_chat_context 抛非 LLMError 领域异常
+        monkeypatch.setattr(
+            chat_service,
+            "assemble_chat_context",
+            lambda *a, **k: (_ for _ in ()).throw(ProviderNotSupportedError("模拟 provider 移除")),
+        )
+
+        with pytest.raises(ProviderNotSupportedError):
+            await chat_service.regenerate_chat(db_session, conv.id)
+
+        # 截断回滚：原始时间线完整保留（无半截断持久化）
         assert _contents(db_session, conv.id) == [
             "第一轮问", "第一轮答", "第二轮问", "第二轮答",
         ]
