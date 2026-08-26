@@ -407,6 +407,13 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
             state.defaultProvider = result.default_provider || data.default_provider;
             state.defaultProviderName = result.default_provider_name || data.default_provider_name || state.defaultProviderName;
             state.defaultModel = result.default_model || data.default_model;
+            // 刷新凭证协议（W1 增量审核 P1）：保存后 key 可能已配置/变更，陈旧值会让
+            // 首启引导卡不消失（index.html 声明「配置好 Key 后引导卡自动消失」）。
+            // 检测失败保持现状（不打断保存流程），返回聊天视图时 renderMessages 读新值。
+            try {
+                const creds = await settings.credentials();
+                state.credentialsProtocol = creds?.protocol ?? null;
+            } catch { /* 刷新失败 → 保持旧协议值，下次 init/保存再刷新 */ }
             // 应用主题
             applyTheme(data.theme_mode || 'auto');
             updateThemeToggleIcon(data.theme_mode || 'dark');
