@@ -36,7 +36,7 @@
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
-| 01 | 类型探测三层补强（严格 cfg- 三元组 → 关键词启发 → local）+ scan_input_ids 双层扫描（input/select + 脚本层）+ probe_endpoint_mode 端点口径；manifest 新增 update_manifest_entry；POST /api/simulators/reprobe 端点 + 前端 local 卡片「重新识别」按钮；文档同步 | 2026-08-26 | <待 commit> |
+| 01 | 类型探测三层补强（严格 cfg- 三元组 → 关键词启发 → local）+ scan_input_ids 双层扫描（input/select + 脚本层）+ probe_endpoint_mode 端点口径；manifest 新增 update_manifest_entry；POST /api/simulators/reprobe 端点 + 前端 local 卡片「重新识别」按钮；文档同步 | 2026-08-26 | 07d9ab4 |
 
 **验证链：** pytest 713→739+1skip ✅（+26：启发式 7 约定/脚本层/endpointMode/update_manifest_entry/reprobe wire）| Vitest 983→986 ✅（+3 reprobe 用例 + 契约锁同步）| 真实数据：22 种子 + 斗罗大陆探测全 ai，config 与手工 manifest 逐字一致 | doc_sync --check ✅
 
