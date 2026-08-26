@@ -44,3 +44,12 @@ class ChatResponse(BaseModel):
     reply: str
     message_id: int
     conversation_id: int
+
+
+class RegenerateRequest(BaseModel):
+    """重生成请求体（可选指定要重生成的目标 assistant 消息）
+
+    Attributes:
+        message_id: 目标 assistant 消息 ID（缺省=末条 AI 回复）
+    """
+    message_id: int | None = None

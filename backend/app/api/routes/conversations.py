@@ -13,10 +13,29 @@ from sqlalchemy.orm import Session
 from backend.app.api.headers import build_content_disposition
 from backend.app.database import get_db
 from backend.app.schemas.conversation import ConversationCreate, ConversationResponse, ConversationUpdate
+from backend.app.schemas.message import ChatResponse, RegenerateRequest
+from backend.app.services import chat as chat_service
 from backend.app.services import conversation as service
 from backend.app.services import conversation_export as export_service
 
 router = APIRouter(prefix="/api/conversations", tags=["对话管理"])
+
+
+@router.post("/{conversation_id}/regenerate", response_model=ChatResponse)
+async def regenerate(
+    conversation_id: int,
+    body: RegenerateRequest | None = None,
+    db: Session = Depends(get_db),
+) -> ChatResponse:
+    """重生成对话中目标 AI 回复（缺省末条 assistant）
+
+    删除目标回复及其后的所有消息（时间线截断），随后按既有非流式路径重新生成
+    一条 AI 回复并落库。编排（截断 / 组装 / 生成 / 事务）收拢在 services/chat.py
+    的 regenerate_chat；领域异常上抛由统一 handler 转 404/400。
+
+    body 可缺省（=末条 assistant）或携带可选 message_id 指向某条 assistant 消息。
+    """
+    return await chat_service.regenerate_chat(db, conversation_id, body.message_id if body else None)
 
 
 @router.get("", response_model=list[ConversationResponse])
