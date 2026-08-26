@@ -246,3 +246,55 @@ describe('saveTabViewState / restoreTabViewState / showEmptyState', () => {
         await expect(activation.activateConversation(11)).resolves.toBeUndefined();
     });
 });
+
+describe('T2 搜索定位 — messageId 透传链', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+
+    it('activateConversation 携带 messageId → renderMessages 收到 { messageId }（网络加载路径）', async () => {
+        const { activation, tabs, state, chat } = await loadModules();
+        state.conversations = [{ id: 11, title: '对话A', character_id: 1 }];
+        globalThis.fetch = makeMock({ messagesByConv: { 11: [msg(1, 'user', 'hi')] } });
+        activation.setActivationHooks({});
+        const renderSpy = vi.spyOn(chat, 'renderMessages');
+        await activation.activateConversation(11, { messageId: 7 });
+        expect(renderSpy).toHaveBeenCalledWith({ messageId: 7 });
+    });
+
+    it('loadTabMessages 网络加载 + messageId → renderMessages 收到 { messageId }', async () => {
+        const { activation, tabs, chat } = await loadModules();
+        tabs.openTab(11);
+        globalThis.fetch = makeMock({ messagesByConv: { 11: [msg(1, 'user', 'fresh')] } });
+        activation.setActivationHooks({});
+        const renderSpy = vi.spyOn(chat, 'renderMessages');
+        await activation.loadTabMessages(11, { messageId: 7 });
+        expect(renderSpy).toHaveBeenCalledWith({ messageId: 7 });
+    });
+
+    it('loadTabMessages 缓存命中 + messageId → renderMessages 收到 { messageId } 且不恢复旧滚动位置（定位覆盖）', async () => {
+        const { activation, tabs, chat } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [msg(1, 'user', 'cached')], scrollTop: 42 });
+        const fetchSpy = vi.fn(makeMock({}));
+        globalThis.fetch = fetchSpy;
+        activation.setActivationHooks({});
+        const renderSpy = vi.spyOn(chat, 'renderMessages');
+        await activation.loadTabMessages(11, { messageId: 7 });
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(renderSpy).toHaveBeenCalledWith({ messageId: 7 });
+        // 定位语义覆盖缓存滚动恢复：不把 scrollTop 恢复成 42（否则覆盖 scrollIntoView 定位）
+        expect(chat.chatDom.chatMessages.scrollTop).not.toBe(42);
+    });
+
+    it('未携带 messageId → renderMessages 不带 messageId，缓存滚动恢复保持（既有语义）', async () => {
+        const { activation, tabs, chat } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [msg(1, 'user', 'cached')], scrollTop: 42 });
+        globalThis.fetch = vi.fn(makeMock({}));
+        activation.setActivationHooks({});
+        const renderSpy = vi.spyOn(chat, 'renderMessages');
+        await activation.loadTabMessages(11);
+        expect(renderSpy).toHaveBeenCalled();
+        expect(renderSpy.mock.calls[0][0]).toBeUndefined(); // 不携带 messageId
+        expect(chat.chatDom.chatMessages.scrollTop).toBe(42); // 恢复滚动保持
+    });
+});

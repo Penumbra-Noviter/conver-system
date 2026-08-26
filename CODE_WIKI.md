@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1744<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->740<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1004<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1783<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->762<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1021<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -621,13 +621,14 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~512 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~557 行<!--/AUTO-->）
 
-**职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名。
+**职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名。T2 搜索定位：`renderMessages({ messageId })` 在消息加载/渲染后把目标气泡 `scrollIntoView({block:'center'})` 定位到视口中央 + 应用 `.search-highlight` 高亮约 3s 自动清除（`locateAndHighlight`），并与既有 `scrollToBottom` 互斥（定位不被滚动到底覆盖）。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/chat.js:renderMessages-->`renderMessages()`<!--/AUTO--> | 渲染消息列表 |
+| <!--AUTO:sig:frontend/js/chat.js:renderMessages-->`renderMessages({ messageId } = {})`<!--/AUTO--> | 渲染消息列表（可选 `{ messageId }`：定位 + 高亮，见 T2） |
+| <!--AUTO:sig:frontend/js/chat.js:locateAndHighlight-->`locateAndHighlight(messageId)`<!--/AUTO--> | T2 定位目标消息 + search-highlight 高亮 + 3s 清除 |
 | <!--AUTO:sig:frontend/js/chat.js:appendMessage-->`appendMessage(role, content, meta = {})`<!--/AUTO--> | 追加消息气泡 |
 | <!--AUTO:sig:frontend/js/chat.js:showThinkingIndicator-->`showThinkingIndicator()`<!--/AUTO--> | 思考指示 |
 | <!--AUTO:sig:frontend/js/chat.js:handleSend-->`handleSend()`<!--/AUTO--> | 发送入口（流式/非流式） |
@@ -789,14 +790,14 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/components/tab-bar.js:initTabBar-->`initTabBar({ container, onActivate } = {})`<!--/AUTO--> | 初始化 tab 栏 |
 
-### 4.46 `frontend/js/conversation-activation.js` — 会话激活（<!--AUTO:lines:frontend/js/conversation-activation.js-->~146 行<!--/AUTO-->）
+### 4.46 `frontend/js/conversation-activation.js` — 会话激活（<!--AUTO:lines:frontend/js/conversation-activation.js-->~154 行<!--/AUTO-->）
 
-**职责**：会话激活流程——tab 视图状态保存/恢复、空态、消息加载（P6.5 多 tab 联动）。
+**职责**：会话激活流程——tab 视图状态保存/恢复、空态、消息加载（P6.5 多 tab 联动）。T2 搜索定位：`activateConversation` / `loadTabMessages` 支持可选 `messageId`，透传 `renderMessages` 触发定位 + 高亮（缓存命中时定位覆盖滚动恢复，不被覆盖）。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/conversation-activation.js:activateConversation-->`activateConversation(conversationId, { saveCurrent = true } = {})`<!--/AUTO--> | 激活会话（先存当前） |
-| <!--AUTO:sig:frontend/js/conversation-activation.js:loadTabMessages-->`loadTabMessages(conversationId)`<!--/AUTO--> | 加载 tab 消息 |
+| <!--AUTO:sig:frontend/js/conversation-activation.js:activateConversation-->`activateConversation(conversationId, { saveCurrent = true, messageId } = {})`<!--/AUTO--> | 激活会话（先存当前；可选 messageId 触发定位） |
+| <!--AUTO:sig:frontend/js/conversation-activation.js:loadTabMessages-->`loadTabMessages(conversationId, { messageId } = {})`<!--/AUTO--> | 加载 tab 消息（可选 messageId 透传渲染） |
 | <!--AUTO:sig:frontend/js/conversation-activation.js:saveTabViewState-->`saveTabViewState()`<!--/AUTO--> | 保存当前 tab 视图状态 |
 | <!--AUTO:sig:frontend/js/conversation-activation.js:restoreTabViewState-->`restoreTabViewState(tab)`<!--/AUTO--> | 恢复 tab 视图状态 |
 | <!--AUTO:sig:frontend/js/conversation-activation.js:showEmptyState-->`showEmptyState()`<!--/AUTO--> | 空态显示 |
@@ -817,14 +818,14 @@ conver system/
 | <!--AUTO:sig:frontend/js/fetch-seam.js:setFetch-->`setFetch(fn)`<!--/AUTO--> | 注入 fetch 实现（测试用） |
 | <!--AUTO:sig:frontend/js/fetch-seam.js:doFetch-->`doFetch(...args)`<!--/AUTO--> | 统一 fetch 出口（超时守卫） |
 
-### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~202 行<!--/AUTO-->）
+### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~208 行<!--/AUTO-->）
 
-**职责**：展示 HTML 生成单源（ARC 展示契约）——消息气泡/角色卡片/会话项/搜索结果/头像/关键词高亮。
+**职责**：展示 HTML 生成单源（ARC 展示契约）——消息气泡/角色卡片/会话项/搜索结果/头像/关键词高亮。T2 搜索定位：`messageBubbleHtml` 接受可选 `messageId` 选项 → 渲染 `data-message-id` 属性（供定位选择器消费）；`buildMessagesHtml` 透传 `m.id`。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/format.js:messageBubbleHtml-->`messageBubbleHtml(role, content, opts = {})`<!--/AUTO--> | 消息气泡 HTML |
-| <!--AUTO:sig:frontend/js/format.js:buildMessagesHtml-->`buildMessagesHtml(messages, context = {})`<!--/AUTO--> | 消息列表 HTML |
+| <!--AUTO:sig:frontend/js/format.js:messageBubbleHtml-->`messageBubbleHtml(role, content, opts = {})`<!--/AUTO--> | 消息气泡 HTML（可选 `{ messageId }` → data-message-id） |
+| <!--AUTO:sig:frontend/js/format.js:buildMessagesHtml-->`buildMessagesHtml(messages, context = {})`<!--/AUTO--> | 消息列表 HTML（透传消息 id → data-message-id） |
 | <!--AUTO:sig:frontend/js/format.js:characterCardHtml-->`characterCardHtml(c)`<!--/AUTO--> | 角色卡片 HTML |
 | <!--AUTO:sig:frontend/js/format.js:conversationItemHtml-->`conversationItemHtml(c, { activeId = null } = {})`<!--/AUTO--> | 会话项 HTML |
 | <!--AUTO:sig:frontend/js/format.js:searchResultItemHtml-->`searchResultItemHtml(r, query)`<!--/AUTO--> | 搜索结果项 HTML（高亮） |
@@ -904,13 +905,13 @@ conver system/
 | <!--AUTO:sig:frontend/js/save-manager.js:renderSavePanel-->`renderSavePanel()`<!--/AUTO--> | 渲染存档面板 |
 | <!--AUTO:sig:frontend/js/save-manager.js:renderGameRow-->`renderGameRow(game)`<!--/AUTO--> | 渲染游戏行 |
 
-### 4.55 `frontend/js/search-view.js` — 搜索视图（<!--AUTO:lines:frontend/js/search-view.js-->~141 行<!--/AUTO-->）
+### 4.55 `frontend/js/search-view.js` — 搜索视图（<!--AUTO:lines:frontend/js/search-view.js-->~146 行<!--/AUTO-->）
 
-**职责**：跨对话搜索视图（输入防抖 + 结果渲染 + 跳转导航）。
+**职责**：跨对话搜索视图（输入防抖 + 结果渲染 + 跳转导航）。T2 搜索定位：结果点击读取 `dataset.messageId`，把 `{ messageId }` 一并传给跳转钩子（签名 `(conversationId, { messageId })`），激活流程据此定位命中消息并高亮。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/search-view.js:initSearchView-->`initSearchView({ navigateToConversation: nav } = {})`<!--/AUTO--> | 搜索视图初始化 |
+| <!--AUTO:sig:frontend/js/search-view.js:initSearchView-->`initSearchView({ navigateToConversation: nav } = {})`<!--/AUTO--> | 搜索视图初始化（跳转钩子签名含 messageId） |
 | <!--AUTO:sig:frontend/js/search-view.js:performSearch-->`performSearch(query)`<!--/AUTO--> | 执行搜索 |
 | <!--AUTO:sig:frontend/js/search-view.js:renderSearchResults-->`renderSearchResults(results, query)`<!--/AUTO--> | 渲染搜索结果 |
 
@@ -1283,13 +1284,13 @@ conver system/
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
-| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->41<!--/AUTO--> | 对话视图 |
+| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->47<!--/AUTO--> | 对话视图 |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
-| `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->12<!--/AUTO--> | 会话激活 |
+| `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->16<!--/AUTO--> | 会话激活 |
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
 | `frontend/tests/error-bar.test.js` | <!--AUTO:tests:frontend/tests/error-bar.test.js-->11<!--/AUTO--> | 错误条渲染/交互/生命周期（T1） |
 | `frontend/tests/loading-button.test.js` | <!--AUTO:tests:frontend/tests/loading-button.test.js-->7<!--/AUTO--> | 按钮 loading 态工具 |
-| `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->36<!--/AUTO--> | 展示契约 |
+| `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->42<!--/AUTO--> | 展示契约 |
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->13<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->69<!--/AUTO--> | Key 注入/端点口径 |
@@ -1299,7 +1300,7 @@ conver system/
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
 | `frontend/tests/save-key-meta.test.js` | <!--AUTO:tests:frontend/tests/save-key-meta.test.js-->25<!--/AUTO--> | 存档键契约 |
 | `frontend/tests/save-manager.test.js` | <!--AUTO:tests:frontend/tests/save-manager.test.js-->64<!--/AUTO--> | 存档管理 |
-| `frontend/tests/search-view.test.js` | <!--AUTO:tests:frontend/tests/search-view.test.js-->17<!--/AUTO--> | 搜索视图 |
+| `frontend/tests/search-view.test.js` | <!--AUTO:tests:frontend/tests/search-view.test.js-->18<!--/AUTO--> | 搜索视图 |
 | `frontend/tests/settings-panel.test.js` | <!--AUTO:tests:frontend/tests/settings-panel.test.js-->33<!--/AUTO--> | 设置面板 |
 | `frontend/tests/simulator-contracts.test.js` | <!--AUTO:tests:frontend/tests/simulator-contracts.test.js-->21<!--/AUTO--> | 模拟器域契约 |
 | `frontend/tests/simulator-import.test.js` | <!--AUTO:tests:frontend/tests/simulator-import.test.js-->40<!--/AUTO--> | 模拟器导入（工单 04） |
@@ -1363,10 +1364,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1744<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1783<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->740<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1004<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->762<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1021<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

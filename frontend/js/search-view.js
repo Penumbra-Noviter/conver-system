@@ -5,7 +5,8 @@
  *   五态文案（空输入 / 至少输入 2 个字符 / 搜索中… / 未找到匹配的消息 /
  *   搜索失败: <原因>，逐字保持）、结果渲染（复用 format.js searchResultItemHtml
  *   纯函数 + escapeHtml 转义）、结果点击跳转（经注入的 navigateToConversation
- *   钩子，不反向 import 编排区）。
+ *   钩子，签名 (conversationId, { messageId }) — T2 消费 dataset.messageId 定位命中消息并高亮，
+ *   不反向 import 编排区）。
  *
  * 依赖方向：search-view.js → api.js（messages.search）/ format.js（纯函数）/
  *   utils.js（escapeHtml）；app.js → search-view.js（initSearchView 接线）。
@@ -54,8 +55,9 @@ let navigateToConversation = () => {};
  *   不可绑定。模块求值于 DOM 就位之后（type=module 延迟执行）为模块头
  *   docstring 已隐含前提，不重复。
  * @param {object} [options]
- * @param {Function} [options.navigateToConversation] - (conversationId) => void；
- *   搜索结果点击跳转（app.js 注入 activateConversation 统一激活流程）
+ * @param {Function} [options.navigateToConversation] - (conversationId, { messageId }) => void；
+ *   搜索结果点击跳转（app.js 注入 activateConversation 统一激活流程）；
+ *   签名扩展：第二参数含 messageId 供 T2 定位命中消息并高亮
  */
 export function initSearchView({ navigateToConversation: nav } = {}) {
     if (typeof nav === 'function') navigateToConversation = nav;
@@ -150,7 +152,10 @@ function renderSearchResults(results, query) {
         item.addEventListener('click', () => {
             const convId = parseInt(item.dataset.conversationId);
             if (convId) {
-                navigateToConversation(convId);
+                // T2：消费 dataset.messageId 一并传给跳转钩子（签名 (conversationId, { messageId })）—
+                // 激活流程据此定位命中消息并高亮
+                const messageId = parseInt(item.dataset.messageId);
+                navigateToConversation(convId, { messageId });
             }
         });
     });

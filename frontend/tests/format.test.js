@@ -103,6 +103,23 @@ describe('messageBubbleHtml — 参数化气泡工厂（F1 三路径统一）', 
         const btn = container.querySelector('.btn-copy-message');
         expect(btn.hasAttribute('onclick')).toBe(false);
     });
+
+    // ── T2 搜索定位：data-message-id 渲染 ──
+
+    it('messageId 选项 → 外层 div 含 data-message-id 属性', () => {
+        const html = messageBubbleHtml('user', 'hello', { messageId: 42 });
+        expect(html).toContain('data-message-id="42"');
+    });
+
+    it('messageId 未提供 → 外层 div 无 data-message-id', () => {
+        const html = messageBubbleHtml('user', 'hello');
+        expect(html).not.toContain('data-message-id');
+    });
+
+    it('messageId=0 → data-message-id="0"（0 为有效 id）', () => {
+        const html = messageBubbleHtml('user', 'hello', { messageId: 0 });
+        expect(html).toContain('data-message-id="0"');
+    });
 });
 
 describe('buildMessagesHtml', () => {
@@ -136,6 +153,27 @@ describe('buildMessagesHtml', () => {
         const html = buildMessagesHtml([{ role: 'user', content: 'a & b' }]);
         expect(html).toContain('btn-copy-message');
         expect(html).not.toContain('data-content');
+    });
+
+    // ── T2 搜索定位：buildMessagesHtml 透传 m.id → data-message-id ──
+
+    it('消息对象有 id → 对应气泡含 data-message-id', () => {
+        const html = buildMessagesHtml([
+            { id: 101, role: 'user', content: 'a' },
+            { id: 202, role: 'assistant', content: 'b' },
+        ]);
+        expect(html).toContain('class="message user" data-message-id="101"');
+        expect(html).toContain('data-message-id="202"');
+    });
+
+    it('消息对象无 id → 气泡无 data-message-id 属性', () => {
+        const html = buildMessagesHtml([{ role: 'user', content: 'a' }]);
+        expect(html).not.toContain('data-message-id');
+    });
+
+    it('零值 id（0）→ data-message-id="0" 保留（0 为有效 id）', () => {
+        const html = buildMessagesHtml([{ id: 0, role: 'user', content: 'a' }]);
+        expect(html).toContain('data-message-id="0"');
     });
 });
 
