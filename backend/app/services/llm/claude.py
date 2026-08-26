@@ -11,6 +11,8 @@ import anthropic
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import LLMError, translate_sdk_error
 
+__all__ = ["ClaudeProvider"]
+
 
 class ClaudeProvider(BaseLLM):
     """Anthropic Claude 实现"""
@@ -39,7 +41,12 @@ class ClaudeProvider(BaseLLM):
         max_tokens: int = 2048,
         model: str | None = None,
     ) -> str:
-        """非流式生成完整回复"""
+        """非流式生成完整回复
+
+        temperature 保留于对外签名供上层（openai 路由 / chat 链路）依赖，
+        但不再透传 SDK——anthropic 1.x 的 messages.create 不含该参数，传入即
+        TypeError（F-56；契约锁测试见 test_llm_shared.py::TestAnthropic1xContractLock）。
+        """
         system, chat_messages = self._prepare_messages(messages)
         model = model or "claude-sonnet-5"
 
@@ -48,7 +55,6 @@ class ClaudeProvider(BaseLLM):
                 model=model,
                 system=system or [],
                 messages=chat_messages,
-                temperature=temperature,
                 max_tokens=max_tokens,
             )
             # 提取文本内容（处理可能的多内容块）
@@ -64,7 +70,12 @@ class ClaudeProvider(BaseLLM):
         max_tokens: int = 2048,
         model: str | None = None,
     ) -> AsyncIterator[str]:
-        """流式生成，逐 token 产出"""
+        """流式生成，逐 token 产出
+
+        temperature 保留于对外签名（同 generate），不传给 SDK——anthropic 1.x
+        的 messages.stream 不含该参数（F-56；契约锁测试见
+        test_llm_shared.py::TestAnthropic1xContractLock）。
+        """
         system, chat_messages = self._prepare_messages(messages)
         model = model or "claude-sonnet-5"
 
@@ -73,7 +84,6 @@ class ClaudeProvider(BaseLLM):
                 model=model,
                 system=system or [],
                 messages=chat_messages,
-                temperature=temperature,
                 max_tokens=max_tokens,
             ) as stream:
                 async for text in stream.text_stream:
