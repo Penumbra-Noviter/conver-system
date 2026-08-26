@@ -334,12 +334,6 @@ async def regenerate_chat(
     except Exception:
         db.rollback()
         raise
-    except LLMError as e:
-        db.rollback()
-        status_code, message = chat_error_response(
-            e, ctx.conversation.model_provider
-        )
-        raise HTTPException(status_code=status_code, detail=message)
 
     # 7. 单事务落库：截断 + 新 assistant 一次提交
     saved = message_service.create_message_no_commit(
