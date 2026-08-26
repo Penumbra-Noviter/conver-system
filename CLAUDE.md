@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 713 + 1 skip）；`cd frontend && npm test`（Vitest 979，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
+测试：`cd backend && python -m pytest`（pytest 739 + 1 skip）；`cd frontend && npm test`（Vitest 986，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
 
 ## 当前状态（2026-08-26）
 
@@ -62,7 +62,8 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **技术债区 F-5/F-6/F-8/F-9/F-12 批次（2026-08-19 kickoff 全自动档小档，commit 链 412b2d7 → ffc54b2）**：F-5/F-6 复核关闭（各附实证）；F-8 manifest 结构校验并入自愈（simulators 非 list 统一重建）+ F-9 sanitize_filename 保留设备名/255 字节收敛（先红后绿 + Falsify 矩阵全过）；F-12 就绪终态发布顺序竞态修复（runtime.json 先落盘再置标志，复现循环 30 次归零）；期末四轴 0 阻断放行；新落债 F-13~F-17（5 项待立项，唯一待办来源 TICKETS.md）
 - ✅ **技术债区 F-13~F-17 批次（2026-08-19 kickoff 全自动档，commit 链 d295c76 → 3111036）**：F-13 设备名判定改首点前组件（+5 用例）/ F-14 改名后缀字节截断复用 `_truncate_utf8_bytes`（+2）/ F-15 OSError 族读取自愈（+1）/ F-17 总名上限 255→120 字节（Windows MAX_PATH 实测，F-9 矩阵改 120 口径，+3）/ F-16 复核关闭（零代码）；F-18/F-19 归档流程项已修（F-9 注记补 F-17 修订 / F-13 常量注释语义同步）；期末四轴 0 阻断放行；新落债 F-20/F-21 待立项（唯一待办来源 TICKETS.md）
 - ✅ **全量审查修复批次（2026-08-25~26 kickoff 全自动档标准档 9 工单 3 波，commit 链 789602c → b63f169）**：三轴评审（根提交→HEAD）12 发现全部修复——W1 代码四票（S1 路由 ORM 清零 / B1 非 ASCII avatar 500 修复 先红后绿 / O1+O3 流式空守卫与异常日志 / S2+S3 包 __all__ 与 PRAGMA docstring）+ W2 文档三票（P1+P5 api-design 补端点契约与模型名换族 / P2 architecture 目录树补 23 文件 / P4 测试基线对齐权威标记）+ W3 登记两票（P3 游戏生成功能四处登记 / E 落债 F-38~F-45 + B2 复核关闭）；期末四轴 0 阻断放行；安全红线 0 违例；冒烟 713+1skip 绿；技术债区 24 项待立项（F-23~F-46）
-- ✅ 测试：pytest 713 + 1 skip（后端）+ Vitest 979（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
+- ✅ **模拟器导入「AI/本地」识别补强 + 重新识别入口（2026-08-26 用户需求单工单）**：probe_config 三层探测（严格 cfg- → 关键词启发 endpoint|url|base/key/model → local）+ scan_input_ids 双层扫描（input/select + 脚本模板字符串层）+ probe_endpoint_mode 端点口径推断；manifest 新增 update_manifest_entry；POST /api/simulators/reprobe 端点 + 前端 local 卡片「重新识别」按钮；22 种子 + 斗罗大陆真实数据探测全 ai（config 与手工 manifest 逐字一致）
+- ✅ 测试：pytest 739 + 1 skip（后端）+ Vitest 986（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
 
 ## 待办管理
 

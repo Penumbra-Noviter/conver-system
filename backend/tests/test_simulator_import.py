@@ -41,6 +41,7 @@ from backend.app.services.simulator_store import (
     import_game,
     next_available_filename,
     probe_config,
+    probe_endpoint_mode,
     sanitize_filename,
     scan_input_ids,
     scan_suspicious,
@@ -59,6 +60,9 @@ __all__ = [
     "TestImportGame",
     "TestImportEndpointWire",
     "TestImportGamePrecomputedScan",
+    "TestProbeEndpointMode",
+    "TestUpdateManifestEntry",
+    "TestReprobeEndpointWire",
 ]
 
 #: 含 cfg- 三元组的样本 HTML（key-injector 契约：input id 即 config 值）
@@ -359,6 +363,31 @@ class TestScanInputIds:
         ids = scan_input_ids("<html><body><p>no inputs</p></body></html>")
         assert ids == set()
 
+    def test_select_ids_collected(self) -> None:
+        """select 元素 id 也纳入扫描（扩展修复：cfg-model 在种子中多为 select）"""
+        html = '<input id="cfg-endpoint"><input id="cfg-apikey"><select id="cfg-model">'
+        ids = scan_input_ids(html)
+        assert ids == {"cfg-endpoint", "cfg-apikey", "cfg-model"}
+
+    def test_script_tier_quoted_ids_collected(self) -> None:
+        """JS 模板字符串内的引号 id 被脚本层捕获（引擎系游戏设置控件路径）"""
+        html = '<script>const html = `<input id="s-endpoint"><select id="s-model">`;</script>'
+        ids = scan_input_ids(html)
+        assert "s-endpoint" in ids
+        assert "s-model" in ids
+
+    def test_script_tier_comment_stripped(self) -> None:
+        """注释内的 id 被剥离（脚本层不收集注释内容）"""
+        html = '<!-- <input id="old-key"> --><input id="s-key">'
+        ids = scan_input_ids(html)
+        assert ids == {"s-key"}
+
+    def test_script_tier_dedup_with_parser(self) -> None:
+        """同一 id 出现在静态 HTML 与脚本层 → 只计一次（set 去重）"""
+        html = '<input id="shared"><script>const x = \'<input id="shared">\';</script>'
+        ids = scan_input_ids(html)
+        assert ids == {"shared"}
+
 
 class TestProbeConfig:
     """元数据探测矩阵：cfg- 三元组齐全 → ai + config；否则 local 无 config（条目级降级）"""
@@ -408,10 +437,11 @@ class TestProbeConfig:
         assert config is not None
 
     def test_id_case_sensitive(self) -> None:
-        """id 大小写敏感（key-injector 按精确 id 取元素）：大写三元组 → local"""
+        """id 大小写：启发式大小写不敏感（CFG-ENDPOINT 等大写变体 → ai + 精确大写 config），
+        严格层 cfg- 前缀匹配仍大小写敏感"""
         game_type, config = probe_config(_cfg_inputs_html("CFG-ENDPOINT", "CFG-APIKEY", "CFG-MODEL"))
-        assert game_type == "local"
-        assert config is None
+        assert game_type == "ai"
+        assert config == {"endpoint": "CFG-ENDPOINT", "apikey": "CFG-APIKEY", "model": "CFG-MODEL"}
 
     def test_script_and_comment_content_ignored(self) -> None:
         """script 字符串 / 注释内的伪 input 不参与探测（HTMLParser 语义实测）"""
@@ -422,6 +452,191 @@ class TestProbeConfig:
         )
         game_type, config = probe_config(html)
         assert game_type == "local"
+
+    # ── 启发式层（L2）：
+    # 覆盖 7 种引擎系约定 + 脚本内嵌 + 负例
+
+    def _heuristic_html(self, *ids: str) -> str:
+        """构造带指定 id 的 input 样本 HTML（启发式探测矩阵用）"""
+        inputs = "".join(f'<input id="{i}">' for i in ids)
+        return f"<html><body>{inputs}</body></html>"
+
+    @pytest.mark.parametrize(
+        ("ids", "expected_config"),
+        [
+            (("s-endpoint", "s-key", "s-model"), {"endpoint": "s-endpoint", "apikey": "s-key", "model": "s-model"}),
+            (("set-endpoint", "set-apikey", "set-model"), {"endpoint": "set-endpoint", "apikey": "set-apikey", "model": "set-model"}),
+            (("inpBase", "inpKey", "inpModel"), {"endpoint": "inpBase", "apikey": "inpKey", "model": "inpModel"}),
+            (("api-base", "api-key", "api-model"), {"endpoint": "api-base", "apikey": "api-key", "model": "api-model"}),
+            (("a-base", "a-key", "a-model"), {"endpoint": "a-base", "apikey": "a-key", "model": "a-model"}),
+            (("w-endpoint", "w-apikey", "w-model"), {"endpoint": "w-endpoint", "apikey": "w-apikey", "model": "w-model"}),
+        ],
+    )
+    def test_heuristic_detects_all_conventions(self, ids: tuple[str, ...], expected_config: dict) -> None:
+        """7 种引擎系 id 约定 → 全部被启发式识别为 ai + 精确 config（文档序首个 id）"""
+        game_type, config = probe_config(self._heuristic_html(*ids))
+        assert game_type == "ai"
+        assert config == expected_config
+
+    def test_heuristic_script_embedded(self) -> None:
+        """脚本内嵌控件（引擎系游戏设置面板，s- 与 wz- 向导并存）→ 文档序首选 s-"""
+        html = (
+            '<script>'
+            'function modalSettings() { return `'
+            '<input id="s-endpoint"><input id="s-key"><select id="s-model">'
+            '`; }'
+            'function wizard() { return `'
+            '<input id="wz-endpoint"><input id="wz-key"><select id="wz-model">'
+            '`; }'
+            '</script>'
+        )
+        game_type, config = probe_config(html)
+        assert game_type == "ai"
+        # 文档序：s- 出现先于 wz-（s- 在脚本中先被定义）
+        assert config == {"endpoint": "s-endpoint", "apikey": "s-key", "model": "s-model"}
+
+    @pytest.mark.parametrize(
+        "ids",
+        [
+            ("s-endpoint", "s-key"),  # 缺 model
+            ("s-endpoint",),  # 只有一项
+            ("username", "password"),  # 全非三组关键词
+            (),  # 无任何输入框
+        ],
+    )
+    def test_heuristic_incomplete_degrades_to_local(self, ids: tuple[str, ...]) -> None:
+        """三组关键词不全 → local（不保留部分 config）"""
+        game_type, config = probe_config(self._heuristic_html(*ids))
+        assert game_type == "local"
+        assert config is None
+
+    def test_heuristic_select_cfg_passes_strict_layer(self) -> None:
+        """cfg-model 为 select → 严格层现在也能识别（select 已纳入扫描）"""
+        html = '<input id="cfg-endpoint"><input id="cfg-apikey"><select id="cfg-model">'
+        game_type, config = probe_config(html)
+        assert game_type == "ai"
+        assert config == {"endpoint": "cfg-endpoint", "apikey": "cfg-apikey", "model": "cfg-model"}
+
+
+class TestProbeEndpointMode:
+    """端点口径推断矩阵"""
+
+    def test_full_chat_completions_suffix(self) -> None:
+        """默认端点以 /chat/completions 结尾 → full"""
+        html = '<script>let cfg = { endpoint: "https://api.deepseek.com/v1/chat/completions" };</script>'
+        assert probe_endpoint_mode(html) == "full"
+
+    def test_base_without_suffix(self) -> None:
+        """默认端点不以 /chat/completions 结尾 → base"""
+        html = '<script>let cfg = { endpoint: "https://api.deepseek.com" };</script>'
+        assert probe_endpoint_mode(html) == "base"
+
+    def test_base_with_v1(self) -> None:
+        """默认端点带 /v1 但不带 /chat/completions → base"""
+        html = '<script>let cfg = { endpoint: "https://api.deepseek.com/v1" };</script>'
+        assert probe_endpoint_mode(html) == "base"
+
+    def test_colon_assignment_style(self) -> None:
+        """JS 赋值式 endpoint = '...' 也匹配"""
+        html = '<script>const endpoint = "https://x.com/v1/chat/completions";</script>'
+        assert probe_endpoint_mode(html) == "full"
+
+    def test_no_endpoint_default(self) -> None:
+        """HTML 无默认端点赋值 → None"""
+        html = '<html><body><p>no endpoint</p></body></html>'
+        assert probe_endpoint_mode(html) is None
+
+
+class TestUpdateManifestEntry:
+    """update_manifest_entry 原子更新"""
+
+    def test_updates_fields_and_preserves_order(self, tmp_path: Path) -> None:
+        """更新 type/config → 其他字段原样保留，条目顺序不变"""
+        from backend.app.services.simulator_manifest import update_manifest_entry, write_manifest, read_manifest
+        sim_dir = tmp_path / "sim"
+        sim_dir.mkdir()
+        manifest = {
+            "version": 2,
+            "simulators": [
+                {"id": "a", "name": "A", "type": "local"},
+                {"id": "b", "name": "B", "type": "ai", "config": {"endpoint": "x"}},
+            ],
+        }
+        write_manifest(sim_dir, manifest)
+        updated = update_manifest_entry(sim_dir, "a", type="ai", config={"endpoint": "s-endpoint", "apikey": "s-key", "model": "s-model"})
+        assert updated["type"] == "ai"
+        assert updated["config"] == {"endpoint": "s-endpoint", "apikey": "s-key", "model": "s-model"}
+        assert updated["id"] == "a"
+        assert updated["name"] == "A"
+        # 顺序不变：b 条目未受影响
+        result = read_manifest(sim_dir)
+        assert len(result["simulators"]) == 2
+        assert result["simulators"][1]["id"] == "b"
+        assert result["simulators"][1]["config"] == {"endpoint": "x"}
+
+    def test_missing_id_raises_key_error(self, tmp_path: Path) -> None:
+        """不存在的条目 id → KeyError"""
+        from backend.app.services.simulator_manifest import update_manifest_entry, write_manifest
+        sim_dir = tmp_path / "sim"
+        sim_dir.mkdir()
+        write_manifest(sim_dir, {"version": 2, "simulators": [{"id": "a"}]})
+        with pytest.raises(KeyError, match="不存在"):
+            update_manifest_entry(sim_dir, "ghost", type="ai")
+
+
+class TestReprobeEndpointWire:
+    """POST /api/simulators/reprobe wire 测试"""
+
+    @pytest.fixture
+    def import_app(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
+        """最小应用（仅模拟器路由）；CONVER_DATA_DIR 指向临时目录"""
+        monkeypatch.setenv("CONVER_DATA_DIR", str(tmp_path))
+        app = FastAPI()
+        app.include_router(simulators_route.router)
+        return app
+
+    def _reprobe(self, client: TestClient, game_id: str) -> object:
+        return client.post("/api/simulators/reprobe", json={"id": game_id})
+
+    def test_local_to_ai_after_reprobe(self, import_app: FastAPI, tmp_path: Path) -> None:
+        """local 游戏（s- family）→ reprobe 后 type=ai + config 三元组 + endpointMode"""
+        # 先导入一个 local 文件（无 cfg- 三元组的 s- 系引擎游戏）
+        html = (
+            '<html><script>'
+            'const html = `<input id="s-endpoint"><input id="s-key"><select id="s-model">`;'
+            'const cfg = { endpoint: "https://api.deepseek.com/v1/chat/completions" };'
+            '</script></html>'
+        ).encode("utf-8")
+        with TestClient(import_app) as client:
+            import_resp = client.post(
+                "/api/simulators/import",
+                files={"file": ("sgame.html", html, "text/html")},
+            )
+        assert import_resp.status_code == 200
+        game_id = import_resp.json()["game"]["id"]
+
+        # reprobe
+        with TestClient(import_app) as client:
+            resp = client.post("/api/simulators/reprobe", json={"id": game_id})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["game"]["type"] == "ai"
+        assert body["game"]["config"] == {"endpoint": "s-endpoint", "apikey": "s-key", "model": "s-model"}
+        assert body["game"]["endpointMode"] == "full"
+
+    def test_unknown_id_404(self, import_app: FastAPI) -> None:
+        """不存在的游戏 id → 404"""
+        with TestClient(import_app) as client:
+            resp = client.post("/api/simulators/reprobe", json={"id": "ghost"})
+        assert resp.status_code == 404
+        assert "不存在" in resp.json()["detail"]
+
+    def test_missing_id_field_422(self, import_app: FastAPI) -> None:
+        """请求体缺 id → 422（FastAPI 校验）"""
+        with TestClient(import_app) as client:
+            resp = client.post("/api/simulators/reprobe", json={})
+        assert resp.status_code == 422
 
 
 class TestScanSuspicious:

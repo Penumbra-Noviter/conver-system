@@ -57,10 +57,10 @@
  */
 
 import { iconHtml } from './icons.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, showSuccess, showError } from './utils.js';
 import { saveKeyIsValidPattern } from './save-key-meta.js';
 import { doFetch } from './fetch-seam.js';
-import { MANIFEST_URL, TIMEOUT_MS, TIMEOUT_REASON } from './simulator-contracts.js';
+import { MANIFEST_URL, TIMEOUT_MS, TIMEOUT_REASON, REPROBE_URL } from './simulator-contracts.js';
 
 // ══════════════════════════════════════════════════
 // fetch seam（单一来源 js/fetch-seam.js — 见模块头 docstring；TD-51/55/60）
@@ -315,6 +315,7 @@ function renderList() {
                     <span class="sim-type-tag sim-type-${game.type}">${TYPE_LABELS[game.type]}</span>
                     ${game.source === 'imported' ? '<span class="sim-source-tag">已导入</span>' : ''}
                     ${game.source === 'generated' ? '<span class="sim-source-tag sim-source-generated">AI 生成</span>' : ''}
+                    ${game.type === 'local' ? `<button type="button" class="sim-reprobe-btn" data-action="reprobe" title="重新识别类型">${iconHtml('refresh', { size: 12 })} 重新识别</button>` : ''}
                 </div>
                 ${game.description ? `<p class="sim-card-desc">${escapeHtml(game.description)}</p>` : ''}
             </div>
@@ -407,9 +408,16 @@ function bindEvents() {
     // 工具条「导入游戏」按钮 → 导入流程钩子（工单 04；未注入时 no-op 不报错）
     container.querySelector('.sim-import-btn')?.addEventListener('click', () => onImportGame());
 
-    // 事件委托：卡片点击 → onOpenGame(game)；重试按钮 → refreshSimulators。
+    // 事件委托：重新识别 → reprobeGame；卡片点击 → onOpenGame(game)；
+    // 重试按钮 → refreshSimulators。
     // 委托挂在持久状态区元素上，重渲染不丢监听（search-view 结果跳转先例）
     stateEl.addEventListener('click', (e) => {
+        const reprobe = e.target.closest('[data-action="reprobe"]');
+        if (reprobe) {
+            const card = reprobe.closest('.sim-card');
+            if (card?.dataset.id) reprobeGame(card.dataset.id);
+            return;
+        }
         const retry = e.target.closest('[data-action="retry"]');
         if (retry) {
             refreshSimulators();
@@ -501,6 +509,30 @@ export async function refreshSimulators() {
  */
 export function getGames() {
     return Array.isArray(games) ? games : [];
+}
+
+/**
+ * 重新识别游戏类型：POST 到 reprobe 端点 → 更新 manifest → 刷新列表。
+ * 仅 local 卡片可点击；成功刷新列表并显示成功提示，失败显示错误不销毁列表。
+ * @param {string} id - 游戏条目 id
+ */
+async function reprobeGame(id) {
+    try {
+        const res = await doFetch(REPROBE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+        });
+        if (!res?.ok) {
+            const detail = res ? await res.json().then(d => d.detail || `请求失败 (${res.status})`).catch(() => `请求失败 (${res.status})`) : '网络错误';
+            showError(`重新识别失败：${detail}`);
+            return;
+        }
+        await refreshSimulators();
+        showSuccess('已重新识别');
+    } catch (err) {
+        showError(`重新识别失败：${err instanceof Error ? err.message : String(err)}`);
+    }
 }
 
 // ══════════════════════════════════════════════════

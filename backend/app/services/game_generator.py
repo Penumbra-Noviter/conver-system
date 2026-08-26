@@ -31,6 +31,7 @@ from backend.app.services.simulator_import import (
     ScanResult,
     import_game,
     probe_config,
+    probe_endpoint_mode,
     scan_input_ids,
     scan_suspicious,
 )
@@ -305,11 +306,13 @@ def scan_generated_html(html: str) -> ScanResult:
     import_game 的 precomputed_scan 复用，消除双重扫描）。
 
     game_type/config 来自 probe_config（cfg- 三元组探测）；warnings 来自
-    scan_suspicious（SUSPICIOUS_PATTERNS 粗筛，命中不拦截）。
+    scan_suspicious（SUSPICIOUS_PATTERNS 粗筛，命中不拦截）；endpoint_mode
+    来自 probe_endpoint_mode（默认端点值口径推断，'full'/'base'）。
     """
     game_type, config = probe_config(html)
     warnings = scan_suspicious(html)
-    return ScanResult(game_type=game_type, config=config, warnings=warnings)
+    return ScanResult(game_type=game_type, config=config, warnings=warnings,
+                      endpoint_mode=probe_endpoint_mode(html))
 
 
 # ═══════════════════════════════════════════════════════════

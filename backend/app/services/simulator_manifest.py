@@ -29,6 +29,7 @@ __all__ = [
     "read_manifest",
     "write_manifest",
     "append_manifest_entry",
+    "update_manifest_entry",
 ]
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,29 @@ def append_manifest_entry(sim_dir: Path, entry: dict) -> None:
     manifest = _read_manifest_or_rebuild(sim_dir)
     manifest["simulators"].append(entry)
     _current_write_manifest()(sim_dir, manifest)
+
+
+def update_manifest_entry(sim_dir: Path, entry_id: str, **updates: object) -> dict:
+    """读-改-写原子更新 manifest 条目（按 id 定位，仅更新给定字段）。
+
+    Args:
+        sim_dir: 数据目录 simulators
+        entry_id: 条目 id（manifest 结构性唯一）
+        **updates: 要更新的字段（如 type="ai", config={...}, endpointMode="full"）
+
+    Returns:
+        更新后的条目 dict
+
+    Raises:
+        KeyError: 条目 id 不存在
+    """
+    manifest = _read_manifest_or_rebuild(sim_dir)
+    for entry in manifest["simulators"]:
+        if entry.get("id") == entry_id:
+            entry.update(updates)
+            _current_write_manifest()(sim_dir, manifest)
+            return dict(entry)
+    raise KeyError(f"游戏不存在：{entry_id}")
 
 
 def _read_manifest_or_rebuild(sim_dir: Path, persist: bool = False) -> dict:

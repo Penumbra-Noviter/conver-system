@@ -585,6 +585,31 @@ multipart 表单字段 `file`（单文件 `.html`）上传第三方模拟器游�
 
 **错误** `400` — 非 .html / 超过 5MB / 空文件（detail 为可读原因）；`409` — SHA-256 内容与已有游戏重复（detail 含「已存在」）；`500` — 落盘失败（如数据目录不可写）。
 
+### 重新识别模拟器游戏
+
+```
+POST /api/simulators/reprobe
+```
+
+**请求体**
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | str | 是 | manifest 游戏条目 id |
+
+```json
+{ "id": "imported-game" }
+```
+
+**响应** `200` — 重读落盘 HTML → 三层类型探测（L1 cfg- 三元组 / L2 关键词启发 `endpoint|url|base`+`key`+`model` / L3 local）+ 端点口径推断 → 原子更新 manifest 条目 `type` / `config` / `endpointMode`（其他字段原样保留）
+```json
+{
+  "ok": true,
+  "game": { "id": "imported-game", "file": "斗罗大陆.html", "name": "斗罗大陆", "type": "ai", "source": "imported", "config": { "endpoint": "s-endpoint", "apikey": "s-key", "model": "s-model" }, "endpointMode": "full" }
+}
+```
+
+**错误** `404` — 游戏条目不存在或条目文件缺失（detail 含「不存在」/「文件」）；`422` — 请求体缺 id。
+
 ### AI 生成模拟器游戏
 
 ```

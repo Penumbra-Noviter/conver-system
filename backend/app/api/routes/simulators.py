@@ -3,6 +3,7 @@
 
 POST /api/simulators/import   — 单文件 HTML 游戏导入（multipart 字段名 `file`）
 POST /api/simulators/generate — 从文本描述 AI 生成游戏
+POST /api/simulators/reprobe  — 重新识别已有游戏（修正 type/config/endpointMode）
 
 导入接口契约（spec T-02 决策 4，与工单 04 前端共用锚点，定版）：
     成功 200：{ ok: true, game: { id, file, name, type, config? }, renamed, warnings }
@@ -17,6 +18,14 @@ POST /api/simulators/generate — 从文本描述 AI 生成游戏
     校验失败 422：{ ok: false, errors: [{field, message}], suggestion, retries }
     重复 409（SHA-256 与现存文件重复，detail 含「已存在」）
     LLM 错误 401/429/504/502：走 LLMError 统一异常处理
+
+重新识别接口契约（2026-08-26：导入类型探测补强 + 存量修正入口）：
+    请求：{ "id": "游戏条目 id" }
+    成功 200：{ ok: true, game: { id, file, name, type, config?, endpointMode? } }
+    条目不存在 404（detail 含「不存在」）；条目 file 对应文件缺失 404
+    （detail 含「文件」）；请求体缺 id 422（FastAPI 校验）
+    语义：重读落盘 HTML → probe_config（三层探测）+ probe_endpoint_mode →
+    更新 manifest 条目 type/config/endpointMode（原子写，其他字段原样保留）
 
 分层约定：本路由仅做 HTTP 映射（状态码 + 响应形状）；校验 / 文件读写 /
 探测 / manifest 注册全部委托 services/simulator_store 导入族；生成逻辑
@@ -51,6 +60,12 @@ class GenerateRequest(BaseModel):
                                description="游戏标题（可选，用于生成文件名）")
 
 
+class ReprobeRequest(BaseModel):
+    """重新识别游戏请求"""
+    id: str = Field(..., min_length=1, max_length=200,
+                    description="manifest 游戏条目 id")
+
+
 @router.post("/import")
 async def import_simulator(file: UploadFile = File(...)) -> dict:
     """导入单文件 HTML 模拟器游戏（multipart 字段名 file；返回契约见模块 docstring）。
@@ -69,6 +84,44 @@ async def import_simulator(file: UploadFile = File(...)) -> dict:
     except simulator_store.SimulatorDuplicateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"ok": True, "game": result.game, "renamed": result.renamed, "warnings": result.warnings}
+
+
+@router.post("/reprobe")
+async def reprobe_simulator(body: ReprobeRequest) -> dict:
+    """重新识别已有游戏：重读落盘 HTML → 三层探测（type/config）+ 端点口径
+    （endpointMode）→ 原子更新 manifest 条目（其他字段原样保留）。
+
+    修正入口（2026-08-26 存量补强）：导入时误判为 local 的 AI 驱动游戏
+    （引擎系游戏控件在 JS 模板字符串内、cfg- 约定不符等）由前端卡片
+    「重新识别」按钮调用。条目不存在 → 404；条目 file 落盘文件缺失 →
+    404（数据目录损坏态，明确文案不静默）。
+    """
+    sim_dir = data_dir_service.simulators_dir()
+    manifest = simulator_store._read_manifest_or_rebuild(sim_dir)
+    target = next((e for e in manifest.get("simulators", []) if e.get("id") == body.id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"游戏不存在：{body.id}")
+    game_file = str(target.get("file") or "")
+    if not game_file:
+        raise HTTPException(status_code=404, detail=f"游戏文件缺失：{body.id}")
+    html_path = sim_dir / game_file
+    if not html_path.is_file():
+        raise HTTPException(status_code=404, detail=f"游戏文件缺失：{game_file}")
+    content = html_path.read_bytes()
+    text = content.decode("utf-8", errors="replace")
+    game_type, config = simulator_store.probe_config(text)
+    endpoint_mode = simulator_store.probe_endpoint_mode(text)
+    updates: dict = {"type": game_type}
+    if config is not None:
+        updates["config"] = config
+    else:
+        updates.pop("config", None)  # local 时不保留旧 config（降级清空）
+    if endpoint_mode is not None:
+        updates["endpointMode"] = endpoint_mode
+    else:
+        updates.pop("endpointMode", None)  # 推断不到时清空旧口径，回落后端缺省语义
+    updated = simulator_store.update_manifest_entry(sim_dir, body.id, **updates)
+    return {"ok": True, "game": updated}
 
 
 @router.post("/generate")

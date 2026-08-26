@@ -8,6 +8,17 @@
 
 ---
 
+## 模拟器导入「AI/本地」识别补强 + 重新识别入口（2026-08-26，用户需求单工单）
+
+- **来源**：用户报告「导入的斗罗大陆被标为纯本地、无法一键同步全局 API 设置」。根因实证：`probe_config` 三重盲区（只扫 `input` 漏 `select` / HTMLParser 不解析 script 内 JS 模板字符串控件 / 只认 `cfg-` 一种约定），种子 22 款全靠手工 manifest 兜底。
+- **三层探测补强**：`probe_config` 改为 L1 严格 cfg- 三元组（生成器契约，不变）→ L2 关键词启发（`endpoint|url|base$` / `key` / `model` 三组各命中 → ai + 文档序首个 id 为 config，大小写不敏感，覆盖 7 种约定：cfg-/set-/inp-/api-/a-/w-/s-）→ L3 local。`scan_input_ids` 双层扫描：HTMLParser 静态层扩展 `input`+`select` + 脚本层注释剥离后 raw-regex 提取 `<input|select ... id="...">`（覆盖引擎系游戏 JS 模板字符串控件）。`_probe_keyword_groups` 用有序列表保证各组首个 id 确定性（set 无序 bug 修复）。
+- **端点口径推断**：新增 `probe_endpoint_mode(html)`：从 JS 默认端点值推断 `'full'`（以 `/chat/completions` 结尾）/ `'base'` / `None`（SIM-API-1 口径），`import_game` 条目追加 `endpointMode`（初始导入即带口径，生成路径同样受益）。`ScanResult` 新增 `endpoint_mode` 字段。
+- **manifest 更新入口**：`simulator_manifest.py` 新增 `update_manifest_entry(sim_dir, entry_id, **updates)`（读-改-写原子，按 id 定位 update，缺失 → KeyError）；`simulator_store.py` re-export。
+- **重新识别端点**：`POST /api/simulators/reprobe`（JSON `{id}`）→ 读 manifest → 读落盘 HTML → 三层探测 + 端点口径 → 原子更新 `type`/`config`/`endpointMode`；条目或文件缺失 → 404。`simulator-store` 路由模块 docstring 补契约。
+- **前端重新识别按钮**：simulators.js local 卡片 title 行渲染 `iconHtml('refresh')` + 「重新识别」按钮（`data-action="reprobe"`），事件委托先拦截 reprobe → `reprobeGame(id)` → `doFetch` POST JSON → 成功 `refreshSimulators()` + `showSuccess('已重新识别')`；失败 `showError` 不销毁列表。`simulator-contracts.js` 新增 `REPROBE_URL`。
+- **使用手册**：index.html guide「模拟器使用指南」补「AI / 纯本地识别」条目；「导入游戏与安全须知」已含自动识别说明。
+- **真实数据验收**：22 款种子 + 斗罗大陆全部探测为 `ai`，config 与手工 manifest 逐字一致（cfg- 族 / s- 族 / set- 族 / inp- 族 / api- 族 / a- 族 / w- 族全覆盖）。pytest 713→739+1skip（+26：启发式 6 约定参数化矩阵 + 脚本内嵌 + select 纳入严格层 + 负例降级 + TestProbeEndpointMode 5 用例 + TestUpdateManifestEntry 2 + TestReprobeEndpointWire 3）| Vitest 983→986（+3 reprobe 前端用例，simulator-contracts `__all__` 契约锁同步 REPROBE_URL）。
+
 ## 分享前准备批次（2026-08-26 — MIT LICENSE + NOTICE + 版本号 0.3.0 + 构建修复，commit 链 62ed29d → def028a）
 
 - **来源**：用户「准备分享给他人」，审查清单确认无密钥泄露/数据库未入库/.env 未入库，补文件级分享三件套。

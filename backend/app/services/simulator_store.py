@@ -40,6 +40,7 @@ from backend.app.services.simulator_import import (
     import_game,
     next_available_filename,
     probe_config,
+    probe_endpoint_mode,
     sanitize_filename,
     scan_input_ids,
     scan_suspicious,
@@ -52,6 +53,7 @@ from backend.app.services.simulator_manifest import (
     _read_manifest_or_rebuild,  # 回归锚测试直接访问，非 __all__ 但保持模块属性
     append_manifest_entry,
     read_manifest,
+    update_manifest_entry,
     write_manifest,
 )
 
@@ -69,6 +71,7 @@ __all__ = [
     "import_game",
     "next_available_filename",
     "probe_config",
+    "probe_endpoint_mode",
     "read_manifest",
     "sanitize_filename",
     "scan_input_ids",
@@ -76,6 +79,7 @@ __all__ = [
     "CFG_REQUIRED_IDS",
     "sha256_bytes",
     "slugify",
+    "update_manifest_entry",
     "write_manifest",
 ]
 

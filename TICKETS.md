@@ -30,6 +30,18 @@
 
 ## 已完成归档
 
+### 会话交付：模拟器导入「AI/本地」识别补强 + 重新识别入口（2026-08-26，用户需求单工单）
+
+> 来源：用户报告「导入的斗罗大陆被标为纯本地、无法一键同步全局 API 设置」。根因实证：`probe_config` 三重盲区（只扫 input 漏 select / HTMLParser 不解析 script 内 JS 模板字符串控件 / 只认 cfg- 一种约定），种子 22 款全靠手工 manifest 兜底。Grilling 共识：自动启发式识别 + 卡片重新识别入口。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| 01 | 类型探测三层补强（严格 cfg- 三元组 → 关键词启发 → local）+ scan_input_ids 双层扫描（input/select + 脚本层）+ probe_endpoint_mode 端点口径；manifest 新增 update_manifest_entry；POST /api/simulators/reprobe 端点 + 前端 local 卡片「重新识别」按钮；文档同步 | 2026-08-26 | <待 commit> |
+
+**验证链：** pytest 713→739+1skip ✅（+26：启发式 7 约定/脚本层/endpointMode/update_manifest_entry/reprobe wire）| Vitest 983→986 ✅（+3 reprobe 用例 + 契约锁同步）| 真实数据：22 种子 + 斗罗大陆探测全 ai，config 与手工 manifest 逐字一致 | doc_sync --check ✅
+
+---
+
 ### 会话交付：code-review 修复批次（2026-08-26，kickoff 全自动档小档 3 工单）
 
 > 来源：`b9ccdea→7bc532a` code-review 发现（滚动高亮坐标系 bug / package-lock 版本漏升 / CSS 死代码+级联冗余）。全自动档小档执行，单 Implement 连续完成。

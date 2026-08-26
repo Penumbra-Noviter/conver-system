@@ -57,6 +57,13 @@ export const IMPORT_URL = '/api/simulators/import';
 export const GENERATE_URL = '/api/simulators/generate';
 
 /**
+ * 重新识别端点 URL（JSON POST — { id }）。
+ * 成功 200：{ ok: true, game: { id, file, name, type, config?, endpointMode? } }
+ * 条目不存在 404；文件缺失 404
+ */
+export const REPROBE_URL = '/api/simulators/reprobe';
+
+/**
  * 恶意模式粗筛键集中文文案映射（工单 04；键集锚定后端
  * simulator_store.SUSPICIOUS_PATTERNS 常量单源 — eval / document.cookie /
  * cross-origin-fetch，增删键必联动后端）。导入成功且 warnings 非空时前端
@@ -104,6 +111,7 @@ export const __all__ = [
     'TIMEOUT_REASON',
     'IMPORT_URL',
     'GENERATE_URL',
+    'REPROBE_URL',
     'WARNING_LABELS',
     'isValidSimulatorFile',
 ];

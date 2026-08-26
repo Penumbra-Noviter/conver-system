@@ -2,8 +2,8 @@
 模拟器导入族（T-02 拆分自 simulator_store）
 
 导入族（spec T-02 决策 4-8 契约锚点）：
-    `import_game` 为服务编排（校验 → 净化 → SHA-256 去重 → 冲突改名 → cfg-
-    三元组探测 → 恶意模式粗筛 → 落盘 → manifest 原子注册）；校验失败
+    `import_game` 为服务编排（校验 → 净化 → SHA-256 去重 → 冲突改名 → 类型
+    探测 → 恶意模式粗筛 → 落盘 → manifest 原子注册）；校验失败
     SimulatorImportError（400 语义）、重复 SimulatorDuplicateError（409 语义、
     文案含「已存在」）；warnings 键集 = SUSPICIOUS_PATTERNS 常量单源
     （eval / document.cookie / cross-origin-fetch，命中不拦截）；id 由最终
@@ -16,6 +16,14 @@
     名仍视为保留，F-13 定版）加 `_` 前缀、总名 UTF-8 超 120 字节按字节截断
     不劈裂多字节字符（F-17 定版：Windows MAX_PATH = 260 全路径上限兼容，
     落盘 OSError 预拦截）。
+
+类型探测（三层，2026-08-26 补强）：`probe_config` L1 严格 cfg- 三元组
+（生成器作者契约）→ L2 关键词启发（endpoint|url|base / key / model 三组
+各命中 → ai + 各组首个 id 为 config）→ L3 local。`scan_input_ids` 双层扫描：
+HTMLParser 静态层（input/select）+ 脚本层 raw-regex（JS 模板字符串渲染的
+运行时控件——引擎系游戏设置面板全在此路径，HTMLParser 不解析 script 内容）。
+`probe_endpoint_mode` 从默认端点值推断 'full'/'base'（SIM-API-1 口径：
+以 /chat/completions 结尾 → full），import_game 条目追加 endpointMode。
 
 G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/
 logging/pathlib/re），与 data_dir 同层——不引入 app 业务代码。
@@ -49,6 +57,7 @@ __all__ = [
     "import_game",
     "next_available_filename",
     "probe_config",
+    "probe_endpoint_mode",
     "read_manifest",
     "sanitize_filename",
     "scan_input_ids",
@@ -87,6 +96,22 @@ SUSPICIOUS_PATTERNS: dict[str, re.Pattern[str]] = {
 #: cfg- 契约所需的三元组 input id（key-injector 探测用，常量单源——generator 校验层复用）
 CFG_REQUIRED_IDS: frozenset[str] = frozenset({"cfg-endpoint", "cfg-apikey", "cfg-model"})
 
+#: 启发式关键词组（id 判定；每组命中任一即视为该字段控件。endpoint 组覆盖
+#: 引擎系全部约定——endpoint/url 子串 + base 结尾（inpBase/api-base/a-base）；
+#: database 等尾部 base 的非控件 id 属已接受残留（须三组同时命中才判 ai，实际面窄）
+_ENDPOINT_RE = re.compile(r"endpoint|url|base$", re.I)
+_KEY_RE = re.compile(r"key", re.I)
+_MODEL_RE = re.compile(r"model", re.I)
+
+#: 脚本层 raw-regex：注释剥离后扫描 <input|select> 的 id 属性（覆盖 JS 模板字符串
+#: 渲染的运行时控件——HTMLParser 不解析 <script> 内部，引擎系游戏（小马宝莉/斗罗大陆
+#: 等）的设置控件全部在此）。匹配 id 的引号形式（`id="..."` / `id='...'`），
+#: 不匹配无引号形式（如 `id=cfg-endpoint`）——现有测试依赖此精度。
+_SCRIPT_TIER_RE = re.compile(r"""<(?:input|select)\b[^>]*?\bid=["']([^"']+)["']""", re.IGNORECASE)
+
+#: 端点默认值提取正则（endpointMode 推断用）：匹配 JS 中 endpoint 赋值的引号内 URL
+_ENDPOINT_DEFAULT_RE = re.compile(r"""endpoint\s*[:=]\s*["'](https?://[^"']+)["']""", re.IGNORECASE)
+
 
 class SimulatorImportError(Exception):
     """导入校验失败（非 .html / 超 5MB / 空文件 / 缺文件名）→ 路由映射 400"""
@@ -112,11 +137,13 @@ class ScanResult:
     game_type: probe_config 判定的游戏类型（"ai" / "local"）
     config: ai 时三元组 dict，local 时 None
     warnings: scan_suspicious 命中的 SUSPICIOUS_PATTERNS 键集
+    endpoint_mode: probe_endpoint_mode 推断值（'full'/'base'/None）
     """
 
     game_type: str
     config: dict | None
     warnings: list[str]
+    endpoint_mode: str | None = None
 
 
 # ── 文件名常量（_MAX_FILENAME_BYTES 定义在 simulator_store，测试 monkeypatch 依赖其命名空间——
@@ -250,42 +277,123 @@ def next_available_filename(sim_dir: Path, desired: str) -> str:
 
 
 class _InputIdScanner(html.parser.HTMLParser):
-    """扫描 input 元素 id（stdlib HTMLParser；script/注释内容不解析——实测语义）。"""
+    """扫描 input/select 元素 id（stdlib HTMLParser；script/注释内容不解析——实测语义）"""
 
     def __init__(self) -> None:
         super().__init__()
         self.ids: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.lower() != "input":
+        if tag.lower() not in ("input", "select"):
             return
         for key, value in attrs:
             if key.lower() == "id" and value:
                 self.ids.append(value.strip())
 
 
-def scan_input_ids(html_text: str) -> set[str]:
-    """扫描 HTML 中所有 input 元素的 id 集合（为 cfg- 契约校验提供单源扫描器）
+def _strip_html_comments(text: str) -> str:
+    """剥离 HTML 注释（<!-- ... -->），为脚本层 raw-regex 提供干净的文本。"""
+    return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
 
-    返回 set 而非 list，便于子集/差集运算（game_generator._check_cfg_contract
-    和 probe_config 均做集合运算，无需保留顺序）。
+
+def _collect_ordered_ids(html_text: str) -> list[str]:
+    """返回文档序的控件 id 列表（parser 静态层在前，脚本层去重补漏在后）。
+
+    用于 probe_config 启发式（须按文档序取各组首个命中，避免 set 无序）。
     """
     scanner = _InputIdScanner()
     scanner.feed(html_text)
-    return set(scanner.ids)
+    seen: set[str] = set()
+    result: list[str] = []
+    for cid in scanner.ids:
+        if cid not in seen:
+            seen.add(cid)
+            result.append(cid)
+    for cid in _SCRIPT_TIER_RE.findall(_strip_html_comments(html_text)):
+        if cid not in seen:
+            seen.add(cid)
+            result.append(cid)
+    return result
+
+
+def scan_input_ids(html_text: str) -> set[str]:
+    """扫描 HTML 中所有 input/select 元素的 id 集合（含脚本模板字符串内的运行时控件）
+
+    双层扫描取并集（覆盖静态 HTML 与 JS 模板字符串渲染两种场景）：
+      1. HTMLParser 层：scanner 解析静态 HTML（input/select 元素，script/注释内容
+         不解析——HTMLParser 语义，保证边界正确如属性含 > 等）；
+      2. 脚本层 raw-regex：注释剥离后对全文正则匹配 `<input|select ... id="..."`，
+         捕获 JS 模板字符串内部渲染的控件（引擎系游戏的设置面板全部走此路径）。
+
+    返回 set 而非 list，便于子集/差集运算（game_generator._check_cfg_contract
+    和 probe_config 的 L1 严格层均做集合运算，无需保留顺序）。
+    """
+    return set(_collect_ordered_ids(html_text))
+
+
+def _probe_keyword_groups(ordered_ids: list[str]) -> dict[str, str] | None:
+    """关键词启发式探测：endpoint/url/base、key、model 三组各命中 ≥1 时返回 config。
+
+    Args:
+        ordered_ids: 文档序控件 id 列表（每组取第一个命中，保证确定性）
+
+    Returns:
+        config 三元组 {endpoint, apikey, model} 或 None（未全中）
+    """
+    endpoint = apikey = model = None
+    for cid in ordered_ids:
+        if endpoint is None and _ENDPOINT_RE.search(cid):
+            endpoint = cid
+        if apikey is None and _KEY_RE.search(cid):
+            apikey = cid
+        if model is None and _MODEL_RE.search(cid):
+            model = cid
+    if endpoint and apikey and model:
+        return {"endpoint": endpoint, "apikey": apikey, "model": model}
+    return None
 
 
 def probe_config(html_text: str) -> tuple[str, dict | None]:
-    """元数据探测：cfg- 前缀 input id 三元组（cfg-endpoint/cfg-apikey/cfg-model）
-    齐全 → ('ai', config 三元组)；否则 ('local', None)——三元组不完整即降级，
-    不保留部分 config（spec 决策 6 条目级降级兜底）。
+    """元数据探测：三层判定（L1 严格 cfg- 三元组 → L2 关键词启发 → L3 local）。
+
+    L1（cfg- 前缀严格匹配）：cfg-endpoint/cfg-apikey/cfg-model 三个控件齐全 →
+      ('ai', config 三元组)；不降级到 L2 的 cfg- 前缀——生成器作者契约。
+    L2（关键词启发）：endpoint|url|base / key / model 三组关键词各命中 ≥1 个 id →
+      ('ai', 各组文档序首个 id 组成的 config)；不保留部分匹配。
+    L3（fallback）：('local', None)。
 
     config 值为输入框 id（key-injector 契约：按 id 定位输入框注入凭证）。
     """
-    cfg_ids = {i for i in scan_input_ids(html_text) if i.startswith("cfg-")}
+    all_ids = scan_input_ids(html_text)
+    cfg_ids = {i for i in all_ids if i.startswith("cfg-")}
+    # L1：严格 cfg- 三元组
     if CFG_REQUIRED_IDS <= cfg_ids:
         return ("ai", {"endpoint": "cfg-endpoint", "apikey": "cfg-apikey", "model": "cfg-model"})
+    # L2：关键词启发（用文档序列表，保证各组首个命中确定性）
+    ordered = _collect_ordered_ids(html_text)
+    heuristic = _probe_keyword_groups(ordered)
+    if heuristic is not None:
+        return ("ai", heuristic)
+    # L3：纯本地
     return ("local", None)
+
+
+def probe_endpoint_mode(html_text: str) -> str | None:
+    """从源码默认端点值推断 endpointMode（SIM-API-1 口径）。
+
+    匹配 JS 中 `endpoint = '...'` 或 `endpoint: '...'` 的默认 URL 值：
+    - 以 /chat/completions 结尾 → 'full'（游戏期望完整路径，主应用需追加后缀）
+    - 其他 → 'base'（游戏自行拼接）
+    - 未匹配默认值 → None（不转换，兼容旧数据 / 无默认端点声明的游戏）
+
+    Returns:
+        'full' | 'base' | None
+    """
+    m = _ENDPOINT_DEFAULT_RE.search(html_text)
+    if not m:
+        return None
+    url = m.group(1).rstrip("/")
+    return "full" if url.endswith("/chat/completions") else "base"
 
 
 def scan_suspicious(html_text: str) -> list[str]:
@@ -365,9 +473,15 @@ def import_game(
         game_type = precomputed_scan.game_type
         config = precomputed_scan.config
         warnings = precomputed_scan.warnings
+        endpoint_mode = precomputed_scan.endpoint_mode
+        if endpoint_mode is None:
+            # 旧 ScanResult 未携带 endpoint_mode（生成路径兜底）：现场推断
+            text = content.decode("utf-8", errors="replace")
+            endpoint_mode = probe_endpoint_mode(text)
     else:
         text = content.decode("utf-8", errors="replace")
         game_type, config = probe_config(text)
+        endpoint_mode = probe_endpoint_mode(text)
         warnings = scan_suspicious(text)
     entry: dict = {
         "id": _unique_game_id(sim_dir, slugify(stem)),
@@ -378,6 +492,8 @@ def import_game(
     }
     if config is not None:
         entry["config"] = config
+    if endpoint_mode is not None:
+        entry["endpointMode"] = endpoint_mode
 
     sim_dir.mkdir(parents=True, exist_ok=True)
     (sim_dir / final_name).write_bytes(content)

@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1767<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->714<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->983<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1796<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->740<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->986<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -319,13 +319,14 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/settings.py:update_settings-->`update_settings(data, db)`<!--/AUTO--> | PUT 批量更新设置 |
 | <!--AUTO:sig:backend/app/api/routes/settings.py:test_connection-->`test_connection(data, db)`<!--/AUTO--> | POST 连接测试（保存时校验 Key） |
 
-### 4.11.5 `backend/app/api/routes/simulators.py` — 模拟器导入路由（工单 03）（<!--AUTO:lines:backend/app/api/routes/simulators.py-->~84 行<!--/AUTO-->）
+### 4.11.5 `backend/app/api/routes/simulators.py` — 模拟器导入路由（工单 03 + 2026-08-26 重新识别）（<!--AUTO:lines:backend/app/api/routes/simulators.py-->~131 行<!--/AUTO-->）
 
-**职责**：POST /api/simulators/import 单文件 HTML 游戏导入（multipart 字段名 `file`）——仅 HTTP 映射（状态码 + 响应形状）；校验/去重/改名/探测/粗筛/manifest 注册全部委托 `services/simulator_store` 导入族（本文件无文件系统业务调用，grep 口径可验）。数据目录请求期解析（可 monkeypatch CONVER_DATA_DIR）。契约：200 `{ok, game{id,file,name,type,config?}, renamed, warnings}`；400（非 .html/超 5MB/空文件）；409（SHA-256 重复，文案含「已存在」）；warnings 键集 eval/document.cookie/cross-origin-fetch（常量单源，不拦截）。
+**职责**：POST /api/simulators/import 单文件 HTML 游戏导入（multipart 字段名 `file`）；POST /api/simulators/reprobe 重新识别已有游戏（JSON `{id}`，重读 HTML → 三层探测 + 端点口径 → 原子更新 manifest 条目 type/config/endpointMode，条目或文件缺失 404）——仅 HTTP 映射（状态码 + 响应形状）；校验/去重/改名/探测/粗筛/manifest 注册全部委托 `services/simulator_store`。契约：import 200 `{ok, game{id,file,name,type,config?}, renamed, warnings}`；reprobe 200 `{ok, game}`。数据目录请求期解析（可 monkeypatch CONVER_DATA_DIR）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:backend/app/api/routes/simulators.py:import_simulator-->`import_simulator(file)`<!--/AUTO--> | POST 导入端点（5MB+1 读取守卫；领域异常映射 400/409） |
+| <!--AUTO:sig:backend/app/api/routes/simulators.py:reprobe_simulator-->`reprobe_simulator(body)`<!--/AUTO--> | POST 重新识别（probe_config + probe_endpoint_mode → update_manifest_entry；缺失 404） |
 
 ### 4.12 `backend/app/services/character.py` — 角色服务（<!--AUTO:lines:backend/app/services/character.py-->~77 行<!--/AUTO-->）
 
@@ -927,9 +928,9 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:isValidGame-->`isValidGame(game)`<!--/AUTO--> | 游戏合法性校验 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:clearTimer-->`clearTimer()`<!--/AUTO--> | 清理超时定时器 |
 
-### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~470 行<!--/AUTO-->）
+### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~501 行<!--/AUTO-->）
 
-**职责**：模拟器列表视图（U7）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新。
+**职责**：模拟器列表视图（U7 + 2026-08-26 重新识别）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新、local 卡片「重新识别」按钮（data-action="reprobe" → `reprobeGame(id)` POST JSON 到 reprobe 端点 → 刷新列表 + 反馈）。
 
 | 元素 | 说明 |
 |------|------|
@@ -940,11 +941,12 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulators.js:refreshSimulators-->`refreshSimulators()`<!--/AUTO--> | 刷新列表 |
 | <!--AUTO:sig:frontend/js/simulators.js:fetchManifestText-->`fetchManifestText()`<!--/AUTO--> | 拉取 manifest 文本 |
 | <!--AUTO:sig:frontend/js/simulators.js:getGames-->`getGames()`<!--/AUTO--> | 获取游戏列表 |
-| <!--AUTO:sig:frontend/js/simulators.js:bindEvents-->`bindEvents()`<!--/AUTO--> | 事件绑定 |
+| <!--AUTO:sig:frontend/js/simulators.js:bindEvents-->`bindEvents()`<!--/AUTO--> | 事件绑定（含重新识别拦截） |
 | <!--AUTO:sig:frontend/js/simulators.js:renderShell-->`renderShell()`<!--/AUTO--> | 渲染壳 |
-| <!--AUTO:sig:frontend/js/simulators.js:renderList-->`renderList()`<!--/AUTO--> | 渲染列表 |
+| <!--AUTO:sig:frontend/js/simulators.js:renderList-->`renderList()`<!--/AUTO--> | 渲染列表（local 卡片含重新识别按钮） |
 | <!--AUTO:sig:frontend/js/simulators.js:renderLoading-->`renderLoading()`<!--/AUTO--> | 加载态渲染 |
 | <!--AUTO:sig:frontend/js/simulators.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
+| <!--AUTO:sig:frontend/js/simulators.js:reprobeGame-->`reprobeGame(id)`<!--/AUTO--> | 重新识别（POST → 刷新 → 反馈） |
 
 ### 4.58 `frontend/js/state.js` — 全局状态（<!--AUTO:lines:frontend/js/state.js-->~33 行<!--/AUTO-->）
 
@@ -1144,7 +1146,7 @@ conver system/
 3. **04 导入提示**：工单 04 导入成功后以同一分析模块对已上传 HTML 运行比对，未覆盖清单非空则提示并引导 per-game CSS 微调。
 
 
-### 4.74 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~112 行<!--/AUTO-->）
+### 4.74 `backend/app/services/simulator_store.py` — 模拟器数据存储（<!--AUTO:lines:backend/app/services/simulator_store.py-->~116 行<!--/AUTO-->）
 
 **职责**：T-02 拆分后保留 `ensure_seeded`（首启种子）+ 顶层 re-export（`__all__` 21 符号不变，`from simulator_store import sanitize_filename` 等仍可用）。manifest 工具与导入族已迁入 `simulator_manifest.py` / `simulator_import.py`（见 §4.74.1 / §4.74.2）。
 
@@ -1152,9 +1154,9 @@ conver system/
 |------|------|
 | <!--AUTO:sig:backend/app/services/simulator_store.py:ensure_seeded-->`ensure_seeded(builtin_dir, target_dir)`<!--/AUTO--> | 首启种子（路径参数化；返回 True=本次拷贝 / False=已种子或源缺失） |
 
-### 4.74.1 `backend/app/services/simulator_manifest.py` — manifest 读写工具（<!--AUTO:lines:backend/app/services/simulator_manifest.py-->~109 行<!--/AUTO-->）
+### 4.74.1 `backend/app/services/simulator_manifest.py` — manifest 读写工具（<!--AUTO:lines:backend/app/services/simulator_manifest.py-->~128 行<!--/AUTO-->）
 
-**职责**：T-02 从 `simulator_store` 拆分。manifest.json 读取/原子写入/追加（缺失/损坏自愈重建）。stdlib only。
+**职责**：T-02 从 `simulator_store` 拆分。manifest.json 读取/原子写入/追加/按 id 更新（缺失/损坏自愈重建）。stdlib only。
 
 | 元素 | 说明 |
 |------|------|
@@ -1163,17 +1165,18 @@ conver system/
 | <!--AUTO:sig:backend/app/services/simulator_manifest.py:read_manifest-->`read_manifest(sim_dir)`<!--/AUTO--> | 读取 manifest.json → dict（缺失抛 FileNotFoundError） |
 | <!--AUTO:sig:backend/app/services/simulator_manifest.py:write_manifest-->`write_manifest(sim_dir, manifest)`<!--/AUTO--> | 原子写 manifest（同目录临时文件 + os.replace，中文保真） |
 | <!--AUTO:sig:backend/app/services/simulator_manifest.py:append_manifest_entry-->`append_manifest_entry(sim_dir, entry)`<!--/AUTO--> | manifest 原子追加（缺失/损坏 → 磁盘 .html 自愈重建后追加） |
+| <!--AUTO:sig:backend/app/services/simulator_manifest.py:update_manifest_entry-->`update_manifest_entry(sim_dir, entry_id, **updates)`<!--/AUTO--> | 按 id 原子更新条目字段（缺失抛 KeyError；重新识别端点消费） |
 
-### 4.74.2 `backend/app/services/simulator_import.py` — 模拟器导入管线（<!--AUTO:lines:backend/app/services/simulator_import.py-->~318 行<!--/AUTO-->）
+### 4.74.2 `backend/app/services/simulator_import.py` — 模拟器导入管线（<!--AUTO:lines:backend/app/services/simulator_import.py-->~415 行<!--/AUTO-->）
 
-**职责**：T-02 从 `simulator_store` 拆分。导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名净化/冲突改名、cfg- 三元组探测、恶意模式粗筛（不拦截）、manifest 追加注册；T-03 新增 `ScanResult` / `scan_generated_html` 单次扫描（消除生成路径双重扫描）。stdlib only。
+**职责**：T-02 从 `simulator_store` 拆分。导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名净化/冲突改名、类型探测（三层：L1 严格 cfg- 三元组 → L2 关键词启发 endpoint|url|base/key/model → L3 local，2026-08-26 补强）、端点口径推断（probe_endpoint_mode，SIM-API-1）、恶意模式粗筛（不拦截）、manifest 追加注册；T-03 新增 `ScanResult` / `scan_generated_html` 单次扫描。`scan_input_ids` 双层扫描（HTMLParser 静态层 input/select + 脚本层 raw-regex 捕获 JS 模板字符串渲染的运行时控件）。stdlib only。
 
 | 元素 | 说明 |
 |------|------|
 | `MAX_IMPORT_BYTES` | 导入文件大小上限（5MB） |
 | `SUSPICIOUS_PATTERNS` | 恶意模式键集（eval/document.cookie/cross-origin-fetch） |
 | `ImportResult` | 导入结果 dataclass（game 条目 + warnings/rename） |
-| `ScanResult` | 预计算扫描结果 dataclass（game_type/config/warnings，T-03） |
+| `ScanResult` | 预计算扫描结果 dataclass（game_type/config/warnings/endpoint_mode，T-03） |
 | `SimulatorDuplicateError` | 内容重复异常（→ 409） |
 | `SimulatorImportError` | 导入校验失败异常（→ 400） |
 | `CFG_REQUIRED_IDS` | cfg- 三元组必需 id 集 |
@@ -1182,9 +1185,10 @@ conver system/
 | <!--AUTO:sig:backend/app/services/simulator_import.py:slugify-->`slugify(stem)`<!--/AUTO--> | id slug（[a-z0-9-] 折叠，空回退 imported-game） |
 | <!--AUTO:sig:backend/app/services/simulator_import.py:find_duplicate-->`find_duplicate(sim_dir, content)`<!--/AUTO--> | SHA-256 去重（仅比对 *.html，命中返回现存文件名） |
 | <!--AUTO:sig:backend/app/services/simulator_import.py:next_available_filename-->`next_available_filename(sim_dir, desired)`<!--/AUTO--> | 冲突自动改名 xxx-2.html（大小写不敏感） |
-| <!--AUTO:sig:backend/app/services/simulator_import.py:probe_config-->`probe_config(html_text)`<!--/AUTO--> | cfg- 三元组探测（齐全 → ai+config；否则 local 无 config 降级） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:probe_config-->`probe_config(html_text)`<!--/AUTO--> | 三层类型探测（cfg- 三元组 / 关键词启发 / local 降级） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:probe_endpoint_mode-->`probe_endpoint_mode(html_text)`<!--/AUTO--> | 默认端点口径推断（/chat/completions 结尾 → full；否则 base；无则 None） |
 | <!--AUTO:sig:backend/app/services/simulator_import.py:scan_suspicious-->`scan_suspicious(html_text)`<!--/AUTO--> | 恶意模式粗筛（SUSPICIOUS_PATTERNS 键集，不拦截） |
-| <!--AUTO:sig:backend/app/services/simulator_import.py:scan_input_ids-->`scan_input_ids(html_text)`<!--/AUTO--> | 输入 id 扫描（cfg- 三元组 + 输入控件 id 收集） |
+| <!--AUTO:sig:backend/app/services/simulator_import.py:scan_input_ids-->`scan_input_ids(html_text)`<!--/AUTO--> | 控件 id 双层扫描（静态 input/select + 脚本模板字符串） |
 | <!--AUTO:sig:backend/app/services/simulator_import.py:import_game-->`import_game(sim_dir, filename, content, source='imported', *, precomputed_scan=None)`<!--/AUTO--> | 导入编排（校验→净化→去重→改名→探测→粗筛→落盘→注册） |
 
 ---
@@ -1202,7 +1206,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-import.js:resetSimulatorImport-->`resetSimulatorImport()`<!--/AUTO--> | 切走视图复位（导入中状态 / 拖拽高亮） |
 
 
-### 4.75.1 `backend/app/services/game_generator.py` — AI 游戏生成编排（<!--AUTO:lines:backend/app/services/game_generator.py-->~513 行<!--/AUTO-->）
+### 4.75.1 `backend/app/services/game_generator.py` — AI 游戏生成编排（<!--AUTO:lines:backend/app/services/game_generator.py-->~516 行<!--/AUTO-->）
 
 **职责**：AI 文本 → HTML 模拟器游戏的主编排——构造 prompt（种子模板 + 用户描述 + 重试反馈）→ resolve_llm 获取 LLM → 生成 → 6 项校验闸门（结构/模板标记/cfg 契约/可解析性/安全/游戏数据）→ 通过复用 `simulator_import.import_game`（经 `simulator_store` re-export）落盘；失败返回结构化错误 + 重试建议（最多 3 次自动重试）。T-04 重试参数内化为私有辅助。
 
@@ -1256,7 +1260,7 @@ conver system/
 | `backend/tests/test_schema_snapshot.py` | <!--AUTO:tests:backend/tests/test_schema_snapshot.py-->1<!--/AUTO--> | schema 快照漂移检测（T-17） |
 | `backend/tests/test_search.py` | <!--AUTO:tests:backend/tests/test_search.py-->13<!--/AUTO--> | 跨对话搜索 |
 | `backend/tests/test_settings_connection.py` | <!--AUTO:tests:backend/tests/test_settings_connection.py-->55<!--/AUTO--> | 设置/凭证/连接测试 |
-| `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->123<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
+| `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->149<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
 | `backend/tests/test_simulator_store.py` | <!--AUTO:tests:backend/tests/test_simulator_store.py-->33<!--/AUTO--> | 模拟器首启种子矩阵 + manifest 工具 + append 原子写/损坏自愈 |
 
 运行：`cd backend && python -m pytest`（pytest.ini 在根：`testpaths = backend/tests`，`pythonpath = .`；共享夹具见 `backend/tests/conftest.py`）。
@@ -1293,7 +1297,7 @@ conver system/
 | `frontend/tests/simulator-manifest.test.js` | <!--AUTO:tests:frontend/tests/simulator-manifest.test.js-->19<!--/AUTO--> | manifest 解析 |
 | `frontend/tests/simulator-pc-css.test.js` | <!--AUTO:tests:frontend/tests/simulator-pc-css.test.js-->24<!--/AUTO--> | 模拟器 PC 覆盖层契约（验收标准 + F1/F2 回归锁） |
 | `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->67<!--/AUTO--> | 模拟器运行视图 |
-| `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->76<!--/AUTO--> | 模拟器列表 |
+| `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->79<!--/AUTO--> | 模拟器列表 |
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
 | `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->53<!--/AUTO--> | 流式会话结算 |
 | `frontend/tests/tabs.test.js` | <!--AUTO:tests:frontend/tests/tabs.test.js-->68<!--/AUTO--> | tab 工作区 |
@@ -1349,10 +1353,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1767<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1796<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->714<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->983<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->740<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->986<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

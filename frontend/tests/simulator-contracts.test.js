@@ -150,16 +150,17 @@ describe('WARNING_LABELS — 恶意模式键集中文映射（键集锚定后端
 });
 
 describe('simulator-contracts __all__ 协议表面', () => {
-    it('__all__ 收口全部常量与纯函数', () => {
-        expect(__all__.sort()).toEqual([
-            'GENERATE_URL',
-            'IMPORT_URL',
-            'MANIFEST_URL',
-            'SIM_DIR',
-            'TIMEOUT_MS',
-            'TIMEOUT_REASON',
-            'WARNING_LABELS',
-            'isValidSimulatorFile',
-        ]);
-    });
+it('__all__ 收口全部常量与纯函数', () => {
+	        expect(__all__.sort()).toEqual([
+	            'GENERATE_URL',
+	            'IMPORT_URL',
+	            'MANIFEST_URL',
+	            'REPROBE_URL',
+	            'SIM_DIR',
+	            'TIMEOUT_MS',
+	            'TIMEOUT_REASON',
+	            'WARNING_LABELS',
+	            'isValidSimulatorFile',
+	        ]);
+	    });
 });

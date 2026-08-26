@@ -620,6 +620,78 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
         expect(openSpy).not.toHaveBeenCalled();
     });
 
+    it('local 卡片渲染「重新识别」按钮，ai 卡片不渲染', async () => {
+        const { sim, panel } = await loadModules();
+        sim.setFetch(makeFetch({ result: mockManifest(MANIFEST_OK) }));
+        sim.initSimulatorsView({ container: panel });
+        await sim.refreshSimulators();
+
+        const localCard = panel.querySelector('.sim-card[data-id="spider-shadow"]');
+        const reprobeBtn = localCard.querySelector('.sim-reprobe-btn');
+        expect(reprobeBtn).not.toBeNull();
+        expect(reprobeBtn.textContent).toContain('重新识别');
+
+        const aiCard = panel.querySelector('.sim-card[data-id="life-sim"]');
+        expect(aiCard.querySelector('.sim-reprobe-btn')).toBeNull();
+    });
+
+    it('点击「重新识别」→ POST reprobe 端点 → 刷新列表', async () => {
+        const { sim, panel } = await loadModules();
+        // 路由 fetch：manifest 请求返回正常，reprobe 请求返回成功
+        const fetchSpy = vi.fn(async (url, opts) => {
+            if (url.includes('/api/simulators/reprobe')) {
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({ ok: true, game: { id: 'spider-shadow', type: 'ai', config: { endpoint: 's-endpoint', apikey: 's-key', model: 's-model' } } }),
+                });
+            }
+            return Promise.resolve(mockManifest(MANIFEST_OK));
+        });
+        sim.setFetch(fetchSpy);
+        sim.initSimulatorsView({ container: panel });
+        await sim.refreshSimulators();
+
+        // 初始 local 卡片有重新识别按钮
+        const localCard = panel.querySelector('.sim-card[data-id="spider-shadow"]');
+        expect(localCard.querySelector('.sim-reprobe-btn')).not.toBeNull();
+
+        // 点击重新识别 → 请求 reprobe 端点
+        localCard.querySelector('.sim-reprobe-btn').click();
+
+        // 等待 DOS 回调（showSuccess 触发 + refreshSimulators 触发）
+        await vi.waitFor(() => {
+            // reprobe 应被调用一次
+            const reprobeCalls = fetchSpy.mock.calls.filter(c => c[0].includes('/api/simulators/reprobe'));
+            expect(reprobeCalls).toHaveLength(1);
+        });
+    });
+
+    it('重新识别失败 → 列表不销毁', async () => {
+        const { sim, panel } = await loadModules();
+        const fetchSpy = vi.fn(async (url, opts) => {
+            if (url.includes('/api/simulators/reprobe')) {
+                return Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: '游戏不存在' }) });
+            }
+            return Promise.resolve(mockManifest(MANIFEST_OK));
+        });
+        sim.setFetch(fetchSpy);
+        sim.initSimulatorsView({ container: panel });
+        await sim.refreshSimulators();
+
+        // 初始有 2 张卡片
+        expect(panel.querySelectorAll('.sim-card')).toHaveLength(2);
+
+        // 点击重新识别 → 失败
+        const localCard = panel.querySelector('.sim-card[data-id="spider-shadow"]');
+        localCard.querySelector('.sim-reprobe-btn').click();
+
+        // 等待片刻，列表不应消失（仍含 2 卡）
+        await vi.waitFor(() => {
+            expect(panel.querySelectorAll('.sim-card')).toHaveLength(2);
+        });
+    });
+
     it('Falsify:initSimulatorsView 无 container → no-op 不抛错', async () => {
         const { sim } = await loadModules();
         expect(() => sim.initSimulatorsView({})).not.toThrow();
