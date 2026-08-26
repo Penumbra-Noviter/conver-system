@@ -327,6 +327,7 @@ export function openGenerateFlow() {
                 fetchCredentials()
                     .then((creds) => {
                         if (!el.isConnected) return; // 模态框已关闭 → 丢弃
+                        if (generating) return; // 已提交生成 → 丢弃迟到响应（不覆盖进行中状态）
                         const protocol = creds?.protocol;
                         if (protocol === 'none' || protocol === 'claude') {
                             const warning = el.querySelector('#gg-cred-warning');
