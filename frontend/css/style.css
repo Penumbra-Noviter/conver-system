@@ -2106,6 +2106,12 @@ input[type="range"]::-moz-range-thumb {
     max-width: 620px;
 }
 
+/* 凭证提示「前往设置」导航链接（F-63：生成器自有中性命名，与模拟器解耦） */
+.gg-config-warning-nav {
+    color: var(--warning);
+    text-decoration: underline;
+}
+
 .game-gen-modal .form-field textarea {
     width: 100%;
     padding: var(--space-2) var(--space-3);
