@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1948<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->790<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1088<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1964<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->793<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1101<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -381,7 +381,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~391 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~385 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -628,7 +628,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~692 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~698 行<!--/AUTO-->）
 
 **职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名、T3 对话内模型切换（openModelSwitch）、T6 末条 AI 回复重生成（regenerateLastReply → conversations.regenerate → settleTurn 重载，在途守卫与 handleSend 非流式共用）。T2 搜索定位：`renderMessages({ messageId })` 在消息加载/渲染后把目标气泡 `scrollIntoView({block:'center'})` 定位到视口中央 + 应用 `.search-highlight` 高亮约 3s 自动清除（`locateAndHighlight`），并与既有 `scrollToBottom` 互斥（定位不被滚动到底覆盖）。
 
@@ -666,13 +666,13 @@ conver system/
 | <!--AUTO:sig:frontend/js/list-views.js:handleCharacterImport-->`handleCharacterImport()`<!--/AUTO--> | 角色卡导入处理 |
 | <!--AUTO:sig:frontend/js/list-views.js:promptUseWizardAfterImportFail-->`promptUseWizardAfterImportFail()`<!--/AUTO--> | 导入失败 → 引导使用向导 |
 
-### 4.36.6 `frontend/js/error-bar.js` — 错误条深模块（<!--AUTO:lines:frontend/js/error-bar.js-->~108 行<!--/AUTO-->）
+### 4.36.6 `frontend/js/error-bar.js` — 错误条深模块（<!--AUTO:lines:frontend/js/error-bar.js-->~126 行<!--/AUTO-->）
 
 **职责**：聊天错误条深模块（T1 — 首启引导与无 Key 主路径闭环）——发送失败（非流式/流式）统一经此承载：独立可关闭、约 `ERROR_BAR_DISMISS_MS` 自动消失、含「前往设置」按钮；none 态文案引导配 Key，其余态显示原始错误；错误不再写入消息列表或 tab 缓存。渲染位置挂到调用方容器（chat.js 传 `#chat-messages` 父级，不随 innerHTML 重建消失）。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/error-bar.js:renderErrorBar-->`renderErrorBar({ container, message, protocol, onNavigateSettings } = {})`<!--/AUTO--> | 渲染错误条（文案分流 / 关闭 / 自动消失） |
+| <!--AUTO:sig:frontend/js/error-bar.js:renderErrorBar-->`renderErrorBar({ container, message, protocol, onNavigateSettings, conversationId } = {})`<!--/AUTO--> | 渲染错误条（文案分流 / 关闭 / 自动消失） |
 | `ERROR_BAR_DISMISS_MS` | 错误条自动消失时长（毫秒；约 8s） |
 
 ### 4.37 `frontend/js/components/character-form.js` — 角色编辑表单（<!--AUTO:lines:frontend/js/components/character-form.js-->~204 行<!--/AUTO-->）
@@ -780,7 +780,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/loading-button.js:clearButtonLoading-->`clearButtonLoading(btn)`<!--/AUTO--> | 未持 restore 引用时的还原 |
 
 
-### 4.44.2 `frontend/js/components/game-generator.js` — AI 游戏生成器（<!--AUTO:lines:frontend/js/components/game-generator.js-->~380 行<!--/AUTO-->）
+### 4.44.2 `frontend/js/components/game-generator.js` — AI 游戏生成器（<!--AUTO:lines:frontend/js/components/game-generator.js-->~381 行<!--/AUTO-->）
 
 **职责**：从用户提供的世界观文本（textarea 粘贴或 .txt/.md 文件上传）生成 HTML 模拟器游戏。模态框输入 → POST /api/simulators/generate → 成功自动刷新列表 / 失败显示错误与重试按钮。T4 凭证预检：`openGenerateFlow` 打开时后台读取凭证端点，none/claude 态模态框顶部提示「需先配置 OpenAI 兼容 Key」+ 设置链接（复用 key-injector 的 `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS` 常量，点击经 `onNavigateSettings` 钩子 → `switchView('settings')`）；openai 态无提示；请求失败静默降级（不阻塞打开）。
 
@@ -1295,14 +1295,14 @@ conver system/
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
-| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->63<!--/AUTO--> | 对话视图 |
+| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->68<!--/AUTO--> | 对话视图 |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->16<!--/AUTO--> | 会话激活 |
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
-| `frontend/tests/error-bar.test.js` | <!--AUTO:tests:frontend/tests/error-bar.test.js-->11<!--/AUTO--> | 错误条渲染/交互/生命周期（T1） |
+| `frontend/tests/error-bar.test.js` | <!--AUTO:tests:frontend/tests/error-bar.test.js-->17<!--/AUTO--> | 错误条渲染/交互/生命周期（T1） |
 | `frontend/tests/loading-button.test.js` | <!--AUTO:tests:frontend/tests/loading-button.test.js-->7<!--/AUTO--> | 按钮 loading 态工具 |
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->49<!--/AUTO--> | 展示契约 |
-| `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->27<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
+| `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->29<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->70<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
@@ -1376,10 +1376,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1948<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1964<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->790<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1088<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->793<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1101<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
