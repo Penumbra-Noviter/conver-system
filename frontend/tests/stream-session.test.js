@@ -51,11 +51,13 @@ describe('mergeFreshList — stale 分支(长度变了 → 仅按位置结算 st
     });
 
     it('位置失配(FIX-A 同字节双流):settleIndex 位置已非本流占位 → 不误结算,新流 streaming 占位保持', () => {
-        // settleIndex=1 处是 user 消息(本流占位已被新流 token 替换);缓存无同 id 消息
+        // settleIndex=1 处是 user 消息(本流占位已被新流 token 替换);缓存无同 id 消息。
+        // 不传 messageId:位置失配场景下无 id 可解析(F-68 语义) — 若传 messageId 则由
+        // F-68 分支按 id 解析/渲染服务端列表,不再走「不误结算」位置守卫。
         const tab = {
             messages: [msg(1, 'user', '第一条'), msg(3, 'user', '第二条'), streaming('你好')],
         };
-        const result = mergeFreshList(tab, 2, [], { settleIndex: 1, messageId: 101 });
+        const result = mergeFreshList(tab, 2, [], { settleIndex: 1 });
         expect(result.render).toBe(false);
         expect(result.messages).toBe(tab.messages); // 原样,不结算
         expect(result.messages.filter((m) => m.streaming)).toHaveLength(1);
@@ -64,16 +66,18 @@ describe('mergeFreshList — stale 分支(长度变了 → 仅按位置结算 st
 
     it('幂等:settleIndex=-1(无本流占位)→ 不动,不结算不追加', () => {
         const tab = { messages: [msg(1, 'user', 'hi')] };
-        // revision 0 ≠ 长度 1 → 走 stale 分支;settleIndex=-1 → 无占位可结算
-        const result = mergeFreshList(tab, 0, [], { settleIndex: -1, messageId: 101 });
+        // revision 0 ≠ 长度 1 → 走 stale 分支;settleIndex=-1 → 无占位可结算。
+        // messageId 缺省(F-60/F-68 id 解析分支不参与)→ 原样不动。
+        const result = mergeFreshList(tab, 0, [], { settleIndex: -1 });
         expect(result.render).toBe(false);
         expect(result.messages).toBe(tab.messages);
     });
 
     it('settleIndex 越界(缓存被替换后缩短)→ 不抛错、不动', () => {
         const tab = { messages: [msg(1, 'user', 'hi')] };
-        expect(() => mergeFreshList(tab, 3, [], { settleIndex: 2, messageId: 101 })).not.toThrow();
-        const result = mergeFreshList(tab, 3, [], { settleIndex: 2, messageId: 101 });
+        // messageId 缺省(F-60/F-68 id 解析分支不参与)→ 越界 no-op,不抛错。
+        expect(() => mergeFreshList(tab, 3, [], { settleIndex: 2 })).not.toThrow();
+        const result = mergeFreshList(tab, 3, [], { settleIndex: 2 });
         expect(result.messages).toBe(tab.messages);
         expect(result.render).toBe(false);
     });
@@ -117,6 +121,48 @@ describe('mergeFreshList — stale 分支(长度变了 → 仅按位置结算 st
             { role: 'assistant', content: '新回复改', id: 3, streaming: false },
         ]);
         expect(result.messages.filter((m) => m.streaming)).toEqual([]);
+    });
+
+    // ── F-66 / F-68:stale F-60 分支空 content 不静默丢弃(spec 修订)──
+
+    it('F-68:stale + messageId 存在 + content 为空字符串(本地命中)→ 原位替换空 content + 清 streaming,render:true(修复前 render:false 静默丢弃)', () => {
+        // 重生成空回复:并发流已把新回复以 streaming 形态写入缓存(同 id),本流 content=''。
+        // 旧守卫 `messageId != null && content` 在 content==='' 时短路 → 落到 render:false 静默丢弃;
+        // fresh 分支(不查 content)正常渲染空回复 — 两侧不一致。修复:有 messageId 即按 id 定位写回。
+        const tab = {
+            messages: [
+                msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+                { role: 'assistant', content: '新回复', id: 3, streaming: true },
+            ],
+        };
+        const server = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'), msg(4, 'user', '并发')];
+        const result = mergeFreshList(tab, 2, server, {
+            settleIndex: -1, anchor: null, messageId: 3, content: '',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toEqual([
+            msg(1, 'user', '你好'),
+            msg(2, 'assistant', '旧回复'),
+            { role: 'assistant', content: '', id: 3, streaming: false },
+        ]);
+        expect(result.messages.filter((m) => m.streaming)).toEqual([]);
+    });
+
+    it('F-68:stale + messageId 存在 + content 为空字符串(本地未命中)→ 渲染服务端权威列表,render:true', () => {
+        // 重生成空回复且本地无同 id(本地仍是旧回复):有 messageId 即不再静默丢弃 —
+        // render:true 渲染服务端列表(空 content 的服务端消息也在场)。
+        const tab = {
+            messages: [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'), msg(4, 'user', '并发')],
+        };
+        const server = [
+            msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+            msg(4, 'user', '并发'), msg(3, 'assistant', ''),
+        ];
+        const result = mergeFreshList(tab, 2, server, {
+            settleIndex: -1, anchor: null, messageId: 3, content: '',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toBe(server); // 服务端列表权威
     });
 });
 
@@ -224,6 +270,27 @@ describe('mergeFreshList — 失败分支(msgs=null → 位置感知追加,不�
             msg(1, 'user', '你好'),
             { role: 'assistant', content: '新回复', id: 3 },
         ]);
+    });
+
+    // ── F-66:messageId === replaceId 顶替场景不被幂等早退吞掉(spec 修订)──
+
+    it('F-66:messageId === replaceId(服务端复用被顶替旧回复 id)→ 跳过幂等早退,按被顶替 id 原位替换,render:true(修复前 render:false + 旧缓存残留)', () => {
+        // 服务端复用被顶替旧回复的 id(2):新回复 messageId=2 === replaceId=2,本地缓存仍含
+        // 旧回复(2, id === replaceId === messageId)。旧实现幂等早退 `next.some(m => m.id === 2)`
+        // 误判「已结算」→ 新内容被吞、旧回复残留、render:false。
+        // 修复:幂等早退区分「新 id 已存在」(真幂等,保持早退)与「新 id === 被顶替 id」
+        // (顶替场景本体 — 跳过幂等早退,继续走 replaceId 原位替换)。
+        const tab = { messages: [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')] };
+        const result = mergeFreshList(tab, 2, null, {
+            settleIndex: -1, anchor: null, replaceId: 2, messageId: 2, content: '新回复',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toEqual([
+            msg(1, 'user', '你好'),
+            { role: 'assistant', content: '新回复', id: 2 },
+        ]);
+        expect(result.messages).toHaveLength(2); // 无重复插入
+        expect(result.messages.some((m) => m.content === '旧回复')).toBe(false); // 无旧残留
     });
 });
 
@@ -677,6 +744,23 @@ describe('createStreamSession — isSettled / 参数校验 / 协议表面', () =
         listSpy.mockRestore();
     });
 
+    it('surfaceError 缺省(未注入 onError)→ 普通错误经 no-op 兜底上抛,不抛错不写错误标记', () => {
+        // 触发 createStreamSession 的 surfaceError no-op 分支:errorSink 未注入时
+        // 普通错误落到空函数兜底(surfaceError 须先于 render 调用 — F-51 契约),
+        // 部分内容保留为普通 assistant 消息,不崩溃。
+        const tab = { conversationId: 1, phase: 'thinking', isStreaming: true, messages: [msg(1, 'user', 'hi')] };
+        const session = createStreamSession({
+            convId: 1,
+            getTab: () => tab,
+            updateTab: (id, patch) => Object.assign(tab, patch),
+        });
+        session.onToken('部分');
+        expect(() => session.onError(new Error('模型超时'))).not.toThrow();
+        expect(tab.phase).toBe('error');
+        expect(tab.messages).toEqual([msg(1, 'user', 'hi'), { role: 'assistant', content: '部分' }]);
+        expect(tab.messages.filter((m) => m.error)).toHaveLength(0);
+    });
+
     it('Falsify:onError 时 tab 已关闭 → no-op 不抛错(settled 空列表兜底)', () => {
         const { session, deps } = makeHarness({ initial: [msg(1, 'user', 'hi')] });
         deps.getTab.mockReturnValue(undefined); // 发起 tab 被关闭
@@ -916,6 +1000,24 @@ describe('settleTurn — 统一结算入口（reload → mergeFreshList → 写�
             convId: 1,
             getTab: () => tab,
             updateTab: (id, patch) => Object.assign(tab, patch),
+            revision: 1,
+            settleIndex: -1,
+        })).resolves.toBeUndefined();
+        expect(tab.messages).toEqual(fresh);
+        listSpy.mockRestore();
+    });
+
+    it('render 缺省 + isActive 为真且 fresh → 渲染经 doRender no-op 兜底，不抛错', async () => {
+        // 触发 settleTurn 的 doRender no-op 分支:render 未注入但 isActive 为真、
+        // merged.render=true(fresh)→ doRender() 落到空函数兜底,不抛错。
+        const fresh = [msg(1, 'user', 'hi'), msg(2, 'assistant', '你好')];
+        const tab = { conversationId: 1, messages: [msg(1, 'user', 'hi')] };
+        const listSpy = vi.spyOn(messages, 'list').mockResolvedValue(fresh);
+        await expect(settleTurn({
+            convId: 1,
+            getTab: () => tab,
+            updateTab: (id, patch) => Object.assign(tab, patch),
+            isActive: () => true,
             revision: 1,
             settleIndex: -1,
         })).resolves.toBeUndefined();

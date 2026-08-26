@@ -47,7 +47,10 @@ import { messages } from './api.js';
  * 位置感知写回本流消息:移除本流 streaming 占位(幂等),把最终消息插入到发起位置;
  * 重生成失败兜底按被顶替旧消息身份(replaceId)原位替换,不尾部追加(F-58)。
  * 幂等规则:
- *   - 缓存已含同 id 消息(被并发流的 fresh 替换结算)→ 不动
+ *   - 缓存已含同 id 消息(被并发流的 fresh 替换结算)→ 不动;
+ *     F-66:messageId === replaceId(服务端复用被顶替旧回复 id)时跳过该早退 —
+ *     缓存中被顶替旧回复 id === replaceId === messageId,幂等检查会误判「已结算」
+ *     而吞掉新内容,顶替场景本体须继续走下方 replaceId 原位替换
  *   - replaceId(被顶替旧消息服务端 id,重生成路径):缓存含同 id 消息 → 原位替换
  *     (旧回复已截断、新回复顶替其位置 — 不落尾部追加,消「顶替」语义残留)
  *   - anchor(本流 user 消息对象引用):位置 anchor 之后插入本流回复 — anchor 用
@@ -62,8 +65,12 @@ import { messages } from './api.js';
  */
 function settleByPosition(tab, anchor, message, replaceId = null) {
     const next = [...tab.messages];
-    // 幂等:缓存已含本流消息(带 id 匹配)— 已被并发流的 fresh 替换结算,不重复插入
-    if (message.id != null && next.some((m) => m.id === message.id)) {
+    // 幂等:缓存已含本流消息(带 id 匹配)— 已被并发流的 fresh 替换结算,不重复插入。
+    // F-66:当 messageId === replaceId(服务端复用被顶替旧回复 id)时,缓存中的被顶替
+    // 旧回复 id === replaceId === messageId,幂等检查会误判「已结算」而吞掉新内容 —
+    // 顶替场景本体须跳过幂等早退,继续走下方 replaceId 原位替换。
+    const isReplacementScenario = replaceId != null && replaceId === message.id;
+    if (!isReplacementScenario && message.id != null && next.some((m) => m.id === message.id)) {
         return { messages: tab.messages, render: false };
     }
     // F-58:重生成失败兜底 — 按被顶替旧消息身份原位替换(后端已截断旧回复,顶替而非尾部追加)。
@@ -100,7 +107,9 @@ function settleByPosition(tab, anchor, message, replaceId = null) {
  *   - fresh(长度未变):整体替换为服务端列表(render: true)
  *   - stale(长度变了):仅按 settleIndex 位置结算本流 streaming 标记
  *     (幂等:该位置仍 streaming 才结算 — 新流 token 已把尾部换成自己的消息时位置
- *     失配 → 不误结算;本流消息已被结算过 → 不动)
+ *     失配 → 不误结算;本流消息已被结算过 → 不动);位置失配且无 anchor 时按
+ *     F-60/F-68 兜底:有 messageId 即按 id 定位写回或渲染服务端权威列表 —
+ *     守卫不查 content(空回复不被静默丢弃,与 fresh 分支行为一致)
  *
  * @param {object|null} tab - 会话 tab(getTab 返回的对象;null/无 messages 安全返回空结果)
  * @param {number} revision - 发起时刻缓存长度(list 前捕获)
@@ -155,9 +164,10 @@ export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor =
         }, replaceId);
     }
     // F-60:stale + anchor=null — 重生成/并发漂移结果不得静默丢弃。
-    // messageId/content 非空时:本地缓存已有同 id 消息 → 原位替换(content + 清 streaming,幂等);
+    // F-68:有 messageId 即按 id 定位写回 — 守卫不查 content(与 fresh 分支一致,
+    // 空回复不被静默丢弃):命中 → 原位替换 content + 清 streaming(幂等);
     // 找不到同 id(重生成场景,本地仍是被顶替的旧回复)→ 至少渲染服务端列表(权威)。
-    if (messageId != null && content) {
+    if (messageId != null) {
         const matchIdx = tab.messages.findIndex((m) => m.id === messageId);
         if (matchIdx >= 0) {
             const next = [...tab.messages];
