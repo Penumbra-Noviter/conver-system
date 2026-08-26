@@ -77,6 +77,47 @@ describe('mergeFreshList — stale 分支(长度变了 → 仅按位置结算 st
         expect(result.messages).toBe(tab.messages);
         expect(result.render).toBe(false);
     });
+
+    // ── S-09（F-60）并发漂移不静默丢弃（stale + settleIndex=-1 + anchor=null 兜底）──
+
+    it('F-60:stale + settleIndex=-1 + anchor=null + messageId/content → 渲染服务端列表（不静默丢弃）', () => {
+        // 重生成场景：并发使本地缓存长度变化（stale，revision 2 → 长度 3），本流无占位可结算
+        // （settleIndex=-1）且无 user anchor（重生成路径）。服务端列表含新回复(3)与并发消息(4)
+        // — 必须写回渲染，不得静默丢弃。
+        const tab = {
+            messages: [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'), msg(4, 'user', '并发')],
+        };
+        const server = [
+            msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+            msg(4, 'user', '并发'), msg(3, 'assistant', '新回复'),
+        ];
+        const result = mergeFreshList(tab, 2, server, {
+            settleIndex: -1, anchor: null, messageId: 3, content: '新回复',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toBe(server); // 服务端列表权威
+    });
+
+    it('F-60:stale + messageId 本地已存在 → 原位替换 content + 清除 streaming（幂等）', () => {
+        // 并发流已把新回复以 streaming 形态写入缓存（同 id 不同位置）→ 按 messageId 原位收尾。
+        const tab = {
+            messages: [
+                msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+                { role: 'assistant', content: '新回复', id: 3, streaming: true },
+            ],
+        };
+        const server = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'), msg(4, 'user', '并发')];
+        const result = mergeFreshList(tab, 2, server, {
+            settleIndex: -1, anchor: null, messageId: 3, content: '新回复改',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toEqual([
+            msg(1, 'user', '你好'),
+            msg(2, 'assistant', '旧回复'),
+            { role: 'assistant', content: '新回复改', id: 3, streaming: false },
+        ]);
+        expect(result.messages.filter((m) => m.streaming)).toEqual([]);
+    });
 });
 
 describe('mergeFreshList — 失败分支(msgs=null → 位置感知追加,不清并发流占位 — 根治 R2)', () => {
@@ -143,6 +184,46 @@ describe('mergeFreshList — 失败分支(msgs=null → 位置感知追加,不�
             { role: 'assistant', content: '回复' }, // 无 id 字段
         ]);
         expect(result.render).toBe(true);
+    });
+
+    // ── S-09（F-58）重生成失败兜底：按被顶替旧消息身份原位替换，不尾部追加 ──
+
+    it('F-58:anchor=null + replaceId → 按被顶替旧回复 id 原位替换（不尾部追加、无旧残留）', () => {
+        // 重生成失败场景：后端已截断旧回复并生成新回复，本地重载失败（msgs=null）→
+        // 本地缓存仍含旧回复(2)。replaceId=2 指认重生成目标 → 原位替换为带服务端 id(3) 的新回复。
+        const tab = { messages: [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')] };
+        const result = mergeFreshList(tab, 2, null, {
+            settleIndex: -1, anchor: null, replaceId: 2, messageId: 3, content: '新回复',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toEqual([
+            msg(1, 'user', '你好'),
+            { role: 'assistant', content: '新回复', id: 3 },
+        ]);
+        expect(result.messages).toHaveLength(2); // 无额外尾部追加
+        expect(result.messages.some((m) => m.content === '旧回复')).toBe(false); // 无旧残留
+    });
+
+    it('F-58:幂等 — 新回复已含同 id（被并发结算）→ replaceId 不重复替换', () => {
+        const tab = { messages: [msg(1, 'user', '你好'), { role: 'assistant', content: '新回复', id: 3 }] };
+        const result = mergeFreshList(tab, 2, null, {
+            settleIndex: -1, anchor: null, replaceId: 2, messageId: 3, content: '新回复',
+        });
+        expect(result.render).toBe(false);
+        expect(result.messages).toBe(tab.messages);
+        expect(result.messages.filter((m) => m.id === 3)).toHaveLength(1);
+    });
+
+    it('F-58:兜底 — replaceId 在缓存中不存在（旧消息已被并发移除）→ 回落尾部追加（既有语义保持）', () => {
+        const tab = { messages: [msg(1, 'user', '你好')] };
+        const result = mergeFreshList(tab, 1, null, {
+            settleIndex: -1, anchor: null, replaceId: 99, messageId: 3, content: '新回复',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toEqual([
+            msg(1, 'user', '你好'),
+            { role: 'assistant', content: '新回复', id: 3 },
+        ]);
     });
 });
 
@@ -741,6 +822,47 @@ describe('settleTurn — 统一结算入口（reload → mergeFreshList → 写�
             streaming('回复B'),
         ]);
         expect(deps.render).toHaveBeenCalledTimes(1);
+    });
+
+    // ── S-09（F-58 + F-60）──
+
+    it('F-58:list 重载失败 + replaceId → 按被顶替旧消息 id 原位替换（不尾部追加、无旧残留）', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { deps, tab, listSpy } = makeSettleHarness({
+            initial: [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')],
+        });
+        listSpy.mockRejectedValue(new Error('服务端故障'));
+        await settleTurn({ ...deps, revision: 2, settleIndex: -1, anchor: null, replaceId: 2, messageId: 3, content: '新回复' });
+        expect(tab.messages).toEqual([
+            msg(1, 'user', '你好'),
+            { role: 'assistant', content: '新回复', id: 3 },
+        ]);
+        expect(tab.messages).toHaveLength(2);
+        expect(tab.messages.some((m) => m.content === '旧回复')).toBe(false);
+        expect(deps.render).toHaveBeenCalledTimes(1);
+        expect(errorSpy).toHaveBeenCalledWith('重新加载消息列表失败:', expect.any(Error));
+        errorSpy.mockRestore();
+    });
+
+    it('F-60:stale + settleIndex=-1 + anchor=null + messageId/content → 服务端列表写回渲染（不静默丢弃）', async () => {
+        const deferred = {};
+        deferred.promise = new Promise((resolve) => { deferred.resolve = resolve; });
+        const { deps, tab, listSpy } = makeSettleHarness({
+            initial: [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')],
+        });
+        listSpy.mockReturnValue(deferred.promise);
+        const p = settleTurn({ ...deps, revision: 2, settleIndex: -1, anchor: null, messageId: 3, content: '新回复' });
+        deps.updateTab(1, { messages: [...tab.messages, msg(4, 'user', '并发')] }); // 长度 2 → 3（stale）
+        deferred.resolve([
+            msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+            msg(4, 'user', '并发'), msg(3, 'assistant', '新回复'),
+        ]);
+        await p;
+        expect(tab.messages).toEqual([
+            msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+            msg(4, 'user', '并发'), msg(3, 'assistant', '新回复'),
+        ]);
+        expect(deps.render).toHaveBeenCalledTimes(1); // 不再静默丢弃
     });
 
     it('幂等：缓存已含同 id 消息（已被并发流结算）→ 失败兜底不重复插入', async () => {
