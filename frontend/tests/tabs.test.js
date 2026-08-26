@@ -907,11 +907,14 @@ describe('FIX-B 非流式双击连发守卫（原 F-1 非流式连发场景同�
             throw new Error(`未 mock 的请求: ${path}`);
         });
 
-        // 第一次发送失败（chat 500）
+        // 第一次发送失败（chat 500）— T1：错误不再写进消息列表，渲染错误条
         chat.chatDom.chatInput.value = '第一条';
         await chat.handleSend();
         expect(chatCalls).toBe(1);
-        expect(document.querySelector('#chat-messages').textContent).toContain('发送失败');
+        expect(document.querySelector('#chat-messages').textContent).not.toContain('服务端故障');
+        const bar = document.querySelector('.chat-error-bar');
+        expect(bar).not.toBeNull();
+        expect(bar.textContent).toContain('服务端故障');
 
         // 失败路径清除守卫 → 再次发送成功（第二次 list 返回完整快照）
         chat.chatDom.chatInput.value = '第二条';
@@ -1440,7 +1443,10 @@ describe('流式 error 帧 → handleStreamError 错误分支（Falsify 失败�
         await chat.handleSend();
         expect(tabs.getTab(11).phase).toBe('error');
         expect(tabs.getTab(11).isStreaming).toBe(false);
-        expect(document.querySelector('#chat-messages').textContent).toContain('[错误] 模型超时');
+        // T1：流式错误不再写 `[错误]` 进消息列表 — 渲染错误条
+        expect(document.querySelector('#chat-messages').textContent).not.toContain('[错误]');
+        expect(document.querySelector('.chat-error-bar')).not.toBeNull();
+        expect(document.querySelector('.chat-error-bar').textContent).toContain('模型超时');
         expect(chat.chatDom.btnSend.querySelector('[data-icon="send"]')).not.toBeNull();
         expect(chat.chatDom.btnSend.classList.contains('btn-stop')).toBe(false);
     });

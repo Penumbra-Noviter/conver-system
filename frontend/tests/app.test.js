@@ -230,8 +230,10 @@ describe('app.js init — 接线序列', () => {
         // 角色/对话空态（renderCharacters / renderConversations 接线）
         expect(document.querySelector('#character-grid').innerHTML).toContain('暂无角色');
         expect(document.querySelector('#conversation-list').innerHTML).toContain('暂无对话');
-        // 无恢复记录 → 聊天区空态（restoreFromStorage → showEmptyState 接线）
-        expect(document.querySelector('#chat-messages').innerHTML).toContain('选择左侧对话或创建新对话开始聊天');
+        // 无恢复记录 → 聊天区空态（restoreFromStorage → showEmptyState 接线；
+        // makeRoute 默认凭证 protocol='none' → 渲染首启引导卡）
+        expect(document.querySelector('#chat-messages .empty-state-guide-btn')).not.toBeNull();
+        expect(document.querySelector('#chat-messages').textContent).toContain('先配置 AI 接口');
         expect(state.characters).toEqual([]);
         expect(state.conversations).toEqual([]);
         // initProviderDropdown 接线：Provider 下拉已按模型列表初始化
@@ -276,6 +278,40 @@ describe('app.js init — 接线序列', () => {
         expect(cascadeSpy).toHaveBeenCalledWith({ ids: 'all', reloadList: false });
         expect(fetchSpy.mock.calls.some(([url, opts]) =>
             String(url).endsWith('/api/conversations') && opts?.method === 'DELETE')).toBe(true);
+    });
+});
+
+describe('app.js init — 凭证协议检测接线（T1 首启引导依据）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('init 调 credentials 端点并缓存协议 → state.credentialsProtocol（三态之一）', async () => {
+        const { state, fetchSpy } = await loadApp(makeRoute({
+            credentials: { key: '', endpoint: '', model: '', protocol: 'openai' },
+        }));
+        expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/api/settings/credentials'))).toBe(true);
+        await vi.waitFor(() => expect(state.credentialsProtocol).toBe('openai'));
+    });
+
+    it('none 协议 → 聊天空态渲染引导卡（state.credentialsProtocol=none）', async () => {
+        await loadApp(makeRoute({
+            credentials: { key: '', endpoint: '', model: '', protocol: 'none' },
+        }));
+        expect(document.querySelector('#chat-messages .empty-state-guide-btn')).not.toBeNull();
+    });
+
+    it('非 none 协议（openai）→ 聊天空态无引导卡（EMPTY_STATE_HTML）', async () => {
+        const { chat } = await loadApp(makeRoute({
+            credentials: { key: 'sk-x', endpoint: 'https://api.example.com/v1', model: 'gpt', protocol: 'openai' },
+        }));
+        expect(document.querySelector('#chat-messages .empty-state-guide-btn')).toBeNull();
+        expect(document.querySelector('#chat-messages').innerHTML).toBe(chat.EMPTY_STATE_HTML);
+    });
+
+    it('Falsify:凭证端点失败 → 静默降级（credentialsProtocol=null，无引导卡、init 不崩溃）', async () => {
+        const { state } = await loadApp(makeRoute({ credentialsFail: true }));
+        await vi.waitFor(() => expect(state.credentialsProtocol).toBe(null));
+        expect(document.querySelector('#chat-messages .empty-state-guide-btn')).toBeNull();
     });
 });
 

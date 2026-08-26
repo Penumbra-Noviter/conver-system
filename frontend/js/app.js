@@ -200,6 +200,17 @@ async function init() {
     await loadModels();
     await loadSettings();
 
+    // T1 凭证协议检测（init 数据加载序列后）：结果缓存到 state.credentialsProtocol，
+    // 供首启引导卡判定（none → 空态渲染引导卡）。检测失败 → 静默降级为 null
+    // （保守不引导、不弹错、init 不中断）。
+    try {
+        const creds = await settings.credentials();
+        state.credentialsProtocol = creds?.protocol ?? null;
+    } catch (err) {
+        console.error('加载凭证协议失败:', err);
+        state.credentialsProtocol = null;
+    }
+
     // P6.5-4 恢复时序契约：conversations 加载完成后才 restore；
     // isValidId 以已加载列表判定（过滤已删会话）；恢复的 tab 一律非流式，
     // 消息在激活时懒加载（走统一激活流程）
@@ -250,6 +261,7 @@ setActivationHooks({
 setChatHooks({
     refreshConversations: loadConversations,
     syncConversationListTitle,
+    navigateToSettings: () => switchView('settings'),
 });
 
 // 级联收口依赖注入（ARC-9 C1 — 删角色级联 / 删对话 / 清空全部 / tab-bar 关最后

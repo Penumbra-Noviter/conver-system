@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1796<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->740<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->986<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1744<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->740<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1004<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 
 ---
 
@@ -602,9 +602,9 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~381 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~392 行<!--/AUTO-->）
 
-**职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）。
+**职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）、T1 凭证协议检测（init 数据加载序列后调 `settings.credentials()`，结果缓存到 `state.credentialsProtocol` 供引导卡判定）。
 
 | 元素 | 说明 |
 |------|------|
@@ -621,9 +621,9 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~458 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~512 行<!--/AUTO-->）
 
-**职责**：消息渲染（气泡/思考指示/复制按钮）、发送流程（handleSend → StreamSession）、标题同步、重命名。
+**职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名。
 
 | 元素 | 说明 |
 |------|------|
@@ -655,6 +655,15 @@ conver system/
 | <!--AUTO:sig:frontend/js/list-views.js:startChatWithCharacter-->`startChatWithCharacter(characterId)`<!--/AUTO--> | 发起角色对话 |
 | <!--AUTO:sig:frontend/js/list-views.js:handleCharacterImport-->`handleCharacterImport()`<!--/AUTO--> | 角色卡导入处理 |
 | <!--AUTO:sig:frontend/js/list-views.js:promptUseWizardAfterImportFail-->`promptUseWizardAfterImportFail()`<!--/AUTO--> | 导入失败 → 引导使用向导 |
+
+### 4.36.6 `frontend/js/error-bar.js` — 错误条深模块（<!--AUTO:lines:frontend/js/error-bar.js-->~108 行<!--/AUTO-->）
+
+**职责**：聊天错误条深模块（T1 — 首启引导与无 Key 主路径闭环）——发送失败（非流式/流式）统一经此承载：独立可关闭、约 `ERROR_BAR_DISMISS_MS` 自动消失、含「前往设置」按钮；none 态文案引导配 Key，其余态显示原始错误；错误不再写入消息列表或 tab 缓存。渲染位置挂到调用方容器（chat.js 传 `#chat-messages` 父级，不随 innerHTML 重建消失）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/error-bar.js:renderErrorBar-->`renderErrorBar({ container, message, protocol, onNavigateSettings } = {})`<!--/AUTO--> | 渲染错误条（文案分流 / 关闭 / 自动消失） |
+| `ERROR_BAR_DISMISS_MS` | 错误条自动消失时长（毫秒；约 8s） |
 
 ### 4.37 `frontend/js/components/character-form.js` — 角色编辑表单（<!--AUTO:lines:frontend/js/components/character-form.js-->~204 行<!--/AUTO-->）
 
@@ -780,7 +789,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/components/tab-bar.js:initTabBar-->`initTabBar({ container, onActivate } = {})`<!--/AUTO--> | 初始化 tab 栏 |
 
-### 4.46 `frontend/js/conversation-activation.js` — 会话激活（<!--AUTO:lines:frontend/js/conversation-activation.js-->~145 行<!--/AUTO-->）
+### 4.46 `frontend/js/conversation-activation.js` — 会话激活（<!--AUTO:lines:frontend/js/conversation-activation.js-->~146 行<!--/AUTO-->）
 
 **职责**：会话激活流程——tab 视图状态保存/恢复、空态、消息加载（P6.5 多 tab 联动）。
 
@@ -948,19 +957,19 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulators.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
 | <!--AUTO:sig:frontend/js/simulators.js:reprobeGame-->`reprobeGame(id)`<!--/AUTO--> | 重新识别（POST → 刷新 → 反馈） |
 
-### 4.58 `frontend/js/state.js` — 全局状态（<!--AUTO:lines:frontend/js/state.js-->~33 行<!--/AUTO-->）
+### 4.58 `frontend/js/state.js` — 全局状态（<!--AUTO:lines:frontend/js/state.js-->~36 行<!--/AUTO-->）
 
-**职责**：全局 DOM 引用缓存（P6.5 后字段退役，仅存 DOM 句柄）。
+**职责**：全局 DOM 引用缓存（P6.5 后字段退役，仅存 DOM 句柄）。T1：`state.credentialsProtocol`（凭证协议缓存，app.js init 检测后写入，供首启引导卡判定）。
 
 > 无公开函数（DOM 引用常量）。
 
-### 4.59 `frontend/js/stream-session.js` — 流式会话（<!--AUTO:lines:frontend/js/stream-session.js-->~332 行<!--/AUTO-->）
+### 4.59 `frontend/js/stream-session.js` — 流式会话（<!--AUTO:lines:frontend/js/stream-session.js-->~348 行<!--/AUTO-->）
 
-**职责**：流式会话深模块（ARC 级联收口）——创建会话/SSE 接线/统一结算 `settleTurn`（ARC9 T-02：按发起会话写回、防悬挂）+ 中止错误归一化。
+**职责**：流式会话深模块（ARC 级联收口）——创建会话/SSE 接线/统一结算 `settleTurn`（ARC9 T-02：按发起会话写回、防悬挂）+ 中止错误归一化。T1：普通（非 AbortError）流式错误不再写 `[错误]` 进消息缓存，经注入回调 `deps.onError` 上抛给聊天域渲染错误条（保持零 DOM）。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/stream-session.js:createStreamSession-->`createStreamSession({ convId, getTab, updateTab, isActiveStream, renderMessages, refreshSendButton, refreshConversations })`<!--/AUTO--> | 创建流式会话 |
+| <!--AUTO:sig:frontend/js/stream-session.js:createStreamSession-->`createStreamSession({ convId, getTab, updateTab, isActiveStream, renderMessages, refreshSendButton, refreshConversations, onError: errorSink })`<!--/AUTO--> | 创建流式会话 |
 | <!--AUTO:sig:frontend/js/stream-session.js:settleTurn-->`settleTurn({ convId, getTab, updateTab, isActive, render, revision, settleIndex = -1, anchor = null, messageId = null, content = '' })`<!--/AUTO--> | 统一结算（完成/停止/出错写回） |
 | <!--AUTO:sig:frontend/js/stream-session.js:settleByPosition-->`settleByPosition(tab, anchor, message)`<!--/AUTO--> | 按位置结算 |
 | <!--AUTO:sig:frontend/js/stream-session.js:mergeFreshList-->`mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor = null, messageId = null, content = '' } = {})`<!--/AUTO--> | 合并刷新消息列表 |
@@ -1270,14 +1279,15 @@ conver system/
 | 文件 | 用例数 | 覆盖主题 |
 |------|--------|----------|
 | `frontend/tests/api.test.js` | <!--AUTO:tests:frontend/tests/api.test.js-->16<!--/AUTO--> | 请求层/超时/SSE/Blob |
-| `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->34<!--/AUTO--> | 应用编排接线 |
+| `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->38<!--/AUTO--> | 应用编排接线 |
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
-| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->38<!--/AUTO--> | 对话视图 |
+| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->41<!--/AUTO--> | 对话视图 |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->12<!--/AUTO--> | 会话激活 |
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
+| `frontend/tests/error-bar.test.js` | <!--AUTO:tests:frontend/tests/error-bar.test.js-->11<!--/AUTO--> | 错误条渲染/交互/生命周期（T1） |
 | `frontend/tests/loading-button.test.js` | <!--AUTO:tests:frontend/tests/loading-button.test.js-->7<!--/AUTO--> | 按钮 loading 态工具 |
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->36<!--/AUTO--> | 展示契约 |
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->13<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试） |
@@ -1353,10 +1363,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1796<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1744<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->740<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->986<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1004<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

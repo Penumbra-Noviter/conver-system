@@ -22,7 +22,7 @@
  *   本就依赖 chat.js；头部深模块归位 chat.js，无需再经 hooks 注入）。
  */
 
-import { chatDom, renderMessages, refreshSendButton, renderChatHeader, EMPTY_STATE_HTML, EMPTY_HEADER_HTML } from './chat.js';
+import { chatDom, renderMessages, refreshSendButton, renderChatHeader, EMPTY_HEADER_HTML } from './chat.js';
 import { autoResizeInput } from './utils.js';
 import { state } from './state.js';
 import { conversations, messages } from './api.js';
@@ -63,11 +63,12 @@ export function restoreTabViewState(tab) {
 
 /**
  * 无活动 tab 时的空态（聊天区 + 头部提示）
- * 聊天区复用 chat.js 导出的共享常量（单一事实来源）
+ * 聊天区委托 renderMessages（chat.js 单一来源）：空态判定 + T1 首启引导卡
+ * （凭证协议 none 时渲染引导卡）均由 renderMessages 收口，本处不内联重复。
  */
 export function showEmptyState() {
     chatDom.chatHeader.innerHTML = EMPTY_HEADER_HTML;
-    chatDom.chatMessages.innerHTML = EMPTY_STATE_HTML;
+    renderMessages();
 }
 
 /**

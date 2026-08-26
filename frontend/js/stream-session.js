@@ -20,6 +20,10 @@
  *   - 停止(AbortError)写回 phase 'error'(警示标记;气泡保持「已停止」语义),
  *     正常完成写回 phase 'done';refreshSendButton 在写回后立即调用（消除停止态到发送态的
  *     UX 窗口;连发依赖此即时复位）
+ *   - T1 错误条化:普通(非 AbortError)流式错误不再写 `[错误] …` 进消息缓存 —
+ *     错误经注入回调 deps.onError 上抛给聊天域(渲染独立错误条);已累积的部分
+ *     内容保留为普通 assistant 消息(无错误标记);无内容则仅保留已发消息。
+ *     本模块保持零 DOM,错误渲染完全在聊天域完成
  *   - settleIndex:发起时刻尾消息位置(本流 streaming 占位位置),幂等 — 该位置仍
  *     streaming 才结算(stale 分支);失败写回改用 anchor(本流 user 消息对象引用,
  *     indexOf 定位不受插入漂移影响 — 回复永远插在自己的 user 之后,时间序不漂移)
@@ -189,14 +193,17 @@ export async function settleTurn({ convId, getTab, updateTab, isActive, render, 
  * @param {Function} [deps.renderMessages] - 活动时消息区渲染回调(chat.js renderMessages)
  * @param {Function} [deps.refreshSendButton] - 发送按钮两态刷新回调(chat.js refreshSendButton)
  * @param {Function} [deps.refreshConversations] - 对话列表刷新回调(chat.js 注入)
+ * @param {Function} [deps.onError] - 普通(非 AbortError)流式错误上抛回调(T1 —
+ *   chat.js 用它渲染错误条;错误不写入消息缓存,本模块保持零 DOM;
+ *   未注入时 no-op 兜底)
  * @returns {{onToken: Function, onDone: Function, onError: Function, isSettled: Function}}
  *   - onToken(token) → string|null:应用 token 并返回累积全文(供调用方 DOM 增量渲染);
  *     settled 后忽略并返回 null
  *   - onDone(messageId) → Promise<void>:正常完成(messageId 非 null)或流中断(null)
- *   - onError(err) → void:错误/停止
+ *   - onError(err) → void:错误/停止(普通错误经 deps.onError 上抛,不写缓存)
  *   - isSettled() → boolean:是否已进入终态(完成/错误)
  */
-export function createStreamSession({ convId, getTab, updateTab, isActiveStream, renderMessages, refreshSendButton, refreshConversations }) {
+export function createStreamSession({ convId, getTab, updateTab, isActiveStream, renderMessages, refreshSendButton, refreshConversations, onError: errorSink }) {
     if (convId == null || typeof getTab !== 'function' || typeof updateTab !== 'function') {
         throw new TypeError('createStreamSession: 需要 convId 与 getTab/updateTab 函数');
     }
@@ -204,6 +211,10 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
     const render = typeof renderMessages === 'function' ? renderMessages : () => {};
     const refreshBtn = typeof refreshSendButton === 'function' ? refreshSendButton : () => {};
     const refreshList = typeof refreshConversations === 'function' ? refreshConversations : () => {};
+    /** 普通流式错误上抛回调（T1 — chat.js 用它渲染错误条；未注入时 no-op）。
+     *  注意：必须用更名绑定 errorSink —— 本函数体内另有 function onError 声明，
+     *  同名参数会被函数声明遮蔽（JS 函数声明提升覆盖参数绑定）。 */
+    const surfaceError = typeof errorSink === 'function' ? errorSink : () => {};
 
     /** @type {string} 已累积的 assistant 全文 */
     let fullContent = '';
@@ -307,7 +318,9 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
     /**
      * 错误/停止 — 按发起 tab 写回终态(防悬挂核心)
      * 停止(AbortError)写回 phase 'error'(警示标记),气泡保持「已停止」语义;
-     * 普通错误写回 phase 'error' 并渲染错误气泡。
+     * 普通错误(T1)不再写 `[错误]` 进消息缓存 — 经注入回调 surfaceError 上抛给
+     * 聊天域渲染错误条(本模块保持零 DOM);已累积的部分内容保留为普通 assistant
+     * 消息(无错误标记),无内容则仅保留已发消息。
      * @param {Error} err - 错误对象
      */
     function onError(err) {
@@ -328,9 +341,12 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
             }
             if (isActive()) render();
         } else {
-            // 错误发生 — 写入缓存(警示标记,渲染路径还原 message-error 样式)
-            updateTab(convId, { messages: [...settled, { role: 'assistant', content: `[错误] ${err.message}`, error: true }] });
+            // 普通错误 — 错误经回调上抛,不写入消息缓存(错误条由聊天域渲染)。
+            // 已累积的部分内容保留为普通 assistant 消息(无错误标记);无内容则仅保留已发消息
+            const next = fullContent ? [...settled, { role: 'assistant', content: fullContent }] : settled;
+            updateTab(convId, { messages: next });
             if (isActive()) render();
+            surfaceError(err);
         }
         // 错误/停止时也刷新按钮与对话列表(避免计数卡死)
         refreshBtn();

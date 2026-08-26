@@ -26,6 +26,9 @@ export const state = {
     defaultModel: 'claude-sonnet-5',
     sidebarCollapsed: false,
     chatSidebarCollapsed: false,
+    // 凭证协议（T1 首启引导判定依据；app.js init 检测后缓存 —
+    // 'openai' | 'claude' | 'none'；未检测/检测失败为 null）
+    credentialsProtocol: null,
 };
 
 // ══════════════════════════════════════════════════

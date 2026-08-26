@@ -40,6 +40,7 @@ import { buildMessagesHtml, messageBubbleHtml } from './format.js';
 import { state } from './state.js';
 import { getActiveTab, getTab, updateTab } from './tabs.js';
 import { createStreamSession, settleTurn } from './stream-session.js';
+import { renderErrorBar } from './error-bar.js';
 import { iconHtml } from './icons.js';
 
 // ══════════════════════════════════════════════════
@@ -62,11 +63,28 @@ export const EMPTY_STATE_HTML = '<div class="empty-state"><p>选择左侧对话�
 /** 无会话时的头部空态文案（单一事实来源 — chat.js renderChatHeader / 激活模块 showEmptyState 复用，禁止内联重复） */
 export const EMPTY_HEADER_HTML = '<span class="chat-title">选择一个角色开始对话</span>';
 
+/** 首启引导卡（T1 — 凭证协议 none 时空态渲染；「前往设置」按钮点击经注入
+ *  navigateToSettings 钩子复用视图切换）。引导卡单一来源在聊天域（DOM 模块），
+ *  conversation-activation.js showEmptyState 复用本分支（见 renderMessages）。 */
+export const EMPTY_STATE_GUIDE_HTML = `
+    <div class="empty-state empty-state-guide">
+        <div class="empty-state-icon">
+            <svg viewBox="0 0 22 22" fill="none">
+                <path d="M3 5a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H8l-5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M8 9h6M8 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <p class="empty-state-text">先配置 AI 接口，再开始对话</p>
+        <p class="empty-state-hint">配置 API Key 后即可开始角色对话</p>
+        <button class="empty-state-guide-btn">前往设置</button>
+    </div>`;
+
 // ── 注入钩子（app.js 注入，避免反向依赖 — options-object 方言：按 key 合并、
 //    键非函数不覆盖、缺省默认 no-op 兜底）──
 const hooks = {
     refreshConversations: () => {},
     syncConversationListTitle: () => {},
+    navigateToSettings: () => {},
 };
 
 /**
@@ -76,6 +94,8 @@ const hooks = {
  * @param {Function} [h.refreshConversations] - 重新拉取对话列表（发送/停止后刷新消息数）
  * @param {Function} [h.syncConversationListTitle] - 重命名成功后同步对话列表项标题
  *   （只做 DOM 手术 — 更新匹配会话项 .title 文本，不重渲染列表）
+ * @param {Function} [h.navigateToSettings] - 切到设置视图（T1 引导卡 / 错误条
+ *   「前往设置」按钮点击调用；app.js 接线 switchView('settings')，复用视图切换）
  */
 export function setChatHooks(h) {
     for (const [key, value] of Object.entries(h ?? {})) {
@@ -98,10 +118,18 @@ export function renderMessages() {
     const container = chatDom.chatMessages;
     const tab = getActiveTab();
     // 空态判定收口（F6）：无活动 tab 或消息为空 → 同一 EMPTY_STATE_HTML（单一来源，
-    // 替代消息列表模板旧空态文案；format.js 不再承担空态分支）
+    // 替代消息列表模板旧空态文案；format.js 不再承担空态分支）。
+    // T1 首启引导：凭证协议为 none 时渲染引导卡（「前往设置」按钮点击经注入
+    // navigateToSettings 钩子复用视图切换；引导卡单一来源在聊天域）。EMPTY_STATE_HTML
+    // 保留为非 none 态文案。
     // Array.isArray 守卫（TD-36）：字符串有 length 会误过空态判定，随后 .filter 抛 TypeError
     if (!tab || !Array.isArray(tab.messages) || !tab.messages.length) {
-        container.innerHTML = EMPTY_STATE_HTML;
+        const showGuide = state.credentialsProtocol === 'none';
+        container.innerHTML = showGuide ? EMPTY_STATE_GUIDE_HTML : EMPTY_STATE_HTML;
+        if (showGuide) {
+            const guideBtn = container.querySelector('.empty-state-guide-btn');
+            if (guideBtn) guideBtn.addEventListener('click', () => hooks.navigateToSettings());
+        }
         return;
     }
     container.innerHTML = buildMessagesHtml(tab.messages, {
@@ -357,6 +385,32 @@ function syncChatHeaderTitle() {
     }
 }
 
+// ── 错误条渲染（T1 — 发送失败统一经 error-bar 深模块承载，不写进消息列表）──
+
+/**
+ * 错误条挂载容器：取 #chat-messages 的父级（.chat-main）— 不随 renderMessages /
+ * appendMessage 的 innerHTML 重建而消失；父级缺失（畸形 DOM）回落 document.body。
+ * @returns {HTMLElement}
+ */
+function errorBarContainer() {
+    return chatDom.chatMessages?.parentElement ?? document.body;
+}
+
+/**
+ * 渲染发送失败错误条（非流式 catch / 流式 onError 上抛共用）。
+ * 文案/协议分流与「前往设置」导航收口在 error-bar.js 深模块（error-bar 单一来源）。
+ * @param {Error|{message?: string}|null} err - 原始错误
+ * @param {string} fallback - 错误信息缺失时的兜底文案
+ */
+function renderSendError(err, fallback) {
+    renderErrorBar({
+        container: errorBarContainer(),
+        message: (err && err.message) || fallback,
+        protocol: state.credentialsProtocol,
+        onNavigateSettings: hooks.navigateToSettings,
+    });
+}
+
 // ── 发送消息（流式防悬挂核心）──
 //
 // 流式生命周期已收口到 stream-session.js（createStreamSession）：fullContent 累积、
@@ -400,6 +454,7 @@ export async function handleSend() {
             renderMessages,
             refreshSendButton,
             refreshConversations: hooks.refreshConversations,
+            onError: (err) => renderSendError(err, '流式回复失败'),
         });
 
         let assistantDiv = null;
@@ -476,7 +531,9 @@ export async function handleSend() {
                 revision, settleIndex: -1, content: result.reply,
             });
         } catch (err) {
-            appendMessage('system', `发送失败: ${err.message}`);
+            // T1：发送失败不再写入 system 失败消息 — 渲染独立错误条（可关闭 /
+            // 约 8s 自动消失 /「前往设置」；none 态文案引导配 Key）
+            renderSendError(err, '发送失败');
         } finally {
             // 完成/失败均清除在途标记 — 之后可再次发送
             nonStreamingInFlight.delete(convId);
@@ -497,6 +554,7 @@ export async function handleSend() {
 export const __all__ = [
     'chatDom',
     'EMPTY_STATE_HTML',
+    'EMPTY_STATE_GUIDE_HTML',
     'EMPTY_HEADER_HTML',
     'setChatHooks',
     'renderMessages',
