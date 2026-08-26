@@ -34,6 +34,8 @@
 | F-59 | `chat.js:733` thinking-indicator finally 无条件移除 + `showThinkingIndicator` 不按 convId 隔离——对 A 重生成显示 thinking、切 B 发送、A 完成会移除 B 的 thinking 指示器（纯 UI 污染） | W4 增量审核 | Worth exploring | 📝 待立项 |
 | F-60 | 重生成成功 + `settleTurn` stale revision（并发外部长度变更）→ `mergeFreshList` 静默丢弃、不渲染不提示（竞态边角） | W4 增量审核 | Worth exploring | 📝 待立项 |
 | F-61 | 重生成 re-render 不清 T2 高亮定时器（`highlightTimer`/`highlightEl` 引用残留分离节点，约 3s 后 no-op；自愈于下次 locate） | W4 增量审核 | Worth exploring | 📝 待立项 |
+| F-62 | `backend/app/services/chat.py:328-339` regenerate `except LLMError` 分支重复死代码（第二分支不可达；与 F-27/F-28 同族的文件尾无换行项已复核关闭） | 期末四轴 | Worth exploring | 📝 待立项 |
+| F-63 | `game-generator.js` 复用 `key-injector.js` 的 `SEL_NAV_SETTINGS='.sim-key-nav-settings'`（模拟器专属选择器名）用于生成器模态框——语义名与用途错位（Mysterious Name 倾向），建议抽中性共享命名 | 期末四轴 | Worth exploring | 📝 待立项 |
 
 ## 技术债处置记录
 
