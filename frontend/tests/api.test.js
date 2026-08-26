@@ -336,4 +336,47 @@ describe('downloadBlob 薄包装', () => {
         }
     });
 });
+
+describe('conversations.regenerate — T6 重生成端点封装', () => {
+    afterEach(() => {
+        setFetch(null);
+    });
+
+    it('无 message_id → POST /api/conversations/{id}/regenerate 且不携带请求体（缺省末条 assistant）', async () => {
+        const fetchMock = vi.fn(async () =>
+            mockResponse({ data: { reply: '新回复', message_id: 43, conversation_id: 1 } })
+        );
+        setFetch(fetchMock);
+
+        const data = await conversations.regenerate(1);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(url).toBe('/api/conversations/1/regenerate');
+        expect(options.method).toBe('POST');
+        expect(options.body).toBeUndefined(); // 缺省末条时后端按 None 处理
+        expect(data).toEqual({ reply: '新回复', message_id: 43, conversation_id: 1 });
+    });
+
+    it('带 message_id → 请求体 { message_id: 42 } 透传', async () => {
+        const fetchMock = vi.fn(async () =>
+            mockResponse({ data: { reply: 'r', message_id: 43, conversation_id: 1 } })
+        );
+        setFetch(fetchMock);
+
+        await conversations.regenerate(1, { message_id: 42 });
+
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(url).toBe('/api/conversations/1/regenerate');
+        expect(options.method).toBe('POST');
+        expect(JSON.parse(options.body)).toEqual({ message_id: 42 });
+    });
+
+    it('非 2xx → 抛带 detail 的 Error（与 messages.chat 同一 request 错误通道）', async () => {
+        const fetchMock = vi.fn(async () => mockResponse({ ok: false, status: 404, data: { detail: '对话不存在' } }));
+        setFetch(fetchMock);
+
+        await expect(conversations.regenerate(999)).rejects.toThrow('对话不存在');
+    });
+});
 });

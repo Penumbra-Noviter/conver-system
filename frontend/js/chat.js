@@ -179,6 +179,8 @@ export function renderMessages({ messageId } = {}) {
     container.innerHTML = buildMessagesHtml(tab.messages, {
         characters: state.characters,
         currentCharacterId: tab.characterId,
+        // T6 重生成：渲染消息列表时开启 — 仅末条已结算 assistant 气泡渲染重生成操作
+        canRegenerate: true,
     });
 
     // 复制按钮事件 + 复制数据补写（FE-1 数据通道单一化：复制内容不经 HTML 属性 —
@@ -188,6 +190,11 @@ export function renderMessages({ messageId } = {}) {
     container.querySelectorAll('.btn-copy-message').forEach((btn, i) => {
         btn.dataset.content = copyMessages[i]?.content ?? '';
         attachCopyButton(btn);
+    });
+
+    // T6 重生成按钮事件（末条 assistant 气泡；chat 域绑定 → regenerateLastReply）
+    container.querySelectorAll('.btn-regenerate').forEach((btn) => {
+        btn.addEventListener('click', () => regenerateLastReply());
     });
 
     // 缓存变体标记（stopped/error/streaming）由 buildMessagesHtml 经工厂透传还原 —
@@ -670,6 +677,67 @@ export async function handleSend() {
     syncChatHeaderTitle();
 }
 
+// ── 重生成（T6 — 末条 assistant 气泡重生成，MVP 非流式）──
+
+/**
+ * 末条 AI 回复重生成（T6 — 末条 assistant 气泡「重生成」按钮触发，MVP 非流式）
+ *
+ * 调 `conversations.regenerate(convId)`（无 message_id = 后端缺省取末条 assistant，
+ * 时间线截断后按既有非流式路径重发），成功后经统一结算入口 `settleTurn` 从服务端
+ * 重载消息列表并渲染新回复 —— fresh 整体替换使**新消息携带服务端 message_id 进入
+ * tab 缓存**（W2 增量审核 #2；失败兜底位置感知写回同样携带 messageId 透传）。
+ * 失败走既有错误条通道（`renderSendError` — 与 `messages.chat` 同一 catch 路径，
+ * 不各自为政），**不写进消息列表**。
+ *
+ * 在途守卫与 `handleSend` 非流式一致（共享同一 `nonStreamingInFlight` 集合 ——
+ * 同对话的非流式发送/重生成互斥，重复触发只发一次真实请求）；进行中状态 = 末条
+ * assistant 气泡重生成按钮禁用 + thinking 指示器（DOM 手术，不动缓存 — 失败语义
+ * 「不写消息列表」要求缓存保持原状）。
+ * 防悬挂：只接受发起时捕获的 convId + isActive 活动归属判定，不读「当前活动」。
+ */
+export async function regenerateLastReply() {
+    const tab = getActiveTab();
+    if (!tab || tab.isStreaming) return;
+    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    const isActive = () => getActiveTab()?.conversationId === convId;
+    // FIX-B 同源在途守卫：非流式发送 / 重生成共用 — 同一对话重复触发只发一次真实请求
+    if (nonStreamingInFlight.has(convId)) return;
+
+    nonStreamingInFlight.add(convId);
+
+    // 进行中状态：末条 assistant 气泡重生成按钮禁用 + thinking 指示器（不动缓存 —
+    // 失败语义「不写消息列表」要求缓存保持原状，成功由 settleTurn 重建 DOM）
+    const assistantBubbles = chatDom.chatMessages.querySelectorAll('.message.assistant');
+    const regenButton = assistantBubbles[assistantBubbles.length - 1]?.querySelector('.btn-regenerate') ?? null;
+    if (regenButton) regenButton.disabled = true;
+    showThinkingIndicator();
+
+    try {
+        const result = await conversations.regenerate(convId);
+        // 成功 — 统一结算入口 settleTurn：从服务端重载截断后的新时间线（含角色开场白
+        //   greeting 与新回复 id）→ fresh 整体替换 tab 缓存 + 活动渲染。messageId 透传
+        //   服务端新消息 id（W2 增量审核 #2：新消息带服务端 id 进缓存 / 失败兜底写回同样携带）
+        const revision = getTab(convId)?.messages.length ?? 0;
+        await settleTurn({
+            convId, getTab, updateTab, isActive, render: renderMessages,
+            revision, settleIndex: -1, messageId: result.message_id, content: result.reply,
+        });
+    } catch (err) {
+        // 失败 — 与 messages.chat 同一错误通道（T1 错误条）：不写进消息列表
+        renderSendError(err, '重生成失败');
+    } finally {
+        // 完成/失败均清除在途标记；恢复按钮与 thinking（成功路径 settle 已重建 DOM —
+        //   旧引用 isConnected 兜底跳过；失败路径复原）
+        nonStreamingInFlight.delete(convId);
+        if (regenButton && regenButton.isConnected) regenButton.disabled = false;
+        chatDom.chatMessages.querySelector('.thinking-indicator')?.remove();
+        refreshSendButton();
+    }
+
+    // 刷新对话列表（更新消息数量）
+    await hooks.refreshConversations();
+}
+
 // ══════════════════════════════════════════════════
 // 协议表面收口（深模块：外部只通过这些函数与 chat.js 交互）
 // ══════════════════════════════════════════════════
@@ -686,4 +754,5 @@ export const __all__ = [
     'startRename',
     'openModelSwitch',
     'handleSend',
+    'regenerateLastReply',
 ];

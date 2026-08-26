@@ -83,6 +83,8 @@ export function userAvatarHtml() {
  * @param {boolean} [opts.streaming=false] - 流式进行中：气泡标记 data-streaming-live="1"
  * @param {boolean} [opts.stopped=false] - 已停止：追加「（已停止）」标记（用户主动停止，非错误）
  * @param {boolean} [opts.error=false] - 错误气泡：追加 message-error 类
+ * @param {boolean} [opts.regenerate=false] - 渲染「重生成」操作按钮（仅 assistant 角色；
+ *   是否传入由聊天域控制 — 末条已结算 assistant 才传）
  * @param {Array} [opts.characters=[]] - 角色列表（assistant 头像来源）
  * @param {number|null} [opts.currentCharacterId=null] - 当前角色 id（assistant 头像匹配）
  * @param {number|string|null} [opts.messageId=null] - 消息 id（非空时外层气泡补
@@ -90,7 +92,7 @@ export function userAvatarHtml() {
  * @returns {string} 气泡 HTML（system 角色无头像 + 无复制按钮）
  */
 export function messageBubbleHtml(role, content, opts = {}) {
-    const { streaming = false, stopped = false, error = false, characters = [], currentCharacterId = null, messageId } = opts;
+    const { streaming = false, stopped = false, error = false, regenerate = false, characters = [], currentCharacterId = null, messageId } = opts;
     const classes = ['message', role];
     if (error) classes.push('message-error');
     let bubbleAttrs = streaming ? ' data-streaming-live="1"' : '';
@@ -104,29 +106,42 @@ export function messageBubbleHtml(role, content, opts = {}) {
     const copyBtn = role === 'system'
         ? ''
         : `<button class="btn-copy-message" title="复制消息">${iconHtml('clipboard')}</button>`;
+    // T6 重生成操作按钮（仅 assistant；进行中禁用由聊天域 DOM 手术负责，工厂只渲染按钮）
+    const regenBtn = regenerate && role === 'assistant'
+        ? `<button class="btn-regenerate" title="重生成">${iconHtml('refresh')}</button>`
+        : '';
     const stopTag = stopped ? '<div class="message-stop-tag">（已停止）</div>' : '';
-    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${stopTag}</div>`;
+    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${regenBtn}${stopTag}</div>`;
 }
 
 /**
  * 构造消息列表 HTML（纯函数，不操作 DOM）
  * 空态判定由调用方负责（chat.js renderMessages 收口 — F6 单一来源），
  * 本函数只做逐条气泡渲染；空数组输入返回空串。
+ * T6 重生成：context.canRegenerate 由聊天域控制（渲染消息列表时开启）——开启后
+ * 仅「末条已结算（非 streaming）assistant」气泡渲染重生成操作按钮（UI 语义 = 末条
+ * AI 回复；结算语义按服务端消息 id 由 settleTurn 重载保证，本工厂不做位置假设）。
  * @param {Array} messages - 消息数组
  * @param {object} [context]
+ * @param {boolean} [context.canRegenerate=false] - 聊天域开关：末条 assistant 渲染
+ *   「重生成」操作按钮
  * @param {Array} [context.characters=[]] - 角色列表（用于 assistant 头像）
  * @param {number|null} [context.currentCharacterId=null] - 当前角色 id
  * @returns {string} 消息区域 HTML
  */
 export function buildMessagesHtml(messages, context = {}) {
-    const { characters = [], currentCharacterId = null } = context;
-    return messages.map((m) => messageBubbleHtml(m.role, m.content, {
+    const { characters = [], currentCharacterId = null, canRegenerate = false } = context;
+    const last = messages[messages.length - 1];
+    // 末条为已结算 assistant 时才渲染重生成按钮（streaming 进行中的气泡不提供）
+    const regenTarget = canRegenerate && last?.role === 'assistant' && !last.streaming;
+    return messages.map((m, i) => messageBubbleHtml(m.role, m.content, {
         characters,
         currentCharacterId,
         streaming: m.streaming,
         stopped: m.stopped,
         error: m.error,
         messageId: m.id,
+        regenerate: regenTarget && i === messages.length - 1,
     })).join('');
 }
 
