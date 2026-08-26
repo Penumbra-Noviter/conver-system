@@ -1,7 +1,8 @@
 """
 聊天回合业务逻辑 — 流式/非流式聊天共用的深模块
 
-协议表面（__all__）：ChatContext / prepare_chat / complete_chat / chat_error_response / stream_reply。
+协议表面（__all__）：ChatContext / assemble_chat_context / prepare_chat / complete_chat /
+regenerate_chat / chat_error_response / stream_reply。
 
 一次「聊天回合」的生命周期（插开场白 → 存用户消息 → 组装上下文 →
 取 Key 与 Provider → 生成 → 错误映射 → 保存/保存部分）全部收拢于此；
@@ -24,7 +25,7 @@ from starlette.requests import ClientDisconnect
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
-from backend.app.models.message import Role
+from backend.app.models.message import Message, Role
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
@@ -33,6 +34,8 @@ from backend.app.services.error_mapping import domain_error_response, llm_error_
 from backend.app.services.exceptions import (
     ConversationNotFoundError,
     DomainError,
+    InvalidRegenerateTargetError,
+    MessageNotFoundError,
 )
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import LLMError
@@ -40,8 +43,10 @@ from backend.app.services.llm.resolver import resolve_llm
 
 __all__ = [
     "ChatContext",
+    "assemble_chat_context",
     "prepare_chat",
     "complete_chat",
+    "regenerate_chat",
     "chat_error_response",
     "stream_reply",
 ]
@@ -61,8 +66,71 @@ class ChatContext:
     provider: BaseLLM
 
 
+def assemble_chat_context(
+    db: Session,
+    conversation_id: int,
+    *,
+    current_input: str | None = None,
+) -> ChatContext:
+    """组装聊天上下文（不插入 user、不自动插入 greeting）
+
+    从 prepare_chat 抽出的下层函数：校验对话 → 取角色 temperature → 组装消息
+    列表 → resolve_llm。不落库任何消息，重生成与普通发送复用同一条组装路径，
+    保证 truncation 后组装与滑窗轮数一致、无幽灵消息。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        current_input: 当前用户输入。提供时作为末条 user 输入追加到消息列表；
+            None（重生成路径）时不追加——把历史末条 user 消息作为待回复目标，
+            避免触发消息在 history + 追加各出现一次的重复。
+
+    Returns:
+        组装好的聊天上下文（对话、温度、消息列表、Provider 实例）
+
+    Raises:
+        ConversationNotFoundError: 对话不存在
+        ApiKeyMissingError: 未配置 API Key
+        ProviderNotSupportedError: 不支持的 Provider
+    """
+    # 1. 验证对话存在
+    conv = conversation_service.require_conversation(db, conversation_id)
+
+    # 2. 获取角色（用于 temperature）
+    character = db.query(Character).filter(Character.id == conv.character_id).first()
+    temperature = character.temperature if character else 0.7
+
+    # 3. 构建消息列表（含 system prompt + 历史 + 滑窗 + 模板变量；不落库）
+    user_name = setting_service.user_name(db)
+    max_rounds = setting_service.sliding_window_rounds(db)
+    if current_input is not None:
+        messages = message_service.build_message_list(
+            db, conv, current_input, max_rounds=max_rounds, user_name=user_name,
+        )
+    else:
+        # 重生成路径：不追加当前输入。build_message_list 末尾恒追加输入，
+        # 此处用空串追加后丢弃，使历史末条 user 即为待回复目标（不重复）。
+        messages = message_service.build_message_list(
+            db, conv, "", max_rounds=max_rounds, user_name=user_name,
+        )
+        messages = messages[:-1]
+
+    # 4. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
+    _, _, provider = resolve_llm(db, conv.model_provider, conv.model_name)
+
+    return ChatContext(
+        conversation=conv,
+        temperature=temperature,
+        messages=messages,
+        provider=provider,
+    )
+
+
 def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
     """校验对话、构建消息列表、获取 Provider — 流式/非流式聊天共用前置逻辑
+
+    先自动插入 greeting、落库用户消息，再委托下层函数 assemble_chat_context
+    组装（组装本身不落库）。重生成不经过本函数（避免重复插入 user）。
 
     Args:
         db: 数据库会话
@@ -81,32 +149,15 @@ def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
     if not conv:
         raise ConversationNotFoundError("对话不存在")
 
-    # 2. 获取角色（用于 temperature）
-    character = db.query(Character).filter(Character.id == conv.character_id).first()
-    temperature = character.temperature if character else 0.7
-
-    # 3. 自动插入 greeting（仅首次，支持模板变量）
+    # 2. 自动插入 greeting（仅首次，支持模板变量）
     user_name = setting_service.user_name(db)
     message_service.auto_insert_greeting(db, request.conversation_id, user_name=user_name)
 
-    # 4. 保存用户消息
+    # 3. 保存用户消息
     message_service.create_message(db, request.conversation_id, Role.USER, request.content)
 
-    # 5. 构建消息列表（含 system prompt + 历史 + 当前输入 + 滑窗 + 模板变量）
-    max_rounds = setting_service.sliding_window_rounds(db)
-    messages = message_service.build_message_list(
-        db, conv, request.content, max_rounds=max_rounds, user_name=user_name,
-    )
-
-    # 6. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
-    _, _, provider = resolve_llm(db, conv.model_provider, conv.model_name)
-
-    return ChatContext(
-        conversation=conv,
-        temperature=temperature,
-        messages=messages,
-        provider=provider,
-    )
+    # 4. 组装上下文（含 system prompt + 历史 + 当前输入 + 滑窗 + Provider）
+    return assemble_chat_context(db, request.conversation_id, current_input=request.content)
 
 
 async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
@@ -151,6 +202,142 @@ async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
         reply=reply_text,
         message_id=saved.id,
         conversation_id=request.conversation_id,
+    )
+
+
+def _resolve_regenerate_target(
+    db: Session,
+    conversation_id: int,
+    message_id: int | None,
+) -> Message:
+    """解析重生成目标消息并校验（对话归属 + 必须为 assistant）
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        message_id: 目标消息 ID；None 时取末条 assistant
+
+    Returns:
+        目标 assistant 消息
+
+    Raises:
+        MessageNotFoundError: 显式 message_id 不存在或不属于该对话；无 assistant 可重生成
+        InvalidRegenerateTargetError: 目标非 assistant
+    """
+    if message_id is not None:
+        target = db.query(Message).filter(Message.id == message_id).first()
+        if target is None or target.conversation_id != conversation_id:
+            raise MessageNotFoundError("消息不存在")
+    else:
+        target = (
+            db.query(Message)
+            .filter(Message.conversation_id == conversation_id, Message.role == Role.ASSISTANT)
+            .order_by(Message.id.desc())
+            .first()
+        )
+        if target is None:
+            raise InvalidRegenerateTargetError("没有可重生成的 AI 回复")
+
+    if target.role != Role.ASSISTANT:
+        raise InvalidRegenerateTargetError("只能重生成 AI 回复")
+    return target
+
+
+def _last_user_before(
+    db: Session,
+    conversation_id: int,
+    target_id: int,
+) -> Message | None:
+    """返回 target 之前最近的一条 user 消息（重生成触发源）
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        target_id: 目标消息 ID
+
+    Returns:
+        最近的 user 消息；不存在则返回 None
+    """
+    return (
+        db.query(Message)
+        .filter(
+            Message.conversation_id == conversation_id,
+            Message.role == Role.USER,
+            Message.id < target_id,
+        )
+        .order_by(Message.id.desc())
+        .first()
+    )
+
+
+async def regenerate_chat(
+    db: Session,
+    conversation_id: int,
+    message_id: int | None = None,
+) -> ChatResponse:
+    """重生成对话中目标 AI 回复（缺省末条 assistant）
+
+    编排：解析并校验目标 → 校验触发源（截断后须有 user 消息）→ 截断（删除目标
+    及其后全部消息，锚定 PK id，不 commit）→ 组装上下文（不插入 user）→ 生成 →
+    单事务落库新 assistant 消息 → ChatResponse。LLM 失败时回滚截断，时间线不变。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        message_id: 目标 assistant 消息 ID；None 取末条 assistant
+
+    Returns:
+        ChatResponse（reply / message_id / conversation_id）
+
+    Raises:
+        ConversationNotFoundError: 对话不存在
+        MessageNotFoundError: message_id 不存在或不属于该对话
+        InvalidRegenerateTargetError: 目标非 assistant / 截断后无触发 user
+        ApiKeyMissingError: 未配置 API Key
+        ProviderNotSupportedError: 不支持的 Provider
+        HTTPException: LLM 调用失败（经 chat_error_response 映射）
+    """
+    # 1. 校验对话存在
+    conversation_service.require_conversation(db, conversation_id)
+
+    # 2. 解析并校验目标
+    target = _resolve_regenerate_target(db, conversation_id, message_id)
+
+    # 3. 校验触发源：截断后必须存在 user 消息（无触发源 → 400）
+    if _last_user_before(db, conversation_id, target.id) is None:
+        raise InvalidRegenerateTargetError("没有可重生成的用户消息")
+
+    # 4. 截断（删除 target 及其后全部，不 commit，LLM 失败可回滚）
+    message_service.delete_messages_from(db, conversation_id, target.id)
+
+    # 5. 组装上下文（不插入 user；历史末条 user 即触发源）
+    ctx = assemble_chat_context(db, conversation_id, current_input=None)
+
+    # 6. 生成回复
+    try:
+        reply_text = await ctx.provider.generate(
+            ctx.messages,
+            temperature=ctx.temperature,
+            model=ctx.conversation.model_name,
+        )
+    except LLMError as e:
+        db.rollback()
+        status_code, message = chat_error_response(
+            e, ctx.conversation.model_provider
+        )
+        raise HTTPException(status_code=status_code, detail=message)
+
+    # 7. 单事务落库：截断 + 新 assistant 一次提交
+    saved = message_service.create_message_no_commit(
+        db, conversation_id, Role.ASSISTANT, reply_text
+    )
+    db.commit()
+    db.refresh(saved)
+
+    return ChatResponse(
+        reply=reply_text,
+        message_id=saved.id,
+        conversation_id=conversation_id,
     )
 
 

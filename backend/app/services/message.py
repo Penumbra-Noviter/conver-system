@@ -1,5 +1,8 @@
 """
 消息管理 & 聊天逻辑
+
+协议表面（__all__）：get_messages / create_message / create_message_no_commit /
+delete_messages_from / auto_insert_greeting / build_message_list / search_messages。
 """
 
 from __future__ import annotations
@@ -15,6 +18,16 @@ from backend.app.schemas.message import SearchResult
 from backend.app.services import conversation as conversation_service
 from backend.app.services.character_fields import PROMPT_FIELDS
 from backend.app.services.llm.prompt import CharacterData, apply_template_vars, build_messages
+
+__all__ = [
+    "get_messages",
+    "create_message",
+    "create_message_no_commit",
+    "delete_messages_from",
+    "auto_insert_greeting",
+    "build_message_list",
+    "search_messages",
+]
 
 
 def get_messages(db: Session, conversation_id: int) -> list[Message]:
@@ -32,6 +45,29 @@ def create_message(db: Session, conversation_id: int, role: Role, content: str) 
 
     保存首条 user 消息时，若标题仍为占位默认值则同步替换为规则截断标题
     （规则收口于 conversation_service.maybe_auto_title，见 ARC-3）。
+
+    内部调用 create_message_no_commit 后执行 commit + refresh。
+    """
+    msg = create_message_no_commit(db, conversation_id, role, content)
+    db.commit()
+    db.refresh(msg)
+    return msg
+
+
+def create_message_no_commit(db: Session, conversation_id: int, role: Role, content: str) -> Message:
+    """创建消息对象并 add 到会话，但不提交（供事务原子性场景使用）
+
+    与 create_message 相同的副作用（conv.updated_at、maybe_auto_title），
+    但调用方负责后续 commit + refresh。典型用途：重生成时先截断后批量提交。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        role: 消息角色（USER / ASSISTANT）
+        content: 消息内容
+
+    Returns:
+        Message 实例（未提交，id 为 None 直到 commit）
     """
     conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if conv:
@@ -41,10 +77,34 @@ def create_message(db: Session, conversation_id: int, role: Role, content: str) 
 
     msg = Message(conversation_id=conversation_id, role=role, content=content)
     db.add(msg)
-
-    db.commit()
-    db.refresh(msg)
     return msg
+
+
+def delete_messages_from(db: Session, conversation_id: int, target_id: int) -> int:
+    """删除对话中 id >= target_id 的所有消息（锚定 PK id 截断）
+
+    不提交（由调用方在事务收尾时一并 commit），支持回滚。
+    不 bump conv.updated_at（仅 create_message 会更新时间戳）。
+    使用 synchronize_session="fetch"：同步移除会话中受影响的消息对象，
+    避免后续复用同 id（SQLite 会复用被删 ROWID）时 identity map 冲突。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        target_id: 截断起点消息 ID（含）
+
+    Returns:
+        删除的消息数量
+    """
+    result = (
+        db.query(Message)
+        .filter(
+            Message.conversation_id == conversation_id,
+            Message.id >= target_id,
+        )
+        .delete(synchronize_session="fetch")
+    )
+    return result
 
 
 def auto_insert_greeting(

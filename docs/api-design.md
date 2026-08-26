@@ -405,6 +405,41 @@ const reader = response.body.getReader();
 - 停止语义为「用户主动停止」，非错误；前端气泡标记「（已停止）」
 - 非流式端点 `POST /api/chats` 不提供停止（请求不可真正中断）
 
+### 重生成回复
+
+```
+POST /api/conversations/{conversation_id}/regenerate
+```
+
+删除目标 AI 回复（缺省为末条 AI 回复）及其后的所有消息（时间线截断，锚定消息
+PK `id`），随后按既有非流式路径重新生成一条 AI 回复并落库。MVP 为非流式。
+
+**请求体**（可缺省 / 仅 body 可选 `message_id`）
+```json
+{ "message_id": 42 }
+```
+- 缺省 `message_id`：取对话末条 assistant 消息作为目标
+- 显式 `message_id`：必须指向该对话中的 assistant 消息
+
+**响应** `200`（与既有非流式响应同构）
+```json
+{
+  "reply": "重新生成的回复",
+  "message_id": 43,
+  "conversation_id": 1
+}
+```
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| conversation 不存在 | 404 | 对话不存在 |
+| message_id 不存在 / 不属于该对话 | 404 | 消息不存在 |
+| target 非 assistant | 400 | 只能重生成 AI 回复 |
+| 截断后无 user（空对话 / 仅 greeting） | 400 | 没有可重生成的用户消息 |
+| 对话没有 assistant 消息（缺省 message_id） | 400 | 没有可重生成的 AI 回复 |
+
 ---
 
 ## 模型 API

@@ -19,6 +19,8 @@ __all__ = [
     "CardValidationError",
     "DocParseError",
     "DomainError",
+    "MessageNotFoundError",
+    "InvalidRegenerateTargetError",
 ]
 
 
@@ -52,3 +54,11 @@ class CardValidationError(DomainError):
 
 class DocParseError(DomainError):
     """文档解析失败（LLM 调用失败 / 返回非 JSON / 字段提取失败）"""
+
+
+class MessageNotFoundError(DomainError):
+    """消息不存在（重生成端点引用不存在的 message_id）"""
+
+
+class InvalidRegenerateTargetError(DomainError):
+    """重生成目标非法（target 非 assistant / 截断后无触发 user）"""

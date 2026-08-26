@@ -24,6 +24,8 @@ from backend.app.services.exceptions import (
     ConversationNotFoundError,
     DocParseError,
     DomainError,
+    InvalidRegenerateTargetError,
+    MessageNotFoundError,
     ProviderNotSupportedError,
 )
 from backend.app.services.llm.errors import (
@@ -59,9 +61,9 @@ def domain_error_response(exc: DomainError) -> tuple[int, str]:
     Returns:
         (HTTP 状态码, 用户可见消息)
     """
-    if isinstance(exc, (ConversationNotFoundError, CharacterNotFoundError)):
+    if isinstance(exc, (ConversationNotFoundError, CharacterNotFoundError, MessageNotFoundError)):
         return status.HTTP_404_NOT_FOUND, str(exc)
-    if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError)):
+    if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError, InvalidRegenerateTargetError)):
         return status.HTTP_400_BAD_REQUEST, str(exc)
     if isinstance(exc, CardFormatError):
         return status.HTTP_422_UNPROCESSABLE_CONTENT, f"导入失败：{exc}。{IMPORT_FORMAT_HINT}"
