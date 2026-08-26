@@ -1234,3 +1234,107 @@ describe('T6 重生成 — 末条 assistant 气泡重生成闭环', () => {
         expect(chat.chatDom.chatMessages.querySelector('.btn-regenerate')).toBeNull();
     });
 });
+
+describe('错误条会话隔离（F-50 — renderSendError 透传会话身份）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 构造恒失败的 fetch（任意 chat 请求都 throw） */
+    function failFetch() {
+        const spy = makeApiMock({ chatResult: { reply: 'x' } });
+        spy.mockImplementation(async () => { throw new Error('boom'); });
+        return spy;
+    }
+
+    it('非流式失败 → 错误条携带 data-conv=会话id（renderSendError 透传 conversationId）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        chat.chatDom.toggleStream.checked = false;
+        api.setFetch(failFetch());
+        vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+
+        chat.chatDom.chatInput.value = '你好';
+        await chat.handleSend();
+
+        const bar = chat.chatDom.chatMessages.parentElement.querySelector('.chat-error-bar');
+        expect(bar).not.toBeNull();
+        expect(bar.dataset.conv).toBe('11');
+    });
+
+    it('流式 onError → 错误条携带 data-conv=会话id（renderSendError 透传 conversationId）', async () => {
+        const env = await loadModules();
+        let captured = null;
+        vi.spyOn(env.api, 'chatStream').mockImplementation((data, cbs) => {
+            captured = { data, cbs };
+            return { abort: vi.fn(), done: Promise.resolve() };
+        });
+        env.tabs.openTab(11);
+        env.api.setFetch(makeApiMock({ messagesByConv: { 11: [msg(1, 'user', '你好'), msg(2, 'assistant', '好的')] } }));
+        env.chat.setChatHooks({ refreshConversations: () => {} });
+
+        env.chat.chatDom.chatInput.value = '你好';
+        await env.chat.handleSend();
+        captured.cbs.onError(new Error('模型超时'));
+
+        const bar = env.chat.chatDom.chatMessages.parentElement.querySelector('.chat-error-bar');
+        expect(bar).not.toBeNull();
+        expect(bar.textContent).toContain('模型超时');
+        expect(bar.dataset.conv).toBe('11');
+    });
+
+    it('重生成失败 → 错误条携带 data-conv=会话id', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')] });
+        vi.spyOn(api.conversations, 'regenerate').mockRejectedValue(new Error('重生成端点错误'));
+        vi.spyOn(ss, 'settleTurn');
+        chat.setChatHooks({ refreshConversations: () => {} });
+
+        chat.renderMessages();
+        chat.chatDom.chatMessages.querySelector('.btn-regenerate').click();
+        await vi.waitFor(() => {
+            const bar = chat.chatDom.chatMessages.parentElement.querySelector('.chat-error-bar');
+            expect(bar).not.toBeNull();
+            expect(bar.dataset.conv).toBe('11');
+        });
+    });
+
+    it('并发：不同会话连续失败 → 两个错误条并存（各自 data-conv）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        chat.chatDom.toggleStream.checked = false;
+        api.setFetch(failFetch());
+        vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+
+        tabs.openTab(11);
+        chat.chatDom.chatInput.value = '会话A';
+        await chat.handleSend();
+
+        tabs.openTab(22);
+        chat.chatDom.chatInput.value = '会话B';
+        await chat.handleSend();
+
+        const bars = chat.chatDom.chatMessages.parentElement.querySelectorAll('.chat-error-bar');
+        expect(bars).toHaveLength(2);
+        expect([...bars].map((b) => b.dataset.conv).sort()).toEqual(['11', '22']);
+    });
+
+    it('并发：同会话连续两次失败 → 仅一条错误条（data-conv 幂等替换）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        chat.chatDom.toggleStream.checked = false;
+        api.setFetch(failFetch());
+        vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+
+        tabs.openTab(11);
+        chat.chatDom.chatInput.value = '第一次';
+        await chat.handleSend();
+        chat.chatDom.chatInput.value = '第二次';
+        await chat.handleSend();
+
+        const bars = chat.chatDom.chatMessages.parentElement.querySelectorAll('.chat-error-bar');
+        expect(bars).toHaveLength(1);
+        expect(bars[0].dataset.conv).toBe('11');
+    });
+});

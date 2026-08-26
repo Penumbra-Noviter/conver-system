@@ -527,17 +527,23 @@ function errorBarContainer() {
 }
 
 /**
- * 渲染发送失败错误条（非流式 catch / 流式 onError 上抛共用）。
+ * 渲染发送失败错误条（非流式 catch / 流式 onError 上抛 / 重生成 catch 共用）。
  * 文案/协议分流与「前往设置」导航收口在 error-bar.js 深模块（error-bar 单一来源）。
+ * 会话身份（conversationId）由调用上下文捕获并透传 — 错误条按会话隔离
+ * （F-50：同会话幂等替换、跨会话并存，并发多 tab 出错互不覆盖）。
+ * 所有调用点均在「发起时已捕获 convId」作用域内，故恒有会话身份可传。
  * @param {Error|{message?: string}|null} err - 原始错误
  * @param {string} fallback - 错误信息缺失时的兜底文案
+ * @param {string|number|null|undefined} conversationId - 会话身份（发起时捕获，
+ *   透传给 renderErrorBar 做数据-会话寻址）
  */
-function renderSendError(err, fallback) {
+function renderSendError(err, fallback, conversationId) {
     renderErrorBar({
         container: errorBarContainer(),
         message: (err && err.message) || fallback,
         protocol: state.credentialsProtocol,
         onNavigateSettings: hooks.navigateToSettings,
+        conversationId,
     });
 }
 
@@ -584,7 +590,7 @@ export async function handleSend() {
             renderMessages,
             refreshSendButton,
             refreshConversations: hooks.refreshConversations,
-            onError: (err) => renderSendError(err, '流式回复失败'),
+            onError: (err) => renderSendError(err, '流式回复失败', convId),
         });
 
         let assistantDiv = null;
@@ -663,7 +669,7 @@ export async function handleSend() {
         } catch (err) {
             // T1：发送失败不再写入 system 失败消息 — 渲染独立错误条（可关闭 /
             // 约 8s 自动消失 /「前往设置」；none 态文案引导配 Key）
-            renderSendError(err, '发送失败');
+            renderSendError(err, '发送失败', convId);
         } finally {
             // 完成/失败均清除在途标记 — 之后可再次发送
             nonStreamingInFlight.delete(convId);
@@ -724,7 +730,7 @@ export async function regenerateLastReply() {
         });
     } catch (err) {
         // 失败 — 与 messages.chat 同一错误通道（T1 错误条）：不写进消息列表
-        renderSendError(err, '重生成失败');
+        renderSendError(err, '重生成失败', convId);
     } finally {
         // 完成/失败均清除在途标记；恢复按钮与 thinking（成功路径 settle 已重建 DOM —
         //   旧引用 isConnected 兜底跳过；失败路径复原）

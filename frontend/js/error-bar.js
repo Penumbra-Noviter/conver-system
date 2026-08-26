@@ -7,7 +7,10 @@
  *     其他态（openai / claude / 未知）显示原始错误信息；
  *   - 交互：「前往设置」按钮（点击调注入的 onNavigateSettings，复用视图切换
  *     勾子）+ 手动关闭按钮；约 ERROR_BAR_DISMISS_MS 自动消失；
- *   - 幂等：同一容器重复渲染替换旧条（同一时刻仅一条在屏）；
+ *   - 幂等 + 会话隔离（F-50）：同一容器重复渲染替换旧条；携带会话身份
+ *     （conversationId）时只替换同会话旧条，不同会话的错误条可并存 —
+ *     多 tab 并发流式出错互不覆盖；无会话身份调用保持「同容器仅一条」
+ *     既有语义（移除容器内所有旧条后插入）；
  *   - 入参防御：无容器 / 无导航回调 / 非字符串 message 均静默降级不抛错。
  *
  * 依赖方向：error-bar.js → 无（纯 DOM 深模块；导航回调经参数注入，避免反向
@@ -30,15 +33,24 @@ const TEXT_NAV_SETTINGS = '前往设置';
 /** none 态引导文案（spec：「无 Key 态文案引导配 Key」） */
 const TEXT_NONE_GUIDE = '未配置 AI 接口，请先配置 Key';
 
-/** 错误条根节点选择器（容器内同刻仅一条；重复渲染替换旧条） */
+/** 错误条根节点选择器（容器内同刻条数受会话隔离约束，见 renderErrorBar） */
 const SEL_ERROR_BAR = '.chat-error-bar';
+
+/** 会话身份标记属性（F-50：幂等替换按 data-conv 寻址，跨会话并存） */
+const DATA_CONV = 'data-conv';
 
 // ══════════════════════════════════════════════════
 // 渲染
 // ══════════════════════════════════════════════════
 
 /**
- * 渲染错误条到容器（顶部插入；同容器已有旧条先移除 — 仅一条在屏）。
+ * 渲染错误条到容器（顶部插入；同容器已有旧条先移除）。
+ *
+ * 幂等 + 会话隔离（F-50）：携带 conversationId 时，只移除同会话的旧错误条
+ *   （跨会话并存 — 多 tab 并发流式出错互不覆盖；本会话重复渲染仍只留一条）；
+ *   无 conversationId（undefined/null）时保持既有行为 — 移除容器内所有旧条
+ *   后插入（同刻仅一条在屏，兼容无会话上下文用例）。会话身份经 data-conv
+ *   属性标记并用于幂等寻址（字符串/数字归一为字符串比较）。
  *
  * 文案分流：protocol === 'none' → 显示「配置 Key」引导文案（不含原始错误）；
  *   其余 protocol → 显示原始错误信息（errMsg 兜底为 message 字符串本身）。
@@ -55,13 +67,19 @@ const SEL_ERROR_BAR = '.chat-error-bar';
  *   'none' | null/未知）；仅 'none' 触发引导文案分流
  * @param {Function} [params.onNavigateSettings] - 「前往设置」点击回调
  *   （app.js 接线 switchView('settings')；非函数时点击 no-op）
+ * @param {string|number|null|undefined} [params.conversationId] - 会话身份
+ *   （F-50：存在时只替换同会话旧条；undefined/null 时移除容器内所有旧条）
  * @returns {HTMLElement|null} 本次渲染的错误条元素；容器缺失时为 null
  */
-export function renderErrorBar({ container, message, protocol, onNavigateSettings } = {}) {
+export function renderErrorBar({ container, message, protocol, onNavigateSettings, conversationId } = {}) {
     if (!container || typeof container.querySelector !== 'function') return null;
 
-    // 幂等：同容器重复渲染替换旧条
-    container.querySelector(SEL_ERROR_BAR)?.remove();
+    // 幂等：有会话身份 → 只移除同会话旧条（跨会话并存）；无会话身份 →
+    // 移除容器内所有旧条（既有「同容器仅一条」语义）。querySelectorAll +
+    // 逐个 remove 覆盖重复条残留的防御场景。
+    const hasConv = conversationId !== undefined && conversationId !== null;
+    const selector = hasConv ? `${SEL_ERROR_BAR}[${DATA_CONV}="${conversationId}"]` : SEL_ERROR_BAR;
+    container.querySelectorAll(selector).forEach((bar) => bar.remove());
 
     const isNone = protocol === 'none';
     const text = isNone ? TEXT_NONE_GUIDE : String(message ?? '');
@@ -69,6 +87,7 @@ export function renderErrorBar({ container, message, protocol, onNavigateSetting
     const bar = document.createElement('div');
     bar.className = 'chat-error-bar';
     bar.setAttribute('role', 'alert');
+    if (hasConv) bar.setAttribute(DATA_CONV, String(conversationId));
 
     const msg = document.createElement('span');
     msg.className = 'chat-error-bar-msg';
