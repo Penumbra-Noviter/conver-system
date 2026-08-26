@@ -2113,6 +2113,16 @@ input[type="range"]::-moz-range-thumb {
     color: #b45309;
     text-decoration: underline;
 }
+/* F-73 dark 语境恢复琥珀：#b45309 对 dark 底 (#1d1a16) 仅 3.45:1 低于 AA；
+   显式 dark 与 OS dark 默认态回退 var(--warning)（#d29a47 对 #1d1a16 = 6.98:1） */
+:root[data-theme="dark"] .gg-config-warning-nav {
+    color: var(--warning);
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .gg-config-warning-nav {
+        color: var(--warning);
+    }
+}
 
 .game-gen-modal .form-field textarea {
     width: 100%;

@@ -112,4 +112,16 @@ describe('style.css .gg-config-warning-nav 对比度契约（F-73）', () => {
     test('--warning 变量单源声明未被改动（仍为 #d29a47）', () => {
         expect(warningDecl().value.trim().toLowerCase()).toBe('#d29a47');
     });
+
+    test('dark 语境恢复琥珀高对比：显式 dark 选择器回退 var(--warning)（W1 直修，防浅色加深波及 dark 底 3.45:1）', () => {
+        const darkRule = ruleWithSelector(':root[data-theme="dark"] .gg-config-warning-nav');
+        expect(darkRule, ':root[data-theme="dark"] .gg-config-warning-nav 应存在').toBeTruthy();
+        expect(decl(darkRule, 'color').value.trim()).toBe('var(--warning)');
+        // OS dark 默认态（:root:not([data-theme="light"])）同样回退
+        const autoDarkRule = allRules.find(
+            (r) => (r.selectors ?? []).includes(':root:not([data-theme="light"]) .gg-config-warning-nav'),
+        );
+        expect(autoDarkRule, 'OS dark 默认态 override 应存在').toBeTruthy();
+        expect(decl(autoDarkRule, 'color').value.trim()).toBe('var(--warning)');
+    });
 });

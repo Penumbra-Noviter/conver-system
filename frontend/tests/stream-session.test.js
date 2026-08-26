@@ -292,6 +292,23 @@ describe('mergeFreshList — 失败分支(msgs=null → 位置感知追加,不�
         expect(result.messages).toHaveLength(2); // 无重复插入
         expect(result.messages.some((m) => m.content === '旧回复')).toBe(false); // 无旧残留
     });
+
+    it('F-66(W1 增量):replaceId 与缓存 id 类型不一致(string vs number)→ 顶替场景仍识别并原位替换(修复前严格等号失配落入幂等早退吞内容)', () => {
+        // replaceId='2'(string) 指认缓存 id=2(number) 的旧回复,messageId=2(number):
+        // 修复前 isReplacementScenario 用严格等号 `'2' === 2` 为 false → 幂等早退
+        // `next.some(m.id === 2)` 误判「已结算」→ render:false + 旧残留。修复后 String() 归一识别顶替场景。
+        const tab = { messages: [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')] };
+        const result = mergeFreshList(tab, 2, null, {
+            settleIndex: -1, anchor: null, replaceId: '2', messageId: 2, content: '新回复',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toEqual([
+            msg(1, 'user', '你好'),
+            { role: 'assistant', content: '新回复', id: 2 },
+        ]);
+        expect(result.messages).toHaveLength(2);
+        expect(result.messages.some((m) => m.content === '旧回复')).toBe(false);
+    });
 });
 
 describe('mergeFreshList — 入参防御', () => {

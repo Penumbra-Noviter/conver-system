@@ -69,14 +69,16 @@ function settleByPosition(tab, anchor, message, replaceId = null) {
     // F-66:当 messageId === replaceId(服务端复用被顶替旧回复 id)时,缓存中的被顶替
     // 旧回复 id === replaceId === messageId,幂等检查会误判「已结算」而吞掉新内容 —
     // 顶替场景本体须跳过幂等早退,继续走下方 replaceId 原位替换。
-    const isReplacementScenario = replaceId != null && replaceId === message.id;
+    const isReplacementScenario = replaceId != null && String(replaceId) === String(message.id);
     if (!isReplacementScenario && message.id != null && next.some((m) => m.id === message.id)) {
         return { messages: tab.messages, render: false };
     }
     // F-58:重生成失败兜底 — 按被顶替旧消息身份原位替换(后端已截断旧回复,顶替而非尾部追加)。
     // 缓存中无该 id(旧消息已被并发结算移除)→ 落到 anchor/尾部常规路径。
+    // W1-F-66 类型归一:replaceId 与缓存 id 用 String() 比对,防跨边界 string/number 类型失配
+    // 使顶替失效(新内容被幂等早退吞掉或落尾部追加+旧残留)。
     if (replaceId != null) {
-        const replaceIdx = next.findIndex((m) => m.id === replaceId);
+        const replaceIdx = next.findIndex((m) => String(m.id) === String(replaceId));
         if (replaceIdx >= 0) {
             next[replaceIdx] = message;
             return { messages: next, render: true };
