@@ -8,6 +8,16 @@
 
 ---
 
+## 技术债消费批次 F-49~F-63（2026-08-26 — kickoff 全自动档标准档 10 工单 5 波，基线 8ebdce1 → HEAD）
+
+- **来源**：用户「消费候选区 F-49~F-63 进入全自动流程」。预检 15 项（1 Speculative + 14 Worth exploring）→ Grilling 共识 **13 做 + 2 关**（F-49 `String(message)` 防御不可达复核关闭；F-61 highlight timer 自愈复核关闭）。2 项产品决策（F-52 搜索降级 = 无匹配回落 scrollToBottom；F-54 openai→claude 凭证对称提示）。
+- **F-56 预检升级为运行时阻断**：`.venv`（真实运行时）实测 anthropic **1.0.0**，`inspect.signature(Messages.create/stream)` 均无 temperature → claude.py:51/76 传参会 TypeError（测试走 mock 全绿掩盖）。修复 = SDK 调用去 temperature（保留 BaseLLM 接口签名供 openai/chat 依赖）+ 契约锁 3 例。**版本矛盾实证**：仓库 `.venv`=1.0.0 vs 系统 python=0.116.0——P-01 与波 1/期末审核引 0.116.0 判断「temperature 静默失效回归」基于系统 python 测量，以运行时 .venv 裁定修复正确（1.0.0 下修复前是崩溃、修复后正常，temperature 对 Claude API 本无效果）。
+- **10 工单 5 波**：波 1 并行 5（P-01~P-05：anthropic 适配/死代码/surfaceError 前置/生成器守卫/错误条隔离）；波 2 并行 2（S-06 搜索回落 + S-10 命名解耦）；波 3（S-07 模型切换族）；波 4（S-08 守卫+thinking 隔离）；波 5（S-09 顶替+不丢弃）。共享文件冲突仅 CODE_WIKI（P-01/P-03 机械标记双改）——「机械块取一侧 + doc_sync 重算」惯例化解；波 2 审核发现 CODE_WIKI prose 残留 SEL_NAV_SETTINGS 表述 → 主会话手动补 prose。
+- **波末增量审核 5 轮**：波 1/2/3/5 放行；波 4 两中危 Falsify 缺陷主会话直修 +2 回归——① 流式首 token thinking 移除未按 data-conv-id 过滤（第三移除路径跨会话误删，`removeThinkingIndicator(container, convId)` 收口）；② 挂死请求 stale `nonStreamingInFlight` 永驻锁死会话（`cleanupStaleInFlight` + `onTabsChanged` 订阅，关闭即清理——只靠入口自愈清不掉「关 tab 重开」场景，实证先红再修）。
+- **期末四轴 0 阻断放行**（Standards 0 硬违规/安全红线 0 / Spec 13/13 核心语义 / Falsify 3 防御性 / Architecture 2 候选）。非阻断落债 **F-64~F-73**（10 项：regenerate 流式在途守卫缺口/结算参数面膨胀/selector 插值未转义×2/空回复 stale 丢弃/state 更新在 save try 内/protocol fail-open/Set 迭代删除/琥珀链接对比度）。
+- **验证链**：pytest 789+1skip→**792+1skip**（+3 契约锁）；Vitest 1087→**1117**（+30）；运行态冒烟（uvicorn 启动 + 根页面/API settings 200 + docs 200）；doc_sync 零漂移。
+- **过程遥测**：10 工单全部单次完成（0 重开），5 轮审核产出 6 类非阻断发现；P-04/P-05 未按指示自行 commit（主会话补提交，后续 prompt 前置「必须自行 commit」后波 5 均自提）；4 处 worktree 因缺 node_modules/dist 占位需环境补齐。
+
 ## UX 体验改进批次（2026-08-26 — kickoff 全自动档标准档 8 工单 5 波，merge 链 15d7c8b→a79c692）
 
 - **来源**：用户「如何进一步提升用户体验，调研一下，设计方案，进入 project-kickoff 全自动流程执行」。调研产物 `docs/ux-research.md`（11 项薄弱点 P1-P11 + 外部对标 5 来源）→ Grilling 共识 3 主题 + 3 快赢 → 8 工单：T0 spike + T1-T7。

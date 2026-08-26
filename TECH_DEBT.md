@@ -17,25 +17,20 @@
 
 ## 技术债候选区
 
-> 当前 8 项待立项（W1/W2/W3/W4 增量审核与实现发现）。
+> 当前 10 项待立项（F-49~F-63 批次的波末增量审核与期末四轴非阻断发现；原 F-49~F-63 已 2026-08-26 全量消费并移出候选区，见处置记录）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| F-49 | `error-bar.js:67` `String(message)` 对可抛 `toString()` 的 message 会抛 TypeError（上游现实不可达，仅防御性） | W1 增量审核 | Speculative | 📝 待立项 |
-| F-50 | 流式多 tab 并发出错时错误条渲染到共享 `.chat-main` 区域，互相替换造成 UX 轻微误导 | W1 增量审核 | Worth exploring | 📝 待立项 |
-| F-51 | `stream-session.js:349-353` `surfaceError` 置于 `render()` 之后，render 抛错会吞掉错误条（防御缺口） | W1 增量审核 | Worth exploring | 📝 待立项 |
-| F-52 | 搜索跳转携带陈旧 messageId（目标消息已被删）时落地在对话顶部、不落 scrollToBottom（`chat.js` locateAndHighlight 无匹配早退），UX 降级且测试已锁定该行为——需产品决策降级语义 | W2 增量审核 | Worth exploring | 📝 待立项 |
-| F-53 | `chat.js:432` 模型切换 `refreshConversations` 网络失败被 catch 记为「切换模型失败」，但 state/头部已更新——日志语义误导，列表可能滞留旧模型与头部不一致 | W3 增量审核 | Worth exploring | 📝 待立项 |
-| F-54 | `credentialWarnReason` 凭证确认不对称：openai 态（仅有 OpenAI key）切到 claude 模型同样不可用却无提示（none 恒提示 / claude 切非 claude 提示） | W3 增量审核 | Worth exploring | 📝 待立项 |
-| F-55 | `game-generator.js` 凭证预检 `.then` 无提交态守卫——提示可能在用户已提交生成后才注入，或显示过期「需配置」提示（竞态） | W3 增量审核 | Worth exploring | 📝 待立项 |
-| F-56 | `backend/requirements.txt` `anthropic>=0.40.0` 无上界：anthropic SDK 1.0.0 已移除 `messages.create` 的 `temperature` 参数（当前环境 0.116.0 支持，`claude.py:51/76` 传 `temperature=`），升级到 1.x 将全量破坏 claude 调用——需锁上界或适配 | T6 实现发现（T6 agent 误报为当前阻断，实测为潜在风险） | Worth exploring | 📝 待立项 |
-| F-57 | `chat.js:699-704` regenerate 在途守卫只查 `nonStreamingInFlight`，未阻断并发**流式**发送（`tab.isStreaming` 重生成期间未置位）——互斥注释「同对话互斥」对流式路径失效，构造：重生成在途 + 流式发送 → 并行双请求 | W4 增量审核 | Worth exploring | 📝 待立项 |
-| F-58 | `chat.js:721-725`+`stream-session.js:179` regenerate 成功但 `settleTurn` 重载失败时 `anchor=null` 走 append 兜底，后端已删旧回复残留本地 + 新回复追加，破坏「顶替」语义（瞬时数据不一致，切 tab 自愈） | W4 增量审核 | Worth exploring | 📝 待立项 |
-| F-59 | `chat.js:733` thinking-indicator finally 无条件移除 + `showThinkingIndicator` 不按 convId 隔离——对 A 重生成显示 thinking、切 B 发送、A 完成会移除 B 的 thinking 指示器（纯 UI 污染） | W4 增量审核 | Worth exploring | 📝 待立项 |
-| F-60 | 重生成成功 + `settleTurn` stale revision（并发外部长度变更）→ `mergeFreshList` 静默丢弃、不渲染不提示（竞态边角） | W4 增量审核 | Worth exploring | 📝 待立项 |
-| F-61 | 重生成 re-render 不清 T2 高亮定时器（`highlightTimer`/`highlightEl` 引用残留分离节点，约 3s 后 no-op；自愈于下次 locate） | W4 增量审核 | Worth exploring | 📝 待立项 |
-| F-62 | `backend/app/services/chat.py:328-339` regenerate `except LLMError` 分支重复死代码（第二分支不可达；与 F-27/F-28 同族的文件尾无换行项已复核关闭） | 期末四轴 | Worth exploring | 📝 待立项 |
-| F-63 | `game-generator.js` 复用 `key-injector.js` 的 `SEL_NAV_SETTINGS='.sim-key-nav-settings'`（模拟器专属选择器名）用于生成器模态框——语义名与用途错位（Mysterious Name 倾向），建议抽中性共享命名 | 期末四轴 | Worth exploring | 📝 待立项 |
+| F-64 | `regenerateLastReply` 在流式在途（`tab.isStreaming`）时无互斥守卫，仅查 `nonStreamingInFlight`——UI 不可达（流式占位无重生成按钮）、编程可入；与 Spec「同对话互斥收口」泛化措辞未全兑现（与期末 Spec 发现 1 同源） | 期末四轴 | 中 | 📝 待立项 |
+| F-65 | `mergeFreshList`/`settleTurn` 参数面膨胀（settleTurn 11 字段），重生成顶替语义复用通用结算路径（id 匹配 / anchor 定位 / 位置式三策略叠加 + replaceId），Repeated Switches / Data Clumps 候选 | 期末四轴 | 中 | 📝 待立项 |
+| F-66 | `mergeFreshList` 中 `messageId === replaceId`（服务端复用旧回复 id）时幂等检查先于原位替换，新内容被吞掉、旧回复残留（后端当前每次重生成签发新 message_id，不触发） | 波5 增量审核（Falsify 轴） | 中 | 📝 待立项 |
+| F-67 | `renderErrorBar` 的 `data-conv` 选择器对 conversationId 裸插值——含引号/`]` id 抛 SyntaxError 抑制错误条（属性写入侧 `String()` 归一、选择器侧未归一，不对称；当前 id 为 DB 数值不可达） | 波1 增量审核（期末复证） | 低 | 📝 待立项 |
+| F-68 | F-60 分支 guard `messageId != null && content` 在 `content===''` 时短路，stale 空回复被静默丢弃（与 fresh 分支渲染空回复行为不一致） | 波5 增量审核（Falsify 轴） | 低 | 📝 待立项 |
+| F-69 | `locateAndHighlight` 无匹配前 `querySelector` 拼接 messageId 未转义（含引号/畸形 id 抛 SyntaxError；id 为 DB 数值不可达，波前既有） | 波2 增量审核（Falsify 轴） | 低 | 📝 待立项 |
+| F-70 | `openModelSwitch` 的 state 就地更新 + `renderChatHeader` 仍在 save try 内，二者抛错会误标「切换模型失败」并跳过列表刷新（波前既有结构；F-53 已把 refresh 移出 try，残余为保存侧） | 波3 增量审核（Falsify 轴） | 低 | 📝 待立项 |
+| F-71 | `credentialWarnReason` 对未知 `credentialsProtocol` 值 fail-open（静默保存不提示；spec 声明三态为唯一事实来源，违反不变式） | 波3 增量审核（Falsify 轴） | 低 | 📝 待立项 |
+| F-72 | `cleanupStaleInFlight` 在 `for...of` 迭代中删除 Set 元素（ECMAScript 对纯删除安全，未来并发 re-add 行为未定义，防御性注释） | 期末四轴 | 低 | 📝 待立项 |
+| F-73 | `.gg-config-warning-nav` 琥珀链接在 light 主题对比度约 3:1（< WCAG AA 4.5:1；视觉超出 F-63「中性命名」票据意图，warning 色语义合理） | 波2 增量审核（Falsify 轴） | 低 | 📝 待立项 |
 
 ## 技术债处置记录
 
@@ -71,6 +66,28 @@
 | F-47 | `initGuideSidebarScroll` 缺 type hints（`app.js:377`） | 2026-08-26 期末四轴（Standards ST-1） | Worth exploring | ✅ 已修（2026-08-26：补 `@returns {void}` 类型标注到 JSDoc） |
 | F-48 | Scroll handler Feature Envy，建议提取 ScrollSpy 类 | 2026-08-26 期末四轴（Architecture A6） | Speculative | ❌ 复核关闭（2026-08-26：git grep 零命中 ScrollSpy，当前唯一滚动高亮逻辑在 55 行深模块内，无第二消费方 → Speculative Generality） |
 | F-45 | O2 一致性缺口：chat 流式中途出错时 DB 落库 partial content 与 UI 错误气泡不一致 | 2026-08-25 全量审查 | Worth exploring | ✅ 已修（2026-08-26：error 路径设 saved=True 阻止 finally 保存幽灵内容，测试 713 全绿） |
+
+#### F-49~F-63 消费子批（2026-08-26，全自动档 13 做 2 关，10 工单 5 波，期末四轴 0 阻断）
+
+> 处置详情：13 项消费（F-50/51/52/53/54/55/56/57/58/59/60/62/63 各对应 TICKETS 归档工单 01-10）；2 项复核关闭（F-49：`error-bar.js:67 String(message)` 上游唯一调用方 `chat.js:renderSendError` 恒传字符串，Speculative 不可达；F-61：highlightTimer 定时器触发即自置 null、约 3s 自愈，零用户可见影响）。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-49 | `error-bar.js:67` `String(message)` 对可抛 `toString()` 的 message 会抛 TypeError | W1 增量审核 | Speculative | ❌ 复核关闭（2026-08-26：git grep 复核唯一调用方恒传字符串，上游不可达） |
+| F-50 | 流式多 tab 并发出错时错误条渲染到共享 `.chat-main` 区域互相覆盖 | W1 增量审核 | Worth exploring | ✅ 已修（2026-08-26：P-05 错误条会话隔离 `data-conv`，跨会话并存） |
+| F-51 | `surfaceError` 置于 `render()` 之后，渲染抛错吞错误条 | W1 增量审核 | Worth exploring | ✅ 已修（2026-08-26：P-03 surfaceError 前置 render） |
+| F-52 | 搜索跳转陈旧 messageId 无匹配早退不滚动 | W2 增量审核 | Worth exploring | ✅ 已修（2026-08-26：S-06 无匹配回落 scrollToBottom，产品决策） |
+| F-53 | 模型切换刷新失败被误记「切换模型失败」 | W3 增量审核 | Worth exploring | ✅ 已修（2026-08-26：S-07 保存/刷新语义分离独立日志） |
+| F-54 | 凭证确认不对称（openai 态切 claude 无提示） | W3 增量审核 | Worth exploring | ✅ 已修（2026-08-26：S-07 credentialWarnReason 对称化，产品决策） |
+| F-55 | 生成器凭证预检 `.then` 无提交态守卫（竞态） | W3 增量审核 | Worth exploring | ✅ 已修（2026-08-26：P-04 `if (generating) return` 守卫） |
+| F-56 | `anthropic>=0.40.0` 无上界，1.x 移除 temperature 参数 | T6 实现发现 | Worth exploring | ✅ 已修（2026-08-26：P-01 SDK 调用不再传 temperature + 契约锁；运行时 .venv 实测 anthropic 1.0.0 创 create/stream 均无 temperature，适配为当前阻断修复；系统 python 0.116.0 测量属另一环境） |
+| F-57 | regenerate 在途未阻并发流式发送（双请求） | W4 增量审核 | Worth exploring | ✅ 已修（2026-08-26：S-08 handleSend 统一补查 nonStreamingInFlight） |
+| F-58 | regenerate settleTurn 失败 anchor=null 尾部追加破坏顶替语义 | W4 增量审核 | Worth exploring | ✅ 已修（2026-08-26：S-09 replaceId 原位替换） |
+| F-59 | thinking 指示器未按 convId 隔离（finally 无条件移除） | W4 增量审核 | Worth exploring | ✅ 已修（2026-08-26：S-08 `data-conv-id` + removeThinkingIndicator 定向移除） |
+| F-60 | 重生成 stale revision 时 mergeFreshList 静默丢弃 | W4 增量审核 | Worth exploring | ✅ 已修（2026-08-26：S-09 stale+anchor null 按 messageId 写回或 render:true） |
+| F-61 | 重生成 re-render 不清 T2 高亮定时器（自愈） | W4 增量审核 | Worth exploring | ❌ 复核关闭（2026-08-26：定时器触发即自置 null，约 3s 自愈，零用户可见影响） |
+| F-62 | `chat.py:328-339` regenerate 重复 `except LLMError` 死代码 | 期末四轴 | Worth exploring | ✅ 已修（2026-08-26：P-02 删除不可达分支，行为零变化） |
+| F-63 | 生成器复用模拟器专属 `SEL_NAV_SETTINGS` 选择器（命名错位） | 期末四轴 | Worth exploring | ✅ 已修（2026-08-26：S-10 生成器自有 `SEL_GG_WARNING_NAV`，key-injector 侧不动） |
 
 ### 2026-08-25（全量审查批次）
 

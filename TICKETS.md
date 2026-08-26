@@ -13,7 +13,7 @@
 
 ## 活跃工单
 
-> 当前 0 项待办（技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)，当前 3 项待立项 F-45/F-47/F-48）。
+> 当前 0 项待办（技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)，当前 10 项待立项 F-64~F-73）。
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
@@ -29,6 +29,27 @@
 ---
 
 ## 已完成归档
+
+### 技术债消费批次 F-49~F-63（2026-08-26，kickoff 全自动档标准档 10 工单 5 波）
+
+> 来源：用户「消费候选区 F-49~F-63 进入全自动流程」。Grilling 共识 13 做 + 2 关（F-49/F-61 复核关闭）。F-56 预检中从「锁上界潜在风险」升级为「运行时阻断」（.venv 实测 anthropic 1.0.0，create/stream 签名无 temperature）。5 轮波末增量审核：波 4 两中危 Falsify 缺陷（F-1 首 token thinking 未隔离 / F-2 挂死请求 stale 在途永驻）主会话直修 +2 回归测试；期末四轴 0 阻断放行。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| 01 P-01 | Claude Provider anthropic 1.x 适配（SDK 调用去 temperature + 契约锁 3 例） | 2026-08-26 | ef67814 / merge 50c13ed |
+| 02 P-02 | chat.py regenerate 重复 except LLMError 死代码删除（6 行） | 2026-08-26 | 708e8b8 / merge 941ac27 |
+| 03 P-03 | surfaceError 前置 render（渲染抛错不吞错误条，契约锁） | 2026-08-26 | bf6ce61 / merge b0246b1 |
+| 04 P-04 | 生成器凭证预检提交态守卫（generating 竞态） | 2026-08-26 | 0a5a843 / merge ac3eadf |
+| 05 P-05 | 错误条会话隔离（data-conv，跨会话并存/同会话幂等） | 2026-08-26 | c166da0 / merge dbc9266 |
+| 06 S-06 | 搜索无匹配回落 scrollToBottom（产品决策降级语义） | 2026-08-26 | 065ff15 / merge 1b7bd44 |
+| 07 S-07 | 模型切换日志语义分离（F-53）+ 凭证对称提示（F-54） | 2026-08-26 | 15b5482 / merge 567328a |
+| 08 S-08 | 重生成在途守卫统一（F-57）+ thinking 指示器会话隔离（F-59） | 2026-08-26 | 3242bf9 / merge d28925a |
+| 09 S-09 | 重生成结算顶替语义 replaceId（F-58）+ 并发漂移不丢弃（F-60） | 2026-08-26 | 680dc33 / merge 8c18bd8 |
+| 10 S-10 | SEL_NAV_SETTINGS 命名错位（生成器自有中性类名，key-injector 不动） | 2026-08-26 | b0ce8b8 / merge a434123 |
+
+**主会话直修**：W4 审核两缺陷 +2 回归测试——① 首 token thinking 未按 data-conv-id 过滤（chat.js:663 第三移除路径误删跨会话指示器）；② 挂死请求 stale 在途条目永驻锁死会话（cleanupStaleInFlight + onTabsChanged 订阅）
+**验证链：** pytest 789+1skip→792+1skip ✅（+3 契约锁）| Vitest 1087→1117 ✅（+30）| 波末增量审核 5 轮（波 1/2/3/5 放行，波 4 两缺陷修复后放行）| 期末四轴 0 阻断、安全红线 0 违例 | 运行态冒烟通过（uvicorn 启动 + 根页面/API 200）| doc_sync 零漂移
+**非阻断落债：** F-64~F-73（10 项，来源 = 波 1/2/3/5 增量审核 + 期末四轴）
 
 ### UX 体验改进批次（2026-08-26，kickoff 全自动档标准档 8 工单 5 波）
 
