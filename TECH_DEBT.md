@@ -17,7 +17,7 @@
 
 ## 技术债候选区
 
-> 当前 4 项待立项（W1/W2 增量审核非阻断发现）。
+> 当前 7 项待立项（W1/W2/W3 增量审核非阻断发现）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
@@ -25,6 +25,9 @@
 | F-50 | 流式多 tab 并发出错时错误条渲染到共享 `.chat-main` 区域，互相替换造成 UX 轻微误导 | W1 增量审核 | Worth exploring | 📝 待立项 |
 | F-51 | `stream-session.js:349-353` `surfaceError` 置于 `render()` 之后，render 抛错会吞掉错误条（防御缺口） | W1 增量审核 | Worth exploring | 📝 待立项 |
 | F-52 | 搜索跳转携带陈旧 messageId（目标消息已被删）时落地在对话顶部、不落 scrollToBottom（`chat.js` locateAndHighlight 无匹配早退），UX 降级且测试已锁定该行为——需产品决策降级语义 | W2 增量审核 | Worth exploring | 📝 待立项 |
+| F-53 | `chat.js:432` 模型切换 `refreshConversations` 网络失败被 catch 记为「切换模型失败」，但 state/头部已更新——日志语义误导，列表可能滞留旧模型与头部不一致 | W3 增量审核 | Worth exploring | 📝 待立项 |
+| F-54 | `credentialWarnReason` 凭证确认不对称：openai 态（仅有 OpenAI key）切到 claude 模型同样不可用却无提示（none 恒提示 / claude 切非 claude 提示） | W3 增量审核 | Worth exploring | 📝 待立项 |
+| F-55 | `game-generator.js` 凭证预检 `.then` 无提交态守卫——提示可能在用户已提交生成后才注入，或显示过期「需配置」提示（竞态） | W3 增量审核 | Worth exploring | 📝 待立项 |
 
 ## 技术债处置记录
 
