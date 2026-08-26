@@ -256,6 +256,21 @@ POST /api/conversations
 PUT /api/conversations/{conversation_id}
 ```
 
+**请求体** — 部分更新（`ConversationUpdate` schema，字段均可选）
+```json
+{
+  "title": "新标题",
+  "model_provider": "deepseek",
+  "model_name": "deepseek-chat"
+}
+```
+
+> **对话内模型切换（T3）**：聊天头部模型徽标可点击弹出模型选择器，确认后前端以
+> `PUT /api/conversations/{id}` 提交 `{ model_provider, model_name }` 保存到该对话。
+> 切换只影响之后发送的消息——流式/非流式聊天请求体均不含模型字段，模型由后端在
+> 请求时读取会话记录，故在途流式天然免疫，不会被切换打断。目标 Provider 凭证不可用
+> （协议 `none` 恒提示 / `claude` 切非 claude）时前端弹确认提示但仍允许保存。
+
 ### 删除对话
 
 ```

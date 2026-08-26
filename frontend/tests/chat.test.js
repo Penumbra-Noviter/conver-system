@@ -842,3 +842,231 @@ describe('聊天头部深模块（F4 收口 — renderChatHeader / startRename /
         errorSpy.mockRestore();
     });
 });
+
+describe('T3 对话内模型切换 — 头部徽标可点击 → 保存 → 同步', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 已知会话 + 双 provider 模型表 + PUT 路由 mock；默认凭证 openai（无确认提示） */
+    async function setupModelSwitch({ protocol = 'openai', putFail = false } = {}) {
+        const env = await loadModules();
+        env.state.conversations = [{ id: 11, title: '会话A', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' }];
+        env.state.models = {
+            providers: [
+                { key: 'claude', name: 'Claude (Anthropic)', models: ['claude-sonnet-5', 'claude-opus-4-8'] },
+                { key: 'deepseek', name: 'DeepSeek', models: ['deepseek-chat'] },
+            ],
+        };
+        env.state.credentialsProtocol = protocol;
+        env.tabs.openTab(11);
+        const refresh = vi.fn();
+        env.chat.setChatHooks({ refreshConversations: refresh });
+        const fetchSpy = makeApiMock({});
+        fetchSpy.mockImplementation((url, options = {}) => {
+            if (String(url).endsWith('/api/conversations/11') && options?.method === 'PUT') {
+                const body = JSON.parse(options.body);
+                return putFail ? mockJson({ detail: 'boom' }, 500) : mockJson({ id: 11, ...body });
+            }
+            return makeApiMock({})(url, options);
+        });
+        env.api.setFetch(fetchSpy);
+        env.chat.renderChatHeader(11);
+        return { ...env, refresh, fetchSpy };
+    }
+
+    /** 点徽标打开选择器 → 选 deepseek-chat → 点「开始对话」确认 */
+    function pickDeepseek() {
+        document.querySelector('.chat-model-badge').click();
+        const overlay = document.querySelector('.modal-overlay');
+        const prov = overlay.querySelector('#ms-provider');
+        prov.value = 'deepseek';
+        prov.dispatchEvent(new Event('change', { bubbles: true }));
+        overlay.querySelector('#ms-model').value = 'deepseek-chat';
+        overlay.querySelector('.ms-start').click();
+    }
+
+    it('.chat-model-badge 是可点击按钮；点击打开模型选择器并预选当前 conv 的 provider/model', async () => {
+        const { chat } = await setupModelSwitch();
+        const badge = chat.chatDom.chatHeader.querySelector('.chat-model-badge');
+        expect(badge.tagName).toBe('BUTTON');
+        badge.click();
+        const overlay = document.querySelector('.modal-overlay');
+        expect(overlay).not.toBeNull();
+        expect(overlay.querySelector('#ms-provider').value).toBe('claude'); // 预选当前 provider
+        expect(overlay.querySelector('#ms-model').value).toBe('claude-sonnet-5'); // 预选当前 model
+        overlay.querySelector('.ms-cancel').click();
+    });
+
+    it('确认切换 → PUT /api/conversations/11 请求体 {model_provider, model_name} + 头部徽标同步 + 列表刷新 + state 就地更新', async () => {
+        const { chat, state, refresh, fetchSpy } = await setupModelSwitch();
+        pickDeepseek();
+
+        await vi.waitFor(() => {
+            expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11') && o?.method === 'PUT')).toBe(true);
+        });
+        const putCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/conversations/11') && o?.method === 'PUT');
+        expect(JSON.parse(putCall[1].body)).toEqual({ model_provider: 'deepseek', model_name: 'deepseek-chat' });
+        // 头部徽标同步（重渲染基于 state.conversations 单一事实来源）
+        expect(chat.chatDom.chatHeader.querySelector('.chat-model-badge').textContent).toContain('DeepSeek · deepseek-chat');
+        // state 就地更新
+        expect(state.conversations[0].model_provider).toBe('deepseek');
+        expect(state.conversations[0].model_name).toBe('deepseek-chat');
+        // 对话列表同步（复用注入钩子 refreshConversations）
+        expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('取消切换 → 不发 PUT、state 与头部不变', async () => {
+        const { chat, fetchSpy } = await setupModelSwitch();
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        document.querySelector('.modal-overlay .ms-cancel').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11') && o?.method === 'PUT')).toBe(false);
+        expect(chat.chatDom.chatHeader.querySelector('.chat-model-badge').textContent).toContain('Claude (Anthropic) · claude-sonnet-5');
+    });
+
+    it('Falsify:切换保存失败 → console.error、state 不污染、头部保持原模型、列表不刷新', async () => {
+        const { chat, refresh, fetchSpy } = await setupModelSwitch({ putFail: true });
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        pickDeepseek();
+
+        await vi.waitFor(() => expect(errorSpy).toHaveBeenCalledWith('切换模型失败:', expect.any(Error)));
+        expect(chat.chatDom.chatHeader.querySelector('.chat-model-badge').textContent).toContain('Claude (Anthropic) · claude-sonnet-5');
+        expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11') && o?.method === 'PUT')).toBe(true);
+        expect(refresh).not.toHaveBeenCalled();
+        errorSpy.mockRestore();
+    });
+});
+
+describe('T3 对话内模型切换 — 凭证不可用确认提示（none/claude 态）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 复用 setupModelSwitch 的 PUT 路由（from 上一 describe 的 helper 逻辑内联） */
+    async function setupSwitch({ protocol }) {
+        const env = await loadModules();
+        env.state.conversations = [{ id: 11, title: '会话A', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' }];
+        env.state.models = {
+            providers: [
+                { key: 'claude', name: 'Claude (Anthropic)', models: ['claude-sonnet-5'] },
+                { key: 'deepseek', name: 'DeepSeek', models: ['deepseek-chat'] },
+            ],
+        };
+        env.state.credentialsProtocol = protocol;
+        env.tabs.openTab(11);
+        env.chat.setChatHooks({ refreshConversations: vi.fn() });
+        const fetchSpy = makeApiMock({});
+        fetchSpy.mockImplementation((url, options = {}) => {
+            if (String(url).endsWith('/api/conversations/11') && options?.method === 'PUT') {
+                return mockJson({ id: 11, ...JSON.parse(options.body) });
+            }
+            return makeApiMock({})(url, options);
+        });
+        env.api.setFetch(fetchSpy);
+        env.chat.renderChatHeader(11);
+        return { ...env, fetchSpy };
+    }
+
+    const hasPut = (fetchSpy) => fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11') && o?.method === 'PUT');
+
+    it('凭证 none 态：任意目标 provider 都弹确认提示，确认后仍保存', async () => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol: 'none' });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        document.querySelector('.modal-overlay .ms-start').click(); // 保持 claude → none 态也提示
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).not.toBeNull());
+        expect(document.querySelector('.confirm-modal').textContent).toContain('尚未配置 API Key');
+        document.querySelector('.confirm-modal .confirm-ok').click();
+        await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
+    });
+
+    it('凭证 none 态：确认弹窗点取消 → 不保存', async () => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol: 'none' });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        document.querySelector('.modal-overlay .ms-start').click();
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).not.toBeNull());
+        document.querySelector('.confirm-modal .confirm-cancel').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(hasPut(fetchSpy)).toBe(false);
+    });
+
+    it('凭证 claude 态 + 目标 provider 非 claude → 弹确认提示，确认后保存', async () => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol: 'claude' });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        const overlay = document.querySelector('.modal-overlay');
+        const prov = overlay.querySelector('#ms-provider');
+        prov.value = 'deepseek';
+        prov.dispatchEvent(new Event('change', { bubbles: true }));
+        overlay.querySelector('#ms-model').value = 'deepseek-chat';
+        overlay.querySelector('.ms-start').click();
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).not.toBeNull());
+        document.querySelector('.confirm-modal .confirm-ok').click();
+        await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
+    });
+
+    it('凭证 claude 态 + 目标 provider 为 claude → 直接保存无确认提示', async () => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol: 'claude' });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        document.querySelector('.modal-overlay .ms-start').click(); // 目标保持 claude
+        await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
+        expect(document.querySelector('.confirm-modal')).toBeNull();
+    });
+
+    it('凭证 openai 态 → 直接保存无确认提示', async () => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol: 'openai' });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        document.querySelector('.modal-overlay .ms-start').click();
+        await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
+        expect(document.querySelector('.confirm-modal')).toBeNull();
+    });
+});
+
+describe('T3 对话内模型切换 — 在途流式不被切换打断', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('切换模型不中止在途流式句柄；模型保存后 state 更新（下一请求由后端读新模型）', async () => {
+        const { chat, state, tabs } = await loadModules();
+        tabs.openTab(11);
+        const abort = vi.fn();
+        tabs.updateTab(11, { isStreaming: true, activeStream: { abort } });
+        state.conversations = [{ id: 11, title: '会话A', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' }];
+        state.models = {
+            providers: [
+                { key: 'claude', name: 'Claude (Anthropic)', models: ['claude-sonnet-5'] },
+                { key: 'deepseek', name: 'DeepSeek', models: ['deepseek-chat'] },
+            ],
+        };
+        state.credentialsProtocol = 'openai';
+        const fetchSpy = makeApiMock({});
+        fetchSpy.mockImplementation((url, options = {}) => {
+            if (String(url).endsWith('/api/conversations/11') && options?.method === 'PUT') {
+                return mockJson({ id: 11, ...JSON.parse(options.body) });
+            }
+            return makeApiMock({})(url, options);
+        });
+        // api 经 fetch 注入（无需显式 import — chat 模块已绑定 setFetch seam）
+        const api = await import('../js/api.js');
+        api.setFetch(fetchSpy);
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderChatHeader(11);
+
+        // 在途流式中触发模型切换（点徽标 → 选 deepseek → 确认）
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        const overlay = document.querySelector('.modal-overlay');
+        const prov = overlay.querySelector('#ms-provider');
+        prov.value = 'deepseek';
+        prov.dispatchEvent(new Event('change', { bubbles: true }));
+        overlay.querySelector('#ms-model').value = 'deepseek-chat';
+        overlay.querySelector('.ms-start').click();
+
+        await vi.waitFor(() => {
+            expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11') && o?.method === 'PUT')).toBe(true);
+        });
+        // 在途流式句柄未被 abort（切换不打断在途流）
+        expect(abort).not.toHaveBeenCalled();
+        // 会话模型已保存 → 下一发送由后端读取新模型
+        expect(state.conversations[0].model_provider).toBe('deepseek');
+        expect(state.conversations[0].model_name).toBe('deepseek-chat');
+        // 在途流仍处于 streaming 态（未因切换被中断写回）
+        expect(tabs.getTab(11).isStreaming).toBe(true);
+    });
+});
