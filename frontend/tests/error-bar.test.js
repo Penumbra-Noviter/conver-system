@@ -211,6 +211,52 @@ describe('renderErrorBar — 会话隔离（F-50 跨会话并存）', () => {
     });
 });
 
+describe('renderErrorBar — 特殊字符会话 id（F-67 选择器注入防御）', () => {
+    it('conversationId 含 " 或 ] 时不抛 SyntaxError，条正常渲染', () => {
+        expect(() => errorBarModule.renderErrorBar({
+            container, message: '特殊id错误', protocol: 'openai',
+            conversationId: 'a"b]c', onNavigateSettings: vi.fn(),
+        })).not.toThrow();
+        expect(container.querySelector('.chat-error-bar')).not.toBeNull();
+    });
+
+    it('含特殊字符会话 id 同会话幂等替换 — 第二次渲染不残留重复条', () => {
+        errorBarModule.renderErrorBar({
+            container, message: 'err1', protocol: 'openai',
+            conversationId: 'a"b]c', onNavigateSettings: vi.fn(),
+        });
+        errorBarModule.renderErrorBar({
+            container, message: 'err2', protocol: 'openai',
+            conversationId: 'a"b]c', onNavigateSettings: vi.fn(),
+        });
+        const bars = container.querySelectorAll('.chat-error-bar');
+        expect(bars).toHaveLength(1);
+        expect(bars[0].textContent).toContain('err2');
+        expect(bars[0].dataset.conv).toBe('a"b]c');
+    });
+
+    it('不同会话（含特殊字符 id）跨会话并存不被误删（F-50 保持）', () => {
+        errorBarModule.renderErrorBar({
+            container, message: 'A1', protocol: 'openai',
+            conversationId: 'a"b', onNavigateSettings: vi.fn(),
+        });
+        errorBarModule.renderErrorBar({
+            container, message: 'B1', protocol: 'openai',
+            conversationId: 'c]d', onNavigateSettings: vi.fn(),
+        });
+        // 会话 c]d 再次失败 → 只替换该会话的条，a"b 的条不被动到
+        errorBarModule.renderErrorBar({
+            container, message: 'B2', protocol: 'openai',
+            conversationId: 'c]d', onNavigateSettings: vi.fn(),
+        });
+        const bars = container.querySelectorAll('.chat-error-bar');
+        expect(bars).toHaveLength(2);
+        const byConv = Object.fromEntries([...bars].map((b) => [b.dataset.conv, b.textContent]));
+        expect(byConv['a"b']).toContain('A1');
+        expect(byConv['c]d']).toContain('B2');
+    });
+});
+
 describe('error-bar — 协议表面收口', () => {
     it('__all__ 收口全部公开符号', () => {
         expect(errorBarModule.__all__.sort()).toEqual(['ERROR_BAR_DISMISS_MS', 'renderErrorBar']);

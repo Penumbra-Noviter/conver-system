@@ -50,7 +50,9 @@ const DATA_CONV = 'data-conv';
  *   （跨会话并存 — 多 tab 并发流式出错互不覆盖；本会话重复渲染仍只留一条）；
  *   无 conversationId（undefined/null）时保持既有行为 — 移除容器内所有旧条
  *   后插入（同刻仅一条在屏，兼容无会话上下文用例）。会话身份经 data-conv
- *   属性标记并用于幂等寻址（字符串/数字归一为字符串比较）。
+ *   属性标记并用于幂等寻址（字符串/数字归一为字符串比较）。旧条定位遍历容器内
+ *   .chat-error-bar 按 data-conv 属性值精确比对（F-67：不选择器裸插值，会话
+ *   id 含引号 / "]" 等特殊字符时免疫 SyntaxError，错误条不被抑制）。
  *
  * 文案分流：protocol === 'none' → 显示「配置 Key」引导文案（不含原始错误）；
  *   其余 protocol → 显示原始错误信息（errMsg 兜底为 message 字符串本身）。
@@ -74,12 +76,18 @@ const DATA_CONV = 'data-conv';
 export function renderErrorBar({ container, message, protocol, onNavigateSettings, conversationId } = {}) {
     if (!container || typeof container.querySelector !== 'function') return null;
 
-    // 幂等：有会话身份 → 只移除同会话旧条（跨会话并存）；无会话身份 →
-    // 移除容器内所有旧条（既有「同容器仅一条」语义）。querySelectorAll +
-    // 逐个 remove 覆盖重复条残留的防御场景。
+    // 幂等 + 会话隔离（F-50 / F-67）：有会话身份 → 遍历容器内旧条、按
+    // data-conv 属性值精确比对，只移除同会话旧条（跨会话并存，其他会话条
+    // 不被误删）；无会话身份 → 移除容器内所有旧条（既有「同容器仅一条」
+    // 语义）。不用选择器裸插值定位（F-67）：conversationId 含引号 / "]" 等
+    // 特殊字符会让 querySelectorAll 抛 SyntaxError 抑制整条错误条；遍历 +
+    // getAttribute 精确比对天然免疫选择器/HTML 形态注入。归一与写入侧
+    // setAttribute 的 String() 同源（String(conversationId)）。
     const hasConv = conversationId !== undefined && conversationId !== null;
-    const selector = hasConv ? `${SEL_ERROR_BAR}[${DATA_CONV}="${conversationId}"]` : SEL_ERROR_BAR;
-    container.querySelectorAll(selector).forEach((bar) => bar.remove());
+    const normalizedId = hasConv ? String(conversationId) : null;
+    container.querySelectorAll(SEL_ERROR_BAR).forEach((bar) => {
+        if (!hasConv || bar.getAttribute(DATA_CONV) === normalizedId) bar.remove();
+    });
 
     const isNone = protocol === 'none';
     const text = isNone ? TEXT_NONE_GUIDE : String(message ?? '');
