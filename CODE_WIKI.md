@@ -2,8 +2,8 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1947<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->790<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1087<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
-> 测试状态：<!--AUTO:tests_total:total-->1947<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->790<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1087<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->793<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->793<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1087<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->793<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->793<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1087<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -508,7 +508,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成（迭代器） |
 | <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.test_connection-->`test_connection(model=None)`<!--/AUTO--> | 连接测试（保存 Key 时校验） |
 
-### 4.25 `backend/app/services/llm/claude.py` — Claude Provider（<!--AUTO:lines:backend/app/services/llm/claude.py-->~68 行<!--/AUTO-->）
+### 4.25 `backend/app/services/llm/claude.py` — Claude Provider（<!--AUTO:lines:backend/app/services/llm/claude.py-->~75 行<!--/AUTO-->）
 
 **职责**：`ClaudeProvider(BaseLLM)`——anthropic SDK 实现（generate/stream_generate + 错误翻译）。
 
@@ -1269,7 +1269,7 @@ conver system/
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->40<!--/AUTO--> | 统一异常处理器 |
 | `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->12<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
 | `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->62<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
-| `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->15<!--/AUTO--> | LLM 基类共享行为 |
+| `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->18<!--/AUTO--> | LLM 基类共享行为 |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
@@ -1377,9 +1377,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1947<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->793<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->790<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->793<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1087<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

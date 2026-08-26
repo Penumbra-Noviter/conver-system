@@ -312,7 +312,11 @@ class TestClaudeCallSiteWrapping:
     """Claude 侧：system 以纯文本透传顶层参数，行为逐字不变"""
 
     async def test_generate_passes_system_as_string(self) -> None:
-        """system 为顶层字符串参数（不进 messages）；默认模型 claude-sonnet-5；提取 text 块"""
+        """system 为顶层字符串参数（不进 messages）；默认模型 claude-sonnet-5；提取 text 块
+
+        F-56 契约：SDK wire 形状不含 temperature（anthropic 1.x create 签名无该参数）；
+        接口仍接收 temperature=0.3，但调用不落 wire。
+        """
         messages = _FakeClaudeMessages(blocks=[SimpleNamespace(type="text", text="你好")])
         provider = _claude_provider(messages)
 
@@ -328,10 +332,10 @@ class TestClaudeCallSiteWrapping:
                 "model": "claude-sonnet-5",
                 "system": "你是助手",
                 "messages": [{"role": "user", "content": "你好"}],
-                "temperature": 0.3,
                 "max_tokens": 64,
             }
         ]
+        assert "temperature" not in messages.calls[0]
 
     async def test_generate_without_text_block_returns_empty(self) -> None:
         """无 text 内容块：返回空串；无 system：system 参数为空列表"""
@@ -344,7 +348,10 @@ class TestClaudeCallSiteWrapping:
         assert messages.calls[0]["system"] == []
 
     async def test_stream_generate_yields_texts_with_system_string(self) -> None:
-        """流式：逐 text 产出；system 仍为顶层字符串参数"""
+        """流式：逐 text 产出；system 仍为顶层字符串参数
+
+        F-56 契约：SDK stream wire 形状不含 temperature（anthropic 1.x stream 签名无该参数）。
+        """
         messages = _FakeClaudeMessages(texts=["你", "好"])
         provider = _claude_provider(messages, base_url="https://api.anthropic.com")
 
@@ -358,6 +365,7 @@ class TestClaudeCallSiteWrapping:
         assert collected == ["你", "好"]
         assert messages.calls[0]["system"] == "S"
         assert messages.calls[0]["messages"] == [{"role": "user", "content": "U"}]
+        assert "temperature" not in messages.calls[0]
 
     async def test_stream_generate_translates_stream_error(self) -> None:
         """流中 SDK 异常：骨架统一翻译为 LLMError"""
@@ -374,6 +382,58 @@ class TestClaudeCallSiteWrapping:
 
         with pytest.raises(LLMError, match="Claude API 调用失败: boom"):
             await provider.generate([{"role": "user", "content": "U"}])
+
+
+class TestAnthropic1xContractLock:
+    """F-56 契约锁：anthropic 1.x 兼容
+
+    SDK 调用（create / stream）不得携带 temperature kwarg——anthropic 1.x
+    的 messages.create 与 messages.stream 签名不再接收该参数，传入即 TypeError。
+    对外接口（generate / stream_generate）仍保留 temperature 签名供上层
+    （openai.py / chat.py 链路）依赖，本类同时钉住该签名不回归。
+    """
+
+    async def test_generate_create_call_has_no_temperature_kwarg(self) -> None:
+        """generate 虽接收 temperature=0.3，但 SDK create 调用不得传 temperature"""
+        messages = _FakeClaudeMessages(blocks=[SimpleNamespace(type="text", text="你好")])
+        provider = _claude_provider(messages)
+
+        await provider.generate(
+            [{"role": "user", "content": "U"}],
+            temperature=0.3,
+            max_tokens=64,
+        )
+
+        assert "temperature" not in messages.calls[0]
+        assert messages.calls[0]["model"] == "claude-sonnet-5"
+        assert messages.calls[0]["max_tokens"] == 64
+
+    async def test_stream_generate_stream_call_has_no_temperature_kwarg(self) -> None:
+        """stream_generate 虽接收 temperature=0.3，但 SDK stream 调用不得传 temperature"""
+        messages = _FakeClaudeMessages(texts=["你", "好"])
+        provider = _claude_provider(messages)
+
+        collected = [
+            t
+            async for t in provider.stream_generate(
+                [{"role": "user", "content": "U"}],
+                temperature=0.3,
+                max_tokens=64,
+            )
+        ]
+
+        assert collected == ["你", "好"]
+        assert "temperature" not in messages.calls[0]
+        assert messages.calls[0]["max_tokens"] == 64
+
+    async def test_public_signature_keeps_temperature_parameter(self) -> None:
+        """对外接口签名保留 temperature 参数（上层调用链路依赖，不得删除）"""
+        import inspect
+
+        gen_sig = inspect.signature(ClaudeProvider.generate)
+        assert "temperature" in gen_sig.parameters
+        stream_sig = inspect.signature(ClaudeProvider.stream_generate)
+        assert "temperature" in stream_sig.parameters
 
 
 class TestConnectionDefault:
