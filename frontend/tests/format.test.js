@@ -323,3 +323,64 @@ describe('searchResultItemHtml', () => {
         expect(html).toContain('data-conversation-id="1"');
     });
 });
+
+describe('messageBubbleHtml — T6 重生成操作按钮', () => {
+    it('assistant + regenerate:true → 渲染 .btn-regenerate 按钮（refresh 图标）', () => {
+        const html = messageBubbleHtml('assistant', '回复', { regenerate: true });
+        expect(html).toContain('btn-regenerate');
+        expect(html).toContain('data-icon="refresh"');
+    });
+
+    it('user + regenerate:true → 不渲染重生成按钮（仅 assistant 角色）', () => {
+        const html = messageBubbleHtml('user', 'hi', { regenerate: true });
+        expect(html).not.toContain('btn-regenerate');
+    });
+
+    it('缺省 regenerate:false → 不渲染重生成按钮', () => {
+        const html = messageBubbleHtml('assistant', '回复');
+        expect(html).not.toContain('btn-regenerate');
+    });
+});
+
+describe('buildMessagesHtml — T6 末条 assistant 重生成操作（聊天域开关）', () => {
+    it('canRegenerate:true → 仅末条 assistant 气泡渲染重生成按钮', () => {
+        const html = buildMessagesHtml([
+            { id: 1, role: 'user', content: 'a' },
+            { id: 2, role: 'assistant', content: 'b' },
+            { id: 3, role: 'user', content: 'c' },
+            { id: 4, role: 'assistant', content: 'd' },
+        ], { canRegenerate: true });
+        // 末条 assistant(id4) 含按钮；前面 assistant(id2) 不含 — 按钮出现在 id4 气泡段之后
+        const btnCount = html.split('btn-regenerate').length - 1;
+        expect(btnCount).toBe(1);
+        expect(html.indexOf('data-message-id="4"')).toBeLessThan(html.indexOf('btn-regenerate'));
+    });
+
+    it('canRegenerate 缺省（聊天域未开启）→ 无重生成按钮', () => {
+        const html = buildMessagesHtml([{ role: 'assistant', content: 'x' }]);
+        expect(html).not.toContain('btn-regenerate');
+    });
+
+    it('末条非 assistant（末条为 user）→ 无重生成按钮', () => {
+        const html = buildMessagesHtml(
+            [
+                { role: 'user', content: 'a' },
+                { role: 'assistant', content: 'b' },
+                { role: 'user', content: 'c' },
+            ],
+            { canRegenerate: true }
+        );
+        expect(html).not.toContain('btn-regenerate');
+    });
+
+    it('末条 assistant 为 streaming（生成中）→ 无重生成按钮', () => {
+        const html = buildMessagesHtml(
+            [
+                { role: 'user', content: 'a' },
+                { role: 'assistant', content: '部分', streaming: true },
+            ],
+            { canRegenerate: true }
+        );
+        expect(html).not.toContain('btn-regenerate');
+    });
+});

@@ -455,6 +455,21 @@ PK `id`），随后按既有非流式路径重新生成一条 AI 回复并落库
 | 截断后无 user（空对话 / 仅 greeting） | 400 | 没有可重生成的用户消息 |
 | 对话没有 assistant 消息（缺省 message_id） | 400 | 没有可重生成的 AI 回复 |
 
+**前端使用**（T6）
+
+```javascript
+// 缺省重生成末条 AI 回复（点击末条 assistant 气泡上的「重生成」按钮触发，MVP 非流式）
+await api.conversations.regenerate(conversationId);
+// 指定目标 assistant 消息（后续扩展用）
+await api.conversations.regenerate(conversationId, { message_id: 42 });
+```
+
+- 成功：`reply` 为新回复内容，`message_id` 为**服务端新消息**的 id —— 前端写
+  tab 缓存 / 结算时必须用该 id 替换占位条目（重生成走统一结算入口 `settleTurn`
+  从服务端重载消息列表，fresh 整体替换即携带该 id）。
+- 失败：走既有错误条通道（与 `messages.chat` 同一 catch 路径），不写进消息列表；
+  重生成期间进行中状态（按钮禁用 + thinking）与在途守卫复用非流式语义。
+
 ---
 
 ## 模型 API

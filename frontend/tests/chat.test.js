@@ -47,14 +47,21 @@ const mockJson = (data, status = 200) =>
 
 /**
  * fetch mock 路由（api.js doFetch seam 消费）
- * POST /api/chats → 非流式消息发送；GET /api/conversations/{id}/messages → 消息列表
+ * POST /api/chats → 非流式消息发送；POST /api/conversations/{id}/regenerate → 重生成；
+ * GET /api/conversations/{id}/messages → 消息列表
  */
-function makeApiMock({ chatResult = null, messagesByConv = {} } = {}) {
+function makeApiMock({ chatResult = null, messagesByConv = {}, regenerateResult = null } = {}) {
     return vi.fn(async (url, options = {}) => {
         const path = String(url).replace(/^.*\/api/, '/api');
         const method = options.method || 'GET';
         if (path === '/api/chats' && method === 'POST') {
             return mockJson(chatResult ?? { reply: '回复' });
+        }
+        const regenMatch = path.match(/^\/api\/conversations\/(\d+)\/regenerate$/);
+        if (regenMatch && method === 'POST') {
+            return mockJson(
+                regenerateResult ?? { reply: '新回复', message_id: 999, conversation_id: Number(regenMatch[1]) }
+            );
         }
         const listMatch = path.match(/^\/api\/conversations\/(\d+)\/messages$/);
         if (listMatch && method === 'GET') {
@@ -1068,5 +1075,162 @@ describe('T3 对话内模型切换 — 在途流式不被切换打断', () => {
         expect(state.conversations[0].model_name).toBe('deepseek-chat');
         // 在途流仍处于 streaming 态（未因切换被中断写回）
         expect(tabs.getTab(11).isStreaming).toBe(true);
+    });
+});
+
+describe('T6 重生成 — 末条 assistant 气泡重生成闭环', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 重生成前置：缓存 [user(1), assistant(2)]；服务端重生成后返回 [user(1), assistant(3)] */
+    const REGEN_MSGS = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')];
+    const REGEN_SERVER = [msg(1, 'user', '你好'), msg(3, 'assistant', '新回复')];
+
+    it('末条 assistant 气泡渲染重生成按钮；点击 → conversations.regenerate(11)（缺省无 message_id）→ settleTurn 重载渲染新回复且服务端消息 id 进缓存', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS });
+        const fetchSpy = makeApiMock({
+            regenerateResult: { reply: '新回复', message_id: 3, conversation_id: 11 },
+            messagesByConv: { 11: REGEN_SERVER },
+        });
+        api.setFetch(fetchSpy);
+        const refresh = vi.fn();
+        chat.setChatHooks({ refreshConversations: refresh });
+
+        chat.renderMessages();
+
+        // 末条 assistant 气泡携带重生成按钮
+        const asstBubble = chat.chatDom.chatMessages.querySelector('.message.assistant');
+        const regenBtn = asstBubble.querySelector('.btn-regenerate');
+        expect(regenBtn).not.toBeNull();
+
+        regenBtn.click();
+
+        // 端点调用契约：POST /api/conversations/11/regenerate，无请求体（缺省末条 assistant）
+        await vi.waitFor(() => {
+            expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11/regenerate') && o?.method === 'POST')).toBe(true);
+        });
+        const regenCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/conversations/11/regenerate') && o?.method === 'POST');
+        expect(regenCall[1].body).toBeUndefined();
+
+        // 统一结算入口 settleTurn 重载 → 服务端列表整体进缓存（新消息携带服务端 message_id=3 — W2 增量审核 #2）
+        await vi.waitFor(() => {
+            expect(tabs.getTab(11).messages).toEqual(REGEN_SERVER);
+        });
+        // 新回复渲染、旧回复消失
+        expect(chat.chatDom.chatMessages.textContent).toContain('新回复');
+        expect(chat.chatDom.chatMessages.textContent).not.toContain('旧回复');
+        // 重渲染后新气泡仍携带重生成按钮（重新绑定）
+        expect(chat.chatDom.chatMessages.querySelector('.message.assistant .btn-regenerate')).not.toBeNull();
+        // 发送流程末尾刷新勾子被调
+        expect(refresh).toHaveBeenCalled();
+    });
+
+    it('在途守卫：进行中显示 thinking + 按钮禁用；同一对话重复触发被拦截（只发一次真实请求）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS });
+
+        let resolveRegen;
+        const regenSpy = vi.spyOn(api.conversations, 'regenerate')
+            .mockReturnValue(new Promise((r) => { resolveRegen = r; }));
+        const settleSpy = vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderMessages();
+        const regenBtn = chat.chatDom.chatMessages.querySelector('.btn-regenerate');
+
+        regenBtn.click(); // 第一次触发 — 在途
+
+        // 进行中状态：thinking 指示器 + 重生成按钮禁用
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).not.toBeNull();
+        expect(regenBtn.disabled).toBe(true);
+
+        // 在途守卫：重复触发（按钮点击 / 直接调用）被拦截 — 只发一次真实请求
+        regenBtn.click();
+        await chat.regenerateLastReply();
+        expect(regenSpy).toHaveBeenCalledTimes(1);
+        expect(settleSpy).not.toHaveBeenCalled();
+
+        // 结算后：settle 委托参数带服务端新消息 id（messageId 透传）+ 进行中 UI 复原
+        resolveRegen({ reply: '新回复', message_id: 3, conversation_id: 11 });
+        await vi.waitFor(() => expect(settleSpy).toHaveBeenCalledTimes(1));
+        const call = settleSpy.mock.calls[0][0];
+        expect(call.convId).toBe(11);
+        expect(call.messageId).toBe(3);
+        expect(call.settleIndex).toBe(-1);
+        await vi.waitFor(() => {
+            expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).toBeNull();
+            expect(regenBtn.disabled).toBe(false);
+        });
+
+        // 在途清除 → 可再次触发
+        await chat.regenerateLastReply();
+        expect(regenSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('失败 → 走错误条通道（不写进消息列表）+ settleTurn 不调用 + thinking/按钮复原 + 在途清除', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS });
+
+        const regenSpy = vi.spyOn(api.conversations, 'regenerate').mockRejectedValue(new Error('重生成端点错误'));
+        const settleSpy = vi.spyOn(ss, 'settleTurn');
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderMessages();
+        const regenBtn = chat.chatDom.chatMessages.querySelector('.btn-regenerate');
+
+        regenBtn.click();
+
+        await vi.waitFor(() => {
+            // 错误经既有错误通道渲染（与 messages.chat 同一 catch 路径 — W2 增量审核 #1）
+            const bar = chat.chatDom.chatMessages.parentElement.querySelector('.chat-error-bar');
+            expect(bar).not.toBeNull();
+            expect(bar.textContent).toContain('重生成端点错误');
+            // 不写进消息列表 — 缓存保持原状
+            expect(tabs.getTab(11).messages).toEqual(REGEN_MSGS);
+            expect(chat.chatDom.chatMessages.querySelector('.message')).not.toBeNull();
+            expect(chat.chatDom.chatMessages.textContent).toContain('旧回复');
+        });
+        expect(settleSpy).not.toHaveBeenCalled();
+
+        // 进行中 UI 复原：thinking 移除 + 按钮恢复可用
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).toBeNull();
+        expect(regenBtn.disabled).toBe(false);
+
+        // 在途清除 → 可再次触发
+        await chat.regenerateLastReply();
+        expect(regenSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('Falsify:无活动 tab → no-op 不调 regenerate、不调刷新', async () => {
+        const { chat, api } = await loadModules();
+        const regenSpy = vi.spyOn(api.conversations, 'regenerate');
+        const refresh = vi.fn();
+        chat.setChatHooks({ refreshConversations: refresh });
+
+        await chat.regenerateLastReply();
+
+        expect(regenSpy).not.toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it('Falsify:流式在途 tab（isStreaming）→ no-op 不调 regenerate', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS, isStreaming: true });
+        const regenSpy = vi.spyOn(api.conversations, 'regenerate');
+
+        await chat.regenerateLastReply();
+
+        expect(regenSpy).not.toHaveBeenCalled();
+    });
+
+    it('Falsify:无末条 assistant（仅 user 消息）→ 不渲染重生成按钮', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [msg(1, 'user', '你好')] });
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.querySelector('.btn-regenerate')).toBeNull();
     });
 });

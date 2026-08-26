@@ -220,6 +220,26 @@ export const conversations = {
     update: (id, data) => request('PUT', `/conversations/${id}`, data),
     delete: (id) => request('DELETE', `/conversations/${id}`),
     deleteAll: () => request('DELETE', '/conversations'),
+    /**
+     * 重生成对话中目标 AI 回复（缺省末条 assistant — T6 MVP 非流式）
+     *
+     * POST /api/conversations/{id}/regenerate；响应与既有非流式 ChatResponse 同构
+     * `{ reply, message_id, conversation_id }`，其中 message_id 为服务端**新消息**
+     * 的 id —— 调用方写 tab 缓存 / 结算时必须用该 id 替换占位条目（W2 增量审核）。
+     * 客户端错误处理与 `messages.chat` 同走 `request` 错误通道（catch 后由聊天域
+     * 统一渲染错误条，不各自为政）。
+     *
+     * @param {number|string} id - 会话 id
+     * @param {object} [opts]
+     * @param {number|string|null} [opts.message_id] - 目标 assistant 消息 id（缺省 =
+     *   末条 AI 回复；不传时后端按 None 处理，请求体不携带）
+     * @returns {Promise<{reply: string, message_id: number, conversation_id: number}>}
+     */
+    regenerate: (id, { message_id } = {}) => request(
+        'POST',
+        `/conversations/${id}/regenerate`,
+        message_id != null ? { message_id } : null,
+    ),
 };
 
 // ══════════════════════════════════════════════════
