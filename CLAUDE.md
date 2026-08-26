@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 739 + 1 skip）；`cd frontend && npm test`（Vitest 986，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
+测试：`cd backend && python -m pytest`（pytest 789 + 1 skip）；`cd frontend && npm test`（Vitest 1087，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
 
 ## 当前状态（2026-08-26）
 
@@ -63,7 +63,8 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **技术债区 F-13~F-17 批次（2026-08-19 kickoff 全自动档，commit 链 d295c76 → 3111036）**：F-13 设备名判定改首点前组件（+5 用例）/ F-14 改名后缀字节截断复用 `_truncate_utf8_bytes`（+2）/ F-15 OSError 族读取自愈（+1）/ F-17 总名上限 255→120 字节（Windows MAX_PATH 实测，F-9 矩阵改 120 口径，+3）/ F-16 复核关闭（零代码）；F-18/F-19 归档流程项已修（F-9 注记补 F-17 修订 / F-13 常量注释语义同步）；期末四轴 0 阻断放行；新落债 F-20/F-21 待立项（唯一待办来源 TICKETS.md）
 - ✅ **全量审查修复批次（2026-08-25~26 kickoff 全自动档标准档 9 工单 3 波，commit 链 789602c → b63f169）**：三轴评审（根提交→HEAD）12 发现全部修复——W1 代码四票（S1 路由 ORM 清零 / B1 非 ASCII avatar 500 修复 先红后绿 / O1+O3 流式空守卫与异常日志 / S2+S3 包 __all__ 与 PRAGMA docstring）+ W2 文档三票（P1+P5 api-design 补端点契约与模型名换族 / P2 architecture 目录树补 23 文件 / P4 测试基线对齐权威标记）+ W3 登记两票（P3 游戏生成功能四处登记 / E 落债 F-38~F-45 + B2 复核关闭）；期末四轴 0 阻断放行；安全红线 0 违例；冒烟 713+1skip 绿；技术债区 24 项待立项（F-23~F-46）
 - ✅ **模拟器导入「AI/本地」识别补强 + 重新识别入口（2026-08-26 用户需求单工单）**：probe_config 三层探测（严格 cfg- → 关键词启发 endpoint|url|base/key/model → local）+ scan_input_ids 双层扫描（input/select + 脚本模板字符串层）+ probe_endpoint_mode 端点口径推断；manifest 新增 update_manifest_entry；POST /api/simulators/reprobe 端点 + 前端 local 卡片「重新识别」按钮；22 种子 + 斗罗大陆真实数据探测全 ai（config 与手工 manifest 逐字一致）
-- ✅ 测试：pytest 739 + 1 skip（后端）+ Vitest 986（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
+- ✅ **UX 体验改进批次（2026-08-26 kickoff 全自动档标准档 8 工单 5 波，merge 链 15d7c8b→a79c692）**：T1 首启无 Key 引导卡 + 发送/流式失败错误条化（保持 stream-session 零 DOM）/ T2 搜索跳转定位+高亮（data-message-id 消费 + scrollIntoView + 3s 清除）/ T3 对话内模型切换（badge→按钮复用 showModelSelector + PUT 已就绪，切换仅影响下条）/ T4 快赢三项（toast 队列上限 + modal 焦点陷阱还原 + 生成器凭证预检复用 key-injector）/ T5 重生成后端端点（assemble_chat_context 抽取 + 截断锚 PK id + 单事务 + PHI 触发源修复）/ T6 重生成前端（末条气泡按钮 + settleTurn 重载 + 错误条）/ T7 文档收尾。期末四轴 0 阻断；安全红线 0 违例；增量审核 5 阻断/重点主会话直修（P1 引导卡 / PHI 触发源 / 事务回滚）；非阻断落债 F-49~F-63；pytest 739→789+1skip、Vitest 986→1087
+- ✅ 测试：pytest 789 + 1 skip（后端）+ Vitest 1087（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
 
 ## 待办管理
 

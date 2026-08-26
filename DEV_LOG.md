@@ -8,6 +8,20 @@
 
 ---
 
+## UX 体验改进批次（2026-08-26 — kickoff 全自动档标准档 8 工单 5 波，merge 链 15d7c8b→a79c692）
+
+- **来源**：用户「如何进一步提升用户体验，调研一下，设计方案，进入 project-kickoff 全自动流程执行」。调研产物 `docs/ux-research.md`（11 项薄弱点 P1-P11 + 外部对标 5 来源）→ Grilling 共识 3 主题 + 3 快赢 → 8 工单：T0 spike + T1-T7。
+- **T1 首启引导 + 错误条化**：init 后检测 `settings.credentials()` 三态，`none` 怪聊天空态内联引导卡（含「前往设置」）；发送/流式失败不再写消息列表，改渲染可关闭错误条（8s auto-dismiss + 前往设置）——**保持 stream-session 零 DOM**（错误经回调上抛）。新建 `error-bar.js` 深模块（文案分流/幂等/计时器/导航注入）。
+- **T2 搜索定位跳转 + 高亮**：消费 `data-message-id`（此前 format.js 采集未用）→ `activateConversation(convId, {messageId})` → `scrollIntoView({block:'center'})` + 复用 `.search-highlight` + 3s 清除；与 scrollToBottom 互斥。
+- **T3 对话内模型切换**：`.chat-model-badge` → 按钮复用 `showModelSelector`（预选当前 provider/model，签名向后兼容）→ `conversations.update` + 同步头部/tab/列表；切换仅影响下条（在途流式天然免疫）；none/claude 凭证不可用确认但允许保存。
+- **T4 快赢三项**：toast 队列上限（`MAX_TOASTS=3` 挤最旧）/ modal 焦点陷阱 + 关闭还原 / 生成器打开凭证预检（none/claude 顶部提示 + 复用 key-injector 引导链接模式）。
+- **T5 重生成后端端点（T0 spike 前置）**：`POST /api/conversations/{id}/regenerate`（body 可选 message_id 缺省末条 assistant）——从 `prepare_chat` 抽 `assemble_chat_context`（不插 user）；`delete_messages_from` 锚 PK id 时间线截断；单事务（截断+新 assistant 一次 commit，LLM 失败/非 LLM 异常均回滚）；`MessageNotFoundError`(404)/`InvalidRegenerateTargetError`(400) 错误族。**T0 spike**（22 实证测试）确认截断须锚 PK id 而非 created_at（微秒 tie 过删邻居）、触发 user 复用须去重。
+- **T6 重生成前端**：末条已结算 assistant 气泡「重生成」按钮 → `conversations.regenerate` → `settleTurn` 非流式重载（新消息带服务端 id 进缓存）；在途守卫与 handleSend 互斥；失败走错误条不写消息列表。
+- **T7 文档收尾**：README 补能力表述 + CODE_WIKI/api-design/index.html 全量核对 + doc_sync 零漂移（569 标记）。
+- **四轮增量审核（W1-W4）**：5 阻断/重点由主会话直修——W1 P1（引导卡配置 Key 后不消失，settings-panel 保存回调刷新 `credentialsProtocol`）/ W2 BREAKS-高（PHI 角色 regenerate 触发源丢失 → `messages[:-1]` 后 pop 末尾 system）+ BREAKS-中（截断后非 LLM 异常回滚不足 → 异常边界扩大到全部 Exception）/ W3 3 项 LOW / W4 5 项（B1 流式发送未入重生成互斥、B3 settleTurn 重载失败顶替语义、B2/M1/M2）。**期末四轴 0 阻断放行、安全红线 0 违例**。
+- **非阻断落债 F-49~F-63**（TECH_DEBT 候选区，15 项：错误条防御/多 tab 错误条/高亮 timer 残留/陈旧 messageId 落地顶部/模型切换刷新失败语义/凭证确认不对称/生成器预检竞态/anthropic SDK 上界/regenerate 互斥与重载竞态等）。
+- **验证**：pytest 739→789+1skip（+50：spike 22 + regenerate 28 + 前端相关零回归）/ Vitest 986→1087（+101）/ cargo 70 零改动；运行态冒烟通过（credentials `protocol:none`、regenerate 404 矩阵、manifest 200）；doc_sync 零漂移。
+
 ## 模拟器导入「AI/本地」识别补强 + 重新识别入口（2026-08-26，用户需求单工单）
 
 - **来源**：用户报告「导入的斗罗大陆被标为纯本地、无法一键同步全局 API 设置」。根因实证：`probe_config` 三重盲区（只扫 `input` 漏 `select` / HTMLParser 不解析 script 内 JS 模板字符串控件 / 只认 `cfg-` 一种约定），种子 22 款全靠手工 manifest 兜底。

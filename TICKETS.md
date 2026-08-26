@@ -30,6 +30,26 @@
 
 ## 已完成归档
 
+### UX 体验改进批次（2026-08-26，kickoff 全自动档标准档 8 工单 5 波）
+
+> 来源：用户「如何进一步提升用户体验，调研→设计→project-kickoff 全自动执行」。调研产物 docs/ux-research.md → Grilling 共识（3 主题 + 3 快赢 + 边界）→ 8 工单。四轮增量审核 5 阻断/重点主会话直修，期末四轴 0 阻断放行。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| T0 | Spike：regenerate truncation×滑窗边界契约（22 实证测试，锚 PK id 截断） | 2026-08-26 | e127b52 |
+| T1 | 首启无 Key 引导卡 + 发送/流式失败错误条化（零 DOM，error-bar.js） | 2026-08-26 | 891f5b1 |
+| T2 | 搜索跳转定位+高亮（data-message-id 消费 + scrollIntoView + 3s 清除） | 2026-08-26 | 72a5692 |
+| T3 | 对话内模型切换（badge→按钮 + showModelSelector 预选 + 仅影响下条） | 2026-08-26 | d5a8e39 |
+| T4 | 快赢三项（toast 队列/modal 焦点陷阱/生成器凭证预检） | 2026-08-26 | 63484e9 |
+| T5 | 重生成后端端点（assemble_chat_context + 截断锚 PK + 单事务） | 2026-08-26 | 7f0171d |
+| T6 | 重生成前端闭环（末条气泡按钮 + settleTurn 重载 + 错误条） | 2026-08-26 | 8a7c4ed |
+| T7 | 文档收尾（README + 全量核对 + doc_sync 零漂移） | 2026-08-26 | 04635ce |
+
+**主会话直修**：W1 P1 引导卡不消失（settings-panel 刷新 credentialsProtocol）/ W2 BREAKS-高 PHI 触发源 + BREAKS-中 事务回滚（先红后绿 +2 回归测试）
+**验证链：** pytest 739→789+1skip ✅（+50）| Vitest 986→1087 ✅（+101）| 期末四轴 0 阻断、安全红线 0 违例 | 运行态冒烟通过 | doc_sync 零漂移 | 非阻断落债 F-49~F-63
+
+---
+
 ### 会话交付：模拟器导入「AI/本地」识别补强 + 重新识别入口（2026-08-26，用户需求单工单）
 
 > 来源：用户报告「导入的斗罗大陆被标为纯本地、无法一键同步全局 API 设置」。根因实证：`probe_config` 三重盲区（只扫 input 漏 select / HTMLParser 不解析 script 内 JS 模板字符串控件 / 只认 cfg- 一种约定），种子 22 款全靠手工 manifest 兜底。Grilling 共识：自动启发式识别 + 卡片重新识别入口。
