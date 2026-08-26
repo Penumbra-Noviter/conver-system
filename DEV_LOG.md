@@ -8,6 +8,16 @@
 
 ---
 
+## 技术债消费批次 F-64~F-73（2026-08-27 — kickoff 全自动档标准档 4 工单 2 波，基线 880aa24 → HEAD）
+
+- **来源**：用户「对候选区新 10 项继续立项」。Grilling 共识 **8 做 + 2 关**——F-64 实证复核关闭（期末审核称 regenerate 流式在途无守卫，但 chat.js:760 入口已查 `if (!tab || tab.isStreaming) return;`，审核基于过时行号误报，git grep 复核现状守卫存在——「票面修复建议实证复核」惯例再次验证）；F-65 settleTurn 参数面膨胀架构重构关闭（单文件内聚未越界、承重重生成核心链路，与 F-37/F-38/F-42 先例同族）。
+- **4 工单 2 波**：T1 error-bar 幂等寻址防注入（F-67 遍历比对）、T2 stream-session 结算边界（F-66 顶替场景跳过幂等早退 + F-68 空回复不丢弃）、T3 chat.js 防御四连（F-69 定位转义 / F-70 保存语义分离 / F-71 fail-closed / F-72 快照迭代）、T4 `.gg-config-warning-nav` 对比度（F-73 `#b45309` 对 --bg 4.61:1）。
+- **波 1 审核两中危直修**（主会话）：① **F-66 类型归一**——`isReplacementScenario`/`replaceIdx` 改 String() 比对，跨 string/number 失配时顶替失效（波 1 审核构造 `replaceId:'2'` vs 缓存 id=2 复现新内容被吞，一行归一 + 回归测试闭合）；② **F-73 dark 语境回退**——`#b45309` 对 dark 底仅 3.45:1，补 `:root[data-theme="dark"]` + `@media(prefers-color-scheme: dark)` 双选择器回退 var(--warning)（6.98:1），T4 代理诚实披露了验收项外的 dark 回归，审核驱动补齐。
+- **期末四轴 0 阻断放行**。非阻断落债 **F-74~F-79**（6 项：幂等比较未归一 / String(null) 坍缩 / 对比度余量 0.11 / Repeated Switches / id 归一三文件分叉 / 顶层 children 遍历注记）。
+- **验证链**：pytest 792+1skip（零后端改动）| Vitest 1117→**1135**（+18，新建 style-css.test.js 5 例含 dark override 断言）| 冒烟（uvicorn + 页面/chat.js/stream-session.js/error-bar.js/style.css/API settings 全 200）| doc_sync 零漂移。
+- **过程遥测**：4 工单全单次完成 0 重开；4 工单均自行 commit（前批「必须自行 commit」prompt 前置生效）；2 轮增量审核放行、1 轮直修；T4 的 dark 副作用由实现者诚实披露 → 直修补齐（良好实践：副作用披露进证据即被审核闭环捕获）。
+- **doc_sync 坑**：新测试文件（style-css.test.js）必须补 CODE_WIKI §5.2 引用才会通过 --check（「源文件未出现在文档引用」是双向覆盖检查方向 2——新增文件未声明即红）。
+
 ## 技术债消费批次 F-49~F-63（2026-08-26 — kickoff 全自动档标准档 10 工单 5 波，基线 8ebdce1 → HEAD）
 
 - **来源**：用户「消费候选区 F-49~F-63 进入全自动流程」。预检 15 项（1 Speculative + 14 Worth exploring）→ Grilling 共识 **13 做 + 2 关**（F-49 `String(message)` 防御不可达复核关闭；F-61 highlight timer 自愈复核关闭）。2 项产品决策（F-52 搜索降级 = 无匹配回落 scrollToBottom；F-54 openai→claude 凭证对称提示）。

@@ -17,26 +17,39 @@
 
 ## 技术债候选区
 
-> 当前 10 项待立项（F-49~F-63 批次的波末增量审核与期末四轴非阻断发现；原 F-49~F-63 已 2026-08-26 全量消费并移出候选区，见处置记录）。
+> 当前 6 项待立项（F-64~F-73 批次的期末四轴非阻断发现；原 F-64~F-73 已 2026-08-27 全量消费并移出候选区，见处置记录）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| F-64 | `regenerateLastReply` 在流式在途（`tab.isStreaming`）时无互斥守卫，仅查 `nonStreamingInFlight`——UI 不可达（流式占位无重生成按钮）、编程可入；与 Spec「同对话互斥收口」泛化措辞未全兑现（与期末 Spec 发现 1 同源） | 期末四轴 | 中 | 📝 待立项 |
-| F-65 | `mergeFreshList`/`settleTurn` 参数面膨胀（settleTurn 11 字段），重生成顶替语义复用通用结算路径（id 匹配 / anchor 定位 / 位置式三策略叠加 + replaceId），Repeated Switches / Data Clumps 候选 | 期末四轴 | 中 | 📝 待立项 |
-| F-66 | `mergeFreshList` 中 `messageId === replaceId`（服务端复用旧回复 id）时幂等检查先于原位替换，新内容被吞掉、旧回复残留（后端当前每次重生成签发新 message_id，不触发） | 波5 增量审核（Falsify 轴） | 中 | 📝 待立项 |
-| F-67 | `renderErrorBar` 的 `data-conv` 选择器对 conversationId 裸插值——含引号/`]` id 抛 SyntaxError 抑制错误条（属性写入侧 `String()` 归一、选择器侧未归一，不对称；当前 id 为 DB 数值不可达） | 波1 增量审核（期末复证） | 低 | 📝 待立项 |
-| F-68 | F-60 分支 guard `messageId != null && content` 在 `content===''` 时短路，stale 空回复被静默丢弃（与 fresh 分支渲染空回复行为不一致） | 波5 增量审核（Falsify 轴） | 低 | 📝 待立项 |
-| F-69 | `locateAndHighlight` 无匹配前 `querySelector` 拼接 messageId 未转义（含引号/畸形 id 抛 SyntaxError；id 为 DB 数值不可达，波前既有） | 波2 增量审核（Falsify 轴） | 低 | 📝 待立项 |
-| F-70 | `openModelSwitch` 的 state 就地更新 + `renderChatHeader` 仍在 save try 内，二者抛错会误标「切换模型失败」并跳过列表刷新（波前既有结构；F-53 已把 refresh 移出 try，残余为保存侧） | 波3 增量审核（Falsify 轴） | 低 | 📝 待立项 |
-| F-71 | `credentialWarnReason` 对未知 `credentialsProtocol` 值 fail-open（静默保存不提示；spec 声明三态为唯一事实来源，违反不变式） | 波3 增量审核（Falsify 轴） | 低 | 📝 待立项 |
-| F-72 | `cleanupStaleInFlight` 在 `for...of` 迭代中删除 Set 元素（ECMAScript 对纯删除安全，未来并发 re-add 行为未定义，防御性注释） | 期末四轴 | 低 | 📝 待立项 |
-| F-73 | `.gg-config-warning-nav` 琥珀链接在 light 主题对比度约 3:1（< WCAG AA 4.5:1；视觉超出 F-63「中性命名」票据意图，warning 色语义合理） | 波2 增量审核（Falsify 轴） | 低 | 📝 待立项 |
+| F-74 | `settleByPosition`/`mergeFreshList` 幂等 id 比较仍严格 `===`（stream-session.js:73/173），与 W1 已归一两处不一致——string/number 跨边界时真幂等早退失效；后端 int 契约在界外 | 期末四轴 Falsify（波 2 判断复核维持） | 低 | 📝 待立项 |
+| F-75 | `String(null/undefined)` 坍缩为 `'null'`/`'undefined'` 字面量参与 id 比较（stream-session.js:72、chat.js:161）；仅字面量 id 可达，不可达 | 期末四轴 Falsify（波 2 复核） | 低 | 📝 待立项 |
+| F-76 | `#b45309` 对 `--page`(#f0ece5)=4.27:1，对 `--bg`(#f8f5ef)=4.61:1 达标但余量 0.11；当前唯一渲染语境为 `.modal`(bg=--bg)，若未来落 `--page` 面或浅底微调将跌破 AA | 期末四轴 Falsify（波 2 数据复核更正） | 低 | 📝 待立项 |
+| F-77 | warnReason 字符串联合在 `credentialWarnReason`(switch) 与 `openModelSwitch`(嵌套三元) 两处分支（possible Repeated Switches / Primitive Obsession 弱判断），'unknown' 臂后再扩态需改两处 | 期末四轴 Standards/Architecture | 低 | 📝 待立项 |
+| F-78 | 会话/消息 id 身份比较归一策略三文件分叉（error-bar String() / chat.js String()+dataset / stream-session 严格与 String() 混用），同概念三种写法 | 期末四轴 Architecture | 低 | 📝 待立项 |
+| F-79 | `locateAndHighlight` 从全后代 querySelector 改为顶层 children 遍历；当前气泡为直接子节点行为等价，未来嵌套包装则静默回落滚动到底（信息性注记） | 期末四轴 Falsify | 低（信息性） | 📝 待立项 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-08-26（技术债消费批次：F-23~F-46 全自动档 kickoff，8 做 15 关 1 跳）
+### 2026-08-27（技术债消费批次：F-64~F-73 全自动档 kickoff，8 做 2 关，4 工单 2 波）
+
+> 处置详情：8 项消费（F-66/F-67 对应 T1、F-66/F-68 对应 T2、F-69~F-72 对应 T3、F-73 对应 T4，见 TICKETS 归档）；2 项复核关闭（F-64：`regenerateLastReply` 入口已查 `tab.isStreaming`，期末审核基于过时行号误报「流式在途无守卫」，git grep 复核现状守卫已存在；F-65：settleTurn 参数面膨胀架构重构——单文件深模块内聚未越界、重构承重重生成核心链路，与 F-37/F-38/F-42 先例同族成本收益不成比例）。波 1 审核两中危 Falsify 缺陷主会话直修（F-66 类型归一 String() 比对 + F-73 dark 语境回退）。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-64 | regenerate 流式在途无互斥守卫（期末审核误报） | 期末四轴 | 中 | ❌ 复核关闭（2026-08-27：chat.js:760 入口已查 `tab.isStreaming`，守卫存在，git grep 复核现状） |
+| F-65 | settleTurn/mergeFreshList 参数面膨胀架构重构候选 | 期末四轴 | 中 | ❌ 复核关闭（2026-08-27：单文件深模块内聚未越界，重构承重重生成核心链路，与 F-37/F-38/F-42 同族成本收益不成比例） |
+| F-66 | mergeFreshList messageId===replaceId 幂等先于原位替换，新内容被吞 | 波5 增量审核 | 中 | ✅ 已修（2026-08-27：T2 顶替场景跳过幂等早退 + W1 直修 String() 类型归一，双回归测试） |
+| F-67 | renderErrorBar data-conv 选择器裸插值抛 SyntaxError | 波1 增量审核 | 低 | ✅ 已修（2026-08-27：T1 遍历 + getAttribute 精确比对，error-bar 100% 覆盖） |
+| F-68 | F-60 空回复 content==='' 短路被静默丢弃 | 波5 增量审核 | 低 | ✅ 已修（2026-08-27：T2 守卫放宽 messageId != null，stale 空回复写回/渲染） |
+| F-69 | locateAndHighlight messageId 裸插值抛 SyntaxError | 波2 增量审核 | 低 | ✅ 已修（2026-08-27：T3 遍历 + dataset.messageId 比对） |
+| F-70 | openModelSwitch state 更新未移出 save try（误标保存失败） | 波3 增量审核 | 低 | ✅ 已修（2026-08-27：T3 PUT 唯一保存 + 更新侧独立 try 记「更新失败」） |
+| F-71 | credentialWarnReason 未知 protocol fail-open | 波3 增量审核 | 低 | ✅ 已修（2026-08-27：T3 switch default fail-closed 返回 'unknown'） |
+| F-72 | cleanupStaleInFlight for...of 迭代删 Set | 期末四轴 | 低 | ✅ 已修（2026-08-27：T3 Array.from 快照迭代） |
+| F-73 | .gg-config-warning-nav light 对比度 <4.5:1 | 波2 增量审核 | 低 | ✅ 已修（2026-08-27：T4 #b45309 对 --bg 4.61:1 + W1 直修 dark 语境回退 var(--warning) 6.98:1，style-css.test.js 静态断言） |
+
+
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
@@ -88,9 +101,3 @@
 | F-61 | 重生成 re-render 不清 T2 高亮定时器（自愈） | W4 增量审核 | Worth exploring | ❌ 复核关闭（2026-08-26：定时器触发即自置 null，约 3s 自愈，零用户可见影响） |
 | F-62 | `chat.py:328-339` regenerate 重复 `except LLMError` 死代码 | 期末四轴 | Worth exploring | ✅ 已修（2026-08-26：P-02 删除不可达分支，行为零变化） |
 | F-63 | 生成器复用模拟器专属 `SEL_NAV_SETTINGS` 选择器（命名错位） | 期末四轴 | Worth exploring | ✅ 已修（2026-08-26：S-10 生成器自有 `SEL_GG_WARNING_NAV`，key-injector 侧不动） |
-
-### 2026-08-25（全量审查批次）
-
-| 编号 | 遗留项 | 来源 | 强度 | 状态 |
-|------|--------|------|------|------|
-| B2 | manifest 条目级字段不做校验（条目非 dict / 字段缺失等形态）复核维持关闭 | 2026-08-25 全量审查 | Speculative | ❌ 复核关闭（2026-08-25：系 simulator_manifest.py `_read_manifest_or_rebuild` docstring 文档化定版——损坏口径经 F-8/F-15 两次范围决策收敛，「条目级字段不做校验，范围收敛」（simulator_manifest.py:89-96）；原子写保证正常运行不产生此类损坏，需手工损坏 manifest 才触发；复核维持关闭） |
