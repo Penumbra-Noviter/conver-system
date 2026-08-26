@@ -1319,6 +1319,74 @@ describe('T6 重生成 — 末条 assistant 气泡重生成闭环', () => {
         expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="22"]')).not.toBeNull();
     });
 
+    // ── W4 增量审核 Falsify 修复回归（F-1 首 token 隔离 / F-2 stale 在途清理）──
+
+    it('F-1:流式首 token 只移除本会话 thinking（双指示器共存态不误删跨会话 A 的指示器）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: REGEN_MSGS });
+
+        let captured22 = null;
+        vi.spyOn(api, 'chatStream').mockImplementation((data, cbs) => {
+            captured22 = { data, cbs };
+            return { abort: vi.fn(), done: Promise.resolve() };
+        });
+        let resolveRegen;
+        vi.spyOn(api.conversations, 'regenerate')
+            .mockReturnValue(new Promise((r) => { resolveRegen = r; }));
+        const settleSpy = vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderMessages();
+
+        // A(11) 重生成在途 → 指示器 data-conv-id="11"
+        chat.chatDom.chatMessages.querySelector('.btn-regenerate').click();
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="11"]')).not.toBeNull();
+
+        // B(22) 流式发送 → data-conv-id="22" 指示器（A 与 B 双指示器共存 — F-59 确立的合法态）
+        tabs.openTab(22);
+        tabs.updateTab(22, { messages: [msg(1, 'user', 'B你好')] });
+        chat.chatDom.chatInput.value = 'B你好';
+        await chat.handleSend();
+        expect(captured22).not.toBeNull();
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="22"]')).not.toBeNull();
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="11"]')).not.toBeNull();
+
+        // B 首 token 到达 → 只移除 B(22) 的指示器，A(11) 的保持（W4 审核 F-1：旧实现取第一个指示器误删 A）
+        captured22.cbs.onToken('B首段');
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="22"]')).toBeNull();
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator[data-conv-id="11"]')).not.toBeNull();
+
+        resolveRegen({ reply: '新回复', message_id: 3, conversation_id: 11 });
+        await vi.waitFor(() => expect(settleSpy).toHaveBeenCalledTimes(1));
+    });
+
+    it('F-2:cleanupStaleInFlight 清除已关闭会话的 stale 在途条目（挂死请求不再永久锁发送）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        chat.chatDom.toggleStream.checked = false;
+        // 非流式请求永不结算（挂死）→ finally 永不执行 → nonStreamingInFlight 条目永驻
+        const fetchSpy = makeApiMock({ chatResult: { reply: '回复' } });
+        fetchSpy.mockImplementationOnce(async () => new Promise(() => {}));
+        api.setFetch(fetchSpy);
+        vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+
+        chat.chatDom.chatInput.value = '挂死请求';
+        const p = chat.handleSend(); // 在途（永不结算）— 不 await
+        chat.chatDom.chatInput.value = '再试';
+        await chat.handleSend();     // 守卫拦截 → 草稿保留
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(chat.chatDom.chatInput.value).toBe('再试'); // 未清空 = 未发起
+
+        // 关闭会话 tab → 重开 → stale 条目被 cleanupStaleInFlight 清除（不再拦截）
+        tabs.closeTab(11);
+        tabs.openTab(11);
+        chat.chatDom.chatInput.value = '恢复了';
+        await chat.handleSend();
+        expect(fetchSpy).toHaveBeenCalledTimes(2); // 第二次真实发起
+        expect(chat.chatDom.chatInput.value).toBe(''); // 已发起（输入被清空）
+    });
+
     // ── S-09（F-58）重生成顶替语义 ──
 
     it('F-58:settleTurn 收到被顶替旧回复身份 replaceId（发起前捕获末条 assistant id）+ 新 messageId 透传', async () => {

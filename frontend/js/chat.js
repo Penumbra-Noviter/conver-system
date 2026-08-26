@@ -38,7 +38,7 @@ import { showExportDialog } from './components/export-dialog.js';
 import { renderMarkdown } from './markdown.js';
 import { buildMessagesHtml, messageBubbleHtml } from './format.js';
 import { state } from './state.js';
-import { getActiveTab, getTab, updateTab } from './tabs.js';
+import { getActiveTab, getTab, updateTab, onTabsChanged } from './tabs.js';
 import { createStreamSession, settleTurn } from './stream-session.js';
 import { renderErrorBar } from './error-bar.js';
 import { iconHtml } from './icons.js';
@@ -110,6 +110,20 @@ export function setChatHooks(h) {
 // 只发一次真实请求，完成/失败后经 finally 清除。流式连发语义不受影响 —— 流式由
 // tab.isStreaming + StreamSession onDone 即时复位管理，本守卫只拦截非流式提交。
 const nonStreamingInFlight = new Set();
+
+/**
+ * 清除已关闭 tab 的 stale 在途条目（F-2 自愈）
+ * 在 handleSend / regenerateLastReply 入口调用，防止永不结算的请求导致
+ * nonStreamingInFlight 永久锁定该会话的发送/重生成。
+ */
+function cleanupStaleInFlight() {
+    for (const convId of nonStreamingInFlight) {
+        if (!getTab(convId)) nonStreamingInFlight.delete(convId);
+    }
+}
+// tab 关闭即清理（closeTab 触发 onTabsChanged），覆盖「挂死请求 → 关 tab → 重开」后
+// 下次发送时 getTab 已非空的场景（只靠入口自愈清不掉重开后的 stale 条目）
+onTabsChanged(cleanupStaleInFlight);
 const copyFeedbackTimers = new WeakMap();
 
 // ══════════════════════════════════════════════════
@@ -601,6 +615,7 @@ export async function handleSend() {
     // 并发双请求，违反「同对话互斥」承诺。统一在此拦截；不复用 isStreaming，避免发送按钮
     // 误变「停止」态）。流式自身在途由 tab.isStreaming 拦并发（发送按钮为「停止」态）。
     // 拒绝发生在清空输入之前，草稿保留。
+    cleanupStaleInFlight();
     if (nonStreamingInFlight.has(convId)) return;
     // 该请求是否归属当前活动 tab（DOM 增量只给活动 tab；后台只累积缓存）
     const isActiveStream = () => getActiveTab()?.conversationId === convId;
@@ -659,8 +674,9 @@ export async function handleSend() {
                             assistantContentDiv = live.querySelector('.message-content');
                             assistantCopyBtn = live.querySelector('.btn-copy-message');
                         } else {
-                            const thinking = chatDom.chatMessages.querySelector('.thinking-indicator');
-                            if (thinking) thinking.remove();
+                            // F-59 会话隔离第三路径（W4 审核 F-1）：只移除本会话的 thinking，
+                            // 不误删其他会话在途指示器（双指示器共存态由 F-59 测试确立为合法）
+                            removeThinkingIndicator(chatDom.chatMessages, convId);
 
                             chatDom.chatMessages.insertAdjacentHTML('beforeend', messageBubbleHtml('assistant', content, {
                                 streaming: true,
@@ -746,6 +762,7 @@ export async function regenerateLastReply() {
     const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
     const isActive = () => getActiveTab()?.conversationId === convId;
     // FIX-B 同源在途守卫：非流式发送 / 重生成共用 — 同一对话重复触发只发一次真实请求
+    cleanupStaleInFlight();
     if (nonStreamingInFlight.has(convId)) return;
 
     // F-58：发起前捕获被顶替旧回复（末条 assistant 消息）的服务端 id — 失败兜底按身份原位
