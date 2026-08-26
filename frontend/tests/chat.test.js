@@ -728,12 +728,12 @@ describe('T2 搜索定位 — renderMessages 高亮与定位（scrollIntoView / 
         vi.useRealTimers();
     });
 
-    it('Falsify:目标消息不存在（messageId 无匹配）→ 不崩溃、不高亮、不滚动到底', async () => {
+    it('Falsify:目标消息不存在（messageId 无匹配）→ 回落 scrollToBottom（不崩溃、不高亮、滚动到底）', async () => {
         const { chat, tabs } = await loadModules();
         const container = setupTarget({ chat, tabs });
         expect(() => chat.renderMessages({ messageId: 999 })).not.toThrow();
         expect(container.querySelectorAll('.search-highlight')).toHaveLength(0);
-        expect(container.scrollTop).not.toBe(container.scrollHeight);
+        expect(container.scrollTop).toBe(container.scrollHeight);
     });
 
     it('第二次定位清理旧定时器：旧 3s 定时器不误清除第二次定位的高亮', async () => {
