@@ -1323,6 +1323,7 @@ conver system/
 | `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->79<!--/AUTO--> | 模拟器列表 |
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
 | `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->67<!--/AUTO--> | 流式会话结算 |
+| `frontend/tests/style-css.test.js` | <!--AUTO:tests:frontend/tests/style-css.test.js-->5<!--/AUTO--> | style.css 静态契约（F-73 .gg-config-warning-nav 对比度 + dark override） |
 | `frontend/tests/tabs.test.js` | <!--AUTO:tests:frontend/tests/tabs.test.js-->68<!--/AUTO--> | tab 工作区 |
 | `frontend/tests/utils.test.js` | <!--AUTO:tests:frontend/tests/utils.test.js-->15<!--/AUTO--> | 通用工具（含 toast 队列上限，T4） |
 
