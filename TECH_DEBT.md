@@ -29,6 +29,11 @@
 | F-54 | `credentialWarnReason` 凭证确认不对称：openai 态（仅有 OpenAI key）切到 claude 模型同样不可用却无提示（none 恒提示 / claude 切非 claude 提示） | W3 增量审核 | Worth exploring | 📝 待立项 |
 | F-55 | `game-generator.js` 凭证预检 `.then` 无提交态守卫——提示可能在用户已提交生成后才注入，或显示过期「需配置」提示（竞态） | W3 增量审核 | Worth exploring | 📝 待立项 |
 | F-56 | `backend/requirements.txt` `anthropic>=0.40.0` 无上界：anthropic SDK 1.0.0 已移除 `messages.create` 的 `temperature` 参数（当前环境 0.116.0 支持，`claude.py:51/76` 传 `temperature=`），升级到 1.x 将全量破坏 claude 调用——需锁上界或适配 | T6 实现发现（T6 agent 误报为当前阻断，实测为潜在风险） | Worth exploring | 📝 待立项 |
+| F-57 | `chat.js:699-704` regenerate 在途守卫只查 `nonStreamingInFlight`，未阻断并发**流式**发送（`tab.isStreaming` 重生成期间未置位）——互斥注释「同对话互斥」对流式路径失效，构造：重生成在途 + 流式发送 → 并行双请求 | W4 增量审核 | Worth exploring | 📝 待立项 |
+| F-58 | `chat.js:721-725`+`stream-session.js:179` regenerate 成功但 `settleTurn` 重载失败时 `anchor=null` 走 append 兜底，后端已删旧回复残留本地 + 新回复追加，破坏「顶替」语义（瞬时数据不一致，切 tab 自愈） | W4 增量审核 | Worth exploring | 📝 待立项 |
+| F-59 | `chat.js:733` thinking-indicator finally 无条件移除 + `showThinkingIndicator` 不按 convId 隔离——对 A 重生成显示 thinking、切 B 发送、A 完成会移除 B 的 thinking 指示器（纯 UI 污染） | W4 增量审核 | Worth exploring | 📝 待立项 |
+| F-60 | 重生成成功 + `settleTurn` stale revision（并发外部长度变更）→ `mergeFreshList` 静默丢弃、不渲染不提示（竞态边角） | W4 增量审核 | Worth exploring | 📝 待立项 |
+| F-61 | 重生成 re-render 不清 T2 高亮定时器（`highlightTimer`/`highlightEl` 引用残留分离节点，约 3s 后 no-op；自愈于下次 locate） | W4 增量审核 | Worth exploring | 📝 待立项 |
 
 ## 技术债处置记录
 
