@@ -17,13 +17,14 @@
 
 ## 技术债候选区
 
-> 当前 3 项待立项（W1 增量审核非阻断发现）。
+> 当前 4 项待立项（W1/W2 增量审核非阻断发现）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
 | F-49 | `error-bar.js:67` `String(message)` 对可抛 `toString()` 的 message 会抛 TypeError（上游现实不可达，仅防御性） | W1 增量审核 | Speculative | 📝 待立项 |
 | F-50 | 流式多 tab 并发出错时错误条渲染到共享 `.chat-main` 区域，互相替换造成 UX 轻微误导 | W1 增量审核 | Worth exploring | 📝 待立项 |
 | F-51 | `stream-session.js:349-353` `surfaceError` 置于 `render()` 之后，render 抛错会吞掉错误条（防御缺口） | W1 增量审核 | Worth exploring | 📝 待立项 |
+| F-52 | 搜索跳转携带陈旧 messageId（目标消息已被删）时落地在对话顶部、不落 scrollToBottom（`chat.js` locateAndHighlight 无匹配早退），UX 降级且测试已锁定该行为——需产品决策降级语义 | W2 增量审核 | Worth exploring | 📝 待立项 |
 
 ## 技术债处置记录
 
