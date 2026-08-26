@@ -377,23 +377,27 @@ export function renderChatHeader(conversationId) {
  * 会话模型切换前判定凭证是否可能不可用（需要确认提示）。
  * T3 语义（spec）：凭证协议三态为唯一事实来源 — none（无任何 Key）恒提示；
  * claude（仅 Claude Key）且目标 provider 非 claude（OpenAI 兼容族）→ 提示；
- * openai 态直接保存。返回提示原因（'none' | 'claude'），无需提示返回 null。
+ * openai（仅 OpenAI 兼容 Key）且目标 provider 为 claude → 提示（F-54 对称化）；
+ * openai 态切向其他 Provider 无提示。返回提示原因（'none' | 'claude' | 'openai'），
+ * 无需提示返回 null。
  * @param {string} selectedProvider - 目标 provider key
- * @returns {'none'|'claude'|null}
+ * @returns {'none'|'claude'|'openai'|null}
  */
 function credentialWarnReason(selectedProvider) {
     if (state.credentialsProtocol === 'none') return 'none';
     if (state.credentialsProtocol === 'claude' && selectedProvider !== 'claude') return 'claude';
+    if (state.credentialsProtocol === 'openai' && selectedProvider === 'claude') return 'openai';
     return null;
 }
 
 /**
  * 对话内模型切换（T3 — .chat-model-badge 点击入口；P3 前部）：
  *   1. 打开模型选择器并预选当前 conv 的 provider/model（showModelSelector 扩展签名）
- *   2. 凭证不可用（none 恒提示 / claude 切非 claude）→ showConfirm 确认提示但允许保存
+ *   2. 凭证不可用（none 恒提示 / claude 切非 claude / openai 切 claude）→ showConfirm 确认提示但允许保存
  *   3. 确认后 conversations.update(convId, { model_provider, model_name })（PUT 已存在）
  *   4. 保存成功 → 就地更新 state.conversations（头部/列表渲染单一事实来源）+
  *      重渲染头部徽标（活动 tab 同步）+ 经注入钩子 refreshConversations 同步对话列表
+ *      （刷新失败独立记录，不影响已成功的保存 — F-53 语义分离）
  *
  * 切换只影响后续发送：在途流式由后端在请求时捕获 provider/model，天然免疫 ——
  * 本函数不触碰任何流式句柄（不 abort / 不终止），见 chat.test.js 在途流式场景。
@@ -407,14 +411,16 @@ export async function openModelSwitch(conv) {
     });
     if (!selection) return; // 用户取消
 
-    // 凭证不可用确认（none 恒提示 / claude 切非 claude）— 确认后仍允许保存
+    // 凭证不可用确认（none 恒提示 / claude 切非 claude / openai 切 claude）— 确认后仍允许保存
     const warnReason = credentialWarnReason(selection.provider);
     if (warnReason) {
         const confirmed = await showConfirm({
             title: '模型可能不可用',
             message: warnReason === 'none'
                 ? '尚未配置 API Key，发送消息可能失败。仍要切换模型吗？'
-                : '当前仅配置了 Claude Key，所选 Provider 可能不可用。仍要切换吗？',
+                : warnReason === 'openai'
+                    ? '当前仅配置了 OpenAI 兼容 Key，所选 Claude Provider 可能不可用。仍要切换吗？'
+                    : '当前仅配置了 Claude Key，所选 Provider 可能不可用。仍要切换吗？',
             detail: `目标：${selection.model}（${selection.provider}）`,
             confirmText: '仍要切换',
             cancelText: '取消',
@@ -435,10 +441,15 @@ export async function openModelSwitch(conv) {
         }
         // 同步聊天头部徽标（重渲染基于 state，活动 tab 数据同步）
         renderChatHeader(conv.id);
-        // 对话列表同步（复用注入钩子 refreshConversations — loadConversations 重渲染）
-        await hooks.refreshConversations();
     } catch (err) {
         console.error('切换模型失败:', err);
+        return; // 保存失败 → 不继续列表刷新
+    }
+    // 对话列表同步（F-53 语义分离：独立 try/catch — 刷新失败记录独立日志，不干扰已成功的保存）
+    try {
+        await hooks.refreshConversations();
+    } catch (err) {
+        console.error('刷新对话列表失败:', err);
     }
 }
 
