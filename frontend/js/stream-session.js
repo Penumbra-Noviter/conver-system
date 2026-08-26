@@ -321,6 +321,8 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
      * 普通错误(T1)不再写 `[错误]` 进消息缓存 — 经注入回调 surfaceError 上抛给
      * 聊天域渲染错误条(本模块保持零 DOM);已累积的部分内容保留为普通 assistant
      * 消息(无错误标记),无内容则仅保留已发消息。
+     * F-51 顺序契约:普通错误分支 surfaceError(err) 先于 render() 调用 —
+     * 渲染抛错(活动 tab DOM 缺陷)不吞错误条;停止路径(AbortError)不调用 surfaceError。
      * @param {Error} err - 错误对象
      */
     function onError(err) {
@@ -345,8 +347,10 @@ export function createStreamSession({ convId, getTab, updateTab, isActiveStream,
             // 已累积的部分内容保留为普通 assistant 消息(无错误标记);无内容则仅保留已发消息
             const next = fullContent ? [...settled, { role: 'assistant', content: fullContent }] : settled;
             updateTab(convId, { messages: next });
-            if (isActive()) render();
+            // F-51:surfaceError 必须先于 render — 渲染抛错(活动 tab DOM 缺陷)不应吞掉错误条。
+            // 契约锁:错误上抛回调先行,渲染异常只影响 DOM 画面,错误条保证出现。
             surfaceError(err);
+            if (isActive()) render();
         }
         // 错误/停止时也刷新按钮与对话列表(避免计数卡死)
         refreshBtn();

@@ -501,6 +501,24 @@ describe('createStreamSession — onError(错误/停止,终态守卫)', () => {
         expect(deps.refreshConversations).toHaveBeenCalledTimes(1);
     });
 
+    it('F-51 契约锁:render 抛错 → surfaceError 仍被调用(错误条不被渲染异常吞掉)', () => {
+        // 回归本源缺陷:surfaceError 位于 render 之后时,render 抛错会跳过错误条上抛。
+        // 契约:错误上抛回调先于渲染执行,渲染异常只影响 DOM 画面,不吞掉错误条。
+        // (渲染异常仍向上传播 — 那是真实的 DOM 缺陷,不应被静默吞掉。)
+        const { session, deps, tab } = makeHarness({ initial: [msg(1, 'user', 'hi')] });
+        session.onToken('部分'); // 经 seam 累积
+        deps.renderMessages.mockImplementation(() => { throw new Error('渲染段崩了'); });
+        expect(() => session.onError(new Error('模型超时'))).toThrow('渲染段崩了');
+        // surfaceError 收到错误对象(先于 render,render 抛错已不可能阻断它)
+        expect(deps.onError).toHaveBeenCalledWith(expect.objectContaining({ message: '模型超时' }));
+        // 错误仍不落消息缓存(错误条归属聊天域),部分内容保留为普通消息
+        expect(tab.messages).toEqual([
+            msg(1, 'user', 'hi'),
+            { role: 'assistant', content: '部分' },
+        ]);
+        expect(tab.phase).toBe('error');
+    });
+
     it('停止(AbortError)+ 有内容 → 保留部分内容 + stopped 标记(「已停止」语义)', () => {
         const { session, deps, tab } = makeHarness({ initial: [msg(1, 'user', 'hi')] });
         session.onToken('部分'); // 经 seam 累积
@@ -510,12 +528,16 @@ describe('createStreamSession — onError(错误/停止,终态守卫)', () => {
             msg(1, 'user', 'hi'),
             { role: 'assistant', content: '部分', stopped: true },
         ]);
+        // 停止路径不触发错误条上抛(surfaceError 不调用)
+        expect(deps.onError).not.toHaveBeenCalled();
     });
 
     it('停止(AbortError)+ 无内容 → 仅保留已发消息', () => {
-        const { session, tab } = makeHarness({ initial: [msg(1, 'user', 'hi')] });
+        const { session, deps, tab } = makeHarness({ initial: [msg(1, 'user', 'hi')] });
         session.onError(abortError());
         expect(tab.messages).toEqual([msg(1, 'user', 'hi')]);
+        // 停止路径不触发错误条上抛(surfaceError 不调用)
+        expect(deps.onError).not.toHaveBeenCalled();
     });
 
     it('终态守卫:错误帧后流关闭补发 onDone(null) → 拦截,phase 保持 error、消息列表不含错误气泡', async () => {
