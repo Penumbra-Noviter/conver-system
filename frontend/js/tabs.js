@@ -47,13 +47,26 @@ let activeId = null;
 const listeners = new Set();
 
 /**
- * updateTab 触发 onTabsChanged 的展示字段 —— 即 getTabDisplay（见下）的派生输入
- * （title / phase）。patch 含任一展示字段才可能改变 tab 条渲染，才触发通知；
- * 纯内容字段（messages/draft/scrollTop 等）patch 不触发通知 —— 流式逐 token 的
- * messages 更新不再引起 tab 条全量 innerHTML 重建（FIX-C 热路径节流）。
- * 注意：本清单与 getTabDisplay 的派生输入互为约束（双清单），改动须同步。
+ * 展示字段单一声明表（F-83）—— 键 = 展示字段（title / phase），值为对应派生取值函数。
+ * 唯一事实来源：DISPLAY_KEYS 由本表键集派生，getTabDisplay 的 title/phase 派生输入
+ * 亦取自本表 —— 通知判定键集与渲染派生输入互为约束由单一声明表保证（不再双清单手
+ * 同步：新增展示字段只改表一处，通知判定与渲染派生即同步生效）。
+ * 派生函数入参为 tab 状态（getTabs() 元素；null / undefined 容错）
  */
-const DISPLAY_KEYS = ['title', 'phase'];
+const DISPLAY_FIELDS = {
+    /** title 展示值：缺省「未命名会话」（空串 / null / undefined 时） */
+    title: (tab) => tab?.title || '未命名会话',
+    /** phase 展示值：原样透传，缺省 'idle'（未知值不抛错、不产生任何指示） */
+    phase: (tab) => tab?.phase ?? 'idle',
+};
+
+/**
+ * updateTab 触发 onTabsChanged 的展示字段键集 —— 由 DISPLAY_FIELDS 声明表派生
+ * （键集合保持 ['title', 'phase'] 不变）。patch 含任一展示字段才可能改变 tab 条渲染，
+ * 才触发通知；纯内容字段（messages/draft/scrollTop 等）patch 不触发通知 ——
+ * 流式逐 token 的 messages 更新不再引起 tab 条全量 innerHTML 重建（FIX-C 热路径节流）。
+ */
+const DISPLAY_KEYS = Object.keys(DISPLAY_FIELDS);
 
 // ══════════════════════════════════════════════════
 // 内部工具
@@ -242,15 +255,15 @@ export function getTabs() {
  *   - errored：phase 为 error（警示标记）
  *   - phase：原样透传（未知值不抛错、不产生任何指示）
  * 纯函数：不修改输入、每次返回新对象。
- * 约束：本函数派生输入（title/phase）与 DISPLAY_KEYS（updateTab 通知依据）互为
- * 双清单，改动须同步 —— patch 含任一展示字段才触发 onTabsChanged（见上）。
+ * 约束：本函数派生输入（title/phase）与 DISPLAY_KEYS（updateTab 通知依据）同源自
+ * DISPLAY_FIELDS 单一声明表 —— 新增展示字段只改表一处（见上）。
  * @param {object|null} tab - tab 对象（getTabs() 元素）；null/undefined → 缺省形态
  * @returns {{title: string, phase: string, generating: boolean, errored: boolean}}
  */
 export function getTabDisplay(tab) {
-    const phase = tab?.phase ?? 'idle';
+    const phase = DISPLAY_FIELDS.phase(tab);
     return {
-        title: tab?.title || '未命名会话',
+        title: DISPLAY_FIELDS.title(tab),
         phase,
         generating: phase === 'thinking' || phase === 'streaming',
         errored: phase === 'error',
@@ -260,7 +273,7 @@ export function getTabDisplay(tab) {
 /**
  * 浅合并 patch 到 tab 状态；对不存在的 conversationId 幂等 no-op（不抛错、不新增）。
  * conversationId 是身份键，不可经 patch 改写（静默忽略）。
- * 通知分类（FIX-C）：patch 含展示字段（DISPLAY_KEYS —— getTabDisplay 的派生输入，
+ * 通知分类（FIX-C）：patch 含展示字段（DISPLAY_KEYS —— DISPLAY_FIELDS 声明表键集，
  * 见上）才触发 onTabsChanged —— tab 条只订阅展示字段变化；纯内容 patch
  * （messages/draft/scrollTop 等）不通知，流式逐 token 的 messages 更新不触发
  * tab 条全量重渲染。一律不写 sessionStorage（见模块 docstring）。

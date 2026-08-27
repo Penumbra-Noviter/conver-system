@@ -33,6 +33,22 @@
  *     失配 → 不结算/按位置插入,消息不丢失、并发占位保持)。消息不携带流身份,
  *     位置匹配是协议边界(与 FIX-A 同源决策)
  *
+ * 停止路径时序/职责表(F-88) — 用户点「停止」的完整链路五跳,职责集中描述
+ * (调试 / 维护无需跨三文件拼读;入口在 tabs.js,中断在 api.js,分流/写回复位在本模块):
+ *   1. 入口 tabs.abortStream(convId): 无 tab / 无 activeStream 句柄 → no-op;
+ *      abort() 抛错静默忽略(连接已断开等)— tabs.js 统一守卫入口
+ *   2. api.chatStream 返回句柄的 abort() → controller.abort() → fetch(signal)
+ *      以 AbortError 中断;chatStream 内部 catch 调 onError(err)(API 层)
+ *   3. 本模块 onError 的 isAbortError 分流:停止路径与普通错误区分 — 停止路径
+ *      不调用 surfaceError(不弹错误条);普通错误经 surfaceError 上抛给聊天域
+ *      渲染错误条(F-51 / T1)
+ *   4. phase 'error' 写回(updateTab { isStreaming:false, activeStream:null,
+ *      phase:'error' }):有部分内容 → 保留为 assistant 消息 + stopped 标记
+ *      (「已停止」语义);无内容 → 仅保留已发消息
+ *   5. 复位钩子: refreshBtn(refreshSendButton 注入) / refreshList
+ *      (refreshConversations 注入) — 消除停止态到发送态的 UX 窗口,
+ *      连发依赖按钮即时复位
+ *
  * 依赖方向:stream-session.js → api.js(messages.list);chat.js → stream-session.js
  * 零 DOM:本模块不触碰 document;DOM 逻辑由 chat.js 经注入回调与 onToken 返回值驱动。
  */

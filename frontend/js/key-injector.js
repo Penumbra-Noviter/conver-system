@@ -374,21 +374,31 @@ export function injectCredentialsIntoGame({ doc, config, credentials, endpointMo
  * 凭证获取失败 → 拒绝（调用方按路径降级：按钮点击静默复位 / 自动同步保持）。
  *
  * @param {object} [params]
- * @param {Document|null} [params.doc] - 同源 iframe contentDocument
+ * @param {Document|null} [params.doc] - 同源 iframe contentDocument（未提供
+ *   getDoc 时回落的注入目标 —— 外部直接调用路径）
+ * @param {Function} [params.getDoc] - () => Document|null；惰性取用源 —— doc 在
+ *   凭证获取完成后才经此取用（F-89 写前失效守卫的执行点，见 flushObserverSync）；
+ *   提供时优先于 doc 参数
  * @param {object|null} [params.config] - manifest config 三元组
  * @param {string|null} [params.endpointMode] - manifest endpointMode
  * @returns {Promise<null|{enabled: boolean, reason: 'claude'|'none'|null,
  *   filled: string[], skipped: string[], written: string[]}>}
  *   null = 未初始化；enabled=false 时 filled/skipped/written 恒为空数组
  */
-export async function syncGameCredentials({ doc, config, endpointMode } = {}) {
+export async function syncGameCredentials({ doc, getDoc, config, endpointMode } = {}) {
     if (typeof fetchCredentials !== 'function') return null; // 未初始化 → 无操作
     const creds = await fetchCredentials();
     const state = resolveButtonState(creds);
     if (!state.enabled) {
         return { enabled: false, reason: state.reason, filled: [], skipped: [], written: [] };
     }
-    const result = injectCredentialsIntoGame({ doc, config, credentials: creds, endpointMode });
+    // F-89 写前失效校验执行点：doc 在凭证获取（含网络窗口）完成后才取用 —— 取用点
+    // 重取使宿主注入的失效守卫（observerContext === ctx，见 flushObserverSync）真正
+    // 生效：断连在途写入窗口内 observerContext 已置 null → getDoc() 返回 null →
+    // 注入全跳过 → 陈旧在途写变 no-op（written.length = 0，熔断计数不 +1）。
+    // 未提供 getDoc（外部直接调用）→ 回落 doc 参数（行为与既有契约一致）。
+    const targetDoc = typeof getDoc === 'function' ? getDoc() : doc;
+    const result = injectCredentialsIntoGame({ doc: targetDoc, config, credentials: creds, endpointMode });
     return { enabled: true, reason: null, ...result };
 }
 
@@ -502,7 +512,7 @@ async function runSync({ bar, getDoc, getConfig, getEndpointMode, feedback }) {
     }
     try {
         const result = await syncGameCredentials({
-            doc: typeof getDoc === 'function' ? getDoc() : null,
+            getDoc,
             config: typeof getConfig === 'function' ? getConfig() : null,
             endpointMode: typeof getEndpointMode === 'function' ? getEndpointMode() : null,
         });
@@ -696,6 +706,12 @@ function handleConfigMutation(mutations) {
  * 观察者防抖到期回调：取 observe 时登记的执行上下文 → 以 observer 路径
  * 自动同步（冷却判定在状态机函数调用时执行 — 防抖到期执行点，TD-76）；
  * 熔断信号（breaker: true）→ 断开观察者，终止自动再同步。
+ * F-89 断连失效守卫：getDoc 闭包以「observerContext === ctx」校验上下文仍有效 ——
+ * 同步在途（await autoSyncIntoGame 含凭证 fetch）期间 destroyFrame 断连已置
+ * observerContext = null，返回 null → 注入全跳过 → written.length = 0 → 陈旧
+ * 在途写变 no-op，同步不再置冷却、不再给共享熔断计数 syncStrikes +1（新观察者
+ * 循环的熔断起点不被污染）。与 runSync 既有「bar !== activeBar」续体守卫
+ * （视图关闭丢弃 UI 更新）同族。
  */
 async function flushObserverSync() {
     observerTimer = null;
@@ -703,7 +719,7 @@ async function flushObserverSync() {
     if (!ctx || !ctx.bar || !ctx.doc) return;
     const result = await autoSyncIntoGame({
         bar: ctx.bar,
-        getDoc: () => ctx.doc ?? null,
+        getDoc: () => (observerContext === ctx ? ctx.doc : null),
         getConfig: () => ctx.config ?? null,
         getEndpointMode: () => ctx.endpointMode ?? null,
         path: 'observer',
