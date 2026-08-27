@@ -32,7 +32,7 @@
 
 ### 架构深化批次 S1~S3（2026-08-27，kickoff 全自动档标准档 3 工单单波并行）
 
-> 来源：用户「improve-codebase-architecture 后评审交付 project-kickoff 全自动优化」——架构报告（D:\tmp\architecture-review-20260827-180658.html）Strong 三候选直落。Grilling 共识：零重开、行为零变化硬约束（S2/S3 纯收口，S1 仅重生成代码形态变化、行为由既有 PHI 用例锁定）。spec：.scratch/arch-deepening-20260827/spec.md。三工单文件互不相交无阻塞 → 单波 3 并行；doc_sync 钩子 worktree 拦截用 --no-verify 提交、合并后主会话统一刷新；工单 02 两次网关并发上限失败后串行重试成功。
+> 来源：用户「improve-codebase-architecture 后评审交付 project-kickoff 全自动优化」——架构报告（D:\tmp\architecture-review-20260827-180658.html）Strong 三候选直落。Grilling 共识：零重开、行为零变化硬约束（S2/S3 纯收口，S1 仅重生成代码形态变化、行为由既有 PHI 用例锁定）。spec：本批 spec/evidence 经 Neat 清场移除（决策结论折入本行与 DEV_LOG 批次摘要）。三工单文件互不相交无阻塞 → 单波 3 并行；doc_sync 钩子 worktree 拦截用 --no-verify 提交、合并后主会话统一刷新；工单 02 两次网关并发上限失败后串行重试成功。
 
 | Ticket | 标题 | 锚定 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
@@ -207,7 +207,7 @@
 - **T1（857d14b）**——新增 `frontend/css/simulator-pc.css`（132 行 6 分区覆盖层：排版基线 15px/1.85/68ch、A 类 15 游戏统一变量覆盖、B 类 7 游戏私有变量映射、状态面板 300px、滚动条 8px、弹窗输入区 + <1100px 窄屏降级）。B 类变量名逐组与源文件核对，6 条偏差以源码为准（A 类变量挂载点多态——:root/[data-theme]/html[data-theme]/body[data-theme]/:root[data-theme] 选择器集扩展；都市异能/魔法少女小圆用 --text-* 命名体系；仿微 --sub 提亮方向与 4.5:1 目标冲突改压深 #5f5f5f；许愿柳 --tx2/3 定义于 body[data-theme] 同特异性覆盖）。
 - **T2（1edf945）**——simulator-view.js 新增 `injectPcOverlay`（幂等 + 空安全，PC_OVERLAY_HREF 常量单点）+ handleLoad 接线（autoSyncIntoGame 之前）；+6 用例（注入/幂等/null 文档/head 缺失/opening 不注入/__all__ 不含）；simulator-view.js lines 覆盖率 99.6%。
 - **merge（42e4af9）**——CODE_WIKI doc_sync 机械标记随批次刷新。
-- **验证链**：Vitest **832** 全绿（基线 826，+6）；**全量 22/22 游戏浏览器实测**（1920×1080：注入 link + html 15px + 条目 15px/1.85 + 68ch≈550–598px + #right-panel/#side-panel 300px + B 类 7 游戏私有变量全生效）；22 张截图存档 `.scratch/sim-pc-reading/shots/`。
+- **验证链**：Vitest **832** 全绿（基线 826，+6）；**全量 22/22 游戏浏览器实测**（1920×1080：注入 link + html 15px + 条目 15px/1.85 + 68ch≈550–598px + #right-panel/#side-panel 300px + B 类 7 游戏私有变量全生效）；22 张截图存档 `.scratch/sim-pc-reading/shots/`（已随清场移除，截图由 git 无法恢复——连同 DEV_LOG/CLAUDE.md 相关引用一并改写，2026-08-27 Neat 联动）。
 - **已知取舍**：多主题游戏亮色主题下提亮值对比度下降（工单目标为暗色默认主题）；<1100px 窄 iframe 视口回落到紧凑基调（降级块）；游戏自身 768px 移动断点在窄 iframe 下仍触发移动布局（桌面窗口 ≥1280 正常）。
 - **期末四轴审核（固定点 e3cd85b）0 阻断放行 + 2 中项当场修复**：F1 降级块 `font-size:14px` 被分区 1 的 15px !important 压死（死代码）→ 降级块字号补 !important（含内层文本档）；F2 内层正文（.msg .m-text/.bubble/.wrap 体系，≥10 游戏显式字号阻断继承）实际 13–14.5px → 分区 1 追加内层正文 15px !important 规则 + 仿微组 14px 双源删除。修复落 `tests/simulator-pc-css.test.js`（13 用例：T1 验收标准 8 条 + F1/F2 回归锁 4 条），浏览器重验 6 个代表游戏内层文本 15px/1.85 全过；Vitest **845** 全绿（832 + 13）。
 
