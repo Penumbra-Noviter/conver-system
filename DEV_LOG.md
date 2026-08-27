@@ -8,6 +8,12 @@
 
 ---
 
+## 版本号升级 v0.4.0（2026-08-27 — 8 处清单，基线 3458679 → HEAD）
+
+- **版本号 0.3.0 → 0.4.0**：8 处全升（index.html/package.json/package-lock 两处/main.py/Cargo.toml/Cargo.lock/tauri.conf.json/tauri-desktop.md）。经验证零残留，构建产物/target/ 与历史调研快照 docs/ux-research.md 不动。
+
+---
+
 ## 技术债消费批次 F-80~F-81（2026-08-27 — kickoff 全自动档轻量档 1 工单，基线 7089845 → HEAD）
 
 - **来源**：用户「继续新一轮消费 kick」选择新债 F-80/F-81。Grilling 共识 **1 做 + 1 关**——F-81 复核关闭：chat.js 3 处 `state.conversations.find(c => c.id === ...)` 严格 `===` 是**会话 id 全库惯例**（chat.js:655/797、conversation-activation.js:134、app.js:218、list-views.js:317、tabs.js 全套均严格 `===`），两侧同源 JSON number（state id 经 list-views.js:308 parseInt/后端 JSON 均 number）无跨边界 string/number 风险——与会话 id 不跨 API 边界不同，消息 id 才跨（F-80 场景）。**严格比对是正确守卫**：契约一旦破裂会响亮失败暴露，改 String() 会静默掩盖真正的类型缺陷；归一目标在不改 tabs.js 层的前提下根本不可达成。

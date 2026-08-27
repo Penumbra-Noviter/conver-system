@@ -1,6 +1,6 @@
 [package]
 name = "conver-system"
-version = "0.3.0"
+version = "0.4.0"
 description = "Conver System 桌面壳（Tauri v2）：动态端口子进程 + 就绪页"
 edition = "2021"
 

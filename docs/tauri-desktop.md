@@ -25,7 +25,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 
 产物：
 
-- 安装器（仅未加 `-SkipInstaller` 时产出）：`src-tauri/target/release/bundle/nsis/Conver System_0.3.0_x64-setup.exe`（**内含后端随包资源** `dist/conver_backend`，经 `bundle.resources` 分发——安装后即可双击直启，无需 python）
+- 安装器（仅未加 `-SkipInstaller` 时产出）：`src-tauri/target/release/bundle/nsis/Conver System_0.4.0_x64-setup.exe`（**内含后端随包资源** `dist/conver_backend`，经 `bundle.resources` 分发——安装后即可双击直启，无需 python）
 - 壳 exe：`src-tauri/target/release/conver-system.exe`
 - 后端打包 exe：`dist/conver_backend/conver_backend.exe`（build-backend.ps1 产出；构建时缺失自动补齐——tauri build 的 resources 依赖它）
 
