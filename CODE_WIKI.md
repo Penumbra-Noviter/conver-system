@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2008<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->793<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1145<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2044<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->810<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1164<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -381,7 +381,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~385 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~380 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -442,7 +442,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/document_parser.py:_default_for-->`_default_for(field)`<!--/AUTO--> | 缺失字段兜底默认值 |
 | <!--AUTO:sig:backend/app/services/document_parser.py:_truncate-->`_truncate(msg, max_len)`<!--/AUTO--> | 错误消息截断 |
 
-### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~100 行<!--/AUTO-->）
+### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~109 行<!--/AUTO-->）
 
 **职责**：领域与 LLM 异常 → 标准错误响应结构（错误码/消息）单源（T-01 迁入 LLM 映射）。
 
@@ -457,7 +457,7 @@ conver system/
 
 > 无公开函数（异常类层次）。
 
-### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~193 行<!--/AUTO-->）
+### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~197 行<!--/AUTO-->）
 
 **职责**：消息读取/写入/写入（不提交）/截断/开场白自动插入/上下文构建（滑窗）/跨对话搜索。
 
@@ -468,7 +468,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/message.py:create_message_no_commit-->`create_message_no_commit(db, conversation_id, role, content)`<!--/AUTO--> | 写入消息（不提交，供事务原子性） |
 | <!--AUTO:sig:backend/app/services/message.py:delete_messages_from-->`delete_messages_from(db, conversation_id, target_id)`<!--/AUTO--> | 截断：删除 target_id 起全部消息（锚定 PK id，不提交） |
 | <!--AUTO:sig:backend/app/services/message.py:auto_insert_greeting-->`auto_insert_greeting(db, conversation_id, user_name='User')`<!--/AUTO--> | 新会话自动插入开场白 |
-| <!--AUTO:sig:backend/app/services/message.py:build_message_list-->`build_message_list(db, conversation, user_content, max_rounds=30, user_name='User')`<!--/AUTO--> | 构建 LLM 上下文（滑窗 + 模板变量） |
+| <!--AUTO:sig:backend/app/services/message.py:build_message_list-->`build_message_list(db, conversation, user_content, max_rounds=30, user_name='User', append_current_input=True)`<!--/AUTO--> | 构建 LLM 上下文（滑窗 + 模板变量） |
 | <!--AUTO:sig:backend/app/services/message.py:search_messages-->`search_messages(db, query, limit=50)`<!--/AUTO--> | 跨对话关键词搜索 |
 
 ### 4.22 `backend/app/services/model_data.py` — Provider 清单单源（<!--AUTO:lines:backend/app/services/model_data.py-->~127 行<!--/AUTO-->）
@@ -549,7 +549,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 非流式生成 |
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成 |
 
-### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~137 行<!--/AUTO-->）
+### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~150 行<!--/AUTO-->）
 
 **职责**：模板变量替换（`{{user}}`/`{{char}}`）、mes_example 解析、system prompt 组装（角色设定注入）。
 
@@ -557,7 +557,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:backend/app/services/llm/prompt.py:apply_template_vars-->`apply_template_vars(text, user_name='User', char_name='Character')`<!--/AUTO--> | 模板变量替换 |
 | <!--AUTO:sig:backend/app/services/llm/prompt.py:parse_mes_example-->`parse_mes_example(mes_example, user_name='User', char_name='Character')`<!--/AUTO--> | 对话示例解析（<START> 分隔） |
-| <!--AUTO:sig:backend/app/services/llm/prompt.py:build_messages-->`build_messages(character, history, user_content, max_rounds=30, user_name='User')`<!--/AUTO--> | 组装完整消息序列（system + 滑窗历史 + 当前） |
+| <!--AUTO:sig:backend/app/services/llm/prompt.py:build_messages-->`build_messages(character, history, user_content, max_rounds=30, user_name='User', append_current_input=True)`<!--/AUTO--> | 组装完整消息序列（system + 滑窗历史 + 当前） |
 
 ### 4.30 `backend/app/services/llm/resolver.py` — LLM 解析器（<!--AUTO:lines:backend/app/services/llm/resolver.py-->~59 行<!--/AUTO-->）
 
@@ -851,7 +851,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/icons.js:iconHtml-->`iconHtml(name, options = {})`<!--/AUTO--> | 图标 HTML 生成（名称 + 选项） |
 
-### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~613 行<!--/AUTO-->）
+### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~759 行<!--/AUTO-->）
 
 **职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，`LINK_NAV_SETTINGS` 文案由游戏生成器凭证预检复用（`SEL_NAV_SETTINGS` 自 F-63 起为模拟器专属，生成器不再借用）。
 
@@ -868,6 +868,9 @@ conver system/
 | <!--AUTO:sig:frontend/js/key-injector.js:resetSyncLoop-->`resetSyncLoop()`<!--/AUTO--> | 复位写回环状态（冷却+熔断） |
 | <!--AUTO:sig:frontend/js/key-injector.js:attachKeyInject-->`attachKeyInject(params = {})`<!--/AUTO--> | 注入按钮接线 |
 | <!--AUTO:sig:frontend/js/key-injector.js:handleKeyClick-->`handleKeyClick(e)`<!--/AUTO--> | 注入按钮点击 |
+| <!--AUTO:sig:frontend/js/key-injector.js:observeConfigControls-->`observeConfigControls(params = {})`<!--/AUTO--> | 配置控件观察（观察者生命周期收口，S3） |
+| <!--AUTO:sig:frontend/js/key-injector.js:mutationTouchesConfig-->`mutationTouchesConfig(mutations, config)`<!--/AUTO--> | 变更是否触及配置 |
+| <!--AUTO:sig:frontend/js/key-injector.js:disconnectObserver-->`disconnectObserver()`<!--/AUTO--> | 断开观察者（含在途防抖清理） |
 
 ### 4.52 `frontend/js/markdown.js` — Markdown 渲染（<!--AUTO:lines:frontend/js/markdown.js-->~203 行<!--/AUTO-->）
 
@@ -924,7 +927,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/search-view.js:performSearch-->`performSearch(query)`<!--/AUTO--> | 执行搜索 |
 | <!--AUTO:sig:frontend/js/search-view.js:renderSearchResults-->`renderSearchResults(results, query)`<!--/AUTO--> | 渲染搜索结果 |
 
-### 4.56 `frontend/js/simulator-view.js` — 模拟器运行视图（<!--AUTO:lines:frontend/js/simulator-view.js-->~505 行<!--/AUTO-->）
+### 4.56 `frontend/js/simulator-view.js` — 模拟器运行视图（<!--AUTO:lines:frontend/js/simulator-view.js-->~405 行<!--/AUTO-->）
 
 **职责**：模拟器 iframe 运行视图（U7/U8）——加载/超时/错误态、配置控件 MutationObserver 重建再同步（TD-75 attributeFilter 收窄）、load 自动同步、PC 阅读共享覆盖层 + per-game CSS 覆盖注入（T-02 决策 12：共享层先、per-game 后，数据目录 `<game-id>.css` 经 /simulators 挂载同源提供）。
 
@@ -936,11 +939,6 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:startOpening-->`startOpening(game)`<!--/AUTO--> | 开始打开流程（加载态） |
 | <!--AUTO:sig:frontend/js/simulator-view.js:handleLoad-->`handleLoad(e)`<!--/AUTO--> | iframe load 处理（自动同步） |
 | <!--AUTO:sig:frontend/js/simulator-view.js:handleTimeout-->`handleTimeout()`<!--/AUTO--> | 加载超时处理 |
-| <!--AUTO:sig:frontend/js/simulator-view.js:autoSyncAfterLoad-->`autoSyncAfterLoad()`<!--/AUTO--> | load 后自动同步 |
-| <!--AUTO:sig:frontend/js/simulator-view.js:observeConfigControls-->`observeConfigControls()`<!--/AUTO--> | 配置控件观察 |
-| <!--AUTO:sig:frontend/js/simulator-view.js:mutationTouchesConfig-->`mutationTouchesConfig(mutations, config)`<!--/AUTO--> | 变更是否触及配置 |
-| <!--AUTO:sig:frontend/js/simulator-view.js:handleConfigMutation-->`handleConfigMutation(mutations)`<!--/AUTO--> | 配置变更处理（再同步） |
-| <!--AUTO:sig:frontend/js/simulator-view.js:disconnectObserver-->`disconnectObserver()`<!--/AUTO--> | 断开观察者 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:injectPerGameCss-->`injectPerGameCss(doc)`<!--/AUTO--> | per-game CSS 覆盖注入（共享层之后） |
 | <!--AUTO:sig:frontend/js/simulator-view.js:renderShell-->`renderShell(game)`<!--/AUTO--> | 渲染运行壳 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
@@ -1266,14 +1264,14 @@ conver system/
 | `backend/tests/test_data_dir_connection.py` | <!--AUTO:tests:backend/tests/test_data_dir_connection.py-->7<!--/AUTO--> | 数据目录/DB 连接集成 |
 | `backend/tests/test_document_parser.py` | <!--AUTO:tests:backend/tests/test_document_parser.py-->15<!--/AUTO--> | 文档智能解析 |
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->40<!--/AUTO--> | 统一异常处理器 |
-| `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->12<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
+| `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->20<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
 | `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->62<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
 | `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->18<!--/AUTO--> | LLM 基类共享行为 |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
-| `backend/tests/test_prompt.py` | <!--AUTO:tests:backend/tests/test_prompt.py-->26<!--/AUTO--> | 提示词构建/模板变量 |
+| `backend/tests/test_prompt.py` | <!--AUTO:tests:backend/tests/test_prompt.py-->35<!--/AUTO--> | 提示词构建/模板变量 |
 | `backend/tests/test_provider_registry.py` | <!--AUTO:tests:backend/tests/test_provider_registry.py-->24<!--/AUTO--> | Provider 注册表 |
 | `backend/tests/test_regenerate.py` | <!--AUTO:tests:backend/tests/test_regenerate.py-->28<!--/AUTO--> | regenerate 端点（截断/事务/错误矩阵） |
 | `backend/tests/test_regenerate_spike.py` | <!--AUTO:tests:backend/tests/test_regenerate_spike.py-->22<!--/AUTO--> | regenerate truncation×滑窗边界实证（T0 spike） |
@@ -1304,7 +1302,7 @@ conver system/
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->49<!--/AUTO--> | 展示契约 |
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->29<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
-| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->70<!--/AUTO--> | Key 注入/端点口径 |
+| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->89<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
@@ -1377,10 +1375,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2008<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2044<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->793<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1145<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->810<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1164<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
