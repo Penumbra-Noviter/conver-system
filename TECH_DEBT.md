@@ -17,11 +17,18 @@
 
 ## 技术债候选区
 
-> 当前 0 项待立项（F-80/F-81 已 2026-08-27 消费并移出候选区，见处置记录；技术债候选区清零）。
+> 当前 8 项待立项（F-82~F-89：F-82~F-88 来源架构报告 2026-08-27 未选中候选；F-89 来源期末四轴 Falsify）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| — | （无待立项条目） | — | — | — |
+| F-82 | settleTurn refresh 收口（三处重复 → 注入回调统一，不碰参数面，避开 F-65 已关闭的参数面重构） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
+| F-83 | tabs.js DISPLAY_KEYS 与 getTabDisplay 双清单收敛（单一字段声明表驱动通知与展示） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
+| F-84 | chat.js 双并发守卫收敛（nonStreamingInFlight Set + tab.isStreaming 归一为 per-tab 概念；注意：chat.js:111 注释声明有意设计，立项前需实证复核） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
+| F-85 | simulator-adapt.js compareCoverage 防御归一放回调用边界（修部分失败路径传畸形数据，纯函数保持严格契约） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
+| F-86 | format.js avatarImgHtml onerror 三层转义改为事件委托/渲染后绑定（消除属性注入面） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
+| F-87 | 文档区分「去重契约模块」与「隐藏复杂度的深模块」（G1：深模块标签通胀，导航信号稀释） | 架构报告 2026-08-27 | Speculative | 📝 待立项 |
+| F-88 | 停止路径三跳导航链补时序/职责表 docstring（G2：tabs→api→stream-session 停止语义分散） | 架构报告 2026-08-27 | Speculative | 📝 待立项 |
+| F-89 | flushObserverSync await 窗口内 destroyFrame 断连后，在途同步仍写已分离 doc（窄竞态；离树写入不可见无回环自触发，无用户可见影响） | 期末四轴 Falsify | Speculative | 📝 待立项 |
 
 ## 技术债处置记录
 

@@ -30,6 +30,21 @@
 
 ## 已完成归档
 
+### 架构深化批次 S1~S3（2026-08-27，kickoff 全自动档标准档 3 工单单波并行）
+
+> 来源：用户「improve-codebase-architecture 后评审交付 project-kickoff 全自动优化」——架构报告（D:\tmp\architecture-review-20260827-180658.html）Strong 三候选直落。Grilling 共识：零重开、行为零变化硬约束（S2/S3 纯收口，S1 仅重生成代码形态变化、行为由既有 PHI 用例锁定）。spec：.scratch/arch-deepening-20260827/spec.md。三工单文件互不相交无阻塞 → 单波 3 并行；doc_sync 钩子 worktree 拦截用 --no-verify 提交、合并后主会话统一刷新；工单 02 两次网关并发上限失败后串行重试成功。
+
+| Ticket | 标题 | 锚定 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | build_messages/build_message_list 新增 append_current_input 显式路径，重生成分支退化为单行调用（PHI 剥离迁入纯函数） | S1 | 2026-08-27 | cf60935 / merge af5fc4c |
+| 02 | _LLM_ERROR_MAP 改为显式有序列表 + docstring「顺序即优先级/基类兜底」契约 | S2 | 2026-08-27 | ec44fdb / merge 958f527 |
+| 03 | 模拟器配置同步状态机边界收口：观察者生命周期（disconnectObserver/configObserver/observerTimer/mutationTouchesConfig）迁入 key-injector，simulator-view 仅留触发点 | S3 | 2026-08-27 | 0476927 / merge f947a65 |
+
+**验证链：** pytest 792→809+1skip ✅（+17）| Vitest 1145→1164 ✅（+19，S3 观察者生命周期 + key-injector 89%）| 覆盖率（本工单口径）：S1 92.08% / S2 97% / S3 两源文件 100% | 波末文件范围核验合规 | 期末四轴 1 阻断修复（CODE_WIKI doc_sync 刷新未提交态 → 补 commit 2ac2211）+ 非阻断落债 F-89 | 运行态冒烟通过（uvicorn + /api/models /docs /api/characters /api/conversations / 首页全 200）| doc_sync 零漂移
+**非阻断落债：** F-89（期末四轴 Falsify：断连与在途同步窄竞态，离树写入不可见，无用户可见影响，Speculative）
+
+---
+
 ### 技术债消费批次 F-80~F-81（2026-08-27，kickoff 全自动档轻量档 1 工单）
 
 > 来源：用户「继续新一轮消费 kick」选择新债 F-80/F-81。Grilling 共识 1 做 + 1 关（F-81 复核关闭——会话 id 全库严格 `===` 惯例（chat.js:655/797、conversation-activation.js:134、app.js:218、list-views.js:317、tabs.js 全套）、两侧同源 JSON number 无跨边界风险、严格比对是正确守卫会响亮暴露契约破裂而非被 String() 静默掩盖）。工单为纯可读性重构零行为变化；期末四轴 0 阻断放行；技术债候选区清零。

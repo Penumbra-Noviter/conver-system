@@ -8,6 +8,18 @@
 
 ---
 
+## 架构深化批次 S1~S3（2026-08-27 — kickoff 全自动档标准档 3 工单单波并行，基线 9a1385b → HEAD）
+
+- **来源**：用户「improve-codebase-architecture 后评审交付 project-kickoff 全自动优化」——架构报告 Strong 三候选直落（S1/S2/S3），W 档六候选（W1/W3/W4/W5/W6/G1/G2）落债 F-82~F-88。
+- **S1 重生成组装**：`build_messages`/`build_message_list` 新增 `append_current_input: bool = True`；False 语义在纯函数收口（不追加 user + 剥离尾随 PHI system），`assemble_chat_context` 重生成分支退化为单行 `append_current_input=False` 调用。以 `test_phi_role_trigger_is_last_user_not_phi` 为权威语义保持绿。**locality 实证**：重生成消息组装规则与普通发送同抽象层，测试直接锁纯函数契约。
+- **S2 错误映射**：`_LLM_ERROR_MAP` dict 插入序 → 显式有序列表 + docstring「顺序即优先级/基类兜底」契约，消除「基类必须排最后否则静默 502」隐式地雷。未注册子类 502 兜底矩阵测试。
+- **S3 状态机边界**：观察者生命周期（disconnectObserver/configObserver/observerTimer/mutationTouchesConfig）从 simulator-view 迁入 key-injector，参数化 { doc, config, endpointMode, bar }；view 仅留触发点（handleLoad/destroyFrame）。信任边界/白名单/观察参数不变。闭环可在单一模块读完。
+- **验证链**：pytest 792→809+1skip（+17）| Vitest 1145→1164（+19，S3 观察者生命周期 + key-injector 89% 用例）| 覆盖率本工单口径 S1 92.08%/S2 97%/S3 两源 100% | 运行态冒烟 5 端点全 200 | doc_sync 零漂移
+- **期末四轴**：1 阻断修复（CODE_WIKI doc_sync 刷新未提交态 → 补 commit 2ac2211）；非阻断落债 F-89（flushObserverSync await 窗口写已分离 doc 窄竞态，Speculative）；S3 `__all__` 15→18 轻胀 + key-injector 多职责积累为判断项非缺陷。
+- **过程遥测**：工单 02 两次网关并发上限失败（无 usage，配额问题）→ 串行重试成功；标准档单波 3 并行 + doc_sync 钩子 --no-verify 提交（预期）+ merge 后统一 doc_sync 刷新（含观察者符号 sig 归属迁移）。
+
+---
+
 ## 版本号升级 v0.4.0（2026-08-27 — 8 处清单，基线 3458679 → HEAD）
 
 - **版本号 0.3.0 → 0.4.0**：8 处全升（index.html/package.json/package-lock 两处/main.py/Cargo.toml/Cargo.lock/tauri.conf.json/tauri-desktop.md）。经验证零残留，构建产物/target/ 与历史调研快照 docs/ux-research.md 不动。
