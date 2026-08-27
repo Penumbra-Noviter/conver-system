@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2052<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->810<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1172<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->1992<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->810<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1182<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -945,7 +945,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:isValidGame-->`isValidGame(game)`<!--/AUTO--> | 游戏合法性校验 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:clearTimer-->`clearTimer()`<!--/AUTO--> | 清理超时定时器 |
 
-### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~501 行<!--/AUTO-->）
+### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~522 行<!--/AUTO-->）
 
 **职责**：模拟器列表视图（U7 + 2026-08-26 重新识别）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新、local 卡片「重新识别」按钮（data-action="reprobe" → `reprobeGame(id)` POST JSON 到 reprobe 端点 → 刷新列表 + 反馈）。
 
@@ -1318,7 +1318,7 @@ conver system/
 | `frontend/tests/simulator-manifest.test.js` | <!--AUTO:tests:frontend/tests/simulator-manifest.test.js-->19<!--/AUTO--> | manifest 解析 |
 | `frontend/tests/simulator-pc-css.test.js` | <!--AUTO:tests:frontend/tests/simulator-pc-css.test.js-->24<!--/AUTO--> | 模拟器 PC 覆盖层契约（验收标准 + F1/F2 回归锁） |
 | `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->67<!--/AUTO--> | 模拟器运行视图 |
-| `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->79<!--/AUTO--> | 模拟器列表 |
+| `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->89<!--/AUTO--> | 模拟器列表 |
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
 | `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->73<!--/AUTO--> | 流式会话结算 |
 | `frontend/tests/style-css.test.js` | <!--AUTO:tests:frontend/tests/style-css.test.js-->5<!--/AUTO--> | style.css 静态契约（F-73 .gg-config-warning-nav 对比度 + dark override） |
@@ -1375,10 +1375,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2052<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->1992<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->810<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1172<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1182<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

@@ -8,7 +8,9 @@
  *   按钮（U9-T2）经注入的 onOpenSaveManager 钩子交给存档面板模块；工具条
  *   「导入游戏」按钮（工单 04）经注入的 onImportGame 钩子交给导入模块
  *   （simulator-import.openImportFlow）。卡片「已导入」badge 与「AI 生成」badge：parseManifest
- *   透传 source 白名单字段（'imported' / 'generated'，T-02 决策 10）。游戏列表
+ *   透传 source 白名单字段（'imported' / 'generated'，T-02 决策 10）。卡片
+ *   「重新识别」按钮渲染判据由纯函数 canReprobeGame 驱动（T-01：local 恒可 /
+ *   ai+source='imported' 可 / 其余不渲染），点击走 reprobeGame 端到端流程。游戏列表
  *   缓存经 getGames() 公开读取（存档面板 getGames 钩子的数据源 — 不重复
  *   fetch manifest，G7）。
  *
@@ -53,7 +55,7 @@
  *   已退役（TD-48）：v1 数据仅兼容透传，不参与任何存档语义。
  *
  * 协议表面（__all__）：initSimulatorsView / refreshSimulators /
- *   parseManifest / filterGames / getGames / setFetch。
+ *   parseManifest / filterGames / canReprobeGame / getGames / setFetch。
  */
 
 import { iconHtml } from './icons.js';
@@ -260,6 +262,24 @@ export function filterGames(games, type) {
     return games;
 }
 
+/**
+ * 重新识别按钮渲染判据（T-01）：游戏条目是否可一键重新识别类型。
+ *
+ * 语义契约：local 条目（无论是否带 source）恒可 reprobe（行为基线不变）；
+ * ai 条目仅当 source='imported'（历史误探为 ai、经导入纠正的老条目）可
+ * reprobe；其余（内置 ai 条目 / ai+source='generated' AI 生成条目）不渲染
+ * 按钮。非对象输入 / type 缺失或非法 / source 非字符串 → false（防御不炸；
+ * parseManifest 已保证 type 合法，此分支为防御性兜底，filterGames 先例）。
+ *
+ * @param {unknown} game - 游戏条目对象（parseManifest 归一化条目）
+ * @returns {boolean} 可重新识别返回 true；否则 false
+ */
+export function canReprobeGame(game) {
+    if (game === null || typeof game !== 'object' || Array.isArray(game)) return false;
+    if (game.type === 'local') return true;
+    return game.type === 'ai' && game.source === 'imported';
+}
+
 // ══════════════════════════════════════════════════
 // 渲染（四态：loading / ready / error / empty）
 // ══════════════════════════════════════════════════
@@ -315,7 +335,7 @@ function renderList() {
                     <span class="sim-type-tag sim-type-${game.type}">${TYPE_LABELS[game.type]}</span>
                     ${game.source === 'imported' ? '<span class="sim-source-tag">已导入</span>' : ''}
                     ${game.source === 'generated' ? '<span class="sim-source-tag sim-source-generated">AI 生成</span>' : ''}
-                    ${game.type === 'local' ? `<button type="button" class="sim-reprobe-btn" data-action="reprobe" title="重新识别类型">${iconHtml('refresh', { size: 12 })} 重新识别</button>` : ''}
+                    ${canReprobeGame(game) ? `<button type="button" class="sim-reprobe-btn" data-action="reprobe" title="重新识别类型">${iconHtml('refresh', { size: 12 })} 重新识别</button>` : ''}
                 </div>
                 ${game.description ? `<p class="sim-card-desc">${escapeHtml(game.description)}</p>` : ''}
             </div>
@@ -513,7 +533,8 @@ export function getGames() {
 
 /**
  * 重新识别游戏类型：POST 到 reprobe 端点 → 更新 manifest → 刷新列表。
- * 仅 local 卡片可点击；成功刷新列表并显示成功提示，失败显示错误不销毁列表。
+ * 仅渲染了「重新识别」按钮的卡片可触发（canReprobeGame 判定为 true：local /
+ * ai+source='imported'，T-01）；成功刷新列表并显示成功提示，失败显示错误不销毁列表。
  * @param {string} id - 游戏条目 id
  */
 async function reprobeGame(id) {
@@ -544,6 +565,7 @@ export const __all__ = [
     'refreshSimulators',
     'parseManifest',
     'filterGames',
+    'canReprobeGame',
     'getGames',
     'setFetch',
 ];
