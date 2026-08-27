@@ -75,23 +75,33 @@ def domain_error_response(exc: DomainError) -> tuple[int, str]:
 
 
 # LLM 错误 → (HTTP 状态码, 用户可见消息) 映射（由 chat.py 迁入，T-01）
-_LLM_ERROR_MAP: dict[type[LLMError], tuple[int, str | None]] = {
-    LLMAuthError: (status.HTTP_401_UNAUTHORIZED, None),
-    LLMRateLimitError: (
+# 顺序契约：列表顺序即匹配优先级——llm_error_response 线性遍历，首个 isinstance
+# 命中的条目生效（S2 显式化，不再依赖 dict 插入顺序的隐式行为）。基类 LLMError
+# 置于末尾作为兜底：任何未显式注册的 LLMError 子类都会命中它 → 恒 502 + str(e)。
+_LLM_ERROR_MAP: list[tuple[type[LLMError], int, str | None]] = [
+    (LLMAuthError, status.HTTP_401_UNAUTHORIZED, None),
+    (
+        LLMRateLimitError,
         status.HTTP_429_TOO_MANY_REQUESTS,
         "API 请求频率超限，请稍后再试",
     ),
-    LLMTimeoutError: (
+    (
+        LLMTimeoutError,
         status.HTTP_504_GATEWAY_TIMEOUT,
         "API 请求超时，请检查网络后重试",
     ),
-    LLMContentFilterError: (status.HTTP_400_BAD_REQUEST, None),
-    LLMError: (status.HTTP_502_BAD_GATEWAY, None),
-}
+    (LLMContentFilterError, status.HTTP_400_BAD_REQUEST, None),
+    (LLMError, status.HTTP_502_BAD_GATEWAY, None),
+]
 
 
 def llm_error_response(e: LLMError, provider: str | None) -> tuple[int, str]:
     """将 LLMError 转为 (HTTP 状态码, 用户可见消息)
+
+    顺序契约：本函数线性遍历 `_LLM_ERROR_MAP`，**首个 isinstance 命中的条目即
+    生效（顺序即优先级）**；映射值固定消息优先于 str(e)；基类 LLMError 兜底——
+    任何未显式注册的 LLMError 子类都会命中基类条目，恒 502 + str(e)。新增 LLMError
+    子类时应在此映射表中显式声明其落点，依赖基类兜底而非巧合。
 
     映射规则：
     - LLMAuthError → 401，provider 非空时输出 "{provider} API Key 无效，请在设置中更新"，
@@ -99,7 +109,7 @@ def llm_error_response(e: LLMError, provider: str | None) -> tuple[int, str]:
     - LLMRateLimitError → 429 + 固定消息「API 请求频率超限，请稍后再试」
     - LLMTimeoutError → 504 + 固定消息「API 请求超时，请检查网络后重试」
     - LLMContentFilterError → 400 + str(e)
-    - LLMError 基类/未知子类 → 502 + str(e) 兜底
+    - LLMError 基类/未注册子类 → 502 + str(e) 兜底
 
     Args:
         e: 待映射的 LLM 异常
@@ -108,7 +118,7 @@ def llm_error_response(e: LLMError, provider: str | None) -> tuple[int, str]:
     Returns:
         (HTTP 状态码, 用户可见消息)
     """
-    for exc_type, (status_code, fixed_msg) in _LLM_ERROR_MAP.items():
+    for exc_type, status_code, fixed_msg in _LLM_ERROR_MAP:
         if isinstance(e, exc_type):
             if fixed_msg is not None:
                 return status_code, fixed_msg
