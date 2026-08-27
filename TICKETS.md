@@ -13,7 +13,7 @@
 
 ## 活跃工单
 
-> 当前 0 项待办（技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)，当前 0 项待立项——候选区清零）。
+> 当前 0 项待办（技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)，当前 1 项待立项 F-90）。
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
@@ -29,6 +29,22 @@
 ---
 
 ## 已完成归档
+
+### 技术债消费批次 F-82~F-89（2026-08-27，kickoff 全自动档小档 3 工单后台 lane）
+
+> 来源：用户「继续消费 TECH_DEBT 候选区 8 项」。Grilling 逐项实证拍板 **3 做 + 5 关**——5 关均附 git grep 复核理由：F-82 settleTurn refresh 收口边界不可行（onError 停止路径与流中断分支绕过 settleTurn，注入刷新回调即扩参数面=同 F-65 被关闭项）；F-84 双并发守卫为有意分工（流式 isStreaming+停止态 UX vs 非流式 Set+禁用态，互斥闭环无缝、关 tab 自愈防锁死，chat.js:111 注释属实）；F-85 compareCoverage 归一化唯一消费方入参恒规整、防御分支生产不可达且被测试契约锁定；F-86 avatarImgHtml 三层转义已单点化且契约锁定、无注入面；F-87 深模块标签通胀修复=大面积美容性重标无功能价值。3 做项经小档后台 lane 连续交付（同分支 kickoff/g1-g3 每工单独立 commit，规避并发上限）。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| G1 | tabs.js 展示字段单一声明表派生 DISPLAY_KEYS（消除双清单「改动须同步」约束） | F-83 | 2026-08-27 | de150c4 / merge 15ad372 |
+| G2 | stream-session 模块 docstring 补停止路径时序/职责表（tabs.abortStream→api.abort→isAbortError 分流→phase error+stopped→复位钩子，五跳） | F-88 | 2026-08-27 | 3926db9 / merge 15ad372 |
+| G3 | flushObserverSync 断连失效守卫 + syncGameCredentials getDoc 惰性取用（陈旧在途写不污染熔断计数） | F-89 | 2026-08-27 | 5a3cab5 / merge 15ad372 |
+
+**关闭：** F-82 / F-84 / F-85 / F-86 / F-87（复核成立，无代码改动，理由见 TECH_DEBT 处置记录）
+**验证链：** pytest 809+1skip ✅（零后端改动）| Vitest 1164→1165 ✅（+1：G3 断连失效守卫测试）| 波末文件范围核验合规（tabs/stream-session/key-injector+test）| 期末四轴 **0 阻断放行**（G3 偏离处方被独立判定必要且最小：工单处方「只改 getDoc 闭包」因 runSync 同步急切求值成死代码，惰性取用是正确补位）、安全红线 0 违例 | 运行态冒烟通过（uvicorn + 5 端点全 200）| doc_sync 零漂移
+**非阻断落债：** F-90（期末四轴 Architecture/Standards：syncGameCredentials doc/getDoc 双通道轻度冗余——外部直调用契约 + 观察者惰性取用刻意保留，未来可收编为 getDoc-only；CLAUDE.md 测试基线散文句手工维护不归 doc_sync 管）
+
+---
 
 ### 架构深化批次 S1~S3（2026-08-27，kickoff 全自动档标准档 3 工单单波并行）
 

@@ -8,6 +8,18 @@
 
 ---
 
+## 技术债消费批次 F-82~F-89（2026-08-27 — kickoff 全自动档小档 3 工单后台 lane，基线 0a5af97 → HEAD）
+
+- **来源**：用户「继续消费 TECH_DEBT 候选区 8 项」。Grilling 逐项实证拍板 **3 做 + 5 关**（F-82/F-84/F-85/F-86/F-87 关闭均附 git grep 复核理由：F-82 收口边界不可行——onError:414 与流中断分支绕过 settleTurn、注入刷新回调即扩参数面=同 F-65 被关闭项；F-84 双并发守卫为有意分工——流式 isStreaming+停止态 UX vs 非流式 Set+禁用态，互斥闭环无缝、关 tab 自愈防锁死，chat.js:111 注释属实；F-85 compareCoverage 唯一消费方入参恒规整、防御分支生产不可达且被 simulator-adapt.test.js:264-279 契约锁定；F-86 avatarImgHtml 三层转义已单点化（唯一 avatarImgHtml）且 format.test.js:205-241 契约锁定、无注入面；F-87 深模块标签通胀修复=10+ 文件头+两文档美容性重标无功能价值、头文件用法内部自洽）。
+- **工单 G1（F-83）**：tabs.js DISPLAY_KEYS 双清单 → 单一展示字段表 `DISPLAY_FIELDS = { title: fn, phase: fn }` 派生（`Object.keys`），getTabDisplay 改由表取、形状 `{title, phase, generating, errored}` 不变；消除「改动须同步」双清单约束。tabs.test.js 68/68（FIX-C 通知分类 5 断言 + 内容更新通知 + ARC-5 展示契约）；tabs.js 99.43% 覆盖；DISPLAY_FIELDS 保持模块私有不进 `__all__`（协议表面不变）。
+- **工单 G2（F-88）**：stream-session.js 模块 docstring 补「停止路径时序/职责表」五跳（tabs.abortStream 守卫入口 → api.chatStream.abort → fetch AbortError → isAbortError 分流（停止路径不调 surfaceError）→ phase error+stopped 写回 → refreshBtn/refreshList 复位钩子）。纯文档零逻辑改动（+16 行），先实码核对再落笔。**G2.md 第 3 跳原文笔误**「普通错误不调用 surfaceError」→ docstring 按验收权威语义订正为「停止路径不调用 surfaceError」（agent 显式声明，记入落账）。
+- **工单 G3（F-89）**：flushObserverSync 断连失效守卫 + syncGameCredentials getDoc 惰性取用。**重要偏离处方**：工单处方「只改 getDoc 闭包」单独无效——runSync 在 `await fetchCredentials()` 前**同步急切求值** `getDoc()`，取用点 observerContext===ctx 恒真、断连窗口内 doc 早已捕获、处方为死代码；红测试精确复现缺陷后补 doc 惰性取用（getDoc 优先回落 doc 参数，向后兼容 5 个直调用例全绿），守卫在正确时点生效。硬约束零触碰（disconnectObserver/resetSyncLoop/SYNC_MAX_STRIKES/冷却/防抖）。期末四轴独立判定偏离**必要、最小、不破坏验收语义**——处方是 spec 时序盲点，有效化是正确补位（与「票面建议须实证复核」惯例同族）。
+- **验证链**：pytest 809+1skip（零后端改动）| Vitest 1164→1165（+1：G3 断连失效守卫测试，含「新观察者循环熔断起点不被污染」灵敏度断言）| 波末文件范围核验合规 | 期末四轴 **0 阻断放行**、安全红线 0 违例 | 运行态冒烟通过（uvicorn + 5 端点全 200）| doc_sync 零漂移
+- **过程遥测**：小档后台 lane 三工单同分支连续 commit（规避上批 3 并行网关并发上限）；doc_sync 钩子 worktree 拦截用 --no-verify、merge 后主会话统一 doc_sync 刷新**并提交**（沿用上批阻断修复教训，未再留未提交态）。
+- **非阻断落债**：F-90（syncGameCredentials doc/getDoc 双通道轻度冗余收编评估 + CLAUDE.md 测试基线散文句手工维护注记）。
+
+---
+
 ## 架构深化批次 S1~S3（2026-08-27 — kickoff 全自动档标准档 3 工单单波并行，基线 9a1385b → HEAD）
 
 - **来源**：用户「improve-codebase-architecture 后评审交付 project-kickoff 全自动优化」——架构报告 Strong 三候选直落（S1/S2/S3），W 档六候选（W1/W3/W4/W5/W6/G1/G2）落债 F-82~F-88。

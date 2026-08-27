@@ -1,38 +1,99 @@
 # TECH_DEBT: conver system
 
-> 技术债候选池与处置记录。**本文件不是任务池**：条目不自动进入任何 session 的 preflight 认领；
-> 消费 = 显式「立项」（转入 `TICKETS.md` 活跃工单，或标记 ❌ 不立项附理由）。
-> 条目格式：编号 / 来源 / 强度 / 状态。
+> **技术债候选池**（未立项子集）与**处置记录**。本文件与 `TICKETS.md`（任务池，本项目任务文件名为 `TICKETS.md` 而非 `TO-TICKETS.md`）分离——候选不等于任务，不自动进入任何 session 的 preflight 认领；消费 = 显式「立项」（从候选区取出 → 转入 `TICKETS.md` 活跃工单，或标记 ❌ 不立项附理由）。
+> 读取契约与强度消费规则见 project-kickoff 步骤 0 预检（`AGENTS.md` §3 任务清单生命周期）。
 >
-> 本文件由 `TICKETS.md` 技术债区独立化迁移而来（2026-08-24，对齐 AGENTS.md §3 规范），
-> 原文完整保留审计追溯。注：本项目任务文件名为 `TICKETS.md`（非 TO-TICKETS.md）。
+> 本文件由 `TICKETS.md` 技术债区独立化迁移而来（2026-08-24，对齐 AGENTS.md §3 规范），原文完整保留审计追溯。
 
-## 清出机制（防膨胀）
+---
 
-1. **候选区只留开放条目**（📝 待立项 / 🔄 进行中）；条目处置后移出候选区，处置详情写入下方处置记录。
-2. **❌ 条目压缩**：具复核价值的关闭项（防 review 重复提出）保留单行摘要；其余直接删除。
-3. **处置记录滚动保留最近 2 个日期节**，更早的节整体删除——归档由 git 历史承担
-   （`git log -p -- TECH_DEBT.md`）。
-4. 清出动作绑定既有维护节点：每会话结束、commit 之前同步执行，不新增仪式。
+## 规范说明
+
+### 条目格式
+
+候选区每行对应一条技术债，含 6 个字段：
+
+| 字段 | 含义 |
+|------|------|
+| **编号** | `F-N` 递增唯一 |
+| **遗留项** | 什么问题、在哪个文件、当前影响 |
+| **来源** | 产生此条目的审核/讨论/评审（如「波 1 增量审核」「期末四轴 Architecture」） |
+| **强度** | `Strong` / `Worth exploring` / `Speculative`（见下方消费规则） |
+| **状态** | `📝 待立项` / `🔄 进行中` / `✅ 已修` / `❌ 复核关闭` |
+| **归属方向** | 此条目的业务方向（如 `前端渲染` / `流式链路` / `架构`），session 只认领匹配方向的条目 |
+
+> 注：本项目历史条目使用旧强度词汇（「中」≈ `Worth exploring`、「低」/「低（信息性）」≈ `Speculative`）；历史条目保留原词，新条目按上方三档录入。
+
+### 强度消费规则
+
+| 强度 | 消费规则 |
+|------|----------|
+| **Strong** | 必入工单清单（下一轮 kickoff 的 plan-tickets 必须包含） |
+| **Worth exploring** | 入候选由 Grilling 拍板（做/关闭），无默认方向 |
+| **Speculative** | 可关闭，关闭须「`git grep` 复核现状仍成立」一句话理由 |
+
+### 清出机制（防膨胀）
+
+1. 候选区只留开放条目（📝 待立项 / 🔄 进行中）；条目处置后整行移出候选区，处置详情写入「技术债处置记录」
+2. ❌ 关闭条目压缩：具复核价值的关闭项（防 review 重复提出的 Speculative 类）保留单行摘要于「复核关闭」表，其余直接删除
+3. 处置记录按日期分节，滚动保留最近 **2 节**（同日多批次合并计为一节）；更早归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）
+4. 清出动作绑定既有维护节点：每会话结束、commit 之前同步执行，不新增仪式
+
+### 多 session 防污染
+
+1. **任务所有权分离**：`TICKETS.md` 是唯一任务池（preflight 只读它）；本文件是候选池（只写不认领）
+2. **条目归属标注**：每条目必填「来源」与「归属方向」，session 只认领自己方向匹配的条目
+3. **消费显式化**：从候选区转工单必须带一句话理由（强度 + 方向匹配），禁止静默批量认领
+4. **写冲突隔离**：候选人落盘写本文件（评审 session 独占），任务状态变更写 `TICKETS.md`（认领 session 独占），不同 session 写不同文件，不互踩
+
+---
 
 ## 技术债候选区
 
-> 当前 8 项待立项（F-82~F-89：F-82~F-88 来源架构报告 2026-08-27 未选中候选；F-89 来源期末四轴 Falsify）。
+> 当前 1 项待立项（F-90，来源：期末四轴 Standards/Architecture 非阻断发现）。
 
-| 编号 | 遗留项 | 来源 | 强度 | 状态 |
+| 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
+|------|--------|------|------|------|----------|
+| F-90 | syncGameCredentials 同时存在 doc 参数与 getDoc 参数（双通道轻度冗余，外部直调用契约 + 观察者惰性取用刻意保留；未来若 doc 仅剩外部直调用可收编为 getDoc-only 并迁移 5 个直调用例）；另 CLAUDE.md 测试基线散文句由主会话手工维护（doc_sync 不覆盖） | 期末四轴 Architecture/Standards | Speculative | 📝 待立项 | 架构 |
+
+### 复核关闭（Speculative 类，防重复提议）
+
+| 编号 | 遗留项（压缩摘要） | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| F-82 | settleTurn refresh 收口（三处重复 → 注入回调统一，不碰参数面，避开 F-65 已关闭的参数面重构） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
-| F-83 | tabs.js DISPLAY_KEYS 与 getTabDisplay 双清单收敛（单一字段声明表驱动通知与展示） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
-| F-84 | chat.js 双并发守卫收敛（nonStreamingInFlight Set + tab.isStreaming 归一为 per-tab 概念；注意：chat.js:111 注释声明有意设计，立项前需实证复核） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
-| F-85 | simulator-adapt.js compareCoverage 防御归一放回调用边界（修部分失败路径传畸形数据，纯函数保持严格契约） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
-| F-86 | format.js avatarImgHtml onerror 三层转义改为事件委托/渲染后绑定（消除属性注入面） | 架构报告 2026-08-27 | Worth exploring | 📝 待立项 |
-| F-87 | 文档区分「去重契约模块」与「隐藏复杂度的深模块」（G1：深模块标签通胀，导航信号稀释） | 架构报告 2026-08-27 | Speculative | 📝 待立项 |
-| F-88 | 停止路径三跳导航链补时序/职责表 docstring（G2：tabs→api→stream-session 停止语义分散） | 架构报告 2026-08-27 | Speculative | 📝 待立项 |
-| F-89 | flushObserverSync await 窗口内 destroyFrame 断连后，在途同步仍写已分离 doc（窄竞态；离树写入不可见无回环自触发，无用户可见影响） | 期末四轴 Falsify | Speculative | 📝 待立项 |
+| F-25 | `error_mapping.py:117` provider 前导空格——docstring 已声明「由调用方负责」，设计意图非缺陷 | 波 1 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
+| F-27 | `test_error_mapping_export.py` 文件末尾无换行符 | 波 1 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
+| F-28 | simulator_store/manifest/import 三个文件末尾缺失换行符 | 波 2 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
+| F-32 | `simulator_import.py` `__all__` 含 read_manifest/write_manifest re-export | 波 2 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
+| F-34 | `game_generator.py:286` 函数对象身份比较（`if check is _check_security`） | 波 3 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
+| F-35 | `scan_generated_html` 被导出到 `__all__` 扩展公共 API 表面 | 波 3 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
+| F-36 | 校验失败时 scan 结果被丢弃，每次重试重新扫描 | 波 3 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
+| F-40 | game_generator `_build_suggestion` 六分支级联 | 2026-08-25 全量审查 | Speculative | ❌ 复核关闭 |
+| F-46 | 空串 token-only 流的前端占位残留（空气泡） | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-48 | Scroll handler Feature Envy，建议提取 ScrollSpy 类 | 2026-08-26 期末四轴（Architecture A6） | Speculative | ❌ 复核关闭 |
+| F-49 | `error-bar.js:67` `String(message)` 对可抛 `toString()` 的 message 会抛 TypeError | W1 增量审核 | Speculative | ❌ 复核关闭 |
+| F-75 | String(null/undefined) 坍缩字面量参与 id 比较 | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-76 | #b45309 对 --page 4.26:1 余量 0.11 | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-79 | locateAndHighlight 顶层 children 遍历注记 | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-87 | 文档区分「去重契约模块」与「深模块」标签 | 架构报告 2026-08-27 | Speculative | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
+
+### 2026-08-27（技术债消费批次：F-82~F-89 全自动档 kickoff，3 做 5 关）
+
+> 处置详情：3 项消费（F-83 对应工单 G1、F-88 对应工单 G2、F-89 对应工单 G3，见 TICKETS 归档）；5 项复核关闭——F-82 settleTurn refresh 收口边界不可行（onError/流中断路径绕过 settleTurn，注入刷新回调即扩参数面=同 F-65 被关闭项；stream-session.js:203 docstring 是对现状的诚实描述）；F-84 双并发守卫为有意分工（流式 isStreaming+停止态 UX vs 非流式 Set+禁用态，互斥闭环无缝、关 tab 自愈防锁死，chat.js:111 注释属实）；F-85 compareCoverage 归一化唯一消费方入参恒规整、防御分支生产不可达且行为被 simulator-adapt.test.js:264-279 契约锁定；F-86 avatarImgHtml 三层转义已单点化（唯一 avatarImgHtml 纯函数）且 format.test.js:205-241 契约锁定、未发现注入面，替代方案破坏纯函数契约且违反零行为变化；F-87 深模块标签通胀 git grep 复核现状成立但修复=10+ 文件头+两文档大面积美容性重标，头文件用法内部自洽（=具备 `__all__` 密封协议面））。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-82 | settleTurn refresh 收口（三处重复 → 注入回调统一） | 架构报告 2026-08-27 | Worth exploring | ❌ 复核关闭（2026-08-27：onError:414 与流中断分支绕过 settleTurn，收口留不一致契约；注入刷新回调即扩参数面=同 F-65 被关闭项，边界不可行） |
+| F-83 | tabs.js DISPLAY_KEYS 与 getTabDisplay 双清单收敛 | 架构报告 2026-08-27 | Worth exploring | ✅ 已修（2026-08-27：工单 G1 单一展示字段表派生 DISPLAY_KEYS） |
+| F-84 | chat.js 双并发守卫收敛 | 架构报告 2026-08-27 | Worth exploring | ❌ 复核关闭（2026-08-27：两守卫为有意分工——流式 isStreaming+停止态 vs 非流式 Set+禁用态，互斥闭环无缝、chat.js:111 注释属实） |
+| F-85 | compareCoverage 防御归一放回调用边界 | 架构报告 2026-08-27 | Worth exploring | ❌ 复核关闭（2026-08-27：唯一消费方入参恒规整，防御分支生产不可达且被测试契约锁定） |
+| F-86 | avatarImgHtml onerror 三层转义注入面 | 架构报告 2026-08-27 | Worth exploring | ❌ 复核关闭（2026-08-27：转义已单点化（唯一 avatarImgHtml）且格式测试契约锁定，无注入面，替代方案破坏纯函数契约） |
+| F-87 | 文档区分「去重契约模块」与「深模块」标签 | 架构报告 2026-08-27 | Speculative | ❌ 复核关闭（2026-08-27：git grep 复核现状成立，但修复=大面积美容性重标无功能价值，头文件用法内部自洽） |
+| F-88 | 停止路径三跳导航链补时序/职责表 docstring | 架构报告 2026-08-27 | Speculative | ✅ 已修（2026-08-27：工单 G2 stream-session.js 模块 docstring 补停止路径时序/职责表） |
+| F-89 | flushObserverSync await 窗口写已分离 doc 窄竞态 | 期末四轴 Falsify | Speculative | ✅ 已修（2026-08-27：工单 G3 flushObserverSync getDoc 闭包失效守卫，断连后不写不计数，+1 测试） |
 
 ### 2026-08-27（技术债消费批次：F-80~F-81 全自动档 kickoff，轻量档 1 做 1 关）
 
@@ -73,7 +134,9 @@
 | F-72 | cleanupStaleInFlight for...of 迭代删 Set | 期末四轴 | 低 | ✅ 已修（2026-08-27：T3 Array.from 快照迭代） |
 | F-73 | .gg-config-warning-nav light 对比度 <4.5:1 | 波2 增量审核 | 低 | ✅ 已修（2026-08-27：T4 #b45309 对 --bg 4.61:1 + W1 直修 dark 语境回退 var(--warning) 6.98:1，style-css.test.js 静态断言） |
 
+### 2026-08-26（增量审核 / 全量审查 / 期末四轴批次：F-23~F-63 存档）
 
+> 处置详情：F-49~F-63 消费子批（2026-08-26，全自动档 13 做 2 关，10 工单 5 波，期末四轴 0 阻断）——13 项消费（F-50/51/52/53/54/55/56/57/58/59/60/62/63 各对应 TICKETS 归档工单 01-10）；2 项复核关闭（F-49：`error-bar.js:67 String(message)` 上游唯一调用方 `chat.js:renderSendError` 恒传字符串，Speculative 不可达；F-61：highlightTimer 定时器触发即自置 null、约 3s 自愈，零用户可见影响）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
@@ -103,13 +166,6 @@
 | F-47 | `initGuideSidebarScroll` 缺 type hints（`app.js:377`） | 2026-08-26 期末四轴（Standards ST-1） | Worth exploring | ✅ 已修（2026-08-26：补 `@returns {void}` 类型标注到 JSDoc） |
 | F-48 | Scroll handler Feature Envy，建议提取 ScrollSpy 类 | 2026-08-26 期末四轴（Architecture A6） | Speculative | ❌ 复核关闭（2026-08-26：git grep 零命中 ScrollSpy，当前唯一滚动高亮逻辑在 55 行深模块内，无第二消费方 → Speculative Generality） |
 | F-45 | O2 一致性缺口：chat 流式中途出错时 DB 落库 partial content 与 UI 错误气泡不一致 | 2026-08-25 全量审查 | Worth exploring | ✅ 已修（2026-08-26：error 路径设 saved=True 阻止 finally 保存幽灵内容，测试 713 全绿） |
-
-#### F-49~F-63 消费子批（2026-08-26，全自动档 13 做 2 关，10 工单 5 波，期末四轴 0 阻断）
-
-> 处置详情：13 项消费（F-50/51/52/53/54/55/56/57/58/59/60/62/63 各对应 TICKETS 归档工单 01-10）；2 项复核关闭（F-49：`error-bar.js:67 String(message)` 上游唯一调用方 `chat.js:renderSendError` 恒传字符串，Speculative 不可达；F-61：highlightTimer 定时器触发即自置 null、约 3s 自愈，零用户可见影响）。
-
-| 编号 | 遗留项 | 来源 | 强度 | 处置 |
-|------|--------|------|------|------|
 | F-49 | `error-bar.js:67` `String(message)` 对可抛 `toString()` 的 message 会抛 TypeError | W1 增量审核 | Speculative | ❌ 复核关闭（2026-08-26：git grep 复核唯一调用方恒传字符串，上游不可达） |
 | F-50 | 流式多 tab 并发出错时错误条渲染到共享 `.chat-main` 区域互相覆盖 | W1 增量审核 | Worth exploring | ✅ 已修（2026-08-26：P-05 错误条会话隔离 `data-conv`，跨会话并存） |
 | F-51 | `surfaceError` 置于 `render()` 之后，渲染抛错吞错误条 | W1 增量审核 | Worth exploring | ✅ 已修（2026-08-26：P-03 surfaceError 前置 render） |
@@ -125,3 +181,12 @@
 | F-61 | 重生成 re-render 不清 T2 高亮定时器（自愈） | W4 增量审核 | Worth exploring | ❌ 复核关闭（2026-08-26：定时器触发即自置 null，约 3s 自愈，零用户可见影响） |
 | F-62 | `chat.py:328-339` regenerate 重复 `except LLMError` 死代码 | 期末四轴 | Worth exploring | ✅ 已修（2026-08-26：P-02 删除不可达分支，行为零变化） |
 | F-63 | 生成器复用模拟器专属 `SEL_NAV_SETTINGS` 选择器（命名错位） | 期末四轴 | Worth exploring | ✅ 已修（2026-08-26：S-10 生成器自有 `SEL_GG_WARNING_NAV`，key-injector 侧不动） |
+
+---
+
+## 处置记录说明
+
+- 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
+- ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
+- 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
+- 新条目从最大编号 +1 递增（当前最大 F-90），避免编号冲突。
