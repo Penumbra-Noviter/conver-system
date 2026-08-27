@@ -17,16 +17,24 @@
 
 ## 技术债候选区
 
-> 当前 2 项待立项（F-74~F-79 批次的期末四轴非阻断发现；原 F-74~F-79 已 2026-08-27 全量消费并移出候选区，见处置记录）。
+> 当前 0 项待立项（F-80/F-81 已 2026-08-27 消费并移出候选区，见处置记录；技术债候选区清零）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| F-80 | `stream-session.js` `String(m.id) === String(x)` 字面比较重复 4 次（isReplacementScenario/replaceIdx/幂等 some/stale findIndex），可提 `sameId(a,b)` 私有 helper 收敛 | 期末四轴 Architecture（F-74~F-79 批次） | 低 | 📝 待立项 |
-| F-81 | `chat.js:378/509/592` 等处 `state.conversations.find(c => c.id === conversationId)` 严格 `===` 残留——两侧同出自 state 源、无跨边界 string/number 风险，范围外既有写法 | 期末四轴 Architecture（F-74~F-79 批次） | 低 | 📝 待立项 |
+| — | （无待立项条目） | — | — | — |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
+
+### 2026-08-27（技术债消费批次：F-80~F-81 全自动档 kickoff，轻量档 1 做 1 关）
+
+> 处置详情：1 项消费（F-80 对应工单 01，见 TICKETS 归档）；1 项复核关闭（F-81：chat.js 3 处 `state.conversations.find(c => c.id === ...)` 严格 `===`——会话 id 全库惯例为严格 `===`（chat.js:655/797、conversation-activation.js:134、app.js:218、list-views.js:317、tabs.js 全套），两侧同源 JSON number（state id 经 parseInt/后端 JSON 均 number）无跨边界风险，严格比对是正确守卫——契约破裂会响亮失败而非被 String() 静默掩盖）。工单纯可读性重构零行为变化（Falsify 突变抽查还原 `a===b` 5 例转红证明测试敏感）。期末四轴 0 阻断放行；技术债候选区清零。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-80 | stream-session String() 字面比较重复 4×，可提 sameId helper | 期末四轴 Architecture | 低 | ✅ 已修（2026-08-27：工单提取模块私有 `sameId(a,b)` helper 替换 4 处调用点，不导出，测试零改动 73 例全绿） |
+| F-81 | chat.js 3 处 state 同源严格 === 残留 | 期末四轴 Architecture | 低 | ❌ 复核关闭（2026-08-27：会话 id 全库严格 === 惯例，两侧同源 number 无跨边界风险，严格比对是正确守卫） |
 
 ### 2026-08-27（技术债消费批次：F-74~F-79 全自动档 kickoff，2 做 3 关）
 

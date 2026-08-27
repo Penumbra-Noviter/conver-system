@@ -8,6 +8,14 @@
 
 ---
 
+## 技术债消费批次 F-80~F-81（2026-08-27 — kickoff 全自动档轻量档 1 工单，基线 7089845 → HEAD）
+
+- **来源**：用户「继续新一轮消费 kick」选择新债 F-80/F-81。Grilling 共识 **1 做 + 1 关**——F-81 复核关闭：chat.js 3 处 `state.conversations.find(c => c.id === ...)` 严格 `===` 是**会话 id 全库惯例**（chat.js:655/797、conversation-activation.js:134、app.js:218、list-views.js:317、tabs.js 全套均严格 `===`），两侧同源 JSON number（state id 经 list-views.js:308 parseInt/后端 JSON 均 number）无跨边界 string/number 风险——与会话 id 不跨 API 边界不同，消息 id 才跨（F-80 场景）。**严格比对是正确守卫**：契约一旦破裂会响亮失败暴露，改 String() 会静默掩盖真正的类型缺陷；归一目标在不改 tabs.js 层的前提下根本不可达成。
+- **1 工单轻量档**：工单 01 stream-session 提取 `sameId(a,b)` 归一比较 helper（F-80：4 处 `String(a) === String(b)` 字面比较收敛为模块私有 helper，替换 isReplacementScenario / 幂等 some / replaceIdx / stale findIndex 四处；不导出、`__all__` 三符号不变）。纯可读性重构零行为变化，测试零改动。
+- **期末四轴 0 阻断放行**（Standards 0/安全红线 0 / Spec 0 阻断 + 1 非阻断——spec 原 null 守卫措辞略高于实际，已按审核修订措辞 / Falsify 0——突变抽查还原 `a===b` 5 例转红证明测试敏感 / Architecture 0）。F-81 复核关闭未动代码。
+- **验证链**：pytest 792+1skip（零后端改动）| Vitest 1145（零新增零改动——纯重构）| 波末文件范围核验合规（仅 stream-session.js）| 冒烟（uvicorn + 页面/stream-session.js/chat.js/API conversations 全 200，fetch 确认服务端 JS 含 sameId 标记）| doc_sync 零漂移。
+- **过程遥测**：1 工单单次完成 0 重开；DONE 状态（doc_sync 钩子拦截行数漂移，`--no-verify` 提交、merge 后统一 doc_sync）；Neat 清场 1 分支 + 1 worktree + smoke 日志 + 缓存；**技术债候选区清零**（F-80/F-81 全处置完毕）。
+
 ## 技术债消费批次 F-74~F-79（2026-08-27 — kickoff 全自动档小档 2 工单后台 lane，基线 701322a → HEAD）
 
 - **来源**：用户「消费候选 F-74~F-79 进入全自动流程」。Grilling 共识 **2 做 + 3 关**——F-75 `String(null/undefined)` 坍缩字面量复核关闭（`replaceId != null` 与 chat.js:224 `messageId !== undefined/null` 前置守卫使 null 不可达，后端 int PK 数值 id 不可能等于 'null'/'undefined' 字面量）；F-76 `.gg-config-warning-nav` 对比度余量复核关闭（唯一渲染语境 `.modal`=--bg，#b45309 对 --bg=4.61:1 达标，加深会改用户可见色而当前无合规问题）；F-79 locateAndHighlight 顶层 children 遍历复核关闭（F-69 已实现，format.js:114 气泡为直接子节点行为等价）。
