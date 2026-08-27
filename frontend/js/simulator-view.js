@@ -11,9 +11,10 @@
  *   <game-id>.css 以 link 追加于共享覆盖层之后 — 同特异性后加载序胜出，
  *   按游戏微调样式；幂等空安全，缺失 CSS 的 404 由浏览器静默处理）、
  *   SIM-API-1 配置持续同步（iframe load 后自动同步主应用凭证/端点/模型 +
- *   MutationObserver 监听配置控件动态重建后再同步 — 冷却/熔断状态迁移收口
- *   在 key-injector 单一状态机，本模块只保留触发时机（load / 防抖到期）与
- *   观察者生命周期（挂载 / disconnect / destroyFrame 复位））、「返回」回列表
+ *   MutationObserver 监听配置控件动态重建后再同步 — 观察者生命周期（挂载 /
+ *   过滤 / 防抖 / 冷却 / 熔断 / 断连）已整体收口 key-injector 单一状态机，
+ *   本模块只保留触发时机（load 后 observe / destroyFrame 断连 + 复位））、
+ *   「返回」回列表
  *   （卸载 iframe；游戏存档在游戏自身 localStorage 前缀隔离保存，重进自动
  *   恢复，卸载不丢进度）。打开参数校验（非法 file → 直接 error 态，不创建
  *   iframe；file 含路径分隔符 → 拒绝 — iframe src 注入守卫，src 永远形如
@@ -25,10 +26,11 @@
  *   超时毫秒 / isValidSimulatorFile file 判据 — 模拟器域事实单一来源，
  *   本视图不持副本）/
  *   key-injector.js（U8-T2/SIM-API-1：attachKeyInject 挂按钮交互 +
- *   autoSyncIntoGame 自动同步编排 + hasConfigTriplet 三元组校验 +
- *   resetSyncLoop 写回环复位 + TEXT_RESYNC 按钮文案 — 同步/注入逻辑收口
- *   在 key-injector.js，凭证获取经 initKeyInjector 钩子由 app.js 接线；
- *   本模块只负责触发时机与观察者）；
+ *   autoSyncIntoGame 自动同步编排 + observeConfigControls 配置控件观察者
+ *   挂载 + disconnectObserver 观察者断连 + hasConfigTriplet 三元组校验 +
+ *   resetSyncLoop 写回环复位 + TEXT_RESYNC 按钮文案 — 同步/注入逻辑与
+ *   观察者生命周期全部收口在 key-injector.js，凭证获取经 initKeyInjector
+ *   钩子由 app.js 接线；本模块只负责触发时机）；
  *   app.js → simulator-view.js（initSimulatorRun 接线 + onOpenGame 接到
  *   openSimulator + 切走 simulators 视图时 closeSimulator 销毁 iframe —
  *   Grilling 共识：状态全在游戏自身 localStorage，避免后台游戏继续跑）。
@@ -48,13 +50,10 @@
  *   目标属性 value/hidden，配置控件自身 class/disabled 等运行期翻转不触发
  *   （期末评审 F1 修复 — 防良性变更累积误熔断）；宿主注入走 property 赋值
  *   与事件派发，不产生 attribute mutation — 无自触发面）。
- *   只处理触及 config 三元组 id 的变更（id 命中 / 变更子树含控件 — 游戏
- *   运行期高频 DOM 更新不触发）；防抖 500ms 合并连续重建。写回环冷却/熔断
- *   状态迁移已收口到 key-injector 单一状态机（autoSyncIntoGame 原子完成
- *   「同步执行 + 冷却判定 + 置冷却 + 观察者计数 + 熔断判定」，返回值经
- *   cooled/breaker 信号传达；冷却仅真写入 written > 0 置位，熔断达阈值
- *   后返回 breaker: true）。本模块只保留触发时机（load/
- *   防抖到期）与观察者生命周期（挂载 / disconnect / destroyFrame 复位）。
+ *   观察者生命周期（挂载 observeConfigControls / 过滤 mutationTouchesConfig /
+ *   防抖 observerTimer / 只处理触及 config 三元组 id 的变更 / 冷却·熔断状态机
+ *   / breaker 断连）已整体收口到 key-injector.js 单一模块可直接读完；
+ *   本模块仅保留触发时机（load 后 observe / destroyFrame 断连 + 复位）。
  *   冷却判定在状态机函数调用时执行（防抖到期执行点）。
  *
  * 错误检测基线（spec Implementation Decisions）：同源 404 仍触发 load 事件，
@@ -66,7 +65,7 @@
 
 import { iconHtml } from './icons.js';
 import { escapeHtml } from './utils.js';
-import { attachKeyInject, hasConfigTriplet, autoSyncIntoGame, resetSyncLoop, TEXT_RESYNC } from './key-injector.js';
+import { attachKeyInject, hasConfigTriplet, autoSyncIntoGame, resetSyncLoop, observeConfigControls, disconnectObserver, TEXT_RESYNC } from './key-injector.js';
 import { SIM_DIR, TIMEOUT_MS, isValidSimulatorFile } from './simulator-contracts.js';
 
 // ══════════════════════════════════════════════════
@@ -78,9 +77,6 @@ import { SIM_DIR, TIMEOUT_MS, isValidSimulatorFile } from './simulator-contracts
 
 /** AI 游戏提示条固定文案（spec 逐字） */
 const HINT_AI = '此游戏需自行配置 AI 接口';
-
-/** 配置控件重建观察者防抖时长（毫秒；连续重建合并为一次同步） */
-const OBSERVER_DEBOUNCE_MS = 500;
 
 // ══════════════════════════════════════════════════
 // 模块级状态（UI 实现细节 — 不属全局应用状态）
@@ -104,12 +100,6 @@ let frame = null;
 /** 超时守卫计时器（无在途超时守卫时为 null） */
 let timeoutTimer = null;
 
-/** 配置控件重建观察者（loaded 后挂游戏文档；destroyFrame 时 disconnect） */
-let configObserver = null;
-
-/** 观察者防抖计时器（无在途防抖时为 null） */
-let observerTimer = null;
-
 // ══════════════════════════════════════════════════
 // 内部工具
 // ══════════════════════════════════════════════════
@@ -122,7 +112,9 @@ function clearTimer() {
     }
 }
 
-/** 卸载 iframe 并清理计时器（幂等；close / 超时 / 重复 open 共用） */
+/** 卸载 iframe 并清理计时器（幂等；close / 超时 / 重复 open 共用）。
+ * 观察者生命周期触发点：disconnectObserver（key-injector — 观察者断连 +
+ * 在途防抖清理）+ resetSyncLoop（写回环冷却/熔断复位 — 熔断计数复位唯一触发点）。 */
 function destroyFrame() {
     clearTimer();
     disconnectObserver();
@@ -199,127 +191,17 @@ function injectPerGameCss(doc) {
 }
 
 // ══════════════════════════════════════════════════
-// 配置控件持续同步（SIM-API-1 — MutationObserver + 防抖 + 冷却）
+// 配置控件持续同步（SIM-API-1 — 观察者生命周期收口 key-injector）
 // ══════════════════════════════════════════════════
-
-/**
- * 断开配置控件观察者 + 清理防抖计时器（幂等；destroyFrame / 重新 observe /
- * closeSimulator 共用）。
- */
-function disconnectObserver() {
-    if (configObserver) {
-        configObserver.disconnect();
-        configObserver = null;
-    }
-    if (observerTimer) {
-        clearTimeout(observerTimer);
-        observerTimer = null;
-    }
-}
-
-/**
- * 变更是否触及 config 三元组控件（SIM-API-1 观察者过滤 — 游戏运行期高频
- * DOM 更新（状态渲染等）不得触发同步；只有 id 命中或变更子树含控件才算）。
- * 语义：目标元素自身 id ∈ 三元组（childList 与 attributes 变更共用判定 —
- * 期末评审去重）；或 childList 新增/移除子树内任一元素 id ∈ 三元组（游戏
- * 整段重建配置面板时命中；子树元素遍历用 id 成员判定，无选择器转义面）。
- * attributes 变更（TD-75 — 游戏以 setAttribute 重建控件）仅目标元素自身
- * 判定；运行期无关属性变更（class/style 等）由 observe 的 attributeFilter
- * 先行拦截（期末评审 F1 修复 — 只监听 value/hidden 票面目标属性）。
- * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
- * @param {object|null} config - manifest config 三元组（endpoint/apikey/model）
- * @returns {boolean} 任一变更触及配置控件为 true
- */
-function mutationTouchesConfig(mutations, config) {
-    const ids = [config?.endpoint, config?.apikey, config?.model]
-        .filter((v) => typeof v === 'string' && v !== '');
-    if (ids.length === 0) return false;
-    for (const m of mutations ?? []) {
-        if (typeof m?.target?.id === 'string' && ids.includes(m.target.id)) return true;
-        if (m?.type === 'attributes') continue; // 属性变更仅目标自身判定（上）
-        const nodes = [...(m?.addedNodes ?? [])];
-        if (m?.removedNodes?.length) nodes.push(...m.removedNodes);
-        for (const node of nodes) {
-            if (node?.nodeType !== 1) continue;
-            if (ids.includes(node.id)) return true;
-            for (const el of node.querySelectorAll?.('*') ?? []) {
-                if (ids.includes(el.id)) return true;
-            }
-        }
-    }
-    return false;
-}
-
-/**
- * 观察者回调：变更触及配置控件 → 防抖 500ms → 自动同步（观察者路径）。
- * 冷却/熔断判定已收口到 key-injector 状态机，本模块只消费返回值
- * breaker 信号决定观察者断连。
- * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
- */
-function handleConfigMutation(mutations) {
-    if (state !== 'loaded' || !frame) return;
-    if (!mutationTouchesConfig(mutations, currentGame?.config)) return;
-    if (observerTimer) clearTimeout(observerTimer);
-    observerTimer = setTimeout(async () => {
-        observerTimer = null;
-        if (state !== 'loaded' || !frame) return;
-        const result = await autoSyncAfterLoad();
-        // 熔断判定在状态机内完成，本模块仅消费 breaker 信号决定观察者生命周期
-        if (result?.breaker === true) disconnectObserver(); // 熔断：断开观察者，终止自动再同步
-    }, OBSERVER_DEBOUNCE_MS);
-}
-
-/**
- * 对 loaded 游戏文档挂配置控件观察者（幂等：先 disconnect 再挂）。
- * 仅 ai + 完整 config 三元组的游戏观察；contentDocument 不可用（测试
- * 空文档等）→ no-op 不抛错。
- */
-function observeConfigControls() {
-    disconnectObserver();
-    if (state !== 'loaded' || !frame?.contentDocument) return;
-    const game = currentGame;
-    if (!game || game.type !== 'ai' || !hasConfigTriplet(game.config)) return;
-    const doc = frame.contentDocument;
-    if (!doc.body || typeof doc.body.addEventListener !== 'function') return;
-    configObserver = new MutationObserver(handleConfigMutation);
-    // TD-75：childList（结构重建）+ attributes（setAttribute 重建 — 属性变更
-    // 路径）。写回环安全前提：宿主注入用 property 赋值（el.value = value）
-    // 与事件派发，不产生 attribute mutation — attributes 监听不新增自触发
-    // 面；attributeFilter 收窄到票面目标属性（value/hidden，期末评审 F1
-    // 修复 — 配置控件自身 class/disabled 等运行期翻转不触发同步，防良性
-    // 变更累积误熔断）；mutationTouchesConfig 的 id 过滤兜底
-    configObserver.observe(doc.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['value', 'hidden'],
-    });
-}
-
-/**
- * 自动同步入口（SIM-API-1）：观察者防抖到期后调用，以 observer 路径同步。
- *
- * 冷却/熔断判定已收口到 key-injector 状态机，本函数仅负责触发时机与
- * 观察者生命周期（熔断后 disconnectObserver）。返回同步结果供调用方
- * 消费（breaker 信号决定观察者断连）。
- * 仅 ai + 完整三元组执行；bar 缺失 / 视图已关闭 → 返回 undefined 不抛错。
- * @returns {Promise<object|undefined>} autoSyncIntoGame 结果（含 cooled/breaker；
- *   bar 缺失等早退路径返回 undefined）
- */
-async function autoSyncAfterLoad() {
-    if (state !== 'loaded' || !frame) return undefined;
-    const game = currentGame;
-    if (!game || game.type !== 'ai' || !hasConfigTriplet(game.config)) return undefined;
-    const bar = runPanel?.querySelector('.sim-key-bar');
-    if (!bar) return undefined;
-    return autoSyncIntoGame({
-        bar,
-        getDoc: () => frame?.contentDocument ?? null,
-        getConfig: () => currentGame?.config ?? null,
-        getEndpointMode: () => currentGame?.endpointMode ?? null,
-        path: 'observer',
-    });
-}
+// 观察→过滤→防抖→同步→冷却→熔断→断连闭环已整体收口到 key-injector.js
+// 单一状态机（observeConfigControls 挂载 / mutationTouchesConfig 过滤 /
+// observerTimer 防抖 / autoSyncIntoGame 冷却·熔断 / breaker 断连）。
+// 本模块仅保留两个触发点：
+//   - handleLoad：loaded 后调 observeConfigControls（参数化传 doc / config /
+//     endpointMode / bar — 观察参数白名单 childList + subtree + attributes +
+//     attributeFilter ['value','hidden'] 不变）；
+//   - destroyFrame：disconnectObserver（观察者断连 + 在途防抖清理）+
+//     resetSyncLoop（写回环冷却/熔断复位）。
 
 /**
  * 打开参数校验：game 须为对象且 file 字段通过安全判据（iframe src 注入
@@ -450,7 +332,17 @@ function handleLoad(e) {
         getConfig: () => currentGame?.config ?? null,
         getEndpointMode: () => currentGame?.endpointMode ?? null,
     });
-    observeConfigControls();
+    // 观察者触发点：配置控件重建后持续同步（观察→过滤→防抖→同步→冷却→
+    // 熔断→断连闭环在 key-injector 单一模块；仅 ai + 完整三元组游戏有 bar，
+    // observe 内部再校验三元组完整性与 doc/body 可用性）
+    if (currentGame?.type === 'ai') {
+        observeConfigControls({
+            doc: frame?.contentDocument ?? null,
+            config: currentGame?.config ?? null,
+            endpointMode: currentGame?.endpointMode ?? null,
+            bar: runPanel?.querySelector('.sim-key-bar') ?? null,
+        });
+    }
 }
 
 /** 超时守卫到期（TIMEOUT_MS 内未收到 load）→ error（卸载 iframe，展示重试/返回）。
