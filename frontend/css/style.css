@@ -3714,6 +3714,12 @@ select {
     overflow: hidden;
 }
 
+/* 无简介的导入/AI 生成卡片占位简介（2026-08-28 — 淡色次级区分真实简介） */
+.sim-card-desc-placeholder {
+    color: var(--ink-4);
+    font-style: italic;
+}
+
 .sim-error {
     display: flex;
     flex-direction: column;
@@ -3945,7 +3951,8 @@ select {
    面板显隐走 hidden 属性 — 本元素设 display:flex 会覆盖 UA [hidden] 规则，
    必须补 #simulator-save-panel[hidden] 显式隐藏；样式全走主题 token。
    ══════════════════════════════════════════════════ */
-.sim-save-manage-btn {
+.sim-save-manage-btn,
+.sim-reprobe-all-btn {
     padding: 5px 12px;
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
@@ -3959,7 +3966,8 @@ select {
     white-space: nowrap;
 }
 
-.sim-save-manage-btn:hover {
+.sim-save-manage-btn:hover,
+.sim-reprobe-all-btn:hover {
     border-color: var(--border-strong);
     color: var(--ink-2);
 }

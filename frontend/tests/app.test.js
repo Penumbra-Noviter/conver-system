@@ -31,6 +31,9 @@
  * 注意：app.js 模块求值即触发 init()（浮空 promise）—— 以 fetch 调用数等待其完成。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+/** 测试环境同源（jsdom）—— CORS 修复后注入的 endpoint 为同源反代地址 */
+const PROXY_ORIGIN = typeof location !== 'undefined' ? location.origin : 'http://localhost';
+
 
 /** 最小 DOM 子集 — 覆盖 app.js / chat.js / search-view.js / settings-panel.js /
  * tab-bar.js 在模块求值期绑定的全部 id/class 契约（只读契约，取自 index.html） */
@@ -548,7 +551,7 @@ describe('app.js 模拟器 Key 注入接线 — initKeyInjector（U8-T2）', () 
         await vi.waitFor(() => {
             expect(doc.getElementById('cfg-apikey').value).toBe('sk-app-openai');
         });
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1`);
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
         expect(document.querySelector('.sim-key-btn').textContent).toBe('已填入');
         // 凭证请求确经 api.js seam 发往端点（initKeyInjector 接线 settings.credentials）

@@ -49,6 +49,10 @@ const CRED_OPENAI = { key: 'sk-smoke-openai', endpoint: 'https://api.example.com
 const CRED_CLAUDE = { key: '', endpoint: '', model: '', protocol: 'claude' };
 const CRED_NONE = { key: '', endpoint: '', model: '', protocol: 'none' };
 
+/** 测试环境同源（jsdom）—— CORS 修复后注入的 endpoint 为同源反代地址
+ * （toProxyEndpoint 内部取 location.origin，测试与其保持一致） */
+const PROXY_ORIGIN = typeof location !== 'undefined' ? location.origin : 'http://localhost';
+
 /** 游戏配置面板 DOM id 三元组（manifest config 契约） */
 const CONFIG = { endpoint: 'cfg-endpoint', apikey: 'cfg-apikey', model: 'cfg-model' };
 
@@ -143,7 +147,7 @@ describe('key-injector — 协议表面 __all__ 与模块私有性', () => {
             'disconnectObserver', 'hasConfigTriplet', 'initKeyInjector',
             'injectCredentialsIntoGame', 'mutationTouchesConfig',
             'observeConfigControls', 'resetSyncLoop',
-            'resolveButtonState', 'syncGameCredentials',
+            'resolveButtonState', 'syncGameCredentials', 'toProxyEndpoint',
         ]);
     });
 
@@ -275,6 +279,53 @@ describe('key-injector — convertEndpoint 端点口径转换（SIM-API-1）', (
     });
 });
 
+describe('key-injector — toProxyEndpoint 同源反代改写（CORS 修复）', () => {
+    it('保留真实 base 路径段作为反代子路径', async () => {
+        const { toProxyEndpoint } = await loadInjector();
+        expect(toProxyEndpoint('https://yunshuzhilian.asia/v1', 'http://127.0.0.1:59189'))
+            .toBe('http://127.0.0.1:59189/api/simulators/proxy/v1');
+    });
+
+    it('无路径 base → 反代地址无子路径', async () => {
+        const { toProxyEndpoint } = await loadInjector();
+        expect(toProxyEndpoint('https://api.deepseek.com', 'http://127.0.0.1:59189'))
+            .toBe('http://127.0.0.1:59189/api/simulators/proxy');
+    });
+
+    it('完整 chat/completions 地址 → 路径段保留 /v1/chat/completions', async () => {
+        const { toProxyEndpoint } = await loadInjector();
+        expect(toProxyEndpoint('https://host/v1/chat/completions', 'http://localhost'))
+            .toBe('http://localhost/api/simulators/proxy/v1/chat/completions');
+    });
+
+    it('尾斜杠归一（/v1/ → /v1）', async () => {
+        const { toProxyEndpoint } = await loadInjector();
+        expect(toProxyEndpoint('https://host/v1/', 'http://localhost'))
+            .toBe('http://localhost/api/simulators/proxy/v1');
+    });
+
+    it('非字符串 / 空值 → 原样返回', async () => {
+        const { toProxyEndpoint } = await loadInjector();
+        expect(toProxyEndpoint('', 'http://localhost')).toBe('');
+        expect(toProxyEndpoint(null, 'http://localhost')).toBeNull();
+        expect(toProxyEndpoint(undefined, 'http://localhost')).toBeUndefined();
+        expect(toProxyEndpoint(42, 'http://localhost')).toBe(42);
+    });
+
+    it('注入 core：真实 base 经 toProxyEndpoint + convertEndpoint full 得到完整反代地址', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makePanelDoc();
+        injectCredentialsIntoGame({
+            doc,
+            config: CONFIG,
+            credentials: { ...CRED_OPENAI, endpoint: 'https://yunshuzhilian.asia/v1' },
+            endpointMode: 'full',
+        });
+        expect(doc.getElementById('cfg-endpoint').value)
+            .toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
+    });
+});
+
 describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () => {
     it('openai 凭证 → 三控件填值（apikey←key；endpoint/model 同名）且各自收到 input 与 change', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
@@ -289,7 +340,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         const result = injectCredentialsIntoGame({ doc, config: CONFIG, credentials: CRED_OPENAI });
 
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1`);
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
         expect(seen['cfg-apikey']).toEqual(['input', 'change']);
         expect(seen['cfg-endpoint']).toEqual(['input', 'change']);
@@ -302,7 +353,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         const doc = makePanelDoc();
         const result = injectCredentialsIntoGame({ doc, config: CONFIG, credentials: CRED_OPENAI, endpointMode: 'full' });
 
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
         expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
@@ -318,7 +369,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
             endpointMode: 'base',
         });
 
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1`);
     });
 
     it('endpoint/model 为空 → 跳过该字段保持游戏默认（spec：不覆盖游戏默认），key 仍注入', async () => {
@@ -376,7 +427,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         });
 
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1`);
         expect(modelEl.value).toBe('deepseek-r1'); // 受管 option 已选中
         const optValues = [...modelEl.options].map((o) => o.value);
         expect(optValues).toContain('deepseek-r1'); // 受管 option 已在选项集
@@ -511,7 +562,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         };
         const result = injectCredentialsIntoGame({ doc, config, credentials: CRED_OPENAI, endpointMode: 'full' });
 
-        expect(doc.getElementById('wz-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('wz-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
         expect(doc.getElementById('wz-key').value).toBe('sk-smoke-openai');
         expect(doc.getElementById('wz-model').value).toBe('gpt-4o-mini');
         expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
@@ -534,7 +585,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
         };
         const result = injectCredentialsIntoGame({ doc, config, credentials: CRED_OPENAI });
 
-        expect(doc.getElementById('s-endpoint').value).toBe('https://api.example.com/v1'); // 首选族被写
+        expect(doc.getElementById('s-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1`); // 首选族被写
         expect(doc.getElementById('s-key').value).toBe('sk-smoke-openai');
         expect(doc.getElementById('s-model').value).toBe('gpt-4o-mini');
         expect(doc.getElementById('wz-endpoint').value).toBe('wz-default'); // 候选族不动
@@ -564,7 +615,7 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
             credentials: CRED_OPENAI,
         });
         expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1`);
     });
 });
 
@@ -890,7 +941,7 @@ describe('key-injector — autoSyncIntoGame 自动同步（SIM-API-1）', () => 
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1`);
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
         expect(btn.textContent).toBe('重新同步'); // 静默：不闪「已填入」
         expect(btn.disabled).toBe(false);
@@ -906,7 +957,7 @@ describe('key-injector — autoSyncIntoGame 自动同步（SIM-API-1）', () => 
 
         await mod.autoSyncIntoGame({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => 'full' });
 
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
     });
 
     it('claude → 自动禁用按钮条 + 文案「游戏仅支持 OpenAI 兼容 Key」（不注入游戏）', async () => {
@@ -1354,7 +1405,7 @@ describe('key-injector — 配置控件观察者生命周期（S3 — 观察→�
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1`);
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
     });
 
@@ -1366,7 +1417,7 @@ describe('key-injector — 配置控件观察者生命周期（S3 — 观察→�
         await vi.advanceTimersByTimeAsync(0);
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
     });
 
     it('防抖（observerTimer）：500ms 窗口内连续重建合并为一次同步', async () => {
@@ -1617,7 +1668,7 @@ describe('key-injector — 配置控件观察者生命周期（S3 — 观察→�
         await vi.advanceTimersByTimeAsync(0); // 同步微任务
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(doc.getElementById('wz-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('wz-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
         expect(doc.getElementById('wz-key').value).toBe('sk-smoke-openai');
         expect(doc.getElementById('wz-model').value).toBe('gpt-4o-mini');
     });

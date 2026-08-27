@@ -676,26 +676,25 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
         expect(openSpy).not.toHaveBeenCalled();
     });
 
-    it('local 卡片渲染「重新识别」按钮，ai 卡片不渲染（DOM 契约锁定：class/data-action/title/文案）', async () => {
+    it('卡片不再渲染 per-card 重新识别按钮；工具栏渲染全量「重新识别」按钮（DOM 契约）', async () => {
         const { sim, panel } = await loadModules();
         sim.setFetch(makeFetch({ result: mockManifest(MANIFEST_OK) }));
         sim.initSimulatorsView({ container: panel });
         await sim.refreshSimulators();
 
-        const localCard = panel.querySelector('.sim-card[data-id="spider-shadow"]');
-        const reprobeBtn = localCard.querySelector('.sim-reprobe-btn');
-        expect(reprobeBtn).not.toBeNull();
-        expect(reprobeBtn.textContent).toContain('重新识别');
-        // DOM 契约（T-01 锁定，不随渲染条件重构改变）：data-action / title 是
-        // 事件委托与用户提示的载重字段
-        expect(reprobeBtn.getAttribute('data-action')).toBe('reprobe');
-        expect(reprobeBtn.getAttribute('title')).toBe('重新识别类型');
-
-        const aiCard = panel.querySelector('.sim-card[data-id="life-sim"]');
-        expect(aiCard.querySelector('.sim-reprobe-btn')).toBeNull();
+        // UI 修复（2026-08-28）：重新识别收口为工具栏全量操作，卡片一律不渲染按钮
+        panel.querySelectorAll('.sim-card').forEach((card) => {
+            expect(card.querySelector('.sim-reprobe-btn')).toBeNull();
+        });
+        // 工具栏全量「重新识别」按钮（DOM 契约：class/data-action/title/文案）
+        const allBtn = panel.querySelector('.sim-reprobe-all-btn');
+        expect(allBtn).not.toBeNull();
+        expect(allBtn.textContent).toContain('重新识别');
+        expect(allBtn.getAttribute('data-action')).toBe('reprobe-all');
+        expect(allBtn.getAttribute('title')).toBe('重新识别所有本地导入的模拟器');
     });
 
-    it('T-01 渲染契约：ai+imported 卡片渲染「重新识别」按钮；ai+generated / 内置 ai 卡片不渲染；local 含 source 亦渲染', async () => {
+    it('T-01 渲染契约调整（2026-08-28）：任何卡片均不渲染 per-card 重新识别按钮（全量操作收口工具栏）', async () => {
         const { sim, panel } = await loadModules();
         const data = {
             version: 2,
@@ -710,13 +709,43 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
         sim.initSimulatorsView({ container: panel });
         await sim.refreshSimulators();
 
-        expect(panel.querySelector('.sim-card[data-id="built-in-ai"] .sim-reprobe-btn')).toBeNull();
-        expect(panel.querySelector('.sim-card[data-id="imported-ai"] .sim-reprobe-btn')).not.toBeNull();
-        expect(panel.querySelector('.sim-card[data-id="generated-ai"] .sim-reprobe-btn')).toBeNull();
-        expect(panel.querySelector('.sim-card[data-id="local-imported"] .sim-reprobe-btn')).not.toBeNull();
+        // 内置 / imported / generated / local 一律不渲染 per-card 按钮
+        panel.querySelectorAll('.sim-card').forEach((card) => {
+            expect(card.querySelector('.sim-reprobe-btn')).toBeNull();
+        });
+        // canReprobeGame 判定逻辑仍导出（供全量按钮筛选），此处不直接依赖渲染
+        expect(sim.canReprobeGame({ type: 'local' })).toBe(true);
     });
 
-    it('点击「重新识别」→ POST reprobe 端点 → 刷新列表', async () => {
+    it('无简介的导入/AI 生成卡片渲染占位简介（消除空白违和）；有简介渲染真实简介', async () => {
+        const { sim, panel } = await loadModules();
+        const data = {
+            version: 2,
+            simulators: [
+                { id: 'with-desc', file: 'a.html', name: '有简介', type: 'ai', description: 'AI 驱动的示例' },
+                { id: 'no-desc-imported', file: 'b.html', name: '导入无简介', type: 'ai', source: 'imported' },
+                { id: 'no-desc-generated', file: 'c.html', name: '生成无简介', type: 'ai', source: 'generated' },
+                { id: 'no-desc-builtin', file: 'd.html', name: '内置缺简介', type: 'local' },
+            ],
+        };
+        sim.setFetch(makeFetch({ result: mockManifest(data) }));
+        sim.initSimulatorsView({ container: panel });
+        await sim.refreshSimulators();
+
+        const desc = (id) => panel.querySelector(`.sim-card[data-id="${id}"] .sim-card-desc`);
+        // 有简介 → 真实简介，无占位样式
+        expect(desc('with-desc').textContent).toBe('AI 驱动的示例');
+        expect(desc('with-desc').classList.contains('sim-card-desc-placeholder')).toBe(false);
+        // 导入无简介 → 占位「本地导入的模拟器」
+        expect(desc('no-desc-imported').textContent).toBe('本地导入的模拟器');
+        expect(desc('no-desc-imported').classList.contains('sim-card-desc-placeholder')).toBe(true);
+        // AI 生成无简介 → 占位「AI 生成的模拟器」
+        expect(desc('no-desc-generated').textContent).toBe('AI 生成的模拟器');
+        // 内置 local 缺简介 → 不渲染简介（非导入/生成源）
+        expect(desc('no-desc-builtin')).toBeNull();
+    });
+
+    it('点击工具栏「重新识别」→ 对可 reprobe 条目 POST 端点 → 刷新列表', async () => {
         const { sim, panel } = await loadModules();
         // 路由 fetch：manifest 请求返回正常，reprobe 请求返回成功
         const fetchSpy = vi.fn(async (url, opts) => {
@@ -733,22 +762,19 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
         sim.initSimulatorsView({ container: panel });
         await sim.refreshSimulators();
 
-        // 初始 local 卡片有重新识别按钮
-        const localCard = panel.querySelector('.sim-card[data-id="spider-shadow"]');
-        expect(localCard.querySelector('.sim-reprobe-btn')).not.toBeNull();
+        // 工具栏全量重新识别按钮
+        panel.querySelector('.sim-reprobe-all-btn').click();
 
-        // 点击重新识别 → 请求 reprobe 端点
-        localCard.querySelector('.sim-reprobe-btn').click();
-
-        // 等待 DOS 回调（showSuccess 触发 + refreshSimulators 触发）
+        // 等待异步 reprobe 完成：MANIFEST_OK 仅 spider-shadow(local) 可 reprobe
         await vi.waitFor(() => {
-            // reprobe 应被调用一次
             const reprobeCalls = fetchSpy.mock.calls.filter(c => c[0].includes('/api/simulators/reprobe'));
             expect(reprobeCalls).toHaveLength(1);
+            // 请求体带 spider-shadow 的 id
+            expect(JSON.parse(reprobeCalls[0][1].body).id).toBe('spider-shadow');
         });
     });
 
-    it('T-01：ai+imported 卡片点击「重新识别」→ 与 local 相同 reprobe 流程（POST 端点 + 列表刷新闭环）', async () => {
+    it('T-01：全量「重新识别」对 ai+imported 与 local 条目发 reprobe（内置 ai 不触发）', async () => {
         const { sim, panel } = await loadModules();
         const data = {
             version: 2,
@@ -756,43 +782,33 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
                 { id: 'life-sim', file: '人生模拟器v3.html', name: '人生模拟器 v3', type: 'ai' },
                 // 历史误探：本为 local，被误识为 ai；source=imported 标记已导入（T-01）
                 { id: 'spider-shadow', file: '蛛网之影.html', name: '蛛网之影', type: 'ai', source: 'imported' },
+                { id: 'local-imported', file: 'local-imported.html', name: '导入的本地', type: 'local', source: 'imported' },
             ],
         };
-        let reprobed = false;
         const fetchSpy = vi.fn(async (url, opts) => {
             if (url.includes('/api/simulators/reprobe')) {
-                reprobed = true;
-                // 服务端重探成功：条目识别为 local（manifest 原子更新由服务端完成）
                 return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true, game: { id: 'spider-shadow', type: 'local' } }) });
             }
-            // 重探成功后刷新返回更新后的 manifest：spider-shadow 现为 local
-            return Promise.resolve(mockManifest(reprobed
-                ? { ...data, simulators: data.simulators.map((s) => (s.id === 'spider-shadow' ? { ...s, type: 'local' } : s)) }
-                : data));
+            return Promise.resolve(mockManifest(data));
         });
         sim.setFetch(fetchSpy);
         sim.initSimulatorsView({ container: panel });
         await sim.refreshSimulators();
 
-        // 初始：ai+imported 卡片已渲染重新识别按钮（T-01 渲染契约）
-        const aiImportedCard = panel.querySelector('.sim-card[data-id="spider-shadow"]');
-        expect(aiImportedCard.querySelector('.sim-reprobe-btn')).not.toBeNull();
+        // 点击工具栏全量重新识别
+        panel.querySelector('.sim-reprobe-all-btn').click();
 
-        aiImportedCard.querySelector('.sim-reprobe-btn').click();
-
-        // 与 local 相同的 POST reprobe 流程
+        // 只对可 reprobe 的条目发请求：spider-shadow(ai+imported) + local-imported(local)
+        // 内置 ai（life-sim）不触发；共 2 个 reprobe 请求
         await vi.waitFor(() => {
             const reprobeCalls = fetchSpy.mock.calls.filter((c) => c[0].includes('/api/simulators/reprobe'));
-            expect(reprobeCalls).toHaveLength(1);
-        });
-        // 重探成功后刷新列表：条目渲染为 local（重新识别闭环）
-        await vi.waitFor(() => {
-            const tag = panel.querySelector('.sim-card[data-id="spider-shadow"] .sim-type-tag');
-            expect(tag?.textContent).toBe('纯本地');
+            expect(reprobeCalls).toHaveLength(2);
+            const ids = reprobeCalls.map((c) => JSON.parse(c[1].body).id).sort();
+            expect(ids).toEqual(['local-imported', 'spider-shadow']);
         });
     });
 
-    it('重新识别失败 → 列表不销毁', async () => {
+    it('全量重新识别失败 → 列表不销毁', async () => {
         const { sim, panel } = await loadModules();
         const fetchSpy = vi.fn(async (url, opts) => {
             if (url.includes('/api/simulators/reprobe')) {
@@ -807,9 +823,8 @@ describe('simulators — 四态渲染与交互（fetch 经 setFetch seam）', ()
         // 初始有 2 张卡片
         expect(panel.querySelectorAll('.sim-card')).toHaveLength(2);
 
-        // 点击重新识别 → 失败
-        const localCard = panel.querySelector('.sim-card[data-id="spider-shadow"]');
-        localCard.querySelector('.sim-reprobe-btn').click();
+        // 点击全量重新识别 → 失败（reprobe 返回 404）
+        panel.querySelector('.sim-reprobe-all-btn').click();
 
         // 等待片刻，列表不应消失（仍含 2 卡）
         await vi.waitFor(() => {

@@ -8,6 +8,22 @@
 
 ---
 
+## 模拟器 API CORS 反代 + 重新识别按钮 UI 收口（2026-08-28 — 用户报告，CORS 连接失败 + 列表违和）
+
+- **来源**：用户报告「模拟器 API 设置连接不上、聊天畅通」；附图指出本地导入斗罗大陆卡片在列表显违和（无简介、带 per-card「重新识别」按钮），建议把重新识别收口为工具栏全量操作。
+- **根因（CORS 实证）**：模拟器游戏在同源 iframe 内用浏览器 fetch 直连第三方 OpenAI 兼容 API（SIM-API-1 方案 2 固有架构：第三方 HTML 零修改）。目标 `yunshuzhilian.asia` 不返回 `Access-Control-Allow-Origin`（OPTIONS 预检实测 403 无 CORS 头）→ 浏览器拦截 →「连接不上」。聊天走主应用后端 FastAPI + openai SDK **服务端**请求，无 CORS → 畅通。这是架构性限制，非回归。
+- **修复（同源反代，与聊天同构、不改第三方 HTML）**：
+  - 后端 `simulators.py` 新增 `/api/simulators/proxy/{path}`（GET/POST/...）：读 `setting_service.credentials` 取真实 base，纯函数 `_build_proxy_target` 把剩余 path 拼到 real_endpoint 的 scheme://netloc，`_proxy_headers` 剥除 hop-by-hop 并注入后端 key，httpx 服务端转发 + StreamingResponse 流式透传。未配置端点 → 503。
+  - 前端 `key-injector.js` 新增 `toProxyEndpoint(endpoint, origin)`：保留真实 base 路径段作为反代子路径、主机换主应用同源；`injectCredentialsIntoGame` 对 endpoint 先 `toProxyEndpoint` 再 `convertEndpoint` 口径转换。注入 endpoint 由 `https://yunshuzhilian.asia/v1/chat/completions` 变为 `http://127.0.0.1:PORT/api/simulators/proxy/v1/chat/completions`。
+  - 安全：key 由后端统一注入（忽略客户端 Authorization），代理目标固定为当前用户配置 base（自用威胁模型，TD-57 续）。
+- **UI 收口**：
+  - `simulators.js` 卡片移除 per-card「重新识别」按钮；工具栏新增「重新识别」全量按钮 → `reprobeAllImported` 对 canReprobeGame 条目（local / ai+imported）全量 POST reprobe 并汇总提示；删除死代码 `reprobeGame`。
+  - 无简介的导入/AI 生成卡片渲染占位简介 `renderCardDesc`（「本地导入的模拟器」/「AI 生成的模拟器」，`.sim-card-desc-placeholder` 淡色），消除空白违和。
+- **验证链**：pytest 809+1skip→823+1skip（+14 proxy 纯函数矩阵 + 路由 wire，monkeypatch httpx/credentials）| Vitest 1182→1189 全绿（toProxyEndpoint 6 + 注入 core + simulators 全量 reprobe/占位简介；inject 断言批量更新为代理形态、F2 重建默认值改代理地址）| 端到端（源码后端 8000 + Playwright）：注入 endpoint = 同源代理地址、点「保存并继续」无 CORS blocked 错误、curl proxy 转发上游 401 INVALID_API_KEY（证明服务端转发 + key 注入）；斗罗大陆卡片去按钮 + 占位简介 + 工具栏「重新识别」按钮。
+- **非阻断落债**：无。
+
+---
+
 ## 版本号升级 v0.6.0（2026-08-28 — 9 处清单 + SECURITY 支持表，基线 v0.5.0 → HEAD）
 
 - **版本号 0.5.0 → 0.6.0**：9 处全升（index.html 侧栏/package.json/package-lock 两处/main.py FastAPI 元数据/Cargo.toml/Cargo.lock/tauri.conf.json/tauri-desktop.md 安装器路径/PROJECT_REFERENCE 状态行）+ SECURITY.md 支持版本表（0.6.x latest）。源码零残留 0.5.0（DEV_LOG 历史条目与第三方依赖如 heck 0.5.0 除外）。

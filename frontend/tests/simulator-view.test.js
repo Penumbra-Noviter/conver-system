@@ -53,6 +53,9 @@ const GAME_AI_CONFIG = {
 
 /** openai 凭证响应（凭证端点契约；endpoint 为 base URL 形态） */
 const CRED_OPENAI = { key: 'sk-smoke-openai', endpoint: 'https://api.example.com/v1', model: 'gpt-4o-mini', protocol: 'openai' };
+/** 测试环境同源（jsdom）—— CORS 修复后注入的 endpoint 为同源反代地址 */
+const PROXY_ORIGIN = typeof location !== 'undefined' ? location.origin : 'http://localhost';
+
 
 /** 加载全新 simulator-view 模块（DOM 先就位；返回模块 + 双面板引用） */
 async function loadModules() {
@@ -478,7 +481,7 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
         expect(fetchMock).toHaveBeenCalledTimes(1); // load 自动同步一次凭证获取
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
         // endpointMode=full：endpoint 注入为 base + /chat/completions
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
         const btn = keyBtn();
         expect(btn.textContent).toBe('重新同步'); // 静默：无「已填入」反馈
@@ -572,7 +575,7 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
 
         expect(fetchMock).toHaveBeenCalledTimes(2); // 自动同步 1 + 点击 1
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions'); // endpointMode=full 转换
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`); // endpointMode=full 转换
         expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
         expect(seen).toEqual(['input', 'change']);
         expect(keyBtn().textContent).toBe('已填入');
@@ -705,7 +708,7 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
 
         expect(fetchMock).toHaveBeenCalledTimes(2); // 重建触发再同步
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai'); // 主应用配置重新生效
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
     });
 
     it('SIM-API-1 观察者:写回环冷却 — 自动同步写入后 1s 内的面板重建跳过再同步；冷却后再重建恢复', async () => {
@@ -790,7 +793,7 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
 
         expect(fetchMock).toHaveBeenCalledTimes(2); // 属性变更重建触发再同步
         expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai'); // 主应用配置重新生效
-        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('cfg-endpoint').value).toBe(`${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions`);
     });
 
     it('TD-75:与配置控件无关的属性变更（class/style — 游戏状态渲染）→ 不触发再同步', async () => {
@@ -960,7 +963,7 @@ describe('simulator-view — 配置同步按钮条与自动同步（U8-T2 + SIM-
         for (let i = 0; i < 5; i++) {
             await vi.advanceTimersByTimeAsync(1000);
             doc.body.innerHTML = `
-                <input id="cfg-endpoint" value="https://api.example.com/v1/chat/completions">
+                <input id="cfg-endpoint" value="${PROXY_ORIGIN}/api/simulators/proxy/v1/chat/completions">
                 <input id="cfg-apikey" value="sk-smoke-openai">
                 <select id="cfg-model">
                     <option value="game-default-model">game-default-model</option>

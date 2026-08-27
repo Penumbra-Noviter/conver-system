@@ -8,9 +8,11 @@
  *   按钮（U9-T2）经注入的 onOpenSaveManager 钩子交给存档面板模块；工具条
  *   「导入游戏」按钮（工单 04）经注入的 onImportGame 钩子交给导入模块
  *   （simulator-import.openImportFlow）。卡片「已导入」badge 与「AI 生成」badge：parseManifest
- *   透传 source 白名单字段（'imported' / 'generated'，T-02 决策 10）。卡片
- *   「重新识别」按钮渲染判据由纯函数 canReprobeGame 驱动（T-01：local 恒可 /
- *   ai+source='imported' 可 / 其余不渲染），点击走 reprobeGame 端到端流程。游戏列表
+ *   透传 source 白名单字段（'imported' / 'generated'，T-02 决策 10）。工具条
+ *   「重新识别」按钮（2026-08-28 UI 收口：由卡片 per-card 按钮改为工具栏全量
+ *   操作）→ reprobeAllImported 对可 reprobe 条目（canReprobeGame 判定：local 恒可 /
+ *   ai+source='imported' 可 / 其余不参与）全量 POST reprobe 端点并汇总提示。
+ *   无简介的导入/AI 生成卡片渲染通用占位简介（renderCardDesc，消除空白违和）。游戏列表
  *   缓存经 getGames() 公开读取（存档面板 getGames 钩子的数据源 — 不重复
  *   fetch manifest，G7）。
  *
@@ -289,6 +291,25 @@ export function canReprobeGame(game) {
  * 渲染工具条（筛选三档按钮 + 计数 + 存档管理按钮）与状态区骨架（四态渲染目标）。
  * 只渲染一次（initSimulatorsView 时），refresh/筛选仅重渲染状态区。
  */
+/**
+ * 卡片简介段：有 description → 原样渲染；无 description（本地导入 / AI 生成
+ * 缺简介）→ 通用占位（消除空白违和，文案中性不编造）。内置种子恒有简介。
+ * @param {object} game - 归一化游戏条目
+ * @returns {string} 简介 HTML（空串 = 不渲染）
+ */
+function renderCardDesc(game) {
+    if (game.description) {
+        return `<p class="sim-card-desc">${escapeHtml(game.description)}</p>`;
+    }
+    if (game.source === 'imported') {
+        return '<p class="sim-card-desc sim-card-desc-placeholder">本地导入的模拟器</p>';
+    }
+    if (game.source === 'generated') {
+        return '<p class="sim-card-desc sim-card-desc-placeholder">AI 生成的模拟器</p>';
+    }
+    return '';
+}
+
 function renderShell() {
     const filterButtons = FILTERS
         .map((f) => `<button type="button" class="sim-filter-btn${f.value === 'all' ? ' active' : ''}" data-filter="${f.value}">${f.label}</button>`)
@@ -299,6 +320,7 @@ function renderShell() {
             <button type="button" class="sim-generate-btn" data-action="generate-game">AI 生成</button>
             <button type="button" class="sim-import-btn" data-action="import-game">导入游戏</button>
             <button type="button" class="sim-save-manage-btn" data-action="open-save-manager">存档管理</button>
+            <button type="button" class="sim-reprobe-all-btn" data-action="reprobe-all" title="重新识别所有本地导入的模拟器">重新识别</button>
             <span class="sim-count"></span>
         </div>
         <div class="sim-state"></div>
@@ -336,9 +358,8 @@ function renderList() {
                     <span class="sim-type-tag sim-type-${game.type}">${TYPE_LABELS[game.type]}</span>
                     ${game.source === 'imported' ? '<span class="sim-source-tag">已导入</span>' : ''}
                     ${game.source === 'generated' ? '<span class="sim-source-tag sim-source-generated">AI 生成</span>' : ''}
-                    ${canReprobeGame(game) ? `<button type="button" class="sim-reprobe-btn" data-action="reprobe" title="重新识别类型">${iconHtml('refresh', { size: 12 })} 重新识别</button>` : ''}
                 </div>
-                ${game.description ? `<p class="sim-card-desc">${escapeHtml(game.description)}</p>` : ''}
+                ${renderCardDesc(game)}
             </div>
         </article>
     `).join('');
@@ -429,16 +450,13 @@ function bindEvents() {
     // 工具条「导入游戏」按钮 → 导入流程钩子（工单 04；未注入时 no-op 不报错）
     container.querySelector('.sim-import-btn')?.addEventListener('click', () => onImportGame());
 
-    // 事件委托：重新识别 → reprobeGame；卡片点击 → onOpenGame(game)；
-    // 重试按钮 → refreshSimulators。
+    // 工具条「重新识别」按钮 → 全量重新识别所有本地导入的模拟器（2026-08-28：
+    // 由卡片 per-card 按钮收口为工具栏全量操作，消除导入卡片上的突兀按钮）
+    container.querySelector('.sim-reprobe-all-btn')?.addEventListener('click', () => reprobeAllImported());
+
+    // 事件委托：卡片点击 → onOpenGame(game)；重试按钮 → refreshSimulators。
     // 委托挂在持久状态区元素上，重渲染不丢监听（search-view 结果跳转先例）
     stateEl.addEventListener('click', (e) => {
-        const reprobe = e.target.closest('[data-action="reprobe"]');
-        if (reprobe) {
-            const card = reprobe.closest('.sim-card');
-            if (card?.dataset.id) reprobeGame(card.dataset.id);
-            return;
-        }
         const retry = e.target.closest('[data-action="retry"]');
         if (retry) {
             refreshSimulators();
@@ -449,6 +467,45 @@ function bindEvents() {
         const game = games.find((g) => g.id === card.dataset.id);
         if (game) onOpenGame(game);
     });
+}
+
+/**
+ * 全量重新识别所有本地导入的模拟器（source='imported' 且可 reprobe 的条目，
+ * canReprobeGame 判定：local 恒可 / ai+imported 可）。逐个走 reprobe 端点
+ * （与单条 reprobe 同语义），汇总成功/失败；完成后刷新列表并给出提示。
+ * 无本地导入条目 → 提示无需操作（不误报）。
+ */
+async function reprobeAllImported() {
+    const targets = games.filter((g) => canReprobeGame(g));
+    if (targets.length === 0) {
+        showSuccess('无可重新识别的本地导入模拟器');
+        return;
+    }
+    let ok = 0;
+    let failed = 0;
+    for (const game of targets) {
+        const id = game.id;
+        try {
+            const res = await doFetch(REPROBE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+            });
+            if (res?.ok) {
+                ok += 1;
+            } else {
+                failed += 1;
+            }
+        } catch {
+            failed += 1;
+        }
+    }
+    await refreshSimulators();
+    if (failed === 0) {
+        showSuccess(`已重新识别 ${ok} 款本地导入模拟器`);
+    } else {
+        showError(`重新识别完成：${ok} 成功，${failed} 失败`);
+    }
 }
 
 /**
@@ -530,31 +587,6 @@ export async function refreshSimulators() {
  */
 export function getGames() {
     return Array.isArray(games) ? games : [];
-}
-
-/**
- * 重新识别游戏类型：POST 到 reprobe 端点 → 更新 manifest → 刷新列表。
- * 仅渲染了「重新识别」按钮的卡片可触发（canReprobeGame 判定为 true：local /
- * ai+source='imported'，T-01）；成功刷新列表并显示成功提示，失败显示错误不销毁列表。
- * @param {string} id - 游戏条目 id
- */
-async function reprobeGame(id) {
-    try {
-        const res = await doFetch(REPROBE_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id }),
-        });
-        if (!res?.ok) {
-            const detail = res ? await res.json().then(d => d.detail || `请求失败 (${res.status})`).catch(() => `请求失败 (${res.status})`) : '网络错误';
-            showError(`重新识别失败：${detail}`);
-            return;
-        }
-        await refreshSimulators();
-        showSuccess('已重新识别');
-    } catch (err) {
-        showError(`重新识别失败：${err instanceof Error ? err.message : String(err)}`);
-    }
 }
 
 // ══════════════════════════════════════════════════

@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2062<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->810<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1182<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2083<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->824<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -321,14 +321,17 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/settings.py:update_settings-->`update_settings(data, db)`<!--/AUTO--> | PUT 批量更新设置 |
 | <!--AUTO:sig:backend/app/api/routes/settings.py:test_connection-->`test_connection(data, db)`<!--/AUTO--> | POST 连接测试（保存时校验 Key） |
 
-### 4.11.5 `backend/app/api/routes/simulators.py` — 模拟器导入路由（工单 03 + 2026-08-26 重新识别）（<!--AUTO:lines:backend/app/api/routes/simulators.py-->~131 行<!--/AUTO-->）
+### 4.11.5 `backend/app/api/routes/simulators.py` — 模拟器导入 + 同源 API 反代路由（工单 03 + 2026-08-26 重新识别 + 2026-08-28 CORS 反代）（<!--AUTO:lines:backend/app/api/routes/simulators.py-->~219 行<!--/AUTO-->）
 
-**职责**：POST /api/simulators/import 单文件 HTML 游戏导入（multipart 字段名 `file`）；POST /api/simulators/reprobe 重新识别已有游戏（JSON `{id}`，重读 HTML → 三层探测 + 端点口径 → 原子更新 manifest 条目 type/config/endpointMode，条目或文件缺失 404）——仅 HTTP 映射（状态码 + 响应形状）；校验/去重/改名/探测/粗筛/manifest 注册全部委托 `services/simulator_store`。契约：import 200 `{ok, game{id,file,name,type,config?}, renamed, warnings}`；reprobe 200 `{ok, game}`。数据目录请求期解析（可 monkeypatch CONVER_DATA_DIR）。
+**职责**：POST /api/simulators/import 单文件 HTML 游戏导入（multipart 字段名 `file`）；POST /api/simulators/reprobe 重新识别已有游戏（JSON `{id}`，重读 HTML → 三层探测 + 端点口径 → 原子更新 manifest 条目 type/config/endpointMode，条目或文件缺失 404）——仅 HTTP 映射（状态码 + 响应形状）；校验/去重/改名/探测/粗筛/manifest 注册全部委托 `services/simulator_store`；`/api/simulators/proxy/{path}` 同源 API 反代（2026-08-28 CORS 修复：把游戏 iframe 内对第三方 OpenAI 兼容 API 的浏览器直连转发为主应用服务端请求，规避 CORS；读 `setting_service.credentials` 取真实 base，`_build_proxy_target` 拼目标、`_proxy_headers` 注入后端 key，httpx 转发 + 流式透传，未配置端点 503）。契约：import 200 `{ok, game{id,file,name,type,config?}, renamed, warnings}`；reprobe 200 `{ok, game}`；proxy 透传上游状态。数据目录请求期解析（可 monkeypatch CONVER_DATA_DIR）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:backend/app/api/routes/simulators.py:import_simulator-->`import_simulator(file)`<!--/AUTO--> | POST 导入端点（5MB+1 读取守卫；领域异常映射 400/409） |
 | <!--AUTO:sig:backend/app/api/routes/simulators.py:reprobe_simulator-->`reprobe_simulator(body)`<!--/AUTO--> | POST 重新识别（probe_config + probe_endpoint_mode → update_manifest_entry；缺失 404） |
+| <!--AUTO:sig:backend/app/api/routes/simulators.py:simulator_api_proxy-->`simulator_api_proxy(path, request, db)`<!--/AUTO--> | 同源 API 反代（CORS 修复；httpx 转发 + 后端注入 key + 流式透传；未配置 503） |
+| <!--AUTO:sig:backend/app/api/routes/simulators.py:_build_proxy_target-->`_build_proxy_target(real_endpoint, path)`<!--/AUTO--> | 代理目标 URL 拼装纯函数（scheme://netloc + path；netloc 缺失 ValueError） |
+| <!--AUTO:sig:backend/app/api/routes/simulators.py:_proxy_headers-->`_proxy_headers(request_headers, api_key)`<!--/AUTO--> | 转发头组装纯函数（剥 hop-by-hop + 注入后端 key） |
 
 ### 4.12 `backend/app/services/character.py` — 角色服务（<!--AUTO:lines:backend/app/services/character.py-->~77 行<!--/AUTO-->）
 
@@ -851,15 +854,16 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/icons.js:iconHtml-->`iconHtml(name, options = {})`<!--/AUTO--> | 图标 HTML 生成（名称 + 选项） |
 
-### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~795 行<!--/AUTO-->）
+### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~834 行<!--/AUTO-->）
 
-**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。**config 多候选（F-91）**：config 三元组字段值可为单 id 字符串或多候选 id 数组，注入/观察者按候选逐个尝试、命中的第一套生效（同一游戏多套同义配置控件，如斗罗大陆向导 wz-*/设置模态 s-*）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，`LINK_NAV_SETTINGS` 文案由游戏生成器凭证预检复用（`SEL_NAV_SETTINGS` 自 F-63 起为模拟器专属，生成器不再借用）。
+**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。**config 多候选（F-91）**：config 三元组字段值可为单 id 字符串或多候选 id 数组，注入/观察者按候选逐个尝试、命中的第一套生效（同一游戏多套同义配置控件，如斗罗大陆向导 wz-*/设置模态 s-*）。**CORS 反代（2026-08-28）**：`toProxyEndpoint` 把真实 base 改写为主应用同源反代地址（保留路径段作反代子路径），`injectCredentialsIntoGame` 对 endpoint 先反代化再口径转换，使游戏经 `/api/simulators/proxy` 由后端服务端转发、规避浏览器 CORS。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，`LINK_NAV_SETTINGS` 文案由游戏生成器凭证预检复用（`SEL_NAV_SETTINGS` 自 F-63 起为模拟器专属，生成器不再借用）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:frontend/js/key-injector.js:initKeyInjector-->`initKeyInjector({ getCredentials, onNavigateSettings } = {})`<!--/AUTO--> | 注入器初始化 |
 | <!--AUTO:sig:frontend/js/key-injector.js:resolveButtonState-->`resolveButtonState(credentials)`<!--/AUTO--> | 按钮状态解析 |
 | <!--AUTO:sig:frontend/js/key-injector.js:convertEndpoint-->`convertEndpoint(endpoint, mode)`<!--/AUTO--> | 端点口径转换（full/base） |
+| <!--AUTO:sig:frontend/js/key-injector.js:toProxyEndpoint-->`toProxyEndpoint(endpoint, origin)`<!--/AUTO--> | 同源反代改写（CORS 修复；保留 base 路径段） |
 | <!--AUTO:sig:frontend/js/key-injector.js:ensureSelectOption-->`ensureSelectOption(selectEl, value)`<!--/AUTO--> | 模型下拉选项保障 |
 | <!--AUTO:sig:frontend/js/key-injector.js:injectCredentialsIntoGame-->`injectCredentialsIntoGame({ doc, config, credentials, endpointMode } = {})`<!--/AUTO--> | 向游戏文档注入凭证 |
 | <!--AUTO:sig:frontend/js/key-injector.js:syncGameCredentials-->`syncGameCredentials({ getDoc, config, endpointMode } = {})`<!--/AUTO--> | 同步游戏凭证 |
@@ -945,9 +949,9 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:isValidGame-->`isValidGame(game)`<!--/AUTO--> | 游戏合法性校验 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:clearTimer-->`clearTimer()`<!--/AUTO--> | 清理超时定时器 |
 
-### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~523 行<!--/AUTO-->）
+### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~553 行<!--/AUTO-->）
 
-**职责**：模拟器列表视图（U7 + 2026-08-26 重新识别 + 2026-08-27 F-92 可 reprobe 范围扩展）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新、可重新识别卡片（local 与 ai+imported，经 `canReprobeGame` 判定）「重新识别」按钮（data-action="reprobe" → `reprobeGame(id)` POST JSON 到 reprobe 端点 → 刷新列表 + 反馈）。
+**职责**：模拟器列表视图（U7 + 2026-08-26 重新识别 + 2026-08-27 F-92 可 reprobe 范围扩展 + 2026-08-28 全量收口）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新、工具栏「重新识别」全量按钮（2026-08-28 UI 收口：per-card 按钮移除 → `reprobeAllImported` 对 `canReprobeGame` 判定条目（local / ai+imported）全量 POST reprobe 端点 + 汇总反馈）；无简介导入/AI 生成卡片渲染占位简介（`renderCardDesc`）。
 
 | 元素 | 说明 |
 |------|------|
@@ -958,12 +962,12 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulators.js:refreshSimulators-->`refreshSimulators()`<!--/AUTO--> | 刷新列表 |
 | <!--AUTO:sig:frontend/js/simulators.js:fetchManifestText-->`fetchManifestText()`<!--/AUTO--> | 拉取 manifest 文本 |
 | <!--AUTO:sig:frontend/js/simulators.js:getGames-->`getGames()`<!--/AUTO--> | 获取游戏列表 |
-| <!--AUTO:sig:frontend/js/simulators.js:bindEvents-->`bindEvents()`<!--/AUTO--> | 事件绑定（含重新识别拦截） |
-| <!--AUTO:sig:frontend/js/simulators.js:renderShell-->`renderShell()`<!--/AUTO--> | 渲染壳 |
-| <!--AUTO:sig:frontend/js/simulators.js:renderList-->`renderList()`<!--/AUTO--> | 渲染列表（local 与 ai+imported 卡片含重新识别按钮） |
+| <!--AUTO:sig:frontend/js/simulators.js:bindEvents-->`bindEvents()`<!--/AUTO--> | 事件绑定（含全量重新识别按钮） |
+| <!--AUTO:sig:frontend/js/simulators.js:renderShell-->`renderShell()`<!--/AUTO--> | 渲染壳（工具栏含「重新识别」全量按钮） |
+| <!--AUTO:sig:frontend/js/simulators.js:renderList-->`renderList()`<!--/AUTO--> | 渲染列表（卡片不渲染 per-card 重新识别按钮） |
 | <!--AUTO:sig:frontend/js/simulators.js:renderLoading-->`renderLoading()`<!--/AUTO--> | 加载态渲染 |
 | <!--AUTO:sig:frontend/js/simulators.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
-| <!--AUTO:sig:frontend/js/simulators.js:reprobeGame-->`reprobeGame(id)`<!--/AUTO--> | 重新识别（POST → 刷新 → 反馈） |
+| <!--AUTO:sig:frontend/js/simulators.js:reprobeAllImported-->`reprobeAllImported()`<!--/AUTO--> | 全量重新识别本地导入（POST 逐个 → 汇总 → 刷新） |
 
 ### 4.58 `frontend/js/state.js` — 全局状态（<!--AUTO:lines:frontend/js/state.js-->~36 行<!--/AUTO-->）
 
@@ -1281,6 +1285,7 @@ conver system/
 | `backend/tests/test_settings_connection.py` | <!--AUTO:tests:backend/tests/test_settings_connection.py-->55<!--/AUTO--> | 设置/凭证/连接测试 |
 | `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->149<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
 | `backend/tests/test_simulator_store.py` | <!--AUTO:tests:backend/tests/test_simulator_store.py-->33<!--/AUTO--> | 模拟器首启种子矩阵 + manifest 工具 + append 原子写/损坏自愈 |
+| `backend/tests/test_simulator_proxy.py` | <!--AUTO:tests:backend/tests/test_simulator_proxy.py-->14<!--/AUTO--> | 模拟器同源 API 反代（CORS：纯函数矩阵 + 路由 wire） |
 
 运行：`cd backend && python -m pytest`（pytest.ini 在根：`testpaths = backend/tests`，`pythonpath = .`；共享夹具见 `backend/tests/conftest.py`）。
 
@@ -1302,7 +1307,7 @@ conver system/
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->49<!--/AUTO--> | 展示契约 |
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->29<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
-| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->97<!--/AUTO--> | Key 注入/端点口径 |
+| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->103<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
@@ -1318,7 +1323,7 @@ conver system/
 | `frontend/tests/simulator-manifest.test.js` | <!--AUTO:tests:frontend/tests/simulator-manifest.test.js-->19<!--/AUTO--> | manifest 解析 |
 | `frontend/tests/simulator-pc-css.test.js` | <!--AUTO:tests:frontend/tests/simulator-pc-css.test.js-->24<!--/AUTO--> | 模拟器 PC 覆盖层契约（验收标准 + F1/F2 回归锁） |
 | `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->67<!--/AUTO--> | 模拟器运行视图 |
-| `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->89<!--/AUTO--> | 模拟器列表 |
+| `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->90<!--/AUTO--> | 模拟器列表 |
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
 | `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->73<!--/AUTO--> | 流式会话结算 |
 | `frontend/tests/style-css.test.js` | <!--AUTO:tests:frontend/tests/style-css.test.js-->5<!--/AUTO--> | style.css 静态契约（F-73 .gg-config-warning-nav 对比度 + dark override） |
@@ -1375,10 +1380,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2062<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2083<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->810<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1182<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->824<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1189<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

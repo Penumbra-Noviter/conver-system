@@ -38,6 +38,24 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 用户修复批次 — 模拟器 API CORS 反代 + 重新识别按钮 UI 收口（2026-08-28）
+
+> 来源：用户报告「模拟器 API 连接不上、聊天畅通」+「本地导入斗罗大陆在列表显违和（无简介、卡片带 per-card 重新识别按钮）」，建议把重新识别收口为工具栏全量操作。
+> 根因（CORS 实证）：模拟器游戏在 iframe 内用浏览器 fetch 直连第三方 OpenAI 兼容 API（SIM-API-1 方案 2 固有架构），目标 yunshuzhilian.asia 无 `Access-Control-Allow-Origin`（OPTIONS 预检实测 403）→ 浏览器 CORS 拦截 →「连不上」；聊天走主应用后端服务端请求不受此限。
+> 修复：后端新增 `/api/simulators/proxy/{path}` 同源反代（httpx 服务端转发 + 后端注入 key + 流式透传，纯函数 `_build_proxy_target`/`_proxy_headers` 可单测）；前端 key-injector 新增 `toProxyEndpoint`，注入 endpoint 改写成主应用同源反代地址再口径转换。UI：重新识别按钮由 per-card 收口为工具栏全量 `reprobeAllImported`（对 canReprobeGame 条目全量 POST）；无简介导入/AI 生成卡片渲染占位简介（`renderCardDesc`，消除空白违和）。详见 DEV_LOG〈模拟器 API CORS 反代 + 重新识别按钮 UI 收口（2026-08-28）〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | 模拟器 API 同源反代（CORS 修复：proxy 端点 + 注入代理化） | 用户报告 | 2026-08-28 | <commit> |
+| 02 | 重新识别按钮收口工具栏全量 + 无简介占位（UI 收口） | 用户报告 | 2026-08-28 | <commit> |
+
+**验证链：** pytest 809+1skip→823+1skip（+14：test_simulator_proxy 纯函数矩阵 + 路由 wire）| Vitest 1182→1189（+7：key-injector toProxyEndpoint + 注入 core + simulators 全量 reprobe/占位简介）| 全量绿 | 端到端（源码后端 + Playwright）：注入 endpoint 变为 `http://127.0.0.1:8000/api/simulators/proxy/v1/chat/completions`、点「保存并继续」无 CORS blocked 错误、curl proxy 端点转发到上游（401 INVALID_API_KEY 证明服务端转发 + key 注入）；斗罗大陆卡片去掉 per-card 按钮、占位简介「本地导入的模拟器」、工具栏出现「重新识别」全量按钮
+**非阻断落债：** 无
+
+---
+
+> 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
 ### 技术债消费批次 F-92（2026-08-27，kickoff 全自动档轻量档 1 工单）
 
 > 来源：用户「消费技术债区，进入 project-kickoff 全自动流程」选择候选区唯一剩余项 F-92。Grilling 实证拍板**做**——git grep 复核 simulators.js 按钮条件 `type==='local'` 与 reprobe 端点按 id 定位不区分 type，确认「ai 但 config 错的老条目无 UI reprobe 入口」为真实缺口；方案 D 锁定：新增纯函数 `canReprobeGame(game) = local 恒真 || ai∧source==='imported'` 驱动渲染条件，后端零改动。轻量档单工单独立分支 kickoff/f92-reprobe-ai-card。

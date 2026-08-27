@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 809 + 1 skip）；`cd frontend && npm test`（Vitest 1182，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
+测试：`cd backend && python -m pytest`（pytest 823 + 1 skip）；`cd frontend && npm test`（Vitest 1189，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
 
 ## 当前状态（2026-08-26）
 

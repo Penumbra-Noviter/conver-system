@@ -70,7 +70,8 @@
  *   app.js → key-injector.js（initKeyInjector 接线）。
  *
  * 协议表面（__all__）：initKeyInjector / attachKeyInject / resolveButtonState /
- *   hasConfigTriplet / convertEndpoint / injectCredentialsIntoGame /
+ *   hasConfigTriplet / convertEndpoint / toProxyEndpoint /
+ *   injectCredentialsIntoGame /
  *   syncGameCredentials / autoSyncIntoGame / observeConfigControls /
  *   disconnectObserver / mutationTouchesConfig / TEXT_RESYNC / TEXT_INJECTED /
  *   MSG_CLAUDE_ONLY / MSG_NO_CREDENTIALS / LINK_NAV_SETTINGS / SEL_NAV_SETTINGS /
@@ -264,6 +265,40 @@ export function convertEndpoint(endpoint, mode) {
     return endpoint;
 }
 
+/** 同源反代端点前缀（后端 simulators.py `simulator_api_proxy`；须与后端路由一致） */
+const PROXY_PREFIX = '/api/simulators/proxy';
+
+/**
+ * 把真实 OpenAI 兼容 base URL 改写成主应用同源反代地址（CORS 修复 2026-08-28）。
+ *
+ * 背景：模拟器游戏在 iframe 内用浏览器 fetch 直连第三方 OpenAI 兼容 API，
+ * 目标不返回 Access-Control-Allow-Origin 即被浏览器 CORS 拦截（「连接不上」）；
+ * 主应用聊天走后端服务端请求不受此限。修复 = 注入的 endpoint 指向主应用同源
+ * 反代端点（/api/simulators/proxy/<path>），后端服务端转发到真实目标。
+ *
+ * 实现：保留真实 base 的路径段（如 https://host/v1 的 /v1）作为反代子路径，
+ * 主机替换为主应用同源 —— 使游戏按 endpoint 推导的相对路径（/v1/models、
+ * /v1/chat/completions）经反代后，由后端原样拼到真实 host，路径映射不丢失。
+ * 非字符串/空值 → 原样返回；解析失败 → 以无路径形态返回同源前缀。
+ *
+ * @param {unknown} endpoint - 凭证端点响应中的 endpoint（真实 base URL）
+ * @param {string} [origin] - 同源前缀（测试可注入；缺省取 location.origin；
+ *   无 origin（非浏览器）时原样返回）
+ * @returns {unknown} 改写后的同源反代 base 地址（非字符串原样返回）
+ */
+export function toProxyEndpoint(endpoint, origin) {
+    if (typeof endpoint !== 'string' || endpoint === '') return endpoint;
+    const o = origin || (typeof location !== 'undefined' ? location.origin : '');
+    if (!o) return endpoint; // 非浏览器/测试未注入 origin → 保持原样（不误改）
+    let path = '';
+    try {
+        path = new URL(endpoint).pathname.replace(/\/+$/, '');
+    } catch {
+        path = '';
+    }
+    return `${o}${PROXY_PREFIX}${path}`;
+}
+
 // ══════════════════════════════════════════════════
 // 纯函数：注入核心（填值 + 派发事件）
 // ══════════════════════════════════════════════════
@@ -350,7 +385,12 @@ export function injectCredentialsIntoGame({ doc, config, credentials, endpointMo
             continue;
         }
         const rawValue = creds[FIELD_VALUE_KEYS[field]];
-        const value = field === 'endpoint' ? convertEndpoint(rawValue, endpointMode) : rawValue;
+        // CORS 修复（2026-08-28）：endpoint 先改写为主应用同源反代地址
+        // （toProxyEndpoint），再做口径转换 —— 游戏经同源反代由后端服务端
+        // 转发，规避浏览器 CORS 拦截
+        const value = field === 'endpoint'
+            ? convertEndpoint(toProxyEndpoint(rawValue), endpointMode)
+            : rawValue;
         if (typeof value !== 'string' || value === '') {
             skipped.push(field); // 空值不覆盖游戏默认
             continue;
@@ -845,6 +885,7 @@ export const __all__ = [
     'resolveButtonState',
     'hasConfigTriplet',
     'convertEndpoint',
+    'toProxyEndpoint',
     'injectCredentialsIntoGame',
     'syncGameCredentials',
     'autoSyncIntoGame',
