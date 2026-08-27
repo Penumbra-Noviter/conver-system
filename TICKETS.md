@@ -46,8 +46,8 @@
 
 | Ticket | 标题 | F 项 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
-| 01 | 模拟器 API 同源反代（CORS 修复：proxy 端点 + 注入代理化） | 用户报告 | 2026-08-28 | <commit> |
-| 02 | 重新识别按钮收口工具栏全量 + 无简介占位（UI 收口） | 用户报告 | 2026-08-28 | <commit> |
+| 01 | 模拟器 API 同源反代（CORS 修复：proxy 端点 + 注入代理化） | 用户报告 | 2026-08-28 | c26144a |
+| 02 | 重新识别按钮收口工具栏全量 + 无简介占位（UI 收口） | 用户报告 | 2026-08-28 | c26144a |
 
 **验证链：** pytest 809+1skip→823+1skip（+14：test_simulator_proxy 纯函数矩阵 + 路由 wire）| Vitest 1182→1189（+7：key-injector toProxyEndpoint + 注入 core + simulators 全量 reprobe/占位简介）| 全量绿 | 端到端（源码后端 + Playwright）：注入 endpoint 变为 `http://127.0.0.1:8000/api/simulators/proxy/v1/chat/completions`、点「保存并继续」无 CORS blocked 错误、curl proxy 端点转发到上游（401 INVALID_API_KEY 证明服务端转发 + key 注入）；斗罗大陆卡片去掉 per-card 按钮、占位简介「本地导入的模拟器」、工具栏出现「重新识别」全量按钮
 **非阻断落债：** 无
