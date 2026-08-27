@@ -374,18 +374,15 @@ export function injectCredentialsIntoGame({ doc, config, credentials, endpointMo
  * 凭证获取失败 → 拒绝（调用方按路径降级：按钮点击静默复位 / 自动同步保持）。
  *
  * @param {object} [params]
- * @param {Document|null} [params.doc] - 同源 iframe contentDocument（未提供
- *   getDoc 时回落的注入目标 —— 外部直接调用路径）
  * @param {Function} [params.getDoc] - () => Document|null；惰性取用源 —— doc 在
- *   凭证获取完成后才经此取用（F-89 写前失效守卫的执行点，见 flushObserverSync）；
- *   提供时优先于 doc 参数
+ *   凭证获取完成后才经此取用（F-89 写前失效守卫的执行点，见 flushObserverSync）
  * @param {object|null} [params.config] - manifest config 三元组
  * @param {string|null} [params.endpointMode] - manifest endpointMode
  * @returns {Promise<null|{enabled: boolean, reason: 'claude'|'none'|null,
  *   filled: string[], skipped: string[], written: string[]}>}
  *   null = 未初始化；enabled=false 时 filled/skipped/written 恒为空数组
  */
-export async function syncGameCredentials({ doc, getDoc, config, endpointMode } = {}) {
+export async function syncGameCredentials({ getDoc, config, endpointMode } = {}) {
     if (typeof fetchCredentials !== 'function') return null; // 未初始化 → 无操作
     const creds = await fetchCredentials();
     const state = resolveButtonState(creds);
@@ -396,8 +393,7 @@ export async function syncGameCredentials({ doc, getDoc, config, endpointMode } 
     // 重取使宿主注入的失效守卫（observerContext === ctx，见 flushObserverSync）真正
     // 生效：断连在途写入窗口内 observerContext 已置 null → getDoc() 返回 null →
     // 注入全跳过 → 陈旧在途写变 no-op（written.length = 0，熔断计数不 +1）。
-    // 未提供 getDoc（外部直接调用）→ 回落 doc 参数（行为与既有契约一致）。
-    const targetDoc = typeof getDoc === 'function' ? getDoc() : doc;
+    const targetDoc = typeof getDoc === 'function' ? getDoc() : null;
     const result = injectCredentialsIntoGame({ doc: targetDoc, config, credentials: creds, endpointMode });
     return { enabled: true, reason: null, ...result };
 }
