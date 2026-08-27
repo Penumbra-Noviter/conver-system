@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2045<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->810<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1165<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2052<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->810<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1172<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -851,9 +851,9 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/icons.js:iconHtml-->`iconHtml(name, options = {})`<!--/AUTO--> | 图标 HTML 生成（名称 + 选项） |
 
-### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~771 行<!--/AUTO-->）
+### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~795 行<!--/AUTO-->）
 
-**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，`LINK_NAV_SETTINGS` 文案由游戏生成器凭证预检复用（`SEL_NAV_SETTINGS` 自 F-63 起为模拟器专属，生成器不再借用）。
+**职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。**config 多候选（F-91）**：config 三元组字段值可为单 id 字符串或多候选 id 数组，注入/观察者按候选逐个尝试、命中的第一套生效（同一游戏多套同义配置控件，如斗罗大陆向导 wz-*/设置模态 s-*）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，`LINK_NAV_SETTINGS` 文案由游戏生成器凭证预检复用（`SEL_NAV_SETTINGS` 自 F-63 起为模拟器专属，生成器不再借用）。
 
 | 元素 | 说明 |
 |------|------|
@@ -1184,9 +1184,9 @@ conver system/
 | <!--AUTO:sig:backend/app/services/simulator_manifest.py:append_manifest_entry-->`append_manifest_entry(sim_dir, entry)`<!--/AUTO--> | manifest 原子追加（缺失/损坏 → 磁盘 .html 自愈重建后追加） |
 | <!--AUTO:sig:backend/app/services/simulator_manifest.py:update_manifest_entry-->`update_manifest_entry(sim_dir, entry_id, **updates)`<!--/AUTO--> | 按 id 原子更新条目字段（缺失抛 KeyError；重新识别端点消费） |
 
-### 4.74.2 `backend/app/services/simulator_import.py` — 模拟器导入管线（<!--AUTO:lines:backend/app/services/simulator_import.py-->~415 行<!--/AUTO-->）
+### 4.74.2 `backend/app/services/simulator_import.py` — 模拟器导入管线（<!--AUTO:lines:backend/app/services/simulator_import.py-->~424 行<!--/AUTO-->）
 
-**职责**：T-02 从 `simulator_store` 拆分。导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名净化/冲突改名、类型探测（三层：L1 严格 cfg- 三元组 → L2 关键词启发 endpoint|url|base/key/model → L3 local，2026-08-26 补强）、端点口径推断（probe_endpoint_mode，SIM-API-1）、恶意模式粗筛（不拦截）、manifest 追加注册；T-03 新增 `ScanResult` / `scan_generated_html` 单次扫描。`scan_input_ids` 双层扫描（HTMLParser 静态层 input/select + 脚本层 raw-regex 捕获 JS 模板字符串渲染的运行时控件）。stdlib only。
+**职责**：T-02 从 `simulator_store` 拆分。导入校验（.html/≤5MB/非空）、SHA-256 去重、文件名净化/冲突改名、类型探测（三层：L1 严格 cfg- 三元组 → L2 关键词启发 endpoint|url|base/key/model → L3 local，2026-08-26 补强；2026-08-27 F-91：L2 改为每组**全量收集**候选 id——单候选保持字符串、多候选为数组，覆盖同一游戏多套同义配置控件如斗罗大陆向导 wz-*/设置模态 s-*）、端点口径推断（probe_endpoint_mode，SIM-API-1）、恶意模式粗筛（不拦截）、manifest 追加注册；T-03 新增 `ScanResult` / `scan_generated_html` 单次扫描。`scan_input_ids` 双层扫描（HTMLParser 静态层 input/select + 脚本层 raw-regex 捕获 JS 模板字符串渲染的运行时控件）。stdlib only。
 
 | 元素 | 说明 |
 |------|------|
@@ -1302,7 +1302,7 @@ conver system/
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->49<!--/AUTO--> | 展示契约 |
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->29<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
-| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->90<!--/AUTO--> | Key 注入/端点口径 |
+| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->97<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
@@ -1375,10 +1375,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2045<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2052<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->810<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1165<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1172<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

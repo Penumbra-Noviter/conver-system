@@ -209,20 +209,34 @@ export function resolveButtonState(credentials) {
 }
 
 /**
- * 校验 manifest config 三元组完整性（三个字段均为非空字符串 DOM id）。
+ * 把 config 字段值归一为候选 id 列表（F-91 多候选契约：值可为单 id 字符串
+ * 或 id 数组——同一游戏多套同义配置控件，如斗罗大陆向导 wz-* 与设置模态
+ * s-*；注入/观察者按候选逐个尝试，命中的第一套生效）。
+ * 非字符串 / 空串 / 空数组 / 含非字符串元素的数组 → 空列表（该字段不可注入）。
+ * @param {unknown} id - config 字段值（string | string[]）
+ * @returns {string[]} 非空候选 id 列表（原序）
+ */
+function configIdCandidates(id) {
+    if (typeof id === 'string') return id === '' ? [] : [id];
+    if (Array.isArray(id)) return id.filter((x) => typeof x === 'string' && x !== '');
+    return [];
+}
+
+/**
+ * 校验 manifest config 三元组完整性（三个字段均含至少一个非空字符串候选 id）。
  *
  * 渲染条件（spec「U8 注入交互」）：仅 ai 游戏且 manifest 含完整 config
  *   三元组时渲染「重新同步」按钮条；三元组不完整视为无 config
- *   （提示条维持现状）。
+ *   （提示条维持现状）。F-91：字段值可为单 id 字符串或 id 数组（多候选）。
  *
  * @param {unknown} config - manifest 条目的 config 字段（endpoint/apikey/model）
  * @returns {boolean} 三元组完整为 true
  */
 export function hasConfigTriplet(config) {
     return config !== null && typeof config === 'object' && !Array.isArray(config)
-        && typeof config.endpoint === 'string' && config.endpoint !== ''
-        && typeof config.apikey === 'string' && config.apikey !== ''
-        && typeof config.model === 'string' && config.model !== '';
+        && configIdCandidates(config.endpoint).length > 0
+        && configIdCandidates(config.apikey).length > 0
+        && configIdCandidates(config.model).length > 0;
 }
 
 /**
@@ -290,9 +304,11 @@ function ensureSelectOption(selectEl, value) {
 /**
  * 按 manifest config 三元组把凭证非空字段同步到游戏配置面板并派发事件。
  *
- * 逐字段处理（顺序 apikey → endpoint → model）：字段 id 为 config 中声明
- *   的非空字符串，且凭证对应值（apikey←key；endpoint/model 同名）为非空
- *   字符串时才尝试写入；endpoint 值先按 endpointMode 做口径转换（SIM-API-1）。
+ * 逐字段处理（顺序 apikey → endpoint → model）：字段候选 id（F-91：config
+ *   值为单 id 字符串或数组——多套同义控件族全部尝试，第一个存在且为
+ *   input/select 的为注入目标；未声明/空 → 跳过）且凭证对应值
+ *   （apikey←key；endpoint/model 同名）为非空字符串时才尝试写入；endpoint
+ *   值先按 endpointMode 做口径转换（SIM-API-1）。
  *   目标元素经 getElementById 查找（白名单 — 不做控件探测 / 自动发现），
  *   须存在且为 input/select，否则该字段跳过并静默降级（不报错不中断，其余
  *   字段继续）。select 元素：目标值不在选项集时追加受管 option（主应用模型
@@ -327,8 +343,9 @@ export function injectCredentialsIntoGame({ doc, config, credentials, endpointMo
     }
     const creds = credentials ?? {};
     for (const field of CONFIG_FIELDS) {
-        const id = config?.[field];
-        if (typeof id !== 'string' || id === '') {
+        // F-91 多候选：候选 id 逐个尝试，第一个存在且为 input/select 的元素为注入目标
+        const candidates = configIdCandidates(config?.[field]);
+        if (candidates.length === 0) {
             skipped.push(field);
             continue;
         }
@@ -338,9 +355,13 @@ export function injectCredentialsIntoGame({ doc, config, credentials, endpointMo
             skipped.push(field); // 空值不覆盖游戏默认
             continue;
         }
-        const el = doc.getElementById(id);
-        if (!el || !TARGET_TAGS.has(el.tagName)) {
-            skipped.push(field); // 控件缺失 / 类型不符 → 静默降级
+        let el = null;
+        for (const id of candidates) {
+            const found = doc.getElementById(id);
+            if (found && TARGET_TAGS.has(found.tagName)) { el = found; break; }
+        }
+        if (!el) {
+            skipped.push(field); // 全部候选控件缺失 / 类型不符 → 静默降级
             continue;
         }
         // select 缺目标 option → 追加受管 option；added=true 时浏览器自动选中
@@ -653,8 +674,10 @@ export function disconnectObserver() {
 /**
  * 变更是否触及 config 三元组控件（SIM-API-1 观察者过滤 — 游戏运行期高频
  * DOM 更新（状态渲染等）不得触发同步；只有 id 命中或变更子树含控件才算）。
- * 语义：目标元素自身 id ∈ 三元组（childList 与 attributes 变更共用判定 —
- * 期末评审去重）；或 childList 新增/移除子树内任一元素 id ∈ 三元组（游戏
+ * 语义：目标元素自身 id ∈ 候选 id 集（F-91：三元组字段值可为单 id 或
+ * 数组——多套同义控件族任一命中即触发；childList 与 attributes 变更共用
+ * 判定 — 期末评审去重）；或 childList 新增/移除子树内任一元素 id ∈ 候选
+ * id 集（游戏
  * 整段重建配置面板时命中；子树元素遍历用 id 成员判定，无选择器转义面）。
  * attributes 变更（TD-75 — 游戏以 setAttribute 重建控件）仅目标元素自身
  * 判定；运行期无关属性变更（class/style 等）由 observe 的 attributeFilter
@@ -665,7 +688,9 @@ export function disconnectObserver() {
  * @returns {boolean} 任一变更触及配置控件为 true
  */
 export function mutationTouchesConfig(mutations, config) {
+    // F-91 多候选：白名单 id 展开数组（config 字段值可为 string 或 string[]）
     const ids = [config?.endpoint, config?.apikey, config?.model]
+        .flatMap((v) => (Array.isArray(v) ? v : [v]))
         .filter((v) => typeof v === 'string' && v !== '');
     if (ids.length === 0) return false;
     for (const m of mutations ?? []) {

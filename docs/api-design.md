@@ -665,11 +665,11 @@ POST /api/simulators/reprobe
 { "id": "imported-game" }
 ```
 
-**响应** `200` — 重读落盘 HTML → 三层类型探测（L1 cfg- 三元组 / L2 关键词启发 `endpoint|url|base`+`key`+`model` / L3 local）+ 端点口径推断 → 原子更新 manifest 条目 `type` / `config` / `endpointMode`（其他字段原样保留）
+**响应** `200` — 重读落盘 HTML → 三层类型探测（L1 cfg- 三元组 / L2 关键词启发 `endpoint|url|base`+`key`+`model` / L3 local）+ 端点口径推断 → 原子更新 manifest 条目 `type` / `config` / `endpointMode`（其他字段原样保留）。`config` 值可为单 id 字符串或多候选 id 数组（F-91：同一游戏多套同义配置控件，如斗罗大陆向导 `wz-*` 与设置模态 `s-*` 并存，全部纳入按文档序排列，注入/观察者按候选逐个尝试）
 ```json
 {
   "ok": true,
-  "game": { "id": "imported-game", "file": "斗罗大陆.html", "name": "斗罗大陆", "type": "ai", "source": "imported", "config": { "endpoint": "s-endpoint", "apikey": "s-key", "model": "s-model" }, "endpointMode": "full" }
+  "game": { "id": "imported-game", "file": "斗罗大陆.html", "name": "斗罗大陆", "type": "ai", "source": "imported", "config": { "endpoint": ["s-endpoint", "wz-endpoint"], "apikey": ["s-key", "wz-key"], "model": ["s-model", "wz-model"] }, "endpointMode": "full" }
 }
 ```
 

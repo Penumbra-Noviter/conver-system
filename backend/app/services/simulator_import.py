@@ -19,11 +19,13 @@
 
 类型探测（三层，2026-08-26 补强）：`probe_config` L1 严格 cfg- 三元组
 （生成器作者契约）→ L2 关键词启发（endpoint|url|base / key / model 三组
-各命中 → ai + 各组首个 id 为 config）→ L3 local。`scan_input_ids` 双层扫描：
-HTMLParser 静态层（input/select）+ 脚本层 raw-regex（JS 模板字符串渲染的
-运行时控件——引擎系游戏设置面板全在此路径，HTMLParser 不解析 script 内容）。
-`probe_endpoint_mode` 从默认端点值推断 'full'/'base'（SIM-API-1 口径：
-以 /chat/completions 结尾 → full），import_game 条目追加 endpointMode。
+各命中 → ai + 每组**全量命中的候选 id** 为 config——多套同义控件族（向导/
+模态）全部纳入，注入按候选逐个尝试；单候选保持字符串）→ L3 local。
+`scan_input_ids` 双层扫描：HTMLParser 静态层（input/select）+ 脚本层
+raw-regex（JS 模板字符串渲染的运行时控件——引擎系游戏设置面板全在此路径，
+HTMLParser 不解析 script 内容）。`probe_endpoint_mode` 从默认端点值推断
+'full'/'base'（SIM-API-1 口径：以 /chat/completions 结尾 → full），import_game
+条目追加 endpointMode。
 
 G4 约束：本模块仅 stdlib import（dataclasses/hashlib/html.parser/
 logging/pathlib/re），与 data_dir 同层——不引入 app 业务代码。
@@ -135,7 +137,7 @@ class ScanResult:
     """预计算扫描结果（避免生成器路径双重扫描：T-03 消除 import_game 内部的 probe_config / scan_suspicious 重复计算）
 
     game_type: probe_config 判定的游戏类型（"ai" / "local"）
-    config: ai 时三元组 dict，local 时 None
+    config: ai 时三元组 dict（值可为 string 或 string[] 多候选），local 时 None
     warnings: scan_suspicious 命中的 SUSPICIOUS_PATTERNS 键集
     endpoint_mode: probe_endpoint_mode 推断值（'full'/'base'/None）
     """
@@ -331,26 +333,32 @@ def scan_input_ids(html_text: str) -> set[str]:
     return set(_collect_ordered_ids(html_text))
 
 
-def _probe_keyword_groups(ordered_ids: list[str]) -> dict[str, str] | None:
+def _probe_keyword_groups(ordered_ids: list[str]) -> dict[str, str | list[str]] | None:
     """关键词启发式探测：endpoint/url/base、key、model 三组各命中 ≥1 时返回 config。
 
+    每组按文档序收集**全部**命中 id（去重由 _collect_ordered_ids 保证）——同一
+    游戏存在多套同义配置控件（斗罗大陆的向导 wz-* 与设置模态 s-*）时全部纳入，
+    注入/观察者按候选逐个尝试，命中的第一套生效。单候选保持字符串（向后兼容
+    既有 manifest 单 id 契约）；多候选 → 数组。
+
     Args:
-        ordered_ids: 文档序控件 id 列表（每组取第一个命中，保证确定性）
+        ordered_ids: 文档序控件 id 列表（去重保证）
 
     Returns:
-        config 三元组 {endpoint, apikey, model} 或 None（未全中）
+        config 三元组 {endpoint, apikey, model}（值可能为 string 或 string[]）
+        或 None（任一关键词零命中）
     """
-    endpoint = apikey = model = None
+    groups: dict[str, list[str]] = {"endpoint": [], "apikey": [], "model": []}
     for cid in ordered_ids:
-        if endpoint is None and _ENDPOINT_RE.search(cid):
-            endpoint = cid
-        if apikey is None and _KEY_RE.search(cid):
-            apikey = cid
-        if model is None and _MODEL_RE.search(cid):
-            model = cid
-    if endpoint and apikey and model:
-        return {"endpoint": endpoint, "apikey": apikey, "model": model}
-    return None
+        if _ENDPOINT_RE.search(cid):
+            groups["endpoint"].append(cid)
+        if _KEY_RE.search(cid):
+            groups["apikey"].append(cid)
+        if _MODEL_RE.search(cid):
+            groups["model"].append(cid)
+    if not all(groups.values()):
+        return None
+    return {k: (v[0] if len(v) == 1 else v) for k, v in groups.items()}
 
 
 def probe_config(html_text: str) -> tuple[str, dict | None]:
@@ -359,10 +367,12 @@ def probe_config(html_text: str) -> tuple[str, dict | None]:
     L1（cfg- 前缀严格匹配）：cfg-endpoint/cfg-apikey/cfg-model 三个控件齐全 →
       ('ai', config 三元组)；不降级到 L2 的 cfg- 前缀——生成器作者契约。
     L2（关键词启发）：endpoint|url|base / key / model 三组关键词各命中 ≥1 个 id →
-      ('ai', 各组文档序首个 id 组成的 config)；不保留部分匹配。
+      ('ai', 每组全量命中候选组成的 config——单候选为字符串、多候选为数组，
+      按文档序排列，注入/观察者按候选逐个尝试)；不保留部分匹配。
     L3（fallback）：('local', None)。
 
-    config 值为输入框 id（key-injector 契约：按 id 定位输入框注入凭证）。
+    config 值为输入框 id（key-injector 契约：按 id 定位输入框注入凭证；
+    多候选场景第一个存在的 id 为实际注入目标）。
     """
     all_ids = scan_input_ids(html_text)
     cfg_ids = {i for i in all_ids if i.startswith("cfg-")}

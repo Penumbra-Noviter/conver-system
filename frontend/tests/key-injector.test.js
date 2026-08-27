@@ -212,6 +212,15 @@ describe('key-injector — hasConfigTriplet 三元组校验', () => {
         expect(hasConfigTriplet([])).toBe(false);
         expect(hasConfigTriplet('cfg')).toBe(false);
     });
+
+    it('F-91 多候选：字段为 id 数组（非空字符串元素）→ true；空数组 / 非字符串元素 → false', async () => {
+        const { hasConfigTriplet } = await loadInjector();
+        expect(hasConfigTriplet({ endpoint: ['s-endpoint', 'wz-endpoint'], apikey: ['s-key', 'wz-key'], model: ['s-model', 'wz-model'] })).toBe(true);
+        expect(hasConfigTriplet({ ...CONFIG, model: ['cfg-model', 'wz-model'] })).toBe(true); // 混合 string|array
+        expect(hasConfigTriplet({ ...CONFIG, endpoint: [] })).toBe(false); // 空数组 → 无候选
+        expect(hasConfigTriplet({ ...CONFIG, apikey: [42] })).toBe(false); // 非字符串元素
+        expect(hasConfigTriplet({ ...CONFIG, apikey: ['', 'cfg-apikey'] })).toBe(true); // 空串元素被清洗后仍有有效候选
+    });
 });
 
 describe('key-injector — convertEndpoint 端点口径转换（SIM-API-1）', () => {
@@ -485,6 +494,77 @@ describe('key-injector — injectCredentialsIntoGame 填值 + 事件派发', () 
     it('防御：整包参数缺失 → 全 skipped 不抛错', async () => {
         const { injectCredentialsIntoGame } = await loadInjector();
         expect(injectCredentialsIntoGame()).toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
+    });
+
+    it('F-91 多候选：manifest 首选 id 缺失、候选族存在 → 注入命中候选族（斗罗大陆向导 wz-* 场景）', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        // 游戏 load 时渲染的是向导（wz-*）；manifest 记录 s-*（模态）在前、wz-* 在后
+        const doc = makeGameDoc(`
+            <input id="wz-endpoint" value="https://api.deepseek.com/v1/chat/completions">
+            <input id="wz-key" placeholder="sk-…">
+            <select id="wz-model"><option value="deepseek-chat">deepseek-chat</option></select>
+        `);
+        const config = {
+            endpoint: ['s-endpoint', 'wz-endpoint'],
+            apikey: ['s-key', 'wz-key'],
+            model: ['s-model', 'wz-model'],
+        };
+        const result = injectCredentialsIntoGame({ doc, config, credentials: CRED_OPENAI, endpointMode: 'full' });
+
+        expect(doc.getElementById('wz-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('wz-key').value).toBe('sk-smoke-openai');
+        expect(doc.getElementById('wz-model').value).toBe('gpt-4o-mini');
+        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
+    });
+
+    it('F-91 多候选：首选候选族存在 → 只写首选族（后续候选不写）', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makeGameDoc(`
+            <input id="s-endpoint" value="s-default">
+            <input id="s-key">
+            <select id="s-model"><option value="m1">m1</option></select>
+            <input id="wz-endpoint" value="wz-default">
+            <input id="wz-key">
+            <select id="wz-model"><option value="m2">m2</option></select>
+        `);
+        const config = {
+            endpoint: ['s-endpoint', 'wz-endpoint'],
+            apikey: ['s-key', 'wz-key'],
+            model: ['s-model', 'wz-model'],
+        };
+        const result = injectCredentialsIntoGame({ doc, config, credentials: CRED_OPENAI });
+
+        expect(doc.getElementById('s-endpoint').value).toBe('https://api.example.com/v1'); // 首选族被写
+        expect(doc.getElementById('s-key').value).toBe('sk-smoke-openai');
+        expect(doc.getElementById('s-model').value).toBe('gpt-4o-mini');
+        expect(doc.getElementById('wz-endpoint').value).toBe('wz-default'); // 候选族不动
+        expect(doc.getElementById('wz-key').value).toBe('');
+        expect(doc.getElementById('wz-model').value).toBe('m2');
+        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
+    });
+
+    it('F-91 多候选：全部候选控件缺失 → 跳过该字段不抛错（与单 id 缺失同语义）', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makeGameDoc('<div></div>');
+        const config = {
+            endpoint: ['s-endpoint', 'wz-endpoint'],
+            apikey: ['s-key', 'wz-key'],
+            model: ['s-model', 'wz-model'],
+        };
+        expect(injectCredentialsIntoGame({ doc, config, credentials: CRED_OPENAI }))
+            .toEqual({ filled: [], skipped: ['apikey', 'endpoint', 'model'], written: [] });
+    });
+
+    it('F-91 多候选：字段为数组但含非字符串元素（脏数据）→ 清洗后有效候选仍注入', async () => {
+        const { injectCredentialsIntoGame } = await loadInjector();
+        const doc = makePanelDoc();
+        const result = injectCredentialsIntoGame({
+            doc,
+            config: { endpoint: [42, 'cfg-endpoint'], apikey: 'cfg-apikey', model: ['cfg-model'] },
+            credentials: CRED_OPENAI,
+        });
+        expect(result).toEqual({ filled: ['apikey', 'endpoint', 'model'], skipped: [], written: ['apikey', 'endpoint', 'model'] });
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
     });
 });
 
@@ -1245,6 +1325,19 @@ describe('key-injector — mutationTouchesConfig 观察者过滤（纯函数 —
         expect(text.nodeType).toBe(3);
         expect(mutationTouchesConfig([rec({ addedNodes: [text] })], CONFIG)).toBe(false);
     });
+
+    it('F-91 多候选：任一候选族控件变更均命中（s- 模态 / wz- 向导任一渲染触发同步）', async () => {
+        const { mutationTouchesConfig } = await loadInjector();
+        const config = {
+            endpoint: ['s-endpoint', 'wz-endpoint'],
+            apikey: ['s-key', 'wz-key'],
+            model: ['s-model', 'wz-model'],
+        };
+        expect(mutationTouchesConfig([rec({ addedNodes: [el('<input id="wz-key">')] })], config)).toBe(true);
+        expect(mutationTouchesConfig([rec({ addedNodes: [el('<select id="s-model">')] })], config)).toBe(true);
+        expect(mutationTouchesConfig([rec({ removedNodes: [el('<div><input id="wz-endpoint"></div>')] })], config)).toBe(true);
+        expect(mutationTouchesConfig([rec({ addedNodes: [el('<input id="other-field">')] })], config)).toBe(false);
+    });
 });
 
 describe('key-injector — 配置控件观察者生命周期（S3 — 观察→过滤→防抖→同步→冷却→熔断→断连）', () => {
@@ -1494,5 +1587,38 @@ describe('key-injector — 配置控件观察者生命周期（S3 — 观察→�
         const { mod: fresh } = await setupObserver();
         expect(() => fresh.disconnectObserver()).not.toThrow();
         expect(() => fresh.disconnectObserver()).not.toThrow();
+    });
+
+    it('F-91 多候选观察者：配置面板以候选族控件重建（斗罗大陆向导 wz-*）→ 防抖后按候选族同步', async () => {
+        const mod = await loadInjector();
+        const fetchMock = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetchMock });
+        const bar = makeBar();
+        const doc = makeGameDoc(`
+            <input id="wz-endpoint" value="https://api.deepseek.com/v1/chat/completions">
+            <input id="wz-key">
+            <select id="wz-model"><option value="deepseek-chat">deepseek-chat</option></select>
+        `);
+        const config = {
+            endpoint: ['s-endpoint', 'wz-endpoint'],
+            apikey: ['s-key', 'wz-key'],
+            model: ['s-model', 'wz-model'],
+        };
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => config, getEndpointMode: () => null });
+        mod.observeConfigControls({ doc, config, endpointMode: 'full', bar });
+
+        // 游戏重建向导面板（wz- 族控件重挂 — 模态 s-* 从未渲染）
+        doc.body.innerHTML = `
+            <input id="wz-endpoint" value="https://api.deepseek.com/v1/chat/completions">
+            <input id="wz-key">
+            <select id="wz-model"><option value="deepseek-chat">deepseek-chat</option></select>
+        `;
+        await vi.advanceTimersByTimeAsync(500); // 防抖到期
+        await vi.advanceTimersByTimeAsync(0); // 同步微任务
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(doc.getElementById('wz-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+        expect(doc.getElementById('wz-key').value).toBe('sk-smoke-openai');
+        expect(doc.getElementById('wz-model').value).toBe('gpt-4o-mini');
     });
 });

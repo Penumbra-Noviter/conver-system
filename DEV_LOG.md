@@ -8,6 +8,16 @@
 
 ---
 
+## 用户 bug 修复 F-91：模拟器 config 多候选 id（2026-08-27 — 用户报告，斗罗大陆同步失效）
+
+- **来源**：用户报告「本地导入的斗罗大陆同步全局 API 设置失效，未自动填入 key/模型」。**根因实证**：斗罗大陆有**两套** AI 配置控件——初始向导 `wz-endpoint/wz-key/wz-model`（load 即渲染）与设置模态 `s-endpoint/s-key/s-model`（后开）；`_probe_keyword_groups` 每关键词只取文档序**首个命中**，模态 `s-*` 族在 HTML 里排在向导 `wz-*` 前 → manifest 记录 `s-*` 族，而 load 注入找 `s-*` 控件不存在 → 全 skipped；观察者过滤也只认 `s-*` → 向导渲染不触发同步。Playwright 复现首启向导端点仍 deepseek 默认/key 空。
+- **修复（config 多候选，最小）**：`_probe_keyword_groups` 改为按文档序**全量收集**每关键词所有命中 id，单候选保持字符串（向后兼容既有 manifest），多候选 → 数组（`{endpoint: ['s-endpoint','wz-endpoint'], ...}`）；注入/观察者按候选逐个尝试、命中的第一套生效。`key-injector.js` 三消费点兼容 `string | string[]`：`hasConfigTriplet`（新增 `configIdCandidates` 归一 helper）/ `injectCredentialsIntoGame`（候选逐个 getElementById，首个存在且 input/select 者为目标）/ `mutationTouchesConfig`（白名单 id 展开数组）。白名单注入纪律保持（仍是 manifest 声明 id，非控件探测）。
+- **验证链**：pytest 809+1skip（探针矩阵零回归；`test_heuristic_script_embedded` 改断言多候选数组——该用例即斗罗大陆场景）| Vitest 1172（key-injector 97 用例全绿，+5 多候选：hasConfigTriplet 数组 / 注入命中候选族 / 首选族存在不写候选 / 全缺失降级 / 观察者候选族重建同步 + 脏数据清洗）| 真实斗罗大陆 probe 返回 `{endpoint:['s-endpoint','wz-endpoint'],...}` endpointMode full | **Playwright 端到端**：打开斗罗大陆首启向导自动填入全局配置（端点 `api.kukuit.com/v1/chat/completions`、key 已填、模型 `deepseek-v4-flash` 选中）——修复前此处为 deepseek 默认/key 空 | AppData manifest 老条目 config 更新为数组态（用户机器一次性数据修正）。
+- **文档**：CODE_WIKI / api-design config 契约描述同步；TICKETS F-91 立项→归档。
+- **非阻断观察**：前端「重新识别」按钮仅 `type === 'local'` 卡片渲染——历史误探为 ai 且 config 错的老条目无法从 UI 一键 reprobe（本次靠一次性数据修正），可作后续候选（Worth exploring）。
+
+---
+
 ## 版本号升级 v0.5.0（2026-08-27 — 8+1 处清单，基线 56339e7 → HEAD）
 
 - **版本号 0.4.0 → 0.5.0**：9 处全升（index.html 侧栏/package.json/package-lock 两处/main.py FastAPI 元数据/Cargo.toml/Cargo.lock 随 cargo build 自动/tauri.conf.json/tauri-desktop.md 安装器路径/PROJECT_REFERENCE 状态行）。经验证源码零残留 0.4.0（DEV_LOG 历史条目除外；构建产物 target/、第三方依赖 winapi 0.4.0 不动）。**打包必产安装器**（用户明确要求，未加 -SkipInstaller）。

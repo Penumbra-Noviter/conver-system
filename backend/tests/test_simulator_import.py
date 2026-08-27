@@ -479,7 +479,7 @@ class TestProbeConfig:
         assert config == expected_config
 
     def test_heuristic_script_embedded(self) -> None:
-        """脚本内嵌控件（引擎系游戏设置面板，s- 与 wz- 向导并存）→ 文档序首选 s-"""
+        """脚本内嵌控件（引擎系游戏设置面板，s- 与 wz- 向导并存）→ 全量候选数组"""
         html = (
             '<script>'
             'function modalSettings() { return `'
@@ -492,8 +492,12 @@ class TestProbeConfig:
         )
         game_type, config = probe_config(html)
         assert game_type == "ai"
-        # 文档序：s- 出现先于 wz-（s- 在脚本中先被定义）
-        assert config == {"endpoint": "s-endpoint", "apikey": "s-key", "model": "s-model"}
+        # 文档序全量候选：s- 族先于 wz- 族；两组都是可注入目标（模态/向导各一套）
+        assert config == {
+            "endpoint": ["s-endpoint", "wz-endpoint"],
+            "apikey": ["s-key", "wz-key"],
+            "model": ["s-model", "wz-model"],
+        }
 
     @pytest.mark.parametrize(
         "ids",
