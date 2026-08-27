@@ -960,7 +960,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulators.js:getGames-->`getGames()`<!--/AUTO--> | 获取游戏列表 |
 | <!--AUTO:sig:frontend/js/simulators.js:bindEvents-->`bindEvents()`<!--/AUTO--> | 事件绑定（含重新识别拦截） |
 | <!--AUTO:sig:frontend/js/simulators.js:renderShell-->`renderShell()`<!--/AUTO--> | 渲染壳 |
-| <!--AUTO:sig:frontend/js/simulators.js:renderList-->`renderList()`<!--/AUTO--> | 渲染列表（local 卡片含重新识别按钮） |
+| <!--AUTO:sig:frontend/js/simulators.js:renderList-->`renderList()`<!--/AUTO--> | 渲染列表（local 与 ai+imported 卡片含重新识别按钮） |
 | <!--AUTO:sig:frontend/js/simulators.js:renderLoading-->`renderLoading()`<!--/AUTO--> | 加载态渲染 |
 | <!--AUTO:sig:frontend/js/simulators.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
 | <!--AUTO:sig:frontend/js/simulators.js:reprobeGame-->`reprobeGame(id)`<!--/AUTO--> | 重新识别（POST → 刷新 → 反馈） |
