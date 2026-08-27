@@ -8,6 +8,15 @@
 
 ---
 
+## 版本号升级 v0.6.0（2026-08-28 — 9 处清单 + SECURITY 支持表，基线 v0.5.0 → HEAD）
+
+- **版本号 0.5.0 → 0.6.0**：9 处全升（index.html 侧栏/package.json/package-lock 两处/main.py FastAPI 元数据/Cargo.toml/Cargo.lock/tauri.conf.json/tauri-desktop.md 安装器路径/PROJECT_REFERENCE 状态行）+ SECURITY.md 支持版本表（0.6.x latest）。源码零残留 0.5.0（DEV_LOG 历史条目与第三方依赖如 heck 0.5.0 除外）。
+- **构建链**：全链通过——cargo test 70 | pytest 809 | vitest 1182 | tauri build NSIS 产出 `Conver System_0.6.0_x64-setup.exe`（25.8 MB）| dist 测试包 | 冒烟 5/5 PASS（就绪标记//api/models/前端挂载/表结构/退出无残留）。
+- **发布**：tag v0.6.0 + GitHub Release 已发（id 378015007），安装器资产 `Conver.System_0.6.0_x64-setup.exe`（25.8 MB，空格按 GitHub 惯例转点号）。v0.6.0 实质变更：F-91 模拟器 config 多候选 id（修斗罗大陆同步失效）+ T-01 ai+imported 老条目可一键 reprobe + SECURITY 策略落地。
+- **过程遥测**：构建经 Git Bash 启动 powershell.exe 时，PATH 会注入 Git `usr/bin`（link.exe 遮蔽 MSVC 的坑）——用 `.scratch/run-build-v060.ps1` 引导脚本剔除 Git 路径后再调 build-backend.ps1（main.py 升版须重建后端）+ build-desktop.ps1 全链，规避脚本铁律。
+
+---
+
 ## 技术债消费批次 F-92（2026-08-27 — kickoff 全自动档轻量档 1 工单，基线 647d720 → HEAD）
 
 - **来源**：用户「消费技术债区，进入 project-kickoff 全自动流程」选择候选区唯一剩余项 F-92（Worth exploring，来源 F-91 非阻断观察）。Grilling 实证拍板**做**——git grep 复核 `simulators.js:318` 按钮条件 `type==='local'`、`simulators.py:89` reprobe 端点按 id 定位不区分 type，确认「ai 但 config 错的历史导入条目无 UI reprobe 入口」为真实缺口；**方案 D 锁定**：新增纯函数 `canReprobeGame(game)`（`local` 恒真 || `ai∧source==='imported'`）驱动渲染条件；后端零改动（reprobe 按 id 通用、source 保留）；不在 generated/种子卡片加按钮、不做历史 manifest 自动迁移。
