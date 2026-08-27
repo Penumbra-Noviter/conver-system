@@ -1107,6 +1107,43 @@ describe('T3 对话内模型切换 — 凭证不可用确认提示（none/claude
         document.querySelector('.confirm-modal .confirm-ok').click();
         await vi.waitFor(() => expect(hasPut(fetchSpy)).toBe(true));
     });
+
+    // ── F-77 文案映射表：四分支逐字回归网（先于提取重构落地 — 重构引入文案漂移/对调即转红）──
+
+    const openModalConfirm = async ({ protocol, targetProvider, targetModel }) => {
+        const { chat, fetchSpy } = await setupSwitch({ protocol });
+        chat.chatDom.chatHeader.querySelector('.chat-model-badge').click();
+        const overlay = document.querySelector('.modal-overlay');
+        if (targetProvider) {
+            const prov = overlay.querySelector('#ms-provider');
+            prov.value = targetProvider;
+            prov.dispatchEvent(new Event('change', { bubbles: true }));
+            overlay.querySelector('#ms-model').value = targetModel;
+        }
+        overlay.querySelector('.ms-start').click();
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).not.toBeNull());
+        return document.querySelector('.confirm-modal .confirm-message').textContent;
+    };
+
+    it('F-77 文案:warnReason=none → 确认文案逐字为「尚未配置 API Key…」', async () => {
+        const msg = await openModalConfirm({ protocol: 'none' });
+        expect(msg).toBe('尚未配置 API Key，发送消息可能失败。仍要切换模型吗？');
+    });
+
+    it('F-77 文案:warnReason=openai(目标 claude)→ 确认文案逐字为「当前仅配置了 OpenAI 兼容 Key…」', async () => {
+        const msg = await openModalConfirm({ protocol: 'openai' });
+        expect(msg).toBe('当前仅配置了 OpenAI 兼容 Key，所选 Claude Provider 可能不可用。仍要切换吗？');
+    });
+
+    it('F-77 文案:warnReason=unknown → 确认文案逐字为「凭证协议状态未知…」', async () => {
+        const msg = await openModalConfirm({ protocol: 'weird-unknown', targetProvider: 'deepseek', targetModel: 'deepseek-chat' });
+        expect(msg).toBe('凭证协议状态未知，所选模型可能不可用。仍要切换吗？');
+    });
+
+    it('F-77 文案:warnReason=claude(默认臂,目标非 claude)→ 确认文案逐字为「当前仅配置了 Claude Key…」', async () => {
+        const msg = await openModalConfirm({ protocol: 'claude', targetProvider: 'deepseek', targetModel: 'deepseek-chat' });
+        expect(msg).toBe('当前仅配置了 Claude Key，所选 Provider 可能不可用。仍要切换吗？');
+    });
 });
 
 describe('T3 对话内模型切换 — 在途流式不被切换打断', () => {

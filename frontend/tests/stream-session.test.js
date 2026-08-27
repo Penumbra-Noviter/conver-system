@@ -164,6 +164,68 @@ describe('mergeFreshList — stale 分支(长度变了 → 仅按位置结算 st
         expect(result.render).toBe(true);
         expect(result.messages).toBe(server); // 服务端列表权威
     });
+
+    it('stale 定位跨边界:缓存 string id 消息 + messageId 为 number(同 id)→ 按 id 定位命中、原位替换 content + 清 streaming、render:true(修复前严格等号落空渲染服务端列表)', () => {
+        // F-78:本地以 string '3' 持有并发流写入的 streaming 消息、结算写入以 number 3
+        // 定位。严格 `'3' === 3` 失配 → 本地命中落空,退化为渲染服务端列表。
+        // 修复:String() 归一后按 id 命中 → 原位替换 content + 清 streaming。
+        const tab = {
+            messages: [
+                msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+                { role: 'assistant', content: '新回复', id: '3', streaming: true },
+            ],
+        };
+        const server = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'), msg(4, 'user', '并发')];
+        const result = mergeFreshList(tab, 2, server, {
+            settleIndex: -1, anchor: null, messageId: 3, content: '新回复改',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toEqual([
+            msg(1, 'user', '你好'),
+            msg(2, 'assistant', '旧回复'),
+            { role: 'assistant', content: '新回复改', id: '3', streaming: false },
+        ]);
+        expect(result.messages.filter((m) => m.streaming)).toEqual([]);
+    });
+
+    it('stale 定位跨边界(反向):缓存 number id 消息 + messageId 为 string(同 id)→ 按 id 定位命中、原位替换 content + 清 streaming、render:true', () => {
+        // Falsify 对偶端:number 缓存 3 vs string messageId '3' — String() 归一双向生效。
+        const tab = {
+            messages: [
+                msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+                { role: 'assistant', content: '新回复', id: 3, streaming: true },
+            ],
+        };
+        const server = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'), msg(4, 'user', '并发')];
+        const result = mergeFreshList(tab, 2, server, {
+            settleIndex: -1, anchor: null, messageId: '3', content: '新回复改',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toEqual([
+            msg(1, 'user', '你好'),
+            msg(2, 'assistant', '旧回复'),
+            { role: 'assistant', content: '新回复改', id: 3, streaming: false },
+        ]);
+        expect(result.messages.filter((m) => m.streaming)).toEqual([]);
+    });
+
+    it('stale 定位无假阳性:缓存 string id 与 messageId 不同 → 本地不命中,渲染服务端权威列表(不同 id 不误匹配)', () => {
+        const tab = {
+            messages: [
+                msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+                { role: 'assistant', content: '新回复', id: '3', streaming: true },
+            ],
+        };
+        const server = [
+            msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复'),
+            msg(4, 'user', '并发'), msg(3, 'assistant', '真正的结束'),
+        ];
+        const result = mergeFreshList(tab, 2, server, {
+            settleIndex: -1, anchor: null, messageId: 9, content: '改',
+        });
+        expect(result.render).toBe(true);
+        expect(result.messages).toBe(server); // 服务端列表权威(非本地误替换)
+    });
 });
 
 describe('mergeFreshList — 失败分支(msgs=null → 位置感知追加,不清并发流占位 — 根治 R2)', () => {
@@ -210,6 +272,34 @@ describe('mergeFreshList — 失败分支(msgs=null → 位置感知追加,不�
         expect(result.render).toBe(false);
         expect(result.messages).toBe(tab.messages);
         expect(result.messages.filter((m) => m.id === 101)).toHaveLength(1);
+    });
+
+    it('幂等早退跨边界:缓存含 string id 消息 + message.id 为 number(同 id)→ 早退激活,render:false、不出现重复消息(修复前严格等号失配走插入路径)', () => {
+        // F-74:后端返回 number id 101、本地缓存以 string '101' 持有同一消息。严格 `===`
+        // 失配 → 幂等早退失效,落入 anchor 路径重复插入。修复:String() 归一后早退激活。
+        const tab = { messages: [msg(1, 'user', 'hi'), { role: 'assistant', content: '你好', id: '101' }] };
+        const result = mergeFreshList(tab, 2, null, { anchor: tab.messages[0], messageId: 101, content: '你好' });
+        expect(result.render).toBe(false);
+        expect(result.messages).toBe(tab.messages);
+        expect(result.messages.filter((m) => String(m.id) === '101')).toHaveLength(1); // 无重复
+    });
+
+    it('幂等早退跨边界(反向):缓存含 number id 消息 + message.id 为 string(同 id)→ 早退激活,render:false', () => {
+        // Falsify 对偶端:number 缓存 '101' vs string message.id '101' — String() 归一双向生效。
+        const tab = { messages: [msg(1, 'user', 'hi'), { role: 'assistant', content: '你好', id: 101 }] };
+        const result = mergeFreshList(tab, 2, null, { anchor: tab.messages[0], messageId: '101', content: '你好' });
+        expect(result.render).toBe(false);
+        expect(result.messages).toBe(tab.messages);
+        expect(result.messages.filter((m) => String(m.id) === '101')).toHaveLength(1);
+    });
+
+    it('幂等早退无假阳性:缓存 string id 与 message.id 不同 → 不早退,正常插入(不同 id 不误匹配)', () => {
+        const tab = { messages: [msg(1, 'user', 'hi'), { role: 'assistant', content: '旧', id: '102' }] };
+        const result = mergeFreshList(tab, 2, null, { anchor: tab.messages[0], messageId: 101, content: '你好' });
+        expect(result.render).toBe(true);
+        expect(result.messages.filter((m) => String(m.id) === '101')).toHaveLength(1); // 新消息插入
+        expect(result.messages.filter((m) => String(m.id) === '102')).toHaveLength(1); // 旧消息保留
+        expect(result.messages).toHaveLength(3);
     });
 
     it('settleIndex=-1(从未创建占位,如零 token 流)→ 追加到尾部', () => {

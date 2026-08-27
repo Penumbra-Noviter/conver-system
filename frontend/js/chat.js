@@ -443,6 +443,20 @@ function credentialWarnReason(selectedProvider) {
 }
 
 /**
+ * 凭证不可用确认文案 — 单一映射表（F-77）。
+ * 键与 credentialWarnReason 返回值（'none'|'claude'|'openai'|'unknown'）一一对应；
+ * 未知 reason 经 ?? 回落 claude 文案（与既有四臂三元的 default 臂语义一致）。
+ * 文案逐字保留，后续新增 reason 臂只需在此追加一条。
+ * @type {Record<'none'|'claude'|'openai'|'unknown', string>}
+ */
+const WARN_REASON_MESSAGE = {
+    none: '尚未配置 API Key，发送消息可能失败。仍要切换模型吗？',
+    openai: '当前仅配置了 OpenAI 兼容 Key，所选 Claude Provider 可能不可用。仍要切换吗？',
+    unknown: '凭证协议状态未知，所选模型可能不可用。仍要切换吗？',
+    claude: '当前仅配置了 Claude Key，所选 Provider 可能不可用。仍要切换吗？',
+};
+
+/**
  * 对话内模型切换（T3 — .chat-model-badge 点击入口；P3 前部）：
  *   1. 打开模型选择器并预选当前 conv 的 provider/model（showModelSelector 扩展签名）
  *   2. 凭证不可用（none 恒提示 / claude 切非 claude / openai 切 claude）→ showConfirm 确认提示但允许保存
@@ -468,13 +482,7 @@ export async function openModelSwitch(conv) {
     if (warnReason) {
         const confirmed = await showConfirm({
             title: '模型可能不可用',
-            message: warnReason === 'none'
-                ? '尚未配置 API Key，发送消息可能失败。仍要切换模型吗？'
-                : warnReason === 'openai'
-                    ? '当前仅配置了 OpenAI 兼容 Key，所选 Claude Provider 可能不可用。仍要切换吗？'
-                    : warnReason === 'unknown'
-                        ? '凭证协议状态未知，所选模型可能不可用。仍要切换吗？'
-                        : '当前仅配置了 Claude Key，所选 Provider 可能不可用。仍要切换吗？',
+            message: WARN_REASON_MESSAGE[warnReason] ?? WARN_REASON_MESSAGE.claude,
             detail: `目标：${selection.model}（${selection.provider}）`,
             confirmText: '仍要切换',
             cancelText: '取消',

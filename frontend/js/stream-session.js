@@ -65,12 +65,13 @@ import { messages } from './api.js';
  */
 function settleByPosition(tab, anchor, message, replaceId = null) {
     const next = [...tab.messages];
-    // 幂等:缓存已含本流消息(带 id 匹配)— 已被并发流的 fresh 替换结算,不重复插入。
+    // 幂等:缓存已含本流消息(String() 归一 id 匹配 — 跨边界 string/number 同 id 亦命中)—
+    // 已被并发流的 fresh 替换结算,不重复插入。
     // F-66:当 messageId === replaceId(服务端复用被顶替旧回复 id)时,缓存中的被顶替
     // 旧回复 id === replaceId === messageId,幂等检查会误判「已结算」而吞掉新内容 —
     // 顶替场景本体须跳过幂等早退,继续走下方 replaceId 原位替换。
     const isReplacementScenario = replaceId != null && String(replaceId) === String(message.id);
-    if (!isReplacementScenario && message.id != null && next.some((m) => m.id === message.id)) {
+    if (!isReplacementScenario && message.id != null && next.some((m) => String(m.id) === String(message.id))) {
         return { messages: tab.messages, render: false };
     }
     // F-58:重生成失败兜底 — 按被顶替旧消息身份原位替换(后端已截断旧回复,顶替而非尾部追加)。
@@ -170,7 +171,7 @@ export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor =
     // 空回复不被静默丢弃):命中 → 原位替换 content + 清 streaming(幂等);
     // 找不到同 id(重生成场景,本地仍是被顶替的旧回复)→ 至少渲染服务端列表(权威)。
     if (messageId != null) {
-        const matchIdx = tab.messages.findIndex((m) => m.id === messageId);
+        const matchIdx = tab.messages.findIndex((m) => String(m.id) === String(messageId));
         if (matchIdx >= 0) {
             const next = [...tab.messages];
             next[matchIdx] = { ...next[matchIdx], content, streaming: false };
