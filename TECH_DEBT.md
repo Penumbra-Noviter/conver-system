@@ -17,20 +17,29 @@
 
 ## 技术债候选区
 
-> 当前 6 项待立项（F-64~F-73 批次的期末四轴非阻断发现；原 F-64~F-73 已 2026-08-27 全量消费并移出候选区，见处置记录）。
+> 当前 2 项待立项（F-74~F-79 批次的期末四轴非阻断发现；原 F-74~F-79 已 2026-08-27 全量消费并移出候选区，见处置记录）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| F-74 | `settleByPosition`/`mergeFreshList` 幂等 id 比较仍严格 `===`（stream-session.js:73/173），与 W1 已归一两处不一致——string/number 跨边界时真幂等早退失效；后端 int 契约在界外 | 期末四轴 Falsify（波 2 判断复核维持） | 低 | 📝 待立项 |
-| F-75 | `String(null/undefined)` 坍缩为 `'null'`/`'undefined'` 字面量参与 id 比较（stream-session.js:72、chat.js:161）；仅字面量 id 可达，不可达 | 期末四轴 Falsify（波 2 复核） | 低 | 📝 待立项 |
-| F-76 | `#b45309` 对 `--page`(#f0ece5)=4.27:1，对 `--bg`(#f8f5ef)=4.61:1 达标但余量 0.11；当前唯一渲染语境为 `.modal`(bg=--bg)，若未来落 `--page` 面或浅底微调将跌破 AA | 期末四轴 Falsify（波 2 数据复核更正） | 低 | 📝 待立项 |
-| F-77 | warnReason 字符串联合在 `credentialWarnReason`(switch) 与 `openModelSwitch`(嵌套三元) 两处分支（possible Repeated Switches / Primitive Obsession 弱判断），'unknown' 臂后再扩态需改两处 | 期末四轴 Standards/Architecture | 低 | 📝 待立项 |
-| F-78 | 会话/消息 id 身份比较归一策略三文件分叉（error-bar String() / chat.js String()+dataset / stream-session 严格与 String() 混用），同概念三种写法 | 期末四轴 Architecture | 低 | 📝 待立项 |
-| F-79 | `locateAndHighlight` 从全后代 querySelector 改为顶层 children 遍历；当前气泡为直接子节点行为等价，未来嵌套包装则静默回落滚动到底（信息性注记） | 期末四轴 Falsify | 低（信息性） | 📝 待立项 |
+| F-80 | `stream-session.js` `String(m.id) === String(x)` 字面比较重复 4 次（isReplacementScenario/replaceIdx/幂等 some/stale findIndex），可提 `sameId(a,b)` 私有 helper 收敛 | 期末四轴 Architecture（F-74~F-79 批次） | 低 | 📝 待立项 |
+| F-81 | `chat.js:378/509/592` 等处 `state.conversations.find(c => c.id === conversationId)` 严格 `===` 残留——两侧同出自 state 源、无跨边界 string/number 风险，范围外既有写法 | 期末四轴 Architecture（F-74~F-79 批次） | 低 | 📝 待立项 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
+
+### 2026-08-27（技术债消费批次：F-74~F-79 全自动档 kickoff，2 做 3 关）
+
+> 处置详情：2 项消费（F-74+F-78 对应工单 A、F-77 对应工单 B，见 TICKETS 归档）；3 项复核关闭（F-75：`String(null/undefined)` 坍缩字面量——`replaceId != null` 与 `chat.js:224` `messageId !== undefined/null` 前置守卫使 null 不可达，且后端 int PK 数值 id 不可能等于 'null'/'undefined' 字面量，无假阳性碰撞；F-76：`.gg-config-warning-nav` 当前唯一渲染语境 `.modal`(bg=--bg) #b45309 对 --bg=4.61:1 达标、加深会改用户可见色而当前无合规问题，余量风险已在 style.css:2110-2111 F-73 注释记录；F-79：locateAndHighlight 顶层 children 遍历为 F-69 现状、format.js:114 气泡为直接子节点行为等价，未来嵌套包装时才需回退选择器）。工单 A 跨边界幂等早退激活为预期内正确性修复，工单 B 纯重构文案逐字。期末四轴 0 阻断放行；非阻断落债 F-80/F-81。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-74 | settleByPosition/mergeFreshList 幂等 id 比较严格 === | 期末四轴 Falsify | 低 | ✅ 已修（2026-08-27：工单 A :73/:173 改 String() 归一，跨边界幂等早退激活/定位命中，+6 用例含反向端与无假阳性） |
+| F-75 | String(null/undefined) 坍缩字面量参与 id 比较 | 期末四轴 Falsify | 低 | ❌ 复核关闭（2026-08-27：replaceId/messageId 均前置守卫不可达，后端 int PK 不可能等于字面量，无假阳性） |
+| F-76 | #b45309 对 --page 4.26:1 余量 0.11 | 期末四轴 Falsify | 低 | ❌ 复核关闭（2026-08-27：唯一渲染语境 .modal=--bg 4.61:1 达标，加深改可见色，注释已记录语境） |
+| F-77 | warnReason 两处分支 Repeated Switches | 期末四轴 Standards/Architecture | 低 | ✅ 已修（2026-08-27：工单 B openModelSwitch 文案提取 WARN_REASON_MESSAGE 映射表，credentialWarnReason 不动，+4 逐字断言） |
+| F-78 | id 归一策略三文件分叉 | 期末四轴 Architecture | 低 | ✅ 已修（2026-08-27：工单 A stream-session 侧 4 处全 String() 归一，error-bar/chat 已归一） |
+| F-79 | locateAndHighlight 顶层 children 遍历注记 | 期末四轴 Falsify | 低（信息性） | ❌ 复核关闭（2026-08-27：F-69 已实现，当前气泡直接子节点行为等价，未来嵌套才回退） |
 
 ### 2026-08-27（技术债消费批次：F-64~F-73 全自动档 kickoff，8 做 2 关，4 工单 2 波）
 

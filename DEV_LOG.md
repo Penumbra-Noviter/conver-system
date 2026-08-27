@@ -8,6 +8,15 @@
 
 ---
 
+## 技术债消费批次 F-74~F-79（2026-08-27 — kickoff 全自动档小档 2 工单后台 lane，基线 701322a → HEAD）
+
+- **来源**：用户「消费候选 F-74~F-79 进入全自动流程」。Grilling 共识 **2 做 + 3 关**——F-75 `String(null/undefined)` 坍缩字面量复核关闭（`replaceId != null` 与 chat.js:224 `messageId !== undefined/null` 前置守卫使 null 不可达，后端 int PK 数值 id 不可能等于 'null'/'undefined' 字面量）；F-76 `.gg-config-warning-nav` 对比度余量复核关闭（唯一渲染语境 `.modal`=--bg，#b45309 对 --bg=4.61:1 达标，加深会改用户可见色而当前无合规问题）；F-79 locateAndHighlight 顶层 children 遍历复核关闭（F-69 已实现，format.js:114 气泡为直接子节点行为等价）。
+- **2 工单后台 lane（小档）**：工单 A stream-session 幂等 id 比较 String() 归一（F-74+F-78：`settleByPosition` 幂等早退 `next.some` + `mergeFreshList` stale 分支 `findIndex` 改 `String()`，跨边界 string/number 幂等早退激活/定位命中——预期内正确性修复）；工单 B openModelSwitch warnReason 文案提取单一映射表（F-77：四臂嵌套三元 → `WARN_REASON_MESSAGE` 映射表 + `?? claude` 回落，文案逐字、`credentialWarnReason` 零改动，纯重构）。两票由同一 Implement agent 同 worktree 连续 commit（小档 lane 机制）。
+- **期末四轴 0 阻断放行**（Standards 0/安全红线 0 / Spec 2/2 验收全过文案逐字 / Falsify 0 跨边界双向+无假阳性+突变灵敏度 / Architecture 0 阻断 + 2 非阻断）。非阻断落债 **F-80**（stream-session `String()` 字面比较重复 4×，可提 `sameId` helper）/ **F-81**（chat.js 3 处 state 同源严格 `===`，范围外既有写法）。
+- **验证链**：pytest 792+1skip（零后端改动）| Vitest 1135→**1145**（+10：stream-session +6、chat +4）| 波末文件范围核验合规 | 冒烟（uvicorn + 页面/chat.js/stream-session.js/style.css/API conversations 全 200，fetch 确认服务端 JS 含 String() 归一与 WARN_REASON_MESSAGE 新标记——防 HTTP 缓存拿旧码）| doc_sync 零漂移。
+- **过程遥测**：2 工单全单次完成 0 重开；两票均 DONE_WITH_CONCERNS（仅 doc_sync pre-commit 钩子拦截 CODE_WIKI 漂移，依 spec 用 `--no-verify` 提交、merge 后统一 doc_sync）；后台 lane 连续无中断；Neat 清场 1 分支 + 1 worktree + smoke 日志 + 缓存。
+- **doc_sync 惯例复证**：CODE_WIKI 机械标记在 Implement 侧漂移属预期（不在工单范围），主会话 merge 后 `python scripts/doc_sync.py` 统一刷新 8 标记、`--check` 归零——与 F-64~73 批「merge 后统一 doc_sync」一致。
+
 ## 技术债消费批次 F-64~F-73（2026-08-27 — kickoff 全自动档标准档 4 工单 2 波，基线 880aa24 → HEAD）
 
 - **来源**：用户「对候选区新 10 项继续立项」。Grilling 共识 **8 做 + 2 关**——F-64 实证复核关闭（期末审核称 regenerate 流式在途无守卫，但 chat.js:760 入口已查 `if (!tab || tab.isStreaming) return;`，审核基于过时行号误报，git grep 复核现状守卫存在——「票面修复建议实证复核」惯例再次验证）；F-65 settleTurn 参数面膨胀架构重构关闭（单文件内聚未越界、承重重生成核心链路，与 F-37/F-38/F-42 先例同族）。

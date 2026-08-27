@@ -29,7 +29,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 访问 http://localhost:8000（Swagger：http://localhost:8000/docs）
 
-测试：`cd backend && python -m pytest`（pytest 789 + 1 skip）；`cd frontend && npm test`（Vitest 1087，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
+测试：`cd backend && python -m pytest`（pytest 793 + 1 skip）；`cd frontend && npm test`（Vitest 1145，覆盖率 `npm run test:coverage`）；`cd src-tauri && cargo test`（70）。权威基线见 [CODE_WIKI.md](CODE_WIKI.md) §5 机械标记。
 
 ## 当前状态（2026-08-26）
 
@@ -64,7 +64,9 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **全量审查修复批次（2026-08-25~26 kickoff 全自动档标准档 9 工单 3 波，commit 链 789602c → b63f169）**：三轴评审（根提交→HEAD）12 发现全部修复——W1 代码四票（S1 路由 ORM 清零 / B1 非 ASCII avatar 500 修复 先红后绿 / O1+O3 流式空守卫与异常日志 / S2+S3 包 __all__ 与 PRAGMA docstring）+ W2 文档三票（P1+P5 api-design 补端点契约与模型名换族 / P2 architecture 目录树补 23 文件 / P4 测试基线对齐权威标记）+ W3 登记两票（P3 游戏生成功能四处登记 / E 落债 F-38~F-45 + B2 复核关闭）；期末四轴 0 阻断放行；安全红线 0 违例；冒烟 713+1skip 绿；技术债区 24 项待立项（F-23~F-46）
 - ✅ **模拟器导入「AI/本地」识别补强 + 重新识别入口（2026-08-26 用户需求单工单）**：probe_config 三层探测（严格 cfg- → 关键词启发 endpoint|url|base/key/model → local）+ scan_input_ids 双层扫描（input/select + 脚本模板字符串层）+ probe_endpoint_mode 端点口径推断；manifest 新增 update_manifest_entry；POST /api/simulators/reprobe 端点 + 前端 local 卡片「重新识别」按钮；22 种子 + 斗罗大陆真实数据探测全 ai（config 与手工 manifest 逐字一致）
 - ✅ **UX 体验改进批次（2026-08-26 kickoff 全自动档标准档 8 工单 5 波，merge 链 15d7c8b→a79c692）**：T1 首启无 Key 引导卡 + 发送/流式失败错误条化（保持 stream-session 零 DOM）/ T2 搜索跳转定位+高亮（data-message-id 消费 + scrollIntoView + 3s 清除）/ T3 对话内模型切换（badge→按钮复用 showModelSelector + PUT 已就绪，切换仅影响下条）/ T4 快赢三项（toast 队列上限 + modal 焦点陷阱还原 + 生成器凭证预检复用 key-injector）/ T5 重生成后端端点（assemble_chat_context 抽取 + 截断锚 PK id + 单事务 + PHI 触发源修复）/ T6 重生成前端（末条气泡按钮 + settleTurn 重载 + 错误条）/ T7 文档收尾。期末四轴 0 阻断；安全红线 0 违例；增量审核 5 阻断/重点主会话直修（P1 引导卡 / PHI 触发源 / 事务回滚）；非阻断落债 F-49~F-63；pytest 739→789+1skip、Vitest 986→1087
-- ✅ 测试：pytest 789 + 1 skip（后端）+ Vitest 1087（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
+- ✅ 测试：pytest 793 + 1 skip（后端）+ Vitest 1145（前端）+ cargo test 70（壳）全绿（权威基线见 CODE_WIKI.md §5 机械标记）
+- ✅ **技术债区 F-64~F-73 批次（2026-08-27 kickoff 全自动档标准档 4 工单 2 波）**：8 做 2 关——T1 error-bar 会话幂等寻址防注入（F-67，遍历比对免疫选择器注入）/ T2 stream-session 结算合并边界（F-66 顶替场景 + F-68 空回复不丢弃）/ T3 chat.js 防御小修（F-69 定位转义 / F-70 保存语义分离 / F-71 fail-closed / F-72 快照迭代）/ T4 .gg-config-warning-nav 对比度加深（F-73，#b45309 对 light ≥4.5:1）；关闭 F-64（regenerate 流式在途守卫已存在，误报）、F-65（架构重构候选成本收益不成比例）；波 1 审核两中危 Falsify 主会话直修（F-66 类型归一 + F-73 dark 语境回退）；期末四轴 0 阻断；pytest 792+1skip、Vitest 1135
+- ✅ **技术债区 F-74~F-79 批次（2026-08-27 kickoff 全自动档小档 2 工单后台 lane）**：2 做 3 关——工单 A stream-session 幂等 id 比较 String() 归一（F-74+F-78，跨边界幂等早退激活/定位命中）+ 工单 B openModelSwitch warnReason 文案提取单一映射表（F-77，纯重构文案逐字）；关闭 F-75（null 不可达且无法与 int id 碰撞）、F-76（当前语境 .modal=--bg 4.61:1 达标）、F-79（F-69 已实现，当前结构等价）；期末四轴 0 阻断放行；pytest 792+1skip、Vitest 1135→1145（+10）；非阻断落债 F-80/F-81（String() 字面重复可提 sameId helper / chat.js 3 处范围外严格 ===）
 
 ## 待办管理
 

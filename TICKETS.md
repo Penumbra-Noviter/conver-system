@@ -13,7 +13,7 @@
 
 ## 活跃工单
 
-> 当前 0 项待办（技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)，当前 6 项待立项 F-74~F-79）。
+> 当前 0 项待办（技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)，当前 2 项待立项 F-80~F-81）。
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
@@ -29,6 +29,21 @@
 ---
 
 ## 已完成归档
+
+### 技术债消费批次 F-74~F-79（2026-08-27，kickoff 全自动档小档 2 工单后台 lane）
+
+> 来源：用户「消费候选 F-74~F-79 进入全自动流程」。Grilling 共识 2 做 + 3 关（F-75 String(null) 坍缩不可达——replaceId/messageId 均前置守卫 + 后端 int id 不可能等于字面量；F-76 对比度余量——当前唯一渲染语境 `.modal`=--bg #b45309 4.61:1 达标、加深会改可见色；F-79 locateAndHighlight 顶层 children 遍历 F-69 已实现、当前气泡为直接子节点行为等价）。工单 A 含一处预期内行为修正（跨边界 string/number 幂等早退激活），工单 B 纯重构零行为变化；期末四轴 0 阻断放行。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | stream-session 幂等 id 比较 String() 归一（settleByPosition 幂等早退 + mergeFreshList stale 定位） | F-74 + F-78 | 2026-08-27 | f865440 / merge 8f464b0 |
+| 02 | openModelSwitch warnReason 提示文案提取单一映射表（纯重构，文案逐字） | F-77 | 2026-08-27 | d7663c6 / merge 8f464b0 |
+
+**关闭：** F-75 / F-76 / F-79（复核成立，无代码改动，理由见 TECH_DEBT 处置记录）
+**验证链：** pytest 792+1skip ✅（零后端改动）| Vitest 1135→1145 ✅（+10：stream-session +6、chat +4）| 波末文件范围核验合规 | 期末四轴 0 阻断、安全红线 0 违例 | 运行态冒烟通过（uvicorn + 页面/JS/CSS/API 全 200，服务端 JS 含新标记）| doc_sync 零漂移
+**非阻断落债：** F-80（stream-session `String()` 字面比较重复 4×，可提 `sameId(a,b)` 私有 helper）/ F-81（chat.js 3 处 state 同源严格 `===`，无跨边界风险，范围外既有写法）
+
+---
 
 ### 技术债消费批次 F-64~F-73（2026-08-27，kickoff 全自动档标准档 4 工单 2 波）
 
