@@ -36,6 +36,7 @@ Conver System 内置了以下 22 款文字模拟器游戏，为第三方作者�
 ### 商用使用
 
 如需将上述游戏用于商业用途，请联系原作者另行授权。
+原作者Github主页：https://github.com/woaiys3
 
 ---
 
