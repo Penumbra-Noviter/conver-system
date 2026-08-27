@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->1998<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->793<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1135<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2008<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->793<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1145<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -628,7 +628,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~786 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~793 行<!--/AUTO-->）
 
 **职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名、T3 对话内模型切换（openModelSwitch）、T6 末条 AI 回复重生成（regenerateLastReply → conversations.regenerate → settleTurn 重载，在途守卫与 handleSend 非流式共用）。T2 搜索定位：`renderMessages({ messageId })` 在消息加载/渲染后把目标气泡 `scrollIntoView({block:'center'})` 定位到视口中央 + 应用 `.search-highlight` 高亮约 3s 自动清除（`locateAndHighlight`），并与既有 `scrollToBottom` 互斥（定位不被滚动到底覆盖）。
 
@@ -973,7 +973,7 @@ conver system/
 
 > 无公开函数（DOM 引用常量）。
 
-### 4.59 `frontend/js/stream-session.js` — 流式会话（<!--AUTO:lines:frontend/js/stream-session.js-->~398 行<!--/AUTO-->）
+### 4.59 `frontend/js/stream-session.js` — 流式会话（<!--AUTO:lines:frontend/js/stream-session.js-->~399 行<!--/AUTO-->）
 
 **职责**：流式会话深模块（ARC 级联收口）——创建会话/SSE 接线/统一结算 `settleTurn`（ARC9 T-02：按发起会话写回、防悬挂）+ 中止错误归一化。T1：普通（非 AbortError）流式错误不再写 `[错误]` 进消息缓存，经注入回调 `deps.onError` 上抛给聊天域渲染错误条（保持零 DOM）。
 
@@ -1295,7 +1295,7 @@ conver system/
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
-| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->81<!--/AUTO--> | 对话视图 |
+| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->85<!--/AUTO--> | 对话视图 |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->16<!--/AUTO--> | 会话激活 |
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
@@ -1322,7 +1322,7 @@ conver system/
 | `frontend/tests/simulator-view.test.js` | <!--AUTO:tests:frontend/tests/simulator-view.test.js-->67<!--/AUTO--> | 模拟器运行视图 |
 | `frontend/tests/simulators.test.js` | <!--AUTO:tests:frontend/tests/simulators.test.js-->79<!--/AUTO--> | 模拟器列表 |
 | `frontend/tests/sse-reader.test.js` | <!--AUTO:tests:frontend/tests/sse-reader.test.js-->4<!--/AUTO--> | SSE 解析 |
-| `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->67<!--/AUTO--> | 流式会话结算 |
+| `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->73<!--/AUTO--> | 流式会话结算 |
 | `frontend/tests/style-css.test.js` | <!--AUTO:tests:frontend/tests/style-css.test.js-->5<!--/AUTO--> | style.css 静态契约（F-73 .gg-config-warning-nav 对比度 + dark override） |
 | `frontend/tests/tabs.test.js` | <!--AUTO:tests:frontend/tests/tabs.test.js-->68<!--/AUTO--> | tab 工作区 |
 | `frontend/tests/utils.test.js` | <!--AUTO:tests:frontend/tests/utils.test.js-->15<!--/AUTO--> | 通用工具（含 toast 队列上限，T4） |
@@ -1377,10 +1377,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->1998<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2008<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->793<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1135<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1145<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
