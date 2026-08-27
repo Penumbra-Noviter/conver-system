@@ -8,6 +8,15 @@
 
 ---
 
+## 版本号升级 v0.6.1 发布批次（2026-08-28 — CORS 反代 + UI 收口修复版发布）
+
+- **版本号 0.6.0 → 0.6.1**：9 处清单全升（index.html 侧栏/package.json/package-lock 两处/main.py FastAPI 元数据/Cargo.toml/Cargo.lock conver-system 条目/tauri.conf.json/tauri-desktop.md 安装器路径/PROJECT_REFERENCE 状态行）。SECURITY 支持表为「0.6.x latest」无需改。源码零残留 0.6.0（第三方依赖版本如 decimal.js 10.6.0 除外）。
+- **构建链**：全链通过——cargo test 70 | pytest 823+1skip | vitest 1189 | 22 款模拟器接入核对全过 | tauri build NSIS 产出 `Conver System_0.6.1_x64-setup.exe`（25.0 MB，含重建后端 0.6.1）| dist 测试包 | 冒烟 5/5 PASS（就绪标记//api/models/前端挂载/表结构/退出无残留）。先后端单独重建（PyInstaller，main.py 升版须重建——manual-update-rule）再全链。
+- **发布**：tag v0.6.1 + GitHub Release 已发（id 378073390），安装器资产 `Conver.System_0.6.1_x64-setup.exe`（26.3 MB，空格按 GitHub 惯例转点号）。v0.6.1 实质变更：模拟器 API 同源反代（CORS 修复）+ 重新识别按钮收口工具栏全量 + 无简介占位。
+- **过程遥测**：引导脚本经 bash heredoc 写入时 `\\` 被折叠为 `\`（PowerShell 正则 `\P` 非法转义）——引导脚本须用 Write 工具（不经 shell 转义）写双反斜杠，或用编辑器；本次修复用 Write 重写 .scratch/run-build-v061.ps1 解决。
+
+---
+
 ## 模拟器 API CORS 反代 + 重新识别按钮 UI 收口（2026-08-28 — 用户报告，CORS 连接失败 + 列表违和）
 
 - **来源**：用户报告「模拟器 API 设置连接不上、聊天畅通」；附图指出本地导入斗罗大陆卡片在列表显违和（无简介、带 per-card「重新识别」按钮），建议把重新识别收口为工具栏全量操作。
