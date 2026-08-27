@@ -1345,6 +1345,59 @@ describe('key-injector — 配置控件观察者生命周期（S3 — 观察→�
         expect(fetchMock).toHaveBeenCalledTimes(1); // 断连后不再响应
     });
 
+    it('F-89 断连失效守卫：在途同步期间 destroyFrame（断连+复位）→ 陈旧在途写变 no-op，syncStrikes 不污染新观察者循环', async () => {
+        const mod = await loadInjector();
+        // 延迟解析的凭证获取 —— 模拟凭证 fetch（await autoSyncIntoGame）窗口
+        let resolveCreds;
+        const fetchMock = vi.fn(() => new Promise((resolve) => { resolveCreds = resolve; }));
+        mod.initKeyInjector({ getCredentials: fetchMock });
+
+        const bar = makeBar();
+        const doc = makePanelDoc();
+        mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => CONFIG, getEndpointMode: () => null });
+        mod.observeConfigControls({ doc, config: CONFIG, endpointMode: null, bar });
+
+        // 游戏重建配置面板 → 防抖到期 → observer 路径同步在途（凭证 fetch 挂起）
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500); // 防抖到期 → flushObserverSync 启动并挂起
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 同步在途（解析前无任何写入）
+
+        // 帧销毁序列（simulator-view destroyFrame 语义）：断连（observerContext=null）+ 复位计数
+        mod.disconnectObserver();
+        mod.resetSyncLoop();
+
+        // 在途凭证此时才返回 → 陈旧在途写必须被拦截（不得落在已销毁帧的 document）
+        resolveCreds(CRED_OPENAI);
+        await vi.advanceTimersByTimeAsync(0); // 陈旧在途同步续体结算
+
+        // 断言 1：陈旧在途写不落地 — 旧 doc 配置面板保持游戏默认（未注入）
+        expect(doc.getElementById('cfg-apikey').value).toBe('');
+        expect(doc.getElementById('cfg-endpoint').value).toBe('game-default-endpoint');
+
+        // 断言 2：熔断计数未被污染 — 重开游戏的新观察者循环仍以 0 strikes 起步：
+        // 恰 3 轮真写入才熔断（陈旧写若被计数，新循环第 2 轮即提前熔断断连）
+        const doc2 = makePanelDoc();
+        const bar2 = makeBar();
+        const fetch2 = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetch2 });
+        mod.attachKeyInject({ bar: bar2, getDoc: () => doc2, getConfig: () => CONFIG, getEndpointMode: () => null });
+        mod.observeConfigControls({ doc: doc2, config: CONFIG, endpointMode: null, bar: bar2 });
+
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000); // 越过写回环冷却（每轮真写入置冷却）
+            rebuildPanel(doc2);
+            await vi.advanceTimersByTimeAsync(500); // 观察者防抖
+            await vi.advanceTimersByTimeAsync(0); // 同步微任务
+        }
+        expect(fetch2).toHaveBeenCalledTimes(3); // 熔断阈值以真实写入计（未被陈旧写提前污染）
+
+        // 第 3 轮真写后熔断 → 观察者断开：后续重建不再同步（与既有熔断用例同构）
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(doc2);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetch2).toHaveBeenCalledTimes(3); // 已断连 → 不复活同步
+    });
+
     it('断连清理在途防抖：断连 + 重开重挂后，旧防抖到期不得以新会话上下文执行同步', async () => {
         const { mod, doc, fetchMock } = await setupObserver();
 
