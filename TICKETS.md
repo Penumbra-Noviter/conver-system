@@ -30,6 +30,19 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-90（2026-08-27，kickoff 全自动档轻量档 1 工单）
+
+> 来源：用户「继续新一轮消费」选择候选区唯一剩余项 F-90。Grilling 实证拍板**做**——`syncGameCredentials` 生产唯一调用方 runSync 传 getDoc（doc 回落分支生产死代码），doc 仅测试消费（5 处直调用例）；收编 getDoc-only 消除 F-89 引入的双通道冗余。轻量档单工单独立分支 kickoff/f90-getdoc-only。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | syncGameCredentials 收编 getDoc-only（删 doc 死参数，5 处测试迁移，惰性时序保持） | F-90 | 2026-08-27 | 58a7f6b / merge 1465c33 |
+
+**验证链：** pytest 809+1skip ✅（零后端改动）| Vitest 1165 ✅（不回退）| key-injector 100% 覆盖（Branch 92.55%）| 波末文件范围核验合规（key-injector.js + test）| 期末轻量自审 0 阻断（Standards 安全红线零命中 / Falsify 突变 `targetDoc 恒 null` → 24 测试失败证明灵敏）| 运行态冒烟通过（uvicorn + 5 端点全 200）| doc_sync 零漂移
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 技术债消费批次 F-82~F-89（2026-08-27，kickoff 全自动档小档 3 工单后台 lane）
 
 > 来源：用户「继续消费 TECH_DEBT 候选区 8 项」。Grilling 逐项实证拍板 **3 做 + 5 关**——5 关均附 git grep 复核理由：F-82 settleTurn refresh 收口边界不可行（onError 停止路径与流中断分支绕过 settleTurn，注入刷新回调即扩参数面=同 F-65 被关闭项）；F-84 双并发守卫为有意分工（流式 isStreaming+停止态 UX vs 非流式 Set+禁用态，互斥闭环无缝、关 tab 自愈防锁死，chat.js:111 注释属实）；F-85 compareCoverage 归一化唯一消费方入参恒规整、防御分支生产不可达且被测试契约锁定；F-86 avatarImgHtml 三层转义已单点化且契约锁定、无注入面；F-87 深模块标签通胀修复=大面积美容性重标无功能价值。3 做项经小档后台 lane 连续交付（同分支 kickoff/g1-g3 每工单独立 commit，规避并发上限）。

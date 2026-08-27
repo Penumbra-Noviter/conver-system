@@ -50,11 +50,11 @@
 
 ## 技术债候选区
 
-> 当前 1 项待立项（F-90，来源：期末四轴 Standards/Architecture 非阻断发现）。
+> 当前 0 项待立项（F-90 已 2026-08-27 消费移出，见处置记录；候选区清零）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-90 | syncGameCredentials 同时存在 doc 参数与 getDoc 参数（双通道轻度冗余，外部直调用契约 + 观察者惰性取用刻意保留；未来若 doc 仅剩外部直调用可收编为 getDoc-only 并迁移 5 个直调用例）；另 CLAUDE.md 测试基线散文句由主会话手工维护（doc_sync 不覆盖） | 期末四轴 Architecture/Standards | Speculative | 📝 待立项 | 架构 |
+| — | （无待立项条目） | — | — | — | — |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -79,6 +79,14 @@
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
+
+### 2026-08-27（技术债消费批次：F-90 全自动档 kickoff，轻量档 1 工单）
+
+> 处置详情：1 项消费（F-90 对应工单，见 TICKETS 归档）。Grilling 实证拍板做——生产唯一调用方 runSync 传 getDoc（doc 回落分支生产死代码），doc 仅测试消费（5 处直调用例）；收编 getDoc-only 消除双通道冗余，惰性时序保持（取用仍在 fetchCredentials await 之后），F-89 守卫走观察者路径不经这 5 个直调用例、零覆盖损失。CLAUDE.md 测试基线散文句部分（1165）由主会话落账时直接刷新，随工单闭环。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-90 | syncGameCredentials doc/getDoc 双通道冗余收编评估 + CLAUDE.md 测试基线散文句维护注记 | 期末四轴 Architecture/Standards | Speculative | ✅ 已修（2026-08-27：轻量档工单收编 getDoc-only——签名删 doc 参数、targetDoc 改 `getDoc() ?? null` 惰性取用、5 处测试迁移 `getDoc: () => doc`，全量 Vitest 1165 不回退、key-injector 100% 覆盖；CLAUDE.md 散文句已刷新 1165） |
 
 ### 2026-08-27（技术债消费批次：F-82~F-89 全自动档 kickoff，3 做 5 关）
 

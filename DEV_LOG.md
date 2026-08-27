@@ -8,6 +8,15 @@
 
 ---
 
+## 技术债消费批次 F-90（2026-08-27 — kickoff 全自动档轻量档 1 工单，基线 c1b665d → HEAD）
+
+- **来源**：用户「继续新一轮消费」选择候选区唯一剩余项 F-90（Speculative，来源期末四轴 Architecture/Standards）。Grilling 实证拍板**做**——`syncGameCredentials` 生产唯一调用方 runSync 传 getDoc（doc 回落分支**生产死代码**），doc 仅测试消费（5 处直调用例）；收编 getDoc-only 消除 F-89 引入的 doc/getDoc 双通道冗余，惰性时序保持（取用仍在 `fetchCredentials()` await 之后），F-89 断连守卫走观察者路径不经这 5 个直调用例、**零覆盖损失**。
+- **工单**：`syncGameCredentials` 签名 `{ doc, getDoc, config, endpointMode }` → `{ getDoc, config, endpointMode }`；`targetDoc` 改 `typeof getDoc === 'function' ? getDoc() : null`（getDoc 非函数 → null → 全 skipped，与基线等价）；5 处测试 `doc:` → `getDoc: () => doc` 迁移。**深模块协议表面诚实化**——公开导出函数不再携带仅测试消费、生产死代码的参数。
+- **验证链**：pytest 809+1skip（零后端改动）| Vitest 1165 ✅（不回退）| key-injector 100% 覆盖（Branch 92.55%）| 波末文件范围核验合规 | 期末轻量自审 0 阻断（安全红线零命中；Falsify：`targetDoc` 恒 null 突变 → 24 测试失败证明测试灵敏，非伪测试）| 运行态冒烟 5 端点全 200 | doc_sync 零漂移
+- **过程遥测**：轻量档单 worktree 直行（.worktrees/f90，规避并发上限无需 lanewise）；doc_sync 钩子 worktree 拦截 --no-verify、merge 后主会话统一 doc_sync 刷新并提交；**TECH_DEBT 候选区清零（F-1~F-90 全部处置完毕）**。
+
+---
+
 ## 技术债消费批次 F-82~F-89（2026-08-27 — kickoff 全自动档小档 3 工单后台 lane，基线 0a5af97 → HEAD）
 
 - **来源**：用户「继续消费 TECH_DEBT 候选区 8 项」。Grilling 逐项实证拍板 **3 做 + 5 关**（F-82/F-84/F-85/F-86/F-87 关闭均附 git grep 复核理由：F-82 收口边界不可行——onError:414 与流中断分支绕过 settleTurn、注入刷新回调即扩参数面=同 F-65 被关闭项；F-84 双并发守卫为有意分工——流式 isStreaming+停止态 UX vs 非流式 Set+禁用态，互斥闭环无缝、关 tab 自愈防锁死，chat.js:111 注释属实；F-85 compareCoverage 唯一消费方入参恒规整、防御分支生产不可达且被 simulator-adapt.test.js:264-279 契约锁定；F-86 avatarImgHtml 三层转义已单点化（唯一 avatarImgHtml）且 format.test.js:205-241 契约锁定、无注入面；F-87 深模块标签通胀修复=10+ 文件头+两文档美容性重标无功能价值、头文件用法内部自洽）。
