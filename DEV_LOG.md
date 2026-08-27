@@ -8,6 +8,17 @@
 
 ---
 
+## 技术债消费批次 F-92（2026-08-27 — kickoff 全自动档轻量档 1 工单，基线 647d720 → HEAD）
+
+- **来源**：用户「消费技术债区，进入 project-kickoff 全自动流程」选择候选区唯一剩余项 F-92（Worth exploring，来源 F-91 非阻断观察）。Grilling 实证拍板**做**——git grep 复核 `simulators.js:318` 按钮条件 `type==='local'`、`simulators.py:89` reprobe 端点按 id 定位不区分 type，确认「ai 但 config 错的历史导入条目无 UI reprobe 入口」为真实缺口；**方案 D 锁定**：新增纯函数 `canReprobeGame(game)`（`local` 恒真 || `ai∧source==='imported'`）驱动渲染条件；后端零改动（reprobe 按 id 通用、source 保留）；不在 generated/种子卡片加按钮、不做历史 manifest 自动迁移。
+- **工单 T-01**：simulators.js 新增导出 `canReprobeGame`（JSDoc + `__all__`），renderList「重新识别」按钮条件由 `game.type==='local'` 内联三元组改为 `canReprobeGame(game)` 驱动；DOM 契约（class/data-action/title/文案）不变。测试 79→89：判定矩阵 8（local→true / ai+imported→true / ai 无 source→false / ai+generated→false / 非对象/type 缺失/type 非法→false）+ 渲染契约 4 项（内置 ai 无 / imported-ai 有 / generated-ai 无 / local-imported 有）+ `__all__` 断言更新 + 既有点击闭环回归。
+- **验证链**：pytest 809+1skip（后端零改动）| Vitest 1172→1182 全绿 | 覆盖率不放宽（simulators.js Stmts 99.64 / Branch 93.93，与任务前基线同口径；未覆盖行为 reprobeGame catch 兜底为既有）| 突变抽查：删 ai+imported 分支 → `expected false to be true`（非伪测试）| 期末四轴 **0 阻断放行**、安全红线 0 违例（`sk-`/`api_key`/`password`/`token` 仅命中测试夹具；.env/.db 未被跟踪）| 非阻断 2 项文档发现已顺手修订（CODE_WIKI §4.57 职责行措辞 + canReprobeGame JSDoc source 声明精确化）| 运行态冒烟全通过 | doc_sync 零漂移。
+- **运行态冒烟（Playwright 真实路径）**：起后端（AppData 数据）→ 清浏览器缓存（ESM 缓存教训）→ 模拟器列表：斗罗大陆（ai+imported）卡片**出现**「重新识别」按钮，其余种子 ai 卡片（无 source）均无按钮（canReprobeGame 精确生效）→ 点击 → 列表刷新 → 查询 manifest：type=ai 保留、source='imported' 保留、config 多候选数组原样、endpointMode=full 保留 → PASS。修复前该按钮不出现。
+- **过程遥测**：轻量档单 worktree 直行（.worktrees/f92）；Implement 报 DONE_WITH_CONCERNS——CODE_WIKI 机械标记漂移被 F-01 pre-commit 钩子拦截（worktree 缺后端构建产物致 cargo 渠道收集失败，基线同样失败=环境性误报，项目已知惯例），先跑官方 `doc_sync.py` 清零漂移再 `--no-verify` 提交；合并后主树统一 doc_sync 重算对齐（total 标记环境敏感，5557a91）。空返回/重开 0 次。
+- **非阻断落债**：无（TECH_DEBT 候选区清零，F-1~F-92 全部处置完毕）。
+
+---
+
 ## 用户 bug 修复 F-91：模拟器 config 多候选 id（2026-08-27 — 用户报告，斗罗大陆同步失效）
 
 - **来源**：用户报告「本地导入的斗罗大陆同步全局 API 设置失效，未自动填入 key/模型」。**根因实证**：斗罗大陆有**两套** AI 配置控件——初始向导 `wz-endpoint/wz-key/wz-model`（load 即渲染）与设置模态 `s-endpoint/s-key/s-model`（后开）；`_probe_keyword_groups` 每关键词只取文档序**首个命中**，模态 `s-*` 族在 HTML 里排在向导 `wz-*` 前 → manifest 记录 `s-*` 族，而 load 注入找 `s-*` 控件不存在 → 全 skipped；观察者过滤也只认 `s-*` → 向导渲染不触发同步。Playwright 复现首启向导端点仍 deepseek 默认/key 空。

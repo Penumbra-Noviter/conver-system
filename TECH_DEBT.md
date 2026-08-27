@@ -50,11 +50,11 @@
 
 ## 技术债候选区
 
-> 当前 1 项待立项（F-92，2026-08-27 F-91 用户 bug 修复批次非阻断观察录入）。
+> 当前 0 项待立项（F-92 已 2026-08-27 消费移出，见处置记录；候选区清零）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-92 | 前端「重新识别」按钮仅 `type === 'local'` 卡片渲染（simulators.js）——历史误探为 ai 且 config 错的老条目（如 F-91 修复前的斗罗大陆）无法从 UI 一键 reprobe 修正，只能靠一次性数据修正 | F-91 用户 bug 修复批次非阻断观察 | Worth exploring | 📝 待立项 | 模拟器导入 |
+| — | （无待立项条目） | — | — | — | — |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -79,6 +79,14 @@
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
+
+### 2026-08-27（技术债消费批次：F-92 全自动档 kickoff，轻量档 1 工单）
+
+> 处置详情：1 项消费（F-92 对应工单 T-01，见 TICKETS 归档）。Grilling 实证拍板**做**——git grep 复核现状仍成立：simulators.js 按钮条件 `type==='local'` + reprobe 端点按 id 定位不区分 type，确认「ai 但 config 错的历史导入条目无 UI reprobe 入口」为真实缺口。方案 D：新增纯函数 `canReprobeGame(game) = game.type==='local' || (ai && source==='imported')` 驱动渲染条件，后端零改动（reprobe 端点天然支持任意 type，source 保留）。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-92 | 前端「重新识别」按钮仅 local 卡片渲染（ai+imported 老条目无法 UI 一键 reprobe） | F-91 用户 bug 修复批次非阻断观察 | Worth exploring | ✅ 已修（2026-08-27：工单 T-01 `canReprobeGame` 纯函数驱动渲染——local 恒真、ai∧source==='imported' 真、其余假；判定矩阵 8 条 + 渲染契约 4 项测试，Vitest 1172→1182，运行态冒烟确认斗罗大陆 ai 卡片出现按钮、reprobe 后 source 保留） |
 
 ### 2026-08-27（技术债消费批次：F-90 全自动档 kickoff，轻量档 1 工单）
 

@@ -38,6 +38,19 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 技术债消费批次 F-92（2026-08-27，kickoff 全自动档轻量档 1 工单）
+
+> 来源：用户「消费技术债区，进入 project-kickoff 全自动流程」选择候选区唯一剩余项 F-92。Grilling 实证拍板**做**——git grep 复核 simulators.js 按钮条件 `type==='local'` 与 reprobe 端点按 id 定位不区分 type，确认「ai 但 config 错的老条目无 UI reprobe 入口」为真实缺口；方案 D 锁定：新增纯函数 `canReprobeGame(game) = local 恒真 || ai∧source==='imported'` 驱动渲染条件，后端零改动。轻量档单工单独立分支 kickoff/f92-reprobe-ai-card。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | canReprobeGame 驱动「重新识别」按钮渲染（ai+imported 可一键 reprobe） | F-92 | 2026-08-27 | 207af86 / merge 43d0bbf / doc_sync 5557a91 |
+
+**验证链：** pytest 809+1skip（后端零改动）| Vitest 1172→1182（+10：canReprobeGame 判定矩阵 8 + 渲染契约 ai+imported/generated + __all__ 断言更新；simulators.test.js 79→89）| 覆盖率不放宽（simulators.js Stmts 99.64 / Branch 93.93，任务前基线口径）| 突变抽查：删 ai+imported 分支 → 测试失败（非伪测试）| 期末四轴 **0 阻断放行**、安全红线 0 违例（非阻断 2 项文档发现已顺手修订）| 运行态冒烟通过（Playwright：ai+imported 斗罗大陆卡片出现「重新识别」按钮、种子 ai 卡片无按钮；点击 → reprobe 成功、manifest type/source/config 保留）| doc_sync 零漂移
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 用户 bug 修复批次 F-91（2026-08-27 — 斗罗大陆同步失效，用户报告单工单）
 
 > 来源：用户报告「本地导入的斗罗大陆同步全局 API 设置失效」。根因实证：斗罗大陆有两套 AI 配置控件（向导 wz-* load 渲染 + 设置模态 s-* 后开），探针每组只取文档序首个命中 → manifest 记 s-* 族，load 注入找不到控件。修复：config 三元组支持多候选 id（`string | string[]`），探针全量收集、注入/观察者按候选逐个尝试。详见 DEV_LOG〈用户 bug 修复 F-91〉。

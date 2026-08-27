@@ -268,8 +268,9 @@ export function filterGames(games, type) {
  * 语义契约：local 条目（无论是否带 source）恒可 reprobe（行为基线不变）；
  * ai 条目仅当 source='imported'（历史误探为 ai、经导入纠正的老条目）可
  * reprobe；其余（内置 ai 条目 / ai+source='generated' AI 生成条目）不渲染
- * 按钮。非对象输入 / type 缺失或非法 / source 非字符串 → false（防御不炸；
- * parseManifest 已保证 type 合法，此分支为防御性兜底，filterGames 先例）。
+ * 按钮。非对象输入 / type 缺失或非法 → false；ai 分支下 source 缺失或非
+ * 'imported' → false（防御不炸；parseManifest 已保证 type 合法，此分支为
+ * 防御性兜底，filterGames 先例）。
  *
  * @param {unknown} game - 游戏条目对象（parseManifest 归一化条目）
  * @returns {boolean} 可重新识别返回 true；否则 false

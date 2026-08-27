@@ -945,9 +945,9 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulator-view.js:isValidGame-->`isValidGame(game)`<!--/AUTO--> | 游戏合法性校验 |
 | <!--AUTO:sig:frontend/js/simulator-view.js:clearTimer-->`clearTimer()`<!--/AUTO--> | 清理超时定时器 |
 
-### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~522 行<!--/AUTO-->）
+### 4.57 `frontend/js/simulators.js` — 模拟器列表（<!--AUTO:lines:frontend/js/simulators.js-->~523 行<!--/AUTO-->）
 
-**职责**：模拟器列表视图（U7 + 2026-08-26 重新识别）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新、local 卡片「重新识别」按钮（data-action="reprobe" → `reprobeGame(id)` POST JSON 到 reprobe 端点 → 刷新列表 + 反馈）。
+**职责**：模拟器列表视图（U7 + 2026-08-26 重新识别 + 2026-08-27 F-92 可 reprobe 范围扩展）——manifest 解析（v2）、类型筛选、渲染 + 事件绑定 + 刷新、可重新识别卡片（local 与 ai+imported，经 `canReprobeGame` 判定）「重新识别」按钮（data-action="reprobe" → `reprobeGame(id)` POST JSON 到 reprobe 端点 → 刷新列表 + 反馈）。
 
 | 元素 | 说明 |
 |------|------|
