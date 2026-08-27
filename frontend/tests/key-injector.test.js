@@ -495,7 +495,7 @@ describe('key-injector — syncGameCredentials 同步编排核心（SIM-API-1）
         mod.initKeyInjector({ getCredentials: fetchMock });
         const doc = makePanelDoc();
 
-        const result = await mod.syncGameCredentials({ doc, config: CONFIG, endpointMode: null });
+        const result = await mod.syncGameCredentials({ getDoc: () => doc, config: CONFIG, endpointMode: null });
 
         expect(result.enabled).toBe(true);
         expect(result.reason).toBeNull();
@@ -509,7 +509,7 @@ describe('key-injector — syncGameCredentials 同步编排核心（SIM-API-1）
         mod.initKeyInjector({ getCredentials: fetchMock });
         const doc = makePanelDoc();
 
-        const result = await mod.syncGameCredentials({ doc, config: CONFIG, endpointMode: null });
+        const result = await mod.syncGameCredentials({ getDoc: () => doc, config: CONFIG, endpointMode: null });
 
         expect(result).toEqual({ enabled: false, reason: 'claude', filled: [], skipped: [], written: [] });
         expect(doc.getElementById('cfg-apikey').value).toBe(''); // 未写入
@@ -520,20 +520,20 @@ describe('key-injector — syncGameCredentials 同步编排核心（SIM-API-1）
         const mod = await loadInjector();
         mod.initKeyInjector({ getCredentials: vi.fn(async () => CRED_NONE) });
         const doc = makePanelDoc();
-        const result = await mod.syncGameCredentials({ doc, config: CONFIG });
+        const result = await mod.syncGameCredentials({ getDoc: () => doc, config: CONFIG });
         expect(result).toEqual({ enabled: false, reason: 'none', filled: [], skipped: [], written: [] });
         expect(doc.getElementById('cfg-apikey').value).toBe('');
     });
 
     it('未初始化（initKeyInjector 未接线）→ 返回 null（调用方静默保持现状）', async () => {
         const mod = await loadInjector(); // 不 init
-        expect(await mod.syncGameCredentials({ doc: makePanelDoc(), config: CONFIG })).toBeNull();
+        expect(await mod.syncGameCredentials({ getDoc: () => makePanelDoc(), config: CONFIG })).toBeNull();
     });
 
     it('凭证获取失败 → 拒绝（调用方按路径降级）', async () => {
         const mod = await loadInjector();
         mod.initKeyInjector({ getCredentials: vi.fn(async () => { throw new Error('网络错误'); }) });
-        await expect(mod.syncGameCredentials({ doc: makePanelDoc(), config: CONFIG }))
+        await expect(mod.syncGameCredentials({ getDoc: () => makePanelDoc(), config: CONFIG }))
             .rejects.toThrow('网络错误');
     });
 });
