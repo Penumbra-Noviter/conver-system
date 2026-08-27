@@ -72,4 +72,5 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 
 唯一待办事实来源：`TICKETS.md`。DEV_LOG 只记"已做"，不存储待办。
 
+- **TICKETS 归档清出（2026-08-27 试点）**：已完成归档完整保留最近 **6 个批次**，更早批次折叠为「历史归档索引」单行（工单号/提交/摘要保留，细节 git log 可溯）；索引超 **60 行**删最旧；新批次归档只承载工单事实表（编号/标题/F 项/日期/提交），来源/Grilling 共识/验证链/过程遥测等叙述**只写 DEV_LOG**（TICKETS 归档末尾一句引用「详见 DEV_LOG〈节标题〉」）；活跃表禁止 ✅ 滞留（commit 前检查）。规则与论证见 [docs/ticket-archive-cleanup-research.md](docs/ticket-archive-cleanup-research.md)
 - DEV_LOG 滚动摘要窗口上限 **12 条**：文档同步时若超限，把最旧一批折叠为一条「阶段摘要」（日期范围 + 每批次一行，置于日志正文顶部），窗口回落至 6~8 条；不拆 docs/——避坑细节已蒸馏 persona/经验笔记，批次细节 git log 可溯
