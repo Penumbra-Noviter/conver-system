@@ -44,6 +44,16 @@ import { messages } from './api.js';
 // ══════════════════════════════════════════════════
 
 /**
+ * id 身份归一比较 — 跨 string/number 边界同 id 匹配(后端 JSON number / 本地 string 归一)
+ * @param {*} a - 第一个 id 值
+ * @param {*} b - 第二个 id 值
+ * @returns {boolean} String(a) === String(b)
+ */
+function sameId(a, b) {
+    return String(a) === String(b);
+}
+
+/**
  * 位置感知写回本流消息:移除本流 streaming 占位(幂等),把最终消息插入到发起位置;
  * 重生成失败兜底按被顶替旧消息身份(replaceId)原位替换,不尾部追加(F-58)。
  * 幂等规则:
@@ -70,8 +80,8 @@ function settleByPosition(tab, anchor, message, replaceId = null) {
     // F-66:当 messageId === replaceId(服务端复用被顶替旧回复 id)时,缓存中的被顶替
     // 旧回复 id === replaceId === messageId,幂等检查会误判「已结算」而吞掉新内容 —
     // 顶替场景本体须跳过幂等早退,继续走下方 replaceId 原位替换。
-    const isReplacementScenario = replaceId != null && String(replaceId) === String(message.id);
-    if (!isReplacementScenario && message.id != null && next.some((m) => String(m.id) === String(message.id))) {
+    const isReplacementScenario = replaceId != null && sameId(replaceId, message.id);
+    if (!isReplacementScenario && message.id != null && next.some((m) => sameId(m.id, message.id))) {
         return { messages: tab.messages, render: false };
     }
     // F-58:重生成失败兜底 — 按被顶替旧消息身份原位替换(后端已截断旧回复,顶替而非尾部追加)。
@@ -79,7 +89,7 @@ function settleByPosition(tab, anchor, message, replaceId = null) {
     // W1-F-66 类型归一:replaceId 与缓存 id 用 String() 比对,防跨边界 string/number 类型失配
     // 使顶替失效(新内容被幂等早退吞掉或落尾部追加+旧残留)。
     if (replaceId != null) {
-        const replaceIdx = next.findIndex((m) => String(m.id) === String(replaceId));
+        const replaceIdx = next.findIndex((m) => sameId(m.id, replaceId));
         if (replaceIdx >= 0) {
             next[replaceIdx] = message;
             return { messages: next, render: true };
@@ -171,7 +181,7 @@ export function mergeFreshList(tab, revision, msgs, { settleIndex = -1, anchor =
     // 空回复不被静默丢弃):命中 → 原位替换 content + 清 streaming(幂等);
     // 找不到同 id(重生成场景,本地仍是被顶替的旧回复)→ 至少渲染服务端列表(权威)。
     if (messageId != null) {
-        const matchIdx = tab.messages.findIndex((m) => String(m.id) === String(messageId));
+        const matchIdx = tab.messages.findIndex((m) => sameId(m.id, messageId));
         if (matchIdx >= 0) {
             const next = [...tab.messages];
             next[matchIdx] = { ...next[matchIdx], content, streaming: false };
