@@ -24,6 +24,12 @@ from backend.app.services.llm.errors import (
 __all__: list[str] = []
 
 
+class _UnregisteredLLMError(LLMError):
+    """未注册的 LLMError 子类（验证「基类兜底」契约：未知子类恒 502 + str(e)）"""
+
+    pass
+
+
 class TestErrorMappingExports:
     """error_mapping 导出验证"""
 
@@ -97,6 +103,72 @@ class TestLLMErrorResponseMapping:
 
         e = _MysteryLLMError("未知 LLM 错误")
         assert llm_error_response(e, "claude") == (502, "未知 LLM 错误")
+
+
+class TestLLMErrorMappingMatrix:
+    """全映射矩阵：显式声明「顺序即优先级 / 基类兜底」契约
+
+    以参数化表格覆盖全部映射（含未注册子类 → 502 兜底），逐字断言 (status, msg)。
+    本表即映射契约的单一事实来源：新增 LLMError 子类时应在此显式声明其落点，
+    而不依赖实现内部「dict 插入顺序 + isinstance 遍历」的隐式行为。
+    """
+
+    @pytest.mark.parametrize(
+        "exc, provider, expected",
+        [
+            pytest.param(
+                LLMAuthError("x"),
+                "claude",
+                (401, "claude API Key 无效，请在设置中更新"),
+                id="auth-with-provider",
+            ),
+            pytest.param(
+                LLMAuthError("x"),
+                "",
+                (401, "API Key 无效，请在设置中更新"),
+                id="auth-with-empty-provider",
+            ),
+            pytest.param(
+                LLMAuthError("x"),
+                None,
+                (401, "API Key 无效，请在设置中更新"),
+                id="auth-without-provider",
+            ),
+            pytest.param(
+                LLMRateLimitError("x"),
+                "claude",
+                (429, "API 请求频率超限，请稍后再试"),
+                id="rate-limit",
+            ),
+            pytest.param(
+                LLMTimeoutError("x"),
+                "claude",
+                (504, "API 请求超时，请检查网络后重试"),
+                id="timeout",
+            ),
+            pytest.param(
+                LLMContentFilterError("内容被内容过滤器拦截"),
+                "claude",
+                (400, "内容被内容过滤器拦截"),
+                id="content-filter",
+            ),
+            pytest.param(
+                LLMError("Claude API 调用失败: boom"),
+                "claude",
+                (502, "Claude API 调用失败: boom"),
+                id="base-llm-error",
+            ),
+            pytest.param(
+                _UnregisteredLLMError("未知 LLM 错误"),
+                "claude",
+                (502, "未知 LLM 错误"),
+                id="unregistered-subclass-502",
+            ),
+        ],
+    )
+    def test_mapping_matrix(self, exc: LLMError, provider: str | None, expected: tuple[int, str]) -> None:
+        """映射表逐字：(status, msg) 与契约一致"""
+        assert llm_error_response(exc, provider) == expected
 
 
 class TestChatServiceNoLongerDefines:
