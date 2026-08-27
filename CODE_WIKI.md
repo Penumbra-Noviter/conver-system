@@ -851,7 +851,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/icons.js:iconHtml-->`iconHtml(name, options = {})`<!--/AUTO--> | 图标 HTML 生成（名称 + 选项） |
 
-### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~775 行<!--/AUTO-->）
+### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~771 行<!--/AUTO-->）
 
 **职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，`LINK_NAV_SETTINGS` 文案由游戏生成器凭证预检复用（`SEL_NAV_SETTINGS` 自 F-63 起为模拟器专属，生成器不再借用）。
 
@@ -862,7 +862,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/key-injector.js:convertEndpoint-->`convertEndpoint(endpoint, mode)`<!--/AUTO--> | 端点口径转换（full/base） |
 | <!--AUTO:sig:frontend/js/key-injector.js:ensureSelectOption-->`ensureSelectOption(selectEl, value)`<!--/AUTO--> | 模型下拉选项保障 |
 | <!--AUTO:sig:frontend/js/key-injector.js:injectCredentialsIntoGame-->`injectCredentialsIntoGame({ doc, config, credentials, endpointMode } = {})`<!--/AUTO--> | 向游戏文档注入凭证 |
-| <!--AUTO:sig:frontend/js/key-injector.js:syncGameCredentials-->`syncGameCredentials({ doc, getDoc, config, endpointMode } = {})`<!--/AUTO--> | 同步游戏凭证 |
+| <!--AUTO:sig:frontend/js/key-injector.js:syncGameCredentials-->`syncGameCredentials({ getDoc, config, endpointMode } = {})`<!--/AUTO--> | 同步游戏凭证 |
 | <!--AUTO:sig:frontend/js/key-injector.js:runSync-->`runSync({ bar, getDoc, getConfig, getEndpointMode, feedback })`<!--/AUTO--> | 执行同步（状态栏驱动） |
 | <!--AUTO:sig:frontend/js/key-injector.js:autoSyncIntoGame-->`autoSyncIntoGame(params = {})`<!--/AUTO--> | 自动同步状态机（path load/observer + cooled/breaker） |
 | <!--AUTO:sig:frontend/js/key-injector.js:resetSyncLoop-->`resetSyncLoop()`<!--/AUTO--> | 复位写回环状态（冷却+熔断） |
