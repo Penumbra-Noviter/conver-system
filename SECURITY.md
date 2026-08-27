@@ -8,9 +8,9 @@ security patches, so please always upgrade to the newest release.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.5.x   | :white_check_mark: (latest) |
+| 0.6.x   | :white_check_mark: (latest) |
+| 0.5.x   | :x:                |
 | 0.4.x   | :x:                |
-| 0.3.x   | :x:                |
 | < 0.3   | :x:                |
 
 ## Reporting a Vulnerability
