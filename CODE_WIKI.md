@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2044<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->810<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1164<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2045<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->810<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1165<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -851,7 +851,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/icons.js:iconHtml-->`iconHtml(name, options = {})`<!--/AUTO--> | 图标 HTML 生成（名称 + 选项） |
 
-### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~759 行<!--/AUTO-->）
+### 4.51 `frontend/js/key-injector.js` — 模拟器 Key 注入（<!--AUTO:lines:frontend/js/key-injector.js-->~775 行<!--/AUTO-->）
 
 **职责**：SIM-API-1 核心——把主应用凭证/模型注入第三方模拟器 iframe（endpointMode 端点口径转换、受管 model option、幂等写入、同步编排、防抖 + **写回环状态机收口（C1）**——冷却/熔断状态单一持有者，`autoSyncIntoGame` 原子完成状态迁移）。T4：导出禁用文案/引导链接常量 `MSG_CLAUDE_ONLY` / `MSG_NO_CREDENTIALS` / `LINK_NAV_SETTINGS` / `SEL_NAV_SETTINGS`，`LINK_NAV_SETTINGS` 文案由游戏生成器凭证预检复用（`SEL_NAV_SETTINGS` 自 F-63 起为模拟器专属，生成器不再借用）。
 
@@ -862,7 +862,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/key-injector.js:convertEndpoint-->`convertEndpoint(endpoint, mode)`<!--/AUTO--> | 端点口径转换（full/base） |
 | <!--AUTO:sig:frontend/js/key-injector.js:ensureSelectOption-->`ensureSelectOption(selectEl, value)`<!--/AUTO--> | 模型下拉选项保障 |
 | <!--AUTO:sig:frontend/js/key-injector.js:injectCredentialsIntoGame-->`injectCredentialsIntoGame({ doc, config, credentials, endpointMode } = {})`<!--/AUTO--> | 向游戏文档注入凭证 |
-| <!--AUTO:sig:frontend/js/key-injector.js:syncGameCredentials-->`syncGameCredentials({ doc, config, endpointMode } = {})`<!--/AUTO--> | 同步游戏凭证 |
+| <!--AUTO:sig:frontend/js/key-injector.js:syncGameCredentials-->`syncGameCredentials({ doc, getDoc, config, endpointMode } = {})`<!--/AUTO--> | 同步游戏凭证 |
 | <!--AUTO:sig:frontend/js/key-injector.js:runSync-->`runSync({ bar, getDoc, getConfig, getEndpointMode, feedback })`<!--/AUTO--> | 执行同步（状态栏驱动） |
 | <!--AUTO:sig:frontend/js/key-injector.js:autoSyncIntoGame-->`autoSyncIntoGame(params = {})`<!--/AUTO--> | 自动同步状态机（path load/observer + cooled/breaker） |
 | <!--AUTO:sig:frontend/js/key-injector.js:resetSyncLoop-->`resetSyncLoop()`<!--/AUTO--> | 复位写回环状态（冷却+熔断） |
@@ -971,7 +971,7 @@ conver system/
 
 > 无公开函数（DOM 引用常量）。
 
-### 4.59 `frontend/js/stream-session.js` — 流式会话（<!--AUTO:lines:frontend/js/stream-session.js-->~408 行<!--/AUTO-->）
+### 4.59 `frontend/js/stream-session.js` — 流式会话（<!--AUTO:lines:frontend/js/stream-session.js-->~424 行<!--/AUTO-->）
 
 **职责**：流式会话深模块（ARC 级联收口）——创建会话/SSE 接线/统一结算 `settleTurn`（ARC9 T-02：按发起会话写回、防悬挂）+ 中止错误归一化。T1：普通（非 AbortError）流式错误不再写 `[错误]` 进消息缓存，经注入回调 `deps.onError` 上抛给聊天域渲染错误条（保持零 DOM）。
 
@@ -989,7 +989,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/stream-session.js:captureAnchor-->`captureAnchor()`<!--/AUTO--> | 捕获锚点 |
 | <!--AUTO:sig:frontend/js/stream-session.js:captureSettleIndex-->`captureSettleIndex()`<!--/AUTO--> | 捕获结算索引 |
 
-### 4.60 `frontend/js/tabs.js` — tab 工作区深模块（<!--AUTO:lines:frontend/js/tabs.js-->~340 行<!--/AUTO-->）
+### 4.60 `frontend/js/tabs.js` — tab 工作区深模块（<!--AUTO:lines:frontend/js/tabs.js-->~352 行<!--/AUTO-->）
 
 **职责**：多 tab 会话工作区状态（P6.5 深模块）——tab 集合/视图状态/流式句柄；结构性变更自动写 sessionStorage（只存 ids + activeId）+ 变更通知；恢复校验。
 
@@ -1302,7 +1302,7 @@ conver system/
 | `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->49<!--/AUTO--> | 展示契约 |
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->29<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
-| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->89<!--/AUTO--> | Key 注入/端点口径 |
+| `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->90<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
@@ -1375,10 +1375,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2044<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2045<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->810<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1164<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1165<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
