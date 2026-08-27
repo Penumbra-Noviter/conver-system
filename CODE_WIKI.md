@@ -973,7 +973,7 @@ conver system/
 
 > 无公开函数（DOM 引用常量）。
 
-### 4.59 `frontend/js/stream-session.js` — 流式会话（<!--AUTO:lines:frontend/js/stream-session.js-->~399 行<!--/AUTO-->）
+### 4.59 `frontend/js/stream-session.js` — 流式会话（<!--AUTO:lines:frontend/js/stream-session.js-->~408 行<!--/AUTO-->）
 
 **职责**：流式会话深模块（ARC 级联收口）——创建会话/SSE 接线/统一结算 `settleTurn`（ARC9 T-02：按发起会话写回、防悬挂）+ 中止错误归一化。T1：普通（非 AbortError）流式错误不再写 `[错误]` 进消息缓存，经注入回调 `deps.onError` 上抛给聊天域渲染错误条（保持零 DOM）。
 
