@@ -8,6 +8,14 @@
 
 ---
 
+## 版本号升级 v0.5.0（2026-08-27 — 8+1 处清单，基线 56339e7 → HEAD）
+
+- **版本号 0.4.0 → 0.5.0**：9 处全升（index.html 侧栏/package.json/package-lock 两处/main.py FastAPI 元数据/Cargo.toml/Cargo.lock 随 cargo build 自动/tauri.conf.json/tauri-desktop.md 安装器路径/PROJECT_REFERENCE 状态行）。经验证源码零残留 0.4.0（DEV_LOG 历史条目除外；构建产物 target/、第三方依赖 winapi 0.4.0 不动）。**打包必产安装器**（用户明确要求，未加 -SkipInstaller）。
+- **构建链**：全链通过——cargo test 70 | pytest 809+1skip | vitest 1164 | tauri build NSIS 产出 `Conver System_0.5.0_x64-setup.exe`（25.8 MB，ProductVersion 实测 0.5.0）| dist 测试包（壳 10.6 MB）| 冒烟 5/5 PASS（就绪标记//api/models/前端挂载/表结构/退出无残留）。
+- **过程遥测**：① 后端 exe 旧于 backend 代码（8/26 产物）→ 打包前手动先跑 build-backend.ps1 重建；② 重建首跑瞬态失败（PyInstaller 重写 dist/conver_backend 时文件锁竞争，退出码 1），重跑成功——同类锁竞争已知为随机窗口问题，失败重试即可；③ 重建后实测后端 /openapi.json info.version=0.5.0 确认内嵌版本再进桌面构建；④ main.py 版本为 8 处清单易漏项（无前端消费，仅 FastAPI 元数据），升版后须重建后端以免产物嵌旧版号。
+
+---
+
 ## 技术债消费批次 F-90（2026-08-27 — kickoff 全自动档轻量档 1 工单，基线 c1b665d → HEAD）
 
 - **来源**：用户「继续新一轮消费」选择候选区唯一剩余项 F-90（Speculative，来源期末四轴 Architecture/Standards）。Grilling 实证拍板**做**——`syncGameCredentials` 生产唯一调用方 runSync 传 getDoc（doc 回落分支**生产死代码**），doc 仅测试消费（5 处直调用例）；收编 getDoc-only 消除 F-89 引入的 doc/getDoc 双通道冗余，惰性时序保持（取用仍在 `fetchCredentials()` await 之后），F-89 断连守卫走观察者路径不经这 5 个直调用例、**零覆盖损失**。

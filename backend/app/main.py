@@ -26,7 +26,7 @@ from backend.app.services.llm.errors import LLMError
 app = FastAPI(
     title="Conver System",
     description="本地优先、多模型可切换的角色对话系统",
-    version="0.4.0",
+    version="0.5.0",
 )
 
 
