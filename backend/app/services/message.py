@@ -144,6 +144,7 @@ def build_message_list(
     user_content: str,
     max_rounds: int = 30,
     user_name: str = "User",
+    append_current_input: bool = True,
 ) -> list[dict]:
     """构建发送给 LLM 的消息列表
 
@@ -153,9 +154,12 @@ def build_message_list(
         3. character.mes_example（对话范例，支持模板变量）
         4. 历史消息（按时间正序，受滑窗限制）
         5. character.post_history_instructions（历史后指令，支持模板变量）
-        6. 当前用户输入（支持模板变量）
+        6. 当前用户输入（支持模板变量；append_current_input=False 时不追加）
 
     查询角色与历史消息后，委托给 services/llm/prompt.py 的纯函数完成组装。
+
+    append_current_input=False（重生成路径）：不追加当前 user 输入；输出末条
+    为历史末条 user（待回复触发源），尾随 PHI system 一并剥离。
 
     模板变量：
         {{user}} — 用户昵称
@@ -178,6 +182,7 @@ def build_message_list(
         user_content=user_content,
         max_rounds=max_rounds,
         user_name=user_name,
+        append_current_input=append_current_input,
     )
 
 

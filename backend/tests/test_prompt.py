@@ -263,3 +263,113 @@ class TestMisc:
             {"role": "system", "content": ""},
             {"role": "user", "content": "你好"},
         ]
+
+
+# ── 8. append_current_input 显式路径 ──
+
+
+class TestAppendCurrentInput:
+    """重生成消息组装：append_current_input 显式契约
+
+    - True（默认）：逐字保持现组装行为（追加当前 user 输入）。
+    - False：不追加当前 user 输入；输出末条为历史末条 user（待回复触发源）；
+      不得残留尾随 system（PHI 已剥离）。
+    """
+
+    def test_true_default_appends_current_input(self) -> None:
+        """默认 True：追加当前 user 输入，末条为当前输入"""
+        char = _char()
+        history = [
+            _msg(Role.USER, "历史1"),
+            _msg(Role.ASSISTANT, "历史2"),
+        ]
+        msgs = build_messages(char, history, "当前输入")
+        assert msgs[-1] == {"role": "user", "content": "当前输入"}
+
+    def test_true_explicit_keeps_phi_and_current_input(self) -> None:
+        """True 显式传参：PHI（system）保留在末条 user 之前"""
+        char = _char(post_history_instructions="保持人设")
+        history = [_msg(Role.USER, "历史1"), _msg(Role.ASSISTANT, "历史2")]
+        msgs = build_messages(char, history, "当前输入", append_current_input=True)
+        assert msgs[-2] == {"role": "system", "content": "保持人设"}
+        assert msgs[-1] == {"role": "user", "content": "当前输入"}
+
+    def test_false_no_current_user_appended(self) -> None:
+        """False：不追加当前 user 输入（末尾不出现当前输入内容）"""
+        char = _char()
+        history = [_msg(Role.USER, "历史1"), _msg(Role.ASSISTANT, "历史2")]
+        msgs = build_messages(char, history, "被忽略的当前输入", append_current_input=False)
+        contents = [m["content"] for m in msgs]
+        assert "被忽略的当前输入" not in contents
+
+    def test_false_last_is_last_history_user(self) -> None:
+        """False：输出末条为历史末条 user（待回复触发源，截断后末条恒为 user）"""
+        char = _char()
+        history = [
+            _msg(Role.USER, "第一轮问"),
+            _msg(Role.ASSISTANT, "第一轮答"),
+            _msg(Role.USER, "第二轮问"),
+        ]
+        msgs = build_messages(char, history, "忽略", append_current_input=False)
+        assert msgs[-1] == {"role": "user", "content": "第二轮问"}
+
+    def test_false_no_trailing_system(self) -> None:
+        """False + PHI：末条为触发 user，不残留尾随 PHI system（PHI 已剥离）"""
+        char = _char(post_history_instructions="保持人设")
+        history = [
+            _msg(Role.USER, "第一轮问"),
+            _msg(Role.ASSISTANT, "第一轮答"),
+            _msg(Role.USER, "第二轮问"),
+        ]
+        msgs = build_messages(char, history, "忽略", append_current_input=False)
+        assert msgs[-1] == {"role": "user", "content": "第二轮问"}
+        # 尾随 system（PHI）已被剥离，不再出现在末尾
+        assert msgs[-1].get("role") != "system"
+        # 触发 user 在列表中只出现一次（不重复）
+        trigger_occurrences = [
+            m for m in msgs if m["role"] == "user" and m["content"] == "第二轮问"
+        ]
+        assert len(trigger_occurrences) == 1
+
+    def test_false_empty_history_no_user(self) -> None:
+        """False + 空历史：不抛错，输出无 user 消息"""
+        char = _char()
+        msgs = build_messages(char, [], "忽略", append_current_input=False)
+        assert [m for m in msgs if m["role"] == "user"] == []
+
+    def test_false_user_content_ignored_not_validated(self) -> None:
+        """False：user_content 值被忽略、不校验、不追加（签名兼容）"""
+        char = _char()
+        history = [
+            _msg(Role.USER, "第一轮问"),
+            _msg(Role.ASSISTANT, "第一轮答"),
+            _msg(Role.USER, "第二轮问"),
+        ]
+        # 空串与任意非空值，False 下均不追加
+        for ignored in ("", "任意内容"):
+            msgs = build_messages(char, history, ignored, append_current_input=False)
+            assert msgs[-1] == {"role": "user", "content": "第二轮问"}
+
+    def test_false_without_phi_no_trailing_system(self) -> None:
+        """False + 无 PHI：无残留 system 尾随（末条即历史末条 user）"""
+        char = _char()
+        history = [
+            _msg(Role.USER, "问1"),
+            _msg(Role.ASSISTANT, "答1"),
+            _msg(Role.USER, "问2"),
+        ]
+        msgs = build_messages(char, history, "忽略", append_current_input=False)
+        assert msgs[-1] == {"role": "user", "content": "问2"}
+
+    def test_false_with_window_truncation_and_phi(self) -> None:
+        """False + 滑窗截断边界 + PHI：滑窗后末条仍为触发 user，无尾随 system"""
+        char = _char(post_history_instructions="保持人设")
+        history = [
+            _msg(Role.USER if i % 2 == 0 else Role.ASSISTANT, f"m{i}")
+            for i in range(10)  # 10 条 + 触发问 = 11 条，max_rounds=2 → 窗口 4
+        ]
+        history.append(_msg(Role.USER, "触发问"))  # 末条触发 user（重生成截断后形态）
+        msgs = build_messages(char, history, "忽略", max_rounds=2, append_current_input=False)
+        # 滑窗保留 [m7, m8, m9, 触发问]，PHI 伪尾随被剥离 → 末条 = 触发问
+        assert msgs[-1] == {"role": "user", "content": "触发问"}
+        assert msgs[-1].get("role") != "system"
