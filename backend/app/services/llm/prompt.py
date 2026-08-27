@@ -111,6 +111,7 @@ def build_messages(
     user_content: str,
     max_rounds: int = 30,
     user_name: str = "User",
+    append_current_input: bool = True,
 ) -> list[dict[str, str]]:
     """组装发送给 LLM 的消息列表（纯函数，无 DB 依赖）
 
@@ -120,14 +121,21 @@ def build_messages(
         3. mes_example（few-shot 示例）
         4. 历史消息（正序，滑窗截断：超过 max_rounds*2 条取最后 max_rounds*2 条）
         5. post_history_instructions（system 消息）
-        6. 当前 user 输入
+        6. 当前 user 输入（append_current_input=True 时）
+
+    append_current_input=False 契约（重生成路径）：
+        不追加当前 user 输入；末条恢复为历史末条 user（待回复触发源）；
+        因无 user 末尾兜底而残留的尾随 PHI system 一并剥离，保证末端无 system。
 
     Args:
         character: 角色纯数据
         history: 历史消息序列（每项至少含 role 与 content 属性）
-        user_content: 当前用户输入
+        user_content: 当前用户输入（False 时被忽略、不校验、不追加）
         max_rounds: 保留的对话轮数（每轮 2 条消息，滑窗上限为 max_rounds*2）
         user_name: 用户昵称（{{user}} 模板变量）
+        append_current_input: 是否追加当前用户输入。True（默认）逐字保持现
+            组装行为；False 用于重生成路径（不追加当前输入，末条为历史末条
+            user，剥离尾随 PHI system）。
 
     Returns:
         组装好的消息列表，role 均为纯字符串 system/user/assistant
@@ -163,8 +171,14 @@ def build_messages(
         phi = apply_template_vars(character.post_history_instructions, user_name, char_name)
         messages.append({"role": "system", "content": phi})
 
-    # 6. 当前输入
-    content = apply_template_vars(user_content, user_name, char_name)
-    messages.append({"role": "user", "content": content})
+    # 6. 当前输入（append_current_input=False 时不追加，并剥离尾随 PHI system）
+    if append_current_input:
+        content = apply_template_vars(user_content, user_name, char_name)
+        messages.append({"role": "user", "content": content})
+    else:
+        # 重生成路径：末条须为历史末条 user（触发源）。无当前 user 末尾兜底时，
+        # 步骤 5 的 PHI（system）会成为末条，故先剥离全部尾随 system。
+        while messages and messages[-1].get("role") == "system":
+            messages.pop()
 
     return messages

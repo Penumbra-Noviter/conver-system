@@ -108,17 +108,12 @@ def assemble_chat_context(
             db, conv, current_input, max_rounds=max_rounds, user_name=user_name,
         )
     else:
-        # 重生成路径：不追加当前输入。build_message_list 末尾恒追加输入，
-        # 此处用空串追加后丢弃，使历史末条 user 即为待回复目标（不重复）。
-        # 带 post_history_instructions（PHI）的角色：build_message_list 在最后
-        # user 之后追加 PHI（system）再追加 "" user，故丢弃 "" user 后需再移除
-        # 末尾 system（PHI），使末尾 user 恢复为触发源（W2 增量审核 BREAKS-高）。
+        # 重生成路径：append_current_input=False —— 不追加当前输入，末条为
+        # 历史末条 user（待回复触发源），尾随 PHI system 已在纯函数内剥离。
         messages = message_service.build_message_list(
             db, conv, "", max_rounds=max_rounds, user_name=user_name,
+            append_current_input=False,
         )
-        messages = messages[:-1]
-        while messages and messages[-1].get("role") == "system":
-            messages.pop()
 
     # 4. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
     _, _, provider = resolve_llm(db, conv.model_provider, conv.model_name)
