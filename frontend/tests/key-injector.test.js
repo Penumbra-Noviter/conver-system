@@ -34,7 +34,8 @@
  * 测试即模块接口契约：公开面 __all__ = initKeyInjector / attachKeyInject /
  *   resolveButtonState / hasConfigTriplet / convertEndpoint /
  *   injectCredentialsIntoGame / syncGameCredentials / autoSyncIntoGame /
- *   TEXT_RESYNC / TEXT_INJECTED / resetSyncLoop（11 项）。
+ *   observeConfigControls / disconnectObserver / mutationTouchesConfig /
+ *   TEXT_RESYNC / TEXT_INJECTED / resetSyncLoop（18 项）。
  * 挂载模式：jsdom + vi.resetModules()；按钮条 fixture 与 simulator-view.js
  *   renderShell 渲染的 DOM 契约一致（.sim-key-bar / .sim-key-btn /
  *   .sim-key-msg）；注入目标文档用 createHTMLDocument 构造（注入核心只依赖
@@ -107,6 +108,30 @@ async function setupBar({ credentials = CRED_OPENAI, getDoc = null, getConfig = 
     return { mod, bar, btn, msg, fetchMock };
 }
 
+/** 装配配置控件观察者（S3 观察者生命周期 seam）：bar + initKeyInjector(mock) +
+ * attach + observeConfigControls 挂到游戏文档；返回 {mod, bar, doc, fetchMock}。
+ * 观察→过滤→防抖→同步→冷却→熔断→断连闭环在 key-injector 单一模块内 ——
+ * 参数化接收 doc/config/endpointMode，不读任何视图模块状态。 */
+async function setupObserver({ credentials = CRED_OPENAI, config = CONFIG, endpointMode = null } = {}) {
+    const mod = await loadInjector();
+    const fetchMock = vi.fn(async () => credentials);
+    mod.initKeyInjector({ getCredentials: fetchMock });
+    const bar = makeBar();
+    const doc = makePanelDoc();
+    mod.attachKeyInject({ bar, getDoc: () => doc, getConfig: () => config, getEndpointMode: () => endpointMode });
+    mod.observeConfigControls({ doc, config, endpointMode, bar });
+    return { mod, bar, doc, fetchMock };
+}
+
+/** 游戏重建配置面板（innerHTML 替换 — 控件恢复默认值；病理循环重置动作） */
+function rebuildPanel(doc) {
+    doc.body.innerHTML = `
+        <input id="cfg-endpoint" value="game-default-endpoint">
+        <input id="cfg-apikey">
+        <select id="cfg-model"><option value="game-default-model">game-default-model</option></select>
+    `;
+}
+
 describe('key-injector — 协议表面 __all__ 与模块私有性', () => {
     it('__all__ 收口公开函数', async () => {
         const mod = await loadInjector();
@@ -115,8 +140,9 @@ describe('key-injector — 协议表面 __all__ 与模块私有性', () => {
             'SEL_NAV_SETTINGS',
             'TEXT_INJECTED', 'TEXT_RESYNC',
             'attachKeyInject', 'autoSyncIntoGame', 'convertEndpoint',
-            'hasConfigTriplet', 'initKeyInjector',
-            'injectCredentialsIntoGame', 'resetSyncLoop',
+            'disconnectObserver', 'hasConfigTriplet', 'initKeyInjector',
+            'injectCredentialsIntoGame', 'mutationTouchesConfig',
+            'observeConfigControls', 'resetSyncLoop',
             'resolveButtonState', 'syncGameCredentials',
         ]);
     });
@@ -1161,5 +1187,259 @@ describe('key-injector — sync loop state machine', () => {
         const r = await mod.autoSyncIntoGame(opts);
         expect(r.breaker).toBe(true);
         expect(r.cooled).toBeUndefined(); // breaker takes priority
+    });
+});
+
+describe('key-injector — mutationTouchesConfig 观察者过滤（纯函数 — S3 参数化 seam）', () => {
+    /** 构造 game 文档内元素（id 成员判定用 — 纯函数不依赖 iframe 元素） */
+    const el = (html) => makeGameDoc(html).body.firstElementChild;
+    /** 构造 MutationRecord 形状（childList 默认；只取过滤关心的字段） */
+    const rec = (partial) => ({ type: 'childList', addedNodes: [], removedNodes: [], target: null, ...partial });
+
+    it('childList added 节点自身 id ∈ 三元组 → true', async () => {
+        const { mutationTouchesConfig } = await loadInjector();
+        expect(mutationTouchesConfig([rec({ addedNodes: [el('<input id="cfg-apikey">')] })], CONFIG)).toBe(true);
+    });
+
+    it('childList added 子树含三元组 id（游戏整段重建配置面板）→ true', async () => {
+        const { mutationTouchesConfig } = await loadInjector();
+        const subtree = el('<div><section><input id="cfg-model"></section></div>');
+        expect(mutationTouchesConfig([rec({ addedNodes: [subtree] })], CONFIG)).toBe(true);
+    });
+
+    it('childList removed 节点自身/子树含三元组 id → true', async () => {
+        const { mutationTouchesConfig } = await loadInjector();
+        expect(mutationTouchesConfig([rec({ removedNodes: [el('<input id="cfg-endpoint">')] })], CONFIG)).toBe(true);
+        expect(mutationTouchesConfig([rec({ removedNodes: [el('<div><input id="cfg-model"></div>')] })], CONFIG)).toBe(true);
+    });
+
+    it('attributes 变更：目标元素自身 id ∈ 三元组 → true（TD-75 setAttribute 重建路径 — 属性变更仅目标自身判定）', async () => {
+        const { mutationTouchesConfig } = await loadInjector();
+        const target = el('<input id="cfg-apikey">');
+        expect(mutationTouchesConfig([rec({ type: 'attributes', target, attributeName: 'value' })], CONFIG)).toBe(true);
+    });
+
+    it('attributes 变更：目标 id 不在三元组（attributeFilter 外运行期属性元素）→ false', async () => {
+        const { mutationTouchesConfig } = await loadInjector();
+        const status = el('<div id="game-status" class="x"></div>');
+        expect(mutationTouchesConfig([rec({ type: 'attributes', target: status, attributeName: 'class' })], CONFIG)).toBe(false);
+    });
+
+    it('三元组不完整 / config 缺失 → false（id 白名单为空 — 无命中可判定）', async () => {
+        const { mutationTouchesConfig } = await loadInjector();
+        const hit = [rec({ addedNodes: [el('<input id="cfg-apikey">')] })];
+        expect(mutationTouchesConfig(hit, null)).toBe(false);
+        expect(mutationTouchesConfig(hit, undefined)).toBe(false);
+        expect(mutationTouchesConfig(hit, { endpoint: 'e', apikey: 'k' })).toBe(false);
+        expect(mutationTouchesConfig(hit, { ...CONFIG, apikey: '' })).toBe(false); // 残缺三元组 → 该 id 不在白名单
+    });
+
+    it('空 mutations / 无关 id / 文本节点 → false（游戏运行期高频 DOM 更新不触发同步）', async () => {
+        const { mutationTouchesConfig } = await loadInjector();
+        expect(mutationTouchesConfig([], CONFIG)).toBe(false);
+        expect(mutationTouchesConfig(undefined, CONFIG)).toBe(false);
+        expect(mutationTouchesConfig(null, CONFIG)).toBe(false);
+        const unrelated = el('<div id="npc-dialog">对话</div>');
+        expect(mutationTouchesConfig([rec({ addedNodes: [unrelated] })], CONFIG)).toBe(false);
+        const text = makeGameDoc('plain text').body.firstChild; // 文本节点（nodeType 3）
+        expect(text.nodeType).toBe(3);
+        expect(mutationTouchesConfig([rec({ addedNodes: [text] })], CONFIG)).toBe(false);
+    });
+});
+
+describe('key-injector — 配置控件观察者生命周期（S3 — 观察→过滤→防抖→同步→冷却→熔断→断连）', () => {
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); document.body.innerHTML = ''; });
+
+    it('observe 挂载后：配置控件结构重建（childList + subtree）→ 防抖后观察者路径再同步（参数化 doc/config/endpointMode — 不读视图状态）', async () => {
+        const { doc, fetchMock } = await setupObserver();
+        expect(fetchMock).not.toHaveBeenCalled(); // 挂载本身不触发同步
+
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500); // 观察者防抖到期
+        await vi.advanceTimersByTimeAsync(0); // 再同步微任务
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1');
+        expect(doc.getElementById('cfg-model').value).toBe('gpt-4o-mini');
+    });
+
+    it('observe 参数化口径：endpointMode=full → 以游戏口径转换后同步', async () => {
+        const { doc, fetchMock } = await setupObserver({ endpointMode: 'full' });
+
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(doc.getElementById('cfg-endpoint').value).toBe('https://api.example.com/v1/chat/completions');
+    });
+
+    it('防抖（observerTimer）：500ms 窗口内连续重建合并为一次同步', async () => {
+        const { doc, fetchMock } = await setupObserver();
+
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(100);
+        rebuildPanel(doc); // 窗口内第二次变化（重置防抖计时器）
+        await vi.advanceTimersByTimeAsync(100);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 合并为一次同步
+    });
+
+    it('attributeFilter 外属性（配置控件自身 class/style 翻转）→ 回调不被交付、不触发同步（观察参数白名单保持）', async () => {
+        const { doc, fetchMock } = await setupObserver();
+
+        const apikeyEl = doc.getElementById('cfg-apikey');
+        apikeyEl.setAttribute('class', 'state-1');
+        apikeyEl.setAttribute('style', 'color: red');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fetchMock).not.toHaveBeenCalled(); // attributeFilter ['value','hidden'] 先行拦截，无自触发面
+    });
+
+    it('TD-75:票面属性 value（setAttribute 重建控件值）→ 防抖后触发再同步', async () => {
+        const { doc, fetchMock } = await setupObserver();
+
+        doc.getElementById('cfg-apikey').setAttribute('value', '');
+        doc.getElementById('cfg-endpoint').setAttribute('value', 'game-default-endpoint');
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(doc.getElementById('cfg-apikey').value).toBe('sk-smoke-openai'); // 主应用配置重新生效
+    });
+
+    it('写回环冷却：真写入后冷却窗内重建 → 防抖到期跳过；冷却过后重建恢复', async () => {
+        const { doc, fetchMock } = await setupObserver();
+
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 首轮同步（真写入 → 置冷却）
+
+        rebuildPanel(doc); // 冷却窗内重建（自写入反应）
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 冷却内防抖到期跳过（无额外 fetch）
+
+        await vi.advanceTimersByTimeAsync(1000); // 冷却已过
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(2); // 恢复再同步
+    });
+
+    it('断连（disconnectObserver）：断连后游戏文档变更不再触发同步', async () => {
+        const { mod, doc, fetchMock } = await setupObserver();
+
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        mod.disconnectObserver();
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 断连后不再响应
+    });
+
+    it('断连清理在途防抖：断连 + 重开重挂后，旧防抖到期不得以新会话上下文执行同步', async () => {
+        const { mod, doc, fetchMock } = await setupObserver();
+
+        rebuildPanel(doc); // 触发变更 → 调度旧会话防抖
+        await vi.advanceTimersByTimeAsync(100); // 旧防抖在途（< 500ms）
+        mod.disconnectObserver(); // 断连：清防抖计时器（本契约点）—— 旧防抖作废
+        expect(fetchMock).not.toHaveBeenCalled(); // 断连本身不触发同步
+
+        // 重开游戏（同模块）：重新 observe 新文档 → 新观察者上下文就位
+        const doc2 = makePanelDoc();
+        const bar2 = makeBar();
+        const fetch2 = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetch2 });
+        mod.attachKeyInject({ bar: bar2, getDoc: () => doc2, getConfig: () => CONFIG, getEndpointMode: () => null });
+        mod.observeConfigControls({ doc: doc2, config: CONFIG, endpointMode: null, bar: bar2 });
+
+        await vi.advanceTimersByTimeAsync(2000); // 越过旧防抖到期点
+        expect(fetch2).not.toHaveBeenCalled(); // 旧防抖已被断连清理 → 不以新会话上下文幽灵同步
+    });
+
+    it('熔断后断连：连续 3 轮重建+真写入 → 第 3 次同步后观察者断开，后续重建不再同步', async () => {
+        const { mod, doc, fetchMock } = await setupObserver();
+
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000); // 越过写回环冷却（重建落在冷却窗外 — TD-76 病理循环钉层）
+            rebuildPanel(doc);
+            await vi.advanceTimersByTimeAsync(500); // 观察者防抖
+            await vi.advanceTimersByTimeAsync(0); // 再同步微任务
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(3); // 3 轮观察者同步（第 3 次后熔断）
+
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetchMock).toHaveBeenCalledTimes(3); // 熔断 → 不再同步（fetch 数封顶）
+
+        // 断连判定探针：仅复位熔断计数（不重挂观察者 — 真实流程中断连与复位仅在
+        // destroyFrame 成对出现）→ 若观察者仍连接则同步复活；已断连则保持封顶。
+        mod.resetSyncLoop();
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(doc);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetchMock).toHaveBeenCalledTimes(3); // 观察者已断开 → 复位计数不复活同步
+    });
+
+    it('熔断后重开（断连 + resetSyncLoop + 重新 observe）→ 新同步循环恢复工作', async () => {
+        const { mod, doc, fetchMock } = await setupObserver();
+
+        for (let i = 0; i < 3; i++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            rebuildPanel(doc);
+            await vi.advanceTimersByTimeAsync(500);
+            await vi.advanceTimersByTimeAsync(0);
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+
+        // 视图销毁序列（destroyFrame 语义）：断连 + 复位
+        mod.disconnectObserver();
+        mod.resetSyncLoop();
+        // 重开游戏：同一模块重新 observe（新文档）
+        const doc2 = makePanelDoc();
+        const bar2 = makeBar();
+        const fetch2 = vi.fn(async () => CRED_OPENAI);
+        mod.initKeyInjector({ getCredentials: fetch2 });
+        mod.attachKeyInject({ bar: bar2, getDoc: () => doc2, getConfig: () => CONFIG, getEndpointMode: () => null });
+        mod.observeConfigControls({ doc: doc2, config: CONFIG, endpointMode: null, bar: bar2 });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        rebuildPanel(doc2);
+        await vi.advanceTimersByTimeAsync(500);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetch2).toHaveBeenCalledTimes(1); // 复位后观察者恢复工作
+        expect(doc2.getElementById('cfg-apikey').value).toBe('sk-smoke-openai');
+    });
+
+    it('防御：doc / bar / 三元组缺失或不全 → observe no-op 不抛错（Falsify）', async () => {
+        const mod = await loadInjector();
+        mod.initKeyInjector({ getCredentials: vi.fn(async () => CRED_OPENAI) });
+        const bar = makeBar();
+        const doc = makePanelDoc();
+        expect(() => mod.observeConfigControls()).not.toThrow();
+        expect(() => mod.observeConfigControls(null)).not.toThrow();
+        expect(() => mod.observeConfigControls({})).not.toThrow();
+        expect(() => mod.observeConfigControls({ doc, config: CONFIG })).not.toThrow(); // 缺 bar
+        expect(() => mod.observeConfigControls({ doc, bar })).not.toThrow(); // 缺 config
+        expect(() => mod.observeConfigControls({ doc, config: { endpoint: 'e' }, bar })).not.toThrow(); // 三元组不全
+        expect(() => mod.observeConfigControls({ doc: null, config: CONFIG, bar })).not.toThrow(); // doc 缺失
+        expect(() => mod.observeConfigControls({ doc, config: CONFIG, bar })).not.toThrow(); // 正常挂载路径
+    });
+
+    it('断连幂等：未挂载 / 重复断连 → 不抛错', async () => {
+        const mod = await loadInjector();
+        expect(() => mod.disconnectObserver()).not.toThrow();
+        const { mod: fresh } = await setupObserver();
+        expect(() => fresh.disconnectObserver()).not.toThrow();
+        expect(() => fresh.disconnectObserver()).not.toThrow();
     });
 });

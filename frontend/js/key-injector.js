@@ -3,7 +3,8 @@
  *
  * 职责：主应用对模拟器配置的单一事实来源同步 —— iframe 加载后自动使用主
  *   应用 OpenAI 兼容凭证（key/endpoint/model）、按钮「重新同步」手动兜底、
- *   动态配置控件持续同步（观察者触发，见 simulator-view.js）三通道共用
+ *   动态配置控件持续同步（观察者触发 — 观察→过滤→防抖→同步→冷却→熔断→
+ *   断连闭环在本模块）三通道共用
  *   同一同步核心（syncGameCredentials → injectCredentialsIntoGame）：
  *   - 凭证获取经 initKeyInjector 注入钩子（G7 模式：app.js 接
  *     settings.credentials()；测试注入 mock）；
@@ -27,8 +28,12 @@
  *     可进入 select），再派发 input/change；
  *   - 幂等写入：字段值已等于目标值时不写不派发（持续同步的写回环守卫 —
  *     重复同步不再触发游戏 change 处理，动态重建场景收敛）；
- *   - 自动同步通道：simulator-view.js 在 iframe load / 配置控件重建后调
- *     autoSyncIntoGame（静默，不闪「已填入」）；按钮点击走同一核心 +
+ *   - 自动同步通道：load 自动同步（simulator-view handleLoad 触发
+ *     autoSyncIntoGame，静默，不闪「已填入」）；配置控件重建持续同步
+ *     走本模块观察者生命周期（observeConfigControls 挂载 → 过滤
+ *     mutationTouchesConfig → 防抖 observerTimer → 同步 → 冷却/熔断 →
+ *     breaker 断连）— 闭环单一模块可读，simulator-view 仅保留触发时机
+ *     （load 后 observe / destroyFrame 断连 + 复位）。按钮点击走同一核心 +
  *     反馈状态机。写回环状态机（冷却/熔断）收口在本模块：
  *     autoSyncIntoGame 一次调用原子完成同步执行 + 冷却判定 + 置冷却 +
  *     观察者计数 + 熔断判定（path: 'load' | 'observer' 区分 load 不计数 /
@@ -61,12 +66,13 @@
  *
  * 依赖方向：key-injector.js →（无 — 纯函数 + DOM，凭证获取经注入钩子）；
  *   simulator-view.js → key-injector.js（attachKeyInject / autoSyncIntoGame /
- *   hasConfigTriplet / 文案常量）；app.js → key-injector.js（initKeyInjector
- *   接线）。
+ *   observeConfigControls / disconnectObserver / hasConfigTriplet / 文案常量）；
+ *   app.js → key-injector.js（initKeyInjector 接线）。
  *
  * 协议表面（__all__）：initKeyInjector / attachKeyInject / resolveButtonState /
  *   hasConfigTriplet / convertEndpoint / injectCredentialsIntoGame /
- *   syncGameCredentials / autoSyncIntoGame / TEXT_RESYNC / TEXT_INJECTED /
+ *   syncGameCredentials / autoSyncIntoGame / observeConfigControls /
+ *   disconnectObserver / mutationTouchesConfig / TEXT_RESYNC / TEXT_INJECTED /
  *   MSG_CLAUDE_ONLY / MSG_NO_CREDENTIALS / LINK_NAV_SETTINGS / SEL_NAV_SETTINGS /
  *   resetSyncLoop。
  */
@@ -157,6 +163,25 @@ let syncCooldownUntil = 0;
 /** 观察者路径写回环熔断计数（连续真写入次数；达到 SYNC_MAX_STRIKES 后熔断；
  * 熔断后 observer 调用恒返回 breaker: true；resetSyncLoop 清零） */
 let syncStrikes = 0;
+
+// ══════════════════════════════════════════════════
+// 配置控件观察者生命周期状态（SIM-API-1 — S3 状态机边界收口；触发器由
+// simulator-view.js 持有，生命周期状态/逻辑收口本模块）
+// ══════════════════════════════════════════════════
+
+/** 配置控件重建观察者防抖时长（毫秒；连续重建合并为一次同步 —
+ * simulator-view 触发点语义保持） */
+const OBSERVER_DEBOUNCE_MS = 500;
+
+/** 配置控件重建观察者（observeConfigControls 挂游戏文档；disconnectObserver 断开） */
+let configObserver = null;
+
+/** 观察者防抖计时器（无在途防抖时为 null；disconnectObserver 清理） */
+let observerTimer = null;
+
+/** 观察者同步执行上下文（observeConfigControls 登记 doc/config/endpointMode/bar —
+ * 防抖到期 flushObserverSync 取用；disconnectObserver 清空） */
+let observerContext = null;
 
 // ══════════════════════════════════════════════════
 // 纯函数：按钮态解析 / 三元组校验 / 端点口径转换
@@ -596,6 +621,135 @@ export function resetSyncLoop() {
     syncStrikes = 0;
 }
 
+// ══════════════════════════════════════════════════
+// 配置控件观察者生命周期（SIM-API-1 — 观察→过滤→防抖→同步→冷却→熔断→断连
+// 闭环单一模块可读；触发器由 simulator-view.js 持有）
+// ══════════════════════════════════════════════════
+
+/**
+ * 断开配置控件观察者 + 清理防抖计时器 + 清空观察者执行上下文（幂等；
+ * destroyFrame / 重新 observe / closeSimulator 共用）。
+ * 不复位写回环状态机（冷却/熔断复位经 resetSyncLoop — observeConfigControls
+ * 开头断连不得顺带复位，避免熔断语义丢失）。
+ */
+export function disconnectObserver() {
+    if (configObserver) {
+        configObserver.disconnect();
+        configObserver = null;
+    }
+    if (observerTimer) {
+        clearTimeout(observerTimer);
+        observerTimer = null;
+    }
+    observerContext = null;
+}
+
+/**
+ * 变更是否触及 config 三元组控件（SIM-API-1 观察者过滤 — 游戏运行期高频
+ * DOM 更新（状态渲染等）不得触发同步；只有 id 命中或变更子树含控件才算）。
+ * 语义：目标元素自身 id ∈ 三元组（childList 与 attributes 变更共用判定 —
+ * 期末评审去重）；或 childList 新增/移除子树内任一元素 id ∈ 三元组（游戏
+ * 整段重建配置面板时命中；子树元素遍历用 id 成员判定，无选择器转义面）。
+ * attributes 变更（TD-75 — 游戏以 setAttribute 重建控件）仅目标元素自身
+ * 判定；运行期无关属性变更（class/style 等）由 observe 的 attributeFilter
+ * 先行拦截（期末评审 F1 修复 — 只监听 value/hidden 票面目标属性）。
+ * 纯函数 — 不依赖 iframe 元素与视图模块状态。
+ * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
+ * @param {object|null} config - manifest config 三元组（endpoint/apikey/model）
+ * @returns {boolean} 任一变更触及配置控件为 true
+ */
+export function mutationTouchesConfig(mutations, config) {
+    const ids = [config?.endpoint, config?.apikey, config?.model]
+        .filter((v) => typeof v === 'string' && v !== '');
+    if (ids.length === 0) return false;
+    for (const m of mutations ?? []) {
+        if (typeof m?.target?.id === 'string' && ids.includes(m.target.id)) return true;
+        if (m?.type === 'attributes') continue;
+        const nodes = [...(m?.addedNodes ?? [])];
+        if (m?.removedNodes?.length) nodes.push(...m.removedNodes);
+        for (const node of nodes) {
+            if (node?.nodeType !== 1) continue;
+            if (ids.includes(node.id)) return true;
+            for (const el of node.querySelectorAll?.('*') ?? []) {
+                if (ids.includes(el.id)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * 观察者回调：变更触及配置控件 → 防抖 OBSERVER_DEBOUNCE_MS → 自动同步
+ * （observer 路径）。冷却/熔断判定已收口到 autoSyncIntoGame 单一状态机，
+ * 本回调只消费 breaker 信号决定观察者断连。
+ * @param {MutationRecord[]} mutations - MutationObserver 回调的变更记录
+ */
+function handleConfigMutation(mutations) {
+    const ctx = observerContext;
+    if (!ctx) return;
+    if (!mutationTouchesConfig(mutations, ctx.config)) return;
+    if (observerTimer) clearTimeout(observerTimer);
+    observerTimer = setTimeout(flushObserverSync, OBSERVER_DEBOUNCE_MS);
+}
+
+/**
+ * 观察者防抖到期回调：取 observe 时登记的执行上下文 → 以 observer 路径
+ * 自动同步（冷却判定在状态机函数调用时执行 — 防抖到期执行点，TD-76）；
+ * 熔断信号（breaker: true）→ 断开观察者，终止自动再同步。
+ */
+async function flushObserverSync() {
+    observerTimer = null;
+    const ctx = observerContext;
+    if (!ctx || !ctx.bar || !ctx.doc) return;
+    const result = await autoSyncIntoGame({
+        bar: ctx.bar,
+        getDoc: () => ctx.doc ?? null,
+        getConfig: () => ctx.config ?? null,
+        getEndpointMode: () => ctx.endpointMode ?? null,
+        path: 'observer',
+    });
+    // 熔断判定在状态机内完成，本模块仅消费 breaker 信号决定观察者生命周期
+    if (result?.breaker === true) disconnectObserver();
+}
+
+/**
+ * 对 loaded 游戏文档挂配置控件观察者（SIM-API-1 观察者生命周期入口 —
+ * 观察→过滤→防抖→同步→冷却→熔断→断连闭环单一模块可读）。
+ *
+ * 触发器：simulator-view.js handleLoad（load 后调用）；re-observe 幂等
+ * （先 disconnect 再挂）。参数化接收 doc / config / endpointMode / bar —
+ * 不读任何 simulator-view 模块状态（currentGame / frame / state）。
+ * 前置守卫：doc/body/bar 可用 + config 三元组完整才观察（观察无意义时不挂，
+ * no-op 不抛错）；三缺任一 → 直接返回。
+ * 观察参数白名单保持：childList + subtree + attributes +
+ * attributeFilter ['value','hidden']（TD-75 — 票面目标属性收窄，配置控件
+ * 自身 class/disabled 等运行期翻转不触发，防良性变更累积误熔断）。宿主注入
+ * 走 property 赋值与事件派发，不产生 attribute mutation — 无自触发面。
+ *
+ * @param {object} [params]
+ * @param {Document|null} [params.doc] - 同源 iframe contentDocument
+ * @param {object|null} [params.config] - manifest config 三元组（DOM id 白名单）
+ * @param {string|null} [params.endpointMode] - manifest endpointMode（'base'|'full'）
+ * @param {HTMLElement|null} [params.bar] - 按钮条容器（.sim-key-bar）
+ */
+export function observeConfigControls(params = {}) {
+    const { doc, config, endpointMode, bar } = params ?? {};
+    disconnectObserver();
+    if (!doc || !bar) return;
+    if (!hasConfigTriplet(config)) return; // 三元组不完整 → 无控件可观察
+    const body = doc.body;
+    if (!body || typeof body.addEventListener !== 'function') return;
+    if (typeof MutationObserver === 'undefined') return;
+    observerContext = { doc, config, endpointMode, bar };
+    configObserver = new MutationObserver(handleConfigMutation);
+    configObserver.observe(body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['value', 'hidden'],
+    });
+}
+
 /**
  * 把同步交互挂到按钮条（simulator-view.js renderShell 渲染后调用）。
  *
@@ -657,6 +811,9 @@ export const __all__ = [
     'injectCredentialsIntoGame',
     'syncGameCredentials',
     'autoSyncIntoGame',
+    'observeConfigControls',
+    'disconnectObserver',
+    'mutationTouchesConfig',
     'TEXT_RESYNC',
     'TEXT_INJECTED',
     'MSG_CLAUDE_ONLY',
