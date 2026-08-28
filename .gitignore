@@ -52,3 +52,6 @@ app.*.map.json
 # Env / secrets
 .env
 .env.*
+# Coverage & widget preview (3.47.2 template alignment, C1)
+/coverage/
+.widget_preview/
