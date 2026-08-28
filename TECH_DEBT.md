@@ -47,12 +47,18 @@
 
 ## 技术债处置记录
 
+### 2026-08-28 — M1-T07（波 4）装配收口
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-4 | ✅ 已按预期升级 | 契约锁已按注释退役（`test/app_contract_test.dart` 删除），行为断言迁入主题测试：`test/theme/app_theme_binding_test.dart`（pump 真实 ConverApp → 改 ThemeController → 断言 MaterialApp 实际生效对应 ThemeData；首启 dark / 双向切换判别 / 重启恢复三用例）+ `test/theme/theme_tokens_test.dart` 浅色锚定与深浅同构断言（G3） |
+
 ### 2026-08-29 — M0 交付后技术债消费（用户拍板：打包修 4 + 关 1 + 留 1）
 
 | 编号 | 处置 | 详情 |
 |------|------|------|
 | F-1 | ✅ 已修 | tables.dart 头注释补全桌面时间戳事实（`server_default=func.now()`）+ F-3 表示差交叉引用；「本提交」 |
 | F-2 | ✅ 已修 | 新增 `.gitattributes`（参照桌面库，`*.dart text eol=lf` 钉死 Dart 生成物行尾，消 build_runner 重跑假脏） |
-| F-4 | ✅ 已修 | `test/app_contract_test.dart` 源码文本锚契约锁（M1 引入浅色主题后升级为行为断言并退役本文件） |
+| F-4 | ✅ 已修 | `test/app_contract_test.dart` 源码文本锚契约锁（M1 引入浅色主题后升级为行为断言并退役本文件）→ **2026-08-28 M1-T07 已按注释退役，见上节** |
 | F-5 | ✅ 已修 | `.gitignore` 追加 `.scratch/`（`git check-ignore -v` 实证生效；evidence 目录按约定本地保留不受影响） |
 | F-6 | ❌ 复核关闭 | Speculative：期末四轴已核实「spec 显式 M0 不调用 `open()`，M1 仓储工单自会覆盖」——现状即设计意图（`git grep` 复核零调用方属实）；F-4 契约锁同文件已含装配锚核验 |

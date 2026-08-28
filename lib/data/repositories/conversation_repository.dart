@@ -112,12 +112,12 @@ class ConversationRepository {
 
     final provider = _resolveValue(
       explicit: modelProvider,
-      fromSettings: await _settings.defaultProvider(),
+      fromSettings: await _settings.defaultProvider,
       fallback: _fallbackProvider,
     );
     final model = _resolveValue(
       explicit: modelName,
-      fromSettings: await _settings.defaultModel(),
+      fromSettings: await _settings.defaultModel,
       fallback: _fallbackModel,
     );
     final effectiveTitle = _resolveValue(
@@ -141,7 +141,7 @@ class ConversationRepository {
     // 预插开场白：把角色 first_mes（模板替换后）插入为首条 assistant 消息。
     if (character != null && character.firstMes.isNotEmpty) {
       final userName = _resolveValue(
-        fromSettings: await _settings.userName(),
+        fromSettings: await _settings.userName,
         fallback: _fallbackUserName,
       );
       final greeting = applyTemplateVars(

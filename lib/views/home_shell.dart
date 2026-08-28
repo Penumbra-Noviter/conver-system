@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/settings_repository.dart';
 import '../view_models/shell_navigation.dart';
+import '../view_models/theme_controller.dart';
 import 'chat/chat_view.dart';
 import 'characters/characters_view.dart';
 import 'search/search_view.dart';
@@ -12,6 +14,8 @@ import 'simulators/simulators_view.dart';
 ///
 /// 当前目的地由 [ShellNavigation]（provider 注入）持有；选中态视觉走
 /// T02 的 NavigationBarTheme（琥珀 accent 指示器与图标文字色）。
+/// 设置页自 M1-T07 起注入应用级共享实例（同一 ThemeController 使主题
+/// 切换端到端生效于 MaterialApp；同一 SettingsRepository 统一数据层）。
 class HomeShell extends StatelessWidget {
   const HomeShell({super.key});
 
@@ -24,7 +28,10 @@ class HomeShell extends StatelessWidget {
         ShellTab.characters => const CharactersView(),
         ShellTab.search => const SearchView(),
         ShellTab.simulators => const SimulatorsView(),
-        ShellTab.settings => const SettingsView(),
+        ShellTab.settings => SettingsView(
+            settingsRepository: context.read<SettingsRepository>(),
+            themeController: context.read<ThemeController>(),
+          ),
       },
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigation.index,
