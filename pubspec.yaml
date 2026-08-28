@@ -38,6 +38,11 @@ dependencies:
   # State management (M0 导航壳 T04 使用；T03 追加 drift 系依赖)
   provider: ^6.1.5+1
 
+  # Local database (M0 T03：schema 自桌面 ORM 派生；path_provider /
+  # sqlite3_flutter_libs 由 drift_flutter 传递捆绑，不直接登记)
+  drift: ^2.34.3
+  drift_flutter: ^0.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -48,6 +53,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # Code generation for drift (M0 T03；drift_dev 与 drift 2.34.x 配对)
+  drift_dev: ^2.34.5
+  build_runner: ^2.16.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
