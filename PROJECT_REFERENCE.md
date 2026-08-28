@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**当前状态**（2026-08-28）：设计已完整落盘并逐节走查定稿——架构、7 项功能迁移映射、模拟器难点专节（ADR-0002 锁定：本地 HTTP 服务器托管 + CORS 直连 + 完整桥接）、去 AI 味 UI 设计系统、M0–M7 里程碑、验证分层。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。**代码未开始**：里程碑已录入 [TICKETS.md](TICKETS.md)，M0 待认领。
+**当前状态**（2026-08-29）：**M0 已交付**——Flutter 工程脚手架 + drift 4 表（characters/conversations/messages/settings，schemaVersion=1）+ Warm Stone 深色主题 token + 5 tab 底部导航壳（应用名「汇流」），模拟器空壳验收通过（G0 全项：analyze 0 / test 23 / APK / 安装拉起 / 五 tab 切换零崩溃 / 视觉核对）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。**下一站 M1**（数据层 + 设置，见 [TICKETS.md](TICKETS.md)）。
 
 **核心能力**（7 项全量，无阉割）：
 - **聊天** — 多轮对话 + SSE 流式打字机渲染 + 停止生成；滑窗上下文、模板变量、重生成、错误态

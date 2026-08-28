@@ -4,7 +4,7 @@ Conver System 的移动端应用（Flutter，Android + iOS 独立运行，无桌
 
 ## 状态
 
-- 设计已落盘并拍板（含 ADR-0002 模拟器决议）；Flutter 工程待创建（`/to-spec` → `/to-tickets` 拆单后开工）
+- **M0 已交付**（2026-08-29）：Flutter 工程脚手架 + drift 4 表 + Warm Stone 深色主题 token + 5 tab 底部导航壳，模拟器空壳验收通过（G0 全项）；应用 launcher 名「汇流」。M1–M7 待办见 [TICKETS.md](TICKETS.md)
 - 权威设计文档：`docs/mobile-design.md`（架构 / 7 项功能全量 / 依赖清单 / M0–M7 里程碑）
 - 技术调研：`docs/mobile-adaptation-research.md`
 - 模拟器决策（ADR-0002）与桌面环境装载/验证记录见桌面端仓库：`desktop/CONSENSUS.md`、`desktop/DEV_LOG.md`
