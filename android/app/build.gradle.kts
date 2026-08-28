@@ -6,7 +6,10 @@ plugins {
 
 android {
     namespace = "com.conversystem.conver_system_mobile"
-    compileSdk = flutter.compileSdkVersion
+    // 显式 37：flutter_secure_storage 11.x（M1-T01 锁定 ^11.0.0）的 AAR 元数据
+    // 要求 compileSdk >= 37，Flutter 3.47.2 默认（flutter.compileSdkVersion=36）
+    // 不满足（M1-T07 构建验证实证）。本机 SDK 平台 android-37.0 已装。
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

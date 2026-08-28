@@ -25,14 +25,23 @@ import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../../models/model_catalog.dart';
 import '../../services/secure_store.dart';
+import 'settings_reader.dart';
 
-/// 设置能力的单一入口（M1-T04）。
+/// 设置能力的单一入口（M1-T04），并作为会话仓储的 [SettingsReader] 实现
+/// （M1-T07 装配接线）。
 ///
 /// seam 备注：工单 03 定义了消费方接口 `SettingsReader`
 /// （lib/data/repositories/settings_reader.dart，三 getter：
-/// defaultProvider / defaultModel / userName）。本类的同名成员与其约定一致；
-/// `implements SettingsReader` 子句按工单契约由工单 07 装配期补写。
-class SettingsRepository {
+/// defaultProvider / defaultModel / userName）。本类同名成员即其实现。
+///
+/// 语义收敛注记（M1-T07，诚实声明）：[SettingsReader] 契约要求原始值
+/// （缺失/空串返回 `''`，兜底由消费方回退），而本类类型化便捷读取按 spec
+/// §设置仓储做缺省填充（'User' / 'claude' / 'claude-sonnet-5'）。经唯一
+/// 消费方会话仓储（ConversationRepository）可观察行为**逐位一致**——其
+/// `_resolveValue` 的兜底常量与本类填充值完全相同，`''` 与填充值在
+/// 「显式值 → 设置值非空 → 兜底常量」链上收敛为同一结果。原始读取仍可经
+/// [getValue] 获得。
+class SettingsRepository implements SettingsReader {
   /// 创建仓储；[database] 为 drift 数据库，[secretStore] 缺省用系统安全存储
   /// 薄实现（测试注入 InMemorySecretStore）
   SettingsRepository({required AppDatabase database, SecretStore? secretStore})
@@ -179,7 +188,8 @@ class SettingsRepository {
 
   /// 用户昵称；缺省 'User'（镜像桌面 user_name）。
   ///
-  /// SettingsReader 约定成员（implements 子句由工单 07 补写）。
+  /// @override [SettingsReader.userName]（语义收敛注记见类注释）。
+  @override
   Future<String> get userName async {
     final value = await getValue('user_name');
     return value.isEmpty ? 'User' : value;
@@ -191,7 +201,8 @@ class SettingsRepository {
 
   /// 默认 provider；缺省 'claude'（镜像桌面 default_provider 的 config 兜底）。
   ///
-  /// SettingsReader 约定成员（implements 子句由工单 07 补写）。
+  /// @override [SettingsReader.defaultProvider]（语义收敛注记见类注释）。
+  @override
   Future<String> get defaultProvider async {
     final value = await getValue('default_provider');
     return value.isEmpty ? 'claude' : value;
@@ -199,7 +210,8 @@ class SettingsRepository {
 
   /// 默认模型；缺省 'claude-sonnet-5'（镜像桌面 default_model 的 config 兜底）。
   ///
-  /// SettingsReader 约定成员（implements 子句由工单 07 补写）。
+  /// @override [SettingsReader.defaultModel]（语义收敛注记见类注释）。
+  @override
   Future<String> get defaultModel async {
     final value = await getValue('default_model');
     return value.isEmpty ? 'claude-sonnet-5' : value;

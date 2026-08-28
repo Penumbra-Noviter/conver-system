@@ -19,13 +19,13 @@ class FakeSettingsReader implements SettingsReader {
   final Map<String, String> values;
 
   @override
-  Future<String> defaultProvider() async => values['default_provider'] ?? '';
+  Future<String> get defaultProvider async => values['default_provider'] ?? '';
 
   @override
-  Future<String> defaultModel() async => values['default_model'] ?? '';
+  Future<String> get defaultModel async => values['default_model'] ?? '';
 
   @override
-  Future<String> userName() async => values['user_name'] ?? '';
+  Future<String> get userName async => values['user_name'] ?? '';
 }
 
 void main() {

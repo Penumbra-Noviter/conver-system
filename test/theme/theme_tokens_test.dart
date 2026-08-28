@@ -72,6 +72,99 @@ void main() {
     });
   });
 
+  test('dark side: 5 缺名 token 补齐自桌面 :root 默认段（M1-T07）', () {
+    // 桌面 style.css `:root`（深色默认段）逐值：
+    expect(ConverColors.accentContrast, const Color(0xFF21180D));
+    expect(ConverColors.onAccent, ConverColors.accentContrast); // --on-accent
+    expect(ConverColors.accentGen, const Color(0xFFA855F7));
+    expect(
+      ConverColors.accentGenSoft,
+      const Color.fromRGBO(168, 85, 247, 0.15),
+    );
+    expect(ConverColors.onDanger, const Color(0xFFFFFDF8));
+    expect(ConverColors.overlay, const Color.fromRGBO(24, 20, 16, 0.72));
+  });
+
+  group('G3 light tokens (M1-T07, desktop :root[data-theme="light"] style.css:121)', () {
+    test('A1 抽样锚点：page / accent / ink1 / overlay / accentGen 逐点对源', () {
+      expect(ConverColorsLight.page, const Color(0xFFF0ECE5)); // #f0ece5
+      expect(ConverColorsLight.accent, const Color(0xFFA96F1D)); // #a96f1d
+      expect(ConverColorsLight.ink1, const Color(0xFF28211A)); // #28211a
+      expect(
+        ConverColorsLight.overlay,
+        const Color.fromRGBO(42, 33, 23, 0.42), // rgba(42, 33, 23, 0.42)
+      );
+      expect(ConverColorsLight.accentGen, const Color(0xFF9333EA)); // #9333ea
+    });
+
+    test('浅色段 25 值逐字转录（含 rgba 分量与 alpha 浮点）', () {
+      // 色值锚定自 style.css:121-147（强制浅色段），逐行对源。
+      expect(ConverColorsLight.page, const Color(0xFFF0ECE5));
+      expect(ConverColorsLight.bg, const Color(0xFFF8F5EF));
+      expect(ConverColorsLight.panel1, const Color(0xFFF4F0E9));
+      expect(ConverColorsLight.panel2, const Color(0xFFEBE5DB));
+      expect(ConverColorsLight.panel3, const Color(0xFFE2DACF));
+      expect(ConverColorsLight.panel4, const Color(0xFFD7CFC2));
+      expect(ConverColorsLight.border, const Color.fromRGBO(63, 51, 38, 0.09));
+      expect(
+        ConverColorsLight.borderStrong,
+        const Color.fromRGBO(63, 51, 38, 0.16),
+      );
+      expect(
+        ConverColorsLight.borderTertiary,
+        const Color.fromRGBO(63, 51, 38, 0.05),
+      );
+      expect(ConverColorsLight.ink1, const Color(0xFF28211A));
+      expect(ConverColorsLight.ink2, const Color(0xFF51463A));
+      expect(ConverColorsLight.ink3, const Color(0xFF766A5C));
+      expect(ConverColorsLight.ink4, const Color(0xFF988C7D));
+      expect(ConverColorsLight.accent, const Color(0xFFA96F1D));
+      expect(ConverColorsLight.accentHover, const Color(0xFF925F17));
+      expect(
+        ConverColorsLight.accentSoft,
+        const Color.fromRGBO(169, 111, 29, 0.12),
+      );
+      expect(ConverColorsLight.accentContrast, const Color(0xFFFFFBF4));
+      expect(ConverColorsLight.onAccent, ConverColorsLight.accentContrast);
+      expect(ConverColorsLight.accentGen, const Color(0xFF9333EA));
+      expect(
+        ConverColorsLight.accentGenSoft,
+        const Color.fromRGBO(147, 51, 234, 0.15),
+      );
+      expect(ConverColorsLight.onDanger, const Color(0xFFFFFDF8));
+      expect(
+        ConverColorsLight.overlay,
+        const Color.fromRGBO(42, 33, 23, 0.42),
+      );
+    });
+
+    test('A2 同构契约：浅/深 token 名集相等且恰为桌面 25 名', () {
+      const expectedNames = <String>{
+        'page', 'bg', 'panel1', 'panel2', 'panel3', 'panel4',
+        'border', 'borderStrong', 'borderTertiary',
+        'ink1', 'ink2', 'ink3', 'ink4',
+        'accent', 'accentHover', 'accentSoft',
+        'accentContrast', 'onAccent',
+        'accentGen', 'accentGenSoft',
+        'onDanger', 'overlay',
+        'success', 'danger', 'warning',
+      };
+      expect(ConverColors.tokens.keys.toSet(), expectedNames);
+      expect(ConverColorsLight.tokens.keys.toSet(), expectedNames);
+      expect(ConverColors.tokens.length, 25);
+      expect(ConverColorsLight.tokens.length, 25);
+      // 映射值与同名 static const 一致（映射登记不漂移）。
+      expect(ConverColorsLight.tokens['page'], ConverColorsLight.page);
+      expect(ConverColors.tokens['accentGen'], ConverColors.accentGen);
+    });
+
+    test('success / danger / warning 浅色沿用深色值（CSS 回退语义，F-73 注记）', () {
+      expect(ConverColorsLight.success, ConverColors.success);
+      expect(ConverColorsLight.danger, ConverColors.danger);
+      expect(ConverColorsLight.warning, ConverColors.warning);
+    });
+  });
+
   group('ConverTheme.dark() (G0.2a ThemeData assembly)', () {
     final theme = ConverTheme.dark();
 
@@ -102,6 +195,35 @@ void main() {
       expect(
         nav.labelTextStyle?.resolve(const {WidgetState.selected})?.color,
         ConverColors.accent,
+      );
+    });
+  });
+
+  group('ConverTheme.light() (M1-T07 ThemeData assembly)', () {
+    final theme = ConverTheme.light();
+
+    test('locks light brightness and warm-paper scaffold background', () {
+      expect(theme.brightness, Brightness.light);
+      expect(theme.scaffoldBackgroundColor, ConverColorsLight.page);
+    });
+
+    test('colorScheme carries the dark-amber accent as primary', () {
+      expect(theme.colorScheme.primary, ConverColorsLight.accent);
+      expect(theme.colorScheme.onPrimary, ConverColorsLight.onAccent);
+      expect(theme.colorScheme.surface, ConverColorsLight.bg);
+    });
+
+    test('navigationBar selected state uses the light-theme amber', () {
+      final nav = theme.navigationBarTheme;
+      expect(nav.backgroundColor, ConverColorsLight.bg);
+      expect(nav.indicatorColor, ConverColorsLight.accentSoft);
+      expect(
+        nav.iconTheme?.resolve(const {WidgetState.selected})?.color,
+        ConverColorsLight.accent,
+      );
+      expect(
+        nav.iconTheme?.resolve(const <WidgetState>{})?.color,
+        ConverColorsLight.ink3,
       );
     });
   });
