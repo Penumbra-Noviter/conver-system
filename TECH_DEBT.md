@@ -39,11 +39,13 @@
 
 ## 候选区
 
-> 当前 1 项待立项：F-7（视图层 token 主题化，M1 G6 冒烟新增）。2026-08-28 M1-T08 收口：F-3 ✅ 已按方案 a 处置（保持 drift INTEGER unix 秒，双端互迁/ISO 口径契约归 M4 导出 JSON 层；见处置记录）。历史消费（2026-08-29 M0 交付后，处置详情由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）。
+> 当前 3 项待立项：F-7（视图层 token 主题化，M6 消费）/ F-8（设置页存储错误面，建议 M2 错误面统一消费）/ F-9（双构造点，装配弱候选）。2026-08-28 M1-T08 收口：F-3 ✅ 已按方案 a 处置（保持 drift INTEGER unix 秒，双端互迁/ISO 口径契约归 M4 导出 JSON 层；见处置记录）。历史消费（2026-08-29 M0 交付后，处置详情由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
 | F-7 | **视图层硬编码深色 token**：各 view 直接引 `ConverColors.ink*`（深色值）——浅色主题下占位组标题等文字对比度不足（G6 冒烟 vision 实证"几乎融为一体"）；需视图层 token 主题化（引 Theme 派生色或按亮度分支）。深色模式（默认）无影响；M6 视觉打磨消费 | M1 G6 冒烟（工单 07 顾虑 #1 预警） | Worth exploring | 📝 待立项 | 前端主题 |
+| F-8 | **设置页存储异常面**：`api_config_section._save` / `default_model_section._save` try/finally 无 catch（写失败无用户反馈、异常上抛）、`theme_section` setThemeMode 未 await、`settings_view._loadEcho` `catch (_) {}` 静默吞错与 CLAUDE「禁止静默吞异常」约定不一致——建议 M2 错误面统一消费（统一失败反馈 + 日志） | M1 期末四轴审核（Falsify 轴失败路径构造） | Worth exploring | 📝 待立项 | 设置页/前端 |
+| F-9 | **双构造点**：`SettingsView` 缺省构造 `AppDatabase.open()`（settings_view.dart import app_database）与 app.dart provider 图并行——工单 06 过渡遗留，07 注入后 App 内不可达但保留第二装配点；`api_config_section` 缺省构造 FlutterSecretStore 同性质（运行时同源，功能单例） | M1 期末四轴审核（Architecture 轴） | Worth exploring（弱） | 📝 待立项 | 装配 |
 
 ## 技术债处置记录
 

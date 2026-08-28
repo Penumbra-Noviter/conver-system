@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**当前状态**（2026-08-29）：**M0 已交付**——Flutter 工程脚手架 + drift 4 表（characters/conversations/messages/settings，schemaVersion=1）+ Warm Stone 深色主题 token + 5 tab 底部导航壳（应用名「汇流」），模拟器空壳验收通过（G0 全项：analyze 0 / test 23 / APK / 安装拉起 / 五 tab 切换零崩溃 / 视觉核对）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。**下一站 M1**（数据层 + 设置，见 [TICKETS.md](TICKETS.md)）。
+**当前状态**（2026-08-29）：**M1 已交付**——数据层 + 设置：4 仓储 CRUD 全语义（桌面服务蓝本逐条对齐：聚合计数/自动命名副作用/天然级联验证）、SecureStorage 双协议槽位（真实 Keystore 通道 G6 实证）、模型清单静态单源（8 provider/60 模型，AST 机械 diff 桌面源）、主题三值切换（auto/浅/深 + 浅色 token 25 值逐字复刻桌面浅色段）。模拟器验收全过（154 测试/analyze 0/Key 真通道往返/切主题即时生效/五 tab 零崩溃）。**下一站 M2**（聊天核心：ChatService + SSE 流式，见 [TICKETS.md](TICKETS.md)）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
 
 **核心能力**（7 项全量，无阉割）：
 - **聊天** — 多轮对话 + SSE 流式打字机渲染 + 停止生成；滑窗上下文、模板变量、重生成、错误态
