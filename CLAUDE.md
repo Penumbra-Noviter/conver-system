@@ -19,7 +19,7 @@ Flutter + Dart（详见 [CONSENSUS.md](CONSENSUS.md) 与设计文档 [docs/mobil
 - 平台薄层（WebView 桥、SecureStorage、本地 HTTP 服务器）集中隔离在 `services/simulator_bridge.dart` 等 seam 之后，不散落进 views
 - UI 复刻桌面 "Warm Stone 暖灰 + 琥珀金" 设计系统（§5 token 表），禁"AI 味"（见 §5.2 清单）
 
-## 怎么跑起来（规划；代码未开始）
+## 怎么跑起来
 
 ```bash
 flutter pub get
@@ -35,11 +35,12 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - `flutter test`（纯 Dart 单测 + 无头 widget 测试），覆盖率目标 ≥ 90%
 - 业务逻辑（chat/llm/数据层/导入链/生成校验）占比最大且是纯 Dart → 可靠性主要由单测兜底；平台薄层做真机/模拟器验证
 
-## 当前状态（2026-08-28）
+## 当前状态（2026-08-29）
 
 - ✅ 设计已落盘：`docs/mobile-design.md`（单一事实来源）+ `docs/mobile-adaptation-research.md`（决策背景）；决策集 Q0~Q14 已拍板，ADR-0002 见桌面库 `desktop/CONSENSUS.md`
-- ✅ Android 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35/AEHD/AVD medium_phone；MCP 插件 preflight 全绿；冒烟 app 已跑通）
-- ⬜ 代码未开始：M0–M7 里程碑已录入 [TICKETS.md](TICKETS.md)，待认领开工
+- ✅ Android 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35+36/AEHD/AVD medium_phone + Flutter 3.47.2；MCP 插件 preflight 全绿）
+- ✅ **M0 已交付**（2026-08-29）：脚手架 + drift 4 表 + 深色主题 token + 5 tab 壳（应用名「汇流」），G0 模拟器空壳验收全项通过；merge 收口 c55ced3
+- ⬜ 下一站 M1（数据层 + 设置）：见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选 F-1~F-6 见 [TECH_DEBT.md](TECH_DEBT.md)
 
 ## 文档体系
 
