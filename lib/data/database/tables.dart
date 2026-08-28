@@ -12,8 +12,10 @@
 ///   因此移动端不生成更严格的 CHECK 长度约束，桌面端仍是长度语义的执行者
 /// - created_at / updated_at 桌面端为 ORM 层客户端默认（datetime.now）+ SQL 层
 ///   server_default=func.now()；移动端列必填无 DB 默认，赋值为仓储层职责（M1）。
-///   注意 DateTime 表示差：drift 默认落 INTEGER（unix 秒），桌面落 TEXT（ISO）——
-///   见 TECH_DEBT F-3（M1 迁移基线 / M4 导出 / 双端互迁时处理）
+///   DateTime 表示差（drift 落 INTEGER（unix 秒），桌面落 TEXT ISO 字符串）——
+///   F-3 方案 a 已处置：保持 drift INTEGER（unix 秒）不变，双端互迁 / ISO 口径
+///   契约归 M4 导出 JSON 层；消息排序 created_at, id 兜底（同秒按 id 正序），
+///   亚秒精度移交 M4 导出层处理（TECH_DEBT F-3 处置记录）
 library;
 
 import 'dart:convert';
