@@ -232,7 +232,7 @@
 
 ### 决策背景
 
-移动端采用「Flutter 独立运行、重写业务逻辑」（见 `docs/mobile-design.md`），无桌面 FastAPI 后端、无同源 iframe。桌面模拟器赖以运行的三个前提在移动端全部消失：`/simulators` 同源静态托管、`/proxy` 反代第三方游戏 API、同源 `key-injector` 直接读写主应用状态。需为 22 款内置（+导入 +AI 生成）HTML 游戏在手机上重建运行、Key 注入、存档管理三项能力，且不阉割功能。
+移动端采用「Flutter 独立运行、重写业务逻辑」（设计文档在独立移动端仓库 `mobile/docs/mobile-design.md`，托管于本仓库 `mobile` 分支），无桌面 FastAPI 后端、无同源 iframe。桌面模拟器赖以运行的三个前提在移动端全部消失：`/simulators` 同源静态托管、`/proxy` 反代第三方游戏 API、同源 `key-injector` 直接读写主应用状态。需为 22 款内置（+导入 +AI 生成）HTML 游戏在手机上重建运行、Key 注入、存档管理三项能力，且不阉割功能。
 
 ### 前提拆解（第一性原理）
 
