@@ -1,0 +1,25 @@
+# Auto-detect text files and normalize to LF（参照桌面库 .gitattributes）
+* text=auto
+
+# Dart / Flutter（生成物重跑不再产生行尾假脏——W2 审计 F-2）
+*.dart text eol=lf
+
+# Config / docs
+*.md text
+*.txt text
+*.json text
+*.yaml text
+*.yml text
+*.xml text
+*.gradle text
+*.kts text
+*.properties text
+*.plist text
+
+# Denylist — binary files
+*.png binary
+*.ico binary
+*.jpg binary
+*.ttf binary
+*.db binary
+*.sqlite binary

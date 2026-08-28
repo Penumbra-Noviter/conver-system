@@ -39,17 +39,20 @@
 
 ## 候选区
 
-> 当前 6 项待立项（M0 kickoff 批次审核落盘：W2 审核 F-1~F-3、W3 审核 F-4、期末四轴 F-5~F-6；全部非阻断，2026-08-29）。
+> 当前 1 项待立项：F-3（DateTime 表示差，非独立可修项——M1 迁移基线 / M4 导出 / 双端互迁设计时消费；tables.dart 头注释已交叉引用）。2026-08-29 技术债消费：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（见处置记录）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-1 | `lib/data/database/tables.dart:13` 头注释称桌面时间戳为「ORM 层客户端默认」，实际 character.py 还有 `server_default=func.now()`（SQL 层默认）——注释对权威源描述不完整 | M0 W2 增量审核 | Worth exploring | 📝 待立项 | 数据层 |
-| F-2 | 仓库无 `.gitattributes`，Windows checkout CRLF / 仓库 LF 造成行尾搅动（重跑 build_runner 后 git status 短暂显示 M，内容零差异）；桌面库有 `.gitattributes` 可参照 | M0 W2 增量审核 | Worth exploring | 📝 待立项 | 工程卫生 |
 | F-3 | DateTime 存储表示差异：drift 默认落 INTEGER（unix 秒），桌面 SQLAlchemy DateTime 落 TEXT（ISO 字符串）——M0 无迁移需求（工单 03 已显式声明），但 **M1 迁移基线 / M4 导出 / 双端数据互迁**设计时必须处理该表示差 | M0 W2 增量审核（工单 03 高不确定点显式声明） | Worth exploring | 📝 待立项 | 数据层 |
-| F-4 | `themeMode: ThemeMode.dark` 装配无测试判别力：`darkTheme` 为 null 时无论 ThemeMode 取值均回退 `theme`，删掉该行全部测试仍绿——需测试加固（如注入假 lightTheme 断言不被采用）或接受文本锚核验 | M0 W3 增量审核 | Worth exploring | 📝 待立项 | 测试 |
-| F-5 | `.scratch/`（含 G0 门证据截图）未被 `.gitignore` 覆盖——`git add -A` 会把门证据扫入提交，与「存档 .scratch 不入库」约定相悖 | M0 期末四轴审核（Falsify 轴） | Worth exploring | 📝 待立项 | 工程卫生 |
-| F-6 | `AppDatabase.open()`（lib/data/database/app_database.dart:31）零调用零覆盖——drift_flutter 惰性打开路径 M0 无验证（spec 显式 M0 不调用，M1 工单自会覆盖；可关闭候选） | M0 期末四轴审核（Falsify/Architecture 轴） | Speculative | 📝 待立项 | 数据层 |
 
 ## 技术债处置记录
 
-> 暂无处置（2026-08-28 建库）。
+### 2026-08-29 — M0 交付后技术债消费（用户拍板：打包修 4 + 关 1 + 留 1）
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-1 | ✅ 已修 | tables.dart 头注释补全桌面时间戳事实（`server_default=func.now()`）+ F-3 表示差交叉引用；「本提交」 |
+| F-2 | ✅ 已修 | 新增 `.gitattributes`（参照桌面库，`*.dart text eol=lf` 钉死 Dart 生成物行尾，消 build_runner 重跑假脏） |
+| F-4 | ✅ 已修 | `test/app_contract_test.dart` 源码文本锚契约锁（M1 引入浅色主题后升级为行为断言并退役本文件） |
+| F-5 | ✅ 已修 | `.gitignore` 追加 `.scratch/`（`git check-ignore -v` 实证生效；evidence 目录按约定本地保留不受影响） |
+| F-6 | ❌ 复核关闭 | Speculative：期末四轴已核实「spec 显式 M0 不调用 `open()`，M1 仓储工单自会覆盖」——现状即设计意图（`git grep` 复核零调用方属实）；F-4 契约锁同文件已含装配锚核验 |

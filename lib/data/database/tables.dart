@@ -10,8 +10,10 @@
 /// - SQLAlchemy `JSON` 列：TEXT 落库 + JSON 编解码 converter
 /// - VARCHAR(n) 长度在 SQLite 桌面端本就不强制（SQLite 不校验 VARCHAR 长度），
 ///   因此移动端不生成更严格的 CHECK 长度约束，桌面端仍是长度语义的执行者
-/// - created_at / updated_at 桌面端为 ORM 层客户端默认（datetime.now），
-///   移动端对应为仓储层职责（M1），列本身必填无默认
+/// - created_at / updated_at 桌面端为 ORM 层客户端默认（datetime.now）+ SQL 层
+///   server_default=func.now()；移动端列必填无 DB 默认，赋值为仓储层职责（M1）。
+///   注意 DateTime 表示差：drift 默认落 INTEGER（unix 秒），桌面落 TEXT（ISO）——
+///   见 TECH_DEBT F-3（M1 迁移基线 / M4 导出 / 双端互迁时处理）
 library;
 
 import 'dart:convert';

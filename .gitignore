@@ -55,3 +55,6 @@ app.*.map.json
 # Coverage & widget preview (3.47.2 template alignment, C1)
 /coverage/
 .widget_preview/
+
+# Kickoff 过程产物（spec/编排/证据存档不入库——F-5；evidence 目录按约定本地保留）
+.scratch/
