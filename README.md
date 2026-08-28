@@ -26,3 +26,21 @@ Conver System 的移动端应用（Flutter，Android + iOS 独立运行，无桌
 https://github.com/Penumbra-Noviter/conver-system.git
 
 的 **`mobile` 分支**。推送即 `git push -u origin mobile`。
+
+## 快速开始
+
+前置：本机已装载 Flutter SDK（stable）与 Android SDK（环境变量 `JAVA_HOME` / `ANDROID_HOME`）。
+
+```bash
+# 1. 拉取依赖
+flutter pub get
+
+# 2. 运行测试（全绿为每票底线）
+flutter test
+
+# 3. 连接设备或启动模拟器后运行
+flutter run
+
+# 4. 构建 debug APK（产物在 build/app/outputs/flutter-apk/）
+flutter build apk --debug
+```
