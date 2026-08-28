@@ -43,6 +43,10 @@ dependencies:
   drift: ^2.34.3
   drift_flutter: ^0.3.1
 
+  # System secure storage (M1 T01：claude/openai 两 API Key 槽位；
+  # 键名与桌面白名单逐字同。真通道行为归 G6 模拟器冒烟)
+  flutter_secure_storage: ^11.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
