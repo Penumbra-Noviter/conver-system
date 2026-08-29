@@ -165,6 +165,50 @@ class _TickingProvider extends LLMProvider {
   Future<void> testConnection({String? model}) async {}
 }
 
+/// 可控挂起的 non-streaming provider：generate 在进入时完成 [started]、挂起于
+/// [gate]，放行后返回 [reply]——F1（重生成期间并发新消息）与 F4（并发双触发
+/// 拒绝）回归测试用：可在 generate 挂起期间对 DB 做并发写入 / 发起第二次调用。
+class _HoldableProvider extends LLMProvider {
+  _HoldableProvider({super.apiKey = 'test-key', this.reply = '新回复'});
+
+  final String reply;
+
+  /// generate 已进入（测试等待其越过快照捕获 / 目标解析）。
+  final Completer<void> started = Completer<void>();
+
+  /// generate 放行信号（测试完成并发注入后打开）。
+  final Completer<void> gate = Completer<void>();
+
+  int generateCallCount = 0;
+
+  @override
+  LLMError translateError(Object error) =>
+      error is LLMError ? error : LLMError('fake API 调用失败: $error');
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async {
+    generateCallCount++;
+    if (!started.isCompleted) {
+      started.complete();
+    }
+    await gate.future;
+    return reply;
+  }
+
+  @override
+  Stream<String> streamGenerate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async* {
+    throw StateError('F1/F4 测试不走流式路径');
+  }
+}
+
 /// 轮询 [condition] 直到为真（测试确定性等待用，避免裸 sleep）。
 Future<void> _until(Future<bool> Function() condition) async {
   for (var i = 0; i < 2000; i++) {
@@ -866,6 +910,34 @@ void main() {
         (Role.user, 'hi'),
       ]);
     });
+
+    test('F3: 发送后立即停止且 provider 解析失败 → 无 add-after-close 未处理异常',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'claude_api_key': 'sk-x'});
+
+      // provider 解析阶段抛 LLM 业务错误（工厂装配）+ 调用方随即取消订阅：
+      // 无 isClosed 守卫时 `_runStreamReply` 的 catch handler 对已关闭 controller
+      // add 抛 StateError → 未处理异步异常（flutter_test 捕获为失败）。
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: _ThrowingFactory(LLMAuthError('claude')),
+      );
+
+      final sub = service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .listen((_) {});
+      await sub.cancel(); // 立即停止 → onCancel → controller 关闭
+
+      // 让 _runStreamReply 的解析失败 handler 执行窗口；无守卫则该 handler 的
+      // controller.add 抛 StateError 被 zone 捕获为未处理异常 → 本测试失败。
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
   });
 
   // ── A5 断流 ──
@@ -875,11 +947,12 @@ void main() {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
 
-      // 连接异常 = 基类 LLMError（T02 wire 层对 socket 断连 / 未收终态帧的
-      // 兜底翻译结果；R3 seam 契约，见 chat_service.dart 注释）。
+      // 连接异常 = T02 wire 真实断连信号 [LLMConnectionInterruptedError]
+      // （LLM 族子类；R3 seam 契约，见 chat_service.dart 注释——断流判定为
+      // 严格子类判型，基类 LLMError 属连接阶段业务错误不误判为断流）。
       wireService(_TickingProvider(
         tokens: const ['a', 'b'],
-        errorAfter: LLMError('claude API 调用失败: connection reset'),
+        errorAfter: LLMConnectionInterruptedError(),
       ));
       final events = await service
           .streamReply(conversationId: conv.id, content: 'hi')
@@ -899,6 +972,36 @@ void main() {
       ]);
     });
 
+    test('A5 seam: 真实 wire 断连子类 → 同样走断流分支（部分落库 + 中断事件）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      // 真实 wire（T02）在流中途抛 [LLMConnectionInterruptedError]（LLMError
+      // 子类，非基类）——EOF 未到终态 / 连接重置的共享可区分异常。断流判定须
+      // 同时识别子类与基类两种信号，否则落入「LLM 业务错误 F-45 不落部分」。
+      wireService(_TickingProvider(
+        tokens: const ['a', 'b'],
+        errorAfter: LLMConnectionInterruptedError(),
+      ));
+      final events = await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(
+        [for (final e in events) if (e is ChatToken) e.token],
+        ['a', 'b'],
+      );
+      final interrupted = events.last;
+      expect(interrupted, isA<ChatInterrupted>());
+      expect((interrupted as ChatInterrupted).messageId, isNotNull);
+      // 已累积部分落库（断流分支，非 F-45 业务错误分支）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+        (Role.assistant, 'ab'),
+      ]);
+    });
+
     test('A5: 断流无部分内容 → 中断事件 messageId 为 null，不落空 assistant',
         () async {
       final char = await seedCharacter();
@@ -906,7 +1009,7 @@ void main() {
 
       wireService(_TickingProvider(
         tokens: const [],
-        errorAfter: LLMError('claude API 调用失败: connection reset'),
+        errorAfter: LLMConnectionInterruptedError(),
       ));
       final events = await service
           .streamReply(conversationId: conv.id, content: 'hi')
@@ -925,7 +1028,7 @@ void main() {
       final conv = await seedConversation(char.id);
       wireService(_TickingProvider(
         tokens: const ['a', 'b'],
-        errorAfter: LLMError('claude API 调用失败: connection reset'),
+        errorAfter: LLMConnectionInterruptedError(),
         delay: const Duration(milliseconds: 10),
       ));
 
@@ -1068,11 +1171,12 @@ void main() {
       ]);
     });
 
-    test('A4: LLM 失败（连接异常，基类）→ 旧消息保留', () async {
+    test('A4: LLM 失败（连接中断信号）→ 旧消息保留', () async {
       final (_, conv, _, _) = await seedConversationWithReply();
+      // T02 wire 共享断连信号 [LLMConnectionInterruptedError]（LLM 族子类）。
       final provider = FakeLLMProvider(
           tokens: const [],
-          error: LLMError('claude API 调用失败: socket 断开'));
+          error: LLMConnectionInterruptedError());
       wireService(provider);
 
       await expectLater(
@@ -1083,6 +1187,64 @@ void main() {
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
         (Role.assistant, '旧回复'),
+      ]);
+    });
+
+    test('F1: 重生成进行中并发新消息 → 新消息保留（有界删除防数据丢失）',
+        () async {
+      final (_, conv, _, oldAssistant) = await seedConversationWithReply();
+      final provider = _HoldableProvider(reply: '新回复');
+      wireService(provider);
+
+      // 网络 generate 挂起（快照已捕获、事务未执行）。
+      final regenerating = service.regenerate(conversationId: conv.id);
+      await provider.started.future;
+
+      // 生成期间并发发送新 user 消息（id > snapshotMaxId）。
+      final concurrent = await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.user,
+        content: '并发新消息',
+      );
+      expect(concurrent.id, greaterThan(oldAssistant.id));
+
+      provider.gate.complete(); // 放行生成 → 有界删旧 + 插新
+      final result = await regenerating;
+
+      expect(result.reply, '新回复');
+      // 有界删除只替换快照内 target 之后的旧消息；并发新 user 保留，
+      // 新回复以新 id 落在其后（F1 数据完整性）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '你好'),
+        (Role.user, '并发新消息'),
+        (Role.assistant, '新回复'),
+      ]);
+    });
+
+    test('F4: 并发双触发 regenerate → 第二次拒绝「重生成进行中」，第一次结果保留',
+        () async {
+      final (_, conv, _, _) = await seedConversationWithReply();
+      final provider = _HoldableProvider(reply: '新回复');
+      wireService(provider);
+
+      final first = service.regenerate(conversationId: conv.id); // 挂起
+      await provider.started.future; // 第一次已进入网络阶段（in-flight）
+
+      // 第二次调用基于同一快照解析目标，会把第一次的新回复当截断目标 → 拒绝。
+      await expectLater(
+        service.regenerate(conversationId: conv.id),
+        throwsA(isA<RegenerateBusyError>()),
+      );
+
+      provider.gate.complete();
+      final result = await first;
+      expect(result.reply, '新回复');
+      // 第一次结果保留（无第二次事务删除）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '你好'),
+        (Role.assistant, '新回复'),
       ]);
     });
 

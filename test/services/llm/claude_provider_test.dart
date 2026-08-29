@@ -439,4 +439,48 @@ void main() {
       expect(body, isNot(contains('temperature')));
     });
   });
+
+  group('normalizeClaudeBaseUrl（F5：base 已含版本段不再拼 /v1/v1/messages）', () {
+    test('末尾 v1 → 剥去版本段', () {
+      expect(normalizeClaudeBaseUrl('https://api.anthropic.com/v1'),
+          'https://api.anthropic.com');
+    });
+
+    test('末尾 v1beta → 剥去版本段', () {
+      expect(normalizeClaudeBaseUrl('https://relay.example.com/v1beta'),
+          'https://relay.example.com');
+    });
+
+    test('末尾无版本段 → 原样（尾斜杠剥去）', () {
+      expect(normalizeClaudeBaseUrl('https://api.anthropic.com/'),
+          'https://api.anthropic.com');
+      expect(normalizeClaudeBaseUrl('https://api.anthropic.com'),
+          'https://api.anthropic.com');
+    });
+
+    test('空 / null → null（回退官方默认端点）', () {
+      expect(normalizeClaudeBaseUrl(null), isNull);
+      expect(normalizeClaudeBaseUrl('  '), isNull);
+    });
+
+    test('wire 集成：base 已含 v1 → 路径拼出 /v1/messages（非 /v1/v1/messages）',
+        () async {
+      final server = await startedServer(FakeLlmServer.jsonResponse({
+        'id': 'msg_t',
+        'type': 'message',
+        'role': 'assistant',
+        'content': [
+          {'type': 'text', 'text': 'ok'},
+        ],
+      }));
+      // 用户把面板地址配成已含版本段 → F5 归一剥去，路径为 {base}/v1/messages。
+      final provider =
+          ClaudeProvider(apiKey: apiKey, baseUrl: '${server.baseUrl}/v1');
+      await provider.generate(
+        messages: const [LlmMessage(role: 'user', content: 'hi')],
+      );
+      expect(server.captured.single.path, '/v1/messages');
+      expect(server.captured.single.path, isNot(contains('/v1/v1')));
+    });
+  });
 }

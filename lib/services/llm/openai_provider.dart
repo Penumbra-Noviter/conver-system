@@ -9,7 +9,7 @@
 ///   research R1-2）；`[DONE]` 终态。
 /// - 401/429/408/504 → Auth / RateLimit / Timeout；400 content_filter →
 ///   ContentFilter；连接失败 → LLM 族兜底；流中途断连（[DONE] 前 EOF / 连接重置）
-///   → 可区分的 [LLMConnectionInterruptedError]（与 Claude wire 共享，claude_provider
+///   → 可区分的 [LLMConnectionInterruptedError]（与 Claude wire 共享，errors.dart
 ///   中定义，供 T03 断流处理统一捕获）。
 /// 锚：`desktop/backend/app/services/llm/openai.py` + `errors.dart::translateSdkError`。
 library;
@@ -20,7 +20,6 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
-import 'claude_provider.dart';
 import 'errors.dart';
 import 'llm_provider.dart';
 import 'sse.dart';
