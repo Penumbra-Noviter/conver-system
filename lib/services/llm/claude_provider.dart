@@ -22,6 +22,7 @@ import 'package:dio/dio.dart';
 import 'errors.dart';
 import 'llm_provider.dart';
 import 'sse.dart';
+import 'translate_helpers.dart';
 
 /// Anthropic 官方版本头（必需；research R1-1：`anthropic-version: 2023-06-01`）。
 const String kAnthropicVersion = '2023-06-01';
@@ -63,10 +64,15 @@ class ClaudeProvider extends LLMProvider {
       return error;
     }
     if (error is DioException) {
-      return _translateDio(error);
+      return translateDioError(_providerName, error);
     }
-    if (error is _HttpStatusError) {
-      return _translateStatus(error.statusCode, error.body, cause: error);
+    if (error is HttpStatusError) {
+      return translateStatusError(
+        _providerName,
+        error.statusCode,
+        error.body,
+        cause: error,
+      );
     }
     if (error is _StreamApiError) {
       return translateSdkError(_providerName, message: error.message, cause: error);
@@ -155,7 +161,7 @@ class ClaudeProvider extends LLMProvider {
       if (response.statusCode != HttpStatus.ok) {
         // 非 SSE 错误体（HTTP 状态码 + 原文），交状态码翻译。
         final errorBody = await utf8.decoder.bind(response).join();
-        throw _HttpStatusError(response.statusCode, errorBody);
+        throw HttpStatusError(response.statusCode, errorBody);
       }
 
       var reachedMessageStop = false;
@@ -249,89 +255,9 @@ class ClaudeProvider extends LLMProvider {
         contentType: Headers.jsonContentType,
       );
 
-  LLMError _translateDio(DioException e) {
-    if (e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.sendTimeout ||
-        e.type == DioExceptionType.receiveTimeout) {
-      return translateSdkError(
-        _providerName,
-        failure: LlmTransportFailure.timeout,
-        cause: e,
-      );
-    }
-    final status = e.response?.statusCode;
-    if (status != null) {
-      return _translateStatus(status, _responseText(e.response), cause: e);
-    }
-    return translateSdkError(
-      _providerName,
-      message: e.message ?? '${e.error ?? e}',
-      cause: e,
-    );
-  }
-
-  /// 状态码 → LLM 族：408 / 504（请求超时 / 网关超时）归 Timeout，
-  /// 其余交 translateSdkError（401/429/400-content_filter 专属，其余兜底）。
-  LLMError _translateStatus(int statusCode, String body, {required Object cause}) {
-    if (statusCode == 408 || statusCode == 504) {
-      return translateSdkError(
-        _providerName,
-        failure: LlmTransportFailure.timeout,
-        message: body,
-        cause: cause,
-      );
-    }
-    return translateSdkError(
-      _providerName,
-      statusCode: statusCode,
-      message: body,
-      cause: cause,
-    );
-  }
-
-  /// 从 dio 错误响应提取人类可读文本：优先 `error.message`（Map 或 JSON 文本
-  /// 均可解出），否则返回原始体（字符串原样 / Map 序列化）。
-  String _responseText(Response<dynamic>? response) {
-    final data = response?.data;
-    if (data is Map<String, dynamic>) {
-      final message = _errorMessageFromMap(data);
-      if (message != null) {
-        return message;
-      }
-      try {
-        return jsonEncode(data);
-      } on JsonUnsupportedObjectError {
-        return '';
-      }
-    }
-    if (data is String && data.isNotEmpty) {
-      final decoded = _decodeJson(data);
-      if (decoded != null) {
-        final message = _errorMessageFromMap(decoded);
-        if (message != null) {
-          return message;
-        }
-      }
-      return data;
-    }
-    return '';
-  }
-
-  /// 提取 Anthropic / OpenAI 通用错误体 `{"error":{"message":...}}` 的消息。
-  String? _errorMessageFromMap(Map<String, dynamic> data) {
-    final error = data['error'];
-    if (error is Map<String, dynamic>) {
-      final message = error['message'];
-      if (message is String && message.isNotEmpty) {
-        return message;
-      }
-    }
-    return null;
-  }
-
-  /// 提取 Anthropic error 事件负载中的 `error.message`。
+  /// 提取 Anthropic error 事件负载中的 `error.message`（Claude 流内 error 事件独有）。
   String _errorEventMessage(SseFrame frame) {
-    final decoded = _decodeJson(frame.data);
+    final decoded = decodeJson(frame.data);
     final error = decoded?['error'];
     if (error is Map<String, dynamic>) {
       final message = error['message'];
@@ -341,23 +267,6 @@ class ClaudeProvider extends LLMProvider {
     }
     return frame.data;
   }
-
-  Map<String, dynamic>? _decodeJson(String data) {
-    try {
-      final decoded = jsonDecode(data);
-      return decoded is Map<String, dynamic> ? decoded : null;
-    } on FormatException {
-      return null;
-    }
-  }
-}
-
-/// wire 层 HTTP 状态错误原语（流式路径抛出，translateError 统一翻译）。
-class _HttpStatusError implements Exception {
-  _HttpStatusError(this.statusCode, this.body);
-
-  final int statusCode;
-  final String body;
 }
 
 /// Anthropic 流内 `error` 事件原语（抛错终止，translateError 翻译进 LLM 族）。
