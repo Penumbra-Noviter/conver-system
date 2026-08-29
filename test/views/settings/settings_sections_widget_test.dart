@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/secure_store.dart';
+import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/view_models/theme_controller.dart';
 import 'package:conver_system_mobile/views/settings/api_config_section.dart';
 import 'package:conver_system_mobile/views/settings/default_model_section.dart';
@@ -78,9 +79,16 @@ void main() {
   });
 
   /// 包一层 MaterialApp + Scaffold，使 SnackBar（ScaffoldMessenger）可呈现。
+  ///
+  /// 主题须用 [ConverTheme.dark]（F-7 起各 section 消费
+  /// `extension<ConverPalette>()!`，默认 ThemeData 不含该扩展会空指针崩溃；
+  /// 真实应用由 ConverApp 装配同一主题注册）。
   Future<void> pumpSection(WidgetTester tester, Widget section) async {
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: section)),
+      MaterialApp(
+        theme: ConverTheme.dark(),
+        home: Scaffold(body: section),
+      ),
     );
     await tester.pumpAndSettle();
   }

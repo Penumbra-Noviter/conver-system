@@ -1,4 +1,5 @@
 import 'package:conver_system_mobile/theme/colors.dart';
+import 'package:conver_system_mobile/theme/conver_palette.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -225,6 +226,66 @@ void main() {
         nav.iconTheme?.resolve(const <WidgetState>{})?.color,
         ConverColorsLight.ink3,
       );
+    });
+  });
+
+  group('ConverPalette (F-7 ThemeExtension，5 枚 token 深/浅镜像)', () {
+    test('dark() 5 枚 == ConverColors 同名常量（逐字）', () {
+      final p = ConverPalette.dark();
+      expect(p.ink1, ConverColors.ink1);
+      expect(p.ink2, ConverColors.ink2);
+      expect(p.ink3, ConverColors.ink3);
+      expect(p.ink4, ConverColors.ink4);
+      expect(p.border, ConverColors.border);
+    });
+
+    test('light() 5 枚 == ConverColorsLight 同名常量（逐字）', () {
+      final p = ConverPalette.light();
+      expect(p.ink1, ConverColorsLight.ink1);
+      expect(p.ink2, ConverColorsLight.ink2);
+      expect(p.ink3, ConverColorsLight.ink3);
+      expect(p.ink4, ConverColorsLight.ink4);
+      expect(p.border, ConverColorsLight.border);
+    });
+
+    test('ConverTheme dark/light 注册对应 ConverPalette extensions', () {
+      final dark = ConverTheme.dark();
+      final light = ConverTheme.light();
+      expect(dark.extension<ConverPalette>(), isNotNull);
+      expect(light.extension<ConverPalette>(), isNotNull);
+      expect(dark.extension<ConverPalette>()!.ink1, ConverColors.ink1);
+      expect(light.extension<ConverPalette>()!.ink1, ConverColorsLight.ink1);
+    });
+
+    test('copyWith：部分覆盖保留其余、全参数覆盖整体替换', () {
+      const base = ConverPalette.dark();
+      final partial = base.copyWith(ink1: const Color(0xFF000001));
+      expect(partial.ink1, const Color(0xFF000001));
+      expect(partial.ink2, base.ink2);
+      expect(partial.ink3, base.ink3);
+      expect(partial.ink4, base.ink4);
+      expect(partial.border, base.border);
+
+      final full = base.copyWith(
+        ink1: const Color(0xFF000001),
+        ink2: const Color(0xFF000002),
+        ink3: const Color(0xFF000003),
+        ink4: const Color(0xFF000004),
+        border: const Color(0xFF000005),
+      );
+      expect(full.ink1, const Color(0xFF000001));
+      expect(full.border, const Color(0xFF000005));
+    });
+
+    test('lerp：t=0 取自身、t=1 取目标、异型 other 回退自身', () {
+      const a = ConverPalette.dark();
+      const b = ConverPalette.light();
+      final atZero = a.lerp(b, 0.0);
+      expect(atZero.ink1, a.ink1);
+      final atOne = a.lerp(b, 1.0);
+      expect(atOne.ink1, b.ink1);
+      // 非 ConverPalette 的 other → 回退自身（ThemeExtension 契约）。
+      expect(a.lerp(null, 0.5).ink1, a.ink1);
     });
   });
 }

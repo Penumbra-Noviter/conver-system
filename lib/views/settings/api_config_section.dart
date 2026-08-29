@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../services/secure_store.dart';
 import '../../theme/colors.dart';
+import '../../theme/conver_palette.dart';
 
 /// 槽位表单的初始回显值（键 = settings/槽位键名）。
 typedef ApiEchoValues = Map<String, String>;
@@ -94,19 +95,19 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
           await _secretStore.write(key: slotKey, value: keyValue);
         }
         final baseUrl = _baseUrlControllers[provider]!.text.trim();
-        await widget.settingsRepository.setMany({'${provider}_base_url': baseUrl});
+        await widget.settingsRepository.setMany({
+          '${provider}_base_url': baseUrl,
+        });
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('API 配置已保存')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('API 配置已保存')));
       }
     } catch (error) {
       debugPrint('API 配置保存失败: $error');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('保存失败，请重试')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('保存失败，请重试')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -119,13 +120,19 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('API 配置',
-            style:
-                textTheme.titleMedium?.copyWith(color: ConverColors.ink1)),
+        Text(
+          'API 配置',
+          style: textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).extension<ConverPalette>()!.ink1,
+          ),
+        ),
         const SizedBox(height: ConverSpacing.space1),
-        Text('服务地址与密钥（密钥存系统安全存储）',
-            style:
-                textTheme.bodySmall?.copyWith(color: ConverColors.ink4)),
+        Text(
+          '服务地址与密钥（密钥存系统安全存储）',
+          style: textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).extension<ConverPalette>()!.ink4,
+          ),
+        ),
         const SizedBox(height: ConverSpacing.space2),
         for (final provider in _providers.keys) ...[
           _fieldLabel(textTheme, '${_providers[provider]!.label} 密钥'),
@@ -133,7 +140,9 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
             controller: _keyControllers[provider],
             obscureText: !_visible[provider]!,
             autofillHints: const [],
-            style: textTheme.bodyMedium?.copyWith(color: ConverColors.ink1),
+            style: textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).extension<ConverPalette>()!.ink1,
+            ),
             decoration: InputDecoration(
               isDense: true,
               hintText: '未配置',
@@ -143,7 +152,7 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   size: 18,
-                  color: ConverColors.ink3,
+                  color: Theme.of(context).extension<ConverPalette>()!.ink3,
                 ),
                 onPressed: () =>
                     setState(() => _visible[provider] = !_visible[provider]!),
@@ -154,11 +163,10 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
           _fieldLabel(textTheme, '${_providers[provider]!.label} Base URL'),
           TextField(
             controller: _baseUrlControllers[provider],
-            style: textTheme.bodyMedium?.copyWith(color: ConverColors.ink1),
-            decoration: const InputDecoration(
-              isDense: true,
-              hintText: '官方默认',
+            style: textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).extension<ConverPalette>()!.ink1,
             ),
+            decoration: const InputDecoration(isDense: true, hintText: '官方默认'),
           ),
           const SizedBox(height: ConverSpacing.space3),
         ],
@@ -172,8 +180,12 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
   }
 
   Widget _fieldLabel(TextTheme textTheme, String text) => Padding(
-        padding: const EdgeInsets.only(bottom: ConverSpacing.space1),
-        child:
-            Text(text, style: textTheme.bodySmall?.copyWith(color: ConverColors.ink3)),
-      );
+    padding: const EdgeInsets.only(bottom: ConverSpacing.space1),
+    child: Text(
+      text,
+      style: textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).extension<ConverPalette>()!.ink3,
+      ),
+    ),
+  );
 }

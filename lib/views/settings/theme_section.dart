@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../theme/colors.dart';
+import '../../theme/conver_palette.dart';
 import '../../view_models/theme_controller.dart';
 
 /// 主题组：三值分段选择器，选中态由 [ThemeController] 驱动。
@@ -22,13 +23,19 @@ class ThemeSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('主题',
-            style:
-                textTheme.titleMedium?.copyWith(color: ConverColors.ink1)),
+        Text(
+          '主题',
+          style: textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).extension<ConverPalette>()!.ink1,
+          ),
+        ),
         const SizedBox(height: ConverSpacing.space1),
-        Text('跟随系统 / 浅色 / 深色（首启为深色）',
-            style:
-                textTheme.bodySmall?.copyWith(color: ConverColors.ink4)),
+        Text(
+          '跟随系统 / 浅色 / 深色（首启为深色）',
+          style: textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).extension<ConverPalette>()!.ink4,
+          ),
+        ),
         const SizedBox(height: ConverSpacing.space2),
         ListenableBuilder(
           listenable: themeController,
@@ -60,9 +67,9 @@ class ThemeSection extends StatelessWidget {
                   } catch (error) {
                     debugPrint('主题切换失败: $error');
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('主题切换失败')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text('主题切换失败')));
                     }
                   }
                 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../services/secure_store.dart';
 import '../../theme/colors.dart';
+import '../../theme/conver_palette.dart';
 import '../../view_models/theme_controller.dart';
 import 'api_config_section.dart';
 import 'default_model_section.dart';
@@ -104,18 +105,23 @@ class _SettingsViewState extends State<SettingsView> {
               ConverSpacing.space6,
             ),
             children: [
-              Text('设置',
-                  style: textTheme.titleLarge
-                      ?.copyWith(color: ConverColors.ink1)),
+              Text(
+                '设置',
+                style: textTheme.titleLarge?.copyWith(
+                  color: Theme.of(context).extension<ConverPalette>()!.ink1,
+                ),
+              ),
               const SizedBox(height: ConverSpacing.space1),
-              Text('应用配置集中管理',
-                  style: textTheme.bodyMedium
-                      ?.copyWith(color: ConverColors.ink3)),
+              Text(
+                '应用配置集中管理',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).extension<ConverPalette>()!.ink3,
+                ),
+              ),
               const SizedBox(height: ConverSpacing.space4),
               if (loaded == null)
                 const Padding(
-                  padding:
-                      EdgeInsets.symmetric(vertical: ConverSpacing.space6),
+                  padding: EdgeInsets.symmetric(vertical: ConverSpacing.space6),
                   child: Center(child: CircularProgressIndicator()),
                 )
               else ...[
@@ -124,36 +130,59 @@ class _SettingsViewState extends State<SettingsView> {
                   secretStore: widget.secretStore,
                   initialValues: loaded.$1,
                 ),
-                const Divider(thickness: 1, color: ConverColors.border),
+                Divider(
+                  thickness: 1,
+                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                ),
                 DefaultModelSection(
                   settingsRepository: _settings,
                   initialProvider: loaded.$2,
                   initialModel: loaded.$3,
                 ),
-                const Divider(thickness: 1, color: ConverColors.border),
+                Divider(
+                  thickness: 1,
+                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                ),
                 ThemeSection(themeController: _themeController),
-                const Divider(thickness: 1, color: ConverColors.border),
+                Divider(
+                  thickness: 1,
+                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                ),
               ],
               for (var i = 0; i < _placeholderItems.length; i++) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                      vertical: ConverSpacing.space2),
+                    vertical: ConverSpacing.space2,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(_placeholderItems[i].label,
-                            style: textTheme.bodyLarge
-                                ?.copyWith(color: ConverColors.ink2)),
+                        child: Text(
+                          _placeholderItems[i].label,
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: Theme.of(context)
+                                .extension<ConverPalette>()!
+                                .ink2,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: ConverSpacing.space2),
-                      Text(_placeholderItems[i].note,
-                          style: textTheme.bodySmall
-                              ?.copyWith(color: ConverColors.ink4)),
+                      Text(
+                        _placeholderItems[i].note,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .extension<ConverPalette>()!
+                              .ink4,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 if (i != _placeholderItems.length - 1)
-                  const Divider(thickness: 1, color: ConverColors.border),
+                  Divider(
+                    thickness: 1,
+                    color: Theme.of(context).extension<ConverPalette>()!.border,
+                  ),
               ],
             ],
           );

@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../models/model_catalog.dart';
 import '../../theme/colors.dart';
+import '../../theme/conver_palette.dart';
 
 /// 「清单项 vs 自定义输入」归一规则（A7 纯函数）。
 ///
@@ -68,9 +69,9 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
 
   /// 当前选中 provider 的清单项（providerByKey 不在 02 票公共面，本地派生）。
   ModelProvider get _currentProvider => ModelCatalog.providers.firstWhere(
-        (p) => p.key == _provider,
-        orElse: () => ModelCatalog.providers.first,
-      );
+    (p) => p.key == _provider,
+    orElse: () => ModelCatalog.providers.first,
+  );
   late final TextEditingController _customController;
   bool _saving = false;
 
@@ -85,7 +86,9 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
     final initialModels = _currentProvider.models;
     _customController = TextEditingController(
       // 初始模型不在当前 provider 清单内 → 视作自定义输入回显
-      text: initialModels.contains(widget.initialModel) ? '' : widget.initialModel,
+      text: initialModels.contains(widget.initialModel)
+          ? ''
+          : widget.initialModel,
     );
     _catalogModel = initialModels.contains(widget.initialModel)
         ? widget.initialModel
@@ -106,19 +109,19 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
         catalogSelection: _catalogModel ?? '',
         fallbackModel: widget.initialModel,
       );
-      await widget.settingsRepository
-          .setMany({'default_provider': _provider, 'default_model': model});
+      await widget.settingsRepository.setMany({
+        'default_provider': _provider,
+        'default_model': model,
+      });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('默认模型已保存')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('默认模型已保存')));
       }
     } catch (error) {
       debugPrint('默认模型保存失败: $error');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('保存失败，请重试')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('保存失败，请重试')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -132,13 +135,19 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('默认模型',
-            style:
-                textTheme.titleMedium?.copyWith(color: ConverColors.ink1)),
+        Text(
+          '默认模型',
+          style: textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).extension<ConverPalette>()!.ink1,
+          ),
+        ),
         const SizedBox(height: ConverSpacing.space1),
-        Text('供应商与模型选择（新对话的缺省取值）',
-            style:
-                textTheme.bodySmall?.copyWith(color: ConverColors.ink4)),
+        Text(
+          '供应商与模型选择（新对话的缺省取值）',
+          style: textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).extension<ConverPalette>()!.ink4,
+          ),
+        ),
         const SizedBox(height: ConverSpacing.space2),
         _fieldLabel(textTheme, '供应商'),
         DropdownButtonFormField<String>(
@@ -155,9 +164,8 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
             setState(() {
               _provider = value;
               _catalogModel = resetModelOnProviderSwitch(
-                  ModelCatalog.providers
-                      .firstWhere((p) => p.key == value)
-                      .models);
+                ModelCatalog.providers.firstWhere((p) => p.key == value).models,
+              );
               _customController.clear();
             });
           },
@@ -177,7 +185,9 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
         _fieldLabel(textTheme, '自定义模型（非空时覆盖清单选择）'),
         TextField(
           controller: _customController,
-          style: textTheme.bodyMedium?.copyWith(color: ConverColors.ink1),
+          style: textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).extension<ConverPalette>()!.ink1,
+          ),
           decoration: const InputDecoration(
             isDense: true,
             hintText: '留空使用上方清单选择',
@@ -194,8 +204,12 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
   }
 
   Widget _fieldLabel(TextTheme textTheme, String text) => Padding(
-        padding: const EdgeInsets.only(bottom: ConverSpacing.space1),
-        child:
-            Text(text, style: textTheme.bodySmall?.copyWith(color: ConverColors.ink3)),
-      );
+    padding: const EdgeInsets.only(bottom: ConverSpacing.space1),
+    child: Text(
+      text,
+      style: textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).extension<ConverPalette>()!.ink3,
+      ),
+    ),
+  );
 }
