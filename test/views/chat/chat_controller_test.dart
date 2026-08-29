@@ -72,6 +72,44 @@ class _ThrowingListConversationRepository extends ConversationRepository {
   }
 }
 
+/// getConversation 必抛的会话仓储子类——命中「openConversation 加载失败」路径
+/// （F2：DB 异常不得成未处理异步异常）。
+class _ThrowingGetConversationRepository extends ConversationRepository {
+  _ThrowingGetConversationRepository(super.db, super.settings);
+
+  @override
+  Future<Conversation?> getConversation(int conversationId) {
+    throw StateError('get failed');
+  }
+}
+
+/// createMessage 延迟 [delay] 后落库的慢消息仓储——构造「stop 时 user 尚未落库」
+/// 的 F1 竞态窗口（可控制 user 落库时延；getMessages 等读取路径不延迟，reload
+/// / 轮询照常）。
+class _SlowMessageRepository extends MessageRepository {
+  _SlowMessageRepository(
+    super.db, {
+    super.now,
+    this.delay = const Duration(milliseconds: 200),
+  });
+
+  final Duration delay;
+
+  @override
+  Future<Message> createMessage({
+    required int conversationId,
+    required Role role,
+    required String content,
+  }) async {
+    await Future<void>.delayed(delay);
+    return super.createMessage(
+      conversationId: conversationId,
+      role: role,
+      content: content,
+    );
+  }
+}
+
 /// 在 [deadline]（5s 墙钟）内轮询 [condition] 直到为真（真实异步等待）。
 ///
 /// 用墙钟期限而非迭代计数：负载下的 per-iteration 延迟可能与 token 间距同量
@@ -119,12 +157,19 @@ void main() {
   });
 
   /// 装配控制器：驱动真实 ChatService + [provider]。
-  ChatController wireController(LLMProvider provider) {
+  ///
+  /// [messageRepository] 非空时替换装配给服务与控制器的消息仓储（F1 慢落库
+  /// 竞态窗口等特殊仓储注入点）。
+  ChatController wireController(
+    LLMProvider provider, {
+    MessageRepository? messageRepository,
+  }) {
+    final messages = messageRepository ?? messageRepo;
     final service = ChatService(
       database: db,
       conversationRepository: convRepo,
       characterRepository: charRepo,
-      messageRepository: messageRepo,
+      messageRepository: messages,
       settingsRepository: settingsRepo,
       providerFactory: FixedLLMProviderFactory(provider),
     );
@@ -132,7 +177,7 @@ void main() {
       chatService: service,
       conversationRepository: convRepo,
       characterRepository: charRepo,
-      messageRepository: messageRepo,
+      messageRepository: messages,
     );
     controller = c;
     return c;
@@ -295,6 +340,36 @@ void main() {
       expect(c.activeConversation, isNull);
     });
 
+    test('openConversation getConversation 抛错 → notice 收口，无未处理异常（F2）',
+        () async {
+      await seedCharacter();
+      final throwingRepo =
+          _ThrowingGetConversationRepository(db, const FakeSettingsReader());
+      final c = ChatController(
+        chatService: ChatService(
+          database: db,
+          conversationRepository: convRepo,
+          characterRepository: charRepo,
+          messageRepository: messageRepo,
+          settingsRepository: settingsRepo,
+          providerFactory:
+              FixedLLMProviderFactory(FakeLLMProvider(tokens: const [])),
+        ),
+        conversationRepository: throwingRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+      );
+      controller = c;
+
+      // 修复前：getConversation 抛错无 catch → 未处理异步异常，await 直接上抛。
+      await c.openConversation(1);
+
+      expect(c.notice, startsWith('加载对话失败'),
+          reason: 'DB 异常收口为 notice，不产生未处理异常');
+      expect(c.activeConversation, isNull);
+      expect(c.messages, isEmpty);
+    });
+
     test('流式中打开其他会话 → 先 stop：已累积部分落库并标「已停止」', () async {
       // 首个会话在流式中；打开第二个会话应中止首会话回合（部分落库）。
       final provider = TickingFakeLLMProvider(
@@ -387,6 +462,40 @@ void main() {
       final settled = await messageRepo.getMessages(conv.id);
       expect([for (final m in settled) (m.role, m.content)],
           [(Role.user, '出发'), (Role.assistant, '完整回复')]);
+    });
+
+    test('流式中两次访问 messages → 合成消息 id 稳定（F4 无每帧漂移）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['a', 'b'],
+        delay: const Duration(milliseconds: 20),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      expect(c.isStreaming, isTrue);
+      // 流式中在途 user + assistant 占位均在列表：连续两次访问（每次重建
+      // 列表），合成消息 id 必须各自稳定（getter 内递减 → 每帧漂移 = 缺陷）。
+      int? userFirst;
+      int? assistantFirst;
+      for (final m in c.messages) {
+        if (m.role == Role.user) userFirst = m.id;
+        if (m.role == Role.assistant) assistantFirst = m.id;
+      }
+      int? userSecond;
+      int? assistantSecond;
+      for (final m in c.messages) {
+        if (m.role == Role.user) userSecond = m.id;
+        if (m.role == Role.assistant) assistantSecond = m.id;
+      }
+      expect(userSecond, userFirst, reason: 'user 合成 id 稳定（不随访问漂移）');
+      expect(assistantSecond, assistantFirst,
+          reason: 'assistant 占位合成 id 稳定（不随访问漂移）');
+      expect(userFirst, isNegative);
+      expect(assistantFirst, isNegative);
+
+      await _until(() async => !c.isStreaming, why: '回合完成');
     });
 
     test('send 空文本 / 流式中重复发送 → 忽略（不重复发起）', () async {
@@ -504,6 +613,69 @@ void main() {
       expect(c.messages.single.stopped, isFalse);
       final settled = await messageRepo.getMessages(conv.id);
       expect([for (final m in settled) m.role], [Role.user]);
+    });
+
+    test('send 后立即 stop（user 落库晚于 stop）→ UI 最终显示已落库 user（F1）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      // user 落库经慢仓储延迟 200ms：构造「stop 完成早于 user 落库」的竞态
+      // 窗口（服务层落库为独立异步路径，cancel 完成不保证 user 已落库）。
+      final slowMessages = _SlowMessageRepository(
+        db,
+        now: () => fakeNow,
+        delay: const Duration(milliseconds: 200),
+      );
+      final c = wireController(
+        TickingFakeLLMProvider(tokens: const ['a'], delay: const Duration(milliseconds: 10)),
+        messageRepository: slowMessages,
+      );
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      await c.stop(); // 立即停止：此刻 user 尚未落库（慢仓储 200ms 后完成）
+
+      expect(c.isStreaming, isFalse);
+      // 修复前：stop reload 读到空库 + 清在途 → UI 空且不自愈；修复后 stop
+      // 有界等待 user 落库再 reload → UI 显示已发 user（不依赖时序巧合）。
+      expect([for (final m in c.messages) (m.role, m.content)],
+          [(Role.user, 'hi')]);
+      final settled = await messageRepo.getMessages(conv.id);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, 'hi')]);
+    });
+
+    test('入口态（backToEntry 后台流）停止 → 重进会话部分内容带「已停止」标记（F3b）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['p0', 'p1', 'p2', 'p3', 'p4'],
+        delay: const Duration(milliseconds: 100),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      await _until(() async => c.streamingText == 'p0',
+          why: '首 token 已累积（user 已落库）');
+      await c.backToEntry();
+      expect(c.isEntry, isTrue);
+      expect(c.isStreaming, isTrue, reason: 'backToEntry 不中止后台流（对齐 P6.5）');
+
+      // 立即重进同一会话：内部 stop() 此刻 _activeConversationId 为 null
+      // （入口态）→ 部分内容已落库但标记判定不得依赖 reload 目标而落空。
+      await c.openConversation(conv.id);
+
+      expect(c.isStreaming, isFalse);
+      final last = c.messages.last;
+      expect(last.role, Role.assistant);
+      expect(last.content, startsWith('p0'),
+          reason: '后台流停止的部分内容经 DB 重载恢复');
+      expect(last.stopped, isTrue,
+          reason: '入口态/后台流停止也正确落「已停止」标记（对照会话内正常 stop）');
+      final settled = await messageRepo.getMessages(conv.id);
+      expect(settled.map((m) => m.role).toList(),
+          [Role.user, Role.assistant]);
     });
   });
 
