@@ -39,7 +39,7 @@
 
 ## 候选区
 
-> 当前 4 项待立项：F-10（设置保存顺序写部分持久化，Worth exploring）/ F-11（ConverPalette 注册耦合+fail-fast 不透明，Worth exploring）/ F-12（`_themeController.load()` 缺 catchError 既有债，Worth exploring）/ F-13（主题快速连点竞态，Speculative）。历史消费（2026-08-29 技术债批次 F-7/F-8/F-9 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
+> 当前 8 项待立项：F-10（设置保存顺序写部分持久化）/ F-11（ConverPalette 注册耦合）/ F-12（load 缺 catchError）/ F-13（主题连点竞态）/ F-14（双 provider 翻译栈重复）/ F-15（RegenerateResult 零消费者）/ F-16（角色缺失文案泛化）/ F-17（停止 cancel 无上界）——全部非阻断（Worth exploring/Speculative），M2 批次后候选区净增 4。历史消费（2026-08-29 技术债批次 F-7/F-8/F-9 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
@@ -47,6 +47,10 @@
 | F-11 | **ConverPalette 未注册 fail-fast 不透明 + 测试面耦合涟漪**：5 视图 25 处 `extension<ConverPalette>()!`，任何不经 ConverTheme 的 MaterialApp 下 build 期 null 崩溃（错误信息泛化「null check operator used on a null value」）；`settings_sections_widget_test` pumpSection 被迫注册 ConverTheme.dark——每个未来渲染 section 的测试/调用方都必须知晓注册扩展 | 波末增量审核 N2 + 期末四轴 Falsify 复证（A） | Worth exploring | 📝 待立项 | 前端主题 |
 | F-12 | **`_themeController.load()` 无 catchError（既有债）**：settings_view initState 中 `.timeout(...)` 无 catch——DB 读失败抛错 → 未处理 async 异常（debug 打屏 / release 静默）；F-8「不静默吞错」精神未达此处 | 期末四轴 Falsify（C，批次范围外既有） | Worth exploring | 📝 待立项 | 设置页/前端 |
 | F-13 | **主题快速连点竞态**：`onSelectionChanged` 改 async 后，连点浅/深色产生并发 `setThemeMode`；`mode != themeMode` 守卫在 in-flight 时 `_themeMode` 未提交，吞掉第二次反向 tap（用户已点深色实际停在浅色）。轻微 UX 竞态，非崩溃 | 期末四轴 Falsify（B） | Speculative | 📝 待立项 | 设置页/前端 |
+| F-14 | **双 provider 翻译栈重复（Divergent Change 风险）**：`claude_provider.dart` 与 `openai_provider.dart` 的 `translateError`/`_translateDio`/`_translateStatus`/`_responseText`/`_errorMessageFromMap`/`_decodeJson` 约 120 行逐字重复（仅端点/请求体不同）——未来改 401 语义/超时类别须改两处 | M2 期末四轴（Architecture） | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-15 | **RegenerateResult 零消费者（Speculative Generality）**：`chat_service.dart` `regenerate` 返回富结果对象（reply/messageId/conversationId），但 `chat_controller` 直接丢弃、lib 全库无人读取——接口表面 > 行为收益 | M2 期末四轴（Standards/Architecture） | Speculative | 📝 待立项 | 聊天链路 |
+| F-16 | **角色缺失文案泛化**：`chat_service.dart` 角色不存在抛 `StateError('角色不存在: ...')` → 兜底「生成回复失败: StateError...」；桌面 `exceptions.py` 有 `CharacterNotFoundError` → 404 领域语义，移动端未迁移 | M2 期末四轴（Spec） | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-17 | **停止 cancel 无上界**：`_stopStreamReply` `await state.providerSub?.cancel()` 在真实网络停滞（socket read 无数据）时等待下一块数据/EOF，「点停止立即中止」即时性不成立（非崩溃，UI 已同步复位）；测试恒定 chunk 间隔掩盖此面 | M2 波4增量审核 concern 复验 | Worth exploring | 📝 待立项 | 聊天链路 |
 
 ## 技术债处置记录
 

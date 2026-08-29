@@ -6,6 +6,20 @@
 
 ---
 
+## M2 kickoff 批次（2026-08-29 — project-kickoff 全自动档交付：聊天核心）
+
+- **交付**：7 票 5 波 DAG（T00 工程门 e623268 / T01a Prompt 组装 bfc701d / T01b SSE+LLM 抽象 4f87f3d / T02 双协议 wire 2cc1c5b / T03 ChatService 342ddad / T04 聊天 UI 4b143d2 / T05 test_connection 0f88df7）+ 波3修复（a1bc0cc）/波4修复（a251df3）/期末收尾（0f9c33f），merge 链至 `59e766a`。**A1~A8 门**：477 测全绿 / analyze 0 / 覆盖率手写口径 95.42%；**A7 冒烟 PASS（窄路径）**——模拟器端到端实证：入口 UI/autoGreeting/发送链/「未配置 claude API Key」逐字错误/测试连接 SnackBar（logcat+像素）；真实打字机流式留待用户 Key（付费账户未擅自调用）。
+- **关键架构修正**：移动端无后端中间层，SSE 契约源 = **Anthropic/OpenAI 官方原始协议**（非桌面统一帧）；`temperature` 官方已弃用 → 不透传（research 实证，修正 Grilling 初判）；flutter_markdown 已 discontinued → flutter_markdown_plus（best-judgment，用户未答）；两端真拍点（markdown 包/最小入口）用户未答，按推荐定案并注明非拍板。
+- **审核链**：波3增量审核（F1 阻断 regenerate×streamReply 数据丢失 / F3/F4/镜像 seam/F5）+ 波4增量审核（F1 阻断 stop 竞态 UI 丢失 / F3b/F2/F4）——四轮修复全被增量审核或合并核验捕获；期末四轴**零阻断**（Spec A1~A8 全过/安全红线 0/架构翻译栈去重非阻断）。
+- **过程遥测**：票 7 + 修复 3 + 收尾 1；网关故障 0（本批未遇）；空返回 1（T05 首次中断，重派接续半成品）、T04 重派接续（ChatController 482 行半成品保留）；子智能体 13 个 token ≈ 1.2 亿；审核 findings：波3 阻断 1/Falsify 5、波4 阻断 1/Falsify 5、期末非阻断 9。**技术债净增**：本轮清零 0 → 净增 4（F-14~F-17）。
+- **避坑（勿重蹈）**：
+  1. **并行票 seam 契约必须合并后实测**：T02/T03 并行开发，T03 按「基类 LLMError 精确判型」、T02 实现「LLMConnectionInterruptedError 子类」——各自单测全绿、集成断流失效，合并时人工核验捕获。并行票间共享 seam 的契约要写进双方工单并合并后跑集成路径。
+  2. **半成品接续优于重写**：T04/T05 两次中断（T05 片段文本早亡、T04 长会话中止），worktree 半成品保留，重派接续（ChatController 482 行/测试骨架 293 行全复用），接续成本远低于重写（M1 教训复证）。
+  3. `adb shell input text` 不支持中文（Unicode NPE）——模拟器冒烟输入用 ASCII；adbd 管道 `cat` 会损坏二进制（用 run-as 设备端 sqlite3 直查，勿 pull 后本地解析）。
+  4. drift_flutter DB 在 `app_flutter/` 目录（非 databases/），冒烟播种角色走设备端 sqlite3 run-as。
+  5. `dart format` 全文件误触会引入无关重排——修复只改目标行（T04 修复教训）。
+- **知识库蒸馏**：候选教训（并行 seam 契约合并在即实测 / 半成品接续复用 / 模拟器冒烟设备端数据操作）——完成段经 distill-lesson 处理。
+
 ## 技术债消费批次 F-7/F-8/F-9（2026-08-29 — project-kickoff 全自动档交付：技术债三候选消费）
 
 - **交付**：3 工单单串行链（01 F-9 eb51b99 / 02 F-8 a7064fb / 03 F-7 ea1b724），merge 68e8d19（基线 78b8a94）。**F-7** ConverPalette ThemeExtension（ink1-4/border 5 枚，dark/light 注册 ConverTheme）+ 5 视图 25 处消费改经 `extension<ConverPalette>()!`（M1 同构契约零改动）；**F-8** 设置页三处失败路径统一失败 SnackBar + debugPrint、theme onSelectionChanged async await、settings_view 去静默吞错；**F-9** 视图层装配 required 化（删 AppDatabase.open/FlutterSecretStore 缺省分支 + app_database import），home_shell 单一装配链。
