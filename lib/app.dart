@@ -8,10 +8,14 @@ import 'data/repositories/character_repository.dart';
 import 'data/repositories/conversation_repository.dart';
 import 'data/repositories/message_repository.dart';
 import 'data/repositories/settings_repository.dart';
+import 'services/chat_service.dart';
+import 'services/llm/factory.dart';
+import 'services/llm/llm_provider.dart';
 import 'services/secure_store.dart';
 import 'theme/conver_theme.dart';
 import 'view_models/shell_navigation.dart';
 import 'view_models/theme_controller.dart';
+import 'views/chat/chat_controller.dart';
 import 'views/home_shell.dart';
 
 /// 应用根组件（入口层）：provider 装配 + MaterialApp 双主题响应式注入。
@@ -56,6 +60,30 @@ class ConverApp extends StatelessWidget {
         ),
         Provider<MessageRepository>(
           create: (context) => MessageRepository(context.read<AppDatabase>()),
+        ),
+        // M2-T04 聊天装配：LLM 工厂 + 回合编排服务 + 聊天控制器。
+        // 视图层（ChatView / ChatEntry）只读 ChatController 与仓储抽象，不触碰
+        // 数据层 / 平台存储（layer_boundary_test 契约）；装配链单一收编于此。
+        Provider<LLMProviderFactory>(
+          create: (_) => const LLMFactory(),
+        ),
+        Provider<ChatService>(
+          create: (context) => ChatService(
+            database: context.read<AppDatabase>(),
+            conversationRepository: context.read<ConversationRepository>(),
+            characterRepository: context.read<CharacterRepository>(),
+            messageRepository: context.read<MessageRepository>(),
+            settingsRepository: context.read<SettingsRepository>(),
+            providerFactory: context.read<LLMProviderFactory>(),
+          ),
+        ),
+        ChangeNotifierProvider<ChatController>(
+          create: (context) => ChatController(
+            chatService: context.read<ChatService>(),
+            conversationRepository: context.read<ConversationRepository>(),
+            characterRepository: context.read<CharacterRepository>(),
+            messageRepository: context.read<MessageRepository>(),
+          ),
         ),
         ChangeNotifierProvider<ThemeController>(
           create: (context) {

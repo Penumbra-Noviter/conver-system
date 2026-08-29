@@ -5,13 +5,14 @@
 //    `ConverColorsLight` 标识符（词边界正则，忽略合法存续的 `ConverSpacing`）——
 //    视图层只经 `Theme.of(context).extension<ConverPalette>()!` 消费。
 // 2. 浅色 widget 断言：pump 真实 ConverApp（内存库）→ 切浅色 → 设置页页头
-//    「设置」/副标题「应用配置集中管理」/聊天占位标题「聊天」用浅色 ink token。
+//    「设置」/副标题「应用配置集中管理」/聊天入口标题「聊天」用浅色 ink token。
 // 3. 深色回归：同上三锚点用深色 ink token（深色板逐位不变）。
 //
 // 锚文本限定：`设置` 同时存在于 NavigationBar label 与设置页页头，须以
 // `find.descendant(of: find.byType(SettingsView), ...)` 限定；`聊天` 同时存在
-// 于 NavigationBar label 与 PlaceholderGroup 标题，须以
-// `find.descendant(of: find.byType(PlaceholderGroup), ...)` 限定。
+// 于 NavigationBar label 与聊天入口标题（T04 起为真实 ChatView，M1 曾为
+// PlaceholderGroup），须以 `find.descendant(of: find.byType(ChatView), ...)`
+// 限定。
 library;
 
 import 'dart:async';
@@ -21,8 +22,8 @@ import 'package:conver_system_mobile/app.dart';
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/theme/colors.dart';
 import 'package:conver_system_mobile/view_models/theme_controller.dart';
+import 'package:conver_system_mobile/views/chat/chat_view.dart';
 import 'package:conver_system_mobile/views/settings/settings_view.dart';
-import 'package:conver_system_mobile/widgets/placeholder_group.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,7 +108,7 @@ void main() {
       // 默认 tab=聊天：PlaceholderGroup 标题用浅色 ink1。
       final chatTitle = tester.widget<Text>(
         find.descendant(
-          of: find.byType(PlaceholderGroup),
+          of: find.byType(ChatView),
           matching: find.text('聊天'),
         ),
       );
@@ -138,7 +139,7 @@ void main() {
 
       final chatTitle = tester.widget<Text>(
         find.descendant(
-          of: find.byType(PlaceholderGroup),
+          of: find.byType(ChatView),
           matching: find.text('聊天'),
         ),
       );
