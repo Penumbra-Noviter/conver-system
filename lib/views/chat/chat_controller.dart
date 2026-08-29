@@ -510,7 +510,7 @@ class ChatController extends ChangeNotifier {
     _reloadPending = true;
   }
 
-/// 流关闭收尾：终态重载 DB 列表并清空在途合成占位（一次 notify，无闪烁）。
+  /// 流关闭收尾：终态重载 DB 列表并清空在途合成占位（一次 notify，无闪烁）。
   Future<void> _onStreamDone() async {
     _subscription = null;
     if (_reloadPending) {
@@ -542,9 +542,9 @@ class ChatController extends ChangeNotifier {
   }
 
   /// 清空在途合成状态（占位 user / 流式文本 / 停止标记），不触碰
-/// [_stoppedMessageIds]（落库消息标记的生命周期随会话）与 [_roundConversationId]
-/// / [_roundUserText] / [_assistantSyntheticId]（入口态后台流仍可能渲染占位，
-/// 停止标记与占位 id 的生命周期随整个回合）。
+  /// [_stoppedMessageIds]（落库消息标记的生命周期随会话）与 [_roundConversationId]
+  /// / [_roundUserText] / [_assistantSyntheticId]（入口态后台流仍可能渲染占位，
+  /// 停止标记与占位 id 的生命周期随整个回合）。
 void _clearInFlight() {
     _pendingUserText = null;
     _pendingUserSyntheticId = null;

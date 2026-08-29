@@ -165,6 +165,42 @@ class _TickingProvider extends LLMProvider {
   Future<void> testConnection({String? model}) async {}
 }
 
+/// [MessageRepository] 的挂起替身：createMessage 可在进入时挂起于 [gate]
+/// （放行后走真实落库）——确定性复现「部分落库挂起期间用户停止 → controller
+/// 关闭 → 落库失败收口时 add-after-close」竞态（T06 内层 catch 守卫回归）。
+class _GatedMessageRepository extends MessageRepository {
+  _GatedMessageRepository(super.db, {super.now});
+
+  /// 挂起器：选中 [gateRole] 角色的 createMessage 进入后 await 其 future。
+  Completer<void>? gate;
+
+  /// 挂起白名单角色（null → 全部挂起）。
+  Role? gateRole;
+
+  /// createMessage 已进入挂起（测试等待其越过入口后发起停止）。
+  final Completer<void> entered = Completer<void>();
+
+  @override
+  Future<Message> createMessage({
+    required int conversationId,
+    required Role role,
+    required String content,
+  }) async {
+    final g = gate;
+    if (g != null && (gateRole == null || role == gateRole)) {
+      if (!entered.isCompleted) {
+        entered.complete();
+      }
+      await g.future;
+    }
+    return super.createMessage(
+      conversationId: conversationId,
+      role: role,
+      content: content,
+    );
+  }
+}
+
 /// 可控挂起的 non-streaming provider：generate 在进入时完成 [started]、挂起于
 /// [gate]，放行后返回 [reply]——F1（重生成期间并发新消息）与 F4（并发双触发
 /// 拒绝）回归测试用：可在 generate 挂起期间对 DB 做并发写入 / 发起第二次调用。
@@ -938,6 +974,36 @@ void main() {
       // controller.add 抛 StateError 被 zone 捕获为未处理异常 → 本测试失败。
       await Future<void>.delayed(const Duration(milliseconds: 50));
     });
+
+    test('A3 Falsify: 停止时对话已被删 → 部分落库失败尽力而为不重抛（无未处理异常）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      wireService(_TickingProvider(
+        tokens: const ['t0', 't1'],
+        delay: const Duration(milliseconds: 10),
+      ));
+
+      final gotFirstToken = Completer<void>();
+      final sub = service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .listen(
+        (e) {
+          if (e is ChatToken && !gotFirstToken.isCompleted) {
+            gotFirstToken.complete();
+          }
+        },
+      );
+      await gotFirstToken.future;
+      await convRepo.deleteConversation(conv.id); // 流式中删除对话（FK CASCADE）
+      // 停止：_stopStreamReply 的 _persistAssistant 落库失败 → 尽力而为吞掉不
+      // 重抛（日志记录），cancel 正常完成、无未处理异常（zone 捕获则测试失败）。
+      await sub.cancel();
+
+      // 对话已删（消息级联删除）→ 无可观察落库。
+      expect(await roleContentsOf(conv.id), isEmpty);
+    });
   });
 
   // ── A5 断流 ──
@@ -1054,6 +1120,46 @@ void main() {
       expect(events.last, isA<ChatError>());
       expect((events.last as ChatError).message,
           startsWith('生成回复失败: '));
+    });
+
+    test('A5 Falsify: 断流部分落库挂起期间停止 → 内层收口守卫 add-after-close'
+        '（无未处理异常）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      // 门控仓库注入：让断流分支的 _persistAssistant 挂起于 createMessage
+      // （仅拦 assistant 角色落库；user 消息与开场白不受影响）。
+      final gatedRepo = _GatedMessageRepository(db, now: () => fakeNow);
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: gatedRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: _FakeFactory(_TickingProvider(
+          tokens: const ['a'],
+          errorAfter: LLMConnectionInterruptedError(),
+          delay: const Duration(milliseconds: 10),
+        )),
+      );
+      final release = Completer<void>();
+      gatedRepo
+        ..gate = release
+        ..gateRole = Role.assistant;
+
+      final sub = service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .listen((_) {});
+      await gatedRepo.entered.future; // 断流分支的部分落库已进入挂起。
+
+      // 挂起期间用户停止 → _stopStreamReply 关闭 controller。
+      await sub.cancel();
+
+      // 放行落库：_persistAssistant 返回 → 外层 controller.add(ChatInterrupted)
+      // 抛 add-after-close StateError → 转内层 catch。无守卫则该 catch 再次 add
+      // 到已关闭 controller → 未处理异步异常（flutter_test zone 判失败）。
+      release.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     });
   });
 

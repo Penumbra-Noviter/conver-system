@@ -42,6 +42,8 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../data/database/app_database.dart';
 import '../data/database/tables.dart' show Role;
 import '../data/repositories/character_repository.dart';
@@ -440,7 +442,10 @@ class ChatService {
       }
     } catch (e) {
       // 断流部分落库失败（如流式中对话被删）→ 收口为 ChatError。
-      controller.add(ChatError('生成回复失败: $e'));
+      // 挂起期间用户停止 → controller 已关闭 → 跳过发事件（对齐外层守卫）。
+      if (!controller.isClosed) {
+        controller.add(ChatError('生成回复失败: $e'));
+      }
     } finally {
       if (!controller.isClosed) {
         await controller.close();
@@ -462,8 +467,9 @@ class ChatService {
     // 已累积部分落库（DB 存纯文本部分内容，不写「已停止」标记）。
     try {
       await _persistAssistant(state);
-    } catch (_) {
-      // 停止路径兜底保存失败不重抛。
+    } catch (e) {
+      // 停止路径兜底保存失败不重抛（尽力而为），仅记录日志不静默吞错。
+      debugPrint('停止路径部分内容落库失败: $e');
     }
     if (!controller.isClosed) {
       await controller.close();
