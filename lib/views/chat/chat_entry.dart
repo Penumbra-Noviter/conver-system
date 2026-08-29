@@ -26,7 +26,7 @@ class ChatEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     final canCreate =
         controller.canCreateConversation && !controller.creatingConversation;
     return SafeArea(
@@ -96,7 +96,7 @@ class ChatEntry extends StatelessWidget {
           Divider(
             thickness: 1,
             height: 1,
-            color: Theme.of(context).extension<ConverPalette>()!.border,
+            color: ConverPalette.of(context).border,
           ),
           Expanded(child: _ConversationList(controller: controller)),
         ],
@@ -111,7 +111,7 @@ class _TemporaryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -139,7 +139,7 @@ class _ConversationList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     final conversations = controller.conversations;
     if (conversations.isEmpty && !controller.loadingEntry) {
       return Center(
@@ -149,7 +149,7 @@ class _ConversationList extends StatelessWidget {
             Icon(
               Icons.chat_bubble_outline,
               size: 40,
-              color: Theme.of(context).extension<ConverPalette>()!.ink4,
+              color: ConverPalette.of(context).ink4,
             ),
             const SizedBox(height: ConverSpacing.space2),
             Text(
@@ -175,7 +175,7 @@ class _ConversationList extends StatelessWidget {
         height: 1,
         indent: ConverSpacing.space4,
         endIndent: ConverSpacing.space4,
-        color: Theme.of(context).extension<ConverPalette>()!.border,
+        color: ConverPalette.of(context).border,
       ),
       itemBuilder: (context, index) {
         final item = conversations[index];
@@ -193,7 +193,7 @@ class _ConversationList extends StatelessWidget {
           ),
           trailing: Icon(
             Icons.chevron_right,
-            color: Theme.of(context).extension<ConverPalette>()!.ink4,
+            color: ConverPalette.of(context).ink4,
           ),
         );
       },

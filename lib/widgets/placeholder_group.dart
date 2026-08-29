@@ -40,14 +40,14 @@ class PlaceholderGroup extends StatelessWidget {
           Text(
             title,
             style: textTheme.titleLarge?.copyWith(
-              color: Theme.of(context).extension<ConverPalette>()!.ink1,
+              color: ConverPalette.of(context).ink1,
             ),
           ),
           const SizedBox(height: ConverSpacing.space1),
           Text(
             description,
             style: textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).extension<ConverPalette>()!.ink3,
+              color: ConverPalette.of(context).ink3,
             ),
           ),
           const SizedBox(height: ConverSpacing.space6),
@@ -62,9 +62,7 @@ class PlaceholderGroup extends StatelessWidget {
                     child: Text(
                       items[i].label,
                       style: textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context)
-                            .extension<ConverPalette>()!
-                            .ink2,
+                        color: ConverPalette.of(context).ink2,
                       ),
                     ),
                   ),
@@ -72,7 +70,7 @@ class PlaceholderGroup extends StatelessWidget {
                   Text(
                     items[i].note,
                     style: textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).extension<ConverPalette>()!.ink4,
+                      color: ConverPalette.of(context).ink4,
                     ),
                   ),
                 ],
@@ -81,7 +79,7 @@ class PlaceholderGroup extends StatelessWidget {
             if (i != items.length - 1)
               Divider(
                 thickness: 1,
-                color: Theme.of(context).extension<ConverPalette>()!.border,
+                color: ConverPalette.of(context).border,
               ),
           ],
         ],

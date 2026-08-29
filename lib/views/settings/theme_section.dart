@@ -26,14 +26,14 @@ class ThemeSection extends StatelessWidget {
         Text(
           '主题',
           style: textTheme.titleMedium?.copyWith(
-            color: Theme.of(context).extension<ConverPalette>()!.ink1,
+            color: ConverPalette.of(context).ink1,
           ),
         ),
         const SizedBox(height: ConverSpacing.space1),
         Text(
           '跟随系统 / 浅色 / 深色（首启为深色）',
           style: textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).extension<ConverPalette>()!.ink4,
+            color: ConverPalette.of(context).ink4,
           ),
         ),
         const SizedBox(height: ConverSpacing.space2),

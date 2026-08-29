@@ -14,7 +14,8 @@ import 'colors.dart';
 ///   [ConverColorsLight] 同名常量（M1 同构契约冻结：不新增/不改任何 token
 ///   值或名，token 名集仍由 colors.dart 的 25 名映射锁定）。
 /// - 装配方（[ConverTheme]）在 dark/light ThemeData 各注册对应 extensions；
-///   消费方统一 `Theme.of(context).extension<ConverPalette>()!`。
+///   消费方统一经 [ConverPalette.of]（或可空场景 [ConverPalette.maybeOf]）
+///   获取，未注册时抛带修复指引的 [FlutterError] 而非泛化 null-check。
 class ConverPalette extends ThemeExtension<ConverPalette> {
   /// 显式值构造（copyWith / lerp 复用）。
   const ConverPalette({
@@ -56,6 +57,30 @@ class ConverPalette extends ThemeExtension<ConverPalette> {
 
   /// 发丝线边框色。
   final Color border;
+
+  /// 安全访问当前 [BuildContext] 装配的 [ConverPalette]。
+  ///
+  /// 未注册时抛带修复指引的 [FlutterError]（消息含「未注册」与
+  /// ConverTheme/MaterialApp（ConverApp）装配提示），而非泛化 null-check。
+  /// 消费方统一经此入口获取 token，取代 `Theme.of(context).extension<ConverPalette>()!`。
+  static ConverPalette of(BuildContext context) {
+    final palette = maybeOf(context);
+    if (palette == null) {
+      throw FlutterError(
+        'ConverPalette 未注册：请确保在 ConverTheme/MaterialApp（ConverApp）'
+        '下构建当前 Widget 的 BuildContext。',
+      );
+    }
+    return palette;
+  }
+
+  /// 可空版本：未注册返回 null、不抛；已注册返回 [ConverPalette] 实例。
+  static ConverPalette? maybeOf(BuildContext context) =>
+      _themeExtensionOf<ConverPalette>(context);
+
+  /// 从 [Theme] 上取 [T] 类型的 [ThemeExtension] 实例；未注册返回 null。
+  static T? _themeExtensionOf<T extends ThemeExtension<T>>(BuildContext context) =>
+      Theme.of(context).extension<T>();
 
   @override
   ConverPalette copyWith({
