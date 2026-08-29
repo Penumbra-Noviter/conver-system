@@ -35,7 +35,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - `flutter test`（纯 Dart 单测 + 无头 widget 测试），覆盖率目标 ≥ 90%
 - 业务逻辑（chat/llm/数据层/导入链/生成校验）占比最大且是纯 Dart → 可靠性主要由单测兜底；平台薄层做真机/模拟器验证
 
-## 当前状态（2026-08-29）
+## 当前状态（2026-08-30）
 
 - ✅ 设计已落盘：`docs/mobile-design.md`（单一事实来源）+ `docs/mobile-adaptation-research.md`（决策背景）；决策集 Q0~Q14 已拍板，ADR-0002 见桌面库 `desktop/CONSENSUS.md`
 - ✅ 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35+36+37/AEHD/AVD medium_phone + Flutter 3.47.2；MCP 插件 preflight 全绿）
@@ -43,7 +43,8 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - ✅ **M1 已交付**（2026-08-29）：4 仓储 CRUD 全语义 + SecureStorage 双槽位 + 模型清单单源 + 主题三值切换（auto/浅/深），G1–G5 门 + G6 模拟器冒烟全项通过；merge 收口 a1d4265
 - ✅ **技术债批次 F-7/F-8/F-9 已交付**（2026-08-29）：视图 token 主题化（ConverPalette ThemeExtension）+ 设置页错误面 + 装配 required 化，全量 171 测 / 覆盖率手写口径 90.63% / 四轴零阻断 / 冒烟 PASS；merge 68e8d19
 - ✅ **M2 已交付**（2026-08-29）：聊天核心——LLM Provider 双协议 SSE wire（Claude/OpenAI 直连）+ ChatService 回合编排（滑窗/模板变量/重生成/停止/断流）+ 打字机 UI + 最小临时会话入口 + test_connection；全量 477 测 / 覆盖率手写口径 95.42% / 四轴零阻断 / A7 冒烟窄路径 PASS（真实流式留待 Key）；merge 59e766a
-- ⬜ 下一站 M3（角色 + 搜索）：见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选 F-10~F-17 见 [TECH_DEBT.md](TECH_DEBT.md)
+- ✅ **技术债批次 F-10~F-17 已交付**（2026-08-30）：7 做 1 关闭 / 6 工单 2 波 merge b9dc9bc / 全量 497 测 / analyze 0 / 覆盖率剔除 drift 97.96% / 四轴零阻断 / 冒烟 PASS / TICKETS 已归档 / 技术债候选区清零
+- ⬜ 下一站 M3（角色 + 搜索）：见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选区已清零（2026-08-30 消费完毕，处置见 [TECH_DEBT.md](TECH_DEBT.md)）
 
 ## 文档体系
 

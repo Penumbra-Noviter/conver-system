@@ -29,7 +29,7 @@
 
 ## 技术债区
 
-> 已迁移至独立文件 [TECH_DEBT.md](TECH_DEBT.md)——当前 **8 项待立项**（F-10 设置保存部分持久化 / F-11 ConverPalette 注册耦合 / F-12 load() 缺 catchError / F-13 主题连点竞态 / F-14 双 provider 翻译栈重复 / F-15 RegenerateResult 零消费者 / F-16 角色缺失文案泛化 / F-17 停止 cancel 无上界，全部非阻断；F-7/F-8/F-9 已于 2026-08-29 消费归档）。
+> 已迁移至独立文件 [TECH_DEBT.md](TECH_DEBT.md)——当前 **0 项待立项**（F-10~F-17 已于 2026-08-30 消费完毕，7 修 1 关闭，处置见 [TECH_DEBT.md](TECH_DEBT.md) 处置记录）。
 
 ---
 
