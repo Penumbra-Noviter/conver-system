@@ -138,14 +138,14 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
         Text(
           '默认模型',
           style: textTheme.titleMedium?.copyWith(
-            color: Theme.of(context).extension<ConverPalette>()!.ink1,
+            color: ConverPalette.of(context).ink1,
           ),
         ),
         const SizedBox(height: ConverSpacing.space1),
         Text(
           '供应商与模型选择（新对话的缺省取值）',
           style: textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).extension<ConverPalette>()!.ink4,
+            color: ConverPalette.of(context).ink4,
           ),
         ),
         const SizedBox(height: ConverSpacing.space2),
@@ -186,7 +186,7 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
         TextField(
           controller: _customController,
           style: textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).extension<ConverPalette>()!.ink1,
+            color: ConverPalette.of(context).ink1,
           ),
           decoration: const InputDecoration(
             isDense: true,
@@ -208,7 +208,7 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
     child: Text(
       text,
       style: textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).extension<ConverPalette>()!.ink3,
+        color: ConverPalette.of(context).ink3,
       ),
     ),
   );

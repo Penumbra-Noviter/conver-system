@@ -119,7 +119,7 @@ class _ConversationHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     return Row(
       children: [
         IconButton(
@@ -151,7 +151,7 @@ class _NoticeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Container(
       width: double.infinity,
@@ -193,7 +193,7 @@ class _MessageList extends StatelessWidget {
   Widget build(BuildContext context) {
     final messages = controller.messages;
     if (messages.isEmpty) {
-      final palette = Theme.of(context).extension<ConverPalette>()!;
+      final palette = ConverPalette.of(context);
       final textTheme = Theme.of(context).textTheme;
       return Center(
         child: Column(
@@ -245,7 +245,7 @@ class _UserBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
@@ -283,7 +283,7 @@ class _AssistantBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     final canRegenerate = !controller.isStreaming &&
         !controller.isRegenerating &&
         !message.streaming &&
@@ -299,7 +299,7 @@ class _AssistantBubble extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerLowest,
           border: Border.all(
-            color: Theme.of(context).extension<ConverPalette>()!.border,
+            color: ConverPalette.of(context).border,
           ),
           borderRadius: BorderRadius.circular(ConverRadii.bubble),
         ),
@@ -383,7 +383,7 @@ class _SystemBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     return Align(
       alignment: Alignment.center,
       child: Padding(
@@ -470,7 +470,7 @@ class _ComposerState extends State<_Composer> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = Theme.of(context).extension<ConverPalette>()!;
+    final palette = ConverPalette.of(context);
     final controller = widget.controller;
     final streaming = controller.isStreaming;
     final canSend = _text.text.trim().isNotEmpty && !streaming;
@@ -485,7 +485,7 @@ class _ComposerState extends State<_Composer> {
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         border: Border(
           top: BorderSide(
-            color: Theme.of(context).extension<ConverPalette>()!.border,
+            color: ConverPalette.of(context).border,
           ),
         ),
       ),

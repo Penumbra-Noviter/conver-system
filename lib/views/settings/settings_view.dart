@@ -108,14 +108,14 @@ class _SettingsViewState extends State<SettingsView> {
               Text(
                 '设置',
                 style: textTheme.titleLarge?.copyWith(
-                  color: Theme.of(context).extension<ConverPalette>()!.ink1,
+                  color: ConverPalette.of(context).ink1,
                 ),
               ),
               const SizedBox(height: ConverSpacing.space1),
               Text(
                 '应用配置集中管理',
                 style: textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).extension<ConverPalette>()!.ink3,
+                  color: ConverPalette.of(context).ink3,
                 ),
               ),
               const SizedBox(height: ConverSpacing.space4),
@@ -132,7 +132,7 @@ class _SettingsViewState extends State<SettingsView> {
                 ),
                 Divider(
                   thickness: 1,
-                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                  color: ConverPalette.of(context).border,
                 ),
                 DefaultModelSection(
                   settingsRepository: _settings,
@@ -141,12 +141,12 @@ class _SettingsViewState extends State<SettingsView> {
                 ),
                 Divider(
                   thickness: 1,
-                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                  color: ConverPalette.of(context).border,
                 ),
                 ThemeSection(themeController: _themeController),
                 Divider(
                   thickness: 1,
-                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                  color: ConverPalette.of(context).border,
                 ),
               ],
               for (var i = 0; i < _placeholderItems.length; i++) ...[
@@ -160,9 +160,7 @@ class _SettingsViewState extends State<SettingsView> {
                         child: Text(
                           _placeholderItems[i].label,
                           style: textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context)
-                                .extension<ConverPalette>()!
-                                .ink2,
+                            color: ConverPalette.of(context).ink2,
                           ),
                         ),
                       ),
@@ -170,9 +168,7 @@ class _SettingsViewState extends State<SettingsView> {
                       Text(
                         _placeholderItems[i].note,
                         style: textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .extension<ConverPalette>()!
-                              .ink4,
+                          color: ConverPalette.of(context).ink4,
                         ),
                       ),
                     ],
@@ -181,7 +177,7 @@ class _SettingsViewState extends State<SettingsView> {
                 if (i != _placeholderItems.length - 1)
                   Divider(
                     thickness: 1,
-                    color: Theme.of(context).extension<ConverPalette>()!.border,
+                    color: ConverPalette.of(context).border,
                   ),
               ],
             ],

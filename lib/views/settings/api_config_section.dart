@@ -191,14 +191,14 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
         Text(
           'API 配置',
           style: textTheme.titleMedium?.copyWith(
-            color: Theme.of(context).extension<ConverPalette>()!.ink1,
+            color: ConverPalette.of(context).ink1,
           ),
         ),
         const SizedBox(height: ConverSpacing.space1),
         Text(
           '服务地址与密钥（密钥存系统安全存储）',
           style: textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).extension<ConverPalette>()!.ink4,
+            color: ConverPalette.of(context).ink4,
           ),
         ),
         const SizedBox(height: ConverSpacing.space2),
@@ -210,7 +210,7 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
             obscureText: !_visible[provider]!,
             autofillHints: const [],
             style: textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).extension<ConverPalette>()!.ink1,
+              color: ConverPalette.of(context).ink1,
             ),
             decoration: InputDecoration(
               isDense: true,
@@ -221,7 +221,7 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   size: 18,
-                  color: Theme.of(context).extension<ConverPalette>()!.ink3,
+                  color: ConverPalette.of(context).ink3,
                 ),
                 onPressed: () =>
                     setState(() => _visible[provider] = !_visible[provider]!),
@@ -234,7 +234,7 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
             key: ValueKey('base-url-$provider'),
             controller: _baseUrlControllers[provider],
             style: textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).extension<ConverPalette>()!.ink1,
+              color: ConverPalette.of(context).ink1,
             ),
             decoration: const InputDecoration(isDense: true, hintText: '官方默认'),
           ),
@@ -256,7 +256,7 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
     child: Text(
       text,
       style: textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).extension<ConverPalette>()!.ink3,
+        color: ConverPalette.of(context).ink3,
       ),
     ),
   );
