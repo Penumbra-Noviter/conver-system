@@ -152,12 +152,15 @@ class RegenerateResult {
 /// `error_mapping.py::domain_error_response` 的聊天相关分支；422 家族与
 /// 角色卡导入无关，不在此迁移）。
 ///
-/// - [ConversationNotFoundError] / [MessageNotFoundError] → 404 + str(exc)；
+/// - [ConversationNotFoundError] / [CharacterNotFoundError] /
+///   [MessageNotFoundError] → 404 + str(exc)；
 /// - [ApiKeyMissingError] / [ProviderNotSupportedError] /
 ///   [InvalidRegenerateTargetError] / [RegenerateBusyError] → 400 + str(exc)；
 /// - 未知 [DomainError] 子类 → 400 + str(e) 兜底（防御性）。
 ({int status, String message}) domainErrorResponse(DomainError error) {
-  if (error is ConversationNotFoundError || error is MessageNotFoundError) {
+  if (error is ConversationNotFoundError ||
+      error is CharacterNotFoundError ||
+      error is MessageNotFoundError) {
     return (status: 404, message: error.message);
   }
   if (error is ApiKeyMissingError ||
@@ -289,7 +292,7 @@ class ChatService {
       }
       final character = await _characterRepository.getCharacter(conv.characterId);
       if (character == null) {
-        throw StateError('角色不存在: ${conv.characterId}');
+        throw CharacterNotFoundError(conv.characterId);
       }
       final userName = await _settingsRepository.userName;
 
@@ -508,10 +511,10 @@ class ChatService {
   ///    + 插新一次提交；生成期间并发写入的新消息（id > snapshotMaxId）保留，
   ///    新回复以新 id 落在其后（F1 数据完整性）。
   ///
-  /// 抛出：领域错误（[ConversationNotFoundError] / [MessageNotFoundError] /
-  /// [InvalidRegenerateTargetError] / [RegenerateBusyError] /
-  /// [ApiKeyMissingError] / [ProviderNotSupportedError]）与 [LLMError]
-  /// （生成失败，UI 经 [llmErrorResponse] 映射）。
+  /// 抛出：领域错误（[ConversationNotFoundError] / [CharacterNotFoundError] /
+  /// [MessageNotFoundError] / [InvalidRegenerateTargetError] /
+  /// [RegenerateBusyError] / [ApiKeyMissingError] / [ProviderNotSupportedError]）
+  /// 与 [LLMError]（生成失败，UI 经 [llmErrorResponse] 映射）。
   Future<RegenerateResult> regenerate({
     required int conversationId,
     int? messageId,
@@ -547,7 +550,7 @@ class ChatService {
       //    不触碰 DB，旧消息保留。
       final character = await _characterRepository.getCharacter(conv.characterId);
       if (character == null) {
-        throw StateError('角色不存在: ${conv.characterId}');
+        throw CharacterNotFoundError(conv.characterId);
       }
       final userName = await _settingsRepository.userName;
       final maxRounds = await _settingsRepository.slidingWindowRounds;
