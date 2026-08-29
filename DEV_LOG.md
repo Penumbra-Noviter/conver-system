@@ -8,7 +8,7 @@
 
 ## M2 kickoff 批次（2026-08-29 — project-kickoff 全自动档交付：聊天核心）
 
-- **交付**：7 票 5 波 DAG（T00 工程门 e623268 / T01a Prompt 组装 bfc701d / T01b SSE+LLM 抽象 4f87f3d / T02 双协议 wire 2cc1c5b / T03 ChatService 342ddad / T04 聊天 UI 4b143d2 / T05 test_connection 0f88df7）+ 波3修复（a1bc0cc）/波4修复（a251df3）/期末收尾（0f9c33f），merge 链至 `59e766a`。**A1~A8 门**：477 测全绿 / analyze 0 / 覆盖率手写口径 95.42%；**A7 冒烟 PASS（窄路径）**——模拟器端到端实证：入口 UI/autoGreeting/发送链/「未配置 claude API Key」逐字错误/测试连接 SnackBar（logcat+像素）；真实打字机流式留待用户 Key（付费账户未擅自调用）。
+- **交付**：7 票 5 波 DAG（T00 工程门 e623268 / T01a Prompt 组装 bfc701d / T01b SSE+LLM 抽象 4f87f3d / T02 双协议 wire 2cc1c5b / T03 ChatService 342ddad / T04 聊天 UI 4b143d2 / T05 test_connection 0f88df7）+ 波3修复（a1bc0cc）/波4修复（a251df3）/期末收尾（0f9c33f），merge 链至 `59e766a`。证据 `.scratch/m2-kickoff/evidence/`（T00~T06 + 09-smoke-gate-a7 + 冒烟 PNG）。**A1~A8 门**：477 测全绿 / analyze 0 / 覆盖率手写口径 95.42%；**A7 冒烟 PASS（窄路径）**——模拟器端到端实证：入口 UI/autoGreeting/发送链/「未配置 claude API Key」逐字错误/测试连接 SnackBar（logcat+像素）；真实打字机流式留待用户 Key（付费账户未擅自调用）。
 - **关键架构修正**：移动端无后端中间层，SSE 契约源 = **Anthropic/OpenAI 官方原始协议**（非桌面统一帧）；`temperature` 官方已弃用 → 不透传（research 实证，修正 Grilling 初判）；flutter_markdown 已 discontinued → flutter_markdown_plus（best-judgment，用户未答）；两端真拍点（markdown 包/最小入口）用户未答，按推荐定案并注明非拍板。
 - **审核链**：波3增量审核（F1 阻断 regenerate×streamReply 数据丢失 / F3/F4/镜像 seam/F5）+ 波4增量审核（F1 阻断 stop 竞态 UI 丢失 / F3b/F2/F4）——四轮修复全被增量审核或合并核验捕获；期末四轴**零阻断**（Spec A1~A8 全过/安全红线 0/架构翻译栈去重非阻断）。
 - **过程遥测**：票 7 + 修复 3 + 收尾 1；网关故障 0（本批未遇）；空返回 1（T05 首次中断，重派接续半成品）、T04 重派接续（ChatController 482 行半成品保留）；子智能体 13 个 token ≈ 1.2 亿；审核 findings：波3 阻断 1/Falsify 5、波4 阻断 1/Falsify 5、期末非阻断 9。**技术债净增**：本轮清零 0 → 净增 4（F-14~F-17）。

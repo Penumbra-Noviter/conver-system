@@ -1,7 +1,7 @@
 # TECH_DEBT: conver system mobile
 
 > **技术债候选池**（未立项子集）与**处置记录**。本文件与 [TICKETS.md](TICKETS.md)（任务池）分离——候选不等于任务，不自动进入任何 session 的 preflight 认领；消费 = 显式「立项」（从候选区取出 → 转入 `TICKETS.md` 活跃工单，或标记 ❌ 不立项附理由）。
-> 读取契约与强度消费规则见 AGENTS.md §3 任务清单生命周期（项目级，与桌面库同构）。
+> 读取契约与强度消费规则见 [CLAUDE.md](CLAUDE.md) §3 任务清单生命周期（项目级，与桌面库同构）。
 
 ---
 

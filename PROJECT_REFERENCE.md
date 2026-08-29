@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**当前状态**（2026-08-29）：**M1 已交付**——数据层 + 设置：4 仓储 CRUD 全语义（桌面服务蓝本逐条对齐：聚合计数/自动命名副作用/天然级联验证）、SecureStorage 双协议槽位（真实 Keystore 通道 G6 实证）、模型清单静态单源（8 provider/60 模型，AST 机械 diff 桌面源）、主题三值切换（auto/浅/深 + 浅色 token 25 值逐字复刻桌面浅色段）。模拟器验收全过（154 测试/analyze 0/Key 真通道往返/切主题即时生效/五 tab 零崩溃）。**下一站 M2**（聊天核心：ChatService + SSE 流式，见 [TICKETS.md](TICKETS.md)）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
+**当前状态**（2026-08-29）：**M2 已交付**——聊天核心：LLM Provider 双协议 SSE wire（Claude/OpenAI 直连官方协议，纯 Dart 无中间层）、ChatService 回合编排（滑窗/模板变量/重生成/停止/断流/错误映射逐字对齐桌面）、打字机 UI（两级降频：streaming 纯文本+光标、完成态 MarkdownBody）、最小临时会话入口、设置页测试连接。477 测试/analyze 0/覆盖率手写口径 95.42%；模拟器冒烟窄路径 PASS（入口/autoGreeting/发送链/错误文案/测试连接全真机实证，真实流式待配置 Key）。**上一里程碑 M1**（数据层 + 设置：4 仓储 CRUD 全语义、SecureStorage 双协议槽位、模型清单单源 8 provider/60 模型、主题三值切换，154 测试全过）。**下一站 M3**（角色 + 搜索，见 [TICKETS.md](TICKETS.md)）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
 
 **核心能力**（7 项全量，无阉割）：
 - **聊天** — 多轮对话 + SSE 流式打字机渲染 + 停止生成；滑窗上下文、模板变量、重生成、错误态

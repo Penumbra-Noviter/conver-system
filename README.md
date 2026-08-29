@@ -4,7 +4,8 @@ Conver System 的移动端应用（Flutter，Android + iOS 独立运行，无桌
 
 ## 状态
 
-- **M1 已交付**（2026-08-29）：数据层 + 设置——4 仓储 CRUD 全语义（天然级联/聚合计数/自动命名副作用）、SecureStorage 双协议槽位（真实 Keystore 通道验证）、模型清单静态单源（8 provider/60 模型）、主题三值切换（auto/浅/深 + 浅色 token 全套），模拟器验收通过（Key 真通道往返/切主题即时生效/154 测试全绿）。M2–M7 待办见 [TICKETS.md](TICKETS.md)
+- **M2 已交付**（2026-08-29）：聊天核心——LLM Provider 双协议 SSE wire（Claude/OpenAI 直连官方协议）+ ChatService 回合编排（滑窗/模板变量/重生成/停止/断流）+ 打字机 UI（两级降频）+ 最小临时会话入口 + 设置页测试连接；477 测试全绿/analyze 0/覆盖率手写口径 95.42%，模拟器冒烟窄路径 PASS（真实流式待配置 Key）。M3–M7 待办见 [TICKETS.md](TICKETS.md)
+- **M1 已交付**（2026-08-29）：数据层 + 设置——4 仓储 CRUD 全语义（天然级联/聚合计数/自动命名副作用）、SecureStorage 双协议槽位（真实 Keystore 通道验证）、模型清单静态单源（8 provider/60 模型）、主题三值切换（auto/浅/深 + 浅色 token 全套），模拟器验收通过（Key 真通道往返/切主题即时生效/154 测试全绿）
 - **M0 已交付**（2026-08-29）：Flutter 工程脚手架 + drift 4 表 + Warm Stone 深色主题 token + 5 tab 底部导航壳；应用 launcher 名「汇流」
 - 权威设计文档：`docs/mobile-design.md`（架构 / 7 项功能全量 / 依赖清单 / M0–M7 里程碑）
 - 技术调研：`docs/mobile-adaptation-research.md`
