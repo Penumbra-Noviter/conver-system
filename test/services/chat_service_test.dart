@@ -165,6 +165,51 @@ class _TickingProvider extends LLMProvider {
   Future<void> testConnection({String? model}) async {}
 }
 
+/// 产出 [tokens] 后**永久停滞**的 provider（T6/F-17 回归）：yield 完最后一个
+/// token 后 `await` 永不完成的 [Completer]——不 complete、不 error、不放 done，
+/// 复现真实网络停滞下 `providerSub.cancel()` 无上界挂起（cancel 等下一块/EOF）。
+///
+/// 与 [_TickingProvider]（会自然收束）互补：本 fake 专用于验证停止路径的
+/// `.timeout` 兜底（有界完成 + onTimeout 不抛错继续收尾）。
+class _StalledProvider extends LLMProvider {
+  _StalledProvider({
+    super.apiKey = 'test-key',
+    List<String> tokens = const [],
+  }) : _tokens = List<String>.unmodifiable(tokens);
+
+  final List<String> _tokens;
+
+  /// 永不完结的挂起点（yield 完后 await 它，使生成器永久挂起）。
+  final Completer<void> _stall = Completer<void>();
+
+  @override
+  LLMError translateError(Object error) =>
+      error is LLMError ? error : LLMError('fake API 调用失败: $error');
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async =>
+      _tokens.join();
+
+  @override
+  Stream<String> streamGenerate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async* {
+    for (final token in _tokens) {
+      yield token;
+    }
+    await _stall.future; // 永久停滞：不 complete / 不 error / 不放 done
+  }
+
+  @override
+  Future<void> testConnection({String? model}) async {}
+}
+
 /// [MessageRepository] 的挂起替身：createMessage 可在进入时挂起于 [gate]
 /// （放行后走真实落库）——确定性复现「部分落库挂起期间用户停止 → controller
 /// 关闭 → 落库失败收口时 add-after-close」竞态（T06 内层 catch 守卫回归）。
@@ -1009,6 +1054,49 @@ void main() {
 
       // 对话已删（消息级联删除）→ 无可观察落库。
       expect(await roleContentsOf(conv.id), isEmpty);
+    });
+
+    test('A3: 停滞 provider 流（产出后永久停滞）→ 停止有界完成（.timeout 兜底不'
+        '抛错，部分内容仍落库 + 事件流关闭）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      wireService(_StalledProvider(tokens: const ['t0', 't1']));
+
+      final events = <ChatEvent>[];
+      final gotLastToken = Completer<void>();
+      final stream = service.streamReply(conversationId: conv.id, content: 'hi');
+      final sub = stream.listen((e) {
+        events.add(e);
+        if (e is ChatToken && e.token == 't1' && !gotLastToken.isCompleted) {
+          gotLastToken.complete();
+        }
+      });
+      await gotLastToken.future; // 已产出 t0、t1；此后 provider 永久停滞
+
+      // 停止：providerSub.cancel() 在停滞流上无上界挂起（F-17）→ 实现包
+      // `.timeout` 兜底后仍应有界完成。断言「有界完成」：超时即 fail（非
+      // try/catch 预期 TimeoutException——那测的是抛错方向）。
+      await sub.cancel().timeout(
+            const Duration(seconds: 6),
+            onTimeout: () =>
+                fail('停止未在有界时间内完成（providerSub.cancel 无限挂起）'),
+          );
+
+      // 已累积部分内容仍按停止语义落库（DB 存纯文本部分内容，不写停止标记）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+        (Role.assistant, 't0t1'),
+      ]);
+      // 事件流正常关闭 + 无终态事件：`sub.cancel()` 的 Future 依赖 onCancel
+      // （即 _stopStreamReply，收尾含 controller.close()）——其上界完成即证明
+      // 停止路径已把事件流关闭收尾；且停止路径不发 ChatDone / ChatError /
+      // ChatInterrupted（仅 token 已累积）。单订阅流不可 re-listen，故以
+      // 「有界完成 + 无终态事件 + 部分落库」三条锚定事件流关闭语义。
+      expect([for (final e in events) if (e is ChatToken) e.token], ['t0', 't1']);
+      expect(events.whereType<ChatDone>(), isEmpty);
+      expect(events.whereType<ChatError>(), isEmpty);
+      expect(events.whereType<ChatInterrupted>(), isEmpty);
     });
   });
 
