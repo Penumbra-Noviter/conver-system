@@ -8,8 +8,8 @@
 /// - 无任何 LLM 网络请求（A6；test_connection 归 M2）
 ///
 /// 依赖注记：SecretStore 直持用于槽位写/删/回显；base_url 与其余键走
-/// 设置仓储。工单 07 装配后两实例由应用级注入统一（当前各自缺省构造，
-/// 运行时同源于平台安全存储）。
+/// 设置仓储。F-9 起 [secretStore] 为构造 required 注入，由装配链单一提供
+/// （home_shell ← app.dart provider），不再视图内缺省构造。
 library;
 
 import 'package:flutter/material.dart';
@@ -26,14 +26,15 @@ class ApiConfigSection extends StatefulWidget {
   const ApiConfigSection({
     super.key,
     required this.settingsRepository,
-    this.secretStore,
+    required this.secretStore,
     this.initialValues = const <String, String>{},
   });
 
   final SettingsRepository settingsRepository;
 
-  /// 槽位直写/删通道；缺省平台安全存储薄实现（测试注入内存 fake）。
-  final SecretStore? secretStore;
+  /// 槽位直写/删通道 — 装配链注入（home_shell ← app.dart provider）；
+  /// 测试注入内存 fake。
+  final SecretStore secretStore;
 
   /// 回显初值：`claude_api_key` / `openai_api_key` / `claude_base_url` /
   /// `openai_base_url`（缺键 = 未配置，显示为空）。
@@ -50,8 +51,7 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
     'openai': (slotKey: SecretStore.openaiApiKeySlot, label: 'OpenAI'),
   };
 
-  late final SecretStore _secretStore =
-      widget.secretStore ?? FlutterSecretStore();
+  late final SecretStore _secretStore = widget.secretStore;
   final _keyControllers = <String, TextEditingController>{};
   final _baseUrlControllers = <String, TextEditingController>{};
   final _visible = <String, bool>{};
