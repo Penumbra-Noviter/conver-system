@@ -71,6 +71,13 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
     'openai': (slotKey: SecretStore.openaiApiKeySlot, label: 'OpenAI'),
   };
 
+  /// 两个 Key 槽位键 — 回滚时区分「SecretStore 槽位（delete/write 旧值）」
+  /// 与「设置表 base_url 键（setMany 写回旧值）」。
+  static const _apiKeySlots = <String>{
+    SecretStore.claudeApiKeySlot,
+    SecretStore.openaiApiKeySlot,
+  };
+
   late final SecretStore _secretStore = widget.secretStore;
   final _keyControllers = <String, TextEditingController>{};
   final _baseUrlControllers = <String, TextEditingController>{};
@@ -107,7 +114,19 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
 
   Future<void> _save() async {
     setState(() => _saving = true);
+    // 写前快照：Key 两槽位经 SecretStore 读现值，base_url 两键经设置仓储
+    // getValue 读现值（快照通道与写入通道对称；getValue 对 api_key 键同样
+    // 重定向 SecretStore，读回语义一致）。任一快照读失败即整体视为保存失败。
+    final snapshot = <String, String>{};
+    // 本次已成功写入的键（Key 槽位键 / base_url 键）——失败时仅回滚此清单。
+    final written = <String>[];
     try {
+      for (final provider in _providers.keys) {
+        final slotKey = _providers[provider]!.slotKey;
+        snapshot[slotKey] = await _secretStore.read(slotKey);
+        snapshot['${provider}_base_url'] = await widget.settingsRepository
+            .getValue('${provider}_base_url');
+      }
       for (final provider in _providers.keys) {
         final slotKey = _providers[provider]!.slotKey;
         final keyValue = _keyControllers[provider]!.text.trim();
@@ -116,17 +135,48 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
         } else {
           await _secretStore.write(key: slotKey, value: keyValue);
         }
+        written.add(slotKey);
         final baseUrl = _baseUrlControllers[provider]!.text.trim();
         await widget.settingsRepository.setMany({
           '${provider}_base_url': baseUrl,
         });
+        written.add('${provider}_base_url');
       }
       _showSnackBar('API 配置已保存');
     } catch (error) {
       debugPrint('API 配置保存失败: $error');
+      await _rollback(snapshot, written);
       _showSnackBar('保存失败，请重试');
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// 回滚 [written] 中已写项到写前 [snapshot] 现值，使失败后四键与保存前
+  /// 完全一致（事务化语义；任一写失败即停止后续写入，只回滚已成功项）。
+  ///
+  /// 回滚幂等（无严格逆序要求）：Key 槽位旧非空 → write 回旧值 / 旧空 →
+  /// delete；base_url → setMany 写回旧值（旧空写空串，读回语义等价未配置）。
+  /// 回滚自身失败仅 debugPrint（文案自定），不重抛、不吞成功路径。
+  Future<void> _rollback(
+    Map<String, String> snapshot,
+    List<String> written,
+  ) async {
+    for (final key in written) {
+      try {
+        final oldValue = snapshot[key] ?? '';
+        if (_apiKeySlots.contains(key)) {
+          if (oldValue.isEmpty) {
+            await _secretStore.delete(key);
+          } else {
+            await _secretStore.write(key: key, value: oldValue);
+          }
+        } else {
+          await widget.settingsRepository.setMany({key: oldValue});
+        }
+      } catch (error) {
+        debugPrint('API 配置保存回滚失败: $error');
+      }
     }
   }
 
