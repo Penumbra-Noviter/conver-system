@@ -52,11 +52,14 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   void initState() {
     super.initState();
-    // 存储通道不可用（平台通道缺失挂起/读取失败）→ 超时兜底保持缺省 dark
+    // 存储通道不可用（平台通道缺失挂起/读取失败）→ 超时兜底保持缺省 dark；
+    // catchError 兜底「读失败即抛」路径——避免未处理 zone 异常（F-12）。
     _themeController.load().timeout(
       const Duration(seconds: 3),
       onTimeout: () => debugPrint('主题偏好加载超时，保持缺省 dark'),
-    );
+    ).catchError((Object error) {
+      debugPrint('主题偏好加载失败，保持缺省 dark: $error');
+    });
     _echoFuture = _loadEcho().timeout(
       const Duration(seconds: 3),
       onTimeout: () => (const <String, String>{}, '', ''),
