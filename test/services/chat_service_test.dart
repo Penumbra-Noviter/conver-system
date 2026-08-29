@@ -413,6 +413,12 @@ void main() {
       expect(mapped.message, '消息不存在');
     });
 
+    test('CharacterNotFound → 404 + 角色不存在: <id>', () {
+      final mapped = domainErrorResponse(CharacterNotFoundError(999999));
+      expect(mapped.status, 404);
+      expect(mapped.message, '角色不存在: 999999');
+    });
+
     test('ApiKeyMissing → 400 + 未配置文案', () {
       final mapped = domainErrorResponse(ApiKeyMissingError('claude'));
       expect(mapped.status, 400);
@@ -794,7 +800,7 @@ void main() {
 
     test('A2 Falsify: 角色缺失（FK 关闭损坏态）→ ChatError 收口不崩溃', () async {
       // 生产态 FK ON + CASCADE 下孤立对话结构不可达；临时关闭 FK 模拟损坏态，
-      // 验证服务层把 StateError 收口为 ChatError（不崩溃、无部分内容）。
+      // 验证服务层把 CharacterNotFoundError 收口为 ChatError（不崩溃、无部分内容）。
       await db.customStatement('PRAGMA foreign_keys = OFF');
       final orphanConv = await db.into(db.conversations).insertReturning(
             ConversationsCompanion.insert(
@@ -815,7 +821,7 @@ void main() {
       expect(events.last, isA<ChatError>());
       expect(
         (events.last as ChatError).message,
-        '生成回复失败: Bad state: 角色不存在: ${orphanConv.characterId}',
+        '角色不存在: ${orphanConv.characterId}',
       );
     });
 
@@ -1429,10 +1435,10 @@ void main() {
       );
     });
 
-    test('A4 Falsify: 角色缺失（FK 关闭损坏态）→ regenerate 拒绝 StateError',
+    test('A4 Falsify: 角色缺失（FK 关闭损坏态）→ regenerate 拒绝 CharacterNotFoundError',
         () async {
       // 生产态 FK ON + CASCADE 下孤立对话结构不可达；临时关闭 FK 模拟损坏态，
-      // 验证 regenerate 在角色缺失时抛 StateError（旧消息保留、无半截断）。
+      // 验证 regenerate 在角色缺失时抛 CharacterNotFoundError（旧消息保留、无半截断）。
       await db.customStatement('PRAGMA foreign_keys = OFF');
       final orphanConv = await db.into(db.conversations).insertReturning(
             ConversationsCompanion.insert(
@@ -1465,7 +1471,7 @@ void main() {
       await expectLater(
         service.regenerate(conversationId: orphanConv.id),
         throwsA(predicate(
-            (e) => e is StateError && e.message.contains('角色不存在'))),
+            (e) => e is CharacterNotFoundError && e.message.contains('角色不存在'))),
       );
       // 旧消息保留（组装/解析阶段抛错，未触碰 DB）。
       final remaining = await (db.select(db.messages)

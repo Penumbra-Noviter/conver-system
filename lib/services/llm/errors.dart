@@ -142,6 +142,11 @@ class ConversationNotFoundError extends DomainError {
   ConversationNotFoundError() : super('对话不存在');
 }
 
+/// 角色不存在（孤立对话引用缺失角色：FK 关闭 / 损坏态）。
+class CharacterNotFoundError extends DomainError {
+  CharacterNotFoundError(int characterId) : super('角色不存在: $characterId');
+}
+
 /// 未配置 API Key。
 class ApiKeyMissingError extends DomainError {
   ApiKeyMissingError(String provider) : super('未配置 $provider API Key，请在设置中填写');
