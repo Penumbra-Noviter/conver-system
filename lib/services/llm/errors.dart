@@ -61,6 +61,18 @@ class LLMResponseParseFailedError extends LLMError {
         );
 }
 
+/// 流在终态前中断（EOF 未收终态帧 / 连接重置）的可区分连接异常。
+///
+/// 共享于 Claude（message_stop 前 EOF / 连接重置）与 OpenAI（[DONE] 前 EOF /
+/// 连接重置）双协议 wire 层，供服务层（T03 ChatService `_isConnectionDrop`）
+/// 与 UI 统一捕获：继承 LLM 错误族（[LLMError]），`translateError` 直通不
+/// 二次翻译；区别于正常完成与鉴权 / 限流 / 超时 / 内容过滤等业务错误——业务
+/// 错误不落部分内容（F-45），连接中断走「回复已中断」部分落库分支。
+class LLMConnectionInterruptedError extends LLMError {
+  LLMConnectionInterruptedError({super.originalError})
+      : super('连接中断，回复未完成');
+}
+
 /// 非 HTTP 响应的传输失败类别（wire 层从传输异常解出的原语，见 [translateSdkError]）。
 enum LlmTransportFailure {
   /// 连接/读取超时。
@@ -155,4 +167,9 @@ class InvalidRegenerateTargetError extends DomainError {
 
   /// 截断后没有可重生成的用户消息（无触发源）。
   InvalidRegenerateTargetError.noTriggerUser() : super('没有可重生成的用户消息');
+}
+
+/// 重生成进行中（F4 并发双触发守卫：同对话 in-flight 期间拒绝第二次调用）。
+class RegenerateBusyError extends DomainError {
+  RegenerateBusyError() : super('重生成进行中');
 }

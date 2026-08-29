@@ -32,11 +32,12 @@
 ///
 /// ## 断流（A5）
 /// 流终止未到终态（连接异常 / 未收终态帧）→ 已累积部分落库 + 非阻塞
-/// [ChatInterrupted]「回复已中断」。R3 seam 契约：wire 层（T02）把流中途连接
-/// 断开翻译为 **基类 [LLMError]**（`translateSdkError` 对非 400/401/429 /
-/// timeout / responseParse 失败的原语翻译，SocketException / HttpException 等
-/// 传输失败落入基类兜底）；业务错误（Auth / RateLimit / Timeout / ContentFilter
-/// 等）为其子类。故 [_isConnectionDrop] 以「精确基类」判型即断流判定。
+/// [ChatInterrupted]「回复已中断」。R3 seam 契约：wire 层（T02）把流中途
+/// 断连（EOF 未到终态 / 连接重置）翻译为可区分的 [LLMConnectionInterruptedError]
+/// （LLM 族子类，errors.dart 共享）；连接阶段失败（SocketException / HTTP
+/// 403 / 404 / 422 等经 `translateSdkError` 兜底）与业务错误（Auth /
+/// RateLimit / Timeout / ContentFilter 等）为其子类/基类，不算断流。故
+/// [_isConnectionDrop] 以「严格子类」判型即断流判定。
 library;
 
 import 'dart:async';
@@ -151,7 +152,7 @@ class RegenerateResult {
 ///
 /// - [ConversationNotFoundError] / [MessageNotFoundError] → 404 + str(exc)；
 /// - [ApiKeyMissingError] / [ProviderNotSupportedError] /
-///   [InvalidRegenerateTargetError] → 400 + str(exc)；
+///   [InvalidRegenerateTargetError] / [RegenerateBusyError] → 400 + str(exc)；
 /// - 未知 [DomainError] 子类 → 400 + str(e) 兜底（防御性）。
 ({int status, String message}) domainErrorResponse(DomainError error) {
   if (error is ConversationNotFoundError || error is MessageNotFoundError) {
@@ -159,7 +160,8 @@ class RegenerateResult {
   }
   if (error is ApiKeyMissingError ||
       error is ProviderNotSupportedError ||
-      error is InvalidRegenerateTargetError) {
+      error is InvalidRegenerateTargetError ||
+      error is RegenerateBusyError) {
     return (status: 400, message: error.message);
   }
   return (status: 400, message: error.message);
@@ -167,13 +169,14 @@ class RegenerateResult {
 
 /// 判定 provider 流异常是否为「连接中断」（断流，R3 seam）。
 ///
-/// 契约（T02 wire 层遵守）：流中途连接断开 / 未收终态帧 → 经 [LLMProvider]
-/// 的 [translateError]（内部走 `translateSdkError` 兜底）翻译为**基类**
-/// [LLMError]（SocketException / HttpException 等传输失败 → 「{provider} API
-/// 调用失败: …」）；业务错误（Auth / RateLimit / Timeout / ContentFilter）与
-/// 协议类错误（BadRequest / ResponseParseFailed）为其子类。故「精确基类」判型
-/// 即断流判定——不把业务错误误判为断流（业务错误不落部分内容，F-45）。
-bool _isConnectionDrop(LLMError error) => error.runtimeType == LLMError;
+/// 契约（T02 wire 层遵守）：流中途断连（EOF 未收终态帧 / 连接重置）→ 可区分
+/// 的 [LLMConnectionInterruptedError]（LLM 族子类，errors.dart 共享，Claude /
+/// OpenAI wire 一致抛出）。**严格子类判型**：连接阶段失败（SocketException /
+/// HTTP 403 / 404 / 422 等经 `translateSdkError` 兜底翻译）为**基类**
+/// [LLMError]，不算断流 → 走业务错误 [ChatError]（F-45 不落部分内容）；业务
+/// 错误（Auth / RateLimit / Timeout / ContentFilter / BadRequest /
+/// ResponseParseFailed）为其子类，同样不走断流分支。
+bool _isConnectionDrop(LLMError error) => error is LLMConnectionInterruptedError;
 
 /// [streamReply] 一次运行的共享可变状态（onData / onCancel / 收尾 handler 间
 /// 传递：完整内容累积、是否已落库、provider 订阅句柄、停止标志）。
@@ -222,6 +225,10 @@ class ChatService {
   final SettingsRepository _settingsRepository;
   final LLMProviderFactory _providerFactory;
 
+  /// F4：重生成 in-flight 对话集（并发双触发守卫——同对话 in-flight 期间
+  /// 第二次调用抛 [RegenerateBusyError]，防第二次事务删掉第一次的新回复）。
+  final Set<int> _regenerateInFlight = {};
+
   /// 发送一条用户消息并流式生成回复（A2）。
   ///
   /// 编排（对齐 `chat.py::prepare_chat` + `stream_reply`）：
@@ -242,8 +249,9 @@ class ChatService {
   /// research 实证排除）→ 已累积部分落库（DB 存纯文本部分内容，UI 侧标「已停
   /// 止」）；无部分内容 → 仅保留已发 user。
   ///
-  /// 断流（A5）：provider 流抛出基类 [LLMError]（连接异常）→ 已累积部分落库 +
-  /// 非阻塞 [ChatInterrupted]「回复已中断」；无部分 → [ChatInterrupted(null)]。
+  /// 断流（A5）：provider 流抛出 [LLMConnectionInterruptedError]（流中途断连）
+  /// → 已累积部分落库 + 非阻塞 [ChatInterrupted]「回复已中断」；无部分 →
+  /// [ChatInterrupted(null)]。
   ///
   /// 错误（A2 错误面）：领域错误 / LLM 业务错误 → [ChatError] 事件（用户可见
   /// 文案），且**不落部分内容**（F-45，锚 `chat.py::stream_reply`）。
@@ -342,18 +350,26 @@ class ChatService {
           );
       state.providerSub = sub;
     } on DomainError catch (e) {
-      controller.add(ChatError(domainErrorResponse(e).message));
-      await controller.close();
+      // F3：调用方可能在解析失败瞬间取消订阅（controller 已 close），
+      // add 到已关闭 controller 抛 StateError → 未处理异步异常；守卫跳过。
+      if (!controller.isClosed) {
+        controller.add(ChatError(domainErrorResponse(e).message));
+        await controller.close();
+      }
     } on LLMError catch (e) {
       // 组装/解析阶段不产生 LLMError（Provider 尚未调用）；防御性兜底。
-      state.saved = true; // F-45。
-      controller.add(ChatError(llmErrorResponse(e, providerName).message));
-      await controller.close();
+      if (!controller.isClosed) {
+        state.saved = true; // F-45。
+        controller.add(ChatError(llmErrorResponse(e, providerName).message));
+        await controller.close();
+      }
     } catch (e) {
       // 未预期异常 → ChatError（对齐桌面 O3 语义），不落部分内容。
-      state.saved = true;
-      controller.add(ChatError('生成回复失败: $e'));
-      await controller.close();
+      if (!controller.isClosed) {
+        state.saved = true;
+        controller.add(ChatError('生成回复失败: $e'));
+        await controller.close();
+      }
     }
   }
 
@@ -369,10 +385,17 @@ class ChatService {
     }
     try {
       final msg = await _persistAssistant(state);
-      controller.add(msg != null ? ChatDone(msg.id) : const ChatDone(null));
+      // F3 同类硬化：onDone 与 onCancel 竞态（收尾瞬间取消）下 controller 可能
+      // 已关闭，add 前守卫避免 add-after-close 的未处理异常。
+      if (!controller.isClosed) {
+        controller.add(
+            msg != null ? ChatDone(msg.id) : const ChatDone(null));
+      }
     } catch (e) {
       // 落库失败（如流式中对话被删）→ 收口为 ChatError，不产生未处理异步异常。
-      controller.add(ChatError('生成回复失败: $e'));
+      if (!controller.isClosed) {
+        controller.add(ChatError('生成回复失败: $e'));
+      }
     } finally {
       if (!controller.isClosed) {
         await controller.close();
@@ -380,7 +403,8 @@ class ChatService {
     }
   }
 
-  /// provider 流异常收尾：断流（基类 [LLMError]）/ 业务错误 / 未预期异常。
+  /// provider 流异常收尾：断流（[LLMConnectionInterruptedError]）/ 业务错误 /
+  /// 未预期异常。
   Future<void> _onProviderStreamError(
     _StreamRunState state,
     StreamController<ChatEvent> controller,
@@ -389,6 +413,9 @@ class ChatService {
   ) async {
     if (state.stopped) {
       return; // 停止路径已收尾（幂等防护）。
+    }
+    if (controller.isClosed) {
+      return; // F3 同类硬化：与 onCancel 竞态下 controller 已关闭 → 无事件可发。
     }
     try {
       if (error is LLMError) {
@@ -462,7 +489,8 @@ class ChatService {
   /// 重生成对话中目标 AI 回复（A4，缺省末条 assistant）。
   ///
   /// 编排（对齐 `chat.py::regenerate_chat` + 移动端**延迟删除**定案）：
-  /// 1. 校验对话存在；
+  /// 0. F4 并发守卫：同对话 in-flight 期间第二次调用抛 [RegenerateBusyError]；
+  /// 1. 校验对话存在，并捕获 `snapshotMaxId`（当前最大消息 id，F1 有界删除上界）；
   /// 2. 解析目标：显式 [messageId] 或末条 assistant；目标非 assistant →
   ///    [InvalidRegenerateTargetError.notAssistant]；不存在 → [MessageNotFoundError]
   ///    / [InvalidRegenerateTargetError.noAssistantReply]；
@@ -470,69 +498,87 @@ class ChatService {
   /// 4. 组装（`append_current_input=False`，历史截断锚定 target.id——桌面「先截
   ///    断后组装」在延迟删除下以读侧过滤等价实现）+ provider 解析（Key 链）；
   /// 5. non-streaming 生成（网络在事务外）；**失败不删行，旧消息保留**；
-  /// 6. 成功后 `db.transaction` 删旧（`id >= target.id`）+ 插新一次提交。
+  /// 6. 成功后 `db.transaction` **有界删旧**（`target.id <= id <= snapshotMaxId`）
+  ///    + 插新一次提交；生成期间并发写入的新消息（id > snapshotMaxId）保留，
+  ///    新回复以新 id 落在其后（F1 数据完整性）。
   ///
   /// 抛出：领域错误（[ConversationNotFoundError] / [MessageNotFoundError] /
-  /// [InvalidRegenerateTargetError] / [ApiKeyMissingError] /
-  /// [ProviderNotSupportedError]）与 [LLMError]（生成失败，UI 经
-  /// [llmErrorResponse] 映射）。
+  /// [InvalidRegenerateTargetError] / [RegenerateBusyError] /
+  /// [ApiKeyMissingError] / [ProviderNotSupportedError]）与 [LLMError]
+  /// （生成失败，UI 经 [llmErrorResponse] 映射）。
   Future<RegenerateResult> regenerate({
     required int conversationId,
     int? messageId,
   }) async {
-    // 1. 校验对话存在。
-    final conv = await _conversationRepository.getConversation(conversationId);
-    if (conv == null) {
-      throw ConversationNotFoundError();
+    // F4：并发双触发守卫。网络生成可挂起（秒级），第二次调用基于同一快照解析
+    // 目标会把第一次的新回复当截断目标删掉；in-flight 期间直接拒绝。
+    if (_regenerateInFlight.contains(conversationId)) {
+      throw RegenerateBusyError();
     }
+    _regenerateInFlight.add(conversationId);
+    try {
+      // 1. 校验对话存在。
+      final conv = await _conversationRepository.getConversation(conversationId);
+      if (conv == null) {
+        throw ConversationNotFoundError();
+      }
 
-    // 2. 解析并校验目标。
-    final target = await _resolveRegenerateTarget(conversationId, messageId);
+      // F1：快照当前最大消息 id。网络生成期间并发写入的新消息 id 严格递增
+      // （> snapshotMaxId），必须在事务删旧时保留，否则无界删除会连带删掉
+      // 这条新 user 消息（静默数据丢失）。
+      final snapshotMaxId = await _messageRepository.maxMessageId(conversationId);
 
-    // 3. 校验触发源（截断后必须存在 user 消息）。
-    final trigger = await _lastUserBefore(conversationId, target.id);
-    if (trigger == null) {
-      throw InvalidRegenerateTargetError.noTriggerUser();
-    }
+      // 2. 解析并校验目标。
+      final target = await _resolveRegenerateTarget(conversationId, messageId);
 
-    // 4. 组装（append_current_input=False）+ provider 解析。延迟删除：此步抛错
-    //    不触碰 DB，旧消息保留。
-    final character = await _characterRepository.getCharacter(conv.characterId);
-    if (character == null) {
-      throw StateError('角色不存在: ${conv.characterId}');
-    }
-    final userName = await _settingsRepository.userName;
-    final maxRounds = await _settingsRepository.slidingWindowRounds;
-    final messages = await _assembleMessages(
-      conv: conv,
-      character: character,
-      historyBeforeId: target.id,
-      maxRounds: maxRounds,
-      userName: userName,
-      appendCurrentInput: false,
-    );
-    final resolved = await _resolveProvider(conv);
+      // 3. 校验触发源（截断后必须存在 user 消息）。
+      final trigger = await _lastUserBefore(conversationId, target.id);
+      if (trigger == null) {
+        throw InvalidRegenerateTargetError.noTriggerUser();
+      }
 
-    // 5. 生成（网络在事务外；LLM 失败 → 异常上抛，未删行、旧消息保留）。
-    final reply =
-        await resolved.llm.generate(messages: messages, model: resolved.model);
-
-    // 6. 单事务：删旧（含 target）+ 插新一次提交（drift 嵌套事务 = savepoint，
-    //    任一失败整体回滚，防半截断持久化）。
-    final saved = await _db.transaction(() async {
-      await _messageRepository.deleteMessagesFrom(conversationId, target.id);
-      return _messageRepository.createMessage(
-        conversationId: conversationId,
-        role: Role.assistant,
-        content: reply,
+      // 4. 组装（append_current_input=False）+ provider 解析。延迟删除：此步抛错
+      //    不触碰 DB，旧消息保留。
+      final character = await _characterRepository.getCharacter(conv.characterId);
+      if (character == null) {
+        throw StateError('角色不存在: ${conv.characterId}');
+      }
+      final userName = await _settingsRepository.userName;
+      final maxRounds = await _settingsRepository.slidingWindowRounds;
+      final messages = await _assembleMessages(
+        conv: conv,
+        character: character,
+        historyBeforeId: target.id,
+        maxRounds: maxRounds,
+        userName: userName,
+        appendCurrentInput: false,
       );
-    });
+      final resolved = await _resolveProvider(conv);
 
-    return RegenerateResult(
-      reply: reply,
-      messageId: saved.id,
-      conversationId: conversationId,
-    );
+      // 5. 生成（网络在事务外；LLM 失败 → 异常上抛，未删行、旧消息保留）。
+      final reply =
+          await resolved.llm.generate(messages: messages, model: resolved.model);
+
+      // 6. 单事务：有界删旧（target.id <= id <= snapshotMaxId）+ 插新一次提交
+      //    （drift 嵌套事务 = savepoint，任一失败整体回滚，防半截断持久化）。
+      final saved = await _db.transaction(() async {
+        await _messageRepository.deleteMessagesFrom(conversationId, target.id,
+            toId: snapshotMaxId);
+        return _messageRepository.createMessage(
+          conversationId: conversationId,
+          role: Role.assistant,
+          content: reply,
+        );
+      });
+
+      return RegenerateResult(
+        reply: reply,
+        messageId: saved.id,
+        conversationId: conversationId,
+      );
+    } finally {
+      _regenerateInFlight.remove(conversationId);
+    }
   }
 
   /// autoGreeting 零消息守卫（对齐 `message.py::auto_insert_greeting`）。

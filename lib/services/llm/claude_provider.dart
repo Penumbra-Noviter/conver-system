@@ -23,18 +23,27 @@ import 'errors.dart';
 import 'llm_provider.dart';
 import 'sse.dart';
 
-/// 流在终态前中断（EOF 未到 message_stop / 连接重置）的可区分连接异常。
-///
-/// 继承 LLM 错误族（[LLMError]），translateError 直通不二次翻译；T03 断流处理
-/// 以 `on LLMConnectionInterruptedError` 捕获并走「回复已中断」分支，区别于
-/// 正常完成与鉴权 / 限流 / 超时等错误。
-class LLMConnectionInterruptedError extends LLMError {
-  LLMConnectionInterruptedError({super.originalError})
-      : super('连接中断，回复未完成');
-}
-
 /// Anthropic 官方版本头（必需；research R1-1：`anthropic-version: 2023-06-01`）。
 const String kAnthropicVersion = '2023-06-01';
+
+/// 规范化 Anthropic 端点根地址（F5：锚 `desktop/backend/app/services/llm/claude.py`
+/// `_normalize_base_url` 语义修正）。
+///
+/// Claude 的 Messages 端点恒为 `{base}/v1/messages`，因此用户配置的面板地址若
+/// 已含版本段（末尾 `v1` / `v1beta`），拼接前须剥去——否则拼出
+/// `/v1/v1/messages`（404，观察级缺陷）；末尾多余斜杠一并去除；空值返回 null
+/// （无覆盖 → 回退官方默认端点）。
+String? normalizeClaudeBaseUrl(String? baseUrl) {
+  if (baseUrl == null || baseUrl.trim().isEmpty) {
+    return null;
+  }
+  var url = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+  final lastSegment = url.split('/').last;
+  if (RegExp(r'^v\d+(beta)?$').hasMatch(lastSegment)) {
+    url = url.substring(0, url.length - lastSegment.length - 1);
+  }
+  return url;
+}
 
 /// Anthropic Claude 实现。
 class ClaudeProvider extends LLMProvider {
@@ -226,8 +235,8 @@ class ClaudeProvider extends LLMProvider {
   }
 
   Uri _messagesUri() {
-    final raw = baseUrl?.trim() ?? '';
-    final base = raw.isEmpty ? _defaultEndpoint : _stripTrailingSlash(raw);
+    // F5：剥去 baseUrl 自带版本段（v1/v1beta），避免拼出 /v1/v1/messages。
+    final base = normalizeClaudeBaseUrl(baseUrl) ?? _defaultEndpoint;
     return Uri.parse('$base/v1/messages');
   }
 
@@ -341,9 +350,6 @@ class ClaudeProvider extends LLMProvider {
       return null;
     }
   }
-
-  static String _stripTrailingSlash(String url) =>
-      url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 }
 
 /// wire 层 HTTP 状态错误原语（流式路径抛出，translateError 统一翻译）。

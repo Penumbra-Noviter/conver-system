@@ -135,13 +135,29 @@ class MessageRepository {
   /// 锚定截断（桌面 delete_messages_from）：删除 [conversationId] 内
   /// `id >= targetId` 的全部消息（含 target），返回删除条数。
   ///
+  /// [toId] 非空时删除上界收敛为 `id <= toId`（F1 有界删除：重生成网络期间
+  /// 并发写入的新消息 id 大于快照上界，必须保留，防静默数据丢失）。
   /// **不**前移对话 `updated_at`；越界 target（无消息满足）返回 0 且零副作用；
   /// 其他对话的消息不受影响。单条 DELETE 语句自身原子，无需显式事务
   /// （桌面为不提交变体、由调用方收尾，M1 无事务级调用方）。
-  Future<int> deleteMessagesFrom(int conversationId, int targetId) {
-    return (_db.delete(_db.messages)
+  Future<int> deleteMessagesFrom(int conversationId, int targetId, {int? toId}) {
+    final query = _db.delete(_db.messages)
+      ..where(($MessagesTable t) => t.conversationId.equals(conversationId))
+      ..where(($MessagesTable t) => t.id.isBiggerOrEqualValue(targetId));
+    if (toId != null) {
+      query.where(($MessagesTable t) => t.id.isSmallerOrEqualValue(toId));
+    }
+    return query.go();
+  }
+
+  /// 对话内当前最大消息 id；无消息返回 0（F1 快照语义辅助：重生成开始时捕获，
+  /// 供有界删除上界）。
+  Future<int> maxMessageId(int conversationId) async {
+    final rows = await (_db.select(_db.messages)
           ..where(($MessagesTable t) => t.conversationId.equals(conversationId))
-          ..where(($MessagesTable t) => t.id.isBiggerOrEqualValue(targetId)))
-        .go();
+          ..orderBy([(t) => OrderingTerm.desc(t.id)])
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? 0 : rows.first.id;
   }
 }
