@@ -5,6 +5,7 @@ import '../data/repositories/settings_repository.dart';
 import '../services/secure_store.dart';
 import '../view_models/shell_navigation.dart';
 import '../view_models/theme_controller.dart';
+import 'chat/chat_controller.dart';
 import 'chat/chat_view.dart';
 import 'characters/characters_view.dart';
 import 'search/search_view.dart';
@@ -25,7 +26,9 @@ class HomeShell extends StatelessWidget {
     final navigation = context.watch<ShellNavigation>();
     return Scaffold(
       body: switch (navigation.current) {
-        ShellTab.chat => const ChatView(),
+        ShellTab.chat => ChatView(
+            controller: context.read<ChatController>(),
+          ),
         ShellTab.characters => const CharactersView(),
         ShellTab.search => const SearchView(),
         ShellTab.simulators => const SimulatorsView(),

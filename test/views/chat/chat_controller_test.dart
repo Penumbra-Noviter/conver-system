@@ -1,0 +1,631 @@
+/// ChatController 回合状态机行为契约（T04a 切片）。
+///
+/// 语义锚点：`desktop/frontend/js/stream-session.js`（onToken 累积 +
+/// streamSettled 终态守卫 + 停止/错误分流）+ `chat.js`（发送↔停止两态 /
+/// 重生成仅末条已结算 assistant / 错误非阻塞上抛）。服务层对话由真实
+/// [ChatService] 承载（内存 drift + InMemorySecretStore + Fake/Ticking
+/// provider），控制器只做状态机编排——不 mock 服务内部实现。
+///
+/// 测试 seam（公共接口边界）：[ChatController] 公开 API（loadEntry /
+/// createConversation / openConversation / backToEntry / send / stop /
+/// regenerate / messages / notice）；可观察状态 = 控制器状态 + 落库结果
+/// （经 [MessageRepository.getMessages]）。
+library;
+
+import 'package:conver_system_mobile/data/database/app_database.dart';
+import 'package:conver_system_mobile/data/database/tables.dart';
+import 'package:conver_system_mobile/data/repositories/character_repository.dart';
+import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/message_repository.dart';
+import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
+import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/llm/errors.dart';
+import 'package:conver_system_mobile/services/llm/llm_provider.dart';
+import 'package:conver_system_mobile/services/secure_store.dart' show SecretStore;
+import 'package:conver_system_mobile/views/chat/chat_controller.dart';
+import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../../helpers/fake_llm_provider.dart';
+import '../../helpers/in_memory_secret_store.dart';
+
+/// [SettingsReader] 的内存假实现（与 chat_service_test 同形，不再造第二条规则）。
+class FakeSettingsReader implements SettingsReader {
+  const FakeSettingsReader([this.values = const {}]);
+
+  final Map<String, String> values;
+
+  @override
+  Future<String> get defaultProvider async => values['default_provider'] ?? '';
+
+  @override
+  Future<String> get defaultModel async => values['default_model'] ?? '';
+
+  @override
+  Future<String> get userName async => values['user_name'] ?? '';
+}
+
+/// createConversation 必抛的会话仓储子类——命中「新建对话落库失败」路径。
+class _ThrowingConversationRepository extends ConversationRepository {
+  _ThrowingConversationRepository(super.db, super.settings);
+
+  @override
+  Future<Conversation> createConversation({
+    required int characterId,
+    String? title,
+    String? modelProvider,
+    String? modelName,
+  }) {
+    throw StateError('create failed');
+  }
+}
+
+/// listConversations 必抛的会话仓储子类——命中「入口加载失败」路径。
+class _ThrowingListConversationRepository extends ConversationRepository {
+  _ThrowingListConversationRepository(super.db, super.settings);
+
+  @override
+  Future<List<ConversationWithCount>> listConversations({int? characterId}) {
+    throw StateError('list failed');
+  }
+}
+
+/// 在 [deadline]（5s 墙钟）内轮询 [condition] 直到为真（真实异步等待）。
+///
+/// 用墙钟期限而非迭代计数：负载下的 per-iteration 延迟可能与 token 间距同量
+/// 级，固定迭代会误判超时。返回值前条件必真；超时抛 StateError。
+Future<void> _until(
+  Future<bool> Function() condition, {
+  String why = '',
+}) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (DateTime.now().isBefore(deadline)) {
+    if (await condition()) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 2));
+  }
+  throw StateError('等待条件超时: $why');
+}
+
+void main() {
+  late AppDatabase db;
+  late ConversationRepository convRepo;
+  late MessageRepository messageRepo;
+  late CharacterRepository charRepo;
+  late SettingsRepository settingsRepo;
+  late InMemorySecretStore secretStore;
+  ChatController? controller;
+
+  // 固定起始时刻（drift 落库为 unix 秒）。
+  var fakeNow = DateTime.fromMillisecondsSinceEpoch(1700000000 * 1000);
+
+  setUp(() async {
+    db = AppDatabase(NativeDatabase.memory());
+    convRepo = ConversationRepository(db, const FakeSettingsReader(),
+        now: () => fakeNow);
+    messageRepo = MessageRepository(db, now: () => fakeNow);
+    charRepo = CharacterRepository(db, now: () => fakeNow);
+    secretStore = InMemorySecretStore();
+    settingsRepo = SettingsRepository(database: db, secretStore: secretStore);
+    await settingsRepo.setMany({'claude_api_key': 'sk-default'});
+  });
+
+  tearDown(() async {
+    controller?.dispose();
+    await db.close();
+  });
+
+  /// 装配控制器：驱动真实 ChatService + [provider]。
+  ChatController wireController(LLMProvider provider) {
+    final service = ChatService(
+      database: db,
+      conversationRepository: convRepo,
+      characterRepository: charRepo,
+      messageRepository: messageRepo,
+      settingsRepository: settingsRepo,
+      providerFactory: FixedLLMProviderFactory(provider),
+    );
+    final c = ChatController(
+      chatService: service,
+      conversationRepository: convRepo,
+      characterRepository: charRepo,
+      messageRepository: messageRepo,
+    );
+    controller = c;
+    return c;
+  }
+
+  Future<Character> seedCharacter({
+    String name = '艾莉亚',
+    String firstMes = '',
+  }) {
+    return charRepo.createCharacter(
+      CharactersCompanion.insert(
+        name: name,
+        firstMes: Value(firstMes),
+        createdAt: fakeNow,
+        updatedAt: fakeNow,
+      ),
+    );
+  }
+
+  Future<Conversation> seedConversation(int characterId) {
+    return convRepo.createConversation(characterId: characterId);
+  }
+
+  List<(Role, String)> roleContentsOf(ChatController c) =>
+      [for (final m in c.messages) (m.role, m.content)];
+
+  group('loadEntry · 入口（最近对话 + 新建可用性）', () {
+    test('loadEntry → conversations 填充；有角色可新建', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+
+      await c.loadEntry();
+
+      expect(c.hasLoadedEntry, isTrue);
+      expect(c.conversations.map((e) => e.conversation.id), contains(conv.id));
+      expect(c.canCreateConversation, isTrue);
+      expect(c.createDisabledReason, isNull);
+    });
+
+    test('loadEntry 无角色 → 新建禁用并给提示文案', () async {
+      final c = wireController(FakeLLMProvider(tokens: const []));
+
+      await c.loadEntry();
+
+      expect(c.conversations, isEmpty);
+      expect(c.canCreateConversation, isFalse);
+      expect(c.createDisabledReason, '请先在角色页创建角色');
+    });
+
+    test('createConversation 取首个角色建会话并进入', () async {
+      await seedCharacter(firstMes: '你好，{{user}}。');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversation();
+
+      expect(c.activeConversationId, isNotNull);
+      expect(c.isEntry, isFalse);
+      // 会话创建预插角色开场白（{{user}} 已替换）。
+      expect(roleContentsOf(c), [(Role.assistant, '你好，User。')]);
+    });
+
+    test('createConversation 无角色 → notice 提示，停留在入口', () async {
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversation();
+
+      expect(c.activeConversationId, isNull);
+      expect(c.isEntry, isTrue);
+      expect(c.notice, '请先在角色页创建角色');
+    });
+
+    test('loadEntry 落库失败 → notice，列表空且入口仍标记已加载（可重试）', () async {
+      await seedCharacter();
+      final throwingListRepo =
+          _ThrowingListConversationRepository(db, const FakeSettingsReader());
+      final c = ChatController(
+        chatService: ChatService(
+          database: db,
+          conversationRepository: throwingListRepo,
+          characterRepository: charRepo,
+          messageRepository: messageRepo,
+          settingsRepository: settingsRepo,
+          providerFactory: FixedLLMProviderFactory(FakeLLMProvider(tokens: const [])),
+        ),
+        conversationRepository: throwingListRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+      );
+      controller = c;
+
+      await c.loadEntry();
+
+      expect(c.hasLoadedEntry, isTrue, reason: '失败也算完成入口加载（幂等可重试）');
+      expect(c.conversations, isEmpty);
+      expect(c.canCreateConversation, isFalse);
+      expect(c.notice, startsWith('加载对话失败'));
+    });
+
+    test('createConversation 落库失败 → notice，停留在入口', () async {
+      await seedCharacter();
+      // 覆盖 createConversation → 抛错（仓储子类命中失败路径）。
+      final throwingConvRepo =
+          _ThrowingConversationRepository(db, const FakeSettingsReader());
+      final c = ChatController(
+        chatService: ChatService(
+          database: db,
+          conversationRepository: throwingConvRepo,
+          characterRepository: charRepo,
+          messageRepository: messageRepo,
+          settingsRepository: settingsRepo,
+          providerFactory: FixedLLMProviderFactory(FakeLLMProvider(tokens: const [])),
+        ),
+        conversationRepository: throwingConvRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+      );
+      controller = c;
+      await c.loadEntry();
+      expect(c.canCreateConversation, isTrue);
+
+      await c.createConversation();
+
+      expect(c.isEntry, isTrue);
+      expect(c.notice, isNotNull);
+      expect(c.notice, startsWith('新建对话失败'));
+    });
+  });
+
+  group('openConversation / backToEntry · 导航', () {
+    test('openConversation → 消息加载；backToEntry → 回入口且刷新列表', () async {
+      final char = await seedCharacter(firstMes: '开场。');
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.openConversation(conv.id);
+
+      expect(c.isEntry, isFalse);
+      expect(c.activeConversationId, conv.id);
+      expect(c.activeConversation?.id, conv.id);
+      expect(c.messages, hasLength(1)); // 开场白
+
+      await c.backToEntry();
+
+      expect(c.isEntry, isTrue);
+      expect(c.activeConversationId, isNull);
+      expect(c.messages, isEmpty);
+      // 入口列表刷新后会话仍在。
+      expect(c.conversations.map((e) => e.conversation.id), contains(conv.id));
+    });
+
+    test('openConversation 目标会话不存在 → 空消息（不崩溃）', () async {
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(999999);
+      expect(c.isEntry, isFalse);
+      expect(c.messages, isEmpty);
+      expect(c.activeConversation, isNull);
+    });
+
+    test('流式中打开其他会话 → 先 stop：已累积部分落库并标「已停止」', () async {
+      // 首个会话在流式中；打开第二个会话应中止首会话回合（部分落库）。
+      final provider = TickingFakeLLMProvider(
+        tokens: const ['p0', 'p1', 'p2', 'p3'],
+        delay: const Duration(milliseconds: 50),
+      );
+      final char = await seedCharacter();
+      final convA = await seedConversation(char.id);
+      final convB = await seedConversation(char.id);
+      final c = wireController(provider);
+      await c.openConversation(convA.id);
+
+      await c.send('hi');
+      expect(c.isStreaming, isTrue);
+      // 已累积一个 token（p0）后切到另一会话。
+      await _until(() async => c.streamingText == 'p0', why: '首 token 已累积');
+      await c.openConversation(convB.id);
+
+      expect(c.isStreaming, isFalse);
+      expect(c.activeConversationId, convB.id);
+      // 首会话回合被中止：部分内容落库（DB 权威）。
+      final settledA = await messageRepo.getMessages(convA.id);
+      expect([for (final m in settledA) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, 'p0')]);
+      await c.openConversation(convA.id);
+      expect(c.messages.last.role, Role.assistant);
+      expect(c.messages.last.content, 'p0',
+          reason: '中止的部分内容在重新进入时经 DB 重载恢复');
+      // 「已停止」标记为会话生命周期内集合，openConversation 会清空——切会话
+      // 后不再显示标记，属控制器设计（重新进入场景的停止标记语义不是本锚）。
+    });
+  });
+
+  group('send · 打字机回合（A2 UI 面）', () {
+    test('send → isStreaming 同步置位；streamingText 逐 token 累积', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['你', '好', '！'],
+        delay: const Duration(milliseconds: 10),
+      ));
+      await c.openConversation(conv.id);
+
+      // 经公开 getter 记录 streamingText 的累积序列（打字机逐 token 追加，
+      // 不做瞬态等值断言——终态重载会立即清空占位）。
+      final seen = <String>[];
+      void record() {
+        final t = c.streamingText;
+        if (seen.isEmpty || seen.last != t) {
+          seen.add(t);
+        }
+      }
+
+      c.addListener(record);
+      final sent = c.send('早上好');
+      expect(c.isStreaming, isTrue,
+          reason: 'send 同步置位 isStreaming（发送↔停止两态切换）');
+
+      await _until(() async {
+        return !c.isStreaming &&
+            c.messages.isNotEmpty &&
+            c.messages.last.role == Role.assistant &&
+            c.messages.last.content == '你好！';
+      }, why: '回合完成且落库完整回复');
+      c.removeListener(record);
+
+      expect(seen, containsAll(['你', '你好', '你好！']),
+          reason: '打字机累积序列须逐 token 增长');
+      expect(c.isStreaming, isFalse);
+
+      await sent;
+    });
+
+    test('send 完成 → isStreaming 复位；落库完整 assistant 替换占位', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const ['完整', '回复']));
+      await c.openConversation(conv.id);
+
+      await c.send('出发');
+      await _until(() async {
+        final msgs = c.messages;
+        return !c.isStreaming &&
+            msgs.isNotEmpty &&
+            msgs.last.role == Role.assistant &&
+            msgs.last.content == '完整回复';
+      });
+
+      expect(c.isStreaming, isFalse);
+      final settled = await messageRepo.getMessages(conv.id);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, '出发'), (Role.assistant, '完整回复')]);
+    });
+
+    test('send 空文本 / 流式中重复发送 → 忽略（不重复发起）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final provider = TickingFakeLLMProvider(
+        tokens: const ['a', 'b'],
+        delay: const Duration(milliseconds: 20),
+      );
+      final c = wireController(provider);
+      await c.openConversation(conv.id);
+
+      await c.send('   ');
+      expect(c.isStreaming, isFalse, reason: '空文本不发起回合');
+
+      await c.send('第一条');
+      expect(c.isStreaming, isTrue);
+      await _until(() async => provider.streamGenerateCallCount == 1,
+          why: '服务层已订阅 provider 流');
+      await c.send('第二条'); // 流式中重复发送被忽略
+      await _until(() async => !c.isStreaming, why: '回合完成');
+      expect(provider.streamGenerateCallCount, 1,
+          reason: '重复发送被 isStreaming 守卫拦截，不二次发起');
+    });
+
+    test('未配置 Key → notice 映射文案；仅保留已发 user', () async {
+      await secretStore.delete(SecretStore.claudeApiKeySlot);
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const ['x']));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      await _until(() async {
+        return !c.isStreaming && roleContentsOf(c).length == 1;
+      });
+
+      expect(c.notice, '未配置 claude API Key，请在设置中填写');
+      expect(roleContentsOf(c), [(Role.user, 'hi')]);
+      final settled = await messageRepo.getMessages(conv.id);
+      expect([for (final m in settled) m.role], [Role.user]);
+    });
+
+    test('LLM 业务错误（中途 Auth）→ notice 映射文案，不落部分内容（F-45）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['a', 'b'],
+        errorAfter: LLMAuthError('claude'),
+        delay: const Duration(milliseconds: 5),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      await _until(() async {
+        return !c.isStreaming && roleContentsOf(c).length == 1;
+      });
+
+      expect(c.notice, 'claude API Key 无效，请在设置中更新');
+      // F-45：业务错误不落部分内容。
+      final settled = await messageRepo.getMessages(conv.id);
+      expect([for (final m in settled) m.role], [Role.user]);
+    });
+  });
+
+  group('stop · 停止（A3 UI 面）', () {
+    test('stop → 已累积部分落库且标「已停止」', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      // 100ms token 间距：观测「至少两个 token」后停止，下个 token 前有充足
+      // 警戒线（负载环境下 stop() 的取消+重载在毫秒级完成，远快于 100ms）。
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['t0', 't1', 't2', 't3', 't4'],
+        delay: const Duration(milliseconds: 100),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      await _until(() async => c.streamingText == 't0t1',
+          why: '已累积两个 token（t0t1）');
+      expect(c.streamingText, 't0t1');
+      await c.stop();
+
+      expect(c.isStreaming, isFalse);
+      expect(c.notice, isNull, reason: '主动停止不是错误，无提示');
+      final last = c.messages.last;
+      expect(last.role, Role.assistant);
+      expect(last.content, 't0t1');
+      expect(last.stopped, isTrue, reason: 'DB 存纯文本部分内容，UI 侧标「已停止」');
+      final settled = await messageRepo.getMessages(conv.id);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, 't0t1')]);
+    });
+
+    test('stop 无部分内容 → 仅保留已发 user，无「已停止」标记', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['a'],
+        delay: const Duration(milliseconds: 100),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      // 首 token 100ms 后才到：此刻只落库了 user。
+      await _until(() async {
+        final settled = await messageRepo.getMessages(conv.id);
+        return settled.any((m) => m.role == Role.user);
+      });
+      await c.stop();
+
+      expect(c.messages, hasLength(1));
+      expect(c.messages.single.role, Role.user);
+      expect(c.messages.single.stopped, isFalse);
+      final settled = await messageRepo.getMessages(conv.id);
+      expect([for (final m in settled) m.role], [Role.user]);
+    });
+  });
+
+  group('interrupted · 断流（A5 UI 面）', () {
+    test('断流 → 非阻塞 notice「回复已中断」+ 部分落库', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['a', 'b'],
+        errorAfter: LLMConnectionInterruptedError(),
+        delay: const Duration(milliseconds: 5),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      await _until(() async => c.notice == '回复已中断');
+
+      expect(c.isStreaming, isFalse);
+      // 断流已累积部分落库（重新进入可恢复）。
+      final settled = await messageRepo.getMessages(conv.id);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, 'ab')]);
+    });
+
+    test('notice 可 dismiss（非阻塞：不挡后续操作）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['a'],
+        errorAfter: LLMConnectionInterruptedError(),
+        delay: const Duration(milliseconds: 3),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      await _until(() async => c.notice == '回复已中断');
+      c.dismissNotice();
+      expect(c.notice, isNull);
+      // 断流后仍可继续发送（非阻塞语义）。
+      c.dismissNotice();
+    });
+  });
+
+  group('regenerate · 重生成（A4 UI 面）', () {
+    Future<int> seedConversationWithReply({String reply = '旧回复'}) async {
+      final char = await seedCharacter(firstMes: '开场。');
+      final conv = await seedConversation(char.id);
+      await messageRepo.createMessage(
+          conversationId: conv.id, role: Role.user, content: '你好');
+      await messageRepo.createMessage(
+          conversationId: conv.id, role: Role.assistant, content: reply);
+      return conv.id;
+    }
+
+    test('regenerate 成功 → 旧回复原位替换，user/开场白保留', () async {
+      final convId = await seedConversationWithReply();
+      final c = wireController(FakeLLMProvider(tokens: const ['新回复']));
+      await c.openConversation(convId);
+
+      await c.regenerate();
+
+      expect(c.messages
+              .where((m) => m.role == Role.assistant && m.content == '新回复'),
+          hasLength(1));
+      expect(roleContentsOf(c),
+          containsAll([
+            (Role.assistant, '开场。'),
+            (Role.user, '你好'),
+            (Role.assistant, '新回复'),
+          ]));
+      expect(c.messages.last.content, '新回复');
+    });
+
+    test('regenerate 领域错误（对话不存在）→ notice 映射文案，旧回复保留语义无复发', () async {
+      final convId = await seedConversationWithReply();
+      final c = wireController(FakeLLMProvider(tokens: const ['新回复']));
+      await c.openConversation(convId);
+
+      // 服务层触发 ConversationNotFoundError：会话删除后重生成（网络层鉴权不
+      // 触达 — messageId 解析前即抛）。
+      await convRepo.deleteConversation(convId);
+      await c.regenerate();
+
+      expect(c.notice, '对话不存在');
+      expect(c.isRegenerating, isFalse, reason: '失败后防并发标志复位');
+    });
+
+    test('regenerate 失败 → notice 映射文案，旧回复保留', () async {
+      final convId = await seedConversationWithReply();
+      final c = wireController(FakeLLMProvider(
+        tokens: const [],
+        error: LLMAuthError('claude'),
+      ));
+      await c.openConversation(convId);
+
+      await c.regenerate();
+
+      expect(c.notice, 'API Key 无效，请在设置中更新');
+      expect(c.messages.last.role, Role.assistant);
+      expect(c.messages.last.content, '旧回复',
+          reason: '重生成失败旧回复保留（服务层延迟删除保证）');
+    });
+
+    test('流式中 regenerate → 忽略（isRegenerating / isStreaming 双守卫）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['a', 'b'],
+        delay: const Duration(milliseconds: 20),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      expect(c.isStreaming, isTrue);
+      await c.regenerate(); // 流式期间忽略
+      expect(c.isStreaming, isTrue, reason: '忽略后回合继续，不被打断');
+
+      await _until(() async => !c.isStreaming);
+      final settled = await messageRepo.getMessages(conv.id);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, 'ab')]);
+    });
+  });
+}
