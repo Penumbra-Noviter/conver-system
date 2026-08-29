@@ -6,6 +6,19 @@
 
 ---
 
+## 技术债消费批次 F-10~F-17（2026-08-30 — project-kickoff 全自动档交付：技术债八候选消费）
+
+- **交付**：Grilling 共识 8 候选 **7 做 1 关闭**（F-15 关闭：桌面 ChatResponse 契约镜像 + F-6 先例 + 测试锁定，零真拍点）。6 工单 2 波 DAG：波1 T2‖T4‖T5（T2 `7d86628` ConverPalette of/maybeOf + 41 处迁移 / T4 `c040c06` 翻译栈共享 / T5 `353a857` CharacterNotFoundError 404 归类）merge `14bf479`；波2 T1‖T3‖T6（T1 `57c3db8` 保存事务化 / T3 `fe98671` 主题异步面 catchError+重入守卫 / T6 `e4ece9c` cancel 加界）merge `b9dc9bc`。证据 `.scratch/techdebt-f10-f17/evidence/`（T1~T6 + smoke-gate + 5 张冒烟 PNG）。
+- **门禁链**：全量 497 测全绿 + analyze 0；覆盖率手写口径（剔除 drift 生成物 3 文件）**97.96%** ≥ 90%；波1/波2 增量审核 Falsify 16 项构造验证**全非阻断** + 文件范围 6 票全合规；**期末四轴零阻断**（Spec 6 工单验收语义全满足、token 契约/文案锚/errors.dart 零 dio 契约三约束保持、安全红线 0、架构无阻断）；运行态冒烟 PASS（设置页渲染 / 主题深 `#171512`↔浅 `#F0ECE5` 像素精确 / logcat 零异常）。
+- **过程遥测**：票 6、波 2（并行 3+3）、merge 6；子智能体 13 个（Grilling/plan-tickets/Implement×6 含重开×2/code-review×3/主会话接续×1）；**空返回重开 2**（T5/T6 首派均零产出：T5 空 worktree、T6 半成品测试 +93 接续），重开后均 DONE（半成品接续优于重写复证）；回退/冲突 0；审核 findings：波1 增量 8 非阻断、波2 增量 8 非阻断、期末 5 非阻断（命名通用 ×2 / Data Clumps / snapshot+written 成对 / T6 测试上界 6s 慢 CI flaky 观察）。**技术债净增**：清零 8 → 净增 0（候选区清零，非阻断判断均不入债）。
+- **避坑（勿重蹈）**：
+  1. **子代理「声称无任务」型假完成**：T5/T6 首派均返回与任务无关内容（浏览器话题/「我没有任务」）且磁盘零产出——完成通知不可信，**必须以磁盘事实核验**（worktree commit + evidence 文件），核验零产出即重开复用 worktree（本轮两票重开后均 DONE）。重开 prompt 必附「前次现场核查指令」。
+  2. **check-complete.py 的 STATUS token 格式**：脚本认 `STATUS: <状态>`（票号须放行尾注释 `# T`），且**未派发工单不放 STATUS 行**——首写把票号塞进 token 值导致「未找到 token」，修正后通过。
+  3. **模拟器截图像素采样**：screencap PNG 为 colortype=6（RGBA）且每行带 filter 字节，裸解析得到全零；须用 PIL `Image.convert('RGB')` + getpixel（同 M1 教训：像素采样是确定性证据，命名/假设不是）。
+  4. **plan-tickets 首派「未收到输入」**：子代理持有 prompt 但声称无输入——重开时把共识全文内联进 prompt（不依赖它读文件），二次调用即产出完整工单。
+  5. **期末全局覆盖率口径**：`flutter test --coverage` 全量产 lcov，drift 生成物 `app_database.g.dart`（468 行 29.9%）拉低全局到 66.31%——按 M2 同口径剔除 3 个生成文件后 97.96% 达标（生成物不经测试覆盖是预期，此前批次已固化此口径）。
+- **知识库蒸馏**：候选教训 2 条（子代理「假完成」必须磁盘核验 / 模拟器像素采样用 PIL 解码 filter）——完成段经 distill-lesson 处理。
+
 ## M2 kickoff 批次（2026-08-29 — project-kickoff 全自动档交付：聊天核心）
 
 - **交付**：7 票 5 波 DAG（T00 工程门 e623268 / T01a Prompt 组装 bfc701d / T01b SSE+LLM 抽象 4f87f3d / T02 双协议 wire 2cc1c5b / T03 ChatService 342ddad / T04 聊天 UI 4b143d2 / T05 test_connection 0f88df7）+ 波3修复（a1bc0cc）/波4修复（a251df3）/期末收尾（0f9c33f），merge 链至 `59e766a`。证据 `.scratch/m2-kickoff/evidence/`（T00~T06 + 09-smoke-gate-a7 + 冒烟 PNG）。**A1~A8 门**：477 测全绿 / analyze 0 / 覆盖率手写口径 95.42%；**A7 冒烟 PASS（窄路径）**——模拟器端到端实证：入口 UI/autoGreeting/发送链/「未配置 claude API Key」逐字错误/测试连接 SnackBar（logcat+像素）；真实打字机流式留待用户 Key（付费账户未擅自调用）。

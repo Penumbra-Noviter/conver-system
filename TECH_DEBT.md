@@ -39,20 +39,28 @@
 
 ## 候选区
 
-> 当前 8 项待立项：F-10（设置保存顺序写部分持久化）/ F-11（ConverPalette 注册耦合）/ F-12（load 缺 catchError）/ F-13（主题连点竞态）/ F-14（双 provider 翻译栈重复）/ F-15（RegenerateResult 零消费者）/ F-16（角色缺失文案泛化）/ F-17（停止 cancel 无上界）——全部非阻断（Worth exploring/Speculative），M2 批次后候选区净增 4。历史消费（2026-08-29 技术债批次 F-7/F-8/F-9 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
+> 当前 0 项待立项（F-10~F-17 已 2026-08-30 全部消费移出，见下方处置记录；候选区清零）。历史消费（2026-08-29 技术债批次 F-7/F-8/F-9 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-10 | **设置保存顺序写部分持久化**：`api_config_section._save` 逐 provider 依次写/删 Key → `setMany` base_url，非事务——后半段失败时显示「保存失败，请重试」，但前半段 Key 已落库（跨 provider 同理）。重试幂等无损坏，但失败文案与真实持久化状态不一致，用户对落库状态产生认知偏差（F-8 失败 UI 使其首次显性化） | 波末增量审核 N1 + 期末四轴 Falsify 复证 | Worth exploring | 📝 待立项 | 设置页/前端 |
-| F-11 | **ConverPalette 未注册 fail-fast 不透明 + 测试面耦合涟漪**：5 视图 25 处 `extension<ConverPalette>()!`，任何不经 ConverTheme 的 MaterialApp 下 build 期 null 崩溃（错误信息泛化「null check operator used on a null value」）；`settings_sections_widget_test` pumpSection 被迫注册 ConverTheme.dark——每个未来渲染 section 的测试/调用方都必须知晓注册扩展 | 波末增量审核 N2 + 期末四轴 Falsify 复证（A） | Worth exploring | 📝 待立项 | 前端主题 |
-| F-12 | **`_themeController.load()` 无 catchError（既有债）**：settings_view initState 中 `.timeout(...)` 无 catch——DB 读失败抛错 → 未处理 async 异常（debug 打屏 / release 静默）；F-8「不静默吞错」精神未达此处 | 期末四轴 Falsify（C，批次范围外既有） | Worth exploring | 📝 待立项 | 设置页/前端 |
-| F-13 | **主题快速连点竞态**：`onSelectionChanged` 改 async 后，连点浅/深色产生并发 `setThemeMode`；`mode != themeMode` 守卫在 in-flight 时 `_themeMode` 未提交，吞掉第二次反向 tap（用户已点深色实际停在浅色）。轻微 UX 竞态，非崩溃 | 期末四轴 Falsify（B） | Speculative | 📝 待立项 | 设置页/前端 |
-| F-14 | **双 provider 翻译栈重复（Divergent Change 风险）**：`claude_provider.dart` 与 `openai_provider.dart` 的 `translateError`/`_translateDio`/`_translateStatus`/`_responseText`/`_errorMessageFromMap`/`_decodeJson` 约 120 行逐字重复（仅端点/请求体不同）——未来改 401 语义/超时类别须改两处 | M2 期末四轴（Architecture） | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-15 | **RegenerateResult 零消费者（Speculative Generality）**：`chat_service.dart` `regenerate` 返回富结果对象（reply/messageId/conversationId），但 `chat_controller` 直接丢弃、lib 全库无人读取——接口表面 > 行为收益 | M2 期末四轴（Standards/Architecture） | Speculative | 📝 待立项 | 聊天链路 |
-| F-16 | **角色缺失文案泛化**：`chat_service.dart` 角色不存在抛 `StateError('角色不存在: ...')` → 兜底「生成回复失败: StateError...」；桌面 `exceptions.py` 有 `CharacterNotFoundError` → 404 领域语义，移动端未迁移 | M2 期末四轴（Spec） | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-17 | **停止 cancel 无上界**：`_stopStreamReply` `await state.providerSub?.cancel()` 在真实网络停滞（socket read 无数据）时等待下一块数据/EOF，「点停止立即中止」即时性不成立（非崩溃，UI 已同步复位）；测试恒定 chunk 间隔掩盖此面 | M2 波4增量审核 concern 复验 | Worth exploring | 📝 待立项 | 聊天链路 |
+| （空） | | | | | |
 
 ## 技术债处置记录
+
+### 2026-08-30 — techdebt-f10-f17 批次收口：F-10~F-17 全部处置（7 做 + 1 关闭）
+
+> 来源：project-kickoff 全自动档技术债消费批次（Grilling 共识 8 候选 7 做 1 关闭、零真拍点；6 工单 2 波 DAG 全零阻断）。交付见 [DEV_LOG.md](DEV_LOG.md)〈技术债消费批次 F-10~F-17〉，证据 `.scratch/techdebt-f10-f17/evidence/`，merge b9dc9bc（基线 5334075）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-10 | ✅ 已修 | T1 `_save` 事务化：写前快照四键（两 Key 槽位 + 两 base_url）→ 逐 provider 写/删 → 任一失败即止 + 回滚已写项（旧非空 write 旧值 / 旧空 delete 或写回空串），回滚失败仅 debugPrint；`_saving` finally 复位；文案逐字不变；重试幂等（+6 新测试 442 行，回滚核心用例 red→green） |
+| F-11 | ✅ 已修 | T2 `ConverPalette.of/maybeOf` + 未注册描述性 FlutterError（消息含「未注册」+ ConverTheme/MaterialApp 装配指引）；41 处（7 文件）`extension<ConverPalette>()!` 机械迁移；token 名/值/深浅零改动（theme_tokens + view_theme_tokens 只读全绿）；grep 零残留 |
+| F-12 | ✅ 已修 | T3 `_themeController.load().timeout(3s)` 补 `.catchError` → debugPrint，DB 读失败保持缺省 dark、无 zone 未处理异常；`theme_controller.dart` 零改动 |
+| F-13 | ✅ 已修 | T3 ThemeSection Stateless→Stateful 持 `_switching` 重入守卫（首行 return + in-flight 禁用 SegmentedButton 双保险），反向连点不再被陈旧守卫吞掉；守卫复位可再切 |
+| F-14 | ✅ 已修 | T4 新增 `translate_helpers.dart`（DioException 分类/408/504 特判/文本提取/JSON 解析/HttpStatusError 单实例 6 成员），双 provider 删除 ~120 行私有重复改调共享；claude 独有 `_StreamApiError`/`_errorEventMessage` 保留原位；errors.dart 零 dio 契约保持 |
+| F-15 | ❌ 复核关闭 | git grep 复核 lib 生产零消费成立，但为桌面 ChatResponse 契约对齐 + F-6 先例（零消费者系设计意图）+ 4 组测试锁定（chat_service_test 断言 reply/messageId/conversationId），删除拉大双端契约距离——保留不立项 |
+| F-16 | ✅ 已修 | T5 新增 `CharacterNotFoundError extends DomainError`（消息「角色不存在: <id>」），streamReply/regenerate 两抛点 StateError→替换，`domainErrorResponse` 404 一族归类（对齐桌面 error_mapping.py）；断言更新 + 404 用例 |
+| F-17 | ✅ 已修 | T6 `_stopStreamReply` cancel 包 `.timeout(3s)` + onTimeout 兜底（不抛错、继续回合收尾：部分落库 + 关流）；`_StalledProvider` 停滞流用例锁有界完成 |
 
 ### 2026-08-29 — techdebt-f7-f9 批次收口：F-7/F-8/F-9 全部消费
 
