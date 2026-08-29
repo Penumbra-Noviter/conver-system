@@ -47,6 +47,11 @@ dependencies:
   # 键名与桌面白名单逐字同。真通道行为归 G6 模拟器冒烟)
   flutter_secure_storage: ^11.0.0
 
+  # M2 聊天核心 T00：HTTP 客户端 + Markdown 渲染（flutter_markdown_plus 为
+  # discontinued 的 flutter_markdown 后继，依赖 markdown ^7.3.1）
+  dio: ^5.11.0
+  flutter_markdown_plus: ^1.0.12
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- M2 T00：release 安装后联网所需（debug/profile 既有权限不动）；
+         cleartext / ATS 豁免 M2 不开，LAN http 归 M5 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="汇流"
         android:name="${applicationName}"
