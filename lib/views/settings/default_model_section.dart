@@ -113,6 +113,13 @@ class _DefaultModelSectionState extends State<DefaultModelSection> {
           const SnackBar(content: Text('默认模型已保存')),
         );
       }
+    } catch (error) {
+      debugPrint('默认模型保存失败: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('保存失败，请重试')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

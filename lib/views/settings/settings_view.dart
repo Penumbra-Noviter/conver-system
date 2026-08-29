@@ -54,7 +54,7 @@ class _SettingsViewState extends State<SettingsView> {
     // 存储通道不可用（平台通道缺失挂起/读取失败）→ 超时兜底保持缺省 dark
     _themeController.load().timeout(
       const Duration(seconds: 3),
-      onTimeout: () {},
+      onTimeout: () => debugPrint('主题偏好加载超时，保持缺省 dark'),
     );
     _echoFuture = _loadEcho().timeout(
       const Duration(seconds: 3),
@@ -82,7 +82,8 @@ class _SettingsViewState extends State<SettingsView> {
         await _settings.defaultProvider,
         await _settings.defaultModel,
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('设置页回显加载失败，返回空回显: $error');
       return (const <String, String>{}, '', '');
     }
   }

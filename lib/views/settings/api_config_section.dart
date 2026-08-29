@@ -101,6 +101,13 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
           const SnackBar(content: Text('API 配置已保存')),
         );
       }
+    } catch (error) {
+      debugPrint('API 配置保存失败: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('保存失败，请重试')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

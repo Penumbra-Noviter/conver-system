@@ -52,10 +52,19 @@ class ThemeSection extends StatelessWidget {
                 ),
               ],
               selected: {themeController.themeMode},
-              onSelectionChanged: (selection) {
+              onSelectionChanged: (selection) async {
                 final mode = selection.first;
                 if (mode != themeController.themeMode) {
-                  themeController.setThemeMode(mode);
+                  try {
+                    await themeController.setThemeMode(mode);
+                  } catch (error) {
+                    debugPrint('主题切换失败: $error');
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('主题切换失败')),
+                      );
+                    }
+                  }
                 }
               },
             );
