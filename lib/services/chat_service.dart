@@ -457,7 +457,8 @@ class ChatService {
   }
 
   /// 停止（A3）：调用方取消订阅时触发。直接取消 provider 订阅（不等待待处理
-  /// 元素），已累积部分落库（无部分 → 仅保留已发 user），关闭事件流。
+  /// 元素，cancel 包 `.timeout` 有界完成——F-17 停滞流兜底），已累积部分落库
+  /// （无部分 → 仅保留已发 user），关闭事件流。
   Future<void> _stopStreamReply(
     _StreamRunState state,
     StreamController<ChatEvent> controller,
@@ -466,7 +467,17 @@ class ChatService {
       return; // 幂等。
     }
     state.stopped = true;
-    await state.providerSub?.cancel();
+    // F-17：providerSub.cancel() 在真实网络 / 停滞 provider 流上无上界挂起
+    // （cancel 等下一块/EOF——Flutter 挂起非抛错）→ 包 `.timeout` 上界，
+    // onTimeout 兜底**不抛错**、返回后继续回合收尾（已累积部分落库 + 关闭
+    // 事件流）。不得以 try/catch 预期异常——挂起不抛错，timeout 兜底是双层
+    // 防御的语义关键（onTimeout 返回值作为 await 结果继续执行）。
+    await state.providerSub?.cancel().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            debugPrint('停止 cancel 停滞，继续回合收尾');
+          },
+        );
     // 已累积部分落库（DB 存纯文本部分内容，不写「已停止」标记）。
     try {
       await _persistAssistant(state);
