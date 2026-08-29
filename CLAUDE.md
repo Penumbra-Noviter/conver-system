@@ -6,7 +6,7 @@ Conver System 的**移动端独立应用**（Flutter，Android + iOS 一套 Dart
 
 ## 技术栈
 
-Flutter + Dart（详见 [CONSENSUS.md](CONSENSUS.md) 与设计文档 [docs/mobile-design.md](docs/mobile-design.md) §0/§2.2）：`drift`（SQLite ORM）、`dio`（REST，用户拍板）、`flutter_secure_storage`（Key）、`webview_flutter`（模拟器）、`provider`（状态管理）、`flutter_markdown` / `file_picker` / `share_plus` / `path_provider`。
+Flutter + Dart（详见 [CONSENSUS.md](CONSENSUS.md) 与设计文档 [docs/mobile-design.md](docs/mobile-design.md) §0/§2.2）：`drift`（SQLite ORM）、`provider`（状态管理）、`flutter_secure_storage`（Key，已落地）。`dio`（REST）/ `webview_flutter`（模拟器）/ `flutter_markdown` / `file_picker` / `share_plus` / `path_provider` 为**已拍板未落地**依赖（M2/M5 引入对应里程碑时入 pubspec，现役勿当已装）。
 
 ## 目录与约定
 
