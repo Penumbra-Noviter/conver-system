@@ -6,6 +6,17 @@
 
 ---
 
+## 技术债消费批次 F-7/F-8/F-9（2026-08-29 — project-kickoff 全自动档交付：技术债三候选消费）
+
+- **交付**：3 工单单串行链（01 F-9 eb51b99 / 02 F-8 a7064fb / 03 F-7 ea1b724），merge 68e8d19（基线 78b8a94）。**F-7** ConverPalette ThemeExtension（ink1-4/border 5 枚，dark/light 注册 ConverTheme）+ 5 视图 25 处消费改经 `extension<ConverPalette>()!`（M1 同构契约零改动）；**F-8** 设置页三处失败路径统一失败 SnackBar + debugPrint、theme onSelectionChanged async await、settings_view 去静默吞错；**F-9** 视图层装配 required 化（删 AppDatabase.open/FlutterSecretStore 缺省分支 + app_database import），home_shell 单一装配链。
+- **门禁链**：全量 171 测全绿 + analyze 0；覆盖率手写口径（剔除 drift 生成物）90.63% ≥ 90%；波末增量审核（Falsify 阻断 0、文件范围合规）；**期末四轴零阻断**（Spec 24/24 验收全过、Standards 0 硬违规安全红线 0、Architecture 无阻断、Falsify 6 非阻断）；运行态冒烟 PASS（模拟器浅色 #F0ECE5 / 深色 #171512 像素精确，主题双向切换成立，F-7 浅色主文字可读 vision 实证）。
+- **过程遥测**：票 3、波 1（串行链）、并行 1（单 lane）；空返回 0、回退/冲突 0；子智能体 5 个（Grilling/plan-tickets/Implement/code-review×2）；波末审核 findings 非阻断 2（N1/N2）、期末 findings 非阻断 11（Falsify 6 + Standards/Arch 判断 5）。**技术债净增提示**：清零 3（F-7/8/9）→ 净增 4（F-10~F-13），净增 > 清零——审核产出仍大于修复容量，下一轮预检可继续消费。
+- **避坑（勿重蹈）**：
+  1. **截图主题状态先采样确认再下结论**：冒烟首张「深色基准」截图实际是浅色（应用持久化主题为浅色，前会话收尾态）——像素采样（背景 == token 精确值）是主题状态的确定性证据，vision 描述与命名假设都不可作为基线（来源：本批冒烟 4.5，教训已入冒烟证据 08-smoke-gate.md）。
+  2. Flutter widget 测试碰 ThemeExtension：消费 `extension<ConverPalette>()!` 的组件在未注册扩展的测试环境 null 崩溃（fail-fast 契约）——测试泵 section 必须用 ConverTheme.dark() 包裹（F-7 涟漪，已申报记录警告档）。
+  3. F-8 的 async 错误面改动暴露既有顺序写非事务性（N1）——失败 UI 把「部分持久化」首次显性化，落债 F-10；改错误面需顺带审视持久化原子性。
+- **知识库蒸馏**：候选教训 1 条（运行态验证先确认基线状态：像素采样 vs 命名假设）——完成段经 distill-lesson 处理。
+
 ## M1 kickoff 批次（2026-08-29 — project-kickoff 全自动档交付：数据层 + 设置）
 
 - **交付**：8 工单 5 波（01 SecureStore c575d58 / 02 模型清单 3266593 / 03 角色对话仓储 038d7f0 / 04 设置仓储 9ec7346 / 05 消息仓储 a7b1b73 / 06 设置页 de9e5de / 07 浅色主题+装配 54df54a+b9ad059+b39b283 / 08 收口 6b4bfd1），merge 链 955d002→783d15a→4e8db1b→794a847→a1d4265。**G1–G5 门全绿**（analyze 0 / 154 测试 / 仓储契约逐锚点 / 主题同构+行为断言 / 清单 60 模型锁 / 设置十键+解析链）+ **G6 冒烟全项过**（Key 真通道往返 27 字符精确回显 / 三值主题即时生效[深浅视觉反转+深色恢复逐字节归位] / 五 tab 零崩溃）。用户真拍两项：主题三值首启深 / 设置页三组真实化。

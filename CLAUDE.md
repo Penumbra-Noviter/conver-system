@@ -41,7 +41,8 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - ✅ 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35+36+37/AEHD/AVD medium_phone + Flutter 3.47.2；MCP 插件 preflight 全绿）
 - ✅ **M0 已交付**（2026-08-29）：脚手架 + drift 4 表 + 深色主题 token + 5 tab 壳（应用名「汇流」），G0 模拟器空壳验收全项通过
 - ✅ **M1 已交付**（2026-08-29）：4 仓储 CRUD 全语义 + SecureStorage 双槽位 + 模型清单单源 + 主题三值切换（auto/浅/深），G1–G5 门 + G6 模拟器冒烟全项通过；merge 收口 a1d4265
-- ⬜ 下一站 M2（聊天核心：ChatService + SSE 流式）：见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选 F-7~F-9 见 [TECH_DEBT.md](TECH_DEBT.md)
+- ✅ **技术债批次 F-7/F-8/F-9 已交付**（2026-08-29）：视图 token 主题化（ConverPalette ThemeExtension）+ 设置页错误面 + 装配 required 化，全量 171 测 / 覆盖率手写口径 90.63% / 四轴零阻断 / 冒烟 PASS；merge 68e8d19
+- ⬜ 下一站 M2（聊天核心：ChatService + SSE 流式）：见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选 F-10~F-13 见 [TECH_DEBT.md](TECH_DEBT.md)
 
 ## 文档体系
 

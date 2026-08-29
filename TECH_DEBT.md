@@ -39,15 +39,26 @@
 
 ## 候选区
 
-> 当前 3 项待立项：F-7（视图层 token 主题化，M6 消费）/ F-8（设置页存储错误面，建议 M2 错误面统一消费）/ F-9（双构造点，装配弱候选）。2026-08-28 M1-T08 收口：F-3 ✅ 已按方案 a 处置（保持 drift INTEGER unix 秒，双端互迁/ISO 口径契约归 M4 导出 JSON 层；见处置记录）。历史消费（2026-08-29 M0 交付后，处置详情由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）。
+> 当前 4 项待立项：F-10（设置保存顺序写部分持久化，Worth exploring）/ F-11（ConverPalette 注册耦合+fail-fast 不透明，Worth exploring）/ F-12（`_themeController.load()` 缺 catchError 既有债，Worth exploring）/ F-13（主题快速连点竞态，Speculative）。历史消费（2026-08-29 技术债批次 F-7/F-8/F-9 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-7 | **视图层硬编码深色 token**：各 view 直接引 `ConverColors.ink*`（深色值）——浅色主题下占位组标题等文字对比度不足（G6 冒烟 vision 实证"几乎融为一体"）；需视图层 token 主题化（引 Theme 派生色或按亮度分支）。深色模式（默认）无影响；M6 视觉打磨消费 | M1 G6 冒烟（工单 07 顾虑 #1 预警） | Worth exploring | 📝 待立项 | 前端主题 |
-| F-8 | **设置页存储异常面**：`api_config_section._save` / `default_model_section._save` try/finally 无 catch（写失败无用户反馈、异常上抛）、`theme_section` setThemeMode 未 await、`settings_view._loadEcho` `catch (_) {}` 静默吞错与 CLAUDE「禁止静默吞异常」约定不一致——建议 M2 错误面统一消费（统一失败反馈 + 日志） | M1 期末四轴审核（Falsify 轴失败路径构造） | Worth exploring | 📝 待立项 | 设置页/前端 |
-| F-9 | **双构造点**：`SettingsView` 缺省构造 `AppDatabase.open()`（settings_view.dart import app_database）与 app.dart provider 图并行——工单 06 过渡遗留，07 注入后 App 内不可达但保留第二装配点；`api_config_section` 缺省构造 FlutterSecretStore 同性质（运行时同源，功能单例） | M1 期末四轴审核（Architecture 轴） | Worth exploring（弱） | 📝 待立项 | 装配 |
+| F-10 | **设置保存顺序写部分持久化**：`api_config_section._save` 逐 provider 依次写/删 Key → `setMany` base_url，非事务——后半段失败时显示「保存失败，请重试」，但前半段 Key 已落库（跨 provider 同理）。重试幂等无损坏，但失败文案与真实持久化状态不一致，用户对落库状态产生认知偏差（F-8 失败 UI 使其首次显性化） | 波末增量审核 N1 + 期末四轴 Falsify 复证 | Worth exploring | 📝 待立项 | 设置页/前端 |
+| F-11 | **ConverPalette 未注册 fail-fast 不透明 + 测试面耦合涟漪**：5 视图 25 处 `extension<ConverPalette>()!`，任何不经 ConverTheme 的 MaterialApp 下 build 期 null 崩溃（错误信息泛化「null check operator used on a null value」）；`settings_sections_widget_test` pumpSection 被迫注册 ConverTheme.dark——每个未来渲染 section 的测试/调用方都必须知晓注册扩展 | 波末增量审核 N2 + 期末四轴 Falsify 复证（A） | Worth exploring | 📝 待立项 | 前端主题 |
+| F-12 | **`_themeController.load()` 无 catchError（既有债）**：settings_view initState 中 `.timeout(...)` 无 catch——DB 读失败抛错 → 未处理 async 异常（debug 打屏 / release 静默）；F-8「不静默吞错」精神未达此处 | 期末四轴 Falsify（C，批次范围外既有） | Worth exploring | 📝 待立项 | 设置页/前端 |
+| F-13 | **主题快速连点竞态**：`onSelectionChanged` 改 async 后，连点浅/深色产生并发 `setThemeMode`；`mode != themeMode` 守卫在 in-flight 时 `_themeMode` 未提交，吞掉第二次反向 tap（用户已点深色实际停在浅色）。轻微 UX 竞态，非崩溃 | 期末四轴 Falsify（B） | Speculative | 📝 待立项 | 设置页/前端 |
 
 ## 技术债处置记录
+
+### 2026-08-29 — techdebt-f7-f9 批次收口：F-7/F-8/F-9 全部消费
+
+> 来源：project-kickoff 全自动档技术债消费批次（Grilling 共识三候选全做、零真拍点；3 工单单串行链）。交付见 [DEV_LOG.md](DEV_LOG.md)〈技术债消费批次 F-7/F-8/F-9〉，证据 `.scratch/techdebt-f7-f9/evidence/`，commit 68e8d19（基线 78b8a94）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-7 | ✅ 已修 | 新增 `ConverPalette` ThemeExtension（ink1-ink4/border 5 枚，dark/light 注册于 ConverTheme）替代视图层硬编码深色 token；5 视图 25 处消费改经 `extension<ConverPalette>()!`；M1 同构契约（token 值/名/名集）零改动；浅色/深色 widget 断言 + 静态不变量测试锁定 |
+| F-8 | ✅ 已修 | api_config/default_model 保存与主题切换失败路径统一「失败 SnackBar + debugPrint」，`_saving` 必复位；theme onSelectionChanged async + await（失败不改控制器态，UI 保持旧值）；settings_view 去 `catch (_) {}` 与空 onTimeout（`_loadEcho` 空回显契约保留）；控制器/仓储零改动 |
+| F-9 | ✅ 已修 | `SettingsView`/`ApiConfigSection` 构造 required 注入化，删 `AppDatabase.open()`/`FlutterSecretStore()` 视图层缺省分支与 app_database import；装配链收编 home_shell（SecretStore ← app.dart provider）；`settings_repository.dart:49` 数据层 seam 保留（边界） |
 
 ### 2026-08-28 — M1-T08（波 5）收口：F-3 方案 a 处置
 
