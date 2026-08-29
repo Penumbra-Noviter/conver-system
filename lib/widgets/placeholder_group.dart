@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
+import '../theme/conver_palette.dart';
 
 /// 占位视图共用骨架：页标题 + 一句话说明 + 分隔线信息组。
 ///
@@ -38,35 +39,50 @@ class PlaceholderGroup extends StatelessWidget {
         children: [
           Text(
             title,
-            style: textTheme.titleLarge?.copyWith(color: ConverColors.ink1),
+            style: textTheme.titleLarge?.copyWith(
+              color: Theme.of(context).extension<ConverPalette>()!.ink1,
+            ),
           ),
           const SizedBox(height: ConverSpacing.space1),
           Text(
             description,
-            style: textTheme.bodyMedium?.copyWith(color: ConverColors.ink3),
+            style: textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).extension<ConverPalette>()!.ink3,
+            ),
           ),
           const SizedBox(height: ConverSpacing.space6),
           for (var i = 0; i < items.length; i++) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: ConverSpacing.space2),
+              padding: const EdgeInsets.symmetric(
+                vertical: ConverSpacing.space2,
+              ),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       items[i].label,
-                      style: textTheme.bodyLarge?.copyWith(color: ConverColors.ink2),
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context)
+                            .extension<ConverPalette>()!
+                            .ink2,
+                      ),
                     ),
                   ),
                   const SizedBox(width: ConverSpacing.space2),
                   Text(
                     items[i].note,
-                    style: textTheme.bodySmall?.copyWith(color: ConverColors.ink4),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).extension<ConverPalette>()!.ink4,
+                    ),
                   ),
                 ],
               ),
             ),
             if (i != items.length - 1)
-              const Divider(thickness: 1, color: ConverColors.border),
+              Divider(
+                thickness: 1,
+                color: Theme.of(context).extension<ConverPalette>()!.border,
+              ),
           ],
         ],
       ),

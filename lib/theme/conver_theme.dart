@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'colors.dart';
+import 'conver_palette.dart';
 
 /// Assembles the Warm Stone [ThemeData] pair (design doc §5.1).
 ///
@@ -35,16 +36,21 @@ abstract final class ConverTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: ConverColors.page,
+      extensions: [ConverPalette.dark()],
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: ConverColors.bg,
         indicatorColor: ConverColors.accentSoft,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return IconThemeData(color: selected ? ConverColors.accent : ConverColors.ink3);
+          return IconThemeData(
+            color: selected ? ConverColors.accent : ConverColors.ink3,
+          );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return TextStyle(color: selected ? ConverColors.accent : ConverColors.ink3);
+          return TextStyle(
+            color: selected ? ConverColors.accent : ConverColors.ink3,
+          );
         }),
       ),
     );
@@ -76,6 +82,7 @@ abstract final class ConverTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: ConverColorsLight.page,
+      extensions: [ConverPalette.light()],
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: ConverColorsLight.bg,
         indicatorColor: ConverColorsLight.accentSoft,

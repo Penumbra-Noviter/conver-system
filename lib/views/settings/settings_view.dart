@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../data/database/app_database.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../services/secure_store.dart';
 import '../../theme/colors.dart';
+import '../../theme/conver_palette.dart';
 import '../../view_models/theme_controller.dart';
 import 'api_config_section.dart';
 import 'default_model_section.dart';
@@ -11,18 +12,24 @@ import '../../widgets/placeholder_group.dart';
 
 /// 设置视图 — 三组真实化（API 配置 / 默认模型 / 主题）+ 其余五组占位。
 ///
-/// 依赖装配：本票（06）先于工单 07 的应用级装配，故仓储/控制器在内部
-/// 缺省构造（AppDatabase 惰性打开）；07 装配后改为注入（构造参数已预留）。
+/// 依赖装配（F-9）：仓储 / 主题控制器 / 安全存储全部由 home_shell 沿
+/// provider 注入（单一装配点），本视图不再现造任何数据层/平台存储实例。
 class SettingsView extends StatefulWidget {
   const SettingsView({
     super.key,
-    this.settingsRepository,
-    this.themeController,
+    required this.settingsRepository,
+    required this.themeController,
+    required this.secretStore,
   });
 
-  /// 缺省时内部构造（工单 07 装配后注入统一实例）。
-  final SettingsRepository? settingsRepository;
-  final ThemeController? themeController;
+  /// 设置仓储（应用级统一实例，home_shell 注入）。
+  final SettingsRepository settingsRepository;
+
+  /// 主题控制器（应用级共享实例，主题切换端到端生效）。
+  final ThemeController themeController;
+
+  /// 安全存储（app.dart provider 注入；透传给 [ApiConfigSection]）。
+  final SecretStore secretStore;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -37,10 +44,8 @@ class _SettingsViewState extends State<SettingsView> {
     PlaceholderItem('桌面版说明', '桌面端获取指引'),
   ];
 
-  late final SettingsRepository _settings = widget.settingsRepository ??
-      SettingsRepository(database: AppDatabase.open());
-  late final ThemeController _themeController = widget.themeController ??
-      ThemeController(settingsRepository: _settings);
+  late final SettingsRepository _settings = widget.settingsRepository;
+  late final ThemeController _themeController = widget.themeController;
 
   Future<(Map<String, String>, String, String)>? _echoFuture;
 
@@ -50,7 +55,7 @@ class _SettingsViewState extends State<SettingsView> {
     // 存储通道不可用（平台通道缺失挂起/读取失败）→ 超时兜底保持缺省 dark
     _themeController.load().timeout(
       const Duration(seconds: 3),
-      onTimeout: () {},
+      onTimeout: () => debugPrint('主题偏好加载超时，保持缺省 dark'),
     );
     _echoFuture = _loadEcho().timeout(
       const Duration(seconds: 3),
@@ -78,7 +83,8 @@ class _SettingsViewState extends State<SettingsView> {
         await _settings.defaultProvider,
         await _settings.defaultModel,
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('设置页回显加载失败，返回空回显: $error');
       return (const <String, String>{}, '', '');
     }
   }
@@ -99,55 +105,84 @@ class _SettingsViewState extends State<SettingsView> {
               ConverSpacing.space6,
             ),
             children: [
-              Text('设置',
-                  style: textTheme.titleLarge
-                      ?.copyWith(color: ConverColors.ink1)),
+              Text(
+                '设置',
+                style: textTheme.titleLarge?.copyWith(
+                  color: Theme.of(context).extension<ConverPalette>()!.ink1,
+                ),
+              ),
               const SizedBox(height: ConverSpacing.space1),
-              Text('应用配置集中管理',
-                  style: textTheme.bodyMedium
-                      ?.copyWith(color: ConverColors.ink3)),
+              Text(
+                '应用配置集中管理',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).extension<ConverPalette>()!.ink3,
+                ),
+              ),
               const SizedBox(height: ConverSpacing.space4),
               if (loaded == null)
                 const Padding(
-                  padding:
-                      EdgeInsets.symmetric(vertical: ConverSpacing.space6),
+                  padding: EdgeInsets.symmetric(vertical: ConverSpacing.space6),
                   child: Center(child: CircularProgressIndicator()),
                 )
               else ...[
                 ApiConfigSection(
                   settingsRepository: _settings,
+                  secretStore: widget.secretStore,
                   initialValues: loaded.$1,
                 ),
-                const Divider(thickness: 1, color: ConverColors.border),
+                Divider(
+                  thickness: 1,
+                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                ),
                 DefaultModelSection(
                   settingsRepository: _settings,
                   initialProvider: loaded.$2,
                   initialModel: loaded.$3,
                 ),
-                const Divider(thickness: 1, color: ConverColors.border),
+                Divider(
+                  thickness: 1,
+                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                ),
                 ThemeSection(themeController: _themeController),
-                const Divider(thickness: 1, color: ConverColors.border),
+                Divider(
+                  thickness: 1,
+                  color: Theme.of(context).extension<ConverPalette>()!.border,
+                ),
               ],
               for (var i = 0; i < _placeholderItems.length; i++) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                      vertical: ConverSpacing.space2),
+                    vertical: ConverSpacing.space2,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(_placeholderItems[i].label,
-                            style: textTheme.bodyLarge
-                                ?.copyWith(color: ConverColors.ink2)),
+                        child: Text(
+                          _placeholderItems[i].label,
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: Theme.of(context)
+                                .extension<ConverPalette>()!
+                                .ink2,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: ConverSpacing.space2),
-                      Text(_placeholderItems[i].note,
-                          style: textTheme.bodySmall
-                              ?.copyWith(color: ConverColors.ink4)),
+                      Text(
+                        _placeholderItems[i].note,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .extension<ConverPalette>()!
+                              .ink4,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 if (i != _placeholderItems.length - 1)
-                  const Divider(thickness: 1, color: ConverColors.border),
+                  Divider(
+                    thickness: 1,
+                    color: Theme.of(context).extension<ConverPalette>()!.border,
+                  ),
               ],
             ],
           );

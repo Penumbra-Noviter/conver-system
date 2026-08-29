@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/settings_repository.dart';
+import '../services/secure_store.dart';
 import '../view_models/shell_navigation.dart';
 import '../view_models/theme_controller.dart';
 import 'chat/chat_view.dart';
@@ -31,6 +32,7 @@ class HomeShell extends StatelessWidget {
         ShellTab.settings => SettingsView(
             settingsRepository: context.read<SettingsRepository>(),
             themeController: context.read<ThemeController>(),
+            secretStore: context.read<SecretStore>(),
           ),
       },
       bottomNavigationBar: NavigationBar(
