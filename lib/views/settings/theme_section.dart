@@ -12,10 +12,47 @@ import '../../theme/conver_palette.dart';
 import '../../view_models/theme_controller.dart';
 
 /// 主题组：三值分段选择器，选中态由 [ThemeController] 驱动。
-class ThemeSection extends StatelessWidget {
+///
+/// F-13 重入守卫：切换持久化进行中（[ThemeController.setThemeMode] 未完成）
+/// 时，[SegmentedButton] 禁用并吞掉后续点击——避免基于陈旧 `themeMode`
+/// （in-flight 期间仍是旧值）触发第二次写入；守卫在进入 setThemeMode 前置位、
+/// 完成后复位（[State] 生命周期与按钮重建对齐，非永久锁死）。
+class ThemeSection extends StatefulWidget {
   const ThemeSection({super.key, required this.themeController});
 
   final ThemeController themeController;
+
+  @override
+  State<ThemeSection> createState() => _ThemeSectionState();
+}
+
+class _ThemeSectionState extends State<ThemeSection> {
+  /// 主题切换进行中标志（F-13 重入守卫；复位正确 → 完成后可再切换）。
+  bool _switching = false;
+
+  Future<void> _onSelectionChanged(Set<ThemeMode> selection) async {
+    if (_switching) {
+      return; // 重入守卫：in-flight 期间吞掉后续点击
+    }
+    final mode = selection.first;
+    if (mode != widget.themeController.themeMode) {
+      setState(() => _switching = true);
+      try {
+        await widget.themeController.setThemeMode(mode);
+      } catch (error) {
+        debugPrint('主题切换失败: $error');
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('主题切换失败')));
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _switching = false);
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +75,7 @@ class ThemeSection extends StatelessWidget {
         ),
         const SizedBox(height: ConverSpacing.space2),
         ListenableBuilder(
-          listenable: themeController,
+          listenable: widget.themeController,
           builder: (context, _) {
             return SegmentedButton<ThemeMode>(
               segments: const [
@@ -58,22 +95,11 @@ class ThemeSection extends StatelessWidget {
                   label: Text('深色'),
                 ),
               ],
-              selected: {themeController.themeMode},
-              onSelectionChanged: (selection) async {
-                final mode = selection.first;
-                if (mode != themeController.themeMode) {
-                  try {
-                    await themeController.setThemeMode(mode);
-                  } catch (error) {
-                    debugPrint('主题切换失败: $error');
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(const SnackBar(content: Text('主题切换失败')));
-                    }
-                  }
-                }
-              },
+              selected: {widget.themeController.themeMode},
+              // F-13：in-flight 期间禁用按钮（onSelectionChanged 置 null），
+              // 与 _onSelectionChanged 内首行守卫双保险，行为确定。
+              onSelectionChanged:
+                  _switching ? null : (selection) => _onSelectionChanged(selection),
             );
           },
         ),
