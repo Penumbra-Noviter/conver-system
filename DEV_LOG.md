@@ -6,6 +6,23 @@
 
 ---
 
+## M3 kickoff 批次（2026-08-30 — project-kickoff 全自动档交付：角色 + 搜索里程碑）
+
+- **交付**：Grilling 共识 5 面拍板（零真拍点 + 3 best-judgment 非拍板：导入占位保留 UI / 批量删除含可裁 / 开始对话默认模型）。8 票 4 波 DAG（W1 M3-01‖M3-04a / W2 M3-02a‖M3-04b / W3 M3-02b‖M3-03‖M3-04c / W4 M3-05，基线 f477e2d → merge 70bc094）。角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板逐字移植（senpai/wanderer/tsundere/butler/nekomimi）/ V2 卡导入导出纯 Dart 服务（四格式识别+V1 兼容+temperature 裁剪）+ seam 收口（file_picker ^12.1.2/share_plus ^13.3.0/path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮（GlobalObjectKey+ensureVisible）。证据 `.scratch/m3-kickoff/evidence/`（M3-01~05 + W3 独立复核 + smoke-gate + 冒烟 PNG）。
+- **门禁链**：全量 **729 测**全绿（M3 交付后 726 + 期末修复 3 新用例）/ analyze 0；覆盖率剔除 drift **98.06%**；四轮波末增量审核（W3 用户要求独立复核轮，0 阻断独立复现 179 测绿）+ **期末四轴零阻断**（Spec 8/8 票满足、F-7 token 契约全库绿、安全红线 0、架构无阻断）；**冒烟 PASS**（角色列表→向导模板建「知性学姐」→保存落库→搜索 hihello→跳转定位高亮全真机实证，UI 树确定性证据）。
+- **主会话修复（期末发现低成本真缺）**：
+  1. **F-7 契约回归 x2**：M3-04b search_view（d76e85e）+ M3-04c chat_view（ff24612）直接引用 ConverColors 违反视图层 token 契约 → 改经 `colorScheme.primary.withValues(alpha:0.13)` / `palette.border`，静态不变量 `view_theme_tokens_test` 真实绿
+  2. **期末四项**（0057d9e）：NaN 温度绕过 [0,2] 裁剪（`_clampTemperature` 补 isNaN 回退 0.7，期末 Falsify 对抗发现）/ manual 回退后 next 误入步骤②（`next()` 补 manual 从①跳③）/ Escape 清空不递增 `_requestSeq` 致在途查询回填空态 / 删除角色后聊天入口陈旧 `_firstCharacter` 缓存（`invalidateEntryCache` 接入 deleteCharacter）
+  3. **构建配置**（9cfc4aa）：`android/gradle.properties` 追加 `kotlin.incremental=false` + `org.gradle.parallel=false` 绕开 Kotlin daemon Windows 并行编译 storage 注册冲突（file_picker/share_plus 多模块触发）
+- **过程遥测**：票 8、波 4（并行 2+2+3+1）、merge 8；子智能体 20+（含网关故障重开 M3-05 x3——两次静默死亡半成品 +849 行接续、W3 审核重开、W3 独立复核轮）；空返回/静默死亡 3（M3-05 x2 + W3 审核 x1）；回退 0；审核 findings：W1 增量 4、W2 增量 7（含 2 真缺）、W3 增量 18 + 独立复核 12、期末四轴 14 全非阻断。**技术债净增**：0（非阻断判断不入债；M3 遗留观察：CharacterDraft 字段 docstring 不一致、校验门分置 Locality、双 timer 冗余、light 高亮 alpha 0.13 vs 0.12 位级不等可辨度、searchPreview 空查询纯函数边界）。
+- **避坑（勿重蹈）**：
+  1. **子代理静默死亡**：M3-05 两次 agent 无通知死亡（任务记录消失），半成品在盘（controller/view/测试已改）——「无完成通知」时立即查磁盘 worktree 状态，半成品接续而非重写（第 3 次派发接续后 DONE）
+  2. **F-7 契约回归进主分支**：M3-04b/04c 视图直接引用 ConverColors 违例被合并（全量测试未跑 view_theme_tokens_test 静态不变量）——波末合并后必须跑全量（或至少静态不变量组），不能只跑受影响模块
+  3. **期末四轴对抗发现 NaN 温度**：JSON 字面量 NaN 被 jsonDecode 宽容接受、double.tryParse 返回 NaN 非 null——「非法值回退」类契约必须显式 isNaN 守卫（Falsify 用恶意输入打数据通路价值再证）
+  4. **Kotlin daemon Windows storage 冲突**：`Could not close incremental caches ... already registered` 在新增多 Kotlin 模块（file_picker/share_plus）后触发——in-process 策略不覆盖此路径，需 `kotlin.incremental=false` + `org.gradle.parallel=false`
+  5. **M3-05 半成品含残留脚本**：`cov_miss.py`/`cov_report.py` 覆盖率统计脚本留在 worktree——半成品接续时须清理临时脚本
+- **知识库蒸馏**：候选教训（子代理静默死亡磁盘核验 / F-7 契约回归合并后全量测试 / NaN 温度 Falsify）——完成段经 distill-lesson 处理。
+
 ## 技术债消费批次 F-10~F-17（2026-08-30 — project-kickoff 全自动档交付：技术债八候选消费）
 
 - **交付**：Grilling 共识 8 候选 **7 做 1 关闭**（F-15 关闭：桌面 ChatResponse 契约镜像 + F-6 先例 + 测试锁定，零真拍点）。6 工单 2 波 DAG：波1 T2‖T4‖T5（T2 `7d86628` ConverPalette of/maybeOf + 41 处迁移 / T4 `c040c06` 翻译栈共享 / T5 `353a857` CharacterNotFoundError 404 归类）merge `14bf479`；波2 T1‖T3‖T6（T1 `57c3db8` 保存事务化 / T3 `fe98671` 主题异步面 catchError+重入守卫 / T6 `e4ece9c` cancel 加界）merge `b9dc9bc`。证据 `.scratch/techdebt-f10-f17/evidence/`（T1~T6 + smoke-gate + 5 张冒烟 PNG）。
