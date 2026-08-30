@@ -48,6 +48,16 @@
 
 ## 技术债处置记录
 
+### 2026-08-30 — F-10~F-17 批次期末非阻断观察追溯补录（3 项复核关闭）
+
+> 来源：F-10~F-17 批次期末四轴非阻断观察——原批次交付时误标「不入债」，2026-08-30 按契约追溯补录；Speculative 项 git grep 复核现状仍成立后关闭。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-24 | `translate_helpers.dart` 公开函数命名偏通用（`decodeJson` / `responseText` / `errorMessageFromMap`） | F-10~F-17 批次期末四轴（Standards/Architecture） | Speculative | ❌ 复核关闭：git grep 复核三函数在位且均有完整 docstring 消解歧义（`responseText` L92 / `errorMessageFromMap` L121 / `decodeJson` L135），共享模块命名由工单明确，后续新增 provider 时如需统一可随改随重命名 |
+| F-25 | `api_config_section._save` `snapshot`（Map）+ `_apiKeySlots` 旁置集合 + `_rollback(snapshot, written)` 成对参数（Primitive Obsession / Data Clumps） | F-10~F-17 批次期末四轴（Architecture） | Speculative | ❌ 复核关闭：git grep 复核 `_apiKeySlots` L76 / `snapshot` L120-127 / `_rollback` L161 均在位，doc 注释已解释槽位类型区分，私有内部实现零公共 API 影响，捆类型纯美容性 |
+| F-26 | `chat_service_test.dart` A3 停滞流用例以 6s 上界断言（慢 CI 机理论 flaky） | F-10~F-17 批次期末四轴（Falsify） | Speculative | ❌ 复核关闭：git grep 复核用例 L1081 存在，flutter_test fake clock 推进可控（测试内显式 pump 时间），无实际 flaky 记录，改为等待模式属过度防御 |
+
 ### 2026-08-30 — M3 期末四轴非阻断观察处置（4 项复核关闭 + 1 项待立项）
 
 > 来源：M3 期末四轴 code-review（Standards/Falsify/Architecture 非阻断判断）——按「非阻断发现落盘 TECH_DEBT」契约入账，Speculative 项 git grep 复核现状仍成立后关闭（清出机制：关闭项移出候选区，留单行摘要）。
