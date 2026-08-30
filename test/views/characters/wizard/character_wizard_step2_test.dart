@@ -1,13 +1,14 @@
-/// CharacterWizardView 步骤②行为契约（工单 M3-02b 验收 1–6）。
+/// CharacterWizardView 步骤②行为契约（工单 M3-02b 验收 1–6 + M4-05 验收 1–5）。
 ///
 /// 语义锚点（spec §Solution 2 / 共识 A2 / 桌面 character-wizard.js
 /// renderStep2 + validateStep case 2）：
 /// - template 模式步骤②渲染 5 模板卡（name/description/tags 逐字来自
 ///   `characterTemplates.dart`），点击 → `selectTemplate(id)` 填充并高亮选中；
 ///   再次进入步骤②保持上次选中态（controller.selectedTemplateId 承载）；
-/// - import 模式步骤②渲染多行 textarea（占位含「粘贴角色设定文档」语义）、
-///   「AI 智能解析」按钮 disabled + 边上逐字文案「文档 AI 解析随 M4 交付」，
-///   text 输入不触发任何解析调用（no-op，不调 parse 接口）；
+/// - import 模式步骤②（M4-05 真 UI）：多行 textarea 绑定
+///   controller.parseText、空文本按钮禁用、>50000 拒绝提示、解析成功自动跳
+///   步骤③预填、失败 SnackBar DocParseError 消息直出留步骤②（占位文案
+///   「文档 AI 解析随 M4 交付」已替换）；
 /// - 步骤②校验：template 未选下一步 → 「请选择一个模板」拦截（视图层
 ///   校验；controller 只读既有状态机，本层拦截不越权）；import 模式下一步
 ///   放行（不受内容影响）；
@@ -29,6 +30,9 @@ import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/character_file_exchange.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/document_parse_service.dart';
+import 'package:conver_system_mobile/services/llm/llm_provider.dart';
+import 'package:conver_system_mobile/services/secure_store.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/view_models/shell_navigation.dart';
 import 'package:conver_system_mobile/views/characters/characters_controller.dart';
@@ -43,6 +47,19 @@ import 'package:provider/provider.dart';
 
 import '../../../helpers/fake_llm_provider.dart';
 import '../../../helpers/in_memory_secret_store.dart';
+
+/// 用内存 drift + 假 LLM 装配真实 [DocumentParseService]（真实 service + 假 LLM，
+/// 锚 M4-04 装配先例）；[tokens] 为 LLM 返回内容序列。
+DocumentParseService _parseService(AppDatabase db, {List<String> tokens = const []}) {
+  final store = InMemorySecretStore();
+  // 写 Key 走 SecretStore 槽位（不落库，测试假值）。
+  store.write(key: SecretStore.claudeApiKeySlot, value: 'sk-test');
+  return DocumentParseService(
+    settings: SettingsRepository(database: db, secretStore: store),
+    providerFactory:
+        FixedLLMProviderFactory(FakeLLMProvider(tokens: tokens)),
+  );
+}
 
 /// [SettingsReader] 的内存假实现（与 chat 系测试同形；本文件仅用默认空值）。
 class _FakeSettingsReader implements SettingsReader {
@@ -193,9 +210,8 @@ void main() {
     });
   });
 
-  group('步骤② import 占位（验收 2）', () {
-    testWidgets('多行 textarea + AI 解析按钮 disabled + M4 文案逐字',
-        (tester) async {
+  group('步骤② import 真 UI（M4-05 验收 1/2）', () {
+    testWidgets('空文本按钮禁用；输入后启用；M4 占位文案移除', (tester) async {
       final c = WizardController(characterRepository: repository);
       await enterStep2(tester, c, mode: WizardCreationMode.import);
 
@@ -204,29 +220,124 @@ void main() {
       expect(textarea.decoration?.hintText, contains('粘贴角色设定文档'),
           reason: '占位文案含「粘贴角色设定文档」语义');
 
-      final parseBtn = tester.widget<OutlinedButton>(
+      // 空文本 → 禁用。
+      var parseBtn = tester.widget<OutlinedButton>(
         find.widgetWithText(OutlinedButton, 'AI 智能解析'),
       );
-      expect(parseBtn.onPressed, isNull, reason: '解析按钮 disabled');
+      expect(parseBtn.onPressed, isNull, reason: '空文本按钮禁用');
 
-      expect(find.text('文档 AI 解析随 M4 交付'), findsOneWidget,
-          reason: 'M4 文案逐字');
-    });
+      // M4 占位文案已移除。
+      expect(find.text('文档 AI 解析随 M4 交付'), findsNothing,
+          reason: 'M4 占位文案替换为真 UI');
 
-    testWidgets('text 输入不触发任何解析调用（no-op）', (tester) async {
-      final c = WizardController(characterRepository: repository);
-      await enterStep2(tester, c, mode: WizardCreationMode.import);
-
+      // 输入后 → 启用。
       await tester.enterText(
           find.byType(TextField), '把这段角色设定文档粘贴进来……');
       await tester.pump();
-
-      expect(c.step, 2, reason: '输入不跳步');
-      expect(c.error, isNull, reason: '输入不产生解析错误');
-      final parseBtn = tester.widget<OutlinedButton>(
+      parseBtn = tester.widget<OutlinedButton>(
         find.widgetWithText(OutlinedButton, 'AI 智能解析'),
       );
-      expect(parseBtn.onPressed, isNull, reason: '输入后按钮仍 disabled');
+      expect(parseBtn.onPressed, isNotNull, reason: '输入后按钮启用');
+      expect(c.parseText, '把这段角色设定文档粘贴进来……',
+          reason: 'textarea 绑定 controller.parseText');
+      expect(c.step, 2, reason: '输入不跳步');
+    });
+
+    testWidgets('文本超 50000 → 拒绝提示 SnackBar，不触 parse', (tester) async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db),
+      );
+      await enterStep2(tester, c, mode: WizardCreationMode.import);
+
+      await tester.enterText(
+          find.byType(TextField), '文' * (maxImportTextLength + 1));
+      await tester.pump();
+      await tester.tap(find.text('AI 智能解析'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(importTextTooLongError), findsOneWidget,
+          reason: '超长拒绝文案 SnackBar');
+      expect(c.step, 2, reason: '拒绝不跳步');
+    });
+
+    testWidgets('解析中 → 按钮 loading（spinner）+ 禁用（防连点）', (tester) async {
+      final provider = FakeLLMProvider(
+        tokens: ['{"name": "艾莉亚"}'],
+        generateDelay: const Duration(milliseconds: 100),
+      );
+      final store = InMemorySecretStore();
+      store.write(key: SecretStore.claudeApiKeySlot, value: 'sk-test');
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: DocumentParseService(
+          settings: SettingsRepository(database: db, secretStore: store),
+          providerFactory: FixedLLMProviderFactory(provider),
+        ),
+      );
+      await enterStep2(tester, c, mode: WizardCreationMode.import);
+      await tester.enterText(find.byType(TextField), '角色设定文档……');
+      await tester.pump();
+
+      await tester.tap(find.text('AI 智能解析'));
+      await tester.pump(); // 触发 parse()，进入 parsing 状态。
+
+      expect(c.parsing, isTrue, reason: '解析中 parsing 标志置位');
+      // 按钮禁用 + spinner 出现（按钮 child 已替换为 spinner，按 spinner 定位）。
+      final btn = tester.widget<OutlinedButton>(
+        find.ancestor(
+          of: find.byType(CircularProgressIndicator),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(btn.onPressed, isNull, reason: '解析中按钮禁用');
+      expect(find.byType(CircularProgressIndicator), findsWidgets,
+          reason: '解析中 loading spinner');
+
+      await tester.pumpAndSettle(); // 等解析完成。
+      expect(c.parsing, isFalse);
+      expect(c.step, 3, reason: '解析完成后跳步骤③');
+    });
+
+    testWidgets('解析成功 → 自动跳步骤③ + 草稿预填（name 空留③必填兜底）',
+        (tester) async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, tokens: [
+          '{"name": "艾莉亚", "description": "森林小狐狸", "personality": "活泼", '
+          '"tags": ["冒险", "奇幻"]}',
+        ]),
+      );
+      await enterStep2(tester, c, mode: WizardCreationMode.import);
+
+      await tester.enterText(
+          find.byType(TextField), '角色设定文档……');
+      await tester.pump();
+      await tester.tap(find.text('AI 智能解析'));
+      await tester.pumpAndSettle();
+
+      expect(c.step, 3, reason: '解析成功自动跳步骤③');
+      expect(c.name, '艾莉亚');
+      expect(find.text('艾莉亚'), findsOneWidget, reason: '步骤③名称预填回显');
+      expect(c.tags, ['冒险', '奇幻']);
+    });
+
+    testWidgets('解析失败 → 留步骤② + SnackBar DocParseError 消息直出',
+        (tester) async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, tokens: ['这不是 JSON']),
+      );
+      await enterStep2(tester, c, mode: WizardCreationMode.import);
+
+      await tester.enterText(find.byType(TextField), '角色设定文档……');
+      await tester.pump();
+      await tester.tap(find.text('AI 智能解析'));
+      await tester.pumpAndSettle();
+
+      expect(c.step, 2, reason: '失败留步骤②');
+      expect(find.text('LLM 返回了无法解析的响应，请重试或手动创建'),
+          findsOneWidget, reason: 'DocParseError 消息 SnackBar 直出');
     });
   });
 
@@ -351,9 +462,18 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
-            // 入口经 context.read<CharacterRepository>() 构造 WizardController。
+            // 入口经 context.read 构造 WizardController + DocumentParseService。
             Provider<CharacterRepository>.value(
               value: env.characterRepository,
+            ),
+            Provider<SettingsRepository>.value(
+              value: SettingsRepository(
+                database: env.db,
+                secretStore: InMemorySecretStore(),
+              ),
+            ),
+            Provider<LLMProviderFactory>.value(
+              value: FixedLLMProviderFactory(FakeLLMProvider(tokens: const ['ok'])),
             ),
           ],
           child: MaterialApp(

@@ -1,18 +1,19 @@
 /// 6 步角色创建向导全屏页（M3-02a 切片：手动创建路径 + 状态机；M3-02b
-/// 追加步骤②真 UI：模板网格 / import 占位 + 视图层校验）。
+/// 追加步骤②真 UI：模板网格 / import 占位；M4-05 步骤② import 接入 AI 解析）。
 ///
 /// 语义锚点（spec §Implementation Decisions 6 步向导 + 桌面
 /// character-wizard.js renderStep / validateStep / handleSave）：
 /// - 全屏 Scaffold + AppBar（标题随步骤；返回 = 上一步，step1 返回 = 退出）
 ///   + 步骤指示器（进度条 + 6 点）;
 /// - 步骤①三卡片（智能导入 / 从模板开始 / 手动创建），手动选中直接跳③；
-///   步骤②（M3-02b）：template → 5 模板卡（name/description/tags 逐字来自
+///   步骤②：template → 5 模板卡（name/description/tags 逐字来自
 ///   `characterTemplates.dart`，点击 [WizardController.selectTemplate] 填充 +
-///   选中高亮，再次进入保持选中态）；import → 多行 textarea（占位含「粘贴
-///   角色设定文档」语义）+ 「AI 智能解析」按钮 disabled + 逐字文案「文档
-///   AI 解析随 M4 交付」（不调任何 parse 接口）；步骤②视图层校验：template
-///   未选下一步 → 「请选择一个模板」拦截（controller 只读既有状态机，
-///   本层拦截不越权）；import 模式放行（不受内容影响）；
+///   选中高亮，再次进入保持选中态）；import（M4-05）→ 多行 textarea 绑定
+///   [WizardController.parseText] + 「AI 智能解析」按钮（空文本禁用 / 超长
+///   拒绝 SnackBar / 解析中 loading 防连点 / 失败 DocParseError 消息直出），
+///   成功由控制器跳步骤③预填；步骤②视图层校验：template 未选下一步 →
+///   「请选择一个模板」拦截（controller 只读既有状态机，本层拦截不越权）；
+///   import 模式下一步放行（不受内容影响）；
 ///   步骤③基本信息（name maxLength=100 / description maxLength=200 / avatar
 ///   / tags splitTags），字段 initialValue 绑定 controller 回显模板/已填值；
 ///   步骤④人格设定；步骤⑤对话风格；步骤⑥四段摘要 + 温度滑块；
@@ -378,7 +379,7 @@ class _Step2 extends StatelessWidget {
           selectedId: controller.selectedTemplateId,
           onSelect: onSelectTemplate,
         ),
-      WizardCreationMode.import => const _ImportPlaceholder(),
+      WizardCreationMode.import => _ImportStep(controller: controller),
       WizardCreationMode.manual || null => const SizedBox.shrink(),
     };
   }
@@ -493,15 +494,65 @@ class _TemplateCard extends StatelessWidget {
   }
 }
 
-/// import 占位（M4 交付 handler 前保留 UI 骨架）：多行 textarea + disabled
-/// 「AI 智能解析」按钮 + 逐字文案「文档 AI 解析随 M4 交付」。
-class _ImportPlaceholder extends StatelessWidget {
-  const _ImportPlaceholder();
+/// import 步骤（M4-05 真 UI）：多行 textarea 绑定 [WizardController.parseText] +
+/// 「AI 智能解析」按钮（空文本禁用 / 超长拒绝 / 解析中 loading / 错误 SnackBar）。
+class _ImportStep extends StatefulWidget {
+  const _ImportStep({required this.controller});
+
+  final WizardController controller;
+
+  @override
+  State<_ImportStep> createState() => _ImportStepState();
+}
+
+class _ImportStepState extends State<_ImportStep> {
+  late final TextEditingController _textController;
+
+  WizardController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: controller.parseText);
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  /// 点击「AI 智能解析」：超长拒绝（不触 parse）；否则调 [WizardController.parse]，
+  /// 失败 SnackBar 直出 [WizardController.parseError]（DocParseError 消息）。
+  Future<void> _handleParse() async {
+    final c = controller;
+    if (c.parseText.trim().length > maxImportTextLength) {
+      _showSnack(importTextTooLongError);
+      return;
+    }
+    final ok = await c.parse();
+    if (!ok && mounted) {
+      final msg = c.parseError;
+      if (msg != null && msg.isNotEmpty) {
+        _showSnack(msg);
+      }
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = ConverPalette.of(context);
+    final c = controller;
+    final enabled = !c.parsing && c.parseText.trim().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -511,6 +562,7 @@ class _ImportPlaceholder extends StatelessWidget {
         ),
         const SizedBox(height: ConverSpacing.space3),
         TextField(
+          controller: _textController,
           maxLines: 10,
           minLines: 6,
           keyboardType: TextInputType.multiline,
@@ -518,20 +570,25 @@ class _ImportPlaceholder extends StatelessWidget {
             hintText: '在此粘贴角色设定文档、小说片段、角色简介等',
             border: OutlineInputBorder(),
           ),
-          // M4 交付 handler，本票据占位：输入不触发任何解析调用（no-op）。
-          onChanged: (_) {},
+          onChanged: c.setParseText,
         ),
         const SizedBox(height: ConverSpacing.space3),
         Row(
           children: [
             OutlinedButton(
-              onPressed: null, // disabled：文档 AI 解析随 M4 交付
-              child: const Text('AI 智能解析'),
+              onPressed: enabled ? _handleParse : null,
+              child: c.parsing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('AI 智能解析'),
             ),
             const SizedBox(width: ConverSpacing.space3),
             Expanded(
               child: Text(
-                '文档 AI 解析随 M4 交付',
+                'AI 自动提取角色字段，解析后可手动微调',
                 style: textTheme.bodySmall?.copyWith(color: palette.ink3),
               ),
             ),
