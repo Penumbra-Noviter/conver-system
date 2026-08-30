@@ -55,7 +55,12 @@ HighlightRange highlightFirst(String content, String query) {
 }
 
 /// 结果预览高亮样式（amber 底，对齐桌面 `.search-highlight`）。
-const _highlightStyle = TextStyle(backgroundColor: ConverColors.accentSoft);
+/// 视图层经 colorScheme 消费 accent token（F-7 契约：不直接引用色板常量）。
+TextStyle _highlightStyle(BuildContext context) =>
+    TextStyle(
+      backgroundColor:
+          Theme.of(context).colorScheme.primary.withValues(alpha: 0.13),
+    );
 
 /// 搜索页状态机（仅本文件内部可见，外部通过渲染结果观察）。
 enum _SearchPhase {
@@ -402,7 +407,7 @@ class _SearchResultTile extends StatelessWidget {
             ),
             const SizedBox(height: ConverSpacing.space1),
             Text.rich(
-              TextSpan(children: _previewSpans()),
+              TextSpan(children: _previewSpans(context)),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: textTheme.bodyMedium?.copyWith(color: palette.ink2),
@@ -412,7 +417,7 @@ class _SearchResultTile extends StatelessWidget {
               _formatTime(result.createdAt),
               style: textTheme.labelSmall?.copyWith(color: palette.ink4),
             ),
-            const Divider(height: 24, color: ConverColors.border),
+            Divider(height: 24, color: palette.border),
           ],
         ),
       ),
@@ -420,7 +425,7 @@ class _SearchResultTile extends StatelessWidget {
   }
 
   /// 预览 spans：`searchPreview` ±50 窗口后 [highlightFirst] 定位第一处命中。
-  List<InlineSpan> _previewSpans() {
+  List<InlineSpan> _previewSpans(BuildContext context) {
     final preview = searchPreview(result.content, query);
     final range = highlightFirst(preview, query);
     if (range.start == null || range.end == null) {
@@ -430,7 +435,7 @@ class _SearchResultTile extends StatelessWidget {
       TextSpan(text: preview.substring(0, range.start!)),
       TextSpan(
         text: preview.substring(range.start!, range.end!),
-        style: _highlightStyle,
+        style: _highlightStyle(context),
       ),
       TextSpan(text: preview.substring(range.end!)),
     ];
@@ -458,7 +463,10 @@ class _RoleChip extends StatelessWidget {
         vertical: 2,
       ),
       decoration: BoxDecoration(
-        color: ConverColors.accentSoft,
+        color: Theme.of(context)
+            .colorScheme
+            .primary
+            .withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -466,7 +474,7 @@ class _RoleChip extends StatelessWidget {
         style: Theme.of(context)
             .textTheme
             .labelSmall
-            ?.copyWith(color: ConverColors.accent),
+            ?.copyWith(color: Theme.of(context).colorScheme.primary),
       ),
     );
   }
