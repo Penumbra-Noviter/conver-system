@@ -47,6 +47,8 @@ import '../../data/repositories/character_repository.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import '../../services/chat_service.dart';
+import '../../services/conversation_export_file_exchange.dart';
+import '../../services/conversation_export_service.dart';
 import '../../services/llm/errors.dart';
 
 /// 单条聊天 UI 显示消息（视图层模型，由 [ChatController.messages] 组装）。
@@ -88,21 +90,35 @@ class ChatController extends ChangeNotifier {
   /// [messageRepository] 提供列表 / 角色来源 / 消息重载；
   /// [highlightDuration] 为跳转定位高亮的自动清除时长（默认 3s，对齐桌面
   /// `chat.js HIGHLIGHT_DURATION=3000`；测试注入短时长验证定时清除）。
+  ///
+  /// 导出装配（M4-03）：[exportService] + [exportFileExchange] 为可选依赖——
+  /// 不传（既有测试装配不变）时导出方法给出「导出功能未配置」错误 notice，
+  /// 不触真正平台通道；装配层（app.dart / chat_test_env）注入真实现或 fake。
   ChatController({
     required ChatService chatService,
     required ConversationRepository conversationRepository,
     required CharacterRepository characterRepository,
     required MessageRepository messageRepository,
     this.highlightDuration = const Duration(seconds: 3),
+    ConversationExportService? exportService,
+    ConversationExportFileExchange? exportFileExchange,
   })  : _chatService = chatService,
         _conversationRepository = conversationRepository,
         _characterRepository = characterRepository,
-        _messageRepository = messageRepository;
+        _messageRepository = messageRepository,
+        _exportService = exportService,
+        _exportFileExchange = exportFileExchange;
 
   final ChatService _chatService;
   final ConversationRepository _conversationRepository;
   final CharacterRepository _characterRepository;
   final MessageRepository _messageRepository;
+
+  /// 导出纯逻辑服务（M4-01）；可选——null 时导出降级为错误 notice。
+  final ConversationExportService? _exportService;
+
+  /// 导出文件 seam（M4-02）；可选——null 时导出降级为错误 notice。
+  final ConversationExportFileExchange? _exportFileExchange;
 
   /// 跳转定位高亮的自动清除时长（对齐桌面 `HIGHLIGHT_DURATION=3000`）。
   final Duration highlightDuration;
@@ -137,6 +153,9 @@ class ChatController extends ChangeNotifier {
   String? _pendingUserText;
   bool _isRegenerating = false;
   String? _notice;
+
+  /// 导出进行中（防连点：重复触发被忽略，完成复位）。
+  bool _exporting = false;
 
   /// 当前回合所属对话 id（[send] 时记录）。入口态 / 后台流停止（
   /// `_activeConversationId` 为 null）时仍可定位本轮会话（F3b）。
@@ -580,6 +599,58 @@ class ChatController extends ChangeNotifier {
   }
 
   // ── 服务/生命周期 ──
+
+  // ── 导出面（M4-03）──
+
+  /// 导出进行中（[exportJson] / [exportMarkdown] 防连点；完成复位）。
+  bool get exporting => _exporting;
+
+  /// 导出当前对话为 JSON：服务生成 → seam 写临时文件并分享 → 非阻塞
+  /// [notice] 反馈（成功 → seam 文案；对话不存在 → 「对话不存在」不触 seam；
+  /// seam/服务异常 → 「导出失败: {e}」）。
+  Future<void> exportJson() => _export(_exportService?.exportJson);
+
+  /// 导出当前对话为 Markdown（同上，走 `exportMarkdown`）。
+  Future<void> exportMarkdown() => _export(_exportService?.exportMarkdown);
+
+  /// 导出编排公共腿：服务生成 → seam 分享，全程经非阻塞 notice 反馈。
+  ///
+  /// [produce] 为服务导出入口（json / markdown 分腿）；[exporting] 防连点
+  /// 复用 [_exporting] 标志，导出期间重复触发被忽略；对话不存在 →
+  /// [produce] 返回 null → notice「对话不存在」且**不触 seam**（归零副作用）。
+  Future<void> _export(
+    Future<ConversationExportResult?> Function(int conversationId)? produce,
+  ) async {
+    final cid = _activeConversationId;
+    if (cid == null) {
+      return; // 菜单仅在会话态出现；防御性兜底（零副作用）。
+    }
+    final service = _exportService;
+    final seam = _exportFileExchange;
+    if (service == null || seam == null || produce == null) {
+      _notice = _notice ?? '导出功能未配置';
+      notifyListeners();
+      return;
+    }
+    if (_exporting) {
+      return; // 防连点：导出进行中重复触发被忽略。
+    }
+    _exporting = true;
+    notifyListeners();
+    try {
+      final result = await produce(cid);
+      if (result == null) {
+        _notice = '对话不存在';
+        return;
+      }
+      _notice = await seam.exportFile(result);
+    } catch (error) {
+      _notice = '导出失败: $error';
+    } finally {
+      _exporting = false;
+      notifyListeners();
+    }
+  }
 
   /// 释放时取消在途流式订阅（ChatService 停止语义：已累积部分落库）与
   /// 高亮定位定时器，并清空高亮状态（防泄漏 / 防「notify after dispose」）。

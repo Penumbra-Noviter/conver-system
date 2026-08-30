@@ -10,6 +10,8 @@ import 'data/repositories/message_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'services/chat_service.dart';
 import 'services/character_file_exchange.dart';
+import 'services/conversation_export_file_exchange.dart';
+import 'services/conversation_export_service.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/secure_store.dart';
@@ -79,12 +81,28 @@ class ConverApp extends StatelessWidget {
             providerFactory: context.read<LLMProviderFactory>(),
           ),
         ),
+        // M4-03 导出装配：纯逻辑服务（复用三仓储 + SettingsRepository as
+        // SettingsReader）+ 文件 seam（真实现缺省，平台通道收口）。两者均在
+        // ChatController 之前声明（provider 嵌套读外层）。
+        Provider<ConversationExportService>(
+          create: (context) => ConversationExportService(
+            conversationRepository: context.read<ConversationRepository>(),
+            characterRepository: context.read<CharacterRepository>(),
+            messageRepository: context.read<MessageRepository>(),
+            settingsReader: context.read<SettingsRepository>(),
+          ),
+        ),
+        Provider<ConversationExportFileExchange>(
+          create: (_) => ConversationExportFileExchange(),
+        ),
         ChangeNotifierProvider<ChatController>(
           create: (context) => ChatController(
             chatService: context.read<ChatService>(),
             conversationRepository: context.read<ConversationRepository>(),
             characterRepository: context.read<CharacterRepository>(),
             messageRepository: context.read<MessageRepository>(),
+            exportService: context.read<ConversationExportService>(),
+            exportFileExchange: context.read<ConversationExportFileExchange>(),
           ),
         ),
         ChangeNotifierProvider<ThemeController>(

@@ -12,6 +12,8 @@ import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/conversation_export_file_exchange.dart';
+import 'package:conver_system_mobile/services/conversation_export_service.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/views/chat/chat_controller.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
@@ -79,7 +81,13 @@ class ChatTestEnv {
   /// 装配 ChatController：真实 ChatService + [provider] 经固定工厂注入。
   ///
   /// 控制器为纯状态机（不自动 loadEntry），UI 挂载时机由测试控制。
-  ChatController controllerOf(LLMProvider provider) {
+  /// M4-03 导出依赖为可选：不传则 controller 导出降级为「导出功能未配置」
+  /// notice（既有测试装配不破坏）；传 fake 断言导出调用链。
+  ChatController controllerOf(
+    LLMProvider provider, {
+    ConversationExportService? exportService,
+    ConversationExportFileExchange? exportFileExchange,
+  }) {
     final service = ChatService(
       database: db,
       conversationRepository: conversationRepository,
@@ -93,6 +101,8 @@ class ChatTestEnv {
       conversationRepository: conversationRepository,
       characterRepository: characterRepository,
       messageRepository: messageRepository,
+      exportService: exportService,
+      exportFileExchange: exportFileExchange,
     );
   }
 
