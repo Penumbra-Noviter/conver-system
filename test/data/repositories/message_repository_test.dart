@@ -396,4 +396,112 @@ void main() {
       expect(await messagesOf(convB.id), hasLength(1));
     });
   });
+
+  group('searchMessages（M3-04a 跨对话 content 模糊检索）', () {
+    /// 带头像的角色种子（join 上下文断言用；既有 seedCharacter 无头像参数）。
+    Future<Character> seedCharacterWithAvatar({
+      String name = '星野',
+      String avatar = 'data:image/png;base64,abc',
+    }) {
+      return db.into(db.characters).insertReturning(
+            CharactersCompanion.insert(
+              name: name,
+              avatar: Value(avatar),
+              createdAt: fakeNow,
+              updatedAt: fakeNow,
+            ),
+          );
+    }
+
+    test('命中 content + join 上下文（角色/对话标题/头像/role）', () async {
+      final char = await seedCharacterWithAvatar(name: '星野');
+      final conv = await convRepo.createConversation(
+        characterId: char.id,
+        title: '夜话',
+      );
+      final msg = await sendUserMessage(conv.id, '今晚的星空很美');
+
+      final hits = await repo.searchMessages('星空');
+
+      expect(hits, hasLength(1));
+      final hit = hits.single;
+      expect(hit.message.id, msg.id);
+      expect(hit.message.conversationId, conv.id);
+      expect(hit.message.role, Role.user);
+      expect(hit.message.content, '今晚的星空很美');
+      expect(hit.message.createdAt, msg.createdAt);
+      expect(hit.conversation.title, '夜话');
+      expect(hit.character.id, char.id);
+      expect(hit.character.name, '星野');
+      expect(hit.character.avatar, 'data:image/png;base64,abc');
+    });
+
+    test('负例：角色名/对话标题命中不返回（仅 content 检索，对齐桌面）', () async {
+      final char = await seedCharacter(name: '风语者');
+      final conv = await convRepo.createConversation(
+        characterId: char.id,
+        title: '机密会议',
+      );
+      await sendUserMessage(conv.id, '今天天气不错');
+
+      expect(await repo.searchMessages('风语者'), isEmpty);
+      expect(await repo.searchMessages('机密'), isEmpty);
+    });
+
+    test('负例：开场白 first_mes 不直接命中（角色列非检索范围）', () async {
+      // 「引导者」带开场白但不为其建对话 → 开场白不作为消息内容落库。
+      await seedCharacter(name: '引导者', firstMes: '欢迎来到冒险世界');
+      final other = await seedCharacter(name: '路人');
+      final conv = await seedConversation(other.id);
+      await sendUserMessage(conv.id, '闲聊内容');
+
+      expect(await repo.searchMessages('欢迎来到冒险世界'), isEmpty);
+    });
+
+    test('中文子串命中 + 英文大小写不敏感命中（SQLite LIKE 语义）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '今天天气不错');
+      await sendUserMessage(conv.id, 'Hello World');
+
+      expect(await repo.searchMessages('天气'), hasLength(1));
+      expect(await repo.searchMessages('hello'), hasLength(1));
+      expect(await repo.searchMessages('HELLO'), hasLength(1));
+    });
+
+    test('排序：createdAt 倒序 + 同秒 id 倒序兜底', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      fakeNow = fakeNow.add(const Duration(seconds: 10));
+      final m1 = await sendUserMessage(conv.id, '关键词 alpha'); // t=+10, id 较小
+      fakeNow = fakeNow.add(const Duration(seconds: -5)); // 回到 t=+5
+      final m2 = await sendUserMessage(conv.id, '关键词 beta'); // t=+5, id 较小
+      final m3 = await sendUserMessage(conv.id, '关键词 gamma'); // t=+5, id 较大
+
+      final hits = await repo.searchMessages('关键词');
+
+      expect(hits.map((h) => h.message.id), [m1.id, m3.id, m2.id]);
+    });
+
+    test('limit 默认 50 截断（>50 条命中只回 50）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      for (var i = 0; i < 55; i++) {
+        await sendUserMessage(conv.id, '批量命中 $i');
+      }
+
+      final hits = await repo.searchMessages('批量');
+
+      expect(hits, hasLength(50));
+    });
+
+    test('空串/纯空白 → 空列表（不抛错、零查询）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '有点内容');
+
+      expect(await repo.searchMessages(''), isEmpty);
+      expect(await repo.searchMessages('   '), isEmpty);
+    });
+  });
 }

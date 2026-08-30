@@ -44,9 +44,29 @@ String truncateTitle(String text, {int maxLen = 20}) {
   return '${String.fromCharCodes(collapsed.runes.take(maxLen))}…';
 }
 
+/// 消息搜索命中行 — 消息 + 所属对话 + 角色三表 join 上下文
+/// （桌面 `search_messages` 的 `(Message, Conversation, Character)` 行元组
+/// 对应物；服务层经 [SearchService] 映射为 `SearchResult` 契约）。
+class MessageSearchHit {
+  const MessageSearchHit({
+    required this.message,
+    required this.conversation,
+    required this.character,
+  });
+
+  /// 命中消息行（`content` 为全文）。
+  final Message message;
+
+  /// 所属对话行（`title` 为对话标题）。
+  final Conversation conversation;
+
+  /// 对话所属角色行（`name` / `avatar` 供结果展示）。
+  final Character character;
+}
+
 /// 消息仓储 — 表面与桌面 message 服务对应
-/// （get_messages / create_message / delete_messages_from；
-/// build_message_list / search_messages 归 M2 / M3，不在此实现）。
+/// （get_messages / create_message / delete_messages_from / search_messages；
+/// build_message_list 归 M2，不在此实现）。
 class MessageRepository {
   /// [now] 为时间戳来源注入点（测试确定性用），缺省 [DateTime.now]。
   MessageRepository(this._db, {DateTime Function()? now})
@@ -65,6 +85,52 @@ class MessageRepository {
             (t) => OrderingTerm.asc(t.id),
           ]))
         .get();
+  }
+
+  /// 跨全部对话的消息 content 模糊检索（桌面 `search_messages` 对应物）。
+  ///
+  /// - **仅匹配 `messages.content` 子串**（不搜角色名 / 对话标题 / 开场白，
+  ///   对齐桌面 `Message.content.ilike` 契约）；
+  /// - 空串 / 纯空白查询 → 空列表（不抛错、零查询短路）；
+  /// - SQLite LIKE 对 ASCII 大小写不敏感、对中文按字节子串匹配——与桌面
+  ///   ILIKE 可观察等价；
+  /// - 三表 join（messages + conversations + characters）携带对话标题 /
+  ///   角色上下文；排序 `created_at` 倒序、同秒以 `id` 倒序兜底；[limit]
+  ///   截断（缺省 50）。
+  Future<List<MessageSearchHit>> searchMessages(
+    String query, {
+    int limit = 50,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return const [];
+    }
+    final pattern = '%$trimmed%';
+    final stmt = _db.select(_db.messages).join([
+      innerJoin(
+        _db.conversations,
+        _db.conversations.id.equalsExp(_db.messages.conversationId),
+      ),
+      innerJoin(
+        _db.characters,
+        _db.characters.id.equalsExp(_db.conversations.characterId),
+      ),
+    ])
+      ..where(_db.messages.content.like(pattern))
+      ..orderBy([
+        OrderingTerm.desc(_db.messages.createdAt),
+        OrderingTerm.desc(_db.messages.id),
+      ])
+      ..limit(limit);
+    final rows = await stmt.get();
+    return [
+      for (final row in rows)
+        MessageSearchHit(
+          message: row.readTable(_db.messages),
+          conversation: row.readTable(_db.conversations),
+          character: row.readTable(_db.characters),
+        ),
+    ];
   }
 
   /// 保存单条消息（桌面 create_message 蓝本内建副作用）：
