@@ -110,7 +110,15 @@ class _ConversationView extends StatelessWidget {
   }
 }
 
-/// 对话顶栏：返回（回入口刷新最近列表）+ 会话标题。
+/// 对话顶栏导出动作（menu 值表）。
+enum _ConversationExportAction { json, markdown }
+
+/// 对话顶栏：返回（回入口刷新最近列表）+ 会话标题 + 导出菜单（⋯）。
+///
+/// M4-03 导出入口：`PopupMenuButton` 两项「导出 JSON」/「导出 Markdown」
+/// （spec A1 逐字；菜单仅在对话态渲染——入口页由 [ChatView] 分发给
+/// `ChatEntry`，本组件不出现）。导出进行中（[ChatController.exporting]）
+/// 按钮禁用防连点（控制器层另有防连点守卫双保险）。
 class _ConversationHeader extends StatelessWidget {
   const _ConversationHeader({required this.controller});
 
@@ -134,6 +142,29 @@ class _ConversationHeader extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: textTheme.titleMedium?.copyWith(color: palette.ink1),
           ),
+        ),
+        PopupMenuButton<_ConversationExportAction>(
+          tooltip: '导出对话',
+          enabled: !controller.exporting,
+          icon: const Icon(Icons.more_vert),
+          onSelected: (action) {
+            switch (action) {
+              case _ConversationExportAction.json:
+                controller.exportJson();
+              case _ConversationExportAction.markdown:
+                controller.exportMarkdown();
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: _ConversationExportAction.json,
+              child: Text('导出 JSON'),
+            ),
+            PopupMenuItem(
+              value: _ConversationExportAction.markdown,
+              child: Text('导出 Markdown'),
+            ),
+          ],
         ),
         const SizedBox(width: ConverSpacing.space2),
       ],

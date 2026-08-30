@@ -12,6 +12,8 @@
 /// （经 [MessageRepository.getMessages]）。
 library;
 
+import 'dart:async';
+
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
@@ -20,6 +22,8 @@ import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/conversation_export_file_exchange.dart';
+import 'package:conver_system_mobile/services/conversation_export_service.dart';
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/secure_store.dart' show SecretStore;
@@ -128,6 +132,66 @@ Future<void> _until(
   throw StateError('等待条件超时: $why');
 }
 
+/// 导出服务 fake（M4-03）：exportJson/exportMarkdown 返回可控 [result] /
+/// [error]，记录调用次数（断言调用链与防连点）。
+class _FakeExportService extends ConversationExportService {
+  _FakeExportService({
+    required super.conversationRepository,
+    required super.characterRepository,
+    required super.messageRepository,
+    required super.settingsReader,
+    this.result,
+    this.error,
+  });
+
+  final ConversationExportResult? result;
+  final Object? error;
+  int jsonCalls = 0;
+  int markdownCalls = 0;
+
+  @override
+  Future<ConversationExportResult?> exportJson(int conversationId) async {
+    jsonCalls++;
+    if (error != null) {
+      throw error!;
+    }
+    return result;
+  }
+
+  @override
+  Future<ConversationExportResult?> exportMarkdown(int conversationId) async {
+    markdownCalls++;
+    if (error != null) {
+      throw error!;
+    }
+    return result;
+  }
+}
+
+/// 导出 seam fake（M4-03）：exportFile 返回可控 [message] / 抛 [error]；
+/// [gate] 非空时挂起（防连点测试的「进行中」窗口）。
+class _FakeExportFileExchange extends ConversationExportFileExchange {
+  _FakeExportFileExchange({this.message, this.error, this.gate});
+
+  final String? message;
+  final Object? error;
+  final Completer<void>? gate;
+  int calls = 0;
+
+  @override
+  Future<String> exportFile(ConversationExportResult result) async {
+    calls++;
+    final g = gate;
+    if (g != null) {
+      await g.future;
+    }
+    if (error != null) {
+      throw error!;
+    }
+    return message ?? '已导出 ${result.fileName}（分享面板已打开）';
+  }
+}
+
 void main() {
   late AppDatabase db;
   late ConversationRepository convRepo;
@@ -161,10 +225,14 @@ void main() {
   /// [messageRepository] 非空时替换装配给服务与控制器的消息仓储（F1 慢落库
   /// 竞态窗口等特殊仓储注入点）；[highlightDuration] 注入高亮 3s 定时器时长
   /// （M3-04c 定时清除测试用短时长，缺省 3s 对齐桌面 HIGHLIGHT_DURATION）。
+  /// [exportService] / [exportFileExchange] 为 M4-03 导出依赖（缺省 null →
+  /// 导出方法给「导出功能未配置」notice；测试注入 fake 断言调用链）。
   ChatController wireController(
     LLMProvider provider, {
     MessageRepository? messageRepository,
     Duration? highlightDuration,
+    ConversationExportService? exportService,
+    ConversationExportFileExchange? exportFileExchange,
   }) {
     final messages = messageRepository ?? messageRepo;
     final service = ChatService(
@@ -181,6 +249,8 @@ void main() {
       characterRepository: charRepo,
       messageRepository: messages,
       highlightDuration: highlightDuration ?? const Duration(seconds: 3),
+      exportService: exportService,
+      exportFileExchange: exportFileExchange,
     );
     controller = c;
     return c;
@@ -990,6 +1060,161 @@ void main() {
           reason: '高亮集合只含 DB 正 id 目标（负 id 不干扰）');
       expect(c.highlightMessageIds.single, greaterThan(0));
       await _until(() async => !c.isStreaming, why: '回合完成');
+    });
+  });
+
+  group('导出 · M4-03 编排（exportJson / exportMarkdown）', () {
+    /// 装配带导出依赖的控制器并打开一个会话（菜单/导出的会话前提）。
+    Future<ChatController> wireOpen(
+      _FakeExportService service,
+      _FakeExportFileExchange seam,
+    ) async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        exportService: service,
+        exportFileExchange: seam,
+      );
+      await c.openConversation(conv.id);
+      return c;
+    }
+
+    ConversationExportResult resultOf(String fileName) =>
+        ConversationExportResult(
+            fileName: fileName, content: '{"conversation":{}}');
+
+    test('exportJson → 服务生成 → seam 分享 → notice = seam 文案', () async {
+      final service = _FakeExportService(
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsReader: const FakeSettingsReader(),
+        result: resultOf('艾莉亚.json'),
+      );
+      final seam = _FakeExportFileExchange(
+          message: '已导出 艾莉亚.json（分享面板已打开）');
+      final c = await wireOpen(service, seam);
+
+      await c.exportJson();
+
+      expect(service.jsonCalls, 1);
+      expect(service.markdownCalls, 0);
+      expect(seam.calls, 1);
+      expect(c.notice, '已导出 艾莉亚.json（分享面板已打开）');
+      expect(c.exporting, isFalse, reason: '完成后复位');
+    });
+
+    test('exportMarkdown → 服务生成 → seam 分享 → notice = seam 文案', () async {
+      final service = _FakeExportService(
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsReader: const FakeSettingsReader(),
+        result: resultOf('艾莉亚.md'),
+      );
+      final seam = _FakeExportFileExchange(
+          message: '已导出 艾莉亚.md（分享面板已打开）');
+      final c = await wireOpen(service, seam);
+
+      await c.exportMarkdown();
+
+      expect(service.markdownCalls, 1);
+      expect(service.jsonCalls, 0);
+      expect(seam.calls, 1);
+      expect(c.notice, '已导出 艾莉亚.md（分享面板已打开）');
+    });
+
+    test('服务返回 null（对话不存在）→ notice「对话不存在」，不触 seam', () async {
+      final service = _FakeExportService(
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsReader: const FakeSettingsReader(),
+        result: null,
+      );
+      final seam = _FakeExportFileExchange();
+      final c = await wireOpen(service, seam);
+
+      await c.exportJson();
+
+      expect(c.notice, '对话不存在');
+      expect(seam.calls, 0, reason: '对话不存在不触 seam（零副作用）');
+      expect(c.exporting, isFalse);
+    });
+
+    test('服务抛错 → notice「导出失败: ...」，不触 seam', () async {
+      final service = _FakeExportService(
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsReader: const FakeSettingsReader(),
+        error: StateError('服务炸了'),
+      );
+      final seam = _FakeExportFileExchange();
+      final c = await wireOpen(service, seam);
+
+      await c.exportJson();
+
+      expect(c.notice, contains('导出失败'));
+      expect(c.notice, contains('服务炸了'));
+      expect(seam.calls, 0);
+      expect(c.exporting, isFalse);
+    });
+
+    test('seam 抛错 → notice「导出失败: ...」（降级文案）', () async {
+      final service = _FakeExportService(
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsReader: const FakeSettingsReader(),
+        result: resultOf('艾莉亚.json'),
+      );
+      final seam = _FakeExportFileExchange(error: StateError('分享面板超时'));
+      final c = await wireOpen(service, seam);
+
+      await c.exportJson();
+
+      expect(c.notice, contains('导出失败'));
+      expect(c.notice, contains('分享面板超时'));
+      expect(seam.calls, 1, reason: 'seam 已被触达才可能抛错');
+      expect(c.exporting, isFalse);
+    });
+
+    test('导出进行中重复触发被忽略（exporting 防连点），完成后恢复', () async {
+      final gate = Completer<void>();
+      final service = _FakeExportService(
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsReader: const FakeSettingsReader(),
+        result: resultOf('艾莉亚.json'),
+      );
+      final seam = _FakeExportFileExchange(gate: gate);
+      final c = await wireOpen(service, seam);
+
+      final first = c.exportJson(); // seam 挂起（进行中）
+      expect(c.exporting, isTrue);
+      await c.exportJson(); // 防连点：进行中重复触发被忽略
+      expect(service.jsonCalls, 1, reason: '进行中重复触发不新增服务调用');
+      expect(seam.calls, 1);
+
+      gate.complete();
+      await first;
+      expect(c.notice, contains('已导出'));
+      expect(c.exporting, isFalse, reason: '完成后恢复，可再次导出');
+    });
+
+    test('未装配导出依赖 → notice「导出功能未配置」且不挂死', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+
+      await c.exportJson();
+
+      expect(c.notice, '导出功能未配置');
+      expect(c.exporting, isFalse);
     });
   });
 }

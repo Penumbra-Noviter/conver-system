@@ -22,6 +22,8 @@ library;
 
 import 'package:conver_system_mobile/data/database/app_database.dart' show Message;
 import 'package:conver_system_mobile/data/database/tables.dart' show Role;
+import 'package:conver_system_mobile/services/conversation_export_file_exchange.dart';
+import 'package:conver_system_mobile/services/conversation_export_service.dart';
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/secure_store.dart';
@@ -35,6 +37,23 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/chat_test_env.dart';
 import '../../helpers/fake_llm_provider.dart';
+
+/// 导出 seam fake（M4-03 widget 层）：记录分享调用并返回固定文案，
+/// 不触真平台通道。
+class _FakeExportFileExchange extends ConversationExportFileExchange {
+  _FakeExportFileExchange({this.message = '已导出 艾莉亚.json（分享面板已打开）'});
+
+  final String message;
+  final List<ConversationExportResult> calls = [];
+  String? lastFileName;
+
+  @override
+  Future<String> exportFile(ConversationExportResult result) async {
+    calls.add(result);
+    lastFileName = result.fileName;
+    return message;
+  }
+}
 
 void main() {
   Future<void> pumpChat(WidgetTester tester, ChatController controller) async {
@@ -570,6 +589,97 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull, reason: '无后置 setState / 无泄漏异常');
+      await env.close();
+    });
+  });
+
+  group('导出菜单 · 顶栏 PopupMenuButton（M4-03）', () {
+    /// 装配带导出依赖（真实导出服务 + fake seam）的控制器并打开会话。
+    Future<ChatController> openWithExport(
+      WidgetTester tester,
+      ChatTestEnv env,
+      _FakeExportFileExchange seam,
+    ) async {
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final service = ConversationExportService(
+        conversationRepository: env.conversationRepository,
+        characterRepository: env.characterRepository,
+        messageRepository: env.messageRepository,
+        settingsReader: const FakeSettingsReader(),
+      );
+      final c = env.controllerOf(
+        FakeLLMProvider(tokens: const []),
+        exportService: service,
+        exportFileExchange: seam,
+      );
+      await c.loadEntry();
+      await c.openConversation(conv.id);
+      await pumpChat(tester, c);
+      return c;
+    }
+
+    testWidgets('对话页顶栏出现 ⋯ 菜单，两项逐字「导出 JSON」「导出 Markdown」',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final seam = _FakeExportFileExchange();
+      await openWithExport(tester, env, seam);
+
+      expect(find.byTooltip('导出对话'), findsOneWidget,
+          reason: '对话态顶栏有导出菜单（⋯）');
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('导出 JSON'), findsOneWidget);
+      expect(find.text('导出 Markdown'), findsOneWidget);
+      await env.close();
+    });
+
+    testWidgets('点「导出 JSON」→ controller.exportJson → seam 收到调用 → notice 显示 seam 文案',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final seam = _FakeExportFileExchange();
+      final c = await openWithExport(tester, env, seam);
+
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('导出 JSON'));
+      await tester.pumpAndSettle();
+
+      expect(seam.calls, hasLength(1));
+      expect(seam.lastFileName, endsWith('.json'));
+      expect(find.text('已导出 艾莉亚.json（分享面板已打开）'), findsOneWidget,
+          reason: '非阻塞 notice 展示 seam 返回文案');
+      expect(c.exporting, isFalse, reason: '完成后复位');
+      await env.close();
+    });
+
+    testWidgets('点「导出 Markdown」→ seam 收到 .md 调用', (tester) async {
+      final env = await ChatTestEnv.create();
+      final seam = _FakeExportFileExchange(message: '已导出 艾莉亚.md（分享面板已打开）');
+      await openWithExport(tester, env, seam);
+
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('导出 Markdown'));
+      await tester.pumpAndSettle();
+
+      expect(seam.calls, hasLength(1));
+      expect(seam.lastFileName, endsWith('.md'));
+      expect(find.text('已导出 艾莉亚.md（分享面板已打开）'), findsOneWidget);
+      await env.close();
+    });
+
+    testWidgets('入口页（无会话）不出现导出菜单', (tester) async {
+      final env = await ChatTestEnv.create();
+      final c = env.controllerOf(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      expect(c.isEntry, isTrue, reason: '停留在入口页');
+      expect(find.byTooltip('导出对话'), findsNothing,
+          reason: '无会话不出现导出菜单（入口页零菜单）');
+      expect(find.text('导出 JSON'), findsNothing);
       await env.close();
     });
   });
