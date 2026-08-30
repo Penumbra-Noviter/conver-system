@@ -14,7 +14,7 @@
   1. **F-7 契约回归 x2**：M3-04b search_view（d76e85e）+ M3-04c chat_view（ff24612）直接引用 ConverColors 违反视图层 token 契约 → 改经 `colorScheme.primary.withValues(alpha:0.13)` / `palette.border`，静态不变量 `view_theme_tokens_test` 真实绿
   2. **期末四项**（0057d9e）：NaN 温度绕过 [0,2] 裁剪（`_clampTemperature` 补 isNaN 回退 0.7，期末 Falsify 对抗发现）/ manual 回退后 next 误入步骤②（`next()` 补 manual 从①跳③）/ Escape 清空不递增 `_requestSeq` 致在途查询回填空态 / 删除角色后聊天入口陈旧 `_firstCharacter` 缓存（`invalidateEntryCache` 接入 deleteCharacter）
   3. **构建配置**（9cfc4aa）：`android/gradle.properties` 追加 `kotlin.incremental=false` + `org.gradle.parallel=false` 绕开 Kotlin daemon Windows 并行编译 storage 注册冲突（file_picker/share_plus 多模块触发）
-- **过程遥测**：票 8、波 4（并行 2+2+3+1）、merge 8；子智能体 20+（含网关故障重开 M3-05 x3——两次静默死亡半成品 +849 行接续、W3 审核重开、W3 独立复核轮）；空返回/静默死亡 3（M3-05 x2 + W3 审核 x1）；回退 0；审核 findings：W1 增量 4、W2 增量 7（含 2 真缺）、W3 增量 18 + 独立复核 12、期末四轴 14 全非阻断。**技术债净增**：0（非阻断判断不入债；M3 遗留观察：CharacterDraft 字段 docstring 不一致、校验门分置 Locality、双 timer 冗余、light 高亮 alpha 0.13 vs 0.12 位级不等可辨度、searchPreview 空查询纯函数边界）。
+- **过程遥测**：票 8、波 4（并行 2+2+3+1）、merge 8；子智能体 20+（含网关故障重开 M3-05 x3——两次静默死亡半成品 +849 行接续、W3 审核重开、W3 独立复核轮）；空返回/静默死亡 3（M3-05 x2 + W3 审核 x1）；回退 0；审核 findings：W1 增量 4、W2 增量 7（含 2 真缺）、W3 增量 18 + 独立复核 12、期末四轴 14 全非阻断。**技术债净增**：期末四轴非阻断观察按契约落盘 TECH_DEBT——F-18 校验门分置（Worth exploring，📝 待立项）+ F-23 平台真通道冒烟未深度触达（Worth exploring，📝 待立项）；F-19~F-22（CharacterDraft docstring / 双 timer / light alpha / searchPreview 边界）git grep 复核现状仍成立后 ❌ 复核关闭（处置记录留痕）。
 - **避坑（勿重蹈）**：
   1. **子代理静默死亡**：M3-05 两次 agent 无通知死亡（任务记录消失），半成品在盘（controller/view/测试已改）——「无完成通知」时立即查磁盘 worktree 状态，半成品接续而非重写（第 3 次派发接续后 DONE）
   2. **F-7 契约回归进主分支**：M3-04b/04c 视图直接引用 ConverColors 违例被合并（全量测试未跑 view_theme_tokens_test 静态不变量）——波末合并后必须跑全量（或至少静态不变量组），不能只跑受影响模块

@@ -39,13 +39,26 @@
 
 ## 候选区
 
-> 当前 0 项待立项（F-10~F-17 已 2026-08-30 全部消费移出，见下方处置记录；候选区清零）。历史消费（2026-08-29 技术债批次 F-7/F-8/F-9 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
+> 当前 2 项待立项（F-18 校验门分置 / F-23 平台真通道冒烟未深度触达，见下表）。历史消费（2026-08-29 技术债批次 F-7/F-8/F-9 处置、2026-08-30 批次 F-10~F-17 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| （空） | | | | | |
+| F-18 | **向导校验门分置两处（Locality 折损）**：步骤①③⑥ 校验在 `WizardController.next()/save()`，步骤②模板门在视图 `_handleNext`（`_step2Error`）——同属「分步校验」概念，改校验逻辑须两处维护；触发面：template 模式未选模板时视图拦截、controller 直调 `next()` 于步骤②放行 | M3 期末四轴（Architecture） | Worth exploring | 📝 待立项 | 前端向导 |
+| F-23 | **V2 卡平台真通道冒烟未深度触达**：file_picker 文件选择器 / share_plus 分享面板 / 批量删除长按多选手势在 M3 模拟器冒烟未实测（避免污染真机数据），由 126 测（card+seam fake）+ 26 测（batch）锁定——平台通道挂起型失败与手势交互的真机面待真机/后续里程碑验证 | M3 冒烟 4.5 覆盖说明 | Worth exploring | 📝 待立项 | 平台验证 |
 
 ## 技术债处置记录
+
+### 2026-08-30 — M3 期末四轴非阻断观察处置（4 项复核关闭 + 1 项待立项）
+
+> 来源：M3 期末四轴 code-review（Standards/Falsify/Architecture 非阻断判断）——按「非阻断发现落盘 TECH_DEBT」契约入账，Speculative 项 git grep 复核现状仍成立后关闭（清出机制：关闭项移出候选区，留单行摘要）。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-18 | 向导校验门分置两处（Locality） | M3 期末四轴（Architecture） | Worth exploring | 📝 待立项（候选区保留，供下轮 Grilling 拍板做/关闭） |
+| F-19 | `CharacterDraft` 13 个公开字段无独立 docstring | M3 期末四轴（Standards） | Speculative | ❌ 复核关闭：git grep 复核字段不在「公开函数必须 docstring」字面范围，`toCompanion()` 单一映射源兜底语义，补写纯美容性、零行为价值 |
+| F-20 | 高亮清除双 timer 冗余 | M3 期末四轴（Architecture） | Speculative | ❌ 复核关闭：git grep 复核 controller 与 view 各自为 dispose 独立取消（跨层生命周期），握手幂等无正确性问题，收敛引入跨层耦合 |
+| F-21 | F-7 修复后 light 主题高亮 alpha 0.13 vs 原 0.12（位级不等） | M3 期末四轴（Falsify） | Speculative | ❌ 复核关闭：git grep 复核 `withValues(alpha:0.13)` 为统一常量，感知不可辨（差 2/255），dark 位级相等已确认，为 colorScheme 消费的固有近似 |
+| F-22 | `searchPreview('', q)` 空内容取首命中分支而非 120 字回退 | M3 期末四轴（Falsify） | Speculative | ❌ 复核关闭：git grep 复核 UI 五态门禁保证实际不空串调用，纯函数层防御分支冗余 |
 
 ### 2026-08-30 — techdebt-f10-f17 批次收口：F-10~F-17 全部处置（7 做 + 1 关闭）
 
