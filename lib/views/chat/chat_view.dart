@@ -415,7 +415,7 @@ class _UserBubble extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: highlighted
-              ? ConverColors.accentSoft
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.13)
               : Theme.of(context).colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(ConverRadii.bubble),
         ),
@@ -463,11 +463,11 @@ class _AssistantBubble extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: highlighted
-              ? ConverColors.accentSoft
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.13)
               : Theme.of(context).colorScheme.surfaceContainerLowest,
           border: Border.all(
             color: highlighted
-                ? ConverColors.accent
+                ? Theme.of(context).colorScheme.primary
                 : ConverPalette.of(context).border,
           ),
           borderRadius: BorderRadius.circular(ConverRadii.bubble),
@@ -569,7 +569,10 @@ class _SystemBubble extends StatelessWidget {
                 vertical: ConverSpacing.space1,
               ),
               decoration: BoxDecoration(
-                color: ConverColors.accentSoft,
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.13),
                 borderRadius: BorderRadius.circular(ConverRadii.sm),
               ),
               child: text,
