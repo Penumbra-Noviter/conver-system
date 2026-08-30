@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -33,7 +35,16 @@ class HomeShell extends StatelessWidget {
         ShellTab.characters => CharactersView(
             controller: context.read<CharactersController>(),
           ),
-        ShellTab.search => const SearchView(),
+        // M3-04c：搜索点击 → 切聊天 tab + 打开目标会话并定位高亮（桌面
+        // navigateToConversation(conversationId, { messageId }) 语义）。
+        ShellTab.search => SearchView(
+            onSelectResult: (conversationId, messageId) {
+              context.read<ShellNavigation>().select(ShellTab.chat);
+              unawaited(context
+                  .read<ChatController>()
+                  .openConversation(conversationId, highlightMessageId: messageId));
+            },
+          ),
         ShellTab.simulators => const SimulatorsView(),
         ShellTab.settings => SettingsView(
             settingsRepository: context.read<SettingsRepository>(),

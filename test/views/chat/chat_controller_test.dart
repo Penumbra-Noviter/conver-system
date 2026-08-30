@@ -159,10 +159,12 @@ void main() {
   /// 装配控制器：驱动真实 ChatService + [provider]。
   ///
   /// [messageRepository] 非空时替换装配给服务与控制器的消息仓储（F1 慢落库
-  /// 竞态窗口等特殊仓储注入点）。
+  /// 竞态窗口等特殊仓储注入点）；[highlightDuration] 注入高亮 3s 定时器时长
+  /// （M3-04c 定时清除测试用短时长，缺省 3s 对齐桌面 HIGHLIGHT_DURATION）。
   ChatController wireController(
     LLMProvider provider, {
     MessageRepository? messageRepository,
+    Duration? highlightDuration,
   }) {
     final messages = messageRepository ?? messageRepo;
     final service = ChatService(
@@ -178,6 +180,7 @@ void main() {
       conversationRepository: convRepo,
       characterRepository: charRepo,
       messageRepository: messages,
+      highlightDuration: highlightDuration ?? const Duration(seconds: 3),
     );
     controller = c;
     return c;
@@ -841,6 +844,152 @@ void main() {
       expect(c.activeConversationId, isNotNull);
       expect(c.isEntry, isFalse);
       expect(c.activeConversation?.characterId, isNotNull);
+    });
+  });
+
+  group('跳转定位高亮 · openConversation highlightMessageId（M3-04c）', () {
+    /// 种子「角色 + 会话 + 单条消息」，返回 (会话 id, 目标消息 id)（高亮锚）。
+    Future<(int, int)> seedConversationWithMessage() async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final msg = await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.user,
+        content: '命中消息',
+      );
+      return (conv.id, msg.id);
+    }
+
+    test('openConversation 带 highlightMessageId → highlightMessageIds 含目标（3s 自动清除后空）',
+        () async {
+      final (convId, targetId) = await seedConversationWithMessage();
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        highlightDuration: const Duration(milliseconds: 80),
+      );
+
+      await c.openConversation(convId, highlightMessageId: targetId);
+
+      expect(c.activeConversationId, convId);
+      expect(c.highlightMessageIds, {targetId});
+      expect(c.highlightRequestSeq, greaterThan(0));
+
+      // 3s（注入 80ms）后自动清除：set 移除、seq 不回退。
+      final seqBefore = c.highlightRequestSeq;
+      await _until(() async => c.highlightMessageIds.isEmpty,
+          why: '高亮定时清除');
+      expect(c.highlightMessageIds, isEmpty);
+      expect(c.highlightRequestSeq, seqBefore, reason: '清除不改请求序号');
+    });
+
+    test('highlightMessageId 省略 → 行为与 M2 完全一致（无高亮状态）', () async {
+      final (convId, targetId) = await seedConversationWithMessage();
+      final c = wireController(FakeLLMProvider(tokens: const []));
+
+      await c.openConversation(convId);
+
+      expect(c.activeConversationId, convId);
+      expect(c.highlightMessageIds, isEmpty);
+      expect(c.highlightRequestSeq, 0);
+      expect([for (final m in c.messages) (m.role, m.content)],
+          [(Role.user, '命中消息')]);
+      expect(targetId, isPositive);
+    });
+
+    test('非目标会话不受影响：切换会话后旧高亮清除', () async {
+      final char = await seedCharacter();
+      final convA = await seedConversation(char.id);
+      final convB = await seedConversation(char.id);
+      final targetA = await messageRepo.createMessage(
+        conversationId: convA.id,
+        role: Role.user,
+        content: 'A 命中',
+      );
+      final c = wireController(FakeLLMProvider(tokens: const []));
+
+      await c.openConversation(convA.id, highlightMessageId: targetA.id);
+      expect(c.highlightMessageIds, {targetA.id});
+
+      // 打开另一个会话（无高亮）：A 的高亮清除，不串扰 B。
+      await c.openConversation(convB.id);
+      expect(c.activeConversationId, convB.id);
+      expect(c.highlightMessageIds, isEmpty,
+          reason: '切换会话清除旧高亮（验收 7：不串）');
+    });
+
+    test('backToEntry → 高亮清除（3s 内返回入口再进入无残留）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final target = await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.user,
+        content: '命中消息',
+      );
+      final c = wireController(FakeLLMProvider(tokens: const []));
+
+      await c.openConversation(conv.id, highlightMessageId: target.id);
+      expect(c.highlightMessageIds, {target.id});
+
+      await c.backToEntry();
+
+      expect(c.isEntry, isTrue);
+      expect(c.highlightMessageIds, isEmpty, reason: '返回入口清除高亮');
+    });
+
+    test('dispose 取消高亮 Timer（无泄漏：清除后 notify 不触发）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final target = await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.user,
+        content: '命中消息',
+      );
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        highlightDuration: const Duration(milliseconds: 60),
+      );
+      await c.openConversation(conv.id, highlightMessageId: target.id);
+      expect(c.highlightMessageIds, {target.id});
+
+      // dispose 取消高亮 timer：若未取消，timer 触发会调 notifyListeners 于已
+      // dispose 的 ChangeNotifier → debug 断言抛错；此处等待超过时长须静默。
+      controller = null; // 避免 tearDown 二次 dispose
+      c.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      expect(c.highlightMessageIds, isEmpty, reason: 'dispose 后 timer 已取消');
+    });
+
+    test('合成负 id 不干扰：流式占位负 id 永不进入高亮集合', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final targetId = await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.user,
+        content: '命中消息',
+      );
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['a', 'b'],
+        delay: const Duration(milliseconds: 20),
+      ));
+      await c.openConversation(conv.id, highlightMessageId: targetId.id);
+
+      await c.send('hi');
+      // 流式进行中：在途 user / assistant 占位为合成负 id（消息列表含负 id）。
+      await _until(() async {
+        final ids = [for (final m in c.messages) m.id];
+        return ids.any((id) => id < 0);
+      }, why: '流式占位合成负 id 已出现');
+
+      expect(
+        [for (final m in c.messages) if (m.id < 0) m.id],
+        isNotEmpty,
+        reason: '合成负 id 存在于消息列表（场景前提）',
+      );
+      expect(c.highlightMessageIds.single, targetId.id,
+          reason: '高亮集合只含 DB 正 id 目标（负 id 不干扰）');
+      expect(c.highlightMessageIds.single, greaterThan(0));
+      await _until(() async => !c.isStreaming, why: '回合完成');
     });
   });
 }

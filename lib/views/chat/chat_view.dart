@@ -184,14 +184,158 @@ class _NoticeBanner extends StatelessWidget {
 }
 
 /// 会话消息列表（DB 权威 + 在途合成占位），逐消息渲染角色气泡。
-class _MessageList extends StatelessWidget {
+///
+/// M3-04c 跳转定位高亮：消息气泡挂 `GlobalObjectKey('msg-<id>')`（DB 正 id；
+/// 流式合成负 id 天然不冲突），目标经 [Scrollable.ensureVisible]（alignment
+/// 0.5 居中）定位；目标不存在回落滚动到底（对齐桌面 `locateAndHighlight`）。
+///
+/// 生命周期：持有 ScrollController（回落滚底）与气泡 key 集合，监听控制器
+/// 的高亮请求序号变化调度定位；视图侧 3s 高亮清除 timer（desktop chat.js
+/// highlightTimer 语义）经 [ChatController.clearHighlight] 收口，dispose 取消。
+class _MessageList extends StatefulWidget {
   const _MessageList({required this.controller});
 
   final ChatController controller;
 
   @override
+  State<_MessageList> createState() => _MessageListState();
+}
+
+class _MessageListState extends State<_MessageList> {
+  /// ListView 滚动控制器（回落滚底 / 未挂树时估位跳近用）。
+  final ScrollController _scrollController = ScrollController();
+
+  /// 气泡 GlobalObjectKey 持有容器：同一 id 复用**同一实例**作 widget key 与
+  /// `currentContext` 查找（GlobalObjectKey 按 `identical(value)` 判等，运行时
+  /// 插值字符串不 canonical，重建 key 将查不到已挂载 context）。
+  final Map<int, GlobalObjectKey> _messageKeys = <int, GlobalObjectKey>{};
+
+  /// 视图侧 3s 高亮清除定时器（dispose 取消防泄漏；与控制器定时器双保险，
+  /// 经 [ChatController.clearHighlight] 幂等收口）。
+  Timer? _highlightTimer;
+
+  /// 已处理的高亮请求序号（防同请求重复定位滚动）。
+  int? _lastHandledSeq;
+
+  /// 当前归属会话 id（切换会话时清理气泡 key 集合，防跨会话串键）。
+  int _lastConversationId = -1;
+
+  /// 平均条目估高（px）：目标气泡未挂树（长列表懒构建）时估位跳近的粗估，
+  /// 跳近后下一帧经 ensureVisible 精确居中（不引入 ScrollablePositionedList）。
+  static const double _estimatedItemExtent = 88.0;
+
+  /// 估位跳近重试上限（防御异常数据；正常 1-2 帧收敛）。
+  static const int _maxScrollAttempts = 6;
+
+  GlobalObjectKey _keyFor(int messageId) =>
+      _messageKeys.putIfAbsent(messageId, () => GlobalObjectKey('msg-$messageId'));
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
+    // 首次挂载时高亮可能已就绪（openConversation 在装配前完成）：帧后检查。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeHandleHighlight());
+  }
+
+  void _onControllerChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeHandleHighlight());
+  }
+
+  /// 按高亮请求序号处理定位：切换会话清 key 集合；新请求 → 视图侧 3s 清除
+  /// timer + 帧后 ensureVisible；无高亮集合时清空本地状态。
+  void _maybeHandleHighlight() {
+    if (!mounted) {
+      return;
+    }
+    final controller = widget.controller;
+    final conversationId = controller.activeConversationId;
+    if (conversationId != _lastConversationId) {
+      _lastConversationId = conversationId ?? -1;
+      _messageKeys.clear();
+    }
+    final targets = controller.highlightMessageIds;
+    if (targets.isEmpty) {
+      _lastHandledSeq = null;
+      _highlightTimer?.cancel();
+      _highlightTimer = null;
+      return;
+    }
+    final seq = controller.highlightRequestSeq;
+    if (seq == _lastHandledSeq) {
+      return;
+    }
+    _lastHandledSeq = seq;
+    final targetId = targets.single;
+    // 视图侧 3s 自动清除（对齐桌面 HIGHLIGHT_DURATION=3000；直接驱控制器收口）。
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(controller.highlightDuration, () {
+      if (mounted) {
+        controller.clearHighlight();
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTargetVisible(targetId));
+  }
+
+  /// 定位 [targetId] 气泡到视口中部（alignment 0.5 居中）。
+  ///
+  /// - 目标已挂树（GlobalObjectKey currentContext 可用）→ ensureVisible 居中；
+  /// - 目标在列表但未挂树（懒构建/深位）→ 按 index 估位跳近后下一帧精确定位
+  ///   （有界重试）；
+  /// - 目标不在已加载列表（删除/未加载）→ 回落滚动到底（桌面语义，不出错）。
+  void _ensureTargetVisible(int targetId, {int attempt = 0}) {
+    if (!mounted) {
+      return;
+    }
+    final bubbleContext = _messageKeys[targetId]?.currentContext;
+    if (bubbleContext != null) {
+      Scrollable.ensureVisible(bubbleContext, alignment: 0.5);
+      return;
+    }
+    final messages = widget.controller.messages;
+    final index = messages.indexWhere((m) => m.id == targetId);
+    if (index < 0) {
+      _scrollToBottom();
+      return;
+    }
+    if (attempt >= _maxScrollAttempts || !_scrollController.hasClients) {
+      return; // 防御：目标可达但异常（测试环境不挂起）；下轮高亮请求会重试。
+    }
+    final position = _scrollController.position;
+    final targetOffset =
+        (index * _estimatedItemExtent).clamp(0.0, position.maxScrollExtent);
+    if ((targetOffset - position.pixels).abs() > 1.0) {
+      position.jumpTo(targetOffset);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureTargetVisible(targetId, attempt: attempt + 1);
+    });
+  }
+
+  /// 回落滚动到底（目标不存在 / 未加载）。
+  void _scrollToBottom() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    final position = _scrollController.position;
+    position.jumpTo(position.maxScrollExtent);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    _highlightTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final messages = controller.messages;
+    final messages = widget.controller.messages;
     if (messages.isEmpty) {
       final palette = ConverPalette.of(context);
       final textTheme = Theme.of(context).textTheme;
@@ -213,6 +357,7 @@ class _MessageList extends StatelessWidget {
       );
     }
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.symmetric(
         horizontal: ConverSpacing.space4,
         vertical: ConverSpacing.space3,
@@ -220,16 +365,27 @@ class _MessageList extends StatelessWidget {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
+        // 高亮命中：controller 集合按 DB 正 id 判定（合成负 id 永不命中）。
+        final highlighted =
+            widget.controller.highlightMessageIds.contains(message.id);
         return Padding(
+          key: _keyFor(message.id),
           padding: const EdgeInsets.symmetric(vertical: ConverSpacing.space2),
           child: switch (message.role) {
-            Role.user => _UserBubble(content: message.content),
+            Role.user => _UserBubble(
+                content: message.content,
+                highlighted: highlighted,
+              ),
             Role.assistant => _AssistantBubble(
-                controller: controller,
+                controller: widget.controller,
                 message: message,
                 isLast: index == messages.length - 1,
+                highlighted: highlighted,
               ),
-            Role.system => _SystemBubble(content: message.content),
+            Role.system => _SystemBubble(
+                content: message.content,
+                highlighted: highlighted,
+              ),
           },
         );
       },
@@ -237,11 +393,14 @@ class _MessageList extends StatelessWidget {
   }
 }
 
-/// user 消息气泡：右对齐 + 面板层底色。
+/// user 消息气泡：右对齐 + 面板层底色（M3-04c 高亮时为琥珀 wash 底）。
 class _UserBubble extends StatelessWidget {
-  const _UserBubble({required this.content});
+  const _UserBubble({required this.content, this.highlighted = false});
 
   final String content;
+
+  /// 跳转定位高亮命中（琥珀 wash 底色，对齐桌面 `search-highlight`）。
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +414,9 @@ class _UserBubble extends StatelessWidget {
           vertical: ConverSpacing.space2,
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+          color: highlighted
+              ? ConverColors.accentSoft
+              : Theme.of(context).colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(ConverRadii.bubble),
         ),
         child: Text(
@@ -275,11 +436,15 @@ class _AssistantBubble extends StatelessWidget {
     required this.controller,
     required this.message,
     required this.isLast,
+    this.highlighted = false,
   });
 
   final ChatController controller;
   final ChatUiMessage message;
   final bool isLast;
+
+  /// 跳转定位高亮命中（琥珀 wash 底色，对齐桌面 `search-highlight`）。
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -297,9 +462,13 @@ class _AssistantBubble extends StatelessWidget {
           vertical: ConverSpacing.space2,
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          color: highlighted
+              ? ConverColors.accentSoft
+              : Theme.of(context).colorScheme.surfaceContainerLowest,
           border: Border.all(
-            color: ConverPalette.of(context).border,
+            color: highlighted
+                ? ConverColors.accent
+                : ConverPalette.of(context).border,
           ),
           borderRadius: BorderRadius.circular(ConverRadii.bubble),
         ),
@@ -375,24 +544,40 @@ class _AssistantBubble extends StatelessWidget {
   }
 }
 
-/// system 角色（开场白元信息等）：居中弱化小字。
+/// system 角色（开场白元信息等）：居中弱化小字（M3-04c 高亮时琥珀 wash 底）。
 class _SystemBubble extends StatelessWidget {
-  const _SystemBubble({required this.content});
+  const _SystemBubble({required this.content, this.highlighted = false});
 
   final String content;
+
+  /// 跳转定位高亮命中（琥珀 wash 底色，对齐桌面 `search-highlight`）。
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
     final palette = ConverPalette.of(context);
+    final text = Text(
+      content,
+      style: TextStyle(fontSize: 12.5, color: palette.ink4),
+    );
     return Align(
       alignment: Alignment.center,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: ConverSpacing.space8),
-        child: Text(
-          content,
-          style: TextStyle(fontSize: 12.5, color: palette.ink4),
-        ),
-      ),
+      child: highlighted
+          ? Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ConverSpacing.space3,
+                vertical: ConverSpacing.space1,
+              ),
+              decoration: BoxDecoration(
+                color: ConverColors.accentSoft,
+                borderRadius: BorderRadius.circular(ConverRadii.sm),
+              ),
+              child: text,
+            )
+          : Padding(
+              padding: const EdgeInsets.symmetric(horizontal: ConverSpacing.space8),
+              child: text,
+            ),
     );
   }
 }
