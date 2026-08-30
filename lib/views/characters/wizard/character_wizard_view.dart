@@ -1,15 +1,24 @@
-/// 6 步角色创建向导全屏页（M3-02a 切片：手动创建路径）。
+/// 6 步角色创建向导全屏页（M3-02a 切片：手动创建路径 + 状态机；M3-02b
+/// 追加步骤②真 UI：模板网格 / import 占位 + 视图层校验）。
 ///
 /// 语义锚点（spec §Implementation Decisions 6 步向导 + 桌面
 /// character-wizard.js renderStep / validateStep / handleSave）：
 /// - 全屏 Scaffold + AppBar（标题随步骤；返回 = 上一步，step1 返回 = 退出）
 ///   + 步骤指示器（进度条 + 6 点）;
 /// - 步骤①三卡片（智能导入 / 从模板开始 / 手动创建），手动选中直接跳③；
-///   步骤②占位文案「模板/导入随 M3-02b 交付」；步骤③基本信息（name
-///   maxLength=100 / description maxLength=200 / avatar / tags splitTags）；
+///   步骤②（M3-02b）：template → 5 模板卡（name/description/tags 逐字来自
+///   `characterTemplates.dart`，点击 [WizardController.selectTemplate] 填充 +
+///   选中高亮，再次进入保持选中态）；import → 多行 textarea（占位含「粘贴
+///   角色设定文档」语义）+ 「AI 智能解析」按钮 disabled + 逐字文案「文档
+///   AI 解析随 M4 交付」（不调任何 parse 接口）；步骤②视图层校验：template
+///   未选下一步 → 「请选择一个模板」拦截（controller 只读既有状态机，
+///   本层拦截不越权）；import 模式放行（不受内容影响）；
+///   步骤③基本信息（name maxLength=100 / description maxLength=200 / avatar
+///   / tags splitTags），字段 initialValue 绑定 controller 回显模板/已填值；
 ///   步骤④人格设定；步骤⑤对话风格；步骤⑥四段摘要 + 温度滑块；
 /// - 校验门文案（「请选择一种创建方式」/「角色名称不能为空」）由
-///   [WizardController.error] 提供，本层展示；
+///   [WizardController.error] 提供；「请选择一个模板」由本层步骤②校验
+///   提供；均经 _ErrorBanner 展示；
 /// - 保存：⑥「保存角色」→ [WizardController.save] 成功 → 触发 [onSaved]
 ///   回调（列表刷新）→ pop 返回。
 ///
@@ -19,6 +28,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../data/character_templates.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/conver_palette.dart';
 import 'character_wizard_controller.dart';
@@ -51,6 +61,10 @@ class CharacterWizardView extends StatefulWidget {
 }
 
 class _CharacterWizardViewState extends State<CharacterWizardView> {
+  /// 步骤②视图层校验错误（template 未选拦截）。controller 为只读共享件，
+  /// 本错误状态由本层持有并在步骤切换时清除，不越权写 controller。
+  String? _step2Error;
+
   /// 向导控制器由入口（characters_view._openWizard）内联创建、本视图拥有
   /// 生命周期——pop 时 dispose（ChangeNotifier 惯例）。
   @override
@@ -67,6 +81,7 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
         final controller = widget.controller;
         final stepTitle =
             _stepTitles[(controller.step - 1).clamp(0, _stepTitles.length - 1)];
+        final error = controller.error ?? _step2Error;
         return Scaffold(
           appBar: AppBar(
             title: Text(stepTitle),
@@ -100,8 +115,7 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
                     child: _buildStep(context, controller),
                   ),
                 ),
-                if (controller.error != null)
-                  _ErrorBanner(message: controller.error!),
+                if (error != null) _ErrorBanner(message: error),
               ],
             ),
           ),
@@ -117,6 +131,7 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
 
   /// AppBar / 系统返回：step>1 → 上一步；step1 → 退出（零副作用）。
   void _handleBack(BuildContext context) {
+    setState(() => _step2Error = null);
     if (widget.controller.step > 1) {
       widget.controller.prev();
       return;
@@ -125,7 +140,9 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
     Navigator.of(context).pop();
   }
 
-  /// 下一步：⑥保存角色；其余 next（校验失败错误由 controller.error 展示）。
+  /// 下一步：⑥保存角色；其余 next（校验失败错误由 controller.error 或本层
+  /// _step2Error 展示）。步骤②视图层校验：template 未选 → 「请选择一个模板」
+  /// 拦截；import 模式放行（不受内容影响）。
   Future<void> _handleNext(BuildContext context) async {
     final controller = widget.controller;
     if (controller.step == 6) {
@@ -138,6 +155,13 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
       }
       return;
     }
+    if (controller.step == 2 &&
+        controller.mode == WizardCreationMode.template &&
+        controller.selectedTemplateId == null) {
+      setState(() => _step2Error = '请选择一个模板');
+      return;
+    }
+    setState(() => _step2Error = null);
     controller.next();
   }
 
@@ -145,7 +169,13 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
   Widget _buildStep(BuildContext context, WizardController controller) {
     return switch (controller.step) {
       1 => _Step1(mode: controller.mode, onSelect: controller.selectMode),
-      2 => const _Step2Placeholder(),
+      2 => _Step2(
+          controller: controller,
+          onSelectTemplate: (String id) {
+            setState(() => _step2Error = null);
+            controller.selectTemplate(id);
+          },
+        ),
       3 => _Step3(controller: controller),
       4 => _Step4(controller: controller),
       5 => _Step5(controller: controller),
@@ -333,37 +363,188 @@ class _ModeCard extends StatelessWidget {
   }
 }
 
-/// 步骤②占位（模板网格 / 导入随 M3-02b 交付）。
-class _Step2Placeholder extends StatelessWidget {
-  const _Step2Placeholder();
+/// 步骤②（M3-02b 真 UI）：template → 5 模板网格；import → textarea 占位 +
+/// disabled 解析按钮 + M4 文案。按 [WizardController.mode] 分派。
+class _Step2 extends StatelessWidget {
+  const _Step2({required this.controller, required this.onSelectTemplate});
+
+  final WizardController controller;
+  final ValueChanged<String> onSelectTemplate;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (controller.mode) {
+      WizardCreationMode.template => _TemplateGrid(
+          selectedId: controller.selectedTemplateId,
+          onSelect: onSelectTemplate,
+        ),
+      WizardCreationMode.import => const _ImportPlaceholder(),
+      WizardCreationMode.manual || null => const SizedBox.shrink(),
+    };
+  }
+}
+
+/// 模板网格：5 模板卡（name / description / tags 逐字来自
+/// `characterTemplates.dart`），点击 → [selectTemplate] 填充 + 选中高亮。
+class _TemplateGrid extends StatelessWidget {
+  const _TemplateGrid({required this.selectedId, required this.onSelect});
+
+  final String? selectedId;
+  final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = ConverPalette.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(ConverSpacing.space6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(ConverRadii.md),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.construction_outlined, size: 32, color: palette.ink4),
-          const SizedBox(height: ConverSpacing.space3),
-          Text(
-            '模板选择与文档导入随 M3-02b 交付',
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(color: palette.ink2),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '选择一个模板作为起点，之后可以自由修改：',
+          style: textTheme.bodyMedium?.copyWith(color: palette.ink2),
+        ),
+        const SizedBox(height: ConverSpacing.space3),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: ConverSpacing.space3,
+          crossAxisSpacing: ConverSpacing.space3,
+          childAspectRatio: 1.15,
+          children: [
+            for (final template in characterTemplates)
+              _TemplateCard(
+                template: template,
+                selected: template.id == selectedId,
+                onTap: () => onSelect(template.id),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 单张模板卡（名称 / 描述 / 标签；选中态描边高亮，对齐桌面 template-card）。
+class _TemplateCard extends StatelessWidget {
+  const _TemplateCard({
+    required this.template,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final CharacterTemplate template;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = ConverPalette.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(ConverRadii.md),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(ConverSpacing.space3),
+        decoration: BoxDecoration(
+          color: selected
+              ? colorScheme.surfaceContainerHigh
+              : colorScheme.surfaceContainerLow,
+          border: Border.all(
+            color: selected ? colorScheme.primary : palette.border,
+            width: selected ? 2 : 1,
           ),
-        ],
+          borderRadius: BorderRadius.circular(ConverRadii.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              template.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleSmall?.copyWith(color: palette.ink1),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              template.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodySmall?.copyWith(color: palette.ink3),
+            ),
+            const SizedBox(height: ConverSpacing.space2),
+            Wrap(
+              spacing: ConverSpacing.space1,
+              runSpacing: 2,
+              children: [
+                for (final tag in template.tags)
+                  Text(
+                    '#$tag',
+                    style: textTheme.labelSmall?.copyWith(color: palette.ink2),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// 步骤③：基本信息（name / description / avatar / tags）。
+/// import 占位（M4 交付 handler 前保留 UI 骨架）：多行 textarea + disabled
+/// 「AI 智能解析」按钮 + 逐字文案「文档 AI 解析随 M4 交付」。
+class _ImportPlaceholder extends StatelessWidget {
+  const _ImportPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = ConverPalette.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '粘贴角色设定文档或简介，AI 将自动提取角色信息：',
+          style: textTheme.bodyMedium?.copyWith(color: palette.ink2),
+        ),
+        const SizedBox(height: ConverSpacing.space3),
+        TextField(
+          maxLines: 10,
+          minLines: 6,
+          keyboardType: TextInputType.multiline,
+          decoration: const InputDecoration(
+            hintText: '在此粘贴角色设定文档、小说片段、角色简介等',
+            border: OutlineInputBorder(),
+          ),
+          // M4 交付 handler，本票据占位：输入不触发任何解析调用（no-op）。
+          onChanged: (_) {},
+        ),
+        const SizedBox(height: ConverSpacing.space3),
+        Row(
+          children: [
+            OutlinedButton(
+              onPressed: null, // disabled：文档 AI 解析随 M4 交付
+              child: const Text('AI 智能解析'),
+            ),
+            const SizedBox(width: ConverSpacing.space3),
+            Expanded(
+              child: Text(
+                '文档 AI 解析随 M4 交付',
+                style: textTheme.bodySmall?.copyWith(color: palette.ink3),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 步骤③：基本信息（name / description / avatar / tags）。字段以
+/// `initialValue` 绑定 controller（M3-02b 追加，模板/已填值回显）；重进本步
+/// 重新从 controller 取当前值，用户编辑不被模板回填覆盖（controller 契约）。
 class _Step3 extends StatelessWidget {
   const _Step3({required this.controller});
 
@@ -382,8 +563,9 @@ class _Step3 extends StatelessWidget {
               ?.copyWith(color: ConverPalette.of(context).ink2),
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
           maxLength: 100,
+          initialValue: controller.name,
           decoration: const InputDecoration(
             labelText: '角色名称',
             hintText: '输入角色名称',
@@ -392,8 +574,9 @@ class _Step3 extends StatelessWidget {
           onChanged: controller.setName,
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
           maxLength: 200,
+          initialValue: controller.description,
           decoration: const InputDecoration(
             labelText: '简短描述',
             hintText: '角色的一句话简介',
@@ -402,7 +585,8 @@ class _Step3 extends StatelessWidget {
           onChanged: controller.setDescription,
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
+          initialValue: controller.avatar,
           decoration: const InputDecoration(
             labelText: '头像 URL',
             hintText: '粘贴头像链接',
@@ -411,7 +595,8 @@ class _Step3 extends StatelessWidget {
           onChanged: controller.setAvatar,
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
+          initialValue: controller.tags.join(', '),
           decoration: const InputDecoration(
             labelText: '标签',
             hintText: '如: 冒险, 奇幻, 可爱',
@@ -424,7 +609,8 @@ class _Step3 extends StatelessWidget {
   }
 }
 
-/// 步骤④：人格设定（personality / scenario / systemPrompt）。
+/// 步骤④：人格设定（personality / scenario / systemPrompt）。字段
+/// `initialValue` 绑定 controller 回显（同 _Step3 语义）。
 class _Step4 extends StatelessWidget {
   const _Step4({required this.controller});
 
@@ -443,8 +629,9 @@ class _Step4 extends StatelessWidget {
               ?.copyWith(color: ConverPalette.of(context).ink2),
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
           maxLines: 6,
+          initialValue: controller.personality,
           decoration: const InputDecoration(
             labelText: '人格设定',
             hintText: '描述角色的性格特征、说话方式、行为模式、背景故事等',
@@ -453,8 +640,9 @@ class _Step4 extends StatelessWidget {
           onChanged: controller.setPersonality,
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
           maxLines: 3,
+          initialValue: controller.scenario,
           decoration: const InputDecoration(
             labelText: '场景设定',
             hintText: '对话发生的场景和环境描述',
@@ -463,8 +651,9 @@ class _Step4 extends StatelessWidget {
           onChanged: controller.setScenario,
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
           maxLines: 3,
+          initialValue: controller.systemPrompt,
           decoration: const InputDecoration(
             labelText: '自定义 System Prompt（可选）',
             hintText: '留空则使用人格设定作为 System Prompt',
@@ -477,7 +666,8 @@ class _Step4 extends StatelessWidget {
   }
 }
 
-/// 步骤⑤：对话风格（firstMes / mesExample）。
+/// 步骤⑤：对话风格（firstMes / mesExample）。字段 `initialValue` 绑定
+/// controller 回显（同 _Step3 语义）。
 class _Step5 extends StatelessWidget {
   const _Step5({required this.controller});
 
@@ -496,8 +686,9 @@ class _Step5 extends StatelessWidget {
               ?.copyWith(color: ConverPalette.of(context).ink2),
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
           maxLines: 3,
+          initialValue: controller.firstMes,
           decoration: const InputDecoration(
             labelText: '开场白',
             hintText: '角色首次对话时自动发送的第一句话',
@@ -506,8 +697,9 @@ class _Step5 extends StatelessWidget {
           onChanged: controller.setFirstMes,
         ),
         const SizedBox(height: ConverSpacing.space3),
-        TextField(
+        TextFormField(
           maxLines: 4,
+          initialValue: controller.mesExample,
           decoration: const InputDecoration(
             labelText: '对话范例（可选）',
             hintText: '展示角色说话风格的示例对话',

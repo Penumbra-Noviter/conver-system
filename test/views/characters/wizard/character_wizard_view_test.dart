@@ -4,7 +4,9 @@
 /// character-wizard.js renderStep / validateStep / handleSave）：
 /// - 全屏 Scaffold + AppBar（返回 = 上一步）+ 步骤指示器；步骤①三卡片
 ///   （智能导入 / 从模板开始 / 手动创建），手动直接跳步骤③；
-/// - 步骤②占位页（文案含「随 M3-02b 交付」语义）；
+/// - 步骤②（M3-02b 真 UI）：template 5 模板卡 / import textarea + disabled 解析
+///   按钮 + M4 文案（占位语义随 M3-02b 交付，本文件仅保留轻量回归断言，深
+///   覆盖见 character_wizard_step2_test.dart）；
 /// - 步骤③ name 必填 maxLength=100、description maxLength=200，校验门
 ///   文案「角色名称不能为空」/「请选择一种创建方式」；
 /// - 步骤⑥四段摘要（基本信息 / 人格设定 / 对话风格 / 设置）+ 温度滑块
@@ -182,7 +184,7 @@ void main() {
       await env.close();
     });
 
-    testWidgets('智能导入进入步骤②占位页（文案含「随 M3-02b 交付」）',
+    testWidgets('智能导入进入步骤②：textarea + AI 解析按钮 disabled + M4 文案',
         (tester) async {
       final env = await _WizEnv.create();
       final c = WizardController(characterRepository: env.characterRepository);
@@ -193,8 +195,20 @@ void main() {
       await tester.tap(find.text('下一步'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('随 M3-02b 交付'), findsOneWidget,
-          reason: '步骤②占位文案（M3-02b 交付语义）');
+      expect(find.text('在此粘贴角色设定文档、小说片段、角色简介等'),
+          findsOneWidget,
+          reason: '步骤② import textarea 占位（M3-02b 真 UI）');
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'AI 智能解析'),
+            )
+            .onPressed,
+        isNull,
+        reason: 'AI 解析按钮 disabled',
+      );
+      expect(find.text('文档 AI 解析随 M4 交付'), findsOneWidget,
+          reason: 'M4 文案逐字');
       expect(c.step, 2);
       await env.close();
     });
@@ -357,7 +371,7 @@ void main() {
       await env.close();
     });
 
-    testWidgets('从模板开始卡片选中 → 步骤②占位（template 模式）',
+    testWidgets('从模板开始卡片选中 → 步骤②模板网格（template 模式）',
         (tester) async {
       final env = await _WizEnv.create();
       final c = WizardController(characterRepository: env.characterRepository);
@@ -370,7 +384,9 @@ void main() {
 
       expect(c.mode, WizardCreationMode.template);
       expect(c.step, 2);
-      expect(find.textContaining('随 M3-02b 交付'), findsOneWidget);
+      // M3-02b 真 UI：5 模板卡名称渲染（替代旧占位文案）。
+      expect(find.text('知性学姐'), findsOneWidget);
+      expect(find.text('活力猫娘'), findsOneWidget);
       await env.close();
     });
   });
