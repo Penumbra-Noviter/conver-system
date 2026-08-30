@@ -18,6 +18,7 @@ import 'package:conver_system_mobile/data/repositories/conversation_repository.d
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/character_card.dart';
 import 'package:conver_system_mobile/services/character_file_exchange.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
 import 'package:conver_system_mobile/view_models/shell_navigation.dart';
@@ -62,6 +63,9 @@ class _ThrowingExchange implements CharacterFileExchange {
   Future<String> exportCharacter(Character character) {
     throw StateError('export failed');
   }
+
+  @override
+  Future<CharacterDraft?> importCharacter() async => null;
 }
 
 /// 记录调用链 + 返回标注文案的 seam fake（断言经 seam 导出的调用链；
@@ -74,6 +78,9 @@ class FakeCharacterFileExchange implements CharacterFileExchange {
     exported.add(character);
     return '已导出 ${character.name}.json（角色导出随后续批次交付）';
   }
+
+  @override
+  Future<CharacterDraft?> importCharacter() async => null;
 }
 
 void main() {

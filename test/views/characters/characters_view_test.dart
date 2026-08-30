@@ -22,6 +22,7 @@ import 'package:conver_system_mobile/data/repositories/conversation_repository.d
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/character_card.dart';
 import 'package:conver_system_mobile/services/character_file_exchange.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
@@ -62,6 +63,9 @@ class FakeCharacterFileExchange implements CharacterFileExchange {
     exported.add(character);
     return '已导出 ${character.name}.json（角色导出随后续批次交付）';
   }
+
+  @override
+  Future<CharacterDraft?> importCharacter() async => null;
 }
 
 /// 本文件的装配基座：内存 drift + 四仓储 + ChatController + 导航 + seam fake
