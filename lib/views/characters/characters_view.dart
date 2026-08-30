@@ -10,7 +10,8 @@
 /// - 卡片四按钮：开始对话（切聊天 tab + [ChatController.createConversationFor]
 ///   直达新会话）/ 编辑（push 编辑表单）/ 导出（经 seam，Stub 占位提示）/
 ///   删除（确认文案含对话数 → 级联删除 + 列表刷新）；
-/// - 空态「暂无角色」+ 创建引导；「新建角色」入口本票留 stub（M3-02a 接真）。
+/// - 空态「暂无角色」+ 创建引导；「新建角色」入口 push 6 步向导
+///   （M3-01 留 stub，M3-02a 接真导航；[CharacterWizardView]）。
 ///
 /// 层级：呈现层。经 [CharactersController] 注入，不触碰数据层 / 平台存储
 /// （layer_boundary_test 契约）。
@@ -19,14 +20,17 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/database/app_database.dart' show Character;
 import '../../data/repositories/character_repository.dart'
-    show CharacterWithCount;
+    show CharacterRepository, CharacterWithCount;
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
 import 'character_edit_view.dart';
 import 'characters_controller.dart';
+import 'wizard/character_wizard_controller.dart';
+import 'wizard/character_wizard_view.dart';
 
 /// 角色列表页：头部 + 提示条 + 卡片列表（RefreshIndicator 包裹）。
 class CharactersView extends StatefulWidget {
@@ -66,6 +70,23 @@ class _CharactersViewState extends State<CharactersView> {
     }
   }
 
+  /// 「新建角色」入口：push 6 步向导（M3-02a 接真导航，替换 M3-01 stub）。
+  ///
+  /// WizardController 经 [CharacterRepository]（provider 装配注入）构造；
+  /// 向导保存成功后回调 [CharactersController.refresh] 刷新列表，pop 回本页。
+  Future<void> _openWizard() async {
+    final repository = context.read<CharacterRepository>();
+    final wizard = WizardController(characterRepository: repository);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CharacterWizardView(
+          controller: wizard,
+          onSaved: () => unawaited(widget.controller.refresh()),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
@@ -79,7 +100,7 @@ class _CharactersViewState extends State<CharactersView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _Header(),
+          _Header(onCreate: () => unawaited(_openWizard())),
           if (controller.notice != null)
             _NoticeBanner(
               notice: controller.notice!,
@@ -99,19 +120,12 @@ class _CharactersViewState extends State<CharactersView> {
   }
 }
 
-/// 头部：标题「角色」+ 工具栏位（M3-01 新建入口留 stub，按钮占位提示；
-/// M3-02a 接真向导）。
+/// 头部：标题「角色」+「新建角色」入口（push 向导；M3-02a 接真）。
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.onCreate});
 
-  /// 新建角色入口占位提示文案（stub，锚「随后续批次交付」语义）。
-  static const _createStubMessage = '角色创建向导随后续批次交付';
-
-  void _onCreate(BuildContext context) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: const Text(_createStubMessage)));
-  }
+  /// 新建角色入口回调（由 state 层 push 向导）。
+  final VoidCallback onCreate;
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +146,7 @@ class _Header extends StatelessWidget {
           ),
           const Spacer(),
           TextButton.icon(
-            onPressed: () => _onCreate(context),
+            onPressed: onCreate,
             icon: const Icon(Icons.add, size: 18),
             label: const Text('新建角色'),
           ),
