@@ -72,14 +72,6 @@
 | F-8 | ✅ 已修 | api_config/default_model 保存与主题切换失败路径统一「失败 SnackBar + debugPrint」，`_saving` 必复位；theme onSelectionChanged async + await（失败不改控制器态，UI 保持旧值）；settings_view 去 `catch (_) {}` 与空 onTimeout（`_loadEcho` 空回显契约保留）；控制器/仓储零改动 |
 | F-9 | ✅ 已修 | `SettingsView`/`ApiConfigSection` 构造 required 注入化，删 `AppDatabase.open()`/`FlutterSecretStore()` 视图层缺省分支与 app_database import；装配链收编 home_shell（SecretStore ← app.dart provider）；`settings_repository.dart:49` 数据层 seam 保留（边界） |
 
-### 2026-08-28 — M1-T08（波 5）收口：F-3 方案 a 处置
+### 2026-08-28 — M1-T08/T07 批次收口（已归档，折叠为一行摘要）
 
-| 编号 | 处置 | 详情 |
-|------|------|------|
-| F-3 | ✅ 已按方案 a 处置（用户此前拍板） | 时间存储维持 drift INTEGER（unix 秒）不变，零代码与 schema 变更（schemaVersion 恒 1）；tables.dart 头注释悬置表述已改写为处置声明。**M4 移交注记**：双端互迁 / ISO 口径契约归 M4 导出 JSON 层；亚秒精度损失由消息排序 `created_at, id` 兜底（同秒按 id 正序），亚秒精度移交 M4 导出层处理 |
-
-### 2026-08-28 — M1-T07（波 4）装配收口
-
-| 编号 | 处置 | 详情 |
-|------|------|------|
-| F-4 | ✅ 已按预期升级 | 契约锁已按注释退役（`test/app_contract_test.dart` 删除），行为断言迁入主题测试：`test/theme/app_theme_binding_test.dart`（pump 真实 ConverApp → 改 ThemeController → 断言 MaterialApp 实际生效对应 ThemeData；首启 dark / 双向切换判别 / 重启恢复三用例）+ `test/theme/theme_tokens_test.dart` 浅色锚定与深浅同构断言（G3） |
+> F-3 按方案 a 处置（时间存储维持 drift INTEGER、schemaVersion 恒 1；ISO 口径契约与亚秒精度移交 M4 导出 JSON 层）；F-4 装配收口（契约锁 `test/app_contract_test.dart` 退役，行为断言迁入主题测试 `app_theme_binding_test.dart` + `theme_tokens_test.dart`）。细节由 git 历史承担。

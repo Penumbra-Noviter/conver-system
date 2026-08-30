@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**当前状态**（2026-08-29）：**M2 已交付**——聊天核心：LLM Provider 双协议 SSE wire（Claude/OpenAI 直连官方协议，纯 Dart 无中间层）、ChatService 回合编排（滑窗/模板变量/重生成/停止/断流/错误映射逐字对齐桌面）、打字机 UI（两级降频：streaming 纯文本+光标、完成态 MarkdownBody）、最小临时会话入口、设置页测试连接。477 测试/analyze 0/覆盖率手写口径 95.42%；模拟器冒烟窄路径 PASS（入口/autoGreeting/发送链/错误文案/测试连接全真机实证，真实流式待配置 Key）。**上一里程碑 M1**（数据层 + 设置：4 仓储 CRUD 全语义、SecureStorage 双协议槽位、模型清单单源 8 provider/60 模型、主题三值切换，154 测试全过）。**下一站 M3**（角色 + 搜索，见 [TICKETS.md](TICKETS.md)）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
+**当前状态**（2026-08-30）：**M3 已交付**——角色 + 搜索：角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板 / V2 卡导入导出（file_picker ^12.1.2 / share_plus ^13.3.0 / path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮。729 测试/analyze 0/覆盖率剔除 drift 98.06%/四轴零阻断；冒烟 PASS（建角色→落库→搜索→跳转高亮真机实证）；merge 70bc094 + 期末修复 0057d9e/9cfc4aa；TICKETS 已归档。**上一里程碑 M2**（2026-08-29：聊天核心——LLM Provider 双协议 SSE wire + ChatService 回合编排 + 打字机 UI + 最小临时会话入口 + 设置页测试连接，477 测试/覆盖率手写口径 95.42%，真实流式待配置 Key）。**下一站 M4**（导出/文档解析：对话导出 JSON/MD + 分享；LLM 文档解析角色字段，见 [TICKETS.md](TICKETS.md)）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
 
 **核心能力**（7 项全量，无阉割）：
 - **聊天** — 多轮对话 + SSE 流式打字机渲染 + 停止生成；滑窗上下文、模板变量、重生成、错误态
