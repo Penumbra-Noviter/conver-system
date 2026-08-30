@@ -238,6 +238,42 @@ class ChatController extends ChangeNotifier {
     await openConversation(conversationId);
   }
 
+  /// 以指定角色建会话并直达（M3-01 角色卡「开始对话」入口）。
+  ///
+  /// 与 [createConversation]（取入口首角色）的差异：会话归属显式传入的
+  /// [characterId]，不依赖 [loadEntry] 缓存的首角色快照；角色不存在 / 已
+  /// 删除 → [notice] 提示且停留入口，零残留会话。两者共用
+  /// [_creatingConversation] 防连点标志（任一建会话流程进行中互相忽略）。
+  Future<void> createConversationFor(int characterId) async {
+    if (_creatingConversation) {
+      return;
+    }
+    _creatingConversation = true;
+    notifyListeners();
+    final int conversationId;
+    try {
+      final character = await _characterRepository
+          .getCharacter(characterId)
+          .timeout(const Duration(seconds: 3));
+      if (character == null) {
+        _creatingConversation = false;
+        _notice = '角色不存在或已删除：无法新建对话';
+        notifyListeners();
+        return;
+      }
+      final conversation =
+          await _conversationRepository.createConversation(characterId: characterId);
+      conversationId = conversation.id;
+    } catch (error) {
+      _creatingConversation = false;
+      _notice = '新建对话失败: $error';
+      notifyListeners();
+      return;
+    }
+    _creatingConversation = false;
+    await openConversation(conversationId);
+  }
+
   // ── 导航面 ──
 
   /// 当前是否停留在入口（最近对话列表）页。

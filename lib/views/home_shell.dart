@@ -7,6 +7,7 @@ import '../view_models/shell_navigation.dart';
 import '../view_models/theme_controller.dart';
 import 'chat/chat_controller.dart';
 import 'chat/chat_view.dart';
+import 'characters/characters_controller.dart';
 import 'characters/characters_view.dart';
 import 'search/search_view.dart';
 import 'settings/settings_view.dart';
@@ -29,7 +30,9 @@ class HomeShell extends StatelessWidget {
         ShellTab.chat => ChatView(
             controller: context.read<ChatController>(),
           ),
-        ShellTab.characters => const CharactersView(),
+        ShellTab.characters => CharactersView(
+            controller: context.read<CharactersController>(),
+          ),
         ShellTab.search => const SearchView(),
         ShellTab.simulators => const SimulatorsView(),
         ShellTab.settings => SettingsView(

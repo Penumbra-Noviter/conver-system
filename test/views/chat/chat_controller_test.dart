@@ -800,4 +800,47 @@ void main() {
           [(Role.user, 'hi'), (Role.assistant, 'ab')]);
     });
   });
+
+  group('createConversationFor · 指定角色直达会话（M3-01）', () {
+    test('指定非首角色 id → 建会话直达（开场白预插）', () async {
+      await seedCharacter(name: '首个角色');
+      final target = await seedCharacter(name: '目标角色', firstMes: '你好，{{user}}。');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry(); // 首角色 cache 为 firstChar，目标角色不入首角色
+
+      await c.createConversationFor(target.id);
+
+      expect(c.activeConversationId, isNotNull);
+      expect(c.isEntry, isFalse);
+      expect(c.activeConversation?.characterId, target.id,
+          reason: '会话归属指定角色而非首个角色');
+      expect(roleContentsOf(c), [(Role.assistant, '你好，User。')],
+          reason: '目标角色开场白经模板替换预插');
+    });
+
+    test('角色不存在 → notice 提示，停留入口且零会话', () async {
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversationFor(999999);
+
+      expect(c.isEntry, isTrue);
+      expect(c.activeConversationId, isNull);
+      expect(c.notice, contains('角色不存在'));
+      expect(await convRepo.listConversations(), isEmpty,
+          reason: '失败路径不残留会话');
+    });
+
+    test('createConversation（首角色入口）行为不回归（M3-01 前既有语义）', () async {
+      await seedCharacter(firstMes: '开场。');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversation();
+
+      expect(c.activeConversationId, isNotNull);
+      expect(c.isEntry, isFalse);
+      expect(c.activeConversation?.characterId, isNotNull);
+    });
+  });
 }

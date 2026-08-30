@@ -9,12 +9,14 @@ import 'data/repositories/conversation_repository.dart';
 import 'data/repositories/message_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'services/chat_service.dart';
+import 'services/character_file_exchange.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/secure_store.dart';
 import 'theme/conver_theme.dart';
 import 'view_models/shell_navigation.dart';
 import 'view_models/theme_controller.dart';
+import 'views/characters/characters_controller.dart';
 import 'views/chat/chat_controller.dart';
 import 'views/home_shell.dart';
 
@@ -95,6 +97,21 @@ class ConverApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(create: (_) => ShellNavigation()),
+        // M3-01 角色装配：文件交换 seam（本票 Stub）+ 角色列表控制器。
+        // 依赖 ShellNavigation 与 ChatController，故置于两者之后（嵌套
+        // provider 只能读取更外层已声明项）。导出按钮经 seam 调用（Stub
+        // 占位提示），永不触真平台通道。
+        Provider<CharacterFileExchange>(
+          create: (_) => const CharacterFileExchangeStub(),
+        ),
+        ChangeNotifierProvider<CharactersController>(
+          create: (context) => CharactersController(
+            characterRepository: context.read<CharacterRepository>(),
+            fileExchange: context.read<CharacterFileExchange>(),
+            navigation: context.read<ShellNavigation>(),
+            chatController: context.read<ChatController>(),
+          ),
+        ),
       ],
       child: Builder(
         builder: (context) {
