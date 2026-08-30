@@ -100,10 +100,14 @@ class _CharactersViewState extends State<CharactersView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(
-            onCreate: () => unawaited(_openWizard()),
-            onImport: () => unawaited(controller.importCharacter()),
-          ),
+          // 多选态：批量操作栏替换普通头部（M3-05）；否则普通头部。
+          if (controller.selectionMode)
+            _BatchBar(controller: controller)
+          else
+            _Header(
+              onCreate: () => unawaited(_openWizard()),
+              onImport: () => unawaited(controller.importCharacter()),
+            ),
           if (controller.notice != null)
             _NoticeBanner(
               notice: controller.notice!,
@@ -165,6 +169,84 @@ class _Header extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// 批量操作栏（M3-05 多选态）：实时选中数 + 批量删除（空选禁用）+ 退出。
+///
+/// 多选态下替换 [CharactersView] 普通头部；退出后恢复 [CharactersView]
+/// 普通头部（[CharactersController.exitSelectionMode]）。
+class _BatchBar extends StatelessWidget {
+  const _BatchBar({required this.controller});
+
+  /// 多选态状态持有者（选中数 / 批量删除 / 退出回调单一来源）。
+  final CharactersController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = ConverPalette.of(context);
+    final count = controller.selection.length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ConverSpacing.space4,
+        ConverSpacing.space5,
+        ConverSpacing.space2,
+        0,
+      ),
+      child: Row(
+        children: [
+          Text(
+            '已选 $count 个角色',
+            style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: '批量删除',
+            icon: Icon(
+              Icons.delete_outline,
+              color: count == 0
+                  ? palette.ink4
+                  : Theme.of(context).colorScheme.error,
+            ),
+            onPressed: count == 0 ? null : () => _confirmBatchDelete(context),
+          ),
+          IconButton(
+            tooltip: '退出多选',
+            icon: Icon(Icons.close, color: palette.ink3),
+            onPressed: controller.exitSelectionMode,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 批量删除确认：文案含选中数与级联说明（验收 3）；确认后经
+  /// [CharactersController.deleteSelected] 逐角色级联删除 + 刷新 + 退多选。
+  Future<void> _confirmBatchDelete(BuildContext context) async {
+    final count = controller.selection.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('批量删除角色'),
+        content: Text(
+          '删除将移除 $count 个角色及其对话与消息，此操作不可撤销。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await controller.deleteSelected();
+    }
   }
 }
 
@@ -281,6 +363,9 @@ class _CharacterList extends StatelessWidget {
 
 /// 单张角色卡片：头像 / 名称 / 描述（空 → personality 前 60 字）/ 开场白
 /// 预览 / 标签 / 温度 / 对话数徽标 + 四按钮。
+///
+/// M3-05 多选层追加：长按任意卡片进入多选态并勾选该卡；多选态下卡片前置
+/// 勾选框、tap 切换选中，隐藏四按钮（防批量勾选时误触单删 / 开始对话）。
 class _CharacterCard extends StatelessWidget {
   const _CharacterCard({required this.row, required this.controller});
 
@@ -290,125 +375,149 @@ class _CharacterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final character = row.character;
+    final selectionMode = controller.selectionMode;
+    final selected =
+        selectionMode && controller.selection.contains(character.id);
     final textTheme = Theme.of(context).textTheme;
     final palette = ConverPalette.of(context);
     final greeting = _preview(character.firstMes.trim(), 60);
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: ConverSpacing.space2),
-      padding: const EdgeInsets.fromLTRB(
-        ConverSpacing.space3,
-        ConverSpacing.space3,
-        ConverSpacing.space3,
-        ConverSpacing.space1,
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(ConverRadii.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Avatar(character: character),
-              const SizedBox(width: ConverSpacing.space3),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      character.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          textTheme.titleMedium?.copyWith(color: palette.ink1),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _cardDescription(character),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          textTheme.bodySmall?.copyWith(color: palette.ink2),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return GestureDetector(
+      onTap: selectionMode
+          ? () => controller.toggleSelection(character.id)
+          : null,
+      onLongPress: () {
+        controller.enterSelectionMode();
+        controller.toggleSelection(character.id);
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: ConverSpacing.space2),
+        padding: const EdgeInsets.fromLTRB(
+          ConverSpacing.space3,
+          ConverSpacing.space3,
+          ConverSpacing.space3,
+          ConverSpacing.space1,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          border: Border.all(
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : palette.border,
           ),
-          if (greeting.isNotEmpty) ...[
-            const SizedBox(height: ConverSpacing.space2),
-            Text(
-              greeting,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.bodySmall?.copyWith(color: palette.ink4),
-            ),
-          ],
-          const SizedBox(height: ConverSpacing.space2),
-          Row(
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: ConverSpacing.space2,
-                  runSpacing: 2,
-                  children: [
-                    for (final tag in character.tags)
+          borderRadius: BorderRadius.circular(ConverRadii.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (selectionMode)
+                  Checkbox(
+                    value: selected,
+                    onChanged: (_) =>
+                        controller.toggleSelection(character.id),
+                  ),
+                _Avatar(character: character),
+                const SizedBox(width: ConverSpacing.space3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '#$tag',
-                        style:
-                            textTheme.labelSmall?.copyWith(color: palette.ink3),
+                        character.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleMedium
+                            ?.copyWith(color: palette.ink1),
                       ),
-                  ],
+                      const SizedBox(height: 2),
+                      Text(
+                        _cardDescription(character),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: palette.ink2),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
+            ),
+            if (greeting.isNotEmpty) ...[
+              const SizedBox(height: ConverSpacing.space2),
               Text(
-                _temperatureLabel(character.temperature),
-                style:
-                    textTheme.labelSmall?.copyWith(color: palette.ink3),
-              ),
-              const SizedBox(width: ConverSpacing.space3),
-              _ConversationCountBadge(count: row.conversationCount),
-            ],
-          ),
-          const SizedBox(height: ConverSpacing.space2),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  onPressed: () =>
-                      unawaited(controller.startConversation(character.id)),
-                  icon: const Icon(Icons.forum_outlined, size: 18),
-                  label: const Text('开始对话'),
-                ),
-              ),
-              IconButton(
-                tooltip: '编辑',
-                icon: Icon(Icons.edit_outlined, color: palette.ink3),
-                onPressed: () => _openEdit(context),
-              ),
-              IconButton(
-                tooltip: '导出',
-                icon: Icon(
-                  Icons.file_download_outlined,
-                  color: palette.ink3,
-                ),
-                onPressed: () =>
-                    unawaited(controller.exportCharacter(character)),
-              ),
-              IconButton(
-                tooltip: '删除',
-                icon: Icon(
-                  Icons.delete_outline,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                onPressed: () => _confirmDelete(context),
+                greeting,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(color: palette.ink4),
               ),
             ],
-          ),
-        ],
+            const SizedBox(height: ConverSpacing.space2),
+            Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: ConverSpacing.space2,
+                    runSpacing: 2,
+                    children: [
+                      for (final tag in character.tags)
+                        Text(
+                          '#$tag',
+                          style: textTheme.labelSmall
+                              ?.copyWith(color: palette.ink3),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  _temperatureLabel(character.temperature),
+                  style: textTheme.labelSmall?.copyWith(color: palette.ink3),
+                ),
+                const SizedBox(width: ConverSpacing.space3),
+                _ConversationCountBadge(count: row.conversationCount),
+              ],
+            ),
+            // 多选态下隐藏四按钮（防误触；勾选交互经卡片 tap）。
+            if (!selectionMode) ...[
+              const SizedBox(height: ConverSpacing.space2),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: () =>
+                          unawaited(controller.startConversation(character.id)),
+                      icon: const Icon(Icons.forum_outlined, size: 18),
+                      label: const Text('开始对话'),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '编辑',
+                    icon: Icon(Icons.edit_outlined, color: palette.ink3),
+                    onPressed: () => _openEdit(context),
+                  ),
+                  IconButton(
+                    tooltip: '导出',
+                    icon: Icon(
+                      Icons.file_download_outlined,
+                      color: palette.ink3,
+                    ),
+                    onPressed: () =>
+                        unawaited(controller.exportCharacter(character)),
+                  ),
+                  IconButton(
+                    tooltip: '删除',
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    onPressed: () => _confirmDelete(context),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
