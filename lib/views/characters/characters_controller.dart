@@ -60,6 +60,11 @@ class CharactersController extends ChangeNotifier {
   List<CharacterWithCount> _characters = const [];
   String? _notice;
 
+  // M3-05 批量删除分区：选中集 / 多选态 / 删除中标志。
+  final Set<int> _selection = <int>{};
+  bool _selectionMode = false;
+  bool _deleting = false;
+
   /// 列表加载中（空态首次加载显示 spinner）。
   bool get loading => _loading;
 
@@ -71,6 +76,16 @@ class CharactersController extends ChangeNotifier {
 
   /// 非阻塞提示（加载失败 / 导出占位 / 删除反馈）；null 无。
   String? get notice => _notice;
+
+  /// 多选模式中（[enterSelectionMode] 进入；[exitSelectionMode] /
+  /// [deleteSelected] / 刷新完成退出）。
+  bool get selectionMode => _selectionMode;
+
+  /// 已勾选的角色 id 集（多选态 tap 切换；退出即清空）。
+  Set<int> get selection => Set<int>.unmodifiable(_selection);
+
+  /// 批量删除进行中（防重入：删除按钮删除中禁用）。
+  bool get deleting => _deleting;
 
   /// 关闭当前非阻塞提示。
   void dismissNotice() {
@@ -101,6 +116,9 @@ class CharactersController extends ChangeNotifier {
       // 成功 / 失败都算完成一次刷新（幂等可重试，对齐 ChatController.loadEntry）。
       _hasLoaded = true;
       _loading = false;
+      // 刷新完成退出多选（验收 5：多选模式下下拉刷新 / 切 tab 返回不乱态）。
+      _selectionMode = false;
+      _selection.clear();
       notifyListeners();
     }
   }
@@ -189,5 +207,77 @@ class CharactersController extends ChangeNotifier {
       return;
     }
     await refresh();
+  }
+
+  // =========================================================================
+  // M3-05 批量删除分区：长按进入多选 → 勾选 → 批量删除（级联 FK 兜底）→
+  // 列表刷新 + 退多选。既有单删路径（[deleteCharacter]）不动。
+  // =========================================================================
+
+  /// 进入多选模式：清空选中集后置位（长按任意卡片触发；进入时选中数为 0，
+  /// 删除按钮禁用由视图层据 [selection] 判空控制）。
+  void enterSelectionMode() {
+    if (_selectionMode) {
+      return;
+    }
+    _selectionMode = true;
+    _selection.clear();
+    notifyListeners();
+  }
+
+  /// 退出多选模式并清空选中集（批量操作栏「退出」按钮；零副作用）。
+  void exitSelectionMode() {
+    if (!_selectionMode && _selection.isEmpty) {
+      return;
+    }
+    _selectionMode = false;
+    _selection.clear();
+    notifyListeners();
+  }
+
+  /// 多选模式下切换 [characterId] 勾选 / 取消（选中数实时反映）。
+  ///
+  /// 非多选态调用为 no-op（零副作用）。
+  void toggleSelection(int characterId) {
+    if (!_selectionMode) {
+      return;
+    }
+    if (!_selection.add(characterId)) {
+      _selection.remove(characterId);
+    }
+    notifyListeners();
+  }
+
+  /// 批量删除：逐角色经 [deleteCharacter] 删除（级联由 FK CASCADE +
+  /// `PRAGMA foreign_keys=ON` 兜底），返回实际删除数。
+  ///
+  /// - 空选 / 删除进行中（[_deleting] 防重入）→ 返回 0 零副作用；
+  /// - 循环前快照选中集（[deleteCharacter] 内部 refresh 会清空选中态，
+  ///   迭代不依赖可变集合）；
+  /// - 循环结束后退出多选并清空选中集。
+  Future<int> deleteSelected() async {
+    if (_deleting) {
+      return 0;
+    }
+    if (_selection.isEmpty) {
+      return 0;
+    }
+    _deleting = true;
+    notifyListeners();
+    final ids = List<int>.of(_selection);
+    var deleted = 0;
+    try {
+      for (final id in ids) {
+        if (await deleteCharacter(id)) {
+          deleted++;
+        }
+      }
+    } finally {
+      _deleting = false;
+      _selectionMode = false;
+      _selection.clear();
+      notifyListeners();
+    }
+    return deleted;
   }
 }
