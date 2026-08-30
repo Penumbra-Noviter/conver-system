@@ -399,6 +399,16 @@ class ChatController extends ChangeNotifier {
     await loadEntry();
   }
 
+  /// 失效入口缓存（角色被删后调用）：重置 [hasLoadedEntry] 与首角色快照，
+  /// 下次进入聊天 tab 时 [loadEntry] 重载——避免「新建对话」沿用已删角色 id
+  /// 触发 FK 约束失败（M3-01 增量审核 F1 陈旧缓存缺口修复）。
+  void invalidateEntryCache() {
+    _hasLoadedEntry = false;
+    _firstCharacter = null;
+    _notice = null;
+    notifyListeners();
+  }
+
   // ── 会话面 ──
 
   /// 组装展示消息列表：DB 权威消息 + 在途合成消息（user + 流式/停止占位）。

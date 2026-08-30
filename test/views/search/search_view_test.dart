@@ -376,6 +376,47 @@ void main() {
       expect(find.textContaining('星空旧结果'), findsNothing,
           reason: '过期旧查询结果被丢弃');
     });
+
+    testWidgets('Escape 清空后在途慢查询返回不得回填空态（W2 真缺回归）',
+        (tester) async {
+      final slow = Completer<List<SearchResult>>();
+      final service = _FakeSearchService()..pending = slow;
+      await pumpView(tester, service: service);
+
+      // 输入触发查询：防抖 300ms 后挂起在 Completer 上（searching 态）。
+      await tester.enterText(find.byType(TextField), '星空');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+      expect(service.callCount, 1, reason: '查询已发出（在途）');
+
+      // Escape 清空 → 回空态。
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(find.text('输入关键词搜索所有对话中的消息'), findsOneWidget,
+          reason: 'Escape 后回空态');
+
+      // 在途查询此刻才返回：内容若回填则违反「清空后不再显示结果」。
+      slow.complete([
+        SearchResult(
+          messageId: 10,
+          conversationId: 3,
+          conversationTitle: '夜话',
+          characterId: 1,
+          characterName: '艾莉亚',
+          characterAvatar: null,
+          role: 'user',
+          content: '星空旧结果',
+          createdAt: DateTime(2026, 8, 30, 12, 34),
+        ),
+      ]);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.textContaining('星空旧结果'), findsNothing,
+          reason: '清空后在途查询返回不得回填空态');
+      expect(find.text('输入关键词搜索所有对话中的消息'), findsOneWidget,
+          reason: '空态保持');
+    });
   });
 
   group('结果渲染 · 真实 SearchService + 内存库契约（验收 3/5/7）', () {

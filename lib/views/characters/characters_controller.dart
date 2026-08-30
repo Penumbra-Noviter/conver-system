@@ -139,6 +139,11 @@ class CharactersController extends ChangeNotifier {
     final active = _chatController.activeConversation;
     if (active != null && active.characterId == characterId) {
       await _chatController.backToEntry();
+    } else {
+      // 删除非活动会话所属角色时入口缓存仍可能指向已删角色（如列表首个）——
+      // 失效缓存，下次进入聊天 tab 重载，避免「新建对话」沿用已删 id 触发 FK 失败
+      // （M3-01 增量审核 F1 陈旧缓存缺口修复）。
+      _chatController.invalidateEntryCache();
     }
     await refresh();
     return true;

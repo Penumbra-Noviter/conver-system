@@ -393,7 +393,10 @@ double _clampTemperature(Object? value) {
     return 0.7;
   }
   final temp = double.tryParse(value.toString());
-  if (temp == null) {
+  // Falsify：JSON 字面量 NaN 被 jsonDecode 宽容接受，double.tryParse 返回
+  // NaN（非 null）——NaN.clamp 仍 NaN 会在导出 jsonEncode 抛错 / debug Slider
+  // 断言，故显式 isNaN 归回默认。
+  if (temp == null || temp.isNaN) {
     return 0.7;
   }
   return temp.clamp(0.0, 2.0).toDouble();

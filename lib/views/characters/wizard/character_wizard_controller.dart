@@ -182,7 +182,9 @@ class WizardController extends ChangeNotifier {
         break;
     }
     _error = null;
-    _step++;
+    // manual 模式步骤②不出现：从①前进（回退后再前进）直接跳③，
+    // 与 prev() 从③回退到①的跳步语义对称（W2 增量审核真缺修复）。
+    _step = (_mode == WizardCreationMode.manual && _step == 1) ? 3 : _step + 1;
     notifyListeners();
     return true;
   }

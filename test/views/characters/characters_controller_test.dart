@@ -255,6 +255,22 @@ void main() {
       expect(controller.characters, hasLength(1));
     });
 
+    test('删除非活动会话角色 → 聊天入口缓存被失效（F1 陈旧缓存回归）', () async {
+      final charA = await seedCharacter(name: '甲');
+      await seedCharacter(name: '乙', secondsAgo: 3);
+      // 先让入口缓存加载（首角色 = 甲）；随后删除非活动会话所属的乙。
+      await chatController.loadEntry();
+      expect(chatController.hasLoadedEntry, isTrue);
+      expect(chatController.canCreateConversation, isTrue);
+
+      // 删除乙（其会话非活动）→ 入口缓存应失效，避免「新建对话」沿用已删角色。
+      await controller.refresh();
+      await controller.deleteCharacter(charA.id);
+
+      expect(chatController.hasLoadedEntry, isFalse,
+          reason: '删除角色后入口缓存失效，下次进入重载');
+    });
+
     test('角色不存在 → false 且零副作用 + notice', () async {
       await seedCharacter(name: '保留');
       await controller.refresh();

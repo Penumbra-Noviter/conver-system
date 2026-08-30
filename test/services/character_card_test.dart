@@ -326,6 +326,9 @@ void main() {
         ('abc', 0.7),
         ('1.2', 1.2),
         (null, 0.7),
+        // Falsify：JSON 字面量 NaN 被 jsonDecode 宽容接受——double.tryParse
+        // 返回 NaN（非 null），必须显式 isNaN 回退 0.7（NaN.clamp 仍 NaN）。
+        ('NaN', 0.7),
       ];
       for (final (raw, expected) in cases) {
         final result = fromV2Card(_v2Card({

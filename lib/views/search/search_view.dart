@@ -152,6 +152,9 @@ class _SearchViewState extends State<SearchView> {
   /// Escape 或清空按钮：清空输入 + 失焦 + 回空态（不触发查询）。
   void _clearAndReset() {
     _debounce?.cancel();
+    // 递增请求序号使在途查询作废（W2 增量审核真缺回归：不递增时
+    // 旧查询返回会把已清空的结果回填覆盖空态）。
+    _requestSeq++;
     _controller.clear();
     _focusNode.unfocus();
     setState(() {

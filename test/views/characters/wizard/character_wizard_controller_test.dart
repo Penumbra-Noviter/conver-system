@@ -91,6 +91,19 @@ void main() {
       expect(c.step, 1, reason: 'manual 步骤②不出现，回退跳过②');
     });
 
+    test('manual 回退①后再次 next 直接跳③（不误入②，W2 真缺回归）', () {
+      final c = WizardController(characterRepository: repository);
+      c.selectMode(WizardCreationMode.manual);
+      c.prev(); // ③ → ①
+      expect(c.step, 1);
+
+      final ok = c.next();
+
+      expect(ok, isTrue);
+      expect(c.step, 3,
+          reason: 'manual 步骤②不出现——回退后再前进必须跳过②直达③');
+    });
+
     test('import / template 选中 → 步骤①停留，next 进入步骤②占位页并放行',
         () {
       for (final mode in [
