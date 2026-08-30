@@ -23,6 +23,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../data/database/app_database.dart' show Character, CharactersCompanion;
 import '../../data/repositories/character_repository.dart';
+import '../../services/character_card.dart';
 import '../../services/character_file_exchange.dart';
 import '../../view_models/shell_navigation.dart';
 import '../chat/chat_controller.dart';
@@ -130,6 +131,36 @@ class CharactersController extends ChangeNotifier {
   Future<void> startConversation(int characterId) {
     _navigation.select(ShellTab.chat);
     return _chatController.createConversationFor(characterId);
+  }
+
+  /// 导入一张角色卡（M3-03）：经 [CharacterFileExchange] seam 调平台文件
+  /// 选择器选单个 `.json` → 解析归一化 → 落库 + 刷新列表 + 成功 notice。
+  ///
+  /// 语义分级（验收 2）：
+  /// - 用户取消 / 平台挂起超时降级（seam 返回 null）→ 零副作用；
+  /// - 格式错（[CardFormatException]，文案含格式引导「无法识别的角色卡
+  ///   格式」等）与校验错（[CardValidationException]，纯原因「角色名称不能
+  ///   为空」）分级转 notice；
+  /// - 其它异常 / 超时兜底「导入角色失败: $error」。
+  Future<void> importCharacter() async {
+    try {
+      final draft = await _fileExchange
+          .importCharacter()
+          .timeout(const Duration(seconds: 3));
+      if (draft == null) {
+        return; // 用户取消 / 挂起降级，零副作用。
+      }
+      await _characterRepository.createCharacter(draft.toCompanion());
+      await refresh();
+      _notice = '已导入角色「${draft.name}」';
+    } on CardFormatException catch (error) {
+      _notice = error.message;
+    } on CardValidationException catch (error) {
+      _notice = error.message;
+    } catch (error) {
+      _notice = _notice ?? '导入角色失败: $error';
+    }
+    notifyListeners();
   }
 
   /// 导出一张角色卡（本票占位）：经 [CharacterFileExchange] seam 调用，

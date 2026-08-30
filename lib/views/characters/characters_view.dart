@@ -100,7 +100,10 @@ class _CharactersViewState extends State<CharactersView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(onCreate: () => unawaited(_openWizard())),
+          _Header(
+            onCreate: () => unawaited(_openWizard()),
+            onImport: () => unawaited(controller.importCharacter()),
+          ),
           if (controller.notice != null)
             _NoticeBanner(
               notice: controller.notice!,
@@ -120,12 +123,16 @@ class _CharactersViewState extends State<CharactersView> {
   }
 }
 
-/// 头部：标题「角色」+「新建角色」入口（push 向导；M3-02a 接真）。
+/// 头部：标题「角色」+「导入角色卡」入口（M3-03）+「新建角色」入口
+/// （push 向导；M3-02a 接真）。
 class _Header extends StatelessWidget {
-  const _Header({required this.onCreate});
+  const _Header({required this.onCreate, required this.onImport});
 
   /// 新建角色入口回调（由 state 层 push 向导）。
   final VoidCallback onCreate;
+
+  /// 导入角色卡入口回调（由 state 层经 controller 调 seam）。
+  final VoidCallback onImport;
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +152,11 @@ class _Header extends StatelessWidget {
             style: textTheme.titleLarge?.copyWith(color: palette.ink1),
           ),
           const Spacer(),
+          IconButton(
+            tooltip: '导入角色卡',
+            icon: Icon(Icons.file_open_outlined, size: 18, color: palette.ink3),
+            onPressed: onImport,
+          ),
           TextButton.icon(
             onPressed: onCreate,
             icon: const Icon(Icons.add, size: 18),

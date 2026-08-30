@@ -52,6 +52,14 @@ dependencies:
   dio: ^5.11.0
   flutter_markdown_plus: ^1.0.12
 
+  # M3-03 V2 卡导入导出（钉版，共识 B）：
+  # - file_picker：导入选单个 .json（FileType.custom + allowedExtensions）
+  # - share_plus：导出分享面板（SharePlus.instance.share）
+  # - path_provider：导出先写临时目录再分享（原为传递依赖，本批转正登记）
+  file_picker: ^12.1.2
+  share_plus: ^13.3.0
+  path_provider: ^2.1.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

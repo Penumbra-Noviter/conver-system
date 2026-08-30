@@ -97,12 +97,13 @@ class ConverApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(create: (_) => ShellNavigation()),
-        // M3-01 角色装配：文件交换 seam（本票 Stub）+ 角色列表控制器。
-        // 依赖 ShellNavigation 与 ChatController，故置于两者之后（嵌套
-        // provider 只能读取更外层已声明项）。导出按钮经 seam 调用（Stub
-        // 占位提示），永不触真平台通道。
+        // M3-01 角色装配：文件交换 seam + 角色列表控制器。依赖
+        // ShellNavigation 与 ChatController，故置于两者之后（嵌套 provider
+        // 只能读取更外层已声明项）。M3-03 将 Stub 换为真实现
+        // [FilePickerShareFileExchange]（file_picker / share_plus /
+        // path_provider 平台通道收口于此；测试注入 fake seam 不触真通道）。
         Provider<CharacterFileExchange>(
-          create: (_) => const CharacterFileExchangeStub(),
+          create: (_) => FilePickerShareFileExchange(),
         ),
         ChangeNotifierProvider<CharactersController>(
           create: (context) => CharactersController(
