@@ -85,12 +85,15 @@ class ChatUiMessage {
 class ChatController extends ChangeNotifier {
   /// [chatService] 为回合编排服务；
   /// [conversationRepository] / [characterRepository] /
-  /// [messageRepository] 提供列表 / 角色来源 / 消息重载。
+  /// [messageRepository] 提供列表 / 角色来源 / 消息重载；
+  /// [highlightDuration] 为跳转定位高亮的自动清除时长（默认 3s，对齐桌面
+  /// `chat.js HIGHLIGHT_DURATION=3000`；测试注入短时长验证定时清除）。
   ChatController({
     required ChatService chatService,
     required ConversationRepository conversationRepository,
     required CharacterRepository characterRepository,
     required MessageRepository messageRepository,
+    this.highlightDuration = const Duration(seconds: 3),
   })  : _chatService = chatService,
         _conversationRepository = conversationRepository,
         _characterRepository = characterRepository,
@@ -100,6 +103,9 @@ class ChatController extends ChangeNotifier {
   final ConversationRepository _conversationRepository;
   final CharacterRepository _characterRepository;
   final MessageRepository _messageRepository;
+
+  /// 跳转定位高亮的自动清除时长（对齐桌面 `HIGHLIGHT_DURATION=3000`）。
+  final Duration highlightDuration;
 
   // ── 入口状态 ──
 
@@ -151,6 +157,20 @@ class ChatController extends ChangeNotifier {
 
   /// 合成消息 id 计数器（负值递减）。
   int _syntheticSeq = 0;
+
+  // ── 跳转定位高亮（M3-04c）──
+
+  /// 当前高亮目标消息 id 集合（DB 正 id；流式合成负 id 永不进入——正 id 判定，
+  /// 对齐 spec §Implementation Decisions 定位落实）。
+  final Set<int> _highlightMessageIds = <int>{};
+
+  /// 高亮请求序号：每次打开/重开会话带高亮 +1（视图据此识别新高亮请求并
+  /// 触发一次定位滚动；清除不递增）。
+  int _highlightRequestSeq = 0;
+
+  /// 高亮自动清除定时器（超时移除 [highlightMessageIds] 并通知；dispose 取消防
+  /// 泄漏、防「notify after dispose」）。
+  Timer? _highlightTimer;
 
   /// F4：在途 user 合成 id——[send] 进入缓冲时一次性分配并缓存（messages
   /// getter 纯读，不再每帧递减漂移）。
@@ -285,12 +305,46 @@ class ChatController extends ChangeNotifier {
   /// 当前对话行；null（未打开 / 对话被删）时 UI 回退占位标题。
   Conversation? get activeConversation => _activeConversation;
 
+  // ── 跳转定位高亮面（M3-04c）──
+
+  /// 当前高亮目标消息 id 集合（DB 正 id；高亮清除 / 换会话时清空）。
+  ///
+  /// 视图据此渲染琥珀高亮样式与定位目标；只读面，写入经 [clearHighlight] /
+  /// [openConversation] 的高亮参数。
+  Set<int> get highlightMessageIds => Set<int>.unmodifiable(_highlightMessageIds);
+
+  /// 高亮请求序号：每次新的高亮请求 +1（不同目标 / 空→有转换时），视图以
+  /// 序号变化触发一次定位滚动（清除不递增，防重复滚动）。
+  int get highlightRequestSeq => _highlightRequestSeq;
+
+  /// 立即清除当前高亮（取消定位定时器）：返回入口 / 会话切换后不残留高亮。
+  void clearHighlight() {
+    _highlightTimer?.cancel();
+    _highlightTimer = null;
+    if (_highlightMessageIds.isEmpty) {
+      return;
+    }
+    _highlightMessageIds.clear();
+    notifyListeners();
+  }
+
   /// 打开 [conversationId]：清空在途回合 → 加载消息。
   ///
-  /// 已在目标会话 → 幂等返回；流式中打开其他会话 → 先 [stop]（已累积部分
-  /// 落库，「已停止」标记交给该会话自身重载）。
-  Future<void> openConversation(int conversationId) async {
+  /// [highlightMessageId] 非空时高亮该 DB 正 id 消息（3s 自动清除；视图按
+  /// [highlightRequestSeq] 变化定位滚动）；省略时仅清除既有的高亮状态
+  /// （默认时序/语义与 M2 完全一致）。已在目标会话：
+  /// - 带高亮 → 幂等重开（重复点击同一结果：重设高亮计时，不重载消息）；
+  /// - 不带高亮 → 幂等返回（M2 零回归）。
+  ///
+  /// 流式中打开其他会话 → 先 [stop]（已累积部分落库，「已停止」标记交给该
+  /// 会话自身重载）。
+  Future<void> openConversation(int conversationId, {int? highlightMessageId}) async {
     if (_activeConversationId == conversationId) {
+      if (highlightMessageId != null) {
+        // 同会话重复点击同一结果：重设高亮（3s 计时重启），不重载消息——幂等。
+        _applyHighlight(highlightMessageId);
+        notifyListeners();
+      }
       return;
     }
     if (_isStreaming) {
@@ -321,14 +375,19 @@ class ChatController extends ChangeNotifier {
         _dbMessages.last.role == Role.assistant) {
       _stoppedMessageIds.add(_dbMessages.last.id);
     }
+    // M3-04c：消息加载完成后再落高亮（正 id 判定；开 B 会话自动清除 A 的高亮，
+    // 负 id 合成消息永不进入——验收 5/7）。
+    _applyHighlight(highlightMessageId);
     notifyListeners();
   }
 
   /// 返回入口页并刷新最近对话（标题 / 消息数已随回合变化）。
   ///
   /// 在途流式**不**中止（对齐桌面 P6.5 后台流语义）：回合继续落库，
-  /// 回到会话时经重载恢复最终状态。
+  /// 回到会话时经重载恢复最终状态。返回时清除跳转定位高亮（3s 内返回入口
+  /// 再进入无残留——验收 7）。
   Future<void> backToEntry() async {
+    clearHighlight();
     _activeConversationId = null;
     _activeConversation = null;
     _dbMessages = const [];
@@ -512,14 +571,49 @@ class ChatController extends ChangeNotifier {
 
   // ── 服务/生命周期 ──
 
-  /// 释放时取消在途流式订阅（ChatService 停止语义：已累积部分落库）。
+  /// 释放时取消在途流式订阅（ChatService 停止语义：已累积部分落库）与
+  /// 高亮定位定时器，并清空高亮状态（防泄漏 / 防「notify after dispose」）。
   @override
   void dispose() {
+    _highlightTimer?.cancel();
+    _highlightTimer = null;
+    _highlightMessageIds.clear();
     _subscription?.cancel();
     super.dispose();
   }
 
   // ── 内部 ──
+
+  /// 应用跳转定位高亮（M3-04c）。
+  ///
+  /// [highlightMessageId] 为 DB 正 id 目标（负 id 合成消息永不进入——永远按
+  /// 正 id 判定）；null → 仅清除既有高亮（取消定时器）。高亮自动清除定时器
+  /// 每次重设；同目标重复请求（幂等重开）不递增 [highlightRequestSeq]（不触发
+  /// 视图重复定位），不同目标 / 空→有转换会递增。
+  void _applyHighlight(int? highlightMessageId) {
+    _highlightTimer?.cancel();
+    _highlightTimer = null;
+    final hadHighlight = _highlightMessageIds.isNotEmpty;
+    final sameTarget = hadHighlight &&
+        highlightMessageId != null &&
+        _highlightMessageIds.single == highlightMessageId;
+    _highlightMessageIds.clear();
+    if (highlightMessageId == null) {
+      return;
+    }
+    _highlightMessageIds.add(highlightMessageId);
+    if (!sameTarget) {
+      _highlightRequestSeq++;
+    }
+    _highlightTimer = Timer(highlightDuration, () {
+      // 定时清除：集合移除 + 通知（视图离开高亮样式）。
+      if (_highlightMessageIds.isEmpty) {
+        return;
+      }
+      _highlightMessageIds.clear();
+      notifyListeners();
+    });
+  }
 
   void _onChatEvent(ChatEvent event) {
     switch (event) {

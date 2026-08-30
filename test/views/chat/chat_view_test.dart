@@ -20,10 +20,12 @@
 /// 显式 `await env.close()`（tearDown 阶段在 fake 时钟边界下可能挂起——实证）。
 library;
 
+import 'package:conver_system_mobile/data/database/app_database.dart' show Message;
 import 'package:conver_system_mobile/data/database/tables.dart' show Role;
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/secure_store.dart';
+import 'package:conver_system_mobile/theme/colors.dart' show ConverColors;
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/views/chat/chat_controller.dart';
 import 'package:conver_system_mobile/views/chat/chat_view.dart';
@@ -393,6 +395,181 @@ void main() {
       expect(find.text('聊天'), findsOneWidget);
       expect(find.text('新建对话'), findsOneWidget);
       expect(find.text('与 艾莉亚 的对话'), findsOneWidget, reason: '入口列表刷新');
+      await env.close();
+    });
+  });
+
+  group('跳转定位高亮 · GlobalObjectKey + ensureVisible + 3s 清除（M3-04c）', () {
+    /// 目标消息 GlobalObjectKey 判定器（GlobalObjectKey 按 value 判等，测试
+    /// 用 value 字符串比较，不依赖实例同一性）。
+    Finder msgKeyOf(int id) => find.byWidgetPredicate(
+          (w) => w.key is GlobalObjectKey && (w.key as GlobalObjectKey).value == 'msg-$id',
+        );
+
+    /// 渲染中带琥珀底（ConverColors.accentSoft）的气泡容器数。
+    int amberBubbleCount(WidgetTester tester) {
+      var count = 0;
+      for (final w in tester.widgetList<Container>(find.byType(Container))) {
+        final deco = w.decoration;
+        if (deco is BoxDecoration && deco.color == ConverColors.accentSoft) {
+          count++;
+        }
+      }
+      return count;
+    }
+
+    /// 种子多消息会话（无开场白 → 列表即 DB 消息），返回 (会话 id, 目标 id)。
+    Future<(int, int)> seedManyMessages(
+      ChatTestEnv env, {
+      int count = 12,
+      int targetIndex = 8,
+    }) async {
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      Message? target;
+      for (var i = 0; i < count; i++) {
+        final role = i.isEven ? Role.user : Role.assistant;
+        final msg = await env.seedMessage(
+          conversationId: conv.id,
+          role: role,
+          content: '消息 ${i + 1} 号内容',
+        );
+        if (i == targetIndex) {
+          target = msg;
+        }
+      }
+      return (conv.id, target!.id);
+    }
+
+    /// 打开会话并带高亮目标，等待定位帧完成（post-frame ensureVisible）。
+    Future<ChatController> openWithHighlight(
+      WidgetTester tester,
+      ChatTestEnv env,
+      int convId,
+      int targetId,
+    ) async {
+      final c = env.controllerOf(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await c.openConversation(convId, highlightMessageId: targetId);
+      await pumpChat(tester, c);
+      await tester.pump(); // ensureVisible 帧
+      return c;
+    }
+
+    testWidgets('目标命中 → GlobalObjectKey 挂载 + 琥珀高亮 + 滚至视口中部（验收 2/3）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, targetId) = await seedManyMessages(env);
+      final c = await openWithHighlight(tester, env, convId, targetId);
+
+      // GlobalObjectKey('msg-<id>') 存在性。
+      expect(msgKeyOf(targetId), findsOneWidget, reason: '目标气泡挂 GlobalObjectKey');
+
+      // 高亮样式：恰一个琥珀底气泡（目标气泡）。
+      expect(amberBubbleCount(tester), 1, reason: '目标气泡琥珀高亮');
+
+      // ensureVisible(alignment 0.5) 落位：目标中心位于消息列表视口的中部带。
+      final listRect = tester.getRect(find.byType(ListView));
+      final targetRect = tester.getRect(msgKeyOf(targetId));
+      final relativeY =
+          (targetRect.center.dy - listRect.top) / listRect.height;
+      expect(relativeY, inInclusiveRange(0.3, 0.7),
+          reason: 'ensureVisible 将目标滚至视口中部（非顶部非底部）');
+
+      expect(c.highlightMessageIds, {targetId});
+      // 让 3s 高亮 timer 走完（避免测试结束 pending timer 断言失败）。
+      await tester.pump(const Duration(seconds: 3));
+      await env.close();
+    });
+
+    testWidgets('3 秒后高亮自动清除（对齐桌面 3000ms 语义，验收 3）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, targetId) = await seedManyMessages(env);
+      final c = await openWithHighlight(tester, env, convId, targetId);
+      expect(amberBubbleCount(tester), 1);
+
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump();
+
+      expect(amberBubbleCount(tester), 0, reason: '3s 后琥珀高亮熄灭');
+      expect(c.highlightMessageIds, isEmpty, reason: '控制器高亮集合同步移除');
+      await env.close();
+    });
+
+    testWidgets('目标消息不存在 → 无高亮、回落滚到底部（验收 4）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, _) = await seedManyMessages(env);
+      await openWithHighlight(tester, env, convId, 999999); // 不存在 id
+
+      expect(amberBubbleCount(tester), 0, reason: '目标不存在无高亮');
+
+      final scrollable = tester.state<ScrollableState>(
+        find
+            .descendant(
+                of: find.byType(ListView),
+                matching: find.byType(Scrollable))
+            .first,
+      );
+      expect(scrollable.position.pixels, scrollable.position.maxScrollExtent,
+          reason: '目标缺失回落滚动到底部');
+      expect(tester.takeException(), isNull, reason: '不出错不挂起');
+      // 让 3s 高亮 timer 走完（避免测试结束 pending timer 断言失败）。
+      await tester.pump(const Duration(seconds: 3));
+      await env.close();
+    });
+
+    testWidgets('合成负 id 不干扰：流式占位负 id 不高亮（验收 5）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.user, content: '命中消息');
+      final target = await env.seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '目标气泡');
+      final c = env.controllerOf(TickingFakeLLMProvider(
+        tokens: const ['流', '式'],
+        delay: const Duration(milliseconds: 50),
+      ));
+      await c.loadEntry();
+      await c.openConversation(conv.id, highlightMessageId: target.id);
+      await pumpChat(tester, c);
+      await tester.pump();
+      expect(amberBubbleCount(tester), 1, reason: '目标气泡高亮');
+
+      // 发送 → 流式占位（合成负 id）持续在列表中；仍只目标气泡高亮。
+      await sendViaUi(tester, '流式触发');
+      await pumpUntil(tester, () => c.streamingText == '流', why: '首 token 到达');
+      await tester.pump(const Duration(milliseconds: 10));
+
+      final syntheticIds = [
+        for (final m in c.messages)
+          if (m.id < 0) m.id,
+      ];
+      expect(syntheticIds, isNotEmpty, reason: '流式占位负 id 存在（场景前提）');
+      expect(c.highlightMessageIds.single, greaterThan(0),
+          reason: '高亮集合只含 DB 正 id');
+      expect(amberBubbleCount(tester), 1,
+          reason: '流式占位（负 id）不被高亮');
+
+      // 回合收尾 + 3s 高亮 timer 走完（防 pending timer 断言失败）。
+      await pumpUntil(tester, () => !c.isStreaming, why: '回合完成');
+      await tester.pump(const Duration(seconds: 3));
+      await env.close();
+    });
+
+    testWidgets('视图 dispose → 取消高亮 Timer（无后置 setState，验收 3）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, targetId) = await seedManyMessages(env);
+      await openWithHighlight(tester, env, convId, targetId);
+      expect(amberBubbleCount(tester), 1);
+
+      // 卸载视图（控制器存活，其 3s Timer 仍在）：dispose 取消视图侧 timer。
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull, reason: '无后置 setState / 无泄漏异常');
       await env.close();
     });
   });
