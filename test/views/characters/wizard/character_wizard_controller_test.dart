@@ -19,9 +19,16 @@ library;
 import 'package:conver_system_mobile/data/database/app_database.dart'
     show AppDatabase, Character, CharactersCompanion;
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
+import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/document_parse_service.dart';
+import 'package:conver_system_mobile/services/llm/llm_provider.dart';
+import 'package:conver_system_mobile/services/secure_store.dart';
 import 'package:conver_system_mobile/views/characters/wizard/character_wizard_controller.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../../helpers/fake_llm_provider.dart';
+import '../../../helpers/in_memory_secret_store.dart';
 
 /// createCharacter 必抛的仓储子类——命中「保存失败 → 可重试」路径。
 class _ThrowingCreateRepository extends CharacterRepository {
@@ -31,6 +38,24 @@ class _ThrowingCreateRepository extends CharacterRepository {
   Future<Character> createCharacter(CharactersCompanion data) {
     throw StateError('create failed');
   }
+}
+
+/// 用内存 drift + 假 LLM 装配真实 [DocumentParseService]（真实 service + 假 LLM，
+/// 锚 M4-04 装配先例）。
+DocumentParseService _parseService(
+  AppDatabase db,
+  LLMProvider provider, {
+  bool writeKey = true,
+}) {
+  final store = InMemorySecretStore();
+  if (writeKey) {
+    // 写 Key 走 SecretStore 槽位（不落库，测试假值）。
+    store.write(key: SecretStore.claudeApiKeySlot, value: 'sk-test');
+  }
+  return DocumentParseService(
+    settings: SettingsRepository(database: db, secretStore: store),
+    providerFactory: FixedLLMProviderFactory(provider),
+  );
 }
 
 void main() {
@@ -375,6 +400,188 @@ void main() {
       expect(c.mode, isNull);
       expect(c.name, isEmpty, reason: '表单复位');
       expect(c.saved, isFalse);
+    });
+  });
+
+  group('AI 智能解析 · parse()（工单 M4-05 验收 3/4/5）', () {
+    test('成功：跳步骤③ + fromParseResult 预填（10 字段落位 + 6 默认）', () async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, FakeLLMProvider(tokens: [
+          '{"name": "艾莉亚", "description": "森林小狐狸", "personality": "活泼", '
+          '"scenario": "森林", "first_mes": "你好，{{user}}", '
+          '"mes_example": "<START> 示例", "system_prompt": "你是小狐狸", '
+          '"post_history_instructions": "保持人设", "tags": ["冒险", "奇幻"], '
+          '"creator": "作者"}',
+        ])),
+      );
+      c.selectMode(WizardCreationMode.import);
+      expect(c.step, 1);
+      c.next(); // ①→②
+      expect(c.step, 2);
+      c.setParseText('角色设定文档……');
+
+      final ok = await c.parse();
+
+      expect(ok, isTrue);
+      expect(c.step, 3, reason: '解析成功自动跳步骤③');
+      expect(c.parsing, isFalse);
+      expect(c.parseError, isNull);
+      // fromParseResult 10 字段落位。
+      expect(c.name, '艾莉亚');
+      expect(c.description, '森林小狐狸');
+      expect(c.personality, '活泼');
+      expect(c.scenario, '森林');
+      expect(c.firstMes, '你好，{{user}}');
+      expect(c.mesExample, '<START> 示例');
+      expect(c.systemPrompt, '你是小狐狸');
+      expect(c.tags, ['冒险', '奇幻']);
+      // 6 字段默认（temperature 保持向导默认 0.7）。
+      expect(c.temperature, 0.7);
+    });
+
+    test('成功：解析后再手动编辑（步骤③可微调）', () async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, FakeLLMProvider(tokens: [
+          '{"name": "艾莉亚", "personality": "解析的人格"}',
+        ])),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+      expect(await c.parse(), isTrue);
+
+      c.setName('微调后名称');
+
+      expect(c.name, '微调后名称');
+      expect(c.personality, '解析的人格', reason: '未手动编辑字段保留解析值');
+    });
+
+    test('解析成功但 name 空 → 跳③，步骤③必填校验兜底（B8）', () async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, FakeLLMProvider(tokens: [
+          '{"description": "无名称解析", "personality": "p"}',
+        ])),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+      expect(await c.parse(), isTrue);
+      expect(c.step, 3, reason: '解析成功跳步骤③');
+      expect(c.name, isEmpty, reason: 'LLM 未提取 name → 草稿 name 空');
+
+      // 步骤③ next 被「角色名称不能为空」门兜底。
+      final ok = c.next();
+      expect(ok, isFalse);
+      expect(c.error, '角色名称不能为空');
+      expect(c.step, 3);
+    });
+
+    test('失败：DocParseError 留步骤② + parseError 直出（不跳步）', () async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, FakeLLMProvider(tokens: ['这不是 JSON'])),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+
+      final ok = await c.parse();
+
+      expect(ok, isFalse);
+      expect(c.step, 2, reason: '失败留步骤②');
+      expect(c.parseError, 'LLM 返回了无法解析的响应，请重试或手动创建',
+          reason: 'DocParseError 消息直出');
+      expect(c.parsing, isFalse, reason: '失败后复位 parsing');
+    });
+
+    test('失败：未配置 API Key → 留步骤② + 文案直出', () async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService:
+            _parseService(db, FakeLLMProvider(tokens: const []), writeKey: false),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+
+      final ok = await c.parse();
+
+      expect(ok, isFalse);
+      expect(c.step, 2);
+      expect(c.parseError, '未配置 API Key，请先在设置中填写');
+    });
+
+    test('防连点：解析中再次 parse 返回 false 且只调一次服务', () async {
+      final provider = FakeLLMProvider(
+        tokens: ['{"name": "艾莉亚"}'],
+        generateDelay: const Duration(milliseconds: 50),
+      );
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, provider),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+
+      final first = c.parse();
+      // parsing 标志在 await 前同步置位——第二次调用应被防连点拦截。
+      expect(c.parsing, isTrue, reason: '解析中 parsing 标志置位');
+      final second = c.parse();
+
+      expect(await second, isFalse, reason: '解析中再次 parse 被拦');
+      expect(await first, isTrue);
+      expect(provider.generateCallCount, 1, reason: '只调一次 LLM');
+      expect(c.step, 3);
+    });
+
+    test('空文本 parse → false 不触服务（视图已禁用，防御）', () async {
+      final provider = FakeLLMProvider(tokens: ['{"name": "艾莉亚"}']);
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, provider),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+
+      final ok = await c.parse();
+
+      expect(ok, isFalse);
+      expect(provider.generateCallCount, 0);
+      expect(c.step, 2);
+    });
+
+    test('文本超 50000 → false + 文案，不触服务', () async {
+      final provider = FakeLLMProvider(tokens: ['{"name": "艾莉亚"}']);
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, provider),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文' * (maxImportTextLength + 1));
+
+      final ok = await c.parse();
+
+      expect(ok, isFalse);
+      expect(c.parseError, importTextTooLongError);
+      expect(provider.generateCallCount, 0, reason: '超长不触 parse 服务');
+      expect(c.step, 2);
+    });
+
+    test('未注入 parseService → parse 降级返回 false（不破坏既有装配）', () async {
+      final c = WizardController(characterRepository: repository);
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+
+      final ok = await c.parse();
+
+      expect(ok, isFalse);
+      expect(c.step, 2, reason: '降级留步骤②');
     });
   });
 }

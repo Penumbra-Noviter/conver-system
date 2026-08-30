@@ -22,6 +22,7 @@ import 'package:flutter/foundation.dart' show immutable;
 
 import '../data/database/app_database.dart'
     show Character, CharactersCompanion;
+import 'document_parse_service.dart' show DocParseResult;
 
 /// 卡片格式错误——结构无法识别 / 不支持，文案含格式引导（对应桌面
 /// `CardFormatError`；路由层转 422 友好报错的移动端等价物）。
@@ -120,6 +121,34 @@ class CharacterDraft {
       extensions: Value(extensions),
       avatar: avatar == null ? const Value.absent() : Value(avatar!),
       temperature: Value(temperature),
+    );
+  }
+
+  /// 从文档解析结果 [DocParseResult] 构造角色字段快照（M4-05 预填草稿）。
+  ///
+  /// 10 字段落位：name / description / personality / scenario / first_mes /
+  /// mes_example / system_prompt / post_history_instructions / tags / creator
+  /// （LLM 解析提取的白名单字段逐字段透传）；其余 6 字段默认：
+  /// alternateGreetings=[] / version='1.0' / creatorNotes={} / extensions={} /
+  /// avatar=null / temperature=0.7（对齐桌面解析产物与新建角色缺省，spec B8）。
+  factory CharacterDraft.fromParseResult(DocParseResult result) {
+    return CharacterDraft(
+      name: result.name,
+      description: result.description,
+      personality: result.personality,
+      scenario: result.scenario,
+      firstMes: result.firstMes,
+      mesExample: result.mesExample,
+      systemPrompt: result.systemPrompt,
+      postHistoryInstructions: result.postHistoryInstructions,
+      alternateGreetings: const <String>[],
+      tags: result.tags,
+      creator: result.creator,
+      version: '1.0',
+      creatorNotes: const <String, dynamic>{},
+      extensions: const <String, dynamic>{},
+      avatar: null,
+      temperature: 0.7,
     );
   }
 }

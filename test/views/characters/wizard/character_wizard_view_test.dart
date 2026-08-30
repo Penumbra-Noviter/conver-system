@@ -4,16 +4,16 @@
 /// character-wizard.js renderStep / validateStep / handleSave）：
 /// - 全屏 Scaffold + AppBar（返回 = 上一步）+ 步骤指示器；步骤①三卡片
 ///   （智能导入 / 从模板开始 / 手动创建），手动直接跳步骤③；
-/// - 步骤②（M3-02b 真 UI）：template 5 模板卡 / import textarea + disabled 解析
-///   按钮 + M4 文案（占位语义随 M3-02b 交付，本文件仅保留轻量回归断言，深
-///   覆盖见 character_wizard_step2_test.dart）；
+/// - 步骤②：template 5 模板卡 / import textarea + 空文本禁用解析按钮（M4-05
+///   真 UI 语义，深覆盖见 character_wizard_step2_test.dart）；
 /// - 步骤③ name 必填 maxLength=100、description maxLength=200，校验门
 ///   文案「角色名称不能为空」/「请选择一种创建方式」；
 /// - 步骤⑥四段摘要（基本信息 / 人格设定 / 对话风格 / 设置）+ 温度滑块
 ///   0–2 / 默认 0.7 / 两位小数显示；空字段显示「未填写」；
 /// - 保存落库（creator 恒空）→ 成功 pop；入口 = 角色页「新建角色」push
-///   向导（经 context.read 读取 `CharacterRepository` 构造 WizardController），
-///   保存返回后列表刷新可见新角色。
+///   向导（经 context.read 读取 `CharacterRepository` 构造 WizardController，
+///   M4-05 追加 SettingsRepository + LLMProviderFactory 装配
+///   DocumentParseService），保存返回后列表刷新可见新角色。
 ///
 /// 测试 seam（公共接口边界）：[CharacterWizardView] 公开接口 +
 /// [WizardController] + 真实仓储（内存 drift）。装配基座内联于本文件。
@@ -27,6 +27,7 @@ import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/character_file_exchange.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/view_models/shell_navigation.dart';
 import 'package:conver_system_mobile/views/characters/characters_controller.dart';
@@ -184,7 +185,7 @@ void main() {
       await env.close();
     });
 
-    testWidgets('智能导入进入步骤②：textarea + AI 解析按钮 disabled + M4 文案',
+    testWidgets('智能导入进入步骤②：textarea 渲染；空文本解析按钮禁用',
         (tester) async {
       final env = await _WizEnv.create();
       final c = WizardController(characterRepository: env.characterRepository);
@@ -197,7 +198,7 @@ void main() {
 
       expect(find.text('在此粘贴角色设定文档、小说片段、角色简介等'),
           findsOneWidget,
-          reason: '步骤② import textarea 占位（M3-02b 真 UI）');
+          reason: '步骤② import textarea 渲染');
       expect(
         tester
             .widget<OutlinedButton>(
@@ -205,10 +206,10 @@ void main() {
             )
             .onPressed,
         isNull,
-        reason: 'AI 解析按钮 disabled',
+        reason: '空文本解析按钮禁用（M4-05：输入后启用）',
       );
-      expect(find.text('文档 AI 解析随 M4 交付'), findsOneWidget,
-          reason: 'M4 文案逐字');
+      expect(find.text('文档 AI 解析随 M4 交付'), findsNothing,
+          reason: 'M4 占位文案已替换为真 UI');
       expect(c.step, 2);
       await env.close();
     });
@@ -523,9 +524,20 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
-            // 入口经 context.read<CharacterRepository>() 构造 WizardController。
+            // 入口经 context.read<CharacterRepository>() 构造 WizardController；
+            // M4-05 追加 SettingsRepository + LLMProviderFactory（_openWizard 装配
+            // DocumentParseService）。
             Provider<CharacterRepository>.value(
               value: env.characterRepository,
+            ),
+            Provider<SettingsRepository>.value(
+              value: SettingsRepository(
+                database: env.db,
+                secretStore: InMemorySecretStore(),
+              ),
+            ),
+            Provider<LLMProviderFactory>.value(
+              value: FixedLLMProviderFactory(FakeLLMProvider(tokens: const ['ok'])),
             ),
           ],
           child: MaterialApp(

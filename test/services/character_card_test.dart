@@ -13,6 +13,7 @@ import 'dart:convert';
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/services/character_card.dart';
+import 'package:conver_system_mobile/services/document_parse_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 极小 PNG / JPEG 裸 base64（供 MIME 推断测试，魔数来自桌面测试 fixture）。
@@ -522,6 +523,78 @@ void main() {
       expect(result.description, '');
       expect(result.avatar, isNull);
       expect(result.version, '1.0');
+    });
+  });
+
+  group('CharacterDraft.fromParseResult（工单 M4-05 验收 5/6）', () {
+    test('10 字段落位 + 6 字段默认', () {
+      final draft = CharacterDraft.fromParseResult(
+        DocParseResult(
+          name: '艾莉亚',
+          description: '森林小狐狸',
+          personality: '活泼',
+          scenario: '森林',
+          firstMes: '你好，{{user}}',
+          mesExample: '<START> 示例',
+          systemPrompt: '你是小狐狸',
+          postHistoryInstructions: '保持人设',
+          tags: const ['冒险', '奇幻'],
+          creator: '作者',
+          parsedFields: const [
+            'name', 'description', 'personality', 'scenario', 'first_mes',
+            'mes_example', 'system_prompt', 'post_history_instructions',
+            'tags', 'creator',
+          ],
+        ),
+      );
+
+      // 10 字段落位。
+      expect(draft.name, '艾莉亚');
+      expect(draft.description, '森林小狐狸');
+      expect(draft.personality, '活泼');
+      expect(draft.scenario, '森林');
+      expect(draft.firstMes, '你好，{{user}}');
+      expect(draft.mesExample, '<START> 示例');
+      expect(draft.systemPrompt, '你是小狐狸');
+      expect(draft.postHistoryInstructions, '保持人设');
+      expect(draft.tags, ['冒险', '奇幻']);
+      expect(draft.creator, '作者');
+      // 6 字段默认。
+      expect(draft.alternateGreetings, isEmpty);
+      expect(draft.version, '1.0');
+      expect(draft.creatorNotes, isEmpty);
+      expect(draft.extensions, isEmpty);
+      expect(draft.avatar, isNull);
+      expect(draft.temperature, 0.7);
+    });
+
+    test('toCompanion 可落库：10 字段 + 6 默认进 companion', () {
+      final draft = CharacterDraft.fromParseResult(
+        DocParseResult(
+          name: '艾莉亚',
+          description: 'd',
+          personality: 'p',
+          scenario: 's',
+          firstMes: 'f',
+          mesExample: 'm',
+          systemPrompt: 'sp',
+          postHistoryInstructions: 'ph',
+          tags: const ['t1'],
+          creator: 'c',
+          parsedFields: const ['name'],
+        ),
+      );
+
+      final companion = draft.toCompanion();
+
+      expect(companion.name.value, '艾莉亚');
+      expect(companion.postHistoryInstructions.value, 'ph');
+      expect(companion.alternateGreetings.value, isEmpty);
+      expect(companion.version.value, '1.0');
+      expect(companion.creatorNotes.value, isEmpty);
+      expect(companion.extensions.value, isEmpty);
+      expect(companion.temperature.value, 0.7);
+      expect(companion.avatar.value, isNull, reason: 'avatar 缺省 Value.absent()');
     });
   });
 }

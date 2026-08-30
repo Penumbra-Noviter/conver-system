@@ -24,6 +24,10 @@ import 'package:flutter/foundation.dart';
 import '../../../data/character_templates.dart';
 import '../../../data/database/app_database.dart' show CharactersCompanion;
 import '../../../data/repositories/character_repository.dart';
+import '../../../services/character_card.dart' show CharacterDraft;
+import '../../../services/document_parse_service.dart'
+    show DocParseResult, DocumentParseService;
+import '../../../services/llm/errors.dart' show DocParseError;
 import 'package:drift/drift.dart' show Value;
 
 // 构造为公开命名参数（装配点语义）+ 私有 `_` 字段：initializing formal 无法
@@ -50,6 +54,12 @@ const double temperatureDefault = 0.7;
 /// 温度两位小数显示（对齐桌面 `formatTemperature` 的 toFixed(2) 语义）。
 String formatTemperature(double value) => value.toStringAsFixed(2);
 
+/// import 文本长度上限（B10：超出拒绝解析）。
+const int maxImportTextLength = 50000;
+
+/// import 文本过长拒绝文案（B10 逐字）。
+const String importTextTooLongError = '文本过长，最多 50000 字符';
+
 /// 逗号分隔标签文本 → 标签数组（中英文逗号、trim、空项过滤；对齐桌面
 /// `splitTags`）。
 List<String> splitTags(String text) => text
@@ -63,11 +73,16 @@ List<String> splitTags(String text) => text
 /// 装配：入口（角色页「新建角色」）构造并注入 [CharacterRepository]；
 /// 测试注入内存库仓储。保存走 [save]，cancel / 校验失败均零副作用。
 class WizardController extends ChangeNotifier {
-  /// [characterRepository] 保存落库数据源。
-  WizardController({required CharacterRepository characterRepository})
-      : _characterRepository = characterRepository;
+  /// [characterRepository] 保存落库数据源；[parseService] AI 智能解析依赖
+  /// （M4-05 可选注入：null 时 [parse] 降级返回 false，不破坏既有装配语义）。
+  WizardController({
+    required CharacterRepository characterRepository,
+    DocumentParseService? parseService,
+  })  : _characterRepository = characterRepository,
+        _parseService = parseService;
 
   final CharacterRepository _characterRepository;
+  final DocumentParseService? _parseService;
 
   // ── 状态 ──
   int _step = 1;
@@ -86,6 +101,15 @@ class WizardController extends ChangeNotifier {
   bool _saving = false;
   bool _saved = false;
   String? _error;
+
+  /// import 解析文本（步骤② textarea 绑定）。
+  String _parseText = '';
+
+  /// AI 解析进行中标志（防连点 / 视图 loading）。
+  bool _parsing = false;
+
+  /// 最近一次 AI 解析错误消息（DocParseError 直出 / 超长拒绝文案）。
+  String? _parseError;
 
   /// 已手动编辑的字段名集合——selectTemplate 只填充未手动编辑的字段
   /// （验收 5：再次手动编辑不被模板回填覆盖）。
@@ -138,6 +162,15 @@ class WizardController extends ChangeNotifier {
 
   /// 最近一次校验 / 保存错误（null = 无）。
   String? get error => _error;
+
+  /// import 解析文本（步骤② textarea 绑定）。
+  String get parseText => _parseText;
+
+  /// AI 解析进行中标志（防连点 / 视图 loading）。
+  bool get parsing => _parsing;
+
+  /// 最近一次 AI 解析错误消息（DocParseError 直出 / 超长拒绝文案）。
+  String? get parseError => _parseError;
 
   // ── 导航 ──
 
@@ -218,6 +251,9 @@ class WizardController extends ChangeNotifier {
     _saving = false;
     _saved = false;
     _error = null;
+    _parseText = '';
+    _parsing = false;
+    _parseError = null;
     _manualEdited.clear();
     notifyListeners();
   }
@@ -282,6 +318,79 @@ class WizardController extends ChangeNotifier {
   void setTemperature(double value) {
     _temperature = value.clamp(temperatureMin, temperatureMax).toDouble();
     notifyListeners();
+  }
+
+  // ── AI 智能解析（M4-05）──
+
+  /// 更新 import 解析文本（步骤② textarea 绑定；不触发解析）。
+  void setParseText(String value) {
+    _parseText = value;
+    notifyListeners();
+  }
+
+  /// AI 智能解析编排：`DocumentParseService.parse(parseText)` → 成功应用
+  /// [DocParseResult] 预填草稿并跳步骤③；失败 / 超长留在步骤②并记录
+  /// [parseError]（DocParseError 消息直出）。
+  ///
+  /// 边界（B10）：文本超 [maxImportTextLength] → 拒绝并提示，不触 parse 服务。
+  /// 返回是否解析成功；[parseService] 未注入时降级返回 false（不抛）。
+  Future<bool> parse() async {
+    final service = _parseService;
+    if (service == null) {
+      _parseError = '解析服务不可用';
+      notifyListeners();
+      return false;
+    }
+    if (_parsing) {
+      return false; // 防连点。
+    }
+    final text = _parseText.trim();
+    if (text.isEmpty) {
+      return false; // 空文本：视图已禁用按钮，防御。
+    }
+    if (text.length > maxImportTextLength) {
+      _parseError = importTextTooLongError;
+      notifyListeners();
+      return false;
+    }
+    _parsing = true;
+    _parseError = null;
+    notifyListeners();
+    try {
+      final result = await service.parse(text);
+      _applyParseResult(result);
+      _parsing = false;
+      _step = 3;
+      notifyListeners();
+      return true;
+    } on DocParseError catch (e) {
+      _parsing = false;
+      _parseError = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _parsing = false;
+      _parseError = '解析失败: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 应用 [DocParseResult] 预填草稿（经 [CharacterDraft.fromParseResult] 落位
+  /// 16 字段；本控制器只承载向导表单字段，postHistoryInstructions 经
+  /// fromParseResult 保留于草稿可落库）。
+  void _applyParseResult(DocParseResult result) {
+    final draft = CharacterDraft.fromParseResult(result);
+    _name = draft.name;
+    _description = draft.description;
+    _personality = draft.personality;
+    _scenario = draft.scenario;
+    _systemPrompt = draft.systemPrompt;
+    _firstMes = draft.firstMes;
+    _mesExample = draft.mesExample;
+    _tags = List<String>.unmodifiable(draft.tags);
+    _selectedTemplateId = null;
+    _manualEdited.clear();
   }
 
   // ── 模板应用 ──

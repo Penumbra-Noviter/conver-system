@@ -178,3 +178,10 @@ class InvalidRegenerateTargetError extends DomainError {
 class RegenerateBusyError extends DomainError {
   RegenerateBusyError() : super('重生成进行中');
 }
+
+/// 文档解析失败（LLM 文档解析错误面：未配 Key / Provider 不支持 / LLM 调用
+/// 失败 / 响应不可解析，全部折叠为单一 [DocParseError]，文案对桌面
+/// `document_parser.py` 逐字）。
+class DocParseError extends DomainError {
+  DocParseError(super.message);
+}
