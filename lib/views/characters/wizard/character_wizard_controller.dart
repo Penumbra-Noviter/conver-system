@@ -111,6 +111,11 @@ class WizardController extends ChangeNotifier {
   /// 最近一次 AI 解析错误消息（DocParseError 直出 / 超长拒绝文案）。
   String? _parseError;
 
+  /// 控制器已处置标志：dispose 后异步续体（[parse] await 后）不再 notify /
+  /// 不跳步——解析挂起中用户点「取消」触发的 BLOCKING-1 崩溃防护
+  /// （ChangeNotifier disposed 后 notifyListeners 触发 debug 断言）。
+  bool _disposed = false;
+
   /// 已手动编辑的字段名集合——selectTemplate 只填充未手动编辑的字段
   /// （验收 5：再次手动编辑不被模板回填覆盖）。
   final Set<String> _manualEdited = <String>{};
@@ -171,6 +176,13 @@ class WizardController extends ChangeNotifier {
 
   /// 最近一次 AI 解析错误消息（DocParseError 直出 / 超长拒绝文案）。
   String? get parseError => _parseError;
+
+  /// 销毁：置 [ChangeNotifier.dispose] 并打已处置标志（异步续体据此退避）。
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   // ── 导航 ──
 
@@ -358,17 +370,28 @@ class WizardController extends ChangeNotifier {
     notifyListeners();
     try {
       final result = await service.parse(text);
+      if (_disposed) {
+        // 解析挂起中控制器已 dispose（用户取消）：续体退避，不 notify、
+        // 不跳步、不写状态（BLOCKING-1 崩遗防护）。
+        return false;
+      }
       _applyParseResult(result);
       _parsing = false;
       _step = 3;
       notifyListeners();
       return true;
     } on DocParseError catch (e) {
+      if (_disposed) {
+        return false;
+      }
       _parsing = false;
       _parseError = e.message;
       notifyListeners();
       return false;
     } catch (e) {
+      if (_disposed) {
+        return false;
+      }
       _parsing = false;
       _parseError = '解析失败: $e';
       notifyListeners();

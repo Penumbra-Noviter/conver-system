@@ -16,11 +16,15 @@
 /// 不 mock 仓储内部。
 library;
 
+import 'dart:async';
+
 import 'package:conver_system_mobile/data/database/app_database.dart'
     show AppDatabase, Character, CharactersCompanion;
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/document_parse_service.dart';
+import 'package:conver_system_mobile/services/llm/errors.dart'
+    show DocParseError, LLMError;
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/secure_store.dart';
 import 'package:conver_system_mobile/views/characters/wizard/character_wizard_controller.dart';
@@ -38,6 +42,37 @@ class _ThrowingCreateRepository extends CharacterRepository {
   Future<Character> createCharacter(CharactersCompanion data) {
     throw StateError('create failed');
   }
+}
+
+/// 受控挂起 LLM：`generate()` 挂起在 [gate] 上，由测试手动 `complete` 补全——
+/// 模拟真实 LLM 网络调用挂起数秒（BLOCKING-1 回归：解析挂起中 dispose）。
+class _GateLLMProvider extends LLMProvider {
+  _GateLLMProvider(this.gate) : super(apiKey: 'test-key');
+
+  /// 手动补全的返回 gate（补全值即 generate 返回值）。
+  final Completer<String> gate;
+
+  @override
+  LLMError translateError(Object error) =>
+      error is LLMError ? error : LLMError('fake API 调用失败: $error');
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) =>
+      gate.future;
+
+  @override
+  Stream<String> streamGenerate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async* {}
+
+  @override
+  Future<void> testConnection({String? model}) async {}
 }
 
 /// 用内存 drift + 假 LLM 装配真实 [DocumentParseService]（真实 service + 假 LLM，
@@ -582,6 +617,65 @@ void main() {
 
       expect(ok, isFalse);
       expect(c.step, 2, reason: '降级留步骤②');
+    });
+
+    test('解析挂起中 dispose 不崩：续体不再 notify / 不跳步（BLOCKING-1 回归）',
+        () async {
+      final gate = Completer<String>();
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, _GateLLMProvider(gate)),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+
+      // 解析挂起中（LLM 未返回）：防连点标志已置位。
+      final future = c.parse();
+      expect(c.parsing, isTrue, reason: '挂起中 parsing 置位');
+
+      // 用户点 AppBar「取消」→ view dispose → 控制器 dispose。
+      c.dispose();
+
+      // LLM 返回后，已处置控制器的异步续体不得再 notifyListeners
+      // （ChangeNotifier disposed 后 notify 触发 debug 断言崩溃）——await
+      // 完成且不抛 FlutterError 即证明安全。
+      gate.complete('{"name": "艾莉亚"}');
+
+      final ok = await future;
+      expect(ok, isFalse, reason: '已处置：续体放弃，不返回成功');
+      expect(c.step, 2, reason: '已处置：不跳步骤③');
+    });
+
+    test('解析挂起中 dispose + 服务抛 DocParseError → 续体不 notify（BLOCKING-1 回归）',
+        () async {
+      final gate = Completer<String>();
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, _GateLLMProvider(gate)),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+
+      final future = c.parse();
+      expect(c.parsing, isTrue, reason: '挂起中 parsing 置位');
+
+      c.dispose();
+
+      // 预挂错误消费：completeError 时真实 await（service.parse 内部微任务链）
+      // 尚未注册监听，否则 zone 会判为「未处理错误」误报——futures 支持多个
+      // 监听，真实 await 仍会收到该错误。
+      unawaited(gate.future.then<void>((_) {}, onError: (Object _) {}));
+
+      // LLM 以解析错误返回：已处置控制器不得再 notify / 写 parseError。
+      gate.completeError(
+        DocParseError('LLM 返回了无法解析的响应，请重试或手动创建'),
+      );
+
+      final ok = await future;
+      expect(ok, isFalse, reason: '已处置：错误续体放弃');
+      expect(c.step, 2, reason: '已处置：不跳步骤③');
     });
   });
 }
