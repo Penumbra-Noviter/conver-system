@@ -9,6 +9,8 @@
 >
 > **归档清出机制（与桌面库同构，2026-08-28 建库即启用）**：已完成归档最近 6 个批次完整保留；更早折叠为「历史归档索引」单行（细节由 git 历史承担：`git log -p -- TICKETS.md`）；叙述（来源/验证链/过程遥测）只写 DEV_LOG.md。
 >
+> **机械检查**：`scripts/pool_cleanup_check.py --check --tickets-file TICKETS.md --candidate-section "## 候选区"`（挂 pre-commit，失败拒提交）核对活跃工单无 ✅/❌ 滞留与候选区结构；安装 `sh scripts/install-pre-commit.sh`（每 clone 一次，本库安装脚本按上述参数定制，规则见 TECH_DEBT.md「清出机制」）。
+>
 > 状态：📝 已录入 | 🔄 进行中 | ✅ 完成 | ❌ 关闭
 
 ---
