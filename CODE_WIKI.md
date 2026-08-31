@@ -182,10 +182,11 @@ conver system/
 │   ├── vitest.config.js
 │   ├── package.json
 │   └── simulators/                 ← 22 款第三方单文件模拟器（HTML，非源码）
-├── scripts/                        ← [F-01 文档同步工具链]（本仓库）
+├── scripts/                        ← [F-01 文档同步工具链 + 清出机制]（本仓库）
 │   ├── check-simulator-css.mjs     ← 模拟器接入契约核对脚本（T-01，退出码 0=全绿）
 │   ├── doc_sync.py                 ← CODE_WIKI 机械标记生成/校验（三渠道）
-│   ├── pre-commit.sh               ← pre-commit 钩子源：跑 `doc_sync.py --check`
+│   ├── pool_cleanup_check.py       ← 清出机制机械检查（候选区/复核关闭/活跃工单/脚注编号；挂 pre-commit）
+│   ├── pre-commit.sh               ← pre-commit 钩子源：先 `pool_cleanup_check.py`，再跑 `doc_sync.py --check`
 │   └── install-hooks.bat           ← 把 pre-commit.sh 复制到 `.git/hooks/pre-commit`
 ├── src-tauri/                      ← Tauri v2 桌面壳
 │   ├── build.rs
