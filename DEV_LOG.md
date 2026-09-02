@@ -262,24 +262,6 @@
 - **工单 06 文档收尾（a38feb9）+ 期末四轴（262fe88）**：程序内手册「模拟器使用指南」导入小节 + 新增「导入游戏与安全须知」guide-section（警告文案与工单 04 弹窗逐字一致）+ TICKETS 归档（5 工单 3 波 commit 链 + 验收摘要）；期末四轴 F-7 当场修（VARS_FAMILY 补 B 类组 5 --text2/--text3 + 成员完整性回归断言），F-8~F-11 落债
 - **验证链**：Vitest **958**（845→958）；pytest **569 + 1 skip**（471+1skip，+98）；cargo 70 零改动；smoke-simulators **14 项**全过（新增 2 导入步骤：警告确认 → 上传 .html → 新卡片「已导入」→ 打开导入游戏共享覆盖层注入生效）；doc_sync --check 全绿
 
-## 滚动摘要（2026-08-09 ~ 08-15 — 阶段摘要：模拟器三期 + 技术债 TD 系列 + 桌面打包 + C1/C2 收口）
-
-- **2026-08-09 GUI 全功能验证 + 08-13 方向/打包 + TD-46/47**：Playwright 黑盒 + vision 视觉核验 4 bug 全修（停止内容未落库 / JSON 导出 500 / badge / 480px），全部先复现再修；方向探讨 + 打包流程（细节 git log 可溯）
-- **模拟器集成最小原型验证（prototype skill）**：22 款单文件 HTML 模拟器集成链路全通（静态托管 + iframe + localStorage 存档 + AI 配置面板探测 + WebView2 CDP 桌面复测）；无正式代码改动，归档 docs/world-simulation-exploration.md
-- **U7 模拟器模块（5 工单 3 波）**：入口/22 游戏数据逐项核查（22/22 全 AI 驱动）、列表页、运行视图、冒烟；技术债区 +12 项待立项
-- **U8+U9 模拟器二期（4 工单 2 波）**：凭证端点（GET /api/settings/credentials）/ manifest v2（endpointMode/saveKeys）/ 注入按钮 / 存档面板；技术债区 +12 项待立项
-- **SIM-API-1 凭证统一（ADR-0001 方案 2）**：key-injector 自动同步 + 受管 option + MutationObserver 重建再同步 + 写回环冷却；22 款第三方 HTML 零修改；Vitest 714→746
-- **TD-75/76 写回环收口**：观察者 attributes 监听 + 熔断终止病理循环；期末 F1/F2 实证命中 written vs filled 语义漂移 → 修复 +3 用例（Vitest 755）
-- **技术债 TD 系列（TD-57/66/67/68、TD-48~71、TD-72/73/74）**：credentials 门控收紧 / 存档键契约单源 / iframe 信任边界文档化；17 项→4 工单 13 做 4 关闭 + 3 新债（超时守卫延展响应体 / 导入回滚事务性 / 图标锁放宽）；技术债区清零
-- **桌面打包面（两次修复 + release 全链）**：dist 后端包陈旧 + `_FRONTEND_RUNTIME` 漏模拟器目录 → 反向差集锁 test_packaging 防复发；build-desktop.ps1 `-SkipInstaller` 开关；release 全链 + NSIS 安装器按用户惯例回收
-- **C1 写回环状态机收口（b0a2fcc）**：一体状态机 API + 熔断经返回值传达 + resetSyncLoop 唯一触发点；Vitest 755→766
-- **C2 saveKeys 匹配语义单源（79d5799）**：saveKeyIsPattern / saveKeyMatches 三消费方收口；Vitest 766→784
-- **DEV_LOG 折叠规则确立**：窗口上限 12 条，超限折叠最旧一批为阶段摘要（回落 6~8 条）；规则入 CLAUDE.md「待办管理」；首次折叠已执行
-
----
-
----
-
 ## 滚动摘要（2026-08-19 — 模拟器配置面板可读性修复：vision 全量诊断 + 分区 7）
 
 - **来源**：用户反馈「部分模拟器 UI 还是反人类」——主模型无视觉，AGENTS.md 约定 View 子智能体不可用（ZCode Agent 注册表无 View 类型），按约定降级 vision skill（vision.js + DashScope）全量诊断 22/22 截图
@@ -314,4 +296,23 @@
 - **C3/C4/C8 批次（08-15，标准档 2 波 3 工单）**——chat.js setChatHooks options-object 方言统一 + simulator-contracts.js 契约深模块 + list-views 下沉（app.js 585→274 行纯编排）；波末审核 0 阻断；Vitest 784→807
 - **C6 批次（08-15，小档 3 工单，子智能体连续空返回主会话直做降级）**——provider_registry.py 派生存取深模块消除 AVAILABLE_MODELS 四处独立遍历；Falsify F4 缺 id 对称校验缺口当场修 + reload 污染防护契约锁；pytest 469+1skip
 - **C5 批次（08-15 前后，标准档 2 工单串行链）**——character_fields.py 单一映射深模块收敛 8 处角色字段硬编码 + CharacterBase schema 继承体系；消费者四模块对标；期末 0 阻断；pytest 434→460+1skip（+26 契约锁）；C7 连带复核关闭
+
+
+## 滚动摘要（2026-08-09 ~ 08-15 — 阶段摘要：模拟器三期 + 技术债 TD 系列 + 桌面打包 + C1/C2 收口）
+
+- **2026-08-09 GUI 全功能验证 + 08-13 方向/打包 + TD-46/47**：Playwright 黑盒 + vision 视觉核验 4 bug 全修（停止内容未落库 / JSON 导出 500 / badge / 480px），全部先复现再修；方向探讨 + 打包流程（细节 git log 可溯）
+- **模拟器集成最小原型验证（prototype skill）**：22 款单文件 HTML 模拟器集成链路全通（静态托管 + iframe + localStorage 存档 + AI 配置面板探测 + WebView2 CDP 桌面复测）；无正式代码改动，归档 docs/world-simulation-exploration.md
+- **U7 模拟器模块（5 工单 3 波）**：入口/22 游戏数据逐项核查（22/22 全 AI 驱动）、列表页、运行视图、冒烟；技术债区 +12 项待立项
+- **U8+U9 模拟器二期（4 工单 2 波）**：凭证端点（GET /api/settings/credentials）/ manifest v2（endpointMode/saveKeys）/ 注入按钮 / 存档面板；技术债区 +12 项待立项
+- **SIM-API-1 凭证统一（ADR-0001 方案 2）**：key-injector 自动同步 + 受管 option + MutationObserver 重建再同步 + 写回环冷却；22 款第三方 HTML 零修改；Vitest 714→746
+- **TD-75/76 写回环收口**：观察者 attributes 监听 + 熔断终止病理循环；期末 F1/F2 实证命中 written vs filled 语义漂移 → 修复 +3 用例（Vitest 755）
+- **技术债 TD 系列（TD-57/66/67/68、TD-48~71、TD-72/73/74）**：credentials 门控收紧 / 存档键契约单源 / iframe 信任边界文档化；17 项→4 工单 13 做 4 关闭 + 3 新债（超时守卫延展响应体 / 导入回滚事务性 / 图标锁放宽）；技术债区清零
+- **桌面打包面（两次修复 + release 全链）**：dist 后端包陈旧 + `_FRONTEND_RUNTIME` 漏模拟器目录 → 反向差集锁 test_packaging 防复发；build-desktop.ps1 `-SkipInstaller` 开关；release 全链 + NSIS 安装器按用户惯例回收
+- **C1 写回环状态机收口（b0a2fcc）**：一体状态机 API + 熔断经返回值传达 + resetSyncLoop 唯一触发点；Vitest 755→766
+- **C2 saveKeys 匹配语义单源（79d5799）**：saveKeyIsPattern / saveKeyMatches 三消费方收口；Vitest 766→784
+- **DEV_LOG 折叠规则确立**：窗口上限 12 条，超限折叠最旧一批为阶段摘要（回落 6~8 条）；规则入 CLAUDE.md「待办管理」；首次折叠已执行
+
+---
+
+---
 
