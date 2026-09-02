@@ -91,11 +91,11 @@
 
 ### 2026-08-27（技术债消费批次：F-90 全自动档 kickoff，轻量档 1 工单）
 
-> 处置详情：1 项消费（F-90 对应工单，见 TICKETS 归档）。Grilling 实证拍板做——生产唯一调用方 runSync 传 getDoc（doc 回落分支生产死代码），doc 仅测试消费（5 处直调用例）；收编 getDoc-only 消除双通道冗余，惰性时序保持（取用仍在 fetchCredentials await 之后），F-89 守卫走观察者路径不经这 5 个直调用例、零覆盖损失。CLAUDE.md 测试基线散文句部分（1165）由主会话落账时直接刷新，随工单闭环。
+> 处置详情：1 项消费（F-90 对应工单，见 TICKETS 归档）。Grilling 实证拍板做——生产唯一调用方 runSync 传 getDoc（doc 回落分支生产死代码），doc 仅测试消费（5 处直调用例）；收编 getDoc-only 消除双通道冗余，惰性时序保持（取用仍在 fetchCredentials await 之后），F-89 守卫走观察者路径不经这 5 个直调用例、零覆盖损失。AGENTS.md 测试基线散文句部分（1165）由主会话落账时直接刷新，随工单闭环。
 
 | 编号 | 遗留项 | 来源 | 强度 | 处置 |
 |------|--------|------|------|------|
-| F-90 | syncGameCredentials doc/getDoc 双通道冗余收编评估 + CLAUDE.md 测试基线散文句维护注记 | 期末四轴 Architecture/Standards | Speculative | ✅ 已修（2026-08-27：轻量档工单收编 getDoc-only——签名删 doc 参数、targetDoc 改 `getDoc() ?? null` 惰性取用、5 处测试迁移 `getDoc: () => doc`，全量 Vitest 1165 不回退、key-injector 100% 覆盖；CLAUDE.md 散文句已刷新 1165） |
+| F-90 | syncGameCredentials doc/getDoc 双通道冗余收编评估 + AGENTS.md 测试基线散文句维护注记 | 期末四轴 Architecture/Standards | Speculative | ✅ 已修（2026-08-27：轻量档工单收编 getDoc-only——签名删 doc 参数、targetDoc 改 `getDoc() ?? null` 惰性取用、5 处测试迁移 `getDoc: () => doc`，全量 Vitest 1165 不回退、key-injector 100% 覆盖；AGENTS.md 散文句已刷新 1165） |
 
 ### 2026-08-27（技术债消费批次：F-82~F-89 全自动档 kickoff，3 做 5 关）
 

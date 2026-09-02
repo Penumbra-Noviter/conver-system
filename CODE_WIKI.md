@@ -200,7 +200,7 @@ conver system/
 │   │   └── main.rs                 ← 壳入口
 │   └── tests/                      ← 集成测试（4 个文件，见 §5.3）
 ├── docs/                           ← 设计文档（架构/API/LLM/Tauri，见 PROJECT_REFERENCE §五）
-├── CLAUDE.md                       ← 项目规则与当前状态
+├── AGENTS.md                       ← 项目规则与当前状态
 ├── PROJECT_REFERENCE.md            ← 项目介绍书（介绍/决策/坑点）
 ├── TICKETS.md                      ← 唯一待办事实来源
 ├── DEV_LOG.md                      ← 开发日志（已做）

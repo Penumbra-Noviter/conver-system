@@ -2,7 +2,7 @@
 
 > 只记「已做」与决策/避坑；待办一律进 [TICKETS.md](TICKETS.md)（唯一待办事实来源）。
 > 格式：`YYYY-MM-DD | <操作> | <描述>`（倒序，最新在前）
-> 滚动摘要窗口上限 12 条，超限在文档同步时折叠为阶段摘要（回落 6~8 条，规则见 [CLAUDE.md](CLAUDE.md)「待办管理」）。
+> 滚动摘要窗口上限 12 条，超限在文档同步时折叠为阶段摘要（回落 6~8 条，规则见 [AGENTS.md](AGENTS.md)「待办管理」）。
 
 ---
 
@@ -88,7 +88,7 @@
 - **工单 G3（F-89）**：flushObserverSync 断连失效守卫 + syncGameCredentials getDoc 惰性取用。**重要偏离处方**：工单处方「只改 getDoc 闭包」单独无效——runSync 在 `await fetchCredentials()` 前**同步急切求值** `getDoc()`，取用点 observerContext===ctx 恒真、断连窗口内 doc 早已捕获、处方为死代码；红测试精确复现缺陷后补 doc 惰性取用（getDoc 优先回落 doc 参数，向后兼容 5 个直调用例全绿），守卫在正确时点生效。硬约束零触碰（disconnectObserver/resetSyncLoop/SYNC_MAX_STRIKES/冷却/防抖）。期末四轴独立判定偏离**必要、最小、不破坏验收语义**——处方是 spec 时序盲点，有效化是正确补位（与「票面建议须实证复核」惯例同族）。
 - **验证链**：pytest 809+1skip（零后端改动）| Vitest 1164→1165（+1：G3 断连失效守卫测试，含「新观察者循环熔断起点不被污染」灵敏度断言）| 波末文件范围核验合规 | 期末四轴 **0 阻断放行**、安全红线 0 违例 | 运行态冒烟通过（uvicorn + 5 端点全 200）| doc_sync 零漂移
 - **过程遥测**：小档后台 lane 三工单同分支连续 commit（规避上批 3 并行网关并发上限）；doc_sync 钩子 worktree 拦截用 --no-verify、merge 后主会话统一 doc_sync 刷新**并提交**（沿用上批阻断修复教训，未再留未提交态）。
-- **非阻断落债**：F-90（syncGameCredentials doc/getDoc 双通道轻度冗余收编评估 + CLAUDE.md 测试基线散文句手工维护注记）。
+- **非阻断落债**：F-90（syncGameCredentials doc/getDoc 双通道轻度冗余收编评估 + AGENTS.md 测试基线散文句手工维护注记）。
 
 ---
 
@@ -310,7 +310,7 @@
 - **桌面打包面（两次修复 + release 全链）**：dist 后端包陈旧 + `_FRONTEND_RUNTIME` 漏模拟器目录 → 反向差集锁 test_packaging 防复发；build-desktop.ps1 `-SkipInstaller` 开关；release 全链 + NSIS 安装器按用户惯例回收
 - **C1 写回环状态机收口（b0a2fcc）**：一体状态机 API + 熔断经返回值传达 + resetSyncLoop 唯一触发点；Vitest 755→766
 - **C2 saveKeys 匹配语义单源（79d5799）**：saveKeyIsPattern / saveKeyMatches 三消费方收口；Vitest 766→784
-- **DEV_LOG 折叠规则确立**：窗口上限 12 条，超限折叠最旧一批为阶段摘要（回落 6~8 条）；规则入 CLAUDE.md「待办管理」；首次折叠已执行
+- **DEV_LOG 折叠规则确立**：窗口上限 12 条，超限折叠最旧一批为阶段摘要（回落 6~8 条）；规则入 AGENTS.md「待办管理」；首次折叠已执行
 
 ---
 

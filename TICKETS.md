@@ -107,7 +107,7 @@
 
 **关闭：** F-82 / F-84 / F-85 / F-86 / F-87（复核成立，无代码改动，理由见 TECH_DEBT 处置记录）
 **验证链：** pytest 809+1skip ✅（零后端改动）| Vitest 1164→1165 ✅（+1：G3 断连失效守卫测试）| 波末文件范围核验合规（tabs/stream-session/key-injector+test）| 期末四轴 **0 阻断放行**（G3 偏离处方被独立判定必要且最小：工单处方「只改 getDoc 闭包」因 runSync 同步急切求值成死代码，惰性取用是正确补位）、安全红线 0 违例 | 运行态冒烟通过（uvicorn + 5 端点全 200）| doc_sync 零漂移
-**非阻断落债：** F-90（期末四轴 Architecture/Standards：syncGameCredentials doc/getDoc 双通道轻度冗余——外部直调用契约 + 观察者惰性取用刻意保留，未来可收编为 getDoc-only；CLAUDE.md 测试基线散文句手工维护不归 doc_sync 管）
+**非阻断落债：** F-90（期末四轴 Architecture/Standards：syncGameCredentials doc/getDoc 双通道轻度冗余——外部直调用契约 + 观察者惰性取用刻意保留，未来可收编为 getDoc-only；AGENTS.md 测试基线散文句手工维护不归 doc_sync 管）
 
 ---
 
