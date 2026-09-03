@@ -229,6 +229,42 @@ def _check_closed_section(text: str) -> list[str]:
     )
 
 
+def _active_list_violations(text: str) -> list[str]:
+    """活跃节内列表行（`- ` 开头）的状态标记检测：含 ✅/❌ 即完成/关闭态滞留。
+
+    活跃工单既可能是表格行（`|` 开头，走 _table_violations 的表格路径）也可能是列表
+    行（`- ✅ **T-01** …` / `- 📝 **E-101** …`）——列表行的状态标记落在行内文本而非
+    单元格，单独扫描。跳过代码块（围栏内示例可能含 ✅/❌，如 DEV_LOG 引用）与表格行；
+    终止于活跃节后下一个顶级节（## ），兼容「活跃表后直接接其他节」的仓库。
+    """
+    violations: list[str] = []
+    lines = text.splitlines()
+    in_section = False
+    in_fence = False
+    for line in lines:
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        if any(line.startswith(s) for s in _ACTIVE_SECTIONS):
+            in_section = True
+            continue
+        if in_section and line.startswith(_TOP_HEADING):
+            break
+        if not in_section:
+            continue
+        stripped = line.strip()
+        if not stripped.startswith("- "):  # 表格行/正文跳过，仅扫 `- ` 列表行
+            continue
+        if "✅" in stripped or "❌" in stripped:
+            label = stripped.split("（", 1)[0].split("：", 1)[0][:60]
+            violations.append(
+                f"TO-TICKETS 活跃工单出现完成/关闭态行「{label}」——完成即归档"
+            )
+    return violations
+
+
 def _check_active_section(text: str) -> list[str]:
     def bad(cells: list[str]) -> str | None:
         if any(("✅" in c or "❌" in c) for c in cells):
@@ -241,6 +277,7 @@ def _check_active_section(text: str) -> list[str]:
         violations += _table_violations(
             text, section, _INDEX_SECTION_PREFIX, None, "TO-TICKETS 活跃工单", bad
         )
+    violations += _active_list_violations(text)
     return violations
 
 
