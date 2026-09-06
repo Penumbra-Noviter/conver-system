@@ -1,9 +1,10 @@
-/// ChatController — 聊天 tab 的回合状态机（发送 / 停止 / 重生成 / 断流提示）。
+/// ChatController — 聊天 tab 编排控制器（入口 / 导航 / 高亮 / 导出 / 消息
+/// 组装；回合状态机委托 [ChatRound]，2026-09-07 架构深化候选 5 分离）。
 ///
 /// 语义锚点（桌面，逐字对齐）：
 /// - `desktop/frontend/js/stream-session.js`：onToken 累积全文 + streamSettled
 ///   终态守卫 + 停止（AbortError）写回「已停止」语义 + 普通错误非阻塞上抛
-///   （不写入消息缓存）；
+///   （不写入消息缓存）——回合细节见 `chat_round.dart`；
 /// - `desktop/frontend/js/chat.js`：发送↔停止两态由 isStreaming 派生（单一
 ///   事实来源）、重生成仅末条已结算 assistant、错误条独立于消息列表。
 ///
@@ -13,20 +14,16 @@
 ///
 /// 层级：ChangeNotifier 视图模型。唯一依赖 [ChatService] + 会话 / 角色 /
 /// 消息仓储抽象（不触碰数据库具体实现 / 平台存储——`layer_boundary_test`
-/// 契约）。ChatView 经 provider 注入本控制器，回合状态与落库可观察状态全部
-/// 收敛于此，UI 只做呈现。
+/// 契约）+ [ChatRound]（回合状态机，注入 chatService / messageRepository /
+/// notice 槽 / 重载回调，经 notify 回调驱动本控制器通知）。ChatView 经
+/// provider 注入本控制器，回合状态与落库可观察状态全部收敛于此，UI 只做
+/// 呈现。
 ///
-/// 回合语义（对齐 ChatService 编排）：
-/// - 发送：[send] 置 isStreaming → 乐观追加在途 user + 流式占位气泡 →
-///   [ChatToken] 累积 [streamingText] → 终态（[ChatDone] / [ChatInterrupted] /
-///   [ChatError]）触发重载 DB 列表替换占位；
-/// - 停止：[stop] 取消流订阅（ChatService 幂等落库已累积部分）→ 重载后把末条
-///   assistant 标「已停止」（[ChatUiMessage.stopped]）；无部分内容仅保留已发
-///   user；
-/// - 重生成：[regenerate] 走 ChatService 延迟删除（失败不删行、旧回复保留），
-///   成功重载列表；[isRegenerating] 防并发；
-/// - 断流：[ChatInterrupted] → 非阻塞 [notice]「回复已中断」（可
-///   [dismissNotice]，不挡后续操作）。
+/// 编辑 / 职责边界：
+/// - 回合状态机（send / stop / regenerate / 流订阅 / 合成消息 / 停止竞态
+///   F1 / 后台补标 F3b）在 [ChatRound]（深模块，纯搬迁不动行为）；
+/// - 本控制器负责：入口列表加载与建会话、导航（open/back）、跳转高亮、
+///   导出编排、DB 权威消息列表与展示消息组装、非阻塞 notice 槽。
 library;
 
 // 构造为公开命名参数（装配点语义）+ 私有 `_` 字段：initializing formal 无法
@@ -49,8 +46,8 @@ import '../../data/repositories/message_repository.dart';
 import '../../services/chat_service.dart';
 import '../../services/conversation_export_file_exchange.dart';
 import '../../services/conversation_export_service.dart';
-import '../../services/llm/errors.dart';
 import '../../services/notice_runner.dart';
+import 'chat_round.dart';
 
 /// 单条聊天 UI 显示消息（视图层模型，由 [ChatController.messages] 组装）。
 ///
@@ -81,12 +78,12 @@ class ChatUiMessage {
   final bool streaming;
 }
 
-/// 聊天 tab 的回合状态机控制器。
+/// 聊天 tab 编排控制器。
 ///
 /// 用法：装配层构造后经 provider 注入；ChatView 首次挂载时若
 /// [hasLoadedEntry] 为 false 则调用 [loadEntry]（幂等）。
 class ChatController extends ChangeNotifier {
-  /// [chatService] 为回合编排服务；
+  /// [chatService] 为回合编排服务（注入 [ChatRound]）；
   /// [conversationRepository] / [characterRepository] /
   /// [messageRepository] 提供列表 / 角色来源 / 消息重载；
   /// [highlightDuration] 为跳转定位高亮的自动清除时长（默认 3s，对齐桌面
@@ -141,44 +138,23 @@ class ChatController extends ChangeNotifier {
 
   List<Message> _dbMessages = const [];
 
-  /// 主动停止后落库的 assistant 消息 id 集合（UI 侧「已停止」标记）。
-  final Set<int> _stoppedMessageIds = <int>{};
+  // ── 回合状态机（委托 ChatRound）──
 
-  // ── 回合状态 ──
-
-  StreamSubscription<ChatEvent>? _subscription;
-  bool _isStreaming = false;
-  bool _streamingStopped = false;
-  bool _reloadPending = false;
-  String _streamingText = '';
-  String? _pendingUserText;
-  bool _isRegenerating = false;
-  // late：字段初始化器需引用实例方法 notifyListeners（首次访问时 this 可用）。
+  // late：字段初始化器需引用实例方法（notifyListeners / _reloadMessages）与
+  // 其它 late 字段（_noticeRunner），首次访问时 this 可用（与 NoticeRunner
+  // 同款惯用）。
   late final NoticeRunner _noticeRunner =
       NoticeRunner(onChanged: notifyListeners);
+  late final ChatRound _round = ChatRound(
+    chatService: _chatService,
+    messageRepository: _messageRepository,
+    noticeRunner: _noticeRunner,
+    reloadMessages: _reloadMessages,
+    notify: notifyListeners,
+  );
 
   /// 导出进行中（防连点：重复触发被忽略，完成复位）。
   bool _exporting = false;
-
-  /// 当前回合所属对话 id（[send] 时记录）。入口态 / 后台流停止（
-  /// `_activeConversationId` 为 null）时仍可定位本轮会话（F3b）。
-  int? _roundConversationId;
-
-  /// 当前回合已发 user 文本（[send] 时记录，生命周期随回合）——stop 后在途
-  /// user 落库确认的目标（F1；backToEntry 清 `_pendingUserText` 不清此值）。
-  String? _roundUserText;
-
-  /// 当前回合是否已累积过 token（ChatToken 到达即置位，生命周期随回合）——
-  /// 「已停止」标记判定的「已累积内容是否存在」依据（F3b：不随 backToEntry
-  /// 清空，入口态/后台流停止仍可判定部分内容已落库）。
-  bool _roundStreamedAnything = false;
-
-  /// 入口态/后台流停止后待补「已停止」标记的会话（stop 时该会话部分内容已
-  /// 落库；重进该会话补标一次，F3b）。
-  final Set<int> _backgroundStoppedConversationIds = <int>{};
-
-  /// 合成消息 id 计数器（负值递减）。
-  int _syntheticSeq = 0;
 
   // ── 跳转定位高亮（M3-04c）──
 
@@ -193,14 +169,6 @@ class ChatController extends ChangeNotifier {
   /// 高亮自动清除定时器（超时移除 [highlightMessageIds] 并通知；dispose 取消防
   /// 泄漏、防「notify after dispose」）。
   Timer? _highlightTimer;
-
-  /// F4：在途 user 合成 id——[send] 进入缓冲时一次性分配并缓存（messages
-  /// getter 纯读，不再每帧递减漂移）。
-  int? _pendingUserSyntheticId;
-
-  /// F4：assistant 流式占位合成 id——[send] 进入缓冲时一次性分配并缓存；不随
-  /// `_clearInFlight` 清空（入口态后台流仍会渲染占位，id 须保持稳定）。
-  int? _assistantSyntheticId;
 
   // ── 入口面 ──
 
@@ -381,15 +349,13 @@ class ChatController extends ChangeNotifier {
       }
       return;
     }
-    if (_isStreaming) {
-      await stop();
+    if (_round.isStreaming) {
+      await _round.stop(currentConversationId: _activeConversationId);
     }
     _activeConversationId = conversationId;
     _activeConversation = null;
     _dbMessages = const [];
-    _stoppedMessageIds.clear();
-    _clearInFlight();
-    _reloadPending = false;
+    _round.resetForNavigation();
     _noticeRunner.clear();
     notifyListeners();
     try {
@@ -404,11 +370,7 @@ class ChatController extends ChangeNotifier {
     await _reloadMessages();
     // 入口态/后台流停止的待补「已停止」标记：重进该会话且末条为 assistant
     // → 补标一次（F3b，标记判定不依赖停止时 reload 目标）。
-    if (_backgroundStoppedConversationIds.remove(conversationId) &&
-        _dbMessages.isNotEmpty &&
-        _dbMessages.last.role == Role.assistant) {
-      _stoppedMessageIds.add(_dbMessages.last.id);
-    }
+    _round.applyBackgroundStoppedMark(conversationId, _dbMessages);
     // M3-04c：消息加载完成后再落高亮（正 id 判定；开 B 会话自动清除 A 的高亮，
     // 负 id 合成消息永不进入——验收 5/7）。
     _applyHighlight(highlightMessageId);
@@ -425,9 +387,7 @@ class ChatController extends ChangeNotifier {
     _activeConversationId = null;
     _activeConversation = null;
     _dbMessages = const [];
-    _stoppedMessageIds.clear();
-    _clearInFlight();
-    _reloadPending = false;
+    _round.resetForNavigation();
     _noticeRunner.clear();
     notifyListeners();
     await loadEntry();
@@ -447,7 +407,8 @@ class ChatController extends ChangeNotifier {
 
   /// 组装展示消息列表：DB 权威消息 + 在途合成消息（user + 流式/停止占位）。
   ///
-  /// 已完成 assistant 由 UI 静态 Markdown 渲染；流式占位为纯文本。
+  /// 已完成 assistant 由 UI 静态 Markdown 渲染；流式占位为纯文本。合成消息
+  /// 状态（在途 user / 占位气泡 / 已停止标记）读自 [ChatRound] 状态面。
   List<ChatUiMessage> get messages {
     final result = <ChatUiMessage>[
       for (final m in _dbMessages)
@@ -455,41 +416,41 @@ class ChatController extends ChangeNotifier {
           id: m.id,
           role: m.role,
           content: m.content,
-          stopped: _stoppedMessageIds.contains(m.id),
+          stopped: _round.isStopped(m.id),
         ),
     ];
-    final pendingUser = _pendingUserText;
+    final pendingUser = _round.pendingUserText;
     if (pendingUser != null && pendingUser.isNotEmpty) {
       // 合成 id 在本条进入缓冲时已分配（send），此处纯读（F4：getter 副作用
       // 已移除，ListView key 不再每帧漂移）。
       result.add(ChatUiMessage(
-        id: _pendingUserSyntheticId!,
+        id: _round.pendingUserSyntheticId!,
         role: Role.user,
         content: pendingUser,
       ));
     }
-    if (_isStreaming || _streamingStopped || _reloadPending) {
+    if (_round.hasSyntheticAssistant) {
       result.add(ChatUiMessage(
-        id: _assistantSyntheticId!,
+        id: _round.assistantSyntheticId!,
         role: Role.assistant,
-        content: _streamingText,
-        streaming: _isStreaming,
-        stopped: _streamingStopped,
+        content: _round.streamingText,
+        streaming: _round.isStreaming,
+        stopped: _round.streamingStopped,
       ));
     }
     return List<ChatUiMessage>.unmodifiable(result);
   }
 
-  // ── 回合面 ──
+  // ── 回合面（委托 ChatRound）──
 
   /// 流式生成进行中（发送↔停止两态判据，单一事实来源）。
-  bool get isStreaming => _isStreaming;
+  bool get isStreaming => _round.isStreaming;
 
   /// 重生成进行中（disabled 重生成小图标）。
-  bool get isRegenerating => _isRegenerating;
+  bool get isRegenerating => _round.isRegenerating;
 
   /// 流式占位气泡已累积的纯文本（逐 token 追加）。
-  String get streamingText => _streamingText;
+  String get streamingText => _round.streamingText;
 
   /// 非阻塞提示（断流「回复已中断」/ 错误映射文案 / 基础设施失败）；null 无。
   String? get notice => _noticeRunner.notice;
@@ -505,110 +466,31 @@ class ChatController extends ChangeNotifier {
 
   /// 发送一条用户消息并开启流式回合（A2 UI 面）。
   ///
-  /// 守卫：空文本 / 无会话 / 流式中 / 重生成中 / 终态重载未完成 → 忽略
-  /// （发送↔停止两态由 [isStreaming] 派生，避免生成中重复发送）。
-  ///
-  /// 回合编排委托 [ChatService.streamReply]（落库 user → 组装 → 流式生成）；
-  /// 本层只订阅事件流：token 累积、终态重载 DB、错误映射 [notice]。
+  /// 守卫：无会话（其余空文本 / 流式中 / 重生成中 / 终态重载未完成 → 忽略，
+  /// 均委托 [ChatRound.send]）。回合编排（落库 user → 组装 → 流式生成）与
+  /// 事件处理全部在 [ChatRound]。
   Future<void> send(String text) async {
-    final trimmed = text.trim();
     final cid = _activeConversationId;
-    if (trimmed.isEmpty ||
-        cid == null ||
-        _isStreaming ||
-        _isRegenerating ||
-        _reloadPending) {
+    if (cid == null) {
       return;
     }
-    _noticeRunner.clear();
-    _isStreaming = true;
-    _streamingStopped = false;
-    _reloadPending = false;
-    _streamingText = '';
-    _pendingUserText = trimmed;
-    // F4：合成 id 在消息进入缓冲时一次性分配（getter 纯读，稳定不漂移）。
-    _pendingUserSyntheticId = _nextSyntheticId();
-    _assistantSyntheticId = _nextSyntheticId();
-    _roundConversationId = cid;
-    _roundUserText = trimmed;
-    _roundStreamedAnything = false;
-    notifyListeners();
-
-    final stream =
-        _chatService.streamReply(conversationId: cid, content: trimmed);
-    // 防御面：事件流理论上只发 ChatEvent（服务层错误经 ChatError 事件收口）；
-    // onError 兜底映射为 ChatError 语义，避免未处理异步异常。
-    _subscription = stream.listen(
-      _onChatEvent,
-      onError: (Object error, StackTrace stackTrace) =>
-          _onChatEvent(ChatError(_descriptiveError(error))),
-      onDone: _onStreamDone,
-    );
+    _round.send(conversationId: cid, text: text);
   }
 
-  /// 停止当前回合（A3 UI 面）：取消流订阅 → ChatService 幂等落库已累积部分
-  /// → 重载后末条 assistant 标「已停止」；无部分内容仅保留已发 user。
+  /// 停止当前回合（A3 UI 面）：委托 [ChatRound.stop]（取消流订阅 → 已累积
+  /// 部分落库 → 重载后末条 assistant 标「已停止」）。
   Future<void> stop() async {
-    if (!_isStreaming) {
-      return;
-    }
-    final sub = _subscription;
-    _subscription = null;
-    final roundCid = _roundConversationId;
-    final pendingUser = _roundUserText;
-    _reloadPending = false;
-    _isStreaming = false;
-    _streamingStopped = true; // 占位气泡保留纯文本 +「已停止」标记
-    notifyListeners();
-    await sub?.cancel(); // ChatService onCancel：已累积部分落库后关闭流
-    // F1：cancel 完成不保证在途 user 已落库（服务层落库为独立异步路径）——
-    // 有界等待其落库后再 reload，保证本路径任何窗口下 stop 后 UI 显示已发
-    // user（不依赖「reload 恰好在落库后执行」的时序巧合；超时兜底防挂起）。
-    if (roundCid != null && pendingUser != null && pendingUser.isNotEmpty) {
-      await _awaitInFlightUserLanded(roundCid, pendingUser);
-    }
-    if (roundCid != null && _activeConversationId == roundCid) {
-      // 会话内停止：重载当前会话并按「本轮已累积过 token 且 DB 末条为
-      // assistant」判「已停止」（原有路径 + 已累积内容判据）。
-      await _reloadMessages();
-      if (_roundStreamedAnything &&
-          _dbMessages.isNotEmpty &&
-          _dbMessages.last.role == Role.assistant) {
-        _stoppedMessageIds.add(_dbMessages.last.id);
-      }
-    } else if (roundCid != null) {
-      // 入口态/后台流停止（reload 目标为空）：基于 round 会话「已累积过 token」
-      // + DB 末条 assistant 判定部分内容已落库 → 记录待补标记，重进该会话时
-      // 补标（F3b）。
-      final latest = await _lastMessageOrNull(roundCid);
-      if (_roundStreamedAnything &&
-          latest != null &&
-          latest.role == Role.assistant) {
-        _backgroundStoppedConversationIds.add(roundCid);
-      }
-    }
-    _clearInFlight();
-    notifyListeners();
+    await _round.stop(currentConversationId: _activeConversationId);
   }
 
-  /// 重生成末条 assistant（A4 UI 面）：委托 [ChatService.regenerate]（延迟
-  /// 删除：失败不删行、旧回复保留），成功重载列表；失败仅 [notice]。
+  /// 重生成末条 assistant（A4 UI 面）：委托 [ChatRound.regenerate]（延迟
+  /// 删除：失败不删行、旧回复保留，成功重载列表；失败仅 [notice]）。
   Future<void> regenerate() async {
     final cid = _activeConversationId;
-    if (cid == null || _isStreaming || _isRegenerating || _reloadPending) {
+    if (cid == null) {
       return;
     }
-    _isRegenerating = true;
-    notifyListeners();
-    await _noticeRunner.guard<void>(
-      op: () async {
-        await _chatService.regenerate(conversationId: cid);
-        await _reloadMessages();
-      },
-      onError: (e) => _descriptiveError(e),
-    );
-    _isRegenerating = false;
-    notifyListeners();
+    await _round.regenerate(conversationId: cid);
   }
 
   // ── 服务/生命周期 ──
@@ -673,14 +555,15 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// 释放时取消在途流式订阅（ChatService 停止语义：已累积部分落库）与
-  /// 高亮定位定时器，并清空高亮状态（防泄漏 / 防「notify after dispose」）。
+  /// 释放时取消在途流式订阅（[ChatRound.dispose]，ChatService 停止语义：已
+  /// 累积部分落库）与高亮定位定时器，并清空高亮状态（防泄漏 / 防「notify
+  /// after dispose」）。
   @override
   void dispose() {
     _highlightTimer?.cancel();
     _highlightTimer = null;
     _highlightMessageIds.clear();
-    _subscription?.cancel();
+    _round.dispose();
     super.dispose();
   }
 
@@ -717,53 +600,16 @@ class ChatController extends ChangeNotifier {
     });
   }
 
-  void _onChatEvent(ChatEvent event) {
-    switch (event) {
-      case ChatToken token:
-        _streamingText += token.token;
-        _roundStreamedAnything = true;
-      case ChatDone():
-        _finishRound();
-      case ChatInterrupted():
-        _noticeRunner.setFirst('回复已中断');
-        _finishRound();
-      case ChatError error:
-        _noticeRunner.setFirst(error.message);
-        _finishRound();
-    }
-    notifyListeners();
-  }
-
-  /// 终态（done / interrupted / error）：停止流式，等流关闭后重载 DB。
+  /// 从 DB 重载当前会话消息（[ChatRound] 的 reloadMessages 回调；不 notify，
+  /// 调用方统一收尾通知），返回最新列表供「已停止」标记判定。
   ///
-  /// [streamingText] 在 [_onStreamDone] 重载后清空（替换为 DB 权威列表）。
-  void _finishRound() {
-    _isStreaming = false;
-    _reloadPending = true;
-  }
-
-  /// 流关闭收尾：终态重载 DB 列表并清空在途合成占位（一次 notify，无闪烁）。
-  Future<void> _onStreamDone() async {
-    _subscription = null;
-    if (_reloadPending) {
-      _reloadPending = false;
-      await _reloadMessages();
-      _clearInFlight();
-      // 自然终态回合已结算：后续回合从新 send 重建 round 记录。
-      _roundConversationId = null;
-      _roundUserText = null;
-      _roundStreamedAnything = false;
-      notifyListeners();
-    }
-  }
-
-  /// 从 DB 重载当前会话消息（不 notify，调用方统一收尾通知）。
-  Future<void> _reloadMessages() async {
+  /// 只置 [_dbMessages]：null 会话（入口态）清空列表即可——在途合成清理由
+  /// [ChatRound] 调用方（如 [_onStreamDone]）各自负责，本回调不越权。
+  Future<List<Message>> _reloadMessages() async {
     final cid = _activeConversationId;
     if (cid == null) {
       _dbMessages = const [];
-      _clearInFlight();
-      return;
+      return _dbMessages;
     }
     try {
       _dbMessages = await _messageRepository.getMessages(cid);
@@ -771,67 +617,6 @@ class ChatController extends ChangeNotifier {
       _noticeRunner.setFirst('加载消息失败: $error');
       _dbMessages = const [];
     }
-  }
-
-  /// 清空在途合成状态（占位 user / 流式文本 / 停止标记），不触碰
-  /// [_stoppedMessageIds]（落库消息标记的生命周期随会话）与 [_roundConversationId]
-  /// / [_roundUserText] / [_assistantSyntheticId]（入口态后台流仍可能渲染占位，
-  /// 停止标记与占位 id 的生命周期随整个回合）。
-void _clearInFlight() {
-    _pendingUserText = null;
-    _pendingUserSyntheticId = null;
-    _streamingText = '';
-    _streamingStopped = false;
-  }
-
-  /// F1：有界等待 [conversationId] 出现内容为 [content] 的 user 行落库——stop
-  /// 后 reload 前补足「cancel 完成 ≠ 在途 user 已落库」的竞态窗口。已落库
-  /// 立即返回；未落库轮询至 3s 总 deadline 兜底（单轮查询 1s 超时，真实网络
-  /// 停滞不挂起 stop 路径）。
-  Future<void> _awaitInFlightUserLanded(int conversationId, String content) async {
-    final deadline = DateTime.now().add(const Duration(seconds: 3));
-    while (DateTime.now().isBefore(deadline)) {
-      try {
-        final messages = await _messageRepository
-            .getMessages(conversationId)
-            .timeout(const Duration(seconds: 1));
-        if (messages.any((m) => m.role == Role.user && m.content == content)) {
-          return;
-        }
-      } catch (_) {
-        // 查询超时/异常：跳过本轮继续轮询（以总 deadline 兜底）。
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-    }
-  }
-
-  /// 返回 [conversationId] 当前最后一条消息（无则 null；查询异常按 null 处理
-  /// ——标记判定为尽力而为，不因 DB 读取失败阻塞）。
-  Future<Message?> _lastMessageOrNull(int conversationId) async {
-    try {
-      final messages = await _messageRepository.getMessages(conversationId);
-      return messages.isEmpty ? null : messages.last;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// 合成消息 id（负值递减，ListView key 唯一）。F4：仅在消息进入缓冲时
-/// （[send] 分配两条合成 id）调用并缓存，不随 messages getter 反复取用。
-  int _nextSyntheticId() {
-    _syntheticSeq -= 1;
-    return _syntheticSeq;
-  }
-
-  /// 领域 / LLM / 未预期异常的展示文案（重生成与事件流防御面共用）。
-  String _descriptiveError(Object error) {
-    if (error is DomainError) {
-      return domainErrorResponse(error).message;
-    }
-    if (error is LLMError) {
-      // 重生成路径 ChatService 不暴露 provider 名 → 无前缀基础文案。
-      return llmErrorResponse(error, '').message;
-    }
-    return '生成回复失败: $error';
+    return _dbMessages;
   }
 }

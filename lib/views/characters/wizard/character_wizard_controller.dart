@@ -22,13 +22,11 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../../../data/character_templates.dart';
-import '../../../data/database/app_database.dart' show CharactersCompanion;
 import '../../../data/repositories/character_repository.dart';
 import '../../../services/character_card.dart' show CharacterDraft;
 import '../../../services/document_parse_service.dart'
     show DocParseResult, DocumentParseService;
 import '../../../services/llm/errors.dart' show DocParseError;
-import 'package:drift/drift.dart' show Value;
 
 // 构造为公开命名参数（装配点语义）+ 私有 `_` 字段：initializing formal 无法
 // 同时满足两者，整文件抑制该 lint（对齐 characters_controller.dart 惯例）。
@@ -110,6 +108,10 @@ class WizardController extends ChangeNotifier {
 
   /// 最近一次 AI 解析错误消息（DocParseError 直出 / 超长拒绝文案）。
   String? _parseError;
+
+  /// 最近一次 AI 解析提取的 post_history_instructions（表单无承载字段，随
+  /// [save] 并入落库——chat_service 对话时消费该字段，解析产物不得静默丢弃）。
+  String _parsedPostHistoryInstructions = '';
 
   /// 控制器已处置标志：dispose 后异步续体（[parse] await 后）不再 notify /
   /// 不跳步——解析挂起中用户点「取消」触发的 BLOCKING-1 崩溃防护
@@ -275,6 +277,7 @@ class WizardController extends ChangeNotifier {
     _parseText = '';
     _parsing = false;
     _parseError = null;
+    _parsedPostHistoryInstructions = '';
     _manualEdited.clear();
     notifyListeners();
   }
@@ -408,19 +411,19 @@ class WizardController extends ChangeNotifier {
     }
   }
 
-  /// 应用 [DocParseResult] 预填草稿（经 [CharacterDraft.fromParseResult] 落位
-  /// 16 字段；本控制器只承载向导表单字段，postHistoryInstructions 经
-  /// fromParseResult 保留于草稿可落库）。
+  /// 应用 [DocParseResult] 预填草稿（parse 链解耦后直拷：表单承载 8 字段 +
+  /// postHistoryInstructions 记 [\_parsedPostHistoryInstructions] 随保存并入
+  /// 落库；creator 按 spec 恒空不预填）。
   void _applyParseResult(DocParseResult result) {
-    final draft = CharacterDraft.fromParseResult(result);
-    _name = draft.name;
-    _description = draft.description;
-    _personality = draft.personality;
-    _scenario = draft.scenario;
-    _systemPrompt = draft.systemPrompt;
-    _firstMes = draft.firstMes;
-    _mesExample = draft.mesExample;
-    _tags = List<String>.unmodifiable(draft.tags);
+    _name = result.name;
+    _description = result.description;
+    _personality = result.personality;
+    _scenario = result.scenario;
+    _systemPrompt = result.systemPrompt;
+    _firstMes = result.firstMes;
+    _mesExample = result.mesExample;
+    _tags = List<String>.unmodifiable(result.tags);
+    _parsedPostHistoryInstructions = result.postHistoryInstructions;
     _selectedTemplateId = null;
     _manualEdited.clear();
   }
@@ -479,6 +482,12 @@ class WizardController extends ChangeNotifier {
   /// 组装 payload 落库（creator 恒空；created_at / updated_at 由仓储层
   /// 赋值）。最终校验 name 非空；成功 `saved=true` 返回 true；失败复位
   /// saving 返回 false（可重试且零副作用）。
+  ///
+  /// 装配收敛（架构深化候选 4）：经 [CharacterDraft] 组装后调
+  /// `toCompanion()`——drift 列名映射单一归属 `character_card.dart`（对齐
+  /// 桌面 CharacterBase 16 字段基类语义）；表单缺省（version '1.0' /
+  /// alternateGreetings [] / creatorNotes {} / extensions {} / avatar null /
+  /// postHistoryInstructions 来自解析）在此补全。
   Future<bool> save() async {
     if (_name.trim().isEmpty) {
       _error = '角色名称不能为空';
@@ -489,21 +498,21 @@ class WizardController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      await _characterRepository.createCharacter(
-        CharactersCompanion(
-          name: Value(_name.trim()),
-          description: Value(_description.trim()),
-          personality: Value(_personality.trim()),
-          scenario: Value(_scenario.trim()),
-          firstMes: Value(_firstMes.trim()),
-          mesExample: Value(_mesExample.trim()),
-          systemPrompt: Value(_systemPrompt.trim()),
-          tags: Value(_tags),
-          avatar: Value(_avatar.trim().isEmpty ? null : _avatar.trim()),
-          creator: Value(''),
-          temperature: Value(_temperature),
-        ),
+      final draft = CharacterDraft(
+        name: _name.trim(),
+        description: _description.trim(),
+        personality: _personality.trim(),
+        scenario: _scenario.trim(),
+        firstMes: _firstMes.trim(),
+        mesExample: _mesExample.trim(),
+        systemPrompt: _systemPrompt.trim(),
+        postHistoryInstructions: _parsedPostHistoryInstructions.trim(),
+        tags: _tags,
+        // avatar 为业务字段：空 → null（落库列默认）；URL 原样。
+        avatar: _avatar.trim().isEmpty ? null : _avatar.trim(),
+        temperature: _temperature,
       );
+      await _characterRepository.createCharacter(draft.toCompanion());
       _saving = false;
       _saved = true;
       notifyListeners();

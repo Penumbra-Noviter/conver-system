@@ -451,7 +451,7 @@ void main() {
   });
 
   group('AI 智能解析 · parse()（工单 M4-05 验收 3/4/5）', () {
-    test('成功：跳步骤③ + fromParseResult 预填（10 字段落位 + 6 默认）', () async {
+    test('成功：跳步骤③ + 解析结果预填表单（8 字段落位）', () async {
       final c = WizardController(
         characterRepository: repository,
         parseService: _parseService(db, FakeLLMProvider(tokens: [
@@ -474,7 +474,7 @@ void main() {
       expect(c.step, 3, reason: '解析成功自动跳步骤③');
       expect(c.parsing, isFalse);
       expect(c.parseError, isNull);
-      // fromParseResult 10 字段落位。
+      // parse 结果 8 个表单字段落位（postHistoryInstructions / creator 不预填表单）。
       expect(c.name, '艾莉亚');
       expect(c.description, '森林小狐狸');
       expect(c.personality, '活泼');
@@ -483,7 +483,7 @@ void main() {
       expect(c.mesExample, '<START> 示例');
       expect(c.systemPrompt, '你是小狐狸');
       expect(c.tags, ['冒险', '奇幻']);
-      // 6 字段默认（temperature 保持向导默认 0.7）。
+      // temperature 保持向导默认 0.7（其余缺省于 save 时经 CharacterDraft 补全）。
       expect(c.temperature, 0.7);
     });
 
@@ -503,6 +503,29 @@ void main() {
 
       expect(c.name, '微调后名称');
       expect(c.personality, '解析的人格', reason: '未手动编辑字段保留解析值');
+    });
+
+    test('解析后保存：postHistoryInstructions 随保存落库（parse 链解耦后修复）',
+        () async {
+      final c = WizardController(
+        characterRepository: repository,
+        parseService: _parseService(db, FakeLLMProvider(tokens: [
+          '{"name": "艾莉亚", "personality": "活泼", '
+          '"post_history_instructions": "保持人设"}',
+        ])),
+      );
+      c.selectMode(WizardCreationMode.import);
+      c.next();
+      c.setParseText('文档');
+
+      expect(await c.parse(), isTrue);
+      final ok = await c.save();
+
+      expect(ok, isTrue);
+      final rows = await repository.listCharacters();
+      expect(rows, hasLength(1));
+      expect(rows.single.character.postHistoryInstructions, '保持人设',
+          reason: '解析出的历史后指令随保存落库（chat_service 对话时消费）');
     });
 
     test('解析成功但 name 空 → 跳③，步骤③必填校验兜底（B8）', () async {

@@ -35,6 +35,15 @@
 
 ## 已完成归档
 
+### 架构深化批次 — 角色字段装配收敛 + ChatRound 分离（2026-09-07）— 候选 4/5 收官
+
+> 来源：improve-codebase-architecture 探索报告候选 4（Worth exploring）+ 候选 5（Worth exploring）——最后两个未探索候选，本案收官。grilling AskUserQuestion 三问全按推荐 A 拍板（parse 链丢失处置 = 解耦+修复 / 装配收敛形态 = 收敛全量装配 / ChatCtrl 分离方向 = 抽回合机）。**候选 4 角色字段装配收敛 + 解耦 parse 链**：删 `CharacterDraft.fromParseResult`（`character_card.dart` 不再依赖 `document_parse_service`，纯转换层解耦）；向导 `_applyParseResult` 从 DocParseResult 直拷 8 表单字段；**修复数据丢失**——解析出的 postHistoryInstructions 此前在 save 路径静默丢弃（注释声称「保留于草稿可落库」与实现不符；chat_service 对话消费该字段），现随保存落库（新测试断言，creator 维持 spec 恒空）；`save()` 改经 CharacterDraft（6 个缺省字段下沉为构造器默认值）→ `toCompanion()`，drift 列名映射单一归属 `character_card.dart`（对齐桌面 CharacterBase 16 字段基类语义）。**候选 5 ChatController 回合状态机与杂项职责分离**：新建 `views/chat/chat_round.dart` ChatRound 深模块（协议表面 = send/stop/regenerate + 合成消息只读状态面 + resetForNavigation/applyBackgroundStoppedMark/isStopped；实现含流订阅/合成 id/F1 停止竞态/F3b 后台补标 ~250 行），**纯搬迁不动行为**（公开 API 零变化，`chat_controller_test` 1260 行原样绿）；ChatController 836→~500 行编排器（入口/导航/高亮/导出/消息组装保留，回合面委托 + reloadMessages 回调注入）；新增 `chat_round_test.dart` 9 独立契约测试。门禁：全量 **827 测**全绿（819 基线 + 修复测试 1 + round 9 − 删旧测 2）/ analyze 0；code-review 四轴 **PASS**（Falsify 8 类对抗场景等价或守卫拦截；Spec 搬迁逐字对照 + grep 零残留）；非阻断 3 条全处理（postHistory 落库前 trim / 删 `_reloadMessages` null 分支冗余 clearInFlight〔双向引用→单向回调〕/ CharacterDraft 缺省字段下沉构造器默认值）。详见 DEV_LOG〈架构深化批次 — 角色字段装配收敛 + ChatRound 分离〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| 候选 4 | 角色字段 → CharactersCompanion 装配收敛 + 解耦 parse 链（含 postHistoryInstructions 落库修复） | 2026-09-07 | （见收口提交） |
+| 候选 5 | ChatController 回合状态机分离（ChatRound 深模块，纯搬迁） | 2026-09-07 | （见收口提交） |
+
 ### 技术债消费批次 F-24（2026-09-07）
 
 > 来源：improve-codebase-architecture 探索报告备选 B（Speculative）+ 用户指令「先消费技术债」显式立项（候选区当时为 0，从备选源落债后消费）。交付：**SettingsReader 契约语义收敛**——兜底常量单一归属 `SettingsDefaults`（`settings_reader.dart` 新增 `abstract final class`：provider/model/userName），`SettingsRepository` 三 getter 填充与 `ConversationRepository._fallback*` 兜底改为引用同一常量（原为各自字面量碰巧相等，任一侧改动即静默破约）；契约文档对齐「实现方填充」现状（原声明「返回空串由消费方回退」与实现矛盾）；消费方 `_resolveValue` 逻辑不动（测试 fake 返回空串的兜底语义保留）。门禁：全量 **819 测**全绿 / analyze 0（行为零变化的重构型收敛，数据层 88 测原样绿）。详见 DEV_LOG〈技术债消费 F-24〉。
