@@ -6,9 +6,9 @@
 ///   创建方式 / 当前步 / 表单字段 / 选中模板 / 温度；
 /// - 导航：next（分步校验门）/ prev（AppBar 返回 = 上一步）/ cancel（零
 ///   副作用，不落库）；manual 选中直接跳步骤③（步骤②不出现）；
-/// - 校验门：步骤①未选方式拦「请选择一种创建方式」；步骤③ name 空 /
-///   纯空白拦「角色名称不能为空」；其余字段可选；步骤②本票为占位页
-///   （M3-02b 交付模板网格 / 导入真 UI），放行；
+/// - 校验门：步骤①未选方式拦「请选择一种创建方式」；步骤② template 未选
+///   模板拦「请选择一个模板」（import 模式放行）；步骤③ name 空 /
+///   纯空白拦「角色名称不能为空」；其余字段可选；
 /// - 模板应用：selectTemplate 填充（对齐桌面 `_applyCharacterData`），已
 ///   手动编辑的字段不被模板回填覆盖；
 /// - 保存：组装 payload → `CharacterRepository.createCharacter`（creator
@@ -202,13 +202,22 @@ class WizardController extends ChangeNotifier {
 
   /// 校验当前步骤并前进到下一步；返回是否放行。
   ///
-  /// 校验门：步骤①未选方式 / 步骤③ name 空、纯空白被拦；步骤②占位放行
-  /// （本票无真 UI）；步骤⑥为末步（next 返回 false）。
+  /// 校验门：步骤①未选方式 / 步骤② template 未选模板 / 步骤③ name 空、
+  /// 纯空白被拦；import 模式步骤②放行（不受内容影响）；步骤⑥为末步
+  /// （next 返回 false）。
   bool next() {
     switch (_step) {
       case 1:
         if (_mode == null) {
           _error = '请选择一种创建方式';
+          notifyListeners();
+          return false;
+        }
+        break;
+      case 2:
+        if (_mode == WizardCreationMode.template &&
+            _selectedTemplateId == null) {
+          _error = '请选择一个模板';
           notifyListeners();
           return false;
         }
@@ -433,6 +442,7 @@ class WizardController extends ChangeNotifier {
       return;
     }
     _selectedTemplateId = id;
+    _error = null;
     _applyTemplate(template);
     notifyListeners();
   }

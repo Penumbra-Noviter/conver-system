@@ -11,15 +11,14 @@
 ///   选中高亮，再次进入保持选中态）；import（M4-05）→ 多行 textarea 绑定
 ///   [WizardController.parseText] + 「AI 智能解析」按钮（空文本禁用 / 超长
 ///   拒绝 SnackBar / 解析中 loading 防连点 / 失败 DocParseError 消息直出），
-///   成功由控制器跳步骤③预填；步骤②视图层校验：template 未选下一步 →
-///   「请选择一个模板」拦截（controller 只读既有状态机，本层拦截不越权）；
+///   成功由控制器跳步骤③预填；步骤②校验门由 controller `next()` 承载
+///   （template 未选 → 「请选择一个模板」，F-18 收拢后视图零校验状态）；
 ///   import 模式下一步放行（不受内容影响）；
 ///   步骤③基本信息（name maxLength=100 / description maxLength=200 / avatar
 ///   / tags splitTags），字段 initialValue 绑定 controller 回显模板/已填值；
 ///   步骤④人格设定；步骤⑤对话风格；步骤⑥四段摘要 + 温度滑块；
-/// - 校验门文案（「请选择一种创建方式」/「角色名称不能为空」）由
-///   [WizardController.error] 提供；「请选择一个模板」由本层步骤②校验
-///   提供；均经 _ErrorBanner 展示；
+/// - 校验门文案（「请选择一种创建方式」/「请选择一个模板」/「角色名称
+///   不能为空」）一律由 [WizardController.error] 提供，经 _ErrorBanner 展示；
 /// - 保存：⑥「保存角色」→ [WizardController.save] 成功 → 触发 [onSaved]
 ///   回调（列表刷新）→ pop 返回。
 ///
@@ -62,10 +61,6 @@ class CharacterWizardView extends StatefulWidget {
 }
 
 class _CharacterWizardViewState extends State<CharacterWizardView> {
-  /// 步骤②视图层校验错误（template 未选拦截）。controller 为只读共享件，
-  /// 本错误状态由本层持有并在步骤切换时清除，不越权写 controller。
-  String? _step2Error;
-
   /// 向导控制器由入口（characters_view._openWizard）内联创建、本视图拥有
   /// 生命周期——pop 时 dispose（ChangeNotifier 惯例）。
   @override
@@ -82,7 +77,7 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
         final controller = widget.controller;
         final stepTitle =
             _stepTitles[(controller.step - 1).clamp(0, _stepTitles.length - 1)];
-        final error = controller.error ?? _step2Error;
+        final error = controller.error;
         return Scaffold(
           appBar: AppBar(
             title: Text(stepTitle),
@@ -132,7 +127,6 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
 
   /// AppBar / 系统返回：step>1 → 上一步；step1 → 退出（零副作用）。
   void _handleBack(BuildContext context) {
-    setState(() => _step2Error = null);
     if (widget.controller.step > 1) {
       widget.controller.prev();
       return;
@@ -141,9 +135,8 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
     Navigator.of(context).pop();
   }
 
-  /// 下一步：⑥保存角色；其余 next（校验失败错误由 controller.error 或本层
-  /// _step2Error 展示）。步骤②视图层校验：template 未选 → 「请选择一个模板」
-  /// 拦截；import 模式放行（不受内容影响）。
+  /// 下一步：⑥保存角色；其余 next（校验失败错误由 controller.error 统一
+  /// 展示——F-18 收拢后视图不再持有分步校验状态）。
   Future<void> _handleNext(BuildContext context) async {
     final controller = widget.controller;
     if (controller.step == 6) {
@@ -156,13 +149,6 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
       }
       return;
     }
-    if (controller.step == 2 &&
-        controller.mode == WizardCreationMode.template &&
-        controller.selectedTemplateId == null) {
-      setState(() => _step2Error = '请选择一个模板');
-      return;
-    }
-    setState(() => _step2Error = null);
     controller.next();
   }
 
@@ -172,10 +158,7 @@ class _CharacterWizardViewState extends State<CharacterWizardView> {
       1 => _Step1(mode: controller.mode, onSelect: controller.selectMode),
       2 => _Step2(
           controller: controller,
-          onSelectTemplate: (String id) {
-            setState(() => _step2Error = null);
-            controller.selectTemplate(id);
-          },
+          onSelectTemplate: controller.selectTemplate,
         ),
       3 => _Step3(controller: controller),
       4 => _Step4(controller: controller),

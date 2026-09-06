@@ -40,14 +40,21 @@
 
 ## 候选区
 
-> 当前 2 项待立项（F-18 校验门分置 / F-23 平台真通道冒烟剩余分面，见下表）。历史消费（2026-09-06 M4 收口 F-23 share_plus 分面关闭、2026-08-29 技术债批次 F-7/F-8/F-9 处置、2026-08-30 批次 F-10~F-17 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
+> 当前 **0 项待立项**（F-18/F-23 已于 2026-09-07 消费完毕，处置见下方处置记录）。历史消费（2026-09-06 M4 收口 F-23 share_plus 分面关闭、2026-09-07 批次 F-18/F-23 全部处置、2026-08-29 技术债批次 F-7/F-8/F-9 处置、2026-08-30 批次 F-10~F-17 处置，见下方处置记录；更早历史由 git 历史承担）：F-1/F-2/F-4/F-5 ✅ 已修、F-6 ❌ 复核关闭（`open()` 无调用方系设计意图）、F-3 ✅ 方案 a 处置（2026-08-28）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-18 | **向导校验门分置两处（Locality 折损）**：步骤①③⑥ 校验在 `WizardController.next()/save()`，步骤②模板门在视图 `_handleNext`（`_step2Error`）——同属「分步校验」概念，改校验逻辑须两处维护；触发面：template 模式未选模板时视图拦截、controller 直调 `next()` 于步骤②放行 | M3 期末四轴（Architecture） | Worth exploring | 📝 待立项 | 前端向导 |
-| F-23 | **file_picker / 批量删除手势真机面未触达（share_plus 分面已关闭）**：file_picker 文件选择器 / 批量删除长按多选手势的真机面仍待验证（share_plus 分享面板分面已由 M4-06 冒烟关闭，2026-09-06）；由 126 测（card+seam fake）+ 26 测（batch）锁定——平台通道挂起型失败与手势交互的真机面待 M5/真机验证 | M3 冒烟 4.5 覆盖说明（share_plus 分面并入 M4 验收） | Worth exploring | 📝 待立项 | 平台验证 |
 
 ## 技术债处置记录
+
+### 2026-09-07 — 技术债消费批次 F-18/F-23（2 项全部处置）
+
+> 来源：用户指令「消费技术债 F-18 F-23」显式立项（非 Grilling 拍板，两候选均 Worth exploring 由用户拍板做）。交付见 [DEV_LOG.md](DEV_LOG.md)〈技术债消费批次 F-18/F-23〉；F-23 证据 `.scratch/techdebt-f18-f23/evidence/F-23.md`；F-18 全量 803 测全绿 / analyze 0 / code-review 四轴 PASS。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-18 | 向导校验门分置两处（Locality） | M3 期末四轴（Architecture） | Worth exploring | ✅ 已修：步骤②模板门移入 `WizardController.next()` case 2（template 未选 → 拦「请选择一个模板」+ 不前进；import 放行），`selectTemplate` 补 `_error = null`；视图删 `_step2Error` 字段与视图层拦截，统一读 `controller.error`——分步校验单一载体 = next() 的 case 1/2/3 switch；测试拆分新契约 + 文案锚保持（controller_test +17 行 / step2 测试原样绿） |
+| F-23 | file_picker / 批量删除手势真机面未触达（share_plus 分面已关闭） | M3 冒烟 4.5 覆盖说明 | Worth exploring | ✅ 已闭合：file_picker 导入系统选择器弹出（`com.android.documentsui` 前台实证）+ 批量删除长按多选手势（长按进多选/自动勾选/加选计数「已选 2 个角色」/退出恢复）模拟器冒烟 PASS，零代码改动；share_plus 分面已于 2026-09-06 M4-06 关闭 → F-23 整条三分面全部闭环 |
 
 ### 2026-09-06 — M4 里程碑收口：F-23 share_plus 分面并入 M4 验收关闭
 

@@ -6,6 +6,17 @@
 
 ---
 
+## 技术债消费批次 F-18/F-23（2026-09-07 — 用户指令显式立项，2 项并行交付）
+
+- **交付**：**F-18 向导校验门收拢**（代码）：步骤②模板门从视图 `_handleNext`（`_step2Error` 字段）移入 `WizardController.next()` case 2——template 未选模板 → `_error = '请选择一个模板'` + notify + return false（不前进）；import 模式放行（不受内容影响）；`selectTemplate(id)` 补 `_error = null`（原视图 setState 清错的 controller 化）；视图删除 `_step2Error` 字段、视图层拦截块与两处 setState，`build` 统一读 `controller.error`，`onSelectTemplate` 由包一层闭包改直接 tear-off。**Locality 达成**：分步校验单一载体 = next() 的 case 1/2/3 switch（controller 全权持有，视图零校验状态）。**F-23 平台真通道冒烟**（验证，零代码）：file_picker V2 卡导入 → `com.android.documentsui` 系统选择器弹出（实测排除「弹不出」挂起风险）；批量删除长按多选手势（长按进多选自动勾选 / 点击加选计数「已选 2 个角色」/ 退出恢复）真机实证；share_plus 分面已于 M4-06 关闭 → **F-23 三分面全部闭环**。证据 `.scratch/techdebt-f18-f23/evidence/`（F-23.md + smoke-file-picker.png + smoke-batch-select.png）。
+- **门禁链**：TDD 先红后绿（controller_test 新契约「template 未选拦截/已选放行」先红 → 实现后绿）；全量 **803 测**全绿（802 基线 + 测试拆分净增 1）/ analyze 0；**code-review 四轴 PASS**（Standards/Spec/Falsify/Architecture 零阻断——Falsify 实测状态流遍历 6 清错点完备、`selectTemplate('未知id')` 早退保错语义正确、视图展示等价性成立；1 条非阻断 stale doc〔视图文件头仍写「本层拦截」〕已修复）。
+- **过程遥测**：立项 = 用户「消费技术债 F-18 F-23」显式指令（候选区状态 📝 → TICKETS 活跃 🔄 → 完成后归档）；主会话 TDD 直做 + code-review 子代理审核（约 8.5 分钟）；模拟器冒烟复用 M3/M4 遗留数据（知性学姐/测试助手），**零写库**（导入取消、删除未执行——避免级联污染，删除动作本身已由 26 测 batch 契约锁定）。
+- **避坑（勿重蹈）**：
+  1. **文档注释与技术债收拢同步**：F-18 代码收拢后，视图文件头 doc 仍写着「本层步骤②校验…本层拦截不越权」——审核抓出的 stale doc 把已消除的分置概念写回文档，误导后续把门放回视图（重新引入技术债）；收拢型改动必须全文 grep 旧概念引用并同步。
+  2. **长按模拟用 adb 同点 swipe**：MCP 无长按原语，`adb shell input swipe x y x y 800`（同点 800ms）即长按手势；从 UI 树实测坐标取点（测算坐标会打偏——既有纪律）。
+  3. **冒烟数据零污染原则**：验证删除/选择类手势到「入口 + 在位可点」即止，不执行破坏性动作（批量删除未点击确认），依赖单测收尾行为面。
+- **知识库蒸馏**：候选教训（文档注释与技术债收拢同步 grep / 长按手势 adb 同点 swipe 模拟 / 冒烟破坏性动作止于在位可点）——完成段经 distill-lesson 处理。
+
 ## M4 kickoff 批次（2026-09-06 收口 — project-kickoff 全自动档交付：导出 / 文档解析里程碑）
 
 - **交付**：Grilling 共识 6 票两条并行依赖链（文件范围互不相交）：链A 导出 M4-01→M4-02→M4-03→M4-06（ConversationExportService 组卷 · ConversationExportFileExchange 文件 seam · 聊天顶栏 ⋯ 菜单导出入口）、链B 解析 M4-04→M4-05（DocumentParseService 三级提取+白名单 · 向导步骤②「AI 智能解析」接入）。波1 merge **42099eb**（M4-01~03）+ **25c7696**（M4-04~05）+ 修复 **1feddd7**（m4-05 解析挂起中 dispose 崩溃，回归断言锁定）。基线 9a881cb。证据 `.scratch/m4-kickoff/evidence/`（M4-01~05 + M4-05-fix + M4-06 + smoke-share-sheet.png）。

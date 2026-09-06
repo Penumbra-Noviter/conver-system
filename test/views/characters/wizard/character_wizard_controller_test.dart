@@ -164,27 +164,39 @@ void main() {
           reason: 'manual 步骤②不出现——回退后再前进必须跳过②直达③');
     });
 
-    test('import / template 选中 → 步骤①停留，next 进入步骤②占位页并放行',
+    test('import 选中 → 步骤①停留，next 进入步骤②并放行到③（步骤②无门）',
         () {
-      for (final mode in [
-        WizardCreationMode.import,
-        WizardCreationMode.template,
-      ]) {
-        final c = WizardController(characterRepository: repository);
-        c.selectMode(mode);
+      final c = WizardController(characterRepository: repository);
+      c.selectMode(WizardCreationMode.import);
 
-        expect(c.mode, mode);
-        expect(c.step, 1, reason: 'import/template 先在①停留（未跳步）');
+      expect(c.mode, WizardCreationMode.import);
+      expect(c.step, 1, reason: 'import 先在①停留（未跳步）');
 
-        final ok = c.next();
+      final ok = c.next();
 
-        expect(ok, isTrue);
-        expect(c.step, 2, reason: '进入步骤②（本票占位页，放行）');
+      expect(ok, isTrue);
+      expect(c.step, 2, reason: '进入步骤②');
 
-        final ok2 = c.next();
-        expect(ok2, isTrue);
-        expect(c.step, 3, reason: '步骤②占位放行 → 步骤③');
-      }
+      final ok2 = c.next();
+      expect(ok2, isTrue);
+      expect(c.step, 3, reason: 'import 步骤②放行（不受内容影响）→ 步骤③');
+    });
+
+    test('template 步骤②未选模板 → next 拦截 + error；已选 → 放行', () {
+      final c = WizardController(characterRepository: repository);
+      c.selectMode(WizardCreationMode.template);
+      c.next();
+
+      expect(c.step, 2, reason: '进入步骤②');
+
+      expect(c.next(), isFalse, reason: 'template 未选模板被拦');
+      expect(c.step, 2, reason: '拦截不前进');
+      expect(c.error, '请选择一个模板', reason: '拦截文案由 controller 承载');
+
+      c.selectTemplate('senpai');
+      expect(c.error, isNull, reason: '选中模板清错（F-18 收拢后 controller 持有）');
+      expect(c.next(), isTrue, reason: '已选模板放行');
+      expect(c.step, 3);
     });
 
     test('六步 next 推进到⑥；prev 逐级回退（AppBar 返回 = 上一步）', () {

@@ -35,6 +35,14 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-18/F-23（2026-09-07）
+
+> 来源：用户指令「消费技术债 F-18 F-23」显式立项（两候选均 Worth exploring，非 Grilling 拍板项）。2 项并行交付：**F-18 向导校验门收拢**（架构类）——步骤②模板门从视图 `_handleNext`（`_step2Error`）移入 `WizardController.next()` case 2（template 未选 → error + 拦截；import 放行），`selectTemplate` 补清错，视图删除 `_step2Error` 字段统一读 `controller.error`（Locality 达成：分步校验单一载体 = next() 的 case 1/2/3 switch）；测试拆分「import 放行」+「template 未选拦截/已选放行」新契约 + 视图文案锚保持；**F-23 平台真通道冒烟**（验证类，零代码改动）——file_picker 导入选择器弹出（`com.android.documentsui`）+ 批量删除长按多选手势（长按进多选/自动勾选/加选计数/退出恢复）模拟器实证，share_plus 分面已于 M4-06 关闭，本票关闭剩余两分面 → **F-23 整条闭环**。门禁：全量 **803 测**全绿 / analyze 0；code-review 四轴 **PASS**（Standards/Spec/Falsify/Architecture 零阻断，1 条非阻断 stale doc 已修）。证据 `.scratch/techdebt-f18-f23/evidence/`（F-23.md + smoke-file-picker.png + smoke-batch-select.png）。详见 DEV_LOG〈技术债消费批次 F-18/F-23〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F-18/F-23 | 技术债消费：向导校验门收拢 + 平台真通道冒烟 | 2026-09-07 | （见收口提交） |
+
 ### M4 批次 — 导出 / 文档解析（2026-09-06 收口）
 
 > 来源：project-kickoff 全自动档（Grilling 共识零真拍点；6 票两条并行依赖链：链A 导出 M4-01→02→03→06 / 链B 解析 M4-04→05，文件范围互不相交）。波1 merge 42099eb（M4-01~03）+ 25c7696（M4-04~05）+ 修复 1feddd7（m4-05 解析挂起中 dispose 崩溃，回归断言锁定）。门禁：全量 **802 测**（M3 729 → +73）/analyze 0；**M4-06 冒烟 PASS**（2026-09-06：hihello 对话顶栏 ⋯ → 导出 JSON/MD → ShareSheet 弹出 ×2 + `测试助手.json`/`.md` 临时文件生成且文件名=角色名净化 + 导出内容语义逐项核对（JSON UTC ISO 8601/升序；MD 日期分组/角色标记）+ **platformTimeout 超时兜底实测**（模拟器无分享接收 app → share_plus Future 不 resolve → 3s 超时 → 非阻塞 SnackBar，app 零崩溃）。交付内容：对话顶栏 ⋯ 菜单导出 JSON/MD（ConversationExportService 组卷 + 文件交换 seam 写临时目录 + share_plus 面板）/ 向导步骤②「AI 智能解析」启用（DocumentParseService 三级提取 + 白名单 + 错误折叠，失败文案与桌面一致）。F-23 重定界：share_plus 分面并入 M4 验收关闭，file_picker 与批量多选手势分面归 M5（TECH_DEBT 处置记录留痕）。证据 `.scratch/m4-kickoff/evidence/`（M4-01~05 + M4-05-fix + M4-06 + smoke-share-sheet.png）。详见 DEV_LOG〈M4 kickoff 批次〉。
