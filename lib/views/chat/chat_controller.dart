@@ -50,6 +50,7 @@ import '../../services/chat_service.dart';
 import '../../services/conversation_export_file_exchange.dart';
 import '../../services/conversation_export_service.dart';
 import '../../services/llm/errors.dart';
+import '../../services/notice_runner.dart';
 
 /// 单条聊天 UI 显示消息（视图层模型，由 [ChatController.messages] 组装）。
 ///
@@ -152,7 +153,9 @@ class ChatController extends ChangeNotifier {
   String _streamingText = '';
   String? _pendingUserText;
   bool _isRegenerating = false;
-  String? _notice;
+  // late：字段初始化器需引用实例方法 notifyListeners（首次访问时 this 可用）。
+  late final NoticeRunner _noticeRunner =
+      NoticeRunner(onChanged: notifyListeners);
 
   /// 导出进行中（防连点：重复触发被忽略，完成复位）。
   bool _exporting = false;
@@ -228,23 +231,36 @@ class ChatController extends ChangeNotifier {
   Future<void> loadEntry() async {
     _loadingEntry = true;
     notifyListeners();
-    try {
-      _conversations = await _conversationRepository
-          .listConversations()
-          .timeout(const Duration(seconds: 3));
-      final characters =
-          await _characterRepository.listCharacters().timeout(const Duration(seconds: 3));
-      _firstCharacter = characters.isEmpty ? null : characters.first.character;
-      _hasLoadedEntry = true;
-    } catch (error) {
-      _notice = _notice ?? '加载对话失败: $error';
+    final conversations = await _noticeRunner.guard(
+      op: () => _conversationRepository.listConversations(),
+      onError: (e) => '加载对话失败: $e',
+    );
+    if (conversations == null) {
+      // 失败：notice 已折叠（先错者胜），清空列表并复位加载态（不产生
+      // 永不结束的加载态 spinner）。
       _conversations = const [];
       _firstCharacter = null;
       _hasLoadedEntry = true;
-    } finally {
       _loadingEntry = false;
       notifyListeners();
+      return;
     }
+    _conversations = conversations;
+    final characters = await _noticeRunner.guard(
+      op: () => _characterRepository.listCharacters(),
+      onError: (e) => '加载对话失败: $e',
+    );
+    if (characters == null) {
+      _firstCharacter = null;
+      _hasLoadedEntry = true;
+      _loadingEntry = false;
+      notifyListeners();
+      return;
+    }
+    _firstCharacter = characters.isEmpty ? null : characters.first.character;
+    _hasLoadedEntry = true;
+    _loadingEntry = false;
+    notifyListeners();
   }
 
   /// 新建对话：取首个角色；无角色 → [notice] 提示（M2 最小入口，M3 替换）。
@@ -253,7 +269,7 @@ class ChatController extends ChangeNotifier {
   Future<void> createConversation() async {
     final character = _firstCharacter;
     if (character == null) {
-      _notice = '请先在角色页创建角色';
+      _noticeRunner.setFirst('请先在角色页创建角色');
       notifyListeners();
       return;
     }
@@ -262,19 +278,18 @@ class ChatController extends ChangeNotifier {
     }
     _creatingConversation = true;
     notifyListeners();
-    final int conversationId;
-    try {
-      final conversation =
-          await _conversationRepository.createConversation(characterId: character.id);
-      conversationId = conversation.id;
-    } catch (error) {
-      _creatingConversation = false;
-      _notice = '新建对话失败: $error';
+    final conversation = await _noticeRunner.guard<Conversation>(
+      op: () =>
+          _conversationRepository.createConversation(characterId: character.id),
+      onError: (e) => '新建对话失败: $e',
+    );
+    _creatingConversation = false;
+    if (conversation == null) {
+      // 失败：notice 已折叠（先错者胜），不复位残局。
       notifyListeners();
       return;
     }
-    _creatingConversation = false;
-    await openConversation(conversationId);
+    await openConversation(conversation.id);
   }
 
   /// 以指定角色建会话并直达（M3-01 角色卡「开始对话」入口）。
@@ -289,28 +304,28 @@ class ChatController extends ChangeNotifier {
     }
     _creatingConversation = true;
     notifyListeners();
-    final int conversationId;
-    try {
-      final character = await _characterRepository
-          .getCharacter(characterId)
-          .timeout(const Duration(seconds: 3));
-      if (character == null) {
-        _creatingConversation = false;
-        _notice = '角色不存在或已删除：无法新建对话';
-        notifyListeners();
-        return;
-      }
-      final conversation =
-          await _conversationRepository.createConversation(characterId: characterId);
-      conversationId = conversation.id;
-    } catch (error) {
+    final character = await _noticeRunner.guard<Character?>(
+      op: () => _characterRepository.getCharacter(characterId),
+      onError: (e) => '新建对话失败: $e',
+    );
+    if (character == null) {
+      // 角色不存在（guard 成功返回 null，无 notice）或查询失败（已折叠）。
+      _noticeRunner.setFirst('角色不存在或已删除：无法新建对话');
       _creatingConversation = false;
-      _notice = '新建对话失败: $error';
       notifyListeners();
       return;
     }
+    final conversation = await _noticeRunner.guard<Conversation>(
+      op: () =>
+          _conversationRepository.createConversation(characterId: characterId),
+      onError: (e) => '新建对话失败: $e',
+    );
     _creatingConversation = false;
-    await openConversation(conversationId);
+    if (conversation == null) {
+      notifyListeners();
+      return;
+    }
+    await openConversation(conversation.id);
   }
 
   // ── 导航面 ──
@@ -375,7 +390,7 @@ class ChatController extends ChangeNotifier {
     _stoppedMessageIds.clear();
     _clearInFlight();
     _reloadPending = false;
-    _notice = null;
+    _noticeRunner.clear();
     notifyListeners();
     try {
       // F2：DB 异常收口为 notice（对齐 _reloadMessages / loadEntry 兜底），
@@ -383,7 +398,7 @@ class ChatController extends ChangeNotifier {
       _activeConversation =
           await _conversationRepository.getConversation(conversationId);
     } catch (error) {
-      _notice = _notice ?? '加载对话失败: $error';
+      _noticeRunner.setFirst('加载对话失败: $error');
       _activeConversation = null;
     }
     await _reloadMessages();
@@ -413,7 +428,7 @@ class ChatController extends ChangeNotifier {
     _stoppedMessageIds.clear();
     _clearInFlight();
     _reloadPending = false;
-    _notice = null;
+    _noticeRunner.clear();
     notifyListeners();
     await loadEntry();
   }
@@ -424,7 +439,7 @@ class ChatController extends ChangeNotifier {
   void invalidateEntryCache() {
     _hasLoadedEntry = false;
     _firstCharacter = null;
-    _notice = null;
+    _noticeRunner.clear();
     notifyListeners();
   }
 
@@ -477,14 +492,14 @@ class ChatController extends ChangeNotifier {
   String get streamingText => _streamingText;
 
   /// 非阻塞提示（断流「回复已中断」/ 错误映射文案 / 基础设施失败）；null 无。
-  String? get notice => _notice;
+  String? get notice => _noticeRunner.notice;
 
   /// 关闭当前非阻塞提示。
   void dismissNotice() {
-    if (_notice == null) {
+    if (!_noticeRunner.hasNotice) {
       return;
     }
-    _notice = null;
+    _noticeRunner.clear();
     notifyListeners();
   }
 
@@ -505,7 +520,7 @@ class ChatController extends ChangeNotifier {
         _reloadPending) {
       return;
     }
-    _notice = null;
+    _noticeRunner.clear();
     _isStreaming = true;
     _streamingStopped = false;
     _reloadPending = false;
@@ -585,17 +600,15 @@ class ChatController extends ChangeNotifier {
     }
     _isRegenerating = true;
     notifyListeners();
-    try {
-      await _chatService.regenerate(conversationId: cid);
-      await _reloadMessages();
-    } catch (error) {
-      // 重生成失败：旧回复保留（服务层保证），仅给出非阻塞提示。
-      _notice = _descriptiveError(error);
-      notifyListeners();
-    } finally {
-      _isRegenerating = false;
-      notifyListeners();
-    }
+    await _noticeRunner.guard<void>(
+      op: () async {
+        await _chatService.regenerate(conversationId: cid);
+        await _reloadMessages();
+      },
+      onError: (e) => _descriptiveError(e),
+    );
+    _isRegenerating = false;
+    notifyListeners();
   }
 
   // ── 服务/生命周期 ──
@@ -628,7 +641,7 @@ class ChatController extends ChangeNotifier {
     final service = _exportService;
     final seam = _exportFileExchange;
     if (service == null || seam == null || produce == null) {
-      _notice = _notice ?? '导出功能未配置';
+      _noticeRunner.setFirst('导出功能未配置');
       notifyListeners();
       return;
     }
@@ -638,14 +651,22 @@ class ChatController extends ChangeNotifier {
     _exporting = true;
     notifyListeners();
     try {
-      final result = await produce(cid);
+      final result = await _noticeRunner.guard<ConversationExportResult?>(
+        op: () => produce(cid),
+        onError: (e) => '导出失败: $e',
+      );
       if (result == null) {
-        _notice = '对话不存在';
+        // 对话不存在（服务成功返回 null）或失败（notice 已折叠）。
+        _noticeRunner.setFirst('对话不存在');
         return;
       }
-      _notice = await seam.exportFile(result);
-    } catch (error) {
-      _notice = '导出失败: $error';
+      final message = await _noticeRunner.guard<String>(
+        op: () => seam.exportFile(result),
+        onError: (e) => '导出失败: $e',
+      );
+      if (message != null) {
+        _noticeRunner.set(message);
+      }
     } finally {
       _exporting = false;
       notifyListeners();
@@ -704,10 +725,10 @@ class ChatController extends ChangeNotifier {
       case ChatDone():
         _finishRound();
       case ChatInterrupted():
-        _notice = _notice ?? '回复已中断';
+        _noticeRunner.setFirst('回复已中断');
         _finishRound();
       case ChatError error:
-        _notice = _notice ?? error.message;
+        _noticeRunner.setFirst(error.message);
         _finishRound();
     }
     notifyListeners();
@@ -747,7 +768,7 @@ class ChatController extends ChangeNotifier {
     try {
       _dbMessages = await _messageRepository.getMessages(cid);
     } catch (error) {
-      _notice = _notice ?? '加载消息失败: $error';
+      _noticeRunner.setFirst('加载消息失败: $error');
       _dbMessages = const [];
     }
   }

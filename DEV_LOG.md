@@ -6,6 +6,17 @@
 
 ---
 
+## 架构深化批次 — 控制器编排收敛 + LLM 流式骨架收敛（2026-09-07 — improve-codebase-architecture 候选 2/3）
+
+- **交付**：grilling 共识 4 问全 A 落地两个 Strong 候选。**候选 2**（控制器超时/notice 编排去重）：新建 **`services/notice_runner.dart`**——[guard] 统一「try / await / `.timeout` / 错误折叠 / 先错者胜 notice」骨架（`timeout` 缺省 3s；[set]/[clear]/[setFirst]/[onChanged] 通知），替换 chat + characters 两控制器 `.timeout(3s)` 6 处 + notice 编排 12 处；专项错误（CardFormat/CardValidation）折叠进 guard.onError switch（单一错误路径）；loading 标志（`_loading`/`_loadingEntry`/`_creatingConversation`/`_exporting`/`_isRegenerating`）各自保留（并发语义不同不硬扭）。**候选 3**（LLM 流式 wire 骨架收敛）：新建 **`services/llm/stream_wire.dart`**——[streamSse] 共享骨架（POST + SSE 消费 + 非 200→HttpStatusError + **消费阶段**断连→LLMConnectionInterruptedError + 未终态 EOF 兜底 + finally 强制关连接，~45 行取代原 ~50 行 ×2 逐行同构）；claude/openai `_streamRequest` 只剩差异面（端点/头/终态/帧提取/errorFrameException 工厂——claude 流内 error 帧保持私有 `_StreamApiError`，openai 传 null，M2 双协议决策不破）。**行为变更点（有意统一，审核确认）**：① regenerate/_export 失败 notice 从「直接覆盖」统一为「先错者胜」（其余 10 处本已 first-wins，此两处是异类收编）；② loadEntry 第二查询（listCharacters）失败保留已成功加载的对话列表（原为清空，新语义对齐 characters.refresh「失败保留既有列表」哲学）——两处均有测试钉死。
+- **门禁链**：全量 **819 测**全绿（810 基线 + NoticeRunner 5 + stream_wire 9 + loadEntry 二查 1 − 结构调整净变）/ analyze 0；**code-review 四轴 PASS**（Falsify 逐点：guard 成功/抛错/挂起/先错者胜、createConversationFor 角色 null vs 查询失败的 setFirst 区分、_export result null vs 失败、streamSse headers.forEach 原样送达 captured 实证、errorFrame 中止 yield、消费方取消 finally close；Spec：文案锚 16 条逐字不变）。非阻断 6 条：处理 4（unused import 删 / 200+空体未终态测试 / **连接拒绝分层契约测试**——postUrl 阶段 SocketException 原样上抛，映射归 provider translateError 层〔openai_provider_test 端到端钉住〕/ loadEntry 二查语义测试），知悉 2（双重 notify 冗余为既有模式 / 7 参顶层函数偏浅为合理权衡）。
+- **过程遥测**：用户 AskUserQuestion 四问全 A；候选 2、3 主会话直做（TDD 迁移风格）+ code-review 子代理 ≈15 分钟；踩坑两次——① NoticeRunner 字段初始化器引用实例方法须 `late final`（`onChanged: notifyListeners` 在构造期不可用）；② **Dart 3 事实修正：`StateError extends Error` 不是 `Exception` 子类型**（二者是兄弟接口）——errorFrameException 工厂返回自定义 `implements Exception` 类型（claude `_StreamApiError` 同构），流式连接拒绝测试因此改断言为 SocketException 上抛而非折叠。
+- **避坑（勿重蹈）**：
+  1. **ChangeNotifier 字段初始化器不能引用实例方法**：`final x = Runner(onChanged: notifyListeners)` 在字段初始化期无 this——用 `late final`（首次访问时 this 可用）或构造体内赋值。
+  2. **Dart 3 中 Error 与 Exception 是兄弟接口**：`StateError is Exception` 为 false（与 Dart 2 直觉相反）——「异常工厂返回 Exception?」时具体错误类型必须 `implements Exception`；测试也据实调整（连接拒绝分层契约）。
+  3. **「覆盖 → 先错者胜」收编是行为变更**：老代码两处失败 notice 直接覆盖（regenerate/_export），统一 first-wins 后若既有未清 notice 会保留旧错——有意为之（与其余 10 处一致）但必须记入变更说明，且失败的文档/测试同步。
+- **知识库蒸馏**：候选教训（ChangeNotifier late final 初始化器 / Dart3 Error≠Exception 子类型 / 收编行为变更要测试钉死）——完成段经 distill-lesson 处理。
+
 ## 架构深化批次 — 文件交换平台腿收敛（2026-09-07 — improve-codebase-architecture 候选 1）
 
 - **交付**：grilling 共识（Q1=共享腿 / Q2=safeFileName 挪纯逻辑 / Q3=删死面 / Q4=新建模块 / Q5=组合级）落地的第一深化候选。新建 **`services/file_name.dart`**（safeFileName 纯函数迁出平台 seam，纯函数归纯处）+ **`services/platform_file_exchange.dart`**（typedef 三枚收敛 + `writeTempAndShare` 组合级共享腿〔临时目录带超时 → 写盘 flush → 分享带超时，StateError 文案单一归属〕+ `pickJsonWithTimeout` + 缺省平台腿 `defaultResolveTempDirectory/defaultPickJsonFile/defaultShareViaPlus`，`coverage:ignore` 平台委托）。两个消费 seam（`character_file_exchange` / `conversation_export_file_exchange`）删除本地 typedef / `_shareViaPlus` / 平台包 import，变薄为业务数据组装 + 注入契约（构造参数名与类型名不变，消费方零改动）；删 `ConversationExportService.characterExportBaseName` 死公开面（生产零调用，规则收敛私有 `_extractCharacterName`）；`conversation_export_service` import 改向 `file_name.dart`——**平台 seam 反向依赖消除**。测试收敛：超时防御用例从两个 seam 测试移入新 `platform_file_exchange_test.dart`（6 测：成功链 + tempDir/share 挂起降级 + pick 三态），safeFileName 组迁入 `file_name_test.dart`，死面测试组删除。

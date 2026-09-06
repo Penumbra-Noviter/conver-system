@@ -25,6 +25,7 @@ import '../../data/database/app_database.dart' show Character, CharactersCompani
 import '../../data/repositories/character_repository.dart';
 import '../../services/character_card.dart';
 import '../../services/character_file_exchange.dart';
+import '../../services/notice_runner.dart';
 import '../../view_models/shell_navigation.dart';
 import '../chat/chat_controller.dart';
 
@@ -58,7 +59,9 @@ class CharactersController extends ChangeNotifier {
   bool _loading = false;
   bool _hasLoaded = false;
   List<CharacterWithCount> _characters = const [];
-  String? _notice;
+  // late：字段初始化器需引用实例方法 notifyListeners（首次访问时 this 可用）。
+  late final NoticeRunner _noticeRunner =
+      NoticeRunner(onChanged: notifyListeners);
 
   // M3-05 批量删除分区：选中集 / 多选态 / 删除中标志。
   final Set<int> _selection = <int>{};
@@ -75,7 +78,7 @@ class CharactersController extends ChangeNotifier {
   List<CharacterWithCount> get characters => _characters;
 
   /// 非阻塞提示（加载失败 / 导出占位 / 删除反馈）；null 无。
-  String? get notice => _notice;
+  String? get notice => _noticeRunner.notice;
 
   /// 多选模式中（[enterSelectionMode] 进入；[exitSelectionMode] /
   /// [deleteSelected] / 刷新完成退出）。
@@ -89,10 +92,10 @@ class CharactersController extends ChangeNotifier {
 
   /// 关闭当前非阻塞提示。
   void dismissNotice() {
-    if (_notice == null) {
+    if (!_noticeRunner.hasNotice) {
       return;
     }
-    _notice = null;
+    _noticeRunner.clear();
     notifyListeners();
   }
 
@@ -107,11 +110,14 @@ class CharactersController extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      _characters =
-          await _characterRepository.listCharacters().timeout(const Duration(seconds: 3));
-      _notice = null;
-    } catch (error) {
-      _notice = _notice ?? '加载角色失败: $error';
+      final list = await _noticeRunner.guard(
+        op: () => _characterRepository.listCharacters(),
+        onError: (e) => '加载角色失败: $e',
+      );
+      if (list != null) {
+        _characters = list;
+        _noticeRunner.clear();
+      }
     } finally {
       // 成功 / 失败都算完成一次刷新（幂等可重试，对齐 ChatController.loadEntry）。
       _hasLoaded = true;
@@ -132,7 +138,7 @@ class CharactersController extends ChangeNotifier {
     final deleted =
         await _characterRepository.deleteCharacter(characterId);
     if (!deleted) {
-      _notice = _notice ?? '角色不存在或已删除';
+      _noticeRunner.setFirst('角色不存在或已删除');
       notifyListeners();
       return false;
     }
@@ -166,36 +172,33 @@ class CharactersController extends ChangeNotifier {
   ///   为空」）分级转 notice；
   /// - 其它异常 / 超时兜底「导入角色失败: $error」。
   Future<void> importCharacter() async {
-    try {
-      final draft = await _fileExchange
-          .importCharacter()
-          .timeout(const Duration(seconds: 3));
-      if (draft == null) {
-        return; // 用户取消 / 挂起降级，零副作用。
-      }
-      await _characterRepository.createCharacter(draft.toCompanion());
-      await refresh();
-      _notice = '已导入角色「${draft.name}」';
-    } on CardFormatException catch (error) {
-      _notice = error.message;
-    } on CardValidationException catch (error) {
-      _notice = error.message;
-    } catch (error) {
-      _notice = _notice ?? '导入角色失败: $error';
+    final draft = await _noticeRunner.guard<CharacterDraft?>(
+      op: () => _fileExchange.importCharacter(),
+      onError: (e) => switch (e) {
+        CardFormatException(:final message) ||
+        CardValidationException(:final message) =>
+          message,
+        _ => '导入角色失败: $e',
+      },
+    );
+    if (draft == null) {
+      return; // 用户取消 / 挂起降级 / 失败，零副作用。
     }
+    await _characterRepository.createCharacter(draft.toCompanion());
+    await refresh();
+    _noticeRunner.set('已导入角色「${draft.name}」');
     notifyListeners();
   }
 
   /// 导出一张角色卡（本票占位）：经 [CharacterFileExchange] seam 调用，
   /// 返回文案展示为 [notice]；异常 / 超时兜底转 notice。
   Future<void> exportCharacter(Character character) async {
-    try {
-      final message = await _fileExchange
-          .exportCharacter(character)
-          .timeout(const Duration(seconds: 3));
-      _notice = message;
-    } catch (error) {
-      _notice = _notice ?? '导出失败: $error';
+    final message = await _noticeRunner.guard<String>(
+      op: () => _fileExchange.exportCharacter(character),
+      onError: (e) => '导出失败: $e',
+    );
+    if (message != null) {
+      _noticeRunner.set(message);
     }
     notifyListeners();
   }
@@ -207,7 +210,7 @@ class CharactersController extends ChangeNotifier {
     final updated =
         await _characterRepository.updateCharacter(characterId, data);
     if (updated == null) {
-      _notice = _notice ?? '角色不存在或已删除';
+      _noticeRunner.setFirst('角色不存在或已删除');
       notifyListeners();
       return;
     }

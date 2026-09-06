@@ -87,6 +87,17 @@ class _ThrowingGetConversationRepository extends ConversationRepository {
   }
 }
 
+/// listCharacters 必抛的角色仓储子类——命中「loadEntry 第二查询失败」路径
+/// （第一查询已成功的对话列表保留，仅首角色置空）。
+class _ThrowingListCharactersRepository extends CharacterRepository {
+  _ThrowingListCharactersRepository(super.db, {super.now});
+
+  @override
+  Future<List<CharacterWithCount>> listCharacters() {
+    throw StateError('list chars failed');
+  }
+}
+
 /// createMessage 延迟 [delay] 后落库的慢消息仓储——构造「stop 时 user 尚未落库」
 /// 的 F1 竞态窗口（可控制 user 落库时延；getMessages 等读取路径不延迟，reload
 /// / 轮询照常）。
@@ -350,6 +361,36 @@ void main() {
       expect(c.conversations, isEmpty);
       expect(c.canCreateConversation, isFalse);
       expect(c.notice, startsWith('加载对话失败'));
+    });
+
+    test('loadEntry 第二查询（listCharacters）失败 → 保留已加载对话 + 首角色空 + notice',
+        () async {
+      // 语义钉死（2026-09-07 架构深化）：第二查询失败保留第一查询成功的对话
+      // 列表（对齐 characters.refresh「失败保留既有列表」哲学），仅首角色置空。
+      final char = await seedCharacter();
+      await seedConversation(char.id);
+      final throwingCharRepo =
+          _ThrowingListCharactersRepository(db, now: () => fakeNow);
+      final c = ChatController(
+        chatService: ChatService(
+          database: db,
+          conversationRepository: convRepo,
+          characterRepository: throwingCharRepo,
+          messageRepository: messageRepo,
+          settingsRepository: settingsRepo,
+          providerFactory: FixedLLMProviderFactory(FakeLLMProvider(tokens: const [])),
+        ),
+        conversationRepository: convRepo,
+        characterRepository: throwingCharRepo,
+        messageRepository: messageRepo,
+      );
+      controller = c;
+
+      await c.loadEntry();
+
+      expect(c.conversations, isNotEmpty, reason: '第一查询成功结果保留');
+      expect(c.canCreateConversation, isFalse, reason: '第二查询失败 → 首角色空，新建禁用');
+      expect(c.notice, startsWith('加载对话失败'), reason: '第二查询失败折叠 notice');
     });
 
     test('createConversation 落库失败 → notice，停留在入口', () async {

@@ -22,6 +22,7 @@ import 'package:dio/dio.dart';
 import 'errors.dart';
 import 'llm_provider.dart';
 import 'sse.dart';
+import 'stream_wire.dart';
 import 'translate_helpers.dart';
 
 /// Anthropic 官方版本头（必需；research R1-1：`anthropic-version: 2023-06-01`）。
@@ -138,64 +139,30 @@ class ClaudeProvider extends LLMProvider {
     }
   }
 
-  /// 流式请求体：POST + SSE 消费，逐 token 产出。
+  /// 流式请求体：POST + SSE 消费，逐 token 产出（共享骨架 [streamSse]，
+  /// 本方法只提供 Anthropic 差异面：端点 / 头 / 终态帧 / 帧提取 / 流错帧）。
   Stream<String> _streamRequest(
     List<LlmMessage> messages, {
     required int maxTokens,
     String? model,
   }) async* {
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
-    try {
-      final body = jsonEncode(
-        _buildBody(messages, maxTokens: maxTokens, model: model, streaming: true),
-      );
-      final request = await client.postUrl(_messagesUri());
-      request.headers.contentType = ContentType.json;
-      request.headers.set('accept', 'application/json');
-      request.headers.set('x-api-key', apiKey);
-      request.headers.set('anthropic-version', kAnthropicVersion);
-      request.write(body);
-
-      final response = await request.close();
-      if (response.statusCode != HttpStatus.ok) {
-        // 非 SSE 错误体（HTTP 状态码 + 原文），交状态码翻译。
-        final errorBody = await utf8.decoder.bind(response).join();
-        throw HttpStatusError(response.statusCode, errorBody);
-      }
-
-      var reachedMessageStop = false;
-      final parser = SseParser();
-      try {
-        await for (final line
-            in const LineSplitter().bind(utf8.decoder.bind(response))) {
-          for (final frame in parser.feed(line)) {
-            // 流内 error 事件（research R1-1：官方 SDK 抛错终止）。
-            if (frame.event == 'error') {
-              throw _StreamApiError(_errorEventMessage(frame));
-            }
-            if (isAnthropicMessageStop(frame)) {
-              reachedMessageStop = true;
-            }
-            final token = extractAnthropicText(frame);
-            if (token != null) {
-              yield token;
-            }
-          }
-        }
-      } on SocketException catch (e) {
-        throw LLMConnectionInterruptedError(originalError: e);
-      } on HttpException catch (e) {
-        throw LLMConnectionInterruptedError(originalError: e);
-      }
-      // 流结束但未收到终态帧：可区分「连接中断」而非正常完成。
-      if (!reachedMessageStop) {
-        throw LLMConnectionInterruptedError();
-      }
-    } finally {
-      // 无论正常 / 异常 / 消费方取消，都强制关闭连接避免泄漏。
-      client.close(force: true);
-    }
+    yield* streamSse(
+      uri: _messagesUri(),
+      body: jsonEncode(
+        _buildBody(messages,
+            maxTokens: maxTokens, model: model, streaming: true),
+      ),
+      headers: {
+        'accept': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': kAnthropicVersion,
+      },
+      errorFrameException: (frame) => frame.event == 'error'
+          ? _StreamApiError(_errorEventMessage(frame))
+          : null,
+      isTerminated: isAnthropicMessageStop,
+      extractToken: extractAnthropicText,
+    );
   }
 
   /// 组装 Messages API 请求体；temperature 不透传（R8），不携带该键。

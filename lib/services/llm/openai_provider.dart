@@ -23,6 +23,7 @@ import 'package:dio/dio.dart';
 import 'errors.dart';
 import 'llm_provider.dart';
 import 'sse.dart';
+import 'stream_wire.dart';
 import 'translate_helpers.dart';
 
 /// 规范化 OpenAI 兼容端点地址（锚 `desktop/backend/app/services/llm/openai.py`
@@ -138,58 +139,24 @@ class OpenAIProvider extends LLMProvider {
     }
   }
 
-  /// 流式请求体：POST + SSE 消费，逐 token 产出。
+  /// 流式请求体：POST + SSE 消费，逐 token 产出（共享骨架 [streamSse]，
+  /// 本方法只提供 OpenAI 差异面：端点 / 头 / 终态帧 / 帧提取；无流内
+  /// 错误帧语义 → [streamSse.errorFrameException] 缺省 null）。
   Stream<String> _streamRequest(
     List<LlmMessage> messages, {
     required int maxTokens,
     String? model,
   }) async* {
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
-    try {
-      final body = jsonEncode(
-        _buildBody(messages, maxTokens: maxTokens, model: model, streaming: true),
-      );
-      final request = await client.postUrl(_chatCompletionsUri());
-      request.headers.contentType = ContentType.json;
-      request.headers.set('authorization', 'Bearer $apiKey');
-      request.write(body);
-
-      final response = await request.close();
-      if (response.statusCode != HttpStatus.ok) {
-        // 非 SSE 错误体（HTTP 状态码 + 原文），交状态码翻译。
-        final errorBody = await utf8.decoder.bind(response).join();
-        throw HttpStatusError(response.statusCode, errorBody);
-      }
-
-      var reachedDone = false;
-      final parser = SseParser();
-      try {
-        await for (final line
-            in const LineSplitter().bind(utf8.decoder.bind(response))) {
-          for (final frame in parser.feed(line)) {
-            if (isOpenAiDone(frame)) {
-              reachedDone = true;
-            }
-            final token = extractOpenAiText(frame);
-            if (token != null) {
-              yield token;
-            }
-          }
-        }
-      } on SocketException catch (e) {
-        throw LLMConnectionInterruptedError(originalError: e);
-      } on HttpException catch (e) {
-        throw LLMConnectionInterruptedError(originalError: e);
-      }
-      // 流结束但未收到 [DONE]：可区分「连接中断」而非正常完成。
-      if (!reachedDone) {
-        throw LLMConnectionInterruptedError();
-      }
-    } finally {
-      // 无论正常 / 异常 / 消费方取消，都强制关闭连接避免泄漏。
-      client.close(force: true);
-    }
+    yield* streamSse(
+      uri: _chatCompletionsUri(),
+      body: jsonEncode(
+        _buildBody(messages,
+            maxTokens: maxTokens, model: model, streaming: true),
+      ),
+      headers: {'authorization': 'Bearer $apiKey'},
+      isTerminated: isOpenAiDone,
+      extractToken: extractOpenAiText,
+    );
   }
 
   /// 组装 Chat Completions 请求体；temperature 照传（默认 0.7）。
