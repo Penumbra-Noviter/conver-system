@@ -29,7 +29,7 @@
 
 ## 技术债区
 
-> 已迁移至独立文件 [TECH_DEBT.md](TECH_DEBT.md)——当前 **0 项待立项**（F-10~F-17 已于 2026-08-30 消费完毕，7 修 1 关闭，处置见 [TECH_DEBT.md](TECH_DEBT.md) 处置记录）。
+> 技术债候选池与处置记录统一见 [TECH_DEBT.md](TECH_DEBT.md)（候选区当前为空）。
 
 ---
 
