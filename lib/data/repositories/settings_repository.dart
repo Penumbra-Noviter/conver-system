@@ -34,13 +34,13 @@ import 'settings_reader.dart';
 /// （lib/data/repositories/settings_reader.dart，三 getter：
 /// defaultProvider / defaultModel / userName）。本类同名成员即其实现。
 ///
-/// 语义收敛注记（M1-T07，诚实声明）：[SettingsReader] 契约要求原始值
-/// （缺失/空串返回 `''`，兜底由消费方回退），而本类类型化便捷读取按 spec
-/// §设置仓储做缺省填充（'User' / 'claude' / 'claude-sonnet-5'）。经唯一
-/// 消费方会话仓储（ConversationRepository）可观察行为**逐位一致**——其
-/// `_resolveValue` 的兜底常量与本类填充值完全相同，`''` 与填充值在
-/// 「显式值 → 设置值非空 → 兜底常量」链上收敛为同一结果。原始读取仍可经
-/// [getValue] 获得。
+/// 语义收敛注记（M1-T07 → F-24 收敛）：[SettingsReader] 契约原声明「原始值，
+/// 兜底由消费方回退」，而本类类型化便捷读取按 spec §设置仓储做缺省填充
+/// （'User' / 'claude' / 'claude-sonnet-5'）——两语义此前「经唯一消费方会话
+/// 仓储可观察行为逐位一致」靠常量碰巧相等收敛，任一侧改动即静默破约。
+/// **2026-09-07 F-24 收敛**：兜底常量单一归属 [SettingsDefaults]
+/// （`settings_reader.dart`），本类填充与消费方兜底引用同一常量；契约文档
+/// 已对齐「实现方填充」的现状。原始读取仍可经 [getValue] 获得。
 class SettingsRepository implements SettingsReader {
   /// 创建仓储；[database] 为 drift 数据库，[secretStore] 缺省用系统安全存储
   /// 薄实现（测试注入 InMemorySecretStore）
@@ -186,34 +186,36 @@ class SettingsRepository implements SettingsReader {
 
   // ── 类型化便捷读取（桌面 DB→config 回退链的常量等价复刻）──
 
-  /// 用户昵称；缺省 'User'（镜像桌面 user_name）。
+  /// 用户昵称；缺省 [SettingsDefaults.userName]（镜像桌面 user_name）。
   ///
   /// @override [SettingsReader.userName]（语义收敛注记见类注释）。
   @override
   Future<String> get userName async {
     final value = await getValue('user_name');
-    return value.isEmpty ? 'User' : value;
+    return value.isEmpty ? SettingsDefaults.userName : value;
   }
 
   /// 滑动窗口轮数；缺省 30（镜像桌面 sliding_window_rounds）。
   Future<int> get slidingWindowRounds =>
       getInt('sliding_window_rounds', defaultValue: 30);
 
-  /// 默认 provider；缺省 'claude'（镜像桌面 default_provider 的 config 兜底）。
+  /// 默认 provider；缺省 [SettingsDefaults.provider]（镜像桌面
+  /// default_provider 的 config 兜底）。
   ///
   /// @override [SettingsReader.defaultProvider]（语义收敛注记见类注释）。
   @override
   Future<String> get defaultProvider async {
     final value = await getValue('default_provider');
-    return value.isEmpty ? 'claude' : value;
+    return value.isEmpty ? SettingsDefaults.provider : value;
   }
 
-  /// 默认模型；缺省 'claude-sonnet-5'（镜像桌面 default_model 的 config 兜底）。
+  /// 默认模型；缺省 [SettingsDefaults.model]（镜像桌面 default_model 的
+  /// config 兜底）。
   ///
   /// @override [SettingsReader.defaultModel]（语义收敛注记见类注释）。
   @override
   Future<String> get defaultModel async {
     final value = await getValue('default_model');
-    return value.isEmpty ? 'claude-sonnet-5' : value;
+    return value.isEmpty ? SettingsDefaults.model : value;
   }
 }

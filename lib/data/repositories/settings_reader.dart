@@ -19,16 +19,33 @@ library;
 
 /// 三个类型化读取 getter — 键值语义与桌面 `get_value` 一致。
 ///
-/// 契约：对应设置键缺失或为空串时返回空串 `''`（空串 = 视同未配置）；
-/// 缺省值兜底腿（`claude` / `claude-sonnet-5` / `User`）由消费方
-/// （会话仓储）回退，本接口不做缺省填充。
+/// 契约（2026-09-07 F-24 收敛，对齐既有实现）：
+/// - 实现方（[SettingsRepository]）对缺失或空串的键返回 [SettingsDefaults]
+///   填充值（`claude` / `claude-sonnet-5` / `User`）——**兜底常量单一归属**，
+///   本文件为唯一来源；
+/// - 消费方无需自行回退；若消费方仍需兜底（如测试假实现按空串语义返回），
+///   必须引用 [SettingsDefaults] 而非复制常量，杜绝「填充值与兜底值碰巧
+///   相等」的静默破约。
 abstract interface class SettingsReader {
-  /// 设置键 `default_provider` 的原始值；缺失或空串返回 `''`。
+  /// 设置键 `default_provider` 的值；缺失或空串返回 [SettingsDefaults.provider]。
   Future<String> get defaultProvider;
 
-  /// 设置键 `default_model` 的原始值；缺失或空串返回 `''`。
+  /// 设置键 `default_model` 的值；缺失或空串返回 [SettingsDefaults.model]。
   Future<String> get defaultModel;
 
-  /// 设置键 `user_name` 的原始值；缺失或空串返回 `''`。
+  /// 设置键 `user_name` 的值；缺失或空串返回 [SettingsDefaults.userName]。
   Future<String> get userName;
+}
+
+/// 设置缺省值——桌面 `config.py` 常量（DEFAULT_PROVIDER='claude' /
+/// DEFAULT_MODEL='claude-sonnet-5' / user_name 默认 'User'）的移动端等价物，
+/// **单一归属**（2026-09-07 F-24 收敛）。
+///
+/// [SettingsReader] 实现方（[SettingsRepository]）的缺省填充与消费方
+/// （[ConversationRepository]）的兜底均引用本常量——任何一侧改动即全局生效，
+/// 不再存在「两份字面量碰巧相等」的隐性契约。
+abstract final class SettingsDefaults {
+  static const String provider = 'claude';
+  static const String model = 'claude-sonnet-5';
+  static const String userName = 'User';
 }

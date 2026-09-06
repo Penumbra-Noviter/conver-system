@@ -6,6 +6,14 @@
 
 ---
 
+## 技术债消费 F-24（2026-09-07 — 用户「先消费技术债」指令立项：SettingsReader 契约语义收敛）
+
+- **交付**：兜底常量**单一归属**——`settings_reader.dart` 新增 `abstract final class SettingsDefaults`（provider='claude' / model='claude-sonnet-5' / userName='User'，桌面 config.py 常量等价物）；`SettingsRepository` 三类型化 getter 的缺省填充与 `ConversationRepository._fallbackProvider/_fallbackModel/_fallbackUserName` 兜底均改为引用同一常量（原为两份字面量「碰巧相等」：接口契约声明「返回空串由消费方回退」、实现做缺省填充，任何一侧常量变动即静默破约——`settings_repository.dart:37-42` 长注释自认的诚实声明）；契约文档对齐「实现方填充」现状；`_resolveValue` 逻辑与测试 fake（返回空串）的兜底语义保留不动。**行为零变化的重构型收敛**：数据层 88 测原样绿。
+- **门禁链**：全量 **819 测**全绿（F-24 后不变——纯引用替换无新行为）/ analyze 0。Speculative 级按「git grep 复核现状仍成立后消费」路径——本项因用户显式指令立项（候选区为 0，从探索报告备选源落债）。
+- **过程遥测**：候选区 0 项 → 向用户澄清事实 + AskUserQuestion 从来源立项（A：立项 SettingsReader，用户拍板）；实现主会话直做（三文件引用替换 + 文档对齐，无新测试——行为不变由既有 88 测锁定）。
+- **避坑（勿重蹈）**：**「碰巧相等」的隐式契约比显式重复更危险**——两份字面量靠注释自认一致时，任一侧改动静默破约（本债根因）；收敛手段是「单一归属 + 引用」而非「删一份」，因为消费方对测试 fake（返回空串）的兜底语义是真实的防御需求。
+- **知识库蒸馏**：候选教训（碰巧相等隐式契约 → 单一归属引用收敛）——完成段经 distill-lesson 处理。
+
 ## 架构深化批次 — 控制器编排收敛 + LLM 流式骨架收敛（2026-09-07 — improve-codebase-architecture 候选 2/3）
 
 - **交付**：grilling 共识 4 问全 A 落地两个 Strong 候选。**候选 2**（控制器超时/notice 编排去重）：新建 **`services/notice_runner.dart`**——[guard] 统一「try / await / `.timeout` / 错误折叠 / 先错者胜 notice」骨架（`timeout` 缺省 3s；[set]/[clear]/[setFirst]/[onChanged] 通知），替换 chat + characters 两控制器 `.timeout(3s)` 6 处 + notice 编排 12 处；专项错误（CardFormat/CardValidation）折叠进 guard.onError switch（单一错误路径）；loading 标志（`_loading`/`_loadingEntry`/`_creatingConversation`/`_exporting`/`_isRegenerating`）各自保留（并发语义不同不硬扭）。**候选 3**（LLM 流式 wire 骨架收敛）：新建 **`services/llm/stream_wire.dart`**——[streamSse] 共享骨架（POST + SSE 消费 + 非 200→HttpStatusError + **消费阶段**断连→LLMConnectionInterruptedError + 未终态 EOF 兜底 + finally 强制关连接，~45 行取代原 ~50 行 ×2 逐行同构）；claude/openai `_streamRequest` 只剩差异面（端点/头/终态/帧提取/errorFrameException 工厂——claude 流内 error 帧保持私有 `_StreamApiError`，openai 传 null，M2 双协议决策不破）。**行为变更点（有意统一，审核确认）**：① regenerate/_export 失败 notice 从「直接覆盖」统一为「先错者胜」（其余 10 处本已 first-wins，此两处是异类收编）；② loadEntry 第二查询（listCharacters）失败保留已成功加载的对话列表（原为清空，新语义对齐 characters.refresh「失败保留既有列表」哲学）——两处均有测试钉死。

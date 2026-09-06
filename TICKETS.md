@@ -35,6 +35,14 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-24（2026-09-07）
+
+> 来源：improve-codebase-architecture 探索报告备选 B（Speculative）+ 用户指令「先消费技术债」显式立项（候选区当时为 0，从备选源落债后消费）。交付：**SettingsReader 契约语义收敛**——兜底常量单一归属 `SettingsDefaults`（`settings_reader.dart` 新增 `abstract final class`：provider/model/userName），`SettingsRepository` 三 getter 填充与 `ConversationRepository._fallback*` 兜底改为引用同一常量（原为各自字面量碰巧相等，任一侧改动即静默破约）；契约文档对齐「实现方填充」现状（原声明「返回空串由消费方回退」与实现矛盾）；消费方 `_resolveValue` 逻辑不动（测试 fake 返回空串的兜底语义保留）。门禁：全量 **819 测**全绿 / analyze 0（行为零变化的重构型收敛，数据层 88 测原样绿）。详见 DEV_LOG〈技术债消费 F-24〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F-24 | 技术债消费：SettingsReader 契约语义收敛 | 2026-09-07 | （见收口提交） |
+
 ### 架构深化批次 — 控制器编排收敛 + LLM 流式骨架收敛（2026-09-07）
 
 > 来源：improve-codebase-architecture 候选 2（Strong）+ 候选 3（Strong），grilling 共识 4 问全 A（NoticeRunner 形态 / onError 折叠 / streamSse 函数参数 / errorFrameException 工厂）。**候选 2 控制器超时/notice 编排去重**：新建 `services/notice_runner.dart`（guard 统一「超时兜底 + onError 错误折叠 + 先错者胜 notice + onChanged 通知」，替换两控制器 `.timeout(3s)` 6 处 + notice 编排 12 处；专项 CardFormat/Validation 折叠进 guard.onError switch；loading 标志各自保留）；**候选 3 LLM 流式 wire 骨架收敛**：新建 `services/llm/stream_wire.dart`（streamSse 共享骨架：POST + SSE 消费 + 非200→HttpStatusError + 消费阶段断连→LLMConnectionInterruptedError + 未终态兜底 + 强制关连接；差异面参数化：uri/body/headers/isTerminated/extractToken/errorFrameException），claude/openai `_streamRequest` 只留差异面（~20 行/provider，原 ~50 行 ×2 骨架消除），claude 流内 error 帧经 errorFrameException 工厂保持私有类型（M2 双协议决策）。**行为变更点（有意统一，审核确认）**：regenerate/_export 失败 notice 从「直接覆盖」统一为「先错者胜」；loadEntry 第二查询失败保留已加载对话列表（对齐 refresh 哲学，测试钉死）。门禁：全量 **819 测**全绿 / analyze 0；code-review 四轴 **PASS**（792 测实名；非阻断 6 条处理 4 条〔unused import / 200 空体未终态测试 / 连接拒绝分层契约测试 / loadEntry 二查语义测试〕，2 条知悉〔双重 notify 冗余为既有模式 / 7 参函数偏浅为合理权衡〕）。报告 `D:\tmp\architecture-review-20260907.html`。详见 DEV_LOG〈架构深化批次 — 控制器编排收敛 + LLM 流式骨架收敛〉。

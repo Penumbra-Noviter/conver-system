@@ -59,12 +59,13 @@ class ConversationRepository {
   final SettingsReader _settings;
   final DateTime Function() _now;
 
-  /// 桌面 config 兜底腿等价常量（spec：与移动端 schema 列默认值同值）。
-  static const _fallbackProvider = 'claude';
-  static const _fallbackModel = 'claude-sonnet-5';
+  /// 桌面 config 兜底腿（引用 [SettingsDefaults] 单一归属——F-24 收敛，
+  /// 原为本地复制字面量、与实现方填充值「碰巧相等」）。
+  static const _fallbackProvider = SettingsDefaults.provider;
+  static const _fallbackModel = SettingsDefaults.model;
 
   /// `{{user}}` 的兜底昵称（桌面 create_conversation 内联 `or 'User'`）。
-  static const _fallbackUserName = 'User';
+  static const _fallbackUserName = SettingsDefaults.userName;
 
   /// 对话列表 + 消息数，按 `updated_at` 倒序；
   /// [characterId] 非空时仅含该角色的对话（桌面 list_conversations）。
