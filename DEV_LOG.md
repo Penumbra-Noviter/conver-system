@@ -6,6 +6,20 @@
 
 ---
 
+## M4 kickoff 批次（2026-09-06 收口 — project-kickoff 全自动档交付：导出 / 文档解析里程碑）
+
+- **交付**：Grilling 共识 6 票两条并行依赖链（文件范围互不相交）：链A 导出 M4-01→M4-02→M4-03→M4-06（ConversationExportService 组卷 · ConversationExportFileExchange 文件 seam · 聊天顶栏 ⋯ 菜单导出入口）、链B 解析 M4-04→M4-05（DocumentParseService 三级提取+白名单 · 向导步骤②「AI 智能解析」接入）。波1 merge **42099eb**（M4-01~03）+ **25c7696**（M4-04~05）+ 修复 **1feddd7**（m4-05 解析挂起中 dispose 崩溃，回归断言锁定）。基线 9a881cb。证据 `.scratch/m4-kickoff/evidence/`（M4-01~05 + M4-05-fix + M4-06 + smoke-share-sheet.png）。
+- **门禁链（2026-08-30 合并时）**：全量 **729→802 测**（M4 新 +73）全绿 / analyze 0；M4-01~05 各票工单内覆盖率 ≥90%（如 M4-05 控制器 98.08% / 视图 99.75%）；波末增量审核 + 期末四轴零阻断（来源：M4-01~05 evidence 文件）。
+- **M4-06 冒烟（2026-09-06 主会话补收口）**：模拟器 emulator-5554（AVD medium_phone API35）真通道实证——hihello 对话顶栏 ⋯ → 导出 JSON/MD → **ShareSheet 弹出 ×2**（`ChooserActivityLauncher` 前台 + UI 树 chooser_header 证据）+ `测试助手.json`/`测试助手.md` 临时文件生成（文件名=角色名净化，中文保留）+ 内容语义逐项核对（JSON：conversation/character/messages 结构 + UTC ISO 8601 带 Z + 消息升序；MD：`# 与 测试助手 的对话` + 角色信息 + 本地时间 + 日期分组 + 角色标记）+ **platformTimeout 超时兜底实测**（模拟器无分享接收 app → share_plus Future 不 resolve → 3s 超时 → StateError → 非阻塞 SnackBar「导出失败: 分享面板超时」，app 零崩溃、logcat 无 FATAL）。**结果 PASS** → F-23 share_plus 分面关闭（file_picker 与批量多选手势重定界归 M5）。
+- **过程遥测**：M4-01~05 为 8/30 晚间主会话+Implement 子代理交付（lint 全绿）；M4-06 冒烟本周补做（基线 HEAD 4703a0f 无 dart 改动，直接复用 8/30 后构建）。冒烟中遭遇**模拟器进程中途退出**一次（qemu 进程消失、adb 失联）——快照重启恢复后 userdata 磁盘态完好（导出文件仍在），冒烟结论不受影响；该观察与用户在 09-05 报告的「使用模拟器时电脑偶尔卡死」同源（AVD 位于 F:\tools\android\avd USB 外接盘，宿主稳定性议题已单独诊断，见会话记录）。
+- **避坑（勿重蹈）**：
+  1. **模拟器进程中途退出可恢复**：异常退出后 adb 失联、`tasklist` 无 qemu，快照重启（秒级 boot）后 userdata 磁盘态完好——导出文件、DB 数据均持久化；冒烟中途掉线不必重做，先验证数据再继续。
+  2. **Git Bash run-as 路径转换坑**：`adb shell run-as <pkg> cat /data/data/...` 会被 MSYS 路径转换污染（`/data` → `C:/Program Files/Git/data`）——前缀 `MSYS_NO_PATHCONV=1` 或双斜杠。
+  3. **ShareSheet「No apps can perform this action.」≠ 功能缺陷**：干净模拟器镜像无 ACTION_SEND 接收 app，空态属环境限制——文件名可见性以临时目录文件清单（`run-as ls`）+ 代码契约（`ShareParams(files:[XFile])`）+ ShareSheet 弹出三方佐证；真机环境才显示分享目标列表。
+  4. **分享面板空态 = 超时兜底的真实验证机会**：share_plus 的 Future 在用户选目标/关面板前不 resolve——无接收 app 时恰好让 `platformTimeout` 兜底路径在真机环境跑通（非阻塞 SnackBar + app 存活），比单测 fake 更有说服力。
+  5. **快照恢复会把遗留系统 UI 一并恢复**：模拟器异常退出前的 ShareSheet 空态面板在快照恢复后仍挂在前台，先 BACK 关闭再继续操作。
+- **知识库蒸馏**：候选教训（模拟器中途退出后的恢复路径与磁盘态持久化验证 / ShareSheet 无目标 app 时的三方佐证取证法）——完成段经 distill-lesson 处理。
+
 ## M3 kickoff 批次（2026-08-30 — project-kickoff 全自动档交付：角色 + 搜索里程碑）
 
 - **交付**：Grilling 共识 5 面拍板（零真拍点 + 3 best-judgment 非拍板：导入占位保留 UI / 批量删除含可裁 / 开始对话默认模型）。8 票 4 波 DAG（W1 M3-01‖M3-04a / W2 M3-02a‖M3-04b / W3 M3-02b‖M3-03‖M3-04c / W4 M3-05，基线 f477e2d → merge 70bc094）。角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板逐字移植（senpai/wanderer/tsundere/butler/nekomimi）/ V2 卡导入导出纯 Dart 服务（四格式识别+V1 兼容+temperature 裁剪）+ seam 收口（file_picker ^12.1.2/share_plus ^13.3.0/path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮（GlobalObjectKey+ensureVisible）。证据 `.scratch/m3-kickoff/evidence/`（M3-01~05 + W3 独立复核 + smoke-gate + 冒烟 PNG）。

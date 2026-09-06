@@ -17,11 +17,10 @@
 
 ## 活跃工单
 
-> 里程碑 M4–M7 待推进（M0/M1/M2/F-7~F-9/M3 已交付归档，见下）。M5 模拟器单里程碑偏大，开工前用 /to-tickets 再细分（本地服务器 → 注入 → 存档桥 → 导入/生成），拆出的子项按 F 编号展开。
+> 里程碑 M5–M7 待推进（M0/M1/M2/F-7~F-9/M3/M4 已交付归档，见下）。M5 模拟器单里程碑偏大，开工前用 /to-tickets 再细分（本地服务器 → 注入 → 存档桥 → 导入/生成），拆出的子项按 F 编号展开。
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| M4 | 导出/文档解析：对话导出(JSON/MD)+分享；LLM 文档解析角色字段 | 📝 | 单测 |
 | M5 | 模拟器：WebView 加载 + Key 注入 + localStorage 存档验证 + CORS 直连复验；「我」页收口 | 📝 | WebView 桥稳定，主流游戏可运行（开工前拆子项） |
 | M6 | 去 AI 味打磨：动效/空态/错误态/无障碍/弱网断线重连 | 📝 | 视觉评审 |
 | M7 | 发布准备：双端图标、Android AAB/iOS 签名、隐私清单 | 📝 | 上架/侧载包 |
@@ -35,6 +34,14 @@
 ---
 
 ## 已完成归档
+
+### M4 批次 — 导出 / 文档解析（2026-09-06 收口）
+
+> 来源：project-kickoff 全自动档（Grilling 共识零真拍点；6 票两条并行依赖链：链A 导出 M4-01→02→03→06 / 链B 解析 M4-04→05，文件范围互不相交）。波1 merge 42099eb（M4-01~03）+ 25c7696（M4-04~05）+ 修复 1feddd7（m4-05 解析挂起中 dispose 崩溃，回归断言锁定）。门禁：全量 **802 测**（M3 729 → +73）/analyze 0；**M4-06 冒烟 PASS**（2026-09-06：hihello 对话顶栏 ⋯ → 导出 JSON/MD → ShareSheet 弹出 ×2 + `测试助手.json`/`.md` 临时文件生成且文件名=角色名净化 + 导出内容语义逐项核对（JSON UTC ISO 8601/升序；MD 日期分组/角色标记）+ **platformTimeout 超时兜底实测**（模拟器无分享接收 app → share_plus Future 不 resolve → 3s 超时 → 非阻塞 SnackBar，app 零崩溃）。交付内容：对话顶栏 ⋯ 菜单导出 JSON/MD（ConversationExportService 组卷 + 文件交换 seam 写临时目录 + share_plus 面板）/ 向导步骤②「AI 智能解析」启用（DocumentParseService 三级提取 + 白名单 + 错误折叠，失败文案与桌面一致）。F-23 重定界：share_plus 分面并入 M4 验收关闭，file_picker 与批量多选手势分面归 M5（TECH_DEBT 处置记录留痕）。证据 `.scratch/m4-kickoff/evidence/`（M4-01~05 + M4-05-fix + M4-06 + smoke-share-sheet.png）。详见 DEV_LOG〈M4 kickoff 批次〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| M4 | 导出/文档解析：对话导出(JSON/MD)+分享；LLM 文档解析角色字段 | M4-01~M4-06（kickoff/m4-export·m4-parse 分支） | 2026-09-06 | 42099eb + 25c7696（+修复 1feddd7） |
 
 ### M3 批次 — 角色 + 搜索（2026-08-30）
 

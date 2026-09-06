@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**当前状态**（2026-08-30）：**M3 已交付**——角色 + 搜索：角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板 / V2 卡导入导出（file_picker ^12.1.2 / share_plus ^13.3.0 / path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮。729 测试/analyze 0/覆盖率剔除 drift 98.06%/四轴零阻断；冒烟 PASS（建角色→落库→搜索→跳转高亮真机实证）；merge 70bc094 + 期末修复 0057d9e/9cfc4aa；TICKETS 已归档。**上一里程碑 M2**（2026-08-29：聊天核心——LLM Provider 双协议 SSE wire + ChatService 回合编排 + 打字机 UI + 最小临时会话入口 + 设置页测试连接，477 测试/覆盖率手写口径 95.42%，真实流式待配置 Key）。**下一站 M4**（导出/文档解析：对话导出 JSON/MD + 分享；LLM 文档解析角色字段，见 [TICKETS.md](TICKETS.md)）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
+**当前状态**（2026-09-06）：**M4 已交付**——对话导出（聊天顶栏 ⋯ 菜单导出 JSON/MD，文件名=角色名净化 + share_plus 分享面板 + 平台超时兜底）/ LLM 文档解析（向导步骤②「AI 智能解析」启用：三级提取 + 白名单 + 错误折叠）。802 测/analyze 0；M4-06 冒烟 PASS（ShareSheet 弹出 ×2 / 临时文件生成 / 内容语义 / 超时兜底实测）；merge 42099eb + 25c7696 + 修复 1feddd7；TICKETS 已归档。**上一里程碑 M3**（2026-08-30：角色+搜索——角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板 / V2 卡导入导出（file_picker ^12.1.2 / share_plus ^13.3.0 / path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮）。**下一站 M5**（模拟器：WebView 加载 + Key 注入 + localStorage 存档验证 + CORS 直连复验；「我」页收口，见 [TICKETS.md](TICKETS.md)）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
 
 **核心能力**（7 项全量，无阉割）：
 - **聊天** — 多轮对话 + SSE 流式打字机渲染 + 停止生成；滑窗上下文、模板变量、重生成、错误态
