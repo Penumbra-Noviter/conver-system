@@ -1,7 +1,7 @@
 /// M4-01：ConversationExportService 导出纯逻辑（JSON + Markdown + 文件名）。
 ///
 /// 测试 seam（公共接口边界）：[ConversationExportService] 公开 API（exportJson /
-/// exportMarkdown / characterExportBaseName）+ [ConversationExportResult] 值对象。
+/// exportMarkdown）+ [ConversationExportResult] 值对象。
 /// 通过内存 drift + 三真实仓储 + [FakeSettingsReader] 驱动（服务层不 mock 内部）；
 /// 输出契约逐字段/逐行断言，不测内部私有函数与遍历顺序。
 ///
@@ -400,43 +400,6 @@ void main() {
       expect(result.content,
           contains('**assistant**: a b c d\ne\tf'));
       // JSON 侧天然安全（jsonEncode 转义），MD 侧净化——有意差异（A7）。
-    });
-  });
-
-  group('characterExportBaseName · 文件名基（桌面语义）', () {
-    test('角色名存在 → 原样（空格折叠下划线）', () async {
-      final char = await seedCharacter(name: '艾 莉 亚');
-      final conv = await seedConversation(char.id);
-
-      expect(await service.characterExportBaseName(conv.id), '艾_莉_亚');
-    });
-
-    test('对话不存在 / 角色缺失 / 角色名为空 → 回退对话 id 字符串', () async {
-      final char = await seedCharacter(name: '有名字');
-      final conv = await seedConversation(char.id);
-
-      expect(await service.characterExportBaseName(999999), '999999');
-      expect(await service.characterExportBaseName(conv.id), '有名字');
-
-      // 角色缺失（假仓储注入）。
-      final nullCharService = ConversationExportService(
-        conversationRepository: convRepo,
-        characterRepository: _NullCharacterRepository(db),
-        messageRepository: msgRepo,
-        settingsReader: settings,
-      );
-      expect(await nullCharService.characterExportBaseName(conv.id),
-          conv.id.toString());
-
-      // 角色名为空。
-      final empty = await charRepo.createCharacter(CharactersCompanion.insert(
-        name: '',
-        createdAt: fakeNow,
-        updatedAt: fakeNow,
-      ));
-      final emptyConv = await convRepo.createConversation(characterId: empty.id);
-      expect(await service.characterExportBaseName(emptyConv.id),
-          emptyConv.id.toString());
     });
   });
 

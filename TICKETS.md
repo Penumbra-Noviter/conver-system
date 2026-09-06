@@ -35,6 +35,14 @@
 
 ## 已完成归档
 
+### 架构深化批次 — 文件交换平台腿收敛（2026-09-07）
+
+> 来源：improve-codebase-architecture 扫描候选 1（Strong）+ grilling 共识（Q1=共享腿 / Q2=safeFileName 挪纯逻辑 / Q3=删死面 / Q4=新建模块 / Q5=组合级，用户拍板前三项，后两项按推荐）。交付：新建 `services/file_name.dart`（safeFileName 纯函数自平台 seam 迁出）+ `services/platform_file_exchange.dart`（typedef 收敛 + `writeTempAndShare`/`pickJsonWithTimeout` 组合级共享腿 + 缺省平台腿，超时阈值/降级文案单一归属）；两个消费 seam（角色卡 / 对话导出）删本地 typedef / `_shareViaPlus` / 平台 import，变薄为业务组装 + 注入契约；删 `ConversationExportService.characterExportBaseName` 死公开面（规则收敛私有 `_extractCharacterName`），`conversation_export_service` 不再 import 平台 seam（反向依赖消除）。门禁：全量 **804 测**全绿 / analyze 0；code-review 四轴 **PASS**（Spec 契约锚零残留、Falsify 行为逐位等价；非阻断 4 条处理 3 条〔docstring 残留 / seam 超时接线微测试 ×2 / 测试文件头〕，1 条跳过〔装配工厂，成本收益边缘〕）。报告 `D:\tmp\architecture-review-20260907.html`（另 4 候选待探索）。详见 DEV_LOG〈架构深化批次 — 文件交换平台腿收敛〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| 深化-1 | 文件交换 seam 合并：平台腿收敛为深模块 | 2026-09-07 | （见收口提交） |
+
 ### 技术债消费批次 F-18/F-23（2026-09-07）
 
 > 来源：用户指令「消费技术债 F-18 F-23」显式立项（两候选均 Worth exploring，非 Grilling 拍板项）。2 项并行交付：**F-18 向导校验门收拢**（架构类）——步骤②模板门从视图 `_handleNext`（`_step2Error`）移入 `WizardController.next()` case 2（template 未选 → error + 拦截；import 放行），`selectTemplate` 补清错，视图删除 `_step2Error` 字段统一读 `controller.error`（Locality 达成：分步校验单一载体 = next() 的 case 1/2/3 switch）；测试拆分「import 放行」+「template 未选拦截/已选放行」新契约 + 视图文案锚保持；**F-23 平台真通道冒烟**（验证类，零代码改动）——file_picker 导入选择器弹出（`com.android.documentsui`）+ 批量删除长按多选手势（长按进多选/自动勾选/加选计数/退出恢复）模拟器实证，share_plus 分面已于 M4-06 关闭，本票关闭剩余两分面 → **F-23 整条闭环**。门禁：全量 **803 测**全绿 / analyze 0；code-review 四轴 **PASS**（Standards/Spec/Falsify/Architecture 零阻断，1 条非阻断 stale doc 已修）。证据 `.scratch/techdebt-f18-f23/evidence/`（F-23.md + smoke-file-picker.png + smoke-batch-select.png）。详见 DEV_LOG〈技术债消费批次 F-18/F-23〉。

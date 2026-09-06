@@ -1,13 +1,12 @@
 /// M4-02：ConversationExportFileExchange 导出文件 seam 测试。
 ///
 /// 测试 seam（公共接口边界）：[ConversationExportFileExchange] 构造注入
-/// [ResolveTempDirectory] / [ShareFile] 类型化 fake + 短 `platformTimeout`
-/// ——断言平台调用点 `.timeout` 防御存在（fake「挂起不抛错」→ 超时降级为
-/// [StateError]，不挂死）。永不触真平台通道（path_provider / share_plus
-/// 缺省实现不落执行路径）。
+/// [ResolveTempDirectory] / [ShareFile] 类型化 fake——断言调用链与文件
+/// 内容；平台腿「挂起不抛错 → 超时降级」防御测试已随共享腿收敛至
+/// `test/services/platform_file_exchange_test.dart`（2026-09-07 架构深化）。
+/// 永不触真平台通道（path_provider / share_plus 缺省实现不落执行路径）。
 ///
-/// 镜像先例 `test/services/character_file_exchange_test.dart` 的 seam
-/// 防御注入形态；输入为 M4-01 [ConversationExportResult]（fileName+content）。
+/// 输入为 M4-01 [ConversationExportResult]（fileName+content）。
 library;
 
 import 'dart:async';
@@ -79,42 +78,21 @@ void main() {
 
       expect(sharedFile.path, endsWith('安全名.md'));
     });
-  });
 
-  group('exportFile · 平台挂起超时降级（防御存在）', () {
-    test('tempDir 挂起不抛错 → 超时降级 StateError，分享不执行', () async {
-      var shared = false;
+    test('tempDir 挂起 + 短超时 → StateError（platformTimeout 接线到共享腿）',
+        () async {
+      // 共享腿超时防御已收敛至 platform_file_exchange_test；此处保留一条
+      // seam 级接线断言，兜住未来 seam 忘记透传 platformTimeout 的回归。
       final hanging = Completer<Directory>().future;
       final seam = ConversationExportFileExchange(
         resolveTempDirectory: () => hanging,
-        shareFile: (file, name) async => shared = true,
+        shareFile: (file, name) async {},
         platformTimeout: const Duration(milliseconds: 50),
       );
 
       await expectLater(
         seam.exportFile(_result()),
-        throwsA(isA<StateError>().having(
-          (e) => e.message, 'message', '获取临时目录超时',
-        )),
-      );
-      expect(shared, isFalse, reason: '临时目录未就绪不进入分享');
-    });
-
-    test('share 挂起不抛错 → 超时降级 StateError（不挂死）', () async {
-      final hanging = Completer<void>().future;
-      final tempDir = await Directory.systemTemp.createTemp('m4-02-test');
-      addTearDown(() => tempDir.delete(recursive: true));
-      final seam = ConversationExportFileExchange(
-        resolveTempDirectory: () async => tempDir,
-        shareFile: (file, name) => hanging,
-        platformTimeout: const Duration(milliseconds: 50),
-      );
-
-      await expectLater(
-        seam.exportFile(_result()),
-        throwsA(isA<StateError>().having(
-          (e) => e.message, 'message', '分享面板超时',
-        )),
+        throwsA(isA<StateError>()),
       );
     });
   });

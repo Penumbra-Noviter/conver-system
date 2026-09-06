@@ -6,6 +6,17 @@
 
 ---
 
+## 架构深化批次 — 文件交换平台腿收敛（2026-09-07 — improve-codebase-architecture 候选 1）
+
+- **交付**：grilling 共识（Q1=共享腿 / Q2=safeFileName 挪纯逻辑 / Q3=删死面 / Q4=新建模块 / Q5=组合级）落地的第一深化候选。新建 **`services/file_name.dart`**（safeFileName 纯函数迁出平台 seam，纯函数归纯处）+ **`services/platform_file_exchange.dart`**（typedef 三枚收敛 + `writeTempAndShare` 组合级共享腿〔临时目录带超时 → 写盘 flush → 分享带超时，StateError 文案单一归属〕+ `pickJsonWithTimeout` + 缺省平台腿 `defaultResolveTempDirectory/defaultPickJsonFile/defaultShareViaPlus`，`coverage:ignore` 平台委托）。两个消费 seam（`character_file_exchange` / `conversation_export_file_exchange`）删除本地 typedef / `_shareViaPlus` / 平台包 import，变薄为业务数据组装 + 注入契约（构造参数名与类型名不变，消费方零改动）；删 `ConversationExportService.characterExportBaseName` 死公开面（生产零调用，规则收敛私有 `_extractCharacterName`）；`conversation_export_service` import 改向 `file_name.dart`——**平台 seam 反向依赖消除**。测试收敛：超时防御用例从两个 seam 测试移入新 `platform_file_exchange_test.dart`（6 测：成功链 + tempDir/share 挂起降级 + pick 三态），safeFileName 组迁入 `file_name_test.dart`，死面测试组删除。
+- **门禁链**：全量 **804 测**全绿（803 基线 + 2 seam 接线微测试；净变化 = 新 12 − 删 9 − 接线 2 归位）/ analyze 0；**code-review 四轴 PASS**（Spec：`_shareViaPlus`/typedef 双定义/safeFileName 双定义零残留、文案锚逐字保留、`parseCharacterCardBytes` 未触；Falsify：importCharacter「pick null 与超时 null 合流」语义逐位等价、exportCharacter 信封/文件名/文案逐位等价、共享腿失败路径实测；Architecture：Locality 达成、平台包 import 收敛单点、共享腿为深模块〔协议 2 函数 + 3 typedef + 3 缺省〕）。非阻断 4 条处理 3 条：类 docstring 残留删、seam 级 `platformTimeout` 接线微测试 ×2（兜未来 seam 忘透传的盲点）、`file_name_test` 补文件头；跳过 1 条（缺省装配工厂，成本收益边缘）。
+- **过程遥测**：用户经 AskUserQuestion 拍板 Q1/Q2/Q3，Q4/Q5 未答按推荐执行（系统提示 best judgment）；Explore 子代理扫描产出 5 候选 + 2 备选（HTML 报告 `D:\tmp\architecture-review-20260907.html`）；本批实现主会话直做（TDD 迁移风格：行为不变，先迁后改）；code-review 子代理 ≈5 分钟；另 4 候选（控制器超时/notice 去重 · LLM 流式骨架收敛 · 角色字段装配收敛 · ChatController 分离）待后续探索。
+- **避坑（勿重蹈）**：
+  1. **「收敛重复」类重构先迁后改**：平台腿收敛是行为不变的迁移——先把纯函数/共享腿落新文件（测试跟着迁），再改消费方（断言锚不动），最后删死面；每步都可独立验证，避免一步大改把行为变更混进迁移。
+  2. **死面删除要同步类级 docstring**：删 `characterExportBaseName` 时漏掉类 docstring 里「文件名基公开方法」的描述——code-review 抓出的残留，收拢型改动必须 grep 全文旧概念引用（F-18 同款教训复证）。
+  3. **seam 级接线测试保留一条**：超时防御收敛到共享腿后，seam→腿的 `platformTimeout` 透传只剩 happy path 隐含覆盖——每 seam 留一条「挂起 fake + 短超时 → StateError」微测试，防未来 seam 忘传参数的回归盲点。
+- **知识库蒸馏**：候选教训（收敛型重构先迁后改 / 死面删除同步 docstring grep / seam 接线微测试兜透传盲点）——完成段经 distill-lesson 处理。
+
 ## 技术债消费批次 F-18/F-23（2026-09-07 — 用户指令显式立项，2 项并行交付）
 
 - **交付**：**F-18 向导校验门收拢**（代码）：步骤②模板门从视图 `_handleNext`（`_step2Error` 字段）移入 `WizardController.next()` case 2——template 未选模板 → `_error = '请选择一个模板'` + notify + return false（不前进）；import 模式放行（不受内容影响）；`selectTemplate(id)` 补 `_error = null`（原视图 setState 清错的 controller 化）；视图删除 `_step2Error` 字段、视图层拦截块与两处 setState，`build` 统一读 `controller.error`，`onSelectTemplate` 由包一层闭包改直接 tear-off。**Locality 达成**：分步校验单一载体 = next() 的 case 1/2/3 switch（controller 全权持有，视图零校验状态）。**F-23 平台真通道冒烟**（验证，零代码）：file_picker V2 卡导入 → `com.android.documentsui` 系统选择器弹出（实测排除「弹不出」挂起风险）；批量删除长按多选手势（长按进多选自动勾选 / 点击加选计数「已选 2 个角色」/ 退出恢复）真机实证；share_plus 分面已于 M4-06 关闭 → **F-23 三分面全部闭环**。证据 `.scratch/techdebt-f18-f23/evidence/`（F-23.md + smoke-file-picker.png + smoke-batch-select.png）。

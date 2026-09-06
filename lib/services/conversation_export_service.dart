@@ -33,7 +33,7 @@ import '../data/repositories/character_repository.dart';
 import '../data/repositories/conversation_repository.dart';
 import '../data/repositories/message_repository.dart';
 import '../data/repositories/settings_reader.dart';
-import 'character_file_exchange.dart' show safeFileName;
+import 'file_name.dart' show safeFileName;
 import 'template_vars.dart';
 
 /// 对话导出结果值对象：[fileName] 为净化后的文件名（含扩展名），[content] 为
@@ -54,7 +54,8 @@ class ConversationExportResult {
 /// 对话导出服务 — 从仓库读取对话/角色/消息，产出桌面契约的导出产物。
 ///
 /// 无平台依赖（layer_boundary：数据层 → 服务层，drift 不泄漏到 UI）；
-/// 表面两个入口 + 文件名基公开方法，测试经内存 drift + 假仓储断言输出契约。
+/// 表面两个入口（exportJson / exportMarkdown），测试经内存 drift + 假仓储
+/// 断言输出契约。
 class ConversationExportService {
   /// [conversationRepository] / [characterRepository] / [messageRepository] 为
   /// 三仓储读取面；[settingsReader] 提供 user_name（MD 模板变量 {{user}} 昵称）。
@@ -207,20 +208,6 @@ class ConversationExportService {
       fileName: _fileName(conversationId, character, 'md'),
       content: lines.join('\n'),
     );
-  }
-
-  /// 导出文件名中的角色名基（桌面 `character_export_filename` 语义）。
-  ///
-  /// 对话不存在 / 角色缺失 / 角色名为空 → 回退会话 id 字符串；否则返回角色名
-  /// 并将空格折叠为下划线（下载文件名友好；另叠加 safeFileName 平台净化在
-  /// 最终文件名上）。
-  Future<String> characterExportBaseName(int conversationId) async {
-    final conversation = await _loadConversationOrNull(conversationId);
-    final character = conversation?.$2;
-    if (conversation == null || character == null || character.name.isEmpty) {
-      return conversationId.toString();
-    }
-    return character.name.replaceAll(' ', '_');
   }
 
   // ── 内部 ──

@@ -4,7 +4,8 @@
 /// [PickJsonBytes] / [ResolveTempDirectory] / [ShareFile] 类型化 fake +
 /// 短 [FilePickerShareFileExchange] `platformTimeout`——断言平台调用点
 /// `.timeout(3s)` 双层防御存在（fake「挂起不抛错」→ 超时降级不挂死）；
-/// 另测顶层纯函数 [safeFileName] 验收 6 语义。永不触真平台通道。
+/// [safeFileName] 验收 6 语义测试已随纯函数迁至 `file_name_test.dart`
+/// （2026-09-07 架构深化）。永不触真平台通道。
 library;
 
 import 'dart:async';
@@ -75,44 +76,6 @@ Uint8List _v2CardBytes() {
 }
 
 void main() {
-  group('safeFileName · 顶层纯函数（验收 6）', () {
-    test('Windows 非法字符与控制字符替换为 _', () {
-      expect(safeFileName(r'a/b\c:d*e?f"g<h>i|j'), 'a_b_c_d_e_f_g_h_i_j');
-      expect(safeFileName('a\x00b\x1fc'), 'a_b_c');
-    });
-
-    test('路径分隔符替换为 _ 且首尾点剔除（不残留分隔符，杜绝穿越）', () {
-      // 验收 6：/ 与 \ 同为非法文件名字符 → 替换为 _；输出不含任何分隔符，
-      // 无法构成子路径（目录穿越免疫）；前导 `..` 形态随首尾点剔除收敛。
-      expect(safeFileName('../etc/passwd'), '_etc_passwd');
-      expect(safeFileName(r'a\b\c'), 'a_b_c');
-      expect(safeFileName('../etc/passwd'), isNot(contains('/')));
-      expect(safeFileName(r'a\b\c'), isNot(contains('\\')));
-    });
-
-    test('首尾空格剔除', () {
-      expect(safeFileName('  name  '), 'name');
-    });
-
-    test('空 / 纯空白 → 回退 character', () {
-      expect(safeFileName(''), 'character');
-      expect(safeFileName('   '), 'character');
-      // 纯非法字符替换后仍非空（`___`），按字面语义不回退（仍是安全文件名）。
-      expect(safeFileName('///'), '___');
-    });
-
-    test('`.` 与 `..` → 首尾点剔除后回退 character（防穿越 / 隐藏文件）', () {
-      expect(safeFileName('..'), 'character');
-      expect(safeFileName('.'), 'character');
-      expect(safeFileName('..角色..'), '角色');
-      expect(safeFileName('....'), 'character');
-    });
-
-    test('超长截断至 100 字符', () {
-      expect(safeFileName('名' * 150), '名' * 100);
-    });
-  });
-
   group('CharacterFileExchangeStub · 占位壳（M3-01 语义不回归）', () {
     test('导出 → 占位文案「随后续批次交付」', () async {
       const stub = CharacterFileExchangeStub();
@@ -199,19 +162,6 @@ void main() {
       expect(draft!.name, '旧卡');
       expect(draft.firstMes, '开场');
     });
-
-    test('pick 挂起不抛错 → 超时降级（.timeout 防御存在）', () async {
-      final hanging = Completer<Uint8List?>().future;
-      final seam = FilePickerShareFileExchange(
-        pickJsonBytes: () => hanging,
-        platformTimeout: const Duration(milliseconds: 50),
-      );
-
-      // 挂起 fake 永不完成：断言 seam 在短超时后降级返回 null（不挂死）。
-      final result = await seam.importCharacter();
-      expect(result, isNull,
-          reason: '挂起 → 超时兜底降级为未选择（不抛错不挂死）');
-    });
   });
 
   group('exportCharacter · 临时目录 + 分享（fake 注入）', () {
@@ -256,33 +206,17 @@ void main() {
       expect(sharedName, 'a_b_c_d_e_f_g_h_i_j.json');
     });
 
-    test('tempDir 挂起 → 超时降级（分享不执行）', () async {
-      var shared = false;
+    test('tempDir 挂起 + 短超时 → StateError（platformTimeout 接线到共享腿）',
+        () async {
+      // 共享腿超时防御已收敛至 platform_file_exchange_test；此处保留一条
+      // seam 级接线断言，兜住未来 seam 忘记透传 platformTimeout 的回归。
       final hanging = Completer<Directory>().future;
       final seam = FilePickerShareFileExchange(
         resolveTempDirectory: () => hanging,
-        shareFile: (file, name) async => shared = true,
+        shareFile: (file, name) async {},
         platformTimeout: const Duration(milliseconds: 50),
       );
 
-      await expectLater(
-        seam.exportCharacter(_character()),
-        throwsA(isA<StateError>()),
-      );
-      expect(shared, isFalse, reason: '临时目录未就绪不进入分享');
-    });
-
-    test('share 挂起 → 超时降级（不挂死正常返回）', () async {
-      final hanging = Completer<void>().future;
-      final tempDir = await Directory.systemTemp.createTemp('seam-test');
-      addTearDown(() => tempDir.delete(recursive: true));
-      final seam = FilePickerShareFileExchange(
-        resolveTempDirectory: () async => tempDir,
-        shareFile: (file, name) => hanging,
-        platformTimeout: const Duration(milliseconds: 50),
-      );
-
-      // share 挂起：超时兜底降级为异常（控制器转 notice），不挂死。
       await expectLater(
         seam.exportCharacter(_character()),
         throwsA(isA<StateError>()),
