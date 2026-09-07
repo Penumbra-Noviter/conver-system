@@ -1,5 +1,5 @@
-/// 模拟器列表页（F-M5-03 占位重写）——四态列表 + 类型筛选 + AppBar 三入口
-/// + 下拉刷新 + 钩子派发。
+/// 模拟器列表页（F-M5-03 占位重写 + F-M5-07 导入钩子接线）——四态列表 +
+/// 类型筛选 + AppBar 三入口 + 下拉刷新 + 钩子派发。
 ///
 /// 验收语义（工单验收语义契约逐条）：
 /// - 四态：loading（进度指示）/ ready（卡片网格）/ error（文案 + 「重试」
@@ -12,6 +12,10 @@
 /// - 下拉刷新 → [SimulatorsController.refresh]；视图 init 后帧触发
 ///   [ensureStarted]（懒启动仅首进发起；控制器 App 存续期常驻不随 tab 销毁）。
 ///
+/// F-M5-07 接线（post-03 顺序追加，spec §4.3 波次安全 + app.dart 装配注释）：
+/// 默认 hooks（onImportTap 未接线）时以 [importFlow] 填充导入入口——既有注入
+/// 钩子（constructor 注入）优先保留，绝不覆盖非空槽位。
+///
 /// 层级：呈现层。经 [SimulatorsController] 注入，不触碰数据层 / 平台存储
 /// （layer_boundary_test 契约）。
 library;
@@ -23,13 +27,23 @@ import 'package:flutter/material.dart';
 import '../../theme/colors.dart' show ConverRadii, ConverSpacing;
 import '../../theme/conver_palette.dart';
 import '../../view_models/simulators_controller.dart';
+import 'import_flow.dart' show SimulatorImportFlow;
+import 'simulators_hooks.dart' show SimulatorsHooks, appendImportHook;
 
 /// 模拟器列表页：AppBar（三入口）+ 四态正文。
 class SimulatorsView extends StatefulWidget {
-  const SimulatorsView({super.key, required this.controller});
+  const SimulatorsView({
+    super.key,
+    required this.controller,
+    this.importFlow,
+  });
 
   /// 模拟器 tab 状态持有者（装配注入，单一事实来源）。
   final SimulatorsController controller;
+
+  /// 导入流程实现（测试注入 fake；缺省默认 seam）。F-M5-07 接线点消费——
+  /// 未接线（onImportTap 已由外部注入）时不生效。
+  final SimulatorImportFlow? importFlow;
 
   @override
   State<SimulatorsView> createState() => _SimulatorsViewState();
@@ -42,12 +56,32 @@ class _SimulatorsViewState extends State<SimulatorsView> {
     widget.controller.addListener(_onControllerChanged);
     // 懒启动（仅首进 tab 发起；控制器幂等，成功后重复触发短路）。
     // 推迟到本帧 build 之后触发（避免 initState 期间 markNeedsBuild during
-    // build）；失败仅日志（错误态由控制器状态机承载）。
+    // build）；导入钩子接线同帧完成（registerHooks 内含 notifyListeners，
+    // 亦须在 build 后调用）；失败仅日志（错误态由控制器状态机承载）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        _wireImportHook();
         unawaited(_ensureStarted());
       }
     });
+  }
+
+  /// F-M5-07 导入钩子接线：既有注入钩子优先（非空槽位不覆盖）；否则以注入/
+  /// 缺省导入流填充 onImportTap。
+  void _wireImportHook() {
+    final controller = widget.controller;
+    if (controller.onImportTap != null) {
+      return;
+    }
+    final flow = widget.importFlow ?? SimulatorImportFlow();
+    controller.registerHooks(appendImportHook(
+      SimulatorsHooks(
+        onOpen: controller.onOpen,
+        onSaveTap: controller.onSaveTap,
+        onGenerateTap: controller.onGenerateTap,
+      ),
+      () => unawaited(flow.handleImport(context)),
+    ));
   }
 
   void _onControllerChanged() => setState(() {});

@@ -267,7 +267,7 @@ void main() {
   });
 
   group('AppBar 三入口 · 渲染 / 禁用态 / 接线派发', () {
-    testWidgets('钩子未接线 → 三入口渲染为禁用态（onPressed null，点击无副作用）',
+    testWidgets('未接线入口渲染为禁用态；导入入口已由 F-M5-07 自动接线（其余仍未接线）',
         (tester) async {
       buildController();
       manifest.result = parseManifest(manifest3Json);
@@ -287,9 +287,10 @@ void main() {
       final generateButton = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.auto_awesome_outlined),
       );
-      expect(saveButton.onPressed, isNull, reason: '未接线 = 禁用态');
-      expect(importButton.onPressed, isNull);
-      expect(generateButton.onPressed, isNull);
+      expect(saveButton.onPressed, isNull, reason: '存档未接线（F-M5-06）= 禁用态');
+      expect(importButton.onPressed, isNotNull,
+          reason: '导入已由 F-M5-07 接线（默认 hooks 下视图自动填充导入流）');
+      expect(generateButton.onPressed, isNull, reason: '生成未接线（F-M5-08b）= 禁用态');
 
       // 禁用按钮点击无副作用（不崩、不触发流程）。
       final callsBefore = manifest.calls;

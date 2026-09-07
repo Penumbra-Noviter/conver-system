@@ -43,3 +43,22 @@ class SimulatorsHooks {
   /// AI 生成入口（F-M5-08b 接线：种子模板 + prompt → 生成对话框）。
   final VoidCallback? onGenerateTap;
 }
+
+/// 合成带导入钩子的 hooks（F-M5-07，post-03 顺序追加）：在 [base] 槽位上叠加
+/// [onImportTap]，其余槽位原样保留。
+///
+/// 装配契约：接线方读取控制器当前槽位合成后经
+/// [SimulatorsController.registerHooks] 生效——既有注入钩子（constructor 注入
+/// / 后续票先行接线）原文保留，绝不覆盖非空槽位（W3 视图测试以注入 hooks
+/// 断言派发，本语义保证其不破）。
+SimulatorsHooks appendImportHook(
+  SimulatorsHooks base,
+  VoidCallback onImportTap,
+) {
+  return SimulatorsHooks(
+    onOpen: base.onOpen,
+    onSaveTap: base.onSaveTap,
+    onImportTap: onImportTap,
+    onGenerateTap: base.onGenerateTap,
+  );
+}
