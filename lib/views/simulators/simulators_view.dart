@@ -43,12 +43,7 @@ import 'generate_dialog.dart' show GenerateDialog;
 import 'import_flow.dart' show SimulatorImportFlow;
 import 'save_sheet.dart' show SaveSheet;
 import 'simulators_hooks.dart'
-    show
-        SimulatorsHooks,
-        appendGenerateHook,
-        appendImportHook,
-        appendSaveHook,
-        buildRunPageLauncher;
+    show SimulatorsHooks, buildRunPageLauncher;
 
 /// 存档 sheet 构建器（F-M5-06 接线点注入 seam）：按面板游戏集构建 sheet。
 /// 测试注入 fake 桥承载；缺省 = 生产 [SaveSheet]。
@@ -99,98 +94,63 @@ class _SimulatorsViewState extends State<SimulatorsView> {
     widget.controller.addListener(_onControllerChanged);
     // 懒启动（仅首进 tab 发起；控制器幂等，成功后重复触发短路）。
     // 推迟到本帧 build 之后触发（避免 initState 期间 markNeedsBuild during
-    // build）；导入钩子接线同帧完成（registerHooks 内含 notifyListeners，
+    // build）；视图默认接线同帧完成（wireViewDefaults 内含 notifyListeners，
     // 亦须在 build 后调用）；失败仅日志（错误态由控制器状态机承载）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // F-M5-04 顺序追加：open 钩子接线——卡片 onTap 经 hooks.onOpen 推
-        // 全屏运行页；合并保留既有槽位（后续票经同一入口接线时互不覆盖）。
-        _wireOpenHandler();
-        // F-M5-07 导入钩子接线：既有注入钩子优先（非空槽位不覆盖）；否则以
-        // 注入/缺省导入流填充 onImportTap（同帧接线，registerHooks 后置）。
-        _wireImportHook();
-        // F-M5-06 存档钩子接线：既有注入钩子优先；否则以注入/缺省 sheet
-        // 构建器填充 onSaveTap（同帧接线）。
-        _wireSaveHook();
-        // F-M5-08b AI 生成钩子接线：既有注入钩子优先；否则以注入/缺省打开器
-        // 填充 onGenerateTap（同帧接线）。
-        _wireGenerateHook();
+        // F-M5-04/06/07/08b 统一接线（W6 B1 修复）：每次挂载刷新视图默认
+        // 槽位，闭包绑定当前 State（内部 mounted 守卫），外部注入槽位优先
+        // 保留——tab 往返后死 context 永不落入回调。
+        _wireViewDefaults();
         unawaited(_ensureStarted());
       }
     });
   }
 
-  /// F-M5-04 顺序追加（post-03）：运行页 open 钩子注入。
+  /// F-M5-04/06/07/08b 视图默认接线（**每次挂载调用**）。
   ///
-  /// 装配点 = 本视图首挂载（HomeShell 按当前 tab 重建本视图 → 每次进入均
-  /// 重新接线，onOpen 恒为最新实现）；接线实现位于 simulators_hooks.dart
-  /// [buildRunPageLauncher]，本处仅派发 [SimulatorsController.registerHooks]。
-  /// 已接线的 onOpen（测试注入 / 后续票显式覆盖）优先，不被缺省覆盖。
-  void _wireOpenHandler() {
-    final controller = widget.controller;
-    if (controller.onOpen != null) {
-      return; // 已接线（如测试注入记录钩子）→ 尊重之，不覆盖。
-    }
-    controller.registerHooks(
-      SimulatorsHooks(
-        onOpen: buildRunPageLauncher(context),
-        onSaveTap: controller.onSaveTap,
-        onImportTap: controller.onImportTap,
-        onGenerateTap: controller.onGenerateTap,
-      ),
-    );
+  /// W6 B1 修复：HomeShell 按 tab switch 直接切换（无 IndexedStack），切回
+  /// 模拟器 tab 即新 State 挂载；若只接线一次，AppBar 四入口闭包将持有首次
+  /// 已卸载 State 的死 context，点击即抛异常 / 入口失效。本方法经
+  /// [SimulatorsController.wireViewDefaults] **每次挂载刷新视图默认槽位**，
+  /// 使闭包绑定当前 State；构造注入的外部钩子槽位恒优先保留（既有「注入
+  /// 优先」契约不变）。四个闭包均在挂载期创建并在调用时先 `mounted` 检查
+  /// 再经 `this.context` 重取 context——死 context 永不落入回调。
+  void _wireViewDefaults() {
+    widget.controller.wireViewDefaults(SimulatorsHooks(
+      onOpen: (game) {
+        if (!mounted) {
+          return;
+        }
+        // 运行页 launcher 在挂载有效期内构造（context 调用时求值）。
+        buildRunPageLauncher(context)(game);
+      },
+      onSaveTap: () {
+        if (!mounted) {
+          return;
+        }
+        _openSaveSheet(context);
+      },
+      onImportTap: () {
+        if (!mounted) {
+          return;
+        }
+        unawaited(_openImportFlow(context));
+      },
+      onGenerateTap: () {
+        if (!mounted) {
+          return;
+        }
+        unawaited(_openGenerateDialog(context));
+      },
+    ));
   }
 
-  /// F-M5-07 导入钩子接线：既有注入钩子优先（非空槽位不覆盖）；否则以注入/
-  /// 缺省导入流填充 onImportTap。
-  void _wireImportHook() {
-    final controller = widget.controller;
-    if (controller.onImportTap != null) {
-      return;
-    }
+  /// AppBar「导入」：注入/缺省导入流（同 _wireImportHook 语义；闭包经
+  /// mounted 守卫后调用，context 为当前 State 有效 context）。
+  Future<void> _openImportFlow(BuildContext context) {
     final flow = widget.importFlow ?? SimulatorImportFlow();
-    controller.registerHooks(appendImportHook(
-      SimulatorsHooks(
-        onOpen: controller.onOpen,
-        onSaveTap: controller.onSaveTap,
-        onGenerateTap: controller.onGenerateTap,
-      ),
-      () => unawaited(flow.handleImport(context)),
-    ));
-  }
-
-  /// F-M5-06 存档钩子接线：既有注入钩子优先（非空槽位不覆盖）；否则以注入/
-  /// 缺省 sheet 构建器填充 onSaveTap（AppBar「存档」→ 底部半屏 sheet）。
-  void _wireSaveHook() {
-    final controller = widget.controller;
-    if (controller.onSaveTap != null) {
-      return;
-    }
-    controller.registerHooks(appendSaveHook(
-      SimulatorsHooks(
-        onOpen: controller.onOpen,
-        onImportTap: controller.onImportTap,
-        onGenerateTap: controller.onGenerateTap,
-      ),
-      () => _openSaveSheet(context),
-    ));
-  }
-
-  /// F-M5-08b AI 生成钩子接线：既有注入钩子优先（非空槽位不覆盖）；否则以
-  /// 注入/缺省打开器填充 onGenerateTap（AppBar「AI 生成」→ 生成对话框）。
-  void _wireGenerateHook() {
-    final controller = widget.controller;
-    if (controller.onGenerateTap != null) {
-      return;
-    }
-    controller.registerHooks(appendGenerateHook(
-      SimulatorsHooks(
-        onOpen: controller.onOpen,
-        onSaveTap: controller.onSaveTap,
-        onImportTap: controller.onImportTap,
-      ),
-      () => unawaited(_openGenerateDialog(context)),
-    ));
+    return flow.handleImport(context);
   }
 
   /// AppBar「AI 生成」：打开生成对话框（测试注入记录 fake；缺省 = 生产实现

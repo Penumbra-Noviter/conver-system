@@ -557,6 +557,50 @@ void main() {
       expect(controller.onSaveTap, isNull);
       expect(controller.onGenerateTap, isNull);
     });
+
+    test('wireViewDefaults：填充视图默认槽位 + 外部构造注入槽位恒优先（W6 B1）',
+        () async {
+      var externalTaps = 0;
+      buildController(
+        hooks: SimulatorsHooks(onGenerateTap: () => externalTaps++),
+      );
+      var defaultTaps = 0;
+      controller.wireViewDefaults(SimulatorsHooks(
+        onGenerateTap: () => defaultTaps++,
+        onSaveTap: () {},
+        onImportTap: () {},
+        onOpen: (_) {},
+      ));
+
+      // 外部槽位优先：onGenerateTap 派发到构造注入钩子，视图默认不覆盖。
+      controller.onGenerateTap!();
+      expect(externalTaps, 1);
+      expect(defaultTaps, 0,
+          reason: '外部构造注入槽位恒优先（既有注入钩子优先契约）');
+      // 未接线槽位被视图默认填充（UI 不再禁用）。
+      expect(controller.onSaveTap, isNotNull);
+      expect(controller.onImportTap, isNotNull);
+      expect(controller.onOpen, isNotNull);
+    });
+
+    test('wireViewDefaults：重复调用刷新视图默认槽位（tab 往返后最新闭包生效）',
+        () async {
+      buildController();
+      var first = 0;
+      controller.wireViewDefaults(SimulatorsHooks(
+        onGenerateTap: () => first++,
+      ));
+      // 模拟切回 tab 后新 State 挂载再次接线。
+      var second = 0;
+      controller.wireViewDefaults(SimulatorsHooks(
+        onGenerateTap: () => second++,
+      ));
+
+      controller.onGenerateTap!();
+      expect(first, 0, reason: '视图默认槽位每次挂载刷新为最新闭包');
+      expect(second, 1,
+          reason: 'W6 B1：重挂载接线后点击派发到新闭包（不持有旧 State）');
+    });
   });
 
   group('真实链 · seed(fake asset) + 真实 server(port 0) + 真实回环 HTTP manifest', () {

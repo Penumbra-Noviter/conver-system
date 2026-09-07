@@ -31,6 +31,8 @@ import 'package:conver_system_mobile/services/simulator/simulator_data_dir.dart'
 import 'package:conver_system_mobile/services/simulator/simulator_server.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/view_models/simulators_controller.dart';
+import 'package:conver_system_mobile/views/simulators/import_flow.dart'
+    show SimulatorImportFlow;
 import 'package:conver_system_mobile/views/simulators/simulators_hooks.dart';
 import 'package:conver_system_mobile/views/simulators/simulators_view.dart';
 
@@ -418,4 +420,113 @@ void main() {
       expect(find.text('新游戏'), findsOneWidget);
     });
   });
+
+  group('W6 B1 回归：tab 往返（卸载→重挂载）后 AppBar 四入口仍可用', () {
+    /// 挂载模拟器 tab 并 settle 至离开 loading（首帧 post-frame 接线完成）。
+    Future<void> mountTab(WidgetTester tester, SimulatorsView view) async {
+      await tester.pumpWidget(
+        MaterialApp(theme: ConverTheme.dark(), home: view),
+      );
+      for (var i = 0;
+          i < 200 && controller.state == SimulatorsState.loading;
+          i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pump();
+    }
+
+    testWidgets('生成入口：挂载→卸载→重挂载后点击 → 打开器被调用（死 context '
+        '不落入回调）', (tester) async {
+      buildController();
+      manifest.result = parseManifest(manifest3Json);
+      var opened = 0;
+      SimulatorsView buildView() => SimulatorsView(
+            controller: controller,
+            openGenerateDialog: (_) async => opened++,
+          );
+
+      await mountTab(tester, buildView());
+      // 切走（home_shell switch 直接卸载）→ 切回（新 State 重挂载）。
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await mountTab(tester, buildView());
+
+      await tester.tap(find.byTooltip('AI 生成'));
+      await tester.pump();
+      await tester.pump();
+      expect(opened, 1,
+          reason: 'W6 B1：重挂载后入口闭包不得持有已卸载 State 的死 context'
+              '（若闭包指旧 State → mounted=false 短路不打开）');
+    });
+
+    testWidgets('存档入口：挂载→卸载→重挂载后点击 → 打开 sheet（注入探针）',
+        (tester) async {
+      buildController();
+      manifest.result = parseManifest(manifest3Json);
+      SimulatorsView buildView() => SimulatorsView(
+            controller: controller,
+            saveSheetBuilder: (games) => _ProbeSaveSheet(games: games),
+          );
+
+      await mountTab(tester, buildView());
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await mountTab(tester, buildView());
+
+      await tester.tap(find.byTooltip('存档管理'));
+      await tester.pumpAndSettle();
+      expect(find.text('存档 sheet 已打开（3 款）'), findsOneWidget,
+          reason: 'W6 B1：重挂载后存档入口仍派发（死 context 不落入回调）');
+    });
+
+    testWidgets('导入入口：挂载→卸载→重挂载后点击 → 派发注入导入流',
+        (tester) async {
+      buildController();
+      manifest.result = parseManifest(manifest3Json);
+      final flow = _RecordingImportFlow();
+
+      await mountTab(
+        tester,
+        SimulatorsView(controller: controller, importFlow: flow),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await mountTab(
+        tester,
+        SimulatorsView(controller: controller, importFlow: flow),
+      );
+
+      await tester.tap(find.byTooltip('导入'));
+      await tester.pump();
+      expect(flow.handleCalls, 1,
+          reason: 'W6 B1：重挂载后导入入口仍派发导入流');
+    });
+
+    testWidgets('卡片打开入口：挂载→卸载→重挂载后点击卡片 → 仍派发 onOpen',
+        (tester) async {
+      final hooks = _RecordingHooks();
+      buildController(hooks: hooks);
+      manifest.result = parseManifest(manifest3Json);
+
+      await mountTab(tester, SimulatorsView(controller: controller));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await mountTab(tester, SimulatorsView(controller: controller));
+
+      await tester.tap(find.text('人生模拟器 v3'));
+      await tester.pump();
+      expect(hooks.openCalls, 1,
+          reason: 'W6 B1：重挂载后卡片打开入口仍派发（external 钩子优先保留）');
+    });
+  });
+}
+
+/// 记录导入流派发次数的 fake flow（W6 B1 接线回归断言用）。
+class _RecordingImportFlow extends SimulatorImportFlow {
+  int handleCalls = 0;
+
+  @override
+  Future<void> handleImport(BuildContext context) async {
+    handleCalls++;
+  }
 }
