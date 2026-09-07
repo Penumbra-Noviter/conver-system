@@ -14,11 +14,13 @@ library;
 
 /// 恶意模式粗筛键集 + 文案映射——单源常量，导入/生成共享。
 ///
-/// [keys] 为三键清单（排序见 [scanSuspicious] 字典序产出）；[patternFor] /
+/// [keys] 为三键清单（输出序契约：scanSuspicious 命中收集按本声明序产出）；
+/// [patternFor] /
 /// [labelFor] 按键取正则与中文文案；未知键文案兜底原始键名（桌面未知键
 /// 直出键名语义，防新增未联动不炸）。
 abstract final class SuspiciousPatterns {
-  /// 三键清单（常量单源；命中收集后排序确定）。
+  /// 三键清单（常量单源；命中收集按声明序输出——新增键按既定声明位追加即
+  /// 自动进入粗筛与文案映射，输出序跟随本声明序而非字典序）。
   static const List<String> keys = <String>[
     'cross-origin-fetch',
     'document.cookie',
