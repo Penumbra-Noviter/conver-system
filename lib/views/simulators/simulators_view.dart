@@ -1,5 +1,5 @@
-/// 模拟器列表页（F-M5-03 占位重写 + F-M5-07 导入钩子接线）——四态列表 +
-/// 类型筛选 + AppBar 三入口 + 下拉刷新 + 钩子派发。
+/// 模拟器列表页（F-M5-03 占位重写 + F-M5-07 导入钩子接线 + F-M5-08b AI 生成
+/// 钩子接线）——四态列表 + 类型筛选 + AppBar 三入口 + 下拉刷新 + 钩子派发。
 ///
 /// 验收语义（工单验收语义契约逐条）：
 /// - 四态：loading（进度指示）/ ready（卡片网格）/ error（文案 + 「重试」
@@ -12,9 +12,10 @@
 /// - 下拉刷新 → [SimulatorsController.refresh]；视图 init 后帧触发
 ///   [ensureStarted]（懒启动仅首进发起；控制器 App 存续期常驻不随 tab 销毁）。
 ///
-/// F-M5-07 接线（post-03 顺序追加，spec §4.3 波次安全 + app.dart 装配注释）：
-/// 默认 hooks（onImportTap 未接线）时以 [importFlow] 填充导入入口——既有注入
-/// 钩子（constructor 注入）优先保留，绝不覆盖非空槽位。
+/// F-M5-07/F-M5-08b 接线（post-03 顺序追加，spec §4.3 波次安全 + app.dart 装配
+/// 注释）：默认 hooks（onImportTap / onGenerateTap 未接线）时以 [importFlow] /
+/// [openGenerateDialog] 填充导入 / 生成入口——既有注入钩子（constructor 注入）
+/// 优先保留，绝不覆盖非空槽位。
 ///
 /// 层级：呈现层。经 [SimulatorsController] 注入，不触碰数据层 / 平台存储
 /// （layer_boundary_test 契约）。
@@ -23,19 +24,40 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'
+    show ReadContext;
 
+import '../../data/repositories/settings_repository.dart'
+    show SettingsRepository;
+import '../../services/llm/errors.dart' show ApiKeyMissingError;
+import '../../services/llm/factory.dart' show LLMFactory;
+import '../../services/simulator/game_generator.dart'
+    show GameGenerator, GenerationCredentials;
 import '../../services/simulator/save_bridge.dart' show SaveGame;
+import '../../services/simulator/simulator_data_dir.dart'
+    show SimulatorDataDir;
 import '../../theme/colors.dart' show ConverRadii, ConverSpacing;
 import '../../theme/conver_palette.dart';
 import '../../view_models/simulators_controller.dart';
+import 'generate_dialog.dart' show GenerateDialog;
 import 'import_flow.dart' show SimulatorImportFlow;
 import 'save_sheet.dart' show SaveSheet;
 import 'simulators_hooks.dart'
-    show SimulatorsHooks, appendImportHook, appendSaveHook, buildRunPageLauncher;
+    show
+        SimulatorsHooks,
+        appendGenerateHook,
+        appendImportHook,
+        appendSaveHook,
+        buildRunPageLauncher;
 
 /// 存档 sheet 构建器（F-M5-06 接线点注入 seam）：按面板游戏集构建 sheet。
 /// 测试注入 fake 桥承载；缺省 = 生产 [SaveSheet]。
 typedef SaveSheetBuilder = Widget Function(List<SaveGame> games);
+
+/// AI 生成对话框打开器（F-M5-08b 接线点注入 seam）：在 [SimulatorsView]
+/// 上下文上打开生成对话框。测试注入记录 fake；缺省 = 生产实现（provider 图
+/// 装配 GameGenerator + showDialog）。
+typedef GenerateDialogOpener = Future<void> Function(BuildContext context);
 
 /// 缺省存档 sheet：生产 [SaveSheet]（内部建立低占位 WebView 访问 server
 /// origin，见 save_sheet.dart）。
@@ -48,6 +70,7 @@ class SimulatorsView extends StatefulWidget {
     required this.controller,
     this.importFlow,
     this.saveSheetBuilder,
+    this.openGenerateDialog,
   });
 
   /// 模拟器 tab 状态持有者（装配注入，单一事实来源）。
@@ -60,6 +83,10 @@ class SimulatorsView extends StatefulWidget {
   /// 存档 sheet 构建器（F-M5-06 接线点消费；测试注入 fake 桥承载，缺省 =
   /// 生产 SaveSheet）。未接线（onSaveTap 已由外部注入）时不生效。
   final SaveSheetBuilder? saveSheetBuilder;
+
+  /// AI 生成对话框打开器（F-M5-08b 接线点消费；测试注入记录 fake，缺省 =
+  /// 生产实现）。未接线（onGenerateTap 已由外部注入）时不生效。
+  final GenerateDialogOpener? openGenerateDialog;
 
   @override
   State<SimulatorsView> createState() => _SimulatorsViewState();
@@ -85,6 +112,9 @@ class _SimulatorsViewState extends State<SimulatorsView> {
         // F-M5-06 存档钩子接线：既有注入钩子优先；否则以注入/缺省 sheet
         // 构建器填充 onSaveTap（同帧接线）。
         _wireSaveHook();
+        // F-M5-08b AI 生成钩子接线：既有注入钩子优先；否则以注入/缺省打开器
+        // 填充 onGenerateTap（同帧接线）。
+        _wireGenerateHook();
         unawaited(_ensureStarted());
       }
     });
@@ -144,6 +174,72 @@ class _SimulatorsViewState extends State<SimulatorsView> {
       ),
       () => _openSaveSheet(context),
     ));
+  }
+
+  /// F-M5-08b AI 生成钩子接线：既有注入钩子优先（非空槽位不覆盖）；否则以
+  /// 注入/缺省打开器填充 onGenerateTap（AppBar「AI 生成」→ 生成对话框）。
+  void _wireGenerateHook() {
+    final controller = widget.controller;
+    if (controller.onGenerateTap != null) {
+      return;
+    }
+    controller.registerHooks(appendGenerateHook(
+      SimulatorsHooks(
+        onOpen: controller.onOpen,
+        onSaveTap: controller.onSaveTap,
+        onImportTap: controller.onImportTap,
+      ),
+      () => unawaited(_openGenerateDialog(context)),
+    ));
+  }
+
+  /// AppBar「AI 生成」：打开生成对话框（测试注入记录 fake；缺省 = 生产实现
+  /// 经 provider 图装配 GameGenerator 并接线成功后的列表刷新）。
+  Future<void> _openGenerateDialog(BuildContext context) {
+    final opener = widget.openGenerateDialog ?? _defaultOpenGenerateDialog;
+    return opener(context);
+  }
+
+  /// 生产 AI 生成对话框打开器：provider 图装配 [GameGenerator]（经既有 LLM
+  /// 直连 seam：SettingsRepository 解析 default_provider/default_model/api_key/
+  /// base_url + [LLMFactory] 派生，claude/openai 兼容 provider 皆可用——生成
+  /// 是主应用内 LLM 调用，非游戏注入，claude key 不违注入红线）→ showDialog；
+  /// 成功后 [SimulatorsController.refresh] 刷新列表（新卡「生成」badge 可见）。
+  Future<void> _defaultOpenGenerateDialog(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => GenerateDialog(
+        generator: _buildGenerator(dialogContext),
+        onGenerated: () => widget.controller.refresh(),
+      ),
+    );
+  }
+
+  /// 生产 [GameGenerator] 装配：经 app provider 图的 SettingsRepository（仅
+  /// 无状态解析 seam，不触碰平台存储细节）解析生成凭据链（default_provider →
+  /// apiKey 槽位解析 → default_model + base_url），LLMFactory 派生 provider
+  /// 实例（生成为 LLM 直连，与游戏注入链路无关）。
+  GameGenerator _buildGenerator(BuildContext context) {
+    final repo = context.read<SettingsRepository>();
+    return GameGenerator(
+      providerFactory: const LLMFactory(),
+      resolveCredentials: () async {
+        final provider = await repo.defaultProvider;
+        final apiKey = await repo.apiKey(provider);
+        if (apiKey.isEmpty) {
+          throw ApiKeyMissingError(provider);
+        }
+        final baseUrl = await repo.baseUrl(provider);
+        return GenerationCredentials(
+          provider: provider,
+          apiKey: apiKey,
+          model: await repo.defaultModel,
+          baseUrl: baseUrl.isEmpty ? null : baseUrl,
+        );
+      },
+      resolveSimDir: () => SimulatorDataDir().resolve(),
+    );
   }
 
   /// AppBar「存档」：把**全部**游戏（不随筛选漏项）映射为 [SaveGame] 最小数据面

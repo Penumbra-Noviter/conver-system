@@ -283,7 +283,7 @@ void main() {
   });
 
   group('AppBar 三入口 · 渲染 / 禁用态 / 接线派发', () {
-    testWidgets('默认接线：存档/导入入口可用（生成仍禁用）；点击存档 → 打开 sheet',
+    testWidgets('默认接线：存档/导入/生成入口可用；点击存档 → 打开 sheet',
         (tester) async {
       buildController();
       manifest.result = parseManifest(manifest3Json);
@@ -312,8 +312,8 @@ void main() {
           reason: '存档已由 F-M5-06 自动接线（AppBar → 底部半屏 sheet）');
       expect(importButton.onPressed, isNotNull,
           reason: '导入已由 F-M5-07 接线（默认 hooks 下视图自动填充导入流）');
-      expect(generateButton.onPressed, isNull,
-          reason: '生成未接线（F-M5-08b）= 禁用态');
+      expect(generateButton.onPressed, isNotNull,
+          reason: '生成已由 F-M5-08b 接线（默认 hooks 下视图自动填充打开器）');
 
       // 点击存档 → 打开 sheet（演示注入 builder 收到全部游戏映射面）。
       await tester.tap(find.byTooltip('存档管理'));

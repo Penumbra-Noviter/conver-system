@@ -168,3 +168,21 @@ SimulatorsHooks appendSaveHook(
     onGenerateTap: base.onGenerateTap,
   );
 }
+
+/// 合成带 AI 生成钩子的 hooks（F-M5-08b，post-03 顺序追加）：在 [base] 上叠加
+/// [onGenerateTap]（AppBar「AI 生成」→ 生成对话框），其余槽位原样保留。
+///
+/// 装配契约与 [appendImportHook] / [appendSaveHook] 同构：接线方读取控制器
+/// 当前槽位合成后经 [SimulatorsController.registerHooks] 生效——既有注入钩子
+/// 原文保留，绝不覆盖非空槽位。
+SimulatorsHooks appendGenerateHook(
+  SimulatorsHooks base,
+  VoidCallback onGenerateTap,
+) {
+  return SimulatorsHooks(
+    onOpen: base.onOpen,
+    onSaveTap: base.onSaveTap,
+    onImportTap: base.onImportTap,
+    onGenerateTap: onGenerateTap,
+  );
+}
