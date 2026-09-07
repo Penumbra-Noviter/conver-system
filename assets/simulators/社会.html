@@ -1,0 +1,1199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>《混社会模拟器》AI角色扮演游戏</title>
+<style>
+/* ============ 主题变量 ============ */
+:root,[data-theme="neon"]{--bg:#08081a;--bg2:#0c0f24;--panel:#0e1128;--card:#121636;--border:#1e2447;--border2:#2a3158;--t:#e8ecff;--t2:#9aa3cc;--t3:#5f6894;--accent:#00d4f0;--accent-dim:rgba(0,212,240,.13);--on-accent:#06121a;--gold:#f0b429;--good:#2ee6a8;--bad:#ff4d6d;--bad-dim:rgba(255,77,109,.09);--user-bg:#13304a;--rad:10px}
+[data-theme="casino"]{--bg:#0a0812;--bg2:#0f0d1a;--panel:#12101f;--card:#181528;--border:#2a2340;--border2:#3a3058;--t:#f0e9d8;--t2:#a89fc0;--t3:#6b6390;--accent:#f0a828;--accent-dim:rgba(240,168,40,.13);--on-accent:#221500;--gold:#f0a828;--good:#40c8a0;--bad:#ff5d5d;--bad-dim:rgba(255,93,93,.09);--user-bg:#2a1f10;--rad:10px}
+[data-theme="ink"]{--bg:#0e0d0f;--bg2:#141317;--panel:#17161b;--card:#1e1c24;--border:#2b2833;--border2:#3b3747;--t:#e8e2d4;--t2:#a49c8a;--t3:#6d6657;--accent:#e05a4e;--accent-dim:rgba(224,90,78,.13);--on-accent:#fff;--gold:#d9b36c;--good:#7fb069;--bad:#c0392b;--bad-dim:rgba(192,57,43,.1);--user-bg:#2b1a16;--rad:10px}
+[data-theme="paper"]{--bg:#f2f0ea;--bg2:#eae7df;--panel:#faf9f5;--card:#fff;--border:#d8d4c8;--border2:#c4bfb0;--t:#23201a;--t2:#6d675c;--t3:#9a9387;--accent:#9a3412;--accent-dim:rgba(154,52,18,.09);--on-accent:#fff;--gold:#a16207;--good:#1f7a4d;--bad:#b91c1c;--bad-dim:rgba(185,28,28,.07);--user-bg:#efe5d4;--rad:10px}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--t);font-size:14px;overflow:hidden}
+button{font-family:inherit}
+input,select,textarea{font-family:inherit;background:var(--bg2);color:var(--t);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:92px;line-height:1.6}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+.btn{padding:7px 15px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--t);font-size:12.5px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:var(--on-accent);font-weight:600}
+.btn.gold:hover{filter:brightness(1.08);color:var(--on-accent)}
+.btn.bad{color:var(--bad);border-color:var(--bad)}
+.btn.bad:hover{background:var(--bad);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center}
+.row .btn{flex:0 0 auto}
+.hint{font-size:11px;color:var(--t3);margin:2px 0 8px;line-height:1.6}
+label{font-size:11px;color:var(--t2);display:block;margin:10px 0 4px;letter-spacing:.4px}
+.check{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2);cursor:pointer;margin:0}
+.check input{width:auto;margin:0}
+/* ============ 顶栏 ============ */
+.topbar{position:fixed;top:0;left:0;right:0;height:50px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 10px;z-index:60}
+.tb-left{display:flex;align-items:center;gap:8px;min-width:0}
+.tb-btn{display:flex;align-items:center;gap:5px;background:var(--accent-dim);border:1px solid var(--border2);color:var(--accent);border-radius:8px;padding:6px 10px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s}
+.tb-btn:hover{border-color:var(--accent)}
+.tb-title{font-weight:800;font-size:15px;letter-spacing:1px;color:var(--t);line-height:1.1}
+.tb-title .sub{display:block;font-size:8.5px;color:var(--t3);font-weight:400;letter-spacing:2.5px}
+.tb-chips{display:flex;gap:6px;margin-left:auto;overflow:hidden}
+.chip{font-size:11px;color:var(--t2);background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.chip.hot{color:var(--bad);border-color:var(--bad)}
+.chip.gold{color:var(--gold);border-color:var(--border2)}
+.tb-right{display:flex;gap:2px}
+.tb-right .tb-btn{padding:6px 9px;font-size:12px;font-weight:500;background:transparent;border-color:transparent;color:var(--t2)}
+.tb-right .tb-btn:hover{color:var(--t);background:var(--bg2);border-color:var(--border)}
+/* ============ 抽屉 ============ */
+.drawer{position:fixed;top:0;bottom:0;width:340px;max-width:88vw;background:var(--panel);border-right:1px solid var(--border);z-index:80;transform:translateX(-105%);transition:transform .22s ease;display:flex;flex-direction:column;box-shadow:8px 0 40px rgba(0,0,0,.35)}
+.drawer.open{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:15px 16px 11px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px}
+.drawer-head button{background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px}
+.drawer-head button:hover{color:var(--bad)}
+.drawer-body{overflow-y:auto;padding:14px 16px;flex:1}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:70;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.show{opacity:1;pointer-events:auto}
+/* ============ 聊天区 ============ */
+.chat-wrap{position:fixed;top:50px;left:0;right:0;bottom:0;display:flex;flex-direction:column}
+.chat-header{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);font-size:12px;color:var(--t2);flex-wrap:wrap}
+.chat-header b{color:var(--t)}
+.chat{flex:1;overflow-y:auto;padding:16px 14px 10px}
+.chat-inner{max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.msg.ai{display:flex;flex-direction:column;gap:4px}
+.msg.ai .tag{font-size:10.5px;color:var(--t3);letter-spacing:.5px}
+.msg.ai .ai-body{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--rad);padding:12px 15px;line-height:1.85;font-size:13.5px}
+.msg.ai .ai-body b{color:var(--accent)}
+.msg.ai .ai-body code{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:0 5px;font-size:12px;color:var(--gold)}
+.msg.user{display:flex;justify-content:flex-end}
+.msg.user .bubble{background:var(--user-bg);border:1px solid var(--border2);border-radius:12px 12px 3px 12px;padding:9px 14px;max-width:80%;line-height:1.7;font-size:13.5px}
+.msg.sys{display:flex;justify-content:center}
+.msg.sys div{display:inline-block;background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:4px 14px;font-size:11.5px;color:var(--t3)}
+.typing{display:inline-flex;gap:4px;align-items:center;margin-left:8px}
+.typing i{width:5px;height:5px;border-radius:50%;background:var(--t3);animation:tp 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}
+.typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,60%,100%{opacity:.25}30%{opacity:1}}
+/* ============ 输入区 ============ */
+.input-bar{background:var(--bg2);border-top:1px solid var(--border);padding:8px 12px calc(10px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
+.quick{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.quick::-webkit-scrollbar{display:none}
+.q-btn{flex:0 0 auto;display:flex;align-items:center;gap:4px;background:var(--panel);border:1px solid var(--border);color:var(--t2);border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;white-space:nowrap;transition:all .12s}
+.q-btn:hover{color:var(--accent);border-color:var(--accent)}
+.q-btn.cheat-q{color:var(--gold)}
+.input-row{display:flex;gap:8px}
+.input-row input{flex:1;padding:11px 14px;border-radius:var(--rad);font-size:14px}
+.input-row .send{background:var(--accent);color:var(--on-accent);font-weight:700;border:none;border-radius:var(--rad);padding:0 22px;font-size:14px;cursor:pointer;flex:0 0 auto}
+.input-row .send:disabled{opacity:.5;cursor:not-allowed}
+/* ============ 弹窗 ============ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;display:none;align-items:center;justify-content:center;padding:14px}
+.modal-overlay.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:18px;width:540px;max-width:97vw;max-height:88vh;overflow-y:auto;box-shadow:0 12px 50px rgba(0,0,0,.55);animation:pop .18s ease}
+@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.modal h2{font-size:15px;margin-bottom:12px}
+.modal .btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.sep{border-top:1px solid var(--border);margin:14px 0;padding-top:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tab{font-size:11.5px;padding:5px 12px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--t2);cursor:pointer}
+.tab.on{color:var(--on-accent);background:var(--accent);border-color:var(--accent)}
+.ency-body{font-size:12.5px;line-height:1.85;color:var(--t2)}
+.ency-body h4{color:var(--accent);margin:12px 0 4px;font-size:13px}
+.ency-body table{width:100%;border-collapse:collapse;margin:6px 0;font-size:11.5px}
+.ency-body th,.ency-body td{border:1px solid var(--border);padding:5px 7px;text-align:left}
+.ency-body th{background:var(--bg2);color:var(--t2);font-weight:600}
+.ency-body b{color:var(--t)}
+/* ============ 向导 ============ */
+.wizard{position:fixed;inset:0;background:var(--bg);z-index:200;overflow-y:auto;padding:18px}
+.wiz-inner{width:660px;max-width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding-bottom:40px}
+.wiz-head{text-align:center;padding-top:14px}
+.wiz-title{font-size:28px;font-weight:900;letter-spacing:5px;color:var(--accent)}
+.wiz-sub{font-size:12px;color:var(--t3);margin-top:5px;letter-spacing:2.5px}
+.wiz-steps{display:flex;gap:6px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.wiz-step{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3);background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:4px 11px}
+.wiz-step span{width:17px;height:17px;border-radius:50%;background:var(--border2);color:var(--bg);font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.wiz-step.on{color:var(--accent);border-color:var(--accent)}
+.wiz-step.on span{background:var(--accent);color:var(--on-accent)}
+.wiz-step.done{color:var(--good);border-color:var(--good)}
+.wiz-step.done span{background:var(--good);color:var(--on-accent)}
+.wiz-body{display:flex;flex-direction:column;gap:12px}
+.wiz-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px}
+.wiz-card h3{font-size:16px;margin-bottom:4px}
+.wiz-desc{font-size:12px;color:var(--t3);line-height:1.75;margin-bottom:4px}
+.wiz-foot{display:flex;justify-content:space-between;gap:10px}
+.wiz-foot .btn{padding:10px 28px;font-size:14px}
+.attr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;margin-top:8px}
+.attr-row{display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:5px 8px}
+.attr-name{font-size:12px;flex:1;white-space:nowrap}
+.attr-val{font-size:13px;font-weight:700;min-width:26px;text-align:center;color:var(--accent)}
+.stepper{width:23px;height:23px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--t2);cursor:pointer;font-size:15px;line-height:1;flex:0 0 auto}
+.stepper:hover{color:var(--accent);border-color:var(--accent)}
+.budget{font-size:12px;color:var(--t2);margin-top:8px}
+.budget b{color:var(--gold);font-size:14px}
+.talent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:8px;margin-top:8px}
+.talent{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;cursor:pointer;transition:all .12s}
+.talent:hover{border-color:var(--accent)}
+.talent.on{border-color:var(--accent);background:var(--accent-dim)}
+.talent.dis{opacity:.35;pointer-events:none}
+.t-name{font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.t-cost{font-size:10px;color:var(--gold);font-weight:600}
+.t-eff{font-size:11.5px;color:var(--t2);line-height:1.5;margin-top:3px}
+.t-g{font-size:10px;color:var(--t3);margin-top:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tchip{font-size:12px;border:1px solid var(--border);background:var(--bg2);color:var(--t2);border-radius:999px;padding:4px 13px;cursor:pointer;transition:all .12s}
+.tchip.on{color:var(--on-accent);background:var(--accent);border-color:var(--accent)}
+.diff-card{display:block;width:100%;text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 15px;cursor:pointer;margin-bottom:8px;transition:all .12s}
+.diff-card:hover{border-color:var(--border2)}
+.diff-card.on{border-color:var(--accent);background:var(--accent-dim)}
+.diff-name{font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.diff-desc{font-size:12px;color:var(--t2);margin:3px 0 6px}
+.diff-params{font-size:11px;color:var(--t3);line-height:1.85}
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;font-size:12.5px}
+.sum-grid .k{color:var(--t3)}
+.sum-grid .v{color:var(--t);font-weight:600;word-break:break-all}
+/* ============ 角色面板 ============ */
+.cp-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.avatar{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--gold));color:var(--on-accent);font-size:24px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.cp-name{font-size:17px;font-weight:800}
+.cp-sub{font-size:11px;color:var(--t3);margin-top:3px;line-height:1.5}
+.cp-rank{font-size:11px;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:2px 10px;margin-left:auto;white-space:nowrap}
+.cp-sec{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:10px}
+.cp-sec h4{font-size:12px;color:var(--accent);margin-bottom:9px;letter-spacing:1px}
+.cp-sec p{font-size:12px;line-height:1.7;color:var(--t2)}
+.bar{height:7px;background:var(--bg);border-radius:99px;overflow:hidden;flex:1}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--accent);transition:width .3s}
+.stat-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px}
+.stat-row .lb{width:46px;color:var(--t2);flex:0 0 auto}
+.stat-row .vl{width:36px;text-align:right;font-weight:700;font-size:11.5px;flex:0 0 auto}
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.res-item{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 11px}
+.res-item .rv{font-size:15px;font-weight:800;color:var(--gold)}
+.res-item .rk{font-size:10.5px;color:var(--t3);margin-top:1px}
+.skill-row,.rel-row{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:7px}
+.skill-row .lb{width:66px;color:var(--t2);flex:0 0 auto}
+.dots{display:flex;gap:3px}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--border2)}
+.dots i.on{background:var(--gold)}
+.rel-name{font-weight:600;white-space:nowrap}
+.rel-tag{font-size:10px;color:var(--t3)}
+.rel-note{font-size:11px;color:var(--t3);margin-left:auto;text-align:right;max-width:46%;line-height:1.5}
+.badge{display:inline-block;font-size:10.5px;border-radius:999px;padding:2px 9px;border:1px solid var(--border2);color:var(--t2)}
+.badge.good{color:var(--good);border-color:var(--good)}
+.badge.bad{color:var(--bad);border-color:var(--bad)}
+/* ============ 死亡/回档 ============ */
+.death-title{color:var(--bad);font-size:19px;text-align:center;letter-spacing:3px}
+.death-card{border:1px solid var(--bad);border-radius:12px;background:var(--bad-dim);padding:12px 14px;margin-top:10px}
+.death-card h4{font-size:12px;color:var(--bad);margin-bottom:6px}
+.death-card p{font-size:12.5px;line-height:1.8;color:var(--t)}
+.d-review{border:1px solid var(--gold);border-radius:12px;background:rgba(240,180,41,.07);padding:12px 14px;margin-top:10px;font-size:12.5px;line-height:1.8}
+.d-review h4{font-size:12px;color:var(--gold);margin-bottom:6px}
+.death-list .rec{border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:9px;background:var(--bg2)}
+.rec-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--t2);margin-bottom:5px}
+.rec-head b{color:var(--bad)}
+.rec-reason{font-size:13px;font-weight:700;color:var(--t);margin-bottom:4px}
+.rec-review{font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:8px}
+.cp-item{border:1px solid var(--border);border-radius:12px;padding:10px 13px;margin-bottom:8px;background:var(--bg2)}
+.cp-item .t{font-size:13px;font-weight:700;color:var(--accent)}
+.cp-item .s{font-size:11px;color:var(--t3);margin-top:3px;line-height:1.6}
+/* ============ Toast ============ */
+#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast{background:var(--panel);border:1px solid var(--border2);color:var(--t);font-size:12.5px;padding:8px 18px;border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.4);animation:pop .18s ease;max-width:92vw;transition:opacity .3s}
+.toast.ok{border-color:var(--good);color:var(--good)}
+.toast.err{border-color:var(--bad);color:var(--bad)}
+.toast.warn{border-color:var(--gold);color:var(--gold)}
+/* ============ 移动端 ============ */
+@media(max-width:760px){
+.tb-title{font-size:13px}
+.tb-title .sub{display:none}
+.chip.hide-m{display:none}
+.tb-right .tb-btn span{display:none}
+.tb-right .tb-btn{padding:6px 8px}
+.drawer{width:87vw}
+.msg.user .bubble{max-width:88%}
+.wiz-title{font-size:22px;letter-spacing:3px}
+.sum-grid{grid-template-columns:1fr}
+.modal{padding:14px}
+.attr-grid{grid-template-columns:repeat(auto-fill,minmax(135px,1fr))}
+.talent-grid{grid-template-columns:1fr 1fr}
+.talent-grid .talent{padding:8px 10px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* ============ v2 视觉优化 ============ */
+.topbar{height:52px;padding:0 14px;gap:6px}
+.tb-btn{border-radius:9px;padding:6px 10px;font-size:12px}
+.tb-right .tb-btn{background:transparent;border:1px solid transparent;color:var(--t2);padding:6px 9px;font-weight:500}
+.tb-right .tb-btn:hover{background:var(--bg2);border-color:var(--border);color:var(--t)}
+.tb-title{font-size:14px;letter-spacing:2px}
+.tb-title .sub{font-size:8px;letter-spacing:3px}
+.chip{background:var(--bg2);border:1px solid var(--border);padding:3px 10px;font-size:10.5px}
+.chip.gold{color:var(--gold)}
+.chat-header{background:transparent;padding:7px 18px;font-size:11.5px;border-bottom:1px solid var(--border)}
+.chat-inner{max-width:860px;gap:16px}
+.msg.ai .tag{font-size:10px;color:var(--t3);letter-spacing:1px;padding-left:4px}
+.msg.ai .ai-body{background:var(--card);border:1px solid var(--border);border-left:2px solid var(--accent);border-radius:12px;padding:13px 16px;line-height:1.85;font-size:13.5px}
+.msg.user .bubble{background:var(--user-bg);border:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.think-box{background:var(--bg2);border:1px dashed var(--border2);border-radius:10px;padding:8px 13px;margin-bottom:8px}
+.think-box summary{cursor:pointer;font-size:11px;color:var(--t3);letter-spacing:1px;user-select:none;list-style:none;display:flex;align-items:center;gap:5px}
+.think-box summary::before{content:'▸';font-size:9px;transition:transform .15s;color:var(--t3)}
+.think-box[open] summary::before{transform:rotate(90deg)}
+.think-box .think-txt{white-space:pre-wrap;margin-top:7px;border-top:1px dashed var(--border);padding-top:7px;color:var(--t3);font-size:11.5px;line-height:1.7}
+.quick{gap:7px}
+.q-btn{background:var(--bg2);border:1px solid var(--border);color:var(--t2);padding:6px 13px;font-size:12px}
+.q-btn:hover{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)}
+.input-bar{background:var(--bg2);padding:10px 14px calc(12px + env(safe-area-inset-bottom));gap:10px}
+.input-row input{border-radius:12px;padding:12px 16px;background:var(--panel);border-color:var(--border2)}
+.drawer{width:350px}
+.drawer-body{padding:16px 18px}
+.cp-sec{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.cp-sec h4{font-size:11px;color:var(--t3);letter-spacing:1.5px;margin-bottom:10px}
+.cp-sec h4::after{content:'';display:block;width:22px;height:2px;background:var(--accent);opacity:.55;border-radius:2px;margin-top:5px}
+.stat-row .lb{color:var(--t3)}
+.bar{background:var(--bg)}
+.st-desc{font-size:10px;color:var(--t3);white-space:nowrap}
+.res-item{background:var(--bg2)}
+.res-item .rv{font-size:14px}
+.skill-pill{display:inline-block;font-size:11px;color:var(--t2);background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;margin:0 6px 6px 0}
+.pill-wrap{margin-top:2px}
+.cp-gender{font-size:11px;color:var(--t3);font-weight:400}
+.dim{color:var(--t3);font-size:11.5px}
+.modal{border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.modal h2{font-size:15px;letter-spacing:.5px}
+.wiz-card{border-radius:16px;padding:20px 22px}
+.wiz-title{font-size:26px}
+.wiz-sub{font-size:11px}
+label{font-size:10.5px;color:var(--t3)}
+.d-review{background:var(--bg2)}
+::-webkit-scrollbar{width:6px;height:6px}
+@media(max-width:760px){
+.cp-sec{padding:11px 12px}
+.chat-inner{gap:12px}
+.msg.ai .ai-body{padding:11px 13px}
+.think-box{padding:7px 10px}
+}
+</style>
+</head>
+<body data-theme="neon">
+<!-- ================= 建号向导 ================= -->
+<div class="wizard" id="wizard">
+  <div class="wiz-inner">
+    <div class="wiz-head">
+      <div class="wiz-title">混社会模拟器</div>
+      <div class="wiz-sub">临江市 · 一个人的江湖 · AI 角色扮演推演</div>
+      <div class="wiz-steps" id="wiz-steps"></div>
+    </div>
+    <div class="wiz-body" id="wiz-body"></div>
+    <div class="wiz-foot">
+      <button class="btn" id="wiz-prev" onclick="Wiz.prev()">上一步</button>
+      <button class="btn gold" id="wiz-next" onclick="Wiz.next()">下一步</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 主界面 ================= -->
+<div id="app" style="display:none">
+  <header class="topbar">
+    <div class="tb-left">
+      <button class="tb-btn" onclick="UI.toggleDrawer()">👤<span>角色</span></button>
+      <div class="tb-title">混社会模拟器<span class="sub">临江市 · 江湖推演</span></div>
+    </div>
+    <div class="tb-chips">
+      <span class="chip" id="chip-day">第1天 · 上午</span>
+      <span class="chip gold hide-m" id="chip-money">¥0</span>
+      <span class="chip hide-m" id="chip-heat">热度 0</span>
+    </div>
+    <div class="tb-right">
+      <button class="tb-btn" onclick="UI.openMem()">📔<span>记忆</span></button>
+      <button class="tb-btn" onclick="UI.openDeaths()">💀<span>回档</span></button>
+      <button class="tb-btn" onclick="UI.openEncy()">📖<span>百科</span></button>
+      <button class="tb-btn" onclick="UI.openGuide()">📜<span>攻略</span></button>
+      <button class="tb-btn" id="btn-gold" style="display:none" onclick="Game.toggleGold()">💰<span>金手指</span></button>
+      <button class="tb-btn" onclick="UI.openSettings()">⚙️<span>设置</span></button>
+    </div>
+  </header>
+
+  <aside class="drawer" id="drawer-char">
+    <div class="drawer-head">👤 角色档案 · 当前状况<span style="color:var(--t3);font-size:11px;font-weight:400">实时更新</span>
+      <button onclick="UI.closeDrawers()">✕</button>
+    </div>
+    <div class="drawer-body" id="char-panel"></div>
+  </aside>
+  <div class="scrim" id="scrim" onclick="UI.closeDrawers()"></div>
+
+  <main class="chat-wrap">
+    <div class="chat-header">
+      <span>📍 <b id="h-loc">—</b></span>
+      <span>🗓 <b id="h-day">第1天 · 上午</b></span>
+      <span id="h-status"></span>
+    </div>
+    <div class="chat"><div class="chat-inner" id="chat"></div></div>
+    <div class="input-bar">
+      <div class="quick" id="quick"></div>
+      <div class="input-row">
+        <input id="msg" placeholder="输入你的行动、说的话、想问的事…（Enter 发送）" maxlength="500">
+        <button class="send" id="btn-send" onclick="Game.send()">行动</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ================= 弹窗 ================= -->
+<div class="modal-overlay" id="settings-modal"><div class="modal"><h2>⚙️ 设置</h2><div id="settings-content"></div></div></div>
+<div class="modal-overlay" id="mem-modal"><div class="modal" style="width:580px"><h2>📔 记忆系统</h2><div id="mem-content"></div><div class="btn-row"><button class="btn gold" onclick="UI.saveNotes()">💾 保存笔记</button><button class="btn" onclick="UI.closeModal('mem-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="ency-modal"><div class="modal" style="width:660px"><h2>📖 世界百科 · 临江市</h2><div class="tabs" id="ency-tabs"></div><div class="ency-body" id="ency-body"></div><div class="btn-row"><button class="btn gold" onclick="UI.closeModal('ency-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="deaths-modal"><div class="modal" style="width:600px"><h2>💀 死亡记录 · 时间回档</h2><div id="deaths-content"></div><div class="btn-row"><button class="btn gold" onclick="UI.closeModal('deaths-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="guide-modal"><div class="modal" style="width:620px"><h2>📜 玩法攻略</h2><div class="ency-body" id="guide-content"></div><div class="btn-row"><button class="btn gold" onclick="UI.closeModal('guide-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="confirm-modal"><div class="modal" style="width:420px"><h2 id="cf-title">确认</h2><div id="cf-text" style="font-size:13px;line-height:1.8;color:var(--t2)"></div><div class="btn-row"><button class="btn" onclick="UI.closeModal('confirm-modal')">取消</button><button class="btn bad" id="cf-yes" onclick="UI.confirmYes()">确定</button></div></div></div>
+<div class="modal-overlay" id="death-overlay"><div class="modal" style="width:620px;border-color:var(--bad)"><h2 class="death-title">💀 江湖路断</h2><div id="death-content"></div><div class="btn-row">
+  <button class="btn bad" onclick="UI.closeDeath()">💀 查看死亡记录</button>
+  <button class="btn gold" onclick="Game.rewindFromDeath()">⏪ 回到关键时间点</button>
+  <button class="btn" onclick="Game.restartGame()">🔄 重新开始</button>
+</div></div></div>
+
+<input type="file" id="import-file" accept=".json,application/json" style="display:none">
+<div id="toast"></div>
+<script>
+'use strict';
+/* ============================================================
+   《混社会模拟器》AI 角色扮演游戏 —— 单文件版
+   世界观与设定：设计文档 v1.0（临江市 · 三面世界 · 帮派 · 行动 · 结局）
+   ============================================================ */
+
+/* ---------- 常量 ---------- */
+const LS_CFG='hsh_cfg_v1', LS_SAVE='hsh_save_v1';
+const NAMES=['陈默','林小北','周铁','阿豪','李飞','王胖子','赵六','韩东','沈青','顾言','吴畏','方一鸣','许大壮','小五','何斌'];
+
+const RULES='【角色扮演质量规则】保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。\n以上守则必须严格遵守，违反即失败。';
+
+const WORLD='【临江市（架空城市，与现实无关）】东南沿海现代大都市，人口约850万，港口贸易发达、贫富差距巨大。移动支付普及、天网监控覆盖、外卖与短视频直播盛行——方便与危险并存。城区：市中心CBD（白面核心）；老城区（传统江湖，青龙帮地盘）；城中村（底层聚集，鱼龙混杂）；工业区（物流、走私通道）；港口码头（货运、黑市入口）；大学城（年轻人、白面机会）；郊区（半公开"赌城"，灰色地带）。\n【三面世界】白面=秩序世界（写字楼/商场/学校/警局），赚得少但安全，开局即有；灰面=人情与利益交织（夜总会/棋牌室/大排档/劳务市场），多数玩家的主战场，开局即有；黑面=法外之地（地下赌场/黑市/码头仓库/废弃厂房），暴利与暴死并存，声望达到"小有名气"后解锁。\n【底层逻辑】1.钱是通行证：没钱寸步难行，但钱分黑钱与白钱，黑钱不能直接买房买车，需要洗白（开公司、买店铺、赌博走账，有损耗）。2.关系是护身符：认识谁比你有理更有用，一个人干不成大事。3.拳头是最后的道理：但现代社会拳头代价极高——监控、报警、扫黑除恶。4.名声是复利：好名声让资源自动找上门，坏名声让警察自动找上门。\n【时间线】玩家18岁开局：起步期18~20挣扎求生；上升期21~25站住脚；巅峰期26~35一方大佬；结局期35+终局。\n【江湖四大帮派】青龙帮=老派传统讲规矩讲辈分，赌场/码头/货运，地盘老城区与码头；城南帮=新生代敢打敢拼没底线，夜场/暴力收债，地盘城南与城中村；金链会=半黑半商有钱有势，夜总会/KTV/娱乐，CBD外围；沙帮=移民抱团走私高手，走私/黑市，港口与郊区。玩家开局不属于任何帮派：可加入一方（庇护+任务+分红，但受帮规约束）、保持独立（自由但危险）或后期称霸（策反、火并、吞并）。\n【官方力量】辖区派出所（威胁★）：日常盘查、打架斗殴；刑警队（★★★）：命案大案必出动；缉毒缉私队（★★★★）：碰毒碰私必遭重拳；扫黑除恶专案组（★★★★★）：后期大Boss，会清剿整个江湖。非法路线越走越窄，逼玩家转型（洗白/经营/跑路）是本作核心张力。\n【中立势力】马爷=放贷人（急用钱，高利息，还不上会被上门）；铁嘴张=律师（捞人打官司，收费极高）；白神医=黑医（治刀伤枪伤不报警，收费贵欠人情）；孙姐=中介（买房洗白介绍生意，抽成）；猴三=情报贩子（买消息买删监控，贵且真假难辨）；陈记者=媒体人（捧你或毁你，可能反噬）。\n【常见行动】合法：打工（外卖/快递/保安，少而稳定）、摆摊开网店（需本金）、考文凭学技能。灰色：看场子（涨义气声望）、当中间人赚中介费（靠口才）、收小额保护费（涨恶名）、放高利贷（收不回来就得打人）、黄牛倒票代排队、乞讨（掉尊严攒情报）。非法：扒窃偷盗（敏捷判定）、抢劫（可能直接上大案）、收债打手（结仇）、地下赌场（可能输到欠债）、走私（缉私队盯着）、毒品（红线：一旦碰，警察永追到底）。收益越大风险越大：风险=被抓概率+结仇概率+声望影响+道德/压力影响。\n【犯罪与惩罚闭环】非法行动→通缉热度上升→街面盘查变多→被抓判定→审讯三选一：老实认罪（刑期减半，帮派信任大降）/找律师硬扛（花大钱可能翻案）/找关系捞人（消耗人情）→坐牢：时间流逝、属性退化、地盘被抢、声望下跌（狱中可能结识大佬）。\n【职业线】劫匪线：踩点→定方案（硬抢/智取/内应）→备装备→执行（潜入→得手→撤离分段判定）→销赃跑路（黑市60%/典当40%/孙姐80%），案后进入风头期（非法行动风险+50%），赃物带记号需切割重铸或跨城出手，防同行黑吃黑（城府判定）。乞丐线：尊严值是隐藏核心（乞讨掉尊严，行善卖艺恢复；过低破罐破摔，高尊严解锁特殊剧情）；乞丐是城市最好的眼睛：情报网、完美伪装（蹲点/跟踪/避风头零成本）、免盘查（热度涨极慢）、黑面通行证；有"乞讨公司"非法控制乞丐抽成50%，可加入/独立/揭发/吞并。\n【结局】由因果值+声望+地位+关键选择判定，共18个结局三档：巅峰档（一代枭雄/商业大亨/地下皇帝/传奇卧底/惊天大盗/丐帮帮主/逆袭之王）；平凡档（金盆洗手/回头是岸/江湖隐士/体面隐退）；堕落档（铁窗余生/横死街头/众叛亲离/瘾君子末路/枪决/法外狂徒/底层沉沦）。\n【叙事要求】剧情通过人物行为、对话与事件自然推进；背景是现代中国城市质感；所有违法情节必须有现实代价（被抓、结仇、热度、心理压力）。';
+
+const PROTOCOL='【输出协议】\n1. 用第二人称"你"叙述，每次回复推进剧情：日常场景150~400字，重大事件（战斗/大案/转折）300~600字；不要一次性长篇总结，也不要每次都写超长。\n2. 每次回复结尾必须附加一个 JSON 代码块（```json ... ```）用于同步游戏状态。只填本次确实发生变化的字段，格式示例：\n```json\n{"day":2,"time":"下午","location":"老城区·大排档","money":430,"blackMoney":0,"fame":"无人知晓","rank":"无","heat":8,"stress":22,"dignity":55,"injury":0,"addiction":0,"karma":0,"attributes":{"武力":43},"skills":{"格斗术":1},"relations":[{"name":"刀疤刘","trust":40,"note":"点头之交"}],"memoryAdd":["刀疤刘让我明天去码头搬货"],"dead":false,"deathReason":""}\n```\n3. 数值规则：money=白钱现金，blackMoney=黑钱；fame只能是 无人知晓/小有名气/名声在外/恶名昭彰/威震一方/传说 之一；rank只能是 无/小弟/打手/头目/堂主/副帮主/龙头 之一；heat 通缉热度0~120；stress压力/dignity尊严/injury伤病/addiction依赖 均为0~100；karma因果值 -100~100（善为正恶为负）；attributes/skills 只在真正提升或下降时给出；relations 是主角认识并有交集的人（信任0~100，可增删）；memoryAdd 每次最多3条值得长期记住的新记忆。\n4. 只有角色真正死亡时才把 dead 设为 true，并在 deathReason 写明死因，其余情况恒为 false。\n5. 玩家没说的不要替玩家做；NPC不知道的不要告诉玩家；数值变化必须与剧情一致，不得无理由变动。';
+
+const ATTRS=['武力','体力','敏捷','智力','口才','城府','胆识','义气','威望'];
+const ATTR_GROUPS=[['身体','武力','体力','敏捷'],['头脑','智力','口才','城府'],['社会','胆识','义气','威望']];
+const ATTR_BASE={武力:40,体力:50,敏捷:45,智力:50,口才:45,城府:40,胆识:40,义气:50,威望:20};
+const SKILL_NAMES=['格斗术','话术','赌博技巧','驾驶','金融知识','反侦察'];
+const FAME_LEVELS=['无人知晓','小有名气','名声在外','恶名昭彰','威震一方','传说'];
+const RANK_LEVELS=['无','小弟','打手','头目','堂主','副帮主','龙头'];
+const TALENTS=[
+{id:'shenli',g:'武力系',name:'天生神力',cost:8,effect:'武力上限+20，拳脚伤害+30%'},
+{id:'tongpi',g:'武力系',name:'铜皮铁骨',cost:8,effect:'受伤减半，更难进入濒死'},
+{id:'kuai',g:'武力系',name:'快手',cost:6,effect:'敏捷+15，扒窃/开锁成功率+25%'},
+{id:'zhanyi',g:'武力系',name:'战意',cost:6,effect:'血量越低攻击越高，残血反杀'},
+{id:'guomu',g:'头脑系',name:'过目不忘',cost:6,effect:'智力+15，学技能时间减半'},
+{id:'shuoke',g:'头脑系',name:'天生说客',cost:6,effect:'口才+15，讲数/谈判成功率+20%'},
+{id:'xinsuan',g:'头脑系',name:'心算天才',cost:8,effect:'赌场、金融收益+30%'},
+{id:'buju',g:'头脑系',name:'布局者',cost:8,effect:'城府+15，识破陷阱概率+25%'},
+{id:'lingxiu',g:'社会系',name:'天生领袖',cost:8,effect:'小弟忠诚度+，收人上限+3'},
+{id:'xiaohu',g:'社会系',name:'笑面虎',cost:8,effect:'恶名不涨仇恨，声望转化+20%'},
+{id:'qianli',g:'社会系',name:'千里眼',cost:8,effect:'情报获取量翻倍，线人免费'},
+{id:'dahuyou',g:'社会系',name:'大忽悠',cost:6,effect:'骗术成功率+，被捕翻案率+15%'},
+{id:'jinli',g:'运气系',name:'锦鲤附体',cost:8,effect:'随机事件利好倾向+，抽奖必中'},
+{id:'jianlou',g:'运气系',name:'捡漏王',cost:6,effect:'战利品/赃物价值+30%'},
+{id:'sitao',g:'运气系',name:'死里逃生',cost:10,effect:'致命伤30%概率捡回一条命（硬核模式禁用）'},
+{id:'guiren',g:'运气系',name:'天降贵人',cost:10,effect:'每月随机触发一次贵人相助事件'}
+];
+const TALENT_REC={chengzhong:['shenli','zhanyi'],junren:['tongpi','zhanyi'],daxue:['guomu','buju'],xiaofan:['shuoke','xiaohu'],fudai:['xinsuan','jinli']};
+
+const ORIGINS=[
+{id:'chengzhong',name:'城中村少年',desc:'城中村长大的穷小子，讲义气、下手狠，有两个从小一起混的兄弟。',mods:{武力:15,义气:15,敏捷:5},money:200,loc:'城中村·出租屋',rel:[{name:'阿强',tag:'发小·小弟',trust:85,note:'从小一起混'},{name:'二狗',tag:'发小·小弟',trust:75,note:'胆小心细'}],heat:0},
+{id:'junren',name:'退伍军人',desc:'部队退役，拳脚过硬、胆识过人，但社会经验少，人脉从零开始。',mods:{武力:20,胆识:15,体力:5,城府:-5},money:800,loc:'工业区·安置房',rel:[{name:'老班长',tag:'战友',trust:75,note:'部队里的老班长'}],heat:0},
+{id:'daxue',name:'辍学大学生',desc:'大学读两年退学，脑子灵、嘴皮子利索，但身板弱、江湖常识少。',mods:{智力:15,口才:10,体力:-10},money:500,loc:'大学城·合租房',rel:[{name:'李哲',tag:'大学室友',trust:60,note:'还在读书'}],heat:0},
+{id:'xiaofan',name:'小贩之子',desc:'老街摆摊长大，从小听江湖故事，嘴甜心细，认识三教九流。',mods:{口才:10,城府:10,武力:-10},money:1500,loc:'老城区·老街小院',rel:[{name:'老陈',tag:'街坊·线人',trust:55,note:'消息灵通'}],heat:0},
+{id:'fudai',name:'富二代败家子',desc:'家里有钱，开局有车有房，但名声差、朋友虚，容易被人盯上。',mods:{威望:-10,义气:-10,智力:-5},money:50000,loc:'CBD·公寓',rel:[{name:'马爷',tag:'放贷人',trust:20,note:'打过交道'},{name:'赵公子',tag:'狐朋狗友',trust:40,note:'酒肉朋友'}],heat:5},
+{id:'custom',name:'自定义出身',desc:'你的故事由你自己书写。',mods:{},money:500,loc:'临江市·出租屋',rel:[],heat:0}
+];
+
+const TRAITS=['重情重义','心狠手辣','圆滑世故','莽撞冲动','胆大心细','沉默寡言','古道热肠','唯利是图','好勇斗狠','精明算计'];
+const GOALS=['一方大佬','洗白上岸','惊天大盗','情报之王','富甲一方','报仇雪恨','随心所欲（自由发展）','自定义目标'];
+
+const DIFFS={
+fun:{id:'fun',icon:'😎',name:'爽玩模式',desc:'纯爽逆袭，全程装逼打脸，三分钟爽一次',params:'收益×3 · 通缉上限50 · 不会死（兄弟相救） · 坐牢≤3个月且属性不退化 · 洗钱0损耗 · 盘查逃脱90% · 事件利好 · 恶名自动转威望（反派光环）',rewind:'死亡回档：无限次',flavor:'本模式为爽玩模式：给玩家快速正反馈与逆袭打脸情节，数值膨胀、惩罚归零，恶名自动转化为威望（反派光环）。玩家濒死时由兄弟相救或送医，除非玩家明确选择赴死，否则不得死亡。'},
+easy:{id:'easy',icon:'🍵',name:'轻松模式',desc:'剧情向，顺风顺水看故事，适合新手',params:'收益×1.5 · 通缉上限80 · 重伤住院（不死亡） · 坐牢≤1年 · 洗钱15% · 盘查逃脱70% · 事件略偏利好',rewind:'死亡回档：无限次',flavor:'本模式为轻松模式：随机事件略偏利好，玩家重伤会被送医住院，除非玩家明确选择赴死，否则不得死亡。'},
+std:{id:'std',icon:'⚖️',name:'标准模式',desc:'正常挑战，有得有失，均衡江湖',params:'收益×1 · 通缉上限100 · 死亡触发回档 · 坐牢≤5年 · 洗钱30% · 盘查逃脱50% · 事件中立',rewind:'死亡回档：无限次',flavor:'本模式为标准模式：风险与收益对等，有得有失，死亡可回档但会留下死亡记录与点评。'},
+hard:{id:'hard',icon:'☠️',name:'硬核模式',desc:'一步错步步错，真实到残忍，适合硬核老玩家',params:'收益×0.8 · 通缉上限120（致命） · 死亡即结局（仅1次回档机会） · 坐牢≤20年/终身 · 洗钱45% · 盘查逃脱30% · 事件恶意',rewind:'死亡回档：仅1次',flavor:'本模式为硬核模式：随机事件恶意倾向（钱包被偷、小弟背叛、警察蹲点），钱会随通货膨胀贬值，黑钱不洗会烂在手里，专案组后期主动出击、全城围剿。玩家死亡即结局。'}
+};
+
+const QUICK=[
+{i:'🔍',t:'四处逛逛',a:'我四处逛逛，观察一下周围的环境和人物。'},
+{i:'🗣️',t:'找人交谈',a:'我找附近的人聊一聊，打听点消息。'},
+{i:'💼',t:'打零工',a:'我去打零工赚钱（外卖/快递/保安都行）。'},
+{i:'🍢',t:'大排档',a:'我去大排档吃一顿，顺便听听江湖闲话。'},
+{i:'🀄',t:'棋牌室',a:'我去棋牌室转转，看看有没有机会。'},
+{i:'🏋️',t:'锻炼',a:'我去锻炼身体，练练拳脚。'},
+{i:'📚',t:'学技能',a:'我花钱花时间学习一项技能。'},
+{i:'🛌',t:'休息',a:'我休息一下，缓一缓。'},
+{i:'📱',t:'刷手机',a:'我刷刷手机，看看新闻和短视频，了解风向。'},
+{i:'🏦',t:'处理钱财',a:'我处理一下手里的钱（存钱/转账/想洗钱的办法）。'}
+];
+const CQUICK=[
+{i:'👑',t:'天降横财',a:'【金手指】天降横财，给我一大笔钱。'},
+{i:'💎',t:'属性强化',a:'【金手指】我的全部属性大幅提升。'},
+{i:'📈',t:'声望暴涨',a:'【金手指】我的声望暴涨，全城都敬畏我。'},
+{i:'🧠',t:'全知情报',a:'【金手指】我获得当前情况下的全部关键情报。'},
+{i:'💊',t:'状态清零',a:'【金手指】我的压力、伤病、热度全部清零。'}
+];
+
+const ENCY=[
+{t:'临江市',h:'<h4>🌆 临江市（完全架空，与现实无关）</h4>东南沿海现代大都市，人口约850万，港口贸易发达、经济繁荣但贫富差距巨大。移动支付普及、天网监控覆盖、外卖与短视频直播盛行——"方便"与"危险"并存。<br><br><b>七大城区：</b><table><tr><th>城区</th><th>特点</th></tr><tr><td>市中心 CBD</td><td>白面核心，写字楼、商场、高档场所</td></tr><tr><td>老城区</td><td>传统江湖，青龙帮地盘</td></tr><tr><td>城中村</td><td>底层聚集，鱼龙混杂</td></tr><tr><td>工业区</td><td>物流、走私通道</td></tr><tr><td>港口码头</td><td>货运、黑市入口</td></tr><tr><td>大学城</td><td>年轻人、白面机会</td></tr><tr><td>郊区</td><td>半公开"赌城"，灰色地带</td></tr></table><h4>底层逻辑（四条铁律）</h4><b>1. 钱是通行证</b>——没钱寸步难行，但黑钱不能直接买房买车，洗白有损耗。<b>2. 关系是护身符</b>——认识谁，比你有理更有用。<b>3. 拳头是最后的道理</b>——但现代社会的拳头代价极高：监控、报警、扫黑除恶。<b>4. 名声是复利</b>——好名声资源上门，坏名声警察上门。'},
+{t:'三面世界',h:'<h4>🌗 三面世界（核心设定）</h4>整个城市分成三个"面"，前期只能混迹其中一两个，随声望提升逐步解锁：<table><tr><th>层面</th><th>代表场所</th><th>特点</th><th>解锁</th></tr><tr><td><b>白面</b>（阳光）</td><td>写字楼、商场、警局</td><td>秩序世界，赚得少但安全</td><td>开局即有</td></tr><tr><td><b>灰面</b>（黄昏）</td><td>夜总会、棋牌室、大排档</td><td>人情与利益交织，主战场</td><td>开局即有</td></tr><tr><td><b>黑面</b>（暗夜）</td><td>地下赌场、黑市、码头仓库</td><td>法外之地，暴利与暴死并存</td><td>声望"小有名气"</td></tr></table><h4>人生四阶段</h4>起步期18~20挣扎求生 → 上升期21~25站住脚 → 巅峰期26~35一方大佬 → 结局期35+终局开启。'},
+{t:'帮派势力',h:'<h4>🐉 江湖四大帮派</h4><table><tr><th>帮派</th><th>风格</th><th>主要产业</th><th>地盘</th></tr><tr><td><b>青龙帮</b></td><td>老派传统，讲规矩讲辈分</td><td>赌场、码头、货运</td><td>老城区、码头</td></tr><tr><td><b>城南帮</b></td><td>新生代，敢打敢拼没底线</td><td>夜场、暴力收债</td><td>城南、城中村</td></tr><tr><td><b>金链会</b></td><td>半黑半商，有钱有势</td><td>夜总会、KTV、娱乐</td><td>CBD 外围</td></tr><tr><td><b>沙帮</b></td><td>移民抱团，走私高手</td><td>走私、黑市</td><td>港口、郊区</td></tr></table>开局不属于任何帮派：可<b>加入一方</b>（庇护+任务+分红，受帮规约束）、<b>保持独立</b>（自由但危险）、<b>后期称霸</b>（策反火并吞并）。<h4>🛡️ 官方力量（对立面也是平衡器）</h4><table><tr><th>单位</th><th>威胁</th><th>说明</th></tr><tr><td>辖区派出所</td><td>★</td><td>日常盘查、打架斗殴</td></tr><tr><td>刑警队</td><td>★★★</td><td>命案大案必出动</td></tr><tr><td>缉毒/缉私队</td><td>★★★★</td><td>碰毒碰私必遭重拳</td></tr><tr><td>扫黑除恶专案组</td><td>★★★★★</td><td>后期大Boss，清剿整个江湖</td></tr></table><h4>🤝 中立势力</h4><b>马爷</b>放贷人（高利息）· <b>铁嘴张</b>律师（捞人打官司）· <b>白神医</b>黑医（治刀伤枪伤）· <b>孙姐</b>中介（买房洗白）· <b>猴三</b>情报贩子（消息真假难辨）· <b>陈记者</b>媒体人（捧你或毁你）。'},
+{t:'行动指南',h:'<h4>🎮 行动总表（收益越大风险越大）</h4><b>🟢 合法（白）：</b>打工（外卖/快递/保安，少而稳定）· 摆摊/开网店（需本金）· 考文凭学技能。<br><b>🟡 灰色（灰）：</b>看场子（涨义气声望）· 当中间人（靠口才）· 收保护费（涨恶名）· 放高利贷（收不回来就得打人）· 黄牛倒票 · 乞讨（掉尊严，攒情报）。<br><b>🔴 非法（黑）：</b>扒窃偷盗（敏捷判定）· 抢劫（可能上大案）· 收债打手（结仇）· 地下赌场（可能欠债）· 走私（缉私队盯着）· 毒品（红线，警察永追到底）。<h4>⚖️ 犯罪与惩罚闭环</h4>非法行动 → 通缉热度上升 → 盘查变多 → 被抓判定 → 审讯三选一（认罪/律师硬扛/找关系捞人）→ 坐牢（属性退化、地盘被抢、声望下跌，可能结识狱中大佬）。<h4>💡 判定的关键属性</h4>打架镇场看<b>武力</b>· 逃跑扒窃看<b>敏捷</b>· 谈判行骗看<b>口才</b>· 识破陷阱看<b>城府</b>· 敢不敢做大事看<b>胆识</b>· 兄弟跟不跟你混看<b>义气</b>· 地位声望看<b>威望</b>。'},
+{t:'职业线',h:'<h4>🦹 劫匪线（毛贼→惊天大盗）</h4>完整职业闭环：<b>踩点</b>（情报完整度决定可选方案）→ <b>定方案</b>（硬抢=武力判定 / 智取=头脑判定 / 内应=人脉判定）→ <b>备装备</b>（黑市/猴三渠道）→ <b>执行</b>（潜入→得手→撤离，分段判定）→ <b>销赃跑路</b>（黑市60% / 典当40% / 孙姐80%）。案后进入<b>风头期</b>（非法行动风险+50%），赃物带记号需切割重铸或跨城出手，防同行黑吃黑（城府判定）。评级：便利店+5热度 / 金店+15（刑警队）/ 银行押运+30（专案组）/ 金库博物馆+60（全城戒严）。<h4>🧧 乞丐线（最底层的信息之王）</h4><b>尊严值</b>是隐藏核心：乞讨掉尊严，行善/卖艺/体面可恢复；过低会破罐破摔，高尊严解锁特殊剧情。四大隐藏价值：<b>情报网</b>（蹲点盯梢听墙根，可卖情报）· <b>完美伪装</b>（蹲点劫案零成本，配劫匪线有奇效）· <b>免盘查</b>（热度涨极慢）· <b>黑面通行证</b>（知道所有暗门）。注意"乞讨公司"抽成50%，可选择加入/独立/揭发/吞并。'},
+{t:'结局因果',h:'<h4>🏆 结局系统（18个结局三档）</h4>由<b>因果值 + 声望 + 地位 + 关键选择</b>综合判定。<b>巅峰档：</b>一代枭雄（统一全城）· 商业大亨（成功洗白）· 地下皇帝（隐退操控全城）· 传奇卧底 · 惊天大盗（海外隐退）· 丐帮帮主（情报帝国）· 逆袭之王（乞丐翻身）。<br><b>平凡档：</b>金盆洗手 · 回头是岸 · 江湖隐士 · 体面隐退。<br><b>堕落档：</b>铁窗余生 · 横死街头 · 众叛亲离 · 瘾君子末路 · 枪决 · 法外狂徒 · 底层沉沦。<h4>☯️ 因果值</h4>每次选择都会积累隐藏的因果值（善正恶负）：早期结的仇、欠的情、背的债，后期必然引爆；行善积德也会在关键时刻救你一命。'}
+];
+
+const GUIDE_HTML='<h4>🎮 怎么玩</h4>在输入框用自然语言描述你的行动（"去棋牌室看看""找刀疤刘打听消息"），或点击下方快捷动作。AI 会扮演世界：推进剧情、演出 NPC、判定成败。每次推演后，右上角状态栏与左下角<b>👤 角色档案</b>会实时更新。<h4>⏰ 时间与体力</h4>游戏按"上午 / 下午 / 晚上"推进，体力和伤病决定你一天能做多少事；压力过高会误判、酗酒；通缉热度高了会被盘查。记得定期休息。<h4>💰 钱与风险</h4>白钱随便花，<b>黑钱不能直接买房买车</b>，需要洗白（有损耗）。收益越大风险越大：被抓、结仇、声望受损、心理压力——本作内置完整的警察逻辑，非法路线越走越窄，转型才是王道。<h4>🤝 关系与记忆</h4>帮过的人会记恩，欠的情早晚要还。📔 记忆系统会保存 AI 生成的关键记忆与关系网络，并在每次推演时注入提示词——AI 不会忘记设定和故事。你还可以写私人笔记，同样会生效。<h4>💀 死亡与回档</h4>死亡后 AI 会点评你这一生的行为并给出建议，然后可以回到关键时间点继续游戏（硬核模式仅1次回档机会）。死亡记录会永久保留，随时可在顶栏 💀 回档 中查看。<h4>📖 世界百科</h4>顶栏 📖 百科 收录临江市、三面世界、帮派势力、行动指南、职业线与结局设定——随时查阅。<h4>⚙️ 设置与存档</h4>右上角 ⚙️ 设置：API 配置（可拉取模型列表、Token 无限制）、界面风格（4套主题）、自动存档开关、导出/导入存档、重新开始。游戏每回合自动存档，刷新或换设备导入即可继续。';
+
+/*__PART_B__*/
+/* ============================================================ 存储 / 工具 / API ============================================================ */ const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}; const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}; const lsDel=k=>{try{localStorage.removeItem(k)}catch(e){}}; const CFG_DEFAULT={apiEndpoint:'https://api.deepseek.com',apiKey:'',model:'deepseek-chat',maxTokens:'unlimited',theme:'neon',autoSave:true,demo:false,reasoningEffort:'medium'}; let cfg=Object.assign({},CFG_DEFAULT,lsGet(LS_CFG,{})); let S=null,W=null,wizStep=0,cpid=1,loading=false,modelsCache=null,cfAction=null,encyTab=0; const saveCfg=()=>lsSet(LS_CFG,cfg); const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;'); const clamp=(n,a,b)=>{n=Number(n);if(!isFinite(n))return a;return Math.min(b,Math.max(a,n))}; const fmt=n=>{n=Math.round(Number(n)||0);return n.toLocaleString('zh-CN')}; const uid=()=>'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); const cleanKey=k=>String(k||'').replace(/[^\x20-\x7E]/g,'').trim(); function toast(msg,type){const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.getElementById('toast').appendChild(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),320)},2400)} function normalizeEndpoint(e){let u=String(e||'').trim().replace(/\/+$/,'');if(!u)u=CFG_DEFAULT.apiEndpoint;if(u.endsWith('/chat/completions'))u=u.slice(0,-'/chat/completions'.length);return u} const age=()=>S?Math.min(60,18+Math.floor((S.res.day-1)/360)):18; /* ---------- API ---------- */ async function callAI(msgs,opt){opt=opt||{};if(cfg.demo){return demoReply(msgs)}const body={model:cfg.model,messages:msgs,stream:false};if(cfg.maxTokens!=='unlimited')body.max_tokens=parseInt(cfg.maxTokens)||4096;else if(opt.short)body.max_tokens=300;if(cfg.reasoningEffort&&cfg.reasoningEffort!=='off'&&String(cfg.model).indexOf('reasoner')>=0)body.reasoning_effort=cfg.reasoningEffort;const r=await fetch(normalizeEndpoint(cfg.apiEndpoint)+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cleanKey(cfg.apiKey)},body:JSON.stringify(body)});if(!r.ok){let t='';try{t=(await r.text()).slice(0,300)}catch(e){}throw new Error('HTTP '+r.status+' '+(t||''))}const d=await r.json();const c=d.choices&&d.choices[0]&&d.choices[0].message;if(!c||!c.content)throw new Error('返回内容为空');return {content:c.content,think:c.reasoning_content||''}} async function fetchModels(){if(cfg.demo){populateModels(['local-demo（本地演示）']);setModelHint('演示模式使用本地脚本');return}const key=cleanKey(cfg.apiKey);if(!key){setModelHint('⚠️ 需要先填入 API Key 才能拉取模型列表');return}setModelHint('⏳ 正在从 API 拉取可用模型列表…');try{const r=await fetch(normalizeEndpoint(cfg.apiEndpoint)+'/models',{headers:{'Authorization':'Bearer '+key}});if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();const list=(d.data||[]).map(m=>m.id).filter(Boolean);if(!list.length)throw new Error('未找到模型');modelsCache={t:Date.now(),list:list};populateModels(list);setModelHint('✅ 已拉取 '+list.length+' 个模型');saveCfg()}catch(e){setModelHint('❌ 拉取失败：'+e.message)}} function populateModels(list,selId){const ids=['w-model','s-model'];list=(list||[]).slice(0,60);ids.forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=list.map(m=>'<option value=\"'+esc(m)+'\">'+esc(m)+'</option>').join('');if(cur&&list.indexOf(cur)>=0)el.value=cur;else if(list.indexOf(cfg.model)>=0)el.value=cfg.model;else if(list.length)el.value=list[0];});} function setModelHint(t){const els=[document.getElementById('w-model-hint'),document.getElementById('s-model-hint')];els.forEach(el=>{if(el)el.textContent=t})} async function testConn(){if(cfg.demo){toast('演示模式无需连接','ok');return}if(!cleanKey(cfg.apiKey)){toast('请先填写 API Key','warn');return}toast('正在测试连接…');try{const r=await callAI([{role:'user',content:'请只回复四个字：连接成功'}],{short:true});const txt=typeof r==='object'?r.content:r;toast('✅ 连接成功：'+(txt||'').slice(0,30),'ok')}catch(e){toast('❌ 连接失败：'+e.message,'err')}} /* ---------- 演示模式（无 Key 时体验完整界面） ---------- */ async function demoReply(msgs){await new Promise(r=>setTimeout(r,700+Math.random()*800));const last=(msgs[msgs.length-1]||{}).content||'';const j={};let text='';const R=()=>Math.random();if(last.indexOf('测试死亡')>=0){j.dead=true;j.deathReason='在城中村巷战中被人围殴致死';j.day=S.res.day;j.time=S.res.time;j.heat=clamp((S.res.heat||0)+40,0,120);text='【演示剧本】你被一群拿钢管的人堵在巷子里。双拳难敌四手，你倒在了墙根。\n\n（演示模式测试死亡流程：查看 AI 点评与回档按钮）'}else if(/打工|零工|外卖|快递|搬货|保安/.test(last)){const g=Math.round(120+R()*200);j.money=(S.res.money||0)+g;j.stress=clamp((S.status.stress||10)+4,0,100);j.day=S.res.day;j.time=S.res.time;text='你在劳务市场接了一天的活，跑腿、搬货，腰酸背痛。工头用手机转了 '+g+' 块给你，临走拍了拍你肩膀："小伙子，明天还来。"\n\n口袋里的钱多了，可这点钱在临江市，连一顿像样的饭局都不够。'}else if(/棋牌|赌/.test(last)){const w=R()>0.45;const g=Math.round(80+R()*220);j.money=(S.res.money||0)+(w?g:-g);j.stress=clamp((S.status.stress||10)+5,0,100);j.day=S.res.day;j.time=S.res.time;text=w?'棋牌室里烟雾缭绕。你手气不错，两圈下来赢了 '+g+' 块。坐你对面的秃头老板眯着眼看了你半天："小子，牌品不错，常来。"':'棋牌室里烟雾缭绕。你手气一般，两圈下来输了 '+g+' 块。坐你对面的秃头老板眯着眼看你："小子，赌这东西，十赌九输，想清楚再来。"'}else if(/锻炼|练|健身|跑步/.test(last)){j.attributes=Object.assign({},S.char.attributes||{});j.attributes.武力=clamp((j.attributes.武力||40)+1+R()*2,0,100);j.attributes.体力=clamp((j.attributes.体力||50)+1,0,100);j.day=S.res.day;j.time=S.res.time;text='你在城中村的旧篮球场练了一下午。拳脚打在沙袋上，一下一下，汗砸在地上。身体是革命的本钱——在这座城市，拳头硬的人至少说话有底气。'}else if(/休息|睡觉|歇/.test(last)){j.stress=Math.max(0,(S.status.stress||10)-12);j.injury=Math.max(0,(S.status.injury||0)-5);j.day=S.res.day;j.time=S.res.time;text='你回到出租屋，泡了一碗面，躺平。窗外是城中村此起彼伏的犬吠和麻将声。脑子放空了一会儿，压力小了不少。明天，又是新的一天。'}else if(/吃|大排档|饭/.test(last)){j.money=Math.max(0,(S.res.money||0)-30);j.day=S.res.day;j.time=S.res.time;text='大排档的烟火气最浓。你要了炒粉和一瓶汽水，隔壁桌几个老江湖在吹牛——谁谁在码头发了财，谁谁进去了。你竖着耳朵，把话都记在心里。'}else if(/打听|交谈|聊天|消息/.test(last)){j.relations=S.relations||[];j.day=S.res.day;j.time=S.res.time;text='你和街坊聊了半天。老陈压低声音告诉你：青龙帮最近在码头缺人手，刀疤刘放话要招几个能打的小子，工钱日结。他冲你挤了挤眼："你要是真缺钱，可以去试试。"'}else if(/手机|刷|新闻|视频/.test(last)){j.day=S.res.day;j.time=S.res.time;text='你刷了半天短视频和本地新闻：郊区赌城昨晚被端了窝点，警方通报抓了十几个人；城东拆迁补偿又上热搜了。手机这玩意儿，既是商机，也是监控——你顺手把几个本地号都关注了。'}else{j.day=S.res.day;j.time=S.res.time;if(R()>0.5)j.money=(S.res.money||0)+Math.round(R()*50);text='你在街上晃了一圈。临江市的傍晚，霓虹灯刚亮起来，外卖骑手在车流里穿行，天网探头在头顶无声地转着。这座城市机会多得是，陷阱也不少——关键看你怎么走。'}const nt=advanceTime();j.day=nt.day;j.time=nt.time;return {content:text+'\n\n```json\n'+JSON.stringify(j)+'\n```',think:demoThink(last)}} function demoThink(act){const T='【模拟推理】第'+S.res.day+'天'+S.res.time+'，现金¥'+fmt(S.res.money)+'，热度'+S.res.heat+'。';let r='推演要点：';if(/打工|零工/.test(act))r+='安排体力劳动，收益中等偏低、压力小涨，保持"钱难挣"的现实感，为灰色路线铺垫。';else if(/棋牌|赌/.test(act))r+='小赌五五开，输赢控制在百元级，避免早期数值失衡；棋牌室是结识灰面人脉的入口。';else if(/打听|交谈/.test(act))r+='借街坊之口放出"码头缺人"的信息钩子，让玩家自然接触青龙帮，不强行推剧情。';else if(/锻炼/.test(act))r+='成长型行动：武力小幅提升，符合"练出来的本事"，不给免费午餐。';else if(/休息/.test(act))r+='恢复行动：减压疗伤，必要的生活节奏。';else if(/吃|大排档/.test(act))r+='生活流场景：花小钱听江湖闲话，丰富世界观，不产生实质收益。';else if(/手机/.test(act))r+='信息流：用新闻侧写城市动态，让世界活着，不直接给好处。';else if(/死亡/.test(act))r+='触发死亡流程：记录死因、生成点评、给出回档建议。';else r+='延续场景，给环境细节与一个小冲突，让玩家自己选择。';return T+r} function advanceTime(){const order=['上午','下午','晚上'];let d=S.res.day,t=S.res.time;const i=order.indexOf(t);if(i<order.length-1)t=order[i+1];else{t='上午';d+=1}S.res.day=d;S.res.time=t;return{d:d,time:t}} /*__PART_C__*/
+/* ============================================================
+   状态 / 推演 / 死亡回档
+   ============================================================ */
+function buildSystem(){
+  const c=S.char,r=S.res,st=S.status;
+  const attrs=ATTRS.map(k=>k+':'+(c.attributes[k]||0)).join('，');
+  const skills=Object.keys(c.skills||{}).map(k=>k+(c.skills[k]>0?' Lv.'+c.skills[k]:'')).join('，')||'无';
+  const tal=c.talents.map(id=>{const t=TALENTS.find(x=>x.id===id);return t?t.name+'（'+t.effect+'）':id;}).join('；')||'无';
+  const rels=(S.relations||[]).map(x=>x.name+'·'+x.tag+'·信任'+x.trust+(x.note?'（'+x.note+'）':'')).join('；')||'暂无';
+  const mems=(S.memFacts||[]).slice(-40).map((f,i)=>(i+1)+'. '+f).join('\n')||'暂无重要记忆';
+  const diff=DIFFS[S.diff]||DIFFS.std;
+  const gold=S.goldfinger?'【金手指已开启】玩家可随时要求：天降横财、属性强化、声望暴涨、全知情报、状态清零。请给出爽快、夸张但不失乐趣的回应。':'【金手指未开启】按正常规则推演。';
+  const rewind=S.rewindNote?'【时间线提示】'+S.rewindNote+' 本时间点之后发生的事不应再发生，不要向玩家提起未来。':'';
+  const profile=JSON.stringify({name:c.name,gender:c.gender,age:age(),origin:c.origin,traits:c.traits,goal:c.goal,backstory:c.backstory||'无',attributes:c.attributes,skills:c.skills,talents:tal,diff:S.diff,day:r.day,time:r.time,location:r.location,money:r.money,blackMoney:r.blackMoney,fame:r.fame,rank:r.rank,heat:r.heat,stress:st.stress,dignity:st.dignity,injury:st.injury,addiction:st.addiction,karma:r.karma});
+  return '你是《混社会模拟器》的AI游戏主持人（GM）。你同时扮演：旁白叙述者、全部NPC、警察与官方、整个世界。游戏背景为现代架空都市"临江市"。你的职责：根据玩家行动推进剧情、扮演NPC对话、判定成败、结算后果，并让每一次选择都有代价。\n\n'+RULES+'\n\n'+WORLD+'\n\n【难度设定】当前：'+diff.icon+diff.name+'。'+diff.params+'。'+diff.flavor+'。死亡回档：'+diff.rewind+'。\n\n【玩家档案（实时）】'+profile+'\n\n【记忆档案】'+mems+'\n\n【关系网络】'+rels+'\n\n【私人笔记】'+(S.notes||'无')+'\n\n'+gold+rewind+'\n\n'+PROTOCOL;
+}
+function splitJSON(raw){
+  let json=null,text=String(raw||'');
+  const re=/```(?:json)?\s*([\s\S]*?)```/g;let m,last=null;
+  while((m=re.exec(text)))last=m;
+  if(last){text=text.slice(0,last.index)+text.slice(last.index+last[0].length);try{json=JSON.parse(last[1].trim())}catch(e){json=null}}
+  if(!json){const a=text.indexOf('{'),b=text.lastIndexOf('}');if(a>=0&&b>a+1){const sub=text.slice(a,b+1);try{const o=JSON.parse(sub);if(o&&typeof o==='object'){json=o;text=(text.slice(0,a)+text.slice(b+1)).trim()}}catch(e){}}}
+  return {text:text.trim(),json:json};
+}
+const JKEYS=['day','time','location','money','blackMoney','fame','rank','heat','stress','dignity','injury','addiction','karma','attributes','skills','relations','memoryAdd','dead','deathReason','deathReview'];
+function applyJSON(j){
+  if(!j||typeof j!=='object')return;
+  if(!JKEYS.some(k=>j[k]!==undefined))return;
+  const r=S.res,st=S.status;
+  if(j.day!==undefined)r.day=clamp(Math.round(j.day),1,9999);
+  if(j.time!==undefined&&['上午','下午','晚上','深夜'].indexOf(j.time)>=0)r.time=j.time;
+  if(j.location!==undefined)r.location=String(j.location).slice(0,30);
+  if(j.money!==undefined)r.money=clamp(Math.round(j.money),0,1e9);
+  if(j.blackMoney!==undefined)r.blackMoney=clamp(Math.round(j.blackMoney),0,1e9);
+  if(j.fame!==undefined&&FAME_LEVELS.indexOf(j.fame)>=0)r.fame=j.fame;
+  if(j.rank!==undefined&&RANK_LEVELS.indexOf(j.rank)>=0)r.rank=j.rank;
+  if(j.heat!==undefined)r.heat=clamp(Math.round(j.heat),0,120);
+  if(j.stress!==undefined)st.stress=clamp(Math.round(j.stress),0,100);
+  if(j.dignity!==undefined)st.dignity=clamp(Math.round(j.dignity),0,100);
+  if(j.injury!==undefined)st.injury=clamp(Math.round(j.injury),0,100);
+  if(j.addiction!==undefined)st.addiction=clamp(Math.round(j.addiction),0,100);
+  if(j.karma!==undefined)r.karma=clamp(Math.round(j.karma),-100,100);
+  if(j.attributes&&typeof j.attributes==='object'){ATTRS.forEach(k=>{if(j.attributes[k]!==undefined)c_attrs()[k]=clamp(Math.round(j.attributes[k]),0,100)})}
+  if(j.skills&&typeof j.skills==='object'){Object.keys(j.skills).forEach(k=>{if(typeof j.skills[k]==='number')S.char.skills[k]=clamp(Math.round(j.skills[k]),0,10)})}
+  if(Array.isArray(j.relations)){S.relations=j.relations.slice(0,40).map(x=>({name:String(x.name||'?').slice(0,12),tag:String(x.tag||'关系').slice(0,8),trust:clamp(x.trust,0,100),note:String(x.note||'').slice(0,30)}))}
+  if(Array.isArray(j.memoryAdd)){j.memoryAdd.forEach(f=>{f=String(f).trim();if(f&&f.length<80&&S.memFacts.indexOf(f)<0)S.memFacts.push(f)});if(S.memFacts.length>40)S.memFacts.splice(0,S.memFacts.length-40)}
+}
+function c_attrs(){return S.char.attributes}
+function newCheckpoint(summary){
+  const data=JSON.stringify({char:S.char,res:S.res,status:S.status,relations:S.relations,memFacts:S.memFacts,notes:S.notes,history:S.history.slice(-60)});
+  S.checkpoints.push({id:cpid++,day:S.res.day,time:S.res.time,summary:String(summary||'').slice(0,30),data:data,t:Date.now()});
+  if(S.checkpoints.length>24)S.checkpoints.shift();
+}
+function saveGame(){
+  if(cfg.autoSave===false)return;
+  try{localStorage.setItem(LS_SAVE,JSON.stringify({v:1,cfg:cfg,S:{char:S.char,res:S.res,status:S.status,relations:S.relations,memFacts:S.memFacts,notes:S.notes,history:S.history.slice(-80),checkpoints:S.checkpoints.slice(-12),deaths:S.deaths,dead:S.dead,lastDeath:S.lastDeath||null,rewindLeft:S.rewindLeft,goldfinger:S.goldfinger,diff:S.diff,rewindNote:S.rewindNote||''}}))}catch(e){}
+}
+function loadGame(){
+  try{const d=JSON.parse(localStorage.getItem(LS_SAVE));if(!d||!d.S||!d.S.char)return null;return d.S}catch(e){return null}
+}
+function clearGame(){try{localStorage.removeItem(LS_SAVE)}catch(e){}}
+function exportSave(){
+  const blob=new Blob([JSON.stringify({v:1,cfg:cfg,S:S,exportAt:new Date().toISOString()})],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='混社会模拟器存档_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  toast('✅ 存档已导出','ok');
+}
+function importSave(){
+  document.getElementById('import-file').click();
+}
+function applyImportFile(file){
+  const rd=new FileReader();
+  rd.onload=()=>{try{const d=JSON.parse(rd.result);const st=d.S||d;if(!st||!st.char||!st.res)throw new Error('格式不正确');UI.confirm('导入存档','导入将覆盖当前游戏进度，确定继续吗？',()=>{S=st;cpid=(S.checkpoints&&S.checkpoints.length)?S.checkpoints[S.checkpoints.length-1].id+1:1;if(S.diff==='hard'&&S.rewindLeft===undefined)S.rewindLeft=1;if(!S.rewindLeft&&S.rewindLeft!==0)S.rewindLeft=999;saveGame();enterGame();toast('✅ 存档导入成功','ok')});}catch(e){toast('❌ 存档解析失败：'+e.message,'err')}};
+  rd.readAsText(file);
+}
+function restartGame(){
+  UI.confirm('重新开始','将清除当前全部进度并回到建号流程，确定吗？',()=>{clearGame();location.reload()});
+}
+function enterGame(){
+  document.getElementById('wizard').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('btn-gold').style.display=S.char.cheat?'inline-flex':'none';
+  updateChips();renderCharPanel();renderChat();renderQuick();
+  document.getElementById('msg').disabled=!!S.dead;
+  document.getElementById('btn-send').disabled=!!S.dead;
+}
+/* ---------- 死亡与回档 ---------- */
+async function handleDeath(text,json){
+  S.dead=true;
+  const cid=S.checkpoints.length?S.checkpoints[S.checkpoints.length-1].id:null;
+  const death={id:uid(),day:S.res.day,time:S.res.time,date:new Date().toLocaleString('zh-CN'),reason:json.deathReason||'不明',narrative:String(text).slice(0,320),review:json.deathReview||'',cid:cid};
+  S.deaths.push(death);S.lastDeath=death;
+  saveGame();renderDeathOverlay(death);
+  document.getElementById('death-overlay').classList.add('show');
+  if(!death.review){try{await fetchReview(death)}catch(e){death.review='（点评获取失败）';renderDeathOverlay(death)}}
+  document.getElementById('msg').disabled=true;document.getElementById('btn-send').disabled=true;
+}
+async function fetchReview(death){
+  const sys='你是《混社会模拟器》的AI主持人。请用180字以内给这位死去的玩家写一段"江湖点评"：1)客观评价其一生的关键行为；2)点出最致命的失误或转折点；3)给重来一次的具体建议。语气像看透世事的江湖老前辈，不煽情、不说教。';
+  const msg='玩家死亡记录：第'+death.day+'天·'+death.time+'，死因：'+death.reason+'。死亡经过：'+death.narrative;
+  if(cfg.demo){death.review='（本地演示点评）这一世，你输在"贪"字上——有了本钱就想一步登天，忘了临江市的规矩：先站住脚，再谈野心。重来一次，先把关系喂熟，再碰大生意。';}
+  else{const rr=await callAI([{role:'system',content:sys},{role:'user',content:msg}],{short:true});death.review=typeof rr==='object'?rr.content:rr;}
+  saveGame();renderDeathOverlay(death);
+}
+function renderDeathOverlay(death){
+  const c=document.getElementById('death-content');
+  const mems=(S.memFacts||[]).slice(-6).map(f=>'· '+f).join('<br>')||'· 这一生，还没有留下什么值得记住的事。';
+  c.innerHTML='<div class="death-card"><h4>死亡档案 · 第'+death.day+'天 '+death.time+'（'+death.date+'）</h4><p><b>死因：</b>'+esc(death.reason)+'</p><p style="margin-top:6px"><b>经过：</b>'+esc(death.narrative)+'</p></div>'
+    +'<div class="d-review"><h4>📜 人生回顾</h4><div style="font-size:12px;color:var(--t2);line-height:1.8">'+mems+'</div></div>'
+    +'<div class="d-review"><h4>🧓 AI 江湖点评</h4><div id="death-review-text">'+(death.review?esc(death.review):'<span class="typing"><i></i><i></i><i></i></span> AI 正在回顾你的一生…')+'</div></div>';
+}
+function rewindTo(cid){
+  if(S.dead&&S.diff==='hard'&&(S.rewindLeft||0)<=0){toast('☠️ 硬核模式回档次数已用完','err');return}
+  const cp=S.checkpoints.find(c=>c.id===cid);if(!cp){toast('未找到该时间点','err');return}
+  let d;try{d=JSON.parse(cp.data)}catch(e){toast('时间点数据损坏','err');return}
+  S.char=d.char;S.res=d.res;S.status=d.status;S.relations=d.relations;S.memFacts=d.memFacts;S.notes=d.notes;S.history=d.history;
+  if(S.diff==='hard')S.rewindLeft=Math.max(0,(S.rewindLeft||1)-1);
+  S.dead=false;S.rewindNote='时间线已回拨至 第'+cp.day+'天'+cp.time+'。';
+  S.history.push({role:'system',content:'【系统】时间线回拨：你回到了 第'+cp.day+'天'+cp.time+'。之前的悲剧已被改写，江湖仍在继续。'});
+  closeAllOverlays();enterGame();saveGame();toast('⏪ 已回档至 第'+cp.day+'天'+cp.time,'ok');
+}
+function closeAllOverlays(){
+  document.querySelectorAll('.modal-overlay').forEach(o=>o.classList.remove('show'));
+  UI.closeDrawers();
+}
+/*__PART_D__*/
+/* ============================================================
+   渲染
+   ============================================================ */
+function md(s){return esc(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\n/g,'<br>')}
+function renderChat(){
+  const box=document.getElementById('chat');
+  let h='';
+  const list=S.history.slice(-200);
+  list.forEach(m=>{
+    if(m.role==='user')h+='<div class="msg user"><div class="bubble">'+md(m.content)+'</div></div>';
+    else if(m.role==='system')h+='<div class="msg sys"><div>'+md(m.content)+'</div></div>';
+    else{
+      const think=m.think&&cfg.reasoningEffort!=='off'?'<details class="think-box" open><summary>思考过程</summary><div class="think-txt">'+esc(m.think)+'</div></details>':'';
+      h+='<div class="msg ai"><div class="tag">第'+(m.day||S.res.day)+'天 · '+(m.time||S.res.time)+(m.loc?' · '+m.loc:'')+'</div>'+think+'<div class="ai-body">'+md(m.content)+'</div></div>';
+    }
+  });
+  if(loading)h+='<div class="msg ai"><div class="tag">推演中…</div><div class="ai-body"><span class="typing"><i></i><i></i><i></i></span> AI 正在推演临江市的反应…</div></div>';
+  box.innerHTML=h;
+  box.scrollTop=box.scrollHeight;
+}
+function statDesc(k,v){
+  if(k==='stress')return v<20?'从容':v<50?'有些烦闷':v<80?'焦躁易怒':'濒临崩溃';
+  if(k==='heat')return v<=0?'无人注意':v<=20?'有人议论':v<=40?'被盯上了':v<=60?'频繁盘查':v<=80?'高危目标':'全城缉捕';
+  if(k==='dignity')return v<30?'落魄潦倒':v<60?'平凡无奇':'体面从容';
+  if(k==='injury')return v<=0?'无伤':v<30?'轻伤':v<60?'重伤(行动受限)':'濒死';
+  if(k==='addiction')return v<=0?'滴酒不沾':v<30?'有点瘾头':v<60?'依赖加重':'重度依赖';
+  return '';
+}
+function moneyDesc(n){return n<=0?'身无分文':n<1000?'捉襟见肘':n<10000?'勉强温饱':n<100000?'小有积蓄':'财大气粗'}
+function renderCharPanel(){
+  const c=S.char,r=S.res,st=S.status;
+  const g=ATTR_GROUPS.map(gr=>gr.slice(1).map(k=>'<div class="stat-row"><span class="lb">'+k+'</span><div class="bar"><i style="width:'+c.attributes[k]+'%"></i></div><span class="vl">'+c.attributes[k]+'</span></div>').join('')).join('');
+  const sk=Object.keys(c.skills||{}).filter(k=>c.skills[k]>0).map(k=>'<span class="skill-pill">'+k+' Lv.'+c.skills[k]+'</span>').join('')||'<p class="dim">尚未掌握技能</p>';
+  const tl=c.talents.map(id=>{const t=TALENTS.find(x=>x.id===id);return t?'<span class="skill-pill">'+t.name+'</span>':'';}).join('')||'<p class="dim">无天赋</p>';
+  const rels=(S.relations||[]).map(x=>'<div class="rel-row"><span class="rel-name">'+esc(x.name)+'</span><span class="rel-tag">'+esc(x.tag)+'</span><div class="bar" style="max-width:56px"><i style="width:'+x.trust+'%"></i></div></div>').join('')||'<p class="dim">还没有认识什么人</p>';
+  const karmaBadge=r.karma>20?'<span class="badge good">善名 +'+r.karma+'</span>':r.karma<-20?'<span class="badge bad">恶债 '+r.karma+'</span>':'<span class="badge">因果 '+r.karma+'</span>';
+  const rewLeft=S.diff==='hard'?(S.rewindLeft||0)+' 次':'∞';
+  document.getElementById('char-panel').innerHTML=
+    '<div class="cp-head"><div class="avatar">'+esc(c.name.slice(0,1))+'</div><div><div class="cp-name">'+esc(c.name)+' <span class="cp-gender">'+esc(c.gender)+'</span></div><div class="cp-sub">'+age()+'岁 · '+esc(c.origin)+' · 第'+r.day+'天 · '+r.time+'</div><div class="cp-sub">🎯 '+esc(c.goal)+'</div></div><div class="cp-rank">'+r.rank+'</div></div>'
+    +'<div class="cp-sec"><h4>当前状况</h4>'
+    +'<div class="stat-row"><span class="lb">压力</span><div class="bar"><i style="width:'+st.stress+'%"></i></div><span class="vl">'+st.stress+'</span><span class="st-desc">'+statDesc('stress',st.stress)+'</span></div>'
+    +'<div class="stat-row"><span class="lb">伤病</span><div class="bar"><i style="width:'+st.injury+'%"></i></div><span class="vl">'+st.injury+'</span><span class="st-desc">'+statDesc('injury',st.injury)+'</span></div>'
+    +'<div class="stat-row"><span class="lb">依赖</span><div class="bar"><i style="width:'+st.addiction+'%"></i></div><span class="vl">'+st.addiction+'</span><span class="st-desc">'+statDesc('addiction',st.addiction)+'</span></div>'
+    +'<div class="stat-row"><span class="lb">尊严</span><div class="bar"><i style="width:'+st.dignity+'%"></i></div><span class="vl">'+st.dignity+'</span><span class="st-desc">'+statDesc('dignity',st.dignity)+'</span></div>'
+    +'<div class="stat-row"><span class="lb">热度</span><div class="bar"><i style="width:'+Math.min(100,r.heat)+'%"></i></div><span class="vl" style="color:'+(r.heat>60?'var(--bad)':'var(--t)')+'">'+r.heat+'</span><span class="st-desc">'+statDesc('heat',r.heat)+'</span></div>'
+    +'</div>'
+    +'<div class="cp-sec"><h4>资源</h4><div class="res-grid">'
+    +'<div class="res-item"><div class="rv">¥'+fmt(r.money)+'</div><div class="rk">白钱 · '+moneyDesc(r.money)+'</div></div>'
+    +'<div class="res-item"><div class="rv">¥'+fmt(r.blackMoney)+'</div><div class="rk">黑钱（需洗白）</div></div>'
+    +'<div class="res-item"><div class="rv">'+r.fame+'</div><div class="rk">声望</div></div>'
+    +'<div class="res-item"><div class="rv">'+r.rank+'</div><div class="rk">地位 · '+karmaBadge+'</div></div>'
+    +'<div class="res-item" style="grid-column:1/-1"><div class="rv" style="font-size:12px">📍 '+esc(r.location)+'</div><div class="rk">回档机会 '+rewLeft+' · 死亡可回到关键时间点</div></div>'
+    +'</div></div>'
+    +'<div class="cp-sec"><h4>属性</h4>'+g+'</div>'
+    +'<div class="cp-sec"><h4>技能与天赋</h4><div class="pill-wrap">'+sk+tl+'</div></div>'
+    +'<div class="cp-sec"><h4>关系网络</h4>'+rels+'</div>'
+    +(c.backstory||S.notes?'<div class="cp-sec"><h4>背景与笔记</h4><p class="dim">'+esc(c.backstory||'')+'</p>'+(S.notes?'<p class="dim" style="margin-top:5px">📝 '+esc(S.notes.slice(0,100))+'</p>':'')+'</div>':'');
+}
+function updateChips(){
+  document.getElementById('chip-day').textContent='第'+S.res.day+'天 · '+S.res.time;
+  document.getElementById('chip-money').textContent='¥'+fmt(S.res.money);
+  const he=document.getElementById('chip-heat');
+  he.textContent='热度 '+S.res.heat;
+  he.className='chip hide-m'+(S.res.heat>=60?' hot':'');
+  document.getElementById('h-loc').textContent=S.res.location;
+  document.getElementById('h-day').textContent='第'+S.res.day+'天 · '+S.res.time;
+  document.getElementById('h-status').textContent=S.dead?'☠️ 已死亡':'';
+}
+function renderQuick(){
+  const q=document.getElementById('quick');
+  let h=QUICK.map((x,i)=>'<button class="q-btn" onclick="Game.quick('+i+')">'+x.i+' '+x.t+'</button>').join('');
+  if(S.goldfinger)h+=CQUICK.map((x,i)=>'<button class="q-btn cheat-q" onclick="Game.quick('+(QUICK.length+i)+')">'+x.i+' '+x.t+'</button>').join('');
+  q.innerHTML=h;
+}
+/*__PART_E__*/
+/* ============================================================
+   游戏动作
+   ============================================================ */
+const Game={
+async send(){
+  if(!S||S.dead||loading)return;
+  const el=document.getElementById('msg');
+  const text=el.value.trim();
+  if(!text)return;
+  el.value='';
+  newCheckpoint('行动：'+text.slice(0,24));
+  S.history.push({role:'user',content:text,day:S.res.day,time:S.res.time});
+  loading=true;
+  renderChat();
+  try{
+    const sys=buildSystem();
+    const msgs=[{role:'system',content:sys}].concat(S.history.slice(-24).map(m=>({role:m.role==='user'?'user':'assistant',content:m.content})));
+    const raw=await callAI(msgs);
+    const think=raw&&typeof raw==='object'?(raw.think||''):'';
+    const cont=raw&&typeof raw==='object'?raw.content:raw;
+    const {text:t,json}=splitJSON(cont);
+    S.history.push({role:'assistant',content:t,think:think||'',day:S.res.day,time:S.res.time,loc:S.res.location});
+    loading=false;
+    applyJSON(json);
+    renderChat();updateChips();renderCharPanel();
+    if(json&&json.dead){await handleDeath(t,json);}
+    else{saveGame();}
+  }catch(e){
+    loading=false;
+    renderChat();
+    toast('❌ '+e.message,'err');
+  }
+},
+quick(i){
+  if(i<QUICK.length)this.sendWith(QUICK[i].a);
+  else{const c=CQUICK[i-QUICK.length];if(c)this.sendWith(c.a);}
+},
+sendWith(text){
+  const el=document.getElementById('msg');
+  el.value=text;
+  this.send();
+},
+toggleGold(){
+  if(!S)return;
+  S.goldfinger=!S.goldfinger;
+  const b=document.getElementById('btn-gold');
+  b.innerHTML=S.goldfinger?'💰<span>金手指·开</span>':'💰<span>金手指</span>';
+  renderQuick();
+  S.history.push({role:'system',content:S.goldfinger?'【系统】金手指已开启：天降横财、属性强化、声望暴涨、全知情报、状态清零，快捷指令已解锁。':'【系统】金手指已关闭。'});
+  renderChat();saveGame();
+  toast(S.goldfinger?'💰 金手指已开启':'金手指已关闭',S.goldfinger?'ok':'');
+},
+async opening(){
+  const sys=buildSystem();
+  const prompt='【开局】游戏开始。请描绘「'+S.char.name+'」——'+age()+'岁，'+S.char.origin+'出身，目标是'+S.char.goal+'——在临江市的第一个清晨。用环境、人物与对话自然展开：交代他/她的处境（住处、口袋里的钱、当前的小麻烦或小机会），最后让"你"面临第一个选择。不要替玩家做决定，300~500字。';
+  loading=true;
+  renderChat();
+  try{
+    const raw=await callAI([{role:'system',content:sys},{role:'user',content:prompt}]);
+    const think=raw&&typeof raw==='object'?(raw.think||''):'';
+    const cont=raw&&typeof raw==='object'?raw.content:raw;
+    const {text:t,json}=splitJSON(cont);
+    S.history.push({role:'assistant',content:t,think:think||'',day:1,time:S.res.time,loc:S.res.location});
+    loading=false;
+    applyJSON(json);
+    newCheckpoint('开局');
+    renderChat();updateChips();renderCharPanel();saveGame();
+  }catch(e){
+    loading=false;
+    renderChat();
+    toast('❌ 开场推演失败：'+e.message+'（可检查 API 配置或在向导开启演示模式）','err');
+  }
+},
+rewindFromDeath(){
+  if(!S||!S.lastDeath)return;
+  const cid=S.lastDeath.cid;
+  if(!cid){toast('未找到可回档的时间点','err');return;}
+  rewindTo(cid);
+},
+restartGame(){restartGame()},
+exportSave(){exportSave()},
+importSave(){importSave()}
+};
+/* ============================================================
+   建号向导
+   ============================================================ */
+const WIZ_STEPS=['🔌 API 配置','🧬 角色设定','📝 备注信息','⚖️ 难度设定','✅ 信息确认'];
+const Wiz={
+wizStep:0,
+W:{demo:false,name:'',gender:'男',origin:'chengzhong',originCustom:'',traits:[],goal:'随心所欲（自由发展）',goalCustom:'',backstory:'',attrAlloc:{},talents:[],cheat:false,note:'',diff:'std'},
+render(){
+  const steps=document.getElementById('wiz-steps');
+  steps.innerHTML=WIZ_STEPS.map((s,i)=>{
+    const cls=i===this.wizStep?'on':i<this.wizStep?'done':'';
+    return '<div class="wiz-step '+cls+'"><span>'+(i+1)+'</span>'+s+'</div>';
+  }).join('');
+  document.getElementById('wiz-prev').style.visibility=this.wizStep===0?'hidden':'visible';
+  const next=document.getElementById('wiz-next');
+  next.textContent=this.wizStep===4?'🎮 开始游戏':'下一步';
+  this.renderBody();
+},
+renderBody(){
+  const htmls=[this.step1HTML,this.step2HTML,this.step3HTML,this.step4HTML,this.step5HTML];
+  document.getElementById('wiz-body').innerHTML=htmls[this.wizStep].call(this);
+  this.afterRender();
+},
+afterRender(){
+  if(this.wizStep===0){
+    document.getElementById('w-endpoint').value=cfg.apiEndpoint;
+    document.getElementById('w-apikey').value=cfg.apiKey;
+    document.getElementById('w-maxtokens').value=cfg.maxTokens;
+    document.getElementById('w-reasoning').value=cfg.reasoningEffort||'medium';
+    document.getElementById('w-demo').checked=!!cfg.demo;
+    populateModels((modelsCache&&modelsCache.list)||['deepseek-chat','deepseek-reasoner'],'w-model');
+    document.getElementById('w-model').value=cfg.model;
+    const h=document.getElementById('w-model-hint');
+    if(cfg.demo)h.textContent='当前为本地演示模式';
+    else if(!cfg.apiKey)h.textContent='填写 Key 后自动拉取模型列表（默认 DeepSeek）';
+    else h.textContent='⏳ 正在拉取模型列表…';
+    if(cfg.apiKey&&!cfg.demo)setTimeout(()=>fetchModels(),300);
+  }
+  if(this.wizStep===1){
+    document.getElementById('w-name').value=this.W.name;
+    document.getElementById('w-gender').value=this.W.gender;
+    document.getElementById('w-origin').value=this.W.origin;
+    this.syncOriginUI();
+    document.getElementById('w-goal').value=this.W.goal;
+    document.getElementById('w-goal-custom-v').value=this.W.goalCustom;
+    document.getElementById('w-backstory').value=this.W.backstory;
+    document.getElementById('w-goal-custom').style.display=this.W.goal==='自定义目标'?'block':'none';
+    this.renderChips();this.renderAttrGrid();this.renderTalGrid();
+    document.getElementById('w-cheat').checked=this.W.cheat;
+  }
+  if(this.wizStep===2)document.getElementById('w-note').value=this.W.note;
+  if(this.wizStep===3)this.renderDiff();
+  if(this.wizStep===4)this.renderSummary();
+},
+step1HTML(){
+  return '<div class="wiz-card"><h3>连接 AI 引擎</h3>'
+   +'<p class="wiz-desc">游戏由 AI 实时推演，世界观见设计文档《混社会模拟器》。默认配置为 DeepSeek（兼容 OpenAI 接口），也可填写其他兼容服务。</p>'
+   +'<label>API 端点</label><input id="w-endpoint" placeholder="https://api.deepseek.com">'
+   +'<label>API Key</label><input id="w-apikey" type="password" placeholder="sk-..." oninput="Wiz.onKey()">'
+   +'<div class="hint" id="w-model-hint">填写 Key 后自动拉取模型列表</div>'
+   +'<label>模型（列表从 API 拉取）</label>'
+   +'<div class="row"><select id="w-model"></select><button class="btn" onclick="Wiz.refresh()">↻ 刷新</button></div>'
+   +'<label>输出 Token 限制</label>'
+   +'<select id="w-maxtokens">'
+   +'<option value="unlimited">无限制（推荐）</option>'
+   +'<option value="2048">2048</option><option value="4096">4096</option><option value="8192">8192</option><option value="16384">16384</option>'
+   +'</select>'
+   +'<label>思考强度</label>'
+   +'<select id="w-reasoning"><option value="off">关闭（不显示思考）</option><option value="low">低</option><option value="medium">中（推荐）</option><option value="high">高</option><option value="max">最大</option></select>'
+   +'<div class="hint">思考过程会显示在每次回复上方（需模型支持，如 deepseek-reasoner）。</div>'
+   +'<div class="row" style="margin-top:10px;flex-wrap:wrap">'
+   +'<button class="btn" onclick="UI.testConn()">🔌 测试连接</button>'
+   +'<label class="check"><input type="checkbox" id="w-demo"> 本地演示模式（没有 Key 也能玩，AI 由本地脚本模拟）</label>'
+   +'</div>'
+   +'<div class="hint">若浏览器拦截跨域（CORS），可使用允许跨域的代理地址，或开启演示模式体验完整界面。</div>'
+   +'</div>';
+},
+step2HTML(){
+  const o=ORIGINS.find(x=>x.id===this.W.origin)||ORIGINS[5];
+  const rec=TALENT_REC[this.W.origin]||[];
+  const recNames=rec.map(id=>{const t=TALENTS.find(x=>x.id===id);return t?t.name:'';}).join(' / ');
+  return '<div class="wiz-card"><h3>主角信息</h3>'
+   +'<label>姓名</label><div class="row"><input id="w-name" maxlength="8" placeholder="输入姓名"><button class="btn" onclick="Wiz.aiName()">🎲 AI 起名</button></div>'
+   +'<label>性别</label><select id="w-gender"><option>男</option><option>女</option><option>保密</option></select>'
+   +'<label>出身（决定初始属性/资金/人脉）</label>'
+   +'<select id="w-origin" onchange="Wiz.origin()">'+ORIGINS.map(x=>'<option value="'+x.id+'">'+x.name+'</option>').join('')+'</select>'
+   +'<div class="hint" id="w-origin-desc">'+esc(o.desc)+'</div>'
+   +'<div id="w-origin-custom" style="display:none"><label>自定义出身设定</label><input id="w-origin-custom-v" placeholder="例如：从乡下进城打工的远房亲戚家的孩子…"></div>'
+   +'<label>性格标签（最多3个，影响 AI 扮演你的方式）</label>'
+   +'<div class="chips" id="w-chips"></div>'
+   +'<label>目标（因果与结局会围绕它展开）</label>'
+   +'<select id="w-goal" onchange="Wiz.goal()">'+GOALS.map(g=>'<option>'+g+'</option>').join('')+'</select>'
+   +'<div id="w-goal-custom" style="display:none"><label>自定义目标</label><input id="w-goal-custom-v" placeholder="例如：在临江市开一家自己的夜宵店"></div>'
+   +'<label>背景故事（可选，可补充任何设定）</label>'
+   +'<textarea id="w-backstory" placeholder="例如：父母早亡，妹妹还在读高中，我必须尽快挣钱…"></textarea>'
+   +'<div class="hint">'+(recNames?'出身推荐天赋：<b style="color:var(--gold)">'+recNames+'</b>':'')+'</div>'
+   +'</div>'
+   +'<div class="wiz-card"><h3>属性分配 <span class="budget">剩余 <b id="w-attr-left"></b> 点</span></h3>'
+   +'<p class="wiz-desc">基础属性随出身变化，分配点数可自由强化（0~100）。</p>'
+   +'<div class="attr-grid" id="w-attr-grid"></div>'
+   +'</div>'
+   +'<div class="wiz-card"><h3>天赋选择 <span class="budget">天赋点 <b id="w-tal-left"></b></span></h3>'
+   +'<label class="check" style="margin-bottom:8px"><input type="checkbox" id="w-cheat" onchange="Wiz.cheat()"> 🏴 <b style="color:var(--gold)">作弊模式</b>：无限天赋点 + 属性点300 + 初始资金+10万 + 全技能Lv.1 + 游戏内金手指快捷指令</label>'
+   +'<div class="talent-grid" id="w-tal-grid"></div>'
+   +'</div>';
+},
+renderChips(){
+  const box=document.getElementById('w-chips');
+  box.innerHTML=TRAITS.map(t=>'<button type="button" class="tchip '+(this.W.traits.indexOf(t)>=0?'on':'')+'" onclick="Wiz.trait(\''+t+'\')">'+t+'</button>').join('');
+},
+attrFinal(k){
+  const o=ORIGINS.find(x=>x.id===this.W.origin)||ORIGINS[5];
+  return clamp((ATTR_BASE[k]||0)+(o.mods[k]||0)+(this.W.attrAlloc[k]||0),0,100);
+},
+renderAttrGrid(){
+  const budget=this.W.cheat?300:150;
+  const used=ATTRS.reduce((s,k)=>s+(this.W.attrAlloc[k]||0),0);
+  document.getElementById('w-attr-left').textContent=(budget-used);
+  document.getElementById('w-attr-grid').innerHTML=ATTRS.map(k=>
+    '<div class="attr-row"><span class="attr-name">'+k+'</span>'
+    +'<button class="stepper" onclick="Wiz.attr(\''+k+'\',-1)">−</button>'
+    +'<span class="attr-val">'+this.attrFinal(k)+'</span>'
+    +'<button class="stepper" onclick="Wiz.attr(\''+k+'\',1)">+</button></div>'
+  ).join('');
+},
+renderTalGrid(){
+  const used=this.W.talents.reduce((s,id)=>{const t=TALENTS.find(x=>x.id===id);return s+(t?t.cost:0)},0);
+  const left=this.W.cheat?999:(20-used);
+  document.getElementById('w-tal-left').textContent=this.W.cheat?'∞':left;
+  document.getElementById('w-tal-grid').innerHTML=TALENTS.map(t=>{
+    const sel=this.W.talents.indexOf(t.id)>=0;
+    const dis=!this.W.cheat&&!sel&&(this.W.talents.length>=4||left<t.cost);
+    return '<div class="talent '+(sel?'on':'')+(dis?' dis':'')+'" onclick="Wiz.talent(\''+t.id+'\')">'
+      +'<div class="t-name">'+t.name+'<span class="t-cost">'+t.cost+'点</span></div>'
+      +'<div class="t-eff">'+t.effect+'</div>'
+      +'<div class="t-g">'+t.g+'</div></div>';
+  }).join('');
+},
+step3HTML(){
+  return '<div class="wiz-card"><h3>备注信息</h3>'
+   +'<p class="wiz-desc">写下你想补充的任何设定：身世细节、性格特点、对 AI 的要求、想走的路线……会写入 AI 提示词并全程生效。</p>'
+   +'<textarea id="w-note" placeholder="例如：我从小在城中村长大，家里还有个妹妹要养；希望剧情现实一点，不要主角光环；我想走灰色路线先攒钱…"></textarea>'
+   +'</div>';
+},
+step4HTML(){
+  return '<div class="wiz-card"><h3>难度设定</h3>'
+   +'<p class="wiz-desc">选择你的江湖难度。死亡回档机制在所有模式可用（硬核模式仅1次）。</p>'
+   +'<div id="w-diffs"></div>'
+   +'</div>';
+},
+renderDiff(){
+  const box=document.getElementById('w-diffs');
+  box.innerHTML=Object.keys(DIFFS).map(id=>{
+    const d=DIFFS[id];
+    return '<div class="diff-card '+(this.W.diff===id?'on':'')+'" onclick="Wiz.diff(\''+id+'\')">'
+      +'<div class="diff-name">'+d.icon+' '+d.name+(this.W.diff===id?'<span style="color:var(--accent)">✓ 已选</span>':'')+'</div>'
+      +'<div class="diff-desc">'+d.desc+'</div>'
+      +'<div class="diff-params">'+d.params+'<br>'+d.rewind+'</div>'
+      +'</div>';
+  }).join('');
+},
+step5HTML(){
+  return '<div class="wiz-card"><h3>信息确认</h3><div class="sum-grid" id="w-sum"></div>'
+   +'<div class="hint" style="margin-top:10px">确认无误后点击右下角「🎮 开始游戏」进入临江市。AI 将按设定与角色扮演守则推演整个江湖。</div>'
+   +'</div>';
+},
+renderSummary(){
+  const w=this.W;
+  const o=ORIGINS.find(x=>x.id===w.origin)||ORIGINS[5];
+  const baseSum=ATTRS.reduce((s,k)=>s+(w.attrAlloc[k]||0),0);
+  const usedTal=w.talents.reduce((s,id)=>{const t=TALENTS.find(x=>x.id===id);return s+(t?t.cost:0)},0);
+  const rows=[
+    ['姓名',w.name||'（未填写）'],['性别',w.gender],
+    ['出身',w.origin==='custom'?(w.originCustom||'自定义'):o.name],
+    ['性格',w.traits.join('、')||'无'],['目标',w.goal==='自定义目标'?(w.goalCustom||'自定义'):w.goal],
+    ['属性加点',baseSum+' 点（基础随出身）'],
+    ['天赋','已选 '+w.talents.length+' 个 · 消耗 '+usedTal+' 点'+(w.cheat?'（作弊模式·无限）':'')],
+    ['作弊模式',w.cheat?'🏴 开启（+10万资金·全技能Lv.1·金手指）':'关闭'],
+    ['备注',w.note?w.note.slice(0,40)+'…':'无'],
+    ['难度',DIFFS[w.diff].icon+DIFFS[w.diff].name],
+    ['初始资金',w.cheat?'¥'+(100000+o.money).toLocaleString():'¥'+o.money.toLocaleString()],
+    ['初始人脉',(o.rel||[]).map(x=>x.name).join('、')||'无']
+  ];
+  document.getElementById('w-sum').innerHTML=rows.map(r=>'<div class="k">'+r[0]+'</div><div class="v">'+esc(r[1])+'</div>').join('');
+},
+trait(t){
+  const i=this.W.traits.indexOf(t);
+  if(i>=0)this.W.traits.splice(i,1);
+  else{if(this.W.traits.length>=3){toast('最多选择3个性格标签','warn');return}this.W.traits.push(t);}
+  this.renderChips();
+},
+attr(k,d){
+  const cur=this.W.attrAlloc[k]||0;
+  const budget=this.W.cheat?300:150;
+  const used=ATTRS.reduce((s,x)=>s+(this.W.attrAlloc[x]||0),0);
+  if(d>0&&used>=budget){toast('属性点已用完','warn');return}
+  const next=clamp(cur+d,0,60);
+  if(next===cur)return;
+  this.W.attrAlloc[k]=next;
+  this.renderAttrGrid();
+},
+talent(id){
+  const i=this.W.talents.indexOf(id);
+  if(i>=0){this.W.talents.splice(i,1);}
+  else{
+    if(!this.W.cheat){
+      const t=TALENTS.find(x=>x.id===id);
+      const used=this.W.talents.reduce((s,x)=>{const tt=TALENTS.find(y=>y.id===x);return s+(tt?tt.cost:0)},0);
+      if(this.W.talents.length>=4){toast('非作弊模式最多选4个天赋','warn');return}
+      if(used+(t?t.cost:0)>20){toast('天赋点不足','warn');return}
+    }
+    this.W.talents.push(id);
+  }
+  this.renderTalGrid();
+},
+cheat(){
+  this.W.cheat=document.getElementById('w-cheat').checked;
+  this.renderAttrGrid();this.renderTalGrid();
+},
+syncOriginUI(){
+  const o=ORIGINS.find(x=>x.id===this.W.origin)||ORIGINS[5];
+  document.getElementById('w-origin-desc').textContent=o.desc;
+  document.getElementById('w-origin-custom').style.display=this.W.origin==='custom'?'block':'none';
+  this.renderAttrGrid();this.renderTalGrid();
+},
+origin(){
+  this.W.origin=document.getElementById('w-origin').value;
+  this.syncOriginUI();
+},
+goal(){
+  this.W.goal=document.getElementById('w-goal').value;
+  document.getElementById('w-goal-custom').style.display=this.W.goal==='自定义目标'?'block':'none';
+},
+diff(id){this.W.diff=id;this.renderDiff();},
+onKey(){
+  clearTimeout(this._kt);
+  const key=document.getElementById('w-apikey').value.trim();
+  if(key.length>10){this._kt=setTimeout(()=>{cfg.apiKey=key;cfg.apiEndpoint=document.getElementById('w-endpoint').value.trim()||CFG_DEFAULT.apiEndpoint;saveCfg();fetchModels();},700);}
+},
+refresh(){this.saveStep();fetchModels();},
+aiName(){
+  const o=ORIGINS.find(x=>x.id===this.W.origin)||ORIGINS[5];
+  const doSet=n=>{this.W.name=n;const el=document.getElementById('w-name');if(el)el.value=n;};
+  if(cfg.demo||!cleanKey(cfg.apiKey)){doSet(NAMES[Math.floor(Math.random()*NAMES.length)]);return}
+  const self=this;
+  callAI([{role:'user',content:'请为一位临江市'+o.name+'出身的年轻主角起一个名字（2~4个汉字，符合现代都市气质），只回复名字本身，不要任何解释。'}],{short:true}).then(r=>{
+    let n=String((r&&typeof r==='object'?r.content:r)||'').trim().slice(0,8);
+    n=n.split('').filter(ch=>{const c=ch.charCodeAt(0);return c>=0x4e00&&c<=0x9fa5}).join('').slice(0,4);
+    if(n)doSet(n);else doSet(NAMES[Math.floor(Math.random()*NAMES.length)]);
+  }).catch(()=>doSet(NAMES[Math.floor(Math.random()*NAMES.length)]));
+},
+saveStep(){
+  if(this.wizStep===0){
+    cfg.apiEndpoint=document.getElementById('w-endpoint').value.trim()||CFG_DEFAULT.apiEndpoint;
+    cfg.apiKey=cleanKey(document.getElementById('w-apikey').value);
+    cfg.model=document.getElementById('w-model').value||cfg.model;
+    cfg.maxTokens=document.getElementById('w-maxtokens').value;
+    cfg.reasoningEffort=document.getElementById('w-reasoning').value;
+    cfg.demo=document.getElementById('w-demo').checked;
+    saveCfg();
+  }
+  if(this.wizStep===1){
+    this.W.name=document.getElementById('w-name').value.trim();
+    this.W.gender=document.getElementById('w-gender').value;
+    this.W.origin=document.getElementById('w-origin').value;
+    this.W.originCustom=document.getElementById('w-origin-custom-v').value.trim();
+    this.W.goal=document.getElementById('w-goal').value;
+    this.W.goalCustom=document.getElementById('w-goal-custom-v').value.trim();
+    this.W.backstory=document.getElementById('w-backstory').value.trim();
+  }
+  if(this.wizStep===2)this.W.note=document.getElementById('w-note').value.trim();
+},
+next(){
+  if(this.wizStep===4){this.startGame();return}
+  this.saveStep();
+  if(this.wizStep===0&&!cfg.demo&&!cleanKey(cfg.apiKey)){toast('请先填写 API Key，或勾选「本地演示模式」','warn');return}
+  if(this.wizStep===1&&!this.W.name){toast('请先给主角起个名字','warn');return}
+  this.wizStep++;
+  this.render();
+},
+prev(){
+  if(this.wizStep>0){this.saveStep();this.wizStep--;this.render();}
+},
+startGame(){
+  this.saveStep();
+  const o=ORIGINS.find(x=>x.id===this.W.origin)||ORIGINS[5];
+  const attrs={};
+  ATTRS.forEach(k=>{attrs[k]=clamp((ATTR_BASE[k]||0)+(o.mods[k]||0)+(this.W.attrAlloc[k]||0),0,100)});
+  const skills={};SKILL_NAMES.forEach(k=>skills[k]=0);
+  if(this.W.cheat)skills['格斗术']=2;
+  S={
+    char:{name:this.W.name,gender:this.W.gender,origin:this.W.origin==='custom'?(this.W.originCustom||'自定义'):o.name,traits:this.W.traits.slice(),goal:this.W.goal==='自定义目标'?(this.W.goalCustom||'自定义目标'):this.W.goal,backstory:this.W.backstory,cheat:this.W.cheat,attributes:attrs,talents:this.W.talents.slice(),skills:skills},
+    res:{day:1,time:'上午',location:o.loc,money:o.money+(this.W.cheat?100000:0),blackMoney:0,fame:'无人知晓',rank:'无',heat:o.heat||0,karma:0},
+    status:{stress:10,dignity:55,injury:0,addiction:0},
+    relations:(o.rel||[]).map(x=>Object.assign({},x)),
+    memFacts:[],notes:this.W.note,
+    history:[],checkpoints:[],deaths:[],dead:false,goldfinger:false,rewindLeft:this.W.diff==='hard'?1:999,
+    diff:this.W.diff,rewindNote:'',lastDeath:null
+  };
+  cpid=1;
+  saveGame();enterGame();
+  toast('🎮 江湖开演！','ok');
+  Game.opening();
+}
+};
+/* ============================================================
+   UI 与初始化
+   ============================================================ */
+const UI={
+toggleDrawer(){
+  const d=document.getElementById('drawer-char');
+  const s=document.getElementById('scrim');
+  const open=d.classList.toggle('open');
+  s.classList.toggle('show',open);
+  if(open)renderCharPanel();
+},
+closeDrawers(){
+  document.getElementById('drawer-char').classList.remove('open');
+  document.getElementById('scrim').classList.remove('show');
+},
+openModal(id){document.getElementById(id).classList.add('show');},
+closeModal(id){document.getElementById(id).classList.remove('show');},
+confirm(title,text,cb,yesLabel){
+  document.getElementById('cf-title').textContent=title;
+  document.getElementById('cf-text').textContent=text;
+  document.getElementById('cf-yes').textContent=yesLabel||'确定';
+  cfAction=cb;
+  this.openModal('confirm-modal');
+},
+confirmYes(){
+  this.closeModal('confirm-modal');
+  if(cfAction){const cb=cfAction;cfAction=null;cb();}
+},
+testConn(){testConn()},
+fetchModelsUI(){fetchModels()},
+openSettings(){
+  const c=cfg;
+  document.getElementById('settings-content').innerHTML=
+    '<label>API 端点</label><input id="s-endpoint" placeholder="https://api.deepseek.com">'
+    +'<label>API Key</label><input id="s-apikey" type="password" placeholder="sk-...">'
+    +'<label>模型（列表从 API 拉取）</label><div class="row"><select id="s-model"></select><button class="btn" onclick="UI.fetchModelsUI()">↻ 拉取列表</button></div>'
+    +'<div class="hint" id="s-model-hint"></div>'
+    +'<label>输出 Token 限制</label>'
+    +'<select id="s-maxtokens"><option value="unlimited">无限制（推荐）</option><option value="2048">2048</option><option value="4096">4096</option><option value="8192">8192</option><option value="16384">16384</option></select>'
+    +'<label>思考强度</label>'
+    +'<select id="s-reasoning"><option value="off">关闭（不显示思考）</option><option value="low">低</option><option value="medium">中（推荐）</option><option value="high">高</option><option value="max">最大</option></select>'
+    +'<div class="row" style="margin:8px 0;flex-wrap:wrap"><button class="btn" onclick="UI.testConn()">🔌 测试连接</button>'
+    +'<label class="check"><input type="checkbox" id="s-demo"> 本地演示模式（无需 API）</label></div>'
+    +'<div class="sep"></div>'
+    +'<label>🎨 界面风格</label>'
+    +'<select id="s-theme"><option value="neon">🌃 暗夜霓虹（赛博蓝）</option><option value="casino">🎰 纸醉金迷（金紫）</option><option value="ink">🀄 江湖墨韵（朱墨）</option><option value="paper">📰 白昼纸面（浅色）</option></select>'
+    +'<label>💾 自动存档（每回合保存，刷新可继续）</label>'
+    +'<label class="check"><input type="checkbox" id="s-autosave"> 开启自动存档</label>'
+    +'<div class="btn-row" style="margin-top:12px"><button class="btn gold" style="flex:1" onclick="UI.saveSettings()">💾 保存设置</button><button class="btn" style="flex:1" onclick="UI.closeModal(\'settings-modal\')">关闭</button></div>'
+    +'<div class="sep"></div>'
+    +'<label>📦 存档管理</label>'
+    +'<div class="row" style="margin-bottom:8px"><button class="btn" style="flex:1" onclick="Game.exportSave()">⬇ 导出存档</button><button class="btn" style="flex:1" onclick="Game.importSave()">⬆ 导入存档</button></div>'
+    +'<button class="btn bad" style="width:100%" onclick="Game.restartGame()">🔄 重新开始</button>'
+    +'<div class="hint" style="margin-top:8px">导出为 JSON 文件可备份或换设备导入继续。若浏览器拦截跨域请求（CORS），请使用允许跨域的代理地址，或开启演示模式体验完整界面。</div>';
+  document.getElementById('s-endpoint').value=c.apiEndpoint;
+  document.getElementById('s-apikey').value=c.apiKey;
+  document.getElementById('s-maxtokens').value=c.maxTokens;
+  document.getElementById('s-reasoning').value=c.reasoningEffort||'medium';
+  document.getElementById('s-theme').value=c.theme;
+  document.getElementById('s-autosave').checked=c.autoSave!==false;
+  document.getElementById('s-demo').checked=!!c.demo;
+  populateModels((modelsCache&&modelsCache.list)||['deepseek-chat','deepseek-reasoner'],'s-model');
+  document.getElementById('s-model').value=c.model;
+  document.getElementById('s-model-hint').textContent=c.demo?'演示模式使用本地脚本':'模型列表从 API 的 /models 接口拉取';
+  this.openModal('settings-modal');
+},
+saveSettings(){
+  cfg.apiEndpoint=document.getElementById('s-endpoint').value.trim()||CFG_DEFAULT.apiEndpoint;
+  cfg.apiKey=cleanKey(document.getElementById('s-apikey').value);
+  cfg.model=document.getElementById('s-model').value||cfg.model;
+  cfg.maxTokens=document.getElementById('s-maxtokens').value;
+  cfg.reasoningEffort=document.getElementById('s-reasoning').value;
+  cfg.theme=document.getElementById('s-theme').value;
+  cfg.autoSave=document.getElementById('s-autosave').checked;
+  cfg.demo=document.getElementById('s-demo').checked;
+  saveCfg();
+  document.body.dataset.theme=cfg.theme;
+  if(cfg.demo)populateModels(['local-demo（本地演示）']);
+  this.closeModal('settings-modal');
+  toast('✅ 设置已保存','ok');
+},
+openMem(){
+  const facts=(S.memFacts||[]).map((f,i)=>'<div class="rel-row"><span class="rel-name" style="color:var(--accent)">#'+(i+1)+'</span><span class="rel-note" style="max-width:80%;text-align:left">'+esc(f)+'</span></div>').join('')||'<p style="font-size:12px;color:var(--t3)">还没有重要记忆。AI 会在关键事件后自动记录，并注入每次推演。</p>';
+  const rels=(S.relations||[]).map(x=>'<div class="rel-row"><span class="rel-name">'+esc(x.name)+'</span><span class="rel-tag">'+esc(x.tag)+'</span><div class="bar" style="max-width:50px"><i style="width:'+x.trust+'%"></i></div><span class="rel-note">'+esc(x.note||'')+'</span></div>').join('')||'<p style="font-size:12px;color:var(--t3)">暂无关系。</p>';
+  document.getElementById('mem-content').innerHTML=
+    '<label>🧠 AI 记忆档案（每次推演自动注入提示词，AI 不会忘记设定与故事）</label>'
+    +'<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px">'+facts+'</div>'
+    +'<label>🤝 关系网络（信任度由 AI 实时维护）</label>'
+    +'<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px">'+rels+'</div>'
+    +'<label>📝 私人笔记（会加入 AI 提示词）</label>'
+    +'<textarea id="mem-notes">'+esc(S.notes||'')+'</textarea>';
+  this.openModal('mem-modal');
+},
+saveNotes(){
+  S.notes=document.getElementById('mem-notes').value.trim();
+  saveGame();
+  toast('✅ 笔记已保存','ok');
+},
+openEncy(){
+  document.getElementById('ency-tabs').innerHTML=ENCY.map((e,i)=>'<button class="tab '+(i===encyTab?'on':'')+'" onclick="UI.encyTab('+i+')">'+e.t+'</button>').join('');
+  document.getElementById('ency-body').innerHTML=ENCY[encyTab].h;
+  this.openModal('ency-modal');
+},
+encyTab(i){encyTab=i;this.openEncy();},
+openGuide(){
+  document.getElementById('guide-content').innerHTML=GUIDE_HTML;
+  this.openModal('guide-modal');
+},
+openDeaths(){
+  const deaths=S.deaths||[];
+  const recs=deaths.length?deaths.slice().reverse().map(d=>'<div class="rec"><div class="rec-head"><span>第'+d.day+'天 · '+d.time+' · '+d.date+'</span><b>☠️</b></div><div class="rec-reason">死因：'+esc(d.reason)+'</div>'
+    +(d.review?'<div class="rec-review">点评：'+esc(d.review)+'</div>':'')
+    +'<button class="btn" style="font-size:11px;padding:4px 10px" onclick="rewindFromDeathId(\''+d.id+'\')">⏪ 回到死前关键点</button></div>').join('')
+    :'<p style="font-size:12px;color:var(--t3)">还没有死亡记录。江湖路远，且行且珍惜。</p>';
+  const cps=S.checkpoints.slice().reverse().map(cp=>'<div class="cp-item"><div class="t">第'+cp.day+'天 · '+cp.time+'</div><div class="s">'+esc(cp.summary||'')+'</div><button class="btn gold" style="font-size:11px;padding:4px 10px;margin-top:6px" onclick="rewindTo('+cp.id+')">⏪ 回档至此</button></div>').join('');
+  const left=S.diff==='hard'?(S.rewindLeft||0)+' 次':'∞ 次';
+  document.getElementById('deaths-content').innerHTML=
+    '<label>☠️ 死亡记录（每次死亡都有 AI 点评，永久保留）</label><div class="death-list">'+recs+'</div>'
+    +'<label style="margin-top:12px">📌 可选时间点（自动存档，保留最近 '+S.checkpoints.length+' 个）</label><div>'+cps+'</div>'
+    +'<div class="hint" style="margin-top:8px">当前回档机会：'+left+'（硬核模式仅1次）。回档后，未来发生的悲剧将被改写。</div>';
+  this.openModal('deaths-modal');
+},
+closeDeath(){
+  this.closeModal('death-overlay');
+  this.openDeaths();
+}
+};
+function rewindFromDeathId(id){
+  const d=(S.deaths||[]).find(x=>x.id===id);
+  if(!d||!d.cid){toast('未找到该死亡对应的时间点','err');return}
+  rewindTo(d.cid);
+}
+function init(){
+  document.body.dataset.theme=cfg.theme;
+  document.getElementById('import-file').addEventListener('change',e=>{
+    const f=e.target.files&&e.target.files[0];
+    if(f)applyImportFile(f);
+    e.target.value='';
+  });
+  const saved=loadGame();
+  if(saved){
+    S=saved;
+    if(S.rewindLeft===undefined)S.rewindLeft=S.diff==='hard'?1:999;
+    cpid=(S.checkpoints&&S.checkpoints.length)?S.checkpoints[S.checkpoints.length-1].id+1:1;
+    enterGame();
+    if(S.dead&&S.lastDeath){renderDeathOverlay(S.lastDeath);document.getElementById('death-overlay').classList.add('show');}
+    toast('💾 已自动恢复上次存档','ok');
+  }else{
+    Wiz.render();
+  }
+  document.getElementById('msg').addEventListener('keydown',e=>{if(e.key==='Enter')Game.send()});
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){
+      UI.closeDrawers();
+      document.querySelectorAll('.modal-overlay.show').forEach(o=>o.classList.remove('show'));
+    }
+  });
+}
+init();
+</script>
+</body>
+</html>

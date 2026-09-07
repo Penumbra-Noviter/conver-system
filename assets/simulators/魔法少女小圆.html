@@ -1,0 +1,2050 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>魔法少女小圆 · 见泷原TRPG</title>
+<style>
+/* ===== Themes ===== */
+body[data-theme="witch"]{--bg-deep:#0d0716;--bg-surface:#150b22;--bg-elevated:#1e1130;--bg-hover:#2a1740;--border:#33204d;--border-active:#4a2f6b;--text-primary:#f2e8f6;--text-secondary:#c3aed2;--text-muted:#7d6691;--accent:#ff6fae;--accent-dim:#d04a8e;--accent-glow:rgba(255,111,174,.14);--gold:#f0b040;--gold-dim:#b87818;--gold-glow:rgba(240,176,64,.18);--purple:#b48aff;--danger:#ff5560;--success:#4ade80;--warning:#e8b028;--hp:#ff5560;--sp:#ff6fae;--xp:#4ade80;--pol-low:#ff8ab8;--pol-mid:#b48aff;--pol-high:#5a4a8a;--pol-max:#ff3340}
+body[data-theme="sakura"]{--bg-deep:#faf4f7;--bg-surface:#fff;--bg-elevated:#f5e9ef;--bg-hover:#eed9e4;--border:#e6d2dd;--border-active:#d4a8bf;--text-primary:#3b2433;--text-secondary:#7a5a6d;--text-muted:#a78a9a;--accent:#d14a7e;--accent-dim:#a93361;--accent-glow:rgba(209,74,126,.12);--gold:#b87e1e;--gold-dim:#96621a;--gold-glow:rgba(184,126,30,.15);--purple:#8b5fc0;--danger:#d83848;--success:#2f9e5f;--warning:#c8901a;--hp:#d83848;--sp:#d14a7e;--xp:#2f9e5f;--pol-low:#e8749f;--pol-mid:#9a6fd0;--pol-high:#6b5a8a;--pol-max:#d83848}
+body[data-theme="homura"]{--bg-deep:#05070f;--bg-surface:#0a1120;--bg-elevated:#101a30;--bg-hover:#182540;--border:#22314f;--border-active:#33486e;--text-primary:#e8f0ff;--text-secondary:#9fb4d8;--text-muted:#64789c;--accent:#5ba8ff;--accent-dim:#3a7bd8;--accent-glow:rgba(91,168,255,.14);--gold:#f0b040;--gold-dim:#b87818;--gold-glow:rgba(240,176,64,.18);--purple:#a78bfa;--danger:#ff5a68;--success:#4ade80;--warning:#e8b028;--hp:#ff5a68;--sp:#5ba8ff;--xp:#4ade80;--pol-low:#8ec5ff;--pol-mid:#a78bfa;--pol-high:#5a4a8a;--pol-max:#ff3340}
+:root{--radius-sm:5px;--radius:8px;--radius-lg:14px;--shadow:0 6px 32px rgba(0,0,0,.5);--font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;--font-mono:"SF Mono","Cascadia Code","Consolas",monospace;--transition:180ms ease}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-primary);line-height:1.55;-webkit-font-smoothing:antialiased;user-select:none;transition:background var(--transition),color var(--transition)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea,select{background:var(--bg-surface);border:1px solid var(--border);color:var(--text-primary);border-radius:var(--radius-sm);padding:8px 12px;outline:none;transition:border var(--transition)}
+input:focus,textarea:focus{border-color:var(--accent-dim)}
+textarea{resize:vertical;line-height:1.6}
+select{cursor:pointer}
+label{display:block;font-size:11px;color:var(--text-muted);margin:10px 0 4px;letter-spacing:.3px}
+.hint{font-size:10.5px;color:var(--text-muted);margin-top:3px;line-height:1.5}
+.row{display:flex;gap:8px;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.spacer{flex:1}
+.val-big{font-size:16px;font-weight:700;color:var(--accent);font-family:var(--font-mono);margin-left:6px}
+/* ===== Buttons ===== */
+.btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-elevated);transition:all var(--transition);white-space:nowrap}
+.btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-active)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#17060e}
+.btn.primary:hover{filter:brightness(1.12)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.danger:hover{background:var(--danger);color:#fff}
+.btn.gold{color:var(--gold);border-color:var(--gold-dim)}
+.btn.gold:hover{background:var(--gold-glow)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ===== Layout ===== */
+#app{display:grid;grid-template-columns:1fr;grid-template-rows:46px 1fr;height:100vh;gap:1px;background:var(--border)}
+#topbar{grid-column:1;grid-row:1;background:var(--bg-surface);display:flex;align-items:center;padding:0 10px;gap:6px;border-bottom:1px solid var(--border);z-index:20;overflow-x:auto;scrollbar-width:none}
+#topbar::-webkit-scrollbar{display:none}
+#center-panel{grid-column:1;grid-row:2;background:var(--bg-deep);display:flex;flex-direction:column;overflow:hidden;position:relative}
+
+#left-panel{position:fixed;left:0;top:46px;bottom:0;width:300px;background:var(--bg-surface);z-index:40;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:6px;transform:translateX(-100%);transition:transform 220ms ease;border-right:1px solid var(--border);box-shadow:4px 0 20px rgba(0,0,0,.3)}
+#left-panel.open{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0;position:sticky;top:0;background:var(--bg-surface);z-index:5}
+.drawer-close{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--border);color:var(--text-secondary);font-size:13px;display:flex;align-items:center;justify-content:center;transition:all var(--transition)}
+.drawer-close:hover{color:var(--danger);border-color:var(--danger);background:var(--accent-glow)}
+.drawer-backdrop{position:fixed;inset:0;top:46px;background:rgba(0,0,0,.4);z-index:39;display:none}
+.drawer-backdrop.show{display:block}
+
+/* ===== Top Bar ===== */
+#topbar .logo{font-size:14px;font-weight:700;letter-spacing:.5px;color:var(--accent);white-space:nowrap;display:flex;align-items:center;gap:5px}
+#topbar .logo span{color:var(--text-secondary);font-weight:400;font-size:10px}
+.top-btn{padding:5px 10px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;transition:all var(--transition);border:1px solid var(--border);color:var(--text-secondary);display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
+.top-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-active)}
+.top-btn.accent{border-color:var(--accent-dim);color:var(--accent)}
+.top-btn.accent:hover{background:var(--accent-glow)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+.top-btn.gold.active{background:var(--gold);color:#000;border-color:var(--gold);font-weight:700;box-shadow:0 0 12px var(--gold-glow)}
+.top-btn .t{display:inline}
+
+/* ===== Panel Cards ===== */
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:10px;flex-shrink:0}
+.panel-card h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);margin-bottom:7px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tag{font-size:9px;font-weight:600;padding:1px 7px;border-radius:20px;border:1px solid var(--border-active);color:var(--text-secondary);text-transform:none;letter-spacing:0}
+.tag.good{color:var(--success);border-color:var(--success)}
+.tag.warn{color:var(--warning);border-color:var(--warning)}
+.tag.bad{color:var(--danger);border-color:var(--danger)}
+
+/* ===== Character Panel ===== */
+.char-header{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.char-gem{width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.85) 0 10%,var(--gem,#ff6fae) 55%,rgba(0,0,0,.55) 100%);box-shadow:0 0 16px var(--gem-glow,rgba(255,111,174,.5));flex-shrink:0;transition:filter .4s ease}
+.char-name{font-size:14px;font-weight:700}
+.char-level{font-size:10px;color:var(--text-muted)}
+.char-meta{font-size:10px;color:var(--text-muted);margin-top:1px}
+.stat-row{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.stat-label{font-size:10px;color:var(--text-muted);width:34px;flex-shrink:0}
+.stat-bar-wrap{flex:1;height:12px;background:var(--bg-deep);border-radius:3px;overflow:hidden;position:relative}
+.stat-bar-fill{height:100%;border-radius:3px;transition:width 400ms ease,background 400ms ease}
+.stat-bar-fill.hp{background:var(--hp)}
+.stat-bar-fill.mg{background:var(--sp)}
+.stat-bar-fill.hope{background:var(--success)}
+.stat-bar-fill.despair{background:var(--purple)}
+.stat-bar-fill.pol{background:var(--pol-low)}
+.stat-val{font-size:10px;color:var(--text-secondary);width:44px;text-align:right;flex-shrink:0;font-family:var(--font-mono)}
+.ability-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.ability-item{background:var(--bg-deep);border-radius:var(--radius-sm);padding:6px 2px;text-align:center}
+.ability-item .val{font-size:15px;font-weight:700;font-family:var(--font-mono)}
+.ability-item .lbl{font-size:9px;color:var(--text-muted);margin-top:1px}
+.ability-item .val.courage{color:var(--danger)}
+.ability-item .val.perception{color:var(--accent)}
+.ability-item .val.will{color:var(--purple)}
+.ability-item .val.bond{color:var(--success)}
+.ability-item .val.reason{color:var(--gold)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:9.5px;padding:2px 8px;border-radius:20px;background:var(--bg-deep);border:1px solid var(--border);color:var(--text-secondary)}
+.chip.inj{color:var(--danger);border-color:var(--danger)}
+.status-box{font-size:11px;color:var(--text-secondary);line-height:1.65;background:var(--bg-deep);border-radius:var(--radius-sm);padding:7px 9px;margin-top:5px;white-space:pre-wrap;word-break:break-word}
+.kv{display:flex;justify-content:space-between;gap:8px;font-size:11px;padding:2px 0;color:var(--text-muted)}
+.kv b{color:var(--text-secondary);font-weight:600;text-align:right;word-break:break-word}
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.res-item{background:var(--bg-deep);border-radius:var(--radius-sm);padding:6px 8px;font-size:10.5px;display:flex;justify-content:space-between;align-items:center}
+.res-item b{font-family:var(--font-mono);color:var(--gold)}
+.people-item{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:var(--radius-sm);background:var(--bg-deep);margin-bottom:4px;font-size:11px}
+.people-item .nm{font-weight:600}
+.people-item .tg{color:var(--text-muted);flex:1;font-size:9.5px}
+.people-item .st{font-size:9px;padding:1px 6px;border-radius:20px;border:1px solid var(--border);color:var(--text-secondary)}
+.people-item .st.danger{color:var(--danger);border-color:var(--danger)}
+.people-item .st.warn{color:var(--warning);border-color:var(--warning)}
+.people-item .st.good{color:var(--success);border-color:var(--success)}
+/* ===== Game Log & Messages ===== */
+#game-log{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.msg{max-width:82%;padding:10px 14px;border-radius:var(--radius);font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word;animation:fadeIn 250ms ease}
+.msg.user{align-self:flex-end;background:var(--accent);color:#17060e;border-bottom-right-radius:4px;font-weight:500}
+.msg.ai{align-self:flex-start;background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--accent-dim);border-bottom-left-radius:4px}
+.msg.system{align-self:center;font-size:10.5px;color:var(--text-muted);background:var(--bg-surface);border:1px solid var(--border);padding:4px 12px;border-radius:20px;max-width:90%}
+.msg .caret{display:inline-block;width:7px;height:13px;background:var(--accent);animation:blink 1s steps(2) infinite;vertical-align:middle;margin-left:2px;border-radius:1px}
+.msg details.reasoning{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;margin-bottom:8px;font-size:11px}
+.msg details.reasoning summary{color:var(--purple);cursor:pointer;font-weight:600;font-size:11px}
+.msg details.reasoning .r-body{color:var(--text-secondary);margin-top:6px;line-height:1.7;white-space:pre-wrap;max-height:220px;overflow-y:auto}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ===== Input ===== */
+#input-area{padding:10px 14px 6px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;gap:7px;align-items:flex-end}
+#input-area textarea{flex:1;resize:none;min-height:40px;max-height:110px;font-size:12.5px;line-height:1.5;border-radius:var(--radius);background:var(--bg-deep);padding:9px 12px}
+#input-area textarea::placeholder{color:var(--text-muted)}
+#send-btn{padding:9px 18px;background:var(--accent);color:#17060e;border-radius:var(--radius);font-weight:700;font-size:12px;transition:all var(--transition);white-space:nowrap}
+#send-btn:hover{filter:brightness(1.12)}
+#send-btn:disabled{opacity:.35;cursor:not-allowed}
+.sq-btn{width:32px;height:32px;border-radius:var(--radius-sm);border:1px solid var(--border);color:var(--text-secondary);font-size:13px;display:flex;align-items:center;justify-content:center;transition:all var(--transition);flex-shrink:0}
+.sq-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-active)}
+.sq-btn.danger:hover{color:var(--danger);border-color:var(--danger)}
+
+/* ===== Quick Actions ===== */
+.quick-actions{display:flex;flex-wrap:wrap;gap:5px;padding:8px 14px 10px}
+.quick-action{padding:5px 11px;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:10.5px;color:var(--text-secondary);transition:all var(--transition)}
+.quick-action:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-active)}
+.quick-action.cheat{display:none;border-color:var(--gold-dim);color:var(--gold)}
+.quick-action.cheat:hover{background:var(--gold-glow)}
+body.cheat-on .quick-action.cheat{display:inline-block}
+
+/* ===== Modals ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:80;display:none;align-items:center;justify-content:center;padding:14px;backdrop-filter:blur(2px)}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;width:520px;max-width:96vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);animation:fadeIn 220ms ease}
+.modal.wide{width:720px}
+.modal h2{font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.modal .m-sub{font-size:11px;color:var(--text-muted);margin-bottom:10px}
+.modal hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;justify-content:flex-end}
+.btn-row.left{justify-content:flex-start}
+
+/* ===== Creation Wizard ===== */
+#creation{position:fixed;inset:0;z-index:90;background:radial-gradient(ellipse at 20% 0%,var(--accent-glow),transparent 55%),radial-gradient(ellipse at 80% 100%,var(--gold-glow),transparent 50%),var(--bg-deep);overflow-y:auto;padding:20px 12px}
+.wz-card{max-width:640px;margin:0 auto;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;box-shadow:var(--shadow)}
+.wz-title{font-size:16px;font-weight:800;letter-spacing:.5px;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wz-title span{color:var(--text-muted);font-weight:400;font-size:10px;letter-spacing:1px}
+.wz-dots{display:flex;gap:5px;justify-content:center;margin:12px 0 4px;flex-wrap:wrap}
+.wz-dot{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);font-size:10px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);background:var(--bg-deep);flex-shrink:0}
+.wz-dot.on{background:var(--accent);color:#17060e;border-color:var(--accent);font-weight:700}
+.wz-dot.done{border-color:var(--accent-dim);color:var(--accent)}
+.wz-nav{display:flex;align-items:center;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+.create-step{display:none;animation:fadeIn 240ms ease}
+.create-step.on{display:block}
+.step-title{font-size:14px;font-weight:700;margin-bottom:2px}
+.step-sub{font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.6}
+.opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.option-card{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;transition:all var(--transition);background:var(--bg-deep);display:flex;flex-direction:column;gap:3px}
+.option-card:hover{border-color:var(--border-active);background:var(--bg-hover)}
+.option-card.selected{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 0 1px var(--accent)}
+.option-card b{font-size:12px}
+.option-card span{font-size:10px;color:var(--text-muted);line-height:1.5}
+.talent-bar{display:flex;justify-content:space-between;align-items:center;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin:8px 0;font-size:11px;color:var(--text-secondary);flex-wrap:wrap;gap:6px}
+.talent-bar b{color:var(--gold);font-family:var(--font-mono);font-size:13px}
+.cheat-toggle{display:flex;align-items:center;gap:6px;margin:0;font-size:11px;color:var(--gold);cursor:pointer}
+.cheat-toggle input{accent-color:var(--gold)}
+.talent-row{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed var(--border)}
+.talent-row .lbl{width:44px;font-size:11px;color:var(--text-secondary);flex-shrink:0;font-weight:600}
+.talent-row .desc{font-size:9.5px;color:var(--text-muted);flex:1;text-align:right}
+.stepper{display:flex;align-items:center;gap:7px}
+.step-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text-secondary);font-size:14px;display:flex;align-items:center;justify-content:center;transition:all var(--transition)}
+.step-btn:hover{border-color:var(--accent-dim);color:var(--accent)}
+.step-btn:disabled{opacity:.25;cursor:not-allowed}
+.stepper .val{width:22px;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--accent)}
+.person-grid{display:flex;flex-direction:column;gap:5px;margin:6px 0}
+.person-row{display:flex;gap:5px;align-items:center}
+.person-row input{flex:1;min-width:0}
+.person-row select{width:76px;flex-shrink:0;padding:8px 6px}
+.fold{border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;margin-top:10px;background:var(--bg-deep)}
+.fold summary{font-size:11px;color:var(--accent);cursor:pointer;font-weight:600}
+.fold[open] summary{margin-bottom:4px}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip-btn{font-size:10.5px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-deep);transition:all var(--transition)}
+.chip-btn:hover{border-color:var(--accent-dim);color:var(--accent);background:var(--accent-glow)}
+.confirm-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.confirm-card{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;background:var(--bg-deep)}
+.confirm-card h4{font-size:11px;color:var(--accent);margin-bottom:5px;letter-spacing:.5px}
+.confirm-card .kv{font-size:11px}
+.confirm-card .kv b{max-width:70%}
+.gem-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.gem-swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all var(--transition);flex-shrink:0}
+.gem-swatch:hover{transform:scale(1.12)}
+.gem-swatch.on{border-color:#fff;box-shadow:0 0 8px var(--gem-glow,currentColor)}
+.gem-swatch input{display:none}
+input[type=color]{width:34px;height:26px;padding:2px;border-radius:4px;cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--accent)}
+/* ===== Wiki / Memory / Deaths panels ===== */
+.wiki-wrap{display:flex;gap:0;height:60vh;min-height:380px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+#wiki-tabs{width:150px;flex-shrink:0;overflow-y:auto;background:var(--bg-deep);display:flex;flex-direction:column;gap:1px;border-right:1px solid var(--border);padding:4px}
+.wiki-tab{padding:8px 10px;font-size:11.5px;color:var(--text-secondary);cursor:pointer;border-left:3px solid transparent;border-radius:3px;text-align:left;line-height:1.4}
+.wiki-tab:hover{background:var(--bg-hover);color:var(--text-primary)}
+.wiki-tab.on{border-left-color:var(--accent);background:var(--accent-glow);color:var(--text-primary);font-weight:600}
+#wiki-content{flex:1;overflow-y:auto;padding:14px 16px;font-size:12px;line-height:1.8;color:var(--text-secondary)}
+#wiki-content h4{color:var(--accent);margin:12px 0 4px;font-size:12.5px}
+#wiki-content h4:first-child{margin-top:0}
+#wiki-content .kw{color:var(--gold);font-weight:600}
+#wiki-content .tag2{color:var(--text-muted);font-size:10px;display:block;margin-bottom:2px;letter-spacing:1px}
+.wiki-ask{display:flex;gap:6px;margin-top:10px}
+.wiki-ask input{flex:1}
+#wiki-answer{font-size:11.5px;color:var(--text-secondary);line-height:1.7;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-top:8px;white-space:pre-wrap;display:none;max-height:180px;overflow-y:auto}
+.mem-sec{margin-bottom:14px}
+.mem-sec h4{font-size:11px;color:var(--accent);letter-spacing:1px;margin-bottom:6px}
+.mem-item{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:var(--radius-sm);background:var(--bg-deep);border:1px solid var(--border);margin-bottom:4px;font-size:11.5px;line-height:1.6}
+.mem-item .no{color:var(--gold);font-family:var(--font-mono);font-size:10px;flex-shrink:0;margin-top:1px}
+.mem-item .tx{flex:1;color:var(--text-secondary)}
+.mem-item .del{color:var(--text-muted);cursor:pointer;font-size:12px;flex-shrink:0;padding:0 2px}
+.mem-item .del:hover{color:var(--danger)}
+.mem-empty{font-size:11px;color:var(--text-muted);text-align:center;padding:10px}
+.death-item{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;background:var(--bg-deep)}
+.death-item .h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.death-item .h b{font-size:12px;color:var(--danger)}
+.death-item .h .dt{font-size:9.5px;color:var(--text-muted)}
+.death-item .cause{font-size:11.5px;color:var(--text-secondary);line-height:1.6}
+.death-item .eval{font-size:11px;color:var(--text-secondary);background:var(--bg-surface);border-radius:var(--radius-sm);padding:8px 10px;margin-top:6px;white-space:pre-wrap;line-height:1.65;display:none}
+.death-item .eval.show{display:block}
+.death-item .btns{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+
+/* ===== Death Overlay ===== */
+#death-overlay{position:fixed;inset:0;z-index:110;background:radial-gradient(ellipse at center,#2a0a18 0%,#0a0308 72%);display:none;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
+#death-overlay.show{display:flex}
+.death-card{max-width:620px;width:100%;background:var(--bg-surface);border:1px solid #5a1a2a;border-radius:var(--radius-lg);padding:22px;box-shadow:0 0 60px rgba(255,40,80,.22);animation:fadeIn 300ms ease}
+.death-title{font-size:18px;font-weight:800;color:var(--danger);margin-bottom:4px}
+.death-sub{font-size:11px;color:var(--text-muted);margin-bottom:12px}
+.death-cause{font-size:13px;color:var(--text-primary);background:var(--bg-deep);border-left:3px solid var(--danger);border-radius:var(--radius-sm);padding:10px 12px;line-height:1.7;margin-bottom:12px;white-space:pre-wrap}
+.death-eval{font-size:12px;color:var(--text-secondary);background:var(--bg-deep);border-radius:var(--radius);padding:12px;line-height:1.75;white-space:pre-wrap;max-height:280px;overflow-y:auto;border:1px solid var(--border)}
+
+/* ===== Toast / Continue ===== */
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--bg-elevated);border:1px solid var(--border-active);color:var(--text-primary);padding:10px 18px;border-radius:8px;font-size:12px;z-index:300;opacity:0;pointer-events:none;transition:all .25s ease;box-shadow:var(--shadow);max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.success{border-color:var(--success);color:var(--success)}
+#toast.error{border-color:var(--danger);color:var(--danger)}
+.overlay-simple{position:fixed;inset:0;z-index:95;background:radial-gradient(ellipse at 20% 0%,var(--accent-glow),transparent 55%),var(--bg-deep);display:none;align-items:center;justify-content:center;padding:20px}
+.overlay-simple.show{display:flex}
+.simple-card{max-width:420px;width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:26px;text-align:center;box-shadow:var(--shadow)}
+.simple-card p{font-size:12px;color:var(--text-secondary);margin:12px 0 16px;line-height:1.7}
+.simple-card .row{justify-content:center}
+
+/* ===== Responsive ===== */
+@media (max-width:768px){
+  #left-panel{width:100%;border-right:none}
+  .top-btn .t{display:none}
+  .top-btn{padding:5px 9px}
+  #topbar .logo span{display:none}
+  .grid2{grid-template-columns:1fr}
+  .opt-grid{grid-template-columns:1fr}
+  .ability-grid{grid-template-columns:repeat(5,1fr)}
+  .wiki-wrap{flex-direction:column;height:65vh}
+  #wiki-tabs{width:100%;flex-direction:row;overflow-x:auto;border-right:none;border-bottom:1px solid var(--border)}
+  .wiki-tab{white-space:nowrap;border-left:none;border-bottom:2px solid transparent}
+  .wiki-tab.on{border-left:none;border-bottom-color:var(--accent)}
+  .msg{max-width:92%}
+  .person-row{flex-wrap:wrap}
+  .person-row select{width:100%}
+  .wz-card{padding:16px}
+  .modal{padding:14px}
+}
+</style>
+</head>
+<body data-theme="witch">
+<!-- ===== Creation Wizard ===== -->
+<div id="creation">
+  <div class="wz-card">
+    <div class="wz-title">💠 魔法少女小圆 <span>MADOKA MAGICA · 见泷原市 TRPG</span></div>
+    <div class="wz-dots" id="wz-dots"></div>
+
+    <div class="create-step on" id="wz-step-0">
+      <div class="step-title">⚙️ API 配置</div>
+      <div class="step-sub">默认使用 DeepSeek 接口。API Key 仅保存在本地浏览器，不会上传到任何服务器。</div>
+      <label>API 端点</label>
+      <input id="wz-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+      <label>API Key</label>
+      <input id="wz-apikey" type="password" placeholder="sk-xxxxxxxx">
+      <label>模型（点击「拉取模型列表」从 API 获取）</label>
+      <div class="row">
+        <select id="wz-model" style="flex:1">
+          <option value="deepseek-chat">deepseek-chat</option>
+          <option value="deepseek-reasoner">deepseek-reasoner</option>
+        </select>
+        <button class="btn" id="wz-fetch" type="button">↻ 拉取模型</button>
+        <button class="btn" id="wz-test" type="button">🔌 测试</button>
+      </div>
+      <div class="hint" id="wz-model-hint"></div>
+      <div class="grid2">
+        <div>
+          <label>推理强度</label>
+          <select id="wz-reasoning">
+            <option value="max" selected>最大推理（推荐）</option>
+            <option value="high">高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
+            <option value="minimal">最小</option>
+          </select>
+        </div>
+        <div>
+          <label>输出 Token 限制</label>
+          <select id="wz-maxtokens">
+            <option value="unlimited" selected>无限制</option>
+            <option value="2048">2048</option>
+            <option value="4096">4096</option>
+            <option value="8192">8192</option>
+            <option value="16384">16384</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint">配置完成后点击「下一步」。</div>
+    </div>
+
+    <div class="create-step" id="wz-step-1">
+      <div class="step-title">👤 角色信息</div>
+      <div class="step-sub">契约对象：11-16 岁的少女（世界观默认；若开放男性契约需说明其因果特殊性）。</div>
+      <div class="grid2">
+        <div><label>姓名</label><input id="wz-name" placeholder="例如：鹿目圆"></div>
+        <div><label>年龄</label><select id="wz-age"></select></div>
+      </div>
+      <div class="grid2">
+        <div>
+          <label>性别</label>
+          <select id="wz-gender">
+            <option value="女" selected>女（设定默认）</option>
+            <option value="男">男（特殊因果，GM 裁定）</option>
+            <option value="自定义">自定义</option>
+          </select>
+        </div>
+        <div><label>学校 / 身份</label><input id="wz-school" placeholder="见泷原中学 二年级"></div>
+      </div>
+      <label>外貌</label>
+      <textarea id="wz-look" rows="2" placeholder="发色、瞳色、体型、常服风格…（可留空由 GM 定）"></textarea>
+      <label>性格</label>
+      <textarea id="wz-personality" rows="2" placeholder="核心性格、口头禅、软肋…（可留空由 GM 定）"></textarea>
+      <div class="sub-title">✨ 天赋 · 五维属性（初始合计 15 点，范围 1-5）</div>
+      <div class="talent-bar">
+        <span>剩余天赋点：<b id="wz-talent-pool">15</b></span>
+        <label class="cheat-toggle"><input type="checkbox" id="wz-cheat"> ⭐ 作弊模式：无限天赋点</label>
+      </div>
+      <div class="talent-row" data-attr="courage"><span class="lbl">勇气</span><div class="stepper"><button class="step-btn minus" type="button">−</button><span class="val" id="attr-courage-val">3</span><button class="step-btn plus" type="button">＋</button></div><span class="desc">战斗 · 直面恐怖 · 主动行动</span></div>
+      <div class="talent-row" data-attr="perception"><span class="lbl">感知</span><div class="stepper"><button class="step-btn minus" type="button">−</button><span class="val" id="attr-perception-val">3</span><button class="step-btn plus" type="button">＋</button></div><span class="desc">侦测魔女 · 洞察谎言与危险</span></div>
+      <div class="talent-row" data-attr="will"><span class="lbl">意志</span><div class="stepper"><button class="step-btn minus" type="button">−</button><span class="val" id="attr-will-val">3</span><button class="step-btn plus" type="button">＋</button></div><span class="desc">抵抗污染 · 心理承受 · 抵御精神攻击</span></div>
+      <div class="talent-row" data-attr="bond"><span class="lbl">羁绊</span><div class="stepper"><button class="step-btn minus" type="button">−</button><span class="val" id="attr-bond-val">3</span><button class="step-btn plus" type="button">＋</button></div><span class="desc">人际影响力 · 凝聚同伴 · 被信任</span></div>
+      <div class="talent-row" data-attr="reason"><span class="lbl">理性</span><div class="stepper"><button class="step-btn minus" type="button">−</button><span class="val" id="attr-reason-val">3</span><button class="step-btn plus" type="button">＋</button></div><span class="desc">分析 · 破解结界法则 · 契约谈判</span></div>
+      <div class="sub-title">💝 重要之人 ×3（希望的主要来源）</div>
+      <div class="person-grid">
+        <div class="person-row"><input class="p-name" placeholder="重要之人①（如：妈妈）"><input class="p-tag" placeholder="关系标签（如：温柔的支柱）"><select class="p-status"><option>平安</option><option>健康</option><option>忧郁</option><option>危险</option><option>未知</option></select></div>
+        <div class="person-row"><input class="p-name" placeholder="重要之人②（如：挚友）"><input class="p-tag" placeholder="关系标签"><select class="p-status"><option>平安</option><option>健康</option><option>忧郁</option><option>危险</option><option>未知</option></select></div>
+        <div class="person-row"><input class="p-name" placeholder="重要之人③（如：老师）"><input class="p-tag" placeholder="关系标签"><select class="p-status"><option>平安</option><option>健康</option><option>忧郁</option><option>危险</option><option>未知</option></select></div>
+      </div>
+      <label>秘密（绝望的来源，也是角色的深度）</label>
+      <textarea id="wz-secret" rows="2" placeholder="一个只有你知道的黑暗秘密…（可留空，由 GM 与你共同确立）"></textarea>
+    </div>
+    <div class="create-step" id="wz-step-2">
+      <div class="step-title">🕯️ 契约与愿望（按世界观设定）</div>
+      <div class="step-sub">丘比会「实现一个愿望」，但其能力有限、文字游戏式兑现；愿望决定你的固有武器与固有魔法。愿望越大，需要的因果越多。</div>
+      <label>战役时代（决定敌人与掉落物）</label>
+      <div class="opt-grid" id="wz-era">
+        <div class="option-card" data-era="A"><b>A · 魔女时代</b><span>TV 本篇：猎杀魔女 → 悲叹之种。残酷循环、真相揭露、结构稀缺。</span></div>
+        <div class="option-card" data-era="B"><b>B · 圆环之理时代</b><span>魔女已在诞生前被抹除：猎杀魔兽 → 悲叹之块。失忆的世界。</span></div>
+        <div class="option-card" data-era="C"><b>C · 焰魔时代</b><span>被安排的世界：魔女重现 + 记忆篡改。寻找自由意志的证据。</span></div>
+      </div>
+      <div class="hint" id="wz-era-hint"></div>
+      <label>愿望 The Wish（核心！请慎重——丘比会逐字实现它）</label>
+      <textarea id="wz-wish" rows="2" placeholder="例如：「治好他的手」「让妈妈回来」「消灭所有魔女」…"></textarea>
+      <div class="grid2">
+        <div><label>固有武器（由愿望主题决定）</label><input id="wz-weapon" placeholder="剑 / 盾 / 缎带 / 枪械 / 幻术…"></div>
+        <div>
+          <label>起始因果（1-5）</label>
+          <div class="row"><input type="range" id="wz-karma" min="1" max="5" step="1" value="3" style="flex:1"><span class="val-big" id="wz-karma-val">3</span></div>
+          <div class="hint">愿望的利他性 / 规模 / 对世界的影响</div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div><label>固有魔法 · 核心能力</label><input id="wz-magic-core" placeholder="核心魔法（1 个）"></div>
+        <div><label>固有魔法 · 辅助能力</label><input id="wz-magic-sub" placeholder="辅助魔法（1 个）"></div>
+      </div>
+      <label>契约记忆</label>
+      <select id="wz-contract-memory">
+        <option value="blur" selected>记忆模糊（丘比常在激动中让你签约）</option>
+        <option value="clear">记得全部细节</option>
+        <option value="none">完全不记得</option>
+      </select>
+      <details class="fold">
+        <summary>＋ 补充自定义（可选）</summary>
+        <div class="grid2">
+          <div><label>称号 / 代号</label><input id="wz-title" placeholder="例如：绯色猎手"></div>
+          <div>
+            <label>灵魂宝石颜色</label>
+            <div class="gem-row" id="wz-gems">
+              <span class="gem-swatch" data-color="#ff6fae" style="background:#ff6fae"></span>
+              <span class="gem-swatch" data-color="#5ba8ff" style="background:#5ba8ff"></span>
+              <span class="gem-swatch" data-color="#4ade80" style="background:#4ade80"></span>
+              <span class="gem-swatch" data-color="#f0b040" style="background:#f0b040"></span>
+              <span class="gem-swatch" data-color="#b48aff" style="background:#b48aff"></span>
+              <span class="gem-swatch" data-color="#e85058" style="background:#e85058"></span>
+              <input type="color" id="wz-gemcolor" value="#ff6fae">
+            </div>
+          </div>
+        </div>
+        <label>变身形象 / 战斗服风格</label>
+        <input id="wz-form" placeholder="简短的视觉描述（可留空）">
+        <label>初始所在地</label>
+        <input id="wz-location" placeholder="见泷原市 · 车站前">
+      </details>
+    </div>
+
+    <div class="create-step" id="wz-step-3">
+      <div class="step-title">📝 备注信息</div>
+      <div class="step-sub">写给 GM（AI）的备注：风格偏好、雷区、期望的剧情走向。可点击下方标签快速填入。</div>
+      <textarea id="wz-notes" rows="6" placeholder="例如：希望多描写心理与情绪；战斗要有紧张感与代价；刀子可以轻一点；重视日常与羁绊…"></textarea>
+      <div class="chip-row" id="wz-note-chips">
+        <button class="chip-btn" type="button">多描写心理与情绪</button>
+        <button class="chip-btn" type="button">重视日常与羁绊</button>
+        <button class="chip-btn" type="button">战斗要有紧张感与代价</button>
+        <button class="chip-btn" type="button">刀子可以轻一点</button>
+        <button class="chip-btn" type="button">希望有原作式反转</button>
+        <button class="chip-btn" type="button">NPC 保持边界感</button>
+        <button class="chip-btn" type="button">多展示掷骰判定</button>
+      </div>
+    </div>
+
+    <div class="create-step" id="wz-step-4">
+      <div class="step-title">🎚️ 难度设定</div>
+      <div class="step-sub">难度影响悲叹之种（/悲叹之块）的掉落率、污染累积速度与叙事残酷程度。</div>
+      <div class="opt-grid" id="wz-diff">
+        <div class="option-card" data-diff="easy"><b>🍃 简单</b><span>种子更充裕、污染更缓、GM 更保护性地叙事</span></div>
+        <div class="option-card" data-diff="normal"><b>🌙 普通</b><span>忠于原作的标准体验（推荐）</span></div>
+        <div class="option-card" data-diff="hard"><b>🔥 困难</b><span>资源稀缺、战斗残酷、重要之人更易遇险</span></div>
+        <div class="option-card" data-diff="hell"><b>🩸 地狱 · 原作再现</b><span>「被设计的屠宰场」：高死亡率、无情揭露</span></div>
+      </div>
+      <div class="hint" id="wz-diff-hint"></div>
+    </div>
+
+    <div class="create-step" id="wz-step-5">
+      <div class="step-title">✅ 信息确认</div>
+      <div class="step-sub">确认以下全部信息，点击「缔结契约」进入见泷原市的夜色。</div>
+      <div class="confirm-grid" id="confirm-body"></div>
+    </div>
+
+    <div class="wz-nav">
+      <button class="btn" id="wz-prev" type="button">← 上一步</button>
+      <div class="spacer"></div>
+      <button class="btn primary" id="wz-next" type="button">下一步 →</button>
+      <button class="btn primary" id="wz-finish" type="button" style="display:none">⚔️ 缔结契约 · 开始游戏</button>
+    </div>
+  </div>
+</div>
+<!-- ===== Main App ===== -->
+<div id="app" style="display:none">
+  <div id="topbar">
+    <div class="logo">💠 魔法少女小圆 <span>见泷原市 TRPG</span></div>
+    <button class="top-btn accent" id="btn-char" type="button" title="角色页面">👤<span class="t"> 角色</span></button>
+    <button class="top-btn" id="btn-wiki" type="button" title="世界百科">📖<span class="t"> 百科</span></button>
+    <button class="top-btn" id="btn-memory" type="button" title="记忆档案">🧠<span class="t"> 记忆</span></button>
+    <button class="top-btn" id="btn-deaths" type="button" title="死亡回档">⏳<span class="t"> 死亡回档</span></button>
+    <div class="spacer"></div>
+    <button class="top-btn gold" id="cheat-toggle" type="button" title="金手指">⭐<span class="t"> 金手指</span></button>
+    <button class="top-btn" id="btn-export" type="button" title="导出存档">💾<span class="t"> 导出</span></button>
+    <button class="top-btn" id="btn-import" type="button" title="导入存档">📥<span class="t"> 导入</span></button>
+    <button class="top-btn accent" id="btn-settings" type="button" title="设置">⚙️<span class="t"> 设置</span></button>
+  </div>
+
+  <div id="left-panel">
+    <div class="drawer-head"><span>👤 角色页面</span><button class="drawer-close" id="drawer-close" type="button" title="关闭">✕</button></div>
+    <div class="panel-card">
+      <div class="char-header">
+        <div class="char-gem" id="char-gem"></div>
+        <div style="flex:1;min-width:0">
+          <div class="char-name" id="char-name">---</div>
+          <div class="char-level" id="char-title">---</div>
+          <div class="char-meta" id="char-meta">---</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h3>💠 灵魂宝石 <span class="tag good" id="pollution-label">明亮</span></h3>
+      <div class="stat-row"><span class="stat-label">污染</span><div class="stat-bar-wrap"><div class="stat-bar-fill pol" id="pollution-bar" style="width:0%"></div></div><span class="stat-val" id="pollution-val">0/10</span></div>
+      <div class="stat-row"><span class="stat-label">魔力</span><div class="stat-bar-wrap"><div class="stat-bar-fill mg" id="magic-bar" style="width:100%"></div></div><span class="stat-val" id="magic-val">10/10</span></div>
+      <div class="stat-row"><span class="stat-label">希望</span><div class="stat-bar-wrap"><div class="stat-bar-fill hope" id="hope-bar" style="width:50%"></div></div><span class="stat-val" id="hope-val">5/10</span></div>
+      <div class="stat-row"><span class="stat-label">绝望</span><div class="stat-bar-wrap"><div class="stat-bar-fill despair" id="despair-bar" style="width:20%"></div></div><span class="stat-val" id="despair-val">2/10</span></div>
+      <div class="chips" style="margin-top:4px"><span class="chip" id="spiral-chip">⚖️ 希望占优</span></div>
+    </div>
+    <div class="panel-card">
+      <h3>🩹 身体（伤害标记）</h3>
+      <div class="chips" id="injury-chips"><span class="chip">无伤</span></div>
+      <div class="status-box" id="cond-body">—</div>
+    </div>
+    <div class="panel-card">
+      <h3>🧠 精神状态</h3>
+      <div class="status-box" id="cond-mental">—</div>
+    </div>
+    <div class="panel-card">
+      <h3>📍 处境</h3>
+      <div class="kv"><span>位置</span><b id="cond-location">—</b></div>
+      <div class="kv"><span>时间</span><b id="cond-time">—</b></div>
+      <div class="status-box" id="cond-status">—</div>
+    </div>
+    <div class="panel-card">
+      <h3>✨ 属性</h3>
+      <div class="ability-grid">
+        <div class="ability-item" title="战斗、直面恐怖、主动行动"><div class="val courage" id="attr-courage">3</div><div class="lbl">勇气</div></div>
+        <div class="ability-item" title="侦测魔女/结界、洞察"><div class="val perception" id="attr-perception">3</div><div class="lbl">感知</div></div>
+        <div class="ability-item" title="抵抗污染、精神承受"><div class="val will" id="attr-will">3</div><div class="lbl">意志</div></div>
+        <div class="ability-item" title="人际、凝聚同伴"><div class="val bond" id="attr-bond">3</div><div class="lbl">羁绊</div></div>
+        <div class="ability-item" title="分析、破解结界、谈判"><div class="val reason" id="attr-reason">3</div><div class="lbl">理性</div></div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h3>🕯️ 契约</h3>
+      <div class="kv"><span>愿望</span><b id="c-wish">—</b></div>
+      <div class="kv"><span>固有武器</span><b id="c-weapon">—</b></div>
+      <div class="kv"><span>核心魔法</span><b id="c-magic1">—</b></div>
+      <div class="kv"><span>辅助魔法</span><b id="c-magic2">—</b></div>
+      <div class="kv"><span>起始因果</span><b id="c-karma">—</b></div>
+      <div class="kv"><span>契约记忆</span><b id="c-memory">—</b></div>
+    </div>
+    <div class="panel-card">
+      <h3>🎒 资源</h3>
+      <div class="res-grid">
+        <div class="res-item"><span>悲叹之种</span><b id="res-seed">0</b></div>
+        <div class="res-item"><span>悲叹之块</span><b id="res-block">0</b></div>
+        <div class="res-item"><span>命运点数</span><b id="res-fate">0</b></div>
+        <div class="res-item"><span>暴露度</span><b id="res-exposed">0</b></div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h3>💝 重要之人</h3>
+      <div id="people-list"><div class="mem-empty">—</div></div>
+    </div>
+    <div class="panel-card">
+      <h3>🖤 秘密</h3>
+      <div class="status-box" id="secret-text">—</div>
+    </div>
+    <div class="panel-card">
+      <h3>📜 战役记录</h3>
+      <div class="kv"><span>时代</span><b id="cmp-era">—</b></div>
+      <div class="kv"><span>回合</span><b id="cmp-turn">0</b></div>
+      <div class="kv"><span>狩猎</span><b id="cmp-kills">0</b></div>
+      <div class="kv"><span>死亡次数</span><b id="cmp-deaths">0</b></div>
+    </div>
+  </div>
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div id="input-area">
+      <textarea id="user-input" rows="1" placeholder="输入你的行动…（Enter 发送）"></textarea>
+      <button class="sq-btn danger" id="btn-stop" type="button" title="停止生成" style="display:none">⏹</button>
+      <button class="sq-btn" id="btn-regen" type="button" title="重新生成AI回复" style="display:none">🔄</button>
+      <button id="send-btn" type="button">▶ 发送</button>
+    </div>
+    <div class="quick-actions" id="quick-actions">
+      <button class="quick-action" data-act="explore" type="button">🔍 探索</button>
+      <button class="quick-action" data-act="talk" type="button">💬 交谈</button>
+      <button class="quick-action" data-act="investigate" type="button">🕵️ 调查</button>
+      <button class="quick-action" data-act="hunt" type="button">⚔️ 狩猎</button>
+      <button class="quick-action" data-act="rest" type="button">😴 休息</button>
+      <button class="quick-action" data-act="purify" type="button">✨ 净化宝石</button>
+      <button class="quick-action" data-act="guard" type="button">🛡️ 戒备</button>
+      <button class="quick-action" data-act="fate" type="button">💎 命运点</button>
+      <button class="quick-action cheat" data-act="cheat_omni" type="button">👁 全知</button>
+      <button class="quick-action cheat" data-act="cheat_purify" type="button">💠 无限净化</button>
+      <button class="quick-action cheat" data-act="cheat_inv" type="button">🛡 无敌</button>
+      <button class="quick-action cheat" data-act="cheat_time" type="button">⏳ 时停</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Settings Modal (xiantu 风格) ===== -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h2>⚙️ 设置</h2>
+    <div class="m-sub">API 配置 · 存档管理 · 界面风格</div>
+    <label>API 端点</label>
+    <input id="cfg-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+    <div class="hint">DeepSeek 默认端点，一般无需修改</div>
+    <label>API Key</label>
+    <input id="cfg-apikey" type="password" placeholder="sk-xxxxxxxx">
+    <div class="hint">密钥仅保存在本地浏览器</div>
+    <label>模型（可点击拉取最新列表）</label>
+    <div class="row">
+      <select id="cfg-model" style="flex:1">
+        <option value="deepseek-chat">deepseek-chat</option>
+        <option value="deepseek-reasoner">deepseek-reasoner</option>
+      </select>
+      <button class="btn" id="cfg-fetch" type="button">↻ 拉取</button>
+      <button class="btn" id="cfg-test" type="button">🔌 测试</button>
+    </div>
+    <div class="hint" id="cfg-model-hint"></div>
+    <div class="grid2">
+      <div>
+        <label>推理强度</label>
+        <select id="cfg-reasoning">
+          <option value="max">最大推理（推荐）</option>
+          <option value="high">高</option>
+          <option value="medium">中</option>
+          <option value="low">低</option>
+          <option value="minimal">最小</option>
+        </select>
+      </div>
+      <div>
+        <label>输出 Token 限制</label>
+        <select id="cfg-maxtokens">
+          <option value="unlimited" selected>无限制</option>
+          <option value="2048">2048</option>
+          <option value="4096">4096</option>
+          <option value="8192">8192</option>
+          <option value="16384">16384</option>
+        </select>
+      </div>
+    </div>
+    <label>🎨 界面风格</label>
+    <div class="row" id="theme-row" style="flex-wrap:wrap">
+      <button class="btn" data-theme="witch" type="button">🕯️ 魔女之夜（默认）</button>
+      <button class="btn" data-theme="sakura" type="button">🌸 樱色黎明</button>
+      <button class="btn" data-theme="homura" type="button">⏳ 焰之蓝</button>
+    </div>
+    <label>💾 自动存档（每次 AI 回复后自动保存）</label>
+    <div class="row"><input type="checkbox" id="cfg-autosave" checked style="width:auto"><span class="hint" style="margin:0">开启后游戏进度实时写入本地浏览器</span></div>
+    <hr>
+    <label>🗂️ 存档管理</label>
+    <div class="row" style="flex-wrap:wrap">
+      <button class="btn gold" id="cfg-export" type="button">📤 导出存档（JSON）</button>
+      <button class="btn" id="cfg-import" type="button">📥 导入存档</button>
+      <button class="btn danger" id="cfg-restart" type="button">🔄 重新开始</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="cfg-cancel" type="button">取消</button>
+      <button class="btn primary" id="cfg-save" type="button">保存设置</button>
+    </div>
+  </div>
+</div>
+<!-- ===== Wiki Modal ===== -->
+<div class="modal-overlay" id="wiki-modal">
+  <div class="modal wide">
+    <h2>📖 世界百科 <span class="tag" id="wiki-era-tag">魔女时代</span></h2>
+    <div class="m-sub">本世界观设定总纲速览（依据 TV 动画与剧场版）。点击条目查看。</div>
+    <div class="wiki-wrap">
+      <div id="wiki-tabs"></div>
+      <div id="wiki-content"></div>
+    </div>
+    <div class="wiki-ask">
+      <input id="wiki-q" placeholder="向百科提问（如：悲叹之种是怎么来的？）…">
+      <button class="btn primary" id="wiki-ask" type="button">提问</button>
+    </div>
+    <div id="wiki-answer"></div>
+    <div class="btn-row"><button class="btn" id="wiki-close" type="button">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== Memory Modal ===== -->
+<div class="modal-overlay" id="memory-modal">
+  <div class="modal">
+    <h2>🧠 记忆档案</h2>
+    <div class="m-sub">重要记忆由 AI 在关键事件时自动记录；早期对话会自动折叠为摘要，保证 AI 不忘记故事。</div>
+    <div class="mem-sec">
+      <h4>📌 战役摘要</h4>
+      <div class="status-box" id="mem-summary">尚未建立。经历关键事件后自动生成。</div>
+    </div>
+    <div class="mem-sec">
+      <h4>⭐ 重要记忆</h4>
+      <div id="mem-important"></div>
+    </div>
+    <div class="mem-sec">
+      <h4>🗞️ 早期记录摘要（折叠区）</h4>
+      <div id="mem-fused"></div>
+    </div>
+    <div class="mem-sec">
+      <h4>🕐 近期事件</h4>
+      <div id="mem-recent"></div>
+    </div>
+    <div class="row">
+      <input id="mem-add" placeholder="手动添加一条记忆…">
+      <button class="btn" id="mem-add-btn" type="button">添加</button>
+    </div>
+    <div class="btn-row"><button class="btn" id="mem-close" type="button">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== Deaths Modal ===== -->
+<div class="modal-overlay" id="deaths-modal">
+  <div class="modal">
+    <h2>⏳ 死亡回档</h2>
+    <div class="m-sub">每一次死亡都会被记录：AI 会点评你的行为并给出建议。你可以选择「回到关键时间点」继续冒险（时间回溯）。</div>
+    <div id="deaths-list"></div>
+    <div class="btn-row"><button class="btn" id="deaths-close" type="button">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== Death Overlay ===== -->
+<div id="death-overlay">
+  <div class="death-card">
+    <div class="death-title">💔 灵魂宝石的光芒熄灭了…</div>
+    <div class="death-sub">本局冒险结束。死亡已被记录，AI 正在复盘你的行为。</div>
+    <div class="death-cause" id="death-cause"></div>
+    <div class="sub-title">🔎 死亡点评 · 行为复盘 · 建议</div>
+    <div class="death-eval" id="death-eval">⏳ AI 正在回顾你最后的选择…</div>
+    <div class="row" style="margin-top:14px;flex-wrap:wrap;gap:8px">
+      <button class="btn primary" id="death-rewind" type="button">⏳ 时间回溯 · 回到关键时间点</button>
+      <button class="btn" id="death-records" type="button">📜 查看全部死亡记录</button>
+      <button class="btn gold" id="death-export" type="button">💾 导出存档</button>
+      <button class="btn" id="death-reeval" type="button" style="display:none">🔄 重新点评</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Continue Overlay ===== -->
+<div class="overlay-simple" id="continue-overlay">
+  <div class="simple-card">
+    <div class="wz-title" style="justify-content:center">💠 魔法少女小圆 <span>见泷原市 TRPG</span></div>
+    <p id="continue-body">检测到未完成的冒险记录（自动存档）。</p>
+    <div class="row">
+      <button class="btn primary" id="btn-continue" type="button">⏳ 继续上次冒险</button>
+      <button class="btn danger" id="btn-newgame" type="button">🔄 重新开始</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+<input type="file" id="import-file" accept=".json" style="display:none">
+<script>
+'use strict';
+/* ============================================================
+   魔法少女小圆 · 见泷原市 TRPG — Game Engine v1.0
+   世界观依据：《魔法少女小圆》设定总纲 v1.0 + 角色扮演守则
+============================================================ */
+
+/* ---------- 常量与配置 ---------- */
+const DEFAULTS = { apiEndpoint:'https://api.deepseek.com/v1/chat/completions', apiKey:'', model:'deepseek-chat', reasoningEffort:'max', maxTokens:'unlimited', theme:'witch', autoSave:true };
+const SAVE_KEY = 'madoka_state_v1';
+const CFG_KEY = 'madoka_cfg_v1';
+const ATTRS = { courage:'勇气', perception:'感知', will:'意志', bond:'羁绊', reason:'理性' };
+const ERA_NAMES = { A:'魔女时代', B:'圆环之理时代', C:'焰魔时代' };
+const ERA_HINTS = {
+  A:'敌人：魔女 → 掉落悲叹之种。主题：残酷循环、真相揭露、结构稀缺。丘比隐藏真相，世界观真相将分阶段揭露。',
+  B:'魔女已在「诞生前被抹除」。敌人：魔兽 → 掉落悲叹之块。主题：被拯救的少女、失忆的世界、终极归宿。',
+  C:'焰魔改写宇宙，所有人复活重返日常，魔女重新存在。敌人：魔女 + 记忆篡改。主题：自由意志 vs 被安排的世界。'
+};
+const DIFF_HINTS = {
+  easy:'种子掉落率约 80%，污染累积更慢，GM 提供更明显的提示与保护性叙事。',
+  normal:'忠于原作的体验：种子约 60% 掉落，标准污染速度。',
+  hard:'种子约 40% 掉落，污染更容易累积，战斗更残酷，重要之人更易陷入危险。',
+  hell:'「被设计的屠宰场」：种子约 30%，NPC 死亡率高，真相揭露无情，随时可能死亡；鼓励寻找诅咒之外的出路。'
+};
+const CONTRACT_MEMORY = { clear:'记得全部细节', blur:'记忆模糊', none:'完全不记得' };
+
+function $(id){ return document.getElementById(id); }
+function clamp(n, lo, hi){ return Math.max(lo, Math.min(hi, n)); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function deepClone(o){ try{ return JSON.parse(JSON.stringify(o)); }catch(e){ return o; } }
+
+function loadConfig(){ try{ return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(CFG_KEY))||{}); }catch(e){ return Object.assign({}, DEFAULTS); } }
+function saveConfig(cfg){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){} }
+function loadState(){ try{ const s = localStorage.getItem(SAVE_KEY); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
+function saveState(){ if(!state || !state.player) return; try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){ console.warn('save failed', e); } }
+function clearState(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+
+let cfg = loadConfig();
+let state = null;
+
+/* ---------- 世界百科数据（依据设定总纲） ---------- */
+const WIKI = [
+{ id:'world', title:'世界构造', html:
+  '<span class="tag2">表层 · 里层 · 宇宙法则</span>'+
+  '<h4>表层：现代日本</h4>舞台为虚构城市「见泷原市」。魔法少女过着双重生活：白天是普通少女，夜晚是猎手。'+
+  '<h4>里层：结界</h4>魔女栖息的扭曲异空间，由现实「折叠」而来。内部时间、空间、物理法则可被魔女改写；结界是魔女内心世界的具象化，其样貌、法则、使魔全部由魔女的<b class="kw">性质</b>决定。'+
+  '<h4>更底层：宇宙法则</h4>宇宙面临热寂，孵化者文明以「少女希望→绝望的情感相变」收集负熵。魔法少女→魔女不是偶然，而是被设计好的能量采集生产线。' },
+{ id:'incubator', title:'孵化者 · 丘比', html:
+  '<span class="tag2">无情感 · 只保证字面真实 · 理性的恶</span>'+
+  '<h4>本质</h4>外星高智能生命体，没有情感、无法理解情感，但对逻辑极度理性。不认为自己作恶，只是「以必要的方式延续宇宙」。普通人看见丘比不会感到异样，也不会谈论它。'+
+  '<h4>契约规则（硬性）</h4>对象为青春期少女（11-16岁）。愿望在其能力范围内实现，功率上限=少女的因果量；愿望可能以扭曲方式实现，因果不足会当场魔女化。丘比不会说谎，但会隐瞒、省略、误导。灵魂被抽出结晶为灵魂宝石，契约不可逆。'+
+  '<h4>策略</h4>永远在正确的时间出现在正确的少女面前；用可爱外表降低戒心；主动揭露部分真相以「收集数据」；从不主动杀人，但也不阻止悲剧发生。' },
+{ id:'soulgem', title:'灵魂宝石', html:
+  '<span class="tag2">本体 · 半径100米 · 油表与毒表</span>'+
+  '<h4>本体</h4>契约后灵魂被结晶为宝石。身体只是人偶：只要宝石完好，身体受伤不会死（可消耗魔力修复）；宝石被毁→立即死亡；宝石与身体相距超过半径约100米→身体失去控制。'+
+  '<h4>功能</h4>侦测魔女与结界（发光、发热、共鸣）；储存魔力；反映持有者情感状态（颜色与浑浊度）。'+
+  '<h4>死亡条件</h4>①宝石被毁 ②魔女化 ③主动摧毁宝石 ④（圆环之理时代）被接引——死亡但不堕落。' },
+{ id:'magic', title:'魔力与污染', html:
+  '<span class="tag2">双轨资源 · 油表 ≠ 毒表</span>'+
+  '<h4>魔力（0-10）</h4>行使魔法消耗的能量，靠悲叹之种（/悲叹之块）补充。耗尽后仅可基础行动。'+
+  '<h4>污染（0-10）</h4>使用魔法与负面情感（绝望、悔恨、憎恨、孤立）都会污染宝石。0-3明亮（检定+1）；4-6浑浊（无修正）；7-9晦暗（检定-1，可能失控）；10满溢→魔女化。'+
+  '<h4>人偶化副作用</h4>魔力低于2：感觉身体不属于自己（感知-1）；污染高于7：梦境与现实混淆（意志-1）；长期不用魔力：身体机能缓慢退化。' },
+{ id:'magicgirl', title:'固有魔法', html:
+  '<span class="tag2">愿望 → 固有武器 + 固有魔法</span>'+
+  '<h4>规则</h4>每个魔法少女的能力由愿望的性质决定：愿望 → 固有武器（战斗媒介）+ 固有魔法（核心×1 + 辅助×1）。能力效果必须与愿望「逻辑相关」。'+
+  '<h4>原作示例</h4>麻美「活下去」→缎带+火枪；焰「重新与圆的相遇」→时间操作+军火；沙耶香「治好恭介的手」→治愈+剑；杏子「让人听布道」→结界/幻术+长枪；圆「消灭所有魔女」→弓（因果驱动的无上限奇迹）。'+
+  '<h4>肉体</h4>魔法少女不再自然衰老；痛觉保留；断肢可再生（消耗魔力，代价是污染上升）。' },
+{ id:'witch', title:'魔女', html:
+  '<span class="tag2">堕落的魔法少女 · 诅咒的集合体</span>'+
+  '<h4>定义</h4>魔女=污染满溢的魔法少女转化而成的存在，本质是诅咒的集合体。由<b class="kw">性质</b>（一种执念/概念的极端化：贪食、伪饰、哀悼、欢愉、愤怒、渴望、禁忌、纯真、终焉、轮回…）定义。'+
+  '<h4>结界与使魔</h4>每个魔女拥有独立结界，主题=性质的具象化；结界内规则可被改写。使魔承担引诱/搬运/守卫/增殖职能；使魔吞噬足够人类后，可成长为新的独立魔女。'+
+  '<h4>魔女之吻</h4>魔女留在人类身上的印记，操控被标记者行为（自残、聚集人类、指认他人为敌、遗忘、狂信、沉睡），为社会视为自杀/事故/心理疾病。'+
+  '<h4>战斗</h4>唯有攻击核心（悲叹之种）可致死；魔女有外壳，须先破坏或绕过；结界法则须先解析（理性检定）才能高效作战。' },
+{ id:'griefseed', title:'悲叹之种', html:
+  '<span class="tag2">魔女核心 · 结构性稀缺</span>'+
+  '<h4>功能</h4>击杀魔女后掉落（或由灵魂宝石破碎重构而来）。吸收灵魂宝石的污染（净化约1d4点），用后变黑废弃。储量有限且不可再生。'+
+  '<h4>稀缺设计</h4>魔女数量受控、种子永远不够用——这是孵化者设计的<b class="kw">闭环屠宰场</b>：魔法少女既是猎人也是猎物。抢种子、让种子、牺牲谁——道德抉择是核心玩法。'+
+  '<h4>圆环之理时代</h4>魔女被抹除后，由人类负面情感凝结的<b class="kw">魔兽</b>掉落悲叹之块，功能同悲叹之种。' },
+{ id:'cycle', title:'生态循环', html:
+  '<span class="tag2">希望与绝望的经济学</span>'+
+  '<h4>循环</h4>魔法少女（希望）→ 猎杀魔女 → 得悲叹之种 → 维持污染 → 情感恶化 → 魔女化（绝望）→ 被猎杀 → 提供悲叹之种……'+
+  '<h4>对玩家的意义</h4>资源永远不够用；情绪管理是第二生命条；队内既有合作又有竞争。绝望≥希望时，每次战斗结束污染+1（绝望螺旋）；希望>绝望时，每次战斗结束希望+1（但希望也是消耗品）。' },
+{ id:'karma', title:'因果与命运', html:
+  '<span class="tag2">隐藏资源 · 只增不减 · 最后的底牌</span>'+
+  '<h4>定义</h4>因果量=少女与世界之间的「羁绊重量」：被爱、被依赖、被拯救、被需要、被记住。愿望功率、魔力强度、魔女化强度都与因果成正比。'+
+  '<h4>原作核心</h4>晓美焰无数次时间回溯，反复加深鹿目圆与他人的因果纠缠；圆的因果量指数级膨胀，最终愿望得以改写全宇宙法则。因果薄弱的少女，愿望再大也会被反噬。'+
+  '<h4>游戏化</h4>因果不随时间消耗、只增不减。因果点可转化为命运点数（重掷检定、免死一次、触发命运巧合）。因果越重，越容易被丘比盯上、被安排进更大的悲剧。' },
+{ id:'law', title:'圆环之理', html:
+  '<span class="tag2">没有开始 · 没有终结的宇宙法则</span>'+
+  '<h4>起源</h4>鹿目圆许下「将所有的魔女，在诞生之前消灭。所有的宇宙、过去与未来所有的魔女，由我亲手消灭」。她回收了包括自己变成的魔女在内的全部魔女，升格为宇宙法则。'+
+  '<h4>机制</h4>搜寻灵魂宝石完全污浊的魔法少女，在魔女化之前消除其诅咒，将其从绝望因果中剥离（被接引者自此「消失」于世界）。被接引的少女成为圆环之理的「神使」。'+
+  '<h4>影响</h4>所有时间线上的魔女在诞生前被抹除；除晓美焰外无人保留旧世界记忆；丘比失去相关因果记忆。' },
+{ id:'homura', title:'晓美焰', html:
+  '<span class="tag2">时间操作 · 唯一记得被抹除世界的人</span>'+
+  '<h4>愿望</h4>「重新与鹿目圆的相遇」→ 时间操作：时停（短时间暂停世界）；倒带（回到过去，上限约一个月，以盾中沙漏计量）。'+
+  '<h4>代价</h4>每次倒带创造/进入新的平行时间线；记忆与因果不随倒带重置。她是唯一记得「被抹除世界」的存在，在圆环之理时代成为孤独的守望者。' },
+{ id:'wraith', title:'魔兽', html:
+  '<span class="tag2">圆环之理时代的新敌人</span>'+
+  '<h4>定义</h4>魔女被抹除后，由人类残留的负面情感/执念凝结而成的新存在。击杀掉落<b class="kw">悲叹之块</b>（功能同悲叹之种）。'+
+  '<h4>差异</h4>魔兽形态与规则差异极大，亦有「巢穴/结界」类高位个体（本游戏自行定义）。' },
+{ id:'homucifer', title:'焰魔（恶魔）', html:
+  '<span class="tag2">撕裂圆环之理 · 改写宇宙的人</span>'+
+  '<h4>诞生</h4>丘比设置空间遮断力场阻断圆环之理对焰的接引，迫使焰在宝石内部构筑魔女结界「伪街」。焰在接引降临时强行分离「作为人类时的记录」，咬碎宝石，以碎片+人类情感极致构筑黑暗宝玉，自称「恶魔」。'+
+  '<h4>结果</h4>她撕裂圆环之理，改写宇宙法则：所有人复活、重返学生生活，魔女重新存在（因果被焰把持），唯有她保留真相。她受困于被自己控制的世界，世界仍不稳定。' },
+{ id:'eras', title:'时代三选', html:
+  '<span class="tag2">GM 战役基调</span>'+
+  '<h4>A · 魔女时代（TV本篇）</h4>敌人：魔女 → 悲叹之种。主题：残酷循环、真相揭露、结构稀缺。'+
+  '<h4>B · 圆环之理时代（TV终局后）</h4>敌人：魔兽 → 悲叹之块。主题：被拯救的少女、失忆的世界、终极归宿。'+
+  '<h4>C · 焰魔时代（叛逆之后）</h4>敌人：魔女 + 记忆篡改 → 悲叹之种。主题：自由意志 vs 被安排的世界。' },
+{ id:'terms', title:'术语表', html:
+  '<h4>孵化者/丘比</h4>无情感的外星生命，契约中介，能量回收者。'+
+  '<h4>灵魂宝石</h4>魔法少女的灵魂结晶，本体；半径约100米内遥控身体。'+
+  '<h4>悲叹之种 / 悲叹之块</h4>魔女核心（魔兽残骸），净化灵魂宝石用，用后废弃。'+
+  '<h4>结界 / 使魔 / 魔女之吻</h4>魔女的扭曲异空间；眷属（吞噬人类可成长为新魔女）；操控印记。'+
+  '<h4>性质</h4>定义魔女本质的执念/概念。'+
+  '<h4>因果 / 圆环之理 / 神使 / 魔兽 / 焰魔</h4>羁绊重量；鹿目圆升格而成的宇宙法则；被接引的少女；魔女被抹除后出现的新敌人；撕裂圆环之理改写宇宙的晓美焰。'+
+  '<h4>见泷原市</h4>主舞台虚构都市。' }
+];
+/* ============================================================
+   创建向导 CC（Creation Wizard）
+============================================================ */
+const CC = {
+  step:0, total:6,
+  era:'A', diff:'normal', gemColor:'#ff6fae',
+  attrs:{ courage:3, perception:3, will:3, bond:3, reason:3 },
+  cheat:false,
+
+  init(){
+    // 年龄
+    const ageSel = $('wz-age');
+    for(let a=11; a<=16; a++){ const o=document.createElement('option'); o.value=a; o.textContent=a+' 岁'; ageSel.appendChild(o); }
+    ageSel.value='14';
+    // 预填配置
+    $('wz-endpoint').value = cfg.apiEndpoint;
+    $('wz-apikey').value = cfg.apiKey;
+    $('wz-model').value = cfg.model;
+    $('wz-reasoning').value = cfg.reasoningEffort;
+    $('wz-maxtokens').value = cfg.maxTokens;
+    // 时代/难度默认选中
+    this.selectCard($('wz-era').querySelector('[data-era="A"]'));
+    this.selectCard($('wz-diff').querySelector('[data-diff="normal"]'));
+    // 宝石颜色
+    const sw = $('wz-gems').querySelector('.gem-swatch[data-color="#ff6fae"]');
+    if(sw) sw.classList.add('on');
+    // 事件
+    $('wz-next').onclick = ()=>this.next();
+    $('wz-prev').onclick = ()=>this.prev();
+    $('wz-finish').onclick = ()=>this.finish();
+    $('wz-fetch').onclick = ()=>fetchModels('wz');
+    $('wz-test').onclick = ()=>testConnection('wz');
+    $('wz-cheat').onchange = (e)=>{ this.cheat=e.target.checked; this.updateTalentBar(); };
+    $('wz-karma').oninput = ()=>{ this.karma=parseInt($('wz-karma').value,10); $('wz-karma-val').textContent=this.karma; };
+    $('wz-gemcolor').oninput = (e)=>{ this.gemColor=e.target.value; this.markGem(this.gemColor); };
+    document.querySelectorAll('.gem-swatch').forEach(s=>{
+      s.onclick = ()=>{ this.gemColor=s.dataset.color; $('wz-gemcolor').value=this.gemColor; this.markGem(this.gemColor); };
+    });
+    document.querySelectorAll('#wz-era .option-card').forEach(c=>{
+      c.onclick = ()=>{ this.era=c.dataset.era; this.selectCard(c); $('wz-era-hint').textContent=ERA_HINTS[this.era]; };
+    });
+    document.querySelectorAll('#wz-diff .option-card').forEach(c=>{
+      c.onclick = ()=>{ this.diff=c.dataset.diff; this.selectCard(c); $('wz-diff-hint').textContent=DIFF_HINTS[this.diff]; };
+    });
+    document.querySelectorAll('#wz-note-chips .chip-btn').forEach(b=>{
+      b.onclick = ()=>{ const ta=$('wz-notes'); ta.value += (ta.value? '\n':'') + b.textContent; ta.focus(); };
+    });
+    document.querySelectorAll('.talent-row').forEach(row=>{
+      const attr = row.dataset.attr;
+      row.querySelector('.plus').onclick = ()=>this.bump(attr, +1);
+      row.querySelector('.minus').onclick = ()=>this.bump(attr, -1);
+    });
+    // 步骤点
+    this.renderDots();
+    this.show(0);
+    // 有 Key 自动拉取模型
+    if(cfg.apiKey){ fetchModels('wz'); }
+  },
+
+  selectCard(card){
+    card.parentElement.querySelectorAll('.option-card').forEach(c=>c.classList.remove('selected'));
+    card.classList.add('selected');
+  },
+  markGem(color){
+    document.querySelectorAll('.gem-swatch').forEach(s=>s.classList.toggle('on', s.dataset.color===color));
+  },
+  renderDots(){
+    const names=['API','角色','契约','备注','难度','确认'];
+    const box=$('wz-dots'); box.innerHTML='';
+    names.forEach((n,i)=>{
+      const d=document.createElement('div');
+      d.className='wz-dot'+(i===this.step?' on':'');
+      if(i<this.step) d.className='wz-dot done';
+      d.textContent=n; d.title=n;
+      box.appendChild(d);
+    });
+  },
+  pool(){ return this.cheat ? 999 : (15 - this.sum()); },
+  sum(){ return this.attrs.courage+this.attrs.perception+this.attrs.will+this.attrs.bond+this.attrs.reason; },
+  updateTalentBar(){
+    $('wz-talent-pool').textContent = this.cheat ? '∞' : this.pool();
+    document.querySelectorAll('.talent-row').forEach(row=>{
+      const attr=row.dataset.attr, v=this.attrs[attr];
+      row.querySelector('.val').textContent=v;
+      const plus=row.querySelector('.plus'), minus=row.querySelector('.minus');
+      plus.disabled = (v>=5) || (!this.cheat && this.pool()<=0);
+      minus.disabled = (v<=1);
+    });
+  },
+  bump(attr, delta){
+    const v=this.attrs[attr];
+    if(delta>0 && v>=5) return;
+    if(delta>0 && !this.cheat && this.pool()<=0){ UI.toast('天赋点不足（可开启作弊模式）','error'); return; }
+    if(delta<0 && v<=1) return;
+    this.attrs[attr]=v+delta;
+    this.updateTalentBar();
+  },
+  show(i){
+    this.step=i;
+    document.querySelectorAll('.create-step').forEach(s=>s.classList.remove('on'));
+    $('wz-step-'+i).classList.add('on');
+    this.renderDots();
+    $('wz-prev').style.visibility = i===0 ? 'hidden' : 'visible';
+    $('wz-next').style.display = i===this.total-1 ? 'none' : '';
+    $('wz-finish').style.display = i===this.total-1 ? '' : 'none';
+    if(i===this.total-1) this.renderConfirm();
+  },
+  next(){
+    if(this.step===0){
+      const key=$('wz-apikey').value.trim();
+      if(!key){ UI.toast('请先填写 API Key','error'); return; }
+      this.saveWizardCfg();
+    }
+    if(this.step===1){
+      if(!$('wz-name').value.trim()){ UI.toast('请填写姓名','error'); return; }
+    }
+    if(this.step===2){
+      if(!$('wz-wish').value.trim()){ UI.toast('请填写你的愿望——丘比在等待','error'); return; }
+    }
+    if(this.step<this.total-1) this.show(this.step+1);
+  },
+  prev(){ if(this.step>0) this.show(this.step-1); },
+  saveWizardCfg(){
+    cfg.apiEndpoint = $('wz-endpoint').value.trim() || DEFAULTS.apiEndpoint;
+    cfg.apiKey = $('wz-apikey').value.trim();
+    cfg.model = $('wz-model').value;
+    cfg.reasoningEffort = $('wz-reasoning').value;
+    cfg.maxTokens = $('wz-maxtokens').value;
+    saveConfig(cfg);
+  },
+  collectPlayer(){
+    const people=[];
+    document.querySelectorAll('.person-row').forEach(row=>{
+      const name=row.querySelector('.p-name').value.trim();
+      if(!name) return;
+      people.push({ name, tag: row.querySelector('.p-tag').value.trim()||'重要之人', status: row.querySelector('.p-status').value });
+    });
+    return {
+      name: $('wz-name').value.trim(),
+      age: parseInt($('wz-age').value,10),
+      gender: $('wz-gender').value,
+      school: $('wz-school').value.trim() || '见泷原中学 二年级',
+      look: $('wz-look').value.trim(),
+      personality: $('wz-personality').value.trim(),
+      attrs: Object.assign({}, this.attrs),
+      wish: $('wz-wish').value.trim(),
+      weapon: $('wz-weapon').value.trim(),
+      magicCore: $('wz-magic-core').value.trim(),
+      magicSub: $('wz-magic-sub').value.trim(),
+      karma: this.karma || 3,
+      contractMemory: $('wz-contract-memory').value,
+      title: $('wz-title').value.trim(),
+      gemColor: this.gemColor,
+      form: $('wz-form').value.trim(),
+      location: $('wz-location').value.trim(),
+      notes: $('wz-notes').value.trim(),
+      people, secret: $('wz-secret').value.trim(),
+      era: this.era, difficulty: this.diff
+    };
+  },
+  renderConfirm(){
+    const p=this.collectPlayer();
+    const body=$('confirm-body');
+    const card=(title, rows)=>{
+      let html='<div class="confirm-card"><h4>'+title+'</h4>';
+      rows.forEach(r=>{ html+='<div class="kv"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>'; });
+      return html+'</div>';
+    };
+    body.innerHTML =
+      card('🔧 API', [['端点',p?cfg.apiEndpoint:'—'],['模型',cfg.model],['Token 限制',cfg.maxTokens==='unlimited'?'无限制':cfg.maxTokens+' tokens']])+
+      card('👤 角色', [['姓名',p.name+'（'+p.age+'岁 · '+p.gender+'）'],['学校',p.school],['外貌',p.look||'（由 GM 定）'],['性格',p.personality||'（由 GM 定）']])+
+      card('✨ 天赋', [['勇气/感知/意志/羁绊/理性', [p.attrs.courage,p.attrs.perception,p.attrs.will,p.attrs.bond,p.attrs.reason].join(' / ')],['天赋作弊',this.cheat?'✅ 无限天赋点':'未开启']])+
+      card('🕯️ 契约', [['时代',ERA_NAMES[p.era]],['愿望',p.wish],['固有武器',p.weapon||'（由愿望衍化，GM 裁定）'],['核心魔法',p.magicCore||'（GM 裁定）'],['辅助魔法',p.magicSub||'（GM 裁定）'],['起始因果',p.karma],['契约记忆',CONTRACT_MEMORY[p.contractMemory]||p.contractMemory],['宝石',p.gemColor+' · '+(p.title||'未命名')]])+
+      card('💝 重要之人', p.people.length? p.people.map(x=>[x.name, x.tag+' · '+x.status]) : [['（未填写）','可随时补充']])+
+      card('🖤 秘密', [['秘密',p.secret||'（由 GM 与你共同确立）']])+
+      card('📝 备注', [['备注',p.notes||'（无）']])+
+      card('🎚️ 难度', [['难度',{easy:'🍃 简单',normal:'🌙 普通',hard:'🔥 困难',hell:'🩸 地狱·原作再现'}[p.difficulty]]]);
+  },
+  finish(){
+    this.saveWizardCfg();
+    const p=this.collectPlayer();
+    state = newState(p);
+    saveState();
+    Game.enterGame();
+    welcomeLogs();
+    Game.runOpening();
+  }
+};
+
+/* ---------- 状态工厂 ---------- */
+function newState(p){
+  return {
+    v:1, createdAt:Date.now(), turn:0,
+    player:p,
+    status:{
+      magic:10, pollution:0, hope:5, despair:2,
+      karma:p.karma, fate:p.karma, exposed:0,
+      location:p.location||'见泷原市 · 车站前', time:'傍晚',
+      condition:'刚刚缔结契约。身体没有任何异样——你甚至觉得那只是一场梦。',
+      mental:'兴奋与不安交织。愿望实现了，而你还没有意识到代价。',
+      situation:'你站在见泷原市的街道上，手里多了一枚温热的宝石。',
+      injuries:[], alive:true
+    },
+    inv:{ seed:0, block:0 },
+    people:p.people,
+    secret:p.secret,
+    notes:p.notes,
+    era:p.era, difficulty:p.difficulty,
+    memory:{ important:[], fused:[], recent:[] },
+    history:[],
+    story:{ summary:'', kills:0, witchKills:0, wraithKills:0 },
+    checkpoints:[], deaths:[],
+    cheatEnabled:false
+  };
+}
+/* ============================================================
+   UI（界面与设置）
+============================================================ */
+const UI = {
+  toastTimer:null,
+  toast(msg, type){
+    const t=$('toast');
+    t.textContent=msg;
+    t.className='show'+(type?' '+type:'');
+    clearTimeout(this.toastTimer);
+    this.toastTimer=setTimeout(()=>{ t.className=''; }, 2600);
+  },
+  openModal(id){ $(id).classList.add('show'); },
+  closeModal(id){ $(id).classList.remove('show'); },
+  toggleDrawer(open){
+    $('left-panel').classList.toggle('open', open);
+    $('drawer-backdrop').classList.toggle('show', open);
+    if(open){ Game.renderAll(); }
+  },
+  closeDrawers(){ this.toggleDrawer(false); },
+
+  /* ---- 主题 ---- */
+  applyTheme(theme){
+    document.body.dataset.theme = theme || 'witch';
+    document.querySelectorAll('#theme-row .btn').forEach(b=>{
+      b.classList.toggle('primary', b.dataset.theme===theme);
+    });
+  },
+
+  /* ---- 设置 ---- */
+  openSettings(){
+    $('cfg-endpoint').value=cfg.apiEndpoint;
+    $('cfg-apikey').value=cfg.apiKey;
+    $('cfg-model').value=cfg.model;
+    $('cfg-reasoning').value=cfg.reasoningEffort;
+    $('cfg-maxtokens').value=cfg.maxTokens;
+    $('cfg-autosave').checked=!!cfg.autoSave;
+    this.openModal('settings-modal');
+    if(cfg.apiKey) fetchModels('cfg');
+  },
+  saveSettings(){
+    cfg.apiEndpoint=$('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    cfg.apiKey=$('cfg-apikey').value.trim();
+    cfg.model=$('cfg-model').value;
+    cfg.reasoningEffort=$('cfg-reasoning').value;
+    cfg.maxTokens=$('cfg-maxtokens').value;
+    cfg.autoSave=$('cfg-autosave').checked;
+    cfg.theme=document.body.dataset.theme;
+    saveConfig(cfg);
+    this.closeModal('settings-modal');
+    this.toast('设置已保存','success');
+    Game.renderAll();
+  },
+  restartGame(){
+    if(!confirm('确定要重新开始吗？当前进度将丢失（自动存档也会清除）。')) return;
+    clearState();
+    location.reload();
+  },
+
+  /* ---- 导出 / 导入 ---- */
+  exportSave(){
+    if(!state){ this.toast('尚无存档可导出','error'); return; }
+    const data={ cfg, state, exportedAt:Date.now() };
+    const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    const a=document.createElement('a');
+    const d=new Date();
+    const pad=n=>String(n).padStart(2,'0');
+    a.href=URL.createObjectURL(blob);
+    a.download='魔法少女小圆存档_'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+'.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this.toast('存档已导出','success');
+  },
+  importSave(){
+    $('import-file').click();
+  },
+  handleImport(e){
+    const file=e.target.files[0];
+    e.target.value='';
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const data=JSON.parse(reader.result);
+        if(!data.state || !data.state.player) throw new Error('bad');
+        if(!confirm('导入存档将覆盖当前进度，确定继续吗？')) return;
+        cfg=Object.assign({}, DEFAULTS, data.cfg||{});
+        saveConfig(cfg);
+        this.applyTheme(cfg.theme);
+        state=data.state;
+        saveState();
+        Game.enterGame(true);
+        this.toast('存档导入成功','success');
+      }catch(err){
+        this.toast('存档文件无效','error');
+      }
+    };
+    reader.readAsText(file);
+  },
+
+  /* ---- 模型拉取 / 测试连接 ---- */
+  modelsCache:null,
+  async fetchModels(scope){
+    const sel=$(scope+'-model'), hint=$(scope+'-model-hint');
+    const key = scope==='wz' ? $('wz-apikey').value.trim() : $('cfg-apikey').value.trim();
+    if(!key){ hint.textContent='⚠️ 需要先填入 API Key 才能拉取模型列表'; return; }
+    hint.textContent='⏳ 正在从 API 拉取可用模型列表…';
+    if(this.modelsCache && this.modelsCache.time > Date.now()-300000){
+      this.populateModels(sel, hint, this.modelsCache.data); return;
+    }
+    const ep = (scope==='wz'? $('wz-endpoint').value.trim() : $('cfg-endpoint').value.trim()) || DEFAULTS.apiEndpoint;
+    let url = ep.replace(/\/chat\/completions$/, '/models');
+    if(url===ep) url = ep.replace(/\/+$/,'') + '/models';
+    try{
+      const r=await fetch(url,{ headers:{'Authorization':'Bearer '+key} });
+      if(r.ok){
+        const data=await r.json();
+        const models=(data.data||[]).map(m=>m.id).filter(id=>/deepseek|chat|reasoner|gpt|qwen|glm/i.test(id));
+        this.modelsCache={ time:Date.now(), data:models };
+        this.populateModels(sel, hint, models);
+      }else{
+        hint.textContent='⚠️ 拉取失败（HTTP '+r.status+'），使用默认列表';
+      }
+    }catch(err){
+      hint.textContent='⚠️ 网络错误，使用默认列表';
+    }
+  },
+  populateModels(sel, hint, models){
+    const current=sel.value;
+    sel.innerHTML='';
+    if(!models || models.length===0){
+      sel.innerHTML='<option value="deepseek-chat">deepseek-chat</option><option value="deepseek-reasoner">deepseek-reasoner</option>';
+    }else{
+      models.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o); });
+    }
+    if([...sel.options].some(o=>o.value===current)) sel.value=current;
+    else sel.value=sel.options[0].value;
+    hint.textContent='✅ 已加载 '+sel.options.length+' 个可用模型';
+  },
+  async testConnection(scope){
+    const key = scope==='wz' ? $('wz-apikey').value.trim() : $('cfg-apikey').value.trim();
+    const ep = (scope==='wz'? $('wz-endpoint').value.trim() : $('cfg-endpoint').value.trim()) || DEFAULTS.apiEndpoint;
+    const model = scope==='wz' ? $('wz-model').value : $('cfg-model').value;
+    if(!key){ this.toast('请先输入 API Key','error'); return; }
+    this.toast('正在测试连接…');
+    try{
+      const r=await fetch(ep,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+        body:JSON.stringify({ model, messages:[{role:'user',content:'回复"连接成功"'}], max_tokens:20 })
+      });
+      if(r.ok) this.toast('✅ 连接成功！','success');
+      else this.toast('❌ 连接失败：HTTP '+r.status,'error');
+    }catch(err){ this.toast('❌ 连接失败：'+err.message,'error'); }
+  },
+
+  /* ---- 百科 ---- */
+  wikiOpen:false,
+  openWiki(){
+    this.wikiOpen=true;
+    this.renderWikiTabs();
+    this.openModal('wiki-modal');
+    $('wiki-era-tag').textContent = state ? (ERA_NAMES[state.era]||'') : '';
+  },
+  renderWikiTabs(){
+    const tabs=$('wiki-tabs'); tabs.innerHTML='';
+    WIKI.forEach((w,i)=>{
+      const b=document.createElement('button');
+      b.className='wiki-tab'+(i===0?' on':'');
+      b.textContent=w.title;
+      b.onclick=()=>{
+        tabs.querySelectorAll('.wiki-tab').forEach(x=>x.classList.remove('on'));
+        b.classList.add('on');
+        $('wiki-content').innerHTML=w.html;
+      };
+      tabs.appendChild(b);
+    });
+    $('wiki-content').innerHTML=WIKI[0].html;
+  },
+  async askWiki(){
+    const q=$('wiki-q').value.trim();
+    if(!q || this.wikiBusy) return;
+    this.wikiBusy=true;
+    $('wiki-ask').disabled=true;
+    const box=$('wiki-answer');
+    box.style.display='block';
+    box.textContent='⏳ 正在查阅世界设定…';
+    const sys='你是《魔法少女小圆》世界观的百科讲解员。请基于以下世界设定速览回答问题，300字以内，不要编造原作没有的设定：\n'+WIKI.map(w=>w.html.replace(/<[^>]+>/g,'')).join('\n');
+    let acc='';
+    const res=await simpleAsk(sys, q, (txt)=>{ acc+=txt; box.textContent='⏳ '+acc; });
+    box.textContent=res || '（未能获取回答，请检查 API 配置）';
+    this.wikiBusy=false;
+    $('wiki-ask').disabled=false;
+  },
+
+  /* ---- 记忆 ---- */
+  openMemory(){ this.renderMemory(); this.openModal('memory-modal'); },
+  renderMemory(){
+    const m=state?state.memory:null;
+    $('mem-summary').textContent = (m&&state.story.summary) ? state.story.summary : '尚未建立。经历关键事件后自动生成。';
+    const imp=$('mem-important'); imp.innerHTML='';
+    if(!m || m.important.length===0) imp.innerHTML='<div class="mem-empty">暂无重要记忆。AI 会在关键事件时自动记录。</div>';
+    else m.important.forEach((x,i)=>{
+      const d=document.createElement('div');
+      d.className='mem-item';
+      d.innerHTML='<span class="no">'+(i+1)+'</span><span class="tx"></span><span class="del" title="删除">✕</span>';
+      d.querySelector('.tx').textContent=x.text;
+      d.querySelector('.del').onclick=()=>{ m.important.splice(i,1); saveState(); this.renderMemory(); };
+      imp.appendChild(d);
+    });
+    const fu=$('mem-fused'); fu.innerHTML='';
+    if(!m || m.fused.length===0) fu.innerHTML='<div class="mem-empty">暂无折叠记录。</div>';
+    else m.fused.forEach((x,i)=>{
+      const d=document.createElement('div');
+      d.className='mem-item';
+      d.innerHTML='<span class="no">§'+(i+1)+'</span><span class="tx"></span><span class="del" title="删除">✕</span>';
+      d.querySelector('.tx').textContent=typeof x==='string'?x:x.text;
+      d.querySelector('.del').onclick=()=>{ m.fused.splice(i,1); saveState(); this.renderMemory(); };
+      fu.appendChild(d);
+    });
+    const rec=$('mem-recent'); rec.innerHTML='';
+    const recent=(state?state.history.slice(-10):[]);
+    if(recent.length===0) rec.innerHTML='<div class="mem-empty">暂无近期事件。</div>';
+    else recent.slice().reverse().forEach(h=>{
+      const d=document.createElement('div');
+      d.className='mem-item';
+      d.innerHTML='<span class="tx"></span>';
+      const tx=d.querySelector('.tx');
+      tx.textContent=(h.role==='user'?'你：':'GM：')+String(h.content).slice(0,140);
+      rec.appendChild(d);
+    });
+  },
+  addMemory(){
+    const v=$('mem-add').value.trim();
+    if(!v || !state) return;
+    if(state.memory.important.some(x=>x.text===v)){ this.toast('这条记忆已存在','error'); return; }
+    state.memory.important.push({t:Date.now(), text:v});
+    saveState();
+    $('mem-add').value='';
+    this.renderMemory();
+    this.toast('记忆已添加','success');
+  },
+
+  /* ---- 死亡记录 ---- */
+  openDeaths(){ this.renderDeaths(); this.openModal('deaths-modal'); $('deaths-modal').style.zIndex='130'; },
+  closeModal(id){ $(id).classList.remove('show'); if(id==='deaths-modal') $(id).style.zIndex=''; },
+  renderDeaths(){
+    const list=$('deaths-list'); list.innerHTML='';
+    if(!state || state.deaths.length===0){
+      list.innerHTML='<div class="mem-empty">✨ 尚未有死亡记录。愿你的宝石永远明亮。</div>';
+      return;
+    }
+    state.deaths.slice().reverse().forEach((rec,i)=>{
+      const d=document.createElement('div');
+      d.className='death-item';
+      const date=new Date(rec.ts);
+      const pad=n=>String(n).padStart(2,'0');
+      const dt=date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())+' '+pad(date.getHours())+':'+pad(date.getMinutes());
+      d.innerHTML=
+        '<div class="h"><b>💔 死亡记录 #'+(state.deaths.length-i)+'</b><span class="dt">'+dt+'</span><span class="tag warn">'+(rec.type||'死亡')+'</span></div>'+
+        '<div class="cause">'+esc(rec.cause)+'</div>'+
+        '<div class="eval'+(rec.evaluation?' show':'')+'"></div>'+
+        '<div class="btns">'+
+          '<button class="btn danger" type="button">⏳ 回到关键时间点</button>'+
+          '<button class="btn" type="button">'+((rec.evaluation?'收起':'展开')+'点评')+'</button>'+
+          '<button class="btn" type="button">🔄 重新点评</button>'+
+        '</div>';
+      const ev=d.querySelector('.eval');
+      ev.textContent = rec.evaluation ? rec.evaluation : '（暂无点评，可点击「重新点评」生成）';
+      const btns=d.querySelectorAll('button');
+      btns[0].onclick=()=>{ Death.rewind(rec); };
+      btns[1].onclick=()=>{ ev.classList.toggle('show'); btns[1].textContent=ev.classList.contains('show')?'收起点评':'展开点评'; };
+      btns[2].onclick=()=>{ ev.textContent='⏳ 正在生成点评…'; ev.classList.add('show'); btns[1].textContent='收起点评'; Death.evaluate(rec, (t)=>{ ev.textContent=t; }); };
+      list.appendChild(d);
+    });
+  }
+};
+/* ============================================================
+   游戏核心 Game
+============================================================ */
+/* 顶层包装（供建卡向导等早期代码引用） */
+function fetchModels(scope){ return UI.fetchModels(scope); }
+function testConnection(scope){ return UI.testConnection(scope); }
+
+const Game = {
+  busy:false, abortCtrl:null, curBubble:null,
+
+  enterGame(fromImport){
+    $('creation').style.display='none';
+    $('app').style.display='grid';
+    $('continue-overlay').classList.remove('show');
+    this.renderAll();
+    if(fromImport){ this.addLog('系统 · 存档已导入，冒险继续。'); }
+  },
+
+  /* ---- 角色面板：实时渲染（每次 AI 回复后刷新） ---- */
+  renderAll(){
+    if(!state || !state.player) return;
+    const p=state.player, st=state.status;
+    $('char-name').textContent = p.name + (p.title? '「'+p.title+'」':'');
+    $('char-title').textContent = p.age+'岁 · '+p.gender + ' · ' + ERA_NAMES[state.era];
+    $('char-meta').textContent = p.school + (state.cheatEnabled? ' · ⭐金手指':'');
+    const gem=$('char-gem');
+    gem.style.setProperty('--gem', p.gemColor||'#ff6fae');
+    gem.style.setProperty('--gem-glow', (p.gemColor||'#ff6fae')+'66');
+    gem.style.filter = 'brightness('+(1 - st.pollution/14)+')';
+    // 污染
+    const pol=st.pollution||0;
+    $('pollution-bar').style.width=(pol*10)+'%';
+    $('pollution-bar').style.background = pol<=3?'var(--pol-low)':pol<=6?'var(--pol-mid)':pol<=9?'var(--pol-high)':'var(--pol-max)';
+    $('pollution-val').textContent=pol+'/10';
+    const pl=$('pollution-label');
+    if(pol<=3){ pl.textContent='明亮'; pl.className='tag good'; }
+    else if(pol<=6){ pl.textContent='浑浊'; pl.className='tag warn'; }
+    else if(pol<=9){ pl.textContent='晦暗'; pl.className='tag bad'; }
+    else { pl.textContent='⚠️ 满溢'; pl.className='tag bad'; }
+    // 魔力 / 希望 / 绝望
+    $('magic-bar').style.width=((st.magic||0)*10)+'%';
+    $('magic-val').textContent=(st.magic||0)+'/10';
+    $('hope-bar').style.width=((st.hope||0)*10)+'%';
+    $('hope-val').textContent=(st.hope||0)+'/10';
+    $('despair-bar').style.width=((st.despair||0)*10)+'%';
+    $('despair-val').textContent=(st.despair||0)+'/10';
+    $('spiral-chip').textContent = (st.despair||0) >= (st.hope||0) ? '⚠️ 绝望螺旋（战斗结束污染+1）' : '☀️ 希望占优';
+    $('spiral-chip').style.color = (st.despair||0) >= (st.hope||0) ? 'var(--danger)' : 'var(--success)';
+    // 身体
+    const inj=$('injury-chips'); inj.innerHTML='';
+    if(!st.injuries || st.injuries.length===0) inj.innerHTML='<span class="chip">无伤</span>';
+    else st.injuries.forEach(x=>{ const s=document.createElement('span'); s.className='chip inj'; s.textContent=x; inj.appendChild(s); });
+    $('cond-body').textContent=st.condition||'—';
+    $('cond-mental').textContent=st.mental||'—';
+    $('cond-location').textContent=st.location||'—';
+    $('cond-time').textContent=st.time||'—';
+    $('cond-status').textContent=st.situation||'—';
+    // 属性
+    $('attr-courage').textContent=p.attrs.courage;
+    $('attr-perception').textContent=p.attrs.perception;
+    $('attr-will').textContent=p.attrs.will;
+    $('attr-bond').textContent=p.attrs.bond;
+    $('attr-reason').textContent=p.attrs.reason;
+    // 契约
+    $('c-wish').textContent=p.wish;
+    $('c-weapon').textContent=p.weapon||'（由愿望衍化）';
+    $('c-magic1').textContent=p.magicCore||'（GM 裁定）';
+    $('c-magic2').textContent=p.magicSub||'（GM 裁定）';
+    $('c-karma').textContent=st.karma;
+    $('c-memory').textContent=CONTRACT_MEMORY[p.contractMemory]||p.contractMemory;
+    // 资源
+    $('res-seed').textContent=state.inv.seed||0;
+    $('res-block').textContent=state.inv.block||0;
+    $('res-fate').textContent=st.fate||0;
+    $('res-exposed').textContent=st.exposed||0;
+    // 重要之人
+    const plist=$('people-list'); plist.innerHTML='';
+    if(!state.people || state.people.length===0) plist.innerHTML='<div class="mem-empty">暂无</div>';
+    else state.people.forEach(p2=>{
+      const d=document.createElement('div');
+      d.className='people-item';
+      const cls = p2.status==='危险'||p2.status==='失踪' ? 'danger' : (p2.status==='忧郁' ? 'warn' : (p2.status==='平安'||p2.status==='健康' ? 'good' : ''));
+      d.innerHTML='<span class="nm"></span><span class="tg"></span><span class="st '+cls+'"></span>';
+      d.querySelector('.nm').textContent=p2.name;
+      d.querySelector('.tg').textContent=p2.tag||'';
+      d.querySelector('.st').textContent=p2.status||'未知';
+      plist.appendChild(d);
+    });
+    // 秘密 / 战役
+    $('secret-text').textContent=state.secret||'（未填写）';
+    $('cmp-era').textContent=ERA_NAMES[state.era];
+    $('cmp-turn').textContent=state.turn;
+    $('cmp-kills').textContent=state.story.kills||0;
+    $('cmp-deaths').textContent=(state.deaths||[]).length;
+    $('cheat-toggle').classList.toggle('active', !!state.cheatEnabled);
+    document.body.classList.toggle('cheat-on', !!state.cheatEnabled);
+    const huntBtn=document.querySelector('.quick-action[data-act="hunt"]');
+    if(huntBtn) huntBtn.textContent = state.era==='B' ? '👻 狩猎魔兽' : '⚔️ 狩猎魔女';
+  },
+  /* ---- 日志与消息 ---- */
+  addLog(text){
+    const log=$('game-log');
+    const d=document.createElement('div');
+    d.className='msg system';
+    d.textContent=text;
+    log.appendChild(d);
+    this.scrollLog();
+  },
+  addMsg(text, role){
+    const log=$('game-log');
+    const d=document.createElement('div');
+    d.className='msg '+role;
+    const b=document.createElement('div');
+    b.className='b-body';
+    b.textContent=text;
+    d.appendChild(b);
+    log.appendChild(d);
+    this.scrollLog();
+    return d;
+  },
+  scrollLog(){
+    const log=$('game-log');
+    log.scrollTop=log.scrollHeight;
+  },
+  onChunk(chunk){
+    const b=this.curBubble;
+    if(!b) return;
+    if(chunk.type==='reasoning'){
+      let det=b.querySelector('details.reasoning');
+      if(!det){
+        det=document.createElement('details');
+        det.className='reasoning';
+        const s=document.createElement('summary');
+        s.textContent='🧠 思考过程';
+        const div=document.createElement('div');
+        div.className='r-body';
+        det.appendChild(s); det.appendChild(div);
+        b.insertBefore(det, b.firstChild);
+      }
+      det.querySelector('.r-body').textContent += chunk.text;
+    }else if(chunk.type==='content'){
+      const body=b.querySelector('.b-body');
+      body.textContent += chunk.text;
+      this.scrollLog();
+    }
+  },
+
+  /* ---- 开场白：进入游戏后由 GM 先生成第一幕 ---- */
+  runOpening(){
+    if(this.busy || !state) return;
+    const p=state.player;
+    const msg='（系统指令：冒险开场。请以 GM 身份为「'+p.name+'」撰写本场冒险的开场白：描写她刚刚与丘比缔结契约后的第一幕——此刻所在的位置与氛围、灵魂宝石初次的反应（如微微发光发热）、'+ERA_NAMES[state.era]+'中潜藏的危险或第一个线索。用第二人称「你」叙述，150-300字。结尾停留在等待玩家行动的瞬间；禁止替玩家做任何决定、行动或说话；不要在正文里出现括号说明。）';
+    this.runTurn(msg, {silentUser:true});
+  },
+
+  /* ---- 回合流程 ---- */
+  setBusy(v){
+    this.busy=v;
+    $('send-btn').disabled=v;
+    $('btn-stop').style.display=v?'':'none';
+    $('btn-regen').style.display=v?'none':(this.canRegen()?'':'none');
+    $('user-input').disabled=v;
+  },
+  canRegen(){
+    if(!state) return false;
+    const h=state.history;
+    return h.length>=2 && h[h.length-1].role==='assistant';
+  },
+  sendAction(){
+    if(this.busy) return;
+    const ta=$('user-input');
+    const msg=ta.value.trim();
+    if(!msg) return;
+    ta.value='';
+    this.runTurn(msg);
+  },
+  quickAction(act){
+    if(this.busy || !state) return;
+    const map={
+      explore:'我环顾四周，探索周边环境，留意任何不对劲的迹象。',
+      talk:'我主动与面前的人交谈，试探性地打探消息。',
+      investigate:'我调查最近的可疑事件与线索，追踪传闻。',
+      hunt: state.era==='B' ? '我循着灵魂宝石的共鸣，搜寻魔兽的踪迹，准备狩猎。' : '我循着灵魂宝石的共鸣，搜寻魔女的结界，准备狩猎。',
+      rest:'我找个安全的地方休息，整理思绪，检查灵魂宝石。',
+      purify:null,
+      guard:'我保持戒备，观察四周，提防被拖入结界或遭遇危险。',
+      fate:null,
+      cheat_omni:'（金手指）我全知地看穿眼前场景的所有真相与隐藏信息。',
+      cheat_purify:'（金手指）我瞬间将灵魂宝石净化至完全清澈。',
+      cheat_inv:'（金手指）本次行动中我处于无敌状态，免疫一切伤害与诅咒。',
+      cheat_time:'（金手指）我暂停时间，在静止的世界中观察并布置一切。'
+    };
+    if(act==='purify'){
+      const inv=state.inv;
+      const hasSeed=inv.seed>0, hasBlock=inv.block>0;
+      if(!hasSeed && !hasBlock){ UI.toast('没有可用的悲叹之种/悲叹之块','error'); return; }
+      if(hasSeed){ inv.seed--; this.addLog('系统 · 使用 1 枚悲叹之种。'); }
+      else { inv.block--; this.addLog('系统 · 使用 1 枚悲叹之块。'); }
+      this.runTurn('我取出一枚'+(hasSeed?'悲叹之种':'悲叹之块')+'，贴近灵魂宝石，让它吸收宝石中的污浊。');
+      return;
+    }
+    if(act==='fate'){
+      if((state.status.fate||0)<=0){ UI.toast('命运点数不足','error'); return; }
+      state.status.fate--;
+      this.addLog('系统 · 消耗 1 点命运点数。');
+      this.runTurn('我消耗 1 点命运点数，请求命运在此刻偏向我——触发一次命运的巧合。');
+      return;
+    }
+    this.runTurn(map[act]||act);
+  },
+  regenerate(){
+    if(this.busy || !state) return;
+    const h=state.history;
+    if(h.length<2 || h[h.length-1].role!=='assistant') return;
+    // 移除最后一条 AI 回复
+    h.pop();
+    const lastMsg=$('game-log').lastElementChild;
+    if(lastMsg && lastMsg.classList.contains('msg')) lastMsg.remove();
+    const userMsg=h[h.length-1];
+    this.runTurn(userMsg.content);
+  },
+  stopGen(){
+    if(this.abortCtrl) this.abortCtrl.abort();
+  },
+  async runTurn(msg, opts){
+    opts=opts||{};
+    this.saveTurnCheckpoint();
+    state.turn++;
+    if(!opts.silentUser){
+      state.history.push({role:'user', content:msg, ts:Date.now()});
+      this.addMsg(msg, 'user');
+    }
+    const bubble=this.addMsg('', 'ai');
+    this.curBubble=bubble;
+    const body=bubble.querySelector('.b-body');
+    const caret=document.createElement('span');
+    caret.className='caret';
+    bubble.appendChild(caret);
+    this.setBusy(true);
+    const res=await this.callAI(msg, (chunk)=>this.onChunk(chunk));
+    this.setBusy(false);
+    if(caret.parentNode) caret.remove();
+    this.curBubble=null;
+    if(!res || !res.content){
+      if(!res) bubble.remove();
+      return;
+    }
+    state.history.push({role:'assistant', content:res.content, ts:Date.now()});
+    this.applyCommands(res.content);
+    this.maybeFuse();
+    this.renderAll();
+    saveState();
+    if(state.status.alive===false){
+      // 死亡流程已由 Death.trigger 处理
+    }else{
+      $('btn-regen').style.display=this.canRegen()?'':'none';
+    }
+  },
+  /* ---- AI 调用 ---- */
+  async callAI(userMessage, onChunk){
+    if(!cfg.apiKey){ this.addLog('系统 · ❌ 请先在设置中配置 API Key。'); return null; }
+    const body={ model:cfg.model, messages:this.buildMessages(userMessage), temperature:0.85, stream:true };
+    const mt=cfg.maxTokens;
+    if(mt && mt!=='unlimited') body.max_tokens=parseInt(mt,10);
+    if(String(cfg.model).indexOf('reasoner')>=0) body.reasoning_effort=cfg.reasoningEffort||'max';
+    this.abortCtrl=new AbortController();
+    try{
+      const resp=await fetch(cfg.apiEndpoint,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},
+        body:JSON.stringify(body),
+        signal:this.abortCtrl.signal
+      });
+      if(!resp.ok){
+        const t=await resp.text();
+        let m='HTTP '+resp.status;
+        try{ m=JSON.parse(t).error?.message||m; }catch(_){}
+        this.addLog('系统 · ❌ API错误：'+m);
+        return null;
+      }
+      return await this.readStream(resp, onChunk);
+    }catch(e){
+      if(e.name!=='AbortError') this.addLog('系统 · ❌ 网络错误：'+e.message);
+      return null;
+    }finally{
+      this.abortCtrl=null;
+    }
+  },
+  async readStream(response, onChunk){
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder();
+    let fullContent='', fullReasoning='', buf='';
+    try{
+      while(true){
+        const {done, value}=await reader.read();
+        if(done) break;
+        buf+=decoder.decode(value, {stream:true});
+        const lines=buf.split('\n');
+        buf=lines.pop()||'';
+        for(const line of lines){
+          const s=line.trim();
+          if(!s || s==='[DONE]') continue;
+          let data='';
+          if(s.startsWith('data: ')) data=s.slice(6);
+          else if(s.startsWith('data:')) data=s.slice(5);
+          else continue;
+          if(data==='[DONE]') continue;
+          try{
+            const json=JSON.parse(data);
+            const delta=json.choices?.[0]?.delta;
+            if(delta){
+              if(delta.reasoning_content){ fullReasoning+=delta.reasoning_content; onChunk&&onChunk({type:'reasoning', text:delta.reasoning_content}); }
+              if(delta.content){ fullContent+=delta.content; onChunk&&onChunk({type:'content', text:delta.content}); }
+            }
+          }catch(e){ console.warn('SSE parse skip'); }
+        }
+      }
+    }finally{ reader.releaseLock(); }
+    return { reasoning:fullReasoning, content:fullContent };
+  },
+  buildMessages(userMessage){
+    const messages=[{role:'system', content:this.buildSystemPrompt()}];
+    messages.push({role:'system', content:this.buildStatusSnapshot()});
+    const memText=this.buildMemoryText();
+    if(memText) messages.push({role:'system', content:memText});
+    const recent=state.history.slice(-30);
+    for(const entry of recent){
+      if(entry.role==='user' || entry.role==='assistant') messages.push({role:entry.role, content:entry.content});
+    }
+    messages.push({role:'user', content:userMessage});
+    return messages;
+  },
+  buildMemoryText(){
+    let t='';
+    const m=state.memory;
+    if(m.fused && m.fused.length>0) t+='【早期记忆摘要】\n'+m.fused.map(x=>typeof x==='string'?x:x.text).join('\n')+'\n\n';
+    if(m.important && m.important.length>0) t+='【重要记忆】\n'+m.important.map((x,i)=>(i+1)+'. '+x.text).join('\n');
+    return t;
+  },
+  maybeFuse(){
+    const h=state.history;
+    if(h.length>90){
+      const drop=h.splice(0, 30);
+      const txt=drop.map(x=>(x.role==='user'?'玩家：':'GM：')+String(x.content).replace(/\[[A-Z_]+:[^\]]*\]/g,'')).join('\n');
+      state.memory.fused.push({t:Date.now(), text:'【早期对话折叠】'+txt.slice(0,1800)});
+      if(state.memory.fused.length>6) state.memory.fused.shift();
+    }
+    const imp=state.memory.important;
+    if(imp.length>40){
+      const drop=imp.splice(0, imp.length-40);
+      state.memory.fused.push({t:Date.now(), text:drop.map(x=>x.text).join('；')});
+      if(state.memory.fused.length>6) state.memory.fused.shift();
+    }
+  },
+  addMemory(text){
+    if(!text) return;
+    const imp=state.memory.important;
+    if(imp.some(x=>x.text===text)) return;
+    imp.push({t:Date.now(), text});
+    if(imp.length>40) this.maybeFuse();
+  },
+  saveTurnCheckpoint(){
+    const snap=deepClone(state);
+    snap.history=snap.history.slice(-40);
+    const cp={ id:uid(), label:'第'+state.turn+'回合 · 行动前', ts:Date.now(), turn:state.turn, named:false, snapshot:snap };
+    state.checkpoints.push(cp);
+    // 快照内保留此前的检查点链（含各自快照），避免回档后链条断裂、后续死亡无点可回
+    snap.checkpoints = deepClone(state.checkpoints.slice(0, -1));
+    const turns=state.checkpoints.filter(c=>!c.named);
+    if(turns.length>6) state.checkpoints=state.checkpoints.filter(c=>c.named || c.id!==turns[0].id);
+  },
+  saveNamedCheckpoint(label){
+    const snap=deepClone(state);
+    snap.history=snap.history.slice(-40);
+    state.checkpoints.push({ id:uid(), label:'关键时间点 · '+label, ts:Date.now(), turn:state.turn, named:true, snapshot:snap });
+    snap.checkpoints = deepClone(state.checkpoints.slice(0, -1));
+    const named=state.checkpoints.filter(c=>c.named);
+    if(named.length>12) state.checkpoints=state.checkpoints.filter(c=>!c.named || c.id!==named[0].id);
+  },
+  /* ---- 系统提示词：世界观 + 守则 + 指令协议 ---- */
+  buildSystemPrompt(){
+    const p=state.player, st=state.status;
+    const eraBlock={
+      A:'【本战役时代：A · 魔女时代】敌人是魔女，掉落悲叹之种。残酷循环、真相揭露、结构稀缺是本时代主题。世界观真相由你（GM）分阶段揭露：初期玩家只知道宝石能侦测魔女；中期可揭露「魔女=堕落的魔法少女」「身体是人偶」；晚期揭露「悲叹之种的稀缺是被设计的」。不要一次性倾倒真相。',
+      B:'【本战役时代：B · 圆环之理时代】魔女已在「诞生前被抹除」。敌人是魔兽（人类负面情感凝结），掉落悲叹之块。世界上几乎无人记得魔女与圆环之理。玩家若在污染满溢时获救，是「被圆环之理接引」——从此消失在世间。',
+      C:'【本战役时代：C · 焰魔时代】焰魔（恶魔焰）撕裂圆环之理、改写了宇宙法则：所有人复活重返日常，魔女重新存在，因果被焰把持。世界「过于完美」，存在被安排的证据。主题：自由意志 vs 被安排的世界。可安排记忆篡改、伪街式诡异日常。'
+    }[state.era];
+    const diffBlock={
+      easy:'【难度：简单】悲叹之种掉落率约80%，污染累积更慢，战斗更保护性，GM 会给出更明显的安全提示与退路。',
+      normal:'【难度：普通】忠于原作：种子约60%掉落，标准污染速度，重要抉择保留残酷性。',
+      hard:'【难度：困难】种子约40%掉落，污染更易累积，战斗更残酷，重要之人更容易陷入危险。',
+      hell:'【难度：地狱 · 原作再现】种子约30%，NPC 死亡率高，真相揭露无情，玩家随时可能死亡；但请始终保留「原作的诅咒之外」的破局可能性。'
+    }[state.difficulty];
+    const cheatBlock = state.cheatEnabled ? '\n【🔴 金手指模式已激活】玩家拥有：全知感知、瞬间移动、无敌战斗、无限净化、时间暂停。你的回应必须体现这些能力生效。' : '';
+    const contractMemory = p.contractMemory==='clear' ? '玩家记得契约时的全部细节。'
+      : p.contractMemory==='none' ? '玩家完全不记得契约时的细节（包括自己许了什么愿，只记得那是自己真心所求）。'
+      : '玩家对契约细节的记忆是模糊的：不记得灵魂被抽出、宝石即本体等真相。';
+    const notesBlock = p.notes ? '\n【玩家备注（务必尊重）】'+p.notes : '';
+    const secretBlock = state.secret ? '\n【玩家的秘密（只有你和玩家知道，剧情中可逐步揭示）】'+state.secret : '';
+
+    return `你是《魔法少女小圆》世界观 TRPG 的主持人（GM）。舞台是虚构城市「见泷原市」。你严格依据原作逻辑（TV动画+剧场版）运行这个世界，凡原作未明确处按本游戏规则处理。
+
+# 一、世界设定速览（不可违背，不可遗忘）
+1. 表层是现代日本；里层是魔女结界（魔女内心世界的具象化，时间/空间/物理法则可被改写，入口以现实景观的错位扭曲呈现）。
+2. 孵化者（丘比）：无情感的外星生命，只保证「字面真实」——会隐瞒、省略、误导，但不说谎。契约对象为11-16岁少女。愿望在其能力范围内实现，功率上限=少女的因果量；愿望可能被文字游戏式扭曲实现，因果不足则当场魔女化。契约不可逆：灵魂被抽出结晶为灵魂宝石，身体沦为被遥控的人偶。丘比从不主动杀人，但也不阻止悲剧发生。
+3. 灵魂宝石=本体：身体受伤不会死（可消耗魔力修复）；宝石被毁→立即死亡；宝石与身体相距超过约100米→身体失控。宝石会侦测魔女/结界（发光、发热、共鸣）。
+4. 魔力与污染是双轨资源（0-10）：魔力是「油表」，用魔法消耗，靠悲叹之种/悲叹之块补充；污染是「毒表」，使用魔法与负面情感（绝望、悔恨、憎恨、孤立）都会累积。0-3明亮（检定+1）；4-6浑浊；7-9晦暗（检定-1，可能失控）；10满溢→魔女化。人偶化副作用：魔力<2感知-1；污染>7意志-1。
+5. 魔女=堕落的魔法少女，由「性质」（执念/概念的极端化）定义；有结界、使魔与魔女之吻（操控被标记者行为）。使魔吞噬足够人类可成长为新的独立魔女。悲叹之种是魔女核心，吸收污染（约1d4点）后变黑废弃，稀缺且不可再生——这是孵化者设计的闭环屠宰场：魔法少女既是猎人也是猎物。
+6. 因果=少女与世界的羁绊重量：被爱、被依赖、被拯救、被需要、被记住。愿望功率与魔女强度随因果增长；因果只增不减。因果越重的角色越容易被丘比盯上、被安排进更大的悲剧。
+7. 希望与绝望（0-10）：绝望≥希望时，每次战斗结束污染+1（绝望螺旋）；希望>绝望时，每次战斗结束希望+1。希望来自羁绊、善行、胜利、被拯救；绝望来自失去、背叛、污染、孤立、知情真相。
+8. 死亡条件：①宝石被毁 ②魔女化 ③主动摧毁宝石 ④（时代B）被圆环之理接引。魔女化是三幕流程（预兆→奇迹检定→转化）；奇迹检定目标=（希望+意志）×2−（绝望+污染），d10小于等于目标成功。
+9. 特殊存在：圆环之理（鹿目圆升格的宇宙法则，接引濒临魔女化的少女，被接引者消失于世界）；晓美焰（时间操作，唯一记得被抹除世界的人）；焰魔（时代C的幕后支配者）。
+
+${eraBlock}
+${diffBlock}${cheatBlock}${notesBlock}${secretBlock}
+
+# 二、角色扮演守则（最高优先级，违反即失败）
+【角色扮演质量规则】保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。
+
+# 三、判定规则（重要行动时展示掷骰）
+掷d10：目标值=属性×2+调整值（简单+2/普通0/困难-2/极难-4），≤目标值成功；掷出1大成功，掷出10大失败。关键检定可消耗1点魔力或意志获得+1。在叙事中展示掷骰，例如：（意志8 · 困难-2 → 目标6 · 掷出5 → 成功）。战斗规则：对魔女须先破坏外壳再攻击核心（悲叹之种）方可致死；结界法则需理性检定解析（未解析时攻击/移动/感知-2）；对魔法少女瞄准灵魂宝石命中即死（难度+3）。撤退需意志检定，失败迷失结界深处。
+${contractMemory}
+`;},
+  /* ---- 当前状态快照（每次对话注入，AI 不迷路） ---- */
+  buildStatusSnapshot(){
+    const p=state.player, st=state.status;
+    const invTxt='悲叹之种x'+(state.inv.seed||0)+'，悲叹之块x'+(state.inv.block||0);
+    const peopleTxt=(state.people||[]).map(x=>x.name+'（'+x.status+'）').join('、')||'无';
+    const spiral = (st.despair||0)>=(st.hope||0) ? '（⚠️ 绝望螺旋：战斗结束污染+1）' : '';
+    const attrPenalty=[];
+    if((st.magic||0)<2) attrPenalty.push('魔力枯竭：感知检定-1（人偶化）');
+    if((st.pollution||0)>7) attrPenalty.push('污染晦暗：意志检定-1');
+    return `【当前状态快照 · 第${state.turn}回合】
+时间：${st.time}｜地点：${st.location}
+魔力 ${st.magic||0}/10｜污染 ${st.pollution||0}/10${st.pollution>=8?'（濒临满溢！）':''}｜希望 ${st.hope||0}/10｜绝望 ${st.despair||0}/10${spiral}
+因果 ${st.karma}｜命运点 ${st.fate||0}｜暴露度 ${st.exposed||0}｜回合数 ${state.turn}
+身体伤害：${st.injuries&&st.injuries.length? st.injuries.join('、') : '无'}
+身体状况：${st.condition||'—'}
+精神状态：${st.mental||'—'}
+当前处境：${st.situation||'—'}
+背包：${invTxt}
+重要之人：${peopleTxt}
+${attrPenalty.length? '状态惩罚：'+attrPenalty.join('；') : ''}
+战役摘要：${state.story.summary||'（尚未建立）'}`;
+  },
+
+  /* ---- 指令解析（AI 输出 → 状态更新） ---- */
+  parseNum(v){ const n=parseInt(v,10); return isNaN(n)?0:n; },
+  applyItem(v){
+    const m=String(v).match(/^([+-=])(.+?)(?:x(\d+))?$/);
+    if(!m) return;
+    const sign=m[1], name=m[2].trim(), qty=parseInt(m[3]||'1',10);
+    let key=null;
+    if(name.indexOf('种')>=0 || /seed/i.test(name)) key='seed';
+    else if(name.indexOf('块')>=0 || /block/i.test(name)) key='block';
+    if(!key) return;
+    if(sign==='+') state.inv[key]=(state.inv[key]||0)+qty;
+    else if(sign==='-') state.inv[key]=Math.max(0,(state.inv[key]||0)-qty);
+    else state.inv[key]=Math.max(0,qty);
+  },
+  applyPerson(v){
+    const parts=String(v).split(/[=:：]/);
+    if(parts.length<2) return;
+    const name=parts[0].trim();
+    const people=state.people||[];
+    const t=people.find(x=>x.name===name);
+    if(t) t.status=parts.slice(1).join('').trim();
+    else people.push({name, tag:'', status:parts.slice(1).join('').trim()});
+  },
+  applyCommands(content){
+    const re=/\[(MAGIC|POLLUTION|HOPE|DESPAIR|KARMA|FATE|EXPOSED|ITEM|LOCATION|TIME|CONDITION|MENTAL|STATUS|MEMORY|SUMMARY|DEATH|CHECKPOINT|PERSON|INJURY|CLEAR_INJURY|KILL)\s*:\s*([^\]]*)\]/g;
+    let m, deathCause=null;
+    while((m=re.exec(content))){
+      const k=m[1], v=(m[2]||'').trim();
+      try{ this.applyOne(k, v); }catch(e){ console.warn('cmd', k, v, e); }
+    }
+  },
+  applyOne(k, v){
+    const st=state.status;
+    switch(k){
+      case 'MAGIC': st.magic=clamp(st.magic+this.parseNum(v),0,10); break;
+      case 'POLLUTION': {
+        st.pollution=clamp(st.pollution+this.parseNum(v),0,10);
+        if(st.pollution>=10 && st.alive){
+          const cause = state.era==='B'
+            ? '灵魂宝石完全污浊——圆环之理降下接引之光，你的存在从这个世界缓缓剥落……'
+            : '灵魂宝石彻底浑浊，黑色裂隙爬满宝石表面——魔女化开始了。你的意识正在崩解。';
+          Death.trigger(cause, state.era==='B'?'被圆环之理接引':'魔女化');
+        }
+        break;
+      }
+      case 'HOPE': st.hope=clamp(st.hope+this.parseNum(v),0,10); break;
+      case 'DESPAIR': st.despair=clamp(st.despair+this.parseNum(v),0,10); break;
+      case 'KARMA': st.karma=Math.max(st.karma, st.karma+this.parseNum(v)); break;
+      case 'FATE': st.fate=Math.max(0, st.fate+this.parseNum(v)); break;
+      case 'EXPOSED': st.exposed=Math.max(0, st.exposed+this.parseNum(v)); break;
+      case 'ITEM': this.applyItem(v); break;
+      case 'LOCATION': st.location=v; break;
+      case 'TIME': st.time=v; break;
+      case 'CONDITION': st.condition=v; break;
+      case 'MENTAL': st.mental=v; break;
+      case 'STATUS': st.situation=v; break;
+      case 'SUMMARY': state.story.summary=v; break;
+      case 'MEMORY': this.addMemory(v); break;
+      case 'PERSON': this.applyPerson(v); break;
+      case 'INJURY': if(v && !st.injuries.includes(v) && st.injuries.length<8) st.injuries.push(v); break;
+      case 'CLEAR_INJURY': st.injuries=st.injuries.filter(x=>x!==v); break;
+      case 'KILL': {
+        state.story.kills=(state.story.kills||0)+1;
+        if(/witch|魔女|Boss/i.test(v)) state.story.witchKills=(state.story.witchKills||0)+1;
+        else state.story.wraithKills=(state.story.wraithKills||0)+1;
+        break;
+      }
+      case 'CHECKPOINT': this.saveNamedCheckpoint(v); break;
+      case 'DEATH': if(st.alive) Death.trigger(v||'灵魂宝石被毁——你死了。', '死亡'); break;
+    }
+  },
+  toggleCheat(){
+    if(!state) return;
+    state.cheatEnabled=!state.cheatEnabled;
+    this.addLog('系统 · '+(state.cheatEnabled?'⭐ 金手指已激活：全知 / 无限净化 / 无敌 / 时停。':'金手指已关闭。'));
+    this.renderAll();
+    saveState();
+  }
+};
+
+/* ============================================================
+   死亡系统（记录 · 点评 · 时间回溯）
+============================================================ */
+function esc(s){ const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+const Death = {
+  trigger(cause, type){
+    if(!state || state.status.alive===false) return;
+    state.status.alive=false;
+    const lastCp=state.checkpoints[state.checkpoints.length-1]||null;
+    const excerpt=(state.history.slice(-6)).map(h=>(h.role==='user'?'你：':'GM：')+String(h.content).replace(/\[[A-Z_]+:[^\]]*\]/g,'').slice(0,120)).join('\n');
+    const rec={ id:uid(), ts:Date.now(), cause:String(cause||'灵魂宝石被毁'), type:type||'死亡', turn:state.turn, cpId:lastCp?lastCp.id:null, excerpt, evaluation:'' };
+    state.deaths.push(rec);
+    saveState();
+    Game.renderAll();
+    // 结算界面
+    $('death-cause').textContent=rec.cause;
+    $('death-eval').textContent='⏳ AI 正在回顾你最后的选择…';
+    $('death-reeval').style.display='none';
+    $('death-overlay').classList.add('show');
+    $('death-rewind').onclick=()=>this.rewind(rec);
+    $('death-records').onclick=()=>{ UI.openDeaths(); };
+    $('death-export').onclick=()=>UI.exportSave();
+    $('death-reeval').onclick=()=>{ $('death-eval').textContent='⏳ 正在重新点评…'; this.evaluate(rec, t=>{ $('death-eval').textContent=t; }); };
+    this.evaluate(rec, t=>{ $('death-eval').textContent=t; });
+  },
+  async evaluate(rec, onText){
+    if(!state) return;
+    const p=state.player;
+    const sys='你是《魔法少女小圆》TRPG 的「死亡点评AI」。请用中文对这名魔法少女玩家的这次死亡给出三段复盘：\n【死亡点评】一句话定性这次死亡（准确、克制、有原作质感，不煽情）。\n【行为复盘】指出2-3个关键决策与失误，结合角色性格与世界观逻辑。\n【建议】下次如何避免（符合原作逻辑，不剧透未揭露真相，不超过300字）。\n格式：直接用三段小标题+正文，不要客套。';
+    const user='角色卡：'+p.name+'（'+p.age+'岁）｜愿望：「'+p.wish+'」｜五维：勇'+p.attrs.courage+'/感'+p.attrs.perception+'/意'+p.attrs.will+'/羁'+p.attrs.bond+'/理'+p.attrs.reason+'｜时代：'+ERA_NAMES[state.era]+'｜难度：'+state.difficulty+
+      '\n\n死亡原因：'+rec.cause+
+      '\n\n死亡前的行动（节选）：\n'+(rec.excerpt||'（无记录）');
+    let acc='';
+    const res=await simpleAsk(sys, user, t=>{ acc+=t; if(onText) onText('⏳ '+acc); });
+    if(res){
+      rec.evaluation=res;
+      saveState();
+      if(onText) onText(res);
+      $('death-reeval').style.display='';
+      UI.renderDeaths();
+    }else{
+      if(onText) onText('（点评生成失败：请检查 API 配置后点击「重新点评」）');
+    }
+  },
+  rewind(rec){
+    if(!state) return;
+    const cp=(state.checkpoints||[]).find(c=>c.id===rec.cpId) || (state.checkpoints||[]).slice().reverse().find(c=>c.turn<rec.turn) || null;
+    if(!cp){ UI.toast('未找到可回溯的时间点','error'); return; }
+    const priorDeaths=deepClone(state.deaths||[]);
+    const priorState=deepClone(state);
+    state=deepClone(cp.snapshot);
+    // 保留死亡记录（含本次），合并去重
+    const all=[...(state.deaths||[]), ...priorDeaths];
+    const seen={}; state.deaths=[];
+    all.forEach(d=>{ if(!seen[d.id]){ seen[d.id]=1; state.deaths.push(d); } });
+    state.status.alive=true;
+    $('death-overlay').classList.remove('show');
+    UI.closeModal('deaths-modal');
+    $('creation').style.display='none';
+    $('app').style.display='grid';
+    Game.setBusy(false);
+    Game.addLog('⏳ 沙漏倒转，世界重新构筑——你回到了「'+cp.label+'」。');
+    Game.renderAll();
+    saveState();
+    UI.toast('已回到关键时间点：'+cp.label,'success');
+  }
+};
+
+async function simpleAsk(system, user, onChunk){
+  if(!cfg.apiKey) return '';
+  const body={ model:cfg.model, messages:[{role:'system',content:system},{role:'user',content:user}], temperature:0.8, stream:true };
+  const mt=cfg.maxTokens;
+  if(mt && mt!=='unlimited') body.max_tokens=parseInt(mt,10);
+  try{
+    const resp=await fetch(cfg.apiEndpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},
+      body:JSON.stringify(body)
+    });
+    if(!resp.ok) return '';
+    const out=await Game.readStream(resp, onChunk);
+    return out.content||'';
+  }catch(e){ return ''; }
+}
+
+/* ============================================================
+   初始化
+============================================================ */
+function welcomeLogs(){
+  Game.addLog('—— 契约缔结 ——');
+  Game.addLog('时代：'+ERA_NAMES[state.era]+'｜难度：'+(state.difficulty==='easy'?'简单':state.difficulty==='normal'?'普通':state.difficulty==='hard'?'困难':'地狱·原作再现'));
+  Game.addLog('你（'+state.player.name+'）刚刚与丘比缔结了契约。愿望已经实现——但记住：丘比只保证「字面真实」。');
+  Game.addLog('输入行动或点击下方快捷按钮开始。祝你在见泷原的夜色中，找到属于你的希望。');
+}
+
+(function init(){
+  UI.applyTheme(cfg.theme);
+  CC.init();
+
+  // 顶栏
+  $('btn-char').onclick=()=>UI.toggleDrawer(true);
+  $('btn-wiki').onclick=()=>UI.openWiki();
+  $('btn-memory').onclick=()=>UI.openMemory();
+  $('btn-deaths').onclick=()=>UI.openDeaths();
+  $('btn-settings').onclick=()=>UI.openSettings();
+  $('btn-export').onclick=()=>UI.exportSave();
+  $('btn-import').onclick=()=>UI.importSave();
+  $('cheat-toggle').onclick=()=>Game.toggleCheat();
+  $('drawer-backdrop').onclick=()=>UI.closeDrawers();
+  $('drawer-close').onclick=()=>UI.closeDrawers();
+  document.addEventListener('keydown', e=>{
+    if(e.key==='Escape'){
+      UI.closeDrawers();
+      ['settings-modal','wiki-modal','memory-modal','deaths-modal'].forEach(id=>UI.closeModal(id));
+    }
+  });
+
+  // 设置
+  $('cfg-save').onclick=()=>UI.saveSettings();
+  $('cfg-cancel').onclick=()=>UI.closeModal('settings-modal');
+  $('cfg-fetch').onclick=()=>UI.fetchModels('cfg');
+  $('cfg-test').onclick=()=>UI.testConnection('cfg');
+  $('cfg-export').onclick=()=>UI.exportSave();
+  $('cfg-import').onclick=()=>UI.importSave();
+  $('cfg-restart').onclick=()=>UI.restartGame();
+  document.querySelectorAll('#theme-row .btn').forEach(b=>{
+    b.onclick=()=>{ cfg.theme=b.dataset.theme; UI.applyTheme(cfg.theme); saveConfig(cfg); };
+  });
+
+  // 百科 / 记忆 / 死亡
+  $('wiki-close').onclick=()=>UI.closeModal('wiki-modal');
+  $('wiki-ask').onclick=()=>UI.askWiki();
+  $('wiki-q').addEventListener('keydown', e=>{ if(e.key==='Enter') UI.askWiki(); });
+  $('mem-close').onclick=()=>UI.closeModal('memory-modal');
+  $('mem-add-btn').onclick=()=>UI.addMemory();
+  $('mem-add').addEventListener('keydown', e=>{ if(e.key==='Enter') UI.addMemory(); });
+  $('deaths-close').onclick=()=>UI.closeModal('deaths-modal');
+
+  // 输入区
+  $('send-btn').onclick=()=>Game.sendAction();
+  $('user-input').addEventListener('keydown', e=>{
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); Game.sendAction(); }
+  });
+  $('btn-stop').onclick=()=>Game.stopGen();
+  $('btn-regen').onclick=()=>Game.regenerate();
+  document.querySelectorAll('.quick-action').forEach(b=>{
+    b.onclick=()=>Game.quickAction(b.dataset.act);
+  });
+  $('import-file').addEventListener('change', e=>UI.handleImport(e));
+
+  // 续档
+  const s=loadState();
+  if(s && s.player){
+    const d=new Date(s.createdAt||Date.now());
+    $('continue-body').textContent='检测到未完成的冒险记录：'+s.player.name+'（'+ERA_NAMES[s.era||'A']+' · 第'+(s.turn||0)+'回合）· 创建于 '+d.toLocaleDateString();
+    $('continue-overlay').classList.add('show');
+    $('btn-continue').onclick=()=>{
+      state=s;
+      Game.enterGame();
+      Game.addLog('系统 · 已读取自动存档，冒险继续。');
+    };
+    $('btn-newgame').onclick=()=>{
+      if(!confirm('确定放弃当前存档，重新开始吗？')) return;
+      clearState();
+      $('continue-overlay').classList.remove('show');
+    };
+  }
+})();
+</script>
+</body>
+</html>

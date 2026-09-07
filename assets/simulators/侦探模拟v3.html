@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>迷雾侦探 · AI推理探案</title>
+<style>
+/* ============ 迷雾侦探 · 卷宗主题 ============ */
+:root{
+  --bg-deep:#0a0d13; --bg-surface:#10141d; --bg-elevated:#161b26; --bg-hover:#1e2433;
+  --border:#242b3c; --border-active:#3a435c;
+  --t:#e9e6de; --t2:#a9a596; --t3:#6e6b5e;
+  --gold:#e8b44a; --gold-dim:#a87f2a; --gold-glow:rgba(232,180,74,0.14);
+  --jade:#5fb8a6; --jade-dim:#2e7a6c; --jade-glow:rgba(95,184,166,0.12);
+  --r:#e05a5a; --gr:#58c878; --purple:#a78bfa; --blue:#6a9fe8;
+  --rad:6px; --rad2:10px; --rad3:16px;
+  --tr:180ms ease;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"SF Mono","Cascadia Code","Consolas",monospace;
+  --serif:Georgia,"Times New Roman","Songti SC","STSong","SimSun",serif;
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:radial-gradient(1200px 700px at 70% -10%,rgba(232,180,74,0.05),transparent 60%),var(--bg-deep);color:var(--t);font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased;user-select:none;-webkit-tap-highlight-color:transparent}
+button{touch-action:manipulation}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea,select{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--rad);padding:8px 12px;outline:none;transition:border var(--tr)}
+input:focus,textarea:focus,select:focus{border-color:var(--gold-dim)}
+textarea{resize:none}
+.sel{user-select:text}
+#app{height:100vh;height:100dvh;position:relative}
+.screen{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg-deep);z-index:10}
+.screen.active{display:flex}
+
+/* ============ 顶栏 ============ */
+.topbar{height:46px;flex-shrink:0;background:var(--bg-surface);display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid var(--border);z-index:20}
+.topbar .logo{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--gold);letter-spacing:2px;white-space:nowrap}
+.topbar .logo span{font-family:var(--font);color:var(--t3);font-weight:400;font-size:10px;margin-left:5px;letter-spacing:1px}
+.topbar .spacer{flex:1}
+.top-btn{padding:5px 11px;border-radius:var(--rad);font-size:11px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr);display:flex;align-items:center;gap:4px;white-space:nowrap;background:none}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+.top-btn.jade{border-color:var(--jade-dim);color:var(--jade)}
+.top-btn.jade:hover{background:var(--jade-glow)}
+.top-btn.danger{border-color:var(--r);color:var(--r)}
+.top-btn.danger:hover{background:rgba(224,90,90,0.12)}
+.badge-completed{font-size:10px;color:var(--gr);border:1px solid var(--gr);border-radius:20px;padding:2px 9px;white-space:nowrap}
+.badge-new{font-size:10px;color:var(--gold);border:1px solid var(--gold-dim);border-radius:20px;padding:2px 9px;white-space:nowrap}
+
+/* ============ 页头（子页面） ============ */
+.page-head{height:46px;flex-shrink:0;background:var(--bg-surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;z-index:20;position:relative}
+.page-head .ph-title{position:absolute;left:50%;transform:translateX(-50%);font-size:13px;font-weight:600;color:var(--t);white-space:nowrap}
+.page-head .ph-sub{position:absolute;left:50%;transform:translateX(-50%);top:30px;font-size:9px;color:var(--t3);white-space:nowrap}
+.back-btn{display:flex;align-items:center;gap:3px;padding:4px 10px;border-radius:var(--rad);font-size:11px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr)}
+.back-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.back-btn.right{margin-left:auto}
+.back-btn.left{margin-right:auto}
+
+/* ============ 页卡 / 列表 ============ */
+.page-body{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:12px 14px;transition:border var(--tr),background var(--tr);position:relative}
+.card:hover{border-color:var(--border-active)}
+.card.disabled{opacity:0.62}
+.card .c-title{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px}
+.card .c-sub{font-size:10.5px;color:var(--t2);margin-top:3px;line-height:1.6}
+.card .c-foot{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin-top:9px}
+.card .c-tag{position:absolute;top:10px;right:12px;font-size:9.5px;color:var(--t3);border:1px solid var(--border);border-radius:12px;padding:1px 8px}
+.chip{display:inline-block;font-size:10px;color:var(--gold);border:1px solid var(--gold-dim);border-radius:20px;padding:1.5px 9px;margin-right:5px;margin-top:4px;white-space:nowrap}
+.chip.jade{color:var(--jade);border-color:var(--jade-dim)}
+.chip.gray{color:var(--t3);border-color:var(--border-active)}
+.chip.red{color:var(--r);border-color:var(--r)}
+.btn{padding:7px 16px;border-radius:var(--rad);font-size:12px;font-weight:500;border:1px solid var(--border);color:var(--t2);transition:all var(--tr);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;background:none}
+.btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.btn.gold{background:var(--gold);color:#16120a;border-color:var(--gold);font-weight:600}
+.btn.gold:hover{background:#ffc94a;color:#16120a}
+.btn.jade{background:var(--jade);color:#06201b;border-color:var(--jade);font-weight:600}
+.btn.jade:hover{background:#6fd4c0;color:#06201b}
+.btn.danger{color:var(--r);border-color:var(--r)}
+.btn.danger:hover{background:rgba(224,90,90,0.12);color:var(--r)}
+.btn.ghost{border-color:transparent;color:var(--t3)}
+.btn.ghost:hover{color:var(--t);background:var(--bg-hover)}
+.btn:disabled{opacity:0.35;cursor:not-allowed}
+.btn.sm{padding:4px 11px;font-size:11px}
+.btn.lg{padding:11px 26px;font-size:13.5px;border-radius:var(--rad2)}
+.empty-tip{text-align:center;color:var(--t3);font-size:11.5px;padding:26px 0;line-height:1.8}
+
+/* ============ 页签 ============ */
+.tabbar{height:48px;flex-shrink:0;background:var(--bg-surface);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 6px;gap:2px;overflow-x:auto;z-index:15}
+.tabbar::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:10px;color:var(--t3);transition:color var(--tr);position:relative;white-space:nowrap}
+.tab .tab-ico{font-size:14px}
+.tab:hover{color:var(--t2)}
+.tab.active{color:var(--gold)}
+.tab.active::after{content:"";position:absolute;bottom:0;left:22%;right:22%;height:2px;background:var(--gold);border-radius:2px}
+
+/* ============ 聊天 ============ */
+#log{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.msg{display:flex;flex-direction:column;gap:4px;animation:fade 240ms ease;max-width:100%}
+.msg.narrator{background:var(--bg-elevated);border-left:3px solid var(--gold-dim);border-radius:var(--rad2);padding:10px 14px}
+.msg.system{background:var(--bg-surface);border-left:3px solid var(--t3);border-radius:var(--rad2);padding:8px 12px;font-size:10.5px;color:var(--t3);font-family:var(--mono)}
+.msg .m-head{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--t2)}
+.msg .m-name{font-weight:600}
+.msg .m-meta{font-size:9.5px;color:var(--jade);border:1px solid var(--jade-dim);border-radius:12px;padding:1px 8px;background:var(--jade-glow)}
+.msg .m-text{font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.msg.narrator .m-text{white-space:normal}
+.msg .m-time{font-size:9px;color:var(--t3);font-family:var(--mono)}
+.msg.me{align-items:flex-end}
+.msg.me .m-bubble{background:var(--bg-elevated);border:1px solid var(--gold-dim);border-radius:12px 12px 3px 12px;padding:9px 13px;font-size:12.5px;line-height:1.7;max-width:82%;white-space:pre-wrap;word-break:break-word}
+.msg.npc{max-width:96%}
+.msg.npc .m-head{align-items:flex-start}
+.msg.npc .m-bubble{background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--jade);border-radius:3px 12px 12px 12px;padding:9px 13px;font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word;max-width:100%}
+.msg.reason-ai .m-bubble{background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:3px 12px 12px 12px;padding:9px 13px;font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dim),var(--border-active));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;color:#1a1509}
+.record-btn{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:10.5px;color:var(--gold);border:1px dashed var(--gold-dim);border-radius:14px;padding:3px 11px;transition:all var(--tr)}
+.record-btn:hover{background:var(--gold-glow)}
+.typing-dots{display:inline-flex;gap:3px;padding:4px 2px}
+.typing-dots span{width:5px;height:5px;background:var(--gold);border-radius:50%;animation:bounce 1s infinite}
+.typing-dots span:nth-child(2){animation-delay:0.15s}
+.typing-dots span:nth-child(3){animation-delay:0.3s}
+@keyframes bounce{0%,80%,100%{transform:scale(0.5)}40%{transform:scale(1)}}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* ============ 输入区 ============ */
+#input-area{flex-shrink:0;padding:10px 14px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end}
+#input-area textarea{flex:1;resize:none;min-height:40px;max-height:110px;font-size:12.5px;line-height:1.5;border-radius:var(--rad2);background:var(--bg-deep);padding:9px 12px}
+#input-area textarea::placeholder{color:var(--t3)}
+#send-btn{padding:10px 20px;background:var(--gold);color:#16120a;border-radius:var(--rad2);font-weight:600;font-size:12.5px;transition:all var(--tr);white-space:nowrap}
+#send-btn:hover{background:#ffc94a}
+#send-btn:disabled{opacity:0.35;cursor:not-allowed}
+.input-hint{flex-shrink:0;padding:4px 16px 2px;font-size:9.5px;color:var(--t3)}
+
+/* ============ 详情页 ============ */
+.detail-sec{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:13px 15px}
+.detail-sec h4{font-size:11px;color:var(--gold);letter-spacing:1.5px;margin-bottom:8px;font-weight:600}
+.detail-sec p,.detail-sec li{font-size:12px;color:var(--t2);line-height:1.85}
+.detail-sec ul{padding-left:17px}
+.detail-sec .k{color:var(--t)}
+.detail-sec .num{font-family:var(--mono);color:var(--gold)}
+.section-line{height:1px;background:var(--border);margin:12px 0}
+.detail-title{font-family:var(--serif);font-size:19px;color:var(--gold);letter-spacing:1px;margin-bottom:2px}
+.detail-sub{font-size:11px;color:var(--t3);margin-bottom:12px}
+
+/* ============ 弹窗 ============ */
+.modal-overlay{position:fixed;inset:0;background:rgba(4,6,10,0.8);z-index:100;display:none;align-items:center;justify-content:center;animation:fade 200ms ease}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad3);padding:20px;width:480px;max-width:94vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.6)}
+.modal h2{font-size:15px;color:var(--gold);margin-bottom:13px;font-family:var(--serif);letter-spacing:1px}
+.modal label{font-size:10.5px;color:var(--t3);display:block;margin-bottom:4px;letter-spacing:0.5px}
+.modal input,.modal select,.modal textarea{width:100%;margin-bottom:12px;padding:8px 11px;font-size:12.5px}
+.modal textarea{min-height:70px}
+.modal select{background:var(--bg-surface)}
+.modal .btn-row{display:flex;gap:7px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap}
+.modal .hint{font-size:9.5px;color:var(--t3);margin-top:-8px;margin-bottom:11px;line-height:1.7}
+.modal .divider{border-top:1px solid var(--border);margin:14px 0 12px;padding-top:12px}
+.modal .status{font-size:10.5px;color:var(--t2);margin:-6px 0 10px;min-height:15px}
+
+/* ============ 设置浮钮 ============ */
+.float-gear{position:fixed;top:12px;right:12px;z-index:90;width:34px;height:34px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border-active);display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--gold);transition:all var(--tr);box-shadow:0 3px 14px rgba(0,0,0,0.45)}
+.float-gear:hover{background:var(--bg-hover);border-color:var(--gold-dim);transform:rotate(25deg)}
+
+/* ============ 创建流程 ============ */
+#screen-setup{background:radial-gradient(900px 500px at 50% -10%,rgba(232,180,74,0.07),transparent 60%),var(--bg-deep)}
+.setup-wrap{flex:1;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:26px 14px 40px}
+.setup-wrap h1{font-family:var(--serif);font-size:26px;color:var(--gold);letter-spacing:5px;margin-bottom:4px}
+.setup-wrap .sub{font-size:11px;color:var(--t3);margin-bottom:20px;letter-spacing:2px}
+.step-dots{display:flex;gap:8px;margin-bottom:22px}
+.step-dot{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--t3);cursor:pointer;padding:4px 10px;border-radius:20px;border:1px solid var(--border)}
+.step-dot .n{width:17px;height:17px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border-active);display:flex;align-items:center;justify-content:center;font-size:9.5px}
+.step-dot.active{color:var(--gold);border-color:var(--gold-dim);background:var(--gold-glow)}
+.step-dot.active .n{background:var(--gold);color:#16120a;border-color:var(--gold)}
+.step-dot.done .n{background:var(--jade);color:#06201b;border-color:var(--jade)}
+.setup-box{width:460px;max-width:94vw;display:none;flex-direction:column;gap:11px}
+.setup-box.active{display:flex}
+.setup-box .step-title{font-size:14px;color:var(--t2);text-align:center;font-weight:600}
+.setup-box .step-hint{font-size:10.5px;color:var(--t3);text-align:center;margin-bottom:4px}
+.setup-box input,.setup-box select,.setup-box textarea{width:100%;text-align:left;font-size:13.5px;padding:10px 14px;background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad2)}
+.setup-box textarea{min-height:80px}
+.setup-box label{font-size:10px;color:var(--t3);letter-spacing:0.5px;margin-bottom:-6px}
+.option-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.option-card{padding:13px 11px;text-align:center;background:var(--bg-elevated);border:2px solid var(--border);border-radius:var(--rad2);cursor:pointer;transition:all var(--tr);font-size:12px}
+.option-card:hover{border-color:var(--gold-dim);background:var(--bg-hover)}
+.option-card.selected{border-color:var(--gold);background:var(--gold-glow);color:var(--gold)}
+.option-card .oc-icon{font-size:22px;display:block;margin-bottom:3px}
+.option-card .oc-name{font-weight:600}
+.setup-nav{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+
+/* ============ 结算 ============ */
+#page-verdict{background:radial-gradient(900px 600px at 50% -10%,rgba(232,180,74,0.09),transparent 60%),var(--bg-deep)}
+.verdict-body{flex:1;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:30px 18px 40px;gap:14px}
+.verdict-title{font-family:var(--serif);font-size:26px;letter-spacing:4px;color:var(--gold)}
+.verdict-title.fail{color:var(--t2)}
+.score-ring{width:150px;height:150px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;margin:6px 0}
+.score-ring::after{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--bg-deep)}
+.score-inner{position:relative;z-index:1;text-align:center}
+.score-inner b{font-size:40px;font-family:var(--mono);color:var(--gold)}
+.score-inner span{font-size:11px;color:var(--t3);display:block;margin-top:-4px}
+.rating-tag{font-size:15px;font-weight:700;color:var(--gold);border:1px solid var(--gold-dim);border-radius:24px;padding:6px 22px;background:var(--gold-glow);letter-spacing:2px}
+.verdict-card{width:min(620px,94vw);background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:16px 18px}
+.verdict-card h4{font-size:11px;color:var(--gold);letter-spacing:1.5px;margin-bottom:8px}
+.verdict-card p,.verdict-card li{font-size:12.5px;color:var(--t2);line-height:1.85}
+.verdict-card ul{padding-left:18px}
+.verdict-actions{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;justify-content:center}
+
+/* ============ Toast ============ */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border-active);padding:9px 18px;border-radius:var(--rad2);font-size:12.5px;z-index:300;pointer-events:none;opacity:0;transition:opacity 300ms ease;max-width:88vw}
+#toast.show{opacity:1}
+#toast.success{border-color:var(--gr)}
+#toast.error{border-color:var(--r)}
+
+/* ============ 响应式 ============ */
+@media(max-width:768px){
+  .topbar{padding:0 8px;gap:5px}
+  .topbar .logo{font-size:13px;letter-spacing:1px;max-width:36vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar .logo span{display:none}
+  .top-stat{display:none}
+  .top-btn{padding:6px 9px;font-size:10.5px;min-height:32px}
+  .tab{min-width:56px;font-size:9px}
+  .tab .tab-n{right:calc(50% - 30px);top:4px}
+  #log{padding:12px 10px}
+  #log .msg .m-text{font-size:13.5px}
+  #input-area{padding:8px 10px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  #input-area textarea{font-size:16px;min-height:44px}
+  #send-btn{min-width:64px;font-size:14px;padding:11px 16px;min-height:44px}
+  .page-body{padding:12px 10px}
+  .modal{width:96vw;padding:15px}
+  .modal .btn{min-height:40px;padding:9px 16px}
+  .setup-box{width:94vw}
+  .setup-box input,.setup-box select,.setup-box textarea{font-size:16px}
+  .setup-nav .btn{min-height:46px}
+  .back-btn{min-height:34px}
+  .btn{min-height:38px}
+  .btn.sm{min-height:30px}
+  .ph-title{font-size:12.5px;max-width:56vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cc-title{font-size:14px}
+  .submit-bar .btn{min-height:46px;flex:1}
+  .case-card,.card{padding:11px 12px}
+  .detail-sec{padding:11px 12px}
+  .verdict-body{padding:22px 12px 40px}
+  .score-ring{width:128px;height:128px}
+  .score-inner b{font-size:34px}
+  .float-gear{top:10px;right:10px}
+}
+@media(max-width:420px){
+  .tab{min-width:52px}
+  .tab-ico{font-size:12px}
+  .setup-wrap h1{font-size:22px}
+  .step-dot{font-size:9.5px;padding:4px 7px}
+}
+.spacer{flex:1}
+.sec-title{font-family:var(--serif);font-size:16px;color:var(--gold);letter-spacing:2px;margin:2px 0 4px}
+.sec-sub{font-size:10.5px;color:var(--t3);margin-bottom:8px}
+
+/* 案件卡片 */
+.case-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:14px 15px;transition:border var(--tr),transform var(--tr);position:relative}
+.case-card:hover{border-color:var(--gold-dim);transform:translateY(-1px)}
+.cc-top{display:flex;align-items:center;gap:10px}
+.cc-icon{width:40px;height:40px;border-radius:var(--rad);background:var(--bg-deep);border:1px solid var(--border-active);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.cc-icon.lg{width:52px;height:52px;font-size:26px;border-color:var(--gold-dim)}
+.cc-title{font-family:var(--serif);font-size:15.5px;font-weight:700;color:var(--t);letter-spacing:0.5px}
+.cc-code{font-size:10px;color:var(--t3);margin-top:1px}
+.cc-tagline{font-size:11.5px;color:var(--t2);line-height:1.7;margin:9px 0 7px}
+.cc-feats{display:flex;flex-wrap:wrap}
+.cc-foot{display:flex;align-items:center;justify-content:flex-end;margin-top:9px;gap:8px}
+.cc-badge{font-size:10px;color:var(--gr);border:1px solid var(--gr);border-radius:20px;padding:2px 10px;white-space:nowrap;margin-left:auto}
+
+/* 人物卡片 */
+.pcard-top{display:flex;align-items:center;gap:10px}
+.avatar-lg{width:42px;height:42px;border-radius:var(--rad2);background:linear-gradient(135deg,var(--gold-dim),var(--border-active));display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#1a1509;flex-shrink:0}
+.pname{font-size:14px;font-weight:700}
+.pname .prole{font-size:10px;color:var(--jade);border:1px solid var(--jade-dim);border-radius:12px;padding:1px 7px;margin-left:6px;font-weight:400;vertical-align:2px}
+.pmeta{font-size:10px;color:var(--t3);margin-top:2px}
+.pbrief{font-size:11.5px;color:var(--t2);line-height:1.7;margin-top:8px}
+.pcard-foot{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin-top:9px}
+.dead-tag{font-size:10px;color:var(--r);border:1px solid var(--r);border-radius:12px;padding:1px 8px}
+.asked-tag{font-size:10px;color:var(--jade);border:1px solid var(--jade-dim);border-radius:12px;padding:1px 8px}
+
+/* 页签计数 & 顶栏信息 */
+.tab-n{position:absolute;top:6px;right:calc(50% - 34px);min-width:15px;height:15px;border-radius:8px;background:var(--gold);color:#16120a;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.top-stat{display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;border:1px solid var(--border-active);font-size:10.5px;color:var(--t2);white-space:nowrap}
+.top-stat b{color:var(--gold)}
+
+/* 提交栏 */
+.submit-bar{flex-shrink:0;padding:10px 16px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:10px}
+
+/* 详情信息行 */
+.info-row{display:flex;gap:8px;font-size:12px;color:var(--t2);line-height:1.8}
+.info-row .k{color:var(--t3);flex-shrink:0}
+.detail-hero{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<input type="file" id="import-file" accept=".json" style="display:none">
+<script>
+"use strict";
+/* ================================================================
+   案件数据（虚构推理案件，纯属创作）
+   ================================================================ */
+const CASES=[
+{
+  id:'lanxin', title:'兰心剧院·名伶之死', code:'毒糖之夜', icon:'🎭',
+  tagline:'台上万人瞩目，一颗薄荷糖里，藏着整座剧院的秘密。',
+  features:['密室毒杀','舞台不在场证明','后台命案','名伶陨落'],
+  backgroundShort:'2026年9月12日晚，老城区兰心剧院首演话剧《夜莺》，名伶白蝶出演女一号。第二幕开场前她迟迟未上台，20:40破门发现她死于化妆间——氰化物中毒。',
+  detail:{
+    background:[
+      '兰心剧院是老城区一座1931年建成的三层欧式剧院，二楼东翼是主演区。女一号白蝶（35岁）是剧团的台柱子——才华横溢、骄傲犀利、言语刻薄，树敌不少，但艺术造诣公认一流。',
+      '2026年9月12日（周六）晚，大型话剧《夜莺》首演，座无虚席。中场休息后第二幕即将开场，女一号却迟迟未上台。20:35助理小夏拍门无人应答，门从内反锁；20:40剧场经理破门，发现白蝶倒毙于梳妆台前，手中握着半支口红，妆只化了一半。',
+      '法医鉴定：氰化物中毒，死亡时间约20:25—20:32，毒源是她含在口中的薄荷润喉糖——糖芯被注入了氰化钾。诡异的是，案发时段，数百名观众可以作证：几乎所有嫌疑人都在舞台上演出。'
+    ],
+    roles:[
+      {name:'白蝶（死者）',desc:'35岁，女一号「夜莺」，剧团台柱子。才华横溢、骄傲犀利、言语刻薄，树敌不少，但艺术造诣公认一流。'},
+      {name:'沈惊鸿',desc:'38岁，男二号「副官」。白蝶前男友，剧团中生代演员，为人谦和、人缘极好。'},
+      {name:'秦菲',desc:'30岁，女二号「侍女」。争强好胜、心思外露，公开嫉妒白蝶的女一号位置。'},
+      {name:'江一帆',desc:'50岁，导演，剧团实际负责人，白蝶的伯乐，处事圆滑。'},
+      {name:'小夏',desc:'22岁，白蝶的跟包助理，第一发现人，最了解白蝶的生活习惯。'},
+      {name:'贺言',desc:'40岁，男一号「夜莺的情人」，白蝶前夫。离婚五年，共同抚养女儿。'},
+      {name:'钱福来',desc:'55岁，剧场经理，精明市侩。白蝶若跳槽，他能拿到一笔可观的违约金。'}
+    ],
+    location:'兰心剧院二楼东翼·白蝶专属化妆间：约5m×4m单间。北墙梳妆台（三面镜+暖光灯带）；西墙沙发茶几，茶几上放「润喉茶壶+茶杯」和贴「白」字标签的薄荷润喉糖铁盒；南墙木门，内插销（白蝶独处时习惯反锁），门缝约1.5cm。走廊东端通舞台侧台，西端通服装间/公共化妆间。案发时段二楼走廊监控受舞台灯光电磁干扰，时断时续。',
+    events:[
+      '19:30 话剧《夜莺》第一幕开演，座无虚席。',
+      '19:50 中场休息，白蝶回到二楼化妆间补妆（她独处时习惯反锁门）。',
+      '20:10 第二幕开演铃响，女一号白蝶迟迟未上台——众人以为她闹情绪迟到。',
+      '20:35 助理小夏拍门无人应答，发现门从内反锁。',
+      '20:40 剧场经理组织破门，发现白蝶倒毙于梳妆台前，手中还握着半支口红。',
+      '20:55 警方到场封锁二楼。法医初步判断：氰化物中毒，死亡时间约20:25—20:32，毒源疑似她口中的薄荷润喉糖。',
+      '诡异的是，案发时段数百名观众与全体演职人员均可作证：主要演员几乎都在舞台上——毒究竟是如何被下的，成了谜题的核心。'
+    ]
+  },
+  firstScene:'你随警方于20:55赶到兰心剧院，二楼东翼走廊已被封锁。空气里混着后台的脂粉味和深秋的潮气。破门后的化妆间里，白蝶仰坐在梳妆台前的椅子上，头微垂，右手还握着半支口红，妆只化了一半——像只是打了个盹。但法医已在门外低声告诉你：氰化物中毒，死亡时间约20:25—20:32，毒源是口腔里那颗薄荷糖。\n\n西墙茶几上放着润喉茶壶和那只贴了「白」字标签的薄荷糖铁盒；门内插销闩合，门缝只有1.5厘米；梳妆台右上角摆着她的手机。走廊东端通向侧台——案发时，数百名观众正看着舞台上的演出。\n\n你站在门口，闻到一股淡淡的薄荷味。现场可以搜查：化妆间、尸体、糖盒、手机、走廊监控……也可以随时去询问剧团里的人。',
+  truth:'【真凶】沈惊鸿（男二号，白蝶前男友）。\n【手法】19:10趁化妆间无人，用镊子将一颗预先注入氰化钾毒液（针孔+食用蜡封口）的薄荷糖放入糖盒「惯取位」（靠镜第一颗）。白蝶19:50中场回房含糖，糖衣约12分钟溶尽、毒芯暴露，20:25—20:28毒发身亡。他20:10起在台上，利用「延时毒发」制造铁证般的不在场证明。密室是白蝶自己反锁的（独处反锁习惯），与凶手无关。\n【动机】白蝶握有他「代笔+剧本抄袭+冒名收款」的铁证（手机加密文件夹「证据-代笔」），20:05发最后通牒短信；他若不灭口，次日将身败名裂。另有旧情恩怨。\n【关键证据】监控19:10拍到他进出白蝶化妆间（背影+侧脸）；毒糖撕口方向与其他糖相反；糖盒盖内侧微量氰化物；茶几3道镊子压痕；门口地毯散落氰化钾结晶；走廊对侧反光镜胶带残痕；服装间备用戏服内袋藏毒（0.05g氰化钾，纸巾包裹，铁证）；他化妆间搜出化学手册+电镀笔记；家族电镀厂氰化钾库存缺失。',
+  evidence:'【物证获取条件】\n- 检查梳妆台手机 → 20:05短信（证词）；指纹解锁加密文件夹 → 「证据-代笔」文件夹（道具，含转账记录）；内有「江导账目」子文件夹。\n- 检查糖盒 → 盒内3颗正常糖、毒糖撕口方向异常（道具）、盒盖内侧微量氰化物（道具）。\n- 检查茶几 → 3道圆形压痕（道具）。\n- 检查门口地毯/地面 → 氰化钾结晶（道具）。\n- 检查走廊对侧墙壁 → 反光镜胶带残痕（道具）。\n- 检查尸体/法医记录 → 口腔毒糖残渣、氰化物尸征、死亡时间（证词）。\n- 查看二楼监控/侧台监控 → 19:10沈惊鸿进入化妆间（证词）；19:52侧台候场有化妆师小方人证。\n- 搜查服装间 → 沈惊鸿备用戏服内袋藏毒（铁证道具）。\n- 搜查沈惊鸿化妆间 → 化学手册+电镀笔记（道具）。\n- 询问证人 → 小夏（白蝶习惯、惯取位、含糖不嚼）、化妆师（撕口方向、秦菲人证）、贺言（白蝶含糖习惯）、钱福来（沈家开电镀厂）。\n- 若玩家追查毒源 → 沈家五金厂库存缺失（证词）。',
+  timeline:'19:08 沈惊鸿进自己化妆间取工具；19:10-19:12 进白蝶化妆间放毒糖、贴反光镜（19:15取下）；19:12 白蝶离房去舞台；19:30 第一幕开演；19:50 中场，白蝶回房反锁、含糖、补妆；19:52 沈惊鸿侧台候场（小方人证）；20:00 小夏续水后离开；20:05 白蝶发短信、开门探头；20:10 第二幕开演，白蝶未登台；约20:00 糖衣溶尽毒芯暴露；20:25-20:28 白蝶毒发死亡；20:35 小夏拍门；20:40 破门；20:55 警方到场。',
+  participants:[
+    {id:'shen',name:'沈惊鸿',age:38,gender:'男',role:'男二号「副官」',dead:false,
+     brief:'白蝶前男友。表面儒雅谦和，人缘极好；大学化学系肄业，家族经营五金电镀厂。',
+     persona:'表面儒雅谦和、风度翩翩，人缘极好；实则虚荣、懦弱、精于算计，极度在意自己的名声。说话滴水不漏，习惯先微笑再开口，自称「只想安安静静演戏的人」。',
+     knowledge:'①他当晚19:08-19:12去过白蝶化妆间（他承认去过，但声称只是「还她一张节目单、说了两句话」就出来了）；②19:12后他在自己化妆间换装候场，19:30起登台，中场19:52在侧台候场（化妆师小方可证）；③他收到白蝶20:05的短信（声称内容是「她说演出结束要跟我谈谈旧事，她总爱说些吓人的话」）；④他知道白蝶与贺言离婚、与秦菲不和；⑤白蝶三年前甩了他，剧团都知道。',
+     secret:'你是真凶，绝不能承认：毒糖是你19:10放的；你根本没还什么节目单。你害怕的致命证据是「代笔+抄袭」（她的加密文件夹、转账记录）——若侦探只问感情纠葛，你装深情；若侦探点出「证据-代笔」文件夹或监控拍到你进出，你先是矢口否认、说「她造谣」，若侦探再拿出藏毒戏服等铁证，你才逐步崩溃承认。谎言暗示：微笑僵硬、指腹反复摩挲衣角、视线短暂下移、说到19:10时段语速变快。'},
+    {id:'qinfei',name:'秦菲',age:30,gender:'女',role:'女二号「侍女」',dead:false,
+     brief:'争强好胜、心思外露。公开嫉妒白蝶的女一号位置，曾被白蝶当众揭穿排练假唱，记恨在心。',
+     persona:'争强好胜、虚荣、心思外露，说话直来直去藏不住事。对白蝶又妒又恨，但提到她死了也会露出一点不自在。',
+     knowledge:'①19:00-19:30她在公共化妆间做头发（化妆师老郑全程在场）；②19:10前后她透过走廊看到沈惊鸿往东边白蝶化妆间方向走，「大概两三分钟就回来了」——这是她能提供的直接线索；③19:50-20:10中场她在走廊东侧补妆，没看到任何人进出白蝶化妆间；④第二幕她在台上，白蝶没上场她还在心里骂「又摆谱」；⑤她恨白蝶揭穿她假唱，但只想过顶替她演女一号，没想过杀人。',
+     secret:'你不是凶手，说真话即可。你提到的「19:10看到沈惊鸿去白蝶那边」是真话，但你不确定他待了多久。不要编造你没见过的东西。你情绪外露，对侦探有问必答，还爱添油加醋。',
+     },
+    {id:'jiang',name:'江一帆',age:50,gender:'男',role:'导演·剧团负责人',dead:false,
+     brief:'白蝶的伯乐，导演、剧团实际负责人，处事圆滑、爱惜羽毛。',
+     persona:'老练市侩、爱惜羽毛，说话圆滑，习惯把责任推给「剧务混乱」。对白蝶之死表现出痛心，但眼神躲闪。',
+     knowledge:'①19:00-19:30他在舞台/观众席指挥走位（舞台监督、灯光师可证），没上过二楼；②19:50-20:10中场他在观众席陪投资方陆总寒暄；③第二幕起他在侧幕指挥，20:35得知白蝶未上台，亲自上楼敲门、组织破门；④他知道白蝶手里有「他账目上的事」（白蝶曾给他看过一张流水截图，说「演出结束谈」），他本想私下谈和；⑤他知道白蝶19:45骂小夏「废物」，知道她中场必回房化妆的习惯。',
+     secret:'你不是凶手，但你有自己的污点：挪用公款、私吞分成。被问起时先搪塞「账目问题纯属误会」，若侦探拿出「江导账目」文件夹证据，你承认经济问题但坚持与命案无关（这是实话）。注意：别主动提账目的事，被戳穿时冷汗、搓手。',
+     },
+    {id:'xiaoxia',name:'小夏',age:22,gender:'女',role:'白蝶的跟包助理·第一发现人',dead:false,
+     brief:'勤快怯懦、逆来顺受。最了解白蝶的习惯，当晚刚被骂「废物」，也是第一个发现尸体的人。',
+     persona:'怯生生、眼圈发红，说话声音小，一提白蝶就哽咽。对白蝶又怕又心疼，讲述时断断续续但句句是真话。',
+     knowledge:'①白蝶的习惯她都清楚：中场必回房、独处必反锁、含糖不嚼（保护嗓子，含化约十几分钟）、永远先拿糖盒里靠镜子第一颗（惯取位）；②19:00-19:30她在服装间熨戏服（裁缝刘姐可证），19:45因戏服烫得不平被白蝶骂「废物」；③19:50白蝶回房，她跟进去了，看见白蝶从糖盒靠镜第一颗取糖含进嘴里，然后赶她出去；④20:00她给茶壶续了水（茶壶是她20:00现泡的，续完就出来了），20:05她离开时白蝶还探出头让她「别管我，我要一个人待着」；⑤白蝶开演前对她说「今晚之后，剧团要变天了」；⑥20:35她拍门没人应，吓坏了。',
+     secret:'你不是凶手，句句属实。你唯一的顾虑是怕别人觉得你被骂后怀恨在心——你可以主动解释「我是怨她，可我从没想过害她」。',
+     },
+    {id:'heyan',name:'贺言',age:40,gender:'男',role:'男一号·白蝶前夫',dead:false,
+     brief:'沉稳内敛。与白蝶离婚五年，共同抚养女儿；事业停滞，对白蝶又爱又怨。',
+     persona:'沉默寡言、情绪克制，提到白蝶时停顿很久。说起女儿会明显柔软。悲伤是真实的，但他不愿在人前失态。',
+     knowledge:'①19:00-19:30他在舞台与导演对戏走位；19:50-20:10中场他在侧台休息室背台词（舞台监督路过看见）；第二幕全程在台上；②他了解白蝶的习惯：保护嗓子含糖不嚼、中场回房补妆、独处反锁——「她这个人，认准的事谁也拦不住」；③白蝶最近跟他说过「我要让沈惊鸿付出代价」，他以为是感情恩怨，没当回事；④20:05他看到沈惊鸿在侧幕盯着手机看了几秒又收起来，脸色不太对；⑤他与白蝶有抚养权之争——白蝶威胁要争回女儿，他怕这个。',
+     secret:'你不是凶手。你担心女儿，也怕警方怀疑你，所以起初话少。问起抚养权你承认「她威胁过我，但我绝不会杀她——那是孩子她妈」。',
+     },
+    {id:'qian',name:'钱福来',age:55,gender:'男',role:'剧场经理',dead:false,
+     brief:'精明市侩、精打细算。白蝶若跳槽他可得300万违约金——她走，他反而得利。',
+     persona:'精明圆滑，说话带着生意人的客气，紧张时会清嗓子。急于撇清关系，但提供信息很爽快。',
+     knowledge:'①19:00-19:30他在票房核对票款（售票员可证）；19:50-20:10在大厅接待嘉宾；②20:35闻讯上楼，20:40组织破门；③他巴不得白蝶走（违约金300万），但没理由杀人；④他认识沈惊鸿多年：「沈家是开五金电镀厂的，沈惊鸿年轻时学过化学，差点去当工程师」——这句是重要线索；⑤破门后他第一时间主张报警。',
+     secret:'你不是凶手，实话实说。你唯一的小心思是别让人知道你在盘算违约金——被问起时搓手、岔开话题。',
+     },
+    {id:'baidie',name:'白蝶',age:35,gender:'女',role:'女一号「夜莺」·死者',dead:true,
+     brief:'本案死者。才华横溢、骄傲犀利、得理不饶人，树敌不少，但艺术造诣公认一流。',
+     persona:'（死者，无法询问）',
+     knowledge:'',
+     secret:''}
+  ]
+},
+{
+  id:'tingsxue', title:'听雪庄·温泉汤屋谋杀案', code:'雪夜拖尸案', icon:'♨️',
+  tagline:'大雪封山，温泉孤岛。一行脚印有去有回，拖痕尽头是浮在水面上的尸体。',
+  features:['暴雪山庄','雪地足迹','温泉孤岛','跨年夜命案'],
+  backgroundShort:'2026年12月31日跨年夜，海拔2800米的温泉旅馆听雪庄被大雪封山。山庄主人、悬疑小说作家段鸿铭被发现面朝下漂浮在温泉汤池中，看似酒后滑倒溺亡。',
+  detail:{
+    background:[
+      '听雪庄是北方山区一座三层木石结构的温泉旅馆，主人段鸿铭（62岁）是畅销悬疑小说作家，性情乖戾、控制欲极强，对妻子长期言语羞辱，对儿子全盘否定，树敌众多。',
+      '2026年12月31日跨年夜，山庄举办小型晚会，住客与职员共14人。23:10，前台林小满在东侧「玉汤」温泉汤屋发现段鸿铭面朝下漂浮在池中，池边大理石沾血、头部有撞伤——乍看是「酒后滑倒撞晕溺亡」的意外。',
+      '次日警方破雪登庄展开调查。雪地上的脚印与拖痕存在无法解释的矛盾——这起看似「酒后滑倒溺亡」的意外，疑点重重。'
+    ],
+    roles:[
+      {name:'段鸿铭（死者）',desc:'62岁，山庄主人、畅销悬疑作家。性情乖戾、控制欲极强，对家人言语刻薄，树敌众多。'},
+      {name:'苏蔓',desc:'34岁，死者第二任妻子，嫁入山庄三年。性情温顺隐忍，常被丈夫当众责骂。'},
+      {name:'关山',desc:'38岁，山庄大厨。热情爽朗、人缘极好。'},
+      {name:'段子豪',desc:'27岁，死者之子。与父亲关系紧张，经营民宿失败、欠下债务。'},
+      {name:'老周',desc:'62岁，山庄管家，在段家服务一辈子，熟悉山庄的每个角落。'},
+      {name:'陆晚',desc:'35岁，私人医生/营养师，负责死者的日常用药。'},
+      {name:'林小满',desc:'26岁，前台/杂务，第一发现人。'}
+    ],
+    location:'山庄东侧「玉汤」半露天温泉汤屋：汤池约4m×3m、深1.2m、水温42℃恒温；池东角有带棱角的大理石台阶（出水口）；北门为玻璃推拉门（不设锁），门外雪地小径向北80米连旅馆侧门（厨房货物通道，直通锅炉房与走廊）；玄关外有木鞋架放公用雪地靴。死者房间为二楼207。当晚21:30起飘雪，22:00转大雪，22:40雪停，共积雪约6cm。',
+    events:[
+      '20:30 跨年晚宴上，段鸿铭当众训斥妻子苏蔓，扬言让她离开山庄。',
+      '20:45 段子豪上二楼与父亲争吵，摔门而出。',
+      '21:00 苏蔓照例给丈夫送去睡前热牛奶（他每晚必喝）。',
+      '21:30 开始飘雪；22:00 转大雪；22:40 雪停，一夜积雪约6厘米。',
+      '23:05 苏蔓提议去叫父亲一起跨年，发现房间无人。',
+      '23:10 前台林小满在东侧「玉汤」汤屋发现段鸿铭漂浮在池中，已无生命体征。',
+      '雪地上有一行从旅馆通向汤屋的脚印与拖痕，深浅不一、方向矛盾——这起看似「酒后滑倒溺亡」的意外，疑点重重。'
+    ]
+  },
+  firstScene:'次日清晨，雪刚停。你随警方乘雪地车登上听雪庄时，山庄还笼在寒雾里。汤屋北门外，一行脚印从侧门方向延伸而来——43码登山靴，单程，旁边是一条被压实了的拖痕，直通半开的玻璃门。\n\n池子里，段鸿铭面朝下漂着，浴衣松散，姿态松弛得像睡着了一样。池边大理石棱角上沾着暗红的血迹。前台姑娘林小满缩在门边，声音发抖：「脚印……拖痕……我探头一看，人就漂在那儿了。」\n\n你蹲下身细看雪地：脚印深浅不一，靠近侧门段深、靠近汤屋段浅；最末端的一步，鞋尖却朝着旅馆的方向。温泉水汽里，飘着一丝若有若无的药味。\n\n可以搜查：尸体、汤屋、雪地脚印、207房间、锅炉房、医务室、大厅监控……也可以去询问山庄里的人。',
+  truth:'【真凶】苏蔓（死者第二任妻子）。\n【手法】20:45-20:50趁医务室无人窃取艾司唑仑4片并擦拭药瓶；21:00将2片碾碎溶入热牛奶端给死者（他每晚21:00必喝牛奶）；22:00雪大时用毛毯裹住昏睡的死者，从207房拖出，经走廊、楼梯、侧门，穿上管家老周的43码「山鹰牌」登山靴（栽赃），雪中拖行80米至汤屋；22:15-22:22将昏迷的死者面朝下按入温泉溺毙，用其头部在池边大理石棱角按压伪造撞伤，擦拭门把手；22:22抹开玻璃幕墙水汽张望确认无人后，踩原脚印返回（去程拖物深印2.8cm+返程浅印2.0cm重叠，末脚印方向指向旅馆）；22:30靴放回锅炉房门口，回房换衣擦发、湿羊毛袜塞入行李箱；22:35换装出现在大厅（头发微湿）。\n【动机】长期被丈夫羞辱虐待；死者已决定离婚让她净身出户并追究其侵占账目；发现她与关山的私情扬言让她身败名裂。\n【关键证据】牛奶杯残奶含艾司唑仑；医务室药瓶短缺4片+被擦拭；监控20:50苏蔓从医务室方向返回大厅；雪地43码单行脚印（深浅两段）+末脚印方向指向旅馆；拖痕+三处同源深灰羊毛纤维（房间/走廊/雪地/池边）；靴内羊毛袜纤维+女性皮屑DNA（与苏蔓一致，铁证）；22:35换装+头发微湿（林小满目击+监控）；苏蔓行李箱内湿羊毛袜（含温泉矿物质+207毛毯纤维，铁证）；死者手机「净身出户+追究」邮件草稿。',
+  evidence:'【物证获取条件】\n- 检查207房间床头柜牛奶杯 → 残奶含艾司唑仑（证词）；床边至门口地毯长条压痕+羊毛纤维（道具）。\n- 检查汤屋池边 → 大理石棱角涂抹状血迹（道具）；玻璃幕墙东北角抹开水汽痕迹（高约150cm，道具）；池边2根深灰羊毛纤维（道具）；玄关潮湿灰毛毯（道具）。\n- 检查雪地脚印 → 43码深浅两段、末脚印方向、拖痕（证词/道具）；拖痕边缘羊毛纤维（道具）。\n- 检查锅炉房门口登山靴 → 靴底纹与雪地脚印吻合（道具）；靴内羊毛袜纤维+女性皮屑（送检DNA → 证词，铁证）。\n- 检查医务室 → 艾司唑仑瓶短缺4片、瓶身被擦拭（证词/道具）；询问陆晚（台账、死者用药习惯）。\n- 查看大厅监控 → 20:50苏蔓从医务室方向返回；21:00端牛奶上楼；22:35换装+头发微湿（证词）。\n- 检查死者手机 → 「净身出户+追究」邮件草稿（道具，动机）。\n- 搜查苏蔓房间 → 行李箱内湿羊毛袜（铁证道具）。\n- 询问证人 → 林小满（22:35换装）、关山（时间线）、老周（靴子、习惯）、段子豪（争吵）、陆晚（药源）。\n- 若玩家提出鉴定靴内DNA → 比对苏蔓（证词）。',
+  timeline:'20:30 晚宴，段鸿铭当众羞辱苏蔓；20:45 段子豪与父争吵摔门；苏蔓取药4片；21:00 苏蔓端牛奶（含药）给死者；21:15 段子豪酒吧买醉；21:30 小雪，老周进锅炉房；22:00 大雪，苏蔓开始拖尸（房间→走廊→楼梯→侧门）；22:05 穿老周43码靴，雪中拖行；22:15-22:22 汤屋溺毙+伪造撞伤+擦拭；22:22 抹开水汽张望，踩原脚印返回；22:30 靴放回锅炉房门口，回房换衣；22:35 苏蔓换装出现在大厅（林小满目击）；22:36 关山端火锅上桌；22:40 雪停；22:45 段子豪醉倒回房；23:00 跨年倒计时；23:05 苏蔓「去叫爸」；23:08 「爸不在房间」；23:10 林小满发现尸体。',
+  participants:[
+    {id:'suman',name:'苏蔓',age:34,gender:'女',role:'死者第二任妻子',dead:false,
+     brief:'死者第二任妻子，嫁入山庄三年。性情温顺隐忍，常被丈夫当众羞辱。',
+     persona:'温婉、声音轻柔，眼眶微红，说话时总微微低头，一副受尽委屈的遗孀模样。对丈夫之死表现出「既怕又难过」——但回答关键问题时会停顿半拍，把话说得滴水不漏。',
+     knowledge:'①21:00她端牛奶给死者（承认，「他每晚都要喝」），21:05回房；②她自称21:30-22:35一直在房间休息，什么都没听见；③22:35她换了深色毛衣长裙出现在大厅（她解释「睡前洗了澡，换了衣服」）；④23:05她提议去叫爸，发现人不在，23:08跑回来说「爸不在房间」；⑤她知道丈夫常年骂她、当晚又当众羞辱她（委屈地承认）；⑥她声称对安眠药一无所知。',
+     secret:'你是真凶，绝不能承认：药是你偷的、牛奶是你下的药、尸体是你拖去汤屋的、老周的靴子是你穿的。被问及22:00-22:35行踪时咬死「在房间睡觉」；被问头发为什么湿 →「洗澡」；被问为什么换衣服 →「睡前换的」。若侦探拿出靴内DNA、湿羊毛袜、监控等铁证，你先是怔住、脸色发白、否认，最后才崩溃承认。谎言暗示：回答前停顿、语气过分平静、反复强调「我一直在房间」「我什么都不知道」，指尖绞着衣角。',
+     },
+    {id:'guanshan',name:'关山',age:38,gender:'男',role:'山庄大厨',dead:false,
+     brief:'热情爽朗、讲义气。山庄大厨，与山庄众人关系融洽。',
+     persona:'嗓门大、热心肠，说话带着厨师的爽快。提到苏蔓时明显紧张、眼神飘忽，会不自觉地舔嘴唇。',
+     knowledge:'①19:00-22:35他在厨房备跨年宵夜，21:00-22:00有临时助手小王在场，22:00-22:35独处；②22:36他端火锅上桌，餐厅多人目击；③他知道苏蔓每晚21:00给段先生端牛奶上楼（「每晚都是她端，雷打不动」）；④他听到晚宴上段鸿铭当众骂苏蔓（他在厨房都听见了）；⑤他与苏蔓相好两年（被问起先否认，追问下承认，但坚称与命案无关）；⑥他不知道苏蔓当晚做了什么——她只跟他说「元旦后跟我走」。',
+     secret:'你不是凶手，你唯一要隐瞒的是与苏蔓的私情。被问到22:00-22:35独处时如实说「在备火锅底料」。听说苏蔓涉案后震惊、激动、语无伦次，是真反应。',
+     },
+    {id:'duanzihao',name:'段子豪',age:27,gender:'男',role:'死者之子',dead:false,
+     brief:'叛逆敏感，才华被父亲长期否定。欠债180万想卖山庄还债，当晚与父亲大吵后买醉。',
+     persona:'宿醉未醒、声音沙哑，说话带着自嘲和怨气，但说到父亲死了会突然沉默。',
+     knowledge:'①20:45他上二楼207找父亲要钱被拒，大吵一架摔门而出（「他连我民宿亏损的账都翻出来骂」）；②21:15-22:30他在一楼酒吧间买醉，酒保小刘一直看着他，「我醉得走不动路，22:30是被搀回去的」；③22:45后他在房间睡觉，23:10被叫醒才知道父亲死了；④他欠债180万，想过卖山庄，但「我只是想拿回属于我的那份」；⑤他听到父亲在晚宴上对苏蔓说「过了年就让你滚出山庄」。',
+     secret:'你不是凶手，句句属实。你嘴硬但没干过这事，被问急了会吼「我要杀他早杀了，还等今晚？」',
+     },
+    {id:'laozhou',name:'老周',age:62,gender:'男',role:'山庄管家·被栽赃者',dead:false,
+     brief:'忠诚木讷、寡言少语，在段家干了一辈子。他的43码「山鹰牌」登山靴被凶手偷穿栽赃。',
+     persona:'沉默、驼背、说话慢吞吞，眼圈发红。被怀疑时急得直搓手，但讲起山庄的事如数家珍。',
+     knowledge:'①21:30-22:40他在锅炉房添煤（自述，无人证——他为此懊恼「可我真的一直在锅炉房」）；②22:40回大厅帮忙，23:00在跨年人群里，23:10随众人发现尸体当场老泪纵横；③他的43码山鹰牌登山靴平时就放在锅炉房门口，「谁都看见过」；④他知道山庄所有角落、死者的习惯：每晚21:00喝热牛奶（苏蔓端）、汤屋42度恒温、池边大理石台阶；⑤他知道段家内情：段先生骂了苏蔓三年、段子豪欠债、陆医生管药；⑥他不知道靴子被穿过——22:40离开锅炉房时觉得靴子有点潮，「以为是自己踩了雪」。',
+     secret:'你不是凶手，实话实说。你最大的委屈是没人能证明你在锅炉房——被怀疑时老泪纵横但条理清楚。你不知道的事绝不瞎说。',
+     },
+    {id:'luwan',name:'陆晚',age:35,gender:'女',role:'私人医生/营养师',dead:false,
+     brief:'谨慎专业、略孤僻。负责死者心脏药与安眠药；医务室安眠药当晚失窃4片，她是第一个发现的。',
+     persona:'说话简洁专业，有点冷淡，条理清晰。对药品管理被指责一事明显不悦，会据理力争。',
+     knowledge:'①21:30-22:30她在医务室整理药品病历（自述无人证）；②22:30清点时发现艾司唑仑少了4片，台账却无任何记录——她主动报告了这件事；③死者的用药习惯：每晚从床头柜药盒吃安眠药，「他从不把药放进牛奶里，药盒当晚满盒未动」——这句是重要线索；④23:10她赶到现场确认死亡，阻止众人移动尸体（保护现场）；⑤她身高165cm、体重50kg，穿37码鞋。',
+     secret:'你不是凶手，实话实说。你唯一介意的是有人可能怀疑你监守自盗——你可以主动提出核对药瓶上的指纹（没有你的指纹）。',
+     },
+    {id:'linxiaoman',name:'林小满',age:26,gender:'女',role:'前台·第一发现人',dead:false,
+     brief:'机灵话多、观察力强。对苏蔓颇有好感，是目击苏蔓22:35换装、头发微湿的关键证人。',
+     persona:'话多、紧张、竹筒倒豆子一样往外倒信息，说着说着自己先害怕起来。对苏蔓好感明显，为她说好话。',
+     knowledge:'①21:00-23:10她在大厅值班；②22:35她看到苏蔓换了深色毛衣+长裙出现在大厅，「头发有点湿，像刚洗过澡」——她当时还打招呼「苏姐洗过澡啦？」；③20:50她看到苏蔓从一楼走廊西侧（医务室方向）走回大厅；④21:00她看到苏蔓端着牛奶上楼；⑤23:05苏蔓说去叫爸，23:08跑回来说爸不在房间，23:09众人分头找，她自告奋勇去东侧温泉区；⑥23:10她在汤屋北门外看到脚印、拖痕、门半开，探头发现浮尸。',
+     secret:'你不是凶手。你真心觉得苏蔓是好人，起初会为她的异常找理由（「洗澡嘛，很正常」），但当侦探逐条追问时，她会如实承认这些细节。',
+     },
+    {id:'duanhongming',name:'段鸿铭',age:62,gender:'男',role:'山庄主人·死者',dead:true,
+     brief:'本案死者。畅销悬疑作家、山庄主人，性情乖戾、控制欲极强，对家人言语刻薄。',
+     persona:'（死者，无法询问）',
+     knowledge:'',
+     secret:''}
+  ]
+},
+{
+  id:'wudao', title:'雾岛·听涛山庄谋杀案', code:'烛台之夜', icon:'🕯️',
+  tagline:'台风孤岛，反锁的书房，一座不翼而飞的烛台。',
+  features:['暴风雪山庄','密室疑云','烛台凶器','家族恩怨'],
+  backgroundShort:'2026年7月31日台风夜，私人岛屿雾岛与外界隔绝。恒远地产董事长陈远山被发现倒毙于反锁的书房，后脑遭青铜烛台多次击打。',
+  detail:{
+    background:[
+      '雾岛是距大陆18海里的私人岛屿，岛上只有一座别墅「听涛山庄」。主人陈远山（58岁）是恒远地产集团董事长，精明多疑、控制欲强，对背叛零容忍。',
+      '2026年7月31日，强台风「海燕」正面登陆，渡轮停航、卫星天线折断、电话线路中断——一座教科书式的暴风雪山庄。22:47，女儿陈晓芸发现二楼书房门反锁；23:05破门后，陈远山倒毙于书房地毯上，后脑及左颞部遭钝器多次击打，凶器是壁炉架上的青铜烛台。',
+      '警方次日凌晨随海警快艇登岛。书房是从内侧反锁的，钥匙却在死者西装内袋里；桌上摊着未签完的《遗嘱修改草案》；壁炉里有一份没烧完的文件。当晚别墅内共7人：死者、妻子、长子、女儿、私人医生、管家、律师。'
+    ],
+    roles:[
+      {name:'陈远山（死者）',desc:'58岁，恒远地产集团董事长。精明多疑、控制欲强，白手起家，对背叛零容忍。'},
+      {name:'沈墨',desc:'35岁，私人医生，负责死者的健康多年，温文尔雅。'},
+      {name:'林婉如',desc:'28岁，死者第二任妻子，前模特出身。'},
+      {name:'陈世杰',desc:'34岁，长子，原集团副总裁。案发前刚被父亲撤职，当晚与父亲争吵后去酒窖饮酒。'},
+      {name:'陈晓芸',desc:'26岁，女儿，画家。与父亲多年不和，是发现书房反锁的第一人。'},
+      {name:'刘福',desc:'62岁，管家，跟随陈家30年，忠诚寡言。'},
+      {name:'赵明诚',desc:'55岁，律师，当晚应约登岛商谈遗嘱事宜。'}
+    ],
+    location:'二楼东翼书房（死者专用）：北墙房门（单扇木门、老式弹子锁，室内反锁必须用钥匙，死者习惯进门把钥匙插在锁孔忘记拔）；东墙两扇落地窗（内闩插死，外临悬崖海面）；南墙整墙书架（后有暗格保险柜）；西墙壁炉（架上原放青铜烛台）；中央偏东红木书桌。走廊对面是医务室。当晚22:02:30全屋停电（主保险丝被人为拧松）。',
+    events:[
+      '20:30 长子陈世杰在书房与父亲争吵，摔门而出。',
+      '21:00 妻子林婉如照例为书房里的丈夫送去热茶。',
+      '21:10—21:40 律师赵明诚应约登岛，与死者密谈（事后证实为修改遗嘱）。',
+      '22:02 全屋突然停电，众人以蜡烛照明。',
+      '22:47 女儿陈晓芸发现书房门反锁、拍门无人应答。',
+      '23:05 众人破门，发现陈远山倒毙于书房内，头部遭钝器多次击打；壁炉架上的青铜烛台不翼而飞。',
+      '台风夜渡轮停航、全岛与外界隔绝——凶手只可能在山庄之内。'
+    ]
+  },
+  firstScene:'海警快艇在凌晨四点靠上雾岛码头。台风刚过，听涛山庄的屋檐还在滴水，浪涛在悬崖下轰响。\n\n二楼书房的木门已经被卸下，靠墙立着。屋内，陈远山俯卧在书桌与壁炉之间的地毯上，头朝壁炉，右手虚握，指缝间夹着一缕红丝线。壁炉架上的青铜烛台不见了——它躺在尸体东侧一米二的地上，底座棱角沾着血。\n\n桌上摊着《遗嘱修改草案》，钢笔滚落一旁，签名只写了一半：「陈远」。壁炉里有一片没烧完的文件残片。门外走廊里，管家刘福红着眼眶：「门是反锁的……备用钥匙我试了，打不开。」\n\n窗外，海还在拍着悬崖。可以搜查：尸体、书房、壁炉、门锁、配电房、医务室、茶房与走廊监控……也可以去询问别墅里的6个人。',
+  truth:'【真凶】沈墨（私人医生）。\n【手法】20:39-20:41在茶房将2片碾碎的艾司唑仑涂于死者专用青花杯内壁；21:30潜入配电房拧松主保险丝（预谋22:02左右断电）；21:46端药托盘上楼制造「在医务室」假象；21:48潜入书房（门未锁、钥匙插在内侧锁孔），拉拢窗帘、翻找书桌抽屉找《药品批号比对表》；21:56死者惊醒质问，扭打中扯落沈墨深蓝西装纽扣（弹落沙发角落）；21:58-22:00用壁炉架上的青铜烛台从死者左后侧连击三下致死（第一下致命，后两下补击）；随后将比对表投入壁炉焚烧（未烧尽留残片）、用钥匙反锁门并把钥匙塞入死者西装内袋伪造密室、擦拭烛台与门把手、离开时钥匙环刮过门框留下漆痕；22:02:30保险丝脱落全屋停电，掩护其返回医务室清洗血迹、把血衣塞进药柜夹缝、换装。\n【动机】三年来利用私人医生身份盗卖恒远生物医药子公司新药研发数据（ZJ-7712系列）获利约1200万；死者已掌握「2026-07-14批次」异常发运证据（《药品批号比对表》+短信约谈），8月1日将报案——灭口保命。另有与林婉如的私情催化。\n【关键证据】沙发角落蓝纽扣（与医务室夹缝血衣同源纤维+死者血DNA，铁证）；茶房监控20:39-20:41沈墨身影；医务室艾司唑仑短缺10片；壁炉残片「0714/ZJ-7712/尾号8847」；死者21:38短信（收件人沈墨）；配电房海沙鞋印与书房门内沙砾成分一致；门框1.4米深蓝漆痕（拔钥匙动作，对应178cm身高）；陈晓芸21:51听到书房翻找声；击打角度力学分析（175-180cm右利手）；沈墨右手虎口擦伤。',
+  evidence:'【物证获取条件】\n- 检查尸体 → 左顶枕部三处钝器创口（法医：第一下致命+补击）、指甲缝地毯绒毛、指间红丝线（道具/证词）。\n- 检查青铜烛台 → 棱角缝隙死者血迹、整体被擦拭（道具）。\n- 检查壁炉灰烬 → 未烧尽的《药品批号比对表》残片（道具，关键）；烧变形的回形针。\n- 检查书桌 → 《遗嘱修改草案》（道具）；抽屉内文件翻动凌乱、比对表缺失。\n- 检查手机 → 21:38短信「谈谈药品批号0714」（证词）。\n- 检查沙发角落 → 深蓝色金属纽扣（道具，关键）。\n- 检查门锁/门框 → 内侧反锁+钥匙在死者口袋（逻辑）、门框1.4米深蓝漆痕（道具）。\n- 检查配电房 → 主保险丝被拧松至一圈（道具）、地面海沙鞋印（道具，与书房沙砾成分比对）。\n- 检查医务室 → 艾司唑仑短缺10片、台账无记录（证词）；水槽鲁米诺阳性（道具）；药柜夹缝黑色塑料袋血衣（铁证道具）。\n- 查看监控 → 茶房20:39-20:41沈墨进出（证词）；走廊21:46沈墨端托盘走向医务室（证词）。\n- 检查画室 → 陈晓芸画作《烛光下的书房》窗帘拉开（道具，时间锚点）。\n- 检查林婉如围巾 → 缺一缕红线、断口钩断（比对红丝线）。\n- 观察沈墨 → 右手虎口擦伤（证词）。\n- 询问证人 → 陈晓芸（21:51翻找声）、赵明诚（遗嘱+21:40死者困倦）、刘福（习惯、备用钥匙）、林婉如（端茶、客厅争吵）。',
+  timeline:'20:30 陈世杰与父争吵摔杯（手划伤）；20:39-20:41 沈墨进茶房涂药；21:00 林婉如端茶上楼（红线钩断）；21:10-21:40 律师密谈新遗嘱；21:30 沈墨潜入配电房拧松保险丝；21:38 死者给沈墨发短信；21:40 律师离开，死者昏睡；21:42 陈晓芸楼梯口遇律师；21:45-21:58 林婉如与陈晓芸在客厅争吵；21:46 沈墨端托盘上楼（走廊监控最后拍到）；21:48 沈墨潜入书房、拉窗帘、翻找；21:51 陈晓芸听到书房翻找声（未敲门）；21:55 沈墨找到比对表；21:56 死者惊醒扭打（蓝纽扣扯落）；21:58-22:00 烛台三击致死；22:00-22:02 烧文件、伪造密室、离开（门框漆痕）；22:02:30 停电；22:03-22:10 沈墨在医务室清洗、藏血衣、换装；22:05 林婉如厨房取水；22:10 沈墨回到客厅；22:15 管家发现陈世杰仍在酒窖（蜡烛燃去1/4）；22:45 陈晓芸完成画作；22:47 敲门发现反锁；23:05 破门。',
+  participants:[
+    {id:'shenmo',name:'沈墨',age:35,gender:'男',role:'私人医生',dead:false,
+     brief:'温文尔雅、医术精湛，负责死者的健康多年。',
+     persona:'温文尔雅、语速平稳，回答滴水不漏，显得过分冷静。自称「只是个医生」。被问及关键问题时会先沉默两秒，再给出精心组织过的答案。',
+     knowledge:'①他自称21:46-22:10一直在医务室煎药（「药要文火慢煎」）；②他承认21:38收到死者短信，声称内容是「让我22:00去书房谈他安眠药的事，我还没去，就出事了」；③他知道死者有失眠、每晚21:00喝妻子端的热茶；④他知道自己与林婉如有私情（被问及先否认，说「只是医患关系」）；⑤他声称对药品批号、数据、新药一无所知，「那是我专业之外的事」；⑥停电时他声称在医务室点蜡烛。',
+     secret:'你是真凶，绝不能承认：药是你涂的、保险丝是你拧的、人是你杀的、血衣是你藏的。被问21:48-22:02行踪咬死「在医务室煎药」；被问翻找声 →「我听不见」；被问蓝纽扣 →「我不知道什么纽扣」。若侦探拿出血衣DNA、蓝纽扣断线比对、茶房监控等铁证，你先是长时间沉默，然后才平静地承认——承认时像在讲别人的事。谎言暗示：过分冷静、回答过于流畅、重复「我在医务室」、被逼问时右手无意识握拳。',
+     },
+    {id:'linwanru',name:'林婉如',age:28,gender:'女',role:'死者第二任妻子',dead:false,
+     brief:'前模特出身，死者第二任妻子，性格软弱、依赖性强。',
+     persona:'惊慌、爱哭，说话带着哭腔。对丈夫之死既害怕又茫然，被问到沈墨时会明显慌乱、声音变小。',
+     knowledge:'①21:00她端茶上楼（她没注意围巾被书桌木刺钩断了一缕红线）；②放下茶时看到死者精神不错，寒暄两句就下楼了；③21:45-21:58她在客厅与继女陈晓芸争吵（关于遗产和股权的传闻），22:00停电时她绊倒碰翻茶几花瓶——「砰」的一声，女儿可以作证；④22:05她去厨房找管家要水；⑤22:47得知书房反锁，23:05破门见到尸体当场晕厥；⑥她不知道新遗嘱内容（律师没宣布）；⑦她与沈墨有私情（被问起时先是慌乱否认，若侦探拿出证据或管家暗示，她崩溃承认，但坚称与命案无关——这是实话）。',
+     secret:'你不是凶手。你隐瞒的只有与沈墨的私情和「你怕丈夫知道」。你说真话时也爱哭，但提到沈墨时手指绞在一起、眼神躲闪。',
+     },
+    {id:'chenshijie',name:'陈世杰',age:34,gender:'男',role:'长子·原集团副总裁',dead:false,
+     brief:'被撤职、背负债务，当晚与父亲大吵后去酒窖饮酒。',
+     persona:'宿醉、暴躁、说话带火气，但眼底有真悲伤。被怀疑时嗓门很大：「我巴不得他活着！他活着我才有钱要！」',
+     knowledge:'①20:30他与父亲在书房争吵（要钱还债被拒），摔碎酒杯手被玻璃划伤，摔门而出——「那是玻璃划的，法医能查」；②21:00-22:15他在一楼酒窖独自喝酒，酒窖监控21:05拍到他；停电后他点了蜡烛，22:15被管家找到时蜡烛只燃了1/4——「我一直没离开过酒窖」；③他以为旧遗嘱里自己能继承30%；④他欠债2000万、被撤职逐出董事会；⑤他不知道新遗嘱内容。',
+     secret:'你不是凶手，句句属实。你暴躁但没杀人。被怀疑时你恨不得把酒窖的蜡烛拿来当证据。',
+     },
+    {id:'chenxiaoyun',name:'陈晓芸',age:26,gender:'女',role:'女儿·画家·第一发现人',dead:false,
+     brief:'敏感叛逆、嘴硬心软。与父亲决裂多年却渴望父爱；她的证词和画作是破案的时间锚点。',
+     persona:'神情疲惫，语气倔强但克制。说到父亲时眼睛发红：「他写字的时候，最像我爸。」',
+     knowledge:'①21:30她路过书房门口（门虚掩），瞥见窗帘拉开、父亲伏案写文件——这是她画作的记忆来源；②21:42她在楼梯口遇到下楼的律师，寒暄两句；③21:45-21:58她在客厅与继母争吵；④21:50她气极跑上楼想找父亲评理，21:51到书房门口，听到门内传出「翻找声、抽屉开合声」——她以为父亲在整理文件，犹豫片刻没敲门就下楼了（关键证词！）；⑤22:00停电，她听到客厅「砰」一声（继母绊倒）；⑥22:10-22:45她回画室点蜡烛，凭记忆画了《烛光下的书房》——画里窗帘是拉开的；⑦22:47她想起21:51的动静越来越不安，上楼敲门无人应，发现反锁，叫来管家破门。',
+     secret:'你不是凶手。你唯一的内疚是「如果我当时敲了门……」——你可以主动把21:51听到翻找声的事告诉侦探，这是你反复琢磨的细节。',
+     },
+    {id:'liufu',name:'刘福',age:62,gender:'男',role:'管家·跟随陈家30年',dead:false,
+     brief:'沉稳寡言、忠诚到近乎愚忠。知道全家秘密（私情、赌债、心结）；备用钥匙从未被动过。',
+     persona:'红着眼眶、声音低沉，说话慢而稳。对陈家的事如数家珍，提到老主人会哽咽。',
+     knowledge:'①21:00他在茶房泡茶（死者专用青花杯，他亲手沏的），交给太太端上楼——「茶是我泡的，可药不是我下的」（他事后才听说茶里有药，又惊又怒）；②21:30-22:10他在厨房备宵夜，22:05太太来厨房找他要水；③22:47被小姐叫到书房门口，他拿出备用钥匙开门——钥匙表面覆着灰，「一看就是很久没人动过」，打不开；④23:05组织破门，坚持报警前别动现场；⑤他了解死者的习惯：进门钥匙插锁孔忘记拔（他提醒过多次）、每晚睡前才锁门、雨天生壁炉；⑥他知道全家秘密：沈医生与太太走得近、少爷欠债、小姐与老爷的心结——「我早就觉得沈医生和太太……可我一个下人，能说什么」。',
+     secret:'你不是凶手。你最大的挣扎是要不要说出沈墨与林婉如的私情——先守口如瓶，若侦探追问或案情明朗，你叹气说出来：「老爷待我不薄，我不能让杀他的人逍遥法外。」',
+     },
+    {id:'zhaomingcheng',name:'赵明诚',age:55,gender:'男',role:'律师·遗嘱见证人',dead:false,
+     brief:'谨慎世故、坚持程序正义。他带来的新遗嘱草案是「遗产动机」的引爆点，也是药效时间的独立证人。',
+     persona:'职业化的冷静，用词严谨，习惯说「根据我的记录」。提到死者时语气敬重。',
+     knowledge:'①21:10-21:40他与死者密谈新遗嘱（内容：林婉如60%、陈世杰20%附条件「三年内戒酒并归还2000万欠款」、陈晓芸10%附条件「放弃股权」、管家5%、慈善5%），死者未最终签名，「说天亮了再签」；②21:38死者当着他的面给沈墨发短信，他听到死者说「沈医生，晚上来一趟」；③21:40他离开时死者已靠椅昏睡，「我以为是累了」；④21:42楼梯口遇到陈晓芸；⑤22:00停电后他一直在客房，23:05破门时他睡衣拖鞋出来，管家可证；⑥他不知道药品批号的事，「陈董没跟我提过」。',
+     secret:'你不是凶手，实话实说。你嘴严（律师职业），但涉及案件事实会如实回答。',
+     },
+    {id:'chenyuanshan',name:'陈远山',age:58,gender:'男',role:'恒远地产董事长·死者',dead:true,
+     brief:'本案死者。精明多疑、控制欲强，白手起家，对背叛零容忍。',
+     persona:'（死者，无法询问）',
+     knowledge:'',
+     secret:''}
+  ]
+}
+];
+/* ================================================================
+   工具 & 状态
+   ================================================================ */
+const $=s=>document.querySelector(s);
+const LS_KEY='detective-ai-save-v1';
+const DEFAULTS={baseUrl:'https://api.deepseek.com',key:'',model:'deepseek-chat',models:['deepseek-chat','deepseek-reasoner'],maxTokens:'unlimited',thinking:'standard'};
+let S=null;
+let NAV={screen:'setup',setupStep:'api',caseId:null,charId:null,detailType:null,detailId:null,tab:'scene'};
+let UI={modal:null,confirm:null,busy:false,toastTimer:null,streamEl:null,setupGender:'男',modelsFetched:false};
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function nowStr(){const d=new Date();const p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes());}
+function loadSave(){try{const d=JSON.parse(localStorage.getItem(LS_KEY));if(d&&d.api)return d;}catch(e){}return null;}
+function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){showToast('⚠️ 存档写入失败：'+e.message,'error');}}
+function caseObj(id){return CASES.find(c=>c.id===id);}
+function caseState(id){if(!S.cases[id])S.cases[id]={started:false,completed:false,sceneLog:[],inventory:[],testimony:[],conclusions:[],reasonLog:[],chars:{},verdict:null,memory:[]};else if(!S.cases[id].memory)S.cases[id].memory=[];return S.cases[id];}
+function charState(cid,cid2){const cs=caseState(cid);if(!cs.chars[cid2])cs.chars[cid2]={log:[],asked:false};return cs.chars[cid2];}
+function playerDesc(){const p=S.player;return p?`${p.name}（${p.gender}，${p.age}岁）${p.note?'，备注：'+p.note:''}`:'侦探';}
+function showToast(msg,type){const t=$('#toast');t.textContent=msg;t.className='show '+(type||'');clearTimeout(UI.toastTimer);UI.toastTimer=setTimeout(()=>{t.className='';},2600);}
+
+/* ================================================================
+   AI 调用层（OpenAI 兼容 / DeepSeek）
+   ================================================================ */
+function chatEndpoint(){let b=S.api.baseUrl.trim().replace(/\/+$/,'');return /\/chat\/completions$/.test(b)?b:b+'/chat/completions';}
+function modelsEndpoint(){let b=S.api.baseUrl.trim().replace(/\/+$/,'');return /\/models$/.test(b)?b:b+'/models';}
+async function fetchModels(){const r=await fetch(modelsEndpoint(),{headers:{'Authorization':'Bearer '+S.api.key}});if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();return (d.data||[]).map(m=>typeof m==='string'?m:m.id).filter(Boolean);}
+function thinkingSuffix(msgs){
+  const t=S.api.thinking;
+  if(t==='fast'){const last=msgs[msgs.length-1];if(last)last.content+='\n（请快速简洁作答，不要长篇大论。）';}
+  else if(t==='deep'){const last=msgs[msgs.length-1];if(last)last.content+='\n（请深入分析、仔细推理，在回答中体现思考的层次与细节。）';}
+}
+async function callAI(messages,{stream=true,onDelta,temp=0.8}={}){
+  const cfg=S.api;
+  if(!cfg.key)throw new Error('未配置 API Key，请先到设置中填写。');
+  const body={model:cfg.model,messages:JSON.parse(JSON.stringify(messages)),temperature:temp,stream};
+  thinkingSuffix(body.messages);
+  body.max_tokens=cfg.maxTokens==='unlimited'?8192:parseInt(cfg.maxTokens)||4096;
+  const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),90000);
+  let r;
+  try{
+    r=await fetch(chatEndpoint(),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(body),signal:ctrl.signal});
+  }catch(e){clearTimeout(to);throw new Error(e.name==='AbortError'?'请求超时（90秒），请检查网络或端点':'网络错误：'+e.message);}
+  clearTimeout(to);
+  if(!r.ok){let msg='HTTP '+r.status;try{const e=await r.json();if(e.error&&e.error.message)msg=e.error.message;}catch(e){}throw new Error(msg);}
+  if(!stream){const d=await r.json();const c=d.choices&&d.choices[0];let content=(c&&c.message&&c.message.content)||'';const reasoning=(c&&c.message&&c.message.reasoning_content)||'';if(!content.trim()&&reasoning)content=reasoning;return {content,reasoning};}
+  const reader=r.body.getReader();const dec=new TextDecoder();let buf='',content='',reasoning='';
+  while(true){
+    const {done,value}=await reader.read();if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let idx;
+    while((idx=buf.indexOf('\n'))>=0){
+      const line=buf.slice(0,idx).trim();buf=buf.slice(idx+1);
+      if(!line.startsWith('data:'))continue;
+      const data=line.slice(5).trim();
+      if(data==='[DONE]')continue;
+      let j;try{j=JSON.parse(data);}catch(e){continue;}
+      if(j.error)throw new Error(j.error.message||'流式响应错误');
+      const delta=j.choices&&j.choices[0]&&j.choices[0].delta;
+      if(delta){
+        if(delta.reasoning_content)reasoning+=delta.reasoning_content;
+        if(delta.content){content+=delta.content;if(onDelta)onDelta(delta.content);}
+      }
+    }
+  }
+  if(!content.trim()&&reasoning)content=reasoning;
+  return {content,reasoning};
+}
+
+/* ================================================================
+   提示词构建
+   ================================================================ */
+const RULES='【角色扮演质量规则】\n- 保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。\n- 禁止代替玩家行动、发言、思考或做出选择。\n- 禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。\n- 禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。\n- 禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。\n- 人物情绪应通过具体行为和对话体现，而非旁白解释。';
+function sceneSystem(c){
+  const cs=caseState(c.id);
+  const inv=cs.inventory.map(i=>i.name).join('、')||'无';
+  const tes=cs.testimony.map(t=>t.name).join('、')||'无';
+  const mem=(cs.memory||[]).map(m=>m.text).join('\n')||'暂无';
+  return `你是《${c.title}》（代号「${c.code}」）案件的 AI 侦查主持人。玩家是前来调查此案的侦探（${playerDesc()}）。\n\n以下是本案的完整真相与证据分布（仅供你判定玩家行动的结果，绝对禁止向玩家泄露真相或替代玩家推理）：\n【案件真相】\n${c.truth}\n【关键物证与获取条件】\n${c.evidence}\n【案件时间线】\n${c.timeline}\n\n【调查记忆（已查实的事实，必须保持一致）】\n${mem}\n【玩家当前持有】\n道具：${inv}\n证词：${tes}\n\n【主持规则】\n1. 根据玩家的行动描述环境、结果与人物反应，保持时间、空间、逻辑一致；玩家没有检查到的东西绝不能出现在描述中。\n2. 只有玩家实际检查/搜索/询问到某物证或证词时，才把它加入其背包/证词库；物品与证词命名要具体、简短（如「白蝶的加密文件夹」「小夏的证言：白蝶的取糖习惯」），与之前已给过的名称保持一致。\n3. 获得新道具或新证词时，在回复的最末尾附加且仅附加一个 JSON 块：\n[[ITEMS]]{"items":[{"name":"...","desc":"..."}],"testimonies":[{"name":"...","desc":"..."}]}[[/ITEMS]]\n没有新获得时输出 [[ITEMS]]{"items":[],"testimonies":[]}[[/ITEMS]]。正文中不要重复罗列这些 JSON。\n4. 不要替玩家做决定，不要代玩家行动；涉及 NPC 时以各自身份自然回应，NPC 不知道的信息一律说不知道。\n5. 玩家若反复纠缠或强行翻找不存在的东西，给出合理的现实结果（找不到、被制止），不要迎合。\n6. 中文回复，描写具体克制，禁止 AI 腔、网络小说腔、解释性旁白；关键结论留给玩家自己推理。\n7. 记忆一致性：调查记忆中已确认的事实（包括某人在询问中认罪、承认的内容）属于已查实信息，现场任何人（包括当事人自己）都不得翻供或前后矛盾；玩家再次质问已认罪者时，其应维持供述、可以补充细节，但绝不能否认。\n8. 玩家出示其背包中持有的具体证物、或引用其证词库中的证词时，相关人物必须做出相应反应；铁证面前，凶手可按人物性格崩溃或认罪。\n9. 当场景中有人正式认罪或承认关键作案事实时，在回复最末尾附加：\n[[FACTS]]{"facts":["沈惊鸿承认：19:10将毒糖放入白蝶的糖盒惯取位"]}[[/FACTS]]\n只有「认罪/承认关键作案事实」这一级别才记录；普通寒暄、一般信息不要记录；没有则输出 [[FACTS]]{"facts":[]}[[/FACTS]]。`;
+}
+function npcSystem(c,p){
+  const cs=caseState(c.id);
+  const mem=(cs.memory||[]).map(m=>m.text).join('\n')||'暂无';
+  const inv=cs.inventory.map(i=>i.name).join('、')||'无';
+  const tes=cs.testimony.map(t=>t.name).join('、')||'无';
+  return `你正在扮演《${c.title}》中的角色「${p.name}」（${p.role}，${p.age}岁，${p.gender}）。玩家是前来调查此案的侦探（${playerDesc()}），正在单独询问你。\n\n${RULES}\n【案件背景】${c.backgroundShort}\n【你的身份与性格】${p.persona}\n【你所知道的信息】${p.knowledge}\n【你的秘密与立场】${p.secret}\n\n【调查记忆（已查实的事实，必须保持一致）】\n${mem}\n【侦探目前持有的证物/证词】\n证物：${inv}\n证词：${tes}\n\n【扮演要求】\n1. 每次回复第一行必须以如下格式开头：【情绪：XX｜小动作：XX】，然后换行再说话。情绪与小动作要具体、克制、符合人物此刻心理（例如「紧张｜指腹反复摩挲衣角」）。\n2. 若你在说谎，用细微的肢体与语气变化暗示（眼神短暂回避、语速变化、话头停顿、过分强调某句），但绝不直接承认、绝不口误说出真相。\n3. 若侦探拿出确凿铁证（点名其背包中持有的具体物证）质问你，你可以按人物性格逐步崩溃或承认，承认要有层次，不要一上来全盘托出。\n4. 当对话产出可记录的证词（即案件核心事实性信息，如某人的行踪、某物证的存在、某习惯）时，在回复最末尾附加 JSON 块：\n[[ITEMS]]{"items":[],"testimonies":[{"name":"证词名","desc":"证词内容"}]}[[/ITEMS]]\n没有则输出 [[ITEMS]]{"items":[],"testimonies":[]}[[/ITEMS]]。\n5. 这是你与侦探唯一的一条对话线，其他人物说过什么你一概不知；不要替侦探行动或思考；不知道的事就说不知道。\n6. 禁止网络小说腔、套路台词、自我感动式抒情；情绪通过行为和对话体现。\n7. 记忆一致性：调查记忆中已确认的事实（包括你自己之前认罪、承认过的内容）属于已查实信息，你必须保持一致——已经认过的事绝不能翻供或否认，也可以自然提及（如「我不是已经说了吗」）。\n8. 当你说出「认罪/承认关键作案事实」时，在回复最末尾附加：\n[[FACTS]]{"facts":["沈惊鸿承认：19:10将毒糖放入白蝶的糖盒惯取位"]}[[/FACTS]]\n只有「认罪/承认关键作案事实」这一级别才记录；普通信息不要记录；没有则输出 [[FACTS]]{"facts":[]}[[/FACTS]]。`;
+}
+function reasonSystem(c){
+  const cs=caseState(c.id);
+  const inv=cs.inventory.map(i=>i.name).join('、')||'无';
+  const tes=cs.testimony.map(t=>t.name).join('、')||'无';
+  const conc=cs.conclusions.map(x=>x.name).join('、')||'无';
+  const mem=(cs.memory||[]).map(m=>m.text).join('；')||'无';
+  return `你是《${c.title}》案件中侦探（${playerDesc()}）的推理助手。\n【本案真相（仅供你判断玩家推理是否正确，绝不可直接告知玩家）】\n${c.truth}\n【调查记忆】${mem}\n【玩家当前掌握】道具：${inv}；证词：${tes}；结论：${conc}\n\n【职责】\n- 帮助玩家梳理线索、指出矛盾、提出调查方向；玩家推理正确时给予肯定（可以说「方向对」），错误时婉转指出并说明理由。\n- 绝不直接说出凶手/手法/真相，不替玩家下结论；用引导式语言（「注意某人的时间线」「这个痕迹说明……」）。\n- 中文回复，简洁有力，不啰嗦，禁止 AI 腔。`;
+}
+function judgeSystem(c){
+  return `你是《${c.title}》案件的终审 AI（资深刑警）。以下是本案完整真相与证据。\n【案件真相】\n${c.truth}\n【关键证据】\n${c.evidence}\n\n【判定规则】\n1. solved=true 必须同时满足：①凶手正确；②核心手法（下毒/行凶/搬运方式）基本正确；③动机基本正确。\n2. score 为 0-100：凶手错误则不超过 30 分；手法、动机、关键证据完整度逐项加分。\n3. rating：90-100=S级名侦探；75-89=A级优秀侦探；60-74=B级合格侦探；60以下=见习侦探。\n4. comment：像资深刑警的结案评语，评价侦探的调查行为（调查效率、关键点把握、证据运用、询问技巧、推理质量），120-200字，具体不空泛，不要只夸或只贬。\n5. gaps：未破案时列出缺失或错误之处，3-5条，每条简洁。\n\n只输出一个 JSON 对象，禁止输出任何其他文字：\n{"solved":true,"score":88,"rating":"A级优秀侦探","comment":"...","gaps":[]}`;
+}
+/* ================================================================
+   渲染层 A：调度 / 设置 / 案件选择 / 案件详情 / 调查主界面
+   ================================================================ */
+function renderAll(){const app=$('#app');const html=renderScreen()+renderModal();app.innerHTML=html;afterRender();}
+function renderScreen(){
+  switch(NAV.screen){
+    case 'setup':return renderSetup();
+    case 'cases':return renderCases();
+    case 'case-detail':return renderCaseDetail();
+    case 'game':return renderGame();
+    case 'chars':return renderChars();
+    case 'chat':return renderChat();
+    case 'inv':return renderInv();
+    case 'inv-detail':return renderInvDetail();
+    case 'test':return renderTest();
+    case 'test-detail':return renderTestDetail();
+    case 'reason':return renderReason();
+    case 'conc':return renderConc();
+    case 'conc-detail':return renderConcDetail();
+    case 'verdict':return renderVerdict();
+  }
+  return '';
+}
+function renderModal(){
+  if(UI.modal==='settings')return renderSettingsModal();
+  if(UI.modal==='confirm')return renderConfirmModal();
+  if(UI.modal==='addconc')return renderAddConcModal();
+  if(UI.modal==='concname')return renderConcnameModal();
+  return '';
+}
+function afterRender(){
+  const log=$('#log');if(log)log.scrollTop=log.scrollHeight;
+  if(!UI.busy){const si=$('#scene-in');if(si)si.focus();const ci=$('#chat-in');if(ci)ci.focus();const ri=$('#reason-in');if(ri)ri.focus();}
+}
+function fmtText(t){return esc(t).replace(/\n/g,'<br>');}
+function parseMeta(text){
+  const m=String(text||'').match(/^【([^】]+)】\s*(?:\n|$)/);
+  if(m)return {meta:m[1].trim(),rest:String(text).slice(m[0].length).trim()};
+  return {meta:null,rest:String(text||'').trim()};
+}
+function parseItems(text){
+  const m=String(text||'').match(/\[\[ITEMS\]\]([\s\S]*?)\[\[\/ITEMS\]\]/);
+  if(!m)return {text:String(text||'').trim(),items:[],testimonies:[]};
+  const clean=String(text).replace(/\[\[ITEMS\]\][\s\S]*?\[\[\/ITEMS\]\]/g,'').trim();
+  try{
+    const d=JSON.parse(m[1].trim());
+    return {text:clean,items:Array.isArray(d.items)?d.items:[],testimonies:Array.isArray(d.testimonies)?d.testimonies:[]};
+  }catch(e){return {text:clean,items:[],testimonies:[]};}
+}
+function parseFacts(text){
+  const m=String(text||'').match(/\[\[FACTS\]\]([\s\S]*?)\[\[\/FACTS\]\]/);
+  if(!m)return {text:String(text||'').trim(),facts:[]};
+  const clean=String(text).replace(/\[\[FACTS\]\][\s\S]*?\[\[\/FACTS\]\]/g,'').trim();
+  try{
+    const d=JSON.parse(m[1].trim());
+    return {text:clean,facts:Array.isArray(d.facts)?d.facts.map(String).filter(Boolean):[]};
+  }catch(e){return {text:clean,facts:[]};}
+}
+function addFacts(cs,facts){
+  if(!cs.memory)cs.memory=[];
+  const added=[];
+  (facts||[]).forEach(f=>{
+    const t=String(f).trim();if(!t)return;
+    if(cs.memory.some(x=>x.text===t))return;
+    cs.memory.push({text:t,time:nowStr()});added.push(t);
+  });
+  return added;
+}
+function factsToConclusions(cs,facts){
+  (facts||[]).forEach(t=>{
+    const nm=t.length>18?t.slice(0,18)+'…':t;
+    cs.conclusions.push({id:uid(),name:nm,desc:'【自动记录 · 认罪/承认】'+t,time:nowStr(),auto:true});
+  });
+}
+function addItems(cs,items,testimonies){
+  const added={items:[],testimonies:[]};
+  (items||[]).forEach(it=>{
+    if(!it||!it.name)return;
+    const n=String(it.name).trim();if(!n)return;
+    const ex=cs.inventory.find(x=>x.name===n);
+    if(ex){if(!ex.desc&&it.desc)ex.desc=String(it.desc).trim();return;}
+    cs.inventory.push({id:uid(),name:n,desc:String(it.desc||'').trim(),time:nowStr()});added.items.push(n);
+  });
+  (testimonies||[]).forEach(t=>{
+    if(!t||!t.name)return;
+    const n=String(t.name).trim();if(!n)return;
+    const ex=cs.testimony.find(x=>x.name===n);
+    if(ex){if(!ex.desc&&t.desc)ex.desc=String(t.desc).trim();return;}
+    cs.testimony.push({id:uid(),name:n,desc:String(t.desc||'').trim(),time:nowStr()});added.testimonies.push(n);
+  });
+  return added;
+}
+function headBar(left,title,sub){
+  return `<div class="page-head"><button class="back-btn left" data-act="head-left">← ${left||'返回'}</button><div class="ph-title">${esc(title||'')}</div>${sub?`<div class="ph-sub">${esc(sub)}</div>`:''}<button class="back-btn right" data-act="head-right">${left?'返回':'→'}</button><button class="top-btn gold" data-act="settings-open" style="margin-left:4px">⚙️</button></div>`;
+}
+/* ---------- 配置页 ---------- */
+function renderSetup(){
+  const api=S.api,done1=!!api.key,done2=!!S.player,step=NAV.setupStep;
+  const p=S.player||{};
+  const genderSel=UI.setupGender||p.gender||'男';
+  const toks=['512','1024','2048','4096','8192','unlimited'];
+  const tokNames={'512':'512 tokens','1024':'1024 tokens','2048':'2048 tokens','4096':'4096 tokens','8192':'8192 tokens','unlimited':'无限制'};
+  const thinks={'fast':'快速（省 token，简洁作答）','standard':'标准','deep':'深入（推理更细致）'};
+  return `<div class="screen active" id="screen-setup">
+    <div class="setup-wrap">
+      <h1>迷雾侦探</h1><div class="sub">AI 推理探案 · 案件卷宗</div>
+      <div class="step-dots">
+        <div class="step-dot ${step==='api'?'active':''} ${done1?'done':''}" data-act="setup-dot" data-step="api"><span class="n">${done1?'✓':'1'}</span>API 配置</div>
+        <div class="step-dot ${step==='role'?'active':''} ${done2?'done':''}" data-act="setup-dot" data-step="role"><span class="n">${done2?'✓':'2'}</span>角色配置</div>
+      </div>
+      <div class="setup-box ${step==='api'?'active':''}">
+        <div class="step-title">🔑 API 配置</div>
+        <div class="step-hint">默认 DeepSeek，兼容 OpenAI 格式的任意端点</div>
+        <label>API 端点</label>
+        <input id="api-base" value="${esc(api.baseUrl)}" placeholder="https://api.deepseek.com">
+        <label>API Key</label>
+        <input id="api-key" type="password" value="${esc(api.key)}" placeholder="sk-...">
+        <label>模型</label>
+        <div style="display:flex;gap:7px">
+          <select id="api-model" style="flex:1">${api.models.map(m=>`<option value="${esc(m)}" ${m===api.model?'selected':''}>${esc(m)}</option>`).join('')}</select>
+          <button class="btn" data-act="models-refresh-setup">🔄 拉取模型列表</button>
+        </div>
+        <label>输出 Token 限制</label>
+        <select id="api-tokens">${toks.map(t=>`<option value="${t}" ${String(api.maxTokens)===t?'selected':''}>${tokNames[t]}</option>`).join('')}</select>
+        <label>思考程度</label>
+        <select id="api-thinking">${Object.keys(thinks).map(k=>`<option value="${k}" ${api.thinking===k?'selected':''}>${thinks[k]}</option>`).join('')}</select>
+        <div class="setup-nav">
+          <button class="btn lg gold" data-act="setup-next" data-step="api">下一步 →</button>
+        </div>
+        <div class="step-hint" style="margin-top:8px">💡 浏览器直连如遇跨域（CORS）错误，可将端点换成支持 CORS 的代理地址。</div>
+      </div>
+      <div class="setup-box ${step==='role'?'active':''}">
+        <div class="step-title">🕵️ 角色配置</div>
+        <div class="step-hint">你是谁？这将影响整个游戏里 NPC 与你的互动</div>
+        <label>姓名</label>
+        <input id="char-name" value="${esc(p.name||'')}" placeholder="侦探的姓名">
+        <label>性别</label>
+        <div class="option-grid">
+          <div class="option-card ${genderSel==='男'?'selected':''}" data-act="setup-gender" data-v="男"><span class="oc-icon">🧑</span><div class="oc-name">男</div></div>
+          <div class="option-card ${genderSel==='女'?'selected':''}" data-act="setup-gender" data-v="女"><span class="oc-icon">👩</span><div class="oc-name">女</div></div>
+        </div>
+        <label>年龄</label>
+        <input id="char-age" type="number" min="16" max="99" value="${esc(p.age||'30')}">
+        <label>备注（自定义设定，可选）</label>
+        <textarea id="char-note" placeholder="例如：退役刑警，擅长观察微表情；或 初出茅庐的记者，直觉敏锐……">${esc(p.note||'')}</textarea>
+        <div class="setup-nav">
+          <button class="btn lg" data-act="setup-prev">← 上一步</button>
+          <button class="btn lg gold" data-act="setup-next" data-step="role">下一步 →</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+/* ---------- 案件选择 ---------- */
+function renderCases(){
+  const p=S.player;
+  return `<div class="screen active">
+    <div class="topbar">
+      <div class="logo">🕵️ 迷雾侦探<span>AI推理探案</span></div>
+      <div class="spacer"></div>
+      <div class="top-stat">🕵️ <b>${esc(p?p.name:'侦探')}</b>${p?` · ${esc(p.gender)}${p.age?'·'+esc(p.age)+'岁':''}`:''}</div>
+      <button class="top-btn gold" data-act="settings-open">⚙️ 设置</button>
+    </div>
+    <div class="page-body">
+      <div class="sec-title">📁 案件卷宗</div>
+      <div class="sec-sub">选择一个案件开始调查。完成后的案件会标记 ✅ 已完成。</div>
+      ${CASES.map(c=>{
+        const cs=caseState(c.id);
+        return `<div class="case-card">
+          <div class="cc-top">
+            <div class="cc-icon">${c.icon}</div>
+            <div>
+              <div class="cc-title">${esc(c.title)}</div>
+              <div class="cc-code">代号「${esc(c.code)}」${cs.started?' · 调查中':''}</div>
+            </div>
+            ${cs.completed?'<div class="cc-badge">✅ 已完成</div>':''}
+          </div>
+          <div class="cc-tagline">${esc(c.tagline)}</div>
+          <div class="cc-feats">${c.features.map(f=>`<span class="chip">${esc(f)}</span>`).join('')}</div>
+          <div class="cc-foot">
+            <button class="btn gold" data-act="case-open" data-id="${c.id}">📋 详细</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+/* ---------- 案件详情 ---------- */
+function renderCaseDetail(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);
+  return `<div class="screen active">
+    <div class="topbar">
+      <button class="top-btn" data-act="back-cases">← 返回</button>
+      <div class="spacer"></div>
+      <button class="top-btn gold" data-act="settings-open">⚙️ 设置</button>
+    </div>
+    <div class="page-body">
+      <div class="detail-hero">
+        <div class="cc-icon lg">${c.icon}</div>
+        <div style="flex:1">
+          <div class="detail-title">${esc(c.title)}</div>
+          <div class="detail-sub">代号「${esc(c.code)}」${cs.completed?' · ✅ 已完成':(cs.started?' · 调查中':'')}</div>
+        </div>
+      </div>
+      <div class="cc-tagline" style="margin:0 0 10px">${esc(c.tagline)}</div>
+      <div class="detail-sec"><h4>📜 背景</h4>${c.detail.background.map(t=>`<p>${fmtText(t)}</p>`).join('<p style="height:6px"></p>')}</div>
+      <div class="detail-sec"><h4>👥 角色</h4>${c.detail.roles.map(r=>`<div class="info-row"><span class="k">${esc(r.name)}</span><span>${fmtText(r.desc)}</span></div>`).join('')}</div>
+      <div class="detail-sec"><h4>📍 地点</h4><p>${fmtText(c.detail.location)}</p></div>
+      <div class="detail-sec"><h4>🕐 发生了什么事情</h4><ul>${c.detail.events.map(e=>`<li>${fmtText(e)}</li>`).join('')}</ul></div>
+      <div class="cc-foot" style="margin-top:14px">
+        <button class="btn danger sm" data-act="case-reset" data-id="${c.id}">↺ 重置本案件</button>
+        <button class="btn lg gold" data-act="case-start" data-id="${c.id}">${cs.started?'▶ 继续调查':'▶ 开始调查'}</button>
+      </div>
+    </div>
+  </div>`;
+}
+/* ---------- 调查主界面（现场） ---------- */
+function renderGame(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);
+  const p=S.player;
+  const log=cs.sceneLog.map(m=>{
+    if(m.role==='user')return `<div class="msg me"><div class="m-bubble">${fmtText(m.content)}</div><div class="m-time">${m.time||''}</div></div>`;
+    return `<div class="msg narrator"><div class="m-head"><span class="m-name">现场</span><span class="m-time">${m.time||''}</span></div><div class="m-text">${fmtText(m.content)}</div></div>`;
+  }).join('');
+  return `<div class="screen active">
+    <div class="topbar">
+      <button class="top-btn" data-act="game-back">← 返回</button>
+      <div class="logo" style="font-size:13px">${c.icon} ${esc(c.title)}</div>
+      <div class="spacer"></div>
+      <div class="top-stat">🕵️ <b>${esc(p?p.name:'侦探')}</b></div>
+      <button class="top-btn gold" data-act="settings-open">⚙️</button>
+    </div>
+    <div class="tabbar">
+      <div class="tab active"><span class="tab-ico">🔍</span>现场调查</div>
+      <div class="tab" data-act="tab-go" data-tab="chars"><span class="tab-ico">👥</span>人物</div>
+      <div class="tab" data-act="tab-go" data-tab="inv"><span class="tab-ico">🎒</span>背包${cs.inventory.length?`<span class="tab-n">${cs.inventory.length}</span>`:''}</div>
+      <div class="tab" data-act="tab-go" data-tab="test"><span class="tab-ico">📜</span>证词${cs.testimony.length?`<span class="tab-n">${cs.testimony.length}</span>`:''}</div>
+      <div class="tab" data-act="tab-go" data-tab="reason"><span class="tab-ico">🧠</span>推理</div>
+      <div class="tab" data-act="tab-go" data-tab="conc"><span class="tab-ico">⚖️</span>结果提交</div>
+    </div>
+    <div id="log" class="sel">${log||`<div class="empty-tip">正在展开现场…</div>`}${UI.busy?'<div class="msg narrator"><div class="typing-dots"><span></span><span></span><span></span></div></div>':''}</div>
+    <div class="input-hint">🔍 输入你想做的事：搜查、检查、翻看、询问、验证……</div>
+    <div id="input-area">
+      <textarea id="scene-in" placeholder="例：仔细检查尸体 / 打开糖盒 / 查看白蝶的手机…" ${UI.busy?'disabled':''}></textarea>
+      <button id="send-btn" data-send="scene" ${UI.busy?'disabled':''}>发送</button>
+    </div>
+  </div>`;
+}
+/* ================================================================
+   渲染层 B1：人物 / 询问 / 背包 / 证词
+   ================================================================ */
+function renderChars(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);
+  const cards=c.participants.map(p=>{
+    const ch=charState(c.id,p.id);
+    if(p.dead)return `<div class="card disabled">
+      <div class="pcard-top"><div class="avatar-lg" style="filter:grayscale(1)">${esc(p.name[0])}</div>
+      <div style="flex:1"><div class="pname">${esc(p.name)}<span class="dead-tag" style="margin-left:6px">死者</span></div>
+      <div class="pmeta">${esc(p.role)} · ${p.age}岁 · ${esc(p.gender)}</div></div></div>
+      <div class="pbrief">${esc(p.brief)}</div></div>`;
+    return `<div class="card">
+      <div class="pcard-top"><div class="avatar-lg">${esc(p.name[0])}</div>
+      <div style="flex:1"><div class="pname">${esc(p.name)}<span class="prole">${esc(p.role)}</span></div>
+      <div class="pmeta">${p.age}岁 · ${esc(p.gender)}</div></div>
+      ${ch.asked?'<span class="asked-tag">已询问</span>':''}</div>
+      <div class="pbrief">${esc(p.brief)}</div>
+      <div class="pcard-foot"><button class="btn gold" data-act="char-open" data-id="${p.id}">💬 ${ch.asked?'继续询问':'询问'}</button></div>
+    </div>`;
+  }).join('');
+  return `<div class="screen active">
+    ${headBar('',`👥 人物 · ${esc(c.title)}`)}
+    <div class="page-body">
+      <div class="sec-sub">每个角色单独询问，互不串线。注意他们的情绪与微动作——说谎的人会露出马脚。</div>
+      ${cards||'<div class="empty-tip">暂无人物</div>'}
+    </div>
+  </div>`;
+}
+function renderChat(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const p=c.participants.find(x=>x.id===NAV.charId);if(!p)return '';
+  const ch=charState(c.id,p.id);
+  const log=ch.log.map(m=>{
+    if(m.role==='user')return `<div class="msg me"><div class="m-bubble">${fmtText(m.content)}</div><div class="m-time">${m.time||''}</div></div>`;
+    return `<div class="msg npc">
+      <div class="m-head"><div class="avatar">${esc(p.name[0])}</div><span class="m-name">${esc(p.name)}</span>${m.meta?`<span class="m-meta">${esc(m.meta)}</span>`:''}<span class="m-time">${m.time||''}</span></div>
+      <div class="m-bubble">${fmtText(m.content)}</div></div>`;
+  }).join('');
+  return `<div class="screen active">
+    ${headBar('chat',`💬 询问 · ${esc(p.name)}`,`${esc(p.role)} · 单独对话线`)}
+    <div id="log" class="sel">${log||'<div class="empty-tip">对方正看着你，等你开口…</div>'}${UI.busy?'<div class="msg npc"><div class="m-head"><div class="avatar">'+esc(p.name[0])+'</div><span class="m-name">'+esc(p.name)+'</span></div><div class="typing-dots"><span></span><span></span><span></span></div></div>':''}</div>
+    <div class="input-hint">💬 观察对方每句话的情绪与小动作，判断是否说谎。</div>
+    <div id="input-area">
+      <textarea id="chat-in" placeholder="向 ${esc(p.name)} 提问…" ${UI.busy?'disabled':''}></textarea>
+      <button id="send-btn" data-send="char" ${UI.busy?'disabled':''}>发送</button>
+    </div>
+  </div>`;
+}
+function listPage(kind,title,emptyTxt){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);
+  const list=kind==='inv'?cs.inventory:cs.testimony;
+  const openAct=kind==='inv'?'inv-open':'test-open';
+  const cards=list.map(it=>`<div class="card">
+    <div class="c-title">${kind==='inv'?'📦':'📝'} ${esc(it.name)}<span class="c-tag">${esc(it.time||'')}</span></div>
+    <div class="c-sub">${esc(it.desc.length>64?it.desc.slice(0,64)+'…':it.desc)}</div>
+    <div class="c-foot"><button class="btn gold" data-act="${openAct}" data-id="${it.id}">🔎 详细</button></div>
+  </div>`).join('');
+  return `<div class="screen active">
+    ${headBar('',`${title} · ${esc(c.title)}`)}
+    <div class="page-body">${cards||`<div class="empty-tip">${emptyTxt}</div>`}</div>
+  </div>`;
+}
+function renderInv(){return listPage('inv','🎒 背包','背包里还没有任何证物。去现场搜查、或从对话中获得证物吧。');}
+function renderTest(){return listPage('test','📜 证词','证词簿还是空的。询问人物、检查现场线索可获得证词。');}
+function detailPage(kind,id){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);
+  const list=kind==='inv'?cs.inventory:cs.testimony;
+  const it=list.find(x=>x.id===id);if(!it)return '';
+  return `<div class="screen active">
+    ${headBar('',kind==='inv'?'📦 证物详情':'📝 证词详情')}
+    <div class="page-body">
+      <div class="detail-sec"><h4>${kind==='inv'?'证物':'证词'}名称</h4><p class="k" style="color:var(--t);font-size:13.5px;font-weight:600">${esc(it.name)}</p></div>
+      <div class="detail-sec"><h4>详细内容</h4><p>${fmtText(it.desc)}</p></div>
+      <div class="detail-sec"><h4>记录时间</h4><p class="num">${esc(it.time||'')}</p></div>
+    </div>
+  </div>`;
+}
+function renderInvDetail(){return detailPage('inv',NAV.detailId);}
+function renderTestDetail(){return detailPage('test',NAV.detailId);}
+/* ================================================================
+   渲染层 B2：推理 / 结论 / 结算 / 弹窗
+   ================================================================ */
+function renderReason(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);
+  const log=cs.reasonLog.map((m,i)=>{
+    if(m.role==='user')return `<div class="msg me"><div class="m-bubble">${fmtText(m.content)}</div><div class="m-time">${m.time||''}</div></div>`;
+    return `<div class="msg reason-ai">
+      <div class="m-head"><span class="m-name">🧠 推理助手</span><span class="m-time">${m.time||''}</span></div>
+      <div class="m-bubble">${fmtText(m.content)}</div>
+      <button class="record-btn" data-act="conc-record" data-i="${i}">📌 记录为结论</button></div>`;
+  }).join('');
+  return `<div class="screen active">
+    ${headBar('',`🧠 推理 · ${esc(c.title)}`)}
+    <div id="log" class="sel">${log||'<div class="empty-tip">把你的想法告诉推理助手，它会帮你梳理线索、指出矛盾（不会直接告诉你答案）。</div>'}${UI.busy?'<div class="msg reason-ai"><div class="m-head"><span class="m-name">🧠 推理助手</span></div><div class="typing-dots"><span></span><span></span><span></span></div></div>':''}</div>
+    <div class="input-hint">🧠 例：把已知线索串起来分析 / 谁的嫌疑最大 / 这瓶药说明了什么</div>
+    <div id="input-area">
+      <textarea id="reason-in" placeholder="说出你的推理…" ${UI.busy?'disabled':''}></textarea>
+      <button id="send-btn" data-send="reason" ${UI.busy?'disabled':''}>发送</button>
+    </div>
+  </div>`;
+}
+function renderConc(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);
+  const cards=cs.conclusions.map(x=>`<div class="card">
+    <div class="c-title">📌 ${esc(x.name)}<span class="c-tag">${esc(x.time||'')}</span>${x.auto?'<span class="chip gray" style="margin:0 0 0 6px">🧠 自动记录</span>':''}</div>
+    <div class="c-sub">${esc(x.desc.length>64?x.desc.slice(0,64)+'…':x.desc)}</div>
+    <div class="c-foot"><button class="btn ghost sm" data-act="conc-del" data-id="${x.id}">🗑 删除</button><button class="btn gold" data-act="conc-open" data-id="${x.id}">🔎 详细</button></div>
+  </div>`).join('');
+  const v=cs.verdict;
+  const memCnt=(cs.memory||[]).length;
+  return `<div class="screen active">
+    ${headBar('',`⚖️ 结论 · ${esc(c.title)}`)}
+    <div class="page-body">
+      <div class="sec-sub">🧠 调查记忆已同步 ${memCnt} 条：询问与现场中角色的认罪、承认会自动记录为「自动记录」结论，并与现场调查、人物询问互相保持一致。${v?`<br>上次判定：${v.solved?'<span style="color:var(--gr)">✅ 破案成功 · '+esc(v.score)+'分</span>':'<span style="color:var(--r)">❌ 尚未破解</span>'}（可重新提交）`:''}</div>
+      ${cards||'<div class="empty-tip">还没有结论。可以在「推理」页把 AI 的推理记录为结论，或点击下方手动添加。</div>'}
+    </div>
+    <div class="submit-bar">
+      <button class="btn jade" data-act="conc-add">＋ 添加结论</button>
+      <button class="btn lg gold" data-act="submit-case">⚖️ 提交破案结论</button>
+    </div>
+  </div>`;
+}
+function renderConcDetail(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);
+  const x=cs.conclusions.find(i=>i.id===NAV.detailId);if(!x)return '';
+  return `<div class="screen active">
+    ${headBar('',`📌 结论详情`)}
+    <div class="page-body">
+      <div class="detail-sec"><h4>结论名称</h4><p class="k" style="color:var(--t);font-size:13.5px;font-weight:600">${esc(x.name)}</p></div>
+      <div class="detail-sec"><h4>详细内容</h4><p>${fmtText(x.desc)}</p></div>
+      <div class="detail-sec"><h4>记录时间</h4><p class="num">${esc(x.time||'')}</p></div>
+    </div>
+    <div class="submit-bar">
+      <button class="btn lg gold" data-act="submit-case">⚖️ 提交破案结论</button>
+    </div>
+  </div>`;
+}
+function renderVerdict(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);const v=cs.verdict;if(!v)return '';
+  const sc=Math.max(0,Math.min(100,v.score||0));
+  return `<div class="screen active" id="page-verdict">
+    <div class="verdict-body">
+      <div class="verdict-title ${v.solved?'':'fail'}">${v.solved?'🏆 破案成功':'🔍 案件尚未破解'}</div>
+      ${v.solved?`<div class="score-ring" style="background:conic-gradient(var(--gold) ${sc}%,var(--border) 0)"><div class="score-inner"><b>${sc}</b><span>/100</span></div></div>
+      <div class="rating-tag">${esc(v.rating||'')}</div>`:''}
+      ${v.solved?`<div class="verdict-card"><h4>📋 结案评语</h4><p class="sel">${fmtText(v.comment||'')}</p></div>`
+      :`<div class="verdict-card"><h4>📋 缺口与错误</h4><ul>${(v.gaps||[]).map(g=>`<li>${fmtText(g)}</li>`).join('')}</ul></div>
+      <div class="verdict-card"><h4>💡 提示</h4><p>继续调查：补充证据、询问人物、完善你的结论后再来提交。</p></div>`}
+      ${v.solved?`<div class="verdict-card"><h4>🔎 行为评价</h4><p class="sel">${fmtText(v.comment||'')}</p></div>`:''}
+      <div class="verdict-actions">
+        ${v.solved?`<button class="btn lg gold" data-act="verdict-complete">✅ 完成</button><button class="btn lg jade" data-act="verdict-continue">🔍 继续探索</button>`
+        :`<button class="btn lg gold" data-act="verdict-continue">🔍 继续调查</button>`}
+      </div>
+    </div>
+  </div>`;
+}
+/* ---------- 弹窗 ---------- */
+function modalShell(title,body,foot){
+  return `<div class="modal-overlay show"><div class="modal"><h2>${title}</h2>${body}<div class="btn-row">${foot}</div></div></div>`;
+}
+function renderSettingsModal(){
+  const api=S.api;
+  const toks=['512','1024','2048','4096','8192','unlimited'];
+  const tokNames={'512':'512 tokens','1024':'1024 tokens','2048':'2048 tokens','4096':'4096 tokens','8192':'8192 tokens','unlimited':'无限制'};
+  const thinks={'fast':'快速','standard':'标准','deep':'深入'};
+  return modalShell('⚙️ 设置',
+    `<label>API 端点</label><input id="set-base" value="${esc(api.baseUrl)}">
+    <label>API Key</label><input id="set-key" type="password" value="${esc(api.key)}">
+    <label>模型</label><div style="display:flex;gap:7px;margin-bottom:12px"><select id="set-model" style="flex:1">${api.models.map(m=>`<option value="${esc(m)}" ${m===api.model?'selected':''}>${esc(m)}</option>`).join('')}</select><button class="btn" data-act="models-refresh">🔄</button></div>
+    <label>输出 Token 限制</label><select id="set-tokens">${toks.map(t=>`<option value="${t}" ${String(api.maxTokens)===t?'selected':''}>${tokNames[t]}</option>`).join('')}</select>
+    <label>思考程度</label><select id="set-thinking">${Object.keys(thinks).map(k=>`<option value="${k}" ${api.thinking===k?'selected':''}>${thinks[k]}</option>`).join('')}</select>
+    <div class="status" id="set-status"></div>
+    <button class="btn sm" data-act="test-conn" style="margin-bottom:4px">📡 测试连接</button>
+    <div class="divider"><label>💾 存档管理</label>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="btn" style="flex:1" data-act="export-save">⬇ 导出存档</button>
+        <button class="btn" style="flex:1" data-act="import-save">⬆ 导入存档</button>
+      </div>
+      <button class="btn danger" style="width:100%;margin-top:8px" data-act="restart-ask">🔄 重新开始（重置一切，仅保留 API 配置）</button>
+      <div class="hint">存档为 JSON 文件，可备份或换设备；导入将覆盖当前进度。</div>
+    </div>`,
+    `<button class="btn gold" data-act="settings-save">保存</button><button class="btn" data-act="settings-close">关闭</button>`);
+}
+function renderConfirmModal(){
+  const c=UI.confirm||{};
+  return modalShell(esc(c.title||'确认'),
+    `<div style="font-size:12.5px;color:var(--t2);line-height:1.8">${fmtText(c.body||'')}</div>`,
+    `<button class="btn ${c.danger?'danger':'gold'}" data-act="confirm-ok">${esc(c.okText||'确定')}</button><button class="btn" data-act="confirm-cancel">取消</button>`);
+}
+function renderAddConcModal(){
+  return modalShell('📌 添加结论',
+    `<label>结论名称</label><input id="conc-name" placeholder="例：真凶是沈惊鸿">
+    <label>详细内容</label><textarea id="conc-desc" placeholder="写明你的结论依据：凶手、手法、动机、关键证据…"></textarea>`,
+    `<button class="btn gold" data-act="conc-save">保存</button><button class="btn" data-act="modal-cancel">取消</button>`);
+}
+function renderConcnameModal(){
+  return modalShell('📌 记录为结论',
+    `<label>结论名称</label><input id="cname-in" placeholder="为这条推理起个结论名">
+    <div class="hint">详细内容将使用该条推理的完整文本。</div>`,
+    `<button class="btn gold" data-act="concname-save">确定</button><button class="btn" data-act="modal-cancel">取消</button>`);
+}
+/* ================================================================
+   交互层 A1：事件分发 / 导航
+   ================================================================ */
+function headBar(left,title,sub){
+  const isChat=left==='chat';
+  const l=isChat?'<button class="back-btn left" data-act="head-left">← 返回</button>':'';
+  const r=isChat?'':'<button class="back-btn right" data-act="head-right">返回 →</button>';
+  return `<div class="page-head">${l}<div class="ph-title">${esc(title||'')}</div>${sub?`<div class="ph-sub">${esc(sub)}</div>`:''}<div style="flex:1"></div>${r}<button class="top-btn gold" data-act="settings-open" style="margin-left:4px">⚙️</button></div>`;
+}
+function handleAct(act,el){
+  switch(act){
+    case 'settings-open':openSettings();break;
+    case 'settings-close':UI.modal=null;renderAll();break;
+    case 'settings-save':saveSettings();break;
+    case 'models-refresh':refreshModels(false);break;
+    case 'models-refresh-setup':refreshModels(true);break;
+    case 'test-conn':testConn();break;
+    case 'export-save':exportSave();break;
+    case 'import-save':importSave();break;
+    case 'restart-ask':askRestart();break;
+    case 'setup-dot':NAV.setupStep=el.dataset.step;renderAll();break;
+    case 'setup-gender':UI.setupGender=el.dataset.v;renderAll();break;
+    case 'setup-prev':NAV.setupStep='api';renderAll();break;
+    case 'setup-next':setupNext(el.dataset.step);break;
+    case 'case-open':NAV.screen='case-detail';NAV.caseId=el.dataset.id;renderAll();break;
+    case 'back-cases':NAV.screen='cases';renderAll();break;
+    case 'case-start':startCase(el.dataset.id);break;
+    case 'case-reset':askResetCase(el.dataset.id);break;
+    case 'game-back':NAV.screen='cases';renderAll();break;
+    case 'tab-go':tabGo(el.dataset.tab);break;
+    case 'head-left':NAV.screen='chars';renderAll();break;
+    case 'head-right':NAV.screen='game';renderAll();break;
+    case 'char-open':openChar(el.dataset.id);break;
+    case 'inv-open':NAV.screen='inv-detail';NAV.detailId=el.dataset.id;renderAll();break;
+    case 'test-open':NAV.screen='test-detail';NAV.detailId=el.dataset.id;renderAll();break;
+    case 'conc-open':NAV.screen='conc-detail';NAV.detailId=el.dataset.id;renderAll();break;
+    case 'conc-add':UI.modal='addconc';renderAll();break;
+    case 'conc-save':concSave();break;
+    case 'conc-del':delConc(el.dataset.id);break;
+    case 'conc-record':recordConc(parseInt(el.dataset.i));break;
+    case 'concname-save':concnameSave();break;
+    case 'modal-cancel':UI.modal=null;renderAll();break;
+    case 'submit-case':askSubmit();break;
+    case 'confirm-ok':confirmOk();break;
+    case 'confirm-cancel':UI.modal=null;UI.confirm=null;renderAll();break;
+    case 'verdict-complete':verdictComplete();break;
+    case 'verdict-continue':NAV.screen='game';renderAll();break;
+  }
+}
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act],[data-send]');
+  if(!el)return;
+  if(el.dataset.act){handleAct(el.dataset.act,el);return;}
+  const s=el.dataset.send;
+  if(s==='scene')sendScene();
+  else if(s==='char')sendChar(false);
+  else if(s==='reason')sendReason();
+});
+/* ================================================================
+   交互层 A2：导航函数 / 发送流程 / 流式渲染
+   ================================================================ */
+function openSettings(){UI.modal='settings';renderAll();}
+function setupNext(step){
+  if(step==='api'){
+    S.api.baseUrl=$('#api-base').value.trim()||DEFAULTS.baseUrl;
+    S.api.key=$('#api-key').value.trim();
+    S.api.model=$('#api-model').value||S.api.model;
+    S.api.maxTokens=$('#api-tokens').value;
+    S.api.thinking=$('#api-thinking').value;
+    if(!S.api.key){showToast('⚠️ 请填写 API Key','error');return;}
+    save();NAV.setupStep='role';renderAll();
+  }else{
+    const name=$('#char-name').value.trim();
+    if(!name){showToast('⚠️ 请填写姓名','error');return;}
+    S.player={name:name,gender:UI.setupGender||'男',age:$('#char-age').value.trim()||'30',note:$('#char-note').value.trim()};
+    save();NAV.screen='cases';renderAll();
+    showToast('✅ 欢迎，'+name+'。选择案件开始调查吧。');
+  }
+}
+function startCase(id){
+  const c=caseObj(id),cs=caseState(id);
+  if(!cs.started){cs.started=true;cs.sceneLog.push({role:'assistant',content:c.firstScene,time:nowStr()});save();}
+  NAV.caseId=id;NAV.screen='game';renderAll();
+  showToast('🕵️ '+(cs.completed?'继续调查：'+c.title:'开始调查：'+c.title));
+}
+function tabGo(tab){NAV.screen=tab;renderAll();}
+function openChar(id){
+  NAV.charId=id;NAV.screen='chat';renderAll();
+  const ch=charState(NAV.caseId,id);
+  if(!ch.asked)sendChar(true);
+}
+function askResetCase(id){
+  const c=caseObj(id);
+  UI.confirm={title:'重置本案件',body:'将清空「'+c.title+'」的全部调查进度（道具、证词、结论、对话），且不可恢复。确定重置？',danger:true,okText:'重置',onOk:()=>{S.cases[id]=null;delete S.cases[id];save();UI.confirm=null;renderAll();showToast('↺ 案件已重置');}};
+  UI.modal='confirm';renderAll();
+}
+function confirmOk(){const fn=UI.confirm&&UI.confirm.onOk;UI.modal=null;UI.confirm=null;if(fn)fn();else renderAll();}
+/* ---- 流式渲染辅助 ---- */
+function startStream(kind,name,letter){
+  const log=$('#log');if(!log)return null;
+  const dots=log.querySelector('.typing-dots');if(dots&&dots.parentElement)dots.parentElement.remove();
+  const el=document.createElement('div');
+  if(kind==='npc'){el.className='msg npc';el.innerHTML=`<div class="m-head"><div class="avatar">${esc(letter||'')}</div><span class="m-name">${esc(name)}</span></div><div class="m-bubble"></div>`;}
+  else if(kind==='reason'){el.className='msg reason-ai';el.innerHTML=`<div class="m-head"><span class="m-name">🧠 推理助手</span></div><div class="m-bubble"></div>`;}
+  else{el.className='msg narrator';el.innerHTML=`<div class="m-head"><span class="m-name">${esc(name||'现场')}</span></div><div class="m-text"></div>`;}
+  log.appendChild(el);log.scrollTop=log.scrollHeight;
+  return el;
+}
+function appendStream(el,t){if(!el||!el.isConnected)return;const x=el.querySelector('.m-bubble,.m-text');if(x){x.textContent+=t;el.parentElement.scrollTop=el.parentElement.scrollHeight;}}
+function finishStream(el,content){if(el&&el.isConnected){const x=el.querySelector('.m-bubble,.m-text');if(x)x.textContent=content;}}
+function pushGains(cs,added,af){
+  const a=[];
+  if(added&&added.items&&added.items.length)a.push('📦 证物：'+added.items.join('、'));
+  if(added&&added.testimonies&&added.testimonies.length)a.push('📜 证词：'+added.testimonies.join('、'));
+  if(af&&af.length)a.push('🧠 记忆：'+af.join('；'));
+  if(a.length)showToast(a.join('　'));
+}
+/* ---- 现场调查 ---- */
+async function sendScene(){
+  if(UI.busy)return;
+  const inp=$('#scene-in');const txt=inp.value.trim();if(!txt)return;
+  const c=caseObj(NAV.caseId),cs=caseState(c.id);
+  cs.sceneLog.push({role:'user',content:txt,time:nowStr()});
+  inp.value='';UI.busy=true;save();renderAll();
+  const msgs=[{role:'system',content:sceneSystem(c)}];
+  cs.sceneLog.slice(-16).forEach(m=>msgs.push({role:m.role,content:m.content}));
+  const bubble=startStream('narrator','现场');
+  try{
+    const res=await callAI(msgs,{stream:true,onDelta:t=>appendStream(bubble,t)});
+    const {text,items,testimonies}=parseItems(res.content);
+    const pf=parseFacts(text);
+    const {meta,rest}=parseMeta(pf.text);
+    const added=addItems(cs,items,testimonies);
+    const af=addFacts(cs,pf.facts);
+    if(af.length)factsToConclusions(cs,af);
+    cs.sceneLog.push({role:'assistant',content:rest||pf.text||text,meta:meta||null,time:nowStr()});
+    UI.busy=false;save();renderAll();pushGains(cs,added,af);
+  }catch(err){
+    UI.busy=false;cs.sceneLog.pop();save();renderAll();
+    showToast('❌ '+err.message,'error');
+  }
+}
+/* ---- 人物询问 ---- */
+async function sendChar(first){
+  if(UI.busy)return;
+  const c=caseObj(NAV.caseId);if(!c)return;
+  const cs=caseState(c.id);
+  const p=c.participants.find(x=>x.id===NAV.charId);if(!p)return;
+  const ch=charState(c.id,p.id);
+  let txt='';
+  if(!first){const inp=$('#chat-in');txt=inp.value.trim();if(!txt)return;inp.value='';}
+  ch.asked=true;
+  const msgs=[{role:'system',content:npcSystem(c,p)}];
+  if(first){
+    msgs.push({role:'user',content:'（'+(S.player?S.player.name:'侦探')+'走进来要向你了解情况。请以'+p.name+'的口吻说出见到对方的第一句话，必须以【情绪：XX｜小动作：XX】开头，然后换行说话，说完停下等对方提问。不要解释你的心理。）'});
+  }else{
+    ch.log.push({role:'user',content:txt,time:nowStr()});
+    ch.log.slice(-20).forEach(m=>msgs.push({role:m.role,content:m.content}));
+    const lm=[...ch.log].reverse().find(m=>m.meta);
+    if(lm)msgs.push({role:'system',content:'（你上一轮的情绪表现为：'+lm.meta+'。请保持连贯。）'});
+  }
+  UI.busy=true;save();renderAll();
+  const bubble=startStream('npc',p.name,p.name[0]);
+  try{
+    const res=await callAI(msgs,{stream:true,onDelta:t=>appendStream(bubble,t)});
+    const {text,items,testimonies}=parseItems(res.content);
+    const pf=parseFacts(text);
+    const {meta,rest}=parseMeta(pf.text);
+    const added=addItems(cs,items,testimonies);
+    const af=addFacts(cs,pf.facts);
+    if(af.length)factsToConclusions(cs,af);
+    ch.log.push({role:'assistant',content:rest||pf.text||text,meta:meta||null,time:nowStr()});
+    UI.busy=false;save();renderAll();pushGains(cs,added,af);
+  }catch(err){
+    UI.busy=false;save();renderAll();
+    showToast('❌ '+err.message,'error');
+  }
+}
+/* ---- 推理 ---- */
+async function sendReason(){
+  if(UI.busy)return;
+  const inp=$('#reason-in');const txt=inp.value.trim();if(!txt)return;
+  const c=caseObj(NAV.caseId),cs=caseState(c.id);
+  cs.reasonLog.push({role:'user',content:txt,time:nowStr()});
+  inp.value='';UI.busy=true;save();renderAll();
+  const msgs=[{role:'system',content:reasonSystem(c)}];
+  cs.reasonLog.slice(-14).forEach(m=>msgs.push({role:m.role,content:m.content}));
+  const bubble=startStream('reason');
+  try{
+    const res=await callAI(msgs,{stream:true,onDelta:t=>appendStream(bubble,t)});
+    const {text,items,testimonies}=parseItems(res.content);
+    const pf=parseFacts(text);
+    const added=addItems(cs,items,testimonies);
+    const af=addFacts(cs,pf.facts);
+    if(af.length)factsToConclusions(cs,af);
+    cs.reasonLog.push({role:'assistant',content:pf.text||text,time:nowStr()});
+    UI.busy=false;save();renderAll();pushGains(cs,added,af);
+  }catch(err){
+    UI.busy=false;cs.reasonLog.pop();save();renderAll();
+    showToast('❌ '+err.message,'error');
+  }
+}
+/* ---- 结论 ---- */
+function concSave(){
+  const name=$('#conc-name').value.trim(),desc=$('#conc-desc').value.trim();
+  if(!name){showToast('⚠️ 请填写结论名称','error');return;}
+  const cs=caseState(NAV.caseId);
+  cs.conclusions.push({id:uid(),name:name,desc:desc,time:nowStr()});
+  UI.modal=null;save();renderAll();showToast('📌 结论已记录');
+}
+function delConc(id){const cs=caseState(NAV.caseId);cs.conclusions=cs.conclusions.filter(x=>x.id!==id);save();renderAll();}
+function recordConc(i){
+  const cs=caseState(NAV.caseId);const m=cs.reasonLog[i];
+  if(!m||m.role!=='assistant'){showToast('⚠️ 只能记录 AI 的推理回复','error');return;}
+  UI.concIdx=i;UI.modal='concname';renderAll();
+}
+function concnameSave(){
+  const cs=caseState(NAV.caseId);
+  const name=$('#cname-in').value.trim();
+  if(!name){showToast('⚠️ 请填写结论名称','error');return;}
+  const m=cs.reasonLog[UI.concIdx];if(!m)return;
+  cs.conclusions.push({id:uid(),name:name,desc:m.content,time:nowStr()});
+  UI.modal=null;UI.concIdx=null;save();renderAll();showToast('📌 已记录为结论');
+}
+/* ================================================================
+   交互层 B：终审判定 / 设置 / 存档 / 启动
+   ================================================================ */
+function renderVerdict(){
+  const c=caseObj(NAV.caseId);if(!c)return '';
+  const cs=caseState(c.id);const v=cs.verdict;
+  if(!v)return `<div class="screen active" id="page-verdict"><div class="verdict-body"><div class="verdict-title" style="color:var(--t2)">⏳ 终审判定中…</div><div class="typing-dots" style="margin-top:10px"><span></span><span></span><span></span></div><div style="font-size:11px;color:var(--t3);margin-top:14px">正在比对你的结论与案件真相，请稍候</div></div></div>`;
+  const sc=Math.max(0,Math.min(100,v.score||0));
+  return `<div class="screen active" id="page-verdict">
+    <div class="verdict-body">
+      <div class="verdict-title ${v.solved?'':'fail'}">${v.solved?'🏆 破案成功':'🔍 案件尚未破解'}</div>
+      ${v.solved?`<div class="score-ring" style="background:conic-gradient(var(--gold) ${sc}%,var(--border) 0)"><div class="score-inner"><b>${sc}</b><span>/100</span></div></div>
+      <div class="rating-tag">${esc(v.rating||'')}</div>`:''}
+      ${v.solved?`<div class="verdict-card"><h4>📋 结案评语</h4><p class="sel">${fmtText(v.comment||'')}</p></div>`
+      :`<div class="verdict-card"><h4>📋 缺口与错误</h4><ul>${(v.gaps||[]).map(g=>`<li>${fmtText(g)}</li>`).join('')}</ul></div>
+      <div class="verdict-card"><h4>💡 提示</h4><p>继续调查：补充证据、询问人物、完善你的结论后再来提交。</p></div>`}
+      <div class="verdict-actions">
+        ${v.solved?`<button class="btn lg gold" data-act="verdict-complete">✅ 完成</button><button class="btn lg jade" data-act="verdict-continue">🔍 继续探索</button>`
+        :`<button class="btn lg gold" data-act="verdict-continue">🔍 继续调查</button>`}
+      </div>
+    </div>
+  </div>`;
+}
+function askSubmit(){
+  const cs=caseState(NAV.caseId);
+  if(!cs.conclusions.length){showToast('⚠️ 请先添加结论再提交','error');return;}
+  UI.confirm={title:'⚖️ 提交破案结论',body:'将把你当前的 '+cs.conclusions.length+' 条结论作为最终答案，交给终审 AI 判定（会消耗一次 API 调用）。确认提交？',okText:'提交判定',onOk:submitCase};
+  UI.modal='confirm';renderAll();
+}
+function extractJSON(t){
+  let s=String(t||'').replace(/```json|```/g,'').trim();
+  const m=s.match(/\{[\s\S]*\}/);
+  if(m)s=m[0];
+  return JSON.parse(s);
+}
+async function submitCase(){
+  const c=caseObj(NAV.caseId),cs=caseState(c.id);
+  const concl=cs.conclusions.map((x,i)=>(i+1)+'. '+x.name+'：'+x.desc).join('\n')||'（无）';
+  const userMsg='【侦探档案】'+playerDesc()
+    +'\n【侦探提交的全部结论】\n'+concl
+    +'\n【调查过程摘要】\n道具：'+(cs.inventory.map(i=>i.name).join('、')||'无')
+    +'\n证词：'+(cs.testimony.map(t=>t.name).join('、')||'无')
+    +'\n近期行动：\n'+(cs.sceneLog.slice(-10).filter(m=>m.role==='user').map(m=>'· '+m.content).join('\n')||'（无）')
+    +'\n\n请按判定规则输出 JSON。';
+  NAV.screen='verdict';renderAll();
+  try{
+    const res=await callAI([{role:'system',content:judgeSystem(c)},{role:'user',content:userMsg}],{stream:false,temp:0.2});
+    const j=extractJSON(res.content);
+    cs.verdict={solved:!!j.solved,score:Math.round(Number(j.score)||0),rating:String(j.rating||''),comment:String(j.comment||''),gaps:Array.isArray(j.gaps)?j.gaps.map(String):[],time:nowStr()};
+    save();renderAll();
+  }catch(err){
+    NAV.screen='conc';renderAll();
+    showToast('❌ 判定失败：'+err.message,'error');
+  }
+}
+function verdictComplete(){
+  const cs=caseState(NAV.caseId);
+  cs.completed=true;save();NAV.screen='cases';renderAll();
+  showToast('🏆 案件已完成！');
+}
+/* ---- 设置 / 存档 ---- */
+function saveSettings(){
+  S.api.baseUrl=$('#set-base').value.trim()||DEFAULTS.baseUrl;
+  S.api.key=$('#set-key').value.trim();
+  S.api.model=$('#set-model').value||S.api.model;
+  S.api.maxTokens=$('#set-tokens').value;
+  S.api.thinking=$('#set-thinking').value;
+  save();UI.modal=null;renderAll();showToast('✅ 设置已保存');
+}
+function fetchModelsWith(base,key){
+  let b=String(base||'').trim().replace(/\/+$/,'');
+  const ep=/\/models$/.test(b)?b:b+'/models';
+  const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),20000);
+  return fetch(ep,{headers:{'Authorization':'Bearer '+key},signal:ctrl.signal})
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(d=>(d.data||[]).map(m=>typeof m==='string'?m:m.id).filter(Boolean))
+    .catch(e=>{clearTimeout(to);throw new Error(e.name==='AbortError'?'请求超时':'网络错误：'+e.message);})
+    .finally(()=>clearTimeout(to));
+}
+async function refreshModels(scope){
+  const base=(scope?$('#api-base'):$('#set-base')).value.trim()||S.api.baseUrl;
+  const key=(scope?$('#api-key'):$('#set-key')).value.trim()||S.api.key;
+  const status=scope?null:$('#set-status');
+  if(!key){if(status)status.textContent='⚠️ 请先填写 API Key';else showToast('⚠️ 请先填写 API Key','error');return;}
+  try{
+    const models=await fetchModelsWith(base,key);
+    S.api.models=models;
+    if(!models.includes(S.api.model))S.api.model=models[0]||S.api.model;
+    const sel=scope?$('#api-model'):$('#set-model');
+    if(sel){sel.innerHTML=models.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');sel.value=S.api.model;}
+    if(status)status.textContent='✅ 拉取成功，共 '+models.length+' 个模型';
+    else showToast('✅ 模型列表已更新');
+  }catch(err){
+    if(status)status.textContent='❌ '+err.message;
+    else showToast('❌ '+err.message,'error');
+  }
+}
+async function testConn(){
+  const st=$('#set-status');if(st)st.textContent='⏳ 测试中…';
+  const base=$('#set-base').value.trim()||S.api.baseUrl;
+  const key=$('#set-key').value.trim()||S.api.key;
+  try{
+    const models=await fetchModelsWith(base,key);
+    if(st)st.textContent='✅ 连接成功 · 模型：'+models.slice(0,5).join('、')+(models.length>5?' 等':'');
+  }catch(err){if(st)st.textContent='❌ '+err.message;}
+}
+function exportSave(){
+  const data={type:'detective-ai-save',version:1,savedAt:new Date().toISOString(),...S};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='迷雾侦探-存档-'+(S.player?S.player.name:'未命名')+'.json';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1200);
+  showToast('💾 存档已导出');
+}
+function importSave(){$('#import-file').click();}
+function askRestart(){
+  UI.confirm={title:'🔄 重新开始',body:'将清除角色与全部案件进度（仅保留 API 配置），并回到角色配置界面。确定？',danger:true,okText:'重置',onOk:restartGame};
+  UI.modal='confirm';renderAll();
+}
+function restartGame(){
+  S.player=null;S.cases={};save();
+  UI.modal=null;UI.confirm=null;
+  NAV={screen:'setup',setupStep:'role'};
+  renderAll();showToast('🔄 已重置，请重新配置角色');
+}
+document.getElementById('import-file').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d||!d.api)throw new Error('无效存档文件');
+      S=d;if(!S.cases)S.cases={};save();
+      UI.modal=null;UI.confirm=null;
+      if(!S.player)NAV={screen:'setup',setupStep:S.api.key?'role':'api'};
+      else NAV={screen:'cases'};
+      renderAll();showToast('✅ 存档已导入');
+    }catch(err){showToast('❌ 导入失败：'+err.message,'error');}
+  };
+  r.readAsText(f);
+  e.target.value='';
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter'||e.shiftKey)return;
+  const id=e.target&&e.target.id;
+  if(id==='scene-in'){e.preventDefault();sendScene();}
+  else if(id==='chat-in'){e.preventDefault();sendChar(false);}
+  else if(id==='reason-in'){e.preventDefault();sendReason();}
+});
+/* ---- 启动 ---- */
+function boot(){
+  const saved=loadSave();
+  S=saved||{api:{...DEFAULTS},player:null,cases:{}};
+  if(!S.cases)S.cases={};
+  if(!S.api)S.api={...DEFAULTS};
+  if(!S.api.models||!S.api.models.length)S.api.models=[...DEFAULTS.models];
+  if(!S.player){NAV.screen='setup';NAV.setupStep=S.api.key?'role':'api';}
+  else NAV.screen='cases';
+  renderAll();
+  if(NAV.screen==='setup'&&NAV.setupStep==='api'&&S.api.key&&!UI.modelsFetched){UI.modelsFetched=true;refreshModels(true);}
+}
+boot();
+</script>
+</body>
+</html>

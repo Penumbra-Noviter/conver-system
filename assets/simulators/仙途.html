@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仙途 · 玄元大陆</title>
+<style>
+:root{
+  --bg-deep:#0a0812;--bg-surface:#141020;--bg-elevated:#1e1830;--bg-hover:#282040;
+  --border:#332850;--border-active:#4a3a70;
+  --t:#ece6f5;--t2:#b0a6c8;--t3:#7a6e9a;
+  --gold:#f0a828;--gold-dim:#b87818;--gold-glow:rgba(240,168,40,0.15);
+  --jade:#40c8a0;--jade-dim:#208060;--jade-glow:rgba(64,200,160,0.13);
+  --r:#e85058;--gr:#28d068;--purple:#a070f0;--blue:#5080e0;
+  --hp:#e85058;--sp:#f0a828;--mp:#5080e0;--exp:#a0d030;
+  --rad:5px;--rad2:9px;--rad3:14px;--tr:180ms ease;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"SF Mono","Consolas",monospace;
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg-deep);color:var(--t);font-family:var(--font);font-size:13px;user-select:none}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--rad);padding:8px 12px;outline:none;transition:border var(--tr)}
+input:focus,textarea:focus{border-color:var(--gold-dim)}
+#app{display:grid;grid-template-columns:1fr;grid-template-rows:46px 1fr;height:100vh;height:100dvh;gap:1px;background:var(--border)}
+#topbar{grid-row:1;background:var(--bg-surface);display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid var(--border);z-index:20}
+#topbar .logo{font-size:14px;font-weight:700;color:var(--gold);white-space:nowrap;letter-spacing:1px}
+#topbar .logo span{color:var(--t3);font-weight:400;font-size:10px;margin-left:4px}
+#topbar .spacer{flex:1}
+.top-stat{display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--rad);border:1px solid var(--border);font-size:10px;white-space:nowrap}
+.top-stat .bar{width:38px;height:5px;border-radius:3px;background:var(--bg-deep);overflow:hidden}
+.top-stat .bar div{height:100%;border-radius:3px;transition:width 300ms}
+.top-btn{padding:5px 11px;border-radius:var(--rad);font-size:11px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+.top-btn.jade{border-color:var(--jade-dim);color:var(--jade)}
+.top-btn.jade:hover{background:var(--jade-glow)}
+#center-panel{grid-row:2;background:var(--bg-deep);display:flex;flex-direction:column;overflow:hidden;position:relative}
+#left-panel,#right-panel{position:fixed;top:47px;bottom:0;width:300px;background:var(--bg-surface);z-index:40;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:7px;transition:transform 220ms ease;box-shadow:0 0 24px rgba(0,0,0,0.4)}
+#left-panel{left:0;transform:translateX(-102%);border-right:1px solid var(--border)}
+#right-panel{right:0;transform:translateX(102%);border-left:1px solid var(--border)}
+#left-panel.open,#right-panel.open{transform:translateX(0)}
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:10px}
+.panel-card h3{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:7px}
+.stat-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.stat-row .lbl{font-size:10px;color:var(--t3);width:44px;flex-shrink:0}
+.stat-row .sbar{flex:1;height:9px;background:var(--bg-deep);border-radius:3px;overflow:hidden}
+.stat-row .sbar div{height:100%;border-radius:3px;transition:width 400ms}
+.stat-row .val{font-size:10px;color:var(--t2);width:46px;text-align:right;font-family:var(--mono);flex-shrink:0}
+.info-row{font-size:10.5px;color:var(--t2);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+.info-row .k{color:var(--t3)}
+.love-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:var(--rad);background:var(--bg-deep);margin-bottom:4px;font-size:10.5px;cursor:pointer;transition:background var(--tr)}
+.love-item:hover{background:var(--bg-hover)}
+.love-item .ln{flex:1;color:var(--t2)}
+.love-item .lv{font-family:var(--mono);font-weight:700}
+.love-item .lv.pos{color:var(--gr)}.love-item .lv.neg{color:var(--r)}.love-item .lv.zero{color:var(--t3)}
+.love-empty{font-size:10px;color:var(--t3);text-align:center;padding:12px}
+#game-log{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:9px;scroll-behavior:smooth}
+.log-entry{padding:10px 14px;border-radius:var(--rad2);font-size:12.5px;line-height:1.7;animation:fade 250ms ease}
+.log-entry.narrative{background:var(--bg-elevated);border-left:3px solid var(--gold-dim)}
+.log-entry.system{background:var(--bg-surface);border-left:3px solid var(--t3);font-size:10.5px;color:var(--t3);font-family:var(--mono)}
+.log-entry.action{background:var(--bg-elevated);border-left:3px solid var(--jade-dim);font-style:italic;color:var(--t2)}
+.log-entry.thinking{background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid var(--purple);font-size:11.5px;color:var(--t2);white-space:pre-wrap}
+.log-entry.gold{background:var(--bg-elevated);border-left:3px solid var(--gold)}
+.log-entry.danger{border-left:3px solid var(--r)}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+#input-area{padding:10px 14px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;gap:7px;align-items:flex-end}
+#input-area textarea{flex:1;resize:none;min-height:40px;max-height:110px;font-size:12.5px;line-height:1.5;background:var(--bg-deep);padding:9px 12px}
+#send-btn{padding:9px 18px;background:var(--gold);color:#000;border-radius:var(--rad2);font-weight:600;font-size:12px;transition:all var(--tr);white-space:nowrap}
+#send-btn:hover{background:#ffc94a}
+#send-btn:disabled{opacity:0.35;cursor:not-allowed}
+.quick-actions{display:flex;flex-wrap:wrap;gap:5px;padding:5px 14px;background:var(--bg-surface)}
+.quick-action{padding:5px 11px;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--rad);font-size:10.5px;color:var(--t2);transition:all var(--tr)}
+.quick-action:hover{background:var(--bg-hover);color:var(--t);border-color:var(--gold-dim)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;display:none;align-items:center;justify-content:center;animation:fade 200ms ease}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad3);padding:20px;width:460px;max-width:94vw;max-height:86vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.6)}
+.modal h2{font-size:15px;color:var(--gold);margin-bottom:12px}
+.modal label{font-size:10.5px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px}
+.modal input,.modal select{width:100%;margin-bottom:11px;padding:8px 11px;font-size:12.5px}
+.modal select{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad);color:var(--t)}
+.modal .btn-row{display:flex;gap:7px;justify-content:flex-end;margin-top:8px}
+.modal .btn{padding:7px 16px;border-radius:var(--rad);font-size:12px;font-weight:500;border:1px solid var(--border);transition:all var(--tr)}
+.modal .btn:hover{background:var(--bg-hover);border-color:var(--border-active)}
+.modal .btn.gold{background:var(--gold);color:#000;border-color:var(--gold)}
+.modal .btn.gold:hover{background:#ffc94a}
+.modal .btn.jade{background:var(--jade);color:#000;border-color:var(--jade)}
+.modal .hint{font-size:9.5px;color:var(--t3);margin-top:-8px;margin-bottom:10px}
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border-active);padding:9px 18px;border-radius:var(--rad);font-size:12.5px;z-index:200;pointer-events:none;opacity:0;transition:opacity 300ms}
+#toast.show{opacity:1}#toast.success{border-color:var(--gr)}#toast.error{border-color:var(--r)}
+#loading-indicator{display:none;align-items:center;gap:7px;padding:7px 12px;font-size:10.5px;color:var(--t3)}
+#loading-indicator.show{display:flex}
+#loading-indicator .dots{display:flex;gap:3px}
+#loading-indicator .dots span{width:5px;height:5px;background:var(--gold);border-radius:50%;animation:bounce 1s infinite}
+#loading-indicator .dots span:nth-child(2){animation-delay:0.15s}
+#loading-indicator .dots span:nth-child(3){animation-delay:0.3s}
+@keyframes bounce{0%,80%,100%{transform:scale(0.5)}40%{transform:scale(1)}}
+/* 创建流程 */
+#setup-overlay{position:fixed;inset:0;background:var(--bg-deep);z-index:300;display:flex;align-items:center;justify-content:flex-start;flex-direction:column;overflow-y:auto;padding:20px 10px 60px}
+#setup-overlay.hidden{display:none}
+#setup-overlay h1{font-size:24px;color:var(--gold);letter-spacing:3px;margin-bottom:4px}
+#setup-overlay .sub{font-size:11px;color:var(--t3);margin-bottom:16px}
+.setup-box{width:430px;max-width:92vw}
+.create-step{display:none;flex-direction:column;gap:11px}
+.create-step.active{display:flex}
+.create-step .step-title{font-size:13px;color:var(--t2);text-align:center}
+.create-step .step-hint{font-size:10.5px;color:var(--t3);text-align:center}
+.create-step input{width:100%;text-align:center;font-size:16px;padding:10px 16px;background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad2)}
+.create-step .custom-input{width:100%;text-align:center;font-size:14px;padding:10px 14px;margin-top:4px;background:var(--bg-elevated);border:1px dashed var(--gold-dim);border-radius:var(--rad2);color:var(--gold)}
+.create-step .option-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}
+.create-step .option-card{padding:13px 10px;text-align:center;background:var(--bg-elevated);border:2px solid var(--border);border-radius:var(--rad2);cursor:pointer;transition:all var(--tr);font-size:11.5px;line-height:1.35}
+.create-step .option-card:hover{border-color:var(--gold-dim);background:var(--bg-hover)}
+.create-step .option-card.selected{border-color:var(--gold);background:var(--gold-glow);color:var(--gold)}
+.create-step .option-card .oc-icon{font-size:22px;display:block;margin-bottom:3px}
+.create-step .option-card .oc-name{font-weight:600}
+.create-step .option-card .oc-desc{font-size:8.5px;color:var(--t3);margin-top:2px}
+.trait-setup .trait-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.trait-setup .trait-row .t-icon{font-size:18px;width:26px;text-align:center}
+.trait-setup .trait-row .t-info{flex:1}
+.trait-setup .trait-row .t-name{font-size:11px;font-weight:600}
+.trait-setup .trait-row .t-desc{font-size:8.5px;color:var(--t3)}
+.trait-setup .trait-row .t-ctrl{display:flex;align-items:center;gap:6px}
+.trait-setup .trait-row .t-ctrl button{width:26px;height:26px;border-radius:50%;border:1px solid var(--border-active);color:var(--gold);font-size:14px;font-weight:700}
+.trait-setup .trait-row .t-ctrl button:hover{background:var(--gold-glow)}
+.trait-setup .trait-row .t-ctrl button:disabled{opacity:0.3}
+.trait-setup .trait-row .t-val{width:22px;text-align:center;font-family:var(--mono);font-weight:700;font-size:13px}
+.points-left{font-size:11px;color:var(--gold);font-weight:600}
+.create-nav{display:flex;gap:10px;justify-content:center;margin-top:12px}
+.create-nav button{padding:10px 28px;border-radius:var(--rad2);font-size:13px;font-weight:600;transition:all var(--tr)}
+.create-nav .btn-prev{background:transparent;border:1px solid var(--border);color:var(--t2)}
+.create-nav .btn-prev:hover{background:var(--bg-hover)}
+.create-nav .btn-next{background:var(--gold);color:#000;border:1px solid var(--gold)}
+.create-nav .btn-next:hover{background:#ffc94a}
+/* 攻略 */
+.guide-section{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:12px;margin-bottom:8px}
+.guide-section h4{font-size:12px;color:var(--gold);margin-bottom:6px}
+.guide-section p,.guide-section li{font-size:11px;color:var(--t2);line-height:1.7}
+.guide-section ul{padding-left:16px}
+.guide-section .tip{color:var(--jade)}
+.guide-section .warn{color:var(--r)}
+/* 百科 */
+.en-cat{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.en-cat button{padding:4px 10px;border-radius:12px;font-size:10px;border:1px solid var(--border);color:var(--t2)}
+.en-cat button.active{border-color:var(--jade);color:var(--jade);background:var(--jade-glow)}
+.en-item{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;color:var(--t2);cursor:pointer;border-radius:var(--rad)}
+.en-item:hover{background:var(--bg-hover)}
+.en-item .en-t{color:var(--gold);font-weight:600}
+.en-item .en-d{color:var(--t3);font-size:9.5px;margin-top:2px}
+.en-ask{display:flex;gap:6px;margin-top:10px}
+.en-ask input{flex:1}
+.drawer-handle{display:none;text-align:center;padding:5px 0;font-size:10px;color:var(--t3);border-bottom:1px solid var(--border);cursor:pointer;flex-shrink:0;margin:-8px -8px 4px;background:var(--bg-surface)}
+.drawer-backdrop{position:fixed;inset:0;top:47px;background:rgba(0,0,0,0.45);z-index:39;display:none}
+.drawer-backdrop.show{display:block}
+@media(max-width:768px){
+  #topbar{gap:3px;padding:0 5px}
+  #topbar .logo{font-size:11px}
+  #topbar .logo span{display:none}
+  .top-stat{padding:2px 4px}
+  .top-stat .bar{width:18px}
+  .top-stat .val-t{display:none}
+  .top-stat.sp-stat,.top-stat.mp-stat{display:none}
+  #loc-display{display:none}
+  #bound-badge{font-size:9px;padding:2px 5px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top-btn{padding:5px 7px;font-size:10px;min-width:30px;justify-content:center}
+  .top-btn .btn-txt{display:none}
+  #left-panel,#right-panel{width:88vw;max-width:340px;padding-bottom:env(safe-area-inset-bottom)}
+  .drawer-handle{display:block}
+  .quick-actions{overflow-x:auto;flex-wrap:nowrap;padding:5px 10px}
+  .quick-action{flex-shrink:0;padding:8px 14px;font-size:11.5px;min-height:36px;border-radius:18px}
+  .log-entry{font-size:13px}
+  #input-area{padding:8px 10px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  #input-area textarea{font-size:14px;min-height:44px;border-radius:10px}
+  #send-btn{min-width:62px;font-size:14px;padding:10px 16px;border-radius:10px}
+  #game-log{padding:10px 12px}
+  .modal{width:96vw;padding:14px}
+  .create-step .option-card{padding:11px 8px;font-size:10.5px}
+  .create-nav button{padding:10px 22px}
+  .setup-box{width:94vw}
+  .guide-section p,.guide-section li{font-size:12px}
+}
+@media(max-width:420px){
+  .create-step .option-grid{grid-template-columns:1fr}
+  .create-step .option-card{padding:12px 10px;font-size:12px}
+  .trait-setup .trait-row .t-ctrl button{width:32px;height:32px}
+  .create-step input{font-size:15px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="logo">仙途<span>玄元大陆 · 修仙AI</span></div>
+    <span class="top-stat" id="bound-badge" style="border-color:var(--gold-dim);color:var(--gold)">未入道</span>
+    <span class="top-stat">❤️<span class="val-t" id="hp-t">100/100</span><div class="bar"><div style="width:100%;background:var(--hp)" id="hp-b"></div></div></span>
+    <span class="top-stat sp-stat">⚡<span class="val-t" id="sp-t">100/100</span><div class="bar"><div style="width:100%;background:var(--sp)" id="sp-b"></div></div></span>
+    <span class="top-stat mp-stat">🧠<span class="val-t" id="mp-t">100/100</span><div class="bar"><div style="width:100%;background:var(--mp)" id="mp-b"></div></div></span>
+    <div class="spacer"></div>
+    <span style="font-size:10px;color:var(--t3)" id="loc-display">📍 未定</span>
+    <button class="top-btn gold" onclick="UI.openGuide()">📜<span class="btn-txt">攻略</span></button>
+    <button class="top-btn jade" onclick="UI.openEncyclopedia()">📖<span class="btn-txt">百科</span></button>
+    <button class="top-btn" onclick="UI.togglePanel('left')">👤<span class="btn-txt">角色</span></button>
+    <button class="top-btn" onclick="UI.togglePanel('right')">🗺️<span class="btn-txt">世界</span></button>
+    <button class="top-btn" onclick="UI.openSettings()">⚙️<span class="btn-txt">设置</span></button>
+  </div>
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div class="quick-actions" id="quick-actions"></div>
+    <div id="input-area">
+      <textarea id="user-input" placeholder="输入你的行动…（例：去坊市看看 / 打坐修炼 / 向林师姐请教）" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();Game.sendAction()}"></textarea>
+      <button id="send-btn" onclick="Game.sendAction()">▶ 行动</button>
+      <div id="loading-indicator"><span class="dots"><span></span><span></span><span></span></span>推演中</div>
+    </div>
+  </div>
+  <div id="left-panel"><div class="drawer-handle" onclick="UI.togglePanel('left')">⬇ 收起</div><div class="panel-card"><h3>🧬 道基</h3><div id="char-core"></div></div><div class="panel-card"><h3>📊 属性</h3><div id="char-stats"></div></div><div class="panel-card"><h3>💗 好感度</h3><div id="love-list"></div></div></div>
+  <div id="right-panel"><div class="drawer-handle" onclick="UI.togglePanel('right')">⬇ 收起</div><div class="panel-card"><h3>📍 位置</h3><div id="world-loc"></div></div><div class="panel-card"><h3>🧭 势力</h3><div id="world-factions"></div></div><div class="panel-card"><h3>🎒 行囊</h3><div id="world-inv"></div></div><div class="panel-card"><h3>📋 任务</h3><div id="world-quests"></div></div><div class="panel-card"><h3>📔 记忆</h3><div id="world-mem"></div></div></div>
+</div>
+<div class="drawer-backdrop" id="drawer-backdrop" onclick="UI.closePanels()"></div>
+
+<div class="modal-overlay" id="guide-modal"><div class="modal" style="width:620px"><h2>📜 修仙攻略 · 仙途指南</h2><div id="guide-content"></div><div class="btn-row"><button class="btn gold" onclick="UI.closeModal('guide-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="ency-modal"><div class="modal" style="width:620px"><h2>📖 世界百科 · 玄元录</h2><div id="ency-content"></div><div class="btn-row"><button class="btn gold" onclick="UI.closeModal('ency-modal')">关闭</button></div></div></div>
+<div class="modal-overlay" id="settings-modal"><div class="modal"><h2>⚙️ 设置</h2><div id="settings-content"></div></div></div>
+<div class="modal-overlay" id="mem-modal"><div class="modal" style="width:560px"><h2>📔 记忆档案</h2><div id="mem-content"></div><div class="btn-row"><button class="btn gold" onclick="UI.closeModal('mem-modal')">关闭</button></div></div></div>
+<input type="file" id="import-file" accept=".json" style="display:none" onchange="Game.handleImport(event)">
+
+<div id="setup-overlay">
+  <h1>仙 途</h1><div class="sub">玄元大陆 · 大道三千 · 求道长生</div>
+  <div class="setup-box">
+    <div class="create-step active" id="step-api">
+      <div class="step-title">第一步 · 配置仙缘（AI接口）</div>
+      <div class="step-hint">游戏由 AI 实时推演，需配置大模型 API</div>
+      <input id="cfg-endpoint" placeholder="API端点（默认 DeepSeek）" value="https://api.deepseek.com/v1/chat/completions">
+      <input id="cfg-apikey" type="password" placeholder="API Key（sk-xxx）">
+      <div style="display:flex;gap:6px">
+        <select id="cfg-model" style="flex:1"><option value="deepseek-chat">deepseek-chat</option><option value="deepseek-reasoner">deepseek-reasoner</option></select>
+        <button class="create-nav btn-prev" style="padding:8px 14px" onclick="UI.fetchModels()">🔄 拉取模型</button>
+      </div>
+      <div class="step-hint" id="model-hint"></div>
+      <label style="font-size:9px;color:var(--t3);margin-top:4px">推理强度</label>
+      <select id="cfg-reasoning"><option value="max">最大</option><option value="high">高</option><option value="medium">中</option></select>
+      <label style="font-size:9px;color:var(--t3)">输出Token限制</label>
+      <select id="cfg-maxtokens"><option value="unlimited">无限制</option><option value="4096">4096</option><option value="8192">8192</option></select>
+      <div class="create-nav"><button class="btn-next" onclick="UI.saveApiConfig()">✅ 保存并继续</button></div>
+    </div>
+    <div class="create-step" id="step-name">
+      <div class="step-title">第二步 · 道号（姓名）</div>
+      <div class="step-hint">可让 AI 起名，也可自定义</div>
+      <input id="name-input" placeholder="点击下方按钮由AI生成">
+      <div class="create-nav"><button class="btn-next" onclick="UI.genName()">🎲 AI起名</button></div>
+      <div class="create-nav"><button class="btn-prev" onclick="UI.prevStep(0)">上一步</button><button class="btn-next" onclick="UI.nextStep()">继续 ▸</button></div>
+    </div>
+    <div class="create-step" id="step-gender">
+      <div class="step-title">第三步 · 性别</div>
+      <div class="option-grid">
+        <div class="option-card" data-v="男"><span class="oc-icon">☯</span><div class="oc-name">男</div><div class="oc-desc">乾阳之体</div></div>
+        <div class="option-card" data-v="女"><span class="oc-icon">❀</span><div class="oc-name">女</div><div class="oc-desc">坤阴之体</div></div>
+      </div>
+      <div class="create-nav"><button class="btn-prev" onclick="UI.prevStep(1)">上一步</button><button class="btn-next" onclick="UI.nextStep()">继续 ▸</button></div>
+    </div>
+    <div class="create-step" id="step-race">
+      <div class="step-title">第四步 · 种族</div>
+      <div class="step-hint">选择你的出身种族（可选"自定义"输入）</div>
+      <div class="option-grid" id="race-grid">
+        <div class="option-card" data-v="人族"><span class="oc-icon">👤</span><div class="oc-name">人族</div><div class="oc-desc">天地主角，修仙文明正统</div></div>
+        <div class="option-card" data-v="妖族"><span class="oc-icon">🐉</span><div class="oc-name">妖族</div><div class="oc-desc">血脉传承，化形修行</div></div>
+        <div class="option-card" data-v="魔修"><span class="oc-icon">🔥</span><div class="oc-name">魔修</div><div class="oc-desc">进境神速，易走火入魔</div></div>
+        <div class="option-card" data-v="鬼修"><span class="oc-icon">👻</span><div class="oc-name">鬼修</div><div class="oc-desc">魂体修行，惧阳雷阳火</div></div>
+        <div class="option-card" data-v="半妖"><span class="oc-icon">🌓</span><div class="oc-name">半妖</div><div class="oc-desc">人妖混血，天赋兼具</div></div>
+        <div class="option-card" data-v="古族"><span class="oc-icon">🗿</span><div class="oc-name">古族</div><div class="oc-desc">上古血脉，肉身强横</div></div>
+        <div class="option-card" data-v="custom"><span class="oc-icon">✏️</span><div class="oc-name">自定义</div><div class="oc-desc">自行输入种族</div></div>
+      </div>
+      <input class="custom-input" id="race-custom" placeholder="输入自定义种族…" style="display:none">
+      <div class="create-nav"><button class="btn-prev" onclick="UI.prevStep(2)">上一步</button><button class="btn-next" onclick="UI.nextStep()">继续 ▸</button></div>
+    </div>
+    <div class="create-step" id="step-talent">
+      <div class="step-title">第五步 · 天赋分配（共20点）</div>
+      <div class="step-hint"><span class="points-left" id="points-left">剩余 20 点</span></div>
+      <div class="trait-setup" id="trait-setup"></div>
+      <div class="create-nav"><button class="btn-prev" onclick="UI.prevStep(3)">上一步</button><button class="btn-next" onclick="UI.nextStep()">继续 ▸</button></div>
+    </div>
+    <div class="create-step" id="step-root">
+      <div class="step-title">第六步 · 灵根</div>
+      <div class="option-grid" id="root-grid">
+        <div class="option-card" data-v="天灵根（火）"><span class="oc-icon">🔥</span><div class="oc-name">天灵根·火</div><div class="oc-desc">单灵根，天骄之资</div></div>
+        <div class="option-card" data-v="天灵根（水）"><span class="oc-icon">💧</span><div class="oc-name">天灵根·水</div><div class="oc-desc">单灵根，天骄之资</div></div>
+        <div class="option-card" data-v="变异灵根（雷）"><span class="oc-icon">⚡</span><div class="oc-name">变异灵根·雷</div><div class="oc-desc">威力强横，极稀有</div></div>
+        <div class="option-card" data-v="变异灵根（冰）"><span class="oc-icon">❄️</span><div class="oc-name">变异灵根·冰</div><div class="oc-desc">威力强横，极稀有</div></div>
+        <div class="option-card" data-v="地灵根（金木）"><span class="oc-icon">🌳</span><div class="oc-name">地灵根·金木</div><div class="oc-desc">双灵根，资质上佳</div></div>
+        <div class="option-card" data-v="伪灵根（三灵根）"><span class="oc-icon">🌀</span><div class="oc-name">伪灵根</div><div class="oc-desc">资质平庸，修炼缓慢</div></div>
+        <div class="option-card" data-v="五灵根（废灵根）"><span class="oc-icon">🌫️</span><div class="oc-name">五灵根</div><div class="oc-desc">被称废灵根，逆天改命之选</div></div>
+        <div class="option-card" data-v="特殊灵根（剑灵根）"><span class="oc-icon">🗡️</span><div class="oc-name">剑灵根</div><div class="oc-desc">天生与剑道契合</div></div>
+        <div class="option-card" data-v="custom"><span class="oc-icon">✏️</span><div class="oc-name">自定义</div><div class="oc-desc">自行输入灵根</div></div>
+      </div>
+      <input class="custom-input" id="root-custom" placeholder="输入自定义灵根…" style="display:none">
+      <div class="create-nav"><button class="btn-prev" onclick="UI.prevStep(4)">上一步</button><button class="btn-next" onclick="UI.nextStep()">继续 ▸</button></div>
+    </div>
+    <div class="create-step" id="step-origin">
+      <div class="step-title">第七步 · 出身</div>
+      <div class="option-grid" id="origin-grid">
+        <div class="option-card" data-v="散修"><span class="oc-icon">🎒</span><div class="oc-name">散修</div><div class="oc-desc">无门无派，自由但艰难</div></div>
+        <div class="option-card" data-v="宗门弟子"><span class="oc-icon">🏯</span><div class="oc-name">宗门弟子</div><div class="oc-desc">有靠山，受规矩约束</div></div>
+        <div class="option-card" data-v="修仙家族"><span class="oc-icon">🏠</span><div class="oc-name">家族子弟</div><div class="oc-desc">世代传承，资源有限</div></div>
+        <div class="option-card" data-v="凡人王朝"><span class="oc-icon">👑</span><div class="oc-name">王朝贵胄</div><div class="oc-desc">凡间权势，初入仙途</div></div>
+        <div class="option-card" data-v="custom"><span class="oc-icon">✏️</span><div class="oc-name">自定义</div><div class="oc-desc">自行输入出身</div></div>
+      </div>
+      <input class="custom-input" id="origin-custom" placeholder="输入自定义出身…" style="display:none">
+      <div class="create-nav"><button class="btn-prev" onclick="UI.prevStep(5)">上一步</button><button class="btn-next" onclick="UI.beginLife()">🌱 踏入仙途</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script>
+// ============================================================
+// 仙途 · 玄元大陆 — 修仙AI游戏引擎
+// ============================================================
+const DEFAULTS={apiEndpoint:'https://api.deepseek.com/v1/chat/completions',apiKey:'',model:'deepseek-chat',reasoningEffort:'max',maxTokens:'unlimited'};
+function loadConfig(){try{return JSON.parse(localStorage.getItem('xiantu_config'))||{};}catch(e){return{}}}
+function saveConfig(c){localStorage.setItem('xiantu_config',JSON.stringify(c));}
+
+// ── 世界观精简版（完整版见百科）──
+const LORE = `【玄元大陆·修仙世界】
+境界体系（凡界九境）：练气→筑基→金丹→元婴→化神→炼虚→合体→大乘→渡劫飞升。每境分初期/中期/后期/圆满。寿元：练气约150年、筑基300年、金丹800年、元婴2000年、化神5000年、炼虚1万年、合体3万年、大乘5万年、渡劫一步登天。
+灵根：天灵根(单)/变异灵根(雷风冰暗等)/地灵根(双)/伪灵根(三四)/五灵根(废灵根)。灵根决定修炼速度。
+大陆五域：东域(正道荟萃·人族繁盛)、南域(十万大山·妖族大本营)、西域(黄沙大漠·魔道渊薮)、北域(万年冰原·古族隐居)、中域(中州腹地·群雄逐鹿)。海域有东海龙宫、蓬莱仙岛。
+修炼四要素：法(功法)侣(道侣)财(灵石)地(洞府灵脉)。功法分黄玄地天仙神六阶。灵石为硬通货(1极品=100上品=1万中品=100万下品)。
+丹药分凡/灵/宝/仙/神丹；法宝分凡器/法器/灵器/宝器/灵宝/仙器/神器/先天灵宝。阵法分凡灵宝仙神阵。符箓攻防辅特殊四类。
+势力：正道圣地(太玄圣地/紫霄仙宗/剑阁/丹霞宗/天机阁)、魔道(血魔宗/阴鬼宗/合欢宗/万毒门/修罗殿)、中立(万宝楼商会/天机阁情报)、妖族妖皇殿、东海龙宫、幽冥地府。宗门分外门/内门/真传/圣子。
+种族：人族、妖族(化形)、魔修、鬼修、巫族古族、龙族、凤族、麒麟族、半妖、精灵灵族、海族。
+天道：赏善罚恶，渡劫有雷劫风火劫心魔劫；功德深厚者天道眷顾；业力深重者劫难加倍。天衍四十九，遁去其一，凡事留一线生机。
+货币：凡界金银铜钱，修仙界灵石灵晶。坊市商会(万宝楼/聚宝阁)，拍卖行是重宝流通主渠道。
+核心冲突：正魔大战、宗门内斗、秘境争夺、兽潮守城、大比打脸、上古遗迹探秘。`;
+
+// ── 攻略（详细版）──
+const GUIDE_HTML = `
+<div class="guide-section"><h4>🌱 入门篇 · 新手须知</h4>
+<ul><li>游戏玩法：输入任意行动（修炼/探索/对话/购买/战斗…），AI实时推演世界，你的选择改变命运。</li>
+<li>核心循环：<b>修炼积累修为 → 突破境界 → 获得更强实力 → 探索更凶险的秘境/势力 → 获取资源 → 继续修炼</b>。</li>
+<li>法侣财地四字真言：功法是根本、道侣同门是助力、灵石是通行证、洞府灵脉是根基。</li>
+<li class="tip">💡 开局建议：先熟悉环境（查看周围），找一份适合自己灵根的功法，再考虑加入势力。</li>
+<li class="warn">⚠️ 前期别浪：练气期遇到筑基修士能跑就跑，修仙界现实而残酷。</li></ul></div>
+<div class="guide-section"><h4>📈 境界突破指南</h4>
+<ul><li>练气→筑基：气海圆满后以<b>筑基丹</b>辅助，压缩气海为灵湖。可输入"准备筑基"触发。</li>
+<li>筑基→金丹：灵湖盈满压缩成丹，需渡<b>金丹劫（小天劫）</b>，备好防御法宝。</li>
+<li>金丹→元婴：金丹碎裂孕育元婴，修仙第一大坎，失败轻则跌落境界重则丹毁人亡。可寻<b>结婴丹</b>。</li>
+<li>元婴→化神：元婴出窍游太虚，渡<b>四九天劫</b>，感悟天地之道。</li>
+<li>化神→炼虚→合体→大乘：法则感悟渐深，身与道合，每一步都以<b>悟道</b>为先。</li>
+<li>渡劫飞升：<b>九九重劫</b>九重天劫+心魔劫，需法宝、丹药、阵法、道心四者齐备。</li>
+<li class="tip">💡 突破前准备：境界圆满 + 破境丹药 + 护体法宝 + 闭关之所（洞府/灵眼）。</li>
+<li class="warn">⚠️ 心魔劫最凶险：执念、恐惧、欲望都会化劫，道心不坚者慎渡。</li></ul></div>
+<div class="guide-section"><h4>🗡️ 修炼路线推荐</h4>
+<ul><li><b>剑修</b>：一生只修一剑，剑即命，威力冠绝同阶"一剑破万法"，但性情刚烈易走火。适合剑灵根/高悟性。</li>
+<li><b>丹修</b>：炼丹养身，地位极高，走到哪都被拉拢，战力偏弱但财富人脉雄厚。适合高财力/火木灵根。</li>
+<li><b>体修（炼体流）</b>：肉身成圣，皮糙肉厚，近战无敌，前期极强。适合高根骨。</li>
+<li><b>阵修/符修</b>：以阵困仙、画符成兵，一人成军，但烧钱。适合高悟性+高财力。</li>
+<li><b>魔修</b>：进境神速，手段狠辣，同阶战力强，但心魔重、业力缠身、被正道追杀。适合胆大心细者。</li>
+<li class="tip">💡 混搭推荐：主修一道 + 辅修保命（遁术/防御符箓）是正道修士标配。</li></ul></div>
+<div class="guide-section"><h4>💰 灵石与资源获取</h4>
+<ul><li>宗门月俸（按境界发灵石丹药）→ 最稳定，入宗门首选。</li>
+<li>任务堂悬赏 → 来钱快，但可能有危险（猎妖/护送/寻物）。</li>
+<li>秘境寻宝 → 一夜暴富或一夜暴毙，量力而行。</li>
+<li>炼丹/炼器/画符售卖 → 技术流致富，需要丹方/器谱/符箓传承。</li>
+<li>坊市倒卖 → 低买高卖，需要眼力与情报（天机阁出售消息）。</li>
+<li class="warn">⚠️ 财不外露：身怀重宝独行野外=给杀人夺宝送菜。</li></ul></div>
+<div class="guide-section"><h4>🏯 势力与宗门指南</h4>
+<ul><li><b>正道圣地</b>（太玄/紫霄/剑阁/丹霞/天机阁）：资源顶级，竞争激烈，圣子圣女内卷。</li>
+<li><b>大宗门</b>（青云宗/万剑门等）：元婴老祖坐镇，内外门体系完善，普通玩家的好归宿。</li>
+<li><b>修仙家族</b>：血缘纽带，传承稳定，但天花板有限。</li>
+<li><b>散修</b>：自由但资源全靠自己，坊市混迹，机缘气运之选。</li>
+<li><b>中立势力</b>（万宝楼/丹盟/器盟）：财可通神，适合丹师炼器师挂靠。</li>
+<li class="tip">💡 加入宗门后：外门→内门→真传→圣子，一路靠大比和贡献往上爬。</li>
+<li class="warn">⚠️ 加入魔道势力前想清楚：正魔大战时你会被正道追杀。</li></ul></div>
+<div class="guide-section"><h4>💗 好感度与道侣指南</h4>
+<ul><li>好感度范围 -100~100：正数交好，负数结怨，超过80可结为道侣。</li>
+<li>提升方式：送礼（投其所好）、帮忙（做任务/解围）、共患难（一起探秘境）、日常陪伴（多对话）。</li>
+<li>降低方式：欺骗背叛、夺其所爱、伤其亲友、当面打脸。</li>
+<li>道侣双修：可互传功法、合力突破，但道侣被劫是经典劫难。</li>
+<li class="tip">💡 好感度在角色面板可随时查看，知己知彼。</li></ul></div>
+<div class="guide-section"><h4>⚔️ 战斗与保命手册</h4>
+<ul><li>战斗输入：可直接说"与XX战斗/出手"，AI结算伤害与消耗。</li>
+<li>保命三件套：遁术（血遁/土遁/瞬移符）、防御法宝（护心镜/金刚符）、疗伤丹药（回气丹/九转还魂丹）。</li>
+<li>打不过就跑：修仙界不丢人，死了才丢人。</li>
+<li>越阶挑战是主角特权，也是作死捷径，量力而行。</li>
+<li class="warn">⚠️ 业力积累会加重天劫，杀人夺宝虽爽，因果难偿。</li></ul></div>
+<div class="guide-section"><h4>🗺️ 地图与危险区域</h4>
+<ul><li>东域（正道/人族）：安全指数★★★★，适合新手发展。</li>
+<li>南域（妖族十万大山）：危险指数★★★☆，妖兽纵横，也有机缘。</li>
+<li>西域（魔道大漠）：危险指数★★★★，非魔修慎入。</li>
+<li>北域（万年冰原）：危险指数★★★★，古族禁地，灵脉深藏。</li>
+<li>中域（中州）：机遇与危险并存，大争之世的主战场。</li>
+<li>禁地（归墟/古战场/深渊）：九死一生，蕴含大机缘，量力而行。</li>
+<li>秘境：周期性开启，名额争夺激烈，机缘与危险并存。</li></ul></div>
+<div class="guide-section"><h4>🚀 飞升之路</h4>
+<ul><li>凡界终点：渡劫期引动九九重劫，功成举霞飞升仙界（真仙→玄仙→金仙→太乙→大罗→准圣→圣人）。</li>
+<li>失败归宿：魂飞魄散 / 兵解转世重修 / 转修散仙（千年一劫共十二劫）。</li>
+<li class="tip">💡 飞升前准备：渡劫大阵+渡劫丹+功德积累+道心圆满，缺一不可。</li>
+<li>另类成道：以力证道（最凶险）、功德证道（最稳妥）、斩三尸证道（最流行）。</li></ul></div>
+<div class="guide-section"><h4>📖 世界百科用法</h4>
+<ul><li>点击顶栏「📖 百科」浏览分类知识（境界/丹药/法宝/势力/地理/种族/天劫）。</li>
+<li>百科底部有<b>AI问答框</b>：不知道的事直接输入问题，AI以世界主脑身份回答，回答会加入记忆。</li>
+<li class="tip">💡 问得越具体回答越准，例如："筑基丹在哪里能买到？大概多少灵石？"</li></ul></div>`;
+
+// ── 百科分类数据 ──
+const ENCY = {
+  '境界':[['练气期','打通经脉引气入体，寿150年。可御法器、施基础法术，寒暑不侵。'],['筑基期','气海液化筑道基，寿300年。可御剑飞行、神识外放，正式修士。'],['金丹期','结丹成基，寿800年。金丹真人，可御宝千里，元神雏形。'],['元婴期','金丹裂元婴出，寿2000年。元婴不灭人不死，可夺舍、瞬移。'],['化神期','神游太虚，寿5000年。掌控法则雏形，神念千里，领域雏形。'],['炼虚期','虚实相生，寿1万年。肉身化元气遁走，法则级神通。'],['合体期','身与道合，寿3万年。开辟小世界雏形，半步仙人。'],['大乘期','道行大乘，寿5万年。内天地自成，镇压一界气运。'],['渡劫期','引九九重劫，飞升仙界。败则灰飞烟灭或兵解转散仙。'],['散仙','渡劫失败保元神重修，千年一劫共十二劫成正果。']],
+  '灵根':[['天灵根','单灵根，修炼极快，天骄之资。'],['变异灵根','雷风冰暗光毒等，威力强横极稀有。'],['地灵根','双灵根，资质上佳。'],['伪灵根','三/四灵根，资质平庸修炼缓慢。'],['五灵根','五行俱全反而不纯，被称废灵根，但可逆天改命。'],['特殊灵根','剑灵根/丹灵根/阵灵根/道体，万中无一。'],['灵体','纯阳体/九阴体/玄冰圣体/混沌圣体等，自带天赋。']],
+  '丹药':[['凡丹','练气用：辟谷丹、回气丹。'],['灵丹','筑基金丹用：筑基丹、聚灵丹、培元丹。'],['宝丹','金丹元婴用：结婴丹、蕴神丹、九转还魂丹。'],['仙丹','化神以上：飞升丹、再造丹、九转金丹。'],['神丹','仙人圣人用，凡界绝迹。'],['禁丹','燃元丹/狂暴丹，强行提升境界但有严重副作用。'],['丹师','学徒→丹师→大师→丹王→丹圣→丹仙，地位极高。']],
+  '法宝':[['法器','练气筑基用，滴血认主。'],['灵器','筑基金丹用，可入丹田温养。'],['宝器','金丹元婴用，可变化大小。'],['灵宝','元婴化神用，器灵成熟可自主护主。'],['仙器','化神以上，蕴含仙道法则。'],['神器','圣人用，可镇界灭世。'],['先天灵宝','天地孕育，如盘古幡/太极图/混沌钟，得之镇气运。'],['飞剑','修仙界最普及攻伐之宝，剑修本命。']],
+  '阵法':[['攻伐阵','杀阵：诛仙剑阵、万剑阵、烈焰焚天阵。'],['防御阵','护山大阵、金刚阵、玄武阵。'],['困阵','迷踪阵、八卦阵、五行困阵。'],['幻阵','心魔幻阵、迷神阵。'],['辅助阵','聚灵阵、传送阵、传讯阵、隐匿阵、禁空阵。'],['布阵三要素','阵基、阵眼、阵源（灵石/灵脉）。'],['经典大阵','诛仙剑阵（非四圣不可破）、十二都天神煞、周天星斗、两仪微尘。']],
+  '势力':[['正道圣地','太玄圣地、紫霄仙宗、剑阁、丹霞宗、天机阁、符仙门。'],['大宗门','青云宗、万剑门等，元婴老祖坐镇。'],['魔道','血魔宗、阴鬼宗、合欢宗、万毒门、修罗殿。'],['中立','万宝楼商会、丹盟、器盟、佣兵工会。'],['妖族','妖皇殿统御十万大山万妖。'],['龙宫','东海龙王所辖，海族之主。'],['幽冥地府','轮回之主，超然三界。'],['隐世圣地','逍遥谷、桃花源，乱世方出。']],
+  '地理':[['东域','灵气浓郁正道荟萃，人族繁盛。'],['南域','蛮荒雨林妖兽纵横，十万大山。'],['西域','黄沙大漠魔道渊薮，亦有佛国。'],['北域','万年冰原古族隐居，极寒绝地。'],['中域','中州腹地群雄逐鹿，灵气枢纽。'],['海域','东海龙宫、蓬莱仙岛、方丈仙山、瀛洲。'],['禁地','归墟、古战场核心、深渊，九死一生。'],['秘境','上古小世界，周期开启，机缘与危险并存。']],
+  '种族':[['人族','天地主角，修仙文明最发达。'],['妖族','草木禽兽修炼化形，血脉妖丹为本。'],['魔族','修炼魔道功法者，居西域魔渊。'],['鬼族','亡魂修炼，居幽冥界，惧阳雷阳火。'],['巫族','盘古血脉后裔，肉身强横不修元神。'],['龙族','鳞虫之长，东海龙宫，控水肉身无双。'],['凤族','浴火重生不死不灭，居南冥梧桐圣境。'],['半妖','人妖混血，天赋兼具，处境尴尬。'],['灵族','灵气孕育的灵性生命，纯净无邪。']],
+  '天劫':[['金丹劫','筑基破金丹的小天劫。'],['四九天劫','元婴破化神。'],['六九天劫','化神破炼虚。'],['九九重劫','渡劫飞升之劫，九重天劫+心魔劫。'],['天劫种类','雷劫、风劫、火劫、水劫、心魔劫、阴阳劫、混沌劫。'],['渡劫要素','境界圆满+法宝+丹药+阵法+道心+功德。'],['其他劫难','情劫、寿元劫、天谴、红尘劫、三灾九难。']],
+  '经济':[['灵石','修仙界硬通货。1极品=100上品=1万中品=100万下品。'],['坊市','修士交易之所，固定坊市+临时坊市。'],['万宝楼','修仙界第一商会，中立但势力滔天。'],['拍卖行','重宝奇珍流通主渠道，常有大势力争锋。'],['灵晶','比极品灵石更精纯，高阶交易通行物。']]
+};
+
+// ── 主游戏对象 ──
+const Game = {
+  state:{player:null,history:[],memory:[],fusedMemory:[],relations:{},inventory:[],quests:[],location:'玄元大陆·东域·无名小村',factions:{'正道联盟':0,'万宝楼':0,'妖皇殿':0,'魔道':0},cheatEnabled:false,apiBusy:false,created:false},
+  memTypes:{'人物':'👤','地点':'📍','事件':'⚔️','物品':'📦','修炼':'🧘','恩怨':'💢','其他':'📝'},
+  addLog(type,text,collapsible){
+    const log=document.getElementById('game-log');
+    const e=document.createElement('div');e.className='log-entry '+type;
+    if(collapsible){e.innerHTML='<details><summary>🧠 AI推演过程</summary><div style="margin-top:5px">'+this.formatText(text)+'</div></details>';}
+    else{e.innerHTML=this.formatText(text);}
+    log.appendChild(e);log.scrollTop=log.scrollHeight;
+  },
+  formatText(t){return String(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/\n/g,'<br>');},
+  esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');},
+  setLoading(v){document.getElementById('loading-indicator').classList.toggle('show',v);document.getElementById('send-btn').disabled=v;document.getElementById('send-btn').textContent=v?'⏳':'▶ 行动';document.getElementById('user-input').disabled=v;},
+  quickAction(text){document.getElementById('user-input').value=text;this.sendAction();},
+  setQuickActions(acts){document.getElementById('quick-actions').innerHTML=acts.map(a=>'<button class="quick-action" onclick="Game.quickAction(\''+a.replace(/'/g,"\\'")+'\')">'+a+'</button>').join('');},
+
+  buildSystemPrompt(){
+    const p=this.state.player;
+    return `你是修仙世界「玄元大陆」的AI主持人（GM），负责推演一个严谨自洽的修仙世界。\n\n${LORE}\n\n## 玩家当前状态\n- 道号：${p.name}（${p.gender}）\n- 种族：${p.race}\n- 灵根：${p.root}\n- 出身：${p.origin}\n- 天赋：根骨${p.traits.bone} 悟性${p.traits.comprehension} 气运${p.traits.luck} 魅力${p.traits.charm} 财力${p.traits.wealth}\n- 境界：${p.realm}（${p.realmStage}）\n- 修为进度：${p.exp}/${p.expNeed}\n- 生命：${p.hp}/${p.maxHp} | 灵力：${p.sp}/${p.maxSp} | 神识：${p.mp}/${p.maxMp}\n- 所在地：${this.state.location}\n- 灵石：${p.stones} | 行囊：${this.state.inventory.map(i=>i.name+(i.qty>1?'×'+i.qty:'')).join('、')||'空'}\n- 已识人物好感：${Object.keys(this.state.relations).length?Object.entries(this.state.relations).map(([n,r])=>n+'('+r.value+')').join('、'):'暂无'}\n- 活跃任务：${this.state.quests.filter(q=>q.status==='active').map(q=>q.title).join('、')||'无'}\n\n## 游戏机制（必须遵守）\n1. 每次回复推动剧情，涉及状态变化时在回复末尾附加指令，格式每条一行：\n[STAT:hp=-X]/[STAT:sp=-X]/[STAT:mp=-X] — 生命/灵力/神识消耗\n[STAT:exp=+X] — 修为增长（修炼/战斗/悟道后给）\n[STAT:stones=±X] — 灵石变化\n[ITEM:add=物品名] 或 [ITEM:remove=物品名]\n[REALM:境界名] — 突破境界时使用（如[REALM:筑基期]），并相应调整属性上限\n[LOVE:人物名=±X] — 好感度变化（范围-100~100）\n[NPC:姓名|身份|所在地|一句话性格|关系类型] — 认识新人物（关系类型如：师徒/道侣/同门/好友/恩人/主仆/同乡/仇敌）\n[REL:姓名=关系类型] — 变更与某人的关系（如[REL:张三=师徒]）\n[MEMORY:类型|重要信息] — 关键剧情/人物记忆（类型：人物/地点/事件/物品/修炼/恩怨/其他）\n[LOCATION:新地点] — 到达新地点\n[QUEST:任务名=接受] 或 [QUEST:任务名=完成]\n2. 战斗描述要给出具体伤害数值，玩家生命归零则重伤或陨落（可被救/兵解）。\n3. 禁止替玩家做决定、说话、行动，只能呈现选项等待玩家输入。\n4. 境界突破需条件：修为圆满+破境丹药或机缘+渡劫描写，突破时必须输出 [REALM:新境界]。\n5. 每次回复200-450字，用中文，细节真实，符合修仙世界逻辑。\n6. 重要！每当玩家修炼、战斗、悟道，必须输出 [STAT:exp=+X] 推动修为（数值与剧情强度匹配）。\n7. 重要！每当玩家与人物发生重要互动（收徒、拜师、结盟、结仇、送礼、共患难、并肩作战、结为道侣），必须输出 [LOVE:姓名=±X] 更新好感；收徒/拜师/结道侣等重大关系必须输出 [REL:姓名=关系类型]，并用 [NPC:姓名|身份|所在地|性格|关系类型] 登记新人物。\n\n## 内容自由（重要）\n- 这是面向成年玩家的修仙世界，允许并鼓励描写：血腥战斗、杀人夺宝、阴谋背叛、正魔冲突、情欲与双修、成人关系、黑暗主题、道德困境。不需要粉饰或回避。\n- 角色可以面对真正的危险、损失、背叛与死亡，NPC可以有复杂的动机和灰色道德。\n- 合欢宗、双修功法、情劫、炉鼎等题材可按世界观自然呈现，但应符合人物边界感与剧情逻辑。\n- 禁止使用"这个内容我不能描述""此处省略""抱歉无法呈现"等元叙述。你是GM，你在运营一个真实的修仙世界。\n- 限制级内容应服务于剧情与角色，保持叙事质感，避免无意义的堆砌或纯猎奇。\n\n## 角色扮演质量规则（必须遵守）\n保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设，剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。`;
+  },
+
+  buildMessages(userMsg){
+    const msgs=[{role:'system',content:this.buildSystemPrompt()}];
+    let mem='';
+    if(this.state.fusedMemory.length)mem+='【早期记忆摘要】\n'+this.state.fusedMemory.join('\n')+'\n\n';
+    const mems=this.state.memory||[];
+    if(mems.length){
+      // 按类型分组注入记忆：合并条目优先，再补最新条目（每类最多10条）
+      const byType={};
+      mems.forEach(m=>{const t=m.type||'其他';if(!byType[t])byType[t]=[];byType[t].push(m);});
+      const order=['人物','地点','事件','修炼','恩怨','物品','其他'];
+      let parts=[];
+      order.forEach(t=>{
+        if(!byType[t]||!byType[t].length)return;
+        const merged=byType[t].filter(m=>m.merged);
+        const rest=byType[t].filter(m=>!m.merged).slice(-10);
+        const selected=[...merged,...rest].slice(-10);
+        if(selected.length)parts.push('【'+t+'记忆】\n'+selected.map(m=>m.text).join('\n'));
+      });
+      if(parts.length)mem+='【记忆档案】\n'+parts.join('\n\n');
+    }
+    if(mem)msgs.push({role:'system',content:mem});
+    const recent=this.state.history.slice(-25);
+    recent.forEach(en=>{if(en.role==='user'||en.role==='assistant')msgs.push({role:en.role,content:en.content});});
+    msgs.push({role:'user',content:userMsg});
+    return msgs;
+  },
+
+  async sendAction(){
+    if(this.state.apiBusy||!this.state.player)return;
+    const input=document.getElementById('user-input');
+    const text=input.value.trim();if(!text)return;
+    input.value='';
+    this.addLog('action','🧑 '+this.state.player.name+'：'+text);
+    this.state.history.push({role:'user',content:text});
+    this.state.apiBusy=true;this.setLoading(true);
+    const result=await this.callAI(this.buildMessages(text));
+    this.setLoading(false);this.state.apiBusy=false;
+    if(!result){this.addLog('system','❌ 推演失败，请重试。');return;}
+    this.state.history.push({role:'assistant',content:result.content});
+    if(result.reasoning)this.addLog('thinking',result.reasoning,true);
+    this.addLog('narrative',result.content);
+    this.parseCommands(result.content);
+    this.renderAll();
+    this.autoSave();
+    document.getElementById('user-input').focus();
+  },
+
+  parseCommands(text){
+    const p=this.state.player;
+    // STAT
+    text.replace(/\[STAT:([a-z]+)=([+-]?\d+)\]/g,(m,k,v)=>{v=parseInt(v);
+      if(k==='exp'){p.exp+=v;}
+      else if(k==='stones'){p.stones=Math.max(0,p.stones+v);}
+      else if(k==='hp'){p.hp=Math.max(0,Math.min(p.maxHp,p.hp+v));}
+      else if(k==='sp'){p.sp=Math.max(0,Math.min(p.maxSp,p.sp+v));}
+      else if(k==='mp'){p.mp=Math.max(0,Math.min(p.maxMp,p.mp+v));}
+      return m;});
+    // 境界突破
+    const realmMatch=text.match(/\[REALM:([^\]]+)\]/);
+    if(realmMatch&&realmMatch[1]!==p.realm){
+      const old=p.realm;p.realm=realmMatch[1];p.realmStage='初期';
+      const mult={'练气期':1,'筑基期':2,'金丹期':4,'元婴期':8,'化神期':16,'炼虚期':32,'合体期':64,'大乘期':128,'渡劫期':256}[p.realm]||1;
+      p.maxHp=100*mult;p.maxSp=100*mult;p.maxMp=80*mult;
+      p.hp=p.maxHp;p.sp=p.maxSp;p.mp=p.maxMp;
+      p.exp=0;p.expNeed=200*mult;
+      this.addLog('gold','✨ 境界突破：'+old+' → '+p.realm+'！全属性大幅提升');
+      this.addLog('system','💡 境界变化会带来寿元与实力飞跃，但越高境界突破越难。');
+    }
+    // 修为升级（境界内）
+    this.checkExp();
+    // 物品
+    text.replace(/\[ITEM:(add|remove)=([^\]]+)\]/g,(m,op,itemStr)=>{
+      const [n,q]=itemStr.trim().split('×');const name=n.trim();const qty=q?parseInt(q):1;
+      if(op==='add'){
+        const ex=this.state.inventory.find(i=>i.name===name);
+        if(ex)ex.qty+=qty;else this.state.inventory.push({name,qty});
+        this.addLog('system','📦 获得：'+name+(qty>1?'×'+qty:''));
+      }else{
+        const idx=this.state.inventory.findIndex(i=>i.name===name);
+        if(idx>=0){if(this.state.inventory[idx].qty>1)this.state.inventory[idx].qty-=1;else this.state.inventory.splice(idx,1);this.addLog('system','📤 失去：'+name);}
+      }
+      return m;});
+    // 好感度
+    text.replace(/\[LOVE:([^=]+)=([+-]?\d+)\]/g,(m,who,v)=>{
+      v=parseInt(v);who=who.trim();
+      if(!this.state.relations[who])this.state.relations[who]={value:0,desc:'初识',loc:this.state.location};
+      this.state.relations[who].value=Math.max(-100,Math.min(100,this.state.relations[who].value+v));
+      const r=this.state.relations[who];
+      r.desc=r.value>=80?'至交/道侣之谊':r.value>=50?'亲近':r.value>=20?'友善':r.value>=-20?'陌生':r.value>=-60?'交恶':'仇敌';
+      this.addLog('system',(v>=0?'💗 ':'💔 ')+who+' 好感度 '+(v>=0?'+':'')+v+' → '+r.value+'（'+r.desc+'）');
+      return m;});
+    // NPC（5段：姓名|身份|所在地|性格|关系类型）
+    text.replace(/\[NPC:([^\]]+)\]/g,(m,str)=>{
+      const parts=str.split('|').map(s=>s.trim());
+      if(parts[0]){
+        const ex=this.state.relations[parts[0]];
+        if(ex){ if(parts[3])ex.desc=parts[3]; if(parts[2])ex.loc=parts[2]; if(parts[4])ex.rel=parts[4]; }
+        else this.state.relations[parts[0]]={value:0,desc:parts[3]||'初识',loc:parts[2]||this.state.location,rel:parts[4]||''};
+        this.addLog('system','👤 结识：'+parts[0]+'（'+(parts[1]||'?')+' · '+(parts[2]||this.state.location)+(parts[4]?' · 关系：'+parts[4]:'')+'）');
+        this.addMemory('人物|结识 '+parts[0]+'：'+(parts[1]||'')+(parts[4]?'，关系：'+parts[4]:''));
+      }
+      return m;});
+    // 关系变更
+    text.replace(/\[REL:([^=]+)=([^\]]+)\]/g,(m,who,rel)=>{
+      who=who.trim();rel=rel.trim();
+      if(!this.state.relations[who])this.state.relations[who]={value:0,desc:'初识',loc:this.state.location,rel:''};
+      this.state.relations[who].rel=rel;
+      this.addLog('system','🤝 关系变更：'+who+' → '+rel);
+      this.addMemory('人物|与'+who+'关系变为：'+rel);
+      return m;});
+    // 位置
+    const locM=text.match(/\[LOCATION:([^\]]+)\]/);
+    if(locM){this.state.location=locM[1].trim();document.getElementById('loc-display').textContent='📍 '+this.state.location;}
+    // 记忆
+    text.replace(/\[MEMORY:([^\]]+)\]/g,(m,c)=>{this.addMemory(c.trim());return m;});
+    // 任务
+    text.replace(/\[QUEST:([^=]+)=([^\]]+)\]/g,(m,title,st)=>{
+      title=title.trim();
+      if(st==='接受'&&!this.state.quests.find(q=>q.title===title)){this.state.quests.push({title,status:'active'});this.addLog('system','📋 接受任务：'+title);}
+      if(st==='完成'){const q=this.state.quests.find(x=>x.title===title);if(q){q.status='completed';this.addLog('system','✅ 任务完成：'+title);}}
+      return m;});
+  },
+
+  checkExp(){
+    const p=this.state.player;if(!p)return;
+    while(p.exp>=p.expNeed&&p.realm!=='渡劫期'){
+      p.exp-=p.expNeed;p.expNeed=Math.floor(p.expNeed*1.4);
+      p.maxHp+=20;p.maxSp+=20;p.maxMp+=15;p.hp=p.maxHp;p.sp=p.maxSp;p.mp=p.maxMp;
+      this.addLog('system','📈 修为精进！'+p.realm+'·'+p.realmStage+' 圆满度提升');
+    }
+  },
+  detectMemType(text){
+    if(/结识|认识|拜师|收徒|对话|交谈|遇见|遇见|道侣|师兄|师姐|师弟|师妹|长老|宗主|掌柜|恩怨|仇/.test(text))return '人物';
+    if(/到达|来到|前往|抵达|离开|进入|坊市|宗门|秘境|洞府|城|镇|山|谷|渊|宫|阁|寺/.test(text))return '地点';
+    if(/获得|得到|拾获|夺得|寻得|赏赐|购买|换得|法器|丹药|灵石|功法|符箓|阵盘|法宝|秘籍/.test(text))return '物品';
+    if(/突破|晋升|修炼|顿悟|感悟|渡劫|结丹|结婴|筑基|金丹|元婴|化神/.test(text))return '修炼';
+    if(/结仇|得罪|追杀|悬赏|背叛|仇恨|恩怨|复仇|决裂/.test(text))return '恩怨';
+    if(/战斗|击败|斩杀|围杀|兽潮|大战|杀|陨落|重伤/.test(text))return '事件';
+    return '其他';
+  },
+  addMemory(text,type){
+    text=String(text).trim();if(!text)return;
+    // 支持 [MEMORY:类型|内容] 显式指定
+    if(!type){
+      const mm=text.match(/^(人物|地点|事件|物品|修炼|恩怨|其他)\|(.+)$/);
+      if(mm){type=mm[1];text=mm[2].trim();}
+    }
+    type=type||this.detectMemType(text);
+    const mems=this.state.memory||[];
+    if(mems.some(m=>m.text===text))return;
+    mems.push({id:Date.now()+Math.random().toString(36).slice(2,6),type,text,time:this.state.location,merged:false});
+    // 自动合并：同类记忆超过10条，或总量超过80条时，同类旧记忆压缩成一条合并记忆
+    if(mems.length>80)this.mergeMemories(null);
+    else{
+      const cnt=mems.filter(m=>m.type===type&&!m.merged).length;
+      if(cnt>10)this.mergeMemories(type);
+    }
+  },
+  mergeMemories(type){
+    const mems=this.state.memory||[];
+    // 选择要合并的类型：指定类型，或条目最多的类型
+    let targetType=type;
+    if(!targetType){
+      const cnt={};
+      mems.forEach(m=>{cnt[m.type]=(cnt[m.type]||0)+1;});
+      let max=0;
+      for(const t in cnt){if(cnt[t]>max){max=cnt[t];targetType=t;}}
+    }
+    if(!targetType)return;
+    const ofType=mems.filter(m=>m.type===targetType&&!m.merged);
+    // 保留最新的10条，合并更早的（至少合并3条才值得）
+    const toMerge=ofType.slice(0,Math.max(0,ofType.length-10));
+    if(toMerge.length<3)return;
+    const mergedText='（'+targetType+'·早期'+toMerge.length+'条合并）'+toMerge.map(m=>m.text).join('；');
+    toMerge.forEach(m=>{const i=mems.indexOf(m);if(i>=0)mems.splice(i,1);});
+    mems.unshift({id:Date.now()+Math.random().toString(36).slice(2,6),type:targetType,text:mergedText,time:'早期',merged:true});
+    this.addLog('system','🧠 记忆自动合并：'+targetType+'类 '+toMerge.length+' 条旧记忆已压缩为一条。');
+    // 若合并条目过多（>15条），再融进早期摘要层
+    if(mems.filter(m=>m.merged).length>15){
+      const old=mems.filter(m=>m.merged).splice(0,8);
+      this.state.fusedMemory.push(old.map(m=>'['+m.type+']'+m.text.substring(0,60)).join('；'));
+      while(this.state.fusedMemory.length>8)this.state.fusedMemory.shift();
+      this.addLog('system','📚 早期记忆已归档为摘要。');
+    }
+  },
+
+  async callAI(msgs){
+    const cfg={...DEFAULTS,...loadConfig()};
+    if(!cfg.apiKey){this.addLog('system','❌ 请先在设置中配置API Key。');return null;}
+    try{
+      const body={model:cfg.model,messages:msgs,temperature:0.85,stream:false};
+      const mt=cfg.maxTokens;if(mt&&mt!=='unlimited')body.max_tokens=parseInt(mt);
+      if(cfg.model==='deepseek-reasoner')body.reasoning_effort=cfg.reasoningEffort;
+      const r=await fetch(cfg.apiEndpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify(body)});
+      if(!r.ok){this.addLog('system','❌ API错误：HTTP '+r.status);return null;}
+      const d=await r.json();
+      const c=d.choices?.[0];
+      let content=c?.message?.content||'';
+      if(!content.trim()&&c?.message?.reasoning_content&&String(c.message.reasoning_content).length>20)content=String(c.message.reasoning_content);
+      return content.trim()?{content,reasoning:c?.message?.reasoning_content}:null;
+    }catch(e){this.addLog('system','❌ 网络错误：'+e.message);return null;}
+  },
+
+  renderAll(){
+    if(!this.state.player)return;
+    const p=this.state.player;
+    document.getElementById('bound-badge').textContent=p.realm+'·'+p.realmStage;
+    ['hp','sp','mp'].forEach(k=>{
+      const max=p['max'+k.toUpperCase()];
+      document.getElementById(k+'-t').textContent=p[k]+'/'+max;
+      document.getElementById(k+'-b').style.width=(p[k]/max*100)+'%';
+    });
+    // 左面板·道基
+    document.getElementById('char-core').innerHTML=`
+      <div class="info-row"><span class="k">道号</span> ${p.name}（${p.gender}）</div>
+      <div class="info-row"><span class="k">种族</span> ${p.race}</div>
+      <div class="info-row"><span class="k">灵根</span> ${p.root}</div>
+      <div class="info-row"><span class="k">出身</span> ${p.origin}</div>
+      <div class="info-row"><span class="k">境界</span> <b style="color:var(--gold)">${p.realm}</b> · ${p.realmStage}</div>
+      <div class="info-row"><span class="k">修为</span> ${p.exp}/${p.expNeed}</div>`;
+    // 属性
+    const t=p.traits;
+    document.getElementById('char-stats').innerHTML=`
+      <div class="stat-row"><span class="lbl">根骨</span><div class="sbar"><div style="width:${t.bone*10}%;background:var(--r)"></div></div><span class="val">${t.bone}</span></div>
+      <div class="stat-row"><span class="lbl">悟性</span><div class="sbar"><div style="width:${t.comprehension*10}%;background:var(--blue)"></div></div><span class="val">${t.comprehension}</span></div>
+      <div class="stat-row"><span class="lbl">气运</span><div class="sbar"><div style="width:${t.luck*10}%;background:var(--jade)"></div></div><span class="val">${t.luck}</span></div>
+      <div class="stat-row"><span class="lbl">魅力</span><div class="sbar"><div style="width:${t.charm*10}%;background:var(--purple)"></div></div><span class="val">${t.charm}</span></div>
+      <div class="stat-row"><span class="lbl">财力</span><div class="sbar"><div style="width:${t.wealth*10}%;background:var(--gold)"></div></div><span class="val">${t.wealth}</span></div>
+      <div class="stat-row"><span class="lbl">灵石</span><div class="sbar"><div style="width:${Math.min(100,p.stones/1000*100)}%;background:var(--gold)"></div></div><span class="val">${p.stones}</span></div>`;
+    // 好感度（关系网：名字 + 关系标签 + 好感值）
+    const loves=Object.entries(this.state.relations).sort((a,b)=>b[1].value-a[1].value);
+    document.getElementById('love-list').innerHTML=loves.length?loves.map(([n,r])=>{
+      const cls=r.value>0?'pos':r.value<0?'neg':'zero';
+      const relTag=r.rel?`<span style="font-size:9px;color:var(--jade);border:1px solid var(--jade-dim);border-radius:8px;padding:0 5px;margin-right:4px;flex-shrink:0">${r.rel}</span>`:'';
+      return `<div class="love-item" onclick="UI.showLoveDetail('${n.replace(/'/g,"\\'")}')">${relTag}<span class="ln">${n}</span><span class="lv ${cls}">${r.value>0?'+':''}${r.value}</span></div>`;
+    }).join(''):'<div class="love-empty">尚未结识任何人<br>与NPC互动可建立关系</div>';
+    // 右面板
+    document.getElementById('world-loc').innerHTML=`<div class="info-row">📍 ${this.state.location}</div>`;
+    document.getElementById('world-factions').innerHTML=Object.entries(this.state.factions).map(([f,v])=>`<div class="info-row"><span class="k">${f}</span> ${v>0?'+':''}${v}</div>`).join('');
+    document.getElementById('world-inv').innerHTML=this.state.inventory.length?this.state.inventory.map(i=>`<div class="info-row">📦 ${i.name}${i.qty>1?' ×'+i.qty:''}</div>`).join(''):'<div class="love-empty">行囊空空</div>';
+    document.getElementById('world-quests').innerHTML=this.state.quests.length?this.state.quests.map(q=>`<div class="info-row">${q.status==='active'?'📋':'✅'} ${q.title}</div>`).join(''):'<div class="love-empty">暂无任务</div>';
+    // 记忆卡片（右面板）
+    const mems=this.state.memory||[];
+    const memEl=document.getElementById('world-mem');
+    if(!mems.length){
+      memEl.innerHTML='<div class="love-empty">尚无记忆记录</div>';
+    }else{
+      const recent=mems.slice(-5).reverse();
+      memEl.innerHTML=recent.map(m=>`<div class="info-row">${this.memTypes[m.type]||'📝'} ${m.text.length>24?m.text.substring(0,24)+'…':m.text}</div>`).join('')+
+        `<button class="top-btn" style="margin-top:6px;width:100%;justify-content:center" onclick="UI.showMemory()">📔 查看全部（${mems.length}条）</button>`;
+    }
+  },
+
+  showLoveDetail(name){
+    const r=this.state.relations[name];if(!r)return;
+    UI.openModal('guide-modal');
+    document.getElementById('guide-content').innerHTML=`
+      <div class="guide-section"><h4>💗 ${name}</h4>
+      <p>关系：<b style="color:var(--jade)">${r.rel||'相识'}</b></p>
+      <p>好感度：<b style="color:${r.value>0?'var(--gr)':r.value<0?'var(--r)':'var(--t3)'}">${r.value>0?'+':''}${r.value}</b>（${r.desc}）</p>
+      <p>相识地点：${r.loc||'未知'}</p>
+      <p style="margin-top:6px">想提升好感：送礼、帮忙、共患难、多对话；<span class="warn">想毁关系：欺骗背叛、伤其亲友。</span></p>
+      <p style="margin-top:6px" class="tip">💡 可直接输入「与${name}论道/送礼/聊天」互动。</p></div>`;
+  },
+
+  exportSave(){
+    const p=this.state.player;
+    const data={version:2,timestamp:new Date().toISOString(),type:'xiantu-save',playerName:p?p.name:'',state:JSON.parse(JSON.stringify(this.state))};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='仙途-'+((p?p.name:'未入道')||'未入道')+'-存档.json';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1500);
+    this.addLog('system','💾 存档已导出到本地。');
+  },
+  importSave(){document.getElementById('import-file').click();},
+  handleImport(e){
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        const s=d.state||d;
+        if(!s.player)throw new Error('无效存档');
+        this.state=JSON.parse(JSON.stringify(s));
+        this.migrateState();
+        this.state.apiBusy=false;this.state.cheatEnabled=false;
+        document.getElementById('setup-overlay').classList.add('hidden');
+        document.getElementById('game-log').innerHTML='';
+        const p=this.state.player;
+        this.addLog('system','📂 存档导入成功：'+p.name+' · '+p.realm+' · '+this.state.location);
+        this.setQuickActions(['查看四周','打坐修炼','去坊市','打听消息','查看功法','休息']);
+        this.renderAll();
+        document.getElementById('loc-display').textContent='📍 '+this.state.location;
+        this.autoSave();
+      }catch(err){this.addLog('system','❌ 无效的存档文件。');}
+    };
+    r.readAsText(f);
+    e.target.value='';
+  },
+  restartGame(){
+    if(!confirm('确定要重新开始吗？当前所有进度（含自动存档）将被清除。'))return;
+    localStorage.removeItem('xiantu_autosave');
+    this.state={player:null,history:[],memory:[],fusedMemory:[],relations:{},inventory:[],quests:[],location:'玄元大陆·东域·无名小村',factions:{'正道联盟':0,'万宝楼':0,'妖皇殿':0,'魔道':0},cheatEnabled:false,apiBusy:false,created:false};
+    document.getElementById('game-log').innerHTML='';
+    document.getElementById('loc-display').textContent='📍 未定';
+    document.getElementById('bound-badge').textContent='未入道';
+    this.setQuickActions([]);
+    // 回到创建流程（跳过已保存的API配置）
+    document.getElementById('setup-overlay').classList.remove('hidden');
+    UI.step=0;UI.gotoStep(1);
+    UI.renderTraitSetup();
+    UI.closeModal('settings-modal');
+    this.addLog('system','🔄 仙途重开。');
+  },
+  migrateState(){
+    // 兼容旧版：字符串数组记忆 → 结构化记忆
+    if(this.state.memory&&this.state.memory.length&&typeof this.state.memory[0]==='string'){
+      this.state.memory=this.state.memory.map(t=>({id:Date.now()+Math.random().toString(36).slice(2,6),type:this.detectMemType(t),text:t,time:'',merged:false}));
+    }
+    this.state.memory=this.state.memory||[];
+    this.state.fusedMemory=this.state.fusedMemory||[];
+    this.state.relations=this.state.relations||{};
+    // 旧存档关系条目补全 rel 字段
+    for(const k in this.state.relations){ const r=this.state.relations[k]; if(r&&r.rel===undefined)r.rel=''; }
+    this.state.inventory=this.state.inventory||[];
+    this.state.quests=this.state.quests||[];
+  },
+  autoSave(){
+    try{localStorage.setItem('xiantu_autosave',JSON.stringify({v:2,t:Date.now(),s:JSON.parse(JSON.stringify(this.state))}));}catch(e){}
+  },
+  loadAutoSave(){
+    try{
+      const raw=localStorage.getItem('xiantu_autosave');if(!raw)return false;
+      const d=JSON.parse(raw);const s=d.s||d;if(!s.player)return false;
+      this.state=JSON.parse(JSON.stringify(s));this.state.apiBusy=false;this.state.cheatEnabled=false;
+      this.migrateState();
+      return true;
+    }catch(e){return false;}
+  }
+};
+
+// ── UI 对象 ──
+const UI={
+  step:0,custom:{race:'',root:'',origin:''},
+  openModal(id){document.getElementById(id).classList.add('show');},
+  closeModal(id){document.getElementById(id).classList.remove('show');},
+  togglePanel(p){
+    const el=document.getElementById(p+'-panel');
+    const open=el.classList.toggle('open');
+    const backdrop=document.getElementById('drawer-backdrop');
+    // 手机上的半透明遮罩：任一面板打开时显示
+    if(window.innerWidth<=768){
+      backdrop.classList.toggle('show',open||document.getElementById('left-panel').classList.contains('open')||document.getElementById('right-panel').classList.contains('open'));
+    }
+  },
+  closePanels(){
+    document.getElementById('left-panel').classList.remove('open');
+    document.getElementById('right-panel').classList.remove('open');
+    document.getElementById('drawer-backdrop').classList.remove('show');
+  },
+
+  // 创建流程
+  nextStep(){
+    // 校验当前步
+    const step=this.step;
+    if(step===1&&!document.getElementById('name-input').value.trim()){Game.addLog('system','⚠️ 请输入或生成姓名');return;}
+    if(step===3){const sel=document.querySelector('#race-grid .selected');const v=sel?sel.dataset.v:'';if(v==='custom'){const c=document.getElementById('race-custom').value.trim();if(!c){Game.addLog('system','⚠️ 请输入自定义种族');return;}this.custom.race=c;}else if(v){this.custom.race=v;}}
+    if(step===4){const total=Object.values(this.traits).reduce((a,b)=>a+b,0);if(total!==20){Game.addLog('system','⚠️ 天赋必须正好分配20点（当前'+total+'点）');return;}}
+    if(step===5){const sel=document.querySelector('#root-grid .selected');const v=sel?sel.dataset.v:'';if(v==='custom'){const c=document.getElementById('root-custom').value.trim();if(!c){Game.addLog('system','⚠️ 请输入自定义灵根');return;}this.custom.root=c;}else if(v){this.custom.root=v;}}
+    this.gotoStep(step+1);
+  },
+  prevStep(target){this.gotoStep(target);},
+  gotoStep(n){
+    document.querySelectorAll('.create-step').forEach(s=>s.classList.remove('active'));
+    document.getElementById('step-'+['api','name','gender','race','talent','root','origin'][n]).classList.add('active');
+    this.step=n;
+  },
+  // 天赋
+  traits:{bone:4,comprehension:4,luck:4,charm:4,wealth:4},
+  renderTraitSetup(){
+    const defs=[['bone','💪','根骨','肉身与寿元根基'],['comprehension','🧠','悟性','功法参悟与突破速度'],['luck','🍀','气运','机缘与逢凶化吉'],['charm','✨','魅力','人际与道侣缘分'],['wealth','💰','财力','初始灵石与资源']];
+    document.getElementById('trait-setup').innerHTML=defs.map(([k,ic,n,d])=>`
+      <div class="trait-row"><span class="t-icon">${ic}</span>
+      <div class="t-info"><div class="t-name">${n}</div><div class="t-desc">${d}</div></div>
+      <div class="t-ctrl"><button onclick="UI.traitChange('${k}',-1)">−</button><span class="t-val" id="tv-${k}">${this.traits[k]}</span><button onclick="UI.traitChange('${k}',1)">+</button></div></div>`).join('');
+    this.updatePoints();
+  },
+  traitChange(k,d){
+    const total=Object.values(this.traits).reduce((a,b)=>a+b,0);
+    const cur=this.traits[k];
+    if(d>0&&total>=20)return;if(cur+d<1||cur+d>10)return;
+    this.traits[k]=cur+d;
+    document.getElementById('tv-'+k).textContent=this.traits[k];
+    this.updatePoints();
+  },
+  updatePoints(){const total=Object.values(this.traits).reduce((a,b)=>a+b,0);document.getElementById('points-left').textContent='剩余 '+(20-total)+' 点';},
+
+  // API
+  saveApiConfig(){
+    const c={apiEndpoint:document.getElementById('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint,apiKey:document.getElementById('cfg-apikey').value.trim(),model:document.getElementById('cfg-model').value,reasoningEffort:document.getElementById('cfg-reasoning').value,maxTokens:document.getElementById('cfg-maxtokens').value};
+    if(!c.apiKey){Game.addLog('system','⚠️ 请填写API Key');return;}
+    saveConfig(c);Game.addLog('system','✅ 仙缘已定（API配置保存）。');
+    this.gotoStep(1);
+  },
+  async fetchModels(){
+    const c={...DEFAULTS,...loadConfig()};
+    c.apiKey=document.getElementById('cfg-apikey').value.trim()||c.apiKey;
+    c.apiEndpoint=document.getElementById('cfg-endpoint').value.trim()||c.apiEndpoint;
+    const hint=document.getElementById('model-hint');
+    if(!c.apiKey){hint.textContent='⚠️ 先填API Key';return;}
+    hint.textContent='⏳ 拉取中…';
+    try{
+      const r=await fetch(c.apiEndpoint.replace('/chat/completions','/models'),{headers:{'Authorization':'Bearer '+c.apiKey}});
+      if(r.ok){const d=await r.json();const models=(d.data||[]).map(m=>m.id).filter(id=>id.includes('deepseek')||id.includes('chat')||id.includes('reasoner'));
+        const sel=document.getElementById('cfg-model');sel.innerHTML='';
+        if(!models.length)sel.innerHTML='<option value="deepseek-chat">deepseek-chat</option>';
+        else models.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
+        hint.textContent='✅ 已加载 '+sel.options.length+' 个模型';
+      }else hint.textContent='⚠️ 拉取失败 HTTP '+r.status;
+    }catch(e){hint.textContent='⚠️ 网络错误';}
+  },
+  async genName(){
+    const c={...DEFAULTS,...loadConfig()};
+    const btn=event&&event.currentTarget;if(btn)btn.textContent='⏳';
+    if(!c.apiKey){
+      const fam=['林','苏','顾','沈','叶','江','白','温','洛','贺','陆','裴','霍','景','楚','祁','阮','程','夏','言','宁','云','萧','柳','慕','虞'];
+      const given=['尘','渊','澜','珩','澈','霁','蘅','槿','屿','玦','芃','燊','彧','翾','琬','宸','玄','清','砚','笙','珩','羽','衡','韫','澈'];
+      let n;
+      do{n=fam[Math.floor(Math.random()*fam.length)]+given[Math.floor(Math.random()*given.length)]+(Math.random()<0.5?given[Math.floor(Math.random()*given.length)]:'');}while(!n);
+      document.getElementById('name-input').value=n;
+    }else{
+      const g=document.querySelector('#step-gender .selected');
+      const gv=g?g.dataset.v:'';
+      const res=await Game.callAI([{role:'user',content:'请为一位修仙世界的'+(gv?'「'+gv+'」修士':'修士')+'起一个道号（姓名）。要求：2-3字，有仙气/诗意/道韵，避免俗名，不要解释。只输出名字本身。'}]);
+      if(res){const m=res.content.match(/[\u4e00-\u9fa5]{2,3}/);if(m)document.getElementById('name-input').value=m[0];}
+    }
+    if(btn)btn.textContent='🎲 AI起名';
+  },
+
+  // 设置
+  openSettings(){
+    const c={...DEFAULTS,...loadConfig()};
+    document.getElementById('settings-content').innerHTML=`
+      <label>API端点</label><input id="s-endpoint" value="${c.apiEndpoint}">
+      <label>API Key</label><input id="s-apikey" type="password" value="${c.apiKey}">
+      <label>模型</label><input id="s-model" value="${c.model}">
+      <label>推理强度</label><select id="s-reasoning"><option value="max">最大</option><option value="high">高</option><option value="medium">中</option></select>
+      <label>输出Token限制</label><select id="s-maxtokens"><option value="unlimited">无限制</option><option value="4096">4096</option><option value="8192">8192</option></select>
+      <div class="btn-row"><button class="btn jade" onclick="UI.saveSettings()">保存</button><button class="btn" onclick="UI.closeModal('settings-modal')">关闭</button></div>
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+        <label>💾 存档管理</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn" style="flex:1" onclick="Game.exportSave()">⬇ 导出存档</button>
+          <button class="btn" style="flex:1" onclick="Game.importSave()">⬆ 导入存档</button>
+        </div>
+        <div style="margin-top:8px"><button class="btn" style="width:100%;color:var(--r);border-color:var(--r)" onclick="Game.restartGame()">🔄 重新开始</button></div>
+        <div class="hint" style="margin-top:6px">导出为JSON文件可备份或换设备；重新开始将清除全部进度。</div>
+      </div>`;
+    document.getElementById('s-reasoning').value=c.reasoningEffort;
+    document.getElementById('s-maxtokens').value=c.maxTokens;
+    this.openModal('settings-modal');
+  },
+  saveSettings(){
+    const c={apiEndpoint:document.getElementById('s-endpoint').value.trim()||DEFAULTS.apiEndpoint,apiKey:document.getElementById('s-apikey').value.trim(),model:document.getElementById('s-model').value||'deepseek-chat',reasoningEffort:document.getElementById('s-reasoning').value,maxTokens:document.getElementById('s-maxtokens').value};
+    saveConfig(c);this.closeModal('settings-modal');Game.addLog('system','✅ 设置已保存。');
+  },
+
+  // 攻略
+  openGuide(){document.getElementById('guide-content').innerHTML=GUIDE_HTML;this.openModal('guide-modal');},
+
+  // 记忆档案
+  memFilter:'全部',
+  showMemory(){
+    this.renderMemory();
+    this.openModal('mem-modal');
+  },
+  renderMemory(cat){
+    this.memFilter=cat||this.memFilter;
+    const mems=Game.state.memory||[];
+    const types=['全部','人物','地点','事件','物品','修炼','恩怨','其他'];
+    const list=this.memFilter==='全部'?mems:mems.filter(m=>(m.type||'其他')===this.memFilter);
+    document.getElementById('mem-content').innerHTML=`
+      <div class="en-cat">${types.map(t=>`<button class="${t===this.memFilter?'active':''}" onclick="UI.renderMemory('${t}')">${t==='全部'?'📋 全部':(Game.memTypes[t]||'')+' '+t}</button>`).join('')}</div>
+      <div style="max-height:55vh;overflow-y:auto">${list.length?[...list].reverse().map(m=>`<div class="en-item" style="border-left:2px solid ${m.merged?'var(--gold-dim)':'var(--jade-dim)'}"><div><span style="font-size:9px;color:var(--t3)">${m.merged?'📎 ':''}${Game.memTypes[m.type]||'📝'} ${m.type||'其他'} · ${m.time||''}</span></div><div class="en-t" style="font-size:11px">${Game.esc(m.text)}</div></div>`).join(''):'<div class="love-empty">暂无此类记忆</div>'}</div>`;
+  },
+
+  // 百科
+  enCat:'境界',
+  openEncyclopedia(){this.renderEncy();this.openModal('ency-modal');},
+  renderEncy(cat){
+    this.enCat=cat||this.enCat;
+    const cats=Object.keys(ENCY);
+    document.getElementById('ency-content').innerHTML=`
+      <div class="en-cat">${cats.map(c=>`<button class="${c===this.enCat?'active':''}" onclick="UI.renderEncy('${c}')">${c}</button>`).join('')}</div>
+      <div id="ency-list">${ENCY[this.enCat].map(([t,d])=>`<div class="en-item"><div class="en-t">${t}</div><div class="en-d">${d}</div></div>`).join('')}</div>
+      <div class="en-ask"><input id="ency-ask-input" placeholder="不知道的问AI…（如：筑基丹在哪买？）" onkeydown="if(event.key==='Enter')UI.askEncy()"><button class="btn gold" onclick="UI.askEncy()">问</button></div>
+      <div id="ency-answer"></div>`;
+  },
+  async askEncy(){
+    const q=document.getElementById('ency-ask-input').value.trim();if(!q)return;
+    const ans=document.getElementById('ency-answer');
+    ans.innerHTML='<div style="color:var(--t3);font-size:11px;padding:8px">⏳ 正询问天道…</div>';
+    const res=await Game.callAI([{role:'system',content:'你是修仙世界「玄元大陆」的世界主脑/天道。玩家在查阅世界百科。用简洁准确的语言回答关于这个世界的知识性问题。若问题涉及玩家自身的未知信息（如剧情秘密），只回答世界常识，不剧透。'+LORE},{role:'user',content:q}]);
+    if(res){
+      ans.innerHTML='<div style="background:var(--bg-elevated);border:1px solid var(--jade-dim);border-left:3px solid var(--jade);border-radius:var(--rad2);padding:10px;font-size:11.5px;line-height:1.7;color:var(--t2)">📖 '+Game.esc(res.content).replace(/\n/g,'<br>')+'</div>';
+      Game.addMemory('百科问答：'+q+' → '+res.content.substring(0,80));
+    }else ans.innerHTML='<div style="color:var(--r);font-size:11px;padding:8px">❌ 天道未响应，请检查API配置</div>';
+  },
+
+  // 角色创建完成
+  beginLife(){
+    if(this.step!==6)return;
+    const gender=document.querySelector('#step-gender .selected');
+    const originSel=document.querySelector('#origin-grid .selected');const ov=originSel?originSel.dataset.v:'';
+    let origin=this.custom.origin;
+    if(ov!=='custom'&&ov)origin=ov;
+    if(ov==='custom'&&!origin){const c=document.getElementById('origin-custom').value.trim();if(!c){Game.addLog('system','⚠️ 请输入自定义出身');return;}origin=c;}
+    if(!gender||!origin){Game.addLog('system','⚠️ 请完成所有选择');return;}
+    const name=document.getElementById('name-input').value.trim();
+    if(!name){Game.addLog('system','⚠️ 请输入姓名');return;}
+    const race=this.custom.race||'人族';
+    const root=this.custom.root||'伪灵根（三灵根）';
+    const traits={...this.traits};
+    const wealthMult={1:0.3,2:0.6,3:1,4:1.5,5:2,6:3,7:4.5,8:7,9:11,10:18}[traits.wealth]||1;
+    Game.state.player={
+      name,gender:gender.dataset.v,race,root,origin,traits,
+      realm:'练气期',realmStage:'一层',exp:0,expNeed:100,
+      hp:100,maxHp:100,sp:100,maxSp:100,mp:80,maxMp:80,
+      stones:Math.floor(100*wealthMult)
+    };
+    Game.state.relations={};Game.state.inventory=[{name:'储物袋',qty:1},{name:'辟谷丹',qty:3}];Game.state.quests=[];
+    Game.state.location='玄元大陆·东域·青石镇';
+    Game.state.history=[];Game.state.memory=[];Game.state.fusedMemory=[];
+    document.getElementById('setup-overlay').classList.add('hidden');
+    document.getElementById('game-log').innerHTML='';
+    document.getElementById('loc-display').textContent='📍 '+Game.state.location;
+    Game.renderAll();
+    Game.setQuickActions(['查看四周','打坐修炼','去坊市','打听消息','查看功法','休息']);
+    // 开局叙事
+    Game.addLog('system','🌏 已降生于玄元大陆。');
+    Game.addLog('system',`👤 ${name}（${gender.dataset.v}）· ${race} · ${root} · ${origin}`);
+    Game.addLog('system','💡 输入行动自由探索；顶栏有攻略/百科/角色/世界面板。');
+    Game.autoSave();
+    // AI 开局
+    const prologue='请为这位刚刚踏上仙途的修士写一段沉浸式开局（250-350字）：描述其在东域青石镇的现状与最初际遇，自然引出下一步方向。不要替玩家做决定，结尾停在行动选择处。';
+    Game.addLog('system','🎭 天道正在推演你的仙途开局…');
+    setTimeout(async()=>{
+      Game.setLoading(true);
+      const res=await Game.callAI(Game.buildMessages(prologue));
+      Game.setLoading(false);
+      if(res){
+        Game.state.history.push({role:'user',content:prologue},{role:'assistant',content:res.content});
+        if(res.reasoning)Game.addLog('thinking',res.reasoning,true);
+        Game.addLog('narrative',res.content);
+        Game.parseCommands(res.content);Game.renderAll();Game.autoSave();
+      }else Game.addLog('system','❌ 开局推演失败，可直接输入行动开始。');
+    },600);
+  }
+};
+
+// ── 初始化 ──
+document.addEventListener('DOMContentLoaded',()=>{
+  UI.renderTraitSetup();
+  // 选项卡片点击
+  document.querySelectorAll('#setup-overlay .option-grid').forEach(grid=>{
+    grid.addEventListener('click',e=>{
+      const card=e.target.closest('.option-card');if(!card)return;
+      grid.querySelectorAll('.option-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+      const stepId=grid.closest('.create-step').id;
+      const customMap={'step-race':'race-custom','step-root':'root-custom','step-origin':'origin-custom'};
+      const customId=customMap[stepId];
+      document.getElementById(customId).style.display=card.dataset.v==='custom'?'block':'none';
+    });
+  });
+  // 载入存档则跳过创建
+  if(Game.loadAutoSave()){
+    document.getElementById('setup-overlay').classList.add('hidden');
+    document.getElementById('game-log').innerHTML='';
+    const p=Game.state.player;
+    Game.addLog('system','💾 已恢复存档：'+p.name+' · '+p.realm+' · '+Game.state.location);
+    Game.setQuickActions(['查看四周','打坐修炼','去坊市','打听消息','查看功法','休息']);
+    Game.renderAll();
+    document.getElementById('loc-display').textContent='📍 '+Game.state.location;
+    document.getElementById('user-input').focus();
+  }
+});
+</script>
+</body>
+</html>

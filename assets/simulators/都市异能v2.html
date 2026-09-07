@@ -1,0 +1,2121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>都市异能 · Urban Awakening</title>
+<style>
+/* ===== CSS Variables ===== */
+:root {
+  --bg-deep: #08081a; --bg-surface: #101022; --bg-elevated: #181830;
+  --bg-hover: #202040; --border: #282850; --border-active: #3a3a60;
+  --text-primary: #e8e8f4; --text-secondary: #a0a0c0; --text-muted: #6a6a8a;
+  --accent: #00d4f0; --accent-dim: #0080a0; --accent-glow: rgba(0,212,240,0.15);
+  --gold: #f0a828; --gold-dim: #b87818; --gold-glow: rgba(240,168,40,0.2);
+  --danger: #e85058; --success: #28d068; --warning: #e8b028; --purple: #a070f0;
+  --hp: #e85058; --sp: #50a0f0; --xp: #a0d030;
+  --radius-sm: 5px; --radius: 8px; --radius-lg: 14px;
+  --shadow: 0 6px 32px rgba(0,0,0,0.5);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  --transition: 180ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-primary);line-height:1.55;-webkit-font-smoothing:antialiased;user-select:none}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea{background:var(--bg-surface);border:1px solid var(--border);color:var(--text-primary);border-radius:var(--radius-sm);padding:8px 12px;outline:none;transition:border var(--transition)}
+input:focus,textarea:focus{border-color:var(--accent-dim)}
+
+/* ===== Layout ===== */
+#app{display:grid;grid-template-columns:1fr;grid-template-rows:46px 1fr;height:100vh;gap:1px;background:var(--border)}
+#topbar{grid-column:1;grid-row:1;background:var(--bg-surface);display:flex;align-items:center;padding:0 12px;gap:8px;border-bottom:1px solid var(--border);z-index:20}
+#center-panel{grid-column:1;grid-row:2;background:var(--bg-deep);display:flex;flex-direction:column;overflow:hidden;position:relative}
+
+/* Side drawers */
+#left-panel{position:fixed;left:0;top:46px;bottom:0;width:290px;background:var(--bg-surface);z-index:40;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:6px;transform:translateX(-100%);transition:transform 220ms ease;border-right:1px solid var(--border);box-shadow:4px 0 20px rgba(0,0,0,0.3)}
+#left-panel.open{transform:translateX(0)}
+#right-panel{position:fixed;right:0;top:46px;bottom:0;width:310px;background:var(--bg-surface);z-index:40;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:6px;transform:translateX(100%);transition:transform 220ms ease;border-left:1px solid var(--border);box-shadow:-4px 0 20px rgba(0,0,0,0.3)}
+#right-panel.open{transform:translateX(0)}
+.drawer-backdrop{position:fixed;inset:0;top:46px;background:rgba(0,0,0,0.4);z-index:39;display:none}
+.drawer-backdrop.show{display:block}
+
+/* ===== Top Bar ===== */
+#topbar .logo{font-size:14px;font-weight:700;letter-spacing:0.5px;color:var(--accent);white-space:nowrap}
+#topbar .logo span{color:var(--text-secondary);font-weight:400;font-size:11px;margin-left:4px}
+#topbar .spacer{flex:1}
+.top-btn{padding:5px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;transition:all var(--transition);border:1px solid var(--border);color:var(--text-secondary);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.top-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-active)}
+.top-btn.accent{border-color:var(--accent-dim);color:var(--accent)}
+.top-btn.accent:hover{background:var(--accent-glow)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+.top-btn.gold.active{background:var(--gold);color:#000;border-color:var(--gold);font-weight:600;box-shadow:0 0 12px var(--gold-glow)}
+.top-btn svg{width:14px;height:14px;flex-shrink:0}
+
+/* ===== Panel Cards ===== */
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:10px}
+.panel-card h3{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);margin-bottom:8px}
+
+/* ===== Character Panel ===== */
+.char-header{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.char-avatar{width:42px;height:42px;border-radius:var(--radius);background:linear-gradient(135deg,var(--accent-dim),var(--purple));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.char-name{font-size:13px;font-weight:600}
+.char-level{font-size:10px;color:var(--text-muted)}
+.char-meta{font-size:10px;color:var(--text-muted);margin-top:1px}
+.stat-row{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.stat-label{font-size:10px;color:var(--text-muted);width:32px;flex-shrink:0}
+.stat-bar-wrap{flex:1;height:12px;background:var(--bg-deep);border-radius:3px;overflow:hidden;position:relative}
+.stat-bar-fill{height:100%;border-radius:3px;transition:width 400ms ease}
+.stat-bar-fill.hp{background:var(--hp)} .stat-bar-fill.sp{background:var(--sp)} .stat-bar-fill.xp{background:var(--xp)}
+.stat-val{font-size:10px;color:var(--text-secondary);width:48px;text-align:right;flex-shrink:0;font-family:var(--font-mono)}
+
+.ability-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.ability-item{background:var(--bg-deep);border-radius:var(--radius-sm);padding:7px;text-align:center}
+.ability-item .val{font-size:17px;font-weight:700;font-family:var(--font-mono)}
+.ability-item .lbl{font-size:9px;color:var(--text-muted);margin-top:1px}
+.ability-item .val.combat{color:var(--danger)} .ability-item .val.perception{color:var(--accent)}
+.ability-item .val.manipulation{color:var(--purple)} .ability-item .val.resistance{color:var(--success)}
+
+.credits-row{display:flex;align-items:center;justify-content:space-between;padding:3px 0}
+.credits-row .val{font-size:14px;font-weight:700;color:var(--gold);font-family:var(--font-mono)}
+.inv-list{max-height:140px;overflow-y:auto}
+.inv-item{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:var(--radius-sm);font-size:11px;transition:background var(--transition)}
+.inv-item:hover{background:var(--bg-hover)}
+.inv-item .icon{width:26px;height:26px;border-radius:4px;background:var(--bg-deep);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.inv-item .name{flex:1} .inv-item .qty{font-size:9px;color:var(--text-muted);font-family:var(--font-mono)}
+.inv-empty{font-size:10px;color:var(--text-muted);text-align:center;padding:10px}
+
+/* ===== Game Log ===== */
+#game-log{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.log-entry{padding:10px 14px;border-radius:var(--radius);font-size:12.5px;line-height:1.7;animation:fadeIn 250ms ease}
+.log-entry.narrative{background:var(--bg-elevated);border-left:3px solid var(--accent-dim)}
+.log-entry.system{background:var(--bg-surface);border-left:3px solid var(--text-muted);font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono)}
+.log-entry.action{background:var(--bg-elevated);border-left:3px solid var(--gold-dim);font-style:italic;color:var(--text-secondary)}
+.log-entry.thinking{background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid var(--purple);font-size:12px;color:var(--text-secondary);white-space:pre-wrap;max-height:none;overflow-y:visible;padding:12px 14px}
+.log-entry.thinking summary{color:var(--purple);font-size:13px;font-weight:600;cursor:pointer;padding:4px 0}
+.log-entry.thinking summary:hover{color:#c0a0ff}
+.log-entry.thinking div{margin-top:8px;line-height:1.7}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== Input ===== */
+#input-area{padding:10px 14px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;gap:7px;align-items:flex-end}
+#input-area textarea{flex:1;resize:none;min-height:40px;max-height:110px;font-size:12.5px;line-height:1.5;border-radius:var(--radius);background:var(--bg-deep);padding:9px 12px}
+#input-area textarea::placeholder{color:var(--text-muted)}
+#send-btn{padding:9px 18px;background:var(--accent);color:#000;border-radius:var(--radius);font-weight:600;font-size:12px;transition:all var(--transition);white-space:nowrap}
+#send-btn:hover{background:#00e0ff}
+#send-btn:disabled{opacity:0.35;cursor:not-allowed}
+
+/* ===== Quick Actions ===== */
+.quick-actions{display:flex;flex-wrap:wrap;gap:5px}
+.quick-action{padding:5px 11px;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:10.5px;color:var(--text-secondary);transition:all var(--transition)}
+.quick-action:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-active)}
+.quick-action.cheat{display:none;border-color:var(--gold-dim);color:var(--gold)}
+.quick-action.cheat.show{display:block}
+
+/* ===== Quests ===== */
+.quest-list{max-height:180px;overflow-y:auto}
+.quest-item{padding:8px;border-radius:var(--radius-sm);background:var(--bg-deep);margin-bottom:5px;font-size:10.5px;cursor:pointer;transition:all var(--transition);border-left:3px solid transparent}
+.quest-item:hover{background:var(--bg-hover)}
+.quest-item.active{border-left-color:var(--accent)} .quest-item.completed{border-left-color:var(--success);opacity:0.7}
+.quest-item .q-title{font-weight:600;font-size:11px} .quest-item .q-desc{color:var(--text-muted);margin-top:2px;font-size:9.5px}
+
+/* ===== Reputation ===== */
+.rep-row{display:flex;align-items:center;justify-content:space-between;padding:3px 0;font-size:10.5px}
+.rep-row .faction{color:var(--text-secondary)}
+.rep-bar-wrap{width:75px;height:5px;background:var(--bg-deep);border-radius:3px;overflow:hidden}
+.rep-bar-fill{height:100%;border-radius:3px}
+.rep-bar-fill.positive{background:var(--success)} .rep-bar-fill.negative{background:var(--danger)} .rep-bar-fill.neutral{background:var(--text-muted)}
+
+/* ===== Map ===== */
+#mini-map{width:100%;height:340px;background:var(--bg-deep);border-radius:var(--radius-sm);position:relative;overflow:hidden}
+.map-node{position:absolute;width:24px;height:24px;background:var(--bg-elevated);border:2px solid var(--border-active);border-radius:50%;transform:translate(-50%,-50%);cursor:pointer;transition:all var(--transition);display:flex;align-items:center;justify-content:center;font-size:11px;z-index:2}
+.map-node.current{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 14px var(--accent-glow);animation:pulse 2s infinite}
+.map-node.visited{border-color:var(--text-muted)}
+.map-node:hover{border-color:var(--accent);transform:translate(-50%,-50%) scale(1.35);z-index:3}
+.map-label{position:absolute;font-size:8px;color:var(--text-muted);transform:translate(-50%,-54px);white-space:nowrap;pointer-events:none;text-align:center}
+.map-zone{position:absolute;border:1px dashed rgba(255,255,255,0.06);border-radius:6px;pointer-events:none;display:flex;align-items:flex-start;justify-content:center;padding-top:6px}
+.map-zone span{font-size:8px;color:rgba(255,255,255,0.1);text-transform:uppercase;letter-spacing:2px}
+@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--accent-glow)}50%{box-shadow:0 0 22px var(--accent-glow),0 0 40px rgba(0,200,232,0.1)}}
+
+/* ===== Settings Modal ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:100;display:flex;align-items:center;justify-content:center;animation:fadeIn 200ms ease}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--radius-lg);padding:22px;width:440px;max-width:92vw;box-shadow:var(--shadow)}
+.modal h2{font-size:15px;margin-bottom:14px}
+.modal label{font-size:10.5px;color:var(--text-muted);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px}
+.modal input,.modal select{width:100%;margin-bottom:12px;padding:8px 11px;font-size:12.5px}
+.modal .btn-row{display:flex;gap:7px;justify-content:flex-end;margin-top:6px}
+.modal .btn{padding:7px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;border:1px solid var(--border);transition:all var(--transition)}
+.modal .btn.primary{background:var(--accent);color:#000;border-color:var(--accent)}
+.modal .btn.primary:hover{background:var(--accent-dim);color:#fff}
+.modal .btn:hover{background:var(--bg-hover)}
+.modal .hint{font-size:9.5px;color:var(--text-muted);margin-top:-10px;margin-bottom:10px}
+
+/* ===== Toast ===== */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border-active);padding:9px 18px;border-radius:var(--radius);font-size:12.5px;z-index:200;pointer-events:none;opacity:0;transition:opacity 300ms ease}
+#toast.show{opacity:1} #toast.success{border-color:var(--success)} #toast.error{border-color:var(--danger)}
+
+/* ===== Loading ===== */
+#loading-indicator{display:none;align-items:center;gap:7px;padding:7px 12px;font-size:10.5px;color:var(--text-muted)}
+#loading-indicator.show{display:flex}
+#loading-indicator .dots{display:flex;gap:3px}
+#loading-indicator .dots span{width:5px;height:5px;background:var(--accent);border-radius:50%;animation:bounce 1s infinite}
+#loading-indicator .dots span:nth-child(2){animation-delay:0.15s}
+#loading-indicator .dots span:nth-child(3){animation-delay:0.3s}
+@keyframes bounce{0%,80%,100%{transform:scale(0.5)}40%{transform:scale(1)}}
+
+/* ===== Character Creation ===== */
+#char-create-overlay{position:fixed;inset:0;background:var(--bg-deep);z-index:300;display:flex;align-items:center;justify-content:flex-start;flex-direction:column;overflow-y:auto;padding:20px 10px 100px;scroll-behavior:smooth}
+#char-create-overlay.hidden{display:none}
+#char-create-overlay h1{font-size:22px;color:var(--accent);margin-bottom:4px;letter-spacing:1px;flex-shrink:0}
+#char-create-overlay .subtitle{font-size:12px;color:var(--text-muted);margin-bottom:16px;flex-shrink:0}
+.create-step{display:none;flex-direction:column;align-items:center;gap:12px;width:420px;max-width:90vw;padding-bottom:10px}
+.create-step.active{display:flex}
+.create-step .step-title{font-size:13px;color:var(--text-secondary);margin-bottom:2px;text-align:center}
+.create-step .step-hint{font-size:10.5px;color:var(--text-muted);text-align:center;margin-bottom:4px}
+.create-step input{width:100%;text-align:center;font-size:16px;padding:10px 16px;background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--radius)}
+.create-step .custom-input{width:100%;text-align:center;font-size:14px;padding:10px 14px;margin-top:4px;background:var(--bg-elevated);border:1px dashed var(--accent-dim);border-radius:var(--radius);color:var(--accent)}
+.create-step .custom-input::placeholder{color:var(--text-muted);font-style:italic}
+.create-step .option-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}
+.create-step .option-card{padding:13px 11px;text-align:center;background:var(--bg-elevated);border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all var(--transition);font-size:12px;line-height:1.3}
+.create-step .option-card:hover{border-color:var(--accent-dim);background:var(--bg-hover)}
+.create-step .option-card.selected{border-color:var(--accent);background:var(--accent-glow);color:var(--accent)}
+.create-step .option-card .oc-icon{font-size:24px;display:block;margin-bottom:4px}
+.create-step .option-card .oc-name{font-weight:600;margin-bottom:1px}
+.create-step .option-card .oc-desc{font-size:9px;color:var(--text-muted)}
+.create-nav{display:flex;gap:10px;margin-top:12px;position:sticky;bottom:0;background:var(--bg-deep);padding:12px 0 8px;z-index:5;flex-shrink:0}
+.create-nav button{padding:10px 30px;border-radius:var(--radius);font-size:13px;font-weight:600;transition:all var(--transition);min-height:44px}
+.create-nav .btn-prev{background:transparent;border:1px solid var(--border);color:var(--text-secondary)}
+.create-nav .btn-prev:hover{background:var(--bg-hover)}
+.create-nav .btn-next{background:var(--accent);color:#000;border:1px solid var(--accent)}
+.create-nav .btn-next:hover{background:var(--accent-dim);color:#fff}
+.create-nav .btn-next:disabled{opacity:0.3;cursor:not-allowed}
+#create-progress{display:flex;gap:5px;margin-bottom:10px;flex-shrink:0}
+#create-progress .dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
+#create-progress .dot.done{background:var(--accent)} #create-progress .dot.current{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+
+/* ===== Mobile ===== */
+@media(max-width:768px){
+  #app{grid-template-columns:1fr;grid-template-rows:42px 1fr}
+  #topbar{padding:0 6px;gap:4px}
+  #topbar .logo{font-size:12px}
+  #topbar .logo span{display:none}
+  .top-btn{padding:6px 10px;font-size:10px;gap:3px;min-height:30px}
+  .top-btn svg{width:12px;height:12px}
+  #left-panel,#right-panel{width:100%!important}
+  #center-panel{grid-column:1;grid-row:2}
+  #game-log{padding:8px 10px;gap:6px}
+  .log-entry{padding:8px 10px;font-size:11px}
+  #input-area{padding:6px 8px;gap:4px}
+  #input-area textarea{min-height:36px;font-size:12px;padding:7px 10px}
+  #send-btn{padding:7px 12px;font-size:11px}
+  .panel-card{padding:8px}.panel-card h3{font-size:9px;margin-bottom:6px}
+  .ability-grid{gap:4px}.ability-item{padding:5px}
+  .ability-item .val{font-size:14px}.ability-item .lbl{font-size:8px}
+  .quick-actions{gap:3px}.quick-action{padding:5px 8px;font-size:10px}
+  #mini-map{height:200px}.map-node{width:18px;height:18px;font-size:9px}.map-label{font-size:7px}
+  .modal{width:95vw;padding:14px}.modal h2{font-size:13px}
+  .modal input,.modal select{padding:7px 9px;font-size:11px}
+  .modal .btn{padding:6px 12px;font-size:10px}
+  /* Character creation mobile */
+  #char-create-overlay{padding:8px;justify-content:flex-start;padding-top:16px;padding-bottom:100px}
+  #char-create-overlay h1{font-size:16px;margin-bottom:2px}
+  #char-create-overlay .subtitle{font-size:9px;margin-bottom:10px}
+  .create-step{width:96vw;gap:7px}
+  .create-step .option-grid{grid-template-columns:1fr 1fr;gap:4px}
+  .create-step .option-card{padding:8px 6px;font-size:9px;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .create-step .option-card .oc-icon{font-size:18px}
+  .create-step .option-card .oc-name{font-size:10px}
+  .create-step .option-card .oc-desc{font-size:7px}
+  .create-step input{font-size:13px;padding:8px 10px}
+  .create-step .custom-input{font-size:11px;padding:7px 8px}
+  .create-nav{position:sticky;bottom:0;background:var(--bg-deep);padding:8px 0;margin-bottom:0}
+  .create-nav button{padding:10px 22px;font-size:12px;min-height:44px}
+  #create-progress{margin-bottom:8px}
+  #create-progress .dot{width:6px;height:6px}
+}
+@media(max-width:400px){
+  .create-step .option-grid{grid-template-columns:1fr}
+  .top-btn{padding:3px 6px;font-size:9px}
+  .top-btn svg{width:10px;height:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== Character Creation ===== -->
+<div id="char-create-overlay">
+  <h1>⚡ 都市异能 · 角色创建</h1>
+  <p class="subtitle">选择你的命运，踏入新京市的地下世界</p>
+  <div id="create-progress">
+    <span class="dot current" data-step="0"></span>
+    <span class="dot" data-step="1"></span>
+    <span class="dot" data-step="2"></span>
+    <span class="dot" data-step="3"></span>
+    <span class="dot" data-step="4"></span>
+  </div>
+
+  <!-- Step 0: Name -->
+  <div class="create-step active" data-step="0">
+    <div class="step-title">📛 你叫什么名字？</div>
+    <div class="step-hint">这将是你在这个世界中的身份标识</div>
+    <input type="text" id="cc-name" placeholder="输入姓名…" maxlength="8" autofocus>
+  </div>
+
+  <!-- Step 1: Gender -->
+  <div class="create-step" data-step="1">
+    <div class="step-title">⚧ 你的性别是？</div>
+    <div class="option-grid">
+      <div class="option-card" data-value="male" onclick="CC.select(this,'gender')"><span class="oc-icon">👨</span><div class="oc-name">男性</div></div>
+      <div class="option-card" data-value="female" onclick="CC.select(this,'gender')"><span class="oc-icon">👩</span><div class="oc-name">女性</div></div>
+    </div>
+  </div>
+
+  <!-- Step 2: Background -->
+  <div class="create-step" data-step="2">
+    <div class="step-title">🏠 你的家境出身？</div>
+    <div class="step-hint">决定你的起点资源、社会关系和初始能力倾向</div>
+    <div class="option-grid">
+      <div class="option-card" data-value="poor" onclick="CC.select(this,'background')"><span class="oc-icon">🏚️</span><div class="oc-name">街头孤儿</div><div class="oc-desc">信用点+200 · 感知+4 · 街头智慧</div></div>
+      <div class="option-card" data-value="normal" onclick="CC.select(this,'background')"><span class="oc-icon">🏢</span><div class="oc-name">普通市民</div><div class="oc-desc">信用点+500 · 均衡属性 · 稳定生活</div></div>
+      <div class="option-card" data-value="rich" onclick="CC.select(this,'background')"><span class="oc-icon">🏛️</span><div class="oc-name">财阀子弟</div><div class="oc-desc">信用点+2000 · 操控+3 · 商业人脉</div></div>
+      <div class="option-card" data-value="clan" onclick="CC.select(this,'background')"><span class="oc-icon">🏯</span><div class="oc-name">异能世家</div><div class="oc-desc">信用点+1000 · 异能全+2 · 家族传承</div></div>
+      <div class="option-card" data-value="custom_bg" onclick="CC.select(this,'background')"><span class="oc-icon">✏️</span><div class="oc-name">⚡ 自定义</div><div class="oc-desc">自由设定你的出身背景</div></div>
+    </div>
+    <input type="text" id="cc-custom-bg" class="custom-input" placeholder="输入你的自定义家境…" maxlength="20" style="display:none">
+  </div>
+
+  <!-- Step 3: Ability -->
+  <div class="create-step" data-step="3">
+    <div class="step-title">⚡ 你的核心异能？</div>
+    <div class="step-hint">这决定了你的战斗风格和世界观互动方式</div>
+    <div class="option-grid">
+      <div class="option-card" data-value="elemental" onclick="CC.select(this,'ability')"><span class="oc-icon">🔥</span><div class="oc-name">元素掌控</div><div class="oc-desc">操控火水风雷 · 战斗+5 操控+3</div></div>
+      <div class="option-card" data-value="psychic" onclick="CC.select(this,'ability')"><span class="oc-icon">🧠</span><div class="oc-name">心灵感应</div><div class="oc-desc">读心念力 · 感知+5 操控+3</div></div>
+      <div class="option-card" data-value="body" onclick="CC.select(this,'ability')"><span class="oc-icon">💪</span><div class="oc-name">身体强化</div><div class="oc-desc">超人体魄自愈 · 战斗+4 抗性+4</div></div>
+      <div class="option-card" data-value="time" onclick="CC.select(this,'ability')"><span class="oc-icon">⏳</span><div class="oc-name">时间感知</div><div class="oc-desc">预知数秒未来 · 感知+5 抗性+3</div></div>
+      <div class="option-card" data-value="space" onclick="CC.select(this,'ability')"><span class="oc-icon">🌀</span><div class="oc-name">空间扭曲</div><div class="oc-desc">瞬移相位穿梭 · 操控+5 感知+3</div></div>
+      <div class="option-card" data-value="shadow" onclick="CC.select(this,'ability')"><span class="oc-icon">🌑</span><div class="oc-name">暗影之力</div><div class="oc-desc">操控暗物质 · 战斗+3 操控+3 抗性+2</div></div>
+      <div class="option-card" data-value="custom_ability" onclick="CC.select(this,'ability')"><span class="oc-icon">✏️</span><div class="oc-name">⚡ 自定义</div><div class="oc-desc">自由设定你的异能类型</div></div>
+    </div>
+    <input type="text" id="cc-custom-ability" class="custom-input" placeholder="输入你的自定义异能…" maxlength="20" style="display:none">
+  </div>
+
+  <!-- Step 4: Talent -->
+  <div class="create-step" data-step="4">
+    <div class="step-title">🌟 你的天赋特长？</div>
+    <div class="step-hint">在异能之外的额外才能</div>
+    <div class="option-grid">
+      <div class="option-card" data-value="combat_genius" onclick="CC.select(this,'talent')"><span class="oc-icon">⚔️</span><div class="oc-name">战斗天才</div><div class="oc-desc">战斗+3 · 战斗时额外优势</div></div>
+      <div class="option-card" data-value="keen_sense" onclick="CC.select(this,'talent')"><span class="oc-icon">👁️</span><div class="oc-name">洞察之眼</div><div class="oc-desc">感知+3 · 自动发现隐藏线索</div></div>
+      <div class="option-card" data-value="silver_tongue" onclick="CC.select(this,'talent')"><span class="oc-icon">👄</span><div class="oc-name">巧舌如簧</div><div class="oc-desc">操控+3 · 谈判交涉优势</div></div>
+      <div class="option-card" data-value="iron_will" onclick="CC.select(this,'talent')"><span class="oc-icon">🛡️</span><div class="oc-name">钢铁意志</div><div class="oc-desc">抗性+3 · 精神控制免疫</div></div>
+      <div class="option-card" data-value="prodigy" onclick="CC.select(this,'talent')"><span class="oc-icon">📖</span><div class="oc-name">天纵奇才</div><div class="oc-desc">全属性+1 · 升级经验-20%</div></div>
+      <div class="option-card" data-value="lucky" onclick="CC.select(this,'talent')"><span class="oc-icon">🍀</span><div class="oc-name">命运眷顾</div><div class="oc-desc">随机好事件概率↑ · 暴击率↑</div></div>
+      <div class="option-card" data-value="custom_talent" onclick="CC.select(this,'talent')"><span class="oc-icon">✏️</span><div class="oc-name">⚡ 自定义</div><div class="oc-desc">自由设定你的天赋特长</div></div>
+    </div>
+    <input type="text" id="cc-custom-talent" class="custom-input" placeholder="输入你的自定义天赋…" maxlength="20" style="display:none">
+  </div>
+
+  <div class="create-nav">
+    <button class="btn-prev" onclick="CC.prev()" id="cc-prev" style="display:none">← 上一步</button>
+    <button class="btn-next" onclick="CC.next()" id="cc-next">下一步 →</button>
+    <button class="btn-next" onclick="CC.finish()" id="cc-finish" style="display:none">🎮 进入游戏</button>
+  </div>
+</div>
+
+<!-- ===== Main App ===== -->
+<div id="app">
+  <div id="topbar">
+    <div class="logo">⚡ 都市异能 <span>URBAN AWAKENING</span></div>
+    <button class="top-btn" onclick="UI.togglePanel('left')" id="tb-char" title="角色面板">👤 角色</button>
+    <button class="top-btn" onclick="UI.togglePanel('right')" id="tb-map" title="地图 & 任务">🗺️ 地图</button>
+    <div class="spacer"></div>
+    <button class="top-btn gold" id="cheat-toggle" onclick="Game.toggleCheat()" title="金手指">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6.4-4.8-6.4 4.8 2.4-7.2-6-4.8h7.6z"/></svg> 金手指
+    </button>
+    <button class="top-btn" onclick="Game.exportSave()" title="导出存档">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> 导出
+    </button>
+    <button class="top-btn" onclick="Game.importSave()" title="导入存档">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg> 导入
+    </button>
+    <button class="top-btn" onclick="UI.openSettings()" title="设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    </button>
+  </div>
+
+  <div id="left-panel">
+    <div class="panel-card">
+      <div class="char-header">
+        <div class="char-avatar" id="char-avatar">🧬</div>
+        <div>
+          <div class="char-name" id="char-name">---</div>
+          <div class="char-level" id="char-level">Lv.1</div>
+          <div class="char-meta" id="char-meta"></div>
+        </div>
+      </div>
+      <div class="stat-row"><span class="stat-label">生命</span><div class="stat-bar-wrap"><div class="stat-bar-fill hp" id="hp-bar" style="width:100%"></div></div><span class="stat-val" id="hp-val">100/100</span></div>
+      <div class="stat-row"><span class="stat-label">灵力</span><div class="stat-bar-wrap"><div class="stat-bar-fill sp" id="sp-bar" style="width:100%"></div></div><span class="stat-val" id="sp-val">80/80</span></div>
+      <div class="stat-row"><span class="stat-label">经验</span><div class="stat-bar-wrap"><div class="stat-bar-fill xp" id="xp-bar" style="width:0%"></div></div><span class="stat-val" id="xp-val">0/100</span></div>
+    </div>
+    <div class="panel-card">
+      <h3>能力属性</h3>
+      <div class="ability-grid">
+        <div class="ability-item" title="影响物理攻击和近战能力"><div class="val combat" id="stat-combat">12</div><div class="lbl">⚔️ 战斗</div></div>
+        <div class="ability-item" title="影响侦查、洞察和发现隐藏信息"><div class="val perception" id="stat-perception">14</div><div class="lbl">👁️ 感知</div></div>
+        <div class="ability-item" title="影响异能精度、说服力和影响力"><div class="val manipulation" id="stat-manipulation">10</div><div class="lbl">🌀 操控</div></div>
+        <div class="ability-item" title="影响防御力、异常状态抗性和HP成长"><div class="val resistance" id="stat-resistance">11</div><div class="lbl">🛡️ 抗性</div></div>
+      </div>
+    </div>
+    <div class="panel-card"><h3>💰 资金</h3><div class="credits-row"><span>信用点</span><span class="val" id="credits-val">500</span></div></div>
+    <div class="panel-card"><h3>🎒 背包</h3><div class="inv-list" id="inv-list"><div class="inv-empty">背包空空如也</div></div></div>
+    <div class="panel-card"><h3>📇 通讯录 <button onclick="Game.showAddContact()" style="color:var(--accent);font-size:12px;border:1px solid var(--accent-dim);border-radius:3px;padding:0 6px;margin-left:4px;cursor:pointer">＋</button></h3><div class="inv-list" id="contact-list"><div class="inv-empty">还没有认识的人</div></div></div>
+  </div>
+
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div id="loading-indicator"><span>AI 正在推演</span><div class="dots"><span></span><span></span><span></span></div></div>
+    <div id="input-area">
+      <textarea id="user-input" rows="1" placeholder="输入你的行动… (Enter 发送)" onkeydown="UI.handleInputKey(event)"></textarea>
+      <button id="send-btn" onclick="Game.sendAction()">▶ 发送</button>
+      <button class="top-btn" onclick="Game.regenerate()" title="重新生成AI回复" id="btn-regen" style="display:none">🔄</button>
+      <button class="top-btn" onclick="Game.editLastAction()" title="编辑上一条消息" id="btn-edit" style="display:none">✏️</button>
+    </div>
+    <div class="quick-actions" id="quick-actions" style="padding:0 16px 8px;flex-wrap:wrap">
+      <button class="quick-action" onclick="Game.quickAction('explore')">🔍 探索</button>
+      <button class="quick-action" onclick="Game.quickAction('talk')">💬 交谈</button>
+      <button class="quick-action" onclick="Game.quickAction('rest')">😴 休息</button>
+      <button class="quick-action" onclick="Game.quickAction('train')">🏋️ 修炼</button>
+      <button class="quick-action" onclick="Game.quickAction('investigate')">🕵️ 调查</button>
+      <button class="quick-action" onclick="Game.quickAction('shop')">🛒 商店</button>
+      <button class="quick-action cheat" id="cheat-btn-1" onclick="Game.quickAction('cheat_info')">👑 全知</button>
+      <button class="quick-action cheat" id="cheat-btn-2" onclick="Game.quickAction('cheat_teleport')">🌐 瞬移</button>
+      <button class="quick-action cheat" id="cheat-btn-3" onclick="Game.quickAction('cheat_ko')">💀 秒杀</button>
+      <button class="quick-action cheat" id="cheat-btn-4" onclick="Game.quickAction('cheat_money')">💎 财富</button>
+    </div>
+  </div>
+
+  <div id="right-panel">
+    <div class="panel-card"><h3>🗺️ 新京市地图</h3><div id="mini-map">
+        <div class="map-zone" style="left:2%;top:2%;width:33%;height:35%"><span>西城区</span></div>
+        <div class="map-zone" style="left:35%;top:2%;width:30%;height:30%"><span>中环区</span></div>
+        <div class="map-zone" style="left:65%;top:2%;width:33%;height:35%"><span>东港区</span></div>
+        <div class="map-zone" style="left:2%;top:38%;width:33%;height:30%"><span>南湾区</span></div>
+        <div class="map-zone" style="left:35%;top:33%;width:30%;height:33%"><span>市中心</span></div>
+        <div class="map-zone" style="left:65%;top:38%;width:33%;height:30%"><span>开发区</span></div>
+        <div class="map-zone" style="left:2%;top:69%;width:47%;height:29%"><span>旧城区</span></div>
+        <div class="map-zone" style="left:50%;top:69%;width:48%;height:29%"><span>地下街区</span></div>
+      </div></div>
+    <div class="panel-card"><h3>📋 当前概况</h3><div id="summary-panel" style="font-size:11px;color:var(--text-secondary);line-height:1.5"></div></div>
+    <div class="panel-card"><h3>🏙️ 势力声望</h3><div id="rep-list"></div></div>
+  </div>
+</div>
+
+<!-- ===== Settings Modal ===== -->
+<div class="modal-overlay hidden" id="settings-modal">
+  <div class="modal">
+    <h2>⚙️ API 设置</h2>
+    <label>API 端点</label>
+    <input id="cfg-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+    <div class="hint">DeepSeek 默认端点，一般无需修改</div>
+    <label>API Key</label>
+    <input id="cfg-apikey" type="password" placeholder="sk-xxxxxxxx">
+    <div class="hint">密钥仅保存在本地浏览器中</div>
+    <label>模型 (打开设置时自动从API拉取可用模型)</label>
+    <select id="cfg-model">
+      <option value="deepseek-chat">deepseek-chat (V3 · 默认)</option>
+      <option value="deepseek-reasoner">deepseek-reasoner (R1 · 推理)</option>
+    </select>
+    <div class="hint" id="model-hint">打开设置时自动拉取最新模型列表…</div>
+    <label>推理深度</label>
+    <select id="cfg-reasoning">
+      <option value="max">最大推理 (推荐)</option>
+      <option value="high">高</option>
+      <option value="medium">中</option>
+      <option value="low">低</option>
+      <option value="minimal">最小</option>
+    </select>
+    <label>输出 Token 限制</label>
+    <select id="cfg-maxtokens">
+      <option value="unlimited" selected>无限制</option>
+      <option value="2048">2048</option>
+      <option value="4096">4096</option>
+      <option value="8192">8192</option>
+      <option value="16384">16384</option>
+    </select>
+    <div class="btn-row">
+      <button class="btn" onclick="UI.testConnection()">🔌 测试连接</button>
+      <button class="btn" onclick="UI.restartGame()" style="color:var(--danger);border-color:var(--danger)">🔄 重新开始</button>
+      <button class="btn" onclick="UI.closeSettings()">取消</button>
+      <button class="btn primary" onclick="UI.saveSettings()">保存设置</button>
+    </div>
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+      <label>💾 存档槽位 <span style="font-size:9px;color:var(--text-muted)">（点击保存 → 选择槽位）</span></label>
+      <div style="display:flex;gap:4px;margin-bottom:6px">
+        <button class="btn" onclick="Game.saveSlot(0)" style="flex:1;font-size:10px">💾 存到槽1</button>
+        <button class="btn" onclick="Game.saveSlot(1)" style="flex:1;font-size:10px">💾 存到槽2</button>
+        <button class="btn" onclick="Game.saveSlot(2)" style="flex:1;font-size:10px">💾 存到槽3</button>
+      </div>
+      <div id="save-slots" style="max-height:120px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="chat-modal">
+  <div class="modal" style="width:500px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h2 id="chat-title" style="margin:0">📱 私聊</h2>
+      <button class="btn" onclick="Game.closePhoneChat()" style="padding:4px 10px;font-size:11px">✕ 关闭</button>
+    </div>
+    <div id="chat-log" style="flex:1;overflow-y:auto;min-height:300px;max-height:55vh;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;font-size:12px;word-break:break-word"></div>
+    <div style="display:flex;gap:6px">
+      <input id="chat-input" placeholder="输入私聊消息…" style="flex:1" onkeydown="if(event.key==='Enter')Game.sendPhoneChat()">
+      <button class="btn primary" onclick="Game.sendPhoneChat()" style="white-space:nowrap">▶</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div class="drawer-backdrop" id="drawer-backdrop" onclick="UI.closeDrawers()"></div>
+<input type="file" id="import-file" accept=".json" style="display:none" onchange="Game.handleImport(event)">
+
+<script>
+// ============================================================
+// 都市异能 · Urban Awakening — Game Engine v2
+// ============================================================
+
+const DEFAULTS = { apiEndpoint:'https://api.deepseek.com/v1/chat/completions', apiKey:'', model:'deepseek-chat', reasoningEffort:'max', maxTokens:'unlimited' };
+
+function loadConfig() { try { return JSON.parse(localStorage.getItem('urban_awakening_config')) || {}; } catch(e) { return {}; } }
+function saveConfig(cfg) { localStorage.setItem('urban_awakening_config', JSON.stringify(cfg)); }
+
+/* ---------- Character Creation ---------- */
+const CC = {
+  step: 0,
+  choices: { name:'', gender:'', background:'', ability:'', talent:'' },
+
+  select(el, type) {
+    const parent = el.parentElement;
+    parent.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    this.choices[type] = el.dataset.value;
+    // Toggle custom input visibility
+    const stepEl = el.closest('.create-step');
+    const customInput = stepEl.querySelector('.custom-input');
+    if (customInput) {
+      if (el.dataset.value === 'custom_bg' || el.dataset.value === 'custom_ability' || el.dataset.value === 'custom_talent') {
+        customInput.style.display = '';
+        customInput.focus();
+        this.choices[type] = ''; // Reset until user types
+      } else {
+        customInput.style.display = 'none';
+        customInput.value = '';
+      }
+    }
+  },
+
+  next() {
+    const stepEls = document.querySelectorAll('.create-step');
+    const current = stepEls[this.step];
+    const val = this.getStepValue(this.step);
+
+    if (!val && this.step < 5) { UI.toast('请先完成当前选择', 'error'); return; }
+    if (this.step === 0) this.choices.name = document.getElementById('cc-name').value.trim();
+
+    if (this.step < 4) {
+      current.classList.remove('active');
+      this.step++;
+      stepEls[this.step].classList.add('active');
+      // Scroll the new step into view on mobile
+      stepEls[this.step].scrollIntoView({ behavior:'smooth', block:'center' });
+      this.updateNav();
+      this.updateProgress();
+      // Focus name input if step 0
+      if (this.step === 0) document.getElementById('cc-name').focus();
+    }
+  },
+
+  prev() {
+    if (this.step > 0) {
+      document.querySelectorAll('.create-step')[this.step].classList.remove('active');
+      this.step--;
+      document.querySelectorAll('.create-step')[this.step].classList.add('active');
+      this.updateNav();
+      this.updateProgress();
+    }
+  },
+
+  finish() {
+    this.choices.name = document.getElementById('cc-name').value.trim() || this.choices.name;
+    if (!this.choices.name) { UI.toast('请输入姓名', 'error'); return; }
+    if (!this.choices.gender) { UI.toast('请选择性别', 'error'); return; }
+    // Resolve custom background
+    if (this.choices.background === 'custom_bg' || (typeof this.choices.background === 'string' && this.choices.background.startsWith('custom_bg|'))) {
+      const customVal = document.getElementById('cc-custom-bg')?.value.trim();
+      if (!customVal) { UI.toast('请输入自定义家境', 'error'); return; }
+      this.choices.background = 'custom_bg|' + customVal;
+    }
+    if (!this.choices.background) { UI.toast('请选择家境', 'error'); return; }
+    // Resolve custom ability
+    if (this.choices.ability === 'custom_ability' || (typeof this.choices.ability === 'string' && this.choices.ability.startsWith('custom_ability|'))) {
+      const customVal = document.getElementById('cc-custom-ability')?.value.trim();
+      if (!customVal) { UI.toast('请输入自定义异能', 'error'); return; }
+      this.choices.ability = 'custom_ability|' + customVal;
+    }
+    if (!this.choices.ability) { UI.toast('请选择异能', 'error'); return; }
+    // Resolve custom talent
+    if (this.choices.talent === 'custom_talent' || (typeof this.choices.talent === 'string' && this.choices.talent.startsWith('custom_talent|'))) {
+      const customVal = document.getElementById('cc-custom-talent')?.value.trim();
+      if (!customVal) { UI.toast('请输入自定义天赋', 'error'); return; }
+      this.choices.talent = 'custom_talent|' + customVal;
+    }
+    if (!this.choices.talent) { UI.toast('请选择天赋', 'error'); return; }
+
+    Game.applyCharacterCreation(this.choices);
+    document.getElementById('char-create-overlay').classList.add('hidden');
+    Game.startGame();
+  },
+
+  getStepValue(step) {
+    switch(step) {
+      case 0: return document.getElementById('cc-name')?.value.trim();
+      case 1: return this.choices.gender;
+      case 2: return this.choices.background === 'custom_bg' ? 
+        (document.getElementById('cc-custom-bg')?.value.trim() || '') : this.choices.background;
+      case 3: return this.choices.ability === 'custom_ability' ? 
+        (document.getElementById('cc-custom-ability')?.value.trim() || '') : this.choices.ability;
+      case 4: return this.choices.talent === 'custom_talent' ? 
+        (document.getElementById('cc-custom-talent')?.value.trim() || '') : this.choices.talent;
+      default: return null;
+    }
+  },
+
+  updateNav() {
+    document.getElementById('cc-prev').style.display = this.step > 0 ? '' : 'none';
+    document.getElementById('cc-next').style.display = this.step < 4 ? '' : 'none';
+    document.getElementById('cc-finish').style.display = this.step === 4 ? '' : 'none';
+  },
+
+  updateProgress() {
+    document.querySelectorAll('#create-progress .dot').forEach((d, i) => {
+      d.classList.remove('done', 'current');
+      if (i < this.step) d.classList.add('done');
+      if (i === this.step) d.classList.add('current');
+    });
+  },
+
+  init() {
+    document.getElementById('cc-name').addEventListener('input', function() {
+      CC.choices.name = this.value.trim();
+    });
+    document.getElementById('cc-name').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') CC.next();
+    });
+    // Watch custom inputs
+    ['cc-custom-bg','cc-custom-ability','cc-custom-talent'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', function() {
+          if (id === 'cc-custom-bg') CC.choices.background = this.value.trim() ? ('custom_bg|'+this.value.trim()) : 'custom_bg';
+          if (id === 'cc-custom-ability') CC.choices.ability = this.value.trim() ? ('custom_ability|'+this.value.trim()) : 'custom_ability';
+          if (id === 'cc-custom-talent') CC.choices.talent = this.value.trim() ? ('custom_talent|'+this.value.trim()) : 'custom_talent';
+        });
+        el.addEventListener('keydown', function(e) { if (e.key === 'Enter') CC.next(); });
+      }
+    });
+    this.updateNav();
+  }
+};
+
+/* ---------- Background/Aptitude Configs ---------- */
+const BG_CONFIG = {
+  poor: { credits:200, perception:4, desc:'街头孤儿 —— 你在新京市最底层长大，对这座城市的黑暗面了如指掌。你没有家人，但你有求生的本能。', rep:{shadow_guild:25, city_police:-10} },
+  normal: { credits:500, all:1, desc:'普通市民 —— 你过着平凡的生活，直到那天早上醒来，世界在你眼中变得不再一样。你有爱你的家人，一份普通的工作，一切都在正轨上——直到觉醒。', rep:{city_police:25} },
+  rich: { credits:2000, manipulation:3, desc:'财阀子弟 —— 你的家族掌控着新京市三分之一的地产。锦衣玉食的生活让你精通社交手腕，但家族的期望也是沉重的枷锁。', rep:{shadow_guild:30, awakened_union:15} },
+  clan: { credits:1000, all:2, desc:'异能世家 —— 你出生在一个代代相传的异能者家族。从小你便知道自己的能力，家族教导你掌控它。但家族的秘密远比你知道的多得多。', rep:{awakened_union:45, bureau:20, shadow_guild:-10} },
+  custom_bg: { credits:800, all:2, desc:'自定义背景' },
+};
+
+const ABILITY_CONFIG = {
+  elemental: { combat:5, manipulation:3, name:'元素掌控', icon:'🔥', desc:'你能够操控自然元素——火焰、水流、风暴与大地。你的愤怒可以点燃空气，你的冷静可以平息波涛。' },
+  psychic: { perception:5, manipulation:3, name:'心灵感应', icon:'🧠', desc:'你的意识可以渗透他人的思想。你能听见未说出口的话语，感知到隐藏的情绪，甚至在强者手中，你能够植入念头。' },
+  body: { combat:4, resistance:4, name:'身体强化', icon:'💪', desc:'你的身体超越了人类极限。钢铁般的肌肉、闪电般的反应、自愈的伤口——你是近战的死神。' },
+  time: { perception:5, resistance:3, name:'时间感知', icon:'⏳', desc:'你能窥见数秒后的未来。在战斗中这让你避无可避，在对话中这让你洞悉对方的下一句话。但未来从来不是确定的。' },
+  space: { manipulation:5, perception:3, name:'空间扭曲', icon:'🌀', desc:'你能折叠空间。瞬移、相位穿梭、制造空间裂隙——你的身体可以在任何地方出现，也可以从任何地方消失。' },
+  shadow: { combat:3, manipulation:3, resistance:2, name:'暗影之力', icon:'🌑', desc:'你能操控暗物质与阴影。你融入黑暗如鱼入水，你的攻击从阴影中诞生，你的敌人连你的位置都找不到。' },
+  custom_ability: { combat:3, perception:3, manipulation:2, resistance:2, name:'自定义异能', icon:'✨', desc:'你拥有独一无二的异能，这是属于你自己的超凡力量。' },
+};
+
+const TALENT_CONFIG = {
+  combat_genius: { combat:3, name:'战斗天才', icon:'⚔️', desc:'你的战斗直觉是无与伦比的。武器在你手中如同活物，战场的节奏由你掌控。' },
+  keen_sense: { perception:3, name:'洞察之眼', icon:'👁️', desc:'没有细节能逃过你的眼睛。隐藏的线索、伪装的面孔、微妙的情绪变化——一切都在你的观察之中。' },
+  silver_tongue: { manipulation:3, name:'巧舌如簧', icon:'👄', desc:'语言是你的武器。你能说服最顽固的敌人，迷惑最警惕的目标，在谈判桌上你从未输过。' },
+  iron_will: { resistance:3, name:'钢铁意志', icon:'🛡️', desc:'你的意志坚不可摧。精神控制、幻术、威压——这些对你的效果微乎其微。你就是磐石。' },
+  prodigy: { all:1, expBonus:-20, name:'天纵奇才', icon:'📖', desc:'你学什么都比别人快。无论是新技能还是异能运用，你总能在最短时间内掌握精髓。' },
+  lucky: { luck:true, name:'命运眷顾', icon:'🍀', desc:'命运似乎总站在你这边。好运经常光顾你，而死神则经常与你擦肩而过。' },
+  custom_talent: { all:1, name:'自定义天赋', icon:'✨', desc:'你拥有独一无二的天赋特长。' },
+};
+
+/* ---------- Map Position Heuristics ---------- */
+const MAP_POSITIONS = [
+  { kw:['公寓','居民','住宅','家'], x:55,y:78, icon:'🏠' },
+  { kw:['商业','商圈','商场','购物'], x:28,y:50, icon:'🏢' },
+  { kw:['科技','工业','园区','工厂'], x:72,y:25, icon:'🏭' },
+  { kw:['聚点','异能者','觉醒者','联盟'], x:48,y:18, icon:'⚡' },
+  { kw:['黑市','暗影','地下','商会'], x:85,y:68, icon:'🌃' },
+  { kw:['管理局','政府','总部','官方'], x:15,y:80, icon:'🏛️' },
+  { kw:['港口','码头','船','海运'], x:82,y:10, icon:'🚢' },
+  { kw:['科研','研究','实验','所'], x:22,y:15, icon:'🔬' },
+  { kw:['酒吧','酒馆','俱乐部','夜'], x:65,y:50, icon:'🍸' },
+  { kw:['情报','暗网','贩子','巢穴'], x:35,y:72, icon:'🕵️' },
+  { kw:['医院','诊所','医疗','药'], x:10,y:55, icon:'🏥' },
+  { kw:['公园','绿地','广场'], x:42,y:40, icon:'🌳' },
+  { kw:['警局','警察','派出所'], x:58,y:62, icon:'🚔' },
+  { kw:['废弃','废墟','荒'], x:75,y:85, icon:'🏚️' },
+  { kw:['地下','隧道','通道'], x:50,y:88, icon:'🕳️' },
+  { kw:['高楼','大厦','塔','办公'], x:38,y:28, icon:'🏙️' },
+  { kw:['学校','学院','大学'], x:68,y:35, icon:'🏫' },
+  { kw:['仓库','货仓','存储'], x:70,y:80, icon:'📦' },
+];
+function getMapPos(locationName) {
+  const name = locationName.toLowerCase();
+  for (const entry of MAP_POSITIONS) {
+    for (const kw of entry.kw) {
+      if (name.includes(kw.toLowerCase())) return { x:entry.x, y:entry.y, icon:entry.icon };
+    }
+  }
+  // Fallback: hash-based pseudo-random but stable position
+  let hash = 0; for (let i=0;i<locationName.length;i++) hash = ((hash<<5)-hash)+locationName.charCodeAt(i);
+  return { x:10+Math.abs(hash%80), y:10+Math.abs((hash>>8)%80), icon:'📍' };
+}
+
+/* ---------- Game State ---------- */
+const Game = {
+  created: false,
+  state: {
+    player: {
+      name: '', gender: '', title: '觉醒者',
+      background: '', ability: '', talent: '',
+      level: 1, exp: 0, maxExp: 100,
+      hp: 100, maxHp: 100, sp: 80, maxSp: 80,
+      credits: 500,
+      abilities: { combat:12, perception:14, manipulation:10, resistance:11 },
+      inventory: [],
+      reputation: { awakened_union:30, city_police:40, shadow_guild:10, bureau:20 },
+    },
+    story: { chapter:1, chapterName:'觉醒之日', location:'居民区 · 你的公寓', visitedLocations:['居民区 · 你的公寓'], flags:{} },
+    quests: [],
+    history: [],
+    memory: [],
+    fusedMemory: [],
+    contacts: [],
+    phoneChat: { active:false, contactIdx:-1, history:[] },
+    cheatEnabled: false,
+  },
+  apiRequesting: false,
+  lastUserMsg: '',
+
+  /* ---- Regenerate ---- */
+  async regenerate() {
+    if (this.apiRequesting) return;
+    // Find the last user message from history
+    const lastUser = [...this.state.history].reverse().find(h => h.role === 'user');
+    if (!lastUser) { this.addLog('system', '没有可重新生成的消息。'); return; }
+    // Remove last assistant response from history
+    let lastAsstIdx = -1;
+    for (let i = this.state.history.length - 1; i >= 0; i--) {
+      if (this.state.history[i].role === 'assistant') { lastAsstIdx = i; break; }
+    }
+    if (lastAsstIdx >= 0) this.state.history.splice(lastAsstIdx, 1);
+    // Remove last narrative entry from log
+    const log = document.getElementById('game-log');
+    const entries = log.querySelectorAll('.log-entry.narrative');
+    if (entries.length > 0) entries[entries.length - 1].remove();
+    // Also remove the last thinking entry if present
+    const thinkEntries = log.querySelectorAll('.log-entry.thinking');
+    if (thinkEntries.length > 0) thinkEntries[thinkEntries.length - 1].remove();
+    this.addLog('system', '🔄 正在重新生成回复…');
+    this.setLoading(true); this.apiRequesting = true;
+    const result = await this.callAI(lastUser.content);
+    this.apiRequesting = false; this.setLoading(false);
+    // Remove "regenerating" log
+    log.querySelectorAll('.log-entry.system').forEach(e => { if (e.textContent.includes('正在重新生成')) e.remove(); });
+    if (!result) return;
+    if (result.reasoning) this.addLog('thinking', result.reasoning, true);
+    this.addLog('narrative', result.content);
+    this.state.history.push({ role:'assistant', content:result.content });
+    this.parseCommands(result.content);
+    this.renderAll();
+    this.autoSave();
+  },
+
+  /* ---- Edit Last Action ---- */
+  editLastAction() {
+    const lastUser = [...this.state.history].reverse().find(h => h.role === 'user');
+    if (!lastUser) return;
+    const input = document.getElementById('user-input');
+    input.value = lastUser.content;
+    input.focus();
+    // Remove that action from history
+    let idx = -1;
+    for (let i = this.state.history.length - 1; i >= 0; i--) {
+      if (this.state.history[i].role === 'user') { idx = i; break; }
+    }
+    if (idx >= 0) this.state.history.splice(idx, 1);
+    // Also remove following assistant response
+    let asstIdx = -1;
+    for (let i = this.state.history.length - 1; i >= 0; i--) {
+      if (this.state.history[i].role === 'assistant') { asstIdx = i; break; }
+    }
+    if (asstIdx >= 0) this.state.history.splice(asstIdx, 1);
+    // Remove entries from log
+    const log = document.getElementById('game-log');
+    const actionEntries = log.querySelectorAll('.log-entry.action');
+    if (actionEntries.length > 0) actionEntries[actionEntries.length - 1].remove();
+    const narrEntries = log.querySelectorAll('.log-entry.narrative');
+    if (narrEntries.length > 0) narrEntries[narrEntries.length - 1].remove();
+  },
+
+  /* ---- Apply Character Creation ---- */
+  applyCharacterCreation(choices) {
+    const p = this.state.player;
+    const s = this.state.story;
+    p.name = choices.name;
+    p.gender = choices.gender;
+
+    // Handle custom background
+    let bgKey = choices.background;
+    let customBgName = '';
+    if (typeof bgKey === 'string' && bgKey.startsWith('custom_bg|')) {
+      customBgName = bgKey.split('|')[1];
+      bgKey = 'custom_bg';
+    }
+    p.background = customBgName || bgKey;
+    p._bgCustomName = customBgName;
+
+    // Handle custom ability
+    let abKey = choices.ability;
+    let customAbName = '';
+    if (typeof abKey === 'string' && abKey.startsWith('custom_ability|')) {
+      customAbName = abKey.split('|')[1];
+      abKey = 'custom_ability';
+    }
+    p.ability = customAbName || abKey;
+    p._abCustomName = customAbName;
+
+    // Handle custom talent
+    let taKey = choices.talent;
+    let customTaName = '';
+    if (typeof taKey === 'string' && taKey.startsWith('custom_talent|')) {
+      customTaName = taKey.split('|')[1];
+      taKey = 'custom_talent';
+    }
+    p.talent = customTaName || taKey;
+    p._taCustomName = customTaName;
+
+    // Apply background bonuses
+    const bg = BG_CONFIG[bgKey];
+    if (bg) {
+      p.credits = bg.credits;
+      if (bg.all) { for (let k in p.abilities) p.abilities[k] += bg.all; }
+      if (bg.combat) p.abilities.combat += bg.combat;
+      if (bg.perception) p.abilities.perception += bg.perception;
+      if (bg.manipulation) p.abilities.manipulation += bg.manipulation;
+      if (bg.resistance) p.abilities.resistance += bg.resistance;
+      if (bg.rep) { for (let k in bg.rep) p.reputation[k] = (p.reputation[k]||0) + bg.rep[k]; }
+    }
+
+    // Apply ability bonuses
+    const ab = ABILITY_CONFIG[abKey];
+    if (ab) {
+      if (ab.combat) p.abilities.combat += ab.combat;
+      if (ab.perception) p.abilities.perception += ab.perception;
+      if (ab.manipulation) p.abilities.manipulation += ab.manipulation;
+      if (ab.resistance) p.abilities.resistance += ab.resistance;
+    }
+
+    // Apply talent bonuses
+    const ta = TALENT_CONFIG[taKey];
+    if (ta) {
+      if (ta.all) { for (let k in p.abilities) p.abilities[k] += ta.all; }
+      if (ta.combat) p.abilities.combat += ta.combat;
+      if (ta.perception) p.abilities.perception += ta.perception;
+      if (ta.manipulation) p.abilities.manipulation += ta.manipulation;
+      if (ta.resistance) p.abilities.resistance += ta.resistance;
+      if (ta.expBonus) p.maxExp = Math.floor(p.maxExp * (1 + ta.expBonus/100));
+    }
+
+    // Set HP/SP based on abilities
+    p.maxHp = 100 + (p.abilities.resistance + p.abilities.combat) * 3;
+    p.hp = p.maxHp;
+    p.maxSp = 80 + (p.abilities.manipulation + p.abilities.perception) * 3;
+    p.sp = p.maxSp;
+
+    // Initial inventory based on background
+    if (choices.background === 'poor') {
+      p.inventory = [{ id:'knife', name:'折叠小刀', icon:'🔪', qty:1, desc:'一把随身携带的防身武器' }];
+    } else if (choices.background === 'rich') {
+      p.inventory = [
+        { id:'phone_enc', name:'加密智能眼镜', icon:'👓', qty:1, desc:'高级通讯与信息显示设备' },
+        { id:'credit_card', name:'黑金信用卡', icon:'💳', qty:1, desc:'额度极高的信用卡' },
+      ];
+    } else if (choices.background === 'clan') {
+      p.inventory = [
+        { id:'talisman', name:'家传护符', icon:'🔮', qty:1, desc:'蕴含微弱灵力的护身符' },
+        { id:'manual', name:'异能修炼手册', icon:'📕', qty:1, desc:'家族世代传承的修炼笔记' },
+      ];
+    } else {
+      p.inventory = [{ id:'phone', name:'智能手机', icon:'📱', qty:1, desc:'普通的通讯设备' }];
+    }
+
+    this.created = true;
+  },
+
+  /* ---- Start Game After Creation ---- */
+  startGame() {
+    const cfg = loadConfig();
+    this.addLog('system', '🌃 **都市异能 · Urban Awakening**');
+    const p = this.state.player;
+    // Resolve configs (handle custom)
+    const bgInfo = p._bgCustomName ? { desc: p._bgCustomName + ' —— 你拥有独特的出身，在这座城市中走出属于自己的道路。' } : (BG_CONFIG[p.background] || { desc: p.background });
+    const abInfo = p._abCustomName ? { icon:'✨', name: p._abCustomName, desc: '你拥有独一无二的异能——' + p._abCustomName + '。这是只属于你的超凡力量。' } : (ABILITY_CONFIG[p.ability] || { icon:'✨', name: p.ability, desc: '' });
+    const taInfo = p._taCustomName ? { icon:'✨', name: p._taCustomName, desc: '你拥有独一无二的天赋——' + p._taCustomName + '。' } : (TALENT_CONFIG[p.talent] || { icon:'✨', name: p.talent, desc: '' });
+    const genderText = p.gender === 'male' ? '男' : '女';
+
+    this.addLog('narrative', `**${p.name}** · ${genderText} · Lv.1 觉醒者`);
+    this.addLog('narrative', `🏠 ${bgInfo.desc}`);
+    this.addLog('narrative', `⚡ **${abInfo.icon} ${abInfo.name}**：${abInfo.desc}`);
+    this.addLog('narrative', `🌟 **${taInfo.icon} ${taInfo.name}**：${taInfo.desc}`);
+
+    // Free play - no quest system
+    this.state.quests = [];
+    
+    this.addLog('system', '💡 在下方输入你的行动。点击顶栏 👤角色 查看状态和通讯录，🗺️地图 查看已探索地点。');
+    this.addLog('system', '⌨️ Esc关闭面板 · Ctrl+S导出存档');
+
+    // Seed initial contacts based on background
+    const bgInit = this.state.player.background;
+    const bgName = this.state.player._bgCustomName || bgInit;
+    if (bgInit === 'normal' || bgName === 'normal') {
+      this.addContact('父亲', '你的父亲，普通上班族', true);
+      this.addContact('母亲', '你的母亲，家庭主妇', true);
+    } else if (bgInit === 'clan' || bgName === 'clan') {
+      this.addContact('父亲', '异能世家的家主，实力深不可测', true);
+      this.addContact('家族长老', '负责指导年轻家族成员的修炼', false);
+    } else if (bgInit === 'rich' || bgName === 'rich') {
+      this.addContact('父亲', '财阀掌舵人，忙于生意但关心你', true);
+      this.addContact('私人助理', '负责处理你的日常事务', true);
+    } else if (bgInit === 'poor' || bgName === 'poor') {
+      this.addContact('老周', '流浪汉朋友，街头消息灵通', false);
+    }
+
+    if (!cfg.apiKey) {
+      this.addLog('system', '⚠️ 请先在设置中配置 DeepSeek API Key 才能与AI互动。');
+    }
+
+    // Send the prologue prompt to AI
+    const prologuePrompt = this.buildProloguePrompt();
+    if (cfg.apiKey) {
+      this.state.history = [];
+      this.addLog('system', '🎭 AI正在为你生成世界开局…');
+      // We'll trigger this after init render
+      setTimeout(() => this.sendPrologue(prologuePrompt), 500);
+    }
+
+    this.renderAll();
+    document.getElementById('user-input').focus();
+  },
+
+  buildProloguePrompt() {
+    const p = this.state.player;
+    const bg = p._bgCustomName ? { desc: p._bgCustomName + ' —— 独特的出身背景' } : (BG_CONFIG[p.background] || { desc: p.background });
+    const ab = p._abCustomName ? { icon:'✨', name: p._abCustomName, desc: '独一无二的异能——' + p._abCustomName } : (ABILITY_CONFIG[p.ability] || { icon:'✨', name: p.ability, desc: '' });
+    const ta = p._taCustomName ? { icon:'✨', name: p._taCustomName, desc: '独一无二的天赋——' + p._taCustomName } : (TALENT_CONFIG[p.talent] || { icon:'✨', name: p.talent, desc: '' });
+    const genderText = p.gender === 'male' ? '男' : '女';
+
+    return `【游戏开局引子 — 请GM开始叙事】
+    
+玩家角色信息：
+- 姓名：${p.name}（${genderText}）
+- 背景：${bg.desc}
+- 核心异能：${ab.icon} ${ab.name} — ${ab.desc}
+- 天赋特长：${ta.icon} ${ta.name} — ${ta.desc}
+- 当前时间：2047年3月15日，早晨7:30
+- 当前地点：新京市·${this.state.story.location}
+
+请以第二人称"你"的视角，为玩家写一段沉浸式的开场叙事（约300-500字），描述角色醒来发现自己异能觉醒的瞬间。根据角色的背景和异能类型来定制——财阀子弟可能在高层公寓中觉醒，街头孤儿可能在出租屋中觉醒。写得自然，有画面感，不要大惊小怪，不要硬往惊悚方向带。日常中突然出现的不寻常就足够有力。不要替玩家做行动选择。
+
+【角色扮演质量规则】保持现实逻辑与人物边界感；NPC只能依据亲眼所见、亲耳所闻或公开信息获知情报，禁止全知视角；禁止代替玩家行动、发言、思考或选择；禁止时间错乱、空间错位、瞬移和设定遗忘；禁止网络小说模板动作、套路台词、解释性旁白和自我感动式抒情；情绪通过具体行为和对话体现，而非旁白解释。
+
+在叙事结束后，另起一行加上：
+---
+（等待玩家行动）
+[LOCATION:${this.state.story.location}]
+
+请严格按照这个格式回复。`;
+  },
+
+  async sendPrologue(prompt) {
+    const result = await this.callAI(prompt);
+    if (!result) {
+      // Clear the waiting message
+      const log = document.getElementById('game-log');
+      const entries = log.querySelectorAll('.log-entry.system');
+      for (let e of entries) {
+        if (e.textContent.includes('AI正在为你生成')) e.remove();
+      }
+      return;
+    }
+    if (result.reasoning) this.addLog('thinking', result.reasoning, true);
+    this.addLog('narrative', result.content);
+    this.state.history.push({ role:'user', content:prompt });
+    this.state.history.push({ role:'assistant', content:result.content });
+    this.parseCommands(result.content);
+    this.renderAll();
+    this.autoSave();
+  },
+
+  /* ---- API Call ---- */
+  async callAI(userMessage, onChunk) {
+    const cfg = { ...DEFAULTS, ...loadConfig() };
+    if (!cfg.apiKey) { this.addLog('system', '❌ 请先在设置中配置 API Key。'); return null; }
+
+    const messages = this.buildMessages(userMessage);
+    const body = { model:cfg.model, messages, temperature:0.85, stream: !!onChunk };
+    const mt = cfg.maxTokens;
+    if (mt && mt !== 'unlimited') body.max_tokens = parseInt(mt);
+    if (cfg.model === 'deepseek-reasoner') body.reasoning_effort = cfg.reasoningEffort || 'max';
+
+    try {
+      const response = await fetch(cfg.apiEndpoint, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${cfg.apiKey}` },
+        body:JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        let errMsg = `HTTP ${response.status}`;
+        try { errMsg = JSON.parse(errText).error?.message || errMsg; } catch(_) {}
+        this.addLog('system', `❌ API错误：${errMsg}`);
+        return null;
+      }
+      if (!!onChunk) {
+        return await this.readStream(response, onChunk);
+      }
+      const data = await response.json();
+      const choice = data.choices?.[0];
+      if (!choice) { this.addLog('system', '❌ API返回空响应。'); return null; }
+      return {
+        reasoning: choice.message?.reasoning_content || choice.reasoning_content || '',
+        content: choice.message?.content || ''
+      };
+    } catch(e) {
+      this.addLog('system', `❌ 网络错误：${e.message}`);
+      return null;
+    }
+  },
+
+  async readStream(response, onChunk) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '', fullReasoning = '', buf = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() || '';
+        for (const line of lines) {
+          const s = line.trim();
+          if (!s || s === '[DONE]') continue;
+          // Handle both "data: {...}" and "data:{...}" formats
+          let data = '';
+          if (s.startsWith('data: ')) data = s.slice(6);
+          else if (s.startsWith('data:')) data = s.slice(5);
+          else continue;
+          if (data === '[DONE]') continue;
+          try {
+            const json = JSON.parse(data);
+            const delta = json.choices?.[0]?.delta;
+            if (delta) {
+              if (delta.reasoning_content) { fullReasoning += delta.reasoning_content; onChunk({ type:'reasoning', text:delta.reasoning_content }); }
+              if (delta.content) { fullContent += delta.content; onChunk({ type:'content', text:delta.content }); }
+            }
+          } catch(e) { console.warn('SSE parse skip:', data.substring(0,60)); }
+        }
+      }
+    } finally { reader.releaseLock(); }
+    return { reasoning:fullReasoning, content:fullContent };
+  },
+
+  buildMessages(userMessage) {
+    const sysPrompt = this.buildSystemPrompt();
+    const messages = [{ role:'system', content:sysPrompt }];
+    // Add accumulated memory as a separate system note
+    if (this.state.memory.length > 0 || (this.state.fusedMemory && this.state.fusedMemory.length > 0)) {
+      let memText = '';
+      if (this.state.fusedMemory && this.state.fusedMemory.length > 0) {
+        memText += '【早期记忆摘要】\n' + this.state.fusedMemory.join('\n') + '\n\n';
+      }
+      if (this.state.memory.length > 0) {
+        memText += '【近期记忆】\n' + this.state.memory.join('\n');
+      }
+      messages.push({ role:'system', content: memText });
+    }
+    // Include recent history (last 25 entries)
+    const recent = this.state.history.slice(-25);
+    for (const entry of recent) {
+      if (entry.role === 'user' || entry.role === 'assistant') messages.push({ role:entry.role, content:entry.content });
+    }
+    messages.push({ role:'user', content:userMessage });
+    return messages;
+  },
+
+  /* ---- CRITICAL: System Prompt ---- */
+  buildSystemPrompt() {
+    const p = this.state.player;
+    const s = this.state.story;
+    const bg = p._bgCustomName ? { desc: p._bgCustomName + ' —— 独特的出身', icon: '' } : (BG_CONFIG[p.background] || {});
+    const ab = p._abCustomName ? { icon:'✨', name: p._abCustomName, desc: '独一无二的异能——' + p._abCustomName } : (ABILITY_CONFIG[p.ability] || {});
+    const ta = p._taCustomName ? { icon:'✨', name: p._taCustomName, desc: '独一无二的天赋——' + p._taCustomName } : (TALENT_CONFIG[p.talent] || {});
+    const gText = p.gender === 'male' ? '男' : '女';
+    const cheatSection = this.state.cheatEnabled ? `
+【🔴 金手指模式已激活】
+玩家拥有：全知感知/瞬间移动/无敌战斗/无限财富/全能力99。
+在回应中必须体现这些能力的效果。` : '';
+
+    return `你是一个都市异能RPG的游戏主持人。你需要用指令来驱动游戏系统——否则玩家的属性、金钱、声望、任务永远不会变化。
+
+每一条回复如果涉及状态变化，必须在末尾附加对应的游戏指令。**不附加指令 = 游戏卡住 = 玩家什么都得不到。**
+
+## ⚠️ 游戏机制（极其重要！指令驱动UI）
+游戏界面靠解析你的输出更新状态。你不用指令 = 玩家血量/背包/任务/地图/声望/信用点永远不变。
+
+**务必在每次回复中推动游戏进程**：
+- 玩家做了有价值的事 → 给经验 [STAT:exp=+X]
+- 影响了某个势力 → 改声望 [REP:势力名=±X]
+- 消费或赚钱 → 改信用点 [STAT:credits=±X]
+- 训练或特殊经历 → 提升能力 [STAT:combat=+1] 等
+- 建立或完成任务 → [QUEST:update=任务ID=状态]
+- 到新地方 → [LOCATION:地点名]
+- 遇到重要NPC → [MEMORY:描述]
+
+### 1. 禁止替玩家选择
+你绝对不能替玩家角色做决定、说话、或选择行动。你只能描述场景、NPC、事件，然后等待玩家输入。当面临选择时，你呈现选项但不选择。当你描述"你决定……""你走向……""你说……"时——你就在犯规。正确的做法是："面前有两条路。一条通往闹市，一条通往暗巷。"然后停止。
+
+### 2. 保持一致性
+每次回应前，确认以下信息是最新状态，不得使用过时数据：
+- 玩家：${p.name} · ${gText} · Lv.${p.level} ${p.title}
+- 背景：${bg.desc || p.background}
+- 异能：${ab.icon||''} ${ab.name||p.ability} — ${ab.desc||''}
+- 天赋：${ta.icon||''} ${ta.name||p.talent} — ${ta.desc||''}
+- 当前位置：${s.location}
+- HP：${p.hp}/${p.maxHp} | SP：${p.sp}/${p.maxSp}
+- 信用点：${p.credits} | 背包：${p.inventory.map(i=>i.icon+i.name+'×'+i.qty).join('、')||'空'}
+- 章节：${s.chapterName} | 活跃任务：${this.state.quests.filter(q=>q.status==='active').map(q=>q.title).join('、')||'无'}
+${cheatSection}
+### 3. 不要编造
+- 不要编造不存在于上述信息中的NPC名字、地点、物品或势力名称，除非是首次引入并由你创建。
+- 不要编造玩家没有的能力或物品。
+- 当玩家询问一个你没有被给予信息的事件/人物时，你可以即兴创作，但要确保与已有设定一致。
+- 不要声称玩家的HP/SP/物品发生了变化，除非你同时使用[STAT:]命令。
+
+### 4. 内容自由
+- 这是一个面向成年人的RPG。你可以描述暴力、阴谋、道德困境、成人关系、黑暗主题。不需要粉饰或回避。
+- 角色可以面对真正的危险、损失、背叛。NPC可以有复杂的动机和灰色道德。
+- 不要使用"这个内容我不能描述"之类的元叙述。你是GM，你在运营一个暗色调的都市异能世界。
+
+## 世界氛围
+- 时间：2047年 · 地点：新京市——表面是繁荣的现代都市，地下是异能者的战场
+- 异能者（觉醒者）占总人口约0.1%，大多隐藏身份
+- 主要势力：异能者联盟（地下互助组织）、异能管理局（政府监管机构）、暗影商会（黑市贸易）、城市警方
+- 普通人基本不知道异能者存在。政府半知半掩。媒体被管控。
+- 科技略超当代（AI助手普及、AR眼镜、无人机巡逻），但异能仍然是未知领域
+
+## 叙事风格
+- 使用第二人称"你"来叙述
+- 每次回应在200-500字之间
+- 运用感官描写（视觉、听觉、触觉、氛围）
+- 在关键时刻停下来，让玩家做选择——而不是替玩家选择
+- 结尾可以问"你怎么做？"但不要预设答案
+- 风格要自然平实。不要大惊小怪。不要硬往阴谋、惊悚、恐怖方向偏——大多数觉醒者也在过普通日子，不是每个人都在搞阴谋。日常中带着不寻常，就够了。
+- 每次到达或描述一个新场所，必须在末尾用 [LOCATION:场所名] 标记（非常重要，这是地图数据来源）。
+- 每次引入新NPC或揭示重要剧情时，用 [MEMORY:描述] 记录。
+- ⚠️ 玩家和一个NPC交换了联系方式（加微信、留电话等）→ 必须用 [CONTACT:名字📱=描述] 标记。
+
+## 指令格式（必须使用，每条单独一行放在回复末尾）
+
+每次你的回应如果涉及以下任何情况，必须在末尾附加对应指令：
+[STAT:hp=-X] — 受伤/治疗
+[STAT:sp=-X] — 使用灵力  
+[STAT:exp=+X] — 获得经验。每次完成有意义的事都应给经验
+[STAT:credits=+X] 或 [STAT:credits=-X] — 金钱变化。买东西、接报酬、被罚款都要改
+[STAT:combat=+1] [STAT:perception=+1] 等 — 能力属性升降。训练、特殊事件后给
+[ITEM:add=物品名] 或 [ITEM:remove=物品名] — 物品得失
+-- 任务系统已移除，无需QUEST指令 --
+[CONTACT:姓名📱=简短描述] — 玩家认识新角色时用。加📱表示有联系方式（交换了手机号等），不加则只是认识
+[LOCATION:地点名] — 到达新场所必须用
+[REP:势力名=+10] 或 [REP:势力名=-5] — 声望变化。势力名：异能者联盟/城市警方/暗影商会/异能管理局
+[MEMORY:关键信息] — 新NPC、重要剧情
+
+例子：帮了异能者联盟一个忙，结尾写：
+[STAT:exp=+20]
+[REP:异能者联盟=+5]
+
+## 性格化
+- 根据玩家的异能和天赋定制叙事风格
+- 不同背景的NPC以不同态度对待玩家（财阀子弟受尊重，街头孤儿被轻视等）
+- 让每个NPC都像活人——有自己的动机、秘密、弱点
+
+## 角色扮演质量规则（必须遵守）
+- 保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。
+- 禁止代替玩家行动、发言、思考或做出选择。
+- 禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。
+- 禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。
+- 禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。
+- 人物情绪应通过具体行为和对话体现，而非旁白解释。
+
+现在开始/继续游戏。`;
+  },
+
+  /* ---- Send Action ---- */
+  async sendAction() {
+    if (this.apiRequesting) return;
+    const input = document.getElementById('user-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = ''; input.style.height = 'auto';
+
+    this.addLog('action', `🧑 ${this.state.player.name}：${text}`);
+    this.state.history.push({ role:'user', content:text });
+
+    // Create a live-updating log entry for streaming
+    const log = document.getElementById('game-log');
+    const liveEntry = document.createElement('div');
+    liveEntry.className = 'log-entry narrative';
+    liveEntry.id = 'live-stream';
+    log.appendChild(liveEntry);
+    log.scrollTop = log.scrollHeight;
+
+    this.setLoading(true); this.apiRequesting = true;
+    let reasoningText = '';
+    let contentText = '';
+
+    const result = await this.callAI(text, (chunk) => {
+      if (chunk.type === 'reasoning') {
+        reasoningText += chunk.text;
+      } else {
+        contentText += chunk.text;
+        liveEntry.innerHTML = Game.formatText(contentText);
+        log.scrollTop = log.scrollHeight;
+      }
+    });
+    
+    this.apiRequesting = false; this.setLoading(false);
+    liveEntry.removeAttribute('id');
+    
+    if (!result) { liveEntry.remove(); return; }
+
+    // Show reasoning in a collapsible block ABOVE the content
+    if (reasoningText) {
+      const thinkEntry = document.createElement('div');
+      thinkEntry.className = 'log-entry thinking';
+      thinkEntry.innerHTML = '<details><summary>🧠 AI 思考过程</summary><div style="margin-top:8px;line-height:1.7">' + this.formatText(reasoningText) + '</div></details>';
+      liveEntry.parentNode.insertBefore(thinkEntry, liveEntry);
+    }
+    // Finalize content
+    liveEntry.innerHTML = this.formatText(result.content);
+    this.state.history.push({ role:'assistant', content:result.content });
+    this.parseCommands(result.content);
+    this.renderAll();
+    this.autoSave();
+    document.getElementById('btn-regen').style.display = '';
+    document.getElementById('btn-edit').style.display = '';
+  },
+
+  /* ---- Quick Action ---- */
+  async quickAction(actionId) {
+    if (this.apiRequesting) return;
+    const actionMap = {
+      explore: '我环顾四周，仔细观察周围的环境和值得注意的细节。',
+      talk: '我寻找附近可以交谈的人，试图打听消息或建立联系。',
+      rest: '我找一个安全的地方休息，恢复体力。',
+      train: '我花时间专注地练习自己的异能，试图提升掌控力。',
+      investigate: '我集中注意力，仔细调查手头所有的线索和信息。',
+      shop: '我前往最近的商业区或市场，看看有什么可以购买的东西。',
+      cheat_info: '【金手指·全知感知】我释放感知力，扫描周围所有的隐藏信息、NPC的真实身份和意图、以及任何隐藏的物体或陷阱。',
+      cheat_teleport: '【金手指·瞬间移动】我使用空间跳跃能力，瞬间传送到我想去的任何地点。',
+      cheat_ko: '【金手指·无敌】我释放全部力量，一击摧毁当前所有敌对目标。',
+      cheat_money: '【金手指·无限财富】我从随身空间中提取大量资金。',
+    };
+    const text = actionMap[actionId] || actionId;
+    document.getElementById('user-input').value = text;
+    await this.sendAction();
+  },
+
+  /* ---- Parse Commands ---- */
+  parseCommands(text) {
+    const lines = text.split('\n');
+    for (const line of lines) {
+      const match = line.match(/\[(\w+):(.+?)\]/);
+      if (!match) continue;
+      this.executeCommand(match[1], match[2]);
+    }
+  },
+
+  executeCommand(cmd, args) {
+    const p = this.state.player;
+    switch(cmd) {
+      case 'STAT': {
+        const eqIdx = args.indexOf('=');
+        if (eqIdx < 0) break;
+        const key = args.substring(0, eqIdx).trim();
+        const val = parseInt(args.substring(eqIdx+1)) || 0;
+        switch(key) {
+          case 'hp': p.hp = Math.max(0, Math.min(p.maxHp, p.hp + val)); this.checkDeath(); break;
+          case 'sp': p.sp = Math.max(0, Math.min(p.maxSp, p.sp + val)); break;
+          case 'exp': this.addExp(val); break;
+          case 'credits': p.credits = Math.max(0, p.credits + val); break;
+          case 'combat': p.abilities.combat = Math.max(1, p.abilities.combat + val); break;
+          case 'perception': p.abilities.perception = Math.max(1, p.abilities.perception + val); break;
+          case 'manipulation': p.abilities.manipulation = Math.max(1, p.abilities.manipulation + val); break;
+          case 'resistance': p.abilities.resistance = Math.max(1, p.abilities.resistance + val); break;
+        }
+        break;
+      }
+      case 'ITEM': {
+        const eqIdx = args.indexOf('=');
+        if (eqIdx < 0) break;
+        const action = args.substring(0, eqIdx).trim();
+        const itemName = args.substring(eqIdx+1).trim();
+        if (action === 'add' && itemName) {
+          const existing = p.inventory.find(i => i.name === itemName);
+          if (existing) existing.qty++;
+          else p.inventory.push({ id:'i'+Date.now(), name:itemName, icon:'📦', qty:1, desc:'' });
+          this.addLog('system', `✅ 获得：${itemName}`);
+          this.addMemory('获得：'+itemName);
+        } else if (action === 'remove' && itemName) {
+          const idx = p.inventory.findIndex(i => i.name === itemName);
+          if (idx >= 0) {
+            if (p.inventory[idx].qty > 1) p.inventory[idx].qty--;
+            else p.inventory.splice(idx, 1);
+            this.addLog('system', `📤 失去：${itemName}`);
+            this.addMemory('失去：'+itemName);
+          }
+        }
+        break;
+      }
+      case 'QUEST': {
+        const parts = args.split('=');
+        if (parts.length < 2) break;
+        const qId = parts[0].trim();
+        const status = parts[1].trim();
+        const quest = this.state.quests.find(q => q.id === qId);
+        if (quest) { quest.status = status; this.addLog('system', `📋 任务更新：${quest.title} → ${status}`); this.addMemory('任务：'+quest.title+'→'+status); }
+        break;
+      }
+      case 'LOCATION': {
+        const loc = args.trim();
+        if (loc && !this.state.story.visitedLocations.includes(loc)) this.state.story.visitedLocations.push(loc);
+        this.state.story.location = loc;
+        this.addLog('system', `📍 当前位置：${loc}`);
+        this.addMemory('到达：'+loc);
+        break;
+      }
+      case 'MEMORY': {
+        this.addMemory(args.trim());
+        break;
+      }
+      case 'REP': {
+        const eqIdx = args.indexOf('=');
+        if (eqIdx < 0) break;
+        const faction = args.substring(0, eqIdx).trim();
+        const val = parseInt(args.substring(eqIdx+1)) || 0;
+        const repMap = { '异能者联盟':'awakened_union', '城市警方':'city_police', '暗影商会':'shadow_guild', '异能管理局':'bureau' };
+        const key = repMap[faction] || faction;
+        if (p.reputation[key] !== undefined) {
+          p.reputation[key] = Math.max(0, Math.min(100, (p.reputation[key]||0) + val));
+          this.addLog('system', `🏙️ ${faction}声望 ${val>=0?'+':''}${val}`);
+        }
+        break;
+      }
+      case 'CONTACT': {
+        const parts = args.split('=');
+        const name = (parts[0] || '').trim();
+        const desc = (parts[1] || '').trim();
+        // Check if name ends with '📱' indicating has contact
+        const hasContact = name.endsWith('📱');
+        const cleanName = hasContact ? name.slice(0, -1).trim() : name;
+        this.addContact(cleanName, desc, hasContact);
+        break;
+      }
+    }
+  },
+
+  addExp(amount) {
+    const p = this.state.player;
+    p.exp += amount;
+    while (p.exp >= p.maxExp) {
+      p.exp -= p.maxExp;
+      p.level++;
+      p.maxExp = Math.floor(p.maxExp * 1.4);
+      p.maxHp += 15; p.hp = p.maxHp;
+      p.maxSp += 10; p.sp = p.maxSp;
+      for (let k in p.abilities) p.abilities[k] += Math.floor(Math.random()*3)+1;
+      this.addLog('system', `🎉 升级！${p.name} 提升至 Lv.${p.level}！`);
+      if (p.level >= 10 && !p.title.includes('高阶')) p.title = '高阶觉醒者';
+      if (p.level >= 25) p.title = '异能大师';
+      if (p.level >= 50) p.title = '传说级觉醒者';
+    }
+  },
+
+  /* ---- Memory System ---- */
+  addMemory(fact) {
+    if (!fact) return;
+    if (this.state.memory.includes(fact)) return;
+    this.state.memory.push(fact);
+    // When memory grows beyond 50, compress oldest items into fused block
+    if (this.state.memory.length > 50) {
+      this.compressMemory();
+    }
+  },
+
+  compressMemory() {
+    // Take oldest 30 items, fuse them into a condensed summary
+    const oldItems = this.state.memory.splice(0, 30);
+    if (!this.state.fusedMemory) this.state.fusedMemory = [];
+    // Group by keywords to merge related facts
+    const fused = this.fuseItems(oldItems);
+    this.state.fusedMemory.push(fused);
+    // Keep fused memory manageable (max 10 blocks)
+    while (this.state.fusedMemory.length > 10) {
+      // Merge oldest two fused blocks
+      const older = this.state.fusedMemory.shift();
+      const next = this.state.fusedMemory.shift();
+      this.state.fusedMemory.unshift(older + '；' + next);
+    }
+  },
+
+  fuseItems(items) {
+    // Simple fusion: group by first 2 chars and concatenate
+    const groups = {};
+    items.forEach(item => {
+      const key = item.substring(0, 6);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    const result = [];
+    for (const k in groups) {
+      if (groups[k].length <= 2) {
+        result.push(groups[k].join('；'));
+      } else {
+        // Multiple related items - create a summary
+        result.push(groups[k][0] + '等（共' + groups[k].length + '条相关信息）');
+      }
+    }
+    return result.join('。');
+  },
+
+  /* ---- Cheat ---- */
+  toggleCheat() {
+    this.state.cheatEnabled = !this.state.cheatEnabled;
+    const btn = document.getElementById('cheat-toggle');
+    const p = this.state.player;
+    if (this.state.cheatEnabled) {
+      btn.classList.add('active');
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6.4-4.8-6.4 4.8 2.4-7.2-6-4.8h7.6z"/></svg> 金手指·开`;
+      p.maxHp = 9999; p.hp = 9999; p.maxSp = 9999; p.sp = 9999; p.credits = 999999;
+      for (let k in p.abilities) p.abilities[k] = 99;
+      document.querySelectorAll('.quick-action.cheat').forEach(b => b.classList.add('show'));
+      this.addLog('system', '👑 **金手指已开启！** 全知感知、瞬间移动、无敌、无限财富、能力全满。');
+    } else {
+      btn.classList.remove('active');
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6.4-4.8-6.4 4.8 2.4-7.2-6-4.8h7.6z"/></svg> 金手指`;
+      // Recalculate from base + level
+      this.recalcStats();
+      document.querySelectorAll('.quick-action.cheat').forEach(b => b.classList.remove('show'));
+      this.addLog('system', '🔓 **金手指已关闭。** 能力恢复至正常水平。');
+    }
+    this.renderAll();
+  },
+
+  recalcStats() {
+    const p = this.state.player;
+    const base = { combat:12, perception:14, manipulation:10, resistance:11 };
+    const bgKey = p._bgCustomName ? 'custom_bg' : p.background;
+    const abKey = p._abCustomName ? 'custom_ability' : p.ability;
+    const taKey = p._taCustomName ? 'custom_talent' : p.talent;
+    const bg = BG_CONFIG[bgKey] || {};
+    const ab = ABILITY_CONFIG[abKey] || {};
+    const ta = TALENT_CONFIG[taKey] || {};
+
+    p.abilities = { ...base };
+    for (let k in p.abilities) {
+      if (bg.all) p.abilities[k] += bg.all;
+      if (bg[k]) p.abilities[k] += bg[k];
+      if (ab[k]) p.abilities[k] += ab[k];
+      if (ta.all) p.abilities[k] += ta.all;
+      if (ta[k]) p.abilities[k] += ta[k];
+      p.abilities[k] += (p.level - 1) * 2;
+    }
+    p.maxHp = 100 + (p.abilities.resistance + p.abilities.combat) * 3 + (p.level-1)*15;
+    p.hp = Math.min(p.hp, p.maxHp);
+    p.maxSp = 80 + (p.abilities.manipulation + p.abilities.perception) * 3 + (p.level-1)*10;
+    p.sp = Math.min(p.sp, p.maxSp);
+    const origCredits = BG_CONFIG[bgKey]?.credits || 500;
+    p.credits = Math.min(p.credits, origCredits + p.level*50);
+  },
+
+  /* ---- State Migration (backwards-compat) ---- */
+  migrateState() {
+    const p = this.state.player || {};
+    const s = this.state.story || {};
+    // Ensure all new fields exist
+    this.state.memory = this.state.memory || [];
+    this.state.fusedMemory = this.state.fusedMemory || [];
+    this.state.history = this.state.history || [];
+    p._bgCustomName = p._bgCustomName || '';
+    p._abCustomName = p._abCustomName || '';
+    p._taCustomName = p._taCustomName || '';
+    p.inventory = p.inventory || [];
+    p.reputation = p.reputation || { awakened_union:30, city_police:40, shadow_guild:10, bureau:20 };
+    p.abilities = p.abilities || { combat:12, perception:14, manipulation:10, resistance:11 };
+    s.visitedLocations = s.visitedLocations || [s.location || '居民区 · 你的公寓'];
+    s.flags = s.flags || {};
+    this.state.quests = this.state.quests || [];
+    this.state.contacts = this.state.contacts || [];
+    this.state.phoneChat = this.state.phoneChat || { active:false, contactIdx:-1, history:[] };
+    this.state.cheatEnabled = false;
+    (this.state.contacts || []).forEach(c => { if (c.hasContact === undefined) c.hasContact = false; });
+  },
+
+  /* ---- Save/Load ---- */
+  saveSlot(idx) {
+    if (!this.created) { UI.toast('游戏尚未开始', 'error'); return; }
+    const p = this.state.player;
+    const meta = {
+      version: 2,
+      name: '存档' + (idx+1),
+      timestamp: new Date().toISOString(),
+      playerName: p.name,
+      playerLevel: p.level,
+      playerLocation: this.state.story.location,
+      playerTitle: p.title,
+      state: JSON.parse(JSON.stringify(this.state))
+    };
+    localStorage.setItem('urban_save_' + idx, JSON.stringify(meta));
+    UI.toast('💾 已保存到槽位' + (idx+1) + ' (' + p.name + ' Lv.' + p.level + ')', 'success');
+    this.addLog('system', '💾 存档槽位' + (idx+1) + '已保存。');
+    this.addLog('system', '   🎒 ' + (p.inventory?p.inventory.length:0) + '件物品 | 📇 ' + (this.state.contacts?this.state.contacts.length:0) + '个联系人 | 🧠 ' + (this.state.memory?this.state.memory.length:0) + '条记忆');
+    this.renderSaveSlots();
+  },
+
+  loadSlot(idx) {
+    try {
+      const raw = localStorage.getItem('urban_save_' + idx);
+      if (!raw) { UI.toast('槽位' + (idx+1) + '为空', 'error'); return; }
+      const meta = JSON.parse(raw);
+      if (!meta.state?.player) throw new Error('无效');
+      if (!confirm('确定加载槽位'+(idx+1)+'的存档吗？\n\n' + (meta.playerName||'?') + ' Lv.' + (meta.playerLevel||1) + '\n' + (meta.playerLocation||'?'))) return;
+      this.state = JSON.parse(JSON.stringify(meta.state));
+      this.migrateState();
+      this.state.history = this.state.history || [];
+      this.state.cheatEnabled = false;
+      this.created = true;
+      document.getElementById('cheat-toggle').classList.remove('active');
+      document.getElementById('cheat-toggle').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6.4-4.8-6.4 4.8 2.4-7.2-6-4.8h7.6z"/></svg> 金手指';
+      document.querySelectorAll('.quick-action.cheat').forEach(b => b.classList.remove('show'));
+      document.getElementById('game-log').innerHTML = '';
+      document.getElementById('char-create-overlay').classList.add('hidden');
+      this.addLog('system', '📂 存档已加载！欢迎回来，' + this.state.player.name + '。');
+      this.renderAll();
+      UI.closeSettings();
+      document.getElementById('user-input').focus();
+    } catch(e) { UI.toast('存档加载失败', 'error'); }
+  },
+
+  deleteSlot(idx) {
+    if (!confirm('确定删除槽位' + (idx+1) + '的存档吗？此操作不可恢复。')) return;
+    localStorage.removeItem('urban_save_' + idx);
+    UI.toast('存档槽位' + (idx+1) + '已删除', 'success');
+    this.renderSaveSlots();
+  },
+
+  renderSaveSlots() {
+    const container = document.getElementById('save-slots');
+    if (!container) return;
+    let html = '';
+    for (let i = 0; i < 3; i++) {
+      try {
+        const raw = localStorage.getItem('urban_save_' + i);
+        if (raw) {
+          const m = JSON.parse(raw);
+          html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:11px;border-bottom:1px solid var(--border)">' +
+            '<span>💾 槽'+(i+1)+'：'+(m.playerName||'?')+' Lv.'+(m.playerLevel||1)+' | '+ (m.playerLocation||'?') +'</span>' +
+            '<span><button class="btn" onclick="Game.loadSlot('+i+')" style="font-size:10px;padding:2px 6px">加载</button> ' +
+            '<button class="btn" onclick="Game.deleteSlot('+i+')" style="font-size:10px;padding:2px 6px;color:var(--danger);border-color:var(--danger)">删</button></span>' +
+            '</div>';
+        } else {
+          html += '<div style="font-size:11px;color:var(--text-muted);padding:6px 0;border-bottom:1px solid var(--border)">💾 槽'+(i+1)+'：空</div>';
+        }
+      } catch(_) {
+        html += '<div style="font-size:11px;color:var(--danger);padding:6px 0;border-bottom:1px solid var(--border)">💾 槽'+(i+1)+'：损坏</div>';
+      }
+    }
+    container.innerHTML = html;
+  },
+
+  /* ---- Export/Import ---- */
+  exportSave() {
+    const saveData = { version:2, timestamp:new Date().toISOString(), state:JSON.parse(JSON.stringify(this.state)) };
+    const blob = new Blob([JSON.stringify(saveData,null,2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `urban-awakening-${this.state.player.name}-Lv${this.state.player.level}.json`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
+    this.addLog('system', '💾 存档已导出！');
+    UI.toast('导出成功', 'success');
+  },
+
+  importSave() { document.getElementById('import-file').click(); },
+
+  handleImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const saveData = JSON.parse(e.target.result);
+        if (!saveData.state?.player) throw new Error('无效存档');
+        this.state = JSON.parse(JSON.stringify(saveData.state));
+        this.migrateState();
+        this.state.history = this.state.history || [];
+        this.state.cheatEnabled = false;
+        this.created = true;
+        document.getElementById('cheat-toggle').classList.remove('active');
+        document.getElementById('cheat-toggle').innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6.4-4.8-6.4 4.8 2.4-7.2-6-4.8h7.6z"/></svg> 金手指`;
+        document.querySelectorAll('.quick-action.cheat').forEach(b => b.classList.remove('show'));
+        document.getElementById('game-log').innerHTML = '';
+        this.addLog('system', '📂 存档已加载！欢迎回来，' + this.state.player.name + '。');
+        this.renderAll();
+        UI.toast('存档导入成功', 'success');
+      } catch(err) {
+        this.addLog('system', `❌ 存档读取失败：${err.message}`);
+        UI.toast('存档格式无效', 'error');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  },
+
+  /* ---- Log ---- */
+  addLog(type, text, isCollapsible) {
+    const log = document.getElementById('game-log');
+    const entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    if (isCollapsible) {
+      entry.innerHTML = '<details><summary>🧠 AI 推理过程</summary><div style="margin-top:5px">' + this.formatText(text) + '</div></details>';
+    } else {
+      entry.innerHTML = this.formatText(text);
+      // Add action buttons for narrative and player action entries
+      if (type === 'narrative') {
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'margin-top:6px;display:flex;gap:6px';
+        const regenBtn = document.createElement('button');
+        regenBtn.textContent = '🔄 重新生成';
+        regenBtn.style.cssText = 'font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text-muted);cursor:pointer';
+        regenBtn.onclick = () => Game.regenerate();
+        btnRow.appendChild(regenBtn);
+        entry.appendChild(btnRow);
+      }
+      if (type === 'action') {
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'margin-top:4px;display:flex;gap:6px';
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️ 编辑重发';
+        editBtn.style.cssText = 'font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text-muted);cursor:pointer';
+        editBtn.onclick = () => Game.editLastAction();
+        btnRow.appendChild(editBtn);
+        entry.appendChild(btnRow);
+      }
+    }
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+  },
+
+  formatText(text) {
+    return String(text)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+  },
+
+  setLoading(v) {
+    document.getElementById('loading-indicator').classList.toggle('show', v);
+    document.getElementById('send-btn').disabled = v;
+    document.getElementById('send-btn').textContent = v ? '⏳' : '▶ 行动';
+    document.getElementById('user-input').disabled = v;
+  },
+
+  /* ---- Auto Save ---- */
+  autoSave() {
+    try {
+      const p = this.state.player;
+      const meta = { version:2, timestamp:new Date().toISOString(), playerName:p.name, playerLevel:p.level, playerLocation:this.state.story.location, state:JSON.parse(JSON.stringify(this.state)) };
+      localStorage.setItem('urban_awakening_autosave', JSON.stringify(meta));
+    } catch(_) {}
+  },
+
+  loadAutoSave() {
+    try {
+      const raw = localStorage.getItem('urban_awakening_autosave');
+      if (!raw) return false;
+      const d = JSON.parse(raw);
+      // Handle both old and new save format
+      const savedState = d.state || d;
+      if (!savedState.player) return false;
+      this.state = JSON.parse(JSON.stringify(savedState));
+      this.migrateState();
+      this.state.history = this.state.history || [];
+      this.state.cheatEnabled = false;
+      this.created = true;
+      return true;
+    } catch(_) { return false; }
+  },
+
+  /* ---- Use Item ---- */
+  useItem(itemId) {
+    const p = this.state.player;
+    const idx = p.inventory.findIndex(i => i.id === itemId);
+    if (idx < 0) return;
+    const item = p.inventory[idx];
+    // Handle known items
+    if (item.id === 'heal_small') {
+      p.hp = Math.min(p.maxHp, p.hp + 30);
+      this.addLog('system', `💊 使用${item.name}：恢复30点生命 (HP:${p.hp}/${p.maxHp})`);
+    } else if (item.id === 'heal_big') {
+      p.hp = Math.min(p.maxHp, p.hp + 80);
+      this.addLog('system', `🧪 使用${item.name}：恢复80点生命 (HP:${p.hp}/${p.maxHp})`);
+    } else if (item.id === 'sp_potion') {
+      p.sp = Math.min(p.maxSp, p.sp + 40);
+      this.addLog('system', `🔮 使用${item.name}：恢复40点灵力 (SP:${p.sp}/${p.maxSp})`);
+    } else {
+      this.addLog('system', `📦 使用${item.name}。`);
+    }
+    // Reduce quantity or remove
+    if (item.qty > 1) item.qty--;
+    else p.inventory.splice(idx, 1);
+    this.renderAll();
+    this.autoSave();
+  },
+
+  /* ---- HP Death Check ---- */
+  checkDeath() {
+    const p = this.state.player;
+    if (p.hp <= 0 && this.created && !this.state.cheatEnabled) {
+      this.addLog('danger', '💀 **你倒下了。** 你的生命值降到了零点。');
+      this.addLog('system', '⚠️ 你可以选择：① 等待救援（可能有机会被NPC救起）② 开启金手指强行复活 ③ 加载之前的存档');
+      p.hp = 1; // Limp mode
+      this.renderAll();
+      this.autoSave();
+    }
+  },
+
+  /* ---- Contacts & Phone Chat ---- */
+  addContact(name, desc, hasContact) {
+    if (!name) return;
+    const existing = this.state.contacts.find(c => c.name === name);
+    if (existing) {
+      if (hasContact && !existing.hasContact) existing.hasContact = true;
+      return;
+    }
+    this.state.contacts.push({ name, desc, hasContact: !!hasContact, chatHistory:[] });
+    this.addLog('system', `📇 **通讯录新增**：${name}` + (hasContact ? ' 📱（可联系）' : '（需获取联系方式）'));
+    this.renderAll();
+    UI.toast('📇 ' + name + ' 已加入通讯录' + (hasContact ? '（可联系）' : ''), 'success');
+  },
+  hasPhone() {
+    const p = this.state.player;
+    if (!p.inventory || !p.inventory.length) return false;
+    return p.inventory.some(i => {
+      const s = (i.name + (i.id||'')).toLowerCase();
+      return s.includes('手机') || s.includes('phone') || s.includes('通讯') || s.includes('眼镜') || s.includes('智能') || s.includes('通讯器');
+    });
+  },
+  openPhoneChat(idx) {
+    if (!this.hasPhone()) { UI.toast('需要通讯设备才能联系他人', 'error'); return; }
+    const c = this.state.contacts[idx];
+    if (!c) return;
+    if (!c.hasContact) {
+      // Offer to get contact via main chat
+      const input = document.getElementById('user-input');
+      input.value = '我拿出手机，试图获取【' + c.name + '】的联系方式。';
+      input.focus();
+      UI.toast('已填入消息到主对话框，发送即可获取联系方式', 'success');
+      UI.closeDrawers();
+      return;
+    }
+    this.state.phoneChat = { active:true, contactIdx:idx, history:c.chatHistory || [] };
+    document.getElementById('chat-title').textContent = '📱 ' + c.name;
+    const log = document.getElementById('chat-log');
+    log.innerHTML = (c.chatHistory || []).map(h => 
+      '<div style="padding:4px 8px;border-radius:4px;background:'+(h.role==='user'?'var(--bg-elevated)':'var(--bg-surface)')+';border-left:2px solid '+(h.role==='user'?'var(--accent-dim)':'var(--purple)')+'"><strong>'+(h.role==='user'?'我':c.name)+'：</strong>'+h.content+'</div>'
+    ).join('');
+    log.scrollTop = log.scrollHeight;
+    document.getElementById('chat-modal').classList.remove('hidden');
+    document.getElementById('chat-input').focus();
+    UI.closeDrawers();
+  },
+  closePhoneChat() {
+    document.getElementById('chat-modal').classList.add('hidden');
+    // Bridge: add private chat summary to main game memory
+    const c = this.state.contacts[this.state.phoneChat.contactIdx];
+    if (c && c.chatHistory && c.chatHistory.length >= 2) {
+      const lastMsgs = c.chatHistory.slice(-4);
+      const summary = lastMsgs.map(h => (h.role==='user'?'我':'对方')+'：'+h.content.substring(0,40)).join(' → ');
+      this.addMemory('[私聊]与' + c.name + '的对话：' + summary);
+      this.addLog('system', '💬 私聊内容已同步到主故事线。');
+    }
+    this.state.phoneChat.active = false;
+    document.getElementById('user-input').focus();
+  },
+  async sendPhoneChat() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text || this.apiRequesting || !this.state.phoneChat.active) return;
+    const c = this.state.contacts[this.state.phoneChat.contactIdx];
+    if (!c) return;
+    input.value = '';
+    const log = document.getElementById('chat-log');
+    log.innerHTML += '<div style="padding:4px 8px;border-radius:4px;background:var(--bg-elevated);border-left:2px solid var(--accent-dim)"><strong>我：</strong>'+text+'</div>';
+    log.scrollTop = log.scrollHeight;
+    c.chatHistory.push({ role:'user', content:text });
+    this.setLoading(true); this.apiRequesting = true;
+    const prompt = `【私聊模式】你正在以${c.name}的身份通过手机与${this.state.player.name}打字聊天。
+
+背景信息（主故事线中的情况，你可能已经知道）：
+- ${this.state.player.name}当前在${this.state.story.location}
+- 最近发生的事：${this.state.memory.slice(-5).join('；') || '暂无'}
+- 你与${this.state.player.name}的关系：${c.desc || '一般认识'}
+
+严格规则：
+1. 只输出${c.name}说的话。纯文字。不要加任何动作描述、场景描写、星号、格式标记。
+2. 绝对不要写"手机屏幕亮起""微信提示音""正在输入"之类的叙述。
+3. 用真实手机聊天的语气：简短、口语化、自然。
+4. 如果聊天内容产生实际影响，在回复最后一行单独加游戏指令：[STAT:xxx][LOCATION:xxx][MEMORY:xxx]等。
+
+${this.state.player.name}：${text}`;
+    const result = await this.callAI(prompt);
+    this.apiRequesting = false; this.setLoading(false);
+    if (!result) return;
+    if (result.reasoning) this.addLog('thinking', result.reasoning, true);
+    const reply = result.content;
+    log.innerHTML += '<div style="padding:4px 8px;border-radius:4px;background:var(--bg-surface);border-left:2px solid var(--purple)"><strong>'+c.name+'：</strong>'+reply+'</div>';
+    log.scrollTop = log.scrollHeight;
+    c.chatHistory.push({ role:'assistant', content:reply });
+    // Apply commands to main game
+    this.parseCommands(reply);
+    // Also parse contacts from reply (auto-detect)
+    this.autoExtractContacts(reply);
+    this.renderAll();
+    this.autoSave();
+  },
+  showAddContact() {
+    const name = prompt('输入联系人姓名：');
+    if (!name || !name.trim()) return;
+    const hasPhone = this.hasPhone();
+    const hasContact = hasPhone ? confirm('是否已获得此人的联系方式（手机号/微信等）？\n\n你有通讯设备，如果回答"确定"，该联系人将标记为"可联系"。') : false;
+    const desc = prompt('简单描述（可选）：') || '';
+    this.addContact(name.trim(), desc, hasContact);
+    UI.closeDrawers();
+    document.getElementById('left-panel').classList.add('open');
+    document.getElementById('drawer-backdrop').classList.add('show');
+  },
+
+  removeContact(idx) {
+    const c = this.state.contacts[idx];
+    if (!c) return;
+    if (!confirm('确定要删除联系人"' + c.name + '"吗？')) return;
+    this.state.contacts.splice(idx, 1);
+    this.addLog('system', '📇 已移除联系人：' + c.name);
+    this.renderAll();
+  },
+
+  renderContacts() {
+    const list = document.getElementById('contact-list');
+    if (!this.state.contacts || this.state.contacts.length === 0) {
+      list.innerHTML = '<div class="inv-empty">还没有认识的人</div>'; return;
+    }
+    list.innerHTML = this.state.contacts.map((c, i) => '<div class="inv-item"><div class="icon">'+(c.hasContact?'📱':'👤')+'</div><div class="name" onclick="Game.openPhoneChat('+i+')" style="cursor:pointer" title="'+(c.desc||'')+(c.hasContact?' (可联系)':' (无联系方式，点击获取)')+'">'+c.name+'</div><button onclick="event.stopPropagation();Game.removeContact('+i+')" style="color:var(--danger);font-size:10px;border:1px solid var(--danger);border-radius:3px;padding:1px 5px;opacity:0.6">✕</button></div>').join('');
+  },
+
+  renderSummary() {
+    const panel = document.getElementById('summary-panel');
+    if (!panel) return;
+    const p = this.state.player;
+    const s = this.state.story;
+    let html = '<b>📍 ' + (s.location || '未知') + '</b><br>';
+    html += 'Lv.' + p.level + ' · HP ' + p.hp + '/' + p.maxHp + ' · ' + p.credits + '信用点<br>';
+    if (this.state.memory && this.state.memory.length > 0) {
+      html += '<br>📌 ' + this.state.memory.slice(-3).join('<br>📌 ');
+    }
+    if (this.state.contacts && this.state.contacts.length > 0) {
+      const reachable = this.state.contacts.filter(c => c.hasContact);
+      if (reachable.length > 0) html += '<br><br>📱 可联系：' + reachable.map(c => c.name).join('、');
+    }
+    panel.innerHTML = html;
+  },
+
+  /* ---- Render ---- */
+  renderAll() {
+    this.renderCharacter(); this.renderSummary(); this.renderReputation(); this.renderMap(); this.renderContacts();
+  },
+
+  renderCharacter() {
+    const p = this.state.player;
+    const ab = p._abCustomName ? { icon:'✨', name: p._abCustomName } : (ABILITY_CONFIG[p.ability] || {});
+    const ta = p._taCustomName ? { icon:'✨', name: p._taCustomName } : (TALENT_CONFIG[p.talent] || {});
+    document.getElementById('char-avatar').textContent = ab.icon || '🧬';
+    document.getElementById('char-name').textContent = p.name || '---';
+    document.getElementById('char-level').textContent = `Lv.${p.level} · ${p.title}`;
+    document.getElementById('char-meta').textContent = `${p.gender==='male'?'♂':'♀'} | ${ab.name||''} | ${ta.name||''}`;
+    document.getElementById('hp-bar').style.width = ((p.hp/p.maxHp)*100) + '%';
+    document.getElementById('hp-val').textContent = p.hp + '/' + p.maxHp;
+    document.getElementById('sp-bar').style.width = ((p.sp/p.maxSp)*100) + '%';
+    document.getElementById('sp-val').textContent = p.sp + '/' + p.maxSp;
+    document.getElementById('xp-bar').style.width = ((p.exp/p.maxExp)*100) + '%';
+    document.getElementById('xp-val').textContent = p.exp + '/' + p.maxExp;
+    document.getElementById('stat-combat').textContent = p.abilities.combat;
+    document.getElementById('stat-perception').textContent = p.abilities.perception;
+    document.getElementById('stat-manipulation').textContent = p.abilities.manipulation;
+    document.getElementById('stat-resistance').textContent = p.abilities.resistance;
+    document.getElementById('credits-val').textContent = p.credits.toLocaleString();
+
+    const invList = document.getElementById('inv-list');
+    if (!p.inventory || p.inventory.length === 0) {
+      invList.innerHTML = '<div class="inv-empty">背包空空如也</div>';
+    } else {
+      invList.innerHTML = p.inventory.map(i => '<div class="inv-item" title="'+(i.desc||'在聊天框输入\"使用'+i.name+'\"')+'"><div class="icon">'+i.icon+'</div><div class="name">'+i.name+'</div><div class="qty">×'+i.qty+'</div></div>').join('');
+    }
+  },
+
+  renderQuests() {
+    const list = document.getElementById('quest-list');
+    const qs = this.state.quests;
+    if (!qs || qs.length === 0) { list.innerHTML = '<div class="inv-empty">暂无任务</div>'; return; }
+    list.innerHTML = qs.map(q => '<div class="quest-item '+q.status+'"><div class="q-title">'+(q.status==='completed'?'✅':'🔹')+' '+q.title+'</div><div class="q-desc">'+q.desc+'</div></div>').join('');
+  },
+
+  renderReputation() {
+    const list = document.getElementById('rep-list');
+    const rep = this.state.player.reputation;
+    const factions = [
+      { key:'awakened_union', name:'异能者联盟' }, { key:'city_police', name:'城市警方' },
+      { key:'shadow_guild', name:'暗影商会' }, { key:'bureau', name:'异能管理局' },
+    ];
+    list.innerHTML = factions.map(f => {
+      const v = Math.max(0, Math.min(100, rep[f.key] || 0));
+      const cls = v >= 60 ? 'positive' : v <= 25 ? 'negative' : 'neutral';
+      return '<div class="rep-row"><span class="faction">'+f.name+'</span><div class="rep-bar-wrap"><div class="rep-bar-fill '+cls+'" style="width:'+v+'%"></div></div></div>';
+    }).join('');
+  },
+
+  renderMap() {
+    const map = document.getElementById('mini-map');
+    if (!map) return;
+    // Clear old nodes (keep zone divs)
+    map.querySelectorAll('.map-node').forEach(n => n.remove());
+    const locs = this.state.story.visitedLocations || [];
+    if (locs.length === 0) return;
+    const currentLoc = this.state.story.location;
+    locs.forEach(loc => {
+      const pos = getMapPos(loc);
+      const isCurrent = loc === currentLoc;
+      const shortName = loc.length > 8 ? loc.substring(0,7)+'…' : loc;
+      const node = document.createElement('div');
+      node.className = 'map-node' + (isCurrent ? ' current' : ' visited');
+      node.style.left = pos.x + '%';
+      node.style.top = pos.y + '%';
+      node.title = loc;
+      node.onclick = function() { Game.state.story.location = loc; Game.addLog('system','📍 前往：'+loc); Game.quickAction('explore'); };
+      const label = document.createElement('span');
+      label.className = 'map-label';
+      label.textContent = pos.icon + ' ' + shortName;
+      node.appendChild(label);
+      node.textContent = pos.icon;
+      map.appendChild(node);
+    });
+  },
+};
+
+/* ---------- UI ---------- */
+const UI = {
+  applyConfig() {
+    const cfg = { ...DEFAULTS, ...loadConfig() };
+    document.getElementById('cfg-endpoint').value = cfg.apiEndpoint;
+    document.getElementById('cfg-apikey').value = cfg.apiKey;
+    document.getElementById('cfg-model').value = cfg.model;
+    document.getElementById('cfg-reasoning').value = cfg.reasoningEffort;
+    document.getElementById('cfg-maxtokens').value = cfg.maxTokens || 'unlimited';
+  },
+  openSettings() { this.applyConfig(); document.getElementById('settings-modal').classList.remove('hidden'); this.fetchModels(); this.renderSaveSlots(); },
+  closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); },
+  restartGame() {
+    if (!confirm('确定要重新开始吗？当前进度将丢失。（自动存档不受影响）')) return;
+    localStorage.removeItem('urban_awakening_autosave');
+    location.reload();
+  },
+  modelsCache: null,
+  async fetchModels() {
+    const cfg = { ...DEFAULTS, ...loadConfig() };
+    if (!cfg.apiKey) { document.getElementById('model-hint').textContent = '⚠️ 需要先填入API Key才能拉取模型列表'; return; }
+    document.getElementById('model-hint').textContent = '⏳ 正在从API拉取可用模型列表…';
+    // Return cached if fresh (< 5min)
+    if (this.modelsCache && this.modelsCache.time > Date.now() - 300000) {
+      this.populateModels(this.modelsCache.data);
+      return;
+    }
+    try {
+      const r = await fetch(cfg.apiEndpoint.replace('/chat/completions', '/models'), {
+        headers: { 'Authorization': 'Bearer ' + cfg.apiKey }
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const models = (data.data || []).map(m => m.id).filter(id => id.includes('deepseek') || id.includes('chat') || id.includes('reasoner'));
+        this.modelsCache = { time: Date.now(), data: models };
+        this.populateModels(models);
+      } else {
+        document.getElementById('model-hint').textContent = '⚠️ 拉取失败，使用默认列表 (HTTP ' + r.status + ')';
+      }
+    } catch(e) {
+      document.getElementById('model-hint').textContent = '⚠️ 网络错误，使用默认列表';
+    }
+  },
+  populateModels(models) {
+    const sel = document.getElementById('cfg-model');
+    const current = sel.value;
+    sel.innerHTML = '';
+    if (models.length === 0) {
+      sel.innerHTML = '<option value="deepseek-chat">deepseek-chat</option><option value="deepseek-reasoner">deepseek-reasoner</option>';
+    } else {
+      models.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); });
+    }
+    // Restore selection
+    if ([...sel.options].some(o => o.value === current)) sel.value = current;
+    else if (models.length > 0) sel.value = models[0];
+    document.getElementById('model-hint').textContent = '✅ 已加载 ' + sel.options.length + ' 个可用模型';
+  },
+  saveSettings() {
+    const cfg = {
+      apiEndpoint: document.getElementById('cfg-endpoint').value.trim() || DEFAULTS.apiEndpoint,
+      apiKey: document.getElementById('cfg-apikey').value.trim(),
+      model: document.getElementById('cfg-model').value,
+      reasoningEffort: document.getElementById('cfg-reasoning').value,
+      maxTokens: document.getElementById('cfg-maxtokens').value,
+    };
+    saveConfig(cfg); this.closeSettings();
+    Game.addLog('system', '✅ 设置已保存。');
+    this.toast('设置已保存', 'success');
+  },
+  async testConnection() {
+    const cfg = { apiEndpoint:document.getElementById('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint, apiKey:document.getElementById('cfg-apikey').value.trim(), model:document.getElementById('cfg-model').value };
+    if (!cfg.apiKey) { this.toast('请先输入API Key', 'error'); return; }
+    this.toast('正在测试连接…');
+    try {
+      const r = await fetch(cfg.apiEndpoint, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},
+        body:JSON.stringify({ model:cfg.model, messages:[{role:'user',content:'回复"连接成功"'}], max_tokens:20 }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        this.toast('✅ 连接成功！', 'success');
+      } else {
+        this.toast('❌ 连接失败：HTTP '+r.status, 'error');
+      }
+    } catch(e) { this.toast('❌ 连接失败：'+e.message, 'error'); }
+  },
+  handleInputKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); Game.sendAction(); } },
+  togglePanel(p) {
+    const panel = document.getElementById(p === 'left' ? 'left-panel' : 'right-panel');
+    const backdrop = document.getElementById('drawer-backdrop');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) {
+      backdrop.classList.add('show');
+      // Force a full re-render when drawer opens so data is always fresh
+      Game.renderAll();
+    } else {
+      backdrop.classList.remove('show');
+    }
+  },
+  closeDrawers() {
+    document.getElementById('left-panel').classList.remove('open');
+    document.getElementById('right-panel').classList.remove('open');
+    document.getElementById('drawer-backdrop').classList.remove('show');
+  },
+  toast(msg, type) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'show ' + (type||'');
+    clearTimeout(el._t); el._t = setTimeout(function(){ el.className = ''; }, 2500);
+  },
+};
+
+/* ---------- Bootstrap ---------- */
+document.addEventListener('DOMContentLoaded', function() {
+  CC.init();
+  // Check for auto-save
+  if (Game.loadAutoSave()) {
+    const p = Game.state.player;
+    if (p && p.name) {
+      document.getElementById('char-create-overlay').classList.add('hidden');
+      document.getElementById('game-log').innerHTML = '';
+      Game.addLog('system', '📂 检测到自动存档。欢迎回来，' + p.name + '。');
+      Game.addLog('system', '💡 如需重新开始，请导出存档后刷新页面。');
+      Game.renderAll();
+      document.getElementById('user-input').focus();
+    }
+  }
+});
+
+// Global keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  // Esc: close modals/panels
+  if (e.key === 'Escape') {
+    if (!document.getElementById('settings-modal').classList.contains('hidden')) {
+      UI.closeSettings();
+    }
+    UI.closeDrawers();
+  }
+  // Ctrl+S: export save
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (Game.created) Game.exportSave();
+  }
+});
+
+// Modal backdrop click
+document.getElementById('chat-modal').addEventListener('click', function(e) { if (e.target === this) Game.closePhoneChat(); });
+document.getElementById('settings-modal').addEventListener('click', function(e) {
+  if (e.target === this) UI.closeSettings();
+});
+
+// Textarea auto-resize
+document.getElementById('user-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 110) + 'px';
+});
+</script>
+</body>
+</html>

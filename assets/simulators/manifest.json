@@ -1,0 +1,365 @@
+{
+  "version": 2,
+  "simulators": [
+    {
+      "id": "life-sim",
+      "file": "人生模拟器v3.html",
+      "name": "人生模拟器 v3",
+      "type": "ai",
+      "description": "AI 驱动的生命模拟（天赋/事件/结局），需配置 AI 接口；存档走 localStorage（ls_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "ls_autosave",
+        "ls_used_names"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "spider-shadow",
+      "file": "蛛网之影.html",
+      "name": "蛛网之影",
+      "type": "ai",
+      "description": "AI 驱动的蜘蛛侠世界观角色扮演，需配置 AI 接口；存档走 localStorage（spiderweb_ 前缀）",
+      "config": {
+        "endpoint": "set-endpoint",
+        "apikey": "set-apikey",
+        "model": "set-model"
+      },
+      "saveKeys": [
+        "spiderweb_state"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "ido-idol-sim",
+      "file": "ido偶像模拟器.html",
+      "name": "星途物语 · 爱豆模拟器",
+      "type": "ai",
+      "description": "AI 驱动的偶像养成模拟（星途物语：出道/通告/粉丝），需配置 AI 接口；存档走 localStorage（xingtu_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "xingtu_state"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "xiantu",
+      "file": "仙途.html",
+      "name": "仙途",
+      "type": "ai",
+      "description": "AI 驱动的修仙模拟（玄元大陆：境界/奇遇/宗门），需配置 AI 接口；存档走 localStorage（xiantu_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "xiantu_autosave"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "fake-wechat",
+      "file": "仿微.html",
+      "name": "仿微 · 微信 AI",
+      "type": "ai",
+      "description": "AI 驱动的微信界面社交模拟（仿微：聊天/朋友圈），需配置 AI 接口；存档走 localStorage（wxai_ 前缀）",
+      "config": {
+        "endpoint": "inpBase",
+        "apikey": "inpKey",
+        "model": "inpModel"
+      },
+      "saveKeys": [
+        "wxai_state_v1",
+        "wxai_state_prev"
+      ],
+      "endpointMode": "base"
+    },
+    {
+      "id": "detective-sim",
+      "file": "侦探模拟v3.html",
+      "name": "迷雾侦探 v3",
+      "type": "ai",
+      "description": "AI 驱动的推理探案（迷雾侦探：现场/线索/结案），需配置 AI 接口；存档走 localStorage（detective-ai- 前缀）",
+      "config": {
+        "endpoint": "api-base",
+        "apikey": "api-key",
+        "model": "api-model"
+      },
+      "saveKeys": [
+        "detective-ai-save-v1"
+      ],
+      "endpointMode": "base"
+    },
+    {
+      "id": "cthulhu-rpg",
+      "file": "克苏鲁跑团AIv2.html",
+      "name": "克苏鲁跑团 v2",
+      "type": "ai",
+      "description": "AI 守秘人的克苏鲁跑团（CoC 7e：调查/检定/理智），需配置 AI 接口；存档走 localStorage（coc_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "coc_autosave"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "harry-potter",
+      "file": "哈利波特.html",
+      "name": "霍格沃茨 · 命运之书",
+      "type": "ai",
+      "description": "哈利·波特世界观 AI 角色扮演（霍格沃茨命运之书），需配置 AI 接口；存档走 localStorage（hpbook_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "hpbook_state"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "my-little-pony",
+      "file": "小马宝莉.html",
+      "name": "小马宝莉",
+      "type": "ai",
+      "description": "小马宝莉世界观 AI 角色扮演，需配置 AI 接口；存档走 localStorage（wg_ 前缀）",
+      "config": {
+        "endpoint": "s-endpoint",
+        "apikey": "s-key",
+        "model": "s-model"
+      },
+      "saveKeys": [
+        "wg_xiaomabaoli_save"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "sakura-academy",
+      "file": "恋樱学园v2.html",
+      "name": "恋樱学园 v2",
+      "type": "ai",
+      "description": "AI 驱动的校园恋爱模拟（恋樱学园），需配置 AI 接口；存档走 localStorage（sakura_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "sakura_state"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "endless-sea",
+      "file": "无尽之海.html",
+      "name": "无尽之海",
+      "type": "ai",
+      "description": "AI 驱动的航海冒险模拟（无尽之海：航行/贸易/探险），需配置 AI 接口；存档走 localStorage（endless_sea_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "endless_sea_save"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "infinite-loop",
+      "file": "无限流v2.html",
+      "name": "无限流 v2",
+      "type": "ai",
+      "description": "AI 驱动的无限流副本轮回模拟（无限轮回），需配置 AI 接口；存档走 localStorage（il_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "il_autosave"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "twilight-witch",
+      "file": "暮色女巫v2.html",
+      "name": "暮色女巫 v2",
+      "type": "ai",
+      "description": "AI 驱动的女巫生存模拟（灰溪村的冬天：痕迹/搜查/审判），需配置 AI 接口；存档走 localStorage（twilight_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "twilight_autosave",
+        "twilight_cps",
+        "twilight_deaths",
+        "twilight_slot_\\d+"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "my-empire",
+      "file": "朕的江山.html",
+      "name": "朕的江山",
+      "type": "ai",
+      "description": "AI 驱动的皇帝治国模拟（朝政/选妃/天下），需配置 AI 接口；存档走 localStorage（emperor_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "emperor_state"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "jianghu",
+      "file": "江湖志v2.html",
+      "name": "江湖志 v2",
+      "type": "ai",
+      "description": "AI 驱动的武侠人生角色扮演（江湖志：闯荡/门派/恩怨），需配置 AI 接口；存档走 localStorage（jianghu_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "jianghu_state_v1"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "spirit-net-ascension",
+      "file": "灵网飞升.html",
+      "name": "灵网飞升",
+      "type": "ai",
+      "description": "AI 驱动的赛博修仙角色扮演（灵网飞升：灵网/飞升），需配置 AI 接口；存档走 localStorage（lwfs_ 前缀）",
+      "config": {
+        "endpoint": "a-base",
+        "apikey": "a-key",
+        "model": "a-model"
+      },
+      "saveKeys": [
+        "lwfs_save_v1"
+      ],
+      "endpointMode": "base"
+    },
+    {
+      "id": "society-sim",
+      "file": "社会.html",
+      "name": "混社会模拟器",
+      "type": "ai",
+      "description": "AI 驱动的混社会人生角色扮演（《混社会模拟器》），需配置 AI 接口；存档走 localStorage（hsh_ 前缀）",
+      "config": {
+        "endpoint": "w-endpoint",
+        "apikey": "w-apikey",
+        "model": "w-model"
+      },
+      "saveKeys": [
+        "hsh_save_v1"
+      ],
+      "endpointMode": "base"
+    },
+    {
+      "id": "urban-god",
+      "file": "神明v3.html",
+      "name": "神明 v3",
+      "type": "ai",
+      "description": "AI 驱动的都市神明模拟（Urban God），需配置 AI 接口；存档走 localStorage（god_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "god_autosave",
+        "god_save_\\d+"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "wishing-willow",
+      "file": "许愿柳.html",
+      "name": "许愿柳",
+      "type": "ai",
+      "description": "AI 驱动的沉浸式角色扮演（许愿柳），需配置 AI 接口；存档走 localStorage（xuyangliu_ 前缀）",
+      "config": {
+        "endpoint": "api-base",
+        "apikey": "api-key",
+        "model": "api-model"
+      },
+      "saveKeys": [
+        "xuyangliu_save_v1",
+        "xuyangliu_ui_v1"
+      ],
+      "endpointMode": "base"
+    },
+    {
+      "id": "urban-awakening",
+      "file": "都市异能v2.html",
+      "name": "都市异能 v2",
+      "type": "ai",
+      "description": "AI 驱动的都市异能角色扮演（Urban Awakening），需配置 AI 接口；存档走 localStorage（urban_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "urban_awakening_autosave",
+        "urban_save_\\d+"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "high-school-sim",
+      "file": "高中生模拟器.html",
+      "name": "高中生模拟器",
+      "type": "ai",
+      "description": "AI 驱动的高中校园生活角色扮演，需配置 AI 接口；存档走 localStorage（wg_ 前缀）",
+      "config": {
+        "endpoint": "s-endpoint",
+        "apikey": "s-key",
+        "model": "s-model"
+      },
+      "saveKeys": [
+        "wg_gaozhongsheng_save"
+      ],
+      "endpointMode": "full"
+    },
+    {
+      "id": "madoka-magica",
+      "file": "魔法少女小圆.html",
+      "name": "魔法少女小圆",
+      "type": "ai",
+      "description": "魔法少女小圆世界观 TRPG（见泷原），AI 驱动，需配置 AI 接口；存档走 localStorage（madoka_ 前缀）",
+      "config": {
+        "endpoint": "cfg-endpoint",
+        "apikey": "cfg-apikey",
+        "model": "cfg-model"
+      },
+      "saveKeys": [
+        "madoka_state_v1"
+      ],
+      "endpointMode": "full"
+    }
+  ]
+}
