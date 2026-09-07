@@ -25,11 +25,15 @@ import 'support/fake_local_storage_access.dart';
 
 void main() {
   group('LocalStorageAccess 生产实现——JS 脚本契约与超时兜底', () {
-    test('enumerate 脚本原文 + 往返解析为全量键值', () async {
+    test('enumerate 脚本原文 + Android 编码串往返解析为全量键值', () async {
       final calls = <String>[];
       final access = JsBridgeLocalStorageAccess((script) async {
         calls.add(script);
-        return '[["k1","v1"],["k2","v2"]]';
+        // 锚 Android evaluateJavascript 生产契约（F-M5-09 AVD 实证，缺陷 #1）：
+        // 字符串结果带外层引号返回 Flutter（JSON 编码串），webview_flutter
+        // `runJavaScriptReturningResult` 对字符串**原样透传**——jsonEncode 外层
+        // 模拟该引号层，内层 = `JSON.stringify` 产物数组 JSON。
+        return jsonEncode('[["k1","v1"],["k2","v2"]]');
       });
       final result = await access.enumerate();
       expect(result, {'k1': 'v1', 'k2': 'v2'});
@@ -40,17 +44,31 @@ void main() {
       );
     });
 
+    test('enumerate：裸 JSON 兼容（锚 iOS/macOS 返回裸值平台）', () async {
+      final access = JsBridgeLocalStorageAccess(
+        (script) async => '[["k1","v1"],["k2","v2"]]',
+      );
+      expect(await access.enumerate(), {'k1': 'v1', 'k2': 'v2'});
+    });
+
     test('空 localStorage → 空 Map（不要求键存在）', () async {
       final access = JsBridgeLocalStorageAccess((script) async => '[]');
       expect(await access.enumerate(), isEmpty);
     });
 
-    test('parseLocalStorageEntries：数组条目解析 / 空数组', () {
+    test('parseLocalStorageEntries：数组条目解析 / 空数组 / Android 编码串解包',
+        () {
       expect(parseLocalStorageEntries('[["a","1"],["b","2"]]'), {
         'a': '1',
         'b': '2',
       });
       expect(parseLocalStorageEntries('[]'), isEmpty);
+      // Android evaluateJavascript 编码串（带外层引号）→ 解包后归一数组解析。
+      expect(
+        parseLocalStorageEntries(jsonEncode('[["a","1"],["b","2"]]')),
+        {'a': '1', 'b': '2'},
+      );
+      expect(parseLocalStorageEntries(jsonEncode('[]')), isEmpty);
     });
 
     test('畸形 JSON / 顶层非数组 → FormatException 上抛；enumerate 兜底空 Map',
@@ -58,8 +76,21 @@ void main() {
       expect(() => parseLocalStorageEntries('not-json'), throwsFormatException);
       expect(() => parseLocalStorageEntries('{"a":1}'),
           throwsFormatException);
+      // 编码串二次解码失败（内容非 JSON）同样走 FormatException 降级路径。
+      expect(
+        () => parseLocalStorageEntries(jsonEncode('{broken')),
+        throwsFormatException,
+      );
       final access = JsBridgeLocalStorageAccess((script) async => '{broken');
       expect(await access.enumerate(), isEmpty, reason: '降级信号 = 空 Map');
+      final encodedAccess = JsBridgeLocalStorageAccess(
+        (script) async => jsonEncode('{broken'),
+      );
+      expect(
+        await encodedAccess.enumerate(),
+        isEmpty,
+        reason: '编码串畸形同样降级空 Map（不崩）',
+      );
     });
 
     test('条目非 [k,v] 二元组 / 值非字符串 → 跳过该条（不炸）', () {

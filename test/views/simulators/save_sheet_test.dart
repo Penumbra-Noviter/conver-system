@@ -126,9 +126,15 @@ class _FakeSheetWebViewController implements SheetWebViewController {
   Future<String> evaluate(String script) async {
     evaluated.add(script);
     if (script == enumerateLocalStorageScript) {
-      return jsonEncode([
+      // 锚 Android evaluateJavascript 生产契约（F-M5-09 AVD 实证，缺陷 #1）：
+      // 字符串结果带外层引号返回 Flutter（JSON 编码串），webview_flutter
+      // `runJavaScriptReturningResult` 对字符串**原样透传**——外层 jsonEncode
+      // 模拟该引号层，内层 = `JSON.stringify` 产物数组 JSON。修复前该契约
+      // 使 `parseLocalStorageEntries` 一次 jsonDecode 得 String → FormatException
+      // → 面板恒 0 键（回归断言见 happy path 用例）。
+      return jsonEncode(jsonEncode([
         for (final entry in store.entries) [entry.key, entry.value],
-      ]);
+      ]));
     }
     return '';
   }

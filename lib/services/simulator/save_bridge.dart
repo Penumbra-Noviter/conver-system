@@ -19,6 +19,10 @@
 /// - 枚举：runJavaScript `JSON.stringify(Object.entries(localStorage))` 往返
 ///   解析为全量键值 Map；挂起/失败 → **超时兜底降级空 Map**（面板显示 0 键，
 ///   不挂死不抛错 —— 桌面 TD-69 存储异常降级空结果同构）；
+/// - **平台契约（F-M5-09 AVD 实证）**：Android `evaluateJavascript` 返回
+///   JSON 编码串（字符串结果带外层引号），`runJavaScriptReturningResult`
+///   原样透传 → [parseLocalStorageEntries] 对编码串解包一次；iOS/macOS 返回
+///   裸值（一次 [jsonDecode] 即数组），二者归一（见函数 docstring）；
 /// - 写回：setItem / removeItem 脚本注入（键值经 JSON 转义，无注入面）；
 ///   **写失败上抛**（quota 等），由 [SaveBridge] 编排「写前快照 + 尽力回滚」
 ///   （承接契约 TD-63/TD-73 语义的异步落地位）；
@@ -105,12 +109,20 @@ String buildRemoveItemScript(String key) =>
 /// 往返解析：`JSON.stringify(Object.entries(localStorage))` 的产物数组 →
 /// `Map<String,String>`。
 ///
-/// 防御（对抗性）：顶层非 List 或 JSON 非法 → 抛 [FormatException]（由
-/// [JsBridgeLocalStorageAccess.enumerate] 兜底降级空 Map）；单条非 `[k,v]`
-/// 二元组 / 键值非字符串 → 跳过该条不炸（localStorage 枚举产物应为同位
-/// 字符串，畸形条属异常数据面，静默略过）。
+/// 平台契约容错（F-M5-09 AVD 实证，缺陷 #1）：Android `evaluateJavascript`
+/// 对字符串结果返回 **JSON 编码串**（带外层引号，如 `"[[\"k\",\"v\"]]"`），
+/// `runJavaScriptReturningResult`（webview_flutter_android）对字符串**原样
+/// 透传**——因此对 [jsonDecode] 后得 `String` 的编码串**再解包一次**（内层
+/// 即 `JSON.stringify` 产物数组 JSON）；iOS/macOS 等平台返回**裸值**（外层
+/// 无引号的数组 JSON 串），一次 [jsonDecode] 直接得 `List`，原样处理。二者
+/// 归一为数组条目解析。
+///
+/// 防御（对抗性）：顶层非 List 或 JSON 非法（含编码串二次解码失败）→ 抛
+/// [FormatException]（由 [JsBridgeLocalStorageAccess.enumerate] 兜底降级空
+/// Map）；单条非 `[k,v]` 二元组 / 键值非字符串 → 跳过该条不炸（localStorage
+/// 枚举产物应为同位字符串，畸形条属异常数据面，静默略过）。
 Map<String, String> parseLocalStorageEntries(String json) {
-  final Object? decoded = jsonDecode(json);
+  final Object? decoded = _decodeLocalStorageEntriesJson(json);
   if (decoded is! List) {
     throw const FormatException('localStorage 枚举结果必须是数组');
   }
@@ -123,6 +135,21 @@ Map<String, String> parseLocalStorageEntries(String json) {
     out[key] = value;
   }
   return out;
+}
+
+/// 单层解包 [json]：Android evaluateJavascript 返回的**编码 JSON 串**
+/// （[jsonDecode] 后得 `String`，其内容为二次 JSON 编码的数组 JSON）再解一次；
+/// 裸 JSON / 非数组形态原样返回（非 List 由调用方判非数组）。JSON 非法（含
+/// 编码串内容畸形）上抛 [FormatException]，交 [enumerate] 降级空 Map。
+Object? _decodeLocalStorageEntriesJson(String json) {
+  final Object? decoded = jsonDecode(json);
+  if (decoded is String) {
+    // 锚 Android `evaluateJavascript`：字符串结果带外层引号返回 Flutter（
+    // `runJavaScriptReturningResult` 原样透传）——解包一次即得
+    // `JSON.stringify` 产物数组 JSON。
+    return jsonDecode(decoded);
+  }
+  return decoded;
 }
 
 // ══════════════════════════════════════════════════
