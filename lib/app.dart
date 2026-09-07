@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:provider/provider.dart';
 
 import 'data/database/app_database.dart';
@@ -15,8 +16,13 @@ import 'services/conversation_export_service.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/secure_store.dart';
+import 'services/simulator/seed_service.dart';
+import 'services/simulator/simulator_contracts.dart';
+import 'services/simulator/simulator_data_dir.dart';
+import 'services/simulator/simulator_server.dart';
 import 'theme/conver_theme.dart';
 import 'view_models/shell_navigation.dart';
+import 'view_models/simulators_controller.dart';
 import 'view_models/theme_controller.dart';
 import 'views/characters/characters_controller.dart';
 import 'views/chat/chat_controller.dart';
@@ -130,6 +136,32 @@ class ConverApp extends StatelessWidget {
             navigation: context.read<ShellNavigation>(),
             chatController: context.read<ChatController>(),
           ),
+        ),
+        // M5-03 模拟器装配：唯一一次模拟器接线（app.dart + home_shell.dart）。
+        // 懒启动编排（首进模拟器 tab 触发）——seed（幂等）→ server.start(8642)
+        // → 回环 HTTP manifest → ready/empty/error；服务器 App 存续期常驻
+        // （实例在应用级 provider，不随 tab 销毁）。后续票（04/06/07/08b）经
+        // SimulatorsHooks / SimulatorsView 追加接线，不触碰本文件。
+        ChangeNotifierProvider<SimulatorsController>(
+          create: (_) {
+            final dataDir = SimulatorDataDir();
+            return SimulatorsController(
+              dataDir: dataDir,
+              seed: (simDir) => ensureSeeded(
+                simDir: simDir,
+                assetRoot: 'assets/${SimulatorContracts.simDir}',
+                loadAsset: (path) async {
+                  final data = await rootBundle.load(path);
+                  return data.buffer.asUint8List(
+                    data.offsetInBytes,
+                    data.lengthInBytes,
+                  );
+                },
+              ),
+              createServer: SimulatorServer.new,
+              loadManifest: loadManifestViaHttp,
+            );
+          },
         ),
       ],
       child: Builder(

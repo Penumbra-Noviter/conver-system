@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../data/repositories/settings_repository.dart';
 import '../services/secure_store.dart';
 import '../view_models/shell_navigation.dart';
+import '../view_models/simulators_controller.dart';
 import '../view_models/theme_controller.dart';
 import 'chat/chat_controller.dart';
 import 'chat/chat_view.dart';
@@ -45,7 +46,11 @@ class HomeShell extends StatelessWidget {
                   .openConversation(conversationId, highlightMessageId: messageId));
             },
           ),
-        ShellTab.simulators => const SimulatorsView(),
+        // M5-03：模拟器 tab 接真实列表页（懒启动编排见 SimulatorsController；
+        // 服务器 App 存续期常驻，不随 tab 往返销毁）。
+        ShellTab.simulators => SimulatorsView(
+            controller: context.read<SimulatorsController>(),
+          ),
         ShellTab.settings => SettingsView(
             settingsRepository: context.read<SettingsRepository>(),
             themeController: context.read<ThemeController>(),
