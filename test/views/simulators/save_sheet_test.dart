@@ -94,13 +94,33 @@ class _RecordingBridge extends SaveBridge {
   }
 }
 
-/// 假 WebView 控制器：记录 evaluate 脚本 + 自动触发 onPageFinished。
+/// 假 WebView 控制器：记录 evaluate 脚本 + 调用序 spy（setOnPageFinished 先于
+/// navigate 的时序契约，W5 B1）+ 最严苛竞态窗口派发 onPageFinished。
 class _FakeSheetWebViewController implements SheetWebViewController {
   _FakeSheetWebViewController(this.store);
 
   final Map<String, String> store;
   final List<String> evaluated = [];
+  final List<String> callOrder = [];
   VoidCallback? onPageFinished;
+
+  @override
+  void setOnPageFinished(VoidCallback onPageFinished) {
+    callOrder.add('setOnPageFinished');
+    this.onPageFinished = onPageFinished;
+  }
+
+  @override
+  void navigate(Uri url) {
+    callOrder.add('navigate');
+    // 最严苛竞态时序：导航发起即完成 → 事件在「挂载后、任何补救窗口前」立即
+    // 派发。委托若未先于 navigate 挂载 = 真实丢事件场景（回调为 null → 事件
+    // 无声丢失，面板阻塞至超时降级）。
+    final callback = onPageFinished;
+    if (callback != null) {
+      Future.microtask(callback);
+    }
+  }
 
   @override
   Future<String> evaluate(String script) async {
@@ -114,21 +134,15 @@ class _FakeSheetWebViewController implements SheetWebViewController {
   }
 
   @override
-  void setOnPageFinished(VoidCallback onPageFinished) {
-    this.onPageFinished = onPageFinished;
-    Future.microtask(onPageFinished); // 真实平台 load 后触发；fake 派发
-  }
-
-  @override
   Widget buildView() => const SizedBox(width: 1, height: 1);
 }
 
 /// 立即抛错的假工厂（WebView 不可用降级路径）。
-Future<SheetWebViewController> _throwingFactory({required Uri url}) async =>
+Future<SheetWebViewController> _throwingFactory() async =>
     throw StateError('WebView 平台不可用');
 
 /// 永不完成的假工厂（超时降级路径）。
-Future<SheetWebViewController> _hangingFactory({required Uri url}) =>
+Future<SheetWebViewController> _hangingFactory() =>
     Completer<SheetWebViewController>().future;
 
 void main() {
@@ -269,7 +283,7 @@ void main() {
         tester,
         games: const [SaveGame(id: 'life-sim', name: '人生模拟器', saveKeys: ['life_save'])],
         bridge: null,
-        webViewFactory: ({required Uri url}) async =>
+        webViewFactory: () async =>
             _FakeSheetWebViewController({'life_save': '{"hp":10}'}),
       );
       await tester.pumpAndSettle();
@@ -286,7 +300,7 @@ void main() {
           SaveGame(id: 'life-sim', name: '人生模拟器', saveKeys: ['life_save']),
         ],
         bridge: null,
-        webViewFactory: ({required Uri url}) async {
+        webViewFactory: () async {
           factoryCalls++;
           if (factoryCalls == 1) {
             throw StateError('首次不可用');
@@ -335,6 +349,52 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('暂无游戏数据'), findsOneWidget);
+    });
+  });
+
+  group('W5 B1 回归 · onPageFinished 委托先于导航挂载', () {
+    testWidgets('调用序 spy：setOnPageFinished 在 navigate 之前；最严苛窗口事件不丢 → ready',
+        (tester) async {
+      final controller = _FakeSheetWebViewController({'life_save': '数据'});
+      await pumpSheet(
+        tester,
+        games: const [SaveGame(id: 'life-sim', name: '人生模拟器', saveKeys: ['life_save'])],
+        bridge: null,
+        webViewFactory: () async => controller,
+      );
+      await tester.pumpAndSettle();
+
+      final mountAt = controller.callOrder.indexOf('setOnPageFinished');
+      final navigateAt = controller.callOrder.indexOf('navigate');
+      expect(mountAt, greaterThanOrEqualTo(0), reason: '委托必须被挂载');
+      expect(navigateAt, greaterThan(mountAt),
+          reason: '挂委托先于 navigate——onPageFinished 只派发给挂载时已存在的'
+              '委托（不回放挂载前事件），先导航后挂委托即事件丢失（W5 B1）');
+
+      // 行为终态：事件在「导航发起即完成」的最严苛时序下仍被送达（fake navigate
+      // 内即刻派发，委托未先挂载即为静默丢事件）→ 面板就绪而非超时降级。
+      expect(find.text('人生模拟器'), findsOneWidget);
+      expect(find.text('读取存档超时，WebView 未就绪'), findsNothing);
+    });
+
+    testWidgets('事件即时派发（microtask 序列内 navigate 后立即完成）→ loaded 必达',
+        (tester) async {
+      // 对抗性：页面加载在导航返回后的同一 microtask 序列内完成（真实丢事件
+      // 窗口最窄形态）——委托已先挂载即必达；断言面板直接就绪，零超时。
+      final controller = _FakeSheetWebViewController({'life_save': '数据'});
+      await pumpSheet(
+        tester,
+        games: const [SaveGame(id: 'life-sim', name: 'x', saveKeys: ['life_save'])],
+        bridge: null,
+        webViewFactory: () async => controller,
+        pageLoadTimeout: const Duration(milliseconds: 100),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 个存档 · 2 字符'), findsOneWidget);
+      expect(find.text('读取存档超时，WebView 未就绪'), findsNothing);
     });
   });
 
