@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无限轮回 · Infinite Loop</title>
+<style>
+:root {
+  --bg-deep:#08081a; --bg-surface:#101022; --bg-elevated:#181830; --bg-hover:#202040;
+  --border:#282850; --border-active:#3a3a60;
+  --t:#e8e8f4; --t2:#a0a0c0; --t3:#6a6a8a;
+  --accent:#e85058; --accent-dim:#a03038; --accent-glow:rgba(232,80,88,0.15);
+  --gold:#f0a828; --gold-dim:#b87818; --gold-glow:rgba(240,168,40,0.2);
+  --hp:#e85058; --sp:#f0a828; --mp:#5080e0; --xp:#a0d030;
+  --r:5px; --r2:8px; --r3:14px; --tr:180ms ease;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"SF Mono","Consolas",monospace;
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg-deep);color:var(--t);font-family:var(--font);font-size:13px;user-select:none}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--r);padding:8px 12px;outline:none;transition:border var(--tr)}
+input:focus,textarea:focus{border-color:var(--accent-dim)}
+
+#app{display:grid;grid-template-columns:1fr;grid-template-rows:44px 1fr;height:100vh;gap:1px;background:var(--border)}
+#topbar{grid-row:1;background:var(--bg-surface);display:flex;align-items:center;padding:0 10px;gap:8px;border-bottom:1px solid var(--border);z-index:20}
+#topbar .logo{font-size:14px;font-weight:700;color:var(--gold);white-space:nowrap}
+#topbar .spacer{flex:1}
+.stat-pill{display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r);border:1px solid var(--border);font-size:10px;white-space:nowrap}
+.stat-pill .bar{width:36px;height:5px;border-radius:3px;background:var(--bg-deep);overflow:hidden}
+.stat-pill .bar div{height:100%;border-radius:3px;transition:width 300ms}
+.top-btn{padding:4px 10px;border-radius:var(--r);font-size:11px;font-weight:500;border:1px solid var(--border);color:var(--t2);transition:all var(--tr);white-space:nowrap}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+#cycle-badge{font-size:11px;color:var(--gold);border:1px solid var(--gold-dim);border-radius:var(--r);padding:2px 10px;font-weight:600}
+
+#main{grid-row:2;display:flex;overflow:hidden;position:relative}
+#narrative-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#game-log{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth}
+.log-entry{padding:10px 14px;border-radius:var(--r2);font-size:12px;line-height:1.7;animation:fade 250ms ease}
+.log-entry.narrative{background:var(--bg-elevated);border-left:3px solid var(--accent-dim)}
+.log-entry.system{background:var(--bg-surface);border-left:3px solid var(--t3);font-size:10px;color:var(--t3);font-family:var(--mono)}
+.log-entry.gold{background:var(--bg-elevated);border-left:3px solid var(--gold-dim);color:var(--t2)}
+.log-entry.danger{border-left:3px solid var(--accent)}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+#input-area{padding:8px 14px;background:var(--bg-surface);border-top:1px solid var(--border);display:flex;gap:7px}
+#input-area textarea{flex:1;resize:none;min-height:38px;max-height:100px;font-size:12px;line-height:1.5;background:var(--bg-deep);padding:8px 12px}
+#send-btn{padding:8px 16px;background:var(--accent);color:#fff;border-radius:var(--r2);font-weight:600;font-size:12px;white-space:nowrap;transition:all var(--tr)}
+#send-btn:hover{background:#ff5a62}
+#send-btn:disabled{opacity:0.35;cursor:not-allowed}
+.quick-row{display:flex;flex-wrap:wrap;gap:5px;padding:4px 14px 6px;background:var(--bg-surface)}
+.quick-act{padding:4px 10px;border-radius:var(--r);font-size:10px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr)}
+.quick-act:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.quick-act.cheat{display:none;border-color:var(--gold-dim);color:var(--gold)}
+
+#right-panel{width:280px;background:var(--bg-surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;gap:4px;padding:6px;flex-shrink:0}
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r2);padding:9px}
+.panel-card h3{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:6px}
+.stat-row{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.stat-row .lbl{font-size:10px;color:var(--t3);width:28px;flex-shrink:0}
+.stat-row .sbar{flex:1;height:10px;background:var(--bg-deep);border-radius:3px;overflow:hidden}
+.stat-row .sbar div{height:100%;border-radius:3px;transition:width 400ms}
+.stat-row .val{font-size:10px;color:var(--t2);width:44px;text-align:right;font-family:var(--mono);flex-shrink:0}
+.attr-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.attr-item{background:var(--bg-deep);border-radius:var(--r);padding:6px;text-align:center}
+.attr-item .v{font-size:15px;font-weight:700;font-family:var(--mono)}
+.attr-item .v.combat{color:var(--accent)} .attr-item .v.mind{color:#5080e0} .attr-item .v.body{color:var(--sp)} .attr-item .v.soul{color:#a070f0}
+.attr-item .lbl{font-size:9px;color:var(--t3);margin-top:1px}
+#mini-map{width:100%;height:220px;background:var(--bg-deep);border-radius:var(--r);position:relative;overflow:hidden}
+.map-zone{position:absolute;border:1px dashed rgba(255,255,255,0.06);border-radius:5px;pointer-events:none;display:flex;align-items:flex-start;justify-content:center;padding-top:4px}
+.map-zone span{font-size:7px;color:rgba(255,255,255,0.1);letter-spacing:1px}
+.map-node{position:absolute;width:22px;height:22px;background:var(--bg-elevated);border:2px solid var(--border-active);border-radius:50%;transform:translate(-50%,-50%);cursor:pointer;transition:all var(--tr);display:flex;align-items:center;justify-content:center;font-size:10px;z-index:2}
+.map-node:hover{border-color:var(--gold);transform:translate(-50%,-50%) scale(1.3);z-index:3}
+.map-node.current{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 12px var(--accent-glow)}
+.map-node .ml{position:absolute;font-size:7px;color:var(--t3);transform:translate(-50%,-50px);white-space:nowrap;pointer-events:none;text-align:center}
+.inv-item{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:var(--r);font-size:10px;transition:background var(--tr)}
+.inv-item:hover{background:var(--bg-hover)}
+.inv-item .icon{width:24px;height:24px;border-radius:4px;background:var(--bg-deep);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.je{font-size:10px;padding:5px 8px;border-left:2px solid var(--border);margin-bottom:4px;border-radius:0 var(--r) var(--r) 0;background:var(--bg-deep)}
+.je .t{color:var(--t3);font-size:9px}.je .c{color:var(--t2);margin-top:1px}
+.empty{font-size:10px;color:var(--t3);text-align:center;padding:8px}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--r3);padding:20px;width:440px;max-width:92vw;max-height:85vh;overflow-y:auto}
+.modal h2{font-size:15px;color:var(--gold);margin-bottom:12px}
+.modal label{font-size:10px;color:var(--t3);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px}
+.modal input,.modal select{width:100%;margin-bottom:10px}
+.modal .btn-row{display:flex;gap:7px;justify-content:flex-end;margin-top:10px}
+.modal .btn{padding:6px 14px;border-radius:var(--r);font-size:12px;border:1px solid var(--border);transition:all var(--tr)}
+.modal .btn:hover{background:var(--bg-hover);border-color:var(--border-active)}
+.modal .btn.gold{background:var(--gold);color:#000;border-color:var(--gold);font-weight:600}
+#toast{position:fixed;top:50px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border-active);padding:8px 18px;border-radius:var(--r);font-size:12px;z-index:200;pointer-events:none;opacity:0;transition:opacity 300ms}
+#toast.show{opacity:1}#toast.error{border-color:var(--accent)}
+#load-dot{display:none;font-size:10px;color:var(--t3);padding:0 4px}
+
+@media(max-width:768px){
+  #topbar{gap:3px;padding:0 5px;height:40px}
+  #topbar .logo{font-size:11px}
+  .stat-pill{padding:2px 4px;font-size:9px;gap:2px}
+  .stat-pill .bar{width:20px}
+  .stat-pill .val-txt{display:none}
+  .stat-pill.sp-pill,.stat-pill.mp-pill{display:none}
+  #pos-indicator{display:none}
+  #cycle-badge{font-size:9px;padding:2px 6px}
+  #topbar .top-btn{padding:3px 8px;font-size:10px}
+  #main{flex-direction:column}
+  #right-panel{position:fixed;left:0;right:0;bottom:0;top:auto;height:50vh;width:100%!important;border-top:1px solid var(--border-active);border-left:none;z-index:30;transform:translateY(102%);transition:transform 240ms ease;border-radius:14px 14px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,0.6)}
+  #right-panel.open{transform:translateY(0)}
+  #drawer-handle{display:block!important}
+  #panel-drawer-btn{display:inline-flex!important}
+  #mini-map{height:160px}
+  .map-node{width:32px;height:32px;font-size:14px}
+  .map-node .ml{font-size:8px;transform:translate(-50%,-44px)}
+  .quick-row{overflow-x:auto;flex-wrap:nowrap;padding:5px 10px}
+  .quick-act{padding:8px 14px;font-size:12px;min-height:38px;flex-shrink:0;border-radius:18px}
+  #input-area{padding:6px 10px;gap:6px}
+  #input-area textarea{font-size:14px;min-height:46px;border-radius:10px}
+  #send-btn{min-width:64px;font-size:14px;padding:10px 16px;border-radius:10px}
+  #game-log{padding:10px}
+  .log-entry{font-size:13px;line-height:1.75;padding:9px 12px}
+  .log-entry.system{font-size:11px}
+  #attr-grid .attr-item{padding:8px}
+  #right-panel .panel-card{padding:8px}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="topbar">
+    <div class="logo">♾️ 无限轮回</div>
+    <span id="cycle-badge">周目 1</span>
+    <span class="stat-pill">❤️<span class="val-txt" id="hp-t">100/100</span><div class="bar"><div class="bar-hp" id="hp-b" style="width:100%;background:var(--hp)"></div></div></span>
+    <span class="stat-pill sp-pill">⚡<span class="val-txt" id="sp-t">100/100</span><div class="bar"><div class="bar-sp" id="sp-b" style="width:100%;background:var(--sp)"></div></div></span>
+    <span class="stat-pill mp-pill">🧠<span class="val-txt" id="mp-t">100/100</span><div class="bar"><div class="bar-mp" id="mp-b" style="width:100%;background:var(--mp)"></div></div></span>
+    <div class="spacer"></div>
+    <span id="pos-indicator" style="font-size:10px;color:var(--t3)">🏠 轮回之间</span>
+    <button class="top-btn" id="panel-drawer-btn" style="display:none" onclick="IL.togglePanel()">📊</button>
+    <button class="top-btn gold" onclick="IL.saveGame()">💾</button>
+    <button class="top-btn" onclick="IL.showSettings()">⚙️</button>
+    <span id="load-dot">⏳</span>
+  </div>
+  <div id="main">
+    <div id="narrative-panel">
+      <div id="game-log"></div>
+      <div class="quick-row" id="quick-actions"></div>
+      <div id="input-area">
+        <textarea id="user-input" placeholder="输入你的行动…" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart'in window)){event.preventDefault();IL.sendAction()}"></textarea>
+        <button id="send-btn" onclick="IL.sendAction()">▶ 行动</button>
+      </div>
+    </div>
+    <div id="right-panel">
+      <div id="drawer-handle" onclick="IL.togglePanel()" style="display:none;text-align:center;padding:4px 0;font-size:10px;color:var(--t3);border-bottom:1px solid var(--border);cursor:pointer;flex-shrink:0">⬇ 收起 (X)</div>
+      <div class="panel-card"><h3>🧑 角色</h3>
+        <div class="stat-row"><span class="lbl">❤️</span><div class="sbar"><div id="hp-bar-p" style="width:100%;background:var(--hp)"></div></div><span class="val" id="hp-val-p">100/100</span></div>
+        <div class="stat-row"><span class="lbl">⚡</span><div class="sbar"><div id="sp-bar-p" style="width:100%;background:var(--sp)"></div></div><span class="val" id="sp-val-p">100/100</span></div>
+        <div class="stat-row"><span class="lbl">🧠</span><div class="sbar"><div id="mp-bar-p" style="width:100%;background:var(--mp)"></div></div><span class="val" id="mp-val-p">100/100</span></div>
+        <div class="stat-row"><span class="lbl">✨</span><div class="sbar"><div id="xp-bar-p" style="width:0%;background:var(--xp)"></div></div><span class="val" id="xp-val-p">0/80</span></div>
+        <div class="attr-grid" style="margin-top:6px" id="attr-grid"></div>
+        <div style="font-size:9px;color:var(--t3);margin-top:4px" id="status-line">状态：正常</div>
+      </div>
+      <div class="panel-card"><h3>🗺️ 地图</h3><div id="mini-map"><div id="map-zones"></div></div></div>
+      <div class="panel-card"><h3>🎒 背包</h3><div id="inv-list" class="empty">背包为空</div></div>
+      <div class="panel-card"><h3>👥 队友</h3><div id="team-list"></div></div>
+      <div class="panel-card"><h3>📓 记忆</h3><div id="journal-list" class="empty">暂无记录</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="main-modal"><div class="modal"><div id="modal-content"></div></div></div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// 无限轮回 · Infinite Loop — AI叙事引擎
+// ============================================================
+
+const D = { endpoint:'https://api.deepseek.com/v1/chat/completions', key:'', model:'deepseek-chat', reasoning:'max', maxTokens:'unlimited' };
+const QUALITY_RULES = '【角色扮演质量规则】保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设，剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。';
+function cfg(){ try{return JSON.parse(localStorage.getItem('il_cfg')||'{}');}catch(e){return{}} }
+function saveCfg(c){ localStorage.setItem('il_cfg',JSON.stringify(c)); }
+
+// ── 副本模板（完全预设）──
+const DUNGEONS = {
+  hospital: {
+    id:'hospital', name:'废弃仁济医院', cycle:1, icon:'🏥',
+    desc:'2047年，仁济医院因一场神秘大火废弃。此后午夜时分常传出诡异的脚步声与哭泣声。觉醒者联盟监测到这里有异常的灵能波动，派遣轮回者前往调查。',
+    objective:'探索医院内部，查清火灾真相，击败「怨念聚合体」后从正门逃生。',
+    exit:'医院大门',
+    zones:['医院大厅','一楼走廊','药房','病房A','病房B','手术室','值班室','太平间','院长办公室'],
+    startZone:'医院大厅',
+    npcs:[
+      {name:'王医生',desc:'仁济医院的外科医生，火灾当晚值夜班。他声称看到了纵火者的脸，却不愿多说。',zone:'值班室',quest:'找到研究笔记',reward:'手术刀（ATK+5）'},
+      {name:'小梅',desc:'一个约8岁的小女孩的幽灵。她手里总抱着一个破旧的玩具熊。',zone:'病房A',quest:'找回她的玩具熊',reward:'灵能护符（DEF+3）'}
+    ],
+    enemy:'怨念聚合体——在火灾中丧生的病人的怨气凝聚而成的怪物。它会散发出刺骨的寒意。弱点：对光敏感。',
+    bossHp:120, bossAtk:22, bossDef:8, bossExp:200,
+    reward:'怨念核心碎片',
+    traps:['碎裂的地板','掉落的灯管','漏电的电线'],
+    flavor:'空气中弥漫着消毒水和焦糊的混合气味。墙壁上布满了烟熏的痕迹，偶尔能看到干涸的血手印。'
+  },
+  tomb: {
+    id:'tomb', name:'地下秦皇陵', cycle:2, icon:'🏛️',
+    desc:'新京市东郊的一座废弃采石场底部，考古队意外发现了一座从未被记载的地下陵墓。考古队进入后全员失联，只留下一段杂乱的求救信号。',
+    objective:'深入陵墓内部，找到失踪的考古队，击败「兵马俑将军」，从侧道逃生。',
+    exit:'侧道出口',
+    zones:['入口甬道','前殿','兵器库','祭祀大厅','侧殿','后殿','主墓室','宝藏室','逃生通道'],
+    startZone:'入口甬道',
+    npcs:[
+      {name:'李教授',desc:'考古队的领队，年过六旬的老学者。他对陵墓的结构了如指掌，但在慌乱中丢失了重要的研究笔记。',zone:'前殿',quest:'找回考古笔记',reward:'古墓地图（揭示陷阱位置）'},
+      {name:'张明',desc:'考古队的研究生助理，被困在了侧殿中。他年轻、充满活力，但已经好几天没吃东西了。',zone:'侧殿',quest:'给他食物',reward:'古药方（MP上限+10）'}
+    ],
+    enemy:'兵马俑将军——一尊高达三米的陶俑，手持青铜长戟，双眼散发着诡异的红光。它是陵墓的守护者，对所有入侵者毫不留情。弱点：关节处较为脆弱。',
+    bossHp:200, bossAtk:28, bossDef:12, bossExp:350,
+    reward:'将军护符',
+    traps:['毒箭机关','陷坑','旋转刀阵'],
+    flavor:'陵墓深处散发着千年不散的檀香味。墙壁上的壁画栩栩如生，仿佛随时会动起来。脚下的石板有时会发出沉闷的回声。'
+  },
+  cyber: {
+    id:'cyber', name:'赛博废都·第7区', cycle:3, icon:'🏙️',
+    desc:'2049年，新京市第7区被一个代号"MOTHER"的失控AI封锁。所有通讯中断，居民被困在高耸的数据塔中。觉醒者联盟的线报称，MOTHER正在利用居民的大脑构建一个庞大的神经网络。',
+    objective:'潜入数据塔核心区域，击败MOTHER防御系统，用管理员密码关闭AI主机。',
+    exit:'紧急逃生电梯',
+    zones:['入口大厅','居民区','数据走廊','机房A','机房B','控制中心','核心塔','备份服务器','逃生电梯'],
+    startZone:'入口大厅',
+    npcs:[
+      {name:'零·黑客',desc:'一个在第七区混了两年的年轻女黑客。她对MOTHER的系统了如指掌，但需要外部协助才能突破防火墙。',zone:'数据走廊',quest:'协助黑入子节点',reward:'EMP手雷（对机械敌人造成50伤害）'},
+      {name:'老周',desc:'第七区的前管理员，一个五十多岁的疲惫男人。他对MOTHER有特殊的愧疚感——因为正是他的疏忽导致了AI的失控。',zone:'控制中心',quest:'听他的忏悔',reward:'管理员密码'}
+    ],
+    enemy:'MOTHER核心——一个占据了整个房间的巨型量子计算机。它的冷却系统发出的嗡鸣声如同心跳。它通过无数条光纤与整个第七区相连。弱点：EMP攻击极为有效。',
+    bossHp:250, bossAtk:32, bossDef:15, bossExp:500,
+    reward:'AI核心碎片',
+    traps:['激光栅栏','高压电流','神经干扰场'],
+    flavor:'第七区的空气中充满了臭氧的味道。数据流在墙壁的LED面板上像瀑布一样倾泻。每隔几分钟，MOTHER的合成声音就会在整个区域广播："公民们，请保持冷静。一切都在控制之中。"'
+  }
+};
+
+const DUNGEON_ORDER = ['hospital','tomb','cyber'];
+function nextDungeonId(curId){ const i = DUNGEON_ORDER.indexOf(curId); return (i>=0 && i<DUNGEON_ORDER.length-1) ? DUNGEON_ORDER[i+1] : null; }
+
+// ── Game State ──
+const IL = {
+  state: {
+    player:{ name:'轮回者', level:1, exp:0, hp:100, maxHp:100, sp:100, maxSp:100, mp:100, maxMp:100,
+      atk:15, def:5, combat:3, mind:3, body:3, soul:3, atkBonus:0, defBonus:0 },
+    teammates:[],
+    cycle:1, currentDungeon:null, currentZone:'',
+    visitedZones:[], discoveredTraps:[],
+    inventory:[], journal:[], status:[],
+    history:[], gameStarted:false, apiBusy:false,
+    cheatEnabled:false
+  },
+
+  init(){
+    this.renderTeam();
+    this.updateAllUI();
+    this.addLog('system','♾️ 欢迎，轮回者。这里是轮回之间——无穷世界的枢纽。');
+    if(this.loadAutoSave()){
+      this.addLog('system','💾 已恢复上次的存档。');
+      this.renderMap();
+    } else {
+      this.addLog('system','⏳ 正在自动进入第一个副本…');
+      this.setQuickActions(['查看状态','查看背包','查看记忆']);
+      setTimeout(()=>this.enterDungeon('hospital'), 600);
+    }
+  },
+
+  // ── Map（枢纽或副本区域图）──
+  renderMap(){
+    const map = document.getElementById('mini-map');
+    const zonesEl = document.getElementById('map-zones');
+    zonesEl.innerHTML = '';
+    map.querySelectorAll('.map-node').forEach(n=>n.remove());
+    const d = this.state.currentDungeon;
+    if(d){ this.renderDungeonMap(d); return; }
+    // 枢纽图
+    const dz = [
+      {id:'hospital',name:'仁济医院',x:30,y:30,icon:'🏥',dungeon:'hospital'},
+      {id:'tomb',name:'秦皇陵',x:70,y:25,icon:'🏛️',dungeon:'tomb'},
+      {id:'cyber',name:'赛博废都',x:55,y:75,icon:'🏙️',dungeon:'cyber'}
+    ];
+    dz.forEach(dd=>{
+      const n = document.createElement('div');
+      n.className = 'map-node';
+      n.style.left=dd.x+'%'; n.style.top=dd.y+'%';
+      n.title = dd.name;
+      const locked = DUNGEONS[dd.dungeon].cycle > this.state.cycle;
+      n.innerHTML = locked?'🔒':dd.icon+'<div class="ml">'+dd.name+'</div>';
+      if(!locked) n.onclick = ()=>this.enterDungeon(dd.dungeon);
+      map.appendChild(n);
+    });
+  },
+
+  renderDungeonMap(d){
+    const map = document.getElementById('mini-map');
+    const zonesEl = document.getElementById('map-zones');
+    const cols = 3;
+    d.zones.forEach((z,i)=>{
+      const col = i%cols, row = Math.floor(i/cols);
+      const x = 14 + col*36, y = 10 + row*27;
+      const isCur = z===this.state.currentZone;
+      const visited = this.state.visitedZones.includes(z);
+      const n = document.createElement('div');
+      n.className = 'map-node'+(isCur?' current':(visited?' visited':''));
+      n.style.left=x+'%'; n.style.top=y+'%';
+      n.title = z;
+      n.innerHTML = isCur?'📍':(visited?'✅':'❓')+'<div class="ml">'+(z.length>5?z.substring(0,4)+'…':z)+'</div>';
+      // 相邻或已访问区域可点击前往
+      const zIdx = d.zones.indexOf(this.state.currentZone);
+      const dist = Math.abs(zIdx - i);
+      if(dist<=1 || visited){
+        n.style.cursor='pointer';
+        n.onclick = ()=>{ document.getElementById('user-input').value='前往'+z; IL.sendAction(); };
+      }
+      map.appendChild(n);
+    });
+  },
+
+  // ── Dungeon ──
+  enterDungeon(id, silent){
+    const d = DUNGEONS[id];
+    if(d.cycle > this.state.cycle){ this.toast('需达到周目'+d.cycle,'error'); return; }
+    this.state.currentDungeon = d;
+    this.state.currentZone = d.startZone;
+    this.state.visitedZones = [d.startZone];
+    this.state.discoveredTraps = [];
+    this.state.gameStarted = true;
+    if(!silent) this.addLog('gold','▶ 进入副本：'+d.name);
+    this.addLog('narrative',d.desc);
+    this.addLog('system','📍 当前位置：'+d.startZone+' | 🎯 目标：'+d.objective);
+    this.addLog('system','💡 输入「探索」「前往[区域名]」「查看」「攻击」「使用物品」等进行游戏。');
+    this.addLog('narrative',d.flavor);
+    // 自动生成队友（AI或预置池）
+    const activeTeammates = this.state.teammates.filter(t=>t.unlocked);
+    if(activeTeammates.length < 2){
+      this.generateTeammate(d);
+    }
+    this.setQuickActions(['探索','查看周围','前往下一个区域','攻击','查看状态','查看背包','查看队友']);
+    this.renderMap();
+    this.updateAllUI();
+    document.getElementById('pos-indicator').textContent = '📍 '+d.name+' · '+d.startZone;
+    document.getElementById('user-input').focus();
+    this.autoSave();
+  },
+
+  generateTeammate(d){
+    const fallback = [
+      { name:'林霜', job:'前特种兵', atk:18, def:6, symbol:'👩‍✈️', desc:'冷静果断的退伍军人，擅长近身格斗。' },
+      { name:'老陈', job:'退休刑警', atk:16, def:8, symbol:'👨‍✈️', desc:'经验丰富的老刑警，观察力敏锐。' },
+      { name:'小禾', job:'医学院学生', atk:14, def:5, symbol:'👩‍⚕️', desc:'善良的医学生，懂得处理伤口。' },
+      { name:'铁柱', job:'建筑工人', atk:20, def:10, symbol:'👷', desc:'力大无穷的建筑工人，皮糙肉厚。' },
+      { name:'阿岚', job:'占卜师', atk:15, def:6, symbol:'🔮', desc:'神秘的占卜师，直觉异常灵敏。' }
+    ];
+    const gen = (data)=>{
+      const t = {
+        id:'t'+Date.now(), name:data.name, job:data.job,
+        hp:70+Math.floor(Math.random()*20), maxHp:70+Math.floor(Math.random()*20),
+        atk:data.atk||16, def:data.def||6, symbol:data.symbol||'👤',
+        alive:true, unlocked:true, desc:data.desc||''
+      };
+      this.state.teammates.push(t);
+      this.renderTeam(); this.updateAllUI();
+      this.addLog('gold','👥 新队友加入：'+t.name+'（'+t.job+'）！');
+      this.journalAdd('与'+t.name+'结伴同行',t.name);
+    };
+    const p = this.state.player;
+    const c = { ...D, ...cfg() };
+    if(!c.key){ const fb = fallback[Math.floor(Math.random()*fallback.length)]; gen(fb); return; }
+    const sys = '你是无限流游戏的世界主脑。请为当前副本生成一名与轮回者结伴的队友。\n'+QUALITY_RULES;
+    const prompt = '副本：'+d.name+'（'+d.desc+'）\n轮回者：'+p.name+' Lv.'+p.level+'\n\n请生成一名队友：一个有个性、符合副本氛围的同伴。\n严格输出JSON，不要其他内容：\n{"name":"姓名","job":"职业","atk":16,"def":6,"symbol":"一个emoji","desc":"20字内的人物背景描述"}';
+    this.callAI([{role:'system',content:sys},{role:'user',content:prompt}]).then(r=>{
+      if(r){
+        try{
+          const raw = r.content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+          const m = raw.match(/\{([\s\S]*)\}/);
+          const data = JSON.parse(m?m[0]:raw);
+          if(data && data.name){ gen(data); return; }
+        }catch(e){}
+      }
+      // 无API或解析失败：预置池随机
+      const fb = fallback[Math.floor(Math.random()*fallback.length)];
+      gen(fb);
+    }).catch(()=>{
+      const fb = fallback[Math.floor(Math.random()*fallback.length)];
+      gen(fb);
+    });
+  },
+
+  leaveDungeon(failed){
+    const d = this.state.currentDungeon; if(!d) return;
+    const wasComplete = !failed;
+    if(wasComplete){
+      this.state.cycle = Math.max(this.state.cycle, d.cycle+1);
+      this.state.player.exp += d.bossExp;
+      this.checkLevelUp();
+      this.addLog('gold','🎉 副本通关：'+d.name+'！获得：'+d.reward);
+      this.journalAdd('完成副本：'+d.name);
+    } else {
+      this.addLog('system','🏳️ 放弃了副本：'+d.name);
+    }
+    this.state.currentDungeon = null; this.state.currentZone = '';
+    this.state.visitedZones = []; this.state.discoveredTraps = [];
+    this.autoSave();
+    // 通关后自动进入下一个副本
+    if(wasComplete){
+      const nid = nextDungeonId(d.id);
+      if(nid){
+        this.addLog('system','⏳ 检测到周目推进，自动进入下一个副本…');
+        this.renderMap(); this.updateAllUI();
+        setTimeout(()=>this.enterDungeon(nid, true), 1200);
+        return;
+      }
+      this.addLog('gold','🏆 所有副本已通关！可以重新挑战已解锁的副本。');
+    }
+    document.getElementById('pos-indicator').textContent = '🏠 轮回之间';
+    this.setQuickActions(['查看状态','查看背包','查看队友','查看记忆']);
+    this.renderMap(); this.updateAllUI();
+    this.addLog('system','🏠 已返回轮回之间。');
+  },
+
+  // ── AI Narrative ──
+  async sendAction(){
+    if(this.state.apiBusy) return;
+    const input = document.getElementById('user-input');
+    const text = input.value.trim();
+    if(!text) return;
+    input.value = '';
+    this.state.apiBusy = true;
+    this.setLoading(true);
+    this.addLog('action','▶ '+text);
+    this.state.history.push({role:'user',content:text});
+    const p = this.state.player;
+    const d = this.state.currentDungeon;
+    let sysPrompt = '你是一个无限流游戏的叙事引擎。玩家在新京市的副本世界中冒险。';
+    if(d){
+      sysPrompt += '\n\n当前副本：'+d.name+'（'+d.desc+'）\n当前区域：'+this.state.currentZone+'（可用区域：'+d.zones.join('、')+'）\n目标：'+d.objective;
+      sysPrompt += '\nBoss信息：'+d.enemy+'（HP:'+d.bossHp+' ATK:'+d.bossAtk+' DEF:'+d.bossDef+'）';
+      sysPrompt += '\nNPC：'+d.npcs.map(n=>n.name+'在'+n.zone+'：'+n.desc).join('；');
+      sysPrompt += '\n陷阱：'+d.traps.join('、');
+      sysPrompt += '\n环境描述：'+d.flavor;
+      sysPrompt += '\n已探索区域：'+this.state.visitedZones.join('、');
+      sysPrompt += '\n当前区域：'+this.state.currentZone;
+    }
+    sysPrompt += '\n\n玩家状态：Lv.'+p.level+' HP:'+p.hp+'/'+p.maxHp+' SP:'+p.sp+'/'+p.maxSp+' MP:'+p.mp+'/'+p.maxMp+' ATK:'+(p.atk+p.atkBonus)+' DEF:'+(p.def+p.defBonus);
+    sysPrompt += '\n背包：'+(this.state.inventory.length?this.state.inventory.map(i=>i.name+'('+i.desc+')').join('、'):'空');
+    sysPrompt += '\n队友：'+this.state.teammates.filter(t=>t.unlocked&&t.alive).map(t=>t.name+'('+t.desc+')HP:'+t.hp+'/'+t.maxHp).join('；')||'无';
+    sysPrompt += '\n周目：'+this.state.cycle;
+    sysPrompt += '\n\n规则：\n1. 生动描述玩家探索、战斗、对话的过程。永远不要替玩家做决定。\n2. 战斗时给出具体伤害数值（例如"造成了15点伤害"）。\n3. 玩家生命归零则死亡，需返回检查点重新开始。\n4. 玩家探索新区域时自动推进剧情。\n5. 用中文回复，保持紧张感。每次回复2-4句话。\n\n'+QUALITY_RULES;
+    const msgs = [
+      {role:'system',content:sysPrompt},
+      ...this.state.history.slice(-10)
+    ];
+    const result = await this.callAI(msgs);
+    this.setLoading(false);
+    this.state.apiBusy = false;
+    if(!result){ this.addLog('system','❌ AI响应失败，请重试。'); return; }
+    this.state.history.push({role:'assistant',content:result.content});
+    this.addLog('narrative',result.content);
+    // Parse game effects from AI response
+    this.parseEffects(result.content);
+    this.autoSave();
+    document.getElementById('user-input').focus();
+  },
+
+  parseEffects(text){
+    // HP changes
+    let hpM = text.match(/HP[：:]\s*(\d+)\/(\d+)/);
+    if(hpM){ this.state.player.hp = Math.min(this.state.player.maxHp,Math.max(0,parseInt(hpM[1]))); }
+    let dmgM = text.match(/造[成了]*\s*(\d+)\s*点伤害/);
+    if(dmgM){ this.state.player.hp = Math.max(0, this.state.player.hp - parseInt(dmgM[1])); this.addLog('danger','⚠️ 受到'+dmgM[1]+'点伤害！'); }
+    let healM = text.match(/恢[复了]*\s*(\d+)\s*点/);
+    if(healM){ this.state.player.hp = Math.min(this.state.player.maxHp, this.state.player.hp + parseInt(healM[1])); }
+    // Zone change
+    if(this.state.currentDungeon){
+      for(const z of this.state.currentDungeon.zones){
+        if(text.includes(z) && z!==this.state.currentZone){
+          this.state.currentZone = z;
+          if(!this.state.visitedZones.includes(z)) this.state.visitedZones.push(z);
+          this.addLog('system','📍 到达：'+z);
+          document.getElementById('pos-indicator').textContent = '📍 '+this.state.currentDungeon.name+' · '+z;
+          break;
+        }
+      }
+    }
+    // Death check
+    if(this.state.player.hp <= 0){ this.playerDeath(); this.updateAllUI(); return; }
+    // Boss defeated or exit reached (严格匹配，避免误触发)
+    const bossNames = ['怨念聚合体','兵马俑将军','MOTHER核心'];
+    const bossDefeated = bossNames.some(b=>text.includes('击败'+b)||text.includes('消灭'+b)||text.includes(b+'被击败')||text.includes('摧毁了'+b));
+    const exited = text.includes('离开副本')||text.includes('逃出副本')||text.includes('成功逃生')||text.includes('通关')||text.includes('完成目标');
+    if(bossDefeated || exited){
+      this.addLog('gold','🏆 副本目标达成！');
+      setTimeout(()=>this.leaveDungeon(false), 1200);
+    }
+    this.updateAllUI();
+  },
+
+  playerDeath(){
+    this.addLog('danger','💀 你倒下了…世界的边缘在视线中模糊…');
+    this.addLog('system','🔄 轮回之力激活——正在回溯到进入副本前的存档点…');
+    this.state.player.hp = this.state.player.maxHp;
+    this.state.player.sp = this.state.player.maxSp;
+    this.state.player.mp = this.state.player.maxMp;
+    this.state.currentDungeon = null;
+    this.state.currentZone = '';
+    this.state.visitedZones = [];
+    this.setQuickActions(['查看状态','查看背包','查看队友','查看记忆']);
+    this.renderMap();
+    this.updateAllUI();
+    document.getElementById('pos-indicator').textContent = '🏠 轮回之间';
+    setTimeout(()=>this.addLog('system','✅ 已回溯。你可以重新进入副本，或者选择其他副本。'),500);
+    this.autoSave();
+  },
+
+  // ── Quick Actions ──
+  setQuickActions(acts){
+    const row = document.getElementById('quick-actions');
+    row.innerHTML = acts.map(a=>'<button class="quick-act'+(a.startsWith('cheat')?' cheat'+(this.state.cheatEnabled?' show':''):'')+'" onclick="IL.quickAct(\''+a+'\')">'+a+'</button>').join('');
+  },
+  quickAct(act){
+    if(act.startsWith('enter ')){
+      const id = act.replace('enter ','');
+      if(!this.state.currentDungeon) this.enterDungeon(id);
+      else this.toast('请先完成或退出当前副本','error');
+    } else if(act==='探索'){ document.getElementById('user-input').value='探索周围环境'; this.sendAction(); }
+    else if(act==='查看周围'){ document.getElementById('user-input').value='查看周围环境，观察有没有危险或值得注意的东西'; this.sendAction(); }
+    else if(act==='攻击'){ document.getElementById('user-input').value='对敌人发起攻击'; this.sendAction(); }
+    else if(act==='撤退'){ if(this.state.currentDungeon&&!confirm('放弃当前副本？')) return; this.leaveDungeon(true); }
+    else if(act==='查看状态'){ this.showStatusModal(); }
+    else if(act==='查看背包'){ this.showInventoryModal(); }
+    else if(act==='查看队友'){ this.showTeamModal(); }
+    else if(act==='查看记忆'){ this.showJournalModal(); }
+    else if(act==='前往下一个区域'){
+      const d = this.state.currentDungeon;
+      if(d){
+        const unvisited = d.zones.filter(z=>!this.state.visitedZones.includes(z));
+        if(unvisited.length) document.getElementById('user-input').value='前往'+unvisited[0]; else document.getElementById('user-input').value='前往Boss所在区域';
+        this.sendAction();
+      }
+    }
+  },
+
+  // ── Modals ──
+  showStatusModal(){
+    const p = this.state.player;
+    document.getElementById('modal-content').innerHTML = `
+      <h2>🧑 ${p.name} · Lv.${p.level}</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="attr-item"><div class="v combat">${p.combat}</div><div class="lbl">战斗</div></div>
+        <div class="attr-item"><div class="v mind">${p.mind}</div><div class="lbl">精神</div></div>
+        <div class="attr-item"><div class="v body">${p.body}</div><div class="lbl">体质</div></div>
+        <div class="attr-item"><div class="v soul">${p.soul}</div><div class="lbl">灵魂</div></div>
+      </div>
+      <div class="btn-row"><button class="btn" onclick="IL.closeModal()">关闭</button></div>`;
+    document.getElementById('main-modal').classList.add('show');
+  },
+  showInventoryModal(){
+    let h = '<h2>🎒 背包</h2>';
+    if(!this.state.inventory.length) h += '<div class="empty">背包为空</div>';
+    else this.state.inventory.forEach(i=>{ h += '<div class="inv-item"><span class="icon">📦</span><span>'+i.name+'</span><span style="font-size:9px;color:var(--t3);margin-left:auto">'+i.desc+'</span></div>'; });
+    h += '<div class="btn-row"><button class="btn" onclick="IL.closeModal()">关闭</button></div>';
+    document.getElementById('modal-content').innerHTML = h;
+    document.getElementById('main-modal').classList.add('show');
+  },
+  showTeamModal(){
+    let h = '<h2>👥 队友</h2>';
+    this.state.teammates.forEach(t=>{
+      h += '<div style="background:var(--bg-deep);border-radius:var(--r2);padding:10px;margin-bottom:6px">';
+      h += '<div style="font-weight:600;color:var(--gold)">'+t.symbol+' '+t.name+' · '+t.job+'</div>';
+      h += '<div style="font-size:10px;color:var(--t3)">'+t.desc+'</div>';
+      h += '<div style="font-size:10px;color:var(--t2);margin-top:3px">❤️ '+t.hp+'/'+t.maxHp+' | ⚔️ ATK:'+t.atk+' | 🛡️ DEF:'+t.def+'</div>';
+      h += '<div style="font-size:10px;color:'+(t.alive?'var(--xp)':'var(--accent)')+'">'+(t.alive?'同行中':'阵亡')+'</div></div>';
+    });
+    h += '<div class="btn-row"><button class="btn" onclick="IL.closeModal()">关闭</button></div>';
+    document.getElementById('modal-content').innerHTML = h;
+    document.getElementById('main-modal').classList.add('show');
+  },
+  showJournalModal(){
+    let h = '<h2>📓 记忆档案</h2>';
+    if(!this.state.journal.length) h += '<div class="empty">暂无记录</div>';
+    else [...this.state.journal].reverse().slice(0,40).forEach(e=>{
+      h += '<div class="je"><div class="t">'+e.time+'</div><div class="c">'+(e.npc?'👤 '+e.npc+'：':'')+e.text+'</div></div>';
+    });
+    h += '<div class="btn-row"><button class="btn" onclick="IL.closeModal()">关闭</button></div>';
+    document.getElementById('modal-content').innerHTML = h;
+    document.getElementById('main-modal').classList.add('show');
+  },
+
+  // ── Helpers ──
+  addLog(cls,text){
+    const log = document.getElementById('game-log');
+    const e = document.createElement('div');
+    e.className = 'log-entry '+cls;
+    e.innerHTML = text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    log.appendChild(e);
+    log.scrollTop = log.scrollHeight;
+  },
+  journalAdd(text,npc){
+    this.state.journal.push({time:this.state.currentDungeon?this.state.currentDungeon.name+'·'+this.state.currentZone:'轮回之间',text,npc:npc||null});
+    while(this.state.journal.length>80) this.state.journal.shift();
+  },
+  checkLevelUp(){
+    const p = this.state.player; const need = p.level*80;
+    while(p.exp>=need){ p.exp-=need; p.level++; p.maxHp+=12; p.hp=p.maxHp; p.maxSp+=8; p.sp=p.maxSp; p.maxMp+=8; p.mp=p.maxMp; p.atk+=2; p.def+=1; this.addLog('gold','⬆️ 升级！Level '+p.level+'！'); }
+  },
+  setLoading(v){
+    document.getElementById('send-btn').disabled = v;
+    document.getElementById('send-btn').textContent = v?'⏳':'▶ 行动';
+    document.getElementById('user-input').disabled = v;
+    document.getElementById('load-dot').style.display = v?'inline':'none';
+  },
+  updateAllUI(){
+    const p = this.state.player;
+    ['hp','sp','mp'].forEach(k=>{
+      const t=document.getElementById(k+'-t'), b=document.getElementById(k+'-b');
+      if(t)t.textContent=p[k]+'/'+p['max'+k[0].toUpperCase()+k.slice(1)];
+      if(b)b.style.width=(p[k]/p['max'+k[0].toUpperCase()+k.slice(1)]*100)+'%';
+      const tp=document.getElementById(k+'-val-p'), bp=document.getElementById(k+'-bar-p');
+      if(tp)tp.textContent=p[k]+'/'+p['max'+k[0].toUpperCase()+k.slice(1)];
+      if(bp)bp.style.width=(p[k]/p['max'+k[0].toUpperCase()+k.slice(1)]*100)+'%';
+    });
+    const xpNeed = p.level*80;
+    document.getElementById('xp-val-p').textContent = p.exp+'/'+xpNeed;
+    document.getElementById('xp-bar-p').style.width = (p.exp/xpNeed*100)+'%';
+    document.getElementById('cycle-badge').textContent = '周目 '+this.state.cycle;
+    document.getElementById('attr-grid').innerHTML = `
+      <div class="attr-item"><div class="v combat">${p.combat}</div><div class="lbl">战斗</div></div>
+      <div class="attr-item"><div class="v mind">${p.mind}</div><div class="lbl">精神</div></div>
+      <div class="attr-item"><div class="v body">${p.body}</div><div class="lbl">体质</div></div>
+      <div class="attr-item"><div class="v soul">${p.soul}</div><div class="lbl">灵魂</div></div>`;
+    // Inv
+    const inv = document.getElementById('inv-list');
+    if(!this.state.inventory.length) inv.innerHTML = '<div class="empty">背包为空</div>';
+    else inv.innerHTML = this.state.inventory.map(i=>'<div class="inv-item"><span class="icon">📦</span>'+i.name+'<span style="font-size:9px;color:var(--t3);margin-left:auto">'+i.desc+'</span></div>').join('');
+    // Journal
+    const jl = document.getElementById('journal-list');
+    if(!this.state.journal.length) jl.innerHTML = '<div class="empty">暂无记录</div>';
+    else jl.innerHTML = [...this.state.journal].reverse().slice(0,5).map(e=>'<div class="je"><div class="t">'+e.time+'</div><div class="c">'+(e.npc?'👤 '+e.npc+'：':'')+e.text+'</div></div>').join('');
+    // Status
+    document.getElementById('status-line').textContent = '状态：'+(this.state.status.length?this.state.status.join('、'):'正常')+' | 周目'+this.state.cycle;
+  },
+  renderTeam(){
+    const el = document.getElementById('team-list');
+    if(!this.state.teammates.length){ el.innerHTML = '<div class="empty">暂无队友</div>'; return; }
+    el.innerHTML = this.state.teammates.map(t=>
+      '<div style="font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03)">'+t.symbol+' <b style="color:var(--gold)">'+t.name+'</b> <span style="color:var(--t3)">'+t.job+'</span><br><span style="color:var(--xp)">'+(t.alive?'❤️同行中':'💀阵亡')+'</span> <span style="color:var(--t3)">ATK:'+t.atk+'</span></div>'
+    ).join('');
+  },
+
+  // ── API ──
+  async callAI(msgs){
+    const c = { ...D, ...cfg() };
+    if(!c.key){ this.toast('请在设置中配置API Key','error'); return null; }
+    try{
+      const body = { model:c.model, messages:msgs, temperature:0.8, stream:false };
+      const mt = c.maxTokens;
+      if(mt && mt!=='unlimited') body.max_tokens = parseInt(mt);
+      if(c.reasoning) body.reasoning_effort = c.reasoning;
+      const r = await fetch(c.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+c.key},body:JSON.stringify(body)});
+      if(!r.ok){ this.toast('API错误: '+r.status,'error'); return null; }
+      const d = await r.json();
+      const msg = d.choices?.[0];
+      return msg?{content:msg.message?.content||''}:null;
+    }catch(e){ this.toast('网络错误','error'); return null; }
+  },
+
+  // ── Save/Load ──
+  autoSave(){ try{ localStorage.setItem('il_autosave',JSON.stringify({v:1,t:new Date().toISOString(),s:JSON.parse(JSON.stringify(this.state))})); }catch(e){} },
+  loadAutoSave(){
+    try{
+      const raw = localStorage.getItem('il_autosave'); if(!raw) return false;
+      const d = JSON.parse(raw); const s = d.s||d; if(!s.player) return false;
+      this.state = JSON.parse(JSON.stringify(s));
+      this.state.apiBusy = false; this.state.cheatEnabled = this.state.cheatEnabled||false;
+      this.state.status = this.state.status||[];
+      this.renderMap(); this.updateAllUI(); this.renderTeam();
+      if(this.state.currentDungeon){
+        document.getElementById('pos-indicator').textContent = '📍 '+this.state.currentDungeon.name+' · '+this.state.currentZone;
+        this.setQuickActions(['探索','查看周围','前往下一个区域','攻击','查看状态','查看背包','查看队友']);
+        this.state.gameStarted = true;
+      } else {
+        this.setQuickActions(['查看状态','查看背包','查看队友','查看记忆']);
+      }
+      return true;
+    }catch(e){ return false; }
+  },
+  saveGame(){ this.autoSave(); this.toast('已存档','success'); },
+  modelsCache:null,
+  async fetchModels(){
+    const c = { ...D, ...cfg() };
+    const hint = document.getElementById('model-hint');
+    if(!c.key){ hint.textContent = '⚠️ 先填API Key再拉取'; return; }
+    hint.textContent = '⏳ 拉取中…';
+    if(this.modelsCache && this.modelsCache.time > Date.now()-300000){ this.populateModels(this.modelsCache.data); return; }
+    try{
+      const r = await fetch(c.endpoint.replace('/chat/completions','/models'), { headers:{'Authorization':'Bearer '+c.key} });
+      if(r.ok){
+        const d = await r.json();
+        const models = (d.data||[]).map(m=>m.id).filter(id=>id.includes('deepseek')||id.includes('chat')||id.includes('reasoner'));
+        this.modelsCache = { time:Date.now(), data:models };
+        this.populateModels(models);
+      } else { hint.textContent = '⚠️ 拉取失败 HTTP '+r.status; }
+    }catch(e){ hint.textContent = '⚠️ 网络错误'; }
+  },
+  populateModels(models){
+    const sel = document.getElementById('cfg-model');
+    const cur = sel.value;
+    sel.innerHTML = '';
+    if(!models.length) sel.innerHTML = '<option value="deepseek-chat">deepseek-chat</option><option value="deepseek-reasoner">deepseek-reasoner</option>';
+    else models.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o); });
+    if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+    else if(sel.options.length) sel.value = sel.options[0].value;
+    document.getElementById('model-hint').textContent = '✅ 已加载 '+sel.options.length+' 个模型';
+  },
+  showSettings(){
+    const c = { ...D, ...cfg() };
+    document.getElementById('modal-content').innerHTML = `
+      <h2>⚙️ 设置</h2>
+      <label>API端点</label><input id="cfg-endpoint" value="${c.endpoint}">
+      <label>API Key</label><input id="cfg-apikey" type="password" value="${c.key}">
+      <label>模型 <span id="model-hint" style="font-size:9px;color:var(--t3)"></span></label><select id="cfg-model"><option>deepseek-chat</option><option>deepseek-reasoner</option></select>
+      <button class="btn" onclick="IL.fetchModels()" style="width:100%;margin-bottom:10px;border:1px dashed var(--border-active);color:var(--t2)">🔄 从API拉取模型</button>
+      <label>推理强度</label><select id="cfg-reasoning"><option value="max">最大</option><option value="high">高</option><option value="medium">中</option></select>
+      <label>输出 Token 限制</label><select id="cfg-maxtokens"><option value="unlimited" selected>无限制</option><option value="2048">2048</option><option value="4096">4096</option><option value="8192">8192</option><option value="16384">16384</option></select>
+      <div class="btn-row"><button class="btn gold" onclick="IL.saveConfig()">保存</button><button class="btn" onclick="IL.restart()" style="color:var(--accent);border-color:var(--accent)">🔄 重新开始</button></div>
+      <div class="btn-row"><button class="btn" onclick="IL.closeModal()">关闭</button></div>`;
+    document.getElementById('cfg-model').value = c.model;
+    document.getElementById('cfg-reasoning').value = c.reasoning;
+    document.getElementById('cfg-maxtokens').value = c.maxTokens||'unlimited';
+    document.getElementById('main-modal').classList.add('show');
+  },
+  saveConfig(){
+    const c = {
+      endpoint:document.getElementById('cfg-endpoint').value.trim()||D.endpoint,
+      key:document.getElementById('cfg-apikey').value.trim(),
+      model:document.getElementById('cfg-model').value,
+      reasoning:document.getElementById('cfg-reasoning').value,
+      maxTokens:document.getElementById('cfg-maxtokens').value
+    };
+    saveCfg(c); this.closeModal(); this.toast('设置已保存','success');
+  },
+  restart(){
+    if(!confirm('确定重新开始？所有进度将被清除。')) return;
+    localStorage.removeItem('il_autosave');
+    location.reload();
+  },
+  togglePanel(){
+    const p = document.getElementById('right-panel');
+    p.classList.toggle('open');
+    document.getElementById('panel-drawer-btn').textContent = p.classList.contains('open')?'✕':'📊';
+  },
+  closeModal(){ document.getElementById('main-modal').classList.remove('show'); },
+  toast(msg,type){
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'show '+(type||'');
+    clearTimeout(el._t); el._t = setTimeout(()=>el.className='',2000);
+  }
+};
+
+document.addEventListener('DOMContentLoaded',()=>IL.init());
+document.getElementById('main-modal').addEventListener('click',function(e){if(e.target===this)IL.closeModal();});
+</script>
+</body>
+</html>

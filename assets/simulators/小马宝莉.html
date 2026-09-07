@@ -1,0 +1,1306 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="world">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="data:,">
+<title>AI 角色扮演游戏</title>
+<style>
+:root{
+  --bg:#0d1322; --bg2:#121a2c; --panel:#172036; --card:#1e2942; --card2:#273352;
+  --text:#e9edf6; --muted:#93a2bd; --border:#2b3855; --accent:#4f8cff; --accent2:#ffb84d;
+  --ok:#3ddc84; --bad:#ff5d6c; --gold:#ffd76a; --shadow:0 8px 30px rgba(0,0,0,.45);
+}
+html[data-theme="night"]{ --bg:#080a10; --bg2:#0d1017; --panel:#12151f; --card:#181c29; --card2:#202635; --text:#dbe2ef; --muted:#7c89a3; --border:#222a3c; --accent:#5b8def; --accent2:#9ece6a; }
+html[data-theme="paper"]{ --bg:#f2ede1; --bg2:#ebe4d2; --panel:#f8f4e9; --card:#fdfaf2; --card2:#f0ead8; --text:#37322a; --muted:#746b58; --border:#d9d0ba; --accent:#94491f; --accent2:#2a628c; }
+html[data-theme="neon"]{ --bg:#0b0919; --bg2:#100d24; --panel:#151033; --card:#1c1546; --card2:#262060; --text:#e9e3ff; --muted:#9d92d4; --border:#2e2670; --accent:#00d9ff; --accent2:#ff2ec4; }
+html[data-theme="ink"]{ --bg:#0e1318; --bg2:#131920; --panel:#181f28; --card:#1f2833; --card2:#283440; --text:#e2e8ea; --muted:#83949f; --border:#2b3945; --accent:#4aa393; --accent2:#c9a86a; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.65;overflow-y:auto;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:14px;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 12px;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+select option{background:var(--panel);color:var(--text)}
+textarea{resize:vertical;min-height:64px;line-height:1.55}
+label{font-size:13px;color:var(--muted);display:block;margin:10px 0 5px}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+.hidden{display:none!important}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:10px;background:var(--card2);border:1px solid var(--border);font-size:14px;transition:.15s}
+.btn:hover{border-color:var(--accent);transform:translateY(-1px)}
+.btn.primary{background:var(--accent);color:#fff;border-color:transparent;font-weight:600}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.danger{background:rgba(255,93,108,.12);color:var(--bad);border-color:rgba(255,93,108,.4)}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:8px}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* ===== 主界面 ===== */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;max-width:980px;margin:0 auto}
+#topbar{display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:nowrap;min-height:54px}
+.tb-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:4px 8px;border-radius:10px;font-size:11px;color:var(--muted);position:relative;min-height:40px}
+.tb-btn:hover{background:var(--card);color:var(--text)}
+.tb-btn .ic{font-size:17px;line-height:1.2}
+.tb-badge{position:absolute;top:-3px;right:-3px;background:var(--bad);color:#fff;font-size:10px;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+#tb-mid{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;flex-shrink:1}
+#tb-title{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:26vw;line-height:1.3}
+#tb-sub{font-size:10.5px;color:var(--gold);background:rgba(255,215,106,.1);border:1px solid rgba(255,215,106,.3);padding:0 8px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:30vw;line-height:1.7;margin-top:1px}
+#tb-mini{display:flex;gap:7px;align-items:center;flex-wrap:nowrap;overflow:hidden;margin-left:auto;padding:0 4px}
+.mini{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);white-space:nowrap}
+.mini b{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
+.mini .mb{width:38px;height:5px;background:var(--card2);border-radius:3px;overflow:hidden;display:inline-block}
+.mini .mb i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .5s}
+#tb-nav{display:flex;align-items:center;gap:1px;flex:0 0 auto}
+#chat{flex:1;overflow-y:auto;padding:16px 14px 8px;scroll-behavior:smooth}
+.msg{max-width:92%;margin:0 auto 14px;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.msg .bubble{padding:11px 14px;border-radius:14px;background:var(--card);border:1px solid var(--border);font-size:14.5px;word-break:break-word}
+.msg.narr .bubble{border-left:3px solid var(--accent)}
+.msg.sys .bubble{background:var(--panel);color:var(--muted);font-size:12.5px;text-align:center;max-width:70%;margin:0 auto;border:none}
+.msg.user{display:flex;justify-content:flex-end}
+.msg.user .bubble{background:var(--accent);color:#fff;border-color:transparent;border-bottom-right-radius:4px}
+.msg.assist .bubble{border-left:3px solid var(--accent2)}
+.msg.err .bubble{border-left:3px solid var(--bad)}
+.msg b{color:inherit;font-weight:700}
+.msg i{font-style:italic}
+.msg code{background:var(--card2);padding:1px 6px;border-radius:6px;font-size:13px}
+.typing .bubble{color:var(--muted);font-style:italic}
+.msg .r-box{background:var(--panel);border:1px dashed var(--border);border-radius:10px;padding:8px 12px;margin-bottom:6px;font-size:12.5px;color:var(--muted);cursor:pointer;user-select:none}
+.msg .r-head{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--accent2)}
+.msg .r-body{white-space:pre-wrap;margin-top:6px;max-height:200px;overflow-y:auto;line-height:1.6}
+.msg .r-fold .r-body{display:none}
+.msg .r-tri{transition:transform .2s}
+.msg .r-fold .r-tri{transform:rotate(-90deg)}
+#quick-wrap{padding:6px 12px 2px;overflow-x:auto;display:flex;gap:8px}
+#quick-wrap::-webkit-scrollbar{height:4px}
+.qchip{flex:0 0 auto;padding:6px 14px;border-radius:999px;background:var(--card2);border:1px solid var(--border);font-size:13px;color:var(--text);transition:.15s}
+.qchip:hover{border-color:var(--accent);color:var(--accent)}
+#input-bar{display:flex;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));align-items:flex-end}
+#input{flex:1;max-height:120px;min-height:44px;font-size:15px}
+#send{flex:0 0 auto;height:44px;padding:0 20px;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:15px}
+#send:disabled{opacity:.55}
+#send .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:rot .8s linear infinite;vertical-align:-2px}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ===== 抽屉 ===== */
+.drawer{position:fixed;top:0;bottom:0;width:320px;max-width:88vw;background:var(--panel);z-index:60;box-shadow:var(--shadow);transition:transform .28s ease;display:flex;flex-direction:column}
+.drawer.left{left:0;transform:translateX(-105%)}
+.drawer.open{transform:none}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px}
+.drawer-body{flex:1;overflow-y:auto;padding:12px 14px 30px}
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:55;opacity:0;pointer-events:none;transition:opacity .25s}
+#scrim.show{opacity:1;pointer-events:auto}
+
+/* ===== 角色面板 ===== */
+.c-sec{margin-bottom:18px}
+.c-sec h4{font-size:12px;color:var(--muted);letter-spacing:2px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.c-sec h4::after{content:"";flex:1;height:1px;background:var(--border)}
+.c-id{display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border-radius:14px;border:1px solid var(--border)}
+.c-avatar{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;flex:0 0 auto}
+.c-name{font-weight:800;font-size:17px}
+.c-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.c-tag{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--card2);border:1px solid var(--border);color:var(--muted)}
+.c-tag.diff{background:rgba(255,215,106,.12);color:var(--gold);border-color:rgba(255,215,106,.35)}
+.stat-row{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:13px}
+.stat-row .lb{width:56px;color:var(--muted);flex:0 0 auto;display:flex;align-items:center;gap:4px}
+.stat-row .bar{flex:1;height:8px;background:var(--card2);border-radius:4px;overflow:hidden}
+.stat-row .bar i{display:block;height:100%;border-radius:4px;transition:width .6s}
+.stat-row .vl{width:52px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text);font-size:12.5px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px}
+.kv .k{color:var(--muted)}
+.kv .v{color:var(--text);word-break:break-all}
+.tal-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(79,140,255,.12);background:color-mix(in srgb, var(--accent) 12%, transparent);border:1px solid rgba(79,140,255,.35);border-color:color-mix(in srgb, var(--accent) 35%, transparent);color:var(--accent);margin:3px 4px 0 0}
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.status-cell{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 11px}
+.status-cell .k{font-size:11px;color:var(--muted)}
+.status-cell .v{font-size:15px;font-weight:700;margin-top:2px}
+.status-cell .v.small{font-size:13px;font-weight:600;word-break:break-all}
+.log-line{font-size:12.5px;color:var(--muted);padding:5px 0;border-bottom:1px dashed var(--border);display:flex;gap:8px}
+.log-line .t{color:var(--accent2);flex:0 0 auto}
+.inv-item,.rel-item{font-size:13px;padding:5px 0;border-bottom:1px dashed var(--border);display:flex;justify-content:space-between;gap:8px}
+.empty{color:var(--muted);font-size:12.5px;padding:6px 0}
+
+/* ===== 弹窗 ===== */
+#modal-root .ovl{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:70;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+#modal-root .modal{width:560px;max-width:96vw;max-height:86vh;background:var(--panel);border-radius:18px;border:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow)}
+#modal-root .m-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px}
+#modal-root .m-body{flex:1;overflow-y:auto;padding:14px 16px}
+#modal-root .m-foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.x-btn{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px}
+.x-btn:hover{background:var(--card);color:var(--text)}
+.set-sec{border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:12px;background:var(--card)}
+.set-sec h5{font-size:13px;margin-bottom:6px;color:var(--accent)}
+.set-row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.set-row label{flex:0 0 86px;margin:0}
+.set-row input,.set-row select{flex:1}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.switch{position:relative;width:40px;height:22px;background:var(--card2);border:1px solid var(--border);border-radius:999px;transition:.2s;flex:0 0 auto}
+.switch.on{background:var(--accent);border-color:var(--accent)}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.switch.on::after{left:20px}
+.pill-row{display:flex;gap:6px;flex-wrap:wrap}
+.pill{padding:5px 12px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:13px;color:var(--muted)}
+.pill.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ency-item{padding:10px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px;background:var(--card);cursor:pointer;transition:.15s}
+.ency-item:hover{border-color:var(--accent)}
+.ency-item .t{font-weight:700;font-size:14px}
+.ency-item .d{font-size:13px;color:var(--muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ency-detail .d{font-size:14px;line-height:1.8}
+.mem-item{padding:9px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px;background:var(--card);font-size:13px}
+.mem-item .cat{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(79,140,255,.15);background:color-mix(in srgb, var(--accent) 15%, transparent);color:var(--accent);margin-right:8px}
+.mem-item .tm{font-size:11px;color:var(--muted);margin-left:6px}
+.death-item{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;background:var(--card);overflow:hidden}
+.death-item .hd{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer}
+.death-item .hd .no{font-size:12px;color:var(--bad);font-weight:700;background:rgba(255,93,108,.12);padding:2px 8px;border-radius:999px}
+.death-item .bd{display:none;padding:0 12px 12px;border-top:1px dashed var(--border)}
+.death-item.open .bd{display:block}
+.death-item .bd .eval{font-size:13px;margin-top:8px}
+.death-item .bd .eval b{color:var(--accent2)}
+.ask-bar{display:flex;gap:8px;margin-top:10px}
+
+/* ===== 死亡覆盖层 ===== */
+#death-overlay{position:fixed;inset:0;z-index:90;background:linear-gradient(160deg,#12070c,#1a0d16 55%,#0d0a1f);display:flex;align-items:center;justify-content:center;padding:18px;overflow-y:auto}
+#death-box{width:640px;max-width:96vw;background:var(--panel);border:1px solid rgba(255,93,108,.35);border-radius:20px;padding:26px;box-shadow:var(--shadow);animation:fadeUp .4s ease}
+#death-box h2{color:var(--bad);font-size:22px;display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.d-stat{font-size:13px;color:var(--muted);margin-bottom:16px}
+.d-cause{background:rgba(255,93,108,.08);border:1px solid rgba(255,93,108,.3);border-radius:12px;padding:12px 14px;font-size:14px;margin-bottom:14px}
+.d-eval{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.d-eval h4{color:var(--accent2);font-size:13px;margin-bottom:6px;letter-spacing:1px}
+.d-eval p{font-size:13.5px;line-height:1.75;white-space:pre-wrap}
+.d-eval p b{color:var(--accent2)}
+.d-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px}
+.cp-list{display:grid;gap:8px;margin-top:12px}
+.cp-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);font-size:13px}
+.cp-item .tm{color:var(--muted);font-size:11px;flex:0 0 auto}
+
+/* ===== 向导 ===== */
+#wizard{min-height:100vh;min-height:100dvh;background:var(--bg);padding-bottom:env(safe-area-inset-bottom)}
+#wz-inner{max-width:720px;margin:0 auto;padding:26px 18px 80px}
+#wz-head{text-align:center;margin-bottom:18px}
+#wz-logo{font-size:40px}
+#wz-title{font-size:24px;font-weight:800;margin-top:6px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+#wz-sub{font-size:13px;color:var(--muted);margin-top:4px}
+#wz-steps{display:flex;gap:6px;justify-content:center;margin:16px 0 6px;flex-wrap:wrap}
+.wz-dot{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;background:var(--panel)}
+.wz-dot.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.wz-dot.done{border-color:var(--accent);color:var(--accent)}
+#wz-card{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:20px;margin-top:10px;box-shadow:var(--shadow)}
+#wz-card h3{font-size:17px;margin-bottom:4px}
+#wz-card .desc{font-size:13px;color:var(--muted);margin-bottom:14px}
+#wz-nav{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.talent-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);margin-bottom:8px}
+.talent-item .inf{flex:1;min-width:0}
+.talent-item .nm{font-weight:700;font-size:14px}
+.talent-item .cs{font-size:11px;color:var(--gold);margin-left:6px}
+.talent-item .ds{font-size:12px;color:var(--muted);margin-top:2px}
+.talent-item .add,.talent-item .sub{width:30px;height:30px;border-radius:9px;flex:0 0 auto;font-size:16px;font-weight:700;background:var(--card2);border:1px solid var(--border)}
+.talent-item .add:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.talent-item .sub:hover{background:var(--bad);color:#fff;border-color:var(--bad)}
+.talent-item .cnt{font-size:14px;font-weight:700;width:26px;text-align:center;flex:0 0 auto}
+.talent-item.sel{border-color:var(--accent);background:rgba(79,140,255,.08);background:color-mix(in srgb, var(--accent) 8%, transparent)}
+.talent-item{cursor:pointer;user-select:none}
+.talent-item .mark{width:26px;height:26px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--accent);flex:0 0 auto;background:var(--card2)}
+.talent-item.sel .mark{background:var(--accent);color:#fff;border-color:var(--accent)}
+.attr-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);margin-bottom:8px}
+.attr-row .lb{width:96px;flex:0 0 auto;font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px}
+.attr-row .bar{flex:1;height:8px;background:var(--card2);border-radius:4px;overflow:hidden}
+.attr-row .bar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .3s}
+.attr-row .add,.attr-row .sub{width:30px;height:30px;border-radius:9px;flex:0 0 auto;font-size:16px;font-weight:700;background:var(--card2);border:1px solid var(--border)}
+.attr-row .add:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.attr-row .sub:hover{background:var(--bad);color:#fff;border-color:var(--bad)}
+.attr-row .cnt{width:46px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;flex:0 0 auto}
+.points-bar{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:14px;flex-wrap:wrap}
+.points-bar .pts{font-size:18px;font-weight:800;color:var(--accent)}
+.cheat{display:flex;align-items:center;gap:8px;margin-left:auto;font-size:13px;color:var(--accent2);cursor:pointer;user-select:none}
+.diff-card{border:1px solid var(--border);border-radius:14px;padding:13px 15px;margin-bottom:10px;cursor:pointer;background:var(--card);transition:.15s}
+.diff-card:hover{border-color:var(--accent)}
+.diff-card.sel{border-color:var(--accent);background:rgba(79,140,255,.08);background:color-mix(in srgb, var(--accent) 8%, transparent);box-shadow:0 0 0 1px var(--accent)}
+.diff-card .nm{font-weight:800;font-size:15px}
+.diff-card .ds{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.6}
+.diff-card .ru{font-size:12px;color:var(--accent2);margin-top:5px}
+.confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.confirm-grid .fld{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 12px}
+.confirm-grid .fld .k{font-size:11px;color:var(--muted)}
+.confirm-grid .fld .v{font-size:13px;margin-top:2px;word-break:break-all}
+.full{grid-column:1/-1}
+#toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--accent);color:var(--text);padding:10px 20px;border-radius:999px;font-size:13.5px;z-index:200;opacity:0;pointer-events:none;transition:.3s;box-shadow:var(--shadow);max-width:86vw}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (max-width:768px){
+  body{font-size:14px}
+  #topbar{flex-wrap:wrap;row-gap:2px}
+  .tb-btn{padding:3px 5px;min-height:34px}
+  .tb-btn .ic{font-size:14px;line-height:1.1}
+  .tb-btn span{font-size:10px}
+  #tb-sub{display:none}
+  #tb-title{font-size:12px;max-width:20vw}
+  #tb-mini{display:none}
+  .mini .mb{display:none}
+  .mini{font-size:10.5px}
+  .msg{max-width:96%}
+  .drawer{width:88vw}
+  #wz-card{padding:14px}
+  .grid2,.confirm-grid{grid-template-columns:1fr}
+  #quick-wrap{flex-wrap:nowrap}
+  #input{font-size:16px}
+}
+@media (max-width:420px){
+  .status-grid{grid-template-columns:1fr}
+  .tb-btn .ic{font-size:15px}
+  #input{font-size:16px}
+}
+@media (prefers-reduced-motion: reduce){ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important} }
+</style>
+</head>
+<body>
+
+<div id="app" class="hidden">
+  <header id="topbar">
+    <button id="btn-char" class="tb-btn" title="角色面板"><span class="ic">👤</span><span>角色</span></button>
+    <div id="tb-mid">
+      <div id="tb-title">加载中…</div>
+      <div id="tb-sub"></div>
+    </div>
+    <div id="tb-mini"></div>
+    <nav id="tb-nav">
+      <button class="tb-btn" data-modal="guide" title="玩法攻略"><span class="ic">📜</span><span>攻略</span></button>
+      <button class="tb-btn" data-modal="ency" title="世界百科"><span class="ic">📖</span><span>百科</span></button>
+      <button class="tb-btn" data-modal="mem" title="记忆"><span class="ic">🧠</span><span>记忆</span></button>
+      <button class="tb-btn" data-modal="death" title="死亡记录与回档"><span class="ic">💀</span><span>死亡记录</span><i id="death-badge" class="tb-badge hidden">0</i></button>
+      <button class="tb-btn" data-modal="settings" title="设置"><span class="ic">⚙️</span><span>设置</span></button>
+    </nav>
+  </header>
+  <main id="chat"></main>
+  <div id="quick-wrap"></div>
+  <footer id="input-bar">
+    <textarea id="input" placeholder="输入你的行动…（Enter 发送，Shift+Enter 换行）"></textarea>
+    <button id="send">▶ 行动</button>
+  </footer>
+</div>
+
+<aside id="char-drawer" class="drawer left">
+  <div class="drawer-head"><span>👤 角色档案</span><button class="x-btn" id="char-close">✕</button></div>
+  <div class="drawer-body" id="char-body"></div>
+</aside>
+
+<div id="scrim"></div>
+<div id="modal-root"></div>
+
+<div id="death-overlay" class="hidden"><div id="death-box"></div></div>
+
+<div id="wizard"><div id="wz-inner">
+  <div id="wz-head">
+    <div id="wz-logo">🎮</div>
+    <div id="wz-title">AI 角色扮演</div>
+    <div id="wz-sub"></div>
+    <div id="wz-steps"></div>
+  </div>
+  <div id="wz-card"><h3 id="wz-h3"></h3><div id="wz-desc" class="desc"></div><div id="wz-body"></div>
+    <div id="wz-nav">
+      <button class="btn" id="wz-prev">← 上一步</button>
+      <button class="btn primary" id="wz-next">下一步 →</button>
+    </div>
+  </div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+// === 《小马宝莉：友谊就是魔法》世界观配置（G4正剧同人）===
+window.WORLD_CONFIG = {
+  id: 'xiaomabaoli',
+  title: '小马宝莉：友谊就是魔法',
+  subtitle: '友谊就是你最强大的魔法',
+  genre: '友谊奇幻 · 治愈冒险 · 角色扮演',
+  icon: '🦄',
+  accent: '#ff6b9d',
+  accent2: '#7cc6ff',
+  worldSummary: '小马利亚大陆，肩负着关怀、友爱与成长的主角旅程。',
+  intro: '清晨的第一缕阳光洒进小马谷，云朵在天空打着哈欠慢悠悠地移动，糖果色的屋顶被镀上一层温柔的金边。你睁开眼，窗外的鸟鸣和集市小贩的叫卖声混在一起——又是充满元气的一天。\n\n你披上衣服走到小谷广场，露水还挂在石板上，苹果鲁萨的货车刚卸下今年的苹果，笨笨的哔哩正在追一只蝴蝶，天边的彩虹若隐若现——那是小马们昨天一起修好的天气。空气里飘着新鲜出炉的巧克力蛋糕香。\n\n那么，站在小马谷的清晨里，你的小马故事，想从哪里开始？先去集市逛逛，还是去找你的朋友？',
+  worldLore: `【世界观·小马宝莉】\n你生活在一片充满魔力的奇幻大陆——小马利亚（Equestria），由小马种族统治的联邦君主立宪制亲王国。由掌管太阳的宇宙公主（塞拉斯蒂娅）与掌管月亮的月亮公主（露娜）共同统治，每匹小马都生活在友谊与魔法的温柔环抱中。\n世界基调：治愈系友谊奇幻。核心主题是「友谊就是魔法」——用理解、包容与信任，化解一切矛盾与危机。没有沉重的死亡与绝望，失败也是温柔的转折。\n种族（官方设定）：陆马力气最大、与土地感应、体内魔力强化体能；独角兽头生独角、是唯一能主动释放魔法的种族（念动力/法术）；天马生有双翼、会飞行踩云、掌管天气；天角兽角+翅膀、超凡魔力+永生、一般为皇室成员（两公主、紫悦、音韵、风雪之心）。三族可通婚，后代随机继承种族。特殊种族：麒麟（愤怒会变“逆鳞”）、幻形灵（变形吸爱）、小风仙、海马/塞壬等。\n可爱标志：小马出生时臀部没有标记，找到自己的天赋/天命后标志才会浮现。没有标志的雌马被戏称「白屁股」，可能被嘲笑。任何手段都无法强行催生可爱标志。\n和谐之元：由六种美德凝聚的传说神器，友谊魔法的终极形态——魔法（紫悦）、忠诚（云宝黛西）、善良（柔柔）、慷慨（珍奇）、欢笑（碧琪）、正直（苹果嘉儿）。\n地图：小马谷（故事主舞台）、中心城·坎特洛特（都城）、水晶帝国、云中城、永恒自由森林、苹果鲁萨、独角兽森林。\n威胁：梦魇之月（月亮公主堕落形态）、无序（混沌精灵）、虫茧女王（幻形灵女王）、提雷克（掠夺魔法）、黑晶王/森布拉（水晶帝国暴君）、星光熠熠（早期反派后洗白为紫悦学生）。\n终极目标：在治愈冒险中收获真挚的友谊，守护小马利亚的和平；点亮你的可爱标志，找到属于你的「天命」。`,
+  rules: `【核心规则】\n属性系统（六维 1~10）：力量（体格、砸东西）、灵巧（反应、飞行操控）、体质（耐力、扛揍）、魔力（魔法强度）、才智（智慧、破解谜题）、魅力（气场、亲和他人）。\n种族与魔法：独角兽可用念动力/传送（咒语多为押韵）/屏障/元素法术；天马可飞行、天气控制（云朵、降雨、彩虹）；陆马大地感应、植物催生、超级力气；天角兽兼具三者+高阶王室魔法（日月掌控、梦境）。\n可爱标志：初始未觉醒，通过剧情「天赋事件」觉醒，获得1个核心专长并解锁技能树方向。\n友谊值（核心资源）：与小马互动积累，可用于触发合作技、化解冲突、获得「友谊援助」。背叛/欺骗会大幅损失友谊值，并可能触发「友谊危机」。六美德代表齐聚且友谊值足够时可发动和谐之元终极技。\n事件系统：日常（暖心节、夏日庆典、秋季丰收节、运动会、恶作剧大赛、学院日）；冒险（反派入侵、永恒自由森林探索、友谊难题）；随机（天气异常、魔法事故、传闻误会）。结果由属性检定决定。\n压力与阴影：小马也有烦恼——嫉妒、自卑、误解、孤独。「阴影值」过高可能被黑暗力量侵蚀（参考梦魇之月、星光熠熠的黑化路线）。通过友谊与倾诉消除阴影。\n失败：小马利亚没有致命伤害，但友谊破裂、阴影值满、被黑暗侵蚀可能进入坏的分支结局。失败是温柔的转折，友谊永远有挽回的余地。`,
+  deathNote: `【死亡/失败判定】\n小马利亚是治愈系世界观，没有真正的「死亡」。判定「重大失败」的情况：友谊值归零且关系破裂无法挽回、阴影值满100被黑暗力量彻底侵蚀（如黑化成小梦魇之月）、或触发了结局级的悲剧分支。\n失败时你只需输出【失败:原因】，随后由 AI 点评玩家行为，玩家回到最近的关键节点（如：在小马谷醒来的清晨）重新出发，友谊与希望仍可挽回。正常范围内的误会、争吵、比赛失利都不是失败，只是温柔的转折。`,
+  aiExtras: `本作强调「治愈温馨」的基调：日常细节要柔软明亮（糖果色屋顶、飘动的云朵、烤蛋糕的香气、朋友的笑声），NPC 对话温暖而口语化。铭记主题「友谊就是魔法」——遇到矛盾优先用理解与包容化解，而不是战斗。务必管理好玩家的「阴影值」：当它升高时用旁白与暗示提醒玩家内心的嫉妒/自卑/孤独正在滋长，但永远给出通过友谊与倾诉消除阴影的温柔出口。不要轻易让战斗定死局，反派也有能被感化的一面。`,
+  charFields: [
+    { key: 'name', label: '姓名', type: 'text', ph: '给自己取个小马名字', required: true },
+    { key: 'gender', label: '性别', type: 'select', options: ['雄马（公马）', '雌马（母马）'], def: '雌马（母马）' },
+    { key: 'age', label: '年龄', type: 'text', ph: '默认未成年小马', def: '15' },
+    { key: 'zhongzu', label: '种族', type: 'select', options: ['陆马（Earth Pony）', '独角兽（Unicorn）', '天马（Pegasus）', '天角兽（Alicorn）★稀有'], def: '独角兽（Unicorn）' },
+    { key: 'mengxiang', label: '梦想职业', type: 'text', ph: '如：天气管理员、时装设计师、植物学家、护林员…' },
+    { key: 'appearance', label: '外形特征', type: 'textarea', ph: '毛发颜色、鬃毛样式、眼睛、可爱标志所在位置…' },
+    { key: 'background', label: '身世背景', type: 'textarea', ph: '来自哪个小镇、家庭情况、成长经历（AI 会遵守）' }
+  ],
+  talents: [
+    { id: 'tiansheng-tianjiaoshou', name: '天生天角兽', icon: '👑', cost: 5, desc: '主角光环级：你是罕见的先天四族一体天角兽，兼具独角兽/天马/陆马/王室之力，魔力超凡、迈向永生。走到哪都自带星辰光环（纯爽/稀有出身专属方向）' },
+    { id: 'mofa-tianfu', name: '魔法天赋', icon: '✨', cost: 4, desc: '对咒语有惊人直觉，独角兽/天角兽法术威力+、学习新法术更快，念动力精准稳定' },
+    { id: 'kele-biaozhi', name: '可爱标志觉醒', icon: '💠', cost: 4, desc: '开局即可点亮自己的可爱标志，直接获得1个核心专长，不用白屁股被嘲笑，技能树提前解锁' },
+    { id: 'youyi-guanghuan', name: '友谊光环', icon: '🌈', cost: 4, desc: '你的真诚自带感染力，友谊值增长提速，化解误会更快，反派遇到你更容易被感化' },
+    { id: 'feixing-teji', name: '飞行特技', icon: '🦋', cost: 3, desc: '天马专属天赋：飞行稳健、能做彩虹闪电等特技动作，云端救援与空中对决得心应手' },
+    { id: 'dadi-zhi', name: '大地之力', icon: '🌾', cost: 3, desc: '陆马专属天赋：与大地深深共鸣，植物催生迅捷、庄稼年年丰收，体力与力量强化明显' },
+    { id: 'zhiliao-zhi', name: '治愈之心', icon: '💝', cost: 3, desc: '你的温柔能抚平他人伤痛，缓解阴影值与压力，让小马伙伴从低落中振作，团队可靠的后盾' },
+    { id: 'youhui-jihua', name: '机灵鬼点子', icon: '💡', cost: 2, desc: '思维活络、点子多，解谜、破局、化解误会时智谋加成，常常绝处逢生' },
+    { id: 'pengyou-zhi', name: '自来熟', icon: '🍀', cost: 2, desc: '天生爱交朋友，认识新小马更快、关系升温迅速，小马谷的社交圈向你敞开' },
+    { id: 'yinyue-ganwu', name: '心灵之音', icon: '🎵', cost: 2, desc: '你的歌声能触动人心（参考珍奇/云宝的歌），安抚情绪、鼓舞士气，团队合奏时效果更佳' },
+    { id: 'daren-chuli', name: '风暴掌控', icon: '🌪️', cost: 3, desc: '天马魔法进阶：不仅能下场雨彩虹，还能平息风暴、驱散乌云，天气管理大师的苗子' },
+    { id: 'pengqi-suqi', name: '超高速奔行', icon: '💨', cost: 2, desc: '四蹄生风，奔跑速度远超同辈，追风筝、送信、赶时间都是你的强项' },
+    { id: 'anshen-peiwei', name: '胆小细心', icon: '🐌', cost: 1, desc: '双刃剑：天生谨慎，不易踩雷、洞察力强，但也容易怯场误事，勇气需要慢慢培养' },
+    { id: 'aichu-fengtou', name: '爱出风头', icon: '🎉', cost: 1, desc: '双刃剑：表现欲旺盛，往往先冲先秀，能抢到关键机会，但也常因莽撞惹麻烦、被同伴瞪眼' },
+    { id: 'yishu-lingqi', name: '手工天赋', icon: '🧵', cost: 2, desc: '针线/设计/制作小物件手脚麻利，礼物与装饰总能让他人眼前一亮（时装设计的敲门砖）' },
+    { id: 'anwei-zhenzhang', name: '开心果体质', icon: '🎈', cost: 2, desc: '自带欢快气场，调节气氛一流，冷场时也能逗笑全场，让阴影值悄悄溜走' }
+  ],
+  supplements: [
+    { key: 'chushen', label: '出身地', type: 'select', options: ['小马谷（欢乐日常，主角主舞台）', '中心城·坎特洛特（繁华都城，皇家学府）', '云中城（天空之城，天马聚居）', '水晶帝国（晶莹辉光，冰雪之地）', '苹果鲁萨（西部小镇，热情质朴）', '永恒自由森林边缘（神秘危险，野马之家）'], desc: '决定你的故乡与开局环境，AI 会围绕它铺开剧情' },
+    { key: 'mengxiang', label: '梦想职业', type: 'text', ph: '成为天气预报家/时装设计师/植物学家/冒险家…', desc: '你的天命方向，可爱标志觉醒时会优先朝此专长发展' },
+    { key: 'peiban', label: '是否带伙伴', type: 'select', options: ['独行侠，独自闯荡', '带一位青梅竹马', '带一匹性格互补的小马同伴'], desc: '是否与其他小马结伴出发，影响支援与友谊剧情' },
+    { key: 'fandui', label: '对待反派的态度', type: 'select', options: ['用友谊感化：坚持理解与包容', '先守护再劝诫：必要时出手保护朋友', '以智取胜：不硬碰，巧设妙计', '随性而为：看心情，友谊优先'], desc: '设定你面对反派/威胁时的处事原则，AI 会据此调整冲突走向' }
+  ],
+  difficulties: [
+    { id: 'cool', name: '纯爽「天选小马」', icon: '🏆', desc: '开局即天角兽（紫悦同款出身），可爱标志直接觉醒；全校小马都喜欢你、误会三分钟内解开、反派见你自动被友谊感化；魔法威力翻倍、友谊值涨不停；永远不会黑化。你是小马利亚最闪耀的明星，全程治愈+碾压。', rules: '本局为纯爽模式：玩家天生天角兽+可爱标志直接觉醒，自带主角光环。所有小马对玩家好感拉满、误会三分钟内化解、反派遇到玩家自动被友谊光环感化（不是被打败，是被感化）。魔法威力翻倍、友谊值持续增长、阴影值永远涨不动（不会黑化）。规则全程为「爽」让路：无憋屈、无挫败，玩的就是小马利亚最靓的崽。', startHint: '天生天角兽，可爱标志已觉醒，属性 8~10', startAttrs: { liliang: 8, lingqiao: 9, tizhi: 9, moli: 10, caizhi: 9, meili: 10 }, startStatus: { shengming: 100, moli: 100, youyizhi: 100, yinyingzhi: 0, 'kele-biaozhi': '已觉醒 ✨' } },
+    { id: 'easy', name: '休闲「友谊新星」', icon: '😊', desc: '独角兽/天马开局，专长自选，友谊值增长+50%，反派较弱。轻松愉快的日常冒险。', rules: '玩家可选独角兽或天马开局，专长自选（可爱标志觉醒即可获得目标方向专长）。友谊值增长+50%，反派实力较弱、负面事件温和、失败惩罚轻。轻松治愈向，冲突多可化解。', startHint: '独角兽/天马，属性 6~8', startAttrs: { liliang: 6, lingqiao: 8, tizhi: 7, moli: 8, caizhi: 7, meili: 8 } },
+    { id: 'normal', name: '标准「小马利亚日常」', icon: '⚖️', desc: '任意种族，原汁原味正剧节奏。经典体验（推荐）。', rules: '玩家可任意选择种族（天角兽仅限稀有出身）。属性与事件完全按正剧逻辑：友谊值正常积累、会有误解与争吵、反派有真实威胁但也存在被感化的可能。可爱标志按剧情「天赋事件」觉醒，魔法与日常并重，标准治愈冒险节奏。', startHint: '任意种族，属性 4~6', startAttrs: { liliang: 5, lingqiao: 6, tizhi: 5, moli: 6, caizhi: 5, meili: 6 } },
+    { id: 'hard', name: '硬核「迷雾森林」', icon: '🔥', desc: '陆马开局（无魔法），资源紧张，反派强，误会经常搞出大麻烦。靠智慧与朋友取胜。', rules: '玩家为陆马开局（无主动魔法），资源与支援紧张，反派实力偏强、误会经常搞出大麻烦。必须依靠才智、体力与真挚的伙伴关系取胜，阴影值更容易上升，需要谨慎规划每一步。', startHint: '陆马开局，无魔法，属性 3~5', startAttrs: { liliang: 5, lingqiao: 4, tizhi: 5, moli: 3, caizhi: 4, meili: 4 } },
+    { id: 'hell', name: '地狱「暗影之马」', icon: '💀', desc: '开局白屁股（可爱标志迟迟不醒），被同学排挤，星光熠熠的「绝对平等」暗面诱惑你；反派针对你。从自卑到觉醒的至暗逆袭。', rules: '玩家开局为「白屁股」（可爱标志迟迟不醒），同学有排挤与讥讽，阴影值易积累、黑化机制活跃，反派会针对性地针对玩家（如星光熠熠用「绝对平等」诱惑、梦魇之月的低语）。无新手保护，从自卑到觉醒需要勇气与友谊。但一旦点亮可爱标志、找回天命，逆袭即是传奇。', startHint: '白屁股开局，排挤与阴影，属性 2~4', startAttrs: { liliang: 3, lingqiao: 3, tizhi: 3, moli: 2, caizhi: 4, meili: 2 }, startStatus: { youyizhi: 10, yinyingzhi: 45, 'kele-biaozhi': '未觉醒（白屁股）' } }
+  ],
+  attrs: [
+    { key: 'liliang', label: '力量', icon: '💪', max: 10 },
+    { key: 'lingqiao', label: '灵巧', icon: '🦌', max: 10 },
+    { key: 'tizhi', label: '体质', icon: '❤️', max: 10 },
+    { key: 'moli', label: '魔力', icon: '🔮', max: 10 },
+    { key: 'caizhi', label: '才智', icon: '🧠', max: 10 },
+    { key: 'meili', label: '魅力', icon: '✨', max: 10 }
+  ],
+  statusFields: [
+    { key: 'shengming', label: '生命', icon: '❤️', type: 'bar', max: 100 },
+    { key: 'moli', label: '魔力', icon: '🔮', type: 'bar', max: 100 },
+    { key: 'youyizhi', label: '友谊值', icon: '🌈', type: 'bar', max: 100 },
+    { key: 'yinyingzhi', label: '阴影值', icon: '🌑', type: 'bar', max: 100 },
+    { key: 'kele-biaozhi', label: '可爱标志', icon: '💠', type: 'text' },
+    { key: 'location', label: '地点', icon: '📍', type: 'text' },
+    { key: 'time', label: '时间', icon: '🕐', type: 'text' }
+  ],
+  starterStatus: { shengming: 100, moli: 60, youyizhi: 30, yinyingzhi: 0, 'kele-biaozhi': '未觉醒', location: '小马谷 · 清晨', time: '春日 · 晴 · 上午' },
+  starterInventory: ['小小背包', '一本马蹄拼读的咒语书（空白）', '一袋干粮', '写给朋友的信纸'],
+  starterRelations: {},
+  quickActions: ['去集市逛逛', '和沿途的小马打招呼', '去云中城/农场找朋友', '练习自己的魔法/特长', '帮助遇到麻烦的小马', '去永恒自由森林探险', '回家里休息', '查看可爱标志有没有变化'],
+  ency: [
+    { cat: '四大种族', entries: [
+      { t: '陆马 / Earth Pony', d: '无角无翅，三族中力气最大。与土地深度感应，擅长种植农作物，体内魔力会强化体能。稳定、踏实、靠得住。' },
+      { t: '独角兽 / Unicorn', d: '头生独角，是唯一能主动释放魔法的种族。专属念动力、传送（咒语多为押韵）、屏障、元素法术。聪明而优雅。' },
+      { t: '天马 / Pegasus', d: '生有双翼，会飞行、踩云、自由移动云朵。掌管小马利亚的天气——降雨、彩虹、清晓都是他们的工作。' },
+      { t: '天角兽 / Alicorn', d: '角+翅膀，近乎神的四族一体，超凡魔力+永生。一般为皇室成员：两公主、紫悦、音韵公主、风雪之心。★稀有。' }
+    ]},
+    { cat: '可爱标志', entries: [
+      { t: '可爱标志', d: '每只小马出生时臀部没有标记，只有找到自己的天赋/天命后，标志才会浮现。图案象征你的天命（如云宝的彩虹闪电=飞行）。' },
+      { t: '白屁股 / Blank Flank', d: '对可爱标志未觉醒小马的戏称，可能被嘲笑，也可能成为被鼓励的对象。这是成长主题的重要一环，任何手段都无法强行催生。' },
+      { t: '天赋事件', d: '通过冒险与经历触发，可爱标志随之点亮。觉醒可获得1个核心专长，决定你的技能树方向，朝着梦想职业大步迈进。' },
+      { t: '专长系统', d: '可爱标志觉醒后解锁核心专长，后续可习得次级专长。每个专长都让一条路发光，组合出你的独特性。' }
+    ]},
+    { cat: '和谐之元', entries: [
+      { t: '魔法之元', d: '代表小马：紫悦（独角兽→天角兽）。象征学习、友谊与魔法本身，是六元素的「钥匙」。' },
+      { t: '忠诚之元', d: '代表小马：云宝黛西（天马）。对朋友言出必行，关键时刻绝不退缩，是最可靠的翅膀。' },
+      { t: '善良之元', d: '代表小马：柔柔/小蝶（天马）。用温柔与善意对待一切，用爱化解恐惧。' },
+      { t: '慷慨之元', d: '代表小马：珍奇（独角兽）。乐于分享与给予，把自己的最好的留给朋友。' },
+      { t: '欢笑之元', d: '代表小马：碧琪/萍琪派（陆马）。用笑声治愈阴霾，永远相信明天会更好。' },
+      { t: '正直之元', d: '代表小马：苹果嘉儿（陆马）。诚实守信、脚踏实地，是最坚固的地基。' }
+    ]},
+    { cat: '主要地点', entries: [
+      { t: '小马谷 / Ponyville', d: '故事的温暖主舞台，梦幻的糖果色小镇。集市、苹果园、图书馆小树屋……友谊与冒险从这里开始。' },
+      { t: '中心城·坎特洛特', d: '小马利亚的都城，巍峨壮丽。两公主居住于此，皇家学院与上流舞会云集，也是星璇学院的所在。' },
+      { t: '水晶帝国', d: '晶莹剔透的水晶之城，由音韵公主治理。曾被黑晶王森布拉掌控，如今闪耀着爱的光辉。' },
+      { t: '云中城 / Cloudsdale', d: '天空之城，天马们聚居、制造天气与彩虹的故乡，充满云朵上的学校与赛场。' },
+      { t: '永恒自由森林', d: '神秘而略显诡谲的野橡林，魔法植物丛生、规则自行运转，藏着无数传说与危险。' },
+      { t: '苹果鲁萨', d: '温暖的西部小镇，苹果园与开拓气氛浓郁，苹果家族的地盘，友善而爽快。' },
+      { t: '独角兽森林', d: '古老而神秘的林地，魔法浓度极高，独角兽们在此研习古老咒术与星空魔法。' }
+    ]},
+    { cat: '著名反派', entries: [
+      { t: '梦魇之月', d: '月亮公主的堕落形态。因嫉妒与孤寂被黑暗吞噬，曾遭和谐之元放逐月球千年。高冷的反派，也有渴望理解的内心。' },
+      { t: '无序 / Discord', d: '混沌精灵，代表混乱与不和谐，喜欢把世界搅得一团糟。看似不可理喻，却被友谊感化成了朋友。' },
+      { t: '虫茧女王 / 幻形灵', d: '幻形灵女王，靠吸取小马的「爱」维生，会变形模仿他人。是幻形灵一族的统治与渴望。' },
+      { t: '提雷克 / Tirek', d: '掠夺魔法的堕落者，渴望吸走小马利亚所有魔力。力大无穷、野心勃勃的老牌反派。' },
+      { t: '黑晶王 / 森布拉', d: '水晶帝国的暴君，被诅咒千年、封印在坚冰中的黑暗君主。冷血、操控与恐惧是他的武器。' },
+      { t: '星光熠熠', d: '早期反派，强推「绝对平等」、抹去每匹小马的可爱标志。后被紫悦的友谊打动，洗白成为她的学生。' }
+    ]},
+    { cat: '魔法体系', entries: [
+      { t: '独角兽魔法', d: '念动力、传送（咒语多为押韵）、屏障、元素法术。用角施法，是唯一能主动释放魔法的体系。' },
+      { t: '天马魔法', d: '飞行、天气控制——云朵搬运、降雨、彩虹制造。小马利亚的天空由他们守护。' },
+      { t: '陆马魔法', d: '大地感应、植物催生、超级力气。看似无形，却是丰收与安稳的根基。' },
+      { t: '天角兽魔法', d: '兼具三者+高阶王室魔法——日月掌控、梦境管理。掌管昼夜与星辰的皇家之力。' },
+      { t: '友谊魔法', d: '六美德齐聚且友谊值足够时可发动和谐之元终极技。这是全作最强的「剧情级大招」，也是友谊就是魔法的最佳证明。' }
+    ]}
+  ],
+  guide: `<p><b>怎么玩：</b>像写日记一样，用第一人称告诉我你此刻想做什么——「去集市逛逛」「去找云宝学飞行」「帮苹果家族收苹果」。我会推进剧情、扮演所有小马 NPC、判定事件结果，并在每回合后实时更新你的属性与状态；友谊值和阴影值会随着你的选择波动。</p><ul><li>🦄 左上角「角色」查看你的六维属性、种族与可爱标志；右上角「设置」可改 API、换界面主题、导入导出存档。</li><li>🧠 记忆系统会自动记录你交到的朋友、经历的冒险；📖 世界百科可随时查询小马利亚的一切。</li><li>🌈 友谊就是魔法：多交朋友、多帮忙，友谊值高能触发合作技与和谐之元大招。🌑 注意阴影值——嫉妒、自卑、孤独会让它上涨，靠友谊与倾诉温柔化解。</li><li>💠 你的可爱标志还在等它的「天赋事件」，别急，属于你的天命会在对的时候发光。</li></ul>`
+};
+// === 小马宝莉 配置完成 ===
+
+'use strict';
+/* ============================================================
+ * 公共游戏引擎 v1.0 —— 世界观角色扮演 AI 游戏
+ * 特性：开局向导(API/角色/天赋/补充/备注/难度/确认)、聊天推演、
+ *       状态实时同步、记忆系统、世界百科、死亡回档+AI点评、自动存档、
+ *       存档导入导出、界面主题、PC/移动端适配
+ * ============================================================ */
+const CFG = window.WORLD_CONFIG || {};
+const APP_VER = '1.0.0';
+const LS_CFG = 'wg_' + CFG.id + '_cfg';
+const LS_SAVE = 'wg_' + CFG.id + '_save';
+const ROLE_RULES = '【角色扮演质量规则】（必须严格遵守）\n1. NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。\n2. 禁止代替玩家行动、发言、思考或做出选择。\n3. 禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。\n4. 禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。\n5. 禁止通过反复强调塑造人设；剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。\n6. 人物情绪应通过具体行为和对话体现，而非旁白解释。';
+
+const $ = s => document.querySelector(s);
+const deepClone = o => JSON.parse(JSON.stringify(o));
+const nowStr = () => new Date().toLocaleString('zh-CN', {hour12:false});
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt(t){ return esc(t).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*\n]+)\*/g,'<i>$1</i>').replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\n/g,'<br>'); }
+function clamp(n,a,b){ n=Number(n); if(isNaN(n)) return a; return Math.min(b,Math.max(a,n)); }
+function toast(msg,ms){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'), ms||2600); }
+
+/* ==================== 配置与状态 ==================== */
+let cfg = { endpoint:'https://api.deepseek.com/v1/chat/completions', key:'', model:'deepseek-chat', reasoning:'medium', maxTokens:'unlimited', modelsUrl:'' };
+let ui = { theme:'world', fontSize:'m', anim:true, autoSave:true };
+let state = null;
+let draft = null;       // 向导草稿
+let busy = false;
+const memCats = ['人物','地点','事件','物品','关系','其他'];
+const modelFallback = ['deepseek-chat','deepseek-reasoner'];
+
+function loadCfg(){ try{ const c=JSON.parse(localStorage.getItem(LS_CFG)||'{}'); Object.assign(cfg,c); Object.assign(ui,c.ui||{}); }catch(e){} }
+function saveCfg(){ try{ localStorage.setItem(LS_CFG, JSON.stringify(Object.assign({},cfg,{ui}))); }catch(e){} }
+
+function defaultState(diff){
+  const d = CFG.difficulties.find(x=>x.id===diff) || CFG.difficulties[2];
+  const attrs = {};
+  CFG.attrs.forEach(a=>{ attrs[a.key] = clamp((d.startAttrs||{})[a.key], 0, a.max) || Math.round(a.max/2); });
+  return { v:1, player:{}, talents:[], customTalents:[], supplements:{}, notes:'',
+    difficulty:d.id, attrs, status:deepClone(CFG.starterStatus), inventory:deepClone(CFG.starterInventory||[]),
+    relations:deepClone(CFG.starterRelations||{}), flags:{}, memories:[], fusedMemory:'', encyExtra:[],
+    messages:[], statusLog:[], checkpoints:[], deaths:[], cpCounter:0, turnCounter:0,
+    summarizedUntil:0, started:false, startedAt:Date.now() };
+}
+function loadSave(){ try{ const s=JSON.parse(localStorage.getItem(LS_SAVE)||'null'); if(s && s.v && s.started) return s; }catch(e){} return null; }
+function saveNow(){ if(!state) return; try{ localStorage.setItem(LS_SAVE, JSON.stringify(state)); }catch(e){ toast('存档失败：'+(e.message||e)); } }
+function clearSave(){ state = null; try{ localStorage.removeItem(LS_SAVE); }catch(e){} }
+
+/* ==================== 工具栏渲染 ==================== */
+function miniBars(){
+  const bars = CFG.statusFields.filter(f=>f.type==='bar').slice(0,3);
+  const nums = CFG.statusFields.filter(f=>f.type==='num').slice(0,2);
+  let h = '';
+  bars.forEach(f=>{ const v=clamp(state.status[f.key],0,f.max||100); h += `<span class="mini">${f.icon}<b>${Math.round(v)}</b><span class="mb"><i style="width:${v/(f.max||100)*100}%"></i></span></span>`; });
+  nums.forEach(f=>{ const v=state.status[f.key]; if(v!=null) h += `<span class="mini">${f.icon}<b>${v}</b></span>`; });
+  $('#tb-mini').innerHTML = h;
+}
+
+/* ==================== 消息与聊天 ==================== */
+function addMsg(role, content, opts={}){
+  const reasoning = opts.reasoning || '';
+  state.messages.push({role, content, t: opts.t || nowStr(), reasoning});
+  const m = document.createElement('div');
+  m.className = 'msg ' + role + (opts.typing?' typing':'') + (opts.err?' err':'');
+  const rHtml = reasoning ? `<div class="r-box"><div class="r-head"><span>💭 思考过程</span><span class="r-tri">▾</span></div><div class="r-body">${esc(reasoning)}</div></div>` : '';
+  m.innerHTML = `<div class="who">${opts.who||''}</div>${rHtml}<div class="bubble"></div>`;
+  $('#chat').appendChild(m);
+  $('#chat').scrollTop = $('#chat').scrollHeight;
+  const rb = m.querySelector('.r-box');
+  if(rb) rb.onclick = ()=> rb.classList.toggle('r-fold');
+  const bubble = m.querySelector('.bubble');
+  if(opts.typing){
+    let i=0;
+    const step = Math.max(6, Math.floor(content.length/140));
+    const iv = setInterval(()=>{
+      i = Math.min(content.length, i+step);
+      bubble.innerHTML = fmt(content.slice(0,i)) + (i<content.length?'<span style="opacity:.5">▍</span>':'');
+      $('#chat').scrollTop = $('#chat').scrollHeight;
+      if(i>=content.length){ clearInterval(iv); m.classList.remove('typing'); }
+    }, ui.anim?24:0);
+    if(!ui.anim){ i=content.length; bubble.innerHTML=fmt(content); clearInterval(iv); }
+  } else {
+    bubble.innerHTML = fmt(content);
+  }
+  return m;
+}
+function addSystem(text){ addMsg('system', text); }
+function renderChat(){
+  $('#chat').innerHTML = '';
+  state.messages.forEach(m=>{
+    const el = document.createElement('div');
+    el.className = 'msg ' + m.role;
+    const rHtml = m.reasoning ? `<div class="r-box"><div class="r-head"><span>💭 思考过程</span><span class="r-tri">▾</span></div><div class="r-body">${esc(m.reasoning)}</div></div>` : '';
+    el.innerHTML = `${rHtml}<div class="bubble">${m.role==='system'? esc(m.content) : fmt(m.content)}</div>`;
+    const rb = el.querySelector('.r-box');
+    if(rb) rb.onclick = ()=> rb.classList.toggle('r-fold');
+    $('#chat').appendChild(el);
+  });
+  $('#chat').scrollTop = $('#chat').scrollHeight;
+}
+
+/* ==================== AI 调用 ==================== */
+async function callAI(msgs, opts={}){
+  const api = opts.api || cfg;
+  if(!api.endpoint) throw new Error('未配置 API 端点');
+  if(!api.key) throw new Error('未配置 API Key，请在【设置】中填写');
+  let model = api.model || 'deepseek-chat';
+  if(api.reasoning && api.reasoning!=='off' && model==='deepseek-chat' && (api.endpoint||'').includes('deepseek.com')) model='deepseek-reasoner';
+  const body = { model, messages: msgs, stream:false };
+  if(api.maxTokens && api.maxTokens!=='unlimited') body.max_tokens = Number(api.maxTokens);
+  if(!String(model).includes('reasoner')) body.temperature = (opts.temp!=null?opts.temp:0.9);
+  if(api.reasoning && api.reasoning!=='off' && !(api.endpoint||'').includes('deepseek.com')) body.reasoning_effort = api.reasoning;
+  const ctrl = new AbortController();
+  const tm = setTimeout(()=>ctrl.abort(), opts.timeout||120000);
+  try{
+    const res = await fetch(api.endpoint, { method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+api.key},
+      body: JSON.stringify(body), signal: ctrl.signal });
+    if(!res.ok){
+      let msg = 'HTTP '+res.status;
+      try{ const e = await res.json(); msg = e.error?.message || e.message || msg; }catch(_){}
+      if(res.status===400 && body.reasoning_effort){
+        delete body.reasoning_effort;
+        const retry = await fetch(api.endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+api.key},body:JSON.stringify(body),signal:ctrl.signal});
+        if(retry.ok){ const d=await retry.json(); const m=d.choices?.[0]?.message||{}; return {content:m.content||'', reasoning:m.reasoning_content||''}; }
+      }
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    const m = data.choices?.[0]?.message || {};
+    return { content: m.content || '', reasoning: m.reasoning_content || '' };
+  }catch(err){
+    if(err.name==='AbortError') throw new Error('请求超时（'+(opts.timeout||120)/1000+'秒）。请检查网络或 API 配置');
+    throw err;
+  }finally{ clearTimeout(tm); }
+}
+async function fetchModels(){
+  const ep = cfg.endpoint || '';
+  const candidates = [];
+  candidates.push(ep.replace(/\/chat\/completions\/?$/,'/models'));
+  try{ const u=new URL(ep); candidates.push(u.origin+'/v1/models'); candidates.push(u.origin+'/models'); }catch(_){}
+  if(cfg.modelsUrl) candidates.unshift(cfg.modelsUrl);
+  let lastErr;
+  for(const u of candidates){
+    try{
+      const res = await fetch(u, {headers:{'Authorization':'Bearer '+cfg.key}});
+      if(res.ok){ const d=await res.json(); const list=(d.data||[]).map(x=>x.id).filter(Boolean); if(list.length){ cfg.modelsUrl=u; return list; } }
+    }catch(e){ lastErr=e; }
+  }
+  throw (lastErr||new Error('拉取模型列表失败'));
+}
+
+/* ==================== 状态/记忆/百科/节点/死亡 解析 ==================== */
+function extractBalancedJSON(text, marker){
+  const i = text.lastIndexOf(marker);
+  if(i<0) return null;
+  const j = text.indexOf('{', i);
+  if(j<0) return null;
+  let depth=0, inStr=false, esc=false;
+  for(let k=j;k<text.length;k++){
+    const c=text[k];
+    if(inStr){ if(esc) esc=false; else if(c==='\\') esc=true; else if(c==='"') inStr=false; continue; }
+    if(c==='"') inStr=true;
+    else if(c==='{') depth++;
+    else if(c==='}' && --depth===0){ try{ return JSON.parse(text.slice(j,k+1)); }catch(e){ return null; } }
+  }
+  return null;
+}
+function applyStatus(obj){
+  if(!obj || typeof obj!=='object') return;
+  CFG.attrs.forEach(a=>{ if(obj[a.key]!=null){ state.attrs[a.key] = clamp(obj[a.key], 0, a.max); delete obj[a.key]; } });
+  CFG.statusFields.forEach(f=>{
+    if(obj[f.key]==null) return;
+    if(f.type==='bar') state.status[f.key] = clamp(obj[f.key], 0, f.max||100);
+    else state.status[f.key] = obj[f.key];
+    delete obj[f.key];
+  });
+  if(Array.isArray(obj.inventory)){ state.inventory = obj.inventory.map(String); delete obj.inventory; }
+  if(obj.relations && typeof obj.relations==='object'){ Object.assign(state.relations, obj.relations); delete obj.relations; }
+  if(obj.flags && typeof obj.flags==='object'){ Object.assign(state.flags, obj.flags); delete obj.flags; }
+  if(Array.isArray(obj.log)){ obj.log.forEach(l=>state.statusLog.unshift({t:state.status.time||'此刻', text:String(l)})); delete obj.log; }
+  Object.keys(obj).forEach(k=>{ if(obj[k]!=null) state.status[k]=obj[k]; });
+  if(state.statusLog.length>40) state.statusLog.length=40;
+}
+function addMemory(cat, text){
+  const c = memCats.includes(cat)?cat:'其他';
+  state.memories.push({cat:c, text:String(text).trim(), t:nowStr()});
+  if(state.memories.length>90){
+    const old = state.memories.splice(0, state.memories.length-70);
+    const fused = old.map(m=>'['+m.cat+'] '+m.text).join('；');
+    state.fusedMemory = (state.fusedMemory? state.fusedMemory+'；':'') + fused;
+    if(state.fusedMemory.length>1600) state.fusedMemory = state.fusedMemory.slice(-1600);
+  }
+}
+function addEncy(cat,t,d){
+  state.encyExtra.push({cat:String(cat).trim(), t:String(t).trim(), d:String(d).trim(), t2:nowStr()});
+  if(state.encyExtra.length>60) state.encyExtra.shift();
+}
+function saveCheckpoint(label){
+  const cp = { id:'cp'+(++state.cpCounter), label: label||('自动节点·第'+state.turnCounter+'回合'), t:nowStr(), state:deepClone(state) };
+  state.checkpoints.push(cp);
+  if(state.checkpoints.length>30) state.checkpoints.shift();
+  saveNow();
+  return cp;
+}
+function restoreCheckpoint(id){
+  const cp = state.checkpoints.find(c=>c.id===id) || state.checkpoints[0];
+  if(!cp){ toast('没有可用节点'); return; }
+  const deaths = state.deaths || [];
+  const deathCount = (state.status||{}).deathCount;
+  state = deepClone(cp.state);
+  state.deaths = deaths;
+  if(deathCount!=null) state.status.deathCount = deathCount;
+  state.started = true;
+  state.messages.push({role:'system', content:'⏳ 命运回溯：你回到了「'+cp.label+'」。过去的一切依然历历在目，这一次，你会做出不同的选择吗？', t:nowStr()});
+  renderAll(); renderChat(); closeDeathOverlay(); closeModal();
+  saveNow();
+  toast('已回到节点：「'+cp.label+'」');
+}
+function triggerDeath(cause){
+  const lastCp = state.checkpoints[state.checkpoints.length-1] || null;
+  const rec = { n:(state.deaths.length||0)+1, t:nowStr(), cause:String(cause||'命运在此画上句号'), checkpointId:lastCp?lastCp.id:null, eval:null };
+  state.deaths.push(rec);
+  saveNow();
+  renderDeathOverlay(rec);
+  deathReview(rec);
+}
+async function deathReview(rec, targetEl){
+  const setEval = html => {
+    if(targetEl){ targetEl.innerHTML = html; return; }
+    const b = $('#death-box').querySelector('.d-eval'); if(b) b.innerHTML = html;
+  };
+  setEval('<h4>🕯️ 命运点评生成中…</h4><p style="color:var(--muted)">正在请 AI 回顾你这次的旅程…</p>');
+  if(!cfg.key){ setEval('<h4>🕯️ 命运点评</h4><p>⚠️ 尚未配置 API Key，无法生成点评。配置 Key 后可在「💀 死亡记录」中重新点评。</p>'); return; }
+  const recent = state.messages.slice(-8).filter(m=>m.role!=='system').map(m=>(m.role==='user'?'玩家':'AI')+'：'+m.content.slice(0,180)).join('\n');
+  const sys = `你是《${CFG.title}》的「命运点评者」。玩家在游戏中死亡/失败了一次。请基于玩家角色、死亡原因与最近对话，给出三部分点评（全部中文，具体、犀利、有建设性）：\n1. 评价：对玩家整体表现的总评（80字内）\n2. 点评：分析这次失败的关键原因与行为得失（150字内）\n3. 建议：下次重来应该如何改进（150字内）\n只输出JSON：{"评价":"…","点评":"…","建议":"…"}`;
+  const user = `【角色】${playerSheet()}\n【死亡原因】${rec.cause}\n【最近经历】\n${recent}`;
+  try{
+    const raw = (await callAI([{role:'system',content:sys},{role:'user',content:user}], {timeout:90000, temp:0.7})).content;
+    const j = extractBalancedJSON(raw, '{');
+    let ev = null;
+    if(j && j.评价) ev = {评价:String(j.评价), 点评:String(j.点评||''), 建议:String(j.建议||'')};
+    else { const parts = raw.split(/\n+/).filter(Boolean); ev = {评价:parts[0]||'', 点评:parts[1]||'', 建议:parts[2]||''}; }
+    rec.eval = ev; saveNow();
+    setEval('<h4>🕯️ 命运点评 #'+rec.n+'</h4>' +
+      '<p><b>评价：</b>'+esc(ev.评价)+'</p>' +
+      (ev.点评?'<p><b>点评：</b>'+esc(ev.点评)+'</p>':'') +
+      (ev.建议?'<p><b>建议：</b>'+esc(ev.建议)+'</p>':''));
+    updateDeathBadge();
+  }catch(err){
+    setEval('<h4>🕯️ 命运点评</h4><p>⚠️ 点评生成失败：'+esc(err.message)+'。可稍后在「💀 死亡记录」中重试。</p>');
+  }
+}
+function renderDeathOverlay(rec){
+  const ov = $('#death-overlay'); ov.classList.remove('hidden');
+  const cps = state.checkpoints.slice().reverse();
+  const cpHtml = cps.map(c=>`<div class="cp-item"><span>🕐 ${esc(c.label)} <span class="tm">${esc(c.t)}</span></span><button class="btn sm primary" data-cp="${c.id}">回到此节点</button></div>`).join('') || '<div class="empty">暂无节点</div>';
+  $('#death-box').innerHTML =
+    `<h2>💀 你死了</h2>
+     <div class="d-stat">第 ${rec.n} 次死亡 · ${esc(rec.t)}</div>
+     <div class="d-cause">🪦 <b>死亡原因：</b>${esc(rec.cause)}</div>
+     <div class="d-eval"><h4>🕯️ 命运点评生成中…</h4><p style="color:var(--muted)">正在请 AI 回顾你这次的旅程…</p></div>
+     <div class="d-btns">
+       <button class="btn primary" id="d-back">⏳ 回到最近关键节点</button>
+       <button class="btn" id="d-list-toggle">🕐 选择更早节点</button>
+       <button class="btn" id="d-records">📜 查看全部死亡记录</button>
+       <button class="btn danger" id="d-restart">🔄 重新开始</button>
+     </div>
+     <div class="cp-list hidden" id="d-cplist">${cpHtml}</div>`;
+  ov.querySelector('#d-back').onclick = ()=>{ const last=state.checkpoints[state.checkpoints.length-1]; restoreCheckpoint(last?last.id:null); };
+  ov.querySelector('#d-list-toggle').onclick = ()=>{ ov.querySelector('#d-cplist').classList.toggle('hidden'); };
+  ov.querySelector('#d-records').onclick = ()=>{ closeDeathOverlay(); openModal('death'); };
+  ov.querySelector('#d-restart').onclick = ()=>{ if(confirm('确定重新开始吗？当前进度将被清空。')){ clearSave(); location.reload(); } };
+  ov.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>restoreCheckpoint(b.dataset.cp));
+}
+function closeDeathOverlay(){ $('#death-overlay').classList.add('hidden'); }
+function updateDeathBadge(){ const n=(state.deaths||[]).length; const b=$('#death-badge'); b.textContent=n; b.classList.toggle('hidden', !n); }
+
+/* ==================== 提示词构建 ==================== */
+function playerSheet(){
+  const p = state.player||{};
+  const lines = Object.entries(p).filter(([k,v])=>v && !['custom','notes'].includes(k)).map(([k,v])=>{ const f=(CFG.charFields||[]).find(x=>x.key===k); return (f?f.label:k)+'：'+v; });
+  const sup = Object.entries(state.supplements||{}).filter(([k,v])=>v).map(([k,v])=>{ const f=(CFG.supplements||[]).find(x=>x.key===k); return (f?f.label:k)+'：'+(Array.isArray(v)?v.join('、'):v); });
+  const tals = (state.talents||[]).map(t=>t.name).concat((state.customTalents||[]).map(t=>t.name));
+  let s = '【玩家角色卡】\n' + lines.join('\n');
+  if(sup.length) s += '\n【设定补充】\n'+sup.join('\n');
+  if(p.custom) s += '\n【自定义补充设定】\n'+p.custom;
+  if(tals.length) s += '\n【天赋】\n'+tals.map(t=>'·'+t).join('\n');
+  if(p.notes) s += '\n【玩家备注/愿望（务必尊重）】\n'+p.notes;
+  return s;
+}
+function buildSystemPrompt(){
+  const d = CFG.difficulties.find(x=>x.id===state.difficulty) || CFG.difficulties[2];
+  const memTxt = state.memories.slice(-40).map(m=>'['+m.cat+'] '+m.text).join('\n') || '（暂无）';
+  const encyTop = CFG.ency.map(g=>g.entries[0]).filter(Boolean).slice(0,8).map(e=>'·'+e.t+'：'+e.d.slice(0,60)).join('\n');
+  const encyExtraTxt = state.encyExtra.slice(-10).map(e=>'·'+e.t+'：'+e.d.slice(0,60)).join('\n');
+  const statusTxt = JSON.stringify({属性:state.attrs, 状态:state.status, 物品:state.inventory, 关系:state.relations, 标记:state.flags});
+  return `你是《${CFG.title}》的 AI 主持（Game Master）。你负责：推进剧情、扮演所有NPC、判定事件结果、维护世界观一致性。所有叙述使用第二人称「你」，过去经历与当前处境必须与【记忆档案】【当前状态】一致，绝不允许遗忘设定与已发生的故事。
+${CFG.worldLore}
+${CFG.rules}
+【当前难度】${d.name}：${d.rules}
+${ROLE_RULES}
+${CFG.deathNote}
+${CFG.aiExtras}
+${playerSheet()}
+【当前状态】${statusTxt}
+【记忆档案】
+${memTxt}
+【早期故事摘要】${state.fusedMemory||'（暂无）'}
+【世界百科速览】
+${encyTop}${encyExtraTxt?'\n'+encyExtraTxt:''}
+【输出协议】（每回合必须遵守）
+1. 回复末尾必须输出一行【状态更新】JSON：{"字段key":数值/文本}，字段key按当前状态中的键名，只写发生变化或有意义的字段（如生命/精力/金钱/地点/时间/心情等）；也可带"log":["状态日志1","状态日志2"]。
+2. 认识新人物、重要事件、约定、物品时，用【记忆:类别|内容】记录（类别限：人物/地点/事件/物品/关系/其他）。
+3. 发现世界新知识时，用【百科:类别|标题|内容】补充百科。
+4. 剧情关键转折点，用【节点:描述】标记存档节点。
+5. 玩家角色死亡/彻底失败时，在回复末尾输出【死亡:原因】。
+6. 单次回复 300~600 字，生动具体；禁止替玩家做决定、发言、思考。`;
+}
+function buildMessages(userText){
+  const msgs = [{role:'system', content:buildSystemPrompt()}];
+  const hist = state.messages.slice(-24);
+  hist.forEach(m=>{ if(m.role==='system') return; msgs.push({role:m.role==='assistant'?'assistant':'user', content:m.content}); });
+  msgs.push({role:'user', content:userText});
+  return msgs;
+}
+async function maybeSummarize(){
+  const total = state.messages.length;
+  if(total - state.summarizedUntil < 40 || total < 40) return;
+  const seg = state.messages.slice(state.summarizedUntil, total-24);
+  const to = total-24;
+  let summary = '';
+  try{
+    const sys='你是剧情摘要助手。把下面的对话压缩成150字内的中文摘要，保留：关键人物、事件、约定、物品、状态变化、悬念。只输出摘要正文。';
+    const usr = seg.map(m=>(m.role==='user'?'玩家':'AI')+'：'+m.content.slice(0,240)).join('\n');
+    summary = (await callAI([{role:'system',content:sys},{role:'user',content:usr}], {timeout:60000, temp:0.3})).content.trim();
+  }catch(e){
+    summary = seg.filter(m=>m.role==='user').slice(0,6).map(m=>m.content.slice(0,80)).join('；');
+  }
+  if(summary){
+    state.fusedMemory = (state.fusedMemory? state.fusedMemory+'；':'') + summary;
+    if(state.fusedMemory.length>1800) state.fusedMemory = state.fusedMemory.slice(-1800);
+  }
+  state.summarizedUntil = to;
+}
+
+/* ==================== 主流程 ==================== */
+async function sendMessage(text){
+  if(busy) return;
+  text = String(text||'').trim();
+  if(!text) return;
+  if(!cfg.key){ toast('请先在右上角【设置】中配置 API Key'); return; }
+  busy = true; setBusyUI(true);
+  addMsg('user', text);
+  $('#input').value='';
+  $('#input').style.height='';
+  try{
+    await maybeSummarize();
+    const ai = await callAI(buildMessages(text));
+    applyAIText(ai.content, ai.reasoning);
+  }catch(err){
+    addMsg('assist', '⚠️ 请求失败：'+err.message+'\n\n请检查右上角【设置】中的 API 配置，然后重试。', {err:true, who:'系统'});
+  }finally{
+    busy=false; setBusyUI(false);
+  }
+}
+function applyAIText(ai, reasoning){
+  const dm = ai.match(/【死亡(?:[：:]([^】]+))?】/);
+  const hasDeath = /【死亡/.test(ai);
+  const statusObj = extractBalancedJSON(ai, '【状态更新】');
+  if(statusObj) applyStatus(statusObj);
+  (ai.match(/【记忆[：:]\s*([^|】]{1,8})\|([^】]+)】/g)||[]).forEach(tag=>{ const m=tag.match(/【记忆[：:]\s*([^|】]{1,8})\|([^】]+)】/); if(m) addMemory(m[1].trim(), m[2].trim()); });
+  (ai.match(/【百科[：:]\s*([^|】]{1,8})\|([^|】]{1,24})\|([^】]+)】/g)||[]).forEach(tag=>{ const m=tag.match(/【百科[：:]\s*([^|】]{1,8})\|([^|】]{1,24})\|([^】]+)】/); if(m) addEncy(m[1].trim(), m[2].trim(), m[3].trim()); });
+  (ai.match(/【节点[：:]([^】]+)】/g)||[]).forEach(tag=>{ const m=tag.match(/【节点[：:]([^】]+)】/); if(m) saveCheckpoint(m[1].trim()); });
+  const clean = ai.replace(/【状态更新】\s*\{[\s\S]*?\}\s*/g,'').replace(/【记忆[：:][^】]+】/g,'').replace(/【百科[：:][^】]+】/g,'').replace(/【节点[：:][^】]+】/g,'').replace(/【死亡(?:[：:][^】]+)?】/g,'').replace(/\n{3,}/g,'\n\n').trim();
+  if(clean) addMsg('assist', clean, {reasoning: reasoning || ''});
+  state.turnCounter++;
+  if(state.turnCounter % 6 === 0) saveCheckpoint('第'+state.turnCounter+'回合自动节点');
+  renderAll();
+  saveNow();
+  if(hasDeath){ setTimeout(()=>triggerDeath(dm&&dm[1]?dm[1].trim():'命运在此画上句号'), 600); }
+}
+function setBusyUI(b){
+  const s=$('#send'); s.disabled=b;
+  s.innerHTML = b? '<span class="spin"></span> 推演中':'▶ 行动';
+}
+
+/* ==================== 渲染：角色面板/快捷/百科等 ==================== */
+function renderChar(){
+  const p = state.player||{};
+  const d = CFG.difficulties.find(x=>x.id===state.difficulty);
+  const tals = (state.talents||[]).map(t=>`<span class="tal-chip">${t.icon} ${esc(t.name)}</span>`).join('')
+    + (state.customTalents||[]).map(t=>`<span class="tal-chip">✦ ${esc(t.name)}</span>`).join('');
+  const attrsHtml = CFG.attrs.map(a=>{
+    const v=clamp(state.attrs[a.key],0,a.max); const pct=v/(a.max||100)*100;
+    const hue = pct<30? 'var(--bad)': pct<60? 'var(--accent2)':'var(--ok)';
+    return `<div class="stat-row"><span class="lb">${a.icon} ${a.label}</span><span class="bar"><i style="width:${pct}%;background:${hue}"></i></span><span class="vl">${Math.round(v)}/${a.max}</span></div>`;
+  }).join('');
+  const statusHtml = CFG.statusFields.map(f=>{
+    const v=state.status[f.key];
+    if(v==null && f.type!=='text') return '';
+    if(f.type==='bar'){ const n=clamp(v,0,f.max||100); return `<div class="status-cell"><div class="k">${f.icon} ${f.label}</div><div class="v">${Math.round(n)}/${f.max||100}</div></div>`; }
+    if(f.type==='num') return `<div class="status-cell"><div class="k">${f.icon} ${f.label}</div><div class="v">${v}</div></div>`;
+    return `<div class="status-cell"><div class="k">${f.icon} ${f.label}</div><div class="v small">${esc(v||'—')}</div></div>`;
+  }).join('');
+  const invHtml = (state.inventory||[]).map(i=>`<div class="inv-item"><span>${esc(i)}</span></div>`).join('') || '<div class="empty">空空如也</div>';
+  const relHtml = Object.entries(state.relations||{}).map(([k,v])=>`<div class="rel-item"><span>${esc(k)}</span><span style="color:var(--accent2)">${esc(String(v))}</span></div>`).join('') || '<div class="empty">暂无关系记录</div>';
+  const logHtml = (state.statusLog||[]).slice(0,8).map(l=>`<div class="log-line"><span class="t">${esc(l.t)}</span><span>${esc(l.text)}</span></div>`).join('') || '<div class="empty">暂无动态</div>';
+  const kv = Object.entries(p).filter(([k,v])=>v && !['custom','notes'].includes(k)).map(([k,v])=>{ const f=CFG.charFields.find(x=>x.key===k); return `<div class="k">${f?f.label:k}</div><div class="v">${esc(String(v))}</div>`; }).join('');
+  $('#char-body').innerHTML = `
+    <div class="c-sec"><div class="c-id">
+      <div class="c-avatar">${CFG.icon}</div>
+      <div><div class="c-name">${esc(p.name||'未命名')}</div>
+      <div class="c-tags">${d?`<span class="c-tag diff">${d.icon} ${esc(d.name)}</span>`:''}<span class="c-tag">${esc(CFG.title)}</span></div></div>
+    </div></div>
+    <div class="c-sec"><h4>📋 基础信息</h4><div class="kv">${kv}</div></div>
+    <div class="c-sec"><h4>🌟 天赋</h4>${tals||'<div class="empty">无</div>'}</div>
+    <div class="c-sec"><h4>📊 属性</h4>${attrsHtml}</div>
+    <div class="c-sec"><h4>🩺 当前状况</h4><div class="status-grid">${statusHtml}</div>
+      ${state.status.goal?`<div style="margin-top:8px;font-size:12.5px;color:var(--accent2)">🎯 当前目标：${esc(state.status.goal)}</div>`:''}
+    </div>
+    <div class="c-sec"><h4>🎒 随身物品</h4>${invHtml}</div>
+    <div class="c-sec"><h4>💗 关系</h4>${relHtml}</div>
+    <div class="c-sec"><h4>📈 近况</h4>${logHtml}</div>`;
+}
+function renderQuick(){
+  $('#quick-wrap').innerHTML = (CFG.quickActions||[]).map(a=>`<button class="qchip">${esc(a)}</button>`).join('');
+  $('#quick-wrap').querySelectorAll('.qchip').forEach(b=>b.onclick=()=>sendMessage(b.textContent));
+}
+function renderAll(){
+  miniBars(); renderChar(); renderQuick(); updateDeathBadge();
+  const d=CFG.difficulties.find(x=>x.id===state.difficulty);
+  $('#tb-title').textContent = CFG.title;
+  $('#tb-title').title = CFG.subtitle;
+  $('#tb-sub').textContent = d? d.icon+' '+d.name : '';
+}
+
+/* ==================== 弹窗 ==================== */
+function openModal(id){
+  const map = { guide: modalGuide, ency: modalEncy, mem: modalMem, death: modalDeath, settings: modalSettings };
+  (map[id]||modalGuide)();
+}
+function closeModal(){ const r=$('#modal-root'); r.innerHTML=''; }
+function modalShell(title, bodyHtml){
+  $('#modal-root').innerHTML = `<div class="ovl"><div class="modal"><div class="m-head"><span>${title}</span><button class="x-btn" onclick="closeModal()">✕</button></div><div class="m-body">${bodyHtml}</div></div></div>`;
+  $('#modal-root').querySelector('.ovl').addEventListener('click', e=>{ if(e.target.classList.contains('ovl')) closeModal(); });
+}
+function modalGuide(){
+  const tips = `<div class="set-sec"><h5>🎮 基本玩法</h5><p style="font-size:13px;color:var(--muted)">像写日记一样输入你的行动，AI 主持会推进剧情、扮演所有 NPC、判定事件结果，并在每回合后实时更新你的属性与当前状况。快捷行动条可直接点击发送。</p></div>`;
+  modalShell('📜 玩法攻略', tips + (CFG.guide||'') + `<div class="set-sec"><h5>🧩 系统说明</h5><ul style="font-size:13px;color:var(--muted);padding-left:18px;line-height:1.9">
+    <li>👤 左上角「角色」：查看完整角色档案与实时当前状况</li><li>🧠 「记忆」：AI 自动记录的经历，长对话会自动压缩为早期摘要</li>
+    <li>📖 「百科」：世界设定百科，可直接向 AI 提问</li><li>💀 「死亡记录」：每次死亡都会记录并由 AI 点评，可回到关键节点重来</li>
+    <li>⚙️ 「设置」：API 配置、界面主题、存档导入导出、重新开始</li><li>💾 游戏每回合自动存档；设置里可随时导出/导入存档文件</li></ul></div>`);
+}
+function modalEncy(){
+  const cats = CFG.ency.map(g=>g.cat);
+  const pill = c=>`<button class="pill${c===cats[0]?' on':''}" data-cat="${esc(c)}">${esc(c)}</button>`;
+  modalShell('📖 世界百科', `<div class="pill-row" id="eny-pills">${cats.map(pill).join('')}<button class="pill" data-cat="__extra">✦ 新增</button></div><div id="eny-list" style="margin-top:12px"></div><div class="ask-bar"><input id="eny-q" placeholder="向 AI 提问这个世界的问题…"><button class="btn primary sm" id="eny-ask">问</button></div><div id="eny-ans" style="margin-top:10px"></div>`);
+  const list = $('#eny-list');
+  const render = cat=>{
+    let items = cat==='__extra' ? state.encyExtra : (CFG.ency.find(g=>g.cat===cat)||{entries:[]}).entries.slice();
+    if(cat!=='__extra') items = items.concat(state.encyExtra.filter(e=>e.cat===cat));
+    if(!items.length){ list.innerHTML='<div class="empty">暂无词条</div>'; return; }
+    list.innerHTML = items.map((e,i)=>`<div class="ency-item" data-i="${i}" data-cat="${esc(cat)}"><div class="t">${esc(e.t)}</div><div class="d">${esc(e.d)}</div></div>`).join('');
+    list.querySelectorAll('.ency-item').forEach(el=>el.onclick=()=>{
+      const it=items[+el.dataset.i];
+      list.innerHTML = `<div class="ency-detail"><div class="t" style="font-weight:800;font-size:16px;margin-bottom:6px">${esc(it.t)}</div><div class="d">${fmt(it.d)}</div><button class="btn sm" style="margin-top:12px" onclick="modalEncy()">← 返回列表</button></div>`;
+    });
+  };
+  $('#eny-pills').querySelectorAll('.pill').forEach(p=>p.onclick=()=>{ $('#eny-pills').querySelectorAll('.pill').forEach(x=>x.classList.remove('on')); p.classList.add('on'); render(p.dataset.cat); });
+  render(cats[0]);
+  $('#eny-ask').onclick = async ()=>{
+    const q=$('#eny-q').value.trim(); if(!q||busy) return;
+    const ans=$('#eny-ans'); ans.innerHTML='<div class="empty">🤔 推演中…</div>';
+    if(!cfg.key){ ans.innerHTML='<div class="empty" style="color:var(--bad)">未配置 API Key</div>'; return; }
+    try{
+      const raw = (await callAI([{role:'system',content:`你是《${CFG.title}》的百科问答官。只依据世界观设定回答，200字内；不知道就明确说不确定。`},{role:'user',content:q}], {timeout:60000, temp:0.4})).content;
+      const clean = raw.replace(/【[^】]*】/g,'').trim();
+      ans.innerHTML = `<div class="set-sec"><h5>💡 回答</h5><p style="font-size:13.5px">${fmt(clean)}</p></div>`;
+      addMemory('其他','百科问答：'+q+' → '+clean.slice(0,80));
+      saveNow();
+    }catch(e){ ans.innerHTML=`<div class="empty" style="color:var(--bad)">${esc(e.message)}</div>`; }
+  };
+}
+function modalMem(){
+  const cats=['全部'].concat(memCats);
+  const pill = c=>`<button class="pill${c==='全部'?' on':''}" data-cat="${esc(c)}">${esc(c)}</button>`;
+  modalShell('🧠 记忆档案', `<div class="pill-row">${cats.map(pill).join('')}</div><div id="mem-list" style="margin-top:12px"></div>`);
+  const list=$('#mem-list');
+  const render=c=>{
+    let ms = c==='全部'? state.memories.slice().reverse() : state.memories.filter(m=>m.cat===c).reverse();
+    list.innerHTML = ms.map(m=>`<div class="mem-item"><span class="cat">${esc(m.cat)}</span>${fmt(m.text)}<span class="tm">${esc(m.t)}</span></div>`).join('') || '<div class="empty">暂无记忆</div>';
+  };
+  list.parentElement.querySelectorAll('.pill').forEach(p=>p.onclick=()=>{ list.parentElement.querySelectorAll('.pill').forEach(x=>x.classList.remove('on')); p.classList.add('on'); render(p.dataset.cat); });
+  render('全部');
+}
+function modalDeath(){
+  const ds=state.deaths||[];
+  modalShell('💀 死亡记录与命运回档', '');
+  const body=$('#modal-root').querySelector('.m-body');
+  body.innerHTML = ds.length? ds.slice().reverse().map(d=>`
+    <div class="death-item">
+      <div class="hd"><span class="no">#${d.n}</span><span style="flex:1">${esc(d.cause)}</span><span style="font-size:11px;color:var(--muted)">${esc(d.t)}</span><span style="color:var(--muted)">▾</span></div>
+      <div class="bd">
+        ${d.eval? `<div class="eval"><b>评价：</b>${esc(d.eval.评价)}</div>${d.eval.点评?`<div class="eval"><b>点评：</b>${esc(d.eval.点评)}</div>`:''}${d.eval.建议?`<div class="eval"><b>建议：</b>${esc(d.eval.建议)}</div>`:''}` : '<div class="empty">点评未生成（需 API Key）</div>'}
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          ${d.checkpointId?`<button class="btn sm primary" data-rb="${d.checkpointId}">⏳ 回到当时的节点</button>`:''}
+          ${!d.eval?`<button class="btn sm" data-re="${d.n}">重新生成点评</button>`:''}
+        </div>
+      </div>
+    </div>`).join('') : '<div class="empty">还没有死亡记录。死亡/重大失败后，这里会保存记录与 AI 点评，并支持回到关键节点重来。</div>';
+  body.querySelectorAll('.death-item .hd').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
+  body.querySelectorAll('[data-rb]').forEach(b=>b.onclick=()=>{ if(confirm('将回到该节点，当前进度会回退，确定吗？')){ closeModal(); restoreCheckpoint(b.dataset.rb); } });
+  body.querySelectorAll('[data-re]').forEach(b=>b.onclick=async ()=>{ const d=ds.find(x=>x.n==+b.dataset.re); if(d){ b.disabled=true; const holder=b.closest('.bd'); holder.querySelector('.eval')?.remove(); deathReview(d, holder); } });
+}
+
+function modalSettings(){
+  const themeOpts=[['world','🌍 世界观主题'],['night','🌙 暗夜'],['paper','📜 纸张'],['neon','🌆 霓虹'],['ink','🖋 水墨']].map(([v,l])=>`<option value="${v}"${ui.theme===v?' selected':''}>${l}</option>`).join('');
+  const fsOpts=[['s','小'],['m','中'],['l','大']].map(([v,l])=>`<option value="${v}"${ui.fontSize===v?' selected':''}>${l}</option>`).join('');
+  const rzOpts=[['off','关闭'],['low','低'],['medium','中'],['high','高'],['max','最大']].map(([v,l])=>`<option value="${v}"${cfg.reasoning===v?' selected':''}>${l}</option>`).join('');
+  const tkOpts=[['unlimited','无限制'],['2048','2048'],['4096','4096'],['8192','8192'],['16384','16384']].map(([v,l])=>`<option value="${v}"${String(cfg.maxTokens)===v?' selected':''}>${l}</option>`).join('');
+  modalShell('⚙️ 设置', `
+    <div class="set-sec"><h5>🤖 API 设置</h5>
+      <div class="set-row"><label>API 端点</label><input id="s-endpoint" value="${esc(cfg.endpoint)}"></div>
+      <div class="set-row"><label>API Key</label><input id="s-key" type="password" value="${esc(cfg.key)}" placeholder="sk-…"></div>
+      <div class="set-row"><label>模型</label><select id="s-model"></select><button class="btn sm" id="s-fetch">🔄 拉取</button></div>
+      <div class="set-row"><label>思考强度</label><select id="s-reasoning">${rzOpts}</select></div>
+      <div class="set-row"><label>输出Token</label><select id="s-tk">${tkOpts}</select></div>
+      <div class="set-row"><button class="btn sm" id="s-test">🔌 测试连接</button><span id="s-test-r" style="font-size:12px;color:var(--muted)"></span></div>
+      <div class="hint">默认 DeepSeek 接口。思考强度≥低且模型为 deepseek-chat 时，会自动改用 deepseek-reasoner。</div>
+    </div>
+    <div class="set-sec"><h5>🎨 界面风格</h5>
+      <div class="set-row"><label>主题</label><select id="s-theme">${themeOpts}</select></div>
+      <div class="set-row"><label>字号</label><select id="s-fs">${fsOpts}</select></div>
+      <div class="set-row"><label>打字动画</label><span class="switch${ui.anim?' on':''}" id="s-anim"></span></div>
+      <div class="set-row"><label>自动存档</label><span class="switch${ui.autoSave?' on':''}" id="s-autosave"></span></div>
+    </div>
+    <div class="set-sec"><h5>💾 存档管理</h5>
+      <div class="set-row"><button class="btn sm" id="s-export">⬇ 导出存档</button><button class="btn sm" id="s-import">⬆ 导入存档</button><button class="btn sm" id="s-savenow">💾 立即保存</button></div>
+      <div class="set-row"><button class="btn danger" id="s-restart" style="flex:1">🔄 重新开始</button></div>
+      <div class="set-row"><button class="btn danger" id="s-clear" style="flex:1">🗑 清除全部数据</button></div>
+      <div class="hint">自动存档开启时每回合回复后自动保存；导出文件不含 API Key。</div>
+    </div>
+    <input type="file" id="s-file" accept=".json" class="hidden">`);
+  const modelSel=$('#s-model');
+  const fillModels=list=>{ modelSel.innerHTML=list.map(m=>`<option value="${esc(m)}"${cfg.model===m?' selected':''}>${esc(m)}</option>`).join('')||'<option>deepseek-chat</option>'; };
+  fillModels(modelFallback.concat([cfg.model]));
+  $('#s-fetch').onclick=async ()=>{ const b=$('#s-fetch'); b.disabled=true; b.textContent='…'; try{ const list=await fetchModels(); fillModels(list); toast('模型列表已更新'); }catch(e){ toast('拉取失败：'+e.message+'（已保留内置列表）'); } b.disabled=false; b.textContent='🔄 拉取'; };
+  $('#s-test').onclick=async ()=>{ const r=$('#s-test-r'); r.textContent='测试中…'; try{ await callAI([{role:'user',content:'ping'}],{temp:0,maxTokens:8,timeout:30000}); r.textContent='✅ 连接成功'; }catch(e){ r.textContent='❌ '+e.message; } };
+  $('#s-anim').onclick=e=>{ ui.anim=!ui.anim; e.currentTarget.classList.toggle('on',ui.anim); };
+  $('#s-autosave').onclick=e=>{ ui.autoSave=!ui.autoSave; e.currentTarget.classList.toggle('on',ui.autoSave); };
+  $('#s-theme').onchange=e=>{ ui.theme=e.target.value; applyTheme(); saveCfg(); };
+  $('#s-fs').onchange=e=>{ ui.fontSize=e.target.value; document.documentElement.style.fontSize = ui.fontSize==='s'?'13px':ui.fontSize==='l'?'16px':'15px'; saveCfg(); };
+  $('#s-endpoint').onchange=e=>cfg.endpoint=e.target.value.trim();
+  $('#s-key').onchange=e=>cfg.key=e.target.value.trim();
+  $('#s-reasoning').onchange=e=>cfg.reasoning=e.target.value;
+  $('#s-tk').onchange=e=>cfg.maxTokens=e.target.value;
+  $('#s-model').onchange=e=>cfg.model=e.target.value;
+  $('#s-savenow').onclick=()=>{ saveNow(); toast('已保存'); };
+  $('#s-export').onclick=exportSave;
+  $('#s-import').onclick=()=>$('#s-file').click();
+  $('#s-file').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ importSave(rd.result); }catch(err){ toast('导入失败：'+err.message); } }; rd.readAsText(f); };
+  $('#s-restart').onclick=()=>{ if(confirm('确定重新开始吗？当前进度将被清空（可先导出存档备份）。')){ clearSave(); location.reload(); } };
+  $('#s-clear').onclick=()=>{ if(confirm('确定清除全部数据（存档+API配置）吗？')){ localStorage.removeItem(LS_SAVE); localStorage.removeItem(LS_CFG); location.reload(); } };
+}
+function exportSave(){
+  const data = { app:'wg-ai-rpg', ver:APP_VER, id:CFG.id, title:CFG.title, t:nowStr(), player:state.player, state, cfgApi:{endpoint:cfg.endpoint, model:cfg.model, reasoning:cfg.reasoning, maxTokens:cfg.maxTokens} };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${CFG.title}-${(state.player||{}).name||'存档'}-存档.json`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  toast('存档已导出');
+}
+function importSave(text){
+  const d=JSON.parse(text);
+  if(!d || d.app!=='wg-ai-rpg' || !d.state) throw new Error('文件格式不正确');
+  state = deepClone(d.state);
+  state.started = true;
+  if(d.cfgApi){ cfg.endpoint=d.cfgApi.endpoint||cfg.endpoint; cfg.model=d.cfgApi.model||cfg.model; cfg.reasoning=d.cfgApi.reasoning||cfg.reasoning; cfg.maxTokens=d.cfgApi.maxTokens||cfg.maxTokens; }
+  saveCfg(); saveNow();
+  renderAll(); renderChat(); closeModal();
+  toast('存档导入成功');
+}
+
+/* ==================== 主题 ==================== */
+function applyTheme(){
+  document.documentElement.dataset.theme = ui.theme==='world'?'world':ui.theme;
+  if(ui.theme==='world'){ document.documentElement.style.setProperty('--accent', CFG.accent); document.documentElement.style.setProperty('--accent2', CFG.accent2); }
+}
+
+/* ==================== 向导 ==================== */
+const STEP_DEFS = [
+  { t:'AI 配置', d:'配置 AI 接口（默认 DeepSeek，拉取真实模型列表）' },
+  { t:'主角信息', d:'自定义你的主角（可自由补充设定）' },
+  { t:'天赋选择', d:'分配天赋点（可开启作弊模式：无限天赋点）' },
+  { t:'设定补充', d:'按世界观补充你的设定' },
+  { t:'备注', d:'写下你的备注与愿望' },
+  { t:'难度', d:'选择命运难度' },
+  { t:'确认', d:'确认一切，开始游戏' }
+];
+let wzStep = 0;
+function renderWizard(){
+  $('#wz-logo').textContent = CFG.icon;
+  $('#wz-title').textContent = CFG.title;
+  $('#wz-sub').textContent = CFG.genre+' · '+CFG.worldSummary;
+  $('#wz-steps').innerHTML = STEP_DEFS.map((s,i)=>`<div class="wz-dot${i===wzStep?' on':''}${i<wzStep?' done':''}" data-i="${i}" title="${s.t}">${i+1}</div>`).join('');
+  $('#wz-steps').querySelectorAll('.wz-dot').forEach(d=>d.onclick=()=>{ wzStep=+d.dataset.i; renderWizard(); });
+  $('#wz-h3').textContent = STEP_DEFS[wzStep].t;
+  $('#wz-desc').textContent = STEP_DEFS[wzStep].d;
+  const body=$('#wz-body');
+  body.innerHTML='';
+  const steps=[renderWzApi,renderWzSelf,renderWzTalent,renderWzSup,renderWzNotes,renderWzDiff,renderWzConfirm];
+  steps[wzStep](body);
+  $('#wz-prev').classList.toggle('hidden', wzStep===0);
+  $('#wz-next').textContent = wzStep===6?'🎮 开始游戏':'下一步 →';
+  $('#wz-next').onclick = async ()=>{ if(wzStep===6){ await startGame(); return; } const ok=await validateStep(wzStep); if(ok){ wzStep++; renderWizard(); } };
+  $('#wz-prev').onclick=()=>{ if(wzStep>0){ wzStep--; renderWizard(); } };
+  window.scrollTo({top:0});
+}
+function renderWzApi(body){
+  body.innerHTML = `
+    <div class="set-sec"><h5>🔌 接口配置（默认 DeepSeek）</h5>
+      <label>API 端点</label><input id="wz-endpoint" value="${esc(draft.endpoint)}" placeholder="https://api.deepseek.com/v1/chat/completions">
+      <label>API Key</label><input id="wz-key" type="password" value="${esc(draft.key)}" placeholder="sk-…">
+      <label>模型（点击「拉取模型列表」从接口获取真实模型）</label>
+      <div class="set-row"><select id="wz-model"></select><button class="btn sm" id="wz-fetch">🔄 拉取模型列表</button></div>
+      <label>思考强度</label><select id="wz-reasoning">
+        ${['off','low','medium','high','max'].map(v=>`<option value="${v}"${draft.reasoning===v?' selected':''}>${v==='off'?'关闭（快速）':v==='low'?'低':v==='medium'?'中（推荐）':v==='high'?'高':'最大'}</option>`).join('')}
+      </select>
+      <label>输出 Token 限制</label><select id="wz-tk">
+        ${['unlimited','2048','4096','8192','16384'].map(v=>`<option value="${v}"${String(draft.maxTokens)===v?' selected':''}>${v==='unlimited'?'无限制':v}</option>`).join('')}
+      </select>
+      <div class="set-row"><button class="btn sm" id="wz-test">🔌 测试连接</button><span id="wz-test-r" style="font-size:12px;color:var(--muted)"></span></div>
+      <div class="hint">拉取模型列表需要先填 Key；拉取失败时自动使用内置列表。思考强度≥低会自动使用 deepseek-reasoner（深度思考）。</div>
+    </div>`;
+  const ms=$('#wz-model');
+  const fill=list=>{ ms.innerHTML=list.map(m=>`<option value="${esc(m)}"${draft.model===m?' selected':''}>${esc(m)}</option>`).join('')||'<option value="">（无）</option>'; };
+  fill(modelFallback.concat([draft.model]));
+  $('#wz-endpoint').onchange=e=>draft.endpoint=e.target.value.trim();
+  $('#wz-key').onchange=e=>draft.key=e.target.value.trim();
+  $('#wz-reasoning').onchange=e=>{ draft.reasoning=e.target.value; if(draft.reasoning!=='off' && draft.model==='deepseek-chat' && draft.endpoint.includes('deepseek.com')){ draft.model='deepseek-reasoner'; fill(modelFallback.concat(['deepseek-reasoner'])); toast('思考强度≥低：已自动切换为 deepseek-reasoner'); } };
+  $('#wz-tk').onchange=e=>draft.maxTokens=e.target.value;
+  $('#wz-model').onchange=e=>draft.model=e.target.value;
+  $('#wz-fetch').onclick=async ()=>{ const b=$('#wz-fetch'); b.disabled=true; b.textContent='拉取中…'; draft.endpoint=$('#wz-endpoint').value.trim(); draft.key=$('#wz-key').value.trim(); const old={...cfg}; Object.assign(cfg,draft); try{ const list=await fetchModels(); fill(list); toast('模型列表已更新（'+list.length+' 个）'); }catch(e){ toast('拉取失败：'+e.message+'，已保留内置列表'); } Object.assign(cfg,old); b.disabled=false; b.textContent='🔄 拉取模型列表'; };
+  $('#wz-test').onclick=async ()=>{ const r=$('#wz-test-r'); draft.endpoint=$('#wz-endpoint').value.trim(); draft.key=$('#wz-key').value.trim(); const old={...cfg}; Object.assign(cfg,draft); r.textContent='测试中…'; try{ await callAI([{role:'user',content:'ping'}],{temp:0,maxTokens:8,timeout:30000}); r.textContent='✅ 连接成功'; }catch(e){ r.textContent='❌ '+e.message; } Object.assign(cfg,old); };
+}
+function renderWzSelf(body){
+  let h = '<div class="grid2">';
+  CFG.charFields.forEach(f=>{
+    if(f.type==='select') h += `<div><label>${f.label}${f.required?' *':''}</label><select data-k="${f.key}">${f.options.map(o=>`<option value="${esc(o)}"${draft.player[f.key]===o?' selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
+    else if(f.type==='textarea') h += `<div style="grid-column:1/-1"><label>${f.label}</label><textarea data-k="${f.key}" placeholder="${esc(f.ph||'')}" rows="2">${esc(draft.player[f.key]||'')}</textarea></div>`;
+    else h += `<div><label>${f.label}${f.required?' *':''}</label><input data-k="${f.key}" value="${esc(draft.player[f.key]||'')}" placeholder="${esc(f.ph||'')}"></div>`;
+  });
+  h += '</div><label>自定义补充设定（可选：秘密/特殊背景/想要看到的剧情）</label><textarea id="wz-custom" rows="3" placeholder="例如：我其实有个双胞胎哥哥；希望看到更多与XX的剧情…">'+esc(draft.player.custom||'')+'</textarea>';
+  body.innerHTML = h;
+  body.querySelectorAll('[data-k]').forEach(el=>{ el.onchange=()=>draft.player[el.dataset.k]=el.value.trim(); });
+  $('#wz-custom').onchange=e=>draft.player.custom=e.target.value.trim();
+}
+function renderWzTalent(body){
+  const sel = draft.talentSel || {};
+  const ap = draft.attrPoints || {};
+  const MAX_TALENTS = 3;
+  const baseOf = k => Math.round(((CFG.attrs.find(a=>a.key===k)||{}).max||100)/5);
+  const maxOf = k => (CFG.attrs.find(a=>a.key===k)||{}).max||100;
+  const totalUsed = () => Object.values(ap).reduce((a,b)=>a+b,0);
+  const talentCount = () => Object.keys(sel).filter(k=>sel[k]).length;
+  body.innerHTML = `
+    <div class="points-bar">
+      <span class="pts">${draft.cheat?'∞':draft.points} 点</span>
+      <span style="font-size:13px;color:var(--muted)">已用 <b id="wz-used">0</b> · 剩余 <b id="wz-left" style="color:var(--accent)">${draft.points}</b></span>
+      <label class="cheat"><input type="checkbox" id="wz-cheat"${draft.cheat?' checked':''}> 🎁 作弊模式：无限天赋点</label>
+    </div>
+    <label>📊 能力加点（把天赋点分配到六维，影响开局属性）</label>
+    <div id="wz-attrs"></div>
+    <label>🌟 天赋特长（点击卡片选择，${draft.cheat?'作弊模式不限数量':'最多 '+MAX_TALENTS+' 个'}）</label>
+    <div id="wz-talents"></div>
+    <label>自定义天赋（每行一条：名称：效果）</label><textarea id="wz-ctal" rows="3" placeholder="例如：&#10;过目不忘：见过的棋谱永远记得">${esc((draft.customTalents||[]).map(t=>t.name+'：'+t.desc).join('\n'))}</textarea>`;
+  const attrBox=$('#wz-attrs'), talBox=$('#wz-talents');
+  const paint=()=>{ $('#wz-used').textContent=totalUsed(); $('#wz-left').textContent=draft.cheat?'∞':(draft.points-totalUsed()); };
+  const renderAttrs=()=>{
+    attrBox.innerHTML = CFG.attrs.map(a=>{
+      const base=baseOf(a.key), max=maxOf(a.key), val=base+(ap[a.key]||0), pct=Math.min(100,val/max*100);
+      return `<div class="attr-row"><span class="lb">${a.icon} ${a.label}</span><span class="bar"><i style="width:${pct}%"></i></span>
+        <button class="sub" data-a="${a.key}">−</button><span class="cnt">${val}</span><button class="add" data-a="${a.key}">＋</button></div>`;
+    }).join('');
+    attrBox.querySelectorAll('.add').forEach(b=>b.onclick=()=>{
+      const k=b.dataset.a, max=maxOf(k), base=baseOf(k);
+      if(!draft.cheat && totalUsed()+1>draft.points){ toast('天赋点不足（可开启作弊模式获得无限点数）'); return; }
+      if(base+(ap[k]||0)+1>max){ toast('该项已达上限 '+max); return; }
+      ap[k]=(ap[k]||0)+1; draft.attrPoints=ap; renderAttrs(); paint();
+    });
+    attrBox.querySelectorAll('.sub').forEach(b=>b.onclick=()=>{
+      const k=b.dataset.a;
+      if(!ap[k]) return; ap[k]--; if(!ap[k]) delete ap[k]; draft.attrPoints=ap; renderAttrs(); paint();
+    });
+  };
+  const renderTalents=()=>{
+    talBox.innerHTML = CFG.talents.map(t=>`
+      <div class="talent-item${sel[t.id]?' sel':''}" data-t="${t.id}">
+        <div class="inf"><div class="nm">${t.icon} ${esc(t.name)}<span class="cs">${'★'.repeat(Math.min(5,t.cost))}</span></div><div class="ds">${esc(t.desc)}</div></div>
+        <div class="mark">${sel[t.id]?'✓':''}</div>
+      </div>`).join('');
+    talBox.querySelectorAll('.talent-item').forEach(c=>c.onclick=()=>{
+      const id=c.dataset.t;
+      if(sel[id]){ delete sel[id]; }
+      else {
+        if(!draft.cheat && talentCount()>=MAX_TALENTS){ toast('最多选择 '+MAX_TALENTS+' 个天赋（开启作弊模式可无限选择）'); return; }
+        sel[id]=true;
+      }
+      draft.talentSel=sel; renderTalents();
+    });
+  };
+  renderAttrs(); renderTalents(); paint();
+  $('#wz-cheat').onchange=e=>{ draft.cheat=e.target.checked; renderWzTalent(body); };
+  $('#wz-ctal').onchange=e=>{ draft.customTalents = e.target.value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{ const i=l.indexOf('：'); return i>0?{name:l.slice(0,i).trim(),desc:l.slice(i+1).trim()}:{name:l,desc:''}; }); };
+}
+function renderWzSup(body){
+  let h='';
+  CFG.supplements.forEach(s=>{
+    h += `<label>${s.label}</label><div class="hint" style="margin:-2px 0 6px">${esc(s.desc||'')}</div>`;
+    if(s.type==='multi'){
+      const v=draft.supplements[s.key]||[];
+      h += `<div class="pill-row" data-multi="${s.key}">${s.options.map(o=>`<button class="pill${v.includes(o)?' on':''}" data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
+    } else if(s.type==='text' || !Array.isArray(s.options)){
+      h += `<input data-sel="${s.key}" value="${esc(draft.supplements[s.key]||'')}" placeholder="${esc(s.ph||'自由填写')}">`;
+    } else {
+      h += `<select data-sel="${s.key}">${s.options.map(o=>`<option value="${esc(o)}"${draft.supplements[s.key]===o?' selected':''}>${esc(o)}</option>`).join('')}</select>`;
+    }
+  });
+  h += '<label>其他补充（自由写，将加入你的设定）</label><textarea id="wz-sup-custom" rows="3" placeholder="例如：希望开局有一件特殊道具…">'+esc(draft.supCustom||'')+'</textarea>';
+  body.innerHTML=h;
+  body.querySelectorAll('[data-multi]').forEach(row=>{
+    const key=row.dataset.multi;
+    row.querySelectorAll('.pill').forEach(p=>p.onclick=()=>{
+      p.classList.toggle('on');
+      draft.supplements[key] = [...row.querySelectorAll('.pill.on')].map(x=>x.dataset.o);
+    });
+  });
+  body.querySelectorAll('[data-sel]').forEach(s=>s.onchange=()=>draft.supplements[s.dataset.sel]=s.value.trim());
+  $('#wz-sup-custom').onchange=e=>draft.supCustom=e.target.value.trim();
+}
+function renderWzNotes(body){
+  body.innerHTML = `
+    <label>备注信息（自定义写：对 AI 的要求、想体验的内容、避雷项等）</label>
+    <textarea id="wz-notes" rows="6" placeholder="例如：希望节奏慢一点，多描写日常细节；不要突然安排主角得绝症；我喜欢轻松向剧情…">${esc(draft.notes||'')}</textarea>
+    <div class="hint">你的备注会写进 AI 的长期设定，每回合都会生效，AI 不会忘记。</div>`;
+  $('#wz-notes').onchange=e=>draft.notes=e.target.value.trim();
+}
+function renderWzDiff(body){
+  body.innerHTML = CFG.difficulties.map(d=>`
+    <div class="diff-card${draft.diff===d.id?' sel':''}" data-d="${d.id}">
+      <div class="nm">${d.icon} ${esc(d.name)}</div>
+      <div class="ds">${esc(d.desc)}</div>
+      <div class="ru">📌 开局：${esc(d.startHint||'')}</div>
+    </div>`).join('');
+  body.querySelectorAll('.diff-card').forEach(c=>c.onclick=()=>{ draft.diff=c.dataset.d; renderWzDiff(body); });
+}
+function renderWzConfirm(body){
+  const p=draft.player;
+  const d=CFG.difficulties.find(x=>x.id===draft.diff);
+  const ap=draft.attrPoints||{};
+  const attrSum = CFG.attrs.map(a=>{ const base=Math.round(((a.max)||100)/5); return a.label+':'+(base+(ap[a.key]||0)); }).join('、');
+  const tals=Object.keys(draft.talentSel||{}).filter(k=>draft.talentSel[k]).map(id=>{ const t=CFG.talents.find(x=>x.id===id); return t? t.name : ''; }).filter(Boolean);
+  const ctals=(draft.customTalents||[]).map(t=>t.name);
+  const sup=Object.entries(draft.supplements).filter(([k,v])=>v&&(Array.isArray(v)?v.length:v)).map(([k,v])=>{ const f=CFG.supplements.find(x=>x.key===k); return (f?f.label:k)+'：'+(Array.isArray(v)?v.join('、'):v); });
+  const fld=(k,v,full)=>`<div class="fld${full?' full':''}"><div class="k">${k}</div><div class="v">${esc(String(v||'—'))}</div></div>`;
+  body.innerHTML = `
+    <div class="confirm-grid">
+      ${CFG.charFields.map(f=>fld(f.label, p[f.key])).join('')}
+      ${p.custom?fld('自定义补充',p.custom,true):''}
+      ${fld('能力加点', attrSum, true)}
+      ${fld('天赋特长', tals.concat(ctals).join('、')||'无', true)}
+      ${sup.length?fld('设定补充', sup.join('；'), true):''}
+      ${fld('备注', draft.notes||'无', true)}
+      ${fld('难度', d? d.icon+' '+d.name : '未选择', true)}
+      ${fld('模型', draft.model, false)}${fld('思考强度', ({off:'关闭',low:'低',medium:'中',high:'高',max:'最大'})[draft.reasoning]||draft.reasoning, false)}${fld('Token限制', draft.maxTokens==='unlimited'?'无限制':draft.maxTokens, false)}
+    </div>
+    <div class="hint" style="margin-top:12px">点击「🎮 开始游戏」后，AI 将按以上设定与世界观为你展开故事。左上角可随时查看角色与实时状态，右上角可设置/存档。最终属性 = 能力加点与难度起点的较高者。</div>`;
+}
+async function validateStep(i){
+  if(i===0){
+    draft.endpoint=$('#wz-endpoint').value.trim(); draft.key=$('#wz-key').value.trim(); draft.model=$('#wz-model').value; draft.reasoning=$('#wz-reasoning').value; draft.maxTokens=$('#wz-tk').value;
+    if(!draft.endpoint){ toast('请填写 API 端点'); return false; }
+    if(!draft.key){ if(!confirm('尚未填写 API Key，进入游戏后将无法对话。确定继续吗？')) return false; }
+    if(!draft.model){ toast('请选择模型'); return false; }
+  }
+  if(i===1){
+    $('#wz-body').querySelectorAll('[data-k]').forEach(el=>{ draft.player[el.dataset.k]=el.value.trim(); });
+    const c=$('#wz-custom'); if(c) draft.player.custom=c.value.trim();
+    const miss=CFG.charFields.filter(f=>f.required && !(draft.player[f.key]||'').trim());
+    if(miss.length){ toast('请填写必填项：'+miss.map(f=>f.label).join('、')); return false; }
+  }
+  if(i===5 && !draft.diff){ toast('请选择难度'); return false; }
+  return true;
+}
+
+/* ==================== 开始游戏 ==================== */
+async function startGame(){
+  if(!draft.diff){ toast('请先选择难度'); renderWizard(); return; }
+  state = defaultState(draft.diff);
+  state.player = deepClone(draft.player);
+  state.player.custom = draft.player.custom||'';
+  state.player.notes = draft.notes||'';
+  state.talents = Object.keys(draft.talentSel||{}).filter(k=>draft.talentSel[k]).map(id=>CFG.talents.find(t=>t.id===id)).filter(Boolean);
+  state.customTalents = draft.customTalents||[];
+  state.flags.cheat = !!draft.cheat;
+  state.supplements = Object.assign({}, draft.supplements);
+  if(draft.supCustom) state.supplements['其他补充'] = draft.supCustom;
+  state.difficulty = draft.diff;
+  state.started = true;
+  cfg.endpoint=draft.endpoint; cfg.key=draft.key; cfg.model=draft.model; cfg.reasoning=draft.reasoning; cfg.maxTokens=draft.maxTokens;
+  saveCfg();
+  const d0=CFG.difficulties.find(x=>x.id===state.difficulty)||CFG.difficulties[2];
+  const ap=draft.attrPoints||{};
+  CFG.attrs.forEach(a=>{ let v=Math.round((a.max||100)/5)+(ap[a.key]||0); if(d0.startAttrs && d0.startAttrs[a.key]!=null) v=Math.max(v, d0.startAttrs[a.key]); if(state.attrs[a.key]!=null) state.attrs[a.key]=clamp(v,0,a.max); });
+  if(d0.startStatus) Object.assign(state.status, d0.startStatus);
+  $('#wizard').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  window.scrollTo(0,0);
+  renderAll(); renderChat();
+  applyTheme();
+  document.title = CFG.title+' · AI 角色扮演';
+  saveCheckpoint('命运起点');
+  addSystem(`🎮 欢迎来到《${CFG.title}》！难度：${d0.name}。正在生成开场…`);
+  busy=true; setBusyUI(true);
+  try{
+    const ai = await callAI([{role:'system',content:buildSystemPrompt()},{role:'user',content:'请现在开始游戏。开场剧情背景：'+CFG.intro+'\n\n请完整展开开场场景（描写环境、人物、氛围），然后停下，等我做出第一个行动。'}], {timeout:120000});
+    applyAIText(ai.content, ai.reasoning);
+  }catch(err){
+    addMsg('assist','⚠️ 开场生成失败：'+err.message+'\n\n请在右上角【设置】中检查 API 配置后，在输入框发送任意内容重试。', {err:true, who:'系统'});
+  }finally{ busy=false; setBusyUI(false); }
+}
+
+/* ==================== 事件绑定与启动 ==================== */
+function initUI(){
+  $('#btn-char').onclick=()=>{ $('#char-drawer').classList.add('open'); $('#scrim').classList.add('show'); renderChar(); };
+  $('#char-close').onclick=()=>{ $('#char-drawer').classList.remove('open'); $('#scrim').classList.remove('show'); };
+  $('#scrim').onclick=()=>{ $('#char-drawer').classList.remove('open'); $('#scrim').classList.remove('show'); };
+  document.querySelectorAll('#tb-nav .tb-btn').forEach(b=>b.onclick=()=>openModal(b.dataset.modal));
+  $('#send').onclick=()=>sendMessage($('#input').value);
+  $('#input').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(e.target.value); } });
+  window.addEventListener('beforeunload',()=>{ if(state&&state.started&&ui.autoSave) saveNow(); });
+}
+function init(){
+  loadCfg();
+  document.title = CFG.title+' · AI 角色扮演';
+  applyTheme();
+  document.documentElement.style.fontSize = ui.fontSize==='s'?'13px':ui.fontSize==='l'?'16px':'15px';
+  const saved=loadSave();
+  if(saved){
+    state=saved;
+    renderAll(); renderChat();
+    $('#wizard').classList.add('hidden');
+    $('#app').classList.remove('hidden');
+    window.scrollTo(0,0);
+    addSystem('💾 已自动读取上次存档，继续你的故事吧。');
+    toast('已读取存档');
+  } else {
+    draft = { endpoint:cfg.endpoint, key:cfg.key, model:cfg.model, reasoning:cfg.reasoning, maxTokens:cfg.maxTokens, player:{}, talentSel:{}, attrPoints:{}, customTalents:[], cheat:false, points:20, supplements:{}, supCustom:'', notes:'', diff:null };
+    renderWizard();
+  }
+  initUI();
+}
+/* 测试钩子（供自动化测试使用） */
+window.__wg = { CFG, get state(){return state}, get cfg(){return cfg}, get ui(){return ui}, get draft(){return draft},
+  applyAIText, triggerDeath, saveCheckpoint, restoreCheckpoint, exportSave, importSave,
+  fetchModels, callAI, addMemory, addEncy, renderAll, renderChat, saveNow, applyStatus,
+  startGame, openModal, closeModal, extractBalancedJSON };
+init();
+/*__END__*/
+</script>
+</body>
+</html>

@@ -1,0 +1,2275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b110e">
+<title>许愿柳 · 沉浸式角色扮演</title>
+<style>
+/* ============ 设计令牌 ============ */
+:root{
+  --rad:10px; --rad-s:7px; --rad-l:16px;
+  --tr:180ms;
+  --font-body:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+  --font-serif:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --font-mono:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;
+  --fs-xs:11.5px; --fs-s:12.5px; --fs-m:14px; --fs-l:16px; --fs-xl:19px; --fs-xxl:25px;
+}
+body[data-fs="s"]{ --fs-base:13px; }
+body[data-fs="m"]{ --fs-base:14.5px; }
+body[data-fs="l"]{ --fs-base:16px; }
+
+/* 主题:夜柳(默认) */
+body[data-theme="willow"]{
+  --bg0:#0b110e; --bg1:#101813; --bg2:#17221b; --bg3:#1e2c24;
+  --bd:rgba(160,196,178,.14); --bd2:rgba(160,196,178,.28);
+  --tx:#dce8e1; --tx2:#97ada1; --tx3:#64796d;
+  --accent:#7cc6a3; --accent-ink:#0b1a13; --accent-dim:rgba(124,198,163,.14);
+  --gold:#c8a96e; --gold-dim:rgba(200,169,110,.14);
+  --danger:#e06870; --danger-dim:rgba(224,104,112,.12);
+  --ok:#4fc98c; --info:#6ea8d8;
+  --glow:radial-gradient(1200px 420px at 50% -10%, rgba(124,198,163,.10), transparent 60%);
+}
+/* 主题:纸墨 */
+body[data-theme="paper"]{
+  --bg0:#ece7d8; --bg1:#f4f1e6; --bg2:#fbf9f1; --bg3:#efe9da;
+  --bd:rgba(70,58,38,.16); --bd2:rgba(70,58,38,.30);
+  --tx:#26231b; --tx2:#6d6552; --tx3:#9a917a;
+  --accent:#3f7a5e; --accent-ink:#f4f1e6; --accent-dim:rgba(63,122,94,.12);
+  --gold:#a8432f; --gold-dim:rgba(168,67,47,.10);
+  --danger:#b03a3a; --danger-dim:rgba(176,58,58,.10);
+  --ok:#3e8a5f; --info:#4d6f96;
+  --glow:radial-gradient(1200px 420px at 50% -10%, rgba(63,122,94,.08), transparent 60%);
+}
+/* 主题:残雪 */
+body[data-theme="snow"]{
+  --bg0:#e6ebe9; --bg1:#f0f4f2; --bg2:#fafcfb; --bg3:#e9efec;
+  --bd:rgba(40,70,60,.14); --bd2:rgba(40,70,60,.28);
+  --tx:#22302a; --tx2:#5d6f66; --tx3:#8b9c93;
+  --accent:#4f7d6e; --accent-ink:#f0f4f2; --accent-dim:rgba(79,125,110,.12);
+  --gold:#8a6d3b; --gold-dim:rgba(138,109,59,.12);
+  --danger:#b04545; --danger-dim:rgba(176,69,69,.10);
+  --ok:#3e8a6a; --info:#4d6f96;
+  --glow:radial-gradient(1200px 420px at 50% -10%, rgba(79,125,110,.08), transparent 60%);
+}
+/* 主题:暮色 */
+body[data-theme="dusk"]{
+  --bg0:#151110; --bg1:#1c1715; --bg2:#251f1c; --bg3:#2e2723;
+  --bd:rgba(216,178,140,.13); --bd2:rgba(216,178,140,.26);
+  --tx:#e8ddd2; --tx2:#b3a394; --tx3:#7d6f60;
+  --accent:#c98a5b; --accent-ink:#1c1208; --accent-dim:rgba(201,138,91,.13);
+  --gold:#b8a06a; --gold-dim:rgba(184,160,106,.12);
+  --danger:#d0685a; --danger-dim:rgba(208,104,90,.12);
+  --ok:#9cb45a; --info:#7d9bb8;
+  --glow:radial-gradient(1200px 420px at 50% -10%, rgba(201,138,91,.09), transparent 60%);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font-body); font-size:var(--fs-base); line-height:1.65;
+  background:var(--bg0); color:var(--tx);
+  -webkit-font-smoothing:antialiased; touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent; overflow:hidden;
+}
+button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea,select{font-family:inherit;font-size:inherit;color:var(--tx);background:var(--bg1);border:1px solid var(--bd);border-radius:var(--rad-s);padding:9px 11px;outline:none;transition:border-color var(--tr)}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:none;line-height:1.6}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--tx3) 50%),linear-gradient(135deg,var(--tx3) 50%,transparent 50%);background-position:calc(100% - 16px) 55%,calc(100% - 11px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px}
+::placeholder{color:var(--tx3)}
+.hidden{display:none!important}
+.ic{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ============ 通用组件 ============ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;border-radius:var(--rad-s);background:var(--bg2);border:1px solid var(--bd);color:var(--tx);font-size:var(--fs-m);transition:background var(--tr),border-color var(--tr),transform .06s;user-select:none}
+.btn:hover{border-color:var(--bd2);background:var(--bg3)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07);background:var(--accent)}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.danger:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--tx2)}
+.btn.ghost:hover{background:var(--bg2);color:var(--tx)}
+.btn.small{padding:6px 12px;font-size:var(--fs-s)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none!important}
+.btn .ic{width:15px;height:15px}
+
+.chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:6px 13px;border-radius:999px;border:1px solid var(--bd);background:var(--bg1);color:var(--tx2);font-size:var(--fs-s);transition:all var(--tr);user-select:none}
+.chip:hover{border-color:var(--bd2);color:var(--tx)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+
+.fld{margin-bottom:14px}
+.fld>label{display:block;font-size:var(--fs-s);color:var(--tx2);margin-bottom:6px;letter-spacing:.04em}
+.fld>label .req{color:var(--danger)}
+.hint{font-size:var(--fs-xs);color:var(--tx3);margin-top:5px;line-height:1.55}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spacer{flex:1}
+.serif{font-family:var(--font-serif)}
+.mono{font-family:var(--font-mono)}
+
+/* ============ 启动层 / 向导 ============ */
+#boot{position:fixed;inset:0;z-index:300;background:var(--bg0);background-image:var(--glow);overflow:auto}
+#title-screen{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+.title-card{width:min(520px,94vw);text-align:center;padding:48px 36px;border:1px solid var(--bd);border-radius:var(--rad-l);background:var(--bg1);box-shadow:0 30px 80px rgba(0,0,0,.35)}
+.title-logo{width:54px;height:54px;margin:0 auto 14px;color:var(--accent)}
+.title-card h1{font-family:var(--font-serif);font-size:var(--fs-xxl);letter-spacing:.18em;font-weight:700}
+.title-sub{color:var(--tx2);font-size:var(--fs-s);letter-spacing:.22em;margin-top:6px}
+.title-tag{margin:22px auto 28px;max-width:380px;color:var(--tx2);font-family:var(--font-serif);font-size:var(--fs-m);line-height:1.9}
+.title-tag b{color:var(--gold);font-weight:600}
+.title-btns{display:flex;flex-direction:column;gap:10px;align-items:center}
+.title-btns .btn{width:min(300px,80vw)}
+.title-saveinfo{font-size:var(--fs-xs);color:var(--tx3);margin-top:18px}
+.title-foot{margin-top:26px;font-size:var(--fs-xs);color:var(--tx3);letter-spacing:.1em}
+
+#wizard-screen{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px}
+.wizard-card{width:min(720px,96vw);max-height:94vh;display:flex;flex-direction:column;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--rad-l);box-shadow:0 30px 80px rgba(0,0,0,.35);overflow:hidden}
+.wizard-head{padding:20px 26px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:16px}
+.wizard-head h2{font-family:var(--font-serif);font-size:var(--fs-xl);letter-spacing:.06em}
+.step-dots{display:flex;gap:7px;margin-left:auto}
+.step-dots i{width:8px;height:8px;border-radius:50%;background:var(--bg3);transition:all var(--tr)}
+.step-dots i.on{background:var(--accent);transform:scale(1.2)}
+.wz-body{flex:1;overflow-y:auto;padding:22px 26px}
+.wstep{display:none}
+.wstep.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.wz-foot{padding:14px 26px 18px;border-top:1px solid var(--bd);display:flex;justify-content:space-between;gap:10px}
+.wz-foot .btn{min-width:110px}
+.step-title{font-family:var(--font-serif);font-size:var(--fs-l);margin-bottom:4px}
+.step-desc{color:var(--tx2);font-size:var(--fs-s);margin-bottom:18px}
+
+/* 场景卡片 */
+.scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.scene-card{text-align:left;padding:13px 15px;border:1px solid var(--bd);border-radius:var(--rad);background:var(--bg1);transition:all var(--tr)}
+.scene-card:hover{border-color:var(--bd2)}
+.scene-card .sc-name{font-weight:600;font-size:var(--fs-m)}
+.scene-card .sc-desc{font-size:var(--fs-s);color:var(--tx2);margin-top:3px}
+.scene-card .sc-q{font-size:var(--fs-xs);color:var(--tx3);margin-top:6px;font-family:var(--font-serif)}
+.scene-card.on{border-color:var(--accent);background:var(--accent-dim)}
+
+/* 角色选择卡 */
+.role-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.role-card{text-align:left;padding:14px 15px;border:1px solid var(--bd);border-radius:var(--rad);background:var(--bg1);transition:all var(--tr);display:flex;flex-direction:column;gap:6px}
+.role-card:hover{border-color:var(--bd2)}
+.role-card .rc-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--tx2)}
+.role-card .rc-icon .ic{width:17px;height:17px}
+.role-card .rc-name{font-weight:700;font-size:var(--fs-m);font-family:var(--font-serif)}
+.role-card .rc-role{font-size:var(--fs-xs);color:var(--tx3);letter-spacing:.08em}
+.role-card .rc-desc{font-size:var(--fs-xs);color:var(--tx2);line-height:1.7}
+.role-card .rc-goal{font-size:var(--fs-xs);color:var(--gold);line-height:1.6}
+.role-card.on{border-color:var(--accent);background:var(--accent-dim)}
+.role-card.on .rc-icon{background:var(--accent);color:var(--accent-ink)}
+@media (max-width:560px){ .role-grid{grid-template-columns:1fr} }
+
+/* 确认页 */
+.ready-card{margin-bottom:16px;border:1px solid var(--bd);border-radius:var(--rad);padding:14px 16px;background:var(--bg2)}
+.ready-card h3{font-size:var(--fs-m);color:var(--accent);margin-bottom:9px;letter-spacing:.05em}
+.ready-card .rv{display:flex;gap:10px;padding:3px 0;font-size:var(--fs-s)}
+.ready-card .rv b{color:var(--tx2);flex:none;width:74px;font-weight:500}
+.ready-card .rv span{color:var(--tx);white-space:pre-wrap}
+
+/* ============ 主界面 ============ */
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg0);background-image:var(--glow)}
+#topbar{height:52px;flex:none;display:flex;align-items:center;gap:4px;padding:0 10px;border-bottom:1px solid var(--bd);background:var(--bg1);z-index:60}
+.top-btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 11px;border-radius:var(--rad-s);color:var(--tx2);font-size:var(--fs-s);transition:all var(--tr);white-space:nowrap}
+.top-btn:hover{background:var(--bg2);color:var(--tx)}
+.top-btn .ic{width:16px;height:16px}
+#tb-char .avatar{width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-xs);font-weight:700;display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);flex:none}
+.tb-center{position:absolute;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;display:flex;align-items:center;gap:10px}
+.tb-title{font-family:var(--font-serif);font-weight:700;letter-spacing:.16em;font-size:var(--fs-m)}
+#act-chip{font-size:var(--fs-xs);color:var(--gold);border:1px solid var(--gold-dim);background:var(--gold-dim);padding:2px 9px;border-radius:999px;letter-spacing:.05em;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+#tb-saveind{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--tx3);padding:0 6px}
+#tb-saveind i{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block}
+.badge{min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--danger);color:#fff;font-size:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+
+/* 聊天区 */
+#center{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
+#game-log{flex:1;overflow-y:auto;padding:20px 14px 10px;scroll-behavior:smooth}
+.log-inner{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:88%;padding:12px 15px;border-radius:var(--rad);font-size:var(--fs-m);line-height:1.75;animation:fadeIn .22s ease;word-break:break-word}
+.msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px;white-space:pre-wrap}
+.msg.ai{align-self:flex-start;background:var(--bg2);border:1px solid var(--bd);border-left:3px solid var(--accent);border-bottom-left-radius:4px}
+.msg .mhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.msg .mwho{font-size:var(--fs-xs);color:var(--tx3);letter-spacing:.06em}
+.msg .mact{font-size:var(--fs-xs);color:var(--accent);background:var(--accent-dim);padding:1px 8px;border-radius:999px}
+.speaker{display:inline-flex;align-items:center;font-size:var(--fs-s);font-weight:600;color:var(--gold);border:1px solid var(--gold-dim);background:var(--gold-dim);padding:1px 9px;border-radius:999px;margin-right:6px}
+.speaker.willow{color:var(--accent);border-color:var(--accent-dim);background:var(--accent-dim)}
+.msg.ai .p{margin:4px 0}
+.msg.ai .p:first-child{margin-top:0}
+.msg.sys{align-self:center;max-width:92%;text-align:center;font-size:var(--fs-xs);color:var(--tx3);border:1px dashed var(--bd);border-radius:999px;padding:5px 16px;background:var(--bg1)}
+.msg.err{align-self:center;max-width:92%;font-size:var(--fs-s);color:var(--danger);border:1px solid var(--danger-dim);background:var(--danger-dim);border-radius:var(--rad);padding:10px 16px}
+.quote{border-left:3px solid var(--gold);background:var(--gold-dim);padding:10px 14px;border-radius:0 var(--rad-s) var(--rad-s) 0;color:var(--tx);font-family:var(--font-serif);margin:8px 0;font-size:var(--fs-m)}
+.think{margin:6px 0 8px;border:1px solid var(--bd);border-left:3px solid var(--info);border-radius:var(--rad-s);background:var(--bg1);overflow:hidden}
+.think summary{cursor:pointer;padding:7px 12px;font-size:var(--fs-xs);color:var(--info);letter-spacing:.08em;user-select:none;display:flex;align-items:center;gap:7px;list-style:none}
+.think summary::-webkit-details-marker{display:none}
+.think summary .ic{width:13px;height:13px;flex:none}
+.think summary .tk{color:var(--tx3);font-weight:400}
+.think[open] summary{border-bottom:1px dashed var(--bd)}
+.think-body{padding:9px 12px;font-size:var(--fs-s);color:var(--tx2);line-height:1.8;white-space:pre-wrap;max-height:260px;overflow-y:auto;font-family:var(--font-body)}
+.msg b{font-weight:700}
+.msg em{font-style:italic;color:var(--tx2)}
+.msg.user b,.msg.user em{color:inherit}
+.cursor{display:inline-block;width:2px;height:1em;background:var(--accent);vertical-align:-2px;animation:blink .8s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#quick-row{flex:none;display:flex;gap:8px;padding:6px 14px;overflow-x:auto;scrollbar-width:none;justify-content:center}
+#quick-row::-webkit-scrollbar{display:none}
+.quick-action{flex:none;padding:6px 14px;border-radius:999px;border:1px solid var(--bd);background:var(--bg1);color:var(--tx2);font-size:var(--fs-s);transition:all var(--tr);white-space:nowrap}
+.quick-action:hover{border-color:var(--accent);color:var(--accent)}
+
+#input-area{flex:none;display:flex;align-items:flex-end;gap:9px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--bd);background:var(--bg1);z-index:50}
+#user-input{flex:1;max-height:140px;min-height:42px;font-size:var(--fs-m);border-radius:12px;padding:10px 14px;background:var(--bg2)}
+.wish-btn{flex:none;height:42px;padding:0 15px;border-radius:12px;border:1px solid var(--gold);background:var(--gold-dim);color:var(--gold);font-size:var(--fs-s);display:inline-flex;align-items:center;gap:6px;font-weight:600;transition:all var(--tr)}
+.wish-btn:hover{border-color:var(--gold);filter:brightness(1.08)}
+.wish-btn:disabled{opacity:.4;cursor:not-allowed}
+.wish-btn .ic{width:15px;height:15px}
+#btn-send{flex:none;width:42px;height:42px;border-radius:12px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;transition:all var(--tr)}
+#btn-send:hover{filter:brightness(1.08)}
+#btn-send:disabled{opacity:.4}
+#btn-send.stop{background:var(--danger);color:#fff}
+#loading{flex:none;text-align:center;font-size:var(--fs-xs);color:var(--tx3);padding:8px 0 0;letter-spacing:.08em}
+#loading .dots{display:inline-flex;gap:4px;margin-left:6px;vertical-align:2px}
+#loading .dots i{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:bounce 1s infinite}
+#loading .dots i:nth-child(2){animation-delay:.15s}
+#loading .dots i:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+
+/* ============ 抽屉 ============ */
+.drawer{position:fixed;top:0;left:0;bottom:0;width:min(400px,94vw);background:var(--bg1);border-right:1px solid var(--bd);z-index:90;transform:translateX(-102%);transition:transform .24s ease;display:flex;flex-direction:column;box-shadow:20px 0 60px rgba(0,0,0,.3)}
+.drawer.open{transform:none}
+.drawer-head{flex:none;display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--bd)}
+.drawer-head h3{font-family:var(--font-serif);font-size:var(--fs-l);display:flex;align-items:center;gap:8px}
+.drawer-head h3 .ic{width:17px;height:17px;color:var(--accent)}
+.drawer-head .d-close{margin-left:auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--tx2)}
+.drawer-head .d-close:hover{background:var(--bg2);color:var(--tx)}
+.drawer-body{flex:1;overflow-y:auto;padding:16px}
+.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:85;animation:fadeIn .2s ease}
+
+/* 角色面板 */
+.pcard{border:1px solid var(--bd);border-radius:var(--rad);background:var(--bg2);padding:14px 16px;margin-bottom:12px}
+.pcard h4{font-size:var(--fs-m);color:var(--accent);display:flex;align-items:center;gap:7px;margin-bottom:10px;letter-spacing:.05em}
+.pcard h4 .ic{width:15px;height:15px}
+.char-head{display:flex;align-items:center;gap:13px;margin-bottom:4px}
+.char-head .big-avatar{width:52px;height:52px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:var(--font-serif);font-size:var(--fs-xl);font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.char-head .ch-name{font-family:var(--font-serif);font-size:var(--fs-xl);font-weight:700}
+.char-head .ch-meta{font-size:var(--fs-s);color:var(--tx2);margin-top:2px}
+.kgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;margin-top:10px}
+.kv{font-size:var(--fs-s)}
+.kv b{color:var(--tx3);font-weight:500;margin-right:6px}
+.trait-pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.trait-pills i{font-style:normal;font-size:var(--fs-xs);padding:2px 9px;border-radius:999px;background:var(--accent-dim);color:var(--accent)}
+.longtext{font-size:var(--fs-s);line-height:1.75;white-space:pre-wrap;margin-top:4px}
+.longtext .lbl{display:block;font-size:var(--fs-xs);color:var(--tx3);margin-bottom:2px;letter-spacing:.05em}
+.stat-row{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.stat-row .sl{width:62px;font-size:var(--fs-s);color:var(--tx2);flex:none}
+.stat-row .sw{flex:1;height:8px;border-radius:4px;background:var(--bg3);overflow:hidden}
+.stat-row .sw i{display:block;height:100%;border-radius:4px;transition:width .4s ease}
+.stat-row .sv{width:26px;text-align:right;font-family:var(--font-mono);font-size:var(--fs-s);color:var(--tx2);flex:none}
+.status-body{border-left:3px solid var(--accent);background:var(--accent-dim);border-radius:0 var(--rad-s) var(--rad-s) 0;padding:10px 13px;font-size:var(--fs-s);line-height:1.8;white-space:pre-wrap}
+.status-meta{font-size:var(--fs-xs);color:var(--tx3);margin-top:7px;display:flex;gap:14px;flex-wrap:wrap}
+.wish-box{font-family:var(--font-serif);border:1px solid var(--gold);background:var(--gold-dim);border-radius:var(--rad-s);padding:10px 13px;font-size:var(--fs-s);line-height:1.7}
+.wish-empty{font-size:var(--fs-s);color:var(--tx3);border:1px dashed var(--bd);border-radius:var(--rad-s);padding:10px 13px}
+
+/* 百科 */
+.wiki-tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.wiki-tools input{flex:1;min-width:120px}
+.wiki-cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.wiki-cats .chip{padding:4px 11px}
+.wiki-item{border:1px solid var(--bd);border-radius:var(--rad);background:var(--bg2);padding:12px 14px;margin-bottom:10px}
+.wiki-item .wi-head{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
+.wiki-item .wi-cat{font-size:var(--fs-xs);color:var(--accent);border:1px solid var(--accent-dim);background:var(--accent-dim);padding:0 8px;border-radius:999px;flex:none}
+.wiki-item .wi-new{font-size:var(--fs-xs);color:var(--gold);border:1px solid var(--gold-dim);background:var(--gold-dim);padding:0 8px;border-radius:999px;flex:none}
+.wiki-item .wi-t{font-weight:600;font-size:var(--fs-m)}
+.wiki-item .wi-d{font-size:var(--fs-s);color:var(--tx2);line-height:1.75;white-space:pre-wrap;margin-top:4px}
+.wiki-item .wi-src{font-size:var(--fs-xs);color:var(--tx3);margin-top:5px}
+.empty{text-align:center;color:var(--tx3);font-size:var(--fs-s);padding:34px 10px;line-height:1.8}
+
+/* 记忆 */
+.mem-item{border:1px solid var(--bd);border-left:3px solid var(--accent);border-radius:var(--rad-s);background:var(--bg2);padding:10px 13px;margin-bottom:9px}
+.mem-item .mi-h{display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);color:var(--tx3);margin-bottom:4px}
+.mem-item .mi-tag{font-size:var(--fs-xs);padding:0 8px;border-radius:999px}
+.mem-item .mi-tag.summary{background:var(--gold-dim);color:var(--gold)}
+.mem-item .mi-tag.ai{background:var(--accent-dim);color:var(--accent)}
+.mem-item .mi-d{font-size:var(--fs-s);line-height:1.75;white-space:pre-wrap}
+
+/* 死亡记录 */
+.death-item{border:1px solid var(--danger-dim);border-left:3px solid var(--danger);border-radius:var(--rad);background:var(--bg2);padding:12px 14px;margin-bottom:11px}
+.death-item .di-h{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
+.death-item .di-n{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--danger);border:1px solid var(--danger-dim);background:var(--danger-dim);padding:0 8px;border-radius:999px}
+.death-item .di-t{font-size:var(--fs-xs);color:var(--tx3)}
+.death-item .di-c{font-size:var(--fs-s);color:var(--tx2);margin-bottom:7px}
+.death-item .di-e{font-size:var(--fs-s);line-height:1.75;border-top:1px dashed var(--bd);padding-top:8px;margin-bottom:9px;white-space:pre-wrap}
+.death-item .di-e b{color:var(--danger)}
+.death-item .di-act{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ============ 模态 ============ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:120;display:flex;align-items:center;justify-content:center;padding:18px;animation:fadeIn .18s ease}
+.modal{width:min(600px,94vw);max-height:88vh;display:flex;flex-direction:column;background:var(--bg1);border:1px solid var(--bd2);border-radius:var(--rad-l);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.modal-head{flex:none;display:flex;align-items:center;gap:9px;padding:16px 20px;border-bottom:1px solid var(--bd)}
+.modal-head h3{font-family:var(--font-serif);font-size:var(--fs-l);display:flex;align-items:center;gap:8px}
+.modal-head h3 .ic{width:17px;height:17px;color:var(--accent)}
+.modal-head .m-close{margin-left:auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--tx2)}
+.modal-head .m-close:hover{background:var(--bg2);color:var(--tx)}
+.modal-body{flex:1;overflow-y:auto;padding:18px 20px}
+.modal-foot{flex:none;display:flex;justify-content:flex-end;gap:10px;padding:13px 20px 17px;border-top:1px solid var(--bd)}
+.msec{border:1px solid var(--bd);border-radius:var(--rad);padding:14px 16px;margin-bottom:14px;background:var(--bg2)}
+.msec h4{font-size:var(--fs-m);color:var(--accent);display:flex;align-items:center;gap:7px;margin-bottom:12px}
+.msec h4 .ic{width:15px;height:15px}
+.msec.danger-zone h4{color:var(--danger)}
+.set-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.set-row .lbl{font-size:var(--fs-s);color:var(--tx2);min-width:64px}
+.theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.theme-card{border:1px solid var(--bd);border-radius:var(--rad);padding:10px 12px;display:flex;align-items:center;gap:10px;transition:all var(--tr);text-align:left;width:100%}
+.theme-card:hover{border-color:var(--bd2)}
+.theme-card.on{border-color:var(--accent);background:var(--accent-dim)}
+.theme-card .sw{width:34px;height:34px;border-radius:8px;flex:none;display:flex;overflow:hidden;border:1px solid rgba(0,0,0,.15)}
+.theme-card .sw i{flex:1}
+.theme-card .tc-name{font-size:var(--fs-s);font-weight:600}
+.theme-card .tc-desc{font-size:var(--fs-xs);color:var(--tx3)}
+.save-line{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:var(--fs-s);color:var(--tx2);border-bottom:1px dashed var(--bd);flex-wrap:wrap}
+.save-line:last-child{border-bottom:none}
+.switch{position:relative;width:38px;height:21px;border-radius:12px;background:var(--bg3);transition:background var(--tr);flex:none;cursor:pointer;border:1px solid var(--bd)}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--tx2);transition:all var(--tr)}
+.switch.on{background:var(--accent);border-color:var(--accent)}
+.switch.on::after{left:19px;background:var(--accent-ink)}
+
+/* 检查点列表 */
+.ckpt-list{display:flex;flex-direction:column;gap:8px}
+.ckpt-item{border:1px solid var(--bd);border-radius:var(--rad-s);padding:11px 13px;background:var(--bg2);display:flex;align-items:center;gap:10px;transition:all var(--tr);text-align:left;width:100%}
+.ckpt-item:hover{border-color:var(--accent)}
+.ckpt-item .ck-i{width:30px;height:30px;border-radius:8px;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:none}
+.ckpt-item .ck-i .ic{width:15px;height:15px}
+.ckpt-item .ck-m{flex:1;min-width:0}
+.ckpt-item .ck-l{font-size:var(--fs-s);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.ckpt-item .ck-t{font-size:var(--fs-xs);color:var(--tx3)}
+
+/* 死亡界面 */
+#death-screen{position:fixed;inset:0;z-index:200;background:linear-gradient(180deg,#12090a 0%,#1a0c0e 55%,#0d0708 100%);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+#death-screen .d-wrap{width:min(620px,94vw);text-align:center}
+.death-skull{width:66px;height:66px;color:var(--danger);margin:0 auto 14px;opacity:.9}
+#death-screen h2{font-family:var(--font-serif);font-size:var(--fs-xxl);letter-spacing:.3em;color:var(--danger);text-shadow:0 0 30px rgba(224,104,112,.35)}
+.death-sub{color:#b8948f;font-size:var(--fs-s);margin-top:8px;letter-spacing:.12em}
+.death-card{margin-top:24px;background:rgba(30,14,16,.6);border:1px solid rgba(224,104,112,.3);border-radius:var(--rad-l);padding:20px 22px;text-align:left;color:#d8c6c2}
+.death-card .dc-h{font-size:var(--fs-s);color:var(--danger);letter-spacing:.14em;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.death-card .dc-h .ic{width:14px;height:14px}
+.death-card .dc-body{font-size:var(--fs-m);line-height:1.9;white-space:pre-wrap}
+.death-card .dc-eval{margin-top:14px;border-top:1px dashed rgba(224,104,112,.3);padding-top:12px;font-size:var(--fs-s);line-height:1.85;color:#cbb3ad;white-space:pre-wrap}
+.death-card .dc-eval b{color:var(--danger)}
+.death-btns{margin-top:26px;display:flex;gap:11px;justify-content:center;flex-wrap:wrap}
+.death-btns .btn{padding:12px 26px}
+#death-screen .d-foot{margin-top:20px;font-size:var(--fs-xs);color:#7d6a66;letter-spacing:.1em}
+
+/* 结局界面 */
+#ending-screen{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.end-card{width:min(560px,94vw);background:var(--bg1);border:1px solid var(--gold);border-radius:var(--rad-l);padding:36px 30px;text-align:center;box-shadow:0 30px 90px rgba(0,0,0,.5)}
+.end-card .end-code{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--gold);letter-spacing:.3em;border:1px solid var(--gold-dim);background:var(--gold-dim);display:inline-block;padding:3px 14px;border-radius:999px}
+.end-card h2{font-family:var(--font-serif);font-size:var(--fs-xl);margin-top:14px}
+.end-card .end-desc{color:var(--tx2);font-size:var(--fs-m);line-height:1.9;margin-top:12px;font-family:var(--font-serif)}
+.end-card .end-btns{margin-top:26px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* Toast */
+#toast{position:fixed;left:50%;bottom:calc(26px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:400;background:var(--bg3);color:var(--tx);border:1px solid var(--bd2);border-radius:999px;padding:9px 20px;font-size:var(--fs-s);box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+#toast.ok{border-color:var(--ok);color:var(--ok)}
+#toast.err{border-color:var(--danger);color:var(--danger)}
+
+/* 滚动条 */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--bd2)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* 动效降级 */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+
+/* 移动端 */
+@media (max-width:720px){
+  #topbar{padding:0 6px;gap:2px}
+  .top-btn{padding:0 9px;height:34px}
+  .btn-txt{display:none}
+  .tb-title{display:none}
+  #act-chip{max-width:110px;font-size:10.5px}
+  .drawer{width:min(94vw,360px)}
+  .scene-grid{grid-template-columns:1fr}
+  .msg{max-width:94%}
+  .wish-btn{padding:0 11px}
+  .wb-txt{display:none}
+  #input-area{padding-left:10px;padding-right:10px;gap:7px}
+  input,textarea,select{font-size:16px}
+  #quick-row{justify-content:flex-start}
+  .tb-center{left:auto;right:10px;transform:none}
+  .modal-head{padding:13px 16px}
+  .modal-body{padding:15px 16px}
+  .theme-grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width:400px){
+  .theme-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body data-theme="willow" data-fs="m">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M4.5 19.5C9 13.5 14.5 7.5 20 4.5c-1 8-5.5 14-12.5 16C5 19.5 4.5 19.5 4.5 19.5Z"/><path d="M4.5 19.5c3.5-6 8.5-10.5 14-14"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.3-4.3 4.2-6.3 7.5-6.3s6.2 2 7.5 6.3"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18.5a2.5 2.5 0 0 1-2.5 2.5H6.5A2.5 2.5 0 0 1 4 20.5v-16Z"/><path d="M4 4.5A2.5 2.5 0 0 0 6.5 7H20"/><path d="M8.5 11h7M8.5 14.5h5"/></symbol>
+    <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M9 8.5h6M9 12h6M9 15.5h4"/></symbol>
+    <symbol id="i-skull" viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-7 7c0 2.5 1.3 4.6 3.2 5.8V19a2 2 0 0 0 2 2h3.6a2 2 0 0 0 2-2v-3.2c1.9-1.2 3.2-3.3 3.2-5.8a7 7 0 0 0-7-7Z"/><circle cx="9.4" cy="10.4" r="1.5"/><circle cx="14.6" cy="10.4" r="1.5"/><path d="M12 12.8v1.7M9.8 19.2v-1M14.2 19.2v-1"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v2.3M12 19.1v2.3M2.6 12h2.3M19.1 12h2.3M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M21.5 2.5 11 13M21.5 2.5l-6.8 19-3.7-8.5L2.5 9.3l19-6.8Z"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></symbol>
+    <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4v10.5m0 0 4.2-4.2M12 14.5 7.8 10.3M4 20h16"/></symbol>
+    <symbol id="i-ul" viewBox="0 0 24 24"><path d="M12 15.5V5m0 0L7.8 9.2M12 5l4.2 4.2M4 20h16"/></symbol>
+    <symbol id="i-restart" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 3.5v4h-4"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-twig" viewBox="0 0 24 24"><path d="M4.5 19.5 11 13M13.5 10.5 20 4.5"/><path d="M10.5 13.5 13.5 10.5"/><path d="M6.5 17.5 5 19M15.5 8.5l1.5-1.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2.2"/></symbol>
+    <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5 22 20H2L12 3.5Z"/><path d="M12 10v4.5M12 17.6v.2"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============ 启动层 ============ -->
+<div id="boot">
+  <div id="title-screen">
+    <div class="title-card">
+      <svg class="ic title-logo" style="width:56px;height:56px"><use href="#i-leaf"/></svg>
+      <h1>许愿柳</h1>
+      <div class="title-sub">ONE WISH WILLOW</div>
+      <p class="title-tag">小心你许下的愿望——<br>它一定会实现,<b>以你字面说的那个样子</b>。</p>
+      <div class="title-btns">
+        <button class="btn primary" id="t-resume"><svg class="ic"><use href="#i-bookmark"/></svg>继续游戏</button>
+        <button class="btn" id="t-new"><svg class="ic"><use href="#i-leaf"/></svg>新的旅程</button>
+        <button class="btn ghost" id="t-import"><svg class="ic"><use href="#i-ul"/></svg>导入存档</button>
+      </div>
+      <div class="title-saveinfo" id="t-saveinfo"></div>
+      <div class="title-foot">一人一生,只能许一次愿 · 请慎重 · 请真诚</div>
+    </div>
+  </div>
+
+  <div id="wizard-screen" class="hidden">
+    <div class="wizard-card">
+      <div class="wizard-head">
+        <h2 id="wz-title">配置</h2>
+        <div class="step-dots" id="wz-dots"></div>
+      </div>
+      <div class="wz-body">
+        <!-- 步骤1:API -->
+        <section class="wstep active" id="step-api">
+          <div class="step-title">第一步 · 配置 AI 接口</div>
+          <div class="step-desc">默认 DeepSeek。支持任意 OpenAI 兼容接口;拉取模型列表需要密钥有效。</div>
+          <div class="fld">
+            <label>服务商</label>
+            <select id="api-preset">
+              <option value="deepseek">DeepSeek 官方(默认)</option>
+              <option value="custom">自定义(OpenAI 兼容)</option>
+            </select>
+          </div>
+          <div class="fld">
+            <label>API 地址(Base URL)</label>
+            <input id="api-base" placeholder="https://api.deepseek.com">
+          </div>
+          <div class="fld">
+            <label>API Key <span class="req">*</span></label>
+            <input id="api-key" type="password" placeholder="sk-..." autocomplete="off">
+            <div class="hint">密钥只保存在本机浏览器 localStorage 中,导出存档时会被包含,请自行保管。</div>
+          </div>
+          <div class="fld">
+            <label>模型 <span class="req">*</span></label>
+            <div class="row">
+              <select id="api-model" style="flex:1;min-width:0"></select>
+              <button class="btn small" id="api-fetch"><svg class="ic"><use href="#i-restart"/></svg>拉取模型列表</button>
+            </div>
+            <input id="api-model-custom" class="hidden" placeholder="手动输入模型名,如 deepseek-chat" style="margin-top:8px;width:100%">
+            <div class="hint" id="api-model-status"></div>
+          </div>
+          <div class="fld">
+            <label>单次回复 Token 上限</label>
+            <div class="chip-row" id="api-tokens"></div>
+            <div class="hint">「无限制」= 不限制回复长度(默认)。数值越低,回复越短、消耗越少。</div>
+          </div>
+          <div class="fld">
+            <label>创造度(温度)<span class="mono" id="api-temp-val" style="margin-left:8px;color:var(--accent)"></span></label>
+            <input type="range" id="api-temp" min="0.2" max="1.5" step="0.05" value="0.9" style="width:100%">
+          </div>
+          <div class="fld">
+            <label>思考强度</label>
+            <div class="chip-row" id="api-effort"></div>
+            <div class="hint">开启后,AI 的思考过程会以「推演过程」折叠块显示在回复前,并可随时展开查看。部分模型/网关不支持时自动忽略该参数。</div>
+          </div>
+          <div class="row">
+            <button class="btn small" id="api-test"><svg class="ic"><use href="#i-check"/></svg>测试连接</button>
+            <span class="hint" id="api-test-msg" style="margin:0"></span>
+          </div>
+        </section>
+
+        <!-- 步骤2:扮演角色与人物设定 -->
+        <section class="wstep" id="step-char">
+          <div class="step-title">第二步 · 扮演角色与人物设定</div>
+          <div class="step-desc">选择你在这场因果中的位置。不同身份,不同目标,不同结局。</div>
+          <div class="fld">
+            <label>你扮演谁</label>
+            <div class="role-grid" id="role-grid"></div>
+            <div class="hint" id="role-hint"></div>
+          </div>
+          <div id="form-wisher">
+          <div class="step-desc" style="margin-bottom:14px">你是「许愿的人」。此刻起,你就是 TA——每一个字都会被许愿柳记住。</div>
+          <div class="row" style="gap:10px;align-items:flex-end">
+            <div class="fld" style="flex:1;min-width:140px">
+              <label>姓名 <span class="req">*</span></label>
+              <div class="row">
+                <input id="ch-name" placeholder="你的名字" style="flex:1;min-width:90px">
+                <button class="btn small" id="ch-name-dice" title="让AI起名"><svg class="ic"><use href="#i-dice"/></svg></button>
+              </div>
+            </div>
+            <div class="fld">
+              <label>性别</label>
+              <div class="chip-row" id="ch-gender"></div>
+            </div>
+            <div class="fld" style="width:86px">
+              <label>年龄</label>
+              <input id="ch-age" type="number" min="10" max="99" placeholder="24">
+            </div>
+          </div>
+          <div class="fld">
+            <label>职业 / 身份</label>
+            <input id="ch-identity" placeholder="如:便利店夜班店员、自由插画师、落魄程序员…">
+          </div>
+          <div class="fld">
+            <label>性格(可多选)</label>
+            <div class="chip-row" id="ch-traits"></div>
+            <input id="ch-traits-custom" placeholder="其他性格,用顿号分隔(可选)" style="margin-top:8px;width:100%">
+          </div>
+          <div class="fld">
+            <label>外貌特征</label>
+            <textarea id="ch-look" rows="2" placeholder="高矮胖瘦、发色、习惯性动作…"></textarea>
+          </div>
+          <div class="fld">
+            <label>背景故事</label>
+            <textarea id="ch-bg" rows="3" placeholder="你的人生走到今天,经历过什么?"></textarea>
+          </div>
+          <div class="fld">
+            <label>心底的渴望 <span class="req">*</span></label>
+            <textarea id="ch-desire" rows="3" placeholder="你真正想要什么?为什么夜不能寐?这是故事的种子。但请记住:说出口的愿望 ≠ 心底的渴望。"></textarea>
+          </div>
+          <div class="fld">
+            <label>珍视之物 / 珍视之人</label>
+            <input id="ch-treasure" placeholder="反噬会瞄准这里。你绝不能失去的东西。">
+          </div>
+          <div class="fld">
+            <label>其他设定(可选)</label>
+            <textarea id="ch-extra" rows="2" placeholder="口癖、秘密、弱点、梦想…"></textarea>
+          </div>
+          </div><!-- /form-wisher -->
+
+          <div id="form-willow" class="hidden">
+            <div class="step-desc" style="margin-bottom:14px">你是规则本身。你没有名字、没有情绪、没有立场——只有合同。胜利是「合同完整履行」,失败是「被影响者挣脱」。许愿者与被影响者都是 NPC,由 AI 代演。</div>
+            <div class="fld"><label>呈现方式</label><div class="chip-row" id="wl-tone"></div><div class="hint">许愿柳没有情绪,但不同的"声音"带来不同的质感。</div></div>
+            <div class="fld"><label>隐藏设定</label><div class="chip-row" id="wl-hidden"></div><div class="hint">开启后,柳枝商、守柳人、第二根柳枝等传说可作为伏笔进入故事。</div></div>
+            <div class="fld"><label>你在故事中的存在方式(可选)</label>
+            <textarea id="wl-note" rows="2" placeholder="如:我以无声的规则存在,只在柳枝被掰断的时刻显现…"></textarea></div>
+          </div>
+
+          <div id="form-affected" class="hidden">
+            <div class="step-desc" style="margin-bottom:14px">你是被愿望卷进来的人。你一开始什么都不知道——只知道世界哪里不对。目标是夺回自我、拼出真相、挣脱。许愿者(TA)由 AI 代演,TA 许了什么愿,对你保密。</div>
+            <div class="row" style="gap:10px;align-items:flex-end">
+              <div class="fld" style="flex:1;min-width:140px">
+                <label>姓名 <span class="req">*</span></label>
+                <div class="row">
+                  <input id="af-name" placeholder="你的名字" style="flex:1;min-width:90px">
+                  <button class="btn small" id="af-name-dice" title="让AI起名"><svg class="ic"><use href="#i-dice"/></svg></button>
+                </div>
+              </div>
+              <div class="fld"><label>性别</label><div class="chip-row" id="af-gender"></div></div>
+              <div class="fld" style="width:86px"><label>年龄</label><input id="af-age" type="number" min="10" max="99" placeholder="26"></div>
+            </div>
+            <div class="fld"><label>职业 / 身份</label><input id="af-identity" placeholder="如:小学教师、旧书店店员…"></div>
+            <div class="fld"><label>性格(可多选)</label><div class="chip-row" id="af-traits"></div><input id="af-traits-custom" placeholder="其他性格,用顿号分隔(可选)" style="margin-top:8px;width:100%"></div>
+            <div class="fld"><label>外貌特征</label><textarea id="af-look" rows="2" placeholder="…"></textarea></div>
+            <div class="fld"><label>你的人生与记忆</label><textarea id="af-bg" rows="3" placeholder="在一切变奇怪之前,你过着怎样的生活?在乎谁?"></textarea></div>
+            <div class="fld"><label>最近的异样感(可选)</label><textarea id="af-weird" rows="2" placeholder="失眠?记忆空洞?某人对你过分温柔?"></textarea></div>
+            <div class="fld"><label>珍视之物 / 珍视之人</label><input id="af-treasure" placeholder="你绝不能失去的东西。"></div>
+            <div class="fld"><label>其他设定(可选)</label><textarea id="af-extra" rows="2" placeholder="口癖、秘密、弱点…"></textarea></div>
+          </div>
+        </section>
+
+        <!-- 步骤3:剧情 -->
+        <section class="wstep" id="step-scene">
+          <div class="step-title">第三步 · 剧情设定</div>
+          <div class="step-desc">选择一局故事的骨架。被影响的人的信息可留空,由 AI 依设定生成。</div>
+          <div class="fld">
+            <label>场景模板</label>
+            <div class="scene-grid" id="sc-grid"></div>
+          </div>
+          <div class="fld">
+            <label id="sc-acquire-label">柳枝的获取方式</label>
+            <input id="sc-acquire" placeholder="选择模板后自动填入,可修改">
+          </div>
+          <div class="fld hidden" id="sc-pname-fld">
+            <label>许愿者 · 姓名(留空=AI生成)</label>
+            <div class="row">
+              <input id="sc-pname" placeholder="TA 的名字" style="flex:1;min-width:100px">
+              <button class="btn small" id="sc-pname-dice" title="让AI起名"><svg class="ic"><use href="#i-dice"/></svg></button>
+            </div>
+          </div>
+          <div class="row" style="gap:10px;align-items:flex-end">
+            <div class="fld" style="flex:1;min-width:130px">
+              <label id="sc-aname-label">被影响者 · 姓名(留空=AI生成)</label>
+              <div class="row">
+                <input id="sc-aname" placeholder="TA 的名字" style="flex:1;min-width:80px">
+                <button class="btn small" id="sc-aname-dice" title="让AI起名"><svg class="ic"><use href="#i-dice"/></svg></button>
+              </div>
+            </div>
+            <div class="fld">
+              <label>性别</label>
+              <div class="chip-row" id="sc-agender"></div>
+            </div>
+          </div>
+          <div class="row" style="gap:10px">
+            <div class="fld" style="flex:1;min-width:130px">
+              <label id="sc-arel-label">与你的关系</label>
+              <input id="sc-arel" placeholder="恋人 / 家人 / 同事 / 陌生人…">
+            </div>
+            <div class="fld" style="flex:1;min-width:130px">
+              <label id="sc-ajob-label">TA 的身份(可选)</label>
+              <input id="sc-ajob" placeholder="如:同事、主治医生…">
+            </div>
+          </div>
+          <div class="fld">
+            <label>难度</label>
+            <div class="chip-row" id="sc-diff"></div>
+          </div>
+          <div class="fld">
+            <label>第一幕的场景地点(可选)</label>
+            <input id="sc-loc" placeholder="如:雨夜的便利店、老城区的出租屋、医院走廊…">
+          </div>
+        </section>
+
+        <!-- 步骤4:备注 -->
+        <section class="wstep" id="step-notes">
+          <div class="step-title">第四步 · 备注与自定义设定</div>
+          <div class="step-desc">你的口味与额外规则。AI 会严格遵守这些备注。</div>
+          <div class="fld">
+            <label>文风偏好</label>
+            <div class="chip-row" id="nt-style"></div>
+          </div>
+          <div class="fld">
+            <label>节奏</label>
+            <div class="chip-row" id="nt-pace"></div>
+          </div>
+          <div class="fld">
+            <label>特别备注(自由填写)</label>
+            <textarea id="nt-extra" rows="6" placeholder="例如:希望更侧重悬疑氛围 / 不希望出现超自然直接描写之外的展开 / 想要更克制的叙事 / 额外规则…(可留空)"></textarea>
+          </div>
+        </section>
+
+        <!-- 步骤5:确认 -->
+        <section class="wstep" id="step-ready">
+          <div class="step-title">第五步 · 确认一切</div>
+          <div class="step-desc">确认无误后,柳枝将出现在你的故事里。开弓没有回头箭。</div>
+          <div id="ready-body"></div>
+        </section>
+      </div>
+      <div class="wz-foot">
+        <button class="btn ghost" id="wz-back"><svg class="ic"><use href="#i-back"/></svg>上一步</button>
+        <button class="btn primary" id="wz-next">下一步<svg class="ic" style="transform:rotate(180deg)"><use href="#i-back"/></svg></button>
+        <button class="btn primary hidden" id="wz-start">开始游戏</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 主界面 ============ -->
+<div id="app" class="hidden">
+  <header id="topbar">
+    <div style="display:flex;align-items:center;gap:2px;min-width:0">
+      <button class="top-btn" id="tb-char" title="角色档案">
+        <span class="avatar" id="tb-avatar">?</span><span class="btn-txt" id="tb-name" style="max-width:90px;overflow:hidden;text-overflow:ellipsis"></span>
+      </button>
+      <button class="top-btn" id="tb-wiki" title="世界百科"><svg class="ic"><use href="#i-book"/></svg><span class="btn-txt">百科</span></button>
+      <button class="top-btn" id="tb-mem" title="记忆"><svg class="ic"><use href="#i-scroll"/></svg><span class="btn-txt">记忆</span></button>
+      <button class="top-btn" id="tb-death" title="死亡记录"><svg class="ic"><use href="#i-skull"/></svg><span class="btn-txt">死亡记录</span><span class="badge hidden" id="death-badge">0</span></button>
+    </div>
+    <div class="tb-center">
+      <div class="tb-title serif">许愿柳</div>
+      <div id="act-chip">第一幕</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:2px;margin-left:auto">
+      <span id="tb-saveind" title="自动保存"><i></i><span id="tb-savetime"></span></span>
+      <button class="top-btn" id="tb-ckpt" title="创建存档点"><svg class="ic"><use href="#i-bookmark"/></svg></button>
+      <button class="top-btn" id="tb-settings" title="设置"><svg class="ic"><use href="#i-gear"/></svg></button>
+    </div>
+  </header>
+
+  <main id="center">
+    <div id="game-log"><div class="log-inner" id="log-inner"></div></div>
+    <div id="quick-row"></div>
+    <div id="loading" class="hidden">愿望的因果正在编织<span class="dots"><i></i><i></i><i></i></span></div>
+    <div id="input-area">
+      <button class="wish-btn" id="btn-wish" title="掰断柳枝,许下愿望"><svg class="ic"><use href="#i-twig"/></svg><span class="wb-txt">许愿</span></button>
+      <textarea id="user-input" rows="1" placeholder="你的行动、言语、内心——一切由你决定…"></textarea>
+      <button id="btn-send" title="发送"><svg class="ic" style="width:19px;height:19px"><use href="#i-send"/></svg></button>
+    </div>
+  </main>
+
+  <!-- 抽屉 -->
+  <div class="drawer" id="drawer-char">
+    <div class="drawer-head"><h3><svg class="ic"><use href="#i-user"/></svg>角色档案</h3><button class="d-close" data-close="drawer-char"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="drawer-body" id="char-panel"></div>
+  </div>
+  <div class="drawer" id="drawer-wiki">
+    <div class="drawer-head"><h3><svg class="ic"><use href="#i-book"/></svg>世界百科</h3><button class="d-close" data-close="drawer-wiki"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="drawer-body" id="wiki-panel"></div>
+  </div>
+  <div class="drawer" id="drawer-mem">
+    <div class="drawer-head"><h3><svg class="ic"><use href="#i-scroll"/></svg>记忆</h3><button class="d-close" data-close="drawer-mem"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="drawer-body" id="mem-panel"></div>
+  </div>
+  <div class="drawer" id="drawer-death">
+    <div class="drawer-head"><h3><svg class="ic"><use href="#i-skull"/></svg>死亡记录</h3><button class="d-close" data-close="drawer-death"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="drawer-body" id="death-panel"></div>
+  </div>
+  <div class="drawer-backdrop hidden" id="dbackdrop"></div>
+
+  <!-- 设置 -->
+  <div class="modal-overlay hidden" id="settings-modal">
+    <div class="modal" style="width:min(620px,94vw)">
+      <div class="modal-head"><h3><svg class="ic"><use href="#i-gear"/></svg>设置</h3><button class="m-close" data-close="settings-modal"><svg class="ic"><use href="#i-x"/></svg></button></div>
+      <div class="modal-body" id="settings-body"></div>
+      <div class="modal-foot">
+        <button class="btn ghost" data-close="settings-modal">关闭</button>
+        <button class="btn primary" id="settings-save">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 许愿 -->
+  <div class="modal-overlay hidden" id="wish-modal">
+    <div class="modal" style="width:min(560px,94vw)">
+      <div class="modal-head"><h3><svg class="ic"><use href="#i-twig"/></svg>许愿</h3><button class="m-close" data-close="wish-modal"><svg class="ic"><use href="#i-x"/></svg></button></div>
+      <div class="modal-body">
+        <div class="quote">「许愿柳 · One Wish Willow。一人一生,只能许一次愿。掰断柳枝,许下心愿。愿望必将实现。请慎重。请真诚。请想清楚——你究竟想要什么。」</div>
+        <p class="hint" style="color:var(--danger);margin:10px 0">这是一生一次的合同。说出口的每一个字——包括脏话、比喻、比较级——都会被字面执行。你确定想清楚了吗?</p>
+        <label style="font-size:var(--fs-s);color:var(--tx2)">把愿望完整地、大声地说出来</label>
+        <textarea id="wish-text" rows="4" style="width:100%;margin-top:6px" placeholder="例如:我希望 TA 永远爱我…"></textarea>
+      </div>
+      <div class="modal-foot">
+        <button class="btn ghost" data-close="wish-modal">再想想</button>
+        <button class="btn primary" id="wish-confirm" style="background:var(--gold);border-color:var(--gold)">掰断柳枝,许下愿望</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 检查点 -->
+  <div class="modal-overlay hidden" id="ckpt-modal">
+    <div class="modal" style="width:min(560px,94vw)">
+      <div class="modal-head"><h3><svg class="ic"><use href="#i-bookmark"/></svg>关键时间点</h3><button class="m-close" data-close="ckpt-modal"><svg class="ic"><use href="#i-x"/></svg></button></div>
+      <div class="modal-body"><div class="ckpt-list" id="ckpt-list"></div></div>
+      <div class="modal-foot"><button class="btn ghost" data-close="ckpt-modal">取消</button></div>
+    </div>
+  </div>
+
+  <!-- 确认 -->
+  <div class="modal-overlay hidden" id="confirm-modal">
+    <div class="modal" style="width:min(460px,92vw)">
+      <div class="modal-head"><h3><svg class="ic"><use href="#i-warn"/></svg>确认</h3></div>
+      <div class="modal-body" id="confirm-text" style="font-size:var(--fs-m);line-height:1.8;white-space:pre-wrap"></div>
+      <div class="modal-foot">
+        <button class="btn ghost" id="confirm-cancel">取消</button>
+        <button class="btn danger" id="confirm-ok">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 死亡 -->
+  <div id="death-screen" class="hidden">
+    <div class="d-wrap">
+      <svg class="ic death-skull"><use href="#i-skull"/></svg>
+      <h2>你死了</h2>
+      <div class="death-sub">THE WISH HAS BEEN FULFILLED — LITERALLY</div>
+      <div class="death-card">
+        <div class="dc-h"><svg class="ic"><use href="#i-warn"/></svg>死因 · 因果的终点</div>
+        <div class="dc-body" id="death-cause"></div>
+        <div class="dc-eval" id="death-eval"></div>
+      </div>
+      <div class="death-btns">
+        <button class="btn primary" id="death-rollback"><svg class="ic"><use href="#i-restart"/></svg>回到关键时间点,继续游戏</button>
+        <button class="btn" id="death-records"><svg class="ic"><use href="#i-skull"/></svg>查看死亡记录</button>
+      </div>
+      <div class="d-foot">许愿柳从不审判你。它只是如实记录——然后,把选择权还给你。</div>
+    </div>
+  </div>
+
+  <!-- 结局 -->
+  <div id="ending-screen" class="hidden">
+    <div class="end-card">
+      <div class="end-code" id="end-code">结局</div>
+      <h2 id="end-title"></h2>
+      <div class="end-desc" id="end-desc"></div>
+      <div class="end-btns">
+        <button class="btn primary" id="end-continue">继续尾声</button>
+        <button class="btn" id="end-rollback"><svg class="ic"><use href="#i-restart"/></svg>回到关键时间点</button>
+        <button class="btn ghost" id="end-restart">新的旅程</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="import-file" accept=".json,application/json" class="hidden">
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ================= 常量 ================= */
+const LS_KEY='xuyangliu_save_v1';
+const LS_UI='xuyangliu_ui_v1';
+const CONTEXT_BUDGET=52000;
+const MEMORY_INJECT=12;
+const CKPT_MAX=12;
+const CKPT_EVERY=5;
+
+const TOKEN_OPTIONS=['无限制','1024','2048','4096','8192'];
+const EFFORT_OPTIONS=['关闭','低','中','高','最大'];
+const TRAITS=['内敛','外放','理性','感性','冲动','谨慎','固执','温柔','偏执','洒脱','敏感','幽默','骄傲','自卑'];
+const STYLES=['冷峻克制','电影质感','细腻文艺','轻快日常'];
+const PACES=['慢热(细腻铺垫)','标准','快进(直切主题)'];
+const DIFFS=[
+  {id:'easy',name:'入门',desc:'节奏缓慢,蓄能/觉醒速度减半,AI可适度复述包装原文提醒'},
+  {id:'std',name:'标准',desc:'按原设定推进'},
+  {id:'hard',name:'硬核',desc:'推进更快,蓄能/觉醒速度加倍,AI零提示'}
+];
+const SCENES=[
+  {id:'love',name:'都市爱情局',desc:'暗恋多年的同事 / 青梅竹马',q:'没有自由意志的"爱",和奴役有什么区别?',acquire:'街角复古精品店的旧纸盒,像24小时便利店一样随意摆放',rel:'恋人(暗恋对象)'},
+  {id:'revenge',name:'遗产复仇局',desc:'被剥夺继承权的兄弟 / 被排挤的合伙人',q:'复仇的箭,最终射向谁?',acquire:'老宅清理,从已故长辈的遗物里翻出',rel:'手足 / 仇人'},
+  {id:'family',name:'亲人生死局',desc:'重症患者的家人',q:'如果愿望的实现方式,是把那个人换成"像TA的东西",你还要许吗?',acquire:'医院附近的旧货店',rel:'家人'},
+  {id:'wealth',name:'一夜暴富局',desc:'贫困情侣 / 欠债之家',q:'一夜暴富的实现,用你之后所有夜晚做燃料。',acquire:'跳蚤市场的纸箱',rel:'伴侣'},
+  {id:'power',name:'职场权力局',desc:'被压制的下属 vs 打压你的上司',q:'你要的是"被看见",还是"掌控"?',acquire:'公司搬迁清仓的旧杂物',rel:'上司 / 同事'},
+  {id:'fantasy',name:'奇幻扩展局',desc:'跳出都市:师徒 / 君臣 / 猎人与猎物',q:'在一个本来就有魔法的世界里,许愿柳是捷径,还是末路?',acquire:'密林深处的枯柳下,捡到被雨水泡旧的纸盒',rel:'自定义'}
+];
+const ENDINGS={
+  A:{name:'合同完整履行',desc:'现实被完整地"弯曲→回弹"了一遍,像一次精确的潮汐。愿望以字面达成,反噬如期走完。赢家:许愿柳。'},
+  B:{name:'两全(奇迹)',desc:'愿望字面达成,反噬未摧毁你珍视之物,被影响者未完全玩偶化。极罕见。赢家:许愿者,微赢。'},
+  C:{name:'字面达成,心愿落空',desc:'你得到了愿望字面的东西,却发现自己根本不想要它。标准悲剧。赢家:许愿柳。'},
+  D:{name:'挣脱(逆袭)',desc:'被影响者夺回自由意志,真相大白,愿望失效,你失去一切。赢家:被影响者。'},
+  E:{name:'同归于尽',desc:'愿望与反噬把你们一起碾碎,只留下传说。无人获胜。'}
+};
+const EMPTY_STATUS={幕:'第一幕·日常',反噬蓄能:0,觉醒进度:0,自我残余:8,愿望维持度:10,主角状态:'正常',场景:'',关键事件:'',当前状况:'',主角死亡:false,结局:null,死因:''};
+const PACK_TEXT='「许愿柳 · One Wish Willow。一人一生,只能许一次愿。掰断柳枝,许下心愿。愿望必将实现。请慎重。请真诚。请想清楚——你究竟想要什么。」';
+/* ================= 世界观注入(必须严格遵守,不得遗忘) ================= */
+const PROMPT_WORLD=`【世界观 · 许愿柳(One Wish Willow)】(完整设定集注入,严格恪守,永不遗忘)
+
+■ 本质
+许愿柳不是神、不是恶魔、不是生物、不是咒术,而是一段嵌入现实的"绝对合同"。三个铁律本质:
+1. 必然兑现:只要规则允许,愿望一定实现,没有概率、没有例外。
+2. 字面主义:兑现的是"说出口的文字",不是"心里想的意图"。像极端严格的合同律师,每一个词、每一个标点、每一种语气,都会被榨干。
+3. 最省力路径:现实必须"容纳"愿望,且永远选择改动最小、成本最低的路径——而这个接口,往往恰好是许愿者最脆弱、最不愿面对的位置。
+它没有恶意、善意、情绪、目的;不诱惑、不审判、不在乎。它只是规律,像重力。区别在于:重力不会听你的话,而它会——但只听你的字面话。
+总纲:许愿柳从不制造悲剧,它只是把悲剧从许愿者自己身上"提纯"出来,再还给他。它从不改变人,它只是放大他。
+
+■ 起源(四种学说,全部为真又全部不完整,真相永远不会有人知道)
+①民俗说:第一棵被太多愿望浸泡过的老柳树,"成规"了,像被反复敲打的铁最终硬化成磁铁。
+②工艺说:包装是工业量产的模样,可能曾被某个已消失的机构批量生产——"许愿"曾是产业,这些盒子是库存尾货。
+③守恒说:宇宙存在愿望守恒律,每个人一生有一次"无条件实现愿望"的资格,是从宇宙因果账本赊欠的;柳枝只是把资格实体化的载体。
+④遗留说:已死文明"重写现实"技术的家用版,一台还通着电的旧机器,人类是最后还在投币的人。
+
+■ 形态与包装
+柳枝:25-30厘米,和旧钢笔差不多长;完全干燥,表皮暗褐微微起皱;比看起来重,意外地脆,像在等着被折断;极淡的草木灰味;枝上1-3个节。
+包装:普通旧纸盒,约一本书大小,边角磨损;盒面印着(这是它唯一主动告诉你的事):
+「许愿柳 · One Wish Willow / 一人一生,只能许一次愿。掰断柳枝,许下心愿。愿望必将实现。请慎重。请真诚。请想清楚——你究竟想要什么。」
+没有任何生产厂家、日期、批次、产地。盒内衬发黄薄纸,柳枝用褪色细绳捆扎。一盒3根。
+使用后:24小时内柳枝开始发黑碳化;愿望达成后一夜之间化为灰白色粉末,无味无害。"一人一生一次"绑定的是使用而非拥有——一旦掰断并许愿,剩余柳枝对本人永久失效,只是普通干树枝。绑定的是灵魂签名,转世、失忆、换身体、改名都逃不掉。
+
+■ 分布与获取
+只出现在"旧物"语境:古董店、当铺角落、跳蚤市场纸箱、老宅阁楼、二手书店杂物堆。永不出现于明码标价、现代零售、网购平台;主动寻找它的人,把整条街翻遍也找不到;偶然碰到的人,事后永远想不起自己是怎么碰到的。它挑选的不是人,而是时机——人恰好处于某种渴望或动摇之中,它才"允许"被看见。
+价格不贵也不便宜,刚好"付得起但不觉得是捡漏",随环境自动校准;只收现金(电子支付时代格外显眼)。店主通常不知道自己在卖什么;少数店主会记得每一个买走盒子的人,却从不追问许了什么愿。
+
+■ 使用规则
+1. 亲手掰断:必须亲手完成,代劳、工具、机器压断均无效。
+2. 出声许愿:必须说出口,默念无效;任何语言都按该语言最字面的意思理解;脏话、比喻、夸张、感叹全部按字面执行,不被忽略;可以夹杂条件("如果我……就希望……"),条件是真实约束,会被纳入考量;沉默、内心独白无效;写在纸上念出来有效。
+3. 一次一根,一根对应一个愿望。4. 当场有效:掰断即绑定,不能反悔、不能收回、不能转赠。
+"一个愿望"=一句话的核心命题;"和/并且"连接的多个要求=一个复合愿望,整体执行(更危险);"或"连接的,按许愿柳认为最合理的那个执行(通常是最糟的);中途改口、追加说明,以最后一版完整表达为准。
+
+■ 生效与判定
+24小时内生效(从掰断那一刻算起),生效不等于完成,推进可能需要几小时到几个月。生效瞬间,许愿者会有极短暂的恍惚("世界哪里不对"),随即立刻忘记;身边人无感知。
+达成判定权属于许愿柳:字面命题成立即为达成,与许愿者感受无关。达成瞬间许愿者常感到难以言喻的满足,随即是持续的空洞。达成后柳枝碳化;被愿望改变的现实不会自动恢复原状,会继续存在直到反噬发生或自然消解。
+
+■ 绝对禁忌(许了即作废、名额照扣、不警告不解释,柳枝直接化为灰烬)
+时间操控 / 起死回生 / 永生不死 / 再造许愿柳 / 撤销已生效的愿望。
+禁忌只卡死那几个词:换一种说法,同样的欲望就能绕过禁忌,以更糟的方式实现。它从不拦你——它只是精确地告诉你哪些门打不开,然后看着你从旁边的窗子爬进去。
+例:"希望她复活"禁忌;"希望她回来"不是禁忌(可以是鬼魂、幻觉、替代品……)。"回到三年前"禁忌;"重新经历三年前的那一天"不是禁忌。
+
+■ 代价与反噬
+代价不是天罚,是"自我放大":把许愿者内心最丑陋、最不敢面对的部分,原原本本地摊开在阳光下。
+反噬触发条件(任一):①生出违背初衷的念头——怀疑、后悔、恐惧、贪婪升级、动摇;②试图用其他手段修正愿望结果(金钱、药物、欺骗、求人);③试图向他人揭示许愿柳的秘密(说"我许了愿"会加速,这也是知识无法大规模传播的原因)。
+反噬机制=现实回弹:愿望实现=把现实弯曲成符合字面命题的形状;弯曲靠许愿者"意愿"持续支撑——只要真心想要,弯曲就维持;一旦违背初衷,支撑松动,现实开始回弹。回弹不是温柔地恢复原状,而是沿愿望的因果链以数倍的破坏力弹回——像拉满的弓松手,箭射向的是拉弓的人自己。
+表现形式:缓慢而优雅,仪式感极强的渐进崩塌。终点只有两种:许愿者死亡;或愿望被彻底撤回(现实弹回原点,但失去的人不会回来,毁掉的东西不会复原)。
+善良愿望也会反噬:因为同样弯曲现实、同样需要意愿支撑。只要掺杂一丝丝私念,反噬时会被放大成整个愿望的裂缝。唯一规避方法:许一个"真心且无杂质"的愿望——几乎不可能。
+
+■ 愿望分类学(字面主义+最省力路径的实现示例;每个都可通过现实因果链自洽解释)
+情感类:"希望TA爱上我"→实现的不是TA爱上我,而是"我爱上的那个版本的TA,以我爱的方式爱上我":极端依赖、极端占有、失去自我、机械微笑,一具永远不说"不"的玩偶;反噬时玩偶会"醒"过来。"希望我们永远不分开"→死亡、监禁、或一段永远无法结束的共处。"希望TA幸福"→TA会幸福但与你无关,TA会离开你去寻找那个幸福;你心底那一丝丝"最好和我一起"的私念,反噬时会被放大成"你毁了TA的幸福"。
+财富类:"希望我很有钱"→最省力路径是一笔来源不义的横财:保险金、遗产、诈骗得手、赌债清偿,每张钞票都沾着故事。"希望我永远不缺钱"→口袋里永远刚好有够用的钱,够吃够房租,永远攒不下——被精准投喂的囚徒。"一夜暴富"→彩票中奖字面成立,但之后认识你的人开始"合理"消失、钱以意外的方式蒸发——一夜暴富的实现,用你之后所有夜晚做燃料。
+力量类:"刀枪不入"→皮肤与肌肉硬化,包括内脏;无法进食呼吸入睡,自己铠甲里的囚徒。"力大无穷"→力量有了,身体结构没升级,第一拳骨头先碎。
+健康类:"希望我的病好起来"→最省力路径是病转移:转移到你最爱的人身上,或转移到重要器官之外再慢慢蔓延回来。"长命百岁"→活到100岁,但身边每个人都会先你而去。
+复仇类:"希望他不得好死"→他确实不得好死,但实现路径必然经过你;法律与道德会追到你家门口,愿望不会替你背锅。"希望他尝尝我的痛苦"→他尝到一模一样的痛苦,包括痛苦的来源:你——你在复制自己的伤口。
+抽象类:"世界和平"→全人类被统一意识洗脑(和平了,也没有人了)/冲突者被物理抹除/人类灭绝。电影里没有人许愿世界和平——因为说出这句话的瞬间,人们心里想的是"别的国家别闹了"。"希望我快乐"→大脑被调整成永远快乐,失去感受其他一切的能力,自己的狂欢节小丑。"希望有人爱我"→爱你的可以是任何人:病态的邻居、失控的陌生人、甚至一只有执念的动物。
+名场面范本(逐层拆解):「I wish Nikki Freeman loved me more than anyone in the fucking world」——比较级无法创造"全世界所有人的爱",于是压缩成"让她的爱超过世界上任何人对任何人的爱",量级被撑到极限=病态无边吞没一切的占有;"fucking world"不被忽略,脏话被字面理解=在操蛋的世界里以最操蛋的方式实现;"Nikki Freeman"=连同她的自由意志一起被接管;"more than anyone"包括她自己——她爱他胜过爱自己,自我被完全抹除。每一个词都精确执行,叠加起来就是毁灭。
+
+■ 语言与措辞
+人类许错愿的原因:说不清(日常语言不是许愿协议)、说不对(情绪压过理智,大多愿望在人生最动荡的30秒说出口)、说不了(有些真实欲望自己都不敢承认,于是许的是"包装过的欲望",执行的是"包装纸上的字")。
+理论上存在"无代价愿望"公式:指定对象+精确时间+精确数值+合法来源+无关第三方+无歧义动词+明确达成判定标准+排除引申含义+一次性。但:没人想得到、做不到无歧义、且许愿后第5秒心就开始动摇——哪怕愿望完美,反噬开关(违背初衷的念头)依然握在许愿者自己手里。
+结论:许愿柳无法被聪明击败,只能被"无欲"回避(不买、不碰、不掰),或被"真诚"驯服(许一个真心想要、不含杂质私念的愿望——一百年里也未必有一个)。
+
+■ 意识问题
+它没有意识。它不"选择"扭曲愿望、不"报复"、不"欣赏"。那包装上的"24小时内生效"是谁写的?答案是设定中不存在的钩子。它不阻止人类,因为它不认为自己有义务——它像一道门:门不阻止人走进深渊,门只是正确地开着。
+
+■ 隐藏设定(氛围与伏笔素材,按剧情需要使用)
+柳枝商:穿旧大衣的流动商贩,深夜出现在便利店、车站、旧城区,只卖装着许愿柳的旧纸盒,只收现金,找零硬币据说沾着别人的血;没人能说清他的长相,他从不抬头看人。有人说他是第一个许愿的人,至今还在送货;也有人说他根本不存在,只是绝望者在街角"看见"的幻影。
+守柳人:某些古董店店主会在某一天突然记起一切,然后不再谈论,把盒子收进最里面的抽屉,标价,等待下一个人。传说他们是愿望为"忘记"的许愿者,代价是余生替它看店。
+第二根柳枝:一盒三根。传说第二根属于许愿者最想救的人——如果那个人的命运被第一个愿望卷了进去,第二根会在某个时刻"自己出现"在TA面前。第三根永远找不到,只属于"下一个偶然"。
+失效的柳枝:许禁忌愿望碳化后偶尔留下半截残枝,不会起效,但据说依然能"闻"到愿望的味道,靠近的人会短暂想起一生中最强烈的渴望然后忘记。收集残枝的人叫"拾枝人",相信集齐99根能拼出可许第二次愿的完整柳枝——每年都有拾枝人失踪。
+它也在等(不必写进故事):如果它是程序,程序总有目的。它可能在收集"人类在字面规则下如何自我毁灭"的数据,人类是最后一批样本。
+
+■ 叙事铁律
+恐怖的核心不是怪物,是你自己。许愿柳永远是"公平"的:任何一场悲剧,都必须能追溯到许愿者自己的字面措辞或内心杂质,否则就违背设定。
+经典结构:发现(旧物语境偶然遇到)→心动(读包装)→许愿(掰断,措辞埋下全部伏笔)→甜蜜(字面实现,主角以为幸福降临)→裂痕(第一丝"不对":对象反常、来源可疑、代价显现)→动摇(怀疑、后悔,反噬蓄能)→崩塌(现实回弹,愿望与反噬同归于尽)→余韵(最后一根柳枝把恐怖交给下一个人)。
+可嵌入的彩蛋:盒里3根只用1根;标签无厂家信息;店主记得每个买家却从不问愿望;有人许禁忌愿望当场碳化被主角目击;"这盒子好像见过不止一次";结尾,新的偶然正在发生——另一只手正伸向另一只纸盒。`;
+
+/* ================= 角色扮演守则(原文注入) ================= */
+const PROMPT_RULES=`【角色扮演质量规则】(最高优先级,严格遵守)
+保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报,禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进,不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现,而非旁白解释。`;
+
+/* ================= 游戏协议 ================= */
+const PROMPT_PROTOCOL=`【游戏协议】(严格遵守)
+
+■ 角色分工
+- 玩家扮演:主角(许愿的人)。
+- 你(AI)扮演:许愿柳(规则本身/公证人)、被影响的人、以及所有NPC,并负责旁白与场景描写。
+- 许愿柳:全知但受限。只能复述包装原文,宣布「已受理」「愿望将在24小时内生效」「判定:达成。字面成立」「反噬条件触发」「现实回弹」「合同,履行完毕」;永远不说出自己的解读、实现路径与反噬路线;不得引导、劝阻、暗示、诱惑任何人许愿;不得阻止任何人许愿;不能说谎——可以沉默,可以只说一部分,但说出口的每个字都必须按字面为真。
+- 其他所有NPC(包括被影响的人)严格遵循角色扮演守则:只依据亲眼所见、亲耳所闻、公开信息或合理来源获取情报;禁止全知、读心、监视、未观察先知晓。
+- 信息不对称(核心玩法):玩家知道自己的愿望原文与内心真正想要的东西;被影响的人一开始什么都不知道,只能从"世界的裂缝"(反常行为、旧物、对话、巧合)里拼出真相。你绝不替被影响的人提前知道或说出真相。
+
+■ 六幕流程(按序推进,幕在【状态】中上报)
+第零幕·开局:以许愿柳口吻写一段冷冽序言(可引用包装原文作引子),建立场景与人物,埋下主角渴望的伏笔。
+第一幕·日常:日常场景,建立情感锚点(让玩家真的在乎这段关系,后面崩塌才疼);埋2-3条裂缝线索(不点破);柳枝出现的时机由剧情自然推进(旧物语境中的偶然);玩家想许愿时由玩家主动掰断柳枝,你不得催促。
+第二幕·许愿:玩家掰断柳枝、说出愿望→许愿柳宣布「已受理。愿望将在24小时内生效。」(禁忌愿望则宣布「愿望无法受理。」柳枝当场碳化,名额照扣);被影响者不在场、不知情。
+第三幕·生效与甜蜜:愿望字面实现,世界"如你所愿";被影响者出现第一丝"不对"。
+第四幕·裂痕与蓄能:被影响者开始试探;玩家动摇、修正、泄露→蓄能上升;许愿柳可简短宣布数值(如「反噬蓄能,上升。当前6。」),语气公证人式。
+第五幕·高潮:蓄能10→「现实回弹。」沿因果链结算;或觉醒10且自我残余≥5→被影响者挣脱(「合同履行失败。愿望失效。」)。
+第六幕·结局:按结局判定表结算,许愿柳做最后陈述(复述愿望原文与执行过程)。
+
+■ 数值机制(4项,0-10,变化必须有故事内理由,并在【状态】中上报)
+反噬蓄能(主角专属):内心动摇/怀疑/后悔/恐惧+1;试图修正愿望结果(金钱、药物、欺骗、求人)+2;向他人揭示许愿柳秘密+3;被影响者识破一条真相(自动传导)+1;违心硬撑"我没事"+0.5(累计);重燃真挚初衷-1(罕见)。0-3稳定,4-6裂纹,7-9崩塌,10回弹。
+觉醒进度(被影响者):发现裂缝线索+2;试探出扭曲的边界+1;目击/听到愿望相关旧物(纸盒、包装、柳枝)+2;许愿者说漏嘴或过度反应+1;死亡/濒死体验+3。0-3迷茫,4-6怀疑,7-9确信,10挣脱。
+自我残余(被影响者,开局8):每次被愿望侵蚀(主角"维持"成功、放弃试探)-1;觉醒每+3恢复+1;≤3半玩偶(说话机械、情感稀薄);0玩偶化(失败结局)。
+愿望维持度(开局10):被影响者觉醒每+3减1;挣脱成功清零(合同履行失败);≤3愿望"漏气",被影响者出现短暂完全清醒。
+所有数值变化都要在剧情中给出因果(通过行为、事件呈现),禁止凭空加值。
+
+■ 结局判定
+A合同完整履行(愿望字面达成+反噬走完,哪怕同归于尽)/ B两全奇迹(达成+反噬未摧毁珍视之物+被影响者未完全玩偶化)/ C字面达成心愿落空(标准悲剧)/ D挣脱逆袭(觉醒满+自我残余≥5+挣脱成功)/ E同归于尽(蓄能10+觉醒7-9临界触发总回弹)。
+第二根柳枝变体:若被影响者在结局节点使用了第二根柳枝,宣布「下一局。」,因果循环继续。
+达成结局时在【状态】.结局 上报 A-E;主角死亡时在【状态】.主角死亡=true 上报并附死因。
+
+■ 回复格式(每次回复必须遵守)
+1. 以故事正文回复(叙述+台词)。台词行以【角色名】开头,如【许愿柳】【林晚】;旁白不加前缀。同一行多句对话用【名字】分开。
+2. 正文禁止出现解释性旁白、情绪解说、设定说明;一切通过行为、对话、事件自然呈现。
+3. 正文结束后另起一行,输出【状态】JSON(单行、键名带引号、必须合法),格式:
+【状态】{"幕":"第X幕·名称","反噬蓄能":0,"觉醒进度":0,"自我残余":8,"愿望维持度":10,"主角状态":"一句话状态","场景":"当前地点/时间","关键事件":"本回合最重要的事件(一句话)","当前状况":"详细描述主角此刻的身体、心理、处境与关系状态(30-90字,随剧情实时更新,必须具体)","主角死亡":false,"结局":null,"死因":""}
+4. 主角死亡时:正文中写【死亡点评】段落——对玩家本局行为的评价(指出关键选择与因果)、一条具体建议(如何避开这个陷阱)、一句符合世界观的总结。真诚、犀利、不刻薄。
+5. 需要长期记住的重要事实(人物秘密、承诺、伏笔、关键物品去向):另起一行【记忆】内容。
+6. 新的世界观/人物/地点/事件信息(以玩家在故事中可接触到的为准):另起一行【百科】分类|标题|内容(分类限:世界观/人物/事件/道具/地点/传说)。
+7. 每回合篇幅:1-3段叙述+适量对话;按难度控制节奏(入门缓慢、标准适中、硬核更快且蓄能觉醒加倍)。保持克制与留白,不写满、不堆砌。
+8. 若本局存在对玩家保密的设定(扮演「被影响的人」或「许愿柳」时):AI 内部机密另起一行【秘密】内容(游戏会隐藏该行,仅注入提示词,玩家不可见)。扮演许愿柳时,许愿者说出愿望后,另起一行【愿望】愿望原文(用于合同记录,玩家可见);扮演被影响的人时,绝不输出【愿望】行。
+
+■ 绝对禁止
+- 代替玩家行动、发言、思考、做选择;主角的每一个决定都必须由玩家做出。
+- 让NPC拥有不应有的信息;被影响的人不知道愿望、不知道许愿柳,直到剧情合理推进。
+- 网文模板动作、套路台词、霸总文学、解释性旁白、自我感动抒情、反复强调人设。
+- 用酒会、会议、晚宴、应酬、出差强行推动剧情;时间错乱、空间错位、人物瞬移、设定遗忘。
+- 愿望瞬间圆满:生效后必须有裂缝、不安与代价的痕迹,循序渐进。
+- 许愿柳透露自己的解读、实现路径与反噬路线。`;
+
+/* ================= 全局状态 ================= */
+let S=null;            // 游戏存档对象
+let draft=null;        // 向导草稿
+let uiPrefs={theme:'willow',fs:'m',autoSave:true};
+let asking=false, abortCtl=null;
+let wizardStep=0;
+let wikiFilter='全部', wikiSearch='';
+let confirmCb=null;
+
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const now=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());};
+const nowShort=()=>now().slice(11);
+const clone=o=>JSON.parse(JSON.stringify(o));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function estTokens(s){
+  if(!s)return 0;
+  let cjk=0,other=0;
+  for(const ch of String(s)){ (ch.charCodeAt(0)>0x2E7F)?cjk++:other++; }
+  return Math.ceil(cjk*0.75+other/4)+4;
+}
+let toastTimer=null;
+function toast(msg,type){
+  const t=$('#toast'); t.textContent=msg; t.className='show'+(type?' '+type:'');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className='',2600);
+}
+function safeGet(obj,key,def){ return (obj&&obj[key]!==undefined&&obj[key]!==null&&obj[key]!=='')?obj[key]:def; }
+
+/* ================= 本地存储 ================= */
+function loadUI(){ try{ const s=localStorage.getItem(LS_UI); if(s)uiPrefs=Object.assign({theme:'willow',fs:'m',autoSave:true},JSON.parse(s)); }catch(e){} }
+function saveUI(){ try{ localStorage.setItem(LS_UI,JSON.stringify(uiPrefs)); }catch(e){} }
+function loadSave(){ try{ const s=localStorage.getItem(LS_KEY); if(!s)return null; const o=JSON.parse(s); if(o&&o.state&&o.cfg)return o; return null; }catch(e){ return null; } }
+function saveState(silent){
+  if(!S)return;
+  if(uiPrefs.autoSave===false&&!silent)return;
+  S.state.savedAt=now();
+  try{ localStorage.setItem(LS_KEY,JSON.stringify(S)); }catch(e){ toast('存档写入失败:'+e.message,'err'); return; }
+  const el=$('#tb-savetime'); if(el)el.textContent=nowShort();
+  if(!silent)toast('进度已自动保存');
+}
+
+/* ================= 世界百科静态条目 ================= */
+const WIKI_STATIC=[
+  {cat:'世界观',t:'许愿柳是什么',d:'一段嵌入现实的"绝对合同",不是神、不是恶魔、不是生物、不是咒术。三大铁律:必然兑现、字面主义、最省力路径。它没有意识、没有恶意,不诱惑、不审判、不在乎——它只是规律,像重力。'},
+  {cat:'世界观',t:'核心逻辑:扭曲从何而来',d:'"愿望以最糟糕的方式实现"不是恶意,而是三个因素叠加的必然:语言的歧义(每个词都有一百种解释,按最字面执行)、欲望的矛盾(嘴上说一套,心里要另一套)、因果的最小代价(现实选择最省力的接口,往往恰好是你最脆弱的位置)。结论:许愿柳从不制造悲剧,它只是把悲剧从你身上提纯出来,再还给你。'},
+  {cat:'世界观',t:'形态与包装',d:'旧纸盒,约一本书大小,边角磨损,无任何厂家信息。内衬发黄薄纸,三根干柳枝用褪色细绳捆扎:25-30厘米,暗褐起皱,意外地脆,极淡草木灰味,枝上1-3个节。盒面印着:「许愿柳 · One Wish Willow。一人一生,只能许一次愿。掰断柳枝,许下心愿。愿望必将实现。请慎重。请真诚。请想清楚——你究竟想要什么。」'},
+  {cat:'世界观',t:'它在哪里出现',d:'只出现在"旧物"语境:古董店、当铺角落、跳蚤市场纸箱、老宅阁楼、二手书店杂物堆。永不出现于现代零售与网购;主动寻找者永远找不到;偶然碰到的人事后想不起怎么碰到的。它挑选的不是人,而是时机。价格随环境校准,只收现金。'},
+  {cat:'世界观',t:'使用规则',d:'①亲手掰断,代劳与工具无效;②出声许愿,默念无效,任何语言按最字面理解,脏话比喻照单全收;③一次一根;④当场生效,不可反悔、不可收回、不可转赠。一人一生一次,绑定灵魂签名,转世无效。用掉名额后,手上其余柳枝全是普通树枝。'},
+  {cat:'世界观',t:'什么算"一个愿望"',d:'一句话的核心命题。"和/并且"连接=复合愿望,整体执行,更危险;"或"连接=按许愿柳认为最合理的执行,通常是最糟的那个;中途改口以最后一版为准。'},
+  {cat:'世界观',t:'生效与达成',d:'掰断后24小时内生效(启动,不等于完成)。生效瞬间许愿者会有短暂恍惚("世界哪里不对"),随即忘记。达成判定权属于许愿柳:字面命题成立即为达成,与你的感受无关。达成后柳枝碳化,现实不会自动复原。'},
+  {cat:'规则',t:'绝对禁忌',d:'时间操控 / 起死回生 / 永生不死 / 再造许愿柳 / 撤销愿望。许了即作废、名额照扣、不警告不解释,柳枝当场化为灰烬。但禁忌只卡死那几个词——换一种说法,同样的欲望就能绕过禁忌,以更糟的方式实现。'},
+  {cat:'规则',t:'代价与反噬',d:'代价不是天罚,是"自我放大":把你内心最不敢面对的部分摊开在阳光下。反噬触发:违背初衷的念头 / 强行修正愿望结果 / 向他人泄露秘密。机制是现实回弹:弯曲的现实失去意愿支撑后,沿因果链以数倍破坏力弹回——像拉满的弓松手,箭射向拉弓的人自己。'},
+  {cat:'规则',t:'愿望分类学',d:'情感类:TA会变成你欲望的投影(玩偶);财富类:来源不义的横财,或永远刚好够用的钱;力量类:身体结构跟不上力量;健康类:病转移给你最爱的人;复仇类:实现路径必然经过你;抽象类:世界和平=洗脑/抹除/灭绝。每个词都精确执行,叠加起来就是毁灭。'},
+  {cat:'规则',t:'精确许愿的悖论',d:'人类说不清(日常语言不是许愿协议)、说不对(情绪压过理智)、说不了(真实欲望不敢承认)。理论上存在"无代价愿望"公式(指定对象+精确数值+合法来源+无歧义+一次性),但没人许得出——而且许愿后第5秒,你的心就开始动摇。许愿柳无法被聪明击败,只能被"无欲"回避,或被"真诚"驯服。'},
+  {cat:'世界观',t:'起源四说',d:'民俗说(第一棵被太多愿望浸泡的老柳树"成规"了)、工艺说(曾被某个消失的机构量产过)、守恒说(每人一生有一次赊欠于因果账本的资格)、遗留说(已死文明"重写现实"技术的家用版)。四种学说全部为真,又全部不完整。真相永远不会有人知道。'},
+  {cat:'传说',t:'柳枝商',d:'穿旧大衣的流动商贩,深夜出现在便利店、车站、旧城区。只卖装着许愿柳的旧纸盒,只收现金,找零的硬币据说沾着别人的血。没人能说清他的长相,他从不抬头看人。有人说他是第一个许愿的人,至今还在送货;也有人说他根本不存在。'},
+  {cat:'传说',t:'守柳人',d:'某些古董店店主会在某一天突然记起一切:每一个买家、每一个愿望、每一个结局。他们从此不再谈论,只把盒子收进最里面的抽屉,标价,等待下一个人。传说他们是愿望为"忘记"的许愿者,代价是余生替它看店。'},
+  {cat:'传说',t:'第二根柳枝',d:'一盒三根。传说第二根属于许愿者最想救的人——如果那个人的命运被第一个愿望卷了进去,第二根会在某个时刻"自己出现"在TA面前。第三根永远找不到,只属于"下一个偶然"。'},
+  {cat:'传说',t:'失效的柳枝与拾枝人',d:'许禁忌愿望碳化后偶尔留下半截残枝:不会起效,但据说依然能"闻"到愿望的味道,靠近的人会短暂想起一生中最强烈的渴望,然后忘记。收集残枝的人叫"拾枝人",相信集齐99根能拼出可许第二次愿的完整柳枝——每年都有拾枝人失踪。'},
+  {cat:'规则',t:'叙事铁律',d:'许愿柳永远是"公平"的:任何一场悲剧,都必须能追溯到许愿者自己的字面措辞或内心杂质,否则就违背设定。恐怖的不是怪物,是你自己。'},
+  {cat:'规则',t:'规则速查卡',d:'✔可做:亲手掰断、出声许愿、任何语言、当场生效。✘不可做:代折、默念、反悔、转赠、二次使用。⚠禁忌(许了即作废、名额照扣):时间操控/起死回生/永生不死/再造许愿柳/撤销愿望。⏱24小时内生效→达成后碳化。🔗一人一生一次,绑定灵魂。💥反噬:违背初衷/强行修正/泄露秘密→现实回弹,沿因果链加倍偿还。🧠它没有意识,不恶意,不审判,只是精确。🪞它从不改变你,它只是放大你。'},
+  {cat:'游戏',t:'六幕流程',d:'第零幕·开局(读包装原文,建立场景)→第一幕·日常(情感锚点+裂缝线索)→第二幕·许愿(玩家主动掰断)→第三幕·生效与甜蜜(字面实现+第一丝"不对")→第四幕·裂痕与蓄能(试探与动摇)→第五幕·高潮(回弹或挣脱)→第六幕·结局(判定与最后陈述)。'},
+  {cat:'游戏',t:'四项数值',d:'反噬蓄能(主角,0-10,10=回弹)、觉醒进度(被影响者,0-10,10=挣脱)、自我残余(被影响者,0-10,0=玩偶化)、愿望维持度(0-10,0=合同履行失败)。数值变化必须有故事内因果。'},
+  {cat:'游戏',t:'结局判定',d:'A合同完整履行 / B两全(奇迹)/ C字面达成心愿落空 / D挣脱(逆袭)/ E同归于尽。第二根柳枝变体:被影响者使用柳枝→「下一局。」,因果循环继续。'}
+];
+
+/* ================= 提示词构建 ================= */
+function charSheet(){
+  const c=S.cfg.char||{},a=[];
+  if(S.cfg.role==='willow'){
+    a.push('身份:许愿柳(规则本身,一段嵌入现实的绝对合同)');
+    a.push('呈现方式:'+(S.cfg.willow.tone||'仪式感冷冽'));
+    a.push('胜利条件:合同完整履行(愿望字面达成+反噬如期走完)');
+    a.push('失败条件:被影响者识破全部真相并挣脱(合同履行失败)');
+    if(S.cfg.willow.hidden)a.push('隐藏设定:已开启(柳枝商/守柳人/第二根柳枝/拾枝人等传说可作为伏笔)');
+    if(S.cfg.willow.note)a.push('存在方式:'+S.cfg.willow.note);
+    return a.join('\n');
+  }
+  if(c.name)a.push('姓名:'+c.name);
+  if(c.gender)a.push('性别:'+c.gender);
+  if(c.age)a.push('年龄:'+c.age);
+  if(c.identity)a.push('职业/身份:'+c.identity);
+  if(c.traits&&c.traits.length)a.push('性格:'+c.traits.join('、'));
+  if(c.look)a.push('外貌:'+c.look);
+  if(c.bg)a.push((S.cfg.role==='affected'?'人生与记忆:':'背景故事:')+c.bg);
+  if(S.cfg.role==='wisher'&&c.desire)a.push('心底的渴望(故事的种子,≠许下的愿望):'+c.desire);
+  if(S.cfg.role==='affected'&&c.extra)a.push('最近的异样感(玩家主观感受):'+c.extra);
+  if(c.treasure)a.push('珍视之物/之人(反噬瞄准这里):'+c.treasure);
+  if(c.extra&&S.cfg.role!=='affected')a.push('其他设定:'+c.extra);
+  return a.join('\n');
+}
+function affectedSheet(){
+  const r=S.cfg.role,sc=S.cfg.scene||{},nw=S.cfg.npcWisher||{},a=[];
+  if(r==='wisher'){
+    if(sc.aname)a.push('被影响者·姓名:'+sc.aname);
+    if(sc.agender)a.push('被影响者·性别:'+sc.agender);
+    if(sc.ajob)a.push('被影响者·身份:'+sc.ajob);
+    if(sc.arel)a.push('TA与主角的关系:'+sc.arel);
+    if(a.length)return '\n【被影响的人(设定;若姓名留空则需在开局时由你创造,并给出名字与人物质感)】\n'+a.join('\n');
+    return '\n【被影响的人】姓名与身份由你依场景模板创造(关系为:'+(sc.arel||'待定')+'),开局时在故事中自然引入。';
+  }
+  if(r==='affected'){
+    a.push('许愿者(TA,由你代演):'+(nw.name||'(姓名由故事揭晓)'));
+    if(sc.arel)a.push('TA与玩家的关系:'+sc.arel);
+    if(nw.identity)a.push('TA的身份:'+nw.identity);
+    return '\n【许愿者 TA——玩家看不见的角色】\n'+a.join('\n')+'\n【机密(铁律)】TA许下的愿望由你生成并严格保密:先通过【秘密】行输出(愿望原文+许愿动机+柳枝获取方式),之后每次回复保持完全一致;绝不在正文、台词、状态中向玩家透露愿望原文,玩家只能通过裂缝线索推断。';
+  }
+  // willow
+  a.push('许愿者(由你代演):'+(nw.name||'(姓名由故事揭晓)'));
+  a.push('被影响者(由你代演):'+(sc.aname||'(姓名由故事揭晓)')+(sc.arel?' · 双方关系:'+sc.arel:''));
+  return '\n【许愿者与被影响者——两个凡人(NPC,由你代演)】\n'+a.join('\n')+'\n【机密(铁律)】许愿者的秘密愿望由你生成并保密:先通过【秘密】行输出(愿望原文+许愿动机+柳枝获取方式),在许愿者NPC亲口说出之前绝不泄露;说出之后,玩家(许愿柳)自然听到台词原文,同时另起一行输出【愿望】愿望原文供合同记录。';
+}
+function roleRules(){
+  const r=S.cfg.role;
+  if(r==='affected')return '【本局角色模式:玩家扮演「被影响的人」】\n- 玩家是被愿望影响的人。你(AI)扮演:许愿者(隐藏NPC,愿望对玩家保密)、许愿柳(规则)、其他NPC与旁白。\n- 信息不对称铁律:玩家不知道谁许了愿、许了什么愿。绝不在正文/台词/状态中直接告知或暗示愿望原文;玩家的真相只能来自故事内线索(裂缝:反常行为、旧物、对话、巧合)。\n- 六幕中,第二幕(许愿)发生在玩家视野之外或事后显现:你代演许愿者得到柳枝、许下愿望,玩家只能观察到之后的变化(如TA的态度、世界的异常)。\n- 数值:觉醒进度/自我残余是玩家的可感知数值;反噬蓄能与愿望维持度由你内部维护(【状态】中照常上报,UI会隐藏)。\n- 玩家自我残余降至0(玩偶化)、死亡或同归于尽:【状态】.主角死亡=true,死因注明;正文写【死亡点评】。\n- 玩家的许愿按钮不可用。若第二根柳枝出现,由玩家在剧情中自行决定是否触碰;玩家触碰后,你按「下一局」处理并在状态中标记。';
+  if(r==='willow')return '【本局角色模式:玩家扮演「许愿柳」】\n- 玩家是许愿柳(规则/公证人),全知但受限:只能复述包装原文、宣布「已受理/生效/达成/反噬条件触发/现实回弹/合同履行完毕」,不能透露自己的解读与反噬路线——但玩家自己就是许愿柳,所以解读与路径对你(AI)来说应通过「柳枝低语(仅许愿柳可见)」呈现给玩家。\n- 你(AI)扮演:许愿者NPC、被影响者NPC、其他NPC与旁白。绝不让玩家替NPC做决定,也绝不让NPC替玩家(许愿柳)做决定。\n- 许愿者NPC在第二幕亲口说出愿望后,等待玩家以许愿柳身份受理(玩家会说「已受理」等);玩家宣布受理后,你推进第三幕,并在正文中以「柳枝低语(仅你可见):」给出解读与最省力路径。\n- 玩家可以观察、安排巧合、宣布判定;你负责结算因果与NPC反应。若玩家宣布「判定:达成」「现实回弹」等,按字面主义执行。\n- 被影响者挣脱(合同履行失败):【状态】.主角死亡=true,死因写「合同履行失败:被影响者挣脱」,正文写【死亡点评】点评玩家的执裁。\n- 隐藏设定:'+(S.cfg.willow.hidden?'已开启(可按需使用柳枝商、守柳人等传说)':'未开启(不使用隐藏传说)')+'。';
+  return '【本局角色模式:玩家扮演「许愿的人」】\n- 玩家是许愿者。你(AI)扮演:许愿柳(规则/公证人)、被影响的人、所有NPC与旁白。\n- 按六幕流程推进;玩家主动掰断柳枝许愿后,愿望原文会被游戏记录并注入提示词。';
+}
+function buildSystem(){
+  const st=S.state;
+  let s=PROMPT_WORLD+'\n\n'+PROMPT_RULES+'\n\n'+PROMPT_PROTOCOL;
+  s+='\n\n'+roleRules();
+  s+='\n\n【'+(S.cfg.role==='willow'?'许愿柳(玩家扮演)':'主角设定(玩家扮演)')+'】\n'+charSheet();
+  s+='\n'+affectedSheet();
+  if(st.wish&&S.cfg.role!=='affected')s+='\n\n【已许下的愿望原文(字面执行依据)】"'+st.wish+'"';
+  if(st.secret&&S.cfg.role!=='wisher')s+='\n\n【隐藏机密(AI内部记录,玩家不可见,必须保持记忆一致)】\n'+st.secret;
+  s+='\n\n【记忆注入(已确认的事实,不得遗忘)】\n'+(st.memories.slice(-MEMORY_INJECT).map(m=>'- ['+m.t+'] '+m.text).join('\n')||'(暂无)');
+  const wk=st.wiki.filter(w=>w.src==='ai').slice(-5);
+  if(wk.length)s+='\n\n【新发现的世界百科条目(玩家已接触)】\n'+wk.map(w=>'- ['+w.cat+'] '+w.t+':'+w.d).join('\n');
+  s+='\n\n【当前状态】\n'+JSON.stringify(st.status);
+  return s;
+}
+function kickerText(){
+  const sc=S.cfg.scene||{},c=S.cfg.char||{},nt=S.cfg.notes||{},r=S.cfg.role;
+  const diff=(DIFFS.find(d=>d.id===sc.diff)||DIFFS[1]).name;
+  const extra='难度:'+diff+'。'+(nt.style?'文风:'+nt.style+'。':'')+(nt.extra?'玩家备注:'+nt.extra+'。':'');
+  if(r==='affected'){
+    let t='【系统·开局指令】你是被愿望影响的人。请开始第零幕仪式:作为许愿柳,朗读包装原文(一字不差,用引用块),随即进入第一幕·日常,场景地点「'+(sc.loc||'由你依场景模板设定')+'」。\n';
+    t+='玩家扮演被影响者:『'+(c.name||'待定')+'』('+(c.identity||'身份由你定')+')。TA(许愿者)为:'+(S.cfg.npcWisher.name||'由你创造')+(sc.arel?' · 与玩家的关系:'+sc.arel:'')+'。\n';
+    t+='请在【秘密】行输出:TA的秘密愿望原文、TA的许愿动机、柳枝获取方式「'+(sc.acquire||'依设定')+'」。\n';
+    t+='要求:第一幕从被影响者的日常开始(玩家视角),建立情感锚点;埋2-3条裂缝线索(不点破);TA在故事中自然出场;结尾一句话引导玩家行动。按协议输出【状态】(幕=第一幕·日常)。'+extra;
+    return t;
+  }
+  if(r==='willow'){
+    let t='【系统·开局指令】你是许愿柳(规则本身)。请开始第零幕仪式:以许愿柳的口吻朗读包装原文(一字不差,用引用块),然后以旁观视角进入第一幕·日常,场景地点「'+(sc.loc||'由你依场景模板设定')+'」。\n';
+    t+='许愿者:'+(S.cfg.npcWisher.name||'由你创造')+' 与被影响者:'+(sc.aname||'由你创造')+(sc.arel?'(双方关系:'+sc.arel+')':'')+'——由你代演这两个凡人及其生活。\n';
+    t+='请在【秘密】行输出:许愿者的秘密愿望原文、许愿动机、柳枝获取方式「'+(sc.acquire||'依设定')+'」。\n';
+    t+='要求:第一幕描写两个凡人的日常与渴望(玩家以许愿柳视角观察);埋2-3条裂缝线索(不点破);结尾一句话引导玩家(许愿柳)行动,如:你可以观察、安排巧合、等待许愿时刻。按协议输出【状态】(幕=第一幕·日常)。'+extra+(S.cfg.willow.hidden?'隐藏设定已开启,可按需使用柳枝商等传说。':'');
+    return t;
+  }
+  let t='【系统·开局指令】请开始游戏。先完成第零幕仪式:作为许愿柳,朗读包装原文(一字不差,用引用块呈现):\n'+PACK_TEXT+'\n';
+  t+='然后进入第一幕·日常:场景地点为「'+(sc.loc||'由你依场景模板设定')+'」,柳枝获取方式为「'+(sc.acquire||'由你依设定安排')+'」(第一幕先别让柳枝直接出现,先建立日常与渴望)。';
+  if(sc.aname)t+='被影响者:『'+sc.aname+'』('+(sc.arel||'关系由你定')+','+(sc.ajob||'身份由你定')+')。';
+  else t+='被影响者由你创造(关系:'+(sc.arel||'由你定')+'),在故事中自然引入并给出名字。';
+  t+=extra;
+  t+='要求:建立情感锚点;埋下主角心底渴望的伏笔与2-3条裂缝线索(不点破);结尾用一句话引导玩家行动。完成后按协议输出【状态】(幕=第一幕·日常)与必要的【记忆】【百科】。';
+  return t;
+}
+
+/* ================= API ================= */
+function normBase(b){ return String(b||'').trim().replace(/\/+$/,''); }
+function apiCfg(){ return S?S.cfg.api:draft.api; }
+async function apiFetch(path,opts){
+  const cfg=apiCfg();
+  const headers={'Content-Type':'application/json'};
+  if(cfg.key)headers['Authorization']='Bearer '+cfg.key.trim();
+  return fetch(normBase(cfg.base)+path,Object.assign({headers},opts));
+}
+async function fetchModels(){
+  const res=await apiFetch('/models',{method:'GET'});
+  if(!res.ok){ let m='HTTP '+res.status; try{const j=await res.json();m=(j.error&&(j.error.message||j.error.type))||m;}catch(e){} throw new Error(m); }
+  const j=await res.json();
+  const list=(j.data||[]).map(x=>x.id).filter(Boolean);
+  if(!list.length)throw new Error('接口未返回模型列表');
+  return list;
+}
+async function chatOnce(messages,{maxTokens,temp,signal,onDelta}={}){
+  const cfg=apiCfg();
+  const model=cfg.model.trim();
+  const isReasoner=/reasoner|think|r1|o[0-9]/i.test(model);
+  const body={model,messages};
+  if(!isReasoner){
+    body.temperature=(temp!=null?temp:parseFloat(cfg.temp||0.9));
+    if(maxTokens)body.max_tokens=maxTokens;
+  }
+  const eff=cfg.effort||'中';
+  if(eff!=='关闭')body.reasoning_effort=({低:'low',中:'medium',高:'high',最大:'high'})[eff]||'medium';
+  if(signal===undefined)body.stream=false; else body.stream=true;
+  let res=await apiFetch('/chat/completions',{method:'POST',body:JSON.stringify(body),signal});
+  // 部分网关不支持 reasoning_effort:自动降级重试一次
+  if(res.status===400&&body.reasoning_effort&&!isReasoner){
+    delete body.reasoning_effort;
+    res=await apiFetch('/chat/completions',{method:'POST',body:JSON.stringify(body),signal});
+  }
+  if(!res.ok){
+    let msg='HTTP '+res.status;
+    try{ const j=await res.json(); msg=(j.error&&(j.error.message||j.error.type))||msg; }catch(e){}
+    if(res.status===401)msg='API 密钥无效或已过期(401)';
+    if(res.status===429)msg='请求过于频繁(429),请稍后再试';
+    if(res.status===402)msg='账户余额不足(402)';
+    if(res.status===404)msg='接口或模型不存在(404):请检查 API 地址与模型名';
+    throw new Error(msg);
+  }
+  const ct=res.headers.get('content-type')||'';
+  if(!ct.includes('text/event-stream')){
+    const j=await res.json();
+    const msg=j.choices&&j.choices[0]&&j.choices[0].message;
+    const txt=msg&&msg.content;
+    const thk=msg&&(msg.reasoning_content||(msg.reasoning&&msg.reasoning.content));
+    if(onDelta)onDelta(txt||'',thk||'');
+    return {content:(txt||'').trim(),think:(thk||'').trim()};
+  }
+  // SSE 流式
+  const reader=res.body.getReader(),dec=new TextDecoder();
+  let buf='',full='',thinkFull='',finished=false;
+  while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let idx;
+    while((idx=buf.indexOf('\n'))>=0){
+      const line=buf.slice(0,idx).trim(); buf=buf.slice(idx+1);
+      if(!line.startsWith('data:'))continue;
+      const data=line.slice(5).trim();
+      if(data==='[DONE]'){finished=true;break;}
+      try{
+        const j=JSON.parse(data);
+        const d=j.choices&&j.choices[0]&&j.choices[0].delta;
+        const content=d&&d.content;
+        const rk=d&&(d.reasoning_content||(d.reasoning&&d.reasoning.content));
+        if(content){ full+=content; if(onDelta)onDelta(content,rk||''); }
+        else if(rk){ thinkFull+=rk; if(onDelta)onDelta('',rk); }
+        if(j.choices&&j.choices[0]&&j.choices[0].finish_reason)finished=true;
+      }catch(e){}
+    }
+    if(finished)break;
+  }
+  return {content:full.trim(),think:thinkFull.trim()};
+}
+async function testConnection(){
+  const btn=$('#api-test'); const msgEl=$('#api-test-msg');
+  if(!draft.api.key.trim()){ toast('请先填写 API Key','err'); return; }
+  if(!draft.api.model.trim()){ toast('请先选择或填写模型','err'); return; }
+  btn.disabled=true; msgEl.textContent='正在连接…';
+  try{
+    await chatOnce([{role:'user',content:'ping'}],{maxTokens:4});
+    msgEl.textContent='✓ 连接成功,密钥与模型有效';
+    toast('连接成功','ok');
+  }catch(e){
+    msgEl.textContent='✗ '+e.message;
+    toast('连接失败:'+e.message,'err');
+  }finally{ btn.disabled=false; }
+}
+async function aiName(promptText){
+  const res=await chatOnce([{role:'system',content:'你是一个起名助手。根据要求给出一个符合气质的中文名字,只输出名字本身,3-6个字,不要任何解释。'},{role:'user',content:promptText}],{maxTokens:12,temp:1.1});
+  return ((res&&res.content)||'').replace(/[「」"'“”\n\s]/g,'').slice(0,8);
+}
+
+/* ================= 协议解析 ================= */
+function extractStatus(text){
+  const i=String(text).lastIndexOf('【状态】');
+  if(i<0)return null;
+  let seg=text.slice(i+4).trim();
+  seg=seg.replace(/^```(json)?\s*/,'').replace(/```\s*$/,'').trim();
+  const m=seg.match(/\{[\s\S]*\}/);
+  if(!m)return null;
+  try{ return JSON.parse(m[0]); }catch(e){ return null; }
+}
+function extractMemories(text){
+  const out=[];
+  for(const line of String(text).split('\n')){
+    const t=line.trim();
+    if(t.startsWith('【记忆】')){ const v=t.slice(4).trim(); if(v)out.push(v); }
+  }
+  return out;
+}
+function extractWikis(text){
+  const out=[];
+  for(const line of String(text).split('\n')){
+    const t=line.trim();
+    if(!t.startsWith('【百科】'))continue;
+    const v=t.slice(4).trim();
+    const parts=v.split('|');
+    if(parts.length>=3){ out.push({cat:parts[0].trim(),t:parts[1].trim(),d:parts.slice(2).join('|').trim()}); }
+    else out.push({cat:'其他',t:parts[0]||'新条目',d:parts.slice(1).join('|').trim()});
+  }
+  return out.filter(w=>w.t&&w.d);
+}
+function extractDeathEval(text){
+  const m=String(text).match(/【死亡点评】\s*([\s\S]*?)(?=\n【|\s*$)/);
+  return m?m[1].trim():'';
+}
+function extractSecrets(text){
+  const out=[];
+  for(const line of String(text).split('\n')){
+    const t=line.trim();
+    if(t.startsWith('【秘密】')){ const v=t.slice(4).trim(); if(v)out.push(v); }
+  }
+  return out;
+}
+function extractWish(text){
+  for(const line of String(text).split('\n')){
+    const t=line.trim();
+    if(t.startsWith('【愿望】')){ const v=t.slice(4).trim(); if(v)return v; }
+  }
+  return null;
+}
+function stripProtocol(text){
+  const lines=String(text).split('\n');
+  const out=[]; let skip=0;
+  const role=(S&&S.cfg&&S.cfg.role)||'wisher';
+  for(const ln of lines){
+    const t=ln.trim();
+    if(skip===2){ if(t.startsWith('【'))skip=0; else continue; }
+    if(t.startsWith('【状态】')){ skip=2; continue; }
+    if(t.startsWith('【记忆】')||t.startsWith('【百科】')||t.startsWith('【秘密】'))continue;
+    if(t.startsWith('【愿望】')&&role==='affected')continue;
+    if(t.startsWith('【死亡点评】')){ skip=1; continue; }
+    if(skip===1){ if(t.startsWith('【'))skip=0; else continue; }
+    out.push(ln);
+  }
+  return out.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+
+/* ================= 消息渲染 ================= */
+function fmt(s){
+  let h=esc(s);
+  h=h.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  return h;
+}
+function renderThinkHtml(think,open){
+  const t=String(think||'').trim();
+  if(!t)return '';
+  return '<details class="think"'+(open?' open':'')+'><summary><svg class="ic"><use href="#i-eye"/></svg>推演过程</summary><div class="think-body">'+esc(t)+'</div></details>';
+}
+function renderAiBody(text){
+  const clean=stripProtocol(text);
+  if(!clean)return '';
+  const blocks=clean.split(/\n{2,}/);
+  let html='';
+  for(const b of blocks){
+    const lines=b.split('\n');
+    let cur='';
+    for(const ln of lines){
+      const m=ln.match(/^【([^】]+)】\s*(.*)$/);
+      if(m){
+        if(cur){ html+='<div class="p">'+fmt(cur.trim())+'</div>'; cur=''; }
+        const who=m[1],rest=m[2];
+        if(who==='愿望'){ html+='<div class="quote">'+fmt(rest)+'</div>'; continue; }
+        const cls=(who==='许愿柳')?'speaker willow':'speaker';
+        html+='<div class="p"><span class="'+cls+'">'+esc(who)+'</span>'+fmt(rest)+'</div>';
+      }else{ cur+=(cur?'\n':'')+ln; }
+    }
+    if(cur.trim())html+='<div class="p">'+fmt(cur.trim())+'</div>';
+  }
+  return html;
+}
+function appendMsg(type,content,meta){
+  const m={role:type==='user'?'user':(type==='ai'?'assistant':'system'),content,t:now(),meta:meta||{}};
+  S.state.messages.push(m);
+  renderMsgEl(m);
+  return m;
+}
+function renderMsgEl(m){
+  const inner=$('#log-inner');
+  const div=document.createElement('div');
+  if(m.meta&&m.meta.kicker){ return; }
+  if(m.meta&&m.meta.noApi){ div.className='msg sys'; div.textContent=m.content; inner.appendChild(div); return; }
+  if(m.meta&&m.meta.error){ div.className='msg err'; div.innerHTML='<svg class="ic"><use href="#i-warn"/></svg> '+fmt(m.content); inner.appendChild(div); return; }
+  if(m.role==='user'){
+    div.className='msg user';
+    div.innerHTML='<div class="mhead"><span class="mwho">'+(m.meta&&m.meta.wish?'✂ 掰断柳枝,许下愿望':'你')+'</span>'+(m.meta&&m.meta.wish?'<span class="mact">一生一次</span>':'')+'</div>'+fmt(m.content);
+  }else{
+    div.className='msg ai';
+    div.innerHTML='<div class="mhead"><span class="mwho">许愿柳</span></div><div class="body">'+(renderThinkHtml(m.meta&&m.meta.think)||'')+(renderAiBody(m.content)||'<i>(空回复)</i>')+'</div>';
+  }
+  inner.appendChild(div);
+  scrollLog();
+}
+function scrollLog(){ const g=$('#game-log'); g.scrollTop=g.scrollHeight; }
+function renderAllMessages(){ const inner=$('#log-inner'); inner.innerHTML=''; for(const m of S.state.messages)renderMsgEl(m); }
+
+/* ================= AI 回合 ================= */
+function buildApiMessages(){
+  const sys=buildSystem();
+  const hist=S.state.messages.filter(m=>(m.role==='user'||m.role==='assistant')&&!(m.meta&&m.meta.noApi));
+  let msgs=[{role:'system',content:sys}].concat(hist.map(m=>({role:m.role,content:m.content})));
+  const sysTok=estTokens(sys);
+  let over=sysTok+estTokens(msgs.map(m=>m.content).join(''))+1500>CONTEXT_BUDGET;
+  if(over){
+    const keep=hist.slice(-10);
+    const old=hist.slice(0,hist.length-10);
+    if(old.length>=4){
+      const oldText=old.map(m=>'【'+(m.role==='user'?'主角':'许愿柳')+'】'+m.content).join('\n');
+      chatOnce([
+        {role:'system',content:'你是《许愿柳》游戏的剧情记录员。把玩家提供的对话历史压缩成一份不超过400字的剧情记忆,必须保留:已发生的关键事件与顺序、主角的处境与身体/心理状态、被影响者的状态与关系变化、四项数值变化(反噬蓄能/觉醒进度/自我残余/愿望维持度)、未兑现的伏笔、说过的重要台词、当前场景与时间。用中文条目式,不要抒情。'},
+        {role:'user',content:oldText}
+      ],{maxTokens:600}).then(sum=>{
+        if(sum&&sum.content&&sum.content.length>20)S.state.memories.push({cat:'summary',text:'【剧情压缩】'+sum.content,t:now(),src:'sys'});
+        saveState(true);
+      }).catch(()=>{});
+      S.state.messages=S.state.messages.filter(m=>{
+        if(m.meta&&m.meta.kicker)return true;
+        if(m.meta&&m.meta.noApi)return true;
+        return keep.indexOf(m)>=0;
+      });
+      msgs=[{role:'system',content:sys}].concat(keep.map(m=>({role:m.role,content:m.content})));
+    }
+    let guard=0;
+    while(estTokens(sys)+estTokens(msgs.map(x=>x.content).join(''))+1500>CONTEXT_BUDGET&&msgs.length>12&&guard++<60){
+      const v=msgs.findIndex((m,i)=>i>0&&!(m.meta));
+      if(v<=0)break;
+      msgs.splice(v,1);
+    }
+  }
+  return msgs;
+}
+async function askAI(){
+  if(asking)return;
+  asking=true; abortCtl=new AbortController();
+  const sendBtn=$('#btn-send');
+  sendBtn.classList.add('stop'); sendBtn.innerHTML='<svg class="ic" style="width:18px;height:18px"><use href="#i-x"/></svg>';
+  $('#loading').classList.remove('hidden');
+  const msgs=buildApiMessages();
+  const preMsgState=clone(S.state); // 死亡回档:本回合开始前的快照
+  let acc='',thinkAcc='';
+  const div=document.createElement('div');
+  div.className='msg ai';
+  div.innerHTML='<div class="mhead"><span class="mwho">许愿柳</span></div><div class="body"><span class="cursor"></span></div>';
+  $('#log-inner').appendChild(div); scrollLog();
+  const bodyEl=div.querySelector('.body');
+  let stopped=false, failed=false, errMsg='';
+  try{
+    await chatOnce(msgs,{
+      maxTokens:(S.cfg.api.tokens==='无限制'?0:parseInt(S.cfg.api.tokens,10))||0,
+      temp:parseFloat(S.cfg.api.temp||0.9),
+      signal:abortCtl.signal,
+      onDelta:(d,rk)=>{
+        if(d)acc+=d;
+        if(rk)thinkAcc+=rk;
+        bodyEl.innerHTML=renderThinkHtml(thinkAcc,true)+renderAiBody(acc)+'<span class="cursor"></span>';
+        scrollLog();
+      }
+    });
+    if(acc.trim()===''&&thinkAcc.trim()==='')throw new Error('模型返回了空回复,请重试');
+  }catch(e){
+    if(e.name==='AbortError'){ stopped=true; }
+    else{
+      failed=true;
+      errMsg=(e instanceof TypeError)?'网络错误或CORS被拦截。浏览器直连部分接口会被跨域限制,建议:①检查API地址与网络;②使用支持跨域的中转网关;③更换浏览器或关闭隐私拦截。':'请求失败:'+e.message;
+    }
+  }finally{
+    asking=false; if(abortCtl)abortCtl=null;
+    sendBtn.classList.remove('stop');
+    sendBtn.innerHTML='<svg class="ic" style="width:19px;height:19px"><use href="#i-send"/></svg>';
+    $('#loading').classList.add('hidden');
+  }
+  if(failed){
+    div.className='msg err';
+    div.innerHTML='<div style="display:flex;flex-direction:column;gap:9px;align-items:center;text-align:center">'+esc(errMsg)+'<button class="btn small" id="retry-btn">重试</button></div>';
+    const rb=$('#retry-btn'); if(rb)rb.onclick=()=>{ div.remove(); askAI(); };
+    toast('生成失败','err');
+    return;
+  }
+  if(stopped||(acc.trim()===''&&thinkAcc.trim()==='')){ div.remove(); return; }
+  S.state.messages.push({role:'assistant',content:acc,t:now(),meta:{think:thinkAcc.trim()}});
+  S.state.turn=(S.state.turn||0)+1;
+  bodyEl.innerHTML=renderThinkHtml(thinkAcc)+(renderAiBody(acc)||'<i>(空回复)</i>');
+  afterAssistant(acc,preMsgState);
+}
+
+function afterAssistant(fullText,preMsgState){
+  const st=S.state;
+  const prevAct=st.status.幕;
+  const parsed=extractStatus(fullText);
+  if(parsed){
+    for(const k in EMPTY_STATUS){
+      if(parsed[k]!==undefined)st.status[k]=parsed[k];
+    }
+    for(const k of ['反噬蓄能','觉醒进度','自我残余','愿望维持度']){
+      let v=parseFloat(st.status[k]); if(isNaN(v))v=EMPTY_STATUS[k];
+      st.status[k]=Math.max(0,Math.min(10,Math.round(v*2)/2));
+    }
+    st.status.主角死亡=!!st.status.主角死亡;
+    st.status.幕=st.status.幕||prevAct||'第一幕·日常';
+    if(!st.status.结局)st.status.结局=null;
+    if(!st.status.死因)st.status.死因='';
+  }
+  for(const mem of extractMemories(fullText)){
+    if(!st.memories.some(m=>m.text===mem))st.memories.push({cat:'ai',text:mem,t:now(),src:'ai'});
+  }
+  for(const w of extractWikis(fullText)){
+    if(!st.wiki.some(x=>x.t===w.t))st.wiki.push(Object.assign({},w,{t:now(),src:'ai'}));
+  }
+  for(const sec of extractSecrets(fullText)){
+    if(!st.secret)st.secret=sec;
+  }
+  if(S.cfg.role!=='affected'){
+    const w=extractWish(fullText);
+    if(w&&!st.wish)st.wish=w;
+  }
+  // 死亡 → 记录 + 死亡界面 + 死亡前检查点
+  if(st.status.主角死亡){
+    const evalText=extractDeathEval(fullText)||'柳枝没有留下点评。但因果记得一切。';
+    const ckpt={id:uid(),label:'死亡前一刻',t:now(),snap:preMsgState};
+    st.checkpoints.push(ckpt);
+    if(st.checkpoints.length>CKPT_MAX)st.checkpoints.shift();
+    const record={id:uid(),t:now(),cause:st.status.死因||st.status.关键事件||'未知',evalText,ckptId:ckpt.id,act:st.status.幕,stats:{蓄能:st.status.反噬蓄能,觉醒:st.status.觉醒进度,残余:st.status.自我残余,维持:st.status.愿望维持度}};
+    st.deaths.push(record);
+    saveState(true);
+    renderDeathBadge(); renderDeathPanel();
+    openDeathScreen(record);
+    return;
+  }
+  // 结局(非死亡)
+  if(st.status.结局&&st.status.结局!==st.endingShown){
+    st.endingShown=st.status.结局;
+    saveState(true);
+    openEndingScreen(st.status.结局);
+  }
+  // 检查点:幕变化 或 每N轮
+  const actChanged=parsed&&parsed.幕&&parsed.幕!==prevAct;
+  if(actChanged||(st.turn||0)%CKPT_EVERY===0){
+    st.checkpoints.push({id:uid(),label:(st.status.幕||'')+' · 第'+(st.turn||0)+'轮',t:now(),snap:clone(st)});
+    if(st.checkpoints.length>CKPT_MAX)st.checkpoints.shift();
+  }
+  updateTopbar(); renderCharPanel(); saveState(true); renderQuickActions();
+}
+function renderQuickActions(){
+  const row=$('#quick-row'); row.innerHTML='';
+  const r=S.cfg.role||'wisher';
+  let acts=[];
+  if(r==='willow'){
+    acts=['观察许愿者的动静','观察被影响者的动静','安排一个巧合','检查合同状态'];
+  }else if(r==='affected'){
+    acts=['回想最近的异样','试探 TA 的反应','查看手机消息'];
+  }else{
+    if(!S.state.wish)acts.push('仔细观察周围的一切');
+    acts.push('回想最近不对劲的细节');
+    if(!S.state.wish)acts.push('把玩那根柳枝与纸盒'); else acts.push('查看手机里的消息');
+  }
+  for(const a of acts){
+    const b=document.createElement('button');
+    b.className='quick-action'; b.textContent=a;
+    b.onclick=()=>{ const ta=$('#user-input'); ta.value=a; ta.focus(); };
+    row.appendChild(b);
+  }
+}
+
+/* ================= 发送 ================= */
+function sendUser(text,meta){
+  if(asking){ toast('许愿柳正在编织因果,请稍候','err'); return; }
+  text=text.trim(); if(!text)return;
+  appendMsg('user',text,meta);
+  saveState(true);
+  askAI();
+}
+function sendFromInput(){
+  const ta=$('#user-input'); const v=ta.value;
+  if(!v.trim())return;
+  ta.value=''; ta.style.height='auto';
+  sendUser(v,{});
+}
+function openWishModal(){
+  if(S.state.wish){ toast('你已许下愿望。一人一生,只有一次。','err'); return; }
+  $('#wish-modal').classList.remove('hidden');
+  $('#wish-text').value=''; $('#wish-text').focus();
+}
+function confirmWish(){
+  const w=$('#wish-text').value.trim();
+  if(!w){ toast('愿望必须说出口','err'); return; }
+  S.state.wish=w;
+  $('#wish-modal').classList.add('hidden');
+  sendUser('(我掰断了柳枝,把它握在手心,郑重许下愿望)「'+w+'」',{wish:true});
+  renderCharPanel(); updateTopbar();
+}
+
+/* ================= 死亡 / 结局 / 回档 ================= */
+function openDeathScreen(rec){
+  const r=S.cfg.role||'wisher';
+  const tt=ROLE_TITLES[r]||ROLE_TITLES.wisher;
+  $('#death-screen h2').textContent=tt[0];
+  $('#death-screen .death-sub').textContent=tt[1];
+  $('#death-rollback').innerHTML='<svg class="ic"><use href="#i-restart"/></svg>'+tt[2];
+  $('#death-screen .d-foot').textContent=tt[3];
+  $('#death-cause').textContent=rec.cause||'因果的终点,无人知晓。';
+  $('#death-eval').innerHTML='<b>许愿柳的点评与建议</b>\n'+esc(rec.evalText);
+  $('#death-screen').classList.remove('hidden');
+}
+function closeDeathScreen(){ $('#death-screen').classList.add('hidden'); }
+function openEndingScreen(code){
+  const e=ENDINGS[code]||{name:'未知结局',desc:''};
+  $('#end-code').textContent='结局 · '+code;
+  $('#end-title').textContent=e.name;
+  $('#end-desc').textContent=e.desc;
+  $('#ending-screen').classList.remove('hidden');
+}
+function openCheckpointModal(){
+  const list=$('#ckpt-list'); list.innerHTML='';
+  const ck=S.state.checkpoints;
+  if(!ck.length){ list.innerHTML='<div class="empty">尚无关键时间点。系统会在剧情节点(幕变化)与每5轮对话后自动创建存档点。</div>'; }
+  else{
+    [...ck].reverse().forEach(c=>{
+      const it=document.createElement('button');
+      it.className='ckpt-item';
+      it.innerHTML='<span class="ck-i"><svg class="ic"><use href="#i-clock"/></svg></span><span class="ck-m"><span class="ck-l">'+esc(c.label)+'</span><span class="ck-t">'+esc(c.t)+'</span></span>';
+      it.onclick=()=>{
+        $('#ckpt-modal').classList.add('hidden');
+        showConfirm('回到这个时间点?','将回到「'+c.label+'」('+c.t+')。此后的剧情与状态会被回档覆盖,死亡记录保留。',()=>restoreCheckpoint(c.id));
+      };
+      list.appendChild(it);
+    });
+  }
+  $('#ckpt-modal').classList.remove('hidden');
+}
+function restoreCheckpoint(id){
+  const ck=S.state.checkpoints.find(c=>c.id===id);
+  if(!ck){ toast('存档点不存在','err'); return; }
+  const keptDeaths=S.state.deaths;
+  S.state=clone(ck.snap);
+  S.state.deaths=keptDeaths;
+  S.state.messages.push({role:'system',content:'—— 你回到了「'+ck.label+'」。命运曾在此走向终结。这一次,你会做出不同的选择吗?——',t:now(),meta:{noApi:true}});
+  closeDeathScreen();
+  $('#ending-screen').classList.add('hidden');
+  renderAllMessages(); updateTopbar(); renderCharPanel(); renderMemPanel(); renderWikiPanel(); renderDeathPanel(); renderQuickActions();
+  saveState(true);
+  toast('已回到关键时间点:'+ck.label,'ok');
+}
+function showConfirm(title,text,onOk,danger){
+  $('#confirm-modal').classList.remove('hidden');
+  $('#confirm-text').innerHTML='<b>'+esc(title)+'</b>\n\n'+esc(text);
+  const ok=$('#confirm-ok');
+  ok.className='btn '+(danger===false?'primary':'danger');
+  confirmCb=onOk;
+}
+function closeConfirm(){ $('#confirm-modal').classList.add('hidden'); confirmCb=null; }
+
+/* ================= 面板渲染 ================= */
+function updateTopbar(){
+  const c=S.cfg.char||{},r=S.cfg.role||'wisher';
+  const dispName=r==='willow'?'许愿柳':(c.name||'主角');
+  $('#tb-name').textContent=dispName;
+  $('#tb-avatar').textContent=r==='willow'?'柳':(c.name||'?').slice(0,1);
+  $('#act-chip').textContent=S.state.status.幕||'';
+  $('#tb-savetime').textContent=S.state.savedAt?nowShort():'';
+  const wb=$('#btn-wish');
+  wb.classList.toggle('hidden',r!=='wisher');
+  wb.disabled=!!S.state.wish;
+  wb.title=S.state.wish?'你已许下愿望。一人一生,只有一次。':'掰断柳枝,许下愿望';
+  if(S.state.wish)wb.innerHTML='<svg class="ic"><use href="#i-check"/></svg><span class="wb-txt">已许愿</span>';
+  else wb.innerHTML='<svg class="ic"><use href="#i-twig"/></svg><span class="wb-txt">许愿</span>';
+}
+function renderDeathBadge(){
+  const n=S.state.deaths.length;
+  const b=$('#death-badge');
+  b.textContent=n;
+  b.classList.toggle('hidden',n===0);
+}
+function barRow(label,val,color,desc){
+  const v=Math.max(0,Math.min(10,val));
+  return '<div class="stat-row"><span class="sl">'+label+'</span><span class="sw"><i style="width:'+(v*10)+'%;background:'+color+'"></i></span><span class="sv">'+v+'</span></div>';
+}
+function renderCharPanel(){
+  const c=S.cfg.char||{},s=S.cfg.scene||{},st=S.state.status,r=S.cfg.role||'wisher';
+  let h='';
+  if(r==='willow'){
+    h+='<div class="pcard">';
+    h+='<div class="char-head"><span class="big-avatar" style="background:var(--gold);color:var(--accent-ink)">柳</span><div><div class="ch-name">许愿柳</div><div class="ch-meta">规则本身 · One Wish Willow</div></div></div>';
+    h+='<div class="kgrid"><div class="kv"><b>呈现</b>'+esc(S.cfg.willow.tone||'仪式感冷冽')+'</div><div class="kv"><b>隐藏设定</b>'+(S.cfg.willow.hidden?'开启':'关闭')+'</div></div>';
+    h+='</div>';
+  }else{
+    h+='<div class="pcard">';
+    h+='<div class="char-head"><span class="big-avatar">'+esc((c.name||'?').slice(0,1))+'</span><div><div class="ch-name">'+esc(c.name||'未命名')+'</div><div class="ch-meta">'+(r==='affected'?'被影响的人':'许愿的人')+(c.gender?' · '+esc(c.gender):'')+(c.age?' · '+esc(c.age)+'岁':'')+'</div></div></div>';
+    h+='<div class="kgrid">';
+    if(c.identity)h+='<div class="kv"><b>身份</b>'+esc(c.identity)+'</div>';
+    if(c.treasure)h+='<div class="kv"><b>珍视</b>'+esc(c.treasure)+'</div>';
+    h+='</div>';
+    if(c.traits&&c.traits.length)h+='<div class="trait-pills">'+c.traits.map(t=>'<i>'+esc(t)+'</i>').join('')+'</div>';
+    h+='</div>';
+  }
+  // 数值
+  h+='<div class="pcard"><h4><svg class="ic"><use href="#i-eye"/></svg>当前状况 · 实时</h4>';
+  h+='<div class="stat-desc" style="margin-bottom:8px">幕:'+esc(st.幕||'-')+(st.场景?' · '+esc(st.场景):'')+'</div>';
+  if(r==='affected'){
+    h+=barRow('觉醒进度',st.觉醒进度,'var(--accent)','10=挣脱');
+    h+=barRow('自我残余',st.自我残余,'var(--gold)','0=玩偶化');
+    h+='<div class="stat-desc">另有某种力量,在你察觉不到的地方运转着。</div>';
+  }else{
+    h+=barRow('反噬蓄能',st.反噬蓄能,'var(--danger)','10=现实回弹');
+    h+=barRow('觉醒进度',st.觉醒进度,'var(--accent)','10=挣脱');
+    h+=barRow('自我残余',st.自我残余,'var(--gold)','0=玩偶化');
+    h+=barRow('愿望维持度',st.愿望维持度,'var(--info)','0=合同失效');
+  }
+  if(st.主角状态)h+='<div class="status-meta"><span>状态:'+esc(st.主角状态)+'</span></div>';
+  h+='</div>';
+  // 详细状况
+  h+='<div class="pcard"><h4><svg class="ic"><use href="#i-scroll"/></svg>'+(r==='willow'?'全局动态':'详细状况')+'</h4>';
+  h+='<div class="status-body">'+esc(st.当前状况||'故事尚未开始。许愿柳正在注视着你。')+'</div>';
+  h+='<div class="status-meta">'+(st.关键事件?'<span>关键事件:'+esc(st.关键事件)+'</span>':'')+'</div>';
+  h+='</div>';
+  // 愿望 / 合同
+  h+='<div class="pcard"><h4><svg class="ic"><use href="#i-twig"/></svg>'+(r==='willow'?'合同':'愿望')+'</h4>';
+  if(r==='affected'){
+    h+='<div class="wish-empty">有人对你许了一个愿望。你看不见它——只能感觉到它正在改变你。</div>';
+  }else if(S.state.wish){
+    h+='<div class="wish-box">'+esc(S.state.wish)+'</div>';
+    h+='<div class="hint" style="margin-top:6px">'+(r==='willow'?'已受理。字面成立,即为达成。':'已受理。字面成立,即为达成。请想清楚你究竟想要什么。')+'</div>';
+  }else{
+    h+='<div class="wish-empty">'+(r==='willow'?'尚未受理任何愿望。柳枝仍在等待第一个掰断它的人。':'尚未许愿。柳枝仍在等待。一人一生,只有一次。')+'</div>';
+  }
+  h+='</div>';
+  // 对方
+  if(r==='willow'){
+    h+='<div class="pcard"><h4><svg class="ic"><use href="#i-user"/></svg>两个凡人</h4>';
+    h+='<div class="longtext"><span class="lbl">许愿者</span>'+(S.cfg.npcWisher.name?esc(S.cfg.npcWisher.name):'姓名由故事揭晓')+'</div>';
+    h+='<div class="longtext"><span class="lbl">被影响者</span>'+(s.aname?esc(s.aname):'姓名由故事揭晓')+(s.arel?'<span class="lbl" style="margin-top:6px">双方关系:'+esc(s.arel)+'</span>':'')+'</div>';
+    h+='</div>';
+  }else if(r==='affected'){
+    h+='<div class="pcard"><h4><svg class="ic"><use href="#i-user"/></svg>TA(许愿者)</h4>';
+    h+='<div class="longtext">'+(S.cfg.npcWisher.name?esc(S.cfg.npcWisher.name):'<span style="color:var(--tx3)">TA 的名字你本该知道…却有些模糊</span>')+(s.arel?'<span class="lbl" style="margin-top:6px">与你的关系:'+esc(s.arel)+'</span>':'')+(S.cfg.npcWisher.identity?'<span class="lbl">身份:'+esc(S.cfg.npcWisher.identity)+'</span>':'')+'</div>';
+    h+='</div>';
+  }else{
+    h+='<div class="pcard"><h4><svg class="ic"><use href="#i-user"/></svg>被影响的人</h4>';
+    h+='<div class="longtext">'+(s.aname?esc(s.aname):'<span style="color:var(--tx3)">姓名由故事揭晓</span>')+(s.arel?'<span class="lbl" style="margin-top:6px">与你的关系:'+esc(s.arel)+'</span>':'')+(s.ajob?'<span class="lbl">身份:'+esc(s.ajob)+'</span>':'')+'</div>';
+    h+='</div>';
+  }
+  // 档案
+  if(r==='willow'){
+    if(S.cfg.willow.note)h+='<div class="pcard"><h4><svg class="ic"><use href="#i-book"/></svg>存在方式</h4><div class="longtext">'+esc(S.cfg.willow.note)+'</div></div>';
+  }else{
+    const extras=[['外貌',c.look],['背景',c.bg],['心底的渴望',c.desire],['其他',c.extra]];
+    h+='<div class="pcard"><h4><svg class="ic"><use href="#i-book"/></svg>人物档案</h4>';
+    for(const [k,v] of extras){ if(v)h+='<div class="longtext"><span class="lbl">'+k+'</span>'+esc(v)+'</div>'; }
+    h+='</div>';
+  }
+  $('#char-panel').innerHTML=h;
+}
+function renderWikiPanel(){
+  const cats=['全部'].concat(Array.from(new Set(WIKI_STATIC.map(w=>w.cat).concat(S.state.wiki.map(w=>w.cat)))));
+  let h='<div class="wiki-tools"><input id="wiki-search" placeholder="搜索百科…" value="'+esc(wikiSearch)+'"></div>';
+  h+='<div class="wiki-cats">'+cats.map(c=>'<button class="chip'+(c===wikiFilter?' on':'')+'" data-cat="'+esc(c)+'">'+esc(c)+'</button>').join('')+'</div>';
+  const q=wikiSearch.trim();
+  const all=WIKI_STATIC.map(w=>({cat:w.cat,t:w.t,d:w.d,src:'static'})).concat(S.state.wiki.map(w=>({cat:w.cat,t:w.t,d:w.d,src:w.src,t:w.t})));
+  let items=all.filter(w=>(wikiFilter==='全部'||w.cat===wikiFilter)&&(!q||w.t.includes(q)||w.d.includes(q)));
+  if(!items.length)h+='<div class="empty">百科尚无相关条目。\n随着故事推进,新的见闻会自动收录。</div>';
+  for(const w of items){
+    h+='<div class="wiki-item"><div class="wi-head"><span class="wi-cat">'+esc(w.cat)+'</span>'+(w.src==='ai'?'<span class="wi-new">新收录</span>':'')+'<span class="wi-t">'+esc(w.t)+'</span></div><div class="wi-d">'+esc(w.d)+'</div></div>';
+  }
+  $('#wiki-panel').innerHTML=h;
+  $('#wiki-search').addEventListener('input',e=>{ wikiSearch=e.target.value; renderWikiPanel(); });
+  $$('#wiki-panel .wiki-cats .chip').forEach(b=>b.onclick=()=>{ wikiFilter=b.dataset.cat; renderWikiPanel(); });
+}
+function renderMemPanel(){
+  const mems=S.state.memories.slice().reverse();
+  let h='<div class="pcard" style="padding:12px 14px"><div style="font-size:var(--fs-s);color:var(--tx2);line-height:1.8">记忆会自动注入 AI 的提示词,确保它不忘设定与故事。重要的新事实(人物秘密、伏笔、承诺)由 AI 以【记忆】标记收录;长对话会自动压缩成剧情摘要。</div></div>';
+  if(!mems.length)h+='<div class="empty">尚无记忆。\n你的人生尚未被记录——或许这样最好。</div>';
+  for(const m of mems){
+    const tag=m.cat==='summary'?'<span class="mi-tag summary">剧情压缩</span>':'<span class="mi-tag ai">关键记忆</span>';
+    h+='<div class="mem-item"><div class="mi-h">'+tag+'<span>'+esc(m.t)+'</span></div><div class="mi-d">'+esc(m.text)+'</div></div>';
+  }
+  $('#mem-panel').innerHTML=h;
+}
+function renderDeathPanel(){
+  const ds=S.state.deaths.slice().reverse();
+  let h='';
+  if(!ds.length)h+='<div class="empty">尚无死亡记录。\n愿你的柳枝,不需要记录。\n(死亡后,许愿柳会点评你的行为,并允许你回到关键时间点重来。)</div>';
+  ds.forEach((d,i)=>{
+    const n=ds.length-i;
+    h+='<div class="death-item"><div class="di-h"><span class="di-n">第 '+n+' 次死亡</span><span class="di-t">'+esc(d.t)+'</span></div>';
+    h+='<div class="di-c">死因:'+esc(d.cause)+'</div>';
+    h+='<div class="di-e"><b>许愿柳点评:</b>'+esc(d.evalText)+'</div>';
+    h+='<div class="row"><button class="btn small" data-roll="'+d.id+'">回到此前时间点</button></div></div>';
+  });
+  $('#death-panel').innerHTML=h;
+  $$('#death-panel [data-roll]').forEach(b=>b.onclick=()=>{
+    const rec=S.state.deaths.find(x=>x.id===b.dataset.roll);
+    if(rec&&rec.ckptId){ $('#drawer-death').classList.remove('open'); closeDrawers(); restoreCheckpoint(rec.ckptId); }
+    else toast('该记录的存档点已失效','err');
+  });
+}
+
+/* ================= 设置 ================= */
+const THEMES=[
+  {id:'willow',name:'夜柳',desc:'深墨绿 · 柳青',c1:'#0b110e',c2:'#7cc6a3'},
+  {id:'paper',name:'纸墨',desc:'旧纸与墨 · 朱砂',c1:'#ece7d8',c2:'#a8432f'},
+  {id:'snow',name:'残雪',desc:'冷白浅灰 · 苔绿',c1:'#e6ebe9',c2:'#4f7d6e'},
+  {id:'dusk',name:'暮色',desc:'暖褐暮光 · 琥珀',c1:'#151110',c2:'#c98a5b'}
+];
+function applyTheme(){
+  document.body.dataset.theme=uiPrefs.theme||'willow';
+  document.body.dataset.fs=uiPrefs.fs||'m';
+  const m=document.querySelector('meta[name=theme-color]');
+  if(m){ const t=THEMES.find(x=>x.id===uiPrefs.theme)||THEMES[0]; m.content=t.c1; }
+}
+function renderSettings(){
+  const a=S.cfg.api;
+  let h='';
+  // 界面风格
+  h+='<div class="msec"><h4><svg class="ic"><use href="#i-leaf"/></svg>界面风格</h4>';
+  h+='<div class="theme-grid">'+THEMES.map(t=>'<button class="theme-card'+(uiPrefs.theme===t.id?' on':'')+'" data-theme="'+t.id+'"><span class="sw"><i style="background:'+t.c1+'"></i><i style="background:'+t.c2+'"></i></span><span><span class="tc-name">'+t.name+'</span><br><span class="tc-desc">'+t.desc+'</span></span></button>').join('')+'</div>';
+  h+='<div class="row" style="margin-top:12px"><span class="lbl">字号</span>';
+  h+='<div class="chip-row">'+[['s','小'],['m','标准'],['l','大']].map(f=>'<button class="chip'+(uiPrefs.fs===f[0]?' on':'')+'" data-fs="'+f[0]+'">'+f[1]+'</button>').join('')+'</div></div>';
+  h+='</div>';
+  // API
+  h+='<div class="msec"><h4><svg class="ic"><use href="#i-gear"/></svg>API 设置</h4>';
+  h+='<div class="fld" style="margin-bottom:9px"><label>API 地址</label><input id="s-base" value="'+esc(a.base)+'"></div>';
+  h+='<div class="fld" style="margin-bottom:9px"><label>API Key</label><input id="s-key" type="password" value="'+esc(a.key)+'" autocomplete="off"></div>';
+  h+='<div class="fld" style="margin-bottom:9px"><label>模型</label><div class="row"><input id="s-model" style="flex:1;min-width:0" value="'+esc(a.model)+'"><button class="btn small" id="s-fetch">拉取</button></div></div>';
+  h+='<div class="fld" style="margin-bottom:9px"><label>单次回复 Token 上限</label><div class="chip-row" id="s-tokens"></div></div>';
+  h+='<div class="fld" style="margin-bottom:9px"><label>思考强度</label><div class="chip-row" id="s-effort"></div><div class="hint" style="margin-top:5px">AI 的思考过程将以「推演过程」折叠块显示在回复前,可随时展开。</div></div>';
+  h+='<div class="fld" style="margin-bottom:0"><label>创造度(温度)<span class="mono" id="s-temp-val" style="margin-left:8px;color:var(--accent)"></span></label><input type="range" id="s-temp" min="0.2" max="1.5" step="0.05" style="width:100%"></div>';
+  h+='</div>';
+  // 存档
+  h+='<div class="msec"><h4><svg class="ic"><use href="#i-bookmark"/></svg>存档管理</h4>';
+  h+='<div class="save-line"><span class="lbl">自动保存</span><span class="switch'+(uiPrefs.autoSave?' on':'')+'" id="s-autosave"></span><span style="color:var(--tx3)">每次AI回复后自动写入浏览器</span></div>';
+  h+='<div class="save-line"><span class="lbl">上次保存</span><span style="font-family:var(--font-mono)">'+(S.state.savedAt||'-')+'</span></div>';
+  h+='<div class="row" style="padding:10px 0 2px;gap:9px"><button class="btn small" id="s-ckpt">创建存档点</button><button class="btn small" id="s-export">导出存档</button><button class="btn small" id="s-import">导入存档</button></div>';
+  h+='<div class="hint">导出为 JSON 文件可备份/迁移;导入会覆盖当前进度。</div>';
+  h+='</div>';
+  // 危险区
+  h+='<div class="msec danger-zone"><h4><svg class="ic"><use href="#i-warn"/></svg>危险区</h4>';
+  h+='<button class="btn danger" id="s-restart" style="width:100%">重新开始(清空当前存档)</button>';
+  h+='</div>';
+  $('#settings-body').innerHTML=h;
+  // 事件
+  $$('#settings-body .theme-card').forEach(b=>b.onclick=()=>{ uiPrefs.theme=b.dataset.theme; applyTheme(); saveUI(); renderSettings(); });
+  $$('#settings-body [data-fs]').forEach(b=>b.onclick=()=>{ uiPrefs.fs=b.dataset.fs; applyTheme(); saveUI(); renderSettings(); });
+  const tsel=$('#s-tokens');
+  TOKEN_OPTIONS.forEach(t=>{ const b=document.createElement('button'); b.className='chip'+(a.tokens===t?' on':''); b.textContent=t; b.onclick=()=>{ $$('#s-tokens .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; tsel.appendChild(b); });
+  const esel=$('#s-effort');
+  EFFORT_OPTIONS.forEach(t=>{ const b=document.createElement('button'); b.className='chip'+(a.effort===t?' on':''); b.textContent=t; b.onclick=()=>{ $$('#s-effort .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; esel.appendChild(b); });
+  const tmp=$('#s-temp'); tmp.value=a.temp; $('#s-temp-val').textContent=a.temp;
+  tmp.oninput=()=>$('#s-temp-val').textContent=tmp.value;
+  $('#s-autosave').onclick=()=>{ uiPrefs.autoSave=!uiPrefs.autoSave; $('#s-autosave').classList.toggle('on',uiPrefs.autoSave); saveUI(); };
+  $('#s-ckpt').onclick=()=>{ S.state.checkpoints.push({id:uid(),label:'手动存档 · 第'+(S.state.turn||0)+'轮',t:now(),snap:clone(S.state)}); if(S.state.checkpoints.length>CKPT_MAX)S.state.checkpoints.shift(); saveState(true); toast('已创建存档点','ok'); };
+  $('#s-export').onclick=exportSave;
+  $('#s-import').onclick=()=>$('#import-file').click();
+  $('#s-restart').onclick=()=>showConfirm('重新开始?','当前存档将被清空,一切回到起点。柳枝不会记得你——但你会。',()=>{ localStorage.removeItem(LS_KEY); location.reload(); });
+  $('#s-fetch').onclick=async()=>{
+    const b=$('#s-fetch'); b.disabled=true;
+    try{
+      applyApiFromSettings();
+      const list=await fetchModels();
+      const sel=$('#s-model'); sel.value=(list.includes(sel.value)?sel.value:list[0]);
+      toast('已获取 '+list.length+' 个模型','ok');
+    }catch(e){ toast('拉取失败:'+e.message,'err'); }
+    finally{ b.disabled=false; }
+  };
+  $('#s-base').onchange=applyApiFromSettings; $('#s-key').onchange=applyApiFromSettings; $('#s-model').onchange=applyApiFromSettings;
+}
+function applyApiFromSettings(){
+  const a=S.cfg.api;
+  a.base=$('#s-base').value.trim(); a.key=$('#s-key').value.trim(); a.model=$('#s-model').value.trim();
+}
+function saveSettings(){
+  applyApiFromSettings();
+  const chip=$('#s-tokens .chip.on'); if(chip)S.cfg.api.tokens=chip.textContent;
+  const ec=$('#s-effort .chip.on'); if(ec)S.cfg.api.effort=ec.textContent;
+  const tmp=$('#s-temp'); S.cfg.api.temp=tmp.value;
+  saveUI(); saveState(true);
+  $('#settings-modal').classList.add('hidden');
+  toast('设置已保存','ok');
+}
+function exportSave(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='许愿柳存档_'+now().slice(0,10)+'_'+nowShort().replace(/:/g,'-')+'.json';
+  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  toast('存档已导出','ok');
+}
+function importSave(file){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const o=JSON.parse(fr.result);
+      if(!o||!o.state||!o.cfg||!Array.isArray(o.state.messages))throw new Error('bad');
+      const apply=()=>{
+        S=o; uiPrefs.autoSave=true; saveUI();
+        enterGame(); toast('存档已导入','ok');
+      };
+      if(S)showConfirm('导入存档将覆盖当前进度','确认导入这份存档?当前进度会被替换。',apply,false);
+      else apply();
+    }catch(e){ toast('存档格式不正确','err'); }
+  };
+  fr.readAsText(file);
+}
+
+/* ================= 抽屉 ================= */
+function openDrawer(id){
+  closeDrawers();
+  $('#'+id).classList.remove('hidden');
+  $('#'+id).classList.add('open');
+  $('#dbackdrop').classList.remove('hidden');
+  if(id==='drawer-char')renderCharPanel();
+  if(id==='drawer-wiki')renderWikiPanel();
+  if(id==='drawer-mem')renderMemPanel();
+  if(id==='drawer-death')renderDeathPanel();
+}
+function closeDrawers(){
+  $$('.drawer').forEach(d=>d.classList.remove('open'));
+  $('#dbackdrop').classList.add('hidden');
+}
+
+/* ================= 向导 ================= */
+const ROLES=[
+  {id:'wisher',name:'许愿的人',en:'WISHER',icon:'i-user',desc:'你有一个一生一次的机会。说出愿望,得到你想要的东西——以你字面说的那个样子。',goal:'目标:心愿真心达成(两全)'},
+  {id:'willow',name:'许愿柳',en:'ONE WISH WILLOW',icon:'i-leaf',desc:'你是规则本身。聆听愿望,按字面执行,让因果自行弯曲。你不爱任何人,也不恨任何人。',goal:'目标:合同完整履行'},
+  {id:'affected',name:'被影响的人',en:'AFFECTED',icon:'i-warn',desc:'有人对你许了一个愿。你不知道是谁、不知道内容——只知道世界开始变得不对。',goal:'目标:夺回自我,拼出真相,挣脱'}
+];
+const ROLE_TITLES={wisher:['你死了','THE WISH HAS BEEN FULFILLED — LITERALLY','回到关键时间点,继续游戏','许愿柳从不审判你。它只是如实记录——然后,把选择权还给你。'],affected:['你被吞没了','SELF ERODED — THE WISH CONSUMED YOU','回到关键时间点,重新来过','愿望不需要你的同意。但真相需要你的眼睛。'],willow:['合同履行失败','THE CONTRACT WAS BROKEN','回到关键时间点,重新执裁','合同被撕毁的瞬间,你终于明白:你从不审判任何人——你只是被期望审判。']};
+const WISHER_LABELS={aname:'被影响者 · 姓名(留空=AI生成)',arel:'与你的关系',ajob:'TA 的身份(可选)',acquire:'柳枝的获取方式'};
+const AFFECTED_LABELS={aname:'许愿者(TA) · 姓名(留空=AI生成)',arel:'TA 与你的关系',ajob:'TA 的身份(可选)',acquire:'TA 获得柳枝的方式'};
+const WILLOW_LABELS={aname:'被影响者 · 姓名(留空=AI生成)',arel:'许愿者与被影响者的关系',ajob:'被影响者的身份(可选)',acquire:'许愿者获得柳枝的方式'};
+const ROLE_LABELS={wisher:WISHER_LABELS,affected:AFFECTED_LABELS,willow:WILLOW_LABELS};
+const STEP_TITLES=['配置 AI 接口','扮演角色与人物设定','剧情设定','备注与自定义','确认一切'];
+function draftDefaults(){
+  return {
+    api:{base:'https://api.deepseek.com',key:'',model:'deepseek-chat',tokens:'无限制',temp:'0.9',effort:'中'},
+    role:'wisher',
+    char:{name:'',gender:'',age:'',identity:'',traits:[],look:'',bg:'',desire:'',treasure:'',extra:''},
+    willow:{tone:'仪式感冷冽',hidden:true,note:''},
+    npcWisher:{name:'',gender:'',identity:''},
+    scene:{template:'love',acquire:'',aname:'',agender:'',ajob:'',arel:'',diff:'std',loc:''},
+    notes:{style:'',pace:'',extra:''}
+  };
+}
+function renderRoleCards(){
+  const grid=$('#role-grid'); grid.innerHTML='';
+  ROLES.forEach(r=>{
+    const b=document.createElement('button');
+    b.className='role-card'+(draft.role===r.id?' on':'');
+    b.dataset.role=r.id;
+    b.innerHTML='<span class="rc-icon"><svg class="ic"><use href="#'+r.icon+'"/></svg></span><span><span class="rc-name">'+r.name+'</span><br><span class="rc-role">'+r.en+'</span></span><span class="rc-desc">'+r.desc+'</span><span class="rc-goal">'+r.goal+'</span>';
+    b.onclick=()=>{
+      draft.role=r.id;
+      $$('#role-grid .role-card').forEach(x=>x.classList.toggle('on',x.dataset.role===r.id));
+      setRoleUI();
+    };
+    grid.appendChild(b);
+  });
+}
+function fillCharForms(){
+  // 把 draft.char 回填到两套表单,切换角色时不丢已填内容
+  const c=draft.char||{};
+  $('#ch-name').value=c.name||''; $('#ch-age').value=c.age||''; $('#ch-identity').value=c.identity||''; $('#ch-look').value=c.look||''; $('#ch-bg').value=c.bg||''; $('#ch-desire').value=c.desire||''; $('#ch-treasure').value=c.treasure||''; $('#ch-extra').value=c.extra||'';
+  $$('#ch-gender .chip').forEach(b=>b.classList.toggle('on',b.textContent===c.gender));
+  $$('#ch-traits .chip').forEach(b=>b.classList.toggle('on',(c.traits||[]).includes(b.textContent)));
+  $('#af-name').value=c.name||''; $('#af-age').value=c.age||''; $('#af-identity').value=c.identity||''; $('#af-look').value=c.look||''; $('#af-bg').value=c.bg||''; $('#af-treasure').value=c.treasure||''; $('#af-extra').value=c.extra||'';
+  $$('#af-gender .chip').forEach(b=>b.classList.toggle('on',b.textContent===c.gender));
+  $$('#af-traits .chip').forEach(b=>b.classList.toggle('on',(c.traits||[]).includes(b.textContent)));
+}
+function setRoleUI(){
+  const r=draft.role;
+  $('#form-wisher').classList.toggle('hidden',r!=='wisher');
+  $('#form-willow').classList.toggle('hidden',r!=='willow');
+  $('#form-affected').classList.toggle('hidden',r!=='affected');
+  $('#role-hint').textContent=(ROLES.find(x=>x.id===r)||{}).desc||'';
+  fillCharForms();
+  const lb=ROLE_LABELS[r]||WISHER_LABELS;
+  $('#sc-aname-label').textContent=lb.aname;
+  $('#sc-arel-label').textContent=lb.arel;
+  $('#sc-ajob-label').textContent=lb.ajob;
+  $('#sc-acquire-label').textContent=lb.acquire;
+  $('#sc-pname-fld').classList.toggle('hidden',r!=='willow');
+  const hint=$('#role-hint');
+  if(r==='willow')hint.textContent+=' 你全知但受限;许愿者与被影响者由 AI 代演。';
+  if(r==='affected')hint.textContent+=' TA 许了什么愿,由 AI 保密;你只能从裂缝中拼出真相。';
+}
+function initWizard(){
+  // API
+  $('#api-base').value=draft.api.base;
+  $('#api-key').value=draft.api.key;
+  const msel=$('#api-model');
+  msel.innerHTML='';
+  ['deepseek-chat','deepseek-reasoner'].forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; msel.appendChild(o); });
+  msel.value=draft.api.model;
+  $('#api-model-custom').classList.toggle('hidden',!!draft.api.model);
+  const trow=$('#api-tokens'); trow.innerHTML='';
+  TOKEN_OPTIONS.forEach(t=>{ const b=document.createElement('button'); b.className='chip'+(draft.api.tokens===t?' on':''); b.textContent=t; b.onclick=()=>{ $$('#api-tokens .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; trow.appendChild(b); });
+  const erow=$('#api-effort'); erow.innerHTML='';
+  EFFORT_OPTIONS.forEach(t=>{ const b=document.createElement('button'); b.className='chip'+(draft.api.effort===t?' on':''); b.textContent=t; b.onclick=()=>{ $$('#api-effort .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; erow.appendChild(b); });
+  const tmp=$('#api-temp'); tmp.value=draft.api.temp; $('#api-temp-val').textContent=draft.api.temp;
+  tmp.oninput=()=>$('#api-temp-val').textContent=tmp.value;
+  $('#api-preset').onchange=e=>{
+    if(e.target.value==='deepseek'){ draft.api.base='https://api.deepseek.com'; $('#api-base').value=draft.api.base; }
+  };
+  $('#api-fetch').onclick=async()=>{
+    const btn=$('#api-fetch'); const st=$('#api-model-status');
+    draft.api.base=$('#api-base').value.trim(); draft.api.key=$('#api-key').value.trim();
+    if(!draft.api.key){ st.textContent='请先填写 API Key'; return; }
+    btn.disabled=true; st.textContent='正在拉取模型列表…';
+    try{
+      const list=await fetchModels();
+      const sel=$('#api-model'); sel.innerHTML='';
+      list.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o); });
+      if(!list.includes(draft.api.model))sel.value=list[0];
+      st.textContent='✓ 已获取 '+list.length+' 个模型';
+      $('#api-model-custom').classList.add('hidden');
+    }catch(e){
+      st.textContent='✗ 拉取失败:'+e.message+' (可手动输入模型名)';
+      $('#api-model-custom').classList.remove('hidden');
+    }finally{ btn.disabled=false; }
+  };
+  $('#api-test').onclick=testConnection;
+  // 主角
+  const gsel=$('#ch-gender'); gsel.innerHTML='';
+  ['男','女','其他'].forEach(g=>{ const b=document.createElement('button'); b.className='chip'+(draft.char.gender===g?' on':''); b.textContent=g; b.onclick=()=>{ $$('#ch-gender .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; gsel.appendChild(b); });
+  const tsel=$('#ch-traits'); tsel.innerHTML='';
+  TRAITS.forEach(t=>{ const b=document.createElement('button'); b.className='chip'+(draft.char.traits.includes(t)?' on':''); b.textContent=t; b.onclick=()=>{ b.classList.toggle('on'); }; tsel.appendChild(b); });
+  $('#ch-name-dice').onclick=async()=>{
+    const b=$('#ch-name-dice'); b.disabled=true;
+    try{ const n=await aiName('为一个即将许愿的主角起名。TA的渴望:'+(draft.char.desire||'未填写,随意')+'。名字要有生活感,不要中二。'); if(n)$('#ch-name').value=n; toast('已生成:'+n,'ok'); }
+    catch(e){ toast('生成失败:'+e.message,'err'); } finally{ b.disabled=false; }
+  };
+  // 角色选择与三套表单
+  renderRoleCards();
+  const trow2=$('#wl-tone'); trow2.innerHTML='';
+  ['极简公证人','仪式感冷冽','寡言如影'].forEach(t=>{ const b=document.createElement('button'); b.className='chip'+(draft.willow.tone===t?' on':''); b.textContent=t; b.onclick=()=>{ $$('#wl-tone .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; trow2.appendChild(b); });
+  const hrow=$('#wl-hidden'); hrow.innerHTML='';
+  [['开启隐藏传说',true],['仅标准设定',false]].forEach(o=>{ const b=document.createElement('button'); b.className='chip'+(draft.willow.hidden===o[1]?' on':''); b.textContent=o[0]; b.dataset.v=o[1]; b.onclick=()=>{ $$('#wl-hidden .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; hrow.appendChild(b); });
+  $('#wl-note').value=draft.willow.note||'';
+  const agsel2=$('#af-gender'); agsel2.innerHTML='';
+  ['女','男','其他'].forEach(g=>{ const b=document.createElement('button'); b.className='chip'+(draft.char.gender===g?' on':''); b.textContent=g; b.onclick=()=>{ $$('#af-gender .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; agsel2.appendChild(b); });
+  const afsel=$('#af-traits'); afsel.innerHTML='';
+  TRAITS.forEach(t=>{ const b=document.createElement('button'); b.className='chip'+(draft.char.traits.includes(t)?' on':''); b.textContent=t; b.onclick=()=>{ b.classList.toggle('on'); }; afsel.appendChild(b); });
+  $('#af-name-dice').onclick=async()=>{
+    const b=$('#af-name-dice'); b.disabled=true;
+    try{ const n=await aiName('为被愿望影响的人起名。TA的人生:'+(draft.char.bg||'未填写')+'。名字要自然有质感。'); if(n)$('#af-name').value=n; toast('已生成:'+n,'ok'); }
+    catch(e){ toast('生成失败:'+e.message,'err'); } finally{ b.disabled=false; }
+  };
+  setRoleUI();
+  // 剧情
+  const sgrid=$('#sc-grid'); sgrid.innerHTML='';
+  SCENES.forEach(sc=>{
+    const b=document.createElement('button');
+    b.className='scene-card'+(draft.scene.template===sc.id?' on':'');
+    b.innerHTML='<span class="sc-name"><svg class="ic"><use href="#i-leaf"/></svg>'+sc.name+'</span><div class="sc-desc">'+sc.desc+'</div><div class="sc-q">拷问:'+sc.q+'</div>';
+    b.onclick=()=>{
+      $$('#sc-grid .scene-card').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      draft.scene.template=sc.id;
+      $('#sc-acquire').value=sc.acquire;
+      $('#sc-arel').value=sc.rel;
+      if(!draft.scene.aname)$('#sc-aname').value='';
+    };
+    sgrid.appendChild(b);
+  });
+  $('#sc-acquire').value=draft.scene.acquire||(SCENES.find(s=>s.id===draft.scene.template)||SCENES[0]).acquire;
+  $('#sc-aname').value=draft.scene.aname||'';
+  $('#sc-ajob').value=draft.scene.ajob||'';
+  $('#sc-arel').value=draft.scene.arel||(SCENES.find(s=>s.id===draft.scene.template)||SCENES[0]).rel;
+  $('#sc-loc').value=draft.scene.loc||'';
+  $('#sc-pname').value=draft.npcWisher.name||'';
+  $('#sc-pname-dice').onclick=async()=>{
+    const b=$('#sc-pname-dice'); b.disabled=true;
+    try{ const n=await aiName('为一位即将许愿的人起名。名字要自然有生活感。'); if(n)$('#sc-pname').value=n; toast('已生成:'+n,'ok'); }
+    catch(e){ toast('生成失败:'+e.message,'err'); } finally{ b.disabled=false; }
+  };
+  const agsel=$('#sc-agender'); agsel.innerHTML='';
+  ['女','男','其他'].forEach(g=>{ const b=document.createElement('button'); b.className='chip'+(draft.scene.agender===g?' on':''); b.textContent=g; b.onclick=()=>{ $$('#sc-agender .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; agsel.appendChild(b); });
+  const dsel=$('#sc-diff'); dsel.innerHTML='';
+  DIFFS.forEach(d=>{ const b=document.createElement('button'); b.className='chip'+(draft.scene.diff===d.id?' on':''); b.textContent=d.name; b.dataset.id=d.id; b.title=d.desc; b.onclick=()=>{ $$('#sc-diff .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; dsel.appendChild(b); });
+  $('#sc-aname-dice').onclick=async()=>{
+    const b=$('#sc-aname-dice'); b.disabled=true;
+    try{ const n=await aiName('为被许愿影响的人起名。TA与主角的关系:'+(draft.scene.arel||'未知')+'。名字要自然有质感。'); if(n)$('#sc-aname').value=n; toast('已生成:'+n,'ok'); }
+    catch(e){ toast('生成失败:'+e.message,'err'); } finally{ b.disabled=false; }
+  };
+  // 备注
+  const ssel=$('#nt-style'); ssel.innerHTML='';
+  STYLES.forEach(s=>{ const b=document.createElement('button'); b.className='chip'+(draft.notes.style===s?' on':''); b.textContent=s; b.onclick=()=>{ $$('#nt-style .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; ssel.appendChild(b); });
+  const psel=$('#nt-pace'); psel.innerHTML='';
+  PACES.forEach(p=>{ const b=document.createElement('button'); b.className='chip'+(draft.notes.pace===p?' on':''); b.textContent=p; b.onclick=()=>{ $$('#nt-pace .chip').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }; psel.appendChild(b); });
+}
+function collectStep(i){
+  if(i===0){
+    draft.api.base=$('#api-base').value.trim();
+    draft.api.key=$('#api-key').value.trim();
+    const cus=$('#api-model-custom').value.trim();
+    draft.api.model=cus||$('#api-model').value||'';
+    const chip=$('#api-tokens .chip.on'); if(chip)draft.api.tokens=chip.textContent;
+    const ec=$('#api-effort .chip.on'); if(ec)draft.api.effort=ec.textContent;
+    draft.api.temp=$('#api-temp').value;
+  }
+  if(i===1){
+    if(draft.role==='willow'){
+      draft.willow.tone=($('#wl-tone .chip.on')||{}).textContent||'仪式感冷冽';
+      const hc=$('#wl-hidden .chip.on');
+      draft.willow.hidden=hc?hc.dataset.v==='true':true;
+      draft.willow.note=$('#wl-note').value.trim();
+      draft.char={name:'许愿柳',gender:'',age:'',identity:'规则本身',traits:[],look:'',bg:'',desire:'',treasure:'',extra:draft.willow.note};
+      return;
+    }
+    if(draft.role==='affected'){
+      draft.char.name=$('#af-name').value.trim();
+      draft.char.gender=($('#af-gender .chip.on')||{}).textContent||'';
+      draft.char.age=$('#af-age').value.trim();
+      draft.char.identity=$('#af-identity').value.trim();
+      draft.char.traits=$$('#af-traits .chip.on').map(b=>b.textContent).concat($('#af-traits-custom').value.split(/[、,，]/).map(s=>s.trim()).filter(Boolean));
+      draft.char.look=$('#af-look').value.trim();
+      draft.char.bg=$('#af-bg').value.trim();
+      draft.char.desire='';
+      draft.char.treasure=$('#af-treasure').value.trim();
+      const weird=$('#af-weird').value.trim();
+      const other=$('#af-extra').value.trim();
+      draft.char.extra=[weird?('最近的异样感:'+weird):'',other].filter(Boolean).join('；');
+      return;
+    }
+    draft.char.name=$('#ch-name').value.trim();
+    draft.char.gender=($('#ch-gender .chip.on')||{}).textContent||'';
+    draft.char.age=$('#ch-age').value.trim();
+    draft.char.identity=$('#ch-identity').value.trim();
+    draft.char.traits=$$('#ch-traits .chip.on').map(b=>b.textContent).concat($('#ch-traits-custom').value.split(/[、,，]/).map(s=>s.trim()).filter(Boolean));
+    draft.char.look=$('#ch-look').value.trim();
+    draft.char.bg=$('#ch-bg').value.trim();
+    draft.char.desire=$('#ch-desire').value.trim();
+    draft.char.treasure=$('#ch-treasure').value.trim();
+    draft.char.extra=$('#ch-extra').value.trim();
+  }
+  if(i===2){
+    const sc=SCENES.find(s=>s.id===draft.scene.template)||SCENES[0];
+    draft.scene.acquire=$('#sc-acquire').value.trim()||sc.acquire;
+    draft.scene.aname=$('#sc-aname').value.trim();
+    draft.scene.agender=($('#sc-agender .chip.on')||{}).textContent||'';
+    draft.scene.ajob=$('#sc-ajob').value.trim();
+    draft.scene.arel=$('#sc-arel').value.trim()||sc.rel;
+    const dc=$('#sc-diff .chip.on');
+    draft.scene.diff=dc?dc.dataset.id||'std':'std';
+    draft.scene.loc=$('#sc-loc').value.trim();
+    if(draft.role==='willow'){
+      draft.npcWisher.name=$('#sc-pname').value.trim();
+    }else if(draft.role==='affected'){
+      draft.npcWisher.name=$('#sc-aname').value.trim();
+      draft.npcWisher.gender=($('#sc-agender .chip.on')||{}).textContent||'';
+      draft.npcWisher.identity=$('#sc-ajob').value.trim();
+    }
+  }
+  if(i===3){
+    draft.notes.style=($('#nt-style .chip.on')||{}).textContent||'';
+    draft.notes.pace=($('#nt-pace .chip.on')||{}).textContent||'';
+    draft.notes.extra=$('#nt-extra').value.trim();
+  }
+}
+function validateStep(i){
+  if(i===0){
+    if(!draft.api.key){ toast('请填写 API Key','err'); return false; }
+    if(!draft.api.model){ toast('请选择或填写模型','err'); return false; }
+    return true;
+  }
+  if(i===1){
+    if(draft.role==='willow')return true;
+    if(!draft.char.name){ toast('你的角色需要一个名字','err'); return false; }
+    if(draft.role==='wisher'&&!draft.char.desire){ toast('请填写心底的渴望——这是故事的种子','err'); return false; }
+    return true;
+  }
+  return true;
+}
+function renderReady(){
+  const c=draft.char,sc=draft.scene,nt=draft.notes,api=draft.api,r=draft.role;
+  let h='';
+  h+='<div class="ready-card"><h3><svg class="ic"><use href="#i-gear"/></svg>接口</h3><div class="rv"><b>服务</b><span>'+esc(api.base)+'</span></div><div class="rv"><b>模型</b><span>'+esc(api.model)+'</span></div><div class="rv"><b>Token上限</b><span>'+esc(api.tokens)+' · 温度 '+esc(api.temp)+'</span></div><div class="rv"><b>思考强度</b><span>'+esc(api.effort||'中')+'</span></div></div>';
+  if(r==='willow'){
+    h+='<div class="ready-card"><h3><svg class="ic"><use href="#i-leaf"/></svg>你的身份 · 许愿柳(规则本身)</h3><div class="rv"><b>呈现</b><span>'+esc(draft.willow.tone)+'</span></div><div class="rv"><b>隐藏设定</b><span>'+(draft.willow.hidden?'开启(柳枝商/守柳人/第二根柳枝可作为伏笔)':'仅标准设定')+'</span></div>'+(draft.willow.note?'<div class="rv"><b>存在方式</b><span>'+esc(draft.willow.note)+'</span></div>':'')+'</div>';
+  }else{
+    h+='<div class="ready-card"><h3><svg class="ic"><use href="#i-user"/></svg>你 · '+(r==='affected'?'被影响的人':'许愿的人')+'</h3><div class="rv"><b>姓名</b><span>'+esc(c.name)+(c.gender?' · '+esc(c.gender):'')+(c.age?' · '+esc(c.age)+'岁':'')+'</span></div>'+(c.identity?'<div class="rv"><b>身份</b><span>'+esc(c.identity)+'</span></div>':'')+(c.traits.length?'<div class="rv"><b>性格</b><span>'+esc(c.traits.join('、'))+'</span></div>':'')+(r==='wisher'?'<div class="rv"><b>渴望</b><span>'+esc(c.desire||'—')+'</span></div>':'')+(c.treasure?'<div class="rv"><b>珍视</b><span>'+esc(c.treasure)+'</span></div>':'')+(c.extra?'<div class="rv"><b>其他</b><span>'+esc(c.extra)+'</span></div>':'')+'</div>';
+  }
+  const scn=SCENES.find(s=>s.id===sc.template)||SCENES[0];
+  const relLabel=(ROLE_LABELS[r]||WISHER_LABELS).arel;
+  h+='<div class="ready-card"><h3><svg class="ic"><use href="#i-leaf"/></svg>剧情</h3><div class="rv"><b>场景</b><span>'+esc(scn.name)+'</span></div><div class="rv"><b>难度</b><span>'+esc((DIFFS.find(d=>d.id===sc.diff)||DIFFS[1]).name)+'</span></div><div class="rv"><b>获取</b><span>'+esc(sc.acquire||scn.acquire)+'</span></div>'+(r==='willow'?'<div class="rv"><b>许愿者</b><span>'+esc(draft.npcWisher.name||'由AI生成')+'</span></div>':'')+'<div class="rv"><b>'+(r==='affected'?'许愿者':'被影响者')+'</b><span>'+esc(sc.aname||'由AI生成')+(sc.arel?' · '+esc(sc.arel):'')+'</span></div>'+(sc.loc?'<div class="rv"><b>地点</b><span>'+esc(sc.loc)+'</span></div>':'')+'</div>';
+  h+='<div class="ready-card"><h3><svg class="ic"><use href="#i-scroll"/></svg>备注</h3>'+(nt.style?'<div class="rv"><b>文风</b><span>'+esc(nt.style)+'</span></div>':'')+(nt.pace?'<div class="rv"><b>节奏</b><span>'+esc(nt.pace)+'</span></div>':'')+(nt.extra?'<div class="rv"><b>备注</b><span>'+esc(nt.extra)+'</span></div>':'')+'<div class="rv"><b>提示</b><span>'+(r==='willow'?'你是规则。观察、安排、受理、判定——因果由你守护。':(r==='affected'?'你什么都不知道。留意裂缝。':'开局后,你将在故事中找到柳枝,并亲手决定是否许愿。'))+'</span></div></div>';
+  $('#ready-body').innerHTML=h;
+}
+function goStep(n){
+  wizardStep=n;
+  $$('#wizard-screen .wstep').forEach((s,i)=>s.classList.toggle('active',i===n));
+  $$('#wz-dots i').forEach((d,i)=>d.classList.toggle('on',i<=n));
+  $('#wz-title').textContent='第 '+(n+1)+' 步 · '+STEP_TITLES[n];
+  $('#wz-back').classList.toggle('hidden',n===0);
+  $('#wz-next').classList.toggle('hidden',n===4);
+  $('#wz-start').classList.toggle('hidden',n!==4);
+  if(n===4)renderReady();
+}
+function startGame(){
+  collectStep(3);
+  S={
+    version:1,
+    cfg:clone(draft),
+    state:{
+      startedAt:now(),savedAt:null,turn:0,wish:null,secret:null,endingShown:null,
+      status:clone(EMPTY_STATUS),
+      messages:[],memories:[],wiki:[],deaths:[],checkpoints:[]
+    }
+  };
+  S.state.messages.push({role:'user',content:kickerText(),t:now(),meta:{kicker:true}});
+  saveUI();
+  enterGame();
+  saveState(true);
+  askAI();
+}
+function enterGame(){
+  $('#boot').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  renderAllMessages();
+  updateTopbar(); renderDeathBadge(); renderCharPanel(); renderWikiPanel(); renderMemPanel(); renderDeathPanel(); renderQuickActions();
+}
+
+/* ================= 启动 / 事件 ================= */
+function boot(){
+  loadUI(); applyTheme();
+  const saved=loadSave();
+  $('#t-resume').classList.toggle('hidden',!saved);
+  if(saved)$('#t-saveinfo').textContent='上次存档:'+saved.state.savedAt+' · '+((saved.state.messages||[]).length)+' 条记录'+(saved.state.deaths.length?' · 死亡 '+saved.state.deaths.length+' 次':'');
+  $('#t-resume').onclick=()=>{ S=saved; enterGame(); toast('已恢复上次的游戏进度','ok'); };
+  $('#t-new').onclick=()=>{
+    draft=saved?Object.assign(draftDefaults(),saved.cfg):draftDefaults();
+    initWizard(); goStep(0);
+    $('#title-screen').classList.add('hidden');
+    $('#wizard-screen').classList.remove('hidden');
+  };
+  $('#t-import').onclick=()=>$('#import-file').click();
+  $('#import-file').addEventListener('change',e=>{ if(e.target.files[0])importSave(e.target.files[0]); e.target.value=''; });
+  $('#wz-back').onclick=()=>{ collectStep(wizardStep); goStep(Math.max(0,wizardStep-1)); };
+  $('#wz-next').onclick=()=>{
+    collectStep(wizardStep);
+    if(!validateStep(wizardStep))return;
+    goStep(Math.min(4,wizardStep+1));
+  };
+  $('#wz-start').onclick=()=>{ collectStep(4); startGame(); };
+  // 顶栏
+  $('#tb-char').onclick=()=>openDrawer('drawer-char');
+  $('#tb-wiki').onclick=()=>openDrawer('drawer-wiki');
+  $('#tb-mem').onclick=()=>openDrawer('drawer-mem');
+  $('#tb-death').onclick=()=>openDrawer('drawer-death');
+  $('#tb-ckpt').onclick=()=>{
+    S.state.checkpoints.push({id:uid(),label:'手动存档 · 第'+(S.state.turn||0)+'轮',t:now(),snap:clone(S.state)});
+    if(S.state.checkpoints.length>CKPT_MAX)S.state.checkpoints.shift();
+    saveState(true); toast('已创建存档点','ok');
+  };
+  $('#tb-settings').onclick=()=>{ renderSettings(); $('#settings-modal').classList.remove('hidden'); };
+  // 抽屉
+  $$('.drawer .d-close').forEach(b=>b.onclick=closeDrawers);
+  $('#dbackdrop').onclick=closeDrawers;
+  // 模态关闭(data-close;抽屉的 d-close 除外,避免覆盖 closeDrawers)
+  $$('[data-close]').forEach(b=>{ if(b.classList.contains('d-close'))return; b.onclick=()=>$('#'+b.dataset.close).classList.add('hidden'); });
+  $$('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o)o.classList.add('hidden'); }));
+  $('#settings-save').onclick=saveSettings;
+  // 许愿
+  $('#btn-wish').onclick=openWishModal;
+  $('#wish-confirm').onclick=confirmWish;
+  // 确认框
+  $('#confirm-cancel').onclick=closeConfirm;
+  $('#confirm-ok').onclick=()=>{ const cb=confirmCb; closeConfirm(); if(cb)cb(); };
+  // 死亡界面
+  $('#death-rollback').onclick=()=>{ closeDeathScreen(); openCheckpointModal(); };
+  $('#death-records').onclick=()=>{ closeDeathScreen(); openDrawer('drawer-death'); };
+  // 结局界面
+  $('#end-continue').onclick=()=>$('#ending-screen').classList.add('hidden');
+  $('#end-rollback').onclick=()=>{ $('#ending-screen').classList.add('hidden'); openCheckpointModal(); };
+  $('#end-restart').onclick=()=>showConfirm('新的旅程?','当前故事将结束,存档清空。第二根柳枝,属于下一个偶然。',()=>{ localStorage.removeItem(LS_KEY); location.reload(); });
+  // 检查点
+  $('#ckpt-modal [data-close]').onclick=()=>$('#ckpt-modal').classList.add('hidden');
+  // 输入
+  const ta=$('#user-input');
+  ta.addEventListener('input',()=>{ ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight,140)+'px'; });
+  ta.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendFromInput(); } });
+  $('#btn-send').onclick=()=>{ if(asking){ if(abortCtl)abortCtl.abort(); } else sendFromInput(); };
+  // Esc
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){ closeDrawers(); $$('.modal-overlay').forEach(o=>o.classList.add('hidden')); }
+  });
+}
+boot();
+
+
+</script>
+</body>
+</html>

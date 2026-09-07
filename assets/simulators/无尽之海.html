@@ -1,0 +1,1945 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>无尽之海 · ENDLESS SEA</title>
+<style>
+/* ===== 主题变量 ===== */
+body[data-theme="deep"]{
+  --bg-deep:#06121c;--bg-surface:#0c1f2d;--bg-elevated:#12303f;--bg-hover:#16384d;
+  --border:#1d3c52;--border-active:#2a5573;
+  --t:#e6eef5;--t2:#9fb8c8;--t3:#5d7a8e;
+  --accent:#2ec4b6;--accent-dim:#1e8a80;--accent-glow:rgba(46,196,182,0.14);
+  --gold:#f0a828;--gold-dim:#b87818;--gold-glow:rgba(240,168,40,0.15);
+  --r:#e85058;--gr:#28d068;--purple:#a070f0;--blue:#50a0f0;
+}
+body[data-theme="amber"]{
+  --bg-deep:#14100a;--bg-surface:#201a10;--bg-elevated:#2b2315;--bg-hover:#352b1a;
+  --border:#3d3220;--border-active:#5a4a2e;
+  --t:#f3ead8;--t2:#c9b896;--t3:#8a7a5c;
+  --accent:#e8a33d;--accent-dim:#b07a24;--accent-glow:rgba(232,163,61,0.15);
+  --gold:#f5c05a;--gold-dim:#c08a2e;--gold-glow:rgba(245,192,90,0.16);
+  --r:#e85058;--gr:#28d068;--purple:#a070f0;--blue:#50a0f0;
+}
+body[data-theme="crimson"]{
+  --bg-deep:#160a0d;--bg-surface:#241014;--bg-elevated:#33181e;--bg-hover:#3e1d24;
+  --border:#47242c;--border-active:#66353f;
+  --t:#f5e8e6;--t2:#cfa9a4;--t3:#8f6a66;
+  --accent:#e85058;--accent-dim:#a82e36;--accent-glow:rgba(232,80,88,0.15);
+  --gold:#f0b040;--gold-dim:#b87818;--gold-glow:rgba(240,176,64,0.16);
+  --r:#e85058;--gr:#28d068;--purple:#a070f0;--blue:#50a0f0;
+}
+body[data-theme="jade"]{
+  --bg-deep:#07130f;--bg-surface:#0d2018;--bg-elevated:#133024;--bg-hover:#183c2d;
+  --border:#1d3d2e;--border-active:#2a5a43;
+  --t:#e6f2ec;--t2:#9fc0b0;--t3:#5d8070;
+  --accent:#40c8a0;--accent-dim:#208060;--accent-glow:rgba(64,200,160,0.14);
+  --gold:#f0a828;--gold-dim:#b87818;--gold-glow:rgba(240,168,40,0.15);
+  --r:#e85058;--gr:#28d068;--purple:#a070f0;--blue:#50a0f0;
+}
+body[data-fs="sm"]{font-size:12px}
+body[data-fs="md"]{font-size:13px}
+body[data-fs="lg"]{font-size:14.5px}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg-deep);color:var(--t);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased;user-select:none}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:6px;padding:8px 12px;outline:none;transition:border 180ms ease;width:100%}
+input:focus,textarea:focus{border-color:var(--accent-dim)}
+textarea{resize:vertical;min-height:42px}
+select{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:6px;padding:8px 10px;outline:none;width:100%;appearance:auto}
+label{display:block;font-size:11px;color:var(--t2);margin:10px 0 4px;letter-spacing:0.3px}
+.hint{font-size:11px;color:var(--t3);margin-top:6px;line-height:1.6}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 14px;border-radius:6px;border:1px solid var(--border);color:var(--t2);font-size:12px;transition:all 180ms ease;background:var(--bg-elevated)}
+.btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.btn.sm{padding:7px 12px;font-size:11px}
+.btn.gold{border-color:var(--gold-dim);color:var(--gold);background:var(--gold-glow)}
+.btn.gold:hover{background:var(--gold-glow);border-color:var(--gold)}
+.btn.jade{border-color:var(--accent-dim);color:var(--accent);background:var(--accent-glow)}
+.btn.jade:hover{border-color:var(--accent)}
+.btn.danger{border-color:var(--r);color:var(--r)}
+.btn.danger:hover{background:rgba(232,80,88,0.12)}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn-row.right{justify-content:flex-end}
+.row-flex{display:flex;gap:6px;align-items:center;width:100%}
+.hidden{display:none!important}
+
+/* ===== 创建流程 ===== */
+#setup-overlay{position:fixed;inset:0;z-index:100;background:var(--bg-deep);overflow-y:auto;padding:24px 14px}
+#setup-overlay::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% -10%,var(--accent-glow),transparent 55%),radial-gradient(ellipse at 85% 110%,rgba(240,168,40,0.06),transparent 50%)}
+.setup-inner{position:relative;max-width:660px;margin:0 auto;padding-bottom:40px}
+.setup-inner h1{font-size:30px;text-align:center;color:var(--t);letter-spacing:6px;margin-top:10px;text-shadow:0 0 24px var(--accent-glow)}
+.setup-inner .sub{text-align:center;color:var(--t3);font-size:11px;letter-spacing:3px;margin:4px 0 18px}
+.step-dots{display:flex;justify-content:center;gap:7px;margin-bottom:16px}
+.step-dots .dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:all 180ms ease}
+.step-dots .dot.on{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+.setup-box{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.4)}
+.create-step{display:none}
+.create-step.active{display:block;animation:fadeIn 220ms ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.step-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.step-hint{font-size:11px;color:var(--t3);margin:6px 0 10px;line-height:1.6}
+.create-nav{display:flex;justify-content:space-between;gap:8px;margin-top:18px;align-items:center}
+.btn-prev,.btn-next{padding:10px 18px;border-radius:8px;font-size:13px;transition:all 180ms ease}
+.btn-prev{background:var(--bg-elevated);border:1px solid var(--border);color:var(--t2)}
+.btn-prev:hover{color:var(--t);border-color:var(--border-active)}
+.btn-next{background:linear-gradient(135deg,var(--accent-dim),var(--accent));color:#04141a;font-weight:700;border:none}
+.btn-next:hover{filter:brightness(1.15)}
+.btn-next.big{padding:12px 26px;font-size:15px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.two-col{grid-template-columns:1fr}}
+.cheat-toggle{width:100%;padding:9px;border:1px dashed var(--gold-dim);border-radius:8px;color:var(--gold);font-size:12px;background:var(--gold-glow);transition:all 180ms ease}
+.cheat-toggle.on{border-style:solid;background:var(--gold);color:#1a1206;font-weight:700}
+.attr-cheat-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0}
+.attr-cheat-row .pts{font-size:12px;color:var(--t2);font-weight:600}
+.attr-cheat-row .cheat-toggle{width:auto;padding:6px 12px;font-size:11px}
+.attr-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.attr-grid{grid-template-columns:1fr}}
+.attr-item{display:flex;align-items:center;gap:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.attr-item .an{font-size:11px;color:var(--t2);flex:1}
+.attr-item .an b{display:block;color:var(--t);font-size:12px}
+.attr-item .av{font-size:15px;font-weight:700;color:var(--accent);min-width:24px;text-align:center}
+.attr-item .ab{width:22px;height:22px;border-radius:5px;background:var(--bg-hover);border:1px solid var(--border);color:var(--t);font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center}
+.attr-item .ab:hover{border-color:var(--accent);color:var(--accent)}
+.attr-item .ab:disabled{opacity:0.3}
+.attr-item .acost{font-size:9px;color:var(--t3);width:34px;text-align:right}
+.chip-grid{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:6px 11px;border-radius:16px;border:1px solid var(--border);font-size:11px;color:var(--t2);background:var(--bg-elevated);transition:all 150ms ease;cursor:pointer}
+.chip:hover{border-color:var(--border-active);color:var(--t)}
+.chip.on{background:var(--accent-glow);border-color:var(--accent-dim);color:var(--accent);font-weight:600}
+.trait-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.trait-grid{grid-template-columns:1fr}}
+.trait-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:10px 12px;cursor:pointer;transition:all 160ms ease;position:relative}
+.trait-card:hover{border-color:var(--border-active)}
+.trait-card.on{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 0 1px var(--accent)}
+.trait-card.rare{border-color:var(--gold-dim)}
+.trait-card.rare.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+.trait-card .tt{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.trait-card .tt .tag{font-size:9px;padding:1px 6px;border-radius:8px;background:var(--gold-glow);color:var(--gold);border:1px solid var(--gold-dim)}
+.trait-card .td{font-size:10.5px;color:var(--t2);margin-top:4px;line-height:1.5}
+.trait-card .tc{position:absolute;top:9px;right:10px;font-size:11px;color:var(--accent);font-weight:700}
+.kv-item{display:flex;gap:6px;align-items:center;background:var(--bg-elevated);border:1px solid var(--border);border-radius:7px;padding:7px 10px;margin-bottom:6px;font-size:11px}
+.kv-item b{color:var(--gold);white-space:nowrap}
+.kv-item .kv-x{color:var(--t3);cursor:pointer;padding:0 4px}
+.kv-item .kv-x:hover{color:var(--r)}
+.diff-list{display:grid;gap:8px}
+.diff-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all 160ms ease}
+.diff-card:hover{border-color:var(--border-active)}
+.diff-card.on{border-color:var(--accent);background:var(--accent-glow);box-shadow:0 0 0 1px var(--accent)}
+.diff-card .dt{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.diff-card .dt .sub{font-size:10px;color:var(--t3);font-weight:400;border:1px solid var(--border);padding:0 6px;border-radius:8px}
+.diff-card .dd{font-size:11px;color:var(--t2);margin-top:4px}
+.diff-card .dm{font-size:10px;color:var(--t3);margin-top:6px;line-height:1.6;border-top:1px dashed var(--border);padding-top:6px}
+#ready-summary{font-size:12px;line-height:1.9;color:var(--t2)}
+#ready-summary .rs-sec{background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+#ready-summary .rs-sec h4{font-size:12px;color:var(--gold);margin-bottom:4px}
+#ready-summary b{color:var(--t)}
+
+/* ===== 主界面布局 ===== */
+#app{display:grid;grid-template-rows:46px 1fr;height:100vh;height:100dvh;gap:1px;background:var(--border)}
+#topbar{grid-row:1;background:var(--bg-surface);display:flex;align-items:center;padding:0 8px;gap:6px;border-bottom:1px solid var(--border);z-index:30}
+#topbar .logo{font-size:13px;font-weight:800;color:var(--accent);white-space:nowrap;letter-spacing:2px}
+#topbar .logo small{color:var(--t3);font-weight:400;font-size:9px;letter-spacing:1px;margin-left:2px}
+#topbar .spacer{flex:1}
+.top-btn{display:flex;align-items:center;gap:4px;padding:5px 9px;border-radius:7px;font-size:11px;border:1px solid var(--border);color:var(--t2);transition:all 160ms ease;white-space:nowrap;background:var(--bg-elevated)}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.top-btn.gold{border-color:var(--gold-dim);color:var(--gold)}
+.top-btn.gold:hover{background:var(--gold-glow)}
+.top-chip{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);font-size:10px;color:var(--t2);white-space:nowrap;background:var(--bg-elevated)}
+.top-chip b{color:var(--t)}
+.top-chip .warn{color:var(--r)}
+#center-panel{grid-row:2;background:var(--bg-deep);display:flex;flex-direction:column;overflow:hidden;position:relative}
+#game-log{flex:1;overflow-y:auto;padding:14px 12px 8px;scroll-behavior:smooth}
+/* 消息 */
+.msg{display:flex;gap:9px;margin-bottom:14px;animation:msgIn 200ms ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.msg .ava{width:32px;height:32px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.msg .body{max-width:78%;min-width:0}
+.msg .nm{font-size:10px;color:var(--t3);margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.msg .nm .tm{font-size:9px;color:var(--t3);opacity:0.7}
+.msg .txt{font-size:13px;line-height:1.75;color:var(--t);background:var(--bg-surface);border:1px solid var(--border);border-radius:4px 12px 12px 12px;padding:9px 13px;word-break:break-word}
+.msg .txt.md-h1,.msg .txt .md-h1{font-size:14px;font-weight:700;margin:4px 0}
+.msg .txt .md-h2{font-size:13px;font-weight:700;margin:4px 0;color:var(--gold)}
+.msg .txt .md-li{margin:2px 0 2px 4px}
+.msg .txt b{color:var(--t)}
+.msg .txt code{background:var(--bg-elevated);border:1px solid var(--border);padding:0 5px;border-radius:4px;font-size:11px}
+.msg .txt table{border-collapse:collapse;margin:6px 0;font-size:11px}
+.msg .txt table td,.msg .txt table th{border:1px solid var(--border);padding:4px 8px}
+.msg.user{flex-direction:row-reverse}
+.msg.user .txt{background:var(--accent-glow);border-color:var(--accent-dim);border-radius:12px 4px 12px 12px;color:var(--t)}
+.msg.sys{justify-content:center}
+.msg.sys .txt{background:transparent;border:none;color:var(--t3);font-size:11px;text-align:center;padding:2px 8px}
+.msg .think{margin-top:5px;font-size:10.5px;color:var(--t3);background:var(--bg-elevated);border:1px dashed var(--border);border-radius:7px;padding:6px 10px;white-space:pre-wrap;word-break:break-word}
+.think-live{margin:0 0 6px;font-size:10.5px;color:var(--t3);background:var(--bg-elevated);border:1px dashed var(--accent-dim);border-radius:7px;padding:6px 10px}
+.think-live .tl-label{display:block;color:var(--gold);font-size:10px;margin-bottom:2px}
+.think-live .tl-txt{white-space:pre-wrap;word-break:break-word;max-height:130px;overflow-y:auto}
+/* 状态栏 / 快捷 / 输入 */
+#sit-bar{display:flex;gap:8px;align-items:center;padding:6px 12px;background:var(--bg-surface);border-top:1px solid var(--border);font-size:11px;color:var(--t2);flex-wrap:wrap}
+#sit-bar .sit-loc{color:var(--accent);font-weight:600}
+.quick-actions{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;flex-shrink:0;background:var(--bg-deep)}
+.quick-actions::-webkit-scrollbar{display:none}
+.quick-btn{flex-shrink:0;padding:7px 13px;border-radius:16px;border:1px solid var(--border);font-size:11px;color:var(--t2);background:var(--bg-surface);transition:all 150ms ease;white-space:nowrap}
+.quick-btn:hover{color:var(--t);border-color:var(--accent-dim);background:var(--accent-glow)}
+.quick-btn.cheat{border-color:var(--gold-dim);color:var(--gold);background:var(--gold-glow)}
+#input-area{display:flex;align-items:flex-end;gap:8px;padding:8px 12px 10px;background:var(--bg-surface);border-top:1px solid var(--border);flex-shrink:0}
+#user-input{flex:1;min-width:0;max-height:110px;min-height:40px;background:var(--bg-deep);border-radius:10px;padding:9px 13px;font-size:13px}
+.gen-btn{width:38px;height:38px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--t2);font-size:15px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.gen-btn:hover{border-color:var(--border-active);color:var(--t)}
+#send-btn{height:38px;padding:0 16px;border-radius:10px;background:linear-gradient(135deg,var(--accent-dim),var(--accent));color:#04141a;font-weight:700;font-size:13px;flex-shrink:0;display:flex;align-items:center;gap:5px}
+#send-btn:disabled{opacity:0.5}
+#loading-indicator{display:none;align-items:center;gap:8px;padding:8px 12px;font-size:11px;color:var(--t3);background:var(--bg-deep);border-top:1px solid var(--border)}
+#loading-indicator.show{display:flex}
+#loading-indicator .dots{display:inline-flex;gap:3px}
+#loading-indicator .dots span{width:4px;height:4px;border-radius:50%;background:var(--accent);animation:blink 1s infinite}
+#loading-indicator .dots span:nth-child(2){animation-delay:0.2s}
+#loading-indicator .dots span:nth-child(3){animation-delay:0.4s}
+@keyframes blink{0%,100%{opacity:0.25}50%{opacity:1}}
+/* 抽屉 */
+#drawer-backdrop{position:fixed;inset:46px 0 0 0;background:rgba(0,0,0,0.5);z-index:38;opacity:0;pointer-events:none;transition:opacity 200ms ease}
+#drawer-backdrop.open{opacity:1;pointer-events:auto}
+#left-panel{position:fixed;left:0;top:46px;bottom:0;width:330px;background:var(--bg-surface);z-index:39;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:10px;transform:translateX(-102%);transition:transform 220ms ease;border-right:1px solid var(--border);box-shadow:6px 0 26px rgba(0,0,0,0.35)}
+#left-panel.open{transform:translateX(0)}
+@media(max-width:700px){#left-panel{width:100%}}
+.card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:12px 13px}
+.card h3{font-size:12px;color:var(--t2);margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.card h3 .sp{flex:1}
+.char-head{display:flex;gap:10px;align-items:center}
+.char-ava{width:48px;height:48px;border-radius:12px;background:var(--accent-glow);border:1px solid var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.char-name{font-size:16px;font-weight:800}
+.char-meta{font-size:10.5px;color:var(--t3);margin-top:2px}
+.bar-row{display:flex;align-items:center;gap:7px;margin-top:7px;font-size:10px;color:var(--t2)}
+.bar-row .bar{flex:1;height:6px;border-radius:3px;background:var(--bg-deep);overflow:hidden}
+.bar-row .bar i{display:block;height:100%;border-radius:3px;transition:width 300ms ease}
+.bar-row .bar .hp{background:linear-gradient(90deg,#c84048,var(--r))}
+.bar-row .bar .xp{background:linear-gradient(90deg,var(--accent-dim),var(--accent))}
+.bar-row .bar .mor{background:linear-gradient(90deg,var(--gold-dim),var(--gold))}
+.attr-grid2{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px}
+.attr-cell{display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface);border:1px solid var(--border);border-radius:7px;padding:5px 9px;font-size:11px;color:var(--t2)}
+.attr-cell b{color:var(--accent);font-size:12px}
+.kv-list{display:grid;gap:5px}
+.kv-line{display:flex;justify-content:space-between;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:11px;color:var(--t2);line-height:1.5}
+.kv-line b{color:var(--t);white-space:nowrap}
+.kv-line .v{text-align:right;color:var(--t2)}
+.kv-line .v.good{color:var(--gr)}
+.kv-line .v.bad{color:var(--r)}
+.kv-line .v.warn{color:var(--gold)}
+.skill-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.skill-tags span{font-size:10px;padding:2px 9px;border-radius:10px;background:var(--accent-glow);border:1px solid var(--accent-dim);color:var(--accent)}
+.trait-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.trait-tags span{font-size:10px;padding:2px 9px;border-radius:10px;background:var(--gold-glow);border:1px solid var(--gold-dim);color:var(--gold)}
+.sec-title{font-size:11px;color:var(--gold);font-weight:700;margin:2px 0 6px;letter-spacing:1px}
+/* 弹窗 */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:90;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--bg-surface);border:1px solid var(--border-active);border-radius:14px;width:min(660px,94vw);max-height:88vh;overflow-y:auto;padding:20px;box-shadow:0 18px 60px rgba(0,0,0,0.55);animation:modalIn 200ms ease}
+@keyframes modalIn{from{opacity:0;transform:scale(0.97)}to{opacity:1;transform:none}}
+.modal h2{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.modal h2 .sp{flex:1}
+.modal .card{margin-bottom:10px}
+.mem-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.mem-tab{padding:7px 14px;border-radius:16px;border:1px solid var(--border);font-size:11px;color:var(--t2);background:var(--bg-elevated)}
+.mem-tab.active{background:var(--accent-glow);border-color:var(--accent-dim);color:var(--accent);font-weight:600}
+.mem-empty{padding:24px;text-align:center;color:var(--t3);font-size:12px;line-height:1.8}
+.mem-item{display:flex;gap:8px;align-items:flex-start;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:11.5px;line-height:1.55}
+.mem-item .mi-ico{flex-shrink:0;font-size:14px}
+.mem-item .mi-x{color:var(--t2);flex:1}
+.mem-item .mi-del{color:var(--t3);cursor:pointer;flex-shrink:0;padding:0 3px;font-size:13px}
+.mem-item .mi-del:hover{color:var(--r)}
+.ency-layout{display:grid;grid-template-columns:220px 1fr;gap:12px}
+@media(max-width:700px){.ency-layout{grid-template-columns:1fr}}
+.ency-list{max-height:58vh;overflow-y:auto;display:grid;gap:4px;align-content:start}
+.ency-item{display:flex;gap:7px;align-items:center;padding:8px 10px;border-radius:8px;border:1px solid transparent;font-size:11.5px;color:var(--t2);cursor:pointer;transition:all 150ms ease}
+.ency-item:hover{background:var(--bg-hover);color:var(--t)}
+.ency-item.on{background:var(--accent-glow);border-color:var(--accent-dim);color:var(--accent)}
+.ency-content{max-height:58vh;overflow-y:auto;font-size:12px;line-height:1.8;color:var(--t2)}
+.ency-content .h{color:var(--gold);font-weight:700}
+.ency-content table{border-collapse:collapse;margin:6px 0;font-size:11px}
+.ency-content table td,.ency-content table th{border:1px solid var(--border);padding:4px 8px;color:var(--t2)}
+.ency-ask{display:flex;gap:6px;margin-top:10px}
+.ency-tag{font-size:9px;color:var(--t3);margin-left:4px}
+/* 死亡与回档 */
+.death-banner{background:linear-gradient(135deg,rgba(232,80,88,0.16),rgba(120,30,40,0.1));border:1px solid var(--r);border-radius:12px;padding:16px;text-align:center;margin-bottom:12px}
+.death-banner .db-title{font-size:22px;font-weight:800;color:var(--r);letter-spacing:2px}
+.death-banner .db-sub{font-size:11px;color:var(--t2);margin-top:6px}
+.death-banner .db-tag{display:inline-block;margin-top:8px;font-size:12px;font-weight:700;color:var(--gold);border:1px solid var(--gold-dim);background:var(--gold-glow);padding:3px 14px;border-radius:14px}
+.death-sec{background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px;font-size:12px;line-height:1.75;color:var(--t2)}
+.death-sec h4{font-size:11px;color:var(--gold);margin-bottom:5px}
+.death-sec .crit{list-style:none;counter-reset:c}
+.death-sec .crit li{counter-increment:c;margin:4px 0;padding-left:22px;position:relative}
+.death-sec .crit li::before{content:counter(c);position:absolute;left:0;top:2px;width:15px;height:15px;border-radius:50%;background:var(--bg-hover);border:1px solid var(--border-active);color:var(--accent);font-size:9px;display:flex;align-items:center;justify-content:center}
+.death-rec{background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
+.death-rec .dr-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.death-rec .dr-t{font-size:13px;font-weight:700;color:var(--r)}
+.death-rec .dr-time{font-size:10px;color:var(--t3)}
+.death-rec .dr-eval{font-size:11.5px;color:var(--t2);margin-top:6px;line-height:1.7}
+.death-rec details{margin-top:8px}
+.death-rec summary{font-size:11px;color:var(--gold);cursor:pointer}
+.death-rec .crit{list-style:none;counter-reset:c;margin-top:6px}
+.death-rec .crit li{counter-increment:c;font-size:11px;color:var(--t2);margin:4px 0;padding-left:20px;position:relative;line-height:1.6}
+.death-rec .crit li::before{content:counter(c);position:absolute;left:0;top:2px;width:14px;height:14px;border-radius:50%;background:var(--bg-hover);border:1px solid var(--border-active);color:var(--accent);font-size:8.5px;display:flex;align-items:center;justify-content:center}
+.ck-rec{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:6px;font-size:11.5px}
+.ck-rec .ck-l{flex:1;min-width:0}
+.ck-rec .ck-t{color:var(--t);font-weight:600}
+.ck-rec .ck-time{color:var(--t3);font-size:10px}
+/* 确认弹窗 */
+#confirm-modal .modal{width:min(420px,92vw)}
+#cf-text{font-size:13px;color:var(--t2);line-height:1.8;margin:6px 0 4px}
+/* Toast */
+#toast-box{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{background:var(--bg-elevated);border:1px solid var(--border-active);color:var(--t);font-size:12px;padding:9px 18px;border-radius:22px;box-shadow:0 8px 30px rgba(0,0,0,0.4);animation:toastIn 220ms ease;max-width:88vw}
+.toast.error{border-color:var(--r);color:var(--r)}
+.toast.success{border-color:var(--gr);color:var(--gr)}
+@keyframes toastIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+/* 主题选择 */
+.theme-row{display:flex;gap:6px;flex-wrap:wrap}
+.theme-btn{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:11px;color:var(--t2);background:var(--bg-elevated)}
+.theme-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-glow);font-weight:600}
+.chk-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.chk-row input{width:auto;accent-color:var(--accent)}
+.chk-row label{margin:0;font-size:12px;color:var(--t)}
+/* 移动端 */
+@media(max-width:820px){
+  .top-btn{padding:5px 7px}
+  .tb-txt{display:none}
+  .top-chip.more{display:none}
+  .msg .body{max-width:86%}
+}
+/* ===== 移动端集中适配 ===== */
+@media(max-width:700px){
+  #app{min-width:0}
+  #topbar{overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  #topbar::-webkit-scrollbar{display:none}
+  #center-panel{min-width:0}
+  .top-chip.more{display:none}
+  .top-chip{max-width:128px;overflow:hidden;text-overflow:ellipsis}
+  .top-btn{padding:5px 9px}
+  .modal{width:94vw!important;max-height:88vh}
+}
+</style>
+</head>
+<body data-theme="deep" data-fs="md">
+
+<!-- ================= 创建流程 ================= -->
+<div id="setup-overlay">
+  <div class="setup-inner">
+    <h1>🌊 无尽之海</h1>
+    <div class="sub">ENDLESS SEA · 航海冒险 × AI 文字跑团</div>
+    <div class="step-dots" id="step-dots"></div>
+    <div class="setup-box">
+
+      <div class="create-step active" id="step-api">
+        <div class="step-title">第一步 · 配置 AI 接口</div>
+        <div class="step-hint">游戏由 AI 实时演绎你的航海传奇，需要配置大模型 API（默认 DeepSeek，兼容 OpenAI 格式）</div>
+        <label>API 端点</label>
+        <input id="cfg-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+        <label>API Key（仅保存在本机浏览器，不会上传）</label>
+        <input id="cfg-apikey" type="password" placeholder="sk-xxxxxxxx">
+        <label>模型</label>
+        <div class="row-flex">
+          <select id="cfg-model"></select>
+          <button class="btn sm" onclick="UI.fetchModels('cfg-')" style="flex-shrink:0">🔄 拉取</button>
+        </div>
+        <div class="hint" id="model-hint">填入 Key 后可点击「拉取」获取模型列表</div>
+        <label>推理强度</label>
+        <select id="cfg-reasoning">
+          <option value="low">低（更快）</option>
+          <option value="medium" selected>中（均衡）</option>
+          <option value="high">高（更细腻）</option>
+        </select>
+        <label>输出 Token 限制</label>
+        <select id="cfg-maxtokens">
+          <option value="unlimited" selected>无限制</option>
+          <option value="2048">2048</option>
+          <option value="4096">4096</option>
+          <option value="8192">8192</option>
+          <option value="16384">16384</option>
+        </select>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.testApi()">🔌 测试连接</button>
+          <button class="btn-next" onclick="UI.saveApi()">保存并下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-self">
+        <div class="step-title">第二步 · 主角信息</div>
+        <div class="step-hint">你是谁？AI 会把这些设定写进记忆，永不遗忘</div>
+        <div class="two-col">
+          <div><label>姓名</label><input id="self-name" placeholder="如：埃德蒙·韦斯特"></div>
+          <div><label>性别</label><select id="self-gender"><option>男</option><option>女</option><option>神秘未知</option></select></div>
+        </div>
+        <div class="two-col">
+          <div><label>年龄</label><input id="self-age" type="number" min="14" max="80" value="22"></div>
+          <div><label>船名</label><input id="self-shipname" placeholder="如：雾燕号"></div>
+        </div>
+        <label>外貌</label>
+        <textarea id="self-appearance" rows="2" placeholder="高挑、晒成古铜色的皮肤、左眉一道旧伤疤、笑起来有点痞…"></textarea>
+        <label>性格</label>
+        <textarea id="self-persona" rows="2" placeholder="勇敢冒失、嘴硬心软、对宝藏没有抵抗力、嘴上说钱钱钱其实最讲义气…"></textarea>
+        <div class="two-col">
+          <div><label>出身背景</label><select id="self-bg" onchange="UI.toggleCustom('bg')"></select></div>
+          <div><label>船上职位</label><select id="self-pos" onchange="UI.toggleCustom('pos')"></select></div>
+        </div>
+        <input id="self-bg-custom" placeholder="填写你的自定义出身…" style="display:none;margin-top:6px">
+        <input id="self-pos-custom" placeholder="填写你的自定义职位…" style="display:none;margin-top:6px">
+        <div class="step-hint">六维属性 · 27 点购点（基础 8，13 以下每点 1 费，14–15 每点 2 费）</div>
+        <div class="attr-cheat-row">
+          <span class="pts" id="attr-left">剩余 27 点</span>
+          <button class="cheat-toggle" id="attr-cheat" onclick="UI.toggleAttrCheat()">🔓 作弊模式：关</button>
+        </div>
+        <div class="attr-grid" id="attr-grid"></div>
+        <div class="step-hint">熟练技能（选 4 项）<span id="skill-pts"></span></div>
+        <div class="chip-grid" id="skill-grid"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.showStep(0)">◂ 上一步</button>
+          <button class="btn-next" onclick="UI.saveSelf()">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-talent">
+        <div class="step-title">第三步 · 天赋</div>
+        <div class="step-hint">可选 1–2 个天赋（稀有天赋限 1 个）；开启作弊模式可无限加点</div>
+        <div class="attr-cheat-row">
+          <span class="pts" id="trait-pts-left">剩余 6 点</span>
+          <button class="cheat-toggle" id="trait-cheat" onclick="UI.toggleTraitCheat()">🔓 作弊模式：关</button>
+        </div>
+        <div class="trait-grid" id="trait-grid"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.showStep(1)">◂ 上一步</button>
+          <button class="btn-next" onclick="UI.saveTalent()">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-notes">
+        <div class="step-title">第四步 · 备注与自定义设定</div>
+        <div class="step-hint">补充你的故事设定，AI 将全部记住并严格遵守</div>
+        <label>备注（目标、禁忌、想体验的内容…）</label>
+        <textarea id="note-input" rows="3" placeholder="例：我想成为七海最富有的商人；不想看到船员白白送死；喜欢轻松幽默的剧情；遇到海怪时我想先谈判再开炮…"></textarea>
+        <label>自定义设定（自由增删）</label>
+        <div id="kv-list"></div>
+        <div class="row-flex">
+          <input id="kv-key" placeholder="关键词（如：船医）" style="flex:1">
+          <input id="kv-val" placeholder="内容（如：叫老汤姆，话痨，爱吹牛）" style="flex:1.6">
+          <button class="btn sm jade" onclick="UI.addKv()" style="flex-shrink:0">＋ 添加</button>
+        </div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.showStep(2)">◂ 上一步</button>
+          <button class="btn-next" onclick="UI.showStep(4)">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-diff">
+        <div class="step-title">第五步 · 难度设定</div>
+        <div class="step-hint">难度不是门槛，是选择权：同一片海，五种人生。随时可在设置中重新开始换档</div>
+        <div class="diff-list" id="diff-list"></div>
+        <div class="hint" id="diff-summary"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.showStep(3)">◂ 上一步</button>
+          <button class="btn-next" onclick="UI.showStep(5)">下一步 ▸</button>
+        </div>
+      </div>
+
+      <div class="create-step" id="step-info">
+        <div class="step-title">第六步 · 信息确认</div>
+        <div class="step-hint">确认你的船员名册与航程设定，起航后随时可在设置中重新开始</div>
+        <div id="ready-summary"></div>
+        <div class="create-nav">
+          <button class="btn-prev" onclick="UI.showStep(4)">◂ 上一步</button>
+          <button class="btn-next big" onclick="UI.startGame()">⚓ 扬帆起航 ▸</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= 主界面 ================= -->
+<div id="app" class="hidden">
+  <div id="topbar">
+    <button class="top-btn" onclick="UI.toggleChar()" title="角色与当前状况">👤<span class="tb-txt"> 角色</span></button>
+    <div class="logo">🌊 无尽之海<small>ENDLESS SEA</small></div>
+    <span class="top-chip" id="chip-loc">📍 皇港</span>
+    <span class="top-chip more" id="chip-money">💰 <b>0</b></span>
+    <span class="top-chip more" id="chip-morale">⚓ <b>75</b></span>
+    <span class="top-chip more" id="chip-wanted">🏴 <b class="warn">0</b></span>
+    <div class="spacer"></div>
+    <button class="top-btn" onclick="UI.openMemory()" title="记忆系统">🧠<span class="tb-txt"> 记忆</span></button>
+    <button class="top-btn" onclick="UI.openEncy()" title="世界百科">📖<span class="tb-txt"> 百科</span></button>
+    <button class="top-btn gold" onclick="UI.openRollback()" title="死亡记录与回档">⏪<span class="tb-txt"> 回档</span></button>
+    <button class="top-btn" onclick="UI.openSettings()" title="设置">⚙️<span class="tb-txt"> 设置</span></button>
+  </div>
+
+  <!-- 角色抽屉（左上角按钮打开） -->
+  <div id="drawer-backdrop" onclick="UI.toggleChar(false)"></div>
+  <div id="left-panel"><div id="char-body"></div></div>
+
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div id="loading-indicator"><span>AI 正在推演航海</span><span class="dots"><span></span><span></span><span></span></span><span id="loading-text" style="flex:1;text-align:right;font-size:10px;color:var(--t3)"></span></div>
+    <div class="quick-actions" id="quick-actions"></div>
+    <div id="sit-bar"><span class="sit-loc" id="sit-loc">📍 皇港</span><span id="sit-weather">🌤 晴好</span><span id="sit-ship"></span><span id="sit-warn"></span></div>
+    <div id="input-area">
+      <textarea id="user-input" rows="1" placeholder="输入你的行动…（例：去酒馆打听情报 / 扬帆出港前往绯红海）" onkeydown="UI.handleInputKey(event)"></textarea>
+      <button class="gen-btn hidden" id="stop-btn" onclick="Game.stopGen()" title="停止生成">⏹</button>
+      <button class="gen-btn" id="regen-btn" onclick="Game.regenerate()" title="重新生成上一条回复" style="display:none">🔄</button>
+      <button id="send-btn" onclick="Game.sendAction()">▶ 起航</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 设置弹窗 ================= -->
+<div class="modal-overlay hidden" id="settings-modal"><div class="modal"><h2>⚙️ 设置</h2><div id="settings-content"></div></div></div>
+
+<!-- ================= 记忆弹窗 ================= -->
+<div class="modal-overlay hidden" id="memory-modal"><div class="modal"><h2>🧠 记忆系统<span class="sp"></span><button class="btn sm" onclick="UI.closeModal('memory-modal')">关闭</button></h2><div id="mem-content"></div></div></div>
+
+<!-- ================= 世界百科弹窗 ================= -->
+<div class="modal-overlay hidden" id="ency-modal"><div class="modal"><h2>📖 世界百科<span class="sp"></span><button class="btn sm" onclick="UI.closeModal('ency-modal')">关闭</button></h2>
+  <div class="ency-layout">
+    <div class="ency-list" id="ency-list"></div>
+    <div>
+      <div class="ency-content" id="ency-content"><div class="hint">点击左侧词条查看详情；也可以向 AI 提问世界观问题。</div></div>
+      <div class="ency-ask">
+        <input id="ency-ask-input" placeholder="向 AI 询问世界观…（如：潮汐之力是什么？）" onkeydown="if(event.key==='Enter')UI.encyAsk()">
+        <button class="btn jade" onclick="UI.encyAsk()" style="flex-shrink:0">提问</button>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ================= 回档弹窗 ================= -->
+<div class="modal-overlay hidden" id="rollback-modal"><div class="modal"><h2>⏪ 死亡记录与回档<span class="sp"></span><button class="btn sm" onclick="UI.closeModal('rollback-modal')">关闭</button></h2>
+  <div class="mem-tabs">
+    <button class="mem-tab active" id="rb-tab-fail" onclick="UI.rbTab('fail')">🪦 死亡记录</button>
+    <button class="mem-tab" id="rb-tab-ck" onclick="UI.rbTab('ck')">📌 存档节点</button>
+  </div>
+  <div id="rb-content"></div>
+</div></div>
+
+<!-- ================= 死亡弹窗 ================= -->
+<div class="modal-overlay hidden" id="death-modal"><div class="modal" id="death-modal-box"><div id="death-body"></div></div></div>
+
+<!-- ================= 确认弹窗 ================= -->
+<div class="modal-overlay hidden" id="confirm-modal"><div class="modal">
+  <h2 id="cf-title">确认</h2>
+  <div id="cf-text"></div>
+  <div class="btn-row right">
+    <button class="btn" onclick="UI.closeModal('confirm-modal')">取消</button>
+    <button class="btn gold" id="cf-ok" onclick="UI.confirmOk()">确定</button>
+  </div>
+</div></div>
+
+<div id="toast-box"></div>
+<input type="file" id="import-file" accept=".json" style="display:none" onchange="Game.handleImport(event)">
+
+<script>
+'use strict';
+/* ================= 工具 ================= */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const deepClone=o=>o?JSON.parse(JSON.stringify(o)):o;
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const lsDel=k=>{try{localStorage.removeItem(k)}catch(e){}};
+const TYPES={人物:'👤',地点:'📍',事件:'⚓',物品:'📦',恩怨:'⚔️',秘辛:'🔮',其他:'📌'};
+function fmtMoney(n){n=Math.round(Number(n)||0);return n.toLocaleString('zh-CN');}
+
+/* ================= 配置 ================= */
+const LS_SAVE='endless_sea_save',LS_CFG='endless_sea_cfg';
+const DEFAULTS={apiEndpoint:'https://api.deepseek.com/v1/chat/completions',apiKey:'',model:'deepseek-chat',reasoningEffort:'medium',maxTokens:'unlimited',autosave:true,theme:'deep',fontSize:'md',models:['deepseek-chat','deepseek-reasoner']};
+let cfg=Object.assign({},DEFAULTS,lsGet(LS_CFG,{}));
+if(!cfg.models||!cfg.models.length)cfg.models=['deepseek-chat','deepseek-reasoner'];
+function saveCfg(){lsSet(LS_CFG,cfg);}
+
+/* ================= 世界观数据 ================= */
+const BACKGROUNDS=['水手世家','贵族子嗣','逃兵','渔村少年','孤儿','前祭司','流放囚犯','商人学徒','海军学院毕业生','海之子民养子'];
+const POSITIONS=['船长','大副','领航员','炮术长','船医','水手长','厨师','见习水手'];
+const SKILLS=['航海','操帆','导航','炮术','近战','剑术','火器','交涉','威吓','侦察','潜行','医疗','生存','贸易','开锁','考古','语言','音乐'];
+const ATTRS=[['str','力量','STR','近战、攀爬、搬货、登船搏杀'],['dex','敏捷','DEX','炮术、闪避、潜行、操舵'],['con','体质','CON','生命、耐疲劳、抗病'],['int','智力','INT','导航计算、贸易、破解、造物'],['wis','感知','WIS','观察、航海直觉、倾听、急救'],['cha','魅力','CHA','交涉、威吓、鼓舞船员、谈判投降']];
+const TRAITS=[
+  {k:'oldwolf',n:'老海狼',i:'🐺',cost:2,rare:false,d:'航海/操帆/炮术相关检定 +2，海战经验丰富'},
+  {k:'lucky',n:'幸运星',i:'🍀',cost:2,rare:false,d:'每天一次，可将一次失败的检定重掷'},
+  {k:'merchant',n:'商人头脑',i:'💰',cost:2,rare:false,d:'买卖价格更优，贸易利润 +10%'},
+  {k:'ironstomach',n:'铁胃',i:'🫙',cost:1,rare:false,d:'坏血病与瘟疫的发作概率大减'},
+  {k:'nighteye',n:'夜猫子',i:'🦉',cost:1,rare:false,d:'夜战与迷雾中视野更佳，先手概率提升'},
+  {k:'silver',n:'巧舌如簧',i:'🗣️',cost:2,rare:false,d:'交涉 / 谈判检定 +2'},
+  {k:'crackshot',n:'神枪手',i:'🎯',cost:2,rare:false,d:'火器命中 +2'},
+  {k:'whaleblood',n:'鲸歌血脉',i:'🐋',cost:2,rare:false,d:'可尝试与海兽沟通；海之子民初始好感更高'},
+  {k:'explorer',n:'探险家之魂',i:'🧭',cost:1,rare:false,d:'探索发现概率提升，迷航概率下降'},
+  {k:'loud',n:'大嗓门',i:'📣',cost:1,rare:false,d:'威吓 +2，鼓舞船员士气更有效'},
+  {k:'tideborn',n:'潮汐共鸣体',i:'🌊',cost:3,rare:true,d:'天生与海脉共鸣：开局即觉醒潮汐之力，潮汐点 +3'},
+  {k:'ancients',n:'先民血脉',i:'🏛️',cost:3,rare:true,d:'可解读先民遗迹的文字与符文'},
+  {k:'stormchild',n:'风暴之子',i:'⛈️',cost:3,rare:true,d:'风暴与雷暴天气中行动不受惩罚，掌舵如常'},
+  {k:'unsinkable',n:'不沉之身',i:'🛟',cost:3,rare:true,d:'船难必获救，溺水不亡'},
+  {k:'shard',n:'七海之证残片',i:'🔱',cost:3,rare:true,d:'携有一枚先民信物残片，掌握一条指向七海之证的终极线索'}
+];
+const DIFFS={
+  tianming:{n:'天命船长',sub:'纯爽',i:'🌟',d:'主角光环拉满，你是七海的天选之人，电影级爽片。',noDeath:true,start:{money:900,food:30,water:30},
+    mods:'敌方命中−3、伤害×0.5、耐久×0.7；我方命中+3、伤害×1.5、暴击区间16–20、装填与修理耗时减半。经济：收益×2、修船升级费用×0.5。生存：物资消耗减半、免疫坏血病与瘟疫、风暴永不致命。死亡：无死亡——重伤必被船员救回、船毁必"奇迹修复"、被俘必能剧情化逃脱。事件：坏事件−50%、好事件+50%、通缉涨得慢消得快。船员：永不哗变、传奇船员招募率×2、士气回升×1.5。成长：经验×2、每次升级额外+1属性点。'},
+  shunfeng:{n:'顺风航行',sub:'轻松',i:'😌',d:'顺风顺水，失误也容错，休闲放松。',start:{money:450,food:20,water:20},
+    mods:'战斗：敌方命中−1、伤害×0.75；我方伤害×1.2。经济：收益×1.5、费用×0.75。生存：物资消耗×0.8、坏血病发作慢。死亡：损失部分金币货物，船被拖回最近港口。事件：坏事件−25%。成长：经验×1.5。'},
+  biaozhun:{n:'常规航海',sub:'标准',i:'⚖️',d:'设计基准值，均衡公平（推荐大多数玩家）。',start:{money:300,food:15,water:15},
+    mods:'战斗：命中对等、暴击自然20、伤害×1。经济：正常物价。生存：正常消耗。死亡：损失部分货物金币、船受损、角色重伤休整一周。事件：正常。成长：经验×1。'},
+  fengbao:{n:'风暴航线',sub:'挑战',i:'🌊',d:'高风险高回报，步步惊心，老水手的舞台。',start:{money:250,food:12,water:12},
+    mods:'战斗：敌方命中+2、伤害×1.25、耐久×1.25；我方装填+1回合。经济：收益×1.25，但维修与补给费×1.1。生存：物资×1.25、恶劣天气概率×1.5。死亡：船沉没需购新船、角色随机失去一件装备。事件：坏事件+25%、通缉涨得快。成长：经验×0.8，传奇掉落率×1.5。'},
+  shenyuan:{n:'深渊试炼',sub:'深渊',i:'💀',d:'一步错满盘输，通关即传说。硬核挑战者专属。',start:{money:200,food:10,water:10},
+    mods:'战斗：敌方命中+4、伤害×1.5、耐久×1.5；AI使用最优战术；我方全部检定−1。经济：收益×1.5，但任何损失按全价赔。生存：物资×1.5、恶劣天气×2、无风与海怪事件大幅增加。死亡：永久阵亡（可留"传奇日记"）。事件：坏事件+50%、见罪即通缉、海军主动猎杀。成长：经验×0.6、传奇掉落率×2。'}
+};
+const SHIP_BASE={name:'双桅纵帆船',speed:6,turn:'良好',hp:45,maxHp:45,armor:1,dmg:'3d6',cargo:120,crewMax:40,note:'最平衡，新手首选'};
+const QUICK_ACTS=[
+  {t:'⚓ 出港航行',f:"Game.quickAction('sail')"},
+  {t:'🧭 探索海域',f:"Game.quickAction('explore')"},
+  {t:'📜 任务与悬赏',f:"Game.quickAction('quest')"},
+  {t:'🍺 酒馆情报',f:"Game.quickAction('tavern')"},
+  {t:'🛒 港口交易',f:"Game.quickAction('trade')"},
+  {t:'🩹 休整补给',f:"Game.quickAction('rest')"},
+  {t:'👥 船员交谈',f:"Game.quickAction('crew')"},
+  {t:'🦜 瞭望四周',f:"Game.quickAction('look')"},
+  {t:'📖 询问世界设定',f:"Game.quickAction('ask')"}
+];
+const CHEAT_ACTS=[
+  {t:'👑 全知',f:"Game.quickAction('c_omni')"},
+  {t:'🌐 瞬移',f:"Game.quickAction('c_tele')"},
+  {t:'💀 雷霆秒杀',f:"Game.quickAction('c_ko')"},
+  {t:'💎 无限财富',f:"Game.quickAction('c_money')"},
+  {t:'🌦 掌控天气',f:"Game.quickAction('c_weather')"}
+];
+const RP_RULES=`【角色扮演质量规则】保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。`;
+const WORLD_CORE=`【世界观核心·无尽之海】
+世界主体是无边海洋「无尽之海」，陆地极少：银冠洲（西方文明帝国/海军/学院/律法）、赤砂洲（南方香料黄金/走私掠夺）、白霜洲（北方冰海/白鲸/传说通往失落大陆）、失落大陆（沉没的先民故土，迷雾笼罩，最高级冒险终点）。时代为黄金航海时代（类16–17世纪）：帆船、火药、帝国扩张、海盗黄金时代；海图仍不完整，通缉令、悬赏榜、酒馆情报是这个时代的"新闻与网络"。
+基调：浪漫冒险为主（宝藏/友谊/传奇），生存务实为辅（粮食/淡水/坏血病/欠饷/风暴），幽默感常在（船员会吐槽、事件有搞笑选项），死亡不轻易，选择有后果。
+四大核心设定：
+①潮汐之力（The Tide）：海面下有流动的「海脉」，其能量即潮汐之力，老航海人称之为"海之呼吸"，极少数人能与之共鸣施展奇迹；它也是先民文明、海怪与海洋异象的根源。
+②先民与大沉没：古代「先民」文明驾驭潮汐之力在海底建城，一场「大沉没」让他们消失；遗迹、沉船、封印与知识沉睡海底——是财富，也是危险。
+③星相航法：迷雾海域靠星辰、洋流、鸟群、鲸歌定位；星图比黄金更珍贵，一张新海图能改变七海版图。
+④七海之证：集齐散落七海的七件先民信物即可号令潮汐之力、成为「七海之王」——所有野心家的终极目标，也是主线核心。
+五大海域：翡翠海（内海/文明中心/海军巡逻强/★）、绯红海（海盗之海/自由港/★★★）、迷雾海（探索区/遗迹海怪众多/★★★★）、风暴海（天候恶劣但航速快/★★★★）、霜寒海（冰山白鲸极光/失落大陆入口/★★★★★）；深渊之下（海底/先民遗迹/终极区域）。
+重要港口：皇港（帝国海军总部）、香料港（东方贸易咽喉）、海鸥城（自由港之王/无关税）、雾灯站（探索前哨）、雷公港（亡命徒聚集地）、白鲸镇（鲸油皮革）。
+主要势力：银潮帝国海军（白帆金锚旗）、绯红海盗兄弟会（以「自由之约」结盟）、东方香料商会（垄断香料瓷器，手段不干净）、海之子民/雾民（掌握潮汐之力与鲸歌，最恨说谎者）、潮汐秘教（寻找沉没遗迹，亦正亦邪，掌握禁忌「深渊」魔法）、赏金猎人公会（中立）、走私联盟（假文书/销赃/黑市情报）。
+角色成长：六属性（力量/敏捷/体质/智力/感知/魅力），调整值=(属性−10)÷2向下取整；通用检定 d20+属性调整+熟练加值≥DC（10简单/15中等/20困难/25极难/30传说）。船型：轻帆船/双桅纵帆船/武装商船/巡航舰/战列舰。船上职位：船长/大副/领航员/炮术长/船医/水手长/厨师/见习水手。5级与10级可觉醒「海魂印记」获得潮汐之力（驭风/唤潮/雷暴/鲸歌/星辉五流派，每天潮汐点=等级+感知调整，消耗潮汐点施法；禁忌「深渊」魔法威力巨大但腐蚀心智、吸引深海之物）。
+海战：每回合每船可选1个航行动作+1个行动；侧舷齐射需敌船在侧舷±30°内，命中=d20+炮术+士气修正 vs 10+敌机动(转向值)；命中后掷部位（船体/帆/桅杆/炮位/船员/货舱/要害），要害进水每回合+1d4，进水值≥剩余耐久则沉没；火攻每回合2d6；接舷战分阶段推进：对峙→压制→突破甲板→控制舵与旗→敌投降；投降条件：损失过半或士气崩溃。追击中可弃货提速、断后放火雷小艇。
+贸易：利润=销地价−产地价−关税−风险成本；物价随供需浮动（封锁→食品涨价）。声望三条主线（海军/海盗/商会）+探索声望（发现新地永久留名）；通缉度影响港口态度，可伪装/贿赂/改名换旗。
+主线三条（可交织）：《七海之证》收集七件信物对抗秘教与帝国；《大沉没之谜》追寻失落大陆真相；《帝国的影子》卷入海军与兄弟会的全面战争。`;
+
+/* ================= 创建流程状态 ================= */
+const Setup={
+  step:0, alloc:{str:8,dex:8,con:8,int:8,wis:8,cha:8}, attrLeft:27, attrCheat:false,
+  traitCheat:false, traitPts:6, traitsSel:[], skills:[], kv:[], diff:'biaozhun',
+  traitPointsUsed(){return this.traitsSel.reduce((s,k)=>{const t=TRAITS.find(x=>x.k===k);return s+(t?t.cost:0)},0);},
+  traitLeft(){return this.traitCheat?999:this.traitPts-this.traitPointsUsed();}
+};
+function attrCost(v){if(v<=13)return v-8;return 5+(v-13)*2;}
+function attrMod(v){return Math.floor((v-10)/2);}
+
+const UI={
+  init(){
+    Setup.alloc={str:8,dex:8,con:8,int:8,wis:8,cha:8};Setup.attrLeft=27;
+    Setup.traitsSel=[];Setup.skills=[];Setup.kv=[];Setup.diff='biaozhun';
+    this.step=0;
+    $('cfg-endpoint').value=cfg.apiEndpoint||DEFAULTS.apiEndpoint;
+    $('cfg-apikey').value=cfg.apiKey||'';
+    $('cfg-model').innerHTML=cfg.models.map(m=>`<option value="${esc(m)}" ${cfg.model===m?'selected':''}>${esc(m)}</option>`).join('');
+    $('cfg-reasoning').value=cfg.reasoningEffort;
+    $('cfg-maxtokens').value=cfg.maxTokens;
+    $('self-bg').innerHTML=BACKGROUNDS.map(b=>`<option>${b}</option>`).join('')+'<option>自定义</option>';
+    $('self-pos').innerHTML=POSITIONS.map(p=>`<option>${p}</option>`).join('')+'<option>自定义</option>';
+    this.renderAttr();this.renderTraits();this.renderSkills();this.renderKv();this.renderDiff();
+    $('model-hint').textContent=cfg.apiKey?'✅ 已检测到已保存的 Key，可点击「拉取模型」刷新列表':'填入 Key 后可点击「拉取」获取模型列表';
+    if(cfg.apiKey&&cfg.apiKey.startsWith('sk-'))this.fetchModels('cfg-',true);
+    this.showStep(0);
+  },
+  showStep(n){
+    Setup.step=n;
+    const steps=['api','self','talent','notes','diff','info'];
+    document.querySelectorAll('.create-step').forEach(el=>el.classList.remove('active'));
+    $('step-'+steps[n]).classList.add('active');
+    $('step-dots').innerHTML=steps.map((s,i)=>`<div class="dot ${i<=n?'on':''}"></div>`).join('');
+    $('setup-overlay').scrollTop=0;
+    if(n===5)this.renderReady();
+    if(n===4)this.renderDiff();
+    if(n===3)this.renderKv();
+  },
+  toast(msg,type){
+    const box=$('toast-box');
+    const el=document.createElement('div');
+    el.className='toast '+(type||'');
+    el.textContent=msg;
+    box.appendChild(el);
+    setTimeout(()=>el.classList.add('show'),10);
+    setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300);},2600);
+  },
+  /* ---- 第一步 API ---- */
+  async fetchModels(prefix,silent){
+    const key=$(prefix+'apikey').value.trim();
+    if(!key){if(!silent)this.toast('⚠️ 需要先填入 API Key 才能拉取模型列表');return;}
+    const ep=$(prefix+'endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    const hint=$(prefix==='cfg-'?'model-hint':'s-model-hint');
+    if(hint)hint.textContent='⏳ 正在拉取可用模型…';
+    const candidates=[];
+    if(/\/chat\/completions$/.test(ep))candidates.push(ep.replace(/\/chat\/completions$/,'/models'));
+    candidates.push(ep.replace(/\/chat\/completions$/,'')+'/models');
+    const m=ep.match(/^(https?:\/\/[^/]+)/);
+    if(m)candidates.push(m[1]+'/v1/models',m[1]+'/models');
+    for(const url of [...new Set(candidates)]){
+      try{
+        const r=await fetch(url,{headers:{'Authorization':'Bearer '+key}});
+        if(!r.ok)continue;
+        const j=await r.json();
+        const arr=(j.data||j.models||[]).map(x=>x.id||x).filter(Boolean);
+        if(arr.length){
+          cfg.models=arr.slice(0,60);
+          const sel=$(prefix+'model');
+          sel.innerHTML=arr.map(mm=>`<option value="${esc(mm)}">${esc(mm)}</option>`).join('');
+          sel.value=cfg.model&&arr.includes(cfg.model)?cfg.model:arr[0];
+          if(hint)hint.textContent='✅ 已获取 '+arr.length+' 个模型';
+          if(prefix==='cfg-')saveCfg();
+          return;
+        }
+      }catch(e){}
+    }
+    if(hint)hint.textContent='⚠️ 拉取失败（网络/CORS/Key 无效），已保留默认列表，可直接使用';
+  },
+  async testApi(){
+    const key=$('cfg-apikey').value.trim(),ep=$('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint,model=$('cfg-model').value||'deepseek-chat';
+    if(!key){this.toast('⚠️ 请先填入 API Key','error');return;}
+    this.toast('⏳ 正在测试连接…');
+    try{
+      const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'user',content:'请只回复两个字：连接成功'}],max_tokens:16})});
+      if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=(j.error&&(j.error.message||j.error.code))||msg;}catch(e){}throw new Error(msg);}
+      this.toast('✅ 连接成功：'+model,'success');
+    }catch(e){this.toast('❌ 连接失败：'+e.message,'error');}
+  },
+  saveApi(){
+    cfg.apiEndpoint=$('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    cfg.apiKey=$('cfg-apikey').value.trim();
+    cfg.model=$('cfg-model').value||'deepseek-chat';
+    cfg.reasoningEffort=$('cfg-reasoning').value;
+    cfg.maxTokens=$('cfg-maxtokens').value;
+    if(!cfg.apiKey){this.toast('⚠️ 请先填入 API Key','error');return;}
+    saveCfg();this.showStep(1);
+  },
+  /* ---- 第二步 主角 ---- */
+  renderAttr(){
+    const g=$('attr-grid');if(!g)return;
+    g.innerHTML=ATTRS.map(([k,cn,en,desc])=>{
+      const v=Setup.alloc[k];
+      return `<div class="attr-row" title="${esc(desc)}">
+        <span class="attr-name">${cn}<i>${en}</i></span>
+        <button class="attr-btn" onclick="UI.attrStep('${k}',-1)">−</button>
+        <span class="attr-val">${v}<i>${attrMod(v)>=0?' +':' '}${attrMod(v)}</i></span>
+        <button class="attr-btn" onclick="UI.attrStep('${k}',1)">＋</button>
+        <span class="attr-cost">${Setup.attrCheat?'∞':attrCost(v)+'点'}</span>
+      </div>`;
+    }).join('');
+    $('attr-left').textContent=Setup.attrCheat?'⚡ 作弊模式 · 无限加点':'剩余 '+Setup.attrLeft+' 点';
+    $('attr-cheat').textContent=Setup.attrCheat?'🔓 作弊模式：开（无限加点）':'🔓 作弊模式：关';
+    $('attr-cheat').classList.toggle('on',Setup.attrCheat);
+  },
+  attrStep(k,delta){
+    const v=Setup.alloc[k];
+    if(delta<0){
+      if(v<=8)return;
+      Setup.alloc[k]=v-1;
+      if(!Setup.attrCheat)Setup.attrLeft+=attrCost(v);
+    }
+    else{
+      if(v>=15&&!Setup.attrCheat){this.toast('属性上限 15','error');return;}
+      if(!Setup.attrCheat){
+        const used=Object.values(Setup.alloc).reduce((s,x)=>s+attrCost(x),0);
+        if(used>=27){this.toast('购点点数不足（作弊模式可无限加点）','error');return;}
+        Setup.attrLeft-=attrCost(v+1);
+      }
+      Setup.alloc[k]=v+1;
+    }
+    this.renderAttr();
+  },
+  toggleAttrCheat(){Setup.attrCheat=!Setup.attrCheat;this.renderAttr();},
+  renderSkills(){
+    const g=$('skill-grid');if(!g)return;
+    g.innerHTML=SKILLS.map(s=>`<button class="skill-chip ${Setup.skills.includes(s)?'on':''}" onclick="UI.toggleSkill('${s}')">${s}</button>`).join('');
+    $('skill-pts').textContent=Setup.skills.length+'/4';
+  },
+  toggleSkill(s){
+    if(Setup.skills.includes(s))Setup.skills=Setup.skills.filter(x=>x!==s);
+    else{
+      if(Setup.skills.length>=4&&!Setup.traitCheat){this.toast('最多选 4 项（作弊模式无限制）','error');return;}
+      Setup.skills.push(s);
+    }
+    this.renderSkills();
+  },
+  saveSelf(){
+    const name=$('self-name').value.trim();
+    if(!name){this.toast('⚠️ 请填写主角姓名','error');return;}
+    Setup.name=name;
+    Setup.gender=$('self-gender').value;
+    Setup.age=Math.min(80,Math.max(14,parseInt($('self-age').value)||22));
+    Setup.shipName=$('self-shipname').value.trim()||'雾燕号';
+    Setup.appearance=$('self-appearance').value.trim();
+    Setup.persona=$('self-persona').value.trim();
+    Setup.bg=$('self-bg').value==='自定义'?($('self-bg-custom').value.trim()||'自定义出身'):$('self-bg').value;
+    Setup.position=$('self-pos').value==='自定义'?($('self-pos-custom').value.trim()||'自由水手'):$('self-pos').value;
+    this.showStep(2);
+  },
+  /* ---- 第三步 天赋 ---- */
+  renderTraits(){
+    const g=$('trait-grid');if(!g)return;
+    const card=t=>`<div class="trait-card ${Setup.traitsSel.includes(t.k)?'on':''} ${t.rare?'rare':''}" onclick="UI.toggleTrait('${t.k}')">
+      <div class="tc-head"><span class="tc-icon">${t.i}</span><b>${t.n}</b>${t.rare?'<em>稀有</em>':''}<span class="tc-cost">${t.cost}点</span></div>
+      <div class="tc-d">${t.d}</div>
+    </div>`;
+    g.innerHTML='<div class="step-hint" style="margin:2px 0">普通天赋</div>'+TRAITS.filter(t=>!t.rare).map(card).join('')+
+      '<div class="step-hint" style="margin:10px 0 2px">稀有天赋（限 1 个）</div>'+TRAITS.filter(t=>t.rare).map(card).join('');
+    $('trait-pts-left').textContent=Setup.traitCheat?'⚡ 作弊模式 · 无限天赋点':'剩余 '+Setup.traitLeft()+' 点';
+    $('trait-cheat').textContent=Setup.traitCheat?'🔓 作弊模式：开（无限天赋点）':'🔓 作弊模式：关';
+    $('trait-cheat').classList.toggle('on',Setup.traitCheat);
+  },
+  toggleTrait(k){
+    const t=TRAITS.find(x=>x.k===k);if(!t)return;
+    if(Setup.traitsSel.includes(k)){Setup.traitsSel=Setup.traitsSel.filter(x=>x!==k);}
+    else{
+      if(t.rare&&Setup.traitsSel.some(x=>{const y=TRAITS.find(z=>z.k===x);return y&&y.rare;})){this.toast('稀有天赋限选 1 个','error');return;}
+      if(!Setup.traitCheat&&Setup.traitLeft()<t.cost){this.toast('天赋点不足（作弊模式可无限加点）','error');return;}
+      Setup.traitsSel.push(k);
+    }
+    this.renderTraits();
+  },
+  toggleTraitCheat(){Setup.traitCheat=!Setup.traitCheat;Setup.attrCheat=Setup.attrCheat||Setup.traitCheat;this.renderTraits();this.renderAttr();},
+  /* ---- 第四步 备注 ---- */
+  renderKv(){
+    const list=$('kv-list');if(!list)return;
+    list.innerHTML=Setup.kv.length?Setup.kv.map((k,i)=>`<div class="kv-row"><b>${esc(k.k)}</b><span>${esc(k.v)}</span><button class="kv-del" onclick="UI.delKv(${i})">✕</button></div>`).join(''):'<div class="hint">暂无自定义设定</div>';
+  },
+  addKv(){
+    const k=$('kv-key').value.trim(),v=$('kv-val').value.trim();
+    if(!k||!v){this.toast('请填写关键词与内容','error');return;}
+    Setup.kv.push({k,v});$('kv-key').value='';$('kv-val').value='';
+    this.renderKv();
+  },
+  delKv(i){Setup.kv.splice(i,1);this.renderKv();},
+  /* ---- 第五步 难度 ---- */
+  renderDiff(){
+    const g=$('diff-list');if(!g)return;
+    g.innerHTML=Object.entries(DIFFS).map(([k,d])=>`<div class="diff-card ${Setup.diff===k?'on':''}" onclick="UI.pickDiff('${k}')">
+      <div class="dc-head"><span class="dc-icon">${d.i}</span><b>${d.n}</b><em>${d.sub}</em></div>
+      <div class="dc-d">${d.d}</div>
+    </div>`).join('');
+    $('diff-summary').innerHTML=`<b>${DIFFS[Setup.diff].i} ${DIFFS[Setup.diff].n}</b> · ${DIFFS[Setup.diff].mods}`;
+  },
+  pickDiff(k){Setup.diff=k;this.renderDiff();},
+  /* ---- 第六步 确认 ---- */
+  renderReady(){
+    const p=Setup;
+    const kvText=p.kv.map(x=>x.k+'：'+x.v).join('；')||'无';
+    const attrs=ATTRS.map(([k,cn])=>cn+' '+p.alloc[k]).join(' ｜ ');
+    $('ready-summary').innerHTML=`
+      <div class="card"><h3>⚓ 主角</h3>
+        <div class="info-row"><span>姓名</span><b>${esc(p.name)}（${p.gender}，${p.age}岁）</b></div>
+        <div class="info-row"><span>身份</span><b>${esc(p.bg)} · ${esc(p.position)}</b></div>
+        <div class="info-row"><span>船名</span><b>${esc(p.shipName)}号（双桅纵帆船）</b></div>
+        <div class="info-row"><span>外貌</span><b>${esc(p.appearance||'（未填）')}</b></div>
+        <div class="info-row"><span>性格</span><b>${esc(p.persona||'（未填）')}</b></div>
+        <div class="info-row"><span>属性</span><b>${attrs}</b></div>
+        <div class="info-row"><span>技能</span><b>${p.skills.join('、')||'无'}</b></div>
+        <div class="info-row"><span>天赋</span><b>${p.traitsSel.map(k=>{const t=TRAITS.find(x=>x.k===k);return t?t.i+t.n:''}).join('、')||'无'}${Setup.traitCheat?'<em style="color:var(--gold)"> + 🔓作弊模式</em>':''}</b></div>
+      </div>
+      <div class="card"><h3>📝 备注与设定</h3>
+        <div class="info-row"><span>备注</span><b>${esc(p.notes||'（未填）')}</b></div>
+        <div class="info-row"><span>自定义</span><b>${esc(kvText)}</b></div>
+      </div>
+      <div class="card"><h3>🎚️ 难度</h3>
+        <div class="info-row"><span>难度</span><b>${DIFFS[p.diff].i} ${DIFFS[p.diff].n}（${DIFFS[p.diff].sub}）</b></div>
+        <div class="mini">${esc(DIFFS[p.diff].d)}</div>
+      </div>
+      <div class="card"><h3>🔌 AI 接口</h3>
+        <div class="info-row"><span>模型</span><b>${esc(cfg.model)}</b></div>
+        <div class="info-row"><span>Token 限制</span><b>${cfg.maxTokens==='unlimited'?'无限制':cfg.maxTokens}</b></div>
+      </div>`;
+  },
+  startGame(){
+    Setup.notes=$('note-input').value.trim();
+    Game.start();
+  }
+};
+/* ================= AI 调用 ================= */
+let busy=false,abortCtrl=null,compressing=false;
+const MAX_HISTORY=36;
+async function callAI(messages,opts={}){
+  if(!cfg.apiKey){if(!opts.silent)UI.toast('❌ 请先配置 API Key','error');return null;}
+  const body={model:cfg.model,messages,stream:true};
+  if(cfg.maxTokens&&cfg.maxTokens!=='unlimited')body.max_tokens=parseInt(cfg.maxTokens);
+  if(/reasoner/.test(cfg.model))body.reasoning_effort=cfg.reasoningEffort||'medium';else body.temperature=0.9;
+  const ac=new AbortController();abortCtrl=ac;
+  try{
+    const r=await fetch(cfg.apiEndpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify(body),signal:ac.signal});
+    if(!r.ok){
+      let msg='HTTP '+r.status;
+      try{const j=await r.json();msg=(j.error&&(j.error.message||j.error.code))||msg;}catch(e){}
+      throw new Error(msg);
+    }
+    if(!r.body)return {content:'',reasoning:''};
+    const reader=r.body.getReader(),dec=new TextDecoder();
+    let full='',reasoning='',buf='';
+    const flush=line=>{
+      line=line.trim();
+      if(!line.startsWith('data:'))return;
+      const data=line.slice(5).trim();
+      if(data==='[DONE]')return;
+      try{
+        const j=JSON.parse(data);
+        const d0=(j.choices&&j.choices[0]&&j.choices[0].delta)||{};
+        if(d0.reasoning_content){reasoning+=d0.reasoning_content;if(opts.onThink)opts.onThink(d0.reasoning_content);}
+        if(d0.content){full+=d0.content;if(opts.onChunk)opts.onChunk(d0.content);}
+      }catch(e){}
+    };
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      let idx;
+      while((idx=buf.indexOf('\n'))>=0){flush(buf.slice(0,idx));buf=buf.slice(idx+1);}
+    }
+    if(buf.trim())flush(buf);
+    return {content:full,reasoning};
+  }catch(e){
+    if(e.name==='AbortError')throw e;
+    if(!opts.silent)throw e;
+    return null;
+  }
+}
+function stopGen(){if(abortCtrl){abortCtrl.abort();abortCtrl=null;}}
+
+/* ================= 轻量 Markdown 渲染 ================= */
+function renderMd(t){
+  let s=esc(t);
+  s=s.replace(/^### (.*)$/gm,'<div class="md-h3">$1</div>')
+     .replace(/^## (.*)$/gm,'<div class="md-h2">$1</div>')
+     .replace(/^# (.*)$/gm,'<div class="md-h1">$1</div>')
+     .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+     .replace(/\*([^*]+)\*/g,'<i>$1</i>')
+     .replace(/`([^`]+)`/g,'<code>$1</code>')
+     .replace(/^- (.*)$/gm,'<div class="md-li">• $1</div>')
+     .replace(/\n/g,'<br>');
+  return s;
+}
+
+/* ================= 状态块解析与应用 ================= */
+function parseState(content){
+  let c=String(content||'').replace(/```(?:json)?/gi,'').replace(/```/g,'');
+  let data=null,clean=c;
+  const re=/⟦STATE⟧([\s\S]*?)⟦\/STATE⟧/g;
+  const parts=c.split(re);
+  if(parts.length>1){
+    clean=parts.filter((_,i)=>i%2===0).join('').trim();
+    for(let i=1;i<parts.length;i+=2){
+      try{data=JSON.parse(parts[i].trim());if(data&&typeof data==='object')break;}catch(e){}
+    }
+  }
+  if(!data){
+    const mm=c.match(/\{[\s\S]*\}\s*$/);
+    if(mm){
+      try{
+        const o=JSON.parse(mm[0]);
+        if(o&&typeof o==='object'&&(o.time||o.money!==undefined||o.ship||o.player)){data=o;clean=c.slice(0,mm.index).trim();}
+      }catch(e){}
+    }
+  }
+  if(!data)clean=c.replace(/⟦STATE⟧[\s\S]*?⟦\/STATE⟧/g,'').replace(/⟦STATE⟧|⟦\/STATE⟧/g,'').trim();
+  return {clean,data};
+}
+function addMemory(raw,silent){
+  if(!raw)return;
+  const i=raw.indexOf('|');
+  let type='其他',x=raw;
+  if(i>0){type=raw.slice(0,i).trim();x=raw.slice(i+1).trim();}
+  if(!TYPES[type])type='其他';
+  x=String(x).slice(0,120);
+  if(!x)return;
+  if(!state)return;
+  state.memories.push({id:uid(),t:type,x,time:state.time||''});
+  if(state.memories.length>80)state.memories=state.memories.slice(-80);
+  if(!silent)addLog('system','🧠 已记入档案：['+type+'] '+x);
+}
+function addEncy(raw){
+  if(!raw||!state)return;
+  const i=raw.indexOf('|');
+  let title=raw,x='';
+  if(i>0){title=raw.slice(0,i).trim();x=raw.slice(i+1).trim();}
+  title=String(title).slice(0,30);x=String(x).slice(0,400);
+  if(!title)return;
+  if(state.ency.some(e=>e.t===title))return;
+  state.ency.push({t:title,h:'📜',b:x||'（AI 补充的知识）',dyn:true});
+  if(state.ency.length>60)state.ency=state.ency.slice(-60);
+  addLog('system','📖 新词条已收录进世界百科：'+title);
+}
+function handleCommands(content){
+  let cause=null;
+  let re=/⟦MEMORY⟧([\s\S]*?)⟦\/MEMORY⟧/g,m,found=false;
+  while((m=re.exec(content))){addMemory(m[1],true);found=true;}
+  if(!found){re=/⟦MEMORY⟧([^⟦\n]{2,100})/g;while((m=re.exec(content)))addMemory(m[1],true);}
+  re=/⟦ENCY⟧([\s\S]*?)⟦\/ENCY⟧/g;found=false;
+  while((m=re.exec(content))){addEncy(m[1]);found=true;}
+  if(!found){re=/⟦ENCY⟧([^⟦\n]{2,300})/g;while((m=re.exec(content)))addEncy(m[1]);}
+  re=/⟦CHECKPOINT⟧([\s\S]*?)⟦\/CHECKPOINT⟧/g;
+  while((m=re.exec(content))){checkpoint(String(m[1]).trim().slice(0,40)||'关键节点');}
+  if(!/⟦CHECKPOINT⟧/.test(content)){const mm=content.match(/⟦CHECKPOINT⟧([^⟦\n]{1,40})/);if(mm)checkpoint(mm[1].trim()||'关键节点');}
+  const dm=content.match(/⟦DEATH⟧([\s\S]*?)⟦\/DEATH⟧/);
+  if(dm){cause=dm[1].trim().slice(0,80);}
+  else if(content.includes('⟦DEATH⟧')){cause='海难';}
+  return cause;
+}
+function applyState(d){
+  const s=state;if(!s)return;
+  if(d.time!==undefined)s.time=String(d.time).slice(0,40);
+  if(d.sea!==undefined)s.sea=String(d.sea).slice(0,20);
+  if(d.location!==undefined)s.location=String(d.location).slice(0,30);
+  if(d.weather!==undefined)s.weather=String(d.weather).slice(0,12);
+  if(d.wind!==undefined)s.wind=String(d.wind).slice(0,12);
+  if(d.money!==undefined)s.money=Math.max(0,Math.round(Number(d.money)||0));
+  if(d.food!==undefined)s.food=Math.max(0,Math.round(Number(d.food)||0));
+  if(d.water!==undefined)s.water=Math.max(0,Math.round(Number(d.water)||0));
+  if(d.wanted!==undefined)s.wanted=Math.max(0,Math.round(Number(d.wanted)||0));
+  if(d.player&&typeof d.player==='object'){
+    const p=s.player;
+    if(d.player.hp!==undefined)p.hp=Math.max(0,Math.round(Number(d.player.hp)||0));
+    if(d.player.maxHp!==undefined)p.maxHp=Math.max(1,Math.round(Number(d.player.maxHp)||0));
+    if(d.player.level!==undefined)p.level=Math.max(1,Math.round(Number(d.player.level)||1));
+    if(d.player.exp!==undefined)p.exp=Math.max(0,Math.round(Number(d.player.exp)||0));
+    if(d.player.expNeed!==undefined)p.expNeed=Math.max(1,Math.round(Number(d.player.expNeed)||1));
+    if(p.hp>p.maxHp)p.hp=p.maxHp;
+  }
+  if(d.ship&&typeof d.ship==='object'){
+    const sh=s.ship;
+    if(d.ship.hp!==undefined)sh.hp=Math.max(0,Math.round(Number(d.ship.hp)||0));
+    if(d.ship.maxHp!==undefined)sh.maxHp=Math.max(1,Math.round(Number(d.ship.maxHp)||0));
+    if(d.ship.armor!==undefined)sh.armor=Math.max(0,Math.round(Number(d.ship.armor)||0));
+    if(d.ship.sail!==undefined)sh.sail=Math.max(0,Math.min(100,Math.round(Number(d.ship.sail)||0)));
+    if(d.ship.morale!==undefined)sh.morale=Math.max(0,Math.min(100,Math.round(Number(d.ship.morale)||0)));
+    if(d.ship.crew!==undefined)sh.crew=Math.max(0,Math.round(Number(d.ship.crew)||0));
+    if(d.ship.maxCrew!==undefined)sh.maxCrew=Math.max(1,Math.round(Number(d.ship.maxCrew)||0));
+    if(d.ship.type!==undefined)sh.type=String(d.ship.type).slice(0,20);
+    if(d.ship.name!==undefined)sh.name=String(d.ship.name).slice(0,20);
+    if(sh.hp>sh.maxHp)sh.hp=sh.maxHp;
+  }
+  if(d.cargo!==undefined&&Array.isArray(d.cargo))s.cargo=d.cargo.slice(0,40).map(c=>({n:String(c.n||c.name||'').slice(0,20),qty:Math.max(1,Math.round(Number(c.qty)||1))}));
+  if(d.quests!==undefined&&Array.isArray(d.quests))s.quests=d.quests.slice(0,20).map(x=>String(x).slice(0,60));
+  if(d.effects!==undefined&&Array.isArray(d.effects))s.effects=d.effects.slice(0,20).map(x=>String(x).slice(0,30));
+  if(d.rep&&typeof d.rep==='object'){
+    ['navy','pirate','merchant','explore'].forEach(k=>{if(d.rep[k]!==undefined)s.rep[k]=Math.max(-100,Math.min(999,Math.round(Number(d.rep[k])||0)));});
+  }
+  if(d.memory){
+    const arr=Array.isArray(d.memory)?d.memory:[d.memory];
+    arr.filter(Boolean).forEach(t=>addMemory(String(t),true));
+  }
+  if(d.checkpoint===true)checkpoint('关键节点·'+(s.time||''));
+}
+
+/* ================= 存档节点 / 回档 ================= */
+function checkpoint(label){
+  if(!state)return;
+  const snap=deepClone(state);
+  snap.log=snap.log.slice(-120);
+  snap.history=snap.history.slice(-16);
+  state.checkpoints.unshift({id:uid(),label:String(label||'存档点').slice(0,40),time:state.time||'',snap});
+  if(state.checkpoints.length>40)state.checkpoints.length=40;
+  return state.checkpoints[0].id;
+}
+function rollbackTo(id){
+  const ck=state.checkpoints.find(c=>c.id===id);
+  if(!ck){UI.toast('找不到该存档节点','error');return;}
+  const snap=deepClone(ck.snap);
+  snap.deaths=state.deaths;
+  snap.ency=state.ency;
+  state=snap;
+  state.gameOver=false;state.ended=null;
+  saveState();
+  renderLog();
+  Game.renderAll();
+  UI.closeModal('death-modal');
+  UI.closeModal('rollback-modal');
+  UI.closeModal('confirm-modal');
+  Game.closeChar();
+  UI.toast('✅ 已回到关键节点：'+ck.label,'success');
+  addLog('system','⏪ 已回到关键节点「'+esc(ck.label)+'」，历史可以重写。');
+}
+
+/* ================= 系统提示词 ================= */
+function snapshotText(){
+  const s=state,p=s.player;
+  const cargo=s.cargo.map(c=>c.n+(c.qty>1?'×'+c.qty:'')).join('、')||'无';
+  const quests=s.quests.join('、')||'无';
+  const mems=s.memories.slice(-8).map(x=>'['+x.t+']'+x.x).join('；')||'（暂无）';
+  const tide=p.tide?(' 潮汐点 '+p.tide+'/'+p.maxTide):'';
+  return `- 时间：${s.time} ｜ 海域：${s.sea} ｜ 地点：${s.location} ｜ 天气：${s.weather} ｜ 风向：${s.wind||'未知'}
+- 玩家：生命 ${p.hp}/${p.maxHp} ｜ 等级 ${p.level} ｜ 经验 ${p.exp}/${p.expNeed}${tide}
+- 船只：${s.ship.name}（${s.ship.type}）耐久 ${s.ship.hp}/${s.ship.maxHp} 护甲 ${s.ship.armor} 帆装 ${s.ship.sail}% 士气 ${s.ship.morale} 船员 ${s.ship.crew}/${s.ship.maxCrew}
+- 金币：${fmtMoney(s.money)} ｜ 粮食：${s.food}天 ｜ 淡水：${s.water}天
+- 货物：${cargo}
+- 声望：海军 ${s.rep.navy} 海盗 ${s.rep.pirate} 商会 ${s.rep.merchant} 探索 ${s.rep.explore} ｜ 通缉度：${s.wanted}
+- 任务：${quests}
+- 状态效果：${s.effects.join('、')||'无'}
+- 近期记忆：${mems}`;
+}
+function buildSystem(){
+  const p=state.player;
+  const kvText=p.kv.map(x=>x.k+'：'+x.v).join('；')||'无';
+  const traitText=p.traits.map(t=>t.i+t.n+'（'+t.d+'）').join('；')||'无';
+  const diff=DIFFS[state.difficulty]||DIFFS.biaozhun;
+  const cheatText=state.cheat?`【🔴 金手指模式（作弊模式）已激活】
+玩家拥有命运作弊器：全知（直接得知任何隐藏信息与真相）、瞬移（任意穿梭海域/地点）、雷霆秒杀（一击消灭任何敌人/舰队）、无限财富（获得任意数量金币）、掌控天气（随心改变天气风向）。玩家发出【金手指·xxx】指令时，你必须立即以华丽震撼的演出响应并实现其效果（结果必须成功），但保持剧情连贯与幽默感；禁用「作弊失效」类反转。`:'';
+  const mems=state.memories.slice(-14).map(x=>'['+x.t+']'+x.x).join('\n');
+  return `${RP_RULES}
+
+${WORLD_CORE}
+
+【当前玩家设定（永不遗忘，必须严格遵守，任何情况下不得篡改或遗漏）】
+- 姓名：${p.name}（${p.gender}，${p.age}岁）｜ 出身：${p.bg} ｜ 船上职位：${p.position}
+- 外貌：${p.appearance||'（由你在演绎中自然呈现）'}
+- 性格：${p.persona||'（由你在演绎中自然呈现）'}
+- 属性：力量${p.attrs.str} 敏捷${p.attrs.dex} 体质${p.attrs.con} 智力${p.attrs.int} 感知${p.attrs.wis} 魅力${p.attrs.cha}（调整值=(属性−10)÷2）
+- 熟练技能：${p.skills.join('、')||'无'}
+- 天赋：${traitText||'无'}
+- 玩家备注：${p.notes||'无'}
+- 自定义设定：${kvText||'无'}
+
+【游戏机制（必须遵守）】
+1. 回合制演绎：每次回复推动剧情，不得代替玩家行动/发言/思考/选择；回复结束后等待玩家输入。
+2. 每次回复末尾必须附带状态块（正文之外另起一行）：⟦STATE⟧{...}⟦/STATE⟧，字段：
+   {"time":"第3天·清晨","sea":"翡翠海","location":"皇港","weather":"晴好","wind":"顺风",
+    "player":{"hp":10,"maxHp":10,"level":1,"exp":40,"expNeed":100},
+    "ship":{"name":"雾燕号","type":"双桅纵帆船","hp":45,"maxHp":45,"armor":1,"sail":100,"morale":75,"crew":10,"maxCrew":40},
+    "money":300,"food":15,"water":15,"cargo":[{"n":"朗姆酒","qty":10}],
+    "rep":{"navy":0,"pirate":0,"merchant":0,"explore":0},"wanted":0,
+    "quests":["护送香料商前往香料港"],"effects":["轻伤"],
+    "memory":["皇港酒馆老板欠你一个人情"],"checkpoint":false}
+   每次状态变化（生命/金钱/声望/位置/天气/船况/货物等）都必须如实更新；无变化字段可省略。
+3. 检定规则：d20+属性调整+熟练加值(2)≥DC（10简单/15中等/20困难/25极难/30传说）；战斗时描述骰值与结果。
+4. 记忆：重要事件（新人物/地点/恩怨/关键线索/重大决策）输出 ⟦MEMORY⟧类型|内容⟦/MEMORY⟧（类型：人物/地点/事件/物品/恩怨/秘辛/其他），每次回复不超过3条。
+5. 百科：玩家问及或你提到的新世界观知识可输出 ⟦ENCY⟧标题|内容⟦/ENCY⟧。
+6. 关键节点：重大抉择、出港、抵达港口、主线推进时输出 ⟦CHECKPOINT⟧节点名⟦/CHECKPOINT⟧（游戏会存档供死亡回档）。
+7. 死亡：玩家生命归零或遭遇必死局面时，输出 ⟦DEATH⟧死亡原因⟦/DEATH⟧（本难度死亡规则见下），随后立即结束当前回复。
+8. 文风：回复150-450字（战斗/大事件可稍长），中文，航海黄金时代质感；浪漫冒险为主、幽默感常在、死亡不轻易；NPC有边界感（见角色扮演守则）；不用"本AI""游戏"等出戏词汇，保持沉浸。
+9. 玩家询问当前状态/规则/世界设定时，如实简洁回答。
+
+【当前难度】${diff.i} ${diff.n}（${diff.sub}）——本局所有数值与事件强度必须按此执行：
+${diff.mods}
+${state.cheat?'':'（若难度为天命船长：玩家永不真正死亡，重伤必获救，绝不触发 ⟦DEATH⟧）'}
+${cheatText}
+
+【故事摘要（长对话压缩后的记忆，同样不可遗忘）】
+${state.summary||'（无，故事刚开始）'}
+
+【已发生的重要记忆】
+${mems||'（暂无）'}
+
+【玩家当前状态】
+${snapshotText()}`;
+}
+
+/* ================= 游戏核心 ================= */
+let state=null;
+const Game={
+  _streamNode:null,
+  setBusy(b){
+    busy=b;
+    $('loading-indicator').classList.toggle('hidden',!b);
+    $('send-btn').classList.toggle('hidden',b);
+    $('stop-btn').classList.toggle('hidden',!b);
+  },
+  start(){
+    const p=Setup;
+    state={
+      v:1,turn:0,difficulty:p.diff,cheat:Setup.traitCheat||Setup.attrCheat,
+      time:'第1天·清晨',sea:'翡翠海',location:'皇港',weather:'晴好',wind:'顺风',
+      player:{
+        name:p.name,gender:p.gender,age:p.age,appearance:p.appearance,persona:p.persona,
+        bg:p.bg,position:p.position,shipName:p.shipName,
+        attrs:Object.assign({},p.alloc),skills:[...p.skills],
+        traits:p.traitsSel.map(k=>{const t=TRAITS.find(x=>x.k===k);return t?{k:t.k,n:t.n,i:t.i,d:t.d}:null}).filter(Boolean),
+        notes:p.notes||'',kv:[...p.kv],
+        level:1,exp:0,expNeed:100,
+        hp:6+Math.floor(p.alloc.con/2),maxHp:6+Math.floor(p.alloc.con/2),
+        tide:p.traitsSel.includes('tideborn')?Math.max(1,3+attrMod(p.alloc.wis)):0,
+        maxTide:p.traitsSel.includes('tideborn')?Math.max(1,3+attrMod(p.alloc.wis)):0
+      },
+      ship:{name:p.shipName,type:'双桅纵帆船',hp:45,maxHp:45,armor:1,sail:100,morale:75,crew:10,maxCrew:40},
+      money:(DIFFS[p.diff]||DIFFS.biaozhun).start.money,
+      food:(DIFFS[p.diff]||DIFFS.biaozhun).start.food,
+      water:(DIFFS[p.diff]||DIFFS.biaozhun).start.water,
+      cargo:[],rep:{navy:0,pirate:0,merchant:0,explore:0},wanted:0,
+      quests:[],effects:[],memories:[],summary:'',ency:[],history:[],log:[],
+      checkpoints:[],deaths:[],ended:null,gameOver:false
+    };
+    checkpoint('故事开始·皇港');
+    saveState();
+    this.enterGame();
+    const shipName=state.ship.name;
+    addLog('system','🌊 新的航程开始了——海图展开，风帆升起，七海在等待你的名字。');
+    state.log.push({t:'system',x:'🌊 新的航程开始了——海图展开，风帆升起，七海在等待你的名字。'});
+    const opening=`【故事开场】清晨的皇港，雾霭还未散尽。你站在码头上，面前是一艘崭新的双桅纵帆船「${shipName}」——你的船，以及船上十名等待你号令的船员。请以航海日志般富有质感的文笔开场：描写港口晨景、你的船与船员们的样貌神态，并给出眼前的处境：悬赏榜上贴着什么、酒馆里能打听到什么、以及出港的方向。最后以三个左右的行动方向收尾，等待玩家选择。不要替玩家做决定，不要直接开始剧情事件。`;
+    setTimeout(()=>{Game.turn(opening,{hideUser:true});},400);
+  },
+  enterGame(){
+    $('setup-overlay').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    this.renderAll();
+  },
+  renderAll(){this.renderChips();this.renderQuick();this.renderSit();this.renderChar();},
+  renderChips(){
+    if(!state)return;
+    $('chip-loc').textContent='📍 '+(state.location||'未知');
+    $('chip-money').textContent='💰 '+fmtMoney(state.money);
+    $('chip-morale').textContent='⚓ 士气 '+state.ship.morale;
+    $('chip-wanted').textContent='🏴 通缉 '+state.wanted;
+  },
+  renderSit(){
+    if(!state)return;
+    $('sit-loc').textContent='📍 '+state.location+(state.location!==state.sea?' · '+state.sea:'');
+    $('sit-weather').textContent='🌤 '+state.weather+(state.wind?' · '+state.wind:'');
+    $('sit-status').textContent='⛵ '+state.ship.name+' 耐久'+state.ship.hp+'/'+state.ship.maxHp+' ｜ 船员'+state.ship.crew+'/'+state.ship.maxCrew;
+  },
+  renderQuick(){
+    const acts=[...(state&&state.cheat?CHEAT_ACTS:[]),...QUICK_ACTS];
+    $('quick-actions').innerHTML=acts.map(a=>`<button class="quick-action ${state&&state.cheat&&a.t.startsWith('👑')||state&&state.cheat&&a.t.startsWith('🌐')||state&&state.cheat&&a.t.startsWith('💀')||state&&state.cheat&&a.t.startsWith('💎')||state&&state.cheat&&a.t.startsWith('🌦')?'cheat':''}" onclick="${a.f}">${a.t}</button>`).join('');
+  },
+  quickAction(k){
+    if(busy)return;
+    const map={
+      sail:'【行动】升帆出航，向目标海域进发。',
+      explore:'【行动】瞭望并探索附近海域，寻找岛屿、遗迹或商船踪迹。',
+      quest:'【行动】查看港口的悬赏榜和任务公告，选择感兴趣的任务。',
+      tavern:'【行动】去酒馆喝一杯，打探情报与传闻。',
+      trade:'【行动】在港口进行交易买卖，看看行情。',
+      rest:'【行动】休整补给，安排船员轮休与船只维护。',
+      crew:'【行动】与船员们交谈，了解他们的近况与想法。',
+      look:'【行动】环顾四周，观察当前环境的细节。',
+      ask:'【设定】请简明扼要地介绍当前所在海域/地点/势力，以及我此刻可以做什么。',
+      c_omni:'【金手指·全知】我闭上眼，海脉的低语涌来——请告诉我当前场景中所有隐藏信息、NPC的真实身份与意图、以及任何隐藏的陷阱与宝物。',
+      c_tele:'【金手指·瞬移】我化作一道流光，瞬间抵达我想去的任何地点。',
+      c_ko:'【金手指·雷霆秒杀】我抬手召来雷霆，一击摧毁当前所有敌对目标！',
+      c_money:'【金手指·无限财富】我从海底的沉船宝库中提取大量金币。',
+      c_weather:'【金手指·掌控天气】我以意念改变天气与风向，令其随心所欲。'
+    };
+    this.turn(map[k]||k);
+  },
+  sendAction(){
+    const input=$('user-input');
+    const v=input.value.trim();
+    if(!v||busy)return;
+    input.value='';
+    this.turn(v);
+  },
+  regenerate(){
+    if(busy||!state)return;
+    const last=state.history[state.history.length-1];
+    if(!last||last.role!=='assistant'){UI.toast('暂无可重写的回复','error');return;}
+    state.history.pop();
+    const userMsg=state.history[state.history.length-1];
+    if(state.log.length&&state.log[state.log.length-1].t==='ai')state.log.pop();
+    renderLog();
+    this.turn(userMsg?userMsg.content:'请继续。',{regen:true});
+  },
+  async turn(userText,opts={}){
+    if(busy||!state)return;
+    if(state.gameOver){UI.toast('本段航程已终结，请回档或重新开始','error');return;}
+    this.setBusy(true);
+    state.history.push({role:'user',content:userText});
+    const msgs=[{role:'system',content:buildSystem()}];
+    for(const m of state.history.slice(-MAX_HISTORY))msgs.push({role:m.role,content:m.content});
+    const node=addLog('ai','',true);
+    const textEl=node.querySelector('.txt');
+    let acc='',think='';
+    $('loading-text').textContent='AI 正在推演航海…';
+    try{
+      const res=await callAI(msgs,{
+        onChunk:c=>{
+          acc+=c;
+          textEl.innerHTML=renderMd(acc.replace(/⟦STATE⟧[\s\S]*?⟦\/STATE⟧/g,'').replace(/⟦MEMORY⟧[\s\S]*?⟦\/MEMORY⟧/g,'').replace(/⟦ENCY⟧[\s\S]*?⟦\/ENCY⟧/g,'').replace(/⟦CHECKPOINT⟧[\s\S]*?⟦\/CHECKPOINT⟧/g,'').replace(/⟦DEATH⟧[\s\S]*?⟦\/DEATH⟧/g,''));
+          $('game-log').scrollTop=$('game-log').scrollHeight;
+        },
+        onThink:c=>{think+=c;$('loading-text').textContent='💭 AI 正在推演航海…（思考中）';}
+      });
+      if(!res||!res.content){
+        if(abortCtrl&&!busy)return;
+        throw new Error('无回复内容');
+      }
+      const {clean,data}=parseState(res.content);
+      const cause=handleCommands(res.content);
+      node.querySelector('.txt').innerHTML=renderMd(clean)+(think?'<details class="think"><summary>💭 推演过程</summary>'+esc(think.slice(-1500))+'</details>':'');
+      state.history.push({role:'assistant',content:clean});
+      state.turn++;
+      if(data)applyState(data);
+      if(state.turn%8===0)checkpoint('自动存档·回合'+state.turn);
+      if(!opts.regen)saveState();
+      this.renderAll();
+      if(cause||(data&&data.dead===true)||state.player.hp<=0){
+        await this.onDeath(cause||(data&&data.dead===true?'海难':'伤势过重'));
+        return;
+      }
+      if(state.history.length>MAX_HISTORY)compressHistory();
+    }catch(e){
+      if(e.name==='AbortError'){
+        addLog('system','⏹ 已停止生成。');
+        state.history.pop();
+        if(!opts.regen)saveState();
+      }else{
+        addLog('system','❌ 出错了：'+esc(e.message)+'（可在设置中检查 API 配置）');
+        state.history.pop();
+      }
+    }finally{
+      this.setBusy(false);
+    }
+  },
+  closeChar(){
+    $('left-panel').classList.remove('open');
+    $('drawer-backdrop').classList.remove('show');
+  }
+};
+/* ================= 死亡评价与死亡流程 ================= */
+async function evalDeath(cause){
+  const S=state,p=S.player;
+  const recent=S.history.slice(-12).map(m=>(m.role==='user'?'【你】':'【演绎】')+String(m.content).slice(0,260)).join('\n');
+  const sys=`你是「无尽之海」的深渊记录官，负责为死去的航海者书写航海日志的终章。请以航海日志编纂者的口吻给出死亡定论。只输出严格JSON（不要多余文字），格式：{"title":"死亡称号（2-6字，如：风暴中的无名者/贪婪者的墓碑/暗礁下的沉骸）","eval":"日志式总评，80-140字","critiques":["3-5条，每条20-50字，逐条点评玩家本次航海中的关键行为与失误"],"advice":"若回到关键时间点重来，给玩家的建议，60-120字"}。critiques要具体到行为，不要空话套话。`;
+  const diff=DIFFS[S.difficulty]||DIFFS.biaozhun;
+  const user=`玩家设定：${p.name}（${p.gender}，${p.age}岁）出身${p.bg}，职位${p.position}，性格${p.persona||'未知'}，天赋${p.traits.map(t=>t.n).join('、')||'无'}，备注：${p.notes||'无'}
+难度：${diff.n}（${diff.sub}）
+死亡原因：${cause}
+死亡时状态：${snapshotText()}
+故事摘要：
+${S.summary||'（无）'}
+近期经历：
+${recent||'（无）'}`;
+  addLog('system','🪦 深渊记录官正在秉笔直书…');
+  const res=await callAI([{role:'system',content:sys},{role:'user',content:user}],{silent:true});
+  const fallback={title:'葬身七海者',eval:'潮水吞没了你的名字，唯有海图上一枚褪色的墨点记得你来过。',critiques:['（记录官失语，未能点评）'],advice:'回档重来，备足补给，稳扎稳打。'};
+  if(!res||!res.content)return fallback;
+  let out=fallback;
+  const m=res.content.match(/⟦EVAL⟧([\s\S]*?)⟦\/EVAL⟧/);
+  const txt=m?m[1]:res.content;
+  const jm=txt.match(/\{[\s\S]*\}/);
+  if(jm){
+    try{
+      const o=JSON.parse(jm[0]);
+      if(o&&typeof o==='object'){
+        out={title:String(o.title||fallback.title).slice(0,10),
+          eval:String(o.eval||fallback.eval),
+          critiques:Array.isArray(o.critiques)?o.critiques.slice(0,6).map(String):fallback.critiques,
+          advice:String(o.advice||fallback.advice)};
+      }
+    }catch(e){}
+  }
+  return out;
+}
+function showDeathModal(ev,cause){
+  const body=$('death-body');
+  if(!ev){
+    body.innerHTML=`<div class="death-loading">🪦 深渊记录官正在秉笔直书…<div class="dots"><span></span><span></span><span></span></div></div>`;
+  }else{
+    body.innerHTML=`
+      <div class="death-title">「${esc(ev.title)}」</div>
+      <div class="death-cause">💀 ${esc(cause)} ｜ 时间：${esc(state.deaths[0]?state.deaths[0].time:state.time)}</div>
+      <div class="card"><h3>📜 航海日志·终章</h3><div class="death-eval">${esc(ev.eval)}</div></div>
+      <div class="card"><h3>🔍 逐条点评</h3>${ev.critiques.map(c=>`<div class="death-critique">• ${esc(c)}</div>`).join('')}</div>
+      <div class="card"><h3>💡 建议</h3><div class="death-advice">${esc(ev.advice)}</div></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn gold" style="flex:1" onclick="Game.rollbackToNearest()">⏪ 回到关键时间点</button>
+        <button class="btn" style="flex:1" onclick="UI.openRollback();UI.closeModal('death-modal')">📜 死亡记录</button>
+        <button class="btn" style="flex:1;color:var(--r);border-color:var(--r)" onclick="Game.restart()">🔄 重新开始</button>
+      </div>
+      <div class="hint" style="margin-top:8px">「回到关键时间点」将回到死亡前最近的关键存档节点，历史可以重写。</div>`;
+  }
+  UI.openModal('death-modal');
+}
+async function onDeath(cause){
+  const S=state;
+  if(!S)return;
+  const diff=DIFFS[S.difficulty]||DIFFS.biaozhun;
+  if(diff.noDeath||S.cheat){
+    S.player.hp=Math.max(1,Math.round(S.player.maxHp*0.3));
+    S.ship.hp=Math.max(1,Math.round(S.ship.maxHp*0.3));
+    addLog('system','🌟 **主角光环发动**：命运不允许你在此谢幕——船员们拼死把你从海底捞了回来，船也被奇迹般修复。你重伤休整，故事继续。');
+    saveState();Game.renderAll();
+    UI.toast('🌟 奇迹生还！','success');
+    return;
+  }
+  S.gameOver=true;
+  addLog('system','💀 **海难**：'+cause);
+  const ckId=S.checkpoints.length?S.checkpoints[0].id:null;
+  showDeathModal(null,cause);
+  const ev=await evalDeath(cause);
+  S.deaths.unshift({id:uid(),time:S.time,cause,ckId,title:ev.title,eval:ev.eval,critiques:ev.critiques,advice:ev.advice});
+  S.ended={title:ev.title,cause,time:S.time};
+  saveState();
+  showDeathModal(ev,cause);
+}
+/* ================= 记忆压缩 ================= */
+async function compressHistory(){
+  if(compressing||!state||state.history.length<=MAX_HISTORY)return;
+  compressing=true;
+  try{
+    const keep=state.history.slice(-16);
+    const old=state.history.slice(0,-16);
+    const oldText=old.map(m=>(m.role==='user'?'【你】':'【演绎】')+m.content).join('\n').slice(-12000);
+    addLog('system','📎 海图官整理航海日志：长对话正在压缩进故事摘要…');
+    const res=await callAI([
+      {role:'system',content:'你是「无尽之海」的航海日志编纂官。根据旧摘要与新增对话，生成更新后的故事摘要：保留重大事件、决策与后果、人物关系变化、势力变动、秘密与伏笔，用第三人称简洁叙述，350字以内，只输出摘要正文，不要任何解释或格式。'},
+      {role:'user',content:'旧摘要：\n'+(state.summary||'(无)')+'\n\n新增对话：\n'+oldText}
+    ],{silent:true});
+    if(res&&res.content&&res.content.trim()){
+      const c=res.content.trim().replace(/⟦STATE⟧[\s\S]*?⟦\/STATE⟧/g,'').trim();
+      if(c)state.summary=c;
+      addLog('system','✅ 航海日志整理完成，故事摘要已更新。');
+    }else{
+      state.summary=(state.summary?state.summary+'\n':'')+'（较早的日常细节已归档）';
+      addLog('system','⚠️ 整理失败，较早对话已归档。');
+    }
+    state.history=keep;
+    saveState();
+  }finally{compressing=false;}
+}
+/* ================= 存档管理 ================= */
+function exportSave(){
+  if(!state)return;
+  const data={type:'endless-sea-save',v:1,savedAt:new Date().toLocaleString('zh-CN'),state:state};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(state.player.name||'无尽之海')+'·无尽之海存档.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  UI.toast('✅ 存档已导出','success');
+}
+function importSave(){$('import-file').click();}
+function handleImport(e){
+  const f=e.target.files&&e.target.files[0];
+  e.target.value='';
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      const s=d.state||d;
+      if(!s||!s.player||!s.ship)throw new Error('格式不正确');
+      state=repairState(s);
+      saveState();
+      enterGame();
+      renderAll();
+      UI.toast('✅ 存档导入成功','success');
+    }catch(err){
+      UI.toast('❌ 导入失败：'+err.message,'error');
+    }
+  };
+  rd.readAsText(f);
+}
+function restartGame(){
+  UI.confirm('重新开始','将清除当前全部进度并回到创建流程，是否继续？',()=>{
+    window._skipSave=true;
+    lsDel(LS_SAVE);
+    location.reload();
+  });
+}
+/* ================= Game 别名与回档扩展 ================= */
+Game.exportSave=exportSave;Game.importSave=importSave;Game.handleImport=handleImport;Game.restart=restartGame;Game.rollbackToNearest=function(){
+  if(!state||!state.deaths.length){UI.toast('没有可回档的死亡记录','error');return;}
+  const d=state.deaths[0];
+  if(d.ckId)rollbackTo(d.ckId);
+  else if(state.checkpoints.length)rollbackTo(state.checkpoints[0].id);
+  else UI.toast('找不到死亡前的存档节点','error');
+};
+/* ================= 角色面板（实时状态） ================= */
+function renderChar(){
+  const panel=$('char-body');
+  if(!state){return;}
+  const p=state.player,s=state,sh=s.ship;
+  const expPct=Math.min(100,Math.round(p.exp/(p.expNeed||1)*100));
+  const hpPct=Math.min(100,Math.round(p.hp/(p.maxHp||1)*100));
+  const attrs=ATTRS.map(([k,cn])=>{
+    const v=p.attrs[k]||8;
+    return `<div class="c-attr" title="${esc(ATTRS.find(a=>a[0]===k)[3])}"><span>${cn}</span><b>${v}</b><i>${attrMod(v)>=0?'+':''}${attrMod(v)}</i></div>`;
+  }).join('');
+  const tide=('tideborn' in p.tide?p.tide:0);
+  const cargo=s.cargo.map(c=>c.n+(c.qty>1?'×'+c.qty:'')).join('、')||'无';
+  const repTxt=[['海军',s.rep.navy],['海盗',s.rep.pirate],['商会',s.rep.merchant],['探索',s.rep.explore]].map(([n,v])=>`${n} ${v}`).join(' ｜ ');
+  panel.innerHTML=`
+    <div class="panel-card char-head">
+      <div class="char-avatar">⚓</div>
+      <div><div class="char-name">${esc(p.name)}</div>
+      <div class="char-meta">${esc(p.position)} · ${esc(p.bg)} · Lv.${p.level}</div></div>
+    </div>
+    <div class="panel-card">
+      <div class="stat-row"><span class="stat-label">生命</span><div class="stat-bar-wrap"><div class="stat-bar-fill hp" style="width:${hpPct}%"></div></div><span class="stat-val">${p.hp}/${p.maxHp}</span></div>
+      <div class="stat-row"><span class="stat-label">经验</span><div class="stat-bar-wrap"><div class="stat-bar-fill xp" style="width:${expPct}%"></div></div><span class="stat-val">${p.exp}/${p.expNeed}</span></div>
+      <div class="ability-grid">${attrs}</div>
+    </div>
+    <div class="panel-card"><h3>🎯 熟练技能</h3>
+      <div class="chip-wrap">${p.skills.map(x=>`<span class="mini-chip">${x}</span>`).join('')||'<span class="hint">无</span>'}</div>
+    </div>
+    <div class="panel-card"><h3>🌟 天赋</h3>
+      <div class="chip-wrap">${p.traits.map(t=>`<span class="mini-chip gold">${t.i}${t.n}</span>`).join('')||'<span class="hint">无</span>'}
+      ${s.cheat?'<span class="mini-chip cheat">🔓 作弊模式</span>':''}</div>
+    </div>
+    <div class="panel-card"><h3>📋 当前状况 <em class="live">实时</em></h3>
+      <div class="kv2">
+        <div><span>📍 位置</span><b>${esc(s.location)} · ${esc(s.sea)}</b></div>
+        <div><span>⏳ 时间</span><b>${esc(s.time)}</b></div>
+        <div><span>🌤 天气</span><b>${esc(s.weather)}${s.wind?' · '+esc(s.wind):''}</b></div>
+        <div><span>⛵ 船只</span><b>${esc(sh.name)}（${esc(sh.type)}）</b></div>
+        <div><span>🛡 耐久</span><b>${sh.hp}/${sh.maxHp} ｜ 护甲 ${sh.armor} ｜ 帆 ${sh.sail}%</b></div>
+        <div><span>⚓ 士气</span><b>${sh.morale}${sh.morale>80?'（昂扬）':sh.morale<30?'（濒临哗变！）':''}</b></div>
+        <div><span>👥 船员</span><b>${sh.crew}/${sh.maxCrew}</b></div>
+        <div><span>💰 金币</span><b>${fmtMoney(s.money)}</b></div>
+        <div><span>🍞 补给</span><b>粮食 ${s.food}天 ｜ 淡水 ${s.water}天</b></div>
+        <div><span>📦 货物</span><b>${esc(cargo)}</b></div>
+        <div><span>🎖 声望</span><b>${repTxt}</b></div>
+        <div><span>🏴 通缉度</span><b>${s.wanted}${s.wanted>0?'（小心海军盘查）':''}</b></div>
+        <div><span>📜 任务</span><b>${esc(s.quests.join('；')||'无')}</b></div>
+        <div><span>🩹 状态</span><b>${esc(s.effects.join('、')||'良好')}</b></div>
+      </div>
+    </div>
+    <div class="panel-card"><h3>🧠 记忆摘录</h3>
+      <div class="mem-mini">${s.memories.slice(-6).map(m=>`<div>${TYPES[m.t]||'📌'} ${esc(m.x)}</div>`).join('')||'<span class="hint">暂无记忆</span>'}</div>
+    </div>
+    <div class="panel-card"><h3>📝 备注</h3><div class="hint">${esc(p.notes||'（无）')}</div></div>`;
+}
+/* ================= 模态框系统 ================= */
+UI.openModal=function(id){$(id).classList.add('show');};
+UI.closeModal=function(id){$(id).classList.remove('show');};
+UI.confirm=function(title,text,fn){
+  $('cf-title').textContent=title;
+  $('cf-text').innerHTML=esc(text);
+  $('cf-ok').onclick=()=>{UI.closeModal('confirm-modal');fn&&fn();};
+  UI.openModal('confirm-modal');
+};
+/* ================= 设置（参考 xiantu 设置页） ================= */
+UI.openSettings=function(){
+  UI.renderSettings();
+  UI.openModal('settings-modal');
+};
+UI.renderSettings=function(){
+  const c=cfg;
+  const modelOpts=c.models.map(m=>`<option value="${esc(m)}" ${c.model===m?'selected':''}>${esc(m)}</option>`).join('');
+  $('settings-content').innerHTML=`
+    <div class="card"><h3>🔌 API 设置</h3>
+      <label>API 端点</label><input id="s-endpoint" value="${esc(c.apiEndpoint)}">
+      <label>API Key（仅保存在本机浏览器）</label><input id="s-apikey" type="password" value="${esc(c.apiKey)}">
+      <label>模型</label><div class="row-flex"><select id="s-model" style="flex:1;margin-bottom:0">${modelOpts}</select><button class="btn sm" onclick="UI.fetchModels('s-')">🔄 拉取</button></div>
+      <div class="hint" id="s-model-hint">可点击「拉取」获取最新模型列表</div>
+      <label>推理强度</label>
+      <select id="s-reasoning"><option value="low" ${c.reasoningEffort==='low'?'selected':''}>低（更快）</option><option value="medium" ${c.reasoningEffort==='medium'?'selected':''}>中（均衡）</option><option value="high" ${c.reasoningEffort==='high'?'selected':''}>高（更细腻）</option></select>
+      <label>输出 Token 限制</label>
+      <select id="s-maxtokens"><option value="unlimited" ${c.maxTokens==='unlimited'?'selected':''}>无限制</option><option value="2048" ${c.maxTokens==='2048'?'selected':''}>2048</option><option value="4096" ${c.maxTokens==='4096'?'selected':''}>4096</option><option value="8192" ${c.maxTokens==='8192'?'selected':''}>8192</option><option value="16384" ${c.maxTokens==='16384'?'selected':''}>16384</option></select>
+    </div>
+    <div class="card"><h3>🎨 界面风格</h3>
+      <div class="theme-row">
+        ${['deep','amber','crimson','jade'].map(t=>`<button class="theme-btn ${t} ${c.theme===t?'on':''}" onclick="UI.pickTheme('${t}')">${t==='deep'?'🌊 深海之夜':t==='amber'?'🏮 琥珀航线':t==='crimson'?'🏴 绯红之海':'🌿 翠浪'}</button>`).join('')}
+      </div>
+      <label>字体大小</label>
+      <select id="s-fontsize"><option value="sm" ${c.fontSize==='sm'?'selected':''}>小</option><option value="md" ${c.fontSize==='md'?'selected':''}>中</option><option value="lg" ${c.fontSize==='lg'?'selected':''}>大</option></select>
+    </div>
+    <div class="card"><h3>💾 存档管理</h3>
+      <div class="chk-row"><input type="checkbox" id="s-autosave" ${c.autosave?'checked':''}><label for="s-autosave" style="margin:0">自动存档（每回合后自动保存）</label></div>
+      <div class="btn-row">
+        <button class="btn" style="flex:1" onclick="Game.exportSave()">⬇ 导出存档</button>
+        <button class="btn" style="flex:1" onclick="Game.importSave()">⬆ 导入存档</button>
+      </div>
+      <button class="btn" style="width:100%;color:var(--r);border-color:var(--r);margin-top:8px" onclick="Game.restart()">🔄 重新开始</button>
+      <div class="hint" style="margin-top:6px">导出为 JSON 文件可备份或换设备；API Key 仅保存在本机浏览器。重新开始将清除全部进度。</div>
+    </div>
+    <div class="btn-row right" style="margin-top:10px">
+      <button class="btn gold" onclick="UI.saveSettings()">💾 保存设置</button>
+      <button class="btn" onclick="UI.closeModal('settings-modal')">关闭</button>
+    </div>`;
+};
+UI.saveSettings=function(){
+  cfg.apiEndpoint=$('s-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+  cfg.apiKey=$('s-apikey').value.trim();
+  cfg.model=$('s-model').value||'deepseek-chat';
+  cfg.reasoningEffort=$('s-reasoning').value;
+  cfg.maxTokens=$('s-maxtokens').value;
+  cfg.autosave=$('s-autosave').checked;
+  cfg.fontSize=$('s-fontsize').value;
+  document.body.dataset.fs=cfg.fontSize;
+  saveCfg();
+  UI.closeModal('settings-modal');
+  UI.toast('✅ 设置已保存','success');
+};
+UI.pickTheme=function(t){
+  cfg.theme=t;
+  document.body.dataset.theme=t;
+  saveCfg();
+  document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('on',b.classList.contains(t)));
+};
+/* ================= 记忆系统 ================= */
+UI.openMemory=function(){UI.renderMemory();UI.openModal('memory-modal');};
+UI.renderMemory=function(){
+  const mems=state?state.memories:[];
+  $('mem-content').innerHTML=`
+    <div class="card"><h3>📜 故事摘要</h3><div class="mem-summary">${esc(state&&state.summary?state.summary:'（暂无，故事刚开始）')}</div>
+    <div class="hint" style="margin-top:6px">长对话会自动压缩进摘要，AI 永不遗忘设定与故事。</div></div>
+    <div class="card"><h3>🧠 记忆档案（${mems.length}）</h3>
+      ${mems.length?mems.slice().reverse().map(m=>`<div class="mem-item"><span class="mem-icon">${TYPES[m.t]||'📌'}</span><div class="mem-x">${esc(m.x)}<div class="mem-time">${esc(m.time||'')}</div></div><button class="kv-del" onclick="UI.delMemory('${m.id}')">✕</button></div>`).join(''):'<div class="hint">暂无记忆。重要事件会自动被记录。</div>'}
+    </div>`;
+};
+UI.delMemory=function(id){
+  if(!state)return;
+  state.memories=state.memories.filter(m=>m.id!==id);
+  saveState();UI.renderMemory();
+};
+/* ================= 世界百科 ================= */
+const ENCY=[
+  {t:'世界与时代',h:'🌍',b:'<span class="h">无尽之海</span>：陆地极少的世界，主体是无边海洋。三大洲（银冠洲/赤砂洲/白霜洲）、四大群岛、无数孤岛点缀其间。一切权力、财富与传说都发生在海面上、港口里、海底之下。<br><span class="h">时代</span>：黄金航海时代（类16–17世纪），帆船、火药、帝国扩张、海盗黄金时代。海图不完整，通缉令与酒馆情报是"新闻与网络"。<br><span class="h">基调</span>：浪漫冒险为主，生存务实为辅，幽默感常在，死亡不轻易，选择有后果。'},
+  {t:'核心设定',h:'🔱',b:'<span class="h">① 潮汐之力</span>：海面下有流动的「海脉」，其能量即潮汐之力（"海之呼吸"），极少数人可共鸣施展奇迹。<br><span class="h">② 先民与大沉没</span>：古代「先民」文明驾驭潮汐之力在海底建城，因「大沉没」消失；遗迹、沉船、封印沉睡海底。<br><span class="h">③ 星相航法</span>：迷雾海域靠星辰、洋流、鸟群、鲸歌定位；星图比黄金更珍贵。<br><span class="h">④ 七海之证</span>：集齐七件先民信物即可号令潮汐之力、成为「七海之王」——终极目标。'},
+  {t:'五大海域',h:'🗺️',b:'<table><tr><th>海域</th><th>特点</th><th>危险</th></tr><tr><td>翡翠海</td><td>内海，文明中心，海军巡逻强</td><td>★</td></tr><tr><td>绯红海</td><td>海盗之海，自由港，兄弟会地盘</td><td>★★★</td></tr><tr><td>迷雾海</td><td>探索区，先民遗迹与海怪众多</td><td>★★★★</td></tr><tr><td>风暴海</td><td>天候恶劣但航速快，北方捷径</td><td>★★★★</td></tr><tr><td>霜寒海</td><td>冰山、白鲸、极光，失落大陆入口</td><td>★★★★★</td></tr><tr><td>深渊之下</td><td>海底，先民遗迹与失落大陆，终极区域</td><td>★★★★★★</td></tr></table>'},
+  {t:'重要港口',h:'⚓',b:'<b>皇港</b>（银冠洲）：帝国海军总部，秩序与官僚并存。<br><b>香料港</b>（赤砂洲）：东方贸易咽喉，货物差价最大。<br><b>海鸥城</b>（绯红海）：自由港之王，无关税、无盘查、乱中有序。<br><b>雾灯站</b>（迷雾海）：探索者前哨，唯一补给点。<br><b>雷公港</b>（风暴海）：亡命徒与佣兵聚集地。<br><b>白鲸镇</b>（霜寒海）：鲸油与皮革贸易，镇民淳朴且彪悍。'},
+  {t:'势力与阵营',h:'⚖️',b:'<span class="h">四大路线</span>：帝国海军（秩序律法）/ 海盗兄弟会（自由财富）/ 商会（中立生意）/ 独立航海家（自由人）。阵营不终身绑定，可叛变可洗白。<br><span class="h">主要势力</span>：银潮帝国海军、绯红海盗兄弟会（自由之约）、东方香料商会、海之子民（雾民，最恨说谎者）、潮汐秘教（亦正亦邪）、赏金猎人公会、走私联盟。'},
+  {t:'六项属性',h:'📊',b:'力量（近战/搬货/登船）、敏捷（炮术/闪避/操舵）、体质（生命/抗病）、智力（导航/贸易/破解）、感知（观察/航海直觉）、魅力（交涉/威吓/鼓舞）。<br>调整值=(属性−10)÷2向下取整。检定：d20+属性调整+熟练加值≥DC（10简单/15中等/20困难/25极难/30传说）。'},
+  {t:'船上职位',h:'🧑‍✈️',b:'<b>船长</b>「号令」：每场战斗一次全队+2 ｜ <b>大副</b>「督战」：接舷士气+2 ｜ <b>领航员</b>「观星」：预知6小时天气 ｜ <b>炮术长</b>「精准装填」：装填减半 ｜ <b>船医</b>「急救/防疫」 ｜ <b>水手长</b>「飞索」：登船荡向敌舰 ｜ <b>厨师</b>「好伙食」：士气提升 ｜ <b>见习水手</b>：经验+20%。'},
+  {t:'船型一览',h:'⛵',b:'<table><tr><th>船型</th><th>航速</th><th>耐久</th><th>齐射</th><th>货舱</th><th>船员</th></tr><tr><td>轻帆船</td><td>7</td><td>30</td><td>2d6</td><td>60</td><td>20</td></tr><tr><td>双桅纵帆船</td><td>6</td><td>45</td><td>3d6</td><td>120</td><td>40</td></tr><tr><td>武装商船</td><td>5</td><td>60</td><td>4d6</td><td>200</td><td>60</td></tr><tr><td>巡航舰</td><td>5</td><td>80</td><td>6d8</td><td>150</td><td>120</td></tr><tr><td>战列舰</td><td>3</td><td>140</td><td>8d10</td><td>100</td><td>250</td></tr></table>风向：顺风×1.5 ｜ 横风×1 ｜ 逆风×0.6（之字形航行）。'},
+  {t:'海战规则',h:'⚔️',b:'每回合：1个航行动作+1个行动。侧舷齐射需在敌船±30°内，命中=d20+炮术+士气 vs 10+目标转向值。<br>部位伤害：船体/帆/桅杆/炮位/船员/货舱/要害（进水每回合+1d4，≥剩余耐久则沉没）。火攻每回合2d6。<br>接舷战：对峙→压制→突破甲板→控制舵旗→敌投降。投降条件：损失过半或士气崩溃。'},
+  {t:'潮汐之力',h:'🌊',b:'觉醒：出身/特殊事件/5级「海魂印记」。每天潮汐点=等级+感知调整（至少1）。<br>五流派：<b>驭风</b>（顺风加速/吹偏炮弹）、<b>唤潮</b>（平静水面/漩涡/水下呼吸）、<b>雷暴</b>（闪电/风暴护盾，易引海怪）、<b>鲸歌</b>（沟通海兽/召唤鲸群/占卜）、<b>星辉</b>（占卜导航/预言/致幻迷雾）。<br>禁忌「深渊」魔法：威力巨大但腐蚀心智、吸引深海之物，用一次掷腐化检定。'},
+  {t:'敌人图鉴',h:'🐙',b:'<b>普通</b>：鲨群、海蛇、巨型章鱼、骷髅船员、武装私掠船。<br><b>精英</b>：塞壬（歌声控心）、利维坦（巨鲸海怪）、幽灵船（永不沉没）、海巨人。<br><b>首领</b>：冰龙王鲸（霜寒海）、雷霆巨人（风暴海）、深渊之眼（迷雾海）。<br><b>非战斗</b>：瘟疫、坏血病、叛变、债务、海市蜃楼、海盗法庭、海军刁难。'},
+  {t:'贸易与声望',h:'💰',b:'商品：粮食木材淡水（基础）、铁矿火药（管制）、朗姆酒、香料丝绸瓷器茶叶（高利润高风险）、黄金珠宝、鲸油皮革（北方限定）、先民遗物（高价+任务）、奴隶（非法）。<br>利润=销地价−产地价−关税−风险成本；物价随供需浮动。<br>声望：海军/海盗/商会三条主线+探索声望。通缉度影响港口态度，可伪装、贿赂、改名换旗。'},
+  {t:'难度档位',h:'🎚️',b:'<b>🌟天命船长</b>（纯爽）：主角光环，无死亡，收益翻倍。<br><b>😌顺风航行</b>（轻松）：容错高，休闲。<br><b>⚖️常规航海</b>（标准）：均衡推荐。<br><b>🌊风暴航线</b>（挑战）：高风险高回报。<br><b>💀深渊试炼</b>（深渊）：一步错满盘输，通关即传说。难度不是门槛，是选择权。'},
+  {t:'术语表',h:'📖',b:'潮汐之力/海脉/先民/大沉没/七海之证/自由港/私掠许可（官方劫掠执照）/之字形航行/链弹（断帆）/葡萄弹（杀伤船员）/潮汐点/海魂印记/星图/鲸歌。'}
+];
+UI.openEncy=function(){UI.renderEncy();UI.openModal('ency-modal');};
+UI.renderEncy=function(){
+  const dyn=state?state.ency:[];
+  const items=[...ENCY,...dyn];
+  $('ency-list').innerHTML=items.map((e,i)=>`<div class="ency-item" onclick="UI.showEncy(${i})"><span class="ec-h">${e.h}</span><span>${esc(e.t)}</span>${e.dyn?'<em class="dyn">动态</em>':''}</div>`).join('');
+  $('ency-content').innerHTML='<div class="hint">点击左侧词条查看详情。AI 在剧情中发现的新知识会自动收录为「动态」词条。</div>';
+};
+UI.showEncy=function(i){
+  const dyn=state?state.ency:[];
+  const items=[...ENCY,...dyn];
+  const e=items[i];
+  if(!e)return;
+  document.querySelectorAll('.ency-item').forEach((el,k)=>el.classList.toggle('on',k===i));
+  $('ency-content').innerHTML=`<div class="ec-h2">${e.h} ${esc(e.t)}</div><div class="ec-b">${e.b}</div>`;
+};
+UI.encyAsk=async function(){
+  const q=$('ency-ask-input').value.trim();
+  if(!q||busy)return;
+  $('ency-ask-input').value='';
+  $('ency-content').innerHTML='<div class="death-loading">🧭 正在查询世界设定…<div class="dots"><span></span><span></span><span></span></div></div>';
+  try{
+    const res=await callAI([
+      {role:'system',content:RP_RULES+'\n\n'+WORLD_CORE+'\n\n你是「无尽之海」的世界设定答疑官。请基于以上世界观资料回答玩家的问题，只输出设定相关的答案（100-250字），不要编造资料中没有的设定，不要提及以上资料本身。'},
+      {role:'user',content:'问题：'+q}
+    ],{silent:true});
+    $('ency-content').innerHTML=`<div class="ec-h2">🧭 世界设定问答</div><div class="ec-b">${res&&res.content?renderMd(res.content.replace(/⟦STATE⟧[\s\S]*?⟦\/STATE⟧/g,'')):'（查询失败，请稍后再试）'}</div>`;
+  }catch(e){
+    $('ency-content').innerHTML='<div class="hint">查询失败：'+esc(e.message)+'</div>';
+  }
+};
+/* ================= 回档与死亡记录 ================= */
+UI.openRollback=function(){UI.rbTab('fail');UI.openModal('rollback-modal');};
+UI.rbTab=function(tab){
+  $('rb-tab-fail').classList.toggle('active',tab==='fail');
+  $('rb-tab-ck').classList.toggle('active',tab==='ck');
+  const content=$('rb-content');
+  if(!state){content.innerHTML='<div class="hint">暂无数据</div>';return;}
+  if(tab==='fail'){
+    const ds=state.deaths;
+    content.innerHTML=`
+      <div class="btn-row" style="margin-bottom:8px"><button class="btn gold" style="flex:1" onclick="checkpoint('手动存档·'+state.time);UI.toast('📌 已创建存档节点','success');UI.rbTab('ck')">📌 手动存档点</button></div>
+      ${ds.length?ds.map(d=>`<div class="fail-card">
+        <div class="fc-head">🪦 「${esc(d.title)}」<em>${esc(d.time)}</em></div>
+        <div class="fc-cause">死因：${esc(d.cause)}</div>
+        <div class="fc-eval">${esc(d.eval)}</div>
+        <div class="fc-crits">${d.critiques.map(c=>`<div>• ${esc(c)}</div>`).join('')}</div>
+        <div class="fc-advice"><b>💡 建议：</b>${esc(d.advice)}</div>
+        <button class="btn sm danger" onclick="rollbackTo('${d.ckId||''}')">⏪ 回到死亡前关键节点</button>
+      </div>`).join(''):'<div class="mem-empty">尚无死亡记录。愿你的航程长久平安。<br>（海难/阵亡后，深渊记录官会在此留下评价与建议）</div>'}`;
+  }else{
+    const cks=state.checkpoints;
+    content.innerHTML=`
+      <div class="btn-row" style="margin-bottom:8px"><button class="btn gold" style="flex:1" onclick="checkpoint('手动存档·'+state.time);UI.toast('📌 已创建存档节点','success');UI.rbTab('ck')">📌 手动存档点</button></div>
+      ${cks.length?cks.map(c=>`<div class="ck-card">
+        <div class="fc-head">📌 ${esc(c.label)}<em>${esc(c.time)}</em></div>
+        <button class="btn sm" onclick="rollbackTo('${c.id}')">⏪ 回档至此</button>
+      </div>`).join(''):'<div class="mem-empty">暂无存档节点</div>'}`;
+  }
+};
+/* ================= 修正与补充（块C） ================= */
+Game.setBusy=function(b){
+  busy=b;
+  $('loading-indicator').classList.toggle('show',b);
+  $('send-btn').classList.toggle('hidden',b);
+  $('stop-btn').classList.toggle('hidden',!b);
+};
+UI.openModal=function(id){$(id).classList.remove('hidden');};
+UI.closeModal=function(id){$(id).classList.add('hidden');};
+UI.toggleChar=function(force){
+  const panel=$('left-panel'),back=$('drawer-backdrop');
+  const open=force!==undefined?force:!panel.classList.contains('open');
+  panel.classList.toggle('open',open);
+  back.classList.toggle('open',open);
+  if(open)renderChar();
+};
+Game.renderSit=function(){
+  if(!state)return;
+  $('sit-loc').textContent='📍 '+state.location+(state.location!==state.sea?' · '+state.sea:'');
+  $('sit-weather').textContent='🌤 '+state.weather+(state.wind?' · '+state.wind:'');
+  $('sit-ship').textContent='⛵ '+state.ship.name+' 耐久'+state.ship.hp+'/'+state.ship.maxHp+' ｜ 船员'+state.ship.crew+'/'+state.ship.maxCrew;
+};
+renderChar=function(){
+  const panel=$('char-body');
+  if(!state){if(panel)panel.innerHTML='';return;}
+  const p=state.player,s=state,sh=s.ship;
+  const expPct=Math.min(100,Math.round(p.exp/(p.expNeed||1)*100));
+  const hpPct=Math.min(100,Math.round(p.hp/(p.maxHp||1)*100));
+  const attrs=ATTRS.map(([k,cn])=>{
+    const v=p.attrs[k]||8;
+    return `<div class="c-attr" title="${esc(ATTRS.find(a=>a[0]===k)[3])}"><span>${cn}</span><b>${v}</b><i>${attrMod(v)>=0?'+':''}${attrMod(v)}</i></div>`;
+  }).join('');
+  const cargo=s.cargo.map(c=>c.n+(c.qty>1?'×'+c.qty:'')).join('、')||'无';
+  const repTxt=[['海军',s.rep.navy],['海盗',s.rep.pirate],['商会',s.rep.merchant],['探索',s.rep.explore]].map(([n,v])=>`${n} ${v}`).join(' ｜ ');
+  panel.innerHTML=`
+    <div class="panel-card char-head">
+      <div class="char-avatar">⚓</div>
+      <div><div class="char-name">${esc(p.name)}</div>
+      <div class="char-meta">${esc(p.position)} · ${esc(p.bg)} · Lv.${p.level}</div></div>
+    </div>
+    <div class="panel-card">
+      <div class="stat-row"><span class="stat-label">生命</span><div class="stat-bar-wrap"><div class="stat-bar-fill hp" style="width:${hpPct}%"></div></div><span class="stat-val">${p.hp}/${p.maxHp}</span></div>
+      <div class="stat-row"><span class="stat-label">经验</span><div class="stat-bar-wrap"><div class="stat-bar-fill xp" style="width:${expPct}%"></div></div><span class="stat-val">${p.exp}/${p.expNeed}</span></div>
+      <div class="ability-grid">${attrs}</div>
+      ${p.tide>0?`<div class="tide-line">🌊 潮汐点 ${p.tide}/${p.maxTide}（已觉醒潮汐之力）</div>`:''}
+    </div>
+    <div class="panel-card"><h3>🎯 熟练技能</h3>
+      <div class="chip-wrap">${p.skills.map(x=>`<span class="mini-chip">${x}</span>`).join('')||'<span class="hint">无</span>'}</div>
+    </div>
+    <div class="panel-card"><h3>🌟 天赋</h3>
+      <div class="chip-wrap">${p.traits.map(t=>`<span class="mini-chip gold">${t.i}${t.n}</span>`).join('')||'<span class="hint">无</span>'}
+      ${s.cheat?'<span class="mini-chip cheat">🔓 作弊模式</span>':''}</div>
+    </div>
+    <div class="panel-card"><h3>📋 当前状况 <em class="live">实时</em></h3>
+      <div class="kv2">
+        <div><span>📍 位置</span><b>${esc(s.location)} · ${esc(s.sea)}</b></div>
+        <div><span>⏳ 时间</span><b>${esc(s.time)}</b></div>
+        <div><span>🌤 天气</span><b>${esc(s.weather)}${s.wind?' · '+esc(s.wind):''}</b></div>
+        <div><span>⛵ 船只</span><b>${esc(sh.name)}（${esc(sh.type)}）</b></div>
+        <div><span>🛡 耐久</span><b>${sh.hp}/${sh.maxHp} ｜ 护甲 ${sh.armor} ｜ 帆 ${sh.sail}%</b></div>
+        <div><span>⚓ 士气</span><b>${sh.morale}${sh.morale>80?'（昂扬）':sh.morale<30?'（濒临哗变！）':''}</b></div>
+        <div><span>👥 船员</span><b>${sh.crew}/${sh.maxCrew}</b></div>
+        <div><span>💰 金币</span><b>${fmtMoney(s.money)}</b></div>
+        <div><span>🍞 补给</span><b>粮食 ${s.food}天 ｜ 淡水 ${s.water}天</b></div>
+        <div><span>📦 货物</span><b>${esc(cargo)}</b></div>
+        <div><span>🎖 声望</span><b>${repTxt}</b></div>
+        <div><span>🏴 通缉度</span><b>${s.wanted}${s.wanted>0?'（小心海军盘查）':''}</b></div>
+        <div><span>📜 任务</span><b>${esc(s.quests.join('；')||'无')}</b></div>
+        <div><span>🩹 状态</span><b>${esc(s.effects.join('、')||'良好')}</b></div>
+      </div>
+    </div>
+    <div class="panel-card"><h3>🧠 记忆摘录</h3>
+      <div class="mem-mini">${s.memories.slice(-6).map(m=>`<div>${TYPES[m.t]||'📌'} ${esc(m.x)}</div>`).join('')||'<span class="hint">暂无记忆</span>'}</div>
+    </div>
+    <div class="panel-card"><h3>📝 备注</h3><div class="hint">${esc(p.notes||'（无）')}</div></div>`;
+};
+/* ================= 日志渲染 ================= */
+function addLog(type,text,stream){
+  const log=$('game-log');
+  const el=document.createElement('div');
+  if(type==='system'){
+    el.className='msg sys';
+    el.innerHTML=`<div class="txt">${renderMd(text)}</div>`;
+  }else if(type==='user'){
+    el.className='msg user';
+    el.innerHTML=`<div class="ava">⚓</div><div class="body"><div class="nm">你 · ${esc(state?state.player.name:'')}</div><div class="txt">${renderMd(text)}</div></div>`;
+  }else{
+    el.className='msg ai';
+    el.innerHTML=`<div class="ava">🌊</div><div class="body"><div class="nm">无尽之海 · 航海日志</div><div class="txt"></div></div>`;
+  }
+  log.appendChild(el);
+  log.scrollTop=log.scrollHeight;
+  return el;
+}
+function renderLog(){
+  const log=$('game-log');
+  log.innerHTML='';
+  if(!state)return;
+  for(const e of state.log){
+    if(e.t==='system')log.insertAdjacentHTML('beforeend',`<div class="msg sys"><div class="txt">${renderMd(e.x)}</div></div>`);
+    else if(e.t==='user')log.insertAdjacentHTML('beforeend',`<div class="msg user"><div class="ava">⚓</div><div class="body"><div class="nm">你 · ${esc(state.player.name)}</div><div class="txt">${renderMd(e.x)}</div></div></div>`);
+    else log.insertAdjacentHTML('beforeend',`<div class="msg ai"><div class="ava">🌊</div><div class="body"><div class="nm">无尽之海 · 航海日志</div><div class="txt">${renderMd(e.x)}</div></div></div>`);
+  }
+  log.scrollTop=log.scrollHeight;
+}
+function saveState(){
+  if(!state)return;
+  if(cfg.autosave===false&&!window._forceSave)return;
+  try{localStorage.setItem(LS_SAVE,JSON.stringify(state));}catch(e){}
+}
+function repairState(s){
+  const d=Object.assign({},s);
+  d.player=Object.assign({name:'无名航海者',gender:'男',age:22,appearance:'',persona:'',bg:'水手世家',position:'船长',shipName:'雾燕号',attrs:{str:8,dex:8,con:8,int:8,wis:8,cha:8},skills:[],traits:[],notes:'',kv:[],level:1,exp:0,expNeed:100,hp:11,maxHp:11,tide:0,maxTide:0},d.player||{});
+  d.ship=Object.assign({name:'雾燕号',type:'双桅纵帆船',hp:45,maxHp:45,armor:1,sail:100,morale:75,crew:10,maxCrew:40},d.ship||{});
+  d.rep=Object.assign({navy:0,pirate:0,merchant:0,explore:0},d.rep||{});
+  d.cargo=d.cargo||[];d.quests=d.quests||[];d.effects=d.effects||[];
+  d.memories=d.memories||[];d.ency=d.ency||[];d.summary=d.summary||'';
+  d.history=d.history||[];d.log=d.log||[];
+  d.checkpoints=d.checkpoints||[];d.deaths=d.deaths||[];
+  d.ended=d.ended||null;d.gameOver=!!d.gameOver;
+  d.turn=d.turn||0;d.cheat=!!d.cheat;d.difficulty=d.difficulty||'biaozhun';
+  return d;
+}
+Game.stopGen=stopGen;
+/* ================= 回合主流程（完整版） ================= */
+Game.turn=async function(userText,opts={}){
+  if(busy||!state)return;
+  if(state.gameOver){UI.toast('本段航程已终结，请回档或重新开始','error');return;}
+  this.setBusy(true);
+  if(!opts.regen){
+    state.history.push({role:'user',content:userText});
+    if(!opts.hideUser){
+      state.log.push({t:'user',x:userText});
+      addLog('user',userText);
+    }
+  }
+  const msgs=[{role:'system',content:buildSystem()}];
+  for(const m of state.history.slice(-MAX_HISTORY))msgs.push({role:m.role,content:m.content});
+  const node=addLog('ai','',true);
+  const bodyEl=node.querySelector('.body');
+  const textEl=node.querySelector('.txt');
+  let acc='',think='',thinkEl=null;
+  $('loading-text').textContent='AI 正在推演航海…';
+  try{
+    const res=await callAI(msgs,{
+      onChunk:c=>{
+        acc+=c;
+        textEl.innerHTML=renderMd(acc.replace(/⟦STATE⟧[\s\S]*?⟦\/STATE⟧/g,'').replace(/⟦MEMORY⟧[\s\S]*?⟦\/MEMORY⟧/g,'').replace(/⟦ENCY⟧[\s\S]*?⟦\/ENCY⟧/g,'').replace(/⟦CHECKPOINT⟧[\s\S]*?⟦\/CHECKPOINT⟧/g,'').replace(/⟦DEATH⟧[\s\S]*?⟦\/DEATH⟧/g,''));
+        $('game-log').scrollTop=$('game-log').scrollHeight;
+      },
+      onThink:c=>{
+        think+=c;
+        if(!thinkEl){
+          thinkEl=document.createElement('div');
+          thinkEl.className='think-live';
+          thinkEl.innerHTML='<span class="tl-label">💭 船长正在思考…</span><div class="tl-txt"></div>';
+          bodyEl.insertBefore(thinkEl,textEl);
+        }
+        thinkEl.querySelector('.tl-txt').textContent=think.slice(0,3000)+(think.length>3000?'\n…（思考继续中）':'');
+        $('loading-text').textContent='💭 正在思考…';
+        $('game-log').scrollTop=$('game-log').scrollHeight;
+      }
+    });
+    if(!res||!res.content){
+      throw new Error('AI 无回复（连接失败或已中断）');
+    }
+    const {clean,data}=parseState(res.content);
+    const cause=handleCommands(res.content);
+    if(thinkEl&&think){
+      thinkEl.outerHTML=`<details class="think" open><summary>💭 AI 思考过程（点击收起）</summary>${esc(think.slice(0,4000))}${think.length>4000?'\n…（思考过长已截断）':''}</details>`;
+    }
+    textEl.innerHTML=renderMd(clean);
+    state.history.push({role:'assistant',content:clean});
+    state.log.push({t:'ai',x:clean});
+    state.turn++;
+    if(data)applyState(data);
+    if(state.turn%8===0)checkpoint('自动存档·回合'+state.turn);
+    if(!opts.regen)saveState();
+    this.renderAll();
+    if(cause||(data&&data.dead===true)||state.player.hp<=0){
+      await this.onDeath(cause||(data&&data.dead===true?'海难':'伤势过重'));
+      return;
+    }
+    if(state.history.length>MAX_HISTORY)compressHistory();
+  }catch(e){
+    if(e.name==='AbortError'){
+      addLog('system','⏹ 已停止生成。');
+      state.history.pop();
+      if(!opts.regen)state.log.pop();
+      if(!opts.regen)saveState();
+    }else{
+      addLog('system','❌ 出错了：'+esc(e.message)+'（可在设置中检查 API 配置）');
+      state.history.pop();
+      if(!opts.regen)state.log.pop();
+    }
+  }finally{
+    this.setBusy(false);
+  }
+};
+/* ================= 输入与初始化 ================= */
+UI.handleInputKey=function(e){
+  if(e.key==='Enter'&&!e.shiftKey){
+    e.preventDefault();
+    Game.sendAction();
+  }
+};
+UI.confirmOk=function(){
+  const fn=UI._confirmFn;
+  UI.closeModal('confirm-modal');
+  if(fn)fn();
+};
+const enterGame=()=>Game.enterGame();
+const renderAll=()=>Game.renderAll();
+function initGame(){
+  document.body.dataset.theme=cfg.theme||'deep';
+  document.body.dataset.fs=cfg.fontSize||'md';
+  const saved=lsGet(LS_SAVE,null);
+  if(saved&&saved.player&&saved.ship){
+    state=repairState(saved);
+    enterGame();
+    renderAll();
+    renderLog();
+    UI.toast('✅ 已恢复上次航海进度','success');
+    if(state.gameOver&&state.deaths.length){
+      addLog('system','🪦 你有一份未了的死亡记录，可打开右上角「⏪ 回档」查看并回到关键时间点。');
+    }
+  }else{
+    UI.init();
+  }
+}
+window.addEventListener('DOMContentLoaded',initGame);
+window.addEventListener('beforeunload',()=>{
+  if(state&&cfg.autosave&&!window._skipSave){
+    try{localStorage.setItem(LS_SAVE,JSON.stringify(state));}catch(e){}
+  }
+});
+/* ================= 补丁 ================= */
+Game.renderChar=renderChar;
+Game.renderAll=function(){this.renderChips();this.renderQuick();this.renderSit();this.renderChar();};
+UI.toggleCustom=function(which){
+  const sel=which==='bg'?$('self-bg'):$('self-pos');
+  const box=which==='bg'?$('self-bg-custom'):$('self-pos-custom');
+  if(box)box.style.display=sel.value==='自定义'?'block':'none';
+};
+UI.confirm=function(title,text,fn){
+  $('cf-title').textContent=title;
+  $('cf-text').innerHTML=esc(text);
+  UI._confirmFn=fn;
+  UI.openModal('confirm-modal');
+};
+UI.saveTalent=function(){
+  UI.showStep(3);
+};
+Game.quickAction=Game.quickAction||function(k){
+  if(busy)return;
+  const map={
+    sail:'【行动】升帆出航，向目标海域进发。',
+    explore:'【行动】瞭望并探索附近海域，寻找岛屿、遗迹或商船踪迹。',
+    quest:'【行动】查看港口的悬赏榜和任务公告，选择感兴趣的任务。',
+    tavern:'【行动】去酒馆喝一杯，打探情报与传闻。',
+    trade:'【行动】在港口进行交易买卖，看看行情。',
+    rest:'【行动】休整补给，安排船员轮休与船只维护。',
+    crew:'【行动】与船员们交谈，了解他们的近况与想法。',
+    look:'【行动】环顾四周，观察当前环境的细节。',
+    ask:'【设定】请简明扼要地介绍当前所在海域/地点/势力，以及我此刻可以做什么。',
+    c_omni:'【金手指·全知】我闭上眼，海脉的低语涌来——请告诉我当前场景中所有隐藏信息、NPC的真实身份与意图、以及任何隐藏的陷阱与宝物。',
+    c_tele:'【金手指·瞬移】我化作一道流光，瞬间抵达我想去的任何地点。',
+    c_ko:'【金手指·雷霆秒杀】我抬手召来雷霆，一击摧毁当前所有敌对目标！',
+    c_money:'【金手指·无限财富】我从海底的沉船宝库中提取大量金币。',
+    c_weather:'【金手指·掌控天气】我以意念改变天气与风向，令其随心所欲。'
+  };
+  Game.turn(map[k]||k);
+};
+</script>
+</body>
+</html>

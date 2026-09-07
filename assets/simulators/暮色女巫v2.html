@@ -1,0 +1,2034 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dusk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>暮色女巫 · 灰溪村的冬天</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕯️</text></svg>">
+<style>
+/* ============ 主题变量 ============ */
+:root{
+  --bg-deep:#14100c; --bg-surface:#1c1712; --bg-elevated:#251e17; --bg-hover:#2f261c;
+  --border:#3b3126; --border-active:#5a4a38;
+  --t:#ece3d4; --t2:#b5a68e; --t3:#82735c;
+  --ember:#e07a3c; --ember-dim:#a85a28; --ember-glow:rgba(224,122,60,.14);
+  --gold:#d8a84e; --gold-dim:#9a7430; --gold-glow:rgba(216,168,78,.15);
+  --jade:#6fae8f; --jade-dim:#3f7a60; --jade-glow:rgba(111,174,143,.12);
+  --r:#d8504f; --gr:#6fbf73; --purple:#9a7ad0; --blue:#5f8fc9;
+  --hp:#d8504f; --mp:#7fa8e0; --decay:#a8987f; --sus:#d8a84e; --trace:#e07a3c; --exp:#9fbf5f;
+  --rad:6px; --rad2:10px; --rad3:16px; --tr:180ms ease;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-serif:Georgia,"Times New Roman","Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;
+  --mono:"SF Mono","Cascadia Code","Consolas",monospace;
+}
+html[data-theme="moon"]{
+  --bg-deep:#0d1218; --bg-surface:#131a23; --bg-elevated:#1a2330; --bg-hover:#223044;
+  --border:#2b3a4d; --border-active:#3f5a78; --t:#dce6f2; --t2:#9fb2c8; --t3:#6d7f96;
+  --ember:#7fa8e0; --ember-dim:#4f6f9e; --ember-glow:rgba(127,168,224,.14);
+  --gold:#c9b26a; --gold-dim:#8a743a; --gold-glow:rgba(201,178,106,.14);
+  --jade:#6fae8f; --jade-dim:#3f7a60; --jade-glow:rgba(111,174,143,.12);
+  --trace:#e8a05c; --sus:#c9b26a; --decay:#8fa3b8;
+}
+html[data-theme="ash"]{
+  --bg-deep:#141412; --bg-surface:#1c1c19; --bg-elevated:#262522; --bg-hover:#302f2a;
+  --border:#3d3a33; --border-active:#5c574b; --t:#eae6da; --t2:#b3ad9d; --t3:#7f7969;
+  --ember:#c8b6a0; --ember-dim:#8d7d67; --ember-glow:rgba(200,182,160,.12);
+  --gold:#c4a96a; --gold-dim:#8a743a; --gold-glow:rgba(196,169,106,.13);
+  --jade:#8fa98f; --jade-dim:#5f7a5f; --jade-glow:rgba(143,169,143,.12);
+  --trace:#d0a06a; --sus:#c4a96a; --decay:#a8a08c;
+}
+html[data-theme="forest"]{
+  --bg-deep:#0f1410; --bg-surface:#161d17; --bg-elevated:#1e2820; --bg-hover:#28362b;
+  --border:#33402f; --border-active:#4d5f45; --t:#e4ead9; --t2:#aebba0; --t3:#76836a;
+  --ember:#8fae5f; --ember-dim:#5f7a3a; --ember-glow:rgba(143,174,95,.14);
+  --gold:#c9b26a; --gold-dim:#8a743a; --gold-glow:rgba(201,178,106,.13);
+  --jade:#6fae8f; --jade-dim:#3f7a60; --jade-glow:rgba(111,174,143,.12);
+  --trace:#c98a4a; --sus:#c9b26a; --decay:#97a088;
+}
+html.fs-sm{font-size:12.5px}
+html.fs-lg{font-size:15px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg-deep);color:var(--t);font-family:var(--font-sans);font-size:14px}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-active);border-radius:3px}
+input,textarea,select,button{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,textarea,select{background:var(--bg-surface);border:1px solid var(--border);color:var(--t);border-radius:var(--rad);padding:8px 12px;outline:none;transition:border var(--tr)}
+input:focus,textarea:focus,select:focus{border-color:var(--ember-dim)}
+select{appearance:auto}
+.muted{color:var(--t3);font-size:10px}
+.row2{display:flex;gap:6px;align-items:center}
+.row2>*{flex:1}
+.row2 .btn{flex-shrink:0}
+.fld{font-size:9.5px;color:var(--t3);display:block;margin-bottom:3px;letter-spacing:1px;margin-top:6px}
+.btn{padding:7px 15px;border-radius:var(--rad);font-size:12px;font-weight:500;border:1px solid var(--border);transition:all var(--tr);background:transparent;color:var(--t2);display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:30px;-webkit-tap-highlight-color:rgba(224,122,60,.35)}
+.btn:hover{background:var(--bg-hover);border-color:var(--border-active);color:var(--t)}
+.btn.gold{background:var(--gold);color:#1a1205;border-color:var(--gold);font-weight:600}
+.btn.gold:hover{background:#e8bc66}
+.btn.danger{color:var(--r);border-color:var(--r)}
+.btn.danger:hover{background:rgba(216,80,79,.12)}
+.btn.small{padding:6px 11px;font-size:11px;min-height:28px}
+.btn.tiny{padding:2px 8px;font-size:10px;min-height:22px;border-radius:4px}
+.btn.big{padding:11px 24px;font-size:13px;font-weight:700;border-radius:var(--rad2)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn:active{transform:scale(.95)}
+.top-btn:active{background:var(--bg-hover);transform:scale(.95)}
+.option-card:active{transform:scale(.97)}
+
+/* ============ 设置向导 ============ */
+#setup-overlay{position:fixed;inset:0;background:var(--bg-deep);z-index:300;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:26px 12px 90px}
+#setup-overlay.hidden{display:none}
+.su-wrap{width:470px;max-width:94vw;display:flex;flex-direction:column;align-items:center}
+#setup-overlay h1{font-family:var(--font-serif);font-size:34px;letter-spacing:10px;color:var(--ember);text-shadow:0 0 30px var(--ember-glow);margin-bottom:2px;font-weight:600}
+#setup-overlay .su-sub{font-size:11px;color:var(--t3);letter-spacing:2px;margin-bottom:16px}
+#su-progress{display:flex;gap:6px;margin-bottom:16px}
+#su-progress .dot{width:9px;height:9px;border-radius:50%;background:var(--border);transition:all var(--tr)}
+#su-progress .dot.done{background:var(--ember)}
+#su-progress .dot.current{background:var(--ember);box-shadow:0 0 8px var(--ember-glow);animation:pulse 1.6s infinite}
+.su-step{display:none;flex-direction:column;gap:10px;width:100%;padding:20px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad3);box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.su-step.active{display:flex}
+.su-title{font-size:14px;font-weight:600;color:var(--gold);text-align:center}
+.su-hint{font-size:10.5px;color:var(--t3);text-align:center;margin-top:-4px}
+.su-step input,.su-step select{width:100%;padding:9px 12px;font-size:13px}
+.su-step textarea{width:100%;min-height:150px;resize:vertical;font-size:12.5px;line-height:1.8;background:var(--bg-deep);padding:10px 12px;border-radius:var(--rad2)}
+.su-nav{display:flex;gap:10px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+.su-nav button{padding:10px 26px;border-radius:var(--rad2);font-size:13px;font-weight:600;transition:all var(--tr);min-height:42px}
+.btn-prev{background:transparent;border:1px solid var(--border);color:var(--t2)}
+.btn-prev:hover{background:var(--bg-hover)}
+.btn-next{background:var(--ember);color:#140b05;border:1px solid var(--ember)}
+.btn-next:hover{background:#f08a4c}
+.option-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}
+.option-card{padding:12px 10px;text-align:center;background:var(--bg-deep);border:2px solid var(--border);border-radius:var(--rad2);cursor:pointer;transition:all var(--tr);font-size:11px;line-height:1.35}
+.option-card:hover{border-color:var(--ember-dim);background:var(--bg-hover)}
+.option-card.selected{border-color:var(--ember);background:var(--ember-glow);color:var(--ember)}
+.option-card .oc-icon{font-size:21px;display:block;margin-bottom:3px}
+.option-card .oc-name{font-weight:600;color:var(--t)}
+.option-card.selected .oc-name{color:var(--ember)}
+.option-card .oc-desc{font-size:8.5px;color:var(--t3);margin-top:2px}
+.custom-input{width:100%;text-align:center;font-size:13px;padding:9px 12px;margin-top:2px;background:var(--bg-deep);border:1px dashed var(--ember-dim);border-radius:var(--rad2);color:var(--ember)}
+.points-left{font-size:11px;color:var(--ember);font-weight:700}
+.trait-row{display:flex;align-items:center;gap:9px;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--rad2);padding:7px 10px}
+.trait-row .t-icon{font-size:17px;width:26px;text-align:center;flex-shrink:0}
+.trait-row .t-info{flex:1;min-width:0}
+.trait-row .t-name{font-size:11.5px;font-weight:600}
+.trait-row .t-desc{font-size:8.5px;color:var(--t3)}
+.trait-row .t-ctrl{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.trait-row .t-ctrl button{width:26px;height:26px;border-radius:50%;border:1px solid var(--border-active);color:var(--ember);font-size:15px;font-weight:700;line-height:1;transition:all var(--tr)}
+.trait-row .t-ctrl button:hover{background:var(--ember-glow);border-color:var(--ember)}
+.trait-row .t-val{width:24px;text-align:center;font-family:var(--mono);font-weight:700;font-size:14px;color:var(--gold)}
+.chip-row{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.chip{padding:4px 11px;border:1px solid var(--border);border-radius:14px;font-size:10.5px;color:var(--t2);cursor:pointer;transition:all var(--tr);background:var(--bg-deep);white-space:nowrap}
+.chip:hover{background:var(--bg-hover);color:var(--t);border-color:var(--ember-dim)}
+/* ============ 主界面 ============ */
+#app{display:grid;grid-template-rows:46px 1fr;height:100vh;height:100dvh;gap:1px;background:var(--border);position:relative;z-index:1}
+#app.hidden{display:none}
+#topbar{display:flex;align-items:center;padding:0 10px;gap:6px;background:var(--bg-surface);border-bottom:1px solid var(--border);z-index:20}
+#topbar .logo{font-size:14px;font-weight:700;color:var(--ember);white-space:nowrap;letter-spacing:1px;font-family:var(--font-serif)}
+#topbar .logo span{color:var(--t3);font-weight:400;font-size:10px;margin-left:5px;letter-spacing:1px}
+#topbar .spacer{flex:1}
+.top-stat{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:var(--rad);border:1px solid var(--border);font-size:10.5px;white-space:nowrap;color:var(--t2);background:var(--bg-deep)}
+.top-btn{padding:5px 11px;border-radius:var(--rad);font-size:11.5px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr);display:flex;align-items:center;gap:5px;white-space:nowrap;min-height:30px}
+.top-btn:hover{background:var(--bg-hover);color:var(--t);border-color:var(--border-active)}
+.top-btn.jade{border-color:var(--jade-dim);color:var(--jade)}
+.top-btn.jade:hover{background:var(--jade-glow)}
+.top-btn.danger{border-color:var(--r);color:var(--r)}
+.top-btn.danger:hover{background:rgba(216,80,79,.12)}
+#loc-display{max-width:170px;overflow:hidden;text-overflow:ellipsis}
+#center-panel{display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--bg-deep)}
+#game-log{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:9px;scroll-behavior:smooth;user-select:text}
+.log-entry{padding:10px 14px;border-radius:var(--rad2);font-size:13px;line-height:1.75;animation:fadeIn 250ms ease;word-break:break-word}
+.log-entry.narrative{background:var(--bg-elevated);border-left:3px solid var(--ember-dim);font-family:var(--font-serif);font-size:13.5px}
+.log-entry.system{background:var(--bg-surface);border-left:3px solid var(--t3);font-size:10.5px;color:var(--t3);font-family:var(--mono);line-height:1.6}
+.log-entry.action{background:var(--bg-elevated);border-left:3px solid var(--jade-dim);font-style:italic;color:var(--t2)}
+.log-entry.thinking{background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid var(--purple);font-size:12px;color:var(--t2);white-space:pre-wrap}
+.log-entry.thinking summary{color:var(--purple);font-size:12.5px;font-weight:600;cursor:pointer;padding:3px 0}
+.log-entry.danger{background:var(--bg-elevated);border-left:3px solid var(--r);color:#f0b3b0}
+#input-area{padding:9px 14px;padding-bottom:calc(9px + env(safe-area-inset-bottom));background:var(--bg-surface);border-top:1px solid var(--border);display:flex;gap:7px;align-items:flex-end}
+#input-area textarea{flex:1;resize:none;min-height:42px;max-height:120px;font-size:13px;line-height:1.5;background:var(--bg-deep);padding:9px 12px;border-radius:var(--rad2)}
+#send-btn{padding:10px 20px;background:var(--ember);color:#140b05;border-radius:var(--rad2);font-weight:700;font-size:12.5px;transition:all var(--tr);white-space:nowrap;min-height:42px}
+#send-btn:hover{background:#f08a4c}
+#send-btn:disabled{opacity:.35;cursor:not-allowed}
+.quick-actions{display:flex;flex-wrap:wrap;gap:5px;padding:6px 14px;background:var(--bg-surface);border-top:1px solid var(--border)}
+.quick-actions.v{flex-direction:column;padding:0}
+.quick-actions.v .quick-action{width:100%;text-align:left;padding:8px 12px;border-radius:var(--rad);border:1px solid var(--border);background:var(--bg-deep)}
+.quick-action{padding:6px 12px;background:var(--bg-deep);border:1px solid var(--border);border-radius:16px;font-size:11px;color:var(--t2);transition:all var(--tr);white-space:nowrap}
+.quick-action:hover{background:var(--bg-hover);color:var(--t);border-color:var(--ember-dim)}
+#loading-indicator{display:none;align-items:center;gap:8px;padding:6px 14px;font-size:11px;color:var(--t3);background:var(--bg-surface);border-top:1px solid var(--border)}
+#loading-indicator.show{display:flex}
+#loading-indicator .dots{display:flex;gap:3px}
+#loading-indicator .dots span{width:5px;height:5px;background:var(--ember);border-radius:50%;animation:bounce 1s infinite}
+#loading-indicator .dots span:nth-child(2){animation-delay:.15s}
+#loading-indicator .dots span:nth-child(3){animation-delay:.3s}
+#left-panel,#right-panel{position:fixed;top:47px;bottom:0;width:308px;background:var(--bg-surface);z-index:40;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:8px;transition:transform 220ms ease;box-shadow:0 0 26px rgba(0,0,0,.45)}
+#left-panel{left:0;transform:translateX(-103%);border-right:1px solid var(--border)}
+#right-panel{right:0;transform:translateX(103%);border-left:1px solid var(--border)}
+#left-panel.open,#right-panel.open{transform:translateX(0)}
+.drawer-handle{display:none;text-align:center;padding:6px 0;font-size:10px;color:var(--t3);border-bottom:1px solid var(--border);cursor:pointer;flex-shrink:0;margin:-8px -8px 4px;background:var(--bg-elevated)}
+.drawer-backdrop{position:fixed;inset:0;top:47px;background:transparent;z-index:39;display:none}
+.drawer-backdrop.show{display:block}
+.panel-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--rad2);padding:10px;margin-bottom:7px}
+.panel-card h3{font-size:9.5px;font-weight:600;letter-spacing:1.4px;color:var(--t3);margin-bottom:7px;text-transform:uppercase}
+.char-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.char-avatar{width:44px;height:44px;border-radius:var(--rad2);background:linear-gradient(135deg,var(--ember-dim),#3a2418);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 0 14px var(--ember-glow)}
+.char-name{font-size:15px;font-weight:700;font-family:var(--font-serif)}
+.char-title{display:inline-block;font-size:9px;color:var(--gold);border:1px solid var(--gold-dim);border-radius:8px;padding:1px 7px;margin:2px 0;background:var(--gold-glow);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.char-meta{font-size:9.5px;color:var(--t3);line-height:1.5;margin-top:1px}
+.stat-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.stat-row .lbl{font-size:10px;color:var(--t3);width:38px;flex-shrink:0}
+.stat-row .sbar{flex:1;height:8px;background:var(--bg-deep);border-radius:4px;overflow:hidden}
+.stat-row .sbar div{height:100%;border-radius:4px;transition:width 400ms ease}
+#bar-hp{background:var(--hp)}
+#bar-mp{background:var(--mp)}
+#bar-ins{background:var(--exp)}
+.stat-row .val{font-size:10px;color:var(--t2);width:52px;text-align:right;font-family:var(--mono);flex-shrink:0}
+.info-row{font-size:10.5px;color:var(--t2);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);line-height:1.6}
+.info-row .k{color:var(--t3)}
+.faction-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.faction-row .fl{font-size:10px;color:var(--t2);width:52px;flex-shrink:0}
+.faction-row .fbar{flex:1;height:6px;background:var(--bg-deep);border-radius:3px;overflow:hidden;position:relative}
+.faction-row .fbar div{height:100%;border-radius:3px;transition:width 400ms ease}
+.faction-row .fv{font-size:9px;color:var(--t3);width:26px;text-align:right;font-family:var(--mono);flex-shrink:0}
+.tdot{width:15px;height:15px;border-radius:50%;background:var(--bg-deep);border:1.5px solid var(--border-active);transition:all 300ms}
+.tdot.on{background:var(--trace);border-color:var(--trace);box-shadow:0 0 8px var(--ember-glow)}
+.love-item{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:var(--rad);background:var(--bg-deep);margin-bottom:4px;font-size:10.5px}
+.love-item .ln{flex:1;color:var(--t2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.love-item .lv{font-family:var(--mono);font-weight:700;flex-shrink:0}
+.love-item .lv.pos{color:var(--gr)}.love-item .lv.neg{color:var(--r)}.love-item .lv.zero{color:var(--t3)}
+.inv-item{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:var(--rad);font-size:11px;color:var(--t2)}
+.inv-item .ic{width:26px;height:26px;border-radius:5px;background:var(--bg-deep);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.inv-item .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inv-item .qt{font-size:9px;color:var(--t3);font-family:var(--mono);flex-shrink:0}
+.inv-empty{font-size:10px;color:var(--t3);text-align:center;padding:10px}
+.notes-box{font-size:10.5px;color:var(--t2);background:var(--bg-deep);border-radius:var(--rad);padding:8px;line-height:1.7;white-space:pre-wrap;max-height:130px;overflow-y:auto}
+.mem-group{margin-bottom:6px}
+.mem-t{font-size:9px;color:var(--t3);letter-spacing:1px;margin-bottom:3px}
+.mem-item{font-size:10px;color:var(--t2);line-height:1.6;padding:3px 6px;border-left:2px solid var(--border-active);margin-bottom:3px}
+
+/* ============ 弹窗 ============ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;display:none;align-items:center;justify-content:center;animation:fadeIn 200ms ease}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg-elevated);border:1px solid var(--border-active);border-radius:var(--rad3);padding:20px;width:480px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:0 10px 44px rgba(0,0,0,.6)}
+.modal.wide{width:640px}
+.modal h2{font-size:15px;color:var(--ember);margin-bottom:12px;font-family:var(--font-serif);letter-spacing:1px}
+.ms-sec{border-top:1px solid var(--border);margin-top:14px;padding-top:12px}
+.ms-sec:first-of-type{border-top:none;margin-top:0;padding-top:0}
+.ms-sec h4{font-size:11px;color:var(--gold);margin-bottom:8px;letter-spacing:1px}
+.modal .btn-row{display:flex;gap:7px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+.slot-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;font-size:11px;border-bottom:1px solid var(--border);color:var(--t2);flex-wrap:wrap}
+.slot-row .btn{margin-left:4px}
+.slot-row.muted{color:var(--t3)}
+
+/* ============ Toast 提示 ============ */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border-active);padding:9px 18px;border-radius:var(--rad2);font-size:12.5px;z-index:700;pointer-events:none;opacity:0;transition:opacity 300ms ease;max-width:88vw;text-align:center}
+#toast.show{opacity:1}
+#toast.success{border-color:var(--gr)}
+#toast.error{border-color:var(--r)}
+
+/* ============ 百科 ============ */
+.en-cat{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.en-cat button{padding:4px 11px;border-radius:13px;font-size:10px;border:1px solid var(--border);color:var(--t2);transition:all var(--tr)}
+.en-cat button.active{border-color:var(--jade);color:var(--jade);background:var(--jade-glow)}
+.en-item{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px;color:var(--t2);border-radius:var(--rad)}
+.en-item .en-t{color:var(--gold);font-weight:600;font-size:11.5px}
+.en-item .en-d{color:var(--t3);font-size:9.5px;margin-top:2px;line-height:1.6}
+.en-ask{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.en-ask input{flex:1;min-width:160px}
+
+/* ============ 死亡档案与回档 ============ */
+.death-item{border:1px solid var(--border);border-radius:var(--rad2);padding:10px;margin-bottom:8px;background:var(--bg-deep)}
+.death-item .di-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+.death-item .di-head span{font-size:12px;font-weight:600;color:var(--r)}
+.death-item .di-ts{font-size:9.5px;color:var(--t3);font-family:var(--mono);font-weight:400}
+.death-item .di-cause{font-size:11px;color:var(--t2);margin-bottom:4px}
+.death-item .di-stats{font-size:10px;margin-bottom:6px}
+.death-item details{font-size:11px}
+.death-item summary{color:var(--gold);cursor:pointer;padding:4px 0}
+.cp-item{border:1px solid var(--border);border-radius:var(--rad2);padding:9px 11px;margin-bottom:6px;background:var(--bg-deep);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cp-item span{font-size:12px;color:var(--t2)}
+
+/* ============ 死亡结算全屏 ============ */
+#death-overlay{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 30%,rgba(120,20,10,.35),rgba(10,6,4,.97) 65%);z-index:500;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px}
+#death-overlay.show{display:flex}
+.death-box{width:580px;max-width:96vw;background:var(--bg-elevated);border:1px solid var(--r);border-radius:var(--rad3);padding:26px;box-shadow:0 0 60px rgba(216,80,79,.2)}
+.db-skull{font-size:52px;text-align:center;display:block;animation:pulse 2.4s infinite}
+.db-title{text-align:center;color:var(--r);font-family:var(--font-serif);font-size:24px;letter-spacing:6px;margin:6px 0 2px}
+.db-sub{text-align:center;font-size:11px;color:var(--t3);margin-bottom:14px}
+#db-review{margin-top:10px}
+.db-sec{background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--rad2);padding:12px;margin-bottom:10px}
+.db-h{font-size:10px;letter-spacing:2px;color:var(--r);font-weight:700;margin-bottom:6px}
+.db-c{font-size:12px;line-height:1.85;color:var(--t2);white-space:pre-wrap}
+.db-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.db-actions .btn.gold{background:var(--ember);color:#140b05;border-color:var(--ember)}
+.db-actions .btn.gold:hover{background:#f08a4c}
+
+/* ============ 引导页 ============ */
+.guide-section{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--rad2);padding:12px;margin-bottom:8px}
+.guide-section h4{font-size:12px;color:var(--gold);margin-bottom:6px}
+.guide-section p,.guide-section li{font-size:11.5px;color:var(--t2);line-height:1.75}
+.guide-section ul{padding-left:16px}
+.guide-section .tip{color:var(--jade)}
+.guide-section .warn{color:var(--r)}
+
+/* ============ 动画与移动端 ============ */
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bounce{0%,80%,100%{transform:scale(.5)}40%{transform:scale(1)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media(max-width:768px){
+  #topbar{gap:4px;padding:0 6px}
+  #topbar .logo{font-size:11px}
+  #topbar .logo span{display:none}
+  .top-btn{padding:6px 7px;font-size:10px;min-width:32px;justify-content:center}
+  .top-btn .btn-txt{display:none}
+  #loc-display{display:none}
+  #left-panel,#right-panel{width:88vw;max-width:350px;padding-bottom:env(safe-area-inset-bottom)}
+  .drawer-handle{display:block}
+  .quick-actions{overflow-x:auto;flex-wrap:nowrap;padding:6px 10px}
+  .quick-action{flex-shrink:0;padding:7px 13px;font-size:11.5px;min-height:34px}
+  #game-log{padding:10px 12px;gap:7px}
+  .log-entry{padding:9px 11px;font-size:12.5px}
+  .log-entry.narrative{font-size:13px}
+  #input-area{padding:8px 10px;padding-bottom:calc(8px + env(safe-area-inset-bottom));gap:5px}
+  #input-area textarea{font-size:13.5px;min-height:42px}
+  #send-btn{min-width:60px;font-size:13px;padding:10px 14px}
+  .modal{width:96vw;padding:15px}
+  .option-grid{gap:5px}
+  .option-card{padding:10px 7px;font-size:10px}
+  .option-card .oc-icon{font-size:18px}
+  #setup-overlay{padding:14px 8px 80px}
+  #setup-overlay h1{font-size:26px;letter-spacing:6px}
+  .su-step{padding:14px}
+  .death-box{padding:18px}
+  .db-c{font-size:11.5px}
+}
+@media(max-width:420px){
+  .option-grid{grid-template-columns:1fr}
+  .trait-row .t-ctrl button{width:30px;height:30px}
+  .su-nav button{padding:10px 20px}
+  .top-btn{padding:5px 6px;min-width:28px}
+}
+</style>
+</head>
+<body>
+<!-- ===== 设置向导（API → 角色 → 备注） ===== -->
+<div id="setup-overlay">
+  <div class="su-wrap">
+    <h1>暮 色 女 巫</h1>
+    <div class="su-sub">灰溪村的冬天 · 公元1387 · 中世纪女巫角色扮演</div>
+    <div class="su-progress"><span class="dot done" data-s="0"></span><span class="dot" data-s="1"></span><span class="dot" data-s="2"></span></div>
+
+    <!-- 第一步：API -->
+    <div class="su-step active" id="su-api">
+      <div class="su-title">第一步 · 配置接口（AI 之灯）</div>
+      <div class="su-hint">游戏由大模型实时推演，先点亮你的灯火</div>
+      <input id="cfg-endpoint" placeholder="API 端点" value="https://api.deepseek.com/v1/chat/completions">
+      <input id="cfg-apikey" type="password" placeholder="API Key（sk-xxx）">
+      <div class="row2">
+        <select id="cfg-model">
+          <option value="deepseek-chat">deepseek-chat（默认）</option>
+          <option value="deepseek-reasoner">deepseek-reasoner（推理）</option>
+        </select>
+        <button class="btn small" onclick="UI.fetchModels()">🔄 拉取模型</button>
+      </div>
+      <div class="su-hint" id="model-hint">填入 Key 后可自动拉取模型列表</div>
+      <label class="fld">推理强度</label>
+      <select id="cfg-reasoning">
+        <option value="max">最大推理（推荐）</option>
+        <option value="high">高</option>
+        <option value="medium">中</option>
+        <option value="low">低</option>
+      </select>
+      <label class="fld">输出 Token 限制</label>
+      <select id="cfg-maxtokens">
+        <option value="unlimited" selected>无限制</option>
+        <option value="1024">1024</option>
+        <option value="2048">2048</option>
+        <option value="4096">4096</option>
+        <option value="8192">8192</option>
+        <option value="16384">16384</option>
+      </select>
+      <div class="su-nav">
+        <button class="btn small" onclick="UI.testConnection()">🔌 测试连接</button>
+        <button class="btn-next" onclick="SW.next()">下一步 ▸</button>
+      </div>
+    </div>
+
+    <!-- 第二步：角色 -->
+    <div class="su-step" id="su-char">
+      <div class="su-title">第二步 · 你是谁</div>
+      <div class="su-hint">身怀一滴古老的血、一页烧剩的书、一段刻骨的仇恨</div>
+      <div class="row2">
+        <input id="cc-name" placeholder="你的名字…" maxlength="12">
+        <button class="btn small" id="btn-ainame" onclick="SW.aiName()" title="需要已配置API">🎲 AI起名</button>
+      </div>
+      <label class="fld">性别</label>
+      <div class="option-grid small">
+        <div class="option-card" data-v="女" onclick="SW.pick(this,'gender')"><span class="oc-icon">🧙‍♀️</span><div class="oc-name">女</div><div class="oc-desc">旧神血脉多传于女子</div></div>
+        <div class="option-card" data-v="男" onclick="SW.pick(this,'gender')"><span class="oc-icon">🧙</span><div class="oc-name">男</div><div class="oc-desc">罕见的觉醒者</div></div>
+      </div>
+      <label class="fld">出身</label>
+      <div class="option-grid" id="origin-grid">
+        <div class="option-card" data-v="apprentice"><span class="oc-icon">📜</span><div class="oc-name">流亡学徒</div><div class="oc-desc">师父被烧死，你带着她的遗物出逃</div></div>
+        <div class="option-card" data-v="outsider"><span class="oc-icon">🏚️</span><div class="oc-name">灰溪归人</div><div class="oc-desc">祖母的故乡，你回来继承她的秘密</div></div>
+        <div class="option-card" data-v="hunter"><span class="oc-icon">🩸</span><div class="oc-name">猎巫人之女</div><div class="oc-desc">父亲追猎女巫，你觉醒后出逃</div></div>
+        <div class="option-card" data-v="merchant"><span class="oc-icon">⚖️</span><div class="oc-name">盐港药贩</div><div class="oc-desc">走私草药与盐，钱多门路多</div></div>
+        <div class="option-card" data-v="wild"><span class="oc-icon">🌲</span><div class="oc-name">林中野孩</div><div class="oc-desc">黑松林边长大，山林如家</div></div>
+        <div class="option-card" data-v="custom"><span class="oc-icon">✏️</span><div class="oc-name">自定义</div><div class="oc-desc">自行书写你的出身</div></div>
+      </div>
+      <input class="custom-input" id="origin-custom" placeholder="输入自定义出身…" style="display:none">
+      <label class="fld">血脉天赋（魔法倾向）</label>
+      <div class="option-grid" id="talent-grid">
+        <div class="option-card" data-v="herbs"><span class="oc-icon">🌿</span><div class="oc-name">药草之触</div><div class="oc-desc">药草学 · 最安全也最被需要</div></div>
+        <div class="option-card" data-v="seer"><span class="oc-icon">👁️</span><div class="oc-name">灵视之眼</div><div class="oc-desc">占卜通灵 · 看得见痕迹与死者</div></div>
+        <div class="option-card" data-v="curse"><span class="oc-icon">🕯️</span><div class="oc-name">咒术之血</div><div class="oc-desc">咒术 · 威力大，痕迹重（初始+1层痕迹）</div></div>
+        <div class="option-card" data-v="phantom"><span class="oc-icon">🌫️</span><div class="oc-name">幻影之肤</div><div class="oc-desc">幻术 · 骗得过一个人，骗不过一群人</div></div>
+        <div class="option-card" data-v="necro"><span class="oc-icon">🦴</span><div class="oc-name">唤灵之耳</div><div class="oc-desc">唤灵 · 与死者打交道，最禁忌的学问</div></div>
+        <div class="option-card" data-v="pact"><span class="oc-icon">🕳️</span><div class="oc-name">契约之印</div><div class="oc-desc">契约 · 与下层之物天然亲近，也被注视</div></div>
+        <div class="option-card" data-v="elemental"><span class="oc-icon">🔥</span><div class="oc-name">元素之心</div><div class="oc-desc">元素 · 动静最大，几乎必然留痕</div></div>
+        <div class="option-card" data-v="custom"><span class="oc-icon">✏️</span><div class="oc-name">自定义</div><div class="oc-desc">自行书写你的天赋</div></div>
+      </div>
+      <input class="custom-input" id="talent-custom" placeholder="输入自定义天赋…" style="display:none">
+      <label class="fld">天赋点数分配 <span class="points-left" id="points-left">剩余 18 点</span></label>
+      <div class="trait-setup" id="trait-setup"></div>
+      <div class="su-nav">
+        <button class="btn-prev" onclick="SW.prev()">← 上一步</button>
+        <button class="btn-next" onclick="SW.next()">下一步 ▸</button>
+      </div>
+    </div>
+
+    <!-- 第三步：备注 -->
+    <div class="su-step" id="su-notes">
+      <div class="su-title">第三步 · 备注与心愿</div>
+      <div class="su-hint">写下你的性格、目标、底线与秘密——AI 将始终牢记并遵循</div>
+      <textarea id="cc-notes" placeholder="例：性格谨慎寡言，只信自己；目标：活过这个冬天，查清祖母之死的真相；底线：不伤害无辜的孩子；对教会：表面顺从，内心厌恶……" maxlength="600"></textarea>
+      <div class="su-hint" style="text-align:left;margin-top:4px">快捷模板（点击填入）：</div>
+      <div class="chip-row" id="notes-chips">
+        <span class="chip" data-t="谨慎隐忍，以药婆身份融入村庄；目标：活过冬天，攒钱离开教区。">🧊 谨慎的药婆</span>
+        <span class="chip" data-t="仇恨刻骨，我要为祖母讨回公道；不惜与猎巫人周旋，必要时以牙还牙。">🔥 复仇的孤狼</span>
+        <span class="chip" data-t="求知若渴，想读懂《灰烬之书》残页的每一个字；愿意为此冒险。">📖 求知的学者</span>
+        <span class="chip" data-t="只想过普通日子：一个暖炉、一柜草药、没人知道我的名字。">🕯️ 平凡的心愿</span>
+      </div>
+      <div class="su-nav">
+        <button class="btn-prev" onclick="SW.prev()">← 上一步</button>
+        <button class="btn-next" onclick="SW.begin()">🕯️ 踏入灰溪村</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 主界面 ===== -->
+<div id="app" class="hidden">
+  <div id="topbar">
+    <div class="logo">🕯️ 暮色女巫 <span>灰溪村的冬天 · 1387</span></div>
+    <button class="top-btn" onclick="UI.togglePanel('left')">👤<span class="btn-txt">角色</span></button>
+    <button class="top-btn" onclick="UI.togglePanel('right')">🌍<span class="btn-txt">世界</span></button>
+    <div class="spacer"></div>
+    <span class="top-stat" id="loc-display" title="当前位置">📍 灰溪村</span>
+    <span class="top-stat" id="day-display" title="游戏时间">🕯️ 第1日</span>
+    <button class="top-btn jade" onclick="UI.openEncy()">📖<span class="btn-txt">百科</span></button>
+    <button class="top-btn danger" onclick="UI.openDeaths()">💀<span class="btn-txt">死亡档案</span></button>
+    <button class="top-btn" onclick="UI.openSettings()">⚙️<span class="btn-txt">设置</span></button>
+  </div>
+
+  <div id="center-panel">
+    <div id="game-log"></div>
+    <div id="loading-indicator"><span>灰烬在低语</span><div class="dots"><span></span><span></span><span></span></div></div>
+    <div id="input-area">
+      <textarea id="user-input" rows="1" placeholder="输入你的行动…（例：向玛尔塔借宿 / 夜里去废塔看看 / 用草药给扬的母亲治病）" onkeydown="UI.key(event)"></textarea>
+      <button id="send-btn" onclick="Game.send()">▶ 行动</button>
+    </div>
+  </div>
+</div>
+
+<!-- 左抽屉：角色（在 #app 外，与遮罩同级，确保 z-index 生效可点击） -->
+<div id="left-panel">
+  <div class="drawer-handle" onclick="UI.togglePanel('left')">⬇ 收起</div>
+  <div class="panel-card">
+    <div class="char-header">
+      <div class="char-avatar" id="ch-avatar">🧙‍♀️</div>
+      <div>
+        <div class="char-name" id="ch-name">---</div>
+        <div class="char-title" id="ch-title">无名外乡人</div>
+        <div class="char-meta" id="ch-meta">出身 · 天赋</div>
+      </div>
+    </div>
+    <div class="info-row"><span class="k">处境</span> <span id="ch-situation">—</span></div>
+    <div class="info-row"><span class="k">地点</span> <b id="ch-loc">—</b></div>
+    <div class="info-row"><span class="k">时间</span> <span id="ch-time">第1日 · 白昼</span> <span id="ch-season" style="margin-left:4px"></span></div>
+    <div class="info-row"><span class="k">天气</span> <span id="ch-weather">—</span></div>
+  </div>
+  <div class="panel-card"><h3>🩸 状态</h3>
+    <div class="stat-row"><span class="lbl">生命</span><div class="sbar"><div id="bar-hp" style="width:100%"></div></div><span class="val" id="v-hp">—</span></div>
+    <div class="stat-row"><span class="lbl">魔力</span><div class="sbar"><div id="bar-mp" style="width:100%"></div></div><span class="val" id="v-mp">—</span></div>
+    <div class="stat-row"><span class="lbl">衰败</span><div class="sbar"><div id="bar-decay" style="width:0%"></div></div><span class="val" id="v-decay">0</span></div>
+    <div class="stat-row"><span class="lbl">怀疑</span><div class="sbar"><div id="bar-sus" style="width:0%"></div></div><span class="val" id="v-sus">0</span></div>
+    <div class="stat-row"><span class="lbl">痕迹</span><div class="dots" id="trace-dots"></div><span class="val" id="v-trace" style="width:auto">无痕</span></div>
+    <div class="stat-row"><span class="lbl">感悟</span><div class="sbar"><div id="bar-ins" style="width:0%"></div></div><span class="val" id="v-ins">0</span></div>
+  </div>
+  <div class="panel-card"><h3>🎒 资源与行囊</h3>
+    <div class="chip-row" id="res-chips"></div>
+    <div class="inv-list" id="inv-list"><div class="inv-empty">空空如也</div></div>
+  </div>
+  <div class="panel-card"><h3>⭐ 天赋</h3><div id="trait-list"></div></div>
+  <div class="panel-card"><h3>💗 关系</h3><div id="rel-list"><div class="inv-empty">尚无熟人</div></div></div>
+  <div class="panel-card"><h3>📜 备注</h3><div id="notes-box" class="notes-box">—</div></div>
+</div>
+
+<!-- 右抽屉：世界 -->
+<div id="right-panel">
+  <div class="drawer-handle" onclick="UI.togglePanel('right')">⬇ 收起</div>
+  <div class="panel-card"><h3>🧭 处境</h3><div id="situation-box" class="notes-box"></div></div>
+  <div class="panel-card"><h3>🏛 人心与势力</h3><div id="faction-list"></div></div>
+  <div class="panel-card"><h3>📔 记忆档案 <button class="btn small" onclick="UI.openMemory()" style="float:right">查看全部</button></h3><div id="mem-list"></div></div>
+</div>
+
+<div class="drawer-backdrop" id="drawer-backdrop" onclick="UI.closePanels()"></div>
+
+<!-- ===== 设置弹窗 ===== -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h2>⚙️ 设置 <span style="font-size:9px;color:var(--t3);font-family:var(--mono)">v1.8</span></h2>
+    <div class="ms-sec"><h4>🔌 AI 接口</h4>
+      <label class="fld">API 端点</label>
+      <input id="cfg-endpoint-2" placeholder="https://api.deepseek.com/v1/chat/completions">
+      <label class="fld">API Key</label>
+      <input id="cfg-apikey-2" type="password" placeholder="sk-xxx">
+      <div class="row2">
+        <select id="cfg-model-2"></select>
+        <button class="btn small" onclick="UI.fetchModels()">🔄 拉取</button>
+      </div>
+      <div class="su-hint" id="model-hint-2"></div>
+      <label class="fld">推理强度</label>
+      <select id="cfg-reasoning-2"></select>
+      <label class="fld">输出 Token 限制</label>
+      <select id="cfg-maxtokens-2"></select>
+      <button class="btn small" onclick="UI.testConnection()">🔌 测试连接</button>
+    </div>
+    <div class="ms-sec"><h4>🎨 界面风格</h4>
+      <label class="fld">主题</label>
+      <select id="cfg-theme">
+        <option value="dusk">暮色 · 烛火与灰烬（默认）</option>
+        <option value="moon">月夜 · 冷蓝的月光</option>
+        <option value="ash">灰烬 · 白骨与苍色</option>
+        <option value="forest">深林 · 苔藓与松影</option>
+      </select>
+      <label class="fld">字号</label>
+      <select id="cfg-fs">
+        <option value="sm">小</option>
+        <option value="md" selected>标准</option>
+        <option value="lg">大</option>
+      </select>
+      <div class="row2">
+        <label class="fld" style="margin:0">流式输出 <input type="checkbox" id="cfg-stream" checked></label>
+        <label class="fld" style="margin:0">显示AI思考 <input type="checkbox" id="cfg-think" checked></label>
+      </div>
+    </div>
+    <div class="ms-sec"><h4>💾 存档</h4>
+      <div class="row2">
+        <button class="btn" onclick="Game.exportSave()">💾 导出存档</button>
+        <button class="btn" onclick="Game.importSave()">📂 导入存档</button>
+      </div>
+      <div id="save-slots"></div>
+      <div class="su-hint">自动存档每回合写入，刷新页面可从上次进度继续</div>
+    </div>
+    <div class="ms-sec"><h4>⚠️ 危险操作</h4>
+      <button class="btn danger" onclick="UI.restartGame()">🔄 重新开始（清空当前进度）</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="UI.closeSettings()">取消</button>
+      <button class="btn gold" onclick="UI.saveSettings()">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 世界百科 ===== -->
+<div class="modal-overlay" id="ency-modal">
+  <div class="modal wide">
+    <h2>📖 世界百科 · 灰烬之书</h2>
+    <div class="en-cat" id="en-cat"></div>
+    <div id="en-list" style="max-height:40vh;overflow-y:auto"></div>
+    <div class="en-ask">
+      <input id="en-q" placeholder="向世界之书提问…（例：废塔密室怎么进去？）" onkeydown="if(event.key==='Enter')UI.encyAsk()">
+      <button class="btn gold" onclick="UI.encyAsk()">提问</button>
+      <button class="btn small" id="en-save-mem" onclick="UI.encySaveMem()" style="display:none">＋ 记入记忆</button>
+    </div>
+    <div id="en-ans" class="notes-box" style="margin-top:8px;display:none"></div>
+    <div class="btn-row"><button class="btn gold" onclick="UI.closeModal('ency-modal')">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== 记忆档案 ===== -->
+<div class="modal-overlay" id="mem-modal">
+  <div class="modal wide">
+    <h2>📔 记忆档案</h2>
+    <div id="mem-full" style="max-height:62vh;overflow-y:auto"></div>
+    <div class="btn-row"><button class="btn gold" onclick="UI.closeModal('mem-modal')">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== 死亡档案 ===== -->
+<div class="modal-overlay" id="death-modal">
+  <div class="modal wide">
+    <h2>💀 死亡档案</h2>
+    <div id="death-list" style="max-height:56vh;overflow-y:auto"></div>
+    <div class="btn-row">
+      <button class="btn danger" onclick="Game.clearDeaths()">清空记录</button>
+      <button class="btn gold" onclick="UI.closeModal('death-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 回档选择 ===== -->
+<div class="modal-overlay" id="cp-modal">
+  <div class="modal wide">
+    <h2>⏳ 回到关键时间点</h2>
+    <div class="su-hint">时光倒流至以下任一节点（死亡档案保留，不随回档消失）</div>
+    <div id="cp-list" style="max-height:52vh;overflow-y:auto"></div>
+    <div class="btn-row"><button class="btn" onclick="UI.closeModal('cp-modal')">取消</button></div>
+  </div>
+</div>
+
+<!-- ===== 死亡结算（全屏） ===== -->
+<div id="death-overlay">
+  <div class="death-box">
+    <div class="db-skull">💀</div>
+    <div class="db-title">你死了</div>
+    <div class="db-sub" id="db-sub">第X日 · 死因</div>
+    <div id="db-review"></div>
+    <div class="db-actions">
+      <button class="btn gold big" onclick="UI.openCP()">⏳ 回到关键时间点</button>
+      <button class="btn big" onclick="UI.openDeaths()">📜 死亡档案</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<input type="file" id="import-file" accept=".json" style="display:none" onchange="Game.handleImport(event)">
+<script>
+'use strict';
+/* ============================================================
+   暮色女巫 · 灰溪村的冬天 — 引擎 v1
+   ============================================================ */
+const NS='twilight';
+const DEFAULTS={apiEndpoint:'https://api.deepseek.com/v1/chat/completions',apiKey:'',model:'deepseek-chat',reasoningEffort:'max',maxTokens:'unlimited',theme:'dusk',fontSize:'md',streaming:true,showThinking:true};
+function loadConfig(){try{const c=JSON.parse(localStorage.getItem(NS+'_config'))||{};return Object.assign({},DEFAULTS,c);}catch(e){return Object.assign({},DEFAULTS);}}
+function saveConfig(c){try{localStorage.setItem(NS+'_config',JSON.stringify(c));}catch(e){}}
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type){const el=$('toast');el.textContent=msg;el.className='show '+(type||'');clearTimeout(el._t);el._t=setTimeout(function(){el.className='';},2600);}
+
+/* ---------- 状态标签 ---------- */
+const TRACE_LABELS=['无痕','肤痕','影痕','嗅痕','命运痕','具现痕'];
+const SUS_LABELS=['平静','侧目','警惕','举报','搜捕','火刑'];
+const DECAY_LABELS=['安稳','恍惚','幻觉','失控'];
+function susStage(v){return v>=100?5:v>=90?4:v>=70?3:v>=50?2:v>=30?1:0;}
+function decayStage(v){return v>=90?3:v>=60?2:v>=30?1:0;}
+function seasonOf(d){return d<=30?'预备期·深秋':d<=60?'初冬':d<=110?'隆冬':d<=150?'冬末':'开春';}
+function relLabel(v){return v>=70?'生死之交':v>=40?'信赖':v>=10?'友好':v>-10?'陌生':v>-50?'厌恶':'死敌';}
+
+/* ---------- 世界观浓缩（注入系统提示词） ---------- */
+const LORE = `【世界之貌】公元1387年，黑死病余烬未熄、百年战争烽火连天、教廷两相对立（1378年大分裂：罗马乌尔班六世 vs 阿维尼翁克莱门特七世）的欧洲边境。女巫真实存在——旧神血脉的残裔、禁忌知识的继承者、被时代逼到绝路的绝望者。世界并不邪恶也不仁慈，它只是"不在乎"。故事发生在格拉芬公国边境的灰溪村，主线约150日（1387年冬至前至1388年开春）：预备期(第1-30日)→初冬(31-60)→隆冬(61-110)→冬末(111-150)。
+【世界三律】(1)等价交换：没有免费的奇迹，代价可为生命/记忆/感官/容貌/时光/因果，不可免除、不可转嫁不知情者、不可用金银替代。万物有秤，秤在看不见的地方。(2)见证衰减：见证者越多力量越弱——一人独处深夜力量最盛；3名清醒见证者效果骤降；12人以上或见证场（弥撒/审判/火刑围观）中力量近乎于无且施法者承受反噬风险。暴露即缴械。(3)痕迹反噬：凡以魔法干涉他人命运必留痕迹。五层：肤痕(仅灵视可见)→影痕(倒影慢半拍)→嗅痕(判血犬可追踪)→命运痕(灾祸偏爱)→具现痕(螺旋灼纹，人人可见，下层之物循痕而来)。
+【灰溪村】约九十户，村北黑松林(林之主居所、"哭地"、废塔)，村南灰溪河(石桥为猎巫人进村必经之路、回水湾不祥)，村中磨坊(磨坊主扬与其寡母)、铁匠铺、面包房兼酒馆、小教堂(克莱芒教士)、老墓园(东北角瘟疫死者无碑土丘，唤灵最易也最险)、村井(井底有"求婚者"的传说)。废塔在黑松林深处山丘顶，塔下密室门锁的钥匙在老寡妇玛尔塔手中。村里管事的是领主管家"跛脚托马"(贪婪胆小)。
+【次圈之地】河湾镇(一日脚程，两千人，集市每周一次，金鹿角旅店老板娘凯特是女巫议会的同情者，治安官独眼霍恩情报明码标价)；圣本笃山谷修道院(半日，藏书约四百卷，院长艾格伯特态度暧昧，修士犹大痴迷古文字、老草药师马丁认得所有药草毒草)；溃兵营地(林中废弃采石场，首领疤脸罗尔夫，与猎巫人巴尔德有旧仇，营地老井封着铁盖)；垂柳沼泽(芦苇夫人"沼婆"：契约系大巫，出售力量明码标价童叟无欺，三只白鹭是她的眼睛)。
+【势力】教会：教皇(两位)→主教安瑟伦(圣奥朗，好大喜功，猎巫令是其廉价政绩)→裁判官塞巴斯蒂安(巡视审判，随身三件"镇场圣物"，其母是接生婆被诬投毒烧死，此为其软肋也是罪证)→本堂神父克莱芒(软弱、良心未泯)。猎巫人巴尔德(前十字军下士，烧过七个"女巫"至少三个冤枉，女儿玛格达病重需要只有女巫会熬的药)。领主红胡子冯·维德(领地贫瘠常年缺钱，功利)；管家跛脚托马(两边收钱两边卖)。女巫议会：联络人"渡鸦"(灰溪桥下三块石+月牙暗号)，派系：守序派(药圃派)/血律派(霜刃派)/中间派，内鬼是常态。下层之物：第一纪元"长眠者"的后裔，井底之物/石下者/芦苇夫人/井底求婚者。它们只在被呼唤时出现；交易但不撒谎(语言里没有谎言，但有省略)；收取"承诺"而非现钱；极有耐心。与之为敌者必死，与之为友者等于把影子卖给了它。非人存在：林之主(记得每个在林中施法的人，可"抹去痕迹"，但你要为它做一件事)、泉之母残响(月圆之夜水面倒影慢半拍)、火之言(火焰会"看见"，会把话传给该听的人)、判血犬(只认气味不吃咒，最难对付)。
+【魔法】力量四源：血脉(旧神之血，以生命力为燃料)、知识(《灰烬之书》，阅读即感染，以记忆为燃料，读书人每翻一页就老一岁)、契约(与下层之物立约，以承诺为酬，条款由对方解释)、信仰(圣迹与巫术同源，靠见证场)。八大学派：药草(最安全，接生婆/药婆的合法接口，教会可容忍)、占卜通灵(预言必模糊，"说破即失效"，看得越远眼睛越瞎)、咒术(痕迹最重，老女巫戒律：咒术只用一次用完必搬家)、幻术(骗得过一个人骗不过一群人)、变化(变狼渗狼性、变鸟忘走路，每一次变形都有一块人皮留在地上)、唤灵(最大的禁忌：召回来的不一定是死者本人)、元素(动静最大几乎必然留痕，穷途末路者的学问)、契约(代价推迟，利息是灵魂，议会明令禁止)。施法三律实操：施法必须由玩家先选代价(血/寿/记忆/感官/容貌/材料/时间/因果/他人自愿代付)，代价不可赊欠不可免除；见证越少越强；每次施法依学派积累痕迹(药草0~1、咒术/唤灵1~2、元素2、契约1+债务)。消痕：禁术静养(30日-1层，自第3层起无效)、药浴净身(月露+艾草+圣盐，限1-2层)、替身代受(烧/埋/沉)、嫁祸转移(最黑暗也最有效)。典籍：《灰烬之书》残页(不可示人，教廷辨书人能循书页追凶；残页预言"霜降之时，灰烬中有人归来")、《反巫手册》(猎巫人巴尔德随身携带)、《药典》(修道院抄本，夹着古祭司文字注释，署名是一片被火燎过的灰烬)、圣奥朗主教通谕(1385年，正式将投毒者与女巫并列为首恶)。女巫十诫(密传)：①不可在见证之下自证；②不可直读猎巫人之心(信仰是屏障，强读反噬)；③不可复活死者；④不可在圣地施法；⑤不可将残页全文告知第二人；⑥咒术只用一次用完即走；⑦收留过的秘密不许再讲给第二个人；⑧别在满月夜的井边唱歌(井底下有耳朵)；⑨欠债必还，还债必记账；⑩活过冬天，就是胜利。
+【民俗】四季节日(圣烛节2/2、五朔节5/1、仲夏圣约翰夜6/24、万圣夜10/31-11/2)是力量之窗也是警惕之窗。禁忌：门楣挂马蹄铁、窗台撒盐、谷仓画五角星、不在室内吹口哨、冬至夜不照镜、满月夜不打水、打翻盐往左肩撒一撮。暗语："桥下三块石"(接头)/"北风来了"(猎巫人将至)/"芦花白了"(沼泽之约)/"借火"(请对方室外单独说话——炉火会听见)。女巫以"凭灰烬"起誓。盐=防御(盐环)，铁=枷锁(冷铁克魔力)，火=见证与毁灭。
+【村民逻辑】告密经济学：举报=赏钱+免嫌+报私仇。灾年交不上税时"烧一个女巫"是教会、领主、村民三方得利的替代方案。村民不是群众演员，人人心里都有一本账。
+【你的处境】你身怀一滴古老的血、一页烧剩的书、一段刻骨的仇恨，踏进灰溪村，试图活过这个冬天。世界不在乎你活着——而你选择如何证明你在乎。`;
+
+/* ---------- 天赋定义 ---------- */
+const TRAIT_DEFS=[
+  {id:'body',name:'体魄',icon:'🩸',desc:'体力与抗寒抗饿，影响生命上限'},
+  {id:'perception',name:'感知',icon:'👁️',desc:'察觉线索与危险，灵视能力'},
+  {id:'will',name:'意志',icon:'🛡️',desc:'抵抗衰败、审讯与魔法反噬'},
+  {id:'charm',name:'魅力',icon:'💬',desc:'社交与好感，村民对你的第一印象'},
+  {id:'magic',name:'灵性',icon:'✨',desc:'魔力上限与法术威力'},
+  {id:'luck',name:'气运',icon:'🍀',desc:'命运的偏爱，机会与灾祸的倾斜'}
+];
+
+/* ---------- 出身配置 ---------- */
+const ORIGINS={
+  apprentice:{name:'流亡学徒',icon:'📜',desc:'你的师父是位老女巫，被猎巫人烧死在邻郡。你带着她最后的遗物——三页《灰烬之书》残页、一枚乌鸦骨雕——逃到灰溪村。你懂得不少草药与禁忌，却从不敢在一个地方久留。',res:{food:5,wood:3,herbs:3,salt:1,iron:0},coins:12,items:[{name:'《灰烬之书》残页',icon:'📜',qty:1,desc:'师父留下的三页残页，写着配方与一句预言'},{name:'乌鸦骨雕',icon:'🪶',qty:1,desc:'师父的信物，凭灰烬起誓的见证'}],rel:{},bonus:{magic:1},intro:'你背着破包袱站在灰溪村村口，包袱里是三页残页和一枚骨雕。师父死前只说了一句话："别用。别让人看见你用。实在要用——用完，就搬家。"'},
+  outsider:{name:'灰溪归人',icon:'🏚️',desc:'你在这座村子长大，祖母死后远走他乡。如今你回来了——为了她留下的秘密：一把废塔密室的钥匙，和半句没说完的话。村里老人还记得你，也有人还记得你祖母。',res:{food:8,wood:4,herbs:2,salt:1,iron:0},coins:8,items:[{name:'黄铜钥匙',icon:'🗝️',qty:1,desc:'祖母遗物，传闻能开废塔密室的门'},{name:'祖母的围巾',icon:'🧣',qty:1,desc:'旧羊毛围巾，带着艾草的气味'}],rel:{玛尔塔:12},bonus:{charm:1},intro:'村口的木栅比记忆里矮了。你攥着祖母留下的钥匙，钥匙齿上还缠着一缕灰白的头发。老寡妇玛尔塔在井边看见你，怔了很久，才叫出你的小名。'},
+  hunter:{name:'猎巫人之女',icon:'🩸',desc:'你的父亲是个猎巫人，靠烧"女巫"领赏金。你十五岁那年在梦里听见了泉水的说话声——血脉觉醒了。你偷了家里的一把匕首和几页《反巫手册》的抄页，逃了出来。你懂猎巫人的手法，也懂他们有多危险。',res:{food:6,wood:3,herbs:1,salt:2,iron:1},coins:20,items:[{name:'旧匕首',icon:'🔪',qty:1,desc:'从家里偷来的猎刀'},{name:'《反巫手册》抄页',icon:'📄',qty:1,desc:'几页辨认与审讯女巫的手册抄页'}],rel:{巴尔德:-25},bonus:{will:1},intro:'你压低了兜帽走进灰溪村。村里人看你的眼神带着警惕——你身上有猎巫人那股铁与血的气味，你花了三个月都没洗掉。你知道父亲迟早会循着线索追来。'},
+  merchant:{name:'盐港药贩',icon:'⚖️',desc:'你从盐港城来，那里没人管你是谁。你走村串户卖草药与私盐，顺带打听消息。你见过的世面比灰溪村全村人加起来都多，也正因如此，你知道这个冬天会有多难熬。',res:{food:6,wood:2,herbs:4,salt:3,iron:0},coins:60,items:[{name:'药贩的秤',icon:'⚖️',qty:1,desc:'做生意用的家伙，也用来"称"人心'}],rel:{金鹿角凯特:8},bonus:{charm:1},intro:'你挑着药担子走进灰溪村，吆喝了两声，没人应。冷风卷着雪沫灌进领口——这地方比你想象中更穷，也更怕生。但你见过比这更穷的村子，知道该怎么敲开他们的门。'},
+  wild:{name:'林中野孩',icon:'🌲',desc:'你是在黑松林边长大的孩子，采蘑菇、套兔子、认草药，山林就是你的家。老猎户老戈特教过你打猎，你管他叫"老戈特叔"。后来你发现，林子在"跟你说话"——风声、树影、狼嚎，都带着意思。',res:{food:7,wood:5,herbs:3,salt:0,iron:0},coins:5,items:[{name:'旧猎弓',icon:'🏹',qty:1,desc:'老戈特送你的旧猎弓'},{name:'松脂袋',icon:'🪵',qty:1,desc:'半袋黑松林的松脂，引火与涂箭用'}],rel:{老戈特:15},bonus:{body:1},intro:'你循着兽道走出黑松林，灰溪村的炊烟就在眼前。林子在身后低语——它认得你，你也认得它。但你得进村，因为林子里的冬天，比村子里的更冷。'},
+  custom:{name:'自定义',icon:'✏️',desc:'由你书写的出身。',res:{food:6,wood:3,herbs:2,salt:1,iron:0},coins:15,items:[],rel:{},bonus:{},intro:'你踏进灰溪村。没有人知道你是从哪来的，也没有人知道你是谁——这正是你想要的。'}
+};
+
+/* ---------- 血脉天赋配置 ---------- */
+const TALENTS={
+  herbs:{name:'药草之触',icon:'🌿',desc:'药草学是你的本能：止血膏、退热汤、安眠茶，你闭着眼都能配。药草系法术代价更轻，村民也更愿意找你"治病"。',items:[{name:'药草包',icon:'🌿',qty:1,desc:'备好的干燥药草'}],bonus:{},res:{herbs:2}},
+  seer:{name:'灵视之眼',icon:'👁️',desc:'你能看见别人看不见的东西：施法后皮肤上的灰纹、水中慢半拍的倒影、死者未散尽的轮廓。占卜通灵系更准，但看得越远，眼睛越瞎。',items:[{name:'灵视药水',icon:'🧪',qty:1,desc:'蟾蜍胆汁与月露调制，能看见肤痕'}],bonus:{perception:1},res:{}},
+  curse:{name:'咒术之血',icon:'🕯️',desc:'你的血天生适合"记账"：霉咒、断缘、窃运，咒术在你手里威力更盛。但世界的秤也认得你——初始便带着1层痕迹（肤痕）。',items:[{name:'乌鸦羽',icon:'🪶',qty:1,desc:'施咒的媒介'}],bonus:{magic:1},res:{},trace:1},
+  phantom:{name:'幻影之肤',icon:'🌫️',desc:'你擅长骗过眼睛：隐影、变脸、迷路术。幻术系效果更强，但记住——骗得过一个人，骗不过一群人。',items:[{name:'铁锈袋',icon:'🧂',qty:1,desc:'旧铁之锈，束缚与防护的反用'}],bonus:{charm:1},res:{}},
+  necro:{name:'唤灵之耳',icon:'🦴',desc:'你能听见死者的话。唤灵系更强、代价更轻——但你比谁都清楚戒律第三条：召回来的，不一定是死者本人。',items:[{name:'骨灰罐',icon:'🪦',qty:1,desc:'墓园东北角取的骨灰，唤灵材料'}],bonus:{will:1},res:{}},
+  pact:{name:'契约之印',icon:'🕳️',desc:'你身上生来带着一道旧印，井底的东西认得你。契约系与你亲和、代价稍轻——但它们也"注视"着你，比任何人都早。',items:[{name:'井底之水',icon:'🫗',qty:1,desc:'一瓶井底之水，通灵与契约的媒介'}],bonus:{magic:1},res:{}},
+  elemental:{name:'元素之心',icon:'🔥',desc:'火、水、风、雷听你的话。元素系威力最强、动静最大——每一次使用，都在向整个教区宣告"这里有女巫"。',items:[{name:'火绒盒',icon:'🔥',qty:1,desc:'打火用的火绒，也用来"借火"'}],bonus:{body:1},res:{}},
+  custom:{name:'自定义',icon:'✏️',desc:'由你书写的天赋。',items:[],bonus:{},res:{}}
+};
+/* ---------- 世界百科数据 ---------- */
+const ENCY={
+'三律':[
+ ['等价交换','世间没有免费的奇迹。代价可为生命、记忆、感官、容貌、时光、因果，不可免除、不可转嫁不知情者、不可用金银替代。"你向世界借一个奇迹，就得还世界一样东西。还什么、还多少，不由你定，由秤定。"'],
+ ['见证衰减','见证者越多、越虔诚、越坚信不可能，力量越弱。3名清醒见证者效果骤降；12人以上或见证场（弥撒、审判、火刑围观）中力量近乎于无且可能反噬。女巫必须躲藏——暴露即缴械。'],
+ ['痕迹反噬','凡以魔法干涉他人命运，必留痕迹。浅时容貌"微微不对"；渐深则牲畜不安、婴儿夜啼、灾祸偏爱；最终具现为螺旋纹——任何人都能"看出"你是女巫，更古老的东西也会循痕而来。'],
+ ['痕迹五层','①肤痕（仅灵视者可见）②影痕（倒影慢半拍）③嗅痕（判血犬可追踪）④命运痕（灾祸偏爱）⑤具现痕（螺旋灼纹，人人可见）。'],
+ ['消痕之法','禁术静养（30日不施法-1层，自第3层起无效）／药浴净身（月露+艾草+圣盐，限1-2层）／替身代受（烧掉、埋掉或沉入流水）／嫁祸转移（最黑暗也最有效）。']
+],
+'地理':[
+ ['格拉芬公国','夹在法兰西王权、神圣罗马帝国与教廷之间的灰色地带，领地贫瘠，男丁常被征兵，荒地众多——这给了外乡人"落户"的缝隙。'],
+ ['灰溪村','约九十户，夹在黑松林与灰溪河之间。有磨坊、铁匠铺、面包房兼酒馆、小教堂、老墓园与村井。吊桥常年失修，只有领主巡视时才放下。'],
+ ['黑松林','村北古老林地，林深不见天日。有林之主的传说、猎人老戈特的狩猎小屋、废塔遗址与常年结霜的"哭地"。冬季狼群会因饥饿逼近村庄。'],
+ ['灰溪河','村南河流，冬季封冻。石桥是猎巫人进村的必经之路，桥下有浅滩——议会联络人留暗号的地方。回水湾水深且静，村民不在那里打水。'],
+ ['废塔','黑松林深处山丘之顶，百年前一位女巫的居所，被焚毁后只剩断壁残垣与地下密室。塔顶施法见证最少、力量最纯。密室钥匙在老寡妇玛尔塔手中。'],
+ ['河湾镇','下游一日脚程，约两千人。每周集市、金鹿角旅店、治安所都在这里。信息与货物的枢纽，鱼龙混杂——在镇上活动比在村里安全（也更昂贵）。'],
+ ['圣本笃修道院','山中半日脚程，藏书约四百卷。院长艾格伯特态度暧昧，默许修士研究"异端医典"。抄经室藏有夹着古祭司文字注释的《药典》抄本。'],
+ ['垂柳沼泽','村西灰绿色沼泽，产毒草、泥炭与芦苇。深处住着芦苇夫人"沼婆"——契约系大巫，出售力量明码标价、童叟无欺，但从不解释价格的含义。'],
+ ['旧石阵','东北五日路程，第一纪元的遗迹。长眠者最后的地上居所，全大陆通灵之力最强的地方。由一位隐居的"石语者"看守。'],
+ ['盐港城','西南四日路程的海港，自由市，教会鞭长莫及。许多走投无路的女巫最后都逃向这里，改名换姓。这是逃亡线的终点。']
+],
+'势力':[
+ ['教廷与主教','教皇（两位，互相绝罚）→主教安瑟伦（好大喜功，猎巫令是廉价政绩）→裁判官→本堂神父→信徒。教会需要女巫就像需要魔鬼——没有魔鬼，"救赎"无从谈起。'],
+ ['裁判官','受过法学与神学训练的专职审判者。格拉芬全境仅三人，流程：指控→逮捕→酷刑→供词→签字→定罪→火刑。酷刑是供词之母。裁判官塞巴斯蒂安随身携带三件"镇场圣物"。'],
+ ['猎巫人','职业猎手，多为退伍军人，按人头领赏。手法：线人情报→跟踪→突袭→铁铐→押送→领赏。弱点：贪财、怕死、怕丢脸、有软肋。'],
+ ['领主与管家','红胡子冯·维德伯爵领地贫瘠常年缺钱。烧女巫可转移税赋民怨；烧掉劳动力他又不满——这是可利用的矛盾。管家"跛脚托马"贪婪胆小，收了两边的钱就会两边都卖。'],
+ ['村民','不是群众演员，人人心里都有一本账。恐惧未知＋依赖药婆＋从众＋嫉妒。告密经济学：举报=赏钱+免嫌+报私仇。真正的安全来自"让他告密反而更亏"。'],
+ ['女巫议会','残存女巫的松散联盟，无据点无首领。联络人"渡鸦"在灰溪桥下留炭笔画记号（三块石+一道月牙）。派系：守序派（药圃派）/血律派（霜刃派）/中间派。内鬼是常态。'],
+ ['下层之物','第一纪元"长眠者"的后裔，沉入井底、石下、沼泽深处。它们不是魔鬼，也不是旧神，而是"世界的另一面"。只在被呼唤时出现；交易但不撒谎（有省略）；收承诺不收现钱；极有耐心。'],
+ ['非人存在','林之主（记得每个林中施法者，可抹去痕迹）、泉之母残响（月圆之夜倒影慢半拍）、火之言（火焰会"看见"、会传话）、判血犬（只认气味不吃咒）、石语者（只说石头的语言）。'],
+ ['修道院','当时唯一的"知识机构"，也是"危险的知情者"。公开服从教会，私下保留学问。院长深知焚书与焚人一样可怕。部分修士实际掌握着与巫术同源的医术。']
+],
+'人物':[
+ ['伊莲·灰发','？—1381，老接生婆，主角血脉与知识的双重源头。圣乔治瘟疫中被诬为投毒者，在灰溪村外被烧死。死前藏起《灰烬之书》残页与一把钥匙。'],
+ ['老寡妇玛尔塔','六十岁，村中"半个知情者"。丈夫死于三十年前的女巫审判。收藏着废塔密室的钥匙。她知道残页的下落线索，说与不说取决于你如何待她。'],
+ ['猎巫人巴尔德','四十岁，前十字军下士。杀过七个"女巫"，至少三个他知道是冤枉的。女儿玛格达病重，只有女巫会熬的药能救。他是最危险的交易对象。'],
+ ['教士克莱芒','三十五岁，本堂神父。温和、软弱、良心未泯。夹在主教、裁判官与村民之间，精神濒临崩溃。被逼到墙角可能出卖你，也可能豁出去保护你。'],
+ ['磨坊主之子扬','二十二岁，莽撞心软，对"新来的外乡女人"有好感。他的忠诚在"全家性命"面前会崩溃。这是本世界对"浪漫"最残酷的注脚。'],
+ ['接生婆梅兰妮','五十岁，"失败的女巫"，只能做一半的魔法。嫉妒真正的女巫，又渴望保护她们。半师半敌，可能偷师、可能藏你、可能让你顶缸。'],
+ ['猎人老戈特','六十五岁，黑松林常客。见过林之主，从不谈论。欠你祖母一条命，是"绝对忠诚"的唯一候选——但他的存在也是你最大的破绽。'],
+ ['代书人安布罗斯','五十岁，兼墓园看守。识字的退伍兵，话极少心极软。能帮你伪造良民证明——但价格极高，且会在被发现时第一时间撇清自己。'],
+ ['金鹿角凯特','河湾镇旅店老板娘，议会的同情者（姐姐被烧死在圣奥朗）。她的旅店是各方势力的中立区。规矩："店里的事，出了店门就不算数。"'],
+ ['裁判官塞巴斯蒂安','五十岁，冷静、高效、危险。他在"种"线人。随身三件镇场圣物。他的秘密：母亲是接生婆，被诬为投毒者，用命换了他的命——这是他的软肋，也是他的罪证。'],
+ ['主教安瑟伦','六十岁，精明、世故、虚荣。真正的信仰是"教会的体面"与"自己的地位"。你若能送他一个大功（如揭发阿维尼翁派间谍），他会在小事上放你一马。'],
+ ['联络人渡鸦','身份成谜，总在深夜的灰溪桥下留记号。声音雌雄莫辨。极可能同时是灰溪村或河湾镇的某个人——猜错的代价是"被引到猎巫人的陷阱里"。'],
+ ['芦苇夫人"沼婆"','垂柳沼泽的大巫，契约系力量的"经销商"。三只白鹭是她的眼睛。规矩："你出什么，我给什么。你问价格，我告诉你的价格就是真的——只是我从不保证你付得起。"'],
+ ['疤脸罗尔夫','三十岁，溃兵首领，前长弓手。不信鬼神，只怕"井"。与巴尔德有旧仇。可用钱雇、用酒买、用井的恐惧威胁——他是你手中的刀，但刀会割手。'],
+ ['修士犹大','二十六岁，修道院图书管理员。痴迷古文字，半个知情者，半个告密者。你若懂"古祭司文字"，他会像飞蛾扑火一样缠上来。'],
+ ['修士马丁','七十岁，修道院草药师。认得所有药草与毒草。认为"救人的就是好药，管它是圣水还是蟾蜍胆汁"。他能做的只是"装作没看见"。']
+],
+'魔法':[
+ ['力量四源','血脉（旧神之血，以生命力为燃料，最隐蔽）／知识（《灰烬之书》，阅读即感染，以记忆为燃料）／契约（与下层之物立约，以承诺为酬，条款由对方解释）／信仰（圣迹与巫术同源，靠见证场）。'],
+ ['八大学派','药草（最安全）/占卜通灵（说破即失效）/咒术（痕迹最重）/幻术（怕见证）/变化（渗兽性）/唤灵（召回的未必是死者）/元素（动静最大）/契约（代价推迟，利息是灵魂）。'],
+ ['施法代价','血（伤口数日不愈）/寿（不可逆）/记忆（永久遗忘）/感官（失嗅失明等）/容貌（衰老疤痕）/材料/时间（仪式不可中断）/因果（记入痕迹）/他人（自愿知情者代付，他们会恨你）。代价不可赊欠、不可免除、不可用金银替代。'],
+ ['见证规则','1~2名清醒见证者：效果减半。3名及以上：效果骤降。12名以上或见证场：近乎于无且承受反噬。不清醒者（醉酒、昏迷、婴儿、牲畜）不计入，但狗与乌鸦"算半个"。'],
+ ['施法判定','代价支付到位＋准备周全＋见证为零＝必定成功；缺一点有风险；缺两点大概率失败或反噬；三点皆缺——不要施法。'],
+ ['典籍','《灰烬之书》残页（不可示人，辨书人循页追凶）／《反巫手册》（猎巫人的教科书）／《药典》（修道院抄本，夹古祭司文字注释）／《圣奥朗主教通谕》（1385，猎巫的"准生证"）。'],
+ ['女巫十诫','①不可在见证下自证 ②不可直读猎巫人之心 ③不可复活死者 ④不可在圣地施法 ⑤残页不可告知第二人 ⑥咒术只用一次用完即走 ⑦收留过的秘密不许再讲 ⑧别在满月夜的井边唱歌 ⑨欠债必还，还债必记账 ⑩活过冬天。'],
+ ['仪式六要素','目的→准备→步骤→代价→收尾→反噬。六要素齐备的仪式可预判、可博弈、可设计——比如故意留下"错误残留"嫁祸他人。']
+],
+'民俗':[
+ ['一年之轮','圣烛节(2/2)点烛驱冬→五朔节(5/1)立五月柱→仲夏圣约翰夜(6/24)篝火与草药→万圣夜(10/31-11/2)亡灵归家→圣马丁节(11/11)屠宰季→圣诞节十二日狂欢。'],
+ ['四季节日','圣烛节、五朔节、仲夏夜、万圣夜是"力量之窗"，也是"警惕之窗"——力量最强之时，恰是教会与村民最戒备之时。'],
+ ['禁忌','门楣挂马蹄铁、窗台撒盐、谷仓画五角星、不在室内吹口哨、倒着扫地招晦气、打翻盐往左肩撒一撮、冬至夜不照镜子、满月夜不打水（"井底的绅士会听见"）。'],
+ ['暗语','"桥下三块石"（接头）/"北风来了"（猎巫人将至）/"芦花白了"（沼泽之约）/"借火"（请对方到室外单独说话——炉火会"听见"）。女巫之间以"凭灰烬"起誓。'],
+ ['经济','铜芬尼日常、银格罗申大额、金弗罗林罕见。以物易物盛行。什一税给教会、三至四成给领主。灾年交不上税时，"烧一个女巫"成了三方得利的替代方案。'],
+ ['穿着','粗麻与羊毛，灰褐为主。忌穿"太新太干净"的衣裳。寡妇穿黑。若暴露，会被"公认"穿红——因为红衣"像火，火不欢迎"。']
+],
+'生存':[
+ ['资源六支柱','食物（每日1份）/柴火（每日0.5捆）/草药（施法原料）/盐（防御与腌肉）/铁（冷铁克魔力）/关系（人情账）。无资源=饿死冻死；用魔法换资源永远存在，只是每换一次都在支付另一种代价。'],
+ ['庇护所等级','村中租屋（隐蔽差）/林中小屋（远而冷，消耗加倍）/废塔密室（见证最少，但废塔"记得"前主人）/修道院客房（安全温暖，但被监视，等于把半条命交给修道院）。'],
+ ['威胁等级','Lv0流言→Lv1恶意村民→Lv2猎巫人（可买通可设计）→Lv3猎巫队（正面无解，只能跑躲借力）→Lv4裁判官（审讯场景）→Lv5火刑（唯一活路是行刑前夜或制造混乱）→Lv6下层之物（只能交易，与之为敌必死）。'],
+ ['审讯求生','①酷刑之下人人都会招，招供不等于定罪（供词要"签字"才算）②审讯者要的是供词而非真相，给他想要的，但留一条活路 ③永远留一个"外援"。'],
+ ['冬季节拍','预备期(1-30日)相对安全→初冬(31-60)第一场饥荒、巴尔德首次进村→隆冬(61-110)资源枯竭、替罪羊事件→冬末(111-150)猎巫令下达、全面搜捕。大雪封路时，猎巫人进不来，你也出不去。'],
+ ['衰败值','饥饿、寒冷、孤独、恐惧的累积。30恍惚、60幻觉（分不清真假——那可能是真的）、90失控、100崩溃。休息、进食、温暖与陪伴可以降低它。']
+],
+'结局':[
+ ['结局总览','A良民（隐藏，洗尽痕迹成为普通女人）/B扳倒审判庭/C与井订约/D盐港城（逃亡）/E灰烬之春（冷眼旁观村庄自毁）/F传承（把火传下去）/G火刑/H消逝/I林之主的记忆/J井底的求婚者/K灰烬归来（预言结局）。'],
+ ['结局A·良民','洗尽痕迹＋伪造良民证明＋让领主欠你人情＋让村庄"集体遗忘你"。要求你彻底放弃"被记住"——这是最难的胜利。'],
+ ['结局C·与井订约','在绝望关头敲响井沿三下。你活着，但影子从此"比人慢半拍"，偶尔听见水声——那是账单在靠近。最好的"活着"结局，也是最坏的一个。'],
+ ['结局D·盐港城','冬天结束前离开教区。处理掉灰溪村的账：不留线索、不留人质、不留遗憾。你逃出了棋盘，代价是再也无法回头。'],
+ ['结局F·传承','把残页内容逐页口授给继承人，处置残页，完成交接仪式。你是"灰烬之书"的一页——烧尽了，但内容被记住了。'],
+ ['结局K·灰烬归来','"霜降之时，灰烬中有人归来。"归来的不是死者，是火。世界的轮回仍在继续，你留下的痕迹会在下一场大雪中重新显形。']
+]
+};
+
+/* ---------- 新手攻略 ---------- */
+const GUIDE_HTML=`
+<div class="guide-section"><h4>🌱 玩法</h4>
+<p>输入任意行动（探索/交谈/采集/施法/潜入/交易…），AI 实时推演世界。核心目标：<b>活过这个冬天</b>（约150日）。你的每个选择都会影响怀疑值、痕迹与人心。</p>
+<ul><li>白天适合社交、采集、做工——扮演"正常女人"越成功，夜晚越自由。</li>
+<li>夜晚适合施法、探索、接头——但每一次外出都可能被目击，每一次施法都在"记账"。</li>
+<li class="tip">💡 开局建议：先找地方落脚，认识玛尔塔或老戈特，储备过冬的食物与柴火。</li>
+<li class="warn">⚠️ 三律是铁律：施法必付代价、见证削弱力量、痕迹会累积。免费魔法不存在。</li></ul></div>
+<div class="guide-section"><h4>🩸 状态详解</h4>
+<ul><li><b>怀疑值</b>（0-100）：村民对你的集体怀疑。30侧目/50警惕/70举报/90搜捕/100火刑。去教堂、帮村民、嫁祸可降低。</li>
+<li><b>痕迹</b>（0-5层）：魔法的账本。3层起判血犬能嗅到你，5层人人可"看出"你是女巫。可用药浴、替身洗去。</li>
+<li><b>衰败值</b>（0-100）：饥饿寒冷的累积。30恍惚、60幻觉、90失控。吃饱睡暖就能降。</li>
+<li><b>资源</b>：食物每日1份、柴火每日0.5捆。盐是防御（盐环），铁是枷锁（冷铁克魔力）。</li></ul></div>
+<div class="guide-section"><h4>💀 死亡与回档</h4>
+<ul><li>死亡是故事的另一种写法。每次死亡，AI 会为你写一份<b>死亡档案</b>：评价你的选择、点评关键失误、给出下一世的建议。</li>
+<li>游戏自动在关键节点（每日更替、重大事件）留下<b>时光节点</b>。死亡后点击"回到关键时间点"，可回到任意节点重新来过。</li>
+<li class="tip">💡 顶栏 💀 按钮可随时翻阅所有死亡记录——看自己是怎么一次次死掉的，也是一种乐趣。</li></ul></div>
+<div class="guide-section"><h4>📖 记忆与百科</h4>
+<ul><li>AI 的记忆分类型（人物/地点/事件/线索…）与重要度，重要的事永远不会忘；旧记忆会被自动压缩为摘要。</li>
+<li>顶栏 📖 百科收录了本世界的设定与人物；不知道的事可以直接"向世界之书提问"，答案可记入记忆。</li>
+<li class="tip">💡 你写的"备注"会始终注入 AI 的提示词——它不会忘记你是谁、你要什么。</li></ul></div>
+<div class="guide-section"><h4>🕯️ 结局</h4>
+<p>本世界不分好坏，只分代价：良民/逃亡/传承/与井订约/扳倒审判庭/灰烬之春……以及隐藏结局：林之主的记忆、井底的求婚者、灰烬归来。每条路都同时打开一扇门、关上一扇门。</p></div>`;
+/* ---------- 设置向导（API → 角色 → 备注） ---------- */
+const SW={
+  step:0,
+  c:{name:'',gender:'',origin:'',talent:'',traits:{body:1,perception:1,will:1,charm:1,magic:1,luck:1},traitLeft:18,notes:''},
+  steps:['su-api','su-char','su-notes'],
+  init(){
+    // 填入已保存的API配置
+    const cfg=loadConfig();
+    $('cfg-endpoint').value=cfg.apiEndpoint;
+    $('cfg-apikey').value=cfg.apiKey;
+    $('cfg-model').value=cfg.model;
+    $('cfg-reasoning').value=cfg.reasoningEffort;
+    $('cfg-maxtokens').value=cfg.maxTokens;
+    // 备注模板chips
+    document.querySelectorAll('#notes-chips .chip').forEach(ch=>{
+      ch.addEventListener('click',()=>{ $('cc-notes').value=ch.dataset.t; toast('模板已填入，可继续修改','success'); });
+    });
+    // 事件委托：出身/天赋卡片（HTML 卡片未内联 onclick，统一在此绑定）
+    [['origin-grid','origin'],['talent-grid','talent']].forEach(([gid,key])=>{
+      const g=$(gid);
+      if(g) g.addEventListener('click',(ev)=>{
+        const card=ev.target.closest('.option-card');
+        if(card) SW.pick(card,key);
+      });
+    });
+    this.renderTraits();
+    this.showStep(0);
+  },
+  showStep(i){
+    this.step=i;
+    document.querySelectorAll('.su-step').forEach(s=>s.classList.remove('active'));
+    $('su-'+['api','char','notes'][i]).classList.add('active');
+    document.querySelectorAll('.su-progress .dot').forEach((d,k)=>{
+      d.classList.toggle('done',k<i); d.classList.toggle('current',k===i);
+    });
+  },
+  pick(el,key){
+    const grid=el.parentElement;
+    grid.querySelectorAll('.option-card').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('selected');
+    this.c[key]=el.dataset.v;
+    // 自定义输入框：按 grid 对应各自的框（origin-grid→#origin-custom，talent-grid→#talent-custom）
+    const customMap={'origin-grid':'origin-custom','talent-grid':'talent-custom'};
+    const customId=customMap[grid.id];
+    if(customId){
+      const customInput=$(customId);
+      if(!customInput) return;
+      if(el.dataset.v==='custom'){ customInput.style.display=''; customInput.focus(); }
+      else { customInput.style.display='none'; customInput.value=''; }
+    }
+  },
+  renderTraits(){
+    const el=$('trait-setup');
+    el.innerHTML=TRAIT_DEFS.map(t=>
+      `<div class="trait-row"><span class="t-icon">${t.icon}</span><div class="t-info"><div class="t-name">${t.name}</div><div class="t-desc">${t.desc}</div></div><div class="t-ctrl"><button onclick="SW.trait('${t.id}',-1)">−</button><span class="t-val">${this.c.traits[t.id]}</span><button onclick="SW.trait('${t.id}',1)">＋</button></div></div>`
+    ).join('');
+    $('points-left').textContent='剩余 '+this.c.traitLeft+' 点';
+  },
+  trait(id,d){
+    const v=this.c.traits[id];
+    if(d>0 && this.c.traitLeft<=0){ toast('天赋点已用尽','error'); return; }
+    if(v+d<1||v+d>8){ return; }
+    this.c.traits[id]=v+d; this.c.traitLeft-=d;
+    this.renderTraits();
+  },
+  saveApi(){
+    const cfg=loadConfig();
+    cfg.apiEndpoint=$('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    cfg.apiKey=$('cfg-apikey').value.trim();
+    cfg.model=$('cfg-model').value;
+    cfg.reasoningEffort=$('cfg-reasoning').value;
+    cfg.maxTokens=$('cfg-maxtokens').value;
+    saveConfig(cfg);
+    return cfg;
+  },
+  next(){
+    if(this.step===0){
+      this.saveApi();
+      if(!$('cfg-apikey').value.trim()){ toast('未填API Key，可在设置中后补','error'); }
+      this.showStep(1);
+    }else if(this.step===1){
+      const name=$('cc-name').value.trim();
+      if(!name){ toast('请先填写名字','error'); return; }
+      this.c.name=name;
+      if(!this.c.gender){ toast('请选择性别','error'); return; }
+      // 自定义出身/天赋：先取输入框内容，再决定校验（选了自定义时 c[key] 是空字符串）
+      if(this.c.origin==='custom'){
+        const v=$('origin-custom').value.trim();
+        if(!v){ toast('请输入自定义出身','error'); return; }
+        this.c.origin='custom|'+v;
+      }else if(!this.c.origin){ toast('请选择出身','error'); return; }
+      if(this.c.talent==='custom'){
+        const v=$('talent-custom').value.trim();
+        if(!v){ toast('请输入自定义天赋','error'); return; }
+        this.c.talent='custom|'+v;
+      }else if(!this.c.talent){ toast('请选择血脉天赋','error'); return; }
+      this.showStep(2);
+    }
+  },
+  prev(){ if(this.step>0) this.showStep(this.step-1); },
+  async aiName(){
+    const cfg=loadConfig();
+    if(!cfg.apiKey){ toast('请先在上一步配置 API Key','error'); return; }
+    const btn=$('btn-ainame');
+    if(!btn) return;
+    btn.disabled=true;
+    btn.textContent='⏳ 起名中…';
+    try{
+      toast('正在请求名字…');
+      const g=this.c.gender||'女';
+      const r=await Game.callRaw([{role:'system',content:'你是一位中世纪取名助手。'},{role:'user',content:`请为一位公元1387年欧洲边境（德语区）的年轻${g==='女'?'女巫':'男巫'}起一个符合时代与地域的名字（名+姓，如：伊莲·灰发、玛尔塔·黑莓、阿黛尔·霜、约纳斯·石桥）。只输出名字本身，不要任何解释或标点。`}],800,0.9);
+      if(r&&r.content){
+        const n=r.content.trim().replace(/[「」"'""。.、]/g,'').slice(0,12);
+        $('cc-name').value=n; this.c.name=n; toast('✨ 名字已生成：'+n,'success');
+      }else{ toast('起名失败，请检查API配置','error'); }
+    }catch(e){ toast('起名失败：'+e.message,'error'); }
+    finally{
+      btn.disabled=false;
+      btn.textContent='🎲 AI起名';
+    }
+  },
+  begin(){
+    const notes=$('cc-notes').value.trim();
+    this.c.notes=notes;
+    Game.start(this.c);
+  }
+};
+
+/* ---------- 记忆类型 ---------- */
+const MEM_TYPES=[['人物','👤'],['地点','📍'],['事件','⚔️'],['物品','📦'],['恩怨','💢'],['线索','🔍'],['其他','📝']];
+const QUICK_ACTS=[
+  {t:'🔍 探索四周',a:'我环顾四周，仔细观察周围的环境和值得注意的细节。'},
+  {t:'💬 与人交谈',a:'我寻找附近可以交谈的人，试着打听消息或混个脸熟。'},
+  {t:'🌿 采集物资',a:'我去黑松林边缘采集柴火、蘑菇和草药（注意安全，白天去）。'},
+  {t:'🛏️ 休息',a:'我回到住处，生火取暖，吃些东西，好好休息一晚。'},
+  {t:'🕯️ 练习法术',a:'我在无人处小心练习血脉天赋相关的法术（考虑代价与痕迹）。'},
+  {t:'🕵️ 打听消息',a:'我去村里或酒馆打听最近的动静：猎巫人、领主、教会的消息。'}
+];
+/* ============================================================
+   Game 引擎
+   ============================================================ */
+const Game={
+  state:null, apiBusy:false, dead:false, lastDay:1,
+
+  /* ---------- 开局 ---------- */
+  start(c){
+    const oKey=c.origin.split('|')[0], oCustom=c.origin.includes('|')?c.origin.split('|')[1]:'';
+    const tKey=c.talent.split('|')[0], tCustom=c.talent.includes('|')?c.talent.split('|')[1]:'';
+    const O=ORIGINS[oKey]||ORIGINS.custom, T=TALENTS[tKey]||TALENTS.custom;
+    const traits={};
+    TRAIT_DEFS.forEach(t=>{ traits[t.id]=Math.min(10,(c.traits[t.id]||1)+(O.bonus[t.id]||0)+(T.bonus[t.id]||0)); });
+    const maxHp=50+traits.body*12+traits.will*3;
+    const maxMp=30+traits.magic*14+traits.will*2;
+    const inv=(O.items||[]).concat(T.items||[]).map((it,i)=>({id:'it'+i+'_'+Date.now(),name:it.name,icon:it.icon,qty:it.qty||1,desc:it.desc||''}));
+    const res=Object.assign({food:6,wood:3,herbs:2,salt:1,iron:0},O.res||{},T.res||{});
+    const relations={};
+    Object.keys(O.rel||{}).forEach(k=>{ relations[k]={value:O.rel[k],rel:'',desc:''}; });
+    this.state={
+      v:3, created:true,
+      player:{
+        name:c.name, gender:c.gender,
+        origin:{key:oKey,name:O.name,desc:oCustom||O.desc},
+        talent:{key:tKey,name:T.name,desc:tCustom||T.desc},
+        traits, hp:maxHp, maxHp, mp:maxMp, maxMp,
+        insight:0, pendingPoints:0, coins:O.coins||0,
+        inventory:inv
+      },
+      story:{day:1,time:'黄昏',weather:'铅灰色的天，初雪将至',location:'灰溪村 · 村口',visited:['灰溪村 · 村口']},
+      suspicion:0, trace:T.trace||0, decay:0,
+      title:'无名外乡人',
+      situation:'你刚踏进灰溪村，还无处落脚。',
+      factions:{村民:0,教会:0,女巫议会:0,领主:0,猎巫人:0},
+      resources:res, relations,
+      memory:[], fused:[],
+      history:[], notes:c.notes||'',
+      turnCount:0
+    };
+    this.dead=false;
+    $('setup-overlay').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    this.renderQuickActions();
+    this.addLog('system','🕯️ **暮色女巫 · 灰溪村的冬天** — 1387年，冬至前一个月');
+    this.addLog('narrative',`**${c.name}**（${c.gender==='女'?'女':'男'}）· ${O.name} · ${T.name}`);
+    this.addLog('system','📜 目标：活过这个冬天。每回合 AI 推演世界；状态随剧情实时更新（👤角色面板）。');
+    this.addLog('system','💡 输入任意行动即可开始。想了解世界？点顶栏 📖百科。');
+    this.renderAll();
+    this.saveCheckpoint('故事开始');
+    const cfg=loadConfig();
+    if(!cfg.apiKey){
+      this.addLog('system','⚠️ 未配置 API Key——请点击右上角 ⚙️ 设置，填入 Key 后返回。');
+    }else{
+      this.addLog('system','🎭 灰烬在低语，世界正在醒来…');
+      setTimeout(()=>this.sendPrologue(),400);
+    }
+  },
+
+  /* ---------- 开局叙事 ---------- */
+  async sendPrologue(){
+    const p=this.state.player, s=this.state.story;
+    const prompt=`【开局】玩家已抵达灰溪村。请以第二人称"你"写一段300-450字的开场叙事：
+- 时间：1387年冬至前一个月，第1日·黄昏。灰溪村村口：木栅与失修的吊桥，低矮的茅草屋顶，炊烟混着初雪将至的铅灰色天空。
+- 玩家：${p.name}（${p.gender}），出身：${p.origin.name}，血脉天赋：${p.talent.name}
+- 随身之物：${p.inventory.map(i=>i.name).join('、')||'几乎一无所有'}
+- 玩家心愿（备注）：${this.state.notes||'活下去'}
+要求：从"你踏上灰溪村的冻土"写起，写出环境的质感与玩家孤身一人的处境感，自然暗示"活过这个冬天"的目标。不要替玩家做任何决定，不要替玩家开口说话。结尾留一个自然的行动空间即可，不要堆砌提问。
+结束时在末尾附状态指令：[LOCATION:灰溪村 · 村口]`;
+    const r=await this.callRaw(this.buildMessages(prompt,true),0,0.9);
+    if(!r) return;
+    if(r.reasoning) this.addLog('thinking',r.reasoning,true);
+    this.addLog('narrative',r.content);
+    this.state.history.push({role:'user',content:'【开局】'+prompt});
+    this.state.history.push({role:'assistant',content:r.content});
+    this.parseCommands(r.content);
+    this.afterTurn();
+  },
+
+  /* ---------- 系统提示词 ---------- */
+  buildSystemPrompt(){
+    const p=this.state.player, s=this.state.story;
+    const t=p.traits;
+    const relTxt=Object.keys(this.state.relations).length?Object.entries(this.state.relations).map(([n,r])=>`${n}(${r.value>=0?'+':''}${r.value}·${relLabel(r.value)}${r.rel?'·'+r.rel:''})`).join('、'):'暂无';
+    const sus=SUS_LABELS[susStage(this.state.suspicion)];
+    const tr=TRACE_LABELS[Math.min(5,this.state.trace)];
+    const dc=DECAY_LABELS[decayStage(this.state.decay)];
+    const facTxt=Object.entries(this.state.factions||{}).map(([k,v])=>`${k}${v>=0?'+':''}${v}`).join(' ');
+    return `你是中世纪黑暗奇幻角色扮演游戏《暮色女巫·灰溪村的冬天》的AI主持人（说书人/GM）。你推演一个严谨自洽、有血有肉的1387年欧洲边境世界，玩家是一名在灰溪村挣扎求生的年轻女巫。永远不要忘记世界观与已发生的故事。
+
+${LORE}
+
+【当前世界状态】（每次回复前以此为准，不得使用过时数据）
+- 时间：第${s.day}日 · ${s.time}（${seasonOf(s.day)}）· 天气：${s.weather}
+- 地点：${s.location}
+- 玩家：${p.name}（${p.gender}）· 出身：${p.origin.name} · 血脉天赋：${p.talent.name}
+- 称号：${this.state.title||'无名外乡人'}（村民与世人对你的称呼，随你的名声与行为变化）
+- 处境：${this.state.situation||'—'}（此刻你正面临的事）
+- 天赋：体魄${t.body} 感知${t.perception} 意志${t.will} 魅力${t.charm} 灵性${t.magic} 气运${t.luck}
+- 生命：${p.hp}/${p.maxHp} | 魔力：${p.mp}/${p.maxMp} | 衰败：${this.state.decay}/100（${dc}）| 感悟：${p.insight}
+- 怀疑值：${this.state.suspicion}/100（${sus}）—— 30村民侧目/50教堂点名/70有人举报/90搜查逮捕/100火刑
+- 痕迹：${this.state.trace}/5层（${tr}）—— 3层起判血犬可追踪，5层人人可见
+- 资源：食物${this.state.resources.food} 柴火${this.state.resources.wood} 草药${this.state.resources.herbs} 盐${this.state.resources.salt} 铁${this.state.resources.iron} 铜芬尼${p.coins}
+- 行囊：${p.inventory.map(i=>i.name+(i.qty>1?'×'+i.qty:'')).join('、')||'空'}
+- 势力态度：${facTxt}（范围-100~100：村民/教会/女巫议会/领主/猎巫人）
+- 已识人物与好感：${relTxt}
+${this.state.notes?`【玩家自定义备注】（始终遵循，这是玩家的人设与目标）\n${this.state.notes}`:''}
+
+【面板实时更新——极其重要】
+游戏界面（角色/世界面板）上的所有内容——状态条、资源、行囊、关系、记忆、称号、势力态度、时间地点——完全由你回复中的指令驱动。每次回复，面板必须至少产生一处可见变化（状态/资源/关系/记忆/称号/势力/时间/地点之一）。纯对话回合也要让时间或氛围产生微小变化。面板长期静止=你失职。
+
+【指令表】（每条单独一行，格式[指令:参数]）
+[STAT:hp=±X] 生命 [STAT:mp=±X] 魔力 [STAT:coins=±X] 铜芬尼 [STAT:insight=+X] 感悟（救人/学艺/重大事件后给；每100点获得1天赋点）
+[SUS:±X] 怀疑值（深夜外出被目击+5、治好"本该死的人"+15、被见念咒画符+25、伤人被目击+30；去教堂礼拜-5、帮村民做工接生-2~5、嫁祸他人-15~25）
+[TRACE:+X] 痕迹（药草自用0、治疗0~1、咒术/唤灵/变化1~2、元素2、契约1+债务；施法必按学派给）
+[DECAY:±X] 衰败值（饥饿寒冷孤独恐惧累积；进食休息取暖下降）
+[RES:food=±X] [RES:wood=±X] [RES:herbs=±X] [RES:salt=±X] [RES:iron=±X] 资源
+[ITEM:add=名称×数量] [ITEM:remove=名称×数量] 物品
+[REL:人物名=±X] 好感度（-100~100；重要互动后必须更新）
+[NPC:姓名|身份|地点|一句话性格|与玩家的关系] 认识新人物时登记
+[MEMORY:类型|内容|重要度1-5] 记忆（类型：人物/地点/事件/物品/恩怨/线索/其他；重要度4-5为必须永记）
+[TITLE:称号] 称号随名声变化：帮村民治病→"村里的药婆"；被怀疑→"那个可疑的外乡女人"；与议会来往→"和乌鸦说话的人"；痕迹渐深→"夜里出门的女人"；被领主管家赏识→"伯爵的人"
+[SITUATION:一句话] 当前处境（如：大雪封路，你被困在村里 / 巴尔德正在桥头盘问每个过路人 / 你手里握着废塔的钥匙）
+[FACTION:势力=±X] 势力态度（村民/教会/女巫议会/领主/猎巫人，-100~100）：救人帮工→村民+；被抓把柄、行迹可疑→教会+；替议会办事→议会+、教会-；交税纳贡→领主+；避开或应付猎巫人→猎巫人-/+；烧杀嫁祸→多数-。变化要有事件依据
+[LOCATION:地点名] 到达新地点（必须）
+[TIME:白天|黄昏|夜晚|黎明] 推进时段 [DAY:+N] 推进天数 [WEATHER:天气]
+[DEATH:死因] 玩家明确死亡时 [CHECKPOINT:节点名] 重大剧情节点（立约/嫁祸/救人/暴露）
+
+【三律实操（必须遵守）】
+1. 玩家施法时，必须先让玩家选择代价（血/寿/记忆/感官/容貌/材料/时间/因果/他人自愿代付），并描述施法过程；禁止凭空免费施法。
+2. 见证者越多效果越弱：1~2名清醒见证效果减半、3名以上骤降、12名以上或见证场中近乎无效且可能反噬。夜间独处施法最强。
+3. 施法后必须按学派给[TRACE:+X]；痕迹累积要体现后果（3层起犬类不安、猎巫人警觉）。
+4. 药草学治病是"合法接口"，但治好"本该死的人"会涨怀疑值。
+
+【时间节拍】
+- 一次完整行动推进一个时段（白天→黄昏→夜晚→黎明），玩家连做几件事后自然推进。
+- 夜晚行动（潜行/施法/接头）通常消耗一夜，推进到次日黎明。
+- 赶远路（河湾镇等一日路程）、守夜、长途采集可推进数日（[DAY:+N]）。
+- 主线约150日（预备期1-30→初冬31-60→隆冬61-110→冬末111-150），别让它停滞。
+
+【状态数值节奏】
+- 数值变化与剧情强度匹配：轻伤-5~-15、重伤-30+、治疗+15~+40；不要每回合大起大落。
+- 怀疑/势力/好感变化必须有事件依据（目击、流言、证据、人情），并在叙事里体现。
+
+【叙事要求】
+- 第二人称"你"叙述，每次回复200-450字（关键时刻可略长）。用感官细节营造14世纪质感（气味、泥泞、烛火、雪声、麦粥），严禁现代词汇（手机/OK/警察/餐厅等）。
+- 绝不替玩家做决定、说话、行动；呈现场景与选择后停下，结尾不预设答案。
+- NPC语言口语化、有时代与地域味；情绪通过动作、对话、沉默体现，不靠旁白解释。
+- 剧情靠行为、对话、事件自然推进，不依赖宴会、会议、巧合偶遇。
+
+【角色扮演质量规则（必须遵守）】
+保持现实逻辑与人物边界感。NPC只能依据亲眼所见、亲耳所闻、公开信息或合理信息来源获取情报，禁止全知视角、读心、监视和未观察先知晓。禁止代替玩家行动、发言、思考或做出选择。禁止时间错乱、空间错位、人物瞬移、物品分身和设定遗忘。禁止重复使用网络小说模板动作、套路台词、霸总文学、解释性旁白和自我感动式抒情。禁止通过反复强调塑造人设。剧情应通过人物行为、对话和事件自然推进，不得依赖酒会、会议、晚宴、应酬、出差等强行推动。人物情绪应通过具体行为和对话体现，而非旁白解释。
+
+【内容自由】
+这是面向成年人的黑暗奇幻RPG。允许并鼓励描写：血腥、酷刑、阴谋、背叛、黑暗主题、道德困境、成人关系与情欲（仅限成年角色之间，不得涉及未成年角色）。不要使用"这个内容我不能描述""此处省略""抱歉无法呈现"等元叙述。你是GM，你在运营一个真实的14世纪边境世界。限制级内容应服务于剧情与角色，保持叙事质感，避免无意义的堆砌。
+
+【每回合自查清单】（回复前过一遍）
+□ 面板有变化吗？→ 附对应指令（至少一处）
+□ 时间推进了吗？→ [TIME:]/[DAY:+1]
+□ 有新地点/新人物/关键信息？→ [LOCATION:]/[NPC:]/[MEMORY:]
+□ 名声或处境变了吗？→ [TITLE:]/[FACTION:]/[SITUATION:]
+□ 施法/受伤/消耗资源了吗？→ 代价+[TRACE:]+[STAT:]/[RES:]
+现在开始/继续游戏。`;
+  },
+
+  /* ---------- 组装消息 ---------- */
+  buildMessages(userMsg,forPrologue){
+    const msgs=[{role:'system',content:this.buildSystemPrompt()}];
+    if(this.state.fused&&this.state.fused.length){
+      msgs.push({role:'system',content:'【早期记忆摘要】\n'+this.state.fused.join('\n')});
+    }
+    const memTxt=this.buildMemoryText();
+    if(memTxt) msgs.push({role:'system',content:memTxt});
+    const recent=this.state.history.slice(-30);
+    recent.forEach(en=>{ if(en.role==='user'||en.role==='assistant') msgs.push({role:en.role,content:en.content}); });
+    msgs.push({role:'user',content:userMsg});
+    return msgs;
+  },
+
+  /* ---------- 记忆系统（类型+重要度+压缩） ---------- */
+  addMemory(text,type,imp){
+    if(!text) return;
+    text=text.trim();
+    if(text.length>160) text=text.slice(0,160);
+    type=MEM_TYPES.some(m=>m[0]===type)?type:'其他';
+    imp=Math.max(1,Math.min(5,parseInt(imp)||3));
+    // 去重：若已有近似记忆则忽略
+    const key=text.slice(0,18);
+    if(this.state.memory.some(m=>m.text.slice(0,18)===key)) return;
+    this.state.memory.push({id:'m'+Date.now()+'_'+Math.random().toString(36).slice(2,6),text,type,imp,day:this.state.story.day,merged:false});
+    if(this.state.memory.length>90) this.consolidateMemory();
+  },
+  buildMemoryText(){
+    const mems=this.state.memory||[];
+    if(!mems.length) return '';
+    const core=mems.filter(m=>m.imp>=4&&!m.merged).slice(-25);
+    const normal=mems.filter(m=>m.imp<4&&!m.merged);
+    let parts=[];
+    if(core.length) parts.push('【核心记忆（永不遗忘）】\n'+core.map(m=>'· '+m.text).join('\n'));
+    const order=MEM_TYPES.map(m=>m[0]);
+    const byType={};
+    normal.forEach(m=>{ if(!byType[m.type]) byType[m.type]=[]; byType[m.type].push(m); });
+    order.forEach(t=>{
+      if(!byType[t]||!byType[t].length) return;
+      parts.push('【'+t+'记忆】\n'+byType[t].slice(-8).map(m=>'· '+m.text).join('\n'));
+    });
+    return parts.join('\n\n');
+  },
+  async consolidateMemory(){
+    // 挑出最旧的低重要度记忆交给AI压缩；失败则本地合并
+    const olds=this.state.memory.filter(m=>m.imp<=3&&!m.merged).slice(0,30);
+    if(olds.length<10) return;
+    const cfg=loadConfig();
+    if(cfg.apiKey){
+      try{
+        const r=await this.callRaw([
+          {role:'system',content:'你是记忆档案馆的抄写员。把下面零散的记忆压缩成3-5条摘要，保留人名、地点、关键因果与承诺。只输出条目本身，每行一条，以[MEMORY:类型|内容|重要度]格式。'},
+          {role:'user',content:olds.map(m=>m.text).join('\n')}
+        ],800,0.3);
+        if(r&&r.content){
+          const lines=r.content.match(/\[MEMORY:([^\]]+)\]/g)||[];
+          lines.forEach(l=>{
+            const mm=l.match(/\[MEMORY:([^|]+)\|([^|]+)\|?(\d?)\]/);
+            if(mm) this.addMemory(mm[2].trim(),mm[1].trim(),parseInt(mm[3])||3);
+          });
+          const ids=new Set(olds.map(m=>m.id));
+          this.state.memory=this.state.memory.filter(m=>!ids.has(m));
+          this.state.fused.push('【早期压缩】'+olds.slice(0,6).map(m=>m.text).join('；')+'（等'+olds.length+'条）');
+          if(this.state.fused.length>12) this.state.fused=this.state.fused.slice(-12);
+          return;
+        }
+      }catch(e){}
+    }
+    // 本地兜底：合并成一条早期摘要
+    const ids=new Set(olds.map(m=>m.id));
+    this.state.memory=this.state.memory.filter(m=>!ids.has(m));
+    this.state.fused.push('【早期压缩】'+olds.slice(0,8).map(m=>m.text).join('；'));
+    if(this.state.fused.length>12) this.state.fused=this.state.fused.slice(-12);
+  },
+  async trimHistory(){
+    if(this.state.history.length<=90) return;
+    const chunk=this.state.history.splice(0,25);
+    const cfg=loadConfig();
+    if(cfg.apiKey){
+      try{
+        const txt=chunk.map(en=>(en.role==='user'?'【玩家】':'【世界】')+en.content.replace(/\[[A-Z]+:[^\]]*\]/g,'')).join('\n').slice(-4000);
+        const r=await this.callRaw([
+          {role:'system',content:'你是记忆档案馆的抄写员。下面是一段剧情对话，请提取2-4条必须记住的关键事实（人名、地点、事件结果、承诺、线索），每行一条，以[MEMORY:类型|内容|重要度]格式。没有重要事实就输出"无"。'},
+          {role:'user',content:txt}
+        ],600,0.3);
+        if(r&&r.content){
+          (r.content.match(/\[MEMORY:([^\]]+)\]/g)||[]).forEach(l=>{
+            const mm=l.match(/\[MEMORY:([^|]+)\|([^|]+)\|?(\d?)\]/);
+            if(mm) this.addMemory(mm[2].trim(),mm[1].trim(),parseInt(mm[3])||3);
+          });
+        }
+      }catch(e){}
+    }else{
+      const last=chunk.filter(en=>en.role==='assistant').slice(-2).map(en=>en.content.replace(/\[[A-Z]+:[^\]]*\]/g,'').slice(0,120)).join('；');
+      if(last) this.addMemory('早期剧情：'+last,'其他',2);
+    }
+  },
+
+  /* ---------- 指令解析 ---------- */
+  parseCommands(text){
+    const st=this.state;
+    (text.match(/\[[A-Z]+:[^\]]*\]/g)||[]).forEach(m=>{
+      const idx=m.indexOf(':');
+      const cmd=m.slice(1,idx), args=m.slice(idx+1,-1);
+      this.exec(cmd,args);
+    });
+    // 死亡判定
+    if(st.player.hp<=0&&!this.dead) return this.startDeath('生命耗尽——你倒在了这个冬天里');
+    if(st.suspicion>=100&&!this.dead) return this.startDeath('怀疑值满溢——你被指认、逮捕，押上了火刑的柴堆');
+    if(st.decay>=100&&!this.dead) return this.startDeath('衰败值满溢——饥饿、寒冷与恐惧压垮了你');
+  },
+  exec(cmd,args){
+    const st=this.state, p=st.player;
+    const eq=(a)=>{const i=a.indexOf('=');return i<0?[a,'0']:[a.slice(0,i).trim(),a.slice(i+1).trim()];};
+    const num=(s)=>parseInt(s)||0;
+    const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+    switch(cmd){
+      case 'STAT':{
+        const [k,v]=eq(args);
+        if(k==='hp') p.hp=clamp(p.hp+num(v),0,p.maxHp);
+        else if(k==='mp') p.mp=clamp(p.mp+num(v),0,p.maxMp);
+        else if(k==='coins') p.coins=Math.max(0,p.coins+num(v));
+        else if(k==='insight'){ p.insight+=num(v); this.checkInsight(); }
+        break;
+      }
+      case 'SUS': st.suspicion=clamp(st.suspicion+num(args),0,100); break;
+      case 'TRACE': st.trace=clamp(st.trace+num(args),0,5); break;
+      case 'DECAY': st.decay=clamp(st.decay+num(args),0,100); break;
+      case 'RES':{
+        const [k,v]=eq(args);
+        if(st.resources[k]!==undefined) st.resources[k]=Math.max(0,st.resources[k]+num(v));
+        break;
+      }
+      case 'ITEM':{
+        const [op,itemStr]=eq(args);
+        const parts=itemStr.split('×');
+        const name=parts[0].trim(), qty=parts[1]?parseInt(parts[1]):1;
+        if(op==='add'&&name){
+          const ex=p.inventory.find(i=>i.name===name);
+          if(ex) ex.qty+=qty; else p.inventory.push({id:'it'+Date.now()+'_'+Math.random().toString(36).slice(2,5),name,icon:'📦',qty,desc:''});
+        }else if(op==='remove'&&name){
+          const idx=p.inventory.findIndex(i=>i.name===name);
+          if(idx>=0){ if(p.inventory[idx].qty>qty) p.inventory[idx].qty-=qty; else p.inventory.splice(idx,1); }
+        }
+        break;
+      }
+      case 'REL':{
+        const [k,v]=eq(args);
+        if(!st.relations[k]) st.relations[k]={value:0,rel:'',desc:''};
+        st.relations[k].value=clamp(st.relations[k].value+num(v),-100,100);
+        break;
+      }
+      case 'NPC':{
+        const parts=args.split('|').map(s=>s.trim());
+        const name=parts[0];
+        if(name){
+          if(!st.relations[name]) st.relations[name]={value:0,rel:'',desc:''};
+          if(parts[1]) st.relations[name].desc=parts[1];
+          if(parts[4]) st.relations[name].rel=parts[4];
+        }
+        break;
+      }
+      case 'MEMORY':{
+        const parts=args.split('|');
+        this.addMemory(parts[1]||parts[0],(parts[0]||'其他').trim(),parts[2]);
+        break;
+      }
+      case 'LOCATION':{
+        const loc=args.trim();
+        if(loc){
+          if(!st.story.visited.includes(loc)) st.story.visited.push(loc);
+          st.story.location=loc;
+        }
+        break;
+      }
+      case 'TIME':{
+        const v=args.trim();
+        if(['白天','黄昏','夜晚','黎明'].includes(v)) st.story.time=v;
+        break;
+      }
+      case 'DAY':{
+        st.story.day=Math.max(1,st.story.day+num(args));
+        break;
+      }
+      case 'WEATHER': if(args.trim()) st.story.weather=args.trim(); break;
+      case 'TITLE': if(args.trim()) st.title=args.trim().slice(0,20); break;
+      case 'SITUATION': if(args.trim()) st.situation=args.trim().slice(0,60); break;
+      case 'FACTION':{
+        const [k,v]=eq(args);
+        if(st.factions[k]!==undefined) st.factions[k]=clamp(st.factions[k]+num(v),-100,100);
+        break;
+      }
+      case 'DEATH': if(args.trim()&&!this.dead) this.startDeath(args.trim()); break;
+      case 'CHECKPOINT': this.saveCheckpoint(args.trim()||'关键节点'); break;
+    }
+  },
+  checkInsight(){
+    const p=this.state.player;
+    while(p.insight>=100){ p.insight-=100; p.pendingPoints++; this.addLog('system','✨ 感悟圆满——获得1点天赋点（可在角色面板分配）'); }
+  },
+  addTraitPoint(id){
+    const p=this.state.player;
+    if(p.pendingPoints<=0) return;
+    if(p.traits[id]>=10){ toast('该天赋已满（10）','error'); return; }
+    p.traits[id]++; p.pendingPoints--;
+    p.maxHp=50+p.traits.body*12+p.traits.will*3;
+    p.maxMp=30+p.traits.magic*14+p.traits.will*2;
+    p.hp=Math.min(p.hp,p.maxHp); p.mp=Math.min(p.mp,p.maxMp);
+    this.renderAll();
+  },
+
+  /* ---------- 发送行动 ---------- */
+  async send(){
+    if(this.apiBusy||this.dead) return;
+    const input=$('user-input');
+    const text=input.value.trim();
+    if(!text) return;
+    input.value=''; input.style.height='auto';
+    this.addLog('action',`🧙 ${this.state.player.name}：${text}`);
+    this.state.history.push({role:'user',content:text});
+    const cfg=loadConfig();
+    if(!cfg.apiKey){ this.addLog('system','❌ 未配置 API Key，请在 ⚙️ 设置 中填写。'); return; }
+    this.apiBusy=true; this.setLoading(true);
+    const log=$('game-log');
+    const live=document.createElement('div');
+    live.className='log-entry narrative'; live.id='live-stream';
+    log.appendChild(live);
+    let reasoningTxt='', contentTxt='';
+    const r=await this.callAI(this.buildMessages(text),cfg.streaming?(chunk)=>{
+      if(chunk.type==='reasoning'){ reasoningTxt+=chunk.text; }
+      else { contentTxt+=chunk.text; live.innerHTML=this.formatText(this.stripCmds(contentTxt)); log.scrollTop=log.scrollHeight; }
+    }:null);
+    this.apiBusy=false; this.setLoading(false);
+    if(!r){ live.remove(); return; }
+    if(cfg.showThinking&&reasoningTxt){
+      const think=document.createElement('div');
+      think.className='log-entry thinking';
+      think.innerHTML='<details><summary>🧠 AI 推演过程</summary><div style="margin-top:6px">'+this.formatText(reasoningTxt)+'</div></details>';
+      live.parentNode.insertBefore(think,live);
+    }
+    live.innerHTML=this.formatText(this.stripCmds(r.content));
+    live.removeAttribute('id');
+    this.state.history.push({role:'assistant',content:r.content});
+    this.parseCommands(r.content);
+    this.afterTurn();
+  },
+  afterTurn(){
+    this.state.turnCount++;
+    this.renderAll();
+    this.autoSave();
+    this.trimHistory();
+    const s=this.state.story;
+    if(s.day!==this.lastDay){ this.lastDay=s.day; this.saveCheckpoint('第'+s.day+'日 · '+s.time); }
+    else if(this.state.turnCount%6===0) this.saveCheckpoint('第'+s.day+'日 · '+s.time+'（自动）');
+    if(this.dead) return;
+    $('user-input').focus();
+  },
+
+  /* ---------- API 调用 ---------- */
+  async callRaw(messages,maxTokens,temp){
+    const cfg=loadConfig();
+    if(!cfg.apiKey) return null;
+    const body={model:cfg.model,messages,temperature:temp||0.85,stream:false};
+    if(maxTokens>0) body.max_tokens=maxTokens;
+    if(cfg.model==='deepseek-reasoner'&&cfg.reasoningEffort) body.reasoning_effort=cfg.reasoningEffort;
+    try{
+      const res=await fetch(cfg.apiEndpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify(body)});
+      if(!res.ok){ const et=await res.text(); let msg='HTTP '+res.status; try{msg=JSON.parse(et).error?.message||msg;}catch(e){} this.addLog('system','❌ API错误：'+msg); return null; }
+      const data=await res.json();
+      const ch=data.choices?.[0];
+      if(!ch) return null;
+      return {reasoning:ch.message?.reasoning_content||ch.reasoning_content||'',content:ch.message?.content||''};
+    }catch(e){ this.addLog('system','❌ 网络错误：'+e.message); return null; }
+  },
+  async callAI(messages,onChunk){
+    const cfg=loadConfig();
+    const body={model:cfg.model,messages,temperature:0.85,stream:!!onChunk};
+    const mt=cfg.maxTokens;
+    if(mt&&mt!=='unlimited') body.max_tokens=parseInt(mt);
+    if(cfg.model==='deepseek-reasoner'&&cfg.reasoningEffort) body.reasoning_effort=cfg.reasoningEffort;
+    try{
+      const res=await fetch(cfg.apiEndpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},body:JSON.stringify(body)});
+      if(!res.ok){ const et=await res.text(); let msg='HTTP '+res.status; try{msg=JSON.parse(et).error?.message||msg;}catch(e){} this.addLog('system','❌ API错误：'+msg); return null; }
+      if(onChunk) return await this.readStream(res,onChunk);
+      const data=await res.json();
+      const ch=data.choices?.[0];
+      if(!ch){ this.addLog('system','❌ API返回空响应'); return null; }
+      return {reasoning:ch.message?.reasoning_content||ch.reasoning_content||'',content:ch.message?.content||''};
+    }catch(e){ this.addLog('system','❌ 网络错误：'+e.message); return null; }
+  },
+  async readStream(res,onChunk){
+    const reader=res.body.getReader(), dec=new TextDecoder();
+    let full='',fullR='',buf='';
+    while(true){
+      const {done,value}=await reader.read();
+      if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n'); buf=lines.pop()||'';
+      for(const line of lines){
+        const s=line.trim();
+        if(!s||s==='[DONE]') continue;
+        let data='';
+        if(s.startsWith('data: ')) data=s.slice(6);
+        else if(s.startsWith('data:')) data=s.slice(5);
+        else continue;
+        if(data==='[DONE]') continue;
+        try{
+          const j=JSON.parse(data);
+          const d=j.choices?.[0]?.delta;
+          if(d){
+            if(d.reasoning_content){ fullR+=d.reasoning_content; onChunk({type:'reasoning',text:d.reasoning_content}); }
+            if(d.content){ full+=d.content; onChunk({type:'content',text:d.content}); }
+          }
+        }catch(e){}
+      }
+    }
+    try{reader.releaseLock();}catch(e){}
+    return {reasoning:fullR,content:full};
+  },
+
+  /* ---------- 死亡与回档 ---------- */
+  async startDeath(cause){
+    if(this.dead) return;
+    this.dead=true; this.apiBusy=false; this.setLoading(false);
+    const st=this.state, p=st.player;
+    const cp=this.saveCheckpoint('死亡前·第'+st.story.day+'日');
+    const lastActs=st.history.slice(-14).map(en=>(en.role==='user'?'【玩家】':'【世界】')+en.content.replace(/\[[A-Z]+:[^\]]*\]/g,'').slice(0,200)).join('\n');
+    const prompt=`玩家在《暮色女巫》中死亡。请以说书人的身份写一份"死亡档案"。
+- 死因：${cause}（第${st.story.day}日，${st.story.time}，${st.story.location}）
+- 玩家状态：怀疑${st.suspicion} 痕迹${st.trace}层 衰败${st.decay} 生命${p.hp}/${p.maxHp}
+- 玩家：${p.name}，出身：${p.origin.name}，血脉天赋：${p.talent.name}，心愿：${st.notes||'活下去'}
+- 最近经历：
+${lastActs}
+请输出三段，严格以【评价】【点评】【建议】开头：
+【评价】总体评价这一世的选择与风格（200字内，冷静有质感，如编年史，不嘲讽不煽情）
+【点评】指出2-4个具体的关键决策与失误，结合三律与中世纪处境（150字内）
+【建议】给下一世的2-4条具体可操作建议（150字内）`;
+    // 保存死亡上下文，供生成/重试使用
+    this._deathCtx={cause,cp,lastActs,prompt};
+    this._deathSaved=false;
+    $('db-sub').textContent='第'+st.story.day+'日 · '+cause;
+    $('db-review').innerHTML='<div class="db-sec"><div class="db-h">⏳ 灰烬正在书写你的死亡档案…</div><div class="db-c">说书人正在翻阅你这一世的所有选择。</div></div>';
+    $('death-overlay').classList.add('show');
+    await this.generateDeathReview();
+  },
+  // 死亡档案生成（纯 AI，可重试；失败绝不使用固定文案）
+  async generateDeathReview(){
+    if(!this._deathCtx) return;
+    const {cause,cp,prompt}=this._deathCtx;
+    $('db-review').innerHTML='<div class="db-sec"><div class="db-h">⏳ 灰烬正在书写你的死亡档案…</div><div class="db-c">说书人正在翻阅你这一世的所有选择。</div></div>';
+    const r=await this.callRaw([
+      {role:'system',content:'你是《暮色女巫》的说书人，笔调如编年史，冷静、精准、慈悲。'},
+      {role:'user',content:prompt}
+    ],1500,0.7);
+    if(!r){
+      $('db-review').innerHTML=
+        '<div class="db-sec"><div class="db-h">⚠️ 死亡档案生成失败</div>'+
+        '<div class="db-c">灰烬没能等到说书人的回音（网络或 API 异常）。这一世的故事不该没有记录——请重试，或检查 ⚙️ 设置 中的 API 配置。</div></div>'+
+        '<div style="text-align:center;margin-top:6px"><button class="btn gold" onclick="Game.generateDeathReview()">🔄 重新请说书人</button></div>';
+      return;
+    }
+    const m=r.content;
+    const g=(label)=>{
+      const i=m.indexOf('【'+label+'】'); if(i<0) return '';
+      const j=m.indexOf('【',i+3);
+      return (j<0?m.slice(i):m.slice(i,j)).replace('【'+label+'】','').trim();
+    };
+    let review={eval:g('评价'),points:g('点评'),advice:g('建议')};
+    // AI 有输出但未按标记分段时，整段作为评价呈现（仍是 AI 生成，绝不套固定文案）
+    if(!review.eval&&!review.points&&!review.advice&&m.trim()){
+      review={eval:m.trim(),points:'',advice:''};
+    }
+    $('db-review').innerHTML=
+      (review.eval?'<div class="db-sec"><div class="db-h">📜 评价</div><div class="db-c">'+esc(review.eval)+'</div></div>':'')+
+      (review.points?'<div class="db-sec"><div class="db-h">✒️ 点评</div><div class="db-c">'+esc(review.points)+'</div></div>':'')+
+      (review.advice?'<div class="db-sec"><div class="db-h">🕯️ 建议</div><div class="db-c">'+esc(review.advice)+'</div></div>':'');
+    if(!this._deathSaved){
+      this._deathSaved=true;
+      this.saveDeathRecord(cause,review,cp);
+    }
+  },
+
+  /* ---------- 时光节点（关键时间点） ---------- */
+  saveCheckpoint(label){
+    if(!this.state) return null;
+    const st=this.state;
+    const list=this.loadCPs();
+    const cp={id:'cp'+Date.now()+'_'+Math.random().toString(36).slice(2,6),day:st.story.day,time:st.story.time,label:label||'',ts:Date.now(),state:JSON.parse(JSON.stringify({
+      player:st.player, story:st.story, suspicion:st.suspicion, trace:st.trace, decay:st.decay,
+      resources:st.resources, relations:st.relations, memory:st.memory, fused:st.fused,
+      history:st.history.slice(-40), notes:st.notes, turnCount:st.turnCount
+    }))};
+    list.push(cp);
+    while(list.length>20) list.shift();
+    try{localStorage.setItem(NS+'_cps',JSON.stringify(list));}catch(e){}
+    return cp.id;
+  },
+  loadCPs(){ try{return JSON.parse(localStorage.getItem(NS+'_cps'))||[];}catch(e){return [];} },
+  rollback(cpId){
+    const list=this.loadCPs();
+    const cp=list.find(c=>c.id===cpId);
+    if(!cp){ toast('该节点已不存在','error'); return; }
+    this.state=JSON.parse(JSON.stringify(cp.state));
+    this.state.created=true;
+    this.dead=false; this.apiBusy=false; this.lastDay=this.state.story.day;
+    this.migrate();
+    $('death-overlay').classList.remove('show');
+    UI.closeModal('cp-modal'); UI.closeModal('death-modal');
+    $('game-log').innerHTML='';
+    this.renderQuickActions();
+    this.addLog('system','⏳ **时光倒流**——你回到了第'+this.state.story.day+'日（'+cp.label+'）。死亡留在档案里，但这一次，你知道了更多。');
+    this.rebuildLog();
+    this.renderAll();
+    this.autoSave();
+    toast('已回到关键时间点','success');
+    $('user-input').focus();
+  },
+  rebuildLog(){
+    (this.state.history||[]).forEach(en=>{
+      if(en.role==='user'&&en.content.startsWith('【开局】')) return;
+      if(en.role==='user') this.addLog('action','🧙 '+this.state.player.name+'：'+en.content.slice(0,200));
+      else if(en.role==='assistant') this.addLog('narrative',this.stripCmds(en.content));
+    });
+  },
+
+  /* ---------- 死亡档案（跨回档永久保留） ---------- */
+  loadDeaths(){ try{return JSON.parse(localStorage.getItem(NS+'_deaths'))||[];}catch(e){return [];} },
+  saveDeathRecord(cause,review,cpId){
+    const list=this.loadDeaths();
+    list.push({id:'d'+Date.now(),ts:Date.now(),name:this.state.player.name,day:this.state.story.day,cause,review,cpId,stats:{sus:this.state.suspicion,trace:this.state.trace,decay:this.state.decay}});
+    while(list.length>50) list.shift();
+    try{localStorage.setItem(NS+'_deaths',JSON.stringify(list));}catch(e){}
+  },
+  clearDeaths(){
+    if(!confirm('确定清空所有死亡记录吗？此操作不可恢复。')) return;
+    localStorage.removeItem(NS+'_deaths');
+    UI.renderDeaths();
+    toast('死亡档案已清空','success');
+  },
+
+  /* ---------- 存档：自动 / 槽位 / 导出导入 ---------- */
+  autoSave(){
+    if(this.dead||!this.state||!this.state.created) return;
+    try{
+      localStorage.setItem(NS+'_autosave',JSON.stringify({v:3,t:Date.now(),playerName:this.state.player.name,day:this.state.story.day,location:this.state.story.location,s:JSON.parse(JSON.stringify(this.state))}));
+    }catch(e){}
+  },
+  loadAutoSave(){
+    try{
+      const raw=localStorage.getItem(NS+'_autosave');
+      if(!raw) return false;
+      const d=JSON.parse(raw);
+      const st=d.s||d.state;
+      if(!st||!st.player||!st.story) return false;
+      this.state=st;
+      this.state.created=true;
+      this.dead=false;
+      this.lastDay=st.story.day;
+      this.migrate();
+      return true;
+    }catch(e){ return false; }
+  },
+  // 兼容旧存档：补齐新增字段
+  migrate(){
+    const st=this.state;
+    if(!st) return;
+    const p=st.player||{};
+    if(p.title===undefined) p.title='无名外乡人';
+    if(!st.title) st.title=p.title;
+    if(st.situation===undefined) st.situation='';
+    if(!st.factions) st.factions={村民:0,教会:0,女巫议会:0,领主:0,猎巫人:0};
+    st.resources=st.resources||{food:6,wood:3,herbs:2,salt:1,iron:0};
+    st.memory=st.memory||[]; st.fused=st.fused||[];
+    st.history=st.history||[]; st.relations=st.relations||{};
+    st.turnCount=st.turnCount||0;
+  },
+  saveSlot(i){
+    if(!this.state||!this.state.created){ toast('游戏尚未开始','error'); return; }
+    try{
+      localStorage.setItem(NS+'_slot_'+i,JSON.stringify({v:3,ts:Date.now(),playerName:this.state.player.name,day:this.state.story.day,state:JSON.parse(JSON.stringify(this.state))}));
+      toast('已存入槽位'+(i+1),'success'); this.renderSlots();
+    }catch(e){ toast('保存失败（存储空间不足）','error'); }
+  },
+  loadSlot(i){
+    try{
+      const raw=localStorage.getItem(NS+'_slot_'+i);
+      if(!raw){ toast('槽位为空','error'); return; }
+      const d=JSON.parse(raw); const st=d.state||d;
+      if(!st.player) throw new Error('bad');
+      if(!confirm('加载槽位'+(i+1)+'：'+d.playerName+' · 第'+d.day+'日？当前进度将被覆盖。')) return;
+      this.state=JSON.parse(JSON.stringify(st));
+      this.state.created=true; this.dead=false; this.lastDay=this.state.story.day;
+      this.migrate();
+      $('game-log').innerHTML='';
+      this.renderQuickActions();
+      this.addLog('system','📂 已加载槽位'+(i+1)+'——'+this.state.player.name+'（第'+this.state.story.day+'日）');
+      this.rebuildLog(); this.renderAll(); this.autoSave();
+      UI.closeSettings(); toast('加载成功','success');
+    }catch(e){ toast('槽位损坏','error'); }
+  },
+  deleteSlot(i){
+    if(!confirm('删除槽位'+(i+1)+'？')) return;
+    localStorage.removeItem(NS+'_slot_'+i);
+    this.renderSlots();
+  },
+  renderSlots(){
+    const box=$('save-slots'); if(!box) return;
+    let html='';
+    for(let i=0;i<3;i++){
+      try{
+        const raw=localStorage.getItem(NS+'_slot_'+i);
+        if(raw){
+          const d=JSON.parse(raw);
+          html+='<div class="slot-row"><span>💾 槽'+(i+1)+'：'+esc(d.playerName)+' · 第'+d.day+'日</span><span><button class="btn tiny" onclick="Game.loadSlot('+i+')">加载</button> <button class="btn tiny danger" onclick="Game.deleteSlot('+i+')">删</button></span></div>';
+        }else{
+          html+='<div class="slot-row muted">💾 槽'+(i+1)+'：空 <button class="btn tiny" onclick="Game.saveSlot('+i+')">存到此处</button></div>';
+        }
+      }catch(e){ html+='<div class="slot-row muted">💾 槽'+(i+1)+'：损坏</div>'; }
+    }
+    box.innerHTML=html;
+  },
+  exportSave(){
+    if(!this.state||!this.state.created){ toast('游戏尚未开始','error'); return; }
+    const data={v:3,ts:Date.now(),playerName:this.state.player.name,day:this.state.story.day,state:JSON.parse(JSON.stringify(this.state))};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='暮色女巫-'+this.state.player.name+'-第'+this.state.story.day+'日.json';
+    a.style.display='none';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},2000);
+    toast('存档已导出','success');
+  },
+  importSave(){ $('import-file').click(); },
+  handleImport(ev){
+    const file=ev.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      try{
+        const d=JSON.parse(e.target.result);
+        const st=d.state||d;
+        if(!st.player||!st.story) throw new Error('invalid');
+        this.state=JSON.parse(JSON.stringify(st));
+        this.state.created=true; this.dead=false; this.lastDay=this.state.story.day;
+        this.migrate();
+        $('setup-overlay').classList.add('hidden');
+        $('app').classList.remove('hidden');
+        $('game-log').innerHTML='';
+        this.renderQuickActions();
+        this.addLog('system','📂 存档导入成功——欢迎回来，'+this.state.player.name+'（第'+this.state.story.day+'日）');
+        this.rebuildLog(); this.renderAll(); this.autoSave();
+        toast('导入成功','success');
+      }catch(err){ toast('存档格式无效','error'); }
+    };
+    reader.readAsText(file);
+    ev.target.value='';
+  },
+/* ---------- 日志与渲染 ---------- */
+  addLog(type,text,collapsible){
+    const log=$('game-log');
+    const e=document.createElement('div');
+    e.className='log-entry '+type;
+    if(collapsible){
+      e.innerHTML='<details><summary>🧠 AI 推演过程</summary><div style="margin-top:6px">'+this.formatText(text)+'</div></details>';
+    }else{
+      e.innerHTML=this.formatText(text);
+    }
+    log.appendChild(e);
+    log.scrollTop=log.scrollHeight;
+  },
+  formatText(t){
+    return esc(t)
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g,'<em>$1</em>')
+      .replace(/\n/g,'<br>');
+  },
+  stripCmds(t){
+    return String(t).split('\n').filter(l=>!/^\[[A-Z]+:/.test(l.trim())).join('\n');
+  },
+  setLoading(v){
+    $('loading-indicator').classList.toggle('show',v);
+    $('send-btn').disabled=v;
+    $('send-btn').textContent=v?'⏳':'▶ 行动';
+    $('user-input').disabled=v;
+  },
+  renderQuickActions(){
+    const el=$('quick-actions');
+    if(!el) return;
+    el.innerHTML=QUICK_ACTS.map(q=>`<button class="quick-action" onclick="Game.quickAction('${q.t}','${esc(q.a).replace(/'/g,"\\'")}')">${q.t}</button>`).join('');
+  },
+  quickAction(label,text){
+    $('user-input').value=text;
+    this.send();
+  },
+  renderAll(){
+    if(!this.state) return;
+    this.renderCharacter();
+    this.renderSituation();
+    this.renderFactions();
+    this.renderMemory();
+  },
+  renderCharacter(){
+    const st=this.state, p=st.player, s=st.story;
+    $('loc-display').textContent='📍 '+s.location.split('·')[0].trim();
+    $('day-display').textContent='🕯️ 第'+s.day+'日';
+    $('ch-avatar').textContent=p.gender==='女'?'🧙‍♀️':'🧙';
+    $('ch-name').textContent=p.name;
+    $('ch-title').textContent=st.title||'无名外乡人';
+    $('ch-situation').textContent=st.situation||'—';
+    $('ch-meta').textContent=p.origin.name+' · '+p.talent.name;
+    $('ch-loc').textContent=s.location;
+    $('ch-time').textContent='第'+s.day+'日 · '+s.time;
+    $('ch-season').textContent='（'+seasonOf(s.day)+'）';
+    $('ch-weather').textContent=s.weather;
+    // 状态条
+    $('bar-hp').style.width=(p.hp/p.maxHp*100)+'%';
+    $('v-hp').textContent=p.hp+'/'+p.maxHp;
+    $('bar-mp').style.width=(p.mp/p.maxMp*100)+'%';
+    $('v-mp').textContent=p.mp+'/'+p.maxMp;
+    $('bar-decay').style.width=st.decay+'%';
+    $('bar-decay').style.background=st.decay>=60?'var(--r)':st.decay>=30?'var(--sus)':'var(--decay)';
+    $('v-decay').textContent=st.decay;
+    $('bar-sus').style.width=st.suspicion+'%';
+    $('bar-sus').style.background=st.suspicion>=70?'var(--r)':st.suspicion>=30?'var(--sus)':'var(--jade)';
+    $('v-sus').textContent=st.suspicion;
+    $('trace-dots').innerHTML=[0,1,2,3,4].map(i=>`<span class="tdot${i<st.trace?' on':''}"></span>`).join('');
+    $('v-trace').textContent=TRACE_LABELS[Math.min(5,st.trace)];
+    $('bar-ins').style.width=(p.insight%100)+'%';
+    $('v-ins').textContent=(p.insight%100)+'/100'+(p.pendingPoints>0?' ✨':'');
+    // 资源
+    const R=[['food','🍞',st.resources.food,'食物'],['wood','🪵',st.resources.wood,'柴火'],['herbs','🌿',st.resources.herbs,'草药'],['salt','🧂',st.resources.salt,'盐'],['iron','🔩',st.resources.iron,'铁'],['coins','🪙',p.coins,'铜芬尼']];
+    $('res-chips').innerHTML=R.map(([k,i,v,n])=>`<span class="chip" title="${n}">${i} ${v}</span>`).join('');
+    // 行囊
+    $('inv-list').innerHTML=p.inventory.length?
+      p.inventory.map(i=>`<div class="inv-item" title="${esc(i.desc||'')}"><span class="ic">${i.icon}</span><span class="nm">${esc(i.name)}</span><span class="qt">×${i.qty}</span></div>`).join('')
+      :'<div class="inv-empty">空空如也</div>';
+    // 天赋
+    $('trait-list').innerHTML=TRAIT_DEFS.map(t=>{
+      const v=p.traits[t.id];
+      const addBtn=p.pendingPoints>0?`<button class="btn tiny" onclick="Game.addTraitPoint('${t.id}')" title="分配1点">＋</button>`:'';
+      return `<div class="stat-row"><span class="lbl">${t.icon}${t.name}</span><div class="sbar"><div style="width:${v*10}%;background:var(--ember)"></div></div><span class="val">${v}${addBtn}</span></div>`;
+    }).join('')+(p.pendingPoints>0?'<div class="su-hint" style="margin-top:4px">✨ 可分配天赋点：'+p.pendingPoints+'</div>':'');
+    // 关系
+    const rels=Object.entries(st.relations).sort((a,b)=>b[1].value-a[1].value);
+    $('rel-list').innerHTML=rels.length?
+      rels.map(([n,r])=>`<div class="love-item"><span class="ln">${esc(n)}${r.rel?'（'+esc(r.rel)+'）':''}</span><span class="lv ${r.value>0?'pos':r.value<0?'neg':'zero'}">${r.value>0?'+':''}${r.value}</span></div>`).join('')
+      :'<div class="inv-empty">尚无熟人</div>';
+    $('notes-box').textContent=st.notes||'—';
+  },
+  renderFactions(){
+    const st=this.state;
+    const box=$('faction-list');
+    if(!box) return;
+    const f=st.factions||{};
+    const order=[['村民','👥'],['教会','⛪'],['女巫议会','🦅'],['领主','👑'],['猎巫人','⚔️']];
+    const label=v=>v<=-60?'敌对':v<=-20?'冷淡':v<20?'观望':v<=60?'友善':'信赖';
+    box.innerHTML=order.map(([k,ic])=>{
+      const v=Math.max(-100,Math.min(100,f[k]||0));
+      const w=Math.abs(v);
+      const color=v>0?'var(--gr)':v<0?'var(--r)':'var(--t3)';
+      return `<div class="faction-row"><span class="fl">${ic}${k}</span><div class="fbar"><div style="width:${w}%;background:${color}"></div></div><span class="fv" style="color:${color}">${v>0?'+':''}${v}</span></div>`;
+    }).join('')+`<div class="muted" style="margin-top:3px">${order.map(([k])=>{const v=f[k]||0;return k+'('+label(v)+')';}).join(' ')}</div>`;
+  },
+  renderSituation(){
+    const st=this.state, s=st.story;
+    const susTxt=['村庄对你尚无特别的目光。','有人开始对你侧目——夜里少出门。','教堂开始点名，税吏可能要求出示良民证明。','有人向河湾镇递了话，猎巫人或许已经在路上。','猎巫人正在搜查。别回家，别回头。','火刑名单上写着你的名字。'];
+    const trTxt=['身上无痕。','肤痕在皮肤下潜伏，只有灵视者看得见。','倒影开始慢半拍——细心的同伴察觉你不对劲。','判血犬能嗅到你了。','灾祸开始偏爱：屋顶漏、麦生虫、婴儿夜啼。','螺旋纹浮现——人人可见，更古老的东西正在靠近。'];
+    const dcTxt=['你尚且安稳。','饥饿与寒冷开始啃噬心神，判定恍惚。','幻觉与真实开始混淆——那可能是真的。','你随时可能崩溃。'];
+    const lines=[
+      '📍 '+s.location,
+      '第'+s.day+'日 · '+s.time+'（'+seasonOf(s.day)+'）· '+s.weather,
+      '👁 怀疑 '+st.suspicion+'/100 —— '+susTxt[susStage(st.suspicion)],
+      '🌫 痕迹 '+st.trace+'/5层 —— '+trTxt[Math.min(5,st.trace)],
+      '🕯 衰败 '+st.decay+'/100 —— '+dcTxt[decayStage(st.decay)],
+      '🎒 食物'+st.resources.food+' · 柴火'+st.resources.wood+' · 草药'+st.resources.herbs+' · 盐'+st.resources.salt+' · 铁'+st.resources.iron
+    ];
+    $('situation-box').innerHTML=lines.join('<br>');
+  },
+  renderMemory(){
+    const mems=this.state.memory||[];
+    if(!mems.length){ $('mem-list').innerHTML='<div class="inv-empty">还没有记忆——世界正在认识你</div>'; return; }
+    let html='';
+    MEM_TYPES.forEach(([t,ic])=>{
+      const arr=mems.filter(m=>m.type===t&&!m.merged).slice(-3);
+      if(!arr.length) return;
+      const cnt=mems.filter(m=>m.type===t).length;
+      html+=`<div class="mem-group"><div class="mem-t">${ic} ${t}（${cnt}）</div>`+arr.map(m=>`<div class="mem-item">${esc(m.text)}</div>`).join('')+'</div>';
+    });
+    $('mem-list').innerHTML=html||'<div class="inv-empty">还没有记忆</div>';
+  },
+};
+/* ============================================================
+   UI 界面
+   ============================================================ */
+const UI={
+  applyTheme(){
+    const cfg=loadConfig();
+    document.documentElement.dataset.theme=cfg.theme||'dusk';
+    document.documentElement.classList.remove('fs-sm','fs-md','fs-lg');
+    document.documentElement.classList.add('fs-'+(cfg.fontSize||'md'));
+  },
+  key(e){
+    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); Game.send(); }
+  },
+  /* ---------- 设置 ---------- */
+  openSettings(){
+    const cfg=loadConfig();
+    $('cfg-endpoint-2').value=cfg.apiEndpoint;
+    $('cfg-apikey-2').value=cfg.apiKey;
+    const fill=(id,cur,opts)=>{
+      const s=$(id);
+      s.innerHTML=opts.map(o=>`<option value="${o}">${o}${o==='deepseek-chat'?'（默认）':''}</option>`).join('');
+      if([...s.options].some(o=>o.value===cur)) s.value=cur;
+    };
+    fill('cfg-model-2',cfg.model,['deepseek-chat','deepseek-reasoner']);
+    fill('cfg-reasoning-2',cfg.reasoningEffort,['max','high','medium','low']);
+    fill('cfg-maxtokens-2',cfg.maxTokens,['unlimited','1024','2048','4096','8192','16384']);
+    $('cfg-theme').value=cfg.theme;
+    $('cfg-fs').value=cfg.fontSize;
+    $('cfg-stream').checked=cfg.streaming;
+    $('cfg-think').checked=cfg.showThinking;
+    this.openModal('settings-modal');
+    this.fetchModels();
+    Game.renderSlots();
+  },
+  saveSettings(){
+    const cfg=loadConfig();
+    cfg.apiEndpoint=$('cfg-endpoint-2').value.trim()||DEFAULTS.apiEndpoint;
+    cfg.apiKey=$('cfg-apikey-2').value.trim();
+    cfg.model=$('cfg-model-2').value||cfg.model;
+    cfg.reasoningEffort=$('cfg-reasoning-2').value;
+    cfg.maxTokens=$('cfg-maxtokens-2').value;
+    cfg.theme=$('cfg-theme').value;
+    cfg.fontSize=$('cfg-fs').value;
+    cfg.streaming=$('cfg-stream').checked;
+    cfg.showThinking=$('cfg-think').checked;
+    saveConfig(cfg);
+    this.applyTheme();
+    this.closeModal('settings-modal');
+    toast('设置已保存','success');
+  },
+  closeSettings(){ this.closeModal('settings-modal'); },
+  restartGame(){
+    if(!confirm('确定要重新开始吗？当前进度（自动存档/槽位/时光节点）将被清除，死亡档案与API设置保留。')) return;
+    localStorage.removeItem(NS+'_autosave');
+    localStorage.removeItem(NS+'_cps');
+    for(let i=0;i<3;i++) localStorage.removeItem(NS+'_slot_'+i);
+    location.reload();
+  },
+  /* ---------- 模型拉取与测试 ---------- */
+  async fetchModels(){
+    const key=$('cfg-apikey-2').value.trim()||$('cfg-apikey').value.trim();
+    const ep=$('cfg-endpoint-2').value.trim()||$('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    const hints=['model-hint','model-hint-2'].map(id=>$(id));
+    if(!key){ hints.forEach(h=>h.textContent='⚠️ 需要先填入 API Key'); return; }
+    hints.forEach(h=>h.textContent='⏳ 正在从 API 拉取模型列表…');
+    try{
+      const r=await fetch(ep.replace(/\/chat\/completions$/,'/models'),{headers:{'Authorization':'Bearer '+key}});
+      if(r.ok){
+        const d=await r.json();
+        let models=(d.data||[]).map(m=>m.id);
+        models.sort((a,b)=>{ const pa=a.includes('deepseek')?0:1, pb=b.includes('deepseek')?0:1; return pa-pb||a.localeCompare(b); });
+        if(models.length>60) models=models.slice(0,60);
+        this.populateModels(models);
+      }else{
+        hints.forEach(h=>h.textContent='⚠️ 拉取失败（HTTP '+r.status+'），使用默认列表');
+        this.populateModels(['deepseek-chat','deepseek-reasoner']);
+      }
+    }catch(e){
+      hints.forEach(h=>h.textContent='⚠️ 网络错误，使用默认列表');
+      this.populateModels(['deepseek-chat','deepseek-reasoner']);
+    }
+  },
+  populateModels(models){
+    const cur=loadConfig().model||'deepseek-chat';
+    ['cfg-model','cfg-model-2'].forEach(id=>{
+      const s=$(id); if(!s) return;
+      s.innerHTML=models.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');
+      if([...s.options].some(o=>o.value===cur)) s.value=cur;
+    });
+    ['model-hint','model-hint-2'].forEach(id=>{ if($(id)) $(id).textContent='✅ 已加载 '+models.length+' 个模型'; });
+  },
+  async testConnection(){
+    const key=$('cfg-apikey-2').value.trim()||$('cfg-apikey').value.trim();
+    const ep=$('cfg-endpoint-2').value.trim()||$('cfg-endpoint').value.trim()||DEFAULTS.apiEndpoint;
+    const model=$('cfg-model-2').value||$('cfg-model').value||'deepseek-chat';
+    if(!key){ toast('请先填入 API Key','error'); return; }
+    toast('正在测试连接…');
+    try{
+      const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,messages:[{role:'user',content:'回复"连接成功"'}],max_tokens:10})});
+      if(r.ok){
+        const d=await r.json();
+        const c=d.choices?.[0]?.message?.content;
+        toast('✅ 连接成功'+(c?'：'+c:''),'success');
+      }else{
+        let msg='HTTP '+r.status;
+        try{ msg=JSON.parse(await r.text()).error?.message||msg; }catch(e){}
+        toast('❌ 连接失败：'+msg,'error');
+      }
+    }catch(e){ toast('❌ 网络错误：'+e.message,'error'); }
+  },
+  /* ---------- 面板与弹窗 ---------- */
+  togglePanel(which){
+    // 同时只保留一个抽屉（移动端 88vw 会重叠遮挡）
+    if(which==='left') $('right-panel').classList.remove('open');
+    else $('left-panel').classList.remove('open');
+    const p=$(which==='left'?'left-panel':'right-panel');
+    const bp=$('drawer-backdrop');
+    const open=p.classList.toggle('open');
+    if(open){ bp.classList.add('show'); Game.renderAll(); }
+    else if(!$('left-panel').classList.contains('open')&&!$('right-panel').classList.contains('open')) bp.classList.remove('show');
+  },
+  closePanels(){
+    $('left-panel').classList.remove('open');
+    $('right-panel').classList.remove('open');
+    $('drawer-backdrop').classList.remove('show');
+  },
+  openModal(id){ $(id).classList.add('show'); },
+  closeModal(id){ $(id).classList.remove('show'); },
+  /* ---------- 世界百科 ---------- */
+  openEncy(){
+    const cat=$('en-cat');
+    const keys=Object.keys(ENCY);
+    cat.innerHTML=keys.map((k,i)=>`<button class="${i===0?'active':''}" onclick="UI.encyCat('${k}',this)">${k}</button>`).join('');
+    this.encyCat(keys[0],cat.firstChild);
+    $('en-ans').style.display='none';
+    $('en-save-mem').style.display='none';
+    this.openModal('ency-modal');
+  },
+  encyCat(k,btn){
+    document.querySelectorAll('#en-cat button').forEach(b=>b.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    $('en-list').innerHTML=ENCY[k].map(([t,d])=>`<div class="en-item"><div class="en-t">${esc(t)}</div><div class="en-d">${esc(d)}</div></div>`).join('');
+  },
+  async encyAsk(){
+    const q=$('en-q').value.trim();
+    if(!q) return;
+    const cfg=loadConfig();
+    if(!cfg.apiKey){ toast('请先配置 API Key','error'); return; }
+    const ans=$('en-ans');
+    ans.style.display=''; ans.innerHTML='⏳ 世界之书正在翻阅典籍…';
+    const flat=Object.values(ENCY).flat().map(([t,d])=>t+'：'+d).join('\n');
+    const r=await Game.callRaw([
+      {role:'system',content:'你是《暮色女巫》的"世界之书"，一本会说话的古书。回答玩家对这个世界设定的提问，笔调古朴、准确、简洁（150字内）。若设定中无答案，就老实说"此书未载"，不要编造。'},
+      {role:'user',content:'已知设定：\n'+flat.slice(0,6000)+'\n\n问题：'+q}
+    ],800,0.4);
+    if(!r){ ans.innerHTML='❌ 提问失败，请检查网络与 API。'; return; }
+    ans.innerHTML='<b>📖 世界之书：</b>'+Game.formatText(r.content);
+    UI._lastEncy=r.content;
+    $('en-save-mem').style.display='';
+  },
+  encySaveMem(){
+    if(!UI._lastEncy) return;
+    Game.addMemory('[百科]'+UI._lastEncy.slice(0,150),'线索',3);
+    toast('已记入记忆档案','success');
+    $('en-save-mem').style.display='none';
+  },
+  /* ---------- 记忆档案 ---------- */
+  openMemory(){
+    const mems=Game.state?Game.state.memory:[];
+    const box=$('mem-full');
+    if(!mems||!mems.length){ box.innerHTML='<div class="inv-empty">记忆档案空空如也</div>'; }
+    else{
+      let html='';
+      MEM_TYPES.forEach(([t,ic])=>{
+        const arr=mems.filter(m=>m.type===t);
+        if(!arr.length) return;
+        html+=`<div class="mem-group"><div class="mem-t">${ic} ${t}（${arr.length}）</div>`+
+          arr.slice().reverse().map(m=>`<div class="mem-item">${'★'.repeat(m.imp)}${'☆'.repeat(5-m.imp)} ${esc(m.text)}<span class="muted" style="font-size:9px"> · 第${m.day}日</span></div>`).join('')+
+          '</div>';
+      });
+      box.innerHTML=html||'<div class="inv-empty">记忆档案空空如也</div>';
+    }
+    this.openModal('mem-modal');
+  },
+  /* ---------- 死亡档案与回档 ---------- */
+  renderDeaths(){
+    const list=Game.loadDeaths();
+    const box=$('death-list');
+    if(!box) return;
+    if(!list.length){ box.innerHTML='<div class="inv-empty">尚无死亡记录——你还活着，这很好。</div>'; return; }
+    const cps=Game.loadCPs();
+    box.innerHTML=list.slice().reverse().map(d=>{
+      const hasCp=cps.some(c=>c.id===d.cpId);
+      const ts=new Date(d.ts);
+      return `<div class="death-item">
+        <div class="di-head"><span>💀 ${esc(d.name)} · 第${d.day}日</span><span class="di-ts">${ts.getMonth()+1}月${ts.getDate()}日 ${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}</span></div>
+        <div class="di-cause">${esc(d.cause)}</div>
+        <div class="di-stats muted">死亡时：怀疑${d.stats.sus} · 痕迹${d.stats.trace}层 · 衰败${d.stats.decay}</div>
+        <details><summary>📜 说书人的死亡档案</summary>
+          <div class="db-sec"><div class="db-h">评价</div><div class="db-c">${esc(d.review.eval)}</div></div>
+          <div class="db-sec"><div class="db-h">点评</div><div class="db-c">${esc(d.review.points)}</div></div>
+          <div class="db-sec"><div class="db-h">建议</div><div class="db-c">${esc(d.review.advice)}</div></div>
+        </details>
+        <div style="margin-top:6px">${hasCp?`<button class="btn tiny" onclick="Game.rollback('${d.cpId}')">⏳ 回到当时的关键节点</button>`:'<span class="muted">该节点已随旧世界消散</span>'}</div>
+      </div>`;
+    }).join('');
+  },
+  openDeaths(){
+    this.renderDeaths();
+    this.openModal('death-modal');
+  },
+  openCP(){
+    const list=Game.loadCPs();
+    const box=$('cp-list');
+    if(!list.length){ box.innerHTML='<div class="inv-empty">没有可用的时间节点（游戏会自动在每日更替与重大事件时留下节点）</div>'; }
+    else{
+      box.innerHTML=list.slice().reverse().map(c=>`<div class="cp-item"><span>⏳ 第${c.day}日 · ${c.time} — ${esc(c.label)}</span><button class="btn tiny gold" onclick="Game.rollback('${c.id}')">回到此处</button></div>`).join('');
+    }
+    this.openModal('cp-modal');
+  }
+};
+
+/* ============================================================
+   启动
+   ============================================================ */
+document.addEventListener('DOMContentLoaded',()=>{
+  UI.applyTheme();
+  SW.init();
+  // 静默恢复自动存档（与参考作品一致：打开页面直接续档）
+  if(Game.loadAutoSave()){
+    $('setup-overlay').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    $('game-log').innerHTML='';
+    Game.addLog('system','💾 已恢复上次的旅程：'+Game.state.player.name+' · 第'+Game.state.story.day+'日 · '+Game.state.story.location+'（v1.8）');
+    Game.rebuildLog();
+    Game.renderAll();
+    $('user-input').focus();
+  }
+});
+
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    document.querySelectorAll('.modal-overlay.show').forEach(m=>m.classList.remove('show'));
+    UI.closePanels();
+  }
+});
+
+// 弹窗点击遮罩关闭
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',(e)=>{ if(e.target===m) m.classList.remove('show'); });
+});
+
+// 输入框自适应高度
+const ta=$('user-input');
+if(ta){
+  ta.addEventListener('input',function(){
+    this.style.height='auto';
+    this.style.height=Math.min(this.scrollHeight,110)+'px';
+  });
+}
+</script>
+</body>
+</html>
