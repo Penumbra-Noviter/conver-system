@@ -24,12 +24,22 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../services/simulator/save_bridge.dart' show SaveGame;
 import '../../theme/colors.dart' show ConverRadii, ConverSpacing;
 import '../../theme/conver_palette.dart';
 import '../../view_models/simulators_controller.dart';
 import 'import_flow.dart' show SimulatorImportFlow;
+import 'save_sheet.dart' show SaveSheet;
 import 'simulators_hooks.dart'
-    show SimulatorsHooks, appendImportHook, buildRunPageLauncher;
+    show SimulatorsHooks, appendImportHook, appendSaveHook, buildRunPageLauncher;
+
+/// 存档 sheet 构建器（F-M5-06 接线点注入 seam）：按面板游戏集构建 sheet。
+/// 测试注入 fake 桥承载；缺省 = 生产 [SaveSheet]。
+typedef SaveSheetBuilder = Widget Function(List<SaveGame> games);
+
+/// 缺省存档 sheet：生产 [SaveSheet]（内部建立低占位 WebView 访问 server
+/// origin，见 save_sheet.dart）。
+Widget _defaultSaveSheet(List<SaveGame> games) => SaveSheet(games: games);
 
 /// 模拟器列表页：AppBar（三入口）+ 四态正文。
 class SimulatorsView extends StatefulWidget {
@@ -37,6 +47,7 @@ class SimulatorsView extends StatefulWidget {
     super.key,
     required this.controller,
     this.importFlow,
+    this.saveSheetBuilder,
   });
 
   /// 模拟器 tab 状态持有者（装配注入，单一事实来源）。
@@ -45,6 +56,10 @@ class SimulatorsView extends StatefulWidget {
   /// 导入流程实现（测试注入 fake；缺省默认 seam）。F-M5-07 接线点消费——
   /// 未接线（onImportTap 已由外部注入）时不生效。
   final SimulatorImportFlow? importFlow;
+
+  /// 存档 sheet 构建器（F-M5-06 接线点消费；测试注入 fake 桥承载，缺省 =
+  /// 生产 SaveSheet）。未接线（onSaveTap 已由外部注入）时不生效。
+  final SaveSheetBuilder? saveSheetBuilder;
 
   @override
   State<SimulatorsView> createState() => _SimulatorsViewState();
@@ -67,6 +82,9 @@ class _SimulatorsViewState extends State<SimulatorsView> {
         // F-M5-07 导入钩子接线：既有注入钩子优先（非空槽位不覆盖）；否则以
         // 注入/缺省导入流填充 onImportTap（同帧接线，registerHooks 后置）。
         _wireImportHook();
+        // F-M5-06 存档钩子接线：既有注入钩子优先；否则以注入/缺省 sheet
+        // 构建器填充 onSaveTap（同帧接线）。
+        _wireSaveHook();
         unawaited(_ensureStarted());
       }
     });
@@ -109,6 +127,38 @@ class _SimulatorsViewState extends State<SimulatorsView> {
       ),
       () => unawaited(flow.handleImport(context)),
     ));
+  }
+
+  /// F-M5-06 存档钩子接线：既有注入钩子优先（非空槽位不覆盖）；否则以注入/
+  /// 缺省 sheet 构建器填充 onSaveTap（AppBar「存档」→ 底部半屏 sheet）。
+  void _wireSaveHook() {
+    final controller = widget.controller;
+    if (controller.onSaveTap != null) {
+      return;
+    }
+    controller.registerHooks(appendSaveHook(
+      SimulatorsHooks(
+        onOpen: controller.onOpen,
+        onImportTap: controller.onImportTap,
+        onGenerateTap: controller.onGenerateTap,
+      ),
+      () => _openSaveSheet(context),
+    ));
+  }
+
+  /// AppBar「存档」：把**全部**游戏（不随筛选漏项）映射为 [SaveGame] 最小数据面
+  /// → 底部半屏 sheet 一次管全部游戏（Q12）。
+  void _openSaveSheet(BuildContext context) {
+    final games = [
+      for (final game in widget.controller.allGames)
+        SaveGame(id: game.id, name: game.name, saveKeys: game.saveKeys),
+    ];
+    final builder = widget.saveSheetBuilder ?? _defaultSaveSheet;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => builder(games),
+    );
   }
 
   void _onControllerChanged() => setState(() {});

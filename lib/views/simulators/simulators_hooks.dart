@@ -150,3 +150,21 @@ SimulatorsHooks appendImportHook(
     onGenerateTap: base.onGenerateTap,
   );
 }
+
+/// 合成带存档钩子的 hooks（F-M5-06，post-03 顺序追加）：在 [base] 槽位上叠加
+/// [onSaveTap]（AppBar「存档」→ 底部半屏 sheet），其余槽位原样保留。
+///
+/// 装配契约与 [appendImportHook] 同构：接线方读取控制器当前槽位合成后经
+/// [SimulatorsController.registerHooks] 生效——既有注入钩子原文保留，绝不
+/// 覆盖非空槽位。
+SimulatorsHooks appendSaveHook(
+  SimulatorsHooks base,
+  VoidCallback onSaveTap,
+) {
+  return SimulatorsHooks(
+    onOpen: base.onOpen,
+    onSaveTap: onSaveTap,
+    onImportTap: base.onImportTap,
+    onGenerateTap: base.onGenerateTap,
+  );
+}
