@@ -26,6 +26,14 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- M5 模拟器本地托管（F-M5-02）：ATS 默认拦截 http 明文，回环豁免
+	     NSAllowsLocalNetworking——WebView 加载 http://127.0.0.1:8642 不因
+	     ATS 被拦（spec §3-9；iOS 无 macOS 暂以 Android 冒烟 + 双端同源背书） -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
