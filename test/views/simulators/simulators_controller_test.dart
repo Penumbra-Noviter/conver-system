@@ -501,6 +501,17 @@ void main() {
       controller.selectFilter(SimulatorFilter.all);
       expect(controller.games, hasLength(2));
     });
+
+    test('allGames 不过滤：筛选态下存档面板仍可一次管全部（Q12）', () async {
+      buildController();
+      loader.result = parseManifest(manifestJson);
+      await controller.ensureStarted();
+
+      controller.selectFilter(SimulatorFilter.local);
+      expect(controller.games.map((g) => g.id), ['local-x']);
+      expect(controller.allGames.map((g) => g.id), ['life-sim', 'local-x'],
+          reason: '存档入口读 allGames——不随筛选漏游戏');
+    });
   });
 
   group('hooks · 四钩子经 SimulatorsHooks 注入', () {

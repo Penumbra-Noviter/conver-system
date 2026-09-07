@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:conver_system_mobile/services/simulator/manifest_parser.dart';
+import 'package:conver_system_mobile/services/simulator/save_bridge.dart';
 import 'package:conver_system_mobile/services/simulator/simulator_contracts.dart';
 import 'package:conver_system_mobile/services/simulator/simulator_data_dir.dart';
 import 'package:conver_system_mobile/services/simulator/simulator_server.dart';
@@ -114,6 +115,17 @@ class _RecordingHooks extends SimulatorsHooks {
       };
 }
 
+/// 探针存档 sheet：断言 AppBar「存档」入口已接线并收到换算后的游戏集。
+class _ProbeSaveSheet extends StatelessWidget {
+  const _ProbeSaveSheet({required this.games});
+
+  final List<SaveGame> games;
+
+  @override
+  Widget build(BuildContext context) =>
+      Text('存档 sheet 已打开（${games.length} 款）');
+}
+
 void main() {
   late Directory parent;
   late SimulatorDataDir dataDir;
@@ -155,11 +167,15 @@ void main() {
   Future<void> pumpView(
     WidgetTester tester, {
     bool settle = true,
+    SaveSheetBuilder? saveSheetBuilder,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: ConverTheme.dark(),
-        home: SimulatorsView(controller: controller),
+        home: SimulatorsView(
+          controller: controller,
+          saveSheetBuilder: saveSheetBuilder,
+        ),
       ),
     );
     if (settle) {
@@ -267,12 +283,17 @@ void main() {
   });
 
   group('AppBar 三入口 · 渲染 / 禁用态 / 接线派发', () {
-    testWidgets('未接线入口渲染为禁用态；导入入口已由 F-M5-07 自动接线（其余仍未接线）',
+    testWidgets('默认接线：存档/导入入口可用（生成仍禁用）；点击存档 → 打开 sheet',
         (tester) async {
       buildController();
       manifest.result = parseManifest(manifest3Json);
 
-      await pumpView(tester);
+      await pumpView(
+        tester,
+        // 探针 sheet（生产 SaveSheet 真渲染归 F-M5-06 save_sheet_test；此处
+        // 只锚入口接线与游戏集映射）。
+        saveSheetBuilder: (games) => _ProbeSaveSheet(games: games),
+      );
 
       expect(find.byTooltip('存档管理'), findsOneWidget);
       expect(find.byTooltip('导入'), findsOneWidget);
@@ -287,16 +308,35 @@ void main() {
       final generateButton = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.auto_awesome_outlined),
       );
-      expect(saveButton.onPressed, isNull, reason: '存档未接线（F-M5-06）= 禁用态');
+      expect(saveButton.onPressed, isNotNull,
+          reason: '存档已由 F-M5-06 自动接线（AppBar → 底部半屏 sheet）');
       expect(importButton.onPressed, isNotNull,
           reason: '导入已由 F-M5-07 接线（默认 hooks 下视图自动填充导入流）');
-      expect(generateButton.onPressed, isNull, reason: '生成未接线（F-M5-08b）= 禁用态');
+      expect(generateButton.onPressed, isNull,
+          reason: '生成未接线（F-M5-08b）= 禁用态');
 
-      // 禁用按钮点击无副作用（不崩、不触发流程）。
-      final callsBefore = manifest.calls;
-      await tester.tap(find.byTooltip('存档管理'), warnIfMissed: false);
+      // 点击存档 → 打开 sheet（演示注入 builder 收到全部游戏映射面）。
+      await tester.tap(find.byTooltip('存档管理'));
+      await tester.pumpAndSettle();
+      expect(find.text('存档 sheet 已打开（3 款）'), findsOneWidget);
+    });
+
+    testWidgets('筛选态下打开存档面板仍收到全部游戏（Q12 一次管全部）',
+        (tester) async {
+      buildController();
+      manifest.result = parseManifest(manifest3Json);
+      await pumpView(
+        tester,
+        saveSheetBuilder: (games) => _ProbeSaveSheet(games: games),
+      );
+
+      // 纯本地筛选态只剩 1 款，但存档面板仍须收到全部 3 款。
+      await tester.tap(find.widgetWithText(ChoiceChip, '纯本地'));
       await tester.pump();
-      expect(manifest.calls, callsBefore);
+
+      await tester.tap(find.byTooltip('存档管理'));
+      await tester.pumpAndSettle();
+      expect(find.text('存档 sheet 已打开（3 款）'), findsOneWidget);
     });
 
     testWidgets('接线后点击三入口 → 派发对应回调', (tester) async {

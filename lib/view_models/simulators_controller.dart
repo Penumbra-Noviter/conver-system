@@ -278,6 +278,10 @@ class SimulatorsController extends ChangeNotifier {
           ]),
       };
 
+  /// 全部游戏（**不过滤**——存档管理 sheet「一次管全部游戏」入口用，Q12；
+  /// 与 [games]（按筛选）区隔）。
+  List<SimulatorGame> get allGames => List.unmodifiable(_games);
+
   /// 打开游戏回调（F-M5-04 接线）；null = 未接线（卡片禁用开放语义）。
   void Function(SimulatorGame game)? get onOpen => _hooks.onOpen;
 
