@@ -13,12 +13,37 @@
 /// 状态机在 `lib/view_models/simulators_controller.dart`（本文件 import 之；
 /// controller 亦 import 本文件持 hooks 槽位——双向引用为「契约类型与持有方
 /// 按票面文件落点约束」下的最小交叉，Dart 库级环引用合法，analyzer 无告警）。
+///
+/// F-M5-04 顺序追加：run 页 open 钩子的**接线实现**——[buildRunPageLauncher]
+/// 供 [SimulatorsView] 首挂载时经 [SimulatorsController.registerHooks] 注入
+/// onOpen（卡片 onTap → push 全屏运行页）；运行页依赖在 route builder 内从
+/// app provider 图读取或经参数注入（测试 seam），不触碰 app.dart /
+/// home_shell.dart（装配纪律）。
 library;
 
 import 'package:flutter/foundation.dart' show VoidCallback;
+import 'package:flutter/material.dart'
+    show BuildContext, MaterialPageRoute, Navigator;
+import 'package:provider/provider.dart' show ReadContext;
 
+import '../../data/repositories/settings_repository.dart'
+    show SettingsRepository;
+import '../../services/secure_store.dart' show SecretStore;
+import '../../services/simulator/injection.dart'
+    show
+        CredentialSettings,
+        InjectedCredentials,
+        assembleCredentials,
+        isOfficialEndpoint;
+import '../../services/simulator/simulator_contracts.dart'
+    show SimulatorContracts;
 import '../../view_models/simulators_controller.dart'
     show SimulatorGame;
+import 'simulator_run_view.dart'
+    show
+        SimulatorRunView,
+        SimulatorWebViewControllerFactory,
+        createFlutterWebViewController;
 
 /// 四钩子槽位：本票只做渲染 + 钩子派发；具体流程由后续票接线实现。
 class SimulatorsHooks {
@@ -42,4 +67,67 @@ class SimulatorsHooks {
 
   /// AI 生成入口（F-M5-08b 接线：种子模板 + prompt → 生成对话框）。
   final VoidCallback? onGenerateTap;
+}
+
+/// F-M5-04 顺序追加：open 钩子接线实现——把 [SimulatorGame] 接为「push 全屏
+/// 运行页」。
+///
+/// [callerContext] 为模拟器列表页所在 [BuildContext]（提供 Navigator 与 app
+/// provider 图访问）；运行页依赖在 route builder 内取用：凭证组装 /
+/// 官方端点检测读 provider 图（或经 [loadCredentials] /
+/// [checkOfficialEndpoint] 注入），WebView 平台 seam 经 [webViewFactory]
+/// 注入（测试 fake 即不触平台通道）。
+void Function(SimulatorGame game) buildRunPageLauncher(
+  BuildContext callerContext, {
+  SimulatorWebViewControllerFactory? webViewFactory,
+  Future<InjectedCredentials> Function()? loadCredentials,
+  Future<bool> Function()? checkOfficialEndpoint,
+  int? port,
+  Duration? loadTimeout,
+}) {
+  return (game) {
+    Navigator.of(callerContext).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => SimulatorRunView(
+          game: game,
+          webViewFactory: webViewFactory ?? createFlutterWebViewController,
+          loadCredentials:
+              loadCredentials ?? () => _credentialsFromProviders(routeContext),
+          checkOfficialEndpoint: checkOfficialEndpoint ??
+              () => _isOfficialFromProviders(routeContext),
+          port: port ?? SimulatorContracts.defaultPort,
+          loadTimeout: loadTimeout ??
+              const Duration(milliseconds: SimulatorContracts.timeoutMs),
+        ),
+      ),
+    );
+  };
+}
+
+/// 生产凭证组装（对齐桌面 setting.py credentials() 语义）：SecretStore 双槽位
+/// + SettingsRepository（default_provider / default_model / configured_model /
+/// openai 协议链 base_url）→ [assembleCredentials]。provider 读取在 await 前
+/// 同步完成（routeContext 生命周期安全），之后的仓储读取为服务调用。
+Future<InjectedCredentials> _credentialsFromProviders(
+  BuildContext context,
+) async {
+  final secretStore = context.read<SecretStore>();
+  final repo = context.read<SettingsRepository>();
+  final provider = await repo.defaultProvider;
+  final settings = CredentialSettings(
+    defaultProvider: provider,
+    defaultModel: await repo.defaultModel,
+    configuredModel: await repo.getValue('default_model'),
+    baseUrl: await repo.baseUrl('openai'),
+  );
+  return assembleCredentials(secretStore, settings);
+}
+
+/// 生产官方端点检测（共识 Q8）：默认 provider + openai 协议链 base_url →
+/// [isOfficialEndpoint]（provider=claude 短路 / 官方域命中 → 提示条）。
+Future<bool> _isOfficialFromProviders(BuildContext context) async {
+  final repo = context.read<SettingsRepository>();
+  final provider = await repo.defaultProvider;
+  final baseUrl = await repo.baseUrl('openai');
+  return isOfficialEndpoint(provider, baseUrl);
 }

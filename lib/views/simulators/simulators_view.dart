@@ -23,6 +23,8 @@ import 'package:flutter/material.dart';
 import '../../theme/colors.dart' show ConverRadii, ConverSpacing;
 import '../../theme/conver_palette.dart';
 import '../../view_models/simulators_controller.dart';
+import 'simulators_hooks.dart'
+    show SimulatorsHooks, buildRunPageLauncher;
 
 /// 模拟器列表页：AppBar（三入口）+ 四态正文。
 class SimulatorsView extends StatefulWidget {
@@ -45,9 +47,33 @@ class _SimulatorsViewState extends State<SimulatorsView> {
     // build）；失败仅日志（错误态由控制器状态机承载）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        // F-M5-04 顺序追加：open 钩子接线——卡片 onTap 经 hooks.onOpen 推
+        // 全屏运行页；合并保留既有槽位（后续票经同一入口接线时互不覆盖）。
+        _wireOpenHandler();
         unawaited(_ensureStarted());
       }
     });
+  }
+
+  /// F-M5-04 顺序追加（post-03）：运行页 open 钩子注入。
+  ///
+  /// 装配点 = 本视图首挂载（HomeShell 按当前 tab 重建本视图 → 每次进入均
+  /// 重新接线，onOpen 恒为最新实现）；接线实现位于 simulators_hooks.dart
+  /// [buildRunPageLauncher]，本处仅派发 [SimulatorsController.registerHooks]。
+  /// 已接线的 onOpen（测试注入 / 后续票显式覆盖）优先，不被缺省覆盖。
+  void _wireOpenHandler() {
+    final controller = widget.controller;
+    if (controller.onOpen != null) {
+      return; // 已接线（如测试注入记录钩子）→ 尊重之，不覆盖。
+    }
+    controller.registerHooks(
+      SimulatorsHooks(
+        onOpen: buildRunPageLauncher(context),
+        onSaveTap: controller.onSaveTap,
+        onImportTap: controller.onImportTap,
+        onGenerateTap: controller.onGenerateTap,
+      ),
+    );
   }
 
   void _onControllerChanged() => setState(() {});
