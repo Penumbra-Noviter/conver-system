@@ -116,7 +116,7 @@ typedef ManifestAppender =
     void Function(Directory simDir, Map<String, dynamic> entry);
 
 /// 导入成功结果：game 为 manifest 条目 dict；renamed 是否自动改名；warnings
-/// 粗筛命中键集（排序确定）。
+/// 粗筛命中键集（输出序 = [SuspiciousPatterns.keys] 声明序）。
 class ImportResult {
   const ImportResult({
     required this.game,
@@ -131,7 +131,8 @@ class ImportResult {
   /// 是否冲突自动改名。
   final bool renamed;
 
-  /// 恶意模式粗筛命中键集（空 = 干净；非空由 UI 展示清单 + 二次确认）。
+  /// 恶意模式粗筛命中键集（输出序 = [SuspiciousPatterns.keys] 声明序；空 = 干净，
+  /// 非空由 UI 展示清单 + 二次确认）。
   final List<String> warnings;
 }
 
@@ -580,8 +581,9 @@ String? probeEndpointMode(String htmlText) {
   return url.endsWith('/chat/completions') ? 'full' : 'base';
 }
 
-/// 恶意模式粗筛：按 [SuspiciousPatterns] 常量清单命中收集键集（字典序确定，
-/// 不拦截——静态审查不承诺防住，拦截决策归 UI 二次确认）。
+/// 恶意模式粗筛：按 [SuspiciousPatterns] 常量清单命中收集键集——输出序 = 键序
+/// （即 [SuspiciousPatterns.keys] 声明序，非独立排序；不拦截——静态审查不承诺
+/// 防住，拦截决策归 UI 二次确认）。
 List<String> scanSuspicious(String htmlText) {
   final hits = <String>[];
   for (final key in SuspiciousPatterns.keys) {
@@ -589,7 +591,6 @@ List<String> scanSuspicious(String htmlText) {
       hits.add(key);
     }
   }
-  // MUTATION: sort REMOVED
   return hits;
 }
 

