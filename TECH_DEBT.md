@@ -43,6 +43,33 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-25 | `seed_service.dart` 对 manifest 列出但资产缺失的单游戏裸抛 `FlutterError`（仅捕获 FileSystemException，rootBundle 加载失败中止整次种子）；当前 bundle 23 资产齐全为既定契约，但消费方 F-M5-03 懒启动编排需自带兜底 | W1 增量审核 F-2 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-26 | `saveKeyMetaRe` 顶层常量双重定义（`manifest_parser.dart:35` 与 `save_key_meta.dart:24` 同名声明）——违反 save_key_meta「契约之家单一来源」；F-M5-04 同时消费两模块将触发 ambiguous import 编译错误 | W1 增量审核 F-1 | Strong | 📝 待立项 | 模拟器桥 |
+| F-27 | `validateImportPayload` 非字符串键静默跳过不触发整包拒绝（save_contract.dart:192）——与桌面整包拒绝语义差异待核对 | W1 增量审核 F-3 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-28 | 白名单正则 `$` 锚点对尾部换行键名的宿主匹配（save_key_meta.dart:81，与桌面同构）——跨端行为一致性确认 | W1 增量审核 F-4 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-29 | `parseManifest` 深嵌套 JSON 抛 `StackOverflowError` 裸抛（仅捕获 FormatException） | W1 增量审核 F-5 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-30 | `simulator_server.dart` `GET /simulators/..`（裸 `..` 段）经 Dart Uri 规范化折叠为 `/` 返回 200 index 而非契约字面的「`..` 段一律 404」（simulator_server.dart:109-114）——折叠目标恒为根合法路由，零泄漏零崩溃，仅字面口径偏差 | W2 增量审核 NB-1 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-31 | `simulators_controller.dart:324-333` refresh 直调 `_fetchManifest` 不入 `_inFlight` 轨道——重叠刷新 last-writer-wins，迟到失败可盖掉成功结果 | W3 增量审核 NB-1 | Worth exploring | 📝 待立项 | 模拟器桥 |
+| F-32 | `simulators_controller.dart:380-387` F-25 兜底捕获面过宽：目录不可写（seed_service 契约要求上抛带路径明确错误）被吞并，用户看到泛化「游戏清单加载失败（HTTP 404）」 | W3 增量审核 NB-2 | Worth exploring | 📝 待立项 | 模拟器桥 |
+| F-33 | `simulators_controller.dart:408-409` `.timeout` 不取消底层 HttpClient 请求，病理场景悬挂连接累积 | W3 增量审核 NB-3 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-34 | `import_flow.dart` `_runImportGame(...).timeout()` 不取消底层 future，超时后仍可能落盘+注册成功，用户见「导入超时」但重试遇「已存在」 | W4 增量审核 NB-1 | Worth exploring | 📝 待立项 | 模拟器桥 |
+| F-35 | `appendImportHook` 合成器 doc 声称「绝不覆盖非空槽位」但实现无条件覆写 onImportTap（保证在调用方 `_wireImportHook` 先检查）——doc 与实现错位 | W4 增量审核 NB-2 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-36 | `InjectionScript.build` 占位符替换碰撞：config id 恰含 `__CONFIG_JSON__`/`__CREDENTIALS_JSON__` 字面量时字段静默跳过（无脚本注入面） | W4 增量审核 NB-3 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-37 | `isOfficialEndpoint` 裸域/尾点盲区：`anthropic.com` 裸域与尾点 FQDN 不命中（与票面定义边界一致，观察记录） | W4 增量审核 NB-4 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-38 | `save_bridge.dart` 全量枚举（多游戏合计至 5MB）一次经 `runJavaScriptReturningResult` 返回，可能超返回值通道体积上限 → 降级空 Map（存档存在但面板显示 0 键，不崩）——归 F-M5-09 冒烟实证 | W5 增量审核 N1 | Worth exploring | 📝 待立项 | 模拟器桥 |
+| F-39 | `save_bridge.dart` 导入 JSON 带 UTF-8 BOM 时 `jsonDecode('\uFEFF{...}')` 抛 FormatException → 误拒「不是有效的 JSON 文件」（优雅拒绝不崩） | W5 增量审核 N2 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-40 | `generated_game_validator.dart` `_firstSyntaxProblem` 开标签 `<script` 大小写敏感、闭合扫描大小写不敏感——大写 `<SCRIPT>` 块未闭合不报错；块内含 `<!--` 文本时误报「未闭合的 HTML 注释」误拒合法 HTML | W5 增量审核 N3 | Worth exploring | 📝 待立项 | 模拟器桥 |
+| F-41 | `save_sheet.dart` `saveSheetBootingText` 常量声明并导出但未使用，booting 分支与测试各硬编码同串字面量（死常量 + 字面量重复） | W5 增量审核 N4 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-42 | `simulators_view.dart` tab 往返后 AppBar 四入口闭包持有已卸载 State 的死 context（HomeShell switch 直接切换无 IndexedStack；W6 B1 已修复为 wireViewDefaults 刷新 + mounted 守卫——本条记录原缺陷面，防回归若未来改 HomeShell 结构复发） | W6 增量审核 B1（已修 9630423） | Speculative | 📝 待立项 | 模拟器桥 |
+| F-43 | `createFlutterWebViewController`（simulator_run_view.dart:94-102）工厂内 `await loadRequest` 后才返回，`_startOpening`（249-254）返回后才挂 `setOnPageFinished`——与 W5 B1（save_sheet onPageFinished 事件丢失，已修 8e630d1 委托先挂后导航）完全同构但未同步修复；极小/秒开页面在委托挂载前完成加载 → 事件丢失 → 15s 超时错误态（有兜底不挂死，非阻塞）；建议对齐 save_sheet 的 seam 形态 | 期末四轴 Falsify F-1 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-44 | W6 B1 修复改 `wireViewDefaults` 统一接线后，`appendImportHook`/`appendSaveHook`/`appendGenerateHook` 三合成器 + `registerHooks` 生产零调用（仅定义/docstring 自我引用 + 测试消费）——死代码面 = Speculative Generality；波末 W5/W6 声称「四合成器共存」在 B1 后已不成立 | 期末四轴 Standards S-NB2 / Architecture A-NB2 | Worth exploring | 📝 待立项 | 模拟器桥 |
+| F-45 | `game_generator.dart` 生成内容与既有游戏 SHA-256 相同触发 409 未映射——用户看到 LLM 错误文案 + 无限重试循环（无「已存在」识别） | 期末四轴 Falsify（W6 N1 补登） | Worth exploring | 📝 待立项 | 模拟器桥 |
+| F-46 | `generate_dialog.dart` 取消按钮不拦在途成功——取消后 LLM 响应返回仍可能落盘（用户见「已取消」但游戏出现） | 期末四轴 Falsify（W6 N2 补登） | Worth exploring | 📝 待立项 | 模拟器桥 |
+| F-47 | 生成服务层空描述无守卫——LLM 产出空 description 时列表卡片空描述（无兜底文案） | 期末四轴 Falsify（W6 N3 补登） | Speculative | 📝 待立项 | 模拟器桥 |
+| F-48 | 生成标题含装饰字符 → sanitizeTitle 产出怪文件名（slug id 与 name 显示不一致） | 期末四轴 Falsify（W6 N4 补登） | Speculative | 📝 待立项 | 模拟器桥 |
+| F-49 | `_persistGenerated` 恒假死分支（条件恒不成立，生成后落盘路径实际走另一分支） | 期末四轴 Falsify | Speculative | 📝 待立项 | 模拟器桥 |
+| F-50 | `saveKeyPrefix` 从 manifest 解析后零消费（存档匹配走 saveKeys 白名单，前缀字段死数据） | 期末四轴 Architecture | Speculative | 📝 待立项 | 模拟器桥 |
+| F-51 | hook 接线三文件散落（simulators_hooks.dart / simulators_view.dart / controllers wire 三处维护）——轻微 Shotgun Surgery，W6 B1 后形态可再收敛 | 期末四轴 Architecture | Speculative | 📝 待立项 | 模拟器桥 |
 
 ## 技术债处置记录
 
