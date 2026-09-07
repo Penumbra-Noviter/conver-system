@@ -6,7 +6,7 @@ Conver System 的**移动端独立应用**（Flutter，Android + iOS 一套 Dart
 
 ## 技术栈
 
-Flutter + Dart（详见 [CONSENSUS.md](CONSENSUS.md) 与设计文档 [docs/mobile-design.md](docs/mobile-design.md) §0/§2.2）：`drift`（SQLite ORM）、`provider`（状态管理）、`flutter_secure_storage`（Key）、`dio`（REST，非流式）、`flutter_markdown_plus`（聊天 Markdown 渲染）已落地；`file_picker`（^12.1.2）/ `share_plus`（^13.3.0）/ `path_provider`（^2.1.6）已随 M3-03 转正入 pubspec（V2 卡导入导出）。`webview_flutter`（模拟器）为**已拍板未落地**依赖（M5 引入时入 pubspec，现役勿当已装）。
+Flutter + Dart（详见 [CONSENSUS.md](CONSENSUS.md) 与设计文档 [docs/mobile-design.md](docs/mobile-design.md) §0/§2.2）：`drift`（SQLite ORM）、`provider`（状态管理）、`flutter_secure_storage`（Key）、`dio`（REST，非流式）、`flutter_markdown_plus`（聊天 Markdown 渲染）已落地；`file_picker`（^12.1.2）/ `share_plus`（^13.3.0）/ `path_provider`（^2.1.6）已随 M3-03 转正入 pubspec（V2 卡导入导出）；`webview_flutter`（^4.14.1）与 `crypto`（^3.0.7，SHA-256）已随 M5-01 落地（模拟器 WebView 桥 + 导入去重）。模拟器业务逻辑集中在 `lib/services/simulator/`（data_dir / seed / manifest_parser / contracts / server / injection / save / import / generate，纯 Dart 可单测），平台薄层（WebView 桥、本地 HTTP 服务器）经 seam 隔离。
 
 ## 目录与约定
 
@@ -35,7 +35,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - `flutter test`（纯 Dart 单测 + 无头 widget 测试），覆盖率目标 ≥ 90%
 - 业务逻辑（chat/llm/数据层/导入链/生成校验）占比最大且是纯 Dart → 可靠性主要由单测兜底；平台薄层做真机/模拟器验证
 
-## 当前状态（2026-08-30）
+## 当前状态（2026-09-07）
 
 - ✅ 设计已落盘：`docs/mobile-design.md`（单一事实来源）+ `docs/mobile-adaptation-research.md`（决策背景）；决策集 Q0~Q14 已拍板，ADR-0002 见桌面库 `desktop/CONSENSUS.md`
 - ✅ 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35+36+37/AEHD + Flutter 3.47.2；AVD medium_phone 数据已迁至 F:\tools\android\avd，2026-09-04；MCP 插件 preflight 全绿）
@@ -45,7 +45,9 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - ✅ **M2 已交付**（2026-08-29）：聊天核心——LLM Provider 双协议 SSE wire（Claude/OpenAI 直连）+ ChatService 回合编排（滑窗/模板变量/重生成/停止/断流）+ 打字机 UI + 最小临时会话入口 + test_connection；全量 477 测 / 覆盖率手写口径 95.42% / 四轴零阻断 / A7 冒烟窄路径 PASS（真实流式留待 Key）；merge 59e766a
 - ✅ **技术债批次 F-10~F-17 已交付**（2026-08-30）：7 做 1 关闭 / 6 工单 2 波 merge b9dc9bc / 全量 497 测 / analyze 0 / 覆盖率剔除 drift 97.96% / 四轴零阻断 / 冒烟 PASS / TICKETS 已归档 / 技术债候选区清零
 - ✅ **M3 已交付**（2026-08-30）：角色 + 搜索——角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板 / V2 卡导入导出（file_picker ^12.1.2 / share_plus ^13.3.0 / path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮；全量 729 测 / analyze 0 / 覆盖率剔除 drift 98.06% / 四轴零阻断 / 冒烟 PASS（建角色→落库→搜索→跳转高亮真机实证）；merge 70bc094 + 期末修复 0057d9e/9cfc4aa；TICKETS 已归档
-- ⬜ 下一站 M4（导出/文档解析：对话导出 JSON/MD + 分享；LLM 文档解析角色字段）：见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选区已清零（2026-08-30 消费完毕，处置见 [TECH_DEBT.md](TECH_DEBT.md)）
+- ✅ **M4 已交付**（2026-09-06）：导出/文档解析——对话导出 JSON/MD（share_plus 分享面板 + 平台超时兜底）/ LLM 文档解析（三级提取+白名单+错误折叠）；全量 802 测 / analyze 0 / M4-06 冒烟 PASS；merge 42099eb + 25c7696 + 修复 1feddd7
+- ✅ **M5 已交付**（2026-09-07）：模拟器全量——22 款随包种子 + 本地 HTTP 托管（127.0.0.1:8642 + 目录墙 + 双端明文工）+ 列表四态/懒启动 + Key 注入（桌面契约逐字 + claude key 不进 + 官方端点提示）+ 存档管理 + 导入链 + AI 生成 + 「我」页收口；全量 1315 测 / analyze 0 / M5 门冒烟 PASS（CORS 复验 + 持久化 + 五游戏 25 轮零崩溃）；11 票 7 波合入收口 3d34ed2；TICKETS 11 票已归档
+- ⬜ 下一站 M6（去 AI 味打磨）与 M7（发布准备）：见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选区 27 条待立项（F-25~F-51，见 [TECH_DEBT.md](TECH_DEBT.md)）
 
 ## 文档体系
 

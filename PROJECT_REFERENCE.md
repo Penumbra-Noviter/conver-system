@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**当前状态**（2026-09-06）：**M4 已交付**——对话导出（聊天顶栏 ⋯ 菜单导出 JSON/MD，文件名=角色名净化 + share_plus 分享面板 + 平台超时兜底）/ LLM 文档解析（向导步骤②「AI 智能解析」启用：三级提取 + 白名单 + 错误折叠）。802 测/analyze 0；M4-06 冒烟 PASS（ShareSheet 弹出 ×2 / 临时文件生成 / 内容语义 / 超时兜底实测）；merge 42099eb + 25c7696 + 修复 1feddd7；TICKETS 已归档。**上一里程碑 M3**（2026-08-30：角色+搜索——角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板 / V2 卡导入导出（file_picker ^12.1.2 / share_plus ^13.3.0 / path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮）。**下一站 M5**（模拟器：WebView 加载 + Key 注入 + localStorage 存档验证 + CORS 直连复验；「我」页收口，见 [TICKETS.md](TICKETS.md)）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
+**当前状态**（2026-09-07）：**M5 已交付**——模拟器全量：22 款游戏随包种子 + 本地 HTTP 托管（127.0.0.1:8642 固定端口 + 目录墙 + 双端明文工）+ 列表页 + Key 注入（自包含 JS 脚本，桌面 key-injector 契约逐字 + claude key 恒不进 + 官方端点提示）+ 存档管理（半屏 sheet + 导出/导入/删除对齐桌面格式）+ 导入链（净化/去重/恶意拒绝二次确认）+ AI 生成（六项校验重试≤3）+「我」页收口（手册 13 节改写/关于/桌面版说明）。1315 测/analyze 0；M5 门冒烟 PASS（Q11 CORS 复验 DeepSeek 放行 vs Anthropic 拦截 / Q12 杀进程存档持久化 / Q10 五游戏 25 轮零崩溃 + 注入幂等 + 15s 超时守卫）；收口 3d34ed2；TICKETS 11 票已归档。**上一里程碑 M4**（2026-09-06：对话导出 JSON/MD + share_plus 分享 + LLM 文档解析）。**下一站 M6**（去 AI 味打磨）与 M7（发布准备），见 [TICKETS.md](TICKETS.md)。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
 
 **核心能力**（7 项全量，无阉割）：
 - **聊天** — 多轮对话 + SSE 流式打字机渲染 + 停止生成；滑窗上下文、模板变量、重生成、错误态
