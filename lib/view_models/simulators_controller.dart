@@ -232,6 +232,7 @@ class SimulatorsController extends ChangeNotifier {
         _createServer = createServer,
         _loadManifest = loadManifest,
         _hooks = hooks,
+        _externalHooks = hooks,
         _port = port,
         _manifestTimeout = manifestTimeout;
 
@@ -240,6 +241,10 @@ class SimulatorsController extends ChangeNotifier {
   final SimulatorServerFactory _createServer;
   final ManifestLoader _loadManifest;
   SimulatorsHooks _hooks;
+
+  /// 构造注入的外部钩子（测试注入 / 未来外部装配）：[wireViewDefaults] 合并时
+  /// 恒优先，视图默认槽位不覆盖——「既有注入钩子优先」契约的单一来源。
+  final SimulatorsHooks _externalHooks;
   final Duration _manifestTimeout;
 
   SimulatorsState _state = SimulatorsState.loading;
@@ -298,6 +303,25 @@ class SimulatorsController extends ChangeNotifier {
   /// 未提供槽位保持 null）。替换既有槽位并通知监听者。
   void registerHooks(SimulatorsHooks hooks) {
     _hooks = hooks;
+    notifyListeners();
+  }
+
+  /// 视图层默认接线（F-M5-04/06/07/08b 统一入口，**每次视图挂载调用**）：
+  /// 构造注入的外部钩子槽位恒优先（绝不覆盖），未接线槽位以 [viewDefaults]
+  /// 填充——视图默认槽位每次挂载刷新为最新实现。
+  ///
+  /// W6 B1 修复语义：HomeShell 按 tab switch 直接切换（无 IndexedStack），
+  /// 每次切回模拟器 tab 都是新 State 挂载；若只接线一次，AppBar 四入口闭包
+  /// 将持有首次已卸载 State 的死 context。本方法每次挂载重新刷新视图默认
+  /// 槽位，使闭包绑定当前 State（配合视图层 `mounted` 守卫，死 context 永不
+  /// 落入回调）；外部注入槽位不参与刷新（既有注入钩子优先契约不变）。
+  void wireViewDefaults(SimulatorsHooks viewDefaults) {
+    _hooks = SimulatorsHooks(
+      onOpen: _externalHooks.onOpen ?? viewDefaults.onOpen,
+      onSaveTap: _externalHooks.onSaveTap ?? viewDefaults.onSaveTap,
+      onImportTap: _externalHooks.onImportTap ?? viewDefaults.onImportTap,
+      onGenerateTap: _externalHooks.onGenerateTap ?? viewDefaults.onGenerateTap,
+    );
     notifyListeners();
   }
 
