@@ -24,15 +24,15 @@
 /// - 清洗后为空数组时保留空数组（结构性合法，非降级信号）。
 ///
 /// 协议表面（深模块：外部只通过这些符号与 manifest_parser 交互）：
-/// `ManifestParseResult` / `parseManifest` / `saveKeyMetaRe`。
+/// `ManifestParseResult` / `parseManifest`。saveKeys 模式判定所需的
+/// `saveKeyMetaRe` 单一来源为 `save_key_meta.dart`（契约之家）——F-26 收口：
+/// 本模块不再持同名顶层常量，消除「multiple libraries define saveKeyMetaRe」
+/// 的潜在 ambiguous import 编译面（本票 injection 系模块同时消费两模块）。
 library;
 
 import 'dart:convert';
 
-/// 正则元字符集：saveKeys 元素含任一字符即按正则模式处理（精确键名不得含
-/// 这些字符）——单一来源：桌面 `js/save-key-meta.js` SAVE_KEY_META_RE
-/// （`/[.*+?^${}()|[\]\\]/`，TD-67/68 契约之家）。
-final RegExp saveKeyMetaRe = RegExp(r'[.*+?^${}()|[\]\\]');
+import 'save_key_meta.dart' show saveKeyMetaRe;
 
 /// manifest 解析结果：成功携带归一化游戏条目数组，失败携带面向用户的错误文案。
 ///
