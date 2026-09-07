@@ -9,7 +9,10 @@
 /// [JsBridgeLocalStorageAccess]（runJavaScript 枚举/写回）读取存档。[SheetWebViewController]
 /// seam 支持求值返回（`runJavaScriptReturningResult` —— 既有运行页 seam 只暴露
 /// 无返回 runJavaScript，运行页文件位不由本票改动，故在 sheet 侧建并行薄适配；
-/// 真通道行为归 F-M5-09 AVD 冒烟）。WebView 不可用 / 挂起 → 超时兜底降级文案，
+/// 真通道行为归 F-M5-09 AVD 冒烟）。**时序纪律（W5 B1）**：WebView `onPageFinished`
+/// 只派发给挂载时已存在的导航委托、不回放挂载前事件——装配严格遵循
+/// 「工厂创建未导航控制器 → 挂 `setOnPageFinished` → `navigate(url)`」两步序，
+/// 杜绝事件丢失导致的恒/偶发超时降级。WebView 不可用 / 挂起 → 超时兜底降级文案，
 /// 不崩。
 ///
 /// 平台 seam 全部注入（测试 fake）：[webViewFactory]（WebView 控制器工厂）、
@@ -71,30 +74,38 @@ abstract interface class SheetWebViewController {
   Future<String> evaluate(String script);
 
   /// 注册页面加载完成回调（origin 建立完成后枚举的前提）。
+  ///
+  /// **时序契约（W5 B1）**：必须由消费方在 [navigate] **之前**调用——webview
+  /// 的 `onPageFinished` 只派发给挂载时已存在的导航委托、不回放挂载前事件；
+  /// 先导航后挂委托会丢失事件（面板走超时降级）。装配方遵循
+  /// 「挂委托 → navigate」两步序（见 [_SaveSheetState._bootstrap]）。
   void setOnPageFinished(VoidCallback onPageFinished);
+
+  /// 发起导航到 [url]（生产 = `loadRequest`；返回即完成请求发出，页面就绪以
+  /// [setOnPageFinished] 回调为准）。调用前委托必须先已挂载。
+  void navigate(Uri url);
 
   /// 渲染平台视图主体（生产 WebViewWidget / 测试占位）。
   Widget buildView();
 }
 
-/// WebView 控制器工厂注入点（U2 seam）——按 [url] 创建并装载控制器。
-typedef SheetWebViewControllerFactory =
-    Future<SheetWebViewController> Function({required Uri url});
+/// WebView 控制器工厂注入点（U2 seam）——创建**未导航**的控制器（委托由消费方
+/// 挂载后经 [SheetWebViewController.navigate] 发起导航，保证 onPageFinished
+/// 不丢失，W5 B1）。
+typedef SheetWebViewControllerFactory = Future<SheetWebViewController> Function();
 
 // 平台薄层收口本文件：真实 WebView 控制器不可在测试宿主运行（平台通道），
 // 真通道行为归 F-M5-09 AVD 冒烟（U2 实证）；与 M4 `defaultPickJsonFile` /
 // `defaultShareViaPlus` 同先例标 ignore。
 // coverage:ignore-start
 
-/// 生产 WebView 控制器工厂：创建装载 [url]（server origin `/` index 页）的
-/// webview_flutter 控制器并返回适配。
-Future<SheetWebViewController> createSheetWebViewController({
-  required Uri url,
-}) async {
+/// 生产 WebView 控制器工厂：仅创建 webview_flutter 控制器（不发起导航——导航
+/// 由消费方挂载 [setOnPageFinished] 之后经 [SheetWebViewController.navigate]
+/// 发起，杜绝 onPageFinished 错过，W5 B1）。
+Future<SheetWebViewController> createSheetWebViewController() async {
   final inner = WebViewController()
     ..setJavaScriptMode(JavaScriptMode.unrestricted)
     ..setBackgroundColor(const Color(0xFF000000));
-  await inner.loadRequest(url);
   return _SheetWebViewControllerImpl(inner);
 }
 
@@ -112,6 +123,14 @@ class _SheetWebViewControllerImpl implements SheetWebViewController {
   void setOnPageFinished(VoidCallback onPageFinished) {
     _inner.setNavigationDelegate(
       NavigationDelegate(onPageFinished: (_) => onPageFinished()),
+    );
+  }
+
+  @override
+  void navigate(Uri url) {
+    // 导航失败（端口未就绪等）不抛未捕获错误：面板由 loaded 超时兜底降级。
+    unawaited(
+      _inner.loadRequest(url).then<void>((_) {}, onError: (Object _) {}),
     );
   }
 
@@ -201,17 +220,20 @@ class _SaveSheetState extends State<SaveSheet> {
     try {
       final url = Uri.parse('http://127.0.0.1:${widget.port}/');
       final controller =
-          await widget.webViewFactory(url: url).timeout(widget.pageLoadTimeout);
+          await widget.webViewFactory().timeout(widget.pageLoadTimeout);
       if (!mounted) {
         return;
       }
       _controller = controller;
       final loaded = Completer<void>();
+      // W5 B1：委托先挂载、后导航——onPageFinished 只派发给挂载时已存在的
+      // 委托（不回放挂载前事件），先导航后挂委托即丢失事件 → 恒/偶发超时降级。
       controller.setOnPageFinished(() {
         if (!loaded.isCompleted) {
           loaded.complete();
         }
       });
+      controller.navigate(url);
       await loaded.future.timeout(widget.pageLoadTimeout);
       if (!mounted) {
         return;
