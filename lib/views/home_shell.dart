@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../data/repositories/settings_repository.dart';
 import '../services/secure_store.dart';
+import '../theme/motion.dart';
 import '../view_models/shell_navigation.dart';
 import '../view_models/simulators_controller.dart';
 import '../view_models/theme_controller.dart';
@@ -28,35 +29,49 @@ class HomeShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navigation = context.watch<ShellNavigation>();
+    final body = switch (navigation.current) {
+      ShellTab.chat => ChatView(
+          controller: context.read<ChatController>(),
+        ),
+      ShellTab.characters => CharactersView(
+          controller: context.read<CharactersController>(),
+        ),
+      // M3-04c：搜索点击 → 切聊天 tab + 打开目标会话并定位高亮（桌面
+      // navigateToConversation(conversationId, { messageId }) 语义）。
+      ShellTab.search => SearchView(
+          onSelectResult: (conversationId, messageId) {
+            context.read<ShellNavigation>().select(ShellTab.chat);
+            unawaited(context
+                .read<ChatController>()
+                .openConversation(conversationId, highlightMessageId: messageId));
+          },
+        ),
+      // M5-03：模拟器 tab 接真实列表页（懒启动编排见 SimulatorsController；
+      // 服务器 App 存续期常驻，不随 tab 往返销毁）。
+      ShellTab.simulators => SimulatorsView(
+          controller: context.read<SimulatorsController>(),
+        ),
+      ShellTab.settings => SettingsView(
+          settingsRepository: context.read<SettingsRepository>(),
+          themeController: context.read<ThemeController>(),
+          secretStore: context.read<SecretStore>(),
+        ),
+    };
     return Scaffold(
-      body: switch (navigation.current) {
-        ShellTab.chat => ChatView(
-            controller: context.read<ChatController>(),
-          ),
-        ShellTab.characters => CharactersView(
-            controller: context.read<CharactersController>(),
-          ),
-        // M3-04c：搜索点击 → 切聊天 tab + 打开目标会话并定位高亮（桌面
-        // navigateToConversation(conversationId, { messageId }) 语义）。
-        ShellTab.search => SearchView(
-            onSelectResult: (conversationId, messageId) {
-              context.read<ShellNavigation>().select(ShellTab.chat);
-              unawaited(context
-                  .read<ChatController>()
-                  .openConversation(conversationId, highlightMessageId: messageId));
-            },
-          ),
-        // M5-03：模拟器 tab 接真实列表页（懒启动编排见 SimulatorsController；
-        // 服务器 App 存续期常驻，不随 tab 往返销毁）。
-        ShellTab.simulators => SimulatorsView(
-            controller: context.read<SimulatorsController>(),
-          ),
-        ShellTab.settings => SettingsView(
-            settingsRepository: context.read<SettingsRepository>(),
-            themeController: context.read<ThemeController>(),
-            secretStore: context.read<SecretStore>(),
-          ),
-      },
+      body: AnimatedSwitcher(
+        // M6-07 克制动效 ①：tab 切换正文区 Fade 160ms（消费 ConverDurations
+        // token）。子 child 以目的地为 ValueKey——切换即替换重建视图，
+        // 「切回 tab 重新 initState」既有契约不被保活破坏（无 IndexedStack）。
+        duration: ConverDurations.tabFade,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+        child: KeyedSubtree(
+          key: ValueKey(navigation.current),
+          child: body,
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigation.index,
         onDestinationSelected: (index) {

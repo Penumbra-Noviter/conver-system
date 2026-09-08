@@ -94,4 +94,42 @@ void main() {
     expect(context.read<ThemeController>().themeMode, ThemeMode.light);
     expect(Theme.of(context).brightness, Brightness.light);
   });
+
+  group('SnackBarTheme 微定制（M6-07 验收 6）', () {
+    testWidgets('双主题：surfaceContainerHigh 底 + ink1 字 + md 圆角', (
+      tester,
+    ) async {
+      await pumpApp(tester);
+
+      final controller = contextUnderMaterialApp(tester).read<ThemeController>();
+
+      // 深色。
+      final darkTheme = Theme.of(contextUnderMaterialApp(tester));
+      final darkSnack = darkTheme.snackBarTheme;
+      expect(darkSnack.backgroundColor, ConverColors.panel3,
+          reason: '深色 surfaceContainerHigh 底');
+      expect(darkSnack.contentTextStyle?.color, ConverColors.ink1,
+          reason: '深色 ink1 字');
+      expect(darkSnack.shape, isNotNull);
+      expect(
+        (darkSnack.shape as RoundedRectangleBorder?)?.borderRadius,
+        BorderRadius.circular(ConverRadii.md),
+        reason: 'md 圆角',
+      );
+
+      // 浅色。
+      unawaited(controller.setThemeMode(ThemeMode.light));
+      await tester.pumpAndSettle();
+      final lightSnack = Theme.of(contextUnderMaterialApp(tester)).snackBarTheme;
+      expect(lightSnack.backgroundColor, ConverColorsLight.panel3,
+          reason: '浅色 surfaceContainerHigh 底');
+      expect(lightSnack.contentTextStyle?.color, ConverColorsLight.ink1,
+          reason: '浅色 ink1 字');
+      expect(
+        (lightSnack.shape as RoundedRectangleBorder?)?.borderRadius,
+        BorderRadius.circular(ConverRadii.md),
+        reason: 'md 圆角',
+      );
+    });
+  });
 }
