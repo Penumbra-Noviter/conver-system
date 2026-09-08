@@ -45,7 +45,8 @@
 |------|--------|------|------|------|----------|
 | F-52 | 聊天重试判据宽于文档契约：流读阶段「HTTP 200 + 空体无终态帧」EOF 被 `stream_wire` 抛 `LLMConnectionInterruptedError`，与连接建立阶段失败同型不可分 → `chat_service` 重试判据（`!producedToken && _isConnectionDrop`）会重试已收到状态码的失败，最坏同一 user 内容 3 次 billable POST；且重试无总预算上限（黑洞网络 ≈33s）。修法方向 = wire 相位隔离（connect 失败 vs read 中 EOF）或错误类型区分。 | W1 增量审核 Falsify（F-N1/F-N2） | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-55 | 无终态路径 cancel-unwind 抛未处理错误：`_stopStreamReply` 的 `cancel().timeout(3s)` 无 onError → 停滞流 cancel 后 3s 窗口内连接 EOF 时 `chat_service.dart:590` 抛 `LLMConnectionInterruptedError` → 部分落库与 controller.close（:597-605）被跳过 + `chat_round.dart:198` stop 收尾被跳过 + 未处理异步错误（注释「挂起不抛错、timeout 双层兜底」对「3s 内以错误完成」不成立）。修法＝onError + 落库/close 移 finally。基线 d5b8c03/6b03d2c 同现，非 M6 引入；09 的 wire force-close 已收窄暴露窗口。 | W2 增量审核（09 相邻发现 2，端到端复现） | Strong | 📝 待立项 | 聊天链路 |
-| F-56 | 假活连接终态化缺口：终态帧已到 + 连接不关闭 → await-for 永不 EOF → round 永不终态化（09 验收 4 为设计选择，但离「假活连接终态化保障」目标差一格）。随修项：① `stream_wire.dart:93/:102` 注释声称「后续行不再重启计时器」失真（每行迭代顶部 `armIdleTimer()` 无条件执行，终态帧后尾随空行会重新武装——可观察保证仍成立，机制与注释不符）；② N4 集成断言缺口：无自动化断言组合「idle 触发 → ChatInterrupted」（wire 与 service 各层单测均绿）。 | W2 增量审核 N1/N2/N4 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-56 | 假活连接终态化缺口：终态帧已到 + 连接不关闭 → await-for 永不 EOF → round 永不终态化（09 验收 4 为设计选择，但离「假活连接终态化保障」目标差一格）。随修项：① `stream_wire.dart:93/:102` 注释声称「后续行不再重启计时器」失真（每行迭代顶部 `armIdleTimer()` 无条件执行，终态帧后尾随空行会重新武装——可观察保证仍成立，机制与注释不符）；② N4 集成断言缺口：无自动化断言组合「idle 触发 → ChatInterrupted」（wire 与 service 各层单测均绿）；③ `stream_wire_test.dart` M6-09「注释帧跨 idleTimeout」时序 flake（W3 全量套件实测 1 次，单独重跑 16/16 绿）——修时加容差/定序。 | W2 增量审核 N1/N2/N4 + W3 增量审核 F8 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-59 | 角色卡语义失真：`characters_view.dart:340-349` `Semantics(button: true)` 无条件标记，而常态（非多选态）onTap 为 null → TalkBack 激活「button」无响应；同 diff 游戏卡（`simulators_view.dart:418`）做了 `button: onOpen != null` 守卫而角色卡未对齐；测试 `characters_view_test.dart:454` 把「可确认可点」锁进断言（验收 4 原文 button:true，票面 tension）。修法方向 = 对齐游戏卡守卫。 | W3 增量审核 F1 | Worth exploring | 📝 待立项 | 无障碍 |
 
 ## 技术债处置记录
 
@@ -65,6 +66,16 @@
 | 编号 | 处置 | 详情 |
 |------|------|------|
 | F-58 | ❌ 复核关闭 | N3 观察：首 token 前 idle → 06 自动重试 → 最坏 3×60s+退避 ≈3.5 分钟静默才「回复已中断」——各环行为与 06×09 契约一致、无错判（首 token 后 idle → `producedToken` 分流正确），纯时长 UX 观察，不入债（来源：W2 增量审核 N3） |
+
+### 2026-09-08 — M6 W3 增量审核落债（F-59 进候选区 + 观察关闭）
+
+> 来源：project-kickoff M6 W3 波末增量审核（固定点 14a49a7，diff = 03 一 merge）。阻断 0；文件范围：2 处申报（chat_controller 只读 getter / api_config tooltip 补丁）均核验**合理成立**（警告档）；过度工程 0（activeCharacterName 状态机 1:1 镜像既有生命周期、游戏卡 null 分支防御语义保留合理）。F1 落债 F-59；F2/F4/F7 观察关闭；F8（stream_wire_test 时序 flake）并入 F-56 随修。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-60 | ❌ 复核关闭 | F2 观察：activeCharacterName 状态机零泄漏（逐路径审计），仅装饰性陈旧——同会话幂等重开不重解析、会话中角色改名/删除不刷新（来源：W3 增量审核 F2） |
+| F-61 | ❌ 复核关闭 | F4 观察：`_BlinkingCursor` 自带 `ExcludeSemantics` 与父级 `Semantics(excludeSemantics: true)` 冗余（唯一实例化点在父级内）——2 行冗余无行为影响，测试自锁（来源：W3 增量审核 F4） |
+| F-62 | ❌ 复核关闭 | F7 观察：openConversation 快速双击竞态（activeConversationId 与 _activeConversation 错配）对既有字段早已存在，+27 行仅加入既有竞态非新类非本波回归（来源：W3 增量审核 F7） |
 
 ### 2026-09-07 — 技术债消费批次 TD-1~TD-4（F-25~F-51 全部处置：19 待修已修 + 8 复核关闭）
 
