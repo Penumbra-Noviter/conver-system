@@ -326,6 +326,10 @@ class _MessageListState extends State<_MessageList> {
   @override
   Widget build(BuildContext context) {
     final messages = widget.controller.messages;
+    // 语义 label 前缀（assistant / system 气泡「角色名: 内容」）；会话缺失 /
+    // 角色解析失败回退占位词（装饰性语义面，不抛错）。
+    final roleName = widget.controller.activeCharacterName?.trim() ?? '角色';
+    final roleLabel = roleName.isEmpty ? '角色' : roleName;
     if (messages.isEmpty) {
       final palette = ConverPalette.of(context);
       final textTheme = Theme.of(context).textTheme;
@@ -368,11 +372,13 @@ class _MessageListState extends State<_MessageList> {
               ),
             Role.assistant => _AssistantBubble(
                 controller: widget.controller,
+                roleName: roleLabel,
                 message: message,
                 isLast: index == messages.length - 1,
                 highlighted: highlighted,
               ),
             Role.system => _SystemBubble(
+                roleName: roleLabel,
                 content: message.content,
                 highlighted: highlighted,
               ),
@@ -395,23 +401,30 @@ class _UserBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = ConverPalette.of(context);
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        margin: const EdgeInsets.only(left: ConverSpacing.space8),
-        padding: const EdgeInsets.symmetric(
-          horizontal: ConverSpacing.space3,
-          vertical: ConverSpacing.space2,
-        ),
-        decoration: BoxDecoration(
-          color: highlighted
-              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.13)
-              : Theme.of(context).colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(ConverRadii.bubble),
-        ),
-        child: Text(
-          content,
-          style: TextStyle(color: palette.ink1, fontSize: 15, height: 1.5),
+    return MergeSemantics(
+      child: Semantics(
+        // 屏幕阅读器整体朗读：label「你: 内容」（spec §4.4 覆盖清单 ①）。
+        label: '你: $content',
+        excludeSemantics: true,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Container(
+            margin: const EdgeInsets.only(left: ConverSpacing.space8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: ConverSpacing.space3,
+              vertical: ConverSpacing.space2,
+            ),
+            decoration: BoxDecoration(
+              color: highlighted
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.13)
+                  : Theme.of(context).colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(ConverRadii.bubble),
+            ),
+            child: Text(
+              content,
+              style: TextStyle(color: palette.ink1, fontSize: 15, height: 1.5),
+            ),
+          ),
         ),
       ),
     );
@@ -424,12 +437,17 @@ class _UserBubble extends StatelessWidget {
 class _AssistantBubble extends StatelessWidget {
   const _AssistantBubble({
     required this.controller,
+    required this.roleName,
     required this.message,
     required this.isLast,
     this.highlighted = false,
   });
 
   final ChatController controller;
+
+  /// 当前会话角色名（语义 label「角色名: 内容」前缀）。
+  final String roleName;
+
   final ChatUiMessage message;
   final bool isLast;
 
@@ -465,29 +483,37 @@ class _AssistantBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (message.streaming)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Flexible(
-                    child: Text(
-                      message.content,
-                      style: TextStyle(
-                        color: palette.ink1,
-                        fontSize: 15,
-                        height: 1.5,
+            // 气泡内容 MergeSemantics + label「角色名: 内容」（spec §4.4 覆盖
+            // 清单 ①：屏幕阅读器整体朗读；`▍` 光标在 streaming 分支内被
+            // ExcludeSemantics 排除，不产生噪音）。
+            MergeSemantics(
+              child: Semantics(
+                label: '$roleName: ${message.content}',
+                excludeSemantics: true,
+                child: message.streaming
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              message.content,
+                              style: TextStyle(
+                                color: palette.ink1,
+                                fontSize: 15,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                          const _BlinkingCursor(),
+                        ],
+                      )
+                    : MarkdownBody(
+                        data: message.content,
+                        styleSheet: _markdownStyle(context),
+                        selectable: true,
                       ),
-                    ),
-                  ),
-                  const _BlinkingCursor(),
-                ],
-              )
-            else
-              MarkdownBody(
-                data: message.content,
-                styleSheet: _markdownStyle(context),
-                selectable: true,
               ),
+            ),
             if (message.stopped)
               Padding(
                 padding: const EdgeInsets.only(top: ConverSpacing.space1),
@@ -536,7 +562,14 @@ class _AssistantBubble extends StatelessWidget {
 
 /// system 角色（开场白元信息等）：居中弱化小字（M3-04c 高亮时琥珀 wash 底）。
 class _SystemBubble extends StatelessWidget {
-  const _SystemBubble({required this.content, this.highlighted = false});
+  const _SystemBubble({
+    required this.roleName,
+    required this.content,
+    this.highlighted = false,
+  });
+
+  /// 当前会话角色名（语义 label「角色名: 内容」前缀）。
+  final String roleName;
 
   final String content;
 
@@ -550,32 +583,41 @@ class _SystemBubble extends StatelessWidget {
       content,
       style: TextStyle(fontSize: 12.5, color: palette.ink4),
     );
-    return Align(
-      alignment: Alignment.center,
-      child: highlighted
-          ? Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: ConverSpacing.space3,
-                vertical: ConverSpacing.space1,
-              ),
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.13),
-                borderRadius: BorderRadius.circular(ConverRadii.sm),
-              ),
-              child: text,
-            )
-          : Padding(
-              padding: const EdgeInsets.symmetric(horizontal: ConverSpacing.space8),
-              child: text,
-            ),
+    return MergeSemantics(
+      child: Semantics(
+        // 屏幕阅读器整体朗读：label「角色名: 内容」（spec §4.4 覆盖清单 ①）。
+        label: '$roleName: $content',
+        excludeSemantics: true,
+        child: Align(
+          alignment: Alignment.center,
+          child: highlighted
+              ? Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ConverSpacing.space3,
+                    vertical: ConverSpacing.space1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.13),
+                    borderRadius: BorderRadius.circular(ConverRadii.sm),
+                  ),
+                  child: text,
+                )
+              : Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: ConverSpacing.space8),
+                  child: text,
+                ),
+        ),
+      ),
     );
   }
 }
 
 /// 单点闪烁光标（打字机占位气泡尾部，`▍` 半宽竖线；非三点 typing）。
+///
+/// ExcludeSemantics：装饰光标不产生朗读噪音（spec §4.4 覆盖清单 ②）。
 class _BlinkingCursor extends StatefulWidget {
   const _BlinkingCursor();
 
@@ -598,16 +640,18 @@ class _BlinkingCursorState extends State<_BlinkingCursor>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: Tween<double>(begin: 0.25, end: 1).animate(_controller),
-      child: Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: 3),
-        child: Text(
-          '▍',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.primary,
-            fontSize: 15,
-            height: 1.5,
+    return ExcludeSemantics(
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 0.25, end: 1).animate(_controller),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 3),
+          child: Text(
+            '▍',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              fontSize: 15,
+              height: 1.5,
+            ),
           ),
         ),
       ),

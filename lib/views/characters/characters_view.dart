@@ -242,9 +242,7 @@ class _BatchBar extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('批量删除角色'),
-        content: Text(
-          '删除将移除 $count 个角色及其对话与消息，此操作不可撤销。',
-        ),
+        content: Text('删除将移除 $count 个角色及其对话与消息，此操作不可撤销。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -339,142 +337,151 @@ class _CharacterCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final palette = ConverPalette.of(context);
     final greeting = _preview(character.firstMes.trim(), 60);
-    return GestureDetector(
-      onTap: selectionMode
-          ? () => controller.toggleSelection(character.id)
-          : null,
-      onLongPress: () {
-        controller.enterSelectionMode();
-        controller.toggleSelection(character.id);
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: ConverSpacing.space2),
-        padding: const EdgeInsets.fromLTRB(
-          ConverSpacing.space3,
-          ConverSpacing.space3,
-          ConverSpacing.space3,
-          ConverSpacing.space1,
-        ),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
-          border: Border.all(
-            color: selected
-                ? Theme.of(context).colorScheme.primary
-                : palette.border,
+    return Semantics(
+      // 可点卡片 button 语义 + 长按多选 hint（spec §4.4 覆盖清单 ③）。
+      button: true,
+      hint: '长按可多选',
+      child: GestureDetector(
+        onTap: selectionMode
+            ? () => controller.toggleSelection(character.id)
+            : null,
+        onLongPress: () {
+          controller.enterSelectionMode();
+          controller.toggleSelection(character.id);
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: ConverSpacing.space2),
+          padding: const EdgeInsets.fromLTRB(
+            ConverSpacing.space3,
+            ConverSpacing.space3,
+            ConverSpacing.space3,
+            ConverSpacing.space1,
           ),
-          borderRadius: BorderRadius.circular(ConverRadii.md),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (selectionMode)
-                  Checkbox(
-                    value: selected,
-                    onChanged: (_) =>
-                        controller.toggleSelection(character.id),
-                  ),
-                _Avatar(character: character),
-                const SizedBox(width: ConverSpacing.space3),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        character.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium
-                            ?.copyWith(color: palette.ink1),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _cardDescription(character),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall
-                            ?.copyWith(color: palette.ink2),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            border: Border.all(
+              color: selected
+                  ? Theme.of(context).colorScheme.primary
+                  : palette.border,
             ),
-            if (greeting.isNotEmpty) ...[
-              const SizedBox(height: ConverSpacing.space2),
-              Text(
-                greeting,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall?.copyWith(color: palette.ink4),
-              ),
-            ],
-            const SizedBox(height: ConverSpacing.space2),
-            Row(
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: ConverSpacing.space2,
-                    runSpacing: 2,
-                    children: [
-                      for (final tag in character.tags)
+            borderRadius: BorderRadius.circular(ConverRadii.md),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (selectionMode)
+                    Checkbox(
+                      value: selected,
+                      onChanged: (_) =>
+                          controller.toggleSelection(character.id),
+                    ),
+                  _Avatar(character: character),
+                  const SizedBox(width: ConverSpacing.space3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          '#$tag',
-                          style: textTheme.labelSmall
-                              ?.copyWith(color: palette.ink3),
+                          character.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleMedium?.copyWith(
+                            color: palette.ink1,
+                          ),
                         ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          _cardDescription(character),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: palette.ink2,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
+              ),
+              if (greeting.isNotEmpty) ...[
+                const SizedBox(height: ConverSpacing.space2),
                 Text(
-                  _temperatureLabel(character.temperature),
-                  style: textTheme.labelSmall?.copyWith(color: palette.ink3),
+                  greeting,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(color: palette.ink4),
                 ),
-                const SizedBox(width: ConverSpacing.space3),
-                _ConversationCountBadge(count: row.conversationCount),
               ],
-            ),
-            // 多选态下隐藏四按钮（防误触；勾选交互经卡片 tap）。
-            if (!selectionMode) ...[
               const SizedBox(height: ConverSpacing.space2),
               Row(
                 children: [
                   Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: () =>
-                          unawaited(controller.startConversation(character.id)),
-                      icon: const Icon(Icons.forum_outlined, size: 18),
-                      label: const Text('开始对话'),
+                    child: Wrap(
+                      spacing: ConverSpacing.space2,
+                      runSpacing: 2,
+                      children: [
+                        for (final tag in character.tags)
+                          Text(
+                            '#$tag',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: palette.ink3,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: '编辑',
-                    icon: Icon(Icons.edit_outlined, color: palette.ink3),
-                    onPressed: () => _openEdit(context),
+                  Text(
+                    _temperatureLabel(character.temperature),
+                    style: textTheme.labelSmall?.copyWith(color: palette.ink3),
                   ),
-                  IconButton(
-                    tooltip: '导出',
-                    icon: Icon(
-                      Icons.file_download_outlined,
-                      color: palette.ink3,
-                    ),
-                    onPressed: () =>
-                        unawaited(controller.exportCharacter(character)),
-                  ),
-                  IconButton(
-                    tooltip: '删除',
-                    icon: Icon(
-                      Icons.delete_outline,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    onPressed: () => _confirmDelete(context),
-                  ),
+                  const SizedBox(width: ConverSpacing.space3),
+                  _ConversationCountBadge(count: row.conversationCount),
                 ],
               ),
+              // 多选态下隐藏四按钮（防误触；勾选交互经卡片 tap）。
+              if (!selectionMode) ...[
+                const SizedBox(height: ConverSpacing.space2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        onPressed: () => unawaited(
+                          controller.startConversation(character.id),
+                        ),
+                        icon: const Icon(Icons.forum_outlined, size: 18),
+                        label: const Text('开始对话'),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '编辑',
+                      icon: Icon(Icons.edit_outlined, color: palette.ink3),
+                      onPressed: () => _openEdit(context),
+                    ),
+                    IconButton(
+                      tooltip: '导出',
+                      icon: Icon(
+                        Icons.file_download_outlined,
+                        color: palette.ink3,
+                      ),
+                      onPressed: () =>
+                          unawaited(controller.exportCharacter(character)),
+                    ),
+                    IconButton(
+                      tooltip: '删除',
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      onPressed: () => _confirmDelete(context),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -484,10 +491,8 @@ class _CharacterCard extends StatelessWidget {
   void _openEdit(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => CharacterEditView(
-          controller: controller,
-          character: row.character,
-        ),
+        builder: (_) =>
+            CharacterEditView(controller: controller, character: row.character),
       ),
     );
   }
@@ -564,9 +569,7 @@ class _ConversationCountBadge extends StatelessWidget {
       ),
       child: Text(
         '$count 对话',
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
+        style: Theme.of(context).textTheme.labelSmall
             ?.copyWith(color: palette.ink3),
       ),
     );

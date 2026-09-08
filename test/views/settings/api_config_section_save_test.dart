@@ -439,4 +439,26 @@ void main() {
       expect(_saveButtonEnabled(tester), isTrue);
     });
   });
+
+  group('语义覆盖（M6-03 验收 6：tooltip 审计补齐）', () {
+    testWidgets('密钥可见性切换按钮有语义 tooltip（隐藏密钥 / 显示密钥）', (tester) async {
+      final store = InMemorySecretStore();
+      await pumpSection(
+        tester,
+        ApiConfigSection(
+          settingsRepository: repo,
+          secretStore: store,
+          initialValues: const {},
+        ),
+      );
+
+      // 缺省隐藏态 → tooltip「显示密钥」（语义 label 资产；两个 provider 槽位各一）。
+      expect(find.byTooltip('显示密钥'), findsNWidgets(2),
+          reason: '可见性按钮 tooltip 补齐（缺省隐藏态，claude/openai 两槽）');
+      await tester.tap(find.byTooltip('显示密钥').first);
+      await tester.pump();
+      expect(find.byTooltip('隐藏密钥'), findsOneWidget,
+          reason: '切换显示后 tooltip 随状态翻转');
+    });
+  });
 }
