@@ -24,6 +24,7 @@ import '../../data/database/tables.dart' show Role;
 import '../../theme/chat_markdown_style.dart' show warmStoneMarkdownDark, warmStoneMarkdownLight;
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
+import '../../widgets/notice_banner.dart';
 import 'chat_controller.dart';
 import 'chat_entry.dart';
 
@@ -98,7 +99,7 @@ class _ConversationView extends StatelessWidget {
         children: [
           _ConversationHeader(controller: controller),
           if (controller.notice != null)
-            _NoticeBanner(
+            NoticeBanner(
               notice: controller.notice!,
               onDismiss: controller.dismissNotice,
             ),
@@ -168,48 +169,6 @@ class _ConversationHeader extends StatelessWidget {
         ),
         const SizedBox(width: ConverSpacing.space2),
       ],
-    );
-  }
-}
-
-/// 非阻塞提示条（断流「回复已中断」/ 错误映射文案 / 基础设施失败）：
-/// 可 [ChatController.dismissNotice]，不挡后续操作。
-class _NoticeBanner extends StatelessWidget {
-  const _NoticeBanner({required this.notice, required this.onDismiss});
-
-  final String notice;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = ConverPalette.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      width: double.infinity,
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          ConverSpacing.space4,
-          ConverSpacing.space1,
-          ConverSpacing.space1,
-          ConverSpacing.space1,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                notice,
-                style: textTheme.bodyMedium?.copyWith(color: palette.ink2),
-              ),
-            ),
-            IconButton(
-              tooltip: '关闭提示',
-              icon: Icon(Icons.close, size: 18, color: palette.ink4),
-              onPressed: onDismiss,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

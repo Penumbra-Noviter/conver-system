@@ -31,6 +31,7 @@ import '../../services/llm/llm_provider.dart' show LLMProviderFactory;
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/notice_banner.dart';
 import 'character_edit_view.dart';
 import 'characters_controller.dart';
 import 'wizard/character_wizard_controller.dart';
@@ -121,7 +122,7 @@ class _CharactersViewState extends State<CharactersView> {
               onImport: () => unawaited(controller.importCharacter()),
             ),
           if (controller.notice != null)
-            _NoticeBanner(
+            NoticeBanner(
               notice: controller.notice!,
               onDismiss: controller.dismissNotice,
             ),
@@ -259,48 +260,6 @@ class _BatchBar extends StatelessWidget {
     if (confirmed == true) {
       await controller.deleteSelected();
     }
-  }
-}
-
-/// 非阻塞提示条（导出占位 / 加载失败 / 删除反馈），可
-/// [CharactersController.dismissNotice]。
-class _NoticeBanner extends StatelessWidget {
-  const _NoticeBanner({required this.notice, required this.onDismiss});
-
-  final String notice;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = ConverPalette.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      width: double.infinity,
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          ConverSpacing.space4,
-          ConverSpacing.space1,
-          ConverSpacing.space1,
-          ConverSpacing.space1,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                notice,
-                style: textTheme.bodyMedium?.copyWith(color: palette.ink2),
-              ),
-            ),
-            IconButton(
-              tooltip: '关闭提示',
-              icon: Icon(Icons.close, size: 18, color: palette.ink4),
-              onPressed: onDismiss,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
