@@ -294,8 +294,11 @@ void main() {
       await tester.pump();
       expect(find.byTooltip('发送'), findsOneWidget, reason: '非阻塞：后续操作可用');
 
-      // dismiss 后提示消失，可继续发送（非阻塞语义）。
+      // dismiss 后提示消失，可继续发送（非阻塞语义）。W5 B1：关闭先经
+      // 140ms 出口淡出，过渡完成后再卸载。
       await tester.tap(find.byTooltip('关闭提示'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 140));
       await tester.pump();
       expect(find.text('回复已中断'), findsNothing);
 
@@ -331,7 +334,7 @@ void main() {
     testWidgets('dismiss → 出口过渡中旧提示仍在树中（Fade 渐隐）→ 过渡完成后卸载',
         (tester) async {
       final env = await ChatTestEnv.create();
-      final c = await openConversation(
+      await openConversation(
         tester,
         env,
         TickingFakeLLMProvider(

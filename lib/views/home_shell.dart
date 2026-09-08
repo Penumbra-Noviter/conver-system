@@ -57,21 +57,27 @@ class HomeShell extends StatelessWidget {
           secretStore: context.read<SecretStore>(),
         ),
     };
+    final bodyView = KeyedSubtree(
+      key: ValueKey(navigation.current),
+      child: body,
+    );
     return Scaffold(
-      body: AnimatedSwitcher(
-        // M6-07 克制动效 ①：tab 切换正文区 Fade 160ms（消费 ConverDurations
-        // token）。子 child 以目的地为 ValueKey——切换即替换重建视图，
-        // 「切回 tab 重新 initState」既有契约不被保活破坏（无 IndexedStack）。
-        duration: ConverDurations.tabFade,
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: child,
-        ),
-        child: KeyedSubtree(
-          key: ValueKey(navigation.current),
-          child: body,
-        ),
-      ),
+      // W5 审核 N1（F-2 修复）：系统「减弱动效」（MediaQuery.disableAnimations）
+      // 下直接切换、无 160ms 淡入——与 05 光标停闪的降级面一致（tabFade=160ms
+      // 是全库唯一 >140ms 动效，共识 4.5「无需降级」说理不再覆盖它）。
+      body: MediaQuery.disableAnimationsOf(context)
+          ? bodyView
+          : AnimatedSwitcher(
+              // M6-07 克制动效 ①：tab 切换正文区 Fade 160ms（消费 ConverDurations
+              // token）。子 child 以目的地为 ValueKey——切换即替换重建视图，
+              // 「切回 tab 重新 initState」既有契约不被保活破坏（无 IndexedStack）。
+              duration: ConverDurations.tabFade,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+              child: bodyView,
+            ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigation.index,
         onDestinationSelected: (index) {

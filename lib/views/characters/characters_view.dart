@@ -30,7 +30,6 @@ import '../../services/document_parse_service.dart';
 import '../../services/llm/llm_provider.dart' show LLMProviderFactory;
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
-import '../../theme/motion.dart' show ConverDurations;
 import '../../widgets/empty_state.dart';
 import '../../widgets/notice_banner.dart';
 import 'character_edit_view.dart';
@@ -123,7 +122,8 @@ class _CharactersViewState extends State<CharactersView> {
               onImport: () => unawaited(controller.importCharacter()),
             ),
           // W5 B1：NoticeBanner 始终渲染（notice 可空），进出过渡 140ms 由
-          // 组件自身 AnimatedSwitcher 管理——dismiss 后播放出口 Fade 再收缩。
+          // 组件自身 AnimatedOpacity 管理——dismiss 后播放出口 Fade，过渡
+          // 完成才回调 dismissNotice（提示条不硬切卸载）。
           NoticeBanner(
             notice: controller.notice,
             onDismiss: controller.dismissNotice,

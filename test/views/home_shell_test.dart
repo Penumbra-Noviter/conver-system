@@ -285,5 +285,36 @@ void main() {
       expect(find.byType(CharactersView), findsOneWidget,
           reason: '切回 tab 视图重建（自动刷新依赖重新 initState）');
     });
+
+    // W5 审核 N1（F-2 修复）：reduce-motion（disableAnimations=true）下 tab
+    // 切换直接替换、无 160ms 淡入——与 05 光标停闪的降级面一致。F-2 书 tabFade
+    // = 160ms 是全库唯一 >140ms 动效，「无需降级」说理不再覆盖它。
+    testWidgets('reduce-motion：无 AnimatedSwitcher 淡入，直接切换重建视图', (tester) async {
+      // 经测试平台调度器注入系统减弱动效（MediaQuery.disableAnimations 的
+      // 来源：MediaQueryData.fromView 读 platformDispatcher.accessibilityFeatures）。
+      tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+          tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue);
+
+      await pumpApp(tester);
+
+      // 降级面：无 AnimatedSwitcher 淡入壳（直接切换，无 Fade 过渡）。
+      expect(find.byType(AnimatedSwitcher), findsNothing,
+          reason: 'reduce-motion 下无 AnimatedSwitcher 淡入（直接切换）');
+
+      // 切 tab → 单帧即达目标视图（无 160ms 过渡窗口）。
+      await tester.tap(_navLabel('角色'));
+      await tester.pump();
+      expect(_navigationOf(tester).current, ShellTab.characters,
+          reason: 'reduce-motion 下切 tab 状态即时生效');
+      expect(find.byType(CharactersView), findsOneWidget,
+          reason: 'reduce-motion 下直接切换：目标视图立即挂载');
+      expect(find.byType(ChatView), findsNothing,
+          reason: 'reduce-motion 下旧视图立即卸载（无淡出并存窗口）');
+
+      // drain：清掉切 tab 触发的异步刷新计时（与「切 tab 不保活」测试一致）。
+      await tester.pumpAndSettle();
+    });
   });
 }
