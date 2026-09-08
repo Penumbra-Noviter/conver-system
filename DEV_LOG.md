@@ -6,6 +6,18 @@
 
 ---
 
+## 技术债消费批次 TD-1~TD-4（2026-09-07 — 用户「消费 F-25~F-51」显式立项，27 条候选全处置）
+
+- **交付**：候选区 27 条（M5 波末增量审核 + 期末四轴非阻断落债）全部处置——**19 待修拆 4 工单 2 波**（波1 398d610：TD-1 异常链 9e8f696〔F-25 种子单游戏缺失降级 / F-31 refresh in-flight 守卫 / F-32 种子错误路径文案 / F-33 timeout 取消底层〕+ TD-2 契约层 1f64ef4〔F-27 导入整包拒对齐 / F-29 manifest 深度兜底 / F-34 import 超时取消令牌补偿 / F-38 枚举分片 / F-39 BOM 容错〕；波2 027bcd3：TD-3 hooks/注入 4677597〔F-35 合成器 doc 对齐 / F-36 占位符碰撞熔断 / F-43 run view 委托先挂对齐 save_sheet / F-44 死合成器清面〕+ TD-4 生成链路 ed8dfbd〔F-40 校验大小写统一 / F-45 409 已存在终止重试 / F-46 取消拦在途 / F-47 空描述兜底 / F-48 标题净化 / F-49 死分支清理〕）；**8 复核关闭**（F-26/42 M5 内已修、F-28/30/37 桌面同构或契约边界、F-41/50/51 设计意图）。候选区清零。
+- **门禁链**：全量 **1360 测**全绿（M5 终 1315 + 新增 45）/ analyze 0 / MUTATION 残留零命中；4 工单均 TDD 红→绿 + 覆盖率 ≥90%（96.1% / 99.5% / 100% / 98.25%）+ 突变抽查 ≥2 处灵敏度实证。
+- **波内复核修正 3 条**（审计快照过期须复核惯例）：F-27 核对桌面 save-manager.js——JS 对象键恒字符串、桌面无「非字符串键拒绝」路径，移动端行为即桌面等价，不改行为只补 docstring 结论 + 3 锚测试；F-29 实证 Dart 3.13 jsonDecode 为迭代解析器（400 万层不溢出），StackOverflowError 当前 VM 不可复现——改确定性深度预扫（maxManifestDepth=4096）+ on StackOverflowError 二道降级；F-39 实证当前 SDK utf8.decode 已剥离 BOM——改显式 `_stripBom` 防御 + 可观察契约锚测试。
+- **过程遥测**：票 4、波 2、merge 3；子智能体 4（Implement×4）；空返回 0；回退/冲突 0；审核 findings 0（消费批次按 TDD 自审 + 全量门禁，未派 code-review——19 条均为审核已定位的单点修复，复核由波内 Implement 自审 + 主会话全量复验承担）；技术债净增 0（候选区 27 → 0）。
+- **避坑（勿重蹈）**：
+  1. **「消费」≠「全修」**：27 条按强度与现状分类——8 条复核关闭（已修 2 + 桌面同构 3 + 设计意图 3）不硬修，Speculative 级「git grep 复核现状仍成立后处置」路径（F-27/29/39 三条复核出审计前提变化，按实证修正处置而非盲修）
+  2. **F-43 与 W5 B1 同构缺陷跨票蔓延**：同一「先 loadRequest 后挂委托」模式出现在两个 seam（save_sheet 已修、run_view 未修）——同构缺陷要在**首次发现时 grep 全仓同类模式**一并处置，不留给期末
+  3. **波末声称的「结构状态」会随后续波失效**：W6 B1 改 wireViewDefaults 后，W5/W6 波末声称「四合成器共存」的 append* 合成器全部失去调用方（F-44）——结构重构后必须重 grep 消费方，不沿用旧波结论
+- **知识库蒸馏**：候选教训（WebView runJavaScriptReturningResult 跨平台 JSON 编码契约 + fake 契约 / onPageFinished 事件委托时序 / tab 往返死 context / 同文件并行追加合并）——完成段经 distill-lesson 处理（3 新笔记 + 1 更新）。
+
 ## M5 kickoff 批次（2026-09-07 — project-kickoff 全自动档交付：模拟器里程碑）
 
 - **交付**：Grilling 共识 16 增量决策 + 5 真拍点按推荐 A 定案（⚑1「我」页=设置页内三占位 / ⚑2 AI 生成入 M5 / ⚑3 冒烟五游戏集+量化口径 / ⚑4 固定端口 8642 / ⚑5 手册 13 节全改写）。11 票 7 波次 DAG（W1 01‖05 / W2 02‖10 / W3 03 / W4 04‖07 / W5 06‖08a / W6 08b / W7 09）。**模拟器全量**：22 款游戏随包种子（manifest 后落盘幂等）+ dart:io 本地 HTTP 托管（固定 8642，路径穿越守卫，Android network_security_config + iOS ATS LocalNetworking）/ 列表页四态 + 懒启动编排 + AppBar 三入口 / Key 注入桥（runJavaScript 自包含脚本，桌面 key-injector 契约逐字：三元组白名单/endpointMode/受管 option/幂等/双事件 + 就绪轮询 ≤5s；claude key 恒不进）+ 官方端点提示条 / 存档桥（契约层纯 Dart 对拍桌面 save-manager 边界矩阵 + 底部半屏 sheet 一次管全部 + 导出分享复用 M4 seam）/ 导入链（净化/SHA-256 去重/cfg 三层探测/恶意粗筛 + 拒绝清单二次确认 + manifest 原子写）/ AI 生成（种子模板 + 六项校验 + 重试 ≤3 + 对话框）/ 「我」页（手册 13 节移动端改写 + 关于 + 桌面版说明）。基线 dfafeb7 → merge 链 90064ca→ebdea6d→843de68→ed5d738→b7e61a2→7f4a4bf→41db74a→87e83c7→6ecf19e→9237bbf。证据 `.scratch/m5-kickoff/evidence/`。
