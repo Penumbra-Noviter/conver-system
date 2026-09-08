@@ -3,6 +3,7 @@
 /// 收敛自 claude / openai 两 provider 的 `_streamRequest` 骨架（原 ~50 行
 /// ×2 逐行同构）；本文件单测骨架统一兜底：逐 token 产出 / 终态帧判定 /
 /// 非 200 → HttpStatusError / EOF 未终态 → LLMConnectionInterruptedError /
+/// connect 段传输失败（拒连 / 连接超时 / 响应头前断）→ LLMConnectionInterruptedError /
 /// 流内错误帧工厂（claude 语义）与缺省忽略（openai 语义）。双 provider
 /// 端到端（FakeLlmServer 播放 canned SSE）仍各自覆盖差异面。
 library;
@@ -131,11 +132,11 @@ void main() {
       );
     });
 
-    test('postUrl 连接拒绝 → SocketException 原样上抛（映射归 provider 层）',
+    test('connect 段：postUrl 连接拒绝 → LLMConnectionInterruptedError（收敛判型）',
         () async {
-      // 分层契约：骨架只折叠**消费阶段**断连（内层 catch）；postUrl 阶段的
-      // 连接拒绝原样上抛，由 provider 外层 translateError 映射进 LLM 族
-      // （openai_provider_test「连接拒绝 → LLM 族兜底」端到端钉住）。
+      // M6-06 契约：connect 段传输失败（DNS / 拒连 / 连接超时 / 响应头前断）
+      // 确定未产生服务端生成，统一收敛为 LLMConnectionInterruptedError（与流
+      // 中途断连判型同构），供服务层「首 token 前」重试编排承接。
       final probe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       final leakedPort = probe.port;
       await probe.close();
@@ -148,7 +149,57 @@ void main() {
           isTerminated: isAnthropicMessageStop,
           extractToken: extractAnthropicText,
         ).toList(),
-        throwsA(isA<SocketException>()),
+        throwsA(isA<LLMConnectionInterruptedError>()),
+      );
+    });
+
+    test('connect 段：connectTimeout 到期（握手黑洞）→ LLMConnectionInterruptedError',
+        () async {
+      // https 黑洞 TCP：TLS 握手挂起 → connectionTimeout 到期抛 SocketException，
+      // connect 段收敛判型（连接超时属「确定未产生服务端生成」的重试面）。
+      final sink = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sub = sink.listen((_) {}, onError: (_) {});
+      addTearDown(() async {
+        await sub.cancel();
+        await sink.close();
+      });
+
+      await expectLater(
+        streamSse(
+          uri: Uri.parse('https://127.0.0.1:${sink.port}/v1/stream'),
+          body: '{}',
+          headers: {},
+          isTerminated: isAnthropicMessageStop,
+          extractToken: extractAnthropicText,
+          connectTimeout: const Duration(milliseconds: 300),
+        ).toList(),
+        throwsA(isA<LLMConnectionInterruptedError>()),
+      );
+    });
+
+    test('connect 段：响应头前断（部分头后关连接）→ LLMConnectionInterruptedError',
+        () async {
+      // 服务端只发部分响应头后关连接：HttpException（未收完整响应头），connect
+      // 段收敛判型——未收到状态码、无生成副作用 → 服务层重试面。
+      final sink = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final sub = sink.listen((socket) {
+        socket.write('HTTP/1.1 200 OK\r\nX-Partial:');
+        socket.flush().then((_) => socket.destroy());
+      }, onError: (_) {});
+      addTearDown(() async {
+        await sub.cancel();
+        await sink.close();
+      });
+
+      await expectLater(
+        streamSse(
+          uri: Uri.parse('http://127.0.0.1:${sink.port}/v1/stream'),
+          body: '{}',
+          headers: {},
+          isTerminated: isAnthropicMessageStop,
+          extractToken: extractAnthropicText,
+        ).toList(),
+        throwsA(isA<LLMConnectionInterruptedError>()),
       );
     });
   });

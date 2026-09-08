@@ -23,9 +23,13 @@ import 'translate_helpers.dart' show HttpStatusError;
 ///   → 抛 provider 私有异常；openai 无此语义传 `null`）；
 /// - [connectTimeout]：连接超时（缺省 10s）。
 ///
-/// 骨架统一兜底：非 200 → [HttpStatusError]（携原文交状态码翻译）；
-/// `SocketException` / `HttpException` → [LLMConnectionInterruptedError]；
-/// 无论正常 / 异常 / 消费方取消，`finally` 强制关闭连接避免泄漏。
+/// 骨架统一兜底：连接建立段（connect 相位）的传输失败（DNS / 拒连 / 连接
+/// 超时 / 响应头前断）确定未产生服务端生成，统一收敛为
+/// [LLMConnectionInterruptedError]（与流中途断连判型同构，服务层据此对
+/// 「首 token 前」失败编排连接阶段自动重试）；已收到状态码非 200 →
+/// [HttpStatusError]（携原文交状态码翻译）；流中段 `SocketException` /
+/// `HttpException` → [LLMConnectionInterruptedError]；无论正常 / 异常 /
+/// 消费方取消，`finally` 强制关闭连接避免泄漏。
 Stream<String> streamSse({
   required Uri uri,
   required String body,
@@ -37,12 +41,23 @@ Stream<String> streamSse({
 }) async* {
   final client = HttpClient()..connectionTimeout = connectTimeout;
   try {
-    final request = await client.postUrl(uri);
-    request.headers.contentType = ContentType.json;
-    headers.forEach(request.headers.set);
-    request.write(body);
+    // 连接建立段（connect 相位）：postUrl → 写请求体 → close 等到响应头。
+    // 本段任一传输失败均为连接建立阶段失败（未收到状态码、无生成副作用），
+    // 统一收敛为 LLMConnectionInterruptedError。已收到状态码则走下方
+    // HttpStatusError 分支（服务端已处理请求 → 不重试）。
+    final HttpClientResponse response;
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      headers.forEach(request.headers.set);
+      request.write(body);
+      response = await request.close();
+    } on SocketException catch (e) {
+      throw LLMConnectionInterruptedError(originalError: e);
+    } on HttpException catch (e) {
+      throw LLMConnectionInterruptedError(originalError: e);
+    }
 
-    final response = await request.close();
     if (response.statusCode != HttpStatus.ok) {
       // 非 SSE 错误体（HTTP 状态码 + 原文），交状态码翻译。
       final errorBody = await utf8.decoder.bind(response).join();

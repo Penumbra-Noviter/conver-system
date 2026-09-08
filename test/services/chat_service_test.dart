@@ -210,6 +210,78 @@ class _StalledProvider extends LLMProvider {
   Future<void> testConnection({String? model}) async {}
 }
 
+/// 依序播放故障序列的流式 provider（M6-06 连接阶段自动重试测试用）。
+///
+/// [sequence] 的第 i 个元素对应第 i+1 次 [streamGenerate] 调用的行为：
+/// 非 null = 该次调用立即抛出该异常（原样，不翻译）；null = 正常产出
+/// [tokens]；序列耗尽后一律正常产出。记录相邻调用间隔（[callGaps]，
+/// 退避时序断言用）与调用计数。
+class _FaultSequenceProvider extends LLMProvider {
+  _FaultSequenceProvider({
+    super.apiKey = 'test-key',
+    List<String> tokens = const [],
+    List<Object?> sequence = const [],
+    this.onFirstFailure,
+  })  : _tokens = List<String>.unmodifiable(tokens),
+        _sequence = List<Object?>.unmodifiable(sequence);
+
+  final List<String> _tokens;
+  final List<Object?> _sequence;
+
+  /// 首次抛错前完成的信号（重试窗口竞态测试用：确定性等首败已发生）。
+  final Completer<void>? onFirstFailure;
+
+  int streamGenerateCallCount = 0;
+
+  /// 相邻两次 streamGenerate 调用的时间间隔（首次调用无前驱不记录）。
+  final List<Duration> callGaps = [];
+
+  final Stopwatch _clock = Stopwatch()..start();
+  Duration _lastCallAt = Duration.zero;
+
+  @override
+  LLMError translateError(Object error) =>
+      error is LLMError ? error : LLMError('fake API 调用失败: $error');
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async =>
+      _tokens.join();
+
+  @override
+  Stream<String> streamGenerate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async* {
+    final now = _clock.elapsed;
+    if (_lastCallAt != Duration.zero) {
+      callGaps.add(now - _lastCallAt);
+    }
+    _lastCallAt = now;
+    final attempt = streamGenerateCallCount++;
+    if (attempt < _sequence.length) {
+      final e = _sequence[attempt];
+      if (e != null) {
+        final signal = onFirstFailure;
+        if (signal != null && !signal.isCompleted) {
+          signal.complete();
+        }
+        throw e;
+      }
+    }
+    for (final token in _tokens) {
+      yield token;
+    }
+  }
+
+  @override
+  Future<void> testConnection({String? model}) async {}
+}
+
 /// [MessageRepository] 的挂起替身：createMessage 可在进入时挂起于 [gate]
 /// （放行后走真实落库）——确定性复现「部分落库挂起期间用户停止 → controller
 /// 关闭 → 落库失败收口时 add-after-close」竞态（T06 内层 catch 守卫回归）。
@@ -337,6 +409,25 @@ void main() {
       messageRepository: messageRepo,
       settingsRepository: settingsRepo,
       providerFactory: _FakeFactory(provider),
+    );
+  }
+
+  /// 以可注入的连接重试退避序列装配服务（M6-06：测试注入短值获得确定性时序）。
+  void wireServiceWithRetry(
+    LLMProvider provider, {
+    List<Duration> retryDelays = const [
+      Duration(milliseconds: 20),
+      Duration(milliseconds: 20),
+    ],
+  }) {
+    service = ChatService(
+      database: db,
+      conversationRepository: convRepo,
+      characterRepository: charRepo,
+      messageRepository: messageRepo,
+      settingsRepository: settingsRepo,
+      providerFactory: _FakeFactory(provider),
+      connectRetryDelays: retryDelays,
     );
   }
 
@@ -1167,7 +1258,9 @@ void main() {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
 
-      wireService(_TickingProvider(
+      // 零 token 的连接中断信号在 M6-06 属「首 token 前」重试窗口：注入短退避
+      // 使重试耗尽（2 次）快速走完，终态语义不变——ChatInterrupted(null)。
+      wireServiceWithRetry(_TickingProvider(
         tokens: const [],
         errorAfter: LLMConnectionInterruptedError(),
       ));
@@ -1254,6 +1347,189 @@ void main() {
       // 到已关闭 controller → 未处理异步异常（flutter_test zone 判失败）。
       release.complete();
       await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+  });
+
+  // ── M6-06 连接阶段自动重试 ──
+
+  group('streamReply · 连接阶段自动重试（M6-06）', () {
+    test('首次连接失败（connect drop，无 token）→ 重试成功：总调用 2 次、'
+        'ChatDone 收束、user 行仅一条、无重复 token', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final provider = _FaultSequenceProvider(
+        tokens: const ['你', '好'],
+        sequence: [LLMConnectionInterruptedError(), null],
+      );
+      wireServiceWithRetry(provider,
+          retryDelays: const [Duration(milliseconds: 50)]);
+
+      final events = await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(
+        [for (final e in events) if (e is ChatToken) e.token],
+        ['你', '好'],
+      );
+      expect(events.last, isA<ChatDone>());
+      expect((events.last as ChatDone).messageId, isNotNull);
+      expect(provider.streamGenerateCallCount, 2);
+      // 重试安全：user 行仅落库一次（unawaited 重放 provider 段，user 落库早于
+      // provider 调用），完整回复落库；token 无重复。
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+        (Role.assistant, '你好'),
+      ]);
+    });
+
+    test('连接失败耗尽（三次均 connect drop，无 token）→ 总调用 3 次，'
+        '既有断流语义 ChatInterrupted(null) 收束', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final provider = _FaultSequenceProvider(
+        tokens: const [],
+        sequence: [
+          LLMConnectionInterruptedError(),
+          LLMConnectionInterruptedError(),
+          LLMConnectionInterruptedError(),
+        ],
+      );
+      wireServiceWithRetry(provider);
+
+      final events = await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.streamGenerateCallCount, 3,
+          reason: '重试 2 次 + 首次 = 共 3 次调用');
+      expect(events.last, isA<ChatInterrupted>());
+      expect((events.last as ChatInterrupted).messageId, isNull);
+      // 无部分内容 → 不落空 assistant；仅已发 user（重试不重复 user 行）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+      ]);
+    });
+
+    test('退避间隔按注入序列执行（重试发生在首败之后）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final provider = _FaultSequenceProvider(
+        tokens: const ['ok'],
+        sequence: [
+          LLMConnectionInterruptedError(),
+          LLMConnectionInterruptedError(),
+          null,
+        ],
+      );
+      wireServiceWithRetry(provider,
+          retryDelays: const [
+            Duration(milliseconds: 50),
+            Duration(milliseconds: 80),
+          ]);
+
+      final events = await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(events.last, isA<ChatDone>());
+      expect(provider.streamGenerateCallCount, 3);
+      // 退避时序：第 2 次调用（首次重试）须在首败 + 50ms 之后，第 3 次同理 + 80ms。
+      expect(provider.callGaps, hasLength(2));
+      expect(provider.callGaps[0] >= const Duration(milliseconds: 50), isTrue,
+          reason: '首次重试未按退避 50ms 等待: ${provider.callGaps[0]}');
+      expect(provider.callGaps[1] >= const Duration(milliseconds: 80), isTrue,
+          reason: '第二次重试未按退避 80ms 等待: ${provider.callGaps[1]}');
+    });
+
+    test('流中已产出至少一个 token 后失败 → 不重试（断流路径，调用 1 次）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final provider = _TickingProvider(
+        tokens: const ['a', 'b'],
+        errorAfter: LLMConnectionInterruptedError(),
+        delay: const Duration(milliseconds: 5),
+      );
+      wireServiceWithRetry(provider);
+
+      final events = await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.streamGenerateCallCount, 1, reason: '已产出 token 不得重试');
+      expect(events.last, isA<ChatInterrupted>());
+      // 断流既有语义：已累积部分落库 + ChatInterrupted（非 F-45 业务错误分支）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+        (Role.assistant, 'ab'),
+      ]);
+    });
+
+    test('状态码/业务错误映射（Auth/RateLimit/Timeout/BadRequest/ContentFilter）'
+        '→ 不重试，走 ChatError', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final businessErrors = <LLMError>[
+        LLMAuthError('claude'),
+        LLMRateLimitError('claude'),
+        LLMTimeoutError('claude'),
+        LLMBadRequestError('claude', '参数非法'),
+        LLMContentFilterError('claude'),
+      ];
+      for (final llmError in businessErrors) {
+        final provider = _FaultSequenceProvider(
+          tokens: const [],
+          sequence: [llmError],
+        );
+        wireServiceWithRetry(provider);
+        final events = await service
+            .streamReply(conversationId: conv.id, content: 'hi')
+            .toList();
+
+        expect(provider.streamGenerateCallCount, 1,
+            reason: '业务错误 ${llmError.runtimeType} 不得重试');
+        expect(events.last, isA<ChatError>(),
+            reason: '业务错误 ${llmError.runtimeType} → ChatError（F-45 不落部分）');
+      }
+    });
+
+    test('Falsify: 重试退避窗口内停止 → 不再订阅，无 Timer 泄漏、无未处理异常',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final firstFailure = Completer<void>();
+      final provider = _FaultSequenceProvider(
+        tokens: const [],
+        sequence: [
+          LLMConnectionInterruptedError(),
+          LLMConnectionInterruptedError(),
+        ],
+        onFirstFailure: firstFailure,
+      );
+      wireServiceWithRetry(provider,
+          retryDelays: const [Duration(milliseconds: 100)]);
+
+      final events = <ChatEvent>[];
+      final sub = service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .listen(events.add);
+      await firstFailure.future; // 首败已发生（重试 handler 即将进入退避窗口）。
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await sub.cancel(); // 停止：取消挂起的重试窗口。
+
+      // 越过注入退避周期（100ms）后：重试不得再订阅（callCount 保持 1），
+      // 无事件产出 + flutter_test zone 捕获未处理异步异常即判失败。
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(provider.streamGenerateCallCount, 1,
+          reason: '停止后不得继续重试订阅');
+      expect(events, isEmpty, reason: '重试窗口内停止不得产出任何事件');
     });
   });
 
