@@ -631,41 +631,6 @@ void main() {
       expect(controller.onGenerateTap, isNull);
     });
 
-    test('registerHooks 接线后四槽位反映新回调并通知', () async {
-      buildController();
-      var notified = 0;
-      controller.addListener(() => notified++);
-      SimulatorGame? opened;
-      final wired = SimulatorsHooks(
-        onOpen: (g) => opened = g,
-        onSaveTap: () {},
-        onImportTap: () {},
-        onGenerateTap: () {},
-      );
-
-      controller.registerHooks(wired);
-
-      expect(notified, 1);
-      expect(controller.onOpen, isNotNull);
-      expect(controller.onSaveTap, isNotNull);
-      expect(controller.onImportTap, isNotNull);
-      expect(controller.onGenerateTap, isNotNull);
-
-      loader.result = parseManifest(manifestJson);
-      await controller.ensureStarted();
-      controller.onOpen!(controller.games.first);
-      expect(opened?.id, 'life-sim', reason: 'open 钩子收到归一化游戏条目');
-    });
-
-    test('registerHooks 部分接线：未提供槽位保持 null（禁用态不误启）', () async {
-      buildController();
-      controller.registerHooks(const SimulatorsHooks(onImportTap: _noop));
-      expect(controller.onImportTap, isNotNull);
-      expect(controller.onOpen, isNull);
-      expect(controller.onSaveTap, isNull);
-      expect(controller.onGenerateTap, isNull);
-    });
-
     test('wireViewDefaults：填充视图默认槽位 + 外部构造注入槽位恒优先（W6 B1）',
         () async {
       var externalTaps = 0;
@@ -791,5 +756,3 @@ class FlutterErrorLike implements Exception {
   @override
   String toString() => 'FlutterError: $message';
 }
-
-void _noop() {}

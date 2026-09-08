@@ -130,11 +130,24 @@ class InjectionScript {
   /// [injection.endpointSuffix]，单一来源不复制字面量。
   static const String endpointSuffix = injection.endpointSuffix;
 
+  /// 模板数据占位符白名单（F-36）：单遍匹配替代顺序 replaceAll——payload 内容
+  /// （config / credentials 中合法出现的占位符字面量，如 config id 恰为
+  /// `__CREDENTIALS_JSON__`）不会被后续替换重扫覆写（顺序 replaceAll 会把
+  /// 先嵌入 payload 里的后置占位符字面量再次替换 → config 变对象 → 字段
+  /// 静默跳过，注入面缺失）。
+  static final RegExp _placeholderPattern = RegExp(
+    r'__(CONFIG_JSON|CREDENTIALS_JSON|ENDPOINT_MODE|READY_POLL_MS)__',
+  );
+
   /// 构造最终注入脚本：替换模板数据占位符。
   ///
   /// [config] 须为完整三元组（[hasConfigTriplet]），否则抛 [ArgumentError]
   /// （编程错误守卫——三元组不完整时调用方应跳过注入而非构脚本）。
   /// [endpointMode] 为 manifest 条目值（`base` / `full` / null 不转换）。
+  ///
+  /// 占位符替换为**单遍** `replaceAllMapped`（F-36 碰撞熔断）：regex 只扫描
+  /// 模板原串一次，嵌入的 payload 文本（config / credentials 内容）不参与
+  /// 后续匹配——config id 或凭证值恰含占位符字面量时原样嵌入、不被覆写。
   static String build({
     required Map<String, dynamic> config,
     required injection.InjectedCredentials credentials,
@@ -148,13 +161,22 @@ class InjectionScript {
       'endpoint': credentials.endpoint,
       'model': credentials.model,
     });
-    return injectionScriptTemplate
-        .replaceAll('__CONFIG_JSON__', jsonEncode(config))
-        .replaceAll('__CREDENTIALS_JSON__', credentialsJson)
-        .replaceAll(
-          '__ENDPOINT_MODE__',
-          endpointMode == null ? 'null' : jsonEncode(endpointMode),
-        )
-        .replaceAll('__READY_POLL_MS__', '$scriptReadyPollMs');
+    return injectionScriptTemplate.replaceAllMapped(
+        _placeholderPattern, (match) {
+      switch (match.group(1)) {
+        case 'CONFIG_JSON':
+          return jsonEncode(config);
+        case 'CREDENTIALS_JSON':
+          return credentialsJson;
+        case 'ENDPOINT_MODE':
+          return endpointMode == null ? 'null' : jsonEncode(endpointMode);
+        case 'READY_POLL_MS':
+          return '$scriptReadyPollMs';
+        default:
+          // 白名单外的 token 理论上不可达（模式受限于 alternation）；返回空
+          // 串不会残留字面量。
+          return '';
+      }
+    });
   }
 }
