@@ -107,9 +107,12 @@ abstract final class ConverColors {
 /// （`frontend/css/style.css` `:root[data-theme="light"]`，style.css:121 起）。
 ///
 /// 与深色 [ConverColors] 同构（25 名色值 token，名集相等，G3 契约）：
-/// - success / danger / warning 桌面浅色段未覆盖 → 浅色沿用深色值
-///   （CSS 变量回退语义）；F-73 warning 浅底对比度问题复刻优先，
-///   无障碍修复归 M6（spec Out of Scope）。
+/// - success / danger 桌面浅色段未覆盖 → 浅色沿用深色值（CSS 变量回退语义）。
+/// - warning 桌面浅色段未覆盖，但沿用深色值会使 F-73 对比度违例复现
+///   （浅底琥珀前景 ≈2.7:1 < WCAG AA 4.5:1）→ M6 修复：改用浅色独立的
+///   深琥珀警示值（TP-3b 授权偏离桌面逐字值，仅改值、名集不变）。
+/// - accent 系同理由桌面逐字值 #A96F1D 深化至 #784E14（相对亮度公式验证
+///   全浅表 ≥4.5:1，见 test/theme/contrast_ratio_test.dart）。
 /// - 阴影 token 与色值分离暂缓（M1 无 UI 消费方）。
 abstract final class ConverColorsLight {
   /// Page background — the warm paper canvas (style.css:122).
@@ -135,14 +138,21 @@ abstract final class ConverColorsLight {
   static const Color ink3 = Color(0xFF766A5C);
   static const Color ink4 = Color(0xFF988C7D);
 
-  /// Darker amber accent (kept readable on light surfaces).
-  static const Color accent = Color(0xFFA96F1D);
+  /// Dark-amber accent — F-73 深化档（#784E14，TP-3b 授权偏离桌面逐字值）。
+  ///
+  /// 桌面逐字值 #A96F1D 作前景于浅表（page #F0ECE5）仅 ≈2.7:1 < WCAG AA
+  /// 4.5:1；按共识 4.3 推荐 A 以相对亮度公式深化至 #784E14——accent 于
+  /// page/bg/panel1..4 全表 ≥4.5:1（算术验证见 test/theme/contrast_ratio_test.dart）。
+  /// 深色 accent #D29A47 不受影响。
+  static const Color accent = Color(0xFF784E14);
 
-  /// Hover state of the accent (darkens rather than lightens).
-  static const Color accentHover = Color(0xFF925F17);
+  /// Hover state of the accent — 更深一档（darkens rather than lightens），
+  /// 与 [accent] 保持可区分且同为 ≥4.5:1 前景档。
+  static const Color accentHover = Color(0xFF6B4311);
 
-  /// Translucent amber wash (12%) for soft selected backgrounds.
-  static const Color accentSoft = Color.fromRGBO(169, 111, 29, 0.12);
+  /// Translucent amber wash (12%) for soft selected backgrounds — RGB 分量
+  /// 与新 accent 一致（alpha 0.12 保留）。
+  static const Color accentSoft = Color.fromRGBO(120, 78, 20, 0.12);
 
   /// Warm-white foreground drawn on top of the accent
   /// (desktop `--accent-contrast`).
@@ -167,11 +177,12 @@ abstract final class ConverColorsLight {
   /// (desktop `--overlay`, style.css:143).
   static const Color overlay = Color.fromRGBO(42, 33, 23, 0.42);
 
-  /// Semantic status colors — 桌面浅色段未覆盖，沿用深色值（CSS 回退语义；
-  /// F-73：warning 即琥珀 accent，浅底对比度问题复刻优先，修复归 M6）。
+  /// Semantic status colors — success / danger 桌面浅色段未覆盖，沿用深色值
+  /// （CSS 回退语义）；warning 为 M6 修复的浅色独立深琥珀警示值（F-73：
+  /// 沿用深色琥珀 #D29A47 作浅底前景对比度不足，名集不变仅值变）。
   static const Color success = ConverColors.success;
   static const Color danger = ConverColors.danger;
-  static const Color warning = ConverColors.warning;
+  static const Color warning = Color(0xFF854906);
 
   /// 全量色值 token 名→值映射 — G3 同构契约的运行时枚举面（共 25 名，
   /// 与 [ConverColors.tokens] 名集相等；维护说明见彼处）。

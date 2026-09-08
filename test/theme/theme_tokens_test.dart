@@ -89,7 +89,9 @@ void main() {
   group('G3 light tokens (M1-T07, desktop :root[data-theme="light"] style.css:121)', () {
     test('A1 抽样锚点：page / accent / ink1 / overlay / accentGen 逐点对源', () {
       expect(ConverColorsLight.page, const Color(0xFFF0ECE5)); // #f0ece5
-      expect(ConverColorsLight.accent, const Color(0xFFA96F1D)); // #a96f1d
+      // F-73：accent 经 TP-3b 授权偏离桌面逐字值 #a96f1d，深化为 #784e14
+      // （浅底前景 ≥4.5:1，对比度算术见 contrast_ratio_test.dart）。
+      expect(ConverColorsLight.accent, const Color(0xFF784E14)); // F-73 深化档
       expect(ConverColorsLight.ink1, const Color(0xFF28211A)); // #28211a
       expect(
         ConverColorsLight.overlay,
@@ -119,11 +121,14 @@ void main() {
       expect(ConverColorsLight.ink2, const Color(0xFF51463A));
       expect(ConverColorsLight.ink3, const Color(0xFF766A5C));
       expect(ConverColorsLight.ink4, const Color(0xFF988C7D));
-      expect(ConverColorsLight.accent, const Color(0xFFA96F1D));
-      expect(ConverColorsLight.accentHover, const Color(0xFF925F17));
+      // F-73：accent / accentHover / accentSoft 经 TP-3b 授权偏离桌面逐字值
+      // （#a96f1d / #925f17 / rgba(169,111,29,0.12)）深化至浅底前景 ≥4.5:1 档，
+      // 名集不变仅值变；accentSoft RGB 分量与新 accent 一致、alpha 0.12 保留。
+      expect(ConverColorsLight.accent, const Color(0xFF784E14));
+      expect(ConverColorsLight.accentHover, const Color(0xFF6B4311));
       expect(
         ConverColorsLight.accentSoft,
-        const Color.fromRGBO(169, 111, 29, 0.12),
+        const Color.fromRGBO(120, 78, 20, 0.12),
       );
       expect(ConverColorsLight.accentContrast, const Color(0xFFFFFBF4));
       expect(ConverColorsLight.onAccent, ConverColorsLight.accentContrast);
@@ -159,10 +164,14 @@ void main() {
       expect(ConverColors.tokens['accentGen'], ConverColors.accentGen);
     });
 
-    test('success / danger / warning 浅色沿用深色值（CSS 回退语义，F-73 注记）', () {
+    test('success / danger 浅色沿用深色值；warning 为浅色独立深琥珀警示值（F-73）', () {
+      // success / danger 桌面浅色段未覆盖 → 沿用深色值（CSS 变量回退语义）。
       expect(ConverColorsLight.success, ConverColors.success);
       expect(ConverColorsLight.danger, ConverColors.danger);
-      expect(ConverColorsLight.warning, ConverColors.warning);
+      // F-73：warning 沿用深色琥珀 #D29A47 作浅底前景对比度不足 → 经 TP-3b
+      // 授权改用浅色独立深琥珀警示值 #854906（浅表 ≥4.5:1，见 contrast_ratio_test）。
+      expect(ConverColorsLight.warning, const Color(0xFF854906));
+      expect(ConverColorsLight.warning, isNot(equals(ConverColors.warning)));
     });
   });
 
