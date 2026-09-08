@@ -20,7 +20,7 @@ import 'package:conver_system_mobile/services/llm/llm_provider.dart'
 import 'package:conver_system_mobile/services/simulator/game_generator.dart'
     show GameGenerator, GenerationCredentials;
 import 'package:conver_system_mobile/services/simulator/import_service.dart'
-    show ImportResult;
+    show ImportResult, SimulatorDuplicateError;
 import 'package:conver_system_mobile/services/simulator/manifest_parser.dart'
     show ManifestParseResult;
 import 'package:conver_system_mobile/services/simulator/simulator_data_dir.dart'
@@ -79,10 +79,7 @@ Future<void> _pumpDialog(
     MaterialApp(
       theme: ConverTheme.dark(),
       home: _DialogHarness(
-        dialog: GenerateDialog(
-          generator: generator,
-          onGenerated: onGenerated,
-        ),
+        dialog: GenerateDialog(generator: generator, onGenerated: onGenerated),
       ),
     ),
   );
@@ -100,7 +97,7 @@ GameGenerator dialogGenerator({
     required int maxTokens,
     required String model,
   })?
-      callGenerate,
+  callGenerate,
 }) {
   final fake = ScriptedFakeLLMProvider(scripts: scripts);
   fake.error = providerError;
@@ -136,7 +133,10 @@ Future<void> _enterDescription(
   String? title,
 }) async {
   if (title != null) {
-    await tester.enterText(find.byKey(const Key('generate-title-field')), title);
+    await tester.enterText(
+      find.byKey(const Key('generate-title-field')),
+      title,
+    );
   }
   await tester.enterText(
     find.byKey(const Key('generate-description-field')),
@@ -148,15 +148,12 @@ Future<void> _enterDescription(
 }
 
 void main() {
-  testWidgets('描述为空 → 生成按钮禁用（空拦截）；标题为可选项不阻塞',
-      (tester) async {
+  testWidgets('描述为空 → 生成按钮禁用（空拦截）；标题为可选项不阻塞', (tester) async {
     await _pumpDialog(tester, dialogGenerator());
 
-    FilledButton generateButton() => tester.widget<FilledButton>(
-          find.widgetWithText(FilledButton, '生成'),
-        );
-    expect(generateButton().onPressed, isNull,
-        reason: '描述必填：空描述时提交禁用');
+    FilledButton generateButton() =>
+        tester.widget<FilledButton>(find.widgetWithText(FilledButton, '生成'));
+    expect(generateButton().onPressed, isNull, reason: '描述必填：空描述时提交禁用');
 
     // 标题可选：仅填标题仍禁用；填入描述后启用。
     await tester.enterText(
@@ -178,28 +175,32 @@ void main() {
     // callGenerate 挂起（永不完结）以稳定断言进度态。
     final generator = dialogGenerator(
       callGenerate:
-          ({required provider, required messages, required maxTokens, required model}) {
-        return Completer<Object?>().future;
-      },
+          ({
+            required provider,
+            required messages,
+            required maxTokens,
+            required model,
+          }) {
+            return Completer<Object?>().future;
+          },
     );
     await _pumpDialog(tester, generator);
     await _enterDescription(tester, '海底世界');
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     expect(find.textContaining('正在生成'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '生成'), findsNothing,
-        reason: '生成中提交不可重复触发');
-    expect(find.text('取消'), findsOneWidget,
-        reason: '生成中取消可用（中止在途重试）');
+    expect(
+      find.widgetWithText(FilledButton, '生成'),
+      findsNothing,
+      reason: '生成中提交不可重复触发',
+    );
+    expect(find.text('取消'), findsOneWidget, reason: '生成中取消可用（中止在途重试）');
     // fake 未被真正调用（callGenerate 注入接管）；此处仅验证 UI 状态。
   });
 
-  testWidgets('成功：对话框关闭 + toast「生成成功」+ onGenerated 刷新回调被调用',
-      (tester) async {
+  testWidgets('成功：对话框关闭 + toast「生成成功」+ onGenerated 刷新回调被调用', (tester) async {
     var refreshCalls = 0;
-    final generator = dialogGenerator(
-      scripts: [buildValidGeneratedHtml()],
-    );
+    final generator = dialogGenerator(scripts: [buildValidGeneratedHtml()]);
     await _pumpDialog(
       tester,
       generator,
@@ -208,32 +209,36 @@ void main() {
     await _enterDescription(tester, '雾中镇', title: '雾中镇');
 
     await tester.pumpAndSettle();
-    expect(find.text('AI 生成游戏'), findsNothing,
-        reason: '成功 → 对话框关闭');
+    expect(find.text('AI 生成游戏'), findsNothing, reason: '成功 → 对话框关闭');
     expect(find.text('生成成功'), findsOneWidget, reason: '成功 toast');
     expect(refreshCalls, 1, reason: '落盘后列表刷新回调');
   });
 
   testWidgets('校验失败耗尽：错误列表 [{field}] {message} + 建议 + 耗尽文案 + '
       '「关闭」（无重试）', (tester) async {
-    final generator = dialogGenerator(
-      scripts: [buildInvalidGeneratedHtml()],
-    );
+    final generator = dialogGenerator(scripts: [buildInvalidGeneratedHtml()]);
     await _pumpDialog(tester, generator);
     await _enterDescription(tester, '注定失败');
 
     await tester.pumpAndSettle();
-    expect(find.text('AI 生成游戏'), findsOneWidget,
-        reason: '失败 → 对话框保留');
+    expect(find.text('AI 生成游戏'), findsOneWidget, reason: '失败 → 对话框保留');
     expect(find.text('重试次数已用尽'), findsOneWidget);
-    expect(find.textContaining('[template]'), findsOneWidget,
-        reason: '错误列表展示 [{field}] {message}');
+    expect(
+      find.textContaining('[template]'),
+      findsOneWidget,
+      reason: '错误列表展示 [{field}] {message}',
+    );
     expect(find.textContaining('[data]'), findsOneWidget);
-    expect(find.textContaining('请确保已替换所有 <!-- GEN:config -->'),
-        findsOneWidget,
-        reason: '修正建议展示');
-    expect(find.widgetWithText(FilledButton, '重试'), findsNothing,
-        reason: '耗尽后按钮转「关闭」');
+    expect(
+      find.textContaining('请确保已替换所有 <!-- GEN:config -->'),
+      findsOneWidget,
+      reason: '修正建议展示',
+    );
+    expect(
+      find.widgetWithText(FilledButton, '重试'),
+      findsNothing,
+      reason: '耗尽后按钮转「关闭」',
+    );
     expect(find.widgetWithText(FilledButton, '关闭'), findsOneWidget);
 
     // 关闭 → 对话框消失。
@@ -242,8 +247,7 @@ void main() {
     expect(find.text('AI 生成游戏'), findsNothing);
   });
 
-  testWidgets('LLM 调用异常 → 失败文案 + 「重试」按钮（未超重试次数时）',
-      (tester) async {
+  testWidgets('LLM 调用异常 → 失败文案 + 「重试」按钮（未超重试次数时）', (tester) async {
     final generator = dialogGenerator(
       providerError: LLMError('claude API 请求超时'),
     );
@@ -252,10 +256,16 @@ void main() {
 
     await tester.pumpAndSettle();
     expect(find.textContaining('claude API 请求超时'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '重试'), findsOneWidget,
-        reason: '未进入编排计数的失败 → 重试可用');
-    expect(find.widgetWithText(TextButton, '关闭'), findsOneWidget,
-        reason: '非耗尽失败 → 关闭按钮（TextButton）');
+    expect(
+      find.widgetWithText(FilledButton, '重试'),
+      findsOneWidget,
+      reason: '未进入编排计数的失败 → 重试可用',
+    );
+    expect(
+      find.widgetWithText(TextButton, '关闭'),
+      findsOneWidget,
+      reason: '非耗尽失败 → 关闭按钮（TextButton）',
+    );
   });
 
   testWidgets('重试按钮：点击重新发起新一轮生成 → 成功关闭', (tester) async {
@@ -263,13 +273,18 @@ void main() {
     var throws = true;
     final generator = dialogGenerator(
       callGenerate:
-          ({required provider, required messages, required maxTokens, required model}) {
-        if (throws) {
-          throws = false;
-          return Future<Object?>.error(LLMError('claude API 请求超时'));
-        }
-        return Future<Object?>.value(buildValidGeneratedHtml());
-      },
+          ({
+            required provider,
+            required messages,
+            required maxTokens,
+            required model,
+          }) {
+            if (throws) {
+              throws = false;
+              return Future<Object?>.error(LLMError('claude API 请求超时'));
+            }
+            return Future<Object?>.value(buildValidGeneratedHtml());
+          },
     );
     await _pumpDialog(tester, generator);
     await _enterDescription(tester, '雾中镇');
@@ -281,6 +296,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('AI 生成游戏'), findsNothing, reason: '重试成功 → 关闭');
     expect(find.text('生成成功'), findsOneWidget);
+  });
+
+  testWidgets('F-45 已存在（409）：展示「已存在相同游戏」明确文案 + 无重试按钮'
+      '（终止重试，关闭退出）', (tester) async {
+    final generator = GameGenerator(
+      providerFactory: FixedGenerationFactory(
+        ScriptedFakeLLMProvider(scripts: [buildValidGeneratedHtml()]),
+      ),
+      resolveCredentials: () async => const GenerationCredentials(
+        provider: 'claude',
+        apiKey: 'sk-test',
+        model: 'claude-sonnet-5',
+      ),
+      resolveSimDir: () async => Directory.systemTemp,
+      persistGame: (dir, name, bytes) async =>
+          throw const SimulatorDuplicateError('游戏已存在（内容与现有文件相同）：x.html'),
+    );
+    await _pumpDialog(tester, generator);
+    await _enterDescription(tester, '重复生成');
+
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('已存在相同游戏'),
+      findsOneWidget,
+      reason: '409/已存在语义映射为明确中文文案（非 LLM 错误文案）',
+    );
+    expect(
+      find.widgetWithText(FilledButton, '重试'),
+      findsNothing,
+      reason: '已存在 → 终止重试（重试只会再产出相同内容）',
+    );
+    expect(find.widgetWithText(FilledButton, '关闭'), findsOneWidget);
+
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI 生成游戏'), findsNothing);
   });
 
   testWidgets('取消：生成中取消 → 中止在途重试 + 对话框关闭', (tester) async {
@@ -297,13 +348,18 @@ void main() {
       ),
       resolveSimDir: () async => Directory.systemTemp,
       callGenerate:
-          ({required provider, required messages, required maxTokens, required model}) {
-        calls++;
-        if (calls == 1) {
-          return Future<Object?>.value(buildInvalidGeneratedHtml());
-        }
-        return gate.future;
-      },
+          ({
+            required provider,
+            required messages,
+            required maxTokens,
+            required model,
+          }) {
+            calls++;
+            if (calls == 1) {
+              return Future<Object?>.value(buildInvalidGeneratedHtml());
+            }
+            return gate.future;
+          },
       persistGame: (dir, name, bytes) async => ImportResult(
         game: <String, dynamic>{
           'id': 'gen',
@@ -333,6 +389,59 @@ void main() {
     expect(calls, 2, reason: '取消后不再发起第 3 次 LLM 调用（不泄漏在途调用）');
   });
 
+  testWidgets('F-46 取消拦在途成功：取消后迟到成功不落盘 + 不 toast「生成成功」'
+      '（用户见「已取消」不得出现游戏）', (tester) async {
+    var persistCalls = 0;
+    final gate = Completer<Object?>();
+    final generator = GameGenerator(
+      providerFactory: FixedGenerationFactory(ScriptedFakeLLMProvider.empty()),
+      resolveCredentials: () async => const GenerationCredentials(
+        provider: 'claude',
+        apiKey: 'sk-test',
+        model: 'claude-sonnet-5',
+      ),
+      resolveSimDir: () async => Directory.systemTemp,
+      callGenerate:
+          ({
+            required provider,
+            required messages,
+            required maxTokens,
+            required model,
+          }) {
+            return gate.future; // 首个（且唯一）在途调用挂起
+          },
+      persistGame: (dir, name, bytes) async {
+        persistCalls++;
+        return ImportResult(
+          game: <String, dynamic>{
+            'id': 'gen',
+            'file': name,
+            'name': '生成',
+            'type': 'ai',
+            'source': 'generated',
+          },
+          renamed: false,
+          warnings: const <String>[],
+        );
+      },
+    );
+    await _pumpDialog(tester, generator);
+    await _enterDescription(tester, '取消在途成功');
+    await tester.pump();
+
+    await tester.tap(find.text('取消'));
+    await tester.pump();
+    expect(persistCalls, 0, reason: '取消前置：尚未落盘');
+
+    // 在途 LLM 响应迟到返回合法 HTML —— 不得落盘、不得展示成功。
+    gate.complete(buildValidGeneratedHtml());
+    await tester.pumpAndSettle();
+
+    expect(persistCalls, 0, reason: '取消令牌：迟到成功不落盘');
+    expect(find.text('AI 生成游戏'), findsNothing, reason: '取消 → 对话框关闭');
+    expect(find.text('生成成功'), findsNothing, reason: '不展示成功 toast');
+  });
+
   group('hooks 接线 — SimulatorsView AI 生成入口派发到对话框打开器', () {
     late Directory parentDir;
     late SimulatorDataDir dataDir;
@@ -342,8 +451,7 @@ void main() {
       dataDir = SimulatorDataDir(resolveDocumentsDir: () async => parentDir);
     });
 
-    testWidgets('默认 hooks 下：AppBar「AI 生成」启用 → 点击派发注入 opener',
-        (tester) async {
+    testWidgets('默认 hooks 下：AppBar「AI 生成」启用 → 点击派发注入 opener', (tester) async {
       var opened = 0;
       final controller = SimulatorsController(
         dataDir: dataDir,
@@ -367,16 +475,20 @@ void main() {
       final generateButton = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.auto_awesome_outlined),
       );
-      expect(generateButton.onPressed, isNotNull,
-          reason: 'F-M5-08b 接线后「AI 生成」入口不再禁用');
+      expect(
+        generateButton.onPressed,
+        isNotNull,
+        reason: 'F-M5-08b 接线后「AI 生成」入口不再禁用',
+      );
 
       await tester.tap(find.byTooltip('AI 生成'));
       await tester.pump();
       expect(opened, 1, reason: 'AppBar AI 生成入口派发到对话框打开器');
     });
 
-    testWidgets('既有注入钩子优先：constructor hooks.onGenerateTap 不被覆盖',
-        (tester) async {
+    testWidgets('既有注入钩子优先：constructor hooks.onGenerateTap 不被覆盖', (
+      tester,
+    ) async {
       var injectedTaps = 0;
       final controller = SimulatorsController(
         dataDir: dataDir,

@@ -412,5 +412,71 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    group('F-36 · 占位符碰撞熔断（payload 恰含占位符字面量）', () {
+      test(
+          'config id 含全部占位符字面量 → 原样嵌入不被后续替换吞掉'
+          '（注入面不静默跳过）', () {
+        final script = InjectionScript.build(
+          config: const <String, dynamic>{
+            'endpoint': '__CREDENTIALS_JSON__',
+            'apikey': '__CONFIG_JSON__',
+            'model': '__READY_POLL_MS__',
+          },
+          credentials: sampleCreds,
+          endpointMode: 'full',
+        );
+
+        // 模板四处占位符整体替换精确发生（config / credentials / endpointMode / 轮询）。
+        expect(
+          script,
+          contains('const config = {"endpoint":"__CREDENTIALS_JSON__"'),
+          reason: 'config 值中的占位符字面量是 id 数据本身，必须原样嵌入',
+        );
+        expect(
+          script,
+          contains('"apikey":"__CONFIG_JSON__","model":"__READY_POLL_MS__"}'),
+        );
+        expect(script, contains('const credentials = {"key":"sk-test-123"'));
+        expect(script, contains('const endpointMode = "full";'));
+        expect(script, contains('const READY_POLL_MS = 5000;'));
+
+        // 熔断正断言：credentials JSON 没有被拼进 config 的位置。
+        expect(
+          script,
+          isNot(contains('"endpoint":{"key":"sk-test-123"')),
+          reason: 'F-36：config 值含 __CREDENTIALS_JSON__ 时不得被后续替换覆写'
+              '（否则 config[endpoint] 变对象 → configIdCandidates 空 → 字段'
+              '静默跳过，注入面缺失）',
+        );
+      });
+
+      test('credentials 值含占位符字面量 → 凭证 JSON 原样嵌入不被吞', () {
+        final script = InjectionScript.build(
+          config: sampleConfig,
+          credentials: const InjectedCredentials(
+            protocol: 'openai',
+            key: '__CONFIG_JSON__',
+            endpoint: '__CREDENTIALS_JSON__',
+            model: '__READY_POLL_MS__',
+          ),
+          endpointMode: 'full',
+        );
+
+        expect(
+          script,
+          contains('const config = {"endpoint":["wz-endpoint","s-endpoint"]'),
+          reason: 'config 侧占位不受凭证侧字面量干扰',
+        );
+        expect(
+          script,
+          contains(
+            'const credentials = {"key":"__CONFIG_JSON__",'
+            '"endpoint":"__CREDENTIALS_JSON__","model":"__READY_POLL_MS__"};',
+          ),
+        );
+        expect(script, contains('const READY_POLL_MS = 5000;'));
+      });
+    });
   });
 }

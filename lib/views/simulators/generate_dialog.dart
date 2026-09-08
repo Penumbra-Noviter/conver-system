@@ -31,11 +31,7 @@ enum _GeneratePhase { idle, generating, failure }
 
 /// AI 生成游戏对话框。
 class GenerateDialog extends StatefulWidget {
-  const GenerateDialog({
-    super.key,
-    required this.generator,
-    this.onGenerated,
-  });
+  const GenerateDialog({super.key, required this.generator, this.onGenerated});
 
   /// 生成编排服务（生产由 SimulatorsView 装配，测试注入 fake）。
   final GameGenerator generator;
@@ -62,8 +58,13 @@ class _GenerateDialogState extends State<GenerateDialog> {
   String? _llmError;
 
   /// 校验失败是否已耗尽重试次数（结果 retries 达总尝试上限 → 按钮转「关闭」）。
-  bool get _exhausted =>
-      (_result?.retries ?? 0) >= maxGenerationRetries + 1;
+  bool get _exhausted => (_result?.retries ?? 0) >= maxGenerationRetries + 1;
+
+  /// 终态失败（无「重试」出口）：重试耗尽，或 409「已存在」（F-45——重试只会
+  /// 再产出相同内容，无收敛价值）→ 只提供「关闭」。
+  bool get _terminalNoRetry =>
+      _exhausted ||
+      (_result?.errors?.any((e) => e.field == 'duplicate') ?? false);
 
   @override
   void dispose() {
@@ -94,12 +95,19 @@ class _GenerateDialogState extends State<GenerateDialog> {
       if (!mounted) {
         return;
       }
+      // F-46 取消令牌（对话框侧防线）：取消后迟到返回的结果——无论 cancel 信号
+      // 还是服务层微竞态下已完成的成功结果——一律丢弃，只关闭对话框；不展示
+      // 成功 toast / 不触发列表刷新（用户意图 = 取消）。落盘拦截主防线在服务层
+      // （[GameGenerator] 落盘前断言 isCancelled），本守卫兜底结果分发竞态。
+      if (_cancelled) {
+        Navigator.of(context).pop();
+        return;
+      }
       if (result.ok) {
         await _onSuccess();
         return;
       }
-      final cancelled =
-          result.errors?.any((e) => e.field == 'cancel') ?? false;
+      final cancelled = result.errors?.any((e) => e.field == 'cancel') ?? false;
       if (cancelled) {
         Navigator.of(context).pop(); // 取消 → 直接关闭。
         return;
@@ -133,8 +141,9 @@ class _GenerateDialogState extends State<GenerateDialog> {
     }
   }
 
-  /// 取消生成：置标志（重试序列下一次尝试前断言）——中止后续重试，在途
-  /// LLM 调用自然结束（不再发起新调用）。
+  /// 取消生成：置取消令牌（F-46）——生成编排在**落盘前置结构**断言（重试序列
+  /// 下一次尝试前 + 校验通过落盘前），拦截在途成功不落盘；本对话框对取消后
+  /// 迟到返回的结果一律丢弃（不 toast 成功 / 不刷新列表）。
   void _cancel() {
     _cancelled = true;
   }
@@ -233,25 +242,27 @@ class _GenerateDialogState extends State<GenerateDialog> {
           if (_exhausted)
             Text(
               '重试次数已用尽',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(color: theme.colorScheme.onErrorContainer),
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+              ),
             ),
           if (result != null)
-            for (final err in result.errors ??
-                const <GenValidationError>[])
+            for (final err in result.errors ?? const <GenValidationError>[])
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   '[${err.field}] ${err.message}',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onErrorContainer),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
                 ),
               ),
           if (llmError != null)
             Text(
               '生成失败：$llmError',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onErrorContainer),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+              ),
             ),
           if (result?.suggestion != null) ...[
             const SizedBox(height: ConverSpacing.space2),
@@ -267,8 +278,7 @@ class _GenerateDialogState extends State<GenerateDialog> {
 
   /// 动作区（按状态机态分派）。
   List<Widget> _buildActions(BuildContext context) {
-    final descriptionEmpty =
-        _descriptionController.text.trim().isEmpty;
+    final descriptionEmpty = _descriptionController.text.trim().isEmpty;
     switch (_phase) {
       case _GeneratePhase.idle:
         return [
@@ -282,14 +292,9 @@ class _GenerateDialogState extends State<GenerateDialog> {
           ),
         ];
       case _GeneratePhase.generating:
-        return [
-          TextButton(
-            onPressed: _cancel,
-            child: const Text('取消'),
-          ),
-        ];
+        return [TextButton(onPressed: _cancel, child: const Text('取消'))];
       case _GeneratePhase.failure:
-        if (_exhausted) {
+        if (_terminalNoRetry) {
           return [
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -302,10 +307,7 @@ class _GenerateDialogState extends State<GenerateDialog> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('关闭'),
           ),
-          FilledButton(
-            onPressed: () => _run(),
-            child: const Text('重试'),
-          ),
+          FilledButton(onPressed: () => _run(), child: const Text('重试')),
         ];
     }
   }

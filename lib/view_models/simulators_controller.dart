@@ -26,7 +26,7 @@
 ///
 /// 四钩子（onOpen / onSaveTap / onImportTap / onGenerateTap）经
 /// [SimulatorsHooks] 注入（缺省未接线 = null = UI 禁用态）；后续票经
-/// [registerHooks] 接线，不触碰 app.dart / home_shell.dart（装配纪律）。
+/// [wireViewDefaults] 接线，不触碰 app.dart / home_shell.dart（装配纪律）。
 ///
 /// 装配（唯一落点 = app.dart）：构造注入 dataDir / seed / server 工厂 /
 /// manifest 拉取 + 端口，测试注入 fake 与临时目录（不触平台通道）。
@@ -306,13 +306,6 @@ class SimulatorsController extends ChangeNotifier {
 
   /// AI 生成入口（F-M5-08b 接线）；null = 未接线（AppBar 禁用态）。
   VoidCallback? get onGenerateTap => _hooks.onGenerateTap;
-
-  /// 接线钩子（后续票 F-M5-04/06/07/08 经 file-scope 实现注入；部分接线时
-  /// 未提供槽位保持 null）。替换既有槽位并通知监听者。
-  void registerHooks(SimulatorsHooks hooks) {
-    _hooks = hooks;
-    notifyListeners();
-  }
 
   /// 视图层默认接线（F-M5-04/06/07/08b 统一入口，**每次视图挂载调用**）：
   /// 构造注入的外部钩子槽位恒优先（绝不覆盖），未接线槽位以 [viewDefaults]

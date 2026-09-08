@@ -54,8 +54,7 @@ class GenValidationError {
 /// `<html`（桌面 `_check_html_structure` 逐字：`lower.strip()` 后判定）。
 GenValidationError? checkHtmlStructure(String htmlText) {
   final lower = htmlText.toLowerCase().trim();
-  final head =
-      lower.length > 200 ? lower.substring(0, 200) : lower;
+  final head = lower.length > 200 ? lower.substring(0, 200) : lower;
   if (lower.startsWith('<!doctype html') || head.contains('<html')) {
     return null;
   }
@@ -88,17 +87,20 @@ GenValidationError? checkCfgContract(String htmlText) {
     return null;
   }
   final names = (missing.toList()..sort()).join('、');
-  return GenValidationError(
-    field: 'cfg',
-    message: '缺少 AI 配置输入框：$names',
-  );
+  return GenValidationError(field: 'cfg', message: '缺少 AI 配置输入框：$names');
 }
 
 /// 检查 4 辅助：手写扫描器寻找首个语法级问题（未闭合注释 / 未闭合 script 块）。
 ///
 /// 除这两类结构性损伤外，其余畸形输入宽容处理（畸形不崩即视为可解析，
 /// U3 语义等价）：返回 null 表示可解析。
+///
+/// F-40 定版：开/闭标签同口径——`<script` 与 `</script` 均在统一小写化文本上
+/// 判定（大小写不敏感，对齐 HTML 标签名大小写不敏感语义）；`<script>` 为
+/// RAW TEXT 元素，块内 `<!--` 文本不算 HTML 注释（整体跳至 `</script>`，
+/// 不做注释配对）。
 String? _firstSyntaxProblem(String html) {
+  final lower = html.toLowerCase();
   var i = 0;
   final n = html.length;
   while (i < n) {
@@ -106,7 +108,7 @@ String? _firstSyntaxProblem(String html) {
     if (open < 0) {
       break;
     }
-    if (html.startsWith('<!--', open)) {
+    if (lower.startsWith('<!--', open)) {
       final end = html.indexOf('-->', open + 4);
       if (end < 0) {
         return '未闭合的 HTML 注释（<!-- 缺少匹配的 -->）';
@@ -114,9 +116,9 @@ String? _firstSyntaxProblem(String html) {
       i = end + 3;
       continue;
     }
-    if (html.startsWith('<script', open) &&
+    if (lower.startsWith('<script', open) &&
         _isTagBreakAt(html, open + '<script'.length)) {
-      final close = html.toLowerCase().indexOf('</script', open + 7);
+      final close = lower.indexOf('</script', open + 7);
       if (close < 0) {
         return '未闭合的 <script> 标签（缺少对应的 </script>）';
       }
@@ -145,8 +147,7 @@ List<GenValidationError> checkSecurity(
   String htmlText, {
   List<String>? precomputedWarnings,
 }) {
-  final warnings =
-      precomputedWarnings ?? scanSuspicious(htmlText);
+  final warnings = precomputedWarnings ?? scanSuspicious(htmlText);
   if (warnings.isEmpty) {
     return const [];
   }
@@ -167,8 +168,8 @@ List<GenValidationError> checkSecurity(
 ///
 /// Returns: 完整数组文本（含两端方括号）；找不到起始或括号不闭合 → null。
 String? extractScenesLiteral(String htmlText) {
-  final match =
-      RegExp(r'(?:var|const|let)\s+GAME_SCENES\s*=\s*\[').firstMatch(htmlText);
+  final match = RegExp(r'(?:var|const|let)\s+GAME_SCENES\s*=\s*\[')
+      .firstMatch(htmlText);
   if (match == null) {
     return null;
   }
@@ -338,7 +339,9 @@ List<GenValidationError> validateGeneratedHtml(
   if (syntax != null) {
     errors.add(syntax);
   }
-  errors.addAll(checkSecurity(htmlText, precomputedWarnings: precomputedWarnings));
+  errors.addAll(
+    checkSecurity(htmlText, precomputedWarnings: precomputedWarnings),
+  );
   final data = checkGameData(htmlText);
   if (data != null) {
     errors.add(data);

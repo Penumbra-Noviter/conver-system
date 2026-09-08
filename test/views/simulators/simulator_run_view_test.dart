@@ -36,9 +36,24 @@ const String _noCredentialsText = '未配置 OpenAI 兼容 Key';
 const String _resyncText = '重新同步';
 const String _injectedText = '已填入';
 
-/// Fake WebView 控制器：记录 runJavaScript 调用 + 可手动触发 onPageFinished。
+/// Fake WebView 控制器：记录 runJavaScript 调用 + 可手动触发 onPageFinished
+/// + 调用序 spy（setOnPageFinished / navigate，F-43）+ 最严苛竞态窗口开关。
 class _FakeWebViewController implements SimulatorWebViewController {
+  _FakeWebViewController({
+    this.instantFinish = false,
+    this.throwOnNavigate = false,
+  });
+
+  /// 最严苛竞态开关：navigate 发起即完成 → onPageFinished 在挂载后的第一
+  /// 时间派发（委托若未先于 navigate 挂载即静默丢事件 → 15s 超时错误态）。
+  final bool instantFinish;
+
+  /// navigate 抛错开关（loadRequest 失败路径：即时错误态，不靠超时兜底）。
+  final bool throwOnNavigate;
+
   final List<String> scripts = <String>[];
+  final List<Uri> navigatedUrls = <Uri>[];
+  final List<String> callOrder = <String>[];
   VoidCallback? onPageFinished;
 
   @override
@@ -48,21 +63,42 @@ class _FakeWebViewController implements SimulatorWebViewController {
 
   @override
   void setOnPageFinished(VoidCallback onPageFinished) {
+    callOrder.add('setOnPageFinished');
     this.onPageFinished = onPageFinished;
+  }
+
+  @override
+  Future<void> navigate(Uri url) async {
+    callOrder.add('navigate');
+    navigatedUrls.add(url);
+    if (throwOnNavigate) {
+      throw StateError('loadRequest 失败');
+    }
+    if (instantFinish) {
+      // 导航发起即完成：事件在「挂载后、任何补救窗口前」立即派发。
+      onPageFinished?.call();
+    }
   }
 
   @override
   Widget buildView() => const SizedBox.expand();
 }
 
-/// Fake 控制器工厂：记录创建 URL（断言 URL 组装），暴露已创建的控制器。
+/// Fake 控制器工厂：暴露已创建的控制器（URL 断言移入 navigate 记录）。
 class _FakeWebViewFactory {
-  final List<Uri> urls = <Uri>[];
   final List<_FakeWebViewController> created = <_FakeWebViewController>[];
+  bool instantFinish = false;
+  bool throwOnNavigate = false;
+  bool throwOnCreate = false;
 
-  Future<SimulatorWebViewController> create({required Uri url}) async {
-    urls.add(url);
-    final controller = _FakeWebViewController();
+  Future<SimulatorWebViewController> create() async {
+    if (throwOnCreate) {
+      throw StateError('WebView 平台不可用');
+    }
+    final controller = _FakeWebViewController(
+      instantFinish: instantFinish,
+      throwOnNavigate: throwOnNavigate,
+    );
     created.add(controller);
     return controller;
   }
@@ -171,7 +207,7 @@ void main() {
       );
 
       expect(
-        factory.urls.single,
+        factory.created.single.navigatedUrls.single,
         Uri.parse(
           'http://127.0.0.1:8642/${SimulatorContracts.simDir}/life-sim.html',
         ),
@@ -373,8 +409,7 @@ void main() {
 
       expect(find.text('游戏加载失败'), findsOneWidget);
       expect(find.text('参数非法：缺少有效的游戏文件'), findsOneWidget);
-      expect(factory.urls, isEmpty, reason: '非法 file 不建页不放行');
-      expect(factory.created, isEmpty);
+      expect(factory.created, isEmpty, reason: '非法 file 不建页不放行');
       expect(find.text(_resyncText), findsNothing);
     });
   });
@@ -399,6 +434,11 @@ void main() {
       expect(find.text('返回'), findsOneWidget);
       expect(factory.created, hasLength(1));
 
+      // 「返回」按钮（根路由 maybePop 空操作不崩）。
+      await tester.tap(find.text('返回'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
       // 重试复用当前游戏：重建控制器 → 新注入周期。
       await tester.tap(find.text('重试'));
       await tester.pump();
@@ -406,13 +446,92 @@ void main() {
 
       expect(factory.created, hasLength(2), reason: '重试重建控制器');
       final retried = factory.created.last;
-      expect(factory.urls.last, Uri.parse(
+      expect(retried.navigatedUrls.last, Uri.parse(
         'http://127.0.0.1:8642/${SimulatorContracts.simDir}/life-sim.html',
       ));
       retried.onPageFinished?.call();
       await tester.pump();
       await tester.pump();
       expect(retried.scripts, hasLength(1), reason: '重试后加载完成照常注入');
+    });
+  });
+
+  group('F-43 · onPageFinished 委托先于导航挂载（对齐 save_sheet W5 B1）', () {
+    testWidgets('调用序 spy：setOnPageFinished 在 navigate 之前', (tester) async {
+      final factory = _FakeWebViewFactory();
+      await pumpRunView(
+        tester,
+        game: _aiGame(),
+        factory: factory,
+        loadCredentials: _openaiCreds(),
+      );
+      final controller = factory.created.single;
+      final mountAt = controller.callOrder.indexOf('setOnPageFinished');
+      final navigateAt = controller.callOrder.indexOf('navigate');
+      expect(mountAt, greaterThanOrEqualTo(0), reason: '委托必须被挂载');
+      expect(navigateAt, greaterThan(mountAt),
+          reason: 'F-43：挂委托先于 navigate——onPageFinished 只派发给挂载时'
+              '已存在的委托（不回放挂载前事件），先导航后挂委托即事件丢失'
+              '→ 秒开页面走 15s 超时错误态（有兜底不挂死）');
+    });
+
+    testWidgets('秒开页面：navigate 发起即完成事件仍送达 → loaded + 注入，零超时',
+        (tester) async {
+      final factory = _FakeWebViewFactory()..instantFinish = true;
+      await pumpRunView(
+        tester,
+        game: _aiGame(),
+        factory: factory,
+        loadCredentials: _openaiCreds(),
+        loadTimeout: const Duration(milliseconds: 100),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      final controller = factory.created.single;
+      // 事件在「导航发起即完成」的最严苛时序下仍被送达（委托先挂载 → 不丢）。
+      expect(controller.scripts, hasLength(1),
+          reason: '秒开页自动注入照常（注入仍 onPageFinished 后）');
+      expect(find.text('游戏加载失败'), findsNothing);
+      // 越过超时窗口不降级（事件未丢，无 15s 超时错误态）。
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('游戏加载失败'), findsNothing);
+      expect(find.textContaining('加载超时'), findsNothing);
+    });
+  });
+
+  group('工厂 / 导航失败路径（即时错误态，不靠超时兜底）', () {
+    testWidgets('工厂抛错（平台不可用）→ 错误态文案「加载模拟器页面失败」',
+        (tester) async {
+      final factory = _FakeWebViewFactory()..throwOnCreate = true;
+      await pumpRunView(
+        tester,
+        game: _aiGame(),
+        factory: factory,
+        loadCredentials: _openaiCreds(),
+      );
+      await tester.pump();
+
+      expect(find.text('游戏加载失败'), findsOneWidget);
+      expect(find.textContaining('加载模拟器页面失败'), findsOneWidget);
+      expect(find.textContaining('加载超时'), findsNothing,
+          reason: '工厂抛错即时降级，不等待 15s 超时');
+    });
+
+    testWidgets('navigate 抛错（loadRequest 失败）→ 即时错误态', (tester) async {
+      final factory = _FakeWebViewFactory()..throwOnNavigate = true;
+      await pumpRunView(
+        tester,
+        game: _aiGame(),
+        factory: factory,
+        loadCredentials: _openaiCreds(),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('加载模拟器页面失败'), findsOneWidget);
+      expect(find.textContaining('加载超时'), findsNothing,
+          reason: 'loadRequest 失败即时降级，不等待 15s 超时');
+      expect(tester.takeException(), isNull);
     });
   });
 

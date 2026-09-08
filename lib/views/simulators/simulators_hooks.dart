@@ -6,7 +6,7 @@
 ///   接线：push 运行页）；save / import / generate = `VoidCallback`（F-M5-06
 ///   存档半屏 sheet / F-M5-07 导入流 / F-M5-08b 生成对话框各自接线）；
 /// - 本票缺省 = 全 null（未接线 = 禁用/空操作不崩，桌面 G7 注入钩子模式
-///   移植）；后续票以其 file-scope 实现经 [SimulatorsController.registerHooks]
+///   移植）；后续票以其 file-scope 实现经 [SimulatorsController.wireViewDefaults]
 ///   注入，不触碰 app.dart / home_shell.dart（装配纪律）。
 ///
 /// 本文件仅定义契约类型；[SimulatorGame] 显示模型与 [SimulatorsController]
@@ -15,7 +15,7 @@
 /// 按票面文件落点约束」下的最小交叉，Dart 库级环引用合法，analyzer 无告警）。
 ///
 /// F-M5-04 顺序追加：run 页 open 钩子的**接线实现**——[buildRunPageLauncher]
-/// 供 [SimulatorsView] 首挂载时经 [SimulatorsController.registerHooks] 注入
+/// 供 [SimulatorsView] 每次挂载时经 [SimulatorsController.wireViewDefaults] 注入
 /// onOpen（卡片 onTap → push 全屏运行页）；运行页依赖在 route builder 内从
 /// app provider 图读取或经参数注入（测试 seam），不触碰 app.dart /
 /// home_shell.dart（装配纪律）。
@@ -130,59 +130,4 @@ Future<bool> _isOfficialFromProviders(BuildContext context) async {
   final provider = await repo.defaultProvider;
   final baseUrl = await repo.baseUrl('openai');
   return isOfficialEndpoint(provider, baseUrl);
-}
-
-/// 合成带导入钩子的 hooks（F-M5-07，post-03 顺序追加）：在 [base] 槽位上叠加
-/// [onImportTap]，其余槽位原样保留。
-///
-/// 装配契约：接线方读取控制器当前槽位合成后经
-/// [SimulatorsController.registerHooks] 生效——既有注入钩子（constructor 注入
-/// / 后续票先行接线）原文保留，绝不覆盖非空槽位（W3 视图测试以注入 hooks
-/// 断言派发，本语义保证其不破）。
-SimulatorsHooks appendImportHook(
-  SimulatorsHooks base,
-  VoidCallback onImportTap,
-) {
-  return SimulatorsHooks(
-    onOpen: base.onOpen,
-    onSaveTap: base.onSaveTap,
-    onImportTap: onImportTap,
-    onGenerateTap: base.onGenerateTap,
-  );
-}
-
-/// 合成带存档钩子的 hooks（F-M5-06，post-03 顺序追加）：在 [base] 槽位上叠加
-/// [onSaveTap]（AppBar「存档」→ 底部半屏 sheet），其余槽位原样保留。
-///
-/// 装配契约与 [appendImportHook] 同构：接线方读取控制器当前槽位合成后经
-/// [SimulatorsController.registerHooks] 生效——既有注入钩子原文保留，绝不
-/// 覆盖非空槽位。
-SimulatorsHooks appendSaveHook(
-  SimulatorsHooks base,
-  VoidCallback onSaveTap,
-) {
-  return SimulatorsHooks(
-    onOpen: base.onOpen,
-    onSaveTap: onSaveTap,
-    onImportTap: base.onImportTap,
-    onGenerateTap: base.onGenerateTap,
-  );
-}
-
-/// 合成带 AI 生成钩子的 hooks（F-M5-08b，post-03 顺序追加）：在 [base] 上叠加
-/// [onGenerateTap]（AppBar「AI 生成」→ 生成对话框），其余槽位原样保留。
-///
-/// 装配契约与 [appendImportHook] / [appendSaveHook] 同构：接线方读取控制器
-/// 当前槽位合成后经 [SimulatorsController.registerHooks] 生效——既有注入钩子
-/// 原文保留，绝不覆盖非空槽位。
-SimulatorsHooks appendGenerateHook(
-  SimulatorsHooks base,
-  VoidCallback onGenerateTap,
-) {
-  return SimulatorsHooks(
-    onOpen: base.onOpen,
-    onSaveTap: base.onSaveTap,
-    onImportTap: base.onImportTap,
-    onGenerateTap: onGenerateTap,
-  );
 }

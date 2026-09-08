@@ -79,25 +79,41 @@ abstract interface class SimulatorWebViewController {
   Future<void> runJavaScript(String script);
 
   /// 注册页面加载完成回调（自动注入触发点；同一控制器只注册一次）。
+  ///
+  /// **时序契约（F-43，对齐 save_sheet W5 B1）**：必须由消费方在 [navigate]
+  /// **之前**调用——webview 的 `onPageFinished` 只派发给挂载时已存在的导航
+  /// 委托、不回放挂载前事件；先导航后挂委托会丢失事件（极小/秒开页面在
+  /// 委托挂载前完成加载 → 15s 超时错误态）。装配方遵循「挂委托 → navigate」
+  /// 两步序（见 [_SimulatorRunViewState._startOpening]）。
   void setOnPageFinished(VoidCallback onPageFinished);
+
+  /// 发起导航到 [url]（生产 = `loadRequest`；返回即完成请求发出，页面就绪以
+  /// [setOnPageFinished] 回调为准）。调用前委托必须先已挂载。
+  Future<void> navigate(Uri url);
 
   /// 渲染平台视图主体（生产 WebViewWidget / 测试占位离屏组件）。
   Widget buildView();
 }
 
-/// WebView 控制器工厂注入点（U1 seam）——按 [url] 创建并装载控制器。
+/// WebView 控制器工厂注入点（U1 seam）——创建**未导航**的控制器（委托由消费
+/// 方挂载后经 [SimulatorWebViewController.navigate] 发起导航，保证
+/// onPageFinished 不丢失，F-43 对齐 save_sheet W5 B1）。
 typedef SimulatorWebViewControllerFactory =
-    Future<SimulatorWebViewController> Function({required Uri url});
+    Future<SimulatorWebViewController> Function();
 
-/// 生产 WebView 控制器工厂（平台薄层收口本文件）：创建装载 [url] 的
-/// webview_flutter 控制器并返回 [SimulatorWebViewController] 适配。
-Future<SimulatorWebViewController> createFlutterWebViewController({
-  required Uri url,
-}) async {
+// 平台薄层收口本文件：真实 WebView 控制器不可在测试宿主运行（平台通道），
+// 真通道行为归 F-M5-09 AVD 冒烟（U1 实证）；与 save_sheet（W5 B1 已修形态）
+// 平台薄层同先例标 ignore。
+// coverage:ignore-start
+
+/// 生产 WebView 控制器工厂：仅创建 webview_flutter 控制器（不发起导航——
+/// 导航由消费方挂载 [setOnPageFinished] 之后经
+/// [SimulatorWebViewController.navigate] 发起，杜绝 onPageFinished 错过，
+/// F-43 对齐 save_sheet W5 B1）。
+Future<SimulatorWebViewController> createFlutterWebViewController() async {
   final inner = WebViewController()
     ..setJavaScriptMode(JavaScriptMode.unrestricted)
     ..setBackgroundColor(const Color(0xFF000000));
-  await inner.loadRequest(url);
   return _FlutterWebViewController(inner);
 }
 
@@ -118,8 +134,12 @@ class _FlutterWebViewController implements SimulatorWebViewController {
   }
 
   @override
+  Future<void> navigate(Uri url) => _inner.loadRequest(url);
+
+  @override
   Widget buildView() => WebViewWidget(controller: _inner);
 }
+// coverage:ignore-end
 
 /// 运行页状态机相位：opening（加载中）→ loaded（可注入）| error（重试）。
 enum _RunPhase { opening, loaded, error }
@@ -246,13 +266,17 @@ class _SimulatorRunViewState extends State<SimulatorRunView> {
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(widget.loadTimeout, _handleTimeout);
     try {
-      final controller = await widget.webViewFactory(url: url);
+      final controller = await widget.webViewFactory();
       if (!mounted) {
         return;
       }
       final captured = controller;
+      // F-43（对齐 save_sheet W5 B1）：委托先挂载、后导航——onPageFinished
+      // 只派发给挂载时已存在的委托（不回放挂载前事件），先导航后挂委托即
+      // 丢失事件（极小/秒开页面在委托挂载前完成加载 → 15s 超时错误态）。
       controller.setOnPageFinished(() => _handlePageFinished(captured));
       setState(() => _controller = controller);
+      await controller.navigate(url);
     } catch (error) {
       if (!mounted) {
         return;
