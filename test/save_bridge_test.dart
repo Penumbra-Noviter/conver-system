@@ -23,36 +23,64 @@ import 'package:conver_system_mobile/services/simulator/save_contract.dart'
 
 import 'support/fake_local_storage_access.dart';
 
+/// 分片枚举测试假件（F-38）：按脚本分派「键名」/「批键值」响应（store 背衬）。
+///
+/// [androidEncoded] = true 时返回 Android evaluateJavascript 编码串契约
+/// （字符串结果带外层引号，webview_flutter_android 原样透传——F-M5-09 实证）；
+/// [responseCapBytes] 模拟返回值通道体积上限（超限抛错）。
+Future<String> _fakeEnumEvaluator(
+  String script,
+  Map<String, String> store, {
+  required bool androidEncoded,
+  int? responseCapBytes,
+}) async {
+  final String raw;
+  if (script == enumerateLocalStorageKeysScript) {
+    raw = jsonEncode(store.keys.toList());
+  } else {
+    // 批读取脚本：JSON.stringify(["k1",...].map((k) => ...)) → 解析嵌入键数组。
+    final inner = script.substring('JSON.stringify('.length);
+    final end = inner.indexOf('].map');
+    final keys = (jsonDecode(inner.substring(0, end + 1)) as List).cast<String>();
+    final entries = [for (final k in keys) [k, store[k]]];
+    raw = jsonEncode(entries);
+  }
+  final payload = androidEncoded ? jsonEncode(raw) : raw;
+  if (responseCapBytes != null && payload.length > responseCapBytes) {
+    throw const FormatException('响应超通道上限（模拟）');
+  }
+  return payload;
+}
+
 void main() {
   group('LocalStorageAccess 生产实现——JS 脚本契约与超时兜底', () {
-    test('enumerate 脚本原文 + Android 编码串往返解析为全量键值', () async {
+    test('enumerate：分片枚举协议（键名 + 批读取）Android 编码串往返 → 全量键值', () async {
       final calls = <String>[];
+      final store = {'k1': 'v1', 'k2': 'v2', 'k3': 'v3'};
       final access = JsBridgeLocalStorageAccess((script) async {
         calls.add(script);
-        // 锚 Android evaluateJavascript 生产契约（F-M5-09 AVD 实证，缺陷 #1）：
-        // 字符串结果带外层引号返回 Flutter（JSON 编码串），webview_flutter
-        // `runJavaScriptReturningResult` 对字符串**原样透传**——jsonEncode 外层
-        // 模拟该引号层，内层 = `JSON.stringify` 产物数组 JSON。
-        return jsonEncode('[["k1","v1"],["k2","v2"]]');
+        return _fakeEnumEvaluator(script, store, androidEncoded: true);
       });
       final result = await access.enumerate();
-      expect(result, {'k1': 'v1', 'k2': 'v2'});
-      expect(
-        calls,
-        [enumerateLocalStorageScript],
-        reason: '枚举脚本逐字（JSON.stringify(Object.entries(localStorage))）',
-      );
+      expect(result, store);
+      expect(calls.first, enumerateLocalStorageKeysScript,
+          reason: '第一步 = 全量键名脚本（键名体积远小于键值，单次返回不触通道上限）');
+      expect(calls, hasLength(2), reason: '3 键 < 单片 32 → 仅 1 批键值读取');
+      expect(calls[1], startsWith('JSON.stringify(['));
     });
 
     test('enumerate：裸 JSON 兼容（锚 iOS/macOS 返回裸值平台）', () async {
+      final store = {'k1': 'v1', 'k2': 'v2'};
       final access = JsBridgeLocalStorageAccess(
-        (script) async => '[["k1","v1"],["k2","v2"]]',
+        (script) => _fakeEnumEvaluator(script, store, androidEncoded: false),
       );
-      expect(await access.enumerate(), {'k1': 'v1', 'k2': 'v2'});
+      expect(await access.enumerate(), store);
     });
 
-    test('空 localStorage → 空 Map（不要求键存在）', () async {
-      final access = JsBridgeLocalStorageAccess((script) async => '[]');
+    test('空 localStorage → 空 Map（键名空数组 → 无键值批次）', () async {
+      final access = JsBridgeLocalStorageAccess(
+        (script) => _fakeEnumEvaluator(script, const {}, androidEncoded: false),
+      );
       expect(await access.enumerate(), isEmpty);
     });
 
@@ -104,6 +132,58 @@ void main() {
         timeout: const Duration(milliseconds: 30),
       );
       expect(await access.enumerate(), isEmpty);
+    });
+
+    test('F-38 分片枚举：多键全量返回（>单片 32 → 多批读取，无降级）', () async {
+      final calls = <String>[];
+      final store = {for (var i = 0; i < 70; i++) 'key_$i': 'v$i'};
+      final access = JsBridgeLocalStorageAccess((script) async {
+        calls.add(script);
+        return _fakeEnumEvaluator(script, store, androidEncoded: false);
+      });
+      final result = await access.enumerate();
+      expect(result, store,
+          reason: '分片后仍全量键值返回（不破坏「导出 payload 键值一致」契约）');
+      expect(calls, hasLength(1 + 3), reason: '键名 1 次 + 70/32 → 3 批键值（32+32+6）');
+      for (final script in calls.skip(1)) {
+        expect(script, startsWith('JSON.stringify(['));
+      }
+    });
+
+    test('F-38 分片枚举：总数据超单次返回上限仍全量返回（分批规避通道上限，不降级空 Map）',
+        () async {
+      // 模拟返回值通道体积上限：单次响应超限抛错。70 键 × 2KB 值合计
+      // ~140KB > cap 100KB —— 不分片一次返回必降级空 Map（存档存在但面板
+      // 显示 0 键，F-38 冒烟实证症状）；分片 32/批 → 每批 ~64KB < cap → 全部成功。
+      final store = {for (var i = 0; i < 70; i++) 'k$i': 'v' * 2000};
+      final access = JsBridgeLocalStorageAccess(
+        (script) => _fakeEnumEvaluator(
+          script,
+          store,
+          androidEncoded: true,
+          responseCapBytes: 100 * 1024,
+        ),
+      );
+      final result = await access.enumerate();
+      expect(result, store,
+          reason: '分批读键值 → 规避通道上限，存档存在不再显示 0 键');
+    });
+
+    test('F-38 分片枚举：某批读取失败 → 整次降级空 Map（批失败路径不崩不抛）', () async {
+      final store = {for (var i = 0; i < 70; i++) 'k$i': 'v$i'};
+      var batchCount = 0;
+      final access = JsBridgeLocalStorageAccess((script) async {
+        if (script != enumerateLocalStorageKeysScript) {
+          batchCount++;
+          if (batchCount == 2) {
+            throw const FormatException('该批读取失败（模拟）');
+          }
+        }
+        return _fakeEnumEvaluator(script, store, androidEncoded: false);
+      });
+      expect(await access.enumerate(), isEmpty,
+          reason: '批失败 → 整次枚举降级空 Map（与既有「失败降级空 Map」契约一致）');
+      expect(batchCount, greaterThanOrEqualTo(2), reason: '第二批已触发');
     });
 
     test('setItem 脚本：键值经 jsonEncode 转义（引号/反斜杠/换行）', () async {
@@ -360,6 +440,26 @@ void main() {
       expect(result!.ok, isFalse);
       expect(result.message, '不是有效的 JSON 文件');
       expect(access.snapshot, isEmpty);
+    });
+
+    test('F-39 导入：JSON 带 UTF-8 BOM → BOM 剥离后正常导入（不误拒「不是有效的 JSON 文件」）', () async {
+      // UTF-8 BOM = EF BB BF（Windows/部分编辑器导出 JSON 常见前缀）；
+      // utf8.decode 保留为 U+FEFF 前导字符 → jsonDecode 抛 FormatException。
+      final bridge = buildBridge(
+        games: [lifeSim],
+        importBytes: Uint8List.fromList([
+          0xEF, 0xBB, 0xBF, // UTF-8 BOM
+          ...utf8.encode(jsonEncode({
+            'keys': {'life_save': '{"hp":10}'},
+          })),
+        ]),
+      );
+
+      final result = await bridge.importGame('life-sim');
+
+      expect(result!.ok, isTrue, reason: 'BOM 剥离后再 decode → 正常导入');
+      expect(result.message, '已恢复 1 个存档键');
+      expect(access['life_save'], '{"hp":10}');
     });
 
     test('导入：超 5MB → 「存档文件过大（上限 5MB）」整包拒绝', () async {

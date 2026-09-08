@@ -169,6 +169,13 @@ bool _isJsonString(Object? value) {
 /// 合法空包（应用 no-op）。game 无 saveKeys → 整体拒绝（「无存档管理」
 /// 游戏不可导入）。`__proto__` 键：Dart Map 天然为普通自有键（等价桌面
 /// TD-70 无原型累积器）—— 白名单命中即可完整写出。
+///
+/// 非字符串键（TD-2 F-27 桌面语义核对结论）：桌面 save-manager.js 以
+/// `Object.entries(payload.keys)` 枚举——JS 对象键恒为字符串（JSON.parse
+/// 产物），非字符串键不存在拒绝路径，等价语义 = **静默跳过**（不整包拒绝、
+/// 不列入问题清单）。本实现同语义：`payloadKeys.forEach` 对非字符串键
+/// `return` 跳过（仅字符串键参与白名单校验与值校验）。真实导入路径
+/// `jsonDecode` 产物键恒为字符串，此分支仅防御直接传入原始 Dart Map 的调用方。
 ValidateResult validateImportPayload(Object? payload, Object? game) {
   if (payload is! Map) {
     return const ValidateResult.reject('存档文件格式无效：顶层必须是对象');

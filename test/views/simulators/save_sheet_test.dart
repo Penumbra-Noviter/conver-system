@@ -125,15 +125,23 @@ class _FakeSheetWebViewController implements SheetWebViewController {
   @override
   Future<String> evaluate(String script) async {
     evaluated.add(script);
-    if (script == enumerateLocalStorageScript) {
-      // 锚 Android evaluateJavascript 生产契约（F-M5-09 AVD 实证，缺陷 #1）：
-      // 字符串结果带外层引号返回 Flutter（JSON 编码串），webview_flutter
-      // `runJavaScriptReturningResult` 对字符串**原样透传**——外层 jsonEncode
-      // 模拟该引号层，内层 = `JSON.stringify` 产物数组 JSON。修复前该契约
-      // 使 `parseLocalStorageEntries` 一次 jsonDecode 得 String → FormatException
+    if (script == enumerateLocalStorageKeysScript) {
+      // 分片枚举第一步：全量键名（F-38）。
+      return jsonEncode(jsonEncode(store.keys.toList()));
+    }
+    if (script.startsWith('JSON.stringify(')) {
+      // 分片枚举第二步：批键值。锚 Android evaluateJavascript 生产契约
+      // （F-M5-09 AVD 实证，缺陷 #1）：字符串结果带外层引号返回 Flutter（JSON
+      // 编码串），webview_flutter `runJavaScriptReturningResult` 对字符串**原样
+      // 透传**——外层 jsonEncode 模拟该引号层。修复前全量枚举单次返回使
+      // `parseLocalStorageEntries` 一次 jsonDecode 得 String → FormatException
       // → 面板恒 0 键（回归断言见 happy path 用例）。
+      final inner = script.substring('JSON.stringify('.length);
+      final end = inner.indexOf('].map');
+      final keys = (jsonDecode(inner.substring(0, end + 1)) as List)
+          .cast<String>();
       return jsonEncode(jsonEncode([
-        for (final entry in store.entries) [entry.key, entry.value],
+        for (final k in keys) [k, store[k]],
       ]));
     }
     return '';

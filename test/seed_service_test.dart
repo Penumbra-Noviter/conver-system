@@ -178,6 +178,73 @@ void main() {
     });
   });
 
+  group('ensureSeeded — F-25 单游戏资产缺失降级（TD-1）', () {
+    test('manifest 列出但 game-a 资产缺失 → 跳过缺失款继续种其余，返回 true', () async {
+      final parent = await makeTempDir();
+      final simDir = await simDirUnder(parent);
+      final manifestBytes = seedManifestBytes();
+      final loader = FakeSeedLoader(<String, Uint8List>{
+        assetOf('manifest.json'): manifestBytes,
+        // game-a.html 缺（未登记资产，rootBundle 裸抛）
+        assetOf('game-b.html'): Uint8List.fromList(utf8.encode('<html>b</html>')),
+      });
+
+      final seeded = await ensureSeeded(simDir: simDir, assetRoot: assetRoot, loadAsset: loader.load);
+
+      expect(seeded, isTrue, reason: '单游戏缺失降级：跳过缺失款不中止整次种子');
+      expect(File('${simDir.path}${Platform.pathSeparator}game-a.html').existsSync(), isFalse,
+          reason: '缺失款不落盘');
+      expect(File('${simDir.path}${Platform.pathSeparator}game-b.html').existsSync(), isTrue,
+          reason: '其余款照常落盘');
+      expect(File('${simDir.path}${Platform.pathSeparator}manifest.json').existsSync(), isTrue,
+          reason: 'manifest 照常最后落盘（种子标记语义不变）');
+      expect(loader.requested.where((p) => p != assetOf('manifest.json')), hasLength(2),
+          reason: '两款均被尝试加载（含缺失款），缺失款跳过不中止');
+    });
+
+    test('Falsify: 缺失款抛 FlutterError 形态（rootBundle 裸抛 FlutterError 而非 StateError）→ 同样跳过不中止', () async {
+      final parent = await makeTempDir();
+      final simDir = await simDirUnder(parent);
+      Future<Uint8List> load(String path) async {
+        if (path == assetOf('manifest.json')) {
+          return seedManifestBytes();
+        }
+        if (path == assetOf('game-a.html')) {
+          throw const _FlutterErrorLike('未登记资产 仿微.html');
+        }
+        return Uint8List.fromList(utf8.encode('<html>b</html>'));
+      }
+
+      final seeded = await ensureSeeded(simDir: simDir, assetRoot: assetRoot, loadAsset: load);
+
+      expect(seeded, isTrue, reason: 'FlutterError 形态同样按单游戏缺失降级');
+      expect(File('${simDir.path}${Platform.pathSeparator}game-b.html').existsSync(), isTrue);
+      expect(File('${simDir.path}${Platform.pathSeparator}manifest.json').existsSync(), isTrue);
+    });
+
+    test('Falsify: 缺失款以 FileSystemException 形态抛（文件系统层错误）→ 不被降级吞，上抛带路径错误', () async {
+      final parent = await makeTempDir();
+      final simDir = await simDirUnder(parent);
+      Future<Uint8List> load(String path) async {
+        if (path == assetOf('game-a.html')) {
+          throw const FileSystemException('asset read failed', 'game-a.html');
+        }
+        if (path == assetOf('manifest.json')) {
+          return seedManifestBytes();
+        }
+        return Uint8List.fromList(utf8.encode('<html>b</html>'));
+      }
+
+      await expectLater(
+        ensureSeeded(simDir: simDir, assetRoot: assetRoot, loadAsset: load),
+        throwsA(isA<FileSystemException>()
+            .having((e) => e.message, 'message', contains(simDir.path))),
+      );
+      expect(File('${simDir.path}${Platform.pathSeparator}game-b.html').existsSync(), isFalse,
+          reason: '文件系统层错误 → 中止整次并上抛（目录不可用语义，非单游戏降级）');
+    });
+  });
+
   group('ensureSeeded — 种子中断时序（可测契约）', () {
     test('manifest 落盘前中断 → 抛错且目标无 manifest；下次调用重种', () async {
       final parent = await makeTempDir();
@@ -187,7 +254,7 @@ void main() {
         assetOf('manifest.json'): manifestBytes,
         assetOf('game-a.html'): Uint8List.fromList(utf8.encode('<html>a</html>')),
         assetOf('game-b.html'): Uint8List.fromList(utf8.encode('<html>b</html>')),
-      })..interruptAfterRequests = 2; // 第 3 次请求（manifest）抛错中断
+      })..interruptAfterRequests = 3; // 第 4 次请求（末尾 manifest 加载）抛错中断
 
       await expectLater(
         ensureSeeded(simDir: simDir, assetRoot: assetRoot, loadAsset: loader.load),
@@ -308,4 +375,15 @@ void main() {
       expect(dir.existsSync(), isFalse);
     });
   });
+}
+
+/// flutter_test 无法直接构造 [FlutterError]，用同形异常模拟 rootBundle 裸抛
+/// （F-2 复现路径：未登记资产 → 非 FileSystemException → 旧实现整次种子中止）。
+class _FlutterErrorLike implements Exception {
+  const _FlutterErrorLike(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'FlutterError: $message';
 }

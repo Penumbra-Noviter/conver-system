@@ -364,6 +364,40 @@ void main() {
       expect(result.keys['__proto__'], '"p"');
       expect(result.keys['ls_autosave'], '"a"');
     });
+
+    test('F-27 桌面等价锚：非字符串键 → 静默跳过（Object.entries 语义），合法字符串键照常校验', () {
+      // 桌面 save-manager.js 以 Object.entries(payload.keys) 枚举——JS 对象键
+      // 恒为字符串，非字符串键不存在拒绝路径，等价语义 = 静默跳过（TD-2 F-27
+      // 桌面语义核对结论，save_contract.dart 模块头 docstring 记录）。
+      final payload = {
+        'keys': {
+          1: '"x"', // 非字符串键 → 桌面等价跳过
+          true: '"y"', // 非字符串键 → 跳过
+          'ls_autosave': '{"v":1}',
+          'ls_used_names': '["a"]',
+        },
+      };
+      final result = validateImportPayload(payload, gameExact);
+      expect(result.ok, isTrue, reason: '非字符串键不触发整包拒绝（桌面等价）');
+      expect(result.keys, {'ls_autosave': '{"v":1}', 'ls_used_names': '["a"]'});
+    });
+
+    test('F-27 桌面等价锚：非字符串键不进入问题清单（问题条目仅字符串键）；非法字符串键仍整包拒绝', () {
+      final payload = {
+        'keys': {1: '"x"', 'ls_autosave': '{"v":1}', 'ls_cfg': '"z"'},
+      };
+      final result = validateImportPayload(payload, gameExact);
+      expect(result.ok, isFalse, reason: '非法字符串键（cfg 键名）仍整包拒绝');
+      expect(result.error, contains('键「ls_cfg」不在该游戏存档键白名单内'));
+      expect(result.error, isNot(contains('键「1」')), reason: '非字符串键不列入问题清单');
+    });
+
+    test('F-27 桌面等价锚：纯非字符串键 → 合法空包（ok:true，无问题项）', () {
+      final result =
+          validateImportPayload({'keys': {1: '"x"', 2.5: '"y"'}}, gameExact);
+      expect(result.ok, isTrue);
+      expect(result.keys, isEmpty);
+    });
   });
 
   // ══════════════════════════════════════════════════

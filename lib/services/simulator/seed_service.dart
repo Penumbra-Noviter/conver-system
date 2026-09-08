@@ -11,7 +11,9 @@
 /// 3. manifest **最后**落盘：中断于 manifest 之前 → 下次启动重种；中断于
 ///    manifest 之后 → 视为已种子（标记语义，不逐文件修复）；
 /// 4. 种子源缺失（资产源不可枚举 / 源缺 manifest）→ 降级不崩溃（返回
-///    false，不创建目录）；数据目录不可写 → 抛带目录路径的明确错误。
+///    false，不创建目录）；数据目录不可写 → 抛带目录路径的明确错误；
+/// 5. 单游戏资产缺失（manifest 列出但源缺，F-25/TD-1）→ 跳过该文件
+///    继续种其余，不中止整次种子。
 ///
 /// 与桌面的形态差异（语义等价）：桌面保险种源在文件系统（`builtin_dir`
 /// iterdir 枚举）；移动端内置资产随包（rootBundle），无法枚举目录，资产
@@ -40,8 +42,10 @@ typedef LoadSeedAsset = Future<Uint8List> Function(String path);
 ///
 /// 返回 true = 本次执行了种子拷贝；false = 已种子（标记存在）或种子源缺失
 /// （源 manifest 不可加载 / 结构不可枚举，降级不崩溃，不创建目录）。
-/// 数据目录不可写 → 抛 [FileSystemException]（消息含 `simDir` 完整路径）。
-/// 游戏资产加载失败（源缺陷）→ 原样抛出（启动期可闻，不静默吞掉）。
+/// 数据目录不可写 / 资产读取遇文件系统层错误 → 抛 [FileSystemException]
+/// （消息含 `simDir` 完整路径）。
+/// 单游戏资产缺失（manifest 列出但源缺，rootBundle 裸抛 FlutterError 等非
+/// 文件系统错误）→ **跳过该文件继续种其余**，不中止整次种子（F-25/TD-1）。
 ///
 /// 源文件清单 = [assetRoot] 下 `manifest.json` 的 `simulators[].file`
 /// （manifest 条目序即拷贝序）；目标落盘名取自 file 的路径 basename
@@ -83,7 +87,17 @@ Future<bool> ensureSeeded({
   try {
     simDir.createSync(recursive: true);
     for (final file in seedFiles) {
-      final bytes = await loadAsset('$assetRoot/$file');
+      final Uint8List bytes;
+      try {
+        bytes = await loadAsset('$assetRoot/$file');
+      } on FileSystemException {
+        // 文件系统层错误（非单游戏缺失）→ 交外层带路径包装（目录不可用语义）。
+        rethrow;
+      } catch (_) {
+        // F-25 单游戏缺失降级（TD-1）：manifest 列出但资产源缺（rootBundle
+        // 裸抛 FlutterError 等）→ 跳过该文件继续种其余，不中止整次种子。
+        continue;
+      }
       final target = File('${simDir.path}${Platform.pathSeparator}${_basename(file)}');
       await target.writeAsBytes(bytes, flush: true);
     }
