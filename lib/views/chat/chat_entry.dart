@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
+import '../../widgets/empty_state.dart';
 import 'chat_controller.dart';
 
 /// 最近对话列表 + 新建的临时入口页。
@@ -143,25 +144,10 @@ class _ConversationList extends StatelessWidget {
     final conversations = controller.conversations;
     if (conversations.isEmpty && !controller.loadingEntry) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 40,
-              color: ConverPalette.of(context).ink4,
-            ),
-            const SizedBox(height: ConverSpacing.space2),
-            Text(
-              '还没有对话',
-              style: textTheme.bodyMedium?.copyWith(color: palette.ink3),
-            ),
-            const SizedBox(height: ConverSpacing.space1),
-            Text(
-              '点「新建对话」开始第一段聊天',
-              style: textTheme.bodySmall?.copyWith(color: palette.ink4),
-            ),
-          ],
+        child: EmptyState(
+          icon: Icons.chat_bubble_outline,
+          message: '还没有对话',
+          hint: '点「新建对话」开始第一段聊天',
         ),
       );
     }

@@ -282,6 +282,41 @@ void main() {
       expect(find.text('人生模拟器 v3'), findsNothing, reason: 'AI 卡被过滤');
       expect(find.text('生成的冒险'), findsNothing);
     });
+
+    testWidgets('筛选空态：切档后无匹配游戏 → 空态文案 + 提示（验收 6 锚）',
+        (tester) async {
+      buildController();
+      manifest.result = parseManifest(manifest3Json);
+
+      await pumpView(tester);
+
+      // manifest3Json 无任何含「纯本地」类型外组合：先全局选「AI 驱动」删档，
+      // 再切一个无匹配档验证筛选空态（该类型暂无可用的游戏）。
+      await tester.tap(find.widgetWithText(ChoiceChip, '纯本地'));
+      await tester.pump();
+      expect(find.text('本地示例'), findsOneWidget);
+
+      // 数据源改为「无纯本地游戏」→ 下拉刷新后筛选空态。
+      manifest.result = parseManifest('''
+{"version":2,"simulators":[
+  {"id":"life-sim","file":"人生模拟器v3.html","name":"人生模拟器 v3","type":"ai","description":"x"},
+  {"id":"gen-game","file":"gen.html","name":"生成的冒险","type":"ai","description":"y"}
+]}
+''');
+      await tester.fling(
+        find.byType(RefreshIndicator),
+        const Offset(0, 300),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
+
+      expect(find.text('该类型暂无可用的游戏'), findsOneWidget,
+          reason: '筛选空态文案逐字（验收 6 锚）');
+      expect(find.text('切换筛选或下拉刷新'), findsOneWidget,
+          reason: '筛选空态提示逐字');
+    });
   });
 
   group('AppBar 三入口 · 渲染 / 禁用态 / 接线派发', () {
