@@ -59,6 +59,7 @@ class ChatUiMessage {
     required this.role,
     required this.content,
     this.stopped = false,
+    this.interrupted = false,
     this.streaming = false,
   });
 
@@ -73,6 +74,10 @@ class ChatUiMessage {
 
   /// 主动停止：UI 侧「已停止」标记（DB 不写标记）。
   final bool stopped;
+
+  /// 断流截断：UI 侧「回复中断」标记（DB 不写标记；与 [stopped] 区分并列，
+  /// 停止/断流为互斥终态不会同时命中）。
+  final bool interrupted;
 
   /// 流式进行中：渲染纯文本 + 闪烁光标（两级降频 streaming 侧）。
   final bool streaming;
@@ -444,6 +449,7 @@ class ChatController extends ChangeNotifier {
           role: m.role,
           content: m.content,
           stopped: _round.isStopped(m.id),
+          interrupted: _round.isInterrupted(m.id),
         ),
     ];
     final pendingUser = _round.pendingUserText;
@@ -518,6 +524,22 @@ class ChatController extends ChangeNotifier {
       return;
     }
     await _round.regenerate(conversationId: cid);
+  }
+
+  /// 当前提示是否为「回复已中断」且会话内存在可重试的截断回复——NoticeBanner
+  /// 「重试」动作渲染判据（仅截断通知传动作；其它 notice 不传，防动作误挂）。
+  bool get hasRetryableInterrupted =>
+      notice == ChatRound.interruptedNoticeText && _round.hasInterrupted;
+
+  /// 重试最近一次截断回复（T3 NoticeBanner「重试」，M6-08）：委托
+  /// [ChatRound.retryInterrupted]——对截断目标触发 regenerate（replace 语义：
+  /// 不新增 user 行）；复用 isRegenerating 防并发与 notice 先错者胜。
+  Future<void> retryInterrupted() async {
+    final cid = _activeConversationId;
+    if (cid == null) {
+      return;
+    }
+    await _round.retryInterrupted(conversationId: cid);
   }
 
   // ── 服务/生命周期 ──

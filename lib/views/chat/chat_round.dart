@@ -1,10 +1,11 @@
 /// ChatRound — 聊天回合状态机（2026-09-07 架构深化候选 5：自 ChatController
 /// 分离，纯搬迁不动行为）。
 ///
-/// 深模块：协议表面 = [send] / [stop] / [regenerate] 三操作 + 合成消息只读
-/// 状态面 + [resetForNavigation] / [applyBackgroundStoppedMark] / [isStopped]；
+/// 深模块：协议表面 = [send] / [stop] / [regenerate] / [retryInterrupted]
+/// 四操作 + 合成消息只读状态面 + [resetForNavigation] /
+/// [applyBackgroundStoppedMark] / [isStopped] / [isInterrupted]；
 /// 实现内含流订阅、合成消息 id、停止竞态（F1）、入口态/后台流停止补标
-/// （F3b）等回合生命周期逻辑。
+/// （F3b）、断流截断标记与重试（M6-08）等回合生命周期逻辑。
 ///
 /// 语义锚点（逐字对齐 ChatController 既有回合行为）：
 /// - 发送：[send] 置 isStreaming → 乐观追加在途 user + 流式占位气泡 →
@@ -17,7 +18,12 @@
 /// - 重生成：[regenerate] 走 ChatService 延迟删除（失败不删行、旧回复保留），
 ///   成功经 [reloadMessages] 重载；[isRegenerating] 防并发；
 /// - 断流：[ChatInterrupted] → notice「回复已中断」（经共享 [NoticeRunner]
-///   先错者胜，不挡后续操作）。
+///   先错者胜，不挡后续操作）+ 截断落库消息标「回复中断」（[isInterrupted]，
+///   UI 侧标记、DB 不写，与「已停止」[isStopped] 区分并列）；零部分内容
+///   （[ChatInterrupted] messageId 为 null）→ 仅提示、无标记；
+/// - 断流重试：[retryInterrupted] 对截断目标消息触发 [ChatService.regenerate]
+///   （replace 语义：不新增 user 行），复用 [isRegenerating] 防并发与 notice
+///   先错者胜；重试成功 → 截断行被替换、标记与提示随重载自然消失。
 library;
 
 import 'dart:async';
@@ -40,6 +46,9 @@ import '../../services/notice_runner.dart';
 // 同时满足两者，整文件抑制该 lint（对齐 chat_controller.dart 惯例）。
 // ignore_for_file: prefer_initializing_formals
 class ChatRound {
+  /// 断流提示文案（NoticeBanner 展示 + 「重试」动作渲染判据的单一来源）。
+  static const String interruptedNoticeText = '回复已中断';
+
   /// [chatService] 回合编排服务；[messageRepository] 停止竞态确认（F1）与
   /// 后台流末条判定（F3b）数据源；[noticeRunner] 共享 notice 槽（断流 /
   /// 错误先错者胜，发送起始清空）；[reloadMessages] 终态 / 停止后重载当前
@@ -75,6 +84,12 @@ class ChatRound {
 
   /// 主动停止后落库的 assistant 消息 id 集合（UI 侧「已停止」标记）。
   final Set<int> _stoppedMessageIds = <int>{};
+
+  /// 断流后落库的截断 assistant 消息 id 集合（UI 侧「回复中断」标记，DB 不
+  /// 写）。会话内断流标记：断流时正处于该会话才记录（对齐 08 已知限制——
+  /// 后台流断流补标不做）；随 [resetForNavigation] 清空、随
+  /// [retryInterrupted] 成功移除（replace 后旧 id 已删除）。
+  final Set<int> _interruptedMessageIds = <int>{};
 
   /// 当前回合所属对话 id（[send] 时记录）。入口态/后台流停止时仍可定位本轮
   /// 会话（F3b）。
@@ -133,6 +148,14 @@ class ChatRound {
 
   /// [messageId] 是否已被标记「已停止」（UI 渲染「已停止」标记）。
   bool isStopped(int messageId) => _stoppedMessageIds.contains(messageId);
+
+  /// [messageId] 是否已被标记「回复中断」（UI 渲染「回复中断」小标；与
+  /// [isStopped] 区分并列——停止/断流为互斥终态，不会同时命中同一消息）。
+  bool isInterrupted(int messageId) => _interruptedMessageIds.contains(messageId);
+
+  /// 会话内是否存在可重试的截断回复（NoticeBanner「重试」动作渲染判据——
+  /// 配合「回复已中断」notice 消费；零部分内容断流为 false）。
+  bool get hasInterrupted => _interruptedMessageIds.isNotEmpty;
 
   // ── 回合操作 ──
 
@@ -246,15 +269,56 @@ class ChatRound {
     _notify();
   }
 
+  /// 重试最近一次截断回复（T3 NoticeBanner「重试」动作，M6-08）：对截断
+  /// 目标消息触发 [ChatService.regenerate]（replace 语义——不新增 user 行、
+  /// 无重复输入，复用延迟删除：失败旧截断行保留）。
+  ///
+  /// 守卫与既有 [regenerate] 同构：[isStreaming] / [isRegenerating] /
+  /// [_reloadPending] 时忽略；无截断目标（[hasInterrupted] 假）零副作用。
+  /// 失败经 [NoticeRunner] 先错者胜（既有「回复已中断」不被失败文案覆盖）；
+  /// 成功 → 截断行被替换、标记随重载自然消失，并清空该目标标记与中断
+  /// notice（中断已解决，提示不再展示）。
+  Future<void> retryInterrupted({required int conversationId}) async {
+    if (_isStreaming || _isRegenerating || _reloadPending) {
+      return;
+    }
+    if (_interruptedMessageIds.isEmpty) {
+      return;
+    }
+    final targetId = _interruptedMessageIds.last;
+    _isRegenerating = true;
+    _notify();
+    var succeeded = false;
+    await _noticeRunner.guard<void>(
+      op: () async {
+        await _chatService.regenerate(
+          conversationId: conversationId,
+          messageId: targetId,
+        );
+        await _reloadMessages();
+        succeeded = true;
+      },
+      onError: (e) => _descriptiveError(e),
+    );
+    if (succeeded) {
+      // 截断行已替换删除（旧 id 不复存在）：清标记与「回复已中断」提示。
+      _interruptedMessageIds.remove(targetId);
+      _noticeRunner.clear();
+    }
+    _isRegenerating = false;
+    _notify();
+  }
+
   // ── 导航 / 生命周期面 ──
 
   /// 导航切换清理（openConversation / backToEntry 共用）：清在途合成 / 已
-  /// 停止标记 / 终态重载待办。不触碰 round 生命周期字段（入口态后台流继续
-  /// 时仍可判定部分内容已落库，F3b 语义）。
+  /// 停止标记 / 截断标记（M6-08：跨会话不串标）/ 终态重载待办。不触碰 round
+  /// 生命周期字段（入口态后台流继续时仍可判定部分内容已落库，F3b 语义）。
   void resetForNavigation() {
     _clearInFlight();
     _reloadPending = false;
     _stoppedMessageIds.clear();
+    _interruptedMessageIds.clear();
   }
 
   /// 重进 [conversationId] 时补后台停止标记（F3b）：该会话有待补标记且
@@ -285,8 +349,14 @@ class ChatRound {
         _roundStreamedAnything = true;
       case ChatDone():
         _finishRound();
-      case ChatInterrupted():
-        _noticeRunner.setFirst('回复已中断');
+      case ChatInterrupted(:final messageId):
+        _noticeRunner.setFirst(ChatRound.interruptedNoticeText);
+        // 截断回复「回复中断」标记（会话内断流，M6-08）：记录落库的截断消息
+        // id（零部分内容 messageId 为 null → 无标记、无重试目标）。
+        final truncatedId = messageId;
+        if (truncatedId != null) {
+          _interruptedMessageIds.add(truncatedId);
+        }
         _finishRound();
       case ChatError error:
         _noticeRunner.setFirst(error.message);
