@@ -412,61 +412,66 @@ class _GameCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final palette = ConverPalette.of(context);
     final colorScheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onOpen == null ? null : () => onOpen!(game),
-      borderRadius: BorderRadius.circular(ConverRadii.md),
-      child: Container(
-        padding: const EdgeInsets.all(ConverSpacing.space3),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(ConverRadii.md),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              game.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.titleSmall?.copyWith(color: palette.ink1),
-            ),
-            const SizedBox(height: ConverSpacing.space1),
-            Expanded(
-              child: Text(
-                game.description,
-                maxLines: 3,
+    return Semantics(
+      // 可点卡片 button 语义（spec §4.4 覆盖清单 ③）；onOpen 未接线 → 不可点，
+      // 不标 button（Falsify：无 onTap 时不误导屏幕阅读器）。
+      button: onOpen != null,
+      child: InkWell(
+        onTap: onOpen == null ? null : () => onOpen!(game),
+        borderRadius: BorderRadius.circular(ConverRadii.md),
+        child: Container(
+          padding: const EdgeInsets.all(ConverSpacing.space3),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerLow,
+            border: Border.all(color: palette.border),
+            borderRadius: BorderRadius.circular(ConverRadii.md),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                game.name,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall?.copyWith(color: palette.ink2),
+                style: textTheme.titleSmall?.copyWith(color: palette.ink1),
               ),
-            ),
-            const SizedBox(height: ConverSpacing.space2),
-            Wrap(
-              spacing: ConverSpacing.space2,
-              runSpacing: 2,
-              children: [
-                _Badge(
-                  label: game.type == SimulatorGameType.ai ? 'AI 驱动' : '纯本地',
-                  color: colorScheme.surfaceContainerHigh,
-                  foreground: game.type == SimulatorGameType.ai
-                      ? colorScheme.primary
-                      : palette.ink3,
+              const SizedBox(height: ConverSpacing.space1),
+              Expanded(
+                child: Text(
+                  game.description,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(color: palette.ink2),
                 ),
-                if (game.source == SimulatorGameSource.imported)
+              ),
+              const SizedBox(height: ConverSpacing.space2),
+              Wrap(
+                spacing: ConverSpacing.space2,
+                runSpacing: 2,
+                children: [
                   _Badge(
-                    label: '导入',
+                    label: game.type == SimulatorGameType.ai ? 'AI 驱动' : '纯本地',
                     color: colorScheme.surfaceContainerHigh,
-                    foreground: palette.ink3,
+                    foreground: game.type == SimulatorGameType.ai
+                        ? colorScheme.primary
+                        : palette.ink3,
                   ),
-                if (game.source == SimulatorGameSource.generated)
-                  _Badge(
-                    label: '生成',
-                    color: colorScheme.surfaceContainerHigh,
-                    foreground: palette.ink3,
-                  ),
-              ],
-            ),
-          ],
+                  if (game.source == SimulatorGameSource.imported)
+                    _Badge(
+                      label: '导入',
+                      color: colorScheme.surfaceContainerHigh,
+                      foreground: palette.ink3,
+                    ),
+                  if (game.source == SimulatorGameSource.generated)
+                    _Badge(
+                      label: '生成',
+                      color: colorScheme.surfaceContainerHigh,
+                      foreground: palette.ink3,
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -450,4 +450,45 @@ void main() {
       await env.close();
     });
   });
+
+  group('语义覆盖（M6-03 验收 4）', () {
+    testWidgets('角色卡 Semantics(button) + 长按多选 hint「长按可多选」', (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(name: '诺克斯');
+
+      await pumpChars(tester, env, env.controller);
+
+      final handle = tester.ensureSemantics();
+      final node = tester.getSemantics(find.text('诺克斯'));
+      expect(node.flagsCollection.isButton, isTrue,
+          reason: '角色卡 button 语义（screen reader 可确认可点）');
+      expect(
+        node.hint,
+        contains('长按可多选'),
+        reason: '长按多选 hint 在语义树（卡片 hint）',
+      );
+      handle.dispose();
+      await env.close();
+    });
+
+    testWidgets('多选态：勾选后 tap 语义保留 button + hint', (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(name: '诺克斯');
+
+      await pumpChars(tester, env, env.controller);
+      // 长按进入多选并勾选。
+      await tester.longPress(find.text('诺克斯'));
+      await tester.pump();
+
+      expect(env.controller.selectionMode, isTrue, reason: '长按进入多选');
+      final handle = tester.ensureSemantics();
+      final node = tester.getSemantics(find.text('诺克斯'));
+      expect(node.flagsCollection.isButton, isTrue,
+          reason: '多选态 tap 切换勾选仍为 button 语义');
+      expect(node.hint, contains('长按可多选'),
+          reason: 'hint 在多选态保留');
+      handle.dispose();
+      await env.close();
+    });
+  });
 }

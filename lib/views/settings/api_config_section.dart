@@ -266,6 +266,9 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
               isDense: true,
               hintText: '未配置',
               suffixIcon: IconButton(
+                // tooltip 即语义 label（M6-03 审计补齐：设置页唯一缺 tooltip
+                // 的 IconButton）；文案随可见性状态切换。
+                tooltip: _visible[provider]! ? '隐藏密钥' : '显示密钥',
                 icon: Icon(
                   _visible[provider]!
                       ? Icons.visibility_off_outlined

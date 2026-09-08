@@ -134,6 +134,10 @@ class ChatController extends ChangeNotifier {
   int? _activeConversationId;
   Conversation? _activeConversation;
 
+  /// 当前会话角色名缓存（assistant/system 气泡语义 label「角色名: 内容」
+  /// 用，M6-03 验收 2 语义来源）；入口页 / 会话加载失败为 null。
+  String? _activeCharacterName;
+
   // ── 会话状态（DB 权威列表）──
 
   List<Message> _dbMessages = const [];
@@ -307,6 +311,10 @@ class ChatController extends ChangeNotifier {
   /// 当前对话行；null（未打开 / 对话被删）时 UI 回退占位标题。
   Conversation? get activeConversation => _activeConversation;
 
+  /// 当前会话角色名（assistant/system 气泡语义 label「角色名: 内容」用）；
+  /// 入口页 / 会话加载失败为 null。
+  String? get activeCharacterName => _activeCharacterName;
+
   // ── 跳转定位高亮面（M3-04c）──
 
   /// 当前高亮目标消息 id 集合（DB 正 id；高亮清除 / 换会话时清空）。
@@ -367,6 +375,8 @@ class ChatController extends ChangeNotifier {
       _noticeRunner.setFirst('加载对话失败: $error');
       _activeConversation = null;
     }
+    // M6-03：缓存角色名供气泡语义 label（失败 / 会话缺失 → null，UI 回退）。
+    _activeCharacterName = await _resolveActiveCharacterName();
     await _reloadMessages();
     // 入口态/后台流停止的待补「已停止」标记：重进该会话且末条为 assistant
     // → 补标一次（F3b，标记判定不依赖停止时 reload 目标）。
@@ -386,6 +396,7 @@ class ChatController extends ChangeNotifier {
     clearHighlight();
     _activeConversationId = null;
     _activeConversation = null;
+    _activeCharacterName = null;
     _dbMessages = const [];
     _round.resetForNavigation();
     _noticeRunner.clear();
@@ -404,6 +415,22 @@ class ChatController extends ChangeNotifier {
   }
 
   // ── 会话面 ──
+
+  /// 解析当前会话角色名（label「角色名: 内容」语义来源）；会话缺失 / 查询
+  /// 失败 → null（UI 回退占位，不抛错不弹 notice——装饰性语义面）。
+  Future<String?> _resolveActiveCharacterName() async {
+    final conversation = _activeConversation;
+    if (conversation == null) {
+      return null;
+    }
+    try {
+      final character =
+          await _characterRepository.getCharacter(conversation.characterId);
+      return character?.name;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// 组装展示消息列表：DB 权威消息 + 在途合成消息（user + 流式/停止占位）。
   ///

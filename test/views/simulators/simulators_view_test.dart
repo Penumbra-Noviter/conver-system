@@ -554,6 +554,44 @@ void main() {
           reason: 'W6 B1：重挂载后卡片打开入口仍派发（external 钩子优先保留）');
     });
   });
+
+  group('语义覆盖（M6-03 验收 5）', () {
+    Future<void> mountReady(WidgetTester tester, SimulatorsHooks hooks) async {
+      buildController(hooks: hooks);
+      manifest.result = parseManifest(manifest3Json);
+      await tester.pumpWidget(
+        MaterialApp(theme: ConverTheme.dark(), home: SimulatorsView(controller: controller)),
+      );
+      for (var i = 0;
+          i < 200 && controller.state == SimulatorsState.loading;
+          i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pump();
+    }
+
+    testWidgets('游戏卡 onTap 非空 → Semantics(button: true)', (tester) async {
+      await mountReady(tester, _RecordingHooks());
+
+      final handle = tester.ensureSemantics();
+      final node = tester.getSemantics(find.text('人生模拟器 v3'));
+      expect(node.flagsCollection.isButton, isTrue,
+          reason: '游戏卡 button 语义（onTap 已接线，可点打开）');
+      handle.dispose();
+    });
+
+    testWidgets('默认装配（无外接 onOpen）→ 视图自动接线 → button 语义保留', (tester) async {
+      await mountReady(tester, const SimulatorsHooks());
+
+      // wireViewDefaults 恒回落 view 默认 onOpen（buildRunPageLauncher），
+      // 挂载后卡片可点 → button 语义为真（对齐既有「未接线不崩」装配行为）。
+      final handle = tester.ensureSemantics();
+      final node = tester.getSemantics(find.text('人生模拟器 v3'));
+      expect(node.flagsCollection.isButton, isTrue,
+          reason: '默认装配自动接线 onOpen → 卡片可点，标 button');
+      handle.dispose();
+    });
+  });
 }
 
 /// 记录导入流派发次数的 fake flow（W6 B1 接线回归断言用）。

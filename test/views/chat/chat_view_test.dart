@@ -683,4 +683,82 @@ void main() {
       await env.close();
     });
   });
+
+  group('语义覆盖（M6-03 验收 1/2/3）', () {
+    testWidgets('user 气泡 MergeSemantics label「你: 内容」整体朗读', (tester) async {
+      final env = await ChatTestEnv.create();
+      await openConversation(tester, env, FakeLLMProvider(tokens: const []));
+      await sendViaUi(tester, '早上好');
+
+      final handle = tester.ensureSemantics();
+      expect(find.bySemanticsLabel('你: 早上好'), findsOneWidget,
+          reason: 'user 气泡 label「你: 内容」');
+      handle.dispose();
+      await env.close();
+    });
+
+    testWidgets('assistant 气泡 MergeSemantics label「角色名: 内容」（角色名取当前会话角色）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      await openConversation(
+        tester,
+        env,
+        TickingFakeLLMProvider(
+          tokens: const ['早上好', '！'],
+          delay: const Duration(milliseconds: 10),
+        ),
+      );
+      await sendViaUi(tester, 'hi');
+      await pumpUntil(
+        tester,
+        () => find.text('早上好！', findRichText: true).evaluate().isNotEmpty,
+        why: 'assistant 完整回复完成',
+      );
+
+      final handle = tester.ensureSemantics();
+      expect(find.bySemanticsLabel('艾莉亚: 早上好！'), findsOneWidget,
+          reason: 'assistant 气泡 label「角色名: 内容」（默认 seed 角色名艾莉亚）');
+      handle.dispose();
+      await env.close();
+    });
+
+    testWidgets('▍光标 ExcludeSemantics：语义树无「▍」噪音', (tester) async {
+      final env = await ChatTestEnv.create();
+      await openConversation(
+        tester,
+        env,
+        TickingFakeLLMProvider(
+          tokens: const ['早', '上'],
+          delay: const Duration(milliseconds: 10),
+        ),
+      );
+      await sendViaUi(tester, 'hi');
+      await tester.pump(const Duration(milliseconds: 11));
+
+      // streaming 占位气泡含 ▍ 光标。
+      expect(find.text('▍'), findsOneWidget);
+
+      final handle = tester.ensureSemantics();
+      expect(find.bySemanticsLabel('▍'), findsNothing,
+          reason: '▍ 光标被 ExcludeSemantics 排除，不产生朗读噪音');
+      expect(
+        find.descendant(
+          of: find.byType(ExcludeSemantics),
+          matching: find.text('▍'),
+        ),
+        findsOneWidget,
+        reason: '▍ 光标被 ExcludeSemantics 包裹',
+      );
+      handle.dispose();
+
+      // 让流式跑完（drain FakeAsync timers，防 dispose 时 Timer pending）。
+      await pumpUntil(
+        tester,
+        () => find.byType(MarkdownBody).evaluate().isNotEmpty,
+        why: '流式完成后光标消失',
+      );
+      expect(find.text('▍'), findsNothing);
+      await env.close();
+    });
+  });
 }
