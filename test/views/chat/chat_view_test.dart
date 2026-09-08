@@ -462,6 +462,48 @@ void main() {
       await env.close();
     });
 
+    testWidgets('断流后点气泡图标「重生成」→ 标记清除 + 横幅消失 + 无可重试目标'
+        '（B1=W6 F-1 死重试按钮回归）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final c = await openConversation(
+        tester,
+        env,
+        InterruptStreamRetryProvider(reply: '新回复'),
+      );
+
+      await sendViaUi(tester, 'hi');
+      await pumpUntil(tester, () => find.text('回复已中断').evaluate().isNotEmpty,
+          why: '断流提示出现');
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
+      expect(find.text('回复中断'), findsOneWidget, reason: '前置：截断标记');
+      expect(find.text('重试'), findsOneWidget, reason: '前置：横幅含重试');
+      expect(c.hasRetryableInterrupted, isTrue);
+
+      // 用户点气泡「重生成」图标（非横幅重试）→ 缺省末条 = 截断消息。
+      await tester.tap(find.byTooltip('重生成'));
+      await tester.pump();
+      await pumpUntil(
+        tester,
+        () => find.text('新回复', findRichText: true).evaluate().isNotEmpty &&
+            find.text('回复中断').evaluate().isEmpty,
+        why: '图标 regenerate 替换完成、标记清除',
+      );
+
+      expect(find.text('回复已中断'), findsNothing,
+          reason: '横幅消失（F-1：regenerate 路径不再残留死重试提示）');
+      expect(find.text('重试'), findsNothing, reason: '死重试按钮不复存在');
+      expect(c.hasRetryableInterrupted, isFalse);
+      expect(c.notice, isNull);
+      expect(c.messages.last.interrupted, isFalse);
+      final settled =
+          await env.messageRepository.getMessages(c.activeConversationId!);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, '新回复')],
+          reason: '图标 regenerate replace 成功、无重复 user 行');
+      await env.close();
+    });
+
     testWidgets('断流零部分内容 → 无「回复中断」标、提示条无「重试」（验收 7）',
         (tester) async {
       final env = await ChatTestEnv.create();

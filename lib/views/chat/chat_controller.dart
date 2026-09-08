@@ -526,10 +526,12 @@ class ChatController extends ChangeNotifier {
     await _round.regenerate(conversationId: cid);
   }
 
-  /// 当前提示是否为「回复已中断」且会话内存在可重试的截断回复——NoticeBanner
-  /// 「重试」动作渲染判据（仅截断通知传动作；其它 notice 不传，防动作误挂）。
+  /// 当前提示是否为「回复已中断」且该提示存在可重试的截断目标——NoticeBanner
+  /// 「重试」动作渲染判据（仅截断通知传动作；其它 notice / 零内容断流不传，
+  /// 防动作误挂）。
   bool get hasRetryableInterrupted =>
-      notice == ChatRound.interruptedNoticeText && _round.hasInterrupted;
+      notice == ChatRound.interruptedNoticeText &&
+      _round.interruptedNoticeTargetId != null;
 
   /// 重试最近一次截断回复（T3 NoticeBanner「重试」，M6-08）：委托
   /// [ChatRound.retryInterrupted]——对截断目标触发 regenerate（replace 语义：
