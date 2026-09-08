@@ -107,10 +107,15 @@ void main() {
 
   /// 装配 ChatRound：驱动真实 ChatService + [provider]；[reloadMessages] 缺省
   /// 为「计数 + 返回 [env.reloaded]」，测试可注入定制重载语义（如会话内停止
-  /// 经真实仓储读末条）。
+  /// 经真实仓储读末条）。[connectRetryDelays] 透传 ChatService 连接阶段重试
+  /// 退避序列（零部分断流测试注入空序列跳过 1s/2s 生产退避）。
   _RoundEnv wireRound(
     LLMProvider provider, {
     Future<List<Message>> Function()? reloadMessages,
+    List<Duration> connectRetryDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+    ],
   }) {
     final service = ChatService(
       database: db,
@@ -119,6 +124,7 @@ void main() {
       messageRepository: messageRepo,
       settingsRepository: settingsRepo,
       providerFactory: FixedLLMProviderFactory(provider),
+      connectRetryDelays: connectRetryDelays,
     );
     late _RoundEnv env;
     final notice = NoticeRunner();
@@ -321,6 +327,205 @@ void main() {
           [(Role.user, 'hi'), (Role.assistant, 'a')],
           reason: '已累积部分落库');
     });
+
+    test('断流有部分内容 → isInterrupted 标记，isStopped 假（两标互斥）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(TickingFakeLLMProvider(
+        tokens: const ['a'],
+        delay: const Duration(milliseconds: 10),
+        errorAfter: LLMConnectionInterruptedError(),
+      ));
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      await _until(() async => (await messageRepo.getMessages(conv.id)).length == 2,
+          why: '截断行落库');
+
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue,
+          reason: '截断回复标「回复中断」（UI 侧标记）');
+      expect(env.round.isStopped(partial.id), isFalse,
+          reason: '断流非主动停止，「已停止」与「回复中断」不并存于同一消息');
+      expect(env.round.hasInterrupted, isTrue, reason: '存在可重试截断目标');
+    });
+
+    test('断流零部分内容（ChatInterrupted(null)）→ 无标记、无重试目标', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        TickingFakeLLMProvider(
+          tokens: const [],
+          errorAfter: LLMConnectionInterruptedError(),
+        ),
+        // 无 token 的连接中断属「首 token 前」重试窗口：注入空退避序列以便
+        // 直接收束（生产为 [1s,2s] 退避耗尽后到该终态）。
+        connectRetryDelays: const [],
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+
+      expect(env.round.hasInterrupted, isFalse,
+          reason: '零部分内容无截断目标（重试目标解析语义自洽）');
+      expect(env.round.isInterrupted(-999), isFalse);
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) m.role], [Role.user],
+          reason: '无部分内容不落空 assistant');
+    });
+  });
+
+  group('retryInterrupted · 断流重试（M6-08）', () {
+    test('重试成功 → 对截断目标 regenerate：截断行替换、不新增 user 行、标记清、'
+        'notice 清', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        InterruptStreamRetryProvider(reply: '新回复'),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      await _until(() async => (await messageRepo.getMessages(conv.id)).length == 2,
+          why: '截断行落库');
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue,
+          reason: '截断标记前置条件');
+
+      await env.round.retryInterrupted(conversationId: conv.id);
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, '新回复')],
+          reason: 'replace 语义：截断行被替换、不新增 user 行、无重复输入');
+      expect(env.round.hasInterrupted, isFalse, reason: '重试成功无可重试目标');
+      expect(env.round.isInterrupted(partial.id), isFalse,
+          reason: '目标标记随替换清除');
+      expect(env.notice.notice, isNull, reason: '中断已解决，notice 清空');
+      expect(env.round.isRegenerating, isFalse, reason: '防并发标志复位');
+    });
+
+    test('重试失败 → 旧截断行保留 + 既有 notice 保持「回复已中断」（先错者胜）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        InterruptThenAuthFailProvider(),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      await _until(() async => (await messageRepo.getMessages(conv.id)).length == 2,
+          why: '截断行落库');
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+
+      await env.round.retryInterrupted(conversationId: conv.id);
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, 'a')],
+          reason: '失败不删行、旧截断行保留（延迟删除语义）');
+      expect(env.round.isInterrupted(partial.id), isTrue, reason: '标记保留');
+      expect(env.notice.notice, '回复已中断',
+          reason: '先错者胜：既有「回复已中断」不被失败文案覆盖');
+      expect(env.round.isRegenerating, isFalse, reason: '失败后防并发标志复位');
+    });
+
+    test('重试期间 isRegenerating 防并发（重复重试被忽略）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final provider = InterruptStreamRetryProvider(reply: '新回复');
+      final env = wireRound(provider,
+          reloadMessages: () => messageRepo.getMessages(conv.id));
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+
+      // 首次重试进行中（同步置 isRegenerating）再触发第二次 → 守卫忽略。
+      await env.round.retryInterrupted(conversationId: conv.id);
+      await env.round.retryInterrupted(conversationId: conv.id);
+
+      expect(provider.generateCallCount, 1,
+          reason: '重试期间重复重试被忽略（isRegenerating 守卫）');
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) m.role], [Role.user, Role.assistant],
+          reason: '无重复生成/无重复行');
+    });
+
+    test('无截断目标（零部分断流）→ retryInterrupted 零副作用', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        TickingFakeLLMProvider(
+          tokens: const [],
+          errorAfter: LLMConnectionInterruptedError(),
+        ),
+        connectRetryDelays: const [],
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      expect(env.round.hasInterrupted, isFalse);
+
+      await env.round.retryInterrupted(conversationId: conv.id);
+      expect(env.round.isRegenerating, isFalse, reason: '无目标不进入重试');
+      expect(env.notice.notice, '回复已中断', reason: '既有 notice 不受影响');
+    });
+  });
+
+  group('标记状态机 · 断流/停止/重试交错（M6-08 Falsify）', () {
+    test('先断流 → 重试成功 → 再发送断流：标记仅落在新截断目标（无残留）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        InterruptStreamRetryProvider(reply: '新回复'),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      // 第一轮：断流 + 重试成功。
+      env.round.send(conversationId: conv.id, text: '第一问');
+      await _until(() async => env.notice.notice == '回复已中断', why: '第一次断流');
+      final firstPartial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(firstPartial.id), isTrue);
+      await env.round.retryInterrupted(conversationId: conv.id);
+      expect(env.round.hasInterrupted, isFalse, reason: '重试成功标记清空');
+      expect(env.round.isInterrupted(firstPartial.id), isFalse,
+          reason: '旧目标标记无残留');
+
+      // 第二轮：再发送再断流 → 标记仅落在新截断行。
+      env.round.send(conversationId: conv.id, text: '第二问');
+      await _until(() async => env.notice.notice == '回复已中断', why: '第二次断流');
+      final secondPartial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(secondPartial.id), isTrue,
+          reason: '新截断行标记');
+      expect(env.round.hasInterrupted, isTrue);
+      expect(env.round.isInterrupted(firstPartial.id), isFalse,
+          reason: '旧目标（已被替换删除）不再在列表中');
+    });
+
+    test('停止不产生「回复中断」标记；断流不产生「已停止」标记', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        TickingFakeLLMProvider(
+          tokens: const ['a', 'b'],
+          delay: const Duration(milliseconds: 10),
+        ),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.round.streamingText.isNotEmpty, why: '已累积 token');
+      await env.round.stop(currentConversationId: conv.id);
+
+      final stopped = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isStopped(stopped.id), isTrue, reason: '主动停止标「已停止」');
+      expect(env.round.isInterrupted(stopped.id), isFalse,
+          reason: '主动停止不产生「回复中断」标记');
+      expect(env.round.hasInterrupted, isFalse);
+    });
   });
 
   group('regenerate · 重生成（A4）', () {
@@ -394,6 +599,27 @@ void main() {
       expect([for (final m in msgs) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, 'ab')],
           reason: 'reset 后 token 仍继续落库（后台流完整落地）');
+    });
+
+    test('截断标记随 resetForNavigation 清空（跨会话不串标，验收 6）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(TickingFakeLLMProvider(
+        tokens: const ['a'],
+        delay: const Duration(milliseconds: 10),
+        errorAfter: LLMConnectionInterruptedError(),
+      ));
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue);
+
+      env.round.resetForNavigation();
+
+      expect(env.round.isInterrupted(partial.id), isFalse,
+          reason: '返回入口/切换会话清理截断标记');
+      expect(env.round.hasInterrupted, isFalse);
     });
   });
 }

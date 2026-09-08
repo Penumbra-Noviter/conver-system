@@ -83,10 +83,16 @@ class ChatTestEnv {
   /// 控制器为纯状态机（不自动 loadEntry），UI 挂载时机由测试控制。
   /// M4-03 导出依赖为可选：不传则 controller 导出降级为「导出功能未配置」
   /// notice（既有测试装配不破坏）；传 fake 断言导出调用链。
+  /// [connectRetryDelays] 透传 ChatService 连接阶段重试退避（M6-08 零部分
+  /// 断流测试注入空序列跳过生产 1s/2s 退避，直接收束）。
   ChatController controllerOf(
     LLMProvider provider, {
     ConversationExportService? exportService,
     ConversationExportFileExchange? exportFileExchange,
+    List<Duration> connectRetryDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+    ],
   }) {
     final service = ChatService(
       database: db,
@@ -95,6 +101,7 @@ class ChatTestEnv {
       messageRepository: messageRepository,
       settingsRepository: settingsRepository,
       providerFactory: FixedLLMProviderFactory(provider),
+      connectRetryDelays: connectRetryDelays,
     );
     return ChatController(
       chatService: service,

@@ -180,3 +180,56 @@ class TickingFakeLLMProvider extends LLMProvider {
   @override
   Future<void> testConnection({String? model}) async {}
 }
+
+/// streamGenerate 产出一个 token 后以断流异常收束；generate（断流重试的
+/// regenerate）正常返回 [reply]——「断流截断标记 + 重试成功替换」标准路径替身
+/// （M6-08：错误态 T3 重试接线测试用）。
+class InterruptStreamRetryProvider extends TickingFakeLLMProvider {
+  InterruptStreamRetryProvider({required this.reply})
+      : super(
+          tokens: const ['a'],
+          errorAfter: LLMConnectionInterruptedError(),
+          delay: const Duration(milliseconds: 5),
+        );
+
+  /// regenerate（重试）返回的完整回复。
+  final String reply;
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async {
+    generateCallCount++;
+    lastMessages = messages;
+    lastMaxTokens = maxTokens;
+    lastModel = model;
+    return reply;
+  }
+}
+
+/// streamGenerate 产出一个 token 后以断流异常收束；generate（断流重试的
+/// regenerate）抛 [LLMAuthError]——「重试失败（先错者胜，旧行保留）」路径替身
+/// （M6-08）。
+class InterruptThenAuthFailProvider extends TickingFakeLLMProvider {
+  InterruptThenAuthFailProvider()
+      : super(
+          tokens: const ['a'],
+          errorAfter: LLMConnectionInterruptedError(),
+          delay: const Duration(milliseconds: 5),
+        );
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async {
+    generateCallCount++;
+    lastMessages = messages;
+    lastMaxTokens = maxTokens;
+    lastModel = model;
+    throw LLMAuthError('claude');
+  }
+}

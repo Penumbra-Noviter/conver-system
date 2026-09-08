@@ -85,12 +85,16 @@ void main() {
     LLMProvider provider, {
     String firstMes = '',
     int? characterId,
+    List<Duration> connectRetryDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+    ],
   }) async {
     final char = characterId == null
         ? await env.seedCharacter(firstMes: firstMes)
         : (await env.characterRepository.getCharacter(characterId))!;
     final conv = await env.seedConversation(char.id);
-    final c = env.controllerOf(provider);
+    final c = env.controllerOf(provider, connectRetryDelays: connectRetryDelays);
     await c.loadEntry();
     await c.openConversation(conv.id);
     await pumpChat(tester, c);
@@ -319,6 +323,127 @@ void main() {
       expect(find.byType(MarkdownBody), findsNothing);
       final settled = await env.messageRepository.getMessages(c.activeConversationId!);
       expect([for (final m in settled) m.role], [Role.user]);
+      await env.close();
+    });
+  });
+
+  group('断流「回复中断」标记 + NoticeBanner 重试（M6-08）', () {
+    testWidgets('断流有部分内容 → 气泡「回复中断」小标 + 提示条「重试」「关闭」'
+        '共存；「已停止」不出现（验收 1/2）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final c = await openConversation(
+        tester,
+        env,
+        InterruptStreamRetryProvider(reply: '新回复'),
+      );
+
+      await sendViaUi(tester, 'hi');
+      await pumpUntil(tester, () => find.text('回复已中断').evaluate().isNotEmpty,
+          why: '断流提示出现');
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
+
+      expect(find.text('回复中断'), findsOneWidget,
+          reason: '截断回复气泡「回复中断」小标');
+      expect(find.text('已停止'), findsNothing,
+          reason: '断流非主动停止，「已停止」不出现（两标互斥）');
+      expect(find.text('重试'), findsOneWidget,
+          reason: '「回复已中断」提示条含「重试」动作');
+      expect(find.byTooltip('关闭提示'), findsOneWidget,
+          reason: '重试按钮与关闭按钮共存');
+      expect(c.messages.last.interrupted, isTrue, reason: '控制器消息面打「回复中断」标');
+      expect(c.messages.last.stopped, isFalse);
+      expect(c.hasRetryableInterrupted, isTrue, reason: '存在可重试截断目标');
+      await env.close();
+    });
+
+    testWidgets('点「重试」→ regenerate replace：截断行替换、标记与提示消失、'
+        '不新增 user 行（验收 3/6）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final c = await openConversation(
+        tester,
+        env,
+        InterruptStreamRetryProvider(reply: '新回复'),
+      );
+
+      await sendViaUi(tester, 'hi');
+      await pumpUntil(tester, () => find.text('回复已中断').evaluate().isNotEmpty,
+          why: '断流提示出现');
+      expect(find.text('回复中断'), findsOneWidget);
+      expect(find.text('hi'), findsOneWidget);
+
+      await tester.tap(find.text('重试'));
+      await tester.pump();
+      await pumpUntil(
+        tester,
+        () => find.text('新回复', findRichText: true).evaluate().isNotEmpty &&
+            find.text('回复中断').evaluate().isEmpty,
+        why: '重试完成：截断行替换、标记消失',
+      );
+
+      expect(find.text('回复已中断'), findsNothing, reason: '中断已解决，提示消失');
+      expect(find.text('重试'), findsNothing, reason: '无可重试目标后动作消失');
+      expect(c.hasRetryableInterrupted, isFalse);
+      expect(c.messages.last.interrupted, isFalse, reason: '新回复无「回复中断」标');
+      // replace 语义：无重复 user 输入行。
+      final settled = await env.messageRepository.getMessages(c.activeConversationId!);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, '新回复')],
+          reason: '重试 regenerate replace：不新增 user 行、无重复输入');
+      await env.close();
+    });
+
+    testWidgets('重试失败 → 旧截断行保留 + 提示保持「回复已中断」（先错者胜）'
+        '，无未处理异常（验收 4）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final c = await openConversation(
+        tester,
+        env,
+        InterruptThenAuthFailProvider(),
+      );
+
+      await sendViaUi(tester, 'hi');
+      await pumpUntil(tester, () => find.text('回复已中断').evaluate().isNotEmpty,
+          why: '断流提示出现');
+
+      await tester.tap(find.text('重试'));
+      await tester.pump();
+      await pumpUntil(tester, () => !c.isRegenerating, why: '重试收尾');
+
+      expect(find.text('回复中断'), findsOneWidget, reason: '旧截断行保留、标记保留');
+      expect(find.text('回复已中断'), findsOneWidget,
+          reason: '先错者胜：既有提示不被失败文案覆盖');
+      expect(find.text('API Key 无效，请在设置中更新'), findsNothing,
+          reason: '先错者胜：重试失败文案不覆盖「回复已中断」');
+      final settled = await env.messageRepository.getMessages(c.activeConversationId!);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, 'a')],
+          reason: '失败不删行、旧截断行保留');
+      expect(tester.takeException(), isNull, reason: '无未处理异常');
+      await env.close();
+    });
+
+    testWidgets('断流零部分内容 → 无「回复中断」标、提示条无「重试」（验收 7）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      await openConversation(
+        tester,
+        env,
+        TickingFakeLLMProvider(
+          tokens: const [],
+          errorAfter: LLMConnectionInterruptedError(),
+        ),
+        // 无 token 连接中断属首 token 前重试窗口：注入空退避直接收束。
+        connectRetryDelays: const [],
+      );
+
+      await sendViaUi(tester, 'hi');
+      await pumpUntil(tester, () => find.text('回复已中断').evaluate().isNotEmpty,
+          why: '断流提示出现');
+
+      expect(find.text('回复中断'), findsNothing, reason: '零部分无截断回复可标记');
+      expect(find.text('重试'), findsNothing, reason: '无截断目标不出现重试动作');
+      expect(find.byTooltip('关闭提示'), findsOneWidget, reason: '仅关闭仍可用');
       await env.close();
     });
   });

@@ -103,6 +103,12 @@ class _ConversationView extends StatelessWidget {
             NoticeBanner(
               notice: controller.notice!,
               onDismiss: controller.dismissNotice,
+              // T3 流式级可操作提示（M6-08）：仅「回复已中断」且存在可重试截断
+              // 目标时传入「重试」动作；其它 notice 零动作（关闭-only）。
+              actionLabel:
+                  controller.hasRetryableInterrupted ? '重试' : null,
+              onAction:
+                  controller.hasRetryableInterrupted ? controller.retryInterrupted : null,
             ),
           Expanded(child: _MessageList(controller: controller)),
           _Composer(controller: controller),
@@ -529,6 +535,31 @@ class _AssistantBubble extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       '已停止',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (message.interrupted)
+              // 断流截断「回复中断」小标（M6-08）：danger 色族，与「已停止」
+              // 样式族并列但文案/图标区分；停止/断流为互斥终态，两标不会同时
+              // 出现在同一消息。
+              Padding(
+                padding: const EdgeInsets.only(top: ConverSpacing.space1),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_outlined,
+                      size: 14,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '回复中断',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.error,
