@@ -170,7 +170,7 @@ mobile/
 
 ### 4.4 方案③实测证据（prototype spike，2026-08-28）
 
-对 LLM API 做了 CORS 直连实测（preflight curl + 浏览器真实 fetch，假 Key 即可判定——CORS 在鉴权前执行，放行则拿到 4xx、拦截则 TypeError）。证据目录（桌面库）：`desktop/.scratch/mobile-cors-spike/`。
+对 LLM API 做了 CORS 直连实测（preflight curl + 浏览器真实 fetch，假 Key 即可判定——CORS 在鉴权前执行，放行则拿到 4xx、拦截则 TypeError）。证据目录（桌面库，spike 证据已于 2026-09-09 Neat 收尾时清理）：`desktop/.scratch/mobile-cors-spike/`（已不存盘，结论见下表）。
 
 | 厂商 | preflight (curl) | 浏览器实测 | 裁决 |
 |---|---|---|---|
@@ -310,4 +310,4 @@ mobile/
 - 桌面 LLM 编排蓝本：`desktop/docs/llm-integration.md` · `desktop/backend/app/services/chat.py`
 - 桌面游戏生成/校验蓝本：`desktop/backend/app/services/game_generator.py`
 - 桌面模拟器适配蓝本：`desktop/frontend/js/simulator-adapt.js` · `desktop/frontend/js/key-injector.js`
-- CORS 实测证据：桌面库 `desktop/.scratch/mobile-cors-spike/`（prototype，请勿复用为生产代码）
+- CORS 实测证据：桌面库 prototype spike（`desktop/.scratch/mobile-cors-spike/`，证据目录已于 2026-09-09 Neat 收尾清理；实测结论见 §4.4 数据表，prototype 请勿复用为生产代码）

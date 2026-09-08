@@ -35,7 +35,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - `flutter test`（纯 Dart 单测 + 无头 widget 测试），覆盖率目标 ≥ 90%
 - 业务逻辑（chat/llm/数据层/导入链/生成校验）占比最大且是纯 Dart → 可靠性主要由单测兜底；平台薄层做真机/模拟器验证
 
-## 当前状态（2026-09-07）
+## 当前状态（2026-09-09）
 
 - ✅ 设计已落盘：`docs/mobile-design.md`（单一事实来源）+ `docs/mobile-adaptation-research.md`（决策背景）；决策集 Q0~Q14 已拍板，ADR-0002 见桌面库 `desktop/CONSENSUS.md`
 - ✅ 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35+36+37/AEHD + Flutter 3.47.2；AVD medium_phone 数据已迁至 F:\tools\android\avd，2026-09-04；MCP 插件 preflight 全绿）
@@ -47,7 +47,8 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - ✅ **M3 已交付**（2026-08-30）：角色 + 搜索——角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板 / V2 卡导入导出（file_picker ^12.1.2 / share_plus ^13.3.0 / path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮；全量 729 测 / analyze 0 / 覆盖率剔除 drift 98.06% / 四轴零阻断 / 冒烟 PASS（建角色→落库→搜索→跳转高亮真机实证）；merge 70bc094 + 期末修复 0057d9e/9cfc4aa；TICKETS 已归档
 - ✅ **M4 已交付**（2026-09-06）：导出/文档解析——对话导出 JSON/MD（share_plus 分享面板 + 平台超时兜底）/ LLM 文档解析（三级提取+白名单+错误折叠）；全量 802 测 / analyze 0 / M4-06 冒烟 PASS；merge 42099eb + 25c7696 + 修复 1feddd7
 - ✅ **M5 已交付**（2026-09-07）：模拟器全量——22 款随包种子 + 本地 HTTP 托管（127.0.0.1:8642 + 目录墙 + 双端明文工）+ 列表四态/懒启动 + Key 注入（桌面契约逐字 + claude key 不进 + 官方端点提示）+ 存档管理 + 导入链 + AI 生成 + 「我」页收口；全量 1315 测 / analyze 0 / M5 门冒烟 PASS（CORS 复验 + 持久化 + 五游戏 25 轮零崩溃）；11 票 7 波合入收口 3d34ed2；TICKETS 11 票已归档
-- ⬜ 下一站 M6（去 AI 味打磨）与 M7（发布准备）：见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选区 27 条待立项（F-25~F-51，见 [TECH_DEBT.md](TECH_DEBT.md)）
+- ✅ **M6 已交付**（2026-09-08）：去 AI 味打磨——动效克制子集 8 项（ConverDurations 对齐桌面、零动画库）+ 空态/错误态/弱网断线重连（连接重试 2 次退避 1s/2s + 断流「回复中断」标记 + NoticeBanner 重试=regenerate replace + idle 60s）+ 实用层无障碍（F-73 浅色 accent #784E14 对比度 ≥4.5:1 + a11y 语义 15 断言）；全量 1460 测 / analyze 0 / 覆盖率 96.78% / 期末四轴阻断 0 / M6 门视觉评审 8/8 PASS（含 B1 核心路径模拟器实测）；11 票 7 波 + B1×2 合入收口（收官 5e7bd33）；TICKETS M6 已归档
+- ⬜ 下一站 M7（发布准备）：双端图标、Android AAB/iOS 签名、隐私清单，见 [TICKETS.md](TICKETS.md) 活跃表；技术债候选区 9 条待立项（F-52~F-66，见 [TECH_DEBT.md](TECH_DEBT.md)）
 
 ## 文档体系
 
