@@ -23,7 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   Future<void> pumpNoticeBanner(
     WidgetTester tester, {
-    required String notice,
+    String? notice,
     required VoidCallback onDismiss,
     String? actionLabel,
     VoidCallback? onAction,
@@ -66,7 +66,11 @@ void main() {
 
       expect(find.byTooltip('关闭提示'), findsOneWidget);
       await tester.tap(find.byTooltip('关闭提示'));
-      expect(dismissed, 1, reason: '关闭回调被派发');
+      // W5 B1：onDismiss 在 140ms 出口过渡完成后触发（先淡出后卸载）。
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
+      expect(dismissed, 1, reason: '关闭回调在出口过渡完成后被派发');
     });
   });
 

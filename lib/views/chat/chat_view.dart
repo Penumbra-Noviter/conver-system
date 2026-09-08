@@ -99,17 +99,19 @@ class _ConversationView extends StatelessWidget {
       child: Column(
         children: [
           _ConversationHeader(controller: controller),
-          if (controller.notice != null)
-            NoticeBanner(
-              notice: controller.notice!,
-              onDismiss: controller.dismissNotice,
-              // T3 流式级可操作提示（M6-08）：仅「回复已中断」且存在可重试截断
-              // 目标时传入「重试」动作；其它 notice 零动作（关闭-only）。
-              actionLabel:
-                  controller.hasRetryableInterrupted ? '重试' : null,
-              onAction:
-                  controller.hasRetryableInterrupted ? controller.retryInterrupted : null,
-            ),
+          // W5 B1：NoticeBanner 始终渲染（notice 可空），进出过渡 140ms 由
+          // 组件自身 AnimatedSwitcher 管理——dismiss 后播放出口 Fade 再收缩。
+          NoticeBanner(
+            notice: controller.notice,
+            onDismiss: controller.dismissNotice,
+            // T3 流式级可操作提示（M6-08）：仅「回复已中断」且存在可重试截断
+            // 目标时传入「重试」动作；其它 notice 零动作（关闭-only）。
+            actionLabel:
+                controller.hasRetryableInterrupted ? '重试' : null,
+            onAction: controller.hasRetryableInterrupted
+                ? controller.retryInterrupted
+                : null,
+          ),
           Expanded(child: _MessageList(controller: controller)),
           _Composer(controller: controller),
         ],
