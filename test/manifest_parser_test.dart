@@ -313,6 +313,63 @@ void main() {
     });
   });
 
+  group('parseManifest — 深度兜底（F-29）', () {
+    /// 构造深度为 3 + [inner] 的合法 v2 manifest：顶层对象(1) + simulators
+    /// 数组(2) + 条目对象(3) + config 值域嵌套 [inner] 层（`{"a":` 重复）。
+    /// 注意：相邻字符串字面量会跨行自动拼接，嵌套串须先算进局部变量再插值。
+    String deepValidManifest(int inner) {
+      final nesting = '{"a":' * inner;
+      final closing = '}' * inner;
+      return '{"version":1,"simulators":['
+          '{"id":"a","file":"a.html","type":"local","name":"A","config":'
+          '$nesting'
+          '1'
+          '$closing'
+          '}]}';
+    }
+
+    test('F-29 深度兜底：嵌套超 [maxManifestDepth] → 结构性失败降级（不裸抛 StackOverflowError/不吞成其他结构错误）', () {
+      final raw = deepValidManifest(maxManifestDepth - 2); // 总深度 = maxManifestDepth + 1
+      final result = parseManifest(raw);
+      expect(result.ok, isFalse);
+      expect(result.error, 'manifest 嵌套深度超出解析上限');
+    });
+
+    test('F-29 深度兜底：恰在上限内的合法深配置 → 正常解析（无 off-by-one 误伤）', () {
+      final raw = deepValidManifest(maxManifestDepth - 3); // 总深度恰 = maxManifestDepth
+      final result = parseManifest(raw);
+      expect(result.ok, isTrue, reason: result.error);
+      expect(result.games!.single['id'], 'a');
+    });
+
+    test('F-29 深度兜底：常态嵌套（config 深约 100 层）→ 不误伤（深度预扫不产生假阳性）', () {
+      final result = parseManifest(deepValidManifest(100));
+      expect(result.ok, isTrue);
+      expect(result.games!.single['config'], isA<Map<String, dynamic>>());
+    });
+
+    test('F-29 Falsify：不平衡闭括号不穿负深度；字符串内花括号/方括号不计入深度（预扫只估结构）', () {
+      // 大量孤立闭括号 → 深度守卫不穿负，正常走后续结构判定（畸形 JSON 文案）。
+      expect(parseManifest(']]]').error, isNot('manifest 嵌套深度超出解析上限'));
+      // 描述文案含 { } [ ] 字面量 → 预扫不误计深度，正常解析。
+      final raw = jsonEncode({
+        'version': 2,
+        'simulators': [
+          {
+            'id': 'a',
+            'file': 'a.html',
+            'type': 'local',
+            'name': 'A',
+            'description': '含 {花括号} 与 [方括号] 的文案',
+          },
+        ],
+      });
+      final result = parseManifest(raw);
+      expect(result.ok, isTrue, reason: result.error);
+      expect(result.games!.single['description'], contains('{'));
+    });
+  });
+
   group('parseManifest — 真实 22 款内置 manifest（数据面锚点）', () {
     test('全量解析无整体失败：22 条、saveKeys 全非空、无退役字段、id 唯一', () async {
       final raw = await rootBundle.loadString('assets/simulators/manifest.json');

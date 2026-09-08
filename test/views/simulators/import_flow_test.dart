@@ -275,6 +275,57 @@ void main() {
       expect(find.text('导入超时，请重试'), findsOneWidget);
     });
 
+    testWidgets('F-34 导入超时 → 取消底层：迟到完成的落盘被补偿，无残留文件与 manifest 条目（重试不遇「已存在」）',
+        (tester) async {
+      final writes = <String>[];
+      final flow = SimulatorImportFlow(
+        resolveSimDir: () async => parent,
+        pickHtmlFile: () async =>
+            (name: 'a.html', bytes: utf8.encode('<html>x</html>')),
+        runImportGame: (dir, name, bytes) async {
+          // Fake 延迟完成：模拟底层 importGame 在超时后仍完成「写文件 + 注册」。
+          // 同步 IO：widget test fake-async zone 中真实异步 IO future 不完成。
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+          File(
+            '${dir.path}${Platform.pathSeparator}game.html',
+          ).writeAsStringSync('<html>x</html>');
+          writes.add(name);
+          return okResult(file: 'game.html');
+        },
+        platformTimeout: const Duration(milliseconds: 50),
+      );
+      await _pumpHarness(tester, flow);
+      await tester.tap(find.text('导入'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump();
+      expect(find.text('导入超时，请重试'), findsOneWidget);
+      expect(find.text('导入成功'), findsNothing, reason: '超时取消 → 不呈现成功');
+
+      // 等待底层延迟完成 + 取消补偿执行。
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
+      await tester.pump();
+      expect(writes, ['a.html'], reason: '底层 future 确在超时后完成（Dart 无法硬性中止）');
+      expect(
+        File('${parent.path}${Platform.pathSeparator}game.html').existsSync(),
+        isFalse,
+        reason: '超时取消后落盘副作用被补偿（无残留文件 → 重试不会遇「已存在」）',
+      );
+      final manifestFile =
+          File('${parent.path}${Platform.pathSeparator}manifest.json');
+      if (manifestFile.existsSync()) {
+        final manifest = jsonDecode(manifestFile.readAsStringSync())
+            as Map<String, dynamic>;
+        final simulators = manifest['simulators'] as List;
+        expect(
+          simulators.where((e) => e is Map && e['id'] == 'game'),
+          isEmpty,
+          reason: '超时取消后 manifest 条目被注销（无幽灵条目）',
+        );
+      }
+    });
+
     testWidgets('导入中不确定态：模态进度出现 → 完成后消失 + 成功 toast',
         (tester) async {
       final gate = Completer<ImportResult>();

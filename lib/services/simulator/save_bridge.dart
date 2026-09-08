@@ -16,9 +16,13 @@
 /// 全量直测（测试注入 Map 型 fake 地址）。
 ///
 /// 读写语义锚（桌面 save-manager.js 逐字）：
-/// - 枚举：runJavaScript `JSON.stringify(Object.entries(localStorage))` 往返
-///   解析为全量键值 Map；挂起/失败 → **超时兜底降级空 Map**（面板显示 0 键，
-///   不挂死不抛错 —— 桌面 TD-69 存储异常降级空结果同构）；
+/// - 枚举：**分片枚举（F-38）**——第一步 runJavaScript
+///   `JSON.stringify(Object.keys(localStorage))` 取全量键名（键名体积远小于键
+///   值，单次返回不触通道上限），随后按 [enumerateBatchSize] 分批
+///   `JSON.stringify([keys].map(k => [k, localStorage.getItem(k)]))` 读键值，
+///   规避全量键值一次经 `runJavaScriptReturningResult` 返回超返回值通道体积
+///   上限 → 降级空 Map 的冒烟实证症状；任一环节挂起/失败 → **超时兜底降级空
+///   Map**（面板显示 0 键，不挂死不抛错 —— 桌面 TD-69 存储异常降级空结果同构）；
 /// - **平台契约（F-M5-09 AVD 实证）**：Android `evaluateJavascript` 返回
 ///   JSON 编码串（字符串结果带外层引号），`runJavaScriptReturningResult`
 ///   原样透传 → [parseLocalStorageEntries] 对编码串解包一次；iOS/macOS 返回
@@ -26,10 +30,13 @@
 /// - 写回：setItem / removeItem 脚本注入（键值经 JSON 转义，无注入面）；
 ///   **写失败上抛**（quota 等），由 [SaveBridge] 编排「写前快照 + 尽力回滚」
 ///   （承接契约 TD-63/TD-73 语义的异步落地位）；
-/// - 导出 payload / 导入校验的键值语义全部复用契约层。
+/// - 导出 payload / 导入校验的键值语义全部复用契约层；导入 JSON 解码前剥离
+///   UTF-8 BOM（F-39，`jsonDecode('\uFEFF{...}')` 会抛 FormatException 误拒
+///   合法文件）。
 ///
 /// 协议表面（深模块）：`LocalStorageAccess` / `JavaScriptEvaluator` /
-/// `enumerateLocalStorageScript` / `buildSetItemScript` / `buildRemoveItemScript`
+/// `enumerateLocalStorageKeysScript` / `buildEnumerateValuesScript` /
+/// `enumerateBatchSize` / `buildSetItemScript` / `buildRemoveItemScript`
 /// / `parseLocalStorageEntries` / `JsBridgeLocalStorageAccess` / `SaveGame` /
 /// `GameSaveSummary` / `SaveActionResult` / `SaveBridge`。
 library;
@@ -92,10 +99,28 @@ typedef JavaScriptEvaluator = Future<String> Function(String script);
 // JS 脚本契约（生产执行面；测试对原文金样断言）
 // ══════════════════════════════════════════════════
 
-/// 全量枚举脚本（锚 U2 方案：`JSON.stringify(Object.entries(localStorage))`
-/// → `[["key","value"],…]` 数组 JSON 返回 Flutter）。
-const String enumerateLocalStorageScript =
-    'JSON.stringify(Object.entries(localStorage))';
+/// 分片枚举第一步：全量键名脚本（`JSON.stringify(Object.keys(localStorage))`
+/// → `["k1","k2",…]` 数组 JSON 返回 Flutter）。
+///
+/// F-38：键名体积远小于键值总量，单次返回不触返回值通道体积上限；键值按
+/// [buildEnumerateValuesScript] 分批读取。
+const String enumerateLocalStorageKeysScript =
+    'JSON.stringify(Object.keys(localStorage))';
+
+/// 分片枚举第二步：给定键子集返回 `[["k","v"],…]` 数组 JSON。
+///
+/// 键嵌入经 [jsonEncode] 转义（安全嵌入为 JS 数组字面量，无注入面），逐键
+/// `localStorage.getItem(k)` 取值——单批返回体积 = 该批全部键值序列化之和，
+/// 由 [enumerateBatchSize] 约束，规避全量键值一次返回超通道上限。
+String buildEnumerateValuesScript(List<String> keys) =>
+    'JSON.stringify(${jsonEncode(keys)}.map((k) => [k, localStorage.getItem(k)]))';
+
+/// 分片枚举单批键数（F-38）：单次 evaluate 返回体积上界 = 该批键值序列化之和。
+///
+/// 口径：批 32 键 × 常见存档值（≤~10KB）≈ 320KB，远离
+/// `runJavaScriptReturningResult` 返回值通道体积上限（F-M5-09 冒烟实证 ~5MB
+/// 量级触发降级空 Map）；键名列表单次返回（体积 = 键名长度之和，远小于键值）。
+const int enumerateBatchSize = 32;
 
 /// setItem 注入脚本：键值经 [jsonEncode] 转义（安全嵌入为 JS 双引号字面量，
 /// 引号/反斜杠/控制字符无注入面）。
@@ -106,23 +131,23 @@ String buildSetItemScript(String key, String value) =>
 String buildRemoveItemScript(String key) =>
     'localStorage.removeItem(${jsonEncode(key)})';
 
-/// 往返解析：`JSON.stringify(Object.entries(localStorage))` 的产物数组 →
+/// 往返解析：分片枚举第二步脚本的产物数组（`[["k","v"],…]`）→
 /// `Map<String,String>`。
 ///
 /// 平台契约容错（F-M5-09 AVD 实证，缺陷 #1）：Android `evaluateJavascript`
 /// 对字符串结果返回 **JSON 编码串**（带外层引号，如 `"[[\"k\",\"v\"]]"`），
 /// `runJavaScriptReturningResult`（webview_flutter_android）对字符串**原样
 /// 透传**——因此对 [jsonDecode] 后得 `String` 的编码串**再解包一次**（内层
-/// 即 `JSON.stringify` 产物数组 JSON）；iOS/macOS 等平台返回**裸值**（外层
-/// 无引号的数组 JSON 串），一次 [jsonDecode] 直接得 `List`，原样处理。二者
-/// 归一为数组条目解析。
+/// 即脚本产物数组 JSON）；iOS/macOS 等平台返回**裸值**（外层无引号的数组
+/// JSON 串），一次 [jsonDecode] 直接得 `List`，原样处理。二者归一为数组条目
+/// 解析。
 ///
 /// 防御（对抗性）：顶层非 List 或 JSON 非法（含编码串二次解码失败）→ 抛
 /// [FormatException]（由 [JsBridgeLocalStorageAccess.enumerate] 兜底降级空
 /// Map）；单条非 `[k,v]` 二元组 / 键值非字符串 → 跳过该条不炸（localStorage
 /// 枚举产物应为同位字符串，畸形条属异常数据面，静默略过）。
 Map<String, String> parseLocalStorageEntries(String json) {
-  final Object? decoded = _decodeLocalStorageEntriesJson(json);
+  final Object? decoded = _decodeEnumeratedJson(json);
   if (decoded is! List) {
     throw const FormatException('localStorage 枚举结果必须是数组');
   }
@@ -137,11 +162,29 @@ Map<String, String> parseLocalStorageEntries(String json) {
   return out;
 }
 
+/// 分片枚举第一步：解析键名脚本产物（`["k1","k2",…]`）→ `List<String>`。
+///
+/// 平台契约与 [parseLocalStorageEntries] 同构（Android 编码串解包 / 裸值归一，
+/// 经 [_decodeEnumeratedJson]）。防御：顶层非数组 → 抛 [FormatException]（交
+/// [enumerate] 降级空 Map）；元素非字符串 → 跳过该条（畸形键名属异常数据面）。
+List<String> _parseEnumeratedKeyList(String json) {
+  final Object? decoded = _decodeEnumeratedJson(json);
+  if (decoded is! List) {
+    throw const FormatException('localStorage 键名枚举结果必须是数组');
+  }
+  final List<String> keys = [];
+  for (final Object? item in decoded) {
+    if (item is! String) continue;
+    keys.add(item);
+  }
+  return keys;
+}
+
 /// 单层解包 [json]：Android evaluateJavascript 返回的**编码 JSON 串**
 /// （[jsonDecode] 后得 `String`，其内容为二次 JSON 编码的数组 JSON）再解一次；
 /// 裸 JSON / 非数组形态原样返回（非 List 由调用方判非数组）。JSON 非法（含
 /// 编码串内容畸形）上抛 [FormatException]，交 [enumerate] 降级空 Map。
-Object? _decodeLocalStorageEntriesJson(String json) {
+Object? _decodeEnumeratedJson(String json) {
   final Object? decoded = jsonDecode(json);
   if (decoded is String) {
     // 锚 Android `evaluateJavascript`：字符串结果带外层引号返回 Flutter（
@@ -151,6 +194,16 @@ Object? _decodeLocalStorageEntriesJson(String json) {
   }
   return decoded;
 }
+
+/// 剥离前导 UTF-8 BOM（F-39）：`jsonDecode('\uFEFF{...}')` 抛
+/// [FormatException] → 误拒合法 JSON 文件。
+///
+/// 现状复核（TD-2 实证）：当前 Dart SDK 的 `utf8.decode(allowMalformed:true)`
+/// 已自带剥离 UTF-8 BOM（EF BB BF，实测解码结果无 U+FEFF 前导）——本函数为
+/// 显式防御：锚 Observable 契约（BOM 文件正常导入），并覆盖 SDK 行为差异 /
+/// 其他解码路径（如解码产物残留字面 U+FEFF）的兜底。无 BOM → 原样返回。
+String _stripBom(String text) =>
+    text.startsWith('\uFEFF') ? text.substring(1) : text;
 
 // ══════════════════════════════════════════════════
 // 生产实现（runJavaScript 双向，U2）
@@ -179,9 +232,21 @@ class JsBridgeLocalStorageAccess implements LocalStorageAccess {
 
   @override
   Future<Map<String, String>> enumerate() async {
+    final Map<String, String> out = {};
     try {
-      final json = await _evaluate(enumerateLocalStorageScript).timeout(timeout);
-      return parseLocalStorageEntries(json);
+      final keysJson = await _evaluate(enumerateLocalStorageKeysScript)
+          .timeout(timeout);
+      final List<String> keys = _parseEnumeratedKeyList(keysJson);
+      for (var i = 0; i < keys.length; i += enumerateBatchSize) {
+        final int end = i + enumerateBatchSize > keys.length
+            ? keys.length
+            : i + enumerateBatchSize;
+        final batchJson = await _evaluate(
+          buildEnumerateValuesScript(keys.sublist(i, end)),
+        ).timeout(timeout);
+        out.addAll(parseLocalStorageEntries(batchJson));
+      }
+      return out;
     } on TimeoutException {
       return const {}; // 挂起降级：不挂死
     } catch (_) {
@@ -412,7 +477,10 @@ class SaveBridge {
     }
     final Object? payload;
     try {
-      payload = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+      // F-39：BOM 文件正常导入的 Observable 契约锚——显式剥离前导 U+FEFF 再
+      // decode（当前 SDK utf8.decode 已自带剥离 UTF-8 BOM，见 [_stripBom]
+      // 现状复核注记；本步为显式防御 + SDK 行为差异兜底）。
+      payload = jsonDecode(_stripBom(utf8.decode(bytes, allowMalformed: true)));
     } on FormatException {
       return const SaveActionResult.failure('不是有效的 JSON 文件');
     }

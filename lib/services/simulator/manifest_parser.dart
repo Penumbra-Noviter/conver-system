@@ -24,15 +24,24 @@
 /// - 清洗后为空数组时保留空数组（结构性合法，非降级信号）。
 ///
 /// 协议表面（深模块：外部只通过这些符号与 manifest_parser 交互）：
-/// `ManifestParseResult` / `parseManifest`。saveKeys 模式判定所需的
-/// `saveKeyMetaRe` 单一来源为 `save_key_meta.dart`（契约之家）——F-26 收口：
-/// 本模块不再持同名顶层常量，消除「multiple libraries define saveKeyMetaRe」
-/// 的潜在 ambiguous import 编译面（本票 injection 系模块同时消费两模块）。
+/// `ManifestParseResult` / `parseManifest` / `maxManifestDepth`。saveKeys 模式
+/// 判定所需的 `saveKeyMetaRe` 单一来源为 `save_key_meta.dart`（契约之家）——
+/// F-26 收口：本模块不再持同名顶层常量，消除「multiple libraries define
+/// saveKeyMetaRe」的潜在 ambiguous import 编译面（本票 injection 系模块同时
+/// 消费两模块）。
 library;
 
 import 'dart:convert';
 
 import 'save_key_meta.dart' show saveKeyMetaRe;
+
+/// manifest JSON 最大允许嵌套深度（防御性上界，TD-2 F-29 深度兜底第一道）。
+///
+/// 合法 manifest 的实际嵌套深度 ≤ ~10（顶层对象 → simulators 数组 → 条目对象
+/// → config 对象，逐层展开）；4096 远高于合法形态，远低于任何平台解析器的栈
+/// 溢出阈值 —— 超深文档即资源耗尽攻击面（每层嵌套构造一个 Map/List 容器，
+/// 且深嵌套 JSON 曾在小栈平台解析器内以 [StackOverflowError] 裸抛）。
+const int maxManifestDepth = 4096;
 
 /// manifest 解析结果：成功携带归一化游戏条目数组，失败携带面向用户的错误文案。
 ///
@@ -61,12 +70,22 @@ class ManifestParseResult {
 /// 结构性错误 → [ManifestParseResult.failure]（列表进错误态）；条目级缺陷 →
 /// 宽容降级不整体失败。归一化语义见模块头 docstring。入参类型由 Dart 强类型
 /// 保证恒为字符串（桌面「非字符串输入」检查在类型系统层面吸收）。
+///
+/// 深度兜底（F-29）：`json.decode` 前置预扫 [maxManifestDepth]（[_exceedsMaxDepth]，
+/// 确定性、平台无关），超限 → 结构性失败降级；解析器内部栈耗尽（
+/// [StackOverflowError]，小栈平台 / 解析器实现差异）→ 同文案结构性失败降级。
 ManifestParseResult parseManifest(String rawJson) {
+  if (_exceedsMaxDepth(rawJson)) {
+    return const ManifestParseResult.failure('manifest 嵌套深度超出解析上限');
+  }
   final Object? data;
   try {
     data = json.decode(rawJson);
   } on FormatException {
     return const ManifestParseResult.failure('manifest 不是合法 JSON');
+  } on StackOverflowError {
+    // 第二道（F-29）：深嵌套在解析器内部栈耗尽 → 结构性失败降级，不裸抛。
+    return const ManifestParseResult.failure('manifest 嵌套深度超出解析上限');
   }
 
   if (data is! Map<String, dynamic>) {
@@ -136,6 +155,44 @@ ManifestParseResult parseManifest(String rawJson) {
   }
 
   return ManifestParseResult.success(games);
+}
+
+/// 预扫原始 JSON 的嵌套深度是否超过 [maxManifestDepth]（字符串/转义感知）。
+///
+/// 逐字符统计 `{`/`[`（+1）与 `}`/`]`（-1）的最大瞬时深度；双引号字符串内
+/// 内容跳过（含反斜杠转义）。本函数只估深度不做语法校验 —— 它是 `json.decode`
+/// 之前的资源耗尽守卫：超深文档在构造嵌套容器前即被拒绝（确定性、可测，不
+/// 依赖平台栈行为）。超限 → true。
+bool _exceedsMaxDepth(String rawJson) {
+  var depth = 0;
+  var inString = false;
+  var escaped = false;
+  for (var i = 0; i < rawJson.length; i++) {
+    final String ch = rawJson[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch == r'\') {
+        escaped = true;
+      } else if (ch == '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch == '"') {
+      inString = true;
+    } else if (ch == '{' || ch == '[') {
+      depth++;
+      if (depth > maxManifestDepth) {
+        return true;
+      }
+    } else if (ch == '}' || ch == ']') {
+      if (depth > 0) {
+        depth--;
+      }
+    }
+  }
+  return false;
 }
 
 /// 归一化 saveKeys（U9-T1 v2 契约）——输出清洗后的字符串数组。

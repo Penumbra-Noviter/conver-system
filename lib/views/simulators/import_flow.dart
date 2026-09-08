@@ -31,8 +31,10 @@ import '../../services/simulator/import_service.dart'
         SimulatorDuplicateError,
         SimulatorImportError,
         importGame,
+        readManifestOrRebuild,
         scanSuspicious,
-        validateImportInput;
+        validateImportInput,
+        writeManifest;
 import '../../services/simulator/simulator_data_dir.dart'
     show SimulatorDataDir;
 import '../../services/simulator/suspicious_patterns.dart'
@@ -154,9 +156,39 @@ class SimulatorImportFlow {
         toast('解析数据目录超时，请重试');
         return;
       }
-      final result =
-          await _runImportGame(simDir, picked.name, picked.bytes)
-              .timeout(platformTimeout);
+      // F-34 超时取消语义：Dart future 无法硬性中止，`Future.timeout` 只放弃
+      // 等待不取消底层——底层 importGame 超时后仍可能「写文件 + manifest 注册」
+      // 完成（用户见「导入超时」但重试遇「已存在」）。对策：超时置取消令牌，
+      // 底层迟到完成后检测令牌 → 补偿副作用（删文件 + 注销条目）→ 归一度量
+      // 「未发生导入」；迟到错误同样吞掉（用户已见超时文案，不追加未处理异常）。
+      final String importName = picked.name;
+      final List<int> importContent = picked.bytes;
+      final cancel = _ImportCancellation();
+      Future<ImportResult?> runImportWithCancellation() async {
+        final ImportResult? result;
+        try {
+          result =
+              await _runImportGame(simDir, importName, importContent);
+        } catch (error) {
+          if (cancel.isCancelled) {
+            return null; // 超时取消后的迟到错误：吞掉（已见超时文案）
+          }
+          rethrow;
+        }
+        if (cancel.isCancelled) {
+          _compensateCancelledImport(simDir, result); // 超时即中止后续动作
+          return null;
+        }
+        return result;
+      }
+      final ImportResult? result = await runImportWithCancellation()
+          .timeout(platformTimeout, onTimeout: () {
+        cancel.cancel();
+        throw TimeoutException('导入超时');
+      });
+      if (result == null) {
+        return; // 超时取消 / 迟到补偿统一出口（toast 已在 TimeoutException 分支给出）
+      }
       final file = result.game['file'] as String? ?? picked.name;
       toast(
         result.renamed ? '导入成功（已改名为 $file）' : '导入成功',
@@ -241,4 +273,48 @@ class SimulatorImportFlow {
   void _dismissImporting(NavigatorState navigator) {
     navigator.pop();
   }
+
+  /// 超时取消后的迟到导入副作用补偿（F-34）：importGame 的「写文件 + manifest
+  /// 注册」在超时后仍可能完成，补偿将其抵消——删除已落盘文件并注销 manifest
+  /// 条目，使「导入超时」对外语义 = 未发生导入（重试不遇「已存在」/幽灵条目）。
+  ///
+  /// 补偿全部走同步 IO（文件删除 / readManifestOrRebuild / writeManifest 均为
+  /// 同步——与 import_service 既有实现一致），尽力而为：manifest 注销失败不
+  /// 改变「导入超时」语义（readManifestOrRebuild 自带自愈重建，磁盘现存 .html
+  /// 为唯一事实来源）。窄竞态注记：底层恰在「写完文件 → 注册条目」之间被取消
+  /// 时，文件已删但条目可能迟到追加（幽灵条目）；该窗口为单微任务级，且条目
+  /// 不指向文件，不影响「重试不遇已存在」主契约。
+  void _compensateCancelledImport(Directory simDir, ImportResult result) {
+    final Object? file = result.game['file'];
+    if (file is String && file.isNotEmpty) {
+      final File target =
+          File('${simDir.path}${Platform.pathSeparator}$file');
+      if (target.existsSync()) {
+        target.deleteSync();
+      }
+    }
+    try {
+      final Map<String, dynamic> manifest = readManifestOrRebuild(simDir);
+      final Object? list = manifest['simulators'];
+      final Object? id = result.game['id'];
+      if (list is List && id is String) {
+        list.removeWhere((e) => e is Map && e['id'] == id);
+        writeManifest(simDir, manifest);
+      }
+    } catch (_) {
+      // 补偿尽力而为：注销失败不改变超时语义（不追加异常）。
+    }
+  }
+}
+
+/// 导入超时取消令牌（F-34）：超时触发 [cancel]，底层 importGame 迟到完成后由
+/// 消费方检测 [isCancelled] 执行副作用补偿。
+class _ImportCancellation {
+  bool _cancelled = false;
+
+  /// 是否已触发超时取消。
+  bool get isCancelled => _cancelled;
+
+  /// 标记取消（幂等）。
+  void cancel() => _cancelled = true;
 }
