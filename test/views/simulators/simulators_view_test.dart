@@ -592,6 +592,44 @@ void main() {
       handle.dispose();
     });
   });
+
+  group('1.3x 大字无溢出（M6-05 验收 4）', () {
+    testWidgets('模拟器列表（长游戏名/长描述/筛选 chips）1.3x 下无 overflow', (tester) async {
+      buildController();
+      manifest.result = parseManifest('''
+{"version":2,"simulators":[
+  {"id":"long-ai","file":"long.html","name":"这是一个特别长的模拟器游戏名称用来探测卡片溢出","type":"ai",
+   "description":"游戏描述也写得非常长，用于在 1.3x 字体下验证卡片描述区换行与截断行为正常不发生横向溢出。".concat("还在继续拉长。")},
+  {"id":"local-1","file":"local.html","name":"本地长名","type":"local",
+   "description":"纯本地游戏描述"},
+  {"id":"gen-1","file":"gen.html","name":"生成冒险","type":"ai",
+   "description":"AI 生成描述","source":"generated"}
+]}
+''');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ConverTheme.dark(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.3),
+            ),
+            child: child!,
+          ),
+          home: SimulatorsView(controller: controller),
+        ),
+      );
+      for (var i = 0;
+          i < 200 && controller.state == SimulatorsState.loading;
+          i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pump();
+
+      expect(tester.takeException(), isNull,
+          reason: '模拟器列表（卡片 + 筛选 chips）在 1.3x 下无 overflow');
+    });
+  });
 }
 
 /// 记录导入流派发次数的 fake flow（W6 B1 接线回归断言用）。
