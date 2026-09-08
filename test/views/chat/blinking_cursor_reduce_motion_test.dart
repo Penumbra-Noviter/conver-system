@@ -90,8 +90,6 @@ void main() {
       final first = opacityAt(tester);
       await tester.pump(const Duration(milliseconds: 20));
       final second = opacityAt(tester);
-      // ignore: avoid_print
-      print('DBG first=$first second=$second');
       expect(second, first, reason: '光标透明度恒定（静态呈现）');
 
 
