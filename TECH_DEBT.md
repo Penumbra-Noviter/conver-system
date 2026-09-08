@@ -44,6 +44,8 @@
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
 | F-52 | 聊天重试判据宽于文档契约：流读阶段「HTTP 200 + 空体无终态帧」EOF 被 `stream_wire` 抛 `LLMConnectionInterruptedError`，与连接建立阶段失败同型不可分 → `chat_service` 重试判据（`!producedToken && _isConnectionDrop`）会重试已收到状态码的失败，最坏同一 user 内容 3 次 billable POST；且重试无总预算上限（黑洞网络 ≈33s）。修法方向 = wire 相位隔离（connect 失败 vs read 中 EOF）或错误类型区分。 | W1 增量审核 Falsify（F-N1/F-N2） | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-55 | 无终态路径 cancel-unwind 抛未处理错误：`_stopStreamReply` 的 `cancel().timeout(3s)` 无 onError → 停滞流 cancel 后 3s 窗口内连接 EOF 时 `chat_service.dart:590` 抛 `LLMConnectionInterruptedError` → 部分落库与 controller.close（:597-605）被跳过 + `chat_round.dart:198` stop 收尾被跳过 + 未处理异步错误（注释「挂起不抛错、timeout 双层兜底」对「3s 内以错误完成」不成立）。修法＝onError + 落库/close 移 finally。基线 d5b8c03/6b03d2c 同现，非 M6 引入；09 的 wire force-close 已收窄暴露窗口。 | W2 增量审核（09 相邻发现 2，端到端复现） | Strong | 📝 待立项 | 聊天链路 |
+| F-56 | 假活连接终态化缺口：终态帧已到 + 连接不关闭 → await-for 永不 EOF → round 永不终态化（09 验收 4 为设计选择，但离「假活连接终态化保障」目标差一格）。随修项：① `stream_wire.dart:93/:102` 注释声称「后续行不再重启计时器」失真（每行迭代顶部 `armIdleTimer()` 无条件执行，终态帧后尾随空行会重新武装——可观察保证仍成立，机制与注释不符）；② N4 集成断言缺口：无自动化断言组合「idle 触发 → ChatInterrupted」（wire 与 service 各层单测均绿）。 | W2 增量审核 N1/N2/N4 | Worth exploring | 📝 待立项 | 聊天链路 |
 
 ## 技术债处置记录
 
@@ -55,6 +57,14 @@
 |------|------|------|
 | F-53 | ❌ 复核关闭 | EmptyState.action 参数槽零生产消费方——TP-4 共识「保留可选 action 参数供未来需要」设计意图，git grep 复核「4 处调用零传 action」现状与设计一致（来源：W1 增量审核 O-N1） |
 | F-54 | ❌ 复核关闭 | StatusView.hint 参数槽同族（两处生产调用零传参，仅测试驱动）——设计意图保留，复核现状成立（来源：W1 增量审核 O-N2） |
+
+### 2026-09-08 — M6 W2 增量审核落债（F-55~F-57 进候选区 + F-58 观察关闭）
+
+> 来源：project-kickoff M6 W2 波末增量审核（固定点 6b03d2c，diff = 02/09 两 merge）。阻断 0；文件范围 02/09 全合规；过度工程 0（动作槽判定非 Speculative——spec §4.3 契约既定 + 08 排期接线，记入 08 票；idleTimeout 最小化）。09 票 Implement 自审发现的两个相邻既有问题经审核实证判定：发现 2（cancel-unwind 未处理错误）Strong 真缺陷、发现 1（sub.cancel 停滞挂起）Worth exploring。N1/N2/N4 并入 F-56。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-58 | ❌ 复核关闭 | N3 观察：首 token 前 idle → 06 自动重试 → 最坏 3×60s+退避 ≈3.5 分钟静默才「回复已中断」——各环行为与 06×09 契约一致、无错判（首 token 后 idle → `producedToken` 分流正确），纯时长 UX 观察，不入债（来源：W2 增量审核 N3） |
 
 ### 2026-09-07 — 技术债消费批次 TD-1~TD-4（F-25~F-51 全部处置：19 待修已修 + 8 复核关闭）
 
