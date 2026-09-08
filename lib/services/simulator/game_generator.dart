@@ -25,9 +25,10 @@
 ///   LLM 调用），返回 cancel 结构化结果给 UI 关闭对话框。
 ///
 /// 协议表面（深模块）：`maxGenerationRetries` / `maxGenerateTokens` /
-/// `generatedFallbackName` / `generatedSource` / `GenerationCredentials` /
-/// `GenerateResult` / `buildSystemPrompt` / `buildUserPrompt` /
-/// `buildRetryPrompt` / `buildSuggestion` / `sanitizeTitle` / `GameGenerator`。
+/// `generatedFallbackName` / `generatedDescriptionFallback` / `generatedSource` /
+/// `GenerationCredentials` / `GenerateResult` / `buildSystemPrompt` /
+/// `buildUserPrompt` / `buildRetryPrompt` / `buildSuggestion` / `sanitizeTitle` /
+/// `deriveGeneratedDescription` / `GameGenerator`。
 // ignore_for_file: prefer_initializing_formals — 构造为公开命名参数（装配点
 // 语义）+ 私有 `_` 字段，initializing formal 无法同时满足两者（对齐
 // simulators_controller.dart 同款惯例）。
@@ -42,7 +43,13 @@ import 'game_seed_template.dart' show GameSeedTemplate;
 import 'generated_game_validator.dart'
     show GenValidationError, validateGeneratedHtml;
 import 'import_service.dart'
-    show ImportResult, importGame, scanSuspicious;
+    show
+        ImportResult,
+        SimulatorDuplicateError,
+        importGame,
+        readManifestOrRebuild,
+        scanSuspicious,
+        writeManifest;
 
 /// 最大重试次数（校验失败后重试打磨；桌面 MAX_RETRIES 逐字）——总尝试
 /// attempt ≤ 首试 + maxGenerationRetries = 4。
@@ -54,6 +61,10 @@ const int maxGenerateTokens = 8192;
 
 /// 默认文件名（无标题或标题净化后为空时回退；桌面 _FALLBACK_NAME 逐字）。
 const String generatedFallbackName = 'generated-game';
+
+/// 生成游戏列表卡片描述兜底文案（F-47：LLM 产出空 world 描述时使用，列表
+/// 卡片 description 恒非空）。
+const String generatedDescriptionFallback = 'AI 生成的模拟器游戏';
 
 /// 生成游戏在 manifest 中的 source 标记（列表「生成」badge 判定依据；
 /// 桌面 GENERATED_SOURCE 逐字）。
@@ -86,8 +97,9 @@ class GenerationCredentials {
 ///
 /// - ok=true：game 为已落盘 manifest 条目（含 source=generated）；
 /// - ok=false：errors 为校验失败错误列表 / 非字符串错误 / 取消信号
-///   （field='cancel'），suggestion 为修正建议；retries 语义：成功 = 此前
-///   失败次数，失败耗尽 = 总尝试次数，取消 = 已执行的尝试数。
+///   （field='cancel'） / **409「已存在」语义**（field='duplicate'，终止重试），
+///   suggestion 为修正建议；retries 语义：成功 = 此前失败次数，失败耗尽 =
+///   总尝试次数，取消 / 已存在 = 已执行的尝试数。
 class GenerateResult {
   const GenerateResult({
     required this.ok,
@@ -231,14 +243,20 @@ String buildSuggestion(List<GenValidationError> errors) {
   for (final err in errors) {
     switch (err.field) {
       case 'structure':
-        suggestions.add('请确保生成的 HTML 以 <!DOCTYPE html> 开头，包含 '
-            '<html>、<head>、<body> 标签。');
+        suggestions.add(
+          '请确保生成的 HTML 以 <!DOCTYPE html> 开头，包含 '
+          '<html>、<head>、<body> 标签。',
+        );
       case 'template':
-        suggestions.add('请确保已替换所有 <!-- GEN:config --> 和 '
-            '<!-- GEN:scenes --> 标记为实际数据，不要保留任何注释标记。');
+        suggestions.add(
+          '请确保已替换所有 <!-- GEN:config --> 和 '
+          '<!-- GEN:scenes --> 标记为实际数据，不要保留任何注释标记。',
+        );
       case 'cfg':
-        suggestions.add('请确保模板中的 cfg-endpoint、cfg-apikey、cfg-model '
-            '三个 input 元素未被删除。');
+        suggestions.add(
+          '请确保模板中的 cfg-endpoint、cfg-apikey、cfg-model '
+          '三个 input 元素未被删除。',
+        );
       case 'syntax':
         suggestions.add('请修复 HTML 语法错误：${err.message}');
       case 'data':
@@ -254,13 +272,87 @@ String buildSuggestion(List<GenValidationError> errors) {
 /// 空格、连字符（桌面 `_sanitize_title` 逐字：剔除标点/emoji 等装饰字符）；
 /// 净化后为空或全装饰 → 回退 [generatedFallbackName]。
 ///
+/// F-48 定版（净化增强）：装饰字符剥离后追加归一化——连续空白压缩为单空格、
+/// 连续连字符压缩为单连字符、首尾 `-`/`_`/空白装饰剥除——使净化结果不再产出
+/// 「纯分隔符」或「残留双空格」等怪文件名（manifest name 与 slug 派生 id 的
+/// 可读口径一致）。
+///
 /// 这是「可读性」层，不是安全层：下游 F-M5-07 `importGame` 内部的
 /// sanitizeFilename 会再做保留名 / 字节截断等安全净化（二次净化兜底）。
 String sanitizeTitle(String title) {
   final cleaned = title
       .replaceAll(RegExp(r'[^\p{L}\p{N}_\s-]', unicode: true), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll(RegExp(r'-{2,}'), '-')
+      .replaceAll(RegExp(r'^[\s_-]+|[\s_-]+$'), '')
       .trim();
   return cleaned.isEmpty ? generatedFallbackName : cleaned;
+}
+
+/// 从生成 HTML 提取 GAME_CONFIG JSON 对象文本（含两端花括号；括号配对 +
+/// 字符串字面量跳过，与校验层 `extractScenesLiteral` 同口径）。定位失败或
+/// 括号不闭合 → null。
+String? _extractConfigLiteral(String htmlText) {
+  final match = RegExp(r'(?:var|const|let)\s+GAME_CONFIG\s*=\s*\{')
+      .firstMatch(htmlText);
+  if (match == null) {
+    return null;
+  }
+  var i = match.end - 1; // 指向 '{'
+  var depth = 0;
+  String? quote; // 当前字符串引号态（" / ' / `）；null = 不在字符串内
+  final n = htmlText.length;
+  while (i < n) {
+    final ch = htmlText[i];
+    if (quote != null) {
+      if (ch == r'\') {
+        i += 2; // 跳过转义序列（可能为转义引号）
+        continue;
+      }
+      if (ch == quote) {
+        quote = null;
+      }
+      i += 1;
+      continue;
+    }
+    if (ch == '"' || ch == "'" || ch == '`') {
+      quote = ch;
+    } else if (ch == '{') {
+      depth += 1;
+    } else if (ch == '}') {
+      depth -= 1;
+      if (depth == 0) {
+        return htmlText.substring(match.end - 1, i + 1);
+      }
+    }
+    i += 1;
+  }
+  return null;
+}
+
+/// 派生生成游戏描述（F-47 空描述兜底）——取生成 HTML 内嵌 GAME_CONFIG 的
+/// `world`（世界观简介）作为列表卡片 description；world 缺失 / 空串 /
+/// 配置定位或解析失败 → 回退 [generatedDescriptionFallback]（LLM 产出空
+/// 描述时卡片不显示空白）。
+String deriveGeneratedDescription(String html) {
+  final raw = _extractConfigLiteral(html);
+  if (raw == null) {
+    return generatedDescriptionFallback;
+  }
+  final Object? decoded;
+  try {
+    decoded = json.decode(raw);
+  } on FormatException {
+    return generatedDescriptionFallback;
+  }
+  if (decoded is! Map<String, dynamic>) {
+    return generatedDescriptionFallback;
+  }
+  final world = decoded['world'];
+  if (world is! String || world.trim().isEmpty) {
+    return generatedDescriptionFallback;
+  }
+  return world.trim();
 }
 
 /// AI 生成游戏服务（编排：凭据解析 → prompt 三件套 → LLM 直连 → 六项校验 →
@@ -281,12 +373,11 @@ class GameGenerator {
     required Future<Directory> Function() resolveSimDir,
     GenerateHtmlReply? callGenerate,
     PersistGeneratedGame? persistGame,
-  })  : _providerFactory = providerFactory,
-        _resolveCredentials = resolveCredentials,
-        _resolveSimDir = resolveSimDir,
-        _callGenerate =
-            callGenerate ?? _defaultCallGenerate,
-        _persistGame = persistGame ?? _defaultPersistGame;
+  }) : _providerFactory = providerFactory,
+       _resolveCredentials = resolveCredentials,
+       _resolveSimDir = resolveSimDir,
+       _callGenerate = callGenerate ?? _defaultCallGenerate,
+       _persistGame = persistGame ?? _defaultPersistGame;
 
   final LLMProviderFactory _providerFactory;
   final Future<GenerationCredentials> Function() _resolveCredentials;
@@ -305,11 +396,7 @@ class GameGenerator {
     String? title,
     GenerationCancellation? isCancelled,
   }) {
-    return _generateWithRetry(
-      description,
-      title,
-      isCancelled: isCancelled,
-    );
+    return _generateWithRetry(description, title, isCancelled: isCancelled);
   }
 
   /// 重试编排（对齐桌面 `_generate_with_retry`；自递归不暴露参数）。
@@ -326,9 +413,7 @@ class GameGenerator {
     if (isCancelled?.call() ?? false) {
       return GenerateResult(
         ok: false,
-        errors: const [
-          GenValidationError(field: 'cancel', message: '已取消生成'),
-        ],
+        errors: const [GenValidationError(field: 'cancel', message: '已取消生成')],
         retries: attempted,
       );
     }
@@ -393,14 +478,38 @@ class GameGenerator {
     // 4. 六项校验闸门（T-03 单次扫描：scanSuspicious 一次 → precomputedWarnings
     // 复用，生成路径内不双重扫描）。
     final warnings = scanSuspicious(reply);
-    final errors = validateGeneratedHtml(
-      reply,
-      precomputedWarnings: warnings,
-    );
+    final errors = validateGeneratedHtml(reply, precomputedWarnings: warnings);
 
     if (errors.isEmpty) {
-      // 校验通过 → 落盘（source=generated）。
-      final game = await _persistGenerated(reply, title);
+      // F-46 取消令牌：在途 LLM 响应迟到返回时，落盘前再次断言取消——取消后
+      // 迟到成功不落盘（用户见「已取消」但游戏不得出现）；对齐 TD-2 F-34 导入
+      // 超时取消令牌模式（isCancelled 仅作为中止信号，不硬性取消底层调用）。
+      if (isCancelled?.call() ?? false) {
+        return GenerateResult(
+          ok: false,
+          errors: const [GenValidationError(field: 'cancel', message: '已取消生成')],
+          retries: attempted,
+        );
+      }
+      // 校验通过 → 落盘（source=generated）。F-45：落盘触发 SHA 去重 409
+      // （生成内容与既有游戏完全相同）→ 识别为「已存在」结构化结果并终止重试
+      // （重试只会再产出相同内容，无收敛价值）；不再向调用方抛原始异常以免
+      // UI 落入「LLM 失败文案 + 无限重试」循环。
+      final Map<String, dynamic> game;
+      try {
+        game = await _persistGenerated(reply, title);
+      } on SimulatorDuplicateError {
+        return GenerateResult(
+          ok: false,
+          errors: const [
+            GenValidationError(
+              field: 'duplicate',
+              message: '已存在相同游戏（内容与现有游戏相同）',
+            ),
+          ],
+          retries: attempted,
+        );
+      }
       return GenerateResult(ok: true, game: game, retries: attempted);
     }
 
@@ -427,15 +536,55 @@ class GameGenerator {
 
   /// 校验通过 → 落地：标题净化 + 文件名 {title}.html → [importGame]
   /// source=generated 落盘 + manifest 注册。
+  ///
+  /// F-49：文件名恒为 `{stem}.html`——`sanitizeTitle` 字符集不含 `.`（装饰字符
+  /// 剥离层），`stem.endsWith('.html')` 条件恒假，原分支为死代码；桌面
+  /// `_persist_generated_game` 同口径（`f"{name}.html"` 无条件拼接）。
+  ///
+  /// F-47：落盘后按生成 HTML 的 GAME_CONFIG.world 派生列表卡片 description
+  /// （world 缺失/空 → 兜底文案 [generatedDescriptionFallback]），补写回
+  /// manifest 条目——LLM 产出空描述时列表卡片不显示空白。
   Future<Map<String, dynamic>> _persistGenerated(
     String html,
     String? title,
   ) async {
     final stem = sanitizeTitle(title ?? '');
-    final filename = (stem.endsWith('.html') ? stem : '$stem.html');
+    final filename = '$stem.html';
     final simDir = await _resolveSimDir();
     final result = await _persistGame(simDir, filename, utf8.encode(html));
-    return result.game;
+    final game = Map<String, dynamic>.from(result.game);
+    game['description'] = deriveGeneratedDescription(html);
+    _updateManifestEntryDescription(simDir, game);
+    return game;
+  }
+
+  /// 将派生 description 补写回 sim_dir/manifest.json 对应条目（F-47）——幂等：
+  /// 条目不存在 / 已一致 / id 缺失均不写盘（读操作经 [readManifestOrRebuild]
+  /// 自带自愈口径，与导入链一致）。
+  void _updateManifestEntryDescription(
+    Directory simDir,
+    Map<String, dynamic> game,
+  ) {
+    final Object? id = game['id'];
+    final Object? description = game['description'];
+    if (id is! String || description is! String) {
+      return;
+    }
+    final manifest = readManifestOrRebuild(simDir);
+    final simulators = manifest['simulators'];
+    if (simulators is! List) {
+      return;
+    }
+    for (final entry in simulators) {
+      if (entry is Map && entry['id'] == id) {
+        if (entry['description'] == description) {
+          return; // 幂等：已一致不重写
+        }
+        entry['description'] = description;
+        writeManifest(simDir, manifest);
+        return;
+      }
+    }
   }
 }
 
@@ -459,10 +608,5 @@ Future<ImportResult> _defaultPersistGame(
   String filename,
   List<int> content,
 ) {
-  return importGame(
-    simDir,
-    filename,
-    content,
-    source: generatedSource,
-  );
+  return importGame(simDir, filename, content, source: generatedSource);
 }
