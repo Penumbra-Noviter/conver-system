@@ -43,8 +43,18 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-52 | 聊天重试判据宽于文档契约：流读阶段「HTTP 200 + 空体无终态帧」EOF 被 `stream_wire` 抛 `LLMConnectionInterruptedError`，与连接建立阶段失败同型不可分 → `chat_service` 重试判据（`!producedToken && _isConnectionDrop`）会重试已收到状态码的失败，最坏同一 user 内容 3 次 billable POST；且重试无总预算上限（黑洞网络 ≈33s）。修法方向 = wire 相位隔离（connect 失败 vs read 中 EOF）或错误类型区分。 | W1 增量审核 Falsify（F-N1/F-N2） | Worth exploring | 📝 待立项 | 聊天链路 |
 
 ## 技术债处置记录
+
+### 2026-09-08 — M6 W1 增量审核落债（O-N1/O-N2 复核关闭）
+
+> 来源：project-kickoff M6 W1 波末增量审核（固定点 d5b8c03，diff = 01/04/06 三 merge）。阻断 0。F-N1（重试判据宽于契约）与 F-N2（无总预算）并入 F-52 进候选区；O-N3（chat/characters 私有 `_NoticeBanner` 逐字重复）已在 W2 工单 02 收编，无需落债。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-53 | ❌ 复核关闭 | EmptyState.action 参数槽零生产消费方——TP-4 共识「保留可选 action 参数供未来需要」设计意图，git grep 复核「4 处调用零传 action」现状与设计一致（来源：W1 增量审核 O-N1） |
+| F-54 | ❌ 复核关闭 | StatusView.hint 参数槽同族（两处生产调用零传参，仅测试驱动）——设计意图保留，复核现状成立（来源：W1 增量审核 O-N2） |
 
 ### 2026-09-07 — 技术债消费批次 TD-1~TD-4（F-25~F-51 全部处置：19 待修已修 + 8 复核关闭）
 
