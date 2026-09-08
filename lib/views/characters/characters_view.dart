@@ -30,6 +30,7 @@ import '../../services/document_parse_service.dart';
 import '../../services/llm/llm_provider.dart' show LLMProviderFactory;
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
+import '../../widgets/empty_state.dart';
 import 'character_edit_view.dart';
 import 'characters_controller.dart';
 import 'wizard/character_wizard_controller.dart';
@@ -128,7 +129,7 @@ class _CharactersViewState extends State<CharactersView> {
             child: RefreshIndicator(
               onRefresh: controller.refresh,
               child: controller.characters.isEmpty
-                  ? _EmptyState(loading: controller.loading)
+                  ? _EmptyPane(loading: controller.loading)
                   : _CharacterList(controller: controller),
             ),
           ),
@@ -303,18 +304,16 @@ class _NoticeBanner extends StatelessWidget {
   }
 }
 
-/// 空态「暂无角色」+ 创建引导；首次加载中显示 spinner；可下拉刷新
-/// （AlwaysScrollableScrollPhysics）。
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.loading});
+/// 空态容器：首次加载中显示 spinner；其余经共享 [EmptyState] 呈现
+/// 「暂无角色」+ 创建引导；可下拉刷新（AlwaysScrollableScrollPhysics）。
+class _EmptyPane extends StatelessWidget {
+  const _EmptyPane({required this.loading});
 
   /// 首次加载中（尚未完成过一次刷新）。
   final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final palette = ConverPalette.of(context);
     if (loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -324,21 +323,10 @@ class _EmptyState extends StatelessWidget {
         child: SizedBox(
           height: constraints.maxHeight,
           child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.person_outline, size: 40, color: palette.ink4),
-                const SizedBox(height: ConverSpacing.space2),
-                Text(
-                  '暂无角色',
-                  style: textTheme.bodyMedium?.copyWith(color: palette.ink3),
-                ),
-                const SizedBox(height: ConverSpacing.space1),
-                Text(
-                  '点「新建角色」创建你的第一个角色',
-                  style: textTheme.bodySmall?.copyWith(color: palette.ink4),
-                ),
-              ],
+            child: EmptyState(
+              icon: Icons.person_outline,
+              message: '暂无角色',
+              hint: '点「新建角色」创建你的第一个角色',
             ),
           ),
         ),

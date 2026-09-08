@@ -44,6 +44,7 @@ import '../../services/simulator/simulator_contracts.dart'
     show SimulatorContracts;
 import '../../theme/conver_palette.dart' show ConverPalette;
 import '../../view_models/simulators_controller.dart' show SimulatorGame;
+import '../../widgets/status_view.dart';
 
 /// 官方端点提示条逐字文案（共识 Q8：defaultProvider=claude 或 base_url 命中
 /// 官方域 → 运行页顶部提示条）。
@@ -465,10 +466,19 @@ class _SimulatorRunViewState extends State<SimulatorRunView> {
   /// loaded（WebView）。
   Widget _buildBody() {
     if (_phase == _RunPhase.error) {
-      return _ErrorView(
-        reason: _errorReason ?? '未知错误',
-        onRetry: _handleRetry,
-        onBack: () => Navigator.of(context).maybePop(),
+      return Center(
+        child: StatusView(
+          icon: Icons.error_outline,
+          title: '游戏加载失败',
+          message: _errorReason ?? '未知错误',
+          actions: [
+            FilledButton(onPressed: _handleRetry, child: const Text('重试')),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              child: const Text('返回'),
+            ),
+          ],
+        ),
       );
     }
     return Stack(
@@ -535,53 +545,6 @@ class _SyncMessageStrip extends StatelessWidget {
             .textTheme
             .bodySmall
             ?.copyWith(color: palette.ink3),
-      ),
-    );
-  }
-}
-
-/// 错误态：错误文案 + 原因 + 重试 / 返回（重试复用当前游戏）。
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({
-    required this.reason,
-    required this.onRetry,
-    required this.onBack,
-  });
-
-  final String reason;
-  final VoidCallback onRetry;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = ConverPalette.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.error_outline, size: 40, color: palette.ink4),
-          const SizedBox(height: 12),
-          Text(
-            '游戏加载失败',
-            style: textTheme.titleSmall?.copyWith(color: palette.ink1),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            reason,
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(color: palette.ink2),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FilledButton(onPressed: onRetry, child: const Text('重试')),
-              const SizedBox(width: 12),
-              OutlinedButton(onPressed: onBack, child: const Text('返回')),
-            ],
-          ),
-        ],
       ),
     );
   }

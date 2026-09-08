@@ -39,6 +39,8 @@ import '../../services/simulator/simulator_data_dir.dart'
 import '../../theme/colors.dart' show ConverRadii, ConverSpacing;
 import '../../theme/conver_palette.dart';
 import '../../view_models/simulators_controller.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/status_view.dart';
 import 'generate_dialog.dart' show GenerateDialog;
 import 'import_flow.dart' show SimulatorImportFlow;
 import 'save_sheet.dart' show SaveSheet;
@@ -274,20 +276,22 @@ class _SimulatorsViewState extends State<SimulatorsView> {
         return const Center(child: CircularProgressIndicator());
       case SimulatorsState.error:
         return _ScrollablePane(
-          child: _StatusColumn(
+          child: StatusView(
             icon: Icons.error_outline,
             message: controller.errorMessage ?? '模拟器启动失败',
-            action: FilledButton(
-              onPressed: () => unawaited(controller.retry()),
-              child: const Text('重试'),
-            ),
+            actions: [
+              FilledButton(
+                onPressed: () => unawaited(controller.retry()),
+                child: const Text('重试'),
+              ),
+            ],
           ),
         );
       case SimulatorsState.empty:
         return RefreshIndicator(
           onRefresh: controller.refresh,
           child: _ScrollablePane(
-            child: _StatusColumn(
+            child: EmptyState(
               icon: Icons.sports_esports_outlined,
               message: '暂无游戏',
               hint: '下拉刷新试试',
@@ -307,7 +311,7 @@ class _SimulatorsViewState extends State<SimulatorsView> {
                 onRefresh: controller.refresh,
                 child: controller.games.isEmpty
                     ? _ScrollablePane(
-                        child: _StatusColumn(
+                        child: EmptyState(
                           icon: Icons.filter_alt_outlined,
                           message: '该类型暂无可用的游戏',
                           hint: '切换筛选或下拉刷新',
@@ -499,50 +503,6 @@ class _Badge extends StatelessWidget {
             .labelSmall
             ?.copyWith(color: foreground),
       ),
-    );
-  }
-}
-
-/// 单态信息列（错误文案 + 重试 / 空态提示），居中展示。
-class _StatusColumn extends StatelessWidget {
-  const _StatusColumn({
-    required this.icon,
-    required this.message,
-    this.hint,
-    this.action,
-  });
-
-  final IconData icon;
-  final String message;
-  final String? hint;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final palette = ConverPalette.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 40, color: palette.ink4),
-        const SizedBox(height: ConverSpacing.space2),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: textTheme.bodyMedium?.copyWith(color: palette.ink2),
-        ),
-        if (hint != null) ...[
-          const SizedBox(height: ConverSpacing.space1),
-          Text(
-            hint!,
-            style: textTheme.bodySmall?.copyWith(color: palette.ink4),
-          ),
-        ],
-        if (action != null) ...[
-          const SizedBox(height: ConverSpacing.space3),
-          action!,
-        ],
-      ],
     );
   }
 }
