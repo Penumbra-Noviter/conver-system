@@ -618,6 +618,10 @@ class _SystemBubble extends StatelessWidget {
 /// 单点闪烁光标（打字机占位气泡尾部，`▍` 半宽竖线；非三点 typing）。
 ///
 /// ExcludeSemantics：装饰光标不产生朗读噪音（spec §4.4 覆盖清单 ②）。
+///
+/// reduce-motion（spec §4.4 / 共识 4.5）：系统开启「减弱动效」
+/// （[MediaQuery.disableAnimationsOf]）时停止循环闪烁——静态呈现完整不透明
+/// ▍（保持占位宽度，列表布局不跳动）；常态 repeat(reverse) 闪烁行为不变。
 class _BlinkingCursor extends StatefulWidget {
   const _BlinkingCursor();
 
@@ -630,7 +634,34 @@ class _BlinkingCursorState extends State<_BlinkingCursor>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 500),
-  )..repeat(reverse: true);
+  );
+
+  /// 系统减弱动效：true 时停闪（静态 ▍）；didChangeDependencies 中随
+  /// MediaQuery 同步（首次检测 / 运行时翻转均生效）。
+  bool _reduceMotion = false;
+
+  /// 上次是否已应用过动画状态（守卫：防重复 repeat / 重复 stop 的 Ticker
+  /// 泄漏与 setState 风暴；初始值 false → 首次 didChangeDependencies 必应用）。
+  bool _appliedOnce = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    if (!_appliedOnce || reduce != _reduceMotion) {
+      _reduceMotion = reduce;
+      _appliedOnce = true;
+      if (reduce) {
+        _controller
+          ..stop()
+          ..value = 1.0; // 静态完全可见（不透明），占位宽度不变。
+      } else {
+        _controller
+          ..value = 0.0
+          ..repeat(reverse: true);
+      }
+    }
+  }
 
   @override
   void dispose() {

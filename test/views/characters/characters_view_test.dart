@@ -491,4 +491,38 @@ void main() {
       await env.close();
     });
   });
+
+  group('1.3x 大字无溢出（M6-05 验收 4）', () {
+    testWidgets('角色列表（长名称/长描述/长引导）1.3x 下 pump 无 overflow', (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '非常长的角色名称用于探测系统大字下卡片行的溢出边界',
+        description: '很长的描述内容，用来在 1.3x 下检查描述区是否横向溢出，'
+            '同时撑起足够的文本长度让换行与截断路径都能被触达。' * 3,
+        firstMes: '开场白也写得比较长，确保卡片底部徽标行不溢出。' * 2,
+        tags: const ['长标签一', '长标签二', '长标签三'],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ConverTheme.dark(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.3),
+            ),
+            child: child!,
+          ),
+          home: Scaffold(body: CharactersView(controller: env.controller)),
+        ),
+      );
+      for (var i = 0; i < 100 && env.controller.loading; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pump();
+
+      expect(tester.takeException(), isNull,
+          reason: '角色列表在 1.3x 下无 RenderFlex overflow');
+      await env.close();
+    });
+  });
 }
