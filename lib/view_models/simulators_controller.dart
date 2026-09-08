@@ -185,18 +185,26 @@ typedef SimulatorServerFactory = SimulatorServer Function(Directory simDir);
 typedef ManifestLoader = Future<ManifestParseResult> Function(int port);
 
 /// 生产 manifest 拉取：回环 HTTP GET `/simulators/manifest.json` →
-/// [parseManifest] 宽容解析。非 200 → failure 文案；超时守卫由
-/// [SimulatorsController] 在加载路径统一施加（TIMEOUT_MS 复用）。
-Future<ManifestParseResult> loadManifestViaHttp(int port) async {
+/// [parseManifest] 宽容解析。非 200 → failure 文案。
+///
+/// 超时守卫在**本函数内**逐阶段施加（[timeout]，缺省复用 TIMEOUT_MS）：
+/// 任一阶段超时即跳出 await 进入 finally 的 `client.close(force: true)`，
+/// **强制取消在途 HttpClient 请求**（F-33/TD-1）——controller 层 `.timeout`
+/// 只管编排面不阻塞，若不在本函数内取消，底层悬挂连接会累积。controller
+/// 加载路径仍保留外层超时（fake 挂起兜底，语义不变）。
+Future<ManifestParseResult> loadManifestViaHttp(
+  int port, {
+  Duration timeout = const Duration(milliseconds: SimulatorContracts.timeoutMs),
+}) async {
   final client = HttpClient();
   try {
     final uri = Uri.parse(
       'http://127.0.0.1:$port/${SimulatorContracts.simDir}/'
       '${SimulatorContracts.manifestFile}',
     );
-    final request = await client.getUrl(uri);
-    final response = await request.close();
-    final body = await response.transform(utf8.decoder).join();
+    final request = await client.getUrl(uri).timeout(timeout);
+    final response = await request.close().timeout(timeout);
+    final body = await response.transform(utf8.decoder).join().timeout(timeout);
     if (response.statusCode != HttpStatus.ok) {
       return ManifestParseResult.failure(
         '游戏清单加载失败（HTTP ${response.statusCode}）',
@@ -349,7 +357,10 @@ class SimulatorsController extends ChangeNotifier {
 
   /// 下拉刷新（ready/empty 轻量重拉 manifest，不重种不重启）；error 态回退
   /// 全链重跑（等同 [retry]）；loading 合并 in-flight。
-  Future<void> refresh() async {
+  ///
+  /// F-31（TD-1）：refresh 同样入 in-flight 轨道——重叠刷新合并为一条链，
+  /// 杜绝 last-writer-wins（迟到失败盖掉成功结果）。
+  Future<void> refresh() {
     final inFlight = _inFlight;
     if (inFlight != null) {
       return inFlight;
@@ -357,7 +368,14 @@ class SimulatorsController extends ChangeNotifier {
     if (_state == SimulatorsState.error) {
       return _chain();
     }
-    await _fetchManifest(port: _port);
+    final future = Future<void>(() => _fetchManifest(port: _port));
+    _inFlight = future;
+    unawaited(
+      future.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
+        _inFlight = null;
+      }),
+    );
+    return future;
   }
 
   /// 错误态重试：重新跑全链编排（seed 幂等 + server 运行中实例复用 /
@@ -410,6 +428,12 @@ class SimulatorsController extends ChangeNotifier {
       debugPrint('模拟器首启种子: $seeded（false = 已种子 / 源缺降级）');
     } on TimeoutException {
       debugPrint('模拟器种子超时，继续启动链路');
+    } on FileSystemException catch (exc) {
+      // F-32（TD-1）捕获面收窄：种子目录不可写（seed_service 契约：带
+      // `simDir` 路径的明确错误）→ 转明确错误态（文案含路径），不再吞并成
+      // 后续清单拉取（HTTP 404 等）泛化错误。
+      _fail('模拟器数据目录不可用: ${simDir.path}（${exc.message}）');
+      return;
     } catch (error) {
       debugPrint('模拟器种子失败（单游戏缺失等），继续启动链路: $error');
     }

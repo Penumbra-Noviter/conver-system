@@ -145,6 +145,24 @@ Future<Directory> makeTempParent() async {
   return parent;
 }
 
+/// F-33（TD-1）fake：永不响应的 HttpClient——getUrl 永久挂起，但 close 被
+/// 记录。经 HttpOverrides.runZoned 注入 [loadManifestViaHttp]，验证超时后
+/// 底层请求被取消（force close 在途连接，杜绝悬挂连接累积）。
+class _NeverRespondingHttpClient implements HttpClient {
+  bool closed = false;
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) => Completer<HttpClientRequest>().future;
+
+  @override
+  void close({bool force = false}) {
+    closed = true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   late Directory parent;
   late SimulatorDataDir dataDir;
@@ -382,6 +400,17 @@ void main() {
   });
 
   group('F-25 兜底 · 种子单游戏缺失（rootBundle 裸抛）不中止列表', () {
+    test('种子挂起（平台通道）→ 超时兜底继续启动链路，不中止编排（F-32 收窄未误伤超时路径）', () async {
+      buildController(manifestTimeout: const Duration(milliseconds: 30));
+      seeder.hang = Completer<bool>();
+      loader.result = parseManifest(manifestJson);
+
+      await controller.ensureStarted();
+
+      expect(controller.state, SimulatorsState.ready,
+          reason: '种子挂起超时降级继续链路（与目录不可写阻塞性错误区分）');
+      seeder.hang!.complete(false); // 清理未完成 future
+    });
     test('seed 抛错但数据目录已有 manifest → 继续编排 → ready', () async {
       // 模拟先前成功种子：数据目录已有 manifest。
       final simDir = Directory('${parent.path}${Platform.pathSeparator}simulators');
@@ -409,6 +438,40 @@ void main() {
       expect(controller.state, SimulatorsState.error);
       expect(controller.errorMessage, contains('加载游戏清单失败'),
           reason: '种子兜底后由 manifest 面决定终态，链路不裸崩');
+    });
+  });
+
+  group('F-32 · 种子错误捕获面收窄（TD-1）', () {
+    test('种子目录不可写（带路径 FileSystemException）→ error 文案含路径，不吞成清单失败', () async {
+      final simDir = Directory('${parent.path}${Platform.pathSeparator}simulators');
+      buildController();
+      seeder.error = FileSystemException('目录只读，无法写入', simDir.path);
+      loader.result = parseManifest(manifestJson); // 即便 manifest 可拉，也不该盖掉种子阻塞性错误
+
+      await controller.ensureStarted();
+
+      expect(controller.state, SimulatorsState.error);
+      expect(controller.errorMessage, contains('模拟器数据目录不可用'),
+          reason: '种子明确错误文案（非清单面泛化错误）');
+      expect(controller.errorMessage, contains(simDir.path),
+          reason: '目录不可写错误带完整路径（F-32 契约要求，不吞并）');
+      expect(controller.errorMessage, isNot(contains('游戏清单加载失败')),
+          reason: '不被吞成清单加载/HTTP 404 泛化错误');
+      expect(loader.calls, 0, reason: '种子阻塞性错误先失败，不再进入 manifest 拉取');
+    });
+
+    test('种子 FileSystemException 不带路径（意外形态）→ 文案仍含数据目录路径（自有兜底）', () async {
+      final simDir = Directory('${parent.path}${Platform.pathSeparator}simulators');
+      buildController();
+      seeder.error = const FileSystemException('写入失败');
+      loader.result = parseManifest(manifestJson);
+
+      await controller.ensureStarted();
+
+      expect(controller.state, SimulatorsState.error);
+      expect(controller.errorMessage, contains(simDir.path),
+          reason: '路径文案由 controller 以 simDir 兜底，不依赖异常自带路径');
+      expect(loader.calls, 0);
     });
   });
 
@@ -481,6 +544,51 @@ void main() {
       await Future.wait([f1, f2]);
       expect(seeder.calls, 1);
       expect(controller.state, SimulatorsState.ready);
+    });
+
+    test('F-31（TD-1）: 重叠 refresh 合并 in-flight——挂起期间二次 refresh 不发起第二次拉取', () async {
+      buildController();
+      loader.result = parseManifest(manifestJson);
+      await controller.ensureStarted();
+      expect(controller.state, SimulatorsState.ready);
+      final callsAfterStart = loader.calls;
+
+      // A：挂起中的 refresh（模拟慢拉）。
+      loader.hang = Completer<ManifestParseResult>();
+      final fA = controller.refresh();
+      await Future<void>.delayed(Duration.zero); // 进入 loader 挂起点
+      // B：A 完成前二次 refresh（旧实现直调 _fetchManifest → 第二次独立拉取）。
+      final fB = controller.refresh();
+
+      expect(loader.calls, callsAfterStart + 1,
+          reason: '重叠 refresh 合并 in-flight，不发起第二次拉取（无 last-writer-wins）');
+
+      loader.hang!.complete(parseManifest(manifestJson));
+      await Future.wait([fA, fB]);
+      expect(controller.state, SimulatorsState.ready);
+      expect(loader.calls, callsAfterStart + 1);
+    });
+
+    test('F-31（TD-1）: 重叠 refresh 共享失败——迟到失败不盖掉先前成功结果', () async {
+      buildController();
+      loader.result = parseManifest(manifestJson);
+      await controller.ensureStarted();
+      expect(controller.state, SimulatorsState.ready);
+
+      // A 挂起中，B 合并；A 完成后（成功）——B 只能是同一条链同一结果。
+      loader.hang = Completer<ManifestParseResult>();
+      final fA = controller.refresh();
+      await Future<void>.delayed(Duration.zero);
+      final fB = controller.refresh();
+
+      loader.hang!.complete(parseManifest(manifestJson));
+      await Future.wait([fA, fB]);
+
+      // 若旧实现（无守卫）：B 独立拉取可在 A 之后单独失败/成功竞争终态；
+      // 守卫后只有一条链，B 与 A 结果一致，ready 结果不被任何迟到失败覆盖。
+      expect(controller.state, SimulatorsState.ready);
+      expect(controller.errorMessage, isNull);
+      expect(loader.calls, 2, reason: '首启 1 次 + 合并后仅 1 次 refresh 拉取');
     });
   });
 
@@ -633,6 +741,42 @@ void main() {
       expect(controller.games, hasLength(2));
       expect(controller.games.first.name, '人生模拟器 v3');
       await server!.stop();
+    });
+  });
+
+  group('F-33（TD-1）· 拉取超时取消底层 HttpClient 请求', () {
+    test('挂起请求超时 → 底层 HttpClient 被 force close（取消在途连接，杜绝悬挂累积）', () async {
+      final fakeClient = _NeverRespondingHttpClient();
+      await HttpOverrides.runZoned(
+        () async {
+          await expectLater(
+            loadManifestViaHttp(4321, timeout: const Duration(milliseconds: 30)),
+            throwsA(isA<TimeoutException>()),
+            reason: '挂起阶段由函数内超时守卫拦截（不再依赖 controller 层）',
+          );
+        },
+        createHttpClient: (_) => fakeClient,
+      );
+      expect(fakeClient.closed, isTrue,
+          reason: '超时后取消底层请求：finally force close 在途 HttpClient');
+    });
+
+    test('正常返回（200 + 合法 manifest）路径不受超时参数影响，解析成功', () async {
+      final httpServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => httpServer.close(force: true));
+      httpServer.listen((request) {
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(manifestJson)
+          ..close();
+      });
+
+      final result = await loadManifestViaHttp(httpServer.port,
+          timeout: const Duration(milliseconds: 500));
+
+      expect(result.ok, isTrue);
+      expect(result.games, hasLength(2));
     });
   });
 }
