@@ -4,7 +4,9 @@
 /// - 非流式 generate 走 dio；流式 streamGenerate 走 dart:io HttpClient 直连；
 /// - POST {base}/v1/messages、x-api-key + anthropic-version 头、system 顶层参数、
 ///   content_block_delta 的 text_delta 逐 token、temperature 不透传（R8）；
-/// - 401/429/400(content_filter)/408/504/连接拒绝 → LLM 族；
+/// - 401/429/400(content_filter)/408/504 → 业务 LLM 族（状态码分支不变）；
+///   流式连接拒绝（connect 段传输失败）→ LLMConnectionInterruptedError
+///   （M6-06 wire connect 相位收敛）；
 /// - 流中途 EOF（未到 message_stop）/ 连接重置 → 可区分的 LLMConnectionInterruptedError；
 /// - 零 token 正常完成（message_stop 已收）不抛错。
 /// 锚：`desktop/backend/app/services/llm/claude.py` + `errors.dart::translateSdkError`。
@@ -306,7 +308,8 @@ void main() {
       expect(e, isA<LLMTimeoutError>());
     });
 
-    test('连接拒绝（端口关闭）→ LLM 族兜底（SocketException 不穿透）', () async {
+    test('连接拒绝（端口关闭）→ LLMConnectionInterruptedError（connect 段收敛，'
+        'SocketException 不穿透）', () async {
       final server = await startedServer(FakeLlmServer.httpError(200));
       final baseUrl = server.baseUrl;
       await server.close();
@@ -317,8 +320,9 @@ void main() {
             .streamGenerate(messages: messages)
             .toList();
         fail('应抛出 LLM 族错误');
-      } on LLMError catch (e) {
-        expect(e.message, startsWith('Claude API 调用失败:'));
+      } on LLMConnectionInterruptedError {
+        // M6-06 契约：wire connect 段传输失败（拒连）统一收敛为
+        // LLMConnectionInterruptedError（SocketException 不穿透）。
       } on SocketException {
         fail('流式连接拒绝的 SocketException 必须经 translateError 进入 LLM 族');
       }

@@ -5,8 +5,10 @@
 /// - POST {base}/v1/chat/completions、Bearer 头、temperature 透传、
 ///   choices[0].delta.content 逐 token（null 跳过）、[DONE] 收束；
 /// - [normalizeBaseUrl] 末尾段 v1 / v1beta 原样、否则补 /v1、空值返回 null；
-/// - 401/429/408/504/连接拒绝 → LLM 族；[DONE] 前 EOF / 连接重置 →
-///   LLMConnectionInterruptedError；零 token 正常完成不抛错。
+/// - 401/429/408/504 → 业务 LLM 族（状态码分支不变）；流式连接拒绝（connect
+///   段传输失败）→ LLMConnectionInterruptedError（M6-06 wire connect 相位收敛）；
+///   [DONE] 前 EOF / 连接重置 → LLMConnectionInterruptedError；
+///   零 token 正常完成不抛错。
 /// 锚：`desktop/backend/app/services/llm/openai.py`（_normalize_base_url /
 /// temperature 透传）+ `errors.dart::translateSdkError`。
 library;
@@ -317,7 +319,8 @@ void main() {
       expect(e, isA<LLMTimeoutError>());
     });
 
-    test('连接拒绝（端口关闭）→ LLM 族兜底（SocketException 不穿透）', () async {
+    test('连接拒绝（端口关闭）→ LLMConnectionInterruptedError（connect 段收敛，'
+        'SocketException 不穿透）', () async {
       final server = await startedServer(FakeLlmServer.httpError(200));
       final baseUrl = server.baseUrl;
       await server.close();
@@ -328,8 +331,9 @@ void main() {
             .streamGenerate(messages: messages)
             .toList();
         fail('应抛出 LLM 族错误');
-      } on LLMError catch (e) {
-        expect(e.message, startsWith('OpenAI API 调用失败:'));
+      } on LLMConnectionInterruptedError {
+        // M6-06 契约：wire connect 段传输失败（拒连）统一收敛为
+        // LLMConnectionInterruptedError（SocketException 不穿透）。
       } on SocketException {
         fail('流式连接拒绝的 SocketException 必须经 translateError 进入 LLM 族');
       }

@@ -32,12 +32,20 @@
 ///
 /// ## 断流（A5）
 /// 流终止未到终态（连接异常 / 未收终态帧）→ 已累积部分落库 + 非阻塞
-/// [ChatInterrupted]「回复已中断」。R3 seam 契约：wire 层（T02）把流中途
-/// 断连（EOF 未到终态 / 连接重置）翻译为可区分的 [LLMConnectionInterruptedError]
-/// （LLM 族子类，errors.dart 共享）；连接阶段失败（SocketException / HTTP
-/// 403 / 404 / 422 等经 `translateSdkError` 兜底）与业务错误（Auth /
-/// RateLimit / Timeout / ContentFilter 等）为其子类/基类，不算断流。故
-/// [_isConnectionDrop] 以「严格子类」判型即断流判定。
+/// [ChatInterrupted]「回复已中断」。R3 seam 契约：wire 层（T02）把**连接建立
+/// 段**传输失败（DNS / 拒连 / 连接超时 / 响应头前断——stream_wire.dart
+/// connect 相位收敛）与**流中途**断连（EOF 未到终态 / 连接重置）统一翻译为
+/// 可区分的 [LLMConnectionInterruptedError]（LLM 族子类，errors.dart 共享）；
+/// 业务错误（Auth / RateLimit / Timeout / ContentFilter 等）为其它的子类/
+/// 基类，不算断流。故 [_isConnectionDrop] 以「严格子类」判型即断流判定。
+///
+/// ## 连接阶段自动重试（M6-06，仅聊天链路）
+/// 连接建立阶段失败（[LLMConnectionInterruptedError]，未收到状态码、确定未
+/// 产生服务端生成）在「首 token 前」窗口内自动重试（缺省 2 次，指数退避
+/// [1s, 2s]；[connectRetryDelays] 可注入）。**不重试**：已收到状态码
+/// （4xx/5xx，含 Auth / RateLimit / Timeout / BadRequest / ContentFilter 映射）
+/// 与流中已产出至少一个 token 后的失败。user 行在落库后才调用 provider，
+/// 重试仅重放 provider 段、不重复落库；重试耗尽 → 既有断流语义收束。
 library;
 
 import 'dart:async';
@@ -174,13 +182,15 @@ class RegenerateResult {
 
 /// 判定 provider 流异常是否为「连接中断」（断流，R3 seam）。
 ///
-/// 契约（T02 wire 层遵守）：流中途断连（EOF 未收终态帧 / 连接重置）→ 可区分
-/// 的 [LLMConnectionInterruptedError]（LLM 族子类，errors.dart 共享，Claude /
-/// OpenAI wire 一致抛出）。**严格子类判型**：连接阶段失败（SocketException /
-/// HTTP 403 / 404 / 422 等经 `translateSdkError` 兜底翻译）为**基类**
-/// [LLMError]，不算断流 → 走业务错误 [ChatError]（F-45 不落部分内容）；业务
-/// 错误（Auth / RateLimit / Timeout / ContentFilter / BadRequest /
-/// ResponseParseFailed）为其子类，同样不走断流分支。
+/// 契约（T02 wire 层遵守）：**连接建立段**传输失败（DNS / 拒连 / 连接超时 /
+/// 响应头前断——stream_wire.dart connect 相位收敛）与**流中途**断连（EOF 未收
+/// 终态帧 / 连接重置）统一翻译为可区分的 [LLMConnectionInterruptedError]（LLM
+/// 族子类，errors.dart 共享，Claude / OpenAI wire 一致抛出）。**严格子类判型**
+/// 即断流判定：HTTP 状态码路径（403 / 404 / 422 等经 `translateSdkError` 兜底
+/// 翻译）与业务错误（Auth / RateLimit / Timeout / ContentFilter / BadRequest /
+/// ResponseParseFailed）均为**基类** [LLMError] 或其非中断子类，不算断流 →
+/// 走业务错误 [ChatError]（F-45 不落部分内容）。M6-06：连接阶段中断属「首
+/// token 前」自动重试窗口，重试耗尽后复用本判定走断流收束。
 bool _isConnectionDrop(LLMError error) => error is LLMConnectionInterruptedError;
 
 /// [streamReply] 一次运行的共享可变状态（onData / onCancel / 收尾 handler 间
@@ -203,6 +213,13 @@ class _StreamRunState {
   /// 已累积的流式内容（逐 token 追加；完成态即完整回复）。
   String fullContent = '';
 
+  /// 是否已产出至少一个 token（M6-06 重试窗口判据：仅「首 token 前」的
+  /// 连接中断失败可重试；流中已产出 → 走既有断流路径）。
+  bool producedToken = false;
+
+  /// 本次回合已发生的连接阶段失败次数（重试编排计数；耗尽后走终态收束）。
+  int connectFailures = 0;
+
   /// provider 流订阅（停止时直接 cancel，不等待待处理元素）。
   StreamSubscription<String>? providerSub;
 }
@@ -214,6 +231,10 @@ class _StreamRunState {
 class ChatService {
   /// [database] 供重生成的「删旧 + 插新」单事务（drift 嵌套事务 = savepoint）；
   /// [settingsRepository] 提供 Key 解析链与滑窗轮数等设置。
+  ///
+  /// [connectRetryDelays]：连接建立阶段失败的重试退避序列（M6-06），长度即
+  /// 最大重试次数。生产默认 `[1s, 2s]`（重试 2 次，指数退避）；测试注入短值
+  /// 以获得确定性退避时序。
   ChatService({
     required AppDatabase database,
     required this._conversationRepository,
@@ -221,7 +242,12 @@ class ChatService {
     required this._messageRepository,
     required this._settingsRepository,
     required this._providerFactory,
-  }) : _db = database;
+    List<Duration> connectRetryDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+    ],
+  })  : _db = database,
+        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays);
 
   final AppDatabase _db;
   final ConversationRepository _conversationRepository;
@@ -229,6 +255,9 @@ class ChatService {
   final MessageRepository _messageRepository;
   final SettingsRepository _settingsRepository;
   final LLMProviderFactory _providerFactory;
+
+  /// 连接阶段失败的重试退避序列（长度 = 最大重试次数；M6-06 弱网重连）。
+  final List<Duration> _connectRetryDelays;
 
   /// F4：重生成 in-flight 对话集（并发双触发守卫——同对话 in-flight 期间
   /// 第二次调用抛 [RegenerateBusyError]，防第二次事务删掉第一次的新回复）。
@@ -257,6 +286,11 @@ class ChatService {
   /// 断流（A5）：provider 流抛出 [LLMConnectionInterruptedError]（流中途断连）
   /// → 已累积部分落库 + 非阻塞 [ChatInterrupted]「回复已中断」；无部分 →
   /// [ChatInterrupted(null)]。
+  ///
+  /// 连接阶段自动重试（M6-06）：连接建立失败（wire connect 相位收敛为
+  /// [LLMConnectionInterruptedError]，未收到状态码、未产出 token）→ 自动重试
+  /// 2 次、退避 [1s, 2s]（[connectRetryDelays] 可注入）；user 行落库仅一次，
+  /// 重试不重复。已收到状态码 / 已产出 token 后失败 → 不重试，走各自既有收束。
   ///
   /// 错误（A2 错误面）：领域错误 / LLM 业务错误 → [ChatError] 事件（用户可见
   /// 文案），且**不落部分内容**（F-45，锚 `chat.py::stream_reply`）。
@@ -329,31 +363,15 @@ class ChatService {
       }
 
       // 6. 订阅 provider 流。cancelOnError 保证错误后在 onError 一次性收尾，
-      //    不再触发 onDone 造成双处置。
-      final sub = resolved.llm
-          .streamGenerate(messages: messages, model: resolved.model)
-          .listen(
-            (token) {
-              if (state.stopped) {
-                return; // 停止后不再追加（_stopStreamReply 已处理部分落库）。
-              }
-              if (controller.isClosed) {
-                return;
-              }
-              state.fullContent += token;
-              controller.add(ChatToken(token));
-            },
-            onError: (Object error, StackTrace stackTrace) {
-              unawaited(
-                _onProviderStreamError(state, controller, providerName, error),
-              );
-            },
-            onDone: () {
-              unawaited(_onProviderStreamDone(state, controller));
-            },
-            cancelOnError: true,
-          );
-      state.providerSub = sub;
+      //    不再触发 onDone 造成双处置。onError 先走 M6-06 连接阶段重试判定。
+      _subscribeStream(
+        state: state,
+        controller: controller,
+        providerName: providerName,
+        llm: resolved.llm,
+        messages: messages,
+        model: resolved.model,
+      );
     } on DomainError catch (e) {
       // F3：调用方可能在解析失败瞬间取消订阅（controller 已 close），
       // add 到已关闭 controller 抛 StateError → 未处理异步异常；守卫跳过。
@@ -376,6 +394,103 @@ class ChatService {
         await controller.close();
       }
     }
+  }
+
+  /// 订阅 provider 流并接线事件（onData / onError / onDone）。
+  ///
+  /// 停止或事件流已关闭时不订阅（幂等守卫，重试/停止竞态下复用）。onError 先
+  /// 走 [_onStreamError] 的 M6-06 连接阶段重试判定，重试耗尽的失败才落到
+  /// [_onProviderStreamError] 终态收束。
+  void _subscribeStream({
+    required _StreamRunState state,
+    required StreamController<ChatEvent> controller,
+    required String providerName,
+    required LLMProvider llm,
+    required List<LlmMessage> messages,
+    required String model,
+  }) {
+    if (state.stopped || controller.isClosed) {
+      return;
+    }
+    final sub = llm
+        .streamGenerate(messages: messages, model: model)
+        .listen(
+          (token) {
+            if (state.stopped) {
+              return; // 停止后不再追加（_stopStreamReply 已处理部分落库）。
+            }
+            if (controller.isClosed) {
+              return;
+            }
+            state.fullContent += token;
+            state.producedToken = true;
+            controller.add(ChatToken(token));
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            unawaited(
+              _onStreamError(
+                state: state,
+                controller: controller,
+                providerName: providerName,
+                llm: llm,
+                messages: messages,
+                model: model,
+                error: error,
+              ),
+            );
+          },
+          onDone: () {
+            unawaited(_onProviderStreamDone(state, controller));
+          },
+          cancelOnError: true,
+        );
+    state.providerSub = sub;
+  }
+
+  /// M6-06 连接阶段失败处理：先判「首 token 前」重试，再走终态收束。
+  ///
+  /// 重试条件（全部满足）：
+  /// - 失败为连接中断（[_isConnectionDrop] 严格子类判型——含 wire connect 相位
+  ///   收敛的 [LLMConnectionInterruptedError]，见 stream_wire.dart）；
+  /// - 尚未产出任何 token（重试窗口 = 首 token 前；流中已产出 → 不重试）；
+  /// - 重试次数未耗尽（[_connectRetryDelays] 长度 = 最大重试次数）。
+  ///
+  /// 重试安全：连接建立阶段失败未收到状态码、确定未产生服务端生成，重放不
+  /// 重复计费/生成；user 行已在 `_runStreamReply` 落库，重试不重复落库。
+  /// 退避期间停止/取消 → 不再订阅（无泄漏）；重试耗尽 → 既有断流/错误收束。
+  Future<void> _onStreamError({
+    required _StreamRunState state,
+    required StreamController<ChatEvent> controller,
+    required String providerName,
+    required LLMProvider llm,
+    required List<LlmMessage> messages,
+    required String model,
+    required Object error,
+  }) async {
+    if (state.stopped || controller.isClosed) {
+      return;
+    }
+    if (!state.producedToken &&
+        error is LLMError &&
+        _isConnectionDrop(error) &&
+        state.connectFailures < _connectRetryDelays.length) {
+      final delay = _connectRetryDelays[state.connectFailures];
+      state.connectFailures++;
+      await Future<void>.delayed(delay);
+      if (state.stopped || controller.isClosed) {
+        return; // 重试窗口内停止/取消：不再订阅（_stopStreamReply 已收尾）。
+      }
+      _subscribeStream(
+        state: state,
+        controller: controller,
+        providerName: providerName,
+        llm: llm,
+        messages: messages,
+        model: model,
+      );
+      return;
+    }
+    await _onProviderStreamError(state, controller, providerName, error);
   }
 
   /// provider 流正常结束（终态帧收束）：非空落库完整 assistant；零 token 空
