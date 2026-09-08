@@ -121,11 +121,13 @@ class _CharactersViewState extends State<CharactersView> {
               onCreate: () => unawaited(_openWizard()),
               onImport: () => unawaited(controller.importCharacter()),
             ),
-          if (controller.notice != null)
-            NoticeBanner(
-              notice: controller.notice!,
-              onDismiss: controller.dismissNotice,
-            ),
+          // W5 B1：NoticeBanner 始终渲染（notice 可空），进出过渡 140ms 由
+          // 组件自身 AnimatedOpacity 管理——dismiss 后播放出口 Fade，过渡
+          // 完成才回调 dismissNotice（提示条不硬切卸载）。
+          NoticeBanner(
+            notice: controller.notice,
+            onDismiss: controller.dismissNotice,
+          ),
           Expanded(
             child: RefreshIndicator(
               onRefresh: controller.refresh,

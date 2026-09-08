@@ -294,8 +294,11 @@ void main() {
       await tester.pump();
       expect(find.byTooltip('发送'), findsOneWidget, reason: '非阻塞：后续操作可用');
 
-      // dismiss 后提示消失，可继续发送（非阻塞语义）。
+      // dismiss 后提示消失，可继续发送（非阻塞语义）。W5 B1：关闭先经
+      // 140ms 出口淡出，过渡完成后再卸载。
       await tester.tap(find.byTooltip('关闭提示'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 140));
       await tester.pump();
       expect(find.text('回复已中断'), findsNothing);
 
@@ -323,6 +326,45 @@ void main() {
       expect(find.byType(MarkdownBody), findsNothing);
       final settled = await env.messageRepository.getMessages(c.activeConversationId!);
       expect([for (final m in settled) m.role], [Role.user]);
+      await env.close();
+    });
+
+    // W5 审核 B1 防复发：NoticeBanner「消失」应有 140ms 出口过渡（验收 3
+    // 完整达成），而非 dismiss 后即时硬切卸载。
+    testWidgets('dismiss → 出口过渡中旧提示仍在树中（Fade 渐隐）→ 过渡完成后卸载',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      await openConversation(
+        tester,
+        env,
+        TickingFakeLLMProvider(
+          tokens: const ['a', 'b'],
+          errorAfter: LLMConnectionInterruptedError(),
+          delay: const Duration(milliseconds: 5),
+        ),
+      );
+
+      await sendViaUi(tester, 'hi');
+      await pumpUntil(tester, () => find.text('回复已中断').evaluate().isNotEmpty,
+          why: '断流 notice 出现');
+      await tester.pump();
+      expect(find.text('回复已中断'), findsOneWidget);
+
+      // 点关闭 → 过渡进行中（~70ms）旧 child 仍在树中（退出动画未完成）。
+      // （IconButton 的 tooltip 在 AnimatedOpacity 外包下坐标偏移，直接用
+      // 图标定位并容忍命中告警。）
+      final closeFinder = find.byTooltip('关闭提示');
+      await tester.tapAt(tester.getCenter(closeFinder));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 70));
+      expect(find.text('回复已中断'), findsOneWidget,
+          reason: '出口过渡进行中：旧提示仍在树中（Fade 渐隐，非即时卸载）');
+
+      // 过渡完成后（>140ms）提示卸载消失。
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump();
+      expect(find.text('回复已中断'), findsNothing,
+          reason: '出口过渡完成：提示卸载');
       await env.close();
     });
   });
