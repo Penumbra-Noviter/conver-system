@@ -245,4 +245,45 @@ void main() {
       await db.close();
     });
   });
+
+  group('动效（M6-07 验收 2：tab 切换正文区 Fade）', () {
+    testWidgets('正文区 AnimatedSwitcher 160ms（消费 token）+ 过渡为 Fade', (tester) async {
+      await pumpApp(tester);
+
+      final switcher = tester.widget<AnimatedSwitcher>(
+        find.byType(AnimatedSwitcher).first,
+      );
+      expect(switcher.duration, const Duration(milliseconds: 160),
+          reason: 'tab 切换正文区 Fade 160ms（消费 ConverDurations.tabFade）');
+      expect(switcher.transitionBuilder, isNotNull,
+          reason: '过渡为 FadeTransition（淡入切换）');
+      expect(
+        find.byWidgetPredicate((w) => w is KeyedSubtree && w.key is ValueKey),
+        findsWidgets,
+        reason: '正文区子 child 以目的地为 ValueKey（切换触发器）',
+      );
+    });
+
+    testWidgets('切 tab 不保活：往返重建视图（characters initState 重新挂载）', (tester) async {
+      await pumpApp(tester);
+
+      // 切到角色 tab（pumpAndSettle 完成过渡 → 旧 child 被移除）。
+      await tester.tap(_navLabel('角色'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CharactersView), findsOneWidget);
+
+      // 切回聊天 → 切走角色：AnimatedSwitcher 不保活旧视图。
+      await tester.tap(_navLabel('聊天'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CharactersView), findsNothing,
+          reason: '切走角色后旧视图被卸载（无 IndexedStack 保活）');
+      expect(find.byType(ChatView), findsOneWidget);
+
+      // 再次切回角色 → 视图重新挂载（「切回 tab 重新 initState」既有契约）。
+      await tester.tap(_navLabel('角色'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CharactersView), findsOneWidget,
+          reason: '切回 tab 视图重建（自动刷新依赖重新 initState）');
+    });
+  });
 }

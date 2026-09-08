@@ -119,4 +119,25 @@ void main() {
       expect(find.byType(NoticeBanner), findsOneWidget);
     });
   });
+
+  group('动效（M6-07 验收 3：挂载淡入 140ms 消费 token）', () {
+    testWidgets('挂载时 TweenAnimationBuilder 淡入 + 时长 140ms', (tester) async {
+      await pumpNoticeBanner(tester, notice: '回复已中断', onDismiss: () {});
+
+      // 组件自身内建挂载淡入（TweenAnimationBuilder 驱动 Opacity）。
+      final tween = tester.widget<TweenAnimationBuilder<double>>(
+        find.byType(TweenAnimationBuilder<double>),
+      );
+      expect(tween.duration, const Duration(milliseconds: 140),
+          reason: '出现过渡 140ms（消费 ConverDurations.fast，非硬编码）');
+      expect(tween.tween, isA<Tween<double>>(),
+          reason: '挂载淡入动画在组件自身（进出来自共享组件）');
+
+      // 完整 pump 后 opacity 收敛为 1（动画结束、内容可见）。
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text('回复已中断'), findsOneWidget);
+    });
+  });
 }

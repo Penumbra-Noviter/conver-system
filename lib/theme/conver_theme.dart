@@ -53,6 +53,15 @@ abstract final class ConverTheme {
           );
         }),
       ),
+      // M6-07 微定制（共识 §3.4）：surfaceContainerHigh 底 + ink1 字 +
+      // md 圆角；不改变行为（既有 25 处 SnackBar 调用零改动）。
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: ConverColors.panel3,
+        contentTextStyle: const TextStyle(color: ConverColors.ink1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ConverRadii.md),
+        ),
+      ),
     );
   }
 
@@ -98,6 +107,14 @@ abstract final class ConverTheme {
             color: selected ? ConverColorsLight.accent : ConverColorsLight.ink3,
           );
         }),
+      ),
+      // M6-07 微定制（共识 §3.4）：与深色结构同构，仅 token 换浅色板。
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: ConverColorsLight.panel3,
+        contentTextStyle: const TextStyle(color: ConverColorsLight.ink1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ConverRadii.md),
+        ),
       ),
     );
   }

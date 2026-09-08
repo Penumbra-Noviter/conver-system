@@ -112,39 +112,52 @@ void main() {
       final c = await openConversation(
         tester,
         env,
+        // M6-07：token 间隔拉长至 200ms——流式窗口（3×200ms）须大于按钮
+        // AnimatedSwitcher 过渡窗口（140ms），使「发送→停止」切换的稳态可被
+        // 观测（过渡期新旧按钮并存属动效固有行为）。
         TickingFakeLLMProvider(
           tokens: const ['你', '好', '！'],
-          delay: const Duration(milliseconds: 10),
+          delay: const Duration(milliseconds: 200),
         ),
       );
 
       await sendViaUi(tester, '早上好');
 
-      // 发送 ↔ 停止：生成中按钮变停止（tooltip 锚）。
+      // 发送 ↔ 停止：分步 pump 完成 AnimatedSwitcher 过渡（>140ms）后断言
+      // 稳态（过渡期新旧按钮并存属动效固有行为；首个 token 200ms 后才到，
+      // 150ms 采样安全）。
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump();
       expect(find.byTooltip('停止'), findsOneWidget,
           reason: '发送↔停止两态：生成中为停止');
       expect(find.byTooltip('发送'), findsNothing);
       expect(find.text('早上好'), findsOneWidget, reason: 'user 消息即时渲染');
 
-      // 第一 token：streaming 占位纯文本 + 单点光标，无 Markdown 渲染。
-      await tester.pump(const Duration(milliseconds: 11));
+      // 第一 token（200ms 到点流式占位出现）：纯文本 + 单点光标，无 Markdown。
+      await tester.pump(const Duration(milliseconds: 60));
       expect(find.byType(MarkdownBody), findsNothing,
           reason: 'streaming 期间两级降频：不跑 Markdown 渲染');
       expect(find.text('你'), findsOneWidget);
       expect(find.text('▍'), findsOneWidget, reason: '单点闪烁光标（非三点 typing）');
 
       // 第二 / 第三 token 追加。
-      await tester.pump(const Duration(milliseconds: 11));
+      await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('你好'), findsOneWidget, reason: '逐 token 追加');
-      await tester.pump(const Duration(milliseconds: 11));
-      await tester.pump(const Duration(milliseconds: 11));
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
 
-      // 完成态：静态 Markdown 渲染完整回复，`▍` 光标消失，两态复位。
+      // 完成态：静态 Markdown 渲染完整回复，`▍` 光标消失；pump 完成
+      // 停止→发送切换的 AnimatedSwitcher 过渡后再断言稳态。
       await pumpUntil(
         tester,
         () => find.text('你好！', findRichText: true).evaluate().isNotEmpty,
         why: '完整回复完成且静态渲染',
       );
+      // M6-07：分步 pump 完成停止→发送 AnimatedSwitcher 过渡后断言稳态。
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump();
       expect(find.byType(MarkdownBody), findsWidgets,
           reason: '已完成 assistant 静态 Markdown');
       expect(find.text('▍'), findsNothing);
@@ -272,6 +285,9 @@ void main() {
       expect(c.isStreaming, isFalse);
       expect(find.textContaining('ab', findRichText: true), findsOneWidget,
           reason: '断流已累积部分落库后呈现');
+      // M6-07：停止→发送切换 AnimatedSwitcher 过渡完成后再断言稳态。
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
       expect(find.byTooltip('发送'), findsOneWidget, reason: '非阻塞：后续操作可用');
 
       // dismiss 后提示消失，可继续发送（非阻塞语义）。
@@ -758,6 +774,64 @@ void main() {
         why: '流式完成后光标消失',
       );
       expect(find.text('▍'), findsNothing);
+      await env.close();
+    });
+  });
+
+  group('动效（M6-07 验收 4：发送↔停止图标过渡 140ms）', () {
+    testWidgets('按钮区 AnimatedSwitcher 时长消费 ConverDurations.fast', (tester) async {
+      final env = await ChatTestEnv.create();
+      await openConversation(
+        tester,
+        env,
+        TickingFakeLLMProvider(
+          tokens: const ['早', '上', '好', '啊', '这', '条', '长'],
+          delay: const Duration(milliseconds: 200),
+        ),
+      );
+
+      final switcher = tester.widget<AnimatedSwitcher>(
+        find.byType(AnimatedSwitcher),
+      );
+      expect(switcher.duration, const Duration(milliseconds: 140),
+          reason: '按钮图标过渡 140ms（消费 ConverDurations.fast，非硬编码）');
+      expect(switcher.transitionBuilder, isNotNull,
+          reason: '过渡为 Fade（两态图标淡入淡出）');
+      await env.close();
+    });
+
+    testWidgets('进入生成 → 停止按钮 Key 保留；完成态复位发送按钮 Key 保留', (tester) async {
+      final env = await ChatTestEnv.create();
+      final c = await openConversation(
+        tester,
+        env,
+        TickingFakeLLMProvider(
+          tokens: const ['早', '上', '好', '啊', '这', '条', '长'],
+          delay: const Duration(milliseconds: 200),
+        ),
+      );
+
+      await sendViaUi(tester, 'hi');
+      // 过渡完成（160ms）后：停止按钮存在且 Key 保留。
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump();
+      expect(find.byKey(const Key('stop-button')), findsOneWidget,
+          reason: '生成中 stop-button Key 保留（验收 4）');
+      expect(find.byKey(const Key('send-button')), findsNothing);
+
+      // 完成态复位：send-button Key 恢复（等流完成信号）。
+      await pumpUntil(
+        tester,
+        () => !c.isStreaming,
+        why: '流式完成（isStreaming 复位）',
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump();
+      expect(find.byKey(const Key('send-button')), findsOneWidget,
+          reason: '完成态 send-button Key 恢复（验收 4）');
+      expect(c.isStreaming, isFalse);
       await env.close();
     });
   });

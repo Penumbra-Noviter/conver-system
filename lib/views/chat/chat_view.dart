@@ -24,6 +24,7 @@ import '../../data/database/tables.dart' show Role;
 import '../../theme/chat_markdown_style.dart' show warmStoneMarkdownDark, warmStoneMarkdownLight;
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
+import '../../theme/motion.dart' show ConverDurations;
 import '../../widgets/notice_banner.dart';
 import 'chat_controller.dart';
 import 'chat_entry.dart';
@@ -776,30 +777,37 @@ class _ComposerState extends State<_Composer> {
               ),
             ),
             const SizedBox(width: ConverSpacing.space1),
-            if (streaming)
-              IconButton(
-                key: const Key('stop-button'),
-                tooltip: '停止',
-                iconSize: 26,
-                icon: Icon(
-                  Icons.stop,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                onPressed: controller.stop,
-              )
-            else
-              IconButton(
-                key: const Key('send-button'),
-                tooltip: '发送',
-                iconSize: 26,
-                icon: Icon(
-                  Icons.send,
-                  color: canSend
-                      ? Theme.of(context).colorScheme.primary
-                      : palette.ink4,
-                ),
-                onPressed: canSend ? _send : null,
-              ),
+            // M6-07 克制动效 ③：发送↔停止图标过渡 140ms（AnimatedSwitcher +
+            // Fade；消费 ConverDurations.fast）。两个 Key 保留——既有测试
+            // 按 Key 定位发送/停止按钮。
+            AnimatedSwitcher(
+              duration: ConverDurations.fast,
+              transitionBuilder: (child, animation) =>
+                  FadeTransition(opacity: animation, child: child),
+              child: streaming
+                  ? IconButton(
+                      key: const Key('stop-button'),
+                      tooltip: '停止',
+                      iconSize: 26,
+                      icon: Icon(
+                        Icons.stop,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      onPressed: controller.stop,
+                    )
+                  : IconButton(
+                      key: const Key('send-button'),
+                      tooltip: '发送',
+                      iconSize: 26,
+                      icon: Icon(
+                        Icons.send,
+                        color: canSend
+                            ? Theme.of(context).colorScheme.primary
+                            : palette.ink4,
+                      ),
+                      onPressed: canSend ? _send : null,
+                    ),
+            ),
           ],
         ),
       ),
