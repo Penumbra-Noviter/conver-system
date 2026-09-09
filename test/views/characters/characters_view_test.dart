@@ -452,7 +452,8 @@ void main() {
   });
 
   group('语义覆盖（M6-03 验收 4）', () {
-    testWidgets('角色卡 Semantics(button) + 长按多选 hint「长按可多选」', (tester) async {
+    testWidgets('常态：非多选角色卡不宣告按钮 + 长按多选 hint 保持（F-59 守卫）',
+        (tester) async {
       final env = await _CharsEnv.create();
       await env.seedCharacter(name: '诺克斯');
 
@@ -460,8 +461,10 @@ void main() {
 
       final handle = tester.ensureSemantics();
       final node = tester.getSemantics(find.text('诺克斯'));
-      expect(node.flagsCollection.isButton, isTrue,
-          reason: '角色卡 button 语义（screen reader 可确认可点）');
+      // F-59：常态（非多选）tap 无效 → 对齐游戏卡 button 守卫不宣告按钮，
+      // 避免 TalkBack 宣告可点实则不可点的卡片。
+      expect(node.flagsCollection.isButton, isFalse,
+          reason: '常态非多选 tap 为 null，不宣告 button（F-59 守卫对齐）');
       expect(
         node.hint,
         contains('长按可多选'),
@@ -487,6 +490,32 @@ void main() {
           reason: '多选态 tap 切换勾选仍为 button 语义');
       expect(node.hint, contains('长按可多选'),
           reason: 'hint 在多选态保留');
+      handle.dispose();
+      await env.close();
+    });
+
+    testWidgets('退出多选态 → 回到不宣告按钮 + hint 保持（F-59 往返）',
+        (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(name: '诺克斯');
+
+      await pumpChars(tester, env, env.controller);
+      // 长按进入多选 → tap 有效，宣告 button。
+      await tester.longPress(find.text('诺克斯'));
+      await tester.pump();
+      expect(env.controller.selectionMode, isTrue, reason: '长按进入多选');
+
+      // 退出多选态 → tap 恢复为 null，button 宣告撤销（守卫往返闭环）。
+      env.controller.exitSelectionMode();
+      await tester.pump();
+      expect(env.controller.selectionMode, isFalse, reason: '退出多选');
+
+      final handle = tester.ensureSemantics();
+      final node = tester.getSemantics(find.text('诺克斯'));
+      expect(node.flagsCollection.isButton, isFalse,
+          reason: '退出多选后 tap 为 null，撤销 button 宣告（F-59 往返）');
+      expect(node.hint, contains('长按可多选'),
+          reason: 'hint 退出多选后仍保留');
       handle.dispose();
       await env.close();
     });
