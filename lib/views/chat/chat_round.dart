@@ -4,16 +4,18 @@
 /// 深模块：协议表面 = [send] / [stop] / [regenerate] / [retryInterrupted]
 /// 四操作 + 合成消息只读状态面 + [resetForNavigation] /
 /// [applyBackgroundStoppedMark] / [isStopped] / [isInterrupted]；
-/// 实现内含流订阅、合成消息 id、停止竞态（F1）、入口态/后台流停止补标
+/// 实现内含流订阅、合成消息 id、停止完成契约（ChatService streamReply onCancel
+/// 保证 user 写已结算，替换原 UI 轮询补偿）、入口态/后台流停止补标
 /// （F3b）、断流截断标记与重试（M6-08）等回合生命周期逻辑。
 ///
 /// 语义锚点（逐字对齐 ChatController 既有回合行为）：
 /// - 发送：[send] 置 isStreaming → 乐观追加在途 user + 流式占位气泡 →
 ///   [ChatToken] 累积 [streamingText] → 终态（done / interrupted / error）
 ///   触发 [reloadMessages] 重载 DB 列表替换占位；
-/// - 停止：[stop] 取消流订阅（ChatService 幂等落库已累积部分）→ 会话内重载
-///   后末条 assistant 标「已停止」（[isStopped]）；无部分内容仅保留已发
-///   user；入口态/后台流停止（[currentConversationId] 非本轮会话）记待补
+/// - 停止：[stop] 取消流订阅——ChatService 停止完成契约保证 cancel resolve 时
+///   已发 user 写已结算（成功落库 / 回合已终态不再写）+ 幂等落库已累积部分 →
+///   会话内重载后末条 assistant 标「已停止」（[isStopped]）；无部分内容仅保留
+///   已发 user；入口态/后台流停止（[currentConversationId] 非本轮会话）记待补
 ///   集合，重进会话时经 [applyBackgroundStoppedMark] 补标（F3b）；
 /// - 重生成：[regenerate] 走 ChatService 延迟删除（失败不删行、旧回复保留），
 ///   成功经 [reloadMessages] 重载；[isRegenerating] 防并发；
@@ -49,8 +51,8 @@ class ChatRound {
   /// 断流提示文案（NoticeBanner 展示 + 「重试」动作渲染判据的单一来源）。
   static const String interruptedNoticeText = '回复已中断';
 
-  /// [chatService] 回合编排服务；[messageRepository] 停止竞态确认（F1）与
-  /// 后台流末条判定（F3b）数据源；[noticeRunner] 共享 notice 槽（断流 /
+  /// [chatService] 回合编排服务；[messageRepository] 后台流末条判定（F3b）与
+  /// 重生成目标解析（[regenerate]）数据源；[noticeRunner] 共享 notice 槽（断流 /
   /// 错误先错者胜，发送起始清空）；[reloadMessages] 终态 / 停止后重载当前
   /// 会话 DB 列表——返回最新列表供「已停止」标记判定（会话内停止路径）；
   /// [notify] 状态变化通知（controller 接入 notifyListeners）。
@@ -103,10 +105,6 @@ class ChatRound {
   /// 当前回合所属对话 id（[send] 时记录）。入口态/后台流停止时仍可定位本轮
   /// 会话（F3b）。
   int? _roundConversationId;
-
-  /// 当前回合已发 user 文本（[send] 时记录，生命周期随回合）——stop 后在途
-  /// user 落库确认的目标（F1）。
-  String? _roundUserText;
 
   /// 当前回合是否已累积过 token（ChatToken 到达即置位，生命周期随回合）——
   /// 「已停止」标记判定的「已累积内容是否存在」依据（F3b）。
@@ -195,7 +193,6 @@ class ChatRound {
     _pendingUserSyntheticId = _nextSyntheticId();
     _assistantSyntheticId = _nextSyntheticId();
     _roundConversationId = conversationId;
-    _roundUserText = trimmed;
     _roundStreamedAnything = false;
     _notify();
 
@@ -213,8 +210,9 @@ class ChatRound {
     );
   }
 
-  /// 停止当前回合（A3 UI 面）：取消流订阅 → ChatService 幂等落库已累积部分
-  /// → 会话内重载后末条 assistant 标「已停止」；无部分内容仅保留已发 user。
+  /// 停止当前回合（A3 UI 面）：取消流订阅 → ChatService 停止完成契约（cancel
+  /// resolve 保证已发 user 写已结算 + 幂等落库已累积部分）→ 会话内重载后末条
+  /// assistant 标「已停止」；无部分内容仅保留已发 user。
   ///
   /// [currentConversationId] 为停止时刻的当前会话（controller 导航面提供；
   /// null = 入口态）——与本轮会话一致 → 重载 + 标记；不一致（入口态/后台流
@@ -226,18 +224,13 @@ class ChatRound {
     final sub = _subscription;
     _subscription = null;
     final roundCid = _roundConversationId;
-    final pendingUser = _roundUserText;
     _reloadPending = false;
     _isStreaming = false;
     _streamingStopped = true; // 占位气泡保留纯文本 +「已停止」标记
     _notify();
-    await sub?.cancel(); // ChatService onCancel：已累积部分落库后关闭流
-    // F1：cancel 完成不保证在途 user 已落库（服务层落库为独立异步路径）——
-    // 有界等待其落库后再 reload，保证本路径任何窗口下 stop 后 UI 显示已发
-    // user（不依赖「reload 恰好在落库后执行」的时序巧合；超时兜底防挂起）。
-    if (roundCid != null && pendingUser != null && pendingUser.isNotEmpty) {
-      await _awaitInFlightUserLanded(roundCid, pendingUser);
-    }
+    // 停止完成契约（AR-2）：cancel（onCancel = ChatService 门等待）resolve 即
+    // 保证已发 user 写已结算——reload 必见已发 user，无需（也无从）再轮询。
+    await sub?.cancel();
     if (roundCid != null && currentConversationId == roundCid) {
       // 会话内停止：重载当前会话并按「本轮已累积过 token 且 DB 末条为
       // assistant」判「已停止」（原有路径 + 已累积内容判据）。
@@ -443,7 +436,6 @@ class ChatRound {
       _clearInFlight();
       // 自然终态回合已结算：后续回合从新 send 重建 round 记录。
       _roundConversationId = null;
-      _roundUserText = null;
       _roundStreamedAnything = false;
       _notify();
     }
@@ -451,34 +443,13 @@ class ChatRound {
 
   /// 清空在途合成状态（占位 user / 流式文本 / 停止标记），不触碰
   /// [_stoppedMessageIds]（落库消息标记的生命周期随会话）与 [_roundConversationId]
-  /// / [_roundUserText] / [_assistantSyntheticId]（入口态后台流仍可能渲染占位，
+  /// / [_assistantSyntheticId]（入口态后台流仍可能渲染占位，
   /// 停止标记与占位 id 的生命周期随整个回合）。
   void _clearInFlight() {
     _pendingUserText = null;
     _pendingUserSyntheticId = null;
     _streamingText = '';
     _streamingStopped = false;
-  }
-
-  /// F1：有界等待 [conversationId] 出现内容为 [content] 的 user 行落库——stop
-  /// 后 reload 前补足「cancel 完成 ≠ 在途 user 已落库」的竞态窗口。已落库
-  /// 立即返回；未落库轮询至 3s 总 deadline 兜底（单轮查询 1s 超时，真实网络
-  /// 停滞不挂起 stop 路径）。
-  Future<void> _awaitInFlightUserLanded(int conversationId, String content) async {
-    final deadline = DateTime.now().add(const Duration(seconds: 3));
-    while (DateTime.now().isBefore(deadline)) {
-      try {
-        final messages = await _messageRepository
-            .getMessages(conversationId)
-            .timeout(const Duration(seconds: 1));
-        if (messages.any((m) => m.role == Role.user && m.content == content)) {
-          return;
-        }
-      } catch (_) {
-        // 查询超时/异常：跳过本轮继续轮询（以总 deadline 兜底）。
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-    }
   }
 
   /// 返回 [conversationId] 当前最后一条消息（无则 null；查询异常按 null 处理
