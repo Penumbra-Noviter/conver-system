@@ -21,6 +21,12 @@
 字体解析：优先 msyhbd.ttc（微软雅黑 Bold），失败枚举系统字体目录回退
 （_FALLBACK_FONTS 序列逐条 try `ImageFont.truetype` 加载，能加载即用）；
 全部不可用抛 FileNotFoundError。
+
+F-69 背景色双向守卫：BG_HEX 与 flutter_launcher_icons.yaml 双键
+（adaptive_icon_background / background_color_android）必须一致——yaml 是 adaptive
+背景的权威源、BG_HEX 是 legacy 源图的权威源，任一改动不同步则 adaptive 与 legacy
+分叉。assert_icon_colors_consistent 在每次生成前机器校验，违反抛 ValueError 拒绝
+生成（脚本改或 yaml 改都拦得住）。
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
 from PIL import Image, ImageDraw, ImageFont
 
 __all__ = [
@@ -44,6 +51,7 @@ __all__ = [
     "SAFE_ZONE_RATIO",
     "FONT_PATH",
     "OUTPUT_FILES",
+    "LAUNCHER_ICONS_YAML",
     "GlyphGeometry",
     "hex_to_rgb",
     "resolve_font_path",
@@ -52,6 +60,7 @@ __all__ = [
     "place_glyph",
     "glyph_geometry",
     "assert_glyph_geometry",
+    "assert_icon_colors_consistent",
     "make_icon_images",
     "generate_icons",
     "main",
@@ -83,6 +92,12 @@ OUTPUT_FILES = (
     "ic_launcher_foreground.png",
     "ic_launcher_monochrome.png",
 )
+
+# F-69 双向守卫的权威源路径：仓库根 flutter_launcher_icons.yaml（adaptive 背景）。
+# 测试可 monkeypatch 或经 yaml_path 参数注入临时文件。
+LAUNCHER_ICONS_YAML = Path(__file__).resolve().parent.parent / "flutter_launcher_icons.yaml"
+# yaml 中必须与 BG_HEX 一致的背景色键（adaptive 背景 + legacy 背景）。
+_LAUNCHER_ICONS_BG_KEYS = ("adaptive_icon_background", "background_color_android")
 
 _FONT_PROBE_SIZE = 24
 _FIT_ITERATIONS = 8
@@ -282,6 +297,56 @@ def assert_glyph_geometry(
         raise ValueError("字形几何契约违反：" + "; ".join(problems))
 
 
+def assert_icon_colors_consistent(
+    bg_hex: str = BG_HEX,
+    yaml_path: str | Path | None = None,
+) -> None:
+    """F-69 双向守卫：脚本 BG_HEX 与 flutter_launcher_icons.yaml 双键必须一致。
+
+    yaml 的 adaptive_icon_background / background_color_android 双键任一与 BG_HEX
+    不一致（或双键彼此不一致、缺失、非法）即抛 ValueError 拒绝生成，双向拦截：
+
+    - yaml 改了脚本没改：adaptive 背景（yaml）与 legacy 源图背景（BG_HEX）分叉；
+    - 脚本改了 yaml 没改：同上反向分叉。
+    """
+    path = Path(yaml_path) if yaml_path is not None else LAUNCHER_ICONS_YAML
+    with path.open(encoding="utf-8") as fh:
+        doc = yaml.safe_load(fh)
+    section = doc.get("flutter_launcher_icons") if isinstance(doc, dict) else None
+    if not isinstance(section, dict):
+        raise ValueError(
+            f"图标背景色双向守卫失败（F-69）：{path} 缺少 flutter_launcher_icons 段。"
+        )
+    problems: list[str] = []
+    values: list[str] = []
+    for key in _LAUNCHER_ICONS_BG_KEYS:
+        value = section.get(key)
+        if not isinstance(value, str):
+            problems.append(f"{key} 缺失或非字符串（{value!r}）")
+            continue
+        try:
+            hex_to_rgb(value)
+        except ValueError as exc:
+            problems.append(f"{key}={value!r} 非法：{exc}")
+            continue
+        values.append(value.upper())
+        if value.upper() != bg_hex.upper():
+            problems.append(
+                f"{key}={value} 与脚本 BG_HEX={bg_hex} 不一致（yaml 改了脚本没改，"
+                "或反之）"
+            )
+    if len(set(values)) > 1:
+        problems.append(f"yaml 双键内部不一致：{dict(zip(_LAUNCHER_ICONS_BG_KEYS, values))}")
+    if problems:
+        raise ValueError(
+            "图标背景色双向守卫失败（F-69）：adaptive 背景与 legacy 源图背景将分叉。\n"
+            + "\n".join(f"- {problem}" for problem in problems)
+            + "\n请同步 scripts/generate_app_icon.py 的 BG_HEX 与 "
+            "flutter_launcher_icons.yaml 的 adaptive_icon_background / "
+            "background_color_android 双键。"
+        )
+
+
 def make_icon_images(
     glyph: str = GLYPH,
     canvas_size: int = CANVAS_SIZE,
@@ -317,7 +382,12 @@ def generate_icons(
     images: dict[str, Image.Image] | None = None,
     font_path: str | Path | None = None,
 ) -> dict[str, Path]:
-    """把三张图标 PNG 确定性落盘（同输入 → 字节一致），返回文件名 → 路径。"""
+    """把三张图标 PNG 确定性落盘（同输入 → 字节一致），返回文件名 → 路径。
+
+    生成前先跑 F-69 背景色双向守卫（脚本 BG_HEX 与 flutter_launcher_icons.yaml
+    双键一致），不一致直接抛 ValueError 拒绝生成。
+    """
+    assert_icon_colors_consistent()
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     if images is None:

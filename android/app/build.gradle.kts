@@ -1,8 +1,10 @@
 // NOTE: fully-qualified `java.util.Properties` breaks here because the AGP
 // `java` extension shadows the package name in the app-module script — explicit
 // imports are required (official Flutter "Sign the app" template).
+import java.io.File
 import java.io.FileInputStream
 import java.util.Properties
+import org.gradle.api.GradleException
 
 plugins {
     id("com.android.application")
@@ -20,6 +22,32 @@ val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+// F-68: 双 exists() 守卫——key.properties 或 keystore 缺失时，release 打包前报清晰
+// 可操作错误（替代 AGP 晦涩的 `SigningConfig "release" is missing required property
+// "storeFile"`）。挂在 packageRelease* 任务（APK 的 :app:packageRelease 与 AAB 的
+// :app:packageReleaseBundle 均以 packageRelease 开头）的 doFirst 上，只在 release
+// 打包时生效；debug 构建与 keystore 存在的正常路径行为不变。
+val keystoreStoreFile: File? = keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it) }
+tasks.matching { it.name.startsWith("packageRelease") }.configureEach {
+    doFirst {
+        if (!keystorePropertiesFile.exists()) {
+            throw GradleException(
+                "release 签名配置缺失：${keystorePropertiesFile.absolutePath} 不存在。\n" +
+                    "该文件为 gitignored 密钥清单（storeFile / storePassword / keyAlias / keyPassword 四键）。\n" +
+                    "按 docs/release-android.md §5 排查：从主仓库 android/key.properties 复制，或按 §5.4 重建后重试。"
+            )
+        }
+        if (keystoreStoreFile == null || !keystoreStoreFile.exists()) {
+            throw GradleException(
+                "release 签名配置缺失：keystore 文件不存在（" +
+                    (keystoreStoreFile?.absolutePath ?: "key.properties 未提供 storeFile 键") + "）。\n" +
+                    "keystore 为仓库外单点资产（docs/release-android.md §5），位于 <repo>/../keys/conver_system_upload.jks。\n" +
+                    "确认文件存在，或按 §5.4 重建后重试。"
+            )
+        }
+    }
 }
 
 android {
