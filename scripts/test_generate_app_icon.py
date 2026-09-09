@@ -9,8 +9,10 @@
 - 全幅源图背景实心 RGB(120,78,20)（#784E14）、字形 RGB(255,251,244)（#FFFBF4）
 - monochrome 变体单通道（黑字形 / 透明底）
 - 同输入两次运行字节级一致（确定性契约）
+- F-69 背景色双向守卫：脚本 BG_HEX 与 flutter_launcher_icons.yaml 双键
+  （adaptive_icon_background / background_color_android）双向一致，改一处必须失败
 
-运行：python -m pytest scripts/test_generate_app_icon.py --cov=scripts/generate_app_icon.py
+运行：python -m pytest scripts/test_generate_app_icon.py --cov=generate_app_icon --cov-fail-under=90
 """
 
 from __future__ import annotations
@@ -331,3 +333,77 @@ class TestGeometryGuard:
     def test_render_glyph_mask_default_center_not_blank(self):
         mask = gen.render_glyph_mask(64, 24, "汇", FONT_PRIMARY)
         assert _ink_box(_alpha_band(mask)) is not None
+
+
+class TestBackgroundColorGuard:
+    """F-69 双向守卫：脚本 BG_HEX 与 yaml 双键双向一致，任一不同步必须失败。
+
+    - 防「yaml 改了脚本没改」：yaml 双键取新值 ≠ BG_HEX → 拒绝（否则 adaptive 与
+      legacy 源图背景分叉）；
+    - 防「脚本改了 yaml 没改」：脚本 BG_HEX 取新值 ≠ yaml → 拒绝；
+    - yaml 双键自身分叉（adaptive 背景 ≠ legacy 背景）→ 拒绝；
+    - 生成管线（generate_icons / main）启动即校验，不一致拒绝生成。
+    """
+
+    @staticmethod
+    def _write_yaml(
+        tmp_path: Path, adaptive: str = "#784E14", bg: str = "#784E14"
+    ) -> Path:
+        content = (
+            "flutter_launcher_icons:\n"
+            '  android: true\n'
+            f'  adaptive_icon_background: "{adaptive}"\n'
+            f'  background_color_android: "{bg}"\n'
+        )
+        path = tmp_path / "flutter_launcher_icons.yaml"
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    def test_matching_yaml_passes(self, tmp_path):
+        gen.assert_icon_colors_consistent(
+            bg_hex=gen.BG_HEX, yaml_path=self._write_yaml(tmp_path)
+        )
+
+    def test_yaml_changed_script_not_rejected(self, tmp_path):
+        # 防「yaml 改了脚本没改」：yaml 双键新值 ≠ 脚本 BG_HEX → 拒绝
+        p = self._write_yaml(tmp_path, adaptive="#AA0000", bg="#AA0000")
+        with pytest.raises(ValueError):
+            gen.assert_icon_colors_consistent(bg_hex=gen.BG_HEX, yaml_path=p)
+
+    def test_script_changed_yaml_not_rejected(self, tmp_path):
+        # 防「脚本改了 yaml 没改」：脚本 BG_HEX 新值 ≠ yaml → 拒绝
+        p = self._write_yaml(tmp_path)
+        with pytest.raises(ValueError):
+            gen.assert_icon_colors_consistent(bg_hex="#AA0000", yaml_path=p)
+
+    def test_yaml_two_keys_diverged_rejected(self, tmp_path):
+        # 双键内部分叉（adaptive 背景 ≠ legacy 背景）→ 拒绝
+        p = self._write_yaml(tmp_path, adaptive="#784E14", bg="#AA0000")
+        with pytest.raises(ValueError):
+            gen.assert_icon_colors_consistent(bg_hex=gen.BG_HEX, yaml_path=p)
+
+    def test_generation_refuses_mismatched_yaml(self, tmp_path, monkeypatch):
+        # 生成管线级守卫：yaml 不一致时 generate_icons 拒绝
+        p = self._write_yaml(tmp_path, adaptive="#AA0000", bg="#AA0000")
+        monkeypatch.setattr(gen, "LAUNCHER_ICONS_YAML", p)
+        with pytest.raises(ValueError):
+            gen.generate_icons(tmp_path / "out")
+
+    def test_repo_yaml_consistent_with_script(self):
+        # 机器守卫落地锚点：仓库内真实 yaml 与脚本 BG_HEX 必须一致
+        if not gen.LAUNCHER_ICONS_YAML.exists():
+            pytest.skip("仓库 flutter_launcher_icons.yaml 不在本环境")
+        gen.assert_icon_colors_consistent(
+            bg_hex=gen.BG_HEX, yaml_path=gen.LAUNCHER_ICONS_YAML
+        )
+
+    def test_missing_section_rejected(self, tmp_path):
+        path = tmp_path / "flutter_launcher_icons.yaml"
+        path.write_text("other: true\n", encoding="utf-8")
+        with pytest.raises(ValueError):
+            gen.assert_icon_colors_consistent(bg_hex=gen.BG_HEX, yaml_path=path)
+
+    def test_invalid_yaml_color_rejected(self, tmp_path):
+        p = self._write_yaml(tmp_path, adaptive="#FFF", bg="#FFF")
+        with pytest.raises(ValueError):
+            gen.assert_icon_colors_consistent(bg_hex=gen.BG_HEX, yaml_path=p)
