@@ -46,10 +46,17 @@
 | F-56 | 假活连接终态化缺口：终态帧已到 + 连接不关闭 → await-for 永不 EOF → round 永不终态化（09 验收 4 为设计选择，但离「假活连接终态化保障」目标差一格）。**随修项 ② 注释失真 / ③ N4 断言 + flake 容差已由 AR-1 收编（2026-09-09）**，本条目缩减为仅剩 ① 假活终态化，正交于相位编码、重开 wire 终态语义，待专项立项。 | W2 增量审核 N1/N2/N4 + W3 增量审核 F8（期末四轴复证 F-N5）+ AR-1 收编 ②③ | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-57 | 停滞连接上 `sub.cancel()` 有界挂起：chat_service `_stopStreamReply` 已有 `.timeout(3s)` 兜底注释（F-17 面），09 idle force-close 已收窄暴露窗口——机制实证（cancel 挂到 EOF 为止），3s 兜底生效、基线同现。 | W2 增量审核（09 相邻发现 1） | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-65 | 断流/重试边界行为集（08 面，AR-5 已修 ②①、缩减为续期两项）：**② 重试成功无条件 clear 吞并发提示 → 已修（AR-5 条件清理：removed && target==replacedId && notice==interruptedText 才清）**；**① 多截断部分重试后旧截断失去入口 → 已修（AR-5 目标推进 target=max(marks) + notice 保持）**；续期两项——**③ reload 完成前点重试命中 `_reloadPending` 守卫静默 no-op（一帧窗口，低值面）**；**④ NoticeBanner 出口过渡窗口内同文案 notice 到达误清新提示——关闭成本陈述：需身份穿越组件边界（NoticeRunner seq + banner noticeId）＝增协议面，与收敛前提冲突；先错者胜使窗口内 notice 几乎不可变，理论级低值（AR-5/AR-6 裁决一致）**。 | W6 审核 F-3/F-5/F-8 + 期末四轴 F-N1/N2/N3/N6 + AR-5 修 ②① + AR-6 ④ 续期陈述 | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-66 | 「回复中断」小标在气泡 MergeSemantics 外成独立语义节点，M6-10 a11y 断言套件零覆盖（屏读体验未锁定）。 | W6 审核 F-6（期末四轴复证 F-N8） | Speculative | 📝 待立项 | 无障碍 |
 | F-67 | characters_view 覆盖缺口（F-59 消费时暴露）：12.4% 未覆盖行全为既有非 seam 路径——刷新失败 debugPrint / 创建向导 / 批量删除确认对话框 / 勾选框 onChanged；本轮仅修 Semantics 守卫（:347 全覆），补齐需新增向导/批删/错误态测试（超出 F-59 seam）。 | F-59 消费覆盖记录 | Speculative | 📝 待立项 | 无障碍 |
 
 ## 技术债处置记录
+
+### 2026-09-09 — 技术债折回 F-66 消费（「回复中断」小标语义断言落位）
+
+> 来源：技术债折回（用户「继续折回」→ best-judgment 取推荐 F-66——W6 F-6 + 期末 F-N8，最小闭口）。交付：**断言首跑即绿（现状小标已可读——气泡 MergeSemantics 外独立可读 label 节点）→ 零产品代码改动**；并列对照双锁 2 断言（断流面「回复中断」findsOneWidget + 「已停止」findsNothing / 停止面反向）+ 突变灵敏度实证（ExcludeSemantics 包裹 → 双红还原）。commit `d2fce63`（merge `34bd231`），基线 f55bbee。门禁：全量 **1500 测**绿（+2）/ analyze 0 / 审核 0 阻断（灵敏度独立复现、既有 15 断言保绿；N 观察：文本锚非结构锚低位风险 / find.text 类型敏感 / 时序硬编码 / 预置 flake 无关）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-66 | ✅ 已修 | 「回复中断」小标 a11y 断言零覆盖（W6 F-6 / 期末 F-N8）：并列对照双锁断言落位（断流「回复中断」+ 停止「已停止」互斥标注界），现状小标屏读可读实证、零产品代码改动 |
 
 ### 2026-09-09 — 技术债折回 F-63 消费（光标 reduce-motion 面缺口收口）
 
