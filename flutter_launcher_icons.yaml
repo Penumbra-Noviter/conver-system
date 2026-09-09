@@ -1,0 +1,20 @@
+# M7-01 启动图标生成器配置（flutter_launcher_icons ^0.14.4）。
+#
+# 源图由 scripts/generate_app_icon.py 程序化生成（确定性占位稿），后续换正式
+# 品牌稿只需替换本配置引用的三张 PNG（或改脚本参数重跑），不触碰 manifest：
+#
+#   python scripts/generate_app_icon.py   # 再生成三张 1024px 源图
+#   dart run flutter_launcher_icons        # 重建 adaptive + legacy 五档
+#
+# 当前取值：adaptive background = 实心底 #784E14；foreground/monochrome 用源图；
+# legacy 五档从全幅源图重生成；foreground_inset 用默认 16%（与 Flutter 模板一致，
+# 「汇」字形 ≤40% 画布，圆形遮罩下不会裁切）。
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icons/ic_launcher_source.png"
+  adaptive_icon_background: "#784E14"
+  adaptive_icon_foreground: "assets/icons/ic_launcher_foreground.png"
+  adaptive_icon_monochrome: "assets/icons/ic_launcher_monochrome.png"
+  min_sdk_android: 21
+  background_color_android: "#784E14"

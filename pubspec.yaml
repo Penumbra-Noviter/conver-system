@@ -84,6 +84,10 @@ dev_dependencies:
   drift_dev: ^2.34.5
   build_runner: ^2.16.0
 
+  # M7-01 启动图标生成器（自适应 + legacy；钉版 ^0.14.4，源图由
+  # scripts/generate_app_icon.py 程序化生成，配置见 flutter_launcher_icons.yaml）
+  flutter_launcher_icons: ^0.14.4
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
