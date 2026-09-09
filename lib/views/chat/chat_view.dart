@@ -675,8 +675,11 @@ class _BlinkingCursorState extends State<_BlinkingCursor>
   /// MediaQuery 同步（首次检测 / 运行时翻转均生效）。
   bool _reduceMotion = false;
 
-  /// 上次是否已应用过动画状态（守卫：防重复 repeat / 重复 stop 的 Ticker
-  /// 泄漏与 setState 风暴；初始值 false → 首次 didChangeDependencies 必应用）。
+  /// 是否已应用过动画状态（守卫：防**无关** didChangeDependencies 重跑
+  /// else 分支导致光标闪断——repeat 会在当前 value 处重建循环，闪烁周期被
+  /// 重置，产生肉眼可见的闪断）。与 Ticker 泄漏无关：repeat 内部先 stop()
+  /// 收束上一 TickerFuture、stop() 幂等，SDK 层无兜底清理遗漏。
+  /// 初始值 false → 首次 didChangeDependencies 必应用。
   bool _appliedOnce = false;
 
   @override
@@ -691,9 +694,9 @@ class _BlinkingCursorState extends State<_BlinkingCursor>
           ..stop()
           ..value = 1.0; // 静态完全可见（不透明），占位宽度不变。
       } else {
-        _controller
-          ..value = 0.0
-          ..repeat(reverse: true);
+        // 不重置 value（保持当前 opacity 连续性）：仅启动 repeat，从当前
+        // value 继续循环。reduce→正常翻转瞬间不再出现 value=0.0 的暗帧。
+        _controller.repeat(reverse: true);
       }
     }
   }
