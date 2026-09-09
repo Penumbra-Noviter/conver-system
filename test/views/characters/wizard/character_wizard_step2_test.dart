@@ -462,7 +462,9 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
-            // 入口经 context.read 构造 WizardController + DocumentParseService。
+            // 入口经 context.read 构造 WizardController；C2 收敛后视图改
+            // context.read 消费装配图 DocumentParseService（本测试按 app.dart
+            // 同构图提供 provider）。
             Provider<CharacterRepository>.value(
               value: env.characterRepository,
             ),
@@ -474,6 +476,16 @@ void main() {
             ),
             Provider<LLMProviderFactory>.value(
               value: FixedLLMProviderFactory(FakeLLMProvider(tokens: const ['ok'])),
+            ),
+            Provider<DocumentParseService>.value(
+              value: DocumentParseService(
+                settings: SettingsRepository(
+                  database: env.db,
+                  secretStore: InMemorySecretStore(),
+                ),
+                providerFactory:
+                    FixedLLMProviderFactory(FakeLLMProvider(tokens: const ['ok'])),
+              ),
             ),
           ],
           child: MaterialApp(

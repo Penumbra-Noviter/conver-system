@@ -55,4 +55,21 @@ void main() {
     expect(offending, isEmpty,
         reason: '视图层不得出现 FlutterSecretStore 标识符（隐式第二装配点）');
   });
+
+  test('lib/views/** 不现造服务实例（装配唯一落点 app.dart 纪律，C2 收敛）', () {
+    // 服务实例构造（含现造 CredentialsResolver 接线）一律收编于 app.dart
+    // 装配图；视图只 context.read 消费（layer_boundary 同款 grep 风格静态
+    // 断言）。`(?:new\s+)?` 兼容本仓库 Dart 2+ 省略 `new` 关键字的既有风格
+    // （`DocumentParseService(...)` 与 `new DocumentParseService(...)` 同构）。
+    final offending = <String>[
+      for (final file in dartFiles)
+        if (RegExp(r'\b(?:new\s+)?(DocumentParseService|GameGenerator|'
+                r'CredentialsResolver|ChatService)\s*\(')
+            .hasMatch(file.readAsStringSync()))
+          file.path,
+    ];
+    expect(offending, isEmpty,
+        reason: '视图层不得现造 DocumentParseService/GameGenerator/'
+            'CredentialsResolver/ChatService（服务装配单一落点）');
+  });
 }

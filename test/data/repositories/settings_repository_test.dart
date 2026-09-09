@@ -8,6 +8,8 @@ library;
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/llm/credentials_resolver.dart';
+import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/secure_store.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -271,6 +273,85 @@ void main() {
       await repository.setMany({'theme_mode': 'light'});
       final rows = await tableRows();
       expect(rows, {'theme_mode': 'light'});
+    });
+  });
+
+  group('B1 wireCredentialsResolver 四键接线（C2 装配收敛）', () {
+    /// 同一设置态下，[SettingsRepository.wireCredentialsResolver] 与手工四
+    /// reader tear-off 装配的解析器 resolve() 结果字段全等（等价性契约：
+    /// 装配收敛只搬接线不搬逻辑，两路径可观察行为逐位一致）。
+    Future<void> expectEquivalentResolve({
+      required bool hasKey,
+      Map<String, String> settings = const {},
+    }) async {
+      await secretStore.write(
+        key: SecretStore.claudeApiKeySlot,
+        value: hasKey ? 'sk-claude' : '',
+      );
+      await repository.setMany(settings);
+
+      final viaRepository =
+          await repository.wireCredentialsResolver().resolve();
+      final manually = await CredentialsResolver(
+        defaultProvider: () => repository.defaultProvider,
+        defaultModel: () => repository.defaultModel,
+        apiKey: repository.apiKey,
+        baseUrl: repository.baseUrl,
+      ).resolve();
+
+      expect(viaRepository.provider, manually.provider);
+      expect(viaRepository.apiKey, manually.apiKey);
+      expect(viaRepository.model, manually.model);
+      expect(viaRepository.baseUrl, manually.baseUrl);
+    }
+
+    test('缺省 provider/model + 已配置 key（含 base_url 归一）', () async {
+      await expectEquivalentResolve(
+        hasKey: true,
+        settings: {'claude_base_url': 'https://claude.example'},
+      );
+    });
+
+    test('显式 default_provider / default_model（覆盖缺省回退）', () async {
+      await expectEquivalentResolve(
+        hasKey: true,
+        settings: {
+          'default_provider': 'deepseek',
+          'default_model': 'deepseek-v4-pro',
+        },
+      );
+    });
+
+    test('空 key 或空槽位 → 两路径同抛 ApiKeyMissingError（既有错误面不改写）',
+        () async {
+      await repository.setMany({'default_provider': 'claude'});
+
+      Future<Object?> flat(
+        Future<ResolvedCredentials> Function() run,
+      ) async {
+        try {
+          await run();
+          return null;
+        } on ApiKeyMissingError catch (e) {
+          return e;
+        }
+      }
+
+      final viaRepository = await flat(repository.wireCredentialsResolver().resolve);
+      final manually = await flat(() => CredentialsResolver(
+            defaultProvider: () => repository.defaultProvider,
+            defaultModel: () => repository.defaultModel,
+            apiKey: repository.apiKey,
+            baseUrl: repository.baseUrl,
+          ).resolve());
+
+      expect(viaRepository, isA<ApiKeyMissingError>());
+      expect(manually, isA<ApiKeyMissingError>());
+      expect(
+        (viaRepository! as ApiKeyMissingError).message,
+        (manually! as ApiKeyMissingError).message,
+        reason: '拆错路径文案与手工接线逐字一致',
+      );
     });
   });
 }

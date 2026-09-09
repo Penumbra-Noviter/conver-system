@@ -27,6 +27,7 @@ import 'package:conver_system_mobile/data/repositories/settings_repository.dart'
 import 'package:conver_system_mobile/services/character_card.dart';
 import 'package:conver_system_mobile/services/character_file_exchange.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/document_parse_service.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/view_models/shell_navigation.dart';
@@ -588,7 +589,8 @@ void main() {
           providers: [
             // 入口经 context.read<CharacterRepository>() 构造 WizardController；
             // M4-05 追加 SettingsRepository + LLMProviderFactory（装配
-            // DocumentParseService）。
+            // DocumentParseService）；C2 收敛后视图改 context.read 消费装配图
+            // 的 DocumentParseService（本测试按 app.dart 同构图提供 provider）。
             Provider<CharacterRepository>.value(value: env.characterRepository),
             Provider<SettingsRepository>.value(
               value: SettingsRepository(
@@ -599,6 +601,16 @@ void main() {
             Provider<LLMProviderFactory>.value(
               value:
                   FixedLLMProviderFactory(FakeLLMProvider(tokens: const ['ok'])),
+            ),
+            Provider<DocumentParseService>.value(
+              value: DocumentParseService(
+                settings: SettingsRepository(
+                  database: env.db,
+                  secretStore: InMemorySecretStore(),
+                ),
+                providerFactory:
+                    FixedLLMProviderFactory(FakeLLMProvider(tokens: const ['ok'])),
+              ),
             ),
           ],
           child: MaterialApp(

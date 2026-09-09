@@ -25,9 +25,7 @@ import 'package:provider/provider.dart';
 import '../../data/database/app_database.dart' show Character;
 import '../../data/repositories/character_repository.dart'
     show CharacterRepository, CharacterWithCount;
-import '../../data/repositories/settings_repository.dart';
 import '../../services/document_parse_service.dart';
-import '../../services/llm/llm_provider.dart' show LLMProviderFactory;
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
 import '../../widgets/empty_state.dart';
@@ -77,18 +75,16 @@ class _CharactersViewState extends State<CharactersView> {
 
   /// 「新建角色」入口：push 6 步向导（M3-02a 接真导航，替换 M3-01 stub）。
   ///
-  /// WizardController 经 [CharacterRepository]（provider 装配注入）构造；M4-05
-  /// 追加注入 [DocumentParseService]（SettingsRepository + LLMProviderFactory 均
-  /// 经 provider 装配读取，本层不造数据实例——layer_boundary_test 契约）。
-  /// 向导保存成功后回调 [CharactersController.refresh] 刷新列表，pop 回本页。
+  /// WizardController 经 [CharacterRepository]（provider 装配注入）构造；
+  /// [DocumentParseService] 经装配图 provider 读取（C2 装配收敛：装配唯一落点
+  /// app.dart，本层只 context.read 消费，不现造服务实例——layer_boundary_test
+  /// 契约）。向导保存成功后回调 [CharactersController.refresh] 刷新列表，pop
+  /// 回本页。
   Future<void> _openWizard() async {
     final repository = context.read<CharacterRepository>();
     final wizard = WizardController(
       characterRepository: repository,
-      parseService: DocumentParseService(
-        settings: context.read<SettingsRepository>(),
-        providerFactory: context.read<LLMProviderFactory>(),
-      ),
+      parseService: context.read<DocumentParseService>(),
     );
     await Navigator.of(context).push(
       MaterialPageRoute<void>(

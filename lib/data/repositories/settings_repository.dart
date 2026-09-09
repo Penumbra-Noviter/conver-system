@@ -24,6 +24,7 @@ import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
 import '../../models/model_catalog.dart';
+import '../../services/llm/credentials_resolver.dart';
 import '../../services/secure_store.dart';
 import 'settings_reader.dart';
 
@@ -183,6 +184,20 @@ class SettingsRepository implements SettingsReader {
   /// 与 [apiKey] 同形链，但读设置表（非敏感，不进安全存储）。
   Future<String> baseUrl(String provider) =>
       _slotValue('base_url', provider, (key) => getValue(key));
+
+  /// 装配本仓储四 reader 的 [CredentialsResolver]（C2 装配收敛单一落点）。
+  ///
+  /// 四 reader 即本类 `defaultProvider / defaultModel / apiKey / baseUrl` 的
+  /// tear-off——聊天、文档解析、模拟器生成三消费点经本方法委托接线，不再各自
+  /// 复制构造；等价性测试保障与手工 tear-off 装配可观察行为逐位一致。
+  /// [CredentialsResolver] 为纯 Dart 零 I/O（仅依赖 errors.dart），仓储（数据
+  /// 层）引用无环路。
+  CredentialsResolver wireCredentialsResolver() => CredentialsResolver(
+        defaultProvider: () => defaultProvider,
+        defaultModel: () => defaultModel,
+        apiKey: apiKey,
+        baseUrl: baseUrl,
+      );
 
   // ── 类型化便捷读取（桌面 DB→config 回退链的常量等价复刻）──
 

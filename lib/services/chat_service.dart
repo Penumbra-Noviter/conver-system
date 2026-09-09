@@ -279,14 +279,11 @@ class ChatService {
   /// [_settingsRepository] 装配 reader（测试可注入，既有装配零 churn）。
   late final CredentialsResolver _credentialsResolver;
 
-  /// 从设置仓储装配缺省解析器 reader（槽链原语 apiKey/baseUrl 即
-  /// `settings_repository._slotValue`）。
-  CredentialsResolver _wireCredentialsResolver() => CredentialsResolver(
-        defaultProvider: () => _settingsRepository.defaultProvider,
-        defaultModel: () => _settingsRepository.defaultModel,
-        apiKey: _settingsRepository.apiKey,
-        baseUrl: _settingsRepository.baseUrl,
-      );
+  /// 从设置仓储装配缺省解析器 reader——委托仓储的
+  /// [SettingsRepository.wireCredentialsResolver]（C2 装配收敛：四 reader 接线
+  /// 单一归属仓储，本类仅消费，构造签名与可选注入参数零改动）。
+  CredentialsResolver _wireCredentialsResolver() =>
+      _settingsRepository.wireCredentialsResolver();
 
   /// 连接阶段失败的重试退避序列（长度 = 最大重试次数；M6-06 弱网重连）。
   final List<Duration> _connectRetryDelays;
