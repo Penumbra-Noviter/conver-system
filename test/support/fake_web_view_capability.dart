@@ -10,8 +10,10 @@
 /// 逻辑，契约单处书写）：锚 Android `evaluateJavascript` 生产契约（F-M5-09
 /// AVD 实证 / 缺陷 #1 教训）——字符串结果带外层引号返回 Flutter（JSON 编码
 /// 串），webview_flutter `runJavaScriptReturningResult` **原样透传**；本假件对
-/// 枚举脚本产物返回 `jsonEncode(jsonEncode(...))` 复刻该外层引号层（解码容错
-/// 归桥层 `parseLocalStorageEntries`，与统一接口 / 生产契约 docstring 同源）。
+/// 枚举脚本产物（**键名 / 键值两个分支**）返回 `jsonEncode(jsonEncode(...))`
+/// 复刻该外层引号层（iOS/macOS 裸值形态 = 桥层双解码容错的另一合法输入，非
+/// 假件复刻形态；解码容错归桥层 `parseLocalStorageEntries`，与统一接口 / 生产
+/// 契约 docstring 同源）。
 library;
 
 import 'dart:convert' show jsonDecode, jsonEncode;
@@ -68,8 +70,11 @@ class FakeWebViewCapability implements WebViewCapability {
   Future<String> evaluate(String script) async {
     evaluateScripts.add(script);
     if (script == enumerateLocalStorageKeysScript) {
-      // MUTATION-SPOTCHECK: single-encode instead of double-encode
-      return jsonEncode(store.keys.toList());
+      // 分片枚举第一步：全量键名（F-38）。**双编码**——`JSON.stringify(...)`
+      // 的字符串结果经 Android evaluateJavascript 带外层引号返回（JSON 编码
+      // 串，生产契约同 [values 分支]，N-F1 复刻对齐）；iOS/macOS 裸值形态为
+      // 桥层双解码容错的另一合法输入（save_bridge `_decodeEnumeratedJson`）。
+      return jsonEncode(jsonEncode(store.keys.toList()));
     }
     if (script.startsWith('JSON.stringify(')) {
       // 分片枚举第二步：批键值。锚 Android evaluateJavascript 生产契约
