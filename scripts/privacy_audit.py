@@ -19,10 +19,9 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 __all__ = [
     "TRACKING_PATTERNS",
@@ -164,44 +163,28 @@ def parse_pubspec_direct_names(pubspec_text: str) -> list[str]:
     return names
 
 
-def _packages_from_mapping(mapping: Mapping[str, Any]) -> list[LockedPackage]:
-    """从已解析的 YAML 对象（yaml.safe_load 的 dict）提取包记录，等价 parse_lock_packages。"""
-    raw = mapping.get("packages", {})
-    if not isinstance(raw, Mapping):
-        return []
-    packages: list[LockedPackage] = []
-    for name, entry in raw.items():
-        entry = entry if isinstance(entry, Mapping) else {}
-        packages.append(
-            LockedPackage(
-                name=str(name),
-                version=str(entry.get("version", "") or ""),
-                dependency_kind=str(entry.get("dependency", "") or ""),
-                source=str(entry.get("source", "") or ""),
-            )
-        )
-    return packages
-
-
 def _matches_any(name: str, patterns: Sequence[str]) -> bool:
     """包名字串子串命中任一排除模式。"""
     return any(p in name for p in patterns)
 
 
 def audit_lockfile(
-    lock_content: str | Mapping[str, Any],
+    lock_content: str,
     *,
     patterns: Sequence[str] = TRACKING_PATTERNS,
 ) -> AuditResult:
-    """审计一份 lock（文本内容或已解析 dict），返回命中名单。
+    """审计一份 pubspec.lock 文本，返回命中名单。
 
-    lock_content 可为 pubspec.lock 原文（字符串）或 yaml.safe_load 的 dict——两者
-    覆盖「read with lock」两种调用场景；命中名单按包名在 lock 中出现顺序给出。
+    lock_content 为 pubspec.lock 原文（str）；命中名单按包名在 lock 中出现顺序给出。
+    非 str 输入抛 TypeError——本函数只接受 lock 文本形态（生产消费方 T04 门禁与 CLI
+    均为文本路径，早期 str/Mapping 双输入分支为 Speculative Generality，已删除）。
     """
-    if isinstance(lock_content, Mapping):
-        packages = _packages_from_mapping(lock_content)
-    else:
-        packages = parse_lock_packages(lock_content)
+    if not isinstance(lock_content, str):
+        raise TypeError(
+            "audit_lockfile 只接受 pubspec.lock 文本（str），"
+            f"收到 {type(lock_content).__name__}"
+        )
+    packages = parse_lock_packages(lock_content)
     hits = tuple(p.name for p in packages if _matches_any(p.name, patterns))
     return AuditResult(package_count=len(packages), hits=hits)
 
