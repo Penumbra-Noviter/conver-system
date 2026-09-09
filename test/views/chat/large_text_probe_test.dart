@@ -48,7 +48,7 @@ void main() {
       );
 
   group('1.3x 无溢出（验收 3/4）', () {
-    testWidgets('聊天对话面板：长文 Markdown 气泡 + 流式占位', (tester) async {
+    testWidgets('聊天对话面板：长文 Markdown 气泡 + 流式占位（真实触发 streaming）', (tester) async {
       final env = await ChatTestEnv.create();
       final char = await env.seedCharacter();
       final conv = await env.seedConversation(char.id);
@@ -65,7 +65,16 @@ void main() {
             '- 第二点：继续撑开高度\n\n'
             '末段收尾的普通长文本内容，用于确保没有横向溢出。' * 2,
       );
-      final controller = env.controllerOf(FakeLLMProvider(tokens: const []));
+      // 流式占位真实触发：发送 → 进入 streaming 渲染「Flexible 文字 + ▍ 光标」
+      // 组合（1.3x 下与光标相关的唯一渲染面，此前从不受测）。token 序列较长，
+      // 采样窗口内流式进行中且占位文字已积累成段（长内容 + 1.3x 边界）。
+      final controller = env.controllerOf(
+        TickingFakeLLMProvider(
+          tokens: const ['今天是', '一个', '适合', '测试', '流式', '占位',
+              '自动', '换行', '的', '长句子'],
+          delay: const Duration(milliseconds: 10),
+        ),
+      );
       await controller.loadEntry();
       await controller.openConversation(conv.id);
 
@@ -73,8 +82,27 @@ void main() {
       await tester.pump();
       await tester.pump();
 
+      await tester.enterText(find.byType(TextField), '1.3x 流式占位无溢出探测');
+      await tester.pump();
+      await tester.tap(find.byTooltip('发送'));
+      // 积累 6 个 token（共 10 个）→ 占位文字「今天是一个适合测试流式占位」，
+      // Streaming 仍进行中（长内容 + 光标同框渲染）。
+      await tester.pump(const Duration(milliseconds: 60));
+
+      // ListView.builder 懒构建：新流式行位于长文气泡之后、初始视口外不挂树。
+      // 逐帧上滑强制构建到底，使「Flexible 文字 + ▍ 光标」组合真实渲染。
+      for (var i = 0; i < 12 && find.text('▍').evaluate().isEmpty; i++) {
+        await tester.drag(find.byType(ListView), const Offset(0, -300));
+        await tester.pump();
+      }
+      expect(find.text('▍'), findsOneWidget,
+          reason: '流式占位真实触发——▍ 光标在 1.3x 大字下渲染');
+
       expect(tester.takeException(), isNull,
-          reason: '聊天对话 Markdown 气泡在 1.3x 下无 RenderFlex overflow');
+          reason: '聊天对话（长文 Markdown + 流式占位）在 1.3x 下无 RenderFlex overflow');
+
+      // drain：让流式跑完避免 Timer pending。
+      await tester.pump(const Duration(seconds: 1));
       await env.close();
     });
 
