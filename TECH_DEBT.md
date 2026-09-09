@@ -45,12 +45,19 @@
 |------|--------|------|------|------|----------|
 | F-56 | 假活连接终态化缺口：终态帧已到 + 连接不关闭 → await-for 永不 EOF → round 永不终态化（09 验收 4 为设计选择，但离「假活连接终态化保障」目标差一格）。**随修项 ② 注释失真 / ③ N4 断言 + flake 容差已由 AR-1 收编（2026-09-09）**，本条目缩减为仅剩 ① 假活终态化，正交于相位编码、重开 wire 终态语义，待专项立项。 | W2 增量审核 N1/N2/N4 + W3 增量审核 F8（期末四轴复证 F-N5）+ AR-1 收编 ②③ | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-57 | 停滞连接上 `sub.cancel()` 有界挂起：chat_service `_stopStreamReply` 已有 `.timeout(3s)` 兜底注释（F-17 面），09 idle force-close 已收窄暴露窗口——机制实证（cancel 挂到 EOF 为止），3s 兜底生效、基线同现。 | W2 增量审核（09 相邻发现 1） | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-63 | 光标 reduce-motion 面测试与实现小缺口（一张小票收口方向）：① `_appliedOnce` 运行时翻转路径（同挂载内 MediaQuery 翻转）零测试覆盖；② reduce→正常翻转同帧 `value=0.0` 光标消失一帧（瞬态缺陷）；③ `_appliedOnce` 注释理由与 SDK 机制不符（repeat 自 stop，泄漏不存在；真实作用 = 防无关 didChangeDependencies 重跑闪断）——注释写歪；④ `large_text_probe_test`「流式占位」面从不触发 streaming，1.3x 唯一与光标组合未渲染，doc 覆盖声明失实；⑤ `blinking_cursor_reduce_motion_test.dart:94` `print('DBG')` 提交残留。 | W4 增量审核 F-1/F-2/F-5/F-6（期末四轴复证 S-N1） | Worth exploring | 📝 待立项 | 无障碍 |
 | F-65 | 断流/重试边界行为集（08 面，AR-5 已修 ②①、缩减为续期两项）：**② 重试成功无条件 clear 吞并发提示 → 已修（AR-5 条件清理：removed && target==replacedId && notice==interruptedText 才清）**；**① 多截断部分重试后旧截断失去入口 → 已修（AR-5 目标推进 target=max(marks) + notice 保持）**；续期两项——**③ reload 完成前点重试命中 `_reloadPending` 守卫静默 no-op（一帧窗口，低值面）**；**④ NoticeBanner 出口过渡窗口内同文案 notice 到达误清新提示——关闭成本陈述：需身份穿越组件边界（NoticeRunner seq + banner noticeId）＝增协议面，与收敛前提冲突；先错者胜使窗口内 notice 几乎不可变，理论级低值（AR-5/AR-6 裁决一致）**。 | W6 审核 F-3/F-5/F-8 + 期末四轴 F-N1/N2/N3/N6 + AR-5 修 ②① + AR-6 ④ 续期陈述 | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-66 | 「回复中断」小标在气泡 MergeSemantics 外成独立语义节点，M6-10 a11y 断言套件零覆盖（屏读体验未锁定）。 | W6 审核 F-6（期末四轴复证 F-N8） | Speculative | 📝 待立项 | 无障碍 |
 | F-67 | characters_view 覆盖缺口（F-59 消费时暴露）：12.4% 未覆盖行全为既有非 seam 路径——刷新失败 debugPrint / 创建向导 / 批量删除确认对话框 / 勾选框 onChanged；本轮仅修 Semantics 守卫（:347 全覆），补齐需新增向导/批删/错误态测试（超出 F-59 seam）。 | F-59 消费覆盖记录 | Speculative | 📝 待立项 | 无障碍 |
 
 ## 技术债处置记录
+
+### 2026-09-09 — 技术债折回 F-63 消费（光标 reduce-motion 面缺口收口）
+
+> 来源：技术债折回（用户「继续折回消费技术债」→ best-judgment 取推荐 F-63——W4 审核 F-1/F-2/F-5/F-6 方向锁定；⑤ DBG print 残留已由期末 hygiene 9221a9f 顺手修）。交付：① 同挂载 MediaQuery 翻转测试 / ② 瞬态缺陷修复（`..value=0.0 ..repeat(reverse:true)` → `repeat(reverse:true)` 自当前 value 续循环——SDK _RepeatingSimulation 源码实证，翻转帧 opacity 连续、无 0.25 暗帧）/ ③ _appliedOnce 注释修正（真实作用 = 防无关 didChangeDependencies 重跑闪断，非 Ticker 泄漏）/ ④ large_text_probe 流式占位面真实触发（改回空 provider 必红实证）。commit `3b929f4`（merge `31d3056`），基线 f7b90fe。门禁：全量 **1498 测**绿 / analyze 0 / chat_view 92.5% 覆盖（守卫行全覆）/ 审核四轴 **0 阻断**（② 修复机制 SDK 源码链核验成立、验收 2/4 红阶段独立复现、4 N 观察均既有形态）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-63 | ✅ 已修 | 光标 reduce-motion 面测试与实现小缺口（W4 F-1/F-2/F-5/F-6 + 期末 S-N1）：① 翻转测试落位 ② 一帧暗帧修复（repeat 自当前 value）③ 注释修正 ④ 流式占位面真实化（⑤ DBG print 已由 9221a9f 修） |
 
 ### 2026-09-09 — 技术债折回 F-59 消费（角色卡语义按钮守卫对齐）
 
