@@ -27,16 +27,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'
     show ReadContext;
 
-import '../../data/repositories/settings_repository.dart'
-    show SettingsRepository;
-import '../../services/llm/credentials_resolver.dart'
-    show CredentialsResolver, ResolvedCredentials;
-import '../../services/llm/factory.dart' show LLMFactory;
-import '../../services/simulator/game_generator.dart'
-    show GameGenerator, GenerationCredentials;
+import '../../services/simulator/game_generator.dart' show GameGenerator;
 import '../../services/simulator/save_bridge.dart' show SaveGame;
-import '../../services/simulator/simulator_data_dir.dart'
-    show SimulatorDataDir;
 import '../../theme/colors.dart' show ConverRadii, ConverSpacing;
 import '../../theme/conver_palette.dart';
 import '../../view_models/simulators_controller.dart';
@@ -163,46 +155,19 @@ class _SimulatorsViewState extends State<SimulatorsView> {
     return opener(context);
   }
 
-  /// 生产 AI 生成对话框打开器：provider 图装配 [GameGenerator]（经既有 LLM
-  /// 直连 seam：SettingsRepository 解析 default_provider/default_model/api_key/
-  /// base_url + [LLMFactory] 派生，claude/openai 兼容 provider 皆可用——生成
-  /// 是主应用内 LLM 调用，非游戏注入，claude key 不违注入红线）→ showDialog；
-  /// 成功后 [SimulatorsController.refresh] 刷新列表（新卡「生成」badge 可见）。
+  /// 生产 AI 生成对话框打开器：经装配图 provider 读取 [GameGenerator]（C2 装配
+  /// 收敛：GameGenerator 与 resolveCredentials 接线单一归属 app.dart，本层只
+  /// context.read 消费，不现造服务实例）→ showDialog；成功后
+  /// [SimulatorsController.refresh] 刷新列表（新卡「生成」badge 可见）。
   Future<void> _defaultOpenGenerateDialog(BuildContext context) {
+    final generator = context.read<GameGenerator>();
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => GenerateDialog(
-        generator: _buildGenerator(dialogContext),
+        generator: generator,
         onGenerated: () => widget.controller.refresh(),
       ),
-    );
-  }
-
-  /// 生产 [GameGenerator] 装配：经 app provider 图的 SettingsRepository（仅
-  /// 无状态解析 seam，不触碰平台存储细节）装配 [CredentialsResolver] 解析
-  /// 生成凭据链（AR-3：provider 缺省 → apiKey 槽位链 → base_url 空归一 →
-  /// default_model 组合序单一归属解析器），LLMFactory 派生 provider 实例
-  /// （生成为 LLM 直连，与游戏注入链路无关）。
-  GameGenerator _buildGenerator(BuildContext context) {
-    final repo = context.read<SettingsRepository>();
-    return GameGenerator(
-      providerFactory: const LLMFactory(),
-      resolveCredentials: () async {
-        final ResolvedCredentials resolved = await CredentialsResolver(
-          defaultProvider: () => repo.defaultProvider,
-          defaultModel: () => repo.defaultModel,
-          apiKey: repo.apiKey,
-          baseUrl: repo.baseUrl,
-        ).resolve();
-        return GenerationCredentials(
-          provider: resolved.provider,
-          apiKey: resolved.apiKey,
-          model: resolved.model,
-          baseUrl: resolved.baseUrl,
-        );
-      },
-      resolveSimDir: () => SimulatorDataDir().resolve(),
     );
   }
 

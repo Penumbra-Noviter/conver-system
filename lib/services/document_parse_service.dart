@@ -122,14 +122,11 @@ class DocumentParseService {
   /// 凭据解析链（AR-3）：组合序单一归属 [CredentialsResolver]。
   late final CredentialsResolver _credentialsResolver;
 
-  /// 从设置仓储装配缺省解析器 reader（槽链原语 apiKey/baseUrl 即
-  /// `settings_repository._slotValue`）。
-  CredentialsResolver _wireCredentialsResolver() => CredentialsResolver(
-        defaultProvider: () => _settings.defaultProvider,
-        defaultModel: () => _settings.defaultModel,
-        apiKey: _settings.apiKey,
-        baseUrl: _settings.baseUrl,
-      );
+  /// 从设置仓储装配缺省解析器 reader——委托仓储的
+  /// [SettingsRepository.wireCredentialsResolver]（C2 装配收敛：四 reader 接线
+  /// 单一归属仓储，本类仅消费，构造签名零改动）。
+  CredentialsResolver _wireCredentialsResolver() =>
+      _settings.wireCredentialsResolver();
 
   /// 解析 [text] 中的角色字段。
   ///

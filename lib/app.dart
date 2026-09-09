@@ -13,9 +13,11 @@ import 'services/chat_service.dart';
 import 'services/character_file_exchange.dart';
 import 'services/conversation_export_file_exchange.dart';
 import 'services/conversation_export_service.dart';
+import 'services/document_parse_service.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/secure_store.dart';
+import 'services/simulator/game_generator.dart';
 import 'services/simulator/seed_service.dart';
 import 'services/simulator/simulator_contracts.dart';
 import 'services/simulator/simulator_data_dir.dart';
@@ -129,6 +131,16 @@ class ConverApp extends StatelessWidget {
         Provider<CharacterFileExchange>(
           create: (_) => FilePickerShareFileExchange(),
         ),
+        // C2 文档解析装配：角色向导的 DocumentParseService 由装配图统一持有
+        // （视图层只 context.read 消费，不再现造，layer_boundary_test 契约）。
+        // 依赖设置仓储（四 reader 接线经 wireCredentialsResolver 单一落点）
+        // 与 LLM 工厂，故置于两者声明之后。
+        Provider<DocumentParseService>(
+          create: (context) => DocumentParseService(
+            settings: context.read<SettingsRepository>(),
+            providerFactory: context.read<LLMProviderFactory>(),
+          ),
+        ),
         ChangeNotifierProvider<CharactersController>(
           create: (context) => CharactersController(
             characterRepository: context.read<CharacterRepository>(),
@@ -142,6 +154,30 @@ class ConverApp extends StatelessWidget {
         // → 回环 HTTP manifest → ready/empty/error；服务器 App 存续期常驻
         // （实例在应用级 provider，不随 tab 销毁）。后续票（04/06/07/08b）经
         // SimulatorsHooks / SimulatorsView 追加接线，不触碰本文件。
+        // C2 生成装配：AI 生成的 GameGenerator 由装配图统一持有（视图只
+        // context.read 消费，不再现造）。resolveCredentials 闭包经仓储
+        // wireCredentialsResolver 解析 → 映射 GenerationCredentials，不现造
+        // CredentialsResolver；providerFactory 复用 LLM 工厂（与聊天/文档解析
+        // 同源），resolveSimDir 保持 SimulatorDataDir 解析。
+        Provider<GameGenerator>(
+          create: (context) {
+            final settings = context.read<SettingsRepository>();
+            return GameGenerator(
+              providerFactory: context.read<LLMProviderFactory>(),
+              resolveCredentials: () async {
+                final resolved =
+                    await settings.wireCredentialsResolver().resolve();
+                return GenerationCredentials(
+                  provider: resolved.provider,
+                  apiKey: resolved.apiKey,
+                  model: resolved.model,
+                  baseUrl: resolved.baseUrl,
+                );
+              },
+              resolveSimDir: () => SimulatorDataDir().resolve(),
+            );
+          },
+        ),
         ChangeNotifierProvider<SimulatorsController>(
           create: (_) {
             final dataDir = SimulatorDataDir();
