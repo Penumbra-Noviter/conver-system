@@ -26,7 +26,7 @@
 /// - 断流重试：[retryInterrupted] 对截断目标消息触发 [ChatService.regenerate]
 ///   （replace 语义：不新增 user 行），复用 [isRegenerating] 防并发与 notice
 ///   先错者胜；重试成功以服务实际替换目标 id（[RegenerateResult.replacedMessageId]）
-///   结算——余标推进 [hasRetryableInterrupted] 目标、配对门 + 文案门条件清理
+///   结算——余标推进 [interruptedNoticeTargetId] 目标、配对门 + 文案门条件清理
 ///   （F-65①/②，见 [interruptedNoticeTargetId]）。
 library;
 
