@@ -221,22 +221,22 @@ class TestTrackingDetection:
         assert result.hits == ()
         assert result.is_clean
 
-    def test_lockfile_dict_content_object(self):
-        content = {
-            "packages": {
-                "dio": {"dependency": "direct main", "version": "5.11.0"},
-                "sentry_flutter": {"dependency": "transitive"},
-            },
-            "sdks": {"dart": "x"},
-        }
-        result = audit_lockfile(content)
+    def test_lockfile_str_content_object(self):
+        text = _lock_text(
+            {"dio": "direct main", "sentry_flutter": "transitive"}
+        )
+        result = audit_lockfile(text)
         assert result.package_count == 2
         assert result.hits == ("sentry_flutter",)
 
-    def test_lockfile_dict_missing_packages(self):
-        assert audit_lockfile({"sdks": {"dart": "x"}}).package_count == 0
-        assert audit_lockfile({}).package_count == 0
-        assert audit_lockfile({"packages": "not-a-mapping"}).package_count == 0
+    def test_lockfile_str_missing_packages(self):
+        assert audit_lockfile("sdks:\n  dart: x\n").package_count == 0
+        assert audit_lockfile("").package_count == 0
+        assert audit_lockfile("packages: not-a-section\n").package_count == 0
+
+    def test_lockfile_dict_input_rejected(self):
+        with pytest.raises(TypeError):
+            audit_lockfile({"packages": {"dio": {"dependency": "direct main"}}})
 
 
 class TestRealProjectAudit:
