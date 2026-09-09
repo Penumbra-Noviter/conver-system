@@ -29,7 +29,8 @@ import 'package:provider/provider.dart'
 
 import '../../data/repositories/settings_repository.dart'
     show SettingsRepository;
-import '../../services/llm/errors.dart' show ApiKeyMissingError;
+import '../../services/llm/credentials_resolver.dart'
+    show CredentialsResolver, ResolvedCredentials;
 import '../../services/llm/factory.dart' show LLMFactory;
 import '../../services/simulator/game_generator.dart'
     show GameGenerator, GenerationCredentials;
@@ -179,25 +180,26 @@ class _SimulatorsViewState extends State<SimulatorsView> {
   }
 
   /// 生产 [GameGenerator] 装配：经 app provider 图的 SettingsRepository（仅
-  /// 无状态解析 seam，不触碰平台存储细节）解析生成凭据链（default_provider →
-  /// apiKey 槽位解析 → default_model + base_url），LLMFactory 派生 provider
-  /// 实例（生成为 LLM 直连，与游戏注入链路无关）。
+  /// 无状态解析 seam，不触碰平台存储细节）装配 [CredentialsResolver] 解析
+  /// 生成凭据链（AR-3：provider 缺省 → apiKey 槽位链 → base_url 空归一 →
+  /// default_model 组合序单一归属解析器），LLMFactory 派生 provider 实例
+  /// （生成为 LLM 直连，与游戏注入链路无关）。
   GameGenerator _buildGenerator(BuildContext context) {
     final repo = context.read<SettingsRepository>();
     return GameGenerator(
       providerFactory: const LLMFactory(),
       resolveCredentials: () async {
-        final provider = await repo.defaultProvider;
-        final apiKey = await repo.apiKey(provider);
-        if (apiKey.isEmpty) {
-          throw ApiKeyMissingError(provider);
-        }
-        final baseUrl = await repo.baseUrl(provider);
+        final ResolvedCredentials resolved = await CredentialsResolver(
+          defaultProvider: () => repo.defaultProvider,
+          defaultModel: () => repo.defaultModel,
+          apiKey: repo.apiKey,
+          baseUrl: repo.baseUrl,
+        ).resolve();
         return GenerationCredentials(
-          provider: provider,
-          apiKey: apiKey,
-          model: await repo.defaultModel,
-          baseUrl: baseUrl.isEmpty ? null : baseUrl,
+          provider: resolved.provider,
+          apiKey: resolved.apiKey,
+          model: resolved.model,
+          baseUrl: resolved.baseUrl,
         );
       },
       resolveSimDir: () => SimulatorDataDir().resolve(),

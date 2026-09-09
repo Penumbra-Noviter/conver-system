@@ -63,6 +63,7 @@ import '../data/repositories/character_repository.dart';
 import '../data/repositories/conversation_repository.dart';
 import '../data/repositories/message_repository.dart';
 import '../data/repositories/settings_repository.dart';
+import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
 import 'llm/prompt.dart';
@@ -252,12 +253,15 @@ class ChatService {
     required this._messageRepository,
     required this._settingsRepository,
     required this._providerFactory,
+    CredentialsResolver? credentialsResolver,
     List<Duration> connectRetryDelays = const [
       Duration(seconds: 1),
       Duration(seconds: 2),
     ],
   })  : _db = database,
-        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays);
+        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays) {
+    _credentialsResolver = credentialsResolver ?? _wireCredentialsResolver();
+  }
 
   final AppDatabase _db;
   final ConversationRepository _conversationRepository;
@@ -265,6 +269,19 @@ class ChatService {
   final MessageRepository _messageRepository;
   final SettingsRepository _settingsRepository;
   final LLMProviderFactory _providerFactory;
+
+  /// 凭据解析链（AR-3）：组合序单一归属 [CredentialsResolver]；缺省由
+  /// [_settingsRepository] 装配 reader（测试可注入，既有装配零 churn）。
+  late final CredentialsResolver _credentialsResolver;
+
+  /// 从设置仓储装配缺省解析器 reader（槽链原语 apiKey/baseUrl 即
+  /// `settings_repository._slotValue`）。
+  CredentialsResolver _wireCredentialsResolver() => CredentialsResolver(
+        defaultProvider: () => _settingsRepository.defaultProvider,
+        defaultModel: () => _settingsRepository.defaultModel,
+        apiKey: _settingsRepository.apiKey,
+        baseUrl: _settingsRepository.baseUrl,
+      );
 
   /// 连接阶段失败的重试退避序列（长度 = 最大重试次数；M6-06 弱网重连）。
   final List<Duration> _connectRetryDelays;
@@ -855,29 +872,23 @@ class ChatService {
     ];
   }
 
-  /// provider 解析（对齐 `resolver.py::resolve_llm`）：Key 解析链经设置仓储，
-  /// 空 → [ApiKeyMissingError]「未配置 {provider} API Key，请在设置中填写」；
-  /// base_url 空 → null；model 缺省回退设置默认。工厂派生抛
-  /// [ProviderNotSupportedError]（未知 Provider）。
+  /// provider 解析（AR-3：委派 [CredentialsResolver]——组合序单一归属
+  /// `credentials_resolver.dart`，镜像 `resolver.py::resolve_llm`）。conv 的
+  /// provider/model 覆盖非空优先，空回退设置默认；空 key 抛
+  /// [ApiKeyMissingError]「未配置 {provider} API Key，请在设置中填写」；base_url
+  /// 空 → null；工厂派生抛 [ProviderNotSupportedError]（未知 Provider）。
   Future<({String provider, String model, LLMProvider llm})>
       _resolveProvider(Conversation conv) async {
-    final provider = conv.modelProvider.isNotEmpty
-        ? conv.modelProvider
-        : await _settingsRepository.defaultProvider;
-    final key = await _settingsRepository.apiKey(provider);
-    if (key.isEmpty) {
-      throw ApiKeyMissingError(provider);
-    }
-    final baseUrl = await _settingsRepository.baseUrl(provider);
-    final model = conv.modelName.isNotEmpty
-        ? conv.modelName
-        : await _settingsRepository.defaultModel;
-    final llm = _providerFactory.create(
-      provider: provider,
-      apiKey: key,
-      baseUrl: baseUrl.isEmpty ? null : baseUrl,
+    final resolved = await _credentialsResolver.resolve(
+      providerOverride: conv.modelProvider,
+      modelOverride: conv.modelName,
     );
-    return (provider: provider, model: model, llm: llm);
+    final llm = _providerFactory.create(
+      provider: resolved.provider,
+      apiKey: resolved.apiKey,
+      baseUrl: resolved.baseUrl,
+    );
+    return (provider: resolved.provider, model: resolved.model, llm: llm);
   }
 
   /// 解析重生成目标并校验（对话归属 + 必须为 assistant；对齐
