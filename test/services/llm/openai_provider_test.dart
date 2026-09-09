@@ -19,6 +19,7 @@ import 'dart:io';
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/llm/openai_provider.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_llm_server.dart';
@@ -396,6 +397,33 @@ void main() {
       final read = ReadPhaseInterruptedError(originalError: Exception('r'));
       expect(provider().translateError(connect), same(connect));
       expect(provider().translateError(read), same(read));
+    });
+  });
+
+  group('默认链对 OpenAI 覆盖（C1：无钩子覆写，直接走基类默认 translateError）', () {
+    OpenAIProvider provider() => OpenAIProvider(apiKey: apiKey);
+
+    test('providerName 覆写为 OpenAI（默认链兜底文案逐字依赖）', () {
+      expect(provider().providerName, 'OpenAI');
+    });
+
+    test('默认链 dio 分支成立：DioException 401 → Auth（逐字 OpenAI 文案）', () {
+      final e = provider().translateError(DioException(
+        requestOptions: RequestOptions(path: '/x'),
+        response: Response(
+          requestOptions: RequestOptions(path: '/x'),
+          statusCode: 401,
+          data: {'error': {'message': 'bad key'}},
+        ),
+      ));
+      expect(e, isA<LLMAuthError>());
+      expect(e.message, 'OpenAI API Key 无效或未配置');
+    });
+
+    test('默认链 responseParse 分支成立：FormatException → ResponseParseFailed', () {
+      final e = provider().translateError(const FormatException('x'));
+      expect(e, isA<LLMResponseParseFailedError>());
+      expect(e.message, contains('兼容 OpenAI'));
     });
   });
 

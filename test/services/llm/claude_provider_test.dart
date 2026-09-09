@@ -17,6 +17,7 @@ import 'dart:io';
 import 'package:conver_system_mobile/services/llm/claude_provider.dart';
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
+import 'package:conver_system_mobile/services/llm/translate_helpers.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_llm_server.dart';
@@ -429,6 +430,27 @@ void main() {
       expect(provider().translateError(connect), same(connect));
       expect(provider().translateError(read), same(read));
     });
+  });
+
+  group('translateProviderError 钩子（C1：_StreamApiError 分支收敛为钩子覆写）', () {
+    ClaudeProvider provider() => ClaudeProvider(apiKey: apiKey);
+
+    test('providerName 覆写为 Claude（默认链兜底文案逐字依赖）', () {
+      expect(provider().providerName, 'Claude');
+    });
+
+    test('非 _StreamApiError 一律返回 null（走基类默认链，不改写通用归属）', () {
+      expect(provider().translateProviderError(StateError('x')), isNull);
+      expect(provider().translateProviderError(HttpStatusError(400, 'x')), isNull);
+      expect(
+          provider().translateProviderError(const SocketException('refused')),
+          isNull);
+    });
+
+    // _StreamApiError 为 claude_provider.dart 私有类型，单元层无法直接实例化；
+    // 其「钩子命中 → LLM 族」行为由上方流式集成用例端到端覆盖：'Anthropic error
+    // 事件（流内错误）→ LLM 族（非穿透原始异常）' 断言逐字文案
+    // 'Claude API 调用失败: Overloaded'（经 errorFrameException → 钩子 → 兜底）。
   });
 
   group('testConnection 默认最小生成（锚 base.py）', () {

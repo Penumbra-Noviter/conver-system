@@ -16,7 +16,6 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dio/dio.dart';
 
@@ -24,7 +23,6 @@ import 'errors.dart';
 import 'llm_provider.dart';
 import 'sse.dart';
 import 'stream_wire.dart';
-import 'translate_helpers.dart';
 
 /// 规范化 OpenAI 兼容端点地址（锚 `desktop/backend/app/services/llm/openai.py`
 /// `_normalize_base_url`）。
@@ -52,7 +50,9 @@ class OpenAIProvider extends LLMProvider {
     this.temperature = 0.7,
   });
 
-  static const String _providerName = 'OpenAI';
+  @override
+  String get providerName => 'OpenAI';
+
   static const String _defaultModel = 'gpt-4o';
   static const String _defaultNormalizedBase = 'https://api.openai.com/v1';
 
@@ -61,48 +61,6 @@ class OpenAIProvider extends LLMProvider {
 
   /// 非流式 REST 客户端（T02 双栈：dio 侧）。
   final Dio _dio = Dio();
-
-  @override
-  LLMError translateError(Object error) {
-    // 已映射为 LLM 族的错误（含连接中断类）直通，不二次翻译。
-    if (error is LLMError) {
-      return error;
-    }
-    if (error is DioException) {
-      return translateDioError(_providerName, error);
-    }
-    if (error is HttpStatusError) {
-      return translateStatusError(
-        _providerName,
-        error.statusCode,
-        error.body,
-        cause: error,
-      );
-    }
-    if (error is SocketException) {
-      return translateSdkError(
-        _providerName,
-        message: error.message,
-        cause: error,
-      );
-    }
-    if (error is HttpException) {
-      return translateSdkError(
-        _providerName,
-        message: error.message,
-        cause: error,
-      );
-    }
-    if (error is FormatException || error is TypeError) {
-      return translateSdkError(
-        _providerName,
-        failure: LlmTransportFailure.responseParse,
-        message: '$error',
-        cause: error,
-      );
-    }
-    return translateSdkError(_providerName, message: '$error', cause: error);
-  }
 
   @override
   Future<String> generate({
