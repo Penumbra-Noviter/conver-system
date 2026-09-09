@@ -47,11 +47,21 @@
 | F-57 | 停滞连接上 `sub.cancel()` 有界挂起：chat_service `_stopStreamReply` 已有 `.timeout(3s)` 兜底注释（F-17 面），09 idle force-close 已收窄暴露窗口——机制实证（cancel 挂到 EOF 为止），3s 兜底生效、基线同现。 | W2 增量审核（09 相邻发现 1） | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-59 | 角色卡语义失真：`characters_view.dart:340-349` `Semantics(button: true)` 无条件标记，而常态（非多选态）onTap 为 null → TalkBack 激活「button」无响应；同 diff 游戏卡（`simulators_view.dart:418`）做了 `button: onOpen != null` 守卫而角色卡未对齐；测试 `characters_view_test.dart:454` 把「可确认可点」锁进断言（验收 4 原文 button:true，票面 tension）。修法方向 = 对齐游戏卡守卫。 | W3 增量审核 F1（期末四轴复证 F-N7） | Worth exploring | 📝 待立项 | 无障碍 |
 | F-63 | 光标 reduce-motion 面测试与实现小缺口（一张小票收口方向）：① `_appliedOnce` 运行时翻转路径（同挂载内 MediaQuery 翻转）零测试覆盖；② reduce→正常翻转同帧 `value=0.0` 光标消失一帧（瞬态缺陷）；③ `_appliedOnce` 注释理由与 SDK 机制不符（repeat 自 stop，泄漏不存在；真实作用 = 防无关 didChangeDependencies 重跑闪断）——注释写歪；④ `large_text_probe_test`「流式占位」面从不触发 streaming，1.3x 唯一与光标组合未渲染，doc 覆盖声明失实；⑤ `blinking_cursor_reduce_motion_test.dart:94` `print('DBG')` 提交残留。 | W4 增量审核 F-1/F-2/F-5/F-6（期末四轴复证 S-N1） | Worth exploring | 📝 待立项 | 无障碍 |
-| F-64 | 聊天 regenerate 目标解析重复：`chat_round.dart` `_resolveLastAssistantId` 与服务层 `_resolveRegenerateTarget` 两处「末条 assistant」判定并存（缺省目标解析重复），有漂移风险——收敛为单一归属。 | 期末四轴 Architecture（A-N1） | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-65 | 断流/重试边界行为集（08 面，期末四轴复证仍存）：① 多截断部分重试成功后旧截断失去唯一重试入口（非末条图标 disabled，横幅已清）；② 重试成功无条件 `_noticeRunner.clear()` 吞 in-flight 并发提示；③ reload 完成前点重试命中 `_reloadPending` 守卫静默 no-op（一帧窗口）；④ NoticeBanner 出口过渡窗口内同文案 notice 到达误清新提示（低概率）。 | W6 审核 F-3/F-5/F-8 + 期末四轴 F-N1/N2/N3/N6 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-65 | 断流/重试边界行为集（08 面，AR-5 已修 ②①、缩减为续期两项）：**② 重试成功无条件 clear 吞并发提示 → 已修（AR-5 条件清理：removed && target==replacedId && notice==interruptedText 才清）**；**① 多截断部分重试后旧截断失去入口 → 已修（AR-5 目标推进 target=max(marks) + notice 保持）**；续期两项——**③ reload 完成前点重试命中 `_reloadPending` 守卫静默 no-op（一帧窗口，低值面）**；**④ NoticeBanner 出口过渡窗口内同文案 notice 到达误清新提示——关闭成本陈述：需身份穿越组件边界（NoticeRunner seq + banner noticeId）＝增协议面，与收敛前提冲突；先错者胜使窗口内 notice 几乎不可变，理论级低值（AR-5/AR-6 裁决一致）**。 | W6 审核 F-3/F-5/F-8 + 期末四轴 F-N1/N2/N3/N6 + AR-5 修 ②① + AR-6 ④ 续期陈述 | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-66 | 「回复中断」小标在气泡 MergeSemantics 外成独立语义节点，M6-10 a11y 断言套件零覆盖（屏读体验未锁定）。 | W6 审核 F-6（期末四轴复证 F-N8） | Speculative | 📝 待立项 | 无障碍 |
 
 ## 技术债处置记录
+
+### 2026-09-09 — 架构深化 AR-5/AR-6 消费（F-64 关闭 + F-65 缩减 + F-53/54 逆向）
+
+> 来源：improve-codebase-architecture 候选 5（断流生命周期）/ 候选 6（组件协议面）。交付：AR-5 `6dc67ad`（merge 5172e34——hasRetryableInterrupted 判据入 round + replacedMessageId 结算键 + 配对门/推进/文案门三条件结算 + _resolveLastAssistantId 删除；chat_round 24 + service 73 + view 30 / 覆盖 96.71% / 三处突变全红 / B1 双锚零改动）；AR-6 `fefe870`（merge 7089384——EmptyState.action + StatusView.hint 删除，纯删减 / 1489 测 / 双组件覆盖 100% / NoticeBanner 零 diff 承重墙）。AR-5/AR-6 联合审核 0 阻断（待确认——以审核报告为准）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-64 | ✅ 已修 | 聊天 regenerate 目标解析重复（_resolveLastAssistantId vs _resolveRegenerateTarget 两处末条判定）：AR-5 收编——RegenerateResult.replacedMessageId（服务实际替换 id）+ round 图标路径零预解析 + _resolveLastAssistantId 整体删除，「末条 assistant」判定唯余 _resolveRegenerateTarget；B1 死重试按钮双锚零改动实证 |
+| F-65 | 🔄 缩减 | ② 条件清理 / ① 目标推进已由 AR-5 修（移出候选区条目已更新描述）；续期 ③④（③ reload 一帧窗口低值面 / ④ 出口过渡陈旧回调——关闭成本陈述落档：需增协议面 + 理论级低值，与 AR-5/AR-6 裁决一致） |
+| F-53 | ❌→✅ 逆向已删 | [逆向 M6 W1 复核关闭] EmptyState.action 参数槽——AR-6 按 TP-4 授权删除（「不预建参数槽，未来需要经版本控制恢复」）；4 调用点零 diff + 锚句改写 |
+| F-54 | ❌→✅ 逆向已删 | [逆向 M6 W1 复核关闭] StatusView.hint 半面——AR-6 对称删除（与 F-53 同判据，且 hint 无 TP-4 有意保留背书）；2 调用点零 diff |
 
 ### 2026-09-09 — 架构深化 AR-1 消费（F-52/F-55 已修 + F-56 缩减）
 
