@@ -46,13 +46,11 @@ class _SettingsViewState extends State<SettingsView> {
     PlaceholderItem('模板变量', '自定义注入变量'),
   ];
 
-  /// 「我」页收口三入口（F-M5-10）：三占位行拆出为真实导航入口。
-  ///
-  /// 页面均为无状态静态文本页，实例可共享复用（push 时同一 const 实例）。
-  static const _profileEntries = <_ProfileEntry>[
-    _ProfileEntry('用户手册', '使用说明', ManualPage()),
-    _ProfileEntry('关于', '版本信息', AboutPage()),
-    _ProfileEntry('桌面版说明', '桌面端获取指引', DesktopNotePage()),
+  /// 「我」页收口三入口（F-M5-10）：行文案 + 目标静态页实例（可共享复用）。
+  static const _profileEntries = <({String label, String note, Widget page})>[
+    (label: '用户手册', note: '使用说明', page: ManualPage()),
+    (label: '关于', note: '版本信息', page: AboutPage()),
+    (label: '桌面版说明', note: '桌面端获取指引', page: DesktopNotePage()),
   ];
 
   late final SettingsRepository _settings = widget.settingsRepository;
@@ -105,15 +103,14 @@ class _SettingsViewState extends State<SettingsView> {
 
   /// 打开「我」页收口子页（与 characters_view 全屏下钻同一 Navigator push
   /// 模式；三页自带 Scaffold + AppBar 返回）。
-  void _openProfilePage(_ProfileEntry entry) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => entry.page),
-    );
+  void _openProfilePage(Widget page) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = ConverPalette.of(context);
     return SafeArea(
       child: FutureBuilder<(Map<String, String>, String, String)>(
         future: _echoFuture,
@@ -129,16 +126,12 @@ class _SettingsViewState extends State<SettingsView> {
             children: [
               Text(
                 '设置',
-                style: textTheme.titleLarge?.copyWith(
-                  color: ConverPalette.of(context).ink1,
-                ),
+                style: textTheme.titleLarge?.copyWith(color: palette.ink1),
               ),
               const SizedBox(height: ConverSpacing.space1),
               Text(
                 '应用配置集中管理',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: ConverPalette.of(context).ink3,
-                ),
+                style: textTheme.bodyMedium?.copyWith(color: palette.ink3),
               ),
               const SizedBox(height: ConverSpacing.space4),
               if (loaded == null)
@@ -152,69 +145,34 @@ class _SettingsViewState extends State<SettingsView> {
                   secretStore: widget.secretStore,
                   initialValues: loaded.$1,
                 ),
-                Divider(
-                  thickness: 1,
-                  color: ConverPalette.of(context).border,
-                ),
+                Divider(thickness: 1, color: palette.border),
                 DefaultModelSection(
                   settingsRepository: _settings,
                   initialProvider: loaded.$2,
                   initialModel: loaded.$3,
                 ),
-                Divider(
-                  thickness: 1,
-                  color: ConverPalette.of(context).border,
-                ),
+                Divider(thickness: 1, color: palette.border),
                 ThemeSection(themeController: _themeController),
-                Divider(
-                  thickness: 1,
-                  color: ConverPalette.of(context).border,
-                ),
+                Divider(thickness: 1, color: palette.border),
               ],
+              // 「对话」「模板变量」两占位（锚共识 D1）：共享行组件、不可点。
               for (var i = 0; i < _placeholderItems.length; i++) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: ConverSpacing.space2,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _placeholderItems[i].label,
-                          style: textTheme.bodyLarge?.copyWith(
-                            color: ConverPalette.of(context).ink2,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: ConverSpacing.space2),
-                      Text(
-                        _placeholderItems[i].note,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: ConverPalette.of(context).ink4,
-                        ),
-                      ),
-                    ],
-                  ),
+                _SettingsRow(
+                  label: _placeholderItems[i].label,
+                  note: _placeholderItems[i].note,
                 ),
                 if (i != _placeholderItems.length - 1)
-                  Divider(
-                    thickness: 1,
-                    color: ConverPalette.of(context).border,
-                  ),
+                  Divider(thickness: 1, color: palette.border),
               ],
-              // 「我」页收口入口（F-M5-10）：三占位行 → 可点击导航行
-              //（1px 边框分割 + chevron 触达语义，与占位行同一视觉层级）。
+              // 「我」页收口三入口（F-M5-10）：共享行组件、整行可点 + chevron。
               for (var i = 0; i < _profileEntries.length; i++) ...[
-                _SettingsNavRow(
+                _SettingsRow(
                   label: _profileEntries[i].label,
                   note: _profileEntries[i].note,
-                  onTap: () => _openProfilePage(_profileEntries[i]),
+                  onTap: () => _openProfilePage(_profileEntries[i].page),
                 ),
                 if (i != _profileEntries.length - 1)
-                  Divider(
-                    thickness: 1,
-                    color: ConverPalette.of(context).border,
-                  ),
+                  Divider(thickness: 1, color: palette.border),
               ],
             ],
           );
@@ -224,23 +182,30 @@ class _SettingsViewState extends State<SettingsView> {
   }
 }
 
-/// 「我」页收口入口单行：label + note + chevron，整行可点（InkWell 触达）。
-class _SettingsNavRow extends StatelessWidget {
-  const _SettingsNavRow({
+/// 设置页共享行组件：label + note（导航行追加 chevron + 整行可点）。
+///
+/// [onTap] 非空 → 导航行（InkWell 触达 + chevron 触达语义）；为空 →
+/// 占位行（不可点、无 chevron）。两路复用同一视觉层级（F-M5-10）。
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
     required this.label,
     required this.note,
-    required this.onTap,
+    this.onTap,
   });
 
+  /// 行名称（设置页展示文案，测试锚点）。
   final String label;
 
+  /// 一句话说明（次级文案）。
   final String note;
 
-  final VoidCallback onTap;
+  /// 整行点击动作；null = 占位行（不可点、无 chevron）。
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = ConverPalette.of(context);
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -250,41 +215,21 @@ class _SettingsNavRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: textTheme.bodyLarge?.copyWith(
-                  color: ConverPalette.of(context).ink2,
-                ),
+                style: textTheme.bodyLarge?.copyWith(color: palette.ink2),
               ),
             ),
             const SizedBox(width: ConverSpacing.space2),
             Text(
               note,
-              style: textTheme.bodySmall?.copyWith(
-                color: ConverPalette.of(context).ink4,
-              ),
+              style: textTheme.bodySmall?.copyWith(color: palette.ink4),
             ),
-            const SizedBox(width: ConverSpacing.space1),
-            Icon(
-              Icons.chevron_right,
-              size: 18,
-              color: ConverPalette.of(context).ink4,
-            ),
+            if (onTap != null) ...[
+              const SizedBox(width: ConverSpacing.space1),
+              Icon(Icons.chevron_right, size: 18, color: palette.ink4),
+            ],
           ],
         ),
       ),
     );
   }
-}
-
-/// 「我」页收口入口元数据：行文案 + 目标静态页实例。
-class _ProfileEntry {
-  const _ProfileEntry(this.label, this.note, this.page);
-
-  /// 入口行名称（设置页展示文案，测试锚点）。
-  final String label;
-
-  /// 一句话说明（次级文案）。
-  final String note;
-
-  /// 目标页面实例（无状态静态文本页，可共享复用）。
-  final Widget page;
 }
