@@ -11,11 +11,11 @@ plugins {
 }
 
 // Release signing material (keystore + passwords) stays OUTSIDE the repo:
-// android/key.properties is gitignored (.gitignore:48); the keystore lives at
-// <repo-root>/keys/conver_system_upload.jks (e.g. F:\Craft\conver system\keys).
-// Semantics: `rootProject` here is the android/ Gradle project (settings.gradle.kts
-// lives in android/), so rootProject.file("key.properties") resolves to
-// android/key.properties.
+// android/key.properties is gitignored (.gitignore:48); the keystore lives in
+// the parent of the repo at <repo>/../keys/conver_system_upload.jks (e.g.
+// F:\Craft\conver system\keys\conver_system_upload.jks). Semantics: `rootProject`
+// here is the android/ Gradle project (settings.gradle.kts lives in android/),
+// so rootProject.file("key.properties") resolves to android/key.properties.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
@@ -50,15 +50,18 @@ android {
         versionName = flutter.versionName
     }
 
-    // storeFile resolves via Project.file() against this module's dir (android/app):
-    // the main-repo relative value "../../keys/conver_system_upload.jks" therefore
-    // lands at <repo-root>/keys/conver_system_upload.jks (outside the repo); the
-    // worktree copy uses an absolute path instead. Both work.
+    // storeFile resolves via rootProject.file() against the android/ Gradle
+    // project dir — NOT against this app module dir, where `file(it)` would be
+    // off by one level (`android/app/../../keys` would hit <repo>/keys, inside
+    // the repo, instead of <repo>/../keys outside it). With rootProject.file(),
+    // the repo key.properties relative value "storeFile=../../keys/..." resolves
+    // to <repo>/../keys/conver_system_upload.jks (outside the repo); the worktree
+    // local copy uses an absolute path instead. Both work.
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
             keyPassword = keystoreProperties.getProperty("keyPassword")
-            storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+            storeFile = keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it) }
             storePassword = keystoreProperties.getProperty("storePassword")
         }
     }
