@@ -210,6 +210,55 @@ class _StalledProvider extends LLMProvider {
   Future<void> testConnection({String? model}) async {}
 }
 
+/// cancel-unwind 以**错误**完成的 provider（F-55 回归专用）：返回一个
+/// `onCancel` 处理器抛 [ReadPhaseInterruptedError] 的流——`StreamController`
+/// 的 `sub.cancel()` 以该错误完成，确定性复刻 F-55 记录的「停滞流 cancel 后
+/// 3s 窗口内连接 EOF 以**错误**完成」（真实 wire 中 EOF 错误经 `await for`
+/// 机制路由进生成器收尾，`providerSub.cancel()` 以错误完成）。
+///
+/// 与 [_StalledProvider]（cancel 干净完成、只走 .timeout 兜底）互补：本 fake
+/// 验证「cancel 以**错误**完成时，落库 + close 收尾仍执行」的结构保证（错误
+/// 注入零竞态：错误由 cancel 自身触发，无窗口时序依赖）。
+class _CancelErrorProvider extends LLMProvider {
+  _CancelErrorProvider({super.apiKey = 'test-key'}) {
+    _events = StreamController<String>(onCancel: () async {
+      // cancel-unwind 断流：取消订阅即抛错 → cancel() 以该错误完成。
+      throw ReadPhaseInterruptedError(
+        originalError: StateError('cancel-unwind 断流'),
+      );
+    });
+  }
+
+  /// 服务端消费的事件流（token 由测试驱动注入；cancel 时以错误完成）。
+  late final StreamController<String> _events;
+
+  @override
+  LLMError translateError(Object error) =>
+      error is LLMError ? error : LLMError('fake API 调用失败: $error');
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async =>
+      ''; // F-55 测试仅走流式路径。
+
+  @override
+  Stream<String> streamGenerate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) =>
+      _events.stream;
+
+  /// 产出 token（ChatService 逐 token 消费；单订阅流在订阅建立前缓冲）。
+  void emit(String token) => _events.add(token);
+
+  @override
+  Future<void> testConnection({String? model}) async {}
+}
+
 /// 依序播放故障序列的流式 provider（M6-06 连接阶段自动重试测试用）。
 ///
 /// [sequence] 的第 i 个元素对应第 i+1 次 [streamGenerate] 调用的行为：
@@ -1189,6 +1238,61 @@ void main() {
       expect(events.whereType<ChatError>(), isEmpty);
       expect(events.whereType<ChatInterrupted>(), isEmpty);
     });
+
+    test('B5/F-55 先红后绿: cancel-unwind 断流（cancel 以错误完成）→ 部分落库 + '
+        'close 收尾仍执行（zone 零未处理异步异常）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      // F-55 真实路径：停滞流 cancel 后 3s 窗口内连接 EOF 以**错误**完成
+      // （cancel-unwind 断流）→ providerSub.cancel() 以错误完成。既有实现
+      // `cancel().timeout` 未包 catch → 错误穿透 `_stopStreamReply`，部分落库
+      // 与 close 收尾被跳过。断言「有界完成 + 部分落库」使未修实现红。
+      final provider = _CancelErrorProvider();
+      wireService(provider);
+
+      final events = <ChatEvent>[];
+      final gotLastToken = Completer<void>();
+      late StreamSubscription<ChatEvent> sub;
+      sub = service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .listen((e) {
+        events.add(e);
+        if (e is ChatToken && e.token == 't1' && !gotLastToken.isCompleted) {
+          gotLastToken.complete();
+        }
+      });
+      // 产出 t0、t1（单订阅流在订阅建立前缓冲，随订阅送达）。
+      provider.emit('t0');
+      provider.emit('t1');
+      await gotLastToken.future;
+
+      // 停止：onCancel → _stopStreamReply → providerSub.cancel() 以
+      // ReadPhaseInterruptedError 完成（cancel-unwind 断流，F-55 真实路径）。
+      // 注：cancel 路径下监听者在 onCancel 前已被 StreamController 移除，
+      // onDone 不可观察（A3 既有锚）；事件流关闭语义以「有界完成 + 无终态
+      // 事件」锚定——有界完成即证明 _stopStreamReply（含 close 收尾）走完。
+      await sub.cancel().timeout(
+            const Duration(seconds: 6),
+            onTimeout: () =>
+                fail('停止未在有界时间内完成（cancel-unwind 断流挂起）'),
+          );
+
+      // F-55 结构保证：cancel 以错误完成后收尾仍执行——部分落库（close 收尾
+      // 随有界完成隐含锚定）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+        (Role.assistant, 't0t1'),
+      ]);
+      expect([for (final e in events) if (e is ChatToken) e.token], ['t0', 't1']);
+      expect(events.whereType<ChatDone>(), isEmpty,
+          reason: '停止路径不发终态事件');
+      expect(events.whereType<ChatInterrupted>(), isEmpty,
+          reason: '停止路径不发中断事件');
+      // zone 零未处理异步异常：未修实现下 cancel 错误穿透成为未处理异步异常，
+      // flutter_test zone 捕获即测试失败（错误经 cancel().timeout 抛出而非
+      // 吞为 zone 级——修复后 try/catch 承接 + 收尾完整）。
+    });
   });
 
   // ── A5 断流 ──
@@ -1258,8 +1362,9 @@ void main() {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
 
-      // 零 token 的连接中断信号在 M6-06 属「首 token 前」重试窗口：注入短退避
-      // 使重试耗尽（2 次）快速走完，终态语义不变——ChatInterrupted(null)。
+      // 零 token 的基类断流（[LLMConnectionInterruptedError]，B2/B6 锚）在 AR-1
+      // 判据单行契约下不再走重试窗口（仅 ConnectPhase 可重试）→ 立即
+      // ChatInterrupted(null)；wireServiceWithRetry 仅保证退避注入不拖慢。
       wireServiceWithRetry(_TickingProvider(
         tokens: const [],
         errorAfter: LLMConnectionInterruptedError(),
@@ -1360,7 +1465,9 @@ void main() {
 
       final provider = _FaultSequenceProvider(
         tokens: const ['你', '好'],
-        sequence: [LLMConnectionInterruptedError(), null],
+        // 连接相位叶子（ConnectPhase）是自动重试的唯一可重试面（AR-1 判据
+        // 单行契约）；基类/ReadPhase 一律不重试。
+        sequence: [ConnectPhaseInterruptedError(), null],
       );
       wireServiceWithRetry(provider,
           retryDelays: const [Duration(milliseconds: 50)]);
@@ -1392,9 +1499,9 @@ void main() {
       final provider = _FaultSequenceProvider(
         tokens: const [],
         sequence: [
-          LLMConnectionInterruptedError(),
-          LLMConnectionInterruptedError(),
-          LLMConnectionInterruptedError(),
+          ConnectPhaseInterruptedError(),
+          ConnectPhaseInterruptedError(),
+          ConnectPhaseInterruptedError(),
         ],
       );
       wireServiceWithRetry(provider);
@@ -1420,8 +1527,8 @@ void main() {
       final provider = _FaultSequenceProvider(
         tokens: const ['ok'],
         sequence: [
-          LLMConnectionInterruptedError(),
-          LLMConnectionInterruptedError(),
+          ConnectPhaseInterruptedError(),
+          ConnectPhaseInterruptedError(),
           null,
         ],
       );
@@ -1450,6 +1557,8 @@ void main() {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
 
+      // 基类断流 + 已产出 token：AR-1 下基类=不可重试兜底信号，无论是否产出
+      // token 均不重试（B2 基类回归锚；改造前 `!producedToken` 已拦，语义不变）。
       final provider = _TickingProvider(
         tokens: const ['a', 'b'],
         errorAfter: LLMConnectionInterruptedError(),
@@ -1467,6 +1576,85 @@ void main() {
       expect(await roleContentsOf(conv.id), [
         (Role.user, 'hi'),
         (Role.assistant, 'ab'),
+      ]);
+    });
+
+    test('B2: 流中已产出 token 后 ReadPhaseInterruptedError → 不重试（断流路径，'
+        '调用 1 次）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      // 读取相位叶子（真实 wire 流中途断连/EOF 未终态）已产出 token 后失败：
+      // 读段不可重试（AR-1 判据单行——仅 ConnectPhase 可重试）。
+      final provider = _TickingProvider(
+        tokens: const ['a', 'b'],
+        errorAfter: ReadPhaseInterruptedError(),
+        delay: const Duration(milliseconds: 5),
+      );
+      wireServiceWithRetry(provider);
+
+      final events = await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.streamGenerateCallCount, 1, reason: 'ReadPhase 已产 token 不得重试');
+      expect(events.last, isA<ChatInterrupted>());
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+        (Role.assistant, 'ab'),
+      ]);
+    });
+
+    test('B3/F-52 先红后绿: 零 token 基类 LLMConnectionInterruptedError → 不重试'
+        '（callCount==1；基类 = 不可重试断流兜底信号）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      // 基类断流在改造前属「首 token 前」重试窗口（!producedToken 成立 +
+      // _isConnectionDrop 成立）→ 会重试（最坏同一 user 内容多次 billable
+      // POST，F-52 计费 gap）；改造后重试判据收束为 ConnectPhase 单行类型契约，
+      // 基类不再重试。断言 callCount==1 使「仍会重试」的实现红。
+      final provider = _FaultSequenceProvider(
+        tokens: const [],
+        sequence: [LLMConnectionInterruptedError()],
+      );
+      wireServiceWithRetry(provider);
+
+      final events = await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.streamGenerateCallCount, 1, reason: '零 token 基类不得重试（F-52）');
+      expect(events.last, isA<ChatInterrupted>());
+      expect((events.last as ChatInterrupted).messageId, isNull,
+          reason: '零部分内容不落空 assistant');
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'), // user 行唯一：≤1 次 billable 发送
+      ]);
+    });
+
+    test('B4/Q1b: 零 token ReadPhaseInterruptedError（首 token 前 idle / 空 200 体'
+        'EOF）→ 不重试，ChatInterrupted(null)，user 行唯一', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      // 首 token 前 idle（已收 200 后静默）：wire idle 恒编码 read 相位
+      // （状态码必已收到）→ 零 token ReadPhase 不可重试（行为变更点 B1）。
+      final provider = _FaultSequenceProvider(
+        tokens: const [],
+        sequence: [ReadPhaseInterruptedError()],
+      );
+      wireServiceWithRetry(provider);
+
+      final events = await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.streamGenerateCallCount, 1, reason: 'read 相位失败不得重试');
+      expect(events.last, isA<ChatInterrupted>());
+      expect((events.last as ChatInterrupted).messageId, isNull);
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
       ]);
     });
 
@@ -1508,8 +1696,8 @@ void main() {
       final provider = _FaultSequenceProvider(
         tokens: const [],
         sequence: [
-          LLMConnectionInterruptedError(),
-          LLMConnectionInterruptedError(),
+          ConnectPhaseInterruptedError(),
+          ConnectPhaseInterruptedError(),
         ],
         onFirstFailure: firstFailure,
       );

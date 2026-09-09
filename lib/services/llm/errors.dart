@@ -61,16 +61,43 @@ class LLMResponseParseFailedError extends LLMError {
         );
 }
 
-/// 流在终态前中断（EOF 未收终态帧 / 连接重置）的可区分连接异常。
+/// 流在终态前中断（EOF 未收终态帧 / 连接重置）的可区分连接异常基类——两相位
+/// 叶子（[ConnectPhaseInterruptedError] / [ReadPhaseInterruptedError]）共享的
+/// **断流伞**。
 ///
 /// 共享于 Claude（message_stop 前 EOF / 连接重置）与 OpenAI（[DONE] 前 EOF /
 /// 连接重置）双协议 wire 层，供服务层（T03 ChatService `_isConnectionDrop`）
 /// 与 UI 统一捕获：继承 LLM 错误族（[LLMError]），`translateError` 直通不
 /// 二次翻译；区别于正常完成与鉴权 / 限流 / 超时 / 内容过滤等业务错误——业务
 /// 错误不落部分内容（F-45），连接中断走「回复已中断」部分落库分支。
+///
+/// **语义**：concrete 保留为**不可重试的断流兜底信号**——生产抛点全部迁移到
+/// 两相位叶子；聊天链路自动重试（M6-06）只认 [ConnectPhaseInterruptedError]，
+/// 基类 / [ReadPhaseInterruptedError] 一律走既有断流收束（B2 行为变更点）。
 class LLMConnectionInterruptedError extends LLMError {
   LLMConnectionInterruptedError({super.originalError})
       : super('连接中断，回复未完成');
+}
+
+/// **连接相位 (connect phase)** 传输失败：wire 连接建立段（postUrl → 写请求体
+/// → close 等到响应头，**未收到状态码**）的失败——DNS / 拒连 / 连接超时 /
+/// 响应头前断。确定未产生服务端生成。
+///
+/// 编码为 [ConnectPhaseInterruptedError]（stream_wire.dart connect 段 2 catch
+/// 收敛）；是聊天链路自动重试（M6-06）的**唯一可重试面**（重试判据 = 本类型
+/// + 次数上限；构造性保证无 token——token 必在 read 段产出）。
+class ConnectPhaseInterruptedError extends LLMConnectionInterruptedError {
+  ConnectPhaseInterruptedError({super.originalError});
+}
+
+/// **读取相位 (read phase)** 失败：已收到响应头后读 SSE 段期间的失败——流中途
+/// EOF（未收终态帧）/ 连接重置 / idle 超时 / 空 200 体非终态 EOF。不可重试。
+///
+/// 编码为 [ReadPhaseInterruptedError]（stream_wire.dart 读段 2 catch +
+/// `!reachedTerminated` 非终态 EOF 收敛）；服务层断流收束（部分落库 +
+/// [ChatInterrupted]）对基类与两叶子同判（断流伞判型）。
+class ReadPhaseInterruptedError extends LLMConnectionInterruptedError {
+  ReadPhaseInterruptedError({super.originalError});
 }
 
 /// 非 HTTP 响应的传输失败类别（wire 层从传输异常解出的原语，见 [translateSdkError]）。

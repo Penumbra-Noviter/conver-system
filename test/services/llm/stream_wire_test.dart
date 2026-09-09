@@ -2,8 +2,9 @@
 ///
 /// 收敛自 claude / openai 两 provider 的 `_streamRequest` 骨架（原 ~50 行
 /// ×2 逐行同构）；本文件单测骨架统一兜底：逐 token 产出 / 终态帧判定 /
-/// 非 200 → HttpStatusError / EOF 未终态 → LLMConnectionInterruptedError /
-/// connect 段传输失败（拒连 / 连接超时 / 响应头前断）→ LLMConnectionInterruptedError /
+/// 非 200 → HttpStatusError / EOF 未终态 → ReadPhaseInterruptedError（读取
+/// 相位）/ connect 段传输失败（拒连 / 连接超时 / 响应头前断）→
+/// ConnectPhaseInterruptedError（连接相位）/ idle 断线 → ReadPhaseInterruptedError /
 /// 流内错误帧工厂（claude 语义）与缺省忽略（openai 语义）。双 provider
 /// 端到端（FakeLlmServer 播放 canned SSE）仍各自覆盖差异面。
 library;
@@ -51,9 +52,16 @@ class _RawSseWriter {
 /// 节奏发帧；handler 返回后 destroy socket（无 Content-Length，连接关闭即 EOF，
 /// 客户端据此自然收束）。
 class _RawSseServer {
-  _RawSseServer(this.handler);
+  _RawSseServer(
+    this.handler, {
+    this.extraHeaders = '',
+  });
 
   final Future<void> Function(_RawSseWriter writer) handler;
+
+  /// 追加到固定响应头之后的额外头部行（如 `Transfer-Encoding: chunked`，
+  /// 供读段 HttpException 路径测试注入畸形帧）。
+  final String extraHeaders;
 
   ServerSocket? _server;
   int _port = 0;
@@ -94,6 +102,7 @@ class _RawSseServer {
           'HTTP/1.1 200 OK\r\n'
           'Content-Type: text/event-stream; charset=utf-8\r\n'
           'Connection: close\r\n'
+          '$extraHeaders'
           '\r\n',
         ));
         unawaited(() async {
@@ -209,7 +218,8 @@ void main() {
       );
     });
 
-    test('EOF 未到终态帧 → LLMConnectionInterruptedError', () async {
+    test('EOF 未到终态帧 → ReadPhaseInterruptedError（读取相位，伞判型仍成立）',
+        () async {
       final server = await startedServer((request) async {
         final response = request.response;
         response.headers.contentType = ContentType('text', 'event-stream');
@@ -220,11 +230,15 @@ void main() {
 
       await expectLater(
         collect(server),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        // A4 伞判型双断言：读取相位叶子仍 isA<LLMConnectionInterruptedError>。
+        throwsA(allOf(
+          isA<ReadPhaseInterruptedError>(),
+          isA<LLMConnectionInterruptedError>(),
+        )),
       );
     });
 
-    test('200 + 空响应体（零帧直接 EOF）→ LLMConnectionInterruptedError',
+    test('200 + 空响应体（零帧直接 EOF）→ ReadPhaseInterruptedError（读取相位）',
         () async {
       final server = await startedServer((request) async {
         final response = request.response;
@@ -234,15 +248,44 @@ void main() {
 
       await expectLater(
         collect(server),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        throwsA(isA<ReadPhaseInterruptedError>()),
       );
     });
 
-    test('connect 段：postUrl 连接拒绝 → LLMConnectionInterruptedError（收敛判型）',
+    test('读段 HttpException：chunked 畸形块（响应头后读期）→ '
+        'ReadPhaseInterruptedError（读取相位，originalError 透传）', () async {
+      // dart:io HttpClient 在 chunked 传输下对畸形块大小行抛 HttpException——
+      // 响应头已收齐（200），读体阶段落错 → 读段 2 catch 的 HttpException 分支
+      // 收敛为读取相位叶子（与 SocketException 分支同构的防御面）。
+      final server = _RawSseServer(
+        (w) async {
+          await w.send('ZZZ-invalid-chunk\r\n');
+          await w.send('data: x\r\n');
+          await w.send('0\r\n\r\n');
+        },
+        extraHeaders: 'Transfer-Encoding: chunked\r\n',
+      );
+      await server.start();
+      addTearDown(server.close);
+
+      await expectLater(
+        streamSse(
+          uri: server.uri,
+          body: '{}',
+          headers: {},
+          isTerminated: isAnthropicMessageStop,
+          extractToken: extractAnthropicText,
+        ).toList(),
+        throwsA(isA<ReadPhaseInterruptedError>()
+            .having((e) => e.originalError, 'originalError', isA<HttpException>())),
+      );
+    });
+
+    test('connect 段：postUrl 连接拒绝 → ConnectPhaseInterruptedError（收敛判型）',
         () async {
-      // M6-06 契约：connect 段传输失败（DNS / 拒连 / 连接超时 / 响应头前断）
-      // 确定未产生服务端生成，统一收敛为 LLMConnectionInterruptedError（与流
-      // 中途断连判型同构），供服务层「首 token 前」重试编排承接。
+      // AR-1 相位契约：connect 段传输失败（DNS / 拒连 / 连接超时 / 响应头前断）
+      // 确定未产生服务端生成，统一收敛为 ConnectPhaseInterruptedError（连接相位
+      // 叶子），供服务层「连接相位」自动重试承接（读取相位叶子不可重试）。
       final probe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       final leakedPort = probe.port;
       await probe.close();
@@ -255,11 +298,15 @@ void main() {
           isTerminated: isAnthropicMessageStop,
           extractToken: extractAnthropicText,
         ).toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        // A4 伞判型双断言：连接相位叶子仍 isA<LLMConnectionInterruptedError>。
+        throwsA(allOf(
+          isA<ConnectPhaseInterruptedError>(),
+          isA<LLMConnectionInterruptedError>(),
+        )),
       );
     });
 
-    test('connect 段：connectTimeout 到期（握手黑洞）→ LLMConnectionInterruptedError',
+    test('connect 段：connectTimeout 到期（握手黑洞）→ ConnectPhaseInterruptedError',
         () async {
       // https 黑洞 TCP：TLS 握手挂起 → connectionTimeout 到期抛 SocketException，
       // connect 段收敛判型（连接超时属「确定未产生服务端生成」的重试面）。
@@ -279,11 +326,11 @@ void main() {
           extractToken: extractAnthropicText,
           connectTimeout: const Duration(milliseconds: 300),
         ).toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        throwsA(isA<ConnectPhaseInterruptedError>()),
       );
     });
 
-    test('connect 段：响应头前断（部分头后关连接）→ LLMConnectionInterruptedError',
+    test('connect 段：响应头前断（部分头后关连接）→ ConnectPhaseInterruptedError',
         () async {
       // 服务端只发部分响应头后关连接：HttpException（未收完整响应头），connect
       // 段收敛判型——未收到状态码、无生成副作用 → 服务层重试面。
@@ -305,7 +352,7 @@ void main() {
           isTerminated: isAnthropicMessageStop,
           extractToken: extractAnthropicText,
         ).toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        throwsA(isA<ConnectPhaseInterruptedError>()),
       );
     });
   });
@@ -390,8 +437,8 @@ void main() {
         'event: content_block_delta\ndata: {"type":"content_block_delta",'
         '"delta":{"type":"text_delta","text":"$token"}}\n\n';
 
-    test('流式中静默 ≥ idleTimeout（无任何行）→ LLMConnectionInterruptedError'
-        '（判型与断流同构，时长可注入）', () async {
+    test('流式中静默 ≥ idleTimeout（无任何行）→ ReadPhaseInterruptedError'
+        '（读取相位，状态码必已收到；伞判型仍成立）', () async {
       final server = _RawSseServer((w) async {
         await w.send(textDelta('He'));
         // 首帧后静默挂起：不写不关（弱网假活连接），等 idleTimeout 到期。
@@ -402,7 +449,11 @@ void main() {
 
       await expectLater(
         idleWire(server.uri, const Duration(milliseconds: 200)).toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        // A4 伞判型双断言：idle 断线编码为读取相位叶子，仍 isA 伞下。
+        throwsA(allOf(
+          isA<ReadPhaseInterruptedError>(),
+          isA<LLMConnectionInterruptedError>(),
+        )),
       );
     });
 
@@ -429,9 +480,10 @@ void main() {
       final server = _RawSseServer((w) async {
         await w.send(textDelta('He'));
         await w.send(frame('message_stop', '{"type":"message_stop"}'));
-        // 终态帧后静默挂起 3× idleTimeout 再自然关闭：若终态后计时器未失效，
+        // 终态帧后静默挂起 4× idleTimeout 再自然关闭：若终态后计时器未失效，
         // 会在 ~idleTimeout 时提前触发（被下方 elapsed 下限断言捕获/抛错）。
-        await Future<void>.delayed(const Duration(milliseconds: 600));
+        // 裕量：静默跨度 800ms = 4× idleTimeout（200ms），断言下限 2.5×。
+        await Future<void>.delayed(const Duration(milliseconds: 800));
       });
       await server.start();
       addTearDown(server.close);
@@ -444,18 +496,21 @@ void main() {
       final took = elapsed.elapsed;
 
       expect(tokens, ['He']);
-      expect(took >= const Duration(milliseconds: 400), isTrue,
-          reason: '终态后不应触发 idle 断线：完成过早（服务端 600ms 环境自然关闭）'
+      expect(took >= const Duration(milliseconds: 500), isTrue,
+          reason: '终态后不应触发 idle 断线：完成过早（服务端 800ms 环境自然关闭）'
               '说明计时器未在终态失效: took=$took');
     });
 
     test('注释帧（: ping）静默忽略维持现状；作为活跃行持续重启计时器 → '
-        '跨 idleTimeout 存活并正常完成（保守不误杀）', () async {
+        '跨 idleTimeout 存活并正常完成（保守不误杀）；帧间隔加裕量防 flake'
+        '（40ms 间隔 ≤ idleTimeout 300ms 的 1/7，抵御调度抖动）', () async {
       final server = _RawSseServer((w) async {
         await w.send(textDelta('He'));
-        // 持续 : ping 注释帧（100ms 间隔），总跨度 500ms > idleTimeout 250ms。
-        for (var i = 0; i < 5; i++) {
-          await Future<void>.delayed(const Duration(milliseconds: 100));
+        // 持续 : ping 注释帧（40ms 间隔），总跨度 360ms > idleTimeout 300ms。
+        // 帧间隔与超时的比值放大（原 100ms/250ms、W3 实测 flake 1 次）——
+        // 调度抖动下任何两行实际到达间隔仍远低于 idleTimeout，不得误杀。
+        for (var i = 0; i < 9; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 40));
           await w.send(': ping\n\n');
         }
         await w.send(frame('message_stop', '{"type":"message_stop"}'));
@@ -464,7 +519,7 @@ void main() {
       addTearDown(server.close);
 
       expect(
-        await idleWire(server.uri, const Duration(milliseconds: 250)).toList(),
+        await idleWire(server.uri, const Duration(milliseconds: 300)).toList(),
         ['He'],
       );
     });

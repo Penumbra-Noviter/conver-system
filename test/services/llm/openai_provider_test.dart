@@ -6,8 +6,9 @@
 ///   choices[0].delta.content 逐 token（null 跳过）、[DONE] 收束；
 /// - [normalizeBaseUrl] 末尾段 v1 / v1beta 原样、否则补 /v1、空值返回 null；
 /// - 401/429/408/504 → 业务 LLM 族（状态码分支不变）；流式连接拒绝（connect
-///   段传输失败）→ LLMConnectionInterruptedError（M6-06 wire connect 相位收敛）；
-///   [DONE] 前 EOF / 连接重置 → LLMConnectionInterruptedError；
+///   段传输失败）→ ConnectPhaseInterruptedError（AR-1 连接相位收敛，服务层
+///   自动重试唯一可重试面）；
+///   [DONE] 前 EOF / 连接重置 → 读取相位 ReadPhaseInterruptedError；
 ///   零 token 正常完成不抛错。
 /// 锚：`desktop/backend/app/services/llm/openai.py`（_normalize_base_url /
 /// temperature 透传）+ `errors.dart::translateSdkError`。
@@ -319,7 +320,7 @@ void main() {
       expect(e, isA<LLMTimeoutError>());
     });
 
-    test('连接拒绝（端口关闭）→ LLMConnectionInterruptedError（connect 段收敛，'
+    test('连接拒绝（端口关闭）→ ConnectPhaseInterruptedError（连接相位收敛，'
         'SocketException 不穿透）', () async {
       final server = await startedServer(FakeLlmServer.httpError(200));
       final baseUrl = server.baseUrl;
@@ -331,9 +332,9 @@ void main() {
             .streamGenerate(messages: messages)
             .toList();
         fail('应抛出 LLM 族错误');
-      } on LLMConnectionInterruptedError {
-        // M6-06 契约：wire connect 段传输失败（拒连）统一收敛为
-        // LLMConnectionInterruptedError（SocketException 不穿透）。
+      } on ConnectPhaseInterruptedError {
+        // AR-1 契约：wire connect 段传输失败（拒连）统一收敛为连接相位叶子
+        // ConnectPhaseInterruptedError（SocketException 不穿透）。
       } on SocketException {
         fail('流式连接拒绝的 SocketException 必须经 translateError 进入 LLM 族');
       }
@@ -341,17 +342,17 @@ void main() {
   });
 
   group('streamGenerate 流式 — 断连可区分异常（供 T03 断流处理）', () {
-    test('[DONE] 前 EOF → LLMConnectionInterruptedError', () async {
+    test('[DONE] 前 EOF → ReadPhaseInterruptedError', () async {
       final server = await startedServer(
         FakeLlmServer.openAi(['partial'], withDone: false),
       );
       await expectLater(
         makeProvider(server).streamGenerate(messages: messages).toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        throwsA(isA<ReadPhaseInterruptedError>()),
       );
     });
 
-    test('流中途连接重置 → LLMConnectionInterruptedError（不穿透原始异常）', () async {
+    test('流中途连接重置 → ReadPhaseInterruptedError（不穿透原始异常）', () async {
       final reset = FakeResetServer(
         body: 'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n'
             'data: {"choices":[{"delta":{"content":" reset"}}]}\n\n',
@@ -363,7 +364,7 @@ void main() {
         OpenAIProvider(apiKey: apiKey, baseUrl: reset.baseUrl)
             .streamGenerate(messages: messages)
             .toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        throwsA(isA<ReadPhaseInterruptedError>()),
       );
     });
   });
@@ -387,6 +388,14 @@ void main() {
       final original = LLMAuthError('OpenAI');
       final e = provider().translateError(original);
       expect(e, same(original));
+    });
+
+    test('C3: 相位叶子（Connect/Read）直通不二次翻译——translateError 不改写 '
+        'wire 已抛出的叶子', () {
+      final connect = ConnectPhaseInterruptedError(originalError: Exception('c'));
+      final read = ReadPhaseInterruptedError(originalError: Exception('r'));
+      expect(provider().translateError(connect), same(connect));
+      expect(provider().translateError(read), same(read));
     });
   });
 

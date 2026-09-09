@@ -33,19 +33,21 @@
 /// ## 断流（A5）
 /// 流终止未到终态（连接异常 / 未收终态帧）→ 已累积部分落库 + 非阻塞
 /// [ChatInterrupted]「回复已中断」。R3 seam 契约：wire 层（T02）把**连接建立
-/// 段**传输失败（DNS / 拒连 / 连接超时 / 响应头前断——stream_wire.dart
-/// connect 相位收敛）与**流中途**断连（EOF 未到终态 / 连接重置）统一翻译为
-/// 可区分的 [LLMConnectionInterruptedError]（LLM 族子类，errors.dart 共享）；
+/// 段**传输失败（DNS / 拒连 / 连接超时 / 响应头前断——stream_wire.dart 连接
+/// 相位收敛为 [ConnectPhaseInterruptedError]）与**读取段**断连（EOF 未到终态 /
+/// 连接重置 / idle 超时——读取相位收敛为 [ReadPhaseInterruptedError]）统一
+/// 编码为 [LLMConnectionInterruptedError] 伞下两叶子（errors.dart 共享）；
 /// 业务错误（Auth / RateLimit / Timeout / ContentFilter 等）为其它的子类/
-/// 基类，不算断流。故 [_isConnectionDrop] 以「严格子类」判型即断流判定。
+/// 基类，不算断流。故 [_isConnectionDrop] 以「伞下判型」即断流判定。
 ///
 /// ## 连接阶段自动重试（M6-06，仅聊天链路）
-/// 连接建立阶段失败（[LLMConnectionInterruptedError]，未收到状态码、确定未
+/// 连接建立阶段失败（[ConnectPhaseInterruptedError]，未收到状态码、确定未
 /// 产生服务端生成）在「首 token 前」窗口内自动重试（缺省 2 次，指数退避
 /// [1s, 2s]；[connectRetryDelays] 可注入）。**不重试**：已收到状态码
 /// （4xx/5xx，含 Auth / RateLimit / Timeout / BadRequest / ContentFilter 映射）
-/// 与流中已产出至少一个 token 后的失败。user 行在落库后才调用 provider，
-/// 重试仅重放 provider 段、不重复落库；重试耗尽 → 既有断流语义收束。
+/// 与读取相位中断（已收响应头后断流，含首 token 前 idle——行为变更点 B1）。
+/// user 行在落库后才调用 provider，重试仅重放 provider 段、不重复落库；重试
+/// 耗尽 → 既有断流语义收束。
 library;
 
 import 'dart:async';
@@ -183,14 +185,16 @@ class RegenerateResult {
 /// 判定 provider 流异常是否为「连接中断」（断流，R3 seam）。
 ///
 /// 契约（T02 wire 层遵守）：**连接建立段**传输失败（DNS / 拒连 / 连接超时 /
-/// 响应头前断——stream_wire.dart connect 相位收敛）与**流中途**断连（EOF 未收
-/// 终态帧 / 连接重置）统一翻译为可区分的 [LLMConnectionInterruptedError]（LLM
-/// 族子类，errors.dart 共享，Claude / OpenAI wire 一致抛出）。**严格子类判型**
+/// 响应头前断——stream_wire.dart 连接相位收敛为 [ConnectPhaseInterruptedError]）
+/// 与**读取段**断连（EOF 未收终态帧 / 连接重置 / idle 超时——读取相位收敛为
+/// [ReadPhaseInterruptedError]）统一编码为 [LLMConnectionInterruptedError] 伞
+/// 下两叶子（errors.dart 共享，Claude / OpenAI wire 一致抛出）。**伞下判型**
 /// 即断流判定：HTTP 状态码路径（403 / 404 / 422 等经 `translateSdkError` 兜底
 /// 翻译）与业务错误（Auth / RateLimit / Timeout / ContentFilter / BadRequest /
 /// ResponseParseFailed）均为**基类** [LLMError] 或其非中断子类，不算断流 →
-/// 走业务错误 [ChatError]（F-45 不落部分内容）。M6-06：连接阶段中断属「首
-/// token 前」自动重试窗口，重试耗尽后复用本判定走断流收束。
+/// 走业务错误 [ChatError]（F-45 不落部分内容）。M6-06：仅连接相位叶子
+/// （[ConnectPhaseInterruptedError]）属自动重试窗口，重试耗尽后复用本判定走
+/// 断流收束。
 bool _isConnectionDrop(LLMError error) => error is LLMConnectionInterruptedError;
 
 /// [streamReply] 一次运行的共享可变状态（onData / onCancel / 收尾 handler 间
@@ -212,10 +216,6 @@ class _StreamRunState {
 
   /// 已累积的流式内容（逐 token 追加；完成态即完整回复）。
   String fullContent = '';
-
-  /// 是否已产出至少一个 token（M6-06 重试窗口判据：仅「首 token 前」的
-  /// 连接中断失败可重试；流中已产出 → 走既有断流路径）。
-  bool producedToken = false;
 
   /// 本次回合已发生的连接阶段失败次数（重试编排计数；耗尽后走终态收束）。
   int connectFailures = 0;
@@ -283,14 +283,16 @@ class ChatService {
   /// research 实证排除）→ 已累积部分落库（DB 存纯文本部分内容，UI 侧标「已停
   /// 止」）；无部分内容 → 仅保留已发 user。
   ///
-  /// 断流（A5）：provider 流抛出 [LLMConnectionInterruptedError]（流中途断连）
-  /// → 已累积部分落库 + 非阻塞 [ChatInterrupted]「回复已中断」；无部分 →
-  /// [ChatInterrupted(null)]。
+  /// 断流（A5）：provider 流抛出 [LLMConnectionInterruptedError] 伞（连接相位
+  /// [ConnectPhaseInterruptedError] / 读取相位 [ReadPhaseInterruptedError] 两
+  /// 叶子均命中伞下判型）→ 已累积部分落库 + 非阻塞 [ChatInterrupted]「回复已
+  /// 中断」；无部分 → [ChatInterrupted(null)]。
   ///
-  /// 连接阶段自动重试（M6-06）：连接建立失败（wire connect 相位收敛为
-  /// [LLMConnectionInterruptedError]，未收到状态码、未产出 token）→ 自动重试
-  /// 2 次、退避 [1s, 2s]（[connectRetryDelays] 可注入）；user 行落库仅一次，
-  /// 重试不重复。已收到状态码 / 已产出 token 后失败 → 不重试，走各自既有收束。
+  /// 连接阶段自动重试（M6-06）：连接建立失败（wire 连接相位收敛为
+  /// [ConnectPhaseInterruptedError]，未收到状态码、构造性保证未产出 token）→
+  /// 自动重试 2 次、退避 [1s, 2s]（[connectRetryDelays] 可注入）；user 行落库
+  /// 仅一次，重试不重复。读取相位 / 基类断流（已收状态码后失败，含首 token
+  /// 前 idle——B1）→ 不重试，走既有断流收束。
   ///
   /// 错误（A2 错误面）：领域错误 / LLM 业务错误 → [ChatError] 事件（用户可见
   /// 文案），且**不落部分内容**（F-45，锚 `chat.py::stream_reply`）。
@@ -423,7 +425,6 @@ class ChatService {
               return;
             }
             state.fullContent += token;
-            state.producedToken = true;
             controller.add(ChatToken(token));
           },
           onError: (Object error, StackTrace stackTrace) {
@@ -447,16 +448,17 @@ class ChatService {
     state.providerSub = sub;
   }
 
-  /// M6-06 连接阶段失败处理：先判「首 token 前」重试，再走终态收束。
+  /// M6-06 连接阶段失败处理：先判连接相位重试，再走终态收束。
   ///
-  /// 重试条件（全部满足）：
-  /// - 失败为连接中断（[_isConnectionDrop] 严格子类判型——含 wire connect 相位
-  ///   收敛的 [LLMConnectionInterruptedError]，见 stream_wire.dart）；
-  /// - 尚未产出任何 token（重试窗口 = 首 token 前；流中已产出 → 不重试）；
+  /// 重试条件（单行类型契约，全部满足）：
+  /// - 失败为**连接相位**叶子 [ConnectPhaseInterruptedError]（wire connect 段
+  ///   构造性保证：未收到状态码、未产出 token——见 stream_wire.dart）；
   /// - 重试次数未耗尽（[_connectRetryDelays] 长度 = 最大重试次数）。
   ///
-  /// 重试安全：连接建立阶段失败未收到状态码、确定未产生服务端生成，重放不
-  /// 重复计费/生成；user 行已在 `_runStreamReply` 落库，重试不重复落库。
+  /// 重试安全（仅对连接相位声明）：连接建立阶段失败未收到状态码、确定未产生
+  /// 服务端生成，重放不重复计费/生成；user 行已在 `_runStreamReply` 落库，
+  /// 重试不重复落库。读取相位（[ReadPhaseInterruptedError]）与基类断流一律
+  /// 不可重试（读段失败服务端已处理请求、可能已产生计费内容）。
   /// 退避期间停止/取消 → 不再订阅（无泄漏）；重试耗尽 → 既有断流/错误收束。
   Future<void> _onStreamError({
     required _StreamRunState state,
@@ -470,9 +472,7 @@ class ChatService {
     if (state.stopped || controller.isClosed) {
       return;
     }
-    if (!state.producedToken &&
-        error is LLMError &&
-        _isConnectionDrop(error) &&
+    if (error is ConnectPhaseInterruptedError &&
         state.connectFailures < _connectRetryDelays.length) {
       final delay = _connectRetryDelays[state.connectFailures];
       state.connectFailures++;
@@ -523,7 +523,7 @@ class ChatService {
     }
   }
 
-  /// provider 流异常收尾：断流（[LLMConnectionInterruptedError]）/ 业务错误 /
+  /// provider 流异常收尾：断流（[LLMConnectionInterruptedError] 伞）/ 业务错误 /
   /// 未预期异常。
   Future<void> _onProviderStreamError(
     _StreamRunState state,
@@ -573,7 +573,8 @@ class ChatService {
 
   /// 停止（A3）：调用方取消订阅时触发。直接取消 provider 订阅（不等待待处理
   /// 元素，cancel 包 `.timeout` 有界完成——F-17 停滞流兜底），已累积部分落库
-  /// （无部分 → 仅保留已发 user），关闭事件流。
+  /// （无部分 → 仅保留已发 user），关闭事件流。cancel 以错误完成（cancel-unwind
+  /// 断流）仍走落库 + close 收尾（F-55 结构保证：try/catch + finally）。
   Future<void> _stopStreamReply(
     _StreamRunState state,
     StreamController<ChatEvent> controller,
@@ -583,25 +584,37 @@ class ChatService {
     }
     state.stopped = true;
     // F-17：providerSub.cancel() 在真实网络 / 停滞 provider 流上无上界挂起
-    // （cancel 等下一块/EOF——Flutter 挂起非抛错）→ 包 `.timeout` 上界，
-    // onTimeout 兜底**不抛错**、返回后继续回合收尾（已累积部分落库 + 关闭
-    // 事件流）。不得以 try/catch 预期异常——挂起不抛错，timeout 兜底是双层
-    // 防御的语义关键（onTimeout 返回值作为 await 结果继续执行）。
-    await state.providerSub?.cancel().timeout(
-          const Duration(seconds: 3),
-          onTimeout: () {
-            debugPrint('停止 cancel 停滞，继续回合收尾');
-          },
-        );
-    // 已累积部分落库（DB 存纯文本部分内容，不写「已停止」标记）。
+    // （cancel 等下一块/EOF）→ 包 `.timeout` 上界，onTimeout 兜底不抛错、返回
+    // 后继续回合收尾。
+    // F-55 事实校准：3s 窗口内连接以**错误**完成（cancel-unwind 断流——停滞
+    // await 上 EOF 落错，经 wire `await for` 机制路由进生成器收尾，cancel()
+    // 以错误完成）是真实路径，既有「挂起不抛错」前提被证伪；且 Dart
+    // `Future.timeout` 无 `onError` 参数，onError 语义必须以 try/catch 实现。
+    // 落库 + close 收尾进 finally：「停止收尾不可被任何前置步骤异常跳过」为
+    // 结构不变量（F-55 修复前，cancel 错误穿透会跳过二者 + 产生未处理异步
+    // 异常 + 卡住调用方 stop 收尾）。
     try {
-      await _persistAssistant(state);
+      await state.providerSub?.cancel().timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              debugPrint('停止 cancel 停滞，继续回合收尾');
+            },
+          );
     } catch (e) {
-      // 停止路径兜底保存失败不重抛（尽力而为），仅记录日志不静默吞错。
-      debugPrint('停止路径部分内容落库失败: $e');
-    }
-    if (!controller.isClosed) {
-      await controller.close();
+      // F-55：cancel 以错误完成（cancel-unwind 断流）→ 捕获继续回合收尾，不
+      // 跳过部分落库与事件流关闭。
+      debugPrint('停止 cancel 断流，继续回合收尾: $e');
+    } finally {
+      // 已累积部分落库（DB 存纯文本部分内容，不写「已停止」标记）。
+      try {
+        await _persistAssistant(state);
+      } catch (e) {
+        // 停止路径兜底保存失败不重抛（尽力而为），仅记录日志不静默吞错。
+        debugPrint('停止路径部分内容落库失败: $e');
+      }
+      if (!controller.isClosed) {
+        await controller.close();
+      }
     }
   }
 
