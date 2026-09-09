@@ -15,6 +15,7 @@ library;
 import 'dart:convert';
 
 import '../data/repositories/settings_repository.dart';
+import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
 
@@ -97,50 +98,69 @@ class DocParseResult {
 
 /// 文档 LLM 解析服务：按默认 Provider/模型把文档文本发往 LLM 提取角色字段。
 ///
-/// 装配（B2）：经 [SettingsRepository] 读默认 provider/model 与 apiKey(baseUrl)
-/// 链，经 [LLMProviderFactory] 创建 Provider；消息 `[system, user]` →
-/// `generate(maxTokens: 4096, model)`（**不传 temperature**，R8 定案）。
-/// 错误面（B9）全部折叠为 [DocParseError] 的桌面一致文案。
+/// 装配（B2）：经 [CredentialsResolver]（AR-3，缺省由 [SettingsRepository]
+/// 装配 reader）解析凭据组合序，经 [LLMProviderFactory] 创建 Provider；消息
+/// `[system, user]` → `generate(maxTokens: 4096, model)`（**不传
+/// temperature**，R8 定案）。错误面（B9）全部折叠为 [DocParseError] 的桌面
+/// 一致文案。
 class DocumentParseService {
-  /// [settings] 提供默认 Provider/模型与凭证解析链；[providerFactory] 装配 LLM。
+  /// [settings] 提供默认 Provider/模型与凭证解析链；[providerFactory] 装配 LLM；
+  /// [credentialsResolver] 解析凭据组合序（AR-3：缺省由 [settings] 装配
+  /// reader，测试可注入）。
   DocumentParseService({
     required SettingsRepository settings,
     required LLMProviderFactory providerFactory,
+    CredentialsResolver? credentialsResolver,
   })  : _settings = settings,
-        _providerFactory = providerFactory;
+        _providerFactory = providerFactory {
+    _credentialsResolver = credentialsResolver ?? _wireCredentialsResolver();
+  }
 
   final SettingsRepository _settings;
   final LLMProviderFactory _providerFactory;
 
+  /// 凭据解析链（AR-3）：组合序单一归属 [CredentialsResolver]。
+  late final CredentialsResolver _credentialsResolver;
+
+  /// 从设置仓储装配缺省解析器 reader（槽链原语 apiKey/baseUrl 即
+  /// `settings_repository._slotValue`）。
+  CredentialsResolver _wireCredentialsResolver() => CredentialsResolver(
+        defaultProvider: () => _settings.defaultProvider,
+        defaultModel: () => _settings.defaultModel,
+        apiKey: _settings.apiKey,
+        baseUrl: _settings.baseUrl,
+      );
+
   /// 解析 [text] 中的角色字段。
   ///
-  /// 编排（对齐桌面 `parse_document`）：默认 provider/model → apiKey(provider)
-  /// 链（空 → DocParseError「未配置 API Key，请先在设置中填写」）→ baseUrl →
-  /// 工厂装配（未知 provider → DocParseError「不支持的 Provider: {provider}」）
-  /// → `[system, user]` 消息 → generate(maxTokens: 4096, model)（失败 →
-  /// DocParseError「LLM 调用失败：{截断200}」）→ 三级 JSON 提取（不可解析 →
-  /// DocParseError「LLM 返回了无法解析的响应，请重试或手动创建」）→ 白名单过滤。
+  /// 编排（对齐桌面 `parse_document`）：[CredentialsResolver] 解析凭据组合序
+  /// （AR-3；空 key → [ApiKeyMissingError] catch 转换 → DocParseError「未配置
+  /// API Key，请先在设置中填写」逐字）→ 工厂装配（未知 provider → DocParseError
+  /// 「不支持的 Provider: {provider}」）→ `[system, user]` 消息 →
+  /// generate(maxTokens: 4096, model)（失败 → DocParseError
+  /// 「LLM 调用失败：{截断200}」）→ 三级 JSON 提取（不可解析 → DocParseError
+  /// 「LLM 返回了无法解析的响应，请重试或手动创建」）→ 白名单过滤。
   ///
   /// 抛出：[DocParseError]（唯一错误面）。
   Future<DocParseResult> parse(String text) async {
-    // 1. 默认 Provider / 模型。
-    final provider = await _settings.defaultProvider;
-    final model = await _settings.defaultModel;
-
-    // 2. apiKey(provider) 链；空 → 未配置。
-    final apiKey = await _settings.apiKey(provider);
-    if (apiKey.isEmpty) {
+    // 1. 凭据解析（AR-3：默认 provider/model + apiKey 链 + base_url 归一
+    //    组合序单一归属解析器；空 key → ApiKeyMissingError 转 DocParseError）。
+    final ResolvedCredentials resolved;
+    try {
+      resolved = await _credentialsResolver.resolve();
+    } on ApiKeyMissingError {
       throw DocParseError('未配置 API Key，请先在设置中填写');
     }
-    final baseUrl = await _settings.baseUrl(provider);
+    final provider = resolved.provider;
+    final model = resolved.model;
 
-    // 3. 工厂装配（未知 provider → ProviderNotSupportedError 转 DocParseError）。
+    // 2. 工厂装配（未知 provider → ProviderNotSupportedError 转 DocParseError）。
     final LLMProvider llm;
     try {
       llm = _providerFactory.create(
         provider: provider,
-        apiKey: apiKey,
-        baseUrl: baseUrl.isEmpty ? null : baseUrl,
+        apiKey: resolved.apiKey,
+        baseUrl: resolved.baseUrl,
       );
     } on ProviderNotSupportedError catch (e) {
       throw DocParseError(e.message);

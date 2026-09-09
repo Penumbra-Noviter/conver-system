@@ -9,6 +9,7 @@
 | **完整桥接（不阉割）** | 模拟器 MVP 全量做：本地托管 + Key 自动注入 + 存档管理 + AI 驱动游戏全通，不分期 | 里程碑承诺（§4.5） |
 | **本地 HTTP 服务器托管** | `dart:io` HttpServer 监听 `127.0.0.1:<固定端口>` serve 文档目录；游戏走正常 http origin → localStorage 语义与桌面一致（另：明文流量限定回环） | `services/simulator_bridge.dart`（§4.5 Q1） |
 | **Key 注入契约** | 保留桌面注入全部语义（游戏零改动）：endpoint/model 由主应用注入；Key 仅存 SecureStorage、白名单三元组注入，`claude key 恒不进游戏` | `simulator_bridge.dart`（§4.5 Q2/Q5） |
+| **凭据解析链 (credential resolution chain)** | 主应用 LLM 凭据组合序的单一收口（AR-3）：provider 缺省/覆盖优先级 → apiKey 槽链（同协议→跨协议兜底）→ 空抛 `ApiKeyMissingError` → base_url 空归一 → model 缺省/覆盖回退；镜像桌面 `resolver.py::resolve_llm` 单点形态。与 Key 注入契约变体（`injection.dart` credentials 组装：openai-only、no-throw、TD-66 门控）为**两条独立单源**，一般链不吸收注入语义 | `services/llm/credentials_resolver.dart`（组合）；`settings_repository.dart`（槽链原语）；`simulator/injection.dart`（注入变体） |
 | **注入幂等守卫** | 桌面熔断机制简化为注入期的幂等守卫（注入单向 Dart→JS），守注入不重复、不越界 | §4.5 Q2 |
 | **单 origin + 前缀隔离** | 存档 localStorage 键带统一前缀白名单（复用桌面 saveKeys 语义），同一 origin 下游戏互不越权 | 存档桥（§4.5 Q3） |
 | **恶意导入策略** | 命中恶意模式 → 拒绝 + 显示命中关键词清单 + 强制二次确认（知情才放行；化解文档类 HTML 关键词误杀） | 导入链（§4.5 Q14） |

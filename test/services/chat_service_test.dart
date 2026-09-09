@@ -1084,6 +1084,49 @@ void main() {
         (Role.assistant, '回复'),
       ]);
     });
+
+    test('AR-3 B1: conv provider/model 覆盖 → 工厂收到覆盖值（resolver 覆盖序）',
+        () async {
+      // 既有锚只覆盖「空字段回退默认」；本用例补覆盖序正断言：conv 显式
+      // provider/model 非空优先传入工厂（deepseek 同协议 → openai 槽 key）。
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({
+        'claude_api_key': 'sk-claude',
+        'openai_api_key': 'sk-openai',
+      });
+      await convRepo.updateConversation(
+        conv.id,
+        const ConversationsCompanion(
+          modelProvider: Value('deepseek'),
+          modelName: Value('deepseek-v3'),
+        ),
+      );
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      final factory = _FakeFactory(provider);
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: factory,
+      );
+
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(factory.lastProvider, 'deepseek', reason: 'conv 覆盖优先于缺省');
+      expect(factory.lastApiKey, 'sk-openai',
+          reason: 'deepseek 同协议 → openai 槽位 key');
+      expect(provider.lastModel, 'deepseek-v3', reason: 'conv model 覆盖优先');
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+        (Role.assistant, '回复'),
+      ]);
+    });
   });
 
   // ── A3 停止 ──
