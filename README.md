@@ -4,6 +4,7 @@ Conver System 的移动端应用（Flutter，Android + iOS 独立运行，无桌
 
 ## 状态
 
+- **M7 已交付**（2026-09-09，Android 范围收窄、iOS 延后）：自适应启动图标（PIL 管线程序化生成「汇」字形占位稿 + flutter_launcher_icons adaptive/monochrome/legacy）+ release 签名（仓库外 keystore + gitignored key.properties，AAB/APK 同证书）+ 隐私清单（docs/privacy-android.md 三节式 + 零第三方 SDK 实证审计）+ 发布验证门禁（docs/release-android.md 版本策略 1.0.0+1 + 双产物命令链 + AVD 冒烟 PASS）；1518 测试全绿/analyze 0/期末四轴 0 阻断；发布构建 `flutter build appbundle|apk --release`
 - **M6 已交付**（2026-09-08）：去 AI 味打磨——动效克制子集 8 项（ConverDurations 对齐桌面 + 零动画库）/ 空态·错误态 / 弱网断线重连（重试 2 次退避 1s/2s + 断流「回复中断」标记 + 横幅重试 + idle 60s）/ 实用层无障碍（F-73 浅色 accent #784E14 ≥4.5:1 + a11y 语义 15 断言）；1460 测试全绿/analyze 0/覆盖率 96.78%，期末四轴阻断 0，M6 门视觉评审 8/8 PASS
 - **M5 已交付**（2026-09-07）：模拟器全量——22 款游戏随包种子 + 本地 HTTP 托管（127.0.0.1:8642 固定端口 + 路径穿越守卫 + Android/iOS 明文回环）+ 列表页四态/懒启动 + Key 自动注入（自包含 JS 脚本，桌面 key-injector 契约逐字 + claude key 恒不进游戏）+ 官方端点提示条 + 存档管理（底部 sheet 一次管全部 + 导出分享/导入/删除对齐桌面格式）+ 导入链（净化/去重/恶意拒绝二次确认）+ AI 生成（六项校验重试≤3）+「我」页收口（手册/关于/桌面版说明）；1315 测试全绿/analyze 0；M5 门冒烟 PASS（CORS 直连复验 + 杀进程存档持久化 + 五游戏 25 轮零崩溃 + 注入幂等 + 超时守卫）
 - **M4 已交付**（2026-09-06）：导出/文档解析——聊天顶栏 ⋯ 菜单导出 JSON/MD（文件名角色名净化 + share_plus 分享面板 + 平台超时兜底）/ 向导「AI 智能解析」LLM 文档解析（三级提取+白名单+错误折叠）；802 测试全绿/analyze 0/冒烟 PASS（ShareSheet 弹出 ×2 + 临时文件生成 + 内容语义 + 超时兜底实测）
@@ -21,6 +22,8 @@ Conver System 的移动端应用（Flutter，Android + iOS 独立运行，无桌
 - [项目介绍](PROJECT_REFERENCE.md) — 背景、关键决策、常碰坑点
 - [设计文档](docs/mobile-design.md) — 架构、7 项功能、模拟器专题、里程碑 M0–M7（单一事实来源）
 - [任务清单](TICKETS.md) — 唯一待办事实来源（M0–M7 已录入）
+- [发布指南](docs/release-android.md) — 版本策略、AAB/APK 发布命令链、签名核对、keystore 生命周期
+- [Android 隐私清单](docs/privacy-android.md) — 数据安全表单备查、零第三方 SDK 实证审计
 - [开发日志](DEV_LOG.md) — 已做与避坑
 - [共识文档](CONSENSUS.md) — 决策登记与 ADR 索引
 - [文档规范](docs/documentation-standards.md) — 单一事实来源分配与跨端引用约定
