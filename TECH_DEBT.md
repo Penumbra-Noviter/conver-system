@@ -43,13 +43,20 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-68 | key.properties 缺失时 release 签名报晦涩「未签名」错误（无 exists() 守卫清晰提示）——android/app/build.gradle.kts signingConfigs | 波 1 Falsify (F3) | Worth exploring | 📝 待立项 | 发布工具链 |
-| F-69 | 图标 #784E14 双处硬编码（scripts/generate_app_icon.py BG 常量 + flutter_launcher_icons.yaml 两键）无双向守卫，改一处不同步则 adaptive 背景与 legacy 分叉 | 波 1 Falsify (F4) | Worth exploring | 📝 待立项 | 发布工具链 |
-| F-70 | privacy_audit.audit_lockfile 双输入（str/Mapping）+ `_packages_from_mapping` 第二套解析器仅测试消费，无生产消费方（Speculative Generality） | 波 1 过度工程 (O1) | Speculative | 📝 待立项 | 发布工具链 |
-| F-71 | privacy_audit patterns= 参数仅测试消费（CLI 用默认名单）——轻量 YAGNI | 波 1 过度工程 (O2) | Speculative | 📝 待立项 | 发布工具链 |
-| F-72 | FileNameSanitizerConfig.FileNameEdgeTrim.none 无生产消费方（仅默认+1 测试）——惰性安全基线，保留现状可做候选 | 波 1 过度工程 (O3) | Speculative | 📝 待立项 | 文件名净化 |
 
 ## 技术债处置记录
+
+### 2026-09-10 — 技术债折回批次（F-68~72 全部处置，候选区清零）
+
+> 来源：用户「消费技术债 F-68~72」指令。F-68/F-69/F-70 消费（工单 A `769368f` merge `e0b1bd7` + 工单 B `2de3b89` merge `a1ce47a`），F-71/F-72 复核关闭。全量 1579 测绿 / analyze 0 / pytest 66（覆盖 99.24%）。**候选区清零**（0 项开放）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-68 | ✅ 已修 | build.gradle.kts release 打包任务双 exists() 守卫——key.properties/keystore 缺失时清晰报错含路径 + docs §5 指引；debug 构建不受影响；正常路径指纹不变（7B:7C:00:A6...） |
+| F-69 | ✅ 已修 | generate_app_icon.py 新增 assert_icon_colors_consistent 双向守卫（yaml 权威源，双键分叉/缺段/非法色均拒生成）+ 突变灵敏度实证 |
+| F-70 | ✅ 已修 | privacy_audit 删 _packages_from_mapping Speculative 分支 + audit_lockfile 收敛单 str 输入 + dict 拒绝 TypeError 契约锁；25 测 / 覆盖 99.24% |
+| F-71 | ❌ 复核关闭 | git grep：patterns= 参数被 test_privacy_audit.py:215-216 消费（自定义/空名单测试 seam，负样本注入正当性）——公开 API 合法扩展点非死代码，YAGNI 无实害 |
+| F-72 | ❌ 复核关闭 | git grep：FileNameEdgeTrim.none 是 FileNameSanitizerConfig.edgeTrim 默认值（file_name.dart:31）+ _applyEdgeTrim case（:71）——删除破坏默认配置完整性（none=不修剪是导出锚行为基座），属设计意图保留 |
 
 ### 2026-09-09 — 技术债折回批次（全部折回：F-56/F-65/F-67 消费，候选区清零）
 

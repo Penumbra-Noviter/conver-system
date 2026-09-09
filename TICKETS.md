@@ -30,6 +30,16 @@
 
 ## 已完成归档
 
+### 技术债折回批次 F-68~72 — 全部处置（2026-09-10 收口）
+
+> 来源：用户「消费技术债 F-68~72」指令。F-68/F-69/F-70 消费（merge `e0b1bd7`/`a1ce47a`），F-71/F-72 复核关闭。交付：release 签名缺失清晰报错守卫 + 图标色值双向守卫 + privacy_audit 删 Speculative Mapping 分支。门禁：全量 **1579 测**绿 / analyze 0 / pytest 66（覆盖 99.24%）/ 候选区清零。处置详情见 TECH_DEBT「2026-09-10 处置记录」节。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F-68/F-69 | release 签名守卫 + 图标色值双向守卫 | 2026-09-10 | 769368f（merge e0b1bd7） |
+| F-70 | privacy_audit 删 Speculative Mapping 分支 | 2026-09-10 | 2de3b89（merge a1ce47a） |
+| F-71/F-72 | 复核关闭（patterns 测试 seam / edgeTrim 默认值） | 2026-09-10 | — |
+
 ### 架构审查批次 C1~C4 — 全库架构深化（2026-09-10 收口）
 
 > 来源：improve-codebase-architecture 报告（D:\tmp\architecture-review-20260910.html，用户预授权全自动优化）；Grilling 拍板 C1~C4 全做、C5 观察不动作；4 工单单波并行（merge `078916b`/`ad6c484`/`7150600`/`7cae529`）。交付：C1 translateError 下沉 LLMProvider 基类默认实现（+钩子 translateProviderError，双 provider 各删 40+ 行重复）；C2 装配腿收敛（SettingsRepository.wireCredentialsResolver() 单一落点 + 两视图 context.read 消费，构造签名冻结 20+ 测试点零波及）；C3 双文件名净化器合并参数化核心（双桌面锚 22 边界逐字符保契）；C4 删死代码 PlaceholderGroup + 设置行收敛（settings_view 净减 56 行）。门禁：全量 **1579 测**绿（+61）/ analyze 0 / 波末增量审核通过（文件范围 1 合规 3 警告结构必需）/ 期末四轴 **0 阻断**。技术债落盘 F-72（FileNameEdgeTrim.none 无生产消费方）。

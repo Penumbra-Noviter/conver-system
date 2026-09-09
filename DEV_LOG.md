@@ -6,6 +6,15 @@
 
 ---
 
+## 技术债折回批次 F-68~72 — 全部处置（2026-09-10 — 用户「消费技术债 F-68~72」指令）
+
+- **范围**：候选区 5 条全处置（做 3 关 2）——F-68/F-69/F-70 消费，F-71/F-72 复核关闭。全量 **1579 测**绿 / analyze 0 / pytest 66（覆盖 99.24%）。**候选区清零**（0 项开放）。
+- **F-68 签名守卫**（`769368f` merge `e0b1bd7`）：build.gradle.kts release 打包任务（packageRelease，APK+AAB 均覆盖）双 exists() 守卫——key.properties/keystore 缺失时清晰报错含绝对路径 + docs/release-android.md §5 指引；debug 构建不受影响（缺失时仍 exit 0 实证）；keystore 存在时正常路径行为绝对一致（apksigner 指纹仍 7B:7C:00:A6...）。TDD 先复现晦涩报错（`SigningConfig "release" is missing required property "storeFile"`）再改。
+- **F-69 图标色值双向守卫**（同 commit）：generate_app_icon.py 新增 `LAUNCHER_ICONS_YAML`（权威源路径）+ `assert_icon_colors_consistent(bg_hex, yaml_path)`——yaml 双键任一 ≠ 脚本 BG_HEX、双键彼此分叉、缺段、非法色均抛 ValueError 拒生成；generate_icons 生成前必跑；零新增依赖（pyyaml 环境既有）；确定性复验两次运行字节 IDENTICAL；突变（删守卫调用 → 单测必失败）灵敏度实证。守卫测试红→绿（8 failed → 41 passed），覆盖率 97.44%。
+- **F-70 删 Mapping 分支**（`2de3b89` merge `a1ce47a`）：privacy_audit 删 `_packages_from_mapping`（无生产消费方 Speculative 第二解析器），audit_lockfile 收敛单 str 输入，新增 dict 输入拒绝 TypeError 契约锁（负样本从静默接受改为明确报错）；25 测 / 覆盖 99.24%；CLI 输出 133 包 0 命中与 docs 一致；Dart 侧零引用。
+- **F-71/F-72 复核关闭**：F-71 patterns= 参数被 test_privacy_audit.py:215-216 消费（测试 seam 负样本注入正当性，公开 API 合法扩展点）；F-72 FileNameEdgeTrim.none 是 FileNameSanitizerConfig.edgeTrim 默认值（file_name.dart:31）+ _applyEdgeTrim case（:71），删除破坏默认配置完整性（none=不修剪是导出锚行为基座）。
+- **过程遥测**：子智能体 2（Implement×2 并行）；合并冲突 0；空返回 0；flaky 0；F-68 缺失路径构建从 2m47s 提速到 22s（fail fast 副产品）。**残留目录处置**：M7 补报的 `.worktrees/m4-export`（123M）+ `m4-parse`（122M）孤儿 worktree（gitdir 指向 D 盘旧路径、git 完全脱管）经用户确认后删除，`.worktrees/` 整体清空。
+
 ## 架构审查批次 C1~C4 — 全库架构深化（2026-09-10 — improve-codebase-architecture 报告直落全自动档）
 
 - **范围**：审查报告 5 候选（HTML `D:\tmp\architecture-review-20260910.html`）；Grilling 拍板 C1~C4 全做、C5 观察不动作；4 工单单波并行（文件集互不相交、零冲突合并）。
