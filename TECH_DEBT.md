@@ -45,12 +45,20 @@
 |------|--------|------|------|------|----------|
 | F-56 | 假活连接终态化缺口：终态帧已到 + 连接不关闭 → await-for 永不 EOF → round 永不终态化（09 验收 4 为设计选择，但离「假活连接终态化保障」目标差一格）。**随修项 ② 注释失真 / ③ N4 断言 + flake 容差已由 AR-1 收编（2026-09-09）**，本条目缩减为仅剩 ① 假活终态化，正交于相位编码、重开 wire 终态语义，待专项立项。 | W2 增量审核 N1/N2/N4 + W3 增量审核 F8（期末四轴复证 F-N5）+ AR-1 收编 ②③ | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-57 | 停滞连接上 `sub.cancel()` 有界挂起：chat_service `_stopStreamReply` 已有 `.timeout(3s)` 兜底注释（F-17 面），09 idle force-close 已收窄暴露窗口——机制实证（cancel 挂到 EOF 为止），3s 兜底生效、基线同现。 | W2 增量审核（09 相邻发现 1） | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-59 | 角色卡语义失真：`characters_view.dart:340-349` `Semantics(button: true)` 无条件标记，而常态（非多选态）onTap 为 null → TalkBack 激活「button」无响应；同 diff 游戏卡（`simulators_view.dart:418`）做了 `button: onOpen != null` 守卫而角色卡未对齐；测试 `characters_view_test.dart:454` 把「可确认可点」锁进断言（验收 4 原文 button:true，票面 tension）。修法方向 = 对齐游戏卡守卫。 | W3 增量审核 F1（期末四轴复证 F-N7） | Worth exploring | 📝 待立项 | 无障碍 |
 | F-63 | 光标 reduce-motion 面测试与实现小缺口（一张小票收口方向）：① `_appliedOnce` 运行时翻转路径（同挂载内 MediaQuery 翻转）零测试覆盖；② reduce→正常翻转同帧 `value=0.0` 光标消失一帧（瞬态缺陷）；③ `_appliedOnce` 注释理由与 SDK 机制不符（repeat 自 stop，泄漏不存在；真实作用 = 防无关 didChangeDependencies 重跑闪断）——注释写歪；④ `large_text_probe_test`「流式占位」面从不触发 streaming，1.3x 唯一与光标组合未渲染，doc 覆盖声明失实；⑤ `blinking_cursor_reduce_motion_test.dart:94` `print('DBG')` 提交残留。 | W4 增量审核 F-1/F-2/F-5/F-6（期末四轴复证 S-N1） | Worth exploring | 📝 待立项 | 无障碍 |
 | F-65 | 断流/重试边界行为集（08 面，AR-5 已修 ②①、缩减为续期两项）：**② 重试成功无条件 clear 吞并发提示 → 已修（AR-5 条件清理：removed && target==replacedId && notice==interruptedText 才清）**；**① 多截断部分重试后旧截断失去入口 → 已修（AR-5 目标推进 target=max(marks) + notice 保持）**；续期两项——**③ reload 完成前点重试命中 `_reloadPending` 守卫静默 no-op（一帧窗口，低值面）**；**④ NoticeBanner 出口过渡窗口内同文案 notice 到达误清新提示——关闭成本陈述：需身份穿越组件边界（NoticeRunner seq + banner noticeId）＝增协议面，与收敛前提冲突；先错者胜使窗口内 notice 几乎不可变，理论级低值（AR-5/AR-6 裁决一致）**。 | W6 审核 F-3/F-5/F-8 + 期末四轴 F-N1/N2/N3/N6 + AR-5 修 ②① + AR-6 ④ 续期陈述 | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-66 | 「回复中断」小标在气泡 MergeSemantics 外成独立语义节点，M6-10 a11y 断言套件零覆盖（屏读体验未锁定）。 | W6 审核 F-6（期末四轴复证 F-N8） | Speculative | 📝 待立项 | 无障碍 |
+| F-67 | characters_view 覆盖缺口（F-59 消费时暴露）：12.4% 未覆盖行全为既有非 seam 路径——刷新失败 debugPrint / 创建向导 / 批量删除确认对话框 / 勾选框 onChanged；本轮仅修 Semantics 守卫（:347 全覆），补齐需新增向导/批删/错误态测试（超出 F-59 seam）。 | F-59 消费覆盖记录 | Speculative | 📝 待立项 | 无障碍 |
 
 ## 技术债处置记录
+
+### 2026-09-09 — 技术债折回 F-59 消费（角色卡语义按钮守卫对齐）
+
+> 来源：技术债折回（用户指令，best-judgment 取推荐 F-59——W3 F1 + 期末 F-N7 复证方向锁定）。交付：`characters_view.dart:347` `button: true` → `button: selectionMode`（对齐游戏卡 `button: onOpen != null` 守卫——tap 有效才宣告；hint「长按可多选」三态保持）+ 双态/退出往返断言 + semantics_test 镜像断言同步（方案 A 影响面扩展，主会话批准——M6-03 验收 4 同源镜像，doc 自指 characters_view_test）。commit `672b9d8`（merge `f6fd709`）。门禁：全量 **1496 测**绿 / analyze 0 / 变异灵敏度（mutant revert → 常态+往返双红）/ 审核 0 阻断。**行为变更**：TalkBack 常态角色卡不再宣告「按钮」（对齐实际可点性——修复目标）。覆盖率 87.6%（守卫行全覆，缺口 12.4% 既有面落债 F-67）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-59 | ✅ 已修 | 角色卡语义失真（W3 F1 / 期末 F-N7）：Semantics button 守卫对齐游戏卡——常态（非多选 onTap null）不宣告 button、多选态宣告 + hint 长按可多选三态保持；semantics_test 镜像断言同步翻转 |
 
 ### 2026-09-09 — 架构深化 AR-5/AR-6 消费（F-64 关闭 + F-65 缩减 + F-53/54 逆向）
 
