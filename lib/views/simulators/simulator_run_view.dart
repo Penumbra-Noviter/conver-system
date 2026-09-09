@@ -12,27 +12,24 @@
 /// - 共识 Q8 / spec §4.2-6：官方端点提示条逐字文案 [officialEndpointBannerText]，
 ///   提示时注入照常静默（claude 不注入）。
 ///
-/// 平台薄层隔离（U1）：本组件不直接调用 webview_flutter——WebView 控制器经
-/// 抽象 seam [SimulatorWebViewController] + 工厂注入点
-/// [SimulatorWebViewControllerFactory] 隔离；生产装配默认工厂
-/// [createFlutterWebViewController]（平台薄层收口本文件），widget 测试注入
-/// fake（离屏占位 + 调用记录），真通道归 F-M5-09 AVD 冒烟。
+/// 平台薄层隔离（U1）：本组件不直接调用 webview_flutter——WebView 能力经统一
+/// seam [WebViewCapability] + 工厂注入点 [WebViewCapabilityFactory] 隔离
+/// （平台薄层收口 `services/simulator/webview_capability.dart`）；生产装配默认
+/// 工厂 [createWebViewCapability]，widget 测试注入共享假件
+/// `test/support/fake_web_view_capability.dart`，真通道归 F-M5-09 AVD 冒烟。
 ///
 /// 层级：呈现层。凭证组装 / 官方端点检测 / 注入脚本全部经构造注入的闭包与
 /// 服务模块消费（layer_boundary_test 与 view_theme_tokens_test 静态不变量：
 /// 视图源不得出现数据层 / 平台存储实现标识符，色彩一律经 ConverPalette /
 /// Theme.colorScheme 消费，不直接引用色值常量表）。
 ///
-/// 协议表面：`SimulatorRunView` / `SimulatorWebViewController` /
-/// `SimulatorWebViewControllerFactory` / `createFlutterWebViewController` /
-/// `officialEndpointBannerText` / `textResync` / `textInjected` /
-/// `msgClaudeOnly` / `msgNoCredentials` / `errorInvalidFile`。
+/// 协议表面：`SimulatorRunView` / `officialEndpointBannerText` / `textResync` /
+/// `textInjected` / `msgClaudeOnly` / `msgNoCredentials` / `errorInvalidFile`。
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../services/simulator/injection.dart'
     show
@@ -42,6 +39,8 @@ import '../../services/simulator/injection.dart'
 import '../../services/simulator/injection_script.dart' show InjectionScript;
 import '../../services/simulator/simulator_contracts.dart'
     show SimulatorContracts;
+import '../../services/simulator/webview_capability.dart'
+    show WebViewCapability, WebViewCapabilityFactory, createWebViewCapability;
 import '../../theme/conver_palette.dart' show ConverPalette;
 import '../../view_models/simulators_controller.dart' show SimulatorGame;
 import '../../widgets/status_view.dart';
@@ -70,78 +69,6 @@ const String errorInvalidFile = '参数非法：缺少有效的游戏文件';
 /// 「已填入」反馈时长（毫秒；桌面 FEEDBACK_MS=2000 逐字）。
 const int feedbackMs = 2000;
 
-/// WebView 控制器抽象（U1 seam）：运行页只依赖本窄接口 + 工厂注入点。
-///
-/// 生产 = [createFlutterWebViewController]（webview_flutter 薄适配，真通道归
-/// AVD 冒烟）；widget 测试 = fake（记录 runJavaScript 调用 + 手动触发
-/// [setOnPageFinished] 回调 + [buildView] 占位）。
-abstract interface class SimulatorWebViewController {
-  /// 页内执行 JS（注入脚本 / 读回断言共用入口）。
-  Future<void> runJavaScript(String script);
-
-  /// 注册页面加载完成回调（自动注入触发点；同一控制器只注册一次）。
-  ///
-  /// **时序契约（F-43，对齐 save_sheet W5 B1）**：必须由消费方在 [navigate]
-  /// **之前**调用——webview 的 `onPageFinished` 只派发给挂载时已存在的导航
-  /// 委托、不回放挂载前事件；先导航后挂委托会丢失事件（极小/秒开页面在
-  /// 委托挂载前完成加载 → 15s 超时错误态）。装配方遵循「挂委托 → navigate」
-  /// 两步序（见 [_SimulatorRunViewState._startOpening]）。
-  void setOnPageFinished(VoidCallback onPageFinished);
-
-  /// 发起导航到 [url]（生产 = `loadRequest`；返回即完成请求发出，页面就绪以
-  /// [setOnPageFinished] 回调为准）。调用前委托必须先已挂载。
-  Future<void> navigate(Uri url);
-
-  /// 渲染平台视图主体（生产 WebViewWidget / 测试占位离屏组件）。
-  Widget buildView();
-}
-
-/// WebView 控制器工厂注入点（U1 seam）——创建**未导航**的控制器（委托由消费
-/// 方挂载后经 [SimulatorWebViewController.navigate] 发起导航，保证
-/// onPageFinished 不丢失，F-43 对齐 save_sheet W5 B1）。
-typedef SimulatorWebViewControllerFactory =
-    Future<SimulatorWebViewController> Function();
-
-// 平台薄层收口本文件：真实 WebView 控制器不可在测试宿主运行（平台通道），
-// 真通道行为归 F-M5-09 AVD 冒烟（U1 实证）；与 save_sheet（W5 B1 已修形态）
-// 平台薄层同先例标 ignore。
-// coverage:ignore-start
-
-/// 生产 WebView 控制器工厂：仅创建 webview_flutter 控制器（不发起导航——
-/// 导航由消费方挂载 [setOnPageFinished] 之后经
-/// [SimulatorWebViewController.navigate] 发起，杜绝 onPageFinished 错过，
-/// F-43 对齐 save_sheet W5 B1）。
-Future<SimulatorWebViewController> createFlutterWebViewController() async {
-  final inner = WebViewController()
-    ..setJavaScriptMode(JavaScriptMode.unrestricted)
-    ..setBackgroundColor(const Color(0xFF000000));
-  return _FlutterWebViewController(inner);
-}
-
-/// webview_flutter 薄适配：仅参数转发与回调注册，零业务逻辑。
-class _FlutterWebViewController implements SimulatorWebViewController {
-  _FlutterWebViewController(this._inner);
-
-  final WebViewController _inner;
-
-  @override
-  Future<void> runJavaScript(String script) => _inner.runJavaScript(script);
-
-  @override
-  void setOnPageFinished(VoidCallback onPageFinished) {
-    _inner.setNavigationDelegate(
-      NavigationDelegate(onPageFinished: (_) => onPageFinished()),
-    );
-  }
-
-  @override
-  Future<void> navigate(Uri url) => _inner.loadRequest(url);
-
-  @override
-  Widget buildView() => WebViewWidget(controller: _inner);
-}
-// coverage:ignore-end
-
 /// 运行页状态机相位：opening（加载中）→ loaded（可注入）| error（重试）。
 enum _RunPhase { opening, loaded, error }
 
@@ -150,7 +77,7 @@ enum _RunPhase { opening, loaded, error }
 /// 提示条；15s 加载超时 → 错误态 + 重试（复用当前游戏）。
 class SimulatorRunView extends StatefulWidget {
   /// 构造运行页。依赖全部经构造注入（测试 seam）：[webViewFactory]（WebView
-  /// 控制器工厂，缺省生产平台薄层）、[loadCredentials]（凭证组装闭包）、
+  /// 能力工厂，缺省生产平台薄层）、[loadCredentials]（凭证组装闭包）、
   /// [checkOfficialEndpoint]（官方端点检测闭包）；[port] 为本地托管端口
   /// （生产固定 [SimulatorContracts.defaultPort]）；[loadTimeout] 加载超时
   /// 守卫（生产 15s）。
@@ -159,7 +86,7 @@ class SimulatorRunView extends StatefulWidget {
     required this.game,
     required this.loadCredentials,
     required this.checkOfficialEndpoint,
-    this.webViewFactory = createFlutterWebViewController,
+    this.webViewFactory = createWebViewCapability,
     this.port = SimulatorContracts.defaultPort,
     this.loadTimeout =
         const Duration(milliseconds: SimulatorContracts.timeoutMs),
@@ -174,8 +101,9 @@ class SimulatorRunView extends StatefulWidget {
   /// 官方端点检测闭包（provider=claude 或 base_url 命中官方域 → 提示条）。
   final Future<bool> Function() checkOfficialEndpoint;
 
-  /// WebView 控制器工厂（U1 seam；测试注入 fake，生产默认平台薄层）。
-  final SimulatorWebViewControllerFactory webViewFactory;
+  /// WebView 能力工厂（统一 U1 seam；构造期注入页面就绪委托；测试注入共享
+  /// 假件，生产默认平台薄层 [createWebViewCapability]）。
+  final WebViewCapabilityFactory webViewFactory;
 
   /// 本地托管端口（URL 基址 127.0.0.1:port 来源；生产 8642）。
   final int port;
@@ -190,8 +118,8 @@ class SimulatorRunView extends StatefulWidget {
 class _SimulatorRunViewState extends State<SimulatorRunView> {
   _RunPhase _phase = _RunPhase.opening;
 
-  /// 当前 WebView 控制器（创建完成前为 null；重试替换为新实例）。
-  SimulatorWebViewController? _controller;
+  /// 当前 WebView 能力（创建完成前为 null；重试替换为新实例）。
+  WebViewCapability? _controller;
 
   /// 加载超时守卫计时器（opening 期间持有；loaded/error 清空）。
   Timer? _timeoutTimer;
@@ -254,7 +182,7 @@ class _SimulatorRunViewState extends State<SimulatorRunView> {
     setState(() => _bannerVisible = visible);
   }
 
-  /// 进入 opening：复位同步控件态 → 创建控制器 → 起 15s 超时守卫。
+  /// 进入 opening：复位同步控件态 → 创建能力（构造期挂委托）→ 起 15s 超时守卫。
   ///
   /// 首次 initState 调用（build 前，无需 setState）；重试时先由调用方
   /// [setState] 复位相位再调用。load 竞态守卫：仅接受当前 `_controller` 身份
@@ -267,15 +195,15 @@ class _SimulatorRunViewState extends State<SimulatorRunView> {
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(widget.loadTimeout, _handleTimeout);
     try {
-      final controller = await widget.webViewFactory();
+      // 构造期委托注入（F-43 对齐 save_sheet W5 B1 的结构化形态）：页面就绪
+      // 委托由工厂构造期挂载、先于任何 navigate——onPageFinished 只派发给挂载
+      // 时已存在的委托（不回放挂载前事件），先导航后挂委托即丢失事件（极小/
+      // 秒开页面在委托挂载前完成加载 → 15s 超时错误态）。装配 = create(挂委托)
+      // → navigate 一步。
+      final controller = await widget.webViewFactory(_handlePageFinished);
       if (!mounted) {
         return;
       }
-      final captured = controller;
-      // F-43（对齐 save_sheet W5 B1）：委托先挂载、后导航——onPageFinished
-      // 只派发给挂载时已存在的委托（不回放挂载前事件），先导航后挂委托即
-      // 丢失事件（极小/秒开页面在委托挂载前完成加载 → 15s 超时错误态）。
-      controller.setOnPageFinished(() => _handlePageFinished(captured));
       setState(() => _controller = controller);
       await controller.navigate(url);
     } catch (error) {
@@ -289,7 +217,7 @@ class _SimulatorRunViewState extends State<SimulatorRunView> {
   }
 
   /// 页面加载完成：opening → loaded（清超时守卫）→ 静默自动注入一次。
-  void _handlePageFinished(SimulatorWebViewController source) {
+  void _handlePageFinished(WebViewCapability source) {
     if (!mounted) {
       return;
     }

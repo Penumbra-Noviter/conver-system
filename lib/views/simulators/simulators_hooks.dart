@@ -37,13 +37,11 @@ import '../../services/simulator/injection.dart'
         isOfficialEndpoint;
 import '../../services/simulator/simulator_contracts.dart'
     show SimulatorContracts;
+import '../../services/simulator/webview_capability.dart'
+    show WebViewCapabilityFactory, createWebViewCapability;
 import '../../view_models/simulators_controller.dart'
     show SimulatorGame;
-import 'simulator_run_view.dart'
-    show
-        SimulatorRunView,
-        SimulatorWebViewControllerFactory,
-        createFlutterWebViewController;
+import 'simulator_run_view.dart' show SimulatorRunView;
 
 /// 四钩子槽位：本票只做渲染 + 钩子派发；具体流程由后续票接线实现。
 class SimulatorsHooks {
@@ -76,10 +74,10 @@ class SimulatorsHooks {
 /// provider 图访问）；运行页依赖在 route builder 内取用：凭证组装 /
 /// 官方端点检测读 provider 图（或经 [loadCredentials] /
 /// [checkOfficialEndpoint] 注入），WebView 平台 seam 经 [webViewFactory]
-/// 注入（测试 fake 即不触平台通道）。
+/// 注入（测试假件即不触平台通道）。
 void Function(SimulatorGame game) buildRunPageLauncher(
   BuildContext callerContext, {
-  SimulatorWebViewControllerFactory? webViewFactory,
+  WebViewCapabilityFactory? webViewFactory,
   Future<InjectedCredentials> Function()? loadCredentials,
   Future<bool> Function()? checkOfficialEndpoint,
   int? port,
@@ -90,7 +88,7 @@ void Function(SimulatorGame game) buildRunPageLauncher(
       MaterialPageRoute<void>(
         builder: (routeContext) => SimulatorRunView(
           game: game,
-          webViewFactory: webViewFactory ?? createFlutterWebViewController,
+          webViewFactory: webViewFactory ?? createWebViewCapability,
           loadCredentials:
               loadCredentials ?? () => _credentialsFromProviders(routeContext),
           checkOfficialEndpoint: checkOfficialEndpoint ??
