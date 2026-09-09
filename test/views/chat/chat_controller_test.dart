@@ -100,7 +100,7 @@ class _ThrowingListCharactersRepository extends CharacterRepository {
 
 /// createMessage 延迟 [delay] 后落库的慢消息仓储——构造「stop 时 user 尚未落库」
 /// 的 F1 竞态窗口（可控制 user 落库时延；getMessages 等读取路径不延迟，reload
-/// / 轮询照常）。
+/// 照常——原 UI 轮询补偿已在 AR-2 删除）。
 class _SlowMessageRepository extends MessageRepository {
   _SlowMessageRepository(
     super.db, {
@@ -734,7 +734,8 @@ void main() {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
       // user 落库经慢仓储延迟 200ms：构造「stop 完成早于 user 落库」的竞态
-      // 窗口（服务层落库为独立异步路径，cancel 完成不保证 user 已落库）。
+      // 窗口——AR-2 停止完成契约保证 cancel resolve 时 user 写已结算，stop 后
+      // reload 必见已发 user（服务层契约取代了原 chat_round 轮询补偿）。
       final slowMessages = _SlowMessageRepository(
         db,
         now: () => fakeNow,
@@ -750,8 +751,9 @@ void main() {
       await c.stop(); // 立即停止：此刻 user 尚未落库（慢仓储 200ms 后完成）
 
       expect(c.isStreaming, isFalse);
-      // 修复前：stop reload 读到空库 + 清在途 → UI 空且不自愈；修复后 stop
-      // 有界等待 user 落库再 reload → UI 显示已发 user（不依赖时序巧合）。
+      // 行为锚（AR-2 契约注释）：stop（cancel）resolve 即保证已发 user 已落库
+      // → reload 读到 user 行、UI 显示已发 user（原「有界等待 user 落库再
+      // reload」由服务层 in-flight 门等待结构性保证，不再依赖时序巧合）。
       expect([for (final m in c.messages) (m.role, m.content)],
           [(Role.user, 'hi')]);
       final settled = await messageRepo.getMessages(conv.id);

@@ -23,6 +23,9 @@
 /// ## 停止（A3）
 /// 调用方取消返回流的订阅 → 生成器 [finally] 兜底把已累积部分落库；无部分
 /// 内容 → 仅保留已发 user。DB 存纯文本部分内容，不写「已停止」标记（UI 侧标）。
+/// **停止完成契约**：取消订阅的完成 Future 保证本轮在途 user 写尝试已结算
+/// （成功落库 / 回合已终态不再写）——`_StreamRunState.userWriteSettled` 门 +
+/// `_runStreamReply` 写后 complete + 终态 finally 兜底。
 ///
 /// ## 重生成（A4，延迟删除）
 /// 目标 = 末条 assistant（缺省，PK 锚定）；截断锚定 target.id；组装走
@@ -222,6 +225,13 @@ class _StreamRunState {
 
   /// provider 流订阅（停止时直接 cancel，不等待待处理元素）。
   StreamSubscription<String>? providerSub;
+
+  /// user 写尝试的结算门（停止完成契约，AR-2）：`_runStreamReply` 在 user
+  /// 消息落库成功后 complete；写失败 / 终态错路径经外层 finally 兜底
+  /// （`!isCompleted` 守卫防双重 complete）。`_stopStreamReply` 置 stopped 后
+  /// 先 await 本门（3s 有界）——`sub.cancel()` resolve 即保证「已发 user 写已
+  /// 结算（成功落库 / 回合已终态不再写）」。
+  final Completer<void> userWriteSettled = Completer<void>();
 }
 
 /// 一次聊天回合的编排服务。
@@ -283,6 +293,10 @@ class ChatService {
   /// research 实证排除）→ 已累积部分落库（DB 存纯文本部分内容，UI 侧标「已停
   /// 止」）；无部分内容 → 仅保留已发 user。
   ///
+  /// **停止完成契约（AR-2）**：取消返回流的订阅（停止）的完成 Future 保证本
+  /// 轮在途 user 写尝试已结算（成功落库 / 回合已终态不再写）——`sub.cancel()`
+  /// resolve 后 reload 必见已发 user（门等待 3s 有界 + 终态兜底，不挂起）。
+  ///
   /// 断流（A5）：provider 流抛出 [LLMConnectionInterruptedError] 伞（连接相位
   /// [ConnectPhaseInterruptedError] / 读取相位 [ReadPhaseInterruptedError] 两
   /// 叶子均命中伞下判型）→ 已累积部分落库 + 非阻塞 [ChatInterrupted]「回复已
@@ -341,6 +355,9 @@ class ChatService {
         role: Role.user,
         content: state.content,
       );
+      // 停止完成契约（AR-2）：user 写已结算 → 放行停止门。此后（组装/解析/
+      // 流式中）任意窗口 `sub.cancel()` 的门等待即时放行，不挂起。
+      state.userWriteSettled.complete();
 
       // 4. 组装消息列表。
       final maxRounds = await _settingsRepository.slidingWindowRounds;
@@ -377,12 +394,18 @@ class ChatService {
     } on DomainError catch (e) {
       // F3：调用方可能在解析失败瞬间取消订阅（controller 已 close），
       // add 到已关闭 controller 抛 StateError → 未处理异步异常；守卫跳过。
+      // 停止完成契约（AR-2 修复）：门先于任何 await 结算——controller 层
+      // `controller.close()` 的完成依赖 onCancel 收尾，而 onCancel 等待门；
+      // 门若只在 finally 结算会与 close 形成闭环，终态错误路径取消卡满 3s
+      // 有界窗口（S1 红态诊断实证）。
+      _settleUserWriteGate(state);
       if (!controller.isClosed) {
         controller.add(ChatError(domainErrorResponse(e).message));
         await controller.close();
       }
     } on LLMError catch (e) {
       // 组装/解析阶段不产生 LLMError（Provider 尚未调用）；防御性兜底。
+      _settleUserWriteGate(state);
       if (!controller.isClosed) {
         state.saved = true; // F-45。
         controller.add(ChatError(llmErrorResponse(e, providerName).message));
@@ -390,11 +413,29 @@ class ChatService {
       }
     } catch (e) {
       // 未预期异常 → ChatError（对齐桌面 O3 语义），不落部分内容。
+      _settleUserWriteGate(state);
       if (!controller.isClosed) {
         state.saved = true;
         controller.add(ChatError('生成回复失败: $e'));
         await controller.close();
       }
+    } finally {
+      // 终态兜底（停止完成契约，AR-2）：三条 catch 已在 `controller.close()`
+      // 前独立结算门（避免与 onCancel 收尾形成闭环），finally 兜底其余任何
+      // 终态退出路径（防御性，`!isCompleted` 守卫防双重 complete）。
+      _settleUserWriteGate(state);
+    }
+  }
+
+  /// 结算 user 写状态门（幂等）——`_runStreamReply` 各终态路径（写成功显式
+  /// complete / 三条 catch / finally 兜底）统一的独立结算点。门必须出现在
+  /// 任何可能阻塞于 onCancel 收尾的 await（如 `controller.close()`）之前：
+  /// `_stopStreamReply`（onCancel）等待门、close 的完成又等待 onCancel 收尾,
+  /// 若门只在 finally（close 返回之后）结算，终态错误路径的取消会等满 3s
+  /// 有界窗口（AR-2 修复实证）。
+  void _settleUserWriteGate(_StreamRunState state) {
+    if (!state.userWriteSettled.isCompleted) {
+      state.userWriteSettled.complete();
     }
   }
 
@@ -583,6 +624,22 @@ class ChatService {
       return; // 幂等。
     }
     state.stopped = true;
+    // 停止完成契约（AR-2）：先 await user 写结算门——`sub.cancel()` resolve
+    // 保证「已发 user 写已结算（成功落库 / 回合已终态不再写）」，调用方据此
+    // 删除 UI 轮询补偿后 reload 必见已发 user。3s 有界（F-17 同款）+ try/catch
+    // 对齐 F-55 结构保证：门等待自身异常不跳过既有收尾；写成功即 try 内
+    // complete、失败/早终态经 `_runStreamReply` 终态兜底，常态零回归（流中
+    // 停止时 token ⟹ user 已写 ⟹ 门已完成）。
+    try {
+      await state.userWriteSettled.future.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('停止等待 user 落库超时，继续回合收尾');
+        },
+      );
+    } catch (e) {
+      debugPrint('停止等待 user 落库异常，继续回合收尾: $e');
+    }
     // F-17：providerSub.cancel() 在真实网络 / 停滞 provider 流上无上界挂起
     // （cancel 等下一块/EOF）→ 包 `.timeout` 上界，onTimeout 兜底不抛错、返回
     // 后继续回合收尾。

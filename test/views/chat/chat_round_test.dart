@@ -16,6 +16,8 @@
 /// provider），不 mock 服务内部实现——与 chat_controller_test 同形装配。
 library;
 
+import 'dart:async';
+
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
@@ -110,6 +112,42 @@ class _ContentThenZeroInterruptProvider extends TickingFakeLLMProvider {
   }
 }
 
+/// [MessageRepository] 的挂起替身（R4 立即停止契约测试用）：createMessage 可在
+/// 进入时挂起于 [gate]（放行后走真实落库）——确定性构造「send 后立即 stop 时
+/// user 写尚未结算」的门控窗口；[gateRole] 限定挂起角色（null → 全部）。
+class _GatedMessageRepository extends MessageRepository {
+  _GatedMessageRepository(super.db);
+
+  /// 挂起器：选中 [gateRole] 角色的 createMessage 进入后 await 其 future。
+  Completer<void>? gate;
+
+  /// 挂起白名单角色（null → 全部挂起）。
+  Role? gateRole;
+
+  /// createMessage 已进入挂起（测试等待其越过入口后发起停止）。
+  final Completer<void> entered = Completer<void>();
+
+  @override
+  Future<Message> createMessage({
+    required int conversationId,
+    required Role role,
+    required String content,
+  }) async {
+    final g = gate;
+    if (g != null && (gateRole == null || role == gateRole)) {
+      if (!entered.isCompleted) {
+        entered.complete();
+      }
+      await g.future;
+    }
+    return super.createMessage(
+      conversationId: conversationId,
+      role: role,
+      content: content,
+    );
+  }
+}
+
 /// 在 [deadline]（5s 墙钟）内轮询 [condition] 直到为真（与
 /// chat_controller_test 同款墙钟语义）。
 Future<void> _until(
@@ -148,12 +186,14 @@ void main() {
     await db.close();
   });
 
-  /// 装配 ChatRound：驱动真实 ChatService + [provider]；[reloadMessages] 缺省
-  /// 为「计数 + 返回 [env.reloaded]」，测试可注入定制重载语义（如会话内停止
-  /// 经真实仓储读末条）。[connectRetryDelays] 透传 ChatService 连接阶段重试
+  /// 装配 ChatRound：驱动真实 ChatService + [provider]；[messageRepository] 可
+  /// 注入特殊仓储（R4 门控 user 写用；缺省真实 messageRepo）；[reloadMessages]
+  /// 缺省为「计数 + 返回 [env.reloaded]」，测试可注入定制重载语义（如会话内
+  /// 停止经真实仓储读末条）。[connectRetryDelays] 透传 ChatService 连接阶段重试
   /// 退避序列（零部分断流测试注入空序列跳过 1s/2s 生产退避）。
   _RoundEnv wireRound(
     LLMProvider provider, {
+    MessageRepository? messageRepository,
     Future<List<Message>> Function()? reloadMessages,
     List<Duration> connectRetryDelays = const [
       Duration(seconds: 1),
@@ -164,7 +204,7 @@ void main() {
       database: db,
       conversationRepository: convRepo,
       characterRepository: charRepo,
-      messageRepository: messageRepo,
+      messageRepository: messageRepository ?? messageRepo,
       settingsRepository: settingsRepo,
       providerFactory: FixedLLMProviderFactory(provider),
       connectRetryDelays: connectRetryDelays,
@@ -347,6 +387,53 @@ void main() {
       // 再次 apply（无待补标记）→ false 零副作用。
       expect(env.round.applyBackgroundStoppedMark(conv.id, msgs), isFalse,
           reason: '待补集合已清，重复 apply 零副作用');
+    });
+
+    test('R4 立即停止契约：user 写未结算前 stop 不完成；放行后 user 行落库且'
+        'reload 已执行（AR-2）', () async {
+      // 无 first_mes 角色 → autoGreeting 零写 → 门控 user 写即门控整个结算
+      // 信号。send 后立即 stop：stop 的完成依赖 cancel（ChatService onCancel 门
+      // 等待 user 写结算）——修复前无此契约，该测试因竞态不可写。
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final gatedRepo = _GatedMessageRepository(db);
+      final release = Completer<void>();
+      gatedRepo
+        ..gate = release
+        ..gateRole = Role.user;
+      // 注入的 reload 既计数（断言「reload 已执行」）又读真实 DB（断言
+      // reload 载荷 = cancel resolve 后必见已发 user）。
+      var reloadCalls = 0;
+      final env = wireRound(
+        FakeLLMProvider(tokens: const ['x']),
+        messageRepository: gatedRepo,
+        reloadMessages: () async {
+          reloadCalls++;
+          return messageRepo.getMessages(conv.id);
+        },
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await gatedRepo.entered.future; // user 写已进入门（挂起待放行）。
+
+      final stopFuture = env.round.stop(currentConversationId: conv.id);
+      var stopped = false;
+      stopFuture.then((_) => stopped = true);
+      await Future<void>.delayed(Duration.zero); // 事件循环轮转，零墙钟。
+      expect(stopped, isFalse,
+          reason: 'user 写未结算前 stop（取消）不得完成（门契约）');
+
+      release.complete(); // 放行 user 写落库。
+      await stopFuture; // 写结算后 stop 完成。
+      expect(stopped, isTrue, reason: 'user 写结算后 stop 完成');
+
+      // cancel resolve 保证写已结算 → reload 必见已发 user（不再需要轮询补偿）。
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)], [(Role.user, 'hi')],
+          reason: 'user 行已落库（立即停止路径）');
+      expect(reloadCalls, greaterThanOrEqualTo(1),
+          reason: 'stop 后 reload 已执行');
     });
   });
 

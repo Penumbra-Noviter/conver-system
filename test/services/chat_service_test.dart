@@ -411,17 +411,6 @@ class _HoldableProvider extends LLMProvider {
   }
 }
 
-/// 轮询 [condition] 直到为真（测试确定性等待用，避免裸 sleep）。
-Future<void> _until(Future<bool> Function() condition) async {
-  for (var i = 0; i < 2000; i++) {
-    if (await condition()) {
-      return;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 1));
-  }
-  throw StateError('等待条件超时');
-}
-
 void main() {
   late AppDatabase db;
   late ConversationRepository convRepo;
@@ -870,6 +859,25 @@ void main() {
       expect(await db.select(db.messages).get(), isEmpty);
     });
 
+    test('AR-2 Falsify 回归: 终态错误路径（对话不存在）整体有界完成'
+        '（门先于 close 结算，无门/close 闭环挂起）', () async {
+      // S1 红态诊断实证（toList 形态）：`.toList()` 收到 done 后显式取消订阅
+      // → onCancel（_stopStreamReply）等待 user 写门；`_runStreamReply` catch
+      // 内 `await controller.close()` 的完成又依赖 onCancel 收尾——门若只在
+      // finally（close 返回后）结算 → 闭环 → 整体卡满 3s 有界窗口（诊断输出：
+      // gate timeout 3s 先于 finally 结算触发）。修复：门在 catch 内、close
+      // 之前独立结算。2s 上界断言「有界完成」使未修实现红（3s > 2s）。
+      wireService(FakeLLMProvider(tokens: const ['x']));
+      await service
+          .streamReply(conversationId: 999999, content: 'hi')
+          .toList()
+          .timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => fail(
+                '终态错误路径整体未在有界时间内完成（门/close 闭环挂起）'),
+          );
+    });
+
     test('A2 F-45: LLM 业务错误不落部分内容（已产出部分也不落库）', () async {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
@@ -1127,10 +1135,9 @@ void main() {
       sub = service
           .streamReply(conversationId: conv.id, content: 'hi')
           .listen((_) {});
-      // 等 user 已落库（首 token 100ms 后才到，此刻尚未产出）。
-      await _until(
-        () async => (await messagesOf(conv.id)).any((m) => m.role == Role.user),
-      );
+      // AR-2 契约（S2）：`await sub.cancel()` 即闩锁——cancel resolve 保证本轮
+      // 在途 user 写已结算，无需再预等（修复前 `_until` 预等是绕开「cancel
+      // 完成 ≠ user 已落库」竞差的药方，契约落位后删除）。
       await sub.cancel();
 
       expect(await roleContentsOf(conv.id), [
@@ -1159,10 +1166,14 @@ void main() {
       final sub = service
           .streamReply(conversationId: conv.id, content: 'hi')
           .listen((_) {});
+      // 立即取消订阅 → onCancel（_stopStreamReply）等待 user 写结算门——user 写
+      // 已成功即显式 complete，`await sub.cancel()` 即时放行（S3 契约注）。
       await sub.cancel(); // 立即停止 → onCancel → controller 关闭
 
-      // 让 _runStreamReply 的解析失败 handler 执行窗口；无守卫则该 handler 的
-      // controller.add 抛 StateError 被 zone 捕获为未处理异常 → 本测试失败。
+      // 让 _runStreamReply 的解析失败 handler 执行窗口；此时 user 写已结算
+      // （cancel resolve 保证了），解析失败经 catch → finally 终态兜底一并结算
+      // 门（S3 契约注）。无守卫则该 handler 的 controller.add 抛 StateError 被
+      // zone 捕获为未处理异常 → 本测试失败。
       await Future<void>.delayed(const Duration(milliseconds: 50));
     });
 
@@ -1214,6 +1225,10 @@ void main() {
       });
       await gotLastToken.future; // 已产出 t0、t1；此后 provider 永久停滞
 
+      // AR-2 契约（S3）：已产出 token ⟹ user 写已落地 ⟹ 门在订阅前已完成，
+      // `_stopStreamReply` 门等待即时放行；本测试的 3s 有界兜底针对 providerSub
+      // cancel 停滞（F-17），与门等待正交。user 行锚定「cancel resolve 保证
+      // user 写已结算」契约。
       // 停止：providerSub.cancel() 在停滞流上无上界挂起（F-17）→ 实现包
       // `.timeout` 兜底后仍应有界完成。断言「有界完成」：超时即 fail（非
       // try/catch 预期 TimeoutException——那测的是抛错方向）。
@@ -1292,6 +1307,95 @@ void main() {
       // zone 零未处理异步异常：未修实现下 cancel 错误穿透成为未处理异步异常，
       // flutter_test zone 捕获即测试失败（错误经 cancel().timeout 抛出而非
       // 吞为 zone 级——修复后 try/catch 承接 + 收尾完整）。
+    });
+
+    test('S1 AR-2 门契约: cancel 不在 user 写结算前 resolve → 放行 → resolve'
+        '（Completer 门确定性，零墙钟）', () async {
+      // 无 first_mes 角色 → autoGreeting 零写 → 全流程唯一 createMessage =
+      // user 写；_GatedMessageRepository 按角色门控：门控 user 写即门控整个
+      // 结算信号（停止路径无部分内容不落 assistant）。
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      expect(await messagesOf(conv.id), isEmpty, reason: '零写前提');
+
+      final gatedRepo = _GatedMessageRepository(db, now: () => fakeNow);
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: gatedRepo,
+        settingsRepository: settingsRepo,
+        providerFactory:
+            _FakeFactory(FakeLLMProvider(tokens: const ['x'])),
+      );
+      final release = Completer<void>();
+      gatedRepo
+        ..gate = release
+        ..gateRole = Role.user;
+
+      final sub = service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .listen((_) {});
+      await gatedRepo.entered.future; // user 写已进入门（挂起待放行）。
+
+      final cancelFuture = sub.cancel(); // 不 await：停止语义启动。
+      var cancelResolved = false;
+      cancelFuture.then((_) => cancelResolved = true);
+      await Future<void>.delayed(Duration.zero); // 事件循环轮转，零墙钟。
+      expect(cancelResolved, isFalse,
+          reason: '取消（停止）不得在 user 写结算前 resolve（门契约）');
+
+      release.complete(); // 放行 user 写落库。
+      await cancelFuture; // 写结算后 cancel resolve。
+      expect(cancelResolved, isTrue,
+          reason: 'user 写结算后 cancel resolve（有界门等待完成）');
+
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'), // 已发 user 可见且唯一。
+      ]);
+    });
+
+    test('AR-2 Falsify: user 写永不结算（停滞）→ 停止经 3s 有界门超时仍完成'
+        '（不挂起、事件流照常收尾）', () async {
+      // 门永不完成路径（极端本地 drift 写停滞）：user 写被锻死仓储永久挂起
+      // （不 complete 不 error）→ `_stopStreamReply` 门等待靠 3s 有界兜底放行
+      // （F-17 同款对齐），事件流收尾不被挂死（6s 上界即 fail）。
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final gatedRepo = _GatedMessageRepository(db, now: () => fakeNow);
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: gatedRepo,
+        settingsRepository: settingsRepo,
+        providerFactory:
+            _FakeFactory(FakeLLMProvider(tokens: const ['x'])),
+      );
+      final blocked = Completer<void>();
+      gatedRepo
+        ..gate = blocked
+        ..gateRole = Role.user;
+
+      final sub = service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .listen((_) {});
+      await gatedRepo.entered.future; // user 写已挂起（测试在停止完成后放行）。
+
+      await sub.cancel().timeout(
+            const Duration(seconds: 6),
+            onTimeout: () => fail(
+                'user 写停滞时停止未在有界时间内完成（门超时兜底失效）'),
+          );
+
+      // 放行停滞写 → `_runStreamReply` 解除挂起（已停止 → 不订阅、无事件、
+      // 无未处理异常），user 行最终落库。
+      blocked.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(await roleContentsOf(conv.id), [
+        (Role.user, 'hi'),
+      ]);
     });
   });
 
