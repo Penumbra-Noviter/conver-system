@@ -1,17 +1,17 @@
 /// StatusView 共享组件契约（M6-01）——状态页（图标 + 可选标题 + 原因/文案 +
-/// 可选提示 + 动作区）。
+/// 动作区）。
 ///
 /// 验收语义（工单 01 验收 2/3/7 + spec §4.3 + 共识 §3.3）：
 /// - 覆盖模拟器列表 `_StatusColumn`（无标题 + 原因 + 可选动作）与运行页
 ///   `_ErrorView`（标题 + 原因 + 重试/返回动作区）两者形态；
 /// - 图标 40px（ink4）+ 标题（ink1，titleSmall）+ 原因（ink2，bodyMedium，
-///   居中）+ 可选提示（ink4）+ 动作区；缺省不渲染；
+///   居中）+ 动作区；缺省不渲染；
 /// - 装饰图标内建 ExcludeSemantics（语义树无图标描述，spec §4.4 覆盖清单 ②）；
 /// - 动作区点击派发（T1 页面级错误页「重试」语义）；
-/// - 边界防御：空原因 / 超长标题与提示 / 空动作列表不崩（Falsify）。
+/// - 边界防御：空原因 / 超长标题 / 空动作列表不崩（Falsify）。
 ///
 /// 测试 seam（公共接口边界）：[StatusView] 公开构造参数（icon / title /
-/// message / hint / actions），经 ConverTheme.dark（ConverPalette 注册）装配。
+/// message / actions），经 ConverTheme.dark（ConverPalette 注册）装配。
 library;
 
 import 'package:conver_system_mobile/theme/conver_palette.dart';
@@ -26,7 +26,6 @@ void main() {
     IconData icon = Icons.error_outline,
     String? title,
     required String message,
-    String? hint,
     List<Widget> actions = const [],
   }) async {
     await tester.pumpWidget(
@@ -38,7 +37,6 @@ void main() {
               icon: icon,
               title: title,
               message: message,
-              hint: hint,
               actions: actions,
             ),
           ),
@@ -48,12 +46,11 @@ void main() {
   }
 
   group('状态页渲染（验收 2）', () {
-    testWidgets('图标 + 标题 + 原因 + 提示 + 动作区', (tester) async {
+    testWidgets('图标 + 标题 + 原因 + 动作区', (tester) async {
       await pumpStatusView(
         tester,
         title: '游戏加载失败',
         message: '加载超时（15 秒未收到响应）',
-        hint: '可重试',
         actions: [
           FilledButton(onPressed: () {}, child: const Text('重试')),
           OutlinedButton(onPressed: () {}, child: const Text('返回')),
@@ -72,9 +69,6 @@ void main() {
       expect(message.style?.color, ConverPalette.dark().ink2,
           reason: '原因/文案 ink2');
       expect(message.textAlign, TextAlign.center, reason: '原因居中');
-
-      final hint = tester.widget<Text>(find.text('可重试'));
-      expect(hint.style?.color, ConverPalette.dark().ink4, reason: '提示 ink4');
 
       expect(find.text('重试'), findsOneWidget);
       expect(find.text('返回'), findsOneWidget);
@@ -95,7 +89,7 @@ void main() {
       expect(find.byType(OutlinedButton), findsNothing);
     });
 
-    testWidgets('缺省参数：无标题/提示/动作区不渲染', (tester) async {
+    testWidgets('缺省参数：无标题/动作区不渲染', (tester) async {
       await pumpStatusView(tester, message: '模拟器启动失败');
 
       expect(find.text('模拟器启动失败'), findsOneWidget);
@@ -147,12 +141,11 @@ void main() {
   });
 
   group('边界输入（Falsify）', () {
-    testWidgets('空原因 / 超长标题与提示 / 空动作列表不崩', (tester) async {
+    testWidgets('空原因 / 超长标题 / 空动作列表不崩', (tester) async {
       await pumpStatusView(
         tester,
         title: '长' * 300,
         message: '',
-        hint: '长' * 300,
         actions: const [],
       );
       expect(tester.takeException(), isNull);

@@ -1,15 +1,14 @@
-/// EmptyState 共享组件契约（M6-01）——空态三段式（线性图标 + 主文案 + 可选
-/// 提示 + 可选动作）。
+/// EmptyState 共享组件契约（M6-01）——空态三段式（线性图标 + 主文案 + 可选提示）。
 ///
 /// 验收语义（工单 01 验收 1/3 + spec §4.2 + 共识 §2.2）：
 /// - 装饰性线性图标 40px（ink4）+ 主文案（ink3，bodyMedium）+ 可选提示
-///   （ink4，bodySmall）+ 可选动作；可选提示/动作缺省不渲染；
+///   （ink4，bodySmall）；可选提示缺省不渲染；
 /// - 装饰图标内建 ExcludeSemantics（语义树无图标描述，spec §4.4 覆盖清单 ②）；
-/// - 空态不加操作入口（TP-4 定案），[action] 参数保留供未来需要（缺省不渲染）；
+/// - 空态不加操作入口（TP-4 定案），不预建参数槽；未来需要经版本控制恢复；
 /// - 边界防御：空主文案 / 超长提示不崩（Falsify）。
 ///
 /// 测试 seam（公共接口边界）：[EmptyState] 公开构造参数（icon / message /
-/// hint / action），经 ConverTheme.dark（ConverPalette 注册）装配。
+/// hint），经 ConverTheme.dark（ConverPalette 注册）装配。
 library;
 
 import 'package:conver_system_mobile/theme/conver_palette.dart';
@@ -24,7 +23,6 @@ void main() {
     IconData icon = Icons.person_outline,
     required String message,
     String? hint,
-    Widget? action,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -35,7 +33,6 @@ void main() {
               icon: icon,
               message: message,
               hint: hint,
-              action: action,
             ),
           ),
         ),
@@ -67,29 +64,12 @@ void main() {
       expect(hint.style?.color, ConverPalette.dark().ink4, reason: '提示 ink4');
     });
 
-    testWidgets('可选提示/动作缺省：hint 与 action 不渲染', (tester) async {
+    testWidgets('可选提示缺省：hint 不渲染', (tester) async {
       await pumpEmptyState(tester, message: '暂无角色');
 
       expect(find.text('暂无角色'), findsOneWidget);
       expect(find.text('点「新建角色」创建你的第一个角色'), findsNothing,
           reason: '未传 hint 不渲染提示行');
-      expect(find.byType(FilledButton), findsNothing, reason: '未传 action 不渲染动作');
-    });
-
-    testWidgets('可选动作：action 渲染且点击派发', (tester) async {
-      var tapped = 0;
-      await pumpEmptyState(
-        tester,
-        message: '暂无角色',
-        action: FilledButton(
-          onPressed: () => tapped++,
-          child: const Text('去创建'),
-        ),
-      );
-
-      expect(find.text('去创建'), findsOneWidget);
-      await tester.tap(find.text('去创建'));
-      expect(tapped, 1, reason: '动作回调被派发');
     });
   });
 
