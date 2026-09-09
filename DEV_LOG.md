@@ -6,6 +6,17 @@
 
 ---
 
+## M7 批次 — 发布准备（Android 范围收窄，iOS 延后）（2026-09-09 — project-kickoff 全自动档，source 交接书 handoff-M7）
+
+- **范围**：用户拍板仅 Android（iOS 延后标注，Windows 无 macOS 路径 design §7.1）；4 工单 2 波 + F1 修复。
+- **T01 自适应启动图标**（`19b1642`）：PIL 管线 `scripts/generate_app_icon.py` 程序化生成占位稿（#784E14 实心底 + #FFFBF4「汇」字形，字形 bbox ≤40% 画布/中心 ≤3%/全像素安全区 66%，msyhbd.ttc 渲染）→ `flutter_launcher_icons ^0.14.4`（dev 吸收）产出 adaptive（含 monochrome）+ legacy 五档；确定性（两次运行字节一致零 git 脏）；manifest 零改动。33 测 / 覆盖率 98% / 全量 1518 绿。
+- **T02 release 签名**（`8452920` + F1 修复 `31796b2`）：keystore 仓库外 `keys/conver_system_upload.jks`（RSA2048/SHA256withRSA/25y）+ gitignored `android/key.properties`（强随机 24 位口令，不入库）；build.gradle.kts signingConfigs 读四键 + release 切专属签名；**波末增量审核 F1 阻断**：`file(it)` 相对 app 模块 off-by-one → 改 `rootProject.file(it)`（相对 android/）+ 防复发断言实跑相对路径版 release 构建通过（指纹 7B:7C:00:A6... 一致）。校验：keytool↔apksigner 指纹核对、AAB/APK 同证书、debug 通道仍 CN=Android Debug。
+- **T03 Android 隐私清单**（`8b5e182`）：`docs/privacy-android.md` 三节式（本机存储 drift+secure_storage / 功能必需传输 dio 用户主动 / 零第三方 SDK 追踪）+ `scripts/privacy_audit.py` 可 import 审计模块（pubspec.lock 全量 133 包 × 11 模式命中 0）+ pytest 99.3%。权限集合核对 = 仅 INTERNET + 明文回环豁免。
+- **T04 发布验证门禁**（`8a14b5c` + `7eca555`）：`docs/release-android.md`（版本策略 1.0.0+1/versionCode=1/递增规则 + 双产物命令链 + keystore 生命周期 + 数据安全表单对照）；`flutter build appbundle/apk --release` 双产物同签名（versionCode=1/versionName=1.0.0 机器核对）；AVD medium_phone release APK 冒烟 PASS（launcher 图标「汇」字形圆角遮罩实机验证 + 主界面 5 tab + 角色页，三截图留证）；TICKETS M7 归档（iOS 延后注记）。
+- **门禁链**：全量 **1518 测**绿 / analyze 0 / pytest scripts/ 57 passed（generate_app_icon 98% / privacy_audit 99%）/ pool_cleanup_check OK / **期末四轴 0 阻断**（期末 Spec 非阻断 1 项：privacy 计数过期 129→133/17→18 已修，文档与 `python scripts/privacy_audit.py` 实测一致）/ 波末增量审核 F1 阻断已修复闭环。
+- **技术债落盘**：F-68~71（key.properties 缺失报错 / 图标色值双处硬编码无守卫 / audit_lockfile Mapping 分支 Speculative / patterns 参数 YAGNI）入候选区本周未消费。
+- **过程遥测**：子智能体 6（Implement×4 + 增量审核 + 期末四轴）+ View×2（图标视觉）+ Grilling + plan-tickets；合并冲突 0；空返回 0；flaky 0；coverage 7.15.3 需模块名口径 `--cov=scripts.privacy_audit`（`--cov=<file.py>` 字面形式 0.00% 陷阱）；sqlite3 native-assets 网络抖动 → curl 重试预下载 + SHA-256 校验惯例（T02/T04 两次遇到）。
+
 ## 架构深化批次 AR-4 — WebView 能力面收敛（2026-09-09 — improve-codebase-architecture 候选 4 直落）
 
 - **交付**：新模块 `lib/services/simulator/webview_capability.dart`——统一能力接口 `WebViewCapability`（页面就绪握手 + 无返回 runJavaScript / 带返回 evaluate〔原样串，解码归桥层〕+ navigate + buildView；**不暴露 setOnPageFinished**）+ `WebViewCapabilityFactory` typedef（**构造期委托注入**）+ 生产工厂 `createWebViewCapability` + `_FlutterWebViewCapability` 适配器（webview_flutter **唯一引用点**，构造即 setNavigationDelegate——时序契约结构性成立，挂委托后导航的两步序收敛为 create(挂委托) → navigate 一步）。两张并行 WebView seam（run 62 行 / sheet 70 行）从 `lib/views/simulators/` 内嵌处删除，两消费点只留差异面：run 侧（simulator_run_view）= 无返回 runJavaScript + navigate 错误上抛即时错误态；sheet 侧（save_sheet）= 带返回 evaluate + navigate 吞错移入消费点 `_bootstrap` 走超时降级；`simulators_hooks` launcher 第三引用点换源（import + 缺省工厂 `createWebViewCapability`）。共享假件 `test/support/fake_web_view_capability.dart`（onPageFinished 构造必填 + instantFinish/throwOnNavigate/throwOnCreate + evaluate 双编码 JSON 契约复刻迁自 save_sheet_test:126-147，F-43/W5 B1 调用序 spy 组改**委托必达**行为断言）。commit 待回填（merge 待回填），基线 ba0d680。

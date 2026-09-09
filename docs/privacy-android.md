@@ -105,7 +105,7 @@ crashlytics | adjust | braze | branch | clevertap | kochava
 
 ### 依赖证据（2026-09-09，`flutter pub deps`，Flutter SDK 3.47.2 / Dart 3.13.2）
 
-直接依赖 17 项，全部为功能库（无 `firebase` / `sentry` / `mixpanel` / 等）：
+直接依赖 18 项，全部为功能库或发布工具链（无 `firebase` / `sentry` / `mixpanel` / 等）：
 
 ```
 crypto 3.0.7 | cupertino_icons 1.0.9 | dio 5.11.0 | drift 2.34.3 |
@@ -113,10 +113,11 @@ drift_flutter 0.3.1 | drift_dev 2.34.5（dev） | file_picker 12.1.2 |
 flutter_markdown_plus 1.0.12 | flutter_secure_storage 11.0.0 |
 path_provider 2.1.6 | provider 6.1.5+1 | share_plus 13.3.0 |
 webview_flutter 4.14.1 | build_runner 2.16.0（dev） | flutter_lints 6.0.0（dev） |
-flutter / flutter_test（SDK）
+flutter_launcher_icons 0.14.4（dev，发布图标生成） | flutter / flutter_test（SDK）
 ```
 
-`pubspec.lock` 全量 129 个包名对排除名单命中 **0**（`flutter pub deps` 全文扫描亦 0 命中）。
+`pubspec.lock` 全量 133 个包名对排除名单命中 **0**（`python scripts/privacy_audit.py` 实证，
+`flutter pub deps` 全文扫描亦 0 命中）。
 `drift`、`dio`、`flutter_secure_storage`、`webview_flutter`、`share_plus`、
 `path_provider` 等既有功能库经 pytest 负向断言**不命中**名单。
 
@@ -135,5 +136,5 @@ flutter / flutter_test（SDK）
 | 权限 | 仅 INTERNET + 明文回环豁免（manifest 机器核对） |
 | 本机存储 | drift SQLite + 系统安全存储，数据不出设备 |
 | 功能性传输 | 仅用户主动请求 → 用户配置的 LLM 端点（HTTPS），无自有服务器 |
-| 第三方 SDK | 追踪 / 统计 / 崩溃上报 SDK：**0**（129 包全量审计实证） |
+| 第三方 SDK | 追踪 / 统计 / 崩溃上报 SDK：**0**（133 包全量审计实证） |
 | 数据上传第三方服务器 | **0**（口径：收集 = 上传至第三方服务器） |
