@@ -47,6 +47,7 @@
 | F-69 | 图标 #784E14 双处硬编码（scripts/generate_app_icon.py BG 常量 + flutter_launcher_icons.yaml 两键）无双向守卫，改一处不同步则 adaptive 背景与 legacy 分叉 | 波 1 Falsify (F4) | Worth exploring | 📝 待立项 | 发布工具链 |
 | F-70 | privacy_audit.audit_lockfile 双输入（str/Mapping）+ `_packages_from_mapping` 第二套解析器仅测试消费，无生产消费方（Speculative Generality） | 波 1 过度工程 (O1) | Speculative | 📝 待立项 | 发布工具链 |
 | F-71 | privacy_audit patterns= 参数仅测试消费（CLI 用默认名单）——轻量 YAGNI | 波 1 过度工程 (O2) | Speculative | 📝 待立项 | 发布工具链 |
+| F-72 | FileNameSanitizerConfig.FileNameEdgeTrim.none 无生产消费方（仅默认+1 测试）——惰性安全基线，保留现状可做候选 | 波 1 过度工程 (O3) | Speculative | 📝 待立项 | 文件名净化 |
 
 ## 技术债处置记录
 

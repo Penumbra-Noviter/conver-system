@@ -6,6 +6,16 @@
 
 ---
 
+## 架构审查批次 C1~C4 — 全库架构深化（2026-09-10 — improve-codebase-architecture 报告直落全自动档）
+
+- **范围**：审查报告 5 候选（HTML `D:\tmp\architecture-review-20260910.html`）；Grilling 拍板 C1~C4 全做、C5 观察不动作；4 工单单波并行（文件集互不相交、零冲突合并）。
+- **C1 translateError 下沉**（`af0a0c2` merge `078916b`）：LLMProvider 基类新增默认 translateError 分发链（LLMError 直通→Dio→HttpStatus→钩子→Socket→Http→Format/Type→兜底）+ `providerName` instance getter（缺省 'LLM'）+ `translateProviderError` 钩子（protected 语义，Claude `_StreamApiError` 唯一实，槽位 HttpStatusError 后）；Claude/OpenAI 删完整覆写各 -40+ 行，`_providerName` static const → instance getter。契约逐字对比程序化核对（base 链 == openai 原链全等、claude 仅差钩子分支）；261 llm 测 + 128 夹具消费方绿；4 突变全红。fixtures 8 处 override 零改动。
+- **C2 装配收敛**（`022e972` merge `ad6c484`）：SettingsRepository 新增 `wireCredentialsResolver()`（四 reader tear-off 单一落点，B1 等价性组 +81 锁与手工接线逐位一致）；chat_service/document_parse_service `_wireCredentialsResolver` 单行委托；app.dart 装配图新增 Provider<DocumentParseService> + Provider<GameGenerator>（resolveCredentials 闭包映射 GenerationCredentials 复用 LLMProviderFactory）；characters_view `_openWizard` 与 simulators_view `_defaultOpenGenerateDialog` 改 `context.read`（`_buildGenerator` 删 -49 行、6 import 剪除）。**构造签名冻结**（chat 构造点 20+ 零波及）。3 处已申报测试偏差均结构必需（wizard 入口 provider 注入 / app_assembly_test 新增 / layer_boundary 正则兼容裸 `X(`）。lgrep 现造扫描 CLEAN。覆盖 97.1%（app.dart 84.4% 闭包面豁免）。
+- **C3 双净化器合并**（`818c136` merge `7150600`）：file_name.dart 新增参数化核心 `safeFileNameCore(Object?, {required FileNameSanitizerConfig})` + `FileNameSanitizerConfig`（extraChars/edgeTrim/maxLength/trimAfterTruncate/fallback 显式命名）+ `FileNameEdgeTrim`；safeFileName 变薄包装（导出锚）+ save_contract.sanitizeFilename 公开名/签名保持委托核心（存档锚）。**双桌面锚 22 边界逐字符保契**（含 %·0x7f/首尾点/超长/`a . .` 怪癖『a 』保留非修一致）；消费方六文件零 diff；211 测绿 / 覆盖 100%。已知：FileNamEdgeTrim.none 无生产消费方 → F-72。
+- **C4 删死代码**（`50cdb3e` merge `7cae529`）：删零实例化 PlaceholderGroup（grep 全库零残留含注释），保留 PlaceholderItem；settings_view 占位行+导航行收敛 `_SettingsRow`（label+note+onTap 三字段，onTap null → InkWell 惰性无 chevron），`_SettingsNavRow` 删、`_ProfileEntry` 降 record；settings_view 净减 56 行（290→234）；新增 settings_shared_row_test 4 用例；58+485 测绿。
+- **门禁链**：全量 **1579 测**绿（+61）/ analyze 0 / 波末增量审核「通过」（文件范围 1 合规 3 警告结构必需，Falsify 6 非阻断，O1/O2 保留复核成立）/ 期末四轴 **0 阻断**（Standards 0 硬违规，Spec 0 缺失，Falsify 0 阻断，Architecture 0 阻断；2 轻量观察不立项：extraChars 按 code unit 迭代非 BMP 静默失效、providerName 缺省 'LLM' 静默文案回退点）。技术债候选区净增 F-72（FileNameEdgeTrim.none Speculative）。
+- **过程遥测**：子智能体 8（Explore + Grilling + plan-tickets + Implement×4 + 波末增量审核 + 期末四轴）；合并冲突 0；空返回 0；flaky 0；C3 初期文件误落主仓库已检出自纠（TDD 红先绿）；sqlite3 native-assets 下载抖动沿用缓存复制惯例（C1）。
+
 ## M7 批次 — 发布准备（Android 范围收窄，iOS 延后）（2026-09-09 — project-kickoff 全自动档，source 交接书 handoff-M7）
 
 - **范围**：用户拍板仅 Android（iOS 延后标注，Windows 无 macOS 路径 design §7.1）；4 工单 2 波 + F1 修复。
