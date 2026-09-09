@@ -112,6 +112,38 @@ class _ContentThenZeroInterruptProvider extends TickingFakeLLMProvider {
   }
 }
 
+/// generate 挂起于 [gate] 的断流重试 provider（F-65② 并发注入回归用）：
+/// streamGenerate 产 token 后断流（截断标记），generate（重试）进入后挂起于
+/// [gate]——重试挂起期测试注入并发 notice，放行后断言并发提示不被结算清空。
+class _GatedInterruptRetryProvider extends TickingFakeLLMProvider {
+  _GatedInterruptRetryProvider({required this.reply})
+      : super(
+          tokens: const ['a'],
+          errorAfter: LLMConnectionInterruptedError(),
+          delay: const Duration(milliseconds: 5),
+        );
+
+  /// regenerate（重试）返回的完整回复。
+  final String reply;
+
+  /// generate 放行信号（测试完成并发注入后打开）。
+  final Completer<void> gate = Completer<void>();
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+  }) async {
+    generateCallCount++;
+    lastMessages = messages;
+    lastMaxTokens = maxTokens;
+    lastModel = model;
+    await gate.future;
+    return reply;
+  }
+}
+
 /// [MessageRepository] 的挂起替身（R4 立即停止契约测试用）：createMessage 可在
 /// 进入时挂起于 [gate]（放行后走真实落库）——确定性构造「send 后立即 stop 时
 /// user 写尚未结算」的门控窗口；[gateRole] 限定挂起角色（null → 全部）。
@@ -571,6 +603,80 @@ void main() {
       expect(env.round.isRegenerating, isFalse);
     });
 
+    test('F-64：图标 regenerate 结算键 = 服务实际替换 id（result.replacedMessageId，'
+        '零预解析；行为与 B1 组等价）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        InterruptStreamRetryProvider(reply: '新回复'),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      await _until(() async => (await messageRepo.getMessages(conv.id)).length == 2,
+          why: '截断行落库');
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue);
+      expect(env.round.interruptedNoticeTargetId, partial.id);
+
+      // 图标路径零预解析（messageId: null 走服务缺省）；结算以服务实际替换
+      // 目标行 id（replacedMessageId）作键——截断标记与 notice 一并结算。
+      await env.round.regenerate(conversationId: conv.id);
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, '新回复')],
+          reason: '图标 regenerate replace 成功（服务缺省目标 = 末条 assistant）');
+      expect(env.round.isInterrupted(partial.id), isFalse,
+          reason: '结算键 = 实际替换行 id：截断标记随替换清除');
+      expect(env.round.hasInterrupted, isFalse);
+      expect(env.round.interruptedNoticeTargetId, isNull,
+          reason: '被解目标 == notice 目标：notice 目标复位');
+      expect(env.notice.notice, isNull, reason: '横幅「回复已中断」清空');
+      expect(env.round.isRegenerating, isFalse);
+    });
+
+    test('F-65②：重试挂起期并发 notice 注入 → 放行后并发 notice 保留'
+        '（文案门：不清「导出成功」）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final provider = _GatedInterruptRetryProvider(reply: '新回复');
+      final env = wireRound(provider,
+          reloadMessages: () => messageRepo.getMessages(conv.id));
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      await _until(() async => (await messageRepo.getMessages(conv.id)).length == 2,
+          why: '截断行落库');
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue);
+
+      // 发起重试：generate 挂起于 gate（网络窗口）。
+      final retry = env.round.retryInterrupted(conversationId: conv.id);
+      await _until(() async => provider.generateCallCount >= 1,
+          why: 'generate 已进入挂起');
+
+      // 挂起期并发 notice 注入（覆盖「回复已中断」）。
+      env.notice.set('导出成功');
+
+      // 放行重试 → 结算完成（文案门未命中 → 不吞并发提示）。
+      provider.gate.complete();
+      await retry;
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, '新回复')],
+          reason: '重试 replace 成功');
+      expect(env.round.isInterrupted(partial.id), isFalse,
+          reason: '目标标记已结算（替换删除）');
+      expect(env.round.interruptedNoticeTargetId, isNull,
+          reason: '无余标：notice 目标复位');
+      expect(env.notice.notice, '导出成功',
+          reason: 'F-65②：结算文案门（notice==回复已中断）未命中 → 并发提示保留');
+      expect(env.round.isRegenerating, isFalse);
+    });
+
     test('重试失败 → 旧截断行保留 + 既有 notice 保持「回复已中断」（先错者胜）',
         () async {
       final char = await seedCharacter();
@@ -725,6 +831,65 @@ void main() {
           reason: '无可重试目标，retry 零副作用');
       expect(env.round.isRegenerating, isFalse);
       expect(env.notice.notice, '回复已中断');
+
+      // F-4 配对门补断言：零内容断流态（target==null）下图标重生成旧截断
+      // （缺省末条 = 上轮截断 A）→ 配对门（target(null) != replacedId(A)）不
+      // 误清横幅——notice 保持「回复已中断」、notice 目标保持 null。
+      await env.round.regenerate(conversationId: conv.id);
+      expect(provider.generateCallCount, callsBefore + 1,
+          reason: '图标 regenerate 走服务缺省（零预解析）');
+      expect(env.notice.notice, '回复已中断',
+          reason: '配对门：target==null 态图标重生成不清横幅');
+      expect(env.round.interruptedNoticeTargetId, isNull,
+          reason: 'notice 目标保持 null（零内容断流态无重试目标）');
+      expect(env.round.hasInterrupted, isFalse,
+          reason: '旧截断行已被替换删除，气泡标记随结算移除');
+    });
+
+    test('F-65①：双截断部分重试 → 目标推进到最近剩余截断、横幅保持 → 再重试 → '
+        '全清（重写语义：DB=[user1, 新回复]）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        InterruptStreamRetryProvider(reply: '新回复'),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      // 第一轮：断流 → 截断 A。
+      env.round.send(conversationId: conv.id, text: '第一问');
+      await _until(() async => env.notice.notice == '回复已中断', why: '第一次断流');
+      await _until(() async => (await messageRepo.getMessages(conv.id)).length == 2,
+          why: '截断 A 落库');
+      final truncatedA = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.interruptedNoticeTargetId, truncatedA.id);
+
+      // 第二轮：断流 → 截断 B（marks={A,B}，notice 目标 = B）。
+      env.round.send(conversationId: conv.id, text: '第二问');
+      await _until(() async => (await messageRepo.getMessages(conv.id)).length == 4,
+          why: '截断 B 落库');
+      final truncatedB = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.interruptedNoticeTargetId, truncatedB.id);
+      expect(env.round.hasInterrupted, isTrue);
+
+      // 重试 B：B 被替换（有界删旧），余标 A 推进为 notice 目标、横幅保持。
+      await env.round.retryInterrupted(conversationId: conv.id);
+      expect(env.round.interruptedNoticeTargetId, truncatedA.id,
+          reason: 'F-65① 目标推进 = max(marks)（DB 主键单调即时序）');
+      expect(env.round.hasInterrupted, isTrue, reason: '余标 A 仍在');
+      expect(env.round.isInterrupted(truncatedB.id), isFalse,
+          reason: 'B 已替换删除');
+      expect(env.notice.notice, '回复已中断',
+          reason: '横幅保持（notice 不清，持续指向最近剩余截断）');
+
+      // 重试 A：从 A 截断点重写后续全部消息（有界删旧）→ 全清。
+      await env.round.retryInterrupted(conversationId: conv.id);
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, '第一问'), (Role.assistant, '新回复')],
+          reason: '产品语义：从截断点重写后续全部（user2 + 已替换 B 一并重写）');
+      expect(env.round.hasInterrupted, isFalse, reason: '全清');
+      expect(env.round.interruptedNoticeTargetId, isNull);
+      expect(env.notice.notice, isNull, reason: '中断全部解决，横幅消失');
     });
   });
 

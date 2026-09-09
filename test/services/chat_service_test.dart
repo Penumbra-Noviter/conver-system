@@ -1963,6 +1963,58 @@ void main() {
           LlmMessage(role: 'user', content: userMsg.content));
     });
 
+    test('F-64: RegenerateResult.replacedMessageId 缺省路径 = 末条 assistant'
+        '（实际替换目标行 id，有界删旧前已知）', () async {
+      final (_, conv, _, oldAssistant) = await seedConversationWithReply();
+      // 追加第二轮 user + assistant → 末条 = 第二答。
+      await sendUserMessage(conv.id, '第二问');
+      final second = await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '第二答',
+      );
+      final provider = FakeLLMProvider(tokens: const ['新答']);
+      wireService(provider);
+
+      final result = await service.regenerate(conversationId: conv.id);
+
+      expect(result.replacedMessageId, second.id,
+          reason: '缺省目标 = 末条 assistant（实际被替换行 id）');
+      expect(result.messageId, isNot(second.id), reason: '新回复为新 id');
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '你好'),
+        (Role.assistant, '旧回复'),
+        (Role.user, '第二问'),
+        (Role.assistant, '新答'),
+      ]);
+    });
+
+    test('F-64: RegenerateResult.replacedMessageId 显式路径 = 指定 messageId'
+        '目标行 id（被替换行非末条）', () async {
+      final (_, conv, _, oldAssistant) = await seedConversationWithReply();
+      // 追加第二轮 user + assistant（目标 = 第一条 assistant，非末条）。
+      await sendUserMessage(conv.id, '第二问');
+      await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '第二答',
+      );
+      wireService(FakeLLMProvider(tokens: const ['新答']));
+
+      final result = await service.regenerate(
+          conversationId: conv.id, messageId: oldAssistant.id);
+
+      expect(result.replacedMessageId, oldAssistant.id,
+          reason: '显式目标 = 实际被替换行 id');
+      expect(result.messageId, isNot(oldAssistant.id));
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '你好'),
+        (Role.assistant, '新答'),
+      ]);
+    });
+
     test('A4: LLM 失败（业务错误）→ 旧消息保留（延迟删除：失败不删行）',
         () async {
       final (_, conv, _, oldAssistant) = await seedConversationWithReply();
