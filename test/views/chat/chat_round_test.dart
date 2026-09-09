@@ -180,6 +180,30 @@ class _GatedMessageRepository extends MessageRepository {
   }
 }
 
+/// 受控事件流 ChatService 替身（F-65③ reload 窗口确定性构造）：streamReply
+/// 返回测试持有的流控制器，测试手动投递 ChatEvent（token / interrupted）并
+/// **控制 done 时机**——不 close 则 `onDone` 不触发、`_reloadPending` 保持
+/// true（重载窗口跨 await 可观测）。regenerate 本测试不触（UnimplementedError
+/// 防静默假通过）。
+class _ScriptedChatService implements ChatService {
+  final StreamController<ChatEvent> events = StreamController<ChatEvent>();
+
+  @override
+  Stream<ChatEvent> streamReply({
+    required int conversationId,
+    required String content,
+  }) =>
+      events.stream;
+
+  @override
+  Future<RegenerateResult> regenerate({
+    required int conversationId,
+    int? messageId,
+  }) async {
+    throw UnimplementedError('F-65③ 脚本化测试不触 regenerate');
+  }
+}
+
 /// 在 [deadline]（5s 墙钟）内轮询 [condition] 直到为真（与
 /// chat_controller_test 同款墙钟语义）。
 Future<void> _until(
@@ -231,16 +255,18 @@ void main() {
       Duration(seconds: 1),
       Duration(seconds: 2),
     ],
+    ChatService? serviceOverride,
   }) {
-    final service = ChatService(
-      database: db,
-      conversationRepository: convRepo,
-      characterRepository: charRepo,
-      messageRepository: messageRepository ?? messageRepo,
-      settingsRepository: settingsRepo,
-      providerFactory: FixedLLMProviderFactory(provider),
-      connectRetryDelays: connectRetryDelays,
-    );
+    final service = serviceOverride ??
+        ChatService(
+          database: db,
+          conversationRepository: convRepo,
+          characterRepository: charRepo,
+          messageRepository: messageRepository ?? messageRepo,
+          settingsRepository: settingsRepo,
+          providerFactory: FixedLLMProviderFactory(provider),
+          connectRetryDelays: connectRetryDelays,
+        );
     late _RoundEnv env;
     final notice = NoticeRunner();
     final round = ChatRound(
@@ -743,6 +769,39 @@ void main() {
       await env.round.retryInterrupted(conversationId: conv.id);
       expect(env.round.isRegenerating, isFalse, reason: '无目标不进入重试');
       expect(env.notice.notice, '回复已中断', reason: '既有 notice 不受影响');
+    });
+  });
+
+  group('reload 窗口 · ③（F-65③：窗口内重试不可达，无静默 no-op）', () {
+    test('done 收尾前 _reloadPending 保持 → 重试判据关闭（按钮不可达）；'
+        'done 收尾后判据恢复（按钮弹入可用）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final service = _ScriptedChatService();
+      final env = wireRound(
+        FakeLLMProvider(tokens: const []),
+        serviceOverride: service,
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      // 受控投递：先 token（有内容）再断流（截断目标 id=1）。
+      service.events.add(const ChatToken('a'));
+      service.events.add(const ChatInterrupted(1));
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+
+      // 未 close：onDone 未触发 → _reloadPending 仍 true（reload 一帧窗口内）。
+      expect(env.round.interruptedNoticeTargetId, 1,
+          reason: '截断目标已解析（判据前置）');
+      expect(env.round.hasRetryableInterrupted, isFalse,
+          reason: 'F-65③：reload 窗口内重试判据随 _reloadPending 关闭——重试'
+              '按钮不可达，杜绝「窗口内点击静默 no-op」');
+
+      // done 收尾：重载触发 → 窗口结束 → 判据恢复（按钮弹入，可重试）。
+      await service.events.close();
+      await _until(() async => env.round.hasRetryableInterrupted,
+          why: 'reload 收尾后按钮弹入可用');
+      expect(env.reloadCalls, greaterThanOrEqualTo(1), reason: 'done 触发重载');
+      env.round.dispose();
     });
   });
 

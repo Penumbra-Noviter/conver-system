@@ -104,6 +104,9 @@ class _ConversationView extends StatelessWidget {
           // 完成才回调 dismissNotice（提示条不硬切卸载）。
           NoticeBanner(
             notice: controller.notice,
+            // F-65④：notice 身份 seq 随文案同步传递（同文案新旧 notice 经
+            // 身份区分，陈旧出口 dismiss 不误清新 notice）。
+            noticeId: controller.noticeId,
             onDismiss: controller.dismissNotice,
             // T3 流式级可操作提示（M6-08）：仅「回复已中断」且存在可重试截断
             // 目标时传入「重试」动作；其它 notice 零动作（关闭-only）。

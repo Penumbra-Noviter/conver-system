@@ -174,10 +174,17 @@ class ChatRound {
 
   /// 当前提示是否为「回复已中断」且该提示存在可重试的截断目标——NoticeBanner
   /// 「重试」动作渲染判据（仅截断通知传动作；其它 notice / 零内容断流不传，
-  /// 防动作误挂）。判据（notice 文案 + notice 目标合取）单一归属本回合。
+  /// 防动作误挂）。判据（notice 文案 + notice 目标 + reload 窗口）单一归属
+  /// 本回合。
+  ///
+  /// F-65③：终态一帧 reload 窗口（[_reloadPending]，`_finishRound` 置位至
+  /// `_onStreamDone` 收尾）内**不渲染**「重试」按钮——共享守卫期间点击原本是
+  /// 静默 no-op（`_regenerateTarget` 直接 return）；窗口内按钮不可达，杜绝
+  /// 无响应点击（接受窗口后按钮弹入微调）。
   bool get hasRetryableInterrupted =>
       _noticeRunner.notice == interruptedNoticeText &&
-      _interruptedNoticeTargetId != null;
+      _interruptedNoticeTargetId != null &&
+      !_reloadPending;
 
   // ── 回合操作 ──
 
