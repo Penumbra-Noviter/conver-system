@@ -5,9 +5,9 @@
 /// - POST {base}/v1/messages、x-api-key + anthropic-version 头、system 顶层参数、
 ///   content_block_delta 的 text_delta 逐 token、temperature 不透传（R8）；
 /// - 401/429/400(content_filter)/408/504 → 业务 LLM 族（状态码分支不变）；
-///   流式连接拒绝（connect 段传输失败）→ LLMConnectionInterruptedError
-///   （M6-06 wire connect 相位收敛）；
-/// - 流中途 EOF（未到 message_stop）/ 连接重置 → 可区分的 LLMConnectionInterruptedError；
+///   流式连接拒绝（connect 段传输失败）→ ConnectPhaseInterruptedError
+///   （AR-1 连接相位收敛，服务层自动重试唯一可重试面）；
+/// - 流中途 EOF（未到 message_stop）/ 连接重置 → 读取相位 ReadPhaseInterruptedError；
 /// - 零 token 正常完成（message_stop 已收）不抛错。
 /// 锚：`desktop/backend/app/services/llm/claude.py` + `errors.dart::translateSdkError`。
 library;
@@ -308,7 +308,7 @@ void main() {
       expect(e, isA<LLMTimeoutError>());
     });
 
-    test('连接拒绝（端口关闭）→ LLMConnectionInterruptedError（connect 段收敛，'
+    test('连接拒绝（端口关闭）→ ConnectPhaseInterruptedError（连接相位收敛，'
         'SocketException 不穿透）', () async {
       final server = await startedServer(FakeLlmServer.httpError(200));
       final baseUrl = server.baseUrl;
@@ -320,9 +320,9 @@ void main() {
             .streamGenerate(messages: messages)
             .toList();
         fail('应抛出 LLM 族错误');
-      } on LLMConnectionInterruptedError {
-        // M6-06 契约：wire connect 段传输失败（拒连）统一收敛为
-        // LLMConnectionInterruptedError（SocketException 不穿透）。
+      } on ConnectPhaseInterruptedError {
+        // AR-1 契约：wire connect 段传输失败（拒连）统一收敛为连接相位叶子
+        // ConnectPhaseInterruptedError（SocketException 不穿透）。
       } on SocketException {
         fail('流式连接拒绝的 SocketException 必须经 translateError 进入 LLM 族');
       }
@@ -330,27 +330,27 @@ void main() {
   });
 
   group('streamGenerate 流式 — 断连可区分异常（供 T03 断流处理）', () {
-    test('EOF 未到 message_stop → LLMConnectionInterruptedError', () async {
+    test('EOF 未到 message_stop → ReadPhaseInterruptedError', () async {
       final server = await startedServer(
         FakeLlmServer.anthropic(['partial'], withStop: false),
       );
       await expectLater(
         makeProvider(server).streamGenerate(messages: messages).toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        throwsA(isA<ReadPhaseInterruptedError>()),
       );
     });
 
-    test('零 token + EOF 未到终态同样识别为中断（非正常完成）', () async {
+    test('零 token + EOF 未到终态同样识别为读取相位中断（非正常完成）', () async {
       final server = await startedServer(
         FakeLlmServer.anthropic(const [], withStop: false),
       );
       await expectLater(
         makeProvider(server).streamGenerate(messages: messages).toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        throwsA(isA<ReadPhaseInterruptedError>()),
       );
     });
 
-    test('流中途连接重置 → LLMConnectionInterruptedError', () async {
+    test('流中途连接重置 → ReadPhaseInterruptedError', () async {
       final reset = FakeResetServer(
         body: 'event: message_start\ndata: {"type":"message_start"}\n\n'
             'event: content_block_delta\n'
@@ -363,7 +363,7 @@ void main() {
         ClaudeProvider(apiKey: apiKey, baseUrl: reset.baseUrl)
             .streamGenerate(messages: messages)
             .toList(),
-        throwsA(isA<LLMConnectionInterruptedError>()),
+        throwsA(isA<ReadPhaseInterruptedError>()),
       );
     });
 
@@ -420,6 +420,14 @@ void main() {
       final original = LLMAuthError('Claude');
       final e = provider().translateError(original);
       expect(e, same(original));
+    });
+
+    test('C3: 相位叶子（Connect/Read）直通不二次翻译——translateError 不改写 '
+        'wire 已抛出的叶子', () {
+      final connect = ConnectPhaseInterruptedError(originalError: Exception('c'));
+      final read = ReadPhaseInterruptedError(originalError: Exception('r'));
+      expect(provider().translateError(connect), same(connect));
+      expect(provider().translateError(read), same(read));
     });
   });
 

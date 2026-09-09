@@ -15,6 +15,8 @@
 | **CORS 直连（方案③）** | 游戏 WebView 内浏览器 fetch 直连第三方 OpenAI 兼容 API（国产厂商实测放行）为默认路径；无 `/proxy` 反代 | §4.4 |
 | **fetch 垫片（方案①）** | JS fetch 拦截垫片，仅为 Claude/OpenAI 官方端点保留兜底位（未启用，视反馈） | §4.5 |
 | **验证分层** | 业务逻辑/widget 用 `flutter test`（宿主无头，无需模拟器）兜底；平台薄层（WebView 桥/SecureStorage/端口绑定）上真机/模拟器验证；iOS 需 macOS+CI | §7.1 |
+| **连接相位 (connect phase)** | wire 连接建立段（postUrl→写请求体→close 等到响应头，未收状态码）的传输失败；编码为 `ConnectPhaseInterruptedError`；是聊天链路自动重试（M6-06）的唯一可重试面 | `services/llm/errors.dart`（公共错误类型契约） |
+| **读取相位 (read phase)** | 已收响应头后读 SSE 段（流中途 EOF/断连/idle 超时/未收敛终态帧）的失败；编码为 `ReadPhaseInterruptedError`；不可重试 | 同上 |
 | **伴生同步（后期可选）** | Tailscale/导出导入实现"连桌面同步数据"的后期可选功能，非 MVP 所需 | §0 / §8 |
 
 > 注：与桌面库共享的领域概念（角色卡 V2、SSE 流式、存档互迁格式等）权威定义在桌面库 `desktop/CONTEXT.md`，本表只登记移动端特有/新增的 load-bearing 术语。

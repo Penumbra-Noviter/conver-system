@@ -26,6 +26,35 @@ void main() {
       expect(LLMContentFilterError('Claude'), isA<LLMError>());
       expect(LLMBadRequestError('OpenAI', 'bad'), isA<LLMError>());
       expect(LLMResponseParseFailedError('OpenAI', 'oops'), isA<LLMError>());
+      // AR-1 两相位叶子同为 LLM 族子类。
+      expect(ConnectPhaseInterruptedError(), isA<LLMError>());
+      expect(ReadPhaseInterruptedError(), isA<LLMError>());
+    });
+
+    test('D1: 相位叶子伞判型锚——两叶子 isA<LLMConnectionInterruptedError>；'
+        '基类非任一叶子（concrete 兜底信号不互为子类）', () {
+      // 断流伞（AR-1）：基类 = 不可重试兜底信号，两叶子 extends 基类。
+      expect(ConnectPhaseInterruptedError(),
+          isA<LLMConnectionInterruptedError>());
+      expect(ReadPhaseInterruptedError(), isA<LLMConnectionInterruptedError>());
+      // 基类保持 concrete：不互为叶子（两相位正交）。
+      expect(LLMConnectionInterruptedError(),
+          isNot(isA<ConnectPhaseInterruptedError>()));
+      expect(LLMConnectionInterruptedError(), isNot(isA<ReadPhaseInterruptedError>()));
+      expect(ConnectPhaseInterruptedError(), isNot(isA<ReadPhaseInterruptedError>()));
+      expect(ReadPhaseInterruptedError(), isNot(isA<ConnectPhaseInterruptedError>()));
+    });
+
+    test('D1: 相位叶子 originalError 透传（wire 原始异常入参）', () {
+      final connectCause = Exception('SocketException: refused');
+      final connect = ConnectPhaseInterruptedError(originalError: connectCause);
+      expect(connect.originalError, same(connectCause));
+      expect(connect.message, '连接中断，回复未完成');
+
+      final readCause = StateError('SocketException: EOF');
+      final read = ReadPhaseInterruptedError(originalError: readCause);
+      expect(read.originalError, same(readCause));
+      expect(read.message, '连接中断，回复未完成');
     });
   });
 
