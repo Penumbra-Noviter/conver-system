@@ -43,9 +43,7 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-52 | 聊天重试判据宽于文档契约：流读阶段「HTTP 200 + 空体无终态帧」EOF 被 `stream_wire` 抛 `LLMConnectionInterruptedError`，与连接建立阶段失败同型不可分 → `chat_service` 重试判据（`!producedToken && _isConnectionDrop`）会重试已收到状态码的失败，最坏同一 user 内容 3 次 billable POST；且重试无总预算上限（黑洞网络 ≈33s）。修法方向 = wire 相位隔离（connect 失败 vs read 中 EOF）或错误类型区分。 | W1 增量审核 Falsify（F-N1/F-N2）（期末四轴 Spec 复证：判定留债非阻断——无崩溃/无内容重复/触发为服务端异常行为/影响有界，建议下个技术债批次优先） | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-55 | 无终态路径 cancel-unwind 抛未处理错误：`_stopStreamReply` 的 `cancel().timeout(3s)` 无 onError → 停滞流 cancel 后 3s 窗口内连接 EOF 时 `chat_service.dart:590` 抛 `LLMConnectionInterruptedError` → 部分落库与 controller.close（:597-605）被跳过 + `chat_round.dart:198` stop 收尾被跳过 + 未处理异步错误（注释「挂起不抛错、timeout 双层兜底」对「3s 内以错误完成」不成立）。修法＝onError + 落库/close 移 finally。基线 d5b8c03/6b03d2c 同现，非 M6 引入；09 的 wire force-close 已收窄暴露窗口。 | W2 增量审核（09 相邻发现 2，端到端复现） | Strong | 📝 待立项 | 聊天链路 |
-| F-56 | 假活连接终态化缺口：终态帧已到 + 连接不关闭 → await-for 永不 EOF → round 永不终态化（09 验收 4 为设计选择，但离「假活连接终态化保障」目标差一格）。随修项：① `stream_wire.dart:93/:102` 注释声称「后续行不再重启计时器」失真（每行迭代顶部 `armIdleTimer()` 无条件执行，终态帧后尾随空行会重新武装——可观察保证仍成立，机制与注释不符）；② N4 集成断言缺口：无自动化断言组合「idle 触发 → ChatInterrupted」（wire 与 service 各层单测均绿）；③ `stream_wire_test.dart` M6-09「注释帧跨 idleTimeout」时序 flake（W3 全量套件实测 1 次，单独重跑 16/16 绿）——修时加容差/定序。 | W2 增量审核 N1/N2/N4 + W3 增量审核 F8（期末四轴复证 F-N5） | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-56 | 假活连接终态化缺口：终态帧已到 + 连接不关闭 → await-for 永不 EOF → round 永不终态化（09 验收 4 为设计选择，但离「假活连接终态化保障」目标差一格）。**随修项 ② 注释失真 / ③ N4 断言 + flake 容差已由 AR-1 收编（2026-09-09）**，本条目缩减为仅剩 ① 假活终态化，正交于相位编码、重开 wire 终态语义，待专项立项。 | W2 增量审核 N1/N2/N4 + W3 增量审核 F8（期末四轴复证 F-N5）+ AR-1 收编 ②③ | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-57 | 停滞连接上 `sub.cancel()` 有界挂起：chat_service `_stopStreamReply` 已有 `.timeout(3s)` 兜底注释（F-17 面），09 idle force-close 已收窄暴露窗口——机制实证（cancel 挂到 EOF 为止），3s 兜底生效、基线同现。 | W2 增量审核（09 相邻发现 1） | Worth exploring | 📝 待立项 | 聊天链路 |
 | F-59 | 角色卡语义失真：`characters_view.dart:340-349` `Semantics(button: true)` 无条件标记，而常态（非多选态）onTap 为 null → TalkBack 激活「button」无响应；同 diff 游戏卡（`simulators_view.dart:418`）做了 `button: onOpen != null` 守卫而角色卡未对齐；测试 `characters_view_test.dart:454` 把「可确认可点」锁进断言（验收 4 原文 button:true，票面 tension）。修法方向 = 对齐游戏卡守卫。 | W3 增量审核 F1（期末四轴复证 F-N7） | Worth exploring | 📝 待立项 | 无障碍 |
 | F-63 | 光标 reduce-motion 面测试与实现小缺口（一张小票收口方向）：① `_appliedOnce` 运行时翻转路径（同挂载内 MediaQuery 翻转）零测试覆盖；② reduce→正常翻转同帧 `value=0.0` 光标消失一帧（瞬态缺陷）；③ `_appliedOnce` 注释理由与 SDK 机制不符（repeat 自 stop，泄漏不存在；真实作用 = 防无关 didChangeDependencies 重跑闪断）——注释写歪；④ `large_text_probe_test`「流式占位」面从不触发 streaming，1.3x 唯一与光标组合未渲染，doc 覆盖声明失实；⑤ `blinking_cursor_reduce_motion_test.dart:94` `print('DBG')` 提交残留。 | W4 增量审核 F-1/F-2/F-5/F-6（期末四轴复证 S-N1） | Worth exploring | 📝 待立项 | 无障碍 |
@@ -54,6 +52,16 @@
 | F-66 | 「回复中断」小标在气泡 MergeSemantics 外成独立语义节点，M6-10 a11y 断言套件零覆盖（屏读体验未锁定）。 | W6 审核 F-6（期末四轴复证 F-N8） | Speculative | 📝 待立项 | 无障碍 |
 
 ## 技术债处置记录
+
+### 2026-09-09 — 架构深化 AR-1 消费（F-52/F-55 已修 + F-56 缩减）
+
+> 来源：improve-codebase-architecture 候选 1（Strong）+ Grilling 共识 `r1-phase-encoding`。交付：wire 连接相位编码 + 重试判据收束（双子类 ConnectPhase/ReadPhaseInterruptedError + 判据单行 + producedToken 删除 + F-55 try/catch/finally 结构保证），commit 613fcd4 / merge 89fd1bf；范围 183 测 + 受影响 92 测全绿 / analyze 0 / 覆盖率 99.32%；code-review 四轴 0 阻断（B1 首 token 前 idle 收窄 / B2 基类兜底语义，影响面核验干净）。行为变更点随交付汇报（F-58 观察随 B1 消亡）。审核 N-F1（「ConnectPhase 无 token」依赖 wire 构造 + translateError 直通）标注为**未来 provider 扩展复核点**，非债。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-52 | ✅ 已修 | 重试判据宽于文档契约（空 200 体 EOF 与连接失败同型 → 最坏 3 次 billable POST）：AR-1 双子类相位编码——空 200 体 EOF 落 ReadPhaseInterruptedError，判据收敛 `error is ConnectPhaseInterruptedError` 单行，同一 user 内容 ≤1 次 billable POST；先红后绿实证（红 callCount 2 → 绿 1） |
+| F-55 | ✅ 已修 | cancel-unwind 未处理错误（_stopStreamReply cancel().timeout 以错误完成 → 落库/close 被跳过）：AR-1 try/catch（Dart Future.timeout 无 onError 参数——事实校准）+ 落库/close 收尾进 finally 结构保证；_CancelErrorProvider 回归（部分落库 + close + zone 零未处理异常），先红后绿实证 |
+| F-56 | 🔄 缩减 | ② 注释失真 / ③ N4 断言 + flake 容差已由 AR-1 收编；仅剩 ① 假活连接终态化缺口待专项（正交于相位编码，重开 wire 终态语义）——候选区条目已缩减 |
 
 ### 2026-09-08 — M6 W1 增量审核落债（O-N1/O-N2 复核关闭）
 

@@ -32,6 +32,14 @@
 
 ## 已完成归档
 
+### 架构深化批次 AR-1 — wire 连接相位编码（2026-09-09 收口）
+
+> 来源：improve-codebase-architecture 候选 1（Strong）+ Grilling 共识 `r1-phase-encoding`（2 轮问毕零真拍点）。交付：双子类 `ConnectPhaseInterruptedError`/`ReadPhaseInterruptedError` extends `LLMConnectionInterruptedError`（基类 concrete 升格「不可重试兜底信号」）+ wire 三抛点相位映射 + 重试判据单行 `error is ConnectPhaseInterruptedError` + `producedToken` 删除 + F-55 try/catch/finally 结构保证 + F-56 ②③ 收编 + CONTEXT 登记。门禁：范围 183 测 + 受影响 92 测全绿 / analyze 0 / 覆盖率 99.32%（口径 `--cov` 3 源文件）/ code-review 四轴 0 阻断（行为变更 B1 首 token 前 idle 收窄为 read 相位不重试、B2 基类语义升级——影响面核验干净；N-F1 标未来 provider 扩展复核点）。**行为变更点**：M6-06 契约面收窄（首 token 前 idle 单次 attempt），F-58 观察随 B1 消亡。技术债：F-52/F-55 ✅ 已修、F-56 缩减待专项。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| AR-1 | wire 连接相位编码 + 重试判据收束 | 2026-09-09 | 613fcd4（merge 89fd1bf） |
+
 ### M6 批次 — 去 AI 味打磨（2026-09-08 收口）
 
 > 来源：project-kickoff 全自动档（Grilling 共识 5 真拍点全按推荐 A 定案：克制动效子集 8 项 / 聊天链路弱网重连自建不引 connectivity_plus / 实用层无障碍含 F-73 授权 / 空态不加操作入口 / 视觉评审走查清单+基线对照）。11 票 7 波次 DAG（W1 01‖04‖06 / W2 02‖09 / W3 03 / W4 05 / W5 07‖10 / W6 08 / W7 11 验收），Lane U 串行链 01→02→03→05→07（第 5 票后链中重启点换新 agent 接 08）+ Lane W 06→09；网关 TLS 断连 W1 三连重开（半成品接续）+ 暂停/恢复一次（TaskStop 后新 agent 接续，半成品零丢失）。合并链 f2391b3→0772c80→df25274→6b03d2c→(债 6046cb7)→80512e3→14a49a7→3226a4b→b115c3a→(债 a9bd412)→48a31b9→f32db5f→c70ae8b→(B1 0118b6a)→(B1 06673bf)→(hygiene 9221a9f)→(债 4ba0635)。波末增量审核 ×6（W1~W6）：W5 B1（NoticeBanner 消失过渡缺失）+ W6 B1（重试双路径死按钮）均派回修复 + 回归断言红→绿；期末四轴**阻断 0** / 非阻断 12（落债 F-64~66 + 复证标注 F-52/56/59/63）。全量 **1460 测**全绿（基线 1360 → +100）/ analyze 0 / MUTATION 0 / 全局覆盖率 **96.78%**（剔除 drift 生成物）。**M6 门视觉评审 PASS**（2026-09-08 AVD medium_phone）：§5.2×5tab×双主题像素采样全过（浅色 accent 实测 7.32:1 ≥4.5:1）/ 动效代码级验收（8 处 / ConverDurations fast140·mid220·slow300+tabFade160 对齐桌面 / 零动画库）/ 空态 7 处 + 错误态 4 型 + 断流「回复中断」vs「已停止」两标互斥运行时实证 / 弱网单测复核（06/09 148 + 08 53 全绿）/ a11y 语义树 + 15 断言全绿（TalkBack 可选未做）/ logcat FATAL=0；**B1 核心路径模拟器实测**（断流→图标 regenerate 清标清横幅 replace 完整回复 user 行不重复）。详见 DEV_LOG〈M6 kickoff 批次〉。

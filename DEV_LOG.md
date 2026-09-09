@@ -6,6 +6,13 @@
 
 ---
 
+## 架构深化批次 AR-1 — wire 连接相位编码（2026-09-09 — improve-codebase-architecture 候选 1 直落）
+
+- **交付**：双子类 `ConnectPhaseInterruptedError`/`ReadPhaseInterruptedError` extends `LLMConnectionInterruptedError`（基类 concrete 升格「不可重试兜底信号」）；wire 三抛点相位映射（connect 段 2 catch → Connect / 读段 2 catch + !reachedTerminated → Read）；重试判据单行 `error is ConnectPhaseInterruptedError` + `producedToken` 字段与 `!producedToken` 判据删除（ConnectPhase 构造性保证无 token）；F-55 结构保证（try/catch 包 cancel().timeout——Dart `Future.timeout` 无 onError 参数事实校准 + 落库/close 收尾进 finally）；F-56 ② 注释失真 / ③ N4 两层拼合断言 / flake 容差收编（① 假活终态化排除续期）；CONTEXT 登记「连接相位/读取相位」。commit 613fcd4（merge 89fd1bf），基线 c5e5ce7。
+- **门禁链**：范围 183 测（errors 28 / wire 17 / chat_service 67 / claude 37 / openai 34）+ 受影响 92 测全绿 / analyze 0；覆盖率 99.32%（291/293，3 源文件口径，2 未命中为既有面诚实披露）；**先红后绿**：F-52（B3 红 callCount 2→绿 1）/ F-55（B5 红错误穿透 :590→绿收尾完整 zone 零异常）/ B4 idle（红→绿）+ 三处突变抽查灵敏度；code-review 四轴 **0 阻断**（B1/B2 影响面核验干净无回归；N-F1「ConnectPhase 无 token 依赖 wire 构造」标未来 provider 扩展复核点；N-S1 TECH_DEBT 流转已补）。
+- **行为变更点（交付汇报）**：B1 首 token 前 idle 断线由「可重试」收窄为「read 相位不重试」（M6-06 契约面收窄，消解 F-58 观察的 ≈3.5 分钟静默 + 杜绝重复计费）；B2 基类语义升级为「不可重试的断流兜底信号」（生产抛点全迁叶子）。
+- **过程遥测**：子智能体 4（Grilling ×1 两轮 + Implement ×1 + code-review ×1）；回退 0 / 冲突 0；空返回 0；技术债闭环：候选区 9 → 7（F-52/55 已修移出 + F-56 缩减）。
+
 ## M6 kickoff 批次（2026-09-08 — project-kickoff 全自动档交付：去 AI 味打磨）
 
 - **交付**：Grilling 共识 5 真拍点全按推荐 A 定案（⚑1 克制动效子集 8 项 / ⚑2 聊天链路弱网重连自建不引 connectivity_plus / ⚑3 实用层无障碍含 F-73 授权 / ⚑4 空态不加操作入口 / ⚑5 视觉评审走查清单+基线对照）。11 票 7 波次 DAG：W1 01‖04‖06（空态/状态组件抽离 + F-73 浅色 accent #784E14 族对比度 ≥4.5:1 + 连接阶段重试 2 次退避 1s/2s）/ W2 02‖09（NoticeBanner 抽离 + idle timeout 60s）/ W3 03（语义覆盖：气泡 MergeSemantics「角色名: 内容」/装饰排除/卡片 button/tooltip 审计，controller 加只读 activeCharacterName）/ W4 05（1.3x 六面探测零溢出 + reduce-motion 光标停闪，Falsify 抓 _appliedOnce 首帧守卫 bug）/ W5 07‖10（ConverDurations 三档 token + tab Fade 160ms 无保活 + SnackBarTheme + a11y 15 断言）/ W6 08（断流「回复中断」标记 + NoticeBanner 重试 regenerate replace）/ W7 11 视觉评审验收（8/8 PASS）。**Lane U 串行链** 01→02→03→05→07 单 agent 连续 + 第 5 票后链中重启点换新 agent 接 08；Lane W 06→09。合并链 f2391b3→0772c80→df25274→6b03d2c→80512e3→14a49a7→3226a4b→b115c3a→48a31b9→f32db5f→c70ae8b→0118b6a→06673bf→9221a9f→4ba0635。证据 `.scratch/m6-kickoff/evidence/`（01~11 + B1 附录）+ 37 张截图 `11-visual/`。
