@@ -475,14 +475,16 @@ void main() {
       );
     });
 
-    test('已收终态帧后静默（> idleTimeout）→ 守卫失效不误杀，正常完成；且完成'
-        '发生在服务端自然关闭时（终态后计时器已取消）', () async {
+    test('已收终态帧后静默（> idleTimeout，< 终态守卫 2s 缺省）→ 正常终态零变更：'
+        '终态后 idle 守卫失效不误杀；终态守卫时长 > 服务端静默跨度 → 不触发，'
+        '完成于服务端自然关闭（09 验收 4 elapsed 下限断言保持）', () async {
       final server = _RawSseServer((w) async {
         await w.send(textDelta('He'));
         await w.send(frame('message_stop', '{"type":"message_stop"}'));
-        // 终态帧后静默挂起 4× idleTimeout 再自然关闭：若终态后计时器未失效，
-        // 会在 ~idleTimeout 时提前触发（被下方 elapsed 下限断言捕获/抛错）。
-        // 裕量：静默跨度 800ms = 4× idleTimeout（200ms），断言下限 2.5×。
+        // 终态帧后静默挂起 800ms（4× idleTimeout 200ms、但 < 终态守卫 2s 缺省）
+        // 再自然关闭：若终态后 idle 计时器未失效，会在 ~idleTimeout 提前触发
+        // （被下方 elapsed 下限断言捕获/抛错）；终态守卫时长（2s）> 静默跨度
+        // （800ms）→ 不触发（守卫仅补假活缺口，正常路径零变）。
         await Future<void>.delayed(const Duration(milliseconds: 800));
       });
       await server.start();
@@ -497,8 +499,8 @@ void main() {
 
       expect(tokens, ['He']);
       expect(took >= const Duration(milliseconds: 500), isTrue,
-          reason: '终态后不应触发 idle 断线：完成过早（服务端 800ms 环境自然关闭）'
-              '说明计时器未在终态失效: took=$took');
+          reason: '终态后不应触发任何守卫断线：完成过早（服务端 800ms 环境自然'
+              '关闭）说明 idle 未在终态失效或终态守卫误触发: took=$took');
     });
 
     test('注释帧（: ping）静默忽略维持现状；作为活跃行持续重启计时器 → '
@@ -548,6 +550,105 @@ void main() {
       expect(cancelWatch.elapsed < const Duration(seconds: 3), isTrue,
           reason: '流动流上 cancel 应及时返回（停滞挂起为 F-17 既有面，不适用）');
       // 越过注入 idleTimeout（200ms）：若计时器泄漏后触发 → 关闭已关闭 client
+      // 应无副作用；zone 捕获未处理异步异常即测试失败。
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+  });
+
+  group('streamSse · 终态守卫（F-56 假活终态化）', () {
+    // 假活终态化时序敏感测试与 idle 组同用原始 ServerSocket 字节级摆布；
+    // idleTimeout 保持生产 60s 缺省值（终态后读阶段守卫已失效），仅注入
+    // 短终态守卫，专测终态帧后的假活收束面。
+    Stream<String> guardWire(Uri uri, Duration terminalTimeout) => streamSse(
+          uri: uri,
+          body: '{}',
+          headers: {},
+          isTerminated: isAnthropicMessageStop,
+          extractToken: extractAnthropicText,
+          idleTimeout: const Duration(seconds: 60),
+          terminalTimeout: terminalTimeout,
+        );
+
+    String textDelta(String token) =>
+        'event: content_block_delta\ndata: {"type":"content_block_delta",'
+        '"delta":{"type":"text_delta","text":"$token"}}\n\n';
+
+    test('假活终态化：终态帧后连接保持 + 无帧 → 终态守卫到期有界收束'
+        '（终态后读阶段 idle 已失效、由守卫兜底；60s idle 不参与）', () async {
+      final server = _RawSseServer((w) async {
+        await w.send(textDelta('He'));
+        await w.send(frame('message_stop', '{"type":"message_stop"}'));
+        // 终态帧后连接保持、不再写也不关（假活）：idle 60s 缺省远大于守卫时长，
+        // 唯一到期的就是终态守卫（200ms）——force-close 使 await-for 自然收束。
+        await Completer<void>().future;
+      });
+      await server.start();
+      addTearDown(server.close);
+
+      final elapsed = Stopwatch()..start();
+      final tokens = await guardWire(
+        server.uri,
+        const Duration(milliseconds: 200),
+      ).toList().timeout(const Duration(seconds: 3)); // 有界：守卫缺失时防挂起。
+      final took = elapsed.elapsed;
+
+      expect(tokens, ['He']);
+      expect(took >= const Duration(milliseconds: 200), isTrue,
+          reason: '完成过早 = 收束非由终态守卫到期触发（took=$took）');
+    });
+
+    test('终态后尾随事件帧持续流动 → 终态守卫逐帧复位不误杀：全部尾随 token '
+        '产出，完成于服务端自然关闭（非守卫提前触发）', () async {
+      final server = _RawSseServer((w) async {
+        await w.send(textDelta('He'));
+        await w.send(frame('message_stop', '{"type":"message_stop"}'));
+        // 终态后尾随事件帧：60ms 一帧（休眠间隔 < 守卫 300ms 的 1/5），总跨度
+        // 360ms > 守卫时长——若守卫未逐帧复位，会在 ~300ms 到期截断尾随帧。
+        for (var i = 1; i <= 6; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          await w.send(textDelta('t$i'));
+        }
+        // handler 返回后 socket.destroy() = 服务端自然关闭（正常收束路径）。
+      });
+      await server.start();
+      addTearDown(server.close);
+
+      final elapsed = Stopwatch()..start();
+      final tokens = await guardWire(
+        server.uri,
+        const Duration(milliseconds: 300),
+      ).toList();
+      final took = elapsed.elapsed;
+
+      expect(tokens, ['He', 't1', 't2', 't3', 't4', 't5', 't6']);
+      expect(took >= const Duration(milliseconds: 300), isTrue,
+          reason: '完成过早 = 终态守卫未随尾随帧复位、提前触发截断（took=$took）');
+    });
+
+    test('Falsify: 终态后守卫挂起中消费方取消 → 及时返回、finally 清理（含终态'
+        '守卫计时器）无泄漏、无未处理异常', () async {
+      final server = _RawSseServer((w) async {
+        await w.send(textDelta('He'));
+        await w.send(frame('message_stop', '{"type":"message_stop"}'));
+        // 终态后尾随帧每 50ms 持续流动（< 守卫 200ms 且 > 0）：守卫持续复位挂起中，
+        // 取消发生在流动中（停滞连接上 cancel 有界挂起为 F-17 既有已知，不适用）。
+        for (var i = 0; i < 4; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await w.send(textDelta('t$i'));
+        }
+        await Completer<void>().future; // 后续不再写，等待 tearDown destroy。
+      });
+      await server.start();
+      addTearDown(server.close);
+
+      final sub = guardWire(server.uri, const Duration(milliseconds: 200))
+          .listen((_) {});
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      final cancelWatch = Stopwatch()..start();
+      await sub.cancel();
+      expect(cancelWatch.elapsed < const Duration(seconds: 3), isTrue,
+          reason: '流动流上 cancel 应及时返回（停滞挂起为 F-17 既有面，不适用）');
+      // 越过终态守卫时长（200ms）：若守卫计时器泄漏后触发 → 关闭已关闭 client
       // 应无副作用；zone 捕获未处理异步异常即测试失败。
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
