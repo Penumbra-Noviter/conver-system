@@ -10,9 +10,8 @@
 //
 // 锚文本限定：`设置` 同时存在于 NavigationBar label 与设置页页头，须以
 // `find.descendant(of: find.byType(SettingsView), ...)` 限定；`聊天` 同时存在
-// 于 NavigationBar label 与聊天入口标题（T04 起为真实 ChatView，M1 曾为
-// PlaceholderGroup），须以 `find.descendant(of: find.byType(ChatView), ...)`
-// 限定。
+// 于 NavigationBar label 与聊天入口标题（T04 起为真实 ChatView），须以
+// `find.descendant(of: find.byType(ChatView), ...)` 限定。
 library;
 
 import 'dart:async';
@@ -105,7 +104,7 @@ void main() {
       await pumpApp(tester);
       await setThemeMode(tester, ThemeMode.light);
 
-      // 默认 tab=聊天：PlaceholderGroup 标题用浅色 ink1。
+      // 默认 tab=聊天：ChatView 标题用浅色 ink1。
       final chatTitle = tester.widget<Text>(
         find.descendant(
           of: find.byType(ChatView),
