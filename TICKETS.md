@@ -19,7 +19,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| M7 | 发布准备：双端图标、Android AAB/iOS 签名、隐私清单 | 📝 | 上架/侧载包 |
 
 ---
 
@@ -30,6 +29,25 @@
 ---
 
 ## 已完成归档
+
+### M7 批次 — 发布准备（Android 范围收窄，iOS 延后）（2026-09-09 收口）
+
+> **范围注记**：Android 范围收窄，iOS 延后（Windows 无 macOS 路径，design §7.1）——
+> 本批仅交付 Android 发布准备，未建任何 iOS 产物，iOS 图标/签名/隐私/上架全部延后，
+> 仅以本注记标注，条目不关闭、不删除。
+> 来源：project-kickoff 全自动档（handoff-M7 收窄）；4 工单 2 波（波1 01 自适应图标 ‖
+> 02 release 签名 ‖ 03 隐私清单 → merge `43ce7f7`；波2 04 release 验证门禁）。
+> 交付：release AAB + 同签名 release APK 双产物（上架/侧载），AVD medium_phone 冒烟
+> PASS（launcher「汇」图标 + 主界面渲染 + 导航壳），`docs/release-android.md`（版本策略
+> 1.0.0+1 / versionCode=1 语义 / 递增规则 + 双产物命令链 + 侧载与签名核对 + keystore
+> 生命周期 + 数据安全表单对照），`docs/privacy-android.md`（T03）。门禁：全量 **1518 测**
+> 绿 / analyze 0 / pytest 57 绿（T01/T03 脚本，覆盖 TOTAL 98.70%）/ 权限集合 ==
+> {INTERNET} + 明文回环豁免 / 双产物签名证书一致（SHA-256 7B:7C:00:A6... == keystore）/
+> 包内 versionCode==1 / versionName==1.0.0。M7-Android 可交付、可侧载、可上报审核。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| M7 | 发布准备：Android 自适应图标 + release 签名 + 隐私清单 + 发布验证门禁（iOS 延后） | 2026-09-09 | 8a14b5c（波1 merge 43ce7f7） |
 
 ### 技术债折回批次 F-56/F-65/F-67 — 全部折回收官（2026-09-09 收口）
 
