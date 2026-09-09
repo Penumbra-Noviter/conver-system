@@ -6,6 +6,11 @@
 
 ---
 
+## 架构深化批次 AR-3 — 凭据解析链单一归属（2026-09-09 — improve-codebase-architecture 候选 3 直落）
+
+- **交付**：新模块 `lib/services/llm/credentials_resolver.dart`（纯 Dart 深模块——四 reader 注入 defaultProvider/defaultModel/apiKey/baseUrl + `ResolvedCredentials{provider, apiKey, model, baseUrl?}` + `CredentialsResolver.resolve({providerOverride, modelOverride})`，镜像桌面 resolver.py::resolve_llm）收编 4 组合点（chat `_resolveProvider` conv 覆盖 / doc-parse parse catch→DocParseError 422 文案逐字 / simulators_view 生成组合包裹 GenerationCredentials；**hook（simulators_hooks）Key 注入契约变体 openai-only 零接触独立单源**）；空 key 抛点统一入解析器（复用 ApiKeyMissingError 类+文案零新增）；ChatService/DocumentParseService 构造加可选 resolver 参数（缺省既有装配零 churn）；CONTEXT 登记「凭据解析链」。commit `8810e0f`（merge `33cdc77`），基线 a6b0070。
+- **门禁链**：规则矩阵 A1-A6（15 用例纯注入零 flutter）+ 范围 754 测全绿（chat 71 / doc-parse+layer 26 / injection+run_view+generate_dialog 75 / game_gen+wizard 68 等）/ analyze 0；覆盖率 100.00%（新模块 11/11）；**变异抽查**：删空 key throw → A3/A6 红、忽略 provider override → A1/A6 红（灵敏度实证）；code-review 四轴 **0 阻断 / 5 非阻断**（缺结尾换行已补 / DEV_LOG 记录本批补 / F1-F2 纯读 await 顺序角落观察〔理论双失败角落错误来源、空 key 省读，正常操作不可观察〕/ A1 装配接线三处同形重复——共识已明示 tradeoff 可接受）。**可观察行为零变更**（B1-B3 内部委派、B4 hook 零 diff）；api_config_section key.isEmpty 表单值路径 grep 实证零槽链引用未误收编。
+
 ## 架构深化批次 AR-2 — 停止完成契约（2026-09-09 — improve-codebase-architecture 候选 2 直落）
 
 - **交付**：停止完成信号（stop completion signal）落位 ChatService——`_StreamRunState.userWriteSettled` Completer 门 + `_runStreamReply` user 写后 complete + 终态兜底（写成功 / DomainError / LLMError / 未预期 catch 四条终态路径门必结算）+ `_stopStreamReply` 置 stopped 后先 await 门（3s 有界 F-17 同款 + try/catch 对齐 F-55 结构保证）再走既有收尾；`sub.cancel()` resolve 结构性保证「已发 user 写已结算」。chat_round 删除 F1 轮询补偿（`_awaitInFlightUserLanded` 20ms 轮询 ≤3s + 1s 单轮查询超时 + `_roundUserText` 死字段），「会话内/入口态后台流」两条腿与 F3b 补标**保留**（共识事实校准：两腿因标记放置位置而非 user 写时序，任何契约形态都不改变两腿结构）；chat_round 的 `_messageRepository` 依赖保留（F3b 末条判定 / regenerate 目标解析）。F1（候选 5 批次走查发现编号）随轮询删除**自然关闭**（非 TECH_DEBT 独立条项，已核实）。commit `9be52cd` 入 `kickoff/ar2-stop-contract`（merge `a6b0070`），基线 ba8830a。**自审修复**：首版门只在 finally 结算 → 与 `controller.close()` 完成（依赖 onCancel 收尾）形成闭环，终态错误路径取消卡满 3s（诊断实证）——门改在三 catch 内、close 之前独立结算（`_settleUserWriteGate`），finally 保留为兜底 + 2s 上界回归断言锁定。

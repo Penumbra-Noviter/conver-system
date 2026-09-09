@@ -32,6 +32,14 @@
 
 ## 已完成归档
 
+### 架构深化批次 AR-3 — 凭据解析链单一归属（2026-09-09 收口）
+
+> 来源：improve-codebase-architecture 候选 3（Worth exploring）+ Grilling 共识 `r3-credentials-resolver`（3 轮六问零真拍点）。交付：`credentials_resolver.dart` 纯 Dart 深模块收编 4 组合点（chat/doc-parse/生成；hook 契约变体零接触独立单源）；空 key 抛点统一复用 ApiKeyMissingError；可选 resolver 参数零 churn 接入。门禁：规则矩阵 A1-A6 15 用例 / 范围 754 测 / analyze 0 / 覆盖率 100% / code-review 四轴 0 阻断（行为零变更确认，F1/F2 纯读角落观察 + A1 装配接线重复 tradeoff 共识明示）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| AR-3 | 凭据解析链单一归属 | 2026-09-09 | 8810e0f（merge 33cdc77） |
+
 ### 架构深化批次 AR-2 — 停止完成契约（2026-09-09 收口）
 
 > 来源：improve-codebase-architecture 候选 2（Strong）+ Grilling 共识 `r2-stop-contract`（2 轮问毕零真拍点）。交付：停止完成信号落位 ChatService（`userWriteSettled` Completer 门 + 终态兜底 + `_stopStreamReply` 置 stopped 先 await 门 3s 有界 + try/catch 对齐 F-55）+ chat_round 轮询补偿删除（`_awaitInFlightUserLanded`/常量/`_roundUserText` 死字段，两条腿与 F3b 保留）+ CONTEXT 登记。**自审修复真实死锁**（门仅在 finally 结算与 close 完成闭环 → 终态错误路径卡满 3s → catch 级独立结算 + finally 兜底 + 2s 上界回归）。门禁：范围 134 测 / analyze 0 / 覆盖率 98.90% / code-review 四轴 0 阻断（死锁修复突变①②承重）。可观察行为零变更。
