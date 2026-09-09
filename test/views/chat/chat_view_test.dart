@@ -20,6 +20,8 @@
 /// 显式 `await env.close()`（tearDown 阶段在 fake 时钟边界下可能挂起——实证）。
 library;
 
+import 'dart:async';
+
 import 'package:conver_system_mobile/data/database/app_database.dart' show Message;
 import 'package:conver_system_mobile/data/database/tables.dart' show Role;
 import 'package:conver_system_mobile/services/conversation_export_file_exchange.dart';
@@ -31,6 +33,7 @@ import 'package:conver_system_mobile/theme/colors.dart' show ConverColors;
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/views/chat/chat_controller.dart';
 import 'package:conver_system_mobile/views/chat/chat_view.dart';
+import 'package:conver_system_mobile/widgets/notice_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -951,6 +954,67 @@ void main() {
       expect(seam.calls, hasLength(1));
       expect(seam.lastFileName, endsWith('.md'));
       expect(find.text('已导出 艾莉亚.md（分享面板已打开）'), findsOneWidget);
+      await env.close();
+    });
+
+    testWidgets('NoticeBanner 收到控制器 noticeId（F-65④ seq 接线：视图传 id）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final seam = _FakeExportFileExchange();
+      final c = await openWithExport(tester, env, seam);
+
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('导出 JSON'));
+      await tester.pumpAndSettle();
+
+      final banner = tester.widget<NoticeBanner>(find.byType(NoticeBanner));
+      expect(c.noticeId, isNotNull, reason: 'notice 置位即分配身份 seq');
+      expect(banner.noticeId, c.noticeId,
+          reason: 'chat_view 把控制器 noticeId 传给 NoticeBanner（seq 接线）');
+      await env.close();
+    });
+
+    testWidgets('④ 同文案新旧 notice：出口过渡窗口内同文案新 notice 到达 → 陈旧 '
+        'dismiss 不误清新 notice（notice 身份 seq end-to-end）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final seam = _FakeExportFileExchange();
+      final c = await openWithExport(tester, env, seam);
+
+      const notice = '已导出 艾莉亚.json（分享面板已打开）';
+      // 第一次导出 → notice（seam 固定文案，id=1）。
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('导出 JSON'));
+      await tester.pumpAndSettle();
+      expect(find.text(notice), findsOneWidget);
+      final firstId = c.noticeId;
+      expect(firstId, isNotNull, reason: 'notice 置位即分配身份');
+
+      // 点关闭 → 140ms 出口过渡开始（分步 pump，不 pumpAndSettle——settle 会
+      // 跑完整个过渡）。
+      await tester.tap(find.byTooltip('关闭提示'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 70));
+      expect(c.noticeId, firstId, reason: '过渡完成前 onDismiss 未触发，身份不变');
+
+      // 过渡窗口内同文案新 notice：再次导出 → NoticeRunner 分配新 seq（同文案
+      // 也分新身份）。小步 pump（合计 <140ms，过渡 timer 未触发）。
+      unawaited(c.exportJson());
+      for (var i = 0; i < 60 && c.noticeId == firstId; i++) {
+        await tester.pump(const Duration(milliseconds: 1));
+      }
+      expect(c.noticeId, isNot(firstId),
+          reason: '窗口内同文案新 notice 分配新身份 seq');
+      expect(c.notice, notice, reason: '新 notice 文案不变（同文案重现值）');
+
+      // 越过 140ms 计时 → 陈旧 dismiss（id1）不得误清新 notice（id2）。
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
+      expect(c.noticeId, isNot(firstId), reason: '新 notice 未被陈旧 dismiss 清掉');
+      expect(c.notice, notice, reason: '陈旧 dismiss 不误清新 notice');
+      expect(find.text(notice), findsOneWidget, reason: '新 notice 持续呈现');
+      expect(tester.takeException(), isNull, reason: 'zone 零未处理异常');
       await env.close();
     });
 

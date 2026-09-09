@@ -209,6 +209,57 @@ void main() {
       expect(find.text('回复已中断'), findsNothing,
           reason: '旧文案随 notice 替换消失');
     });
+
+    testWidgets('过渡窗口内同文案 notice 被替换 → 陈旧回调不误清新 notice'
+        '（F-65④：notice 身份 seq，同文案新旧可区分）', (tester) async {
+      final hostKey = GlobalKey<_NoticeBannerHostState>();
+      await tester.pumpWidget(_NoticeBannerHost(key: hostKey));
+
+      // 点关闭进入出口过渡（140ms 计时中）。
+      await tester.tap(find.byTooltip('关闭提示'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 70));
+
+      // 过渡窗口内父级把 notice 替换成**同文案**新提示（新一轮断流 arrive 同
+      // 文案「回复已中断」；host 分配新身份 seq）。修复前文案相等守卫
+      // （stillSame = 文本相等）误判 → 陈旧 dismiss 清新 notice。
+      hostKey.currentState!.replaceNotice('回复已中断');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100)); // 越过 140ms 计时
+      await tester.pump();
+
+      expect(hostKey.currentState!.dismissed, 0,
+          reason: 'F-65④：陈旧关闭回调不得派发（同文案但 notice 身份不同）');
+      expect(find.text('回复已中断'), findsOneWidget,
+          reason: '同文案新 notice 不被陈旧回调误清、正常呈现');
+    });
+
+    testWidgets('陈旧 dismiss 与新 dismiss 竞态：同文案新 notice 在陈旧窗口过后'
+        '仍可正常关闭（新 dismiss 不因陈旧在场被吞）', (tester) async {
+      final hostKey = GlobalKey<_NoticeBannerHostState>();
+      await tester.pumpWidget(_NoticeBannerHost(key: hostKey));
+
+      // 关 A（id1）→ 陈旧过渡窗口中同文案新 notice B（id2）到达并渲染。
+      await tester.tap(find.byTooltip('关闭提示'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 70));
+      hostKey.currentState!.replaceNotice('回复已中断');
+      await tester.pump(); // 新 notice 先渲染（生产：下一帧）再让陈旧 timer 越过。
+      await tester.pump(const Duration(milliseconds: 100)); // 越过陈旧 140ms
+      await tester.pump();
+      expect(hostKey.currentState!.dismissed, 0,
+          reason: '陈旧 dismiss（id1）不派发（id2 在场）');
+      expect(find.text('回复已中断'), findsOneWidget, reason: 'B 呈现');
+
+      // B 自己的关闭（id2==id2）仍正常派发——不因陈旧回调在场被吞。
+      await tester.tap(find.byTooltip('关闭提示'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
+      expect(hostKey.currentState!.dismissed, 1,
+          reason: '新 dismiss 正常派发（首错者胜语义不被陈旧回调破坏）');
+      expect(find.text('回复已中断'), findsNothing, reason: 'B 正常关闭卸载');
+    });
   });
 }
 
@@ -225,11 +276,21 @@ class _NoticeBannerHostState extends State<_NoticeBannerHost> {
   /// 当前 notice（模拟父级控制器状态）。
   String? _notice = '回复已中断';
 
+  /// 当前 notice 的身份 seq（模拟 NoticeRunner 递增语义；F-65④）。
+  int _noticeSeq = 1;
+
+  /// 当前 notice 身份（null = 无 notice）。
+  int? _noticeId = 1;
+
   /// onDismiss 派发计数（出口过渡完成后触发）。
   int dismissed = 0;
 
-  /// 父级把 notice 替换为 [next]（模拟过渡窗口内 arrive 新提示）。
-  void replaceNotice(String next) => setState(() => _notice = next);
+  /// 父级把 notice 替换为 [next]（模拟过渡窗口内 arrive 新提示）：分配新身份
+  /// seq——同文案重现值也可区分（对齐 NoticeRunner.set）。
+  void replaceNotice(String next) => setState(() {
+        _notice = next;
+        _noticeId = ++_noticeSeq;
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -238,9 +299,11 @@ class _NoticeBannerHostState extends State<_NoticeBannerHost> {
       home: Scaffold(
         body: NoticeBanner(
           notice: _notice,
+          noticeId: _noticeId,
           onDismiss: () => setState(() {
             dismissed++;
             _notice = null; // 父级清空 notice → 组件转空占位。
+            _noticeId = null;
           }),
         ),
       ),

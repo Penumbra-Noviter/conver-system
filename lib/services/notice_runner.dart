@@ -27,20 +27,36 @@ class NoticeRunner {
 
   String? _notice;
 
+  /// 当前 notice 的**身份 seq**（F-65④）：每次产生新 notice（[set] /
+  /// [setFirst] 置位）单调递增分配，[clear] 复位为 null。与 [notice] 同步
+  /// 变化（同文案重现值也分新身份）——NoticeBanner 出口过渡的陈旧回调以
+  /// 身份判定「是否仍是被关闭的那条」，同文案新旧 notice 可区分。
+  int? _noticeId;
+
+  /// 身份序号（单调递增，不回溯）。
+  int _noticeSeq = 0;
+
   /// 当前待展示 notice（null = 无）。
   String? get notice => _notice;
+
+  /// 当前 notice 的**身份 seq**（null = 无 notice）。每次新 notice 置位分配
+  /// 新值（含同文案重现值）；[clear] 清空。NoticeBanner 经此区分同文案新旧
+  /// notice，防止陈旧出口 dismiss 误清新 notice（F-65④）。
+  int? get noticeId => _noticeId;
 
   bool get hasNotice => _notice != null;
 
   /// 清空（操作成功 / 新操作开始时用）。
   void clear() {
     _notice = null;
+    _noticeId = null;
     _notify();
   }
 
   /// 覆盖式设置（成功文案 / 状态引导提示用）。
   void set(String message) {
     _notice = message;
+    _noticeId = ++_noticeSeq;
     _notify();
   }
 
@@ -51,6 +67,7 @@ class NoticeRunner {
       return;
     }
     _notice = message;
+    _noticeId = ++_noticeSeq;
     _notify();
   }
 

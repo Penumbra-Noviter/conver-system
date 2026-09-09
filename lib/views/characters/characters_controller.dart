@@ -80,6 +80,10 @@ class CharactersController extends ChangeNotifier {
   /// 非阻塞提示（加载失败 / 导出占位 / 删除反馈）；null 无。
   String? get notice => _noticeRunner.notice;
 
+  /// 当前 notice 的身份 seq（F-65④，转发 [NoticeRunner.noticeId]）：新 notice
+  /// （含同文案重现值）分配新值，NoticeBanner 据此区分同文案新旧 notice。
+  int? get noticeId => _noticeRunner.noticeId;
+
   /// 多选模式中（[enterSelectionMode] 进入；[exitSelectionMode] /
   /// [deleteSelected] / 刷新完成退出）。
   bool get selectionMode => _selectionMode;

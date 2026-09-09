@@ -31,14 +31,21 @@ import '../theme/motion.dart' show ConverDurations;
 ///
 /// [notice] 可空：为 null 时渲染空占位（宽度撑满，布局不跳动）；非 null 时
 /// 渲染提示条。关闭动作先播放 140ms 出口过渡，动画结束后回调 [onDismiss]。
+///
+/// F-65④：出口过渡的陈旧回调以 **notice 身份 seq**（[noticeId]，由父级
+/// NoticeRunner 单调递增分配）判定「是否仍是被关闭的那条」——同文案新旧
+/// notice 可区分，陈旧 dismiss 不误清新 notice；未提供 [noticeId] 时回退
+/// 文案相等守卫（既有语义）。
 class NoticeBanner extends StatefulWidget {
   /// 构造提示条。[notice] 为提示文案（ink2，bodyMedium；null → 空占位），
-  /// [onDismiss] 为关闭回调（**出口过渡完成后触发**）；[actionLabel] /
-  /// [onAction] 供 T3「重试」动作接线（仅定义契约，不接业务——两者须同时
-  /// 提供才渲染动作区）。
+  /// [noticeId] 为当前 notice 的**身份 seq**（随 [notice] 同步传递；同文案
+  /// 新 notice 须配新 id，防陈旧 dismiss 误清——F-65④）；[onDismiss] 为关闭
+  /// 回调（**出口过渡完成后触发**）；[actionLabel] / [onAction] 供 T3「重试」
+  /// 动作接线（仅定义契约，不接业务——两者须同时提供才渲染动作区）。
   const NoticeBanner({
     super.key,
     this.notice,
+    this.noticeId,
     required this.onDismiss,
     this.actionLabel,
     this.onAction,
@@ -47,6 +54,11 @@ class NoticeBanner extends StatefulWidget {
   /// 提示文案（断流「回复已中断」/ 错误映射 / 导出占位等，逐字锚桌面）；
   /// null 时组件渲染空占位（出口过渡后隐藏）。
   final String? notice;
+
+  /// 当前 notice 的**身份 seq**（父级 NoticeRunner 单调递增；null = 无 /
+  /// 未接入 seq）。出口过渡陈旧回调以此判定「仍是被关闭的那条」；同文案新旧
+  /// notice 因 seq 不同而可区分（F-65④）。null 时回退文案相等守卫。
+  final int? noticeId;
 
   /// 关闭回调（如 [ChatController.dismissNotice] / [CharactersController.dismissNotice]）；
   /// 出口过渡完成后触发。
@@ -71,7 +83,14 @@ class _NoticeBannerState extends State<NoticeBanner> {
 
   /// 出口过渡窗口内被关闭的提示文案（防「过渡窗口内 notice 被替换 → 陈旧
   /// 回调误清新 notice」：仅当当前 notice 仍是它时才派发 [onDismiss]）。
+  /// 未接入 [NoticeBanner.noticeId]（null）时回退文案相等判定（既有语义）。
   String? _dismissingNotice;
+
+  /// 出口过渡窗口内被关闭的提示**身份 seq**（F-65④）：通知单点关闭时的
+  /// [NoticeBanner.noticeId]，过渡完成后与当前 [NoticeBanner.noticeId]
+  /// 比较——同文案新旧 notice 因 seq 不同而可区分，陈旧 dismiss 不误清新
+  /// notice。
+  int? _dismissingNoticeId;
 
   @override
   void dispose() {
@@ -89,6 +108,7 @@ class _NoticeBannerState extends State<NoticeBanner> {
     setState(() {
       _exiting = true;
       _dismissingNotice = widget.notice;
+      _dismissingNoticeId = widget.noticeId;
     });
     _exitTimer?.cancel();
     _exitTimer = Timer(ConverDurations.fast, () {
@@ -96,10 +116,16 @@ class _NoticeBannerState extends State<NoticeBanner> {
         return;
       }
       setState(() => _exiting = false);
-      final stillSame = widget.notice == _dismissingNotice;
+      // F-65④：双方均接入身份 seq → 按 seq 判定（同文案新旧可区分）；任一
+      // 为 null（未接入）→ 回退文案相等判定（既有语义）。
+      final stillSame =
+          widget.noticeId != null && _dismissingNoticeId != null
+              ? widget.noticeId == _dismissingNoticeId
+              : widget.notice == _dismissingNotice;
       _dismissingNotice = null;
+      _dismissingNoticeId = null;
       // 仅当被关闭的提示仍是当前 notice 才派发：过渡窗口内 notice 被替换
-      // 或已清空时，陈旧回调不得误清新鲜 notice。
+      // （含同文案新 seq）或已清空时，陈旧回调不得误清新鲜 notice。
       if (stillSame) {
         widget.onDismiss();
       }

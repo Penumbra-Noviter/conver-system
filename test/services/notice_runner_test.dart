@@ -84,4 +84,44 @@ void main() {
       expect(runner.hasNotice, isFalse);
     });
   });
+
+  group('NoticeRunner · notice 身份 seq（F-65④）', () {
+    test('每次 set 分配递增 seq：同文案两次 set → noticeId 可区分', () {
+      final runner = NoticeRunner();
+      expect(runner.noticeId, isNull, reason: '无 notice 时身份为空');
+
+      runner.set('回复已中断');
+      final first = runner.noticeId;
+      expect(first, isNotNull, reason: '置位即分配身份');
+
+      runner.set('回复已中断'); // 同文案覆盖（新一轮断流 / 并发提示）
+      expect(runner.noticeId, isNotNull);
+      expect(runner.noticeId, isNot(first),
+          reason: '同文案新旧 notice 身份区分——出口过渡陈旧 dismiss 可辨认');
+    });
+
+    test('setFirst 先错者胜：被忽略的 setFirst 不改身份；清空后置位分新身份',
+        () {
+      final runner = NoticeRunner();
+      runner.setFirst('A');
+      final a = runner.noticeId;
+
+      runner.setFirst('B'); // 先错者胜：被忽略 → 身份不变。
+      expect(runner.noticeId, a, reason: '被忽略的 setFirst 不换身份');
+
+      runner.clear();
+      runner.setFirst('A'); // 同文案重现值（clear+setFirst）。
+      expect(runner.noticeId, isNotNull);
+      expect(runner.noticeId, isNot(a), reason: '同文案重现值身份区分');
+    });
+
+    test('clear → 身份清空；notice 为 null 时 noticeId 为 null', () {
+      final runner = NoticeRunner();
+      runner.set('x');
+      expect(runner.noticeId, isNotNull);
+      runner.clear();
+      expect(runner.noticeId, isNull, reason: 'clear 清空身份');
+      expect(runner.noticeId, isNull);
+    });
+  });
 }

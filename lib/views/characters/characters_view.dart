@@ -126,6 +126,9 @@ class _CharactersViewState extends State<CharactersView> {
           // 完成才回调 dismissNotice（提示条不硬切卸载）。
           NoticeBanner(
             notice: controller.notice,
+            // F-65④：notice 身份 seq 随文案同步传递（同文案新旧 notice 经
+            // 身份区分，陈旧出口 dismiss 不误清新 notice）。
+            noticeId: controller.noticeId,
             onDismiss: controller.dismissNotice,
           ),
           Expanded(

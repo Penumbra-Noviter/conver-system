@@ -15,6 +15,8 @@
 /// （重复 controller 测试内联装配，避免新增范围外 helper 文件）。
 library;
 
+import 'dart:async';
+
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
@@ -30,6 +32,7 @@ import 'package:conver_system_mobile/view_models/shell_navigation.dart';
 import 'package:conver_system_mobile/views/characters/characters_controller.dart';
 import 'package:conver_system_mobile/views/characters/characters_view.dart';
 import 'package:conver_system_mobile/views/chat/chat_controller.dart';
+import 'package:conver_system_mobile/widgets/notice_banner.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -447,6 +450,69 @@ void main() {
 
       expect(find.text('新角色'), findsOneWidget, reason: '下拉刷新重新拉取');
       expect(find.text('旧角色'), findsOneWidget);
+      await env.close();
+    });
+  });
+
+  group('notice 身份 seq · F-65④（同文案新旧不误清）', () {
+    testWidgets('NoticeBanner 收到控制器 noticeId（角色页 seq 接线：视图传 id）',
+        (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(name: '导我');
+      await pumpChars(tester, env, env.controller);
+
+      await tester.tap(find.byTooltip('导出'));
+      await tester.pump();
+      await tester.pump();
+      expect(env.controller.noticeId, isNotNull, reason: 'notice 置位即分配身份');
+
+      final banner = tester.widget<NoticeBanner>(find.byType(NoticeBanner));
+      expect(banner.noticeId, env.controller.noticeId,
+          reason: 'characters_view 把控制器 noticeId 传给 NoticeBanner');
+      await env.close();
+    });
+
+    testWidgets('④ 同文案新旧 notice：出口过渡窗口内同文案新 notice → 陈旧 dismiss'
+        ' 不误清新 notice（notice 身份 seq end-to-end）', (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(name: '导我');
+      await pumpChars(tester, env, env.controller);
+
+      const notice = '已导出 导我.json（角色导出随后续批次交付）';
+      // 第一次导出 → notice（fake seam 固定文案，id=1）。
+      await tester.tap(find.byTooltip('导出'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.textContaining('随后续批次交付'), findsOneWidget);
+      final firstId = env.controller.noticeId;
+      expect(firstId, isNotNull, reason: 'notice 置位即分配身份');
+
+      // 点关闭 → 140ms 出口过渡开始（分步 pump，不 settle）。
+      await tester.tap(find.byTooltip('关闭提示'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 70));
+      expect(env.controller.noticeId, firstId, reason: '过渡完成前身份不变');
+
+      // 过渡窗口内同文案新 notice：再次导出 → 新 seq（同文案也分新身份）。
+      final char = env.controller.characters.single.character;
+      unawaited(env.controller.exportCharacter(char));
+      for (var i = 0; i < 60 && env.controller.noticeId == firstId; i++) {
+        await tester.pump(const Duration(milliseconds: 1));
+      }
+      expect(env.controller.noticeId, isNot(firstId),
+          reason: '窗口内同文案新 notice 分配新身份 seq');
+      expect(env.controller.notice, notice);
+
+      // 越过 140ms 计时 → 陈旧 dismiss（id1）不得误清新 notice（id2）。
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
+      expect(env.controller.noticeId, isNot(firstId),
+          reason: '新 notice 未被陈旧 dismiss 清掉');
+      expect(env.controller.notice, notice,
+          reason: '陈旧 dismiss 不误清新 notice');
+      expect(find.textContaining('随后续批次交付'), findsOneWidget,
+          reason: '新 notice 持续呈现');
+      expect(tester.takeException(), isNull, reason: 'zone 零未处理异常');
       await env.close();
     });
   });

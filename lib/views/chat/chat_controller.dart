@@ -488,6 +488,10 @@ class ChatController extends ChangeNotifier {
   /// 非阻塞提示（断流「回复已中断」/ 错误映射文案 / 基础设施失败）；null 无。
   String? get notice => _noticeRunner.notice;
 
+  /// 当前 notice 的身份 seq（F-65④，转发 [NoticeRunner.noticeId]）：新 notice
+  /// （含同文案重现值）分配新值，NoticeBanner 据此区分同文案新旧 notice。
+  int? get noticeId => _noticeRunner.noticeId;
+
   /// 关闭当前非阻塞提示。
   void dismissNotice() {
     if (!_noticeRunner.hasNotice) {
