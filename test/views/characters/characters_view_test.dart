@@ -25,6 +25,7 @@ import 'package:conver_system_mobile/data/repositories/settings_repository.dart'
 import 'package:conver_system_mobile/services/character_card.dart';
 import 'package:conver_system_mobile/services/character_file_exchange.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/view_models/shell_navigation.dart';
 import 'package:conver_system_mobile/views/characters/characters_controller.dart';
@@ -34,6 +35,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import '../../helpers/fake_llm_provider.dart';
 import '../../helpers/in_memory_secret_store.dart';
@@ -66,6 +68,22 @@ class FakeCharacterFileExchange implements CharacterFileExchange {
 
   @override
   Future<CharacterDraft?> importCharacter() async => null;
+}
+
+/// refresh 即抛错的控制器变体（探测 CharactersView._ensureLoaded 刷新失败
+/// 防御分支：失败仅 debugPrint，保持缺省空列表）。
+class _RefreshThrowingController extends CharactersController {
+  _RefreshThrowingController({
+    required super.characterRepository,
+    required super.fileExchange,
+    required super.navigation,
+    required super.chatController,
+  });
+
+  @override
+  Future<void> refresh() async {
+    throw StateError('模拟刷新失败');
+  }
 }
 
 /// 本文件的装配基座：内存 drift + 四仓储 + ChatController + 导航 + seam fake
@@ -447,6 +465,194 @@ void main() {
 
       expect(find.text('新角色'), findsOneWidget, reason: '下拉刷新重新拉取');
       expect(find.text('旧角色'), findsOneWidget);
+      await env.close();
+    });
+  });
+
+  group('覆盖缺口补齐（F-67）', () {
+    testWidgets('刷新抛错 → 仅 debugPrint 日志，保持缺省空列表（_ensureLoaded 防御）',
+        (tester) async {
+      final env = await _CharsEnv.create();
+      final throwing = _RefreshThrowingController(
+        characterRepository: env.characterRepository,
+        fileExchange: env.exchange,
+        navigation: env.navigation,
+        chatController: env.chatController,
+      );
+      addTearDown(throwing.dispose);
+
+      // 捕获 debugPrint 输出：临时替换全局钩子，断言后必须在本测试体内
+      // 还原（flutter_test 的 foundation 不变量检查在 tearDown 前执行）。
+      final logs = <String>[];
+      final original = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        logs.add(message ?? '');
+      };
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ConverTheme.dark(),
+            home: Scaffold(body: CharactersView(controller: throwing)),
+          ),
+        );
+        // initState 后帧回调触发 _ensureLoaded → refresh 抛错被捕获。
+        for (var i = 0; i < 100 && throwing.loading; i++) {
+          await tester.pump(const Duration(milliseconds: 10));
+        }
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          logs.any((l) => l.contains('角色列表刷新失败')),
+          isTrue,
+          reason: '刷新失败折叠为 debugPrint（对齐 ChatView._ensureEntryLoaded）',
+        );
+        expect(find.text('暂无角色'), findsOneWidget,
+            reason: '刷新失败保持缺省空列表');
+      } finally {
+        debugPrint = original;
+      }
+      await env.close();
+    });
+
+    testWidgets('点「新建角色」→ push 6 步向导（步骤①三卡片）', (tester) async {
+      final env = await _CharsEnv.create();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            // 入口经 context.read<CharacterRepository>() 构造 WizardController；
+            // M4-05 追加 SettingsRepository + LLMProviderFactory（装配
+            // DocumentParseService）。
+            Provider<CharacterRepository>.value(value: env.characterRepository),
+            Provider<SettingsRepository>.value(
+              value: SettingsRepository(
+                database: env.db,
+                secretStore: InMemorySecretStore(),
+              ),
+            ),
+            Provider<LLMProviderFactory>.value(
+              value:
+                  FixedLLMProviderFactory(FakeLLMProvider(tokens: const ['ok'])),
+            ),
+          ],
+          child: MaterialApp(
+            theme: ConverTheme.dark(),
+            home: Scaffold(body: CharactersView(controller: env.controller)),
+          ),
+        ),
+      );
+      for (var i = 0; i < 100 && env.controller.loading; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pump();
+
+      await tester.tap(find.text('新建角色'));
+      await tester.pumpAndSettle();
+
+      // 向导出现（步骤①）——M3-01 stub 已被真实导航替换。
+      expect(find.text('智能导入'), findsOneWidget);
+      expect(find.text('从模板开始'), findsOneWidget);
+      expect(find.text('手动创建'), findsOneWidget);
+
+      // 返回角色页（步骤①返回 = 退出向导）。
+      await tester.tap(find.byTooltip('退出'));
+      await tester.pumpAndSettle();
+      expect(find.text('新建角色'), findsOneWidget, reason: '退出向导回列表页');
+      await env.close();
+    });
+
+    testWidgets('多选态批量删除：确认对话框文案含选中数；取消零副作用；确认级联删除',
+        (tester) async {
+      final env = await _CharsEnv.create();
+      final a = await env.seedCharacter(name: '阿甲');
+      await env.seedCharacter(name: '阿乙');
+      await env.seedConversation(a.id);
+
+      await pumpChars(tester, env, env.controller);
+      await tester.longPress(find.text('阿甲'));
+      await tester.pump();
+      await tester.tap(find.text('阿乙'));
+      await tester.pump();
+      expect(find.text('已选 2 个角色'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('批量删除'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('批量删除角色'), findsOneWidget, reason: '确认对话框标题');
+      expect(
+        find.textContaining('删除将移除 2 个角色及其对话与消息'),
+        findsOneWidget,
+        reason: '确认文案含选中数与级联说明',
+      );
+
+      // 取消 → 零副作用（角色保留、仍在多选态）。
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(env.controller.characters, hasLength(2), reason: '取消零副作用');
+      expect(env.controller.selectionMode, isTrue, reason: '取消后仍在多选态');
+
+      // 确认 → 级联删除 + 列表刷新 + 退出多选。
+      await tester.tap(find.byTooltip('批量删除'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('删除'));
+      await tester.pumpAndSettle();
+      await pumpUntil(
+        tester,
+        () => env.controller.characters.isEmpty,
+        why: '批量删除后列表刷新为空',
+      );
+      expect(env.controller.selectionMode, isFalse, reason: '删除完成自动退出多选');
+      expect(find.text('已选'), findsNothing, reason: '批量栏消失');
+      expect(await env.conversationRepository
+              .listConversations(characterId: a.id),
+          isEmpty, reason: '级联：对话消失');
+      await env.close();
+    });
+
+    testWidgets('多选态点勾选框 onChanged → 切换选中（toggleSelection 直连）',
+        (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(name: '阿甲');
+
+      await pumpChars(tester, env, env.controller);
+      await tester.longPress(find.text('阿甲'));
+      await tester.pump();
+      expect(env.controller.selection, hasLength(1), reason: '长按默认勾选');
+
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      expect(env.controller.selection, isEmpty, reason: '点勾选框取消勾选');
+
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+      expect(env.controller.selection, hasLength(1), reason: '再点勾选框重新勾选');
+      await env.close();
+    });
+
+    testWidgets(':351 多选态 tap 卡片 → toggleSelection（与勾选框同源直触）',
+        (tester) async {
+      final env = await _CharsEnv.create();
+      final a = await env.seedCharacter(name: '阿甲');
+      final b = await env.seedCharacter(name: '阿乙');
+
+      await pumpChars(tester, env, env.controller);
+      await tester.longPress(find.text('阿甲'));
+      await tester.pump();
+      expect(env.controller.selection, {a.id}, reason: '长按默认勾选阿甲');
+
+      // tap 阿乙卡片追加勾选。
+      await tester.tap(find.text('阿乙'));
+      await tester.pump();
+      expect(env.controller.selection, {a.id, b.id}, reason: 'tap 追加勾选');
+
+      // 退出多选后 tap 卡片应无效（onTap 为 null，F-59 守卫）。
+      env.controller.exitSelectionMode();
+      await tester.pump();
+      await tester.tap(find.text('阿乙'));
+      await tester.pump();
+      expect(env.controller.selectionMode, isFalse);
+      expect(env.controller.selection, isEmpty, reason: '非多选态 tap 零副作用');
       await env.close();
     });
   });
