@@ -22,6 +22,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:conver_system_mobile/services/file_name.dart';
 import 'package:conver_system_mobile/services/simulator/save_key_meta.dart';
 
 /// localStorage 兼容 seam（Storage 子集，桌面 `window.localStorage` 语义）：
@@ -293,10 +294,19 @@ List<String> deleteGameKeys(Object? game, SaveStorage? storage) {
 /// 正斜杠 / 冒号 / 星号 / 问号 / 尖括号 / 竖线 / 百分号 → `_`；修剪尾部点
 /// 与空格；空结果兜底 `game`。正常 id 经净化后不变（既有契约
 /// `<gameId>-saves.json` 保持）。桌面 `sanitizeFilename` 逐字。
+///
+/// C3 架构审查（2026-09-10）：收敛为薄包装，行为委托参数化核心
+/// [safeFileNameCore]（`lib/services/file_name.dart`，纯 Dart 零平台依赖），
+/// 此处仅声明存档锚配置（`\x7f%` 附加字符 / 仅尾修剪 / 不截断 / 兜底 `game` /
+/// 非 String → `game`）。公开函数名与签名保持——存档桥 `show sanitizeFilename`
+/// 导入面不破裂。
 String sanitizeFilename(Object? name) {
-  if (name is! String) return 'game';
-  final cleaned = name
-      .replaceAll(RegExp(r'[\x00-\x1f\x7f"\\/:*?<>|%]'), '_')
-      .replaceAll(RegExp(r'[. ]+$'), '');
-  return cleaned.isEmpty ? 'game' : cleaned;
+  return safeFileNameCore(
+    name,
+    config: const FileNameSanitizerConfig(
+      extraChars: '\x7f%',
+      edgeTrim: FileNameEdgeTrim.trailingDotsAndSpaces,
+      fallback: 'game',
+    ),
+  );
 }
