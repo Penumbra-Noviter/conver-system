@@ -32,6 +32,14 @@
 
 ## 已完成归档
 
+### 架构深化批次 AR-2 — 停止完成契约（2026-09-09 收口）
+
+> 来源：improve-codebase-architecture 候选 2（Strong）+ Grilling 共识 `r2-stop-contract`（2 轮问毕零真拍点）。交付：停止完成信号落位 ChatService（`userWriteSettled` Completer 门 + 终态兜底 + `_stopStreamReply` 置 stopped 先 await 门 3s 有界 + try/catch 对齐 F-55）+ chat_round 轮询补偿删除（`_awaitInFlightUserLanded`/常量/`_roundUserText` 死字段，两条腿与 F3b 保留）+ CONTEXT 登记。**自审修复真实死锁**（门仅在 finally 结算与 close 完成闭环 → 终态错误路径卡满 3s → catch 级独立结算 + finally 兜底 + 2s 上界回归）。门禁：范围 134 测 / analyze 0 / 覆盖率 98.90% / code-review 四轴 0 阻断（死锁修复突变①②承重）。可观察行为零变更。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| AR-2 | 停止完成契约（消除 UI 轮询补偿） | 2026-09-09 | 9be52cd（merge a6b0070） |
+
 ### 架构深化批次 AR-1 — wire 连接相位编码（2026-09-09 收口）
 
 > 来源：improve-codebase-architecture 候选 1（Strong）+ Grilling 共识 `r1-phase-encoding`（2 轮问毕零真拍点）。交付：双子类 `ConnectPhaseInterruptedError`/`ReadPhaseInterruptedError` extends `LLMConnectionInterruptedError`（基类 concrete 升格「不可重试兜底信号」）+ wire 三抛点相位映射 + 重试判据单行 `error is ConnectPhaseInterruptedError` + `producedToken` 删除 + F-55 try/catch/finally 结构保证 + F-56 ②③ 收编 + CONTEXT 登记。门禁：范围 183 测 + 受影响 92 测全绿 / analyze 0 / 覆盖率 99.32%（口径 `--cov` 3 源文件）/ code-review 四轴 0 阻断（行为变更 B1 首 token 前 idle 收窄为 read 相位不重试、B2 基类语义升级——影响面核验干净；N-F1 标未来 provider 扩展复核点）。**行为变更点**：M6-06 契约面收窄（首 token 前 idle 单次 attempt），F-58 观察随 B1 消亡。技术债：F-52/F-55 ✅ 已修、F-56 缩减待专项。
