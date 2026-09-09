@@ -19,6 +19,8 @@
 | **连接相位 (connect phase)** | wire 连接建立段（postUrl→写请求体→close 等到响应头，未收状态码）的传输失败；编码为 `ConnectPhaseInterruptedError`；是聊天链路自动重试（M6-06）的唯一可重试面 | `services/llm/errors.dart`（公共错误类型契约） |
 | **读取相位 (read phase)** | 已收响应头后读 SSE 段（流中途 EOF/断连/idle 超时/未收敛终态帧）的失败；编码为 `ReadPhaseInterruptedError`；不可重试 | 同上 |
 | **停止完成信号 (stop completion signal)** | `streamReply` 消费方取消返回流的订阅（停止）所 await 的完成 Future，保证本轮已发 user 消息写尝试已结算（成功落库或回合已终态不再写）后才 resolve；ChatRound 据此删除 UI 层轮询补偿，reload 必见已发 user | `services/chat_service.dart`（streamReply doc，公共契约） |
+| **WebView 能力面 (webview capability)** | 模拟器 WebView 桥的单一平台薄层 seam——统一能力接口（页面就绪握手 + 无返回 `runJavaScript` / 带返回 `evaluate`〔原样串，JSON 解码容错归桥层 `parseLocalStorageEntries`〕+ `navigate` + `buildView`）+ 工厂 typedef `WebViewCapabilityFactory`（构造期委托注入）+ 生产适配器（webview_flutter **唯一引用点**）；两消费点只声明差异面（运行页 = runJavaScript + navigate 错误上抛即时错误态；存档 sheet = evaluate + navigate 吞错走超时降级）；聚合形态 = 两并行 WebView seam（F-43 / W5 B1）收敛 | `lib/services/simulator/webview_capability.dart` |
+| **页面就绪握手 (page-ready handshake)** | `onPageFinished` 委托由工厂 **构造期注入**、先于任何 navigate 挂载的时序契约——webview 的 `onPageFinished` 只派发给挂载时已存在的导航委托、不回放挂载前事件；结构性归生产适配器（构造即 `setNavigationDelegate`），消费点形态上不可违反（接口不暴露 `setOnPageFinished`）；挂委托后导航的两步序收敛为 create(挂委托) → navigate 一步 | 同上（F-43 TD-3 / W5 B1 修复的结构化形态） |
 | **伴生同步（后期可选）** | Tailscale/导出导入实现"连桌面同步数据"的后期可选功能，非 MVP 所需 | §0 / §8 |
 
 > 注：与桌面库共享的领域概念（角色卡 V2、SSE 流式、存档互迁格式等）权威定义在桌面库 `desktop/CONTEXT.md`，本表只登记移动端特有/新增的 load-bearing 术语。

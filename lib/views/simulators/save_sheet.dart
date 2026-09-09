@@ -5,40 +5,39 @@
 ///
 /// U2（最大风险，spec §6 登记）：Flutter 主进程与游戏非同源，localStorage 访问
 /// 须建立 server origin —— sheet 内持一个**低占位 WebView** 指向
-/// `http://127.0.0.1:<port>/`（F-M5-02 `/` index 路由），`onPageFinished` 后经
-/// [JsBridgeLocalStorageAccess]（runJavaScript 枚举/写回）读取存档。[SheetWebViewController]
-/// seam 支持求值返回（`runJavaScriptReturningResult` —— 既有运行页 seam 只暴露
-/// 无返回 runJavaScript，运行页文件位不由本票改动，故在 sheet 侧建并行薄适配；
-/// 真通道行为归 F-M5-09 AVD 冒烟）。**时序纪律（W5 B1）**：WebView `onPageFinished`
-/// 只派发给挂载时已存在的导航委托、不回放挂载前事件——装配严格遵循
-/// 「工厂创建未导航控制器 → 挂 `setOnPageFinished` → `navigate(url)`」两步序，
-/// 杜绝事件丢失导致的恒/偶发超时降级。WebView 不可用 / 挂起 → 超时兜底降级文案，
-/// 不崩。
+/// `http://127.0.0.1:<port>/`（F-M5-02 `/` index 路由），页面就绪后经
+/// [JsBridgeLocalStorageAccess]（evaluate 枚举/写回）读取存档。[WebViewCapability]
+/// 统一能力 seam 支持求值返回（生产 = webview_flutter 带返回值求值薄适配，平台
+/// 薄层收口 `services/simulator/webview_capability.dart`；真通道行为归 F-M5-09
+/// AVD 冒烟）。**时序契约（W5 B1）**：WebView `onPageFinished` 只
+/// 派发给挂载时已存在的导航委托、不回放挂载前事件——装配 = create(挂委托) →
+/// navigate 一步（委托由工厂构造期注入），杜绝事件丢失导致的恒/偶发超时降级。
+/// navigate 错误在消费点吞掉，面板只走 loaded 超时降级口径。WebView 不可用 /
+/// 挂起 → 超时兜底降级文案，不崩。
 ///
-/// 平台 seam 全部注入（测试 fake）：[webViewFactory]（WebView 控制器工厂）、
+/// 平台 seam 全部注入（测试假件）：[webViewFactory]（WebView 能力工厂）、
 /// [saveBridge]（测试注入 fake 桥直接跳过 WebView 建立）；导出/导入平台腿由
 /// 桥内建（M4 `platform_file_exchange` 复用，不新增平台通道代码）。
 ///
 /// 层级：呈现层。存档键收集/校验/应用/删除语义全部经 [SaveBridge] 编排消费
 /// F-M5-05 契约纯函数，本文件只做展示编排与确认弹窗。
 ///
-/// 协议表面：`SaveSheet` / `SheetWebViewController` /
-/// `SheetWebViewControllerFactory` / `createSheetWebViewController` /
-/// `saveSheetTitle` / `saveSheetExportHint` / `saveSheetNoSaveText` /
-/// `saveSheetWgNote` / `saveSheetBootingText` / `saveSheetDegradedText` /
-/// `saveSheetTimeoutText`。
+/// 协议表面：`SaveSheet` / `saveSheetTitle` / `saveSheetExportHint` /
+/// `saveSheetNoSaveText` / `saveSheetWgNote` / `saveSheetBootingText` /
+/// `saveSheetDegradedText` / `saveSheetTimeoutText`。
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../services/simulator/save_bridge.dart'
     show GameSaveSummary, JsBridgeLocalStorageAccess, SaveBridge, SaveGame;
 import '../../services/simulator/save_key_meta.dart' show wgSessionOnlyIds;
 import '../../services/simulator/simulator_contracts.dart'
     show SimulatorContracts;
+import '../../services/simulator/webview_capability.dart'
+    show WebViewCapability, WebViewCapabilityFactory, createWebViewCapability;
 import '../../theme/conver_palette.dart' show ConverPalette;
 
 /// 面板标题。
@@ -66,79 +65,6 @@ const String saveSheetTimeoutText = '读取存档超时，WebView 未就绪';
 /// 无游戏数据空态文案。
 const String saveSheetEmptyText = '暂无游戏数据';
 
-/// 存量页 WebView 控制器抽象（U2 seam）：支持求值返回 —— 生产 = webview_flutter
-/// `runJavaScriptReturningResult` 薄适配；widget 测试 = fake（记录脚本 + 手动/
-/// 自动触发 [setOnPageFinished] + [buildView] 占位）。
-abstract interface class SheetWebViewController {
-  /// 页内执行 [script] 并返回其结果（localStorage 枚举/写回共用入口）。
-  Future<String> evaluate(String script);
-
-  /// 注册页面加载完成回调（origin 建立完成后枚举的前提）。
-  ///
-  /// **时序契约（W5 B1）**：必须由消费方在 [navigate] **之前**调用——webview
-  /// 的 `onPageFinished` 只派发给挂载时已存在的导航委托、不回放挂载前事件；
-  /// 先导航后挂委托会丢失事件（面板走超时降级）。装配方遵循
-  /// 「挂委托 → navigate」两步序（见 [_SaveSheetState._bootstrap]）。
-  void setOnPageFinished(VoidCallback onPageFinished);
-
-  /// 发起导航到 [url]（生产 = `loadRequest`；返回即完成请求发出，页面就绪以
-  /// [setOnPageFinished] 回调为准）。调用前委托必须先已挂载。
-  void navigate(Uri url);
-
-  /// 渲染平台视图主体（生产 WebViewWidget / 测试占位）。
-  Widget buildView();
-}
-
-/// WebView 控制器工厂注入点（U2 seam）——创建**未导航**的控制器（委托由消费方
-/// 挂载后经 [SheetWebViewController.navigate] 发起导航，保证 onPageFinished
-/// 不丢失，W5 B1）。
-typedef SheetWebViewControllerFactory = Future<SheetWebViewController> Function();
-
-// 平台薄层收口本文件：真实 WebView 控制器不可在测试宿主运行（平台通道），
-// 真通道行为归 F-M5-09 AVD 冒烟（U2 实证）；与 M4 `defaultPickJsonFile` /
-// `defaultShareViaPlus` 同先例标 ignore。
-// coverage:ignore-start
-
-/// 生产 WebView 控制器工厂：仅创建 webview_flutter 控制器（不发起导航——导航
-/// 由消费方挂载 [setOnPageFinished] 之后经 [SheetWebViewController.navigate]
-/// 发起，杜绝 onPageFinished 错过，W5 B1）。
-Future<SheetWebViewController> createSheetWebViewController() async {
-  final inner = WebViewController()
-    ..setJavaScriptMode(JavaScriptMode.unrestricted)
-    ..setBackgroundColor(const Color(0xFF000000));
-  return _SheetWebViewControllerImpl(inner);
-}
-
-/// webview_flutter 薄适配：参数转发 + 求值返回,零业务逻辑。
-class _SheetWebViewControllerImpl implements SheetWebViewController {
-  _SheetWebViewControllerImpl(this._inner);
-
-  final WebViewController _inner;
-
-  @override
-  Future<String> evaluate(String script) async =>
-      (await _inner.runJavaScriptReturningResult(script)).toString();
-
-  @override
-  void setOnPageFinished(VoidCallback onPageFinished) {
-    _inner.setNavigationDelegate(
-      NavigationDelegate(onPageFinished: (_) => onPageFinished()),
-    );
-  }
-
-  @override
-  void navigate(Uri url) {
-    // 导航失败（端口未就绪等）不抛未捕获错误：面板由 loaded 超时兜底降级。
-    unawaited(
-      _inner.loadRequest(url).then<void>((_) {}, onError: (Object _) {}),
-    );
-  }
-
-  @override
-  Widget buildView() => WebViewWidget(controller: _inner);
-}
-// coverage:ignore-end
-
 /// sheet 相位：booting（建立 origin + 枚举）→ ready（行列表）| degraded（文案）。
 enum _SheetPhase { booting, ready, degraded }
 
@@ -146,16 +72,17 @@ enum _SheetPhase { booting, ready, degraded }
 ///
 /// 构造入参：[games] 面板管理的游戏集（视图从列表模型映射为最小数据面）；
 /// [saveBridge] 测试注入 fake 桥（缺省 = 生产建立低占位 WebView 后自建）；
-/// [webViewFactory] WebView 控制器工厂（缺省生产薄适配）；[port] 本地托管端口
-/// （生产固定 [SimulatorContracts.defaultPort]）；[pageLoadTimeout] WebView
-/// 建立 + 页面 load 超时守卫；[platformTimeout] 桥内平台调用点超时。
+/// [webViewFactory] WebView 能力工厂（缺省生产平台薄层；构造期注入页面就绪
+/// 委托）；[port] 本地托管端口（生产固定 [SimulatorContracts.defaultPort]）；
+/// [pageLoadTimeout] WebView 建立 + 页面 load 超时守卫；[platformTimeout] 桥内
+/// 平台调用点超时。
 class SaveSheet extends StatefulWidget {
   /// 构造底部半屏存档 sheet。
   const SaveSheet({
     super.key,
     required this.games,
     this.saveBridge,
-    this.webViewFactory = createSheetWebViewController,
+    this.webViewFactory = createWebViewCapability,
     this.port = SimulatorContracts.defaultPort,
     this.pageLoadTimeout = const Duration(milliseconds: 8000),
     this.platformTimeout = const Duration(seconds: 10),
@@ -167,8 +94,9 @@ class SaveSheet extends StatefulWidget {
   /// 存档编排桥（测试注入 fake；缺省 = 生产自建，含 WebView 建立）。
   final SaveBridge? saveBridge;
 
-  /// WebView 控制器工厂（U2 seam；测试注入 fake 不触平台通道）。
-  final SheetWebViewControllerFactory webViewFactory;
+  /// WebView 能力工厂（统一 U2 seam；构造期注入页面就绪委托；测试注入共享
+  /// 假件不触平台通道）。
+  final WebViewCapabilityFactory webViewFactory;
 
   /// 本地托管端口（生产 8642）。
   final int port;
@@ -195,8 +123,8 @@ class _SaveSheetState extends State<SaveSheet> {
   /// 当前编排桥（生产自建 / 注入共用）。
   SaveBridge? _bridge;
 
-  /// 低占位 WebView 控制器（origin 建立用；生产路径非空）。
-  SheetWebViewController? _controller;
+  /// 低占位 WebView 能力（origin 建立用；生产路径非空）。
+  WebViewCapability? _controller;
 
   @override
   void initState() {
@@ -219,21 +147,27 @@ class _SaveSheetState extends State<SaveSheet> {
     });
     try {
       final url = Uri.parse('http://127.0.0.1:${widget.port}/');
-      final controller =
-          await widget.webViewFactory().timeout(widget.pageLoadTimeout);
+      final loaded = Completer<void>();
+      // 构造期委托注入（W5 B1 结构化形态）：页面就绪委托由工厂构造期挂载、先于
+      // 任何 navigate——onPageFinished 只派发给挂载时已存在的委托（不回放挂载前
+      // 事件），先导航后挂委托即丢失事件 → 恒/偶发超时降级。装配 = create(挂
+      // 委托) → navigate 一步。
+      final controller = await widget
+          .webViewFactory((source) {
+            if (!loaded.isCompleted) {
+              loaded.complete();
+            }
+          })
+          .timeout(widget.pageLoadTimeout);
       if (!mounted) {
         return;
       }
       _controller = controller;
-      final loaded = Completer<void>();
-      // W5 B1：委托先挂载、后导航——onPageFinished 只派发给挂载时已存在的
-      // 委托（不回放挂载前事件），先导航后挂委托即丢失事件 → 恒/偶发超时降级。
-      controller.setOnPageFinished(() {
-        if (!loaded.isCompleted) {
-          loaded.complete();
-        }
-      });
-      controller.navigate(url);
+      // navigate 错误在消费点吞掉：面板只走 loaded 超时降级口径（差异策略在
+      // 消费点；旧适配器 unawaited(onError) 同语义上移本处）。
+      unawaited(
+        controller.navigate(url).then<void>((_) {}, onError: (Object _) {}),
+      );
       await loaded.future.timeout(widget.pageLoadTimeout);
       if (!mounted) {
         return;

@@ -2,22 +2,23 @@
 /// WebView 不可用降级/超时）/ 游戏行渲染（键数·字符·wg 注记·无存档管理降级）/
 /// 导出·导入·删除交互（确认弹窗 / toast / 操作后刷新）。
 ///
-/// 测试 seam：注入 fake [SaveBridge]（extends 覆盖四方法，记录调用）+ fake
-/// [SheetWebViewControllerFactory]（生产 bootstrap 路径以假控制器承载
+/// 测试 seam：注入 fake [SaveBridge]（extends 覆盖四方法，记录调用）+ 共享
+/// 假件 `FakeWebViewCapabilityFactory`（生产 bootstrap 路径以假能力承载
 /// evaluate 往返），永不触 webview_flutter 平台通道（U2 隔离）。
 library;
 
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:conver_system_mobile/services/simulator/save_bridge.dart';
+import 'package:conver_system_mobile/services/simulator/webview_capability.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/views/simulators/save_sheet.dart';
 
 import '../../support/fake_local_storage_access.dart';
+import '../../support/fake_web_view_capability.dart';
 
 /// 行 fixture：存档游戏 / 无存档管理 / wg_ 族注记 / 正则多键。
 final List<GameSaveSummary> _rows = const [
@@ -94,77 +95,24 @@ class _RecordingBridge extends SaveBridge {
   }
 }
 
-/// 假 WebView 控制器：记录 evaluate 脚本 + 调用序 spy（setOnPageFinished 先于
-/// navigate 的时序契约，W5 B1）+ 最严苛竞态窗口派发 onPageFinished。
-class _FakeSheetWebViewController implements SheetWebViewController {
-  _FakeSheetWebViewController(this.store);
-
-  final Map<String, String> store;
-  final List<String> evaluated = [];
-  final List<String> callOrder = [];
-  VoidCallback? onPageFinished;
-
-  @override
-  void setOnPageFinished(VoidCallback onPageFinished) {
-    callOrder.add('setOnPageFinished');
-    this.onPageFinished = onPageFinished;
-  }
-
-  @override
-  void navigate(Uri url) {
-    callOrder.add('navigate');
-    // 最严苛竞态时序：导航发起即完成 → 事件在「挂载后、任何补救窗口前」立即
-    // 派发。委托若未先于 navigate 挂载 = 真实丢事件场景（回调为 null → 事件
-    // 无声丢失，面板阻塞至超时降级）。
-    final callback = onPageFinished;
-    if (callback != null) {
-      Future.microtask(callback);
-    }
-  }
-
-  @override
-  Future<String> evaluate(String script) async {
-    evaluated.add(script);
-    if (script == enumerateLocalStorageKeysScript) {
-      // 分片枚举第一步：全量键名（F-38）。
-      return jsonEncode(jsonEncode(store.keys.toList()));
-    }
-    if (script.startsWith('JSON.stringify(')) {
-      // 分片枚举第二步：批键值。锚 Android evaluateJavascript 生产契约
-      // （F-M5-09 AVD 实证，缺陷 #1）：字符串结果带外层引号返回 Flutter（JSON
-      // 编码串），webview_flutter `runJavaScriptReturningResult` 对字符串**原样
-      // 透传**——外层 jsonEncode 模拟该引号层。修复前全量枚举单次返回使
-      // `parseLocalStorageEntries` 一次 jsonDecode 得 String → FormatException
-      // → 面板恒 0 键（回归断言见 happy path 用例）。
-      final inner = script.substring('JSON.stringify('.length);
-      final end = inner.indexOf('].map');
-      final keys = (jsonDecode(inner.substring(0, end + 1)) as List)
-          .cast<String>();
-      return jsonEncode(jsonEncode([
-        for (final k in keys) [k, store[k]],
-      ]));
-    }
-    return '';
-  }
-
-  @override
-  Widget buildView() => const SizedBox(width: 1, height: 1);
-}
-
 /// 立即抛错的假工厂（WebView 不可用降级路径）。
-Future<SheetWebViewController> _throwingFactory() async =>
+Future<WebViewCapability> _throwingFactory(
+  void Function(WebViewCapability source) onPageFinished,
+) async =>
     throw StateError('WebView 平台不可用');
 
 /// 永不完成的假工厂（超时降级路径）。
-Future<SheetWebViewController> _hangingFactory() =>
-    Completer<SheetWebViewController>().future;
+Future<WebViewCapability> _hangingFactory(
+  void Function(WebViewCapability source) onPageFinished,
+) =>
+    Completer<WebViewCapability>().future;
 
 void main() {
   Future<void> pumpSheet(
     WidgetTester tester, {
     required List<SaveGame> games,
     SaveBridge? bridge,
-    SheetWebViewControllerFactory? webViewFactory,
+    WebViewCapabilityFactory? webViewFactory,
     Duration pageLoadTimeout = const Duration(milliseconds: 500),
   }) async {
     // 加高测试表面，保证 4 行游戏列表全量可见（ListView 懒构建不依赖视口）。
@@ -291,14 +239,38 @@ void main() {
       expect(find.text('读取存档超时，WebView 未就绪'), findsOneWidget);
     });
 
+    testWidgets('生产 bootstrap：navigate 抛错 → 消费点吞错，只走超时降级口径',
+        (tester) async {
+      // navigate 错误策略差异面（差异在消费点）：统一适配器上抛 → sheet 侧
+      // 消费点吞错（loaded 永不完成）→ 只走超时降级文案；不出现「存档读取
+      // 不可用」的 navigate 错误面、零未捕获异常。
+      final factory = FakeWebViewCapabilityFactory()..throwOnNavigate = true;
+      await pumpSheet(
+        tester,
+        games: const [SaveGame(id: 'life-sim', name: 'x', saveKeys: ['life_save'])],
+        bridge: null,
+        webViewFactory: factory.create,
+        pageLoadTimeout: const Duration(milliseconds: 100),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100)); // 超时到期
+      await tester.pump();
+
+      expect(tester.takeException(), isNull, reason: 'navigate 错误被吞，零未捕获');
+      expect(find.text('读取存档超时，WebView 未就绪'), findsOneWidget,
+          reason: '只走超时降级口径（不弹 navigate 错误面）');
+    });
+
     testWidgets('生产 bootstrap happy path：evaluate 往返解析渲染真实行',
         (tester) async {
+      final factory = FakeWebViewCapabilityFactory()
+        ..instantFinish = true
+        ..store['life_save'] = '{"hp":10}';
       await pumpSheet(
         tester,
         games: const [SaveGame(id: 'life-sim', name: '人生模拟器', saveKeys: ['life_save'])],
         bridge: null,
-        webViewFactory: () async =>
-            _FakeSheetWebViewController({'life_save': '{"hp":10}'}),
+        webViewFactory: factory.create,
       );
       await tester.pumpAndSettle();
 
@@ -308,18 +280,21 @@ void main() {
 
     testWidgets('降级 → 重试重建 → 成功就绪', (tester) async {
       var factoryCalls = 0;
+      final factory = FakeWebViewCapabilityFactory()
+        ..instantFinish = true
+        ..store['life_save'] = '数据';
       await pumpSheet(
         tester,
         games: const [
           SaveGame(id: 'life-sim', name: '人生模拟器', saveKeys: ['life_save']),
         ],
         bridge: null,
-        webViewFactory: () async {
+        webViewFactory: (onPageFinished) async {
           factoryCalls++;
           if (factoryCalls == 1) {
             throw StateError('首次不可用');
           }
-          return _FakeSheetWebViewController({'life_save': '数据'});
+          return factory.create(onPageFinished);
         },
       );
       await tester.pump();
@@ -366,41 +341,43 @@ void main() {
     });
   });
 
-  group('W5 B1 回归 · onPageFinished 委托先于导航挂载', () {
-    testWidgets('调用序 spy：setOnPageFinished 在 navigate 之前；最严苛窗口事件不丢 → ready',
+  group('W5 B1 回归 · 页面就绪委托必达（构造期委托注入）', () {
+    testWidgets('委托构造期注入 + navigate 派发 → 最严苛窗口事件不丢 → 面板就绪零降级',
         (tester) async {
-      final controller = _FakeSheetWebViewController({'life_save': '数据'});
+      // 委托必达（行为断言形态）：统一接口不暴露 setOnPageFinished，页面就绪
+      // 委托由工厂构造期注入（假件 onPageFinished 构造必填）——装配 =
+      // create(挂委托) → navigate 一步，秒开页事件必达（onPageFinished 只派发
+      // 给挂载时已存在的委托，不回放挂载前事件；未先挂载 = 静默丢事件 → 超时
+      // 降级，W5 B1）。
+      final factory = FakeWebViewCapabilityFactory()
+        ..instantFinish = true
+        ..store['life_save'] = '数据';
       await pumpSheet(
         tester,
         games: const [SaveGame(id: 'life-sim', name: '人生模拟器', saveKeys: ['life_save'])],
         bridge: null,
-        webViewFactory: () async => controller,
+        webViewFactory: factory.create,
       );
       await tester.pumpAndSettle();
 
-      final mountAt = controller.callOrder.indexOf('setOnPageFinished');
-      final navigateAt = controller.callOrder.indexOf('navigate');
-      expect(mountAt, greaterThanOrEqualTo(0), reason: '委托必须被挂载');
-      expect(navigateAt, greaterThan(mountAt),
-          reason: '挂委托先于 navigate——onPageFinished 只派发给挂载时已存在的'
-              '委托（不回放挂载前事件），先导航后挂委托即事件丢失（W5 B1）');
-
-      // 行为终态：事件在「导航发起即完成」的最严苛时序下仍被送达（fake navigate
-      // 内即刻派发，委托未先挂载即为静默丢事件）→ 面板就绪而非超时降级。
+      // 行为终态：事件在「导航发起即完成」的最严苛时序下仍被送达（委托构造期
+      // 已挂载）→ 面板就绪而非超时降级。
       expect(find.text('人生模拟器'), findsOneWidget);
       expect(find.text('读取存档超时，WebView 未就绪'), findsNothing);
     });
 
-    testWidgets('事件即时派发（microtask 序列内 navigate 后立即完成）→ loaded 必达',
+    testWidgets('事件必达（navigate 发起即完成）→ loaded 必达，零超时',
         (tester) async {
-      // 对抗性：页面加载在导航返回后的同一 microtask 序列内完成（真实丢事件
-      // 窗口最窄形态）——委托已先挂载即必达；断言面板直接就绪，零超时。
-      final controller = _FakeSheetWebViewController({'life_save': '数据'});
+      // 对抗性：页面加载在导航返回序列内立即完成（真实丢事件窗口最窄形态）
+      // ——委托构造期已挂载即必达；断言面板直接就绪，零超时。
+      final factory = FakeWebViewCapabilityFactory()
+        ..instantFinish = true
+        ..store['life_save'] = '数据';
       await pumpSheet(
         tester,
         games: const [SaveGame(id: 'life-sim', name: 'x', saveKeys: ['life_save'])],
         bridge: null,
-        webViewFactory: () async => controller,
+        webViewFactory: factory.create,
         pageLoadTimeout: const Duration(milliseconds: 100),
       );
       await tester.pump();
