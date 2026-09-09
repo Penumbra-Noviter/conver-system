@@ -1,10 +1,18 @@
 /// LLM Provider 抽象 + 共享消息准备 / 错误翻译骨架 + LLMProviderFactory 抽象。
 ///
-/// 本文件零传输依赖（dio / dart:io）；具体 wire 实现在 T02 装配层。
+/// 本文件引入 dio / dart:io 传输异常类型（既有长期依赖）——仅用于基类默认
+/// 错误分发链的分类，不含任何 wire 调用；具体 wire 实现在 T02 装配层。
+/// `errors.dart` 保持零 dio / dart:io 依赖（传输异常以 [translateSdkError]
+/// 原语入参），`translate_helpers.dart` 承载分类原语（只读共享）。
 /// 桌面权威源（只读，语义锚点）：`desktop/backend/app/services/llm/base.py`（BaseLLM）。
 library;
 
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+
 import 'errors.dart';
+import 'translate_helpers.dart';
 
 /// 单条 LLM 对话消息（角色 + 内容），不可变值对象。
 class LlmMessage {
@@ -25,9 +33,11 @@ class LlmMessage {
 ///
 /// ChatService 与 UI 只依赖本抽象与 [LLMProviderFactory]，不触碰具体 Provider。
 /// 共享骨架（Provider 不再各自实现）：[prepareMessages]（system 分离 + chat
-/// 逐条重建）与 [runTranslated]（错误翻译骨架）；[testConnection] 默认 =
-/// 最小生成请求（max_tokens=1）。[translateError] 为抽象契约，子类须将自身
-/// wire 层异常统一映射为 LLM 错误族。
+/// 逐条重建）、[runTranslated]（错误翻译骨架）与 [translateError]（通用错误
+/// 分发链默认实现）；[testConnection] 默认 = 最小生成请求（max_tokens=1）。
+/// 分发链顺序：LLMError 直通 → DioException → HttpStatusError → Provider 特有
+/// 钩子 [translateProviderError] → SocketException → HttpException →
+/// FormatException/TypeError → 兜底；文案统一以 [providerName] 命名 provider。
 abstract class LLMProvider {
   LLMProvider({required this.apiKey, this.baseUrl});
 
@@ -36,6 +46,12 @@ abstract class LLMProvider {
 
   /// 自定义端点（空 → Provider 官方默认端点）。
   final String? baseUrl;
+
+  /// Provider 名（错误文案逐字依赖，如「{name} API 调用失败: …」）。
+  ///
+  /// 具体 Provider 覆写返回既有 'Claude' / 'OpenAI' 字面量；未覆写时用中性
+  /// 缺省 'LLM'（测试夹具零改动编译）。
+  String get providerName => 'LLM';
 
   /// 共享消息准备：从消息列表提出 system prompt，返回 `(system, chat_messages)`。
   ///
@@ -56,12 +72,73 @@ abstract class LLMProvider {
     return (system: system, chat: chat);
   }
 
-  /// 错误翻译抽象契约：将 wire 层任意异常映射为 LLM 错误族。
+  /// 错误翻译契约（默认实现）：将 wire 层任意异常映射为 LLM 错误族。
   ///
-  /// 对齐 `base.py::_translate_error`：抽象方法强制子类实现，杜绝 wire 异常
-  /// 以原始形态穿透到上层。generate / streamGenerate 的调用体经 [runTranslated]
+  /// 对齐 `base.py::_translate_error`。分发链按序：
+  /// [LLMError] 直通（含 [LLMConnectionInterruptedError] 两相位叶子，不二次
+  /// 翻译）→ [DioException]（[translateDioError]，timeout / 状态码 / 兜底）→
+  /// [HttpStatusError]（[translateStatusError]，408/504 归 Timeout）→ Provider
+  /// 特有钩子 [translateProviderError]（默认返回 null）→ [SocketException] /
+  /// [HttpException]（LLM 族兜底）→ [FormatException] / [TypeError]
+  /// （[LlmTransportFailure.responseParse]）→ 未知异常兜底（文案含
+  /// [providerName]）。generate / streamGenerate 的调用体经 [runTranslated]
   /// 捕获任何异常并交给本方法翻译后再上抛。
-  LLMError translateError(Object error);
+  LLMError translateError(Object error) {
+    // 已映射为 LLM 族的错误（含连接中断类）直通，不二次翻译。
+    if (error is LLMError) {
+      return error;
+    }
+    if (error is DioException) {
+      return translateDioError(providerName, error);
+    }
+    if (error is HttpStatusError) {
+      return translateStatusError(
+        providerName,
+        error.statusCode,
+        error.body,
+        cause: error,
+      );
+    }
+    // Provider 特有异常钩子：Claude 只命中其流内 error 事件原语，其余返回
+    // null 继续通用链；OpenAI 无特有异常，直接继承本默认（返回 null）。
+    final providerSpecific = translateProviderError(error);
+    if (providerSpecific != null) {
+      return providerSpecific;
+    }
+    if (error is SocketException) {
+      // 连接阶段网络失败（拒绝 / DNS / 重置）→ LLM 族兜底，不穿透原始异常。
+      return translateSdkError(
+        providerName,
+        message: error.message,
+        cause: error,
+      );
+    }
+    if (error is HttpException) {
+      return translateSdkError(
+        providerName,
+        message: error.message,
+        cause: error,
+      );
+    }
+    if (error is FormatException || error is TypeError) {
+      return translateSdkError(
+        providerName,
+        failure: LlmTransportFailure.responseParse,
+        message: '$error',
+        cause: error,
+      );
+    }
+    return translateSdkError(providerName, message: '$error', cause: error);
+  }
+
+  /// Provider 特有异常翻译钩子（protected 语义的扩展点）。
+  ///
+  /// 在 [translateError] 默认链中固定于 [HttpStatusError] 之后、[SocketException]
+  /// 之前被咨询：返回非 null 的 LLM 族错误则直接采用，否则继续通用链。
+  /// 缺省实现恒返回 null（无特有异常）。子类覆写只对**自身私有异常原语**
+  /// 返回非 null——如 Claude 的流内 `error` 事件原语；对其他类型一律返回
+  /// null，保证通用链归属与顺序不变更。
+  LLMError? translateProviderError(Object error) => null;
 
   /// 共享错误翻译骨架：块内抛出的任意异常统一经 [translateError] 映射为
   /// LLM 错误族上抛。对应 `base.py::_translated_call`（Dart 以回调替

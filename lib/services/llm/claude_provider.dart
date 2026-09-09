@@ -15,7 +15,6 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dio/dio.dart';
 
@@ -51,57 +50,25 @@ String? normalizeClaudeBaseUrl(String? baseUrl) {
 class ClaudeProvider extends LLMProvider {
   ClaudeProvider({required super.apiKey, super.baseUrl});
 
-  static const String _providerName = 'Claude';
+  @override
+  String get providerName => 'Claude';
+
   static const String _defaultModel = 'claude-sonnet-5';
   static const String _defaultEndpoint = 'https://api.anthropic.com';
 
   /// 非流式 REST 客户端（T02 双栈：dio 侧）。
   final Dio _dio = Dio();
 
+  /// Claude 特有异常翻译钩子：只命中 Anthropic 流内 `error` 事件原语
+  /// （[translateSdkError] 进 LLM 族），其余返回 null 走基类默认分发链——
+  /// 对齐原完整覆写中 `_StreamApiError` 分支的逐字语义与槽位（HttpStatusError
+  /// 后、SocketException 前）。
   @override
-  LLMError translateError(Object error) {
-    // 已映射为 LLM 族的错误（含连接中断类）直通，不二次翻译。
-    if (error is LLMError) {
-      return error;
-    }
-    if (error is DioException) {
-      return translateDioError(_providerName, error);
-    }
-    if (error is HttpStatusError) {
-      return translateStatusError(
-        _providerName,
-        error.statusCode,
-        error.body,
-        cause: error,
-      );
-    }
+  LLMError? translateProviderError(Object error) {
     if (error is _StreamApiError) {
-      return translateSdkError(_providerName, message: error.message, cause: error);
+      return translateSdkError(providerName, message: error.message, cause: error);
     }
-    if (error is SocketException) {
-      // 连接阶段网络失败（拒绝 / DNS / 重置）→ LLM 族兜底，不穿透原始异常。
-      return translateSdkError(
-        _providerName,
-        message: error.message,
-        cause: error,
-      );
-    }
-    if (error is HttpException) {
-      return translateSdkError(
-        _providerName,
-        message: error.message,
-        cause: error,
-      );
-    }
-    if (error is FormatException || error is TypeError) {
-      return translateSdkError(
-        _providerName,
-        failure: LlmTransportFailure.responseParse,
-        message: '$error',
-        cause: error,
-      );
-    }
-    return translateSdkError(_providerName, message: '$error', cause: error);
+    return null;
   }
 
   @override
