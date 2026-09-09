@@ -341,7 +341,10 @@ class _CharacterCard extends StatelessWidget {
     final greeting = _preview(character.firstMes.trim(), 60);
     return Semantics(
       // 可点卡片 button 语义 + 长按多选 hint（spec §4.4 覆盖清单 ③）。
-      button: true,
+      // F-59 守卫对齐游戏卡（simulators_view.dart _GameCard：button: onOpen != null）：
+      // tap 有效才宣告 button——常态（非多选）onTap 为 null 不宣告，
+      // 长按进多选由 hint「长按可多选」描述。
+      button: selectionMode,
       hint: '长按可多选',
       child: GestureDetector(
         onTap: selectionMode

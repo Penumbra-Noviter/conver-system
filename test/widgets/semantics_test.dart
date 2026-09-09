@@ -13,8 +13,10 @@
 ///   验收 5 的「tooltip 语义 label」断言按此读取（这正是屏幕阅读器朗读的
 ///   tooltip 资产；`find.bySemanticsLabel` 不会命中 tooltip）；
 /// - 「hasTapAction」= `actions` 含 `SemanticsAction.tap`；角色卡常态（非
-///   多选）tap 语义接线为空（点击无动作），按钮语义锚为 `isButton` +
-///   长按 action + hint（M6-03 既有契约，见 characters_view_test）。
+///   多选）tap 语义接线为空（点击无动作）→ 不宣告 button（F-59 守卫对齐
+///   游戏卡 `simulators_view._GameCard`，`button: onOpen != null`
+///   同构守卫：tap 有效才宣告）；hint「长按可多选」常态保持；多选态
+///   isButton + tap action + hint（M6-03 既有契约，见 characters_view_test）。
 library;
 
 import 'dart:io';
@@ -419,14 +421,16 @@ void main() {
   // ─────────────────────────── 验收 4：卡片 button 语义 ─────────────────
 
   group('卡片 button 语义（验收 4）', () {
-    testWidgets('角色卡 Semantics(button) + 长按多选 hint + 长按 action',
+    testWidgets(
+        '角色卡常态：不宣告 button + 长按多选 hint + 长按 action（F-59 守卫）',
         (tester) async {
       await setupChars(tester);
       final handle = tester.ensureSemantics();
       final data = semanticsDataOf(tester, find.text('诺克斯'));
 
-      expect(data.flagsCollection.isButton, isTrue,
-          reason: '角色卡 button 语义（Semantics(button) 生效）');
+      // F-59：常态（非多选）tap 无效 → 对齐游戏卡 button 守卫不宣告按钮。
+      expect(data.flagsCollection.isButton, isFalse,
+          reason: '常态非多选 tap 为 null，不宣告 button（F-59 守卫对齐）');
       expect(data.hint, contains('长按可多选'),
           reason: '长按多选 hint 在语义树');
       expect(data.actions & SemanticsAction.longPress.index != 0, isTrue,
