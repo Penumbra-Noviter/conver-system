@@ -291,6 +291,71 @@ void main() {
     });
   });
 
+  // ─────────────── F-66：断流/停止小标语义可读（并列对照双锁）──────────────
+
+  group('断流/停止小标语义可读（F-66）', () {
+    testWidgets('断流截断气泡：「回复中断」小标在语义树为可读文本节点；'
+        '「已停止」不进入语义面（并列对照）', (tester) async {
+      final env = await ChatTestEnv.create();
+      await openSeededConversation(
+        tester,
+        env,
+        InterruptStreamRetryProvider(reply: '新回复'),
+      );
+      await sendViaUi(tester, 'hi');
+      await pumpUntil(tester, () => find.text('回复已中断').evaluate().isNotEmpty,
+          why: '断流提示出现（截断标记落位前置）');
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
+
+      final handle = tester.ensureSemantics();
+      expect(find.text('回复中断'), findsOneWidget, reason: '前置：小标渲染');
+      expect(find.bySemanticsLabel('回复中断'), findsOneWidget,
+          reason: 'F-66 验收 1：断流截断气泡语义树含「回复中断」小标文本节点'
+              '（断流标记不可省，屏读可辨读状态）');
+      expect(find.bySemanticsLabel('已停止'), findsNothing,
+          reason: 'F-66 验收 2：断流非主动停止，语义面无「已停止」'
+              '（两标互斥、标注界不相互污染）');
+      handle.dispose();
+      await env.close();
+    });
+
+    testWidgets('主动停止气泡：「已停止」小标在语义树为可读文本节点；'
+        '「回复中断」不进入语义面（并列对照）', (tester) async {
+      final env = await ChatTestEnv.create();
+      await openSeededConversation(
+        tester,
+        env,
+        TickingFakeLLMProvider(
+          tokens: const ['t0', 't1', 't2', 't3', 't4'],
+          delay: const Duration(milliseconds: 100),
+        ),
+      );
+      await sendViaUi(tester, 'hi');
+      await tester.pump(const Duration(milliseconds: 110));
+      await tester.pump(const Duration(milliseconds: 110));
+      expect(find.text('t0t1'), findsOneWidget, reason: '前置：已累积部分内容');
+
+      await tester.tap(find.byTooltip('停止'));
+      await tester.pump();
+      // 耗尽剩余 provider 的 pending token timers（对齐 chat_view_test A3 形态）。
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump();
+
+      final handle = tester.ensureSemantics();
+      expect(find.text('已停止'), findsOneWidget, reason: '前置：小标渲染');
+      expect(find.bySemanticsLabel('已停止'), findsOneWidget,
+          reason: 'F-66 验收 2：主动停止气泡语义树含「已停止」小标文本节点'
+              '（停止标记不可省，屏读可辨读状态）');
+      expect(find.bySemanticsLabel('回复中断'), findsNothing,
+          reason: 'F-66 验收 2：主动停止非断流，语义面无「回复中断」'
+              '（两标互斥、标注界不相互污染）');
+      handle.dispose();
+      await env.close();
+    });
+  });
+
   // ─────────────────────────── 验收 2：光标排除 ─────────────────────────
 
   group('▍光标语义排除（验收 2）', () {
