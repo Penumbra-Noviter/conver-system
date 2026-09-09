@@ -20,5 +20,7 @@
 | **读取相位 (read phase)** | 已收响应头后读 SSE 段（流中途 EOF/断连/idle 超时/未收敛终态帧）的失败；编码为 `ReadPhaseInterruptedError`；不可重试 | 同上 |
 | **停止完成信号 (stop completion signal)** | `streamReply` 消费方取消返回流的订阅（停止）所 await 的完成 Future，保证本轮已发 user 消息写尝试已结算（成功落库或回合已终态不再写）后才 resolve；ChatRound 据此删除 UI 层轮询补偿，reload 必见已发 user | `services/chat_service.dart`（streamReply doc，公共契约） |
 | **伴生同步（后期可选）** | Tailscale/导出导入实现"连桌面同步数据"的后期可选功能，非 MVP 所需 | §0 / §8 |
+| **截断回复生命周期 (interrupt lifecycle)** | 断流→截断标记→重试目标的回合级子生命周期，单一归属 ChatRound：标记集 `_interruptedMessageIds`（UI 侧、DB 不写）、notice 重试目标 `_interruptedNoticeTargetId`（零内容断流复位 null = F-4 规则）、重试渲染判据 `hasRetryableInterrupted`、结算规则（配对门 `removed && target==replacedId` + 文案门条件清理 + 目标推进 `max(marks)`）；controller/view 纯读消费；与「已停止」标记体系并列互斥 | `chat_round.dart`（判据/结算）+ `chat_service.dart`（regenerate 契约） |
+| **重生成替换目标 (replaced message id)** | `RegenerateResult.replacedMessageId`：服务层 regenerate 实际替换的有界删旧目标行 id（缺省=末条 assistant / 显式 messageId）——截断结算键，客户端零预解析；「末条 assistant」判定唯一归属 `_resolveRegenerateTarget`（F-64 单一来源） | `chat_service.dart`（RegenerateResult 字段 + `_resolveRegenerateTarget`） |
 
 > 注：与桌面库共享的领域概念（角色卡 V2、SSE 流式、存档互迁格式等）权威定义在桌面库 `desktop/CONTEXT.md`，本表只登记移动端特有/新增的 load-bearing 术语。

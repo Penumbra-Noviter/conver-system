@@ -431,7 +431,66 @@ void main() {
       final settled = await env.messageRepository.getMessages(c.activeConversationId!);
       expect([for (final m in settled) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, '新回复')],
-          reason: '重试 regenerate replace：不新增 user 行、无重复输入');
+          reason: '图标 regenerate replace 成功、无重复 user 行');
+      await env.close();
+    });
+
+    testWidgets('双截断 → 横幅重试后持续可点（指向最近剩余截断）→ 再重试 → 全清'
+        '（F-65① UI 面 + 重写语义）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final c = await openConversation(
+        tester,
+        env,
+        InterruptStreamRetryProvider(reply: '新回复'),
+      );
+
+      // 两次发送各断流 → A/B 双截断。
+      await sendViaUi(tester, '第一问');
+      await pumpUntil(
+          tester,
+          () => find.text('回复中断').evaluate().length == 1,
+          why: '截断 A 标记就绪');
+      // 完成停止→发送 AnimatedSwitcher 过渡（防双按钮歧义）。
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
+      await sendViaUi(tester, '第二问');
+      await pumpUntil(
+          tester,
+          () => find.text('回复中断').evaluate().length == 2,
+          why: '双截断标记就绪');
+      await tester.pump(const Duration(milliseconds: 140));
+      await tester.pump();
+      expect(c.hasRetryableInterrupted, isTrue, reason: '横幅含可重试目标');
+
+      // 重试最近截断（B）→ 横幅保持（余标 A 推进为 notice 目标）。
+      await tester.tap(find.text('重试'));
+      await tester.pump();
+      await pumpUntil(tester, () => !c.isRegenerating, why: '第一次重试收尾');
+      expect(c.hasRetryableInterrupted, isTrue,
+          reason: 'F-65①：余标推进后横幅仍可重试');
+      expect(c.notice, '回复已中断');
+      expect(find.text('重试'), findsOneWidget, reason: '横幅持续（不消失）');
+      await pumpUntil(
+          tester,
+          () => find.text('回复中断').evaluate().length == 1,
+          why: 'B 已替换，仅余 A 小标');
+
+      // 再重试（推进目标 A）→ 全清、横幅消失。
+      await tester.tap(find.text('重试'));
+      await tester.pump();
+      await pumpUntil(
+          tester,
+          () => !c.isRegenerating && find.text('回复已中断').evaluate().isEmpty,
+          why: '第二次重试完成且横幅消失',
+      );
+      expect(c.hasRetryableInterrupted, isFalse);
+      expect(c.notice, isNull);
+      expect(find.text('回复中断'), findsNothing, reason: '全部截断已解决');
+      final settled =
+          await env.messageRepository.getMessages(c.activeConversationId!);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, '第一问'), (Role.assistant, '新回复')],
+          reason: '重写语义：从 A 截断点重写后续全部');
       await env.close();
     });
 

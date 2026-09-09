@@ -116,6 +116,7 @@ class RegenerateResult {
   const RegenerateResult({
     required this.reply,
     required this.messageId,
+    required this.replacedMessageId,
     required this.conversationId,
   });
 
@@ -124,6 +125,10 @@ class RegenerateResult {
 
   /// 新落库的 assistant 消息 id。
   final int messageId;
+
+  /// 被替换的旧 assistant 目标行 id（= regenerate 有界删旧前解析的实际替换
+  /// 目标，F-64 截断结算键）——客户端以本字段作结算键，零预解析。
+  final int replacedMessageId;
 
   /// 所属对话 id。
   final int conversationId;
@@ -724,6 +729,9 @@ class ChatService {
   ///    + 插新一次提交；生成期间并发写入的新消息（id > snapshotMaxId）保留，
   ///    新回复以新 id 落在其后（F1 数据完整性）。
   ///
+  /// 返回 [RegenerateResult.replacedMessageId] = 步骤 2 解析的实际替换目标行 id
+  /// （有界删旧前已知）——客户端截断结算键（F-64 单一来源），无需预解析。
+  ///
   /// 抛出：领域错误（[ConversationNotFoundError] / [CharacterNotFoundError] /
   /// [MessageNotFoundError] / [InvalidRegenerateTargetError] /
   /// [RegenerateBusyError] / [ApiKeyMissingError] / [ProviderNotSupportedError]）
@@ -796,6 +804,7 @@ class ChatService {
       return RegenerateResult(
         reply: reply,
         messageId: saved.id,
+        replacedMessageId: target.id,
         conversationId: conversationId,
       );
     } finally {
