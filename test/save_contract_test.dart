@@ -595,6 +595,39 @@ void main() {
     });
   });
 
+  group('sanitizeFilename · 存档锚对照负样本增量（C3 双锚分叉）', () {
+    test('% 与 0x7f → 替换为 _（导出锚保留此二字符——对照分叉）', () {
+      expect(sanitizeFilename('a%b'), 'a_b');
+      expect(sanitizeFilename('a\x7fb'), 'a_b');
+    });
+
+    test('前导点与前导空白保留（导出锚剔除——对照分叉）', () {
+      expect(sanitizeFilename('.abc.'), '.abc');
+      expect(sanitizeFilename('..a'), '..a');
+      expect(sanitizeFilename('  name  '), '  name');
+    });
+
+    test('尾部点空格混合连续剔除（单次整段剔尾）', () {
+      expect(sanitizeFilename('a . .'), 'a');
+      expect(sanitizeFilename('trail.  .'), 'trail');
+    });
+
+    test('超长名不截断（导出锚截断 100——对照分叉）', () {
+      expect(sanitizeFilename('n' * 150), 'n' * 150);
+    });
+
+    test('中文名净化后不变', () {
+      expect(sanitizeFilename('中文名'), '中文名');
+    });
+
+    test('更多非字符串类型 → game（Falsify 扩展）', () {
+      expect(sanitizeFilename(3.14), 'game');
+      expect(sanitizeFilename(true), 'game');
+      expect(sanitizeFilename(['x']), 'game');
+      expect(sanitizeFilename({'k': 1}), 'game');
+    });
+  });
+
   // ══════════════════════════════════════════════════
   // maxImportBytes — 5MB 上限常量契约
   // ══════════════════════════════════════════════════
