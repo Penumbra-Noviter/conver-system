@@ -183,6 +183,8 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
   /// 测试连接：用表单当前 Key / base_url 现值（不入库、独立于 [_save]；
   /// F-10 边界）经 [LLMProviderFactory] 实例化后调 `testConnection`。
   ///
+  /// 模型入参（T1）：`testConnection(model:)` 恒传 `settingsRepository
+  /// .defaultModel` 解析值（与聊天链同源），不落入 Provider 硬编码默认模型。
   /// 清空字段按未配置处理：Key 空 → 提示「未提供 API Key，请在设置中填写后再测试」
   /// 且不发任何请求；base_url 空 → null（Provider 官方默认端点）。错误映射逐字
   /// 对齐 `desktop/backend/app/api/routes/settings.py::test_connection` 局部
@@ -202,12 +204,18 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
 
     setState(() => _testing.add(provider));
     try {
+      // 测试连接始终传全局 default_model（T1 / 与聊天链 CredentialsResolver
+      // 的 defaultModel reader 同源，设置表单当前无模型字段）；defaultModel
+      // getter 恒返回非空（显式空 → SettingsDefaults.model 兜底）。避免
+      // Provider 侧落入硬编码默认模型（openai gpt-4o / claude claude-sonnet-5），
+      // 使第三方兼容端点 + 自定义模型（如 deepseek-v4-flash）真实可校验。
+      final model = await widget.settingsRepository.defaultModel;
       final llm = widget.providerFactory.create(
         provider: provider,
         apiKey: key,
         baseUrl: baseUrl.isEmpty ? null : baseUrl,
       );
-      await llm.testConnection();
+      await llm.testConnection(model: model);
       debugPrint('测试连接成功($provider)');
       _showSnackBar('连接成功');
     } on LLMError catch (error) {

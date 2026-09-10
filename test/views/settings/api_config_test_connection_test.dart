@@ -17,6 +17,7 @@ library;
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/secure_store.dart';
@@ -155,9 +156,64 @@ void main() {
     });
   });
 
+  group('default_model 传参（T1：不再落入 provider 硬编码默认模型）', () {
+    testWidgets('default_model=deepseek-v4-flash → openai 测试连接收到该模型', (tester) async {
+      await repo.setMany({'default_model': 'deepseek-v4-flash'});
+      final provider = FakeLLMProvider();
+      final factory = _RecordingFactory(provider);
+      await pumpSection(
+        tester,
+        ApiConfigSection(
+          settingsRepository: repo,
+          secretStore: InMemorySecretStore(),
+          providerFactory: factory,
+          initialValues: const <String, String>{},
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('api-key-openai')),
+        'sk-openai-test',
+      );
+      await tester.tap(find.byKey(const ValueKey('test-connection-openai')));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('连接成功'), findsOneWidget);
+      expect(provider.testConnectionCallCount, 1);
+      expect(provider.lastModel, 'deepseek-v4-flash',
+          reason: '测试连接必须传 default_model 解析值（经 testConnection → generate 记录），'
+              '不得落入 provider 硬编码 gpt-4o');
+    });
+
+    testWidgets('default_model 未配置 → 传入 SettingsDefaults.model 兜底解析值（非空）', (tester) async {
+      final provider = FakeLLMProvider();
+      final factory = _RecordingFactory(provider);
+      await pumpSection(
+        tester,
+        ApiConfigSection(
+          settingsRepository: repo,
+          secretStore: InMemorySecretStore(),
+          providerFactory: factory,
+          initialValues: const <String, String>{},
+        ),
+      );
+
+      await tapClaudeTest(tester);
+
+      expect(find.text('连接成功'), findsOneWidget);
+      expect(provider.testConnectionCallCount, 1);
+      expect(provider.lastModel, SettingsDefaults.model,
+          reason: 'default_model 未显式配置 → defaultModel getter 兜底 SettingsDefaults.model');
+      expect(provider.lastModel, isNotEmpty,
+          reason: '测试连接始终传非空模型（defaultModel getter 恒非空语义）');
+    });
+  });
+
   group('失败路径（fake factory 抛错）', () {
     testWidgets('未提供 Key →「未提供 API Key，请在设置中填写后再测试」且工厂不触发', (tester) async {
-      final factory = _RecordingFactory(FakeLLMProvider());
+      final provider = FakeLLMProvider();
+      final factory = _RecordingFactory(provider);
       await pumpSection(
         tester,
         ApiConfigSection(
@@ -178,6 +234,9 @@ void main() {
       );
       expect(factory.calls, isEmpty,
           reason: '未配置 Key 按未配置处理，不发任何请求');
+      expect(provider.testConnectionCallCount, 0);
+      expect(provider.lastModel, isNull,
+          reason: '未提供 Key 不发请求、不读模型');
     });
 
     for (final (error, expected) in [
