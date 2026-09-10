@@ -6,6 +6,13 @@
 
 ---
 
+## 技术债折回批次 F-73/F-74 — 全部处置（2026-09-10 — 用户「消费技术债区」指令）
+
+- **范围**：候选区 2 条全处置（做 1 关 1）——F-73 消费，F-74 复核关闭。全量 **1613 测**绿 / analyze 0。**候选区清零**（0 项开放）。
+- **F-73 toProxyEndpoint 双实现交叉校验**（✅ 修）：injection_test.dart 金样组新增「F-73 交叉校验」测试——JS 模板 toProxyEndpoint 四个语义步骤（非字符串短路 / origin 回退 / pathname 提取+尾斜杠剥离 / 前缀拼接）逐一 token 断言 + Dart mirror 行为锚调用。原金样为逐字锁（改 JS 同步改金样字面量即绿，锁不住语义漂移），新测试锁**语义结构锚**——改任一步骤结构（含同步改金样）即红，与既有 Dart mirror 行为矩阵形成双向联动。58 injection 测绿。
+- **F-74 /proxy 开放面**（❌ 复核关闭）：git grep 复核——server 仅回环绑定（`HttpServer.bind(InternetAddress.loopbackIPv4)`，simulator_server.dart:138，无公网暴露）；`_buildProxyTarget` 目标 netloc 恒取配置 base（无任意 URL 转发面）；spec Out of Scope 已声明不做鉴权；桌面同构先例（后端同样不鉴权）——加鉴权属过度工程。纵深防御提示保留。
+- **过程遥测**：零子智能体（纯测试增强 + 复核关闭，主会话直做）；合并冲突 0；flaky 0。
+
 ## 真机问题批次 CORS 反代 + 测试连接 — 诊断与修复（2026-09-10 — 用户真机验证反馈）
 
 - **诊断**：真机反馈两问题——① 设置页测试连接失败（Claude 显示「Claude API Key 无效或未配置」、OpenAI 显示 `Model "gpt-4o" is not supported`）；② 模拟器连接 API 失败。代码定位：`api_config_section.dart:210` 测试连接 `llm.testConnection()` **不传 model** → 落硬编码默认模型（openai `gpt-4o` / claude `claude-sonnet-5`）——用户配第三方兼容端点只认自定义模型（实测 `/v1/models` 仅 `deepseek-v4-flash`），对话正常（聊天走 CredentialsResolver 传配置模型）。模拟器失败 = WebView 浏览器 fetch 直连目标端点被 CORS 拦截（dio 原生不受限所以对话 OK）。

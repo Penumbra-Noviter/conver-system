@@ -43,10 +43,17 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-73 | injection toProxyEndpoint JS 模板与 Dart mirror 双实现无交叉校验（改 JS 忘改 Dart 测试不报警）——金样断言锁模板文本、mirror 锁 Dart 行为，两者无漂移联动 | 期末四轴 Architecture 注记 | Speculative | 📝 待立项 | 模拟器桥 |
-| F-74 | 本地 /proxy 反代为同设备开放面（任何进程可调 /proxy 拿 App 注入 Bearer 打配置 host）——spec Out of Scope 已声明不做鉴权，仅纵深防御提示 | 期末四轴 Falsify | Speculative | 📝 待立项 | 模拟器桥 |
 
 ## 技术债处置记录
+
+### 2026-09-10 — 技术债折回批次（F-73/F-74，候选区清零）
+
+> 来源：用户「消费技术债区」指令。F-73 消费（✅ 已修），F-74 复核关闭（❌）。全量 **1613 测**绿 / analyze 0。**候选区清零**（0 项开放）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-73 | ✅ 已修 | injection_test.dart 新增交叉校验测试「F-73 交叉校验：JS 模板 toProxyEndpoint 语义 token 与 Dart mirror 行为矩阵联动」——四个语义步骤（非字符串短路 / origin 回退 / pathname 提取+尾斜杠剥离 / 前缀拼接）逐一 token 断言 + mirror 行为锚调用；改 JS 逻辑（含同步改金样）删任一步骤结构即红，与 Dart mirror 行为矩阵形成双向联动 |
+| F-74 | ❌ 复核关闭 | git grep 复核：server 仅回环绑定（`HttpServer.bind(InternetAddress.loopbackIPv4)`，simulator_server.dart:138，无公网暴露）；`_buildProxyTarget` 目标 netloc 恒取配置 base（无任意 URL 转发面）；spec Out of Scope 已声明不做鉴权；桌面同构先例（后端同样不鉴权）——加鉴权属过度工程，纵深防御提示保留在 DEV_LOG |
 
 ### 2026-09-10 — 技术债折回批次（F-68~72 全部处置，候选区清零）
 

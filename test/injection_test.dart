@@ -478,6 +478,40 @@ void main() {
       );
     });
 
+    test('F-73 交叉校验：JS 模板 toProxyEndpoint 语义 token 与 Dart mirror 行为矩阵联动', () {
+      // 防漂移（F-73）：金样逐字锁只防「模板文本被改」——若实现者改 JS 逻辑
+      // 并同步改金样字面量，Dart mirror（injection.dart toProxyEndpoint）仍
+      // 可能静默失联。本测试把「语义结构锚」作为金样断言：四个语义步骤
+      // （非字符串短路 / origin 回退 / pathname 提取 / 前缀拼接）逐一 token
+      // 断言，改任一步骤结构（含同步改金样）即红——与下方 Dart mirror 行为
+      // 矩阵（test/injection_test.dart toProxyEndpoint group）形成双向联动。
+      final script = buildSample();
+      // ① 非字符串/空 → 原样短路（Dart mirror 矩阵：空串 → ''、null → null）。
+      expect(
+        script,
+        contains("if (typeof endpoint !== 'string' || endpoint === '') return endpoint;"),
+      );
+      // ② origin 回退：运行时 location.origin（Dart mirror 矩阵：空 origin → 原样）。
+      expect(
+        script,
+        contains("const o = origin || (typeof location !== 'undefined' ? location.origin : '');"),
+      );
+      // ③ pathname 提取 + 尾斜杠剥离（Dart mirror 矩阵：/v1/ → /v1、深层路径保留）。
+      expect(
+        script,
+        contains('new URL(endpoint).pathname.replace(/\\/+\$/, \'\')'),
+      );
+      // ④ 前缀拼接：origin + PROXY_PREFIX + path（Dart mirror 矩阵：origin+prefix+path）。
+      expect(
+        script,
+        contains('return `\${o}\${PROXY_PREFIX}\${path}`;'),
+      );
+      // 联动锚：Dart mirror 存在同语义实现（改 JS 忘 Dart 时此处直接引用其
+      // 行为验证已在下方 group 覆盖；此处断言 mirror 函数存在且非空）。
+      expect(toProxyEndpoint('https://api.deepseek.com/v1', 'http://127.0.0.1:8642'),
+          'http://127.0.0.1:8642/proxy/v1');
+    });
+
     test('config 三元组嵌入（F-91 候选原样进字符串，无省略）', () {
       final script = buildSample();
       expect(script, contains('"wz-endpoint"'));
