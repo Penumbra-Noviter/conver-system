@@ -83,8 +83,8 @@
 
 | Ticket | 标题 | F 项 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
-| 01 | text_utils.role_str 共享收敛（prompt/chat 改指 + 删私有归一函数） | F-94 | 2026-09-10 | [见提交 2] |
-| 02 | build_message_list 增可选 history 参数（assemble 传入已取历史消除双查） | F-95 | 2026-09-10 | [见提交 2] |
+| 01 | text_utils.role_str 共享收敛（prompt/chat 改指 + 删私有归一函数） | F-94 | 2026-09-10 | 364436d |
+| 02 | build_message_list 增可选 history 参数（assemble 传入已取历史消除双查） | F-95 | 2026-09-10 | 364436d |
 
 **验证链：** pytest 891+1skip→896+1skip（+5：test_text_utils role_str 矩阵 4 + build_message_list 显式 history 不再查库锁）| 既有 prompt/chat/regenerate 用例全绿（role_str 收敛零行为变化）| 波末文件范围核验合规（text_utils/prompt/chat/message+tests）| doc_sync 零漂移
 **非阻断落债：** 无（候选区清零）
