@@ -30,6 +30,16 @@
 
 ## 已完成归档
 
+### 真机问题批次 — CORS 同源反代 + 测试连接修复（2026-09-10 收口）
+
+> 来源：用户真机验证反馈（模拟器连接 API 失败 + 设置页测试连接失败）。实测诊断：测试连接不传模型（硬编码 gpt-4o/claude-sonnet-5，第三方端点不认）；模拟器 CORS（目标端点不放行 WebView 直连）→ 拍板桌面同源反代方案移植（T2 注入改写 + T3 server /proxy 路由）。交付：测试连接传 default_model（与聊天链同源）/ 注入 toProxyEndpoint 改写（桌面逐字）/ server /proxy 流式反代（全相位超时 60s + key App 侧注入 + SSE 透传）。门禁：全量 **1612 测**绿 / analyze 0 / 真实端点链路验证 PASS（yunshuzhilian.asia → 200）/ 期末四轴 0 阻断（Spec 超时缺失已修 fd3820b；F-73/F-74 落盘）。Claude 面 502 为站侧上游未开通（实测 5 模型名全 502），非 App 缺陷。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| T1 | 测试连接传 default_model | 2026-09-10 | 05d54b8（merge 265e305） |
+| T2 | 注入 toProxyEndpoint 同源改写 | 2026-09-10 | 2418ff1（merge 8ead524） |
+| T3 | server /proxy 流式反代路由 | 2026-09-10 | 2972dd7（merge 6cb3885）+ 超时修复 fd3820b |
+
 ### 技术债折回批次 F-68~72 — 全部处置（2026-09-10 收口）
 
 > 来源：用户「消费技术债 F-68~72」指令。F-68/F-69/F-70 消费（merge `e0b1bd7`/`a1ce47a`），F-71/F-72 复核关闭。交付：release 签名缺失清晰报错守卫 + 图标色值双向守卫 + privacy_audit 删 Speculative Mapping 分支。门禁：全量 **1579 测**绿 / analyze 0 / pytest 66（覆盖 99.24%）/ 候选区清零。处置详情见 TECH_DEBT「2026-09-10 处置记录」节。

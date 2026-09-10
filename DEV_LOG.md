@@ -6,6 +6,16 @@
 
 ---
 
+## 真机问题批次 CORS 反代 + 测试连接 — 诊断与修复（2026-09-10 — 用户真机验证反馈）
+
+- **诊断**：真机反馈两问题——① 设置页测试连接失败（Claude 显示「Claude API Key 无效或未配置」、OpenAI 显示 `Model "gpt-4o" is not supported`）；② 模拟器连接 API 失败。代码定位：`api_config_section.dart:210` 测试连接 `llm.testConnection()` **不传 model** → 落硬编码默认模型（openai `gpt-4o` / claude `claude-sonnet-5`）——用户配第三方兼容端点只认自定义模型（实测 `/v1/models` 仅 `deepseek-v4-flash`），对话正常（聊天走 CredentialsResolver 传配置模型）。模拟器失败 = WebView 浏览器 fetch 直连目标端点被 CORS 拦截（dio 原生不受限所以对话 OK）。
+- **实测端点**（用户提供测试 key，修复后注销）：OpenAI 面 `deepseek-v4-flash` → **200**（key 有效）；Claude 面 `/v1/messages` 5 个模型名全 **502「Upstream authentication failed」**——站侧 Claude 上游未开通（非 App 缺陷，Claude 测试连接传模型后仍看站侧）；`sk-` 实测 key 未入库（临时验证脚本跑完即删）。
+- **修复（3 工单）**：T1 `05d54b8` api_config 测试连接传 `settingsRepository.defaultModel`（与聊天链同源，红→绿实证）；T2 `2418ff1` 注入脚本加桌面逐字 `toProxyEndpoint`（origin 运行时 `location.origin`，调用序 `convertEndpoint(toProxyEndpoint(...))`，`proxyPrefix='/proxy'` 单源）；T3 `2972dd7` server `/proxy` 路由（任意 method → `scheme://netloc + path` 目标解析 → 丢弃游戏 Authorization + App 侧 Bearer 注入 → dart:io HttpClient 流式透传 SSE → 未配置 503）。**SDK 三层坑实证**：autoCompress 缺省 gzip / dart HttpClient 无条件注入 accept-encoding / bufferOutput 缺省缓冲到 close 才落 socket（首字节 1061ms）——全在 _handleProxy 修复并锁进测试。
+- **期末四轴**：0 阻断；Spec 1 项缺失（`connectionTimeout` 只管连接建立、上游 stall 时无限挂起——全相位超时未实现）→ 修 `fd3820b`：`close().timeout(60s)` + 响应体 `.timeout(60s)`（对齐桌面 httpx timeout=60 全局语义）+ stall 回归测试（裸上游 accept 不响应，注入 300ms 验证 502 不挂连接）；非阻断 F-73（JS/Dart mirror 双实现无交叉校验）/ F-74（本地 /proxy 开放面纵深）落盘。
+- **真实端点链路验证 PASS**：Dart VM 起 SimulatorServer 反代 → `yunshuzhilian.asia/v1/chat/completions` → **HTTP 200 + deepseek-v4-flash**（game-side-key 被丢弃 + App 侧 Bearer 注入实证，JNI 通道 + 流式 SSE 真通道）。
+- **门禁链**：全量 **1612 测**绿 / analyze 0 / 期末四轴 0 阻断 / APK 重建（62.3MB）。**技术债候选区 F-73/F-74 待立项**。
+- **过程遥测**：子智能体 5（research + Implement×3 + 期末四轴）；合并冲突 0；空返回 0；flaky 0；`dart run` 直接跑项目外脚本因 flutter 依赖树解析失败 → 改临时 `flutter test` 文件验证（跑完即删，防 key 残留）。
+
 ## 技术债折回批次 F-68~72 — 全部处置（2026-09-10 — 用户「消费技术债 F-68~72」指令）
 
 - **范围**：候选区 5 条全处置（做 3 关 2）——F-68/F-69/F-70 消费，F-71/F-72 复核关闭。全量 **1579 测**绿 / analyze 0 / pytest 66（覆盖 99.24%）。**候选区清零**（0 项开放）。

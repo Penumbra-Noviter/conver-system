@@ -43,6 +43,8 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-73 | injection toProxyEndpoint JS 模板与 Dart mirror 双实现无交叉校验（改 JS 忘改 Dart 测试不报警）——金样断言锁模板文本、mirror 锁 Dart 行为，两者无漂移联动 | 期末四轴 Architecture 注记 | Speculative | 📝 待立项 | 模拟器桥 |
+| F-74 | 本地 /proxy 反代为同设备开放面（任何进程可调 /proxy 拿 App 注入 Bearer 打配置 host）——spec Out of Scope 已声明不做鉴权，仅纵深防御提示 | 期末四轴 Falsify | Speculative | 📝 待立项 | 模拟器桥 |
 
 ## 技术债处置记录
 
