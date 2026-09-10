@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **15 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **14 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -28,7 +28,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| WL-1 | 世界书数据模型 + 仓库层（lorebook_entries 新表 + character_book 解析入库） | ⬜ 待办 | spec §WL-1；pytest 契约锁通过；既有 character_book 保真零回归 |
 | WL-2 | 激活引擎纯函数（activate_lorebook_entries / build_world_injection / collect_scan_text） | ⬜ 待办 | spec §WL-2；命中矩阵 + depth 边界 + 同种子 RNG 可复现；零 DB 依赖 |
 | WL-3 | 注入链集成（build_messages 增 world 可选参数，三注入位；prepare_chat 组装） | ⬜ 待办 | spec §WL-3；world=None 逐字节零回归；重生成路径一致性 |
 | WL-4 | 世界书编辑器前端（CRUD 面板 + 泛词告警 + 字段校验） | ⬜ 待办 | spec §WL-4；Vitest 用例 + Playwright 端到端（新增→保存→重开还原→注入生效） |
@@ -79,6 +78,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### 世界书批次 WL-1（2026-09-10 — 世界书数据模型 + 仓库层，WL 批首个）
+
+> 来源：AI风月对标调研五批工单（WL 世界书首张）；字段规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §WL-1。叙述详见 DEV_LOG〈WL-1 世界书数据模型 + 仓库层（2026-09-10）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| WL-1 | 世界书数据模型 + 仓库层（lorebook_entries 新表 + character_book 解析入库） | 2026-09-10 | 51e3786 |
+
+**验证链：** pytest 823+1skip→845+1skip（+22：test_lorebook_store 契约锁——keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归）| schema.sql 快照同步（新表 DDL + CHECK ×4 + 索引）+ test_migrate_data 表集合更新 | services/schemas __all__ 登记同步 | 既有 character_book 往返保真零回归（test_character_card 全绿）| doc_sync 零漂移
+**非阻断落债：** 无
+
+---
 
 ### 用户修复批次 — 模拟器 API CORS 反代 + 重新识别按钮 UI 收口（2026-08-28）
 
