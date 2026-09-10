@@ -78,6 +78,19 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 技术债消费批次 F-93（2026-09-10，轻量档 1 工单）
+
+> 来源：用户「消费技术债后继续推进 WL-3」；候选区唯一剩余项 F-93（WL-1 期末 code-review Standards 轴）。Grilling 实证拍板**做**——git grep 复核 `lorebook._as_str_list` 与 `character_card._as_list` 逐行重复仍成立（character_card 2 处 + lorebook 1 处消费）。方案：新建 `services/text_utils.py` 共享单点 `as_str_list` 收敛，两消费者改指、删除重复私有函数；行为由既有测试全量锁定 + 新契约锁 7 条。处置详情见 TECH_DEBT 2026-09-10 节。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | text_utils.as_str_list 共享单点收敛（character_card/lorebook 改指 + 删重复私有函数） | F-93 | 2026-09-10 | 4ad64e7 |
+
+**验证链：** pytest 873+1skip→879+1skip（+6：test_text_utils 脏数据容错矩阵）| character_card（56）+ lorebook_store（24）既有用例零变化 | 覆盖率不放宽（纯重构收敛）| 波末文件范围核验合规（text_utils/character_card/lorebook/__init__+tests）| doc_sync 零漂移
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 世界书批次 WL-2（2026-09-10 — 激活引擎纯函数，WL 批第二张）
 
 > 来源：AI风月对标调研五批工单（WL 世界书第二张）；引擎语义/契约锁依据见 docs/chat-simulator-upgrade-spec.md §WL-2。叙述详见 DEV_LOG〈WL-2 世界书激活引擎纯函数（2026-09-10）〉。

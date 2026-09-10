@@ -53,7 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-93 | lorebook._as_str_list 与 character_card._as_list 逐行重复（同包两处脏数据容错 helper；跨私有函数边界，收敛需建共享模块并动既有测试面） | WL-1 期末 code-review Standards 轴 | Worth exploring | 📝 待立项 | 架构去重 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -79,21 +78,13 @@
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-08-27（技术债消费批次：F-92 全自动档 kickoff，轻量档 1 工单）
+### 2026-09-10（技术债消费批次：F-93，轻量档 1 工单）
 
-> 处置详情：1 项消费（F-92 对应工单 T-01，见 TICKETS 归档）。Grilling 实证拍板**做**——git grep 复核现状仍成立：simulators.js 按钮条件 `type==='local'` + reprobe 端点按 id 定位不区分 type，确认「ai 但 config 错的历史导入条目无 UI reprobe 入口」为真实缺口。方案 D：新增纯函数 `canReprobeGame(game) = game.type==='local' || (ai && source==='imported')` 驱动渲染条件，后端零改动（reprobe 端点天然支持任意 type，source 保留）。
-
-| 编号 | 遗留项 | 来源 | 强度 | 处置 |
-|------|--------|------|------|------|
-| F-92 | 前端「重新识别」按钮仅 local 卡片渲染（ai+imported 老条目无法 UI 一键 reprobe） | F-91 用户 bug 修复批次非阻断观察 | Worth exploring | ✅ 已修（2026-08-27：工单 T-01 `canReprobeGame` 纯函数驱动渲染——local 恒真、ai∧source==='imported' 真、其余假；判定矩阵 8 条 + 渲染契约 4 项测试，Vitest 1172→1182，运行态冒烟确认斗罗大陆 ai 卡片出现按钮、reprobe 后 source 保留） |
-
-### 2026-08-27（技术债消费批次：F-90 全自动档 kickoff，轻量档 1 工单）
-
-> 处置详情：1 项消费（F-90 对应工单，见 TICKETS 归档）。Grilling 实证拍板做——生产唯一调用方 runSync 传 getDoc（doc 回落分支生产死代码），doc 仅测试消费（5 处直调用例）；收编 getDoc-only 消除双通道冗余，惰性时序保持（取用仍在 fetchCredentials await 之后），F-89 守卫走观察者路径不经这 5 个直调用例、零覆盖损失。AGENTS.md 测试基线散文句部分（1165）由主会话落账时直接刷新，随工单闭环。
+> 处置详情：1 项消费（F-93 对应工单，见 TICKETS 归档）。Grilling 实证拍板**做**——git grep 复核现状仍成立：`lorebook._as_str_list`（lorebook.py:212）与 `character_card._as_list`（character_card.py:212）逐行重复（None/空→[]、list→str 化、其它→单值包裹），character_card 2 处消费 + lorebook 1 处消费，同包跨私有函数边界。方案：新建 `services/text_utils.py` 共享单点 `as_str_list`（F-93 收敛），两消费者改指、删除重复私有函数；行为由 character_card / lorebook 既有测试全量锁定（90 用例零变化）+ test_text_utils 契约锁 7 条（None/空/list 混合/单值包裹矩阵）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 处置 |
 |------|--------|------|------|------|
-| F-90 | syncGameCredentials doc/getDoc 双通道冗余收编评估 + AGENTS.md 测试基线散文句维护注记 | 期末四轴 Architecture/Standards | Speculative | ✅ 已修（2026-08-27：轻量档工单收编 getDoc-only——签名删 doc 参数、targetDoc 改 `getDoc() ?? null` 惰性取用、5 处测试迁移 `getDoc: () => doc`，全量 Vitest 1165 不回退、key-injector 100% 覆盖；AGENTS.md 散文句已刷新 1165） |
+| F-93 | lorebook._as_str_list 与 character_card._as_list 逐行重复 | WL-1 期末 code-review Standards 轴 | Worth exploring | ✅ 已修（2026-09-10：轻量档工单 `text_utils.as_str_list` 共享单点收敛——character_card / lorebook 改指 + 删私有函数，pytest 873→879 全绿零回归、doc_sync 零漂移） |
 
 ### 2026-08-27（技术债消费批次：F-82~F-89 全自动档 kickoff，3 做 5 关）
 
