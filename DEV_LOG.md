@@ -6,6 +6,19 @@
 
 ---
 
+## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
+
+- **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。
+- **授权与边界**：FetchFlow 路线判 crawl；授权预检 `CHECKPOINT`（robots.txt 整站 `Disallow: /` + `/zh` 登录墙重定向）→ 摆信号给用户确认授权后继续。网络画像 `authorized_target_only`：同源只读 GET、低频串行、不爆破接口、不发聊天消息、不触发计费路径。
+- **结论（本次最值钱的发现）**：目标站前端是 **Dify 定制版**（Next.js + Turbopack SPA，业务层自研 + `/go/api` 与 `/console/api` 双前缀），后端为 **Go**（世界书正则要求 Go 语法）。其记忆与内容机制**非原创**——世界书 / 记忆宫殿 = **SillyTavern World Info 规范的产品化变体** + 一层「AI 自动写条目」。本项目无需逆向，字段语义直接对齐 ST 规范即可；且本项目角色卡 V2 已带 `character_book` 往返保真（仅缺消费），`docs/world-simulation-exploration.md` D4 已选定同一规范路线。
+- **证据获取方式**（可复用方法论）：不碰登录态即从构建产物拿到绝大部分实现证据——29 个 `_next/static` chunk 全量下载 → 路径字面量收集得完整 API 面 → 关键词频次定位业务 bundle（chat/message/SSE 计数最高者）→ 上下文切片挖字段语义 → **i18n 资源还原产品语义（作者端世界书帮助文档整段内嵌，是一手证据）**。登录态阶段仅只读观察（网络瀑布 + `page.evaluate` 内 fetch 探结构）。
+- **产出**：15 个工单立项（批次 WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载，登记 TICKETS 活跃区）+ 两份文档（`docs/chat-simulator-upgrade-spec.md` 实现规格：字段表 + 纯函数签名 + 契约锁用例；`docs/external-benchmark-aigirlfriend.md` 对标档案：对方事实 + 方法论 + 复现路径 + 环境坑）。
+- **环境修复（顺带）**：① 采集脚手架 `fetchflow-work/` 移出仓库至 `D:\tmp\fetchflow-aigs\`——`scripts/doc_sync.py` files 校验会把仓库内 .py/.js 与 CODE_WIKI 引用做双向覆盖，临时脚本入仓即报漂移；② `src-tauri/target` 残留仓库在 D 盘时期的构建缓存（tauri-build 读不到 permissions 绝对路径）致 cargo 编译失败 → doc_sync cargo 渠道降级、tests_total 少 70 → `cargo clean` 后重建。
+- **未决**：SillyTavern 及其扩展许可证未核实（本机 DNS 将 github / raw.githubusercontent / deepwiki / docs.sillytavern.app 解析到非公网 IP，web_fetch 全败，仅 web_search 摘要可用）——实现批次开工前若涉及直接复用代码需先核实 LICENSE。
+- **非阻断落债**：无。
+
+---
+
 ---
 
 ## 版本号升级 v0.6.1 发布批次（2026-08-28 — CORS 反代 + UI 收口修复版发布）

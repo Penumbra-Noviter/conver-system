@@ -19,11 +19,53 @@
 
 ## 活跃工单
 
-> 当前 0 项待办（技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)，当前 0 项待立项）。
+> 当前 **15 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
+> 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
+> 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
+> 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
+
+### 批次 WL — 世界书引擎（承接 docs/world-simulation-exploration.md D3/D4）
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| — | （无活跃工单） | — | — |
+| WL-1 | 世界书数据模型 + 仓库层（lorebook_entries 新表 + character_book 解析入库） | ⬜ 待办 | spec §WL-1；pytest 契约锁通过；既有 character_book 保真零回归 |
+| WL-2 | 激活引擎纯函数（activate_lorebook_entries / build_world_injection / collect_scan_text） | ⬜ 待办 | spec §WL-2；命中矩阵 + depth 边界 + 同种子 RNG 可复现；零 DB 依赖 |
+| WL-3 | 注入链集成（build_messages 增 world 可选参数，三注入位；prepare_chat 组装） | ⬜ 待办 | spec §WL-3；world=None 逐字节零回归；重生成路径一致性 |
+| WL-4 | 世界书编辑器前端（CRUD 面板 + 泛词告警 + 字段校验） | ⬜ 待办 | spec §WL-4；Vitest 用例 + Playwright 端到端（新增→保存→重开还原→注入生效） |
+| WL-5 | 记忆宫殿（AI 归纳 → source=auto 条目；阈值触发；失败隔离） | ⬜ 待办 | spec §WL-5；阈值矩阵 + JSON 降级不抛 + 主流程不受影响 |
+
+### 批次 MS — 消息操作（继续 + swipes 多候选）
+
+| Ticket | 标题 | 状态 | 验收摘要 |
+|--------|------|------|----------|
+| MS-1 | swipes 数据模型与服务（message_swipes 新表 + messages.active_swipe_index 自愈迁移） | ⬜ 待办 | spec §MS-1；序号唯一约束 + 切换越界异常 + 级联 + 导出往返 |
+| MS-2 | swipes 前端（候选计数 + 左右切换 + 失败回滚；重生成改为追加候选） | ⬜ 待办 | spec §MS-2；Vitest 用例；单选不渲染控制条 |
+| MS-3 | 「继续」生成（append 续写，不追加 user 消息） | ⬜ 待办 | spec §MS-3；条数不变 + 失败原内容零改动 |
+
+### 批次 BR — 存档升级为分支点
+
+| Ticket | 标题 | 状态 | 验收摘要 |
+|--------|------|------|----------|
+| BR-1 | 分支元数据 + 快照导出（conversations 增 parent/branch_from_message_id；版本化快照含世界书与 swipes） | ⬜ 待办 | spec §BR-1；截断锚正确性 + 版本拒绝 + 导出导入往返 |
+| BR-2 | 从快照/分支派生会话（clone_conversation / branch_from_message + 路由） | ⬜ 待办 | spec §BR-2；新会话逐条一致 + 源零改动 + 世界书独立 + 父子级联语义 |
+
+### 批次 CG — CG 沉淀与剧情回顾
+
+| Ticket | 标题 | 状态 | 验收摘要 |
+|--------|------|------|----------|
+| CG-1 | text2img Provider 抽象（与 LLM Provider 同构 + 单一来源登记） | ⬜ 待办 | spec §CG-1；注册表派生 + 缺 Key 错误映射 + 超时/轮询上限 |
+| CG-2 | CG 资产库 + 画廊（cg_images 新表 + 加权抽取 + 解锁） | ⬜ 待办 | spec §CG-2；入库去重 + 解锁幂等 + 加权分布可复现 + 会话删除图保留 |
+| CG-3 | 对话内出图 + 剧情回顾时间线 | ⬜ 待办 | spec §CG-3；三态渲染 + 失败不破坏对话 + 时间线顺序 |
+
+### 批次 MD — Mod 挂载层
+
+| Ticket | 标题 | 状态 | 验收摘要 |
+|--------|------|------|----------|
+| MD-1 | Mod 数据模型与注入叠加（mods + mod_bindings 新表；apply_prompt_mods 三区域叠加） | ⬜ 待办 | spec §MD-1；绑定唯一 + 禁用零影响 + 排序稳定 + 空列表原样返回 |
+| MD-2 | Mod 管理 UI（列表/开关/排序/区域选择/导入导出；CSS 类复用现有后载序注入 seam） | ⬜ 待办 | spec §MD-2；Vitest 用例 + Playwright 冒烟 |
+
+> **实施顺序建议**：WL → MS → BR → CG → MD（依赖与风险见 spec 末节表格）。
+> **每批统一验收口径**：先红后绿 + 全量基线不回退（pytest 823+1skip / Vitest 1189 / cargo 70）+ 覆盖率不放宽 + 冒烟 + 文档同步。
 
 ---
 
