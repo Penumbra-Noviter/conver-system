@@ -17,7 +17,10 @@
   - ST 映射：insertion_order(或 order)→order、group→group_name、selective+secondary_keys→and、position 仅 before_char/after_char 保留（in_chat 回落 world）。
 - **契约同步（快照即契约）**：`tests/fixtures/schema.sql` 补新表 DDL + CHECK + 索引；`test_migrate_data` 目标表集合断言更新（characters/conversations/messages/settings/lorebook_entries）；services/schemas `__all__` 登记同步；CODE_WIKI §3 树 / §4.21.5 / §5.1 同步，doc_sync 零漂移。
 - **验证链**：先红后绿（22 用例初跑 collection 红 → 实现后全绿）| pytest 823+1skip→845+1skip（+22，零回归）| test_character_card character_book 往返保真用例全绿 | Vitest/cargo 零改动（本工单纯后端）| pool_cleanup_check + doc_sync --check 双钩子通过。
-- **非阻断落债**：无。
+- **期末 code-review 三轴（51e3786 后、修复前）**：Standards 0 违例（低危 2 项：_as_str_list / _as_list 逐行重复 → 落债 F-93；JsonList 公开名未入 __all__ → 随手改名 _JsonList）；Spec 0 发现；**Falsify 2 项 HIGH 当场修复**（先红后绿 +2 用例，pytest→847+1skip）：
+  1. `parse_character_book` 布尔字符串反转——`bool("false")`==True 使 `constant/enabled` 语义反转（禁用条目变常驻注入）、`selective="false"` 使 match_mode 误转 and → 新增 `_as_bool` 按字面求值（false/0/no/空 → False，true/1/yes → True），契约锁 `test_parse_character_book_boolean_strings`。
+  2. `update_entry` 显式 null 毒化——`LorebookEntryUpdate(content=None)` 对 NOT NULL 列抛 IntegrityError 500、对可空列落 NULL 导致后续响应序列化 ValidationError 永久 500 → 更新循环 skip None（显式 null 视为未提供），契约锁 `test_update_explicit_null_is_noop`。
+- **非阻断落债**：F-93（架构去重）。
 
 ---
 

@@ -19,7 +19,7 @@ from backend.app.database import Base
 __all__ = ["LorebookEntry"]
 
 
-class JsonList(TypeDecorator):
+class _JsonList(TypeDecorator):
     """TEXT 列承载 JSON 数组：ORM 层暴露 list[str]，落库/读回自动序列化"""
 
     impl = Text
@@ -60,7 +60,7 @@ class LorebookEntry(Base):
         Integer, ForeignKey("characters.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title = Column(String(200), default="", comment="条目标题（可空）")
-    keys = Column(JsonList(), nullable=False, default=list, server_default=text("'[]'"), comment="触发关键词（JSON 数组）")
+    keys = Column(_JsonList(), nullable=False, default=list, server_default=text("'[]'"), comment="触发关键词（JSON 数组）")
     content = Column(Text, nullable=False, default="", comment="命中后注入内容")
     constant = Column(Boolean, default=False, comment="常驻（不判命中，直接注入）")
     order = Column(Integer, default=100, comment="命中条目排序（升序注入）")

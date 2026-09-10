@@ -87,8 +87,8 @@
 |--------|------|----------|------|
 | WL-1 | 世界书数据模型 + 仓库层（lorebook_entries 新表 + character_book 解析入库） | 2026-09-10 | 51e3786 |
 
-**验证链：** pytest 823+1skip→845+1skip（+22：test_lorebook_store 契约锁——keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归）| schema.sql 快照同步（新表 DDL + CHECK ×4 + 索引）+ test_migrate_data 表集合更新 | services/schemas __all__ 登记同步 | 既有 character_book 往返保真零回归（test_character_card 全绿）| doc_sync 零漂移
-**非阻断落债：** 无
+**验证链：** pytest 823+1skip→847+1skip（+24：test_lorebook_store 契约锁 22 + Falsify 修复锁 2——keys 数组/越界拒/级联/替换幂等/ST 解析/布尔字符串/显式 null 防毒化/保真零回归）| schema.sql 快照同步（新表 DDL + CHECK ×4 + 索引）+ test_migrate_data 表集合更新 | services/schemas __all__ 登记同步 | 既有 character_book 往返保真零回归（test_character_card 全绿）| 期末 code-review 三轴：Standards 0 违例 / Spec 0 发现 / Falsify 2 HIGH 当场修复 | doc_sync 零漂移
+**非阻断落债：** F-93（架构去重，入 TECH_DEBT 候选区）
 
 ---
 

@@ -94,6 +94,10 @@ def create_entry(db: Session, character_id: int, payload: LorebookEntryCreate) -
 def update_entry(db: Session, entry_id: int, payload: LorebookEntryUpdate) -> LorebookEntry:
     """部分更新世界书条目（仅提交显式字段）
 
+    显式 null 视为「未提供」跳过写入（LorebookEntryUpdate 全字段 Optional 形态下，
+    `{"content": null}` 若照写会对 NOT NULL 列抛 IntegrityError、对可空列落 NULL
+    毒化后续读取——由 Falsify 修复锁锁定该语义）。
+
     Args:
         db: 数据库会话
         entry_id: 条目 ID（不存在抛 LorebookEntryNotFoundError）
@@ -104,6 +108,8 @@ def update_entry(db: Session, entry_id: int, payload: LorebookEntryUpdate) -> Lo
     """
     entry = _require_entry(db, entry_id)
     for field, value in payload.model_dump(exclude_unset=True).items():
+        if value is None:
+            continue
         setattr(entry, field, value)
     db.commit()
     db.refresh(entry)
@@ -182,7 +188,7 @@ def _entry_from_st(raw: dict) -> LorebookEntryCreate:
     if position not in _KNOWN_ST_POSITIONS:
         position = "world"
     # ST selective 语义：启用 secondary_keys 时全部关键词须命中 → and；否则 or
-    selective = bool(raw.get("selective", False))
+    selective = _as_bool(raw.get("selective"), False)
     secondary = raw.get("secondary_keys") or []
     match_mode = "and" if selective and secondary else "or"
 
@@ -190,7 +196,7 @@ def _entry_from_st(raw: dict) -> LorebookEntryCreate:
         title=str(raw.get("name") or "")[:200],
         keys=_as_str_list(raw.get("keys")),
         content=str(raw.get("content") or ""),
-        constant=bool(raw.get("constant", False)),
+        constant=_as_bool(raw.get("constant"), False),
         order=_clamp_int(raw.get("insertion_order", raw.get("order", 100)), 0, 9999, 100),
         probability=_clamp_int(raw.get("probability", 100), 1, 100, 100),
         group_name=str(raw.get("group") or "")[:100],
@@ -199,7 +205,7 @@ def _entry_from_st(raw: dict) -> LorebookEntryCreate:
         position=position,
         depth=_clamp_int(raw.get("depth", _DEPTH_DEFAULT), 0, 20, _DEPTH_DEFAULT),
         source="manual",
-        enabled=bool(raw.get("enabled", True)),
+        enabled=_as_bool(raw.get("enabled"), True),
     )
 
 
@@ -210,6 +216,23 @@ def _as_str_list(value) -> list[str]:
     if isinstance(value, list):
         return [str(v) for v in value]
     return [str(value)]
+
+
+def _as_bool(value, default: bool) -> bool:
+    """布尔容错：字符串按字面求值（'false'/'0'/'no'/空 → False，'true'/'1'/'yes' → True），
+    数值按非零，其它（含 None）→ default。杜绝 bool('false') == True 的语义反转（Falsify 修复）。"""
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("false", "0", "no", "off", ""):
+            return False
+        if lowered in ("true", "1", "yes", "on"):
+            return True
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return default
 
 
 def _clamp_int(value, lo: int, hi: int, default: int) -> int:

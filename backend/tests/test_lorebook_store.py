@@ -116,6 +116,16 @@ def test_update_missing_raises(db_session) -> None:
         lorebook_service.update_entry(db_session, 99999, LorebookEntryUpdate(title="x"))
 
 
+def test_update_explicit_null_is_noop(db_session, make_character) -> None:
+    """显式 null 视为未提供：NOT NULL 列防 IntegrityError、可空列防 NULL 中毒（Falsify 修复锁）"""
+    char = _persist(db_session, make_character)
+    entry = lorebook_service.create_entry(db_session, char.id, LorebookEntryCreate(title="t", content="c", enabled=True))
+    updated = lorebook_service.update_entry(db_session, entry.id, LorebookEntryUpdate(content=None, enabled=None))
+    assert updated.content == "c"
+    assert updated.enabled is True
+    assert updated.title == "t"
+
+
 def test_delete(db_session, make_character) -> None:
     """删除后列表为空"""
     char = _persist(db_session, make_character)
@@ -261,6 +271,32 @@ def test_parse_character_book_tolerant() -> None:
     assert d.depth == 20
     assert d.group_weight == 1
     assert d.position == "world"
+
+
+def test_parse_character_book_boolean_strings() -> None:
+    """布尔字符串脏数据（false/true）按字面求值，不反转语义（Falsify 修复锁）"""
+    drafts = lorebook_service.parse_character_book(
+        {
+            "entries": [
+                {
+                    "keys": ["a"],
+                    "constant": "false",  # bool("false") 陷阱：必须解析为 False
+                    "enabled": "false",
+                    "selective": "false",
+                    "secondary_keys": ["b"],
+                }
+            ]
+        }
+    )
+    d = drafts[0]
+    assert d.constant is False
+    assert d.enabled is False
+    assert d.match_mode == "or"  # selective=false 时不因存在 secondary_keys 反转为 and
+    drafts_true = lorebook_service.parse_character_book(
+        {"entries": [{"constant": "true", "enabled": "true"}]}
+    )
+    assert drafts_true[0].constant is True
+    assert drafts_true[0].enabled is True
 
 
 # ════════════════════════════════════════════════════════════════
