@@ -15,8 +15,10 @@ Prompt 组装 — LLM 消息列表的纯函数组装层
 from __future__ import annotations
 
 from collections.abc import Sequence
-from backend.app.services.character_fields import PROMPT_FIELDS
 from dataclasses import dataclass
+
+from backend.app.services.character_fields import PROMPT_FIELDS
+from backend.app.services.text_utils import role_str
 
 __all__ = ["CharacterData", "apply_template_vars", "parse_mes_example", "build_messages"]
 
@@ -96,13 +98,6 @@ def parse_mes_example(
                     })
 
     return messages
-
-
-def _role_str(role: str | object) -> str:
-    """归一化消息角色：兼容 str 与带 .value 的枚举（如 models.message.Role）"""
-    if hasattr(role, "value"):
-        return str(role.value)
-    return str(role)
 
 
 def build_messages(
@@ -197,7 +192,7 @@ def build_messages(
         history_list = history_list[-(max_rounds * 2):]
 
     for msg in history_list:
-        messages.append({"role": _role_str(msg.role), "content": msg.content})
+        messages.append({"role": role_str(msg.role), "content": msg.content})
 
     # 5. 历史后指令（post_history_instructions）— 附加在历史消息之后、当前输入之前
     if character.post_history_instructions:

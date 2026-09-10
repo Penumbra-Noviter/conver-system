@@ -49,6 +49,7 @@ from backend.app.services.lorebook_engine import (
     build_world_injection,
     collect_scan_text,
 )
+from backend.app.services.text_utils import role_str
 
 __all__ = [
     "ChatContext",
@@ -123,14 +124,14 @@ def assemble_chat_context(
     if current_input is not None:
         messages = message_service.build_message_list(
             db, conv, current_input, max_rounds=max_rounds, user_name=user_name,
-            world_injection=world_injection,
+            world_injection=world_injection, history=history,
         )
     else:
         # 重生成路径：append_current_input=False —— 不追加当前输入，末条为
         # 历史末条 user（待回复触发源），尾随 PHI system 已在纯函数内剥离。
         messages = message_service.build_message_list(
             db, conv, "", max_rounds=max_rounds, user_name=user_name,
-            append_current_input=False, world_injection=world_injection,
+            append_current_input=False, world_injection=world_injection, history=history,
         )
 
     # 4. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
@@ -530,8 +531,5 @@ def _lorebook_world_injection(
 
 
 def _msg_role(msg: object) -> str:
-    """消息 → 角色字符串（兼容 str 与带 .value 的枚举，如 models.message.Role）"""
-    role = getattr(msg, "role", "")
-    if hasattr(role, "value"):
-        return str(role.value)
-    return str(role)
+    """消息 → 角色字符串（委托 text_utils.role_str，F-94 收敛）"""
+    return role_str(getattr(msg, "role", ""))

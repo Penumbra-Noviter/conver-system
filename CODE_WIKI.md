@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2151<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->892<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2156<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->897<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -390,7 +390,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~453 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~451 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -466,7 +466,7 @@ conver system/
 
 > 无公开函数（异常类层次）。
 
-### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~201 行<!--/AUTO-->）
+### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~205 行<!--/AUTO-->）
 
 **职责**：消息读取/写入/写入（不提交）/截断/开场白自动插入/上下文构建（滑窗）/跨对话搜索。
 
@@ -477,7 +477,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/message.py:create_message_no_commit-->`create_message_no_commit(db, conversation_id, role, content)`<!--/AUTO--> | 写入消息（不提交，供事务原子性） |
 | <!--AUTO:sig:backend/app/services/message.py:delete_messages_from-->`delete_messages_from(db, conversation_id, target_id)`<!--/AUTO--> | 截断：删除 target_id 起全部消息（锚定 PK id，不提交） |
 | <!--AUTO:sig:backend/app/services/message.py:auto_insert_greeting-->`auto_insert_greeting(db, conversation_id, user_name='User')`<!--/AUTO--> | 新会话自动插入开场白 |
-| <!--AUTO:sig:backend/app/services/message.py:build_message_list-->`build_message_list(db, conversation, user_content, max_rounds=30, user_name='User', append_current_input=True, world_injection=None)`<!--/AUTO--> | 构建 LLM 上下文（滑窗 + 模板变量） |
+| <!--AUTO:sig:backend/app/services/message.py:build_message_list-->`build_message_list(db, conversation, user_content, max_rounds=30, user_name='User', append_current_input=True, world_injection=None, history=None)`<!--/AUTO--> | 构建 LLM 上下文（滑窗 + 模板变量） |
 | <!--AUTO:sig:backend/app/services/message.py:search_messages-->`search_messages(db, query, limit=50)`<!--/AUTO--> | 跨对话关键词搜索 |
 
 ### 4.21.5 `backend/app/services/lorebook.py` — 世界书条目仓库层（WL-1）（<!--AUTO:lines:backend/app/services/lorebook.py-->~187 行<!--/AUTO-->）
@@ -504,13 +504,14 @@ conver system/
 | <!--AUTO:sig:backend/app/services/lorebook_engine.py:collect_scan_text-->`collect_scan_text(history, current_input, depth, *, role_of)`<!--/AUTO--> | 扫描窗口文本（0=仅输入；N=2N 条对话消息+输入；>20 裁剪；system 不计轮） |
 | `LorebookEntryData` | 引擎输入纯数据容器（frozen dataclass，与 ORM 解耦） |
 
-### 4.21.7 `backend/app/services/text_utils.py` — 脏数据容错工具（F-93 收敛）（<!--AUTO:lines:backend/app/services/text_utils.py-->~24 行<!--/AUTO-->）
+### 4.21.7 `backend/app/services/text_utils.py` — 文本/角色归一容错工具（F-93/F-94 收敛）（<!--AUTO:lines:backend/app/services/text_utils.py-->~37 行<!--/AUTO-->）
 
-**职责**：跨模块共享的脏数据容错单点（F-93 收敛）——character_card._as_list 与 lorebook._as_str_list 前身合并；行为由 character_card / lorebook 既有测试与 test_text_utils 契约锁锁定。
+**职责**：跨模块共享的容错单点——as_str_list（F-93：character_card._as_list 与 lorebook._as_str_list 前身合并）+ role_str（F-94：prompt._role_str 与 chat._msg_role 前身合并）；行为由 character_card / lorebook / prompt / chat 既有测试与 test_text_utils 契约锁锁定。
 
 | 函数 | 说明 |
 |------|------|
 | <!--AUTO:sig:backend/app/services/text_utils.py:as_str_list-->`as_str_list(value)`<!--/AUTO--> | 脏值 → str 化列表（None/空 → []；list → 逐元素 str；其它 → 单值包裹） |
+| <!--AUTO:sig:backend/app/services/text_utils.py:role_str-->`role_str(value)`<!--/AUTO--> | 消息角色归一（带 .value 枚举解包为值；纯字符串原样；None → "None" 兜底） |
 
 ### 4.22 `backend/app/services/model_data.py` — Provider 清单单源（<!--AUTO:lines:backend/app/services/model_data.py-->~127 行<!--/AUTO-->）
 
@@ -590,7 +591,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 非流式生成 |
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成 |
 
-### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~178 行<!--/AUTO-->）
+### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~174 行<!--/AUTO-->）
 
 **职责**：模板变量替换（`{{user}}`/`{{char}}`）、mes_example 解析、system prompt 组装（角色设定注入）。
 
@@ -1317,7 +1318,7 @@ conver system/
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
 | `backend/tests/test_prompt.py` | <!--AUTO:tests:backend/tests/test_prompt.py-->35<!--/AUTO--> | 提示词构建/模板变量 |
 | `backend/tests/test_prompt_world_injection.py` | <!--AUTO:tests:backend/tests/test_prompt_world_injection.py-->7<!--/AUTO--> | build_messages 世界书注入契约锁（WL-3：world=None 逐字节零回归/三注入位/世界知识合并/重生成尾随剥离/空世界书无空 system） |
-| `backend/tests/test_chat_world_injection.py` | <!--AUTO:tests:backend/tests/test_chat_world_injection.py-->5<!--/AUTO--> | assemble_chat_context 世界书注入集成契约锁（WL-3：普通/重生成两路径一致/无条目零开销/滑窗与 depth 解耦） |
+| `backend/tests/test_chat_world_injection.py` | <!--AUTO:tests:backend/tests/test_chat_world_injection.py-->6<!--/AUTO--> | assemble_chat_context 世界书注入集成契约锁（WL-3：普通/重生成两路径一致/无条目零开销/滑窗与 depth 解耦） |
 | `backend/tests/test_provider_registry.py` | <!--AUTO:tests:backend/tests/test_provider_registry.py-->24<!--/AUTO--> | Provider 注册表 |
 | `backend/tests/test_regenerate.py` | <!--AUTO:tests:backend/tests/test_regenerate.py-->28<!--/AUTO--> | regenerate 端点（截断/事务/错误矩阵） |
 | `backend/tests/test_regenerate_spike.py` | <!--AUTO:tests:backend/tests/test_regenerate_spike.py-->22<!--/AUTO--> | regenerate truncation×滑窗边界实证（T0 spike） |
@@ -1327,7 +1328,7 @@ conver system/
 | `backend/tests/test_settings_connection.py` | <!--AUTO:tests:backend/tests/test_settings_connection.py-->55<!--/AUTO--> | 设置/凭证/连接测试 |
 | `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->149<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
 | `backend/tests/test_simulator_store.py` | <!--AUTO:tests:backend/tests/test_simulator_store.py-->33<!--/AUTO--> | 模拟器首启种子矩阵 + manifest 工具 + append 原子写/损坏自愈 |
-| `backend/tests/test_text_utils.py` | <!--AUTO:tests:backend/tests/test_text_utils.py-->6<!--/AUTO--> | 脏数据容错工具契约锁（F-93：None/空 → []、list → str 化、其它 → 单值包裹） |
+| `backend/tests/test_text_utils.py` | <!--AUTO:tests:backend/tests/test_text_utils.py-->10<!--/AUTO--> | 文本/角色归一容错工具契约锁（F-93/F-94：None/空 → []、list → str 化、其它 → 单值包裹、枚举 .value 解包） |
 | `backend/tests/test_simulator_proxy.py` | <!--AUTO:tests:backend/tests/test_simulator_proxy.py-->14<!--/AUTO--> | 模拟器同源 API 反代（CORS：纯函数矩阵 + 路由 wire） |
 
 运行：`cd backend && python -m pytest`（pytest.ini 在根：`testpaths = backend/tests`，`pythonpath = .`；共享夹具见 `backend/tests/conftest.py`）。
@@ -1423,9 +1424,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2151<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2156<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->892<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->897<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1189<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

@@ -146,6 +146,7 @@ def build_message_list(
     user_name: str = "User",
     append_current_input: bool = True,
     world_injection: dict[str, list[str]] | None = None,
+    history: Sequence[Message] | None = None,
 ) -> list[dict]:
     """构建发送给 LLM 的消息列表
 
@@ -159,6 +160,9 @@ def build_message_list(
 
     world_injection（WL-3）：世界书注入块（{before_char/after_char/system: [内容]}）
     透传给 build_messages；None/全空时零注入、输出与改动前逐字节一致。
+
+    history（F-95）：可选外部传入的历史（None → 内部查询）。调用方（如
+    assemble_chat_context 已为世界书扫描窗取过历史）传此参数可避免重复查询。
 
     查询角色与历史消息后，委托给 services/llm/prompt.py 的纯函数完成组装。
 
@@ -178,7 +182,8 @@ def build_message_list(
         field: getattr(character, field, "") or ""
         for field in PROMPT_FIELDS
     })
-    history = get_messages(db, conversation.id)
+    if history is None:
+        history = get_messages(db, conversation.id)
 
     return build_messages(
         character=char_data,

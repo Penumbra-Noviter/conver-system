@@ -189,3 +189,20 @@ def test_scan_depth_independent_of_max_rounds(db_session, monkeypatch) -> None:
     assert "旧闻命中" in joined  # 注入块存在（depth 窗口含最早消息）
     assert "第一轮问题" not in joined  # 但最早消息本身已被滑窗截出上下文
     assert "第三轮问题" in joined  # 窗口内消息保留
+
+
+def test_build_message_list_accepts_external_history(db_session, monkeypatch) -> None:
+    """显式传 history 时不再重复查库（F-95 修复锁）"""
+    char = _create_character(db_session)
+    conv = _create_conversation(db_session, char.id)
+    message_service.create_message(db_session, conv.id, Role.USER, "你好")
+    message_service.create_message(db_session, conv.id, Role.ASSISTANT, "你好呀")
+
+    def _forbid(_db, _cid) -> None:
+        raise AssertionError("build_message_list 收到 history 后不应再查询历史")
+
+    history = message_service.get_messages(db_session, conv.id)  # 调用方显式取一次
+    monkeypatch.setattr(message_service, "get_messages", _forbid)
+    msgs = message_service.build_message_list(db_session, conv, "输入", history=history)
+    assert msgs[-1] == {"role": "user", "content": "输入"}
+    assert any(m["content"] == "你好" for m in msgs)

@@ -53,8 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-94 | chat._msg_role 与 prompt._role_str 枚举归一重复（同包两处「兼容 str 与带 .value 枚举」三行逻辑，收敛需跨私有函数边界建共享 helper） | WL-3 期末 code-review Standards 轴 | Worth exploring | 📝 待立项 | 架构去重 |
-| F-95 | assemble_chat_context 每次回合双查历史（扫描窗 get_messages + build_message_list 内部再查一次；仅角色含启用世界书条目时发生，固定 2 次非 N+1） | WL-3 期末 code-review Standards 轴 | Speculative | 📝 待立项 | 性能 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -80,13 +78,15 @@
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-10（技术债消费批次：F-93，轻量档 1 工单）
+### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95，轻量档 3 工单）
 
-> 处置详情：1 项消费（F-93 对应工单，见 TICKETS 归档）。Grilling 实证拍板**做**——git grep 复核现状仍成立：`lorebook._as_str_list`（lorebook.py:212）与 `character_card._as_list`（character_card.py:212）逐行重复（None/空→[]、list→str 化、其它→单值包裹），character_card 2 处消费 + lorebook 1 处消费，同包跨私有函数边界。方案：新建 `services/text_utils.py` 共享单点 `as_str_list`（F-93 收敛），两消费者改指、删除重复私有函数；行为由 character_card / lorebook 既有测试全量锁定（90 用例零变化）+ test_text_utils 契约锁 7 条（None/空/list 混合/单值包裹矩阵）。
+> 处置详情：3 项消费（各对应 TICKETS 归档工单）。Grilling 实证拍板**全做**——F-93 git grep 复核 `lorebook._as_str_list` 与 `character_card._as_list` 逐行重复仍成立（character_card 2 处 + lorebook 1 处消费）；F-94 `chat._msg_role` 与 `prompt._role_str` 的 `hasattr(.value)` 枚举归一重复（chat.py:535 / prompt.py:103）；F-95 `build_message_list` 生产调用方仅 chat.py 两处（assemble_chat_context），加可选 history 参数即可消除扫描窗 + 内部双查。方案：新建 `services/text_utils.py` 共享单点（as_str_list + role_str）收敛 F-93/F-94；F-95 build_message_list 增 `history: Sequence | None`（None → 内部查询，既有调用不变）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 处置 |
 |------|--------|------|------|------|
 | F-93 | lorebook._as_str_list 与 character_card._as_list 逐行重复 | WL-1 期末 code-review Standards 轴 | Worth exploring | ✅ 已修（2026-09-10：轻量档工单 `text_utils.as_str_list` 共享单点收敛——character_card / lorebook 改指 + 删私有函数，pytest 873→879 全绿零回归、doc_sync 零漂移） |
+| F-94 | chat._msg_role 与 prompt._role_str 枚举归一重复 | WL-3 期末 code-review Standards 轴 | Worth exploring | ✅ 已修（2026-09-10：轻量档工单 `text_utils.role_str` 收敛——prompt/chat 改指 + 删私有函数，pytest 891→896 全绿零回归） |
+| F-95 | assemble_chat_context 扫描窗 + build_message_list 双查历史 | WL-3 期末 code-review Standards 轴 | Speculative | ✅ 已修（2026-09-10：轻量档工单 `build_message_list` 增可选 history 参数，assemble 传入已取历史消除双查；显式传 history 不再查库由契约锁锁定） |
 
 ### 2026-08-27（技术债消费批次：F-82~F-89 全自动档 kickoff，3 做 5 关）
 

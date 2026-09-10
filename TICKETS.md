@@ -77,6 +77,20 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 技术债消费批次 F-94 + F-95（2026-09-10，轻量档 2 工单）
+
+> 来源：用户「继续消费技术债」；候选区 WL-3 期末 code-review Standards 轴两项。Grilling 实证拍板**全做**——F-94 `chat._msg_role` 与 `prompt._role_str` 枚举归一重复（chat.py:535 / prompt.py:103 `hasattr(.value)`）；F-95 `build_message_list` 生产调用方仅 chat.py 两处，加可选 history 参数即消除扫描窗 + 内部双查。方案：text_utils 增 `role_str` 收敛（prompt/chat 改指）+ build_message_list 增 `history: Sequence | None`（None → 内部查询）。处置详情见 TECH_DEBT 2026-09-10 节。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | text_utils.role_str 共享收敛（prompt/chat 改指 + 删私有归一函数） | F-94 | 2026-09-10 | [见提交 2] |
+| 02 | build_message_list 增可选 history 参数（assemble 传入已取历史消除双查） | F-95 | 2026-09-10 | [见提交 2] |
+
+**验证链：** pytest 891+1skip→896+1skip（+5：test_text_utils role_str 矩阵 4 + build_message_list 显式 history 不再查库锁）| 既有 prompt/chat/regenerate 用例全绿（role_str 收敛零行为变化）| 波末文件范围核验合规（text_utils/prompt/chat/message+tests）| doc_sync 零漂移
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 世界书批次 WL-3（2026-09-10 — 注入链集成，WL 批第三张）
 
 > 来源：AI风月对标调研五批工单（WL 世界书第三张）；组装语义/契约锁依据见 docs/chat-simulator-upgrade-spec.md §WL-3。叙述详见 DEV_LOG〈WL-3 世界书注入链集成（2026-09-10）〉。

@@ -66,6 +66,17 @@
 
 ---
 
+## 技术债消费批次 F-94 + F-95：role_str 收敛 + 消除双查历史（2026-09-10 — 用户「继续消费技术债」）
+
+- **来源**：候选区 WL-3 期末 code-review Standards 轴两项。Grilling 实证拍板**全做**——F-94 git grep 复核 `chat._msg_role`（chat.py:535）与 `prompt._role_str`（prompt.py:103）的 `hasattr(.value)` 枚举归一逐字重复；F-95 复核 `build_message_list` 生产调用方仅 chat.py 两处（assemble_chat_context 124/131），加可选 history 参数即可消除「扫描窗 get_messages + 内部再查」双查（固定 2 次非 N+1，但 WL-3 引入的真实冗余）。
+- **方案**：
+  - F-94：`text_utils.role_str(value)` 共享单点（带 .value 枚举解包为值、纯字符串原样、None → "None" 兜底）——prompt.build_messages 与 chat._msg_role 改指、删除两处私有归一函数；test_text_utils 增 role_str 参数化矩阵 4 条。
+  - F-95：`build_message_list` 增 `history: Sequence[Message] | None = None`（None → 内部 get_messages，既有直调与测试零变化）；assemble_chat_context 两分支传入已取 history；契约锁 `test_build_message_list_accepts_external_history`（monkeypatch get_messages 为抛错守卫——收到 history 后不再查库）。
+- **验证链**：pytest 891+1skip→896+1skip（+5）| 既有 prompt/chat/regenerate 用例全绿（收敛零行为变化）| doc_sync 零漂移 | pool_cleanup_check 通过（候选区清零、脚注 F-95 与处置记录一致）。
+- **非阻断落债**：无（候选区清零）。
+
+---
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。
