@@ -179,8 +179,10 @@ class ConverApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider<SimulatorsController>(
-          create: (_) {
+          create: (context) {
             final dataDir = SimulatorDataDir();
+            final settings = context.read<SettingsRepository>();
+            final secretStore = context.read<SecretStore>();
             return SimulatorsController(
               dataDir: dataDir,
               seed: (simDir) => ensureSeeded(
@@ -194,7 +196,18 @@ class ConverApp extends StatelessWidget {
                   );
                 },
               ),
-              createServer: SimulatorServer.new,
+              createServer: (simDir) => SimulatorServer(
+                simDir,
+                // /proxy 反代凭据 seam（T3）：与注入链同源——openai 协议链
+                // base_url + SecretStore openai 槽 key（claude key 恒不进）。
+                // 每请求读取（桌面 route handler 语义）：用户改端点/key 后
+                // 无需重启 server 即生效。
+                proxyConfigReader: () async => ProxyRouteConfig(
+                  endpoint: await settings.baseUrl('openai'),
+                  apiKey: await secretStore
+                      .read(SecretStore.openaiApiKeySlot),
+                ),
+              ),
               loadManifest: loadManifestViaHttp,
             );
           },
