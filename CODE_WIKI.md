@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2083<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->824<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2105<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->846<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -93,16 +93,18 @@ conver system/
 │   │   │       ├── messages.py     ← 消息读取 + 跨对话搜索
 │   │   │       ├── models.py       ← Provider/模型清单
 │   │   │       └── settings.py     ← 设置 CRUD + 凭证 + 连接测试
-│   │   ├── models/                 ← SQLAlchemy ORM（4 实体）
+│   │   ├── models/                 ← SQLAlchemy ORM（5 实体）
 │   │   │   ├── __init__.py
 │   │   │   ├── character.py        ← 角色（V2 字段映射，JSON 列兼容存量）
 │   │   │   ├── conversation.py     ← 会话
+│   │   │   ├── lorebook.py         ← 世界书条目（WL-1，JsonList TypeDecorator）
 │   │   │   ├── message.py          ← 消息（Role 枚举按值存取）
 │   │   │   └── setting.py          ← 设置键值
 │   │   ├── schemas/                ← Pydantic v2 请求/响应模型
 │   │   │   ├── __init__.py
 │   │   │   ├── character.py
 │   │   │   ├── conversation.py
+│   │   │   ├── lorebook.py         ← 世界书条目（Create/Update/Response，边界「拒」）
 │   │   │   ├── message.py
 │   │   │   └── settings.py
 │   │   └── services/               ← 业务服务层（路由 → service → ORM）
@@ -121,6 +123,7 @@ conver system/
 │   │       ├── model_data.py       ← Provider/模型清单单一来源（AVAILABLE_MODELS）
 │   │       ├── provider_registry.py ← Provider 派生元数据深模块（C6）
 │   │       ├── setting.py          ← 设置服务（凭证槽位/滑窗轮数）
+│   │       ├── lorebook.py         ← 世界书条目仓库层（WL-1）
 │   │       └── llm/                ← LLM 接入层（深模块）
 │   │           ├── __init__.py     ← 包级导出零 SDK 副作用契约
 │   │           ├── base.py         ← BaseLLM 抽象基类（generate/stream/test）
@@ -133,7 +136,7 @@ conver system/
 │   ├── run_backend.py              ← 独立启动脚本（日志/数据目录/端口）
 │   ├── scripts/
 │   │   └── migrate_data.py         ← 数据目录迁移工具（校验/标记/幂等）
-│   ├── tests/                      ← pytest（25 个文件，见 §5.1）
+│   ├── tests/                      ← pytest（26 个文件，见 §5.1）
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   ├── conver_backend.spec         ← PyInstaller 打包配置
@@ -446,7 +449,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/document_parser.py:_default_for-->`_default_for(field)`<!--/AUTO--> | 缺失字段兜底默认值 |
 | <!--AUTO:sig:backend/app/services/document_parser.py:_truncate-->`_truncate(msg, max_len)`<!--/AUTO--> | 错误消息截断 |
 
-### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~109 行<!--/AUTO-->）
+### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~118 行<!--/AUTO-->）
 
 **职责**：领域与 LLM 异常 → 标准错误响应结构（错误码/消息）单源（T-01 迁入 LLM 映射）。
 
@@ -455,7 +458,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/error_mapping.py:domain_error_response-->`domain_error_response(exc)`<!--/AUTO--> | 领域异常 → 响应 dict |
 | <!--AUTO:sig:backend/app/services/error_mapping.py:llm_error_response-->`llm_error_response(e, provider)`<!--/AUTO--> | LLM 异常 → (HTTP 状态码, 消息)（映射表单源） |
 
-### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~40 行<!--/AUTO-->）
+### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~43 行<!--/AUTO-->）
 
 **职责**：领域异常定义（404/409/422 类），供 service 层抛出、errors.py 统一处理。
 
@@ -474,6 +477,19 @@ conver system/
 | <!--AUTO:sig:backend/app/services/message.py:auto_insert_greeting-->`auto_insert_greeting(db, conversation_id, user_name='User')`<!--/AUTO--> | 新会话自动插入开场白 |
 | <!--AUTO:sig:backend/app/services/message.py:build_message_list-->`build_message_list(db, conversation, user_content, max_rounds=30, user_name='User', append_current_input=True)`<!--/AUTO--> | 构建 LLM 上下文（滑窗 + 模板变量） |
 | <!--AUTO:sig:backend/app/services/message.py:search_messages-->`search_messages(db, query, limit=50)`<!--/AUTO--> | 跨对话关键词搜索 |
+
+### 4.21.5 `backend/app/services/lorebook.py` — 世界书条目仓库层（WL-1）（<!--AUTO:lines:backend/app/services/lorebook.py-->~173 行<!--/AUTO-->）
+
+**职责**：lorebook_entries 表存取 + 角色卡 `character_book` → 条目草案解析（字段语义对齐 SillyTavern World Info，spec §WL-1）。排序契约 order 升序 + id 稳定；边界策略：Schema「拒」（Field 约束）、parse「裁剪」（脏数据容错）双轨分界由契约锁锁定。命中判定/排序/注入引擎在 lorebook_engine.py（WL-2 承接）。
+
+| 函数 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/services/lorebook.py:list_entries-->`list_entries(db, character_id)`<!--/AUTO--> | 角色条目列表（order 升序 + id 稳定排序） |
+| <!--AUTO:sig:backend/app/services/lorebook.py:create_entry-->`create_entry(db, character_id, payload)`<!--/AUTO--> | 创建条目（角色不存在抛 CharacterNotFoundError） |
+| <!--AUTO:sig:backend/app/services/lorebook.py:update_entry-->`update_entry(db, entry_id, payload)`<!--/AUTO--> | 部分更新（exclude_unset，缺失抛 LorebookEntryNotFoundError） |
+| <!--AUTO:sig:backend/app/services/lorebook.py:delete_entry-->`delete_entry(db, entry_id)`<!--/AUTO--> | 删除条目（缺失抛 LorebookEntryNotFoundError） |
+| <!--AUTO:sig:backend/app/services/lorebook.py:replace_entries-->`replace_entries(db, character_id, entries)`<!--/AUTO--> | 全量替换（先删后插单事务，幂等） |
+| <!--AUTO:sig:backend/app/services/lorebook.py:parse_character_book-->`parse_character_book(book)`<!--/AUTO--> | character_book → 条目草案（ST 字段一一映射 + 数值裁剪） |
 
 ### 4.22 `backend/app/services/model_data.py` — Provider 清单单源（<!--AUTO:lines:backend/app/services/model_data.py-->~127 行<!--/AUTO-->）
 
@@ -1272,6 +1288,7 @@ conver system/
 | `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->20<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
 | `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->62<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
 | `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->18<!--/AUTO--> | LLM 基类共享行为 |
+| `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->22<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
@@ -1381,9 +1398,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2083<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2105<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->824<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->846<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1189<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

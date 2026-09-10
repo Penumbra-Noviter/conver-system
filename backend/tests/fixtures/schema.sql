@@ -12,8 +12,9 @@
 -- 后人工核验落盘（对照 app/models/*.py 与 docs/architecture.md）。
 -- 对照结论：characters 全 19 列（含 created_at/updated_at——历史手抄
 -- 17 列漂移缺的正是这两列）；conversations 为 model_provider/model_name
--- （历史手抄漂移成 provider/model）；含 3 条索引（name / character_id /
--- conversation_id），不含任何 sqlite_* 内部表。
+-- （历史手抄漂移成 provider/model）；lorebook_entries 为 WL-1 世界书条目表
+-- （含 4 条 CHECK 边界约束 + FK 级联）；含 4 条索引（name / character_id /
+-- conversation_id / lorebook_entries_character_id），不含任何 sqlite_* 内部表。
 -- =====================================================================
 
 CREATE TABLE characters (
@@ -67,8 +68,36 @@ CREATE TABLE settings (
 	PRIMARY KEY ("key")
 );
 
+CREATE TABLE lorebook_entries (
+	id INTEGER NOT NULL, 
+	character_id INTEGER NOT NULL, 
+	title VARCHAR(200), 
+	keys TEXT DEFAULT '[]' NOT NULL, 
+	content TEXT NOT NULL, 
+	constant BOOLEAN, 
+	"order" INTEGER, 
+	probability INTEGER, 
+	group_name VARCHAR(100), 
+	group_weight INTEGER, 
+	match_mode VARCHAR(8), 
+	position VARCHAR(16), 
+	depth INTEGER, 
+	source VARCHAR(16), 
+	enabled BOOLEAN, 
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_lorebook_entries_order CHECK ("order" >= 0 AND "order" <= 9999), 
+	CONSTRAINT ck_lorebook_entries_probability CHECK (probability >= 1 AND probability <= 100), 
+	CONSTRAINT ck_lorebook_entries_group_weight CHECK (group_weight >= 1 AND group_weight <= 100), 
+	CONSTRAINT ck_lorebook_entries_depth CHECK (depth >= 0 AND depth <= 20), 
+	FOREIGN KEY(character_id) REFERENCES characters (id) ON DELETE CASCADE
+);
+
 CREATE INDEX ix_characters_name ON characters (name);
 
 CREATE INDEX ix_conversations_character_id ON conversations (character_id);
+
+CREATE INDEX ix_lorebook_entries_character_id ON lorebook_entries (character_id);
 
 CREATE INDEX ix_messages_conversation_id ON messages (conversation_id);

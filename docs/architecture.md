@@ -60,6 +60,7 @@ conver-system/
 │   │   │   ├── __init__.py
 │   │   │   ├── character.py
 │   │   │   ├── conversation.py
+│   │   │   ├── lorebook.py        # 世界书条目（WL-1，keys 列 JsonList 序列化）
 │   │   │   ├── message.py
 │   │   │   └── setting.py
 │   │   │
@@ -67,6 +68,7 @@ conver-system/
 │   │   │   ├── __init__.py
 │   │   │   ├── character.py
 │   │   │   ├── conversation.py
+│   │   │   ├── lorebook.py        # 世界书条目 Create/Update/Response（WL-1）
 │   │   │   ├── message.py
 │   │   │   └── settings.py
 │   │   │
@@ -88,6 +90,7 @@ conver-system/
 │   │       ├── model_data.py      # 可用模型硬编码清单（后续可扩展为动态查询）
 │   │       ├── provider_registry.py # Provider 派生元数据单一来源（协议映射 / 协议族模型集 / key 顺序）
 │   │       ├── setting.py         # 运行时设置读写（白名单 + 回退链 + 整型容错）
+│   │       ├── lorebook.py        # 世界书条目仓库层（WL-1：存取 + character_book 解析）
 │   │       ├── simulator_import.py # 模拟器导入族（T-02：文件名净化 / SHA-256 去重 / cfg 探测 / 静态粗筛）
 │   │       ├── simulator_manifest.py # manifest.json 读写工具（首启种子后幂等标记）
 │   │       ├── simulator_store.py # 模拟器数据存储（首启种子契约；manifest / 导入族已拆分独立模块）
@@ -285,6 +288,30 @@ conver-system/
 |------|------|------|
 | key | VARCHAR(100) PK | 配置键 |
 | value | TEXT | 配置值 |
+
+### lorebook_entries（WL-1，世界书条目）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增 |
+| character_id | INTEGER FK | → characters.id（ON DELETE CASCADE，索引） |
+| title | VARCHAR(200) | 条目标题（可空） |
+| keys | TEXT | JSON 数组：触发关键词（ORM 层 JsonList 序列化） |
+| content | TEXT | 命中后注入内容 |
+| constant | BOOLEAN | 常驻（不判命中，直接注入） |
+| order | INTEGER | 命中条目排序（升序注入，CHECK 0..9999） |
+| probability | INTEGER | 独立命中概率（CHECK 1..100） |
+| group_name | VARCHAR(100) | 互斥组名（空=不分组） |
+| group_weight | INTEGER | 组内权重（CHECK 1..100） |
+| match_mode | VARCHAR(8) | or / and |
+| position | VARCHAR(16) | world / before_char / after_char |
+| depth | INTEGER | 参与命中的最近轮数（CHECK 0..20） |
+| source | VARCHAR(16) | manual / auto（记忆宫殿产出） |
+| enabled | BOOLEAN | 单条开关 |
+| created_at | DATETIME | |
+| updated_at | DATETIME | |
+
+> 字段语义对齐 SillyTavern World Info；解析/排序/注入引擎见 spec §WL-2（lorebook_engine.py）。
 
 ## 设计决策说明
 

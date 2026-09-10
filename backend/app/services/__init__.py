@@ -25,6 +25,7 @@ __all__ = [
     "game_generator",
     "game_template",
     "llm",
+    "lorebook",
     "message",
     "model_data",
     "provider_registry",

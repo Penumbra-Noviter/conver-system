@@ -6,6 +6,21 @@
 
 ---
 
+## WL-1 世界书数据模型 + 仓库层（2026-09-10 — AI风月对标五批工单 WL 首批，承接 handoff）
+
+- **来源**：承接 D:\tmp\handoff-2026-09-10-aigirlfriend-benchmark.md——调研已落盘（commit a5f28e6），本会话开工 WL-1。字段语义对齐 SillyTavern World Info（spec §WL-1，D4 七件套先行）。
+- **交付**：`lorebook_entries` 新表（16 字段 + 4 条 CHECK 边界约束 + FK 级联，见 docs/architecture.md §数据库模型）；`backend/app/services/lorebook.py` 深模块（`__all__` 6 函数：list/create/update/delete/replace_entries + parse_character_book）；`backend/app/schemas/lorebook.py`（Create/Update/Response，边界「拒」语义 Field 约束）；异常族 +LorebookEntryNotFoundError（→404 映射）。
+- **关键决策（契约锁锁定）**：
+  - `keys` 列按规格 TEXT 承载 JSON 数组——`JsonList` TypeDecorator（impl=Text）在 ORM 层暴露 `list[str]`，DDL 保持 TEXT、落库/读回自动序列化。
+  - 边界策略双轨：Schema 层越界**拒**（pydantic Field ge/le）、parse_character_book 脏数据**裁剪**（导入容错）——分界由 test_lorebook_store 用例锁定。
+  - `replace_entries` 先删后插单事务（bulk delete + synchronize_session="fetch"），幂等；`create/update/delete` 对缺失目标抛领域异常（防 FK 违例 500 / 静默错位）。
+  - ST 映射：insertion_order(或 order)→order、group→group_name、selective+secondary_keys→and、position 仅 before_char/after_char 保留（in_chat 回落 world）。
+- **契约同步（快照即契约）**：`tests/fixtures/schema.sql` 补新表 DDL + CHECK + 索引；`test_migrate_data` 目标表集合断言更新（characters/conversations/messages/settings/lorebook_entries）；services/schemas `__all__` 登记同步；CODE_WIKI §3 树 / §4.21.5 / §5.1 同步，doc_sync 零漂移。
+- **验证链**：先红后绿（22 用例初跑 collection 红 → 实现后全绿）| pytest 823+1skip→845+1skip（+22，零回归）| test_character_card character_book 往返保真用例全绿 | Vitest/cargo 零改动（本工单纯后端）| pool_cleanup_check + doc_sync --check 双钩子通过。
+- **非阻断落债**：无。
+
+---
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

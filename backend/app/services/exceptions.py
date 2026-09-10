@@ -21,6 +21,7 @@ __all__ = [
     "DomainError",
     "MessageNotFoundError",
     "InvalidRegenerateTargetError",
+    "LorebookEntryNotFoundError",
 ]
 
 
@@ -62,3 +63,7 @@ class MessageNotFoundError(DomainError):
 
 class InvalidRegenerateTargetError(DomainError):
     """重生成目标非法（target 非 assistant / 截断后无触发 user）"""
+
+
+class LorebookEntryNotFoundError(DomainError):
+    """世界书条目不存在"""

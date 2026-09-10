@@ -25,6 +25,7 @@ from backend.app.services.exceptions import (
     DocParseError,
     DomainError,
     InvalidRegenerateTargetError,
+    LorebookEntryNotFoundError,
     MessageNotFoundError,
     ProviderNotSupportedError,
 )
@@ -61,7 +62,15 @@ def domain_error_response(exc: DomainError) -> tuple[int, str]:
     Returns:
         (HTTP 状态码, 用户可见消息)
     """
-    if isinstance(exc, (ConversationNotFoundError, CharacterNotFoundError, MessageNotFoundError)):
+    if isinstance(
+        exc,
+        (
+            ConversationNotFoundError,
+            CharacterNotFoundError,
+            MessageNotFoundError,
+            LorebookEntryNotFoundError,
+        ),
+    ):
         return status.HTTP_404_NOT_FOUND, str(exc)
     if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError, InvalidRegenerateTargetError)):
         return status.HTTP_400_BAD_REQUEST, str(exc)
