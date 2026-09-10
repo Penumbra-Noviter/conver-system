@@ -86,7 +86,7 @@
 |--------|------|----------|------|
 | WL-2 | 激活引擎纯函数（activate_lorebook_entries / build_world_injection / collect_scan_text） | 2026-09-10 | 59c3726 |
 
-**验证链：** pytest 847+1skip→871+1skip（+24：test_lorebook_engine 契约锁——空输入零异常/constant 直进/or-and 矩阵/大小写不敏感锁定/depth 边界裁剪/system 不计轮/概率 0-100 闸/RNG 同种子复现/互斥组加权抽一/order-id 稳定排序/泛词不报错/零 DB 导入 subprocess 检查）| services __all__ 登记同步 | doc_sync 零漂移
+**验证链：** pytest 847+1skip→873+1skip（+26：test_lorebook_engine 契约锁 24 + 审核修复锁 2——空输入零异常/constant 直进/or-and 矩阵/大小写不敏感锁定/depth 边界裁剪/system 不计轮/概率 0-100 闸/RNG 同种子复现/跨输入顺序可复现/互斥组加权抽一/order-id 稳定排序/空白 key 剔除与裁剪/泛词不报错/零 DB 导入 subprocess 检查）| services __all__ 登记同步 | 期末 code-review 三轴：Standards 0 违例 / Spec 0 发现 / Falsify 1 MEDIUM + 1 LOW 当场修复 | doc_sync 零漂移
 **非阻断落债：** 无（F-93 仍为 WL-1 遗留候选，未消费）
 
 ---

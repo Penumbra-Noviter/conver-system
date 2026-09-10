@@ -34,6 +34,9 @@
   - `build_world_injection`：position 分组 world→system / before_char / after_char，组内 (order, id) 升序；未知 position 回落 system 不静默丢弃（初版回退值写错为 "world" 被测试当场抓住）。
 - **过程遥测**：零 DB subprocess 测试初版在 backend/ cwd 下失败（`backend` 为命名空间包，需仓库根于 sys.path）→ 修正为 `cwd=repo_root`；泛词测试标点 key 初版用半角 "," 而文本是全角 "，"（测试笔误）→ 统一全角。
 - **验证链**：先红后绿（24 用例 collection 红 → 实现后全绿）| pytest 847+1skip→871+1skip（+24，零回归）| Vitest/cargo 零改动 | pool_cleanup_check + doc_sync --check 双钩子通过。
+- **期末 code-review 三轴（59c3726 后、修复前）**：Standards 0 违例（低危 2 项随手清理：_weighted_pick 死分支 total<=0/None 守卫 + 排序键提取 _sort_key 三处收敛）；Spec 0 发现；**Falsify 1 MEDIUM + 1 LOW 当场修复**（先红后绿 +2 用例，pytest→873+1skip）：
+  1. 同种子可复现不随输入顺序不变——RNG 消耗序列（概率掷点 + 组抽签）跟随迭代序，同一集合乱序传入同种子得不同抽取 → `activate` 入口先按 (order, id) 规范化排序再进闸，契约锁 `test_same_seed_reproducible_across_input_order`（顺/逆序同种子结果一致）。
+  2. 含周边空白 key 保留空白参与匹配（"  foo  " 永不命中，与「空白即剔除」自相矛盾）→ `_keys_match` 匹配前 strip，契约锁 `test_padded_keys_trimmed`。
 - **非阻断落债**：无。
 
 ---

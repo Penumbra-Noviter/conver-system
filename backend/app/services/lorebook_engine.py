@@ -98,8 +98,12 @@ def activate_lorebook_entries(
     rng = rng or random.Random()
     match_text = scan_text if scan_text else current_input
 
+    # 输入先按 (order, id) 规范化：RNG 消耗序列（概率掷点 + 组抽签）随规范序，
+    # 同种子可复现性不随调用方传入顺序漂移（Falsify 修复锁）
+    ordered = sorted(entries, key=_sort_key)
+
     candidates: list[LorebookEntryData] = []
-    for entry in entries:
+    for entry in ordered:
         if not entry.enabled:
             continue
         if not entry.constant and not _keys_match(entry, match_text):
@@ -109,7 +113,7 @@ def activate_lorebook_entries(
         candidates.append(entry)
 
     resolved = _resolve_groups(candidates, rng)
-    return sorted(resolved, key=lambda e: (e.order, e.id))
+    return sorted(resolved, key=_sort_key)
 
 
 def build_world_injection(
@@ -134,7 +138,7 @@ def build_world_injection(
         position → 注入内容列表（按 (order, id) 升序）
     """
     blocks: dict[str, list[str]] = {"system": [], "before_char": [], "after_char": []}
-    for entry in sorted(activated, key=lambda e: (e.order, e.id)):
+    for entry in sorted(activated, key=_sort_key):
         key = _POSITION_KEYS.get(entry.position, "system")
         blocks[key].append(apply_template_vars(entry.content, user_name, char_name))
     return blocks
@@ -176,8 +180,11 @@ def collect_scan_text(
 
 
 def _keys_match(entry: LorebookEntryData, text: str) -> bool:
-    """子串命中判定：or=任一 key、and=全部 key；空 key 不参与；大小写不敏感"""
-    keys = [k for k in entry.keys if k and k.strip()]
+    """子串命中判定：or=任一 key、and=全部 key；空白 key 剔除；大小写不敏感
+
+    匹配前去除 key 周边空白（与「空白即剔除」语义一致，Falsify 修复锁）。
+    """
+    keys = [k.strip() for k in entry.keys if k and k.strip()]
     if not keys:
         return False
     lowered = text.lower()
@@ -209,18 +216,14 @@ def _resolve_groups(
 
     result = list(singles)
     for group in groups.values():
-        picked = _weighted_pick(group, rng)
-        if picked is not None:
-            result.append(picked)
+        result.append(_weighted_pick(group, rng))
     return result
 
 
-def _weighted_pick(group: Sequence[LorebookEntryData], rng: random.Random) -> LorebookEntryData | None:
-    """按 group_weight 加权抽一（权重兜底 ≥1，杜绝零权重整组不可抽）"""
+def _weighted_pick(group: Sequence[LorebookEntryData], rng: random.Random) -> LorebookEntryData:
+    """按 group_weight 加权抽一（权重兜底 ≥1，非空组恒可抽）"""
     weights = [max(e.group_weight, 1) for e in group]
     total = sum(weights)
-    if total <= 0:
-        return None
     r = rng.random() * total
     cumulative = 0.0
     for entry, weight in zip(group, weights):
@@ -228,3 +231,8 @@ def _weighted_pick(group: Sequence[LorebookEntryData], rng: random.Random) -> Lo
         if r < cumulative:
             return entry
     return group[-1]
+
+
+def _sort_key(entry: LorebookEntryData) -> tuple[int, int]:
+    """输出/规范化排序键：order 升序、同 order 按 id 升序（确定性锁定）"""
+    return (entry.order, entry.id)

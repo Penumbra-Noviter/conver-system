@@ -120,6 +120,14 @@ def test_empty_keys_never_match_nonconstant() -> None:
     assert activate_lorebook_entries([_entry(id=1, keys=("   ",))], "anything") == []
 
 
+def test_padded_keys_trimmed() -> None:
+    """含周边空白的 key 去除空白后参与匹配（与「空白即剔除」语义一致，Falsify 修复锁）"""
+    entry = _entry(id=1, keys=("  foo  ",))
+    assert [e.id for e in activate_lorebook_entries([entry], "the foo story")] == [1]
+    entry_cn = _entry(id=2, keys=(" 酒馆 ",))
+    assert [e.id for e in activate_lorebook_entries([entry_cn], "走进酒馆")] == [2]
+
+
 # ════════════════════════════════════════════════════════════════
 # 四、collect_scan_text depth 边界
 # ════════════════════════════════════════════════════════════════
@@ -213,6 +221,22 @@ def test_probability_middle_seeded_reproducible() -> None:
     # 不同种子 → 结果可不同（证明掷点真实消耗 RNG）
     other = [e.id for e in activate_lorebook_entries(entries, "x", rng=random.Random(1))]
     assert isinstance(other, list)
+
+
+def test_same_seed_reproducible_across_input_order() -> None:
+    """同种子跨输入顺序可复现：条目顺序规范化后 RNG 消耗序列不随调用方排序漂移（Falsify 修复锁）"""
+    entries = [
+        _entry(id=1, keys=("x",), probability=50),
+        _entry(id=2, keys=("x",), probability=50),
+        _entry(id=3, keys=("x",), group_name="g", group_weight=60),
+        _entry(id=4, keys=("x",), group_name="g", group_weight=40),
+    ]
+    a = [e.id for e in activate_lorebook_entries(entries, "x", rng=random.Random(1))]
+    b = [
+        e.id
+        for e in activate_lorebook_entries(list(reversed(entries)), "x", rng=random.Random(1))
+    ]
+    assert a == b
 
 
 # ════════════════════════════════════════════════════════════════
