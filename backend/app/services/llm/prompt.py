@@ -152,9 +152,11 @@ def build_messages(
     """
     char_name = character.name or "Character"
     world = world or {}
-    world_before = world.get("before_char") or []
-    world_after = world.get("after_char") or []
-    world_knowledge = world.get("system") or []
+    # 空/纯空白注入内容不产生空 system 消息（Falsify 修复锁：`or []` 只挡
+    # None/空列表，列表内的空串元素须在此过滤）
+    world_before = [c for c in (world.get("before_char") or []) if c and c.strip()]
+    world_after = [c for c in (world.get("after_char") or []) if c and c.strip()]
+    world_knowledge = [c for c in (world.get("system") or []) if c and c.strip()]
 
     messages: list[dict[str, str]] = []
 

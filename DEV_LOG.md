@@ -60,7 +60,9 @@
 - **关键决策**：ORM→LorebookEntryData 解耦转换收在 chat 层辅助函数（引擎零 DB 依赖不变）；depth = 启用条目最大 depth；重生成路径 current_input 传 ""（扫描靠历史命中，与消息滑窗解耦）。
 - **过程遥测**：集成测试 `test_regenerate_path_injects_world` 初版红——测试构造的历史以 assistant 结尾，违反重生成截断后「历史以触发 user 结尾」真实状态（代码行为正确，测试场景错误）→ 修正为以 user 结尾的三条历史。
 - **验证链**：先红后绿（11 用例初跑 10 红 1 绿（仅基线）→ 实现后全绿）| pytest 879+1skip→890+1skip（+11，零回归；含既有 prompt/chat/regenerate 全绿）| Vitest/cargo 零改动 | doc_sync 零漂移。
-- **非阻断落债**：无。
+- **期末 code-review 三轴（ec5f1e3 后、修复前）**：Standards 0 违例（低危 3 项：_msg_role/_role_str 枚举归一重复 → 落债 F-94；扫描窗 + build_message_list 双查历史 → 落债 F-95；message.py world_injection 注解宽松 → 随手精确化为 dict[str, list[str]]）；Spec 0 发现；**Falsify 1 LOW 当场修复**（先红后绿 +1 用例，pytest→891+1skip）：
+  1. 空 content 条目激活后产生空 system 消息——`or []` 只挡 None/空列表，列表内空串元素（constant 条目 content="" 恒激活）穿透：before_char/after_char 输出 `content:""` 空壳、world 输出只剩 `[世界知识]` 空头 → `build_messages` 三注入位过滤空/纯空白内容（`c and c.strip()`），契约锁 `test_empty_content_entries_filtered`（全空内容 == world=None、混合保留非空）。
+- **非阻断落债**：F-94 / F-95（入 TECH_DEBT 候选区）。
 
 ---
 

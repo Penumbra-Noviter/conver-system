@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2150<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->891<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2151<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->892<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -590,7 +590,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 非流式生成 |
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成 |
 
-### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~176 行<!--/AUTO-->）
+### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~178 行<!--/AUTO-->）
 
 **职责**：模板变量替换（`{{user}}`/`{{char}}`）、mes_example 解析、system prompt 组装（角色设定注入）。
 
@@ -1316,7 +1316,7 @@ conver system/
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
 | `backend/tests/test_prompt.py` | <!--AUTO:tests:backend/tests/test_prompt.py-->35<!--/AUTO--> | 提示词构建/模板变量 |
-| `backend/tests/test_prompt_world_injection.py` | <!--AUTO:tests:backend/tests/test_prompt_world_injection.py-->6<!--/AUTO--> | build_messages 世界书注入契约锁（WL-3：world=None 逐字节零回归/三注入位/世界知识合并/重生成尾随剥离/空世界书无空 system） |
+| `backend/tests/test_prompt_world_injection.py` | <!--AUTO:tests:backend/tests/test_prompt_world_injection.py-->7<!--/AUTO--> | build_messages 世界书注入契约锁（WL-3：world=None 逐字节零回归/三注入位/世界知识合并/重生成尾随剥离/空世界书无空 system） |
 | `backend/tests/test_chat_world_injection.py` | <!--AUTO:tests:backend/tests/test_chat_world_injection.py-->5<!--/AUTO--> | assemble_chat_context 世界书注入集成契约锁（WL-3：普通/重生成两路径一致/无条目零开销/滑窗与 depth 解耦） |
 | `backend/tests/test_provider_registry.py` | <!--AUTO:tests:backend/tests/test_provider_registry.py-->24<!--/AUTO--> | Provider 注册表 |
 | `backend/tests/test_regenerate.py` | <!--AUTO:tests:backend/tests/test_regenerate.py-->28<!--/AUTO--> | regenerate 端点（截断/事务/错误矩阵） |
@@ -1423,9 +1423,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2150<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2151<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->891<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->892<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1189<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

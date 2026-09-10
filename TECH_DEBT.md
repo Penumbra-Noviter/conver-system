@@ -53,6 +53,8 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-94 | chat._msg_role 与 prompt._role_str 枚举归一重复（同包两处「兼容 str 与带 .value 枚举」三行逻辑，收敛需跨私有函数边界建共享 helper） | WL-3 期末 code-review Standards 轴 | Worth exploring | 📝 待立项 | 架构去重 |
+| F-95 | assemble_chat_context 每次回合双查历史（扫描窗 get_messages + build_message_list 内部再查一次；仅角色含启用世界书条目时发生，固定 2 次非 N+1） | WL-3 期末 code-review Standards 轴 | Speculative | 📝 待立项 | 性能 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -195,4 +197,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-93），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-95），避免编号冲突。

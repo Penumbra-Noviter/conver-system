@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **13 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **12 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -28,7 +28,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| WL-3 | 注入链集成（build_messages 增 world 可选参数，三注入位；prepare_chat 组装） | ⬜ 待办 | spec §WL-3；world=None 逐字节零回归；重生成路径一致性 |
 | WL-4 | 世界书编辑器前端（CRUD 面板 + 泛词告警 + 字段校验） | ⬜ 待办 | spec §WL-4；Vitest 用例 + Playwright 端到端（新增→保存→重开还原→注入生效） |
 | WL-5 | 记忆宫殿（AI 归纳 → source=auto 条目；阈值触发；失败隔离） | ⬜ 待办 | spec §WL-5；阈值矩阵 + JSON 降级不抛 + 主流程不受影响 |
 
@@ -77,6 +76,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### 世界书批次 WL-3（2026-09-10 — 注入链集成，WL 批第三张）
+
+> 来源：AI风月对标调研五批工单（WL 世界书第三张）；组装语义/契约锁依据见 docs/chat-simulator-upgrade-spec.md §WL-3。叙述详见 DEV_LOG〈WL-3 世界书注入链集成（2026-09-10）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| WL-3 | 注入链集成（build_messages 增 world 可选参数，三注入位；prepare_chat 组装） | 2026-09-10 | ec5f1e3 |
+
+**验证链：** pytest 879+1skip→891+1skip（+12：test_prompt_world_injection 7 + test_chat_world_injection 5——world=None 逐字节零回归/三注入位序列/世界知识合并单条/重生成尾随剥离/空世界书无空 system/空 content 条目过滤/普通与重生成两路径一致/无条目零开销/滑窗与 depth 解耦）| 既有 build_messages/chat/regenerate 用例全绿（零变化硬约束）| 期末 code-review 三轴：Standards 0 违例 / Spec 0 发现 / Falsify 1 LOW 当场修复（空内容空壳 system）| doc_sync 零漂移
+**非阻断落债：** F-94（_msg_role/_role_str 重复）/ F-95（双查历史），入 TECH_DEBT 候选区
+
+---
 
 ### 技术债消费批次 F-93（2026-09-10，轻量档 1 工单）
 

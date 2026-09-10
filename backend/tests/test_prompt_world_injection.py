@@ -139,3 +139,15 @@ def test_empty_world_no_empty_system_messages() -> None:
     ):
         assert build_messages(_character(), _history(("user", "问"), ("assistant", "答")), "输入", world=world) == baseline
     assert "世界知识" not in "".join(m["content"] for m in baseline)
+
+
+def test_empty_content_entries_filtered() -> None:
+    """空/纯空白 content 的注入块不产生空 system 消息（Falsify 修复锁）"""
+    baseline = build_messages(_character(), [], "输入")
+    # 全空内容 → 零注入，与 world=None 一致（无 content:"" 空壳、无 [世界知识] 空头）
+    world_all_empty = {"before_char": [""], "system": ["  "], "after_char": [""]}
+    assert build_messages(_character(), [], "输入", world=world_all_empty) == baseline
+    # 混合：空条目被滤掉，非空条目保留
+    mixed = build_messages(_character(), [], "输入", world={"system": ["", "知识"]})
+    assert any("[世界知识]" in m["content"] and "知识" in m["content"] for m in mixed)
+    assert not any(not m["content"].strip() for m in mixed)  # 无空 system 消息

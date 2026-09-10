@@ -145,7 +145,7 @@ def build_message_list(
     max_rounds: int = 30,
     user_name: str = "User",
     append_current_input: bool = True,
-    world_injection: dict | None = None,
+    world_injection: dict[str, list[str]] | None = None,
 ) -> list[dict]:
     """构建发送给 LLM 的消息列表
 
