@@ -112,16 +112,24 @@ def build_messages(
     max_rounds: int = 30,
     user_name: str = "User",
     append_current_input: bool = True,
+    world: dict[str, list[str]] | None = None,
 ) -> list[dict[str, str]]:
     """组装发送给 LLM 的消息列表（纯函数，无 DB 依赖）
 
     组装顺序：
+        0. world["before_char"] 注入块（世界书：角色 system prompt 之前，逐条 system）
         1. system prompt（system_prompt 优先，否则 personality）
         2. scenario（作为 [场景设定]\\n... 的 system 消息）
+        2.5 world["after_char"] 注入块（世界书：场景设定之后，逐条 system）
+        2.75 world["system"] 合并为单条 [世界知识] system（多条以空行连接，按给定序）
         3. mes_example（few-shot 示例）
         4. 历史消息（正序，滑窗截断：超过 max_rounds*2 条取最后 max_rounds*2 条）
         5. post_history_instructions（system 消息）
         6. 当前 user 输入（append_current_input=True 时）
+
+    world 参数（WL-3）：None 或全空列表时零注入、输出与改动前逐字节一致
+    （零变化硬约束，由既有用例锁定）；键即注入位置（world="system" 为世界书
+    position='world' 内容，见 lorebook_engine.build_world_injection 契约）。
 
     append_current_input=False 契约（重生成路径）：
         不追加当前 user 输入；末条恢复为历史末条 user（待回复触发源）；
@@ -136,23 +144,46 @@ def build_messages(
         append_current_input: 是否追加当前用户输入。True（默认）逐字保持现
             组装行为；False 用于重生成路径（不追加当前输入，末条为历史末条
             user，剥离尾随 PHI system）。
+        world: 世界书注入块（{before_char/after_char/system: [内容]}，默认 None
+            零注入；注入内容已在引擎层做过模板变量替换，此处不重复处理）
 
     Returns:
         组装好的消息列表，role 均为纯字符串 system/user/assistant
     """
     char_name = character.name or "Character"
+    world = world or {}
+    world_before = world.get("before_char") or []
+    world_after = world.get("after_char") or []
+    world_knowledge = world.get("system") or []
+
+    messages: list[dict[str, str]] = []
+
+    # 0. before_char 注入块（世界书）：角色 system prompt 之前，最高优先级上下文
+    for content in world_before:
+        messages.append({"role": "system", "content": content})
 
     # 1. system prompt（优先使用 system_prompt 字段，其次 personality）
     system_content = character.system_prompt or character.personality
-    messages: list[dict[str, str]] = [{
+    messages.append({
         "role": "system",
         "content": apply_template_vars(system_content, user_name, char_name),
-    }]
+    })
 
     # 2. 场景设定（scenario）— 附加在 system prompt 后，作为补充上下文
     if character.scenario:
         scenario = apply_template_vars(character.scenario, user_name, char_name)
         messages.append({"role": "system", "content": f"[场景设定]\n{scenario}"})
+
+    # 2.5 after_char 注入块（世界书）：场景设定之后
+    for content in world_after:
+        messages.append({"role": "system", "content": content})
+
+    # 2.75 world 知识（世界书）：合并为单条 [世界知识] system，多条以空行连接
+    if world_knowledge:
+        messages.append({
+            "role": "system",
+            "content": "[世界知识]\n" + "\n\n".join(world_knowledge),
+        })
 
     # 3. 对话范例（mes_example）— 作为 few-shot 示例插入
     if character.mes_example:

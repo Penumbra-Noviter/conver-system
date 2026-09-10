@@ -16,7 +16,9 @@ api/routes/chat.py 只保留 HTTP 映射（领域异常 → HTTPException）与 
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Callable
+import logging
+import random
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
@@ -28,6 +30,7 @@ from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, Role
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
+from backend.app.services import lorebook as lorebook_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
 from backend.app.services.error_mapping import domain_error_response, llm_error_response
@@ -40,6 +43,12 @@ from backend.app.services.exceptions import (
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import LLMError
 from backend.app.services.llm.resolver import resolve_llm
+from backend.app.services.lorebook_engine import (
+    LorebookEntryData,
+    activate_lorebook_entries,
+    build_world_injection,
+    collect_scan_text,
+)
 
 __all__ = [
     "ChatContext",
@@ -51,8 +60,6 @@ __all__ = [
     "stream_reply",
 ]
 
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -100,19 +107,30 @@ def assemble_chat_context(
     character = db.query(Character).filter(Character.id == conv.character_id).first()
     temperature = character.temperature if character else 0.7
 
-    # 3. 构建消息列表（含 system prompt + 历史 + 滑窗 + 模板变量；不落库）
+    # 3. 构建消息列表（含 system prompt + 历史 + 滑窗 + 模板变量 + 世界书注入；不落库）
     user_name = setting_service.user_name(db)
     max_rounds = setting_service.sliding_window_rounds(db)
+    history = message_service.get_messages(db, conv.id)
+    world_injection = _lorebook_world_injection(
+        db, character, history, current_input or "", user_name,
+    )
+    if any(world_injection.values()):
+        logger.debug(
+            "世界书注入：%s（%d 条）",
+            {k: len(v) for k, v in world_injection.items()},
+            sum(len(v) for v in world_injection.values()),
+        )
     if current_input is not None:
         messages = message_service.build_message_list(
             db, conv, current_input, max_rounds=max_rounds, user_name=user_name,
+            world_injection=world_injection,
         )
     else:
         # 重生成路径：append_current_input=False —— 不追加当前输入，末条为
         # 历史末条 user（待回复触发源），尾随 PHI system 已在纯函数内剥离。
         messages = message_service.build_message_list(
             db, conv, "", max_rounds=max_rounds, user_name=user_name,
-            append_current_input=False,
+            append_current_input=False, world_injection=world_injection,
         )
 
     # 4. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
@@ -455,3 +473,65 @@ async def stream_reply(
                 )
             except Exception:
                 logger.exception("保存已生成的部分消息失败")
+
+
+def _lorebook_world_injection(
+    db: Session,
+    character: Character | None,
+    history: Sequence[Message],
+    current_input: str,
+    user_name: str,
+) -> dict[str, list[str]]:
+    """组装世界书注入块（角色无启用条目 → {}，零开销）
+
+    WL-3 注入链：list_entries → 启用条目最大 depth → collect_scan_text 构建扫描
+    窗口（全量历史，与消息滑窗 max_rounds 解耦）→ activate（每次调用新 RNG，
+    注入结果非确定性，符合概率/互斥组语义）→ build_world_injection。条目 →
+    LorebookEntryData 的 ORM 解耦转换在此完成（引擎零 DB 依赖）。
+
+    Args:
+        db: 数据库会话
+        character: 角色 ORM（None → 零注入）
+        history: 对话历史（扫描窗口源，非滑窗截断后）
+        current_input: 当前输入（重生成路径传 ""，靠历史命中）
+        user_name: 用户昵称（{{user}} 模板变量）
+
+    Returns:
+        build_world_injection 输出形态（{system/before_char/after_char: [内容]}）；
+        无条目/全部禁用时返回 {}
+    """
+    if character is None:
+        return {}
+    entries = lorebook_service.list_entries(db, character.id)
+    enabled = [e for e in entries if e.enabled]
+    if not enabled:
+        return {}
+
+    depth = max(e.depth for e in enabled)
+    scan_text = collect_scan_text(history, current_input, depth, role_of=_msg_role)
+    data_entries = [
+        LorebookEntryData(
+            id=e.id,
+            keys=tuple(e.keys),
+            content=e.content,
+            constant=e.constant,
+            order=e.order,
+            probability=e.probability,
+            group_name=e.group_name,
+            group_weight=e.group_weight,
+            match_mode=e.match_mode,
+            position=e.position,
+            enabled=e.enabled,
+        )
+        for e in enabled
+    ]
+    activated = activate_lorebook_entries(data_entries, scan_text, rng=random.Random())
+    return build_world_injection(activated, user_name=user_name, char_name=character.name or "Character")
+
+
+def _msg_role(msg: object) -> str:
+    """消息 → 角色字符串（兼容 str 与带 .value 的枚举，如 models.message.Role）"""
+    role = getattr(msg, "role", "")
+    if hasattr(role, "value"):
+        return str(role.value)
+    return str(role)

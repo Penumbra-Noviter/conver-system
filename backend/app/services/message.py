@@ -145,6 +145,7 @@ def build_message_list(
     max_rounds: int = 30,
     user_name: str = "User",
     append_current_input: bool = True,
+    world_injection: dict | None = None,
 ) -> list[dict]:
     """构建发送给 LLM 的消息列表
 
@@ -155,6 +156,9 @@ def build_message_list(
         4. 历史消息（按时间正序，受滑窗限制）
         5. character.post_history_instructions（历史后指令，支持模板变量）
         6. 当前用户输入（支持模板变量；append_current_input=False 时不追加）
+
+    world_injection（WL-3）：世界书注入块（{before_char/after_char/system: [内容]}）
+    透传给 build_messages；None/全空时零注入、输出与改动前逐字节一致。
 
     查询角色与历史消息后，委托给 services/llm/prompt.py 的纯函数完成组装。
 
@@ -183,6 +187,7 @@ def build_message_list(
         max_rounds=max_rounds,
         user_name=user_name,
         append_current_input=append_current_input,
+        world=world_injection,
     )
 
 

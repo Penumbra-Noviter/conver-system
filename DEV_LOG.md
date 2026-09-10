@@ -50,6 +50,20 @@
 
 ---
 
+## WL-3 世界书注入链集成（2026-09-10 — AI风月对标五批工单 WL 第三张，承接 WL-2）
+
+- **来源**：承接 WL-2（引擎纯函数就绪）；把激活结果接入现有组装链（spec §WL-3）。**零变化硬约束**：world=None 时 build_messages 输出与改动前逐字节一致（由既有 test_prompt 用例 + 新基线断言锁定）。
+- **交付**（三处改动，向后兼容）：
+  - `prompt.py::build_messages` 增 `world: dict[str, list[str]] | None = None`：before_char 块插入 system prompt 前（逐条 system）、after_char 块插入 [场景设定] 后、world（键 system）内容合并为单条 `[世界知识]\n...`（多条空行连接）；`world or {}` + 空列表跳过 → 空世界书零注入、零空 system 消息。注入内容已在引擎层模板替换，不重复处理。
+  - `message.py::build_message_list` 增 `world_injection` 透传。
+  - `chat.py::assemble_chat_context`：`_lorebook_world_injection` 辅助（list_entries → 启用条目最大 depth → collect_scan_text 全量历史（与消息滑窗 max_rounds 解耦）→ activate（每次调用新 RNG，注入非确定性）→ build_world_injection），普通/重生成两路径统一传入；注入非空时 debug 日志（验收「日志中确认注入块」）。
+- **关键决策**：ORM→LorebookEntryData 解耦转换收在 chat 层辅助函数（引擎零 DB 依赖不变）；depth = 启用条目最大 depth；重生成路径 current_input 传 ""（扫描靠历史命中，与消息滑窗解耦）。
+- **过程遥测**：集成测试 `test_regenerate_path_injects_world` 初版红——测试构造的历史以 assistant 结尾，违反重生成截断后「历史以触发 user 结尾」真实状态（代码行为正确，测试场景错误）→ 修正为以 user 结尾的三条历史。
+- **验证链**：先红后绿（11 用例初跑 10 红 1 绿（仅基线）→ 实现后全绿）| pytest 879+1skip→890+1skip（+11，零回归；含既有 prompt/chat/regenerate 全绿）| Vitest/cargo 零改动 | doc_sync 零漂移。
+- **非阻断落债**：无。
+
+---
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。
