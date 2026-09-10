@@ -41,6 +41,15 @@
 
 ---
 
+## 技术债消费批次 F-93：text_utils 共享单点收敛（2026-09-10 — 用户「消费技术债后继续推进 WL-3」）
+
+- **来源**：候选区唯一剩余项 F-93（WL-1 期末 code-review Standards 轴：`lorebook._as_str_list` 与 `character_card._as_list` 逐行重复）。Grilling 实证拍板**做**——git grep 复核现状仍成立：两函数逐行一致（None/空→[]、list→str 化、其它→单值包裹），character_card 2 处消费（alternate_greetings/tags）+ lorebook 1 处消费（keys），同包跨私有函数边界。
+- **方案**：新建 `backend/app/services/text_utils.py`（`__all__` = as_str_list，深模块共享单点）→ character_card / lorebook 改指 import、删除重复私有函数；`services/__init__.py` 登记。行为语义逐字不变——character_card（56）+ lorebook_store（24）既有用例全量锁定零回归，另加 test_text_utils 契约锁 7 条（None/空/list 混合/单值包裹参数化矩阵）。
+- **验证链**：pytest 873+1skip→879+1skip（+6）| 波末文件范围核验合规 | doc_sync 零漂移 | pool_cleanup_check 通过（候选区清零、脚注 F-93 与处置记录一致）。
+- **非阻断落债**：无（候选区清零）。
+
+---
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

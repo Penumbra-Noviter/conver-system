@@ -17,6 +17,7 @@ from backend.app.models.character import Character
 from backend.app.schemas.character import CharacterCreate
 from backend.app.services.character_fields import CHARACTER_V2_FIELDS, V2_KEY_MAP, V1_TO_V2_MAP
 from backend.app.services.exceptions import CardFormatError, CardValidationError
+from backend.app.services.text_utils import as_str_list
 
 __all__ = ["to_v2_card", "from_v2_card"]
 
@@ -158,8 +159,8 @@ def _build_create(data: dict) -> CharacterCreate:
         mes_example=str(data.get("mes_example") or ""),
         system_prompt=str(data.get("system_prompt") or ""),
         post_history_instructions=str(data.get("post_history_instructions") or ""),
-        alternate_greetings=_as_list(data.get("alternate_greetings")),
-        tags=_as_list(data.get("tags")),
+        alternate_greetings=as_str_list(data.get("alternate_greetings")),
+        tags=as_str_list(data.get("tags")),
         creator=str(data.get("creator") or ""),
         version=str(version)[:50],
         creator_notes=_as_dict(data.get("creator_notes")),
@@ -207,15 +208,6 @@ def _to_data_uri(avatar: str) -> str:
     if _is_data_uri(avatar) or avatar.startswith(("http://", "https://")):
         return avatar
     return f"data:image/{_infer_mime(avatar)};base64,{avatar}"
-
-
-def _as_list(value) -> list[str]:
-    """容忍脏数据：None → []，list → str 化列表，其它 → 单值包裹"""
-    if value is None or value == "":
-        return []
-    if isinstance(value, list):
-        return [str(v) for v in value]
-    return [str(value)]
 
 
 def _as_dict(value) -> dict:

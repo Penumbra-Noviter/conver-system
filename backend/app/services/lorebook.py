@@ -20,6 +20,7 @@ from backend.app.models.character import Character
 from backend.app.models.lorebook import LorebookEntry
 from backend.app.schemas.lorebook import LorebookEntryCreate, LorebookEntryUpdate
 from backend.app.services.exceptions import CharacterNotFoundError, LorebookEntryNotFoundError
+from backend.app.services.text_utils import as_str_list
 
 __all__ = [
     "list_entries",
@@ -194,7 +195,7 @@ def _entry_from_st(raw: dict) -> LorebookEntryCreate:
 
     return LorebookEntryCreate(
         title=str(raw.get("name") or "")[:200],
-        keys=_as_str_list(raw.get("keys")),
+        keys=as_str_list(raw.get("keys")),
         content=str(raw.get("content") or ""),
         constant=_as_bool(raw.get("constant"), False),
         order=_clamp_int(raw.get("insertion_order", raw.get("order", 100)), 0, 9999, 100),
@@ -207,15 +208,6 @@ def _entry_from_st(raw: dict) -> LorebookEntryCreate:
         source="manual",
         enabled=_as_bool(raw.get("enabled"), True),
     )
-
-
-def _as_str_list(value) -> list[str]:
-    """容错：None/空 → []；list → str 化；其它 → 单值包裹（对齐 character_card._as_list 惯例）"""
-    if value is None or value == "":
-        return []
-    if isinstance(value, list):
-        return [str(v) for v in value]
-    return [str(value)]
 
 
 def _as_bool(value, default: bool) -> bool:

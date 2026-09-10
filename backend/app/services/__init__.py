@@ -34,4 +34,5 @@ __all__ = [
     "simulator_import",
     "simulator_manifest",
     "simulator_store",
+    "text_utils",
 ]

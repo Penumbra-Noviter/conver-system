@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2133<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->874<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2139<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->880<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -125,6 +125,7 @@ conver system/
 │   │       ├── setting.py          ← 设置服务（凭证槽位/滑窗轮数）
 │   │       ├── lorebook.py         ← 世界书条目仓库层（WL-1）
 │   │       ├── lorebook_engine.py  ← 世界书激活引擎纯函数（WL-2，零 DB 依赖）
+│   │       ├── text_utils.py       ← 脏数据容错工具（as_str_list，F-93 收敛单点）
 │   │       └── llm/                ← LLM 接入层（深模块）
 │   │           ├── __init__.py     ← 包级导出零 SDK 副作用契约
 │   │           ├── base.py         ← BaseLLM 抽象基类（generate/stream/test）
@@ -137,7 +138,7 @@ conver system/
 │   ├── run_backend.py              ← 独立启动脚本（日志/数据目录/端口）
 │   ├── scripts/
 │   │   └── migrate_data.py         ← 数据目录迁移工具（校验/标记/幂等）
-│   ├── tests/                      ← pytest（27 个文件，见 §5.1）
+│   ├── tests/                      ← pytest（28 个文件，见 §5.1）
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   ├── conver_backend.spec         ← PyInstaller 打包配置
@@ -352,7 +353,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/character.py:update_character-->`update_character(db, character_id, data)`<!--/AUTO--> | 更新角色 |
 | <!--AUTO:sig:backend/app/services/character.py:delete_character-->`delete_character(db, character_id)`<!--/AUTO--> | 删除角色 |
 
-### 4.13 `backend/app/services/character_card.py` — 角色卡 V2 转换（<!--AUTO:lines:backend/app/services/character_card.py-->~192 行<!--/AUTO-->）
+### 4.13 `backend/app/services/character_card.py` — 角色卡 V2 转换（<!--AUTO:lines:backend/app/services/character_card.py-->~186 行<!--/AUTO-->）
 
 **职责**：SillyTavern Character Card V2 信封导出/导入——兼容 V1 旧卡与裸 data；非 V2 标准字段存 `extensions.conver_system.*` 命名空间保证往返保真；头像 data URI 规范化。
 
@@ -479,7 +480,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/message.py:build_message_list-->`build_message_list(db, conversation, user_content, max_rounds=30, user_name='User', append_current_input=True)`<!--/AUTO--> | 构建 LLM 上下文（滑窗 + 模板变量） |
 | <!--AUTO:sig:backend/app/services/message.py:search_messages-->`search_messages(db, query, limit=50)`<!--/AUTO--> | 跨对话关键词搜索 |
 
-### 4.21.5 `backend/app/services/lorebook.py` — 世界书条目仓库层（WL-1）（<!--AUTO:lines:backend/app/services/lorebook.py-->~193 行<!--/AUTO-->）
+### 4.21.5 `backend/app/services/lorebook.py` — 世界书条目仓库层（WL-1）（<!--AUTO:lines:backend/app/services/lorebook.py-->~187 行<!--/AUTO-->）
 
 **职责**：lorebook_entries 表存取 + 角色卡 `character_book` → 条目草案解析（字段语义对齐 SillyTavern World Info，spec §WL-1）。排序契约 order 升序 + id 稳定；边界策略：Schema「拒」（Field 约束）、parse「裁剪」（脏数据容错）双轨分界由契约锁锁定。命中判定/排序/注入引擎在 lorebook_engine.py（WL-2 承接）。
 
@@ -502,6 +503,14 @@ conver system/
 | <!--AUTO:sig:backend/app/services/lorebook_engine.py:build_world_injection-->`build_world_injection(activated, *, user_name='User', char_name='Character')`<!--/AUTO--> | position 分组（world→system）构建注入块，{{user}}/{{char}} 模板替换 |
 | <!--AUTO:sig:backend/app/services/lorebook_engine.py:collect_scan_text-->`collect_scan_text(history, current_input, depth, *, role_of)`<!--/AUTO--> | 扫描窗口文本（0=仅输入；N=2N 条对话消息+输入；>20 裁剪；system 不计轮） |
 | `LorebookEntryData` | 引擎输入纯数据容器（frozen dataclass，与 ORM 解耦） |
+
+### 4.21.7 `backend/app/services/text_utils.py` — 脏数据容错工具（F-93 收敛）（<!--AUTO:lines:backend/app/services/text_utils.py-->~24 行<!--/AUTO-->）
+
+**职责**：跨模块共享的脏数据容错单点（F-93 收敛）——character_card._as_list 与 lorebook._as_str_list 前身合并；行为由 character_card / lorebook 既有测试与 test_text_utils 契约锁锁定。
+
+| 函数 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/services/text_utils.py:as_str_list-->`as_str_list(value)`<!--/AUTO--> | 脏值 → str 化列表（None/空 → []；list → 逐元素 str；其它 → 单值包裹） |
 
 ### 4.22 `backend/app/services/model_data.py` — Provider 清单单源（<!--AUTO:lines:backend/app/services/model_data.py-->~127 行<!--/AUTO-->）
 
@@ -1316,6 +1325,7 @@ conver system/
 | `backend/tests/test_settings_connection.py` | <!--AUTO:tests:backend/tests/test_settings_connection.py-->55<!--/AUTO--> | 设置/凭证/连接测试 |
 | `backend/tests/test_simulator_import.py` | <!--AUTO:tests:backend/tests/test_simulator_import.py-->149<!--/AUTO--> | 模拟器导入（校验矩阵/去重/改名/探测/粗筛/manifest 注册/路由 wire） |
 | `backend/tests/test_simulator_store.py` | <!--AUTO:tests:backend/tests/test_simulator_store.py-->33<!--/AUTO--> | 模拟器首启种子矩阵 + manifest 工具 + append 原子写/损坏自愈 |
+| `backend/tests/test_text_utils.py` | <!--AUTO:tests:backend/tests/test_text_utils.py-->6<!--/AUTO--> | 脏数据容错工具契约锁（F-93：None/空 → []、list → str 化、其它 → 单值包裹） |
 | `backend/tests/test_simulator_proxy.py` | <!--AUTO:tests:backend/tests/test_simulator_proxy.py-->14<!--/AUTO--> | 模拟器同源 API 反代（CORS：纯函数矩阵 + 路由 wire） |
 
 运行：`cd backend && python -m pytest`（pytest.ini 在根：`testpaths = backend/tests`，`pythonpath = .`；共享夹具见 `backend/tests/conftest.py`）。
@@ -1411,9 +1421,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2133<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2139<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->874<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->880<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1189<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
