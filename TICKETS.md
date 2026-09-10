@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **14 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **13 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -28,7 +28,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| WL-2 | 激活引擎纯函数（activate_lorebook_entries / build_world_injection / collect_scan_text） | ⬜ 待办 | spec §WL-2；命中矩阵 + depth 边界 + 同种子 RNG 可复现；零 DB 依赖 |
 | WL-3 | 注入链集成（build_messages 增 world 可选参数，三注入位；prepare_chat 组装） | ⬜ 待办 | spec §WL-3；world=None 逐字节零回归；重生成路径一致性 |
 | WL-4 | 世界书编辑器前端（CRUD 面板 + 泛词告警 + 字段校验） | ⬜ 待办 | spec §WL-4；Vitest 用例 + Playwright 端到端（新增→保存→重开还原→注入生效） |
 | WL-5 | 记忆宫殿（AI 归纳 → source=auto 条目；阈值触发；失败隔离） | ⬜ 待办 | spec §WL-5；阈值矩阵 + JSON 降级不抛 + 主流程不受影响 |
@@ -78,6 +77,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### 世界书批次 WL-2（2026-09-10 — 激活引擎纯函数，WL 批第二张）
+
+> 来源：AI风月对标调研五批工单（WL 世界书第二张）；引擎语义/契约锁依据见 docs/chat-simulator-upgrade-spec.md §WL-2。叙述详见 DEV_LOG〈WL-2 世界书激活引擎纯函数（2026-09-10）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| WL-2 | 激活引擎纯函数（activate_lorebook_entries / build_world_injection / collect_scan_text） | 2026-09-10 | 59c3726 |
+
+**验证链：** pytest 847+1skip→871+1skip（+24：test_lorebook_engine 契约锁——空输入零异常/constant 直进/or-and 矩阵/大小写不敏感锁定/depth 边界裁剪/system 不计轮/概率 0-100 闸/RNG 同种子复现/互斥组加权抽一/order-id 稳定排序/泛词不报错/零 DB 导入 subprocess 检查）| services __all__ 登记同步 | doc_sync 零漂移
+**非阻断落债：** 无（F-93 仍为 WL-1 遗留候选，未消费）
+
+---
 
 ### 世界书批次 WL-1（2026-09-10 — 世界书数据模型 + 仓库层，WL 批首个）
 
