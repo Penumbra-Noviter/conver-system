@@ -180,6 +180,56 @@ void main() {
     });
   });
 
+  group('toProxyEndpoint · 同源反代改写行为矩阵（方案 A 桌面逐字）', () {
+    const origin = 'http://127.0.0.1:8642';
+    const prefix = '/proxy';
+
+    test('合法 base URL → origin + /proxy + 路径段保留', () {
+      expect(toProxyEndpoint('https://api.deepseek.com/v1', origin),
+          '$origin$prefix/v1');
+    });
+
+    test('尾斜杠剥离：https://host/v1/ → .../proxy/v1', () {
+      expect(toProxyEndpoint('https://api.deepseek.com/v1/', origin),
+          '$origin$prefix/v1');
+    });
+
+    test('深层路径段保留（/v1/chat/completions 形态）', () {
+      expect(
+        toProxyEndpoint('https://api.deepseek.com/v1/chat/completions', origin),
+        '$origin$prefix/v1/chat/completions',
+      );
+    });
+
+    test('空串 → 原样（不误改）', () {
+      expect(toProxyEndpoint('', origin), '');
+    });
+
+    test('null（非字符串语义）→ 原样', () {
+      expect(toProxyEndpoint(null, origin), isNull);
+    });
+
+    test('空 origin → 原样（非浏览器 / 未注入 origin → 不误改）', () {
+      expect(toProxyEndpoint('https://api.deepseek.com/v1', ''),
+          'https://api.deepseek.com/v1');
+    });
+
+    test('非法 URL（无 scheme 裸串，new URL 抛错分支）→ 无路径形态', () {
+      expect(toProxyEndpoint('api.deepseek.com/v1', origin), '$origin$prefix');
+    });
+
+    test('不可解析串 → 无路径形态（origin + /proxy）', () {
+      expect(toProxyEndpoint('not a url', origin), '$origin$prefix');
+    });
+
+    test('无路径 base URL（https://host 与 https://host/）→ 无路径形态', () {
+      expect(toProxyEndpoint('https://api.deepseek.com', origin),
+          '$origin$prefix');
+      expect(toProxyEndpoint('https://api.deepseek.com/', origin),
+          '$origin$prefix');
+    });
+  });
+
   group('assembleCredentials · 凭证组装（claude key 恒不进游戏）', () {
     test('openai 槽位 key + deepseek 设置 → openai 三元组（model 门控放行）', () async {
       final store = InMemorySecretStore();
@@ -380,6 +430,52 @@ void main() {
       expect(script, contains("'/chat/completions'"));
       expect(script, contains('endpoint.replace(/\\/+\$/, \'\')'));
       expect(InjectionScript.endpointSuffix, endpointSuffix);
+    });
+
+    test('proxyPrefix 单源契约：SimulatorContracts.proxyPrefix == "/proxy"', () {
+      expect(SimulatorContracts.proxyPrefix, '/proxy');
+    });
+
+    test('PROXY_PREFIX 占位符替换：build 产物 JS 字面量与契约常量恒等', () {
+      final script = buildSample();
+      expect(script, contains('const PROXY_PREFIX = "/proxy";'));
+    });
+
+    test('toProxyEndpoint 桌面逐字金样：函数签名 + 核心分支逐字', () {
+      final script = buildSample();
+      // 桌面 key-injector.js L289-300 逐字（移动端无 export，函数体逐字）。
+      expect(script, contains('function toProxyEndpoint(endpoint, origin) {'));
+      expect(
+        script,
+        contains(
+          "if (typeof endpoint !== 'string' || endpoint === '') return endpoint;",
+        ),
+      );
+      expect(
+        script,
+        contains(
+          "const o = origin || (typeof location !== 'undefined' ? location.origin : '');",
+        ),
+      );
+      expect(script, contains('if (!o) return endpoint;'));
+      expect(script, contains('new URL(endpoint).pathname.replace(/\\/+\$/, \'\')'));
+      expect(script, contains('return `\${o}\${PROXY_PREFIX}\${path}`;'));
+    });
+
+    test('endpoint 取值调用序：convertEndpoint(toProxyEndpoint(rawValue), endpointMode)', () {
+      final script = buildSample();
+      // 桌面 L391-392：先同源改写再口径转换（CORS 修复）。
+      expect(
+        script,
+        contains(
+          'convertEndpoint(toProxyEndpoint(rawValue), endpointMode)',
+        ),
+      );
+      // 旧调用序（直接 convertEndpoint(rawValue, ...)）不得残留。
+      expect(
+        script,
+        isNot(contains('convertEndpoint(rawValue, endpointMode)')),
+      );
     });
 
     test('config 三元组嵌入（F-91 候选原样进字符串，无省略）', () {

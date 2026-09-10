@@ -45,6 +45,13 @@ abstract final class SimulatorContracts {
   /// 存档全部静默丢失（spec §3-1）。
   static const int defaultPort = 8642;
 
+  /// 同源反代端点前缀（方案 A CORS 修复，T2/T3 单源）。注入脚本把真实
+  /// OpenAI 兼容 base URL 改写为本地 server 同源反代地址 `/proxy/<path>`，
+  /// 浏览器 fetch 落在本地 server 上由服务端转发（规避 CORS 拦截）。桌面
+  /// 对应 `PROXY_PREFIX = '/api/simulators/proxy'`；移动端本地 server 路由
+  /// 挂 `/proxy`（T3 读本常量，与模板占位符替换值共用）。
+  static const String proxyPrefix = '/proxy';
+
   /// file 字段安全判据（锚桌面 simulator-contracts.js isValidSimulatorFile 逐字）：
   /// 非空字符串且不含 `/` `\`（路径分隔符，拒绝穿越与子路径）、`%`（百分号
   /// 编码面）、`#`（URL fragment 分隔符）→ true；其余一律 false。

@@ -13,11 +13,12 @@
 /// 协议表面（深模块，外部只通过这些符号与本模块交互）：
 /// `InjectedCredentials` / `ButtonState` / `CredentialSettings` /
 /// `assembleCredentials` / `resolveButtonState` / `hasConfigTriplet` /
-/// `convertEndpoint` / `endpointSuffix` / `isOfficialEndpoint`。
+/// `convertEndpoint` / `toProxyEndpoint` / `endpointSuffix` / `isOfficialEndpoint`。
 library;
 
 import '../../models/model_catalog.dart' show ModelCatalog;
 import '../secure_store.dart' show SecretStore;
+import 'simulator_contracts.dart' show SimulatorContracts;
 
 /// OpenAI 兼容协议聊天补全路径后缀（endpointMode 口径转换用；桌面
 /// key-injector.js `ENDPOINT_SUFFIX = '/chat/completions'` 逐字）。
@@ -220,6 +221,38 @@ String? convertEndpoint(String? endpoint, String? mode) {
         : trimmed;
   }
   return endpoint;
+}
+
+/// 把真实 OpenAI 兼容 base URL 改写成主应用同源反代地址（方案 A CORS 修复，
+/// 桌面 key-injector.js toProxyEndpoint L289-300 逐字）。
+///
+/// 背景：模拟器游戏在 WebView 内用浏览器 fetch 直连第三方 OpenAI 兼容 API，
+/// 目标不返回 Access-Control-Allow-Origin 即被浏览器 CORS 拦截（「连接不上」）；
+/// 修复 = 注入的 endpoint 指向本地 server 同源反代端点
+/// （[SimulatorContracts.proxyPrefix] + `<path>`），server 侧服务端转发到真实
+/// 目标。保留真实 base 的路径段（如 `https://host/v1` 的 `/v1`）作为反代
+/// 子路径——游戏按 endpoint 推导的相对路径（`/v1/models`、`/v1/chat/completions`）
+/// 经反代后由 server 原样拼到真实 host，路径映射不丢失。
+///
+/// 契约（桌面逐字）：非字符串/空值 → 原样返回；origin 缺失（非浏览器 / 测试
+/// 未注入）→ 原样返回（不误改）；URL 解析失败 → 以无路径形态返回同源前缀
+/// （`origin + proxyPrefix`）；成功 → `origin + proxyPrefix + 去尾斜杠 pathname`。
+///
+/// [origin] 显式入参供测试注入（运行态由 JS 侧 `location.origin` 缺省分支覆盖；
+/// 游戏页由本地 server 同源托管，自动含懒启动/动态端口）。
+String? toProxyEndpoint(String? endpoint, String origin) {
+  if (endpoint == null || endpoint.isEmpty) {
+    return endpoint;
+  }
+  if (origin.isEmpty) {
+    return endpoint;
+  }
+  var path = '';
+  final uri = Uri.tryParse(endpoint);
+  if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
+    path = uri.path.replaceAll(RegExp(r'/+$'), '');
+  }
+  return '$origin${SimulatorContracts.proxyPrefix}$path';
 }
 
 /// 官方端点检测（共识 Q8）：默认 provider=claude 或 base url 命中官方域 →

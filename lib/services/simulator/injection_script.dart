@@ -1,15 +1,17 @@
-/// 自包含注入 JS 常量串（F-M5-04）——单次 `runJavaScript` 注入即完成三元组
-/// 填值 + 幂等写入 + 双事件派发 + 就绪轮询（≤5000ms 吸收引擎系动态面板渲染
-/// 竞态，等价替代桌面 load 注入一次性竞态）。
+/// 自包含注入 JS 常量串（F-M5-04 + T2 CORS）——单次 `runJavaScript` 注入即
+/// 完成三元组填值 + 幂等写入 + 双事件派发 + 就绪轮询（≤5000ms 吸收引擎系动态
+/// 面板渲染竞态，等价替代桌面 load 注入一次性竞态）。
 ///
 /// 桌面权威源（只读，语义逐字锚点）：`desktop/frontend/js/key-injector.js`
 /// `injectCredentialsIntoGame`（CONFIG_FIELDS 字段序 / FIELD_VALUE_KEYS 映射 /
 /// TARGET_TAGS 白名单 / ensureSelectOption 受管 option / convertEndpoint 口径 /
-/// 幂等「值已等不写不派发」/ input+change 双事件）。游戏零改动，契约全量保留。
+/// toProxyEndpoint 同源改写（T2 CORS） / 幂等「值已等不写不派发」/ input+change
+/// 双事件）。游戏零改动，契约全量保留。
 ///
 /// 就绪轮询上限常量单一归属：[SimulatorContracts.scriptReadyPollMs]（桌面
 /// 「就绪轮询 ≤5s」逐字）；本模块经 [InjectionScript.scriptReadyPollMs] 别名
-/// 消费，不复制字面量。
+/// 消费，不复制字面量。同源反代前缀 [SimulatorContracts.proxyPrefix]（'/proxy'）
+/// 为 T2/T3 单源，模板占位符 `__PROXY_PREFIX__` build 期替换为契约常量值。
 ///
 /// 安全：注入的 openai key 必然进入游戏自身 DOM 与脚本内存（功能本义）；
 /// claude key 恒不为空串（凭证层契约），故不可能出现在本脚本中。
@@ -27,13 +29,15 @@ import 'simulator_contracts.dart' show SimulatorContracts;
 /// - `__CONFIG_JSON__`：manifest config 三元组（F-91 候选 id 数组原样嵌入）；
 /// - `__CREDENTIALS_JSON__`：凭证三元组（key/endpoint/model）；
 /// - `__ENDPOINT_MODE__`：endpointMode 字面量（`"full"` / `"base"` / `null`）；
-/// - `__READY_POLL_MS__`：就绪轮询上限（[InjectionScript.scriptReadyPollMs]）。
+/// - `__READY_POLL_MS__`：就绪轮询上限（[InjectionScript.scriptReadyPollMs]）；
+/// - `__PROXY_PREFIX__`：同源反代前缀（[SimulatorContracts.proxyPrefix]，T2 单源）。
 const String injectionScriptTemplate = """
 (() => {
   const CONFIG_FIELDS = ['apikey', 'endpoint', 'model'];
   const FIELD_VALUE_KEYS = { apikey: 'key', endpoint: 'endpoint', model: 'model' };
   const TARGET_TAGS = new Set(['INPUT', 'SELECT']);
   const ENDPOINT_SUFFIX = '/chat/completions';
+  const PROXY_PREFIX = __PROXY_PREFIX__;
   const READY_POLL_MS = __READY_POLL_MS__;
   const POLL_INTERVAL_MS = 250;
   const config = __CONFIG_JSON__;
@@ -56,6 +60,22 @@ const String injectionScriptTemplate = """
       return trimmed.endsWith(ENDPOINT_SUFFIX) ? trimmed.slice(0, -ENDPOINT_SUFFIX.length) : trimmed;
     }
     return endpoint;
+  }
+
+  // CORS 修复（桌面 key-injector.js toProxyEndpoint L289-300 逐字）：endpoint
+  // 改写为本地 server 同源反代地址（绕过浏览器 CORS 拦截）——origin 运行时取
+  // location.origin（游戏页由本地 server 同源托管，自动含懒启动/动态端口）。
+  function toProxyEndpoint(endpoint, origin) {
+    if (typeof endpoint !== 'string' || endpoint === '') return endpoint;
+    const o = origin || (typeof location !== 'undefined' ? location.origin : '');
+    if (!o) return endpoint; // 非浏览器/测试未注入 origin → 保持原样（不误改）
+    let path = '';
+    try {
+      path = new URL(endpoint).pathname.replace(/\\/+\$/, '');
+    } catch {
+      path = '';
+    }
+    return `\${o}\${PROXY_PREFIX}\${path}`;
   }
 
   function hasSelectOption(selectEl, value) {
@@ -82,7 +102,12 @@ const String injectionScriptTemplate = """
       const candidates = configIdCandidates(config[field]);
       if (candidates.length === 0) { skipped.push(field); continue; }
       const rawValue = credentials[FIELD_VALUE_KEYS[field]];
-      const value = field === 'endpoint' ? convertEndpoint(rawValue, endpointMode) : rawValue;
+      // CORS 修复（T2）：endpoint 先改写为本地 server 同源反代地址
+      // （toProxyEndpoint），再做口径转换 —— 游戏经同源反代由 server 侧转发，
+      // 浏览器不再 CORS 拦截（对齐桌面 L391-392 调用序）。
+      const value = field === 'endpoint'
+          ? convertEndpoint(toProxyEndpoint(rawValue), endpointMode)
+          : rawValue;
       if (typeof value !== 'string' || value === '') { skipped.push(field); continue; }
       let el = null;
       for (const id of candidates) {
@@ -136,7 +161,7 @@ class InjectionScript {
   /// 先嵌入 payload 里的后置占位符字面量再次替换 → config 变对象 → 字段
   /// 静默跳过，注入面缺失）。
   static final RegExp _placeholderPattern = RegExp(
-    r'__(CONFIG_JSON|CREDENTIALS_JSON|ENDPOINT_MODE|READY_POLL_MS)__',
+    r'__(CONFIG_JSON|CREDENTIALS_JSON|ENDPOINT_MODE|READY_POLL_MS|PROXY_PREFIX)__',
   );
 
   /// 构造最终注入脚本：替换模板数据占位符。
@@ -172,6 +197,10 @@ class InjectionScript {
           return endpointMode == null ? 'null' : jsonEncode(endpointMode);
         case 'READY_POLL_MS':
           return '$scriptReadyPollMs';
+        case 'PROXY_PREFIX':
+          // 单源消费 [SimulatorContracts.proxyPrefix]，与 T3 server 路由共用；
+          // jsonEncode 产出 JS 双引号字符串字面量。
+          return jsonEncode(SimulatorContracts.proxyPrefix);
         default:
           // 白名单外的 token 理论上不可达（模式受限于 alternation）；返回空
           // 串不会残留字面量。
