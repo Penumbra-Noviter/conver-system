@@ -24,6 +24,20 @@
 
 ---
 
+## WL-2 世界书激活引擎纯函数（2026-09-10 — AI风月对标五批工单 WL 第二张，承接 WL-1）
+
+- **来源**：承接 WL-1（51e3786）；引擎语义对齐 SillyTavern World Info（spec §WL-2）。交付 `backend/app/services/lorebook_engine.py` 深模块（`__all__`：LorebookEntryData + activate_lorebook_entries / build_world_injection / collect_scan_text），**零 DB / 零 IO**——subprocess 独立进程导入检查锁死 sqlalchemy 不入 sys.modules。
+- **关键决策（契约锁锁定）**：
+  - `LorebookEntryData` frozen dataclass 与 ORM 解耦（ORM→数据转换由 WL-3 调用方承担，引擎不 import 数据库）；复用 `llm/prompt.py::apply_template_vars` 做注入内容 `{{user}}/{{char}}` 模板替换（同一 seam，无重复实现）。
+  - 流程顺序即语义：enabled 过滤 → constant 直进 / keys 子串命中（or=任一、and=全部；**大小写不敏感**锁定；空/纯空白 key 不参与——防 `any([])`/`all([])` 空集陷阱）→ 概率闸（>=100 必进、<=0 必弃且均不消耗 RNG，中间值掷点）→ 同组按 group_weight 加权抽一（每组合计一次 RNG，权重兜底 ≥1）→ 输出 (order, id) 升序。
+  - depth 由 collect_scan_text 落实：0→仅输入；N→最近 2N 条「对话消息」（system 指令不计轮）+ 输入；>20 裁剪为 20、<0 视为 0。scan_text 为空时 activate 回退 current_input（调用方可只传输入）。
+  - `build_world_injection`：position 分组 world→system / before_char / after_char，组内 (order, id) 升序；未知 position 回落 system 不静默丢弃（初版回退值写错为 "world" 被测试当场抓住）。
+- **过程遥测**：零 DB subprocess 测试初版在 backend/ cwd 下失败（`backend` 为命名空间包，需仓库根于 sys.path）→ 修正为 `cwd=repo_root`；泛词测试标点 key 初版用半角 "," 而文本是全角 "，"（测试笔误）→ 统一全角。
+- **验证链**：先红后绿（24 用例 collection 红 → 实现后全绿）| pytest 847+1skip→871+1skip（+24，零回归）| Vitest/cargo 零改动 | pool_cleanup_check + doc_sync --check 双钩子通过。
+- **非阻断落债**：无。
+
+---
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

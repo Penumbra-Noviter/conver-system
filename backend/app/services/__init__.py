@@ -26,6 +26,7 @@ __all__ = [
     "game_template",
     "llm",
     "lorebook",
+    "lorebook_engine",
     "message",
     "model_data",
     "provider_registry",

@@ -91,6 +91,7 @@ conver-system/
 │   │       ├── provider_registry.py # Provider 派生元数据单一来源（协议映射 / 协议族模型集 / key 顺序）
 │   │       ├── setting.py         # 运行时设置读写（白名单 + 回退链 + 整型容错）
 │   │       ├── lorebook.py        # 世界书条目仓库层（WL-1：存取 + character_book 解析）
+│   │       ├── lorebook_engine.py # 世界书激活引擎纯函数（WL-2：命中/概率/互斥组/注入块分组，零 DB）
 │   │       ├── simulator_import.py # 模拟器导入族（T-02：文件名净化 / SHA-256 去重 / cfg 探测 / 静态粗筛）
 │   │       ├── simulator_manifest.py # manifest.json 读写工具（首启种子后幂等标记）
 │   │       ├── simulator_store.py # 模拟器数据存储（首启种子契约；manifest / 导入族已拆分独立模块）
