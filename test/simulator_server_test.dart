@@ -98,6 +98,166 @@ Future<int> rawRequestStatus(int port, String rawTarget) async {
   return int.parse(head.split(' ')[1]);
 }
 
+/// ── T3 · /proxy 同源反代契约矩阵（真上游测试服务器 + 真转发）───────────────
+///
+/// seam 语义（工单 03 验收 + 桌面锚点逐字）：测 seam = 构造注入
+/// `proxyConfigReader`（返回「OpenAI 兼容 base + key」）；行为经真实监听
+/// SimulatorServer + 真实 dart:io HttpClient 转发到**真实 upstream 测试
+/// 服务器**断言——method/目标/请求体/头（key 注入 / 游戏头丢弃）/SSE 字节
+/// 透传/未配置 503。桌面对齐：`api/routes/simulators.py` `simulator_api_proxy`
+/// / `_build_proxy_target` / `_proxy_headers`。
+
+/// 上游记录的一条请求（供断言「到达目标的事实」）。
+class _UpstreamRequest {
+  _UpstreamRequest({
+    required this.method,
+    required this.path,
+    required this.headers,
+    required this.body,
+  });
+
+  final String method;
+  final String path;
+
+  /// 头名小写 → join 值（断言按小写键读）。
+  final Map<String, String> headers;
+
+  final List<int> body;
+
+  String get bodyText => utf8.decode(body);
+}
+
+/// 真实 upstream 测试服务器：记录每请求 (method/path/headers/body)，可按
+/// 测试配置状态码 / 响应头 / 响应体 / SSE 分块流（分块间延迟 + 逐块 flush）。
+class _FakeUpstream {
+  _FakeUpstream._(this._server);
+
+  final HttpServer _server;
+
+  int get port => _server.port;
+
+  /// 记录到的请求（按到达顺序；每个测试内请求为顺序执行，无并发竞态）。
+  final List<_UpstreamRequest> requests = [];
+
+  int statusCode = HttpStatus.ok;
+  Map<String, String> respHeaders = const {};
+  bool hasBody = true;
+  List<int> Function() bodyProvider = () => utf8.encode('{"ok":true}');
+
+  /// 非空 → SSE 分块模式：逐块延迟 [sseChunkDelay] 后下发（验证流式透传）。
+  List<String>? sseChunks;
+  Duration sseChunkDelay = const Duration(milliseconds: 20);
+
+  static Future<_FakeUpstream> start() async {
+    final server =
+        await HttpServer.bind(InternetAddress.loopbackIPv4, /* port */ 0);
+    // 模拟真实 OpenAI 兼容端点：不自动 gzip（代理 outbound 已关 autoUncompress，
+    // 不会带 accept-encoding）。
+    server.autoCompress = false;
+    final fake = _FakeUpstream._(server);
+    server.listen(fake._handle);
+    return fake;
+  }
+
+  Future<void> close() async {
+    await _server.close(force: true);
+  }
+
+  Future<void> _handle(HttpRequest req) async {
+    final body = <int>[];
+    await for (final chunk in req) {
+      body.addAll(chunk);
+    }
+    final headers = <String, String>{};
+    req.headers.forEach((name, values) {
+      headers[name.toLowerCase()] = values.join(',');
+    });
+    requests.add(_UpstreamRequest(
+      method: req.method,
+      path: req.uri.path,
+      headers: headers,
+      body: body,
+    ));
+
+    final resp = req.response;
+    resp.statusCode = statusCode;
+    respHeaders.forEach((name, value) => resp.headers.set(name, value));
+    if (sseChunks != null) {
+      // 关闭响应层小 chunk 缓冲：分块间延迟 + 逐块 flush，使「真流式透传
+      // 时序」测试对代理缓冲实现有灵敏度（缓冲实现首字节必迟到）。
+      resp.bufferOutput = false;
+      resp.headers.set(HttpHeaders.contentTypeHeader, 'text/event-stream');
+      for (final chunk in sseChunks!) {
+        if (sseChunkDelay > Duration.zero) {
+          await Future<void>.delayed(sseChunkDelay);
+        }
+        resp.add(utf8.encode(chunk));
+        await resp.flush();
+      }
+      await resp.close();
+      return;
+    }
+    final bodyBytes = bodyProvider();
+    if (hasBody) {
+      // 显式 content-length：断言代理响应侧已剥除（服务端仍按流式补帧）。
+      resp.headers.set(HttpHeaders.contentLengthHeader, '${bodyBytes.length}');
+      resp.add(bodyBytes);
+    }
+    await resp.close();
+  }
+}
+
+/// 经代理的请求结果（状态码 + 头 + 字节体）。
+class _ProxyResult {
+  _ProxyResult(this.status, this.headers, this.body);
+
+  final int status;
+
+  /// 头名小写 → join 值。
+  final Map<String, String> headers;
+
+  final List<int> body;
+
+  String get text => utf8.decode(body);
+}
+
+/// 真实 HttpClient 经代理发任意 method：返回状态码 + 头 + 字节体。
+Future<_ProxyResult> _proxyRequest(
+  int port,
+  String method,
+  String path, {
+  Map<String, String> headers = const {},
+  List<int>? body,
+}) async {
+  final client = HttpClient();
+  try {
+    final req = await client.openUrl(
+      method,
+      Uri.parse('http://127.0.0.1:$port$path'),
+    );
+    headers.forEach((name, value) => req.headers.set(name, value));
+    if (body != null) {
+      req.add(body);
+    }
+    final resp = await req.close();
+    final outHeaders = <String, String>{};
+    resp.headers.forEach((name, values) {
+      outHeaders[name.toLowerCase()] = values.join(',');
+    });
+    final outBody = <int>[];
+    await for (final chunk in resp) {
+      outBody.addAll(chunk);
+    }
+    return _ProxyResult(resp.statusCode, outHeaders, outBody);
+  } finally {
+    client.close(force: true);
+  }
+}
+
+/// 反代 reader fake：返回给定配置（null = 未配置）。
+Future<ProxyRouteConfig?> Function() _readerFor(ProxyRouteConfig? config) =>
+    () async => config;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -423,6 +583,383 @@ void main() {
         reason: '端口被占必须明确抛错且含端口信息（换端口 = 换 origin = 存档丢失）',
       );
       expect(server.isRunning, isFalse, reason: '抛错后未在监听');
+    });
+  });
+
+  group('SimulatorServer — /proxy 反代 · 未配置防御', () {
+    test('未注入 reader → /proxy 一律 503（防御），静态路由不受影响', () async {
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(simDir); // 无 reader
+      final port = await server.start(port: 0);
+
+      for (final method in ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']) {
+        final result = await _proxyRequest(port, method, '/proxy/v1/models');
+        expect(result.status, 503, reason: '$method /proxy 未配置 → 503 不挂连接');
+      }
+      expect((await httpGet(port, '/simulators/manifest.json')).$1, 200,
+          reason: '静态托管路由不受 /proxy 分支影响');
+      await server.stop();
+    });
+
+    test('reader 返回 null（未配置）→ 503，文案可读', () async {
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(simDir, proxyConfigReader: _readerFor(null));
+      final port = await server.start(port: 0);
+
+      final (status, _, body) = await httpGet(port, '/proxy/v1/models');
+      expect(status, 503);
+      expect(body, contains('未配置 OpenAI 兼容端点'));
+      await server.stop();
+    });
+
+    test('reader 返回 endpoint 空串 → 503（未配置语义）', () async {
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(
+          const ProxyRouteConfig(endpoint: '', apiKey: 'x'),
+        ),
+      );
+      final port = await server.start(port: 0);
+
+      expect((await httpGet(port, '/proxy/v1/models')).$1, 503);
+      await server.stop();
+    });
+
+    test('reader 抛错 → 503 防御（配置读取失败视同未配置）', () async {
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: () async => throw StateError('secret store down'),
+      );
+      final port = await server.start(port: 0);
+
+      expect((await httpGet(port, '/proxy/v1/models')).$1, 503);
+      await server.stop();
+    });
+
+    test('endpoint 无 netloc → 503（OpenAI 兼容端点无效语义）', () async {
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(
+          const ProxyRouteConfig(endpoint: 'not-a-valid-url', apiKey: 'x'),
+        ),
+      );
+      final port = await server.start(port: 0);
+
+      final (status, _, body) = await httpGet(port, '/proxy/v1/models');
+      expect(status, 503);
+      expect(body, contains('OpenAI 兼容端点无效'));
+      await server.stop();
+    });
+  });
+
+  group('SimulatorServer — /proxy 反代 · 转发契约矩阵', () {
+    test('POST 转发：method/目标/请求体逐字到达上游，App key 注入 Bearer，'
+        '游戏 Authorization 被弃、自定义头透传、host/content-length/'
+        'accept-encoding 剥除', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1',
+          apiKey: 'app-secret-key',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      final body = '{"model":"deepseek-v4-flash","messages":[{"role":"user",'
+          '"content":"hi"}]}';
+      final result = await _proxyRequest(port, 'POST', '/proxy/v1/chat/completions',
+        headers: {
+          'authorization': 'Bearer game-token',
+          'x-custom': 'keep-me',
+          'accept-encoding': 'gzip',
+          'content-type': 'application/json',
+        },
+        body: utf8.encode(body),
+      );
+      expect(result.status, 200);
+
+      final req = upstream.requests.single;
+      expect(req.method, 'POST', reason: '方法逐字转发');
+      expect(req.path, '/v1/chat/completions', reason: '请求 path 原样拼到 netloc');
+      expect(req.bodyText, body, reason: '聊天 payload 逐字透传');
+      expect(req.headers['authorization'], 'Bearer app-secret-key',
+          reason: 'App 侧 key 注入 Bearer，游戏 Authorization 被弃');
+      expect(req.headers['x-custom'], 'keep-me', reason: '自定义头原样透传');
+      expect(req.headers['host'], '127.0.0.1:${upstream.port}',
+          reason: 'host 由 HttpClient 按目标重建（不转发游戏 Host）');
+      expect(req.headers['content-length'], isNull,
+          reason: 'content-length 剥除（服务端按流式补帧）');
+      expect(req.headers['accept-encoding'], isNull,
+          reason: 'accept-encoding 剥除（压缩层语义）');
+      expect(req.headers['connection'], isNull, reason: 'connection 不转发');
+      await server.stop();
+    });
+
+    test('App key 为空 → 不注入 Authorization；游戏 Authorization 仍被丢弃', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1',
+          apiKey: '',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      await _proxyRequest(port, 'GET', '/proxy/v1/models',
+        headers: {'authorization': 'Bearer game-token'});
+      final req = upstream.requests.single;
+      expect(req.headers['authorization'], isNull,
+          reason: 'App key 为空 → 不注入 Authorization，游戏头也不达上游');
+      await server.stop();
+    });
+
+    test('目标解析：base 自身 path 段（/v1）不参与拼接，短路径 /v1/models 命中', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1', // base 含 /v1
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      final result = await _proxyRequest(port, 'GET', '/proxy/v1/models');
+      expect(result.status, 200);
+      expect(upstream.requests.single.path, '/v1/models',
+          reason: '/v1 来自请求 path（不重复拼接 base 自身 path 段）');
+      await server.stop();
+    });
+
+    test('目标解析：base 无 path 段（netloc-only）→ 请求 path 原样追加', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}', // 无路径
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      await _proxyRequest(port, 'GET', '/proxy/v1/models');
+      expect(upstream.requests.single.path, '/v1/models');
+      await server.stop();
+    });
+
+    test('任意 method 转发（GET/PUT/PATCH/DELETE/OPTIONS/HEAD）到达上游同一目标', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1',
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      for (final method in ['GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']) {
+        final result = await _proxyRequest(port, method, '/proxy/v1/resource',
+          headers: const {'access-control-request-method': 'POST'},
+        );
+        expect(result.status, 200, reason: '$method 透传且上游响应回传');
+        if (method == 'HEAD') {
+          expect(result.body, isEmpty, reason: 'HEAD 无响应体');
+        }
+      }
+      expect(upstream.requests.map((r) => r.method), [
+        'GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD',
+      ], reason: '方法逐一到达上游');
+      expect(upstream.requests.first.path, '/v1/resource');
+      await server.stop();
+    });
+
+    test('上游非 2xx 状态码透传（404）且响应体回传', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      upstream.statusCode = HttpStatus.notFound;
+      upstream.bodyProvider = () => utf8.encode('{"error":"no such model"}');
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1',
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      final result = await _proxyRequest(port, 'GET', '/proxy/v1/models');
+      expect(result.status, 404, reason: '上游状态码透传');
+      expect(result.text, '{"error":"no such model"}');
+      await server.stop();
+    });
+
+    test('上游连接失败 → 502 明确状态码（转发失败语义），不挂连接', () async {
+      // 先占一个端口再释放 → 保证连接被拒（而非撞上其他服务）。
+      final probe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final deadPort = probe.port;
+      await probe.close();
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:$deadPort/v1',
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      final result = await _proxyRequest(port, 'GET', '/proxy/v1/models');
+      expect(result.status, 502, reason: '上游不可达 → Bad Gateway 明确状态码');
+      expect(result.text, contains('502'), reason: '文案可读');
+      await server.stop();
+    });
+
+    test('裸 /proxy（无子路径）→ 转发到上游根路径，不挂连接不崩', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1',
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      for (final path in ['/proxy', '/proxy/']) {
+        final result = await _proxyRequest(port, 'GET', path);
+        expect(result.status, 200, reason: '$path 转发到上游根路径');
+        expect(upstream.requests.last.path, '/');
+      }
+      await server.stop();
+    });
+
+    test('并发 6 个 /proxy 请求全部正确转发（独立 HttpClient 无共享状态竞态）', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1',
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      final results = await Future.wait(<Future<_ProxyResult>>[
+        for (var i = 0; i < 6; i++)
+          _proxyRequest(port, i.isEven ? 'GET' : 'POST',
+              '/proxy/v1/chat/completions',
+              body: i.isEven ? null : utf8.encode('{"n":$i}')),
+      ]);
+      for (final r in results) {
+        expect(r.status, 200);
+      }
+      expect(upstream.requests.length, 6);
+      expect(
+        upstream.requests.map((r) => r.method).where((m) => m == 'POST').length,
+        3,
+      );
+      await server.stop();
+    });
+  });
+
+  group('SimulatorServer — /proxy 反代 · SSE 流式透传', () {
+    test('SSE 分块流逐字节回传：状态码 + 头透传（content-length 除外），'
+        '响应体字节保真', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      upstream.respHeaders = {'x-custom-resp': 'hello-upstream'};
+      upstream.sseChunks = [
+        'data: {"choices":[{"delta":{"content":"你"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"好"}}]}\n\n',
+        'data: [DONE]\n\n',
+      ];
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1',
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      final result = await _proxyRequest(port, 'POST', '/proxy/v1/chat/completions',
+        body: utf8.encode('{"stream":true}'),
+      );
+      expect(result.status, 200);
+      expect(result.headers['content-type'], 'text/event-stream',
+          reason: '响应 content-type 透传');
+      expect(result.headers['x-custom-resp'], 'hello-upstream',
+          reason: '自定义响应头透传');
+      expect(result.headers['content-length'], isNull,
+          reason: '响应 content-length 剥除（流式补帧）');
+      expect(result.text,
+          'data: {"choices":[{"delta":{"content":"你"}}]}\n\n'
+          'data: {"choices":[{"delta":{"content":"好"}}]}\n\n'
+          'data: [DONE]\n\n',
+          reason: 'SSE 帧逐字节透传（含 UTF-8 中文）');
+      await server.stop();
+    });
+
+    test('流式透传时序：首字节早于上游全部帧完成（逐块冲洗，非整响应缓冲）', () async {
+      final upstream = await _FakeUpstream.start();
+      addTearDown(upstream.close);
+      upstream.sseChunks = ['A', 'B', 'C'];
+      upstream.sseChunkDelay = const Duration(milliseconds: 350);
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${upstream.port}/v1',
+          apiKey: 'k',
+        )),
+      );
+      final port = await server.start(port: 0);
+
+      final client = HttpClient();
+      final sw = Stopwatch()..start();
+      final req = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$port/proxy/v1/chat/completions'),
+      );
+      req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      req.add(utf8.encode('{"stream":true}'));
+      final resp = await req.close();
+      Duration? firstChunkAt;
+      final received = <int>[];
+      await for (final chunk in resp) {
+        firstChunkAt ??= sw.elapsed;
+        received.addAll(chunk);
+      }
+      client.close(force: true);
+
+      // 上游总时长 ≈ 3×350ms ≈ 1050ms；真流式透传首字节应在 700ms 内到达
+      // （整响应缓冲则必须等上游 close 后才发首字节）。
+      expect(firstChunkAt, isNotNull, reason: '响应流到达');
+      expect(firstChunkAt!.inMilliseconds, lessThan(700),
+          reason: '首字节逐块冲洗回传（缓冲实现必在 ~1050ms 后才发首字节）');
+      expect(utf8.decode(received), 'ABC', reason: '字节保真');
+      await server.stop();
     });
   });
 }
