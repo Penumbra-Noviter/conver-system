@@ -961,5 +961,38 @@ void main() {
       expect(utf8.decode(received), 'ABC', reason: '字节保真');
       await server.stop();
     });
+
+    test('上游接受连接但不响应（stall）：连接超时（注入短值）→ 502 不挂连接', () async {
+      // 上游裸监听：接受连接并读完请求体，但永不响应（模拟上游挂死——
+      // _FakeUpstream 常路径必响应，无法表达 stall，故单独绑一个）。
+      final stall = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => stall.close(force: true));
+      stall.listen((HttpRequest req) {
+        req.drain<void>().ignore();
+      });
+
+      final simDir = await makeSimDir();
+      final server = SimulatorServer(
+        simDir,
+        proxyConfigReader: _readerFor(ProxyRouteConfig(
+          endpoint: 'http://127.0.0.1:${stall.port}/v1',
+          apiKey: 'k',
+        )),
+        proxyConnectTimeout: const Duration(milliseconds: 300),
+      );
+      final port = await server.start(port: 0);
+
+      final sw = Stopwatch()..start();
+      final result =
+          await _proxyRequest(port, 'POST', '/proxy/v1/chat/completions',
+              body: utf8.encode('{"stream":true}'));
+      sw.stop();
+
+      expect(sw.elapsedMilliseconds, lessThan(2000),
+          reason: 'connectionTimeout 生效：stall 在 ~300ms 超时，绝不无限挂起');
+      expect(result.status, HttpStatus.badGateway,
+          reason: '上游超时 → 502（明确状态码，不挂连接）');
+      await server.stop();
+    });
   });
 }

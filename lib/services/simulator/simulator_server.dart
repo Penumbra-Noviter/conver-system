@@ -101,14 +101,22 @@ class SimulatorServer {
   ///
   /// T3：可选 [proxyConfigReader] 注入 /proxy 反代凭据 seam（未注入 → /proxy
   /// 一律 503 防御）；[SimulatorServerFactory] typedef 的单参签名保持兼容，
-  /// 控制器零改动。
+  /// 控制器零改动。可选 [proxyConnectTimeout] 覆盖反代上游连接超时
+  /// （缺省 [defaultProxyConnectTimeout] = 60s，spec D3 对齐桌面 httpx
+  /// timeout=60；测试注入短值验证 stall 场景）。
   SimulatorServer(
     this._simDir, {
     ProxyConfigReader? proxyConfigReader,
-  }) : _proxyConfigReader = proxyConfigReader;
+    Duration proxyConnectTimeout = defaultProxyConnectTimeout,
+  })  : _proxyConfigReader = proxyConfigReader,
+        _proxyConnectTimeout = proxyConnectTimeout;
+
+  /// 反代上游连接超时缺省值（spec D3：对齐桌面 httpx timeout=60）。
+  static const Duration defaultProxyConnectTimeout = Duration(seconds: 60);
 
   final Directory _simDir;
   final ProxyConfigReader? _proxyConfigReader;
+  final Duration _proxyConnectTimeout;
 
   HttpServer? _httpServer;
 
@@ -242,7 +250,11 @@ class SimulatorServer {
       return;
     }
 
-    final client = HttpClient()..autoUncompress = false;
+    // 连接超时（spec D3：缺省 60s 对齐桌面 httpx timeout=60；测试可注入短值）；
+    // autoUncompress 关闭保持字节保真（见下 accept-encoding 剥除注释）。
+    final client = HttpClient()
+      ..autoUncompress = false
+      ..connectionTimeout = _proxyConnectTimeout;
     try {
       final outReq = await client.openUrl(req.method, Uri.parse(target));
       _copyRequestHeaders(req, outReq);
@@ -258,8 +270,13 @@ class SimulatorServer {
         );
       }
       // 请求体逐字节透传（addStream）后 close 得上游响应（dart:io 流式先例）。
+      // 全相位超时（spec D3 对齐桌面 httpx timeout=60）：connectionTimeout
+      // 只管连接建立；上游「接受连接但不返回响应头 / 响应体 stall」须由
+      // close() 与响应流的 timeout 兜底（桌面 httpx 全局 timeout 语义），
+      // 否则请求无限挂起。
       await outReq.addStream(req);
-      final outResp = await outReq.close();
+      final outResp =
+          await outReq.close().timeout(_proxyConnectTimeout);
 
       try {
         resp.statusCode = outResp.statusCode;
@@ -276,7 +293,8 @@ class SimulatorServer {
           resp.headers.add(name, values);
         });
         // SSE 兼容：逐块回写 + 逐块 flush；客户端提前断开 → 静默关闭。
-        await for (final chunk in outResp) {
+        // 响应体读取同样受 [_proxyConnectTimeout] 约束（数据间静默 stall 兜底）。
+        await for (final chunk in outResp.timeout(_proxyConnectTimeout)) {
           resp.add(chunk);
           await resp.flush();
         }
