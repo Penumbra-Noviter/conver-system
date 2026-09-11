@@ -206,6 +206,20 @@
 - **期末 code-review 四轴**：Spec 0 偏差（「异步任务 submit+poll」明确留 CG-3 image_tasks，CG-1 只做直接 generate——spec 原文本就两可选）/ Standards 0 硬违例 / **Falsify 1 flaky 实证修复**（见上）+ 防御矩阵全锁（畸形/超时/连接/缺 Key/越界/未知 Provider）/ Architecture 0 发现（镜像 llm 包结构，协议表面小）。
 - **非阻断落债**：无。
 
+## CG-2 CG 资产库 + 画廊（2026-09-11 — AI风月对标五批工单 CG 第二张，承接 CG-1 Provider）
+
+- **来源**：承接 CG-1（图片 Provider 就绪）；资产库承载生成结果（spec §CG-2）。
+- **数据模型**：`cg_images` 新表（`backend/app/models/cg_image.py`，10 列与 spec 字段规格逐字一致）——生命周期由 **DB FK 落实**：character_id → CASCADE（删作品级联删图）、conversation_id / message_id → SET NULL（**会话删除后图保留**，对齐对标站语义）；url = 本地文件路径或 URL（CG-1 ImageResult.url 契约）。
+- **服务**（`services/gallery.py` 深模块，`__all__` 4 函数）：
+  - `add_cg`：入库 + **幂等去重**（同作品同 url 返回既有行，不覆盖首条 unlock_hint）；归属守卫（未知角色/会话 404、消息不属于该会话 404——不得错挂归属）。
+  - `list_cg`：角色隔离 + group_name / unlocked_only 过滤 + **id 降序**（新品在前，画廊最新产出优先，确定性）。
+  - `unlock_cg`：解锁 + **幂等**（已解锁再调无副作用）；未知 → CgImageNotFoundError（404 族登记）。
+  - `pick_cg_by_weight`：加权抽选（对齐对标站「概率模式——触发时从加权列表挑一张」）——**weight 来源拍板**：spec 表无权重列，函数按候选 `weight` 属性 duck-typed（无 → 1，weight=0 永不抽中），**按 id 升序规范化排序后掷点**（同种子可复现 + 不随输入顺序——WL-2「RNG 消耗序列跟随迭代序」同型 Falsify 教训直接复用）；作者端权重赋值留 CG-3/编辑器。
+- **schema 同步（快照即契约）**：schema.sql 补 cg_images DDL + 双索引（**逐字取 ORM create_all 输出**——漂移锁语句级对比，列序/FK 语义错位即红）；test_migrate_data 表集合 +cg_images；models/__init__ 清单 +CgImage（6 实体）。
+- **验证链**：契约锁 24 例全绿（实现先行——行为锁仍具证伪力：去重/幂等/分布/SET NULL 任一破坏即红）| pytest 1005+1skip→1029+1skip（+24，零回归）| 前端/cargo 零改动 | doc_sync 零漂移（§3 树 + §4.21.9 + §5.1 手补；§4 标题须带 AUTO:lines 标记——doc_sync 检查项）| pool_cleanup_check 通过。
+- **期末 code-review 四轴**：Spec 0 偏差（加权来源拍板记录见上）/ Standards 0 硬违例 / **Falsify 0 HIGH**（404 守卫全锁 + 加权全边界 + 级联全语义 PRAGMA ON 实证）+ Architecture 0 发现（gallery 协议表面 4 函数；级联零手写服务层）。
+- **非阻断落债**：无。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

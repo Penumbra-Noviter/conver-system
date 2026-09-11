@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **4 项待办**（2 批：CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **3 项待办**（2 批：CG 图像沉淀 / MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -43,7 +43,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| CG-2 | CG 资产库 + 画廊（cg_images 新表 + 加权抽取 + 解锁） | ⬜ 待办 | spec §CG-2；入库去重 + 解锁幂等 + 加权分布可复现 + 会话删除图保留 |
 | CG-3 | 对话内出图 + 剧情回顾时间线 | ⬜ 待办 | spec §CG-3；三态渲染 + 失败不破坏对话 + 时间线顺序 |
 
 ### 批次 MD — Mod 挂载层
@@ -68,6 +67,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### CG 批次 CG-2（2026-09-11 — CG 资产库 + 画廊，CG 批第二张）
+
+> 来源：AI风月对标调研五批工单（CG 图像沉淀第二张）；生命周期语义对齐对标站「会话删除后图保留」，规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §CG-2。叙述详见 DEV_LOG〈CG-2 CG 资产库 + 画廊（2026-09-11）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| CG-2 | CG 资产库 + 画廊（cg_images 新表 + 加权抽取 + 解锁） | 2026-09-11 | 4b2d16d |
+
+**验证链：** 后端 pytest 1005+1skip→1029+1skip（+24：test_gallery——入库默认/显式字段、去重（同作品同 url 返回既有不覆盖、异作品不误去重）、404 守卫（未知角色/会话/消息跨会话）、列表角色隔离/分组/解锁过滤/id 降序、解锁幂等、加权抽选（同种子顺序无关可复现/weight=0 永不抽中/总权重 0 与空候选 None/2000 轮分布显著/单候选恒中）、SET NULL（删会话图留 conversation/message 置 NULL）、CASCADE（删作品图清））| cg_images 新表（CgImage 模型 + schema.sql DDL 与索引逐字契约 + test_migrate_data 表集合 +7 实体 models 清单）| pick_cg_by_weight 规范化排序（WL-2 同型教训）| 全量后端绿零回归（前端/cargo 零改动）| 期末四轴：Spec 0 偏差（加权来源拍板：weight 属性 duck-typed 缺省 1——spec 表无权重列，加权机制 + 可复现契约锁定，作者端权重赋值留 CG-3/编辑器）+ Standards 0 硬违例 / Falsify 0 HIGH（防御矩阵全锁）| doc_sync 零漂移
+**非阻断落债：** 无
+
+---
 
 ### CG 批次 CG-1（2026-09-11 — text2img Provider 抽象，CG 批首张）
 
