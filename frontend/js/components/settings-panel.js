@@ -231,6 +231,11 @@ export async function loadSettings() {
             updateThemeToggleIcon(s.theme_mode || 'dark');
         }
         if (s.user_name) $('#setting-user-name').value = s.user_name;
+        // WL-5 记忆宫殿开关（'1'/'true' → 勾选）
+        const memoryPalace = $('#setting-memory-palace');
+        if (memoryPalace) {
+            memoryPalace.checked = ['1', 'true', 'yes'].includes(String(s.memory_palace_enabled || '').toLowerCase());
+        }
     } catch (err) {
         console.error('加载设置失败:', err);
     }
@@ -393,6 +398,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
             sliding_window_rounds: slidingWindowInput.value,
             theme_mode: themeSelect.value,
             user_name: userNameInput.value,
+            // WL-5 记忆宫殿开关
+            memory_palace_enabled: ($('#setting-memory-palace')?.checked) ? '1' : '0',
         };
 
         const btn = $('#btn-save-settings');

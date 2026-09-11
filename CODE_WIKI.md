@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2184<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->902<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1212<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2197<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->915<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1212<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -126,6 +126,7 @@ conver system/
 │   │       ├── setting.py          ← 设置服务（凭证槽位/滑窗轮数）
 │   │       ├── lorebook.py         ← 世界书条目仓库层（WL-1）
 │   │       ├── lorebook_engine.py  ← 世界书激活引擎纯函数（WL-2，零 DB 依赖）
+│   │       ├── memory_palace.py    ← 记忆宫殿（WL-5：LLM 归纳 → auto 条目，失败隔离）
 │   │       ├── text_utils.py       ← 脏数据容错工具（as_str_list，F-93 收敛单点）
 │   │       └── llm/                ← LLM 接入层（深模块）
 │   │           ├── __init__.py     ← 包级导出零 SDK 副作用契约
@@ -139,7 +140,7 @@ conver system/
 │   ├── run_backend.py              ← 独立启动脚本（日志/数据目录/端口）
 │   ├── scripts/
 │   │   └── migrate_data.py         ← 数据目录迁移工具（校验/标记/幂等）
-│   ├── tests/                      ← pytest（31 个文件，见 §5.1）
+│   ├── tests/                      ← pytest（32 个文件，见 §5.1）
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   ├── conver_backend.spec         ← PyInstaller 打包配置
@@ -403,7 +404,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~451 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~506 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -526,13 +527,24 @@ conver system/
 | <!--AUTO:sig:backend/app/services/text_utils.py:as_str_list-->`as_str_list(value)`<!--/AUTO--> | 脏值 → str 化列表（None/空 → []；list → 逐元素 str；其它 → 单值包裹） |
 | <!--AUTO:sig:backend/app/services/text_utils.py:role_str-->`role_str(value)`<!--/AUTO--> | 消息角色归一（带 .value 枚举解包为值；纯字符串原样；None → "None" 兜底） |
 
+### 4.21.8 `backend/app/services/memory_palace.py` — 记忆宫殿（WL-5）（<!--AUTO:lines:backend/app/services/memory_palace.py-->~180 行<!--/AUTO-->）
+
+**职责**：LLM 自动归纳对话要点 → 世界书 auto 条目（source='auto'，position='world'，depth=20 固定）。失败隔离双保险：summarize_turn 内部吞 LLM/JSON 解析失败（记日志返回 None）+ chat.maybe_memory_palace 外层兜底异常，记忆增强绝不阻断对话主流程。触发：complete_chat / stream_reply 完整回合落库后，开关（settings `memory_palace_enabled`）+ 阈值（每 N 轮 / 字符数）达标即归纳。
+
+| 函数 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/services/memory_palace.py:should_summarize-->`should_summarize(message_count, char_count, *, every_rounds, char_threshold)`<!--/AUTO--> | 阈值判定（每 2N 条消息 或 字符数达标） |
+| <!--AUTO:sig:backend/app/services/memory_palace.py:summarize_turn-->`summarize_turn(history, *, provider, model=None, user_name='User', char_name='Character')`<!--/AUTO--> | 归纳 → MemoryDraft（剥围栏 + 严格 JSON；失败降级 None 不抛） |
+| <!--AUTO:sig:backend/app/services/memory_palace.py:persist_drafts-->`persist_drafts(db, character_id, drafts)`<!--/AUTO--> | 落库 auto 条目（keys 空跳过；同 keys+content 去重；返回计数） |
+| `MemoryDraft` / `MEMORY_DRAFT_SCHEMA` | 归纳草案容器 / 输出 JSON schema（title/keys/content 单源） |
+
 ### 4.22 `backend/app/services/model_data.py` — Provider 清单单源（<!--AUTO:lines:backend/app/services/model_data.py-->~127 行<!--/AUTO-->）
 
 **职责**：`AVAILABLE_MODELS` Provider/模型清单唯一声明源（ARC10 T-14）——factory 注册与 setting API map 自动派生；`_OPENAI_PROTOCOL_MODELS` 门控单源（TD-66）。
 
 > 无公开函数（数据表 + 派生逻辑）。
 
-### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~172 行<!--/AUTO-->）
+### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~188 行<!--/AUTO-->）
 
 **职责**：DB settings 表读写——凭证槽位（按 Provider 存取 Key/base_url）、滑窗轮数、用户名、默认模型；凭证通用解析（填任一 key 全局可用）。
 
@@ -805,7 +817,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/components/model-selector.js:showModelSelector-->`showModelSelector(characterName, options = {})`<!--/AUTO--> | 打开模型选择（options：`{ preselected, title }`；缺省创建对话语义） |
 
-### 4.44 `frontend/js/components/settings-panel.js` — 设置面板（<!--AUTO:lines:frontend/js/components/settings-panel.js-->~424 行<!--/AUTO-->）
+### 4.44 `frontend/js/components/settings-panel.js` — 设置面板（<!--AUTO:lines:frontend/js/components/settings-panel.js-->~431 行<!--/AUTO-->）
 
 **职责**：设置面板——Provider 下拉初始化、模型联动、凭证测试（testApiKeys）、主题切换、侧栏开关、清空会话接线。
 
@@ -1340,6 +1352,7 @@ conver system/
 | `backend/tests/test_lorebook_routes.py` | <!--AUTO:tests:backend/tests/test_lorebook_routes.py-->5<!--/AUTO--> | 世界书 CRUD 路由契约锁（WL-4：列表/创建/部分更新/删除/守卫 404/校验 422） |
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
+| `backend/tests/test_memory_palace.py` | <!--AUTO:tests:backend/tests/test_memory_palace.py-->13<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
@@ -1452,9 +1465,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2184<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2197<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->902<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->915<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1212<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

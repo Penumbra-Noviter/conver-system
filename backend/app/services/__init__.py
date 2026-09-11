@@ -27,6 +27,7 @@ __all__ = [
     "llm",
     "lorebook",
     "lorebook_engine",
+    "memory_palace",
     "message",
     "model_data",
     "provider_registry",

@@ -103,6 +103,21 @@
 
 ---
 
+## WL-5 记忆宫殿 AI 归纳层（2026-09-10 — AI风月对标五批工单 WL 收官，承接 WL-4 编辑器）
+
+- **来源**：承接 WL-4（世界书编辑器就绪，可管理 auto 条目）；本票落地「AI 自动写条目」层（spec §WL-5），引擎（lorebook_engine / lorebook 仓库）**零改动**——调用方形态。WL 批 5 张至此全部完成。
+- **交付**：
+  - `services/memory_palace.py` 深模块（`__all__` 5 名：MemoryDraft / MEMORY_DRAFT_SCHEMA / should_summarize / summarize_turn / persist_drafts）。`MEMORY_DRAFT_SCHEMA`（title/keys/content）是 prompt 组装与解析校验的单一来源；`summarize_turn` 剥 ```json 围栏 + 严格 json.loads + 字段校验（title/content 为 str、keys 为非空 str 列表），LLM 异常 / 非法 JSON / 缺字段一律降级返回 None + 记日志（**不向上抛**）。
+  - `persist_drafts`：keys 空跳过；同 (keys, content) 指纹去重（frozenset 集）；auto 条目固定 position='world'、depth=20、source='auto'。
+  - **chat 集成**：`complete_chat` / `stream_reply` 完整回合落库后调 `maybe_memory_palace`（开关 settings `memory_palace_enabled` + 阈值 `every_rounds`/`char_threshold` 达标 → 归纳 → 落库）；**异常隔离双保险**——summarize_turn 内部吞失败 + maybe_memory_palace 外层 try/except 兜底意外，记忆增强绝不破坏对话主流程。
+  - settings 三键入 ALLOWED_KEYS + setting_service 三 helper；前端设置面板「对话」组加「记忆增强」开关（index.html + settings-panel load/save 接线）。
+- **关键决策**：开关为全局（settings）而非会话级（spec 允许二选一）；「自动总结」互斥项按 spec 后置不实现（避免双重压缩）；summarize 温度 0.3 促稳定 JSON。
+- **过程遥测**：集成测试初版断言消息数 3（误算 greeting，角色 first_mes="" 实为 2 条）→ 修正；脚本化 provider（按调用序返回聊天回复 → 归纳 JSON）验证两阶段调用。
+- **验证链**：先红后绿（13 用例）| pytest 901+1skip→914+1skip（+13，零回归）| Vitest 1212 零改动（前端仅设置开关接线）| 双端全绿。
+- **非阻断落债**：无。
+
+---
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

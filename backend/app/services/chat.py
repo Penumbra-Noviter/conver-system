@@ -31,6 +31,7 @@ from backend.app.models.message import Message, Role
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
 from backend.app.services import lorebook as lorebook_service
+from backend.app.services import memory_palace as memory_palace_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
 from backend.app.services.error_mapping import domain_error_response, llm_error_response
@@ -216,6 +217,9 @@ async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
     saved = message_service.create_message(
         db, request.conversation_id, Role.ASSISTANT, reply_text
     )
+
+    # WL-5 记忆宫殿：回合完成后按阈值触发自动归纳（失败绝不阻断主流程）
+    await maybe_memory_palace(db, request.conversation_id, ctx.provider, ctx.conversation.model_name)
 
     return ChatResponse(
         reply=reply_text,
@@ -444,6 +448,10 @@ async def stream_reply(
             )
             saved = True
             message_id = saved_msg.id
+            # WL-5 记忆宫殿：完整回合落库后按阈值触发归纳（失败不阻断）
+            await maybe_memory_palace(
+                db, conversation_id, ctx.provider, ctx.conversation.model_name
+            )
         yield {"type": "done", "message_id": message_id}
 
     except ClientDisconnect:
@@ -533,3 +541,55 @@ def _lorebook_world_injection(
 def _msg_role(msg: object) -> str:
     """消息 → 角色字符串（委托 text_utils.role_str，F-94 收敛）"""
     return role_str(getattr(msg, "role", ""))
+
+
+async def maybe_memory_palace(
+    db: Session,
+    conversation_id: int,
+    provider: BaseLLM,
+    model: str | None,
+) -> None:
+    """记忆宫殿触发（WL-5）：开关开 + 阈值达标 → 归纳 → 落库；任何失败不阻断
+
+    complete_chat / stream_reply 在完整回合落库后调用。异常隔离策略：
+    summarize_turn 内部已吞 LLM/JSON 失败（返回 None）；本函数再包一层
+    try/except 兜底意外（DB/计数异常等），保证记忆增强绝不破坏对话主流程。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        provider: 本回合已解析的 LLM Provider（复用，不重复解析）
+        model: 模型名（透传归纳调用）
+    """
+    try:
+        if not setting_service.memory_palace_enabled(db):
+            return
+        conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        if conv is None:
+            return
+        messages = message_service.get_messages(db, conversation_id)
+        if not messages:
+            return
+        message_count = len(messages)
+        char_count = sum(len(m.content or "") for m in messages)
+        if not memory_palace_service.should_summarize(
+            message_count,
+            char_count,
+            every_rounds=setting_service.memory_palace_every_rounds(db),
+            char_threshold=setting_service.memory_palace_char_threshold(db),
+        ):
+            return
+        character = db.query(Character).filter(Character.id == conv.character_id).first()
+        if character is None:
+            return
+        draft = await memory_palace_service.summarize_turn(
+            messages,
+            provider=provider,
+            model=model,
+            user_name=setting_service.user_name(db),
+            char_name=character.name,
+        )
+        if draft is not None:
+            memory_palace_service.persist_drafts(db, character.id, [draft])
+    except Exception:  # noqa: BLE001 — 异常隔离兜底（记忆增强失败绝不影响对话）
+        logger.exception("记忆宫殿触发失败（已隔离，不影响对话主流程）")

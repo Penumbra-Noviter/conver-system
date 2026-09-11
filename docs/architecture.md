@@ -93,6 +93,7 @@ conver-system/
 │   │       ├── setting.py         # 运行时设置读写（白名单 + 回退链 + 整型容错）
 │   │       ├── lorebook.py        # 世界书条目仓库层（WL-1：存取 + character_book 解析）
 │   │       ├── lorebook_engine.py # 世界书激活引擎纯函数（WL-2：命中/概率/互斥组/注入块分组，零 DB）
+│   │       ├── memory_palace.py  # 记忆宫殿（WL-5：LLM 归纳 → 世界书 auto 条目，失败隔离）
 │   │       ├── text_utils.py      # 脏数据容错工具（as_str_list 共享单点，F-93 收敛）
 │   │       ├── simulator_import.py # 模拟器导入族（T-02：文件名净化 / SHA-256 去重 / cfg 探测 / 静态粗筛）
 │   │       ├── simulator_manifest.py # manifest.json 读写工具（首启种子后幂等标记）

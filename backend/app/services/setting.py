@@ -38,6 +38,9 @@ __all__ = [
     "default_provider",
     "default_model",
     "credentials",
+    "memory_palace_enabled",
+    "memory_palace_every_rounds",
+    "memory_palace_char_threshold",
 ]
 
 # 允许前端读写的配置键白名单
@@ -52,6 +55,10 @@ ALLOWED_KEYS = {
     "sliding_window_rounds",
     "theme_mode",
     "user_name",
+    # WL-5 记忆宫殿（对话回合后自动归纳 → 世界书 auto 条目）
+    "memory_palace_enabled",
+    "memory_palace_every_rounds",
+    "memory_palace_char_threshold",
 }
 
 # Provider 协议元数据（协议映射 / openai 协议族模型集）单一来源位于
@@ -214,3 +221,18 @@ def credentials(db: Session) -> dict[str, str]:
         model = ""
 
     return {"key": key, "endpoint": endpoint, "model": model, "protocol": protocol}
+
+
+def memory_palace_enabled(db: Session) -> bool:
+    """记忆宫殿开关（默认关；'1'/'true' → 开）"""
+    return get_value(db, "memory_palace_enabled", "").lower() in ("1", "true", "yes")
+
+
+def memory_palace_every_rounds(db: Session) -> int:
+    """记忆归纳轮数间隔（默认 1 = 每回合）"""
+    return get_int(db, "memory_palace_every_rounds", default=1)
+
+
+def memory_palace_char_threshold(db: Session) -> int:
+    """记忆字符数阈值（参考对标站 10000）"""
+    return get_int(db, "memory_palace_char_threshold", default=10000)
