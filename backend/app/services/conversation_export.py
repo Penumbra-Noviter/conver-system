@@ -23,6 +23,7 @@ from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.message import Message, MessageSwipe
 from backend.app.schemas.conversation import ConversationExportCharacter
+from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
 from backend.app.services.llm.prompt import apply_template_vars
 
@@ -65,13 +66,7 @@ def export_conversation_json(db: Session, conversation_id: int) -> dict | None:
     messages_data = []
     for msg in messages:
         # MS-1：导出候选集（index 升序）与激活序号——记忆随存档走，往返一致
-        swipes = [
-            s.content
-            for s in db.query(MessageSwipe)
-            .filter(MessageSwipe.message_id == msg.id)
-            .order_by(MessageSwipe.index.asc())
-            .all()
-        ]
+        swipes = [s.content for s in message_service.list_swipes(db, msg.id)]
         messages_data.append({
             "id": msg.id,
             "role": msg.role.value,

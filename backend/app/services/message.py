@@ -297,21 +297,23 @@ def add_swipe(
         新候选序号（index；首次追加返回 1，候选 0 为原始内容）
     """
     msg = _require_message(db, message_id)
-    count = (
-        db.query(func.count(MessageSwipe.id))
+    max_index = (
+        db.query(func.max(MessageSwipe.index))
         .filter(MessageSwipe.message_id == message_id)
         .scalar()
-        or 0
     )
-    if count == 0:
+    if max_index is None:
         # 播种：原始内容 = 候选 0（受保护，delete_swipe 拒删）
         db.add(MessageSwipe(message_id=message_id, index=0, content=msg.content))
-        count = 1
-    db.add(MessageSwipe(message_id=message_id, index=count, content=content))
+        max_index = 0
+    next_index = max_index + 1  # max+1：删中间候选留空档后不碰撞（Falsify HIGH 修复）
+    db.add(MessageSwipe(message_id=message_id, index=next_index, content=content))
     if make_active:
-        msg.active_swipe_index = count
+        # content 跟随激活候选（LLM 上下文/前端渲染读 msg.content = 当前候选）
+        msg.content = content
+        msg.active_swipe_index = next_index
     db.commit()
-    return count
+    return next_index
 
 
 def list_swipes(db: Session, message_id: int) -> list[MessageSwipe]:
@@ -343,6 +345,12 @@ def switch_swipe(db: Session, message_id: int, index: int) -> Message:
     )
     if exists is None:
         raise SwipeIndexError(f"候选序号不存在: {index}")
+    swipe = (
+        db.query(MessageSwipe)
+        .filter(MessageSwipe.message_id == message_id, MessageSwipe.index == index)
+        .first()
+    )
+    msg.content = swipe.content  # content 跟随激活候选
     msg.active_swipe_index = index
     db.commit()
     db.refresh(msg)
@@ -351,7 +359,7 @@ def switch_swipe(db: Session, message_id: int, index: int) -> Message:
 
 def delete_swipe(db: Session, message_id: int, index: int) -> Message:
     """删除候选；删除当前激活候选时回落到相邻候选（小于被删 index 的最大现存，
-    否则大于的最小现存）；候选清空 → SwipeIndexError 拒绝（保留消息本体）
+    否则大于的最小现存）；候选 0 = 消息原始内容，受保护拒删（永不出现候选清空态）
 
     Args:
         db: 数据库会话
@@ -381,9 +389,15 @@ def delete_swipe(db: Session, message_id: int, index: int) -> Message:
         .all()
     ]
     if msg.active_swipe_index == index:
-        # 回落到相邻候选：小于被删 index 的最大现存，否则大于的最小现存
-        lower = [i for i in remaining if i < index]
-        msg.active_swipe_index = lower[-1] if lower else remaining[0]
+        # 回落到相邻候选：小于被删 index 的最大现存，否则大于的最小现存；
+        # content 同步跟随回落候选（候选 0 = 原始内容永远在，无「清空」态）
+        fallback = (lower[-1] if (lower := [i for i in remaining if i < index]) else remaining[0])
+        msg.active_swipe_index = fallback
+        msg.content = (
+            db.query(MessageSwipe.content)
+            .filter(MessageSwipe.message_id == message_id, MessageSwipe.index == fallback)
+            .scalar()
+        )
     db.commit()
     db.refresh(msg)
     return msg

@@ -59,7 +59,21 @@ def test_add_swipe_increments_index(db_session: Session) -> None:
     assert swipes[0].content == "原始回复"  # 候选 0 = 原始内容（播种）
     db_session.refresh(msg)
     assert msg.active_swipe_index == 1  # 仅第一个 make_active 生效
+    assert msg.content == "候选一"  # content 跟随激活候选（Falsify 修复锁）
     assert swipes[2].content == "候选二"
+
+
+def test_add_swipe_after_middle_delete_no_collision(db_session: Session) -> None:
+    """删中间候选留空档后重新 add：序号 = max(index)+1 不碰撞（Falsify HIGH 修复锁）"""
+    _, _, msg = _setup(db_session)
+    message_service.add_swipe(db_session, msg.id, "候选一")
+    message_service.add_swipe(db_session, msg.id, "候选二")
+    message_service.add_swipe(db_session, msg.id, "候选三")
+    message_service.delete_swipe(db_session, msg.id, 2)  # 剩余 [0,1,3]
+
+    idx = message_service.add_swipe(db_session, msg.id, "候选四")
+    assert idx == 4  # max(0,1,3)+1，不碰撞现存 3
+    assert [s.index for s in message_service.list_swipes(db_session, msg.id)] == [0, 1, 3, 4]
 
 
 def test_add_swipe_content_index_unique(db_session: Session) -> None:
@@ -87,9 +101,11 @@ def test_switch_swipe_valid_and_out_of_range(db_session: Session) -> None:
 
     switched = message_service.switch_swipe(db_session, msg.id, 1)
     assert switched.active_swipe_index == 1
-    assert message_service.list_swipes(db_session, msg.id)[1].content == "候选一"
+    assert switched.content == "候选一"  # content 跟随激活
     # 切回原始候选 0
-    assert message_service.switch_swipe(db_session, msg.id, 0).active_swipe_index == 0
+    back = message_service.switch_swipe(db_session, msg.id, 0)
+    assert back.active_swipe_index == 0
+    assert back.content == "原始回复"
 
     with pytest.raises(SwipeIndexError):
         message_service.switch_swipe(db_session, msg.id, 99)
@@ -112,10 +128,11 @@ def test_delete_swipe_middle_and_active_fallback(db_session: Session) -> None:
     message_service.delete_swipe(db_session, msg.id, 2)
     assert [s.index for s in message_service.list_swipes(db_session, msg.id)] == [0, 1, 3]
 
-    # 删当前 active=3 → 回落到相邻较小候选（index=1）
+    # 删当前 active=3 → 回落到相邻较小候选（index=1），content 跟随回落
     message_service.delete_swipe(db_session, msg.id, 3)
     db_session.refresh(msg)
     assert msg.active_swipe_index == 1
+    assert msg.content == "候选一"  # 回落 index=1 → 候选一
 
 
 def test_delete_swipe_last_and_base_protected(db_session: Session) -> None:
@@ -172,7 +189,7 @@ def test_export_includes_swipes_and_active(db_session: Session) -> None:
     data = export_conversation_json(db_session, conv.id)
     assert data is not None
     exported_msg = next(m for m in data["messages"] if m["role"] == "assistant")
-    assert exported_msg["content"] == "原始回复"
+    assert exported_msg["content"] == "候选二"  # content = 激活候选
     assert exported_msg["active_swipe_index"] == 2
     assert exported_msg["swipes"] == ["原始回复", "候选一", "候选二", "候选三"]
 

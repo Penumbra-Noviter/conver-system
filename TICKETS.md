@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **10 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **9 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -33,7 +33,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| MS-1 | swipes 数据模型与服务（message_swipes 新表 + messages.active_swipe_index 自愈迁移） | ⬜ 待办 | spec §MS-1；序号唯一约束 + 切换越界异常 + 级联 + 导出往返 |
 | MS-2 | swipes 前端（候选计数 + 左右切换 + 失败回滚；重生成改为追加候选） | ⬜ 待办 | spec §MS-2；Vitest 用例；单选不渲染控制条 |
 | MS-3 | 「继续」生成（append 续写，不追加 user 消息） | ⬜ 待办 | spec §MS-3；条数不变 + 失败原内容零改动 |
 
@@ -74,6 +73,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### 消息操作批次 MS-1（2026-09-10 — swipes 数据模型与服务，MS 批首张）
+
+> 来源：AI风月对标调研五批工单（MS 消息操作首张）；重生成语义从「覆盖」升级为「追加候选」，字段规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §MS-1。叙述详见 DEV_LOG〈MS-1 swipes 数据模型与服务（2026-09-10）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| MS-1 | swipes 数据模型与服务（message_swipes 新表 + messages.active_swipe_index 自愈迁移） | 2026-09-10 | [见提交 2] |
+
+**验证链：** pytest 916+1skip→925+1skip（+9：test_message_swipes——播种序号自增/唯一约束/删中间后重加不碰撞/切换越界与 content 跟随/删中间与活跃回落/原始候选受保护/级联/导出含候选集与激活索引/自愈迁移幂等）| 重生成改 add_swipe：历史消息数不变（content 跟随激活候选可见，原内容存候选 0），test_regenerate 3 例按新语义修订锁定 | schema.sql 快照同步 + test_migrate_data 表集合更新 | conversation_export 消息键扩展 | 期末 code-review 三轴：Standards 0 硬违例 / Spec 1 实现偏差 + Falsify 1 HIGH + 3 项当场修复（add_swipe max+1 修碰撞 / content 跟随激活候选 / regenerate bump updated_at / delete 回落 content 同步；F-98 落债）| 全量双端绿零回归（Vitest 1213 零改动）| doc_sync 零漂移
+**非阻断落债：** 无
+
+---
 
 ### 世界书批次 WL-5（2026-09-10 — 记忆宫殿 AI 归纳层，WL 批收官）
 

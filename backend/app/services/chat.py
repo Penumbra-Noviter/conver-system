@@ -16,6 +16,7 @@ api/routes/chat.py 只保留 HTTP 映射（领域异常 → HTTPException）与 
 
 from __future__ import annotations
 
+import datetime
 import logging
 import random
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
@@ -361,8 +362,14 @@ async def regenerate_chat(
         )
         raise HTTPException(status_code=status_code, detail=message)
 
-    # 6. add_swipe 追加候选并置为激活（历史消息数不变；LLM 失败路径无副作用）
+    # 6. add_swipe 追加候选并置为激活（历史消息数不变；LLM 失败路径无副作用）。
+    #    content 跟随激活候选（旧前端/后续 LLM 上下文读到新回复）；bump 会话
+    #    updated_at（Falsify 修复：会话列表排序置顶）
     message_service.add_swipe(db, target.id, reply_text, make_active=True)
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if conv is not None:
+        conv.updated_at = datetime.datetime.now()
+    db.commit()
     db.refresh(target)
 
     return ChatResponse(

@@ -130,8 +130,13 @@
   - **重生成语义变更**：`regenerate_chat` 不再截断 DB——目标保留，`add_swipe` 追加候选并置激活（历史消息数不变）；上下文经 `assemble_chat_context(history_limit_message_id=触发源)` 截止于触发 user（模型不看到被替换的回复）；LLM 失败无截断可回滚（原内容与候选均保留）。`conversation_export` JSON 消息含 active_swipe_index/swipes（记忆随存档走）。
 - **关键决策**：候选 0 播种 vs 隐含基座——选播种（统一行模型，active 序号始终指向候选行，无 -1 特例）；原始候选保护使「候选清空拒绝」自然成立。
 - **过程遥测**：① 导出契约测试（test_conversation_export 精确键断言）需补两键；② PRAGMA table_info 列序（type/notnull/dflt 为 index 2/3/4）初版断言写错当场修正；③ test_regenerate 3 例按新语义修订（截断断言 → 候选断言）。
-- **验证链**：先红后绿（8 用例）| pytest 916+1skip→924+1skip（+8，零回归）| Vitest 1213 零改动（前端 MS-2 承接）| schema.sql/migrate 同步 | doc_sync 零漂移。
-- **非阻断落债**：无。
+- **验证链**：先红后绿（8 用例）| pytest 916+1skip→925+1skip（+9，零回归）| Vitest 1213 零改动（前端 MS-2 承接）| schema.sql/migrate 同步 | doc_sync 零漂移。
+- **期末 code-review 三轴（a95c2b2 后、修复前）**：Standards 0 硬违例（低危：add_swipe 序号碰撞被 Standards/Spec/Falsify 三轴独立复现 + 陈旧 docstring + delete_messages_from 退役候选）；Spec 1 实现偏差（同碰撞）；**Falsify 1 HIGH + 3 项当场修复**：
+  1. **add_swipe 序号碰撞（HIGH，三轴复现）**——序号用 `count` 而非 `max(index)+1`，删中间候选（[0,1,3]）后重加 → 与现存 3 碰撞 → 未处理 IntegrityError 500 → 改 `max+1`，契约锁 `test_add_swipe_after_middle_delete_no_collision`。
+  2. **content 不跟随激活候选（MEDIUM）**——regenerate/switch 只改 active_swipe_index，msg.content 恒为原始 → LLM 上下文与旧前端永远显示原始回复（重生成无可见效果）→ **content 跟随激活候选**（add_swipe make_active / switch_swipe / delete_swipe 回落均同步 msg.content），候选 0 保留原始；契约锁更新（switch 回切 content=原始、回落 content=回落候选、导出 content=激活候选）。
+  3. **regenerate 不 bump conv.updated_at（LOW）**——会话列表不再置顶 → regenerate 末尾更新 conv.updated_at。
+  4. 落债 F-98（delete_messages_from 退役候选，Speculative）。
+- **非阻断落债**：F-98（delete_messages_from 生产退役候选）。
 
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 

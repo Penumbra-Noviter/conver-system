@@ -4,7 +4,7 @@ T5 重生成后端端点 — 端到端 / 服务层 / 下层函数的契约测试
 覆盖（验收语义契约，按 T0 spike 定稿）：
     1. assemble_chat_context（prepare_chat 抽出的下层函数）：不插入 user、
        不自动插入 greeting；current_input 时追加输入、None 时（重生成）不追加
-    2. delete_messages_from：锚定 PK id 截断（target 及之后全部），不 commit
+    2. delete_messages_from：锚定 PK id 截断服务函数（MS-1 后仅测试消费，生产退役）
     3. create_message_no_commit：不 commit 的 create 辅助（事务原子性）
     4. regenerate_chat 编排：截断 → 组装（不插入 user）→ 生成 → 落库（单事务）；
        无幽灵重复 user；LLM 失败回滚截断
@@ -378,8 +378,8 @@ class TestRegenerateChatService:
         assert resp.reply == "新的回复"
         assert resp.conversation_id == conv.id
         assert isinstance(resp.message_id, int)
-        # MS-1 swipes：历史消息数不变（目标保留），新回复追加为候选并置激活
-        assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答", "第二轮问", "第二轮答"]
+        # MS-1 swipes：历史消息数不变；content 跟随激活候选（新回复可见），原内容存候选 0
+        assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答", "第二轮问", "新的回复"]
         from backend.app.services import message as message_service
         target = db_session.query(Message).filter(Message.id == resp.message_id).first()
         assert [s.content for s in message_service.list_swipes(db_session, target.id)] == ["第二轮答", "新的回复"]
@@ -390,7 +390,7 @@ class TestRegenerateChatService:
         ).count()
         assert user_count == 2
 
-    async def test_happy_path_with_message_id_truncates_all_after(
+    async def test_happy_path_with_message_id_appends_candidate(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """显式 message_id 指向非末条 assistant → 目标保留，新回复追加为其候选（MS-1）"""
@@ -408,8 +408,8 @@ class TestRegenerateChatService:
         resp = await chat_service.regenerate_chat(db_session, conv.id, message_id=target_id)
 
         assert resp.reply == "重写第一轮答"
-        # MS-1：消息全保留（不截断），目标(第一轮答)新增候选并置激活
-        assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答", "第二轮问", "第二轮答"]
+        # MS-1：消息全保留（不截断）；content 跟随激活候选，原内容存候选 0
+        assert _contents(db_session, conv.id) == ["第一轮问", "重写第一轮答", "第二轮问", "第二轮答"]
         from backend.app.services import message as message_service
         target = db_session.query(Message).filter(Message.id == resp.message_id).first()
         assert [s.content for s in message_service.list_swipes(db_session, target.id)] == ["第一轮答", "重写第一轮答"]
@@ -618,8 +618,8 @@ class TestRegenerateRoute:
         resp = await conversations_route.regenerate(conv.id, body, db_session)
 
         assert resp.reply == "路由重写"
-        # MS-1 swipes：历史消息数不变（target 保留），新回复追加为候选并置激活
-        assert _contents(db_session, conv.id) == ["问", "答"]
+        # MS-1 swipes：历史消息数不变；content 跟随激活候选，原内容存候选 0
+        assert _contents(db_session, conv.id) == ["问", "路由重写"]
         from backend.app.services import message as message_service
         target = db_session.query(Message).filter(Message.id == resp.message_id).first()
         assert [s.content for s in message_service.list_swipes(db_session, target.id)] == ["答", "路由重写"]
