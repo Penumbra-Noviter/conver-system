@@ -82,6 +82,7 @@ def assemble_chat_context(
     conversation_id: int,
     *,
     current_input: str | None = None,
+    history_limit_message_id: int | None = None,
 ) -> ChatContext:
     """组装聊天上下文（不插入 user、不自动插入 greeting）
 
@@ -95,6 +96,9 @@ def assemble_chat_context(
         current_input: 当前用户输入。提供时作为末条 user 输入追加到消息列表；
             None（重生成路径）时不追加——把历史末条 user 消息作为待回复目标，
             避免触发消息在 history + 追加各出现一次的重复。
+        history_limit_message_id: 历史截止消息 ID（含）——MS-1 重生成路径传入
+            触发源 user id，目标 assistant 及其后续不进上下文（模型不看到被
+            替换的回复）；世界书扫描窗与消息列表共用该截止。
 
     Returns:
         组装好的聊天上下文（对话、温度、消息列表、Provider 实例）
@@ -115,6 +119,8 @@ def assemble_chat_context(
     user_name = setting_service.user_name(db)
     max_rounds = setting_service.sliding_window_rounds(db)
     history = message_service.get_messages(db, conv.id)
+    if history_limit_message_id is not None:
+        history = [m for m in history if m.id <= history_limit_message_id]
     world_injection = _lorebook_world_injection(
         db, character, history, current_input or "", user_name,
     )
@@ -302,11 +308,13 @@ async def regenerate_chat(
     conversation_id: int,
     message_id: int | None = None,
 ) -> ChatResponse:
-    """重生成对话中目标 AI 回复（缺省末条 assistant）
+    """重生成对话中目标 AI 回复（缺省末条 assistant）——MS-1 swipes 语义
 
-    编排：解析并校验目标 → 校验触发源（截断后须有 user 消息）→ 截断（删除目标
-    及其后全部消息，锚定 PK id，不 commit）→ 组装上下文（不插入 user）→ 生成 →
-    单事务落库新 assistant 消息 → ChatResponse。LLM 失败时回滚截断，时间线不变。
+    编排：解析并校验目标 → 校验触发源（须存在 user 消息）→ 组装上下文（历史
+    截止于触发源 user，目标及其后续不进上下文——模型不看到被替换的回复；不插入
+    user）→ 生成 → **add_swipe 追加候选**（历史消息数不变：1 条 assistant + N 候选，
+    新候选置为激活）→ ChatResponse（message_id = 目标消息，候选挂于其上）。
+    LLM 失败时无截断可回滚（原内容与候选均保留），时间线不变。
 
     Args:
         db: 数据库会话
@@ -314,12 +322,12 @@ async def regenerate_chat(
         message_id: 目标 assistant 消息 ID；None 取末条 assistant
 
     Returns:
-        ChatResponse（reply / message_id / conversation_id）
+        ChatResponse（reply / message_id=目标消息 / conversation_id）
 
     Raises:
         ConversationNotFoundError: 对话不存在
         MessageNotFoundError: message_id 不存在或不属于该对话
-        InvalidRegenerateTargetError: 目标非 assistant / 截断后无触发 user
+        InvalidRegenerateTargetError: 目标非 assistant / 无触发 user
         ApiKeyMissingError: 未配置 API Key
         ProviderNotSupportedError: 不支持的 Provider
         HTTPException: LLM 调用失败（经 chat_error_response 映射）
@@ -330,43 +338,36 @@ async def regenerate_chat(
     # 2. 解析并校验目标
     target = _resolve_regenerate_target(db, conversation_id, message_id)
 
-    # 3. 校验触发源：截断后必须存在 user 消息（无触发源 → 400）
-    if _last_user_before(db, conversation_id, target.id) is None:
+    # 3. 校验触发源：必须存在 user 消息（无触发源 → 400）
+    trigger = _last_user_before(db, conversation_id, target.id)
+    if trigger is None:
         raise InvalidRegenerateTargetError("没有可重生成的用户消息")
 
-    # 4. 截断（删除 target 及其后全部，不 commit；截断后任何异常均回滚，
-    #    防半截断持久化——W2 增量审核 BREAKS-中：不止 LLMError，resolve_llm
-    #    的 ApiKeyMissing/ProviderNotSupported 等异常同样须回滚）
-    message_service.delete_messages_from(db, conversation_id, target.id)
-
-    # 5-6. 组装上下文 + 生成回复（同一原子的异常边界）
+    # 4-5. 组装上下文（历史截止于触发源 user，不插入 user）+ 生成回复。
+    #     MS-1：不再截断 DB——目标与后续消息保留，新回复以候选追加。
     try:
-        ctx = assemble_chat_context(db, conversation_id, current_input=None)
+        ctx = assemble_chat_context(
+            db, conversation_id, current_input=None,
+            history_limit_message_id=trigger.id,
+        )
         reply_text = await ctx.provider.generate(
             ctx.messages,
             temperature=ctx.temperature,
             model=ctx.conversation.model_name,
         )
     except LLMError as e:
-        db.rollback()
         status_code, message = chat_error_response(
             e, ctx.conversation.model_provider
         )
         raise HTTPException(status_code=status_code, detail=message)
-    except Exception:
-        db.rollback()
-        raise
 
-    # 7. 单事务落库：截断 + 新 assistant 一次提交
-    saved = message_service.create_message_no_commit(
-        db, conversation_id, Role.ASSISTANT, reply_text
-    )
-    db.commit()
-    db.refresh(saved)
+    # 6. add_swipe 追加候选并置为激活（历史消息数不变；LLM 失败路径无副作用）
+    message_service.add_swipe(db, target.id, reply_text, make_active=True)
+    db.refresh(target)
 
     return ChatResponse(
         reply=reply_text,
-        message_id=saved.id,
+        message_id=target.id,
         conversation_id=conversation_id,
     )
 

@@ -63,6 +63,31 @@ def get_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """创建所有表（如果不存在）"""
+    """创建所有表（如果不存在），并执行自愈迁移（MS-1：存量库补 messages.active_swipe_index）"""
     import backend.app.models  # noqa: F401 — 确保模型被注册
     Base.metadata.create_all(bind=engine)
+    _ensure_messages_active_swipe_index(engine)
+
+
+def _ensure_messages_active_swipe_index(bind=engine) -> None:
+    """自愈迁移：存量 messages 表缺 active_swipe_index 列时 ALTER TABLE 补列（幂等）
+
+    create_all 不会给已存在表加列（项目无 alembic，spec §0 迁移约束）：PRAGMA
+    table_info 探测缺列 → ALTER TABLE ADD COLUMN（默认 0），已存在则无事。
+    连续两次调用无副作用（幂等，契约锁 test_message_swipes::test_migration_idempotent）。
+
+    Args:
+        bind: 可连接的 Engine/Connection（默认应用引擎；测试可传入内存库）
+    """
+    from sqlalchemy import text
+
+    with bind.connect() as conn:
+        columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(messages)")).fetchall()
+        }
+        if "active_swipe_index" not in columns:
+            conn.execute(
+                text("ALTER TABLE messages ADD COLUMN active_swipe_index INTEGER NOT NULL DEFAULT 0")
+            )
+            conn.commit()

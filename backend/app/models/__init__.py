@@ -3,7 +3,7 @@
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.lorebook import LorebookEntry
-from backend.app.models.message import Message
+from backend.app.models.message import Message, MessageSwipe, Role
 from backend.app.models.setting import Setting
 
-__all__ = ["Character", "Conversation", "LorebookEntry", "Message", "Setting"]
+__all__ = ["Character", "Conversation", "LorebookEntry", "Message", "MessageSwipe", "Role", "Setting"]

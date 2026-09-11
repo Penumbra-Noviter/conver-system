@@ -22,6 +22,7 @@ __all__ = [
     "MessageNotFoundError",
     "InvalidRegenerateTargetError",
     "LorebookEntryNotFoundError",
+    "SwipeIndexError",
 ]
 
 
@@ -67,3 +68,7 @@ class InvalidRegenerateTargetError(DomainError):
 
 class LorebookEntryNotFoundError(DomainError):
     """世界书条目不存在"""
+
+
+class SwipeIndexError(DomainError):
+    """候选序号非法（switch 越界 / 候选清空拒绝删除）"""

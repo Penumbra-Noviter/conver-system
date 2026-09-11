@@ -148,7 +148,7 @@ class TestMigrateSuccess:
                     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
                 )
             }
-            assert tables == {"characters", "conversations", "messages", "settings", "lorebook_entries"}
+            assert tables == {"characters", "conversations", "messages", "settings", "lorebook_entries", "message_swipes"}
             assert conn.execute("SELECT COUNT(*) FROM characters").fetchone()[0] == 1
             assert conn.execute("SELECT name FROM characters").fetchone()[0] == "中文角色 测试"
             assert conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0] == 1

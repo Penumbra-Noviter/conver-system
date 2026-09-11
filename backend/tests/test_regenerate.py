@@ -378,8 +378,12 @@ class TestRegenerateChatService:
         assert resp.reply == "新的回复"
         assert resp.conversation_id == conv.id
         assert isinstance(resp.message_id, int)
-        # 时间线截断：末条 assistant（第二轮答）被删，第二轮问保留，追加新的回复
-        assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答", "第二轮问", "新的回复"]
+        # MS-1 swipes：历史消息数不变（目标保留），新回复追加为候选并置激活
+        assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答", "第二轮问", "第二轮答"]
+        from backend.app.services import message as message_service
+        target = db_session.query(Message).filter(Message.id == resp.message_id).first()
+        assert [s.content for s in message_service.list_swipes(db_session, target.id)] == ["第二轮答", "新的回复"]
+        assert target.active_swipe_index == 1
         # 无幽灵重复 user（仍为原有 2 条 user，重生成不新增）
         user_count = db_session.query(Message).filter(
             Message.conversation_id == conv.id, Message.role == Role.USER
@@ -389,7 +393,7 @@ class TestRegenerateChatService:
     async def test_happy_path_with_message_id_truncates_all_after(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """显式 message_id 指向非末条 assistant → 删除 target 及其后全部再重生成"""
+        """显式 message_id 指向非末条 assistant → 目标保留，新回复追加为其候选（MS-1）"""
         fake = _FakeProvider(reply="重写第一轮答")
         _patch_api_key(monkeypatch)
         conv = _create_conversation(db_session)
@@ -404,8 +408,12 @@ class TestRegenerateChatService:
         resp = await chat_service.regenerate_chat(db_session, conv.id, message_id=target_id)
 
         assert resp.reply == "重写第一轮答"
-        # 删掉 [第一轮答, 第二轮问, 第二轮答]，保留 [第一轮问]，重生成一条
-        assert _contents(db_session, conv.id) == ["第一轮问", "重写第一轮答"]
+        # MS-1：消息全保留（不截断），目标(第一轮答)新增候选并置激活
+        assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答", "第二轮问", "第二轮答"]
+        from backend.app.services import message as message_service
+        target = db_session.query(Message).filter(Message.id == resp.message_id).first()
+        assert [s.content for s in message_service.list_swipes(db_session, target.id)] == ["第一轮答", "重写第一轮答"]
+        assert target.active_swipe_index == 1
 
     async def test_generate_input_is_trigger_user_without_duplicate(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
@@ -610,8 +618,12 @@ class TestRegenerateRoute:
         resp = await conversations_route.regenerate(conv.id, body, db_session)
 
         assert resp.reply == "路由重写"
-        # 截断：target(答) 被删，仅剩 问 + 新回复
-        assert _contents(db_session, conv.id) == ["问", "路由重写"]
+        # MS-1 swipes：历史消息数不变（target 保留），新回复追加为候选并置激活
+        assert _contents(db_session, conv.id) == ["问", "答"]
+        from backend.app.services import message as message_service
+        target = db_session.query(Message).filter(Message.id == resp.message_id).first()
+        assert [s.content for s in message_service.list_swipes(db_session, target.id)] == ["答", "路由重写"]
+        assert target.active_swipe_index == 1
 
     async def test_conversation_not_found_404(self, db_session: Session) -> None:
         """对话不存在 → 上抛 ConversationNotFoundError（统一 handler 转 404）"""

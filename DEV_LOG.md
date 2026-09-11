@@ -119,6 +119,20 @@
 
 ---
 
+---
+
+## MS-1 swipes 数据模型与服务（2026-09-10 — AI风月对标五批工单 MS 首张，承接 WL 批收官）
+
+- **来源**：承接 WL 批（世界书全链路就绪）；本票落地「消息多候选」——重生成从覆盖语义升级为追加候选（spec §MS-1）。
+- **交付**：
+  - `message_swipes` 新表（id/message_id FK CASCADE 索引/index/content/created_at + (message_id, index) 唯一约束）；`messages.active_swipe_index` 列（default 0）+ **自愈迁移** `database._ensure_messages_active_swipe_index(bind)`（PRAGMA table_info 探测缺列 → ALTER TABLE 补列，幂等契约锁）。
+  - `message.py` 四函数（__all__ 7→11）：add_swipe（**候选 0 = 消息原始内容播种**——首次追加把原内容物化为候选行，新内容从 1 起，UI 计数/切换/删除统一作用于候选行）/ list_swipes（index 升序）/ switch_swipe（越界 SwipeIndexError）/ delete_swipe（**原始候选 0 受保护拒删**；删活跃回落到相邻候选：小于被删 index 的最大现存，否则大于的最小）。
+  - **重生成语义变更**：`regenerate_chat` 不再截断 DB——目标保留，`add_swipe` 追加候选并置激活（历史消息数不变）；上下文经 `assemble_chat_context(history_limit_message_id=触发源)` 截止于触发 user（模型不看到被替换的回复）；LLM 失败无截断可回滚（原内容与候选均保留）。`conversation_export` JSON 消息含 active_swipe_index/swipes（记忆随存档走）。
+- **关键决策**：候选 0 播种 vs 隐含基座——选播种（统一行模型，active 序号始终指向候选行，无 -1 特例）；原始候选保护使「候选清空拒绝」自然成立。
+- **过程遥测**：① 导出契约测试（test_conversation_export 精确键断言）需补两键；② PRAGMA table_info 列序（type/notnull/dflt 为 index 2/3/4）初版断言写错当场修正；③ test_regenerate 3 例按新语义修订（截断断言 → 候选断言）。
+- **验证链**：先红后绿（8 用例）| pytest 916+1skip→924+1skip（+8，零回归）| Vitest 1213 零改动（前端 MS-2 承接）| schema.sql/migrate 同步 | doc_sync 零漂移。
+- **非阻断落债**：无。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

@@ -146,6 +146,8 @@ class TestExportJson:
             "role": "user",
             "content": "你好",
             "created_at": msg1.created_at.isoformat(),
+            "active_swipe_index": 0,  # MS-1：候选集与激活序号随导出
+            "swipes": [],
         }
         assert data["messages"][1]["role"] == "assistant"
 

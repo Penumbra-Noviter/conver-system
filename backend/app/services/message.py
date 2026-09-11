@@ -2,21 +2,24 @@
 消息管理 & 聊天逻辑
 
 协议表面（__all__）：get_messages / create_message / create_message_no_commit /
-delete_messages_from / auto_insert_greeting / build_message_list / search_messages。
+delete_messages_from / auto_insert_greeting / build_message_list / search_messages /
+add_swipe / list_swipes / switch_swipe / delete_swipe。
 """
 
 from __future__ import annotations
 
 import datetime
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
-from backend.app.models.message import Message, Role
+from backend.app.models.message import Message, MessageSwipe, Role
 from backend.app.schemas.message import SearchResult
 from backend.app.services import conversation as conversation_service
 from backend.app.services.character_fields import PROMPT_FIELDS
+from backend.app.services.exceptions import MessageNotFoundError, SwipeIndexError
 from backend.app.services.llm.prompt import CharacterData, apply_template_vars, build_messages
 
 __all__ = [
@@ -27,6 +30,10 @@ __all__ = [
     "auto_insert_greeting",
     "build_message_list",
     "search_messages",
+    "add_swipe",
+    "list_swipes",
+    "switch_swipe",
+    "delete_swipe",
 ]
 
 
@@ -252,3 +259,131 @@ def search_messages(
         ))
 
     return output
+
+
+# ════════════════════════════════════════════════════════════════
+# MS-1 swipes 多候选
+# ════════════════════════════════════════════════════════════════
+
+def _require_message(db: Session, message_id: int) -> Message:
+    """守卫：消息必须存在，否则抛 MessageNotFoundError"""
+    msg = db.query(Message).filter(Message.id == message_id).first()
+    if msg is None:
+        raise MessageNotFoundError(f"消息不存在: {message_id}")
+    return msg
+
+
+def add_swipe(
+    db: Session,
+    message_id: int,
+    content: str,
+    *,
+    make_active: bool = True,
+) -> int:
+    """为消息追加候选（MS-1：重生成等操作改为追加而非覆盖）
+
+    候选 0 = 消息原始内容（首次 add_swipe 时播种为候选行），新内容从候选 1 起
+    递增——候选集含原始版本，UI 计数/切换/删除统一作用于候选行。序号与
+    (message_id, index) 唯一约束一致；make_active=True 时同步更新
+    messages.active_swipe_index。
+
+    Args:
+        db: 数据库会话
+        message_id: 归属消息 ID（不存在抛 MessageNotFoundError）
+        content: 候选内容
+        make_active: 是否把新候选置为当前激活
+
+    Returns:
+        新候选序号（index；首次追加返回 1，候选 0 为原始内容）
+    """
+    msg = _require_message(db, message_id)
+    count = (
+        db.query(func.count(MessageSwipe.id))
+        .filter(MessageSwipe.message_id == message_id)
+        .scalar()
+        or 0
+    )
+    if count == 0:
+        # 播种：原始内容 = 候选 0（受保护，delete_swipe 拒删）
+        db.add(MessageSwipe(message_id=message_id, index=0, content=msg.content))
+        count = 1
+    db.add(MessageSwipe(message_id=message_id, index=count, content=content))
+    if make_active:
+        msg.active_swipe_index = count
+    db.commit()
+    return count
+
+
+def list_swipes(db: Session, message_id: int) -> list[MessageSwipe]:
+    """消息候选列表（index 升序）"""
+    return (
+        db.query(MessageSwipe)
+        .filter(MessageSwipe.message_id == message_id)
+        .order_by(MessageSwipe.index.asc())
+        .all()
+    )
+
+
+def switch_swipe(db: Session, message_id: int, index: int) -> Message:
+    """切换激活候选（越界抛 SwipeIndexError）并更新 active_swipe_index
+
+    Args:
+        db: 数据库会话
+        message_id: 归属消息 ID
+        index: 目标候选序号（必须存在）
+
+    Returns:
+        更新后的 Message
+    """
+    msg = _require_message(db, message_id)
+    exists = (
+        db.query(MessageSwipe.id)
+        .filter(MessageSwipe.message_id == message_id, MessageSwipe.index == index)
+        .first()
+    )
+    if exists is None:
+        raise SwipeIndexError(f"候选序号不存在: {index}")
+    msg.active_swipe_index = index
+    db.commit()
+    db.refresh(msg)
+    return msg
+
+
+def delete_swipe(db: Session, message_id: int, index: int) -> Message:
+    """删除候选；删除当前激活候选时回落到相邻候选（小于被删 index 的最大现存，
+    否则大于的最小现存）；候选清空 → SwipeIndexError 拒绝（保留消息本体）
+
+    Args:
+        db: 数据库会话
+        message_id: 归属消息 ID
+        index: 待删除候选序号
+
+    Returns:
+        更新后的 Message
+    """
+    msg = _require_message(db, message_id)
+    if index == 0:
+        raise SwipeIndexError("候选 0 为消息原始内容，受保护不可删除")
+    swipe = (
+        db.query(MessageSwipe)
+        .filter(MessageSwipe.message_id == message_id, MessageSwipe.index == index)
+        .first()
+    )
+    if swipe is None:
+        raise SwipeIndexError(f"候选序号不存在: {index}")
+    db.delete(swipe)
+
+    remaining = [
+        row[0]
+        for row in db.query(MessageSwipe.index)
+        .filter(MessageSwipe.message_id == message_id)
+        .order_by(MessageSwipe.index.asc())
+        .all()
+    ]
+    if msg.active_swipe_index == index:
+        # 回落到相邻候选：小于被删 index 的最大现存，否则大于的最小现存
+        lower = [i for i in remaining if i < index]
+        msg.active_swipe_index = lower[-1] if lower else remaining[0]
+    db.commit()
+    db.refresh(msg)
+    return msg

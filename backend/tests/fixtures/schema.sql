@@ -13,8 +13,10 @@
 -- 对照结论：characters 全 19 列（含 created_at/updated_at——历史手抄
 -- 17 列漂移缺的正是这两列）；conversations 为 model_provider/model_name
 -- （历史手抄漂移成 provider/model）；lorebook_entries 为 WL-1 世界书条目表
--- （含 4 条 CHECK 边界约束 + FK 级联）；含 4 条索引（name / character_id /
--- conversation_id / lorebook_entries_character_id），不含任何 sqlite_* 内部表。
+-- （含 4 条 CHECK 边界约束 + FK 级联）；message_swipes 为 MS-1 候选表
+-- （(message_id, index) 唯一 + messages.active_swipe_index 列自愈迁移）；含 5 条索引
+-- （name / character_id / conversation_id / lorebook_entries_character_id /
+-- message_swipes_message_id），不含任何 sqlite_* 内部表。
 -- =====================================================================
 
 CREATE TABLE characters (
@@ -57,9 +59,21 @@ CREATE TABLE messages (
 	conversation_id INTEGER NOT NULL, 
 	role VARCHAR(9) NOT NULL, 
 	content TEXT NOT NULL, 
+	active_swipe_index INTEGER DEFAULT '0' NOT NULL, 
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
+);
+
+CREATE TABLE message_swipes (
+	id INTEGER NOT NULL, 
+	message_id INTEGER NOT NULL, 
+	"index" INTEGER NOT NULL, 
+	content TEXT NOT NULL, 
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_message_swipes_message_index UNIQUE (message_id, "index"), 
+	FOREIGN KEY(message_id) REFERENCES messages (id) ON DELETE CASCADE
 );
 
 CREATE TABLE settings (
@@ -99,5 +113,7 @@ CREATE INDEX ix_characters_name ON characters (name);
 CREATE INDEX ix_conversations_character_id ON conversations (character_id);
 
 CREATE INDEX ix_lorebook_entries_character_id ON lorebook_entries (character_id);
+
+CREATE INDEX ix_message_swipes_message_id ON message_swipes (message_id);
 
 CREATE INDEX ix_messages_conversation_id ON messages (conversation_id);

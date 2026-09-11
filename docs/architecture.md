@@ -285,6 +285,26 @@ conver-system/
 | conversation_id | INTEGER FK | → conversations.id |
 | role | VARCHAR(20) | user / assistant / system（ORM 层 Role 枚举，按值存取） |
 | content | TEXT | 消息内容 |
+| active_swipe_index | INTEGER | 当前激活候选序号（MS-1：默认 0，自愈迁移补列） |
+| created_at | DATETIME | |
+
+### message_swipes（MS-1，候选表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增 |
+| message_id | INTEGER FK | → messages.id（ON DELETE CASCADE，索引） |
+| index | INTEGER | 候选序号（0 起；(message_id, index) 唯一） |
+| content | TEXT | 候选内容 |
+| created_at | DATETIME | |
+
+> 候选 0 = 消息原始内容（首次 add_swipe 播种，受保护拒删）；重生成 = 追加候选而非覆盖（历史消息数不变）。
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增 |
+| conversation_id | INTEGER FK | → conversations.id |
+| role | VARCHAR(20) | user / assistant / system（ORM 层 Role 枚举，按值存取） |
+| content | TEXT | 消息内容 |
 | created_at | DATETIME | |
 
 ### settings
