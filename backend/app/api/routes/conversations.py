@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.api.headers import build_content_disposition
 from backend.app.database import get_db
+from backend.app.schemas.branch import BranchRequest, ImportBranchRequest
 from backend.app.schemas.conversation import ConversationCreate, ConversationResponse, ConversationUpdate
 from backend.app.schemas.message import ChatResponse, RegenerateRequest
 from backend.app.services import chat as chat_service
@@ -19,6 +20,21 @@ from backend.app.services import conversation as service
 from backend.app.services import conversation_export as export_service
 
 router = APIRouter(prefix="/api/conversations", tags=["对话管理"])
+
+
+@router.post("/import-branch", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
+async def import_branch(
+    body: ImportBranchRequest,
+    db: Session = Depends(get_db),
+) -> ConversationResponse:
+    """导入分支快照并重建会话（BR-2：POST /api/conversations/import-branch）
+
+    版本化快照校验（validate_branch_snapshot：缺/不支持版本/畸形 → BranchSnapshotError
+    → 400 明确拒绝）后经 clone_conversation 重建（消息/候选/激活往返一致；角色须存在）。
+    """
+    snapshot = export_service.validate_branch_snapshot(body.snapshot)
+    new_conv = service.clone_conversation(db, snapshot)
+    return ConversationResponse.model_validate(new_conv)
 
 
 @router.post("/{conversation_id}/regenerate", response_model=ChatResponse)
@@ -50,6 +66,44 @@ async def continue_chat(
     转 404/400。无请求体（续写目标恒为末条 assistant，前端按钮只渲染在末条气泡）。
     """
     return await chat_service.continue_chat(db, conversation_id)
+
+
+@router.post("/{conversation_id}/branch", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
+async def branch(
+    conversation_id: int,
+    body: BranchRequest,
+    db: Session = Depends(get_db),
+) -> ConversationResponse:
+    """从锚消息派生分支会话（BR-2：POST /api/conversations/{id}/branch）
+
+    锚消息须存在且属于该会话（否则 MessageNotFoundError → 404 明确错误体）；
+    新会话消息 = 源截断含锚，parent/branch_from_message_id/branch_title 记录。
+    """
+    new_conv = service.branch_from_message(
+        db, conversation_id, body.message_id, title=body.title
+    )
+    return ConversationResponse.model_validate(new_conv)
+
+
+@router.get("/{conversation_id}/snapshot")
+async def snapshot(conversation_id: int, db: Session = Depends(get_db)) -> JSONResponse:
+    """分支快照下载（BR-2：GET /api/conversations/{id}/snapshot，导出）
+
+    版本化快照 JSON（含世界书条目与候选——记忆随存档走）；Content-Disposition
+    下载头（字符名参与文件名，同 export/json 风格）。
+    """
+    snap = export_service.build_branch_snapshot(db, conversation_id)
+    character_name = export_service.character_export_filename(db, conversation_id)
+    return JSONResponse(
+        content=snap.model_dump(mode="json"),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": build_content_disposition(
+                f"branch-snapshot-{conversation_id}.json",
+                f"branch-snapshot-{conversation_id}-{character_name}.json",
+            )
+        },
+    )
 
 
 @router.get("", response_model=list[ConversationResponse])

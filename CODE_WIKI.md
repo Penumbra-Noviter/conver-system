@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2261<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->966<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1225<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2279<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->984<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1225<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -287,7 +287,7 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/chat.py:create_chat-->`create_chat(request, db)`<!--/AUTO--> | POST 非流式对话（prepare + complete） |
 | <!--AUTO:sig:backend/app/api/routes/chat.py:stream_chat-->`stream_chat(request, raw_request, db)`<!--/AUTO--> | POST SSE 流式对话（断开感知 is_disconnected） |
 
-### 4.8 `backend/app/api/routes/conversations.py` — 会话路由（<!--AUTO:lines:backend/app/api/routes/conversations.py-->~103 行<!--/AUTO-->）
+### 4.8 `backend/app/api/routes/conversations.py` — 会话路由（<!--AUTO:lines:backend/app/api/routes/conversations.py-->~148 行<!--/AUTO-->）
 
 **职责**：会话 CRUD + 清空 + JSON/Markdown 导出 + 重生成端点。
 
@@ -418,9 +418,9 @@ conver system/
 | <!--AUTO:sig:backend/app/services/chat.py:assemble_chat_context-->`assemble_chat_context(db, conversation_id, *, current_input=None, history_limit_message_id=None)`<!--/AUTO--> | 下层组装函数（不插 user / greeting，重生成复用） |
 | <!--AUTO:sig:backend/app/services/chat.py:regenerate_chat-->`regenerate_chat(db, conversation_id, message_id=None)`<!--/AUTO--> | 重生成编排：截断 → 组装 → 生成 → 单事务落库 |
 
-### 4.15 `backend/app/services/conversation.py` — 会话服务（<!--AUTO:lines:backend/app/services/conversation.py-->~144 行<!--/AUTO-->）
+### 4.15 `backend/app/services/conversation.py` — 会话服务（<!--AUTO:lines:backend/app/services/conversation.py-->~282 行<!--/AUTO-->）
 
-**职责**：会话 CRUD + 默认标题（角色名派生）+ 自动标题（首条消息截断）+ 清空。
+**职责**：会话 CRUD + 默认标题（角色名派生）+ 自动标题（首条消息截断）+ 清空 + 分支派生（BR-2）。
 
 | 元素 | 说明 |
 |------|------|
@@ -432,8 +432,10 @@ conver system/
 | <!--AUTO:sig:backend/app/services/conversation.py:maybe_auto_title-->`maybe_auto_title(db, conv, content)`<!--/AUTO--> | 首条消息自动生成标题 |
 | <!--AUTO:sig:backend/app/services/conversation.py:create_conversation-->`create_conversation(db, data)`<!--/AUTO--> | 创建会话 |
 | <!--AUTO:sig:backend/app/services/conversation.py:update_conversation-->`update_conversation(db, conversation_id, data)`<!--/AUTO--> | 更新（重命名等） |
-| <!--AUTO:sig:backend/app/services/conversation.py:delete_conversation-->`delete_conversation(db, conversation_id)`<!--/AUTO--> | 删除会话 |
+| <!--AUTO:sig:backend/app/services/conversation.py:delete_conversation-->`delete_conversation(db, conversation_id)`<!--/AUTO--> | 删除会话（BR-2：子分支 parent/锚置空，不连坐） |
 | <!--AUTO:sig:backend/app/services/conversation.py:delete_all_conversations-->`delete_all_conversations(db)`<!--/AUTO--> | 清空全部会话 |
+| <!--AUTO:sig:backend/app/services/conversation.py:clone_conversation-->`clone_conversation(db, snapshot, *, title=None)`<!--/AUTO--> | 快照重建会话（BR-2：消息/候选往返一致 + 防御矩阵） |
+| <!--AUTO:sig:backend/app/services/conversation.py:branch_from_message-->`branch_from_message(db, conversation_id, message_id, *, title=None)`<!--/AUTO--> | 锚消息派生分支（BR-2：截断快照 + 父/锚/分支名记录） |
 
 ### 4.16 `backend/app/services/conversation_export.py` — 会话导出（<!--AUTO:lines:backend/app/services/conversation_export.py-->~270 行<!--/AUTO-->）
 
@@ -1347,6 +1349,7 @@ conver system/
 | `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->36<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
 | `backend/tests/test_chat_continue.py` | <!--AUTO:tests:backend/tests/test_chat_continue.py-->21<!--/AUTO--> | 续写端点契约锁（MS-3：条数不变/不追加 user/失败零改动/续写触发形态/空续写 no-op/错误矩阵） |
 | `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
+| `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->18<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->20<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
 | `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->19<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
@@ -1475,9 +1478,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2261<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2279<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->966<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->984<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1225<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

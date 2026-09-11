@@ -15,10 +15,12 @@ from pydantic import BaseModel, Field
 
 __all__ = [
     "SNAPSHOT_VERSION",
+    "BranchRequest",
     "BranchSnapshot",
     "BranchSnapshotLorebookEntry",
     "BranchSnapshotMessage",
     "BranchSnapshotSwipe",
+    "ImportBranchRequest",
 ]
 
 #: 当前快照版本（版本化导出/导入契约；未知版本拒绝导入）
@@ -66,3 +68,18 @@ class BranchSnapshot(BaseModel):
     messages: list[BranchSnapshotMessage] = Field(default_factory=list)
     lorebook_entries: list[BranchSnapshotLorebookEntry] = Field(default_factory=list)
     swipes: list[BranchSnapshotSwipe] = Field(default_factory=list)
+
+
+class BranchRequest(BaseModel):
+    """从锚消息派生分支请求体（BR-2：POST /api/conversations/{id}/branch）"""
+    message_id: int = Field(..., description="分叉锚消息 id（该消息为快照末条，含）")
+    title: str | None = Field(None, max_length=200, description="分支显示名")
+
+
+class ImportBranchRequest(BaseModel):
+    """导入分支快照请求体（BR-2：POST /api/conversations/import-branch）
+
+    snapshot 为原始 dict（版本化 JSON），由服务层 validate_branch_snapshot
+    校验（缺/不支持版本 → BranchSnapshotError 明确拒绝）后重建会话。
+    """
+    snapshot: dict = Field(..., description="版本化分支快照（build_branch_snapshot 输出）")

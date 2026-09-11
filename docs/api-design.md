@@ -470,6 +470,124 @@ await api.conversations.regenerate(conversationId, { message_id: 42 });
 - 失败：走既有错误条通道（与 `messages.chat` 同一 catch 路径），不写进消息列表；
   重生成期间进行中状态（按钮禁用 + thinking）与在途守卫复用非流式语义。
 
+### 切换消息候选（MS-2）
+
+```
+POST /api/messages/{message_id}/switch-swipe
+```
+
+切换消息激活候选（候选 0 = 消息原始内容，受保护不可删）。
+
+**请求体**
+```json
+{ "index": 1 }
+```
+
+**响应** `200` — MessageResponse（`content` 跟随激活候选，`active_swipe_index` 已更新）。
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| 消息不存在 | 404 | 消息不存在: {id} |
+| 候选序号不存在 | 400 | 候选序号不存在: {index} |
+
+### 继续生成（MS-3，append 续写）
+
+```
+POST /api/conversations/{conversation_id}/continue
+```
+
+不产生新 user 消息，直接在末条 assistant 之后续写：原消息内容扩展为
+「原内容 + 续写片段」（消息条数不变；原内容保留为候选，续写结果追加为新候选
+并置激活）。**无请求体**（续写目标恒为末条 assistant——前端「继续」按钮只渲染
+在末条气泡）。上下文触发 = 尾随 user 消息（续写指令 + 原消息末段），不新增
+system（适配器 last-system-wins 锁定契约下尾随 system 会挤掉人设链）。
+
+**响应** `200` — 与重生成同构
+```json
+{
+  "reply": "原内容 + 续写片段",
+  "message_id": 42,
+  "conversation_id": 1
+}
+```
+`message_id` = **被续写的消息**（消息 id 不变，内容扩展；前端结算须用它原位更新）。
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| conversation 不存在 | 404 | 对话不存在 |
+| 末条非 assistant（空对话 / 末条为 user） | 400 | 没有可续写的 AI 回复（末条须为 AI 回复） |
+
+### 分支派生（BR-2）
+
+#### 从锚消息派生分支
+
+```
+POST /api/conversations/{conversation_id}/branch
+```
+
+新会话 = 源会话截断含锚（消息/候选/激活往返一致），parent_conversation_id /
+branch_from_message_id 记录派生来源与锚；世界书为角色级共享（随角色自然继承）。
+
+**请求体**
+```json
+{ "message_id": 42, "title": "雪夜分叉" }
+```
+`title` 可选（进入新会话标题与 branch_title 分支显示名）。
+
+**响应** `201` — ConversationResponse。
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| conversation 不存在 | 404 | 对话不存在 |
+| message_id 不存在 / 不属于该对话 | 404 | 分叉锚消息不存在: {id} |
+
+#### 导入分支快照
+
+```
+POST /api/conversations/import-branch
+```
+
+从版本化快照（build_branch_snapshot 输出 / GET snapshot 下载）重建会话。
+
+**请求体**
+```json
+{ "snapshot": { "version": 1, "character_id": 1, "messages": [ ... ], ... } }
+```
+
+**响应** `201` — ConversationResponse。
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| 快照缺版本号 | 400 | 快照缺少版本号（version 字段），无法识别格式 |
+| 快照版本不支持 | 400 | 不支持的快照版本: {version}（当前支持版本 1） |
+| 快照结构畸形 | 400 | 快照结构无效: ... |
+| 快照角色不存在 | 404 | 角色不存在: {id} |
+
+#### 分支快照下载
+
+```
+GET /api/conversations/{conversation_id}/snapshot
+```
+
+导出版本化快照 JSON（含世界书条目与候选——记忆随存档走）；Content-Disposition
+下载头（`?upto_message_id` 截断为 BR-2 服务层能力，路由层当前全量导出）。
+
+**响应** `200` — 快照 JSON（version/messages/lorebook_entries/swipes）。
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| conversation 不存在 | 404 | 对话不存在 |
+
 ---
 
 ## 模型 API

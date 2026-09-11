@@ -1,9 +1,10 @@
 """
-对话 CRUD 业务逻辑
+对话 CRUD 业务逻辑（BR-2：clone_conversation / branch_from_message 分支派生）
 """
 
 from __future__ import annotations
 
+import datetime
 from typing import Optional
 
 from sqlalchemy import func
@@ -11,11 +12,17 @@ from sqlalchemy.orm import Session
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
-from backend.app.models.message import Message, Role
+from backend.app.models.message import Message, MessageSwipe, Role
+from backend.app.schemas.branch import BranchSnapshot
 from backend.app.schemas.conversation import ConversationCreate, ConversationUpdate
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
-from backend.app.services.exceptions import ConversationNotFoundError
+from backend.app.services.exceptions import (
+    BranchSnapshotError,
+    CharacterNotFoundError,
+    ConversationNotFoundError,
+    MessageNotFoundError,
+)
 from backend.app.services.llm.prompt import apply_template_vars
 
 
@@ -165,10 +172,20 @@ def update_conversation(db: Session, conversation_id: int, data: ConversationUpd
 
 
 def delete_conversation(db: Session, conversation_id: int) -> bool:
-    """删除对话及关联消息（级联）"""
+    """删除对话及关联消息（级联）
+
+    BR-2 删源置空策略：删除源会话**不连坐已派生分支**——先将其子会话的
+    parent_conversation_id / branch_from_message_id 置 NULL（与 SQLite
+    ON DELETE SET NULL 同语义；本模型对分支列不加 FK——存量库 ALTER 补
+    自引用 FK 不可靠，故在服务层显式兑现并锁定），branch_title 保留
+    （分支显示名仍可用）。
+    """
     conv = get_conversation(db, conversation_id)
     if not conv:
         return False
+    db.query(Conversation).filter(
+        Conversation.parent_conversation_id == conversation_id
+    ).update({"parent_conversation_id": None, "branch_from_message_id": None})
     db.delete(conv)
     db.commit()
     return True
@@ -179,3 +196,145 @@ def delete_all_conversations(db: Session) -> None:
     db.query(Message).delete()
     db.query(Conversation).delete()
     db.commit()
+
+
+# ════════════════════════════════════════════════════
+# BR-2 分支派生（快照导入 / 锚消息分支）
+# ════════════════════════════════════════════════════
+
+def clone_conversation(
+    db: Session,
+    snapshot: BranchSnapshot,
+    *,
+    title: str | None = None,
+) -> Conversation:
+    """从分支快照重建会话（BR-2：导入 / 分支共用）
+
+    新会话：character_id 复用快照角色（**世界书为角色级共享**——随角色自然
+    继承，不重插条目：重插会产生角色条目重复副本，破坏记忆宫殿增量计数等
+    既有不变量；「新会话独立可改」在共享角色模型下不可兑现，Spec 偏差记录）；
+    消息按快照序（build_branch_snapshot 输出即 id 序=插入序）重建，role /
+    content / created_at 往返保真；候选与激活序号按快照 swipes 的
+    message_index 直接落库（候选 0 = 原始内容；content 恒等于激活候选）。
+
+    防御校验（契约锁锁定，手写快照破坏不变量即拒）：
+        - 角色存在（CharacterNotFoundError → 404）
+        - 消息角色合法（Role 枚举成员；非法 → BranchSnapshotError）
+        - 激活序号在候选范围内、content == 激活候选（快照不变量）
+
+    Args:
+        db: 数据库会话
+        snapshot: 校验通过的分支快照（BranchSnapshot；路由层经
+            validate_branch_snapshot 先行校验版本身份）
+        title: 新会话标题；None → 快照标题（再缺省「与 {角色名} 的对话」）
+
+    Returns:
+        重建的新会话
+
+    Raises:
+        CharacterNotFoundError: 快照角色不存在
+        BranchSnapshotError: 消息角色非法 / 激活序号越界 / content≠激活候选
+    """
+    character = db.query(Character).filter(Character.id == snapshot.character_id).first()
+    if character is None:
+        raise CharacterNotFoundError(f"角色不存在: {snapshot.character_id}")
+
+    conv = Conversation(
+        character_id=snapshot.character_id,
+        title=title or snapshot.title or _default_title_for_character(character.name),
+        model_provider=snapshot.model_provider or setting_service.default_provider(db),
+        model_name=snapshot.model_name or setting_service.default_model(db),
+    )
+    db.add(conv)
+    db.flush()  # 取新会话 id（候选引用）
+
+    # 消息按快照序重建（created_at 保真；非法角色 → 明确异常）
+    rebuilt = []
+    for item in snapshot.messages:
+        try:
+            role = Role(item.role)
+        except ValueError as e:
+            raise BranchSnapshotError(f"快照消息角色无效: {item.role}") from e
+        msg = Message(
+            conversation_id=conv.id,
+            role=role,
+            content=item.content,
+            created_at=item.created_at,
+        )
+        db.add(msg)
+        rebuilt.append(msg)
+    db.flush()  # 取消息 id（候选引用）
+
+    # 候选与激活序号直接落库（不走 add_swipe：播种语义假设 content 即候选 0）
+    for entry in snapshot.swipes:
+        if entry.message_index >= len(rebuilt):
+            raise BranchSnapshotError(
+                f"快照候选 message_index 越界: {entry.message_index}"
+            )
+        target = rebuilt[entry.message_index]
+        if not entry.swipes:
+            continue
+        if entry.active_swipe_index >= len(entry.swipes):
+            raise BranchSnapshotError(
+                f"快照激活序号越界: {entry.active_swipe_index}（候选仅 {len(entry.swipes)} 条）"
+            )
+        if target.content != entry.swipes[entry.active_swipe_index]:
+            raise BranchSnapshotError("快照消息内容与激活候选不一致（content 须跟随激活候选）")
+        for index, content in enumerate(entry.swipes):
+            db.add(MessageSwipe(message_id=target.id, index=index, content=content))
+        target.active_swipe_index = entry.active_swipe_index
+
+    conv.updated_at = datetime.datetime.now()
+    db.commit()
+    db.refresh(conv)
+    return conv
+
+
+def branch_from_message(
+    db: Session,
+    conversation_id: int,
+    message_id: int,
+    *,
+    title: str | None = None,
+) -> Conversation:
+    """从源会话的锚消息处派生分支会话（BR-2，spec §BR-2）
+
+    编排：校验源会话 + 锚消息（存在 / 属于该会话，404）→ 截断快照（含锚）→
+    clone（消息/候选重建；世界书随角色共享）→ 记录 parent_conversation_id /
+    branch_from_message_id / branch_title（分支显示名）→ 返回新会话。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 源会话 ID
+        message_id: 分叉锚消息 id（该消息为快照末条，含；随源删除时分支引用置空）
+        title: 分支显示名（进入 branch_title 与新会话标题）
+
+    Returns:
+        新分支会话（parent/branch_from_message_id 已记录）
+
+    Raises:
+        ConversationNotFoundError: 源会话不存在
+        MessageNotFoundError: 锚消息不存在或不属于该会话
+    """
+    conv = require_conversation(db, conversation_id)
+    anchor = (
+        db.query(Message.id)
+        .filter(Message.id == message_id, Message.conversation_id == conversation_id)
+        .first()
+    )
+    if anchor is None:
+        raise MessageNotFoundError(f"分叉锚消息不存在: {message_id}")
+
+    # 延迟导入防循环：conversation_export 依赖本模块（require_conversation）
+    from backend.app.services import conversation_export as export_service
+
+    snapshot = export_service.build_branch_snapshot(
+        db, conversation_id, upto_message_id=message_id
+    )
+    new_conv = clone_conversation(db, snapshot, title=title)
+    new_conv.parent_conversation_id = conversation_id
+    new_conv.branch_from_message_id = message_id
+    new_conv.branch_title = title
+    db.commit()
+    db.refresh(new_conv)
+    return new_conv
