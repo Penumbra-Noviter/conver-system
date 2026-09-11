@@ -2,8 +2,9 @@
 消息查询 REST API 路由
 
 包含：
-    - GET /api/conversations/{id}/messages — 获取消息历史
+    - GET /api/conversations/{id}/messages — 获取消息历史（含候选集/激活序号）
     - GET /api/messages/search — 搜索消息
+    - POST /api/messages/{message_id}/switch-swipe — 切换候选（MS-2）
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.schemas.message import MessageResponse, SearchResult
+from backend.app.schemas.message import MessageResponse, SearchResult, SwitchSwipeRequest
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 
@@ -24,9 +25,32 @@ router = APIRouter(tags=["消息"])
     response_model=list[MessageResponse],
 )
 def get_messages(conversation_id: int, db: Session = Depends(get_db)) -> list[MessageResponse]:
-    """获取对话的消息历史（按时间正序）"""
+    """获取对话的消息历史（按时间正序；assistant 消息附候选集与激活序号，MS-2）"""
     conversation_service.require_conversation(db, conversation_id)
-    return message_service.get_messages(db, conversation_id)
+    messages = message_service.get_messages(db, conversation_id)
+    return [
+        _with_swipes(db, msg)
+        for msg in messages
+    ]
+
+
+@router.post(
+    "/api/messages/{message_id}/switch-swipe",
+    response_model=MessageResponse,
+)
+def switch_swipe(
+    message_id: int, body: SwitchSwipeRequest, db: Session = Depends(get_db)
+) -> MessageResponse:
+    """切换消息激活候选（越界 → SwipeIndexError → 400）"""
+    msg = message_service.switch_swipe(db, message_id, body.index)
+    return _with_swipes(db, msg)
+
+
+def _with_swipes(db: Session, msg) -> MessageResponse:
+    """ORM 消息 → 响应（附候选集 content 列表与激活序号）"""
+    response = MessageResponse.model_validate(msg)
+    response.swipes = [s.content for s in message_service.list_swipes(db, msg.id)]
+    return response
 
 
 @router.get("/api/messages/search", response_model=list[SearchResult])

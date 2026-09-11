@@ -92,7 +92,7 @@ export function userAvatarHtml() {
  * @returns {string} 气泡 HTML（system 角色无头像 + 无复制按钮）
  */
 export function messageBubbleHtml(role, content, opts = {}) {
-    const { streaming = false, stopped = false, error = false, regenerate = false, characters = [], currentCharacterId = null, messageId } = opts;
+    const { streaming = false, stopped = false, error = false, regenerate = false, characters = [], currentCharacterId = null, messageId, swipes = [], activeSwipeIndex = 0 } = opts;
     const classes = ['message', role];
     if (error) classes.push('message-error');
     let bubbleAttrs = streaming ? ' data-streaming-live="1"' : '';
@@ -110,8 +110,16 @@ export function messageBubbleHtml(role, content, opts = {}) {
     const regenBtn = regenerate && role === 'assistant'
         ? `<button class="btn-regenerate" title="重生成">${iconHtml('refresh')}</button>`
         : '';
+    // MS-2 候选控制条（仅 assistant 且候选 > 1）：‹ 2/3 › 左右切换，聊天域绑定事件
+    const swipeBar = role === 'assistant' && Array.isArray(swipes) && swipes.length > 1
+        ? `<div class="swipe-bar" data-swipe-bar>
+            <button class="btn-icon swipe-prev" title="上一候选">${iconHtml('chevronLeft')}</button>
+            <span class="swipe-count" data-swipe-count>${activeSwipeIndex + 1}/${swipes.length}</span>
+            <button class="btn-icon swipe-next" title="下一候选">${iconHtml('chevronRight')}</button>
+          </div>`
+        : '';
     const stopTag = stopped ? '<div class="message-stop-tag">（已停止）</div>' : '';
-    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${regenBtn}${stopTag}</div>`;
+    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${regenBtn}${swipeBar}${stopTag}</div>`;
 }
 
 /**
@@ -142,6 +150,9 @@ export function buildMessagesHtml(messages, context = {}) {
         error: m.error,
         messageId: m.id,
         regenerate: regenTarget && i === messages.length - 1,
+        // MS-2：候选集与激活序号透传（气泡工厂据此渲染候选控制条）
+        swipes: m.swipes,
+        activeSwipeIndex: m.active_swipe_index ?? 0,
     })).join('');
 }
 

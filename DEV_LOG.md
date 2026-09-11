@@ -138,6 +138,17 @@
   4. 落债 F-98（delete_messages_from 退役候选，Speculative）。
 - **非阻断落债**：F-98（delete_messages_from 生产退役候选）。
 
+---
+
+## MS-2 swipes 前端候选控制条（2026-09-10 — AI风月对标五批工单 MS 第二张，承接 MS-1）
+
+- **来源**：承接 MS-1（候选表 + content 跟随激活模型就绪）；本票把候选体验接到聊天 UI（spec §MS-2）。
+- **后端**（前端依赖）：MessageResponse 扩展 `swipes`（候选 content 列表）/`active_swipe_index`，GET 消息列表经 `_with_swipes` 填充；新增 `POST /api/messages/{id}/switch-swipe`（body {index}，越界 SwipeIndexError→400）；路由契约锁并入 test_message_swipes（列表含候选/切换生效/越界 400）。
+- **前端**：`format.js::messageBubbleHtml` 增候选控制条（仅 assistant 且 swipes>1：‹ n/m ›，图标走 iconHtml('chevronLeft/Right')）——buildMessagesHtml 透传 swipes/active；`chat.js::switchSwipe`（私有）——控制条点击 → **乐观更新**（msg.content 跟随激活候选 + updateTab + renderMessages）→ `messages.switchSwipe` 落库 → **失败回滚**（恢复原候选 + 重渲染 + 错误条）；api.js messages.switchSwipe。
+- **过程遥测**：chat-swipes 契约锁初版「失败回滚」在跑 2a 后失败——根因是测试文件模块级共享常量 `SWIPE_MSG` 被 2a 的乐观更新就地突变（content 变候选二）污染后续用例 → seedTab 改为逐用例克隆消息对象（{...m, swipes:[...]}）；临场用调试探针定位（catch 内回滚后值仍为候选二 → 推断 prevContent 已被污染）。
+- **验证链**：后端 pytest 923+1skip（+1 路由用例）| 前端 Vitest 1213→1219（+6 契约锁）| 全量双端绿零回归 | doc_sync 零漂移。
+- **非阻断落债**：无。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2206<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->923<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1213<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2213<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->924<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1219<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -186,7 +186,7 @@ conver system/
 │   │   └── utils/
 │   │       ├── model-utils.js      ← 模型下拉填充工具
 │   │       └── sse-reader.js       ← SSE 流解析
-│   ├── tests/                      ← Vitest（34 个文件，见 §5.2）
+│   ├── tests/                      ← Vitest（35 个文件，见 §5.2）
 │   ├── vitest.config.js
 │   ├── package.json
 │   └── simulators/                 ← 22 款第三方单文件模拟器（HTML，非源码）
@@ -302,7 +302,7 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/conversations.py:export_conversation_markdown-->`export_conversation_markdown(conversation_id, db)`<!--/AUTO--> | GET Markdown 导出 |
 | <!--AUTO:sig:backend/app/api/routes/conversations.py:regenerate-->`regenerate(conversation_id, body=None, db)`<!--/AUTO--> | POST 重生成 AI 回复 |
 
-### 4.9 `backend/app/api/routes/messages.py` — 消息路由（<!--AUTO:lines:backend/app/api/routes/messages.py-->~33 行<!--/AUTO-->）
+### 4.9 `backend/app/api/routes/messages.py` — 消息路由（<!--AUTO:lines:backend/app/api/routes/messages.py-->~53 行<!--/AUTO-->）
 
 **职责**：消息读取 + 跨对话关键词搜索。
 
@@ -663,7 +663,7 @@ conver system/
 | <!--AUTO:sig:backend/scripts/migrate_data.py:migrate-->`migrate(source, target, force=False)`<!--/AUTO--> | 执行迁移（幂等 + 标记） |
 | <!--AUTO:sig:backend/scripts/migrate_data.py:main-->`main(argv=None)`<!--/AUTO--> | CLI 入口 |
 
-### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~306 行<!--/AUTO-->）
+### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~308 行<!--/AUTO-->）
 
 **职责**：Fetch 封装——超时守卫（AbortController + 15s 兜底，TD-51/55/72）、错误归一化、SSE 流式、Blob 下载（Content-Disposition 文件名解析）。T6 重生成：`conversations.regenerate(id, { message_id? })` 封装 `POST /api/conversations/{id}/regenerate`（缺省末条 assistant），客户端错误处理与 `messages.chat` 同走 `request` 错误通道。
 
@@ -698,7 +698,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~793 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~834 行<!--/AUTO-->）
 
 **职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名、T3 对话内模型切换（openModelSwitch）、T6 末条 AI 回复重生成（regenerateLastReply → conversations.regenerate → settleTurn 重载，在途守卫与 handleSend 非流式共用）。T2 搜索定位：`renderMessages({ messageId })` 在消息加载/渲染后把目标气泡 `scrollIntoView({block:'center'})` 定位到视口中央 + 应用 `.search-highlight` 高亮约 3s 自动清除（`locateAndHighlight`），并与既有 `scrollToBottom` 互斥（定位不被滚动到底覆盖）。
 
@@ -910,7 +910,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/fetch-seam.js:setFetch-->`setFetch(fn)`<!--/AUTO--> | 注入 fetch 实现（测试用） |
 | <!--AUTO:sig:frontend/js/fetch-seam.js:doFetch-->`doFetch(...args)`<!--/AUTO--> | 统一 fetch 出口（超时守卫） |
 
-### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~224 行<!--/AUTO-->）
+### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~235 行<!--/AUTO-->）
 
 **职责**：展示 HTML 生成单源（ARC 展示契约）——消息气泡/角色卡片/会话项/搜索结果/头像/关键词高亮。T2 搜索定位：`messageBubbleHtml` 接受可选 `messageId` 选项 → 渲染 `data-message-id` 属性（供定位选择器消费）；`buildMessagesHtml` 透传 `m.id`。T6 重生成：`buildMessagesHtml` 的 `context.canRegenerate`（聊天域开关）为真且末条为已结算 assistant 时，该气泡经 `messageBubbleHtml` 渲染「重生成」操作按钮。
 
@@ -1356,7 +1356,7 @@ conver system/
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_memory_palace.py` |
-| `backend/tests/test_message_swipes.py` | <!--AUTO:tests:backend/tests/test_message_swipes.py-->9<!--/AUTO--> | swipes 多候选契约锁（MS-1：播种序号自增/唯一约束/切换越界/删中间与回落/原始候选保护/级联/导出含候选集/自愈迁移幂等） | <!--AUTO:tests:backend/tests/test_memory_palace.py-->15<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
+| `backend/tests/test_message_swipes.py` | <!--AUTO:tests:backend/tests/test_message_swipes.py-->10<!--/AUTO--> | swipes 多候选契约锁（MS-1：播种序号自增/唯一约束/切换越界/删中间与回落/原始候选保护/级联/导出含候选集/自愈迁移幂等） | <!--AUTO:tests:backend/tests/test_memory_palace.py-->15<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
@@ -1386,7 +1386,8 @@ conver system/
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
-| `frontend/tests/chat.test.js` | <!--AUTO:tests:frontend/tests/chat.test.js-->85<!--/AUTO--> | 对话视图 |
+| `frontend/tests/chat.test.js` |
+| `frontend/tests/chat-swipes.test.js` | <!--AUTO:tests:frontend/tests/chat-swipes.test.js-->6<!--/AUTO--> | swipes 候选控制条契约锁（MS-2：计数渲染/单选不渲染/切换调用参数/边界不越界/失败回滚） | <!--AUTO:tests:frontend/tests/chat.test.js-->85<!--/AUTO--> | 对话视图 |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->16<!--/AUTO--> | 会话激活 |
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
@@ -1469,10 +1470,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2206<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2213<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->923<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1213<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->924<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1219<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

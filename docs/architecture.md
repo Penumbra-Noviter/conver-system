@@ -52,7 +52,7 @@ conver-system/
 │   │   │       ├── chat.py        # 聊天端点（HTTP 映射 + SSE 帧包装，逻辑在 services/chat.py）
 │   │   │       ├── conversations.py # 对话管理
 │   │   │       ├── lorebook.py     # 世界书条目 CRUD（WL-4：列表/创建/部分更新/删除）
-│   │   │       ├── messages.py    # 消息检索（GET 历史 + 搜索）
+│   │   │       ├── messages.py    # 消息检索（GET 历史含候选集/激活序号 + 搜索 + switch-swipe 端点 MS-2）
 │   │   │       ├── models.py      # 可用模型列表
 │   │   │       ├── settings.py    # 配置管理 + GET /credentials 只读凭证端点（U8 模拟器注入）
 │   │   │       └── simulators.py  # 模拟器路由（T-02：import 单文件导入 + generate AI 生成游戏）

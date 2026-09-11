@@ -11,14 +11,21 @@ from pydantic import BaseModel, Field
 
 
 class MessageResponse(BaseModel):
-    """消息响应体"""
+    """消息响应体（MS-2：含候选集与激活序号）"""
     id: int
     conversation_id: int
     role: str
     content: str
     created_at: datetime.datetime
+    swipes: list[str] = Field(default_factory=list, description="候选集（index 升序；含原始内容候选 0）")
+    active_swipe_index: int = Field(0, description="当前激活候选序号")
 
     model_config = {"from_attributes": True}
+
+
+class SwitchSwipeRequest(BaseModel):
+    """切换候选请求体"""
+    index: int = Field(..., ge=0, description="目标候选序号")
 
 
 class SearchResult(BaseModel):

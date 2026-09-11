@@ -265,6 +265,8 @@ export const messages = {
     list: (conversationId) => request('GET', `/conversations/${conversationId}/messages`),
     chat: (data) => request('POST', '/chats', data),
     search: (q, limit = 50) => request('GET', `/messages/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    /** 切换消息激活候选（MS-2：body {index}；越界 → 400） */
+    switchSwipe: (messageId, index) => request('POST', `/messages/${messageId}/switch-swipe`, { index }),
 };
 
 /**

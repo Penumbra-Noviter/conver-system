@@ -217,6 +217,15 @@ export function renderMessages({ messageId } = {}) {
         btn.addEventListener('click', () => regenerateLastReply());
     });
 
+    // MS-2 候选控制条事件：左右切换 → 乐观更新渲染 → 调 switch-swipe 落库 → 失败回滚
+    container.querySelectorAll('[data-swipe-bar]').forEach((bar) => {
+        const messageId = Number(bar.closest('.message').dataset.messageId);
+        bar.querySelector('.swipe-prev')?.addEventListener('click', () =>
+            switchSwipe(messageId, -1));
+        bar.querySelector('.swipe-next')?.addEventListener('click', () =>
+            switchSwipe(messageId, 1));
+    });
+
     // 缓存变体标记（stopped/error/streaming）由 buildMessagesHtml 经工厂透传还原 —
     // 切走再切回后停止/错误/流式语义保持一致（F1）；onToken 据此复用 live 气泡
 
@@ -841,6 +850,42 @@ export async function regenerateLastReply() {
 
     // 刷新对话列表（更新消息数量）
     await hooks.refreshConversations();
+}
+
+/**
+ * 切换消息候选（MS-2）：‹ › 控制条点击 → 乐观更新渲染 → 落库 → 失败回滚
+ *
+ * @param {number} messageId - 目标消息 id
+ * @param {number} delta - 1=下一候选 / -1=上一候选
+ */
+async function switchSwipe(messageId, delta) {
+    const tab = getActiveTab();
+    if (!tab || !Array.isArray(tab.messages)) return;
+    const msg = tab.messages.find((m) => m && m.id === messageId);
+    const swipes = Array.isArray(msg?.swipes) ? msg.swipes : [];
+    if (!msg || swipes.length <= 1) return; // 单选不渲染控制条（防御）
+    const current = Number(msg.active_swipe_index ?? 0);
+    const next = Math.min(swipes.length - 1, Math.max(0, current + delta));
+    if (next === current) return; // 边界已到
+
+    const prevContent = msg.content;
+    const prevActive = msg.active_swipe_index;
+    // 乐观更新：content 跟随激活候选（与后端 switch_swipe 语义一致）+ 重渲染
+    msg.content = swipes[next];
+    msg.active_swipe_index = next;
+    updateTab(tab.conversationId, { messages: tab.messages });
+    renderMessages();
+
+    try {
+        await messages.switchSwipe(messageId, next);
+    } catch (err) {
+        // 失败回滚：恢复原候选并重渲染（弱化断言禁止 — 状态必须还原）
+        msg.content = prevContent;
+        msg.active_swipe_index = prevActive;
+        updateTab(tab.conversationId, { messages: tab.messages });
+        renderMessages();
+        renderSendError(err, '切换候选失败', tab.conversationId);
+    }
 }
 
 // ══════════════════════════════════════════════════

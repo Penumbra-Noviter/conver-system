@@ -202,6 +202,59 @@ def test_export_includes_swipes_and_active(db_session: Session) -> None:
     assert rt_msg["active_swipe_index"] == 2
 
 # ════════════════════════════════════════════════════════════════
+# 七、路由：消息列表含候选 + switch-swipe 端点（MS-2 前端依赖）
+# ════════════════════════════════════════════════════════════════
+
+
+def test_messages_route_includes_swipes_and_switch(db_session) -> None:
+    """GET 消息列表含候选集/激活序号；POST switch-swipe 切换生效（越界 400）"""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from backend.app.api.errors import domain_error_handler
+    from backend.app.api.routes import messages as messages_route
+    from backend.app.database import get_db
+    from backend.app.services.exceptions import DomainError
+
+    app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
+    app.include_router(messages_route.router)
+    app.dependency_overrides[get_db] = lambda: db_session
+
+    from backend.app.models.character import Character
+    from backend.app.schemas.conversation import ConversationCreate
+
+    char = Character(name="swipe路由", personality="测试", first_mes="")
+    db_session.add(char)
+    db_session.commit()
+    db_session.refresh(char)
+    conv = conversation_service.create_conversation(
+        db_session, ConversationCreate(character_id=char.id)
+    )
+    db_session.add(Message(conversation_id=conv.id, role=Role.ASSISTANT, content="原始"))
+    db_session.commit()
+    msg = db_session.query(Message).filter(Message.conversation_id == conv.id).first()
+    message_service.add_swipe(db_session, msg.id, "候选A", make_active=False)
+    message_service.add_swipe(db_session, msg.id, "候选B", make_active=False)
+
+    with TestClient(app) as client:
+        listed = client.get(f"/api/conversations/{conv.id}/messages")
+        assert listed.status_code == 200
+        item = listed.json()[0]
+        assert item["swipes"] == ["原始", "候选A", "候选B"]
+        assert item["active_swipe_index"] == 0
+        assert item["content"] == "原始"  # active=0 → 原始
+
+        switched = client.post(f"/api/messages/{msg.id}/switch-swipe", json={"index": 2})
+        assert switched.status_code == 200
+        body = switched.json()
+        assert body["active_swipe_index"] == 2
+        assert body["content"] == "候选B"  # content 跟随激活
+
+        assert client.post(f"/api/messages/{msg.id}/switch-swipe", json={"index": 99}).status_code == 400
+
+
+# ════════════════════════════════════════════════════════════════
 # 六、自愈迁移幂等（spec §0：加列须附契约锁锁幂等）
 # ════════════════════════════════════════════════════════════════
 
