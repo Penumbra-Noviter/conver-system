@@ -2,7 +2,7 @@
 消息管理 & 聊天逻辑
 
 协议表面（__all__）：get_messages / create_message / create_message_no_commit /
-delete_messages_from / auto_insert_greeting / build_message_list / search_messages /
+auto_insert_greeting / build_message_list / search_messages /
 add_swipe / list_swipes / switch_swipe / delete_swipe。
 """
 
@@ -26,7 +26,6 @@ __all__ = [
     "get_messages",
     "create_message",
     "create_message_no_commit",
-    "delete_messages_from",
     "auto_insert_greeting",
     "build_message_list",
     "search_messages",
@@ -85,33 +84,6 @@ def create_message_no_commit(db: Session, conversation_id: int, role: Role, cont
     msg = Message(conversation_id=conversation_id, role=role, content=content)
     db.add(msg)
     return msg
-
-
-def delete_messages_from(db: Session, conversation_id: int, target_id: int) -> int:
-    """删除对话中 id >= target_id 的所有消息（锚定 PK id 截断）
-
-    不提交（由调用方在事务收尾时一并 commit），支持回滚。
-    不 bump conv.updated_at（仅 create_message 会更新时间戳）。
-    使用 synchronize_session="fetch"：同步移除会话中受影响的消息对象，
-    避免后续复用同 id（SQLite 会复用被删 ROWID）时 identity map 冲突。
-
-    Args:
-        db: 数据库会话
-        conversation_id: 对话 ID
-        target_id: 截断起点消息 ID（含）
-
-    Returns:
-        删除的消息数量
-    """
-    result = (
-        db.query(Message)
-        .filter(
-            Message.conversation_id == conversation_id,
-            Message.id >= target_id,
-        )
-        .delete(synchronize_session="fetch")
-    )
-    return result
 
 
 def auto_insert_greeting(

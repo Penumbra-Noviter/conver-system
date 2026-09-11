@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2209<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->926<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1213<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2206<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->923<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1213<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -480,7 +480,7 @@ conver system/
 
 > 无公开函数（异常类层次）。
 
-### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~335 行<!--/AUTO-->）
+### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~312 行<!--/AUTO-->）
 
 **职责**：消息读取/写入/写入（不提交）/截断/开场白自动插入/上下文构建（滑窗）/跨对话搜索。
 
@@ -489,7 +489,6 @@ conver system/
 | <!--AUTO:sig:backend/app/services/message.py:get_messages-->`get_messages(db, conversation_id)`<!--/AUTO--> | 会话消息列表 |
 | <!--AUTO:sig:backend/app/services/message.py:create_message-->`create_message(db, conversation_id, role, content)`<!--/AUTO--> | 写入消息（自动提交） |
 | <!--AUTO:sig:backend/app/services/message.py:create_message_no_commit-->`create_message_no_commit(db, conversation_id, role, content)`<!--/AUTO--> | 写入消息（不提交，供事务原子性） |
-| <!--AUTO:sig:backend/app/services/message.py:delete_messages_from-->`delete_messages_from(db, conversation_id, target_id)`<!--/AUTO--> | 截断：删除 target_id 起全部消息（锚定 PK id，不提交） |
 | <!--AUTO:sig:backend/app/services/message.py:auto_insert_greeting-->`auto_insert_greeting(db, conversation_id, user_name='User')`<!--/AUTO--> | 新会话自动插入开场白 |
 | <!--AUTO:sig:backend/app/services/message.py:build_message_list-->`build_message_list(db, conversation, user_content, max_rounds=30, user_name='User', append_current_input=True, world_injection=None, history=None)`<!--/AUTO--> | 构建 LLM 上下文（滑窗 + 模板变量） |
 | <!--AUTO:sig:backend/app/services/message.py:search_messages-->`search_messages(db, query, limit=50)`<!--/AUTO--> | 跨对话关键词搜索 |
@@ -1365,7 +1364,7 @@ conver system/
 | `backend/tests/test_prompt_world_injection.py` | <!--AUTO:tests:backend/tests/test_prompt_world_injection.py-->7<!--/AUTO--> | build_messages 世界书注入契约锁（WL-3：world=None 逐字节零回归/三注入位/世界知识合并/重生成尾随剥离/空世界书无空 system） |
 | `backend/tests/test_chat_world_injection.py` | <!--AUTO:tests:backend/tests/test_chat_world_injection.py-->6<!--/AUTO--> | assemble_chat_context 世界书注入集成契约锁（WL-3：普通/重生成两路径一致/无条目零开销/滑窗与 depth 解耦） |
 | `backend/tests/test_provider_registry.py` | <!--AUTO:tests:backend/tests/test_provider_registry.py-->24<!--/AUTO--> | Provider 注册表 |
-| `backend/tests/test_regenerate.py` | <!--AUTO:tests:backend/tests/test_regenerate.py-->28<!--/AUTO--> | regenerate 端点（截断/事务/错误矩阵） |
+| `backend/tests/test_regenerate.py` | <!--AUTO:tests:backend/tests/test_regenerate.py-->25<!--/AUTO--> | regenerate 端点（截断/事务/错误矩阵） |
 | `backend/tests/test_regenerate_spike.py` | <!--AUTO:tests:backend/tests/test_regenerate_spike.py-->22<!--/AUTO--> | regenerate truncation×滑窗边界实证（T0 spike） |
 | `backend/tests/test_resolve_llm.py` | <!--AUTO:tests:backend/tests/test_resolve_llm.py-->7<!--/AUTO--> | LLM 解析器 |
 | `backend/tests/test_schema_snapshot.py` | <!--AUTO:tests:backend/tests/test_schema_snapshot.py-->1<!--/AUTO--> | schema 快照漂移检测（T-17） |
@@ -1470,9 +1469,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2209<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2206<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->926<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->923<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1213<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

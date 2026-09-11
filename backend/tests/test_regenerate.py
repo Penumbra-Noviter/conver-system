@@ -4,7 +4,6 @@ T5 重生成后端端点 — 端到端 / 服务层 / 下层函数的契约测试
 覆盖（验收语义契约，按 T0 spike 定稿）：
     1. assemble_chat_context（prepare_chat 抽出的下层函数）：不插入 user、
        不自动插入 greeting；current_input 时追加输入、None 时（重生成）不追加
-    2. delete_messages_from：锚定 PK id 截断服务函数（MS-1 后仅测试消费，生产退役）
     3. create_message_no_commit：不 commit 的 create 辅助（事务原子性）
     4. regenerate_chat 编排：截断 → 组装（不插入 user）→ 生成 → 落库（单事务）；
        无幽灵重复 user；LLM 失败回滚截断
@@ -263,67 +262,6 @@ class TestAssembleChatContext:
         conv = _create_conversation(db_session)
         with pytest.raises(ApiKeyMissingError):
             chat_service.assemble_chat_context(db_session, conv.id, current_input="你好")
-
-
-# ── 2. delete_messages_from 截断服务函数 ──
-
-
-class TestDeleteMessagesFrom:
-    """时间线截断：锚定 PK id，删除 target 及其后全部，不 commit"""
-
-    def test_deletes_target_and_after(self, db_session: Session) -> None:
-        """截断语义：删除 target 及所有 id >= target 的消息"""
-        char_id = _create_character(db_session)
-        conv = _create_conversation(db_session, character_id=char_id)
-        _add_messages(
-            db_session, conv.id,
-            ("user", "问题"), ("assistant", "旧回复"),
-            ("user", "额外问题"), ("assistant", "额外回复"),
-        )
-        target_id = _message_id(db_session, conv.id, "旧回复")
-
-        deleted = message_service.delete_messages_from(db_session, conv.id, target_id)
-        db_session.commit()
-
-        assert deleted == 3  # 旧回复 + 额外问题 + 额外回复
-        assert _contents(db_session, conv.id) == ["问题"]
-
-    def test_anchor_is_pk_id_not_created_at(self, db_session: Session) -> None:
-        """回归锁：created_at 微秒 tie 时不误删邻居——锚定 id 只删 target 自身"""
-        import datetime
-
-        char_id = _create_character(db_session)
-        conv = _create_conversation(db_session, character_id=char_id)
-        _add_messages(
-            db_session, conv.id,
-            ("user", "第一轮问"), ("assistant", "第一轮答"), ("user", "触发"),
-        )
-        # 强制全部共享同一微秒时间戳（真实运行中相邻 create_message 可能 tie）
-        rows = db_session.query(Message).filter(Message.conversation_id == conv.id).all()
-        shared = datetime.datetime(2026, 1, 1, 12, 0, 0, 1)
-        for r in rows:
-            r.created_at = shared
-        db_session.commit()
-
-        target_id = _message_id(db_session, conv.id, "触发")
-
-        message_service.delete_messages_from(db_session, conv.id, target_id)
-        db_session.commit()
-
-        # 只删触发（id 锚），同刻的前两轮全部保留
-        assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答"]
-
-    def test_no_commit_write_when_rolled_back(self, db_session: Session) -> None:
-        """事务原子性：不 commit 的删除可整体回滚（LLM 失败路径）"""
-        char_id = _create_character(db_session)
-        conv = _create_conversation(db_session, character_id=char_id)
-        _add_messages(db_session, conv.id, ("user", "问题"), ("assistant", "回复"))
-        target_id = _message_id(db_session, conv.id, "回复")
-
-        message_service.delete_messages_from(db_session, conv.id, target_id)
-        db_session.rollback()
-
-        assert _contents(db_session, conv.id) == ["问题", "回复"]
 
 
 # ── 3. create_message_no_commit 原子性辅助 ──

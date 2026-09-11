@@ -53,7 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-98 | delete_messages_from 生产无调用方（MS-1 重生成改 add_swipe 后退役；仅 __all__ 协议面 + 3 个自测消费）——保留或删除待拍板 | MS-1 期末 code-review Standards 轴 | Speculative | 📝 待立项 | 架构清理 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -80,7 +79,7 @@
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95 + F-96（做）+ F-97（关），轻量档 5 项）
+### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95 + F-96（做）+ F-97（关）+ F-98（做），轻量档 6 项）
 
 > 处置详情：3 项消费（各对应 TICKETS 归档工单）。Grilling 实证拍板**全做**——F-93 git grep 复核 `lorebook._as_str_list` 与 `character_card._as_list` 逐行重复仍成立（character_card 2 处 + lorebook 1 处消费）；F-94 `chat._msg_role` 与 `prompt._role_str` 的 `hasattr(.value)` 枚举归一重复（chat.py:535 / prompt.py:103）；F-95 `build_message_list` 生产调用方仅 chat.py 两处（assemble_chat_context），加可选 history 参数即可消除扫描窗 + 内部双查。方案：新建 `services/text_utils.py` 共享单点（as_str_list + role_str）收敛 F-93/F-94；F-95 build_message_list 增 `history: Sequence | None`（None → 内部查询，既有调用不变）。
 
@@ -91,6 +90,7 @@
 | F-95 | assemble_chat_context 扫描窗 + build_message_list 双查历史 | WL-3 期末 code-review Standards 轴 | Speculative | ✅ 已修（2026-09-10：轻量档工单 `build_message_list` 增可选 history 参数，assemble 传入已取历史消除双查；显式传 history 不再查库由契约锁锁定） |
 | F-96 | escapeHtml 不转义引号——属性上下文插值（value="..."/data-*="..."）含 " 时可属性注入（WL-4 lorebook-editor 曾局部 escapeAttr，其余组件同类） | WL-4 期末 code-review Falsify 轴（stored XSS 实证） | Worth exploring | ✅ 已修（2026-09-10：轻量档工单升级共享 `escapeHtml` 同时转义 " → &quot;（15 处属性插值一处收敛），lorebook-editor escapeAttr 退役；markdown sanitizeUrl 补实体引号形态拒绝（&quot;/&#34;/&#x22/，保 TD-42「引号 URL → 纯文本」契约）；契约锁 escapeHtml 引号转义 + DOM 往返 + 无注入属性，Vitest 1211→1212） |
 | F-97 | 记忆宫殿开关为全局 settings 而非会话级 | WL-5 期末 code-review Spec 轴 | Worth exploring | ❌ 复核关闭（2026-09-10：注入链 `_lorebook_world_injection` → `list_entries(character_id)` 取角色全部启用条目（含 source=auto），无会话维度过滤——auto 条目对角色所有会话注入；「会话级开关」要生效须结构性变更（注入链按会话过滤或 auto 条目改挂会话），与「记忆归角色跨会话共享」产品语义冲突且改动面大；现状全局开关与角色级注入架构自洽，spec 存储位置二选一（settings 已实现）已满足） |
+| F-98 | delete_messages_from 生产退役 | MS-1 期末 code-review Standards 轴 | Speculative | ✅ 已修（2026-09-10：轻量档工单删除——无生产调用方、语义被 MS-1 add_swipe/regenerate 新流程取代，保留即误导（截断语义与 swipes 冲突）；删函数 + __all__ + 模块 docstring + test_regenerate §2 三用例，pytest 925→922 全绿零回归） |
 
 ### 2026-08-27（技术债消费批次：F-82~F-89 全自动档 kickoff，3 做 5 关）
 
