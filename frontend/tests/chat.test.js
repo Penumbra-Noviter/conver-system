@@ -48,14 +48,20 @@ const mockJson = (data, status = 200) =>
 /**
  * fetch mock 路由（api.js doFetch seam 消费）
  * POST /api/chats → 非流式消息发送；POST /api/conversations/{id}/regenerate → 重生成；
- * GET /api/conversations/{id}/messages → 消息列表
+ * POST /api/conversations/{id}/continue → 续写；GET /api/conversations/{id}/messages → 消息列表
  */
-function makeApiMock({ chatResult = null, messagesByConv = {}, regenerateResult = null } = {}) {
+function makeApiMock({ chatResult = null, messagesByConv = {}, regenerateResult = null, continueResult = null } = {}) {
     return vi.fn(async (url, options = {}) => {
         const path = String(url).replace(/^.*\/api/, '/api');
         const method = options.method || 'GET';
         if (path === '/api/chats' && method === 'POST') {
             return mockJson(chatResult ?? { reply: '回复' });
+        }
+        const contMatch = path.match(/^\/api\/conversations\/(\d+)\/continue$/);
+        if (contMatch && method === 'POST') {
+            return mockJson(
+                continueResult ?? { reply: '续写', message_id: 1, conversation_id: Number(contMatch[1]) }
+            );
         }
         const regenMatch = path.match(/^\/api\/conversations\/(\d+)\/regenerate$/);
         if (regenMatch && method === 'POST') {
@@ -1586,6 +1592,146 @@ describe('T6 重生成 — 末条 assistant 气泡重生成闭环', () => {
         tabs.updateTab(11, { messages: [msg(1, 'user', '你好')] });
         chat.renderMessages();
         expect(chat.chatDom.chatMessages.querySelector('.btn-regenerate')).toBeNull();
+    });
+});
+
+describe('MS-3 继续 — 末条 assistant 气泡续写闭环（append 续写）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 续写前置：缓存 [user(1), assistant(2)]；服务端续写后同 id 消息内容扩展 */
+    const CONT_MSGS = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')];
+    const CONT_SERVER = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复（续写片段）')];
+
+    it('末条 assistant 气泡渲染继续按钮（与重生成同组）；点击 → conversations.continue(11)（无请求体）→ settleTurn 重载渲染扩展内容且消息 id 不变', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: CONT_MSGS });
+        const fetchSpy = makeApiMock({
+            continueResult: { reply: '旧回复（续写片段）', message_id: 2, conversation_id: 11 },
+            messagesByConv: { 11: CONT_SERVER },
+        });
+        api.setFetch(fetchSpy);
+        const refresh = vi.fn();
+        chat.setChatHooks({ refreshConversations: refresh });
+
+        chat.renderMessages();
+
+        // 末条 assistant 气泡携带继续按钮；重生成按钮同组渲染（同一气泡）
+        const asstBubble = chat.chatDom.chatMessages.querySelector('.message.assistant');
+        const contBtn = asstBubble.querySelector('.btn-continue');
+        expect(contBtn).not.toBeNull();
+        expect(asstBubble.querySelector('.btn-regenerate')).not.toBeNull();
+
+        contBtn.click();
+
+        // 端点调用契约：POST /api/conversations/11/continue，无请求体（续写目标恒为末条）
+        await vi.waitFor(() => {
+            expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11/continue') && o?.method === 'POST')).toBe(true);
+        });
+        const contCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/conversations/11/continue') && o?.method === 'POST');
+        expect(contCall[1].body).toBeUndefined();
+
+        // settleTurn 重载 → 扩展内容进缓存（消息 id 不变 = 2，非新消息）
+        await vi.waitFor(() => {
+            expect(tabs.getTab(11).messages).toEqual(CONT_SERVER);
+        });
+        expect(chat.chatDom.chatMessages.textContent).toContain('旧回复（续写片段）');
+        // 重渲染后新气泡仍携带继续按钮（重新绑定）
+        expect(chat.chatDom.chatMessages.querySelector('.message.assistant .btn-continue')).not.toBeNull();
+        expect(refresh).toHaveBeenCalled();
+    });
+
+    it('在途守卫：继续进行中 thinking + 按钮禁用；与重生成共享互斥集合（只发一次真实请求）', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: CONT_MSGS });
+
+        let resolveCont;
+        const contSpy = vi.spyOn(api.conversations, 'continue')
+            .mockReturnValue(new Promise((r) => { resolveCont = r; }));
+        const settleSpy = vi.spyOn(ss, 'settleTurn').mockResolvedValue(undefined);
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderMessages();
+        const contBtn = chat.chatDom.chatMessages.querySelector('.btn-continue');
+
+        contBtn.click(); // 第一次触发 — 在途
+
+        // 进行中状态：thinking 指示器 + 继续按钮禁用（同组重生成按钮一并禁用）
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).not.toBeNull();
+        expect(contBtn.disabled).toBe(true);
+        expect(chat.chatDom.chatMessages.querySelector('.message.assistant .btn-regenerate').disabled).toBe(true);
+
+        // 在途守卫：重复触发（按钮点击 / 直接调用）被拦截 — 只发一次真实请求
+        contBtn.click();
+        await chat.continueLastReply();
+        expect(contSpy).toHaveBeenCalledTimes(1);
+        expect(settleSpy).not.toHaveBeenCalled();
+
+        // 结算后：settle 委托参数带服务端消息 id（续写不产生新消息，id = 被续写消息）+ 进行中 UI 复原
+        resolveCont({ reply: '旧回复（续写片段）', message_id: 2, conversation_id: 11 });
+        await vi.waitFor(() => expect(settleSpy).toHaveBeenCalledTimes(1));
+        const call = settleSpy.mock.calls[0][0];
+        expect(call.convId).toBe(11);
+        expect(call.messageId).toBe(2);
+        expect(call.settleIndex).toBe(-1);
+        await vi.waitFor(() => {
+            expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).toBeNull();
+            expect(contBtn.disabled).toBe(false);
+            expect(chat.chatDom.chatMessages.querySelector('.message.assistant .btn-regenerate').disabled).toBe(false);
+        });
+
+        // 在途清除 → 可再次触发
+        await chat.continueLastReply();
+        expect(contSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('失败 → 走错误条通道（不写进消息列表）+ settleTurn 不调用 + thinking/按钮复原 + 在途清除', async () => {
+        const { chat, tabs, api, ss } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: CONT_MSGS });
+
+        const contSpy = vi.spyOn(api.conversations, 'continue').mockRejectedValue(new Error('续写端点错误'));
+        const settleSpy = vi.spyOn(ss, 'settleTurn');
+        chat.setChatHooks({ refreshConversations: () => {} });
+        chat.renderMessages();
+        const contBtn = chat.chatDom.chatMessages.querySelector('.btn-continue');
+
+        contBtn.click();
+
+        await vi.waitFor(() => {
+            // 错误经既有错误通道渲染（与 messages.chat / 重生成同一 catch 路径）
+            const bar = chat.chatDom.chatMessages.parentElement.querySelector('.chat-error-bar');
+            expect(bar).not.toBeNull();
+            expect(bar.textContent).toContain('续写端点错误');
+            // 不写进消息列表 — 缓存保持原状（续写失败原内容零改动语义）
+            expect(tabs.getTab(11).messages).toEqual(CONT_MSGS);
+            expect(chat.chatDom.chatMessages.textContent).toContain('旧回复');
+        });
+        expect(settleSpy).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+            expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).toBeNull();
+            expect(contBtn.disabled).toBe(false);
+        });
+    });
+
+    it('Falsify:流式在途 tab（isStreaming）→ no-op 不调 continue', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: CONT_MSGS, isStreaming: true });
+        const contSpy = vi.spyOn(api.conversations, 'continue');
+
+        await chat.continueLastReply();
+
+        expect(contSpy).not.toHaveBeenCalled();
+    });
+
+    it('Falsify:无末条 assistant（仅 user 消息）→ 不渲染继续按钮', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [msg(1, 'user', '你好')] });
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.querySelector('.btn-continue')).toBeNull();
     });
 });
 

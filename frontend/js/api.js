@@ -255,6 +255,18 @@ export const conversations = {
         `/conversations/${id}/regenerate`,
         message_id != null ? { message_id } : null,
     ),
+    /**
+     * 续写末条 AI 回复（MS-3 append 续写：不追加 user，原消息扩展为「原内容 + 续写片段」）
+     *
+     * POST /api/conversations/{id}/continue；无请求体（续写目标恒为末条 assistant）。
+     * 响应与既有非流式 ChatResponse 同构 `{ reply, message_id, conversation_id }`，
+     * 其中 message_id = **被续写的消息**（消息 id 不变，内容扩展）——调用方经
+     * settleTurn 重载服务端列表获得扩展内容。
+     *
+     * @param {number|string} id - 会话 id
+     * @returns {Promise<{reply: string, message_id: number, conversation_id: number}>}
+     */
+    continue: (id) => request('POST', `/conversations/${id}/continue`, null),
 };
 
 // ══════════════════════════════════════════════════

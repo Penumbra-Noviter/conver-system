@@ -38,6 +38,20 @@ async def regenerate(
     return await chat_service.regenerate_chat(db, conversation_id, body.message_id if body else None)
 
 
+@router.post("/{conversation_id}/continue", response_model=ChatResponse)
+async def continue_chat(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+) -> ChatResponse:
+    """续写末条 AI 回复（MS-3 append 续写：不追加 user，原消息扩展为「原内容 + 续写片段」）
+
+    编排（解析末条 assistant → 组装上下文 + 尾随续写触发 → 生成 → add_swipe 追加
+    候选）收拢在 services/chat.py 的 continue_chat；领域异常上抛由统一 handler
+    转 404/400。无请求体（续写目标恒为末条 assistant，前端按钮只渲染在末条气泡）。
+    """
+    return await chat_service.continue_chat(db, conversation_id)
+
+
 @router.get("", response_model=list[ConversationResponse])
 def list_conversations(
     character_id: Optional[int] = Query(None, description="按角色筛选"),

@@ -2,7 +2,7 @@
 聊天回合业务逻辑 — 流式/非流式聊天共用的深模块
 
 协议表面（__all__）：ChatContext / assemble_chat_context / prepare_chat / complete_chat /
-regenerate_chat / chat_error_response / stream_reply。
+regenerate_chat / continue_chat / chat_error_response / stream_reply。
 
 一次「聊天回合」的生命周期（插开场白 → 存用户消息 → 组装上下文 →
 取 Key 与 Provider → 生成 → 错误映射 → 保存/保存部分）全部收拢于此；
@@ -41,6 +41,7 @@ from backend.app.services.error_mapping import domain_error_response, llm_error_
 from backend.app.services.exceptions import (
     ConversationNotFoundError,
     DomainError,
+    InvalidContinueTargetError,
     InvalidRegenerateTargetError,
     MessageNotFoundError,
 )
@@ -61,12 +62,26 @@ __all__ = [
     "prepare_chat",
     "complete_chat",
     "regenerate_chat",
+    "continue_chat",
     "chat_error_response",
     "stream_reply",
 ]
 
 
 logger = logging.getLogger(__name__)
+
+
+#: MS-3 续写指令（尾随 user 触发的指令行；spec §MS-3 两可选实证拍板——
+#: 续写触发用「原消息末段」（user 形态），否决「续写系统提示」：适配器
+#: _prepare_messages「last system wins」锁定契约下尾随 system 会挤掉角色
+#: persona/system 链，user 形态与普通路径 system 链一致）
+CONTINUE_INSTRUCTION = (
+    "（请继续书写上一条 AI 回复：保持角色人设、语气与文风，"
+    "不要重复或概括已经写过的内容，直接从停下的地方接续）"
+)
+
+#: 续写触发的「原消息末段」锚点长度上限（字符）
+_CONTINUATION_TAIL_CHARS = 200
 
 
 @dataclass
@@ -374,6 +389,142 @@ async def regenerate_chat(
 
     return ChatResponse(
         reply=reply_text,
+        message_id=target.id,
+        conversation_id=conversation_id,
+    )
+
+
+def _resolve_continue_target(
+    db: Session,
+    conversation_id: int,
+) -> Message:
+    """解析续写目标并校验（须为对话末条消息且为 assistant）
+
+    MS-3 语义：续写只能在末条 assistant 之后进行（前端按钮也只渲染在末条
+    assistant 气泡）。末条为 user / 对话无消息 → 无续写目标。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+
+    Returns:
+        末条 assistant 消息
+
+    Raises:
+        InvalidContinueTargetError: 对话无消息或末条非 assistant
+    """
+    latest = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation_id)
+        .order_by(Message.id.desc())
+        .first()
+    )
+    if latest is None or latest.role != Role.ASSISTANT:
+        raise InvalidContinueTargetError("没有可续写的 AI 回复（末条须为 AI 回复）")
+    return latest
+
+
+def _continuation_tail(content: str | None) -> str:
+    """取原消息末段（续写触发锚点）：去首尾空白后取末 200 字符
+
+    MS-3 触发形态：尾随 user 消息 = CONTINUE_INSTRUCTION + 末段（spec §MS-3
+    「原消息末段为触发」）。短内容整体作为末段；空内容返回空串（触发只含指令）。
+
+    Args:
+        content: 被续写消息原文（可为 None）
+
+    Returns:
+        末段锚点字符串（非空原文时非空）
+    """
+    text = (content or "").strip()
+    if not text:
+        return ""
+    if len(text) > _CONTINUATION_TAIL_CHARS:
+        return text[-_CONTINUATION_TAIL_CHARS:]
+    return text
+
+
+async def continue_chat(
+    db: Session,
+    conversation_id: int,
+) -> ChatResponse:
+    """续写末条 AI 回复（MS-3 append 续写：不追加 user，原消息扩展为「原内容 + 续写片段」）
+
+    编排：解析并校验末条 assistant → 组装上下文（历史截止于目标，不插入 user）→
+    尾随续写触发 user 消息（CONTINUE_INSTRUCTION + 原消息末段）→ 生成 → **add_swipe
+    追加候选**（消息条数不变：原内容保留为候选，续写结果置为激活，content 跟随
+    激活候选）→ ChatResponse（message_id = 被续写消息）。LLM 失败时无任何落库
+    （原内容与候选均不变）。
+
+    触发形态拍板（spec §MS-3 两可选实证选一）：尾随 **user** 消息而非续写 system
+    提示 —— 适配器 _prepare_messages「last system wins」为锁定契约，尾随 system
+    会把角色 persona/system 链挤掉（真实 Provider 下续写出戏）；user 形态下
+    system 链与普通路径完全一致。「不追加 user」契约指 DB 层零新增消息行。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+
+    Returns:
+        ChatResponse（reply=原内容+续写片段 / message_id=被续写消息 / conversation_id）
+
+    Raises:
+        ConversationNotFoundError: 对话不存在
+        InvalidContinueTargetError: 末条非 assistant / 对话无消息
+        ApiKeyMissingError: 未配置 API Key
+        ProviderNotSupportedError: 不支持的 Provider
+        HTTPException: LLM 调用失败（经 chat_error_response 映射）
+    """
+    # 1. 校验对话存在
+    conversation_service.require_conversation(db, conversation_id)
+
+    # 2. 解析并校验目标（须为末条 assistant）
+    target = _resolve_continue_target(db, conversation_id)
+
+    # 3-4. 组装上下文（历史截止于目标，不插入 user；当前输入 None → 不追加）
+    #      + 尾随续写触发 user 消息（指令 + 原消息末段）。
+    try:
+        ctx = assemble_chat_context(
+            db, conversation_id, current_input=None,
+            history_limit_message_id=target.id,
+        )
+        tail = _continuation_tail(target.content)
+        trigger = CONTINUE_INSTRUCTION if not tail else f"{CONTINUE_INSTRUCTION}\n{tail}"
+        ctx.messages.append({"role": "user", "content": trigger})
+        reply_text = await ctx.provider.generate(
+            ctx.messages,
+            temperature=ctx.temperature,
+            model=ctx.conversation.model_name,
+        )
+    except LLMError as e:
+        status_code, message = chat_error_response(
+            e, ctx.conversation.model_provider
+        )
+        raise HTTPException(status_code=status_code, detail=message)
+
+    # 5. add_swipe 追加候选并置为激活：原内容保留（无候选时播种候选 0），
+    #    续写结果 = 原内容 + 续写片段（消息条数不变；content 跟随激活候选）。
+    #    bump 会话 updated_at（会话列表排序置顶，与 regenerate 一致）。
+    base_text = target.content or ""
+    continuation = reply_text.strip()
+    if not continuation:
+        # 空续写（LLM 未产出片段）：零改动 no-op——不新增重复候选行（Falsify
+        # 守卫：base + "" = base 会产生内容相同的重复候选），消息与候选均不动。
+        return ChatResponse(
+            reply=base_text,
+            message_id=target.id,
+            conversation_id=conversation_id,
+        )
+    new_text = base_text + continuation
+    message_service.add_swipe(db, target.id, new_text, make_active=True)
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if conv is not None:
+        conv.updated_at = datetime.datetime.now()
+    db.commit()
+    db.refresh(target)
+
+    return ChatResponse(
+        reply=new_text,
         message_id=target.id,
         conversation_id=conversation_id,
     )

@@ -46,8 +46,13 @@ describe('iconHtml', () => {
         expect(html).toContain('<path');
     });
 
-    it('play 图标已下架：调用抛「未知图标: play」', () => {
-        expect(() => iconHtml('play')).toThrow('未知图标: play');
+    it('MS-3 继续按钮消费 play 图标（复活：曾随 U7 入口改 gamepad 而下架，现续写动作消费；移除会令按钮渲染测试红灯）', () => {
+        const html = iconHtml('play');
+
+        expect(html).toContain('data-icon="play"');
+        expect(html).toContain('aria-hidden="true"');
+        expect(html).toContain('stroke="currentColor"');
+        expect(html).toContain('<path');
     });
 
     it('index.html 内联 gamepad 副本与 iconHtml(\'gamepad\') 一致（归一化内部标记）', () => {

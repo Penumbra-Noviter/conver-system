@@ -21,6 +21,7 @@ __all__ = [
     "DomainError",
     "MessageNotFoundError",
     "InvalidRegenerateTargetError",
+    "InvalidContinueTargetError",
     "LorebookEntryNotFoundError",
     "SwipeIndexError",
 ]
@@ -64,6 +65,10 @@ class MessageNotFoundError(DomainError):
 
 class InvalidRegenerateTargetError(DomainError):
     """重生成目标非法（target 非 assistant / 截断后无触发 user）"""
+
+
+class InvalidContinueTargetError(DomainError):
+    """续写目标非法（末条非 assistant / 对话无 message —— 只能在末条之后续写）"""
 
 
 class LorebookEntryNotFoundError(DomainError):
