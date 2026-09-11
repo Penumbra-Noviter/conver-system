@@ -180,6 +180,18 @@
 - **期末 code-review 四轴**：Spec 0 偏差 / Standards 0 硬违例（死导入 MessageSwipe 顺手移除；schemas/__init__ manifest +branch）/ **Falsify 0 HIGH**（锚跨会话 404、版本畸形包装 BranchSnapshotError 不裸抛 pydantic、批量候选 N+1 回归锁——list_swipes 被调即炸）/ Architecture 0 发现（list_swipes_batch 上移共享单点，协议表面仍小）。
 - **非阻断落债**：无（BR-1 范围封闭；「导出→导入重建往返」字面由 BR-2 契约锁 test_conversation_branch 承担）。
 
+## BR-2 从快照/分支派生会话（2026-09-11 — AI风月对标五批工单 BR 收官，承接 BR-1 快照）
+
+- **来源**：承接 BR-1（快照导出 + validate 就绪）；「从快照/分支派生新会话」（spec §BR-2）。
+- **服务**（conversation.py 扩展）：`clone_conversation(db, snapshot, *, title=None)`（快照导入/分支共用重建）+ `branch_from_message(db, conversation_id, message_id, *, title=None)`（截断快照 + clone + 父/锚/分支名记录）；`delete_conversation` 增删源置空（子分支 parent/锚 → NULL，branch_title 保留——与 ON DELETE SET NULL 同语义，因本模型不加 FK 在服务层显式兑现并锁定）。
+- **三路由**：GET /{id}/snapshot（快照下载，Content-Disposition 字符名参与文件名）/ POST /{id}/branch（body {message_id, title?} → 201 ConversationResponse）/ POST /import-branch（body {snapshot} → validate → clone → 201）。**静态路径 /import-branch 声明先于 /{id}/branch**（int 转换失败会 422 而非路由回退）。
+- **世界书语义拍板（Spec 偏差，契约锁锁定）**：快照 lorebook_entries 随存档往返保真但 **clone 不重插**——本数据模型世界书条目为**角色级**（SillyTavern 同构，list_entries(db, character_id)），分支复用同一 character_id 自然共享；重插会产生角色条目重复副本，破坏记忆宫殿增量计数（总消息 - auto 条目×2）等既有不变量。spec「新会话独立可改」在共享角色模型下不可兑现 → 契约锁 #3 锁定可兑现语义：**分支后角色条目集合不变（不重复不污染）+ 分支与源视角一致（共享世界态）**；「改新会话条目」= 改角色条目（正常共享语义）。对标站取证（aigs-mod-msg-branch-cg-spec.md §3.3）：「条目随快照走」指记忆宫殿 auto 条目，本项目角色级共享模型下随角色继承即为等价语义。
+- **clone 防御矩阵（Falsify，契约锁锁定）**：未知角色 → CharacterNotFoundError（404）；消息角色非法（非 Role 成员）→ BranchSnapshotError（不裸抛 ValueError）；激活序号越界（active ≥ 候选数）→ BranchSnapshotError；**content ≠ 激活候选 → BranchSnapshotError**（手写快照破坏「content 跟随激活候选」不变量即拒）；候选 message_index 越界 → BranchSnapshotError。候选直接落 MessageSwipe 行（不走 add_swipe——播种语义假设 content 即候选 0，active>0 时重建会错位）。
+- **过程遥测**：conversation.py ↔ conversation_export.py 模块级循环导入 → `branch_from_message` 内延迟导入（conversation_export 依赖 require_conversation，已注释）；契约锁 18 例初跑全红 → 实现后全绿；snapshot 路由测试初版直接对 JSONResponse 下标（TypeError）→ 改 json.loads(resp.body)。
+- **验证链**：先红后绿（18 用例）| pytest 965+1skip→983+1skip（+18，零回归）| 前端/cargo 零改动 | api-design 补 MS-2/MS-3/BR-2 端点文档（此前 MS 批端点未同步的文档缺口本次一并闭环）| doc_sync 6 标记刷新 + pool_cleanup_check 通过。
+- **期末 code-review 四轴**：Spec 1 偏差记录（世界书独立可改 → 角色级共享，契约锁改写）+ Standards 0 硬违例 + **Falsify 0 HIGH**（防御矩阵全锁）+ Architecture 0 发现（路由薄，深模块保持）。
+- **非阻断落债**：**F-100（Worth exploring，前端方向）**——spec §BR-2 前端段未消费：消息级「分支」操作 + 会话列表分支来源标记 + 模拟器存档面板「以此存档开新对话」（后端三路由就绪，纯前端接线）。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。
