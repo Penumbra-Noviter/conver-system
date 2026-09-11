@@ -192,6 +192,20 @@
 - **期末 code-review 四轴**：Spec 1 偏差记录（世界书独立可改 → 角色级共享，契约锁改写）+ Standards 0 硬违例 + **Falsify 0 HIGH**（防御矩阵全锁）+ Architecture 0 发现（路由薄，深模块保持）。
 - **非阻断落债**：**F-100（Worth exploring，前端方向）**——spec §BR-2 前端段未消费：消息级「分支」操作 + 会话列表分支来源标记 + 模拟器存档面板「以此存档开新对话」（后端三路由就绪，纯前端接线）。
 
+## CG-1 text2img Provider 抽象（2026-09-11 — AI风月对标五批工单 CG 首张，承接 BR 批收官）
+
+- **来源**：承接 BR-2（handoff 风险标注「外部后端 + 异步任务 + 长耗时」——本票先立 Provider 抽象，任务化/画廊留 CG-2/CG-3）。
+- **形态与 LLM Provider 同构**（镜像 `services/llm/` 六件套）：`services/image/` 包——`base.py`（BaseImageGen ABC + ImageGenParams pydantic（越界拒）+ ImageResult dataclass）/ `errors.py`（ImageError 族：Auth/Timeout/Response/Connection）/ `factory.py`（ImageFactory：单一来源派生 + 懒加载，`_CLASS_OVERRIDES` 支持独立实现类）/ `model_data.py`（AVAILABLE_IMAGE_PROVIDERS 单一来源 + 派生元数据 IMAGE_PROVIDER_KEYS / image_provider_id / image_provider_requires_key）/ `resolver.py`（resolve_image 收口）/ `storage.py`（CG 图片落盘）。**包级导入零副作用契约**：`image/__init__.py` 只导 factory/resolver，httpx 与 PIL 均为调用期依赖（镜像 LLM 侧「包级导入零 SDK 副作用」）。
+- **本地优先两类最小后端**：
+  - `http_backend.py` HttpImageGen：A1111 兼容 txt2img（POST {base_url}/sdapi/v1/txt2img，payload prompt/negative_prompt/width/height/steps）→ {images:[base64]} → 解码落盘本地；**15s 超时守卫语义**（`_HTTP_CLIENT_FACTORY` 模块级 seam 供测试注入假客户端）；api_key 有值附带 Authorization Bearer；无 base_url 构造即 ImageConnectionError；响应畸形全形态 → ImageResponseError 明确错误。
+  - `local_backend.py` LocalImageGen：确定性占位 PNG（颜色/图形由 prompt 派生——同 prompt 同字节，可复现断言），零网络零 Key——无外部后端时 CG 链路可用 + 测试/冒烟。
+- **缺 Key 语义**：requires_key Provider（未来云端生图）且 Key 缺失 → ImageAuthError（→401 明确报错），**不影响对话主流程**（CG-3 任务失败只影响出图）；本地优先后端默认 requires_key=False 无需 Key 走通。resolver 对 IMAGE_PROVIDER_KEYS 用**运行时模块引用**（非 import 冻结——单一来源实时派生，测试可注入）。
+- **错误映射**：error_mapping.py 增 `image_error_response`（单一入口，镜像 llm_error_response）：Auth 401 / Timeout 504 固定文案 / Response·Connection 502 / 基类 502 兜底。
+- **过程遥测**：契约锁初跑 22 例 2 失败——① resolver 冻结导入 IMAGE_PROVIDER_KEYS（monkeypatch 模块级常量不生效）→ 改运行时模块引用；② **flaky 实证**（5 连跑 1 失败）：`test_different_prompt_different_image` 偶发同字节——根因 `save_image_bytes` 时间戳+微秒文件名在同微秒连续两次写入互相覆盖（后写覆盖先写，读同一文件）→ 文件名加 uuid4 短后缀保证唯一，5 连跑稳定。
+- **验证链**：先红后绿（22 用例）| pytest 983+1skip→1005+1skip（+22，零回归）| 前端/cargo 零改动 | doc_sync 零漂移（§3 树 + §4.21.8 + §5.1 手补；sig 标记类名不可解析（AST 只认函数/方法）→ 类改方法形态 `BaseImageGen.generate`）| pool_cleanup_check 通过。
+- **期末 code-review 四轴**：Spec 0 偏差（「异步任务 submit+poll」明确留 CG-3 image_tasks，CG-1 只做直接 generate——spec 原文本就两可选）/ Standards 0 硬违例 / **Falsify 1 flaky 实证修复**（见上）+ 防御矩阵全锁（畸形/超时/连接/缺 Key/越界/未知 Provider）/ Architecture 0 发现（镜像 llm 包结构，协议表面小）。
+- **非阻断落债**：无。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

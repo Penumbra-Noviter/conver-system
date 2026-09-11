@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **5 项待办**（3 批：CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **4 项待办**（2 批：CG 图像沉淀 / MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -43,7 +43,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| CG-1 | text2img Provider 抽象（与 LLM Provider 同构 + 单一来源登记） | ⬜ 待办 | spec §CG-1；注册表派生 + 缺 Key 错误映射 + 超时/轮询上限 |
 | CG-2 | CG 资产库 + 画廊（cg_images 新表 + 加权抽取 + 解锁） | ⬜ 待办 | spec §CG-2；入库去重 + 解锁幂等 + 加权分布可复现 + 会话删除图保留 |
 | CG-3 | 对话内出图 + 剧情回顾时间线 | ⬜ 待办 | spec §CG-3；三态渲染 + 失败不破坏对话 + 时间线顺序 |
 
@@ -69,6 +68,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### CG 批次 CG-1（2026-09-11 — text2img Provider 抽象，CG 批首张）
+
+> 来源：AI风月对标调研五批工单（CG 图像沉淀首张）；形态与 LLM Provider 同构（镜像 llm 包六件套），规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §CG-1。叙述详见 DEV_LOG〈CG-1 text2img Provider 抽象（2026-09-11）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| CG-1 | text2img Provider 抽象（与 LLM Provider 同构 + 单一来源登记） | 2026-09-11 | 0f8a8d9 |
+
+**验证链：** 后端 pytest 983+1skip→1005+1skip（+22：test_image_provider——注册表派生（a1111/custom-http → HttpImageGen、local → LocalImageGen）/缺 Key 401（requires_key 临时登记条目）/响应畸形全形态（缺 images/非列表/空/非法 base64 → ImageResponseError）/超时 504 固定文案/连接 502/A1111 happy path 落盘本地 + PNG magic + Authorization Bearer 头/本地占位确定性（同 prompt 同字节、异 prompt 异字节）/参数越界拒/映射矩阵）| image_error_response 映射族（401/504/502）入 error_mapping 单一入口 | cg_dir 数据目录契约（storage.save_image_bytes 落盘 + uuid 后缀）| 全量后端绿零回归（前端/cargo 零改动）| 期末四轴：Spec 0 偏差 / Standards 0 硬违例（包级导入零 httpx/PIL 副作用契约镜像 LLM 侧）/ **Falsify 1 flaky 实证当场修复**（save_image_bytes 时间戳+微秒命名同微秒连续写入互相覆盖 → uuid 短后缀；测试 5 连跑稳定）+ resolver 冻结导入改运行时模块引用（可测单源）| doc_sync 零漂移
+**非阻断落债：** 无
+
+---
 
 ### 分支批次 BR-2（2026-09-11 — 从快照/分支派生会话，BR 批收官）
 
