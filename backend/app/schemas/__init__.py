@@ -11,6 +11,7 @@ Pydantic 请求 / 响应模型以独立模块文件存在（如 character / conv
 """
 
 __all__ = [
+    "branch",
     "character",
     "conversation",
     "lorebook",

@@ -3,12 +3,13 @@
 
 协议表面（__all__）：get_messages / create_message / create_message_no_commit /
 auto_insert_greeting / build_message_list / search_messages /
-add_swipe / list_swipes / switch_swipe / delete_swipe。
+add_swipe / list_swipes / list_swipes_batch / switch_swipe / delete_swipe。
 """
 
 from __future__ import annotations
 
 import datetime
+from collections.abc import Sequence
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -31,6 +32,7 @@ __all__ = [
     "search_messages",
     "add_swipe",
     "list_swipes",
+    "list_swipes_batch",
     "switch_swipe",
     "delete_swipe",
 ]
@@ -296,6 +298,37 @@ def list_swipes(db: Session, message_id: int) -> list[MessageSwipe]:
         .order_by(MessageSwipe.index.asc())
         .all()
     )
+
+
+def list_swipes_batch(
+    db: Session,
+    message_ids: Sequence[int],
+) -> dict[int, list[str]]:
+    """批量取候选内容（message_id → index 升序 content 列表；无候选消息缺键）
+
+    BR-1：快照导出等批量场景复用——一次 IN 查询填充全部候选，避免逐消息
+    list_swipes 的 N+1（MS-2 路由 _with_swipes_batch 同构逻辑上移服务层，
+    路由改指本函数，单一实现）。
+
+    Args:
+        db: 数据库会话
+        message_ids: 消息 id 序列（空 → 空 dict，零查询）
+
+    Returns:
+        {message_id: [候选 content，index 升序]}；无候选消息不出现键
+    """
+    if not message_ids:
+        return {}
+    rows = (
+        db.query(MessageSwipe.message_id, MessageSwipe.content)
+        .filter(MessageSwipe.message_id.in_(message_ids))
+        .order_by(MessageSwipe.message_id, MessageSwipe.index)
+        .all()
+    )
+    swipes_by_message: dict[int, list[str]] = {}
+    for message_id, content in rows:
+        swipes_by_message.setdefault(message_id, []).append(content)
+    return swipes_by_message
 
 
 def switch_swipe(db: Session, message_id: int, index: int) -> Message:

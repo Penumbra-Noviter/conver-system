@@ -22,6 +22,7 @@ __all__ = [
     "MessageNotFoundError",
     "InvalidRegenerateTargetError",
     "InvalidContinueTargetError",
+    "BranchSnapshotError",
     "LorebookEntryNotFoundError",
     "SwipeIndexError",
 ]
@@ -69,6 +70,10 @@ class InvalidRegenerateTargetError(DomainError):
 
 class InvalidContinueTargetError(DomainError):
     """续写目标非法（末条非 assistant / 对话无 message —— 只能在末条之后续写）"""
+
+
+class BranchSnapshotError(DomainError):
+    """分支快照非法（版本缺失/不支持/结构畸形 —— 导入拒绝并给明确错误）"""
 
 
 class LorebookEntryNotFoundError(DomainError):

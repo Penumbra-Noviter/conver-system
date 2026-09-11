@@ -63,10 +63,12 @@ def get_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """创建所有表（如果不存在），并执行自愈迁移（MS-1：存量库补 messages.active_swipe_index）"""
+    """创建所有表（如果不存在），并执行自愈迁移（MS-1：存量库补 messages.active_swipe_index；
+    BR-1：存量库补 conversations 分支三列）"""
     import backend.app.models  # noqa: F401 — 确保模型被注册
     Base.metadata.create_all(bind=engine)
     _ensure_messages_active_swipe_index(engine)
+    _ensure_conversation_branch_columns(engine)
 
 
 def _ensure_messages_active_swipe_index(bind=engine) -> None:
@@ -91,3 +93,32 @@ def _ensure_messages_active_swipe_index(bind=engine) -> None:
                 text("ALTER TABLE messages ADD COLUMN active_swipe_index INTEGER NOT NULL DEFAULT 0")
             )
             conn.commit()
+
+
+def _ensure_conversation_branch_columns(bind=engine) -> None:
+    """自愈迁移：存量 conversations 表缺分支三列时 ALTER TABLE 补列（幂等）
+
+    BR-1 分支元数据：parent_conversation_id（INTEGER，可空）/ branch_from_message_id
+    （INTEGER，可空）/ branch_title（VARCHAR(200)，可空）。create_all 不会给已存在
+    表加列（项目无 alembic，spec §0 迁移约束）：PRAGMA table_info 探测缺列 →
+    ALTER TABLE ADD COLUMN；连续两次调用无副作用（幂等，契约锁
+    test_branch_snapshot::test_migration_adds_columns_idempotent）。
+
+    Args:
+        bind: 可连接的 Engine/Connection（默认应用引擎；测试可传入内存库）
+    """
+    from sqlalchemy import text
+
+    with bind.connect() as conn:
+        columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(conversations)")).fetchall()
+        }
+        for name, coltype in (
+            ("parent_conversation_id", "INTEGER"),
+            ("branch_from_message_id", "INTEGER"),
+            ("branch_title", "VARCHAR(200)"),
+        ):
+            if name not in columns:
+                conn.execute(text(f"ALTER TABLE conversations ADD COLUMN {name} {coltype}"))
+        conn.commit()

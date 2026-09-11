@@ -50,6 +50,9 @@ CREATE TABLE conversations (
 	model_name VARCHAR(100), 
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	parent_conversation_id INTEGER, 
+	branch_from_message_id INTEGER, 
+	branch_title VARCHAR(200), 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(character_id) REFERENCES characters (id) ON DELETE CASCADE
 );

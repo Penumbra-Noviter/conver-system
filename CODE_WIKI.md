@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2240<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->945<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1225<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2261<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->966<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1225<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -103,6 +103,7 @@ conver system/
 │   │   │   └── setting.py          ← 设置键值
 │   │   ├── schemas/                ← Pydantic v2 请求/响应模型
 │   │   │   ├── __init__.py
+│   │   │   ├── branch.py           ← 分支快照（BR-1：SNAPSHOT_VERSION + 版本化载荷）
 │   │   │   ├── character.py
 │   │   │   ├── conversation.py
 │   │   │   ├── lorebook.py         ← 世界书条目（Create/Update/Response，边界「拒」）
@@ -235,7 +236,7 @@ conver system/
 
 > 无公开函数（纯配置常量）。注意 `DATABASE_URL` 默认值带 `+aiosqlite` 前缀，但 `database.py` 建引擎时剔除（同步 ORM，勿误判为异步）。
 
-### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~70 行<!--/AUTO-->）
+### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~96 行<!--/AUTO-->）
 
 **职责**：SQLAlchemy 同步引擎（`PRAGMA foreign_keys=ON`）、`get_db` 会话依赖、`init_db` 建表。
 
@@ -302,7 +303,7 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/conversations.py:export_conversation_markdown-->`export_conversation_markdown(conversation_id, db)`<!--/AUTO--> | GET Markdown 导出 |
 | <!--AUTO:sig:backend/app/api/routes/conversations.py:regenerate-->`regenerate(conversation_id, body=None, db)`<!--/AUTO--> | POST 重生成 AI 回复 |
 
-### 4.9 `backend/app/api/routes/messages.py` — 消息路由（<!--AUTO:lines:backend/app/api/routes/messages.py-->~67 行<!--/AUTO-->）
+### 4.9 `backend/app/api/routes/messages.py` — 消息路由（<!--AUTO:lines:backend/app/api/routes/messages.py-->~57 行<!--/AUTO-->）
 
 **职责**：消息读取 + 跨对话关键词搜索。
 
@@ -434,14 +435,16 @@ conver system/
 | <!--AUTO:sig:backend/app/services/conversation.py:delete_conversation-->`delete_conversation(db, conversation_id)`<!--/AUTO--> | 删除会话 |
 | <!--AUTO:sig:backend/app/services/conversation.py:delete_all_conversations-->`delete_all_conversations(db)`<!--/AUTO--> | 清空全部会话 |
 
-### 4.16 `backend/app/services/conversation_export.py` — 会话导出（<!--AUTO:lines:backend/app/services/conversation_export.py-->~141 行<!--/AUTO-->）
+### 4.16 `backend/app/services/conversation_export.py` — 会话导出（<!--AUTO:lines:backend/app/services/conversation_export.py-->~270 行<!--/AUTO-->）
 
-**职责**：会话导出 JSON/Markdown 两种格式（含角色信息头）。
+**职责**：会话导出 JSON/Markdown 两种格式（含角色信息头）+ 分支快照导出（BR-1）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:backend/app/services/conversation_export.py:export_conversation_json-->`export_conversation_json(db, conversation_id)`<!--/AUTO--> | JSON 导出（结构化消息 + 角色元数据） |
 | <!--AUTO:sig:backend/app/services/conversation_export.py:export_conversation_markdown-->`export_conversation_markdown(db, conversation_id)`<!--/AUTO--> | Markdown 导出（对话记录可读化） |
+| <!--AUTO:sig:backend/app/services/conversation_export.py:build_branch_snapshot-->`build_branch_snapshot(db, conversation_id, upto_message_id=None)`<!--/AUTO--> | 分支快照导出（BR-1：版本化 + 消息按 id 序 + 世界书条目与候选） |
+| <!--AUTO:sig:backend/app/services/conversation_export.py:validate_branch_snapshot-->`validate_branch_snapshot(data)`<!--/AUTO--> | 快照校验（BR-1：缺/不支持版本 → BranchSnapshotError 明确异常，BR-2 导入复用） |
 
 ### 4.17 `backend/app/services/data_dir.py` — 数据目录契约（<!--AUTO:lines:backend/app/services/data_dir.py-->~67 行<!--/AUTO-->）
 
@@ -465,7 +468,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/document_parser.py:_default_for-->`_default_for(field)`<!--/AUTO--> | 缺失字段兜底默认值 |
 | <!--AUTO:sig:backend/app/services/document_parser.py:_truncate-->`_truncate(msg, max_len)`<!--/AUTO--> | 错误消息截断 |
 
-### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~120 行<!--/AUTO-->）
+### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~121 行<!--/AUTO-->）
 
 **职责**：领域与 LLM 异常 → 标准错误响应结构（错误码/消息）单源（T-01 迁入 LLM 映射）。
 
@@ -474,13 +477,13 @@ conver system/
 | <!--AUTO:sig:backend/app/services/error_mapping.py:domain_error_response-->`domain_error_response(exc)`<!--/AUTO--> | 领域异常 → 响应 dict |
 | <!--AUTO:sig:backend/app/services/error_mapping.py:llm_error_response-->`llm_error_response(e, provider)`<!--/AUTO--> | LLM 异常 → (HTTP 状态码, 消息)（映射表单源） |
 
-### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~49 行<!--/AUTO-->）
+### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~52 行<!--/AUTO-->）
 
 **职责**：领域异常定义（404/409/422 类），供 service 层抛出、errors.py 统一处理。
 
 > 无公开函数（异常类层次）。
 
-### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~312 行<!--/AUTO-->）
+### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~340 行<!--/AUTO-->）
 
 **职责**：消息读取/写入/写入（不提交）/截断/开场白自动插入/上下文构建（滑窗）/跨对话搜索。
 
@@ -1343,6 +1346,7 @@ conver system/
 | `backend/tests/test_character_import_avatar.py` | <!--AUTO:tests:backend/tests/test_character_import_avatar.py-->2<!--/AUTO--> | 角色导入非 ASCII avatar 500 回归（服务层 ValueError 缺陷路径 + API 层全路径） |
 | `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->36<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
 | `backend/tests/test_chat_continue.py` | <!--AUTO:tests:backend/tests/test_chat_continue.py-->21<!--/AUTO--> | 续写端点契约锁（MS-3：条数不变/不追加 user/失败零改动/续写触发形态/空续写 no-op/错误矩阵） |
+| `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->20<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
 | `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->19<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
@@ -1471,9 +1475,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2240<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2261<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->945<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->966<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1225<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

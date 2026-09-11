@@ -24,6 +24,7 @@ from backend.app.services.exceptions import (
     ConversationNotFoundError,
     DocParseError,
     DomainError,
+    BranchSnapshotError,
     InvalidContinueTargetError,
     InvalidRegenerateTargetError,
     LorebookEntryNotFoundError,
@@ -74,7 +75,7 @@ def domain_error_response(exc: DomainError) -> tuple[int, str]:
         ),
     ):
         return status.HTTP_404_NOT_FOUND, str(exc)
-    if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError, InvalidRegenerateTargetError, InvalidContinueTargetError, SwipeIndexError)):
+    if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError, InvalidRegenerateTargetError, InvalidContinueTargetError, BranchSnapshotError, SwipeIndexError)):
         return status.HTTP_400_BAD_REQUEST, str(exc)
     if isinstance(exc, CardFormatError):
         return status.HTTP_422_UNPROCESSABLE_CONTENT, f"导入失败：{exc}。{IMPORT_FORMAT_HINT}"

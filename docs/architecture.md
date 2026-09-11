@@ -276,6 +276,9 @@ conver-system/
 | model_name | VARCHAR(100) | 具体模型名 |
 | created_at | DATETIME | |
 | updated_at | DATETIME | |
+| parent_conversation_id | INTEGER | 派生来源会话（BR-1：分支元数据，可空；删源置空为服务层语义） |
+| branch_from_message_id | INTEGER | 分叉锚消息 id（BR-1：快照末条，可空） |
+| branch_title | VARCHAR(200) | 分支显示名（BR-1，可空） |
 
 ### messages
 

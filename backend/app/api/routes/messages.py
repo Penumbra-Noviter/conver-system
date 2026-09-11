@@ -13,7 +13,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.models.message import MessageSwipe
 from backend.app.schemas.message import MessageResponse, SearchResult, SwitchSwipeRequest
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
@@ -47,22 +46,12 @@ def switch_swipe(
 def _with_swipes_batch(db: Session, messages: list) -> list[MessageResponse]:
     """ORM 消息列表 → 响应（候选集批量填充，避免每消息一次查询的 N+1）
 
-    一次查询本批消息的全部候选（message_id IN），按消息分组；user/system 等
-    无候选消息自然为空列表。
+    批量取候选逻辑上移服务层（message_service.list_swipes_batch，BR-1 共享单点，
+    快照导出复用）；user/system 等无候选消息自然为空列表。
     """
     if not messages:
         return []
-    ids = [m.id for m in messages]
-    rows = (
-        db.query(MessageSwipe.message_id, MessageSwipe.content)
-        .filter(MessageSwipe.message_id.in_(ids))
-        .order_by(MessageSwipe.message_id, MessageSwipe.index)
-        .all()
-    )
-    swipes_by_message: dict[int, list[str]] = {}
-    for message_id, content in rows:
-        swipes_by_message.setdefault(message_id, []).append(content)
-
+    swipes_by_message = message_service.list_swipes_batch(db, [m.id for m in messages])
     responses = [MessageResponse.model_validate(m) for m in messages]
     for resp in responses:
         resp.swipes = swipes_by_message.get(resp.id, [])
