@@ -153,6 +153,17 @@
   - Standards 低危：退化断言替换为真实调用参数断言（POST body {index:1}）。
 - **非阻断落债**：无。
 
+## MS-3 继续生成（2026-09-11 — AI风月对标五批工单 MS 收官，承接 MS-2）
+
+- **来源**：承接 MS-2（swipes 前端就绪）；「继续」= append 续写：不产生新 user 消息，末条 assistant 原内容扩展为「原内容 + 续写片段」（spec §MS-3）。本会话开工时按 handoff 未决项「续写触发设计」实证拍板。
+- **触发形态拍板（spec 两可选实证选一，契约锁锁定）**：尾随 **user** 消息 = 续写指令（`CONTINUE_INSTRUCTION`）+ 原消息末段锚点（`_continuation_tail`：去首尾空白后末 200 字符）。**否决「续写系统提示」**——Falsify 实证：`llm/base.py::_prepare_messages`「last system wins」为锁定契约（test_llm_shared.py:99），尾随 system 会把角色 persona/system 链挤掉（真实 Provider 下续写出戏）；user 形态不新增 system，system 链与普通/重生成路径完全一致。「不追加 user」契约指 DB 层零新增消息行（LLM 上下文加一条 user 触发不违反——重生成路径同样以触发 user 收尾）。
+- **后端**：`chat.py::continue_chat`（`__all__` +continue_chat）+ `_resolve_continue_target`（须为对话末条且 assistant——前端按钮只渲染在末条气泡）+ `_continuation_tail`；新领域异常 `InvalidContinueTargetError`（error_mapping 400 族登记）；`POST /api/conversations/{id}/continue` 无请求体（续写目标恒为末条）。编排：解析末条 → `assemble_chat_context(current_input=None, history_limit_message_id=target.id)`（PHI 尾随剥离与重生成一致）→ 追加 user 触发 → 生成 → **add_swipe 追加候选**（原内容保留候选 0/既有候选不变，续写结果 = 原内容+片段置激活，content 跟随激活候选）→ bump updated_at。**空续写 no-op 守卫**（Falsify：LLM 返回空白时 base+""=base 会产生内容相同的重复候选行 → 直接返回零改动）。
+- **前端**：`format.js::messageBubbleHtml` 增 `continue` 参数 + `.btn-continue`（`iconHtml('play')`——play 图标复活：曾随 U7 入口改 gamepad 下架，icons.test.js「已下架」锁改复活渲染断言）与重生成同组渲染；`chat.js::continueLastReply`（与 regenerateLastReply 同 seam：共享 nonStreamingInFlight 互斥集合、进行中按钮组禁用 + thinking、成功 settleTurn 重载（消息 id 不变，replaceId=result.message_id 重载失败原位替换扩展内容）、失败错误条不写列表）；api.js conversations.continue。
+- **过程遥测**：编辑事故——chat.js 插入 continueLastReply 时误删 switchSwipe 注释块开头（`/**` 行被吞）→ 当场恢复；测试笔误——`_patch_api_key(None)` 无效调用草稿残留 → 清理。
+- **验证链**：后端 pytest 923+1skip→944+1skip（+21：test_chat_continue——条数不变/不追加 user/失败零改动/续写触发形态（尾随 user 指令+末段、无尾随 system、PHI 剥离、长回复取末段）/内容跟随激活候选/空续写 no-op/问候语可续写/错误矩阵/端点同构）| 前端 Vitest 1220→1225（+5：chat.test.js MS-3 闭环——同组渲染/无请求体端点契约/共享互斥/失败错误条/Falsify 流式在途与无末条不渲染；icons.test.js play 锁复活）| 全量双端绿零回归 | doc_sync 15 标记刷新零漂移 | pool_cleanup_check 通过。
+- **期末 code-review 四轴**：Spec 1 实现偏差记录（spec 签名 `-> str` → ChatResponse——与 regenerate_chat 同构，路由与前端结算需要 message_id）；Standards 0 硬违例；**Falsify 1 项当场修复**（空续写 → 重复候选行守卫，先红后绿 +1 用例）；Architecture 0 发现（复用 assemble_chat_context/add_swipe，零逻辑复制）。
+- **非阻断落债**：**F-99（Strong，LLM 链路方向）**——适配器多 system 折叠实证：`_prepare_messages` 使含 PHI/scenario/世界书注入的角色在真实 Provider 调用时 persona/scenario/世界书 system 块全部丢弃、仅存末条（实证脚本：组装层 6 system → 折叠后 system=PHI，chat 仅剩 3 条历史）。既有缺陷（BE-3 收口引入），MS-3 触发形态已规避；修复需重设计适配器 system 合并策略 + 修订 test_llm_shared 锁定契约，另立项。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

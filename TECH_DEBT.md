@@ -53,6 +53,7 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-99 | LLM 适配器多 system 折叠：`backend/app/services/llm/base.py::_prepare_messages`「last system wins」锁定契约（test_llm_shared.py:99）使含 PHI/scenario/世界书注入的角色在真实 Provider（OpenAI/Claude）调用时 persona/scenario/世界书 system 块全部丢弃、仅存末条。2026-09-11 实证脚本：组装层 6 条 system（before/persona/scenario/after/knowledge/PHI）→ 折叠后 system=PHI，chat 仅剩 3 条历史——角色人设一致性受损，WL 世界书 position=system 注入对含 PHI 角色失效 | MS-3 期末四轴（续写触发形态实证发现；MS-3 已选 user 触发形态规避，本债为既有缺陷） | Strong | 📝 待立项 | LLM 链路 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -201,4 +202,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-98），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-99），避免编号冲突。

@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **8 项待办**（5 批：WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **7 项待办**（5 批：BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -33,7 +33,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| MS-3 | 「继续」生成（append 续写，不追加 user 消息） | ⬜ 待办 | spec §MS-3；条数不变 + 失败原内容零改动 |
 
 ### 批次 BR — 存档升级为分支点
 
@@ -72,6 +71,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### 消息操作批次 MS-3（2026-09-11 — 「继续」生成 append 续写，MS 批收官）
+
+> 来源：AI风月对标调研五批工单（MS 消息操作第三张/收官）；续写不追加 user、原消息扩展为「原内容 + 续写片段」，触发形态两可选实证拍板（尾随 user 消息 = 续写指令 + 原消息末段，否决续写 system 提示——适配器 last-system-wins 锁定契约会挤掉人设链），规格依据 docs/chat-simulator-upgrade-spec.md §MS-3。叙述详见 DEV_LOG〈MS-3 继续生成（2026-09-11）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| MS-3 | 「继续」生成（append 续写，不追加 user 消息） | 2026-09-11 | db149e9 |
+
+**验证链：** 后端 pytest 923+1skip→944+1skip（+21：test_chat_continue——条数不变/不追加 user/失败零改动/续写触发形态（尾随 user 指令+末段、无尾随 system、PHI 角色剥离）/内容跟随激活候选/空续写 no-op/问候语可续写/错误矩阵）| 前端 Vitest 1220→1225（+5：chat.test.js MS-3 闭环——继续按钮同组渲染/无请求体端点契约/共享 in-flight 互斥/失败错误条不写列表/Falsify 流式在途与无末条不渲染；icons.test.js play 图标「已下架」锁改复活渲染断言）| 全量双端绿零回归 | 期末 code-review 四轴：Spec 1 实现偏差（spec 签名 `-> str` → ChatResponse，与 regenerate 同构，路由需要 message_id）+ Standards 0 硬违例 / Falsify 空续写守卫（base+""=base 重复候选行 → no-op）当场修复 | doc_sync 15 标记刷新零漂移
+**非阻断落债：** F-99（适配器多 system 折叠：persona/scenario/世界书在真实 Provider 下仅存末条 system——MS-3 触发形态实证发现，方向=LLM 链路，待立项）
+
+---
 
 ### 消息操作批次 MS-2（2026-09-10 — swipes 前端，MS 批第二张）
 
