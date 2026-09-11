@@ -24,6 +24,7 @@ __all__ = [
     "InvalidContinueTargetError",
     "BranchSnapshotError",
     "CgImageNotFoundError",
+    "ImageTaskNotFoundError",
     "LorebookEntryNotFoundError",
     "SwipeIndexError",
 ]
@@ -79,6 +80,10 @@ class BranchSnapshotError(DomainError):
 
 class CgImageNotFoundError(DomainError):
     """CG 图片不存在（解锁等操作引用不存在的 cg_images 行）"""
+
+
+class ImageTaskNotFoundError(DomainError):
+    """图片任务不存在（轮询引用不存在的 image_tasks 行）"""
 
 
 class LorebookEntryNotFoundError(DomainError):

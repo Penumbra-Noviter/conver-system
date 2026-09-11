@@ -21,6 +21,7 @@ from backend.app.api.routes import (
     characters,
     chat,
     conversations,
+    images,
     lorebook,
     messages,
     models,
@@ -48,6 +49,7 @@ app.add_exception_handler(LLMError, llm_error_handler)
 app.include_router(characters.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
+app.include_router(images.router)
 app.include_router(lorebook.router)
 app.include_router(messages.router)
 app.include_router(models.router)
@@ -83,6 +85,17 @@ app.mount(
     "/simulators",
     StaticFiles(directory=str(data_dir_service.simulators_dir()), check_dir=False),
     name="simulators",
+)
+
+# ── 挂载 /cg（CG 图片数据目录，CG-3）──
+# 出图结果落盘数据目录 cg/ 子目录（本地文件路径）；前端 <img src="/cg/<文件名>">
+# 经此静态挂载加载（basename 由前端从 result_url 派生，见 cg-review.js/chat.js）。
+# check_dir=False 避免 import 期文件系统副作用；目录由 storage.save_image_bytes
+# 按需创建。
+app.mount(
+    "/cg",
+    StaticFiles(directory=str(data_dir_service.cg_dir()), check_dir=False),
+    name="cg",
 )
 
 #: 内置模拟器种子源（打包态 _MEIPASS/frontend/simulators；源码态仓库

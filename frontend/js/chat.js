@@ -31,7 +31,7 @@
  * 方言：按 key 合并、键非函数不覆盖、缺省默认 no-op 兜底）。
  */
 
-import { chatStream, messages, conversations } from './api.js';
+import { chatStream, messages, conversations, images } from './api.js';
 import { escapeHtml, autoResizeInput } from './utils.js';
 import { providerDisplayName } from './utils/model-utils.js';
 import { showExportDialog } from './components/export-dialog.js';
@@ -44,6 +44,8 @@ import { renderErrorBar } from './error-bar.js';
 import { iconHtml } from './icons.js';
 import { showModelSelector } from './components/model-selector.js';
 import { showConfirm } from './components/confirm-dialog.js';
+import { openModal } from './components/modal.js';
+import { cgImageUrl } from './cg-review.js';
 
 // ══════════════════════════════════════════════════
 // 聊天域 DOM 引用
@@ -57,6 +59,7 @@ export const chatDom = {
     btnSend: $('#btn-send'),
     toggleStream: $('#toggle-stream'),
     chatHeader: $('#chat-header'),
+    btnGenImage: $('#btn-gen-image'),
 };
 
 /** 无活动 tab 时的消息区空态（单一事实来源 — app.js showEmptyState 复用，禁止内联重复） */
@@ -923,6 +926,171 @@ export async function continueLastReply() {
     await hooks.refreshConversations();
 }
 
+// ── CG-3 对话内出图（生成图片入口 → 提交 → 轮询 → 三态渲染）──
+
+/** 轮询间隔（毫秒）；出图需 10-30 秒，1s 轮询平衡延迟与请求量 */
+const CG_POLL_INTERVAL_MS = 1000;
+/** 轮询上限（约 90s）；超限判失败，防永不结算 */
+const CG_POLL_MAX_ATTEMPTS = 90;
+
+/**
+ * 对话内「生成图片」入口（#btn-gen-image 点击触发）。
+ *
+ * 流程：读活动 tab（conversationId + 末条 assistant 作锚消息）→ 弹出描述输入
+ * modal → 提交任务 → 渲染「生成中」态（需 10-30 秒提示）→ 轮询 → 成功换图 /
+ * 失败渲染错误条（复用 renderSendError seam，**不破坏对话**——不写消息列表）。
+ *
+ * 在途守卫：无活动 tab / 流式在途 → no-op；同一会话已有未结算出图任务 → 拦截
+ * （防重复提交，per-conversation 集合）。
+ */
+export async function generateImage() {
+    const tab = getActiveTab();
+    if (!tab || tab.isStreaming) return;
+    const convId = tab.conversationId;
+    if (cgInFlight.has(convId)) return;
+
+    const prompt = await promptImageDescription();
+    if (!prompt) return;
+
+    // 末条 assistant 作为出图锚消息（挂 CG 到具体消息；无则会话级）
+    const lastAssistant = Array.isArray(tab.messages)
+        ? [...tab.messages].reverse().find((m) => m?.role === 'assistant')
+        : null;
+
+    let task;
+    try {
+        task = await images.submitTask({
+            conversation_id: convId,
+            prompt,
+            message_id: lastAssistant?.id ?? null,
+        });
+    } catch (err) {
+        renderSendError(err, '图片生成失败', convId);
+        return;
+    }
+
+    cgInFlight.add(convId);
+    const pendingEl = renderCgTaskState(convId, task.id, 'pending');
+    pollImageTask(task.id, pendingEl, convId, 0);
+}
+
+/** 同会话未结算出图任务集合（防重复提交） */
+const cgInFlight = new Set();
+
+/**
+ * 弹出描述输入 modal，返回用户输入的提示词（空/取消 → null）。
+ * @returns {Promise<string|null>}
+ */
+function promptImageDescription() {
+    return new Promise((resolve) => {
+        let settled = false;
+        const done = (value) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+        };
+        const body = `<textarea id="cg-prompt-input" rows="3" placeholder="描述要生成的画面…"></textarea>`;
+        const actions = `<button class="btn-primary" id="cg-prompt-submit">生成</button>`;
+        openModal({
+            title: '生成图片',
+            body,
+            actions,
+            overlayId: 'cg-prompt-modal',
+            onOpen: () => document.querySelector('#cg-prompt-input')?.focus(),
+            onClose: () => done(null),
+        });
+        // 提交按钮：读 textarea → 直接移除遮罩（绕过 close 的 cancelResult）
+        document.querySelector('#cg-prompt-submit')?.addEventListener('click', () => {
+            const value = document.querySelector('#cg-prompt-input')?.value?.trim() || '';
+            document.querySelector('#cg-prompt-modal')?.remove();
+            done(value || null);
+        });
+    });
+}
+
+/**
+ * 渲染出图任务三态（生成中 / 成功 / 失败）于消息区末尾。
+ *
+ * 生成中：sparkles 图标 + 「图片生成中…（需 10-30 秒）」提示文案；
+ * 成功：<img>（cgImageUrl 映射 /cg 静态挂载）；失败：错误文案 + 错误条。
+ * 纯 DOM 手术，不写消息缓存（失败语义「不破坏对话」要求缓存保持原状）。
+ *
+ * @param {number|string} convId - 会话 id（会话隔离：仅活动 tab 渲染）
+ * @param {number} taskId - 任务 id
+ * @param {'pending'|'succeeded'|'failed'} state - 目标态
+ * @param {string} [resultUrl] - 成功时的图片地址
+ * @param {string} [error] - 失败信息
+ * @returns {HTMLElement|null} pending 态返回的元素引用（后续轮询替换）
+ */
+export function renderCgTaskState(convId, taskId, state, { resultUrl = '', error = '' } = {}) {
+    if (getActiveTab()?.conversationId !== convId) return null;
+    const container = chatDom.chatMessages;
+    const existing = container.querySelector(`[data-cg-task-id="${taskId}"]`);
+    const el = existing || document.createElement('div');
+    el.className = 'message cg-task';
+    el.dataset.cgTaskId = String(taskId);
+
+    if (state === 'pending') {
+        el.innerHTML = `<div class="message-content cg-task-pending">${iconHtml('sparkles')} 图片生成中…（需 10-30 秒）</div>`;
+    } else if (state === 'succeeded') {
+        const url = cgImageUrl(resultUrl);
+        el.innerHTML = `<div class="message-content cg-task-image-wrap"><img class="cg-task-image" src="${url}" alt="生成图片" loading="lazy" /></div>`;
+    } else {
+        el.innerHTML = `<div class="message-content cg-task-failed">图片生成失败</div>`;
+    }
+    if (!existing) container.appendChild(el);
+    scrollToBottom();
+    return el;
+}
+
+/**
+ * 轮询任务状态直至终态（成功/失败），驱动三态渲染。
+ *
+ * 成功 → renderCgTaskState succeeded（出图挂 CG 由后端 run 完成）；
+ * 失败 → failed 态 + 错误条（renderSendError seam，复用现有通道）；
+ * 超限（约 90s）→ 判失败。终态/超限后清除 cgInFlight。
+ *
+ * @param {number} taskId - 任务 id
+ * @param {HTMLElement|null} pendingEl - pending 态元素引用
+ * @param {number|string} convId - 会话 id
+ * @param {number} attempts - 已轮询次数
+ */
+export async function pollImageTask(taskId, pendingEl, convId, attempts) {
+    if (getActiveTab()?.conversationId !== convId) {
+        cgInFlight.delete(convId);
+        return;
+    }
+    let task;
+    try {
+        task = await images.getTask(taskId);
+    } catch (err) {
+        renderCgTaskState(convId, taskId, 'failed', { error: err?.message });
+        renderSendError(err, '图片生成失败', convId);
+        cgInFlight.delete(convId);
+        return;
+    }
+
+    if (task.status === 'succeeded') {
+        renderCgTaskState(convId, taskId, 'succeeded', { resultUrl: task.result_url });
+        cgInFlight.delete(convId);
+        return;
+    }
+    if (task.status === 'failed') {
+        renderCgTaskState(convId, taskId, 'failed', { error: task.error });
+        const err = new Error(task.error || '图片生成失败');
+        renderSendError(err, '图片生成失败', convId);
+        cgInFlight.delete(convId);
+        return;
+    }
+    if (attempts + 1 >= CG_POLL_MAX_ATTEMPTS) {
+        renderCgTaskState(convId, taskId, 'failed', { error: '生成超时' });
+        renderSendError(new Error('图片生成超时，请稍后重试'), '图片生成失败', convId);
+        cgInFlight.delete(convId);
+        return;
+    }
+    setTimeout(() => pollImageTask(taskId, pendingEl, convId, attempts + 1), CG_POLL_INTERVAL_MS);
+}
+
 /**
  * 切换消息候选（MS-2）：‹ › 控制条点击 → 乐观更新渲染 → 落库 → 失败回滚
  *
@@ -991,4 +1159,7 @@ export const __all__ = [
     'handleSend',
     'regenerateLastReply',
     'continueLastReply',
+    'generateImage',
+    'renderCgTaskState',
+    'pollImageTask',
 ];

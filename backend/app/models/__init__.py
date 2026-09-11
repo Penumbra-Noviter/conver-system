@@ -3,6 +3,7 @@
 from backend.app.models.cg_image import CgImage
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
+from backend.app.models.image_task import ImageTask
 from backend.app.models.lorebook import LorebookEntry
 from backend.app.models.message import Message, MessageSwipe, Role
 from backend.app.models.setting import Setting
@@ -11,6 +12,7 @@ __all__ = [
     "CgImage",
     "Character",
     "Conversation",
+    "ImageTask",
     "LorebookEntry",
     "Message",
     "MessageSwipe",

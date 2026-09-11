@@ -128,6 +128,24 @@ CREATE TABLE cg_images (
 	FOREIGN KEY(message_id) REFERENCES messages (id) ON DELETE SET NULL
 );
 
+CREATE TABLE image_tasks (
+	id INTEGER NOT NULL, 
+	conversation_id INTEGER NOT NULL, 
+	character_id INTEGER NOT NULL, 
+	message_id INTEGER, 
+	provider VARCHAR(50), 
+	params TEXT NOT NULL, 
+	status VARCHAR(20), 
+	result_url TEXT, 
+	error TEXT, 
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	completed_at DATETIME, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(conversation_id) REFERENCES conversations (id) ON DELETE CASCADE, 
+	FOREIGN KEY(character_id) REFERENCES characters (id) ON DELETE CASCADE, 
+	FOREIGN KEY(message_id) REFERENCES messages (id) ON DELETE SET NULL
+);
+
 CREATE INDEX ix_characters_name ON characters (name);
 
 CREATE INDEX ix_cg_images_character_id ON cg_images (character_id);
@@ -135,6 +153,8 @@ CREATE INDEX ix_cg_images_character_id ON cg_images (character_id);
 CREATE INDEX ix_cg_images_conversation_id ON cg_images (conversation_id);
 
 CREATE INDEX ix_conversations_character_id ON conversations (character_id);
+
+CREATE INDEX ix_image_tasks_conversation_id ON image_tasks (conversation_id);
 
 CREATE INDEX ix_lorebook_entries_character_id ON lorebook_entries (character_id);
 

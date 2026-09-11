@@ -14,6 +14,7 @@ __all__ = [
     "branch",
     "character",
     "conversation",
+    "image_task",
     "lorebook",
     "message",
     "settings",

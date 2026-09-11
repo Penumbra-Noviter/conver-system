@@ -317,6 +317,37 @@ conver-system/
 | key | VARCHAR(100) PK | 配置键 |
 | value | TEXT | 配置值 |
 
+### cg_images（CG-2，CG 资产库）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增 |
+| character_id | INTEGER FK | → characters.id（ON DELETE CASCADE：删作品级联删图） |
+| conversation_id | INTEGER FK | → conversations.id（ON DELETE SET NULL：会话删除后图保留） |
+| message_id | INTEGER FK | → messages.id（ON DELETE SET NULL：消息删除后图保留） |
+| url | TEXT | 图片地址（本地文件路径或 URL） |
+| group_name | VARCHAR(100) | 分组（空 = 默认分组） |
+| is_special | BOOLEAN | 特殊 CG |
+| unlocked | BOOLEAN | 是否已解锁 |
+| unlock_hint | TEXT | 未解锁时提示 |
+| created_at | DATETIME | |
+
+### image_tasks（CG-3，图片生成任务）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增 |
+| conversation_id | INTEGER FK | → conversations.id（CASCADE） |
+| character_id | INTEGER FK | → characters.id（CASCADE） |
+| message_id | INTEGER FK | → messages.id（SET NULL：出图锚消息） |
+| provider | VARCHAR(50) | 图片 Provider 标识（缺省 local） |
+| params | TEXT | 生成参数 JSON（ImageGenParams） |
+| status | VARCHAR(20) | pending/running/succeeded/failed |
+| result_url | TEXT | 成功后的图片地址 |
+| error | TEXT | 失败信息 |
+| created_at | DATETIME | |
+| completed_at | DATETIME | 终态时间 |
+
 ### lorebook_entries（WL-1，世界书条目）
 
 | 字段 | 类型 | 说明 |

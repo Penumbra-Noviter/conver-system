@@ -281,6 +281,29 @@ export const messages = {
     switchSwipe: (messageId, index) => request('POST', `/messages/${messageId}/switch-swipe`, { index }),
 };
 
+// ══════════════════════════════════════════════════
+// 图片出图 & CG 回顾 API（CG-3）
+// ══════════════════════════════════════════════════
+
+export const images = {
+    /**
+     * 提交图片生成任务（对话内出图）——POST /api/images/tasks
+     * @param {object} data - { conversation_id, prompt, negative_prompt?, width?, height?, provider?, message_id? }
+     * @returns {Promise<{id: number, conversation_id: number, status: string, ...}>}
+     */
+    submitTask: (data) => request('POST', '/images/tasks', data),
+    /**
+     * 轮询任务状态——GET /api/images/tasks/{id}
+     * @returns {Promise<{id, status: 'pending'|'running'|'succeeded'|'failed', result_url?, error?}>}
+     */
+    getTask: (id) => request('GET', `/images/tasks/${id}`),
+    /**
+     * 剧情回顾时间线——GET /api/characters/{id}/cg-timeline
+     * @returns {Promise<Array<{cg_id, url, group_name, message_content, message_created_at}>>}
+     */
+    cgTimeline: (characterId) => request('GET', `/characters/${characterId}/cg-timeline`),
+};
+
 /**
  * 流式聊天 — 通过 fetch + ReadableStream 逐 token 消费
  *
@@ -360,4 +383,5 @@ export const __all__ = [
     'chatStream',
     'models',
     'settings',
+    'images',
 ];

@@ -41,6 +41,11 @@
                 </svg>
                 <span class="nav-label">搜索</span>
             </button>
+            <button class="nav-btn" data-view="cg" title="剧情回顾">
+                <!-- SVG 为 iconHtml('sparkles', { size: 20, className: 'nav-icon' }) 输出，与 icons.js ICON_PATHS 保持同步 -->
+                <svg class="nav-icon" width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-icon="sparkles" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 1 .8 3.2L12 5l-3.2.8L8 9l-.8-3.2L4 5l3.2-.8L8 1ZM12.5 10l.4 1.6 1.6.4-1.6.4-.4 1.6-.4-1.6-1.6-.4 1.6-.4.4-1.6ZM3 10l.5 2 .5-2 2-.5-2-.5-.5-2-.5 2-2 .5 2 .5Z"/></svg>
+                <span class="nav-label">回顾</span>
+            </button>
             <button class="nav-btn" data-view="simulators" title="模拟器">
                 <!-- SVG 为 iconHtml('gamepad', { size: 20, className: 'nav-icon' }) 输出，与 icons.js ICON_PATHS 保持同步 -->
                 <svg class="nav-icon" width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-icon="gamepad" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="5" width="13" height="6" rx="2.5"/><path d="M5 6.75v2.5M3.75 8h2.5"/><path d="M10.5 7.25v.01M10.5 9v.01"/></svg>
@@ -155,6 +160,11 @@
                                 <input type="checkbox" id="toggle-stream" checked>
                                 <span>流式输出</span>
                             </label>
+                            <button class="btn-gen-image" id="btn-gen-image" title="生成图片">
+                                <!-- SVG 为 iconHtml('sparkles', { size: 16 }) 输出，与 icons.js ICON_PATHS 保持同步 -->
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-icon="sparkles" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 1 .8 3.2L12 5l-3.2.8L8 9l-.8-3.2L4 5l3.2-.8L8 1ZM12.5 10l.4 1.6 1.6.4-1.6.4-.4 1.6-.4-1.6-1.6-.4 1.6-.4.4-1.6ZM3 10l.5 2 .5-2 2-.5-2-.5-.5-2-.5 2-2 .5 2 .5Z"/></svg>
+                                <span>生成图片</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -219,6 +229,14 @@
             <div id="simulator-list-panel"></div>
             <div id="simulator-run-panel" hidden></div>
             <div id="simulator-save-panel" hidden></div>
+        </section>
+
+        <!-- 剧情回顾视图（CG-3：已解锁 CG + 消息片段时间线，只读） -->
+        <section id="view-cg" class="view">
+            <div class="view-header">
+                <h2>剧情回顾</h2>
+            </div>
+            <div id="cg-timeline" class="cg-timeline"></div>
         </section>
 
         <!-- 设置视图 -->
@@ -566,6 +584,10 @@
                 <path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
             <span>搜索</span>
+        </button>
+        <button class="mobile-nav-btn" data-view="cg">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-icon="sparkles" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 1 .8 3.2L12 5l-3.2.8L8 9l-.8-3.2L4 5l3.2-.8L8 1ZM12.5 10l.4 1.6 1.6.4-1.6.4-.4 1.6-.4-1.6-1.6-.4 1.6-.4.4-1.6ZM3 10l.5 2 .5-2 2-.5-2-.5-.5-2-.5 2-2 .5 2 .5Z"/></svg>
+            <span>回顾</span>
         </button>
         <button class="mobile-nav-btn" data-view="simulators">
             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-icon="gamepad" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="5" width="13" height="6" rx="2.5"/><path d="M5 6.75v2.5M3.75 8h2.5"/><path d="M10.5 7.25v.01M10.5 9v.01"/></svg>

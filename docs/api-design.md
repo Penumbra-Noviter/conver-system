@@ -590,6 +590,62 @@ GET /api/conversations/{conversation_id}/snapshot
 
 ---
 
+## 图片出图 API（CG-3）
+
+### 提交图片生成任务
+
+```
+POST /api/images/tasks
+```
+
+对话内出图：prompt → 后台异步生成 → 完成挂 CG（会话/锚消息归属）。缺省 provider=local
+（零配置占位后端）；HTTP 后端（a1111/custom-http）需后续 settings 接线提供 base_url。
+
+**请求体**
+```json
+{ "conversation_id": 1, "prompt": "雪夜客栈", "message_id": 42 }
+```
+`message_id` 可选（出图锚消息，缺省会话级 CG）。
+
+**响应** `201` — ImageTaskResponse（status=pending，后台 asyncio 执行）。
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| conversation 不存在 | 404 | 对话不存在 |
+| message_id 不属于该会话 | 404 | 消息不存在: {id} |
+
+### 轮询任务状态
+
+```
+GET /api/images/tasks/{task_id}
+```
+
+**响应** `200` — 三态：`status` = pending/running（生成中，需 10-30 秒）/
+succeeded（`result_url` 本地文件路径，前端经 `/cg/<basename>` 静态挂载加载）/
+failed（`error` 记录，不破坏对话）。
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| 任务不存在 | 404 | 图片任务不存在: {id} |
+
+### 剧情回顾时间线
+
+```
+GET /api/characters/{character_id}/cg-timeline
+```
+
+已解锁 CG + 对应消息片段，按消息 created_at 升序、同消息多图按入库序（cg.id 升序）。
+
+**响应** `200` — `list[CgTimelineItem]`（cg_id/url/group_name/message_content/message_created_at）。
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| 角色不存在 | 404 | 角色不存在 |
+
+---
+
 ## 模型 API
 
 ### 获取可用模型列表

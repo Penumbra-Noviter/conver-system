@@ -156,6 +156,7 @@ class TestMigrateSuccess:
                 "lorebook_entries",
                 "message_swipes",
                 "cg_images",
+                "image_tasks",
             }
             assert conn.execute("SELECT COUNT(*) FROM characters").fetchone()[0] == 1
             assert conn.execute("SELECT name FROM characters").fetchone()[0] == "中文角色 测试"

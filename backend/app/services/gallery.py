@@ -29,7 +29,7 @@ from backend.app.services.exceptions import (
     MessageNotFoundError,
 )
 
-__all__ = ["add_cg", "list_cg", "unlock_cg", "pick_cg_by_weight"]
+__all__ = ["add_cg", "list_cg", "unlock_cg", "pick_cg_by_weight", "cg_timeline"]
 
 
 def add_cg(
@@ -146,6 +146,45 @@ def unlock_cg(db: Session, cg_id: int) -> CgImage:
         db.commit()
         db.refresh(cg)
     return cg
+
+
+def cg_timeline(db: Session, character_id: int) -> list[dict]:
+    """剧情回顾时间线（CG-3）：已解锁 CG + 对应消息片段，按时间升序
+
+    排序契约（契约锁锁定）：消息 created_at 升序（CG 无锚消息时按其自身
+    created_at 参与排序）；同一条消息的多图保持入库序（cg.id 升序）——
+    对齐「时间线顺序 = 消息 created_at 升序；同消息多图入库序」。
+
+    Args:
+        db: 数据库会话
+        character_id: 归属作品
+
+    Returns:
+        时间线条目 dict 列表（cg_id/url/group_name/message_content/
+        message_created_at/cg_created_at），已解锁且按上述序
+    """
+    rows = (
+        db.query(CgImage, Message.content, Message.created_at)
+        .outerjoin(Message, Message.id == CgImage.message_id)
+        .filter(CgImage.character_id == character_id, CgImage.unlocked.is_(True))
+        .all()
+    )
+    items = [
+        {
+            "cg_id": cg.id,
+            "url": cg.url,
+            "group_name": cg.group_name,
+            "message_content": msg_content,
+            "message_created_at": msg_created_at,
+            "cg_created_at": cg.created_at,
+        }
+        for cg, msg_content, msg_created_at in rows
+    ]
+    # 消息 created_at 升序（无锚消息 → 用 cg.created_at 参与排序）；同消息 → cg.id 升序（入库序）
+    return sorted(
+        items,
+        key=lambda it: (it["message_created_at"] or it["cg_created_at"], it["cg_id"]),
+    )
 
 
 def pick_cg_by_weight(

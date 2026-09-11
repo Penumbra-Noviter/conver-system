@@ -42,10 +42,11 @@ import { initSettingsPanel, loadSettings, initProviderDropdown } from './compone
 import { initTabBar } from './components/tab-bar.js';
 import { showError, autoResizeInput } from './utils.js';
 import { state } from './state.js';
-import { chatDom, handleSend, refreshSendButton, setChatHooks } from './chat.js';
+import { chatDom, handleSend, refreshSendButton, setChatHooks, generateImage } from './chat.js';
 import { getActiveTab, abortStream, restoreFromStorage } from './tabs.js';
 import { activateConversation, showEmptyState, setActivationHooks } from './conversation-activation.js';
 import { initSearchView } from './search-view.js';
+import { renderCgTimeline } from './cg-review.js';
 import { closeConversationsAndResettle, setCascadeHooks } from './cascade.js';
 import { initSimulatorsView, refreshSimulators, getGames } from './simulators.js';
 import { initSimulatorRun, openSimulator, closeSimulator } from './simulator-view.js';
@@ -105,6 +106,10 @@ async function switchView(viewName) {
         // 聚焦时序（ARC-9 C1）：100ms 延迟聚焦留在编排区 — 搜索视图事件绑定
         // 与防抖逻辑在 search-view.js，本处只负责视图切换后的焦点引导
         setTimeout(() => document.querySelector('#search-input')?.focus(), 100);
+    }
+    // 剧情回顾视图：进入即渲染当前活动对话角色的 CG 时间线（CG-3）
+    if (viewName === 'cg') {
+        renderCgTimeline(getActiveTab()?.characterId ?? null);
     }
     // 用户手册视图：初始化侧边栏滚动高亮
     if (viewName === 'guide') {
@@ -172,6 +177,12 @@ chatDom.chatInput.addEventListener('keydown', (e) => {
 
 chatDom.chatInput.addEventListener('input', () => {
     autoResizeInput(chatDom.chatInput);
+});
+
+// CG-3 生成图片入口（#btn-gen-image → chat.js generateImage；无活动 tab 时 no-op）
+chatDom.btnGenImage?.addEventListener('click', () => {
+    if (!getActiveTab()) return;
+    generateImage();
 });
 
 // ══════════════════════════════════════════════════
