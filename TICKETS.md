@@ -84,7 +84,7 @@
 |--------|------|----------|------|
 | WL-4 | 世界书编辑器前端（CRUD 面板 + 泛词告警 + 字段校验） | 2026-09-10 | 7073757 |
 
-**验证链：** 后端 pytest 896+1skip→901+1skip（+5：test_lorebook_routes 路由契约锁——列表/创建/部分更新/删除/守卫 404/校验 422）| 前端 Vitest 1189→1206（+17：lorebook-editor 契约锁——chips 录入去重删除/表单校验（含空数值防静默 0）/泛词告警/payload 字段映射与后端 schema 一致/列表渲染搜索过滤/开关态渲染/toggle 状态/属性上下文注入防护）| 全量双端绿零回归 | Playwright 端到端：角色卡「世界书」按钮开面板 → 新增（chip 录入/内容/保存）→ 列表显示 → 重开编辑字段全还原 → 发消息「酒馆在哪里？」后端 DEBUG 日志「世界书注入：{'system': 1}（1 条）」注入生效 | 期末 code-review 三轴：Standards 1 硬违例（路由 type hints）+ Spec 0 硬发现 + Falsify 1 HIGH（stored XSS 属性注入，escapeAttr 修复+契约锁）+ 2 LOW 当场修复 | doc_sync 零漂移
+**验证链：** 后端 pytest 896+1skip→901+1skip（+5：test_lorebook_routes 路由契约锁——列表/创建/部分更新/删除/守卫 404/校验 422）| 前端 Vitest 1189→1211（+22：lorebook-editor 契约锁——chips 录入去重删除与增删交互/表单校验（含空数值防静默 0）/泛词告警/payload 字段映射与后端 schema 一致/列表渲染搜索过滤/开关态渲染/保存成功失败与校验拦截/列表错误路径/属性上下文注入防护；覆盖率 94.18% 过 90% 门）| 全量双端绿零回归 | Playwright 端到端：角色卡「世界书」按钮开面板 → 新增（chip 录入/内容/保存）→ 列表显示 → 重开编辑字段全还原 → 发消息「酒馆在哪里？」后端 DEBUG 日志「世界书注入：{'system': 1}（1 条）」注入生效 | 期末 code-review 三轴：Standards 1 硬违例（路由 type hints）+ Spec 0 硬发现 + Falsify 1 HIGH（stored XSS 属性注入，escapeAttr 修复+契约锁）+ 2 LOW 当场修复 | doc_sync 零漂移
 **非阻断落债：** F-96（escapeHtml 属性转义仓库级同族），入 TECH_DEBT 候选区；内容 20000 上限为设计决策（UI 层可配，后端不限长保导入保真）
 
 ---

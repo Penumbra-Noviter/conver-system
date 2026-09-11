@@ -141,6 +141,7 @@ describe('5. 列表渲染：开关状态/常驻标记/搜索过滤', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         vi.resetModules();
+        vi.resetAllMocks(); // vi.mock 工厂不随 resetModules 重跑，需清调用史防跨用例污染
     });
 
     it('渲染条目行：常驻标记、启用开关状态、关键词预览', async () => {
@@ -218,6 +219,106 @@ describe('5. 列表渲染：开关状态/常驻标记/搜索过滤', () => {
         await flush();
 
         expect(document.querySelector('.lorebook-empty').textContent).toContain('还没有世界书条目');
+    });
+
+    it('chips 交互：添加按钮录入 + 回车录入 + 删除 + 泛词告警显隐', async () => {
+        const { lorebook } = await import('../js/api.js');
+        const { showLorebookEditor } = await import('../js/components/lorebook-editor.js');
+        lorebook.list.mockResolvedValue([]);
+
+        showLorebookEditor({ characterId: 1, characterName: '测试角色' });
+        await flush();
+        document.querySelector('[data-lorebook-add]').click(); // 进入编辑视图
+        await flush();
+
+        const input = document.querySelector('#le-keys-input');
+        input.value = '酒馆';
+        document.querySelector('#le-keys-add').click(); // 添加按钮
+        expect(document.querySelectorAll('.lorebook-chip').length).toBe(1);
+        input.value = '龙';
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); // 回车录入
+        expect(document.querySelectorAll('.lorebook-chip').length).toBe(2);
+
+        // 泛词告警：录入单字符 key 后显示
+        input.value = '你';
+        document.querySelector('#le-keys-add').click();
+        expect(document.querySelector('#le-generic-warning').hidden).toBe(false);
+
+        // 删除 chip
+        document.querySelector('[data-chip-x]').click();
+        expect(document.querySelectorAll('.lorebook-chip').length).toBe(2);
+    });
+
+    it('保存成功（create）→ 调 API 并返回列表', async () => {
+        const { lorebook } = await import('../js/api.js');
+        const { showLorebookEditor } = await import('../js/components/lorebook-editor.js');
+        lorebook.list.mockResolvedValue([]);
+        lorebook.create.mockResolvedValue({ id: 9 });
+
+        showLorebookEditor({ characterId: 1, characterName: '测试角色' });
+        await flush();
+        document.querySelector('[data-lorebook-add]').click();
+        await flush();
+
+        document.querySelector('#le-title').value = '酒馆';
+        document.querySelector('#le-keys-input').value = '酒馆';
+        document.querySelector('#le-keys-add').click();
+        document.querySelector('#le-content').value = '内容';
+        document.querySelector('#le-save').click();
+        await flush();
+
+        expect(lorebook.create).toHaveBeenCalledWith(1, expect.objectContaining({
+            title: '酒馆', keys: ['酒馆'], content: '内容', position: 'world', depth: 20,
+        }));
+        expect(document.querySelector('[data-lorebook-list]')).not.toBeNull(); // 回到列表
+    });
+
+    it('保存校验失败（内容超限）→ 内联错误且不调 API', async () => {
+        const { lorebook } = await import('../js/api.js');
+        const { showLorebookEditor } = await import('../js/components/lorebook-editor.js');
+        lorebook.list.mockResolvedValue([]);
+
+        showLorebookEditor({ characterId: 1, characterName: '测试角色' });
+        await flush();
+        document.querySelector('[data-lorebook-add]').click();
+        await flush();
+
+        document.querySelector('#le-keys-input').value = '酒馆';
+        document.querySelector('#le-keys-add').click();
+        document.querySelector('#le-content').value = 'x'.repeat(20001);
+        document.querySelector('#le-save').click();
+        await flush();
+
+        expect(document.querySelector('#le-content-error').textContent).toContain('内容过长');
+        expect(lorebook.create).not.toHaveBeenCalled();
+    });
+
+    it('保存失败（API 抛错）→ 不崩溃', async () => {
+        const { lorebook } = await import('../js/api.js');
+        const { showLorebookEditor } = await import('../js/components/lorebook-editor.js');
+        lorebook.list.mockResolvedValue([]);
+        lorebook.create.mockRejectedValue(new Error('网络错误'));
+
+        showLorebookEditor({ characterId: 1, characterName: '测试角色' });
+        await flush();
+        document.querySelector('[data-lorebook-add]').click();
+        await flush();
+
+        document.querySelector('#le-keys-input').value = '酒馆';
+        document.querySelector('#le-keys-add').click();
+        document.querySelector('#le-save').click();
+        await flush();
+        expect(document.querySelector('[data-lorebook-root]')).not.toBeNull();
+    });
+
+    it('列表加载失败 → 错误提示（不抛）', async () => {
+        const { lorebook } = await import('../js/api.js');
+        const { showLorebookEditor } = await import('../js/components/lorebook-editor.js');
+        lorebook.list.mockRejectedValue(new Error('加载失败'));
+
+        showLorebookEditor({ characterId: 1, characterName: '测试角色' });
+        await flush();
+        expect(document.querySelector('.lorebook-empty').textContent).toContain('加载世界书失败');
     });
 
     it('协议表面：__all__ 覆盖全部公开导出', () => {

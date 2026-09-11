@@ -86,6 +86,7 @@
 - **验证链**：后端 pytest 896+1skip→901+1skip（+5 路由契约锁）| 前端 Vitest 1189→1204（+15 编辑器契约锁）| 全量双端绿零回归 | **Playwright 端到端**：角色卡「世界书」按钮 → 模态开（空态提示）→ 新增条目（chip「酒馆」回车录入 + 内容 + 保存）→ 列表显示条目（标题/关键词/order/开关）→ 重开编辑字段全还原（标题/chip/内容/数值/启用）→ 发消息「酒馆在哪里？」→ 后端 DEBUG `世界书注入：{'system': 1, 'before_char': 0, 'after_char': 0}（1 条）` → **注入生效**（400 为未配 API Key 环境预期，注入在 resolve_llm 前已构建）。
 - **期末 code-review 三轴（7073757 后、修复前）**：Standards 1 硬违例（路由缺返回 type hints → 补 `-> list[LorebookEntryResponse]` 系）+ 低危多项（CONTENT_MAX_LENGTH/GENERIC_KEYS 未入 __all__ → 补；chip 模板双份 → 提取 chipHtml；删除无确认 → showConfirm 门；「事件绑定（委托）」注释失实 → 改逐行绑定；BOUNDS/GENERIC_KEYS 与后端边界双轨漂移风险 → 随 F-96 注记）；Spec 0 硬发现（3 LOW 可辩护：组权重和提示按 spec「可取其中合理项」省略、入口按仓库无详情面板现实取卡按钮、契约锁 #5 开关态渲染已补锁）；**Falsify 1 HIGH + 2 LOW 当场修复**（先红后绿 +2 用例，Vitest→1206）：
   1. **stored XSS（HIGH）**——`escapeHtml` 只转义 `&<>` 不转义 `"`，`data-chip-x="..."`/`value="..."` 插值含引号的可信度不足内容（keys 可来自导入角色卡）可直接属性注入 `autofocus onfocus=` → 新增 `escapeAttr`（escapeHtml + `"`→`&quot;`）应用于全部属性插值，契约锁 `test_attribute_context_injection_safe`（含引号 key/标题渲染后无注入属性、dataset/value 往返一致）。
+  - 覆盖率收口：初测 83.53% 低于 90% 门 → 补 7 用例（chips 增删交互/保存成功失败/校验拦截/列表错误路径）→ **94.18%**（Stmts/Lines 94.18 / Funcs 100 / Branch 79.81）；测试顺带发现 vi.mock 工厂不随 resetModules 重跑 → beforeEach 补 resetAllMocks 防跨用例污染。
   2. 空数值输入 `Number("")===0` 静默落 order/depth=0 → validate 空输入报「请填写」。
   3. 内容 20000 上限仅前端（后端 content 无长度约束）——设计决策保持：spec 的 20000 属 UI 层可配约束，后端不限长以保 character_book 导入保真（parse 不截断）。
 - **非阻断落债**：F-96（escapeHtml 属性上下文转义缺陷仓库级同族，WL-4 局部修复）→ 入 TECH_DEBT 候选区。
