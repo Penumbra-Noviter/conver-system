@@ -53,12 +53,12 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-97 | 记忆宫殿开关为全局 settings 而非会话级（spec「会话级开关落 settings 或 conversations 扩展字段」语义未实现；全局开关对多会话共用，会话级细化需 conversations 加列自愈迁移或按会话键） | WL-5 期末 code-review Spec 轴 | Worth exploring | 📝 待立项 | 产品语义 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
 | 编号 | 遗留项（压缩摘要） | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
+| F-97 | 记忆宫殿会话级开关细化（全局开关与角色级条目注入架构自洽，会话级需结构性变更） | WL-5 期末 code-review Spec 轴 | Worth exploring | ❌ 复核关闭 |
 | F-25 | `error_mapping.py:117` provider 前导空格——docstring 已声明「由调用方负责」，设计意图非缺陷 | 波 1 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
 | F-27 | `test_error_mapping_export.py` 文件末尾无换行符 | 波 1 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
 | F-28 | simulator_store/manifest/import 三个文件末尾缺失换行符 | 波 2 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
@@ -79,7 +79,7 @@
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95 + F-96，轻量档 4 工单）
+### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95 + F-96（做）+ F-97（关），轻量档 5 项）
 
 > 处置详情：3 项消费（各对应 TICKETS 归档工单）。Grilling 实证拍板**全做**——F-93 git grep 复核 `lorebook._as_str_list` 与 `character_card._as_list` 逐行重复仍成立（character_card 2 处 + lorebook 1 处消费）；F-94 `chat._msg_role` 与 `prompt._role_str` 的 `hasattr(.value)` 枚举归一重复（chat.py:535 / prompt.py:103）；F-95 `build_message_list` 生产调用方仅 chat.py 两处（assemble_chat_context），加可选 history 参数即可消除扫描窗 + 内部双查。方案：新建 `services/text_utils.py` 共享单点（as_str_list + role_str）收敛 F-93/F-94；F-95 build_message_list 增 `history: Sequence | None`（None → 内部查询，既有调用不变）。
 
@@ -89,6 +89,7 @@
 | F-94 | chat._msg_role 与 prompt._role_str 枚举归一重复 | WL-3 期末 code-review Standards 轴 | Worth exploring | ✅ 已修（2026-09-10：轻量档工单 `text_utils.role_str` 收敛——prompt/chat 改指 + 删私有函数，pytest 891→896 全绿零回归） |
 | F-95 | assemble_chat_context 扫描窗 + build_message_list 双查历史 | WL-3 期末 code-review Standards 轴 | Speculative | ✅ 已修（2026-09-10：轻量档工单 `build_message_list` 增可选 history 参数，assemble 传入已取历史消除双查；显式传 history 不再查库由契约锁锁定） |
 | F-96 | escapeHtml 不转义引号——属性上下文插值（value="..."/data-*="..."）含 " 时可属性注入（WL-4 lorebook-editor 曾局部 escapeAttr，其余组件同类） | WL-4 期末 code-review Falsify 轴（stored XSS 实证） | Worth exploring | ✅ 已修（2026-09-10：轻量档工单升级共享 `escapeHtml` 同时转义 " → &quot;（15 处属性插值一处收敛），lorebook-editor escapeAttr 退役；markdown sanitizeUrl 补实体引号形态拒绝（&quot;/&#34;/&#x22/，保 TD-42「引号 URL → 纯文本」契约）；契约锁 escapeHtml 引号转义 + DOM 往返 + 无注入属性，Vitest 1211→1212） |
+| F-97 | 记忆宫殿开关为全局 settings 而非会话级 | WL-5 期末 code-review Spec 轴 | Worth exploring | ❌ 复核关闭（2026-09-10：注入链 `_lorebook_world_injection` → `list_entries(character_id)` 取角色全部启用条目（含 source=auto），无会话维度过滤——auto 条目对角色所有会话注入；「会话级开关」要生效须结构性变更（注入链按会话过滤或 auto 条目改挂会话），与「记忆归角色跨会话共享」产品语义冲突且改动面大；现状全局开关与角色级注入架构自洽，spec 存储位置二选一（settings 已实现）已满足） |
 
 ### 2026-08-27（技术债消费批次：F-82~F-89 全自动档 kickoff，3 做 5 关）
 
