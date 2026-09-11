@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2197<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->915<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1212<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2200<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->917<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1213<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -404,7 +404,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~506 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~525 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -527,7 +527,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/text_utils.py:as_str_list-->`as_str_list(value)`<!--/AUTO--> | 脏值 → str 化列表（None/空 → []；list → 逐元素 str；其它 → 单值包裹） |
 | <!--AUTO:sig:backend/app/services/text_utils.py:role_str-->`role_str(value)`<!--/AUTO--> | 消息角色归一（带 .value 枚举解包为值；纯字符串原样；None → "None" 兜底） |
 
-### 4.21.8 `backend/app/services/memory_palace.py` — 记忆宫殿（WL-5）（<!--AUTO:lines:backend/app/services/memory_palace.py-->~180 行<!--/AUTO-->）
+### 4.21.8 `backend/app/services/memory_palace.py` — 记忆宫殿（WL-5）（<!--AUTO:lines:backend/app/services/memory_palace.py-->~195 行<!--/AUTO-->）
 
 **职责**：LLM 自动归纳对话要点 → 世界书 auto 条目（source='auto'，position='world'，depth=20 固定）。失败隔离双保险：summarize_turn 内部吞 LLM/JSON 解析失败（记日志返回 None）+ chat.maybe_memory_palace 外层兜底异常，记忆增强绝不阻断对话主流程。触发：complete_chat / stream_reply 完整回合落库后，开关（settings `memory_palace_enabled`）+ 阈值（每 N 轮 / 字符数）达标即归纳。
 
@@ -835,7 +835,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleSidebar-->`toggleSidebar()`<!--/AUTO--> | 侧栏开关 |
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleChatSidebar-->`toggleChatSidebar()`<!--/AUTO--> | 会话侧栏开关 |
 
-### 4.44.1 `frontend/js/components/lorebook-editor.js` — 世界书编辑器（WL-4）（<!--AUTO:lines:frontend/js/components/lorebook-editor.js-->~407 行<!--/AUTO-->）
+### 4.44.1 `frontend/js/components/lorebook-editor.js` — 世界书编辑器（WL-4）（<!--AUTO:lines:frontend/js/components/lorebook-editor.js-->~418 行<!--/AUTO-->）
 
 **职责**：角色世界书条目 CRUD 面板（列表 + 编辑表单双视图）。骨架由通用模态框工厂 openModal 承担（ARC-10 C3 seam，不新造）；图标走 icons.js iconHtml()。纯函数核（chips 录入去重删除 / 泛词判定 / 条目校验 / payload 构建）独立单测；payload 字段名映射单一来源（与后端 LorebookEntryBase 逐字段一致，契约锁锁定）。入口：角色卡「世界书」按钮（list-views.js 事件委托）。
 
@@ -1352,7 +1352,7 @@ conver system/
 | `backend/tests/test_lorebook_routes.py` | <!--AUTO:tests:backend/tests/test_lorebook_routes.py-->5<!--/AUTO--> | 世界书 CRUD 路由契约锁（WL-4：列表/创建/部分更新/删除/守卫 404/校验 422） |
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
-| `backend/tests/test_memory_palace.py` | <!--AUTO:tests:backend/tests/test_memory_palace.py-->13<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
+| `backend/tests/test_memory_palace.py` | <!--AUTO:tests:backend/tests/test_memory_palace.py-->15<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
@@ -1393,7 +1393,7 @@ conver system/
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->103<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
-| `frontend/tests/lorebook-editor.test.js` | <!--AUTO:tests:frontend/tests/lorebook-editor.test.js-->22<!--/AUTO--> | 世界书编辑器契约锁（WL-4：chips 交互/表单校验/泛词告警/payload 字段映射/列表渲染搜索/保存双路径/XSS 属性注入防护） |
+| `frontend/tests/lorebook-editor.test.js` | <!--AUTO:tests:frontend/tests/lorebook-editor.test.js-->23<!--/AUTO--> | 世界书编辑器契约锁（WL-4：chips 交互/表单校验/泛词告警/payload 字段映射/列表渲染搜索/保存双路径/XSS 属性注入防护） |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
@@ -1465,10 +1465,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2197<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2200<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->915<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1212<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->917<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1213<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

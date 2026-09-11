@@ -210,6 +210,32 @@ describe('5. 列表渲染：开关状态/常驻标记/搜索过滤', () => {
         expect(rows[0].textContent).toContain('皇宫');
     });
 
+    it('source 过滤（WL-5）：auto 条目带记忆标记，按来源过滤缩小列表', async () => {
+        const { lorebook } = await import('../js/api.js');
+        const { showLorebookEditor } = await import('../js/components/lorebook-editor.js');
+        lorebook.list.mockResolvedValue([
+            { id: 1, title: '手动条目', keys: ['手'], enabled: true, order: 10, constant: false, source: 'manual' },
+            { id: 2, title: '记忆条目', keys: ['记忆'], enabled: true, order: 20, constant: false, source: 'auto' },
+        ]);
+
+        showLorebookEditor({ characterId: 1, characterName: '测试角色' });
+        await flush();
+
+        // auto 条目带「记忆」标记
+        const rows = document.querySelectorAll('.lorebook-row');
+        expect(rows[1].textContent).toContain('记忆');
+        expect(rows[1].querySelector('.lorebook-badge-auto')).not.toBeNull();
+
+        // source 过滤：auto → 只留记忆条目
+        const filter = document.querySelector('[data-lorebook-source]');
+        filter.value = 'auto';
+        filter.dispatchEvent(new Event('change'));
+        await flush();
+        const autoRows = document.querySelectorAll('.lorebook-row');
+        expect(autoRows.length).toBe(1);
+        expect(autoRows[0].textContent).toContain('记忆条目');
+    });
+
     it('空世界书 → 空态提示', async () => {
         const { lorebook } = await import('../js/api.js');
         const { showLorebookEditor } = await import('../js/components/lorebook-editor.js');

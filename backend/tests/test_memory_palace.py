@@ -310,3 +310,45 @@ def test_memory_palace_trigger_exception_isolated(db_session, monkeypatch, caplo
     )
     resp = _asyncio.run(_chat_service.complete_chat(db, _ChatRequest(conversation_id=conv_id, content="你好")))
     assert resp.reply == "这是回复"  # 记忆触发层的意外不影响回合
+
+
+# ════════════════════════════════════════════════════════════════
+# 六、期末审核修复锁（Falsify / Spec）
+# ════════════════════════════════════════════════════════════════
+
+
+def test_title_truncated_to_200(db_session) -> None:
+    """LLM 超长 title 截断到 200（Falsify 修复：防 list 路由 response_model 500）"""
+    provider = _FakeProvider(reply='{"title": "' + "很" * 300 + '", "keys": ["酒馆"], "content": "内容"}')
+    draft = _loop(_summarize(provider))
+    assert draft is not None
+    assert len(draft.title) == 200
+
+    char = _create_character(db_session)
+    assert persist_drafts(db_session, char.id, [draft]) == 1
+    entry = db_session.query(LorebookEntry).first()
+    assert len(entry.title) == 200  # 入库即截断，路由序列化不 500
+
+
+def test_every_rounds_rhythm_incremental(db_session, monkeypatch) -> None:
+    """每 N 轮节奏（F1 修复）：增量计数——N=2 时每两回合归纳一次，非累计恒触发"""
+    db, conv_id, char_id = _setup_conv(db_session, monkeypatch)
+    # 序列：回合1回复、回合2回复、回合2后归纳 JSON
+    provider = _ScriptedProvider([
+        "回复一", "回复二",
+        '{"title": "要点", "keys": ["酒馆"], "content": "约在酒馆。"}',
+    ])
+    _patch_chat_env(monkeypatch, provider)
+    monkeypatch.setattr(_setting_service, "memory_palace_enabled", lambda db: True)
+    monkeypatch.setattr(_setting_service, "memory_palace_every_rounds", lambda db: 2)
+
+    _asyncio.run(_chat_service.complete_chat(db, _ChatRequest(conversation_id=conv_id, content="第一轮")))
+    # 回合1后：增量 2 < 4 → 不归纳（provider 只被调 1 次=聊天回复）
+    assert len(provider.calls) == 1
+    assert _lorebook_service.list_entries(db, char_id) == []
+
+    _asyncio.run(_chat_service.complete_chat(db, _ChatRequest(conversation_id=conv_id, content="第二轮")))
+    # 回合2后：增量 4 ≥ 4 → 归纳（provider 再调 2 次：回复 + 归纳）
+    assert len(provider.calls) == 3
+    entries = _lorebook_service.list_entries(db, char_id)
+    assert len(entries) == 1 and entries[0].source == "auto"

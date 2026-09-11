@@ -185,11 +185,17 @@ async function renderList(root, characterId, onChanged) {
     root.innerHTML = `
         <div class="lorebook-toolbar">
             <input type="text" class="lorebook-search" data-lorebook-search placeholder="按标题/关键词过滤…">
+            <select class="lorebook-source-filter" data-lorebook-source title="按来源过滤">
+                <option value="">全部来源</option>
+                <option value="manual">手动</option>
+                <option value="auto">记忆宫殿</option>
+            </select>
             <button class="btn btn-primary lorebook-add" data-lorebook-add>${iconHtml('plus')} 新增条目</button>
         </div>
         <div class="lorebook-list" data-lorebook-list></div>
     `;
     const searchInput = root.querySelector('[data-lorebook-search]');
+    const sourceFilter = root.querySelector('[data-lorebook-source]');
     const listEl = root.querySelector('[data-lorebook-list]');
 
     let entries = [];
@@ -202,11 +208,13 @@ async function renderList(root, characterId, onChanged) {
 
     const render = () => {
         const q = (searchInput.value || '').trim().toLowerCase();
-        const filtered = q
-            ? entries.filter((e) =>
-                (e.title || '').toLowerCase().includes(q) ||
-                (e.keys || []).some((k) => k.toLowerCase().includes(q)))
-            : entries;
+        const source = sourceFilter.value;
+        const filtered = entries.filter((e) => {
+            if (source && (e.source || 'manual') !== source) return false;
+            if (!q) return true;
+            return (e.title || '').toLowerCase().includes(q) ||
+                (e.keys || []).some((k) => k.toLowerCase().includes(q));
+        });
         listEl.innerHTML = filtered.length
             ? filtered.map((e) => rowHtml(e)).join('')
             : '<div class="lorebook-empty">' + (entries.length ? '无匹配条目' : '还没有世界书条目，点「新增条目」开始') + '</div>';
@@ -247,19 +255,22 @@ async function renderList(root, characterId, onChanged) {
     root.querySelector('[data-lorebook-add]').addEventListener('click', () =>
         renderEditor(root, characterId, null, onChanged));
     searchInput.addEventListener('input', render);
+    sourceFilter.addEventListener('change', render);
     render();
 }
 
-/** 列表行 HTML（标题/关键词前 3 + 计数/开关/order/常驻标记） */
+/** 列表行 HTML（标题/关键词前 3 + 计数/开关/order/常驻标记/来源标记） */
 function rowHtml(e) {
     const keys = e.keys || [];
     const keysPreview = keys.length
         ? escapeHtml(keys.slice(0, 3).join('、')) + (keys.length > 3 ? ` <span class="lorebook-keys-count">+${keys.length - 3}</span>` : '')
         : '<span class="lorebook-keys-empty">（常驻/无关键词）</span>';
+    const sourceBadge = (e.source || 'manual') === 'auto'
+        ? ' <span class="lorebook-badge lorebook-badge-auto">记忆</span>' : '';
     return `
         <div class="lorebook-row${e.constant ? ' is-constant' : ''}">
             <div class="lorebook-row-main">
-                <div class="lorebook-row-title">${escapeHtml(e.title || '（未命名）')}${e.constant ? ` ${iconHtml('pin')}<span class="lorebook-badge">常驻</span>` : ''}</div>
+                <div class="lorebook-row-title">${escapeHtml(e.title || '（未命名）')}${e.constant ? ` ${iconHtml('pin')}<span class="lorebook-badge">常驻</span>` : ''}${sourceBadge}</div>
                 <div class="lorebook-row-keys">${keysPreview}</div>
             </div>
             <span class="lorebook-order">${e.order}</span>

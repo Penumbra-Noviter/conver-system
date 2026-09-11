@@ -22,11 +22,13 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.requests import ClientDisconnect
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
+from backend.app.models.lorebook import LorebookEntry
 from backend.app.models.message import Message, Role
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
@@ -219,7 +221,9 @@ async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
     )
 
     # WL-5 记忆宫殿：回合完成后按阈值触发自动归纳（失败绝不阻断主流程）
-    await maybe_memory_palace(db, request.conversation_id, ctx.provider, ctx.conversation.model_name)
+    await _maybe_memory_palace(
+        db, request.conversation_id, ctx.provider, ctx.conversation.model_name
+    )
 
     return ChatResponse(
         reply=reply_text,
@@ -448,11 +452,13 @@ async def stream_reply(
             )
             saved = True
             message_id = saved_msg.id
-            # WL-5 记忆宫殿：完整回合落库后按阈值触发归纳（失败不阻断）
-            await maybe_memory_palace(
+        yield {"type": "done", "message_id": message_id}
+        # WL-5 记忆宫殿：done 帧发出后触发归纳（Falsify 修复：归纳 LLM 调用不
+        # 阻塞 done 帧；断连取消此时无副作用——消息已落库、done 已送达）
+        if saved and full_content:
+            await _maybe_memory_palace(
                 db, conversation_id, ctx.provider, ctx.conversation.model_name
             )
-        yield {"type": "done", "message_id": message_id}
 
     except ClientDisconnect:
         # 客户端在发送过程中断开 — 尽力保存已生成部分
@@ -543,7 +549,7 @@ def _msg_role(msg: object) -> str:
     return role_str(getattr(msg, "role", ""))
 
 
-async def maybe_memory_palace(
+async def _maybe_memory_palace(
     db: Session,
     conversation_id: int,
     provider: BaseLLM,
@@ -554,6 +560,9 @@ async def maybe_memory_palace(
     complete_chat / stream_reply 在完整回合落库后调用。异常隔离策略：
     summarize_turn 内部已吞 LLM/JSON 失败（返回 None）；本函数再包一层
     try/except 兜底意外（DB/计数异常等），保证记忆增强绝不破坏对话主流程。
+
+    每 N 轮语义（Falsify/Spec 修复）：增量消息数 = 总消息数 - 已归纳轮数×2
+    （每个 auto 条目对应一轮已消费），避免 N>1 时累计单调恒触发。
 
     Args:
         db: 数据库会话
@@ -567,20 +576,31 @@ async def maybe_memory_palace(
         conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
         if conv is None:
             return
+        character = db.query(Character).filter(Character.id == conv.character_id).first()
+        if character is None:
+            return
         messages = message_service.get_messages(db, conversation_id)
         if not messages:
             return
-        message_count = len(messages)
+        # 增量计数：每个 auto 条目对应已归纳的一轮（2 条消息），杜绝 N>1 时
+        # 累计单调恒触发（should_summarize 纯函数语义不变，调用方传增量）
+        auto_count = (
+            db.query(func.count(LorebookEntry.id))
+            .filter(
+                LorebookEntry.character_id == character.id,
+                LorebookEntry.source == "auto",
+            )
+            .scalar()
+            or 0
+        )
+        incremental = max(0, len(messages) - auto_count * 2)
         char_count = sum(len(m.content or "") for m in messages)
         if not memory_palace_service.should_summarize(
-            message_count,
+            incremental,
             char_count,
             every_rounds=setting_service.memory_palace_every_rounds(db),
             char_threshold=setting_service.memory_palace_char_threshold(db),
         ):
-            return
-        character = db.query(Character).filter(Character.id == conv.character_id).first()
-        if character is None:
             return
         draft = await memory_palace_service.summarize_turn(
             messages,
