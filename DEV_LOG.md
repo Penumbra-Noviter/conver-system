@@ -164,6 +164,22 @@
 - **期末 code-review 四轴**：Spec 1 实现偏差记录（spec 签名 `-> str` → ChatResponse——与 regenerate_chat 同构，路由与前端结算需要 message_id）；Standards 0 硬违例；**Falsify 1 项当场修复**（空续写 → 重复候选行守卫，先红后绿 +1 用例）；Architecture 0 发现（复用 assemble_chat_context/add_swipe，零逻辑复制）。
 - **非阻断落债**：**F-99（Strong，LLM 链路方向）**——适配器多 system 折叠实证：`_prepare_messages` 使含 PHI/scenario/世界书注入的角色在真实 Provider 调用时 persona/scenario/世界书 system 块全部丢弃、仅存末条（实证脚本：组装层 6 system → 折叠后 system=PHI，chat 仅剩 3 条历史）。既有缺陷（BE-3 收口引入），MS-3 触发形态已规避；修复需重设计适配器 system 合并策略 + 修订 test_llm_shared 锁定契约，另立项。
 
+## BR-1 分支元数据与快照导出（2026-09-11 — AI风月对标五批工单 BR 首张，承接 MS 批收官）
+
+- **来源**：承接 MS-3（handoff 建议 BR 批在世界书之后，快照需含世界书条目——WL 已全）；分支语义对齐对标站「存档升级为分支点」（spec §BR-1）。
+- **字段与迁移**：conversations 增 `parent_conversation_id`（INTEGER 可空）/`branch_from_message_id`（INTEGER 可空）/`branch_title`（VARCHAR(200) 可空）；自愈迁移 `database.py::_ensure_conversation_branch_columns`（PRAGMA table_info 探测缺列 → ALTER ADD COLUMN，幂等契约锁——存量行 NULL 零影响）。**不加 FK 决策**：删源会话时 parent 置空为服务层语义（BR-2 锁定），SQLite ALTER ADD COLUMN 加自引用 FK 约束在存量库不可靠。
+- **快照导出**（conversation_export.py，`__all__` 3→5）：`build_branch_snapshot(db, conversation_id, upto_message_id=None) -> BranchSnapshot`——载荷 {version, character_id, model_provider, model_name, title, messages:[{role, content, created_at}], lorebook_entries, swipes}；`validate_branch_snapshot(data)`——缺/不支持版本（SNAPSHOT_VERSION=1 单一来源）/非 dict/结构畸形 → `BranchSnapshotError`（400 族登记）明确异常，BR-2 导入复用。
+- **关键决策（契约锁锁定）**：
+  - **消息按 id 升序**（非 created_at）：created_at 为秒精度，同秒多条排序不可靠；id=插入序稳定，快照/重建的稳定序以 id 为准（与 MS-2 批量填充/continue 的末条定位同构）。
+  - **swipes 载荷按 message_index**（截断后 messages 数组下标重定基）：源消息 id 在重建会话无意义，位置序是唯一稳定引用；契约锁 `test_truncation_rebases_swipe_message_index` 锁截断后指向。
+  - **锚校验前置**：upto_message_id 不存在/跨会话 → MessageNotFoundError（禁止静默空快照——「截断后消息为空」与「锚打错」不可区分，后者必须显式 404）。
+  - **记忆随存档走**：世界书条目（list_entries 确定性 (order, id) 序，字段保真 keys/constant/position）+ 候选集与激活序号随快照；无条目/无候选 → 空列表（结构稳定）。
+  - **批量候选单点**：`message_service.list_swipes_batch`（一次 IN 查询）上移服务层，BR-1 快照 + messages 路由 `_with_swipes_batch` 改指复用（消除路由私有实现 + export_conversation_json 顺带消逐消息 N+1——MS-2 只修了消息列表，JSON 导出的同型 N+1 本次顺带闭环）。
+- **schema 同步（快照即契约）**：tests/fixtures/schema.sql conversations 加三列（**列序与 ORM 元数据一致**——test_schema_snapshot 语句级 DDL 对比，列序错位即红）；test_migrate_data 表集合不变（无新表）。
+- **验证链**：先红后绿（21 用例 collection 红 → 实现后全绿）| pytest 944+1skip→965+1skip（+21，零回归）| 前端/cargo 零改动 | doc_sync 10 标记刷新 + pool_cleanup_check 通过。
+- **期末 code-review 四轴**：Spec 0 偏差 / Standards 0 硬违例（死导入 MessageSwipe 顺手移除；schemas/__init__ manifest +branch）/ **Falsify 0 HIGH**（锚跨会话 404、版本畸形包装 BranchSnapshotError 不裸抛 pydantic、批量候选 N+1 回归锁——list_swipes 被调即炸）/ Architecture 0 发现（list_swipes_batch 上移共享单点，协议表面仍小）。
+- **非阻断落债**：无（BR-1 范围封闭；「导出→导入重建往返」字面由 BR-2 契约锁 test_conversation_branch 承担）。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **7 项待办**（5 批：BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **6 项待办**（4 批：BR 分支 / CG 图像沉淀 / MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -38,7 +38,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| BR-1 | 分支元数据 + 快照导出（conversations 增 parent/branch_from_message_id；版本化快照含世界书与 swipes） | ⬜ 待办 | spec §BR-1；截断锚正确性 + 版本拒绝 + 导出导入往返 |
 | BR-2 | 从快照/分支派生会话（clone_conversation / branch_from_message + 路由） | ⬜ 待办 | spec §BR-2；新会话逐条一致 + 源零改动 + 世界书独立 + 父子级联语义 |
 
 ### 批次 CG — CG 沉淀与剧情回顾
@@ -71,6 +70,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### 分支批次 BR-1（2026-09-11 — 分支元数据与快照导出，BR 批首张）
+
+> 来源：AI风月对标调研五批工单（BR 分支首张）；快照版本化 + 记忆随存档走（世界书条目与候选），规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §BR-1。叙述详见 DEV_LOG〈BR-1 分支元数据与快照导出（2026-09-11）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| BR-1 | 分支元数据 + 快照导出（conversations 增 parent/branch_from_message_id/branch_title + 自愈迁移；版本化快照含世界书与 swipes） | 2026-09-11 | 43693d2 |
+
+**验证链：** 后端 pytest 944+1skip→965+1skip（+21：test_branch_snapshot——截断锚含/不含、swipes message_index 截断后重定基、世界书条目与候选随存档（字段保真）、版本缺失/不支持/畸形/非 dict 明确异常、JSON 往返稳定 + 消息与源逐条一致、批量候选无 N+1（list_swipes 调用即炸锁）、迁移幂等 + 存量行 NULL）| schema.sql conversations 加三列（列序与 ORM 一致，漂移锁绿）+ test_migrate_data 表集合不变（无新表）| messages 路由 _with_swipes_batch 改指 list_swipes_batch 共享单点（export_conversation_json 顺带消 N+1）| 全量后端绿零回归（前端/cargo 零改动）| 期末四轴：Spec 0 偏差 / Standards 0 硬违例（死导入 MessageSwipe 顺手移除）/ Falsify 0 HIGH（锚不存在/跨会话 → MessageNotFoundError 禁静默空快照已锁；迁移幂等契约锁）| doc_sync 10 标记刷新零漂移
+**非阻断落债：** 无
+
+---
 
 ### 消息操作批次 MS-3（2026-09-11 — 「继续」生成 append 续写，MS 批收官）
 
