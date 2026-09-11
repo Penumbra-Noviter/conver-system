@@ -23,6 +23,7 @@ __all__ = [
     "InvalidRegenerateTargetError",
     "InvalidContinueTargetError",
     "BranchSnapshotError",
+    "CgImageNotFoundError",
     "LorebookEntryNotFoundError",
     "SwipeIndexError",
 ]
@@ -74,6 +75,10 @@ class InvalidContinueTargetError(DomainError):
 
 class BranchSnapshotError(DomainError):
     """分支快照非法（版本缺失/不支持/结构畸形 —— 导入拒绝并给明确错误）"""
+
+
+class CgImageNotFoundError(DomainError):
+    """CG 图片不存在（解锁等操作引用不存在的 cg_images 行）"""
 
 
 class LorebookEntryNotFoundError(DomainError):

@@ -111,7 +111,28 @@ CREATE TABLE lorebook_entries (
 	FOREIGN KEY(character_id) REFERENCES characters (id) ON DELETE CASCADE
 );
 
+CREATE TABLE cg_images (
+	id INTEGER NOT NULL, 
+	character_id INTEGER NOT NULL, 
+	conversation_id INTEGER, 
+	message_id INTEGER, 
+	url TEXT NOT NULL, 
+	group_name VARCHAR(100), 
+	is_special BOOLEAN, 
+	unlocked BOOLEAN, 
+	unlock_hint TEXT, 
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(character_id) REFERENCES characters (id) ON DELETE CASCADE, 
+	FOREIGN KEY(conversation_id) REFERENCES conversations (id) ON DELETE SET NULL, 
+	FOREIGN KEY(message_id) REFERENCES messages (id) ON DELETE SET NULL
+);
+
 CREATE INDEX ix_characters_name ON characters (name);
+
+CREATE INDEX ix_cg_images_character_id ON cg_images (character_id);
+
+CREATE INDEX ix_cg_images_conversation_id ON cg_images (conversation_id);
 
 CREATE INDEX ix_conversations_character_id ON conversations (character_id);
 

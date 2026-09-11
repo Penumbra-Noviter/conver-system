@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2301<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1006<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1225<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2325<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1030<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1225<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -94,8 +94,9 @@ conver system/
 │   │   │       ├── messages.py     ← 消息读取 + 跨对话搜索
 │   │   │       ├── models.py       ← Provider/模型清单
 │   │   │       └── settings.py     ← 设置 CRUD + 凭证 + 连接测试
-│   │   ├── models/                 ← SQLAlchemy ORM（5 实体）
+│   │   ├── models/                 ← SQLAlchemy ORM（6 实体）
 │   │   │   ├── __init__.py
+│   │   │   ├── cg_image.py         ← CG 图片资产（CG-2：CASCADE/SET NULL 生命周期）
 │   │   │   ├── character.py        ← 角色（V2 字段映射，JSON 列兼容存量）
 │   │   │   ├── conversation.py     ← 会话
 │   │   │   ├── lorebook.py         ← 世界书条目（WL-1，JsonList TypeDecorator）
@@ -128,6 +129,7 @@ conver system/
 │   │       ├── lorebook.py         ← 世界书条目仓库层（WL-1）
 │   │       ├── lorebook_engine.py  ← 世界书激活引擎纯函数（WL-2，零 DB 依赖）
 │   │       ├── memory_palace.py    ← 记忆宫殿（WL-5：LLM 归纳 → auto 条目，失败隔离）
+│   │       ├── gallery.py          ← CG 资产库（CG-2：入库去重/解锁/加权抽选）
 │   │       ├── text_utils.py       ← 脏数据容错工具（as_str_list，F-93 收敛单点）
 │   │       ├── llm/                ← LLM 接入层（深模块）
 │   │       │   ├── __init__.py     ← 包级导出零 SDK 副作用契约
@@ -480,7 +482,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/document_parser.py:_default_for-->`_default_for(field)`<!--/AUTO--> | 缺失字段兜底默认值 |
 | <!--AUTO:sig:backend/app/services/document_parser.py:_truncate-->`_truncate(msg, max_len)`<!--/AUTO--> | 错误消息截断 |
 
-### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~153 行<!--/AUTO-->）
+### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~155 行<!--/AUTO-->）
 
 **职责**：领域与 LLM 异常 → 标准错误响应结构（错误码/消息）单源（T-01 迁入 LLM 映射）。
 
@@ -489,7 +491,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/error_mapping.py:domain_error_response-->`domain_error_response(exc)`<!--/AUTO--> | 领域异常 → 响应 dict |
 | <!--AUTO:sig:backend/app/services/error_mapping.py:llm_error_response-->`llm_error_response(e, provider)`<!--/AUTO--> | LLM 异常 → (HTTP 状态码, 消息)（映射表单源） |
 
-### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~52 行<!--/AUTO-->）
+### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~55 行<!--/AUTO-->）
 
 **职责**：领域异常定义（404/409/422 类），供 service 层抛出、errors.py 统一处理。
 
@@ -569,6 +571,17 @@ conver system/
 | <!--AUTO:sig:backend/app/services/memory_palace.py:summarize_turn-->`summarize_turn(history, *, provider, model=None, user_name='User', char_name='Character')`<!--/AUTO--> | 归纳 → MemoryDraft（剥围栏 + 严格 JSON；失败降级 None 不抛） |
 | <!--AUTO:sig:backend/app/services/memory_palace.py:persist_drafts-->`persist_drafts(db, character_id, drafts)`<!--/AUTO--> | 落库 auto 条目（keys 空跳过；同 keys+content 去重；返回计数） |
 | `MemoryDraft` / `MEMORY_DRAFT_SCHEMA` | 归纳草案容器 / 输出 JSON schema（title/keys/content 单源） |
+
+### 4.21.9 `backend/app/services/gallery.py` — CG 资产库（CG-2）（<!--AUTO:lines:backend/app/services/gallery.py-->~154 行<!--/AUTO-->）
+
+**职责**：cg_images 资产库深模块——入库（幂等去重：同作品同 url 返回既有）、列表（角色隔离 + 分组/解锁过滤，新品在前 id 降序）、解锁（幂等）、加权抽选（pick_cg_by_weight：weight 属性缺省 1、weight=0 永不抽中、**按 id 升序规范化后掷点**——同种子可复现不随输入顺序，WL-2 同型教训锁定）。生命周期由 DB FK 落实（character CASCADE / conversation·message SET NULL——会话删除后图保留）。
+
+| 函数 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/services/gallery.py:add_cg-->`add_cg(db, character_id, url, *, conversation_id=None, message_id=None, group_name='', unlock_hint='')`<!--/AUTO--> | 入库（同作品同 url 去重返回既有；角色/会话/消息归属 404 守卫） |
+| <!--AUTO:sig:backend/app/services/gallery.py:list_cg-->`list_cg(db, character_id, *, group_name=None, unlocked_only=False)`<!--/AUTO--> | 列表（角色隔离 + 过滤，id 降序） |
+| <!--AUTO:sig:backend/app/services/gallery.py:unlock_cg-->`unlock_cg(db, cg_id)`<!--/AUTO--> | 解锁（幂等；未知 → CgImageNotFoundError 404） |
+| <!--AUTO:sig:backend/app/services/gallery.py:pick_cg_by_weight-->`pick_cg_by_weight(candidates, *, rng=None)`<!--/AUTO--> | 加权抽选（空/总权重 0 → None；同种子顺序无关可复现） |
 
 ### 4.22 `backend/app/services/model_data.py` — Provider 清单单源（<!--AUTO:lines:backend/app/services/model_data.py-->~127 行<!--/AUTO-->）
 
@@ -1375,6 +1388,7 @@ conver system/
 | `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
 | `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->18<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
 | `backend/tests/test_image_provider.py` | <!--AUTO:tests:backend/tests/test_image_provider.py-->22<!--/AUTO--> | 图片 Provider 契约锁（CG-1：注册表派生/缺 Key 401/畸形响应/超时 504/连接 502/A1111 happy path 落盘/本地占位确定性/映射矩阵） |
+| `backend/tests/test_gallery.py` | <!--AUTO:tests:backend/tests/test_gallery.py-->24<!--/AUTO--> | CG 资产库契约锁（CG-2：入库去重同作品同 url/解锁幂等/加权抽选同种子顺序无关与分布/SET NULL 会话删图留/CASCADE 作品删图清/404 守卫） |
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->20<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
 | `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->19<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
@@ -1503,9 +1517,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2301<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2325<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1006<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1030<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1225<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

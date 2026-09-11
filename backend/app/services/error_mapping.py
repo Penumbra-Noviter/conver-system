@@ -25,6 +25,7 @@ from backend.app.services.exceptions import (
     DocParseError,
     DomainError,
     BranchSnapshotError,
+    CgImageNotFoundError,
     InvalidContinueTargetError,
     InvalidRegenerateTargetError,
     LorebookEntryNotFoundError,
@@ -84,6 +85,7 @@ def domain_error_response(exc: DomainError) -> tuple[int, str]:
             CharacterNotFoundError,
             MessageNotFoundError,
             LorebookEntryNotFoundError,
+            CgImageNotFoundError,
         ),
     ):
         return status.HTTP_404_NOT_FOUND, str(exc)
