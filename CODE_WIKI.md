@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2279<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->984<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1225<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2301<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1006<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1225<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -129,15 +129,25 @@ conver system/
 │   │       ├── lorebook_engine.py  ← 世界书激活引擎纯函数（WL-2，零 DB 依赖）
 │   │       ├── memory_palace.py    ← 记忆宫殿（WL-5：LLM 归纳 → auto 条目，失败隔离）
 │   │       ├── text_utils.py       ← 脏数据容错工具（as_str_list，F-93 收敛单点）
-│   │       └── llm/                ← LLM 接入层（深模块）
-│   │           ├── __init__.py     ← 包级导出零 SDK 副作用契约
-│   │           ├── base.py         ← BaseLLM 抽象基类（generate/stream/test）
-│   │           ├── claude.py       ← ClaudeProvider（anthropic SDK）
-│   │           ├── openai.py       ← OpenAIProvider（openai SDK，兼容聚合平台）
-│   │           ├── errors.py       ← SDK 错误翻译（认证/限流/超时/坏请求）
-│   │           ├── factory.py      ← LLMFactory 注册表（显式注册 + 懒加载）
-│   │           ├── prompt.py       ← 提示词构建（模板变量/mes_example/滑窗）
-│   │           └── resolver.py     ← DB 配置 → Provider 实例解析
+│   │       ├── llm/                ← LLM 接入层（深模块）
+│   │       │   ├── __init__.py     ← 包级导出零 SDK 副作用契约
+│   │       │   ├── base.py         ← BaseLLM 抽象基类（generate/stream/test）
+│   │       │   ├── claude.py       ← ClaudeProvider（anthropic SDK）
+│   │       │   ├── openai.py       ← OpenAIProvider（openai SDK，兼容聚合平台）
+│   │       │   ├── errors.py       ← SDK 错误翻译（认证/限流/超时/坏请求）
+│   │       │   ├── factory.py      ← LLMFactory 注册表（显式注册 + 懒加载）
+│   │       │   ├── prompt.py       ← 提示词构建（模板变量/mes_example/滑窗）
+│   │       │   └── resolver.py     ← DB 配置 → Provider 实例解析
+│   │       └── image/              ← 图片生成接入层（CG-1，与 LLM 同构）
+│   │           ├── __init__.py     ← 包级导出零 httpx/PIL 副作用契约
+│   │           ├── base.py         ← BaseImageGen 抽象基类（generate(params)）
+│   │           ├── errors.py       ← ImageError 族（认证/超时/畸形/连接）
+│   │           ├── model_data.py   ← 图片 Provider 清单单一来源（AVAILABLE_IMAGE_PROVIDERS）
+│   │           ├── factory.py      ← ImageFactory 注册表（单一来源自动派生）
+│   │           ├── storage.py      ← CG 图片本地落盘（cg/ 子目录 + uuid 唯一）
+│   │           ├── http_backend.py ← A1111 兼容 txt2img（15s 超时守卫）
+│   │           ├── local_backend.py← 本地文件占位后端（确定性 PNG，零网络零 Key）
+│   │           └── resolver.py     ← Provider 校验/缺 Key/实例化收口
 │   ├── run_backend.py              ← 独立启动脚本（日志/数据目录/端口）
 │   ├── scripts/
 │   │   └── migrate_data.py         ← 数据目录迁移工具（校验/标记/幂等）
@@ -448,7 +458,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/conversation_export.py:build_branch_snapshot-->`build_branch_snapshot(db, conversation_id, upto_message_id=None)`<!--/AUTO--> | 分支快照导出（BR-1：版本化 + 消息按 id 序 + 世界书条目与候选） |
 | <!--AUTO:sig:backend/app/services/conversation_export.py:validate_branch_snapshot-->`validate_branch_snapshot(data)`<!--/AUTO--> | 快照校验（BR-1：缺/不支持版本 → BranchSnapshotError 明确异常，BR-2 导入复用） |
 
-### 4.17 `backend/app/services/data_dir.py` — 数据目录契约（<!--AUTO:lines:backend/app/services/data_dir.py-->~67 行<!--/AUTO-->）
+### 4.17 `backend/app/services/data_dir.py` — 数据目录契约（<!--AUTO:lines:backend/app/services/data_dir.py-->~77 行<!--/AUTO-->）
 
 **职责**：数据目录路径单源（本地优先，桌面版重定向到 %APPDATA%）——目录解析、文件路径拼接、DB 路径、模拟器子目录（T-02 外置）。
 
@@ -470,7 +480,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/document_parser.py:_default_for-->`_default_for(field)`<!--/AUTO--> | 缺失字段兜底默认值 |
 | <!--AUTO:sig:backend/app/services/document_parser.py:_truncate-->`_truncate(msg, max_len)`<!--/AUTO--> | 错误消息截断 |
 
-### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~121 行<!--/AUTO-->）
+### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~153 行<!--/AUTO-->）
 
 **职责**：领域与 LLM 异常 → 标准错误响应结构（错误码/消息）单源（T-01 迁入 LLM 映射）。
 
@@ -534,6 +544,20 @@ conver system/
 |------|------|
 | <!--AUTO:sig:backend/app/services/text_utils.py:as_str_list-->`as_str_list(value)`<!--/AUTO--> | 脏值 → str 化列表（None/空 → []；list → 逐元素 str；其它 → 单值包裹） |
 | <!--AUTO:sig:backend/app/services/text_utils.py:role_str-->`role_str(value)`<!--/AUTO--> | 消息角色归一（带 .value 枚举解包为值；纯字符串原样；None → "None" 兜底） |
+
+### 4.21.8 `backend/app/services/image/` — 图片生成接入层（CG-1，与 LLM 同构）
+
+**职责**：text2img Provider 抽象——`AVAILABLE_IMAGE_PROVIDERS` 单一来源登记（a1111/custom-http → HttpImageGen、local → LocalImageGen，factory 派生注册）；本地优先生成结果落盘数据目录 cg/ 子目录；ImageError 族经 error_mapping.image_error_response 映射（401/504/502）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/services/image/base.py:BaseImageGen.generate-->`generate(params)`<!--/AUTO--> | 抽象基类：generate(ImageGenParams) → ImageResult（url 本地路径/URL） |
+| <!--AUTO:sig:backend/app/services/image/factory.py:ImageFactory.get_provider-->`get_provider(name, *, api_key=None, base_url=None)`<!--/AUTO--> | 注册表（单一来源派生 + 懒加载；未知 Provider → ProviderNotSupportedError） |
+| <!--AUTO:sig:backend/app/services/image/http_backend.py:HttpImageGen.generate-->`generate(params)`<!--/AUTO--> | A1111 txt2img（15s 超时守卫；畸形响应/非法 base64 → ImageResponseError；落盘本地） |
+| <!--AUTO:sig:backend/app/services/image/local_backend.py:LocalImageGen.generate-->`generate(params)`<!--/AUTO--> | 本地占位后端（确定性 PNG，零网络零 Key） |
+| <!--AUTO:sig:backend/app/services/image/resolver.py:resolve_image-->`resolve_image(provider, *, api_key=None, base_url=None)`<!--/AUTO--> | Provider 校验 + 缺 Key（ImageAuthError）+ 实例化收口 |
+| <!--AUTO:sig:backend/app/services/image/storage.py:save_image_bytes-->`save_image_bytes(raw, *, width=None, height=None, content_type='image/png')`<!--/AUTO--> | CG 图片落盘（cg/ 子目录，uuid 后缀防同微秒覆盖） |
+| <!--AUTO:sig:backend/app/services/error_mapping.py:image_error_response-->`image_error_response(e)`<!--/AUTO--> | ImageError 族 → HTTP（auth 401 / timeout 504 / 畸形·连接 502） |
 
 ### 4.21.8 `backend/app/services/memory_palace.py` — 记忆宫殿（WL-5）（<!--AUTO:lines:backend/app/services/memory_palace.py-->~195 行<!--/AUTO-->）
 
@@ -1350,6 +1374,7 @@ conver system/
 | `backend/tests/test_chat_continue.py` | <!--AUTO:tests:backend/tests/test_chat_continue.py-->21<!--/AUTO--> | 续写端点契约锁（MS-3：条数不变/不追加 user/失败零改动/续写触发形态/空续写 no-op/错误矩阵） |
 | `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
 | `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->18<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
+| `backend/tests/test_image_provider.py` | <!--AUTO:tests:backend/tests/test_image_provider.py-->22<!--/AUTO--> | 图片 Provider 契约锁（CG-1：注册表派生/缺 Key 401/畸形响应/超时 504/连接 502/A1111 happy path 落盘/本地占位确定性/映射矩阵） |
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->20<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
 | `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->19<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
@@ -1478,9 +1503,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2279<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2301<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->984<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1006<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1225<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

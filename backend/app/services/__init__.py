@@ -24,6 +24,7 @@ __all__ = [
     "exceptions",
     "game_generator",
     "game_template",
+    "image",
     "llm",
     "lorebook",
     "lorebook_engine",

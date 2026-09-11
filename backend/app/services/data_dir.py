@@ -36,10 +36,12 @@ __all__ = [
     "DATA_DIR_NAME",
     "DB_FILE",
     "SIMULATORS_DIR",
+    "CG_DIR",
     "data_dir",
     "data_dir_file",
     "database_path",
     "simulators_dir",
+    "cg_dir",
 ]
 
 #: 数据目录环境变量名（值即数据目录；空串视为未设置）
@@ -50,6 +52,8 @@ DATA_DIR_NAME = "ConverSystem"
 DB_FILE = "conver_system.db"
 #: 数据目录下模拟器游戏子目录名（T-02 外置；前端 MANIFEST_URL 恒为 simulators/manifest.json）
 SIMULATORS_DIR = "simulators"
+#: 数据目录下 CG 图片子目录名（CG-1：本地优先生成结果落盘；storage.save_image_bytes 消费）
+CG_DIR = "cg"
 
 
 def data_dir() -> Path:
@@ -83,3 +87,12 @@ def simulators_dir() -> Path:
     挂载（check_dir=False）与种子（startup 事件）分离的时序。
     """
     return data_dir() / SIMULATORS_DIR
+
+
+def cg_dir() -> Path:
+    """数据目录下 CG 图片目录（<数据目录>\\cg，CG-1 本地优先生成结果落盘）。
+
+    纯路径解析不做 mkdir——目录创建由落盘函数（image.storage.save_image_bytes）
+    按需创建（mkdir parents），与 data_dir_file 同语义。
+    """
+    return data_dir() / CG_DIR

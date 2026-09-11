@@ -39,8 +39,20 @@ from backend.app.services.llm.errors import (
     LLMRateLimitError,
     LLMTimeoutError,
 )
+from backend.app.services.image.errors import (
+    ImageAuthError,
+    ImageConnectionError,
+    ImageError,
+    ImageResponseError,
+    ImageTimeoutError,
+)
 
-__all__ = ["domain_error_response", "IMPORT_FORMAT_HINT", "llm_error_response"]
+__all__ = [
+    "domain_error_response",
+    "IMPORT_FORMAT_HINT",
+    "image_error_response",
+    "llm_error_response",
+]
 
 #: 角色卡导入失败时的支持格式说明（随 B1 迁入，422 detail 拼接用）
 IMPORT_FORMAT_HINT = (
@@ -139,4 +151,29 @@ def llm_error_response(e: LLMError, provider: str | None) -> tuple[int, str]:
                 prefix = f"{provider} " if provider else ""
                 return status_code, f"{prefix}API Key 无效，请在设置中更新"
             return status_code, str(e)
+    return status.HTTP_502_BAD_GATEWAY, str(e)
+
+
+def image_error_response(e: ImageError) -> tuple[int, str]:
+    """将图片生成异常（CG-1 ImageError 族）转为 (HTTP 状态码, 用户可见消息)
+
+    映射规则（镜像 LLM 异常族语义）：
+    - ImageAuthError → 401（凭据缺失/无效）
+    - ImageTimeoutError → 504 + 固定消息「图片生成请求超时，请检查后端后重试」
+    - ImageResponseError → 502 + str(e)（上游响应畸形，明确错误）
+    - ImageConnectionError → 502 + str(e)（连接失败/端点未配置）
+    - ImageError 基类/未知子类 → 502 + str(e) 兜底
+
+    Args:
+        e: 待映射的图片生成异常
+
+    Returns:
+        (HTTP 状态码, 用户可见消息)
+    """
+    if isinstance(e, ImageAuthError):
+        return status.HTTP_401_UNAUTHORIZED, str(e)
+    if isinstance(e, ImageTimeoutError):
+        return status.HTTP_504_GATEWAY_TIMEOUT, "图片生成请求超时，请检查后端后重试"
+    if isinstance(e, (ImageResponseError, ImageConnectionError)):
+        return status.HTTP_502_BAD_GATEWAY, str(e)
     return status.HTTP_502_BAD_GATEWAY, str(e)
