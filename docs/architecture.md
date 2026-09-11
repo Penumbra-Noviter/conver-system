@@ -51,6 +51,7 @@ conver-system/
 │   │   │       ├── characters.py  # 角色 CRUD
 │   │   │       ├── chat.py        # 聊天端点（HTTP 映射 + SSE 帧包装，逻辑在 services/chat.py）
 │   │   │       ├── conversations.py # 对话管理
+│   │   │       ├── lorebook.py     # 世界书条目 CRUD（WL-4：列表/创建/部分更新/删除）
 │   │   │       ├── messages.py    # 消息检索（GET 历史 + 搜索）
 │   │   │       ├── models.py      # 可用模型列表
 │   │   │       ├── settings.py    # 配置管理 + GET /credentials 只读凭证端点（U8 模拟器注入）
@@ -180,6 +181,7 @@ conver-system/
 │   │   │   ├── export-dialog.js   # 导出弹窗
 │   │   │   ├── game-generator.js  # AI 游戏生成器深模块（世界观文本/.txt 上传 → 游戏生成流程 UI）
 │   │   │   ├── loading-button.js  # 按钮 loading 态工具（禁用 + 内联 spinner 统一异步反馈）
+│   │   │   ├── lorebook-editor.js # 世界书编辑器（WL-4：列表/编辑/chips/校验/泛词告警，payload 字段映射单源）
 │   │   │   ├── settings-panel.js  # 设置面板（initSettingsPanel / loadSettings）
 │   │   │   └── tab-bar.js         # tab 条 presentational 组件（消费 getTabDisplay 展示契约）
 │   │   ├── data/

@@ -207,6 +207,21 @@ export const characters = {
 };
 
 // ══════════════════════════════════════════════════
+// 世界书 API（WL-4：条目 CRUD，挂在角色下）
+// ══════════════════════════════════════════════════
+
+export const lorebook = {
+    /** 角色世界书条目列表（order 升序） */
+    list: (characterId) => request('GET', `/characters/${characterId}/lorebook`),
+    /** 创建条目 */
+    create: (characterId, data) => request('POST', `/characters/${characterId}/lorebook`, data),
+    /** 部分更新条目 */
+    update: (entryId, data) => request('PUT', `/lorebook/${entryId}`, data),
+    /** 删除条目 */
+    delete: (entryId) => request('DELETE', `/lorebook/${entryId}`),
+};
+
+// ══════════════════════════════════════════════════
 // 对话 API
 // ══════════════════════════════════════════════════
 
@@ -326,6 +341,7 @@ export const __all__ = [
     'requestBlob',
     'characters',
     'conversations',
+    'lorebook',
     'messages',
     'chatStream',
     'models',

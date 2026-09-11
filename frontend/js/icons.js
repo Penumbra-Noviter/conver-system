@@ -34,6 +34,10 @@ const ICON_PATHS = {
     sparkles: '<path d="m8 1 .8 3.2L12 5l-3.2.8L8 9l-.8-3.2L4 5l3.2-.8L8 1ZM12.5 10l.4 1.6 1.6.4-1.6.4-.4 1.6-.4-1.6-1.6-.4 1.6-.4.4-1.6ZM3 10l.5 2 .5-2 2-.5-2-.5-.5-2-.5 2-2 .5 2 .5Z"/>',
     gamepad: '<rect x="1.5" y="5" width="13" height="6" rx="2.5"/><path d="M5 6.75v2.5M3.75 8h2.5"/><path d="M10.5 7.25v.01M10.5 9v.01"/>',
     refresh: '<path d="M14 8A6 6 0 1 1 8 2c1.68 0 3.29.67 4.5 1.83L14 5"/><path d="M14 2v4h-4"/>',
+    plus: '<path d="M8 3v10M3 8h10"/>',
+    pin: '<path d="M10 2.5 13.5 6l-1.6.4-2.2 2.2.9 3.4-1 1-3.1-3.1L3 13l-.8-.8 3.1-3.5-3.1-3.1 1-1 3.4.9 2.2-2.2.2-1.8Z"/>',
+    toggleOn: '<rect x="1.5" y="4.5" width="13" height="7" rx="3.5"/><circle cx="10.5" cy="8" r="2.2" fill="currentColor"/>',
+    toggleOff: '<rect x="1.5" y="4.5" width="13" height="7" rx="3.5"/><circle cx="5.5" cy="8" r="2.2" fill="currentColor"/>',
 };
 
 /**

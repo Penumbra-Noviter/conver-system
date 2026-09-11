@@ -17,7 +17,16 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.errors import domain_error_handler, llm_error_handler
-from backend.app.api.routes import characters, chat, conversations, messages, models, settings, simulators
+from backend.app.api.routes import (
+    characters,
+    chat,
+    conversations,
+    lorebook,
+    messages,
+    models,
+    settings,
+    simulators,
+)
 from backend.app.services import data_dir as data_dir_service
 from backend.app.services import simulator_store
 from backend.app.services.exceptions import DomainError
@@ -39,6 +48,7 @@ app.add_exception_handler(LLMError, llm_error_handler)
 app.include_router(characters.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
+app.include_router(lorebook.router)
 app.include_router(messages.router)
 app.include_router(models.router)
 app.include_router(settings.router)

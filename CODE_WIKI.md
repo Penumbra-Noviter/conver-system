@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2156<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->897<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1189<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2176<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->902<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1204<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -90,6 +90,7 @@ conver system/
 │   │   │       ├── characters.py   ← 角色 CRUD + 导入导出 + 文档解析
 │   │   │       ├── chat.py         ← 对话（含 SSE 流式端点）
 │   │   │       ├── conversations.py← 会话 CRUD + 清空 + JSON/Markdown 导出
+│   │   │       ├── lorebook.py     ← 世界书条目 CRUD（WL-4）
 │   │   │       ├── messages.py     ← 消息读取 + 跨对话搜索
 │   │   │       ├── models.py       ← Provider/模型清单
 │   │   │       └── settings.py     ← 设置 CRUD + 凭证 + 连接测试
@@ -138,7 +139,7 @@ conver system/
 │   ├── run_backend.py              ← 独立启动脚本（日志/数据目录/端口）
 │   ├── scripts/
 │   │   └── migrate_data.py         ← 数据目录迁移工具（校验/标记/幂等）
-│   ├── tests/                      ← pytest（30 个文件，见 §5.1）
+│   ├── tests/                      ← pytest（31 个文件，见 §5.1）
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   ├── conver_backend.spec         ← PyInstaller 打包配置
@@ -174,6 +175,7 @@ conver system/
 │   │   │   ├── confirm-dialog.js   ← 确认/提示对话框
 │   │   │   ├── export-dialog.js    ← 会话导出对话框
 │   │   │   ├── loading-button.js  ← 按钮 loading 态工具（spinner + 禁用 + restore）
+│   │   │   ├── lorebook-editor.js ← 世界书编辑器（WL-4：列表/编辑/chips/校验/泛词告警）
 │   │   │   ├── modal.js            ← 模态骨架（骨架收口 C3-DEFER）
 │   │   │   ├── model-selector.js   ← 模型选择弹层
 │   │   │   ├── settings-panel.js   ← 设置面板（Key/主题/侧栏）
@@ -183,7 +185,7 @@ conver system/
 │   │   └── utils/
 │   │       ├── model-utils.js      ← 模型下拉填充工具
 │   │       └── sse-reader.js       ← SSE 流解析
-│   ├── tests/                      ← Vitest（33 个文件，见 §5.2）
+│   ├── tests/                      ← Vitest（34 个文件，见 §5.2）
 │   ├── vitest.config.js
 │   ├── package.json
 │   └── simulators/                 ← 22 款第三方单文件模拟器（HTML，非源码）
@@ -217,7 +219,7 @@ conver system/
 
 ## 四、核心模块详细说明
 
-### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~79 行<!--/AUTO-->）
+### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~89 行<!--/AUTO-->）
 
 **职责**：FastAPI 应用装配——注册统一异常处理器、on_startup 初始化 DB 与模拟器首启种子（Provider 懒注册，不预热 SDK）、API 路由挂载（须 `/api` 前缀且在静态挂载前）、`/simulators` 挂载（数据目录 simulators，T-02 外置，先于根挂载）、前端静态文件挂载。
 
@@ -338,6 +340,17 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/simulators.py:simulator_api_proxy-->`simulator_api_proxy(path, request, db)`<!--/AUTO--> | 同源 API 反代（CORS 修复；httpx 转发 + 后端注入 key + 流式透传；未配置 503） |
 | <!--AUTO:sig:backend/app/api/routes/simulators.py:_build_proxy_target-->`_build_proxy_target(real_endpoint, path)`<!--/AUTO--> | 代理目标 URL 拼装纯函数（scheme://netloc + path；netloc 缺失 ValueError） |
 | <!--AUTO:sig:backend/app/api/routes/simulators.py:_proxy_headers-->`_proxy_headers(request_headers, api_key)`<!--/AUTO--> | 转发头组装纯函数（剥 hop-by-hop + 注入后端 key） |
+
+### 4.11.6 `backend/app/api/routes/lorebook.py` — 世界书条目 CRUD 路由（WL-4）（<!--AUTO:lines:backend/app/api/routes/lorebook.py-->~53 行<!--/AUTO-->）
+
+**职责**：世界书条目 HTTP 映射——GET/POST `/api/characters/{id}/lorebook`（列表/创建）+ PUT/DELETE `/api/lorebook/{entry_id}`（部分更新/删除）。只做 HTTP 映射：角色/条目存在性守卫抛领域异常（统一 handler 转 404）；请求体校验（keys 数组、数值边界）由 Pydantic Schema 拦截（422）；增删改查全部委托 `backend/app/services/lorebook.py` 仓库层。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/api/routes/lorebook.py:list_lorebook-->`list_lorebook(character_id, db)`<!--/AUTO--> | GET 角色世界书列表（order 升序） |
+| <!--AUTO:sig:backend/app/api/routes/lorebook.py:create_lorebook-->`create_lorebook(character_id, payload, db)`<!--/AUTO--> | POST 创建条目（角色不存在 404；校验 422） |
+| <!--AUTO:sig:backend/app/api/routes/lorebook.py:update_lorebook-->`update_lorebook(entry_id, payload, db)`<!--/AUTO--> | PUT 部分更新（条目不存在 404） |
+| <!--AUTO:sig:backend/app/api/routes/lorebook.py:delete_lorebook-->`delete_lorebook(entry_id, db)`<!--/AUTO--> | DELETE 删除条目（条目不存在 404；204） |
 
 ### 4.12 `backend/app/services/character.py` — 角色服务（<!--AUTO:lines:backend/app/services/character.py-->~77 行<!--/AUTO-->）
 
@@ -635,7 +648,7 @@ conver system/
 | <!--AUTO:sig:backend/scripts/migrate_data.py:migrate-->`migrate(source, target, force=False)`<!--/AUTO--> | 执行迁移（幂等 + 标记） |
 | <!--AUTO:sig:backend/scripts/migrate_data.py:main-->`main(argv=None)`<!--/AUTO--> | CLI 入口 |
 
-### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~292 行<!--/AUTO-->）
+### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~306 行<!--/AUTO-->）
 
 **职责**：Fetch 封装——超时守卫（AbortController + 15s 兜底，TD-51/55/72）、错误归一化、SSE 流式、Blob 下载（Content-Disposition 文件名解析）。T6 重生成：`conversations.regenerate(id, { message_id? })` 封装 `POST /api/conversations/{id}/regenerate`（缺省末条 assistant），客户端错误处理与 `messages.chat` 同走 `request` 错误通道。
 
@@ -692,7 +705,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/chat.js:scrollToBottom-->`scrollToBottom()`<!--/AUTO--> | 滚动到底部 |
 | <!--AUTO:sig:frontend/js/chat.js:attachCopyButton-->`attachCopyButton(btn)`<!--/AUTO--> | 复制按钮接线 |
 
-### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~370 行<!--/AUTO-->）
+### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~380 行<!--/AUTO-->）
 
 **职责**：角色/对话两个列表视图深模块（C4，search-view 先例）——角色网格渲染与四类按钮事件委托、对话列表渲染与打开/删除委托、角色导入（含失败引导向导）、开始对话全流程（模型选择→创建→切视图→激活→聚焦）、列表标题同步 DOM 手术；协调层经 `initListViews({ switchView })` 接线。T3 模型切换的对话列表同步经 chat.js 注入的 `refreshConversations` 钩子（重渲染列表，meta 显示新模型），本模块零改动（`showModelSelector(charName)` 调用点保持向后兼容）。
 
@@ -810,6 +823,19 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleSidebar-->`toggleSidebar()`<!--/AUTO--> | 侧栏开关 |
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleChatSidebar-->`toggleChatSidebar()`<!--/AUTO--> | 会话侧栏开关 |
 
+### 4.44.1 `frontend/js/components/lorebook-editor.js` — 世界书编辑器（WL-4）（<!--AUTO:lines:frontend/js/components/lorebook-editor.js-->~393 行<!--/AUTO-->）
+
+**职责**：角色世界书条目 CRUD 面板（列表 + 编辑表单双视图）。骨架由通用模态框工厂 openModal 承担（ARC-10 C3 seam，不新造）；图标走 icons.js iconHtml()。纯函数核（chips 录入去重删除 / 泛词判定 / 条目校验 / payload 构建）独立单测；payload 字段名映射单一来源（与后端 LorebookEntryBase 逐字段一致，契约锁锁定）。入口：角色卡「世界书」按钮（list-views.js 事件委托）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/components/lorebook-editor.js:showLorebookEditor-->`showLorebookEditor({ characterId, characterName = '角色', onChanged } = {})`<!--/AUTO--> | 打开世界书编辑器模态框（列表视图） |
+| <!--AUTO:sig:frontend/js/components/lorebook-editor.js:isGenericKey-->`isGenericKey(key)`<!--/AUTO--> | 泛词判定（单字符或高频虚词/标点 → 告警） |
+| <!--AUTO:sig:frontend/js/components/lorebook-editor.js:validateLorebookEntry-->`validateLorebookEntry(entry)`<!--/AUTO--> | 条目校验（内容超限/关键词为空/数值越界 → 内联错误） |
+| <!--AUTO:sig:frontend/js/components/lorebook-editor.js:buildLorebookPayload-->`buildLorebookPayload(form)`<!--/AUTO--> | payload 构建（字段名映射单一来源 + 类型化） |
+| <!--AUTO:sig:frontend/js/components/lorebook-editor.js:addKeyChip-->`addKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 录入（去重/裁剪/空拒） |
+| <!--AUTO:sig:frontend/js/components/lorebook-editor.js:removeKeyChip-->`removeKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 删除 |
+
 ### 4.44.1 `frontend/js/components/loading-button.js` — 按钮 loading 态工具（<!--AUTO:lines:frontend/js/components/loading-button.js-->~59 行<!--/AUTO-->）
 
 **职责**：异步操作按钮的统一「执行中」反馈 —— 禁用 + 内联 spinner + 文字切换，
@@ -869,7 +895,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/fetch-seam.js:setFetch-->`setFetch(fn)`<!--/AUTO--> | 注入 fetch 实现（测试用） |
 | <!--AUTO:sig:frontend/js/fetch-seam.js:doFetch-->`doFetch(...args)`<!--/AUTO--> | 统一 fetch 出口（超时守卫） |
 
-### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~223 行<!--/AUTO-->）
+### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~224 行<!--/AUTO-->）
 
 **职责**：展示 HTML 生成单源（ARC 展示契约）——消息气泡/角色卡片/会话项/搜索结果/头像/关键词高亮。T2 搜索定位：`messageBubbleHtml` 接受可选 `messageId` 选项 → 渲染 `data-message-id` 属性（供定位选择器消费）；`buildMessagesHtml` 透传 `m.id`。T6 重生成：`buildMessagesHtml` 的 `context.canRegenerate`（聊天域开关）为真且末条为已结算 assistant 时，该气泡经 `messageBubbleHtml` 渲染「重生成」操作按钮。
 
@@ -885,7 +911,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/format.js:assistantAvatarHtml-->`assistantAvatarHtml(characters, currentCharacterId)`<!--/AUTO--> | 助手头像 |
 | <!--AUTO:sig:frontend/js/format.js:userAvatarHtml-->`userAvatarHtml()`<!--/AUTO--> | 用户头像 |
 
-### 4.50 `frontend/js/icons.js` — 图标 seam（<!--AUTO:lines:frontend/js/icons.js-->~60 行<!--/AUTO-->）
+### 4.50 `frontend/js/icons.js` — 图标 seam（<!--AUTO:lines:frontend/js/icons.js-->~64 行<!--/AUTO-->）
 
 **职责**：动态模板/状态图标单源（OPT-1 图标协议收口）——`iconHtml` seam，禁止手写 emoji/SVG 碎片。
 
@@ -1311,6 +1337,7 @@ conver system/
 | `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->62<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
 | `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->18<!--/AUTO--> | LLM 基类共享行为 |
 | `backend/tests/test_lorebook_engine.py` | <!--AUTO:tests:backend/tests/test_lorebook_engine.py-->26<!--/AUTO--> | 世界书激活引擎纯函数契约锁（WL-2：命中矩阵/大小写/depth 边界/概率 RNG 复现/互斥组/排序/零 DB 导入） |
+| `backend/tests/test_lorebook_routes.py` | <!--AUTO:tests:backend/tests/test_lorebook_routes.py-->5<!--/AUTO--> | 世界书 CRUD 路由契约锁（WL-4：列表/创建/部分更新/删除/守卫 404/校验 422） |
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
@@ -1353,6 +1380,7 @@ conver system/
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->103<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
+| `frontend/tests/lorebook-editor.test.js` | <!--AUTO:tests:frontend/tests/lorebook-editor.test.js-->15<!--/AUTO--> | 世界书编辑器契约锁（WL-4：chips 录入去重删除/表单校验/泛词告警/payload 字段映射/列表渲染搜索过滤） |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
@@ -1424,10 +1452,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2156<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2176<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->897<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1189<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->902<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1204<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

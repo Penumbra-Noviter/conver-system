@@ -4218,3 +4218,167 @@ select {
     border-color: var(--danger);
     color: var(--danger);
 }
+
+/* ════════════════════════════════════════════════════════════════
+   世界书编辑器（WL-4）— 复用既有设计 token（--panel/--ink/--border 系）
+   ════════════════════════════════════════════════════════════════ */
+
+.lorebook-modal .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.lorebook-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.lorebook-search {
+    flex: 1;
+    min-width: 0;
+}
+
+.lorebook-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.lorebook-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border, #e2e2e2);
+    border-radius: 8px;
+    background: var(--panel, #fff);
+}
+
+.lorebook-row.is-constant {
+    border-left: 3px solid var(--accent, #4f7cff);
+}
+
+.lorebook-row-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.lorebook-row-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--ink-1, #1a1a1a);
+}
+
+.lorebook-badge {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--accent-soft, #eef3ff);
+    color: var(--accent, #4f7cff);
+}
+
+.lorebook-row-keys {
+    font-size: 12px;
+    color: var(--ink-2, #666);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lorebook-keys-count {
+    color: var(--accent, #4f7cff);
+}
+
+.lorebook-keys-empty {
+    color: var(--ink-3, #999);
+    font-style: italic;
+}
+
+.lorebook-order {
+    font-size: 12px;
+    color: var(--ink-3, #999);
+    min-width: 2em;
+    text-align: right;
+}
+
+.lorebook-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--ink-3, #999);
+}
+
+.lorebook-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.lorebook-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.lorebook-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: var(--panel-2, #f2f2f2);
+    border: 1px solid var(--border, #e2e2e2);
+    font-size: 12px;
+}
+
+.lorebook-chip-x {
+    display: inline-flex;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    color: var(--ink-2, #666);
+}
+
+.lorebook-chips-input {
+    display: flex;
+    gap: 6px;
+}
+
+.lorebook-chips-input input {
+    flex: 1;
+}
+
+.lorebook-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.lorebook-switches {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.lorebook-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ink-1, #1a1a1a);
+}
+
+.lorebook-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.lorebook-toggle {
+    color: var(--ink-2, #666);
+}

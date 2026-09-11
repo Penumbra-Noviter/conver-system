@@ -77,6 +77,17 @@
 
 ---
 
+## WL-4 世界书编辑器前端（2026-09-10 — AI风月对标五批工单 WL 第四张，承接 WL-3 注入链）
+
+- **来源**：承接 WL-3（注入链就绪，后端世界书引擎全链路可用）；本票补齐「可编辑」闭环（spec §WL-4）。WL 批后端 3 张（WL-1 数据 / WL-2 引擎 / WL-3 注入链）→ 前端编辑面板。
+- **后端**（前置依赖）：`routes/lorebook.py` 四端点（GET/POST `/api/characters/{id}/lorebook` + PUT/DELETE `/api/lorebook/{entry_id}`），纯 HTTP 映射委托 `services/lorebook.py` 仓库层（守卫 404 / 校验 422 由领域异常 + Pydantic 承担）；main.py 注册。契约锁 `test_lorebook_routes.py` 5 用例（wire_app fixture + get_db 覆盖为内存会话，对齐 test_error_handler 模式）。
+- **前端**：`components/lorebook-editor.js` 深模块（协议表面 6 名）——列表视图（搜索过滤/开关/常驻标记/关键词前 3+计数/编辑/删除）+ 编辑视图（chips 录入去重删除/内容 textarea/匹配模式/注入位置/数值/常驻/启用 + 内联校验 + 泛词告警「关键词过泛，会显著增加注入量」）。**字段名映射单一来源**：`buildLorebookPayload` 与后端 LorebookEntryBase 逐字段一致（契约锁锁定 12 字段名集合）。骨架复用 openModal seam（C3，不新造）、图标走 iconHtml()（新增 plus/pin/toggleOn/toggleOff 四枚入 icons.js 单源）。入口：角色卡新增「世界书」按钮（list-views.js 事件委托）。api.js 增 lorebook 四方法。
+- **过程遥测**：① `showAlert` 从 utils.js 导入报「does not provide an export」——实际在 confirm-dialog.js，Playwright console 错误当场抓住并修复；② 空态/列表渲染初测经 vi.mock 缺声明失败 → 补 hoisted mock；③ Playwright 冒烟首轮注入日志不可见——uvicorn `--log-level debug` 只配自身 logger，应用 root 仍 WARNING → `.scratch/run-wl4-debug.py` 前置 `logging.basicConfig(DEBUG)` 捕获（临时脚本已随 Neat 清场删除）。
+- **验证链**：后端 pytest 896+1skip→901+1skip（+5 路由契约锁）| 前端 Vitest 1189→1204（+15 编辑器契约锁）| 全量双端绿零回归 | **Playwright 端到端**：角色卡「世界书」按钮 → 模态开（空态提示）→ 新增条目（chip「酒馆」回车录入 + 内容 + 保存）→ 列表显示条目（标题/关键词/order/开关）→ 重开编辑字段全还原（标题/chip/内容/数值/启用）→ 发消息「酒馆在哪里？」→ 后端 DEBUG `世界书注入：{'system': 1, 'before_char': 0, 'after_char': 0}（1 条）` → **注入生效**（400 为未配 API Key 环境预期，注入在 resolve_llm 前已构建）。
+- **非阻断落债**：无。
+
+---
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

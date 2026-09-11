@@ -180,6 +180,7 @@ export function characterCardHtml(c) {
             <div class="character-card-actions">
                 <button class="btn-icon chat-with" title="开始对话">${iconHtml('chat')}</button>
                 <button class="btn-icon edit-char" title="编辑">${iconHtml('edit')}</button>
+                <button class="btn-icon lorebook-char" title="世界书">${iconHtml('fileText')}</button>
                 <button class="btn-icon export-char" title="导出角色卡">${iconHtml('export')}</button>
                 <button class="btn-icon delete-char" title="删除">${iconHtml('trash')}</button>
             </div>

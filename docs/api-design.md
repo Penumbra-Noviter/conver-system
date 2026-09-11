@@ -745,3 +745,51 @@ POST /api/simulators/generate
 | 500 | 服务器内部错误 |
 | 502 | LLM API 调用失败 |
 | 504 | LLM API 请求超时 |
+
+## 世界书 API（WL-4）
+
+### 获取角色世界书条目列表
+
+```
+GET /api/characters/{character_id}/lorebook
+```
+
+返回世界书条目数组（order 升序、同 order 按 id 稳定）。角色不存在 → 404。
+
+```json
+[
+  {
+    "id": 1, "character_id": 1, "title": "酒馆", "keys": ["酒馆", "tavern"],
+    "content": "酒馆的老板是莉莉。", "constant": false, "order": 50,
+    "probability": 80, "group_name": "", "group_weight": 100,
+    "match_mode": "or", "position": "world", "depth": 20,
+    "source": "manual", "enabled": true, "created_at": "...", "updated_at": "..."
+  }
+]
+```
+
+### 创建世界书条目
+
+```
+POST /api/characters/{character_id}/lorebook
+```
+
+请求体：LorebookEntryCreate（title/keys/content/constant/order/probability/group_name/group_weight/match_mode/position/depth/enabled）。`keys` 必须为 JSON 数组（非数组 → 422）；数值越界 → 422；角色不存在 → 404。返回创建的条目。
+
+### 更新世界书条目
+
+```
+PUT /api/lorebook/{entry_id}
+```
+
+请求体：LorebookEntryUpdate（全字段可选，仅提交显式字段；显式 null 视为未提供）。条目不存在 → 404。
+
+### 删除世界书条目
+
+```
+DELETE /api/lorebook/{entry_id}
+```
+
+成功 → 204。条目不存在 → 404。删角色 → 世界书条目级联删除（FK CASCADE）。
+
+> 字段语义对齐 SillyTavern World Info（spec WL-1/§WL-4）；命中/注入引擎见「对话 API」上下文组装（assemble_chat_context 世界书注入，WL-3）。
