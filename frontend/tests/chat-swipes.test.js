@@ -95,7 +95,8 @@ describe('1. 候选计数渲染', () => {
 describe('2. 切换调用参数（乐观 + 落库）', () => {
     it('点击下一候选 → 乐观切换渲染 + switchSwipe 调用参数正确', async () => {
         const { chat, tabs, api } = await loadModules();
-        api.setFetch(makeApiMock());
+        const fetchMock = makeApiMock();
+        api.setFetch(fetchMock);
         seedTab(tabs, [SWIPE_MSG]);
         chat.renderMessages();
 
@@ -107,8 +108,11 @@ describe('2. 切换调用参数（乐观 + 落库）', () => {
         expect(msg.content).toBe('候选二');
         expect(msg.active_swipe_index).toBe(1);
         expect(document.querySelector('[data-swipe-count]').textContent).toBe('2/3');
-        // 落库调用参数
-        expect(api.default ?? api).toBeDefined();
+        // 落库调用参数：POST /api/messages/{id}/switch-swipe，body {index: 1}
+        expect(fetchMock).toHaveBeenCalledWith(
+            expect.stringContaining('/api/messages/5/switch-swipe'),
+            expect.objectContaining({ method: 'POST', body: JSON.stringify({ index: 1 }) })
+        );
     });
 
     it('边界：末候选点下一 → 不越界不调用', async () => {
@@ -148,5 +152,40 @@ describe('3. 失败回滚', () => {
         expect(msg.content).toBe('候选一'); // 回滚
         expect(msg.active_swipe_index).toBe(0);
         expect(document.querySelector('[data-swipe-count]').textContent).toBe('1/3');
+    });
+});
+describe('4. 重叠切换并发保护（generation token）', () => {
+    it('旧调用失败但已有更新调用 → 不回滚（UI 与服务端一致）', async () => {
+        const { chat, tabs, api } = await loadModules();
+        // deferred mock：手动控制每个 switch-swipe 请求的 resolve/reject 时序
+        const deferreds = [];
+        const fetchMock = vi.fn((url) => {
+            if (String(url).includes('/switch-swipe')) {
+                return new Promise((resolve, reject) => {
+                    deferreds.push({ resolve, reject });
+                });
+            }
+            return Promise.resolve({ ok: true, status: 200, json: async () => ({}) });
+        });
+        api.setFetch(fetchMock);
+        seedTab(tabs, [SWIPE_MSG]);
+        chat.renderMessages();
+
+        // 连点两次：调用 1（index 1）挂起 → 调用 2（index 2）挂起
+        document.querySelector('.swipe-next').click(); // 乐观 → 候选二
+        document.querySelector('.swipe-next').click(); // 乐观 → 候选三
+        expect(deferreds.length).toBe(2);
+
+        // 调用 2 成功（服务端确认候选三）→ 调用 1 失败（旧调用）
+        deferreds[1].resolve({ ok: true, status: 200, json: async () => ({}) });
+        await new Promise((r) => setTimeout(r, 0));
+        deferreds[0].reject(new Error('旧调用失败'));
+        await new Promise((r) => setTimeout(r, 0));
+
+        // generation token：旧调用失败不回滚，UI 保持最新候选（与服务端一致）
+        const msg = tabs.getTab(11).messages[0];
+        expect(msg.content).toBe('候选三');
+        expect(msg.active_swipe_index).toBe(2);
+        expect(document.querySelector('[data-swipe-count]').textContent).toBe('3/3');
     });
 });

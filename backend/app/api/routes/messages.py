@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
+from backend.app.models.message import MessageSwipe
 from backend.app.schemas.message import MessageResponse, SearchResult, SwitchSwipeRequest
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
@@ -28,10 +29,7 @@ def get_messages(conversation_id: int, db: Session = Depends(get_db)) -> list[Me
     """获取对话的消息历史（按时间正序；assistant 消息附候选集与激活序号，MS-2）"""
     conversation_service.require_conversation(db, conversation_id)
     messages = message_service.get_messages(db, conversation_id)
-    return [
-        _with_swipes(db, msg)
-        for msg in messages
-    ]
+    return _with_swipes_batch(db, messages)
 
 
 @router.post(
@@ -43,14 +41,32 @@ def switch_swipe(
 ) -> MessageResponse:
     """切换消息激活候选（越界 → SwipeIndexError → 400）"""
     msg = message_service.switch_swipe(db, message_id, body.index)
-    return _with_swipes(db, msg)
+    return _with_swipes_batch(db, [msg])[0]
 
 
-def _with_swipes(db: Session, msg) -> MessageResponse:
-    """ORM 消息 → 响应（附候选集 content 列表与激活序号）"""
-    response = MessageResponse.model_validate(msg)
-    response.swipes = [s.content for s in message_service.list_swipes(db, msg.id)]
-    return response
+def _with_swipes_batch(db: Session, messages: list) -> list[MessageResponse]:
+    """ORM 消息列表 → 响应（候选集批量填充，避免每消息一次查询的 N+1）
+
+    一次查询本批消息的全部候选（message_id IN），按消息分组；user/system 等
+    无候选消息自然为空列表。
+    """
+    if not messages:
+        return []
+    ids = [m.id for m in messages]
+    rows = (
+        db.query(MessageSwipe.message_id, MessageSwipe.content)
+        .filter(MessageSwipe.message_id.in_(ids))
+        .order_by(MessageSwipe.message_id, MessageSwipe.index)
+        .all()
+    )
+    swipes_by_message: dict[int, list[str]] = {}
+    for message_id, content in rows:
+        swipes_by_message.setdefault(message_id, []).append(content)
+
+    responses = [MessageResponse.model_validate(m) for m in messages]
+    for resp in responses:
+        resp.swipes = swipes_by_message.get(resp.id, [])
+    return responses
 
 
 @router.get("/api/messages/search", response_model=list[SearchResult])

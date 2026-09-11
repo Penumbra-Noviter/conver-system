@@ -855,9 +855,15 @@ export async function regenerateLastReply() {
 /**
  * 切换消息候选（MS-2）：‹ › 控制条点击 → 乐观更新渲染 → 落库 → 失败回滚
  *
+ * 并发保护（Falsify 修复）：快速连点会产生重叠在途请求——generation token 保证
+ * 只有「最后一次调用」失败才回滚（旧调用失败时 UI 已处于更新的候选状态，回滚会
+ * 与服务端分歧）；无更新在途时照常回滚。
+ *
  * @param {number} messageId - 目标消息 id
  * @param {number} delta - 1=下一候选 / -1=上一候选
  */
+const swipeSeq = new Map(); // messageId → 最近一次调用序号
+
 async function switchSwipe(messageId, delta) {
     const tab = getActiveTab();
     if (!tab || !Array.isArray(tab.messages)) return;
@@ -867,6 +873,9 @@ async function switchSwipe(messageId, delta) {
     const current = Number(msg.active_swipe_index ?? 0);
     const next = Math.min(swipes.length - 1, Math.max(0, current + delta));
     if (next === current) return; // 边界已到
+
+    const seq = (swipeSeq.get(messageId) || 0) + 1;
+    swipeSeq.set(messageId, seq);
 
     const prevContent = msg.content;
     const prevActive = msg.active_swipe_index;
@@ -879,12 +888,17 @@ async function switchSwipe(messageId, delta) {
     try {
         await messages.switchSwipe(messageId, next);
     } catch (err) {
-        // 失败回滚：恢复原候选并重渲染（弱化断言禁止 — 状态必须还原）
-        msg.content = prevContent;
-        msg.active_swipe_index = prevActive;
-        updateTab(tab.conversationId, { messages: tab.messages });
-        renderMessages();
+        // 失败回滚：仅当仍是最近一次调用（无更新在途）时还原，防旧调用回滚
+        // 把 UI 冻回早于服务端已确认状态的候选（Falsify 修复）
+        if (swipeSeq.get(messageId) === seq) {
+            msg.content = prevContent;
+            msg.active_swipe_index = prevActive;
+            updateTab(tab.conversationId, { messages: tab.messages });
+            renderMessages();
+        }
         renderSendError(err, '切换候选失败', tab.conversationId);
+    } finally {
+        if (swipeSeq.get(messageId) === seq) swipeSeq.delete(messageId);
     }
 }
 

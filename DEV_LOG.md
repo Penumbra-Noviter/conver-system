@@ -146,7 +146,11 @@
 - **后端**（前端依赖）：MessageResponse 扩展 `swipes`（候选 content 列表）/`active_swipe_index`，GET 消息列表经 `_with_swipes` 填充；新增 `POST /api/messages/{id}/switch-swipe`（body {index}，越界 SwipeIndexError→400）；路由契约锁并入 test_message_swipes（列表含候选/切换生效/越界 400）。
 - **前端**：`format.js::messageBubbleHtml` 增候选控制条（仅 assistant 且 swipes>1：‹ n/m ›，图标走 iconHtml('chevronLeft/Right')）——buildMessagesHtml 透传 swipes/active；`chat.js::switchSwipe`（私有）——控制条点击 → **乐观更新**（msg.content 跟随激活候选 + updateTab + renderMessages）→ `messages.switchSwipe` 落库 → **失败回滚**（恢复原候选 + 重渲染 + 错误条）；api.js messages.switchSwipe。
 - **过程遥测**：chat-swipes 契约锁初版「失败回滚」在跑 2a 后失败——根因是测试文件模块级共享常量 `SWIPE_MSG` 被 2a 的乐观更新就地突变（content 变候选二）污染后续用例 → seedTab 改为逐用例克隆消息对象（{...m, swipes:[...]}）；临场用调试探针定位（catch 内回滚后值仍为候选二 → 推断 prevContent 已被污染）。
-- **验证链**：后端 pytest 923+1skip（+1 路由用例）| 前端 Vitest 1213→1219（+6 契约锁）| 全量双端绿零回归 | doc_sync 零漂移。
+- **验证链**：后端 pytest 923+1skip（+1 路由用例）| 前端 Vitest 1213→1220（+7 契约锁）| 全量双端绿零回归 | doc_sync 零漂移。
+- **期末 code-review**：Standards 0 硬违例（低危：get_messages 每消息一次 list_swipes 的 N+1、chat-swipes 退化断言 `api.default ?? api` 恒真）；**Falsify 2 项当场修复**：
+  1. **消息列表 N+1 查询**——`_with_swipes` 逐消息查询候选（含 user/system 空候选），长会话每次加载数百次查询 → `_with_swipes_batch` 一次 `message_id IN` 批量填充按消息分组（SQLite IN 元组初版用 raw text 报 expanding 绑定错，改用 ORM query）。
+  2. **重叠切换竞态**——快速连点产生重叠在途请求，旧调用失败时用调用前捕获的 prev* 回滚会把 UI 冻回早于服务端已确认状态的候选 → switchSwipe 增 **generation token**（per-message seq：仅当仍是最近一次调用时失败才回滚），契约锁 `test_overlapping_switch_concurrency`（deferred mock 时序：旧失败 + 新成功 → 不回滚，UI 与服务端一致）。
+  - Standards 低危：退化断言替换为真实调用参数断言（POST body {index:1}）。
 - **非阻断落债**：无。
 
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
