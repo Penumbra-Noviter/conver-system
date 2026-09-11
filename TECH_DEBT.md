@@ -53,7 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-96 | escapeHtml 不转义引号——属性上下文插值（`value="..."`/`data-*="..."`）含 `"` 时可属性注入；WL-4 lorebook-editor 已局部修复（escapeAttr），character-form/character-wizard/settings-panel 等既有渲染仍属同类（F-69 族既有债） | WL-4 期末 code-review Falsify 轴（stored XSS 实证） | Worth exploring | 📝 待立项 | 安全 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -79,7 +78,7 @@
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95，轻量档 3 工单）
+### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95 + F-96，轻量档 4 工单）
 
 > 处置详情：3 项消费（各对应 TICKETS 归档工单）。Grilling 实证拍板**全做**——F-93 git grep 复核 `lorebook._as_str_list` 与 `character_card._as_list` 逐行重复仍成立（character_card 2 处 + lorebook 1 处消费）；F-94 `chat._msg_role` 与 `prompt._role_str` 的 `hasattr(.value)` 枚举归一重复（chat.py:535 / prompt.py:103）；F-95 `build_message_list` 生产调用方仅 chat.py 两处（assemble_chat_context），加可选 history 参数即可消除扫描窗 + 内部双查。方案：新建 `services/text_utils.py` 共享单点（as_str_list + role_str）收敛 F-93/F-94；F-95 build_message_list 增 `history: Sequence | None`（None → 内部查询，既有调用不变）。
 
@@ -88,6 +87,7 @@
 | F-93 | lorebook._as_str_list 与 character_card._as_list 逐行重复 | WL-1 期末 code-review Standards 轴 | Worth exploring | ✅ 已修（2026-09-10：轻量档工单 `text_utils.as_str_list` 共享单点收敛——character_card / lorebook 改指 + 删私有函数，pytest 873→879 全绿零回归、doc_sync 零漂移） |
 | F-94 | chat._msg_role 与 prompt._role_str 枚举归一重复 | WL-3 期末 code-review Standards 轴 | Worth exploring | ✅ 已修（2026-09-10：轻量档工单 `text_utils.role_str` 收敛——prompt/chat 改指 + 删私有函数，pytest 891→896 全绿零回归） |
 | F-95 | assemble_chat_context 扫描窗 + build_message_list 双查历史 | WL-3 期末 code-review Standards 轴 | Speculative | ✅ 已修（2026-09-10：轻量档工单 `build_message_list` 增可选 history 参数，assemble 传入已取历史消除双查；显式传 history 不再查库由契约锁锁定） |
+| F-96 | escapeHtml 不转义引号——属性上下文插值（value="..."/data-*="..."）含 " 时可属性注入（WL-4 lorebook-editor 曾局部 escapeAttr，其余组件同类） | WL-4 期末 code-review Falsify 轴（stored XSS 实证） | Worth exploring | ✅ 已修（2026-09-10：轻量档工单升级共享 `escapeHtml` 同时转义 " → &quot;（15 处属性插值一处收敛），lorebook-editor escapeAttr 退役；markdown sanitizeUrl 补实体引号形态拒绝（&quot;/&#34;/&#x22/，保 TD-42「引号 URL → 纯文本」契约）；契约锁 escapeHtml 引号转义 + DOM 往返 + 无注入属性，Vitest 1211→1212） |
 
 ### 2026-08-27（技术债消费批次：F-82~F-89 全自动档 kickoff，3 做 5 关）
 

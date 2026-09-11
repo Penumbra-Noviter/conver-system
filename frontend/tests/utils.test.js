@@ -64,6 +64,17 @@ describe('escapeHtml', () => {
         expect(escapeHtml('a & b')).toBe('a &amp; b');
     });
 
+    it('转义双引号（F-96 修复锁：属性上下文插值安全，DOM 读回自动解码往返一致）', () => {
+        expect(escapeHtml('a"b')).toBe('a&quot;b');
+        expect(escapeHtml('x" autofocus onfocus="alert(1)')).toBe(
+            'x&quot; autofocus onfocus=&quot;alert(1)'
+        );
+        const div = document.createElement('div');
+        div.innerHTML = `<input value="${escapeHtml('a"b')}">`;
+        expect(div.querySelector('input').value).toBe('a"b'); // 实体解码往返
+        expect(div.querySelector('input').hasAttribute('onfocus')).toBe(false);
+    });
+
     it('非字符串返回空串', () => {
         expect(escapeHtml(null)).toBe('');
         expect(escapeHtml(undefined)).toBe('');

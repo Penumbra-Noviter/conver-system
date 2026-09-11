@@ -22,18 +22,21 @@ const SAFE_URL_SCHEMES = /^(https?|mailto|tel)$/i;
  *
  * TD-42（属性注入面）：href 属性以双引号包裹，URL 内任何裸引号（" 或 '）均可击穿
  * 属性边界注入事件属性（`[x](" onmouseover="alert(1))` 实测产出 onmouseover 属性）。
- * escapeHtml 不转义引号（textContent→innerHTML 引号原样通过），故在 trim 后直接拒绝
- * 含引号 URL（返回 null → 调用方中和为纯文本）。单引号实测不击穿双引号属性边界
- * （jsdom DOM 解析验证），但 URL 安全性判定不应依赖渲染模板的属性引号风格
- * （防未来模板单引号化后静默复发），故一并拒绝；代价：RFC 3986 sub-delims 允许的
- * 含 ' URL（如 mailto:foo'bar@x.com）被中和为纯文本，本仓库无真实用例，可接受。
+ * 管线整体文本先经 escapeHtml（F-96 起同时转义 " → &quot;），故裸引号与实体引号
+ * 形态（&quot;/&#34;/&#x22/&#x22;，大小写不敏感）一律拒绝（返回 null → 调用方中和
+ * 为纯文本）。单引号实测不击穿双引号属性边界（jsdom DOM 解析验证），但 URL 安全性
+ * 判定不应依赖渲染模板的属性引号风格（防未来模板单引号化后静默复发），故一并拒绝；
+ * 代价：RFC 3986 sub-delims 允许的含 ' URL（如 mailto:foo'bar@x.com）被中和为纯文本，
+ * 本仓库无真实用例，可接受。
  *
  * @param {string} url - 原始链接地址（已 HTML 转义，可能含首尾空白）
- * @returns {string|null} 去首尾空白后的安全 URL；含引号或 scheme 不在白名单时返回 null（调用方渲染为纯文本）
+ * @returns {string|null} 去首尾空白后的安全 URL；含引号（裸或实体）或 scheme 不在白名单时返回 null（调用方渲染为纯文本）
  */
 function sanitizeUrl(url) {
     const trimmed = url.trim();
     if (trimmed.includes('"') || trimmed.includes("'")) return null;
+    // 实体引号形态（escapeHtml 升级后 " → &quot;，防实体形态击穿；TD-42 契约保持）
+    if (/&(?:quot|#0*34|#x0*22);/i.test(trimmed)) return null;
     const scheme = trimmed.replace(/[\u0000-\u0020]/g, '').match(/^([a-z][a-z0-9+.-]*):/i);
     if (scheme && !SAFE_URL_SCHEMES.test(scheme[1])) return null;
     return trimmed;

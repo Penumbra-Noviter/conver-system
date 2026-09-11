@@ -93,6 +93,16 @@
 
 ---
 
+## 技术债消费批次 F-96：escapeHtml 引号转义升级（2026-09-10 — 用户「继续消费技术债」）
+
+- **来源**：候选区 WL-4 期末 Falsify 轴 stored XSS 实证（`escapeHtml` 只转义 `&<>`，属性上下文插值 `value="..."`/`data-*="..."` 含 `"` 可截断属性注入）。Grilling 实证拍板**做**——git grep 复核 **15 处** `="${escapeHtml(...)}"` 属性插值（format.js:44 alt/src、character-form.js ×5、settings-panel.js:42、model-selector.js:47、tab-bar.js:74 title、character-wizard.js ×4、model-utils.js:33），值多为用户可控（角色名/描述/avatar/tags/creator、provider key 等）。
+- **方案（一处收敛全族）**：升级共享 `utils.js::escapeHtml` 同时转义 `"` → `&quot;`（文本上下文 `&quot;` 渲染无害、DOM 读回自动解码往返一致）；lorebook-editor 的局部 `escapeAttr` 退役（回指共享函数）。
+- **连带契约修复**：markdown TD-42「引号 URL → 中和为纯文本」缓解依赖「escapeHtml 不转义引号」——升级后整文本先转义使 `"` 变 `&quot;` 逃过裸引号检查（实测产出 `<a href="&quot; onmouseover=...">` 惰性链接，安全但违约）→ `sanitizeUrl` 补实体引号形态拒绝（`&quot;`/`&#34;`/`&#x22;` 大小写不敏感），TD-42 既有用例全绿保住契约。
+- **验证链**：Vitest 1211→1212（+1：escapeHtml 引号转义精确输出 + DOM 实体解码往返 + 无注入属性断言）| markdown/format/utils 既有用例全绿 | 全量双端绿零回归。
+- **非阻断落债**：无（候选区清零）。
+
+---
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。

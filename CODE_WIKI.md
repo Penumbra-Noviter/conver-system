@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2183<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->902<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1211<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2184<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->902<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1212<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -823,7 +823,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleSidebar-->`toggleSidebar()`<!--/AUTO--> | 侧栏开关 |
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleChatSidebar-->`toggleChatSidebar()`<!--/AUTO--> | 会话侧栏开关 |
 
-### 4.44.1 `frontend/js/components/lorebook-editor.js` — 世界书编辑器（WL-4）（<!--AUTO:lines:frontend/js/components/lorebook-editor.js-->~413 行<!--/AUTO-->）
+### 4.44.1 `frontend/js/components/lorebook-editor.js` — 世界书编辑器（WL-4）（<!--AUTO:lines:frontend/js/components/lorebook-editor.js-->~407 行<!--/AUTO-->）
 
 **职责**：角色世界书条目 CRUD 面板（列表 + 编辑表单双视图）。骨架由通用模态框工厂 openModal 承担（ARC-10 C3 seam，不新造）；图标走 icons.js iconHtml()。纯函数核（chips 录入去重删除 / 泛词判定 / 条目校验 / payload 构建）独立单测；payload 字段名映射单一来源（与后端 LorebookEntryBase 逐字段一致，契约锁锁定）。入口：角色卡「世界书」按钮（list-views.js 事件委托）。
 
@@ -941,7 +941,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/key-injector.js:mutationTouchesConfig-->`mutationTouchesConfig(mutations, config)`<!--/AUTO--> | 变更是否触及配置 |
 | <!--AUTO:sig:frontend/js/key-injector.js:disconnectObserver-->`disconnectObserver()`<!--/AUTO--> | 断开观察者（含在途防抖清理） |
 
-### 4.52 `frontend/js/markdown.js` — Markdown 渲染（<!--AUTO:lines:frontend/js/markdown.js-->~203 行<!--/AUTO-->）
+### 4.52 `frontend/js/markdown.js` — Markdown 渲染（<!--AUTO:lines:frontend/js/markdown.js-->~206 行<!--/AUTO-->）
 
 **职责**：消息 Markdown 渲染（代码块保护 + URL 消毒 XSS 防护）。
 
@@ -1083,7 +1083,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/tabs.js:persist-->`persist()`<!--/AUTO--> | 写 sessionStorage |
 | <!--AUTO:sig:frontend/js/tabs.js:commit-->`commit()`<!--/AUTO--> | 提交（持久化 + 通知） |
 
-### 4.61 `frontend/js/utils.js` — 通用工具（<!--AUTO:lines:frontend/js/utils.js-->~120 行<!--/AUTO-->）
+### 4.61 `frontend/js/utils.js` — 通用工具（<!--AUTO:lines:frontend/js/utils.js-->~125 行<!--/AUTO-->）
 
 **职责**：通用工具——HTML 转义、Toast（T4 队列上限：`MAX_TOASTS≈3`，新条挤最旧）、Blob 下载、头像首字母、标签格式化、输入框自适应。
 
@@ -1400,7 +1400,7 @@ conver system/
 | `frontend/tests/stream-session.test.js` | <!--AUTO:tests:frontend/tests/stream-session.test.js-->73<!--/AUTO--> | 流式会话结算 |
 | `frontend/tests/style-css.test.js` | <!--AUTO:tests:frontend/tests/style-css.test.js-->5<!--/AUTO--> | style.css 静态契约（F-73 .gg-config-warning-nav 对比度 + dark override） |
 | `frontend/tests/tabs.test.js` | <!--AUTO:tests:frontend/tests/tabs.test.js-->68<!--/AUTO--> | tab 工作区 |
-| `frontend/tests/utils.test.js` | <!--AUTO:tests:frontend/tests/utils.test.js-->15<!--/AUTO--> | 通用工具（含 toast 队列上限，T4） |
+| `frontend/tests/utils.test.js` | <!--AUTO:tests:frontend/tests/utils.test.js-->16<!--/AUTO--> | 通用工具（含 toast 队列上限，T4） |
 
 运行：`cd frontend && npm test`（= `vitest run`）。
 
@@ -1452,10 +1452,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2183<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2184<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->902<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1211<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1212<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

@@ -49,18 +49,11 @@ const BOUNDS = {
 };
 
 /**
- * 属性上下文转义（escapeHtml 只转义 &<>，不转义引号——属性插值须额外转义 "，
- * 防 data-* 与 value 属性注入，Falsify HIGH 修复锁）
- * @param {*} value - 待转义值
- * @returns {string}
+ * 关键词 chip 模板（chips 录入区与回显共用，避免双份字面量；
+ * escapeHtml 自 F-96 起转义引号，属性上下文安全）
  */
-function escapeAttr(value) {
-    return escapeHtml(value).replace(/"/g, '&quot;');
-}
-
-/** 关键词 chip 模板（chips 录入区与回显共用，避免双份字面量） */
 function chipHtml(key) {
-    return `<span class="lorebook-chip">${escapeHtml(key)}<button type="button" class="lorebook-chip-x" data-chip-x="${escapeAttr(key)}">${iconHtml('x')}</button></span>`;
+    return `<span class="lorebook-chip">${escapeHtml(key)}<button type="button" class="lorebook-chip-x" data-chip-x="${escapeHtml(key)}">${iconHtml('x')}</button></span>`;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -287,7 +280,7 @@ function renderEditor(root, characterId, entry, onChanged) {
         <div class="lorebook-editor">
             <div class="form-field">
                 <label for="le-title">标题</label>
-                <input type="text" id="le-title" maxlength="200" value="${escapeAttr(e.title || '')}" placeholder="条目标题（可空）">
+                <input type="text" id="le-title" maxlength="200" value="${escapeHtml(e.title || '')}" placeholder="条目标题（可空）">
             </div>
             <div class="form-field">
                 <label for="le-keys">触发关键词 <span class="field-error" id="le-keys-error"></span></label>
@@ -330,7 +323,7 @@ function renderEditor(root, characterId, entry, onChanged) {
                 </div>
                 <div class="form-field">
                     <label for="le-group-name">互斥组名</label>
-                    <input type="text" id="le-group-name" maxlength="100" value="${escapeAttr(e.group_name || '')}" placeholder="空=不分组">
+                    <input type="text" id="le-group-name" maxlength="100" value="${escapeHtml(e.group_name || '')}" placeholder="空=不分组">
                 </div>
                 <div class="form-field">
                     <label for="le-group-weight">组内权重 <span class="field-error" id="le-group-weight-error"></span></label>

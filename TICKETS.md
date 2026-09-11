@@ -89,6 +89,19 @@
 
 ---
 
+### 技术债消费批次 F-96（2026-09-10，轻量档 1 工单）
+
+> 来源：用户「继续消费技术债」；候选区 WL-4 期末 Falsify 轴 stored XSS 实证（escapeHtml 不转义引号 → 属性上下文注入）。Grilling 实证拍板**做**——git grep 复核 15 处 `="${escapeHtml(...)}"` 属性插值（format/character-form/settings-panel/model-selector/tab-bar/character-wizard/model-utils），值多为用户可控内容。方案：升级共享 `escapeHtml` 同时转义 `"`（一处收敛全族），lorebook-editor 局部 escapeAttr 退役；markdown sanitizeUrl 补实体引号形态拒绝保住 TD-42 契约。处置详情见 TECH_DEBT 2026-09-10 节。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | escapeHtml 升级转义引号（15 处属性插值一处收敛 + markdown 实体引号拒绝 + 契约锁） | F-96 | 2026-09-10 | [见提交 2] |
+
+**验证链：** Vitest 1211→1212（+1：escapeHtml 引号转义 + DOM 实体解码往返 + 无注入属性）| markdown TD-42 既有用例全绿（实体引号拒绝保住「引号 URL → 纯文本」契约）| 全量双端绿零回归 | doc_sync 零漂移
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 技术债消费批次 F-94 + F-95（2026-09-10，轻量档 2 工单）
 
 > 来源：用户「继续消费技术债」；候选区 WL-3 期末 code-review Standards 轴两项。Grilling 实证拍板**全做**——F-94 `chat._msg_role` 与 `prompt._role_str` 枚举归一重复（chat.py:535 / prompt.py:103 `hasattr(.value)`）；F-95 `build_message_list` 生产调用方仅 chat.py 两处，加可选 history 参数即消除扫描窗 + 内部双查。方案：text_utils 增 `role_str` 收敛（prompt/chat 改指）+ build_message_list 增 `history: Sequence | None`（None → 内部查询）。处置详情见 TECH_DEBT 2026-09-10 节。

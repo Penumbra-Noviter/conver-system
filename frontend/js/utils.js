@@ -6,6 +6,11 @@ import { requestBlob } from './api.js';
 
 /**
  * HTML 转义（防 XSS）
+ *
+ * 除 &<> 外同时转义 "（F-96 收敛：textContent→innerHTML 只实体化 &<>，双引号
+ * 在属性上下文（`value="..."`/`data-*="..."`）会截断属性致注入；补 `&quot;`
+ * 后文本与属性两类插值均可安全使用同一函数）。DOM 读回（value/dataset）自动
+ * 解码实体，往返语义不变。
  * @param {string} str
  * @returns {string}
  */
@@ -13,7 +18,7 @@ export function escapeHtml(str) {
     if (typeof str !== 'string') return '';
     const div = document.createElement('div');
     div.textContent = str;
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, '&quot;');
 }
 
 /**
