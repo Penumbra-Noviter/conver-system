@@ -81,7 +81,7 @@
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
-| WL-5 | 记忆宫殿（AI 归纳 → source=auto 条目；阈值触发；失败隔离） | 2026-09-10 | [见提交 2] |
+| WL-5 | 记忆宫殿（AI 归纳 → source=auto 条目；阈值触发；失败隔离） | 2026-09-10 | 91cb653 |
 
 **验证链：** pytest 901+1skip→916+1skip（+15：test_memory_palace——阈值矩阵/JSON 剥围栏严格解析/非法与缺字段与 LLM 异常降级不抛/keys 空跳过/同 keys+content 去重/position-depth-source 固定/schema 三字段/chat 完整回合触发/开关关不产生/归纳失败不破坏回合/触发层意外外层隔离/title 超长截断防 500/每 N 轮增量节奏）| Vitest 1212→1213（+1：source 过滤 + 记忆标记）| 双端全绿零回归 | 期末 code-review 三轴：Standards 0 硬违例 / Spec 3 发现（每 N 轮节奏增量修复 / 开关全局偏差落债 / source 过滤已补）/ Falsify 2 MEDIUM + 2 LOW 当场修复（stream done 帧后触发 / title 截断 / prompt 注入隔离指令 / 窗口字符预算）| doc_sync 零漂移
 **非阻断落债：** F-97（记忆开关会话级细化候选）；「自动总结」互斥项按 spec 后置不实现（DEV_LOG 记录）
