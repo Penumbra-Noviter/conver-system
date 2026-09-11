@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **3 项待办**（2 批：CG 图像沉淀 / MD Mod 挂载）。
+> 当前 **2 项待办**（1 批：MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -43,7 +43,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| CG-3 | 对话内出图 + 剧情回顾时间线 | ⬜ 待办 | spec §CG-3；三态渲染 + 失败不破坏对话 + 时间线顺序 |
 
 ### 批次 MD — Mod 挂载层
 
@@ -67,6 +66,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### CG 批次 CG-3（2026-09-11 — 对话内出图 + 剧情回顾，CG 批收官）
+
+> 来源：AI风月对标调研五批工单（CG 图像沉淀第三张/收官）；出图走 CG-1 Provider + CG-2 资产库，含前端三态渲染与回顾时间线页，规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §CG-3。叙述详见 DEV_LOG〈CG-3 对话内出图 + 剧情回顾（2026-09-11）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| CG-3 | 对话内出图 + 剧情回顾时间线 | 2026-09-11 | 3e04824 |
+
+**验证链：** 后端 pytest 1029+1skip→1042+1skip（+13：test_image_tasks——提交 pending + params JSON 往返、会话/锚消息 404、轮询 + 未知 404、run 成功出图入资产库（挂锚消息）+ 失败 failed 不外抛不破坏对话、未知/已终态 no-op、时间线排序（消息 created_at 升序 + 同消息入库序 + 仅解锁 + 无锚按 cg.created_at）、路由三端点）| image_tasks 新表（模型 + schema.sql DDL 逐字契约 + test_migrate_data + 7 实体）| /cg 静态挂载（本地图片 HTTP 加载）| 前端 Vitest 1225→1238（+13：cg-review 7——cgImageUrl 本地路径映射 /cg/时间线三态/转义/失败空态；cg-generate 6——生成中 10-30s 提示/成功 img/失败 error-bar seam 不破坏对话/会话隔离）| 全量双端绿零回归 + cargo 零改动 | 期末四轴：Spec 0 偏差（provider 缺省 local 零配置占位——出图链路端到端可用，HTTP 后端需后续 settings 接线）+ Standards 0 硬违例（函数漏 export 关键字当场修）/ Falsify 0 HIGH（run 失败不外抛 + 已终态 no-op + 时间线排序全锁）| doc_sync 零漂移
+**非阻断落债：** 无（CG 批收官；「作者端权重赋值」与「图片 Provider 设置 UI」随 MD 批后如立项）
+
+---
 
 ### CG 批次 CG-2（2026-09-11 — CG 资产库 + 画廊，CG 批第二张）
 

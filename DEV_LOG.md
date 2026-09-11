@@ -220,6 +220,23 @@
 - **期末 code-review 四轴**：Spec 0 偏差（加权来源拍板记录见上）/ Standards 0 硬违例 / **Falsify 0 HIGH**（404 守卫全锁 + 加权全边界 + 级联全语义 PRAGMA ON 实证）+ Architecture 0 发现（gallery 协议表面 4 函数；级联零手写服务层）。
 - **非阻断落债**：无。
 
+## CG-3 对话内出图 + 剧情回顾（2026-09-11 — AI风月对标五批工单 CG 收官，承接 CG-2 资产库）
+
+- **来源**：承接 CG-1（Provider）/ CG-2（资产库）；出图全链路（提交→生成→入资产库→挂 CG→回顾）＋ 前端（spec §CG-3，含前端，CG 批收官）。
+- **后端**：
+  - `image_tasks` 新表（CG-3）：conversation_id/character_id CASCADE、message_id SET NULL（出图锚）、provider/params(JSON)/status(pending/running/succeeded/failed)/result_url/error/created_at/completed_at。
+  - `image/tasks.py` 深模块：`create_image_task`（提交 pending + 会话/锚消息归属 404）/ `get_image_task`（轮询，未知 404）/ `run_image_task`（**session 注入**核心逻辑：pending → running → resolve_image → generate → 成功 gallery.add_cg（挂锚消息）+ succeeded / 失败 failed + error；**失败不破坏对话**——异常吞并落 failed 态不外抛）。路由后台 `_background_run` 用 SessionLocal 包装。
+  - `gallery.cg_timeline`：剧情回顾时间线（已解锁 CG + 消息片段），排序契约锁定——**消息 created_at 升序（无锚按 cg.created_at）+ 同消息多图入库序（cg.id）**。
+  - 路由 `routes/images.py`：POST /api/images/tasks（asyncio.create_task 后台）、GET /api/images/tasks/{id}（轮询三态）、GET /api/characters/{id}/cg-timeline；**/cg 静态挂载**（本地图片文件 HTTP 加载，`<img src="/cg/<basename>">`）。
+- **前端**：
+  - `cg-review.js` 深模块：`cgImageUrl`（本地绝对路径 → `/cg/<basename>`，URL 原样——**单一来源**，chat.js 复用）+ `renderCgTimeline`（回顾页时间线三态：null 角色/空列表/条目渲染 + escapeHtml 转义 + img 映射）。
+  - `chat.js` 出图入口：`generateImage`（#btn-gen-image 点击 → 描述 modal → 提交 → 轮询）+ `renderCgTaskState`（三态渲染：生成中 sparkles +「需 10-30 秒」/ 成功 `<img>` / 失败文案）+ `pollImageTask`（1s 轮询、90 次上限；**失败走 renderSendError 复用 error-bar seam，不写消息缓存**）；per-conversation `cgInFlight` 防重复提交。
+  - index.html：桌面 + 移动「回顾」导航按钮（sparkles）+ `#view-cg` 视图 + 输入区「生成图片」按钮；app.js 接线（switchView 'cg' 分支渲染当前活动角色时间线 + btn-gen-image 绑定）。
+- **过程遥测**：三处当场修——① `create_image_task` 占位死代码残留（清理 + 导入移模块顶）；② gallery.py Edit 误吞 `pick_cg_by_weight` 函数签名（孤儿 docstring/body，重插 def 行）；③ `renderCgTaskState`/`pollImageTask` 只入 `__all__` 未加 `export` 关键字（ES 模块不导出，Vitest `not a function`）。
+- **验证链**：先红后绿——后端 13 契约锁（run 用 local 后端零网络 + CONVER_DATA_DIR tmp；失败路径用 a1111 无 base_url 构造即错，零 monkeypatch）+ 前端 13（cg-review 7 / cg-generate 6）| pytest 1029+1skip→1042+1skip / Vitest 1225→1238，全量双端绿零回归，cargo 零改动 | schema.sql image_tasks DDL + 索引逐字契约 + test_migrate_data + 7 实体 | doc_sync 零漂移（§3 树 + §4.21.10/11 + §5 前后端行 + cg-review.js files 双向覆盖）| pool_cleanup_check 通过。
+- **期末 code-review 四轴**：Spec 0 偏差（provider 缺省 local 零配置占位——端到端可用，HTTP 后端 base_url 待 MD 批后 settings 接线）+ Standards 0 硬违例 + **Falsify 0 HIGH**（run 失败不外抛/已终态 no-op/时间线排序全锁/会话隔离不渲染）+ Architecture 0 发现（cgImageUrl 单一来源；run 核心 session 注入可测）。
+- **非阻断落债**：无。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。
