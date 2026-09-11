@@ -82,6 +82,13 @@ describe('2. 表单校验：阻止提交 + 内联错误', () => {
         expect(r.errors.depth).toContain('0-20');
         expect(r.errors.group_weight).toContain('1-100');
     });
+
+    it('空数值输入不静默落 0（Falsify LOW 修复锁）', () => {
+        const r = validateLorebookEntry({ ...base, order: '', depth: '' });
+        expect(r.ok).toBe(false);
+        expect(r.errors.order).toContain('请填写');
+        expect(r.errors.depth).toContain('请填写');
+    });
 });
 
 describe('3. 泛词告警触发条件', () => {
@@ -152,8 +159,33 @@ describe('5. 列表渲染：开关状态/常驻标记/搜索过滤', () => {
         expect(rows[0].textContent).toContain('酒馆');
         expect(rows[0].textContent).toContain('+1'); // 关键词前 3 + 计数
         expect(rows[0].querySelector('[data-lorebook-toggle]').dataset.lorebookToggle).toBe('1');
+        // 开关状态实际渲染（enabled→toggleOn / 禁用→toggleOff）
+        expect(rows[0].querySelector('[data-lorebook-toggle] svg').dataset.icon).toBe('toggleOn');
+        expect(rows[1].querySelector('[data-lorebook-toggle] svg').dataset.icon).toBe('toggleOff');
         expect(rows[1].textContent).toContain('常驻'); // 常驻标记
         expect(rows[1].classList.contains('is-constant')).toBe(true);
+    });
+
+    it('属性上下文注入防护：含引号的 key/标题渲染安全（Falsify HIGH 修复锁）', async () => {
+        const { lorebook } = await import('../js/api.js');
+        const { showLorebookEditor } = await import('../js/components/lorebook-editor.js');
+        const evil = 'x" autofocus onfocus="alert(1)';
+        lorebook.list.mockResolvedValue([
+            { id: 1, title: evil, keys: [evil], enabled: true, order: 10, constant: false },
+        ]);
+
+        showLorebookEditor({ characterId: 1, characterName: '测试' });
+        await flush();
+        document.querySelector('[data-lorebook-edit]').click();
+        await flush();
+
+        const titleInput = document.querySelector('#le-title');
+        expect(titleInput.value).toBe(evil); // value 原样（&quot; 解码回引号）
+        expect(titleInput.hasAttribute('onfocus')).toBe(false); // 无注入属性
+        const chipX = document.querySelector('[data-chip-x]');
+        expect(chipX.dataset.chipX).toBe(evil); // dataset 往返一致
+        expect(chipX.hasAttribute('onfocus')).toBe(false);
+        expect(document.querySelector('[onfocus]')).toBeNull();
     });
 
     it('搜索过滤：按标题/关键词缩小列表', async () => {

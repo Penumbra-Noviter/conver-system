@@ -16,7 +16,7 @@
 import { lorebook } from '../api.js';
 import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
-import { showAlert } from './confirm-dialog.js';
+import { showAlert, showConfirm } from './confirm-dialog.js';
 import { escapeHtml } from '../utils.js';
 
 export const __all__ = [
@@ -26,6 +26,8 @@ export const __all__ = [
     'buildLorebookPayload',
     'addKeyChip',
     'removeKeyChip',
+    'CONTENT_MAX_LENGTH',
+    'GENERIC_KEYS',
 ];
 
 //: 单条内容长度上限（对标站实测约束；WL-4 默认 20000 字符，可调）
@@ -45,6 +47,21 @@ const BOUNDS = {
     depth: { min: 0, max: 20 },
     group_weight: { min: 1, max: 100 },
 };
+
+/**
+ * 属性上下文转义（escapeHtml 只转义 &<>，不转义引号——属性插值须额外转义 "，
+ * 防 data-* 与 value 属性注入，Falsify HIGH 修复锁）
+ * @param {*} value - 待转义值
+ * @returns {string}
+ */
+function escapeAttr(value) {
+    return escapeHtml(value).replace(/"/g, '&quot;');
+}
+
+/** 关键词 chip 模板（chips 录入区与回显共用，避免双份字面量） */
+function chipHtml(key) {
+    return `<span class="lorebook-chip">${escapeHtml(key)}<button type="button" class="lorebook-chip-x" data-chip-x="${escapeAttr(key)}">${iconHtml('x')}</button></span>`;
+}
 
 // ════════════════════════════════════════════════════════════════
 // 纯函数核（可独立单测）
@@ -102,7 +119,12 @@ export function validateLorebookEntry(entry) {
         errors.keys = '至少填写一个触发关键词（或勾选「常驻」）';
     }
     for (const field of ['order', 'probability', 'depth', 'group_weight']) {
-        const value = Number(entry[field]);
+        const raw = String(entry[field] ?? '').trim();
+        if (raw === '') {
+            errors[field] = `请填写 ${field}`; // 空输入不得静默落 0（Falsify 修复锁）
+            continue;
+        }
+        const value = Number(raw);
         const { min, max } = BOUNDS[field];
         if (!Number.isFinite(value) || value < min || value > max) {
             errors[field] = `${field} 需在 ${min}-${max} 之间`;
@@ -195,7 +217,7 @@ async function renderList(root, characterId, onChanged) {
         listEl.innerHTML = filtered.length
             ? filtered.map((e) => rowHtml(e)).join('')
             : '<div class="lorebook-empty">' + (entries.length ? '无匹配条目' : '还没有世界书条目，点「新增条目」开始') + '</div>';
-        // 事件绑定（委托）
+        // 事件绑定（逐行绑定：rowHtml 渲染后对每行按钮挂监听）
         listEl.querySelectorAll('[data-lorebook-edit]').forEach((btn) => {
             btn.addEventListener('click', () => renderEditor(root, characterId, entries.find((x) => x.id === Number(btn.dataset.lorebookEdit)), onChanged));
         });
@@ -215,6 +237,8 @@ async function renderList(root, characterId, onChanged) {
         listEl.querySelectorAll('[data-lorebook-del]').forEach((btn) => {
             btn.addEventListener('click', async () => {
                 const id = Number(btn.dataset.lorebookDel);
+                const ok = await showConfirm('删除这条世界书条目？', { detail: '删除后不可恢复' });
+                if (!ok) return;
                 try {
                     await lorebook.delete(id);
                     entries = entries.filter((e) => e.id !== id);
@@ -257,18 +281,17 @@ function renderEditor(root, characterId, entry, onChanged) {
     const e = entry || {};
     const keys = Array.isArray(e.keys) ? e.keys : [];
     const isEdit = Boolean(entry);
-    const chipHtml = keys.map((k) =>
-        `<span class="lorebook-chip">${escapeHtml(k)}<button type="button" class="lorebook-chip-x" data-chip-x="${escapeHtml(k)}">${iconHtml('x')}</button></span>`).join('');
+    const chips = keys.map((k) => chipHtml(k)).join('');
 
     root.innerHTML = `
         <div class="lorebook-editor">
             <div class="form-field">
                 <label for="le-title">标题</label>
-                <input type="text" id="le-title" maxlength="200" value="${escapeHtml(e.title || '')}" placeholder="条目标题（可空）">
+                <input type="text" id="le-title" maxlength="200" value="${escapeAttr(e.title || '')}" placeholder="条目标题（可空）">
             </div>
             <div class="form-field">
                 <label for="le-keys">触发关键词 <span class="field-error" id="le-keys-error"></span></label>
-                <div class="lorebook-chips" id="le-chips">${chipHtml}</div>
+                <div class="lorebook-chips" id="le-chips">${chips}</div>
                 <div class="lorebook-chips-input">
                     <input type="text" id="le-keys-input" placeholder="回车或点添加录入关键词">
                     <button type="button" class="btn" id="le-keys-add">添加</button>
@@ -307,7 +330,7 @@ function renderEditor(root, characterId, entry, onChanged) {
                 </div>
                 <div class="form-field">
                     <label for="le-group-name">互斥组名</label>
-                    <input type="text" id="le-group-name" maxlength="100" value="${escapeHtml(e.group_name || '')}" placeholder="空=不分组">
+                    <input type="text" id="le-group-name" maxlength="100" value="${escapeAttr(e.group_name || '')}" placeholder="空=不分组">
                 </div>
                 <div class="form-field">
                     <label for="le-group-weight">组内权重 <span class="field-error" id="le-group-weight-error"></span></label>
@@ -339,8 +362,7 @@ function renderEditor(root, characterId, entry, onChanged) {
     const contentError = root.querySelector('#le-content-error');
 
     const renderChips = () => {
-        chipsEl.innerHTML = currentKeys.map((k) =>
-            `<span class="lorebook-chip">${escapeHtml(k)}<button type="button" class="lorebook-chip-x" data-chip-x="${escapeHtml(k)}">${iconHtml('x')}</button></span>`).join('');
+        chipsEl.innerHTML = currentKeys.map((k) => chipHtml(k)).join('');
         chipsEl.querySelectorAll('[data-chip-x]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 currentKeys = removeKeyChip(currentKeys, btn.dataset.chipX);

@@ -34,7 +34,7 @@ router = APIRouter(tags=["世界书"])
     "/api/characters/{character_id}/lorebook",
     response_model=list[LorebookEntryResponse],
 )
-def list_lorebook(character_id: int, db: Session = Depends(get_db)) -> list:
+def list_lorebook(character_id: int, db: Session = Depends(get_db)) -> list[LorebookEntryResponse]:
     """获取角色世界书条目列表（order 升序、同 order 按 id 稳定）"""
     character_service.require_character(db, character_id)
     return lorebook_service.list_entries(db, character_id)
@@ -46,7 +46,7 @@ def list_lorebook(character_id: int, db: Session = Depends(get_db)) -> list:
 )
 def create_lorebook(
     character_id: int, payload: LorebookEntryCreate, db: Session = Depends(get_db)
-):
+) -> LorebookEntryResponse:
     """创建世界书条目（角色不存在 → 404）"""
     character_service.require_character(db, character_id)
     return lorebook_service.create_entry(db, character_id, payload)
@@ -55,7 +55,7 @@ def create_lorebook(
 @router.put("/api/lorebook/{entry_id}", response_model=LorebookEntryResponse)
 def update_lorebook(
     entry_id: int, payload: LorebookEntryUpdate, db: Session = Depends(get_db)
-):
+) -> LorebookEntryResponse:
     """部分更新世界书条目（仅提交显式字段；条目不存在 → 404）"""
     return lorebook_service.update_entry(db, entry_id, payload)
 

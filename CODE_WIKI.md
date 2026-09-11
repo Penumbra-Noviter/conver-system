@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2176<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->902<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1204<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2178<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->902<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1206<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -823,7 +823,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleSidebar-->`toggleSidebar()`<!--/AUTO--> | 侧栏开关 |
 | <!--AUTO:sig:frontend/js/components/settings-panel.js:toggleChatSidebar-->`toggleChatSidebar()`<!--/AUTO--> | 会话侧栏开关 |
 
-### 4.44.1 `frontend/js/components/lorebook-editor.js` — 世界书编辑器（WL-4）（<!--AUTO:lines:frontend/js/components/lorebook-editor.js-->~393 行<!--/AUTO-->）
+### 4.44.1 `frontend/js/components/lorebook-editor.js` — 世界书编辑器（WL-4）（<!--AUTO:lines:frontend/js/components/lorebook-editor.js-->~413 行<!--/AUTO-->）
 
 **职责**：角色世界书条目 CRUD 面板（列表 + 编辑表单双视图）。骨架由通用模态框工厂 openModal 承担（ARC-10 C3 seam，不新造）；图标走 icons.js iconHtml()。纯函数核（chips 录入去重删除 / 泛词判定 / 条目校验 / payload 构建）独立单测；payload 字段名映射单一来源（与后端 LorebookEntryBase 逐字段一致，契约锁锁定）。入口：角色卡「世界书」按钮（list-views.js 事件委托）。
 
@@ -1380,7 +1380,7 @@ conver system/
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->103<!--/AUTO--> | Key 注入/端点口径 |
 | `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
-| `frontend/tests/lorebook-editor.test.js` | <!--AUTO:tests:frontend/tests/lorebook-editor.test.js-->15<!--/AUTO--> | 世界书编辑器契约锁（WL-4：chips 录入去重删除/表单校验/泛词告警/payload 字段映射/列表渲染搜索过滤） |
+| `frontend/tests/lorebook-editor.test.js` | <!--AUTO:tests:frontend/tests/lorebook-editor.test.js-->17<!--/AUTO--> | 世界书编辑器契约锁（WL-4：chips 录入去重删除/表单校验/泛词告警/payload 字段映射/列表渲染搜索过滤） |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
@@ -1452,10 +1452,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2176<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2178<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->902<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1204<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1206<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

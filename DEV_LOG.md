@@ -84,7 +84,11 @@
 - **前端**：`components/lorebook-editor.js` 深模块（协议表面 6 名）——列表视图（搜索过滤/开关/常驻标记/关键词前 3+计数/编辑/删除）+ 编辑视图（chips 录入去重删除/内容 textarea/匹配模式/注入位置/数值/常驻/启用 + 内联校验 + 泛词告警「关键词过泛，会显著增加注入量」）。**字段名映射单一来源**：`buildLorebookPayload` 与后端 LorebookEntryBase 逐字段一致（契约锁锁定 12 字段名集合）。骨架复用 openModal seam（C3，不新造）、图标走 iconHtml()（新增 plus/pin/toggleOn/toggleOff 四枚入 icons.js 单源）。入口：角色卡新增「世界书」按钮（list-views.js 事件委托）。api.js 增 lorebook 四方法。
 - **过程遥测**：① `showAlert` 从 utils.js 导入报「does not provide an export」——实际在 confirm-dialog.js，Playwright console 错误当场抓住并修复；② 空态/列表渲染初测经 vi.mock 缺声明失败 → 补 hoisted mock；③ Playwright 冒烟首轮注入日志不可见——uvicorn `--log-level debug` 只配自身 logger，应用 root 仍 WARNING → `.scratch/run-wl4-debug.py` 前置 `logging.basicConfig(DEBUG)` 捕获（临时脚本已随 Neat 清场删除）。
 - **验证链**：后端 pytest 896+1skip→901+1skip（+5 路由契约锁）| 前端 Vitest 1189→1204（+15 编辑器契约锁）| 全量双端绿零回归 | **Playwright 端到端**：角色卡「世界书」按钮 → 模态开（空态提示）→ 新增条目（chip「酒馆」回车录入 + 内容 + 保存）→ 列表显示条目（标题/关键词/order/开关）→ 重开编辑字段全还原（标题/chip/内容/数值/启用）→ 发消息「酒馆在哪里？」→ 后端 DEBUG `世界书注入：{'system': 1, 'before_char': 0, 'after_char': 0}（1 条）` → **注入生效**（400 为未配 API Key 环境预期，注入在 resolve_llm 前已构建）。
-- **非阻断落债**：无。
+- **期末 code-review 三轴（7073757 后、修复前）**：Standards 1 硬违例（路由缺返回 type hints → 补 `-> list[LorebookEntryResponse]` 系）+ 低危多项（CONTENT_MAX_LENGTH/GENERIC_KEYS 未入 __all__ → 补；chip 模板双份 → 提取 chipHtml；删除无确认 → showConfirm 门；「事件绑定（委托）」注释失实 → 改逐行绑定；BOUNDS/GENERIC_KEYS 与后端边界双轨漂移风险 → 随 F-96 注记）；Spec 0 硬发现（3 LOW 可辩护：组权重和提示按 spec「可取其中合理项」省略、入口按仓库无详情面板现实取卡按钮、契约锁 #5 开关态渲染已补锁）；**Falsify 1 HIGH + 2 LOW 当场修复**（先红后绿 +2 用例，Vitest→1206）：
+  1. **stored XSS（HIGH）**——`escapeHtml` 只转义 `&<>` 不转义 `"`，`data-chip-x="..."`/`value="..."` 插值含引号的可信度不足内容（keys 可来自导入角色卡）可直接属性注入 `autofocus onfocus=` → 新增 `escapeAttr`（escapeHtml + `"`→`&quot;`）应用于全部属性插值，契约锁 `test_attribute_context_injection_safe`（含引号 key/标题渲染后无注入属性、dataset/value 往返一致）。
+  2. 空数值输入 `Number("")===0` 静默落 order/depth=0 → validate 空输入报「请填写」。
+  3. 内容 20000 上限仅前端（后端 content 无长度约束）——设计决策保持：spec 的 20000 属 UI 层可配约束，后端不限长以保 character_book 导入保真（parse 不截断）。
+- **非阻断落债**：F-96（escapeHtml 属性上下文转义缺陷仓库级同族，WL-4 局部修复）→ 入 TECH_DEBT 候选区。
 
 ---
 

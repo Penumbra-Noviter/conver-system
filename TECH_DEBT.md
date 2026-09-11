@@ -53,6 +53,7 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-96 | escapeHtml 不转义引号——属性上下文插值（`value="..."`/`data-*="..."`）含 `"` 时可属性注入；WL-4 lorebook-editor 已局部修复（escapeAttr），character-form/character-wizard/settings-panel 等既有渲染仍属同类（F-69 族既有债） | WL-4 期末 code-review Falsify 轴（stored XSS 实证） | Worth exploring | 📝 待立项 | 安全 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -197,4 +198,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-95），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-96），避免编号冲突。
