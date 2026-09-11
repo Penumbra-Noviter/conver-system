@@ -80,7 +80,7 @@
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
-| MS-1 | swipes 数据模型与服务（message_swipes 新表 + messages.active_swipe_index 自愈迁移） | 2026-09-10 | [见提交 2] |
+| MS-1 | swipes 数据模型与服务（message_swipes 新表 + messages.active_swipe_index 自愈迁移） | 2026-09-10 | a95c2b2 |
 
 **验证链：** pytest 916+1skip→925+1skip（+9：test_message_swipes——播种序号自增/唯一约束/删中间后重加不碰撞/切换越界与 content 跟随/删中间与活跃回落/原始候选受保护/级联/导出含候选集与激活索引/自愈迁移幂等）| 重生成改 add_swipe：历史消息数不变（content 跟随激活候选可见，原内容存候选 0），test_regenerate 3 例按新语义修订锁定 | schema.sql 快照同步 + test_migrate_data 表集合更新 | conversation_export 消息键扩展 | 期末 code-review 三轴：Standards 0 硬违例 / Spec 1 实现偏差 + Falsify 1 HIGH + 3 项当场修复（add_swipe max+1 修碰撞 / content 跟随激活候选 / regenerate bump updated_at / delete 回落 content 同步；F-98 落债）| 全量双端绿零回归（Vitest 1213 零改动）| doc_sync 零漂移
 **非阻断落债：** 无
