@@ -223,13 +223,21 @@ export function characterCardHtml(c) {
  * @param {object} c - 对话对象（id/title/message_count/model_name/model_provider）
  * @param {object} [opts]
  * @param {number|null} [opts.activeId=null] - 活动 tab 的会话 id（匹配则高亮）
+ * @param {{title: string, preview: (string|null)}} [opts.branchSource=null] -
+ *   分支来源（F-100 能力 2）：`title` 为已解析的父标题（父已删回落 branch_title），
+ *   `preview` 为锚消息截断预览；null（普通会话）不渲染标记
  * @returns {string} 对话列表项 HTML
  */
-export function conversationItemHtml(c, { activeId = null } = {}) {
+export function conversationItemHtml(c, { activeId = null, branchSource = null } = {}) {
+    // F-100 能力 2：分支派生会话标注来源（父标题 + 锚预览），普通会话不渲染
+    const branchMarker = branchSource
+        ? `<div class="branch-source">${iconHtml('gitBranch', { size: 12 })}<span class="branch-source-text">从「${escapeHtml(branchSource.title)}」分叉${branchSource.preview ? ` · ${escapeHtml(branchSource.preview)}` : ''}</span></div>`
+        : '';
     return `
         <div class="conversation-item ${c.id === activeId ? 'active' : ''}"
              data-id="${c.id}">
             <div class="title">${escapeHtml(c.title)}</div>
+            ${branchMarker}
             <div class="meta">${c.message_count} 条消息 · ${escapeHtml(c.model_name || c.model_provider)}</div>
             <button class="btn-icon btn-delete-conv" title="删除对话">${iconHtml('x', { size: 14 })}</button>
         </div>

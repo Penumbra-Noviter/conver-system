@@ -304,6 +304,27 @@ export async function loadConversations() {
 }
 
 /**
+ * 解析分支来源显示数据（F-100 能力 2：会话列表分支来源标记）
+ *
+ * 父标题按 parent_conversation_id 客户端关联同一次 list() 返回的
+ * state.conversations；父已删（parent 置 NULL）回落只显 branch_title。
+ * 普通会话（无任何分支元数据）返回 null —— 不渲染分支标记。
+ *
+ * @param {object} conv - 会话对象（parent_conversation_id / branch_title / branch_from_message_preview）
+ * @param {Array} allConversations - 同一次列表返回的全部会话（父标题关联源）
+ * @returns {{title: string, preview: (string|null)}|null} 分支来源；普通会话为 null
+ */
+function resolveBranchSource(conv, allConversations) {
+    const parent = conv.parent_conversation_id != null
+        ? allConversations.find((p) => p.id === conv.parent_conversation_id)
+        : null;
+    const title = parent?.title ?? conv.branch_title ?? '';
+    const preview = conv.branch_from_message_preview ?? null;
+    if (!title && !preview) return null;
+    return { title, preview };
+}
+
+/**
  * 渲染对话列表（激活高亮按活动 tab 判定 — 单一事实来源）+ 打开/删除委托。
  * 供 activation / cascade / chat 钩子注入（renderConversations）。
  */
@@ -319,7 +340,10 @@ export function renderConversations() {
     const activeConvId = getActiveTab()?.conversationId ?? null;
 
     list.innerHTML = state.conversations
-        .map((c) => conversationItemHtml(c, { activeId: activeConvId }))
+        .map((c) => conversationItemHtml(c, {
+            activeId: activeConvId,
+            branchSource: resolveBranchSource(c, state.conversations),
+        }))
         .join('');
 
     list.querySelectorAll('.conversation-item').forEach((item) => {

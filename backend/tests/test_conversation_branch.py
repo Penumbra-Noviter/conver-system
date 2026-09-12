@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from backend.app.api.routes import conversations as conversations_route
 from backend.app.models.message import Message, MessageSwipe, Role
 from backend.app.schemas.branch import SNAPSHOT_VERSION, BranchSnapshot, BranchSnapshotMessage, BranchSnapshotSwipe
-from backend.app.schemas.conversation import ConversationCreate
+from backend.app.schemas.conversation import ConversationCreate, ConversationResponse
 from backend.app.schemas.lorebook import LorebookEntryCreate
 from backend.app.services import conversation as conversation_service
 from backend.app.services import conversation_export as export_service
@@ -443,3 +443,98 @@ class TestBranchRoutes:
             "第一轮问", "第一轮答", "第二轮问", "重写第二轮答",
         ]
         assert "attachment" in resp.headers.get("content-disposition", "")
+
+
+# ── 4. 列表分支来源标记（F-100 能力 2：后端最小暴露）──
+
+
+class TestListBranchProvenance:
+    """GET /api/conversations 列表带出分支元数据 + 锚消息截断预览（普通会话 None）"""
+
+    @staticmethod
+    def _branch_source(db: Session, anchor_content: str) -> tuple[object, int]:
+        """源会话（长锚消息）+ 派生分支，返回 (child, anchor_id)"""
+        char_id = _create_character(db)
+        conv = _create_conversation(db, character_id=char_id, title="雪夜")
+        ids = _add_messages(
+            db, conv.id,
+            ("user", "问"), ("assistant", anchor_content),
+        )
+        child = conversation_service.branch_from_message(db, conv.id, ids[1], title="雪夜分叉")
+        return child, ids[1]
+
+    @staticmethod
+    def _dumped(db: Session, conversation_id: int) -> dict:
+        """list_conversations 结果中指定会话的序列化字段（响应契约口径）"""
+        rows = conversation_service.list_conversations(db)
+        target = next(c for c in rows if c.id == conversation_id)
+        return ConversationResponse.model_validate(target).model_dump()
+
+    def test_list_branch_fields_serialized_and_preview_truncated(
+        self, db_session: Session
+    ) -> None:
+        """分支会话带出 parent/branch_from_message_id/branch_title + 锚预览（>60 截断）"""
+        child, anchor_id = self._branch_source(
+            db_session, "雪夜里的一封长信，字字句句都是分叉的起点，" * 5
+        )
+
+        dumped = self._dumped(db_session, child.id)
+
+        assert dumped["parent_conversation_id"] is not None
+        assert dumped["parent_conversation_id"] != child.id  # 父 ≠ 子
+        assert dumped["branch_from_message_id"] == anchor_id
+        assert dumped["branch_title"] == "雪夜分叉"
+        preview = dumped["branch_from_message_preview"]
+        assert preview is not None
+        assert preview.startswith("雪夜里的一封长信")
+        assert len(preview) == 61  # 60 字符 + 「…」
+
+    def test_list_normal_conversation_branch_fields_none(
+        self, db_session: Session
+    ) -> None:
+        """普通会话四字段均为 None（序列化契约：不渲染分支标记的依据）"""
+        char_id = _create_character(db_session)
+        conv = _create_conversation(db_session, character_id=char_id, title="普通对话")
+        _add_messages(db_session, conv.id, ("user", "问"), ("assistant", "答"))
+
+        dumped = self._dumped(db_session, conv.id)
+
+        assert dumped["parent_conversation_id"] is None
+        assert dumped["branch_from_message_id"] is None
+        assert dumped["branch_title"] is None
+        assert dumped["branch_from_message_preview"] is None
+
+    def test_list_short_anchor_preview_no_ellipsis(self, db_session: Session) -> None:
+        """短锚消息（≤60 字符）预览不追加省略号、空白折叠为单空格"""
+        child, _ = self._branch_source(db_session, "  短锚  消息  ")
+
+        dumped = self._dumped(db_session, child.id)
+
+        assert dumped["branch_from_message_preview"] == "短锚 消息"
+
+    def test_list_whitespace_anchor_preview_none(self, db_session: Session) -> None:
+        """纯空白锚消息内容 → 预览 None（不渲染无意义标记；分支元数据仍带出）"""
+        child, _ = self._branch_source(db_session, "  \n  ")
+
+        dumped = self._dumped(db_session, child.id)
+
+        assert dumped["branch_from_message_preview"] is None
+        assert dumped["branch_title"] == "雪夜分叉"
+        assert dumped["parent_conversation_id"] is not None
+
+    def test_list_parent_deleted_fallback_data_intact(self, db_session: Session) -> None:
+        """父已删：branch_title 保留（前端回落显示名），parent/锚/预览置 None"""
+        char_id = _create_character(db_session)
+        parent = _create_conversation(db_session, character_id=char_id, title="雪夜")
+        ids = _add_messages(db_session, parent.id, ("user", "问"), ("assistant", "长锚消息"))
+        child = conversation_service.branch_from_message(
+            db_session, parent.id, ids[1], title="雪夜分叉"
+        )
+
+        conversation_service.delete_conversation(db_session, parent.id)
+
+        dumped = self._dumped(db_session, child.id)
+        assert dumped["parent_conversation_id"] is None
+        assert dumped["branch_from_message_id"] is None
+        assert dumped["branch_title"] == "雪夜分叉"
+        assert dumped["branch_from_message_preview"] is None

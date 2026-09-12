@@ -529,3 +529,72 @@ describe('list-views Mod 按钮委托 — MD-2/04', () => {
         expect(spy).toHaveBeenCalledWith({ characterId: 1, characterName: '角色A' });
     });
 });
+
+describe('list-views 会话列表分支来源标记 — F-100 能力 2', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    const branchConv = (id, extra) => ({
+        id,
+        title: '雪夜分叉',
+        message_count: 2,
+        model_name: 'claude-sonnet-5',
+        model_provider: 'claude',
+        ...extra,
+    });
+
+    it('分支会话渲染来源标记：父标题（客户端关联 state.conversations）+ 锚预览', async () => {
+        await loadModules(makeRoute({
+            conversations: [
+                { id: 1, title: '雪夜', message_count: 4, model_name: 'claude-sonnet-5', model_provider: 'claude' },
+                branchConv(2, {
+                    parent_conversation_id: 1,
+                    branch_from_message_id: 10,
+                    branch_title: '雪夜分叉',
+                    branch_from_message_preview: '那一夜，风雪未停，她转身',
+                }),
+            ],
+        }));
+
+        const item = document.querySelector('#conversation-list .conversation-item[data-id="2"]');
+        expect(item).not.toBeNull();
+        expect(item.querySelector('.branch-source')).not.toBeNull();
+        expect(item.querySelector('.branch-source').querySelector('[data-icon="gitBranch"]')).not.toBeNull();
+        const text = item.querySelector('.branch-source-text').textContent;
+        // 父标题来自客户端关联（父 id=1 的标题「雪夜」），而非分支自身的 branch_title
+        expect(text).toContain('从「雪夜」分叉');
+        expect(text).toContain('那一夜，风雪未停，她转身');
+    });
+
+    it('父已删（parent 置 NULL）→ 回落只显 branch_title（无锚预览）', async () => {
+        await loadModules(makeRoute({
+            conversations: [
+                branchConv(2, {
+                    parent_conversation_id: null,
+                    branch_from_message_id: null,
+                    branch_title: '雪夜分叉',
+                    branch_from_message_preview: null,
+                }),
+            ],
+        }));
+
+        const item = document.querySelector('#conversation-list .conversation-item[data-id="2"]');
+        expect(item.querySelector('.branch-source')).not.toBeNull();
+        const text = item.querySelector('.branch-source-text').textContent;
+        // 回落 branch_title（「雪夜分叉」），不渲染锚预览分隔符
+        expect(text).toContain('从「雪夜分叉」分叉');
+        expect(text).not.toContain('·');
+    });
+
+    it('普通会话不渲染分支标记（零回归）', async () => {
+        await loadModules(makeRoute({
+            conversations: [
+                { id: 1, title: '普通对话', message_count: 3, model_name: 'claude-sonnet-5', model_provider: 'claude' },
+            ],
+        }));
+
+        const item = document.querySelector('#conversation-list .conversation-item[data-id="1"]');
+        expect(item).not.toBeNull();
+        expect(item.querySelector('.branch-source')).toBeNull();
+    });
+});
