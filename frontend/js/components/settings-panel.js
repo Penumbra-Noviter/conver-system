@@ -15,7 +15,7 @@
  */
 
 import { state } from '../state.js';
-import { settings, conversations } from '../api.js';
+import { settings, conversations, images } from '../api.js';
 import { showAlert, showConfirm } from './confirm-dialog.js';
 import { escapeHtml } from '../utils.js';
 import { beginButtonLoading } from './loading-button.js';
@@ -231,6 +231,9 @@ export async function loadSettings() {
             updateThemeToggleIcon(s.theme_mode || 'dark');
         }
         if (s.user_name) $('#setting-user-name').value = s.user_name;
+        // MD-3 图片生成后端（生图能力门控设置回填）
+        if (s.image_provider) $('#setting-image-provider').value = s.image_provider;
+        if (s.image_base_url) $('#setting-image-url').value = s.image_base_url;
         // WL-5 记忆宫殿开关（'1'/'true' → 勾选）
         const memoryPalace = $('#setting-memory-palace');
         if (memoryPalace) {
@@ -400,6 +403,9 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
             user_name: userNameInput.value,
             // WL-5 记忆宫殿开关
             memory_palace_enabled: ($('#setting-memory-palace')?.checked) ? '1' : '0',
+            // MD-3 图片生成后端
+            image_provider: $('#setting-image-provider')?.value ?? '',
+            image_base_url: $('#setting-image-url')?.value ?? '',
         };
 
         const btn = $('#btn-save-settings');
@@ -421,6 +427,13 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
                 const creds = await settings.credentials();
                 state.credentialsProtocol = creds?.protocol ?? null;
             } catch { /* 刷新失败 → 保持旧协议值，下次 init/保存再刷新 */ }
+            // MD-3 刷新生图能力：保存后出图后端可能已配置/变更 → 重查 + 门控按钮
+            try {
+                const avail = await images.available();
+                state.imageGenerationAvailable = avail?.available === true;
+            } catch { /* 刷新失败 → 保持旧值 */ }
+            const genBtn = $('#btn-gen-image');
+            if (genBtn) genBtn.hidden = state.imageGenerationAvailable !== true;
             // 应用主题
             applyTheme(data.theme_mode || 'auto');
             updateThemeToggleIcon(data.theme_mode || 'dark');

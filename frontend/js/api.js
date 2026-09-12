@@ -302,6 +302,11 @@ export const images = {
      * @returns {Promise<Array<{cg_id, url, group_name, message_content, message_created_at}>>}
      */
     cgTimeline: (characterId) => request('GET', `/characters/${characterId}/cg-timeline`),
+    /**
+     * 生图能力门控（MD-3）——GET /api/images/available
+     * @returns {Promise<{available: boolean}>}
+     */
+    available: () => request('GET', '/images/available'),
 };
 
 /**

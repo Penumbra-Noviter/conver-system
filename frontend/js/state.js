@@ -29,6 +29,9 @@ export const state = {
     // 凭证协议（T1 首启引导判定依据；app.js init 检测后缓存 —
     // 'openai' | 'claude' | 'none'；未检测/检测失败为 null）
     credentialsProtocol: null,
+    // 生图能力（MD-3）：是否配置了可用的生图后端；app.js init 检测后缓存
+    // （未检测/检测失败为 null → 出图按钮默认隐藏，保守不出占位图）
+    imageGenerationAvailable: null,
 };
 
 // ══════════════════════════════════════════════════

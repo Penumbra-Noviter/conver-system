@@ -41,6 +41,8 @@ __all__ = [
     "memory_palace_enabled",
     "memory_palace_every_rounds",
     "memory_palace_char_threshold",
+    "image_provider",
+    "image_base_url",
 ]
 
 # 允许前端读写的配置键白名单
@@ -59,6 +61,9 @@ ALLOWED_KEYS = {
     "memory_palace_enabled",
     "memory_palace_every_rounds",
     "memory_palace_char_threshold",
+    # MD-3 图片生成后端（生图能力门控依据：provider + base_url）
+    "image_provider",
+    "image_base_url",
 }
 
 # Provider 协议元数据（协议映射 / openai 协议族模型集）单一来源位于
@@ -236,3 +241,13 @@ def memory_palace_every_rounds(db: Session) -> int:
 def memory_palace_char_threshold(db: Session) -> int:
     """记忆字符数阈值（参考对标站 10000）"""
     return get_int(db, "memory_palace_char_threshold", default=10000)
+
+
+def image_provider(db: Session) -> str:
+    """图片生成后端标识（空串 = 未配置；MD-3）"""
+    return get_value(db, "image_provider")
+
+
+def image_base_url(db: Session) -> str:
+    """图片生成后端端点地址（HTTP 类后端必需；空串 = 未配置；MD-3）"""
+    return get_value(db, "image_base_url")

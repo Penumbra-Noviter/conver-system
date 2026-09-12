@@ -127,3 +127,21 @@ describe('CG-3 出图轮询', () => {
         expect(tabs.getTab(11).messages).toEqual(msgs);
     });
 });
+
+describe('MD-3 生图能力门控', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('未配置生图后端（available !== true）→ generateImage no-op（不弹 modal、不提交）', async () => {
+        const { chat, tabs, state, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [{ id: 1, role: 'user', content: '你好' }] });
+        state.imageGenerationAvailable = false;
+        const submitSpy = vi.spyOn(api.images, 'submitTask');
+
+        await chat.generateImage();
+
+        expect(submitSpy).not.toHaveBeenCalled();
+        expect(document.querySelector('.modal-overlay')).toBeNull(); // 不弹描述输入框
+    });
+});

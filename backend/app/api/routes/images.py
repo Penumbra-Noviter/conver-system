@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
 from backend.app.schemas.image_task import CgTimelineItem, ImageTaskCreate, ImageTaskResponse
 from backend.app.services import conversation as conversation_service
 from backend.app.services import gallery as gallery_service
+from backend.app.services import setting as setting_service
 from backend.app.services.image import tasks as tasks_service
 
 router = APIRouter(tags=["图片"])
@@ -45,8 +46,14 @@ async def submit_image_task(
     """提交图片生成任务（对话内出图：prompt → 后台生成 → 完成挂 CG）
 
     出图锚 message_id 可选（缺省 None → 会话级 CG，不挂具体消息）；后台
-    异步执行（失败落 failed 态，不破坏对话）。character_id 由会话派生。
+    异步执行（失败落 failed 态，不破坏对话）。character_id 由会话派生；
+    provider 从 settings（image_provider）解析（MD-3），未配置生图后端 → 400。
     """
+    if not tasks_service.image_generation_available(db):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="未配置图片生成后端，请先在设置中配置生图服务",
+        )
     conv = conversation_service.require_conversation(db, body.conversation_id)
     task = tasks_service.create_image_task(
         db,
@@ -57,11 +64,17 @@ async def submit_image_task(
         width=body.width,
         height=body.height,
         steps=body.steps,
-        provider=body.provider,
+        provider=setting_service.image_provider(db),
         message_id=body.message_id,
     )
     asyncio.create_task(_background_run(task.id))
     return ImageTaskResponse.model_validate(task)
+
+
+@router.get("/api/images/available")
+def image_available(db: Session = Depends(get_db)) -> dict[str, bool]:
+    """生图能力门控（MD-3）：是否配置了可用的生图后端（前端据此控制出图按钮）"""
+    return {"available": tasks_service.image_generation_available(db)}
 
 
 @router.get("/api/images/tasks/{task_id}", response_model=ImageTaskResponse)

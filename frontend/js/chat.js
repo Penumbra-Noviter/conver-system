@@ -946,6 +946,8 @@ const CG_POLL_MAX_ATTEMPTS = 90;
 export async function generateImage() {
     const tab = getActiveTab();
     if (!tab || tab.isStreaming) return;
+    // MD-3 生图能力门控（防御兜底）：未配置生图后端 → no-op（按钮通常已隐藏）
+    if (state.imageGenerationAvailable !== true) return;
     const convId = tab.conversationId;
     if (cgInFlight.has(convId)) return;
 

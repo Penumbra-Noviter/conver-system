@@ -598,8 +598,8 @@ GET /api/conversations/{conversation_id}/snapshot
 POST /api/images/tasks
 ```
 
-对话内出图：prompt → 后台异步生成 → 完成挂 CG（会话/锚消息归属）。缺省 provider=local
-（零配置占位后端）；HTTP 后端（a1111/custom-http）需后续 settings 接线提供 base_url。
+对话内出图：prompt → 后台异步生成 → 完成挂 CG（会话/锚消息归属）。**provider 由
+settings（image_provider）解析，非请求体**（MD-3）；未配置生图后端 → 400 明确拒绝。
 
 **请求体**
 ```json
@@ -613,8 +613,20 @@ POST /api/images/tasks
 
 | 场景 | HTTP | detail 示例 |
 |------|------|------------|
+| 未配置生图后端 | 400 | 未配置图片生成后端，请先在设置中配置生图服务 |
 | conversation 不存在 | 404 | 对话不存在 |
 | message_id 不属于该会话 | 404 | 消息不存在: {id} |
+
+### 生图能力门控
+
+```
+GET /api/images/available
+```
+
+是否配置了可用的生图后端（前端据此控制「生成图片」按钮显隐；判定单源
+`image_generation_available`：未配置 / local 占位 → False；HTTP 类需 base_url）。
+
+**响应** `200` — `{ "available": true | false }`
 
 ### 轮询任务状态
 

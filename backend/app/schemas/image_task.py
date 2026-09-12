@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field
 class ImageTaskCreate(BaseModel):
     """提交图片生成任务请求体（POST /api/images/tasks）
 
-    provider 缺省 "local"（零配置占位后端，链路可用）；生成参数对齐
-    ImageGenParams（prompt/negative_prompt/width/height/steps）。
+    provider 不再由请求体指定——从 settings（image_provider）解析（MD-3）；
+    生成参数对齐 ImageGenParams（prompt/negative_prompt/width/height/steps）。
     message_id 为出图锚消息（缺省 None → 会话级 CG，不挂具体消息）。
     """
     conversation_id: int = Field(..., description="产出会话")
@@ -22,7 +22,6 @@ class ImageTaskCreate(BaseModel):
     width: int = Field(512, ge=32, le=2048, description="图片宽")
     height: int = Field(512, ge=32, le=2048, description="图片高")
     steps: int = Field(20, ge=1, le=150, description="采样步数")
-    provider: str = Field("local", description="图片 Provider 标识")
     message_id: int | None = Field(None, description="出图锚消息 id（可选）")
 
 

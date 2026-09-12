@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2351<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1043<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1238<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2359<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1050<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1239<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -587,7 +587,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/gallery.py:pick_cg_by_weight-->`pick_cg_by_weight(candidates, *, rng=None)`<!--/AUTO--> | 加权抽选（空/总权重 0 → None；同种子顺序无关可复现） |
 | <!--AUTO:sig:backend/app/services/gallery.py:cg_timeline-->`cg_timeline(db, character_id)`<!--/AUTO--> | 剧情回顾时间线（CG-3：已解锁 CG + 消息片段，消息 created_at 升序 + 同消息入库序） |
 
-### 4.21.10 `backend/app/services/image/tasks.py` — 图片任务（CG-3）（<!--AUTO:lines:backend/app/services/image/tasks.py-->~134 行<!--/AUTO-->）
+### 4.21.10 `backend/app/services/image/tasks.py` — 图片任务（CG-3）（<!--AUTO:lines:backend/app/services/image/tasks.py-->~167 行<!--/AUTO-->）
 
 **职责**：对话内出图任务服务——提交（pending）→ 后台 run（running → resolve_image → generate → 成功 gallery.add_cg + succeeded / 失败 failed + error）。**失败不破坏对话**：任何异常吞并落 failed 态、不外抛；run 核心逻辑 session 注入（路由后台包装负责 SessionLocal 生命周期）。
 
@@ -595,9 +595,10 @@ conver system/
 |------|------|
 | <!--AUTO:sig:backend/app/services/image/tasks.py:create_image_task-->`create_image_task(db, *, conversation_id, character_id, prompt, negative_prompt='', width=512, height=512, steps=20, provider='local', message_id=None)`<!--/AUTO--> | 提交任务（pending；会话/锚消息归属 404 守卫） |
 | <!--AUTO:sig:backend/app/services/image/tasks.py:get_image_task-->`get_image_task(db, task_id)`<!--/AUTO--> | 轮询（未知 → ImageTaskNotFoundError 404） |
-| <!--AUTO:sig:backend/app/services/image/tasks.py:run_image_task-->`run_image_task(task_id, db)`<!--/AUTO--> | 后台执行核心（session 注入；失败落 failed 不外抛） |
+| <!--AUTO:sig:backend/app/services/image/tasks.py:run_image_task-->`run_image_task(task_id, db)`<!--/AUTO--> | 后台执行核心（session 注入；失败落 failed 不外抛；base_url 读 settings） |
+| <!--AUTO:sig:backend/app/services/image/tasks.py:image_generation_available-->`image_generation_available(db)`<!--/AUTO--> | 生图能力门控单源（MD-3：未配置/local 占位 → False；HTTP 类需 base_url） |
 
-### 4.21.11 `backend/app/api/routes/images.py` — 出图/CG 回顾路由（CG-3）（<!--AUTO:lines:backend/app/api/routes/images.py-->~65 行<!--/AUTO-->）
+### 4.21.11 `backend/app/api/routes/images.py` — 出图/CG 回顾路由（CG-3）（<!--AUTO:lines:backend/app/api/routes/images.py-->~76 行<!--/AUTO-->）
 
 **职责**：POST /api/images/tasks（提交 + 后台 asyncio 执行）/ GET /api/images/tasks/{id}（轮询三态）/ GET /api/characters/{id}/cg-timeline（剧情回顾时间线）。/cg 静态挂载在 main.py（图片文件加载）。
 
@@ -607,7 +608,7 @@ conver system/
 
 > 无公开函数（数据表 + 派生逻辑）。
 
-### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~188 行<!--/AUTO-->）
+### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~199 行<!--/AUTO-->）
 
 **职责**：DB settings 表读写——凭证槽位（按 Provider 存取 Key/base_url）、滑窗轮数、用户名、默认模型；凭证通用解析（填任一 key 全局可用）。
 
@@ -723,7 +724,7 @@ conver system/
 | <!--AUTO:sig:backend/scripts/migrate_data.py:migrate-->`migrate(source, target, force=False)`<!--/AUTO--> | 执行迁移（幂等 + 标记） |
 | <!--AUTO:sig:backend/scripts/migrate_data.py:main-->`main(argv=None)`<!--/AUTO--> | CLI 入口 |
 
-### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~342 行<!--/AUTO-->）
+### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~347 行<!--/AUTO-->）
 
 **职责**：Fetch 封装——超时守卫（AbortController + 15s 兜底，TD-51/55/72）、错误归一化、SSE 流式、Blob 下载（Content-Disposition 文件名解析）。T6 重生成：`conversations.regenerate(id, { message_id? })` 封装 `POST /api/conversations/{id}/regenerate`（缺省末条 assistant），客户端错误处理与 `messages.chat` 同走 `request` 错误通道。
 
@@ -739,7 +740,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~406 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~423 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）、T1 凭证协议检测（init 数据加载序列后调 `settings.credentials()`，结果缓存到 `state.credentialsProtocol` 供引导卡判定）。
 
@@ -758,7 +759,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~1069 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~1071 行<!--/AUTO-->）
 
 **职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名、T3 对话内模型切换（openModelSwitch）、T6 末条 AI 回复重生成（regenerateLastReply → conversations.regenerate → settleTurn 重载，在途守卫与 handleSend 非流式共用）。T2 搜索定位：`renderMessages({ messageId })` 在消息加载/渲染后把目标气泡 `scrollIntoView({block:'center'})` 定位到视口中央 + 应用 `.search-highlight` 高亮约 3s 自动清除（`locateAndHighlight`），并与既有 `scrollToBottom` 互斥（定位不被滚动到底覆盖）。
 
@@ -880,7 +881,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/components/model-selector.js:showModelSelector-->`showModelSelector(characterName, options = {})`<!--/AUTO--> | 打开模型选择（options：`{ preselected, title }`；缺省创建对话语义） |
 
-### 4.44 `frontend/js/components/settings-panel.js` — 设置面板（<!--AUTO:lines:frontend/js/components/settings-panel.js-->~431 行<!--/AUTO-->）
+### 4.44 `frontend/js/components/settings-panel.js` — 设置面板（<!--AUTO:lines:frontend/js/components/settings-panel.js-->~444 行<!--/AUTO-->）
 
 **职责**：设置面板——Provider 下拉初始化、模型联动、凭证测试（testApiKeys）、主题切换、侧栏开关、清空会话接线。
 
@@ -1109,7 +1110,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/simulators.js:renderError-->`renderError(reason)`<!--/AUTO--> | 错误态渲染 |
 | <!--AUTO:sig:frontend/js/simulators.js:reprobeAllImported-->`reprobeAllImported()`<!--/AUTO--> | 全量重新识别本地导入（POST 逐个 → 汇总 → 刷新） |
 
-### 4.58 `frontend/js/state.js` — 全局状态（<!--AUTO:lines:frontend/js/state.js-->~36 行<!--/AUTO-->）
+### 4.58 `frontend/js/state.js` — 全局状态（<!--AUTO:lines:frontend/js/state.js-->~39 行<!--/AUTO-->）
 
 **职责**：全局 DOM 引用缓存（P6.5 后字段退役，仅存 DOM 句柄）。T1：`state.credentialsProtocol`（凭证协议缓存，app.js init 检测后写入，供首启引导卡判定）。
 
@@ -1407,7 +1408,7 @@ conver system/
 | `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->18<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
 | `backend/tests/test_image_provider.py` | <!--AUTO:tests:backend/tests/test_image_provider.py-->22<!--/AUTO--> | 图片 Provider 契约锁（CG-1：注册表派生/缺 Key 401/畸形响应/超时 504/连接 502/A1111 happy path 落盘/本地占位确定性/映射矩阵） |
 | `backend/tests/test_gallery.py` | <!--AUTO:tests:backend/tests/test_gallery.py-->24<!--/AUTO--> | CG 资产库契约锁（CG-2：入库去重同作品同 url/解锁幂等/加权抽选同种子顺序无关与分布/SET NULL 会话删图留/CASCADE 作品删图清/404 守卫） |
-| `backend/tests/test_image_tasks.py` | <!--AUTO:tests:backend/tests/test_image_tasks.py-->13<!--/AUTO--> | 图片任务契约锁（CG-3：提交/轮询 404/run 成功出图入资产库/失败不破坏对话/时间线排序/路由） |
+| `backend/tests/test_image_tasks.py` | <!--AUTO:tests:backend/tests/test_image_tasks.py-->20<!--/AUTO--> | 图片任务契约锁（CG-3：提交/轮询 404/run 成功出图入资产库/失败不破坏对话/时间线排序/路由 + MD-3 能力门控矩阵/提交 400/available） |
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->20<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
 | `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->19<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
@@ -1455,7 +1456,7 @@ conver system/
 | `frontend/tests/chat.test.js` |
 | `frontend/tests/chat-swipes.test.js` | <!--AUTO:tests:frontend/tests/chat-swipes.test.js-->7<!--/AUTO--> | swipes 候选控制条契约锁（MS-2：计数渲染/单选不渲染/切换调用参数/边界不越界/失败回滚） | <!--AUTO:tests:frontend/tests/chat.test.js-->90<!--/AUTO--> | 对话视图 |
 | `frontend/tests/cg-review.test.js` | <!--AUTO:tests:frontend/tests/cg-review.test.js-->7<!--/AUTO--> | 剧情回顾视图契约锁（CG-3：cgImageUrl 本地路径映射 /cg/时间线三态/内容转义/失败空态） |
-| `frontend/tests/cg-generate.test.js` | <!--AUTO:tests:frontend/tests/cg-generate.test.js-->6<!--/AUTO--> | 出图三态契约锁（CG-3：生成中 10-30s 提示/成功 img/失败 error-bar seam 不破坏对话/会话隔离） |
+| `frontend/tests/cg-generate.test.js` | <!--AUTO:tests:frontend/tests/cg-generate.test.js-->7<!--/AUTO--> | 出图三态契约锁（CG-3：生成中 10-30s 提示/成功 img/失败 error-bar seam 不破坏对话/会话隔离） |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->16<!--/AUTO--> | 会话激活 |
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
@@ -1538,10 +1539,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2351<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2359<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1043<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1238<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1050<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1239<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

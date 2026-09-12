@@ -284,6 +284,23 @@
                 </div>
 
                 <div class="settings-group">
+                    <h3>图片生成（出图）</h3>
+                    <div class="form-field">
+                        <label for="setting-image-provider">生图后端</label>
+                        <select id="setting-image-provider">
+                            <option value="">未配置（禁用出图）</option>
+                            <option value="a1111">A1111 兼容（Stable Diffusion WebUI）</option>
+                            <option value="custom-http">自定义 HTTP 端点</option>
+                        </select>
+                        <p class="settings-hint">对话内「生成图片」仅在配置可用后端后启用；本地占位后端仅用于开发测试。</p>
+                    </div>
+                    <div class="form-field" id="image-url-field">
+                        <label for="setting-image-url">生图端点地址</label>
+                        <input type="url" id="setting-image-url" placeholder="http://127.0.0.1:7860（A1111 面板地址）">
+                    </div>
+                </div>
+
+                <div class="settings-group">
                     <h3>对话</h3>
                     <div class="form-field">
                         <label for="setting-sliding-window">上下文保留轮数</label>

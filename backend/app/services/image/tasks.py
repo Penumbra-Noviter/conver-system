@@ -20,15 +20,51 @@ from backend.app.models.conversation import Conversation
 from backend.app.models.image_task import ImageTask
 from backend.app.models.message import Message
 from backend.app.services import gallery as gallery_service
+from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import (
     ConversationNotFoundError,
     ImageTaskNotFoundError,
     MessageNotFoundError,
 )
 from backend.app.services.image.base import ImageGenParams
+from backend.app.services.image.model_data import image_provider_id
 from backend.app.services.image.resolver import resolve_image
 
-__all__ = ["create_image_task", "get_image_task", "run_image_task"]
+__all__ = [
+    "create_image_task",
+    "get_image_task",
+    "run_image_task",
+    "image_generation_available",
+]
+
+
+def image_generation_available(db: Session) -> bool:
+    """生图能力门控单一来源（MD-3）
+
+    判定（读 settings image_provider / image_base_url）：
+        - provider 未配置（空串）→ False
+        - provider = local（占位后端，仅开发/测试）→ False（生产不可用）
+        - provider 为 HTTP 类（a1111 / custom-http）→ base_url 非空才可用
+        - 未登记 provider → False
+
+    Args:
+        db: 数据库会话
+
+    Returns:
+        是否配置了可用的生图后端
+    """
+    provider = setting_service.image_provider(db)
+    if not provider:
+        return False
+    try:
+        protocol_id = image_provider_id(provider)
+    except KeyError:
+        return False
+    if protocol_id == "local":
+        return False  # 占位后端生产不可用
+    if protocol_id == "http":
+        return bool(setting_service.image_base_url(db))
+    return False
 
 
 def create_image_task(
@@ -134,7 +170,9 @@ async def run_image_task(task_id: int, db: Session) -> None:
 
     try:
         params = ImageGenParams(**json.loads(task.params))
-        _, backend = resolve_image(task.provider)
+        _, backend = resolve_image(
+            task.provider, base_url=setting_service.image_base_url(db)
+        )
         result = await backend.generate(params)
         gallery_service.add_cg(
             db,

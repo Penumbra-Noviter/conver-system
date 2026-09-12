@@ -30,6 +30,7 @@ from backend.app.schemas.image_task import ImageTaskCreate
 from backend.app.services import conversation as conversation_service
 from backend.app.services import gallery as gallery_service
 from backend.app.services import message as message_service
+from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import (
     ConversationNotFoundError,
     ImageTaskNotFoundError,
@@ -74,6 +75,11 @@ def _set_message_created_at(db: Session, message_id: int, dt) -> None:
     """显式设置消息 created_at（秒精度默认 now 会同时刻，排序测试须可控）"""
     db.query(Message).filter(Message.id == message_id).update({"created_at": dt})
     db.commit()
+
+
+def _configure_image_backend(db: Session, provider: str, base_url: str = "") -> None:
+    """写 settings 图片后端配置（MD-3）"""
+    setting_service.set_many(db, {"image_provider": provider, "image_base_url": base_url})
 
 
 def _create_task(
@@ -203,6 +209,39 @@ class TestRunImageTask:
         assert db_session.query(CgImage).count() == cg_count
 
 
+# ── 2.5 生图能力门控（MD-3）──
+
+
+class TestImageAvailability:
+    """image_generation_available 判定矩阵（门控单一来源）"""
+
+    def test_unconfigured_false(self, db_session: Session) -> None:
+        """未配置（空 provider）→ False"""
+        assert tasks_service.image_generation_available(db_session) is False
+
+    def test_local_placeholder_false(self, db_session: Session) -> None:
+        """local 占位后端生产不可用 → False"""
+        _configure_image_backend(db_session, "local")
+        assert tasks_service.image_generation_available(db_session) is False
+
+    def test_http_without_base_url_false(self, db_session: Session) -> None:
+        """HTTP 类后端无 base_url → False"""
+        _configure_image_backend(db_session, "a1111")
+        assert tasks_service.image_generation_available(db_session) is False
+
+    def test_http_with_base_url_true(self, db_session: Session) -> None:
+        """a1111 / custom-http + base_url → True"""
+        _configure_image_backend(db_session, "a1111", "http://127.0.0.1:7860")
+        assert tasks_service.image_generation_available(db_session) is True
+        _configure_image_backend(db_session, "custom-http", "http://127.0.0.1:9999")
+        assert tasks_service.image_generation_available(db_session) is True
+
+    def test_unknown_provider_false(self, db_session: Session) -> None:
+        """未登记 provider → False"""
+        _configure_image_backend(db_session, "nope", "http://x")
+        assert tasks_service.image_generation_available(db_session) is False
+
+
 # ── 3. 剧情回顾时间线排序 ──
 
 
@@ -257,14 +296,15 @@ class TestCgTimeline:
 
 
 class TestImageRoutes:
-    """POST /api/images/tasks、GET task、GET cg-timeline"""
+    """POST /api/images/tasks、GET task、GET cg-timeline、GET available"""
 
     async def test_submit_task_route(self, db_session: Session, monkeypatch: pytest.MonkeyPatch, cg_dir_tmp) -> None:
-        """POST /api/images/tasks：创建任务（后台注入 no-op，不碰真实 DB）"""
+        """POST /api/images/tasks：配置生图后端后创建任务（provider 从 settings 取，后台注入 no-op）"""
         async def _noop(task_id: int) -> None:
             pass
 
         monkeypatch.setattr(images_route, "_background_run", _noop)
+        _configure_image_backend(db_session, "a1111", "http://127.0.0.1:7860")
         char_id = _create_character(db_session)
         conv = _create_conversation(db_session, char_id)
 
@@ -275,7 +315,30 @@ class TestImageRoutes:
         assert resp.id is not None
         assert resp.status == "pending"
         assert resp.conversation_id == conv.id
-        assert db_session.query(ImageTask).count() == 1
+        task = db_session.query(ImageTask).one()
+        assert task.provider == "a1111"  # provider 来自 settings，非请求体
+
+    async def test_submit_without_backend_400(self, db_session: Session, monkeypatch: pytest.MonkeyPatch, cg_dir_tmp) -> None:
+        """核心契约（MD-3）：未配置生图后端 → 400 明确拒绝（不发任务）"""
+        from fastapi import HTTPException
+
+        char_id = _create_character(db_session)
+        conv = _create_conversation(db_session, char_id)
+
+        with pytest.raises(HTTPException) as exc:
+            await images_route.submit_image_task(
+                ImageTaskCreate(conversation_id=conv.id, prompt="一只猫"), db_session
+            )
+
+        assert exc.value.status_code == 400
+        assert "未配置图片生成后端" in exc.value.detail
+        assert db_session.query(ImageTask).count() == 0
+
+    async def test_available_route(self, db_session: Session, cg_dir_tmp) -> None:
+        """GET /api/images/available：反映生图后端配置态"""
+        assert images_route.image_available(db_session) == {"available": False}
+        _configure_image_backend(db_session, "a1111", "http://127.0.0.1:7860")
+        assert images_route.image_available(db_session) == {"available": True}
 
     async def test_get_task_route(self, db_session: Session, cg_dir_tmp) -> None:
         """GET /api/images/tasks/{id}：返回任务状态"""

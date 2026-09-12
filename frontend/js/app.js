@@ -37,7 +37,7 @@
  *   - ./components/ — 模态框相关组件（modal 工厂 / confirm / model-selector / export / character-form）
  */
 
-import { models, settings } from './api.js';
+import { models, settings, images } from './api.js';
 import { initSettingsPanel, loadSettings, initProviderDropdown } from './components/settings-panel.js';
 import { initTabBar } from './components/tab-bar.js';
 import { showError, autoResizeInput } from './utils.js';
@@ -185,6 +185,14 @@ chatDom.btnGenImage?.addEventListener('click', () => {
     generateImage();
 });
 
+// MD-3 生图能力门控：按 state.imageGenerationAvailable 显示/隐藏出图按钮
+// （未配置生图后端 → 隐藏；检测失败/null → 隐藏，保守不出占位图）。
+export function syncImageGenerationButton() {
+    const btn = chatDom.btnGenImage;
+    if (!btn) return;
+    btn.hidden = state.imageGenerationAvailable !== true;
+}
+
 // ══════════════════════════════════════════════════
 // 模型列表
 // ══════════════════════════════════════════════════
@@ -221,6 +229,17 @@ async function init() {
         console.error('加载凭证协议失败:', err);
         state.credentialsProtocol = null;
     }
+
+    // MD-3 生图能力检测（init 数据加载序列后）：结果缓存到 state.imageGenerationAvailable，
+    // 出图按钮据此显示/隐藏（未配置生图后端 → 隐藏，保守不出占位图）。
+    try {
+        const avail = await images.available();
+        state.imageGenerationAvailable = avail?.available === true;
+    } catch (err) {
+        console.error('加载生图能力失败:', err);
+        state.imageGenerationAvailable = false;
+    }
+    syncImageGenerationButton();
 
     // P6.5-4 恢复时序契约：conversations 加载完成后才 restore；
     // isValidId 以已加载列表判定（过滤已删会话）；恢复的 tab 一律非流式，
