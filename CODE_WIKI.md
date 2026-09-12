@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2473<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1113<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1290<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2487<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1113<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1304<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -764,7 +764,7 @@ conver system/
 | <!--AUTO:sig:backend/scripts/migrate_data.py:migrate-->`migrate(source, target, force=False)`<!--/AUTO--> | 执行迁移（幂等 + 标记） |
 | <!--AUTO:sig:backend/scripts/migrate_data.py:main-->`main(argv=None)`<!--/AUTO--> | CLI 入口 |
 
-### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~371 行<!--/AUTO-->）
+### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~391 行<!--/AUTO-->）
 
 **职责**：Fetch 封装——超时守卫（AbortController + 15s 兜底，TD-51/55/72）、错误归一化、SSE 流式、Blob 下载（Content-Disposition 文件名解析）。T6 重生成：`conversations.regenerate(id, { message_id? })` 封装 `POST /api/conversations/{id}/regenerate`（缺省末条 assistant），客户端错误处理与 `messages.chat` 同走 `request` 错误通道。
 
@@ -780,7 +780,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/api.js:requestBlob-->`requestBlob(path, { timeout } = {})`<!--/AUTO--> | Blob 下载请求 |
 | <!--AUTO:sig:frontend/js/api.js:chatStream-->`chatStream(data, { onToken, onDone, onError })`<!--/AUTO--> | SSE 流式对话（解析 + 回调） |
 
-### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~423 行<!--/AUTO-->）
+### 4.34 `frontend/js/app.js` — 应用编排（<!--AUTO:lines:frontend/js/app.js-->~426 行<!--/AUTO-->）
 
 **职责**：初始化接线（init）——视图切换、设置面板/搜索/模拟器装配、列表视图接线（list-views 注入）、T1 凭证协议检测（init 数据加载序列后调 `settings.credentials()`，结果缓存到 `state.credentialsProtocol` 供引导卡判定）。
 
@@ -799,7 +799,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~1071 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~1143 行<!--/AUTO-->）
 
 **职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名、T3 对话内模型切换（openModelSwitch）、T6 末条 AI 回复重生成（regenerateLastReply → conversations.regenerate → settleTurn 重载，在途守卫与 handleSend 非流式共用）。T2 搜索定位：`renderMessages({ messageId })` 在消息加载/渲染后把目标气泡 `scrollIntoView({block:'center'})` 定位到视口中央 + 应用 `.search-highlight` 高亮约 3s 自动清除（`locateAndHighlight`），并与既有 `scrollToBottom` 互斥（定位不被滚动到底覆盖）。
 
@@ -811,6 +811,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/chat.js:showThinkingIndicator-->`showThinkingIndicator(convId)`<!--/AUTO--> | 思考指示 |
 | <!--AUTO:sig:frontend/js/chat.js:handleSend-->`handleSend()`<!--/AUTO--> | 发送入口（流式/非流式） |
 | <!--AUTO:sig:frontend/js/chat.js:regenerateLastReply-->`regenerateLastReply()`<!--/AUTO--> | T6 末条 assistant 重生成（MVP 非流式 → settleTurn 重载；失败走错误条） |
+| <!--AUTO:sig:frontend/js/chat.js:branchLastReply-->`branchLastReply()`<!--/AUTO--> | F-100 末条 assistant 分支（POST branch → 刷新 + activateConversation 创建即打开） |
 | <!--AUTO:sig:frontend/js/chat.js:isActiveStream-->`isActiveStream()`<!--/AUTO--> | 是否有活跃流 |
 | <!--AUTO:sig:frontend/js/chat.js:renderChatHeader-->`renderChatHeader(conversationId)`<!--/AUTO--> | 会话头部渲染（含 T3 模型徽标按钮） |
 | <!--AUTO:sig:frontend/js/chat.js:syncChatHeaderTitle-->`syncChatHeaderTitle()`<!--/AUTO--> | 标题同步（tab 视图联动） |
@@ -1020,7 +1021,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/fetch-seam.js:setFetch-->`setFetch(fn)`<!--/AUTO--> | 注入 fetch 实现（测试用） |
 | <!--AUTO:sig:frontend/js/fetch-seam.js:doFetch-->`doFetch(...args)`<!--/AUTO--> | 统一 fetch 出口（超时守卫） |
 
-### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~245 行<!--/AUTO-->）
+### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~254 行<!--/AUTO-->）
 
 **职责**：展示 HTML 生成单源（ARC 展示契约）——消息气泡/角色卡片/会话项/搜索结果/头像/关键词高亮。T2 搜索定位：`messageBubbleHtml` 接受可选 `messageId` 选项 → 渲染 `data-message-id` 属性（供定位选择器消费）；`buildMessagesHtml` 透传 `m.id`。T6 重生成：`buildMessagesHtml` 的 `context.canRegenerate`（聊天域开关）为真且末条为已结算 assistant 时，该气泡经 `messageBubbleHtml` 渲染「重生成」操作按钮。
 
@@ -1036,7 +1037,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/format.js:assistantAvatarHtml-->`assistantAvatarHtml(characters, currentCharacterId)`<!--/AUTO--> | 助手头像 |
 | <!--AUTO:sig:frontend/js/format.js:userAvatarHtml-->`userAvatarHtml()`<!--/AUTO--> | 用户头像 |
 
-### 4.50 `frontend/js/icons.js` — 图标 seam（<!--AUTO:lines:frontend/js/icons.js-->~66 行<!--/AUTO-->）
+### 4.50 `frontend/js/icons.js` — 图标 seam（<!--AUTO:lines:frontend/js/icons.js-->~68 行<!--/AUTO-->）
 
 **职责**：动态模板/状态图标单源（OPT-1 图标协议收口）——`iconHtml` seam，禁止手写 emoji/SVG 碎片。
 
@@ -1521,7 +1522,7 @@ conver system/
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
 | `frontend/tests/chat.test.js` |
-| `frontend/tests/chat-swipes.test.js` | <!--AUTO:tests:frontend/tests/chat-swipes.test.js-->7<!--/AUTO--> | swipes 候选控制条契约锁（MS-2：计数渲染/单选不渲染/切换调用参数/边界不越界/失败回滚） | <!--AUTO:tests:frontend/tests/chat.test.js-->90<!--/AUTO--> | 对话视图 |
+| `frontend/tests/chat-swipes.test.js` | <!--AUTO:tests:frontend/tests/chat-swipes.test.js-->7<!--/AUTO--> | swipes 候选控制条契约锁（MS-2：计数渲染/单选不渲染/切换调用参数/边界不越界/失败回滚） | <!--AUTO:tests:frontend/tests/chat.test.js-->96<!--/AUTO--> | 对话视图 |
 | `frontend/tests/cg-review.test.js` | <!--AUTO:tests:frontend/tests/cg-review.test.js-->7<!--/AUTO--> | 剧情回顾视图契约锁（CG-3：cgImageUrl 本地路径映射 /cg/时间线三态/内容转义/失败空态） |
 | `frontend/tests/cg-generate.test.js` | <!--AUTO:tests:frontend/tests/cg-generate.test.js-->7<!--/AUTO--> | 出图三态契约锁（CG-3：生成中 10-30s 提示/成功 img/失败 error-bar seam 不破坏对话/会话隔离） |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
@@ -1529,7 +1530,7 @@ conver system/
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
 | `frontend/tests/error-bar.test.js` | <!--AUTO:tests:frontend/tests/error-bar.test.js-->20<!--/AUTO--> | 错误条渲染/交互/生命周期（T1） |
 | `frontend/tests/loading-button.test.js` | <!--AUTO:tests:frontend/tests/loading-button.test.js-->7<!--/AUTO--> | 按钮 loading 态工具 |
-| `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->50<!--/AUTO--> | 展示契约 |
+| `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->57<!--/AUTO--> | 展示契约 |
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->29<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->103<!--/AUTO--> | Key 注入/端点口径 |
@@ -1538,7 +1539,7 @@ conver system/
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
-| `frontend/tests/mod-codec.test.js` | <!--AUTO:tests:frontend/tests/mod-codec.test.js-->20<!--/AUTO--> | Mod codec 纯函数契约锁（F-103：三区域序列化/表单校验/payload 组装/排序交换/信封校验/导入容错，零 DOM） |
+| `frontend/tests/mod-codec.test.js` | <!--AUTO:tests:frontend/tests/mod-codec.test.js-->21<!--/AUTO--> | Mod codec 纯函数契约锁（F-103：三区域序列化/表单校验/payload 组装/排序交换/信封校验/导入容错，零 DOM） |
 | `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->26<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
 | `frontend/tests/save-key-meta.test.js` | <!--AUTO:tests:frontend/tests/save-key-meta.test.js-->25<!--/AUTO--> | 存档键契约 |
@@ -1608,10 +1609,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2473<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2487<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1113<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1290<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1304<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
