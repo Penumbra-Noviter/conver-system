@@ -6,6 +6,23 @@
 
 ---
 
+## 技术债候选区消费批次（2026-09-13 — F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波）
+
+- **来源**：用户指令「8 项消费」（F-99/F-100 既有 + F-101~F-106 新增）。预检逐项 git grep 复核后按强度拍板：Strong（F-99）必做；Worth exploring（F-100/F-102/F-103）做；Speculative（F-101/F-104/F-105）关（复核现状成立）；F-100 能力 3「模拟器存档开新对话」复核关闭（存档=游戏 localStorage 状态 ≠ BranchSnapshot 对话快照，不同构，语义不清）。plan-tickets 产出 spec v0.2 + 7 工单（原 8 张，删能力 3 的 08 票）；plan-tickets 复核发现两处修正——能力 2 需后端暴露（ConversationResponse 未序列化分支三列，主会话接受补全）；能力 3 映射未钉死（促成关闭）。
+- **交付**（7 工单 3 波，波 1 并行 3 / 波 2 并行 2 / 波 3 并行 2）：
+  - F-99（01）：`_prepare_messages` 多 system 全量合并（按序 \n\n 连接 + 空/空白过滤 + 无 system None），test_llm_shared「取末条」契约修订为「合并」——persona/scenario/世界书/PHI 在真实 Provider 下不再丢失。
+  - F-103（02）：提取 `frontend/js/mod-codec.js` 深模块（8 codec 纯函数迁入，零 DOM），字节等价 9/9 零行为变化证明。
+  - F-102（03+04）：后端 `reorder_character_mods` + `PUT /api/characters/{id}/mods/order` 单事务原子重排（空列表 400/归属不符 404/恰好覆盖校验）；前端 moveBinding 改单次 reorder，computeSortSwap 改产完整新序数组，setSortOrder 前端退役。
+  - F-106（05）：importModsFromEnvelope 补 Array.isArray 拒绝（mods:[[]] 不再落空名 Mod）。
+  - F-100 能力 1（06）：末条 assistant 气泡「分支」按钮（与重生成/继续同组 + nonStreamingInFlight 同源守卫）→ POST branch → 创建即打开；icons.js 加 gitBranch。
+  - F-100 能力 2（07）：ConversationResponse 扩 parent_conversation_id/branch_from_message_id/branch_title + list_conversations 带出锚消息截断预览；前端会话卡片渲染来源标记（父缺失回落 branch_title）。
+- **关键决策**：ModReorderError 波末迁回 exceptions.py 统一登记 + error_mapping 显式 400（工单 03 曾为守范围定义在 mods.py）；reorder 空列表 400 拒绝（防误清空）；codec 模块落 js 根（对齐 save-key-meta.js）；分支成功「创建即打开」（对齐 startChatWithCharacter activate 语义）。
+- **期末四轴（0 HIGH 阻断，安全红线 0 违例）**：1 MEDIUM 当场修（ddfe978 先红后绿）——branch_title 契约断裂：branchLastReply 不传 title 致能力 2「父缺失回落 branch_title」恒失效，修复=补传源会话标题（后端 falsy 兜底安全）+ 契约锁更新；Architecture 2 MEDIUM 落债 F-109（codec 声明名实不符）/F-110（发送类动作样板第 4 次复制）；LOW 落债 F-111（空来源标记空引号）+ 复核关闭 F-112（lax 强转）/F-113（strip 无守卫）/F-114（reorder 乐观假设，fail-closed 可接受）。
+- **验证链**：先红后绿（各工单契约锁，05 红灯证明测试灵敏）| pytest 1096+1skip→1117+1skip（+21）/ Vitest 1287→1311（+24）/ cargo 70 零改动 | 运行态冒烟（uvicorn：reorder 反转 200/空列表 400/混入他角色 404 全链路；分支端点因无真实 Key 由单元测试覆盖）| doc_sync + pool_cleanup_check 双钩子通过 | 处置记录按滚动规则保留最近 2 节（2026-08-27×4 + 2026-08-26 节由 git 历史承担）。
+- **非阻断落债**：F-109~F-111（候选区）+ F-112~F-114（复核关闭）；技术债候选区 8→3 项（净消 5，防膨胀合规）。
+
+---
+
 ## MD-2 Mod 管理 UI + 注入链集成（2026-09-12 — AI风月对标五批工单 MD 批收官）
 
 - **来源**：承接 MD-1（e047462，数据层 + apply_prompt_mods 纯函数）；MD 批收官，spec §MD-2。project-kickoff 全自动档，4 工单 3 波（01 后端路由 ∥ 02 注入链 → 03 库面板 → 04 挂载面板）。
