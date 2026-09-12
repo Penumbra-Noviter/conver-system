@@ -19,6 +19,7 @@ export default defineConfig({
                 'js/components/settings-panel.js',
                 'js/components/model-selector.js',
                 'js/components/character-submit.js',
+                'js/components/mod-manager.js', // MD-2/03 Mod 库管理面板（per-file ≥90% 口径）
                 'js/simulators.js',
                 'js/simulator-view.js',
                 'js/key-injector.js',
