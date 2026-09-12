@@ -29,6 +29,7 @@ __all__ = [
     "ModAlreadyBoundError",
     "ModBindingNotFoundError",
     "ModNotFoundError",
+    "ModReorderError",
     "SwipeIndexError",
 ]
 
@@ -103,6 +104,10 @@ class ModBindingNotFoundError(DomainError):
 
 class ModAlreadyBoundError(DomainError):
     """Mod 已绑定（同角色同 Mod 重复挂载）"""
+
+
+class ModReorderError(DomainError):
+    """批量重排参数非法（空列表 / 重复 binding_id / 未恰好覆盖该角色全部绑定）"""
 
 
 class SwipeIndexError(DomainError):

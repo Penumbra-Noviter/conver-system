@@ -3,7 +3,8 @@ Mod 挂载层服务（MD-1，深模块）
 
 协议表面（__all__）：ModPayload / list_mods / create_mod / update_mod /
 delete_mod / bind_mod / unbind_mod / set_binding_enabled / set_binding_sort_order /
-list_character_mods / reorder_character_mods / apply_prompt_mods / ModReorderError。
+list_character_mods / reorder_character_mods / apply_prompt_mods（ModReorderError 在
+exceptions.py 统一登记，本模块不导出）。
 
 数据模型：mods（全局 Mod 库，目标区域 prompt|memory|css）+ mod_bindings（作品级
 挂载，(character_id, mod_id) 唯一 + sort_order + enabled 开关）。本模块只做存取
@@ -32,10 +33,10 @@ from backend.app.models.mods import Mod, ModBinding
 from backend.app.schemas.mods import ModCreate, ModUpdate
 from backend.app.services.exceptions import (
     CharacterNotFoundError,
-    DomainError,
     ModAlreadyBoundError,
     ModBindingNotFoundError,
     ModNotFoundError,
+    ModReorderError,
 )
 
 __all__ = [
@@ -51,22 +52,11 @@ __all__ = [
     "list_character_mods",
     "reorder_character_mods",
     "apply_prompt_mods",
-    "ModReorderError",
 ]
 
 #: prompt 区 payload 的三区域键（spec §MD-1 词汇）→ 注入块键（对齐
 #: lorebook_engine._POSITION_KEYS：world → system 世界知识块）
 _REGION_KEYS = (("world", "system"), ("before_char", "before_char"), ("after_char", "after_char"))
-
-
-class ModReorderError(DomainError):
-    """批量重排参数非法（空列表 / 重复 binding_id / 未恰好覆盖该角色全部绑定）
-
-    定义在本模块（而非 services/exceptions.py）以守住本工单文件范围：它落在
-    error_mapping.domain_error_response 的未知 DomainError 兜底分支 → HTTP 400
-    （该 fallback 恒把未显式登记的 DomainError 子类映射为 400，见 error_mapping
-    末尾 ``return 400, str(exc)``），故无需在 error_mapping 显式登记。
-    """
 
 
 @dataclass(frozen=True)

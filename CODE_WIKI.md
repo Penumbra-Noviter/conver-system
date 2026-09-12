@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2454<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1097<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1287<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2473<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1113<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1290<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -178,6 +178,7 @@ conver system/
 │   │   ├── key-injector.js         ← 模拟器 Key/模型注入（SIM-API-1）
 │   │   ├── list-views.js           ← 角色/对话列表视图深模块（C4）
 │   │   ├── markdown.js             ← Markdown 渲染（XSS 消毒）
+│   │   ├── mod-codec.js            ← Mod codec 纯函数（F-103：三区域序列化/信封校验/排序交换，零 DOM）
 │   │   ├── save-key-meta.js        ← 存档键契约单一来源（TD-67/68）
 │   │   ├── save-manager.js         ← 模拟器存档管理（导出/导入/删除）
 │   │   ├── search-view.js          ← 跨对话搜索视图
@@ -374,7 +375,7 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/lorebook.py:update_lorebook-->`update_lorebook(entry_id, payload, db)`<!--/AUTO--> | PUT 部分更新（条目不存在 404） |
 | <!--AUTO:sig:backend/app/api/routes/lorebook.py:delete_lorebook-->`delete_lorebook(entry_id, db)`<!--/AUTO--> | DELETE 删除条目（条目不存在 404；204） |
 
-### 4.11.7 `backend/app/api/routes/mods.py` — Mod 库与挂载路由（MD-2）（<!--AUTO:lines:backend/app/api/routes/mods.py-->~97 行<!--/AUTO-->）
+### 4.11.7 `backend/app/api/routes/mods.py` — Mod 库与挂载路由（MD-2）（<!--AUTO:lines:backend/app/api/routes/mods.py-->~109 行<!--/AUTO-->）
 
 **职责**：Mod 能力 HTTP 映射——Mod 库 CRUD（GET/POST/PUT/DELETE `/api/mods`）+ 角色挂载（GET/POST `/api/characters/{id}/mods`、PUT `/api/mod-bindings/{id}` 开关、PUT `/api/mod-bindings/{id}/sort` 排序、DELETE `/api/mod-bindings/{id}` 解绑）。只做 HTTP 映射：守卫（角色/Mod/绑定不存在、重复挂载）抛领域异常（统一 handler 转 404/400）；请求体校验由 Pydantic Schema 拦截（422）；增删改查全部委托 `backend/app/services/mods.py`。
 
@@ -506,7 +507,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/document_parser.py:_default_for-->`_default_for(field)`<!--/AUTO--> | 缺失字段兜底默认值 |
 | <!--AUTO:sig:backend/app/services/document_parser.py:_truncate-->`_truncate(msg, max_len)`<!--/AUTO--> | 错误消息截断 |
 
-### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~162 行<!--/AUTO-->）
+### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~163 行<!--/AUTO-->）
 
 **职责**：领域与 LLM 异常 → 标准错误响应结构（错误码/消息）单源（T-01 迁入 LLM 映射）。
 
@@ -515,7 +516,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/error_mapping.py:domain_error_response-->`domain_error_response(exc)`<!--/AUTO--> | 领域异常 → 响应 dict |
 | <!--AUTO:sig:backend/app/services/error_mapping.py:llm_error_response-->`llm_error_response(e, provider)`<!--/AUTO--> | LLM 异常 → (HTTP 状态码, 消息)（映射表单源） |
 
-### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~67 行<!--/AUTO-->）
+### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~70 行<!--/AUTO-->）
 
 **职责**：领域异常定义（404/409/422 类），供 service 层抛出、errors.py 统一处理。
 
@@ -623,7 +624,7 @@ conver system/
 
 **职责**：POST /api/images/tasks（提交 + 后台 asyncio 执行）/ GET /api/images/tasks/{id}（轮询三态）/ GET /api/characters/{id}/cg-timeline（剧情回顾时间线）。/cg 静态挂载在 main.py（图片文件加载）。
 
-### 4.21.12 `backend/app/services/mods.py` — Mod 挂载层（MD-1）（<!--AUTO:lines:backend/app/services/mods.py-->~285 行<!--/AUTO-->）
+### 4.21.12 `backend/app/services/mods.py` — Mod 挂载层（MD-1）（<!--AUTO:lines:backend/app/services/mods.py-->~336 行<!--/AUTO-->）
 
 **职责**：Mod 挂载层深模块——mods（全局 Mod 库，目标区域 prompt|memory|css）+ mod_bindings（作品级挂载，(character_id, mod_id) 唯一 + sort_order + enabled 开关）的存取，以及「prompt 区注入叠加」纯函数 apply_prompt_mods。生命周期由 DB FK 落实（删作品/删 Mod 级联删绑定）；`ModPayload` 为纯数据容器（与 ORM 解耦，`mod_id`/`target_area`/`payload`/`sort_order`/`enabled`）。apply_prompt_mods 零 DB：已启用 prompt 区 Mod 按 sort_order 升序（同序按 mod_id 稳定）叠加进 base_blocks（`system`/`before_char`/`after_char` 三块，与 build_world_injection 输出同构）；payload 为 JSON `{"world"/"before_char"/"after_char": str}`，`world` 注入 `system` 块（对齐 _POSITION_KEYS）；非 JSON/非 dict/区域非 str 容错跳过（不破坏对话）。
 
@@ -637,6 +638,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/mods.py:unbind_mod-->`unbind_mod(db, binding_id)`<!--/AUTO--> | 解绑（删除绑定行） |
 | <!--AUTO:sig:backend/app/services/mods.py:set_binding_enabled-->`set_binding_enabled(db, binding_id, enabled)`<!--/AUTO--> | 切换绑定开关（幂等） |
 | <!--AUTO:sig:backend/app/services/mods.py:set_binding_sort_order-->`set_binding_sort_order(db, binding_id, sort_order)`<!--/AUTO--> | 调整绑定排序（MD-2：单条幂等更新 sort_order） |
+| <!--AUTO:sig:backend/app/services/mods.py:reorder_character_mods-->`reorder_character_mods(db, character_id, ordered_binding_ids)`<!--/AUTO--> | 原子批量重排（F-102：单事务校验归属 + 逐条 sort_order=index；空列表/重复/未覆盖 → ModReorderError） |
 | <!--AUTO:sig:backend/app/services/mods.py:list_character_mods-->`list_character_mods(db, character_id)`<!--/AUTO--> | 角色已挂载绑定（sort_order 升序 + 同序 mod_id 稳定） |
 | <!--AUTO:sig:backend/app/services/mods.py:apply_prompt_mods-->`apply_prompt_mods(base_blocks, mods)`<!--/AUTO--> | prompt 三区域叠加纯函数（world→system / before_char / after_char，空列表零变化） |
 
@@ -664,7 +666,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/setting.py:default_model-->`default_model(db)`<!--/AUTO--> | 默认模型 |
 | <!--AUTO:sig:backend/app/services/setting.py:credentials-->`credentials(db)`<!--/AUTO--> | 全部凭证（只读端点用） |
 
-### 4.24 `backend/app/services/llm/base.py` — LLM 抽象基类（<!--AUTO:lines:backend/app/services/llm/base.py-->~90 行<!--/AUTO-->）
+### 4.24 `backend/app/services/llm/base.py` — LLM 抽象基类（<!--AUTO:lines:backend/app/services/llm/base.py-->~95 行<!--/AUTO-->）
 
 **职责**：`BaseLLM` 协议——generate/stream_generate/test_connection 骨架 + 错误翻译钩子（`_translate_error` 子类覆写）+ `_prepare_messages` 统一消息形态。
 
@@ -950,21 +952,14 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/lorebook-editor.js:addKeyChip-->`addKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 录入（去重/裁剪/空拒） |
 | <!--AUTO:sig:frontend/js/components/lorebook-editor.js:removeKeyChip-->`removeKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 删除 |
 
-### 4.44.2 `frontend/js/components/mod-manager.js` — Mod 管理面板（MD-2）（<!--AUTO:lines:frontend/js/components/mod-manager.js-->~639 行<!--/AUTO-->）
+### 4.44.2 `frontend/js/components/mod-manager.js` — Mod 管理面板（MD-2）（<!--AUTO:lines:frontend/js/components/mod-manager.js-->~475 行<!--/AUTO-->）
 
 **职责**：Mod 管理面板组件——`showModManager` 入口（复用 openModal 骨架）+ Mod 库区块（列表 id 升序 / 新建编辑表单 / target_area 下拉 prompt|memory|css / 导入导出 JSON 信封 `{"version":1,"mods":[...]}`）。prompt 区 payload 在 UI 呈现为「三区域文本框 world/before_char/after_char」并序列化为 JSON 字符串；memory/css 区为自由文本。导入导出纯前端（导出本地 Blob 下载镜像 save-manager 形态；导入逐条 `mods.create` 容错，source="imported"）。
 
 | 元素 | 说明 |
 |------|------|
 | <!--AUTO:sig:frontend/js/components/mod-manager.js:showModManager-->`showModManager({ characterId = null, characterName = '角色', onChanged } = {})`<!--/AUTO--> | 打开 Mod 管理面板（复用 openModal；标题含角色名；MD-2/04 扩展 characterId 入挂载区块） |
-| <!--AUTO:sig:frontend/js/components/mod-manager.js:buildModPayload-->`buildModPayload(form)`<!--/AUTO--> | 表单 → Mod payload（三区域序列化 + target_area 切换录入形态） |
-| <!--AUTO:sig:frontend/js/components/mod-manager.js:validateModForm-->`validateModForm(form)`<!--/AUTO--> | 表单校验（名称为空 / payload JSON 非法 → 内联错误） |
-| <!--AUTO:sig:frontend/js/components/mod-manager.js:serializePromptPayload-->`serializePromptPayload(world, beforeChar, afterChar)`<!--/AUTO--> | 三区域文本 → prompt 区 JSON 字符串 |
-| <!--AUTO:sig:frontend/js/components/mod-manager.js:parsePromptPayload-->`parsePromptPayload(payload)`<!--/AUTO--> | prompt 区 JSON → 三区域文本（容错） |
-| <!--AUTO:sig:frontend/js/components/mod-manager.js:buildExportEnvelope-->`buildExportEnvelope(modsList)`<!--/AUTO--> | Mod 库 → 导出信封 `{"version":1,"mods":[...]}` |
-| <!--AUTO:sig:frontend/js/components/mod-manager.js:parseImportEnvelope-->`parseImportEnvelope(text)`<!--/AUTO--> | 导入信封校验（非法 JSON/version 不符/mods 非数组 → 报错） |
 | <!--AUTO:sig:frontend/js/components/mod-manager.js:exportLibrary-->`exportLibrary(modsList)`<!--/AUTO--> | 导出下载（本地 Blob，镜像 save-manager downloadJson 形态） |
-| <!--AUTO:sig:frontend/js/components/mod-manager.js:computeSortSwap-->`computeSortSwap(bindings, index, direction)`<!--/AUTO--> | 上移/下移相邻交换 sort_order 纯函数（MD-2/04：返回交换后列表，落库 mods.setSortOrder） |
 
 ### 4.44.1 `frontend/js/components/loading-button.js` — 按钮 loading 态工具（<!--AUTO:lines:frontend/js/components/loading-button.js-->~59 行<!--/AUTO-->）
 
@@ -1081,6 +1076,21 @@ conver system/
 | <!--AUTO:sig:frontend/js/markdown.js:sanitizeUrl-->`sanitizeUrl(url)`<!--/AUTO--> | URL 协议消毒 |
 | <!--AUTO:sig:frontend/js/markdown.js:createCodeBlockToken-->`createCodeBlockToken(html, tokenId)`<!--/AUTO--> | 代码块占位保护 |
 | <!--AUTO:sig:frontend/js/markdown.js:escapeRegExp-->`escapeRegExp(str)`<!--/AUTO--> | 正则转义 |
+
+### 4.52.1 `frontend/js/mod-codec.js` — Mod codec 纯函数（F-103）（<!--AUTO:lines:frontend/js/mod-codec.js-->~199 行<!--/AUTO-->）
+
+**职责**：Mod 面板 codec 深模块（从 mod-manager.js 提取，零 DOM 零副作用）——prompt 区 payload 三区域序列化/解析、表单校验/组装、排序交换计算、导出导入信封校验。mod-manager.js 改 import 这 8 个函数（UI 只留渲染/事件）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/mod-codec.js:serializePromptPayload-->`serializePromptPayload(world, beforeChar, afterChar)`<!--/AUTO--> | 三区域文本 → prompt 区 JSON 字符串 |
+| <!--AUTO:sig:frontend/js/mod-codec.js:parsePromptPayload-->`parsePromptPayload(payload)`<!--/AUTO--> | prompt 区 JSON → 三区域文本（容错） |
+| <!--AUTO:sig:frontend/js/mod-codec.js:validateModForm-->`validateModForm(form)`<!--/AUTO--> | 表单校验（名称为空 / payload 非法 → 内联错误） |
+| <!--AUTO:sig:frontend/js/mod-codec.js:buildModPayload-->`buildModPayload(form)`<!--/AUTO--> | 表单 → Mod payload（三区域序列化 + 区域切换） |
+| <!--AUTO:sig:frontend/js/mod-codec.js:computeSortSwap-->`computeSortSwap(bindings, index, direction)`<!--/AUTO--> | 上移/下移相邻交换 sort_order 纯函数 |
+| <!--AUTO:sig:frontend/js/mod-codec.js:buildExportEnvelope-->`buildExportEnvelope(modsList)`<!--/AUTO--> | Mod 库 → 导出信封 `{"version":1,"mods":[...]}` |
+| <!--AUTO:sig:frontend/js/mod-codec.js:parseImportEnvelope-->`parseImportEnvelope(text)`<!--/AUTO--> | 导入信封校验（非法 JSON/version 不符/mods 非数组 → 报错） |
+| <!--AUTO:sig:frontend/js/mod-codec.js:importModsFromEnvelope-->`importModsFromEnvelope(text)`<!--/AUTO--> | 信封逐条容错导入（source="imported"） |
 
 ### 4.53 `frontend/js/save-key-meta.js` — 存档键契约（<!--AUTO:lines:frontend/js/save-key-meta.js-->~119 行<!--/AUTO-->）
 
@@ -1472,12 +1482,12 @@ conver system/
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->40<!--/AUTO--> | 统一异常处理器 |
 | `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->20<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
 | `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->62<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
-| `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->18<!--/AUTO--> | LLM 基类共享行为 |
+| `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->20<!--/AUTO--> | LLM 基类共享行为 |
 | `backend/tests/test_lorebook_engine.py` | <!--AUTO:tests:backend/tests/test_lorebook_engine.py-->26<!--/AUTO--> | 世界书激活引擎纯函数契约锁（WL-2：命中矩阵/大小写/depth 边界/概率 RNG 复现/互斥组/排序/零 DB 导入） |
 | `backend/tests/test_lorebook_routes.py` | <!--AUTO:tests:backend/tests/test_lorebook_routes.py-->5<!--/AUTO--> | 世界书 CRUD 路由契约锁（WL-4：列表/创建/部分更新/删除/守卫 404/校验 422） |
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
-| `backend/tests/test_mods.py` | <!--AUTO:tests:backend/tests/test_mods.py-->29<!--/AUTO--> | Mod 挂载层契约锁（MD-1：绑定唯一/禁用零影响/sort_order 叠加序含同序稳定/解绑与级联/空列表零变化/CRUD/404 守卫/target_area 过滤/payload 容错） |
-| `backend/tests/test_mods_routes.py` | <!--AUTO:tests:backend/tests/test_mods_routes.py-->12<!--/AUTO--> | Mod 路由契约锁（MD-2：库 CRUD/挂载/开关/排序/解绑/404·400·422 守卫） |
+| `backend/tests/test_mods.py` | <!--AUTO:tests:backend/tests/test_mods.py-->36<!--/AUTO--> | Mod 挂载层契约锁（MD-1：绑定唯一/禁用零影响/sort_order 叠加序含同序稳定/解绑与级联/空列表零变化/CRUD/404 守卫/target_area 过滤/payload 容错） |
+| `backend/tests/test_mods_routes.py` | <!--AUTO:tests:backend/tests/test_mods_routes.py-->19<!--/AUTO--> | Mod 路由契约锁（MD-2：库 CRUD/挂载/开关/排序/解绑/404·400·422 守卫） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_memory_palace.py` |
 | `backend/tests/test_message_swipes.py` | <!--AUTO:tests:backend/tests/test_message_swipes.py-->10<!--/AUTO--> | swipes 多候选契约锁（MS-1：播种序号自增/唯一约束/切换越界/删中间与回落/原始候选保护/级联/导出含候选集/自愈迁移幂等） | <!--AUTO:tests:backend/tests/test_memory_palace.py-->15<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
@@ -1528,7 +1538,8 @@ conver system/
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
-| `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->43<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
+| `frontend/tests/mod-codec.test.js` | <!--AUTO:tests:frontend/tests/mod-codec.test.js-->20<!--/AUTO--> | Mod codec 纯函数契约锁（F-103：三区域序列化/表单校验/payload 组装/排序交换/信封校验/导入容错，零 DOM） |
+| `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->26<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
 | `frontend/tests/save-key-meta.test.js` | <!--AUTO:tests:frontend/tests/save-key-meta.test.js-->25<!--/AUTO--> | 存档键契约 |
 | `frontend/tests/save-manager.test.js` | <!--AUTO:tests:frontend/tests/save-manager.test.js-->64<!--/AUTO--> | 存档管理 |
@@ -1597,10 +1608,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2454<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2473<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1097<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1287<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1113<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1290<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

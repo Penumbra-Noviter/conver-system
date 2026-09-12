@@ -30,6 +30,7 @@ from backend.app.services.exceptions import (
     ModAlreadyBoundError,
     ModBindingNotFoundError,
     ModNotFoundError,
+    ModReorderError,
 )
 
 __all__: list[str] = []
@@ -483,7 +484,7 @@ class TestReorderCharacterMods:
         mod = _create_mod(db_session)
         mods_service.bind_mod(db_session, char_id, mod.id)
 
-        with pytest.raises(mods_service.ModReorderError):
+        with pytest.raises(ModReorderError):
             mods_service.reorder_character_mods(db_session, char_id, [])
 
     def test_reorder_unknown_character(self, db_session: Session) -> None:
@@ -529,7 +530,7 @@ class TestReorderCharacterMods:
         b1 = mods_service.bind_mod(db_session, char_id, m1.id)  # sort_order=0
         mods_service.bind_mod(db_session, char_id, m2.id)  # sort_order=1
 
-        with pytest.raises(mods_service.ModReorderError):
+        with pytest.raises(ModReorderError):
             mods_service.reorder_character_mods(db_session, char_id, [b1.id])
 
         remained = mods_service.list_character_mods(db_session, char_id)
@@ -546,5 +547,5 @@ class TestReorderCharacterMods:
         b1 = mods_service.bind_mod(db_session, char_id, m1.id)
         mods_service.bind_mod(db_session, char_id, m2.id)
 
-        with pytest.raises(mods_service.ModReorderError):
+        with pytest.raises(ModReorderError):
             mods_service.reorder_character_mods(db_session, char_id, [b1.id, b1.id])
