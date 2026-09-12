@@ -392,3 +392,64 @@ describe('buildMessagesHtml — T6 末条 assistant 重生成操作（聊天域�
         expect(html).not.toContain('btn-regenerate');
     });
 });
+
+describe('messageBubbleHtml — F-100 分支操作按钮', () => {
+    it('assistant + branch:true → 渲染 .btn-branch 按钮（gitBranch 图标）', () => {
+        const html = messageBubbleHtml('assistant', '回复', { branch: true });
+        expect(html).toContain('btn-branch');
+        expect(html).toContain('data-icon="gitBranch"');
+    });
+
+    it('user + branch:true → 不渲染分支按钮（仅 assistant 角色）', () => {
+        const html = messageBubbleHtml('user', 'hi', { branch: true });
+        expect(html).not.toContain('btn-branch');
+    });
+
+    it('缺省 branch:false → 不渲染分支按钮', () => {
+        const html = messageBubbleHtml('assistant', '回复');
+        expect(html).not.toContain('btn-branch');
+    });
+});
+
+describe('buildMessagesHtml — F-100 末条 assistant 分支操作（聊天域开关）', () => {
+    it('canBranch:true → 仅末条 assistant 气泡渲染分支按钮', () => {
+        const html = buildMessagesHtml([
+            { id: 1, role: 'user', content: 'a' },
+            { id: 2, role: 'assistant', content: 'b' },
+            { id: 3, role: 'user', content: 'c' },
+            { id: 4, role: 'assistant', content: 'd' },
+        ], { canBranch: true });
+        // 末条 assistant(id4) 含按钮；前面 assistant(id2) 不含 — 按钮出现在 id4 气泡段之后
+        const btnCount = html.split('btn-branch').length - 1;
+        expect(btnCount).toBe(1);
+        expect(html.indexOf('data-message-id="4"')).toBeLessThan(html.indexOf('btn-branch'));
+    });
+
+    it('canBranch 缺省（聊天域未开启）→ 无分支按钮', () => {
+        const html = buildMessagesHtml([{ role: 'assistant', content: 'x' }]);
+        expect(html).not.toContain('btn-branch');
+    });
+
+    it('末条非 assistant（末条为 user）→ 无分支按钮', () => {
+        const html = buildMessagesHtml(
+            [
+                { role: 'user', content: 'a' },
+                { role: 'assistant', content: 'b' },
+                { role: 'user', content: 'c' },
+            ],
+            { canBranch: true }
+        );
+        expect(html).not.toContain('btn-branch');
+    });
+
+    it('末条 assistant 为 streaming（生成中）→ 无分支按钮', () => {
+        const html = buildMessagesHtml(
+            [
+                { role: 'user', content: 'a' },
+                { role: 'assistant', content: '部分', streaming: true },
+            ],
+            { canBranch: true }
+        );
+        expect(html).not.toContain('btn-branch');
+    });
+});

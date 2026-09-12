@@ -292,6 +292,26 @@ export const conversations = {
      * @returns {Promise<{reply: string, message_id: number, conversation_id: number}>}
      */
     continue: (id) => request('POST', `/conversations/${id}/continue`, null),
+    /**
+     * 从锚消息派生分支会话（F-100 能力 1：POST /api/conversations/{id}/branch）
+     *
+     * 以源会话的锚消息（message_id）为快照末条派生一条新分支会话（BR-2 消费）。
+     * 响应为 201 ConversationResponse（含新会话 `id`/`character_id`/`title`）——调用方
+     * 据此「刷新会话列表 + 激活新分支会话」（创建即打开，对齐 startChatWithCharacter）。
+     * 客户端错误处理与 messages.chat / regenerate / continue 同走 `request` 错误通道
+     * （catch 后由聊天域统一渲染错误条，不各自为政）。
+     *
+     * @param {number|string} id - 源会话 id
+     * @param {object} [opts]
+     * @param {number|string} opts.message_id - 分叉锚消息 id（末条 assistant id）
+     * @param {string} [opts.title] - 分支显示名（缺省 = 源会话标题；不传时不携带）
+     * @returns {Promise<{id: number, character_id: number, title: string}>}
+     */
+    branch: (id, { message_id, title } = {}) => request(
+        'POST',
+        `/conversations/${id}/branch`,
+        { message_id, ...(title != null ? { title } : {}) },
+    ),
 };
 
 // ══════════════════════════════════════════════════

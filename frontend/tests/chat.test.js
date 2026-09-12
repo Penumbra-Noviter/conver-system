@@ -48,9 +48,10 @@ const mockJson = (data, status = 200) =>
 /**
  * fetch mock 路由（api.js doFetch seam 消费）
  * POST /api/chats → 非流式消息发送；POST /api/conversations/{id}/regenerate → 重生成；
- * POST /api/conversations/{id}/continue → 续写；GET /api/conversations/{id}/messages → 消息列表
+ * POST /api/conversations/{id}/continue → 续写；POST /api/conversations/{id}/branch → 分支；
+ * GET /api/conversations/{id}/messages → 消息列表
  */
-function makeApiMock({ chatResult = null, messagesByConv = {}, regenerateResult = null, continueResult = null } = {}) {
+function makeApiMock({ chatResult = null, messagesByConv = {}, regenerateResult = null, continueResult = null, branchResult = null } = {}) {
     return vi.fn(async (url, options = {}) => {
         const path = String(url).replace(/^.*\/api/, '/api');
         const method = options.method || 'GET';
@@ -67,6 +68,12 @@ function makeApiMock({ chatResult = null, messagesByConv = {}, regenerateResult 
         if (regenMatch && method === 'POST') {
             return mockJson(
                 regenerateResult ?? { reply: '新回复', message_id: 999, conversation_id: Number(regenMatch[1]) }
+            );
+        }
+        const branchMatch = path.match(/^\/api\/conversations\/(\d+)\/branch$/);
+        if (branchMatch && method === 'POST') {
+            return mockJson(
+                branchResult ?? { id: 20, character_id: 1, title: '分支对话', conversation_id: Number(branchMatch[1]) }
             );
         }
         const listMatch = path.match(/^\/api\/conversations\/(\d+)\/messages$/);
@@ -1732,6 +1739,145 @@ describe('MS-3 继续 — 末条 assistant 气泡续写闭环（append 续写）
         tabs.updateTab(11, { messages: [msg(1, 'user', '你好')] });
         chat.renderMessages();
         expect(chat.chatDom.chatMessages.querySelector('.btn-continue')).toBeNull();
+    });
+});
+
+describe('F-100 能力 1 分支 — 末条 assistant 气泡分支闭环（创建即打开）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 分支前置：缓存 [user(1), assistant(2)]；服务端 201 返回新分支会话 id=20 */
+    const BRANCH_MSGS = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')];
+
+    it('末条 assistant 气泡渲染分支按钮（与重生成/继续同组）；点击 → conversations.branch(11, {message_id:2}) → 成功后刷新列表 + 激活新分支会话（id 来自 201）', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: BRANCH_MSGS });
+        const fetchSpy = makeApiMock({ branchResult: { id: 20, character_id: 1, title: '分支对话' } });
+        api.setFetch(fetchSpy);
+        const refresh = vi.fn();
+        const activate = vi.fn();
+        chat.setChatHooks({ refreshConversations: refresh, activateConversation: activate });
+
+        chat.renderMessages();
+
+        // 末条 assistant 气泡携带分支按钮；重生成/继续按钮同组渲染（同一气泡）
+        const asstBubble = chat.chatDom.chatMessages.querySelector('.message.assistant');
+        const branchBtn = asstBubble.querySelector('.btn-branch');
+        expect(branchBtn).not.toBeNull();
+        expect(asstBubble.querySelector('.btn-regenerate')).not.toBeNull();
+        expect(asstBubble.querySelector('.btn-continue')).not.toBeNull();
+
+        branchBtn.click();
+
+        // 端点调用契约：POST /api/conversations/11/branch，请求体 { message_id: 2 }
+        await vi.waitFor(() => {
+            expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11/branch') && o?.method === 'POST')).toBe(true);
+        });
+        const branchCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/conversations/11/branch') && o?.method === 'POST');
+        expect(JSON.parse(branchCall[1].body)).toEqual({ message_id: 2 });
+
+        // 成功后刷新列表 + 激活新分支会话（新会话 id = 20 来自 201 响应）
+        await vi.waitFor(() => {
+            expect(refresh).toHaveBeenCalled();
+            expect(activate).toHaveBeenCalledWith(20);
+        });
+    });
+
+    it('在途守卫：分支进行中 thinking + 按钮组禁用；与重生成/继续共享互斥集合（只发一次真实请求）', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: BRANCH_MSGS });
+
+        let resolveBranch;
+        const branchSpy = vi.spyOn(api.conversations, 'branch')
+            .mockReturnValue(new Promise((r) => { resolveBranch = r; }));
+        chat.setChatHooks({ refreshConversations: () => {}, activateConversation: () => {} });
+        chat.renderMessages();
+        const branchBtn = chat.chatDom.chatMessages.querySelector('.btn-branch');
+
+        branchBtn.click(); // 第一次触发 — 在途
+
+        // 进行中状态：thinking 指示器 + 分支按钮禁用（同组重生成/继续一并禁用）
+        expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).not.toBeNull();
+        expect(branchBtn.disabled).toBe(true);
+        expect(chat.chatDom.chatMessages.querySelector('.message.assistant .btn-regenerate').disabled).toBe(true);
+        expect(chat.chatDom.chatMessages.querySelector('.message.assistant .btn-continue').disabled).toBe(true);
+
+        // 在途守卫：重复触发（按钮点击 / 直接调用）被拦截 — 只发一次真实请求
+        branchBtn.click();
+        await chat.branchLastReply();
+        expect(branchSpy).toHaveBeenCalledTimes(1);
+
+        // 结算后：进行中 UI 复原
+        resolveBranch({ id: 20, character_id: 1, title: '分支对话' });
+        await vi.waitFor(() => {
+            expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).toBeNull();
+        });
+
+        // 在途清除 → 可再次触发
+        await chat.branchLastReply();
+        expect(branchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('失败 → 走错误条通道（不写进消息列表）+ activate 不调用 + thinking/按钮复原 + 在途清除', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: BRANCH_MSGS });
+
+        vi.spyOn(api.conversations, 'branch').mockRejectedValue(new Error('分支端点错误'));
+        const refresh = vi.fn();
+        const activate = vi.fn();
+        chat.setChatHooks({ refreshConversations: refresh, activateConversation: activate });
+        chat.renderMessages();
+        const branchBtn = chat.chatDom.chatMessages.querySelector('.btn-branch');
+
+        branchBtn.click();
+
+        await vi.waitFor(() => {
+            // 错误经既有错误通道渲染（与 messages.chat / 重生成同一 catch 路径）
+            const bar = chat.chatDom.chatMessages.parentElement.querySelector('.chat-error-bar');
+            expect(bar).not.toBeNull();
+            expect(bar.textContent).toContain('分支端点错误');
+            // 不写进消息列表 — 缓存保持原状
+            expect(tabs.getTab(11).messages).toEqual(BRANCH_MSGS);
+            expect(chat.chatDom.chatMessages.textContent).toContain('旧回复');
+        });
+        expect(activate).not.toHaveBeenCalled();
+        await vi.waitFor(() => {
+            expect(chat.chatDom.chatMessages.querySelector('.thinking-indicator')).toBeNull();
+            expect(branchBtn.disabled).toBe(false);
+        });
+    });
+
+    it('Falsify:流式在途 tab（isStreaming）→ no-op 不调 branch', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: BRANCH_MSGS, isStreaming: true });
+        const branchSpy = vi.spyOn(api.conversations, 'branch');
+
+        await chat.branchLastReply();
+
+        expect(branchSpy).not.toHaveBeenCalled();
+    });
+
+    it('Falsify:无末条 assistant（仅 user 消息）→ 不渲染分支按钮', async () => {
+        const { chat, tabs } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [msg(1, 'user', '你好')] });
+        chat.renderMessages();
+        expect(chat.chatDom.chatMessages.querySelector('.btn-branch')).toBeNull();
+    });
+
+    it('Falsify:无末条 assistant（仅 user 消息）→ branchLastReply 直接调用 no-op 不调 branch', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [msg(1, 'user', '你好')] });
+        const branchSpy = vi.spyOn(api.conversations, 'branch');
+
+        await chat.branchLastReply();
+
+        expect(branchSpy).not.toHaveBeenCalled();
     });
 });
 

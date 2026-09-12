@@ -292,6 +292,9 @@ setChatHooks({
     refreshConversations: loadConversations,
     syncConversationListTitle,
     navigateToSettings: () => switchView('settings'),
+    // F-100 分支成功后「创建即打开」：复用统一激活流程（activateConversation 已在本
+    // 文件顶部 import），避免 chat.js 反向依赖 conversation-activation.js（G7 注入）
+    activateConversation,
 });
 
 // 级联收口依赖注入（ARC-9 C1 — 删角色级联 / 删对话 / 清空全部 / tab-bar 关最后
