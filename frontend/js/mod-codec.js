@@ -154,7 +154,7 @@ export async function importModsFromEnvelope(text) {
     let imported = 0;
     let failed = 0;
     for (const m of parsed.mods) {
-        if (m === null || typeof m !== 'object') {
+        if (m === null || typeof m !== 'object' || Array.isArray(m)) {
             failed += 1;
             continue;
         }
