@@ -163,6 +163,20 @@ describe('5. 导入落库容错 importModsFromEnvelope（mock api.js）', () => 
         expect(r.imported).toBe(1);
         expect(r.failed).toBe(2);
     });
+
+    it('数组条目（[] / [{name:"A"}]）→ 拒绝 failed 计数，不落库；合法对象条目照常导入（F-106）', async () => {
+        mods.create.mockResolvedValue({ id: 1 });
+
+        const r = await importModsFromEnvelope('{"version":1,"mods":[[],[{"name":"A"}],{"name":"B","target_area":"prompt","payload":"x"}]}');
+
+        expect(mods.create).toHaveBeenCalledTimes(1);
+        expect(r.ok).toBe(true);
+        expect(r.imported).toBe(1);
+        expect(r.failed).toBe(2);
+        // 唯一一次 create 是合法对象条目 B，且 source 强制 imported
+        expect(mods.create.mock.calls[0][0].name).toBe('B');
+        expect(mods.create.mock.calls[0][0].source).toBe('imported');
+    });
 });
 
 describe('6. computeSortSwap 纯函数', () => {
