@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { characters, conversations, messages, request, requestBlob, setFetch, settings } from '../js/api.js';
+import { characters, conversations, messages, mods, request, requestBlob, setFetch, settings, __all__ } from '../js/api.js';
 import { downloadBlob } from '../js/utils.js';
 
 /**
@@ -379,4 +379,51 @@ describe('conversations.regenerate — T6 重生成端点封装', () => {
         await expect(conversations.regenerate(999)).rejects.toThrow('对话不存在');
     });
 });
+});
+
+describe('api.js mods 对象端点映射（MD-2/03）', () => {
+    afterEach(() => {
+        setFetch(null);
+    });
+
+    it('库端点 list/create/update/delete 映射 /mods', async () => {
+        const fetchMock = vi.fn(async () => mockResponse({ data: {} }));
+        setFetch(fetchMock);
+
+        await mods.list();
+        await mods.create({ name: 'A' });
+        await mods.update(3, { name: 'B' });
+        await mods.delete(3);
+
+        expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/mods', expect.objectContaining({ method: 'GET' }));
+        expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/mods', expect.objectContaining({ method: 'POST' }));
+        expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ name: 'A' });
+        expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/mods/3', expect.objectContaining({ method: 'PUT' }));
+        expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ name: 'B' });
+        expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/mods/3', expect.objectContaining({ method: 'DELETE' }));
+    });
+
+    it('挂载端点 listCharacterMods/bind/setEnabled/setSortOrder/unbind 映射正确', async () => {
+        const fetchMock = vi.fn(async () => mockResponse({ data: {} }));
+        setFetch(fetchMock);
+
+        await mods.listCharacterMods(7);
+        await mods.bind(7, { mod_id: 9 });
+        await mods.setEnabled(11, false);
+        await mods.setSortOrder(11, 4);
+        await mods.unbind(11);
+
+        expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/characters/7/mods', expect.objectContaining({ method: 'GET' }));
+        expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/characters/7/mods', expect.objectContaining({ method: 'POST' }));
+        expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ mod_id: 9 });
+        expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/mod-bindings/11', expect.objectContaining({ method: 'PUT' }));
+        expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ enabled: false });
+        expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/mod-bindings/11/sort', expect.objectContaining({ method: 'PUT' }));
+        expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ sort_order: 4 });
+        expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/mod-bindings/11', expect.objectContaining({ method: 'DELETE' }));
+    });
+
+    it('__all__ 收口含 mods', () => {
+        expect(__all__).toContain('mods');
+    });
 });

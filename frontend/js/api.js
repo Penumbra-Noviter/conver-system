@@ -222,6 +222,31 @@ export const lorebook = {
 };
 
 // ══════════════════════════════════════════════════
+// Mod API（MD-2/03：库 CRUD + 角色挂载 CRUD）
+// ══════════════════════════════════════════════════
+
+export const mods = {
+    /** 全局 Mod 库列表（id 升序） */
+    list: () => request('GET', '/mods'),
+    /** 创建 Mod */
+    create: (data) => request('POST', '/mods', data),
+    /** 部分更新 Mod */
+    update: (modId, data) => request('PUT', `/mods/${modId}`, data),
+    /** 删除 Mod */
+    delete: (modId) => request('DELETE', `/mods/${modId}`),
+    /** 角色挂载列表（sort_order 升序） */
+    listCharacterMods: (characterId) => request('GET', `/characters/${characterId}/mods`),
+    /** 挂载 Mod 到角色（body {mod_id, enabled?, sort_order?}） */
+    bind: (characterId, data) => request('POST', `/characters/${characterId}/mods`, data),
+    /** 切换挂载开关（body {enabled}） */
+    setEnabled: (bindingId, enabled) => request('PUT', `/mod-bindings/${bindingId}`, { enabled }),
+    /** 调整挂载排序（body {sort_order}；工单 04 消费） */
+    setSortOrder: (bindingId, sortOrder) => request('PUT', `/mod-bindings/${bindingId}/sort`, { sort_order: sortOrder }),
+    /** 解绑 */
+    unbind: (bindingId) => request('DELETE', `/mod-bindings/${bindingId}`),
+};
+
+// ══════════════════════════════════════════════════
 // 对话 API
 // ══════════════════════════════════════════════════
 
@@ -384,6 +409,7 @@ export const __all__ = [
     'characters',
     'conversations',
     'lorebook',
+    'mods',
     'messages',
     'chatStream',
     'models',

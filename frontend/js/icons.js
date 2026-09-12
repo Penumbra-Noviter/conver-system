@@ -39,6 +39,7 @@ const ICON_PATHS = {
     pin: '<path d="M10 2.5 13.5 6l-1.6.4-2.2 2.2.9 3.4-1 1-3.1-3.1L3 13l-.8-.8 3.1-3.5-3.1-3.1 1-1 3.4.9 2.2-2.2.2-1.8Z"/>',
     toggleOn: '<rect x="1.5" y="4.5" width="13" height="7" rx="3.5"/><circle cx="10.5" cy="8" r="2.2" fill="currentColor"/>',
     toggleOff: '<rect x="1.5" y="4.5" width="13" height="7" rx="3.5"/><circle cx="5.5" cy="8" r="2.2" fill="currentColor"/>',
+    puzzle: '<path d="M4 4h2.5c0-1.5 3-1.5 3 0H12v8h-2.5c0-1.5-3-1.5-3 0H4Z"/>',
 };
 
 /**
