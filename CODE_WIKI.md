@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2487<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1113<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1304<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2499<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1118<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1311<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -455,7 +455,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/chat.py:assemble_chat_context-->`assemble_chat_context(db, conversation_id, *, current_input=None, history_limit_message_id=None)`<!--/AUTO--> | 下层组装函数（不插 user / greeting，重生成复用） |
 | <!--AUTO:sig:backend/app/services/chat.py:regenerate_chat-->`regenerate_chat(db, conversation_id, message_id=None)`<!--/AUTO--> | 重生成编排：截断 → 组装 → 生成 → 单事务落库 |
 
-### 4.15 `backend/app/services/conversation.py` — 会话服务（<!--AUTO:lines:backend/app/services/conversation.py-->~282 行<!--/AUTO-->）
+### 4.15 `backend/app/services/conversation.py` — 会话服务（<!--AUTO:lines:backend/app/services/conversation.py-->~310 行<!--/AUTO-->）
 
 **职责**：会话 CRUD + 默认标题（角色名派生）+ 自动标题（首条消息截断）+ 清空 + 分支派生（BR-2）。
 
@@ -764,7 +764,7 @@ conver system/
 | <!--AUTO:sig:backend/scripts/migrate_data.py:migrate-->`migrate(source, target, force=False)`<!--/AUTO--> | 执行迁移（幂等 + 标记） |
 | <!--AUTO:sig:backend/scripts/migrate_data.py:main-->`main(argv=None)`<!--/AUTO--> | CLI 入口 |
 
-### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~391 行<!--/AUTO-->）
+### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~396 行<!--/AUTO-->）
 
 **职责**：Fetch 封装——超时守卫（AbortController + 15s 兜底，TD-51/55/72）、错误归一化、SSE 流式、Blob 下载（Content-Disposition 文件名解析）。T6 重生成：`conversations.regenerate(id, { message_id? })` 封装 `POST /api/conversations/{id}/regenerate`（缺省末条 assistant），客户端错误处理与 `messages.chat` 同走 `request` 错误通道。
 
@@ -822,7 +822,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/chat.js:scrollToBottom-->`scrollToBottom()`<!--/AUTO--> | 滚动到底部 |
 | <!--AUTO:sig:frontend/js/chat.js:attachCopyButton-->`attachCopyButton(btn)`<!--/AUTO--> | 复制按钮接线 |
 
-### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~390 行<!--/AUTO-->）
+### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~413 行<!--/AUTO-->）
 
 **职责**：角色/对话两个列表视图深模块（C4，search-view 先例）——角色网格渲染与四类按钮事件委托、对话列表渲染与打开/删除委托、角色导入（含失败引导向导）、开始对话全流程（模型选择→创建→切视图→激活→聚焦）、列表标题同步 DOM 手术；协调层经 `initListViews({ switchView })` 接线。T3 模型切换的对话列表同步经 chat.js 注入的 `refreshConversations` 钩子（重渲染列表，meta 显示新模型），本模块零改动（`showModelSelector(charName)` 调用点保持向后兼容）。
 
@@ -953,7 +953,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/lorebook-editor.js:addKeyChip-->`addKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 录入（去重/裁剪/空拒） |
 | <!--AUTO:sig:frontend/js/components/lorebook-editor.js:removeKeyChip-->`removeKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 删除 |
 
-### 4.44.2 `frontend/js/components/mod-manager.js` — Mod 管理面板（MD-2）（<!--AUTO:lines:frontend/js/components/mod-manager.js-->~475 行<!--/AUTO-->）
+### 4.44.2 `frontend/js/components/mod-manager.js` — Mod 管理面板（MD-2）（<!--AUTO:lines:frontend/js/components/mod-manager.js-->~478 行<!--/AUTO-->）
 
 **职责**：Mod 管理面板组件——`showModManager` 入口（复用 openModal 骨架）+ Mod 库区块（列表 id 升序 / 新建编辑表单 / target_area 下拉 prompt|memory|css / 导入导出 JSON 信封 `{"version":1,"mods":[...]}`）。prompt 区 payload 在 UI 呈现为「三区域文本框 world/before_char/after_char」并序列化为 JSON 字符串；memory/css 区为自由文本。导入导出纯前端（导出本地 Blob 下载镜像 save-manager 形态；导入逐条 `mods.create` 容错，source="imported"）。
 
@@ -1021,7 +1021,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/fetch-seam.js:setFetch-->`setFetch(fn)`<!--/AUTO--> | 注入 fetch 实现（测试用） |
 | <!--AUTO:sig:frontend/js/fetch-seam.js:doFetch-->`doFetch(...args)`<!--/AUTO--> | 统一 fetch 出口（超时守卫） |
 
-### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~254 行<!--/AUTO-->）
+### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~262 行<!--/AUTO-->）
 
 **职责**：展示 HTML 生成单源（ARC 展示契约）——消息气泡/角色卡片/会话项/搜索结果/头像/关键词高亮。T2 搜索定位：`messageBubbleHtml` 接受可选 `messageId` 选项 → 渲染 `data-message-id` 属性（供定位选择器消费）；`buildMessagesHtml` 透传 `m.id`。T6 重生成：`buildMessagesHtml` 的 `context.canRegenerate`（聊天域开关）为真且末条为已结算 assistant 时，该气泡经 `messageBubbleHtml` 渲染「重生成」操作按钮。
 
@@ -1030,7 +1030,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/format.js:messageBubbleHtml-->`messageBubbleHtml(role, content, opts = {})`<!--/AUTO--> | 消息气泡 HTML（可选 `{ messageId }` → data-message-id；`{ regenerate }` → 重生成按钮） |
 | <!--AUTO:sig:frontend/js/format.js:buildMessagesHtml-->`buildMessagesHtml(messages, context = {})`<!--/AUTO--> | 消息列表 HTML（透传消息 id → data-message-id；`context.canRegenerate` → 末条 assistant 重生成按钮） |
 | <!--AUTO:sig:frontend/js/format.js:characterCardHtml-->`characterCardHtml(c)`<!--/AUTO--> | 角色卡片 HTML |
-| <!--AUTO:sig:frontend/js/format.js:conversationItemHtml-->`conversationItemHtml(c, { activeId = null } = {})`<!--/AUTO--> | 会话项 HTML |
+| <!--AUTO:sig:frontend/js/format.js:conversationItemHtml-->`conversationItemHtml(c, { activeId = null, branchSource = null } = {})`<!--/AUTO--> | 会话项 HTML |
 | <!--AUTO:sig:frontend/js/format.js:searchResultItemHtml-->`searchResultItemHtml(r, query)`<!--/AUTO--> | 搜索结果项 HTML（高亮） |
 | <!--AUTO:sig:frontend/js/format.js:highlightText-->`highlightText(text, keyword)`<!--/AUTO--> | 关键词高亮 |
 | <!--AUTO:sig:frontend/js/format.js:avatarImgHtml-->`avatarImgHtml(src, alt, fallbackHtml)`<!--/AUTO--> | 头像 HTML（占位回退） |
@@ -1471,7 +1471,7 @@ conver system/
 | `backend/tests/test_chat_continue.py` | <!--AUTO:tests:backend/tests/test_chat_continue.py-->21<!--/AUTO--> | 续写端点契约锁（MS-3：条数不变/不追加 user/失败零改动/续写触发形态/空续写 no-op/错误矩阵） |
 | `backend/tests/test_chat_mod_injection.py` | <!--AUTO:tests:backend/tests/test_chat_mod_injection.py-->6<!--/AUTO--> | prompt 注入链集成契约锁（MD-2：三区域叠加/禁用与非 prompt 区零影响/无 Mod 零回归/sort_order 升序/叠加于世界书之上不新增尾随 system） |
 | `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
-| `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->18<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
+| `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->23<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
 | `backend/tests/test_image_provider.py` | <!--AUTO:tests:backend/tests/test_image_provider.py-->22<!--/AUTO--> | 图片 Provider 契约锁（CG-1：注册表派生/缺 Key 401/畸形响应/超时 504/连接 502/A1111 happy path 落盘/本地占位确定性/映射矩阵） |
 | `backend/tests/test_gallery.py` | <!--AUTO:tests:backend/tests/test_gallery.py-->24<!--/AUTO--> | CG 资产库契约锁（CG-2：入库去重同作品同 url/解锁幂等/加权抽选同种子顺序无关与分布/SET NULL 会话删图留/CASCADE 作品删图清/404 守卫） |
 | `backend/tests/test_image_tasks.py` | <!--AUTO:tests:backend/tests/test_image_tasks.py-->20<!--/AUTO--> | 图片任务契约锁（CG-3：提交/轮询 404/run 成功出图入资产库/失败不破坏对话/时间线排序/路由 + MD-3 能力门控矩阵/提交 400/available） |
@@ -1534,13 +1534,13 @@ conver system/
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->29<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->103<!--/AUTO--> | Key 注入/端点口径 |
-| `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->22<!--/AUTO--> | 角色/对话列表视图 |
+| `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->25<!--/AUTO--> | 角色/对话列表视图 |
 | `frontend/tests/lorebook-editor.test.js` | <!--AUTO:tests:frontend/tests/lorebook-editor.test.js-->23<!--/AUTO--> | 世界书编辑器契约锁（WL-4：chips 交互/表单校验/泛词告警/payload 字段映射/列表渲染搜索/保存双路径/XSS 属性注入防护） |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
-| `frontend/tests/mod-codec.test.js` | <!--AUTO:tests:frontend/tests/mod-codec.test.js-->21<!--/AUTO--> | Mod codec 纯函数契约锁（F-103：三区域序列化/表单校验/payload 组装/排序交换/信封校验/导入容错，零 DOM） |
-| `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->26<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
+| `frontend/tests/mod-codec.test.js` | <!--AUTO:tests:frontend/tests/mod-codec.test.js-->22<!--/AUTO--> | Mod codec 纯函数契约锁（F-103：三区域序列化/表单校验/payload 组装/排序交换/信封校验/导入容错，零 DOM） |
+| `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->29<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
 | `frontend/tests/save-key-meta.test.js` | <!--AUTO:tests:frontend/tests/save-key-meta.test.js-->25<!--/AUTO--> | 存档键契约 |
 | `frontend/tests/save-manager.test.js` | <!--AUTO:tests:frontend/tests/save-manager.test.js-->64<!--/AUTO--> | 存档管理 |
@@ -1609,10 +1609,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2487<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2499<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1113<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1304<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1118<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1311<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
