@@ -403,14 +403,14 @@ describe('api.js mods 对象端点映射（MD-2/03）', () => {
         expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/mods/3', expect.objectContaining({ method: 'DELETE' }));
     });
 
-    it('挂载端点 listCharacterMods/bind/setEnabled/setSortOrder/unbind 映射正确', async () => {
+    it('挂载端点 listCharacterMods/bind/setEnabled/reorder/unbind 映射正确', async () => {
         const fetchMock = vi.fn(async () => mockResponse({ data: {} }));
         setFetch(fetchMock);
 
         await mods.listCharacterMods(7);
         await mods.bind(7, { mod_id: 9 });
         await mods.setEnabled(11, false);
-        await mods.setSortOrder(11, 4);
+        await mods.reorder(7, [11, 12, 13]);
         await mods.unbind(11);
 
         expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/characters/7/mods', expect.objectContaining({ method: 'GET' }));
@@ -418,8 +418,8 @@ describe('api.js mods 对象端点映射（MD-2/03）', () => {
         expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ mod_id: 9 });
         expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/mod-bindings/11', expect.objectContaining({ method: 'PUT' }));
         expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ enabled: false });
-        expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/mod-bindings/11/sort', expect.objectContaining({ method: 'PUT' }));
-        expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ sort_order: 4 });
+        expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/characters/7/mods/order', expect.objectContaining({ method: 'PUT' }));
+        expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual([11, 12, 13]);
         expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/mod-bindings/11', expect.objectContaining({ method: 'DELETE' }));
     });
 

@@ -10,7 +10,7 @@
  *   - 表单校验（validateModForm：名称必填 / target_area 收口三值）
  *   - 保存 payload 组装（buildModPayload：与后端 schemas/mods.py ModCreate 逐字段一致）
  *   - 导入导出信封（buildExportEnvelope / parseImportEnvelope / importModsFromEnvelope）
- *   - 挂载排序交换（computeSortSwap：上移/下移相邻交换 sort_order 纯函数）
+ *   - 挂载排序重排（computeSortSwap：上移/下移产出完整新序 binding_id 数组纯函数）
  *   - TARGET_AREAS：目标区域合法值（与后端 schemas/mods.py Literal 收口一致）
  *
  * 硬约束（Node ESM 真实消费者兼容）：模块顶层零 DOM / 零浏览器 API / 零副作用；
@@ -175,24 +175,24 @@ export async function importModsFromEnvelope(text) {
 }
 
 /**
- * 计算上移/下移时相邻两项交换 sort_order 后的两次 setSortOrder 参数。
+ * 计算上移/下移后的完整挂载顺序（F-102 新契约：产出 binding_id 顺序数组）。
  * 纯函数（不接触 DOM / 不落库），供移动事件处理器与独立单测消费。
  * @param {Array} bindings - 已按 sort_order 升序的绑定列表
  * @param {number} index - 待移动项在列表中的下标
  * @param {'up'|'down'} direction - 移动方向（up=与前一交换，down=与后一交换）
- * @returns {Array<{id: number, sortOrder: number}>} 两次 setSortOrder 调用参数
- *   （边界越界返回空数组 — 调用方据此 no-op）
+ * @returns {Array<number>} 移动后的完整 binding_id 顺序数组（按新序）；
+ *   边界越界（首项上移 / 末项下移 / 下标越界）返回原顺序数组 — 调用方据此 no-op
  */
 export function computeSortSwap(bindings, index, direction) {
     if (!Array.isArray(bindings)) return [];
+    const ids = bindings.map((b) => b.id);
     const target = direction === 'up' ? index - 1 : index + 1;
-    if (index < 0 || target < 0 || target >= bindings.length) return [];
-    const a = bindings[index];
-    const b = bindings[target];
-    return [
-        { id: a.id, sortOrder: b.sort_order ?? 0 },
-        { id: b.id, sortOrder: a.sort_order ?? 0 },
-    ];
+    if (index < 0 || index >= bindings.length || target < 0 || target >= bindings.length) {
+        return ids;
+    }
+    const next = [...ids];
+    [next[index], next[target]] = [next[target], next[index]];
+    return next;
 }
 
 // ════════════════════════════════════════════════════════════════
