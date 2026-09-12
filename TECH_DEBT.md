@@ -55,6 +55,12 @@
 |------|--------|------|------|------|----------|
 | F-99 | LLM 适配器多 system 折叠：`backend/app/services/llm/base.py::_prepare_messages`「last system wins」锁定契约（test_llm_shared.py:99）使含 PHI/scenario/世界书注入的角色在真实 Provider（OpenAI/Claude）调用时 persona/scenario/世界书 system 块全部丢弃、仅存末条。2026-09-11 实证脚本：组装层 6 条 system（before/persona/scenario/after/knowledge/PHI）→ 折叠后 system=PHI，chat 仅剩 3 条历史——角色人设一致性受损，WL 世界书 position=system 注入对含 PHI 角色失效 | MS-3 期末四轴（续写触发形态实证发现；MS-3 已选 user 触发形态规避，本债为既有缺陷） | Strong | 📝 待立项 | LLM 链路 |
 | F-100 | spec §BR-2 前端段未消费：消息级「分支」操作（与重生成同 seam）+ 会话列表分支来源标记（父标题 + 锚消息预览）+ 模拟器存档面板「以此存档开新对话」（save-key-meta 快照形态已有，接 /import-branch 即开新会话）。后端三路由已就绪，纯前端接线 | BR-2 期末四轴（Spec 轴未消费段登记） | Worth exploring | 📝 待立项 | 前端 |
+| F-101 | ModResponse 非可选 str/datetime 映射可空 DB 列（description/version/source 无 nullable=False）——裸 SQL 写 NULL 时 from_attributes 序列化 None→str 抛 ValidationError → 500；当前 create_mod/update_mod 全路径不产 NULL，理论性 | MD-2 波 1 增量审核 Falsify（F3） | Speculative | 📝 待立项 | 后端 |
+| F-102 | 排序交换非原子：mod-manager moveBinding 两次 mods.setSortOrder 无事务/补偿，第一次成功第二次失败（断网/并发删除 404）留重复 sort_order——重拉后 mod_id 决胜自愈、下次移动自愈，但服务端中间态不一致 | MD-2 期末四轴 Falsify | Worth exploring | 📝 待立项 | 前端排序 |
+| F-103 | mod-manager.js 混责（Divergent Change）：面板 UI（render* 族）+ codec 纯函数（serializePromptPayload/parsePromptPayload/validateModForm/buildModPayload/computeSortSwap/parseImportEnvelope/importModsFromEnvelope）+ 信封同室，codec 可独立深模块 | MD-2 期末四轴 Architecture | Worth exploring | 📝 待立项 | 前端架构 |
+| F-104 | 客户端 Blob 下载逻辑第三份拷贝：mod-manager exportLibrary（createObjectURL→a download→revoke+jsdom 降级）与 save-manager downloadJson 逐段同形，未提取共享 helper | MD-2 期末四轴 Standards | Speculative | 📝 待立项 | 前端 |
+| F-105 | 角色存在性守卫两处两种实现：routes/mods.py 列表路由显式 character_service.require_character（重，载会话计数）vs bind_mod 内 mods._require_character（轻，仅 Character.id），违背路由模块「守卫由服务层抛领域异常」声明 | MD-2 期末四轴 Standards/Architecture | Speculative | 📝 待立项 | 后端 |
+| F-106 | 导入信封条目数组类型漏校验：importModsFromEnvelope 只判 typeof!=='object' 未 Array.isArray 拒绝，mods:[[]] 被当作合法条目建空名 Mod（name 默认 ""）——轻微空 Mod 污染 | MD-2 期末四轴 Falsify | Speculative | 📝 待立项 | 前端 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -76,6 +82,8 @@
 | F-76 | #b45309 对 --page 4.26:1 余量 0.11 | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
 | F-79 | locateAndHighlight 顶层 children 遍历注记 | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
 | F-87 | 文档区分「去重契约模块」与「深模块」标签 | 架构报告 2026-08-27 | Speculative | ❌ 复核关闭 |
+| F-107 | mod-manager 导出未走 spec 字面 downloadBlob——utils.downloadBlob 是服务端导出 fetch helper，Mod 导出纯客户端无服务端导出面，本地 Blob 下载为正确形态，spec 措辞不精确 | MD-2 期末四轴 Spec | Speculative | ❌ 复核关闭 |
+| F-108 | 导入往返逐条 version 回落服务端默认 1.0（id/created_at 重建）——spec 仅强制信封 version=1、未强制逐条 version 保留，非缺陷 | MD-2 期末四轴 Spec | Speculative | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
@@ -203,4 +211,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-100），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-108），避免编号冲突。

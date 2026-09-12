@@ -6,6 +6,24 @@
 
 ---
 
+## MD-2 Mod 管理 UI + 注入链集成（2026-09-12 — AI风月对标五批工单 MD 批收官）
+
+- **来源**：承接 MD-1（e047462，数据层 + apply_prompt_mods 纯函数）；MD 批收官，spec §MD-2。project-kickoff 全自动档，4 工单 3 波（01 后端路由 ∥ 02 注入链 → 03 库面板 → 04 挂载面板）。
+- **交付**：
+  - 后端：`routes/mods.py`（9 端点：Mod 库 CRUD + 挂载/开关/排序/解绑）+ `services/mods.py` 增 `set_binding_sort_order`（排序落库）+ `chat.py::_mod_prompt_injection`（注入链集成：list_character_mods → 一次 IN 回读 Mod 组 ModPayload → apply_prompt_mods 叠加进 world 注入块）。
+  - 前端：`api.js` mods 对象（9 方法）+ `components/mod-manager.js`（showModManager 入口 + Mod 库区块 + 挂载区块 + computeSortSwap 纯函数）+ 角色卡片 `.mod-char` 按钮 + list-views 事件委托。
+- **关键决策（契约锁锁定）**：
+  - 排序落库 = 新增 `set_binding_sort_order`（单条幂等更新，binding_id 稳定），**非解绑重绑**——v1.1 拍板，语义正确、无丢失窗口。
+  - 注入链 = 叠加在 `_lorebook_world_injection` 之后、`build_message_list` 之前，world→system 三区域，**不新增尾随 system**（不恶化 F-99 适配器 system 折叠）。
+  - `ModAlreadyBoundError` → 400（项目无 409）；挂载响应不嵌套 Mod 详情（前端按 mod_id 客户端关联）。
+  - memory/css 区 Mod 本期只做管理面 + 数据落库，实际注入消费留后续（spec「由各自消费方读取」）。
+- **波末环境修复（CG-1 遗留）**：requirements.txt 缺 pillow/httpx 声明（local_backend.py import PIL、http_backend.py import httpx 均既用未声明），venv 缺 PIL 致 test_image_provider 收集失败——补 `pillow>=10.0`/`httpx>=0.27` + venv pip install。
+- **期末四轴（0 HIGH 阻断，安全红线 0 违例）**：Falsify 1 MEDIUM（排序交换非原子，自愈）+ Architecture 1 LOW-MED（mod-manager UI/codec 混责）+ 若干 LOW——落债 F-101~F-106 + 复核关闭 F-107~F-108；波 1 增量审核 F1（sort_order 越界 OverflowError → 500）先红后绿修复（fd23060，schema 加 ge/le 9999 + 契约锁）。
+- **验证链**：先红后绿（后端 +18 / 前端 +48 用例）| pytest 1078+1skip→1096+1skip / Vitest 1239→1287 / cargo 70 零改动 | 运行态冒烟（uvicorn 建角色→建 Mod→挂载→排序→开关 200 全链路）| doc_sync + pool_cleanup_check 双钩子通过。
+- **非阻断落债**：F-101~F-108（详见 TECH_DEBT.md）。
+
+---
+
 ## MD-1 Mod 数据模型与注入叠加（2026-09-12 — AI风月对标五批工单 MD 首批，承接 MD-3）
 
 - **来源**：承接 MD-3（daf0fd7，出图能力门控独立 follow-up）；回到 MD 主线，spec §MD-1。交付 `mods` + `mod_bindings` 新表 + `services/mods.py` 深模块（prompt 区三区域叠加纯函数 apply_prompt_mods）；注入链集成、前端 UI 与路由留 MD-2。

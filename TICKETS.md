@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **1 项待办**（1 批：MD Mod 挂载）。
+> 当前 **0 项待办**。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -48,7 +48,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| MD-2 | Mod 管理 UI（列表/开关/排序/区域选择/导入导出；CSS 类复用现有后载序注入 seam） | ⬜ 待办 | spec §MD-2；Vitest 用例 + Playwright 冒烟 |
 
 > **实施顺序建议**：WL → MS → BR → CG → MD（依赖与风险见 spec 末节表格）。
 > **每批统一验收口径**：先红后绿 + 全量基线不回退（pytest 823+1skip / Vitest 1189 / cargo 70）+ 覆盖率不放宽 + 冒烟 + 文档同步。
@@ -65,6 +64,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### Mod 挂载批次 MD-2（2026-09-12 — Mod 管理 UI + 注入链集成，MD 批收官）
+
+> 来源：AI风月对标调研五批工单（MD Mod 挂载第二张/收官）；后端路由 + prompt 注入链集成 + 前端 Mod 管理面板（库 CRUD/挂载/开关/排序/区域选择/导入导出），规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §MD-2。叙述详见 DEV_LOG〈MD-2 Mod 管理 UI + 注入链集成（2026-09-12）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| MD-2 | Mod 管理 UI + 注入链集成（路由 + assemble_chat_context 注入 + Mod 管理面板 + 卡片入口） | 2026-09-12 | 0c3edfb |
+
+**验证链：** 后端 pytest 1078+1skip→1096+1skip（+18：test_mods_routes 12 用例——库 CRUD/挂载/开关/排序/解绑/404·400·422 守卫 + F1 修复锁 sort_order 越界 422；test_chat_mod_injection 6 用例——三区域叠加/禁用与非 prompt 区零影响/无 Mod 零回归/sort_order 升序/不新增尾随 system）| 前端 Vitest 1239→1287（+48：mod-manager 43 + api.test 端点映射 + format/list-views 入口接线）| services/mods.py 增 set_binding_sort_order（排序落库 v1.1 拍板）+ routes/mods.py 9 端点 + chat.py `_mod_prompt_injection`（IN 回读组 ModPayload → apply_prompt_mods）| mod-manager.js（库区块 + 挂载区块 + computeSortSwap 纯函数，覆盖率 96%+）| 运行态冒烟：uvicorn 建角色→建 Mod→挂载→排序→开关全链路 200 | 期末四轴 0 HIGH 阻断（1 MEDIUM 非原子排序自愈 + 若干 LOW 落债）+ 安全红线 0 违例 + 文件范围核验合规 | doc_sync 零漂移
+**非阻断落债：** F-101~F-106（候选区 6 项）+ F-107~F-108（复核关闭 2 项，详见 TECH_DEBT.md）；另波末环境修复——CG-1 遗留依赖声明缺口（requirements.txt 补 pillow/httpx + venv pip install）
+
+---
 
 ### Mod 挂载批次 MD-1（2026-09-12 — Mod 数据模型与注入叠加，MD 批首张）
 
