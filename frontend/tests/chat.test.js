@@ -1749,10 +1749,10 @@ describe('F-100 能力 1 分支 — 末条 assistant 气泡分支闭环（创建
     /** 分支前置：缓存 [user(1), assistant(2)]；服务端 201 返回新分支会话 id=20 */
     const BRANCH_MSGS = [msg(1, 'user', '你好'), msg(2, 'assistant', '旧回复')];
 
-    it('末条 assistant 气泡渲染分支按钮（与重生成/继续同组）；点击 → conversations.branch(11, {message_id:2}) → 成功后刷新列表 + 激活新分支会话（id 来自 201）', async () => {
+    it('末条 assistant 气泡渲染分支按钮（与重生成/继续同组）；点击 → conversations.branch(11, {message_id:2, title}) → 成功后刷新列表 + 激活新分支会话（id 来自 201）', async () => {
         const { chat, tabs, api } = await loadModules();
         tabs.openTab(11);
-        tabs.updateTab(11, { messages: BRANCH_MSGS });
+        tabs.updateTab(11, { title: '源对话', messages: BRANCH_MSGS });
         const fetchSpy = makeApiMock({ branchResult: { id: 20, character_id: 1, title: '分支对话' } });
         api.setFetch(fetchSpy);
         const refresh = vi.fn();
@@ -1770,12 +1770,13 @@ describe('F-100 能力 1 分支 — 末条 assistant 气泡分支闭环（创建
 
         branchBtn.click();
 
-        // 端点调用契约：POST /api/conversations/11/branch，请求体 { message_id: 2 }
+        // 端点调用契约：POST /api/conversations/11/branch，请求体 { message_id: 2, title: '源对话' }
+        // （title 进 branch_title — 父会话删除后来源标记回落 branch_title 不失效，期末审核修复锁）
         await vi.waitFor(() => {
             expect(fetchSpy.mock.calls.some(([u, o]) => String(u).endsWith('/api/conversations/11/branch') && o?.method === 'POST')).toBe(true);
         });
         const branchCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/conversations/11/branch') && o?.method === 'POST');
-        expect(JSON.parse(branchCall[1].body)).toEqual({ message_id: 2 });
+        expect(JSON.parse(branchCall[1].body)).toEqual({ message_id: 2, title: '源对话' });
 
         // 成功后刷新列表 + 激活新分支会话（新会话 id = 20 来自 201 响应）
         await vi.waitFor(() => {

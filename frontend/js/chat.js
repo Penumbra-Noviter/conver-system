@@ -984,7 +984,9 @@ export async function branchLastReply() {
     showThinkingIndicator(convId);
 
     try {
-        const result = await conversations.branch(convId, { message_id: messageId });
+        // title = 源会话标题（期末审核修复：进入 branch_title，父会话删除后
+        // 会话列表来源标记回落 branch_title 不失效；空串由后端 falsy 兜底回落快照标题）
+        const result = await conversations.branch(convId, { message_id: messageId, title: tab.title });
         // 成功 — 刷新会话列表（新分支进入侧栏）+ 激活/打开新分支会话（创建即打开；
         // 新会话 id 来自 201 响应）。顺序对齐 startChatWithCharacter：
         // loadConversations（重拉列表）→ activateConversation（openTab + 懒加载消息 + 渲染）
