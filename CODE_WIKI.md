@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2439<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1097<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1272<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2454<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1097<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1287<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -819,7 +819,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/chat.js:scrollToBottom-->`scrollToBottom()`<!--/AUTO--> | 滚动到底部 |
 | <!--AUTO:sig:frontend/js/chat.js:attachCopyButton-->`attachCopyButton(btn)`<!--/AUTO--> | 复制按钮接线 |
 
-### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~380 行<!--/AUTO-->）
+### 4.36.5 `frontend/js/list-views.js` — 角色/对话列表视图（<!--AUTO:lines:frontend/js/list-views.js-->~390 行<!--/AUTO-->）
 
 **职责**：角色/对话两个列表视图深模块（C4，search-view 先例）——角色网格渲染与四类按钮事件委托、对话列表渲染与打开/删除委托、角色导入（含失败引导向导）、开始对话全流程（模型选择→创建→切视图→激活→聚焦）、列表标题同步 DOM 手术；协调层经 `initListViews({ switchView })` 接线。T3 模型切换的对话列表同步经 chat.js 注入的 `refreshConversations` 钩子（重渲染列表，meta 显示新模型），本模块零改动（`showModelSelector(charName)` 调用点保持向后兼容）。
 
@@ -950,13 +950,13 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/lorebook-editor.js:addKeyChip-->`addKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 录入（去重/裁剪/空拒） |
 | <!--AUTO:sig:frontend/js/components/lorebook-editor.js:removeKeyChip-->`removeKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 删除 |
 
-### 4.44.2 `frontend/js/components/mod-manager.js` — Mod 管理面板（MD-2）（<!--AUTO:lines:frontend/js/components/mod-manager.js-->~427 行<!--/AUTO-->）
+### 4.44.2 `frontend/js/components/mod-manager.js` — Mod 管理面板（MD-2）（<!--AUTO:lines:frontend/js/components/mod-manager.js-->~639 行<!--/AUTO-->）
 
 **职责**：Mod 管理面板组件——`showModManager` 入口（复用 openModal 骨架）+ Mod 库区块（列表 id 升序 / 新建编辑表单 / target_area 下拉 prompt|memory|css / 导入导出 JSON 信封 `{"version":1,"mods":[...]}`）。prompt 区 payload 在 UI 呈现为「三区域文本框 world/before_char/after_char」并序列化为 JSON 字符串；memory/css 区为自由文本。导入导出纯前端（导出本地 Blob 下载镜像 save-manager 形态；导入逐条 `mods.create` 容错，source="imported"）。
 
 | 元素 | 说明 |
 |------|------|
-| <!--AUTO:sig:frontend/js/components/mod-manager.js:showModManager-->`showModManager({ characterName = '角色', onChanged } = {})`<!--/AUTO--> | 打开 Mod 管理面板（复用 openModal；标题含角色名） |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:showModManager-->`showModManager({ characterId = null, characterName = '角色', onChanged } = {})`<!--/AUTO--> | 打开 Mod 管理面板（复用 openModal；标题含角色名；MD-2/04 扩展 characterId 入挂载区块） |
 | <!--AUTO:sig:frontend/js/components/mod-manager.js:buildModPayload-->`buildModPayload(form)`<!--/AUTO--> | 表单 → Mod payload（三区域序列化 + target_area 切换录入形态） |
 | <!--AUTO:sig:frontend/js/components/mod-manager.js:validateModForm-->`validateModForm(form)`<!--/AUTO--> | 表单校验（名称为空 / payload JSON 非法 → 内联错误） |
 | <!--AUTO:sig:frontend/js/components/mod-manager.js:serializePromptPayload-->`serializePromptPayload(world, beforeChar, afterChar)`<!--/AUTO--> | 三区域文本 → prompt 区 JSON 字符串 |
@@ -964,6 +964,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/mod-manager.js:buildExportEnvelope-->`buildExportEnvelope(modsList)`<!--/AUTO--> | Mod 库 → 导出信封 `{"version":1,"mods":[...]}` |
 | <!--AUTO:sig:frontend/js/components/mod-manager.js:parseImportEnvelope-->`parseImportEnvelope(text)`<!--/AUTO--> | 导入信封校验（非法 JSON/version 不符/mods 非数组 → 报错） |
 | <!--AUTO:sig:frontend/js/components/mod-manager.js:exportLibrary-->`exportLibrary(modsList)`<!--/AUTO--> | 导出下载（本地 Blob，镜像 save-manager downloadJson 形态） |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:computeSortSwap-->`computeSortSwap(bindings, index, direction)`<!--/AUTO--> | 上移/下移相邻交换 sort_order 纯函数（MD-2/04：返回交换后列表，落库 mods.setSortOrder） |
 
 ### 4.44.1 `frontend/js/components/loading-button.js` — 按钮 loading 态工具（<!--AUTO:lines:frontend/js/components/loading-button.js-->~59 行<!--/AUTO-->）
 
@@ -1024,7 +1025,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/fetch-seam.js:setFetch-->`setFetch(fn)`<!--/AUTO--> | 注入 fetch 实现（测试用） |
 | <!--AUTO:sig:frontend/js/fetch-seam.js:doFetch-->`doFetch(...args)`<!--/AUTO--> | 统一 fetch 出口（超时守卫） |
 
-### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~244 行<!--/AUTO-->）
+### 4.49 `frontend/js/format.js` — 展示契约（<!--AUTO:lines:frontend/js/format.js-->~245 行<!--/AUTO-->）
 
 **职责**：展示 HTML 生成单源（ARC 展示契约）——消息气泡/角色卡片/会话项/搜索结果/头像/关键词高亮。T2 搜索定位：`messageBubbleHtml` 接受可选 `messageId` 选项 → 渲染 `data-message-id` 属性（供定位选择器消费）；`buildMessagesHtml` 透传 `m.id`。T6 重生成：`buildMessagesHtml` 的 `context.canRegenerate`（聊天域开关）为真且末条为已结算 assistant 时，该气泡经 `messageBubbleHtml` 渲染「重生成」操作按钮。
 
@@ -1518,16 +1519,16 @@ conver system/
 | `frontend/tests/desktop-settings.test.js` | <!--AUTO:tests:frontend/tests/desktop-settings.test.js-->20<!--/AUTO--> | 桌面壳设置（关闭行为偏好，D11） |
 | `frontend/tests/error-bar.test.js` | <!--AUTO:tests:frontend/tests/error-bar.test.js-->20<!--/AUTO--> | 错误条渲染/交互/生命周期（T1） |
 | `frontend/tests/loading-button.test.js` | <!--AUTO:tests:frontend/tests/loading-button.test.js-->7<!--/AUTO--> | 按钮 loading 态工具 |
-| `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->49<!--/AUTO--> | 展示契约 |
+| `frontend/tests/format.test.js` | <!--AUTO:tests:frontend/tests/format.test.js-->50<!--/AUTO--> | 展示契约 |
 | `frontend/tests/game-generator.test.js` | <!--AUTO:tests:frontend/tests/game-generator.test.js-->29<!--/AUTO--> | AI 游戏生成器（模态框/错误/重试/T4 凭证预检） |
 | `frontend/tests/icons.test.js` | <!--AUTO:tests:frontend/tests/icons.test.js-->7<!--/AUTO--> | 图标 seam |
 | `frontend/tests/key-injector.test.js` | <!--AUTO:tests:frontend/tests/key-injector.test.js-->103<!--/AUTO--> | Key 注入/端点口径 |
-| `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->21<!--/AUTO--> | 角色/对话列表视图 |
+| `frontend/tests/list-views.test.js` | <!--AUTO:tests:frontend/tests/list-views.test.js-->22<!--/AUTO--> | 角色/对话列表视图 |
 | `frontend/tests/lorebook-editor.test.js` | <!--AUTO:tests:frontend/tests/lorebook-editor.test.js-->23<!--/AUTO--> | 世界书编辑器契约锁（WL-4：chips 交互/表单校验/泛词告警/payload 字段映射/列表渲染搜索/保存双路径/XSS 属性注入防护） |
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
-| `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->30<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
+| `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->43<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
 | `frontend/tests/save-key-meta.test.js` | <!--AUTO:tests:frontend/tests/save-key-meta.test.js-->25<!--/AUTO--> | 存档键契约 |
 | `frontend/tests/save-manager.test.js` | <!--AUTO:tests:frontend/tests/save-manager.test.js-->64<!--/AUTO--> | 存档管理 |
@@ -1596,10 +1597,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2439<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2454<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1097<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1272<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1287<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
