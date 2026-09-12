@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2388<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1079<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1239<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2405<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1096<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1239<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -93,6 +93,7 @@ conver system/
 │   │   │       ├── lorebook.py     ← 世界书条目 CRUD（WL-4）
 │   │   │       ├── messages.py     ← 消息读取 + 跨对话搜索
 │   │   │       ├── models.py       ← Provider/模型清单
+│   │   │       ├── mods.py         ← Mod 库与挂载路由（MD-2）
 │   │   │       └── settings.py     ← 设置 CRUD + 凭证 + 连接测试
 │   │   ├── models/                 ← SQLAlchemy ORM（7 实体）
 │   │   │   ├── __init__.py
@@ -239,7 +240,7 @@ conver system/
 
 ## 四、核心模块详细说明
 
-### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~101 行<!--/AUTO-->）
+### 4.1 `backend/app/main.py` — 应用入口（<!--AUTO:lines:backend/app/main.py-->~103 行<!--/AUTO-->）
 
 **职责**：FastAPI 应用装配——注册统一异常处理器、on_startup 初始化 DB 与模拟器首启种子（Provider 懒注册，不预热 SDK）、API 路由挂载（须 `/api` 前缀且在静态挂载前）、`/simulators` 挂载（数据目录 simulators，T-02 外置，先于根挂载）、前端静态文件挂载。
 
@@ -372,6 +373,22 @@ conver system/
 | <!--AUTO:sig:backend/app/api/routes/lorebook.py:update_lorebook-->`update_lorebook(entry_id, payload, db)`<!--/AUTO--> | PUT 部分更新（条目不存在 404） |
 | <!--AUTO:sig:backend/app/api/routes/lorebook.py:delete_lorebook-->`delete_lorebook(entry_id, db)`<!--/AUTO--> | DELETE 删除条目（条目不存在 404；204） |
 
+### 4.11.7 `backend/app/api/routes/mods.py` — Mod 库与挂载路由（MD-2）（<!--AUTO:lines:backend/app/api/routes/mods.py-->~97 行<!--/AUTO-->）
+
+**职责**：Mod 能力 HTTP 映射——Mod 库 CRUD（GET/POST/PUT/DELETE `/api/mods`）+ 角色挂载（GET/POST `/api/characters/{id}/mods`、PUT `/api/mod-bindings/{id}` 开关、PUT `/api/mod-bindings/{id}/sort` 排序、DELETE `/api/mod-bindings/{id}` 解绑）。只做 HTTP 映射：守卫（角色/Mod/绑定不存在、重复挂载）抛领域异常（统一 handler 转 404/400）；请求体校验由 Pydantic Schema 拦截（422）；增删改查全部委托 `backend/app/services/mods.py`。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/api/routes/mods.py:list_mods-->`list_mods(db)`<!--/AUTO--> | GET Mod 库列表（id 升序） |
+| <!--AUTO:sig:backend/app/api/routes/mods.py:create_mod-->`create_mod(payload, db)`<!--/AUTO--> | POST 创建 Mod |
+| <!--AUTO:sig:backend/app/api/routes/mods.py:update_mod-->`update_mod(mod_id, payload, db)`<!--/AUTO--> | PUT 部分更新（不存在 404） |
+| <!--AUTO:sig:backend/app/api/routes/mods.py:delete_mod-->`delete_mod(mod_id, db)`<!--/AUTO--> | DELETE 删库（级联删绑定；204） |
+| <!--AUTO:sig:backend/app/api/routes/mods.py:list_character_mods-->`list_character_mods(character_id, db)`<!--/AUTO--> | GET 角色挂载列表（sort_order 升序） |
+| <!--AUTO:sig:backend/app/api/routes/mods.py:bind_mod-->`bind_mod(character_id, payload, db)`<!--/AUTO--> | POST 挂载（重复挂载 400） |
+| <!--AUTO:sig:backend/app/api/routes/mods.py:update_binding_enabled-->`update_binding_enabled(binding_id, payload, db)`<!--/AUTO--> | PUT 切换开关 |
+| <!--AUTO:sig:backend/app/api/routes/mods.py:update_binding_sort-->`update_binding_sort(binding_id, payload, db)`<!--/AUTO--> | PUT 调整 sort_order |
+| <!--AUTO:sig:backend/app/api/routes/mods.py:delete_binding-->`delete_binding(binding_id, db)`<!--/AUTO--> | DELETE 解绑（204） |
+
 ### 4.12 `backend/app/services/character.py` — 角色服务（<!--AUTO:lines:backend/app/services/character.py-->~77 行<!--/AUTO-->）
 
 **职责**：角色 CRUD 业务逻辑 + 消息计数 + 不存在即抛领域异常。
@@ -423,7 +440,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~660 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~709 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -488,7 +505,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/document_parser.py:_default_for-->`_default_for(field)`<!--/AUTO--> | 缺失字段兜底默认值 |
 | <!--AUTO:sig:backend/app/services/document_parser.py:_truncate-->`_truncate(msg, max_len)`<!--/AUTO--> | 错误消息截断 |
 
-### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~157 行<!--/AUTO-->）
+### 4.19 `backend/app/services/error_mapping.py` — 错误映射（<!--AUTO:lines:backend/app/services/error_mapping.py-->~162 行<!--/AUTO-->）
 
 **职责**：领域与 LLM 异常 → 标准错误响应结构（错误码/消息）单源（T-01 迁入 LLM 映射）。
 
@@ -605,7 +622,7 @@ conver system/
 
 **职责**：POST /api/images/tasks（提交 + 后台 asyncio 执行）/ GET /api/images/tasks/{id}（轮询三态）/ GET /api/characters/{id}/cg-timeline（剧情回顾时间线）。/cg 静态挂载在 main.py（图片文件加载）。
 
-### 4.21.12 `backend/app/services/mods.py` — Mod 挂载层（MD-1）（<!--AUTO:lines:backend/app/services/mods.py-->~270 行<!--/AUTO-->）
+### 4.21.12 `backend/app/services/mods.py` — Mod 挂载层（MD-1）（<!--AUTO:lines:backend/app/services/mods.py-->~285 行<!--/AUTO-->）
 
 **职责**：Mod 挂载层深模块——mods（全局 Mod 库，目标区域 prompt|memory|css）+ mod_bindings（作品级挂载，(character_id, mod_id) 唯一 + sort_order + enabled 开关）的存取，以及「prompt 区注入叠加」纯函数 apply_prompt_mods。生命周期由 DB FK 落实（删作品/删 Mod 级联删绑定）；`ModPayload` 为纯数据容器（与 ORM 解耦，`mod_id`/`target_area`/`payload`/`sort_order`/`enabled`）。apply_prompt_mods 零 DB：已启用 prompt 区 Mod 按 sort_order 升序（同序按 mod_id 稳定）叠加进 base_blocks（`system`/`before_char`/`after_char` 三块，与 build_world_injection 输出同构）；payload 为 JSON `{"world"/"before_char"/"after_char": str}`，`world` 注入 `system` 块（对齐 _POSITION_KEYS）；非 JSON/非 dict/区域非 str 容错跳过（不破坏对话）。
 
@@ -618,6 +635,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/mods.py:bind_mod-->`bind_mod(db, character_id, mod_id, *, enabled=True, sort_order=None)`<!--/AUTO--> | 挂载（sort_order=None 自动续尾；重复绑定 ModAlreadyBoundError） |
 | <!--AUTO:sig:backend/app/services/mods.py:unbind_mod-->`unbind_mod(db, binding_id)`<!--/AUTO--> | 解绑（删除绑定行） |
 | <!--AUTO:sig:backend/app/services/mods.py:set_binding_enabled-->`set_binding_enabled(db, binding_id, enabled)`<!--/AUTO--> | 切换绑定开关（幂等） |
+| <!--AUTO:sig:backend/app/services/mods.py:set_binding_sort_order-->`set_binding_sort_order(db, binding_id, sort_order)`<!--/AUTO--> | 调整绑定排序（MD-2：单条幂等更新 sort_order） |
 | <!--AUTO:sig:backend/app/services/mods.py:list_character_mods-->`list_character_mods(db, character_id)`<!--/AUTO--> | 角色已挂载绑定（sort_order 升序 + 同序 mod_id 稳定） |
 | <!--AUTO:sig:backend/app/services/mods.py:apply_prompt_mods-->`apply_prompt_mods(base_blocks, mods)`<!--/AUTO--> | prompt 三区域叠加纯函数（world→system / before_char / after_char，空列表零变化） |
 
@@ -1423,6 +1441,7 @@ conver system/
 | `backend/tests/test_character_import_avatar.py` | <!--AUTO:tests:backend/tests/test_character_import_avatar.py-->2<!--/AUTO--> | 角色导入非 ASCII avatar 500 回归（服务层 ValueError 缺陷路径 + API 层全路径） |
 | `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->36<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
 | `backend/tests/test_chat_continue.py` | <!--AUTO:tests:backend/tests/test_chat_continue.py-->21<!--/AUTO--> | 续写端点契约锁（MS-3：条数不变/不追加 user/失败零改动/续写触发形态/空续写 no-op/错误矩阵） |
+| `backend/tests/test_chat_mod_injection.py` | <!--AUTO:tests:backend/tests/test_chat_mod_injection.py-->6<!--/AUTO--> | prompt 注入链集成契约锁（MD-2：三区域叠加/禁用与非 prompt 区零影响/无 Mod 零回归/sort_order 升序/叠加于世界书之上不新增尾随 system） |
 | `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
 | `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->18<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
 | `backend/tests/test_image_provider.py` | <!--AUTO:tests:backend/tests/test_image_provider.py-->22<!--/AUTO--> | 图片 Provider 契约锁（CG-1：注册表派生/缺 Key 401/畸形响应/超时 504/连接 502/A1111 happy path 落盘/本地占位确定性/映射矩阵） |
@@ -1441,6 +1460,7 @@ conver system/
 | `backend/tests/test_lorebook_routes.py` | <!--AUTO:tests:backend/tests/test_lorebook_routes.py-->5<!--/AUTO--> | 世界书 CRUD 路由契约锁（WL-4：列表/创建/部分更新/删除/守卫 404/校验 422） |
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
 | `backend/tests/test_mods.py` | <!--AUTO:tests:backend/tests/test_mods.py-->29<!--/AUTO--> | Mod 挂载层契约锁（MD-1：绑定唯一/禁用零影响/sort_order 叠加序含同序稳定/解绑与级联/空列表零变化/CRUD/404 守卫/target_area 过滤/payload 容错） |
+| `backend/tests/test_mods_routes.py` | <!--AUTO:tests:backend/tests/test_mods_routes.py-->11<!--/AUTO--> | Mod 路由契约锁（MD-2：库 CRUD/挂载/开关/排序/解绑/404·400·422 守卫） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_memory_palace.py` |
 | `backend/tests/test_message_swipes.py` | <!--AUTO:tests:backend/tests/test_message_swipes.py-->10<!--/AUTO--> | swipes 多候选契约锁（MS-1：播种序号自增/唯一约束/切换越界/删中间与回落/原始候选保护/级联/导出含候选集/自愈迁移幂等） | <!--AUTO:tests:backend/tests/test_memory_palace.py-->15<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
@@ -1559,9 +1579,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2388<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2405<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1079<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1096<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1239<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

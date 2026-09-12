@@ -979,3 +979,30 @@ DELETE /api/lorebook/{entry_id}
 成功 → 204。条目不存在 → 404。删角色 → 世界书条目级联删除（FK CASCADE）。
 
 > 字段语义对齐 SillyTavern World Info（spec WL-1/§WL-4）；命中/注入引擎见「对话 API」上下文组装（assemble_chat_context 世界书注入，WL-3）。
+
+## Mod API（MD-2）
+
+> Mod 挂载层：全局 Mod 库（目标区域 prompt|memory|css）+ 作品（角色）级挂载（(character_id, mod_id) 唯一 + sort_order + enabled）。prompt 区 Mod 在 assemble_chat_context 世界书注入之后叠加（apply_prompt_mods）；memory/css 区消费留后续。守卫：角色/Mod/绑定不存在 → 404，重复挂载 → 400，非法请求体 → 422。
+
+### Mod 库列表 / 创建 / 更新 / 删除
+
+```
+GET    /api/mods                          → Mod 列表（id 升序）
+POST   /api/mods                          → 创建（body：ModCreate）
+PUT    /api/mods/{mod_id}                 → 部分更新（body：ModUpdate，仅显式字段）
+DELETE /api/mods/{mod_id}                 → 204（级联删绑定）
+```
+
+Mod 响应字段：`id / name / description / target_area / payload / version / source / created_at`。Mod 不存在 → 404。
+
+### 角色挂载
+
+```
+GET    /api/characters/{character_id}/mods       → 挂载列表（sort_order 升序）
+POST   /api/characters/{character_id}/mods       → 挂载（body：{mod_id, enabled?, sort_order?}）
+PUT    /api/mod-bindings/{binding_id}            → 切换开关（body：{enabled}）
+PUT    /api/mod-bindings/{binding_id}/sort       → 调整排序（body：{sort_order}）
+DELETE /api/mod-bindings/{binding_id}            → 204 解绑
+```
+
+挂载响应字段：`id / character_id / mod_id / enabled / sort_order`（不嵌套 Mod 详情，前端按 mod_id 关联）。角色不存在 → 404；同角色同 Mod 重复挂载 → 400；绑定不存在 → 404。
