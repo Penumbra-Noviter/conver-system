@@ -798,6 +798,81 @@ export async function handleSend() {
     syncChatHeaderTitle();
 }
 
+// ── 末条 assistant 动作生命周期骨架（F-110 — 重生成/继续/分支共享，私有 helper）──
+
+/**
+ * 「末条 assistant 动作」共享生命周期骨架（F-110 私有 helper — 重生成 / 继续 / 分支三
+ * 入口只保留差异点，守卫与在途生命周期统一在此，调整时序只改一处）。
+ *
+ * 契约（守卫时序不得重排）：
+ * 1. getActiveTab 守卫（无活动 tab 或流式在途 → no-op）
+ * 2. convId 发起时捕获（防悬挂核心 — 后续全部按捕获值寻址，不读「当前活动」）
+ * 3. cleanupStaleInFlight() → nonStreamingInFlight 互斥查询（与 handleSend
+ *    非流式共享同一集合，命中即 no-op — 同对话重复触发只发一次真实请求）
+ * 4. prepare(ctx) 可 falsy 中止（中止发生在置在途标记之前）：捕获差异点（重生成的
+ *    replaceId）或防御性 no-op（分支的 messageId==null）
+ * 5. 加入 nonStreamingInFlight + 末条 assistant 气泡按钮禁用（buttonSelector 数组形态，
+ *    join 后单次 querySelectorAll）+ thinking 指示器（DOM 手术，不动缓存）
+ * 6. await action(ctx)；catch 走 renderSendError(errorLabel, convId) 错误条通道 —
+ *    不写进消息列表（缓存保持原状）
+ * 7. finally 统一复原：清在途标记 → isConnected 守卫恢复按钮（成功路径 settle / 切走
+ *    会话已重建 DOM，旧引用 isConnected 为 false 自然跳过 — 分支成功已切走活动 tab 时
+ *    靠此兜底，不得优化掉）→ 按 convId 移除 thinking（F-59 会话隔离）→ refreshSendButton
+ *
+ * @param {object} opts
+ * @param {string[]} opts.buttonSelector - 末条 assistant 气泡内待禁用按钮 selector
+ *   （数组形态，逐元素 join 后单次查询）
+ * @param {string} opts.errorLabel - 失败错误条兜底文案（调用方透传，原文不变）
+ * @param {(() => boolean)|null} [opts.isActive=null] - 活动归属判定覆盖；缺省按发起时
+ *   捕获的 convId 派生（getActiveTab()?.conversationId === convId）
+ * @param {((ctx: {tab: object, convId: string, isActive: () => boolean}) => object|null|undefined|false)} [opts.prepare]
+ *   - 前置捕获/防御，返回 falsy 即静默中止（不置在途标记、不动 DOM）
+ * @param {((ctx: object) => Promise<void>)} opts.action - 动作主体（在途态就位后执行）
+ * @returns {Promise<boolean>} 动作是否真实发起 — 守卫/互斥/中止路径为 false；置在途
+ *   标记后恒为 true（含 catch 失败），调用方据此决定后续动作（如会话列表刷新）
+ */
+async function runLastAssistantAction({ buttonSelector, errorLabel, isActive = null, prepare, action }) {
+    const tab = getActiveTab();
+    if (!tab || tab.isStreaming) return false;
+    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    const isActiveFn = isActive ?? (() => getActiveTab()?.conversationId === convId);
+    // FIX-B 同源在途守卫：非流式发送/重生成/继续/分支共用 — 同一对话重复触发只发一次真实请求
+    cleanupStaleInFlight();
+    if (nonStreamingInFlight.has(convId)) return false;
+
+    const ctx = { tab, convId, isActive: isActiveFn };
+    const extra = prepare ? prepare(ctx) : {};
+    if (!extra) return false;
+
+    nonStreamingInFlight.add(convId);
+
+    // 进行中状态：末条 assistant 气泡操作按钮组禁用 + thinking 指示器（DOM 手术，不动
+    // 缓存 — 失败语义「不写消息列表」要求缓存保持原状，成功由 settleTurn / 会话切换重建 DOM）
+    const assistantBubbles = chatDom.chatMessages.querySelectorAll('.message.assistant');
+    const lastBubble = assistantBubbles[assistantBubbles.length - 1];
+    const actionButtons = lastBubble
+        ? [...lastBubble.querySelectorAll(buttonSelector.join(','))]
+        : [];
+    actionButtons.forEach((btn) => { btn.disabled = true; });
+    showThinkingIndicator(convId);
+
+    try {
+        await action({ ...ctx, ...extra });
+    } catch (err) {
+        // 失败 — 既有错误条通道（T1 错误条）：不写进消息列表
+        renderSendError(err, errorLabel, convId);
+    } finally {
+        // 完成/失败均清除在途标记；恢复按钮组与 thinking（成功路径 settle/切走已重建
+        //   DOM — 旧引用 isConnected 兜底跳过；失败路径复原）。F-59 会话隔离：只移除本会话
+        //   （convId）的 thinking 指示器
+        nonStreamingInFlight.delete(convId);
+        actionButtons.forEach((btn) => { if (btn.isConnected) btn.disabled = false; });
+        removeThinkingIndicator(chatDom.chatMessages, convId);
+        refreshSendButton();
+    }
+    return true;
+}
+
 // ── 重生成（T6 — 末条 assistant 气泡重生成，MVP 非流式）──
 
 /**
@@ -820,56 +895,33 @@ export async function handleSend() {
  * 防悬挂：只接受发起时捕获的 convId + isActive 活动归属判定，不读「当前活动」。
  */
 export async function regenerateLastReply() {
-    const tab = getActiveTab();
-    if (!tab || tab.isStreaming) return;
-    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
-    const isActive = () => getActiveTab()?.conversationId === convId;
-    // FIX-B 同源在途守卫：非流式发送 / 重生成共用 — 同一对话重复触发只发一次真实请求
-    cleanupStaleInFlight();
-    if (nonStreamingInFlight.has(convId)) return;
+    const started = await runLastAssistantAction({
+        buttonSelector: ['.btn-regenerate'],
+        errorLabel: '重生成失败',
+        // F-58：发起前捕获被顶替旧回复（末条 assistant 消息）的服务端 id — 失败兜底按身份原位
+        // 替换，不尾部追加。无 id（本地暂存消息）回落既有追加语义。
+        prepare({ tab }) {
+            const lastAssistant = Array.isArray(tab.messages)
+                ? [...tab.messages].reverse().find((m) => m?.role === 'assistant')
+                : null;
+            return { replaceId: lastAssistant?.id ?? null };
+        },
+        async action({ convId, isActive, replaceId }) {
+            const result = await conversations.regenerate(convId);
+            // 成功 — 统一结算入口 settleTurn：从服务端重载截断后的新时间线（含角色开场白
+            //   greeting 与新回复 id）→ fresh 整体替换 tab 缓存 + 活动渲染。messageId 透传
+            //   服务端新消息 id（W2 增量审核 #2：新消息带服务端 id 进缓存 / 失败兜底写回同样携带）
+            const revision = getTab(convId)?.messages.length ?? 0;
+            await settleTurn({
+                convId, getTab, updateTab, isActive, render: renderMessages,
+                revision, settleIndex: -1, messageId: result.message_id, content: result.reply,
+                replaceId,  // F-58:被顶替旧回复身份 — 失败兜底按此 id 原位替换(不尾部追加)
+            });
+        },
+    });
 
-    // F-58：发起前捕获被顶替旧回复（末条 assistant 消息）的服务端 id — 失败兜底按身份原位
-    // 替换，不尾部追加。无 id（本地暂存消息）回落既有追加语义。
-    const lastAssistant = Array.isArray(tab.messages)
-        ? [...tab.messages].reverse().find((m) => m?.role === 'assistant')
-        : null;
-    const replaceId = lastAssistant?.id ?? null;
-
-    nonStreamingInFlight.add(convId);
-
-    // 进行中状态：末条 assistant 气泡重生成按钮禁用 + thinking 指示器（不动缓存 —
-    // 失败语义「不写消息列表」要求缓存保持原状，成功由 settleTurn 重建 DOM）
-    const assistantBubbles = chatDom.chatMessages.querySelectorAll('.message.assistant');
-    const regenButton = assistantBubbles[assistantBubbles.length - 1]?.querySelector('.btn-regenerate') ?? null;
-    if (regenButton) regenButton.disabled = true;
-    showThinkingIndicator(convId);
-
-    try {
-        const result = await conversations.regenerate(convId);
-        // 成功 — 统一结算入口 settleTurn：从服务端重载截断后的新时间线（含角色开场白
-        //   greeting 与新回复 id）→ fresh 整体替换 tab 缓存 + 活动渲染。messageId 透传
-        //   服务端新消息 id（W2 增量审核 #2：新消息带服务端 id 进缓存 / 失败兜底写回同样携带）
-        const revision = getTab(convId)?.messages.length ?? 0;
-        await settleTurn({
-            convId, getTab, updateTab, isActive, render: renderMessages,
-            revision, settleIndex: -1, messageId: result.message_id, content: result.reply,
-            replaceId,  // F-58:被顶替旧回复身份 — 失败兜底按此 id 原位替换(不尾部追加)
-        });
-    } catch (err) {
-        // 失败 — 与 messages.chat 同一错误通道（T1 错误条）：不写进消息列表
-        renderSendError(err, '重生成失败', convId);
-    } finally {
-        // 完成/失败均清除在途标记；恢复按钮与 thinking（成功路径 settle 已重建 DOM —
-        //   旧引用 isConnected 兜底跳过；失败路径复原）。F-59 会话隔离：只移除本会话
-        //   （convId）的 thinking 指示器 — 不误删其他会话在途指示器
-        nonStreamingInFlight.delete(convId);
-        if (regenButton && regenButton.isConnected) regenButton.disabled = false;
-        removeThinkingIndicator(chatDom.chatMessages, convId);
-        refreshSendButton();
-    }
-
-    // 刷新对话列表（更新消息数量）
-    await hooks.refreshConversations();
+    // 刷新对话列表（更新消息数量）— 动作未真实发起（守卫/互斥/中止）时保持既有 no-op 语义
+    if (started) await hooks.refreshConversations();
 }
 
 // ── MS-3 继续（末条 assistant 气泡 append 续写，与重生成同组 seam）──
@@ -892,49 +944,25 @@ export async function regenerateLastReply() {
  * 防悬挂：只接受发起时捕获的 convId + isActive 活动归属判定，不读「当前活动」。
  */
 export async function continueLastReply() {
-    const tab = getActiveTab();
-    if (!tab || tab.isStreaming) return;
-    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
-    const isActive = () => getActiveTab()?.conversationId === convId;
-    cleanupStaleInFlight();
-    if (nonStreamingInFlight.has(convId)) return;
+    const started = await runLastAssistantAction({
+        buttonSelector: ['.btn-regenerate', '.btn-continue'],
+        errorLabel: '续写失败',
+        async action({ convId, isActive }) {
+            const result = await conversations.continue(convId);
+            // 成功 — 统一结算入口 settleTurn：从服务端重载（续写不产生新消息，消息 id
+            //   不变，扩展内容与候选随服务端列表整体进入缓存）。messageId = 被续写消息
+            //   id，replaceId 同值（重载失败兜底按该 id 原位替换扩展内容，不尾部追加）
+            const revision = getTab(convId)?.messages.length ?? 0;
+            await settleTurn({
+                convId, getTab, updateTab, isActive, render: renderMessages,
+                revision, settleIndex: -1, messageId: result.message_id, content: result.reply,
+                replaceId: result.message_id ?? null,
+            });
+        },
+    });
 
-    nonStreamingInFlight.add(convId);
-
-    // 进行中状态：末条 assistant 气泡操作按钮组（重生成+继续）禁用 + thinking 指示器
-    const assistantBubbles = chatDom.chatMessages.querySelectorAll('.message.assistant');
-    const actionButtons = assistantBubbles.length
-        ? [...assistantBubbles[assistantBubbles.length - 1].querySelectorAll('.btn-regenerate, .btn-continue')]
-        : [];
-    actionButtons.forEach((btn) => { btn.disabled = true; });
-    showThinkingIndicator(convId);
-
-    try {
-        const result = await conversations.continue(convId);
-        // 成功 — 统一结算入口 settleTurn：从服务端重载（续写不产生新消息，消息 id
-        //   不变，扩展内容与候选随服务端列表整体进入缓存）。messageId = 被续写消息
-        //   id，replaceId 同值（重载失败兜底按该 id 原位替换扩展内容，不尾部追加）
-        const revision = getTab(convId)?.messages.length ?? 0;
-        await settleTurn({
-            convId, getTab, updateTab, isActive, render: renderMessages,
-            revision, settleIndex: -1, messageId: result.message_id, content: result.reply,
-            replaceId: result.message_id ?? null,
-        });
-    } catch (err) {
-        // 失败 — 与重生成同一错误通道（T1 错误条）：不写进消息列表
-        renderSendError(err, '续写失败', convId);
-    } finally {
-        // 完成/失败均清除在途标记；恢复按钮组与 thinking（成功路径 settle 已重建
-        //   DOM — 旧引用 isConnected 兜底跳过；失败路径复原）。F-59 会话隔离：只移除
-        //   本会话（convId）的 thinking 指示器
-        nonStreamingInFlight.delete(convId);
-        actionButtons.forEach((btn) => { if (btn.isConnected) btn.disabled = false; });
-        removeThinkingIndicator(chatDom.chatMessages, convId);
-        refreshSendButton();
-    }
-
-    // 刷新对话列表（更新消息数量）
-    await hooks.refreshConversations();
+    // 刷新对话列表（更新消息数量）— 动作未真实发起（守卫/互斥/中止）时保持既有 no-op 语义
+    if (started) await hooks.refreshConversations();
 }
 
 // ── F-100 能力 1 分支（末条 assistant 气泡「分支」按钮触发，MVP 非流式）──
@@ -957,53 +985,31 @@ export async function continueLastReply() {
  * 防悬挂：只接受发起时捕获的 convId，不读「当前活动」。
  */
 export async function branchLastReply() {
-    const tab = getActiveTab();
-    if (!tab || tab.isStreaming) return;
-    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
-    // FIX-B 同源在途守卫：非流式发送/重生成/继续/分支共用 — 同一对话重复触发只发一次
-    cleanupStaleInFlight();
-    if (nonStreamingInFlight.has(convId)) return;
-
-    // 锚 = 末条已结算 assistant（复用 regenerate/continue 的 lastAssistant 定位）；
-    // 后端 BranchRequest 的 message_id 必传（无缺省），无 id 时防御 no-op（按钮仅在
-    // 末条已结算 assistant 气泡渲染，结算语义保证 id 存在）。
-    const lastAssistant = Array.isArray(tab.messages)
-        ? [...tab.messages].reverse().find((m) => m?.role === 'assistant')
-        : null;
-    const messageId = lastAssistant?.id ?? null;
-    if (messageId == null) return;
-
-    nonStreamingInFlight.add(convId);
-
-    // 进行中状态：末条 assistant 气泡操作按钮组（重生成+继续+分支）禁用 + thinking 指示器
-    const assistantBubbles = chatDom.chatMessages.querySelectorAll('.message.assistant');
-    const actionButtons = assistantBubbles.length
-        ? [...assistantBubbles[assistantBubbles.length - 1].querySelectorAll('.btn-regenerate, .btn-continue, .btn-branch')]
-        : [];
-    actionButtons.forEach((btn) => { btn.disabled = true; });
-    showThinkingIndicator(convId);
-
-    try {
-        // title = 源会话标题（期末审核修复：进入 branch_title，父会话删除后
-        // 会话列表来源标记回落 branch_title 不失效；空串由后端 falsy 兜底回落快照标题）
-        const result = await conversations.branch(convId, { message_id: messageId, title: tab.title });
-        // 成功 — 刷新会话列表（新分支进入侧栏）+ 激活/打开新分支会话（创建即打开；
-        // 新会话 id 来自 201 响应）。顺序对齐 startChatWithCharacter：
-        // loadConversations（重拉列表）→ activateConversation（openTab + 懒加载消息 + 渲染）
-        await hooks.refreshConversations();
-        await hooks.activateConversation(result.id);
-    } catch (err) {
-        // 失败 — 与重生成/续写同一错误通道（T1 错误条）：不写进消息列表
-        renderSendError(err, '分支失败', convId);
-    } finally {
-        // 完成/失败均清除在途标记；恢复按钮组与 thinking（成功路径已切走新会话 —
-        //   旧引用 isConnected 兜底跳过；失败路径复原）。F-59 会话隔离：只移除本会话
-        //   （convId）的 thinking 指示器
-        nonStreamingInFlight.delete(convId);
-        actionButtons.forEach((btn) => { if (btn.isConnected) btn.disabled = false; });
-        removeThinkingIndicator(chatDom.chatMessages, convId);
-        refreshSendButton();
-    }
+    await runLastAssistantAction({
+        buttonSelector: ['.btn-regenerate', '.btn-continue', '.btn-branch'],
+        errorLabel: '分支失败',
+        // 锚 = 末条已结算 assistant（复用 regenerate/continue 的 lastAssistant 定位）；
+        // 后端 BranchRequest 的 message_id 必传（无缺省），无 id 时防御 no-op（按钮仅在
+        // 末条已结算 assistant 气泡渲染，结算语义保证 id 存在）。
+        prepare({ tab }) {
+            const lastAssistant = Array.isArray(tab.messages)
+                ? [...tab.messages].reverse().find((m) => m?.role === 'assistant')
+                : null;
+            const messageId = lastAssistant?.id ?? null;
+            return messageId == null ? null : { messageId };
+        },
+        async action({ convId, tab, messageId }) {
+            // title = 源会话标题（期末审核修复：进入 branch_title，父会话删除后
+            // 会话列表来源标记回落 branch_title 不失效；空串由后端 falsy 兜底回落快照标题）
+            const result = await conversations.branch(convId, { message_id: messageId, title: tab.title });
+            // 成功 — 刷新会话列表（新分支进入侧栏）+ 激活/打开新分支会话（创建即打开；
+            // 新会话 id 来自 201 响应）。顺序对齐 startChatWithCharacter：
+            // loadConversations（重拉列表）→ activateConversation（openTab + 懒加载消息 + 渲染）
+            // 时序敏感：需先拿到 result.id 激活会话，不得上提出 action
+            await hooks.refreshConversations();
+            await hooks.activateConversation(result.id);
+        },
+    });
 }
 
 // ── CG-3 对话内出图（生成图片入口 → 提交 → 轮询 → 三态渲染）──
