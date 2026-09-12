@@ -31,6 +31,9 @@ from backend.app.services.exceptions import (
     InvalidRegenerateTargetError,
     LorebookEntryNotFoundError,
     MessageNotFoundError,
+    ModAlreadyBoundError,
+    ModBindingNotFoundError,
+    ModNotFoundError,
     ProviderNotSupportedError,
     SwipeIndexError,
 )
@@ -88,10 +91,12 @@ def domain_error_response(exc: DomainError) -> tuple[int, str]:
             LorebookEntryNotFoundError,
             CgImageNotFoundError,
             ImageTaskNotFoundError,
+            ModNotFoundError,
+            ModBindingNotFoundError,
         ),
     ):
         return status.HTTP_404_NOT_FOUND, str(exc)
-    if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError, InvalidRegenerateTargetError, InvalidContinueTargetError, BranchSnapshotError, SwipeIndexError)):
+    if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError, InvalidRegenerateTargetError, InvalidContinueTargetError, BranchSnapshotError, SwipeIndexError, ModAlreadyBoundError)):
         return status.HTTP_400_BAD_REQUEST, str(exc)
     if isinstance(exc, CardFormatError):
         return status.HTTP_422_UNPROCESSABLE_CONTENT, f"导入失败：{exc}。{IMPORT_FORMAT_HINT}"
