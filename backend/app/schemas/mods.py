@@ -81,7 +81,7 @@ class ModBindCreate(BaseModel):
     """挂载请求（mod_id 必填；enabled 默认开、sort_order None = 自动续尾）"""
     mod_id: int = Field(..., description="挂载的 Mod ID")
     enabled: bool = Field(True, description="绑定开关（默认开）")
-    sort_order: int | None = Field(None, description="叠加排序（None = 自动续尾）")
+    sort_order: int | None = Field(None, ge=0, le=9999, description="叠加排序（None = 自动续尾）")
 
 
 class ModBindingUpdate(BaseModel):
@@ -91,4 +91,4 @@ class ModBindingUpdate(BaseModel):
 
 class ModBindSortUpdate(BaseModel):
     """挂载排序更新请求（sort_order 必填）"""
-    sort_order: int = Field(..., description="目标排序值")
+    sort_order: int = Field(..., ge=0, le=9999, description="目标排序值")

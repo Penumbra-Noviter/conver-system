@@ -211,3 +211,29 @@ def test_duplicate_bind_conflict(db_session: Session, wire_app: FastAPI) -> None
         assert first.status_code == 200
         dup = client.post(f"/api/characters/{char_id}/mods", json={"mod_id": mod_id})
         assert dup.status_code == 400
+
+
+def test_sort_order_bounds(db_session: Session, wire_app: FastAPI) -> None:
+    """sort_order 越界（超 2^63 / 负数 / >9999）→ 422 而非 500（F1 修复锁：防 SQLite OverflowError）"""
+    char_id = _create_character(db_session)
+    mod_id = _create_mod(db_session)
+
+    with TestClient(wire_app) as client:
+        # 挂载 body sort_order 超 64 位 → 422（F1：否则 db.commit 抛 OverflowError → 500）
+        huge = client.post(
+            f"/api/characters/{char_id}/mods", json={"mod_id": mod_id, "sort_order": 10**25}
+        )
+        assert huge.status_code == 422
+
+        # 正常挂载后，sort 端点超界 / 负数 → 422
+        ok = client.post(f"/api/characters/{char_id}/mods", json={"mod_id": mod_id})
+        assert ok.status_code == 200
+        binding_id = ok.json()["id"]
+        sort_huge = client.put(
+            f"/api/mod-bindings/{binding_id}/sort", json={"sort_order": 10**25}
+        )
+        assert sort_huge.status_code == 422
+        sort_neg = client.put(
+            f"/api/mod-bindings/{binding_id}/sort", json={"sort_order": -1}
+        )
+        assert sort_neg.status_code == 422

@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2405<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1096<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1239<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2406<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1097<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1239<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -1460,7 +1460,7 @@ conver system/
 | `backend/tests/test_lorebook_routes.py` | <!--AUTO:tests:backend/tests/test_lorebook_routes.py-->5<!--/AUTO--> | 世界书 CRUD 路由契约锁（WL-4：列表/创建/部分更新/删除/守卫 404/校验 422） |
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
 | `backend/tests/test_mods.py` | <!--AUTO:tests:backend/tests/test_mods.py-->29<!--/AUTO--> | Mod 挂载层契约锁（MD-1：绑定唯一/禁用零影响/sort_order 叠加序含同序稳定/解绑与级联/空列表零变化/CRUD/404 守卫/target_area 过滤/payload 容错） |
-| `backend/tests/test_mods_routes.py` | <!--AUTO:tests:backend/tests/test_mods_routes.py-->11<!--/AUTO--> | Mod 路由契约锁（MD-2：库 CRUD/挂载/开关/排序/解绑/404·400·422 守卫） |
+| `backend/tests/test_mods_routes.py` | <!--AUTO:tests:backend/tests/test_mods_routes.py-->12<!--/AUTO--> | Mod 路由契约锁（MD-2：库 CRUD/挂载/开关/排序/解绑/404·400·422 守卫） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_memory_palace.py` |
 | `backend/tests/test_message_swipes.py` | <!--AUTO:tests:backend/tests/test_message_swipes.py-->10<!--/AUTO--> | swipes 多候选契约锁（MS-1：播种序号自增/唯一约束/切换越界/删中间与回落/原始候选保护/级联/导出含候选集/自愈迁移幂等） | <!--AUTO:tests:backend/tests/test_memory_palace.py-->15<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
@@ -1579,9 +1579,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2405<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2406<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1096<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1097<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1239<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
