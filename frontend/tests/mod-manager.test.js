@@ -1,20 +1,17 @@
 /**
- * Mod 管理面板契约锁（MD-2 / 03，spec §MD-2）
+ * Mod 管理面板 UI 契约锁（MD-2 / 03，spec §MD-2）
  *
- * 覆盖：
- *   1. prompt 三区域 payload 序列化/解析（serializePromptPayload / parsePromptPayload）
- *   2. 表单校验（validateModForm：名称必填 / target_area 收口三值）
- *   3. 保存 payload 按区域切换形态（buildModPayload：prompt → JSON 字符串，memory/css → 自由文本）
- *   4. 导入导出信封（buildExportEnvelope 字面命中 version/mods 键；parseImportEnvelope 拒非法）
- *   5. 导入容错（importModsFromEnvelope：逐条 mods.create，单条失败不阻断其余，source 落 imported）
- *   6. 面板渲染与交互（showModManager：标题含角色名 / 列表 id 升序 / 新建 / 编辑 / 删除 / 导出）
+ * 覆盖（仅 UI 渲染与交互；codec 纯函数契约已迁 mod-codec.test.js — F-103）：
+ *   1. 面板渲染与交互（showModManager：标题含角色名 / 列表 id 升序 / 新建 / 编辑 / 删除 / 导出）
+ *   2. 协议表面与图标 seam（__all__ 收口 showModManager；图标走 iconHtml）
+ *   3. 挂载区块（MD-2/04：sort_order 升序 / 挂载 / 解绑 / 开关 / 上移下移 / 失败回滚）
  *
- * 挂载模式：jsdom + vi.mock(api.js)（面板与导入用假 mods；纯函数组不依赖 DOM）。
+ * 挂载模式：jsdom + vi.mock(api.js)（面板渲染用假 mods）。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { iconHtml } from '../js/icons.js';
 
-// 面板/导入组 mock API 层（组件 import '../api.js' 解析到同一模块）
+// 面板组 mock API 层（组件 import '../api.js' 解析到同一模块）
 vi.mock('../js/api.js', () => ({
     mods: {
         list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(),
@@ -24,101 +21,11 @@ vi.mock('../js/api.js', () => ({
 }));
 
 import { mods } from '../js/api.js';
-import {
-    showModManager,
-    computeSortSwap,
-    TARGET_AREAS,
-    serializePromptPayload,
-    parsePromptPayload,
-    validateModForm,
-    buildModPayload,
-    buildExportEnvelope,
-    parseImportEnvelope,
-    importModsFromEnvelope,
-    __all__,
-} from '../js/components/mod-manager.js';
+import { showModManager, __all__ } from '../js/components/mod-manager.js';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-describe('1. prompt 三区域 payload 序列化/解析', () => {
-    it('TARGET_AREAS 收口三值', () => {
-        expect(TARGET_AREAS).toEqual(['prompt', 'memory', 'css']);
-    });
-
-    it('serializePromptPayload 输出 {world,before_char,after_char} JSON 字符串', () => {
-        expect(JSON.parse(serializePromptPayload('w', 'b', 'a'))).toEqual({ world: 'w', before_char: 'b', after_char: 'a' });
-        expect(JSON.parse(serializePromptPayload())).toEqual({ world: '', before_char: '', after_char: '' });
-    });
-
-    it('parsePromptPayload：合法 JSON 提取三区域；非法回退全空', () => {
-        expect(parsePromptPayload('{"world":"w","before_char":"b","after_char":"a"}')).toEqual({ world: 'w', before_char: 'b', after_char: 'a' });
-        expect(parsePromptPayload('not-json')).toEqual({ world: '', before_char: '', after_char: '' });
-        expect(parsePromptPayload('42')).toEqual({ world: '', before_char: '', after_char: '' });
-        expect(parsePromptPayload(null)).toEqual({ world: '', before_char: '', after_char: '' });
-        expect(parsePromptPayload('')).toEqual({ world: '', before_char: '', after_char: '' });
-    });
-});
-
-describe('2. 表单校验 validateModForm', () => {
-    it('名称空 → 阻止 + name 错误', () => {
-        const r = validateModForm({ name: '  ', target_area: 'prompt' });
-        expect(r.ok).toBe(false);
-        expect(r.errors.name).toContain('名称');
-    });
-
-    it('非法 target_area → 阻止 + target_area 错误', () => {
-        const r = validateModForm({ name: 'A', target_area: 'bogus' });
-        expect(r.ok).toBe(false);
-        expect(r.errors.target_area).toBeTruthy();
-    });
-
-    it('合法（名称 + 有效区域）→ ok', () => {
-        expect(validateModForm({ name: 'A', target_area: 'memory' }).ok).toBe(true);
-    });
-});
-
-describe('3. buildModPayload 按区域切换 payload 形态', () => {
-    it('prompt 区：payload 序列化为三区域 JSON 字符串', () => {
-        const p = buildModPayload({ name: 'M', description: 'd', target_area: 'prompt', world: 'w', before_char: 'b', after_char: 'a' });
-        expect(p.name).toBe('M');
-        expect(p.target_area).toBe('prompt');
-        expect(JSON.parse(p.payload)).toEqual({ world: 'w', before_char: 'b', after_char: 'a' });
-    });
-
-    it('memory/css 区：payload 为自由文本', () => {
-        expect(buildModPayload({ name: 'M', target_area: 'memory', payload: 'raw' }).payload).toBe('raw');
-        expect(buildModPayload({ name: 'M', target_area: 'css', payload: 'p { color: red }' }).payload).toBe('p { color: red }');
-    });
-
-    it('name 裁剪空白；非法 target_area 回退 prompt', () => {
-        const p = buildModPayload({ name: '  X  ', target_area: 'bogus', world: '', before_char: '', after_char: '' });
-        expect(p.name).toBe('X');
-        expect(p.target_area).toBe('prompt');
-    });
-});
-
-describe('4. 导入导出信封', () => {
-    it('buildExportEnvelope 字面命中 version 与 mods 键', () => {
-        const e = buildExportEnvelope([{ id: 1 }, { id: 2 }]);
-        expect(e.version).toBe(1);
-        expect(e.mods).toEqual([{ id: 1 }, { id: 2 }]);
-    });
-
-    it('parseImportEnvelope：非法 JSON / version 不符 / mods 非数组 → 报错', () => {
-        expect(parseImportEnvelope('not-json').ok).toBe(false);
-        expect(parseImportEnvelope('{"version":2,"mods":[]}').ok).toBe(false);
-        expect(parseImportEnvelope('{"version":1,"mods":{}}').ok).toBe(false);
-        expect(parseImportEnvelope('').ok).toBe(false);
-    });
-
-    it('parseImportEnvelope：合法信封通过', () => {
-        const r = parseImportEnvelope('{"version":1,"mods":[{"name":"A"}]}');
-        expect(r.ok).toBe(true);
-        expect(r.mods).toEqual([{ name: 'A' }]);
-    });
-});
-
-describe('5. 面板渲染与交互（mock api.js + DOM）', () => {
+describe('1. 面板渲染与交互（mock api.js + DOM）', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         vi.resetAllMocks();
@@ -295,12 +202,6 @@ describe('5. 面板渲染与交互（mock api.js + DOM）', () => {
         }
     });
 
-    it('导入：非法信封报错不落库（mods.create 未调用）', async () => {
-        const r = await importModsFromEnvelope('not-json');
-        expect(r.ok).toBe(false);
-        expect(mods.create).not.toHaveBeenCalled();
-    });
-
     it('导入：文件输入读取合法信封 → 逐条 create 并刷新列表', async () => {
         mods.list.mockResolvedValue([]);
         mods.create.mockResolvedValue({ id: 1 });
@@ -357,20 +258,6 @@ describe('5. 面板渲染与交互（mock api.js + DOM）', () => {
         expect(document.querySelector('[data-mod-free-fields]').hidden).toBe(false);
     });
 
-    it('导入：合法信封逐条 create，单条失败不阻断其余（容错）', async () => {
-        mods.create.mockRejectedValueOnce(new Error('重复'));
-        mods.create.mockResolvedValue({ id: 1 });
-
-        const r = await importModsFromEnvelope('{"version":1,"mods":[{"name":"A","target_area":"prompt","payload":"x"},{"name":"B","target_area":"css","payload":"y"},{"name":"C","target_area":"memory","payload":"z"}]}');
-
-        expect(mods.create).toHaveBeenCalledTimes(3);
-        expect(r.ok).toBe(true);
-        expect(r.imported).toBe(2);
-        expect(r.failed).toBe(1);
-        expect(mods.create.mock.calls[0][0].source).toBe('imported');
-        expect(mods.create.mock.calls[1][0].target_area).toBe('css');
-    });
-
     it('新建保存失败（API 抛错）→ 提示且不崩溃', async () => {
         mods.list.mockResolvedValue([]);
         mods.create.mockRejectedValue(new Error('网络错误'));
@@ -417,13 +304,9 @@ describe('5. 面板渲染与交互（mock api.js + DOM）', () => {
     });
 });
 
-describe('6. 协议表面与图标 seam', () => {
-    it('__all__ 覆盖全部公开导出', () => {
-        for (const name of ['showModManager', 'computeSortSwap', 'TARGET_AREAS', 'serializePromptPayload',
-            'parsePromptPayload', 'validateModForm', 'buildModPayload',
-            'buildExportEnvelope', 'parseImportEnvelope', 'importModsFromEnvelope']) {
-            expect(__all__).toContain(name);
-        }
+describe('2. 协议表面与图标 seam', () => {
+    it('__all__ 收口 showModManager（codec 已迁 mod-codec.js）', () => {
+        expect(__all__).toEqual(['showModManager']);
     });
 
     it('puzzle 图标走 iconHtml seam（MD-2 Mod 按钮）', () => {
@@ -435,7 +318,7 @@ describe('6. 协议表面与图标 seam', () => {
 // 挂载区块（MD-2/04）：当前角色已挂载 Mod 的管理
 // ════════════════════════════════════════════════════════════════
 
-describe('7. 挂载区块（MD-2/04）', () => {
+describe('3. 挂载区块（MD-2/04）', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         vi.resetAllMocks();
@@ -655,32 +538,5 @@ describe('7. 挂载区块（MD-2/04）', () => {
         expect(alertSpy).toHaveBeenCalledWith('切换失败: 网络错误');
         // 重拉：初始 1 次 + 失败回滚再拉 1 次
         expect(mods.listCharacterMods).toHaveBeenCalledTimes(2);
-    });
-});
-
-describe('8. computeSortSwap 纯函数', () => {
-    const bindings = [
-        { id: 11, sort_order: 0 },
-        { id: 12, sort_order: 10 },
-        { id: 13, sort_order: 20 },
-    ];
-
-    it('up：与前一交换 sort_order', () => {
-        expect(computeSortSwap(bindings, 1, 'up')).toEqual([
-            { id: 12, sortOrder: 0 },
-            { id: 11, sortOrder: 10 },
-        ]);
-    });
-
-    it('down：与后一交换 sort_order', () => {
-        expect(computeSortSwap(bindings, 1, 'down')).toEqual([
-            { id: 12, sortOrder: 20 },
-            { id: 13, sortOrder: 10 },
-        ]);
-    });
-
-    it('边界越界 → 空数组（no-op）', () => {
-        expect(computeSortSwap(bindings, 0, 'up')).toEqual([]);
-        expect(computeSortSwap(bindings, 2, 'down')).toEqual([]);
     });
 });
