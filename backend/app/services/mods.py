@@ -2,8 +2,8 @@
 Mod 挂载层服务（MD-1，深模块）
 
 协议表面（__all__）：ModPayload / list_mods / create_mod / update_mod /
-delete_mod / bind_mod / unbind_mod / set_binding_enabled / list_character_mods /
-apply_prompt_mods。
+delete_mod / bind_mod / unbind_mod / set_binding_enabled / set_binding_sort_order /
+list_character_mods / apply_prompt_mods。
 
 数据模型：mods（全局 Mod 库，目标区域 prompt|memory|css）+ mod_bindings（作品级
 挂载，(character_id, mod_id) 唯一 + sort_order + enabled 开关）。本模块只做存取
@@ -46,6 +46,7 @@ __all__ = [
     "bind_mod",
     "unbind_mod",
     "set_binding_enabled",
+    "set_binding_sort_order",
     "list_character_mods",
     "apply_prompt_mods",
 ]
@@ -251,6 +252,24 @@ def set_binding_enabled(db: Session, binding_id: int, enabled: bool) -> ModBindi
     """
     binding = _require_binding(db, binding_id)
     binding.enabled = enabled
+    db.commit()
+    db.refresh(binding)
+    return binding
+
+
+def set_binding_sort_order(db: Session, binding_id: int, sort_order: int) -> ModBinding:
+    """单条幂等更新绑定的 sort_order（MD-2 排序落库，非解绑重绑）
+
+    Args:
+        db: 数据库会话
+        binding_id: 绑定 ID（不存在抛 ModBindingNotFoundError）
+        sort_order: 目标叠加排序值
+
+    Returns:
+        更新后的 ModBinding ORM 对象
+    """
+    binding = _require_binding(db, binding_id)
+    binding.sort_order = sort_order
     db.commit()
     db.refresh(binding)
     return binding

@@ -25,6 +25,7 @@ from backend.app.api.routes import (
     lorebook,
     messages,
     models,
+    mods,
     settings,
     simulators,
 )
@@ -53,6 +54,7 @@ app.include_router(images.router)
 app.include_router(lorebook.router)
 app.include_router(messages.router)
 app.include_router(models.router)
+app.include_router(mods.router)
 app.include_router(settings.router)
 app.include_router(simulators.router)
 
