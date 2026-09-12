@@ -40,6 +40,8 @@ const ICON_PATHS = {
     toggleOn: '<rect x="1.5" y="4.5" width="13" height="7" rx="3.5"/><circle cx="10.5" cy="8" r="2.2" fill="currentColor"/>',
     toggleOff: '<rect x="1.5" y="4.5" width="13" height="7" rx="3.5"/><circle cx="5.5" cy="8" r="2.2" fill="currentColor"/>',
     puzzle: '<path d="M4 4h2.5c0-1.5 3-1.5 3 0H12v8h-2.5c0-1.5-3-1.5-3 0H4Z"/>',
+    // F-100 分支锚：git 分支线框（Lucide git-branch 风格，16x16 归一，currentColor 描边）
+    gitBranch: '<path d="M4 2v8"/><circle cx="12" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><path d="M12 6a6 6 0 0 1-6 6"/>',
 };
 
 /**

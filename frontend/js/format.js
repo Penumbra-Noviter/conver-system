@@ -87,6 +87,8 @@ export function userAvatarHtml() {
  *   是否传入由聊天域控制 — 末条已结算 assistant 才传）
  * @param {boolean} [opts.continue=false] - 渲染「继续」操作按钮（MS-3 — 与重生成
  *   同组渲染；是否传入由聊天域控制，末条已结算 assistant 才传）
+ * @param {boolean} [opts.branch=false] - 渲染「分支」操作按钮（F-100 能力 1 — 与
+ *   重生成/继续同组渲染；是否传入由聊天域控制，末条已结算 assistant 才传）
  * @param {Array} [opts.characters=[]] - 角色列表（assistant 头像来源）
  * @param {number|null} [opts.currentCharacterId=null] - 当前角色 id（assistant 头像匹配）
  * @param {number|string|null} [opts.messageId=null] - 消息 id（非空时外层气泡补
@@ -94,7 +96,7 @@ export function userAvatarHtml() {
  * @returns {string} 气泡 HTML（system 角色无头像 + 无复制按钮）
  */
 export function messageBubbleHtml(role, content, opts = {}) {
-    const { streaming = false, stopped = false, error = false, regenerate = false, cont = false, characters = [], currentCharacterId = null, messageId, swipes = [], activeSwipeIndex = 0 } = opts;
+    const { streaming = false, stopped = false, error = false, regenerate = false, cont = false, branch = false, characters = [], currentCharacterId = null, messageId, swipes = [], activeSwipeIndex = 0 } = opts;
     const classes = ['message', role];
     if (error) classes.push('message-error');
     let bubbleAttrs = streaming ? ' data-streaming-live="1"' : '';
@@ -116,6 +118,10 @@ export function messageBubbleHtml(role, content, opts = {}) {
     const contBtn = cont && role === 'assistant'
         ? `<button class="btn-continue" title="继续">${iconHtml('play')}</button>`
         : '';
+    // F-100 能力 1 分支操作按钮（与重生成/继续同组渲染；仅 assistant，末条已结算才传）
+    const branchBtn = branch && role === 'assistant'
+        ? `<button class="btn-branch" title="分支">${iconHtml('gitBranch')}</button>`
+        : '';
     // MS-2 候选控制条（仅 assistant 且候选 > 1）：‹ 2/3 › 左右切换，聊天域绑定事件
     const swipeBar = role === 'assistant' && Array.isArray(swipes) && swipes.length > 1
         ? `<div class="swipe-bar" data-swipe-bar>
@@ -125,7 +131,7 @@ export function messageBubbleHtml(role, content, opts = {}) {
           </div>`
         : '';
     const stopTag = stopped ? '<div class="message-stop-tag">（已停止）</div>' : '';
-    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${regenBtn}${contBtn}${swipeBar}${stopTag}</div>`;
+    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${regenBtn}${contBtn}${branchBtn}${swipeBar}${stopTag}</div>`;
 }
 
 /**
@@ -143,13 +149,15 @@ export function messageBubbleHtml(role, content, opts = {}) {
  * @param {number|null} [context.currentCharacterId=null] - 当前角色 id
  * @param {boolean} [context.canContinue=false] - 聊天域开关（MS-3）：末条 assistant
  *   渲染「继续」操作按钮（与重生成同组；同一目标语义）
+ * @param {boolean} [context.canBranch=false] - 聊天域开关（F-100 能力 1）：末条
+ *   assistant 渲染「分支」操作按钮（与重生成/继续同组；同一目标语义）
  * @returns {string} 消息区域 HTML
  */
 export function buildMessagesHtml(messages, context = {}) {
-    const { characters = [], currentCharacterId = null, canRegenerate = false, canContinue = false } = context;
+    const { characters = [], currentCharacterId = null, canRegenerate = false, canContinue = false, canBranch = false } = context;
     const last = messages[messages.length - 1];
-    // 末条为已结算 assistant 时才渲染重生成/继续按钮（streaming 进行中的气泡不提供）
-    const regenTarget = (canRegenerate || canContinue) && last?.role === 'assistant' && !last.streaming;
+    // 末条为已结算 assistant 时才渲染重生成/继续/分支按钮（streaming 进行中的气泡不提供）
+    const regenTarget = (canRegenerate || canContinue || canBranch) && last?.role === 'assistant' && !last.streaming;
     return messages.map((m, i) => messageBubbleHtml(m.role, m.content, {
         characters,
         currentCharacterId,
@@ -159,6 +167,7 @@ export function buildMessagesHtml(messages, context = {}) {
         messageId: m.id,
         regenerate: canRegenerate && regenTarget && i === messages.length - 1,
         cont: canContinue && regenTarget && i === messages.length - 1,
+        branch: canBranch && regenTarget && i === messages.length - 1,
         // MS-2：候选集与激活序号透传（气泡工厂据此渲染候选控制条）
         swipes: m.swipes,
         activeSwipeIndex: m.active_swipe_index ?? 0,

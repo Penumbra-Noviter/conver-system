@@ -90,6 +90,7 @@ const hooks = {
     refreshConversations: () => {},
     syncConversationListTitle: () => {},
     navigateToSettings: () => {},
+    activateConversation: () => {},
 };
 
 /**
@@ -101,6 +102,9 @@ const hooks = {
  *   （只做 DOM 手术 — 更新匹配会话项 .title 文本，不重渲染列表）
  * @param {Function} [h.navigateToSettings] - 切到设置视图（T1 引导卡 / 错误条
  *   「前往设置」按钮点击调用；app.js 接线 switchView('settings')，复用视图切换）
+ * @param {Function} [h.activateConversation] - 激活/打开指定会话（F-100 分支成功后
+ *   「创建即打开」；app.js 接线 conversation-activation.js 的 activateConversation，
+ *   复用统一激活流程，避免 chat.js 反向依赖 conversation-activation.js）
  */
 export function setChatHooks(h) {
     for (const [key, value] of Object.entries(h ?? {})) {
@@ -202,9 +206,11 @@ export function renderMessages({ messageId } = {}) {
     container.innerHTML = buildMessagesHtml(tab.messages, {
         characters: state.characters,
         currentCharacterId: tab.characterId,
-        // T6 重生成 / MS-3 继续：渲染消息列表时开启 — 仅末条已结算 assistant 气泡渲染操作按钮
+        // T6 重生成 / MS-3 继续 / F-100 分支：渲染消息列表时开启 — 仅末条已结算
+        // assistant 气泡渲染操作按钮（与重生成/继续同组）
         canRegenerate: true,
         canContinue: true,
+        canBranch: true,
     });
 
     // 复制按钮事件 + 复制数据补写（FE-1 数据通道单一化：复制内容不经 HTML 属性 —
@@ -224,6 +230,11 @@ export function renderMessages({ messageId } = {}) {
     // MS-3 继续按钮事件（末条 assistant 气泡；同组渲染，同一绑定 seam → continueLastReply）
     container.querySelectorAll('.btn-continue').forEach((btn) => {
         btn.addEventListener('click', () => continueLastReply());
+    });
+
+    // F-100 分支按钮事件（末条 assistant 气泡；与重生成/继续同组，同一绑定 seam → branchLastReply）
+    container.querySelectorAll('.btn-branch').forEach((btn) => {
+        btn.addEventListener('click', () => branchLastReply());
     });
 
     // MS-2 候选控制条事件：左右切换 → 乐观更新渲染 → 调 switch-swipe 落库 → 失败回滚
@@ -926,6 +937,73 @@ export async function continueLastReply() {
     await hooks.refreshConversations();
 }
 
+// ── F-100 能力 1 分支（末条 assistant 气泡「分支」按钮触发，MVP 非流式）──
+
+/**
+ * 末条 AI 回复分支（F-100 能力 1 — 末条 assistant 气泡「分支」按钮触发，MVP 非流式）
+ *
+ * 调 `conversations.branch(convId, { message_id: 末条assistantId })`（锚 = 末条已结算
+ * assistant，复用 regenerate/continue 的 lastAssistant 定位；message_id 必传 — 后端
+ * BranchRequest 无缺省）。成功后 201 响应携带新会话 id → 刷新会话列表 + 激活/打开
+ * 新分支会话（「创建即打开」，对齐 startChatWithCharacter 的 activate 语义）。
+ * 失败走既有错误条通道（`renderSendError` — 与发送/重生成/续写同一 catch 路径），
+ * **不写进消息列表**（源会话缓存保持原状）。
+ *
+ * 在途守卫与 `handleSend`/`regenerateLastReply`/`continueLastReply` 共享同一
+ * `nonStreamingInFlight` 集合（同对话的非流式发送/重生成/继续/分支互斥，重复触发
+ * 只发一次真实请求）；进行中状态 = 末条 assistant 气泡操作按钮组（重生成+继续+
+ * 分支）禁用 + thinking 指示器（DOM 手术，不动缓存 — 失败语义「不写消息列表」
+ * 要求缓存保持原状）。
+ * 防悬挂：只接受发起时捕获的 convId，不读「当前活动」。
+ */
+export async function branchLastReply() {
+    const tab = getActiveTab();
+    if (!tab || tab.isStreaming) return;
+    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    // FIX-B 同源在途守卫：非流式发送/重生成/继续/分支共用 — 同一对话重复触发只发一次
+    cleanupStaleInFlight();
+    if (nonStreamingInFlight.has(convId)) return;
+
+    // 锚 = 末条已结算 assistant（复用 regenerate/continue 的 lastAssistant 定位）；
+    // 后端 BranchRequest 的 message_id 必传（无缺省），无 id 时防御 no-op（按钮仅在
+    // 末条已结算 assistant 气泡渲染，结算语义保证 id 存在）。
+    const lastAssistant = Array.isArray(tab.messages)
+        ? [...tab.messages].reverse().find((m) => m?.role === 'assistant')
+        : null;
+    const messageId = lastAssistant?.id ?? null;
+    if (messageId == null) return;
+
+    nonStreamingInFlight.add(convId);
+
+    // 进行中状态：末条 assistant 气泡操作按钮组（重生成+继续+分支）禁用 + thinking 指示器
+    const assistantBubbles = chatDom.chatMessages.querySelectorAll('.message.assistant');
+    const actionButtons = assistantBubbles.length
+        ? [...assistantBubbles[assistantBubbles.length - 1].querySelectorAll('.btn-regenerate, .btn-continue, .btn-branch')]
+        : [];
+    actionButtons.forEach((btn) => { btn.disabled = true; });
+    showThinkingIndicator(convId);
+
+    try {
+        const result = await conversations.branch(convId, { message_id: messageId });
+        // 成功 — 刷新会话列表（新分支进入侧栏）+ 激活/打开新分支会话（创建即打开；
+        // 新会话 id 来自 201 响应）。顺序对齐 startChatWithCharacter：
+        // loadConversations（重拉列表）→ activateConversation（openTab + 懒加载消息 + 渲染）
+        await hooks.refreshConversations();
+        await hooks.activateConversation(result.id);
+    } catch (err) {
+        // 失败 — 与重生成/续写同一错误通道（T1 错误条）：不写进消息列表
+        renderSendError(err, '分支失败', convId);
+    } finally {
+        // 完成/失败均清除在途标记；恢复按钮组与 thinking（成功路径已切走新会话 —
+        //   旧引用 isConnected 兜底跳过；失败路径复原）。F-59 会话隔离：只移除本会话
+        //   （convId）的 thinking 指示器
+        nonStreamingInFlight.delete(convId);
+        actionButtons.forEach((btn) => { if (btn.isConnected) btn.disabled = false; });
+        removeThinkingIndicator(chatDom.chatMessages, convId);
+        refreshSendButton();
+    }
+}
+
 // ── CG-3 对话内出图（生成图片入口 → 提交 → 轮询 → 三态渲染）──
 
 /** 轮询间隔（毫秒）；出图需 10-30 秒，1s 轮询平衡延迟与请求量 */
@@ -1161,6 +1239,7 @@ export const __all__ = [
     'handleSend',
     'regenerateLastReply',
     'continueLastReply',
+    'branchLastReply',
     'generateImage',
     'renderCgTaskState',
     'pollImageTask',
