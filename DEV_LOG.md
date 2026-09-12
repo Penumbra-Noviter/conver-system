@@ -6,6 +6,25 @@
 
 ---
 
+## MD-1 Mod 数据模型与注入叠加（2026-09-12 — AI风月对标五批工单 MD 首批，承接 MD-3）
+
+- **来源**：承接 MD-3（daf0fd7，出图能力门控独立 follow-up）；回到 MD 主线，spec §MD-1。交付 `mods` + `mod_bindings` 新表 + `services/mods.py` 深模块（prompt 区三区域叠加纯函数 apply_prompt_mods）；注入链集成、前端 UI 与路由留 MD-2。
+- **交付**：
+  - `backend/app/models/mods.py`：`Mod`（mods 表：id/name/description/target_area(prompt|memory|css)/payload TEXT/version/source(manual|imported)/created_at）+ `ModBinding`（mod_bindings 表：(character_id, mod_id) 唯一 + enabled + sort_order；FK 双 CASCADE——删作品/删 Mod 级联删绑定）。
+  - `backend/app/services/mods.py` 深模块（`__all__` = ModPayload + 9 函数：list_mods/create_mod/update_mod/delete_mod/bind_mod/unbind_mod/set_binding_enabled/list_character_mods/apply_prompt_mods）。
+  - `backend/app/schemas/mods.py`（ModCreate/ModUpdate，target_area Literal 收口三值）；异常族 +ModNotFoundError/ModBindingNotFoundError/ModAlreadyBoundError。
+- **关键决策（契约锁锁定）**：
+  - `apply_prompt_mods` 纯函数（零 DB）：base_blocks 三块键为 `system`/`before_char`/`after_char`（与 build_world_injection 输出同构，可直接作为 world_injection 传入 build_messages）；prompt Mod payload 为 JSON `{"world"/"before_char"/"after_char": str}`，`world` 注入 `system` 块（对齐 lorebook_engine._POSITION_KEYS 的 world→system 语义）。返回新 dict（新列表），不就地篡改输入。
+  - 叠加序：(sort_order, mod_id) 升序稳定——同序按 mod_id 决胜（确定性锁定）；disabled / target_area≠prompt 过滤；payload 非 JSON / JSON 非 dict / 区域值非 str 容错跳过（不破坏对话，不抛）。
+  - `bind_mod` sort_order=None 自动续尾（max+1，首为 0；显式 None 判空防 0 值 falsy 陷阱）；重复绑定预检抛 ModAlreadyBoundError（DB 唯一约束 uq_mod_bindings_character_mod 兜底）。
+  - spec 签名表外补充 `unbind_mod`（契约锁 #4「解绑」强制）+ `list_character_mods`（读侧自然对应，MD-2 UI 即用）。
+- **契约同步（快照即契约）**：`tests/fixtures/schema.sql` 补 mods + mod_bindings 两表 DDL（含唯一约束）+ 2 索引；`test_migrate_data` 目标表集合 +2；models/schemas/services 三包 `__all__` 登记；CODE_WIKI §3 树 / §4.21.12 / §5.1 同步，doc_sync 零漂移。
+- **验证链**：先红后绿（29 用例 collection 红 → 实现后全绿）| pytest 1049+1skip→1078+1skip（+29，零回归）| 覆盖率 services/mods.py 100%、models 93%（仅 __repr__ 未测）、schemas 100% | Vitest/cargo 零改动（本工单纯后端）| pool_cleanup_check + doc_sync --check 双钩子通过。
+- **期末四轴自审**：Spec 1 实现偏差（spec 签名表无 unbind_mod，但契约锁 #4「解绑」要求 → 补充 + list_character_mods，本文记录）+ Standards 0 硬违例 / Falsify 0 HIGH（绑定唯一预检 + 自动 sort_order 判空 + payload 三形态容错（非 JSON / JSON 非 dict / 区域值非 str）+ 空列表零变化 + 输入不篡改全锁）/ Architecture 0（深模块：与 lorebook_engine 同构的纯函数 + 存取层，Locality 单一文件）。
+- **非阻断落债**：无（MD-1 数据层收官；注入链集成——assemble_chat_context 读角色绑定 Mod 组装 ModPayload 后 apply_prompt_mods——与前端 UI/路由一并留 MD-2）。
+
+---
+
 ## WL-1 世界书数据模型 + 仓库层（2026-09-10 — AI风月对标五批工单 WL 首批，承接 handoff）
 
 - **来源**：承接 D:\tmp\handoff-2026-09-10-aigirlfriend-benchmark.md——调研已落盘（commit a5f28e6），本会话开工 WL-1。字段语义对齐 SillyTavern World Info（spec §WL-1，D4 七件套先行）。

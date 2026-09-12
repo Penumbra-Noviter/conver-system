@@ -19,7 +19,7 @@
 
 ## 活跃工单
 
-> 当前 **2 项待办**（1 批：MD Mod 挂载）。
+> 当前 **1 项待办**（1 批：MD Mod 挂载）。
 > 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -48,7 +48,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| MD-1 | Mod 数据模型与注入叠加（mods + mod_bindings 新表；apply_prompt_mods 三区域叠加） | ⬜ 待办 | spec §MD-1；绑定唯一 + 禁用零影响 + 排序稳定 + 空列表原样返回 |
 | MD-2 | Mod 管理 UI（列表/开关/排序/区域选择/导入导出；CSS 类复用现有后载序注入 seam） | ⬜ 待办 | spec §MD-2；Vitest 用例 + Playwright 冒烟 |
 
 > **实施顺序建议**：WL → MS → BR → CG → MD（依赖与风险见 spec 末节表格）。
@@ -66,6 +65,19 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### Mod 挂载批次 MD-1（2026-09-12 — Mod 数据模型与注入叠加，MD 批首张）
+
+> 来源：AI风月对标调研五批工单（MD Mod 挂载首张）；mods + mod_bindings 新表 + services/mods.py 深模块（prompt 三区域叠加纯函数 apply_prompt_mods），规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §MD-1。叙述详见 DEV_LOG〈MD-1 Mod 数据模型与注入叠加（2026-09-12）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| MD-1 | Mod 数据模型与注入叠加（mods + mod_bindings 新表；apply_prompt_mods 三区域叠加） | 2026-09-12 | e047462 |
+
+**验证链：** 后端 pytest 1049+1skip→1078+1skip（+29：test_mods 契约锁——绑定唯一/禁用零影响/sort_order 叠加序含同序稳定/解绑与删角色·删 Mod 级联/空列表零变化/CRUD 语义/bind 自动 sort_order/404 守卫/target_area 过滤/payload 三形态容错/三区域映射 world→system）| mods + mod_bindings 新表（模型 + schema.sql DDL 与唯一约束逐字契约 + test_migrate_data 表集合 +10 实体 models 清单）| services/mods.py 深模块（ModPayload 纯容器 + 9 函数，覆盖率 100%）| 全量后端绿零回归（前端/cargo 零改动）| 期末四轴：Spec 1 偏差记录（unbind_mod/list_character_mods 为 spec 签名表外补充——契约锁 #4「解绑」与读侧完整性要求）+ Standards 0 硬违例 / Falsify 0 HIGH（payload 三形态容错 + sort_order 判空 + 输入不篡改全锁）| doc_sync 零漂移
+**非阻断落债：** 无（注入链集成——assemble_chat_context 读角色绑定 Mod 组装 ModPayload 后 apply_prompt_mods——与前端 UI/路由留 MD-2）
+
+---
 
 ### 图片出图门控 MD-3（2026-09-11 — 出图能力门控 + 图片 Provider 设置，CG 批后立项）
 
