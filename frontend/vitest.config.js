@@ -21,6 +21,7 @@ export default defineConfig({
                 'js/components/character-submit.js',
                 'js/components/mod-manager.js', // MD-2/03 Mod 库管理面板（per-file ≥90% 口径）
                 'js/mod-codec.js', // F-103 Mod codec 深模块（8 纯函数迁入，per-file ≥90% 口径）
+                'js/mod-css.js', // T4 css 区 Mod 注入 seam（per-file ≥90% 口径）
                 'js/simulators.js',
                 'js/simulator-view.js',
                 'js/key-injector.js',

@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2499<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1118<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1311<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2520<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1118<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1332<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -179,6 +179,7 @@ conver system/
 │   │   ├── list-views.js           ← 角色/对话列表视图深模块（C4）
 │   │   ├── markdown.js             ← Markdown 渲染（XSS 消毒）
 │   │   ├── mod-codec.js            ← Mod codec 纯函数（F-103：三区域序列化/信封校验/排序交换，零 DOM）
+│   │   ├── mod-css.js              ← css 区 Mod 注入 seam（T4：payload 拉取关联 + style 节点注入/移除）
 │   │   ├── save-key-meta.js        ← 存档键契约单一来源（TD-67/68）
 │   │   ├── save-manager.js         ← 模拟器存档管理（导出/导入/删除）
 │   │   ├── search-view.js          ← 跨对话搜索视图
@@ -799,7 +800,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/cascade.js:setCascadeHooks-->`setCascadeHooks(h)`<!--/AUTO--> | 注入级联钩子（tab 关闭/列表刷新） |
 | <!--AUTO:sig:frontend/js/cascade.js:closeConversationsAndResettle-->`closeConversationsAndResettle({ ids = 'all', reloadList = false } = {})`<!--/AUTO--> | 关闭会话并重结算 |
 
-### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~1156 行<!--/AUTO-->）
+### 4.36 `frontend/js/chat.js` — 对话视图（<!--AUTO:lines:frontend/js/chat.js-->~1183 行<!--/AUTO-->）
 
 **职责**：消息渲染（气泡/思考指示/复制按钮/空态与 T1 首启引导卡）、发送流程（handleSend → StreamSession，失败经 error-bar 深模块渲染错误条）、标题同步、重命名、T3 对话内模型切换（openModelSwitch）、T6 末条 AI 回复重生成（regenerateLastReply → conversations.regenerate → settleTurn 重载，在途守卫与 handleSend 非流式共用）。T2 搜索定位：`renderMessages({ messageId })` 在消息加载/渲染后把目标气泡 `scrollIntoView({block:'center'})` 定位到视口中央 + 应用 `.search-highlight` 高亮约 3s 自动清除（`locateAndHighlight`），并与既有 `scrollToBottom` 互斥（定位不被滚动到底覆盖）。
 
@@ -846,6 +847,15 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/error-bar.js:renderErrorBar-->`renderErrorBar({ container, message, protocol, onNavigateSettings, conversationId } = {})`<!--/AUTO--> | 渲染错误条（文案分流 / 关闭 / 自动消失） |
 | `ERROR_BAR_DISMISS_MS` | 错误条自动消失时长（毫秒；约 8s） |
+
+### 4.36.7 `frontend/js/mod-css.js` — css 区 Mod 注入 seam（<!--AUTO:lines:frontend/js/mod-css.js-->~99 行<!--/AUTO-->）
+
+**职责**：css 区 Mod 前端消费（T4）——拉取角色绑定（`ModBindingResponse` 不嵌套 Mod 详情，与 Mod 库两段式按 `mod_id` 客户端关联），过滤 `enabled && target_area==='css'`，按 binding `sort_order` 升序以 `\n` 拼接 payload，注入 `<style id="mod-css-active">` 挂 `document.head`。id 幂等（任意调用序列后至多一个节点）；单调令牌使迟到完成的在途 apply 失效（切会话竞态）；payload 零转义零前缀改写（本地信任级别，textContent 赋值 DOM 结构不被撑破）；取数失败静默降级不抛出。chat.js 经 onTabsChanged 接线（会话打开/切换/关闭生命周期）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/mod-css.js:applyCharacterCss-->`applyCharacterCss(characterId)`<!--/AUTO--> | 拉取 + 注入（空 payload / 失败 / 被取代 → false，从不 reject） |
+| <!--AUTO:sig:frontend/js/mod-css.js:removeCharacterCss-->`removeCharacterCss()`<!--/AUTO--> | 移除 style 节点（无节点 no-op；使在途 apply 失效） |
 
 ### 4.37 `frontend/js/components/character-form.js` — 角色编辑表单（<!--AUTO:lines:frontend/js/components/character-form.js-->~204 行<!--/AUTO-->）
 
@@ -1522,7 +1532,7 @@ conver system/
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
 | `frontend/tests/chat.test.js` |
-| `frontend/tests/chat-swipes.test.js` | <!--AUTO:tests:frontend/tests/chat-swipes.test.js-->7<!--/AUTO--> | swipes 候选控制条契约锁（MS-2：计数渲染/单选不渲染/切换调用参数/边界不越界/失败回滚） | <!--AUTO:tests:frontend/tests/chat.test.js-->96<!--/AUTO--> | 对话视图 |
+| `frontend/tests/chat-swipes.test.js` | <!--AUTO:tests:frontend/tests/chat-swipes.test.js-->7<!--/AUTO--> | swipes 候选控制条契约锁（MS-2：计数渲染/单选不渲染/切换调用参数/边界不越界/失败回滚） | <!--AUTO:tests:frontend/tests/chat.test.js-->100<!--/AUTO--> | 对话视图 |
 | `frontend/tests/cg-review.test.js` | <!--AUTO:tests:frontend/tests/cg-review.test.js-->7<!--/AUTO--> | 剧情回顾视图契约锁（CG-3：cgImageUrl 本地路径映射 /cg/时间线三态/内容转义/失败空态） |
 | `frontend/tests/cg-generate.test.js` | <!--AUTO:tests:frontend/tests/cg-generate.test.js-->7<!--/AUTO--> | 出图三态契约锁（CG-3：生成中 10-30s 提示/成功 img/失败 error-bar seam 不破坏对话/会话隔离） |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
@@ -1541,6 +1551,7 @@ conver system/
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
 | `frontend/tests/mod-codec.test.js` | <!--AUTO:tests:frontend/tests/mod-codec.test.js-->22<!--/AUTO--> | Mod codec 纯函数契约锁（F-103：三区域序列化/表单校验/payload 组装/排序交换/信封校验/导入容错，零 DOM） |
 | `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->29<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
+| `frontend/tests/mod-css.test.js` | <!--AUTO:tests:frontend/tests/mod-css.test.js-->17<!--/AUTO--> | css 区 Mod 注入 seam 契约锁（T4：sort_order 升序 \n 拼接/两段式关联/id 幂等/零注入/取数失败静默降级/`</style>` 撑破与迟到 apply 竞态 Falsify） |
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
 | `frontend/tests/save-key-meta.test.js` | <!--AUTO:tests:frontend/tests/save-key-meta.test.js-->25<!--/AUTO--> | 存档键契约 |
 | `frontend/tests/save-manager.test.js` | <!--AUTO:tests:frontend/tests/save-manager.test.js-->64<!--/AUTO--> | 存档管理 |
@@ -1609,10 +1620,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2499<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2520<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1118<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1311<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1332<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

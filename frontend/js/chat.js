@@ -9,6 +9,8 @@
  *      对话内模型切换 openModelSwitch；app.js 只留注入接线）
  *   4. 聊天域 DOM 引用（chatDom）
  *   5. 发送按钮两态（send/stop）— 由活动 tab 的 isStreaming 派生（refreshSendButton）
+ *   6. css 区 Mod 注入接线（T4 — onTabsChanged 驱动 reconcile，会话打开/切换/关闭生命周期；
+ *      注入/移除本体在 mod-css.js 深模块，本文件只做时机挂点）
  *
  * P6.5 多 tab 语义：
  *   - 消息渲染读活动 tab 缓存（messages/characterId），无活动 tab → 空态
@@ -46,6 +48,7 @@ import { showModelSelector } from './components/model-selector.js';
 import { showConfirm } from './components/confirm-dialog.js';
 import { openModal } from './components/modal.js';
 import { cgImageUrl } from './cg-review.js';
+import { applyCharacterCss, removeCharacterCss } from './mod-css.js';
 
 // ══════════════════════════════════════════════════
 // 聊天域 DOM 引用
@@ -133,6 +136,33 @@ function cleanupStaleInFlight() {
 // tab 关闭即清理（closeTab 触发 onTabsChanged），覆盖「挂死请求 → 关 tab → 重开」后
 // 下次发送时 getTab 已非空的场景（只靠入口自愈清不掉重开后的 stale 条目）
 onTabsChanged(cleanupStaleInFlight);
+
+// ── css 区 Mod 消费接线（T4 — 会话打开/切换/关闭生命周期）──
+// onTabsChanged 结构性通知驱动 reconcile：活动 tab 的 characterId 变化 → 先 remove
+// 旧样式再 apply 新角色样式；无活动 tab / characterId 未知 → remove。
+// 时机覆盖说明：新开 tab 首次通知时 characterId 尚为 null，但 activateConversation
+// 随后 updateTab({title, characterId}) 含展示键 title → 再次触发通知，此时 characterId
+// 已补全 —— 两次通知合成一次生效的 reconcile。纯展示通知（phase 等）按 characterId
+// 去重跳过，不在流式热路径重复拉取。失败静默降级（mod-css 契约不 reject，此处 catch 兜底），
+// 不阻塞会话打开。
+let appliedCssCharacterId = null;
+
+async function reconcileCharacterCss() {
+    const characterId = getActiveTab()?.characterId ?? null;
+    if (characterId === appliedCssCharacterId) return;
+    appliedCssCharacterId = characterId;
+    removeCharacterCss();
+    if (characterId == null) return;
+    try {
+        const ok = await applyCharacterCss(characterId);
+        if (!ok) appliedCssCharacterId = null; // 失败 → 下次通知可重试
+    } catch (err) {
+        console.error('应用 css Mod 失败:', err);
+        appliedCssCharacterId = null;
+    }
+}
+
+onTabsChanged(reconcileCharacterCss);
 const copyFeedbackTimers = new WeakMap();
 
 // ══════════════════════════════════════════════════

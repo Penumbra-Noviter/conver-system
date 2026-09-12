@@ -30,6 +30,14 @@ const CHAT_DOM_HTML = `
     <div class="chat-sidebar"></div>
 `;
 
+// T4 css 区 Mod 注入接线：mock mod-css 深模块（真实模块契约由 mod-css.test.js 锁定，
+// 本文件只断言 chat.js 生命周期接线的调用时序与参数）
+vi.mock('../js/mod-css.js', () => ({
+    applyCharacterCss: vi.fn(),
+    removeCharacterCss: vi.fn(),
+    __all__: ['applyCharacterCss', 'removeCharacterCss'],
+}));
+
 /** 加载全新 chat + tabs + api + stream-session 实例（DOM 先就位） */
 async function loadModules() {
     vi.resetModules();
@@ -1983,5 +1991,84 @@ describe('错误条会话隔离（F-50 — renderSendError 透传会话身份）
         const bars = chat.chatDom.chatMessages.parentElement.querySelectorAll('.chat-error-bar');
         expect(bars).toHaveLength(1);
         expect(bars[0].dataset.conv).toBe('11');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// T4 css 区 Mod 注入接线（会话打开/切换/关闭生命周期 — onTabsChanged 驱动）
+// 真实 mod-css 模块契约由 mod-css.test.js 锁定；本组只断言接线的调用时序与参数。
+// ══════════════════════════════════════════════════
+describe('css Mod 注入接线（T4）', () => {
+    beforeEach(() => { vi.resetAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 加载模块链并复位 mod-css mock 实现（resetAllMocks 会清掉工厂默认实现） */
+    async function loadWithModCss() {
+        const env = await loadModules();
+        const modCss = await import('../js/mod-css.js');
+        modCss.applyCharacterCss.mockResolvedValue(true);
+        return { ...env, modCss };
+    }
+
+    it('打开会话（characterId 补全通知）→ remove 先于 apply(characterId)', async () => {
+        const { tabs, modCss } = await loadWithModCss();
+
+        tabs.openTab(11);
+        tabs.updateTab(11, { title: '会话11', characterId: 1 });
+
+        expect(modCss.removeCharacterCss).toHaveBeenCalledTimes(1);
+        expect(modCss.applyCharacterCss).toHaveBeenCalledTimes(1);
+        expect(modCss.applyCharacterCss).toHaveBeenCalledWith(1);
+        expect(modCss.removeCharacterCss.mock.invocationCallOrder[0])
+            .toBeLessThan(modCss.applyCharacterCss.mock.invocationCallOrder[0]);
+    });
+
+    it('切会话 → 先 remove 再 apply 新角色；关全部 tab（回列表）→ 仅 remove', async () => {
+        const { tabs, modCss } = await loadWithModCss();
+
+        tabs.openTab(11);
+        tabs.updateTab(11, { title: 'A', characterId: 1 });
+        tabs.openTab(22);
+        tabs.updateTab(22, { title: 'B', characterId: 2 });
+
+        expect(modCss.applyCharacterCss.mock.calls.map((c) => c[0])).toEqual([1, 2]);
+        // 3 次 remove：#1 会话11 补全；#2 openTab(22) 首次通知（新 tab characterId 尚为
+        // null → 安全移除旧角色样式）；#3 updateTab(22) characterId 补全后 remove+apply。
+        // 中间 null-characterId 的 remove 为幂等 no-op，无害；最终序列仍满足 remove → apply。
+        expect(modCss.removeCharacterCss).toHaveBeenCalledTimes(3);
+        // 切会话时序：最后一次 remove 先于第二次 apply
+        expect(modCss.removeCharacterCss.mock.invocationCallOrder[2])
+            .toBeLessThan(modCss.applyCharacterCss.mock.invocationCallOrder[1]);
+
+        tabs.closeAllTabs();
+        expect(modCss.removeCharacterCss).toHaveBeenCalledTimes(4);
+        expect(modCss.applyCharacterCss).toHaveBeenCalledTimes(2); // 无活动角色 → 不再注入
+    });
+
+    it('同会话展示字段通知（phase 变化）→ 按 characterId 去重，不重复 remove/apply', async () => {
+        const { tabs, modCss } = await loadWithModCss();
+
+        tabs.openTab(11);
+        tabs.updateTab(11, { title: 'A', characterId: 1 });
+        tabs.updateTab(11, { phase: 'thinking' });
+        tabs.updateTab(11, { phase: 'idle' });
+
+        expect(modCss.applyCharacterCss).toHaveBeenCalledTimes(1);
+        expect(modCss.removeCharacterCss).toHaveBeenCalledTimes(1);
+    });
+
+    it('接线失败（apply reject）→ 不向通知链抛出，后续切换仍可 reconcile', async () => {
+        const { tabs, modCss } = await loadWithModCss();
+        modCss.applyCharacterCss.mockRejectedValue(new Error('boom'));
+
+        tabs.openTab(11);
+        tabs.updateTab(11, { title: 'A', characterId: 1 });
+        await new Promise((r) => setTimeout(r, 0)); // reject 被接线兜底捕获（未处理 rejection 会使测试失败）
+
+        modCss.applyCharacterCss.mockResolvedValue(true);
+        tabs.openTab(22);
+        tabs.updateTab(22, { title: 'B', characterId: 2 });
+        await new Promise((r) => setTimeout(r, 0));
+        expect(modCss.applyCharacterCss).toHaveBeenLastCalledWith(2);
     });
 });
