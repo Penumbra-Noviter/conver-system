@@ -6,6 +6,7 @@ from backend.app.models.conversation import Conversation
 from backend.app.models.image_task import ImageTask
 from backend.app.models.lorebook import LorebookEntry
 from backend.app.models.message import Message, MessageSwipe, Role
+from backend.app.models.mods import Mod, ModBinding
 from backend.app.models.setting import Setting
 
 __all__ = [
@@ -16,6 +17,8 @@ __all__ = [
     "LorebookEntry",
     "Message",
     "MessageSwipe",
+    "Mod",
+    "ModBinding",
     "Role",
     "Setting",
 ]

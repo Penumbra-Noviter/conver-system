@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2359<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1050<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1239<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2388<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1079<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1239<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -102,6 +102,7 @@ conver system/
 │   │   │   ├── conversation.py     ← 会话
 │   │   │   ├── lorebook.py         ← 世界书条目（WL-1，JsonList TypeDecorator）
 │   │   │   ├── message.py          ← 消息（Role 枚举按值存取）
+│   │   │   ├── mods.py             ← Mod 挂载层（MD-1：mods + mod_bindings 两表）
 │   │   │   └── setting.py          ← 设置键值
 │   │   ├── schemas/                ← Pydantic v2 请求/响应模型
 │   │   │   ├── __init__.py
@@ -110,6 +111,7 @@ conver system/
 │   │   │   ├── conversation.py
 │   │   │   ├── lorebook.py         ← 世界书条目（Create/Update/Response，边界「拒」）
 │   │   │   ├── message.py
+│   │   │   ├── mods.py             ← Mod 请求模型（ModCreate/ModUpdate，target_area Literal）
 │   │   │   └── settings.py
 │   │   └── services/               ← 业务服务层（路由 → service → ORM）
 │   │       ├── __init__.py
@@ -131,6 +133,7 @@ conver system/
 │   │       ├── lorebook_engine.py  ← 世界书激活引擎纯函数（WL-2，零 DB 依赖）
 │   │       ├── memory_palace.py    ← 记忆宫殿（WL-5：LLM 归纳 → auto 条目，失败隔离）
 │   │       ├── gallery.py          ← CG 资产库（CG-2：入库去重/解锁/加权抽选）
+│   │       ├── mods.py             ← Mod 挂载层（MD-1：绑定 + prompt 三区域叠加）
 │   │       ├── text_utils.py       ← 脏数据容错工具（as_str_list，F-93 收敛单点）
 │   │       ├── llm/                ← LLM 接入层（深模块）
 │   │       │   ├── __init__.py     ← 包级导出零 SDK 副作用契约
@@ -494,7 +497,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/error_mapping.py:domain_error_response-->`domain_error_response(exc)`<!--/AUTO--> | 领域异常 → 响应 dict |
 | <!--AUTO:sig:backend/app/services/error_mapping.py:llm_error_response-->`llm_error_response(e, provider)`<!--/AUTO--> | LLM 异常 → (HTTP 状态码, 消息)（映射表单源） |
 
-### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~58 行<!--/AUTO-->）
+### 4.20 `backend/app/services/exceptions.py` — 领域异常（<!--AUTO:lines:backend/app/services/exceptions.py-->~67 行<!--/AUTO-->）
 
 **职责**：领域异常定义（404/409/422 类），供 service 层抛出、errors.py 统一处理。
 
@@ -601,6 +604,22 @@ conver system/
 ### 4.21.11 `backend/app/api/routes/images.py` — 出图/CG 回顾路由（CG-3）（<!--AUTO:lines:backend/app/api/routes/images.py-->~76 行<!--/AUTO-->）
 
 **职责**：POST /api/images/tasks（提交 + 后台 asyncio 执行）/ GET /api/images/tasks/{id}（轮询三态）/ GET /api/characters/{id}/cg-timeline（剧情回顾时间线）。/cg 静态挂载在 main.py（图片文件加载）。
+
+### 4.21.12 `backend/app/services/mods.py` — Mod 挂载层（MD-1）（<!--AUTO:lines:backend/app/services/mods.py-->~270 行<!--/AUTO-->）
+
+**职责**：Mod 挂载层深模块——mods（全局 Mod 库，目标区域 prompt|memory|css）+ mod_bindings（作品级挂载，(character_id, mod_id) 唯一 + sort_order + enabled 开关）的存取，以及「prompt 区注入叠加」纯函数 apply_prompt_mods。生命周期由 DB FK 落实（删作品/删 Mod 级联删绑定）；`ModPayload` 为纯数据容器（与 ORM 解耦，`mod_id`/`target_area`/`payload`/`sort_order`/`enabled`）。apply_prompt_mods 零 DB：已启用 prompt 区 Mod 按 sort_order 升序（同序按 mod_id 稳定）叠加进 base_blocks（`system`/`before_char`/`after_char` 三块，与 build_world_injection 输出同构）；payload 为 JSON `{"world"/"before_char"/"after_char": str}`，`world` 注入 `system` 块（对齐 _POSITION_KEYS）；非 JSON/非 dict/区域非 str 容错跳过（不破坏对话）。
+
+| 函数 | 说明 |
+|------|------|
+| <!--AUTO:sig:backend/app/services/mods.py:list_mods-->`list_mods(db)`<!--/AUTO--> | 全局 Mod 库列表（id 升序） |
+| <!--AUTO:sig:backend/app/services/mods.py:create_mod-->`create_mod(db, payload)`<!--/AUTO--> | 创建 Mod（单事务提交） |
+| <!--AUTO:sig:backend/app/services/mods.py:update_mod-->`update_mod(db, mod_id, payload)`<!--/AUTO--> | 部分更新（exclude_unset；显式 None 跳过） |
+| <!--AUTO:sig:backend/app/services/mods.py:delete_mod-->`delete_mod(db, mod_id)`<!--/AUTO--> | 删除 Mod（级联删绑定） |
+| <!--AUTO:sig:backend/app/services/mods.py:bind_mod-->`bind_mod(db, character_id, mod_id, *, enabled=True, sort_order=None)`<!--/AUTO--> | 挂载（sort_order=None 自动续尾；重复绑定 ModAlreadyBoundError） |
+| <!--AUTO:sig:backend/app/services/mods.py:unbind_mod-->`unbind_mod(db, binding_id)`<!--/AUTO--> | 解绑（删除绑定行） |
+| <!--AUTO:sig:backend/app/services/mods.py:set_binding_enabled-->`set_binding_enabled(db, binding_id, enabled)`<!--/AUTO--> | 切换绑定开关（幂等） |
+| <!--AUTO:sig:backend/app/services/mods.py:list_character_mods-->`list_character_mods(db, character_id)`<!--/AUTO--> | 角色已挂载绑定（sort_order 升序 + 同序 mod_id 稳定） |
+| <!--AUTO:sig:backend/app/services/mods.py:apply_prompt_mods-->`apply_prompt_mods(base_blocks, mods)`<!--/AUTO--> | prompt 三区域叠加纯函数（world→system / before_char / after_char，空列表零变化） |
 
 ### 4.22 `backend/app/services/model_data.py` — Provider 清单单源（<!--AUTO:lines:backend/app/services/model_data.py-->~127 行<!--/AUTO-->）
 
@@ -1421,6 +1440,7 @@ conver system/
 | `backend/tests/test_lorebook_engine.py` | <!--AUTO:tests:backend/tests/test_lorebook_engine.py-->26<!--/AUTO--> | 世界书激活引擎纯函数契约锁（WL-2：命中矩阵/大小写/depth 边界/概率 RNG 复现/互斥组/排序/零 DB 导入） |
 | `backend/tests/test_lorebook_routes.py` | <!--AUTO:tests:backend/tests/test_lorebook_routes.py-->5<!--/AUTO--> | 世界书 CRUD 路由契约锁（WL-4：列表/创建/部分更新/删除/守卫 404/校验 422） |
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
+| `backend/tests/test_mods.py` | <!--AUTO:tests:backend/tests/test_mods.py-->29<!--/AUTO--> | Mod 挂载层契约锁（MD-1：绑定唯一/禁用零影响/sort_order 叠加序含同序稳定/解绑与级联/空列表零变化/CRUD/404 守卫/target_area 过滤/payload 容错） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_memory_palace.py` |
 | `backend/tests/test_message_swipes.py` | <!--AUTO:tests:backend/tests/test_message_swipes.py-->10<!--/AUTO--> | swipes 多候选契约锁（MS-1：播种序号自增/唯一约束/切换越界/删中间与回落/原始候选保护/级联/导出含候选集/自愈迁移幂等） | <!--AUTO:tests:backend/tests/test_memory_palace.py-->15<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
@@ -1539,9 +1559,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2359<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2388<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1050<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1079<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1239<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

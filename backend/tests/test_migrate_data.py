@@ -157,6 +157,8 @@ class TestMigrateSuccess:
                 "message_swipes",
                 "cg_images",
                 "image_tasks",
+                "mods",
+                "mod_bindings",
             }
             assert conn.execute("SELECT COUNT(*) FROM characters").fetchone()[0] == 1
             assert conn.execute("SELECT name FROM characters").fetchone()[0] == "中文角色 测试"

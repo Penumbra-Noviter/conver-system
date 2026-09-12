@@ -17,5 +17,6 @@ __all__ = [
     "image_task",
     "lorebook",
     "message",
+    "mods",
     "settings",
 ]

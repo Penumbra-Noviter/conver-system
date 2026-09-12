@@ -26,6 +26,9 @@ __all__ = [
     "CgImageNotFoundError",
     "ImageTaskNotFoundError",
     "LorebookEntryNotFoundError",
+    "ModAlreadyBoundError",
+    "ModBindingNotFoundError",
+    "ModNotFoundError",
     "SwipeIndexError",
 ]
 
@@ -88,6 +91,18 @@ class ImageTaskNotFoundError(DomainError):
 
 class LorebookEntryNotFoundError(DomainError):
     """世界书条目不存在"""
+
+
+class ModNotFoundError(DomainError):
+    """Mod 不存在（更新/删除/绑定引用不存在的 mods 行）"""
+
+
+class ModBindingNotFoundError(DomainError):
+    """Mod 绑定不存在（解绑/开关切换引用不存在的 mod_bindings 行）"""
+
+
+class ModAlreadyBoundError(DomainError):
+    """Mod 已绑定（同角色同 Mod 重复挂载）"""
 
 
 class SwipeIndexError(DomainError):

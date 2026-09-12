@@ -32,6 +32,7 @@ __all__ = [
     "memory_palace",
     "message",
     "model_data",
+    "mods",
     "provider_registry",
     "setting",
     "simulator_import",

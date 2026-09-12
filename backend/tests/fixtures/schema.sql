@@ -146,6 +146,30 @@ CREATE TABLE image_tasks (
 	FOREIGN KEY(message_id) REFERENCES messages (id) ON DELETE SET NULL
 );
 
+CREATE TABLE mods (
+	id INTEGER NOT NULL, 
+	name VARCHAR(200) NOT NULL, 
+	description TEXT, 
+	target_area VARCHAR(16) NOT NULL, 
+	payload TEXT NOT NULL, 
+	version VARCHAR(50), 
+	source VARCHAR(16), 
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+	PRIMARY KEY (id)
+);
+
+CREATE TABLE mod_bindings (
+	id INTEGER NOT NULL, 
+	character_id INTEGER NOT NULL, 
+	mod_id INTEGER NOT NULL, 
+	enabled BOOLEAN NOT NULL, 
+	sort_order INTEGER NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_mod_bindings_character_mod UNIQUE (character_id, mod_id), 
+	FOREIGN KEY(character_id) REFERENCES characters (id) ON DELETE CASCADE, 
+	FOREIGN KEY(mod_id) REFERENCES mods (id) ON DELETE CASCADE
+);
+
 CREATE INDEX ix_characters_name ON characters (name);
 
 CREATE INDEX ix_cg_images_character_id ON cg_images (character_id);
@@ -161,3 +185,7 @@ CREATE INDEX ix_lorebook_entries_character_id ON lorebook_entries (character_id)
 CREATE INDEX ix_message_swipes_message_id ON message_swipes (message_id);
 
 CREATE INDEX ix_messages_conversation_id ON messages (conversation_id);
+
+CREATE INDEX ix_mod_bindings_character_id ON mod_bindings (character_id);
+
+CREATE INDEX ix_mod_bindings_mod_id ON mod_bindings (mod_id);
