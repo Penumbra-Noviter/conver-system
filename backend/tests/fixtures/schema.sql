@@ -117,6 +117,7 @@ CREATE TABLE cg_images (
 	conversation_id INTEGER, 
 	message_id INTEGER, 
 	url TEXT NOT NULL, 
+	weight INTEGER DEFAULT '100' NOT NULL, 
 	group_name VARCHAR(100), 
 	is_special BOOLEAN, 
 	unlocked BOOLEAN, 

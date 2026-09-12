@@ -540,7 +540,7 @@ class TestVerifyAndCompare:
         _make_db(a)
         _make_db(b)
         ok, reason = databases_equivalent(a, b)
-        assert ok is True
+        assert ok is True, f"偶发不一致时诊断用（历史 flake 无 reason 不可归因）：{reason}"
         assert reason == ""
 
     def test_databases_equivalent_table_set_differs(self, tmp_path) -> None:

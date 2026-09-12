@@ -41,6 +41,9 @@ def add_cg(
     message_id: int | None = None,
     group_name: str = "",
     unlock_hint: str = "",
+    weight: int = 100,
+    unlocked: bool = False,
+    is_special: bool = False,
 ) -> CgImage:
     """入库一张 CG 图（幂等去重：同作品同 url 直接返回既有行，不重复入库）
 
@@ -52,6 +55,9 @@ def add_cg(
         message_id: 产出自哪条消息（可选；不存在或不属于该会话 → MessageNotFoundError）
         group_name: 分组（空 = 默认分组，展示层映射）
         unlock_hint: 未解锁时提示
+        weight: 加权抽选权重（0 = 永不抽中；默认 100）
+        unlocked: 是否已解锁（默认 False，出图链路保持锁定）
+        is_special: 特殊 CG 标记（画廊置顶语义，默认 False）
 
     Returns:
         新入库或既有（同作品同 url）的 CgImage
@@ -92,6 +98,9 @@ def add_cg(
         url=url,
         group_name=group_name,
         unlock_hint=unlock_hint,
+        weight=weight,
+        unlocked=unlocked,
+        is_special=is_special,
     )
     db.add(cg)
     db.commit()

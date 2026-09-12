@@ -35,6 +35,9 @@ class CgImage(Base):
         comment="产出自哪条消息（消息删除后图保留 → SET NULL）",
     )
     url = Column(Text, nullable=False, comment="图片地址（本地文件路径或 URL）")
+    # T1：加权抽选权重（自愈迁移见 database.py::_ensure_cg_images_weight）
+    weight = Column(Integer, nullable=False, default=100, server_default="100",
+                    comment="加权抽选权重（0 = 永不抽中；概率池候选门槛 weight>0）")
     group_name = Column(String(100), default="", comment="分组（空 = 默认分组，展示层映射）")
     is_special = Column(Boolean, default=False, comment="特殊 CG（画廊置顶语义，CG-3 消费）")
     unlocked = Column(Boolean, default=False, comment="是否已解锁")

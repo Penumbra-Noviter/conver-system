@@ -137,6 +137,37 @@ class TestAddCg:
 
         assert again.unlock_hint == "首条提示"
 
+    def test_add_with_weight_unlocked_special(self, db_session: Session) -> None:
+        """扩参契约（T1）：weight/unlocked/is_special 显式传参逐一落库"""
+        char_id = _create_character(db_session)
+
+        cg = gallery_service.add_cg(
+            db_session, char_id, URL_A, weight=0, unlocked=True, is_special=True
+        )
+
+        assert cg.weight == 0
+        assert cg.unlocked is True
+        assert cg.is_special is True
+
+    def test_add_weight_default_100(self, db_session: Session) -> None:
+        """默认契约（T1）：不传新参数时 weight=100（与旧行为一致）"""
+        char_id = _create_character(db_session)
+
+        cg = gallery_service.add_cg(db_session, char_id, URL_A)
+
+        assert cg.weight == 100
+
+    def test_add_dedup_preserves_existing_weight(self, db_session: Session) -> None:
+        """幂等去重不回退（T1）：同作品同 url 再调返回既有行，不改既有 weight"""
+        char_id = _create_character(db_session)
+        first = gallery_service.add_cg(db_session, char_id, URL_A, weight=7)
+
+        again = gallery_service.add_cg(db_session, char_id, URL_A, weight=999)
+
+        assert again.id == first.id
+        assert again.weight == 7
+        assert db_session.query(CgImage).count() == 1
+
     def test_add_unknown_character_404(self, db_session: Session) -> None:
         """未知作品 → CharacterNotFoundError"""
         with pytest.raises(CharacterNotFoundError):
@@ -356,3 +387,148 @@ class TestCgImageLifecycle:
         db_session.commit()
 
         assert db_session.query(CgImage).count() == 0
+
+
+# ── 6. 自愈迁移（T1：cg_images.weight 列；spec §0 加列须附幂等契约锁）──
+
+
+def test_cg_weight_migration_on_legacy_db() -> None:
+    """存量库（无 weight 列）→ 迁移补列，存量行 weight=100；连续两次调用幂等"""
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine("sqlite://")
+    with engine.connect() as conn:
+        # 模拟存量库：cg_images 不含 weight（历史 schema 形态），且已有存量行
+        conn.execute(text(
+            "CREATE TABLE cg_images ("
+            " id INTEGER PRIMARY KEY, character_id INTEGER NOT NULL,"
+            " conversation_id INTEGER, message_id INTEGER, url TEXT NOT NULL,"
+            " group_name VARCHAR(100), is_special BOOLEAN, unlocked BOOLEAN,"
+            " unlock_hint TEXT, created_at DATETIME)"
+        ))
+        conn.execute(text("INSERT INTO cg_images (character_id, url) VALUES (1, 'legacy.png')"))
+        conn.commit()
+
+    from backend.app.database import _ensure_cg_images_weight
+
+    _ensure_cg_images_weight(engine)  # 首次补列
+    _ensure_cg_images_weight(engine)  # 幂等：再跑无事
+
+    with engine.connect() as conn:
+        info = conn.execute(text("PRAGMA table_info(cg_images)")).fetchall()
+        columns = {row[1] for row in info}
+        assert "weight" in columns
+        # 列类型/约束与 ORM 定义一致（INTEGER NOT NULL DEFAULT 100；PRAGMA 列序：type=2, notnull=3, dflt=4）
+        col = next(r for r in info if r[1] == "weight")
+        assert col[2] == "INTEGER" and col[3] == 1 and col[4] == "100"
+        # 存量行补默认 100
+        legacy_weight = conn.execute(
+            text("SELECT weight FROM cg_images WHERE url='legacy.png'")
+        ).scalar()
+        assert legacy_weight == 100
+
+
+def test_init_db_wires_cg_weight_migration(tmp_path, monkeypatch) -> None:
+    """init_db 接线锁（T1）：init_db 调用链触发 weight 自愈迁移（接线不脱落）"""
+    import backend.app.database as database_mod
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'wiring.db'}")
+    with engine.connect() as conn:
+        # 预置存量形态：cg_images 无 weight（create_all 不会给已存在表加列）
+        conn.execute(text(
+            "CREATE TABLE cg_images ("
+            " id INTEGER PRIMARY KEY, character_id INTEGER NOT NULL,"
+            " conversation_id INTEGER, message_id INTEGER, url TEXT NOT NULL,"
+            " group_name VARCHAR(100), is_special BOOLEAN, unlocked BOOLEAN,"
+            " unlock_hint TEXT, created_at DATETIME)"
+        ))
+        conn.commit()
+
+    monkeypatch.setattr(database_mod, "engine", engine)
+    database_mod.init_db()
+
+    with engine.connect() as conn:
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(cg_images)")).fetchall()}
+        assert "weight" in columns
+
+def test_cg_weight_migration_concurrent_no_duplicate_crash(tmp_path) -> None:
+    """并发迁移 Falsify（T1）：竞态窗口——conn1 持过期探测快照（他方连接已抢先
+    补列并提交）再执行 ALTER → duplicate column；实现须吞该错视为「他方已补齐」，
+    不得崩溃。过期快照用透传代理确定性复现（真两连接的 PRAGMA/ALTER 时序在
+    单机测试中不可稳定交错——原版直接传 Connection 反而是守卫不触发的伪测试，
+    突变验证 #2 揭示后重写）"""
+    from sqlalchemy import create_engine
+
+    from backend.app.database import _ensure_cg_images_weight
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'race.db'}")
+    with engine.connect() as conn:
+        conn.execute(text(
+            "CREATE TABLE cg_images ("
+            " id INTEGER PRIMARY KEY, character_id INTEGER NOT NULL,"
+            " conversation_id INTEGER, message_id INTEGER, url TEXT NOT NULL,"
+            " group_name VARCHAR(100), is_special BOOLEAN, unlocked BOOLEAN,"
+            " unlock_hint TEXT, created_at DATETIME)"
+        ))
+        conn.commit()
+
+    conn1 = engine.connect()
+    try:
+        # 他方连接抢先补列并提交（竞态的「他方」半边，真实 DDL）
+        conn1.execute(text(
+            "ALTER TABLE cg_images ADD COLUMN weight INTEGER NOT NULL DEFAULT 100"
+        ))
+        conn1.commit()
+
+        class _StaleProbeResult:
+            """过期探测快照：PRAGMA table_info 返回空（看不见 weight），其余透传"""
+
+            def fetchall(self) -> list:
+                return []
+
+        class _StaleProbeConn:
+            """竞态窗口模拟：探测命中过期快照，ALTER 落在真实连接上（撞 duplicate column）"""
+
+            def __init__(self, real) -> None:
+                self._real = real
+
+            def execute(self, stmt, *args, **kwargs):
+                result = self._real.execute(stmt, *args, **kwargs)
+                if "table_info" in str(stmt):
+                    return _StaleProbeResult()
+                return result
+
+            def commit(self) -> None:
+                self._real.commit()
+
+            def rollback(self) -> None:
+                self._real.rollback()
+
+        _ensure_cg_images_weight(_StaleProbeConn(conn1))  # 不得抛 duplicate column
+
+        columns = {row[1] for row in conn1.execute(text("PRAGMA table_info(cg_images)"))}
+        assert "weight" in columns
+    finally:
+        conn1.close()
+
+
+def test_add_weight_negative_roundtrip(db_session: Session) -> None:
+    """Falsify（T1）：weight 负数不崩溃、原样落库——数据层无 CHECK 约束，
+    「永不抽中/过滤」语义由调用方门槛（T6：weight>0 候选过滤）保证"""
+    char_id = _create_character(db_session)
+
+    cg = gallery_service.add_cg(db_session, char_id, URL_A, weight=-5)
+
+    db_session.expire(cg)
+    assert cg.weight == -5
+
+
+def test_add_weight_none_falls_back_to_column_default(db_session: Session) -> None:
+    """Falsify（T1）：weight=None 不崩、不写 NULL——SQLAlchemy 对带 Python 端
+    default 的列，INSERT 时 None 回退列默认 100（NOT NULL 约束无被破坏面）"""
+    char_id = _create_character(db_session)
+
+    cg = gallery_service.add_cg(db_session, char_id, URL_A, weight=None)  # type: ignore[arg-type]
+
+    assert cg.weight == 100
