@@ -35,6 +35,14 @@ class ConversationResponse(BaseModel):
     message_count: int = 0
     created_at: datetime.datetime
     updated_at: datetime.datetime
+    # BR-2 分支来源元数据（F-100 能力 2：列表分支来源标记的最小暴露）
+    #   普通会话四字段均为 None；branch_from_message_preview 为锚消息 content 的
+    #   截断预览（~60 字符，服务层 list_conversations 经关联查询带出，非表列，
+    #   同 message_count 的序列化面扩展，不涉及表结构变更）。
+    parent_conversation_id: Optional[int] = None
+    branch_from_message_id: Optional[int] = None
+    branch_title: Optional[str] = None
+    branch_from_message_preview: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

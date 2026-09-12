@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.models.character import Character
@@ -27,10 +27,25 @@ from backend.app.services.llm.prompt import apply_template_vars
 
 
 def list_conversations(db: Session, character_id: Optional[int] = None) -> list[Conversation]:
-    """获取对话列表，附带消息数量"""
+    """获取对话列表，附带消息数量与分支来源元数据（锚消息截断预览）
+
+    F-100 能力 2（后端最小暴露）：对分支派生会话带出 parent_conversation_id /
+    branch_from_message_id / branch_title 三列（ORM 已写入，此处随列表序列化），
+    并经关联查询补 branch_from_message_preview（锚消息 content 截断 ~60 字符）；
+    普通会话该字段为 None（不渲染分支标记的依据）。
+    """
+    # 锚消息内容（分支会话 branch_from_message_id 指向父会话中的分叉锚消息；
+    # 父已删时 branch_from_message_id 置 NULL → 子查询无命中 → 预览为 None）
+    anchor_content = (
+        select(Message.content)
+        .where(Message.id == Conversation.branch_from_message_id)
+        .correlate(Conversation)
+        .scalar_subquery()
+    )
     query = db.query(
         Conversation,
         func.count(Message.id).label("message_count"),
+        anchor_content.label("branch_from_message_preview"),
     ).outerjoin(
         Message, Message.conversation_id == Conversation.id
     ).group_by(Conversation.id)
@@ -39,8 +54,9 @@ def list_conversations(db: Session, character_id: Optional[int] = None) -> list[
         query = query.filter(Conversation.character_id == character_id)
 
     results = []
-    for conv, count in query.order_by(Conversation.updated_at.desc()).all():
+    for conv, count, anchor_raw in query.order_by(Conversation.updated_at.desc()).all():
         conv.message_count = count
+        conv.branch_from_message_preview = _truncate_branch_preview(anchor_raw)
         results.append(conv)
     return results
 
@@ -74,6 +90,22 @@ def truncate_title(text: str, max_len: int = 20) -> str:
     不剥离 Markdown 语法（原样截断字符）。
     """
     collapsed = " ".join(text.split())
+    if len(collapsed) <= max_len:
+        return collapsed
+    return collapsed[:max_len] + "…"
+
+
+def _truncate_branch_preview(content: str | None, max_len: int = 60) -> str | None:
+    """锚消息预览截断（纯函数）
+
+    折叠所有空白为单空格并去首尾，截取前 max_len 个字符后追加「…」；
+    None / 空 / 纯空白返回 None（普通会话或锚消息缺失时不渲染分支标记）。
+    """
+    if not content:
+        return None
+    collapsed = " ".join(content.split())
+    if not collapsed:
+        return None
     if len(collapsed) <= max_len:
         return collapsed
     return collapsed[:max_len] + "…"
