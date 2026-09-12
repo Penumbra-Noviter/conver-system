@@ -3,7 +3,7 @@
 
 覆盖：
     1. _prepare_messages 共享 helper 上移 BaseLLM（最小子类直测：system 分离 /
-       无 system / 空列表 / 多 system 取末条 / 消息重建 / OpenAI 侧 string 形态）
+       无 system / 空列表 / 多 system 合并 / 空空白过滤 / 消息重建 / OpenAI 侧 string 形态）
     2. OpenAI 调用处 dict 包装（system 以 {"role": "system", ...} 置首）、
        Claude 调用处字符串透传（system 顶层参数）——wire 形状逐字钉住
     3. generate / stream_generate 共享 try/except 骨架：SDK 异常（create / 流中）
@@ -96,17 +96,50 @@ class TestSharedMessagePreparation:
         assert system is None
         assert chat == []
 
-    def test_prepare_messages_last_system_message_wins(self) -> None:
-        """多条 system：取末条内容（与既有 Provider 行为一致）"""
+    def test_prepare_messages_merges_multiple_system_messages(self) -> None:
+        """多条 system（含夹在 user/assistant 之间的）：按组装顺序以 \n\n 连接为单一纯文本"""
         provider = _MinimalProvider("test-key")
         system, chat = provider._prepare_messages(
             [
                 {"role": "system", "content": "第一条"},
                 {"role": "user", "content": "你好"},
                 {"role": "system", "content": "第二条"},
+                {"role": "assistant", "content": "在的"},
+                {"role": "system", "content": "第三条"},
             ]
         )
-        assert system == "第二条"
+        assert system == "第一条\n\n第二条\n\n第三条"
+        assert chat == [
+            {"role": "user", "content": "你好"},
+            {"role": "assistant", "content": "在的"},
+        ]
+
+    def test_prepare_messages_filters_empty_and_whitespace_system(self) -> None:
+        """空串 / 纯空白 system 被过滤（不产生空段落）；非空块仍按序合并"""
+        provider = _MinimalProvider("test-key")
+        system, chat = provider._prepare_messages(
+            [
+                {"role": "system", "content": "第一条"},
+                {"role": "system", "content": ""},
+                {"role": "system", "content": "   \n\t "},
+                {"role": "system", "content": "第二条"},
+                {"role": "user", "content": "你好"},
+            ]
+        )
+        assert system == "第一条\n\n第二条"
+        assert chat == [{"role": "user", "content": "你好"}]
+
+    def test_prepare_messages_all_empty_system_returns_none(self) -> None:
+        """全部 system 为空 / 纯空白：返回 None（等价无 system 契约）"""
+        provider = _MinimalProvider("test-key")
+        system, chat = provider._prepare_messages(
+            [
+                {"role": "system", "content": ""},
+                {"role": "system", "content": "   "},
+                {"role": "user", "content": "你好"},
+            ]
+        )
+        assert system is None
         assert chat == [{"role": "user", "content": "你好"}]
 
     def test_openai_provider_uses_shared_string_form(self) -> None:
