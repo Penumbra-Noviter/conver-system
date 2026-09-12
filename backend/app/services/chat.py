@@ -31,11 +31,13 @@ from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
 from backend.app.models.lorebook import LorebookEntry
 from backend.app.models.message import Message, Role
+from backend.app.models.mods import Mod
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
 from backend.app.services import lorebook as lorebook_service
 from backend.app.services import memory_palace as memory_palace_service
 from backend.app.services import message as message_service
+from backend.app.services import mods as mods_service
 from backend.app.services import setting as setting_service
 from backend.app.services.error_mapping import domain_error_response, llm_error_response
 from backend.app.services.exceptions import (
@@ -146,6 +148,8 @@ def assemble_chat_context(
             {k: len(v) for k, v in world_injection.items()},
             sum(len(v) for v in world_injection.values()),
         )
+    # MD-2/02：在世界书注入之上叠加启用 prompt 区 Mod（追加各块，不新增尾随 system）
+    world_injection = _mod_prompt_injection(db, character, world_injection)
     if current_input is not None:
         messages = message_service.build_message_list(
             db, conv, current_input, max_rounds=max_rounds, user_name=user_name,
@@ -701,6 +705,59 @@ def _lorebook_world_injection(
     ]
     activated = activate_lorebook_entries(data_entries, scan_text, rng=random.Random())
     return build_world_injection(activated, user_name=user_name, char_name=character.name or "Character")
+
+
+def _mod_prompt_injection(
+    db: Session,
+    character: Character | None,
+    world_injection: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    """把角色启用的 prompt 区 Mod 叠加进世界书注入块（MD-2/02 注入链）
+
+    挂载表只存 mod_id（不冗余 target_area/payload），此处以 mod_id 一次性回读
+    Mod（IN 查询，避免 N+1），组装 ModPayload（sort_order/enabled 来自挂载，
+    target_area/payload 来自 Mod）后经 apply_prompt_mods 叠加（world→system）。
+
+    角色为空 / 无绑定 / 全禁用 / 全非 prompt 区 → 原样返回 world_injection
+    （零开销，与 _lorebook_world_injection 的「无条目 → {}」同语义）。
+
+    Args:
+        db: 数据库会话
+        character: 角色 ORM（None → 零注入）
+        world_injection: _lorebook_world_injection 的产物
+            （{system/before_char/after_char: [内容]}）
+
+    Returns:
+        叠加后的注入块 dict（apply_prompt_mods 返回新 dict；无可参与项时为
+        原 world_injection 对象）
+    """
+    if character is None:
+        return world_injection
+    bindings = mods_service.list_character_mods(db, character.id)
+    enabled = [b for b in bindings if b.enabled]
+    if not enabled:
+        return world_injection
+
+    mod_ids = [b.mod_id for b in enabled]
+    mods_by_id = {m.id: m for m in db.query(Mod).filter(Mod.id.in_(mod_ids)).all()}
+
+    payloads: list[mods_service.ModPayload] = []
+    for binding in enabled:
+        mod = mods_by_id.get(binding.mod_id)
+        if mod is None or mod.target_area != "prompt":
+            continue
+        payloads.append(
+            mods_service.ModPayload(
+                mod_id=mod.id,
+                target_area=mod.target_area,
+                payload=mod.payload,
+                sort_order=binding.sort_order,
+                enabled=binding.enabled,
+            )
+        )
+    if not payloads:
+        return world_injection
+    return mods_service.apply_prompt_mods(world_injection, payloads)
 
 
 def _msg_role(msg: object) -> str:
