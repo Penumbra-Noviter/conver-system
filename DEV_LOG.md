@@ -6,7 +6,19 @@
 
 ---
 
-## 技术债候选区消费批次（2026-09-13 — F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波）
+## 技术债候选区消费批次 F-109~F-111（2026-09-13 — F-110 做 + F-109/F-111 复核关闭，轻量档 1 工单）
+
+- **来源**：用户指令「消费技术债候选区 3 项（F-109~111）」。project-kickoff 全自动档，知识库预检命中 3 条经验（ESM 拆分注入钩子 / 异步重载版本守卫 / 属性转义数据通道）。
+- **Grilling 实证拍板（1 做 2 关）**：
+  - F-109 关（票面前提不成立）：mod-codec.js docstring 硬约束段（:16-18，与 F-103 创建提交同龄）已逐字豁免 importModsFromEnvelope（async、经 api.js fetch 注入点、不触 DOM、Node/jsdom 消费者兼容理由）；「迁出模块」被证据否定——函数内聚消费 parseImportEnvelope + TARGET_AREAS，契约测试已钉在本模块。
+  - F-110 做：三函数逐行比对成立——守卫前奏（cleanupStaleInFlight + nonStreamingInFlight.has）与 finally 复原（delete inFlight → isConnected 守卫恢复按钮 → removeThinkingIndicator → refreshSendButton）逐字相同，差异仅按钮 selector 与错误文案；handleSend 明确排除（流式分支语义独特，强纳撑爆 seam）。
+  - F-111 关（场景不可达）：list-views.js:323 空值守卫使 branch_title 与锚预览均空时 resolveBranchSource 返回 null 整段不渲染；后端 `_truncate_branch_preview` 对 None/空返回 None + clone_conversation title falsy 兜底，输入源封死。
+- **交付（工单 F-110，commit 57bef68，净 +6 行）**：chat.js 私有 `runLastAssistantAction({buttonSelector, errorLabel, isActive=null, prepare, action})` options-object helper（对齐 setChatHooks 先例）——helper 拥有守卫时序 7 步（getActiveTab → convId 捕获 → isActive 派生 → cleanupStaleInFlight → 互斥查 → prepare 可 falsy 中止 → 置标记+按钮禁用（数组形态归一）+ thinking → action → catch renderSendError → finally 统一复原）；三函数收缩为 prepare+action 闭包；branch 的 refreshConversations 留在 action 体内（result.id 先行激活时序敏感）；regen/continue 的兜底刷新以 `if (started)` 条件保留在调用方（helper 返回动作是否真实发起，被 chat.test.js:1580 既有断言锚定）；isConnected 复原兜底原样保留（branch 成功切走 tab 场景）。
+- **验证链**：grep 收敛 nonStreamingInFlight.has 4→2（机械证据）| 全量 Vitest 1311 断言零修改全绿（42 files）+ 范围锚定面 chat 96/swipes 7/error-bar 20 | pytest 1117+1skip 零回归（cargo 零改动）| 运行态冒烟：uvicorn 8017 加载应用→打开会话→气泡渲染，console 仅无关 favicon 404，服务 taskkill 停净端口复核 | doc_sync pre-commit 拦截后刷新 1 标记（chat.js 行数）。
+- **期末四轴（降级：code-review 子智能体连续 3 次被网关并发上限拒绝——user concurrency limit exceeded，非模型问题，重开上限触达后按有界只读任务降级主会话直做）**：**通过（无需继续修改），0 阻断 0 落债**。Spec 轴独立复核 `if (started) refreshConversations()` 等价性成立——原三函数守卫中止路径在 try/finally 前 return（本就不刷新）、失败路径 started 仍 true 照常刷新，逐路径等价；Falsify 四项（replaceId 捕获时序 / 空按钮集合 no-op / isConnected 元素引用恢复不读当前 tab / F-59 convId 隔离）全过；Standards 观察一处：isActive 覆盖参数当前无调用方使用（Grilling 共识签名即含，非偏差，不落债）；Architecture：协议表面零扩张、互斥契约单点收口。
+- **非阻断落债**：无新增；技术债候选区 3→0 清零（F-110 已修 + F-109/F-111 复核关闭，防膨胀合规）。
+
+---
 
 - **来源**：用户指令「8 项消费」（F-99/F-100 既有 + F-101~F-106 新增）。预检逐项 git grep 复核后按强度拍板：Strong（F-99）必做；Worth exploring（F-100/F-102/F-103）做；Speculative（F-101/F-104/F-105）关（复核现状成立）；F-100 能力 3「模拟器存档开新对话」复核关闭（存档=游戏 localStorage 状态 ≠ BranchSnapshot 对话快照，不同构，语义不清）。plan-tickets 产出 spec v0.2 + 7 工单（原 8 张，删能力 3 的 08 票）；plan-tickets 复核发现两处修正——能力 2 需后端暴露（ConversationResponse 未序列化分支三列，主会话接受补全）；能力 3 映射未钉死（促成关闭）。
 - **交付**（7 工单 3 波，波 1 并行 3 / 波 2 并行 2 / 波 3 并行 2）：

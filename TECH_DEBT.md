@@ -53,9 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-109 | mod-codec.js 模块声明「纯函数、零 DOM、零副作用」与实际不符：importModsFromEnvelope 为 async 且经 api.js 发 fetch（spec 明列其属迁移范围所致）——声明应改为「codec 纯函数 + 导入编排」或迁移该函数出模块 | 技术债批次期末四轴 Architecture | Worth exploring | 📝 待立项 | 前端架构 |
-| F-110 | 发送类动作进行中态样板第 4 次复制：chat.js branchLastReply 复制 handleSend/regenerateLastReply/continueLastReply 的 ~20 行 nonStreamingInFlight + 按钮禁用 + thinking 样板，可提取公共 seam | 技术债批次期末四轴 Architecture | Worth exploring | 📝 待立项 | 前端 |
-| F-111 | 会话列表分支来源标记空值渲染：branch_title 与锚消息预览均为空时模板产出空引号片段（外观缺陷） | 技术债批次期末四轴 Falsify | Speculative | 📝 待立项 | 前端 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -85,14 +82,18 @@
 | F-112 | ModsOrderUpdate lax 强转（字符串数字/布尔不 422）——前端唯一调用方 mod-manager reorder 恒传 number 数组，无真实脏数据路径 | 技术债批次期末四轴 Spec | Speculative | ❌ 复核关闭 |
 | F-113 | `_prepare_messages` content.strip() 无类型守卫（非 str 抛 AttributeError）——组装层 content 恒为 DB Text 列字符串，防御缺口不可达 | 技术债批次期末四轴 Falsify | Speculative | ❌ 复核关闭 |
 | F-114 | 前端 reorder 乐观假设（提交后本地即按新序渲染，并发陈旧 400 由重拉自愈）——fail-closed 可接受，自愈语义已有契约 | 技术债批次期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-109 | mod-codec.js 声明名实不符——docstring 硬约束段（:16-18）已逐字豁免 importModsFromEnvelope（async、经 api.js fetch 注入点、不触 DOM），声明与实现一致，票面前提不成立 | 技术债批次期末四轴 Architecture | Worth exploring | ❌ 复核关闭 |
+| F-111 | 会话列表分支来源标记空值渲染——list-views.js:323 空值守卫使空引号场景不可达（branch_title 与锚预览均空时 resolveBranchSource 返回 null 整段不渲染），后端标题/预览兜底链封死输入源 | 技术债批次期末四轴 Falsify | Speculative | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-13（技术债消费批次：F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波）
+### 2026-09-13（技术债消费批次 ×2：批1 F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波；批2 F-110 做 + F-109/F-111 关，轻量档 1 工单）
 
-> 处置详情：5 项消费（F-99→工单01、F-100 能力1/2→工单06/07、F-102→工单03/04、F-103→工单02、F-106→工单05，见 DEV_LOG〈技术债候选区消费批次〉）；3 项复核关闭——F-101 全路径不产 NULL 理论性 500 不可达、F-104 提取共享 helper 收益 < 成本、F-105 轻重两种守卫是不同 seam 非缺陷；另 F-100 能力 3「模拟器存档开新对话」部分关闭（存档=游戏 localStorage 状态 ≠ BranchSnapshot 对话快照，不同构，语义不清）。期末四轴 0 HIGH 阻断 + 1 MEDIUM 当场修（ddfe978：branch_title 契约断裂——分支调用补传源会话标题，能力 2「父缺失回落 branch_title」恢复生效）+ 非阻断落债 F-109~F-111 / 复核关闭 F-112~F-114。
+> 批 1 处置详情：5 项消费（F-99→工单01、F-100 能力1/2→工单06/07、F-102→工单03/04、F-103→工单02、F-106→工单05，见 DEV_LOG〈技术债候选区消费批次〉）；3 项复核关闭——F-101 全路径不产 NULL 理论性 500 不可达、F-104 提取共享 helper 收益 < 成本、F-105 轻重两种守卫是不同 seam 非缺陷；另 F-100 能力 3「模拟器存档开新对话」部分关闭（存档=游戏 localStorage 状态 ≠ BranchSnapshot 对话快照，不同构，语义不清）。期末四轴 0 HIGH 阻断 + 1 MEDIUM 当场修（ddfe978：branch_title 契约断裂——分支调用补传源会话标题，能力 2「父缺失回落 branch_title」恢复生效）+ 非阻断落债 F-109~F-111 / 复核关闭 F-112~F-114。
+>
+> 批 2 处置详情：Grilling 实证拍板 1 做 2 关——F-110 三函数样板逐行比对成立（守卫前奏/finally 复原逐字相同、差异仅按钮 selector 与错误文案），提取 chat.js 私有 helper `runLastAssistantAction({buttonSelector, errorLabel, isActive, prepare, action})`（对齐 setChatHooks options-object 先例，handleSend 明确排除），行为保持重构由全量 Vitest 1311 锚定 + grep 收敛 4→2 机械证据，见 DEV_LOG〈技术债候选区消费批次 F-109~F-111〉；F-109/F-111 复核关闭理由见复核关闭表。
 
 | 编号 | 遗留项 | 来源 | 强度 | 处置 |
 |------|--------|------|------|------|
@@ -104,6 +105,7 @@
 | F-104 | 客户端 Blob 下载逻辑第三份拷贝 | MD-2 期末四轴 Standards | Speculative | ❌ 复核关闭（2026-09-13：两处轻度重复，提取共享 helper 收益 < 成本） |
 | F-105 | 角色存在性守卫两处两种实现（轻 vs 重） | MD-2 期末四轴 Standards/Architecture | Speculative | ❌ 复核关闭（2026-09-13：轻量 Character.id 查询与重载会话计数是不同 seam，非缺陷） |
 | F-106 | 导入信封数组类型漏校验（mods:[[]] 建空名 Mod） | MD-2 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-13：工单05 importModsFromEnvelope 补 Array.isArray 拒绝 + 「数组拒绝/合法导入」两臂契约锁，红灯证明测试灵敏） |
+| F-110 | 发送类动作进行中态样板第 4 次复制（chat.js branchLastReply 复制 handleSend/regenerateLastReply/continueLastReply 的 ~20 行 nonStreamingInFlight + 按钮禁用 + thinking 样板） | 技术债批次期末四轴 Architecture | Worth exploring | ✅ 已修（2026-09-13：批 2 工单 F-110 提取 chat.js 私有 `runLastAssistantAction` options-object helper（prepare 可中止 + finally 统一复原含 isConnected 兜底），三函数收缩为 prepare+action 闭包、handleSend 排除；grep 4→2，Vitest 1311 断言零修改全绿） |
 
 ### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95 + F-96（做）+ F-97（关）+ F-98（做），轻量档 6 项）
 
