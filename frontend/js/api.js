@@ -240,8 +240,13 @@ export const mods = {
     bind: (characterId, data) => request('POST', `/characters/${characterId}/mods`, data),
     /** 切换挂载开关（body {enabled}） */
     setEnabled: (bindingId, enabled) => request('PUT', `/mod-bindings/${bindingId}`, { enabled }),
-    /** 调整挂载排序（body {sort_order}；工单 04 消费） */
-    setSortOrder: (bindingId, sortOrder) => request('PUT', `/mod-bindings/${bindingId}/sort`, { sort_order: sortOrder }),
+    /**
+     * 原子批量重排角色挂载顺序（F-102：body = [binding_id...] 按新序；工单 04 消费）
+     * @param {number|string} characterId - 角色 id
+     * @param {Array<number>} orderedIds - 移动后的完整 binding_id 顺序数组
+     * @returns {Promise<Array>} 重排后的挂载列表（sort_order 升序）
+     */
+    reorder: (characterId, orderedIds) => request('PUT', `/characters/${characterId}/mods/order`, orderedIds),
     /** 解绑 */
     unbind: (bindingId) => request('DELETE', `/mod-bindings/${bindingId}`),
 };

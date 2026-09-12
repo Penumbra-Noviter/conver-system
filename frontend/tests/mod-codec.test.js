@@ -20,7 +20,7 @@ vi.mock('../js/api.js', () => ({
     mods: {
         list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(),
         listCharacterMods: vi.fn(), bind: vi.fn(), setEnabled: vi.fn(),
-        setSortOrder: vi.fn(), unbind: vi.fn(),
+        reorder: vi.fn(), unbind: vi.fn(),
     },
 }));
 
@@ -179,30 +179,30 @@ describe('5. 导入落库容错 importModsFromEnvelope（mock api.js）', () => 
     });
 });
 
-describe('6. computeSortSwap 纯函数', () => {
+describe('6. computeSortSwap 纯函数（F-102 新契约：产出完整新序 binding_id 数组）', () => {
     const bindings = [
         { id: 11, sort_order: 0 },
         { id: 12, sort_order: 10 },
         { id: 13, sort_order: 20 },
     ];
 
-    it('up：与前一交换 sort_order', () => {
-        expect(computeSortSwap(bindings, 1, 'up')).toEqual([
-            { id: 12, sortOrder: 0 },
-            { id: 11, sortOrder: 10 },
-        ]);
+    it('up：产出移动后完整新序 binding_id 数组', () => {
+        expect(computeSortSwap(bindings, 1, 'up')).toEqual([12, 11, 13]);
     });
 
-    it('down：与后一交换 sort_order', () => {
-        expect(computeSortSwap(bindings, 1, 'down')).toEqual([
-            { id: 12, sortOrder: 20 },
-            { id: 13, sortOrder: 10 },
-        ]);
+    it('down：产出移动后完整新序 binding_id 数组', () => {
+        expect(computeSortSwap(bindings, 1, 'down')).toEqual([11, 13, 12]);
     });
 
-    it('边界越界 → 空数组（no-op）', () => {
-        expect(computeSortSwap(bindings, 0, 'up')).toEqual([]);
-        expect(computeSortSwap(bindings, 2, 'down')).toEqual([]);
+    it('首/末项越界 → 返回原顺序数组（no-op 不发请求）', () => {
+        expect(computeSortSwap(bindings, 0, 'up')).toEqual([11, 12, 13]);
+        expect(computeSortSwap(bindings, 2, 'down')).toEqual([11, 12, 13]);
+    });
+
+    it('非数组 → 空数组；下标越界 → 原顺序（Falsify 防御）', () => {
+        expect(computeSortSwap(null, 0, 'up')).toEqual([]);
+        expect(computeSortSwap(bindings, -1, 'up')).toEqual([11, 12, 13]);
+        expect(computeSortSwap(bindings, 3, 'down')).toEqual([11, 12, 13]);
     });
 });
 

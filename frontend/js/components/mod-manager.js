@@ -12,8 +12,9 @@
  * 「绑定列表」与「Mod 库列表」按 mod_id 客户端关联（不引入后端嵌套 join）；
  * 未在库中命中的 mod_id（异常数据）显示「未知 Mod」占位不崩溃。
  *
- * 排序落库方式（主会话拍板）：上移/下移 = 与相邻绑定交换 sort_order，落库走
- * mods.setSortOrder(bindingId, sortOrder) 两次调用（binding_id 稳定、无丢失窗口）。
+ * 排序落库方式（F-102 主会话拍板）：上移/下移 = computeSortSwap 产出完整新序
+ * binding_id 数组，落库走 mods.reorder(characterId, orderedIds) 单次原子重排
+ * （半失败不留重复 sort_order 脏窗口）。
  *
  * 导入导出为纯前端能力：
  *   - 导出 = 取 mods.list() 组装信封 {"version":1,"mods":[...]} → 本地 Blob 下载
@@ -26,7 +27,7 @@
  * 序列化为 JSON 字符串存入 payload；memory/css 区 payload 为自由文本。表单按
  * target_area 切换录入形态。
  *
- * codec 纯函数（序列化/解析/校验/组装/排序交换/导入导出信封）已迁入
+ * codec 纯函数（序列化/解析/校验/组装/排序重排/导入导出信封）已迁入
  * frontend/js/mod-codec.js（F-103），本面板只负责渲染与事件，按需 import。
  *
  * 协议表面（__all__）：showModManager。
@@ -429,11 +430,13 @@ async function renderMounts(root, characterId, onChanged) {
         const list = sorted();
         const index = list.findIndex((b) => b.id === id);
         if (index < 0) return;
-        const ops = computeSortSwap(list, index, direction);
-        if (ops.length === 0) return;
+        const orderedIds = computeSortSwap(list, index, direction);
+        // 越界（首项上移 / 末项下移）→ computeSortSwap 返回原顺序数组 → no-op 不发请求
+        const noop = orderedIds.length === list.length &&
+            orderedIds.every((bindingId, i) => bindingId === list[i].id);
+        if (noop) return;
         try {
-            await mods.setSortOrder(ops[0].id, ops[0].sortOrder);
-            await mods.setSortOrder(ops[1].id, ops[1].sortOrder);
+            await mods.reorder(characterId, orderedIds);
             await reload();
         } catch (err) {
             showAlert('调整排序失败: ' + err.message);
