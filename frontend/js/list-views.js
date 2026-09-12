@@ -33,6 +33,7 @@ import { showCharacterForm } from './components/character-form.js';
 import { showCharacterWizard } from './components/character-wizard.js';
 import { showConfirm, showAlert } from './components/confirm-dialog.js';
 import { showLorebookEditor } from './components/lorebook-editor.js';
+import { showModManager } from './components/mod-manager.js';
 import { showModelSelector } from './components/model-selector.js';
 import { downloadBlob, showError, showSuccess } from './utils.js';
 import { beginButtonLoading } from './components/loading-button.js';
@@ -130,6 +131,16 @@ function renderCharacters() {
             const id = parseInt(btn.closest('.character-card').dataset.id);
             const char = state.characters.find((c) => c.id === id);
             showLorebookEditor({ characterId: id, characterName: char?.name || '角色' });
+        });
+    });
+
+    // 事件委托：Mod 管理（MD-2/04，镜像世界书委托）
+    grid.querySelectorAll('.mod-char').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.closest('.character-card').dataset.id);
+            const char = state.characters.find((c) => c.id === id);
+            showModManager({ characterId: id, characterName: char?.name || '角色' });
         });
     });
 
