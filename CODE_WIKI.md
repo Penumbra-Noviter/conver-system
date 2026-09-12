@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2406<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1097<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1239<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2439<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1097<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1272<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -199,6 +199,7 @@ conver system/
 │   │   │   ├── lorebook-editor.js ← 世界书编辑器（WL-4：列表/编辑/chips/校验/泛词告警）
 │   │   │   ├── modal.js            ← 模态骨架（骨架收口 C3-DEFER）
 │   │   │   ├── model-selector.js   ← 模型选择弹层
+│   │   │   ├── mod-manager.js      ← Mod 管理面板（MD-2：库 CRUD + 导入导出）
 │   │   │   ├── settings-panel.js   ← 设置面板（Key/主题/侧栏）
 │   │   │   └── tab-bar.js          ← 会话 tab 栏组件
 │   │   ├── data/
@@ -761,7 +762,7 @@ conver system/
 | <!--AUTO:sig:backend/scripts/migrate_data.py:migrate-->`migrate(source, target, force=False)`<!--/AUTO--> | 执行迁移（幂等 + 标记） |
 | <!--AUTO:sig:backend/scripts/migrate_data.py:main-->`main(argv=None)`<!--/AUTO--> | CLI 入口 |
 
-### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~347 行<!--/AUTO-->）
+### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~371 行<!--/AUTO-->）
 
 **职责**：Fetch 封装——超时守卫（AbortController + 15s 兜底，TD-51/55/72）、错误归一化、SSE 流式、Blob 下载（Content-Disposition 文件名解析）。T6 重生成：`conversations.regenerate(id, { message_id? })` 封装 `POST /api/conversations/{id}/regenerate`（缺省末条 assistant），客户端错误处理与 `messages.chat` 同走 `request` 错误通道。
 
@@ -949,6 +950,21 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/lorebook-editor.js:addKeyChip-->`addKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 录入（去重/裁剪/空拒） |
 | <!--AUTO:sig:frontend/js/components/lorebook-editor.js:removeKeyChip-->`removeKeyChip(keys, key)`<!--/AUTO--> | 关键词 chips 删除 |
 
+### 4.44.2 `frontend/js/components/mod-manager.js` — Mod 管理面板（MD-2）（<!--AUTO:lines:frontend/js/components/mod-manager.js-->~427 行<!--/AUTO-->）
+
+**职责**：Mod 管理面板组件——`showModManager` 入口（复用 openModal 骨架）+ Mod 库区块（列表 id 升序 / 新建编辑表单 / target_area 下拉 prompt|memory|css / 导入导出 JSON 信封 `{"version":1,"mods":[...]}`）。prompt 区 payload 在 UI 呈现为「三区域文本框 world/before_char/after_char」并序列化为 JSON 字符串；memory/css 区为自由文本。导入导出纯前端（导出本地 Blob 下载镜像 save-manager 形态；导入逐条 `mods.create` 容错，source="imported"）。
+
+| 元素 | 说明 |
+|------|------|
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:showModManager-->`showModManager({ characterName = '角色', onChanged } = {})`<!--/AUTO--> | 打开 Mod 管理面板（复用 openModal；标题含角色名） |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:buildModPayload-->`buildModPayload(form)`<!--/AUTO--> | 表单 → Mod payload（三区域序列化 + target_area 切换录入形态） |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:validateModForm-->`validateModForm(form)`<!--/AUTO--> | 表单校验（名称为空 / payload JSON 非法 → 内联错误） |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:serializePromptPayload-->`serializePromptPayload(world, beforeChar, afterChar)`<!--/AUTO--> | 三区域文本 → prompt 区 JSON 字符串 |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:parsePromptPayload-->`parsePromptPayload(payload)`<!--/AUTO--> | prompt 区 JSON → 三区域文本（容错） |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:buildExportEnvelope-->`buildExportEnvelope(modsList)`<!--/AUTO--> | Mod 库 → 导出信封 `{"version":1,"mods":[...]}` |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:parseImportEnvelope-->`parseImportEnvelope(text)`<!--/AUTO--> | 导入信封校验（非法 JSON/version 不符/mods 非数组 → 报错） |
+| <!--AUTO:sig:frontend/js/components/mod-manager.js:exportLibrary-->`exportLibrary(modsList)`<!--/AUTO--> | 导出下载（本地 Blob，镜像 save-manager downloadJson 形态） |
+
 ### 4.44.1 `frontend/js/components/loading-button.js` — 按钮 loading 态工具（<!--AUTO:lines:frontend/js/components/loading-button.js-->~59 行<!--/AUTO-->）
 
 **职责**：异步操作按钮的统一「执行中」反馈 —— 禁用 + 内联 spinner + 文字切换，
@@ -1024,7 +1040,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/format.js:assistantAvatarHtml-->`assistantAvatarHtml(characters, currentCharacterId)`<!--/AUTO--> | 助手头像 |
 | <!--AUTO:sig:frontend/js/format.js:userAvatarHtml-->`userAvatarHtml()`<!--/AUTO--> | 用户头像 |
 
-### 4.50 `frontend/js/icons.js` — 图标 seam（<!--AUTO:lines:frontend/js/icons.js-->~65 行<!--/AUTO-->）
+### 4.50 `frontend/js/icons.js` — 图标 seam（<!--AUTO:lines:frontend/js/icons.js-->~66 行<!--/AUTO-->）
 
 **职责**：动态模板/状态图标单源（OPT-1 图标协议收口）——`iconHtml` seam，禁止手写 emoji/SVG 碎片。
 
@@ -1488,7 +1504,7 @@ conver system/
 
 | 文件 | 用例数 | 覆盖主题 |
 |------|--------|----------|
-| `frontend/tests/api.test.js` | <!--AUTO:tests:frontend/tests/api.test.js-->19<!--/AUTO--> | 请求层/超时/SSE/Blob |
+| `frontend/tests/api.test.js` | <!--AUTO:tests:frontend/tests/api.test.js-->22<!--/AUTO--> | 请求层/超时/SSE/Blob |
 | `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->38<!--/AUTO--> | 应用编排接线 |
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
@@ -1511,6 +1527,7 @@ conver system/
 | `frontend/tests/markdown.test.js` | <!--AUTO:tests:frontend/tests/markdown.test.js-->52<!--/AUTO--> | Markdown 渲染/消毒 |
 | `frontend/tests/modal.test.js` | <!--AUTO:tests:frontend/tests/modal.test.js-->15<!--/AUTO--> | 模态框焦点陷阱/关闭还原 |
 | `frontend/tests/model-selector.test.js` | <!--AUTO:tests:frontend/tests/model-selector.test.js-->13<!--/AUTO--> | 模型选择 |
+| `frontend/tests/mod-manager.test.js` | <!--AUTO:tests:frontend/tests/mod-manager.test.js-->30<!--/AUTO--> | Mod 管理面板契约锁（MD-2：库列表 id 升序/新建编辑删除/三区域 payload 往返/导出信封/导入逐条容错/端点映射） |
 | `frontend/tests/model-utils.test.js` | <!--AUTO:tests:frontend/tests/model-utils.test.js-->5<!--/AUTO--> | 模型下拉工具 |
 | `frontend/tests/save-key-meta.test.js` | <!--AUTO:tests:frontend/tests/save-key-meta.test.js-->25<!--/AUTO--> | 存档键契约 |
 | `frontend/tests/save-manager.test.js` | <!--AUTO:tests:frontend/tests/save-manager.test.js-->64<!--/AUTO--> | 存档管理 |
@@ -1579,10 +1596,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2406<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2439<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1097<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1239<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1272<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。
