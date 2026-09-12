@@ -9,6 +9,8 @@ MD-1 Mod 挂载层 — 契约测试
     5. apply_prompt_mods 空 Mod 列表 → 输入原样返回（零变化）
     补充：CRUD 语义（create/list/update/delete）+ bind 自动 sort_order +
     404 守卫 + target_area 过滤 + payload 解析容错 + world→system 映射。
+    补充（F-102 后端）：reorder_character_mods 批量重排原子契约（正常重排 /
+    空列表 400 / 越界缺失 404 / 归属不符 404 / 重复 id / 角色不存在 404）。
 
 依赖：pytest + SQLite 内存库（conftest.db_session）；级联语义测试手动开启
 PRAGMA foreign_keys=ON（conftest 默认关，与 test_message_swipes 同模式）。
@@ -16,6 +18,7 @@ PRAGMA foreign_keys=ON（conftest 默认关，与 test_message_swipes 同模式�
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -438,3 +441,110 @@ class TestApplyPromptMods:
         ]
         mods_service.apply_prompt_mods(base, mods)
         assert base["system"] == snapshot  # 原列表未被追加
+
+
+# ── 4. reorder_character_mods（批量重排，F-102 后端）──
+
+
+class TestReorderCharacterMods:
+    """reorder_character_mods 服务层原子契约（spec §F-102）
+
+    语义：ordered_binding_ids 必须恰好覆盖该角色全部绑定，逐条 sort_order =
+    列表下标，一次 commit；任一校验失败整体不落库。
+    """
+
+    def test_reorder_persists_new_order(self, db_session: Session) -> None:
+        """正常重排：sort_order = 列表下标持久化，列表按新序返回"""
+        char_id = _create_character(db_session)
+        m1 = _create_mod(db_session, name="M1")
+        m2 = _create_mod(db_session, name="M2")
+        m3 = _create_mod(db_session, name="M3")
+        b1 = mods_service.bind_mod(db_session, char_id, m1.id)  # sort_order=0
+        b2 = mods_service.bind_mod(db_session, char_id, m2.id)  # sort_order=1
+        b3 = mods_service.bind_mod(db_session, char_id, m3.id)  # sort_order=2
+
+        result = mods_service.reorder_character_mods(
+            db_session, char_id, [b3.id, b1.id, b2.id]
+        )
+
+        assert [b.mod_id for b in result] == [m3.id, m1.id, m2.id]
+        assert [b.sort_order for b in result] == [0, 1, 2]
+
+        persisted = mods_service.list_character_mods(db_session, char_id)
+        assert [(b.mod_id, b.sort_order) for b in persisted] == [
+            (m3.id, 0),
+            (m1.id, 1),
+            (m2.id, 2),
+        ]
+
+    def test_reorder_empty_list_rejected(self, db_session: Session) -> None:
+        """空列表 → ModReorderError（400 明确拒绝，避免误清空）"""
+        char_id = _create_character(db_session)
+        mod = _create_mod(db_session)
+        mods_service.bind_mod(db_session, char_id, mod.id)
+
+        with pytest.raises(mods_service.ModReorderError):
+            mods_service.reorder_character_mods(db_session, char_id, [])
+
+    def test_reorder_unknown_character(self, db_session: Session) -> None:
+        """角色不存在 → CharacterNotFoundError"""
+        with pytest.raises(CharacterNotFoundError):
+            mods_service.reorder_character_mods(db_session, 9999, [1])
+
+    def test_reorder_missing_binding(self, db_session: Session) -> None:
+        """引用不存在的 binding_id → ModBindingNotFoundError"""
+        char_id = _create_character(db_session)
+        mod = _create_mod(db_session)
+        mods_service.bind_mod(db_session, char_id, mod.id)
+
+        with pytest.raises(ModBindingNotFoundError):
+            mods_service.reorder_character_mods(db_session, char_id, [9999])
+
+    def test_reorder_foreign_binding_rejected_atomically(self, db_session: Session) -> None:
+        """混入他角色绑定 → ModBindingNotFoundError 且原顺序零改动（原子）"""
+        char_id = _create_character(db_session)
+        other_id = _create_character(db_session, name="另一角色")
+        m1 = _create_mod(db_session, name="M1")
+        m2 = _create_mod(db_session, name="M2")
+        b1 = mods_service.bind_mod(db_session, char_id, m1.id)  # sort_order=0
+        mods_service.bind_mod(db_session, char_id, m2.id)  # sort_order=1
+        foreign = mods_service.bind_mod(db_session, other_id, m1.id)  # 他角色
+
+        with pytest.raises(ModBindingNotFoundError):
+            mods_service.reorder_character_mods(
+                db_session, char_id, [b1.id, foreign.id]
+            )
+
+        remained = mods_service.list_character_mods(db_session, char_id)
+        assert [(b.mod_id, b.sort_order) for b in remained] == [
+            (m1.id, 0),
+            (m2.id, 1),
+        ]
+
+    def test_reorder_incomplete_coverage_rejected(self, db_session: Session) -> None:
+        """缺失某绑定（未恰好覆盖）→ ModReorderError 且零改动"""
+        char_id = _create_character(db_session)
+        m1 = _create_mod(db_session, name="M1")
+        m2 = _create_mod(db_session, name="M2")
+        b1 = mods_service.bind_mod(db_session, char_id, m1.id)  # sort_order=0
+        mods_service.bind_mod(db_session, char_id, m2.id)  # sort_order=1
+
+        with pytest.raises(mods_service.ModReorderError):
+            mods_service.reorder_character_mods(db_session, char_id, [b1.id])
+
+        remained = mods_service.list_character_mods(db_session, char_id)
+        assert [(b.mod_id, b.sort_order) for b in remained] == [
+            (m1.id, 0),
+            (m2.id, 1),
+        ]
+
+    def test_reorder_duplicate_id_rejected(self, db_session: Session) -> None:
+        """重复 binding_id → ModReorderError（HTTP 层由 schema 422 拦截，服务层防御）"""
+        char_id = _create_character(db_session)
+        m1 = _create_mod(db_session, name="M1")
+        m2 = _create_mod(db_session, name="M2")
+        b1 = mods_service.bind_mod(db_session, char_id, m1.id)
+        mods_service.bind_mod(db_session, char_id, m2.id)
+
+        with pytest.raises(mods_service.ModReorderError):
+            mods_service.reorder_character_mods(db_session, char_id, [b1.id, b1.id])
