@@ -1,10 +1,19 @@
 /**
- * Conver System — Mod 管理面板组件（MD-2 / 03）
+ * Conver System — Mod 管理面板组件（MD-2 / 03 + 04）
  *
  * 全局 Mod 库维护面板：列表（id 升序）/ 新建 / 编辑 / 删除 / 目标区域
  * （prompt|memory|css）/ 导入导出 JSON。骨架（遮罩 / 标题 / 关闭按钮 /
  * 焦点陷阱 / Escape / 遮罩点击）由通用模态框工厂 openModal 承担；图标一律走
  * icons.js 的 iconHtml()（不手写 emoji/SVG 碎片）。
+ *
+ * MD-2/04 扩展「当前角色挂载」区块：当 showModManager 收到 characterId 时，
+ * 与 Mod 库区块并列渲染该角色已挂载 Mod（sort_order 升序），支持挂载新 Mod /
+ * 解绑 / 切换启用开关 / 上移下移排序。挂载视图展示 Mod 名称与目标区域时，把
+ * 「绑定列表」与「Mod 库列表」按 mod_id 客户端关联（不引入后端嵌套 join）；
+ * 未在库中命中的 mod_id（异常数据）显示「未知 Mod」占位不崩溃。
+ *
+ * 排序落库方式（主会话拍板）：上移/下移 = 与相邻绑定交换 sort_order，落库走
+ * mods.setSortOrder(bindingId, sortOrder) 两次调用（binding_id 稳定、无丢失窗口）。
  *
  * 导入导出为纯前端能力：
  *   - 导出 = 取 mods.list() 组装信封 {"version":1,"mods":[...]} → 本地 Blob 下载
@@ -20,9 +29,9 @@
  * 字段名映射单一来源：buildModPayload（与后端 schemas/mods.py ModCreate 逐字段
  * 一致；name/description/target_area/payload，version/source 由服务端默认）。
  *
- * 协议表面（__all__）：showModManager / TARGET_AREAS / serializePromptPayload /
- * parsePromptPayload / validateModForm / buildModPayload / buildExportEnvelope /
- * parseImportEnvelope / importModsFromEnvelope。
+ * 协议表面（__all__）：showModManager / computeSortSwap / TARGET_AREAS /
+ * serializePromptPayload / parsePromptPayload / validateModForm / buildModPayload /
+ * buildExportEnvelope / parseImportEnvelope / importModsFromEnvelope。
  */
 
 import { mods } from '../api.js';
@@ -33,6 +42,7 @@ import { escapeHtml } from '../utils.js';
 
 export const __all__ = [
     'showModManager',
+    'computeSortSwap',
     'TARGET_AREAS',
     'serializePromptPayload',
     'parsePromptPayload',
@@ -193,17 +203,39 @@ export async function importModsFromEnvelope(text) {
     return { ok: true, imported, failed, error: null };
 }
 
+/**
+ * 计算上移/下移时相邻两项交换 sort_order 后的两次 setSortOrder 参数。
+ * 纯函数（不接触 DOM / 不落库），供移动事件处理器与独立单测消费。
+ * @param {Array} bindings - 已按 sort_order 升序的绑定列表
+ * @param {number} index - 待移动项在列表中的下标
+ * @param {'up'|'down'} direction - 移动方向（up=与前一交换，down=与后一交换）
+ * @returns {Array<{id: number, sortOrder: number}>} 两次 setSortOrder 调用参数
+ *   （边界越界返回空数组 — 调用方据此 no-op）
+ */
+export function computeSortSwap(bindings, index, direction) {
+    if (!Array.isArray(bindings)) return [];
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= bindings.length) return [];
+    const a = bindings[index];
+    const b = bindings[target];
+    return [
+        { id: a.id, sortOrder: b.sort_order ?? 0 },
+        { id: b.id, sortOrder: a.sort_order ?? 0 },
+    ];
+}
+
 // ════════════════════════════════════════════════════════════════
 // 视图
 // ════════════════════════════════════════════════════════════════
 
 /**
- * 打开 Mod 管理模态框（Mod 库区块；角色挂载区块归工单 04）。
+ * 打开 Mod 管理模态框（Mod 库区块 + 可选「当前角色挂载」区块）。
  * @param {object} opts
  * @param {string} [opts.characterName='角色'] - 角色名（模态框标题）
+ * @param {number|null} [opts.characterId=null] - 角色 id；传入时渲染挂载区块
  * @param {function} [opts.onChanged] - 库增删改后回调（如刷新）
  */
-export function showModManager({ characterName = '角色', onChanged } = {}) {
+export function showModManager({ characterId = null, characterName = '角色', onChanged } = {}) {
     openModal({
         title: `${characterName} 的 Mod 管理`,
         modalClass: 'mod-manager-modal',
@@ -212,9 +244,29 @@ export function showModManager({ characterName = '角色', onChanged } = {}) {
         removeExisting: '.modal-overlay',
         onOpen(overlay) {
             const root = overlay.querySelector('[data-mod-manager-root]');
-            renderLibrary(root, onChanged);
+            renderManager(root, { characterId, onChanged });
         },
     });
+}
+
+/**
+ * 渲染面板整体：Mod 库区块（恒有）+ 当前角色挂载区块（有 characterId 时并列）。
+ * @param {HTMLElement} root - 容器
+ * @param {object} opts
+ * @param {number|null} opts.characterId - 角色 id（null 则不渲染挂载区块）
+ * @param {function|null} opts.onChanged - 变更回调
+ */
+async function renderManager(root, { characterId, onChanged }) {
+    root.innerHTML = `
+        <div class="mod-library-section" data-mod-library-section></div>
+        ${characterId != null ? '<div class="mod-mount-section" data-mod-mount-section></div>' : ''}
+    `;
+    const librarySection = root.querySelector('[data-mod-library-section]');
+    await renderLibrary(librarySection, onChanged);
+    if (characterId != null) {
+        const mountSection = root.querySelector('[data-mod-mount-section]');
+        await renderMounts(mountSection, characterId, onChanged);
+    }
 }
 
 /**
@@ -450,4 +502,180 @@ function exportLibrary(modsList) {
     a.download = 'mods-library.json';
     a.click();
     URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════════════════════
+// 挂载区块（MD-2/04）— 当前角色已挂载 Mod 的管理
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * 渲染「当前角色挂载」区块（列表 / 开关 / 挂载 / 解绑 / 上移下移排序）。
+ * 绑定列表与 Mod 库列表按 mod_id 客户端关联；未命中显示「未知 Mod」占位。
+ * 所有变更操作成功后重拉列表（服务端实况）；失败 → showAlert + 重拉回滚。
+ * @param {HTMLElement} root - 区块容器
+ * @param {number} characterId - 角色 id
+ * @param {function|null} onChanged - 变更回调（挂载变更不触发，保留签名一致）
+ */
+async function renderMounts(root, characterId, onChanged) {
+    root.innerHTML = `
+        <div class="mod-mount-heading">当前角色挂载</div>
+        <div class="mod-mount-toolbar">
+            <select data-mod-bind-select aria-label="选择要挂载的 Mod">
+                <option value="">选择 Mod 挂载…</option>
+            </select>
+            <button class="btn btn-primary" data-mod-bind-add>${iconHtml('plus')} 挂载</button>
+        </div>
+        <div class="mod-mount-list" data-mod-mount-list></div>
+    `;
+    const selectEl = root.querySelector('[data-mod-bind-select]');
+    const listEl = root.querySelector('[data-mod-mount-list]');
+
+    let bindings = [];
+    let modsList = [];
+    try {
+        [bindings, modsList] = await Promise.all([
+            mods.listCharacterMods(characterId),
+            mods.list(),
+        ]);
+    } catch (err) {
+        listEl.innerHTML = `<div class="mod-empty">加载挂载失败：${escapeHtml(err.message)}</div>`;
+        return;
+    }
+
+    const modById = new Map(modsList.map((m) => [m.id, m]));
+    const sorted = () => [...bindings].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+    const render = () => {
+        const list = sorted();
+        listEl.innerHTML = list.length
+            ? list.map((b, i) => bindingRowHtml(b, modById.get(b.mod_id), i === 0, i === list.length - 1)).join('')
+            : '<div class="mod-empty">该角色还没有挂载 Mod，从上方选择一个 Mod 挂载</div>';
+        renderBindOptions(selectEl, modsList, bindings);
+
+        listEl.querySelectorAll('[data-mod-binding-toggle]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const id = Number(btn.dataset.modBindingToggle);
+                const binding = bindings.find((b) => b.id === id);
+                if (!binding) return;
+                try {
+                    await mods.setEnabled(id, !binding.enabled);
+                    await reload();
+                } catch (err) {
+                    showAlert('切换失败: ' + err.message);
+                    await reload();
+                }
+            });
+        });
+
+        listEl.querySelectorAll('[data-mod-binding-unbind]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const id = Number(btn.dataset.modBindingUnbind);
+                const binding = bindings.find((b) => b.id === id);
+                const mod = modById.get(binding?.mod_id);
+                const ok = await showConfirm({
+                    title: '解绑 Mod',
+                    message: `确定解绑「${mod?.name ?? '未知 Mod'}」吗？`,
+                    detail: '解绑后该 Mod 不再注入此角色（库中仍保留）',
+                    confirmText: '解绑',
+                    cancelText: '取消',
+                    danger: true,
+                });
+                if (!ok) return;
+                try {
+                    await mods.unbind(id);
+                    await reload();
+                } catch (err) {
+                    showAlert('解绑失败: ' + err.message);
+                    await reload();
+                }
+            });
+        });
+
+        listEl.querySelectorAll('[data-mod-binding-up]').forEach((btn) => {
+            btn.addEventListener('click', () => moveBinding(Number(btn.dataset.modBindingUp), 'up'));
+        });
+        listEl.querySelectorAll('[data-mod-binding-down]').forEach((btn) => {
+            btn.addEventListener('click', () => moveBinding(Number(btn.dataset.modBindingDown), 'down'));
+        });
+    };
+
+    const moveBinding = async (id, direction) => {
+        const list = sorted();
+        const index = list.findIndex((b) => b.id === id);
+        if (index < 0) return;
+        const ops = computeSortSwap(list, index, direction);
+        if (ops.length === 0) return;
+        try {
+            await mods.setSortOrder(ops[0].id, ops[0].sortOrder);
+            await mods.setSortOrder(ops[1].id, ops[1].sortOrder);
+            await reload();
+        } catch (err) {
+            showAlert('调整排序失败: ' + err.message);
+            await reload();
+        }
+    };
+
+    const reload = async () => {
+        try {
+            bindings = await mods.listCharacterMods(characterId);
+            render();
+        } catch (err) {
+            showAlert('刷新失败: ' + err.message);
+        }
+    };
+
+    root.querySelector('[data-mod-bind-add]').addEventListener('click', async () => {
+        const modId = Number(selectEl.value);
+        if (!modId) {
+            showAlert('请先选择一个 Mod');
+            return;
+        }
+        // 客户端重复挂载拦截（后端 ModAlreadyBoundError 400 兜底）
+        if (bindings.some((b) => b.mod_id === modId)) {
+            showAlert('该 Mod 已挂载');
+            return;
+        }
+        try {
+            await mods.bind(characterId, { mod_id: modId });
+            await reload();
+        } catch (err) {
+            showAlert('挂载失败: ' + err.message);
+            await reload();
+        }
+    });
+
+    render();
+}
+
+/** 挂载行 HTML（名称 / 区域徽标 / 排序序号 / 上移下移 / 开关 / 解绑） */
+function bindingRowHtml(binding, mod, isFirst, isLast) {
+    const name = mod ? (mod.name || '（未命名）') : '未知 Mod';
+    const area = mod?.target_area || 'unknown';
+    const order = binding.sort_order ?? 0;
+    return `
+        <div class="mod-binding-row" data-binding-id="${binding.id}" data-sort-order="${order}">
+            <span class="mod-binding-order" title="排序序号">${order}</span>
+            <div class="mod-binding-main">
+                <div class="mod-binding-name">${escapeHtml(name)}</div>
+                <div class="mod-binding-meta">
+                    ${mod
+                        ? `<span class="mod-badge mod-badge-${escapeHtml(area)}">${escapeHtml(area)}</span>`
+                        : '<span class="mod-badge">未知区域</span>'}
+                </div>
+            </div>
+            <button class="btn-icon mod-binding-up" data-mod-binding-up="${binding.id}" title="上移" ${isFirst ? 'disabled' : ''}>${iconHtml('chevronLeft')}</button>
+            <button class="btn-icon mod-binding-down" data-mod-binding-down="${binding.id}" title="下移" ${isLast ? 'disabled' : ''}>${iconHtml('chevronRight')}</button>
+            <button class="btn-icon mod-binding-toggle" data-mod-binding-toggle="${binding.id}" title="${binding.enabled ? '点击禁用' : '点击启用'}">${binding.enabled ? iconHtml('toggleOn') : iconHtml('toggleOff')}</button>
+            <button class="btn-icon mod-binding-unbind" data-mod-binding-unbind="${binding.id}" title="解绑">${iconHtml('trash')}</button>
+        </div>`;
+}
+
+/** 挂载下拉选项：只列未挂载 Mod（客户端去重，id 升序） */
+function renderBindOptions(selectEl, modsList, bindings) {
+    const boundIds = new Set(bindings.map((b) => b.mod_id));
+    const unbound = modsList
+        .filter((m) => !boundIds.has(m.id))
+        .sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+    selectEl.innerHTML = '<option value="">选择 Mod 挂载…</option>' +
+        unbound.map((m) => `<option value="${m.id}">${escapeHtml(m.name || '（未命名）')}</option>`).join('');
 }

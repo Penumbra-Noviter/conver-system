@@ -11,17 +11,22 @@
  *
  * 挂载模式：jsdom + vi.mock(api.js)（面板与导入用假 mods；纯函数组不依赖 DOM）。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { iconHtml } from '../js/icons.js';
 
 // 面板/导入组 mock API 层（组件 import '../api.js' 解析到同一模块）
 vi.mock('../js/api.js', () => ({
-    mods: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    mods: {
+        list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(),
+        listCharacterMods: vi.fn(), bind: vi.fn(), setEnabled: vi.fn(),
+        setSortOrder: vi.fn(), unbind: vi.fn(),
+    },
 }));
 
 import { mods } from '../js/api.js';
 import {
     showModManager,
+    computeSortSwap,
     TARGET_AREAS,
     serializePromptPayload,
     parsePromptPayload,
@@ -414,7 +419,7 @@ describe('5. 面板渲染与交互（mock api.js + DOM）', () => {
 
 describe('6. 协议表面与图标 seam', () => {
     it('__all__ 覆盖全部公开导出', () => {
-        for (const name of ['showModManager', 'TARGET_AREAS', 'serializePromptPayload',
+        for (const name of ['showModManager', 'computeSortSwap', 'TARGET_AREAS', 'serializePromptPayload',
             'parsePromptPayload', 'validateModForm', 'buildModPayload',
             'buildExportEnvelope', 'parseImportEnvelope', 'importModsFromEnvelope']) {
             expect(__all__).toContain(name);
@@ -423,5 +428,259 @@ describe('6. 协议表面与图标 seam', () => {
 
     it('puzzle 图标走 iconHtml seam（MD-2 Mod 按钮）', () => {
         expect(iconHtml('puzzle')).toContain('data-icon="puzzle"');
+    });
+});
+
+// ════════════════════════════════════════════════════════════════
+// 挂载区块（MD-2/04）：当前角色已挂载 Mod 的管理
+// ════════════════════════════════════════════════════════════════
+
+describe('7. 挂载区块（MD-2/04）', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        vi.resetAllMocks();
+    });
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('挂载区块列出已挂载 Mod（sort_order 升序，含名称/区域/序号/开关态）', async () => {
+        mods.list.mockResolvedValue([
+            { id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' },
+            { id: 2, name: 'B', target_area: 'memory', source: 'manual', payload: '' },
+        ]);
+        mods.listCharacterMods.mockResolvedValue([
+            { id: 12, character_id: 1, mod_id: 2, enabled: false, sort_order: 20 },
+            { id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 5 },
+        ]);
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        const rows = document.querySelectorAll('.mod-binding-row');
+        expect(rows.length).toBe(2);
+        // sort_order 升序：A(sort 5) 在 B(sort 20) 前
+        expect(rows[0].querySelector('.mod-binding-name').textContent).toBe('A');
+        expect(rows[0].dataset.sortOrder).toBe('5');
+        expect(rows[0].querySelector('.mod-binding-meta').textContent).toContain('prompt');
+        expect(rows[0].querySelector('[data-mod-binding-toggle]').innerHTML).toContain('data-icon="toggleOn"');
+        expect(rows[1].querySelector('.mod-binding-name').textContent).toBe('B');
+        expect(rows[1].dataset.sortOrder).toBe('20');
+        expect(rows[1].querySelector('.mod-binding-meta').textContent).toContain('memory');
+        expect(rows[1].querySelector('[data-mod-binding-toggle]').innerHTML).toContain('data-icon="toggleOff"');
+    });
+
+    it('挂载下拉只列未挂载 Mod（客户端去重）', async () => {
+        mods.list.mockResolvedValue([
+            { id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' },
+            { id: 2, name: 'B', target_area: 'css', source: 'manual', payload: '' },
+        ]);
+        mods.listCharacterMods.mockResolvedValue([
+            { id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 0 },
+        ]);
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        const values = [...document.querySelectorAll('[data-mod-bind-select] option')].map((o) => o.value);
+        expect(values).toEqual(['', '2']); // 已挂载的 A(id=1) 不出现在选项
+    });
+
+    it('未在库中命中的 mod_id（异常数据）→ 显示「未知 Mod」占位不崩', async () => {
+        mods.list.mockResolvedValue([{ id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' }]);
+        mods.listCharacterMods.mockResolvedValue([
+            { id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 0 },
+            { id: 12, character_id: 1, mod_id: 999, enabled: false, sort_order: 10 }, // 库中不存在
+        ]);
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        const rows = document.querySelectorAll('.mod-binding-row');
+        expect(rows.length).toBe(2);
+        expect(rows[1].querySelector('.mod-binding-name').textContent).toBe('未知 Mod');
+        expect(rows[1].querySelector('.mod-binding-meta').textContent).toContain('未知区域');
+    });
+
+    it('挂载新 Mod：选择未挂载 Mod → mods.bind 调用，列表新增该行', async () => {
+        mods.list.mockResolvedValue([
+            { id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' },
+            { id: 2, name: 'B', target_area: 'css', source: 'manual', payload: '' },
+        ]);
+        mods.listCharacterMods
+            .mockResolvedValueOnce([{ id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 0 }])
+            .mockResolvedValueOnce([
+                { id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 0 },
+                { id: 12, character_id: 1, mod_id: 2, enabled: true, sort_order: 10 },
+            ]);
+        mods.bind.mockResolvedValue({ id: 12, character_id: 1, mod_id: 2, enabled: true, sort_order: 10 });
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        const select = document.querySelector('[data-mod-bind-select]');
+        select.value = '2';
+        document.querySelector('[data-mod-bind-add]').click();
+        await flush();
+
+        expect(mods.bind).toHaveBeenCalledWith(1, { mod_id: 2 });
+        const rows = document.querySelectorAll('.mod-binding-row');
+        expect(rows.length).toBe(2);
+        expect(rows[1].querySelector('.mod-binding-name').textContent).toBe('B');
+    });
+
+    it('未选择 Mod → showAlert 且不调 bind', async () => {
+        mods.list.mockResolvedValue([]);
+        mods.listCharacterMods.mockResolvedValue([]);
+        const confirmModule = await import('../js/components/confirm-dialog.js');
+        const alertSpy = vi.spyOn(confirmModule, 'showAlert').mockResolvedValue(undefined);
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        document.querySelector('[data-mod-bind-add]').click();
+        await flush();
+
+        expect(alertSpy).toHaveBeenCalledWith('请先选择一个 Mod');
+        expect(mods.bind).not.toHaveBeenCalled();
+    });
+
+    it('挂载失败（后端 400 兜底）→ showAlert 且列表重拉回滚', async () => {
+        mods.list.mockResolvedValue([
+            { id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' },
+            { id: 2, name: 'B', target_area: 'css', source: 'manual', payload: '' },
+        ]);
+        mods.listCharacterMods.mockResolvedValue([]);
+        mods.bind.mockRejectedValue(new Error('该 Mod 已挂载'));
+        const confirmModule = await import('../js/components/confirm-dialog.js');
+        const alertSpy = vi.spyOn(confirmModule, 'showAlert').mockResolvedValue(undefined);
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        const select = document.querySelector('[data-mod-bind-select]');
+        select.value = '2'; // 未挂载的 B
+        document.querySelector('[data-mod-bind-add]').click();
+        await flush();
+
+        expect(mods.bind).toHaveBeenCalledWith(1, { mod_id: 2 });
+        expect(alertSpy).toHaveBeenCalledWith('挂载失败: 该 Mod 已挂载');
+        expect(mods.listCharacterMods).toHaveBeenCalledTimes(2); // 初始 + 失败重拉
+    });
+
+    it('开关切换 → mods.setEnabled 调用，行内开关态翻转', async () => {
+        mods.list.mockResolvedValue([{ id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' }]);
+        mods.listCharacterMods
+            .mockResolvedValueOnce([{ id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 0 }])
+            .mockResolvedValueOnce([{ id: 11, character_id: 1, mod_id: 1, enabled: false, sort_order: 0 }]);
+        mods.setEnabled.mockResolvedValue({});
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        document.querySelector('[data-mod-binding-toggle]').click();
+        await flush();
+
+        expect(mods.setEnabled).toHaveBeenCalledWith(11, false);
+        expect(document.querySelector('[data-mod-binding-toggle]').innerHTML).toContain('data-icon="toggleOff"');
+    });
+
+    it('解绑（showConfirm 确认后）→ mods.unbind 调用，列表移除该行', async () => {
+        mods.list.mockResolvedValue([{ id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' }]);
+        mods.listCharacterMods
+            .mockResolvedValueOnce([{ id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 0 }])
+            .mockResolvedValueOnce([]);
+        mods.unbind.mockResolvedValue(null);
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        document.querySelector('[data-mod-binding-unbind]').click();
+        await flush();
+        expect(document.querySelector('.confirm-modal')).not.toBeNull();
+        document.querySelector('.confirm-ok').click();
+        await flush();
+
+        expect(mods.unbind).toHaveBeenCalledWith(11);
+        expect(document.querySelectorAll('.mod-binding-row').length).toBe(0);
+    });
+
+    it('上移 → mods.setSortOrder 两次交换相邻 sort_order 并持久化，重拉后顺序正确', async () => {
+        mods.list.mockResolvedValue([
+            { id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' },
+            { id: 2, name: 'B', target_area: 'memory', source: 'manual', payload: '' },
+        ]);
+        mods.listCharacterMods
+            .mockResolvedValueOnce([
+                { id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 0 },
+                { id: 12, character_id: 1, mod_id: 2, enabled: true, sort_order: 10 },
+            ])
+            .mockResolvedValueOnce([
+                { id: 12, character_id: 1, mod_id: 2, enabled: true, sort_order: 0 },
+                { id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 10 },
+            ]);
+        mods.setSortOrder.mockResolvedValue({});
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        // 上移第二行（B，index 1）
+        document.querySelectorAll('.mod-binding-row')[1].querySelector('[data-mod-binding-up]').click();
+        await flush();
+
+        expect(mods.setSortOrder).toHaveBeenCalledTimes(2);
+        expect(mods.setSortOrder).toHaveBeenNthCalledWith(1, 12, 0);  // B 取 A 的 0
+        expect(mods.setSortOrder).toHaveBeenNthCalledWith(2, 11, 10); // A 取 B 的 10
+        // 重拉后顺序正确：B 在前
+        const after = document.querySelectorAll('.mod-binding-row');
+        expect(after[0].querySelector('.mod-binding-name').textContent).toBe('B');
+        expect(after[0].dataset.sortOrder).toBe('0');
+        expect(after[1].querySelector('.mod-binding-name').textContent).toBe('A');
+        expect(after[1].dataset.sortOrder).toBe('10');
+    });
+
+    it('变更失败 → showAlert 提示且列表重拉回滚（listCharacterMods 再拉）', async () => {
+        mods.list.mockResolvedValue([{ id: 1, name: 'A', target_area: 'prompt', source: 'manual', payload: '' }]);
+        mods.listCharacterMods.mockResolvedValue([{ id: 11, character_id: 1, mod_id: 1, enabled: true, sort_order: 0 }]);
+        mods.setEnabled.mockRejectedValue(new Error('网络错误'));
+        const confirmModule = await import('../js/components/confirm-dialog.js');
+        const alertSpy = vi.spyOn(confirmModule, 'showAlert').mockResolvedValue(undefined);
+
+        showModManager({ characterId: 1, characterName: 'R' });
+        await flush();
+
+        document.querySelector('[data-mod-binding-toggle]').click();
+        await flush();
+
+        expect(alertSpy).toHaveBeenCalledWith('切换失败: 网络错误');
+        // 重拉：初始 1 次 + 失败回滚再拉 1 次
+        expect(mods.listCharacterMods).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('8. computeSortSwap 纯函数', () => {
+    const bindings = [
+        { id: 11, sort_order: 0 },
+        { id: 12, sort_order: 10 },
+        { id: 13, sort_order: 20 },
+    ];
+
+    it('up：与前一交换 sort_order', () => {
+        expect(computeSortSwap(bindings, 1, 'up')).toEqual([
+            { id: 12, sortOrder: 0 },
+            { id: 11, sortOrder: 10 },
+        ]);
+    });
+
+    it('down：与后一交换 sort_order', () => {
+        expect(computeSortSwap(bindings, 1, 'down')).toEqual([
+            { id: 12, sortOrder: 20 },
+            { id: 13, sortOrder: 10 },
+        ]);
+    });
+
+    it('边界越界 → 空数组（no-op）', () => {
+        expect(computeSortSwap(bindings, 0, 'up')).toEqual([]);
+        expect(computeSortSwap(bindings, 2, 'down')).toEqual([]);
     });
 });

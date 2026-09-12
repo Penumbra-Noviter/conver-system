@@ -511,3 +511,21 @@ describe('list-views initListViews — 幂等与契约破坏 Falsify', () => {
         expect(() => listViews.initListViews({ switchView: () => {} })).not.toThrow();
     });
 });
+
+describe('list-views Mod 按钮委托 — MD-2/04', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('.mod-char 点击 → 事件委托打开 showModManager（绑定该角色 id）', async () => {
+        const { } = await loadModules(makeRoute({
+            characters: [{ id: 1, name: '角色A', conversation_count: 0 }],
+        }));
+        const modManagerModule = await import('../js/components/mod-manager.js');
+        const spy = vi.spyOn(modManagerModule, 'showModManager').mockImplementation(() => {});
+
+        document.querySelector('#character-grid .mod-char').click();
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy).toHaveBeenCalledWith({ characterId: 1, characterName: '角色A' });
+    });
+});

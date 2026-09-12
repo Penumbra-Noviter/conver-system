@@ -285,6 +285,14 @@ describe('characterCardHtml', () => {
         expect(html).toContain('data-icon="messages"');
         expect(html).toContain('0');
     });
+
+    it('渲染 Mod 按钮（.mod-char，puzzle 图标，并列世界书按钮）', () => {
+        const html = characterCardHtml(char);
+        expect(html).toContain('class="btn-icon mod-char"');
+        expect(html).toContain('data-icon="puzzle"');
+        // 与世界书按钮并列（同一 actions 组）
+        expect(html).toContain('class="btn-icon lorebook-char"');
+    });
 });
 
 describe('conversationItemHtml', () => {
