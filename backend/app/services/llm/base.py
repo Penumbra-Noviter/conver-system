@@ -47,17 +47,22 @@ class BaseLLM(ABC):
     def _prepare_messages(self, messages: list[dict]) -> tuple[str | None, list[dict]]:
         """从消息列表提取 system prompt，返回 (system_content, chat_messages)
 
-        system 以纯文本内容返回：Claude 侧直接用作顶层 system 参数，
-        OpenAI 侧需在调用处包装回 {"role": "system", "content": ...} 再插入消息列表。
-        非 system 消息逐条重建为 {"role", "content"} 字典（不持有外部引用）。
+        多条 system 收集全部 content，过滤空 / 纯空白后按组装顺序以 ``\\n\\n``
+        连接为单一纯文本（无任何非空 system 返回 None）。system 仍以纯文本
+        返回：Claude 侧直接用作顶层 system 参数，OpenAI 侧需在调用处包装回
+        {"role": "system", "content": ...} 再插入消息列表。非 system 消息逐条
+        重建为 {"role", "content"} 字典（不持有外部引用）。
         """
-        system = None
-        chat_messages = []
+        system_parts: list[str] = []
+        chat_messages: list[dict] = []
         for msg in messages:
             if msg["role"] == "system":
-                system = msg["content"]
+                content = msg["content"]
+                if content is not None and content.strip():
+                    system_parts.append(content)
             else:
                 chat_messages.append({"role": msg["role"], "content": msg["content"]})
+        system = "\n\n".join(system_parts) if system_parts else None
         return system, chat_messages
 
     @asynccontextmanager
