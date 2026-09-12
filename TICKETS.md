@@ -67,6 +67,19 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 图片出图门控 MD-3（2026-09-11 — 出图能力门控 + 图片 Provider 设置，CG 批后立项）
+
+> 来源：CG-3 交付后用户指出的产品缺口——出图默认走 local 占位后端（开发形态），生产点出图会得到占位图而非真实生成；且无「是否可用」判定。本工单立门控单源 + 图片 Provider 设置，与 MD-1/MD-2（Mod 挂载）无关（编号顺延为独立 follow-up）。叙述详见 DEV_LOG〈MD-3 出图能力门控 + 图片 Provider 设置（2026-09-11）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| MD-3 | 出图能力门控 + 图片 Provider 设置（image_provider/image_base_url 设置 + /available + 按钮门控 + 设置 UI） | 2026-09-11 | daf0fd7 |
+
+**验证链：** 后端 pytest 1042+1skip→1049+1skip（+7：availability 矩阵——未配置/local 占位/HTTP 无 base_url/HTTP+base_url/未知 provider + 提交无后端 400 + /available 路由 + 提交 provider 从 settings 取）；全量后端绿零回归 | 前端 Vitest 1238→1239（+1：MD-3 守卫——未配置生图后端 generateImage no-op 不弹 modal 不提交）+ settings-panel 图片设置 UI 回填/收集 | provider 从请求体移入 settings（ImageTaskCreate 删 provider 字段），run_image_task 读 settings base_url | 判定单源 image_generation_available（settings 存取器 + 门控 + 前端守卫三处消费同源）| doc_sync 零漂移
+**非阻断落债：** 无
+
+---
+
 ### CG 批次 CG-3（2026-09-11 — 对话内出图 + 剧情回顾，CG 批收官）
 
 > 来源：AI风月对标调研五批工单（CG 图像沉淀第三张/收官）；出图走 CG-1 Provider + CG-2 资产库，含前端三态渲染与回顾时间线页，规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §CG-3。叙述详见 DEV_LOG〈CG-3 对话内出图 + 剧情回顾（2026-09-11）〉。

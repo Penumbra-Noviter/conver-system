@@ -237,6 +237,22 @@
 - **期末 code-review 四轴**：Spec 0 偏差（provider 缺省 local 零配置占位——端到端可用，HTTP 后端 base_url 待 MD 批后 settings 接线）+ Standards 0 硬违例 + **Falsify 0 HIGH**（run 失败不外抛/已终态 no-op/时间线排序全锁/会话隔离不渲染）+ Architecture 0 发现（cgImageUrl 单一来源；run 核心 session 注入可测）。
 - **非阻断落债**：无。
 
+## MD-3 出图能力门控 + 图片 Provider 设置（2026-09-11 — CG 批后用户指出的产品缺口，独立 follow-up）
+
+- **来源**：CG-3 交付后用户问「没有生图能力的模型有检测机制吗」——核对结论：出图不走聊天模型（独立图片 Provider 体系），但存在真实缺口：① 出图默认 local 占位后端（开发形态），生产点出图得占位图而非真实生成；② 无「是否可用」判定与设置项。本工单补门控 + 设置。
+- **后端**：
+  - settings 增 `image_provider` / `image_base_url`（ALLOWED_KEYS + 存取器 `setting.image_provider/image_base_url`）。
+  - **判定单源** `image_generation_available(db)`（image/tasks.py）：未配置/local 占位 → False；HTTP 类（a1111/custom-http）→ base_url 非空；未知 provider → False。
+  - 提交语义变更：`ImageTaskCreate` 删 `provider` 字段（provider 改由 settings 解析，非请求体）；路由提交前 `image_generation_available` 门控（未配置 → 400「未配置图片生成后端」）；`run_image_task` 读 settings base_url（`resolve_image(task.provider, base_url=...)`）。
+  - 新端点 `GET /api/images/available` → `{available}`。
+- **前端**：
+  - `api.js` images.available；`state.imageGenerationAvailable`（默认 null）。
+  - 门控：app.js init 检测后 `syncImageGenerationButton()` 按 available 显示/隐藏 `#btn-gen-image`（未配置/null → 隐藏，保守不出占位图）；chat.js `generateImage` 加防御守卫（available !== true → no-op）。
+  - 设置 UI：index.html 增「图片生成」组（`#setting-image-provider` 下拉：未配置/A1111/自定义 HTTP + `#setting-image-url` 端点地址）；settings-panel.js 回填/收集 + 保存后重查 available 并再门控按钮。
+- **验证链**：先红后绿——后端 +7 契约锁（availability 矩阵 + 提交 400 + /available + provider 从 settings 取，更新旧 submit 测试）+ 前端 +1（未配置 → generateImage no-op 不弹 modal 不提交）| pytest 1042+1skip→1049+1skip / Vitest 1238→1239，全量双端绿零回归，cargo 零改动 | doc_sync 零漂移（§4.21.10 sig + §5 计数 + api-design available/提交语义）| pool_cleanup_check 通过。
+- **期末 code-review 四轴**：Spec 0 偏差（判定对象拍板 = 「是否配置生图后端」而非「聊天模型能力」——出图不走聊天模型）/ Standards 0 硬违例 / **Falsify 0 HIGH**（local 占位排除 + 未知 provider 排除 + 未配置 400 不发任务 + 前端双重门控按钮隐藏 + 守卫）+ Architecture 0 发现（判定单源三处消费）。
+- **非阻断落债**：无。
+
 ## 外部对标调研 AI风月 + 五批工单立项（2026-09-10 — 用户需求：聊天/模拟器功能体验对标）
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。
