@@ -12,6 +12,8 @@ get_db 覆盖为内存会话）：
     PUT    /api/mod-bindings/{binding_id}        → 切换 enabled；不存在 → 404
     PUT    /api/mod-bindings/{binding_id}/sort   → 调整 sort_order；不存在 → 404
     DELETE /api/mod-bindings/{binding_id}        → 204；不存在 → 404
+    PUT    /api/characters/{character_id}/mods/order → 原子批量重排；空列表 400 /
+    归属不符 404 / 缺失 404 / 角色不存在 404 / 重复或非法 body 422
 """
 
 from __future__ import annotations
@@ -237,3 +239,113 @@ def test_sort_order_bounds(db_session: Session, wire_app: FastAPI) -> None:
             f"/api/mod-bindings/{binding_id}/sort", json={"sort_order": -1}
         )
         assert sort_neg.status_code == 422
+
+
+# ── 4. 原子批量重排 PUT /api/characters/{id}/mods/order（F-102 后端）──
+
+
+def test_reorder_mods_persists_new_order(db_session: Session, wire_app: FastAPI) -> None:
+    """提交 [binding_id...] → sort_order=0,1,2 持久化，GET 列表返回新序"""
+    char_id = _create_character(db_session)
+    m1 = _create_mod(db_session, name="M1")
+    m2 = _create_mod(db_session, name="M2")
+    m3 = _create_mod(db_session, name="M3")
+    b1 = mods_service.bind_mod(db_session, char_id, m1)
+    b2 = mods_service.bind_mod(db_session, char_id, m2)
+    b3 = mods_service.bind_mod(db_session, char_id, m3)
+
+    with TestClient(wire_app) as client:
+        resp = client.put(
+            f"/api/characters/{char_id}/mods/order", json=[b3.id, b1.id, b2.id]
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [item["mod_id"] for item in body] == [m3, m1, m2]
+    assert [item["sort_order"] for item in body] == [0, 1, 2]
+
+    with TestClient(wire_app) as client:
+        listed = client.get(f"/api/characters/{char_id}/mods")
+    assert [item["mod_id"] for item in listed.json()] == [m3, m1, m2]
+
+
+def test_reorder_foreign_binding_rejected_atomically(
+    db_session: Session, wire_app: FastAPI
+) -> None:
+    """混入他角色 binding_id → 404 且原顺序零改动（单事务原子）"""
+    char_id = _create_character(db_session)
+    other_id = _create_character(db_session, name="另一角色")
+    m1 = _create_mod(db_session, name="M1")
+    m2 = _create_mod(db_session, name="M2")
+    b1 = mods_service.bind_mod(db_session, char_id, m1)
+    mods_service.bind_mod(db_session, char_id, m2)
+    foreign = mods_service.bind_mod(db_session, other_id, m1)
+
+    with TestClient(wire_app) as client:
+        resp = client.put(
+            f"/api/characters/{char_id}/mods/order", json=[b1.id, foreign.id]
+        )
+        assert resp.status_code == 404
+        listed = client.get(f"/api/characters/{char_id}/mods")
+    assert [item["mod_id"] for item in listed.json()] == [m1, m2]
+
+
+def test_reorder_character_not_found(db_session: Session, wire_app: FastAPI) -> None:
+    """角色不存在 → 404"""
+    with TestClient(wire_app) as client:
+        resp = client.put("/api/characters/99999/mods/order", json=[1])
+    assert resp.status_code == 404
+
+
+def test_reorder_missing_binding(db_session: Session, wire_app: FastAPI) -> None:
+    """引用不存在的 binding_id → 404 无部分写入"""
+    char_id = _create_character(db_session)
+    m1 = _create_mod(db_session, name="M1")
+    b1 = mods_service.bind_mod(db_session, char_id, m1)
+
+    with TestClient(wire_app) as client:
+        resp = client.put(f"/api/characters/{char_id}/mods/order", json=[b1.id, 99999])
+        assert resp.status_code == 404
+
+
+def test_reorder_empty_list_rejected(db_session: Session, wire_app: FastAPI) -> None:
+    """空列表 → 400 明确拒绝（避免误清空）"""
+    char_id = _create_character(db_session)
+    m1 = _create_mod(db_session, name="M1")
+    mods_service.bind_mod(db_session, char_id, m1)
+
+    with TestClient(wire_app) as client:
+        resp = client.put(f"/api/characters/{char_id}/mods/order", json=[])
+    assert resp.status_code == 400
+
+
+def test_reorder_incomplete_coverage_rejected(
+    db_session: Session, wire_app: FastAPI
+) -> None:
+    """缺失某绑定（未恰好覆盖）→ 400 且无部分写入"""
+    char_id = _create_character(db_session)
+    m1 = _create_mod(db_session, name="M1")
+    m2 = _create_mod(db_session, name="M2")
+    b1 = mods_service.bind_mod(db_session, char_id, m1)
+    mods_service.bind_mod(db_session, char_id, m2)
+
+    with TestClient(wire_app) as client:
+        resp = client.put(f"/api/characters/{char_id}/mods/order", json=[b1.id])
+        assert resp.status_code == 400
+        listed = client.get(f"/api/characters/{char_id}/mods")
+    assert [item["mod_id"] for item in listed.json()] == [m1, m2]
+
+
+def test_reorder_duplicate_and_invalid_body(db_session: Session, wire_app: FastAPI) -> None:
+    """重复 binding_id / 非数组 / 含非整数 → 422"""
+    char_id = _create_character(db_session)
+    m1 = _create_mod(db_session, name="M1")
+    m2 = _create_mod(db_session, name="M2")
+    b1 = mods_service.bind_mod(db_session, char_id, m1)
+    mods_service.bind_mod(db_session, char_id, m2)
+
+    with TestClient(wire_app) as client:
+        base = f"/api/characters/{char_id}/mods/order"
+        assert client.put(base, json=[b1.id, b1.id]).status_code == 422
+        assert client.put(base, json={"a": 1}).status_code == 422
+        assert client.put(base, json=[b1.id, "x"]).status_code == 422

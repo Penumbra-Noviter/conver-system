@@ -8,7 +8,8 @@ Literal 收口三值（prompt|memory|css）、source 用 Literal 收口（manual
 MD-2/01 补响应与挂载模型：ModResponse（from_attributes 驱动 ORM→JSON 序列化）、
 ModBindingResponse（挂载响应不嵌套 Mod 详情，前端按 mod_id 客户端关联）、
 ModBindCreate（mod_id 必填，enabled/sort_order 可选）、ModBindingUpdate
-（enabled 必填）、ModBindSortUpdate（sort_order 必填）。
+（enabled 必填）、ModBindSortUpdate（sort_order 必填）。F-102 后端补
+ModsOrderUpdate（批量重排请求，RootModel[list[int]] 原始数组 + 去重校验）。
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from __future__ import annotations
 import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel, model_validator
 
 __all__ = [
     "ModCreate",
@@ -26,6 +27,7 @@ __all__ = [
     "ModBindCreate",
     "ModBindingUpdate",
     "ModBindSortUpdate",
+    "ModsOrderUpdate",
 ]
 
 
@@ -92,3 +94,22 @@ class ModBindingUpdate(BaseModel):
 class ModBindSortUpdate(BaseModel):
     """挂载排序更新请求（sort_order 必填）"""
     sort_order: int = Field(..., ge=0, le=9999, description="目标排序值")
+
+
+class ModsOrderUpdate(RootModel[list[int]]):
+    """批量重排请求体：按新序排列的 binding_id 原始 JSON 数组（F-102 后端）
+
+    RootModel 使 body 直接为数组（`[binding_id, ...]`），非对象包裹。Schema 层只做
+    形状与去重校验：
+        - 非数组 / 含非整数 → 422（FastAPI 原生 RequestValidationError）
+        - 重复 binding_id → 422（model_validator 拒绝）
+    空列表留给服务层 reorder_character_mods 抛 ModReorderError（→ 400 明确拒绝，
+    避免误清空）。
+    """
+
+    @model_validator(mode="after")
+    def _reject_duplicate_ids(self) -> "ModsOrderUpdate":
+        """重复 binding_id → ValueError（FastAPI 转 422）"""
+        if len(self.root) != len(set(self.root)):
+            raise ValueError("ordered_binding_ids 含重复 binding_id")
+        return self

@@ -3,7 +3,7 @@ Mod 挂载层服务（MD-1，深模块）
 
 协议表面（__all__）：ModPayload / list_mods / create_mod / update_mod /
 delete_mod / bind_mod / unbind_mod / set_binding_enabled / set_binding_sort_order /
-list_character_mods / apply_prompt_mods。
+list_character_mods / reorder_character_mods / apply_prompt_mods / ModReorderError。
 
 数据模型：mods（全局 Mod 库，目标区域 prompt|memory|css）+ mod_bindings（作品级
 挂载，(character_id, mod_id) 唯一 + sort_order + enabled 开关）。本模块只做存取
@@ -32,6 +32,7 @@ from backend.app.models.mods import Mod, ModBinding
 from backend.app.schemas.mods import ModCreate, ModUpdate
 from backend.app.services.exceptions import (
     CharacterNotFoundError,
+    DomainError,
     ModAlreadyBoundError,
     ModBindingNotFoundError,
     ModNotFoundError,
@@ -48,12 +49,24 @@ __all__ = [
     "set_binding_enabled",
     "set_binding_sort_order",
     "list_character_mods",
+    "reorder_character_mods",
     "apply_prompt_mods",
+    "ModReorderError",
 ]
 
 #: prompt 区 payload 的三区域键（spec §MD-1 词汇）→ 注入块键（对齐
 #: lorebook_engine._POSITION_KEYS：world → system 世界知识块）
 _REGION_KEYS = (("world", "system"), ("before_char", "before_char"), ("after_char", "after_char"))
+
+
+class ModReorderError(DomainError):
+    """批量重排参数非法（空列表 / 重复 binding_id / 未恰好覆盖该角色全部绑定）
+
+    定义在本模块（而非 services/exceptions.py）以守住本工单文件范围：它落在
+    error_mapping.domain_error_response 的未知 DomainError 兜底分支 → HTTP 400
+    （该 fallback 恒把未显式登记的 DomainError 子类映射为 400，见 error_mapping
+    末尾 ``return 400, str(exc)``），故无需在 error_mapping 显式登记。
+    """
 
 
 @dataclass(frozen=True)
@@ -291,6 +304,68 @@ def list_character_mods(db: Session, character_id: int) -> list[ModBinding]:
         .order_by(ModBinding.sort_order.asc(), ModBinding.mod_id.asc())
         .all()
     )
+
+
+def reorder_character_mods(
+    db: Session,
+    character_id: int,
+    ordered_binding_ids: list[int],
+) -> list[ModBinding]:
+    """原子批量重排角色挂载 Mod 顺序（F-102 后端）
+
+    一次性提交该角色全部挂载 Mod 的 binding_id 新序，单事务内校验归属并逐条
+    ``sort_order = 列表下标``，一次 commit——消除「两次独立写中间态留下重复
+    sort_order」的窗口。任一校验失败在 commit 之前抛出，整体不落库（无部分写入）。
+
+    校验顺序（任一失败即抛、整体不落库）：
+        1. 角色存在 → 否则 CharacterNotFoundError（404）
+        2. 非空列表 → 否则 ModReorderError（400，明确拒绝，避免误清空）
+        3. 无重复 id → 否则 ModReorderError（400；HTTP 层已由 schema 422 拦截，
+           此处为直接调用方的防御）
+        4. 逐条 binding 存在且归属该角色 → 否则 ModBindingNotFoundError（404；
+           引用不存在 / 混入他角色绑定同归一 404）
+        5. 恰好覆盖该角色全部绑定（不缺失）→ 否则 ModReorderError（400）
+
+    Args:
+        db: 数据库会话
+        character_id: 角色 ID（不存在抛 CharacterNotFoundError）
+        ordered_binding_ids: 按新序排列的绑定 ID 列表（恰好覆盖该角色全部绑定）
+
+    Returns:
+        重排后的绑定列表（sort_order 升序，同序按 mod_id 稳定）
+
+    Raises:
+        CharacterNotFoundError: 角色不存在
+        ModBindingNotFoundError: 任一 binding_id 不存在或归属其他角色
+        ModReorderError: 空列表 / 重复 id / 未恰好覆盖该角色全部绑定
+    """
+    _require_character(db, character_id)
+
+    if not ordered_binding_ids:
+        raise ModReorderError("批量重排不能为空列表")
+
+    if len(ordered_binding_ids) != len(set(ordered_binding_ids)):
+        raise ModReorderError("ordered_binding_ids 含重复 binding_id")
+
+    existing = (
+        db.query(ModBinding)
+        .filter(ModBinding.character_id == character_id)
+        .all()
+    )
+    by_id = {b.id: b for b in existing}
+
+    for binding_id in ordered_binding_ids:
+        if binding_id not in by_id:
+            raise ModBindingNotFoundError(f"Mod 绑定不存在: {binding_id}")
+
+    if set(ordered_binding_ids) != set(by_id):
+        raise ModReorderError("ordered_binding_ids 必须恰好覆盖该角色全部绑定")
+
+    for index, binding_id in enumerate(ordered_binding_ids):
+        by_id[binding_id].sort_order = index
+
+    db.commit()
+    return list_character_mods(db, character_id)
 
 
 def apply_prompt_mods(
