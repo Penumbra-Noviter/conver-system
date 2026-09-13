@@ -6,6 +6,19 @@
 
 ---
 
+## 技术债消费批次 F-115~F-122（2026-09-14 — 3 做 5 关，轻量档 8 项主会话直做）
+
+- **来源**：用户指令「消费」+ userselect F-115~F-122（mod-cg-wiring 期末四轴落债 8 项：6 Speculative + 2 Worth exploring）。逐项 git grep 复核现状后拍板 3 做 5 关。
+- **3 做（低成本真实修复，commit 0fb43ba）**：
+  - F-117：`mod-css.js::collectCssPayloads` 空串 payload 产生游离 `\n`（与后端 `_memory_mod_instructions` 语义不一致）——`.map(payload)` 后加 `.filter((p) => p.trim() !== '')`；防复发断言：多 Mod 拼接测试加空串 payload，锁定 textContent 无游离换行（先红后绿）。
+  - F-119：`database.py::_ensure_cg_images_weight` 用 `hasattr(bind, "connect")` 脆弱 duck-type——改 `isinstance(bind, Engine)` + `from sqlalchemy import Engine`；test_gallery 45 用例锁定两路径行为不变。
+  - F-120：`cg-review.js::handleCgGalleryClick` `Number(tile?.dataset.cgId)` 在 actionEl 脱离 `.cg-tile` 时得 `NaN` 静默 no-op——加 `Number.isNaN(cgId)||Number.isNaN(characterId)` 守卫 early return。
+- **5 关（复核关闭，理由见 TECH_DEBT.md 复核关闭表）**：F-115（list_cg 透传 service 既有过滤参数，删除返工）、F-116（锁定 url 在响应体是 spec 设计使然，锁定=软 UX 门）、F-118（applyCharacterCss false 无法区分空态/失败，修复牵动 17 用例开销可忽略）、F-121（触发语义≠展示过滤，下沉窄函数 Leverage 低）、F-122（编排 seam 本就如此，2 实例抽象收益<成本）。
+- **验证链**：pytest 1173+1skip→1174+1skip + Vitest 1351 零回退 + cargo 70 零改动全绿 | pool_cleanup_check 候选区/复核关闭/脚注编号全合规 | doc_sync 刷新 1 标记（pytest 计数）。
+- **清出**：技术债候选区 8→0 清零；复核关闭表 +5 项；处置记录 +1 节（2026-09-14）。一并删除 `.scratch/mod-cg-wiring/`（13 文件，归档已由 TICKETS/DEV_LOG/TECH_DEBT + git 历史承载，一次性产物无用，用户授权「没用就删」）。
+
+---
+
 ## mod-cg-wiring 批次（2026-09-14 — Mod memory/css 消费 + CG 解锁/画廊/加权自动出图，标准档 7 工单）
 
 - **来源**：用户指令「检查项目进度，看还有哪些原有设计未落地」→ 诊断为两类缺口：①规格内半成品（Mod memory/css 区无消费方、CG 解锁端点/加权自动出图接线半截、画廊 UI 缺失）；②大版本方向未落地（World 实体/玩法层 rules 等，明确后置）。用户选第一梯队（成本低、管道已有末端未接）。
