@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { characters, conversations, messages, mods, request, requestBlob, setFetch, settings, __all__ } from '../js/api.js';
+import { characters, conversations, images, messages, mods, request, requestBlob, setFetch, settings, __all__ } from '../js/api.js';
 import { downloadBlob } from '../js/utils.js';
 
 /**
@@ -425,5 +425,66 @@ describe('api.js mods 对象端点映射（MD-2/03）', () => {
 
     it('__all__ 收口含 mods', () => {
         expect(__all__).toContain('mods');
+    });
+});
+
+describe('api.js images — CG 录入 / 解锁 / 全量列表（T2/T5）', () => {
+    afterEach(() => {
+        setFetch(null);
+    });
+
+    it('images.list(characterId) → GET /api/characters/{id}/cg 全量（含未解锁）', async () => {
+        const payload = [
+            { id: 9, character_id: 5, url: '/cg/a.png', group_name: 'g', weight: 100, unlock_hint: '', is_special: false, unlocked: true, created_at: '2026-01-01' },
+            { id: 3, character_id: 5, url: '/cg/b.png', group_name: 'g', weight: 100, unlock_hint: 'hint', is_special: true, unlocked: false, created_at: '2026-01-02' },
+        ];
+        const fetchMock = vi.fn(async () => mockResponse({ data: payload }));
+        setFetch(fetchMock);
+
+        const data = await images.list(5);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith('/api/characters/5/cg', expect.objectContaining({ method: 'GET' }));
+        expect(data).toEqual(payload);
+    });
+
+    it('images.create(characterId, data) → POST /api/characters/{id}/cg 携 JSON body', async () => {
+        const body = { url: '/cg/new.png', group_name: '名场面', weight: 100, unlock_hint: 'hint', is_special: true };
+        const fetchMock = vi.fn(async () =>
+            mockResponse({ data: { id: 11, character_id: 5, ...body, unlocked: false, created_at: '2026-01-03' } })
+        );
+        setFetch(fetchMock);
+
+        const data = await images.create(5, body);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(url).toBe('/api/characters/5/cg');
+        expect(options.method).toBe('POST');
+        expect(JSON.parse(options.body)).toEqual(body);
+        expect(data.id).toBe(11);
+        expect(data.unlocked).toBe(false);
+    });
+
+    it('images.unlock(cgId) → POST /api/cg/{id}/unlock（幂等）', async () => {
+        const fetchMock = vi.fn(async () =>
+            mockResponse({ data: { id: 3, character_id: 5, url: '/cg/b.png', group_name: 'g', weight: 100, unlock_hint: '', is_special: false, unlocked: true, created_at: '2026-01-02' } })
+        );
+        setFetch(fetchMock);
+
+        const data = await images.unlock(3);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith('/api/cg/3/unlock', expect.objectContaining({ method: 'POST' }));
+        expect(data.unlocked).toBe(true);
+    });
+
+    it('非 2xx → 抛带 detail 的 Error（与既有 request 同通道）', async () => {
+        setFetch(vi.fn(async () => mockResponse({ ok: false, status: 404, data: { detail: 'CG 图片不存在' } })));
+        await expect(images.unlock(999)).rejects.toThrow('CG 图片不存在');
+    });
+
+    it('__all__ 收口含 images', () => {
+        expect(__all__).toContain('images');
     });
 });
