@@ -206,6 +206,37 @@ class TestMaybeAutoCGProbability:
         assert cg.conversation_id == conv_id
 
     @pytest.mark.asyncio
+    async def test_unlock_uses_unlock_cg_seam(
+        self, db_session, monkeypatch
+    ) -> None:
+        """SP2/A1 防复发：解锁经 gallery.unlock_cg 单一 seam（非内联 unlocked=True）"""
+        import backend.app.services.gallery as gallery_module
+
+        _patch_api_key(monkeypatch)
+        char_id = _create_character(db_session)
+        conv_id = _create_conversation(db_session, char_id)
+        cg_id = _add_cg(db_session, char_id, weight=100)
+        setting_service.set_many(db_session, {"cg_auto_trigger_probability": "100"})
+        monkeypatch.setattr(random, "randint", lambda a, b: 1)
+        fake = _FakeProvider()
+        _patch_factory(monkeypatch, fake)
+
+        real_unlock = gallery_module.unlock_cg
+        calls: list[int] = []
+
+        def _spy(db, cg_id_arg: int):
+            calls.append(cg_id_arg)
+            return real_unlock(db, cg_id_arg)
+
+        monkeypatch.setattr(gallery_module, "unlock_cg", _spy)
+
+        await chat_service.complete_chat(
+            db_session, ChatRequest(conversation_id=conv_id, content="你好")
+        )
+
+        assert calls == [cg_id]
+
+    @pytest.mark.asyncio
     async def test_probability_miss_no_change(
         self, db_session, monkeypatch
     ) -> None:

@@ -252,9 +252,7 @@ async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
         db, request.conversation_id, ctx.provider, ctx.conversation.model_name
     )
     # T6：CG 自动触发（完整回合后按概率自动解锁候选 CG）
-    await _maybe_auto_cg(
-        db, request.conversation_id, ctx.provider, ctx.conversation.model_name, saved.id
-    )
+    await _maybe_auto_cg(db, request.conversation_id, saved.id)
 
     return ChatResponse(
         reply=reply_text,
@@ -628,9 +626,7 @@ async def stream_reply(
                 db, conversation_id, ctx.provider, ctx.conversation.model_name
             )
             # T6：CG 自动触发（done 帧后路径，与 complete_chat 同型）
-            await _maybe_auto_cg(
-                db, conversation_id, ctx.provider, ctx.conversation.model_name, message_id
-            )
+            await _maybe_auto_cg(db, conversation_id, message_id)
 
     except ClientDisconnect:
         # 客户端在发送过程中断开 — 尽力保存已生成部分
@@ -885,8 +881,6 @@ async def _maybe_memory_palace(
 async def _maybe_auto_cg(
     db: Session,
     conversation_id: int,
-    provider: BaseLLM,
-    model: str | None,
     assistant_message_id: int,
 ) -> None:
     """CG 自动触发（T6）：完整回合后按概率自动解锁候选 CG
@@ -928,9 +922,9 @@ async def _maybe_auto_cg(
         if cg is None:
             return
 
-        # 锚定：unlock 后 cg.message_id = assistant_message_id, cg.conversation_id = conversation_id
-        # unlock_cg 本身不改锚，锚定在 _maybe_auto_cg 内补写
-        cg.unlocked = True
+        # 解锁走 gallery.unlock_cg 单一 seam（幂等 + refresh + CgImageNotFoundError 语义）
+        cg = gallery_service.unlock_cg(db, cg.id)
+        # 锚定：unlock_cg 本身不改锚，锚定在 _maybe_auto_cg 内补写
         cg.message_id = assistant_message_id
         cg.conversation_id = conversation_id
         db.commit()
