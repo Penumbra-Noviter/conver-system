@@ -53,6 +53,10 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-123 | 「读取角色某 target_area 启用 Mod」在 chat.py `_mod_prompt_injection`/`_memory_mod_instructions` 两处重复（list_character_mods→IN 回读→area 过滤），mods.py 缺「按 area 过滤回读」单一读取面；css 区后端消费者将是第三份（Locality 缺失） | 架构报告 2026-09-14 | Strong | 📝 待立项 | 架构去重 |
+| F-124 | 「add_swipe→bump updated_at→commit→refresh」四步在 chat.py regenerate_chat/continue_chat 逐字重复；bump updated_at 不变量（Falsify 修出的排序置顶）落在 add_swipe 之外，靠调用方各自记得补（Locality 泄漏于 message.py/chat.py 两文件） | 架构报告 2026-09-14 | Strong | 📝 待立项 | 架构去重 |
+| F-125 | database.py 三个自愈迁移（_ensure_messages_active_swipe_index/_ensure_conversation_branch_columns/_ensure_cg_images_weight）重复「PRAGMA 探测→ALTER ADD COLUMN」原语，仅列/类型/默认/是否并发安全不同；_ensure_cg_images_weight 是唯一实现并发安全处；第 4 列迁移须整份抄写（Leverage 低） | 架构报告 2026-09-14 | Worth exploring | 📝 待立项 | 架构去重 |
+| F-126 | 「await generate + except LLMError→chat_error_response→raise」接线在 complete_chat/regenerate_chat/continue_chat 三段逐字重复；映射本体已收口但「记得包 try/except」知识散落三处（包装体薄 ~6 行，leverage 偏低） | 架构报告 2026-09-14 | Speculative | 📝 待立项 | 架构去重 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -147,4 +151,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-122），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-126），避免编号冲突。
