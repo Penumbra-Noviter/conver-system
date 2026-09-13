@@ -43,6 +43,8 @@ __all__ = [
     "memory_palace_char_threshold",
     "image_provider",
     "image_base_url",
+    # T6：CG 自动触发（完整回合后按概率自动解锁候选 CG）
+    "cg_auto_trigger_probability",
 ]
 
 # 允许前端读写的配置键白名单
@@ -64,6 +66,8 @@ ALLOWED_KEYS = {
     # MD-3 图片生成后端（生图能力门控依据：provider + base_url）
     "image_provider",
     "image_base_url",
+    # T6：CG 自动触发（完整回合后按概率自动解锁候选 CG）
+    "cg_auto_trigger_probability",
 }
 
 # Provider 协议元数据（协议映射 / openai 协议族模型集）单一来源位于
@@ -251,3 +255,13 @@ def image_provider(db: Session) -> str:
 def image_base_url(db: Session) -> str:
     """图片生成后端端点地址（HTTP 类后端必需；空串 = 未配置；MD-3）"""
     return get_value(db, "image_base_url")
+
+
+def cg_auto_trigger_probability(db: Session) -> int:
+    """CG 自动触发概率（0-100 整数，默认 0=关闭）"""
+    value = get_int(db, "cg_auto_trigger_probability", default=0)
+    if value < 0:
+        return 0
+    if value > 100:
+        return 100
+    return value
