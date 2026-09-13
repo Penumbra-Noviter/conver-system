@@ -207,6 +207,41 @@ def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
     return assemble_chat_context(db, request.conversation_id, current_input=request.content)
 
 
+async def _generate_with_error_mapping(ctx: ChatContext) -> str:
+    """await generate + 捕获 LLMError → chat_error_response → raise HTTPException
+
+    非流式三条路径（complete_chat / regenerate_chat / continue_chat）共用的
+    「生成并映射 LLM 错误」私有 seam：把「记得包 try/except 异常映射接线」的知识从
+    三处逐字重复收敛为单点（F-126）。生成成功返回回复文本；LLMError 经
+    chat_error_response 单一入口映射为 HTTPException 上抛（状态码/消息逐字
+    一致，不重复实现映射）；非 LLMError 异常原样透传（不吞、不映射——领域异常 /
+    持久化异常等由各自调用方负责）。
+
+    流式路径 stream_reply 刻意不纳入本 seam：其错误帧走 llm_error_response 直接
+    产出 SSE error 帧而非 raise HTTPException，语义不同（F-45 错误不落库契约）。
+
+    Args:
+        ctx: prepare_chat / assemble_chat_context 的产物
+
+    Returns:
+        生成的回复文本
+
+    Raises:
+        HTTPException: LLM 调用失败（401/429/504/400/502，经 chat_error_response 映射）
+    """
+    try:
+        return await ctx.provider.generate(
+            ctx.messages,
+            temperature=ctx.temperature,
+            model=ctx.conversation.model_name,
+        )
+    except LLMError as e:
+        status_code, message = chat_error_response(
+            e, ctx.conversation.model_provider
+        )
+        raise HTTPException(status_code=status_code, detail=message)
+
+
 async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
     """非流式聊天回合深模块入口：prepare → generate → LLM 错误映射 → 持久化 → 响应构造
 
@@ -228,18 +263,7 @@ async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
         HTTPException: LLM 调用失败（401/429/504/400/502，经 chat_error_response 映射）
     """
     ctx = prepare_chat(db, request)
-
-    try:
-        reply_text = await ctx.provider.generate(
-            ctx.messages,
-            temperature=ctx.temperature,
-            model=ctx.conversation.model_name,
-        )
-    except LLMError as e:
-        status_code, message = chat_error_response(
-            e, ctx.conversation.model_provider
-        )
-        raise HTTPException(status_code=status_code, detail=message)
+    reply_text = await _generate_with_error_mapping(ctx)
 
     saved = message_service.create_message(
         db, request.conversation_id, Role.ASSISTANT, reply_text
@@ -366,21 +390,13 @@ async def regenerate_chat(
 
     # 4-5. 组装上下文（历史截止于触发源 user，不插入 user）+ 生成回复。
     #     MS-1：不再截断 DB——目标与后续消息保留，新回复以候选追加。
-    try:
-        ctx = assemble_chat_context(
-            db, conversation_id, current_input=None,
-            history_limit_message_id=trigger.id,
-        )
-        reply_text = await ctx.provider.generate(
-            ctx.messages,
-            temperature=ctx.temperature,
-            model=ctx.conversation.model_name,
-        )
-    except LLMError as e:
-        status_code, message = chat_error_response(
-            e, ctx.conversation.model_provider
-        )
-        raise HTTPException(status_code=status_code, detail=message)
+    #     assemble 不抛 LLMError，移出 try；生成 + 错误映射收口于
+    #     _generate_with_error_mapping（F-126）。
+    ctx = assemble_chat_context(
+        db, conversation_id, current_input=None,
+        history_limit_message_id=trigger.id,
+    )
+    reply_text = await _generate_with_error_mapping(ctx)
 
     # 6. message 层单一入口追加候选并置为激活（历史消息数不变；LLM 失败路径
     #    无副作用）。content 跟随激活候选（旧前端/后续 LLM 上下文读到新回复）；
@@ -484,24 +500,16 @@ async def continue_chat(
 
     # 3-4. 组装上下文（历史截止于目标，不插入 user；当前输入 None → 不追加）
     #      + 尾随续写触发 user 消息（指令 + 原消息末段）。
-    try:
-        ctx = assemble_chat_context(
-            db, conversation_id, current_input=None,
-            history_limit_message_id=target.id,
-        )
-        tail = _continuation_tail(target.content)
-        trigger = CONTINUE_INSTRUCTION if not tail else f"{CONTINUE_INSTRUCTION}\n{tail}"
-        ctx.messages.append({"role": "user", "content": trigger})
-        reply_text = await ctx.provider.generate(
-            ctx.messages,
-            temperature=ctx.temperature,
-            model=ctx.conversation.model_name,
-        )
-    except LLMError as e:
-        status_code, message = chat_error_response(
-            e, ctx.conversation.model_provider
-        )
-        raise HTTPException(status_code=status_code, detail=message)
+    #      组装/尾随触发均不抛 LLMError，移出 try；生成 + 错误映射收口于
+    #      _generate_with_error_mapping（F-126）。
+    ctx = assemble_chat_context(
+        db, conversation_id, current_input=None,
+        history_limit_message_id=target.id,
+    )
+    tail = _continuation_tail(target.content)
+    trigger = CONTINUE_INSTRUCTION if not tail else f"{CONTINUE_INSTRUCTION}\n{tail}"
+    ctx.messages.append({"role": "user", "content": trigger})
+    reply_text = await _generate_with_error_mapping(ctx)
 
     # 5. message 层单一入口追加候选并置为激活：原内容保留（无候选时播种
     #    候选 0），续写结果 = 原内容 + 续写片段（消息条数不变；content 跟随激活

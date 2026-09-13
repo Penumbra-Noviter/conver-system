@@ -365,6 +365,69 @@ class TestCompleteChat:
             await chat_service.complete_chat(db_session, req)
 
 
+# ── 3b. _generate_with_error_mapping 私有 seam 直测（F-126）──
+
+
+class TestGenerateWithErrorMapping:
+    """非流式三条路径共用的「生成并映射 LLM 错误」私有 seam 契约锁"""
+
+    def _make_ctx(self, db_session, provider) -> chat_service.ChatContext:
+        """落库一个 provider="claude" 的对话，组装 ChatContext"""
+        conv = _create_conversation(db_session, provider="claude", model="claude-test")
+        return chat_service.ChatContext(
+            conversation=conv,
+            temperature=0.7,
+            messages=[{"role": "user", "content": "你好"}],
+            provider=provider,
+        )
+
+    async def test_returns_reply_on_success(self, db_session) -> None:
+        """正常路径：假 Provider 返回回复文本 → 原样返回（不透传、不包装）"""
+        fake = _FakeProvider(reply="这是回复")
+        ctx = self._make_ctx(db_session, fake)
+
+        reply = await chat_service._generate_with_error_mapping(ctx)
+
+        assert reply == "这是回复"
+        # generate 参数透传：temperature / model 逐字
+        _, temperature, _, model = fake.calls[0]
+        assert temperature == 0.7
+        assert model == "claude-test"
+
+    @pytest.mark.parametrize("llm_exc, status_code, message", [
+        (LLMAuthError("bad key"), 401, "claude API Key 无效，请在设置中更新"),
+        (LLMRateLimitError("rate"), 429, "API 请求频率超限，请稍后再试"),
+        (LLMTimeoutError("timeout"), 504, "API 请求超时，请检查网络后重试"),
+        (LLMContentFilterError("filtered"), 400, "filtered"),
+        (LLMError("boom"), 502, "boom"),
+    ])
+    async def test_llm_error_maps_to_http_exception(
+        self, db_session, llm_exc: LLMError, status_code: int, message: str
+    ) -> None:
+        """LLM 各子类 → HTTPException（状态码/消息与 chat_error_response 输出逐字一致）"""
+        fake = _FakeProvider(error=llm_exc)
+        ctx = self._make_ctx(db_session, fake)
+
+        with pytest.raises(HTTPException) as exc:
+            await chat_service._generate_with_error_mapping(ctx)
+
+        assert exc.value.status_code == status_code
+        assert exc.value.detail == message
+        # 锚定：与映射本体 chat_error_response 输出逐字一致（不重复实现映射）
+        assert (status_code, message) == chat_service.chat_error_response(
+            llm_exc, ctx.conversation.model_provider
+        )
+
+    async def test_non_llm_error_propagates_unchanged(self, db_session) -> None:
+        """Falsify：非 LLMError 异常透传不吞（只 catch LLMError，不映射、不吞错）"""
+        fake = _FakeProvider(error=RuntimeError("boom"))
+        ctx = self._make_ctx(db_session, fake)
+
+        with pytest.raises(RuntimeError) as exc:
+            await chat_service._generate_with_error_mapping(ctx)
+        assert str(exc.value) == "boom"
+
+
 # ── 4. 路由薄化后直测（create_chat / stream_chat 领域异常上抛、LLM 错误转 HTTPException）──
 
 
