@@ -23,7 +23,7 @@ from backend.app.schemas.conversation import ConversationCreate
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services.conversation_export import export_conversation_json
-from backend.app.services.exceptions import SwipeIndexError
+from backend.app.services.exceptions import MessageNotFoundError, SwipeIndexError
 
 __all__: list[str] = []
 
@@ -288,3 +288,81 @@ def test_migration_idempotent_on_legacy_db() -> None:
         conn.execute(text("INSERT INTO messages (id, conversation_id, role, content) VALUES (1, 1, 'user', 'x')"))
         conn.commit()
         assert conn.execute(text("SELECT active_swipe_index FROM messages WHERE id=1")).scalar() == 0
+
+
+# ════════════════════════════════════════════════════════════════
+# 八、append_swipe_and_bump 持久化仪式契约锁（F-124）
+# ════════════════════════════════════════════════════════════════
+
+
+def test_append_swipe_and_bump_appends_active_and_bumps_updated_at(
+    db_session: Session,
+) -> None:
+    """追加候选并置激活 + bump 会话 updated_at + 返回刷新后 Message
+
+    锁定「add_swipe → bump updated_at → commit → refresh」原子语义（F-124 收口）：
+    候选 0 播种原始内容、新内容置激活、content/active_swipe_index 跟随、会话
+    updated_at 确实 bump（排序置顶不变量）。
+    """
+    import datetime as _dt
+
+    _, conv, msg = _setup(db_session)
+    before = _dt.datetime(2000, 1, 1)
+    conv.updated_at = before
+    db_session.commit()
+
+    result = message_service.append_swipe_and_bump(db_session, msg.id, "追加候选")
+
+    # 返回刷新后的 Message：content 跟随激活候选、active_swipe_index 正确
+    assert isinstance(result, Message)
+    assert result.id == msg.id
+    assert result.content == "追加候选"
+    assert result.active_swipe_index == 1
+    # 候选集：候选 0 = 原始内容播种，新候选 index 1
+    swipes = message_service.list_swipes(db_session, msg.id)
+    assert [s.index for s in swipes] == [0, 1]
+    assert [s.content for s in swipes] == ["原始回复", "追加候选"]
+    # 会话 updated_at 确实 bump（排序置顶不变量）
+    db_session.refresh(conv)
+    assert conv.updated_at > before
+
+
+def test_append_swipe_and_bump_seeds_zero_and_idempotent_repeat(
+    db_session: Session,
+) -> None:
+    """无既有候选时播种候选 0（原始内容）；重复调用幂等追加候选 1、2"""
+    _, conv, msg = _setup(db_session)
+
+    message_service.append_swipe_and_bump(db_session, msg.id, "候选一")
+    message_service.append_swipe_and_bump(db_session, msg.id, "候选二")
+
+    swipes = message_service.list_swipes(db_session, msg.id)
+    assert [s.index for s in swipes] == [0, 1, 2]
+    assert [s.content for s in swipes] == ["原始回复", "候选一", "候选二"]
+    db_session.refresh(msg)
+    assert msg.active_swipe_index == 2  # 最后一次 make_active 生效
+    assert msg.content == "候选二"
+
+
+def test_append_swipe_and_bump_make_active_false_keeps_content(
+    db_session: Session,
+) -> None:
+    """make_active=False：追加候选但不改激活（content/active_swipe_index 不跟随）"""
+    _, conv, msg = _setup(db_session)
+
+    result = message_service.append_swipe_and_bump(
+        db_session, msg.id, "候选一", make_active=False,
+    )
+
+    assert result.active_swipe_index == 0  # 未置激活
+    assert result.content == "原始回复"  # content 不跟随
+    assert [s.content for s in message_service.list_swipes(db_session, msg.id)] == [
+        "原始回复",
+        "候选一",
+    ]
+
+
+def test_append_swipe_and_bump_missing_message_raises(db_session: Session) -> None:
+    """message_id 不存在 → MessageNotFoundError（add_swipe 守卫上抛，不落库）"""
+    with pytest.raises(MessageNotFoundError):
+        message_service.append_swipe_and_bump(db_session, 99999, "内容")
