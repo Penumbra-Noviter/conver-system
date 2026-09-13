@@ -69,6 +69,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_messages_active_swipe_index(engine)
     _ensure_conversation_branch_columns(engine)
+    _ensure_cg_images_weight(engine)
 
 
 def _ensure_messages_active_swipe_index(bind=engine) -> None:
@@ -122,3 +123,41 @@ def _ensure_conversation_branch_columns(bind=engine) -> None:
             if name not in columns:
                 conn.execute(text(f"ALTER TABLE conversations ADD COLUMN {name} {coltype}"))
         conn.commit()
+
+
+def _ensure_cg_images_weight(bind=engine) -> None:
+    """自愈迁移：存量 cg_images 表缺 weight 列时 ALTER TABLE 补列（幂等）
+
+    T1 加权概率池地基：weight INTEGER NOT NULL DEFAULT 100（存量行统一补 100）。
+    create_all 不会给已存在表加列（项目无 alembic，spec §0 迁移约束）：PRAGMA
+    table_info 探测缺列 → ALTER TABLE ADD COLUMN，已存在则无事。连续两次调用
+    无副作用（幂等，契约锁 test_gallery::test_cg_weight_migration_on_legacy_db）。
+
+    并发安全（Falsify 锁 test_gallery::test_cg_weight_migration_concurrent_no_duplicate_crash）：
+    两连接竞态时后到者基于过期探测结果 ALTER → duplicate column，吞掉该错视为
+    「他方已补齐」（列约束双方一致，无副作用）；其余 OperationalError 原样上抛。
+
+    Args:
+        bind: Engine 或既有 Connection（默认应用引擎；测试可直接传内存库连接）
+    """
+    from sqlalchemy.exc import OperationalError
+    from sqlalchemy import text
+
+    if hasattr(bind, "connect"):  # Engine → 借出连接；Connection → 直接复用（不代管生命周期）
+        with bind.connect() as conn:
+            return _ensure_cg_images_weight(conn)
+    conn = bind
+    columns = {
+        row[1]
+        for row in conn.execute(text("PRAGMA table_info(cg_images)")).fetchall()
+    }
+    if "weight" not in columns:
+        try:
+            conn.execute(
+                text("ALTER TABLE cg_images ADD COLUMN weight INTEGER NOT NULL DEFAULT 100")
+            )
+            conn.commit()
+        except OperationalError as exc:
+            if "duplicate column" not in str(exc):
+                raise
+            conn.rollback()  # 竞态他方已补列 → 幂等无事

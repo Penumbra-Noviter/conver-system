@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2499<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1118<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1311<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2507<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1126<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1311<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -257,7 +257,7 @@ conver system/
 
 > 无公开函数（纯配置常量）。注意 `DATABASE_URL` 默认值带 `+aiosqlite` 前缀，但 `database.py` 建引擎时剔除（同步 ORM，勿误判为异步）。
 
-### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~96 行<!--/AUTO-->）
+### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~129 行<!--/AUTO-->）
 
 **职责**：SQLAlchemy 同步引擎（`PRAGMA foreign_keys=ON`）、`get_db` 会话依赖、`init_db` 建表。
 
@@ -597,13 +597,13 @@ conver system/
 | <!--AUTO:sig:backend/app/services/memory_palace.py:persist_drafts-->`persist_drafts(db, character_id, drafts)`<!--/AUTO--> | 落库 auto 条目（keys 空跳过；同 keys+content 去重；返回计数） |
 | `MemoryDraft` / `MEMORY_DRAFT_SCHEMA` | 归纳草案容器 / 输出 JSON schema（title/keys/content 单源） |
 
-### 4.21.9 `backend/app/services/gallery.py` — CG 资产库（CG-2）（<!--AUTO:lines:backend/app/services/gallery.py-->~188 行<!--/AUTO-->）
+### 4.21.9 `backend/app/services/gallery.py` — CG 资产库（CG-2）（<!--AUTO:lines:backend/app/services/gallery.py-->~197 行<!--/AUTO-->）
 
 **职责**：cg_images 资产库深模块——入库（幂等去重：同作品同 url 返回既有）、列表（角色隔离 + 分组/解锁过滤，新品在前 id 降序）、解锁（幂等）、加权抽选（pick_cg_by_weight：weight 属性缺省 1、weight=0 永不抽中、**按 id 升序规范化后掷点**——同种子可复现不随输入顺序，WL-2 同型教训锁定）。生命周期由 DB FK 落实（character CASCADE / conversation·message SET NULL——会话删除后图保留）。
 
 | 函数 | 说明 |
 |------|------|
-| <!--AUTO:sig:backend/app/services/gallery.py:add_cg-->`add_cg(db, character_id, url, *, conversation_id=None, message_id=None, group_name='', unlock_hint='')`<!--/AUTO--> | 入库（同作品同 url 去重返回既有；角色/会话/消息归属 404 守卫） |
+| <!--AUTO:sig:backend/app/services/gallery.py:add_cg-->`add_cg(db, character_id, url, *, conversation_id=None, message_id=None, group_name='', unlock_hint='', weight=100, unlocked=False, is_special=False)`<!--/AUTO--> | 入库（同作品同 url 去重返回既有；角色/会话/消息归属 404 守卫） |
 | <!--AUTO:sig:backend/app/services/gallery.py:list_cg-->`list_cg(db, character_id, *, group_name=None, unlocked_only=False)`<!--/AUTO--> | 列表（角色隔离 + 过滤，id 降序） |
 | <!--AUTO:sig:backend/app/services/gallery.py:unlock_cg-->`unlock_cg(db, cg_id)`<!--/AUTO--> | 解锁（幂等；未知 → CgImageNotFoundError 404） |
 | <!--AUTO:sig:backend/app/services/gallery.py:pick_cg_by_weight-->`pick_cg_by_weight(candidates, *, rng=None)`<!--/AUTO--> | 加权抽选（空/总权重 0 → None；同种子顺序无关可复现） |
@@ -1473,7 +1473,7 @@ conver system/
 | `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
 | `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->23<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
 | `backend/tests/test_image_provider.py` | <!--AUTO:tests:backend/tests/test_image_provider.py-->22<!--/AUTO--> | 图片 Provider 契约锁（CG-1：注册表派生/缺 Key 401/畸形响应/超时 504/连接 502/A1111 happy path 落盘/本地占位确定性/映射矩阵） |
-| `backend/tests/test_gallery.py` | <!--AUTO:tests:backend/tests/test_gallery.py-->24<!--/AUTO--> | CG 资产库契约锁（CG-2：入库去重同作品同 url/解锁幂等/加权抽选同种子顺序无关与分布/SET NULL 会话删图留/CASCADE 作品删图清/404 守卫） |
+| `backend/tests/test_gallery.py` | <!--AUTO:tests:backend/tests/test_gallery.py-->32<!--/AUTO--> | CG 资产库契约锁（CG-2：入库去重同作品同 url/解锁幂等/加权抽选同种子顺序无关与分布/SET NULL 会话删图留/CASCADE 作品删图清/404 守卫） |
 | `backend/tests/test_image_tasks.py` | <!--AUTO:tests:backend/tests/test_image_tasks.py-->20<!--/AUTO--> | 图片任务契约锁（CG-3：提交/轮询 404/run 成功出图入资产库/失败不破坏对话/时间线排序/路由 + MD-3 能力门控矩阵/提交 400/available） |
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->20<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
@@ -1609,9 +1609,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2499<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2507<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1118<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1126<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1311<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
