@@ -532,3 +532,248 @@ def test_add_weight_none_falls_back_to_column_default(db_session: Session) -> No
     cg = gallery_service.add_cg(db_session, char_id, URL_A, weight=None)  # type: ignore[arg-type]
 
     assert cg.weight == 100
+
+
+# ── 7. CG 路由三件套（T2：录入 / 解锁 / 全量列表；镜像 test_mods_routes.py 形态：
+#     真实路由 + 统一异常处理器最小应用，get_db 覆盖为内存会话；路由零 ORM 契约）──
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from backend.app.api.errors import domain_error_handler  # noqa: E402
+from backend.app.api.routes import images as images_route  # noqa: E402
+from backend.app.database import get_db  # noqa: E402
+from backend.app.services.exceptions import DomainError  # noqa: E402
+
+
+@pytest.fixture
+def cg_wire_app(db_session: Session) -> FastAPI:
+    """CG 三端点真实路由 + 统一 handler 的最小应用（get_db 覆盖为内存会话）"""
+    app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
+    app.include_router(images_route.router)
+    app.dependency_overrides[get_db] = lambda: db_session
+    return app
+
+
+class TestCgCreateRoute:
+    """POST /api/characters/{character_id}/cg（T2 录入端点契约）"""
+
+    def test_create_201_default_locked_and_passthrough(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """合法 body → 201；unlocked 恒 False（不收 unlocked 字段）；
+        weight/unlock_hint/is_special/group_name 逐一透传落库（T1 扩参消费验证）"""
+        char_id = _create_character(db_session)
+
+        with TestClient(cg_wire_app) as client:
+            resp = client.post(
+                f"/api/characters/{char_id}/cg",
+                json={
+                    "url": URL_A,
+                    "group_name": "第一章",
+                    "weight": 250,
+                    "unlock_hint": "通关第一章后解锁",
+                    "is_special": True,
+                },
+            )
+
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["character_id"] == char_id
+        assert body["url"] == URL_A
+        assert body["group_name"] == "第一章"
+        assert body["weight"] == 250
+        assert body["unlock_hint"] == "通关第一章后解锁"
+        assert body["is_special"] is True
+        # 初始默认锁定：端点不收 unlocked 字段，恒 False
+        assert body["unlocked"] is False
+        # 落库一致性：响应即 DB 行（id 可回查）
+        row = db_session.query(CgImage).filter(CgImage.id == body["id"]).one()
+        assert row.unlocked is False
+        assert row.weight == 250
+
+    def test_create_defaults_weight_100_and_empty_group(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """仅传 url（其余缺省）→ weight=100、group_name=""、hint=""、is_special=False"""
+        char_id = _create_character(db_session)
+
+        with TestClient(cg_wire_app) as client:
+            resp = client.post(f"/api/characters/{char_id}/cg", json={"url": URL_A})
+
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["weight"] == 100
+        assert body["group_name"] == ""
+        assert body["unlock_hint"] == ""
+        assert body["is_special"] is False
+
+    def test_create_same_url_idempotent_no_duplicate(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """add_cg 既有幂等去重语义经路由不破坏：同作品同 url 二次录入 → 同一行"""
+        char_id = _create_character(db_session)
+
+        with TestClient(cg_wire_app) as client:
+            first = client.post(f"/api/characters/{char_id}/cg", json={"url": URL_A})
+            second = client.post(f"/api/characters/{char_id}/cg", json={"url": URL_A})
+
+        assert first.status_code == 201
+        assert second.status_code == 201
+        assert second.json()["id"] == first.json()["id"]
+        assert len(gallery_service.list_cg(db_session, char_id)) == 1
+
+    def test_create_unknown_character_404(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """角色不存在 → 404（CharacterNotFoundError 经统一 handler 映射）"""
+        with TestClient(cg_wire_app) as client:
+            resp = client.post("/api/characters/99999/cg", json={"url": URL_A})
+
+        assert resp.status_code == 404
+
+    def test_create_422_matrix(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """Falsify 矩阵：url 空串 / url 非字符串 / weight<0 / weight=None /
+        body 缺 url → 一律 422（pydantic 校验，min_length=1 / ge=0 / 必填）"""
+        char_id = _create_character(db_session)
+        cases: list[dict] = [
+            {"url": ""},
+            {"url": 123},
+            {"url": URL_A, "weight": -1},
+            {"url": URL_A, "weight": None},
+            {},
+        ]
+
+        with TestClient(cg_wire_app) as client:
+            for payload in cases:
+                resp = client.post(f"/api/characters/{char_id}/cg", json=payload)
+                assert resp.status_code == 422, f"payload={payload} → {resp.status_code}"
+
+        # 422 拒绝路径零副作用：未产生任何 CG 行
+        assert gallery_service.list_cg(db_session, char_id) == []
+
+
+class TestCgUnlockRoute:
+    """POST /api/cg/{cg_id}/unlock（T2 解锁端点契约）"""
+
+    def test_unlock_200_sets_unlocked(self, db_session: Session, cg_wire_app: FastAPI) -> None:
+        """锁定 CG 调用后 unlocked=True，响应即解锁后的行"""
+        char_id = _create_character(db_session)
+        cg = gallery_service.add_cg(db_session, char_id, URL_A)
+
+        with TestClient(cg_wire_app) as client:
+            resp = client.post(f"/api/cg/{cg.id}/unlock")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["id"] == cg.id
+        assert body["unlocked"] is True
+
+    def test_unlock_idempotent_repeat(self, db_session: Session, cg_wire_app: FastAPI) -> None:
+        """幂等：已解锁再调返回同一行（同 id、unlocked 仍 True、无新行）"""
+        char_id = _create_character(db_session)
+        cg = gallery_service.add_cg(db_session, char_id, URL_A)
+
+        with TestClient(cg_wire_app) as client:
+            first = client.post(f"/api/cg/{cg.id}/unlock")
+            second = client.post(f"/api/cg/{cg.id}/unlock")
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert second.json()["id"] == first.json()["id"]
+        assert second.json()["unlocked"] is True
+        assert len(gallery_service.list_cg(db_session, char_id)) == 1
+
+    def test_unlock_unknown_cg_404(self, db_session: Session, cg_wire_app: FastAPI) -> None:
+        """不存在 id → 404（CgImageNotFoundError 经统一 handler 映射）"""
+        with TestClient(cg_wire_app) as client:
+            resp = client.post("/api/cg/99999/unlock")
+
+        assert resp.status_code == 404
+
+
+class TestCgListRoute:
+    """GET /api/characters/{character_id}/cg（T2 全量列表端点契约）"""
+
+    def test_list_desc_includes_locked(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """全量含未解锁，id 降序（新品在前，与画廊网格排序契约一致）"""
+        char_id = _create_character(db_session)
+        ids = [
+            gallery_service.add_cg(db_session, char_id, f"cg/pic_{i}.png").id
+            for i in range(3)
+        ]
+
+        with TestClient(cg_wire_app) as client:
+            resp = client.get(f"/api/characters/{char_id}/cg")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert [item["id"] for item in body] == sorted(ids, reverse=True)
+        # 含未解锁（列表不做解锁过滤——画廊灰态消费 unlock_hint）
+        assert all(item["unlocked"] is False for item in body)
+
+    def test_list_empty_character_returns_empty_array(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """无 CG 角色 → 200 与空数组 []"""
+        char_id = _create_character(db_session)
+
+        with TestClient(cg_wire_app) as client:
+            resp = client.get(f"/api/characters/{char_id}/cg")
+
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_list_unknown_character_404(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """角色不存在 → 404（require_character → 统一 handler）"""
+        with TestClient(cg_wire_app) as client:
+            resp = client.get("/api/characters/99999/cg")
+
+        assert resp.status_code == 404
+
+    def test_list_filters_group_name_and_unlocked_only(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """可选查询参数过滤：group_name 精确匹配 / unlocked_only 仅已解锁（默认全量）"""
+        char_id = _create_character(db_session)
+        gallery_service.add_cg(db_session, char_id, "cg/a.png", group_name="第一章")
+        gallery_service.add_cg(db_session, char_id, "cg/b.png", group_name="第二章")
+        gallery_service.add_cg(db_session, char_id, "cg/c.png", group_name="第一章")
+
+        with TestClient(cg_wire_app) as client:
+            by_group = client.get(
+                f"/api/characters/{char_id}/cg", params={"group_name": "第一章"}
+            )
+            unlocked_only = client.get(
+                f"/api/characters/{char_id}/cg", params={"unlocked_only": "true"}
+            )
+
+        # group_name 过滤：仅第一章 2 张，id 降序
+        assert by_group.status_code == 200
+        assert [item["url"] for item in by_group.json()] == ["cg/c.png", "cg/a.png"]
+        # unlocked_only 过滤：全部锁定 → 空
+        assert unlocked_only.status_code == 200
+        assert unlocked_only.json() == []
+
+    def test_list_cross_character_isolation(
+        self, db_session: Session, cg_wire_app: FastAPI
+    ) -> None:
+        """角色隔离：角色 A 的列表请求碰不到角色 B 的 CG（id 枚举别的角色资产不可见）"""
+        char_a = _create_character(db_session, name="角色 A")
+        char_b = _create_character(db_session, name="角色 B")
+        gallery_service.add_cg(db_session, char_a, "cg/a_only.png")
+        gallery_service.add_cg(db_session, char_b, "cg/b_only.png")
+
+        with TestClient(cg_wire_app) as client:
+            resp_a = client.get(f"/api/characters/{char_a}/cg")
+            resp_b = client.get(f"/api/characters/{char_b}/cg")
+
+        assert [item["url"] for item in resp_a.json()] == ["cg/a_only.png"]
+        assert [item["url"] for item in resp_b.json()] == ["cg/b_only.png"]
