@@ -3,7 +3,8 @@
 
 协议表面（__all__）：get_messages / create_message / create_message_no_commit /
 auto_insert_greeting / build_message_list / search_messages /
-add_swipe / list_swipes / list_swipes_batch / switch_swipe / delete_swipe。
+add_swipe / append_swipe_and_bump / list_swipes / list_swipes_batch /
+switch_swipe / delete_swipe。
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ __all__ = [
     "build_message_list",
     "search_messages",
     "add_swipe",
+    "append_swipe_and_bump",
     "list_swipes",
     "list_swipes_batch",
     "switch_swipe",
@@ -288,6 +290,42 @@ def add_swipe(
         msg.active_swipe_index = next_index
     db.commit()
     return next_index
+
+
+def append_swipe_and_bump(
+    db: Session,
+    message_id: int,
+    content: str,
+    *,
+    make_active: bool = True,
+) -> Message:
+    """追加候选并连带 bump 会话 updated_at + commit + refresh（F-124 持久化仪式单一入口）
+
+    收口「add_swipe → bump conversation.updated_at → commit → refresh」四步为一处：
+    重生成 / 续写两调用点只传 message_id + 新文本。语义与原两调用点逐字一致：
+
+    1. add_swipe（内部已 commit 候选行；候选 0 播种 + 新候选置激活 + content 跟随）；
+    2. 由 message_id 归属消息解析 conversation_id，取 Conversation；存在时
+       bump updated_at（会话列表排序置顶不变量，漏 bump 隐患消除）；
+    3. commit + refresh，返回刷新后的目标 Message。
+
+    Args:
+        db: 数据库会话
+        message_id: 归属消息 ID（不存在抛 MessageNotFoundError）
+        content: 候选内容
+        make_active: 是否把新候选置为当前激活（content 跟随激活候选）
+
+    Returns:
+        刷新后的目标 Message（content/active_swipe_index 与候选一致）
+    """
+    add_swipe(db, message_id, content, make_active=make_active)
+    msg = _require_message(db, message_id)
+    conv = db.query(Conversation).filter(Conversation.id == msg.conversation_id).first()
+    if conv is not None:
+        conv.updated_at = datetime.datetime.now()
+    db.commit()
+    db.refresh(msg)
+    return msg
 
 
 def list_swipes(db: Session, message_id: int) -> list[MessageSwipe]:
