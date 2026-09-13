@@ -29,6 +29,7 @@ from starlette.requests import ClientDisconnect
 
 from backend.app.models.character import Character
 from backend.app.models.conversation import Conversation
+from backend.app.models.cg_image import CgImage
 from backend.app.models.lorebook import LorebookEntry
 from backend.app.models.message import Message, Role
 from backend.app.models.mods import Mod
@@ -249,6 +250,10 @@ async def complete_chat(db: Session, request: ChatRequest) -> ChatResponse:
     # WL-5 记忆宫殿：回合完成后按阈值触发自动归纳（失败绝不阻断主流程）
     await _maybe_memory_palace(
         db, request.conversation_id, ctx.provider, ctx.conversation.model_name
+    )
+    # T6：CG 自动触发（完整回合后按概率自动解锁候选 CG）
+    await _maybe_auto_cg(
+        db, request.conversation_id, ctx.provider, ctx.conversation.model_name, saved.id
     )
 
     return ChatResponse(
@@ -618,9 +623,13 @@ async def stream_reply(
         yield {"type": "done", "message_id": message_id}
         # WL-5 记忆宫殿：done 帧发出后触发归纳（Falsify 修复：归纳 LLM 调用不
         # 阻塞 done 帧；断连取消此时无副作用——消息已落库、done 已送达）
-        if saved and full_content:
+        if saved and full_content and message_id is not None:
             await _maybe_memory_palace(
                 db, conversation_id, ctx.provider, ctx.conversation.model_name
+            )
+            # T6：CG 自动触发（done 帧后路径，与 complete_chat 同型）
+            await _maybe_auto_cg(
+                db, conversation_id, ctx.provider, ctx.conversation.model_name, message_id
             )
 
     except ClientDisconnect:
@@ -871,3 +880,60 @@ async def _maybe_memory_palace(
             memory_palace_service.persist_drafts(db, character.id, [draft])
     except Exception:  # noqa: BLE001 — 异常隔离兜底（记忆增强失败绝不影响对话）
         logger.exception("记忆宫殿触发失败（已隔离，不影响对话主流程）")
+
+
+async def _maybe_auto_cg(
+    db: Session,
+    conversation_id: int,
+    provider: BaseLLM,
+    model: str | None,
+    assistant_message_id: int,
+) -> None:
+    """CG 自动触发（T6）：完整回合后按概率自动解锁候选 CG
+
+    complete_chat / stream_reply 在完整回合落库后调用。异常隔离策略：任何失败不阻断
+    主流程（logger.exception 记录）。
+
+    详细语义见 spec T6-cg-auto-trigger.md。
+    """
+    try:
+        prob = setting_service.cg_auto_trigger_probability(db)
+        if prob == 0:
+            return
+        if random.randint(1, 100) > prob:
+            return
+
+        conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        if conv is None:
+            return
+        character = db.query(Character).filter(Character.id == conv.character_id).first()
+        if character is None:
+            return
+
+        from backend.app.services import gallery as gallery_service
+
+        # 候选池：锁定且 weight>0 的 CG（weight=0 的锁定 CG 永不进池）
+        candidates = (
+            db.query(CgImage)
+            .filter(
+                CgImage.character_id == conv.character_id,
+                CgImage.unlocked.is_(False),
+                CgImage.weight > 0,
+            )
+            .all()
+        )
+
+        # pick_cg_by_weight 算法本体零改动（T1 落地）：空池 → None，空池 no-op
+        cg = gallery_service.pick_cg_by_weight(candidates)
+        if cg is None:
+            return
+
+        # 锚定：unlock 后 cg.message_id = assistant_message_id, cg.conversation_id = conversation_id
+        # unlock_cg 本身不改锚，锚定在 _maybe_auto_cg 内补写
+        cg.unlocked = True
+        cg.message_id = assistant_message_id
+        cg.conversation_id = conversation_id
+        db.commit()
+    except Exception:  # noqa: BLE001 — 异常隔离兜底
+        logger.exception("CG 自动触发失败（已隔离，不影响对话主流程）")
+

@@ -552,3 +552,42 @@ class TestCredentialsEndpoint:
         assert resp.protocol == "claude"
         assert resp.key == ""
         assert resp.endpoint == ""
+
+
+# ── T6：cg_auto_trigger_probability 白名单读写 ──
+
+
+class TestCGAutoTriggerProbability:
+    """cg_auto_trigger_probability 键缺省/非数字/越界 → getter 返回钳制后的 0-100 整数；白名单可读写"""
+
+    def test_default_returns_zero(self, db_session) -> None:
+        """键缺省 → getter 返回默认 0"""
+        assert setting_service.cg_auto_trigger_probability(db_session) == 0
+
+    def test_read_write_roundtrip(self, db_session) -> None:
+        """可读写往返：100 写入 → 读取为 100"""
+        _save_setting(db_session, "cg_auto_trigger_probability", "100")
+        assert setting_service.cg_auto_trigger_probability(db_session) == 100
+
+    def test_clamp_above_100(self, db_session) -> None:
+        """值 200 → 钳制到 100"""
+        _save_setting(db_session, "cg_auto_trigger_probability", "200")
+        assert setting_service.cg_auto_trigger_probability(db_session) == 100
+
+    def test_clamp_below_zero(self, db_session) -> None:
+        """值 -1 → 钳制到 0"""
+        _save_setting(db_session, "cg_auto_trigger_probability", "-1")
+        assert setting_service.cg_auto_trigger_probability(db_session) == 0
+
+    def test_non_numeric_returns_zero(self, db_session) -> None:
+        """非数字值 → 返回默认 0"""
+        _save_setting(db_session, "cg_auto_trigger_probability", "abc")
+        assert setting_service.cg_auto_trigger_probability(db_session) == 0
+
+    def test_allowed_key_present_in_get_all(self, db_session) -> None:
+        """cg_auto_trigger_probability 出现在 get_all 白名单中"""
+        _save_setting(db_session, "cg_auto_trigger_probability", "50")
+        all_settings = setting_service.get_all(db_session)
+        assert "cg_auto_trigger_probability" in all_settings
+        assert all_settings["cg_auto_trigger_probability"] == "50"
+
