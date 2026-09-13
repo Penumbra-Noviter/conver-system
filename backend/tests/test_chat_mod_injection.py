@@ -260,3 +260,124 @@ def test_mod_overlays_on_top_of_lorebook_no_trailing_system(db_session, monkeypa
     assert len(world_msgs) == 1  # 世界书 + Mod 合并为单条，不新增独立尾随 system
     assert world_msgs[0]["content"] == "[世界知识]\n世界书内容\n\nMod内容"  # 世界书在前、Mod 追加在后
     assert ctx.messages[-1] == {"role": "user", "content": "你好"}  # 末条仍为 user，无尾随 system
+
+
+# ════════════════════════════════════════════════════════════════
+# 六、memory 区回读链路（T3：_memory_mod_instructions，归纳注入数据源）
+# ════════════════════════════════════════════════════════════════
+
+
+def test_memory_mod_instructions_sort_order_then_mod_id(db_session) -> None:
+    """多个启用 memory Mod 按 (sort_order, mod_id) 升序以 \\n 连接（纯文本直拼）"""
+    char = _create_character(db_session)
+    m1 = _create_mod(db_session, name="M1", target_area="memory", payload="口径一")
+    m2 = _create_mod(db_session, name="M2", target_area="memory", payload="口径二")
+    m3 = _create_mod(db_session, name="M3", target_area="memory", payload="口径三")
+    # m2 先挂（同 sort_order=0 下按 mod_id 决胜 → m1 在前）
+    _bind(db_session, char.id, m2, sort_order=0)
+    _bind(db_session, char.id, m1, sort_order=0)
+    _bind(db_session, char.id, m3, sort_order=1)
+
+    assert chat_service._memory_mod_instructions(db_session, char) == "口径一\n口径二\n口径三"
+
+
+def test_memory_mod_instructions_filters_disabled_and_other_areas(db_session) -> None:
+    """disabled 绑定与 target_area 为 prompt/css 的 Mod 不出现"""
+    char = _create_character(db_session)
+    mem_ok = _create_mod(db_session, name="记忆", target_area="memory", payload="口径")
+    mem_off = _create_mod(db_session, name="禁用记忆", target_area="memory", payload="不该出现")
+    prompt_mod = _create_mod(db_session, name="提示", target_area="prompt", payload="提示不该出现")
+    css_mod = _create_mod(db_session, name="样式", target_area="css", payload="样式不该出现")
+    _bind(db_session, char.id, mem_ok)
+    _bind(db_session, char.id, mem_off, enabled=False)
+    _bind(db_session, char.id, prompt_mod)
+    _bind(db_session, char.id, css_mod)
+
+    assert chat_service._memory_mod_instructions(db_session, char) == "口径"
+
+
+def test_memory_mod_instructions_empty_cases(db_session) -> None:
+    """角色 None / 无绑定 / 无 memory Mod（全非 memory 区）→ 返回空串（归纳链路零影响）"""
+    assert chat_service._memory_mod_instructions(db_session, None) == ""
+
+    char = _create_character(db_session)
+    assert chat_service._memory_mod_instructions(db_session, char) == ""  # 无绑定
+
+    prompt_mod = _create_mod(db_session, name="提示", target_area="prompt", payload="提示内容")
+    _bind(db_session, char.id, prompt_mod)
+    assert chat_service._memory_mod_instructions(db_session, char) == ""  # 绑定存在但非 memory 区
+
+
+def test_memory_mod_instructions_skips_blank_payload(db_session) -> None:
+    """payload 空串/纯空白 Mod 跳过；全空白 → 返回空串；空白与非空白混合只留非空白"""
+    char = _create_character(db_session)
+    blank1 = _create_mod(db_session, name="空", target_area="memory", payload="")
+    blank2 = _create_mod(db_session, name="纯空白", target_area="memory", payload=" \n\t ")
+    real = _create_mod(db_session, name="有效", target_area="memory", payload="有效口径")
+    _bind(db_session, char.id, blank1, sort_order=0)
+    _bind(db_session, char.id, blank2, sort_order=1)
+    _bind(db_session, char.id, real, sort_order=2)
+
+    assert chat_service._memory_mod_instructions(db_session, char) == "有效口径"
+
+    # 全空白：另建角色只挂空白
+    char2 = _create_character(db_session, name="空白角色")
+    _bind(db_session, char2.id, blank1)
+    assert chat_service._memory_mod_instructions(db_session, char2) == ""
+
+
+def test_memory_mod_instructions_payload_verbatim_no_json_parse(db_session) -> None:
+    """payload 纯文本直拼（不做 JSON 解析/转义）：JSON 形态文本原样透传"""
+    char = _create_character(db_session)
+    raw = '{"world": "不该被解析成结构"}'
+    mod_id = _create_mod(db_session, name="伪装 JSON", target_area="memory", payload=raw)
+    _bind(db_session, char.id, mod_id)
+
+    assert chat_service._memory_mod_instructions(db_session, char) == raw
+
+
+def test_memory_mod_instructions_skips_deleted_mod_binding(db_session) -> None:
+    """绑定指向已删除的 Mod（悬挂绑定）→ 跳过不崩溃"""
+    from sqlalchemy import delete as sa_delete
+
+    from backend.app.models.mods import Mod as ModModel
+
+    char = _create_character(db_session)
+    ok = _create_mod(db_session, name="有效", target_area="memory", payload="有效口径")
+    dangling = _create_mod(db_session, name="将删", target_area="memory", payload="悬挂不该出现")
+    _bind(db_session, char.id, ok, sort_order=0)
+    _bind(db_session, char.id, dangling, sort_order=1)
+    db_session.execute(sa_delete(ModModel).where(ModModel.id == dangling))
+    db_session.commit()
+
+    assert chat_service._memory_mod_instructions(db_session, char) == "有效口径"
+
+
+def test_memory_mod_instructions_single_in_query_no_nplus1(db_session) -> None:
+    """N 个启用 memory 绑定 → mods 表恰 1 次 SELECT（IN 查询防 N+1，与 _mod_prompt_injection 同型）"""
+    from sqlalchemy import event
+
+    char = _create_character(db_session)
+    for i in range(3):
+        mod_id = _create_mod(db_session, name=f"M{i}", target_area="memory", payload=f"口{i}")
+        _bind(db_session, char.id, mod_id, sort_order=i)
+    db_session.expire_all()  # 强制后续访问走 DB（排除 identity map 缓存假象）
+
+    statements: list[str] = []
+
+    def _record(conn, cursor, statement, parameters, context, executemany) -> None:
+        statements.append(statement)
+
+    engine = db_session.get_bind()
+    event.listen(engine, "before_cursor_execute", _record)
+    try:
+        chat_service._memory_mod_instructions(db_session, char)
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+
+    mod_selects = [
+        s for s in statements
+        if "from mods" in s.lower() and not s.lower().startswith(("insert", "update", "delete"))
+    ]
+    assert len(mod_selects) == 1
+
