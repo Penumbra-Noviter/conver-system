@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2582<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1161<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2595<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1174<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -621,7 +621,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/image/tasks.py:run_image_task-->`run_image_task(task_id, db)`<!--/AUTO--> | 后台执行核心（session 注入；失败落 failed 不外抛；base_url 读 settings） |
 | <!--AUTO:sig:backend/app/services/image/tasks.py:image_generation_available-->`image_generation_available(db)`<!--/AUTO--> | 生图能力门控单源（MD-3：未配置/local 占位 → False；HTTP 类需 base_url） |
 
-### 4.21.11 `backend/app/api/routes/images.py` — 出图/CG 回顾路由（CG-3）（<!--AUTO:lines:backend/app/api/routes/images.py-->~76 行<!--/AUTO-->）
+### 4.21.11 `backend/app/api/routes/images.py` — 出图/CG 回顾路由（CG-3）（<!--AUTO:lines:backend/app/api/routes/images.py-->~138 行<!--/AUTO-->）
 
 **职责**：POST /api/images/tasks（提交 + 后台 asyncio 执行）/ GET /api/images/tasks/{id}（轮询三态）/ GET /api/characters/{id}/cg-timeline（剧情回顾时间线）。/cg 静态挂载在 main.py（图片文件加载）。
 
@@ -1483,7 +1483,7 @@ conver system/
 | `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
 | `backend/tests/test_conversation_branch.py` | <!--AUTO:tests:backend/tests/test_conversation_branch.py-->23<!--/AUTO--> | 分支派生契约锁（BR-2：clone 往返 + 防御矩阵/分支逐条一致/源零改动/世界书共享/删源置空/路由 404 与版本拒绝/快照下载） |
 | `backend/tests/test_image_provider.py` | <!--AUTO:tests:backend/tests/test_image_provider.py-->22<!--/AUTO--> | 图片 Provider 契约锁（CG-1：注册表派生/缺 Key 401/畸形响应/超时 504/连接 502/A1111 happy path 落盘/本地占位确定性/映射矩阵） |
-| `backend/tests/test_gallery.py` | <!--AUTO:tests:backend/tests/test_gallery.py-->32<!--/AUTO--> | CG 资产库契约锁（CG-2：入库去重同作品同 url/解锁幂等/加权抽选同种子顺序无关与分布/SET NULL 会话删图留/CASCADE 作品删图清/404 守卫） |
+| `backend/tests/test_gallery.py` | <!--AUTO:tests:backend/tests/test_gallery.py-->45<!--/AUTO--> | CG 资产库契约锁（CG-2：入库去重同作品同 url/解锁幂等/加权抽选同种子顺序无关与分布/SET NULL 会话删图留/CASCADE 作品删图清/404 守卫） |
 | `backend/tests/test_image_tasks.py` | <!--AUTO:tests:backend/tests/test_image_tasks.py-->20<!--/AUTO--> | 图片任务契约锁（CG-3：提交/轮询 404/run 成功出图入资产库/失败不破坏对话/时间线排序/路由 + MD-3 能力门控矩阵/提交 400/available） |
 | `backend/tests/test_cg_auto_trigger.py` | <!--AUTO:tests:backend/tests/test_cg_auto_trigger.py-->15<!--/AUTO--> | CG 自动触发契约锁（T6：概率判定/候选池过滤/锚定/隔离/双路径接线/settings 键读写） |
 | `backend/tests/test_conversation_service.py` | <!--AUTO:tests:backend/tests/test_conversation_service.py-->13<!--/AUTO--> | 会话服务/标题生成 |
@@ -1621,9 +1621,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2582<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2595<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1161<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1174<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1351<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

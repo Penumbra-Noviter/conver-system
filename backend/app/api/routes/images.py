@@ -1,9 +1,15 @@
 """
-图片出图 / CG 回顾路由（CG-3）
+图片出图 / CG 回顾路由（CG-3 / T2）
 
 - POST /api/images/tasks — 提交图片生成任务（后台异步执行）
 - GET  /api/images/tasks/{task_id} — 轮询任务状态（三态：pending/running/succeeded/failed）
 - GET  /api/characters/{character_id}/cg-timeline — 剧情回顾时间线（已解锁 CG + 消息片段）
+- POST /api/characters/{character_id}/cg — 手工录入 CG（T2：初始恒锁定）
+- POST /api/cg/{cg_id}/unlock — 解锁 CG（T2：幂等）
+- GET  /api/characters/{character_id}/cg — 全量 CG 列表（T2：id 降序，含未解锁）
+
+路由零 ORM：CG 三件套全部委托 gallery service（add_cg / unlock_cg / list_cg），
+领域异常由应用级 DomainError handler（api/errors.py）统一映射 HTTP。
 """
 
 from __future__ import annotations
@@ -14,7 +20,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.schemas.image_task import CgTimelineItem, ImageTaskCreate, ImageTaskResponse
+from backend.app.schemas.image_task import (
+    CgImageCreate,
+    CgImageResponse,
+    CgTimelineItem,
+    ImageTaskCreate,
+    ImageTaskResponse,
+)
 from backend.app.services import conversation as conversation_service
 from backend.app.services import gallery as gallery_service
 from backend.app.services import setting as setting_service
@@ -93,3 +105,64 @@ def cg_timeline(character_id: int, db: Session = Depends(get_db)) -> list[CgTime
 
     character_service.require_character(db, character_id)
     return [CgTimelineItem(**item) for item in gallery_service.cg_timeline(db, character_id)]
+
+
+@router.post(
+    "/api/characters/{character_id}/cg",
+    response_model=CgImageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_cg(
+    character_id: int, body: CgImageCreate, db: Session = Depends(get_db)
+) -> CgImageResponse:
+    """手工录入 CG（T2；画廊「录入 CG」表单数据通道）
+
+    初始默认锁定：不收 unlocked 字段，服务层 add_cg 默认恒 unlocked=False；
+    同作品同 url 幂等去重（既有行直接返回，add_cg 语义不破坏）。
+    角色不存在 → 404（CharacterNotFoundError 经统一 handler 映射）。
+    """
+    cg = gallery_service.add_cg(
+        db,
+        character_id,
+        body.url,
+        group_name=body.group_name,
+        unlock_hint=body.unlock_hint,
+        weight=body.weight,
+        is_special=body.is_special,
+    )
+    return CgImageResponse.model_validate(cg)
+
+
+@router.post("/api/cg/{cg_id}/unlock", response_model=CgImageResponse)
+def unlock_cg(cg_id: int, db: Session = Depends(get_db)) -> CgImageResponse:
+    """解锁 CG（T2；画廊锁定态点击数据通道，幂等复用 unlock_cg）
+
+    幂等：已解锁再调返回同一行、无副作用。cg 不存在 → 404
+    （CgImageNotFoundError 经统一 handler 映射）。
+    """
+    return CgImageResponse.model_validate(gallery_service.unlock_cg(db, cg_id))
+
+
+@router.get(
+    "/api/characters/{character_id}/cg",
+    response_model=list[CgImageResponse],
+)
+def list_cg(
+    character_id: int,
+    group_name: str | None = None,
+    unlocked_only: bool = False,
+    db: Session = Depends(get_db),
+) -> list[CgImageResponse]:
+    """角色全量 CG 列表（T2；画廊网格数据通道，id 降序全量含未解锁）
+
+    默认全量（不传过滤 → list_cg 无过滤）；可选 group_name 精确过滤 /
+    unlocked_only 仅已解锁（list_cg 既有过滤语义）。角色不存在 → 404
+    （require_character → 统一 handler）。
+    """
+    from backend.app.services import character as character_service
+
+    character_service.require_character(db, character_id)
+    rows = gallery_service.list_cg(
+        db, character_id, group_name=group_name, unlocked_only=unlocked_only
+    )
+    return [CgImageResponse.model_validate(cg) for cg in rows]
