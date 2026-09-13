@@ -53,6 +53,14 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-115 | `images.py::list_cg` 路由额外暴露 `group_name`/`unlocked_only` 查询参数，spec §T2 端点契约未定义、前端 `images.list()` 未消费（Speculative Generality） | mod-cg-wiring 期末四轴 Spec/Standards | Speculative | 📝 待立项 | 后端路由 |
+| F-116 | 锁定 CG 的 `url` 仍含于 `GET /api/characters/{id}/cg` 响应体——「未解锁不泄露原图」仅在渲染层成立，软 UX 门而非机密边界（本地单用户信任模型可接受，但声明窄于字面） | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 后端契约 |
+| F-117 | `mod-css.js::collectCssPayloads` 未跳过空字符串 payload（仅过滤非 string），产生游离 `\n`；与后端 `_memory_mod_instructions` 的 `(payload or "").strip()` 语义不一致 | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 前端注入 |
+| F-118 | `chat.js::reconcileCharacterCss` 把 `applyCharacterCss` 的任何 `false`（含「该角色本就无 css Mod」合法空态）都置 `appliedCssCharacterId=null`，击穿去重守卫 → 流式期间每条 onTabsChanged 重拉 2 次请求（低效非正确性问题） | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 前端注入 |
+| F-119 | `database.py::_ensure_cg_images_weight` 用 `hasattr(bind, "connect")` 区分 Engine/Connection，脆弱 duck-type（SQLAlchemy 2.0.51 实测为真但 `isinstance(bind, Engine)` 更稳） | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 迁移 |
+| F-120 | `cg-review.js::handleCgGalleryClick` 中 `Number(tile?.dataset.cgId)` 在 actionEl 脱离 `.cg-tile` 时得 `NaN`，下游静默 no-op（当前渲染下不可达，防御缺口） | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 前端渲染 |
+| F-121 | 候选池过滤（`unlocked==False AND weight>0`）内联在 chat.py，而 `list_cg`/`pick_cg_by_weight` 在 gallery.py——「加权候选池」领域概念拆两模块（观察级，spec 已划 chat.py 为落点） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | 📝 待立项 | 架构去重 |
+| F-122 | chat.py 从 709→799 行持续膨胀，`_maybe_memory_palace` 与 `_maybe_auto_cg` 两处同型 try/except 隔离样板并列（Repeated Switches 雏形，chat.py 本就是编排 seam，暂可接受） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | 📝 待立项 | 架构去重 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -127,4 +135,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-114），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-122），避免编号冲突。
