@@ -65,6 +65,22 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 架构深化候选消费批次 F-123~F-126（2026-09-14 — 4 做，标准档 4 工单串行）
+
+> 来源：用户指令「全做」架构深化扫描 4 候选（F-123~F-126，source=架构报告 2026-09-14）。纯重构行为零变化。叙述详见 DEV_LOG〈架构深化候选消费批次 F-123~F-126（2026-09-14）〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| T1 | Mod 区过滤读取单一 seam（list_enabled_mods_for_area 下沉 mods.py） | F-123 | 2026-09-14 | a016d7c |
+| T2 | 追加候选「持久化仪式」收口（append_swipe_and_bump 单一入口） | F-124 | 2026-09-14 | 49d342c |
+| T3 | generate+LLM 错误映射接线收口（_generate_with_error_mapping 私有 seam，stream_reply 排除） | F-126 | 2026-09-14 | 114aae6 |
+| T4 | 自愈迁移原语抽取（_ensure_column 通用原语 + 三 wrapper 退化声明） | F-125 | 2026-09-14 | 19868f2 |
+
+**验证链：** pytest 1174+1skip→1199+1skip（+25 契约锁）+ Vitest 1351 + cargo 70 零回退全绿 | 冒烟 uvicorn 8899 docs/models/available 全 200 | 期末四轴「通过」0 Critical（Architecture 轴确认四工单均真深化，无伪深化）+ 观察级落债 F-127~F-129 | doc_sync 零漂移
+**非阻断落债：** F-127~F-129（append 两段提交非原子 / 冗余重取 / 三连接）
+
+---
+
 ### 技术债消费批次 F-115~F-122（2026-09-14 — 3 做 5 关，轻量档 8 项主会话直做）
 
 > 来源：用户指令「消费」+ userselect F-115~F-122（mod-cg-wiring 期末四轴落债 8 项）。逐项 git grep 复核现状后拍板 3 做 5 关。叙述详见 DEV_LOG〈技术债消费批次 F-115~F-122（2026-09-14）〉。
@@ -138,25 +154,13 @@
 
 ---
 
-### 图片出图门控 MD-3（2026-09-11 — 出图能力门控 + 图片 Provider 设置，CG 批后立项）
-
-> 来源：CG-3 交付后用户指出的产品缺口——出图默认走 local 占位后端（开发形态），生产点出图会得到占位图而非真实生成；且无「是否可用」判定。本工单立门控单源 + 图片 Provider 设置，与 MD-1/MD-2（Mod 挂载）无关（编号顺延为独立 follow-up）。叙述详见 DEV_LOG〈MD-3 出图能力门控 + 图片 Provider 设置（2026-09-11）〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| MD-3 | 出图能力门控 + 图片 Provider 设置（image_provider/image_base_url 设置 + /available + 按钮门控 + 设置 UI） | 2026-09-11 | daf0fd7 |
-
-**验证链：** 后端 pytest 1042+1skip→1049+1skip（+7：availability 矩阵——未配置/local 占位/HTTP 无 base_url/HTTP+base_url/未知 provider + 提交无后端 400 + /available 路由 + 提交 provider 从 settings 取）；全量后端绿零回归 | 前端 Vitest 1238→1239（+1：MD-3 守卫——未配置生图后端 generateImage no-op 不弹 modal 不提交）+ settings-panel 图片设置 UI 回填/收集 | provider 从请求体移入 settings（ImageTaskCreate 删 provider 字段），run_image_task 读 settings base_url | 判定单源 image_generation_available（settings 存取器 + 门控 + 前端守卫三处消费同源）| doc_sync 零漂移
-**非阻断落债：** 无
-
----
-
 ### 历史归档索引（2026-09-14 二次压缩：2026-08-27 ~ 2026-09-11 批次）
 
 > 折叠规则见头部「归档清出机制」。原文细节由 git 历史承担（`git log -p -- TICKETS.md`）；叙述详情见 DEV_LOG 同名节。
 
 | 日期 | 批次 | 提交 | 摘要 |
 |------|------|------|------|
+| 2026-09-11 | 图片出图门控 MD-3（出图能力门控 + 图片 Provider 设置） | daf0fd7 | image_generation_available 判定单源 + settings image_provider/base_url + 前端按钮门控 |
 | 2026-09-11 | CG 批次 CG-3（对话内出图 + 剧情回顾） | 3e04824 | 出图三态渲染 + 剧情回顾时间线，image_tasks 表 + /cg 静态挂载 |
 | 2026-09-11 | CG 批次 CG-2（CG 资产库 + 画廊） | 4b2d16d | cg_images 表 + add/list/unlock/pick_cg_by_weight，生命周期 FK 落实 |
 | 2026-09-11 | CG 批次 CG-1（text2img Provider 抽象） | 0f8a8d9 | image 包镜像 llm 六件套，Http/LocalImageGen + 错误映射 |

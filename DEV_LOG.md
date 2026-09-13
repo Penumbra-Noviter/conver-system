@@ -6,6 +6,21 @@
 
 ---
 
+## 架构深化候选消费批次 F-123~F-126（2026-09-14 — 4 做，标准档 4 工单串行）
+
+- **来源**：用户指令「全做」架构深化扫描 4 候选（F-123~F-126，source=架构报告 2026-09-14）。纯重构行为零变化。串行 lane（chat.py 被 T1/T2/T3 重叠 + 网关并发上限实证——本批零并行撞网关）。
+- **交付**（4 工单串行，T1→T2→T3 依赖链 + T4 独立）：
+  - T1/F-123（a016d7c）：`list_enabled_mods_for_area(db, character_id, target_area)` 下沉 mods.py 单一 seam——chat.py `_mod_prompt_injection`（prompt 区）与 `_memory_mod_instructions`（memory 区）两处重复「回读→area 过滤」改指；锚 `Mod.id.in_` chat.py 0 / `list_enabled_mods_for_area` 2；覆盖率 97.79%。
+  - T2/F-124（49d342c）：`append_swipe_and_bump` 收口 message.py 单一入口——`add_swipe→bump updated_at→commit→refresh` 四步不变量单点，regenerate/continue 只传 target+文本；锚 `updated_at=datetime` chat.py 0；覆盖率 96.11%。
+  - T3/F-126（114aae6）：私有 `_generate_with_error_mapping(ctx)` 收敛三处「generate+except LLMError→映射→raise」接线；`stream_reply` 刻意排除（走 llm_error_response 产出 SSE error 帧，保 F-45 错误不落库契约）；锚 `except LLMError` 2 / `chat_error_response(` 2；覆盖率 96.34%。
+  - T4/F-125（19868f2）：`_ensure_column(bind, table, col, def, *, concurrent=False)` 通用自愈原语——三 `_ensure_*` 退化为声明，wrapper 保留 `bind=engine` 默认参（既有迁移契约锁零改动）；并发吞错语义逐字保持；锚 `ALTER TABLE` 1 / `PRAGMA table_info` 1；覆盖率 94%。
+- **验证链**：pytest 1174+1skip→1199+1skip（+25 契约锁，既有用例零改动）+ Vitest 1351 + cargo 70 零回退全绿 | 冒烟 uvicorn 8899 docs/models/available 全 200（含 T4 迁移自愈重构后启动）| doc_sync 零漂移 | pool_cleanup_check 全合规。
+- **期末四轴（结论「通过」，0 Critical）**：Spec 4/4 工单锚文本全命中；Falsify 0 Critical（LLMError 五子类映射/非 LLMError 透传/并发吞错/缺列幂等全锁）；**Architecture 轴确认四工单均真深化、无伪深化**（无透传浅壳、无搬运复杂度）。观察级：T2 append_swipe_and_bump 两段提交非原子（候选落库但 updated_at 未 bump 的崩溃窗口，非回归——重构前同样两段）+ 冗余重取 `_require_message`；T4 `_ensure_conversation_branch_columns` Engine 形态 3 连接（原 1 连接）→ 落债 F-127~F-129。`_ensure_column.bind` 缺类型注解（LOW）当场修（`Engine | Connection`）。
+- **避坑（勿重踩）**：本批零并行（网关并发上限实证沿用串行 lane，稳定零重开）；CODE_WIKI 冲突仍沿用「提取对方 diff 手工重放 + doc_sync 刷新」（T4 的 §5 test_database 行 + 26 文件计数 checkout --ours 后手工补回）。
+- **非阻断落债**：F-127（append 两段提交非原子，Worth exploring）/ F-128（冗余重取，Speculative）/ F-129（三连接，Speculative）。F-123~F-126 已修归档。
+
+---
+
 ## 技术债消费批次 F-115~F-122（2026-09-14 — 3 做 5 关，轻量档 8 项主会话直做）
 
 - **来源**：用户指令「消费」+ userselect F-115~F-122（mod-cg-wiring 期末四轴落债 8 项：6 Speculative + 2 Worth exploring）。逐项 git grep 复核现状后拍板 3 做 5 关。
