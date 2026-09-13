@@ -53,9 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-127 | `append_swipe_and_bump` 两段提交非原子——`add_swipe` 内部 commit 后，外层再 bump updated_at + 二次 commit，崩溃窗口内「候选已落库但 updated_at 未 bump」（排序置顶不变量短暂失效；非本批回归，重构前同样两段，但「持久化仪式」未真正原子化） | arch-f123-126 期末四轴 Falsify/Architecture | Worth exploring | 📝 待立项 | 架构去重 |
-| F-128 | `append_swipe_and_bump` 冗余重取——`add_swipe` 已 `_require_message` 取到消息，外层又 `_require_message` 重取一次（identity map 同对象，冗余 SELECT） | arch-f123-126 期末四轴 Architecture | Speculative | 📝 待立项 | 架构去重 |
-| F-129 | `_ensure_conversation_branch_columns` 三列循环在 Engine 形态下各开独立连接 + 各 commit（原 1 连接 1 commit → 3 连接 3 commit），封装边界的轻微代价 | arch-f123-126 期末四轴 Architecture | Speculative | 📝 待立项 | 架构去重 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -92,6 +89,7 @@
 | F-118 | applyCharacterCss 的 false 无法区分「无 css Mod 空态」vs「取数失败」，修复需改返回契约牵动 17 用例，实际开销（流式本地 2 次请求）可忽略——成本收益不成比例 | mod-cg-wiring 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
 | F-121 | 候选池过滤是回合末一次性触发语义（未解锁+weight>0），与 gallery.list_cg 列表展示过滤不同；下沉只增被 chat.py 独调的窄函数 Leverage 低，spec 已划 chat.py 为触发编排落点 | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭 |
 | F-122 | chat.py 本就是编排 seam，两处回合末副作用触发器各有独立领域语义，仅 2 实例抽象「触发器」收益 < 成本（Speculative Generality 反面），暂可接受 | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭 |
+| F-128 | `append_swipe_and_bump` 冗余重取——`add_swipe(commit=False)` 后 msg 未 expire，`_require_message` 命中 identity map 不再发 SQL；剩余「再取一次」是 append 需 msg.conversation_id 而 add_swipe 返回 next_index 的合理结构（非冗余开销） | arch-f123-126 期末四轴 Architecture | Speculative | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
@@ -115,6 +113,9 @@
 | F-124 | 候选追加「持久化仪式」重复 + 不变量泄漏 | 架构报告 2026-09-14 | Strong | ✅ 已修（2026-09-14：工单 T2 `append_swipe_and_bump` 收口 message.py 单一入口，`updated_at=datetime` 0 / 覆盖率 96.11%，commit 49d342c） |
 | F-125 | 自愈迁移原语 Repeated Switch | 架构报告 2026-09-14 | Worth exploring | ✅ 已修（2026-09-14：工单 T4 `_ensure_column` 通用原语 + 三 wrapper 退化为声明，`ALTER TABLE` 1 / `PRAGMA table_info` 1，commit 19868f2） |
 | F-126 | generate+LLM 错误映射接线重复 | 架构报告 2026-09-14 | Speculative | ✅ 已修（2026-09-14：工单 T3 私有 `_generate_with_error_mapping` 三调用点复用，stream_reply 刻意排除，`except LLMError` 2，commit 114aae6） |
+| F-127 | `append_swipe_and_bump` 两段提交非原子 | arch-f123-126 期末四轴 Falsify/Architecture | Worth exploring | ✅ 已修（2026-09-14：add_swipe 加 `commit=False` 参数 + append 单 commit 原子落库，防复发断言 test_append_swipe_and_bump_single_commit_atomic） |
+| F-128 | `append_swipe_and_bump` 冗余重取 | arch-f123-126 期末四轴 Architecture | Speculative | ❌ 复核关闭（commit=False 后 msg 未 expire，_require_message 命中 identity map 不发 SQL；剩余再取一次是 append 需 conversation_id 而 add_swipe 返回 index 的合理结构） |
+| F-129 | `_ensure_conversation_branch_columns` 三连接/三 commit | arch-f123-126 期末四轴 Architecture | Speculative | ✅ 已修（2026-09-14：Engine 形态单连接循环补三列，Connection 形态直接循环） |
 
 ### 2026-09-13（技术债消费批次 ×2：批1 F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波；批2 F-110 做 + F-109/F-111 关，轻量档 1 工单）
 

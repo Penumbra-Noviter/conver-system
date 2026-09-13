@@ -327,6 +327,33 @@ def test_append_swipe_and_bump_appends_active_and_bumps_updated_at(
     assert conv.updated_at > before
 
 
+def test_append_swipe_and_bump_single_commit_atomic(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-127 防复发：候选 + content 跟随 + bump updated_at 单 commit 原子落库
+
+    锁定「追加候选与 updated_at bump 同一事务」——若未来改回 add_swipe 内 commit
+    + 外层再 commit 的两段提交（候选已落库但 updated_at 未 bump 的崩溃窗口），
+    本用例 commit 计数断言失败。
+    """
+    _, conv, msg = _setup(db_session)
+    db_session.commit()  # 基线落库（spy 之前）
+
+    commit_count = 0
+    real_commit = db_session.commit
+
+    def _spy_commit() -> None:
+        nonlocal commit_count
+        commit_count += 1
+        real_commit()
+
+    monkeypatch.setattr(db_session, "commit", _spy_commit)
+
+    message_service.append_swipe_and_bump(db_session, msg.id, "追加候选")
+
+    assert commit_count == 1  # 单 commit，非两段提交
+
+
 def test_append_swipe_and_bump_seeds_zero_and_idempotent_repeat(
     db_session: Session,
 ) -> None:

@@ -255,6 +255,7 @@ def add_swipe(
     content: str,
     *,
     make_active: bool = True,
+    commit: bool = True,
 ) -> int:
     """为消息追加候选（MS-1：重生成等操作改为追加而非覆盖）
 
@@ -268,6 +269,8 @@ def add_swipe(
         message_id: 归属消息 ID（不存在抛 MessageNotFoundError）
         content: 候选内容
         make_active: 是否把新候选置为当前激活
+        commit: 是否提交（False 由调用方统一提交——append_swipe_and_bump 的
+            单 commit 结算：候选 + content 跟随 + updated_at bump 原子落库）
 
     Returns:
         新候选序号（index；首次追加返回 1，候选 0 为原始内容）
@@ -288,7 +291,8 @@ def add_swipe(
         # content 跟随激活候选（LLM 上下文/前端渲染读 msg.content = 当前候选）
         msg.content = content
         msg.active_swipe_index = next_index
-    db.commit()
+    if commit:
+        db.commit()
     return next_index
 
 
@@ -304,10 +308,11 @@ def append_swipe_and_bump(
     收口「add_swipe → bump conversation.updated_at → commit → refresh」四步为一处：
     重生成 / 续写两调用点只传 message_id + 新文本。语义与原两调用点逐字一致：
 
-    1. add_swipe（内部已 commit 候选行；候选 0 播种 + 新候选置激活 + content 跟随）；
+    1. add_swipe(commit=False)（候选 0 播种 + 新候选置激活 + content 跟随，不提交）；
     2. 由 message_id 归属消息解析 conversation_id，取 Conversation；存在时
        bump updated_at（会话列表排序置顶不变量，漏 bump 隐患消除）；
-    3. commit + refresh，返回刷新后的目标 Message。
+    3. 单 commit（候选 + content 跟随 + updated_at bump 原子落库，F-127 消除两段
+       提交窗口）+ refresh，返回刷新后的目标 Message。
 
     Args:
         db: 数据库会话
@@ -318,7 +323,7 @@ def append_swipe_and_bump(
     Returns:
         刷新后的目标 Message（content/active_swipe_index 与候选一致）
     """
-    add_swipe(db, message_id, content, make_active=make_active)
+    add_swipe(db, message_id, content, make_active=make_active, commit=False)
     msg = _require_message(db, message_id)
     conv = db.query(Conversation).filter(Conversation.id == msg.conversation_id).first()
     if conv is not None:

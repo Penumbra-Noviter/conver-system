@@ -138,12 +138,19 @@ def _ensure_conversation_branch_columns(bind=engine) -> None:
     Args:
         bind: 可连接的 Engine/Connection（默认应用引擎；测试可传入内存库）
     """
-    for name, coltype in (
+    cols = (
         ("parent_conversation_id", "INTEGER"),
         ("branch_from_message_id", "INTEGER"),
         ("branch_title", "VARCHAR(200)"),
-    ):
-        _ensure_column(bind, "conversations", name, coltype)
+    )
+    if isinstance(bind, Engine):
+        # Engine 形态：单连接循环补三列（F-129 消除每次 _ensure_column 各开新连接）
+        with bind.connect() as conn:
+            for name, coltype in cols:
+                _ensure_column(conn, "conversations", name, coltype)
+    else:
+        for name, coltype in cols:
+            _ensure_column(bind, "conversations", name, coltype)
 
 
 def _ensure_cg_images_weight(bind=engine) -> None:

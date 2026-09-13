@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2621<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1200<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2622<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1201<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -258,7 +258,7 @@ conver system/
 
 > 无公开函数（纯配置常量）。注意 `DATABASE_URL` 默认值带 `+aiosqlite` 前缀，但 `database.py` 建引擎时剔除（同步 ORM，勿误判为异步）。
 
-### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~128 行<!--/AUTO-->）
+### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~135 行<!--/AUTO-->）
 
 **职责**：SQLAlchemy 同步引擎（`PRAGMA foreign_keys=ON`）、`get_db` 会话依赖、`init_db` 建表。
 
@@ -523,7 +523,7 @@ conver system/
 
 > 无公开函数（异常类层次）。
 
-### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~372 行<!--/AUTO-->）
+### 4.21 `backend/app/services/message.py` — 消息服务（<!--AUTO:lines:backend/app/services/message.py-->~377 行<!--/AUTO-->）
 
 **职责**：消息读取/写入/写入（不提交）/截断/开场白自动插入/上下文构建（滑窗）/跨对话搜索。
 
@@ -535,7 +535,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/message.py:auto_insert_greeting-->`auto_insert_greeting(db, conversation_id, user_name='User')`<!--/AUTO--> | 新会话自动插入开场白 |
 | <!--AUTO:sig:backend/app/services/message.py:build_message_list-->`build_message_list(db, conversation, user_content, max_rounds=30, user_name='User', append_current_input=True, world_injection=None, history=None)`<!--/AUTO--> | 构建 LLM 上下文（滑窗 + 模板变量） |
 | <!--AUTO:sig:backend/app/services/message.py:search_messages-->`search_messages(db, query, limit=50)`<!--/AUTO--> | 跨对话关键词搜索 |
-| <!--AUTO:sig:backend/app/services/message.py:add_swipe-->`add_swipe(db, message_id, content, *, make_active=True)`<!--/AUTO--> | 追加候选（候选 0 播种原始内容；新内容从 1 起，MS-1） |
+| <!--AUTO:sig:backend/app/services/message.py:add_swipe-->`add_swipe(db, message_id, content, *, make_active=True, commit=True)`<!--/AUTO--> | 追加候选（候选 0 播种原始内容；新内容从 1 起，MS-1） |
 | <!--AUTO:sig:backend/app/services/message.py:list_swipes-->`list_swipes(db, message_id)`<!--/AUTO--> | 候选列表（index 升序） |
 | <!--AUTO:sig:backend/app/services/message.py:switch_swipe-->`switch_swipe(db, message_id, index)`<!--/AUTO--> | 切换激活候选（越界 SwipeIndexError） |
 | <!--AUTO:sig:backend/app/services/message.py:delete_swipe-->`delete_swipe(db, message_id, index)`<!--/AUTO--> | 删除候选（原始候选 0 受保护；删活跃回落相邻） |
@@ -1504,7 +1504,7 @@ conver system/
 | `backend/tests/test_mods_routes.py` | <!--AUTO:tests:backend/tests/test_mods_routes.py-->19<!--/AUTO--> | Mod 路由契约锁（MD-2：库 CRUD/挂载/开关/排序/解绑/404·400·422 守卫） |
 | `backend/tests/test_migrate_data.py` | <!--AUTO:tests:backend/tests/test_migrate_data.py-->53<!--/AUTO--> | 数据迁移工具 |
 | `backend/tests/test_memory_palace.py` |
-| `backend/tests/test_message_swipes.py` | <!--AUTO:tests:backend/tests/test_message_swipes.py-->14<!--/AUTO--> | swipes 多候选契约锁（MS-1：播种序号自增/唯一约束/切换越界/删中间与回落/原始候选保护/级联/导出含候选集/自愈迁移幂等） | <!--AUTO:tests:backend/tests/test_memory_palace.py-->22<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
+| `backend/tests/test_message_swipes.py` | <!--AUTO:tests:backend/tests/test_message_swipes.py-->15<!--/AUTO--> | swipes 多候选契约锁（MS-1：播种序号自增/唯一约束/切换越界/删中间与回落/原始候选保护/级联/导出含候选集/自愈迁移幂等） | <!--AUTO:tests:backend/tests/test_memory_palace.py-->22<!--/AUTO--> | 记忆宫殿契约锁（WL-5：阈值矩阵/JSON 降级不抛/keys 空跳过与去重/position-depth 固定/chat 触发开关与失败隔离） |
 | `backend/tests/test_p35.py` | <!--AUTO:tests:backend/tests/test_p35.py-->25<!--/AUTO--> | P3.5 阶段功能回归 |
 | `backend/tests/test_package_exports.py` | <!--AUTO:tests:backend/tests/test_package_exports.py-->4<!--/AUTO--> | 包级导出契约（__all__） |
 | `backend/tests/test_packaging.py` | <!--AUTO:tests:backend/tests/test_packaging.py-->27<!--/AUTO--> | PyInstaller 打包形态 |
@@ -1623,9 +1623,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2621<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2622<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1200<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1201<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1351<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
