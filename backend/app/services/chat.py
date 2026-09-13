@@ -760,6 +760,45 @@ def _mod_prompt_injection(
     return mods_service.apply_prompt_mods(world_injection, payloads)
 
 
+def _memory_mod_instructions(db: Session, character: Character | None) -> str:
+    """读角色启用 memory 区 Mod 的归纳口径（T3：memory 区 Mod 消费数据源）
+
+    与 _mod_prompt_injection 同型模式：挂载表只存 mod_id，此处先取启用绑定，
+    再以 mod_id 一次性 IN 查询回读 Mod（防 N+1），过滤 target_area=="memory"，
+    按 (binding.sort_order, mod_id) 升序取 payload 纯文本以 \n 连接（不做 JSON
+    解析、不转义）。空串/纯空白 payload 跳过；绑定指向已删 Mod 跳过。
+
+    角色为空 / 无绑定 / 全禁用 / 无 memory Mod → 返回空串
+    （空串传入 summarize_turn 时归纳 prompt 字节级不变——调用方零影响契约）。
+
+    Args:
+        db: 数据库会话
+        character: 角色 ORM（None → 空串）
+
+    Returns:
+        memory 区 Mod payload 以 \n 连接的纯文本；无可参与项时为空串
+    """
+    if character is None:
+        return ""
+    bindings = [b for b in mods_service.list_character_mods(db, character.id) if b.enabled]
+    if not bindings:
+        return ""
+
+    mod_ids = [b.mod_id for b in bindings]
+    mods_by_id = {m.id: m for m in db.query(Mod).filter(Mod.id.in_(mod_ids)).all()}
+
+    # list_character_mods 已按 (sort_order, mod_id) 升序返回，此处沿用其确定性排序
+    lines: list[str] = []
+    for binding in bindings:
+        mod = mods_by_id.get(binding.mod_id)
+        if mod is None or mod.target_area != "memory":
+            continue
+        if not (mod.payload or "").strip():
+            continue
+        lines.append(mod.payload)
+    return "\n".join(lines)
+
+
 def _msg_role(msg: object) -> str:
     """消息 → 角色字符串（委托 text_utils.role_str，F-94 收敛）"""
     return role_str(getattr(msg, "role", ""))
@@ -824,6 +863,9 @@ async def _maybe_memory_palace(
             model=model,
             user_name=setting_service.user_name(db),
             char_name=character.name,
+            # T3：角色解析成功后回读 memory 区 Mod 归纳口径（无 memory Mod → 空串，
+            # 归纳 prompt 字节级不变）；失败由本函数既有 try/except 隔离
+            extra_instructions=_memory_mod_instructions(db, character),
         )
         if draft is not None:
             memory_palace_service.persist_drafts(db, character.id, [draft])
