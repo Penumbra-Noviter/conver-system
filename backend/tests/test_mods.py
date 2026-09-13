@@ -549,3 +549,134 @@ class TestReorderCharacterMods:
 
         with pytest.raises(ModReorderError):
             mods_service.reorder_character_mods(db_session, char_id, [b1.id, b1.id])
+
+
+# ── 5. list_enabled_mods_for_area（F-123：Mod 区过滤读取单一 seam）──
+
+
+class TestListEnabledModsForArea:
+    """list_enabled_mods_for_area 语义契约（spec §F-123）
+
+    单一读取 seam：list_character_mods 取启用绑定 → Mod.id.in_() 一次性回读 →
+    按 target_area 过滤，组装 ModPayload（sort_order/enabled 来自挂载，
+    target_area/payload 来自 Mod），按 (sort_order, mod_id) 升序返回。
+    """
+
+    def test_only_enabled_and_area_matched(self, db_session: Session) -> None:
+        """仅返回 target_area 匹配且 enabled 的绑定；禁用与非目标区不返回"""
+        char_id = _create_character(db_session)
+        prompt_ok = _create_mod(db_session, name="prompt", target_area="prompt", payload="p1")
+        prompt_off = _create_mod(db_session, name="prompt 禁用", target_area="prompt", payload="不该出现")
+        mem = _create_mod(db_session, name="memory", target_area="memory", payload="m1")
+        css = _create_mod(db_session, name="css", target_area="css", payload="c1")
+        mods_service.bind_mod(db_session, char_id, prompt_ok.id)
+        mods_service.bind_mod(db_session, char_id, prompt_off.id, enabled=False)
+        mods_service.bind_mod(db_session, char_id, mem.id)
+        mods_service.bind_mod(db_session, char_id, css.id)
+
+        result = mods_service.list_enabled_mods_for_area(db_session, char_id, "prompt")
+
+        assert [(p.mod_id, p.target_area, p.enabled) for p in result] == [
+            (prompt_ok.id, "prompt", True),
+        ]
+
+    def test_sorted_by_sort_order_then_mod_id(self, db_session: Session) -> None:
+        """按 (sort_order, mod_id) 升序稳定排序（同序按 mod_id 决胜）"""
+        char_id = _create_character(db_session)
+        m1 = _create_mod(db_session, name="M1", target_area="prompt")
+        m2 = _create_mod(db_session, name="M2", target_area="prompt")
+        m3 = _create_mod(db_session, name="M3", target_area="prompt")
+        mods_service.bind_mod(db_session, char_id, m2.id, sort_order=0)
+        mods_service.bind_mod(db_session, char_id, m1.id, sort_order=0)
+        mods_service.bind_mod(db_session, char_id, m3.id, sort_order=1)
+
+        result = mods_service.list_enabled_mods_for_area(db_session, char_id, "prompt")
+
+        assert [p.mod_id for p in result] == [m1.id, m2.id, m3.id]
+
+    def test_skips_dangling_binding(self, db_session: Session) -> None:
+        """绑定指向已删 Mod（悬挂绑定）→ 跳过不崩溃"""
+        from sqlalchemy import delete as sa_delete
+
+        from backend.app.models.mods import Mod as ModModel
+
+        char_id = _create_character(db_session)
+        ok = _create_mod(db_session, name="有效", target_area="prompt", payload="ok")
+        dangling = _create_mod(db_session, name="将删", target_area="prompt", payload="悬挂")
+        mods_service.bind_mod(db_session, char_id, ok.id, sort_order=0)
+        mods_service.bind_mod(db_session, char_id, dangling.id, sort_order=1)
+        db_session.execute(sa_delete(ModModel).where(ModModel.id == dangling.id))
+        db_session.commit()
+
+        result = mods_service.list_enabled_mods_for_area(db_session, char_id, "prompt")
+
+        assert [p.mod_id for p in result] == [ok.id]
+
+    def test_no_bindings_empty(self, db_session: Session) -> None:
+        """角色无绑定 → []"""
+        char_id = _create_character(db_session)
+        assert mods_service.list_enabled_mods_for_area(db_session, char_id, "prompt") == []
+
+    def test_no_matching_area_empty(self, db_session: Session) -> None:
+        """有绑定但无 target_area 匹配 → []"""
+        char_id = _create_character(db_session)
+        mem = _create_mod(db_session, name="memory", target_area="memory", payload="m")
+        css = _create_mod(db_session, name="css", target_area="css", payload="c")
+        mods_service.bind_mod(db_session, char_id, mem.id)
+        mods_service.bind_mod(db_session, char_id, css.id)
+
+        assert mods_service.list_enabled_mods_for_area(db_session, char_id, "prompt") == []
+
+    def test_disabled_binding_excluded(self, db_session: Session) -> None:
+        """全部绑定禁用 → []（不返回禁用项）"""
+        char_id = _create_character(db_session)
+        mod = _create_mod(db_session, name="禁用", target_area="prompt", payload="p")
+        mods_service.bind_mod(db_session, char_id, mod.id, enabled=False)
+
+        assert mods_service.list_enabled_mods_for_area(db_session, char_id, "prompt") == []
+
+    def test_cross_character_isolation(self, db_session: Session) -> None:
+        """他角色绑定不混入（跨角色隔离）"""
+        char_id = _create_character(db_session)
+        other_id = _create_character(db_session, name="另一角色")
+        mod = _create_mod(db_session, name="共享 Mod", target_area="prompt", payload="p")
+        mods_service.bind_mod(db_session, other_id, mod.id, sort_order=99)
+
+        assert mods_service.list_enabled_mods_for_area(db_session, char_id, "prompt") == []
+        assert [p.mod_id for p in mods_service.list_enabled_mods_for_area(db_session, other_id, "prompt")] == [mod.id]
+
+    def test_unknown_area_empty(self, db_session: Session) -> None:
+        """target_area 为非法值（无任何 Mod 匹配）→ []"""
+        char_id = _create_character(db_session)
+        mod = _create_mod(db_session, name="prompt", target_area="prompt", payload="p")
+        mods_service.bind_mod(db_session, char_id, mod.id)
+
+        assert mods_service.list_enabled_mods_for_area(db_session, char_id, "bogus") == []
+
+    def test_single_in_query_no_nplus1(self, db_session: Session) -> None:
+        """N 个启用绑定 → mods 表恰 1 次 SELECT（IN 查询防 N+1）"""
+        from sqlalchemy import event
+
+        char_id = _create_character(db_session)
+        for i in range(3):
+            mod = _create_mod(db_session, name=f"M{i}", target_area="prompt", payload=f"p{i}")
+            mods_service.bind_mod(db_session, char_id, mod.id, sort_order=i)
+        db_session.expire_all()
+
+        statements: list[str] = []
+
+        def _record(conn, cursor, statement, parameters, context, executemany) -> None:
+            statements.append(statement)
+
+        engine = db_session.get_bind()
+        event.listen(engine, "before_cursor_execute", _record)
+        try:
+            mods_service.list_enabled_mods_for_area(db_session, char_id, "prompt")
+        finally:
+            event.remove(engine, "before_cursor_execute", _record)
+
+        mod_selects = [
+            s for s in statements
+            if "from mods" in s.lower() and not s.lower().startswith(("insert", "update", "delete"))
+        ]
+        assert len(mod_selects) == 1

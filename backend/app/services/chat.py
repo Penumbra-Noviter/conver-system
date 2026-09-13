@@ -32,7 +32,6 @@ from backend.app.models.conversation import Conversation
 from backend.app.models.cg_image import CgImage
 from backend.app.models.lorebook import LorebookEntry
 from backend.app.models.message import Message, Role
-from backend.app.models.mods import Mod
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
 from backend.app.services import lorebook as lorebook_service
@@ -719,12 +718,10 @@ def _mod_prompt_injection(
 ) -> dict[str, list[str]]:
     """把角色启用的 prompt 区 Mod 叠加进世界书注入块（MD-2/02 注入链）
 
-    挂载表只存 mod_id（不冗余 target_area/payload），此处以 mod_id 一次性回读
-    Mod（IN 查询，避免 N+1），组装 ModPayload（sort_order/enabled 来自挂载，
-    target_area/payload 来自 Mod）后经 apply_prompt_mods 叠加（world→system）。
-
-    角色为空 / 无绑定 / 全禁用 / 全非 prompt 区 → 原样返回 world_injection
-    （零开销，与 _lorebook_world_injection 的「无条目 → {}」同语义）。
+    读取逻辑下沉为 mods_service 的区过滤读取 seam（F-123）：按 target_area="prompt"
+    回读启用 Mod → ModPayload，再经 apply_prompt_mods 叠加（world→system）。角色为
+    空 / 无绑定 / 全禁用 / 全非 prompt 区 → 原样返回 world_injection（零开销，与
+    _lorebook_world_injection 的「无条目 → {}」同语义）。
 
     Args:
         db: 数据库会话
@@ -738,28 +735,7 @@ def _mod_prompt_injection(
     """
     if character is None:
         return world_injection
-    bindings = mods_service.list_character_mods(db, character.id)
-    enabled = [b for b in bindings if b.enabled]
-    if not enabled:
-        return world_injection
-
-    mod_ids = [b.mod_id for b in enabled]
-    mods_by_id = {m.id: m for m in db.query(Mod).filter(Mod.id.in_(mod_ids)).all()}
-
-    payloads: list[mods_service.ModPayload] = []
-    for binding in enabled:
-        mod = mods_by_id.get(binding.mod_id)
-        if mod is None or mod.target_area != "prompt":
-            continue
-        payloads.append(
-            mods_service.ModPayload(
-                mod_id=mod.id,
-                target_area=mod.target_area,
-                payload=mod.payload,
-                sort_order=binding.sort_order,
-                enabled=binding.enabled,
-            )
-        )
+    payloads = mods_service.list_enabled_mods_for_area(db, character.id, "prompt")
     if not payloads:
         return world_injection
     return mods_service.apply_prompt_mods(world_injection, payloads)
@@ -768,10 +744,9 @@ def _mod_prompt_injection(
 def _memory_mod_instructions(db: Session, character: Character | None) -> str:
     """读角色启用 memory 区 Mod 的归纳口径（T3：memory 区 Mod 消费数据源）
 
-    与 _mod_prompt_injection 同型模式：挂载表只存 mod_id，此处先取启用绑定，
-    再以 mod_id 一次性 IN 查询回读 Mod（防 N+1），过滤 target_area=="memory"，
-    按 (binding.sort_order, mod_id) 升序取 payload 纯文本以 \n 连接（不做 JSON
-    解析、不转义）。空串/纯空白 payload 跳过；绑定指向已删 Mod 跳过。
+    读取逻辑下沉为 mods_service 的区过滤读取 seam（F-123）：按 target_area="memory"
+    回读启用 Mod，取 payload 纯文本以 \n 连接（不做 JSON 解析、不转义）。空串/
+    纯空白 payload 过滤与悬挂绑定跳过语义保留在本调用点（内存区专属，不下沉）。
 
     角色为空 / 无绑定 / 全禁用 / 无 memory Mod → 返回空串
     （空串传入 summarize_turn 时归纳 prompt 字节级不变——调用方零影响契约）。
@@ -785,22 +760,9 @@ def _memory_mod_instructions(db: Session, character: Character | None) -> str:
     """
     if character is None:
         return ""
-    bindings = [b for b in mods_service.list_character_mods(db, character.id) if b.enabled]
-    if not bindings:
-        return ""
-
-    mod_ids = [b.mod_id for b in bindings]
-    mods_by_id = {m.id: m for m in db.query(Mod).filter(Mod.id.in_(mod_ids)).all()}
-
-    # list_character_mods 已按 (sort_order, mod_id) 升序返回，此处沿用其确定性排序
-    lines: list[str] = []
-    for binding in bindings:
-        mod = mods_by_id.get(binding.mod_id)
-        if mod is None or mod.target_area != "memory":
-            continue
-        if not (mod.payload or "").strip():
-            continue
-        lines.append(mod.payload)
+    payloads = mods_service.list_enabled_mods_for_area(db, character.id, "memory")
+    # seam 继承 list_character_mods 的 (sort_order, mod_id) 升序，此处沿用其确定性排序
+    lines = [p.payload for p in payloads if (p.payload or "").strip()]
     return "\n".join(lines)
 
 
