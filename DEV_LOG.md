@@ -6,6 +6,35 @@
 
 ---
 
+## mod-cg-wiring 批次（2026-09-14 — Mod memory/css 消费 + CG 解锁/画廊/加权自动出图，标准档 7 工单）
+
+- **来源**：用户指令「检查项目进度，看还有哪些原有设计未落地」→ 诊断为两类缺口：①规格内半成品（Mod memory/css 区无消费方、CG 解锁端点/加权自动出图接线半截、画廊 UI 缺失）；②大版本方向未落地（World 实体/玩法层 rules 等，明确后置）。用户选第一梯队（成本低、管道已有末端未接）。
+- **Grilling 四 ADR 拍板**：
+  - D1 memory 区消费 = 归纳指令叠加：`summarize_turn` 加 `extra_instructions: str = ""`，拼入归纳 prompt（schema 要求后、防注入句前）；chat.py 回读 enabled+target_area=="memory" 绑定按 (sort_order, mod_id) 升序，payload **纯文本** \n 连接；无 memory Mod 归纳 prompt 字节级不变（契约锁）。
+  - D2 css 区消费 = 会话内样式注入：纯前端 seam（mod-css.js 深模块），`<style id="mod-css-active">` textContent 注入对话视图，切会话移除 + id 幂等；不强制选择器前缀（本地信任级别与 per-game CSS 相同）；spec「同 seam 不新造」前提与「角色绑定」不同构（character↔game 无关联）故弃。
+  - D3 画廊 UI = cg-review 扩 tab + 录入表单本期做：全量 CG 网格（未解锁灰态占位不泄露原图 + unlock_hint + is_special）、点击解锁确认、页头录入表单（url/group/weight/hint/special，默认锁定进概率池）。
+  - D4 自动出图 = 回合末概率触发 + 全局 settings 键 `cg_auto_trigger_probability`（0-100 默认 0=关闭）：概率命中 → 未解锁且 weight>0 候选 → 空池 no-op → pick_cg_by_weight → unlock_cg → 锚定 message_id。
+- **交付**（7 工单，串行 lane 因网关并发上限降级——首波并行 3 连撞 captcha/user concurrency limit，转逐票串行）：
+  - T1（52c3b03）：cg_images 加 weight 列（PRAGMA 探测+ALTER 自愈+幂等契约锁+并发 duplicate column 吞并）+ add_cg 扩 weight/unlocked/is_special 可选参数（既有出图任务调用方零改动）。
+  - T2（351871d）：images.py 三路由（list/create/unlock）零 ORM 走 gallery service，CgImageCreate 不收 unlocked（默认恒锁定），领域异常经统一 handler 映射。
+  - T3（96386e7）：memory 区归纳注入 + 一次 IN 回读防 N+1（事件监听器断言 mods 表恰 1 次 SELECT）。
+  - T4（e079d80）：mod-css.js 深模块（applyCharacterCss/removeCharacterCss 两导出 + 单调令牌竞态失效 + 两段式取数）+ chat.js onTabsChanged 接线。
+  - T5（112e722）：cg-review.js 页签自建（ensureCgViewShell 幂等 + 防重绑，app.js/index.html 零改动）+ api.js images.list/create/unlock + 未解锁灰态占位不加载原图。
+  - T6（c5ef42d）：setting.py 新键 + _maybe_auto_cg + complete_chat/stream_reply 双路径接线。
+  - T7（da28e69）：版本号三源 + Cargo.lock/package-lock 五处 0.6.1→1.1.0。
+- **验证链**：pytest 1117+1skip→1173+1skip（+56）+ Vitest 1311→1351（+40）+ cargo 70 零改动全绿 | 运行态冒烟：uvicorn 8899 + CG 真实链路（录入 id=1 恒锁定 → list → unlock unlocked=True）全通 | 期末四轴 0 HIGH 阻断 + 2 MEDIUM 当场修（7e953d5）+ 安全红线 0 违例 | doc_sync 零漂移。
+- **期末四轴 MEDIUM 修复**（7e953d5）：①SP1/A1 `_maybe_auto_cg` 签名偏离 spec（provider/model 死参数）→ 删参数对齐 spec 三参；②SP2/A1 解锁绕过 unlock_cg seam（内联 cg.unlocked=True）→ 恢复 `gallery_service.unlock_cg(db, cg.id)` 单一 seam + 锚定补写；防复发断言 test_unlock_uses_unlock_cg_seam（spy 验证 unlock_cg 被调）。
+- **避坑（勿重踩）**：
+  1. **波次并行撞网关并发上限**：首波 3 并行连失败（captcha verify failed / user concurrency limit exceeded），T1 重开 2 次仍触顶——转逐票串行 lane 后稳定。网关层失败不计入工单 BLOCKED（非任务失败），策略性降并行。
+  2. **worktree 落 exFAT 盘致 git dubious ownership**：`F:/Craft/conver system/worktrees/`（exFAT 不记所有权）让 git 拒绝一切操作、agent 烧掉尝试；加 `safe.directory` 例外修复；后续 worktree 统一用 NTFS 路径 `desktop/.worktrees/`。
+  3. **merge 遗漏 T2 分支**：波 2 应合 T2+T6，只合了 T6——冒烟发现 unlock 端点 405（OpenAPI 缺三路由）定位 T2 未合，de50b80 补齐。教训：波末按完成门/文件范围核验合并完整性，不能只凭「波内测试绿」。
+  4. **CODE_WIKI 冲突全取一侧丢对方增补**：T4 合并 checkout --ours 整体丢弃 T4 对 CODE_WIKI 的 §3/§4.36.7/§5 增补（persona 既有教训复现）——改为提取 T4 的 CODE_WIKI diff 手工重放到当前版本再 doc_sync 刷新。
+  5. **doc_sync --check 在缺 node_modules/dist 的 worktree 假通过/真拦截**：vitest/cargo 渠道不可收集时渠道降级跳过（假通过），补齐产物后真实收集才报漂移——commit 前须保证三渠道产物齐备。
+  6. **T5 首派 agent 中断留半成品**：用了未注册的 eye/lock 图标（icons.js 只读不可加）、initCgView 独立入口无人调用（app.js 只读约束下页签永不初始化）、测试数据与「信任后端降序」契约矛盾——续作重开时附完整问题清单修正，未解锁项补「不加载原图」契约（灰态占位）。
+- **非阻断落债**：F-115~F-122（8 项，来源期末四轴，详见 TECH_DEBT.md 候选区——list_cg 扩参/锁定 url 在响应体/空串 payload/去重守卫击穿/duck-type/NaN 防御/候选池拆两模块/chat.py 膨胀）。
+
+---
+
 ## 技术债候选区消费批次 F-109~F-111（2026-09-13 — F-110 做 + F-109/F-111 复核关闭，轻量档 1 工单）
 
 - **来源**：用户指令「消费技术债候选区 3 项（F-109~111）」。project-kickoff 全自动档，知识库预检命中 3 条经验（ESM 拆分注入钩子 / 异步重载版本守卫 / 属性转义数据通道）。

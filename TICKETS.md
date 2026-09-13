@@ -65,6 +65,25 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### mod-cg-wiring 批次（2026-09-14 — Mod memory/css 消费 + CG 解锁/画廊/加权自动出图，标准档 7 工单）
+
+> 来源：用户指令「检查项目进度，看还有哪些原有设计未落地」→ 选第一梯队半成品（Mod memory/css 消费方 + CG 解锁端点/加权自动出图接线）；project-kickoff 全自动档。Grilling 四 ADR 拍板（memory 区=归纳指令叠加 / css 区=会话内样式注入 / 画廊=cg-review 扩 tab+录入表单 / 自动出图=回合末概率触发+全局 settings 键）。叙述详见 DEV_LOG〈mod-cg-wiring 批次（2026-09-14）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| T1 | cg_images weight 列迁移 + add_cg 扩参（weight/unlocked/is_special，幂等去重不改既有语义） | 2026-09-14 | 52c3b03 |
+| T2 | CG 路由三件套：POST/GET /api/characters/{id}/cg + POST /api/cg/{id}/unlock（零 ORM 走 gallery service） | 2026-09-14 | 351871d |
+| T3 | memory 区 Mod 消费：summarize_turn 扩 extra_instructions + chat 回读注入（纯文本 \n 连接，无 Mod 字节级不变） | 2026-09-14 | 96386e7 |
+| T4 | css 区 Mod 前端注入 seam（mod-css.js 深模块 + chat.js onTabsChanged 接线） | 2026-09-14 | e079d80 |
+| T5 | 画廊页签 + 录入表单 + 锁定态交互（cg-review.js 页签自建 + api.js 三方法） | 2026-09-14 | 112e722 |
+| T6 | 回合末概率触发 + settings 键 cg_auto_trigger_probability + _maybe_auto_cg | 2026-09-14 | c5ef42d |
+| T7 | 版本号 0.6.1 → 1.1.0（package.json/package-lock/tauri.conf/Cargo.toml/Cargo.lock） | 2026-09-14 | da28e69 |
+
+**验证链：** pytest 1117+1skip→1173+1skip（+56）+ Vitest 1311→1351（+40）+ cargo 70 零改动，全绿 | 运行态冒烟：uvicorn 8899 docs/available 200 + CG 真实链路（录入→列表→解锁）全通 | 期末四轴 0 HIGH 阻断 + 2 MEDIUM 当场修（7e953d5：_maybe_auto_cg 恢复 unlock_cg seam + 删 provider/model 死参数，防复发断言 test_unlock_uses_unlock_cg_seam）+ 安全红线 0 违例 | doc_sync 零漂移
+**非阻断落债：** F-115~F-122（8 项，详见 TECH_DEBT.md 候选区）；另 merge 遗漏修复——T2 分支初漏合并（de50b80 补齐，冒烟发现 unlock 端点 405 定位）
+
+---
+
 ### 技术债消费批次 F-109~F-111（2026-09-13 — 1 做 2 关，轻量档 1 工单）
 
 > 来源：用户指令「消费技术债候选区 3 项（F-109~111）」；Grilling 实证拍板 F-110 做、F-109/F-111 复核关闭（关闭理由见 TECH_DEBT.md 复核关闭表）。叙述详见 DEV_LOG〈技术债候选区消费批次 F-109~F-111（2026-09-13）〉。
