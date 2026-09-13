@@ -53,10 +53,9 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-123 | 「读取角色某 target_area 启用 Mod」在 chat.py `_mod_prompt_injection`/`_memory_mod_instructions` 两处重复（list_character_mods→IN 回读→area 过滤），mods.py 缺「按 area 过滤回读」单一读取面；css 区后端消费者将是第三份（Locality 缺失） | 架构报告 2026-09-14 | Strong | 📝 待立项 | 架构去重 |
-| F-124 | 「add_swipe→bump updated_at→commit→refresh」四步在 chat.py regenerate_chat/continue_chat 逐字重复；bump updated_at 不变量（Falsify 修出的排序置顶）落在 add_swipe 之外，靠调用方各自记得补（Locality 泄漏于 message.py/chat.py 两文件） | 架构报告 2026-09-14 | Strong | 📝 待立项 | 架构去重 |
-| F-125 | database.py 三个自愈迁移（_ensure_messages_active_swipe_index/_ensure_conversation_branch_columns/_ensure_cg_images_weight）重复「PRAGMA 探测→ALTER ADD COLUMN」原语，仅列/类型/默认/是否并发安全不同；_ensure_cg_images_weight 是唯一实现并发安全处；第 4 列迁移须整份抄写（Leverage 低） | 架构报告 2026-09-14 | Worth exploring | 📝 待立项 | 架构去重 |
-| F-126 | 「await generate + except LLMError→chat_error_response→raise」接线在 complete_chat/regenerate_chat/continue_chat 三段逐字重复；映射本体已收口但「记得包 try/except」知识散落三处（包装体薄 ~6 行，leverage 偏低） | 架构报告 2026-09-14 | Speculative | 📝 待立项 | 架构去重 |
+| F-127 | `append_swipe_and_bump` 两段提交非原子——`add_swipe` 内部 commit 后，外层再 bump updated_at + 二次 commit，崩溃窗口内「候选已落库但 updated_at 未 bump」（排序置顶不变量短暂失效；非本批回归，重构前同样两段，但「持久化仪式」未真正原子化） | arch-f123-126 期末四轴 Falsify/Architecture | Worth exploring | 📝 待立项 | 架构去重 |
+| F-128 | `append_swipe_and_bump` 冗余重取——`add_swipe` 已 `_require_message` 取到消息，外层又 `_require_message` 重取一次（identity map 同对象，冗余 SELECT） | arch-f123-126 期末四轴 Architecture | Speculative | 📝 待立项 | 架构去重 |
+| F-129 | `_ensure_conversation_branch_columns` 三列循环在 Engine 形态下各开独立连接 + 各 commit（原 1 连接 1 commit → 3 连接 3 commit），封装边界的轻微代价 | arch-f123-126 期末四轴 Architecture | Speculative | 📝 待立项 | 架构去重 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -98,7 +97,7 @@
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-14（技术债消费批次 F-115~F-122：3 做 + 5 关，轻量档 8 项主会话直做）
+### 2026-09-14（技术债消费批次 ×2：批1 F-115~F-122 3 做 5 关轻量档；批2 F-123~F-126 架构深化全做标准档 4 工单串行）
 
 > 来源：用户指令「消费」+ userselect F-115~F-122。逐项 git grep 复核现状后拍板 3 做 5 关（全 Speculative/Worth exploring，成本收益显式权衡）。处置后候选区清零。
 
@@ -112,6 +111,10 @@
 | F-118 | `reconcileCharacterCss` 把合法空态也置 null 击穿去重守卫（流式重复拉取低效） | mod-cg-wiring 期末四轴 Falsify | Speculative | ❌ 复核关闭（`applyCharacterCss` false 无法区分「无 css Mod 空态」vs「取数失败」，修复需改返回契约牵动 17 用例，实际开销可忽略——成本收益不成比例） |
 | F-121 | 候选池过滤内联 chat.py（加权候选池概念拆两模块） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭（回合末一次性触发语义 ≠ gallery.list_cg 展示过滤；下沉只增被 chat.py 独调的窄函数 Leverage 低，spec 已划 chat.py 为触发编排落点） |
 | F-122 | chat.py 持续膨胀，两处回合末副作用触发器并列（Repeated Switches 雏形） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭（chat.py 本就是编排 seam，两触发器各有独立领域语义，仅 2 实例抽象「触发器」收益 < 成本） |
+| F-123 | Mod 区过滤读取 Repeated Switch | 架构报告 2026-09-14 | Strong | ✅ 已修（2026-09-14：工单 T1 `list_enabled_mods_for_area` 下沉 mods.py 单一 seam，chat.py 两调用点改指，`Mod.id.in_` 0 / 覆盖率 97.79%，commit a016d7c） |
+| F-124 | 候选追加「持久化仪式」重复 + 不变量泄漏 | 架构报告 2026-09-14 | Strong | ✅ 已修（2026-09-14：工单 T2 `append_swipe_and_bump` 收口 message.py 单一入口，`updated_at=datetime` 0 / 覆盖率 96.11%，commit 49d342c） |
+| F-125 | 自愈迁移原语 Repeated Switch | 架构报告 2026-09-14 | Worth exploring | ✅ 已修（2026-09-14：工单 T4 `_ensure_column` 通用原语 + 三 wrapper 退化为声明，`ALTER TABLE` 1 / `PRAGMA table_info` 1，commit 19868f2） |
+| F-126 | generate+LLM 错误映射接线重复 | 架构报告 2026-09-14 | Speculative | ✅ 已修（2026-09-14：工单 T3 私有 `_generate_with_error_mapping` 三调用点复用，stream_reply 刻意排除，`except LLMError` 2，commit 114aae6） |
 
 ### 2026-09-13（技术债消费批次 ×2：批1 F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波；批2 F-110 做 + F-109/F-111 关，轻量档 1 工单）
 
@@ -151,4 +154,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-126），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-129），避免编号冲突。

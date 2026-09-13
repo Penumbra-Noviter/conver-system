@@ -258,7 +258,7 @@ conver system/
 
 > 无公开函数（纯配置常量）。注意 `DATABASE_URL` 默认值带 `+aiosqlite` 前缀，但 `database.py` 建引擎时剔除（同步 ORM，勿误判为异步）。
 
-### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~127 行<!--/AUTO-->）
+### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~128 行<!--/AUTO-->）
 
 **职责**：SQLAlchemy 同步引擎（`PRAGMA foreign_keys=ON`）、`get_db` 会话依赖、`init_db` 建表。
 

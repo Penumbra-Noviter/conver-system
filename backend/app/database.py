@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from backend.app.config import settings
@@ -73,7 +74,7 @@ def init_db() -> None:
 
 
 def _ensure_column(
-    bind, table: str, column_name: str, column_def: str, *, concurrent: bool = False,
+    bind: Engine | Connection, table: str, column_name: str, column_def: str, *, concurrent: bool = False,
 ) -> None:
     """通用自愈迁移原语：探测缺列 → 补列（幂等；concurrent 吞 duplicate column）
 
