@@ -3,12 +3,14 @@ Mod 挂载层服务（MD-1，深模块）
 
 协议表面（__all__）：ModPayload / list_mods / create_mod / update_mod /
 delete_mod / bind_mod / unbind_mod / set_binding_enabled / set_binding_sort_order /
-list_character_mods / reorder_character_mods / apply_prompt_mods（ModReorderError 在
-exceptions.py 统一登记，本模块不导出）。
+list_character_mods / list_enabled_mods_for_area / reorder_character_mods /
+apply_prompt_mods（ModReorderError 在 exceptions.py 统一登记，本模块不导出）。
 
 数据模型：mods（全局 Mod 库，目标区域 prompt|memory|css）+ mod_bindings（作品级
 挂载，(character_id, mod_id) 唯一 + sort_order + enabled 开关）。本模块只做存取
 与「prompt 区注入叠加」纯函数；memory/css 区由各自消费方读取（MD-2 及后续）。
+list_enabled_mods_for_area 为「读取角色某 target_area 启用 Mod」的单一 seam
+（F-123）：prompt/memory 消费方复用，css 区未来消费者复用同一读取路径。
 
 apply_prompt_mods（纯函数，零 DB）：把已启用 prompt 区 Mod 的注入内容按
 sort_order 升序（同序按 mod_id 稳定）叠加进 base_blocks。base_blocks 三块键为
@@ -50,6 +52,7 @@ __all__ = [
     "set_binding_enabled",
     "set_binding_sort_order",
     "list_character_mods",
+    "list_enabled_mods_for_area",
     "reorder_character_mods",
     "apply_prompt_mods",
 ]
@@ -294,6 +297,52 @@ def list_character_mods(db: Session, character_id: int) -> list[ModBinding]:
         .order_by(ModBinding.sort_order.asc(), ModBinding.mod_id.asc())
         .all()
     )
+
+
+def list_enabled_mods_for_area(
+    db: Session, character_id: int, target_area: str,
+) -> list[ModPayload]:
+    """读取角色启用且 target_area 匹配的 Mod，回读为 ModPayload，按 (sort_order, mod_id) 升序
+
+    挂载表只存 mod_id（不冗余 target_area/payload），此处先取启用绑定，再以 mod_id
+    一次性 IN 查询回读 Mod（防 N+1，保持单次 SELECT），按 target_area 过滤后组装
+    ModPayload（sort_order/enabled 来自挂载，target_area/payload 来自 Mod）。
+
+    排序继承 list_character_mods 的 (sort_order, mod_id) 升序稳定序；悬挂绑定
+    （Mod 已删）跳过；无启用绑定 → 返回 []；启用绑定存在但无 target_area 匹配
+    （或全非目标区）→ 返回 []。
+
+    Args:
+        db: 数据库会话
+        character_id: 角色 ID
+        target_area: 目标区域（prompt|memory|css）
+
+    Returns:
+        ModPayload 列表（仅 enabled 绑定 + target_area 匹配；按 (sort_order, mod_id) 升序）
+    """
+    bindings = list_character_mods(db, character_id)
+    enabled = [b for b in bindings if b.enabled]
+    if not enabled:
+        return []
+
+    mod_ids = [b.mod_id for b in enabled]
+    mods_by_id = {m.id: m for m in db.query(Mod).filter(Mod.id.in_(mod_ids)).all()}
+
+    payloads: list[ModPayload] = []
+    for binding in enabled:
+        mod = mods_by_id.get(binding.mod_id)
+        if mod is None or mod.target_area != target_area:
+            continue
+        payloads.append(
+            ModPayload(
+                mod_id=mod.id,
+                target_area=mod.target_area,
+                payload=mod.payload,
+                sort_order=binding.sort_order,
+                enabled=binding.enabled,
+            )
+        )
+    return payloads
 
 
 def reorder_character_mods(
