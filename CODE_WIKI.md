@@ -848,7 +848,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/error-bar.js:renderErrorBar-->`renderErrorBar({ container, message, protocol, onNavigateSettings, conversationId } = {})`<!--/AUTO--> | 渲染错误条（文案分流 / 关闭 / 自动消失） |
 | `ERROR_BAR_DISMISS_MS` | 错误条自动消失时长（毫秒；约 8s） |
 
-### 4.36.7 `frontend/js/mod-css.js` — css 区 Mod 注入 seam（<!--AUTO:lines:frontend/js/mod-css.js-->~99 行<!--/AUTO-->）
+### 4.36.7 `frontend/js/mod-css.js` — css 区 Mod 注入 seam（<!--AUTO:lines:frontend/js/mod-css.js-->~100 行<!--/AUTO-->）
 
 **职责**：css 区 Mod 前端消费（T4）——拉取角色绑定（`ModBindingResponse` 不嵌套 Mod 详情，与 Mod 库两段式按 `mod_id` 客户端关联），过滤 `enabled && target_area==='css'`，按 binding `sort_order` 升序以 `\n` 拼接 payload，注入 `<style id="mod-css-active">` 挂 `document.head`。id 幂等（任意调用序列后至多一个节点）；单调令牌使迟到完成的在途 apply 失效（切会话竞态）；payload 零转义零前缀改写（本地信任级别，textContent 赋值 DOM 结构不被撑破）；取数失败静默降级不抛出。chat.js 经 onTabsChanged 接线（会话打开/切换/关闭生命周期）。
 

@@ -293,6 +293,8 @@ function handleCgGalleryClick(e) {
     const cgId = Number(tile?.dataset.cgId);
     const characterId = Number(tile?.dataset.cgCharacter);
     const action = actionEl.dataset.cgAction;
+    // 防御：actionEl 脱离 .cg-tile 时 dataset 缺省 → NaN，静默 no-op（当前渲染不可达）
+    if (Number.isNaN(cgId) || Number.isNaN(characterId)) return;
 
     if (action === 'unlock') {
         handleUnlock(cgId, characterId);

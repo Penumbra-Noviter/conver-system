@@ -88,6 +88,7 @@ describe('1. 注入（enabled css Mod payload → style 节点）', () => {
                 mod(2, 'prompt', '{"world":"x"}'),
                 mod(4, 'memory', '归纳口径'),
                 mod(5, 'css', '/* c5 */'),
+                mod(6, 'css', ''), // F-117：空串 payload → 跳过，不产生游离 \n
             ],
             // bindings 故意乱序（sort_order 2,0,1）→ 断言按 sort_order 升序拼接
             bindings: [
@@ -96,6 +97,7 @@ describe('1. 注入（enabled css Mod payload → style 节点）', () => {
                 binding(12, 2, { sortOrder: 3 }),  // prompt 区 → 排除
                 binding(14, 4, { sortOrder: 4 }),  // memory 区 → 排除
                 binding(15, 5, { enabled: false, sortOrder: 5 }), // disabled → 排除
+                binding(16, 6, { sortOrder: 6 }),  // css 区空串 payload → 跳过
             ],
         }));
 

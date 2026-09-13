@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from backend.app.config import settings
@@ -143,7 +143,7 @@ def _ensure_cg_images_weight(bind=engine) -> None:
     from sqlalchemy.exc import OperationalError
     from sqlalchemy import text
 
-    if hasattr(bind, "connect"):  # Engine → 借出连接；Connection → 直接复用（不代管生命周期）
+    if isinstance(bind, Engine):  # Engine → 借出连接；Connection → 直接复用（不代管生命周期）
         with bind.connect() as conn:
             return _ensure_cg_images_weight(conn)
     conn = bind

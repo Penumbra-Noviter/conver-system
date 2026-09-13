@@ -50,6 +50,7 @@ async function collectCssPayloads(characterId) {
         .map((b) => modById.get(b.mod_id))
         .filter((m) => m.target_area === 'css' && typeof m.payload === 'string')
         .map((m) => m.payload)
+        .filter((p) => p.trim() !== '')
         .join('\n');
 }
 

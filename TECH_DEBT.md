@@ -53,14 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-115 | `images.py::list_cg` 路由额外暴露 `group_name`/`unlocked_only` 查询参数，spec §T2 端点契约未定义、前端 `images.list()` 未消费（Speculative Generality） | mod-cg-wiring 期末四轴 Spec/Standards | Speculative | 📝 待立项 | 后端路由 |
-| F-116 | 锁定 CG 的 `url` 仍含于 `GET /api/characters/{id}/cg` 响应体——「未解锁不泄露原图」仅在渲染层成立，软 UX 门而非机密边界（本地单用户信任模型可接受，但声明窄于字面） | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 后端契约 |
-| F-117 | `mod-css.js::collectCssPayloads` 未跳过空字符串 payload（仅过滤非 string），产生游离 `\n`；与后端 `_memory_mod_instructions` 的 `(payload or "").strip()` 语义不一致 | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 前端注入 |
-| F-118 | `chat.js::reconcileCharacterCss` 把 `applyCharacterCss` 的任何 `false`（含「该角色本就无 css Mod」合法空态）都置 `appliedCssCharacterId=null`，击穿去重守卫 → 流式期间每条 onTabsChanged 重拉 2 次请求（低效非正确性问题） | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 前端注入 |
-| F-119 | `database.py::_ensure_cg_images_weight` 用 `hasattr(bind, "connect")` 区分 Engine/Connection，脆弱 duck-type（SQLAlchemy 2.0.51 实测为真但 `isinstance(bind, Engine)` 更稳） | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 迁移 |
-| F-120 | `cg-review.js::handleCgGalleryClick` 中 `Number(tile?.dataset.cgId)` 在 actionEl 脱离 `.cg-tile` 时得 `NaN`，下游静默 no-op（当前渲染下不可达，防御缺口） | mod-cg-wiring 期末四轴 Falsify | Speculative | 📝 待立项 | 前端渲染 |
-| F-121 | 候选池过滤（`unlocked==False AND weight>0`）内联在 chat.py，而 `list_cg`/`pick_cg_by_weight` 在 gallery.py——「加权候选池」领域概念拆两模块（观察级，spec 已划 chat.py 为落点） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | 📝 待立项 | 架构去重 |
-| F-122 | chat.py 从 709→799 行持续膨胀，`_maybe_memory_palace` 与 `_maybe_auto_cg` 两处同型 try/except 隔离样板并列（Repeated Switches 雏形，chat.py 本就是编排 seam，暂可接受） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | 📝 待立项 | 架构去重 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -92,10 +84,30 @@
 | F-114 | 前端 reorder 乐观假设（提交后本地即按新序渲染，并发陈旧 400 由重拉自愈）——fail-closed 可接受，自愈语义已有契约 | 技术债批次期末四轴 Falsify | Speculative | ❌ 复核关闭 |
 | F-109 | mod-codec.js 声明名实不符——docstring 硬约束段（:16-18）已逐字豁免 importModsFromEnvelope（async、经 api.js fetch 注入点、不触 DOM），声明与实现一致，票面前提不成立 | 技术债批次期末四轴 Architecture | Worth exploring | ❌ 复核关闭 |
 | F-111 | 会话列表分支来源标记空值渲染——list-views.js:323 空值守卫使空引号场景不可达（branch_title 与锚预览均空时 resolveBranchSource 返回 null 整段不渲染），后端标题/预览兜底链封死输入源 | 技术债批次期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-115 | list_cg 路由透传 gallery.list_cg 既有 group_name/unlocked_only 过滤参数（非无中生有），画廊分组过滤是可预见需求（网格已展示 group_name），删除反而未来返工 | mod-cg-wiring 期末四轴 Spec/Standards | Speculative | ❌ 复核关闭 |
+| F-116 | 锁定 CG url 在 list 响应体是 spec 设计使然（list 全量含未解锁、响应含 url），前端渲染层已正确不加载锁定原图，锁定是软 UX 门非机密边界（本地单用户信任模型可接受） | mod-cg-wiring 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-118 | applyCharacterCss 的 false 无法区分「无 css Mod 空态」vs「取数失败」，修复需改返回契约牵动 17 用例，实际开销（流式本地 2 次请求）可忽略——成本收益不成比例 | mod-cg-wiring 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-121 | 候选池过滤是回合末一次性触发语义（未解锁+weight>0），与 gallery.list_cg 列表展示过滤不同；下沉只增被 chat.py 独调的窄函数 Leverage 低，spec 已划 chat.py 为触发编排落点 | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭 |
+| F-122 | chat.py 本就是编排 seam，两处回合末副作用触发器各有独立领域语义，仅 2 实例抽象「触发器」收益 < 成本（Speculative Generality 反面），暂可接受 | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
+
+### 2026-09-14（技术债消费批次 F-115~F-122：3 做 + 5 关，轻量档 8 项主会话直做）
+
+> 来源：用户指令「消费」+ userselect F-115~F-122。逐项 git grep 复核现状后拍板 3 做 5 关（全 Speculative/Worth exploring，成本收益显式权衡）。处置后候选区清零。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-117 | `mod-css.js::collectCssPayloads` 空串 payload 产生游离 `\n`（与后端 `_memory_mod_instructions` 语义不一致） | mod-cg-wiring 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-14：`.map(payload)` 后加 `.filter((p) => p.trim() !== '')` 跳过空串；防复发断言——多 Mod 拼接测试加空串 payload 锁定 textContent 无游离换行） |
+| F-119 | `database.py::_ensure_cg_images_weight` 用 `hasattr(bind, "connect")` 脆弱 duck-type 区分 Engine/Connection | mod-cg-wiring 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-14：改 `isinstance(bind, Engine)` + `from sqlalchemy import Engine`；test_gallery 45 用例锁定两路径行为不变） |
+| F-120 | `cg-review.js::handleCgGalleryClick` `Number(tile?.dataset.cgId)` 在 actionEl 脱离 `.cg-tile` 时得 `NaN` 静默 no-op | mod-cg-wiring 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-14：加 `Number.isNaN(cgId)||Number.isNaN(characterId)` 守卫 early return） |
+| F-115 | `images.py::list_cg` 路由暴露 `group_name`/`unlocked_only` 查询参数（spec 未定义、前端未消费） | mod-cg-wiring 期末四轴 Spec/Standards | Speculative | ❌ 复核关闭（透传 gallery.list_cg 既有过滤参数非无中生有；画廊分组过滤可预见需求，删除反而未来返工） |
+| F-116 | 锁定 CG 的 `url` 仍含于 list 响应体 | mod-cg-wiring 期末四轴 Falsify | Speculative | ❌ 复核关闭（spec 设计使然——list 全量含未解锁；锁定=软 UX 门非机密边界，前端渲染层已正确不加载锁定原图） |
+| F-118 | `reconcileCharacterCss` 把合法空态也置 null 击穿去重守卫（流式重复拉取低效） | mod-cg-wiring 期末四轴 Falsify | Speculative | ❌ 复核关闭（`applyCharacterCss` false 无法区分「无 css Mod 空态」vs「取数失败」，修复需改返回契约牵动 17 用例，实际开销可忽略——成本收益不成比例） |
+| F-121 | 候选池过滤内联 chat.py（加权候选池概念拆两模块） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭（回合末一次性触发语义 ≠ gallery.list_cg 展示过滤；下沉只增被 chat.py 独调的窄函数 Leverage 低，spec 已划 chat.py 为触发编排落点） |
+| F-122 | chat.py 持续膨胀，两处回合末副作用触发器并列（Repeated Switches 雏形） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭（chat.py 本就是编排 seam，两触发器各有独立领域语义，仅 2 实例抽象「触发器」收益 < 成本） |
 
 ### 2026-09-13（技术债消费批次 ×2：批1 F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波；批2 F-110 做 + F-109/F-111 关，轻量档 1 工单）
 
