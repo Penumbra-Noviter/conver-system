@@ -65,6 +65,20 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 技术债消费批次 F-127~F-129（2026-09-14 — 2 做 1 关，轻量档 3 项主会话直做）
+
+> 来源：用户指令「消费 F-127~129」（架构批次期末四轴观察级落债）。逐项 git grep 复核后拍板 2 做 1 关。叙述详见 DEV_LOG〈技术债消费批次 F-127~F-129（2026-09-14）〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| F-127 | add_swipe 加 commit 参数 + append 单 commit 原子落库（消除两段提交窗口） | F-127 | 2026-09-14 | 5ed88f5 |
+| F-129 | _ensure_conversation_branch_columns 单连接循环补三列 | F-129 | 2026-09-14 | 5ed88f5 |
+
+**验证链：** pytest 1199+1skip→1200+1skip（+1 防复发断言 test_append_swipe_and_bump_single_commit_atomic）+ Vitest 1351 + cargo 70 零回退全绿 | 复核关闭 F-128（commit=False 后 msg 未 expire 命中 identity map，剩余再取是合理结构）| 技术债候选区 3→0 清零
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 架构深化候选消费批次 F-123~F-126（2026-09-14 — 4 做，标准档 4 工单串行）
 
 > 来源：用户指令「全做」架构深化扫描 4 候选（F-123~F-126，source=架构报告 2026-09-14）。纯重构行为零变化。叙述详见 DEV_LOG〈架构深化候选消费批次 F-123~F-126（2026-09-14）〉。
@@ -141,25 +155,13 @@
 
 ---
 
-### Mod 挂载批次 MD-1（2026-09-12 — Mod 数据模型与注入叠加，MD 批首张）
-
-> 来源：AI风月对标调研五批工单（MD Mod 挂载首张）；mods + mod_bindings 新表 + services/mods.py 深模块（prompt 三区域叠加纯函数 apply_prompt_mods），规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §MD-1。叙述详见 DEV_LOG〈MD-1 Mod 数据模型与注入叠加（2026-09-12）〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| MD-1 | Mod 数据模型与注入叠加（mods + mod_bindings 新表；apply_prompt_mods 三区域叠加） | 2026-09-12 | e047462 |
-
-**验证链：** 后端 pytest 1049+1skip→1078+1skip（+29：test_mods 契约锁——绑定唯一/禁用零影响/sort_order 叠加序含同序稳定/解绑与删角色·删 Mod 级联/空列表零变化/CRUD 语义/bind 自动 sort_order/404 守卫/target_area 过滤/payload 三形态容错/三区域映射 world→system）| mods + mod_bindings 新表（模型 + schema.sql DDL 与唯一约束逐字契约 + test_migrate_data 表集合 +10 实体 models 清单）| services/mods.py 深模块（ModPayload 纯容器 + 9 函数，覆盖率 100%）| 全量后端绿零回归（前端/cargo 零改动）| 期末四轴：Spec 1 偏差记录（unbind_mod/list_character_mods 为 spec 签名表外补充——契约锁 #4「解绑」与读侧完整性要求）+ Standards 0 硬违例 / Falsify 0 HIGH（payload 三形态容错 + sort_order 判空 + 输入不篡改全锁）| doc_sync 零漂移
-**非阻断落债：** 无（注入链集成——assemble_chat_context 读角色绑定 Mod 组装 ModPayload 后 apply_prompt_mods——与前端 UI/路由留 MD-2）
-
----
-
 ### 历史归档索引（2026-09-14 二次压缩：2026-08-27 ~ 2026-09-11 批次）
 
 > 折叠规则见头部「归档清出机制」。原文细节由 git 历史承担（`git log -p -- TICKETS.md`）；叙述详情见 DEV_LOG 同名节。
 
 | 日期 | 批次 | 提交 | 摘要 |
 |------|------|------|------|
+| 2026-09-12 | Mod 挂载批次 MD-1（Mod 数据模型与注入叠加） | e047462 | mods + mod_bindings 新表 + apply_prompt_mods 三区域叠加纯函数 |
 | 2026-09-11 | 图片出图门控 MD-3（出图能力门控 + 图片 Provider 设置） | daf0fd7 | image_generation_available 判定单源 + settings image_provider/base_url + 前端按钮门控 |
 | 2026-09-11 | CG 批次 CG-3（对话内出图 + 剧情回顾） | 3e04824 | 出图三态渲染 + 剧情回顾时间线，image_tasks 表 + /cg 静态挂载 |
 | 2026-09-11 | CG 批次 CG-2（CG 资产库 + 画廊） | 4b2d16d | cg_images 表 + add/list/unlock/pick_cg_by_weight，生命周期 FK 落实 |

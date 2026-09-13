@@ -6,6 +6,18 @@
 
 ---
 
+## 技术债消费批次 F-127~F-129（2026-09-14 — 2 做 1 关，轻量档 3 项主会话直做）
+
+- **来源**：用户指令「消费 F-127~129」（架构批次期末四轴观察级落债）。逐项 git grep 复核现状后拍板 2 做 1 关。
+- **2 做（commit 5ed88f5）**：
+  - F-127（Worth exploring）`append_swipe_and_bump` 两段提交非原子——`add_swipe` 加 `commit: bool = True` 参数（默认向后兼容），append 调 `commit=False` 后单 commit（候选 + content 跟随 + updated_at bump 原子落库），消除「候选已落库但 updated_at 未 bump」崩溃窗口；防复发断言 test_append_swipe_and_bump_single_commit_atomic（spy commit 计数 == 1）。
+  - F-129（Speculative）`_ensure_conversation_branch_columns` Engine 形态三连接/三 commit——改单连接循环补三列（Connection 形态直接循环），消除每次 `_ensure_column` 各开新连接。
+- **1 关（F-128，Speculative）**：`append_swipe_and_bump` 冗余重取——F-127 改 commit=False 后 msg 未 expire，`_require_message` 命中 identity map 不再发 SQL；剩余「再取一次」是 append 需 msg.conversation_id 而 add_swipe 返回 next_index 的合理结构（非冗余开销）。复核关闭。
+- **验证链**：pytest 1199+1skip→1200+1skip（+1 防复发断言）+ Vitest 1351 + cargo 70 零回退全绿 | doc_sync 刷新 8 标记 + pool_cleanup_check 全合规 | 技术债候选区 3→0 清零。
+- **非阻断落债**：无（候选区清零）。
+
+---
+
 ## 架构深化候选消费批次 F-123~F-126（2026-09-14 — 4 做，标准档 4 工单串行）
 
 - **来源**：用户指令「全做」架构深化扫描 4 候选（F-123~F-126，source=架构报告 2026-09-14）。纯重构行为零变化。串行 lane（chat.py 被 T1/T2/T3 重叠 + 网关并发上限实证——本批零并行撞网关）。
