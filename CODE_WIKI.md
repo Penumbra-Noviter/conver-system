@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2563<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1161<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1332<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2582<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1161<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -765,7 +765,7 @@ conver system/
 | <!--AUTO:sig:backend/scripts/migrate_data.py:migrate-->`migrate(source, target, force=False)`<!--/AUTO--> | 执行迁移（幂等 + 标记） |
 | <!--AUTO:sig:backend/scripts/migrate_data.py:main-->`main(argv=None)`<!--/AUTO--> | CLI 入口 |
 
-### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~396 行<!--/AUTO-->）
+### 4.33 `frontend/js/api.js` — 统一请求层（<!--AUTO:lines:frontend/js/api.js-->~416 行<!--/AUTO-->）
 
 **职责**：Fetch 封装——超时守卫（AbortController + 15s 兜底，TD-51/55/72）、错误归一化、SSE 流式、Blob 下载（Content-Disposition 文件名解析）。T6 重生成：`conversations.regenerate(id, { message_id? })` 封装 `POST /api/conversations/{id}/regenerate`（缺省末条 assistant），客户端错误处理与 `messages.chat` 同走 `request` 错误通道。
 
@@ -1527,14 +1527,14 @@ conver system/
 
 | 文件 | 用例数 | 覆盖主题 |
 |------|--------|----------|
-| `frontend/tests/api.test.js` | <!--AUTO:tests:frontend/tests/api.test.js-->22<!--/AUTO--> | 请求层/超时/SSE/Blob |
+| `frontend/tests/api.test.js` | <!--AUTO:tests:frontend/tests/api.test.js-->27<!--/AUTO--> | 请求层/超时/SSE/Blob |
 | `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->38<!--/AUTO--> | 应用编排接线 |
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
 | `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
 | `frontend/tests/chat.test.js` |
 | `frontend/tests/chat-swipes.test.js` | <!--AUTO:tests:frontend/tests/chat-swipes.test.js-->7<!--/AUTO--> | swipes 候选控制条契约锁（MS-2：计数渲染/单选不渲染/切换调用参数/边界不越界/失败回滚） | <!--AUTO:tests:frontend/tests/chat.test.js-->100<!--/AUTO--> | 对话视图 |
-| `frontend/tests/cg-review.test.js` | <!--AUTO:tests:frontend/tests/cg-review.test.js-->7<!--/AUTO--> | 剧情回顾视图契约锁（CG-3：cgImageUrl 本地路径映射 /cg/时间线三态/内容转义/失败空态） |
+| `frontend/tests/cg-review.test.js` | <!--AUTO:tests:frontend/tests/cg-review.test.js-->21<!--/AUTO--> | 剧情回顾视图契约锁（CG-3：cgImageUrl 本地路径映射 /cg/时间线三态/内容转义/失败空态） |
 | `frontend/tests/cg-generate.test.js` | <!--AUTO:tests:frontend/tests/cg-generate.test.js-->7<!--/AUTO--> | 出图三态契约锁（CG-3：生成中 10-30s 提示/成功 img/失败 error-bar seam 不破坏对话/会话隔离） |
 | `frontend/tests/components-icons.test.js` | <!--AUTO:tests:frontend/tests/components-icons.test.js-->4<!--/AUTO--> | 组件图标一致性 |
 | `frontend/tests/conversation-activation.test.js` | <!--AUTO:tests:frontend/tests/conversation-activation.test.js-->16<!--/AUTO--> | 会话激活 |
@@ -1621,10 +1621,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2563<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2582<!--/AUTO-->** 项全绿。
 >
 > - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1161<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1332<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1351<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

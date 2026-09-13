@@ -353,6 +353,26 @@ export const images = {
      */
     cgTimeline: (characterId) => request('GET', `/characters/${characterId}/cg-timeline`),
     /**
+     * 角色全量 CG 列表（T2/T5：画廊网格数据通道，id 降序、全量含未解锁）
+     * @param {number|string} characterId - 角色 id
+     * @returns {Promise<Array<{id, character_id, url, group_name, weight, unlock_hint, is_special, unlocked, created_at}>>}
+     */
+    list: (characterId) => request('GET', `/characters/${characterId}/cg`),
+    /**
+     * 手工录入 CG（T2/T5：画廊「录入 CG」表单数据通道）——POST /api/characters/{id}/cg
+     * 初始默认锁定：不收 unlocked 字段，服务层默认恒 unlocked=False。
+     * @param {number|string} characterId - 角色 id
+     * @param {object} data - { url, group_name?, weight?, unlock_hint?, is_special? }
+     * @returns {Promise<{id, character_id, url, group_name, weight, unlock_hint, is_special, unlocked, created_at}>}
+     */
+    create: (characterId, data) => request('POST', `/characters/${characterId}/cg`, data),
+    /**
+     * 解锁 CG（T2/T5：画廊锁定态点击数据通道，幂等复用）——POST /api/cg/{id}/unlock
+     * @param {number|string} cgId - CG id
+     * @returns {Promise<{id, character_id, url, group_name, weight, unlock_hint, is_special, unlocked, created_at}>}
+     */
+    unlock: (cgId) => request('POST', `/cg/${cgId}/unlock`),
+    /**
      * 生图能力门控（MD-3）——GET /api/images/available
      * @returns {Promise<{available: boolean}>}
      */
