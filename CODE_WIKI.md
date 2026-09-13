@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2609<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1188<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2616<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1195<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -443,7 +443,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~750 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~752 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -1478,7 +1478,7 @@ conver system/
 | `backend/tests/test_character_card.py` | <!--AUTO:tests:backend/tests/test_character_card.py-->56<!--/AUTO--> | 角色卡 V2 导入导出/往返保真 |
 | `backend/tests/test_character_fields.py` | <!--AUTO:tests:backend/tests/test_character_fields.py-->26<!--/AUTO--> | 角色字段常量映射契约锁 |
 | `backend/tests/test_character_import_avatar.py` | <!--AUTO:tests:backend/tests/test_character_import_avatar.py-->2<!--/AUTO--> | 角色导入非 ASCII avatar 500 回归（服务层 ValueError 缺陷路径 + API 层全路径） |
-| `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->36<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
+| `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->43<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
 | `backend/tests/test_chat_continue.py` | <!--AUTO:tests:backend/tests/test_chat_continue.py-->21<!--/AUTO--> | 续写端点契约锁（MS-3：条数不变/不追加 user/失败零改动/续写触发形态/空续写 no-op/错误矩阵） |
 | `backend/tests/test_chat_mod_injection.py` | <!--AUTO:tests:backend/tests/test_chat_mod_injection.py-->13<!--/AUTO--> | prompt 注入链集成契约锁（MD-2：三区域叠加/禁用与非 prompt 区零影响/无 Mod 零回归/sort_order 升序/叠加于世界书之上不新增尾随 system） |
 | `backend/tests/test_branch_snapshot.py` | <!--AUTO:tests:backend/tests/test_branch_snapshot.py-->21<!--/AUTO--> | 分支快照契约锁（BR-1：截断锚/世界书与候选随存档/版本拒绝/JSON 往返/批量候选/迁移幂等） |
@@ -1622,9 +1622,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2609<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2616<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1188<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1195<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1351<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
