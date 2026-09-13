@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2616<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1195<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2621<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1200<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1351<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -258,7 +258,7 @@ conver system/
 
 > 无公开函数（纯配置常量）。注意 `DATABASE_URL` 默认值带 `+aiosqlite` 前缀，但 `database.py` 建引擎时剔除（同步 ORM，勿误判为异步）。
 
-### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~129 行<!--/AUTO-->）
+### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~127 行<!--/AUTO-->）
 
 **职责**：SQLAlchemy 同步引擎（`PRAGMA foreign_keys=ON`）、`get_db` 会话依赖、`init_db` 建表。
 
@@ -1469,7 +1469,7 @@ conver system/
 
 ## 五、测试
 
-三层测试体系：后端 pytest（25 文件）、前端 Vitest（33 文件）、壳 cargo test（4 集成文件 + lib.rs 单元）。覆盖率基线：后端 `pytest --cov`（目标 ≥90%）、前端 `npm run test:coverage`。
+三层测试体系：后端 pytest（26 文件）、前端 Vitest（33 文件）、壳 cargo test（4 集成文件 + lib.rs 单元）。覆盖率基线：后端 `pytest --cov`（目标 ≥90%）、前端 `npm run test:coverage`。
 
 ### 5.1 后端 pytest（backend/tests）
 
@@ -1491,6 +1491,7 @@ conver system/
 | `backend/tests/test_conversation_export.py` | <!--AUTO:tests:backend/tests/test_conversation_export.py-->20<!--/AUTO--> | 会话 JSON/Markdown 导出 |
 | `backend/tests/test_data_dir.py` | <!--AUTO:tests:backend/tests/test_data_dir.py-->19<!--/AUTO--> | 数据目录契约（UNC/尾分隔符） |
 | `backend/tests/test_data_dir_connection.py` | <!--AUTO:tests:backend/tests/test_data_dir_connection.py-->7<!--/AUTO--> | 数据目录/DB 连接集成 |
+| `backend/tests/test_database.py` | <!--AUTO:tests:backend/tests/test_database.py-->5<!--/AUTO--> | 自愈迁移原语契约锁（F-125：缺列补列幂等/已存在列 no-op/concurrent 吞 duplicate/非 duplicate 原样上抛/Connection 双形态） |
 | `backend/tests/test_document_parser.py` | <!--AUTO:tests:backend/tests/test_document_parser.py-->15<!--/AUTO--> | 文档智能解析 |
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->40<!--/AUTO--> | 统一异常处理器 |
 | `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->20<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
@@ -1622,9 +1623,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2616<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2621<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1195<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1200<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1351<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
