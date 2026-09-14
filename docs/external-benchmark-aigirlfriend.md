@@ -156,4 +156,4 @@ python -c "..."   # curl_cffi impersonate=chrome 抓 HTML 存盘
 
 ## 八、与本项目的关系（一句话总览）
 
-对方是我们功能体验的对标物，但其记忆/内容机制的**标准血统是 SillyTavern 世界书**，且本项目角色卡 V2 已带 `character_book` 往返保真、`docs/world-simulation-exploration.md` 已选定该规范路线 —— 因此本项目**不需要逆向对方**，只需按 `chat-simulator-upgrade-spec.md` 实现引擎与生成层。
+对方是我们功能体验的对标物，但其记忆/内容机制的**标准血统是 SillyTavern 世界书**，且本项目角色卡 V2 已带 `character_book` 往返保真、`chat-simulator-upgrade-spec.md` 已按该规范实现引擎与生成层 —— 因此本项目**不需要逆向对方**。

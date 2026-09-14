@@ -427,7 +427,7 @@ conver-system/
 
 ## 模拟器信任边界（TD-57）
 
-22 款内置第三方模拟器与用户导入的游戏（T-02 `/api/simulators/import`）与主应用**同源**（同协议/主机/端口，静态托管于数据目录 `simulators/`）运行。以下为该同源信任边界的权威文档：威胁模型、已接受风险、现有收缩措施清单、未来方向与加固不可行论证。未来涉及模拟器安全决策时以此为准（共识记录见 [CONSENSUS.md](../CONSENSUS.md) §2；探索跟踪见 [world-simulation-exploration.md](world-simulation-exploration.md) 未决事项 U11）。
+22 款内置第三方模拟器与用户导入的游戏（T-02 `/api/simulators/import`）与主应用**同源**（同协议/主机/端口，静态托管于数据目录 `simulators/`）运行。以下为该同源信任边界的权威文档：威胁模型、已接受风险、现有收缩措施清单、未来方向与加固不可行论证。未来涉及模拟器安全决策时以此为准（共识记录见 [CONSENSUS.md](../CONSENSUS.md) §2）。
 
 ### 威胁模型声明
 

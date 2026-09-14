@@ -6,6 +6,15 @@
 
 ---
 
+## 大世界方向关闭（2026-09-14 — 文档清理，代码零改动）
+
+- **决策**：用户拍板关闭「角色对话 → 世界模拟平台」大版本设想，落盘 CONSENSUS §1「方向边界」。
+- **移除**：删除 `docs/world-simulation-exploration.md`（探索文档，大世界方向唯一载体）；清理 CONSENSUS（U11 引用 + 方向边界）/ TICKETS（批次 WL 表头）/ architecture（模拟器信任边界 U11 引用）/ spec（批次 WL 标题）/ external-benchmark（尾段引用）/ DEV_LOG（427/731 文件名引用）对「大世界方向」的引用。
+- **保留**：角色级世界书（lorebook + 记忆宫殿，WL 批次）作为角色对话功能保留——CODE_WIKI / TICKETS 归档 / DEV_LOG 的「世界书」描述与代码（lorebook/lorebook_engine/memory_palace）零改动。
+- **代码零改动**：大世界（World 实体/玩法层/玩家状态/玩法包）从未落地代码（models 无 world.py、后端/前端 grep 零命中），无需迁移。
+
+---
+
 ## 技术债消费批次 F-130~F-138（2026-09-14 — 7 做 2 关，轻量档 9 项主会话直做）
 
 - **来源**：用户指令「消费技术债 F-130~138」（消息编辑重发期末四轴落债 9 项）。逐项 git grep 复核现状后拍板 7 做 2 关。
@@ -424,7 +433,7 @@
 
 - **来源**：用户要求对标 `aigirlfriendstudio.com` 的聊天与模拟器功能体验（记忆宫殿 / 世界书编辑器 / MOD 挂载 / 消息级操作 / 存档分支 / CG 沉淀），用于本项目后续实现借鉴。
 - **授权与边界**：FetchFlow 路线判 crawl；授权预检 `CHECKPOINT`（robots.txt 整站 `Disallow: /` + `/zh` 登录墙重定向）→ 摆信号给用户确认授权后继续。网络画像 `authorized_target_only`：同源只读 GET、低频串行、不爆破接口、不发聊天消息、不触发计费路径。
-- **结论（本次最值钱的发现）**：目标站前端是 **Dify 定制版**（Next.js + Turbopack SPA，业务层自研 + `/go/api` 与 `/console/api` 双前缀），后端为 **Go**（世界书正则要求 Go 语法）。其记忆与内容机制**非原创**——世界书 / 记忆宫殿 = **SillyTavern World Info 规范的产品化变体** + 一层「AI 自动写条目」。本项目无需逆向，字段语义直接对齐 ST 规范即可；且本项目角色卡 V2 已带 `character_book` 往返保真（仅缺消费），`docs/world-simulation-exploration.md` D4 已选定同一规范路线。
+- **结论（本次最值钱的发现）**：目标站前端是 **Dify 定制版**（Next.js + Turbopack SPA，业务层自研 + `/go/api` 与 `/console/api` 双前缀），后端为 **Go**（世界书正则要求 Go 语法）。其记忆与内容机制**非原创**——世界书 / 记忆宫殿 = **SillyTavern World Info 规范的产品化变体** + 一层「AI 自动写条目」。本项目无需逆向，字段语义直接对齐 ST 规范即可；且本项目角色卡 V2 已带 `character_book` 往返保真（仅缺消费），字段语义直接对齐 ST 规范（角色级世界书已落地）。
 - **证据获取方式**（可复用方法论）：不碰登录态即从构建产物拿到绝大部分实现证据——29 个 `_next/static` chunk 全量下载 → 路径字面量收集得完整 API 面 → 关键词频次定位业务 bundle（chat/message/SSE 计数最高者）→ 上下文切片挖字段语义 → **i18n 资源还原产品语义（作者端世界书帮助文档整段内嵌，是一手证据）**。登录态阶段仅只读观察（网络瀑布 + `page.evaluate` 内 fetch 探结构）。
 - **产出**：15 个工单立项（批次 WL 世界书 / MS 消息操作 / BR 分支 / CG 图像沉淀 / MD Mod 挂载，登记 TICKETS 活跃区）+ 两份文档（`docs/chat-simulator-upgrade-spec.md` 实现规格：字段表 + 纯函数签名 + 契约锁用例；`docs/external-benchmark-aigirlfriend.md` 对标档案：对方事实 + 方法论 + 复现路径 + 环境坑）。
 - **环境修复（顺带）**：① 采集脚手架 `fetchflow-work/` 移出仓库至 `D:\tmp\fetchflow-aigs\`——`scripts/doc_sync.py` files 校验会把仓库内 .py/.js 与 CODE_WIKI 引用做双向覆盖，临时脚本入仓即报漂移；② `src-tauri/target` 残留仓库在 D 盘时期的构建缓存（tauri-build 读不到 permissions 绝对路径）致 cargo 编译失败 → doc_sync cargo 渠道降级、tests_total 少 70 → `cargo clean` 后重建。
@@ -728,7 +737,7 @@
 ## 滚动摘要（2026-08-09 ~ 08-15 — 阶段摘要：模拟器三期 + 技术债 TD 系列 + 桌面打包 + C1/C2 收口）
 
 - **2026-08-09 GUI 全功能验证 + 08-13 方向/打包 + TD-46/47**：Playwright 黑盒 + vision 视觉核验 4 bug 全修（停止内容未落库 / JSON 导出 500 / badge / 480px），全部先复现再修；方向探讨 + 打包流程（细节 git log 可溯）
-- **模拟器集成最小原型验证（prototype skill）**：22 款单文件 HTML 模拟器集成链路全通（静态托管 + iframe + localStorage 存档 + AI 配置面板探测 + WebView2 CDP 桌面复测）；无正式代码改动，归档 docs/world-simulation-exploration.md
+- **模拟器集成最小原型验证（prototype skill）**：22 款单文件 HTML 模拟器集成链路全通（静态托管 + iframe + localStorage 存档 + AI 配置面板探测 + WebView2 CDP 桌面复测）；无正式代码改动
 - **U7 模拟器模块（5 工单 3 波）**：入口/22 游戏数据逐项核查（22/22 全 AI 驱动）、列表页、运行视图、冒烟；技术债区 +12 项待立项
 - **U8+U9 模拟器二期（4 工单 2 波）**：凭证端点（GET /api/settings/credentials）/ manifest v2（endpointMode/saveKeys）/ 注入按钮 / 存档面板；技术债区 +12 项待立项
 - **SIM-API-1 凭证统一（ADR-0001 方案 2）**：key-injector 自动同步 + 受管 option + MutationObserver 重建再同步 + 写回环冷却；22 款第三方 HTML 零修改；Vitest 714→746

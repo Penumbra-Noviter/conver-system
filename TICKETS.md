@@ -24,7 +24,7 @@
 > 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
 
-### 批次 WL — 世界书引擎（承接 docs/world-simulation-exploration.md D3/D4）
+### 批次 WL — 世界书引擎（角色级 lorebook，AI 风月对标）
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|

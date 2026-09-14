@@ -21,7 +21,7 @@
 
 ---
 
-## 批次 WL — 世界书引擎（对应 docs/world-simulation-exploration.md 的 D3/D4）
+## 批次 WL — 世界书引擎（角色级世界书，AI 风月对标）
 
 ### WL-1 世界书数据模型 + 仓库层
 目标：落地 Lorebook 条目表与仓库函数，字段语义对齐 SillyTavern World Info（D4 七件套先行）。
