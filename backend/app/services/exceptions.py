@@ -22,6 +22,7 @@ __all__ = [
     "MessageNotFoundError",
     "InvalidRegenerateTargetError",
     "InvalidContinueTargetError",
+    "InvalidEditTargetError",
     "BranchSnapshotError",
     "CgImageNotFoundError",
     "ImageTaskNotFoundError",
@@ -76,6 +77,10 @@ class InvalidRegenerateTargetError(DomainError):
 
 class InvalidContinueTargetError(DomainError):
     """续写目标非法（末条非 assistant / 对话无 message —— 只能在末条之后续写）"""
+
+
+class InvalidEditTargetError(DomainError):
+    """编辑目标非法（target 非 user —— 编辑 assistant 后置，swipes 多候选语义本期不破坏）"""
 
 
 class BranchSnapshotError(DomainError):

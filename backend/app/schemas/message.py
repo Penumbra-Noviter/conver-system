@@ -60,3 +60,8 @@ class RegenerateRequest(BaseModel):
         message_id: 目标 assistant 消息 ID（缺省=末条 AI 回复）
     """
     message_id: int | None = None
+
+
+class EditMessageRequest(BaseModel):
+    """编辑重发请求体（仅 user；content 就地替换后重新生成后续回复）"""
+    content: str = Field(..., min_length=1, description="修正后的用户消息内容")
