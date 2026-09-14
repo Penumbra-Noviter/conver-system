@@ -71,6 +71,9 @@ class Character(Base):
     prompt_mode = Column(String(8), default="simple", server_default="simple", nullable=False, comment="专家模式开关（simple/expert）")
     expert_prompt = Column(Text, default="", server_default="", nullable=False, comment="专家模式整段 system prompt")
 
+    # ── PD-4 预设对话（项目自有字段，不进 V2 规范清单，与 prompt_mode/expert_prompt 同归类） ──
+    preset_dialogues = Column(JSON, default=list, comment="预设对话（few-shot 示范，list[PresetDialogue]）")
+
     created_at = Column(DateTime, default=datetime.datetime.now, server_default=func.now())
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now, server_default=func.now())
 

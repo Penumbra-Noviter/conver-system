@@ -47,10 +47,14 @@ class TestCharacterV2Fields:
     """CHARACTER_V2_FIELDS — 20 内容字段，与 ORM 声明的 V2 列集合一致"""
 
     # 从 ORM 提取 V2 内容字段名（排除 id / created_at / updated_at 系统列，
-    # 以及 PD-5 项目自有非 V2 字段 prompt_mode / expert_prompt——不进 CHARACTER_V2_FIELDS）
+    # 以及项目自有非 V2 字段 prompt_mode / expert_prompt / preset_dialogues
+    # ——均不进 CHARACTER_V2_FIELDS）
     ORM_V2_COLUMNS = {
         c.name for c in Character.__table__.columns
-        if c.name not in ("id", "created_at", "updated_at", "prompt_mode", "expert_prompt")
+        if c.name not in (
+            "id", "created_at", "updated_at",
+            "prompt_mode", "expert_prompt", "preset_dialogues",
+        )
     }
 
     def test_length(self):
@@ -70,6 +74,11 @@ class TestCharacterV2Fields:
     def test_contains_core_fields(self):
         for f in ("name", "description", "personality", "scenario", "first_mes", "temperature", "avatar"):
             assert f in CHARACTER_V2_FIELDS, f"缺核心字段 {f}"
+
+    def test_preset_dialogues_not_in_v2_fields(self):
+        # 预设对话（PD-4）为项目自有字段，与 prompt_mode / expert_prompt 同归类，
+        # 走 extensions.conver_system 命名空间往返，不进 V2 标准内容字段清单
+        assert "preset_dialogues" not in CHARACTER_V2_FIELDS
 
 
 class TestPromptFields:

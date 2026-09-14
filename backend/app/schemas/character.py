@@ -13,6 +13,18 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 
+# ── 预设对话（few-shot 示范，项目自有字段，不进 V2 规范清单）──
+
+# 预设对话数量上限（单一来源：character_card 归一化截断消费）
+PRESET_DIALOGUE_MAX = 10
+
+
+class PresetDialogue(BaseModel):
+    """预设对话条目（few-shot 示范）：标题 + 正文"""
+    name: str = Field(..., description="对话标题")
+    content: str = Field(..., description="对话正文")
+
+
 # ── 基类（16 个 V2 内容字段 ── 单一来源）──
 
 
@@ -42,6 +54,8 @@ class CharacterBase(BaseModel):
     # PD-5 专家模式（项目自有字段，不进 V2 规范清单）
     prompt_mode: str = Field("simple", description="专家模式开关（simple/expert）")
     expert_prompt: str = Field("", description="专家模式整段 system prompt")
+    # PD-4 预设对话（项目自有字段，不进 V2 规范清单，经 conver_system 命名空间往返）
+    preset_dialogues: list[PresetDialogue] = Field(default_factory=list, description="预设对话（few-shot 示范）")
 
 
 # ── 请求体（继承基类，字段清单由 CharacterBase 唯一定义）──
@@ -76,6 +90,7 @@ class CharacterUpdate(CharacterBase):
     max_tokens: Optional[int] = Field(None, ge=1, le=131072)
     prompt_mode: Optional[str] = None
     expert_prompt: Optional[str] = None
+    preset_dialogues: Optional[list[PresetDialogue]] = None
 
     @field_validator("name", "prompt_mode", "expert_prompt", mode="before")
     @classmethod

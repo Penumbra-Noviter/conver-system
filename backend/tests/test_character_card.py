@@ -19,7 +19,7 @@ import base64
 import pytest
 
 from backend.app.models.character import Character
-from backend.app.schemas.character import CharacterCreate
+from backend.app.schemas.character import PRESET_DIALOGUE_MAX, CharacterCreate, PresetDialogue
 from backend.app.services.character_card import SPEC, from_v2_card, to_v2_card
 from backend.app.services.exceptions import CardFormatError, CardValidationError
 
@@ -448,6 +448,26 @@ def test_to_v2_url_avatar_keeps_lorebook(make_character) -> None:
     assert ns["temperature"] == 0.7
 
 
+def test_to_v2_sampling_params_namespace(make_character) -> None:
+    """采样参数（SP-1）非 None 写入 conver_system 命名空间（对齐 temperature 模式）"""
+    char = make_character(
+        top_p=0.9, presence_penalty=0.5, frequency_penalty=0.6, max_tokens=100,
+    )
+    ns = to_v2_card(char)["data"]["extensions"]["conver_system"]
+    assert ns["top_p"] == 0.9
+    assert ns["presence_penalty"] == 0.5
+    assert ns["frequency_penalty"] == 0.6
+    assert ns["max_tokens"] == 100
+
+
+def test_to_v2_expert_mode_namespace(make_character) -> None:
+    """专家模式（PD-5）非默认值写入 conver_system 命名空间（与 preset_dialogues 同归类）"""
+    char = make_character(prompt_mode="expert", expert_prompt="专家提示词")
+    ns = to_v2_card(char)["data"]["extensions"]["conver_system"]
+    assert ns["prompt_mode"] == "expert"
+    assert ns["expert_prompt"] == "专家提示词"
+
+
 # ════════════════════════════════════════════════════════════════
 # 八、V2 往返（spec §7 验收）
 # ════════════════════════════════════════════════════════════════
@@ -535,3 +555,110 @@ class TestImportRouteErrorPropagation:
         with pytest.raises(CardValidationError) as exc_info:
             import_character({"spec": "chara_card_v2", "data": {"personality": "x"}}, None)  # type: ignore[arg-type]
         assert "角色名称不能为空" in str(exc_info.value)
+
+
+# ════════════════════════════════════════════════════════════════
+# 九、预设对话（preset_dialogues）往返与归一化（PD-4）
+# ════════════════════════════════════════════════════════════════
+
+
+def _pd_pairs(items: object) -> list[tuple[str, str]]:
+    """预设对话 → [(name, content)]（兼容 dict 与 PresetDialogue 对象）"""
+    out: list[tuple[str, str]] = []
+    for item in items:  # type: ignore[union-attr]
+        name = item.name if hasattr(item, "name") else item["name"]
+        content = item.content if hasattr(item, "content") else item["content"]
+        out.append((name, content))
+    return out
+
+
+def test_preset_dialogue_max_constant() -> None:
+    """PRESET_DIALOGUE_MAX 单一来源常量 == 10（spec 锚点）"""
+    assert PRESET_DIALOGUE_MAX == 10
+
+
+def test_to_v2_preset_dialogues_in_namespace(make_character) -> None:
+    """预设对话写入 extensions.conver_system 命名空间，不落 data 顶层"""
+    pd = [{"name": "寒暄", "content": "你好，请问怎么称呼？"}]
+    card = to_v2_card(make_character(preset_dialogues=pd))
+    data, ns = card["data"], card["data"]["extensions"]["conver_system"]
+    assert "preset_dialogues" not in data
+    assert ns["preset_dialogues"] == pd
+
+
+def test_to_v2_preset_dialogues_empty_not_written(make_character) -> None:
+    """空预设对话（None / []）不写命名空间"""
+    for value in (None, []):
+        ns = to_v2_card(make_character(preset_dialogues=value))["data"]["extensions"]["conver_system"]
+        assert "preset_dialogues" not in ns
+
+
+def test_from_preset_dialogues_from_namespace() -> None:
+    """conver_system 命名空间预设对话读回为 PresetDialogue 列表"""
+    pd = [{"name": "寒暄", "content": "你好。"}, {"name": "告别", "content": "再见。"}]
+    result = from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": pd}}))
+    assert all(isinstance(d, PresetDialogue) for d in result.preset_dialogues)
+    assert _pd_pairs(result.preset_dialogues) == [("寒暄", "你好。"), ("告别", "再见。")]
+
+
+def test_preset_dialogues_roundtrip(make_character) -> None:
+    """导出→导入预设对话逐项保真（name/content 一致）"""
+    pd = [
+        {"name": "寒暄", "content": "你好，久等了。"},
+        {"name": "告别", "content": "下次再见。"},
+    ]
+    result = _roundtrip(make_character(preset_dialogues=pd))
+    assert _pd_pairs(result.preset_dialogues) == [("寒暄", "你好，久等了。"), ("告别", "下次再见。")]
+
+
+def test_from_preset_dialogues_none_or_non_list() -> None:
+    """脏数据：None / dict / str → []"""
+    assert from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": None}})).preset_dialogues == []
+    assert from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": {"name": "x", "content": "y"}}})).preset_dialogues == []
+    assert from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": "文本"}})).preset_dialogues == []
+
+
+def test_from_preset_dialogues_skips_non_dict_items() -> None:
+    """list 内含非 dict 项（str / int / None）被跳过"""
+    pd = ["非字典", {"name": "有效", "content": "正文"}, 123, None, {"name": "x", "content": "y"}]
+    result = from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": pd}}))
+    assert _pd_pairs(result.preset_dialogues) == [("有效", "正文"), ("x", "y")]
+
+
+def test_from_preset_dialogues_coerces_scalar_fields() -> None:
+    """name / content 非 str（int）→ str() 化保留"""
+    pd = [{"name": 123, "content": 456}]
+    result = from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": pd}}))
+    assert _pd_pairs(result.preset_dialogues) == [("123", "456")]
+
+
+def test_from_preset_dialogues_filters_blank() -> None:
+    """空 name 或空 content（含 trim 后空）的项被过滤"""
+    pd = [
+        {"name": "", "content": "有内容"},
+        {"name": "有标题", "content": ""},
+        {"name": "   ", "content": "空白标题"},
+        {"name": "有标题", "content": "  "},
+        {"name": "有效", "content": "正文"},
+    ]
+    result = from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": pd}}))
+    assert _pd_pairs(result.preset_dialogues) == [("有效", "正文")]
+
+
+def test_from_preset_dialogues_trims_and_dedupes() -> None:
+    """trim 后同名去重保留首个"""
+    pd = [
+        {"name": " 寒暄 ", "content": " 你好 "},
+        {"name": "寒暄", "content": "重复的第二个"},
+    ]
+    result = from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": pd}}))
+    assert _pd_pairs(result.preset_dialogues) == [("寒暄", "你好")]
+
+
+def test_from_preset_dialogues_truncates_to_10() -> None:
+    """超 10 截断到 10（去重前）"""
+    pd = [{"name": f"示范{i}", "content": f"内容{i}"} for i in range(12)]
+    result = from_v2_card(_v2_card(extensions={"conver_system": {"preset_dialogues": pd}}))
+    assert len(result.preset_dialogues) == 10
+    assert _pd_pairs(result.preset_dialogues) == [(f"示范{i}", f"内容{i}") for i in range(10)]
+
