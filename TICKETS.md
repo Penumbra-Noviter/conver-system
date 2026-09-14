@@ -71,9 +71,9 @@
 
 | Ticket | 标题 | F 项 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
-| SP-1 | 后端数据层：Character 加 4 采样列 + 自愈迁移 + schema + character_fields + 往返保真 | — | 2026-09-14 | |
-| SP-2 | LLM 调用链透传 + provider 分化（OpenAI 全透传 / Claude 仅 max_tokens） | — | 2026-09-14 | |
-| SP-3 | 前端角色表单/向导加采样参数控件 | — | 2026-09-14 | |
+| SP-1 | 后端数据层：Character 加 4 采样列 + 自愈迁移 + schema + character_fields + 往返保真 | — | 2026-09-14 | 6967f5c |
+| SP-2 | LLM 调用链透传 + provider 分化（OpenAI 全透传 / Claude 仅 max_tokens） | — | 2026-09-14 | 6967f5c |
+| SP-3 | 前端角色表单/向导加采样参数控件 | — | 2026-09-14 | 6967f5c |
 
 **验证链：** pytest 1225+1skip→1234+1skip（+9 契约锁：test_character_sampling 4 + test_sampling_transmit 5）+ Vitest 1379→1380（+1 Falsify max_tokens 守卫）+ cargo 70 零改动 | 期末三轴 0 阻断（Falsify 主会话直修 max_tokens NaN 守卫）| 双钩子通过
 
