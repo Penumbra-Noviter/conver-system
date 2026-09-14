@@ -53,6 +53,12 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-139 | CharacterUpdate.prompt_mode/expert_prompt 为 Optional[str]=None 但 ORM 列 nullable=False，发送 {"prompt_mode": null} 触发 IntegrityError(500) 而非 Pydantic 422（前端不发 null，需刻意构造畸形请求） | 波 1 增量审核 Falsify | Speculative | 📝 待立项 | 后端 schema |
+| F-140 | character-wizard.js 备用开场白删除 handler 用 indexOf(row) 定位后 splice(idx,1)，极端竞态下 indexOf 返回 -1 导致 splice(-1,1) 误删末项（单线程 UI 无并发，触发概率极低） | 波 2 增量审核 Falsify | Speculative | 📝 待立项 | 前端渲染 |
+| F-141 | build_prompt_debug 中 character=None（孤儿对话，SQLite FK CASCADE 未启用时可达）时 character.prompt_mode 属性访问 AttributeError，fail-open（只读 debug 端点，FK 正常时不可达） | 期末四轴 Falsify | Worth exploring | 📝 待立项 | 后端 debug 端点 |
+| F-142 | CharacterBase.prompt_mode 用 str 未用 Literal['simple','expert'] 枚举约束，直接 API 可写任意值（前端已归一，运行时安全回退 simple，纵深防御缺口） | 期末四轴 Standards | Speculative | 📝 待立项 | 后端 schema |
+| F-143 | chat._character_data 与 message.build_message_list 的 CharacterData 构造几乎逐字重复（PROMPT_FIELDS 投影 + 显式补 prompt_mode/expert_prompt），未来增字段需同步两处 | 期末四轴 Architecture | Speculative | 📝 待立项 | 后端 prompt 组装 |
+| F-144 | character-wizard.js 备用开场白删除用 state.splice 直接变异数组 vs character-form.js 以 DOM 为真源，同批次同类功能两套模式不一致 | 期末四轴 Architecture | Speculative | 📝 待立项 | 前端渲染 |
 
 
 ### 复核关闭（Speculative 类，防重复提议）
@@ -152,4 +158,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-138），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-144），避免编号冲突。

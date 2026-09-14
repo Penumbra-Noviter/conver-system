@@ -6,6 +6,20 @@
 
 ---
 
+## Prompt 打磨批次 PD（2026-09-14 — 6 工单标准档，预设开场白/Prompt Debug/专家模式）
+
+- **来源**：用户对标 AI 风月「对话质量 / Prompt 工程」第二轮，选定三功能——预设开场白选择、Prompt Debug 面板、专家模式自由编辑 PROMPT。三 ADR 拍板：专家模式=新增 prompt_mode/expert_prompt 可逆字段；预设对话=复用 alternate_greetings 做开场白选择不加表；Prompt Debug=只读预览+来源标注。
+- **PD-1 预设开场白后端**（7f9b849）：ConversationCreate.greeting + create_conversation 按 model_fields_set 四态分流（None/空串/显式/未传），未传零回归。
+- **PD-5 专家模式后端**（0b85c4d）：prompt_mode/expert_prompt 两列 + _ensure_column 自愈迁移 + build_messages 专家分流（expert 单条替代 personality/scenario/post_history，世界书/mes_example/history/user 照旧）+ character_card conver_system 往返 + PROMPT_FIELDS ⊆ CHARACTER_V2_FIELDS 断言维持。
+- **PD-2 预设开场白前端**（e2d4118）：备用开场白列表编辑（上限 10/去重）+ 新建对话开场白下拉（默认/备选/无开场白映射 greeting）。
+- **PD-3 Prompt Debug 后端**（b90df29）：GET /api/conversations/{id}/prompt-debug + prompt.py 抽 _assemble 共享核心（build_messages 与 build_messages_with_source 共用，零变化契约成立）+ chat.py 注入链来源保留（character/world/memory/mod/history/user）。
+- **PD-4/PD-6 前端**（3d55076/e03eefc）：Prompt Debug 只读面板（SOURCE_CLASS 单一映射表 + escapeHtml）+ 专家模式两态编辑（可逆切换/从当前字段生成/保存 payload）。
+- **验证链**：pytest 1234+1skip→1272+1skip（+38）+ Vitest 1379→1448（+69）+ cargo 70 零改动 | 期末四轴 0 Critical/0 High（1 Medium F-141 + 3 Low F-142~144 落债）| doc_sync 零漂移 | 运行态冒烟（prompt-debug 端点 + expert 单条分流 + greeting override）全通。
+- **过程遥测**：标准档 3 波（波1 PD-1+PD-5 / 波2 PD-2+PD-3 / 波3 PD-4+PD-6 各并行 2）；波2 两子代理空返回失败 1 次（并行峰值网关限流，重开成功）；「前次现场核查」重开机制实证有效；worktree 并行无冲突（6 工单文件范围互不相交）。
+- **非阻断落债**：F-139~F-144（6 项，波末/期末审核，见 TECH_DEBT 候选区）。
+
+---
+
 ## 采样参数扩展批次 SP（2026-09-14 — 3 工单小档，AI 风月对话质量对标）
 
 - **来源**：用户对标 AI 风月「对话质量 / prompt 工程」维度，选定「采样参数扩展」（top_p / presence_penalty / frequency_penalty / max_tokens）。

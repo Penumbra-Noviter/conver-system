@@ -19,24 +19,9 @@
 
 ## 活跃工单
 
-> 当前 **6 项待办**（批次 PD — Prompt 打磨）。
+> 当前 **0 项待办**。
 > 规格依据统一见 [docs/prompt-polish-spec.md](docs/prompt-polish-spec.md)。
-> 来源：AI风月对标调研「对话质量 / Prompt 工程」第二轮（[docs/external-benchmark-aigirlfriend.md](docs/external-benchmark-aigirlfriend.md) §3.7）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
-
-### 批次 PD — Prompt 打磨（预设开场白选择 / Prompt Debug 面板 / 专家模式 PROMPT）
-
-| Ticket | 标题 | 状态 | 验收摘要 |
-|--------|------|------|----------|
-| PD-1 | 预设开场白后端：ConversationCreate.greeting override + create_conversation 消费 alternate_greetings | ⬜ 待办 | — |
-| PD-2 | 预设开场白前端：备用开场白编辑 + 新建对话开场白选择 | ⬜ 待办 | — |
-| PD-3 | Prompt Debug 后端：prompt-debug 端点 + 带来源组装追溯（复用组装链不漂移） | ⬜ 待办 | — |
-| PD-4 | Prompt Debug 前端：只读预览面板（分段来源标注） | ⬜ 待办 | — |
-| PD-5 | 专家模式后端：prompt_mode + expert_prompt 列 + 自愈迁移 + build_messages 分流 | ⬜ 待办 | — |
-| PD-6 | 专家模式前端：基础/专家两态编辑 UI | ⬜ 待办 | — |
-
-> **实施顺序建议**：PD-1 → PD-2 → PD-5 → PD-6 → PD-3 → PD-4（依赖见 spec §5）。
-> **每批统一验收口径**：先红后绿 + 全量基线不回退（pytest 1234+1skip / Vitest 1380 / cargo 70）+ 覆盖率不放宽 + 冒烟 + 文档同步。
 
 ---
 
@@ -50,6 +35,25 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
+
+### Prompt 打磨批次 PD（2026-09-14 — 6 工单标准档，预设开场白/Prompt Debug/专家模式）
+
+> 来源：用户对标 AI 风月「对话质量 / Prompt 工程」第二轮，选定「预设开场白选择 + Prompt Debug 面板 + 专家模式自由编辑 PROMPT」三功能。叙述详见 DEV_LOG〈Prompt 打磨批次 PD（2026-09-14）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| PD-1 | 预设开场白后端：ConversationCreate.greeting override + create_conversation 消费 alternate_greetings | 2026-09-14 | 7f9b849 |
+| PD-2 | 预设开场白前端：备用开场白编辑 + 新建对话开场白选择 | 2026-09-14 | e2d4118 |
+| PD-3 | Prompt Debug 后端：prompt-debug 端点 + 带来源组装追溯（_assemble 共享核心） | 2026-09-14 | b90df29 |
+| PD-4 | Prompt Debug 前端：只读预览面板（来源色标） | 2026-09-14 | 3d55076 |
+| PD-5 | 专家模式后端：prompt_mode/expert_prompt 列 + 自愈迁移 + build_messages 分流 | 2026-09-14 | 0b85c4d |
+| PD-6 | 专家模式前端：基础/专家两态编辑 | 2026-09-14 | e03eefc |
+
+**验证链：** pytest 1234+1skip→1272+1skip（+38）+ Vitest 1379→1448（+69）+ cargo 70 零改动 | 期末四轴 0 Critical/0 High（1 Medium F-141 + 3 Low F-142~144 落债）| doc_sync 零漂移 | 运行态冒烟（prompt-debug 端点 + expert 单条分流 + greeting override）全通
+
+**非阻断落债：** F-139~F-144（6 项，见 TECH_DEBT 候选区）
+
+---
 
 ### 采样参数扩展批次 SP（2026-09-14 — 3 工单小档，AI 风月对话质量对标）
 
