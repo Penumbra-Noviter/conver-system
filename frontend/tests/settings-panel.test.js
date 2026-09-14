@@ -101,6 +101,8 @@ const SETTINGS_DOM_HTML = `
     <input id="setting-claude-key"><input id="setting-claude-url">
     <input id="setting-openai-key"><input id="setting-openai-url">
     <input id="setting-sliding-window"><input id="setting-user-name">
+    <input type="checkbox" id="setting-narrative-style-enabled">
+    <textarea id="setting-narrative-style-rules" placeholder="留空使用内置默认"></textarea>
     <button id="btn-save-settings"></button>
     <button id="btn-clear-all-convs"></button>
     <button id="btn-theme-toggle"></button>
@@ -725,5 +727,155 @@ describe('no-op 守卫 — 设置面板元素缺失时不抛 TypeError（ARC9-2�
         expect(JSON.parse(putCall[1].body).default_provider_name).toBe(''); // :339 收口空串
         expect(rejectionSpy).not.toHaveBeenCalled();
         window.removeEventListener('unhandledrejection', rejectionSpy);
+    });
+});
+
+// ══════════════════════════════════════════════════
+// 叙述风格设置（工单 03）— 回填 / 保存 payload / 缺失守卫
+// ══════════════════════════════════════════════════
+
+describe('叙述风格设置 — 回填/保存 payload/缺失守卫（工单 03）', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** 加载面板 + 初始化 Provider/事件绑定（复用 save 前置；无 Key → 跳过连接测试） */
+    async function loadSaveable() {
+        const env = await loadPanel();
+        env.state.models.providers = PROVIDERS;
+        env.state.defaultProvider = 'claude';
+        env.state.defaultModel = 'claude-sonnet-5';
+        env.panel.initProviderDropdown();
+        env.panel.initSettingsPanel({});
+        const confirmModule = await import('../js/components/confirm-dialog.js');
+        const api = await import('../js/api.js');
+        return { ...env, confirmModule, api };
+    }
+
+    // ── 回填路径 ──
+    it('回填：开关真值集（"true"）勾选 + 规则文本写入编辑框', async () => {
+        const { panel } = await loadPanel();
+        const api = await import('../js/api.js');
+        api.setFetch(vi.fn(async () => mockJson({
+            narrative_style_enabled: 'true',
+            narrative_style_rules: '自定义规则文本',
+        })));
+
+        await panel.loadSettings();
+
+        expect(document.querySelector('#setting-narrative-style-enabled').checked).toBe(true);
+        expect(document.querySelector('#setting-narrative-style-rules').value).toBe('自定义规则文本');
+    });
+
+    it('回填：开关 "0" 不勾选 + 规则空 → 留空占位（不复制内置默认规则）', async () => {
+        const { panel } = await loadPanel();
+        const api = await import('../js/api.js');
+        api.setFetch(vi.fn(async () => mockJson({
+            narrative_style_enabled: '0',
+            narrative_style_rules: '',
+        })));
+        // 预置反向状态：loadSettings 必须主动清掉勾选态、把规则文本留空（防假绿）
+        const toggle = document.querySelector('#setting-narrative-style-enabled');
+        const rules = document.querySelector('#setting-narrative-style-rules');
+        toggle.checked = true;
+        rules.value = '预置非空文本';
+
+        await panel.loadSettings();
+
+        expect(toggle.checked).toBe(false);
+        expect(rules.value).toBe('');
+        expect(rules.value).not.toContain('总之'); // 内置默认规则清单标记（前端不得复制）
+        expect(rules.placeholder).toBe('留空使用内置默认');
+    });
+
+    // ── 保存 payload 路径 ──
+    it('保存 payload：开关勾选 → narrative_style_enabled "1" + narrative_style_rules 文本', async () => {
+        const { confirmModule, api } = await loadSaveable();
+        const alertSpy = vi.spyOn(confirmModule, 'showAlert');
+        const fetchSpy = vi.fn(async (url, options = {}) => {
+            const path = String(url).replace(/^.*\/api/, '/api');
+            if (path === '/api/settings' && options.method === 'PUT') {
+                return mockJson({ default_provider: 'claude', default_provider_name: 'Claude', default_model: 'claude-sonnet-5' });
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+        api.setFetch(fetchSpy);
+
+        document.querySelector('#setting-narrative-style-enabled').checked = true;
+        document.querySelector('#setting-narrative-style-rules').value = '自定义规则';
+        document.querySelector('#btn-save-settings').click();
+
+        await vi.waitFor(() => expect(alertSpy).toHaveBeenCalledWith('设置已保存'));
+        const putCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/settings') && o?.method === 'PUT');
+        const body = JSON.parse(putCall[1].body);
+        expect(body.narrative_style_enabled).toBe('1');
+        expect(body.narrative_style_rules).toBe('自定义规则');
+    });
+
+    it('保存 payload：开关不勾选 → narrative_style_enabled "0"', async () => {
+        const { confirmModule, api } = await loadSaveable();
+        const alertSpy = vi.spyOn(confirmModule, 'showAlert');
+        const fetchSpy = vi.fn(async (url, options = {}) => {
+            const path = String(url).replace(/^.*\/api/, '/api');
+            if (path === '/api/settings' && options.method === 'PUT') {
+                return mockJson({ default_provider: 'claude', default_provider_name: 'Claude', default_model: 'claude-sonnet-5' });
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+        api.setFetch(fetchSpy);
+
+        document.querySelector('#setting-narrative-style-enabled').checked = false;
+        document.querySelector('#setting-narrative-style-rules').value = '';
+        document.querySelector('#btn-save-settings').click();
+
+        await vi.waitFor(() => expect(alertSpy).toHaveBeenCalledWith('设置已保存'));
+        const putCall = fetchSpy.mock.calls.find(([u, o]) => String(u).endsWith('/api/settings') && o?.method === 'PUT');
+        expect(JSON.parse(putCall[1].body).narrative_style_enabled).toBe('0');
+    });
+
+    // ── 缺失守卫路径（DOM 契约破坏 → 入口守卫 no-op，对齐 TD-13/TD-15）──
+    it('缺 #setting-narrative-style-enabled 点击保存 → 守卫 warn 早退（零 fetch、无 rejection）', async () => {
+        vi.resetModules();
+        document.body.innerHTML = SETTINGS_DOM_HTML.replace('<input type="checkbox" id="setting-narrative-style-enabled">', '');
+        expect(document.querySelector('#setting-narrative-style-enabled')).toBeNull();
+        const panel = await import('../js/components/settings-panel.js');
+        const state = (await import('../js/state.js')).state;
+        state.models.providers = PROVIDERS;
+        panel.initSettingsPanel({});
+        const api = await import('../js/api.js');
+        const fetchSpy = vi.fn(async () => mockJson({ ok: true }));
+        api.setFetch(fetchSpy);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const rejectionSpy = vi.fn();
+        window.addEventListener('unhandledrejection', rejectionSpy);
+
+        document.querySelector('#btn-save-settings').click();
+        await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(rejectionSpy).not.toHaveBeenCalled();
+        window.removeEventListener('unhandledrejection', rejectionSpy);
+        warnSpy.mockRestore();
+    });
+
+    it('缺 #setting-narrative-style-rules 点击保存 → 守卫 warn 早退（零 fetch、无 rejection）', async () => {
+        vi.resetModules();
+        document.body.innerHTML = SETTINGS_DOM_HTML.replace('<textarea id="setting-narrative-style-rules" placeholder="留空使用内置默认"></textarea>', '');
+        expect(document.querySelector('#setting-narrative-style-rules')).toBeNull();
+        const panel = await import('../js/components/settings-panel.js');
+        const state = (await import('../js/state.js')).state;
+        state.models.providers = PROVIDERS;
+        panel.initSettingsPanel({});
+        const api = await import('../js/api.js');
+        const fetchSpy = vi.fn(async () => mockJson({ ok: true }));
+        api.setFetch(fetchSpy);
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const rejectionSpy = vi.fn();
+        window.addEventListener('unhandledrejection', rejectionSpy);
+
+        document.querySelector('#btn-save-settings').click();
+        await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(rejectionSpy).not.toHaveBeenCalled();
+        window.removeEventListener('unhandledrejection', rejectionSpy);
+        warnSpy.mockRestore();
     });
 });

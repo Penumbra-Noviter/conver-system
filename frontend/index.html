@@ -325,6 +325,20 @@
                 </div>
 
                 <div class="settings-group">
+                    <h3>叙述风格</h3>
+                    <div class="form-field">
+                        <label for="setting-narrative-style-enabled">叙述风格</label>
+                        <label class="toggle-row"><input type="checkbox" id="setting-narrative-style-enabled" checked> 启用叙述风格（降低 AI 生成痕迹）</label>
+                        <p class="settings-hint">开启后每次生成注入反 AI 味写作约束，关闭即回到原始输出。</p>
+                    </div>
+                    <div class="form-field">
+                        <label for="setting-narrative-style-rules">规则文本</label>
+                        <textarea id="setting-narrative-style-rules" rows="6" placeholder="留空使用内置默认"></textarea>
+                        <p class="settings-hint">留空使用内置默认规则；自定义规则与角色设定冲突时，以角色设定为准。</p>
+                    </div>
+                </div>
+
+                <div class="settings-group">
                     <h3>主题</h3>
                     <div class="form-field">
                         <label for="setting-theme">主题模式</label>
