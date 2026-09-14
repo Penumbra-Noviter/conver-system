@@ -14,12 +14,20 @@ import 'dart:async';
 
 import 'package:conver_system_mobile/app.dart';
 import 'package:conver_system_mobile/data/database/app_database.dart';
+import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/theme/colors.dart';
 import 'package:conver_system_mobile/view_models/theme_controller.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+
+import '../helpers/in_memory_secret_store.dart';
+
+/// 预写 `onboarding_completed` 标记，使启动门直接进主壳（工单 05）。
+Future<void> _markOnboardingCompleted(AppDatabase db) =>
+    SettingsRepository(database: db, secretStore: InMemorySecretStore())
+        .setMany({'onboarding_completed': 'true'});
 
 void main() {
   late AppDatabase db;
@@ -33,6 +41,7 @@ void main() {
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
+    await _markOnboardingCompleted(db);
     await tester.pumpWidget(ConverApp(database: db));
     await tester.pumpAndSettle();
   }
