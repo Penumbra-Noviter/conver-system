@@ -25,6 +25,7 @@ import {
     splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit,
     TEMP_SLIDER, SAMPLING_SLIDERS, formatTemperature, formatSampling,
     avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
+    normalizeAlternateGreetings, addAlternateGreeting, alternateGreetingRowsHtml,
 } from './character-submit.js';
 
 /**
@@ -48,6 +49,7 @@ export function showCharacterWizard(onSuccess = null) {
         mes_example: '',
         system_prompt: '',
         tags: [],
+        alternate_greetings: [],
         avatar: '',
         temperature: TEMP_SLIDER.default,
         top_p: SAMPLING_SLIDERS.top_p.default,
@@ -327,6 +329,17 @@ function renderStep5(state) {
                 <span class="field-hint">开场白是用户对角色<strong>第一印象</strong>。好的开场白能立即展现角色性格。支持模板变量：<code>{{user}}</code>、<code>{{char}}</code></span>
             </div>
             <div class="form-field">
+                <label for="wiz-alt-greetings-input">备用开场白（可选，最多 10 条）</label>
+                <div class="alt-greetings-list" id="wiz-alt-greetings-list">
+                    ${alternateGreetingRowsHtml(state.alternate_greetings)}
+                </div>
+                <div class="alt-greetings-add">
+                    <input type="text" id="wiz-alt-greetings-input" placeholder="输入一条备用开场白">
+                    <button type="button" class="btn-secondary" id="wiz-alt-greetings-add">${iconHtml('plus', { size: 14 })} 添加</button>
+                </div>
+                <span class="field-hint">新建对话时可从这些开场白中选择</span>
+            </div>
+            <div class="form-field">
                 <label for="wiz-mes-example">对话范例（可选）</label>
                 <textarea id="wiz-mes-example" rows="4" placeholder="<START>&#10;{{user}}: 你好&#10;{{char}}: 欢迎，我等你很久了">${escapeHtml(state.mes_example)}</textarea>
                 <span class="field-hint">展示角色说话风格的示例对话，帮助 AI 理解角色的语气和表达方式。用 <code>&lt;START&gt;</code> 标记开始，用 <code>{{user}}</code> 和 <code>{{char}}</code> 表示对话双方。</span>
@@ -531,9 +544,36 @@ function bindStep4Events(state, body) {
 function bindStep5Events(state, body) {
     const firstMesInput = body.querySelector('#wiz-first-mes');
     const mesExampleInput = body.querySelector('#wiz-mes-example');
+    const altList = body.querySelector('#wiz-alt-greetings-list');
+    const altInput = body.querySelector('#wiz-alt-greetings-input');
+    const altAdd = body.querySelector('#wiz-alt-greetings-add');
 
     if (firstMesInput) firstMesInput.addEventListener('input', () => { state.first_mes = firstMesInput.value; });
     if (mesExampleInput) mesExampleInput.addEventListener('input', () => { state.mes_example = mesExampleInput.value; });
+
+    // 备用开场白列表编辑（PD-2）：增删直接操作 DOM + state（不整步重渲染，
+    // 保持 first_mes/mes_example 输入焦点与未提交内容）
+    if (altAdd && altInput) {
+        altAdd.addEventListener('click', () => {
+            const current = state.alternate_greetings;
+            const next = addAlternateGreeting(current, altInput.value);
+            altInput.value = '';
+            if (next.length !== current.length) {
+                state.alternate_greetings = next;
+                altList.innerHTML = alternateGreetingRowsHtml(next);
+            }
+        });
+    }
+    if (altList) {
+        altList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.alt-greeting-remove');
+            if (!btn) return;
+            const row = btn.closest('.alt-greeting-row');
+            const idx = [...altList.querySelectorAll('.alt-greeting-row')].indexOf(row);
+            state.alternate_greetings.splice(idx, 1);
+            row.remove();
+        });
+    }
 }
 
 function bindStep6Events(state, body) {
@@ -664,6 +704,7 @@ async function handleSave(state, statusEl, submitBtn, close, onSuccess) {
         avatar: state.avatar,
         creator: '',
         tags: state.tags,
+        alternate_greetings: state.alternate_greetings,
     });
 
     // 提交态状态机（禁用/文案/状态栏/600ms 延时关窗/失败恢复收敛到深模块）
@@ -690,6 +731,7 @@ function _applyCharacterData(state, data) {
     state.mes_example = data.mes_example || '';
     state.system_prompt = data.system_prompt || '';
     state.tags = Array.isArray(data.tags) ? [...data.tags] : [];
+    state.alternate_greetings = normalizeAlternateGreetings(data.alternate_greetings);
 }
 
 function getTemplateIcon(templateId) {

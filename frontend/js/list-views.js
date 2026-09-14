@@ -35,7 +35,8 @@ import { showConfirm, showAlert } from './components/confirm-dialog.js';
 import { showLorebookEditor } from './components/lorebook-editor.js';
 import { showModManager } from './components/mod-manager.js';
 import { showModelSelector } from './components/model-selector.js';
-import { downloadBlob, showError, showSuccess } from './utils.js';
+import { openModal } from './components/modal.js';
+import { downloadBlob, showError, showSuccess, escapeHtml } from './utils.js';
 import { beginButtonLoading } from './components/loading-button.js';
 import { characterCardHtml, conversationItemHtml } from './format.js';
 import { state } from './state.js';
@@ -255,6 +256,91 @@ async function handleCharacterImport() {
 // 模型选择 & 开始对话
 // ══════════════════════════════════════════════════
 
+// 开场白下拉选项 value 标记（其余 value 为 alternate_greetings 源数组索引）
+const GREETING_DEFAULT = '__default__';
+const GREETING_NONE = '__none__';
+
+/**
+ * 构建开场白下拉选项（新建对话入口）
+ *
+ * 选项序列 = first_mes（默认）+ alternate_greetings 各项 + 「无开场白」。
+ * value 编码：默认 '__default__'、备用 = 源数组索引（字符串）、无 = '__none__'；
+ * 空备用项跳过渲染但保留源索引（与 resolveGreeting 对齐）。
+ * @param {object} character - 角色对象（first_mes / alternate_greetings）
+ * @returns {Array<{value: string, label: string}>} 选项列表
+ */
+export function buildGreetingOptions(character) {
+    const firstMes = typeof character?.first_mes === 'string' ? character.first_mes : '';
+    const alts = Array.isArray(character?.alternate_greetings) ? character.alternate_greetings : [];
+    const options = [{ value: GREETING_DEFAULT, label: firstMes ? `默认：${firstMes}` : '默认' }];
+    for (let i = 0; i < alts.length; i++) {
+        const text = typeof alts[i] === 'string' ? alts[i] : '';
+        if (text) options.push({ value: String(i), label: text });
+    }
+    options.push({ value: GREETING_NONE, label: '无开场白' });
+    return options;
+}
+
+/**
+ * 由下拉选中 value 解析 greeting 字段（创建对话 payload）
+ *
+ * 默认 → {}（不传 greeting，后端回退 first_mes）；备用索引 → { greeting: 该文本 }；
+ * 无 → { greeting: '' }（显式空串 = 不预插）；非法 value → {}（Falsify 兜底）。
+ * @param {string} value - 下拉 value
+ * @param {object} character - 角色对象（alternate_greetings）
+ * @returns {{greeting?: string}} 合并进创建 payload 的字段（默认返回空对象）
+ */
+export function resolveGreeting(value, character) {
+    if (value === GREETING_NONE) return { greeting: '' };
+    if (value === GREETING_DEFAULT) return {};
+    const alts = Array.isArray(character?.alternate_greetings) ? character.alternate_greetings : [];
+    // 仅严格纯数字字符串（非空）作为索引——Number('') === 0 会把空串误判为索引 0
+    if (typeof value !== 'string' || value === '' || !/^\d+$/.test(value)) return {};
+    const text = alts[Number(value)];
+    if (typeof text === 'string' && text) return { greeting: text };
+    return {};
+}
+
+/**
+ * 显示开场白选择对话框（复用 openModal 骨架，返回选中 value 或 null）
+ * @param {object} character - 角色对象
+ * @returns {Promise<string|null>} 选中 value；取消返回 null
+ */
+function showGreetingSelector(character) {
+    return new Promise((resolve) => {
+        const options = buildGreetingOptions(character);
+        openModal({
+            title: `开场白 · ${character?.name || '角色'}`,
+            modalClass: 'greeting-selector-modal',
+            removeExisting: '.modal-overlay',
+            focusSelector: '.gs-start',
+            cancelResult: null,
+            onClose: resolve,
+            body: `
+                <p class="model-selector-hint">选择对话的开场白</p>
+                <div class="form-field">
+                    <label for="gs-greeting">开场白</label>
+                    <select id="gs-greeting">
+                        ${options.map((o) =>
+                            `<option value="${escapeHtml(o.value)}" ${o.value === GREETING_DEFAULT ? 'selected' : ''}>${escapeHtml(o.label)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `,
+            actions: `
+                <button class="btn-secondary gs-cancel">取消</button>
+                <button class="btn-primary gs-start">开始对话</button>
+            `,
+            onOpen: (overlay, close) => {
+                const select = overlay.querySelector('#gs-greeting');
+                const pick = () => close(select.value);
+                overlay.querySelector('.gs-cancel').addEventListener('click', () => close(null));
+                overlay.querySelector('.gs-start').addEventListener('click', pick);
+            },
+        });
+    });
+}
+
 /**
  * 开始与角色对话：模型选择 → 创建对话 → 切 chat 视图 → 激活会话 → 聚焦输入
  * @param {number} characterId - 角色 id
@@ -267,11 +353,20 @@ async function startChatWithCharacter(characterId) {
     const selection = await showModelSelector(charName);
     if (!selection) return; // 用户取消
 
+    // 开场白选择（仅当存在备用开场白时弹出；否则走 first_mes 现状零回归）
+    let greetingField = {};
+    if (char && Array.isArray(char.alternate_greetings) && char.alternate_greetings.length > 0) {
+        const greetingValue = await showGreetingSelector(char);
+        if (greetingValue === null) return; // 用户取消
+        greetingField = resolveGreeting(greetingValue, char);
+    }
+
     try {
         const conv = await conversations.create({
             character_id: characterId,
             model_provider: selection.provider,
             model_name: selection.model,
+            ...greetingField,
             // 标题不传：后端默认「与 {角色名} 的对话」，首条消息后自动替换（P3.5）
         });
         switchView('chat');
@@ -452,4 +547,6 @@ export const __all__ = [
     'renderConversations',
     'syncConversationListTitle',
     'initListViews',
+    'buildGreetingOptions',
+    'resolveGreeting',
 ];

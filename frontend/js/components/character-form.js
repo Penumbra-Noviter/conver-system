@@ -18,6 +18,7 @@ import {
     splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit,
     TEMP_SLIDER, SAMPLING_SLIDERS, formatTemperature, formatSampling,
     avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
+    normalizeAlternateGreetings, addAlternateGreeting, alternateGreetingRowsHtml,
 } from './character-submit.js';
 
 /**
@@ -53,6 +54,16 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             <label for="cf-first-mes">开场白 (Greeting)<span class="field-warning" id="cf-warn-first-mes" hidden>建议填写</span></label>
             <textarea id="cf-first-mes" rows="3" placeholder="首次对话时角色自动发送的开场消息">${escapeHtml(char.first_mes || '')}</textarea>
             <span class="field-hint">支持模板变量：<code>{{user}}</code>、<code>{{char}}</code></span>
+        </div>
+
+        <div class="form-field">
+            <label for="cf-alt-greetings-input">备用开场白（可选，最多 10 条）</label>
+            <div class="alt-greetings-list" id="cf-alt-greetings-list"></div>
+            <div class="alt-greetings-add">
+                <input type="text" id="cf-alt-greetings-input" placeholder="输入一条备用开场白">
+                <button type="button" class="btn-secondary" id="cf-alt-greetings-add">${iconHtml('plus', { size: 14 })} 添加</button>
+            </div>
+            <span class="field-hint">新建对话时可从这些开场白中选择</span>
         </div>
 
         <div class="form-field">
@@ -160,6 +171,9 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             const warnPersonality = overlay.querySelector('#cf-warn-personality');
             const warnFirstMes = overlay.querySelector('#cf-warn-first-mes');
             const completenessHint = overlay.querySelector('#cf-completeness-hint');
+            const altGreetingsList = overlay.querySelector('#cf-alt-greetings-list');
+            const altGreetingsInput = overlay.querySelector('#cf-alt-greetings-input');
+            const altGreetingsAdd = overlay.querySelector('#cf-alt-greetings-add');
 
             // 完整性引导（D6）：姓名 + 人格设定 + 开场白三项均非空视为完整
             const updateCompletenessHints = () => {
@@ -201,6 +215,33 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             // 完整性引导：关键字段输入时实时刷新提示
             [nameInput, personalityInput, firstMesInput].forEach((el) => {
                 el.addEventListener('input', updateCompletenessHints);
+            });
+
+            // ── 备用开场白列表编辑（PD-2）──
+            // 以 DOM 为真源：增删/提交时读当前所有行值，经归一化收口
+            const renderAltGreetings = (list) => {
+                altGreetingsList.innerHTML = alternateGreetingRowsHtml(list);
+            };
+            const readAltGreetings = () =>
+                [...altGreetingsList.querySelectorAll('.alt-greeting-input')]
+                    .map((el) => el.value.trim()).filter(Boolean);
+
+            // 初始回填（edit 模式还原；非数组/脏数据归一化）
+            renderAltGreetings(normalizeAlternateGreetings(char.alternate_greetings));
+
+            // 添加：读当前行 + 新输入 → addAlternateGreeting（空/重复/上限守卫）
+            altGreetingsAdd.addEventListener('click', () => {
+                const current = readAltGreetings();
+                const next = addAlternateGreeting(current, altGreetingsInput.value);
+                altGreetingsInput.value = '';
+                if (next.length !== current.length) renderAltGreetings(next);
+            });
+
+            // 删除：事件委托直接移除行（closest 定位，无需重编号）
+            altGreetingsList.addEventListener('click', (e) => {
+                const btn = e.target.closest('.alt-greeting-remove');
+                if (!btn) return;
+                btn.closest('.alt-greeting-row').remove();
             });
 
             // ── 提交 ──
@@ -247,6 +288,7 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                     avatar: avatarInput.value.trim(),
                     creator: overlay.querySelector('#cf-creator').value.trim(),
                     tags: splitTags(overlay.querySelector('#cf-tags').value.trim()),
+                    alternate_greetings: normalizeAlternateGreetings(readAltGreetings()),
                 });
 
                 // 提交态状态机（禁用/文案/状态栏/600ms 延时关窗/失败恢复收敛到深模块）
