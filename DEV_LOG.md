@@ -6,6 +6,21 @@
 
 ---
 
+## 消息编辑重发 + 删除单条消息批次（2026-09-14 — 3 工单小档，对标 AI 风月消息级操作）
+
+- **来源**：用户对标 AI 风月「把角色对话打磨更精细」（放弃世界模拟大版本——World 实体 + 多角色 token 成本顾虑），gap 分析后选定「消息编辑重发 + 删除单条消息」（对标档案 §3.4 消息级操作）。
+- **Grilling 共识**：编辑重发仅 user 消息（就地替换 content + 物理截断后续 + 重新生成，复用 regenerate 生成逻辑）；删除单条消息角色感知（删 user 截断后续 / 删 assistant 仅删该条 + swipes 级联）；破坏性操作前端二次确认；编辑 assistant 后置。
+- **交付**（3 工单小档，串行 lane + 前端独立 worktree）：
+  - T1（a365b81）：service 层三 seam——`update_message`（就地替换，commit=False 供原子）/ `delete_message`（USER id>=目标截断 / ASSISTANT 仅删该条 + bump）/ `edit_and_resend`（_resolve_edit_target → update_message → assemble_chat_context → 生成 → 截断后续 → create_message 单 commit 结算，LLM 失败 session close 回滚零落库）+ `InvalidEditTargetError` 挂 400。
+  - T2（3bcd80f）：`EditMessageRequest`（min_length=1）+ PUT/DELETE 端点；范围偏差——spec 跨工单不一致（edit_and_resend 需 conversation_id 但端点无此参数），加 `require_message` 公开别名（_require_message 转发，命名对齐 require_conversation）让路由保持纯 HTTP 映射，接受（记录警告）。
+  - T3（8269f1e）：api.js messages.edit/delete + messageBubbleHtml 按钮（edit 仅 user / delete user+assistant / streaming 不渲染）+ editMessage（settleTurn 重载）/ deleteMessage（简单重载）+ promptMessageEdit。
+- **验证链**：pytest 1200+1skip→1223+1skip（+23：17 service + 6 端点）+ Vitest 1351→1378（+27）+ cargo 70 零改动 | doc_sync 零漂移 | 期末四轴 0 Critical/0 HIGH（13 发现：2 MEDIUM + 11 LOW）。
+- **期末四轴 MEDIUM 主会话直修**（80f4880，先红后绿）：①Falsify「bulk-delete 路径 FK 级联零测试锁定」——补 `test_delete_user_cascades_following_swipes` + `test_happy_path_cascades_following_swipes`（开 FK + 构造 swipes + 断言 orphan 零）；②Falsify「editMessage/deleteMessage 绕过 nonStreamingInFlight 互斥」——两函数加 `cleanupStaleInFlight` + `nonStreamingInFlight.has/add/delete` 守卫（与 regenerate/continue/branch 同纪律）+ 防复发断言（挂起 DELETE + 双触发 no-op）。pytest 1225+1skip / Vitest 1379。
+- **避坑（勿重踩）**：①spec 跨工单不一致（service 签名 vs 端点契约参数不匹配）是本期唯一「范围偏差」根因——plan-tickets 拆票时 service 签名与端点契约须交叉核对，避免实现时才需加解析 seam；②后台派发的 Implement 子智能体用 AskUserQuestion 不会转达主会话（agent 报告「未获答复」按 best judgment 继续）——后台派发 prompt 须明示「不要用 AskUserQuestion，best judgment + 如实上报 concern」。
+- **非阻断落债**：F-130~F-138（9 项，见 TECH_DEBT 候选区——require_message 空心别名+三查冗余 / 级联 Seam 环境依赖+StaleData / 按钮 css 悬停不统一 / 角色判定缓存漂移 / autoflush 分歧 / promptMessageEdit 重复 / _resolve_* 家族萌芽 / 全空白 content / error_mapping 行膨胀）。
+
+---
+
 ## 技术债消费批次 F-127~F-129（2026-09-14 — 2 做 1 关，轻量档 3 项主会话直做）
 
 - **来源**：用户指令「消费 F-127~129」（架构批次期末四轴观察级落债）。逐项 git grep 复核现状后拍板 2 做 1 关。

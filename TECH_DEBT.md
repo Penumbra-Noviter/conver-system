@@ -53,6 +53,15 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-130 | `require_message` 零行为透传别名（`_require_message` 公开转发）+ 目标解析知识散布——路由 require_message → `_resolve_edit_target` 再查 → `update_message` 三查同消息冗余 | 消息编辑重发期末四轴 Standards/Architecture/Spec | Worth exploring | 📝 待立项 | 架构 |
+| F-131 | 级联删除 Seam 不局部——swipe 级联依赖全局 `PRAGMA foreign_keys=ON` 而非 `delete_message` 模块内保证（bulk-delete 路径已补契约锁，但 seam 环境依赖）；另 `synchronize_session=False` bulk delete 后 identity map 残留被删对象，潜伏 StaleData | 消息编辑重发期末四轴 Architecture/Falsify | Worth exploring | 📝 待立项 | 数据完整性 |
+| F-132 | 消息操作按钮 css 悬停显示不统一——copy 悬停显示（opacity 0→hover），regen/cont/branch/edit/delete 常驻内联显示（跨批次既有问题，03 新增 edit/delete 延续） | 工单 03 期末 concern + 期末四轴观察 | Worth exploring | 📝 待立项 | 前端渲染 |
+| F-133 | `editMessage`/`deleteMessage` 角色判定取自本地缓存 `tab.messages`，缓存与服务端漂移时二次确认文案错述破坏范围 | 消息编辑重发期末四轴 Falsify | Speculative | 📝 待立项 | 前端 |
+| F-134 | autoflush 分歧——conftest `db_session` 默认 autoflush=True vs 生产 `SessionLocal` autoflush=False，测试未复现生产时序 | 消息编辑重发期末四轴 Falsify | Speculative | 📝 待立项 | 测试基建 |
+| F-135 | `promptMessageEdit` 与 `promptImageDescription` 同型重复（modal+textarea+onClose 兜底+submit 读值） | 消息编辑重发期末四轴 Architecture + 工单 03 concern | Speculative | 📝 待立项 | 前端 |
+| F-136 | `_resolve_edit_target` 与 `_resolve_continue_target`/regenerate 解析构成「load→校验归属→校验角色」平行家族萌芽 | 消息编辑重发期末四轴 Architecture | Speculative | 📝 待立项 | 架构 |
+| F-137 | `EditMessageRequest.content` 仅 `min_length=1`，全空白字符串（如"   "）穿过校验送生成 | 消息编辑重发期末四轴 Falsify（观察） | Speculative | 📝 待立项 | 后端校验 |
+| F-138 | `error_mapping.py` 400 分支 isinstance 元组行膨胀（~180 字符） | 消息编辑重发期末四轴 Standards | Speculative | 📝 待立项 | 后端 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -155,4 +164,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-129），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-138），避免编号冲突。
