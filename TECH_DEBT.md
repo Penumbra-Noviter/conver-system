@@ -53,11 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-139 | CharacterUpdate.prompt_mode/expert_prompt 为 Optional[str]=None 但 ORM 列 nullable=False，发送 {"prompt_mode": null} 触发 IntegrityError(500) 而非 Pydantic 422（前端不发 null，需刻意构造畸形请求） | 波 1 增量审核 Falsify | Speculative | 📝 待立项 | 后端 schema |
-| F-140 | character-wizard.js 备用开场白删除 handler 用 indexOf(row) 定位后 splice(idx,1)，极端竞态下 indexOf 返回 -1 导致 splice(-1,1) 误删末项（单线程 UI 无并发，触发概率极低） | 波 2 增量审核 Falsify | Speculative | 📝 待立项 | 前端渲染 |
-| F-142 | CharacterBase.prompt_mode 用 str 未用 Literal['simple','expert'] 枚举约束，直接 API 可写任意值（前端已归一，运行时安全回退 simple，纵深防御缺口） | 期末四轴 Standards | Speculative | 📝 待立项 | 后端 schema |
-| F-143 | chat._character_data 与 message.build_message_list 的 CharacterData 构造几乎逐字重复（PROMPT_FIELDS 投影 + 显式补 prompt_mode/expert_prompt），未来增字段需同步两处 | 期末四轴 Architecture | Speculative | 📝 待立项 | 后端 prompt 组装 |
-| F-144 | character-wizard.js 备用开场白删除用 state.splice 直接变异数组 vs character-form.js 以 DOM 为真源，同批次同类功能两套模式不一致 | 期末四轴 Architecture | Speculative | 📝 待立项 | 前端渲染 |
 
 
 ### 复核关闭（Speculative 类，防重复提议）
@@ -83,12 +78,16 @@
 | F-128 | `append_swipe_and_bump` 冗余重取——`add_swipe(commit=False)` 后 msg 未 expire，`_require_message` 命中 identity map 不再发 SQL；剩余「再取一次」是 append 需 msg.conversation_id 而 add_swipe 返回 next_index 的合理结构（非冗余开销） | arch-f123-126 期末四轴 Architecture | Speculative | ❌ 复核关闭 |
 | F-133 | editMessage/deleteMessage 角色判定取自 tab.messages 乐观缓存——与 regenerate/continue/branch 同源的既有乐观 UI 模式，服务端 404 兜底，二次确认文案错述非破坏性（用户可取消） | 消息编辑重发期末四轴 Falsify | Speculative | ❌ 复核关闭 |
 | F-136 | `_resolve_edit_target`/`_resolve_continue_target`/`_resolve_regenerate_target` 三解析函数独立领域语义（edit=user / continue=末条 assistant / regenerate=assistant+缺省末条），仅 3 实例抽象「目标解析器」收益 < 成本（Speculative Generality 反面） | 消息编辑重发期末四轴 Architecture | Speculative | ❌ 复核关闭 |
+| F-140 | character-wizard.js 备用开场白删除 indexOf(row) 后 splice(idx,1)——row 经 `btn.closest('.alt-greeting-row')` 定位且事件委托在 altList 上，row 必在 DOM 内，indexOf 不可能 -1（单线程无并发），不可达缺陷 | PD 批次波 2 增量审核 Falsify | Speculative | ❌ 复核关闭 |
+| F-142 | CharacterBase.prompt_mode 用 str 未用 Literal——build_messages 仅 `== "expert"` 走 expert 分支、其余任意值运行时安全回退 simple，改 Literal 需破坏 CharacterBase 单一来源或冒 CharacterResponse 序列化风险，纵深防御收益 < 成本 | PD 批次期末四轴 Standards | Speculative | ❌ 复核关闭 |
+| F-143 | chat._character_data 与 message.build_message_list 的 CharacterData 构造逐字镜像——有意识设计（`_character_data` docstring 已声明「同口径单一语义镜像」），仅 2 实例提取 helper 收益 < 成本 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭 |
+| F-144 | character-wizard.js `state.splice` 直接变异 vs character-form.js 以 DOM 为真源——wizard 的 state 是跨步骤向导真源（增删须同步 state 供后续步骤读）、form 的 DOM 是单表单提交时读的真源，语境不同，强行统一收益 < 成本 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-14（技术债消费批次 ×3：批1 F-115~F-122 3 做 5 关轻量档；批2 F-123~F-126 架构深化全做标准档 4 工单串行；批3 F-130~F-138 7 做 2 关轻量档主会话直做）
+### 2026-09-14（技术债消费批次 ×4：批1 F-115~F-122 3 做 5 关轻量档；批2 F-123~F-126 架构深化全做标准档 4 工单串行；批3 F-130~F-138 7 做 2 关轻量档主会话直做；批4 F-139~F-144 1 做 4 关轻量档主会话直做）
 
 > 来源：用户指令「消费」+ userselect F-115~F-122。逐项 git grep 复核现状后拍板 3 做 5 关（全 Speculative/Worth exploring，成本收益显式权衡）。处置后候选区清零。
 
@@ -119,6 +118,11 @@
 | F-137 | `EditMessageRequest.content` 仅 min_length=1，全空白字符串穿过校验送生成 | 消息编辑重发期末四轴 Falsify（观察） | Speculative | ✅ 已修（2026-09-14：加 field_validator strip 后拒绝全空白 + 防复发断言 test_edit_blank_content_422） |
 | F-138 | error_mapping.py 400 分支 isinstance 元组行膨胀（~180 字符） | 消息编辑重发期末四轴 Standards | Speculative | ✅ 已修（2026-09-14：提取模块常量 `_HTTP_400_DOMAIN_ERRORS` 多行元组，400 分支改指常量） |
 | F-141 | build_prompt_debug character=None 时 character.prompt_mode AttributeError | PD 批次期末四轴 Falsify | Worth exploring | ❌ 复核关闭（误报：_character_data 用 getattr 默认值返回空 CharacterData + character_name/prompt_mode 均有 if-else 守卫 + _lorebook_world_injection/_mod_prompt_injection None 时返回空注入，None 路径已完整覆盖） |
+| F-139 | CharacterUpdate.prompt_mode/expert_prompt Optional[str]=None 但 ORM 列 nullable=False，显式 null 触发 IntegrityError(500) | PD 批次波 1 增量审核 Falsify | Speculative | ✅ 已修（2026-09-14：CharacterUpdate 加 field_validator 拒绝 name/prompt_mode/expert_prompt 显式 null，防复发断言 test_update_rejects_null_for_not_null_columns 三字段 422；附带修复 name 同构缺口） |
+| F-140 | character-wizard.js 备用开场白删除 indexOf(row) 后 splice(idx,1)，idx 可能 -1 误删末项 | PD 批次波 2 增量审核 Falsify | Speculative | ❌ 复核关闭（row 经 btn.closest 定位且事件委托在 altList 上，row 必在 DOM 内，indexOf 不可能 -1，单线程无并发，不可达） |
+| F-142 | CharacterBase.prompt_mode 用 str 未用 Literal 枚举 | PD 批次期末四轴 Standards | Speculative | ❌ 复核关闭（build_messages 仅 ==expert 走 expert 分支、其余任意值安全回退 simple，改 Literal 需破坏 CharacterBase 单一来源或冒响应序列化风险，纵深防御收益 < 成本） |
+| F-143 | chat._character_data 与 message.build_message_list CharacterData 构造逐字镜像 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭（有意识镜像——_character_data docstring 已声明同口径单一语义镜像，仅 2 实例提取 helper 收益 < 成本） |
+| F-144 | character-wizard.js state.splice vs character-form.js DOM 真源两套模式 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭（wizard state 是跨步骤向导真源、form DOM 是单表单真源，语境不同，强行统一收益 < 成本） |
 
 ### 2026-09-13（技术债消费批次 ×2：批1 F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波；批2 F-110 做 + F-109/F-111 关，轻量档 1 工单）
 
@@ -137,19 +141,6 @@
 | F-105 | 角色存在性守卫两处两种实现（轻 vs 重） | MD-2 期末四轴 Standards/Architecture | Speculative | ❌ 复核关闭（2026-09-13：轻量 Character.id 查询与重载会话计数是不同 seam，非缺陷） |
 | F-106 | 导入信封数组类型漏校验（mods:[[]] 建空名 Mod） | MD-2 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-13：工单05 importModsFromEnvelope 补 Array.isArray 拒绝 + 「数组拒绝/合法导入」两臂契约锁，红灯证明测试灵敏） |
 | F-110 | 发送类动作进行中态样板第 4 次复制（chat.js branchLastReply 复制 handleSend/regenerateLastReply/continueLastReply 的 ~20 行 nonStreamingInFlight + 按钮禁用 + thinking 样板） | 技术债批次期末四轴 Architecture | Worth exploring | ✅ 已修（2026-09-13：批 2 工单 F-110 提取 chat.js 私有 `runLastAssistantAction` options-object helper（prepare 可中止 + finally 统一复原含 isConnected 兜底），三函数收缩为 prepare+action 闭包、handleSend 排除；grep 4→2，Vitest 1311 断言零修改全绿） |
-
-### 2026-09-10（技术债消费批次：F-93 + F-94 + F-95 + F-96（做）+ F-97（关）+ F-98（做），轻量档 6 项）
-
-> 处置详情：3 项消费（各对应 TICKETS 归档工单）。Grilling 实证拍板**全做**——F-93 git grep 复核 `lorebook._as_str_list` 与 `character_card._as_list` 逐行重复仍成立（character_card 2 处 + lorebook 1 处消费）；F-94 `chat._msg_role` 与 `prompt._role_str` 的 `hasattr(.value)` 枚举归一重复（chat.py:535 / prompt.py:103）；F-95 `build_message_list` 生产调用方仅 chat.py 两处（assemble_chat_context），加可选 history 参数即可消除扫描窗 + 内部双查。方案：新建 `services/text_utils.py` 共享单点（as_str_list + role_str）收敛 F-93/F-94；F-95 build_message_list 增 `history: Sequence | None`（None → 内部查询，既有调用不变）。
-
-| 编号 | 遗留项 | 来源 | 强度 | 处置 |
-|------|--------|------|------|------|
-| F-93 | lorebook._as_str_list 与 character_card._as_list 逐行重复 | WL-1 期末 code-review Standards 轴 | Worth exploring | ✅ 已修（2026-09-10：轻量档工单 `text_utils.as_str_list` 共享单点收敛——character_card / lorebook 改指 + 删私有函数，pytest 873→879 全绿零回归、doc_sync 零漂移） |
-| F-94 | chat._msg_role 与 prompt._role_str 枚举归一重复 | WL-3 期末 code-review Standards 轴 | Worth exploring | ✅ 已修（2026-09-10：轻量档工单 `text_utils.role_str` 收敛——prompt/chat 改指 + 删私有函数，pytest 891→896 全绿零回归） |
-| F-95 | assemble_chat_context 扫描窗 + build_message_list 双查历史 | WL-3 期末 code-review Standards 轴 | Speculative | ✅ 已修（2026-09-10：轻量档工单 `build_message_list` 增可选 history 参数，assemble 传入已取历史消除双查；显式传 history 不再查库由契约锁锁定） |
-| F-96 | escapeHtml 不转义引号——属性上下文插值（value="..."/data-*="..."）含 " 时可属性注入（WL-4 lorebook-editor 曾局部 escapeAttr，其余组件同类） | WL-4 期末 code-review Falsify 轴（stored XSS 实证） | Worth exploring | ✅ 已修（2026-09-10：轻量档工单升级共享 `escapeHtml` 同时转义 " → &quot;（15 处属性插值一处收敛），lorebook-editor escapeAttr 退役；markdown sanitizeUrl 补实体引号形态拒绝（&quot;/&#34;/&#x22/，保 TD-42「引号 URL → 纯文本」契约）；契约锁 escapeHtml 引号转义 + DOM 往返 + 无注入属性，Vitest 1211→1212） |
-| F-97 | 记忆宫殿开关为全局 settings 而非会话级 | WL-5 期末 code-review Spec 轴 | Worth exploring | ❌ 复核关闭（2026-09-10：注入链 `_lorebook_world_injection` → `list_entries(character_id)` 取角色全部启用条目（含 source=auto），无会话维度过滤——auto 条目对角色所有会话注入；「会话级开关」要生效须结构性变更（注入链按会话过滤或 auto 条目改挂会话），与「记忆归角色跨会话共享」产品语义冲突且改动面大；现状全局开关与角色级注入架构自洽，spec 存储位置二选一（settings 已实现）已满足） |
-| F-98 | delete_messages_from 生产退役 | MS-1 期末 code-review Standards 轴 | Speculative | ✅ 已修（2026-09-10：轻量档工单删除——无生产调用方、语义被 MS-1 add_swipe/regenerate 新流程取代，保留即误导（截断语义与 swipes 冲突）；删函数 + __all__ + 模块 docstring + test_regenerate §2 三用例，pytest 925→922 全绿零回归） |
 
 ---
 

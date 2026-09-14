@@ -353,6 +353,17 @@ class TestCharactersRouteCrud:
             not_found_del = client.delete("/api/characters/99999")
         assert not_found_del.status_code == 404
 
+    def test_update_rejects_null_for_not_null_columns(self, wire_app) -> None:
+        """Falsify F-139：PUT 显式传 null 到 NOT NULL 列（name/prompt_mode/expert_prompt）
+        → 422 而非 500（exclude_unset 会把显式 null setattr 到 nullable=False 列触发 IntegrityError）"""
+        with TestClient(wire_app, raise_server_exceptions=False) as client:
+            created = client.post("/api/characters", json={"name": "原始名"})
+            assert created.status_code == 201
+            char_id = created.json()["id"]
+            for payload in ({"prompt_mode": None}, {"expert_prompt": None}, {"name": None}):
+                resp = client.put(f"/api/characters/{char_id}", json=payload)
+                assert resp.status_code == 422, f"{payload} 应 422，实际 {resp.status_code}"
+
     def test_export_character(self, wire_app) -> None:
         """GET /api/characters/{id}/export → 200 V2 卡 JSON；不存在 → 404"""
         with TestClient(wire_app) as client:

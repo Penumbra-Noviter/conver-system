@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ── 基类（16 个 V2 内容字段 ── 单一来源）──
@@ -76,6 +76,19 @@ class CharacterUpdate(CharacterBase):
     max_tokens: Optional[int] = Field(None, ge=1, le=131072)
     prompt_mode: Optional[str] = None
     expert_prompt: Optional[str] = None
+
+    @field_validator("name", "prompt_mode", "expert_prompt", mode="before")
+    @classmethod
+    def _reject_null_for_not_null_columns(cls, value: object) -> object:
+        """拒绝显式 null：三列 `nullable=False`，显式 None 经 `update_character` 的
+        `exclude_unset` 写库路径 `setattr(char, field, None)` → IntegrityError(500)。
+
+        省略字段（partial update 语义）走 Pydantic 默认值 None，因
+        `validate_default=False` 不触发本 validator，仍可安全省略。
+        """
+        if value is None:
+            raise ValueError("NOT NULL 列不接受 null，请省略该字段")
+        return value
 
 
 # ── 响应体（继承基类 + 元数据字段）──
