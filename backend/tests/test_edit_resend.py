@@ -17,10 +17,11 @@ from __future__ import annotations
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.app.models.character import Character
-from backend.app.models.message import Message, Role
+from backend.app.models.message import Message, MessageSwipe, Role
 from backend.app.schemas.conversation import ConversationCreate
 from backend.app.schemas.message import ChatResponse
 from backend.app.services import chat as chat_service
@@ -183,6 +184,35 @@ class TestEditAndResend:
             .count()
         )
         assert user_count == 1
+
+    async def test_happy_path_cascades_following_swipes(
+        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """截断后续 → 被截断 assistant 的 swipes 级联删除（bulk delete 路径 FK 级联锁定）"""
+        db_session.execute(text("PRAGMA foreign_keys=ON"))
+        fake = _FakeProvider(reply="新的回复")
+        _patch_api_key(monkeypatch)
+        conv = _create_conversation(db_session)
+        _add_messages(
+            db_session, conv.id,
+            ("user", "第一轮问"), ("assistant", "第一轮答"),
+            ("user", "第二轮问"), ("assistant", "第二轮答"),
+        )
+        second_assistant = _message_id(db_session, conv.id, "第二轮答")
+        message_service.add_swipe(db_session, second_assistant, "二候选", make_active=False)
+        _patch_factory(monkeypatch, fake)
+        target = _message_id(db_session, conv.id, "第一轮问")
+
+        await chat_service.edit_and_resend(db_session, conv.id, target, "修正后的问题")
+
+        assert _contents(db_session, conv.id) == ["修正后的问题", "新的回复"]
+        # 被截断 assistant 的 swipes 级联删除（bulk delete 依赖 FK CASCADE）
+        assert (
+            db_session.query(MessageSwipe)
+            .filter(MessageSwipe.message_id == second_assistant)
+            .count()
+            == 0
+        )
 
     async def test_edit_last_user_preserves_prior_messages(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch

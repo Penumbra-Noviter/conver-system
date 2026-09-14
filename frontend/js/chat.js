@@ -1106,6 +1106,8 @@ export async function editMessage(messageId) {
     const tab = getActiveTab();
     if (!tab || tab.isStreaming) return;
     const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    cleanupStaleInFlight();
+    if (nonStreamingInFlight.has(convId)) return;
     const current = Array.isArray(tab.messages)
         ? (tab.messages.find((m) => m && m.id === messageId)?.content ?? '')
         : '';
@@ -1122,6 +1124,7 @@ export async function editMessage(messageId) {
     });
     if (!confirmed) return;
 
+    nonStreamingInFlight.add(convId);
     try {
         const result = await messages.edit(messageId, content);
         // 成功 — 统一结算入口 settleTurn：从服务端重载编辑后的新时间线（编辑点后续已
@@ -1137,6 +1140,8 @@ export async function editMessage(messageId) {
     } catch (err) {
         // 失败 — 既有错误条通道（与 messages.chat / regenerate 同源），不写进消息列表
         renderSendError(err, '编辑失败', convId);
+    } finally {
+        nonStreamingInFlight.delete(convId);
     }
 }
 
@@ -1155,6 +1160,8 @@ export async function deleteMessage(messageId) {
     const tab = getActiveTab();
     if (!tab || tab.isStreaming) return;
     const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    cleanupStaleInFlight();
+    if (nonStreamingInFlight.has(convId)) return;
     const target = Array.isArray(tab.messages)
         ? tab.messages.find((m) => m && m.id === messageId)
         : null;
@@ -1172,6 +1179,7 @@ export async function deleteMessage(messageId) {
     });
     if (!confirmed) return;
 
+    nonStreamingInFlight.add(convId);
     try {
         await messages.delete(messageId);
         // 删除无 ChatResponse — 走简单重载（messages.list + renderMessages，不套 settleTurn）
@@ -1182,6 +1190,8 @@ export async function deleteMessage(messageId) {
     } catch (err) {
         // 失败 — 既有错误条通道，不写进消息列表
         renderSendError(err, '删除失败', convId);
+    } finally {
+        nonStreamingInFlight.delete(convId);
     }
 }
 

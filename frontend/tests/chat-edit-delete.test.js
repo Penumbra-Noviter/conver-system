@@ -371,4 +371,44 @@ describe('deleteMessage — 删除单条消息闭环（角色感知确认）', (
         await chat.deleteMessage(1);
         expect(deleteSpy).not.toHaveBeenCalled();
     });
+
+    it('Falsify:nonStreamingInFlight 在途 → 第二次删除 no-op（同对话互斥不重复请求）', async () => {
+        const { chat, tabs, api } = await loadModules();
+        tabs.openTab(11);
+        tabs.updateTab(11, { messages: [msg(1, 'user', '原文'), msg(2, 'assistant', '回复')] });
+        // 挂起的 DELETE：手动控制 resolve，模拟「删除请求在途」
+        let resolveDelete;
+        const pendingDelete = new Promise((r) => { resolveDelete = r; });
+        const fetchSpy = vi.fn(async (url, options = {}) => {
+            const path = String(url).replace(/^.*\/api/, '/api');
+            const m = path.match(/^\/api\/messages\/(\d+)$/);
+            if (m && (options.method || 'GET') === 'DELETE') return pendingDelete;
+            if (path.match(/^\/api\/conversations\/\d+\/messages$/) && (options.method || 'GET') === 'GET') {
+                return mockJson([msg(1, 'user', '原文'), msg(2, 'assistant', '回复')]);
+            }
+            throw new Error(`未 mock 的请求: ${path}`);
+        });
+        api.setFetch(fetchSpy);
+        chat.renderMessages();
+
+        // 第一次删除：确认 → DELETE 挂起（nonStreamingInFlight 已 add）
+        chat.chatDom.chatMessages.querySelector('.message.assistant .btn-delete-message').click();
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).not.toBeNull());
+        document.querySelector('.confirm-modal .confirm-ok').click();
+        await vi.waitFor(() => {
+            expect(fetchSpy.mock.calls.filter(([, o]) => o?.method === 'DELETE')).toHaveLength(1);
+        });
+        // 等第一次确认框完全关闭（showConfirm resolve 后移除）
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).toBeNull());
+
+        // 第二次删除：nonStreamingInFlight 在途 → 立即 no-op（不弹确认框、不发第二次 DELETE）
+        chat.chatDom.chatMessages.querySelector('.message.assistant .btn-delete-message').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(document.querySelector('.confirm-modal')).toBeNull();
+        expect(fetchSpy.mock.calls.filter(([, o]) => o?.method === 'DELETE')).toHaveLength(1);
+
+        // 清理：resolve 第一次删除，让流程收尾
+        resolveDelete({ ok: true, status: 204, json: async () => { throw new Error('no json'); } });
+        await vi.waitFor(() => expect(document.querySelector('.confirm-modal')).toBeNull());
+    });
 });

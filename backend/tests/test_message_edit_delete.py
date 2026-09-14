@@ -162,6 +162,40 @@ class TestDeleteMessage:
 
         assert _contents(db_session, conv.id) == []
 
+    def test_delete_user_cascades_following_swipes(self, db_session: Session) -> None:
+        """删 USER 截断后续 → 被截断 assistant 的 swipes 级联删除（bulk delete 路径 FK 级联锁定）"""
+        db_session.execute(text("PRAGMA foreign_keys=ON"))
+        char_id = _create_character(db_session)
+        conv = _create_conversation(db_session, character_id=char_id)
+        _add_messages(
+            db_session, conv.id,
+            ("user", "第一轮问"), ("assistant", "第一轮答"),
+            ("user", "第二轮问"), ("assistant", "第二轮答"),
+        )
+        first_assistant = _message_id(db_session, conv.id, "第一轮答")
+        second_assistant = _message_id(db_session, conv.id, "第二轮答")
+        message_service.add_swipe(db_session, first_assistant, "一候选", make_active=False)
+        message_service.add_swipe(db_session, second_assistant, "二候选", make_active=False)
+        target = _message_id(db_session, conv.id, "第二轮问")
+
+        message_service.delete_message(db_session, target)
+
+        assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答"]
+        # 被截断 assistant 的 swipes 级联删除（bulk delete 依赖 FK CASCADE）
+        assert (
+            db_session.query(MessageSwipe)
+            .filter(MessageSwipe.message_id == second_assistant)
+            .count()
+            == 0
+        )
+        # 保留的第一轮 assistant 的 swipes 不受影响
+        assert (
+            db_session.query(MessageSwipe)
+            .filter(MessageSwipe.message_id == first_assistant)
+            .count()
+            == 2
+        )
+
     def test_delete_assistant_only_and_cascade_swipes(self, db_session: Session) -> None:
         """删 ASSISTANT → 仅删该条，候选级联删除，触发 user 保留"""
         db_session.execute(text("PRAGMA foreign_keys=ON"))
