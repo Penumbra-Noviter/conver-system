@@ -5,15 +5,24 @@
     - GET /api/conversations/{id}/messages — 获取消息历史（含候选集/激活序号）
     - GET /api/messages/search — 搜索消息
     - POST /api/messages/{message_id}/switch-swipe — 切换候选（MS-2）
+    - PUT /api/messages/{message_id} — 编辑重发（仅 user；message-edit-resend）
+    - DELETE /api/messages/{message_id} — 删除单条消息（message-edit-resend）
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.schemas.message import MessageResponse, SearchResult, SwitchSwipeRequest
+from backend.app.schemas.message import (
+    ChatResponse,
+    EditMessageRequest,
+    MessageResponse,
+    SearchResult,
+    SwitchSwipeRequest,
+)
+from backend.app.services import chat as chat_service
 from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 
@@ -70,3 +79,36 @@ def search_messages(
     """
     results = message_service.search_messages(db, q, limit=limit)
     return results
+
+
+@router.put("/api/messages/{message_id}", response_model=ChatResponse)
+async def edit_message(
+    message_id: int,
+    body: EditMessageRequest,
+    db: Session = Depends(get_db),
+) -> ChatResponse:
+    """编辑重发（仅 user）：就地替换 content 并重新生成后续回复（message-edit-resend）
+
+    编排（替换 content + 物理截断后续 + 重新生成，单 commit 原子落库；LLM 失败
+    零落库）收拢在 services/chat.py 的 edit_and_resend。路由先经 message_service
+    解析消息归属会话（不存在 → MessageNotFoundError → 404），再委托生成；领域异常
+    （MessageNotFoundError / InvalidEditTargetError）上抛由统一 handler 转 404/400。
+    响应 ChatResponse（message_id = 新 assistant 消息 id）。
+    """
+    message = message_service.require_message(db, message_id)
+    return await chat_service.edit_and_resend(
+        db, message.conversation_id, message_id, body.content
+    )
+
+
+@router.delete("/api/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_message(
+    message_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    """删除单条消息（角色感知：USER 截断其及后续 / ASSISTANT 仅删该条+候选级联）
+
+    删除范围收敛于 services/message.py 的 delete_message（不存在 →
+    MessageNotFoundError → 404）。204 No Content。
+    """
+    message_service.delete_message(db, message_id)
