@@ -6,10 +6,12 @@ Prompt 组装 — LLM 消息列表的纯函数组装层
 单测、可复用（如 CLI 调用 / 后续多 Provider 上下文复用）。
 
 公开 API（__all__）：
-    CharacterData           — 角色纯数据容器（不含 DB 依赖）
-    apply_template_vars     — 模板变量替换（{{user}} / {{char}}）
-    parse_mes_example       — mes_example 分块多轮解析
-    build_messages          — 完整消息列表组装（主入口）
+    CharacterData              — 角色纯数据容器（不含 DB 依赖）
+    InjectedSegment            — 带来源的注入分段（世界书/记忆/Mod）
+    apply_template_vars        — 模板变量替换（{{user}} / {{char}}）
+    parse_mes_example          — mes_example 分块多轮解析
+    build_messages             — 完整消息列表组装（主入口，零来源语义）
+    build_messages_with_source — 带来源标注的消息列表组装（debug 追溯）
 """
 
 from __future__ import annotations
@@ -20,7 +22,28 @@ from dataclasses import dataclass
 from backend.app.services.character_fields import PROMPT_FIELDS
 from backend.app.services.text_utils import role_str
 
-__all__ = ["CharacterData", "apply_template_vars", "parse_mes_example", "build_messages"]
+__all__ = [
+    "CharacterData",
+    "InjectedSegment",
+    "apply_template_vars",
+    "parse_mes_example",
+    "build_messages",
+    "build_messages_with_source",
+    "SOURCE_CHARACTER",
+    "SOURCE_WORLD",
+    "SOURCE_MEMORY",
+    "SOURCE_MOD",
+    "SOURCE_HISTORY",
+    "SOURCE_USER",
+]
+
+#: 来源枚举（PD-3 debug 追溯六类；chat.py 注入链构造 InjectedSegment 时引用单一来源）
+SOURCE_CHARACTER = "character"
+SOURCE_WORLD = "world"
+SOURCE_MEMORY = "memory"
+SOURCE_MOD = "mod"
+SOURCE_HISTORY = "history"
+SOURCE_USER = "user"
 
 
 @dataclass(frozen=True)
@@ -45,6 +68,19 @@ class CharacterData:
     post_history_instructions: str = ""
     prompt_mode: str = "simple"
     expert_prompt: str = ""
+
+
+@dataclass(frozen=True)
+class InjectedSegment:
+    """带来源的注入分段（世界书/记忆/Mod 注入项，PD-3 debug 追溯）
+
+    Attributes:
+        content: 注入内容（已在注入链层做过模板变量替换）
+        source: 来源（world=世界书手动条目 / memory=记忆宫殿 auto 条目 /
+            mod=prompt 区 Mod）；默认 world
+    """
+    content: str
+    source: str = SOURCE_WORLD
 
 
 def apply_template_vars(text: str, user_name: str = "User", char_name: str = "Character") -> str:
@@ -113,119 +149,204 @@ def build_messages(
     append_current_input: bool = True,
     world: dict[str, list[str]] | None = None,
 ) -> list[dict[str, str]]:
-    """组装发送给 LLM 的消息列表（纯函数，无 DB 依赖）
+    """组装发送给 LLM 的消息列表（纯函数，无 DB 依赖；零来源语义）
 
-    组装顺序：
-        0. world["before_char"] 注入块（世界书：角色 system prompt 之前，逐条 system）
-        1. system prompt（system_prompt 优先，否则 personality）
-        2. scenario（作为 [场景设定]\\n... 的 system 消息）
-        2.5 world["after_char"] 注入块（世界书：场景设定之后，逐条 system）
-        2.75 world["system"] 合并为单条 [世界知识] system（多条以空行连接，按给定序）
-        3. mes_example（few-shot 示例）
-        4. 历史消息（正序，滑窗截断：超过 max_rounds*2 条取最后 max_rounds*2 条）
-        5. post_history_instructions（system 消息）
-        6. 当前 user 输入（append_current_input=True 时）
-
-    world 参数（WL-3）：None 或全空列表时零注入、输出与改动前逐字节一致
-    （零变化硬约束，由既有用例锁定）；键即注入位置（world="system" 为世界书
-    position='world' 内容，见 lorebook_engine.build_world_injection 契约）。
-
-    append_current_input=False 契约（重生成路径）：
-        不追加当前 user 输入；末条恢复为历史末条 user（待回复触发源）；
-        因无 user 末尾兜底而残留的尾随 PHI system 一并剥离，保证末端无 system。
+    签名与输出与 PD-3 改动前保持一致（零变化硬约束）：world 参数只接受纯字符串
+    列表（世界书注入块在调用方已叠加合并），逐字节输出与改动前一致。组装顺序见
+    `_assemble`——本函数与 build_messages_with_source 共用同一组装核心，来源标注
+    仅 debug 路径需要。
 
     Args:
         character: 角色纯数据
         history: 历史消息序列（每项至少含 role 与 content 属性）
-        user_content: 当前用户输入（False 时被忽略、不校验、不追加）
+        user_content: 当前用户输入（append_current_input=False 时被忽略）
         max_rounds: 保留的对话轮数（每轮 2 条消息，滑窗上限为 max_rounds*2）
         user_name: 用户昵称（{{user}} 模板变量）
-        append_current_input: 是否追加当前用户输入。True（默认）逐字保持现
-            组装行为；False 用于重生成路径（不追加当前输入，末条为历史末条
-            user，剥离尾随 PHI system）。
+        append_current_input: 是否追加当前用户输入。True（默认）保持现组装行为；
+            False 用于重生成路径（不追加当前输入，末条为历史末条 user，剥离尾随 PHI）
         world: 世界书注入块（{before_char/after_char/system: [内容]}，默认 None
-            零注入；注入内容已在引擎层做过模板变量替换，此处不重复处理）
+            零注入；注入内容已在引擎层做过模板变量替换）
 
     Returns:
-        组装好的消息列表，role 均为纯字符串 system/user/assistant
+        组装好的消息列表，每项只含 role 与 content
+    """
+    segments = _assemble(
+        character, history, user_content, max_rounds, user_name,
+        append_current_input, world,
+    )
+    return [{"role": s["role"], "content": s["content"]} for s in segments]
+
+
+def build_messages_with_source(
+    character: CharacterData,
+    history: Sequence[object],
+    user_content: str,
+    max_rounds: int = 30,
+    user_name: str = "User",
+    append_current_input: bool = True,
+    world: dict[str, list[str | InjectedSegment]] | None = None,
+) -> list[dict[str, str]]:
+    """组装发送给 LLM 的消息列表，逐条标注来源（PD-3 debug 追溯专用，只读见证）
+
+    与 build_messages 共用同一组装核心 `_assemble`（单一组装实现，不复制顺序），
+    仅多返回每条 source 字段。world 参数额外接受 InjectedSegment 项以携带来源
+    （world/memory/mod）；纯字符串项回退来源 world（与 build_messages 等价）。
+
+    来源枚举见模块常量 SOURCE_CHARACTER / SOURCE_WORLD / SOURCE_MEMORY /
+    SOURCE_MOD / SOURCE_HISTORY / SOURCE_USER。
+
+    Args:
+        character: 角色纯数据
+        history: 历史消息序列
+        user_content: 当前用户输入
+        max_rounds: 保留的对话轮数
+        user_name: 用户昵称
+        append_current_input: 是否追加当前用户输入
+        world: 带来源注入块（{before_char/after_char/system: [内容或 InjectedSegment]}）
+
+    Returns:
+        带 source 的消息分段列表，content/role 序列与 build_messages 逐条一致
+    """
+    return _assemble(
+        character, history, user_content, max_rounds, user_name,
+        append_current_input, world,
+    )
+
+
+def _assemble(
+    character: CharacterData,
+    history: Sequence[object],
+    user_content: str,
+    max_rounds: int,
+    user_name: str,
+    append_current_input: bool,
+    world: dict[str, list[str | InjectedSegment]] | None,
+) -> list[dict[str, str]]:
+    """消息列表组装核心（私有；build_messages / build_messages_with_source 共用）
+
+    组装顺序（PD-5 已含 expert 分流）：
+        0. world["before_char"] 注入块（逐条 system，最高优先级）
+        1. system prompt（system_prompt 优先，否则 personality）；expert 模式以
+           expert_prompt 单条替代 1/2/5 三处结构化注入
+        2. scenario（[场景设定] system）
+        2.5 world["after_char"] 注入块
+        2.75 world["system"] 合并单条 [世界知识]（多条以空行连接）
+        3. mes_example（few-shot）
+        4. 历史消息（正序，滑窗截断）
+        5. post_history_instructions（system；expert 模式跳过）
+        6. 当前 user 输入（append_current_input=False 时剥离尾随 system）
     """
     char_name = character.name or "Character"
     world = world or {}
     # 空/纯空白注入内容不产生空 system 消息（Falsify 修复锁：`or []` 只挡
     # None/空列表，列表内的空串元素须在此过滤）
-    world_before = [c for c in (world.get("before_char") or []) if c and c.strip()]
-    world_after = [c for c in (world.get("after_char") or []) if c and c.strip()]
-    world_knowledge = [c for c in (world.get("system") or []) if c and c.strip()]
+    world_before = _filter_injection(world.get("before_char"))
+    world_after = _filter_injection(world.get("after_char"))
+    world_knowledge = _filter_injection(world.get("system"))
 
-    # 专家模式分流（PD-5）：expert 且 expert_prompt 非空 → system 区单条，
-    # 替代步骤 1（system_prompt/personality）、步骤 2（scenario）、步骤 5（PHI）
     expert = (
         character.prompt_mode == "expert"
         and bool(character.expert_prompt and character.expert_prompt.strip())
     )
 
-    messages: list[dict[str, str]] = []
+    segments: list[dict[str, str]] = []
 
-    # 0. before_char 注入块（世界书）：角色 system prompt 之前，最高优先级上下文
-    for content in world_before:
-        messages.append({"role": "system", "content": content})
+    for content, source in world_before:
+        segments.append({"role": "system", "content": content, "source": source})
 
     if expert:
-        # 专家模式：单条 system（expert_prompt），仅替代角色静态字段，世界书/范例/历史/user 照旧
-        messages.append({
+        segments.append({
             "role": "system",
             "content": apply_template_vars(character.expert_prompt, user_name, char_name),
+            "source": SOURCE_CHARACTER,
         })
     else:
-        # 1. system prompt（优先使用 system_prompt 字段，其次 personality）
         system_content = character.system_prompt or character.personality
-        messages.append({
+        segments.append({
             "role": "system",
             "content": apply_template_vars(system_content, user_name, char_name),
+            "source": SOURCE_CHARACTER,
         })
-
-        # 2. 场景设定（scenario）— 附加在 system prompt 后，作为补充上下文
         if character.scenario:
             scenario = apply_template_vars(character.scenario, user_name, char_name)
-            messages.append({"role": "system", "content": f"[场景设定]\n{scenario}"})
+            segments.append({
+                "role": "system",
+                "content": f"[场景设定]\n{scenario}",
+                "source": SOURCE_CHARACTER,
+            })
 
-    # 2.5 after_char 注入块（世界书）：场景设定之后
-    for content in world_after:
-        messages.append({"role": "system", "content": content})
+    for content, source in world_after:
+        segments.append({"role": "system", "content": content, "source": source})
 
-    # 2.75 world 知识（世界书）：合并为单条 [世界知识] system，多条以空行连接
     if world_knowledge:
-        messages.append({
+        merged_source = _world_knowledge_source([s for _, s in world_knowledge])
+        segments.append({
             "role": "system",
-            "content": "[世界知识]\n" + "\n\n".join(world_knowledge),
+            "content": "[世界知识]\n" + "\n\n".join(c for c, _ in world_knowledge),
+            "source": merged_source,
         })
 
-    # 3. 对话范例（mes_example）— 作为 few-shot 示例插入
     if character.mes_example:
-        messages.extend(parse_mes_example(character.mes_example, user_name, char_name))
+        for example in parse_mes_example(character.mes_example, user_name, char_name):
+            segments.append({
+                "role": example["role"],
+                "content": example["content"],
+                "source": SOURCE_CHARACTER,
+            })
 
-    # 4. 历史消息（滑窗截断，保留最近 max_rounds 轮对话）
     history_list = list(history)
     if len(history_list) > max_rounds * 2:
         history_list = history_list[-(max_rounds * 2):]
 
     for msg in history_list:
-        messages.append({"role": role_str(msg.role), "content": msg.content})
+        segments.append({
+            "role": role_str(msg.role),
+            "content": msg.content,
+            "source": SOURCE_HISTORY,
+        })
 
-    # 5. 历史后指令（post_history_instructions）— 附加在历史消息之后、当前输入之前
-    # （expert 模式下被 expert_prompt 单条 system 替代，不注入独立 PHI）
     if not expert and character.post_history_instructions:
         phi = apply_template_vars(character.post_history_instructions, user_name, char_name)
-        messages.append({"role": "system", "content": phi})
+        segments.append({"role": "system", "content": phi, "source": SOURCE_CHARACTER})
 
-    # 6. 当前输入（append_current_input=False 时不追加，并剥离尾随 PHI system）
     if append_current_input:
         content = apply_template_vars(user_content, user_name, char_name)
-        messages.append({"role": "user", "content": content})
+        segments.append({"role": "user", "content": content, "source": SOURCE_USER})
     else:
         # 重生成路径：末条须为历史末条 user（触发源）。无当前 user 末尾兜底时，
         # 步骤 5 的 PHI（system）会成为末条，故先剥离全部尾随 system。
-        while messages and messages[-1].get("role") == "system":
-            messages.pop()
+        while segments and segments[-1].get("role") == "system":
+            segments.pop()
 
-    return messages
+    return segments
+
+
+def _split_injection(item: str | InjectedSegment) -> tuple[str, str]:
+    """注入项 → (content, source)；纯字符串回退来源 world"""
+    if isinstance(item, InjectedSegment):
+        return item.content, item.source
+    return item, SOURCE_WORLD
+
+
+def _filter_injection(
+    items: list[str | InjectedSegment] | None,
+) -> list[tuple[str, str]]:
+    """过滤空/纯空白注入项，返回 [(content, source)]（保持给定序）"""
+    result: list[tuple[str, str]] = []
+    for item in items or []:
+        content, source = _split_injection(item)
+        if content and content.strip():
+            result.append((content, source))
+    return result
+
+
+def _world_knowledge_source(sources: list[str]) -> str:
+    """[世界知识] 合并块来源：单一来源取之；混合来源回落 world（文档化兜底）
+
+    world/memory 皆属世界书条目、mod 亦可能追加进 system 块；混合时以 world 兜底
+    （内容一致性不受来源标注影响，debug 只见证不改线上）。
+    """
+    distinct = set(sources)
+    if len(distinct) == 1:
+        return sources[0]
+    return SOURCE_WORLD

@@ -31,8 +31,10 @@ from backend.app.models.conversation import Conversation
 from backend.app.models.cg_image import CgImage
 from backend.app.models.lorebook import LorebookEntry
 from backend.app.models.message import Message, Role
+from backend.app.schemas.conversation import PromptDebugResponse
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
+from backend.app.services.character_fields import PROMPT_FIELDS
 from backend.app.services import lorebook as lorebook_service
 from backend.app.services import memory_palace as memory_palace_service
 from backend.app.services import message as message_service
@@ -49,11 +51,19 @@ from backend.app.services.exceptions import (
 )
 from backend.app.services.llm.base import BaseLLM
 from backend.app.services.llm.errors import LLMError
+from backend.app.services.llm.prompt import (
+    SOURCE_MEMORY,
+    SOURCE_MOD,
+    SOURCE_WORLD,
+    CharacterData,
+    InjectedSegment,
+    apply_template_vars,
+    build_messages_with_source,
+)
 from backend.app.services.llm.resolver import resolve_llm
 from backend.app.services.lorebook_engine import (
     LorebookEntryData,
     activate_lorebook_entries,
-    build_world_injection,
     collect_scan_text,
 )
 from backend.app.services.text_utils import role_str
@@ -68,6 +78,7 @@ __all__ = [
     "edit_and_resend",
     "chat_error_response",
     "stream_reply",
+    "build_prompt_debug",
 ]
 
 
@@ -149,17 +160,20 @@ def assemble_chat_context(
     history = message_service.get_messages(db, conv.id)
     if history_limit_message_id is not None:
         history = [m for m in history if m.id <= history_limit_message_id]
-    world_injection = _lorebook_world_injection(
+    tagged_world = _lorebook_world_injection(
         db, character, history, current_input or "", user_name,
     )
-    if any(world_injection.values()):
+    if any(tagged_world.values()):
         logger.debug(
             "世界书注入：%s（%d 条）",
-            {k: len(v) for k, v in world_injection.items()},
-            sum(len(v) for v in world_injection.values()),
+            {k: len(v) for k, v in tagged_world.items()},
+            sum(len(v) for v in tagged_world.values()),
         )
-    # MD-2/02：在世界书注入之上叠加启用 prompt 区 Mod（追加各块，不新增尾随 system）
-    world_injection = _mod_prompt_injection(db, character, world_injection)
+    # MD-2/02：在世界书注入之上叠加启用 prompt 区 Mod（追加各块，不新增尾随 system）。
+    # 注入链产出带来源分段（world/memory/mod），在线路径派生纯字符串块透传给
+    # build_message_list（其 world_injection 契约不变，输出逐字节零变化）。
+    tagged_mod = _mod_prompt_injection(db, character)
+    world_injection = _plain_injection(_merge_injections(tagged_world, tagged_mod))
     if current_input is not None:
         messages = message_service.build_message_list(
             db, conv, current_input, max_rounds=max_rounds, user_name=user_name,
@@ -807,13 +821,15 @@ def _lorebook_world_injection(
     history: Sequence[Message],
     current_input: str,
     user_name: str,
-) -> dict[str, list[str]]:
-    """组装世界书注入块（角色无启用条目 → {}，零开销）
+) -> dict[str, list[InjectedSegment]]:
+    """组装世界书注入块（带来源：manual→world，auto→memory；无启用条目 → {}）
 
     WL-3 注入链：list_entries → 启用条目最大 depth → collect_scan_text 构建扫描
     窗口（全量历史，与消息滑窗 max_rounds 解耦）→ activate（每次调用新 RNG，
-    注入结果非确定性，符合概率/互斥组语义）→ build_world_injection。条目 →
-    LorebookEntryData 的 ORM 解耦转换在此完成（引擎零 DB 依赖）。
+    注入结果非确定性，符合概率/互斥组语义）→ 按 position 分组（与
+    lorebook_engine.build_world_injection 同序），source 由条目 source 字段区分
+    （manual→world / auto→memory；PD-3 来源保真）。条目 → LorebookEntryData 的
+    ORM 解耦转换在此完成（引擎零 DB 依赖）。
 
     Args:
         db: 数据库会话
@@ -823,8 +839,7 @@ def _lorebook_world_injection(
         user_name: 用户昵称（{{user}} 模板变量）
 
     Returns:
-        build_world_injection 输出形态（{system/before_char/after_char: [内容]}）；
-        无条目/全部禁用时返回 {}
+        {system/before_char/after_char: [InjectedSegment]}；无条目/全部禁用时返回 {}
     """
     if character is None:
         return {}
@@ -852,37 +867,163 @@ def _lorebook_world_injection(
         for e in enabled
     ]
     activated = activate_lorebook_entries(data_entries, scan_text, rng=random.Random())
-    return build_world_injection(activated, user_name=user_name, char_name=character.name or "Character")
+    # 引擎 LorebookEntryData 不承载 source（零 DB 依赖契约），来源经 entry.id 反查
+    source_by_id = {e.id: e.source for e in enabled}
+    return _build_tagged_world_injection(
+        activated, source_by_id=source_by_id,
+        user_name=user_name, char_name=character.name or "Character",
+    )
+
+
+#: position → 注入块键（对齐 lorebook_engine._POSITION_KEYS：world→system）
+_WORLD_POSITION_KEYS = {"world": "system", "before_char": "before_char", "after_char": "after_char"}
+
+#: 注入块键全集（合并遍历序）
+_WORLD_BLOCK_KEYS = ("system", "before_char", "after_char")
+
+
+def _build_tagged_world_injection(
+    activated: Sequence[LorebookEntryData],
+    *,
+    source_by_id: dict[int, str],
+    user_name: str,
+    char_name: str,
+) -> dict[str, list[InjectedSegment]]:
+    """按 position 分组构建带来源注入块（与 build_world_injection 同序 + 来源标注）
+
+    PD-3 来源保真：组内按 (order, id) 升序、content 经模板替换、position 映射与
+    lorebook_engine.build_world_injection 一致；仅多标注 source（manual→world /
+    auto→memory）。
+
+    Args:
+        activated: 激活引擎输出（含 id，按 (order, id) 已排序与否均可）
+        source_by_id: entry id → source（"manual"/"auto"）
+        user_name: {{user}} 模板变量值
+        char_name: {{char}} 模板变量值
+
+    Returns:
+        {system/before_char/after_char: [InjectedSegment]}（三键恒在，值可为空列表）
+    """
+    blocks: dict[str, list[InjectedSegment]] = {"system": [], "before_char": [], "after_char": []}
+    for entry in sorted(activated, key=lambda e: (e.order, e.id)):
+        key = _WORLD_POSITION_KEYS.get(entry.position, "system")
+        source = SOURCE_MEMORY if source_by_id.get(entry.id) == "auto" else SOURCE_WORLD
+        content = apply_template_vars(entry.content, user_name, char_name)
+        blocks[key].append(InjectedSegment(content=content, source=source))
+    return blocks
 
 
 def _mod_prompt_injection(
     db: Session,
     character: Character | None,
-    world_injection: dict[str, list[str]],
-) -> dict[str, list[str]]:
-    """把角色启用的 prompt 区 Mod 叠加进世界书注入块（MD-2/02 注入链）
+) -> dict[str, list[InjectedSegment]]:
+    """读取角色启用的 prompt 区 Mod 注入增量（source='mod'，与 world 分开）
 
-    读取逻辑下沉为 mods_service 的区过滤读取 seam（F-123）：按 target_area="prompt"
-    回读启用 Mod → ModPayload，再经 apply_prompt_mods 叠加（world→system）。角色为
-    空 / 无绑定 / 全禁用 / 全非 prompt 区 → 原样返回 world_injection（零开销，与
-    _lorebook_world_injection 的「无条目 → {}」同语义）。
+    MD-2/02 注入链拆分（PD-3 来源保真）：不再与 world_injection 合并，单独返回
+    mod 增量，由 _merge_injections 叠加。mod 增量经 mods_service.apply_prompt_mods(
+    {}, payloads) 计算（复用单一纯函数叠加语义，不复制 payload 解析/区域映射），
+    再标注 source='mod'。角色空 / 无绑定 / 全禁用 / 全非 prompt 区 → {}。
 
     Args:
         db: 数据库会话
         character: 角色 ORM（None → 零注入）
-        world_injection: _lorebook_world_injection 的产物
-            （{system/before_char/after_char: [内容]}）
 
     Returns:
-        叠加后的注入块 dict（apply_prompt_mods 返回新 dict；无可参与项时为
-        原 world_injection 对象）
+        {system/before_char/after_char: [InjectedSegment(source='mod')]}；无参与项返回 {}
     """
     if character is None:
-        return world_injection
+        return {}
     payloads = mods_service.list_enabled_mods_for_area(db, character.id, "prompt")
     if not payloads:
-        return world_injection
-    return mods_service.apply_prompt_mods(world_injection, payloads)
+        return {}
+    plain_mod = mods_service.apply_prompt_mods({}, payloads)
+    return {
+        key: [InjectedSegment(content=content, source=SOURCE_MOD) for content in contents]
+        for key, contents in plain_mod.items()
+        if contents
+    }
+
+
+def _merge_injections(
+    world: dict[str, list[InjectedSegment]],
+    mod: dict[str, list[InjectedSegment]],
+) -> dict[str, list[InjectedSegment]]:
+    """按块合并世界书与 Mod 注入（world 在前、mod 追加，对齐 apply_prompt_mods 叠加序）"""
+    merged: dict[str, list[InjectedSegment]] = {}
+    for key in _WORLD_BLOCK_KEYS:
+        items = list(world.get(key, [])) + list(mod.get(key, []))
+        if items:
+            merged[key] = items
+    return merged
+
+
+def _plain_injection(
+    tagged: dict[str, list[InjectedSegment]],
+) -> dict[str, list[str]]:
+    """带来源注入块 → 纯字符串注入块（在线路径透传 build_message_list，零变化）"""
+    return {key: [seg.content for seg in segs] for key, segs in tagged.items()}
+
+
+def _character_data(character: Character | None) -> CharacterData:
+    """从 ORM 角色构造 CharacterData（PROMPT_FIELDS 投影 + prompt_mode/expert_prompt）
+
+    与 message.build_message_list 的 CharacterData 构造同口径（单一语义镜像）；
+    character 为 None 时返回空角色（name=""）。
+    """
+    return CharacterData(
+        **{field: getattr(character, field, "") or "" for field in PROMPT_FIELDS},
+        prompt_mode=getattr(character, "prompt_mode", "") or "simple",
+        expert_prompt=getattr(character, "expert_prompt", "") or "",
+    )
+
+
+def build_prompt_debug(db: Session, conversation_id: int) -> PromptDebugResponse:
+    """构建 prompt-debug 追溯（只读：不落库、不触发 LLM）
+
+    与 assemble_chat_context 走同一上游（history、世界书扫描窗、mod 叠加），但用
+    build_messages_with_source 产出带来源 segments；current_input 固定为空串
+    （append_current_input=True），故末条为 source='user' 的空内容占位（spec §PD-3
+    user 来源语义）。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+
+    Returns:
+        PromptDebugResponse（conversation_id / character_name / model / prompt_mode /
+        segments）
+
+    Raises:
+        ConversationNotFoundError: 对话不存在
+    """
+    conv = conversation_service.require_conversation(db, conversation_id)
+    character = db.query(Character).filter(Character.id == conv.character_id).first()
+
+    user_name = setting_service.user_name(db)
+    max_rounds = setting_service.sliding_window_rounds(db)
+    history = message_service.get_messages(db, conv.id)
+
+    tagged_world = _lorebook_world_injection(db, character, history, "", user_name)
+    tagged_mod = _mod_prompt_injection(db, character)
+    combined = _merge_injections(tagged_world, tagged_mod)
+
+    segments = build_messages_with_source(
+        character=_character_data(character),
+        history=history,
+        user_content="",
+        max_rounds=max_rounds,
+        user_name=user_name,
+        append_current_input=True,
+        world=combined,
+    )
+
+    return PromptDebugResponse(
+        conversation_id=conversation_id,
+        character_name=character.name if character else "",
+        model=f"{conv.model_provider}/{conv.model_name}",
+        prompt_mode=character.prompt_mode if character else "simple",
+        segments=segments,
+    )
 
 
 def _memory_mod_instructions(db: Session, character: Character | None) -> str:

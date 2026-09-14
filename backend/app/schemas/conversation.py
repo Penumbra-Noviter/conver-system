@@ -48,6 +48,27 @@ class ConversationResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PromptDebugSegment(BaseModel):
+    """prompt-debug 分段（role / content / source，PD-3）"""
+    role: str
+    content: str
+    source: str
+
+
+class PromptDebugResponse(BaseModel):
+    """prompt-debug 只读追溯响应（不落库、不触发 LLM）
+
+    来源枚举 source ∈ {character/world/memory/mod/history/user}（见
+    services/llm/prompt.py SOURCE_* 常量）。segments 的 content 序列与
+    assemble_chat_context 产出 messages 逐条一致（debug 只见证、不改线上）。
+    """
+    conversation_id: int
+    character_name: str
+    model: str
+    prompt_mode: str
+    segments: list[PromptDebugSegment]
+
+
 class ConversationExportCharacter(BaseModel):
     """对话导出 JSON 的 character 段
 
