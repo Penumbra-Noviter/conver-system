@@ -3,8 +3,8 @@
 /// - 非流式 [generate] 走 dio；流式 [streamGenerate] 走 dart:io HttpClient 直连
 ///   （设计文档双栈裁定：`research/stack-confirm/findings.md` R2）。
 /// - POST `{normalizedBase}/chat/completions`（[normalizeBaseUrl] 补 `/v1` 段）；
-///   `Authorization: Bearer <key>` 头；temperature **照传**（R8 定案：与 Claude
-///   相反，OpenAI 端点接受 temperature，默认 0.7 逐字透传）；
+///   `Authorization: Bearer <key>` 头；temperature **照传**（U-2：由
+///   generate/streamGenerate 的 `temperature` 参数驱动，缺省 0.7 逐字透传）；
 ///   `choices[0].delta.content` 逐 token 产出（null / 空 choices 跳过，锚
 ///   research R1-2）；`[DONE]` 终态。
 /// - 401/429/408/504 → Auth / RateLimit / Timeout；400 content_filter →
@@ -47,7 +47,6 @@ class OpenAIProvider extends LLMProvider {
   OpenAIProvider({
     required super.apiKey,
     super.baseUrl,
-    this.temperature = 0.7,
   });
 
   @override
@@ -55,9 +54,6 @@ class OpenAIProvider extends LLMProvider {
 
   static const String _defaultModel = 'gpt-4o';
   static const String _defaultNormalizedBase = 'https://api.openai.com/v1';
-
-  /// 采样温度（R8：OpenAI 侧照传）。默认 0.7 对齐桌面 openai.py generate 参数。
-  final double temperature;
 
   /// 非流式 REST 客户端（T02 双栈：dio 侧）。
   final Dio _dio = Dio();
@@ -67,9 +63,11 @@ class OpenAIProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) {
     return runTranslated(() async {
-      final body = _buildBody(messages, maxTokens: maxTokens, model: model);
+      final body = _buildBody(messages,
+          maxTokens: maxTokens, model: model, temperature: temperature);
       final response = await _dio.post(
         _chatCompletionsUri().toString(),
         data: body,
@@ -84,12 +82,13 @@ class OpenAIProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     try {
       // 注意不用 yield*：Dart 语义下 yield* 将内层流错误直接转发到外层流，
       // 不经外层 try/catch；await for 则将错误在其语句处抛出、可被捕获翻译。
       await for (final token in _streamRequest(messages,
-          maxTokens: maxTokens, model: model)) {
+          maxTokens: maxTokens, model: model, temperature: temperature)) {
         yield token;
       }
     } catch (e) {
@@ -104,12 +103,16 @@ class OpenAIProvider extends LLMProvider {
     List<LlmMessage> messages, {
     required int maxTokens,
     String? model,
+    double temperature = 0.7,
   }) async* {
     yield* streamSse(
       uri: _chatCompletionsUri(),
       body: jsonEncode(
         _buildBody(messages,
-            maxTokens: maxTokens, model: model, streaming: true),
+            maxTokens: maxTokens,
+            model: model,
+            temperature: temperature,
+            streaming: true),
       ),
       headers: {'authorization': 'Bearer $apiKey'},
       isTerminated: isOpenAiDone,
@@ -117,11 +120,12 @@ class OpenAIProvider extends LLMProvider {
     );
   }
 
-  /// 组装 Chat Completions 请求体；temperature 照传（默认 0.7）。
+  /// 组装 Chat Completions 请求体；temperature 照传（U-2：取传入参数，缺省 0.7）。
   Map<String, dynamic> _buildBody(
     List<LlmMessage> messages, {
     required int maxTokens,
     String? model,
+    double temperature = 0.7,
     bool streaming = false,
   }) {
     final prepared = prepareMessages(messages);

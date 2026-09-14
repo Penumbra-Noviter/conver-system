@@ -100,8 +100,9 @@ class DocParseResult {
 ///
 /// 装配（B2）：经 [CredentialsResolver]（AR-3，缺省由 [SettingsRepository]
 /// 装配 reader）解析凭据组合序，经 [LLMProviderFactory] 创建 Provider；消息
-/// `[system, user]` → `generate(maxTokens: 4096, model)`（**不传
-/// temperature**，R8 定案）。错误面（B9）全部折叠为 [DocParseError] 的桌面
+/// `[system, user]` → `generate(maxTokens: 4096, model)`（temperature 用
+/// 默认 0.7，U-2 补 temperature 参数后调用零改动）。错误面（B9）全部折叠为
+/// [DocParseError] 的桌面
 /// 一致文案。
 class DocumentParseService {
   /// [settings] 提供默认 Provider/模型与凭证解析链；[providerFactory] 装配 LLM；
@@ -163,7 +164,7 @@ class DocumentParseService {
       throw DocParseError(e.message);
     }
 
-    // 4. 组装 [system, user] 消息并调用 LLM（maxTokens 4096；不传 temperature）。
+    // 4. 组装 [system, user] 消息并调用 LLM（maxTokens 4096；temperature 用默认 0.7）。
     final String raw;
     try {
       raw = await llm.generate(

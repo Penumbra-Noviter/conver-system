@@ -62,6 +62,7 @@ class FakeLLMProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -83,6 +84,7 @@ class FakeLLMProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     streamGenerateCallCount++;
     lastMessages = messages;
@@ -145,6 +147,7 @@ class TickingFakeLLMProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -162,6 +165,7 @@ class TickingFakeLLMProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     streamGenerateCallCount++;
     lastMessages = messages;
@@ -200,6 +204,7 @@ class InterruptStreamRetryProvider extends TickingFakeLLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -225,6 +230,7 @@ class InterruptThenAuthFailProvider extends TickingFakeLLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;

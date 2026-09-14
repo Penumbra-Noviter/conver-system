@@ -61,6 +61,7 @@ class _GateLLMProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) =>
       gate.future;
 
@@ -69,6 +70,7 @@ class _GateLLMProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {}
 
   @override

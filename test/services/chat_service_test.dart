@@ -129,6 +129,7 @@ class _TickingProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -146,6 +147,7 @@ class _TickingProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     streamGenerateCallCount++;
     lastMessages = messages;
@@ -191,6 +193,7 @@ class _StalledProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async =>
       _tokens.join();
 
@@ -199,6 +202,7 @@ class _StalledProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     for (final token in _tokens) {
       yield token;
@@ -241,6 +245,7 @@ class _CancelErrorProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async =>
       ''; // F-55 测试仅走流式路径。
 
@@ -249,6 +254,7 @@ class _CancelErrorProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) =>
       _events.stream;
 
@@ -297,6 +303,7 @@ class _FaultSequenceProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async =>
       _tokens.join();
 
@@ -305,6 +312,7 @@ class _FaultSequenceProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     final now = _clock.elapsed;
     if (_lastCallAt != Duration.zero) {
@@ -392,6 +400,7 @@ class _HoldableProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     if (!started.isCompleted) {
@@ -406,6 +415,7 @@ class _HoldableProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     throw StateError('F1/F4 测试不走流式路径');
   }

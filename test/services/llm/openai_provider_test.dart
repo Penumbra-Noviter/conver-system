@@ -47,9 +47,8 @@ void main() {
     return srv;
   }
 
-  OpenAIProvider makeProvider(FakeLlmServer server, {double temperature = 0.7}) =>
-      OpenAIProvider(
-          apiKey: apiKey, baseUrl: server.baseUrl, temperature: temperature);
+  OpenAIProvider makeProvider(FakeLlmServer server) =>
+      OpenAIProvider(apiKey: apiKey, baseUrl: server.baseUrl);
 
   const messages = [
     LlmMessage(role: 'system', content: 'You are helpful'),
@@ -158,13 +157,13 @@ void main() {
       ]);
     });
 
-    test('temperature 透传（R8：OpenAI 侧照传，可配置默认 0.7）', () async {
+    test('temperature 透传（U-2：generate 参数驱动，缺省 0.7）', () async {
       final server = await startedServer(FakeLlmServer.jsonResponse({
         'choices': [
           {'message': {'role': 'assistant', 'content': 'x'}},
         ],
       }));
-      await makeProvider(server, temperature: 0.9).generate(messages: messages);
+      await makeProvider(server).generate(messages: messages, temperature: 0.9);
       expect(server.captured.single.jsonBody!['temperature'], 0.9);
     });
   });

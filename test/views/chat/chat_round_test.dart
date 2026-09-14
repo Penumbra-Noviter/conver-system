@@ -87,6 +87,7 @@ class _ContentThenZeroInterruptProvider extends TickingFakeLLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     _streamCalls++;
     streamGenerateCallCount++;
@@ -103,6 +104,7 @@ class _ContentThenZeroInterruptProvider extends TickingFakeLLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -134,6 +136,7 @@ class _GatedInterruptRetryProvider extends TickingFakeLLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;

@@ -140,6 +140,20 @@ void main() {
           .generate(messages: messages, model: 'claude-haiku-4-5');
       expect(server.captured.single.jsonBody!['model'], 'claude-haiku-4-5');
     });
+
+    test('U-2：temperature 参数接收但忽略，body 不含 temperature 键', () async {
+      final server = await startedServer(FakeLlmServer.jsonResponse({
+        'id': 'msg_t',
+        'type': 'message',
+        'role': 'assistant',
+        'content': [
+          {'type': 'text', 'text': 'ok'},
+        ],
+      }));
+      await makeProvider(server)
+          .generate(messages: messages, temperature: 0.9);
+      expect(server.captured.single.jsonBody!, isNot(contains('temperature')));
+    });
   });
 
   group('generate 非流式 — HTTP 状态码 → LLM 族', () {
