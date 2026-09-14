@@ -43,6 +43,9 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-75 | 22 款种子 HTML 游戏响应式 CSS 不彻底：窄屏/异形屏文字截断（固定宽度面板如 width:270px/300px + 仅 @media 768/420 两档断点）；Flutter WebView 容器（webview_capability.dart）无 initialScale/缩放兜底 | 用户 APK/模拟器实测反馈（2026-09-14） | Worth exploring | 📝 待立项 | 模拟器/种子游戏 |
+| F-76 | 角色 temperature 直接读 DB 无 clamp：`_resolveTemperature` 用 `==` 比较 double，角色值为 NaN/Infinity 时（DB 层无 CHECK 约束）会透传到 LLM 请求体致 API 400；`getTemperature()` 有 clamp 但 `character.temperature` 无 | U-UX 期末四轴 Falsify（2026-09-14） | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-77 | `SettingsReader` 接口每加一个消费方所需 getter 就穿透全部 16 处 `implements`（15 测试假实现 + 1 真实实现）；接口混合了 DI seam 与类型化 DAO 两角色，扩展有结构性脆弱性 | U-UX 期末四轴 Architecture（2026-09-14） | Speculative | 📝 待立项 | 数据层 |
 
 ## 技术债处置记录
 

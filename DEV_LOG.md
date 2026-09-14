@@ -6,6 +6,16 @@
 
 ---
 
+## U-UX 补全批次 — 聊天首页/生成参数/模板变量/新手指引（2026-09-14 — 用户 APK/模拟器实测反馈）
+
+- **范围**：用户实测反馈四条（① 聊天首页「临时」半成品 ② 模拟器 UI 适配 ③ 新手指引缺失 ④ 设置两占位行）落 4 工单 U-1~U-4 + 技术债候选 F-75（模拟器响应式，本批未消费）。Grilling 4 决策全按推荐拍板（mobile 先行 / 全局同一替换管线 / 分页 carousel / 对齐桌面完整语义）；拆 5 工单（U-2 拆 prefactoring 02 + 功能 03）。
+- **交付**：U-1 聊天首页角色选择条（ChoiceChip 选中高亮）+ 会话长按重命名/删除；U-2 `LLMProvider` 补 temperature 参数（wide refactor 15 子类，openai 透传/claude 忽略，对齐桌面 F-56）+ 全局 temperature/max_tokens 设置（角色级为主、全局兜底）；U-3 `applyTemplateVars` 增 `extraVars` 全局替换管线（key 长度降序防前缀吞并、保留 user/char 优先）+ 设置编辑页；U-4 首次启动分页新手指引（`_StartupGate` 启动门 + 跳过持久化）。
+- **门禁链**：全量 **1681 测**绿 / analyze 0 / 各工单本工单口径覆盖率 ≥90% / 期末四轴 **0 阻断**（通过）。修复 F-73 色彩契约回归（01 角色选择条误引 ConverColors → colorScheme，`eb7b119`）。
+- **期末四轴非阻断 6 项**：F-1 temperature NaN/Infinity 边界 → 落 TECH_DEBT F-76；A-1 SettingsReader 接口加 getter 连锁 16 处 → 落 F-77；Sp-1 settings_view 文件头注释漂移 → 已顺手修；F-2 JSON 嵌套静默丢弃 / F-3 重复 key 无 UI 去重 → 记录不落（UX 小面，UI 路径不触发）；安全红线 grep 零命中。
+- **串行链降级**：后台 job settle 后 `send_message` 不可用（`list_agents` 空），串行链改为复用 worktree 派新 Implement 逐票接续（02→03→04→05 各一新 agent）。
+- **范围外测试连锁（两处，记录警告）**：03「对话」占位改导航 → `settings_nav_test`/`settings_shared_row_test` chevron 3→4；04 `SettingsReader`（abstract interface class）加 `templateVars` getter → 17 处 `implements` fake 需实现（14 测试文件清单外机械连带，每处一行 `async => const {}`）。均为 Dart 语言特性/编译硬前提，非功能蔓延。
+- **过程遥测**：子智能体 7（Grilling + plan-tickets + Implement×4 含 05 修复 + code-review）；合并冲突 0；空返回 0；flaky 1（chat_entry_test 全量偶发、单跑复绿）；code-review 子智能体默认模型路由失效（yunshu 无 deepseek-v4-flash）→ 改用 kuku/qwen3.7-plus。
+
 ## 技术债折回批次 F-73/F-74 — 全部处置（2026-09-10 — 用户「消费技术债区」指令）
 
 - **范围**：候选区 2 条全处置（做 1 关 1）——F-73 消费，F-74 复核关闭。全量 **1613 测**绿 / analyze 0。**候选区清零**（0 项开放）。
