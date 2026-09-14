@@ -6,6 +6,16 @@
 
 ---
 
+## 技术债消费批次 F-139~F-144（2026-09-14 — 1 做 4 关，轻量档 5 项主会话直做）
+
+- **来源**：用户指令「消费技术债 F-139/F-140/F-142/F-143/F-144」（PD 批次期末四轴落债 6 项中除已关 F-141 外 5 项，均 Speculative）。逐项 git grep 复核现状后拍板 1 做 4 关。
+- **1 做（commit 47b2eef）**：F-139 CharacterUpdate.prompt_mode/expert_prompt Optional[str]=None 但 ORM 列 nullable=False——`update_character` 的 `exclude_unset=True` 会把显式 null setattr 到 nullable=False 列触发 IntegrityError(500)（Falsify 红灯实证：`{"prompt_mode": null}` 返回 500）。修法：CharacterUpdate 加 `field_validator("name", "prompt_mode", "expert_prompt", mode="before")` 拒绝显式 null（省略字段走 validate_default=False 不触发，partial update 语义保持）；防复发断言 test_update_rejects_null_for_not_null_columns（三字段 422，先红后绿）。附带修复 name 同构缺口（name 同为 nullable=False 列，F-139 票面只报 prompt_mode/expert_prompt 漏了 name）。
+- **4 关（复核关闭，理由见 TECH_DEBT.md 复核关闭表）**：F-140（row 经 btn.closest 定位且事件委托在 altList 上，row 必在 DOM 内，indexOf 不可能 -1，单线程无并发不可达）；F-142（build_messages 仅 ==expert 走 expert 分支、其余任意值安全回退 simple，改 Literal 需破坏 CharacterBase 单一来源或冒 CharacterResponse 序列化风险，纵深防御收益 < 成本）；F-143（有意识镜像——_character_data docstring 已声明同口径单一语义镜像，仅 2 实例提取 helper 收益 < 成本）；F-144（wizard state 跨步骤向导真源 vs form DOM 单表单真源，语境不同强行统一收益 < 成本）。
+- **验证链**：pytest 1272+1skip→1273+1skip（+1 防复发断言）+ Vitest 1448 + cargo 70 零改动全绿 | doc_sync 刷新 5 标记（测试总数 +1 漂移修复）+ pool_cleanup_check 全合规 | 技术债候选区 5→0 清零 | 处置记录滚动到最近 2 节（删 09-10 节，git 历史兜底）。
+- **非阻断落债**：无（候选区清零）。
+
+---
+
 ## Prompt 打磨批次 PD（2026-09-14 — 6 工单标准档，预设开场白/Prompt Debug/专家模式）
 
 - **来源**：用户对标 AI 风月「对话质量 / Prompt 工程」第二轮，选定三功能——预设开场白选择、Prompt Debug 面板、专家模式自由编辑 PROMPT。三 ADR 拍板：专家模式=新增 prompt_mode/expert_prompt 可逆字段；预设对话=复用 alternate_greetings 做开场白选择不加表；Prompt Debug=只读预览+来源标注。
