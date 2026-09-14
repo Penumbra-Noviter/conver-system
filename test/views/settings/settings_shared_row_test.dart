@@ -81,25 +81,31 @@ void main() {
     testWidgets('chevron 仅导航行渲染（3 个），占位行无 chevron', (tester) async {
       await pumpSettings(tester);
 
-      expect(find.byIcon(Icons.chevron_right), findsNWidgets(3),
-          reason: '仅三导航行渲染 chevron，占位行不渲染（与现状视觉一致）');
-      // 占位行 label 所在行不得含 chevron。
-      for (final label in ['对话', '模板变量']) {
-        expect(
-          find.descendant(
-            of: rowInkWell(label),
-            matching: find.byIcon(Icons.chevron_right),
-          ),
-          findsNothing,
-          reason: '占位行「$label」不渲染 chevron',
-        );
-      }
+      expect(find.byIcon(Icons.chevron_right), findsNWidgets(4),
+          reason: '三导航行 + 「对话」导航（工单 03）共 4 行 chevron，占位行不渲染');
+      // 占位行（模板变量）label 所在行不得含 chevron；「对话」导航行有 chevron。
+      expect(
+        find.descendant(
+          of: rowInkWell('模板变量'),
+          matching: find.byIcon(Icons.chevron_right),
+        ),
+        findsNothing,
+        reason: '占位行「模板变量」不渲染 chevron',
+      );
+      expect(
+        find.descendant(
+          of: rowInkWell('对话'),
+          matching: find.byIcon(Icons.chevron_right),
+        ),
+        findsOneWidget,
+        reason: '导航行「对话」渲染 chevron',
+      );
     });
 
-    testWidgets('占位行不可点：tap「对话」不触发任何导航', (tester) async {
+    testWidgets('占位行不可点：tap「模板变量」不触发任何导航', (tester) async {
       await pumpSettings(tester);
 
-      await tester.tap(find.text('对话'));
+      await tester.tap(find.text('模板变量'));
       await tester.pumpAndSettle();
 
       expect(find.byType(ManualPage), findsNothing);

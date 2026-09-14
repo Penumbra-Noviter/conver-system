@@ -390,6 +390,12 @@ class ChatService {
         userContent: state.content,
       );
 
+      // 4b. 组装生成参数（工单 03）：温度按「角色为主、全局兜底」，max_tokens
+      // 取全局设置。
+      final globalTemperature = await _settingsRepository.getTemperature();
+      final temperature = _resolveTemperature(character, globalTemperature);
+      final maxTokens = await _settingsRepository.getMaxTokens();
+
       // 5. provider 解析（Key 缺失 → ApiKeyMissingError；未知 → 工厂抛）。
       final resolved = await _resolveProvider(conv);
       providerName = resolved.provider;
@@ -409,6 +415,8 @@ class ChatService {
         llm: resolved.llm,
         messages: messages,
         model: resolved.model,
+        temperature: temperature,
+        maxTokens: maxTokens,
       );
     } on DomainError catch (e) {
       // F3：调用方可能在解析失败瞬间取消订阅（controller 已 close），
@@ -470,12 +478,19 @@ class ChatService {
     required LLMProvider llm,
     required List<LlmMessage> messages,
     required String model,
+    required double temperature,
+    required int maxTokens,
   }) {
     if (state.stopped || controller.isClosed) {
       return;
     }
     final sub = llm
-        .streamGenerate(messages: messages, model: model)
+        .streamGenerate(
+          messages: messages,
+          model: model,
+          temperature: temperature,
+          maxTokens: maxTokens,
+        )
         .listen(
           (token) {
             if (state.stopped) {
@@ -496,6 +511,8 @@ class ChatService {
                 llm: llm,
                 messages: messages,
                 model: model,
+                temperature: temperature,
+                maxTokens: maxTokens,
                 error: error,
               ),
             );
@@ -527,6 +544,8 @@ class ChatService {
     required LLMProvider llm,
     required List<LlmMessage> messages,
     required String model,
+    required double temperature,
+    required int maxTokens,
     required Object error,
   }) async {
     if (state.stopped || controller.isClosed) {
@@ -547,6 +566,8 @@ class ChatService {
         llm: llm,
         messages: messages,
         model: model,
+        temperature: temperature,
+        maxTokens: maxTokens,
       );
       return;
     }
@@ -782,9 +803,19 @@ class ChatService {
       );
       final resolved = await _resolveProvider(conv);
 
+      // 4b. 组装生成参数（工单 03）：温度按「角色为主、全局兜底」，max_tokens
+      // 取全局设置（与 streamReply 同组装语义）。
+      final globalTemperature = await _settingsRepository.getTemperature();
+      final temperature = _resolveTemperature(character, globalTemperature);
+      final maxTokens = await _settingsRepository.getMaxTokens();
+
       // 5. 生成（网络在事务外；LLM 失败 → 异常上抛，未删行、旧消息保留）。
-      final reply =
-          await resolved.llm.generate(messages: messages, model: resolved.model);
+      final reply = await resolved.llm.generate(
+        messages: messages,
+        model: resolved.model,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      );
 
       // 6. 单事务：有界删旧（target.id <= id <= snapshotMaxId）+ 插新一次提交
       //    （drift 嵌套事务 = savepoint，任一失败整体回滚，防半截断持久化）。
@@ -876,6 +907,18 @@ class ChatService {
     return [
       for (final m in built) LlmMessage(role: m.role, content: m.content),
     ];
+  }
+
+  /// 组装采样温度：角色 `character.temperature` 为主、全局 [globalTemperature]
+  /// 兜底（工单 03 判定契约，spec §U-2 高不确定点）。
+  ///
+  /// 角色温度 == [SettingsRepository.defaultTemperature]（0.7，DB 默认）判定为
+  /// 「未显式覆盖」→ 回退全局值；接受「显式设 0.7 会被全局覆盖」的边界。
+  double _resolveTemperature(Character character, double globalTemperature) {
+    if (character.temperature == SettingsRepository.defaultTemperature) {
+      return globalTemperature;
+    }
+    return character.temperature;
   }
 
   /// provider 解析（AR-3：委派 [CredentialsResolver]——组合序单一归属

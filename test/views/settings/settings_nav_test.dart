@@ -67,11 +67,11 @@ void main() {
       expect(find.text('用户手册'), findsOneWidget);
       expect(find.text('关于'), findsOneWidget);
       expect(find.text('桌面版说明'), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_right), findsNWidgets(3),
-          reason: '三入口均需 chevron 或等价触达语义（票面验收 1）');
+      expect(find.byIcon(Icons.chevron_right), findsNWidgets(4),
+          reason: '三入口 + 「对话」导航（工单 03）共 4 行 chevron');
     });
 
-    testWidgets('「对话」「模板变量」两占位保持原样', (tester) async {
+    testWidgets('「对话」导航入口与「模板变量」占位并存', (tester) async {
       await pumpSettings(tester);
 
       expect(find.text('对话'), findsOneWidget);

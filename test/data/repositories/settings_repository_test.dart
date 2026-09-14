@@ -37,8 +37,8 @@ void main() {
     return {for (final row in rows) row.key: row.value};
   }
 
-  group('A1 白名单键集（G5）', () {
-    test('与桌面 ALLOWED_KEYS 十键逐字相等', () {
+  group('A1 白名单键集（G5 + 工单 03）', () {
+    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 两 mobile 先行键', () {
       expect(
         SettingsRepository.allowedKeys,
         equals(<String>{
@@ -52,6 +52,8 @@ void main() {
           'sliding_window_rounds',
           'theme_mode',
           'user_name',
+          'temperature',
+          'max_tokens',
         }),
       );
     });
@@ -157,6 +159,43 @@ void main() {
       });
       expect(await repository.defaultProvider, 'deepseek');
       expect(await repository.defaultModel, 'deepseek-v4-pro');
+    });
+  });
+
+  group('U-2 temperature / max_tokens 类型化读取（工单 03）', () {
+    test('getTemperature 缺省 0.7；写入后读回；空串回退缺省', () async {
+      expect(await repository.getTemperature(), 0.7);
+      await repository.setMany({'temperature': '1.3'});
+      expect(await repository.getTemperature(), 1.3);
+      await repository.setMany({'temperature': ''});
+      expect(await repository.getTemperature(), 0.7);
+    });
+
+    test('getTemperature 非数字回退缺省；越界 clamp 到 [0, 2]', () async {
+      await repository.setMany({'temperature': 'abc'});
+      expect(await repository.getTemperature(), 0.7);
+
+      await repository.setMany({'temperature': '-1.5'});
+      expect(await repository.getTemperature(), 0.0);
+
+      await repository.setMany({'temperature': '9.9'});
+      expect(await repository.getTemperature(), 2.0);
+    });
+
+    test('getMaxTokens 缺省 2048；数字往返；非数字回退缺省', () async {
+      expect(await repository.getMaxTokens(), 2048);
+      await repository.setMany({'max_tokens': '4096'});
+      expect(await repository.getMaxTokens(), 4096);
+      await repository.setMany({'max_tokens': 'xyz'});
+      expect(await repository.getMaxTokens(), 2048);
+    });
+
+    test('temperature / max_tokens 白名单内：setMany 可写、getAll 可读', () async {
+      await repository.setMany({'temperature': '1.2', 'max_tokens': '8192'});
+      expect(await repository.getAll(), {
+        'temperature': '1.2',
+        'max_tokens': '8192',
+      });
     });
   });
 

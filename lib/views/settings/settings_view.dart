@@ -8,13 +8,15 @@ import '../../view_models/theme_controller.dart';
 import '../../widgets/placeholder_group.dart';
 import 'about_page.dart';
 import 'api_config_section.dart';
+import 'conversation_settings_page.dart';
 import 'default_model_section.dart';
 import 'desktop_note_page.dart';
 import 'manual_page.dart';
 import 'theme_section.dart';
 
-/// 设置视图 — 三组真实化（API 配置 / 默认模型 / 主题）+ 两占位（对话 /
-/// 模板变量）+「我」页收口三入口（用户手册 / 关于 / 桌面版说明，F-M5-10）。
+/// 设置视图 — 三组真实化（API 配置 / 默认模型 / 主题）+「对话」设置子页入口
+/// （工单 03）+ 一占位（模板变量）+「我」页收口三入口（用户手册 / 关于 /
+/// 桌面版说明，F-M5-10）。
 ///
 /// 依赖装配（F-9）：仓储 / 主题控制器 / 安全存储全部由 home_shell 沿
 /// provider 注入（单一装配点），本视图不再现造任何数据层/平台存储实例。
@@ -40,9 +42,9 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  /// 「对话」「模板变量」两占位不在 M5 范围（锚共识 D1），保持占位。
+  /// 「模板变量」占位不在本票范围（锚共识 D1）；「对话」已真实化为导航入口
+  /// （工单 03，见 [_openConversationSettings]）。
   static const _placeholderItems = <PlaceholderItem>[
-    PlaceholderItem('对话', '生成参数与行为'),
     PlaceholderItem('模板变量', '自定义注入变量'),
   ];
 
@@ -107,6 +109,17 @@ class _SettingsViewState extends State<SettingsView> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
+  /// 打开「对话」设置子页（工单 03；子页自带 Scaffold + AppBar 返回）。
+  void _openConversationSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ConversationSettingsPage(
+          settingsRepository: _settings,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -155,7 +168,13 @@ class _SettingsViewState extends State<SettingsView> {
                 ThemeSection(themeController: _themeController),
                 Divider(thickness: 1, color: palette.border),
               ],
-              // 「对话」「模板变量」两占位（锚共识 D1）：共享行组件、不可点。
+              // 「对话」导航入口（工单 03）+「模板变量」占位（锚共识 D1）。
+              _SettingsRow(
+                label: '对话',
+                note: '生成参数与行为',
+                onTap: _openConversationSettings,
+              ),
+              Divider(thickness: 1, color: palette.border),
               for (var i = 0; i < _placeholderItems.length; i++) ...[
                 _SettingsRow(
                   label: _placeholderItems[i].label,

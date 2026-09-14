@@ -52,10 +52,12 @@ class SettingsRepository implements SettingsReader {
   final AppDatabase _db;
   final SecretStore _secretStore;
 
-  /// 白名单键集 — 与桌面 `setting.py::ALLOWED_KEYS` **十键逐字相等**。
+  /// 白名单键集 — 与桌面 `setting.py::ALLOWED_KEYS` **十键逐字相等**，外加两
+  /// mobile 先行键 `temperature` / `max_tokens`（工单 03，桌面无此二键——
+  /// 契约漂移显式标注，spec §U-2「mobile 先行差异」）。
   ///
   /// 白名单外的写入一律忽略（[setMany]）；白名单内两 api_key 键重定向到
-  /// SecretStore 槽位，其余八键落设置表。
+  /// SecretStore 槽位，其余键落设置表。
   static const Set<String> allowedKeys = <String>{
     'claude_api_key',
     'claude_base_url',
@@ -67,6 +69,8 @@ class SettingsRepository implements SettingsReader {
     'sliding_window_rounds',
     'theme_mode',
     'user_name',
+    'temperature',
+    'max_tokens',
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -80,6 +84,27 @@ class SettingsRepository implements SettingsReader {
     SecretStore.claudeApiKeySlot,
     SecretStore.openaiApiKeySlot,
   };
+
+  /// 全局采样温度缺省（0.7）——对齐桌面角色字段 DB 默认（tables.dart
+  /// `withDefault(Constant(0.7))`）与 character_wizard 的 `temperatureDefault`。
+  ///
+  /// 工单 03 判定契约（spec §U-2 高不确定点）：角色 `temperature ==
+  /// defaultTemperature` 判定为「未显式覆盖」→ 回退全局温度；接受「显式设 0.7
+  /// 会被全局覆盖」的边界。
+  static const double defaultTemperature = 0.7;
+
+  /// 全局采样温度合法区间 [0, 2]（对齐 character_wizard temperatureMin/Max）。
+  static const double temperatureMin = 0;
+  static const double temperatureMax = 2;
+
+  /// 全局 max_tokens 缺省（2048）——对齐当前调用级硬编码（`LLMProvider` 缺省）。
+  static const int defaultMaxTokens = 2048;
+
+  /// max_tokens 输入合法区间 [1, maxTokensMax]（mobile 先行，无桌面锚点；
+  /// 见工单 03 高不确定点：负数/非数字回退 [defaultMaxTokens]、超上限 clamp）。
+  /// clamp 落 UI 输入层（conversation_settings_page），仓储读取保持 getInt 语义。
+  static const int maxTokensMin = 1;
+  static const int maxTokensMax = 100000;
 
   // ── 键值 CRUD ──
 
@@ -213,6 +238,26 @@ class SettingsRepository implements SettingsReader {
   /// 滑动窗口轮数；缺省 30（镜像桌面 sliding_window_rounds）。
   Future<int> get slidingWindowRounds =>
       getInt('sliding_window_rounds', defaultValue: 30);
+
+  /// 全局采样温度；缺省 [defaultTemperature]，clamp 到
+  /// [temperatureMin, temperatureMax]。
+  ///
+  /// 读取 `temperature` 键（mobile 先行键，桌面 ALLOWED_KEYS 无此键）；非数字/
+  /// 缺失 → 缺省；越界 → clamp。
+  Future<double> getTemperature() async {
+    final parsed = double.tryParse(await getValue('temperature'));
+    if (parsed == null) {
+      return defaultTemperature;
+    }
+    return parsed.clamp(temperatureMin, temperatureMax).toDouble();
+  }
+
+  /// 全局 max_tokens；缺省 [defaultMaxTokens]。
+  ///
+  /// 读取 `max_tokens` 键（mobile 先行键，桌面无此键）；非数字/缺失回退缺省
+  /// （镜像 [getInt] 语义）。合法区间 clamp 由 UI 输入层保证（见
+  /// [maxTokensMin] / [maxTokensMax]）。
+  Future<int> getMaxTokens() => getInt('max_tokens', defaultValue: defaultMaxTokens);
 
   /// 默认 provider；缺省 [SettingsDefaults.provider]（镜像桌面
   /// default_provider 的 config 兜底）。

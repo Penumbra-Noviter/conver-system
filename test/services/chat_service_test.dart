@@ -119,6 +119,7 @@ class _TickingProvider extends LLMProvider {
   List<LlmMessage>? lastMessages;
   int? lastMaxTokens;
   String? lastModel;
+  double? lastTemperature;
 
   @override
   LLMError translateError(Object error) =>
@@ -135,6 +136,7 @@ class _TickingProvider extends LLMProvider {
     lastMessages = messages;
     lastMaxTokens = maxTokens;
     lastModel = model;
+    lastTemperature = temperature;
     final e = errorAfter;
     if (e != null) {
       throw e;
@@ -153,6 +155,7 @@ class _TickingProvider extends LLMProvider {
     lastMessages = messages;
     lastMaxTokens = maxTokens;
     lastModel = model;
+    lastTemperature = temperature;
     for (final token in _tokens) {
       await Future<void>.delayed(delay);
       yield token;
@@ -487,6 +490,7 @@ void main() {
     String scenario = '',
     String mesExample = '',
     String postHistoryInstructions = '',
+    double? temperature,
   }) {
     return charRepo.createCharacter(
       CharactersCompanion.insert(
@@ -497,6 +501,9 @@ void main() {
         scenario: Value(scenario),
         mesExample: Value(mesExample),
         postHistoryInstructions: Value(postHistoryInstructions),
+        temperature: temperature == null
+            ? const Value.absent()
+            : Value(temperature),
         createdAt: fakeNow,
         updatedAt: fakeNow,
       ),
@@ -1136,6 +1143,89 @@ void main() {
         (Role.user, 'hi'),
         (Role.assistant, '回复'),
       ]);
+    });
+  });
+
+  // ── U-2 温度组装 / max_tokens 透传（工单 03）──
+
+  group('streamReply · 生成参数组装（U-2，工单 03）', () {
+    test('角色默认 0.7 + 全局未设 → provider 收到 0.7 / 2048', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final provider = _TickingProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.lastTemperature, 0.7);
+      expect(provider.lastMaxTokens, 2048);
+    });
+
+    test('角色非 0.7 时全局不生效（角色温度为主）', () async {
+      final char = await seedCharacter(temperature: 1.2);
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'temperature': '0.9'});
+
+      final provider = _TickingProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.lastTemperature, 1.2, reason: '角色 1.2 覆盖全局 0.9');
+    });
+
+    test('角色 0.7 时全局生效（判定为未覆盖 → 兜底全局值）', () async {
+      final char = await seedCharacter(); // temperature 取 DB 默认 0.7
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'temperature': '0.9'});
+
+      final provider = _TickingProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.lastTemperature, 0.9, reason: '角色 0.7 视为未覆盖 → 全局 0.9');
+    });
+
+    test('max_tokens 全局 4096 → provider 收到 4096', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'max_tokens': '4096'});
+
+      final provider = _TickingProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.lastMaxTokens, 4096);
+    });
+
+    test('regenerate 透传 temperature + max_tokens', () async {
+      final char = await seedCharacter(temperature: 1.3);
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'max_tokens': '8192'});
+      await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.user,
+        content: '你好',
+      );
+      await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '旧回复',
+      );
+
+      final provider = _TickingProvider(tokens: const ['新回复']);
+      wireService(provider);
+      await service.regenerate(conversationId: conv.id);
+
+      expect(provider.lastTemperature, 1.3);
+      expect(provider.lastMaxTokens, 8192);
     });
   });
 

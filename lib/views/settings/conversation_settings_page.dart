@@ -1,0 +1,175 @@
+/// 「对话」设置子页（工单 03）——全局 temperature / max_tokens 编辑、保存与回显。
+///
+/// 语义锚点（spec §U-2 / US-2.1 / US-2.4）：
+/// - temperature：slider 0–2（对齐 character_wizard temperatureMin/Max），缺省
+///   0.7；写入 `temperature` 键（mobile 先行，桌面 ALLOWED_KEYS 无此键）。
+/// - max_tokens：数字输入，缺省 2048；合法区间
+///   [SettingsRepository.maxTokensMin, SettingsRepository.maxTokensMax]
+///   （mobile 先行，无桌面锚点；负数/非数字回退缺省、超上限 clamp）。
+///
+/// 视图层只做展示编排 + 输入校验，读写经 [SettingsRepository]（数据层），
+/// 不触碰平台存储。
+library;
+
+import 'package:flutter/material.dart';
+
+import '../../data/repositories/settings_repository.dart';
+import '../../theme/colors.dart';
+import '../../theme/conver_palette.dart';
+
+/// 「对话」设置子页。
+class ConversationSettingsPage extends StatefulWidget {
+  const ConversationSettingsPage({super.key, required this.settingsRepository});
+
+  /// 设置仓储（应用级统一实例，settings_view 注入）。
+  final SettingsRepository settingsRepository;
+
+  @override
+  State<ConversationSettingsPage> createState() =>
+      _ConversationSettingsPageState();
+}
+
+class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
+  double _temperature = SettingsRepository.defaultTemperature;
+  final TextEditingController _maxTokensController = TextEditingController();
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _maxTokensController.dispose();
+    super.dispose();
+  }
+
+  /// 加载已保存值回显；读取失败保持缺省（不阻塞页面渲染）。
+  Future<void> _load() async {
+    try {
+      final temperature = await widget.settingsRepository.getTemperature();
+      final maxTokens = await widget.settingsRepository.getMaxTokens();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _temperature = temperature;
+        _maxTokensController.text = maxTokens.toString();
+        _loaded = true;
+      });
+    } catch (e) {
+      debugPrint('对话参数加载失败，保持缺省: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() => _loaded = true);
+    }
+  }
+
+  /// 保存 temperature / max_tokens 到设置表；max_tokens 非数字回退缺省、
+  /// 越界 clamp 到合法区间。
+  Future<void> _save() async {
+    final parsed = int.tryParse(_maxTokensController.text.trim());
+    final maxTokens = parsed == null
+        ? SettingsRepository.defaultMaxTokens
+        : parsed
+              .clamp(
+                SettingsRepository.maxTokensMin,
+                SettingsRepository.maxTokensMax,
+              )
+              .toInt();
+    try {
+      await widget.settingsRepository.setMany({
+        'temperature': _temperature.toString(),
+        'max_tokens': maxTokens.toString(),
+      });
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已保存')));
+    } catch (e) {
+      debugPrint('对话参数保存失败: $e');
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('保存失败')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = ConverPalette.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('对话')),
+      body: SafeArea(
+        child: !_loaded
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  ConverSpacing.space4,
+                  ConverSpacing.space5,
+                  ConverSpacing.space4,
+                  ConverSpacing.space6,
+                ),
+                children: [
+                  Text(
+                    '温度',
+                    style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+                  ),
+                  const SizedBox(height: ConverSpacing.space1),
+                  Text(
+                    '采样随机性（0–2，默认 0.7）',
+                    style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+                  ),
+                  const SizedBox(height: ConverSpacing.space2),
+                  Slider(
+                    value: _temperature,
+                    min: SettingsRepository.temperatureMin,
+                    max: SettingsRepository.temperatureMax,
+                    divisions: 20,
+                    label: _temperature.toStringAsFixed(2),
+                    onChanged: (value) =>
+                        setState(() => _temperature = value),
+                  ),
+                  Text(
+                    _temperature.toStringAsFixed(2),
+                    style: textTheme.bodyLarge?.copyWith(color: palette.ink2),
+                  ),
+                  const SizedBox(height: ConverSpacing.space4),
+                  Divider(thickness: 1, color: palette.border),
+                  const SizedBox(height: ConverSpacing.space4),
+                  Text(
+                    '最大 token 数',
+                    style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+                  ),
+                  const SizedBox(height: ConverSpacing.space1),
+                  Text(
+                    '单次回复长度上限（1–100000，默认 2048）',
+                    style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+                  ),
+                  const SizedBox(height: ConverSpacing.space2),
+                  TextField(
+                    controller: _maxTokensController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      hintText: '输入最大 token 数',
+                    ),
+                  ),
+                  const SizedBox(height: ConverSpacing.space5),
+                  FilledButton(
+                    onPressed: _save,
+                    child: const Text('保存'),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
