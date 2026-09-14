@@ -14,7 +14,7 @@ import base64
 import binascii
 
 from backend.app.models.character import Character
-from backend.app.schemas.character import CharacterCreate
+from backend.app.schemas.character import PRESET_DIALOGUE_MAX, CharacterCreate
 from backend.app.services.character_fields import CHARACTER_V2_FIELDS, V2_KEY_MAP, V1_TO_V2_MAP
 from backend.app.services.exceptions import CardFormatError, CardValidationError
 from backend.app.services.text_utils import as_str_list
@@ -61,6 +61,10 @@ def to_v2_card(char: Character) -> dict:
         ns["prompt_mode"] = char.prompt_mode
     if char.expert_prompt:
         ns["expert_prompt"] = char.expert_prompt
+
+    # PD-4 预设对话：写入 conver_system 命名空间（不落 data 顶层，与 prompt_mode/expert_prompt 同归类）
+    if char.preset_dialogues:
+        ns["preset_dialogues"] = char.preset_dialogues
 
     # 头像：base64 data URI → data.avatar（去前缀，ST 兼容）；URL → 命名空间 avatar_url
     data_avatar = None
@@ -177,6 +181,9 @@ def _build_create(data: dict) -> CharacterCreate:
     prompt_mode = str(ns.get("prompt_mode") or "simple")
     expert_prompt = str(ns.get("expert_prompt") or "")
 
+    # PD-4 预设对话：conver_system 命名空间往返（对齐 temperature 既有模式），读回并归一化
+    preset_dialogues = _normalize_preset_dialogues(ns.get("preset_dialogues"))
+
     version = data.get("character_version") or data.get("version") or "1.0"
 
     return CharacterCreate(
@@ -202,6 +209,7 @@ def _build_create(data: dict) -> CharacterCreate:
         max_tokens=max_tokens,
         prompt_mode=prompt_mode,
         expert_prompt=expert_prompt,
+        preset_dialogues=preset_dialogues,
     )
 
 
@@ -260,6 +268,32 @@ def _conver_system(extensions: dict) -> dict:
     """取 extensions 中的 conver_system 命名空间（不存在 / 非 dict 返回空 dict）"""
     ns = extensions.get(_NS)
     return ns if isinstance(ns, dict) else {}
+
+
+def _normalize_preset_dialogues(value: object) -> list[dict]:
+    """预设对话归一化：非 list → []；逐项 name/content trim 非空；按 name 去重保留首个；截断至 PRESET_DIALOGUE_MAX
+
+    PD-4 预设对话导入侧容错：脏数据（None / 非 list / 空字段 / 同名重复 / 超量）
+    全部收敛为「干净 list[dict]」，再交 CharacterCreate 由 Pydantic 转 PresetDialogue。
+    """
+    if not isinstance(value, list):
+        return []
+    result: list[dict] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        content = str(item.get("content") or "").strip()
+        if not name or not content:
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        result.append({"name": name, "content": content})
+        if len(result) >= PRESET_DIALOGUE_MAX:
+            break
+    return result
 
 
 def _clamp_temperature(value) -> float:
