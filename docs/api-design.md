@@ -492,6 +492,53 @@ POST /api/messages/{message_id}/switch-swipe
 | 消息不存在 | 404 | 消息不存在: {id} |
 | 候选序号不存在 | 400 | 候选序号不存在: {index} |
 
+### 编辑重发（message-edit-resend）
+
+```
+PUT /api/messages/{message_id}
+```
+
+就地替换该 user 消息的 `content`，物理截断其后的消息，并重新生成后续回复
+（替换 + 删后续 + 新 assistant 单 commit 原子落库；LLM 调用失败时未提交变更随
+session 关闭回滚 → 零落库）。仅限 user 消息（assistant 编辑本期不做）。响应与
+`chat` 同构的 `ChatResponse`（`message_id` = 新 assistant 消息 id）。
+
+**请求体**
+```json
+{ "content": "修正后的用户输入" }
+```
+
+**响应** `200`
+```json
+{ "reply": "新回复", "message_id": 43, "conversation_id": 1 }
+```
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| 消息不存在 / 不属于该对话 | 404 | 消息不存在: {id} |
+| 目标非 user | 400 | 只能编辑用户消息 |
+
+### 删除单条消息（message-edit-resend）
+
+```
+DELETE /api/messages/{message_id}
+```
+
+删除单条消息（角色感知）：USER → 删除该条及其后所有消息（后续 assistant 失去
+触发源）；ASSISTANT（及 system 等非 user 角色）→ 仅删该条，其候选经
+`message_swipes.message_id` FK `ON DELETE CASCADE` 级联删除。删除后 bump 所属
+`conversation.updated_at`（会话列表排序不变量）。
+
+**响应** `204` — No Content。
+
+**错误语义**
+
+| 场景 | HTTP | detail 示例 |
+|------|------|------------|
+| 消息不存在 | 404 | 消息不存在: {id} |
+
 ### 继续生成（MS-3，append 续写）
 
 ```
