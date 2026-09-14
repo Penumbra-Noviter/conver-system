@@ -239,6 +239,16 @@ export async function loadSettings() {
         if (memoryPalace) {
             memoryPalace.checked = ['1', 'true', 'yes'].includes(String(s.memory_palace_enabled || '').toLowerCase());
         }
+        // 01 叙述风格开关（'1'/'true'/'yes' → 勾选，与 memory_palace 同口径）
+        const narrativeStyleToggle = $('#setting-narrative-style-enabled');
+        if (narrativeStyleToggle) {
+            narrativeStyleToggle.checked = ['1', 'true', 'yes'].includes(String(s.narrative_style_enabled || '').toLowerCase());
+        }
+        // 01 叙述风格规则文本（空 = 内置默认 → 留空占位，前端不复制后端默认常量）
+        const narrativeStyleRules = $('#setting-narrative-style-rules');
+        if (narrativeStyleRules) {
+            narrativeStyleRules.value = s.narrative_style_rules || '';
+        }
     } catch (err) {
         console.error('加载设置失败:', err);
     }
@@ -318,11 +328,11 @@ async function testApiKeys(data) {
 /**
  * 初始化设置面板：绑定所有事件监听器
  * Provider/模型下拉、自定义输入元素或 save/clear 按钮缺失（index.html 契约被破坏的极端场景）→ 对应绑定 no-op 不抛错。
- * save 回调另有入口统一守卫（TD-13 / TD-15）：守卫收集 10 个表单元素变量
- * （9 个表单字段 + #setting-custom-model，后者条件化——仅自定义模型模式
+ * save 回调另有入口统一守卫（TD-13 / TD-15）：守卫收集 12 个表单元素变量
+ * （11 个表单字段 + #setting-custom-model，后者条件化——仅自定义模型模式
  * （modelSelect.value === '__custom__'）要求，与 getSelectedModel 裸读分支对齐；
  * 非自定义模式该元素缺失不早退）任一缺失 → console.warn + 早退 no-op
- * （不执行保存、不发 fetch、不抛 TypeError）；第 11 次 DOM 读取
+ * （不执行保存、不发 fetch、不抛 TypeError）；第 13 次 DOM 读取
  * （default_provider_name 的 option:checked）由 `?.` 收口，不参与缺失收集。
  *
  * @param {object} [options]
@@ -352,10 +362,10 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
 
     // ── 保存设置（按钮缺失 → 绑定 no-op 不抛错）──
     $('#btn-save-settings')?.addEventListener('click', async () => {
-        // ── 入口统一守卫（TD-13 / TD-15）：10 个元素变量任一缺失 → console.warn + 早退 no-op ──
-        // 9 个表单字段读取 + #setting-custom-model（条件化：仅 modelSelect.value === '__custom__'
+        // ── 入口统一守卫（TD-13 / TD-15）：12 个元素变量任一缺失 → console.warn + 早退 no-op ──
+        // 11 个表单字段读取 + #setting-custom-model（条件化：仅 modelSelect.value === '__custom__'
         // 时收集，与 getSelectedModel 裸读分支对齐——非自定义模式该元素缺失不早退）。
-        // 第 11 次 DOM 读取（default_provider_name 的 option:checked）由 `?.` 收口为空串，
+        // 第 13 次 DOM 读取（default_provider_name 的 option:checked）由 `?.` 收口为空串，
         // 不参与缺失收集。守卫在数据收集前拦截：不执行保存、不发 fetch、无 rejection、无 TypeError。
         const claudeKeyInput = $('#setting-claude-key');
         const claudeUrlInput = $('#setting-claude-url');
@@ -367,6 +377,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
         const userNameInput = $('#setting-user-name');
         const modelSelect = $('#setting-default-model');
         const customModelInput = $('#setting-custom-model');
+        const narrativeStyleToggle = $('#setting-narrative-style-enabled');
+        const narrativeStyleRules = $('#setting-narrative-style-rules');
         const missing = [
             ['#setting-claude-key', claudeKeyInput],
             ['#setting-claude-url', claudeUrlInput],
@@ -377,6 +389,8 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
             ['#setting-theme', themeSelect],
             ['#setting-user-name', userNameInput],
             ['#setting-default-model', modelSelect],
+            ['#setting-narrative-style-enabled', narrativeStyleToggle],
+            ['#setting-narrative-style-rules', narrativeStyleRules],
         ];
         // TD-15：custom-model 缺失检查条件化——仅在自定义模型模式要求（与 getSelectedModel
         // 裸读分支 modelSelect.value === '__custom__' 精确对齐）；modelSelect 自身缺失
@@ -401,6 +415,9 @@ export function initSettingsPanel({ onConversationsCleared } = {}) {
             sliding_window_rounds: slidingWindowInput.value,
             theme_mode: themeSelect.value,
             user_name: userNameInput.value,
+            // 01 叙述风格（开关 + 规则文本；两元素已纳入上方入口守卫，此处裸读安全）
+            narrative_style_enabled: narrativeStyleToggle.checked ? '1' : '0',
+            narrative_style_rules: narrativeStyleRules.value,
             // WL-5 记忆宫殿开关
             memory_palace_enabled: ($('#setting-memory-palace')?.checked) ? '1' : '0',
             // MD-3 图片生成后端
