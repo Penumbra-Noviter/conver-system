@@ -16,6 +16,7 @@ class ConversationCreate(BaseModel):
     title: str = Field("新对话", max_length=200)
     model_provider: str = Field("claude", description="模型提供商")
     model_name: str = Field("claude-sonnet-5", description="具体模型名")
+    greeting: Optional[str] = Field(None, description="指定开场白（显式传入时覆盖角色 first_mes；None/空串表示不预插）")
 
 
 class ConversationUpdate(BaseModel):

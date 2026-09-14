@@ -181,11 +181,19 @@ def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
     db.commit()
     db.refresh(conv)
 
-    # 预插开场白：创建对话时把角色的 first_mes 插入为首条 assistant 消息
-    if character and character.first_mes:
+    # 预插开场白：创建对话时把开场白插入为首条 assistant 消息
+    #   - 显式传 greeting 时以其值为准（None/空串 → 不预插）
+    #   - 未传 greeting 时用 character.first_mes（既有语义，零回归）
+    if "greeting" in data.model_fields_set:
+        greeting_text = data.greeting
+    else:
+        greeting_text = character.first_mes if character else None
+
+    if greeting_text:
         user_name = (setting_service.get_value(db, 'user_name') or 'User')
-        greeting = apply_template_vars(character.first_mes, user_name, character.name)
-        message_service.create_message(db, conv.id, Role.ASSISTANT, greeting)
+        char_name = character.name if character else "Character"
+        content = apply_template_vars(greeting_text, user_name, char_name)
+        message_service.create_message(db, conv.id, Role.ASSISTANT, content)
 
     db.refresh(conv)
     return conv
