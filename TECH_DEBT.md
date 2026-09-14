@@ -55,7 +55,6 @@
 |------|--------|------|------|------|----------|
 | F-139 | CharacterUpdate.prompt_mode/expert_prompt 为 Optional[str]=None 但 ORM 列 nullable=False，发送 {"prompt_mode": null} 触发 IntegrityError(500) 而非 Pydantic 422（前端不发 null，需刻意构造畸形请求） | 波 1 增量审核 Falsify | Speculative | 📝 待立项 | 后端 schema |
 | F-140 | character-wizard.js 备用开场白删除 handler 用 indexOf(row) 定位后 splice(idx,1)，极端竞态下 indexOf 返回 -1 导致 splice(-1,1) 误删末项（单线程 UI 无并发，触发概率极低） | 波 2 增量审核 Falsify | Speculative | 📝 待立项 | 前端渲染 |
-| F-141 | build_prompt_debug 中 character=None（孤儿对话，SQLite FK CASCADE 未启用时可达）时 character.prompt_mode 属性访问 AttributeError，fail-open（只读 debug 端点，FK 正常时不可达） | 期末四轴 Falsify | Worth exploring | 📝 待立项 | 后端 debug 端点 |
 | F-142 | CharacterBase.prompt_mode 用 str 未用 Literal['simple','expert'] 枚举约束，直接 API 可写任意值（前端已归一，运行时安全回退 simple，纵深防御缺口） | 期末四轴 Standards | Speculative | 📝 待立项 | 后端 schema |
 | F-143 | chat._character_data 与 message.build_message_list 的 CharacterData 构造几乎逐字重复（PROMPT_FIELDS 投影 + 显式补 prompt_mode/expert_prompt），未来增字段需同步两处 | 期末四轴 Architecture | Speculative | 📝 待立项 | 后端 prompt 组装 |
 | F-144 | character-wizard.js 备用开场白删除用 state.splice 直接变异数组 vs character-form.js 以 DOM 为真源，同批次同类功能两套模式不一致 | 期末四轴 Architecture | Speculative | 📝 待立项 | 前端渲染 |
@@ -119,6 +118,7 @@
 | F-136 | `_resolve_edit_target` 与 `_resolve_continue_target`/regenerate 解析构成平行家族萌芽 | 消息编辑重发期末四轴 Architecture | Speculative | ❌ 复核关闭（三解析函数独立领域语义——edit=user / continue=末条 assistant / regenerate=assistant+缺省末条，仅 3 实例抽象「目标解析器」收益 < 成本） |
 | F-137 | `EditMessageRequest.content` 仅 min_length=1，全空白字符串穿过校验送生成 | 消息编辑重发期末四轴 Falsify（观察） | Speculative | ✅ 已修（2026-09-14：加 field_validator strip 后拒绝全空白 + 防复发断言 test_edit_blank_content_422） |
 | F-138 | error_mapping.py 400 分支 isinstance 元组行膨胀（~180 字符） | 消息编辑重发期末四轴 Standards | Speculative | ✅ 已修（2026-09-14：提取模块常量 `_HTTP_400_DOMAIN_ERRORS` 多行元组，400 分支改指常量） |
+| F-141 | build_prompt_debug character=None 时 character.prompt_mode AttributeError | PD 批次期末四轴 Falsify | Worth exploring | ❌ 复核关闭（误报：_character_data 用 getattr 默认值返回空 CharacterData + character_name/prompt_mode 均有 if-else 守卫 + _lorebook_world_injection/_mod_prompt_injection None 时返回空注入，None 路径已完整覆盖） |
 
 ### 2026-09-13（技术债消费批次 ×2：批1 F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波；批2 F-110 做 + F-109/F-111 关，轻量档 1 工单）
 
