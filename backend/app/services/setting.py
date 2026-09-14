@@ -45,6 +45,10 @@ __all__ = [
     "image_base_url",
     # T6：CG 自动触发（完整回合后按概率自动解锁候选 CG）
     "cg_auto_trigger_probability",
+    # 01 叙述风格（对话降 AI 味：开关 + 规则文本，供注入链消费）
+    "NARRATIVE_STYLE_DEFAULT_RULES",
+    "narrative_style_enabled",
+    "narrative_style_rules",
 ]
 
 # 允许前端读写的配置键白名单
@@ -68,6 +72,9 @@ ALLOWED_KEYS = {
     "image_base_url",
     # T6：CG 自动触发（完整回合后按概率自动解锁候选 CG）
     "cg_auto_trigger_probability",
+    # 01 叙述风格（对话降 AI 味：开关 + 规则文本）
+    "narrative_style_enabled",
+    "narrative_style_rules",
 }
 
 # Provider 协议元数据（协议映射 / openai 协议族模型集）单一来源位于
@@ -265,3 +272,29 @@ def cg_auto_trigger_probability(db: Session) -> int:
     if value > 100:
         return 100
     return value
+
+
+# 01 叙述风格默认规则（反 AI 味清单；注入链在用户未自定义规则时回退此文本）
+NARRATIVE_STYLE_DEFAULT_RULES = (
+    "叙述风格约束（降低 AI 生成痕迹）：\n"
+    "1. 禁止总结式收尾，不以感慨、升华或归纳结束回复。\n"
+    "2. 禁止「总之」「值得注意的是」「首先……其次……」等句式。\n"
+    "3. 只输出角色台词、动作与内心活动，不输出说明性正文。\n"
+    "4. 禁止括号外旁白与动机解释，想法只通过动作或内心呈现。\n"
+    "5. 禁止复读用户输入，不机械重复对方刚说过的话。\n"
+    "6. 禁止使用 emoji、markdown 标题或列表，行文以自然段落为主。\n"
+    "7. 禁止机械对称的一问一答与堆砌式小作文。\n"
+    "8. 保持人称与语气一致，与角色设定契合。\n"
+    "9. 不确定如何回应时，用短句与动作推进场景。\n"
+    "若与角色设定冲突，以角色设定为准。"
+)
+
+
+def narrative_style_enabled(db: Session) -> bool:
+    """叙述风格开关（默认关；'1'/'true'/'yes' 大小写不敏感 → True）"""
+    return get_value(db, "narrative_style_enabled", "").lower() in ("1", "true", "yes")
+
+
+def narrative_style_rules(db: Session) -> str:
+    """叙述风格规则文本（DB 非空返回原值，空/缺省回退默认反 AI 味清单）"""
+    return get_value(db, "narrative_style_rules") or NARRATIVE_STYLE_DEFAULT_RULES
