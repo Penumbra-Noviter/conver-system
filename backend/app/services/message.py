@@ -134,7 +134,7 @@ def build_message_list(
     append_current_input: bool = True,
     world_injection: dict[str, list[str]] | None = None,
     history: Sequence[Message] | None = None,
-    narrative_style: str | None = None,
+    narrative_style: str = "",
 ) -> list[dict]:
     """构建发送给 LLM 的消息列表
 
@@ -152,9 +152,9 @@ def build_message_list(
     history（F-95）：可选外部传入的历史（None → 内部查询）。调用方（如
     assemble_chat_context 已为世界书扫描窗取过历史）传此参数可避免重复查询。
 
-    narrative_style（02）：None（默认）→ 内部查 narrative_style_enabled，开启时读
-    narrative_style_rules、关闭时传空串（不读 rules，避免无谓读取）；显式传字符串
-    时直接透传（调用方已解析）。空串/纯空白在组装层零注入。
+    narrative_style（02）：叙述风格规则文本，非空时在组装层注入 [叙述风格] system 段；
+    空串/纯空白零注入。由调用方（assemble_chat_context / build_prompt_debug）查
+    narrative_style_enabled/rules 决定是否传入——本函数不查设置（纯透传）。
 
     查询角色与历史消息后，委托给 services/llm/prompt.py 的纯函数完成组装。
 
@@ -181,14 +181,6 @@ def build_message_list(
     )
     if history is None:
         history = get_messages(db, conversation.id)
-
-    # 02 叙述风格：None → 查设置（开启才读 rules，关闭空串）；非 None → 透传。
-    if narrative_style is None:
-        narrative_style = (
-            setting_service.narrative_style_rules(db)
-            if setting_service.narrative_style_enabled(db)
-            else ""
-        )
 
     return build_messages(
         character=char_data,

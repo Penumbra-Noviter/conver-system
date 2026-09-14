@@ -165,40 +165,26 @@ class TestExpertNarrativeInjection:
 
 
 class TestBuildMessageListNarrative:
-    def test_enabled_injects(self, db_session) -> None:
-        """enabled=1 → 注入 rules"""
+    def test_explicit_style_injects(self, db_session) -> None:
+        """显式传 narrative_style → 注入（build_message_list 纯透传，不查设置）"""
         char = _persist_character(db_session)
         conv = _persist_conversation(db_session, char.id)
-        _save_setting(db_session, "narrative_style_enabled", "1")
-        _save_setting(db_session, "narrative_style_rules", "自定义规则")
 
-        msgs = message_service.build_message_list(db_session, conv, "你好")
+        msgs = message_service.build_message_list(
+            db_session, conv, "你好", narrative_style="自定义规则"
+        )
 
         assert {"role": "system", "content": "[叙述风格]\n自定义规则"} in msgs
 
-    def test_disabled_zero_injection_and_skips_rules_read(
-        self, db_session, monkeypatch
-    ) -> None:
-        """enabled 关闭（缺省）→ 零注入，且不读 rules（monkeypatch 抛错验不触达）"""
+    def test_empty_style_zero_injection(self, db_session) -> None:
+        """显式传空串 → 零注入（不查设置）"""
         char = _persist_character(db_session)
         conv = _persist_conversation(db_session, char.id)
 
-        def _boom(db):
-            raise AssertionError("关闭时不应读取 narrative_style_rules")
-
-        monkeypatch.setattr(setting_service, "narrative_style_rules", _boom)
-        msgs = message_service.build_message_list(db_session, conv, "你好")
+        msgs = message_service.build_message_list(
+            db_session, conv, "你好", narrative_style=""
+        )
         assert not any(m["content"].startswith("[叙述风格]") for m in msgs)
-
-    def test_default_none_queries_setting(self, db_session) -> None:
-        """默认 None（未显式传）→ 内部查设置注入"""
-        char = _persist_character(db_session)
-        conv = _persist_conversation(db_session, char.id)
-        _save_setting(db_session, "narrative_style_enabled", "1")
-        _save_setting(db_session, "narrative_style_rules", "默认触发")
-
-        msgs = message_service.build_message_list(db_session, conv, "你好")
-        assert {"role": "system", "content": "[叙述风格]\n默认触发"} in msgs
 
 
 class _FakeProvider:

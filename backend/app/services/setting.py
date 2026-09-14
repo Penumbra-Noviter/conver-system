@@ -291,8 +291,12 @@ NARRATIVE_STYLE_DEFAULT_RULES = (
 
 
 def narrative_style_enabled(db: Session) -> bool:
-    """叙述风格开关（默认关；'1'/'true'/'yes' 大小写不敏感 → True）"""
-    return get_value(db, "narrative_style_enabled", "").lower() in ("1", "true", "yes")
+    """叙述风格开关（默认开，opt-out；'0' 显式关闭；'1'/'true'/'yes' 大小写不敏感 → True）
+
+    ADR-1 拍板「默认启用」：降 AI 味是跨角色通用诉求，全新安装未配置该键时视为开启；
+    用户显式写 '0' 才关闭。与 memory_palace_enabled（默认关 opt-in）语义相反，勿混用口径。
+    """
+    return get_value(db, "narrative_style_enabled", "1").lower() in ("1", "true", "yes")
 
 
 def narrative_style_rules(db: Session) -> str:

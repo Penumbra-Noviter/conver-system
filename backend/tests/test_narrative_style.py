@@ -5,7 +5,7 @@
     1. ALLOWED_KEYS 含 narrative_style_enabled / narrative_style_rules 两键
     2. get_all 返回两键、set_many 写两键且忽略白名单外键
     3. narrative_style_enabled 真值口径（"1"/"true"/"yes" 大小写不敏感 → True，
-       其余/空/缺省 → False）
+       其余/显式空 → False，缺省 → True 默认启用 opt-out）
     4. narrative_style_rules 默认规则回退（DB 非空返回原值，空/缺省返回默认常量）
     5. NARRATIVE_STYLE_DEFAULT_RULES 覆盖反 AI 味规则清单 + 末尾冲突声明
 
@@ -61,11 +61,16 @@ class TestNarrativeStyleKeys:
 
 
 class TestNarrativeStyleEnabled:
-    """访问器真值口径（对齐 memory_palace_enabled）"""
+    """访问器真值口径（默认启用 opt-out，与 memory_palace_enabled 的 opt-in 相反）"""
 
-    def test_default_false_when_missing(self, db_session) -> None:
-        """键缺省 → False"""
-        assert setting_service.narrative_style_enabled(db_session) is False
+    def test_default_true_when_missing(self, db_session) -> None:
+        """键缺省 → True（ADR-1 默认启用降 AI 味）"""
+        assert setting_service.narrative_style_enabled(db_session) is True
+
+    def test_true_when_explicit_empty(self, db_session) -> None:
+        """显式空串 → True（get_value 空值回退 default "1"，与缺省同义）"""
+        _save_setting(db_session, "narrative_style_enabled", "")
+        assert setting_service.narrative_style_enabled(db_session) is True
 
     @pytest.mark.parametrize("value", ["1", "true", "yes", "True", "TRUE", "YES"])
     def test_true_values(self, db_session, value: str) -> None:
@@ -73,9 +78,9 @@ class TestNarrativeStyleEnabled:
         _save_setting(db_session, "narrative_style_enabled", value)
         assert setting_service.narrative_style_enabled(db_session) is True
 
-    @pytest.mark.parametrize("value", ["0", "false", "no", "off", "", "abc", "2"])
+    @pytest.mark.parametrize("value", ["0", "false", "no", "off", "abc", "2"])
     def test_false_values(self, db_session, value: str) -> None:
-        """非真值集 / 空 / 缺省 → False"""
+        """显式非真值集 → False"""
         _save_setting(db_session, "narrative_style_enabled", value)
         assert setting_service.narrative_style_enabled(db_session) is False
 

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from sqlalchemy.orm import Session
 
 from backend.app.models.character import Character
@@ -28,6 +30,12 @@ from backend.app.services import setting as setting_service
 from backend.app.services.llm import resolver as llm_resolver
 
 __all__: list[str] = []
+
+
+@pytest.fixture(autouse=True)
+def _disable_narrative_style(db_session) -> None:
+    """隔离叙述风格默认启用：本文件测 Mod 注入基础组装，不测叙述风格"""
+    setting_service.set_many(db_session, {"narrative_style_enabled": "0"})
 
 
 class _FakeProvider:
