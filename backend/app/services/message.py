@@ -3,6 +3,7 @@
 
 协议表面（__all__）：get_messages / create_message / create_message_no_commit /
 auto_insert_greeting / build_message_list / search_messages /
+update_message / delete_message /
 add_swipe / append_swipe_and_bump / list_swipes / list_swipes_batch /
 switch_swipe / delete_swipe。
 """
@@ -31,6 +32,8 @@ __all__ = [
     "auto_insert_greeting",
     "build_message_list",
     "search_messages",
+    "update_message",
+    "delete_message",
     "add_swipe",
     "append_swipe_and_bump",
     "list_swipes",
@@ -247,6 +250,81 @@ def _require_message(db: Session, message_id: int) -> Message:
     if msg is None:
         raise MessageNotFoundError(f"消息不存在: {message_id}")
     return msg
+
+
+# ════════════════════════════════════════════════════════════════
+# 消息级编辑 / 删除（message-edit-resend）
+# ════════════════════════════════════════════════════════════════
+
+def update_message(
+    db: Session,
+    message_id: int,
+    content: str,
+    *,
+    commit: bool = True,
+) -> Message:
+    """就地替换消息 content（不触碰 swipes；user 消息无候选，assistant 编辑本期不做故候选无需处理）
+
+    edit_and_resend 经 commit=False 参与原子落库（同 add_swipe(commit=False) 既有模式）：
+    替换后不提交，由调用方统一 commit；commit=True 时提交并 refresh。
+
+    Args:
+        db: 数据库会话
+        message_id: 目标消息 ID（不存在抛 MessageNotFoundError）
+        content: 新内容
+        commit: 是否提交（False 由调用方统一提交）
+
+    Returns:
+        更新后的 Message（commit=True 时已 refresh）
+
+    Raises:
+        MessageNotFoundError: 消息不存在
+    """
+    msg = _require_message(db, message_id)
+    msg.content = content
+    if commit:
+        db.commit()
+        db.refresh(msg)
+    return msg
+
+
+def delete_message(
+    db: Session,
+    message_id: int,
+    *,
+    commit: bool = True,
+) -> None:
+    """角色感知删除单条消息（spec §delete message）
+
+    USER → 删除该条及其后所有消息（conversation_id 相同且 id >= 目标 id，
+    后续 assistant 失去触发源）；ASSISTANT（及 system 等非 user 角色）→ 仅删
+    该条，其候选经 message_swipes.message_id FK ON DELETE CASCADE 级联删除。
+    删除后 bump 所属 conversation.updated_at（会话列表排序不变量，同
+    append_swipe_and_bump 口径）。级联语义下沉 service 层受保护写：删除范围由
+    本函数收敛，不靠调用方自觉。
+
+    Args:
+        db: 数据库会话
+        message_id: 目标消息 ID（不存在抛 MessageNotFoundError）
+        commit: 是否提交（False 由调用方统一提交）
+
+    Raises:
+        MessageNotFoundError: 消息不存在
+    """
+    msg = _require_message(db, message_id)
+    conversation_id = msg.conversation_id
+    if msg.role == Role.USER:
+        db.query(Message).filter(
+            Message.conversation_id == conversation_id,
+            Message.id >= msg.id,
+        ).delete(synchronize_session=False)
+    else:
+        db.delete(msg)
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if conv is not None:
+        conv.updated_at = datetime.datetime.now()
+    if commit:
+        db.commit()
 
 
 def add_swipe(

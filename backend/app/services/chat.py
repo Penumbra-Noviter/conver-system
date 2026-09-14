@@ -2,7 +2,7 @@
 聊天回合业务逻辑 — 流式/非流式聊天共用的深模块
 
 协议表面（__all__）：ChatContext / assemble_chat_context / prepare_chat / complete_chat /
-regenerate_chat / continue_chat / chat_error_response / stream_reply。
+regenerate_chat / continue_chat / edit_and_resend / chat_error_response / stream_reply。
 
 一次「聊天回合」的生命周期（插开场白 → 存用户消息 → 组装上下文 →
 取 Key 与 Provider → 生成 → 错误映射 → 保存/保存部分）全部收拢于此；
@@ -43,6 +43,7 @@ from backend.app.services.exceptions import (
     ConversationNotFoundError,
     DomainError,
     InvalidContinueTargetError,
+    InvalidEditTargetError,
     InvalidRegenerateTargetError,
     MessageNotFoundError,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "complete_chat",
     "regenerate_chat",
     "continue_chat",
+    "edit_and_resend",
     "chat_error_response",
     "stream_reply",
 ]
@@ -407,6 +409,112 @@ async def regenerate_chat(
     return ChatResponse(
         reply=reply_text,
         message_id=target.id,
+        conversation_id=conversation_id,
+    )
+
+
+def _resolve_edit_target(
+    db: Session,
+    conversation_id: int,
+    message_id: int,
+) -> Message:
+    """解析编辑目标并校验（存在 + 属于该对话 + 必须为 user）
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        message_id: 目标消息 ID
+
+    Returns:
+        目标 user 消息
+
+    Raises:
+        MessageNotFoundError: 消息不存在或不属于该对话
+        InvalidEditTargetError: 目标非 user
+    """
+    target = db.query(Message).filter(Message.id == message_id).first()
+    if target is None or target.conversation_id != conversation_id:
+        raise MessageNotFoundError("消息不存在")
+    if target.role != Role.USER:
+        raise InvalidEditTargetError("只能编辑用户消息")
+    return target
+
+
+async def edit_and_resend(
+    db: Session,
+    conversation_id: int,
+    message_id: int,
+    content: str,
+) -> ChatResponse:
+    """编辑重发（仅 user）：就地替换 content + 物理截断后续 + 重新生成 assistant 回复
+
+    编排（spec §edit-resend 原子性契约）：
+    1. require_conversation 校验对话存在；
+    2. _resolve_edit_target 解析并校验目标（存在 + 属于该会话 + role == USER）；
+    3. update_message(commit=False) 就地替换 content（不提交，参与原子落库）；
+    4. assemble_chat_context(history_limit_message_id=message_id) 组装上下文
+       （历史截止于被编辑 user，后续不进上下文；不插入 user）；
+    5. _generate_with_error_mapping 生成（失败抛 HTTPException，未提交变更随
+       session close 回滚 → 零落库）；
+    6. 成功后物理删除 id > message_id 的后续消息（被编辑 user 保留）；
+    7. create_message(ASSISTANT) 落库新回复 —— 单 commit 结算 content 替换 +
+       后续删除 + 新 assistant 三者，原子落库。
+
+    与 regenerate_chat 的差异：regenerate 是「上下文截止 + 候选追加、不删后续」；
+    本函数是「替换 content + 物理删后续 + 新建 assistant」，故生成前破坏性变更
+    须在失败时回滚（不 commit，靠 session close 回滚未提交变更）。
+
+    Args:
+        db: 数据库会话
+        conversation_id: 对话 ID
+        message_id: 被编辑的 user 消息 ID
+        content: 修正后的 user 消息内容
+
+    Returns:
+        ChatResponse（reply=新回复 / message_id=新 assistant 消息 / conversation_id）
+
+    Raises:
+        ConversationNotFoundError: 对话不存在
+        MessageNotFoundError: message_id 不存在或不属于该对话
+        InvalidEditTargetError: 目标非 user
+        ApiKeyMissingError: 未配置 API Key
+        ProviderNotSupportedError: 不支持的 Provider
+        HTTPException: LLM 调用失败（经 chat_error_response 映射）
+    """
+    # 1. 校验对话存在
+    conversation_service.require_conversation(db, conversation_id)
+
+    # 2. 解析并校验目标（存在 + 属于该会话 + role == USER）
+    _resolve_edit_target(db, conversation_id, message_id)
+
+    # 3. 就地替换 content（不提交——与后续删除 + 新 assistant 同一 commit 结算）
+    message_service.update_message(db, message_id, content, commit=False)
+
+    # 4-5. 组装上下文（历史截止于被编辑 user）+ 生成回复。
+    #     assemble 不抛 LLMError，移出 try；生成 + 错误映射收口于
+    #     _generate_with_error_mapping（F-126）。失败上抛 HTTPException，
+    #     未提交的 content 替换随 session close 回滚（零落库）。
+    ctx = assemble_chat_context(
+        db, conversation_id, current_input=None,
+        history_limit_message_id=message_id,
+    )
+    reply_text = await _generate_with_error_mapping(ctx)
+
+    # 6. 物理截断被编辑 user 之后的所有消息（旧回复基于旧内容已无意义）。
+    #    仅删 id > message_id，被编辑 user 保留。
+    db.query(Message).filter(
+        Message.conversation_id == conversation_id,
+        Message.id > message_id,
+    ).delete(synchronize_session=False)
+
+    # 7. 单 commit 结算：content 替换 + 后续删除 + 新 assistant 原子落库。
+    saved = message_service.create_message(
+        db, conversation_id, Role.ASSISTANT, reply_text
+    )
+
+    return ChatResponse(
+        reply=reply_text,
+        message_id=saved.id,
         conversation_id=conversation_id,
     )
 
