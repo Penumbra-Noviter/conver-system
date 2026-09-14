@@ -48,6 +48,9 @@ class FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => values['user_name'] ?? '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// [LLMProviderFactory] 的内存假实现：记录派生入参；`unsupported` 触发
@@ -769,6 +772,56 @@ void main() {
       ];
       expect(historyRoles, hasLength(1));
       expect(provider.lastMaxTokens, 2048);
+    });
+
+    test('A2: autoGreeting 开场白注入 extraVars（工单 04）', () async {
+      await settingsRepo.setMany({'template_vars': '{"city":"长安"}'});
+      final char = await seedCharacter(name: '影');
+      final conv = await seedConversation(char.id);
+      expect(await messagesOf(conv.id), isEmpty);
+
+      await charRepo.updateCharacter(
+        char.id,
+        const CharactersCompanion(firstMes: Value('{{user}}，我在{{city}}的{{char}}等你。')),
+      );
+
+      wireService(FakeLLMProvider(tokens: const ['回应']));
+      await service
+          .streamReply(conversationId: conv.id, content: '来了')
+          .toList();
+
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, 'User，我在长安的影等你。'),
+        (Role.user, '来了'),
+        (Role.assistant, '回应'),
+      ]);
+    });
+
+    test('A2: 组装经 extraVars 注入 system/scenario/phi/userContent（工单 04）',
+        () async {
+      await settingsRepo.setMany({'template_vars': '{"city":"长安"}'});
+      final char = await seedCharacter(
+        name: '艾莉亚',
+        personality: '{{char}}住在{{city}}',
+        scenario: '在{{city}}相遇',
+        postHistoryInstructions: '提到{{city}}',
+      );
+      final conv = await seedConversation(char.id);
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '去{{city}}')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      expect(sent[0],
+          const LlmMessage(role: 'system', content: '艾莉亚住在长安'));
+      expect(sent[1],
+          const LlmMessage(role: 'system', content: '[场景设定]\n在长安相遇'));
+      expect(sent[sent.length - 2],
+          const LlmMessage(role: 'system', content: '提到长安'));
+      expect(sent.last, const LlmMessage(role: 'user', content: '去长安'));
     });
 
     test('A2: 零 token 空流不落库（done messageId 为 null）', () async {

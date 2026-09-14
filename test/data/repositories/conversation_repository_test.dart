@@ -4,6 +4,8 @@
 /// （M0 seam 复用）；语义锚点：桌面 `services/conversation.py`。
 library;
 
+import 'dart:convert';
+
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
@@ -26,6 +28,27 @@ class FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => values['user_name'] ?? '';
+
+  @override
+  Future<Map<String, String>> get templateVars async {
+    final raw = values['template_vars'] ?? '';
+    if (raw.isEmpty) {
+      return const {};
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        return const {};
+      }
+      return {
+        for (final entry in decoded.entries)
+          if (entry.key is String && entry.value is String)
+            entry.key as String: entry.value as String,
+      };
+    } on FormatException {
+      return const {};
+    }
+  }
 }
 
 void main() {
@@ -198,6 +221,45 @@ void main() {
       final char = await seedCharacter(name: '诺克斯', firstMes: '嗨，{{user}}。');
       final conv = await repo.createConversation(characterId: char.id);
       expect((await messagesOf(conv.id)).single.content, '嗨，User。');
+    });
+
+    test('first_mes 含自定义变量 → 开场白注入 extraVars（工单 04）', () async {
+      final char = await seedCharacter(
+        name: '艾莉亚',
+        firstMes: '欢迎来到{{city}}，{{user}}！我是{{char}}。',
+      );
+      final withVars = ConversationRepository(
+        db,
+        const FakeSettingsReader({
+          'user_name': '阿明',
+          'template_vars': '{"city":"长安"}',
+        }),
+        now: () => fakeNow,
+      );
+
+      final conv = await withVars.createConversation(characterId: char.id);
+
+      expect(
+        (await messagesOf(conv.id)).single.content,
+        '欢迎来到长安，阿明！我是艾莉亚。',
+      );
+    });
+
+    test('template_vars 非法 JSON → extraVars 回退空 map，开场白仅替换 user/char',
+        () async {
+      final char = await seedCharacter(
+        name: '艾莉亚',
+        firstMes: '欢迎{{city}}，{{user}}。',
+      );
+      final broken = ConversationRepository(
+        db,
+        const FakeSettingsReader({'template_vars': 'not-json'}),
+        now: () => fakeNow,
+      );
+
+      final conv = await broken.createConversation(characterId: char.id);
+
+      expect((await messagesOf(conv.id)).single.content, '欢迎{{city}}，User。');
     });
 
     test('角色无 first_mes → 不预插消息（message_count 0）', () async {

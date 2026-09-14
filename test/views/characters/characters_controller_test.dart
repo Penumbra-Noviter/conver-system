@@ -45,6 +45,9 @@ class FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => values['user_name'] ?? '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// listCharacters 必抛的角色仓储子类——命中「加载失败 → notice」路径。

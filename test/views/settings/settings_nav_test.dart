@@ -15,6 +15,7 @@ import 'package:conver_system_mobile/views/settings/about_page.dart';
 import 'package:conver_system_mobile/views/settings/desktop_note_page.dart';
 import 'package:conver_system_mobile/views/settings/manual_page.dart';
 import 'package:conver_system_mobile/views/settings/settings_view.dart';
+import 'package:conver_system_mobile/views/settings/template_vars_page.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,17 +68,31 @@ void main() {
       expect(find.text('用户手册'), findsOneWidget);
       expect(find.text('关于'), findsOneWidget);
       expect(find.text('桌面版说明'), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_right), findsNWidgets(4),
-          reason: '三入口 + 「对话」导航（工单 03）共 4 行 chevron');
+      expect(find.byIcon(Icons.chevron_right), findsNWidgets(5),
+          reason: '三入口 + 「对话」（工单 03）+「模板变量」（工单 04）共 5 行 chevron');
     });
 
-    testWidgets('「对话」导航入口与「模板变量」占位并存', (tester) async {
+    testWidgets('「对话」与「模板变量」导航入口并存', (tester) async {
       await pumpSettings(tester);
 
       expect(find.text('对话'), findsOneWidget);
       expect(find.text('生成参数与行为'), findsOneWidget);
       expect(find.text('模板变量'), findsOneWidget);
       expect(find.text('自定义注入变量'), findsOneWidget);
+    });
+
+    testWidgets('点「模板变量」→ TemplateVarsPage，返回 → 回到设置页', (tester) async {
+      await pumpSettings(tester);
+
+      await tester.tap(find.text('模板变量'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TemplateVarsPage), findsOneWidget);
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(TemplateVarsPage), findsNothing);
+      expect(find.text('模板变量'), findsOneWidget,
+          reason: '返回后回到设置页，入口行仍在');
     });
 
     testWidgets('点「用户手册」→ ManualPage，返回 → 回到设置页', (tester) async {

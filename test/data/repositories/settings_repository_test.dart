@@ -37,8 +37,8 @@ void main() {
     return {for (final row in rows) row.key: row.value};
   }
 
-  group('A1 白名单键集（G5 + 工单 03）', () {
-    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 两 mobile 先行键', () {
+  group('A1 白名单键集（G5 + 工单 03/04）', () {
+    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 三 mobile 先行键', () {
       expect(
         SettingsRepository.allowedKeys,
         equals(<String>{
@@ -54,6 +54,7 @@ void main() {
           'user_name',
           'temperature',
           'max_tokens',
+          'template_vars',
         }),
       );
     });
@@ -196,6 +197,44 @@ void main() {
         'temperature': '1.2',
         'max_tokens': '8192',
       });
+    });
+  });
+
+  group('U-3 templateVars JSON 读写（工单 04）', () {
+    test('缺省空 map（无配置）', () async {
+      expect(await repository.templateVars, isEmpty);
+    });
+
+    test('写入 JSON 后读回（往返一致）', () async {
+      await repository.setMany({
+        'template_vars': '{"city":"长安","place":"月牙泉"}',
+      });
+      expect(await repository.templateVars, {
+        'city': '长安',
+        'place': '月牙泉',
+      });
+    });
+
+    test('非法 JSON 回退空 map', () async {
+      await repository.setMany({'template_vars': 'not-json{{{'});
+      expect(await repository.templateVars, isEmpty);
+    });
+
+    test('JSON 非对象（数组）回退空 map', () async {
+      await repository.setMany({'template_vars': '[1,2]'});
+      expect(await repository.templateVars, isEmpty);
+    });
+
+    test('JSON 值非字符串的条目被过滤', () async {
+      await repository.setMany({
+        'template_vars': '{"city":"长安","count":3,"ok":true}',
+      });
+      expect(await repository.templateVars, {'city': '长安'});
+    });
+
+    test('template_vars 白名单内：setMany 可写、getAll 可读', () async {
+      await repository.setMany({'template_vars': '{"a":"b"}'});
+      expect(await repository.getAll(), {'template_vars': '{"a":"b"}'});
     });
   });
 

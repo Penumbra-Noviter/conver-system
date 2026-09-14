@@ -35,6 +35,12 @@ abstract interface class SettingsReader {
 
   /// 设置键 `user_name` 的值；缺失或空串返回 [SettingsDefaults.userName]。
   Future<String> get userName;
+
+  /// 设置键 `template_vars` 的值（JSON `{"key":"value",...}` 反序列化）。
+  ///
+  /// 缺失 / 空串 / 非法 JSON / 非对象 JSON → 空 map；值非字符串的条目被过滤。
+  /// 实现由工单 04 的设置仓储提供（mobile 先行，桌面无对应特性）。
+  Future<Map<String, String>> get templateVars;
 }
 
 /// 设置缺省值——桌面 `config.py` 常量（DEFAULT_PROVIDER='claude' /

@@ -364,9 +364,10 @@ class ChatService {
         throw CharacterNotFoundError(conv.characterId);
       }
       final userName = await _settingsRepository.userName;
+      final extraVars = await _settingsRepository.templateVars;
 
       // 2. autoGreeting 零消息守卫。
-      await _autoInsertGreeting(conv, character, userName);
+      await _autoInsertGreeting(conv, character, userName, extraVars);
 
       // 3. 落库 user 消息。
       await _messageRepository.createMessage(
@@ -386,6 +387,7 @@ class ChatService {
         historyBeforeId: null,
         maxRounds: maxRounds,
         userName: userName,
+        extraVars: extraVars,
         appendCurrentInput: true,
         userContent: state.content,
       );
@@ -792,6 +794,7 @@ class ChatService {
         throw CharacterNotFoundError(conv.characterId);
       }
       final userName = await _settingsRepository.userName;
+      final extraVars = await _settingsRepository.templateVars;
       final maxRounds = await _settingsRepository.slidingWindowRounds;
       final messages = await _assembleMessages(
         conv: conv,
@@ -799,6 +802,7 @@ class ChatService {
         historyBeforeId: target.id,
         maxRounds: maxRounds,
         userName: userName,
+        extraVars: extraVars,
         appendCurrentInput: false,
       );
       final resolved = await _resolveProvider(conv);
@@ -843,11 +847,12 @@ class ChatService {
   /// autoGreeting 零消息守卫（对齐 `message.py::auto_insert_greeting`）。
   ///
   /// 对话无任何消息且角色有非空 first_mes → 首条 assistant 开场白（模板变量
-  /// `{{user}}/{{char}}` 替换后落库）；否则零副作用。
+  /// `{{user}}/{{char}}` 与 [extraVars] 自定义变量替换后落库）；否则零副作用。
   Future<void> _autoInsertGreeting(
     Conversation conv,
     Character character,
     String userName,
+    Map<String, String> extraVars,
   ) async {
     final existing = await _messageRepository.getMessages(conv.id);
     if (existing.isNotEmpty) {
@@ -860,6 +865,7 @@ class ChatService {
       character.firstMes,
       userName: userName,
       charName: character.name,
+      extraVars: extraVars,
     );
     await _messageRepository.createMessage(
       conversationId: conv.id,
@@ -881,6 +887,7 @@ class ChatService {
     required String userName,
     required bool appendCurrentInput,
     String userContent = '',
+    Map<String, String> extraVars = const {},
   }) async {
     final charData = CharacterData(
       name: character.name,
@@ -903,6 +910,7 @@ class ChatService {
       maxRounds: maxRounds,
       userName: userName,
       appendCurrentInput: appendCurrentInput,
+      extraVars: extraVars,
     );
     return [
       for (final m in built) LlmMessage(role: m.role, content: m.content),

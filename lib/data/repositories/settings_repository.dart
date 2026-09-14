@@ -20,6 +20,8 @@
 /// sliding_window_rounds 默认 30）。
 library;
 
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
@@ -52,9 +54,9 @@ class SettingsRepository implements SettingsReader {
   final AppDatabase _db;
   final SecretStore _secretStore;
 
-  /// 白名单键集 — 与桌面 `setting.py::ALLOWED_KEYS` **十键逐字相等**，外加两
-  /// mobile 先行键 `temperature` / `max_tokens`（工单 03，桌面无此二键——
-  /// 契约漂移显式标注，spec §U-2「mobile 先行差异」）。
+  /// 白名单键集 — 与桌面 `setting.py::ALLOWED_KEYS` **十键逐字相等**，外加三
+  /// mobile 先行键 `temperature` / `max_tokens` / `template_vars`（工单 03/04，
+  /// 桌面无此三键——契约漂移显式标注，spec §U-2/U-3「mobile 先行差异」）。
   ///
   /// 白名单外的写入一律忽略（[setMany]）；白名单内两 api_key 键重定向到
   /// SecretStore 槽位，其余键落设置表。
@@ -71,6 +73,7 @@ class SettingsRepository implements SettingsReader {
     'user_name',
     'temperature',
     'max_tokens',
+    'template_vars',
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -233,6 +236,35 @@ class SettingsRepository implements SettingsReader {
   Future<String> get userName async {
     final value = await getValue('user_name');
     return value.isEmpty ? SettingsDefaults.userName : value;
+  }
+
+  /// 模板变量表（工单 04 / spec §U-3）；缺省空 map。
+  ///
+  /// 读设置键 `template_vars`（JSON `{"key":"value",...}`）反序列化：缺失 /
+  /// 空串 / 非法 JSON / 非对象 JSON → 空 map；值非字符串的条目被过滤。
+  ///
+  /// @override [SettingsReader.templateVars]（mobile 先行，桌面无对应特性）。
+  @override
+  Future<Map<String, String>> get templateVars async {
+    final raw = await getValue('template_vars');
+    if (raw.isEmpty) {
+      return const {};
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        return const {};
+      }
+      final result = <String, String>{};
+      decoded.forEach((key, value) {
+        if (key is String && value is String) {
+          result[key] = value;
+        }
+      });
+      return result;
+    } on FormatException {
+      return const {};
+    }
   }
 
   /// 滑动窗口轮数；缺省 30（镜像桌面 sliding_window_rounds）。

@@ -73,6 +73,9 @@ class _FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// 全装配（角色页入口 → 向导 → 列表可见测试用），同

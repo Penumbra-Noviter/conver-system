@@ -45,6 +45,9 @@ class FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => values['user_name'] ?? '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// 可控假服务：记录调用次数 / 查询词，可设返回结果 / 抛错 / 挂起 Completer

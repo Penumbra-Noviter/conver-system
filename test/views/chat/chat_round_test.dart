@@ -48,6 +48,9 @@ class _FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// ChatRound 测试环境载体：回合 + 共享 notice 槽 + 注入回调观测（reload 次数

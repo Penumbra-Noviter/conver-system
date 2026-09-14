@@ -7,20 +7,37 @@
 /// 将复用本函数，不另写第二份替换逻辑。
 library;
 
-/// 替换文本中的模板变量：`{{user}}` → [userName]，`{{char}}` → [charName]。
+/// 替换文本中的模板变量：`{{user}}` → [userName]，`{{char}}` → [charName]，
+/// 以及 [extraVars] 中的用户自定义 `{{key}}`（工单 04 / spec §U-3，mobile
+/// 新增——桌面 `apply_template_vars` 仅 user/char，无 extraVars）。
 ///
-/// 行为与桌面 `apply_template_vars` 逐条对齐：
+/// 行为与桌面 `apply_template_vars` 逐条对齐，并扩展 extraVars：
 /// - 空文本原样返回（不做任何替换）；
 /// - 不含占位符的文本原样返回；
-/// - 先替换 `{{user}}` 再替换 `{{char}}`（与桌面 replace 链同序）；
+/// - 替换顺序：先 `{{user}}` → `{{char}}` → 再逐 key 替换 [extraVars]
+///   （与桌面 replace 链同序，extraVars 追加于其后）；
+/// - [extraVars] 按 key 长度**降序**替换（防 `{{a}}` 与 `{{ab}}` 前缀误替换）；
+/// - 保留 key（`user` / `char`）优先：[extraVars] 中的同名 key 被跳过，
+///   用户自定义 key 不覆盖内置两变量；
 /// - 不做递归替换（替换值中若含占位符文本，按同序一次性处理）。
 String applyTemplateVars(
   String text, {
   String userName = 'User',
   String charName = 'Character',
+  Map<String, String> extraVars = const {},
 }) {
   if (text.isEmpty) {
     return text;
   }
-  return text.replaceAll('{{user}}', userName).replaceAll('{{char}}', charName);
+  var result =
+      text.replaceAll('{{user}}', userName).replaceAll('{{char}}', charName);
+  final keys = extraVars.keys.toList()
+    ..sort((a, b) => b.length.compareTo(a.length));
+  for (final key in keys) {
+    if (key == 'user' || key == 'char') {
+      continue;
+    }
+    result = result.replaceAll('{{$key}}', extraVars[key]!);
+  }
+  return result;
 }

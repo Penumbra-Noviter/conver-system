@@ -145,10 +145,12 @@ class ConversationRepository {
         fromSettings: await _settings.userName,
         fallback: _fallbackUserName,
       );
+      final extraVars = await _settings.templateVars;
       final greeting = applyTemplateVars(
         character.firstMes,
         userName: userName,
         charName: character.name,
+        extraVars: extraVars,
       );
       final greetingAt = _now();
       await _db.into(_db.messages).insert(

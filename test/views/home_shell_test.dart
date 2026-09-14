@@ -30,6 +30,9 @@ class _FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 ShellNavigation _navigationOf(WidgetTester tester) =>

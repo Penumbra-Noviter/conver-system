@@ -5,13 +5,13 @@ import '../../services/secure_store.dart';
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
 import '../../view_models/theme_controller.dart';
-import '../../widgets/placeholder_group.dart';
 import 'about_page.dart';
 import 'api_config_section.dart';
 import 'conversation_settings_page.dart';
 import 'default_model_section.dart';
 import 'desktop_note_page.dart';
 import 'manual_page.dart';
+import 'template_vars_page.dart';
 import 'theme_section.dart';
 
 /// 设置视图 — 三组真实化（API 配置 / 默认模型 / 主题）+「对话」设置子页入口
@@ -42,12 +42,6 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  /// 「模板变量」占位不在本票范围（锚共识 D1）；「对话」已真实化为导航入口
-  /// （工单 03，见 [_openConversationSettings]）。
-  static const _placeholderItems = <PlaceholderItem>[
-    PlaceholderItem('模板变量', '自定义注入变量'),
-  ];
-
   /// 「我」页收口三入口（F-M5-10）：行文案 + 目标静态页实例（可共享复用）。
   static const _profileEntries = <({String label, String note, Widget page})>[
     (label: '用户手册', note: '使用说明', page: ManualPage()),
@@ -120,6 +114,15 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
+  /// 打开「模板变量」编辑子页（工单 04；子页自带 Scaffold + AppBar 返回）。
+  void _openTemplateVars() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TemplateVarsPage(settingsRepository: _settings),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -168,21 +171,19 @@ class _SettingsViewState extends State<SettingsView> {
                 ThemeSection(themeController: _themeController),
                 Divider(thickness: 1, color: palette.border),
               ],
-              // 「对话」导航入口（工单 03）+「模板变量」占位（锚共识 D1）。
+              // 「对话」（工单 03）+「模板变量」（工单 04）两导航入口。
               _SettingsRow(
                 label: '对话',
                 note: '生成参数与行为',
                 onTap: _openConversationSettings,
               ),
               Divider(thickness: 1, color: palette.border),
-              for (var i = 0; i < _placeholderItems.length; i++) ...[
-                _SettingsRow(
-                  label: _placeholderItems[i].label,
-                  note: _placeholderItems[i].note,
-                ),
-                if (i != _placeholderItems.length - 1)
-                  Divider(thickness: 1, color: palette.border),
-              ],
+              _SettingsRow(
+                label: '模板变量',
+                note: '自定义注入变量',
+                onTap: _openTemplateVars,
+              ),
+              Divider(thickness: 1, color: palette.border),
               // 「我」页收口三入口（F-M5-10）：共享行组件、整行可点 + chevron。
               for (var i = 0; i < _profileEntries.length; i++) ...[
                 _SettingsRow(
