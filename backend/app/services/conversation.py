@@ -152,6 +152,8 @@ def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
 
     标题：未显式传 title（或传空）时默认「与 {角色名} 的对话」；
     模型：未显式传 model_provider/model_name 时回退到 settings 默认值（再回退到 config 默认值）。
+    预设对话快照：data.preset_dialogue 原样固化到列（None/空串 → null，不落伪值），
+    前端选择、后端信任落库（与 greeting 快照同语义，不校验是否属于角色 preset_dialogues）。
     """
     character = db.query(Character).filter(Character.id == data.character_id).first()
     title = (
@@ -176,6 +178,8 @@ def create_conversation(db: Session, data: ConversationCreate) -> Conversation:
         title=title,
         model_provider=provider,
         model_name=model_name,
+        # 预设对话快照：None/空串归一为 null（不落伪值），非空原样固化
+        preset_dialogue=data.preset_dialogue or None,
     )
     db.add(conv)
     db.commit()

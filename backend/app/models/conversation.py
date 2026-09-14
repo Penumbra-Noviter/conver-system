@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
 
 from backend.app.database import Base
 
@@ -30,6 +30,11 @@ class Conversation(Base):
     parent_conversation_id = Column(Integer, nullable=True, comment="派生来源会话 id")
     branch_from_message_id = Column(Integer, nullable=True, comment="分叉锚消息 id（快照末条）")
     branch_title = Column(String(200), nullable=True, comment="分支显示名")
+
+    # NPD-05 预设对话快照（创建时把请求传入的选中预设对话 content 原样固化，
+    # 与开场白 first_mes 快照语义一致；可空列，存量库经自愈迁移补列见
+    # database.py::_ensure_conversation_preset_dialogue）
+    preset_dialogue = Column(Text, nullable=True, comment="预设对话快照内容")
 
     def __repr__(self) -> str:
         return f"<Conversation(id={self.id}, character_id={self.character_id}, title='{self.title}')>"
