@@ -19,38 +19,24 @@
 
 ## 活跃工单
 
-> 当前 **0 项待办**。
-> 规格依据（字段规格、纯函数签名、契约锁用例）统一见 [docs/chat-simulator-upgrade-spec.md](docs/chat-simulator-upgrade-spec.md)。
-> 来源：AI风月对标调研（证据链与三份规格笔记见仓库外 `D:\tmp\fetchflow-aigs\`——采集脚手架不入库，避免 doc_sync files 双向覆盖校验误判）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
+> 当前 **6 项待办**（批次 PD — Prompt 打磨）。
+> 规格依据统一见 [docs/prompt-polish-spec.md](docs/prompt-polish-spec.md)。
+> 来源：AI风月对标调研「对话质量 / Prompt 工程」第二轮（[docs/external-benchmark-aigirlfriend.md](docs/external-benchmark-aigirlfriend.md) §3.7）；定位约束=纯本地、不盈利、不做社交体系/积分体系。
 > 技术债候选池见 [TECH_DEBT.md](TECH_DEBT.md)。
 
-### 批次 WL — 世界书引擎（角色级 lorebook，AI 风月对标）
+### 批次 PD — Prompt 打磨（预设开场白选择 / Prompt Debug 面板 / 专家模式 PROMPT）
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
+| PD-1 | 预设开场白后端：ConversationCreate.greeting override + create_conversation 消费 alternate_greetings | ⬜ 待办 | — |
+| PD-2 | 预设开场白前端：备用开场白编辑 + 新建对话开场白选择 | ⬜ 待办 | — |
+| PD-3 | Prompt Debug 后端：prompt-debug 端点 + 带来源组装追溯（复用组装链不漂移） | ⬜ 待办 | — |
+| PD-4 | Prompt Debug 前端：只读预览面板（分段来源标注） | ⬜ 待办 | — |
+| PD-5 | 专家模式后端：prompt_mode + expert_prompt 列 + 自愈迁移 + build_messages 分流 | ⬜ 待办 | — |
+| PD-6 | 专家模式前端：基础/专家两态编辑 UI | ⬜ 待办 | — |
 
-### 批次 MS — 消息操作（继续 + swipes 多候选）
-
-| Ticket | 标题 | 状态 | 验收摘要 |
-|--------|------|------|----------|
-
-### 批次 BR — 存档升级为分支点
-
-| Ticket | 标题 | 状态 | 验收摘要 |
-|--------|------|------|----------|
-
-### 批次 CG — CG 沉淀与剧情回顾
-
-| Ticket | 标题 | 状态 | 验收摘要 |
-|--------|------|------|----------|
-
-### 批次 MD — Mod 挂载层
-
-| Ticket | 标题 | 状态 | 验收摘要 |
-|--------|------|------|----------|
-
-> **实施顺序建议**：WL → MS → BR → CG → MD（依赖与风险见 spec 末节表格）。
-> **每批统一验收口径**：先红后绿 + 全量基线不回退（pytest 823+1skip / Vitest 1189 / cargo 70）+ 覆盖率不放宽 + 冒烟 + 文档同步。
+> **实施顺序建议**：PD-1 → PD-2 → PD-5 → PD-6 → PD-3 → PD-4（依赖见 spec §5）。
+> **每批统一验收口径**：先红后绿 + 全量基线不回退（pytest 1234+1skip / Vitest 1380 / cargo 70）+ 覆盖率不放宽 + 冒烟 + 文档同步。
 
 ---
 
