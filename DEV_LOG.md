@@ -6,6 +6,23 @@
 
 ---
 
+## 技术债消费批次 F-130~F-138（2026-09-14 — 7 做 2 关，轻量档 9 项主会话直做）
+
+- **来源**：用户指令「消费技术债 F-130~138」（消息编辑重发期末四轴落债 9 项）。逐项 git grep 复核现状后拍板 7 做 2 关。
+- **7 做（commit 45a67aa）**：
+  - F-130（Worth exploring）`require_message` 零行为透传别名 + 目标解析三查冗余——`edit_and_resend` 去 conversation_id 参数、`_resolve_edit_target` 简化只传 message_id 派生 conversation_id、删 `require_message` 公开别名 + 路由直调（目标解析知识收口单一入口）；连带删 2 防御测试（跨会话/会话不存在——防御对象「调用方传错 conversation_id」随参数移除消失）。
+  - F-131（Worth exploring）级联 Seam 依赖全局 PRAGMA + bulk delete identity map 残留——`delete_message`/`edit_and_resend` 两处 `synchronize_session=False`→`'fetch'` 消除身份映射残留；防复发断言 test_delete_user_syncs_identity_map（db.get 返回 None）；PRAGMA 依赖文档化为 SQLite 连接级固有（非模块可局部化）。
+  - F-132（Worth exploring）按钮 css 悬停显示不统一——style.css 操作按钮组（regen/cont/branch/edit/delete）加 opacity 0→hover 0.6→自身 1 统一 hover 显示 + 图标按钮样式对齐 copy。
+  - F-134（Speculative）autoflush 分歧——conftest sessionmaker 加 `autoflush=False` 对齐生产 SessionLocal（测试复现生产 flush 时序）。
+  - F-135（Speculative）promptMessageEdit/promptImageDescription 同型重复——提取 chat.js 私有 `promptTextarea` helper 收敛，DOM id/行为逐字保持。
+  - F-137（Speculative）全空白 content 穿过校验——`EditMessageRequest` 加 field_validator strip 后拒绝全空白；防复发断言 test_edit_blank_content_422。
+  - F-138（Speculative）error_mapping 400 行膨胀——提取模块常量 `_HTTP_400_DOMAIN_ERRORS` 多行元组。
+- **2 关（复核关闭，理由见 TECH_DEBT.md 复核关闭表）**：F-133（乐观 UI 既有模式 + 服务端 404 兜底）、F-136（三解析函数独立领域语义，仅 3 实例抽象收益 < 成本）。
+- **验证链**：pytest 1225+1skip（净 0：+2 防复发断言 −2 归属/会话防御测试）+ Vitest 1379 + cargo 70 零回退全绿 | doc_sync 刷新 8 标记 + pool_cleanup_check 全合规 | 技术债候选区 9→0 清零 | 复核关闭表滚动保留最近 4 批（08 月 15 条整批删除）。
+- **非阻断落债**：无（候选区清零）。
+
+---
+
 ## 消息编辑重发 + 删除单条消息批次（2026-09-14 — 3 工单小档，对标 AI 风月消息级操作）
 
 - **来源**：用户对标 AI 风月「把角色对话打磨更精细」（放弃世界模拟大版本——World 实体 + 多角色 token 成本顾虑），gap 分析后选定「消息编辑重发 + 删除单条消息」（对标档案 §3.4 消息级操作）。

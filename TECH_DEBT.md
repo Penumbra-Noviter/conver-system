@@ -53,36 +53,13 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-130 | `require_message` 零行为透传别名（`_require_message` 公开转发）+ 目标解析知识散布——路由 require_message → `_resolve_edit_target` 再查 → `update_message` 三查同消息冗余 | 消息编辑重发期末四轴 Standards/Architecture/Spec | Worth exploring | 📝 待立项 | 架构 |
-| F-131 | 级联删除 Seam 不局部——swipe 级联依赖全局 `PRAGMA foreign_keys=ON` 而非 `delete_message` 模块内保证（bulk-delete 路径已补契约锁，但 seam 环境依赖）；另 `synchronize_session=False` bulk delete 后 identity map 残留被删对象，潜伏 StaleData | 消息编辑重发期末四轴 Architecture/Falsify | Worth exploring | 📝 待立项 | 数据完整性 |
-| F-132 | 消息操作按钮 css 悬停显示不统一——copy 悬停显示（opacity 0→hover），regen/cont/branch/edit/delete 常驻内联显示（跨批次既有问题，03 新增 edit/delete 延续） | 工单 03 期末 concern + 期末四轴观察 | Worth exploring | 📝 待立项 | 前端渲染 |
-| F-133 | `editMessage`/`deleteMessage` 角色判定取自本地缓存 `tab.messages`，缓存与服务端漂移时二次确认文案错述破坏范围 | 消息编辑重发期末四轴 Falsify | Speculative | 📝 待立项 | 前端 |
-| F-134 | autoflush 分歧——conftest `db_session` 默认 autoflush=True vs 生产 `SessionLocal` autoflush=False，测试未复现生产时序 | 消息编辑重发期末四轴 Falsify | Speculative | 📝 待立项 | 测试基建 |
-| F-135 | `promptMessageEdit` 与 `promptImageDescription` 同型重复（modal+textarea+onClose 兜底+submit 读值） | 消息编辑重发期末四轴 Architecture + 工单 03 concern | Speculative | 📝 待立项 | 前端 |
-| F-136 | `_resolve_edit_target` 与 `_resolve_continue_target`/regenerate 解析构成「load→校验归属→校验角色」平行家族萌芽 | 消息编辑重发期末四轴 Architecture | Speculative | 📝 待立项 | 架构 |
-| F-137 | `EditMessageRequest.content` 仅 `min_length=1`，全空白字符串（如"   "）穿过校验送生成 | 消息编辑重发期末四轴 Falsify（观察） | Speculative | 📝 待立项 | 后端校验 |
-| F-138 | `error_mapping.py` 400 分支 isinstance 元组行膨胀（~180 字符） | 消息编辑重发期末四轴 Standards | Speculative | 📝 待立项 | 后端 |
+
 
 ### 复核关闭（Speculative 类，防重复提议）
 
 | 编号 | 遗留项（压缩摘要） | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
 | F-97 | 记忆宫殿会话级开关细化（全局开关与角色级条目注入架构自洽，会话级需结构性变更） | WL-5 期末 code-review Spec 轴 | Worth exploring | ❌ 复核关闭 |
-| F-25 | `error_mapping.py:117` provider 前导空格——docstring 已声明「由调用方负责」，设计意图非缺陷 | 波 1 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
-| F-27 | `test_error_mapping_export.py` 文件末尾无换行符 | 波 1 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
-| F-28 | simulator_store/manifest/import 三个文件末尾缺失换行符 | 波 2 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
-| F-32 | `simulator_import.py` `__all__` 含 read_manifest/write_manifest re-export | 波 2 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
-| F-34 | `game_generator.py:286` 函数对象身份比较（`if check is _check_security`） | 波 3 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
-| F-35 | `scan_generated_html` 被导出到 `__all__` 扩展公共 API 表面 | 波 3 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
-| F-36 | 校验失败时 scan 结果被丢弃，每次重试重新扫描 | 波 3 增量审核（Falsify 轴） | Speculative | ❌ 复核关闭 |
-| F-40 | game_generator `_build_suggestion` 六分支级联 | 2026-08-25 全量审查 | Speculative | ❌ 复核关闭 |
-| F-46 | 空串 token-only 流的前端占位残留（空气泡） | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
-| F-48 | Scroll handler Feature Envy，建议提取 ScrollSpy 类 | 2026-08-26 期末四轴（Architecture A6） | Speculative | ❌ 复核关闭 |
-| F-49 | `error-bar.js:67` `String(message)` 对可抛 `toString()` 的 message 会抛 TypeError | W1 增量审核 | Speculative | ❌ 复核关闭 |
-| F-75 | String(null/undefined) 坍缩字面量参与 id 比较 | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
-| F-76 | #b45309 对 --page 4.26:1 余量 0.11 | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
-| F-79 | locateAndHighlight 顶层 children 遍历注记 | 期末四轴 Falsify | Speculative | ❌ 复核关闭 |
-| F-87 | 文档区分「去重契约模块」与「深模块」标签 | 架构报告 2026-08-27 | Speculative | ❌ 复核关闭 |
 | F-107 | mod-manager 导出未走 spec 字面 downloadBlob——utils.downloadBlob 是服务端导出 fetch helper，Mod 导出纯客户端无服务端导出面，本地 Blob 下载为正确形态，spec 措辞不精确 | MD-2 期末四轴 Spec | Speculative | ❌ 复核关闭 |
 | F-108 | 导入往返逐条 version 回落服务端默认 1.0（id/created_at 重建）——spec 仅强制信封 version=1、未强制逐条 version 保留，非缺陷 | MD-2 期末四轴 Spec | Speculative | ❌ 复核关闭 |
 | F-101 | ModResponse 非可选 vs 可空列——create_mod/update_mod 全路径经 Schema 默认值落库不产 NULL，理论性 500 不可达 | 技术债批次复核关闭 | Speculative | ❌ 复核关闭 |
@@ -99,12 +76,14 @@
 | F-121 | 候选池过滤是回合末一次性触发语义（未解锁+weight>0），与 gallery.list_cg 列表展示过滤不同；下沉只增被 chat.py 独调的窄函数 Leverage 低，spec 已划 chat.py 为触发编排落点 | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭 |
 | F-122 | chat.py 本就是编排 seam，两处回合末副作用触发器各有独立领域语义，仅 2 实例抽象「触发器」收益 < 成本（Speculative Generality 反面），暂可接受 | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭 |
 | F-128 | `append_swipe_and_bump` 冗余重取——`add_swipe(commit=False)` 后 msg 未 expire，`_require_message` 命中 identity map 不再发 SQL；剩余「再取一次」是 append 需 msg.conversation_id 而 add_swipe 返回 next_index 的合理结构（非冗余开销） | arch-f123-126 期末四轴 Architecture | Speculative | ❌ 复核关闭 |
+| F-133 | editMessage/deleteMessage 角色判定取自 tab.messages 乐观缓存——与 regenerate/continue/branch 同源的既有乐观 UI 模式，服务端 404 兜底，二次确认文案错述非破坏性（用户可取消） | 消息编辑重发期末四轴 Falsify | Speculative | ❌ 复核关闭 |
+| F-136 | `_resolve_edit_target`/`_resolve_continue_target`/`_resolve_regenerate_target` 三解析函数独立领域语义（edit=user / continue=末条 assistant / regenerate=assistant+缺省末条），仅 3 实例抽象「目标解析器」收益 < 成本（Speculative Generality 反面） | 消息编辑重发期末四轴 Architecture | Speculative | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-14（技术债消费批次 ×2：批1 F-115~F-122 3 做 5 关轻量档；批2 F-123~F-126 架构深化全做标准档 4 工单串行）
+### 2026-09-14（技术债消费批次 ×3：批1 F-115~F-122 3 做 5 关轻量档；批2 F-123~F-126 架构深化全做标准档 4 工单串行；批3 F-130~F-138 7 做 2 关轻量档主会话直做）
 
 > 来源：用户指令「消费」+ userselect F-115~F-122。逐项 git grep 复核现状后拍板 3 做 5 关（全 Speculative/Worth exploring，成本收益显式权衡）。处置后候选区清零。
 
@@ -125,6 +104,15 @@
 | F-127 | `append_swipe_and_bump` 两段提交非原子 | arch-f123-126 期末四轴 Falsify/Architecture | Worth exploring | ✅ 已修（2026-09-14：add_swipe 加 `commit=False` 参数 + append 单 commit 原子落库，防复发断言 test_append_swipe_and_bump_single_commit_atomic） |
 | F-128 | `append_swipe_and_bump` 冗余重取 | arch-f123-126 期末四轴 Architecture | Speculative | ❌ 复核关闭（commit=False 后 msg 未 expire，_require_message 命中 identity map 不发 SQL；剩余再取一次是 append 需 conversation_id 而 add_swipe 返回 index 的合理结构） |
 | F-129 | `_ensure_conversation_branch_columns` 三连接/三 commit | arch-f123-126 期末四轴 Architecture | Speculative | ✅ 已修（2026-09-14：Engine 形态单连接循环补三列，Connection 形态直接循环） |
+| F-130 | `require_message` 零行为透传别名 + 目标解析知识散布（路由 require_message → _resolve_edit_target 再查 → update_message 三查同消息冗余） | 消息编辑重发期末四轴 Standards/Architecture/Spec | Worth exploring | ✅ 已修（2026-09-14：edit_and_resend 去 conversation_id 参数、_resolve_edit_target 简化只传 message_id 派生 conversation_id、删 require_message 公开别名 + 路由直调，目标解析知识收口单一入口） |
+| F-131 | 级联删除 Seam 依赖全局 PRAGMA + `synchronize_session=False` bulk delete 后 identity map 残留被删对象 | 消息编辑重发期末四轴 Architecture/Falsify | Worth exploring | ✅ 已修（2026-09-14：delete_message/edit_and_resend 两处 bulk delete 改 `synchronize_session="fetch"` 消除身份映射残留 + 防复发断言 test_delete_user_syncs_identity_map；PRAGMA 依赖文档化为 SQLite 连接级固有，非模块可局部化） |
+| F-132 | 消息操作按钮 css 悬停显示不统一（copy hover 显示，regen/cont/branch/edit/delete 常驻） | 工单 03 期末 concern + 期末四轴观察 | Worth exploring | ✅ 已修（2026-09-14：style.css 操作按钮组加 opacity 0→hover 0.6→自身 1 统一 hover 显示 + 图标按钮样式对齐 copy） |
+| F-133 | editMessage/deleteMessage 角色判定取自 tab.messages 乐观缓存，漂移时二次确认文案错述破坏范围 | 消息编辑重发期末四轴 Falsify | Speculative | ❌ 复核关闭（乐观 UI 既有模式——与 regenerate/continue/branch 同源读 tab 缓存；服务端 404 兜底，二次确认文案错述非破坏性（用户可取消）） |
+| F-134 | autoflush 分歧——conftest db_session 默认 autoflush=True vs 生产 SessionLocal autoflush=False | 消息编辑重发期末四轴 Falsify | Speculative | ✅ 已修（2026-09-14：conftest sessionmaker 加 autoflush=False 对齐生产，测试复现生产 flush 时序） |
+| F-135 | promptMessageEdit 与 promptImageDescription 同型重复 | 消息编辑重发期末四轴 Architecture + 工单 03 concern | Speculative | ✅ 已修（2026-09-14：提取 chat.js 私有 promptTextarea helper 收敛两同型函数，DOM id/行为逐字保持） |
+| F-136 | `_resolve_edit_target` 与 `_resolve_continue_target`/regenerate 解析构成平行家族萌芽 | 消息编辑重发期末四轴 Architecture | Speculative | ❌ 复核关闭（三解析函数独立领域语义——edit=user / continue=末条 assistant / regenerate=assistant+缺省末条，仅 3 实例抽象「目标解析器」收益 < 成本） |
+| F-137 | `EditMessageRequest.content` 仅 min_length=1，全空白字符串穿过校验送生成 | 消息编辑重发期末四轴 Falsify（观察） | Speculative | ✅ 已修（2026-09-14：加 field_validator strip 后拒绝全空白 + 防复发断言 test_edit_blank_content_422） |
+| F-138 | error_mapping.py 400 分支 isinstance 元组行膨胀（~180 字符） | 消息编辑重发期末四轴 Standards | Speculative | ✅ 已修（2026-09-14：提取模块常量 `_HTTP_400_DOMAIN_ERRORS` 多行元组，400 分支改指常量） |
 
 ### 2026-09-13（技术债消费批次 ×2：批1 F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波；批2 F-110 做 + F-109/F-111 关，轻量档 1 工单）
 

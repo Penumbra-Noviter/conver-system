@@ -65,6 +65,25 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 技术债消费批次 F-130~F-138（2026-09-14 — 7 做 2 关，轻量档 9 项主会话直做）
+
+> 来源：用户指令「消费技术债 F-130~138」（消息编辑重发期末四轴落债 9 项）。逐项 git grep 复核现状后拍板 7 做 2 关。叙述详见 DEV_LOG〈技术债消费批次 F-130~F-138（2026-09-14）〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| F-130 | edit_and_resend 去 conversation_id 参数 + _resolve_edit_target 简化 + 删 require_message 别名（目标解析收敛单一入口） | F-130 | 2026-09-14 | 45a67aa |
+| F-131 | delete_message/edit_and_resend bulk delete synchronize_session=False→'fetch'（消除 identity map 残留） | F-131 | 2026-09-14 | 45a67aa |
+| F-132 | 消息操作按钮 css hover 显示 + 图标样式统一对齐 copy | F-132 | 2026-09-14 | 45a67aa |
+| F-134 | conftest autoflush=False 对齐生产 SessionLocal | F-134 | 2026-09-14 | 45a67aa |
+| F-135 | promptTextarea helper 收敛 promptMessageEdit/promptImageDescription | F-135 | 2026-09-14 | 45a67aa |
+| F-137 | EditMessageRequest strip 后拒绝全空白 | F-137 | 2026-09-14 | 45a67aa |
+| F-138 | error_mapping 400 家族异常提取 _HTTP_400_DOMAIN_ERRORS 元组常量 | F-138 | 2026-09-14 | 45a67aa |
+
+**验证链：** pytest 1225+1skip（净 0：+2 防复发断言 −2 归属/会话防御测试）+ Vitest 1379 + cargo 70 零回退全绿 | 复核关闭 F-133/F-136（理由见 TECH_DEBT.md 复核关闭表）| 技术债候选区 9→0 清零 | 复核关闭表滚动保留最近 4 批（08 月 15 条整批删除）
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 消息编辑重发 + 删除单条消息批次（2026-09-14 — 3 工单小档，对标 AI 风月消息级操作）
 
 > 来源：用户对标 AI 风月「把角色对话打磨更精细」，选定「消息编辑重发 + 删除单条消息」。叙述详见 DEV_LOG〈消息编辑重发 + 删除单条消息批次（2026-09-14）〉。
@@ -144,38 +163,14 @@
 
 ---
 
-### 技术债消费批次 F-109~F-111（2026-09-13 — 1 做 2 关，轻量档 1 工单）
-
-> 来源：用户指令「消费技术债候选区 3 项（F-109~111）」；Grilling 实证拍板 F-110 做、F-109/F-111 复核关闭（关闭理由见 TECH_DEBT.md 复核关闭表）。叙述详见 DEV_LOG〈技术债候选区消费批次 F-109~F-111（2026-09-13）〉。
-
-| Ticket | 标题 | F 项 | 完成日期 | 提交 |
-|--------|------|------|----------|------|
-| F-110 | chat.js 末条 assistant 动作生命周期样板提取（runLastAssistantAction，行为保持重构） | F-110 | 2026-09-13 | 57bef68 |
-
-**验证链：** 全量 Vitest 1311 断言零修改全绿 + pytest 1117+1skip 零回归（cargo 零改动）| grep 收敛证据 nonStreamingInFlight.has 4→2 | 运行态冒烟：uvicorn 8017 加载应用→打开会话→消息气泡渲染无 console 错误 | 期末四轴详见 DEV_LOG | doc_sync 零漂移（pre-commit 刷新 1 标记）
-**非阻断落债：** 技术债候选区 3→0 项清零（净消 3，防膨胀合规）
-
----
-
-### Mod 挂载批次 MD-2（2026-09-12 — Mod 管理 UI + 注入链集成，MD 批收官）
-
-> 来源：AI风月对标调研五批工单（MD Mod 挂载第二张/收官）；后端路由 + prompt 注入链集成 + 前端 Mod 管理面板（库 CRUD/挂载/开关/排序/区域选择/导入导出），规格/契约锁依据见 docs/chat-simulator-upgrade-spec.md §MD-2。叙述详见 DEV_LOG〈MD-2 Mod 管理 UI + 注入链集成（2026-09-12）〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| MD-2 | Mod 管理 UI + 注入链集成（路由 + assemble_chat_context 注入 + Mod 管理面板 + 卡片入口） | 2026-09-12 | 0c3edfb |
-
-**验证链：** 后端 pytest 1078+1skip→1096+1skip（+18：test_mods_routes 12 用例——库 CRUD/挂载/开关/排序/解绑/404·400·422 守卫 + F1 修复锁 sort_order 越界 422；test_chat_mod_injection 6 用例——三区域叠加/禁用与非 prompt 区零影响/无 Mod 零回归/sort_order 升序/不新增尾随 system）| 前端 Vitest 1239→1287（+48：mod-manager 43 + api.test 端点映射 + format/list-views 入口接线）| services/mods.py 增 set_binding_sort_order（排序落库 v1.1 拍板）+ routes/mods.py 9 端点 + chat.py `_mod_prompt_injection`（IN 回读组 ModPayload → apply_prompt_mods）| mod-manager.js（库区块 + 挂载区块 + computeSortSwap 纯函数，覆盖率 96%+）| 运行态冒烟：uvicorn 建角色→建 Mod→挂载→排序→开关全链路 200 | 期末四轴 0 HIGH 阻断（1 MEDIUM 非原子排序自愈 + 若干 LOW 落债）+ 安全红线 0 违例 + 文件范围核验合规 | doc_sync 零漂移
-**非阻断落债：** F-101~F-106（候选区 6 项）+ F-107~F-108（复核关闭 2 项，详见 TECH_DEBT.md）；另波末环境修复——CG-1 遗留依赖声明缺口（requirements.txt 补 pillow/httpx + venv pip install）
-
----
-
-### 历史归档索引（2026-09-14 二次压缩：2026-08-27 ~ 2026-09-11 批次）
+### 历史归档索引（2026-09-14 二次压缩：2026-08-27 ~ 2026-09-13 批次）
 
 > 折叠规则见头部「归档清出机制」。原文细节由 git 历史承担（`git log -p -- TICKETS.md`）；叙述详情见 DEV_LOG 同名节。
 
 | 日期 | 批次 | 提交 | 摘要 |
 |------|------|------|------|
+| 2026-09-13 | 技术债消费批次 F-109~F-111（1 做 2 关） | 57bef68 | runLastAssistantAction 末条 assistant 动作样板提取 |
+| 2026-09-12 | Mod 挂载批次 MD-2（Mod 管理 UI + 注入链集成） | 0c3edfb | Mod 管理面板 + assemble_chat_context 注入 + 挂载/开关/排序 |
 | 2026-09-12 | Mod 挂载批次 MD-1（Mod 数据模型与注入叠加） | e047462 | mods + mod_bindings 新表 + apply_prompt_mods 三区域叠加纯函数 |
 | 2026-09-11 | 图片出图门控 MD-3（出图能力门控 + 图片 Provider 设置） | daf0fd7 | image_generation_available 判定单源 + settings image_provider/base_url + 前端按钮门控 |
 | 2026-09-11 | CG 批次 CG-3（对话内出图 + 剧情回顾） | 3e04824 | 出图三态渲染 + 剧情回顾时间线，image_tasks 表 + /cg 静态挂载 |
