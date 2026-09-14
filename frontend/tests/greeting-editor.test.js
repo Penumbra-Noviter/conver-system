@@ -21,8 +21,12 @@ import {
     addAlternateGreeting,
     alternateGreetingRowsHtml,
     MAX_ALTERNATE_GREETINGS,
+    normalizePresetDialogues,
+    addPresetDialogue,
+    presetDialogueRowsHtml,
+    MAX_PRESET_DIALOGUES,
 } from '../js/components/character-submit.js';
-import { buildGreetingOptions, resolveGreeting } from '../js/list-views.js';
+import { buildGreetingOptions, resolveGreeting, buildPresetDialogueOptions, resolvePresetDialogue } from '../js/list-views.js';
 
 const mockJson = (data, status = 200) =>
     Promise.resolve({ ok: status < 400, status, json: async () => data });
@@ -269,6 +273,198 @@ describe('验收标准 4 — 向导备用开场白编辑 + 保存', () => {
     });
 });
 
+describe('预设对话归一化 + payload（PD-4 前端镜像）', () => {
+    it('MAX_PRESET_DIALOGUES 常量 = 10', () => {
+        expect(MAX_PRESET_DIALOGUES).toBe(10);
+    });
+
+    it('normalizePresetDialogues：trim + 过滤空 name/content + 按 name 去重 + 截断 10', () => {
+        expect(normalizePresetDialogues([
+            { name: ' 寒暄 ', content: ' 你好 ' },
+            { name: '寒暄', content: '重复的第二个' },
+            { name: '', content: '有空名' },
+            { name: '有空内容', content: '' },
+            { name: '有效', content: '正文' },
+        ])).toEqual([{ name: '寒暄', content: '你好' }, { name: '有效', content: '正文' }]);
+    });
+
+    it('normalizePresetDialogues 非数组/非对象项 → 过滤（对齐后端）', () => {
+        expect(normalizePresetDialogues(null)).toEqual([]);
+        expect(normalizePresetDialogues('bad')).toEqual([]);
+        expect(normalizePresetDialogues([{ name: 'x', content: 'y' }, 'str', 1, null])).toEqual([{ name: 'x', content: 'y' }]);
+    });
+
+    it('normalizePresetDialogues 截断到 10（去重前）', () => {
+        const list = Array.from({ length: 12 }, (_, i) => ({ name: `示范${i}`, content: `内容${i}` }));
+        expect(normalizePresetDialogues(list)).toHaveLength(10);
+        expect(normalizePresetDialogues(list)[9]).toEqual({ name: '示范9', content: '内容9' });
+    });
+
+    it('addPresetDialogue：正常追加 / 空 name或content 不追加 / name 重复不追加 / 上限', () => {
+        expect(addPresetDialogue([], '寒暄', '你好')).toEqual([{ name: '寒暄', content: '你好' }]);
+        expect(addPresetDialogue([{ name: 'a', content: 'b' }], '', 'c')).toEqual([{ name: 'a', content: 'b' }]);
+        expect(addPresetDialogue([{ name: 'a', content: 'b' }], 'a', 'c')).toEqual([{ name: 'a', content: 'b' }]);
+        const full = Array.from({ length: 10 }, (_, i) => ({ name: `n${i}`, content: `c${i}` }));
+        expect(addPresetDialogue(full, 'x', 'y')).toHaveLength(10);
+    });
+
+    it('presetDialogueRowsHtml：非数组→空串；行 HTML 含 name+content 双字段 + 转义', () => {
+        expect(presetDialogueRowsHtml(null)).toBe('');
+        expect(presetDialogueRowsHtml('bad')).toBe('');
+        expect(presetDialogueRowsHtml([])).toBe('');
+        const html = presetDialogueRowsHtml([{ name: '寒暄', content: '你好<世界>' }]);
+        expect(html.match(/preset-dialogue-row/g)).toHaveLength(1);
+        expect(html).toContain('value="寒暄"');
+        expect(html).toContain('你好&lt;世界&gt;');
+        expect(html).toContain('data-icon="x"');
+    });
+
+    it('buildCharacterPayload 含 preset_dialogues（数组透传 / 非数组 → []）', () => {
+        expect(buildCharacterPayload({ preset_dialogues: [{ name: 'a', content: 'b' }] }).preset_dialogues)
+            .toEqual([{ name: 'a', content: 'b' }]);
+        expect(buildCharacterPayload({ preset_dialogues: 'bad' }).preset_dialogues).toEqual([]);
+        expect(buildCharacterPayload({}).preset_dialogues).toEqual([]);
+    });
+});
+
+describe('预设对话下拉选项 + preset_dialogue 映射', () => {
+    it('buildPresetDialogueOptions：选项序列 = 无预设对话 + 各 name（空 name/content 跳过）', () => {
+        const opts = buildPresetDialogueOptions({
+            preset_dialogues: [
+                { name: '寒暄', content: '你好。' },
+                { name: '', content: '空标题' },
+                { name: '空内容', content: '' },
+                { name: '告别', content: '再见。' },
+            ],
+        });
+        expect(opts.map((o) => o.value)).toEqual(['__none__', '0', '3']);
+        expect(opts[0].label).toBe('无预设对话');
+        expect(opts[1].label).toBe('寒暄');
+        expect(opts[2].label).toBe('告别');
+    });
+
+    it('buildPresetDialogueOptions：无预设对话 → 仅「无预设对话」', () => {
+        const opts = buildPresetDialogueOptions({ preset_dialogues: [] });
+        expect(opts.map((o) => o.value)).toEqual(['__none__']);
+    });
+
+    it('resolvePresetDialogue：无预设对话 → {}（不传 preset_dialogue）', () => {
+        expect(resolvePresetDialogue('__none__', {})).toEqual({});
+    });
+
+    it('resolvePresetDialogue：选中索引 → { preset_dialogue: content }', () => {
+        const char = { preset_dialogues: [{ name: '寒暄', content: '你好。' }, { name: '告别', content: '再见。' }] };
+        expect(resolvePresetDialogue('0', char)).toEqual({ preset_dialogue: '你好。' });
+        expect(resolvePresetDialogue('1', char)).toEqual({ preset_dialogue: '再见。' });
+    });
+
+    it('resolvePresetDialogue Falsify：非法 value（越界/未知标记/非数字/空）→ {} 不抛错', () => {
+        const char = { preset_dialogues: [{ name: 'a', content: 'b' }] };
+        expect(resolvePresetDialogue('99', char)).toEqual({});
+        expect(resolvePresetDialogue('bogus', char)).toEqual({});
+        expect(resolvePresetDialogue('', char)).toEqual({});
+    });
+});
+
+describe('预设对话编辑（form）—— 增删归一化 + 保存', () => {
+    beforeEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); });
+
+    async function loadForm() {
+        vi.resetModules();
+        document.body.innerHTML = '';
+        return await import('../js/components/character-form.js');
+    }
+
+    it('edit 模式预设对话列表回填（name+content 双字段）', async () => {
+        const form = await loadForm();
+        form.showCharacterForm('edit', {
+            id: 1, name: 'x',
+            preset_dialogues: [{ name: '寒暄', content: '你好。' }, { name: '告别', content: '再见。' }],
+        });
+        const rows = document.querySelectorAll('#cf-preset-dialogues-list .preset-dialogue-row');
+        expect(rows).toHaveLength(2);
+        expect(rows[0].querySelector('.preset-dialogue-name').value).toBe('寒暄');
+        expect(rows[0].querySelector('.preset-dialogue-content').value).toBe('你好。');
+        expect(rows[1].querySelector('.preset-dialogue-name').value).toBe('告别');
+        expect(rows[1].querySelector('.preset-dialogue-content').value).toBe('再见。');
+    });
+
+    it('edit 模式非数组/空 preset_dialogues → 空列表不抛错', async () => {
+        const form = await loadForm();
+        form.showCharacterForm('edit', { id: 1, name: 'x', preset_dialogues: 'bad' });
+        expect(document.querySelectorAll('#cf-preset-dialogues-list .preset-dialogue-row')).toHaveLength(0);
+    });
+
+    it('添加/删除：空 name或content 不添加 / name 重复不添加 / 删除（组件级）', async () => {
+        const form = await loadForm();
+        form.showCharacterForm('create');
+        const list = document.querySelector('#cf-preset-dialogues-list');
+        const nameInput = document.querySelector('#cf-preset-dialogues-name');
+        const contentInput = document.querySelector('#cf-preset-dialogues-content');
+        const addBtn = document.querySelector('#cf-preset-dialogues-add');
+
+        nameInput.value = '寒暄';
+        contentInput.value = '你好。';
+        addBtn.click();
+        expect(list.querySelectorAll('.preset-dialogue-row')).toHaveLength(1);
+
+        nameInput.value = '';
+        contentInput.value = '有内容';
+        addBtn.click(); // 空 name
+        expect(list.querySelectorAll('.preset-dialogue-row')).toHaveLength(1);
+
+        nameInput.value = '有标题';
+        contentInput.value = '';
+        addBtn.click(); // 空 content
+        expect(list.querySelectorAll('.preset-dialogue-row')).toHaveLength(1);
+
+        nameInput.value = '寒暄';
+        contentInput.value = '重复的第二个';
+        addBtn.click(); // name 重复
+        expect(list.querySelectorAll('.preset-dialogue-row')).toHaveLength(1);
+
+        nameInput.value = '告别';
+        contentInput.value = '再见。';
+        addBtn.click();
+        expect(list.querySelectorAll('.preset-dialogue-row')).toHaveLength(2);
+
+        list.querySelector('.preset-dialogue-remove').click(); // 删除第一行
+        expect(list.querySelectorAll('.preset-dialogue-row')).toHaveLength(1);
+        expect(list.querySelector('.preset-dialogue-name').value).toBe('告别');
+    });
+
+    it('保存 payload 收集 preset_dialogues（form create，含归一化）', async () => {
+        const form = await loadForm();
+        let captured = null;
+        globalThis.fetch = vi.fn(async (url, opts) => {
+            captured = JSON.parse(opts.body);
+            return mockJson({ id: 1, name: 'x' });
+        });
+        form.showCharacterForm('create');
+        const overlay = document.querySelector('.modal-overlay');
+        overlay.querySelector('#cf-name').value = '角色A';
+        overlay.querySelector('#cf-personality').value = 'p';
+        overlay.querySelector('#cf-first-mes').value = 'hi';
+        const nameInput = overlay.querySelector('#cf-preset-dialogues-name');
+        const contentInput = overlay.querySelector('#cf-preset-dialogues-content');
+        const addBtn = overlay.querySelector('#cf-preset-dialogues-add');
+        nameInput.value = '寒暄';
+        contentInput.value = '你好。';
+        addBtn.click();
+        nameInput.value = '告别';
+        contentInput.value = '再见。';
+        addBtn.click();
+        overlay.querySelector('#cf-submit').click();
+
+        await vi.waitFor(() => expect(captured).not.toBeNull());
+        expect(captured.preset_dialogues).toEqual([
+            { name: '寒暄', content: '你好。' },
+            { name: '告别', content: '再见。' },
+        ]);
+    });
+});
+
 describe('验收标准 3 — 新建对话开场白选择集成（list-views）', () => {
     beforeEach(() => { vi.restoreAllMocks(); });
     afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); });
@@ -431,5 +627,60 @@ describe('验收标准 3 — 新建对话开场白选择集成（list-views）',
 
         expect(fetchSpy.mock.calls.some(([u, o]) =>
             String(u).endsWith('/api/conversations') && o?.method === 'POST')).toBe(false);
+    });
+
+    it('仅存在预设对话（无备用开场白）→ 弹双选 → 选预设对话 → POST body 含 preset_dialogue', async () => {
+        const { fetchSpy } = await loadListViews({
+            characters: [{
+                id: 1, name: '角色A', conversation_count: 0,
+                first_mes: '默认开场', preset_dialogues: [{ name: '寒暄', content: '你好，久等了。' }],
+            }],
+            conversations: [{ id: 21, title: 't', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' }],
+            createdConv: { id: 21, title: 't', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' },
+        });
+
+        document.querySelector('#character-grid .chat-with').click();
+        await vi.waitFor(() => expect(document.querySelector('.modal-overlay')).not.toBeNull());
+        document.querySelector('.modal-overlay .ms-start').click();
+
+        await vi.waitFor(() => expect(document.querySelector('.greeting-selector-modal')).not.toBeNull());
+        const presetSelect = document.querySelector('#gs-preset-dialogue');
+        const optionValues = [...presetSelect.options].map((o) => o.value);
+        expect(optionValues).toEqual(['__none__', '0']);
+
+        presetSelect.value = '0'; // 选「寒暄」
+        document.querySelector('.gs-start').click();
+
+        await vi.waitFor(() => {
+            const post = fetchSpy.mock.calls.find(([u, o]) =>
+                String(u).endsWith('/api/conversations') && o?.method === 'POST');
+            expect(post).toBeTruthy();
+            expect(JSON.parse(post[1].body).preset_dialogue).toBe('你好，久等了。');
+        });
+    });
+
+    it('选「无预设对话」→ POST body 不含 preset_dialogue 字段', async () => {
+        const { fetchSpy } = await loadListViews({
+            characters: [{
+                id: 1, name: '角色A', conversation_count: 0,
+                first_mes: '默认开场', preset_dialogues: [{ name: '寒暄', content: '你好。' }],
+            }],
+            conversations: [{ id: 21, title: 't', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' }],
+            createdConv: { id: 21, title: 't', character_id: 1, model_name: 'claude-sonnet-5', model_provider: 'claude' },
+        });
+
+        document.querySelector('#character-grid .chat-with').click();
+        await vi.waitFor(() => expect(document.querySelector('.modal-overlay')).not.toBeNull());
+        document.querySelector('.modal-overlay .ms-start').click();
+        await vi.waitFor(() => expect(document.querySelector('.greeting-selector-modal')).not.toBeNull());
+        // 默认已是「无预设对话」，直接开始
+        document.querySelector('.gs-start').click();
+
+        await vi.waitFor(() => {
+            const post = fetchSpy.mock.calls.find(([u, o]) =>
+                String(u).endsWith('/api/conversations') && o?.method === 'POST');
+            expect(post).toBeTruthy();
+            expect('preset_dialogue' in JSON.parse(post[1].body)).toBe(false);
+        });
     });
 });

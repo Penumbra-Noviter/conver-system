@@ -171,18 +171,90 @@ export function alternateGreetingRowsHtml(list) {
 }
 
 /**
- * 从显式字段对象构造 18 字段角色 payload（API 请求体契约）
+ * 预设对话数量上限（对齐后端 PRESET_DIALOGUE_MAX，PD-4）
+ */
+export const MAX_PRESET_DIALOGUES = 10;
+
+/**
+ * 归一化预设对话列表（编辑面板回填 / 防脏数据）
+ *
+ * 逐项 name/content str() 化 + trim → 过滤 name 或 content 为空的项 →
+ * 按 name 去重（保持首次出现顺序）→ 截断至上限 MAX_PRESET_DIALOGUES。
+ * 非数组输入 → []；非对象项跳过。语义与后端 character_card 归一化对齐。
+ * @param {Array<{name: *, content: *}>|null|undefined} list - 预设对话列表
+ * @returns {Array<{name: string, content: string}>} 归一化后的列表（长度 ≤ 上限）
+ */
+export function normalizePresetDialogues(list) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const item of list) {
+        if (out.length >= MAX_PRESET_DIALOGUES) break;
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const name = String((item.name) || '').trim();
+        const content = String((item.content) || '').trim();
+        if (!name || !content || seen.has(name)) continue;
+        seen.add(name);
+        out.push({ name, content });
+    }
+    return out;
+}
+
+/**
+ * 尝试向预设对话列表追加一条（表单共用单一来源）
+ *
+ * name 或 content trim 后为空 / name 与既有项重复 / 已达上限 → 返回归一化后的
+ * 当前列表（不追加）；成功 → 返回追加后的新数组（长度 ≤ 上限）。非数组输入视作 []。
+ * @param {Array<{name: *, content: *}>|null|undefined} list - 当前列表
+ * @param {*} name - 对话标题
+ * @param {*} content - 对话正文
+ * @returns {Array<{name: string, content: string}>} 追加后的列表
+ */
+export function addPresetDialogue(list, name, content) {
+    const current = normalizePresetDialogues(list);
+    const n = String((name) || '').trim();
+    const c = String((content) || '').trim();
+    if (!n || !c || current.length >= MAX_PRESET_DIALOGUES || current.some((d) => d.name === n)) {
+        return current;
+    }
+    return [...current, { name: n, content: c }];
+}
+
+/**
+ * 预设对话行 HTML（name + content 双字段行，表单共用单一来源）
+ * @param {Array<{name: *, content: *}>|null|undefined} list - 预设对话数组
+ * @returns {string} 行 HTML（空/非数组 → ''）
+ */
+export function presetDialogueRowsHtml(list) {
+    if (!Array.isArray(list)) return '';
+    return list.map((d) => {
+        const isObj = d && typeof d === 'object' && !Array.isArray(d);
+        const name = isObj ? String((d.name) || '').trim() : '';
+        const content = isObj ? String((d.content) || '').trim() : '';
+        return `
+        <div class="preset-dialogue-row">
+            <input type="text" class="preset-dialogue-name" placeholder="对话标题" value="${escapeHtml(name)}">
+            <textarea class="preset-dialogue-content" rows="2" placeholder="对话正文">${escapeHtml(content)}</textarea>
+            <button type="button" class="btn-icon preset-dialogue-remove" title="删除预设对话">${iconHtml('x', { size: 14 })}</button>
+        </div>
+    `;
+    }).join('');
+}
+
+/**
+ * 从显式字段对象构造 19 字段角色 payload（API 请求体契约）
  *
  * 空值语义（与现状逐字一致）：`avatar` 空/falsy → null；`creator` 缺省 → 空串；
  * `temperature` 归一为数值（缺省 0.7）；`name/description/personality/first_mes/
  * scenario/mes_example/system_prompt` 为字符串（可空串）；`tags` 为数组（非数组 → []）。
  * `prompt_mode` 归一为二值（非 'expert' → 'simple'）；`expert_prompt` 非字符串 → 空串。
+ * `alternate_greetings` / `preset_dialogues` 为数组（非数组 → []）。
  * 字段顺序无契约要求，字段集与空值语义是契约。
  *
  * @param {object} [fields={}] - 字段对象（name/description/personality/first_mes/
  *   scenario/mes_example/system_prompt/temperature/avatar/creator/tags/
- *   prompt_mode/expert_prompt）
- * @returns {object} 18 字段 payload
+ *   alternate_greetings/preset_dialogues/prompt_mode/expert_prompt）
+ * @returns {object} 19 字段 payload
  */
 export function buildCharacterPayload(fields = {}) {
     // max_tokens 无通用默认（不同模型不同）：空/非法/越界 → null（不覆盖 provider 默认）
@@ -205,6 +277,7 @@ export function buildCharacterPayload(fields = {}) {
         creator: fields.creator ?? '',
         tags: Array.isArray(fields.tags) ? fields.tags : [],
         alternate_greetings: Array.isArray(fields.alternate_greetings) ? fields.alternate_greetings : [],
+        preset_dialogues: Array.isArray(fields.preset_dialogues) ? fields.preset_dialogues : [],
         prompt_mode: fields.prompt_mode === 'expert' ? 'expert' : 'simple',
         expert_prompt: fields.expert_prompt ?? '',
     };
@@ -276,5 +349,6 @@ export const __all__ = [
     'splitTags', 'tagsToComma', 'TEMP_SLIDER', 'SAMPLING_SLIDERS', 'formatTemperature',
     'formatSampling', 'avatarPreviewHtml', 'NAME_REQUIRED_MESSAGE', 'MAX_ALTERNATE_GREETINGS',
     'normalizeAlternateGreetings', 'addAlternateGreeting', 'alternateGreetingRowsHtml',
+    'MAX_PRESET_DIALOGUES', 'normalizePresetDialogues', 'addPresetDialogue', 'presetDialogueRowsHtml',
     'buildCharacterPayload', 'buildExpertPrompt', 'beginSubmit', 'succeedSubmit', 'failSubmit',
 ];
