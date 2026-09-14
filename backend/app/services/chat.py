@@ -112,6 +112,16 @@ class ChatContext:
     max_tokens: int | None = None
 
 
+def _narrative_style(db: Session) -> str:
+    """查叙述风格设置：开启返回规则文本，关闭返回空串（不读 rules，避免无谓读取）
+
+    assemble_chat_context 与 build_prompt_debug 共用；空串/纯空白在组装层零注入。
+    """
+    if setting_service.narrative_style_enabled(db):
+        return setting_service.narrative_style_rules(db)
+    return ""
+
+
 def assemble_chat_context(
     db: Session,
     conversation_id: int,
@@ -157,6 +167,7 @@ def assemble_chat_context(
     # 3. 构建消息列表（含 system prompt + 历史 + 滑窗 + 模板变量 + 世界书注入；不落库）
     user_name = setting_service.user_name(db)
     max_rounds = setting_service.sliding_window_rounds(db)
+    narrative_style = _narrative_style(db)
     history = message_service.get_messages(db, conv.id)
     if history_limit_message_id is not None:
         history = [m for m in history if m.id <= history_limit_message_id]
@@ -178,6 +189,7 @@ def assemble_chat_context(
         messages = message_service.build_message_list(
             db, conv, current_input, max_rounds=max_rounds, user_name=user_name,
             world_injection=world_injection, history=history,
+            narrative_style=narrative_style,
         )
     else:
         # 重生成路径：append_current_input=False —— 不追加当前输入，末条为
@@ -185,6 +197,7 @@ def assemble_chat_context(
         messages = message_service.build_message_list(
             db, conv, "", max_rounds=max_rounds, user_name=user_name,
             append_current_input=False, world_injection=world_injection, history=history,
+            narrative_style=narrative_style,
         )
 
     # 4. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
@@ -1002,6 +1015,7 @@ def build_prompt_debug(db: Session, conversation_id: int) -> PromptDebugResponse
     user_name = setting_service.user_name(db)
     max_rounds = setting_service.sliding_window_rounds(db)
     history = message_service.get_messages(db, conv.id)
+    narrative_style = _narrative_style(db)
 
     tagged_world = _lorebook_world_injection(db, character, history, "", user_name)
     tagged_mod = _mod_prompt_injection(db, character)
@@ -1015,6 +1029,7 @@ def build_prompt_debug(db: Session, conversation_id: int) -> PromptDebugResponse
         user_name=user_name,
         append_current_input=True,
         world=combined,
+        narrative_style=narrative_style,
     )
 
     return PromptDebugResponse(

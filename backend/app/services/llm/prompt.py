@@ -35,6 +35,7 @@ __all__ = [
     "SOURCE_MOD",
     "SOURCE_HISTORY",
     "SOURCE_USER",
+    "SOURCE_NARRATIVE",
 ]
 
 #: 来源枚举（PD-3 debug 追溯六类；chat.py 注入链构造 InjectedSegment 时引用单一来源）
@@ -44,6 +45,8 @@ SOURCE_MEMORY = "memory"
 SOURCE_MOD = "mod"
 SOURCE_HISTORY = "history"
 SOURCE_USER = "user"
+#: 叙述风格注入段来源（02 叙述风格 prompt 注入：独立 system 段，与 after_char 同阶）
+SOURCE_NARRATIVE = "narrative"
 
 
 @dataclass(frozen=True)
@@ -148,6 +151,7 @@ def build_messages(
     user_name: str = "User",
     append_current_input: bool = True,
     world: dict[str, list[str]] | None = None,
+    narrative_style: str = "",
 ) -> list[dict[str, str]]:
     """组装发送给 LLM 的消息列表（纯函数，无 DB 依赖；零来源语义）
 
@@ -166,13 +170,15 @@ def build_messages(
             False 用于重生成路径（不追加当前输入，末条为历史末条 user，剥离尾随 PHI）
         world: 世界书注入块（{before_char/after_char/system: [内容]}，默认 None
             零注入；注入内容已在引擎层做过模板变量替换）
+        narrative_style: 叙述风格规则文本（空串/纯空白零注入，输出与不传逐字节
+            一致；非空时在 after_char 之后、[世界知识] 之前注入 [叙述风格] system 段）
 
     Returns:
         组装好的消息列表，每项只含 role 与 content
     """
     segments = _assemble(
         character, history, user_content, max_rounds, user_name,
-        append_current_input, world,
+        append_current_input, world, narrative_style,
     )
     return [{"role": s["role"], "content": s["content"]} for s in segments]
 
@@ -185,6 +191,7 @@ def build_messages_with_source(
     user_name: str = "User",
     append_current_input: bool = True,
     world: dict[str, list[str | InjectedSegment]] | None = None,
+    narrative_style: str = "",
 ) -> list[dict[str, str]]:
     """组装发送给 LLM 的消息列表，逐条标注来源（PD-3 debug 追溯专用，只读见证）
 
@@ -193,7 +200,7 @@ def build_messages_with_source(
     （world/memory/mod）；纯字符串项回退来源 world（与 build_messages 等价）。
 
     来源枚举见模块常量 SOURCE_CHARACTER / SOURCE_WORLD / SOURCE_MEMORY /
-    SOURCE_MOD / SOURCE_HISTORY / SOURCE_USER。
+    SOURCE_MOD / SOURCE_HISTORY / SOURCE_USER / SOURCE_NARRATIVE。
 
     Args:
         character: 角色纯数据
@@ -203,13 +210,15 @@ def build_messages_with_source(
         user_name: 用户昵称
         append_current_input: 是否追加当前用户输入
         world: 带来源注入块（{before_char/after_char/system: [内容或 InjectedSegment]}）
+        narrative_style: 叙述风格规则文本（非空时注入 source=narrative 的
+            [叙述风格] system 段；空串/纯空白零注入）
 
     Returns:
         带 source 的消息分段列表，content/role 序列与 build_messages 逐条一致
     """
     return _assemble(
         character, history, user_content, max_rounds, user_name,
-        append_current_input, world,
+        append_current_input, world, narrative_style,
     )
 
 
@@ -221,6 +230,7 @@ def _assemble(
     user_name: str,
     append_current_input: bool,
     world: dict[str, list[str | InjectedSegment]] | None,
+    narrative_style: str,
 ) -> list[dict[str, str]]:
     """消息列表组装核心（私有；build_messages / build_messages_with_source 共用）
 
@@ -230,6 +240,8 @@ def _assemble(
            expert_prompt 单条替代 1/2/5 三处结构化注入
         2. scenario（[场景设定] system）
         2.5 world["after_char"] 注入块
+        2.7 narrative_style 非空时注入 [叙述风格] system（source=narrative；
+            expert/simple 皆注入，因 after_char 不在 expert 替代范围）
         2.75 world["system"] 合并单条 [世界知识]（多条以空行连接）
         3. mes_example（few-shot）
         4. 历史消息（正序，滑窗截断）
@@ -277,6 +289,15 @@ def _assemble(
 
     for content, source in world_after:
         segments.append({"role": "system", "content": content, "source": source})
+
+    # 02 叙述风格注入：after_char 之后、[世界知识] 之前；空/纯空白零注入（与不传
+    # narrative_style 输出逐字节一致）。expert 模式同样注入（after_char 不在替代范围）。
+    if narrative_style and narrative_style.strip():
+        segments.append({
+            "role": "system",
+            "content": f"[叙述风格]\n{narrative_style}",
+            "source": SOURCE_NARRATIVE,
+        })
 
     if world_knowledge:
         merged_source = _world_knowledge_source([s for _, s in world_knowledge])
