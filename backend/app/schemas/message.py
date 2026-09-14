@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class MessageResponse(BaseModel):
@@ -65,3 +65,16 @@ class RegenerateRequest(BaseModel):
 class EditMessageRequest(BaseModel):
     """编辑重发请求体（仅 user；content 就地替换后重新生成后续回复）"""
     content: str = Field(..., min_length=1, description="修正后的用户消息内容")
+
+    @field_validator("content")
+    @classmethod
+    def _reject_blank(cls, value: str) -> str:
+        """strip 后拒绝全空白（min_length=1 拦不住 "   "，F-137 后端防御补强）
+
+        Field 约束先于 validator 运行：纯空白串通过 min_length=1 后才到此处，
+        strip 后为空即拒绝。合法内容 strip 后返回（去首尾空白，对齐前端 trim 语义）。
+        """
+        value = value.strip()
+        if not value:
+            raise ValueError("消息内容不能为空")
+        return value

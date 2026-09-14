@@ -34,7 +34,9 @@ def db_session() -> Iterator[Session]:
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    SessionFactory = sessionmaker(bind=engine)
+    # autoflush=False 对齐生产 SessionLocal（database.py）——F-134：消除测试/
+    # 生产时序分歧，测试复现生产的 flush 时序（生产不依赖隐式 autoflush）。
+    SessionFactory = sessionmaker(bind=engine, autoflush=False)
     session = SessionFactory()
     yield session
     session.close()

@@ -201,6 +201,17 @@ class TestPutEditMessage:
 
         assert resp.status_code == 422
 
+    def test_edit_blank_content_422(self, db_session: Session) -> None:
+        """全空白 content（"   "）→ 422（F-137：min_length=1 拦不住，strip 后拒绝）"""
+        conv = _create_conversation(db_session)
+        _add_messages(db_session, conv.id, ("user", "问"), ("assistant", "答"))
+        target = _message_id(db_session, conv.id, "问")
+
+        with _client(db_session) as client:
+            resp = client.put(f"/api/messages/{target}", json={"content": "   "})
+
+        assert resp.status_code == 422
+
 
 # ── DELETE 删除单条 ──
 

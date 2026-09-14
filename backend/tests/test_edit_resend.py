@@ -29,7 +29,6 @@ from backend.app.services import conversation as conversation_service
 from backend.app.services import message as message_service
 from backend.app.services import setting as setting_service
 from backend.app.services.exceptions import (
-    ConversationNotFoundError,
     InvalidEditTargetError,
     MessageNotFoundError,
 )
@@ -169,7 +168,7 @@ class TestEditAndResend:
         _patch_factory(monkeypatch, fake)
         target = _message_id(db_session, conv.id, "第一轮问")
 
-        resp = await chat_service.edit_and_resend(db_session, conv.id, target, "修正后的问题")
+        resp = await chat_service.edit_and_resend(db_session, target, "修正后的问题")
 
         assert isinstance(resp, ChatResponse)
         assert resp.reply == "新的回复"
@@ -203,7 +202,7 @@ class TestEditAndResend:
         _patch_factory(monkeypatch, fake)
         target = _message_id(db_session, conv.id, "第一轮问")
 
-        await chat_service.edit_and_resend(db_session, conv.id, target, "修正后的问题")
+        await chat_service.edit_and_resend(db_session, target, "修正后的问题")
 
         assert _contents(db_session, conv.id) == ["修正后的问题", "新的回复"]
         # 被截断 assistant 的 swipes 级联删除（bulk delete 依赖 FK CASCADE）
@@ -229,7 +228,7 @@ class TestEditAndResend:
         _patch_factory(monkeypatch, fake)
         target = _message_id(db_session, conv.id, "第二轮问")
 
-        resp = await chat_service.edit_and_resend(db_session, conv.id, target, "修正后第二轮问")
+        resp = await chat_service.edit_and_resend(db_session, target, "修正后第二轮问")
 
         assert resp.reply == "新第二轮答"
         assert _contents(db_session, conv.id) == [
@@ -251,7 +250,7 @@ class TestEditAndResend:
         _patch_factory(monkeypatch, fake)
         target = _message_id(db_session, conv.id, "第一轮问")
 
-        await chat_service.edit_and_resend(db_session, conv.id, target, "修正后的问题")
+        await chat_service.edit_and_resend(db_session, target, "修正后的问题")
 
         messages, _, _, _ = fake.calls[0]
         # 末条 = 修正后的触发 user；后续（第二轮问/答）不进上下文
@@ -270,7 +269,7 @@ class TestEditAndResend:
         target = _message_id(db_session, conv.id, "答")
 
         with pytest.raises(InvalidEditTargetError):
-            await chat_service.edit_and_resend(db_session, conv.id, target, "新内容")
+            await chat_service.edit_and_resend(db_session, target, "新内容")
 
     async def test_target_not_found_raises(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
@@ -281,27 +280,7 @@ class TestEditAndResend:
         _add_messages(db_session, conv.id, ("user", "问"), ("assistant", "答"))
 
         with pytest.raises(MessageNotFoundError):
-            await chat_service.edit_and_resend(db_session, conv.id, 99999, "新内容")
-
-    async def test_target_other_conversation_raises(
-        self, db_session: Session, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """message_id 属于其他对话 → MessageNotFoundError（不得跨会话编辑）"""
-        _patch_api_key(monkeypatch)
-        char_id = _create_character(db_session)
-        conv_a = _create_conversation(db_session, character_id=char_id)
-        _add_messages(db_session, conv_a.id, ("user", "问A"), ("assistant", "答A"))
-        conv_b = _create_conversation(db_session, character_id=char_id)
-        _add_messages(db_session, conv_b.id, ("user", "问B"), ("assistant", "答B"))
-        target = _message_id(db_session, conv_a.id, "问A")
-
-        with pytest.raises(MessageNotFoundError):
-            await chat_service.edit_and_resend(db_session, conv_b.id, target, "新内容")
-
-    async def test_conversation_not_found(self, db_session: Session) -> None:
-        """对话不存在 → ConversationNotFoundError（404）"""
-        with pytest.raises(ConversationNotFoundError):
-            await chat_service.edit_and_resend(db_session, 99999, 1, "新内容")
+            await chat_service.edit_and_resend(db_session, 99999, "新内容")
 
     async def test_llm_error_zero_persistence(
         self, db_session: Session, monkeypatch: pytest.MonkeyPatch
@@ -320,7 +299,7 @@ class TestEditAndResend:
         before = _contents(db_session, conv.id)
 
         with pytest.raises(HTTPException) as exc:
-            await chat_service.edit_and_resend(db_session, conv.id, target, "修正后的问题")
+            await chat_service.edit_and_resend(db_session, target, "修正后的问题")
 
         assert exc.value.status_code == 401
         # 模拟 session close 回滚未提交变更 → 时间线原样保留（零落库）

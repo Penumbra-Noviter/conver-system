@@ -1059,12 +1059,21 @@ export async function branchLastReply() {
 // ── 消息级编辑重发 + 删除单条消息（工单 03 — 与末条 assistant 动作不同，作用于任意消息）──
 
 /**
- * 弹出消息内容编辑 modal（textarea），返回用户输入的新内容（空/取消 → null）。
- * 与 promptImageDescription 同型：openModal + onClose 兜底取消 + 提交按钮读 textarea。
- * @param {string} initialContent - 预填的原消息内容（HTML 转义防 </textarea> 注入）
+ * 弹出 textarea 输入 modal，返回用户输入文本（空/取消 → null）。
+ * promptMessageEdit 与 promptImageDescription 共用的同型收敛（F-135）：openModal +
+ * onClose 兜底取消 + 提交按钮读 textarea（绕过 close 的 cancelResult）。
+ * @param {object} opts - 配置
+ * @param {string} opts.overlayId - modal 遮罩 id（关闭时 remove）
+ * @param {string} opts.inputId - textarea 元素 id
+ * @param {string} opts.submitId - 提交按钮元素 id
+ * @param {string} opts.title - modal 标题
+ * @param {string} opts.placeholder - textarea 占位符
+ * @param {string} [opts.initialValue=''] - 预填内容（调用方负责 HTML 转义）
+ * @param {number} [opts.rows=3] - textarea 行数
+ * @param {string} [opts.submitLabel='确定'] - 提交按钮文案
  * @returns {Promise<string|null>}
  */
-function promptMessageEdit(initialContent) {
+function promptTextarea({ overlayId, inputId, submitId, title, placeholder, initialValue = '', rows = 3, submitLabel = '确定' }) {
     return new Promise((resolve) => {
         let settled = false;
         const done = (value) => {
@@ -1072,22 +1081,40 @@ function promptMessageEdit(initialContent) {
             settled = true;
             resolve(value);
         };
-        const body = `<textarea id="edit-message-input" rows="4" placeholder="编辑消息内容…">${escapeHtml(initialContent)}</textarea>`;
-        const actions = `<button class="btn-primary" id="edit-message-submit">保存</button>`;
+        const body = `<textarea id="${inputId}" rows="${rows}" placeholder="${placeholder}">${initialValue}</textarea>`;
+        const actions = `<button class="btn-primary" id="${submitId}">${submitLabel}</button>`;
         openModal({
-            title: '编辑消息',
+            title,
             body,
             actions,
-            overlayId: 'edit-message-modal',
-            onOpen: () => document.querySelector('#edit-message-input')?.focus(),
+            overlayId,
+            onOpen: () => document.querySelector(`#${inputId}`)?.focus(),
             onClose: () => done(null),
         });
         // 提交按钮：读 textarea → 直接移除遮罩（绕过 close 的 cancelResult）
-        document.querySelector('#edit-message-submit')?.addEventListener('click', () => {
-            const value = document.querySelector('#edit-message-input')?.value?.trim() || '';
-            document.querySelector('#edit-message-modal')?.remove();
+        document.querySelector(`#${submitId}`)?.addEventListener('click', () => {
+            const value = document.querySelector(`#${inputId}`)?.value?.trim() || '';
+            document.querySelector(`#${overlayId}`)?.remove();
             done(value || null);
         });
+    });
+}
+
+/**
+ * 弹出消息内容编辑 modal（textarea），返回用户输入的新内容（空/取消 → null）。
+ * @param {string} initialContent - 预填的原消息内容（HTML 转义防 </textarea> 注入）
+ * @returns {Promise<string|null>}
+ */
+function promptMessageEdit(initialContent) {
+    return promptTextarea({
+        overlayId: 'edit-message-modal',
+        inputId: 'edit-message-input',
+        submitId: 'edit-message-submit',
+        title: '编辑消息',
+        placeholder: '编辑消息内容…',
+        initialValue: escapeHtml(initialContent),
+        rows: 4,
+        submitLabel: '保存',
     });
 }
 
@@ -1253,29 +1280,14 @@ const cgInFlight = new Set();
  * @returns {Promise<string|null>}
  */
 function promptImageDescription() {
-    return new Promise((resolve) => {
-        let settled = false;
-        const done = (value) => {
-            if (settled) return;
-            settled = true;
-            resolve(value);
-        };
-        const body = `<textarea id="cg-prompt-input" rows="3" placeholder="描述要生成的画面…"></textarea>`;
-        const actions = `<button class="btn-primary" id="cg-prompt-submit">生成</button>`;
-        openModal({
-            title: '生成图片',
-            body,
-            actions,
-            overlayId: 'cg-prompt-modal',
-            onOpen: () => document.querySelector('#cg-prompt-input')?.focus(),
-            onClose: () => done(null),
-        });
-        // 提交按钮：读 textarea → 直接移除遮罩（绕过 close 的 cancelResult）
-        document.querySelector('#cg-prompt-submit')?.addEventListener('click', () => {
-            const value = document.querySelector('#cg-prompt-input')?.value?.trim() || '';
-            document.querySelector('#cg-prompt-modal')?.remove();
-            done(value || null);
-        });
+    return promptTextarea({
+        overlayId: 'cg-prompt-modal',
+        inputId: 'cg-prompt-input',
+        submitId: 'cg-prompt-submit',
+        title: '生成图片',
+        placeholder: '描述要生成的画面…',
+        rows: 3,
+        submitLabel: '生成',
     });
 }
 

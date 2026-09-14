@@ -151,6 +151,21 @@ class TestDeleteMessage:
 
         assert _contents(db_session, conv.id) == ["第一轮问", "第一轮答"]
 
+    def test_delete_user_syncs_identity_map(self, db_session: Session) -> None:
+        """删 USER 后 identity map 不残留被删对象（F-131：bulk delete synchronize_session='fetch'）
+
+        fetch 同步后 db.get 不再命中 identity map 残留对象，fresh 查询返回 None——
+        消除潜伏 StaleData（synchronize_session=False 会返回残留对象，此断言红）。
+        """
+        char_id = _create_character(db_session)
+        conv = _create_conversation(db_session, character_id=char_id)
+        _add_messages(db_session, conv.id, ("user", "问"), ("assistant", "答"))
+        target = _message_id(db_session, conv.id, "问")
+
+        message_service.delete_message(db_session, target)
+
+        assert db_session.get(Message, target) is None
+
     def test_delete_user_from_first_truncates_all(self, db_session: Session) -> None:
         """删首条 USER → 整段清空（id >= 目标 全删）"""
         char_id = _create_character(db_session)

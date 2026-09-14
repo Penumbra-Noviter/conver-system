@@ -2,7 +2,7 @@
 消息管理 & 聊天逻辑
 
 协议表面（__all__）：get_messages / create_message / create_message_no_commit /
-auto_insert_greeting / build_message_list / search_messages / require_message /
+auto_insert_greeting / build_message_list / search_messages /
 update_message / delete_message /
 add_swipe / append_swipe_and_bump / list_swipes / list_swipes_batch /
 switch_swipe / delete_swipe。
@@ -32,7 +32,6 @@ __all__ = [
     "auto_insert_greeting",
     "build_message_list",
     "search_messages",
-    "require_message",
     "update_message",
     "delete_message",
     "add_swipe",
@@ -253,17 +252,6 @@ def _require_message(db: Session, message_id: int) -> Message:
     return msg
 
 
-def require_message(db: Session, message_id: int) -> Message:
-    """按 ID 取单条消息（不存在抛 MessageNotFoundError）—— `_require_message` 的公开别名
-
-    message 级端点（PUT /api/messages/{message_id}）的归属解析入口：由 message_id
-    解析出消息及其 conversation_id 后委托下游（chat_service.edit_and_resend 需要
-    conversation_id）。与 `_require_message` 同语义，公开供路由层调用，避免路由
-    直接触碰 ORM。命名对齐 conversation_service.require_conversation（深函数守卫）。
-    """
-    return _require_message(db, message_id)
-
-
 # ════════════════════════════════════════════════════════════════
 # 消息级编辑 / 删除（message-edit-resend）
 # ════════════════════════════════════════════════════════════════
@@ -326,10 +314,14 @@ def delete_message(
     msg = _require_message(db, message_id)
     conversation_id = msg.conversation_id
     if msg.role == Role.USER:
+        # synchronize_session="fetch"（F-131）：bulk delete 后同步 session，
+        # 消除 identity map 残留被删对象 → 潜伏 StaleData。级联删除仍依赖
+        # 连接级 PRAGMA foreign_keys=ON（database.py connect 事件统一开启）——
+        # SQLite 外键是连接级契约，非本函数可局部化，属环境依赖而非模块缺陷。
         db.query(Message).filter(
             Message.conversation_id == conversation_id,
             Message.id >= msg.id,
-        ).delete(synchronize_session=False)
+        ).delete(synchronize_session="fetch")
     else:
         db.delete(msg)
     conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()

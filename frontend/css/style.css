@@ -1123,6 +1123,46 @@ body {
     border-color: var(--accent);
 }
 
+/* 消息操作按钮组（regen/cont/branch/edit/delete）——统一 hover 显示 + 图标按钮
+   样式，对齐 copy（F-132：此前 copy 悬停显示、其余常驻内联显示，视觉不一致） */
+.btn-regenerate,
+.btn-continue,
+.btn-branch,
+.btn-edit-message,
+.btn-delete-message {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    cursor: pointer;
+    font-size: 11px;
+    opacity: 0;
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
+    flex-shrink: 0;
+}
+
+.message:hover .btn-regenerate,
+.message:hover .btn-continue,
+.message:hover .btn-branch,
+.message:hover .btn-edit-message,
+.message:hover .btn-delete-message {
+    opacity: 0.6;
+}
+
+.btn-regenerate:hover,
+.btn-continue:hover,
+.btn-branch:hover,
+.btn-edit-message:hover,
+.btn-delete-message:hover {
+    opacity: 1 !important;
+    transform: scale(1.05);
+}
+
 /* 用户主动停止的 assistant 气泡标记 */
 .message-stop-tag {
     margin-top: var(--space-1);

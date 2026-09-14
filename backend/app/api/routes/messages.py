@@ -90,15 +90,13 @@ async def edit_message(
     """编辑重发（仅 user）：就地替换 content 并重新生成后续回复（message-edit-resend）
 
     编排（替换 content + 物理截断后续 + 重新生成，单 commit 原子落库；LLM 失败
-    零落库）收拢在 services/chat.py 的 edit_and_resend。路由先经 message_service
-    解析消息归属会话（不存在 → MessageNotFoundError → 404），再委托生成；领域异常
-    （MessageNotFoundError / InvalidEditTargetError）上抛由统一 handler 转 404/400。
-    响应 ChatResponse（message_id = 新 assistant 消息 id）。
+    零落库）收拢在 services/chat.py 的 edit_and_resend。目标解析（不存在 →
+    MessageNotFoundError → 404 / 非 user → InvalidEditTargetError → 400）由
+    edit_and_resend 内部 _resolve_edit_target 单一入口承担（F-130 收敛：路由不再
+    预查 message，message_id 全局唯一）。响应 ChatResponse（message_id = 新
+    assistant 消息 id）。
     """
-    message = message_service.require_message(db, message_id)
-    return await chat_service.edit_and_resend(
-        db, message.conversation_id, message_id, body.content
-    )
+    return await chat_service.edit_and_resend(db, message_id, body.content)
 
 
 @router.delete("/api/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -415,25 +415,28 @@ async def regenerate_chat(
 
 def _resolve_edit_target(
     db: Session,
-    conversation_id: int,
     message_id: int,
 ) -> Message:
-    """解析编辑目标并校验（存在 + 属于该对话 + 必须为 user）
+    """解析编辑目标并校验（存在 + 必须为 user）
+
+    编辑入口语义（F-130 收敛）：PUT /api/messages/{message_id} 的 URL 不携带
+    conversation_id，message_id 全局唯一，故归属校验由「message_id 存在」自然
+    承担（查出的 target 自带 conversation_id）。不再有外部 conversation_id 输入，
+    「跨会话编辑」防御对象随之消失——目标解析知识收口本函数单一入口。
 
     Args:
         db: 数据库会话
-        conversation_id: 对话 ID
         message_id: 目标消息 ID
 
     Returns:
         目标 user 消息
 
     Raises:
-        MessageNotFoundError: 消息不存在或不属于该对话
+        MessageNotFoundError: 消息不存在
         InvalidEditTargetError: 目标非 user
     """
     target = db.query(Message).filter(Message.id == message_id).first()
-    if target is None or target.conversation_id != conversation_id:
+    if target is None:
         raise MessageNotFoundError("消息不存在")
     if target.role != Role.USER:
         raise InvalidEditTargetError("只能编辑用户消息")
@@ -442,15 +445,16 @@ def _resolve_edit_target(
 
 async def edit_and_resend(
     db: Session,
-    conversation_id: int,
     message_id: int,
     content: str,
 ) -> ChatResponse:
     """编辑重发（仅 user）：就地替换 content + 物理截断后续 + 重新生成 assistant 回复
 
     编排（spec §edit-resend 原子性契约）：
-    1. require_conversation 校验对话存在；
-    2. _resolve_edit_target 解析并校验目标（存在 + 属于该会话 + role == USER）；
+    1. _resolve_edit_target 解析并校验目标（存在 + role == USER），并由 target
+       派生 conversation_id（F-130 收敛：不再由路由预查 message 后冗余传入，
+       目标解析知识收口本函数单一入口）；
+    2. require_conversation 校验对话存在（防御 FK 脏数据，正常不可达）；
     3. update_message(commit=False) 就地替换 content（不提交，参与原子落库）；
     4. assemble_chat_context(history_limit_message_id=message_id) 组装上下文
        （历史截止于被编辑 user，后续不进上下文；不插入 user）；
@@ -466,7 +470,6 @@ async def edit_and_resend(
 
     Args:
         db: 数据库会话
-        conversation_id: 对话 ID
         message_id: 被编辑的 user 消息 ID
         content: 修正后的 user 消息内容
 
@@ -474,18 +477,19 @@ async def edit_and_resend(
         ChatResponse（reply=新回复 / message_id=新 assistant 消息 / conversation_id）
 
     Raises:
-        ConversationNotFoundError: 对话不存在
-        MessageNotFoundError: message_id 不存在或不属于该对话
+        ConversationNotFoundError: 对话不存在（FK 脏数据防御）
+        MessageNotFoundError: message_id 不存在
         InvalidEditTargetError: 目标非 user
         ApiKeyMissingError: 未配置 API Key
         ProviderNotSupportedError: 不支持的 Provider
         HTTPException: LLM 调用失败（经 chat_error_response 映射）
     """
-    # 1. 校验对话存在
-    conversation_service.require_conversation(db, conversation_id)
+    # 1. 解析并校验目标（存在 + role == USER），派生 conversation_id（F-130 收敛）
+    target = _resolve_edit_target(db, message_id)
+    conversation_id = target.conversation_id
 
-    # 2. 解析并校验目标（存在 + 属于该会话 + role == USER）
-    _resolve_edit_target(db, conversation_id, message_id)
+    # 2. 校验对话存在（防御 FK 脏数据——message 存在但其 conversation 被物理删）
+    conversation_service.require_conversation(db, conversation_id)
 
     # 3. 就地替换 content（不提交——与后续删除 + 新 assistant 同一 commit 结算）
     message_service.update_message(db, message_id, content, commit=False)
@@ -505,7 +509,7 @@ async def edit_and_resend(
     db.query(Message).filter(
         Message.conversation_id == conversation_id,
         Message.id > message_id,
-    ).delete(synchronize_session=False)
+    ).delete(synchronize_session="fetch")
 
     # 7. 单 commit 结算：content 替换 + 后续删除 + 新 assistant 原子落库。
     saved = message_service.create_message(

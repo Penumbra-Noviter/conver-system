@@ -68,6 +68,20 @@ IMPORT_FORMAT_HINT = (
     "也可改用「创建角色」向导（智能导入/模板/手动）"
 )
 
+#: 400 家族领域异常（映射为 HTTP 400 + str(exc)）。多行元组常量替代单行膨胀
+#: isinstance 元组（F-138）：新增 400 家族异常时在此登记，避免单行超长。
+_HTTP_400_DOMAIN_ERRORS: tuple[type[DomainError], ...] = (
+    ApiKeyMissingError,
+    ProviderNotSupportedError,
+    InvalidRegenerateTargetError,
+    InvalidContinueTargetError,
+    InvalidEditTargetError,
+    BranchSnapshotError,
+    SwipeIndexError,
+    ModAlreadyBoundError,
+    ModReorderError,
+)
+
 
 def domain_error_response(exc: DomainError) -> tuple[int, str]:
     """领域异常 → (HTTP 状态码, 用户可见消息) 单一映射入口
@@ -98,7 +112,7 @@ def domain_error_response(exc: DomainError) -> tuple[int, str]:
         ),
     ):
         return status.HTTP_404_NOT_FOUND, str(exc)
-    if isinstance(exc, (ApiKeyMissingError, ProviderNotSupportedError, InvalidRegenerateTargetError, InvalidContinueTargetError, InvalidEditTargetError, BranchSnapshotError, SwipeIndexError, ModAlreadyBoundError, ModReorderError)):
+    if isinstance(exc, _HTTP_400_DOMAIN_ERRORS):
         return status.HTTP_400_BAD_REQUEST, str(exc)
     if isinstance(exc, CardFormatError):
         return status.HTTP_422_UNPROCESSABLE_CONTENT, f"导入失败：{exc}。{IMPORT_FORMAT_HINT}"
