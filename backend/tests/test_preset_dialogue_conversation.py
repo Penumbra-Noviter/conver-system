@@ -139,3 +139,38 @@ class TestPresetDialogueMigration:
             assert conn.execute(
                 text("SELECT preset_dialogue FROM conversations WHERE title='旧行'")
             ).scalar() is None
+
+
+class TestCharacterPresetDialogueMigration:
+    """PD-4 character.preset_dialogues 自愈迁移（波 1 修复缺口补登记）"""
+
+    def _legacy_engine(self):
+        """模拟存量库：characters 表不含 preset_dialogues 列"""
+        engine = create_engine("sqlite://")
+        with engine.connect() as conn:
+            conn.execute(text(
+                "CREATE TABLE characters ("
+                " id INTEGER PRIMARY KEY, name VARCHAR(100) NOT NULL)"
+            ))
+            conn.commit()
+        return engine
+
+    def test_migration_adds_column_idempotent(self) -> None:
+        """首次补列 + 幂等再跑无事；存量行 preset_dialogues 为 NULL 零影响"""
+        from backend.app.database import _ensure_character_preset_dialogue_column
+
+        engine = self._legacy_engine()
+        _ensure_character_preset_dialogue_column(engine)  # 首次补列
+        _ensure_character_preset_dialogue_column(engine)  # 幂等：再跑无事
+
+        with engine.connect() as conn:
+            columns = {
+                row[1]: row
+                for row in conn.execute(text("PRAGMA table_info(characters)")).fetchall()
+            }
+            assert "preset_dialogues" in columns
+            conn.execute(text("INSERT INTO characters (name) VALUES ('旧行')"))
+            conn.commit()
+            assert conn.execute(
+                text("SELECT preset_dialogues FROM characters WHERE name='旧行'")
+            ).scalar() is None

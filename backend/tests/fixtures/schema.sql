@@ -43,6 +43,7 @@ CREATE TABLE characters (
 	max_tokens INTEGER, 
 	prompt_mode VARCHAR(8) DEFAULT 'simple' NOT NULL, 
 	expert_prompt TEXT DEFAULT '' NOT NULL, 
+	preset_dialogues JSON, 
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
 	PRIMARY KEY (id)

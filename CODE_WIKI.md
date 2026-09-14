@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2792<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1274<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1448<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2841<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1323<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1448<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -258,7 +258,7 @@ conver system/
 
 > 无公开函数（纯配置常量）。注意 `DATABASE_URL` 默认值带 `+aiosqlite` 前缀，但 `database.py` 建引擎时剔除（同步 ORM，勿误判为异步）。
 
-### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~182 行<!--/AUTO-->）
+### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~204 行<!--/AUTO-->）
 
 **职责**：SQLAlchemy 同步引擎（`PRAGMA foreign_keys=ON`）、`get_db` 会话依赖、`init_db` 建表。
 
@@ -406,7 +406,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/character.py:update_character-->`update_character(db, character_id, data)`<!--/AUTO--> | 更新角色 |
 | <!--AUTO:sig:backend/app/services/character.py:delete_character-->`delete_character(db, character_id)`<!--/AUTO--> | 删除角色 |
 
-### 4.13 `backend/app/services/character_card.py` — 角色卡 V2 转换（<!--AUTO:lines:backend/app/services/character_card.py-->~241 行<!--/AUTO-->）
+### 4.13 `backend/app/services/character_card.py` — 角色卡 V2 转换（<!--AUTO:lines:backend/app/services/character_card.py-->~270 行<!--/AUTO-->）
 
 **职责**：SillyTavern Character Card V2 信封导出/导入——兼容 V1 旧卡与裸 data；非 V2 标准字段存 `extensions.conver_system.*` 命名空间保证往返保真；头像 data URI 规范化。
 
@@ -456,7 +456,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/chat.py:assemble_chat_context-->`assemble_chat_context(db, conversation_id, *, current_input=None, history_limit_message_id=None)`<!--/AUTO--> | 下层组装函数（不插 user / greeting，重生成复用） |
 | <!--AUTO:sig:backend/app/services/chat.py:regenerate_chat-->`regenerate_chat(db, conversation_id, message_id=None)`<!--/AUTO--> | 重生成编排：截断 → 组装 → 生成 → 单事务落库 |
 
-### 4.15 `backend/app/services/conversation.py` — 会话服务（<!--AUTO:lines:backend/app/services/conversation.py-->~317 行<!--/AUTO-->）
+### 4.15 `backend/app/services/conversation.py` — 会话服务（<!--AUTO:lines:backend/app/services/conversation.py-->~321 行<!--/AUTO-->）
 
 **职责**：会话 CRUD + 默认标题（角色名派生）+ 自动标题（首条消息截断）+ 清空 + 分支派生（BR-2）。
 
@@ -650,7 +650,7 @@ conver system/
 
 > 无公开函数（数据表 + 派生逻辑）。
 
-### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~211 行<!--/AUTO-->）
+### 4.23 `backend/app/services/setting.py` — 设置服务（<!--AUTO:lines:backend/app/services/setting.py-->~238 行<!--/AUTO-->）
 
 **职责**：DB settings 表读写——凭证槽位（按 Provider 存取 Key/base_url）、滑窗轮数、用户名、默认模型；凭证通用解析（填任一 key 全局可用）。
 
@@ -1486,8 +1486,8 @@ conver system/
 
 | 文件 | 用例数 | 覆盖主题 |
 |------|--------|----------|
-| `backend/tests/test_character_card.py` | <!--AUTO:tests:backend/tests/test_character_card.py-->56<!--/AUTO--> | 角色卡 V2 导入导出/往返保真 |
-| `backend/tests/test_character_fields.py` | <!--AUTO:tests:backend/tests/test_character_fields.py-->26<!--/AUTO--> | 角色字段常量映射契约锁 |
+| `backend/tests/test_character_card.py` | <!--AUTO:tests:backend/tests/test_character_card.py-->69<!--/AUTO--> | 角色卡 V2 导入导出/往返保真 |
+| `backend/tests/test_character_fields.py` | <!--AUTO:tests:backend/tests/test_character_fields.py-->27<!--/AUTO--> | 角色字段常量映射契约锁 |
 | `backend/tests/test_character_sampling.py` | <!--AUTO:tests:backend/tests/test_character_sampling.py-->4<!--/AUTO--> | 采样参数契约锁（SP-1：迁移幂等/往返保真/clamp） |
 | `backend/tests/test_sampling_transmit.py` | <!--AUTO:tests:backend/tests/test_sampling_transmit.py-->5<!--/AUTO--> | 采样参数透传契约锁（SP-2：OpenAI 透传/Claude 不传/_sampling_kwargs） |
 | `backend/tests/test_character_import_avatar.py` | <!--AUTO:tests:backend/tests/test_character_import_avatar.py-->2<!--/AUTO--> | 角色导入非 ASCII avatar 500 回归（服务层 ValueError 缺陷路径 + API 层全路径） |
@@ -1508,6 +1508,8 @@ conver system/
 | `backend/tests/test_database.py` | <!--AUTO:tests:backend/tests/test_database.py-->5<!--/AUTO--> | 自愈迁移原语契约锁（F-125：缺列补列幂等/已存在列 no-op/concurrent 吞 duplicate/非 duplicate 原样上抛/Connection 双形态） |
 | `backend/tests/test_document_parser.py` | <!--AUTO:tests:backend/tests/test_document_parser.py-->15<!--/AUTO--> | 文档智能解析 |
 | `backend/tests/test_expert_prompt.py` | <!--AUTO:tests:backend/tests/test_expert_prompt.py-->20<!--/AUTO--> | 专家模式契约锁（PD-5：expert 分流/回退/世界书注入/迁移幂等/往返保真） |
+| `backend/tests/test_narrative_style.py` | <!--AUTO:tests:backend/tests/test_narrative_style.py-->29<!--/AUTO--> | 叙述风格设置键与访问器契约锁（NPD-01） |
+| `backend/tests/test_preset_dialogue_conversation.py` | <!--AUTO:tests:backend/tests/test_preset_dialogue_conversation.py-->6<!--/AUTO--> | 预设对话快照列 + character 迁移幂等契约锁（NPD-04/05） |
 | `backend/tests/test_edit_resend.py` | <!--AUTO:tests:backend/tests/test_edit_resend.py-->7<!--/AUTO--> | 编辑重发编排契约锁（01：替换+截断+重生成原子性/目标非 user 400/LLM 失败零落库） |
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->41<!--/AUTO--> | 统一异常处理器 |
 | `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->20<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
@@ -1646,9 +1648,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2792<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2841<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1274<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1323<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1448<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
