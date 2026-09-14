@@ -317,6 +317,14 @@ export const conversations = {
         `/conversations/${id}/branch`,
         { message_id, ...(title != null ? { title } : {}) },
     ),
+    /**
+     * 读取最终组装后的 prompt 分段（只读调试，PD-4）。
+     * GET /conversations/{id}/prompt-debug；响应含 conversation_id/character_name/
+     * model/prompt_mode/segments（{role, content, source}）。
+     * @param {number|string} id - 会话 id
+     * @returns {Promise<object>} prompt-debug 响应
+     */
+    promptDebug: (id) => request('GET', `/conversations/${id}/prompt-debug`),
 };
 
 // ══════════════════════════════════════════════════
