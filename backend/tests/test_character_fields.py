@@ -46,10 +46,11 @@ class TestCharacterFieldsExports:
 class TestCharacterV2Fields:
     """CHARACTER_V2_FIELDS — 20 内容字段，与 ORM 声明的 V2 列集合一致"""
 
-    # 从 ORM 提取 V2 内容字段名（排除 id / created_at / updated_at）
+    # 从 ORM 提取 V2 内容字段名（排除 id / created_at / updated_at 系统列，
+    # 以及 PD-5 项目自有非 V2 字段 prompt_mode / expert_prompt——不进 CHARACTER_V2_FIELDS）
     ORM_V2_COLUMNS = {
         c.name for c in Character.__table__.columns
-        if c.name not in ("id", "created_at", "updated_at")
+        if c.name not in ("id", "created_at", "updated_at", "prompt_mode", "expert_prompt")
     }
 
     def test_length(self):

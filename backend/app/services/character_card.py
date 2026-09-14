@@ -56,6 +56,12 @@ def to_v2_card(char: Character) -> dict:
     if char.max_tokens is not None:
         ns["max_tokens"] = char.max_tokens
 
+    # PD-5 专家模式：非默认值写入命名空间（默认 simple / 空串不落卡，对齐采样参数 None 不落卡）
+    if char.prompt_mode == "expert":
+        ns["prompt_mode"] = char.prompt_mode
+    if char.expert_prompt:
+        ns["expert_prompt"] = char.expert_prompt
+
     # 头像：base64 data URI → data.avatar（去前缀，ST 兼容）；URL → 命名空间 avatar_url
     data_avatar = None
     if char.avatar and _is_data_uri(char.avatar):
@@ -167,6 +173,10 @@ def _build_create(data: dict) -> CharacterCreate:
     )
     max_tokens = _clamp_optional_int(ns.get("max_tokens", data.get("max_tokens")), 1, 131072)
 
+    # PD-5 专家模式：conver_system 命名空间往返（对齐 temperature 既有模式）
+    prompt_mode = str(ns.get("prompt_mode") or "simple")
+    expert_prompt = str(ns.get("expert_prompt") or "")
+
     version = data.get("character_version") or data.get("version") or "1.0"
 
     return CharacterCreate(
@@ -190,6 +200,8 @@ def _build_create(data: dict) -> CharacterCreate:
         presence_penalty=presence_penalty,
         frequency_penalty=frequency_penalty,
         max_tokens=max_tokens,
+        prompt_mode=prompt_mode,
+        expert_prompt=expert_prompt,
     )
 
 

@@ -65,6 +65,12 @@ class Character(Base):
     frequency_penalty = Column(Float, nullable=True, comment="LLM frequency_penalty（OpenAI 系）")
     max_tokens = Column(Integer, nullable=True, comment="LLM 最大输出 token（None=provider 默认）")
 
+    # ── PD-5 专家模式（项目自有字段，不进 V2 规范清单） ──
+    # NOT NULL + server_default（对齐 Message.active_swipe_index 模式）：raw INSERT 与
+    # 迁移 ALTER 均需服务端默认值；Python 侧 default 供 ORM flush 兜底
+    prompt_mode = Column(String(8), default="simple", server_default="simple", nullable=False, comment="专家模式开关（simple/expert）")
+    expert_prompt = Column(Text, default="", server_default="", nullable=False, comment="专家模式整段 system prompt")
+
     created_at = Column(DateTime, default=datetime.datetime.now, server_default=func.now())
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now, server_default=func.now())
 
