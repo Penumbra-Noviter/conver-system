@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session
 from backend.app.api.headers import build_content_disposition
 from backend.app.database import get_db
 from backend.app.schemas.branch import BranchRequest, ImportBranchRequest
-from backend.app.schemas.conversation import ConversationCreate, ConversationResponse, ConversationUpdate
+from backend.app.schemas.conversation import (
+    ConversationCreate,
+    ConversationResponse,
+    ConversationUpdate,
+    PromptDebugResponse,
+)
 from backend.app.schemas.message import ChatResponse, RegenerateRequest
 from backend.app.services import chat as chat_service
 from backend.app.services import conversation as service
@@ -104,6 +109,16 @@ async def snapshot(conversation_id: int, db: Session = Depends(get_db)) -> JSONR
             )
         },
     )
+
+
+@router.get("/{conversation_id}/prompt-debug", response_model=PromptDebugResponse)
+def prompt_debug(conversation_id: int, db: Session = Depends(get_db)) -> PromptDebugResponse:
+    """prompt-debug 只读追溯（PD-3：不落库、不触发 LLM）
+
+    返回最终组装后的消息列表，逐条标注来源（character/world/memory/mod/history/
+    user）。编排收口于 services/chat.py::build_prompt_debug。
+    """
+    return chat_service.build_prompt_debug(db, conversation_id)
 
 
 @router.get("", response_model=list[ConversationResponse])
