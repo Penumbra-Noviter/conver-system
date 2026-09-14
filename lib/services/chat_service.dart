@@ -922,11 +922,25 @@ class ChatService {
   ///
   /// 角色温度 == [SettingsRepository.defaultTemperature]（0.7，DB 默认）判定为
   /// 「未显式覆盖」→ 回退全局值；接受「显式设 0.7 会被全局覆盖」的边界。
+  ///
+  /// 防御（F-76）：DB 层无 CHECK 约束，`character.temperature` 可能为
+  /// NaN/Infinity（`==` 对 NaN 恒 false 会误判「已覆盖」透传致 API 400）或
+  /// 越界值——NaN/Infinity 回退全局、越界 clamp 到合法区间
+  /// [SettingsRepository.temperatureMin, temperatureMax]（对齐
+  /// `SettingsRepository.getTemperature` 契约）。
   double _resolveTemperature(Character character, double globalTemperature) {
-    if (character.temperature == SettingsRepository.defaultTemperature) {
+    final temperature = character.temperature;
+    if (temperature.isNaN ||
+        temperature.isInfinite ||
+        temperature == SettingsRepository.defaultTemperature) {
       return globalTemperature;
     }
-    return character.temperature;
+    return temperature
+        .clamp(
+          SettingsRepository.temperatureMin,
+          SettingsRepository.temperatureMax,
+        )
+        .toDouble();
   }
 
   /// provider 解析（AR-3：委派 [CredentialsResolver]——组合序单一归属

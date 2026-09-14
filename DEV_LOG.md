@@ -6,6 +6,14 @@
 
 ---
 
+## 技术债消费批次 F-75/F-76/F-77 — 全部处置（2026-09-14 — 用户「消费技术债」指令）
+
+- **范围**：候选区 3 条全处置（做 1 关 2）——F-76 消费，F-75/F-77 复核关闭。全量 **1684 测**绿（+3）/ analyze 0。**候选区清零**（0 项开放）。
+- **F-76 temperature NaN/Infinity 回退 + clamp**（✅ 修）：`_resolveTemperature`（chat_service.dart）原用 `==` 比较 double、对 `character.temperature` 无 clamp——角色温度 NaN/Infinity（DB 无 CHECK 约束）时 `== 0.7` 恒 false 会误判「已覆盖」透传致 API 400、越界值直接透传。改为 NaN/Infinity 回退全局、越界 clamp 到 [0,2]（对齐 `SettingsRepository.getTemperature` 契约）；3 复现测试（上界 9.9→2.0 / 下界 -1.5→0.0 / Infinity→全局 0.9）红→绿。
+- **F-77 SettingsReader implements 成本**（❌ 复核关闭）：git grep 复核——接口 4 getter 稳定（defaultProvider/defaultModel/userName/templateVars，近期仅 U-UX 加 templateVars 一个），16 处 implements 中 15 处测试假实现；Dart `implements` 编译期强制加 getter 时同步提醒所有实现方更新是防漏测的正确成本，非结构性脆弱。
+- **F-75 种子 HTML 响应式**（❌ 复核关闭）：复核现状——22 款种子 HTML 均已带 viewport meta + @media 断点（768/420 等）；根因是内容资产 CSS 质量（固定宽度面板 270/300px 在异形屏截断）非 Flutter 代码债；WebView setInitialScale 兜底治标（整体缩放文字变小破坏布局，Android 专属 API 与 iOS 引入平台分歧）。真实 UX 问题转内容更新专项（逐款改 CSS + 真机验证），不进代码债候选区。
+- **过程遥测**：零子智能体（纯代码修复 + 复核关闭，主会话直做）；合并冲突 0；flaky 0。
+
 ## U-UX 补全批次 — 聊天首页/生成参数/模板变量/新手指引（2026-09-14 — 用户 APK/模拟器实测反馈）
 
 - **范围**：用户实测反馈四条（① 聊天首页「临时」半成品 ② 模拟器 UI 适配 ③ 新手指引缺失 ④ 设置两占位行）落 4 工单 U-1~U-4 + 技术债候选 F-75（模拟器响应式，本批未消费）。Grilling 4 决策全按推荐拍板（mobile 先行 / 全局同一替换管线 / 分页 carousel / 对齐桌面完整语义）；拆 5 工单（U-2 拆 prefactoring 02 + 功能 03）。

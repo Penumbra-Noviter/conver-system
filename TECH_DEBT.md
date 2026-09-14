@@ -43,11 +43,18 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-75 | 22 款种子 HTML 游戏响应式 CSS 不彻底：窄屏/异形屏文字截断（固定宽度面板如 width:270px/300px + 仅 @media 768/420 两档断点）；Flutter WebView 容器（webview_capability.dart）无 initialScale/缩放兜底 | 用户 APK/模拟器实测反馈（2026-09-14） | Worth exploring | 📝 待立项 | 模拟器/种子游戏 |
-| F-76 | 角色 temperature 直接读 DB 无 clamp：`_resolveTemperature` 用 `==` 比较 double，角色值为 NaN/Infinity 时（DB 层无 CHECK 约束）会透传到 LLM 请求体致 API 400；`getTemperature()` 有 clamp 但 `character.temperature` 无 | U-UX 期末四轴 Falsify（2026-09-14） | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-77 | `SettingsReader` 接口每加一个消费方所需 getter 就穿透全部 16 处 `implements`（15 测试假实现 + 1 真实实现）；接口混合了 DI seam 与类型化 DAO 两角色，扩展有结构性脆弱性 | U-UX 期末四轴 Architecture（2026-09-14） | Speculative | 📝 待立项 | 数据层 |
 
 ## 技术债处置记录
+
+### 2026-09-14 — 技术债消费批次（F-75/F-76/F-77，候选区清零）
+
+> 来源：用户「消费技术债」指令。F-76 消费（✅ 已修），F-75/F-77 复核关闭（❌）。**候选区清零**（0 项开放）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-76 | ✅ 已修 | `_resolveTemperature`（chat_service.dart）加 NaN/Infinity 回退全局 + 越界 clamp 到 [0,2]（对齐 `SettingsRepository.getTemperature` 契约）；3 复现测试（上界 9.9→2.0 / 下界 -1.5→0.0 / Infinity→全局 0.9）红→绿 |
+| F-77 | ❌ 复核关闭 | git grep 复核：SettingsReader 4 getter 稳定（defaultProvider/defaultModel/userName/templateVars，近期仅 U-UX 加 templateVars 一个）；16 处 implements 中 15 处测试假实现，Dart `implements` 编译期强制（加 getter 时编译器提醒所有实现方同步）是防漏测的正确成本，非结构性脆弱——关闭不立项 |
+| F-75 | ❌ 复核关闭 | 复核现状：22 款种子 HTML 均已带 viewport meta + @media 断点（768/420 等），响应式已有基础；根因是内容资产 CSS 质量（固定宽度面板 270/300px 在异形屏截断），非 Flutter 代码债；WebView setInitialScale 兜底治标（整体缩放文字变小、破坏布局，且 Android 专属 API 与 iOS 引入平台分歧），正解是内容更新通道逐款改 CSS + 真机验证——关闭不立项，真实 UX 问题转内容更新专项、不进代码债候选区 |
 
 ### 2026-09-10 — 技术债折回批次（F-73/F-74，候选区清零）
 
