@@ -1260,4 +1260,109 @@ void main() {
       expect(c.exporting, isFalse);
     });
   });
+
+  group('U-1 · 角色选择与会话管理（entry actions）', () {
+    test('loadEntry → characters 全量 + selectedCharacterId 默认首角色', () async {
+      final first = await seedCharacter(name: '首角色');
+      final second = await seedCharacter(name: '次角色');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+
+      await c.loadEntry();
+
+      expect(c.characters.map((e) => e.id), [first.id, second.id]);
+      expect(c.selectedCharacterId, first.id);
+      expect(c.canCreateConversation, isTrue);
+    });
+
+    test('selectCharacter → 切换选中态；重复选择同 id 幂等', () async {
+      final first = await seedCharacter(name: '首角色');
+      final second = await seedCharacter(name: '次角色');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      c.selectCharacter(second.id);
+
+      expect(c.selectedCharacterId, second.id);
+      c.selectCharacter(second.id); // 幂等：不破坏既有状态
+      expect(c.selectedCharacterId, second.id);
+      expect(first.id, isNot(second.id));
+    });
+
+    test('selectCharacter 不存在 id → 无操作（选中态不变）', () async {
+      final first = await seedCharacter(name: '首角色');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      c.selectCharacter(999999);
+
+      expect(c.selectedCharacterId, first.id);
+    });
+
+    test('createConversation 以选中角色建会话（非首角色）', () async {
+      await seedCharacter(name: '首角色');
+      final target =
+          await seedCharacter(name: '目标角色', firstMes: '你好，{{user}}。');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      c.selectCharacter(target.id);
+
+      await c.createConversation();
+
+      expect(c.activeConversation?.characterId, target.id);
+      expect(roleContentsOf(c), [(Role.assistant, '你好，User。')]);
+    });
+
+    test('renameConversation → 委托 updateConversation 落库并刷新列表', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.renameConversation(conv.id, '新标题');
+
+      expect((await convRepo.getConversation(conv.id))?.title, '新标题');
+      expect(
+        c.conversations.map((e) => e.conversation.title),
+        contains('新标题'),
+      );
+    });
+
+    test('renameConversation 对话不存在 → notice「对话不存在」', () async {
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.renameConversation(999999, 'x');
+
+      expect(c.notice, '对话不存在');
+    });
+
+    test('removeConversation → 委托 deleteConversation 落库并 loadEntry 刷新',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      expect(c.conversations.map((e) => e.conversation.id), contains(conv.id));
+
+      await c.removeConversation(conv.id);
+
+      expect(await convRepo.getConversation(conv.id), isNull);
+      expect(
+        c.conversations.map((e) => e.conversation.id),
+        isNot(contains(conv.id)),
+      );
+    });
+
+    test('removeConversation 不存在 id → 零副作用（列表不变）', () async {
+      final char = await seedCharacter();
+      await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      final before = c.conversations.map((e) => e.conversation.id).toList();
+
+      await c.removeConversation(999999);
+
+      expect(c.conversations.map((e) => e.conversation.id).toList(), before);
+    });
+  });
 }
