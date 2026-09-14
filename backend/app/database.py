@@ -70,6 +70,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_messages_active_swipe_index(engine)
     _ensure_conversation_branch_columns(engine)
+    _ensure_conversation_preset_dialogue(engine)
     _ensure_cg_images_weight(engine)
     _ensure_character_sampling_columns(engine)
     _ensure_character_expert_columns(engine)
@@ -153,6 +154,20 @@ def _ensure_conversation_branch_columns(bind=engine) -> None:
     else:
         for name, coltype in cols:
             _ensure_column(bind, "conversations", name, coltype)
+
+
+def _ensure_conversation_preset_dialogue(bind=engine) -> None:
+    """自愈迁移：存量 conversations 表缺 preset_dialogue 列时补列（幂等，委托 _ensure_column）
+
+    NPD-05 预设对话快照：preset_dialogue（TEXT，可空）。create_all 不会给已存在
+    表加列（项目无 alembic，spec §0 迁移约束）：探测缺列 → 补列；连续两次调用无
+    副作用（幂等，契约锁
+    test_preset_dialogue_conversation::TestPresetDialogueMigration::test_migration_adds_column_idempotent）。
+
+    Args:
+        bind: 可连接的 Engine/Connection（默认应用引擎；测试可传入内存库）
+    """
+    _ensure_column(bind, "conversations", "preset_dialogue", "TEXT")
 
 
 def _ensure_cg_images_weight(bind=engine) -> None:

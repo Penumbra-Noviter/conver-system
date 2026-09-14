@@ -17,6 +17,7 @@ class ConversationCreate(BaseModel):
     model_provider: str = Field("claude", description="模型提供商")
     model_name: str = Field("claude-sonnet-5", description="具体模型名")
     greeting: Optional[str] = Field(None, description="指定开场白（显式传入时覆盖角色 first_mes；None/空串表示不预插）")
+    preset_dialogue: Optional[str] = Field(None, description="预设对话快照（前端选中的预设对话 content；None/空串归一为 null）")
 
 
 class ConversationUpdate(BaseModel):
@@ -36,6 +37,8 @@ class ConversationResponse(BaseModel):
     message_count: int = 0
     created_at: datetime.datetime
     updated_at: datetime.datetime
+    # NPD-05 预设对话快照（创建时固化的选中预设对话 content；普通会话为 None）
+    preset_dialogue: Optional[str] = None
     # BR-2 分支来源元数据（F-100 能力 2：列表分支来源标记的最小暴露）
     #   普通会话四字段均为 None；branch_from_message_preview 为锚消息 content 的
     #   截断预览（~60 字符，服务层 list_conversations 经关联查询带出，非表列，

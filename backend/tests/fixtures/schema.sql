@@ -59,6 +59,7 @@ CREATE TABLE conversations (
 	parent_conversation_id INTEGER, 
 	branch_from_message_id INTEGER, 
 	branch_title VARCHAR(200), 
+	preset_dialogue TEXT, 
 	PRIMARY KEY (id), 
 	FOREIGN KEY(character_id) REFERENCES characters (id) ON DELETE CASCADE
 );
