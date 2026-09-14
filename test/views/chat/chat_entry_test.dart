@@ -1,15 +1,15 @@
-/// 最小临时会话入口 widget 契约（T04b 切片）。
+/// 聊天首页角色选择与会话管理 widget 契约（U-1 工单 01）。
 ///
-/// 入口面（锚：spec ID-2「最小临时会话入口：最近对话列表（listConversations）+
-/// 『新建对话』（取首个角色，无角色禁用并提示）+ 界面标注『临时』」）：
-/// - 标题「聊天」+「临时」标注（M3 替换的占位语义，best-judgment ② 细化）；
-/// - 最近对话列表：标题 + 消息数，tap 进会话；
-/// - 「新建对话」：有角色可点并进入新会话（渲染预插开场白）；无角色禁用 +
-///   提示「请先在角色页创建角色」；无会话空态。
+/// 入口面（锚：spec U-1 + 工单 01 验收标准 7 条）：
+/// - 标题「聊天」（无「临时」标注、无「后续里程碑替换」副标题文案）；
+/// - 角色选择条：横向渲染全部角色名，tap 切换选中态（选中高亮）；
+/// - 「新建对话」以选中角色建会话并直达；无角色禁用 + 提示「请先在角色页创建角色」；
+/// - 长按会话列表项弹出「重命名 / 删除」菜单；重命名/删除经控制器落库并刷新；
+/// - 最近对话列表：标题 + 消息数，tap 进会话。
 ///
 /// 测试 seam（公共接口边界）：ChatView / ChatEntry 公开接口 + ChatController
-/// 可观察状态（isEntry / activeConversationId / conversations）。经内存库 +
-/// InMemorySecretStore + FakeLLMProvider 驱动真实 ChatService（不 mock 服务层）。
+/// 可观察状态。经内存库 + InMemorySecretStore + FakeLLMProvider 驱动真实
+/// ChatService（不 mock 服务层）。
 ///
 /// 环境形态同 chat_view_test：每测试体自建 env + 测试体内 inline close
 /// （tearDown 阶段在 FakeAsync 边界可能挂起——实证）。
@@ -53,15 +53,17 @@ void main() {
   ChatController entryController(ChatTestEnv env, LLMProvider provider) =>
       env.controllerOf(provider);
 
-  group('入口 · 临时标注与新建按钮', () {
-    testWidgets('标题「聊天」+「临时」标注 +「新建对话」+ 无会话空态', (tester) async {
+  group('入口 · 角色选择条与新建按钮', () {
+    testWidgets('标题「聊天」（无临时标注/无副标题文案）+「新建对话」+ 无会话空态',
+        (tester) async {
       final env = await ChatTestEnv.create();
       final c = entryController(env, FakeLLMProvider(tokens: const []));
       await c.loadEntry();
       await pumpChat(tester, c);
 
       expect(find.text('聊天'), findsOneWidget);
-      expect(find.text('临时'), findsOneWidget);
+      expect(find.text('临时'), findsNothing);
+      expect(find.textContaining('后续里程碑替换'), findsNothing);
       expect(find.text('新建对话'), findsOneWidget);
       expect(find.text('还没有对话'), findsOneWidget);
       await env.close();
@@ -78,6 +80,67 @@ void main() {
       expect(button.onPressed, isNull, reason: '无角色禁用新建');
       expect(find.text('请先在角色页创建角色'), findsOneWidget);
       expect(c.notice, isNull, reason: '禁用提示是 UI 文案，非错误 notice');
+      await env.close();
+    });
+
+    testWidgets('角色选择条渲染全部角色名 + 默认选中首角色 + tap 切换高亮', (tester) async {
+      final env = await ChatTestEnv.create();
+      final first = await env.seedCharacter(name: '艾莉亚');
+      final second = await env.seedCharacter(name: '白露');
+      final c = entryController(env, FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      expect(find.text('艾莉亚'), findsOneWidget);
+      expect(find.text('白露'), findsOneWidget);
+      expect(c.selectedCharacterId, first.id, reason: '默认选中首角色');
+      expect(
+        tester
+            .widget<ChoiceChip>(find.byKey(Key('character-chip-${first.id}')))
+            .selected,
+        isTrue,
+        reason: '首角色 chip 高亮',
+      );
+
+      await tester.tap(find.byKey(Key('character-chip-${second.id}')));
+      await tester.pump();
+
+      expect(c.selectedCharacterId, second.id);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.byKey(Key('character-chip-${second.id}')))
+            .selected,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<ChoiceChip>(find.byKey(Key('character-chip-${first.id}')))
+            .selected,
+        isFalse,
+      );
+      await env.close();
+    });
+
+    testWidgets('新建对话以选中角色建会话（非首角色）', (tester) async {
+      final env = await ChatTestEnv.create();
+      await env.seedCharacter(name: '艾莉亚');
+      final target =
+          await env.seedCharacter(name: '白露', firstMes: '你好，{{user}}。');
+      final c = entryController(env, FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byKey(Key('character-chip-${target.id}')));
+      await tester.pump();
+      expect(c.selectedCharacterId, target.id);
+
+      await tester.tap(find.text('新建对话'));
+      await pumpUntil(tester, () => !c.isEntry, why: '进入新会话');
+
+      expect(c.activeConversation?.characterId, target.id,
+          reason: '会话归属选中角色而非首角色');
+      expect(find.text('你好，User。', findRichText: true), findsOneWidget,
+          reason: '选中角色开场白经模板替换预插');
       await env.close();
     });
   });
@@ -145,6 +208,79 @@ void main() {
           why: 'backToEntry 刷新后会话进入列表');
       await tester.pump();
       expect(find.text('与 艾莉亚 的对话'), findsOneWidget);
+      await env.close();
+    });
+  });
+
+  group('入口 · 长按会话管理（重命名 / 删除）', () {
+    testWidgets('长按会话 → 弹出「重命名 / 删除」菜单', (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      await env.seedConversation(char.id);
+      final c = entryController(env, FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      await tester.longPress(find.text('与 艾莉亚 的对话'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('重命名'), findsOneWidget);
+      expect(find.text('删除'), findsOneWidget);
+      await env.close();
+    });
+
+    testWidgets('重命名流程 → 更新 DB 并刷新列表标题', (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final c = entryController(env, FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      await tester.longPress(find.text('与 艾莉亚 的对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('重命名'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('rename-field')), findsOneWidget,
+          reason: '重命名对话框预填输入框');
+      await tester.enterText(
+          find.byKey(const Key('rename-field')), '我的新对话');
+      await tester.tap(find.byKey(const Key('rename-confirm')));
+      await pumpUntil(
+        tester,
+        () => c.conversations.any((e) => e.conversation.title == '我的新对话'),
+        why: '重命名落库并刷新列表',
+      );
+
+      expect(
+        (await env.conversationRepository.getConversation(conv.id))?.title,
+        '我的新对话',
+      );
+      expect(find.widgetWithText(ListTile, '我的新对话'), findsOneWidget);
+      await env.close();
+    });
+
+    testWidgets('删除流程 → 落库并刷新为空态', (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final c = entryController(env, FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      await tester.longPress(find.text('与 艾莉亚 的对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('删除'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('删除对话'), findsOneWidget, reason: '删除确认对话框');
+      await tester.tap(find.byKey(const Key('delete-confirm')));
+      await pumpUntil(tester, () => c.conversations.isEmpty,
+          why: '删除落库并刷新列表');
+
+      expect(await env.conversationRepository.getConversation(conv.id), isNull);
+      expect(find.text('还没有对话'), findsOneWidget);
       await env.close();
     });
   });

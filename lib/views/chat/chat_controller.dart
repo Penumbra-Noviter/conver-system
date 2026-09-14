@@ -32,13 +32,14 @@ library;
 
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart';
 
-// 只引出 drift 生成的类型化行类（Message / Conversation / Character），
-// 不触碰数据层具体实现标识符（layer_boundary_test：视图层不得引用数据层具体
-// 实现）。
+// 只引出 drift 生成的类型化行类（Message / Conversation / Character）与
+// 部分更新的 companion（ConversationsCompanion），不触碰数据层具体实现标识符
+// （layer_boundary_test：视图层不得引用数据层具体实现）。
 import '../../data/database/app_database.dart'
-    show Message, Conversation, Character;
+    show Message, Conversation, Character, ConversationsCompanion;
 import '../../data/database/tables.dart' show Role;
 import '../../data/repositories/character_repository.dart';
 import '../../data/repositories/conversation_repository.dart';
@@ -131,7 +132,8 @@ class ChatController extends ChangeNotifier {
   bool _hasLoadedEntry = false;
   bool _loadingEntry = false;
   List<ConversationWithCount> _conversations = const [];
-  Character? _firstCharacter;
+  List<Character> _characters = const [];
+  int? _selectedCharacterId;
   bool _creatingConversation = false;
 
   // ── 导航状态 ──
@@ -190,17 +192,27 @@ class ChatController extends ChangeNotifier {
   /// 最近对话列表（`updated_at` 倒序，随 [loadEntry] 刷新）。
   List<ConversationWithCount> get conversations => _conversations;
 
-  /// 是否存在可用于「新建对话」的首个角色（characters 首条）。
-  bool get canCreateConversation => _firstCharacter != null;
+  /// 入口角色列表（全量，`updated_at` 倒序，随 [loadEntry] 刷新）。
+  List<Character> get characters => _characters;
 
-  /// 无可新建角色时的禁用提示文案（[canCreateConversation] false 时非空）。
+  /// 当前选中的角色 id；无角色或尚未加载时为 null。
+  int? get selectedCharacterId => _selectedCharacterId;
+
+  /// 是否存在可用于「新建对话」的选中角色。
+  bool get canCreateConversation => _selectedCharacterId != null;
+
+  /// 无选中角色时的禁用提示文案（[canCreateConversation] false 时非空）。
   String? get createDisabledReason =>
-      _firstCharacter == null ? '请先在角色页创建角色' : null;
+      _selectedCharacterId == null ? '请先在角色页创建角色' : null;
 
   /// 「新建对话」提交中（防连点重复建会话）。
   bool get creatingConversation => _creatingConversation;
 
-  /// 加载最近对话 + 首个角色（新建来源；入口导航每次回来都调用以刷新）。
+  /// 加载最近对话 + 全部角色（新建来源 + 角色选择条；入口导航每次回来都调用
+  /// 以刷新）。
+  ///
+  /// 选中态不跨启动持久化（U-1 假设）：[selectedCharacterId] 为空或已不在角色
+  /// 列表时回退默认选中首角色；角色为空时选中态置 null（新建禁用）。
   ///
   /// 每步查询带 3s 防挂兜底（平台存储通道在宿主测试环境可能挂起——widget
   /// 测试实证；query 超时 → catch 复位 loading 态与空列表，不产生永不结束的
@@ -216,7 +228,8 @@ class ChatController extends ChangeNotifier {
       // 失败：notice 已折叠（先错者胜），清空列表并复位加载态（不产生
       // 永不结束的加载态 spinner）。
       _conversations = const [];
-      _firstCharacter = null;
+      _characters = const [];
+      _selectedCharacterId = null;
       _hasLoadedEntry = true;
       _loadingEntry = false;
       notifyListeners();
@@ -228,53 +241,53 @@ class ChatController extends ChangeNotifier {
       onError: (e) => '加载对话失败: $e',
     );
     if (characters == null) {
-      _firstCharacter = null;
+      _characters = const [];
+      _selectedCharacterId = null;
       _hasLoadedEntry = true;
       _loadingEntry = false;
       notifyListeners();
       return;
     }
-    _firstCharacter = characters.isEmpty ? null : characters.first.character;
+    _characters = [for (final entry in characters) entry.character];
+    _selectedCharacterId = _resolveSelectedCharacterId();
     _hasLoadedEntry = true;
     _loadingEntry = false;
     notifyListeners();
   }
 
-  /// 新建对话：取首个角色；无角色 → [notice] 提示（M2 最小入口，M3 替换）。
+  /// 计算有效选中角色 id：现有选中仍在角色列表则保留，否则回退首角色
+  /// （列表为空 → null，新建禁用）。
+  int? _resolveSelectedCharacterId() {
+    final current = _selectedCharacterId;
+    if (current != null && _characters.any((c) => c.id == current)) {
+      return current;
+    }
+    return _characters.isEmpty ? null : _characters.first.id;
+  }
+
+  /// 新建对话：以 [selectedCharacterId] 建会话并直达；无选中角色 → [notice]
+  /// 提示（U-1 角色选择入口）。
   ///
-  /// 创建成功随即进入新会话（createConversation 蓝本预插开场白）。
+  /// 委托 [createConversationFor]：防连点标志 [_creatingConversation] 单一归属
+  /// 后者，不再本方法各自置位/复位（避免双重重置）。创建成功随即进入新会话
+  /// （createConversation 蓝本预插开场白）。
   Future<void> createConversation() async {
-    final character = _firstCharacter;
-    if (character == null) {
+    final characterId = _selectedCharacterId;
+    if (characterId == null) {
       _noticeRunner.setFirst('请先在角色页创建角色');
       notifyListeners();
       return;
     }
-    if (_creatingConversation) {
-      return;
-    }
-    _creatingConversation = true;
-    notifyListeners();
-    final conversation = await _noticeRunner.guard<Conversation>(
-      op: () =>
-          _conversationRepository.createConversation(characterId: character.id),
-      onError: (e) => '新建对话失败: $e',
-    );
-    _creatingConversation = false;
-    if (conversation == null) {
-      // 失败：notice 已折叠（先错者胜），不复位残局。
-      notifyListeners();
-      return;
-    }
-    await openConversation(conversation.id);
+    await createConversationFor(characterId);
   }
 
-  /// 以指定角色建会话并直达（M3-01 角色卡「开始对话」入口）。
+  /// 以指定角色建会话并直达（M3-01 角色卡「开始对话」入口；U-1 入口「新建
+  /// 对话」的委托目标）。
   ///
-  /// 与 [createConversation]（取入口首角色）的差异：会话归属显式传入的
-  /// [characterId]，不依赖 [loadEntry] 缓存的首角色快照；角色不存在 / 已
-  /// 删除 → [notice] 提示且停留入口，零残留会话。两者共用
-  /// [_creatingConversation] 防连点标志（任一建会话流程进行中互相忽略）。
+  /// 会话归属显式传入的 [characterId]，不依赖入口选中态快照；角色不存在 / 已
+  /// 删除 → [notice] 提示且停留入口，零残留会话。[createConversation] 以选中
+  /// 角色委托本方法；[_creatingConversation] 防连点标志单一归属本处（任一建
+  /// 会话流程进行中互相忽略）。
   Future<void> createConversationFor(int characterId) async {
     if (_creatingConversation) {
       return;
@@ -303,6 +316,52 @@ class ChatController extends ChangeNotifier {
       return;
     }
     await openConversation(conversation.id);
+  }
+
+  /// 切换入口角色选择条选中态（U-1）。
+  ///
+  /// 仅接受当前 [characters] 中存在的 id（不存在 → 零副作用，不破坏选中态）；
+  /// 同 id 幂等（不重复通知）。
+  void selectCharacter(int characterId) {
+    if (_selectedCharacterId == characterId) {
+      return;
+    }
+    if (!_characters.any((c) => c.id == characterId)) {
+      return;
+    }
+    _selectedCharacterId = characterId;
+    notifyListeners();
+  }
+
+  /// 重命名会话（U-1）：委托 [ConversationRepository.updateConversation]
+  /// 部分更新标题落库，随后 [loadEntry] 刷新列表。
+  ///
+  /// 会话不存在 → [notice]「对话不存在」；仓储异常 → notice 折叠（先错者胜）。
+  Future<void> renameConversation(int conversationId, String title) async {
+    final updated = await _noticeRunner.guard<Conversation?>(
+      op: () => _conversationRepository.updateConversation(
+        conversationId,
+        ConversationsCompanion(title: Value(title)),
+      ),
+      onError: (e) => '重命名失败: $e',
+    );
+    if (updated == null) {
+      _noticeRunner.setFirst('对话不存在');
+    }
+    await loadEntry();
+  }
+
+  /// 删除会话（U-1）：委托 [ConversationRepository.deleteConversation]
+  /// 落库，随后 [loadEntry] 刷新列表。
+  ///
+  /// 会话不存在（仓储返回 false）零副作用，刷新后列表自然不变；仓储异常 →
+  /// notice 折叠（先错者胜）。
+  Future<void> removeConversation(int conversationId) async {
+    await _noticeRunner.guard<bool>(
+      op: () => _conversationRepository.deleteConversation(conversationId),
+      onError: (e) => '删除失败: $e',
+    );
+    await loadEntry();
   }
 
   // ── 导航面 ──
@@ -409,12 +468,13 @@ class ChatController extends ChangeNotifier {
     await loadEntry();
   }
 
-  /// 失效入口缓存（角色被删后调用）：重置 [hasLoadedEntry] 与首角色快照，
-  /// 下次进入聊天 tab 时 [loadEntry] 重载——避免「新建对话」沿用已删角色 id
-  /// 触发 FK 约束失败（M3-01 增量审核 F1 陈旧缓存缺口修复）。
+  /// 失效入口缓存（角色被删后调用）：重置 [hasLoadedEntry] 与角色列表/选中态
+  /// 快照，下次进入聊天 tab 时 [loadEntry] 重载——避免「新建对话」沿用已删角色
+  /// id 触发 FK 约束失败（M3-01 增量审核 F1 陈旧缓存缺口修复）。
   void invalidateEntryCache() {
     _hasLoadedEntry = false;
-    _firstCharacter = null;
+    _characters = const [];
+    _selectedCharacterId = null;
     _noticeRunner.clear();
     notifyListeners();
   }
