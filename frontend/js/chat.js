@@ -49,6 +49,7 @@ import { showConfirm } from './components/confirm-dialog.js';
 import { openModal } from './components/modal.js';
 import { cgImageUrl } from './cg-review.js';
 import { applyCharacterCss, removeCharacterCss } from './mod-css.js';
+import { showPromptDebug } from './components/prompt-debug.js';
 
 // ══════════════════════════════════════════════════
 // 聊天域 DOM 引用
@@ -460,6 +461,7 @@ export function renderChatHeader(conversationId) {
         <span class="chat-title" id="chat-title-text" title="双击重命名">${escapeHtml(conv.title)}</span>
         <button class="chat-model-badge" id="chat-model-badge" title="切换模型">${escapeHtml(providerLabel)} · ${escapeHtml(modelLabel)}</button>
         <button class="btn-icon btn-export-conv" id="btn-export-conv" title="导出对话">${iconHtml('download')}</button>
+        <button class="btn-icon btn-prompt-debug" id="btn-prompt-debug" title="Prompt Debug">${iconHtml('info')}</button>
     `;
     // 双击标题重命名
     const titleEl = chatDom.chatHeader.querySelector('#chat-title-text');
@@ -479,6 +481,13 @@ export function renderChatHeader(conversationId) {
     if (exportBtn) {
         exportBtn.addEventListener('click', () => {
             showExportDialog(conversationId);
+        });
+    }
+    // PD-4 Prompt Debug 只读预览面板入口
+    const debugBtn = chatDom.chatHeader.querySelector('#btn-prompt-debug');
+    if (debugBtn) {
+        debugBtn.addEventListener('click', () => {
+            showPromptDebug(conversationId);
         });
     }
     // T3 模型切换：模型徽标 → 打开模型选择器（预选当前 provider/model）
