@@ -128,9 +128,9 @@ describe('buildCharacterPayload — 16 字段集 + 空值语义', () => {
             alternate_greetings: ['备一'],
         });
         expect(Object.keys(payload).sort()).toEqual([
-            'alternate_greetings', 'avatar', 'creator', 'description', 'first_mes',
-            'frequency_penalty', 'max_tokens', 'mes_example', 'name', 'personality',
-            'presence_penalty', 'scenario', 'system_prompt', 'tags', 'temperature', 'top_p',
+            'alternate_greetings', 'avatar', 'creator', 'description', 'expert_prompt',
+            'first_mes', 'frequency_penalty', 'max_tokens', 'mes_example', 'name', 'personality',
+            'presence_penalty', 'prompt_mode', 'scenario', 'system_prompt', 'tags', 'temperature', 'top_p',
         ].sort());
     });
 
@@ -173,9 +173,9 @@ describe('buildCharacterPayload — 16 字段集 + 空值语义', () => {
         expect(buildCharacterPayload({ max_tokens: '8192' }).max_tokens).toBe(8192);
     });
 
-    it('空参数对象 → 16 字段全默认（不抛错）', () => {
+    it('空参数对象 → 18 字段全默认（不抛错）', () => {
         const payload = buildCharacterPayload();
-        expect(Object.keys(payload)).toHaveLength(16);
+        expect(Object.keys(payload)).toHaveLength(18);
     });
 });
 
@@ -291,6 +291,7 @@ describe('组件级：form 提交请求体（真实 modal.js + fetch 捕获）',
             temperature: 1.25, top_p: 1, presence_penalty: 0, frequency_penalty: 0,
             max_tokens: null, avatar: 'http://x/a.png', creator: '作者',
             tags: ['甲', '乙', '丙'], alternate_greetings: [],
+            prompt_mode: 'simple', expert_prompt: '',
         });
     });
 
@@ -315,7 +316,7 @@ describe('组件级：form 提交请求体（真实 modal.js + fetch 捕获）',
         expect(calls[0].body.avatar).toBeNull();
         expect(calls[0].body.creator).toBe('');
         expect(calls[0].body.temperature).toBe(0.7);
-        expect(Object.keys(calls[0].body)).toHaveLength(16);
+        expect(Object.keys(calls[0].body)).toHaveLength(18);
     });
 });
 
@@ -368,6 +369,7 @@ describe('组件级：wizard 保存请求体（恒 create，creator 恒空）', 
             temperature: 0.7, top_p: 1, presence_penalty: 0, frequency_penalty: 0,
             max_tokens: null, avatar: 'http://x/a.png', creator: '',
             tags: ['冒险', '奇幻'], alternate_greetings: [],
+            prompt_mode: 'simple', expert_prompt: '',
         });
     });
 });

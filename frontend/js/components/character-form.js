@@ -15,7 +15,7 @@ import { showConfirm } from './confirm-dialog.js';
 import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
 import {
-    splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit,
+    splitTags, buildCharacterPayload, buildExpertPrompt, beginSubmit, succeedSubmit, failSubmit,
     TEMP_SLIDER, SAMPLING_SLIDERS, formatTemperature, formatSampling,
     avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
     normalizeAlternateGreetings, addAlternateGreeting, alternateGreetingRowsHtml,
@@ -45,6 +45,25 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
         </div>
 
         <div class="form-field">
+            <label>编辑模式</label>
+            <div class="mode-toggle" role="group" aria-label="提示词编辑模式">
+                <button type="button" id="cf-mode-basic" class="btn-secondary mode-btn active" aria-pressed="true">基础模式</button>
+                <button type="button" id="cf-mode-expert" class="btn-secondary mode-btn" aria-pressed="false">专家模式</button>
+            </div>
+            <span class="field-hint">专家模式将用下方整段 PROMPT 替换人格/场景/历史后指令的结构化组装；世界书与 Mod 注入仍生效</span>
+        </div>
+
+        <div class="form-field" id="cf-expert-area" hidden>
+            <label for="cf-expert-prompt">专家 PROMPT（整段 System Prompt）</label>
+            <textarea id="cf-expert-prompt" rows="14" placeholder="直接编写完整的 System Prompt；支持 {{user}} / {{char}} 模板变量">${escapeHtml(char.expert_prompt || '')}</textarea>
+            <div class="expert-actions">
+                <button type="button" class="btn-secondary" id="cf-expert-generate">${iconHtml('sparkles', { size: 14 })} 从当前字段生成</button>
+                <button type="button" class="btn-secondary" id="cf-expert-clear">${iconHtml('x', { size: 14 })} 空白开始</button>
+            </div>
+            <span class="field-hint">此段替代人格设定 / 场景设定 / 自定义 System Prompt 的结构化组装（对话范例与开场白仍照旧生效）</span>
+        </div>
+
+        <div class="form-field expert-structured-field">
             <label for="cf-personality">人格设定 (Personality)<span class="field-warning" id="cf-warn-personality" hidden>建议填写</span></label>
             <textarea id="cf-personality" rows="6" placeholder="角色的人格设定、性格特征、说话方式等核心 System Prompt">${escapeHtml(char.personality || '')}</textarea>
             <span class="field-hint">支持模板变量：<code>{{user}}</code>（用户昵称）、<code>{{char}}</code>（角色名称）</span>
@@ -66,7 +85,7 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             <span class="field-hint">新建对话时可从这些开场白中选择</span>
         </div>
 
-        <div class="form-field">
+        <div class="form-field expert-structured-field">
             <label for="cf-scenario">场景设定</label>
             <textarea id="cf-scenario" rows="3" placeholder="对话发生的场景描述">${escapeHtml(char.scenario || '')}</textarea>
             <span class="field-hint">支持模板变量：<code>{{user}}</code>、<code>{{char}}</code></span>
@@ -131,7 +150,7 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             <input type="text" id="cf-creator" placeholder="角色作者/来源" value="${escapeHtml(char.creator || '')}">
         </div>
 
-        <div class="form-field">
+        <div class="form-field expert-structured-field">
             <label for="cf-system-prompt">自定义 System Prompt（覆盖人格设定）</label>
             <textarea id="cf-system-prompt" rows="3" placeholder="留空则使用人格设定作为 System Prompt">${escapeHtml(char.system_prompt || '')}</textarea>
         </div>
@@ -174,6 +193,15 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             const altGreetingsList = overlay.querySelector('#cf-alt-greetings-list');
             const altGreetingsInput = overlay.querySelector('#cf-alt-greetings-input');
             const altGreetingsAdd = overlay.querySelector('#cf-alt-greetings-add');
+            const scenarioInput = overlay.querySelector('#cf-scenario');
+            const systemPromptInput = overlay.querySelector('#cf-system-prompt');
+            const basicBtn = overlay.querySelector('#cf-mode-basic');
+            const expertBtn = overlay.querySelector('#cf-mode-expert');
+            const expertArea = overlay.querySelector('#cf-expert-area');
+            const expertPromptInput = overlay.querySelector('#cf-expert-prompt');
+            const generateBtn = overlay.querySelector('#cf-expert-generate');
+            const clearBtn = overlay.querySelector('#cf-expert-clear');
+            const structuredFields = [...overlay.querySelectorAll('.expert-structured-field')];
 
             // 完整性引导（D6）：姓名 + 人格设定 + 开场白三项均非空视为完整
             const updateCompletenessHints = () => {
@@ -186,6 +214,31 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                 completenessHint.hidden = name.length > 0 && personality.length > 0 && firstMes.length > 0;
             };
             updateCompletenessHints();
+
+            // ── 专家模式切换（PD-6）──
+            // currentMode 是提交时 prompt_mode 的真源；切换只改显隐，不丢 expert_prompt
+            let currentMode = char.prompt_mode === 'expert' ? 'expert' : 'simple';
+            const renderMode = () => {
+                const isExpert = currentMode === 'expert';
+                structuredFields.forEach((field) => { field.hidden = isExpert; });
+                expertArea.hidden = !isExpert;
+                basicBtn.classList.toggle('active', !isExpert);
+                expertBtn.classList.toggle('active', isExpert);
+                basicBtn.setAttribute('aria-pressed', String(!isExpert));
+                expertBtn.setAttribute('aria-pressed', String(isExpert));
+            };
+            basicBtn.addEventListener('click', () => { currentMode = 'simple'; renderMode(); });
+            expertBtn.addEventListener('click', () => { currentMode = 'expert'; renderMode(); });
+            generateBtn.addEventListener('click', () => {
+                expertPromptInput.value = buildExpertPrompt({
+                    system_prompt: systemPromptInput.value,
+                    personality: personalityInput.value,
+                    scenario: scenarioInput.value,
+                    post_history_instructions: char.post_history_instructions || '',
+                });
+            });
+            clearBtn.addEventListener('click', () => { expertPromptInput.value = ''; });
+            renderMode();
 
             // ── 事件绑定 ──
             // 关闭路径（关闭按钮/遮罩点击/Escape）由工厂承担；取消按钮在此绑定
@@ -289,6 +342,8 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                     creator: overlay.querySelector('#cf-creator').value.trim(),
                     tags: splitTags(overlay.querySelector('#cf-tags').value.trim()),
                     alternate_greetings: normalizeAlternateGreetings(readAltGreetings()),
+                    prompt_mode: currentMode,
+                    expert_prompt: expertPromptInput.value.trim(),
                 });
 
                 // 提交态状态机（禁用/文案/状态栏/600ms 延时关窗/失败恢复收敛到深模块）

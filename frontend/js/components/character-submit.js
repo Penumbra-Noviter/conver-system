@@ -171,16 +171,18 @@ export function alternateGreetingRowsHtml(list) {
 }
 
 /**
- * 从显式字段对象构造 16 字段角色 payload（API 请求体契约）
+ * 从显式字段对象构造 18 字段角色 payload（API 请求体契约）
  *
  * 空值语义（与现状逐字一致）：`avatar` 空/falsy → null；`creator` 缺省 → 空串；
  * `temperature` 归一为数值（缺省 0.7）；`name/description/personality/first_mes/
  * scenario/mes_example/system_prompt` 为字符串（可空串）；`tags` 为数组（非数组 → []）。
+ * `prompt_mode` 归一为二值（非 'expert' → 'simple'）；`expert_prompt` 非字符串 → 空串。
  * 字段顺序无契约要求，字段集与空值语义是契约。
  *
  * @param {object} [fields={}] - 字段对象（name/description/personality/first_mes/
- *   scenario/mes_example/system_prompt/temperature/avatar/creator/tags）
- * @returns {object} 11 字段 payload
+ *   scenario/mes_example/system_prompt/temperature/avatar/creator/tags/
+ *   prompt_mode/expert_prompt）
+ * @returns {object} 18 字段 payload
  */
 export function buildCharacterPayload(fields = {}) {
     // max_tokens 无通用默认（不同模型不同）：空/非法/越界 → null（不覆盖 provider 默认）
@@ -203,7 +205,28 @@ export function buildCharacterPayload(fields = {}) {
         creator: fields.creator ?? '',
         tags: Array.isArray(fields.tags) ? fields.tags : [],
         alternate_greetings: Array.isArray(fields.alternate_greetings) ? fields.alternate_greetings : [],
+        prompt_mode: fields.prompt_mode === 'expert' ? 'expert' : 'simple',
+        expert_prompt: fields.expert_prompt ?? '',
     };
+}
+
+/**
+ * 从结构化字段拼接专家模式整段 PROMPT（PD-6「从当前字段生成」）
+ *
+ * 拼接顺序固定：首段取 `system_prompt`（非空优先，空则回落 `personality`），
+ * 依次追加 `scenario`、`post_history_instructions`，非空段以两个换行分隔；
+ * 全空 → 空串。各字段先 trim；非字符串（null/undefined/对象/数字）视为空段。
+ *
+ * @param {object} [fields={}] - 字段对象（system_prompt/personality/scenario/post_history_instructions）
+ * @returns {string} 拼接后的整段 prompt（全空 → ''）
+ */
+export function buildExpertPrompt(fields = {}) {
+    const source = fields && typeof fields === 'object' && !Array.isArray(fields) ? fields : {};
+    const text = (value) => (typeof value === 'string' ? value.trim() : '');
+    const head = text(source.system_prompt) || text(source.personality);
+    const scenario = text(source.scenario);
+    const postHistory = text(source.post_history_instructions);
+    return [head, scenario, postHistory].filter(Boolean).join('\n\n');
 }
 
 /**
@@ -253,5 +276,5 @@ export const __all__ = [
     'splitTags', 'tagsToComma', 'TEMP_SLIDER', 'SAMPLING_SLIDERS', 'formatTemperature',
     'formatSampling', 'avatarPreviewHtml', 'NAME_REQUIRED_MESSAGE', 'MAX_ALTERNATE_GREETINGS',
     'normalizeAlternateGreetings', 'addAlternateGreeting', 'alternateGreetingRowsHtml',
-    'buildCharacterPayload', 'beginSubmit', 'succeedSubmit', 'failSubmit',
+    'buildCharacterPayload', 'buildExpertPrompt', 'beginSubmit', 'succeedSubmit', 'failSubmit',
 ];
