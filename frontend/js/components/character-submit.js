@@ -56,6 +56,20 @@ export const TEMP_SLIDER = Object.freeze({
 });
 
 /**
+ * 采样参数滑块配置常量（SP-3，表单/向导共用单一来源）
+ *
+ * top_p / presence_penalty / frequency_penalty 为 OpenAI 系采样参数，default
+ * 与 OpenAI API 默认一致（top_p=1 / presence=0 / frequency=0）——透传默认值
+ * 等价于「不设置」，故用固定滑块（非 None）。max_tokens 无通用默认（不同模型
+ * 不同），走「空输入 = null = 不覆盖 provider 默认」语义，由数字输入承载。
+ */
+export const SAMPLING_SLIDERS = Object.freeze({
+    top_p: { min: 0, max: 1, step: 0.05, default: 1.0 },
+    presence_penalty: { min: -2, max: 2, step: 0.1, default: 0.0 },
+    frequency_penalty: { min: -2, max: 2, step: 0.1, default: 0.0 },
+});
+
+/**
  * 温度统一格式化（两位小数）：表单与向导初始显示/实时显示一致
  * 非数字输入（'abc'/NaN/Infinity 等）经 Number.isFinite 校验失败后回退
  * TEMP_SLIDER.default（畸形存量数据编辑不显示 NaN）
@@ -65,6 +79,18 @@ export const TEMP_SLIDER = Object.freeze({
 export function formatTemperature(value) {
     const num = Number(value ?? TEMP_SLIDER.default);
     return (Number.isFinite(num) ? num : TEMP_SLIDER.default).toFixed(2);
+}
+
+/**
+ * 采样参数统一格式化（两位小数）：表单/向导初始显示/实时显示一致
+ * @param {number|string|null|undefined} value - 采样值（缺省/非法 → 该 key 的 default）
+ * @param {string} key - SAMPLING_SLIDERS 的键（top_p / presence_penalty / frequency_penalty）
+ * @returns {string} 两位小数字符串
+ */
+export function formatSampling(value, key) {
+    const cfg = SAMPLING_SLIDERS[key];
+    const num = Number(value ?? cfg.default);
+    return (Number.isFinite(num) ? num : cfg.default).toFixed(2);
 }
 
 /**
@@ -97,6 +123,9 @@ export const NAME_REQUIRED_MESSAGE = '角色名称不能为空';
  * @returns {object} 11 字段 payload
  */
 export function buildCharacterPayload(fields = {}) {
+    // max_tokens 无通用默认（不同模型不同）：空/非法/越界 → null（不覆盖 provider 默认）
+    const rawMaxTokens = Number(fields.max_tokens);
+    const maxTokens = Number.isFinite(rawMaxTokens) && rawMaxTokens >= 1 ? rawMaxTokens : null;
     return {
         name: fields.name ?? '',
         description: fields.description ?? '',
@@ -106,6 +135,10 @@ export function buildCharacterPayload(fields = {}) {
         mes_example: fields.mes_example ?? '',
         system_prompt: fields.system_prompt ?? '',
         temperature: Number(fields.temperature ?? TEMP_SLIDER.default),
+        top_p: Number(fields.top_p ?? SAMPLING_SLIDERS.top_p.default),
+        presence_penalty: Number(fields.presence_penalty ?? SAMPLING_SLIDERS.presence_penalty.default),
+        frequency_penalty: Number(fields.frequency_penalty ?? SAMPLING_SLIDERS.frequency_penalty.default),
+        max_tokens: maxTokens,
         avatar: fields.avatar || null,
         creator: fields.creator ?? '',
         tags: Array.isArray(fields.tags) ? fields.tags : [],
@@ -156,6 +189,7 @@ export function failSubmit(btn, statusEl, err, restoreLabel) {
 }
 
 export const __all__ = [
-    'splitTags', 'tagsToComma', 'TEMP_SLIDER', 'formatTemperature', 'avatarPreviewHtml',
-    'NAME_REQUIRED_MESSAGE', 'buildCharacterPayload', 'beginSubmit', 'succeedSubmit', 'failSubmit',
+    'splitTags', 'tagsToComma', 'TEMP_SLIDER', 'SAMPLING_SLIDERS', 'formatTemperature',
+    'formatSampling', 'avatarPreviewHtml', 'NAME_REQUIRED_MESSAGE', 'buildCharacterPayload',
+    'beginSubmit', 'succeedSubmit', 'failSubmit',
 ];

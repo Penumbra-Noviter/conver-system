@@ -34,6 +34,27 @@ def _normalize_base_url(base_url: str | None) -> str | None:
     return f"{url}/v1"
 
 
+def _optional_sampling_kwargs(
+    top_p: float | None,
+    presence_penalty: float | None,
+    frequency_penalty: float | None,
+) -> dict[str, float]:
+    """采样参数仅非 None 时透传（None = 不覆盖 API 默认）
+
+    SP-1：OpenAI 系采样参数（top_p / presence_penalty / frequency_penalty）
+    均为可空字段，None 表示「不设置」——不传 SDK 即走 API 默认，避免把 None
+    当作字面值发给 OpenAI 造成 400。generate / stream_generate 共用。
+    """
+    kwargs: dict[str, float] = {}
+    if top_p is not None:
+        kwargs["top_p"] = top_p
+    if presence_penalty is not None:
+        kwargs["presence_penalty"] = presence_penalty
+    if frequency_penalty is not None:
+        kwargs["frequency_penalty"] = frequency_penalty
+    return kwargs
+
+
 class OpenAIProvider(BaseLLM):
     """OpenAI / 兼容 API 实现"""
 
@@ -61,6 +82,9 @@ class OpenAIProvider(BaseLLM):
         temperature: float = 0.7,
         max_tokens: int = 2048,
         model: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> str:
         """非流式生成完整回复"""
         system, chat_messages = self._prepare_messages(messages)
@@ -74,6 +98,7 @@ class OpenAIProvider(BaseLLM):
                 messages=chat_messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                **_optional_sampling_kwargs(top_p, presence_penalty, frequency_penalty),
             )
             return response.choices[0].message.content or ""
 
@@ -83,6 +108,9 @@ class OpenAIProvider(BaseLLM):
         temperature: float = 0.7,
         max_tokens: int = 2048,
         model: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> AsyncIterator[str]:
         """流式生成，逐 token 产出"""
         system, chat_messages = self._prepare_messages(messages)
@@ -96,6 +124,7 @@ class OpenAIProvider(BaseLLM):
                 messages=chat_messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                **_optional_sampling_kwargs(top_p, presence_penalty, frequency_penalty),
                 stream=True,
             )
             async for chunk in stream:

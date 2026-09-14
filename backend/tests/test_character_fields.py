@@ -3,7 +3,7 @@
 
 锁的内容：
 1. 6 个公开符号的存在性（__all__ 与模块空间一致）
-2. CHARACTER_V2_FIELDS 长度 16 + 成员集合与 ORM Column 名集合一致
+2. CHARACTER_V2_FIELDS 长度 20 + 成员集合与 ORM Column 名集合一致
 3. PROMPT_FIELDS / PARSE_FIELDS / EXPORT_FIELDS 长度与成员精确匹配
 4. V2_KEY_MAP / V1_TO_V2_MAP 键值对精确匹配
 """
@@ -44,7 +44,7 @@ class TestCharacterFieldsExports:
 
 
 class TestCharacterV2Fields:
-    """CHARACTER_V2_FIELDS — 16 内容字段，与 ORM 声明的 V2 列集合一致"""
+    """CHARACTER_V2_FIELDS — 20 内容字段，与 ORM 声明的 V2 列集合一致"""
 
     # 从 ORM 提取 V2 内容字段名（排除 id / created_at / updated_at）
     ORM_V2_COLUMNS = {
@@ -53,7 +53,7 @@ class TestCharacterV2Fields:
     }
 
     def test_length(self):
-        assert len(CHARACTER_V2_FIELDS) == 16
+        assert len(CHARACTER_V2_FIELDS) == 20
 
     def test_set_equals_orm_v2_columns(self):
         assert set(CHARACTER_V2_FIELDS) == self.ORM_V2_COLUMNS, (

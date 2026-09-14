@@ -117,16 +117,19 @@ describe('tagsToComma — 标签数组转逗号字符串（splitTags 逆操作�
     });
 });
 
-describe('buildCharacterPayload — 11 字段集 + 空值语义', () => {
-    it('钉 11 字段集合（字段名逐字）', () => {
+describe('buildCharacterPayload — 15 字段集 + 空值语义', () => {
+    it('钉 15 字段集合（字段名逐字）', () => {
         const payload = buildCharacterPayload({
             name: 'A', description: 'd', personality: 'p', first_mes: 'f',
             scenario: 's', mes_example: 'm', system_prompt: 'sp',
-            temperature: '1.5', avatar: 'http://x/a.png', creator: 'me', tags: ['t1'],
+            temperature: '1.5', top_p: 0.9, presence_penalty: 0.5,
+            frequency_penalty: -0.3, max_tokens: 4096,
+            avatar: 'http://x/a.png', creator: 'me', tags: ['t1'],
         });
         expect(Object.keys(payload).sort()).toEqual([
-            'avatar', 'creator', 'description', 'first_mes', 'mes_example',
-            'name', 'personality', 'scenario', 'system_prompt', 'tags', 'temperature',
+            'avatar', 'creator', 'description', 'first_mes', 'frequency_penalty',
+            'max_tokens', 'mes_example', 'name', 'personality', 'presence_penalty',
+            'scenario', 'system_prompt', 'tags', 'temperature', 'top_p',
         ].sort());
     });
 
@@ -141,7 +144,7 @@ describe('buildCharacterPayload — 11 字段集 + 空值语义', () => {
         expect(buildCharacterPayload({ avatar: 'http://x/y.png' }).avatar).toBe('http://x/y.png');
     });
 
-    it('缺省字段：creator 空串 / 文本字段空串 / tags [] / temperature 0.7', () => {
+    it('缺省字段：creator 空串 / 文本字段空串 / tags [] / temperature 0.7 / 采样默认', () => {
         const payload = buildCharacterPayload({ name: 'A' });
         expect(payload.creator).toBe('');
         expect(payload.description).toBe('');
@@ -149,6 +152,10 @@ describe('buildCharacterPayload — 11 字段集 + 空值语义', () => {
         expect(payload.first_mes).toBe('');
         expect(payload.tags).toEqual([]);
         expect(payload.temperature).toBe(0.7);
+        expect(payload.top_p).toBe(1);
+        expect(payload.presence_penalty).toBe(0);
+        expect(payload.frequency_penalty).toBe(0);
+        expect(payload.max_tokens).toBeNull();
     });
 
     it('非数组 tags → []（不抛错）', () => {
@@ -156,9 +163,18 @@ describe('buildCharacterPayload — 11 字段集 + 空值语义', () => {
         expect(buildCharacterPayload({}).tags).toEqual([]);
     });
 
-    it('空参数对象 → 11 字段全默认（不抛错）', () => {
+    it('max_tokens Falsify：空/非法/越界 → null（不覆盖默认）；合法正数 → 值', () => {
+        expect(buildCharacterPayload({ max_tokens: '' }).max_tokens).toBeNull();
+        expect(buildCharacterPayload({ max_tokens: 'abc' }).max_tokens).toBeNull();
+        expect(buildCharacterPayload({ max_tokens: '0' }).max_tokens).toBeNull();
+        expect(buildCharacterPayload({ max_tokens: -5 }).max_tokens).toBeNull();
+        expect(buildCharacterPayload({ max_tokens: 4096 }).max_tokens).toBe(4096);
+        expect(buildCharacterPayload({ max_tokens: '8192' }).max_tokens).toBe(8192);
+    });
+
+    it('空参数对象 → 15 字段全默认（不抛错）', () => {
         const payload = buildCharacterPayload();
-        expect(Object.keys(payload)).toHaveLength(11);
+        expect(Object.keys(payload)).toHaveLength(15);
     });
 });
 
@@ -271,7 +287,8 @@ describe('组件级：form 提交请求体（真实 modal.js + fetch 捕获）',
         expect(calls[0].body).toEqual({
             name: '角色A', description: '描述', personality: '人格', first_mes: '开场',
             scenario: '场景', mes_example: '范例', system_prompt: '提示',
-            temperature: 1.25, avatar: 'http://x/a.png', creator: '作者',
+            temperature: 1.25, top_p: 1, presence_penalty: 0, frequency_penalty: 0,
+            max_tokens: null, avatar: 'http://x/a.png', creator: '作者',
             tags: ['甲', '乙', '丙'],
         });
     });
@@ -297,7 +314,7 @@ describe('组件级：form 提交请求体（真实 modal.js + fetch 捕获）',
         expect(calls[0].body.avatar).toBeNull();
         expect(calls[0].body.creator).toBe('');
         expect(calls[0].body.temperature).toBe(0.7);
-        expect(Object.keys(calls[0].body)).toHaveLength(11);
+        expect(Object.keys(calls[0].body)).toHaveLength(15);
     });
 });
 
@@ -347,7 +364,8 @@ describe('组件级：wizard 保存请求体（恒 create，creator 恒空）', 
         expect(calls[0].body).toEqual({
             name: '角色A', description: '描述', personality: '人格', first_mes: '开场',
             scenario: '场景', mes_example: '范例', system_prompt: '提示',
-            temperature: 0.7, avatar: 'http://x/a.png', creator: '',
+            temperature: 0.7, top_p: 1, presence_penalty: 0, frequency_penalty: 0,
+            max_tokens: null, avatar: 'http://x/a.png', creator: '',
             tags: ['冒险', '奇幻'],
         });
     });

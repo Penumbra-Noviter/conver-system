@@ -65,6 +65,22 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 采样参数扩展批次 SP（2026-09-14 — 3 工单小档，AI 风月对话质量对标）
+
+> 来源：用户对标 AI 风月「对话质量 / prompt 工程」维度，选定「采样参数扩展」。语义约束（实证）：anthropic 1.0.0 `messages.create` 已移除全部采样参数（仅 `max_tokens` 可用），故 top_p/presence_penalty/frequency_penalty 仅 OpenAI 系生效、Claude 系仅透传 max_tokens。叙述详见 DEV_LOG〈采样参数扩展批次 SP（2026-09-14）〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| SP-1 | 后端数据层：Character 加 4 采样列 + 自愈迁移 + schema + character_fields + 往返保真 | — | 2026-09-14 | |
+| SP-2 | LLM 调用链透传 + provider 分化（OpenAI 全透传 / Claude 仅 max_tokens） | — | 2026-09-14 | |
+| SP-3 | 前端角色表单/向导加采样参数控件 | — | 2026-09-14 | |
+
+**验证链：** pytest 1225+1skip→1234+1skip（+9 契约锁：test_character_sampling 4 + test_sampling_transmit 5）+ Vitest 1379→1380（+1 Falsify max_tokens 守卫）+ cargo 70 零改动 | 期末三轴 0 阻断（Falsify 主会话直修 max_tokens NaN 守卫）| 双钩子通过
+
+**非阻断落债：** 无
+
+---
+
 ### 技术债消费批次 F-130~F-138（2026-09-14 — 7 做 2 关，轻量档 9 项主会话直做）
 
 > 来源：用户指令「消费技术债 F-130~138」（消息编辑重发期末四轴落债 9 项）。逐项 git grep 复核现状后拍板 7 做 2 关。叙述详见 DEV_LOG〈技术债消费批次 F-130~F-138（2026-09-14）〉。

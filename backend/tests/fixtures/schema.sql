@@ -10,8 +10,8 @@
 --
 -- 来源：一次性从 ORM 元数据 dump（Base.metadata.create_all → sqlite DDL）
 -- 后人工核验落盘（对照 app/models/*.py 与 docs/architecture.md）。
--- 对照结论：characters 全 19 列（含 created_at/updated_at——历史手抄
--- 17 列漂移缺的正是这两列）；conversations 为 model_provider/model_name
+-- 对照结论：characters 全 23 列（含 created_at/updated_at + SP-1 采样四列
+-- top_p/presence_penalty/frequency_penalty/max_tokens）；conversations 为 model_provider/model_name
 -- （历史手抄漂移成 provider/model）；lorebook_entries 为 WL-1 世界书条目表
 -- （含 4 条 CHECK 边界约束 + FK 级联）；message_swipes 为 MS-1 候选表
 -- （(message_id, index) 唯一 + messages.active_swipe_index 列自愈迁移）；含 5 条索引
@@ -37,6 +37,10 @@ CREATE TABLE characters (
 	extensions JSON, 
 	avatar TEXT, 
 	temperature FLOAT, 
+	top_p FLOAT, 
+	presence_penalty FLOAT, 
+	frequency_penalty FLOAT, 
+	max_tokens INTEGER, 
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
 	PRIMARY KEY (id)

@@ -6,6 +6,18 @@
 
 ---
 
+## 采样参数扩展批次 SP（2026-09-14 — 3 工单小档，AI 风月对话质量对标）
+
+- **来源**：用户对标 AI 风月「对话质量 / prompt 工程」维度，选定「采样参数扩展」（top_p / presence_penalty / frequency_penalty / max_tokens）。
+- **实证约束**：anthropic 1.0.0 `messages.create` 参数表（inspect.signature）无 temperature/top_p/presence_penalty/frequency_penalty，仅 max_tokens 可用——采样参数仅 OpenAI 系生效，Claude 系保留对外签名但不透传 SDK（同 F-56 temperature 处理）。
+- **SP-1 数据层**：Character 加 4 可空列（top_p/presence_penalty/frequency_penalty FLOAT + max_tokens INTEGER，NULL = 不覆盖 provider 默认）+ `_ensure_character_sampling_columns` 自愈迁移 + schema 4 字段（带 ge/le 边界）+ CHARACTER_V2_FIELDS 16→20 + character_card 往返保真（非 None 写 conver_system 命名空间、None 不落卡、非法值 clamp 回 None）。
+- **SP-2 透传链**：BaseLLM/Claude/OpenAI 签名加 3 采样参数（默认 None）；OpenAI 经 `_optional_sampling_kwargs` 仅非 None 透传；Claude 不传 SDK；ChatContext 加 4 字段 + `_sampling_kwargs` 从上下文提取非 None 参数 + generate/stream 两路径 `**_sampling_kwargs(ctx)` 透传（None 不传 → 现有 mock 零改动）。
+- **SP-3 前端**：character-submit 加 SAMPLING_SLIDERS 常量 + formatSampling + buildCharacterPayload 15 字段（top_p/presence/frequency 用 OpenAI API 默认 1/0/0，max_tokens 空/非法/越界 → null）；character-form + character-wizard 加 4 控件（3 滑块 + 1 数字输入）。
+- **Falsify 直修**：max_tokens 原 truthy 判断在输入 'abc'/'0'/负数 时得 NaN/0/负（后端 422）——改 Number.isFinite + >=1 守卫，+1 契约锁。
+- **验证链**：pytest 1225+1skip→1234+1skip（+9：test_character_sampling 4 + test_sampling_transmit 5）+ Vitest 1379→1380（+1 Falsify）+ cargo 70 零改动 | doc_sync 刷新 23 标记 + 手补 2 新测试 §5 标记 | pool_cleanup_check 通过 | 技术债候选区无新增。
+
+---
+
 ## 大世界方向关闭（2026-09-14 — 文档清理，代码零改动）
 
 - **决策**：用户拍板关闭「角色对话 → 世界模拟平台」大版本设想，落盘 CONSENSUS §1「方向边界」。

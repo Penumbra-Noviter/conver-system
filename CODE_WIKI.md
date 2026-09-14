@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2675<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1226<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1379<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2685<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1235<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1380<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -258,7 +258,7 @@ conver system/
 
 > 无公开函数（纯配置常量）。注意 `DATABASE_URL` 默认值带 `+aiosqlite` 前缀，但 `database.py` 建引擎时剔除（同步 ORM，勿误判为异步）。
 
-### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~135 行<!--/AUTO-->）
+### 4.3 `backend/app/database.py` — 引擎与会话（<!--AUTO:lines:backend/app/database.py-->~160 行<!--/AUTO-->）
 
 **职责**：SQLAlchemy 同步引擎（`PRAGMA foreign_keys=ON`）、`get_db` 会话依赖、`init_db` 建表。
 
@@ -406,7 +406,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/character.py:update_character-->`update_character(db, character_id, data)`<!--/AUTO--> | 更新角色 |
 | <!--AUTO:sig:backend/app/services/character.py:delete_character-->`delete_character(db, character_id)`<!--/AUTO--> | 删除角色 |
 
-### 4.13 `backend/app/services/character_card.py` — 角色卡 V2 转换（<!--AUTO:lines:backend/app/services/character_card.py-->~186 行<!--/AUTO-->）
+### 4.13 `backend/app/services/character_card.py` — 角色卡 V2 转换（<!--AUTO:lines:backend/app/services/character_card.py-->~231 行<!--/AUTO-->）
 
 **职责**：SillyTavern Character Card V2 信封导出/导入——兼容 V1 旧卡与裸 data；非 V2 标准字段存 `extensions.conver_system.*` 命名空间保证往返保真；头像 data URI 规范化。
 
@@ -419,7 +419,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/character_card.py:_conver_system-->`_conver_system(extensions)`<!--/AUTO--> | 读写 `extensions.conver_system.*` 命名空间 |
 | <!--AUTO:sig:backend/app/services/character_card.py:_clamp_temperature-->`_clamp_temperature(value)`<!--/AUTO--> | 温度值收敛到合法区间 |
 
-### 4.13.5 `backend/app/services/character_fields.py` — 角色字段常量映射（<!--AUTO:lines:backend/app/services/character_fields.py-->~101 行<!--/AUTO-->）
+### 4.13.5 `backend/app/services/character_fields.py` — 角色字段常量映射（<!--AUTO:lines:backend/app/services/character_fields.py-->~105 行<!--/AUTO-->）
 
 **职责**：角色 V2 字段清单单一映射深模块（C5 架构评审）——CHARACTER_V2_FIELDS 16 字段全集 + 4 个具名投影子集 + V2_KEY_MAP / V1_TO_V2_MAP 映射。
 
@@ -443,7 +443,7 @@ conver system/
 | `OPENAI_PROTOCOL_MODELS` | openai 协议族模型集（id=="openai" 的 models 并集，TD-66） |
 | `resolve_api_provider(key)` | key → 凭证槽位协议（映射者返回 id，否则自身） |
 
-### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~845 行<!--/AUTO-->）
+### 4.14 `backend/app/services/chat.py` — 对话编排（<!--AUTO:lines:backend/app/services/chat.py-->~876 行<!--/AUTO-->）
 
 **职责**：对话核心——上下文准备（滑窗 + 开场白 + 模板变量）、非流式完成、重生成编排、SSE 流式回复（逐块结算 + 部分内容落库）、错误响应统一通道（`chat_error_response`，LLM 异常映射见 §4.19 error_mapping.py）。
 
@@ -668,7 +668,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/setting.py:default_model-->`default_model(db)`<!--/AUTO--> | 默认模型 |
 | <!--AUTO:sig:backend/app/services/setting.py:credentials-->`credentials(db)`<!--/AUTO--> | 全部凭证（只读端点用） |
 
-### 4.24 `backend/app/services/llm/base.py` — LLM 抽象基类（<!--AUTO:lines:backend/app/services/llm/base.py-->~95 行<!--/AUTO-->）
+### 4.24 `backend/app/services/llm/base.py` — LLM 抽象基类（<!--AUTO:lines:backend/app/services/llm/base.py-->~101 行<!--/AUTO-->）
 
 **职责**：`BaseLLM` 协议——generate/stream_generate/test_connection 骨架 + 错误翻译钩子（`_translate_error` 子类覆写）+ `_prepare_messages` 统一消息形态。
 
@@ -676,11 +676,11 @@ conver system/
 |------|------|
 | <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.__init__-->`__init__(api_key, base_url=None)`<!--/AUTO--> | 构造（密钥 + 可选 base_url） |
 | <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM._translate_error-->`_translate_error(error)`<!--/AUTO--> | SDK 错误翻译钩子（子类覆写） |
-| <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 非流式生成 |
-| <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成（迭代器） |
+| <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None, top_p=None, presence_penalty=None, frequency_penalty=None)`<!--/AUTO--> | 非流式生成 |
+| <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None, top_p=None, presence_penalty=None, frequency_penalty=None)`<!--/AUTO--> | 流式生成（迭代器） |
 | <!--AUTO:sig:backend/app/services/llm/base.py:BaseLLM.test_connection-->`test_connection(model=None)`<!--/AUTO--> | 连接测试（保存 Key 时校验） |
 
-### 4.25 `backend/app/services/llm/claude.py` — Claude Provider（<!--AUTO:lines:backend/app/services/llm/claude.py-->~75 行<!--/AUTO-->）
+### 4.25 `backend/app/services/llm/claude.py` — Claude Provider（<!--AUTO:lines:backend/app/services/llm/claude.py-->~82 行<!--/AUTO-->）
 
 **职责**：`ClaudeProvider(BaseLLM)`——anthropic SDK 实现（generate/stream_generate + 错误翻译）。
 
@@ -688,8 +688,8 @@ conver system/
 |------|------|
 | <!--AUTO:sig:backend/app/services/llm/claude.py:ClaudeProvider.__init__-->`__init__(api_key, base_url=None)`<!--/AUTO--> | 构造 |
 | <!--AUTO:sig:backend/app/services/llm/claude.py:ClaudeProvider._translate_error-->`_translate_error(error)`<!--/AUTO--> | anthropic 异常 → LLMError 分类 |
-| <!--AUTO:sig:backend/app/services/llm/claude.py:ClaudeProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 非流式生成 |
-| <!--AUTO:sig:backend/app/services/llm/claude.py:ClaudeProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成 |
+| <!--AUTO:sig:backend/app/services/llm/claude.py:ClaudeProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None, top_p=None, presence_penalty=None, frequency_penalty=None)`<!--/AUTO--> | 非流式生成 |
+| <!--AUTO:sig:backend/app/services/llm/claude.py:ClaudeProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None, top_p=None, presence_penalty=None, frequency_penalty=None)`<!--/AUTO--> | 流式生成 |
 
 ### 4.26 `backend/app/services/llm/errors.py` — SDK 错误翻译（<!--AUTO:lines:backend/app/services/llm/errors.py-->~63 行<!--/AUTO-->）
 
@@ -711,7 +711,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.get_provider-->`get_provider(name, api_key, base_url=None)`<!--/AUTO--> | 按名取实例（未注册则懒加载兜底） |
 | <!--AUTO:sig:backend/app/services/llm/factory.py:LLMFactory.list_providers-->`list_providers()`<!--/AUTO--> | 已注册 Provider 清单 |
 
-### 4.28 `backend/app/services/llm/openai.py` — OpenAI Provider（<!--AUTO:lines:backend/app/services/llm/openai.py-->~87 行<!--/AUTO-->）
+### 4.28 `backend/app/services/llm/openai.py` — OpenAI Provider（<!--AUTO:lines:backend/app/services/llm/openai.py-->~113 行<!--/AUTO-->）
 
 **职责**：`OpenAIProvider(BaseLLM)`——openai SDK 实现（兼容 base_url 聚合平台，`_normalize_base_url` 端点形态归一）。
 
@@ -719,8 +719,8 @@ conver system/
 |------|------|
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.__init__-->`__init__(api_key, base_url=None)`<!--/AUTO--> | 构造（base_url 归一化） |
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider._translate_error-->`_translate_error(error)`<!--/AUTO--> | openai 异常 → LLMError 分类 |
-| <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 非流式生成 |
-| <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None)`<!--/AUTO--> | 流式生成 |
+| <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None, top_p=None, presence_penalty=None, frequency_penalty=None)`<!--/AUTO--> | 非流式生成 |
+| <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None, top_p=None, presence_penalty=None, frequency_penalty=None)`<!--/AUTO--> | 流式生成 |
 
 ### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~174 行<!--/AUTO-->）
 
@@ -858,7 +858,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/mod-css.js:applyCharacterCss-->`applyCharacterCss(characterId)`<!--/AUTO--> | 拉取 + 注入（空 payload / 失败 / 被取代 → false，从不 reject） |
 | <!--AUTO:sig:frontend/js/mod-css.js:removeCharacterCss-->`removeCharacterCss()`<!--/AUTO--> | 移除 style 节点（无节点 no-op；使在途 apply 失效） |
 
-### 4.37 `frontend/js/components/character-form.js` — 角色编辑表单（<!--AUTO:lines:frontend/js/components/character-form.js-->~204 行<!--/AUTO-->）
+### 4.37 `frontend/js/components/character-form.js` — 角色编辑表单（<!--AUTO:lines:frontend/js/components/character-form.js-->~246 行<!--/AUTO-->）
 
 **职责**：创建/编辑模式的角色表单（含完整性提示）。
 
@@ -866,7 +866,7 @@ conver system/
 |------|------|
 | <!--AUTO:sig:frontend/js/components/character-form.js:showCharacterForm-->`showCharacterForm(mode = 'create', characterData = null, onSuccess = null)`<!--/AUTO--> | 打开表单（创建/编辑） |
 
-### 4.38 `frontend/js/components/character-submit.js` — 提交状态机（<!--AUTO:lines:frontend/js/components/character-submit.js-->~149 行<!--/AUTO-->）
+### 4.38 `frontend/js/components/character-submit.js` — 提交状态机（<!--AUTO:lines:frontend/js/components/character-submit.js-->~181 行<!--/AUTO-->）
 
 **职责**：角色提交收敛（ARC10 T-12）——payload 构建、提交按钮三态（进行中/成功/失败）统一入口。
 
@@ -881,7 +881,7 @@ conver system/
 | <!--AUTO:sig:frontend/js/components/character-submit.js:succeedSubmit-->`succeedSubmit(statusEl, successMsgHtml, close, onSuccess = null)`<!--/AUTO--> | 提交成功态 |
 | <!--AUTO:sig:frontend/js/components/character-submit.js:failSubmit-->`failSubmit(btn, statusEl, err, restoreLabel)`<!--/AUTO--> | 提交失败态（恢复按钮） |
 
-### 4.39 `frontend/js/components/character-wizard.js` — 六步创建向导（<!--AUTO:lines:frontend/js/components/character-wizard.js-->~584 行<!--/AUTO-->）
+### 4.39 `frontend/js/components/character-wizard.js` — 六步创建向导（<!--AUTO:lines:frontend/js/components/character-wizard.js-->~644 行<!--/AUTO-->）
 
 **职责**：六步创建向导（模板选择/文档导入/自定义…）——步骤渲染 + 事件绑定 + 校验 + 保存；6 步渲染函数分离。
 
@@ -1477,6 +1477,8 @@ conver system/
 |------|--------|----------|
 | `backend/tests/test_character_card.py` | <!--AUTO:tests:backend/tests/test_character_card.py-->56<!--/AUTO--> | 角色卡 V2 导入导出/往返保真 |
 | `backend/tests/test_character_fields.py` | <!--AUTO:tests:backend/tests/test_character_fields.py-->26<!--/AUTO--> | 角色字段常量映射契约锁 |
+| `backend/tests/test_character_sampling.py` | <!--AUTO:tests:backend/tests/test_character_sampling.py-->4<!--/AUTO--> | 采样参数契约锁（SP-1：迁移幂等/往返保真/clamp） |
+| `backend/tests/test_sampling_transmit.py` | <!--AUTO:tests:backend/tests/test_sampling_transmit.py-->5<!--/AUTO--> | 采样参数透传契约锁（SP-2：OpenAI 透传/Claude 不传/_sampling_kwargs） |
 | `backend/tests/test_character_import_avatar.py` | <!--AUTO:tests:backend/tests/test_character_import_avatar.py-->2<!--/AUTO--> | 角色导入非 ASCII avatar 500 回归（服务层 ValueError 缺陷路径 + API 层全路径） |
 | `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->43<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
 | `backend/tests/test_chat_continue.py` | <!--AUTO:tests:backend/tests/test_chat_continue.py-->21<!--/AUTO--> | 续写端点契约锁（MS-3：条数不变/不追加 user/失败零改动/续写触发形态/空续写 no-op/错误矩阵） |
@@ -1536,7 +1538,7 @@ conver system/
 | `frontend/tests/app.test.js` | <!--AUTO:tests:frontend/tests/app.test.js-->38<!--/AUTO--> | 应用编排接线 |
 | `frontend/tests/cascade.test.js` | <!--AUTO:tests:frontend/tests/cascade.test.js-->12<!--/AUTO--> | 级联收口 |
 | `frontend/tests/character-modal.test.js` | <!--AUTO:tests:frontend/tests/character-modal.test.js-->39<!--/AUTO--> | 角色表单/模态 |
-| `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->30<!--/AUTO--> | 提交状态机 |
+| `frontend/tests/character-submit.test.js` | <!--AUTO:tests:frontend/tests/character-submit.test.js-->31<!--/AUTO--> | 提交状态机 |
 | `frontend/tests/chat-edit-delete.test.js` | <!--AUTO:tests:frontend/tests/chat-edit-delete.test.js-->17<!--/AUTO--> | 消息编辑/删除前端契约锁（03：api edit/delete 契约/按钮角色渲染/editMessage·deleteMessage 确认与重载） |
 | `frontend/tests/chat.test.js` |
 | `frontend/tests/chat-swipes.test.js` | <!--AUTO:tests:frontend/tests/chat-swipes.test.js-->7<!--/AUTO--> | swipes 候选控制条契约锁（MS-2：计数渲染/单选不渲染/切换调用参数/边界不越界/失败回滚） | <!--AUTO:tests:frontend/tests/chat.test.js-->100<!--/AUTO--> | 对话视图 |
@@ -1627,10 +1629,10 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2675<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2685<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1226<!--/AUTO-->
-> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1379<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1235<!--/AUTO-->
+> - Vitest（前端）：<!--AUTO:tests_total:vitest-->1380<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 
 基线同步机制：`scripts/doc_sync.py` 机械维护上表与 §5 各文件用例数、§4 行数/签名标记；`pre-commit` 钩子拦截漂移提交（`python scripts/doc_sync.py --check`）。手动刷新：`python scripts/doc_sync.py`。

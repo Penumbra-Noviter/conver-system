@@ -23,7 +23,8 @@ import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
 import {
     splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit,
-    TEMP_SLIDER, formatTemperature, avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
+    TEMP_SLIDER, SAMPLING_SLIDERS, formatTemperature, formatSampling,
+    avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
 } from './character-submit.js';
 
 /**
@@ -49,6 +50,10 @@ export function showCharacterWizard(onSuccess = null) {
         tags: [],
         avatar: '',
         temperature: TEMP_SLIDER.default,
+        top_p: SAMPLING_SLIDERS.top_p.default,
+        presence_penalty: SAMPLING_SLIDERS.presence_penalty.default,
+        frequency_penalty: SAMPLING_SLIDERS.frequency_penalty.default,
+        max_tokens: '',
         // 文档解析结果
         parsing: false,
         parseError: '',
@@ -367,6 +372,26 @@ function renderStep6(state) {
                         </div>
                         <span class="field-hint">较低的值使回复更可控，较高的值使回复更有创意</span>
                     </div>
+                    <div class="form-field">
+                        <label for="wiz-top-p">Top P: <span id="wiz-top-p-value">${formatSampling(state.top_p, 'top_p')}</span></label>
+                        <input type="range" id="wiz-top-p" min="${SAMPLING_SLIDERS.top_p.min}" max="${SAMPLING_SLIDERS.top_p.max}" step="${SAMPLING_SLIDERS.top_p.step}" value="${state.top_p}">
+                        <span class="field-hint">核采样：控制回复多样性（仅 OpenAI 系生效）</span>
+                    </div>
+                    <div class="form-field">
+                        <label for="wiz-presence-penalty">存在惩罚 (Presence Penalty): <span id="wiz-presence-penalty-value">${formatSampling(state.presence_penalty, 'presence_penalty')}</span></label>
+                        <input type="range" id="wiz-presence-penalty" min="${SAMPLING_SLIDERS.presence_penalty.min}" max="${SAMPLING_SLIDERS.presence_penalty.max}" step="${SAMPLING_SLIDERS.presence_penalty.step}" value="${state.presence_penalty}">
+                        <span class="field-hint">惩罚已出现的话题，鼓励新内容（仅 OpenAI 系生效）</span>
+                    </div>
+                    <div class="form-field">
+                        <label for="wiz-frequency-penalty">频率惩罚 (Frequency Penalty): <span id="wiz-frequency-penalty-value">${formatSampling(state.frequency_penalty, 'frequency_penalty')}</span></label>
+                        <input type="range" id="wiz-frequency-penalty" min="${SAMPLING_SLIDERS.frequency_penalty.min}" max="${SAMPLING_SLIDERS.frequency_penalty.max}" step="${SAMPLING_SLIDERS.frequency_penalty.step}" value="${state.frequency_penalty}">
+                        <span class="field-hint">惩罚重复用词，降低逐字重复（仅 OpenAI 系生效）</span>
+                    </div>
+                    <div class="form-field">
+                        <label for="wiz-max-tokens">最大输出 Token</label>
+                        <input type="number" id="wiz-max-tokens" min="1" max="131072" placeholder="留空 = 模型默认 (2048)" value="${escapeHtml(state.max_tokens || '')}">
+                        <span class="field-hint">限制回复最大长度（留空使用 provider 默认）</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -521,6 +546,39 @@ function bindStep6Events(state, body) {
             tempValue.textContent = formatTemperature(state.temperature);
         });
     }
+
+    // 采样参数滑块实时显示（SP-3）
+    const topPSlider = body.querySelector('#wiz-top-p');
+    const topPValue = body.querySelector('#wiz-top-p-value');
+    const presenceSlider = body.querySelector('#wiz-presence-penalty');
+    const presenceValue = body.querySelector('#wiz-presence-penalty-value');
+    const frequencySlider = body.querySelector('#wiz-frequency-penalty');
+    const frequencyValue = body.querySelector('#wiz-frequency-penalty-value');
+    const maxTokensInput = body.querySelector('#wiz-max-tokens');
+
+    if (topPSlider && topPValue) {
+        topPSlider.addEventListener('input', () => {
+            state.top_p = parseFloat(topPSlider.value);
+            topPValue.textContent = formatSampling(state.top_p, 'top_p');
+        });
+    }
+    if (presenceSlider && presenceValue) {
+        presenceSlider.addEventListener('input', () => {
+            state.presence_penalty = parseFloat(presenceSlider.value);
+            presenceValue.textContent = formatSampling(state.presence_penalty, 'presence_penalty');
+        });
+    }
+    if (frequencySlider && frequencyValue) {
+        frequencySlider.addEventListener('input', () => {
+            state.frequency_penalty = parseFloat(frequencySlider.value);
+            frequencyValue.textContent = formatSampling(state.frequency_penalty, 'frequency_penalty');
+        });
+    }
+    if (maxTokensInput) {
+        maxTokensInput.addEventListener('input', () => {
+            state.max_tokens = maxTokensInput.value.trim();
+        });
+    }
 }
 
 // ══════════════════════════════════════════════════
@@ -599,6 +657,10 @@ async function handleSave(state, statusEl, submitBtn, close, onSuccess) {
         mes_example: state.mes_example,
         system_prompt: state.system_prompt,
         temperature: state.temperature,
+        top_p: state.top_p,
+        presence_penalty: state.presence_penalty,
+        frequency_penalty: state.frequency_penalty,
+        max_tokens: state.max_tokens,
         avatar: state.avatar,
         creator: '',
         tags: state.tags,

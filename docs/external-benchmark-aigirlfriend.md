@@ -86,6 +86,20 @@
 - 作者端 CG 编辑器：默认分组 / 移动分组 / 设为特殊 CG（有上限）/ 解锁后显示名称 / 解锁提示 / **概率加权抽一张**（触发时从加权池随机出一张）/ 各类数量上限 / 建议压到 5MB 以下。
 - 旁证：语音沉淀同类链路（`POST /t2v`、`/t2v/apps`、`/t2v/audios`、预设音色清单 AUDIO_MODEL_LIST）。
 
+### 3.7 对话质量 / Prompt 工程（2026-09-14 第二轮逆向新增）
+
+前轮只覆盖「功能机制」，本轮补「角色对话质量」的 prompt 组装与采样参数层。证据来自两个主业务 bundle（`04c6s23osg27j.js`=作者端、`3bklesf-98sue.js`=Dify 聊天客户端）的 i18n 资源与客户端源码。
+
+- **三段式 Prompt 结构**：`base prompt（基础）+ pre-prompt（前置）+ post-prompt（后置）`。i18n 原文 `prePromptAndPrePostTextLengthWarning:"Your combined prompt length (base prompt + pre-prompt + post-prompt) is excessive..."` 直接命名三段，并建议「用 World Info 拆分长 prompt 以降耗」。
+- **双层编辑器**：基础模式（结构化字段）↔ 专家模式（直接编辑整个 PROMPT，切换后不可逆回基础模式）。`promptMode:{simple:"Switch to Expert Mode to edit the whole PROMPT", advancedWarning:"...once you modify the PROMPT, you CANNOT return to the basic mode"}`。
+- **Prompt Debug 面板**（作者可见）：可查 `System Prompt / Prefix Prompt / Suffix Prompt / Other Info`，来源分 `app / user / mod` 三层（`promptDebug:{systemPrompt,prefixPrompt,suffixPrompt,otherInfo,type:{app,user,mod}}`）。
+- **预设开场白 + 预设对话**：`defaultDialogue` 模块——开场白（opening statement）≤10、预设对话（preset dialogue，含 user question + ai answer）≤10，供快速开局选择（`maxOpeningStatementsWarning:"Maximum 10 opening statements allowed"`）。
+- **模型采样参数面板**：暴露 `temperature / topP(=Top_P) / topK / presencePenalty / frequencyPenalty / maxTokens / context(=Context length) / thinkingBudget(=Thinking budget)`。`topK` 与 `thinkingBudget` 非 OpenAI 标准参数，说明后端接入推理型模型（thinking budget=思考 token 预算）。
+- **上下文组成结构**：`noticeTip9:"For the context composition structure of the AIERO LLM, please refer to the Official Documentation"`——对方内部自称「AIERO LLM」，有一套官方文档化的上下文组装结构（system + prefix + suffix + other info + 世界书 + 记忆 + 聊天记录 + Knowledge）。
+- **记忆压缩**：记忆达 10000 字符自动触发压缩；总结结果含 `sorry` / `对不起` 视为命中过滤（`noticeTip7/8`）。
+- **模型参数默认值**：`recommend_model:{model:{completion_params:{temperature:0}}}`（temperature 默认 0）。
+- **品牌/域名旁证**：`"fengyue.ai"!==ek&&"testaf.aiero.cc"!==ek`——另有 fengyue.ai 与 testaf.aiero.cc（测试环境）别名。
+
 ---
 
 ## 四、方法论（可复用于任何同类对标）

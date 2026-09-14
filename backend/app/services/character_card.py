@@ -46,6 +46,15 @@ def to_v2_card(char: Character) -> dict:
 
     # temperature：以 DB 实时值为准写入命名空间
     ns["temperature"] = char.temperature
+    # 采样参数（SP-1）：仅非 None 写入命名空间（None = 未设置，不落卡）
+    if char.top_p is not None:
+        ns["top_p"] = char.top_p
+    if char.presence_penalty is not None:
+        ns["presence_penalty"] = char.presence_penalty
+    if char.frequency_penalty is not None:
+        ns["frequency_penalty"] = char.frequency_penalty
+    if char.max_tokens is not None:
+        ns["max_tokens"] = char.max_tokens
 
     # 头像：base64 data URI → data.avatar（去前缀，ST 兼容）；URL → 命名空间 avatar_url
     data_avatar = None
@@ -148,6 +157,16 @@ def _build_create(data: dict) -> CharacterCreate:
     # temperature：命名空间优先，其次裸 data 顶层（容错），无则默认 0.7，并裁剪到 [0, 2] 合法区间
     temperature = _clamp_temperature(ns.get("temperature", data.get("temperature", 0.7)))
 
+    # 采样参数（SP-1）：命名空间优先，其次裸 data 顶层（容错）；可空字段 None/非法值回退 None（不覆盖 provider 默认）
+    top_p = _clamp_optional_float(ns.get("top_p", data.get("top_p")), 0.0, 1.0)
+    presence_penalty = _clamp_optional_float(
+        ns.get("presence_penalty", data.get("presence_penalty")), -2.0, 2.0,
+    )
+    frequency_penalty = _clamp_optional_float(
+        ns.get("frequency_penalty", data.get("frequency_penalty")), -2.0, 2.0,
+    )
+    max_tokens = _clamp_optional_int(ns.get("max_tokens", data.get("max_tokens")), 1, 131072)
+
     version = data.get("character_version") or data.get("version") or "1.0"
 
     return CharacterCreate(
@@ -167,6 +186,10 @@ def _build_create(data: dict) -> CharacterCreate:
         extensions=extensions,
         avatar=avatar_value,
         temperature=temperature,
+        top_p=top_p,
+        presence_penalty=presence_penalty,
+        frequency_penalty=frequency_penalty,
+        max_tokens=max_tokens,
     )
 
 
@@ -234,3 +257,31 @@ def _clamp_temperature(value) -> float:
     except (TypeError, ValueError):
         return 0.7
     return min(2.0, max(0.0, temp))
+
+
+def _clamp_optional_float(value, low: float, high: float) -> float | None:
+    """可空浮点采样参数裁剪到 [low, high]；None/非法值回退 None（不覆盖 provider 默认）
+
+    top_p / presence_penalty / frequency_penalty 的往返裁剪：None 表示「未设置」
+    直接透传；非 None 时转 float 并夹到合法区间；脏数据（字符串 'abc'/NaN/None
+    之外的非数值）回退 None，与 temperature 的「非法回退默认」不同——采样参数
+    无「全局默认」概念，None 才是语义上的缺省。
+    """
+    if value is None:
+        return None
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return min(high, max(low, v))
+
+
+def _clamp_optional_int(value, low: int, high: int) -> int | None:
+    """可空整数采样参数（max_tokens）裁剪到 [low, high]；None/非法值回退 None"""
+    if value is None:
+        return None
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        return None
+    return min(high, max(low, v))

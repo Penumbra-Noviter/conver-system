@@ -58,6 +58,12 @@ class Character(Base):
     # ── 项目原有字段 ──
     avatar = Column(Text, nullable=True, comment="头像（base64 或路径）")
     temperature = Column(Float, default=0.7, comment="LLM 温度参数")
+    # 采样参数（SP-1）：None 表示不覆盖 provider 默认；仅 OpenAI 系生效，
+    # Claude anthropic 1.0.0 已移除全部采样参数（F-56 + SP-1 实证，仅 max_tokens 可用）
+    top_p = Column(Float, nullable=True, comment="LLM top_p 采样参数（OpenAI 系）")
+    presence_penalty = Column(Float, nullable=True, comment="LLM presence_penalty（OpenAI 系）")
+    frequency_penalty = Column(Float, nullable=True, comment="LLM frequency_penalty（OpenAI 系）")
+    max_tokens = Column(Integer, nullable=True, comment="LLM 最大输出 token（None=provider 默认）")
 
     created_at = Column(DateTime, default=datetime.datetime.now, server_default=func.now())
     updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now, server_default=func.now())

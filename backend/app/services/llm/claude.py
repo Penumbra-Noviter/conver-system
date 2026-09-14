@@ -40,12 +40,17 @@ class ClaudeProvider(BaseLLM):
         temperature: float = 0.7,
         max_tokens: int = 2048,
         model: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> str:
         """非流式生成完整回复
 
-        temperature 保留于对外签名供上层（openai 路由 / chat 链路）依赖，
-        但不再透传 SDK——anthropic 1.x 的 messages.create 不含该参数，传入即
-        TypeError（F-56；契约锁测试见 test_llm_shared.py::TestAnthropic1xContractLock）。
+        temperature / top_p / presence_penalty / frequency_penalty 保留于对外签名
+        供上层（chat 链路）依赖，但不透传 SDK——anthropic 1.0.0 的 messages.create
+        已移除全部采样参数（F-56 temperature + SP-1 实证 top_p/presence/frequency），
+        仅 max_tokens 可用，传入即 TypeError（契约锁测试见
+        test_llm_shared.py::TestAnthropic1xContractLock）。
         """
         system, chat_messages = self._prepare_messages(messages)
         model = model or "claude-sonnet-5"
@@ -69,12 +74,14 @@ class ClaudeProvider(BaseLLM):
         temperature: float = 0.7,
         max_tokens: int = 2048,
         model: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> AsyncIterator[str]:
         """流式生成，逐 token 产出
 
-        temperature 保留于对外签名（同 generate），不传给 SDK——anthropic 1.x
-        的 messages.stream 不含该参数（F-56；契约锁测试见
-        test_llm_shared.py::TestAnthropic1xContractLock）。
+        采样参数保留于对外签名但不透传 SDK（同 generate，anthropic 1.0.0 移除全部
+        采样参数，仅 max_tokens 可用）。
         """
         system, chat_messages = self._prepare_messages(messages)
         model = model or "claude-sonnet-5"

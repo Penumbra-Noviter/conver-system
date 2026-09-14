@@ -94,6 +94,11 @@ class ChatContext:
     temperature: float
     messages: list[dict]
     provider: BaseLLM
+    # SP-1 采样参数：None 表示「不覆盖 provider 默认」
+    top_p: float | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    max_tokens: int | None = None
 
 
 def assemble_chat_context(
@@ -130,9 +135,13 @@ def assemble_chat_context(
     # 1. 验证对话存在
     conv = conversation_service.require_conversation(db, conversation_id)
 
-    # 2. 获取角色（用于 temperature）
+    # 2. 获取角色（用于 temperature 与采样参数）
     character = db.query(Character).filter(Character.id == conv.character_id).first()
     temperature = character.temperature if character else 0.7
+    top_p = character.top_p if character else None
+    presence_penalty = character.presence_penalty if character else None
+    frequency_penalty = character.frequency_penalty if character else None
+    max_tokens = character.max_tokens if character else None
 
     # 3. 构建消息列表（含 system prompt + 历史 + 滑窗 + 模板变量 + 世界书注入；不落库）
     user_name = setting_service.user_name(db)
@@ -172,6 +181,10 @@ def assemble_chat_context(
         temperature=temperature,
         messages=messages,
         provider=provider,
+        top_p=top_p,
+        presence_penalty=presence_penalty,
+        frequency_penalty=frequency_penalty,
+        max_tokens=max_tokens,
     )
 
 
@@ -209,6 +222,25 @@ def prepare_chat(db: Session, request: ChatRequest) -> ChatContext:
     return assemble_chat_context(db, request.conversation_id, current_input=request.content)
 
 
+def _sampling_kwargs(ctx: ChatContext) -> dict[str, float | int]:
+    """从 ChatContext 提取非 None 采样参数 kwargs（SP-1）
+
+    None 字段不进入 kwargs——保留 provider 默认（generate / stream_generate 的
+    参数默认值）。与 temperature 的「总是传 0.7」不同：采样参数是可选覆盖，
+    None 才是语义上的「未设置」。max_tokens None 时不传，走 provider 默认 2048。
+    """
+    kwargs: dict[str, float | int] = {}
+    if ctx.top_p is not None:
+        kwargs["top_p"] = ctx.top_p
+    if ctx.presence_penalty is not None:
+        kwargs["presence_penalty"] = ctx.presence_penalty
+    if ctx.frequency_penalty is not None:
+        kwargs["frequency_penalty"] = ctx.frequency_penalty
+    if ctx.max_tokens is not None:
+        kwargs["max_tokens"] = ctx.max_tokens
+    return kwargs
+
+
 async def _generate_with_error_mapping(ctx: ChatContext) -> str:
     """await generate + 捕获 LLMError → chat_error_response → raise HTTPException
 
@@ -236,6 +268,7 @@ async def _generate_with_error_mapping(ctx: ChatContext) -> str:
             ctx.messages,
             temperature=ctx.temperature,
             model=ctx.conversation.model_name,
+            **_sampling_kwargs(ctx),
         )
     except LLMError as e:
         status_code, message = chat_error_response(
@@ -705,6 +738,7 @@ async def stream_reply(
             ctx.messages,
             temperature=ctx.temperature,
             model=ctx.conversation.model_name,
+            **_sampling_kwargs(ctx),
         ):
             # 客户端断开 → 停止生成，保存已生成部分（不再发送事件）
             if await is_disconnected():

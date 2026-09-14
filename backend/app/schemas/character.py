@@ -34,6 +34,11 @@ class CharacterBase(BaseModel):
     extensions: dict = Field(default_factory=dict, description="扩展字段")
     avatar: Optional[str] = Field(None, description="头像 base64 / 路径")
     temperature: float = Field(0.7, ge=0.0, le=2.0, description="LLM 温度参数")
+    # 采样参数（SP-1）：None = 不覆盖 provider 默认；仅 OpenAI 系生效
+    top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="LLM top_p 采样参数（OpenAI 系）")
+    presence_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="LLM presence_penalty（OpenAI 系）")
+    frequency_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="LLM frequency_penalty（OpenAI 系）")
+    max_tokens: Optional[int] = Field(None, ge=1, le=131072, description="LLM 最大输出 token（None=provider 默认）")
 
 
 # ── 请求体（继承基类，字段清单由 CharacterBase 唯一定义）──
@@ -62,6 +67,10 @@ class CharacterUpdate(CharacterBase):
     extensions: Optional[dict] = None
     avatar: Optional[str] = None
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
+    top_p: Optional[float] = Field(None, ge=0.0, le=1.0)
+    presence_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0)
+    frequency_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0)
+    max_tokens: Optional[int] = Field(None, ge=1, le=131072)
 
 
 # ── 响应体（继承基类 + 元数据字段）──

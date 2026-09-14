@@ -32,7 +32,7 @@ __all__ = [
     "V1_TO_V2_MAP",
 ]
 
-# ── V2 全部内容字段（16 项） ──
+# ── V2 全部内容字段（20 项） ──
 # 顺序与 ORM models/character.py Column 声明一致（排除 id/created_at/updated_at）
 CHARACTER_V2_FIELDS: Final[list[str]] = [
     "name",
@@ -51,6 +51,10 @@ CHARACTER_V2_FIELDS: Final[list[str]] = [
     "extensions",
     "avatar",
     "temperature",
+    "top_p",
+    "presence_penalty",
+    "frequency_penalty",
+    "max_tokens",
 ]
 
 # ── Prompt 组装视角（6 项） ──

@@ -16,7 +16,8 @@ import { iconHtml } from '../icons.js';
 import { openModal } from './modal.js';
 import {
     splitTags, buildCharacterPayload, beginSubmit, succeedSubmit, failSubmit,
-    TEMP_SLIDER, formatTemperature, avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
+    TEMP_SLIDER, SAMPLING_SLIDERS, formatTemperature, formatSampling,
+    avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
 } from './character-submit.js';
 
 /**
@@ -76,6 +77,30 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
         </div>
 
         <div class="form-field">
+            <label for="cf-top-p">Top P: <span id="cf-top-p-value">${formatSampling(char.top_p, 'top_p')}</span></label>
+            <input type="range" id="cf-top-p" min="${SAMPLING_SLIDERS.top_p.min}" max="${SAMPLING_SLIDERS.top_p.max}" step="${SAMPLING_SLIDERS.top_p.step}" value="${char.top_p ?? SAMPLING_SLIDERS.top_p.default}">
+            <span class="field-hint">核采样：控制回复多样性（仅 OpenAI 系生效）</span>
+        </div>
+
+        <div class="form-field">
+            <label for="cf-presence-penalty">存在惩罚 (Presence Penalty): <span id="cf-presence-penalty-value">${formatSampling(char.presence_penalty, 'presence_penalty')}</span></label>
+            <input type="range" id="cf-presence-penalty" min="${SAMPLING_SLIDERS.presence_penalty.min}" max="${SAMPLING_SLIDERS.presence_penalty.max}" step="${SAMPLING_SLIDERS.presence_penalty.step}" value="${char.presence_penalty ?? SAMPLING_SLIDERS.presence_penalty.default}">
+            <span class="field-hint">惩罚已出现的话题，鼓励新内容（仅 OpenAI 系生效）</span>
+        </div>
+
+        <div class="form-field">
+            <label for="cf-frequency-penalty">频率惩罚 (Frequency Penalty): <span id="cf-frequency-penalty-value">${formatSampling(char.frequency_penalty, 'frequency_penalty')}</span></label>
+            <input type="range" id="cf-frequency-penalty" min="${SAMPLING_SLIDERS.frequency_penalty.min}" max="${SAMPLING_SLIDERS.frequency_penalty.max}" step="${SAMPLING_SLIDERS.frequency_penalty.step}" value="${char.frequency_penalty ?? SAMPLING_SLIDERS.frequency_penalty.default}">
+            <span class="field-hint">惩罚重复用词，降低逐字重复（仅 OpenAI 系生效）</span>
+        </div>
+
+        <div class="form-field">
+            <label for="cf-max-tokens">最大输出 Token</label>
+            <input type="number" id="cf-max-tokens" min="1" max="131072" placeholder="留空 = 模型默认 (2048)" value="${char.max_tokens ?? ''}">
+            <span class="field-hint">限制回复最大长度（留空使用 provider 默认）</span>
+        </div>
+
+        <div class="form-field">
             <label for="cf-avatar">头像 URL / Base64</label>
             <input type="text" id="cf-avatar" placeholder="粘贴头像链接或 base64 数据" value="${escapeHtml(char.avatar || '')}">
             <div class="avatar-preview" id="cf-avatar-preview">
@@ -121,6 +146,13 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             const firstMesInput = overlay.querySelector('#cf-first-mes');
             const tempSlider = overlay.querySelector('#cf-temperature');
             const tempValue = overlay.querySelector('#cf-temp-value');
+            const topPSlider = overlay.querySelector('#cf-top-p');
+            const topPValue = overlay.querySelector('#cf-top-p-value');
+            const presenceSlider = overlay.querySelector('#cf-presence-penalty');
+            const presenceValue = overlay.querySelector('#cf-presence-penalty-value');
+            const frequencySlider = overlay.querySelector('#cf-frequency-penalty');
+            const frequencyValue = overlay.querySelector('#cf-frequency-penalty-value');
+            const maxTokensInput = overlay.querySelector('#cf-max-tokens');
             const statusEl = overlay.querySelector('#cf-status');
             const avatarInput = overlay.querySelector('#cf-avatar');
             const avatarPreview = overlay.querySelector('#cf-avatar-preview');
@@ -148,6 +180,17 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             // 温度滑块实时显示（两位小数统一）
             tempSlider.addEventListener('input', () => {
                 tempValue.textContent = formatTemperature(tempSlider.value);
+            });
+
+            // 采样参数滑块实时显示（SP-3）
+            topPSlider.addEventListener('input', () => {
+                topPValue.textContent = formatSampling(topPSlider.value, 'top_p');
+            });
+            presenceSlider.addEventListener('input', () => {
+                presenceValue.textContent = formatSampling(presenceSlider.value, 'presence_penalty');
+            });
+            frequencySlider.addEventListener('input', () => {
+                frequencyValue.textContent = formatSampling(frequencySlider.value, 'frequency_penalty');
             });
 
             // 头像预览（onerror 回退与空态占位收敛到字段语义共享函数）
@@ -197,6 +240,10 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                     mes_example: overlay.querySelector('#cf-mes-example').value.trim(),
                     system_prompt: overlay.querySelector('#cf-system-prompt').value.trim(),
                     temperature: tempSlider.value,
+                    top_p: topPSlider.value,
+                    presence_penalty: presenceSlider.value,
+                    frequency_penalty: frequencySlider.value,
+                    max_tokens: maxTokensInput.value.trim(),
                     avatar: avatarInput.value.trim(),
                     creator: overlay.querySelector('#cf-creator').value.trim(),
                     tags: splitTags(overlay.querySelector('#cf-tags').value.trim()),

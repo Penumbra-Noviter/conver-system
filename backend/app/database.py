@@ -71,6 +71,7 @@ def init_db() -> None:
     _ensure_messages_active_swipe_index(engine)
     _ensure_conversation_branch_columns(engine)
     _ensure_cg_images_weight(engine)
+    _ensure_character_sampling_columns(engine)
 
 
 def _ensure_column(
@@ -169,3 +170,31 @@ def _ensure_cg_images_weight(bind=engine) -> None:
         bind: Engine 或既有 Connection（默认应用引擎；测试可直接传内存库连接）
     """
     _ensure_column(bind, "cg_images", "weight", "INTEGER NOT NULL DEFAULT 100", concurrent=True)
+
+
+def _ensure_character_sampling_columns(bind=engine) -> None:
+    """自愈迁移：存量 characters 表缺采样参数四列时补列（幂等，委托 _ensure_column）
+
+    SP-1 采样参数扩展：top_p / presence_penalty / frequency_penalty（FLOAT，可空）
+    / max_tokens（INTEGER，可空）。可空列 NULL 语义 = 「不覆盖 provider 默认」，
+    存量角色补列后全为 NULL、行为不变（零回归）。create_all 不会给已存在表加列
+    （项目无 alembic，spec §0 迁移约束）：探测缺列 → 逐列补列；连续两次调用无
+    副作用（幂等，契约锁 test_character_sampling::test_migration_idempotent）。
+
+    Args:
+        bind: 可连接的 Engine/Connection（默认应用引擎；测试可传入内存库）
+    """
+    cols = (
+        ("top_p", "FLOAT"),
+        ("presence_penalty", "FLOAT"),
+        ("frequency_penalty", "FLOAT"),
+        ("max_tokens", "INTEGER"),
+    )
+    if isinstance(bind, Engine):
+        # Engine 形态：单连接循环补四列（F-129 消除每次 _ensure_column 各开新连接）
+        with bind.connect() as conn:
+            for name, coltype in cols:
+                _ensure_column(conn, "characters", name, coltype)
+    else:
+        for name, coltype in cols:
+            _ensure_column(bind, "characters", name, coltype)

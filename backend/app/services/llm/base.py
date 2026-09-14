@@ -85,6 +85,9 @@ class BaseLLM(ABC):
         temperature: float = 0.7,
         max_tokens: int = 2048,
         model: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> str:
         """非流式生成完整回复"""
         ...
@@ -96,6 +99,9 @@ class BaseLLM(ABC):
         temperature: float = 0.7,
         max_tokens: int = 2048,
         model: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> AsyncIterator[str]:
         """流式生成，逐 token 产出"""
         ...
