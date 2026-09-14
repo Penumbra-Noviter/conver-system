@@ -19,6 +19,7 @@ import {
     TEMP_SLIDER, SAMPLING_SLIDERS, formatTemperature, formatSampling,
     avatarPreviewHtml, NAME_REQUIRED_MESSAGE, tagsToComma,
     normalizeAlternateGreetings, addAlternateGreeting, alternateGreetingRowsHtml,
+    normalizePresetDialogues, addPresetDialogue, presetDialogueRowsHtml,
 } from './character-submit.js';
 
 /**
@@ -83,6 +84,17 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                 <button type="button" class="btn-secondary" id="cf-alt-greetings-add">${iconHtml('plus', { size: 14 })} 添加</button>
             </div>
             <span class="field-hint">新建对话时可从这些开场白中选择</span>
+        </div>
+
+        <div class="form-field">
+            <label for="cf-preset-dialogues-name">预设对话（可选，最多 10 条）</label>
+            <div class="preset-dialogues-list" id="cf-preset-dialogues-list"></div>
+            <div class="preset-dialogues-add">
+                <input type="text" id="cf-preset-dialogues-name" placeholder="对话标题">
+                <textarea id="cf-preset-dialogues-content" rows="2" placeholder="对话正文"></textarea>
+                <button type="button" class="btn-secondary" id="cf-preset-dialogues-add">${iconHtml('plus', { size: 14 })} 添加</button>
+            </div>
+            <span class="field-hint">新建对话时可从这些预设对话中选择开局示范</span>
         </div>
 
         <div class="form-field expert-structured-field">
@@ -193,6 +205,10 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
             const altGreetingsList = overlay.querySelector('#cf-alt-greetings-list');
             const altGreetingsInput = overlay.querySelector('#cf-alt-greetings-input');
             const altGreetingsAdd = overlay.querySelector('#cf-alt-greetings-add');
+            const presetDialoguesList = overlay.querySelector('#cf-preset-dialogues-list');
+            const presetNameInput = overlay.querySelector('#cf-preset-dialogues-name');
+            const presetContentInput = overlay.querySelector('#cf-preset-dialogues-content');
+            const presetAdd = overlay.querySelector('#cf-preset-dialogues-add');
             const scenarioInput = overlay.querySelector('#cf-scenario');
             const systemPromptInput = overlay.querySelector('#cf-system-prompt');
             const basicBtn = overlay.querySelector('#cf-mode-basic');
@@ -297,6 +313,37 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                 btn.closest('.alt-greeting-row').remove();
             });
 
+            // ── 预设对话列表编辑（PD-4 前端镜像备用开场白，扩 name+content 双字段）──
+            const renderPresetDialogues = (list) => {
+                presetDialoguesList.innerHTML = presetDialogueRowsHtml(list);
+            };
+            const readPresetDialogues = () =>
+                [...presetDialoguesList.querySelectorAll('.preset-dialogue-row')]
+                    .map((row) => ({
+                        name: row.querySelector('.preset-dialogue-name').value.trim(),
+                        content: row.querySelector('.preset-dialogue-content').value.trim(),
+                    }))
+                    .filter((d) => d.name && d.content);
+
+            // 初始回填（edit 模式还原；非数组/脏数据归一化）
+            renderPresetDialogues(normalizePresetDialogues(char.preset_dialogues));
+
+            // 添加：读当前行 + 新输入 → addPresetDialogue（空/重复/上限守卫）
+            presetAdd.addEventListener('click', () => {
+                const current = readPresetDialogues();
+                const next = addPresetDialogue(current, presetNameInput.value, presetContentInput.value);
+                presetNameInput.value = '';
+                presetContentInput.value = '';
+                if (next.length !== current.length) renderPresetDialogues(next);
+            });
+
+            // 删除：事件委托直接移除行（closest 定位，无需重编号）
+            presetDialoguesList.addEventListener('click', (e) => {
+                const btn = e.target.closest('.preset-dialogue-remove');
+                if (!btn) return;
+                btn.closest('.preset-dialogue-row').remove();
+            });
+
             // ── 提交 ──
             overlay.querySelector('#cf-submit').addEventListener('click', async () => {
                 // 校验
@@ -342,6 +389,7 @@ export function showCharacterForm(mode = 'create', characterData = null, onSucce
                     creator: overlay.querySelector('#cf-creator').value.trim(),
                     tags: splitTags(overlay.querySelector('#cf-tags').value.trim()),
                     alternate_greetings: normalizeAlternateGreetings(readAltGreetings()),
+                    preset_dialogues: normalizePresetDialogues(readPresetDialogues()),
                     prompt_mode: currentMode,
                     expert_prompt: expertPromptInput.value.trim(),
                 });

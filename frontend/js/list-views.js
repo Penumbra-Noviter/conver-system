@@ -301,28 +301,82 @@ export function resolveGreeting(value, character) {
     return {};
 }
 
+// 预设对话下拉选项 value 标记（其余 value 为 preset_dialogues 源数组索引）
+const PRESET_DIALOGUE_NONE = '__none__';
+
 /**
- * 显示开场白选择对话框（复用 openModal 骨架，返回选中 value 或 null）
- * @param {object} character - 角色对象
- * @returns {Promise<string|null>} 选中 value；取消返回 null
+ * 构建预设对话下拉选项（新建对话入口）
+ *
+ * 选项序列 = 「无预设对话」+ preset_dialogues 各 name（name/content 空项跳过但
+ * 保留源索引，与 resolvePresetDialogue 对齐）。预设对话无「默认」概念，缺省即
+ * 不传（首项为「无预设对话」）。
+ * @param {object} character - 角色对象（preset_dialogues）
+ * @returns {Array<{value: string, label: string}>} 选项列表
  */
-function showGreetingSelector(character) {
+export function buildPresetDialogueOptions(character) {
+    const list = Array.isArray(character?.preset_dialogues) ? character.preset_dialogues : [];
+    const options = [{ value: PRESET_DIALOGUE_NONE, label: '无预设对话' }];
+    for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        const isObj = item && typeof item === 'object' && !Array.isArray(item);
+        const name = isObj && typeof item.name === 'string' ? item.name.trim() : '';
+        const content = isObj && typeof item.content === 'string' ? item.content.trim() : '';
+        if (name && content) options.push({ value: String(i), label: name });
+    }
+    return options;
+}
+
+/**
+ * 由下拉选中 value 解析 preset_dialogue 字段（创建对话 payload）
+ *
+ * 无 → {}（不传 preset_dialogue）；索引 → { preset_dialogue: 该 content }；
+ * 非法 value → {}（Falsify 兜底）。content 原样透传（快照不加工）。
+ * @param {string} value - 下拉 value
+ * @param {object} character - 角色对象（preset_dialogues）
+ * @returns {{preset_dialogue?: string}} 合并进创建 payload 的字段（默认返回空对象）
+ */
+export function resolvePresetDialogue(value, character) {
+    if (value === PRESET_DIALOGUE_NONE) return {};
+    const list = Array.isArray(character?.preset_dialogues) ? character.preset_dialogues : [];
+    if (typeof value !== 'string' || value === '' || !/^\d+$/.test(value)) return {};
+    const item = list[Number(value)];
+    if (item && typeof item.content === 'string' && item.content) {
+        return { preset_dialogue: item.content };
+    }
+    return {};
+}
+
+/**
+ * 显示开场白 + 预设对话双选对话框（复用 openModal 骨架，返回选中对象或 null）
+ * @param {object} character - 角色对象
+ * @returns {Promise<{greeting: string, presetDialogue: string}|null>} 选中值；取消返回 null
+ */
+function showChatStartSelector(character) {
     return new Promise((resolve) => {
-        const options = buildGreetingOptions(character);
+        const greetingOptions = buildGreetingOptions(character);
+        const presetOptions = buildPresetDialogueOptions(character);
         openModal({
-            title: `开场白 · ${character?.name || '角色'}`,
+            title: `开始对话 · ${character?.name || '角色'}`,
             modalClass: 'greeting-selector-modal',
             removeExisting: '.modal-overlay',
             focusSelector: '.gs-start',
             cancelResult: null,
             onClose: resolve,
             body: `
-                <p class="model-selector-hint">选择对话的开场白</p>
+                <p class="model-selector-hint">选择对话的开场白与预设对话</p>
                 <div class="form-field">
                     <label for="gs-greeting">开场白</label>
                     <select id="gs-greeting">
-                        ${options.map((o) =>
+                        ${greetingOptions.map((o) =>
                             `<option value="${escapeHtml(o.value)}" ${o.value === GREETING_DEFAULT ? 'selected' : ''}>${escapeHtml(o.label)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="gs-preset-dialogue">预设对话</label>
+                    <select id="gs-preset-dialogue">
+                        ${presetOptions.map((o) =>
+                            `<option value="${escapeHtml(o.value)}" ${o.value === PRESET_DIALOGUE_NONE ? 'selected' : ''}>${escapeHtml(o.label)}</option>`
                         ).join('')}
                     </select>
                 </div>
@@ -332,8 +386,12 @@ function showGreetingSelector(character) {
                 <button class="btn-primary gs-start">开始对话</button>
             `,
             onOpen: (overlay, close) => {
-                const select = overlay.querySelector('#gs-greeting');
-                const pick = () => close(select.value);
+                const greetingSelect = overlay.querySelector('#gs-greeting');
+                const presetSelect = overlay.querySelector('#gs-preset-dialogue');
+                const pick = () => close({
+                    greeting: greetingSelect.value,
+                    presetDialogue: presetSelect.value,
+                });
                 overlay.querySelector('.gs-cancel').addEventListener('click', () => close(null));
                 overlay.querySelector('.gs-start').addEventListener('click', pick);
             },
@@ -353,12 +411,16 @@ async function startChatWithCharacter(characterId) {
     const selection = await showModelSelector(charName);
     if (!selection) return; // 用户取消
 
-    // 开场白选择（仅当存在备用开场白时弹出；否则走 first_mes 现状零回归）
+    // 开场白 + 预设对话双选（存在任一即弹出；否则走 first_mes 现状零回归）
     let greetingField = {};
-    if (char && Array.isArray(char.alternate_greetings) && char.alternate_greetings.length > 0) {
-        const greetingValue = await showGreetingSelector(char);
-        if (greetingValue === null) return; // 用户取消
-        greetingField = resolveGreeting(greetingValue, char);
+    let presetDialogueField = {};
+    const hasAltGreetings = Array.isArray(char?.alternate_greetings) && char.alternate_greetings.length > 0;
+    const hasPresetDialogues = Array.isArray(char?.preset_dialogues) && char.preset_dialogues.length > 0;
+    if (hasAltGreetings || hasPresetDialogues) {
+        const picked = await showChatStartSelector(char);
+        if (picked === null) return; // 用户取消
+        greetingField = resolveGreeting(picked.greeting, char);
+        presetDialogueField = resolvePresetDialogue(picked.presetDialogue, char);
     }
 
     try {
@@ -367,6 +429,7 @@ async function startChatWithCharacter(characterId) {
             model_provider: selection.provider,
             model_name: selection.model,
             ...greetingField,
+            ...presetDialogueField,
             // 标题不传：后端默认「与 {角色名} 的对话」，首条消息后自动替换（P3.5）
         });
         switchView('chat');
@@ -549,4 +612,6 @@ export const __all__ = [
     'initListViews',
     'buildGreetingOptions',
     'resolveGreeting',
+    'buildPresetDialogueOptions',
+    'resolvePresetDialogue',
 ];
