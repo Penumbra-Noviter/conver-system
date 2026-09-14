@@ -39,6 +39,9 @@ class CharacterBase(BaseModel):
     presence_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="LLM presence_penalty（OpenAI 系）")
     frequency_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="LLM frequency_penalty（OpenAI 系）")
     max_tokens: Optional[int] = Field(None, ge=1, le=131072, description="LLM 最大输出 token（None=provider 默认）")
+    # PD-5 专家模式（项目自有字段，不进 V2 规范清单）
+    prompt_mode: str = Field("simple", description="专家模式开关（simple/expert）")
+    expert_prompt: str = Field("", description="专家模式整段 system prompt")
 
 
 # ── 请求体（继承基类，字段清单由 CharacterBase 唯一定义）──
@@ -71,6 +74,8 @@ class CharacterUpdate(CharacterBase):
     presence_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0)
     frequency_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0)
     max_tokens: Optional[int] = Field(None, ge=1, le=131072)
+    prompt_mode: Optional[str] = None
+    expert_prompt: Optional[str] = None
 
 
 # ── 响应体（继承基类 + 元数据字段）──

@@ -163,11 +163,16 @@ def build_message_list(
     if not character:
         raise ValueError(f"角色不存在: {conversation.character_id}")
 
-    # 按 PROMPT_FIELDS 从 ORM 提取（单一映射深模块，C5 架构评审）
-    char_data = CharacterData(**{
-        field: getattr(character, field, "") or ""
-        for field in PROMPT_FIELDS
-    })
+    # 按 PROMPT_FIELDS 从 ORM 提取（单一映射深模块，C5 架构评审）；
+    # prompt_mode / expert_prompt 为 PD-5 项目自有字段，不进 PROMPT_FIELDS，此处显式补
+    char_data = CharacterData(
+        **{
+            field: getattr(character, field, "") or ""
+            for field in PROMPT_FIELDS
+        },
+        prompt_mode=getattr(character, "prompt_mode", "") or "simple",
+        expert_prompt=getattr(character, "expert_prompt", "") or "",
+    )
     if history is None:
         history = get_messages(db, conversation.id)
 

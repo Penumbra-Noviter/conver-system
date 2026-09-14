@@ -34,6 +34,8 @@ class CharacterData:
         scenario: 场景设定（组装为 [场景设定]\\n... 的 system 消息）
         mes_example: 对话范例（few-shot，<START> 分隔多轮）
         post_history_instructions: 历史后指令（历史之后、当前输入之前）
+        prompt_mode: 组装模式（simple=结构化组装；expert=整段 expert_prompt 替代）
+        expert_prompt: 专家模式整段 system prompt（仅 prompt_mode='expert' 且非空时生效）
     """
     name: str
     system_prompt: str = ""
@@ -41,6 +43,8 @@ class CharacterData:
     scenario: str = ""
     mes_example: str = ""
     post_history_instructions: str = ""
+    prompt_mode: str = "simple"
+    expert_prompt: str = ""
 
 
 def apply_template_vars(text: str, user_name: str = "User", char_name: str = "Character") -> str:
@@ -153,23 +157,37 @@ def build_messages(
     world_after = [c for c in (world.get("after_char") or []) if c and c.strip()]
     world_knowledge = [c for c in (world.get("system") or []) if c and c.strip()]
 
+    # 专家模式分流（PD-5）：expert 且 expert_prompt 非空 → system 区单条，
+    # 替代步骤 1（system_prompt/personality）、步骤 2（scenario）、步骤 5（PHI）
+    expert = (
+        character.prompt_mode == "expert"
+        and bool(character.expert_prompt and character.expert_prompt.strip())
+    )
+
     messages: list[dict[str, str]] = []
 
     # 0. before_char 注入块（世界书）：角色 system prompt 之前，最高优先级上下文
     for content in world_before:
         messages.append({"role": "system", "content": content})
 
-    # 1. system prompt（优先使用 system_prompt 字段，其次 personality）
-    system_content = character.system_prompt or character.personality
-    messages.append({
-        "role": "system",
-        "content": apply_template_vars(system_content, user_name, char_name),
-    })
+    if expert:
+        # 专家模式：单条 system（expert_prompt），仅替代角色静态字段，世界书/范例/历史/user 照旧
+        messages.append({
+            "role": "system",
+            "content": apply_template_vars(character.expert_prompt, user_name, char_name),
+        })
+    else:
+        # 1. system prompt（优先使用 system_prompt 字段，其次 personality）
+        system_content = character.system_prompt or character.personality
+        messages.append({
+            "role": "system",
+            "content": apply_template_vars(system_content, user_name, char_name),
+        })
 
-    # 2. 场景设定（scenario）— 附加在 system prompt 后，作为补充上下文
-    if character.scenario:
-        scenario = apply_template_vars(character.scenario, user_name, char_name)
-        messages.append({"role": "system", "content": f"[场景设定]\n{scenario}"})
+        # 2. 场景设定（scenario）— 附加在 system prompt 后，作为补充上下文
+        if character.scenario:
+            scenario = apply_template_vars(character.scenario, user_name, char_name)
+            messages.append({"role": "system", "content": f"[场景设定]\n{scenario}"})
 
     # 2.5 after_char 注入块（世界书）：场景设定之后
     for content in world_after:
@@ -195,7 +213,8 @@ def build_messages(
         messages.append({"role": role_str(msg.role), "content": msg.content})
 
     # 5. 历史后指令（post_history_instructions）— 附加在历史消息之后、当前输入之前
-    if character.post_history_instructions:
+    # （expert 模式下被 expert_prompt 单条 system 替代，不注入独立 PHI）
+    if not expert and character.post_history_instructions:
         phi = apply_template_vars(character.post_history_instructions, user_name, char_name)
         messages.append({"role": "system", "content": phi})
 
