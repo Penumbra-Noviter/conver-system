@@ -5,8 +5,8 @@
 /// - POST `{base}/v1/messages`；`x-api-key` + `anthropic-version: 2023-06-01`
 ///   头（官方必需）；system 作顶层参数；`content_block_delta` 的 `text_delta`
 ///   逐 token 产出；`message_stop` 为终态；`ping` 忽略；`error` 事件抛错终止。
-/// - **temperature 不透传**（R8 定案：Anthropic 官方已弃用 temperature，
-///   Opus 4.6 后非 1.0 值 → HTTP 400），请求体不携带该键。
+/// - **temperature 接收但忽略**（U-2 更新 R8 定案：Anthropic 官方已弃用
+///   temperature，Opus 4.6 后非 1.0 值 → HTTP 400），请求体不携带该键。
 /// - 401/429/408/504 → Auth / RateLimit / Timeout；400 content_filter →
 ///   ContentFilter；连接失败 → LLM 族兜底；流中途断连（EOF 未到终态 / 连接重置）
 ///   → 可区分的 [LLMConnectionInterruptedError]（供 T03 断流处理）。
@@ -76,7 +76,9 @@ class ClaudeProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) {
+    // U-2：temperature 接收但忽略（Anthropic 已弃用该键，请求体不携带）。
     return runTranslated(() async {
       final body = _buildBody(messages, maxTokens: maxTokens, model: model);
       final response = await _dio.post(
@@ -93,6 +95,7 @@ class ClaudeProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     try {
       // 注意不用 yield*：Dart 语义下 yield* 将内层流错误直接转发到外层流，
@@ -132,7 +135,7 @@ class ClaudeProvider extends LLMProvider {
     );
   }
 
-  /// 组装 Messages API 请求体；temperature 不透传（R8），不携带该键。
+  /// 组装 Messages API 请求体；temperature 接收但忽略（U-2），不携带该键。
   Map<String, dynamic> _buildBody(
     List<LlmMessage> messages, {
     required int maxTokens,

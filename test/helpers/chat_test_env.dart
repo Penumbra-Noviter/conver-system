@@ -36,6 +36,9 @@ class FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => values['user_name'] ?? '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// 聊天 widget 测试环境：内存库 + 四仓储 + InMemorySecretStore + 装配函数。

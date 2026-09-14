@@ -83,6 +83,7 @@ class ScriptedFakeLLMProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     callCount++;
     lastMessages = messages;
@@ -104,6 +105,7 @@ class ScriptedFakeLLMProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) {
     throw UnimplementedError('生成路径不使用流式接口');
   }

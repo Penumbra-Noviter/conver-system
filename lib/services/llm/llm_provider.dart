@@ -153,19 +153,24 @@ abstract class LLMProvider {
 
   /// 非流式生成完整回复。
   ///
-  /// 注：R8 定案不透传 temperature（Claude 官方已弃用，非 1.0 值 → HTTP 400），
-  /// 本抽象层据此不设 temperature 参数，T02 wire 层无需透传。
+  /// [temperature] 采样温度，缺省 0.7（对齐桌面 `BaseLLM.generate` 签名，
+  /// U-2 更新：原 R8「不透传 temperature」定案仅对 Claude 成立）。OpenAI 透传
+  /// 进请求体；Claude 接收但忽略（Anthropic 已弃用该键）。
   Future<String> generate({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   });
 
   /// 流式生成，逐 token 产出。
+  ///
+  /// [temperature] 语义同 [generate]（OpenAI 透传、Claude 忽略）。
   Stream<String> streamGenerate({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   });
 
   /// 测试 API 连接是否可用（校验 Key 有效性与网络可达性）。

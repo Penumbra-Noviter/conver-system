@@ -48,6 +48,9 @@ class _FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// ChatRound 测试环境载体：回合 + 共享 notice 槽 + 注入回调观测（reload 次数
@@ -87,6 +90,7 @@ class _ContentThenZeroInterruptProvider extends TickingFakeLLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     _streamCalls++;
     streamGenerateCallCount++;
@@ -103,6 +107,7 @@ class _ContentThenZeroInterruptProvider extends TickingFakeLLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -134,6 +139,7 @@ class _GatedInterruptRetryProvider extends TickingFakeLLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;

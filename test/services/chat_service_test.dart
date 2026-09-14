@@ -48,6 +48,9 @@ class FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => values['user_name'] ?? '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// [LLMProviderFactory] 的内存假实现：记录派生入参；`unsupported` 触发
@@ -119,6 +122,7 @@ class _TickingProvider extends LLMProvider {
   List<LlmMessage>? lastMessages;
   int? lastMaxTokens;
   String? lastModel;
+  double? lastTemperature;
 
   @override
   LLMError translateError(Object error) =>
@@ -129,11 +133,13 @@ class _TickingProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     lastMessages = messages;
     lastMaxTokens = maxTokens;
     lastModel = model;
+    lastTemperature = temperature;
     final e = errorAfter;
     if (e != null) {
       throw e;
@@ -146,11 +152,13 @@ class _TickingProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     streamGenerateCallCount++;
     lastMessages = messages;
     lastMaxTokens = maxTokens;
     lastModel = model;
+    lastTemperature = temperature;
     for (final token in _tokens) {
       await Future<void>.delayed(delay);
       yield token;
@@ -191,6 +199,7 @@ class _StalledProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async =>
       _tokens.join();
 
@@ -199,6 +208,7 @@ class _StalledProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     for (final token in _tokens) {
       yield token;
@@ -241,6 +251,7 @@ class _CancelErrorProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async =>
       ''; // F-55 测试仅走流式路径。
 
@@ -249,6 +260,7 @@ class _CancelErrorProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) =>
       _events.stream;
 
@@ -297,6 +309,7 @@ class _FaultSequenceProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async =>
       _tokens.join();
 
@@ -305,6 +318,7 @@ class _FaultSequenceProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     final now = _clock.elapsed;
     if (_lastCallAt != Duration.zero) {
@@ -392,6 +406,7 @@ class _HoldableProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async {
     generateCallCount++;
     if (!started.isCompleted) {
@@ -406,6 +421,7 @@ class _HoldableProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) async* {
     throw StateError('F1/F4 测试不走流式路径');
   }
@@ -477,6 +493,7 @@ void main() {
     String scenario = '',
     String mesExample = '',
     String postHistoryInstructions = '',
+    double? temperature,
   }) {
     return charRepo.createCharacter(
       CharactersCompanion.insert(
@@ -487,6 +504,9 @@ void main() {
         scenario: Value(scenario),
         mesExample: Value(mesExample),
         postHistoryInstructions: Value(postHistoryInstructions),
+        temperature: temperature == null
+            ? const Value.absent()
+            : Value(temperature),
         createdAt: fakeNow,
         updatedAt: fakeNow,
       ),
@@ -752,6 +772,56 @@ void main() {
       ];
       expect(historyRoles, hasLength(1));
       expect(provider.lastMaxTokens, 2048);
+    });
+
+    test('A2: autoGreeting 开场白注入 extraVars（工单 04）', () async {
+      await settingsRepo.setMany({'template_vars': '{"city":"长安"}'});
+      final char = await seedCharacter(name: '影');
+      final conv = await seedConversation(char.id);
+      expect(await messagesOf(conv.id), isEmpty);
+
+      await charRepo.updateCharacter(
+        char.id,
+        const CharactersCompanion(firstMes: Value('{{user}}，我在{{city}}的{{char}}等你。')),
+      );
+
+      wireService(FakeLLMProvider(tokens: const ['回应']));
+      await service
+          .streamReply(conversationId: conv.id, content: '来了')
+          .toList();
+
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, 'User，我在长安的影等你。'),
+        (Role.user, '来了'),
+        (Role.assistant, '回应'),
+      ]);
+    });
+
+    test('A2: 组装经 extraVars 注入 system/scenario/phi/userContent（工单 04）',
+        () async {
+      await settingsRepo.setMany({'template_vars': '{"city":"长安"}'});
+      final char = await seedCharacter(
+        name: '艾莉亚',
+        personality: '{{char}}住在{{city}}',
+        scenario: '在{{city}}相遇',
+        postHistoryInstructions: '提到{{city}}',
+      );
+      final conv = await seedConversation(char.id);
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '去{{city}}')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      expect(sent[0],
+          const LlmMessage(role: 'system', content: '艾莉亚住在长安'));
+      expect(sent[1],
+          const LlmMessage(role: 'system', content: '[场景设定]\n在长安相遇'));
+      expect(sent[sent.length - 2],
+          const LlmMessage(role: 'system', content: '提到长安'));
+      expect(sent.last, const LlmMessage(role: 'user', content: '去长安'));
     });
 
     test('A2: 零 token 空流不落库（done messageId 为 null）', () async {
@@ -1126,6 +1196,89 @@ void main() {
         (Role.user, 'hi'),
         (Role.assistant, '回复'),
       ]);
+    });
+  });
+
+  // ── U-2 温度组装 / max_tokens 透传（工单 03）──
+
+  group('streamReply · 生成参数组装（U-2，工单 03）', () {
+    test('角色默认 0.7 + 全局未设 → provider 收到 0.7 / 2048', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      final provider = _TickingProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.lastTemperature, 0.7);
+      expect(provider.lastMaxTokens, 2048);
+    });
+
+    test('角色非 0.7 时全局不生效（角色温度为主）', () async {
+      final char = await seedCharacter(temperature: 1.2);
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'temperature': '0.9'});
+
+      final provider = _TickingProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.lastTemperature, 1.2, reason: '角色 1.2 覆盖全局 0.9');
+    });
+
+    test('角色 0.7 时全局生效（判定为未覆盖 → 兜底全局值）', () async {
+      final char = await seedCharacter(); // temperature 取 DB 默认 0.7
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'temperature': '0.9'});
+
+      final provider = _TickingProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.lastTemperature, 0.9, reason: '角色 0.7 视为未覆盖 → 全局 0.9');
+    });
+
+    test('max_tokens 全局 4096 → provider 收到 4096', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'max_tokens': '4096'});
+
+      final provider = _TickingProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: 'hi')
+          .toList();
+
+      expect(provider.lastMaxTokens, 4096);
+    });
+
+    test('regenerate 透传 temperature + max_tokens', () async {
+      final char = await seedCharacter(temperature: 1.3);
+      final conv = await seedConversation(char.id);
+      await settingsRepo.setMany({'max_tokens': '8192'});
+      await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.user,
+        content: '你好',
+      );
+      await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '旧回复',
+      );
+
+      final provider = _TickingProvider(tokens: const ['新回复']);
+      wireService(provider);
+      await service.regenerate(conversationId: conv.id);
+
+      expect(provider.lastTemperature, 1.3);
+      expect(provider.lastMaxTokens, 8192);
     });
   });
 

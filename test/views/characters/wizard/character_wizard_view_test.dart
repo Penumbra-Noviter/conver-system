@@ -58,6 +58,9 @@ class FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => values['user_name'] ?? '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// 本文件的装配基座：内存 drift + 角色仓储（向导保存落库用）。

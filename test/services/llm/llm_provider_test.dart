@@ -35,6 +35,7 @@ class _ThrowingProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) =>
       throw UnimplementedError();
 
@@ -43,6 +44,7 @@ class _ThrowingProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) =>
       throw UnimplementedError();
 
@@ -72,6 +74,7 @@ class _DefaultChainProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) =>
       throw UnimplementedError();
 
@@ -80,6 +83,7 @@ class _DefaultChainProvider extends LLMProvider {
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
+    double temperature = 0.7,
   }) =>
       throw UnimplementedError();
 }

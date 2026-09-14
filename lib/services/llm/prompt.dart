@@ -73,10 +73,13 @@ class HistoryMessage {
 /// - 消息内容中的 `{{user}}` / `{{char}}` 模板变量一并替换。
 ///
 /// [userName] / [charName] 缺省为 `User` / `Character`（与桌面签名一致）。
+/// [extraVars] 为用户自定义注入变量（工单 04 / spec §U-3，mobile 新增），
+/// 消息内容中的 `{{key}}` 一并替换。
 List<PromptMessage> parseMesExample(
   String mesExample, {
   String userName = 'User',
   String charName = 'Character',
+  Map<String, String> extraVars = const {},
 }) {
   if (mesExample.isEmpty || mesExample.trim().isEmpty) {
     return const [];
@@ -100,7 +103,7 @@ List<PromptMessage> parseMesExample(
           messages.add((
             role: 'user',
             content: applyTemplateVars(content,
-                userName: userName, charName: charName),
+                userName: userName, charName: charName, extraVars: extraVars),
           ));
         }
       } else if (line.startsWith('{{char}}')) {
@@ -109,7 +112,7 @@ List<PromptMessage> parseMesExample(
           messages.add((
             role: 'assistant',
             content: applyTemplateVars(content,
-                userName: userName, charName: charName),
+                userName: userName, charName: charName, extraVars: extraVars),
           ));
         }
       }
@@ -144,6 +147,7 @@ List<PromptMessage> buildMessages(
   int maxRounds = 30,
   String userName = 'User',
   bool appendCurrentInput = true,
+  Map<String, String> extraVars = const {},
 }) {
   // 空角色名回退 'Character'。
   final charName = character.name.isEmpty ? 'Character' : character.name;
@@ -159,6 +163,7 @@ List<PromptMessage> buildMessages(
         systemContent,
         userName: userName,
         charName: charName,
+        extraVars: extraVars,
       ),
     ),
   ];
@@ -169,6 +174,7 @@ List<PromptMessage> buildMessages(
       character.scenario,
       userName: userName,
       charName: charName,
+      extraVars: extraVars,
     );
     messages.add((role: 'system', content: '[场景设定]\n$scenario'));
   }
@@ -180,6 +186,7 @@ List<PromptMessage> buildMessages(
         character.mesExample,
         userName: userName,
         charName: charName,
+        extraVars: extraVars,
       ),
     );
   }
@@ -200,6 +207,7 @@ List<PromptMessage> buildMessages(
       character.postHistoryInstructions,
       userName: userName,
       charName: charName,
+      extraVars: extraVars,
     );
     messages.add((role: 'system', content: phi));
   }
@@ -210,6 +218,7 @@ List<PromptMessage> buildMessages(
       userContent,
       userName: userName,
       charName: charName,
+      extraVars: extraVars,
     );
     messages.add((role: 'user', content: content));
   } else {

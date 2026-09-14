@@ -37,8 +37,8 @@ void main() {
     return {for (final row in rows) row.key: row.value};
   }
 
-  group('A1 白名单键集（G5）', () {
-    test('与桌面 ALLOWED_KEYS 十键逐字相等', () {
+  group('A1 白名单键集（G5 + 工单 03/04/05）', () {
+    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 四 mobile 先行键', () {
       expect(
         SettingsRepository.allowedKeys,
         equals(<String>{
@@ -52,6 +52,10 @@ void main() {
           'sliding_window_rounds',
           'theme_mode',
           'user_name',
+          'temperature',
+          'max_tokens',
+          'template_vars',
+          'onboarding_completed',
         }),
       );
     });
@@ -157,6 +161,98 @@ void main() {
       });
       expect(await repository.defaultProvider, 'deepseek');
       expect(await repository.defaultModel, 'deepseek-v4-pro');
+    });
+  });
+
+  group('U-2 temperature / max_tokens 类型化读取（工单 03）', () {
+    test('getTemperature 缺省 0.7；写入后读回；空串回退缺省', () async {
+      expect(await repository.getTemperature(), 0.7);
+      await repository.setMany({'temperature': '1.3'});
+      expect(await repository.getTemperature(), 1.3);
+      await repository.setMany({'temperature': ''});
+      expect(await repository.getTemperature(), 0.7);
+    });
+
+    test('getTemperature 非数字回退缺省；越界 clamp 到 [0, 2]', () async {
+      await repository.setMany({'temperature': 'abc'});
+      expect(await repository.getTemperature(), 0.7);
+
+      await repository.setMany({'temperature': '-1.5'});
+      expect(await repository.getTemperature(), 0.0);
+
+      await repository.setMany({'temperature': '9.9'});
+      expect(await repository.getTemperature(), 2.0);
+    });
+
+    test('getMaxTokens 缺省 2048；数字往返；非数字回退缺省', () async {
+      expect(await repository.getMaxTokens(), 2048);
+      await repository.setMany({'max_tokens': '4096'});
+      expect(await repository.getMaxTokens(), 4096);
+      await repository.setMany({'max_tokens': 'xyz'});
+      expect(await repository.getMaxTokens(), 2048);
+    });
+
+    test('temperature / max_tokens 白名单内：setMany 可写、getAll 可读', () async {
+      await repository.setMany({'temperature': '1.2', 'max_tokens': '8192'});
+      expect(await repository.getAll(), {
+        'temperature': '1.2',
+        'max_tokens': '8192',
+      });
+    });
+  });
+
+  group('U-3 templateVars JSON 读写（工单 04）', () {
+    test('缺省空 map（无配置）', () async {
+      expect(await repository.templateVars, isEmpty);
+    });
+
+    test('写入 JSON 后读回（往返一致）', () async {
+      await repository.setMany({
+        'template_vars': '{"city":"长安","place":"月牙泉"}',
+      });
+      expect(await repository.templateVars, {
+        'city': '长安',
+        'place': '月牙泉',
+      });
+    });
+
+    test('非法 JSON 回退空 map', () async {
+      await repository.setMany({'template_vars': 'not-json{{{'});
+      expect(await repository.templateVars, isEmpty);
+    });
+
+    test('JSON 非对象（数组）回退空 map', () async {
+      await repository.setMany({'template_vars': '[1,2]'});
+      expect(await repository.templateVars, isEmpty);
+    });
+
+    test('JSON 值非字符串的条目被过滤', () async {
+      await repository.setMany({
+        'template_vars': '{"city":"长安","count":3,"ok":true}',
+      });
+      expect(await repository.templateVars, {'city': '长安'});
+    });
+
+    test('template_vars 白名单内：setMany 可写、getAll 可读', () async {
+      await repository.setMany({'template_vars': '{"a":"b"}'});
+      expect(await repository.getAll(), {'template_vars': '{"a":"b"}'});
+    });
+  });
+
+  group('U-4 onboarding_completed 读写（工单 05）', () {
+    test('白名单内：setMany 可写、getValue 读回一致、getAll 可读', () async {
+      await repository.setMany({'onboarding_completed': 'true'});
+      expect(await repository.getValue('onboarding_completed'), 'true');
+      expect(await repository.getAll(), {'onboarding_completed': 'true'});
+    });
+
+    test('缺失回退空串（isCompleted 判「未完成」的仓储侧契约）', () async {
+      expect(await repository.getValue('onboarding_completed'), '');
+    });
+
+    test('空串值行读回空串（与缺失同判「未完成」）', () async {
+      await repository.setMany({'onboarding_completed': ''});
+      expect(await repository.getValue('onboarding_completed'), '');
     });
   });
 

@@ -4,6 +4,7 @@ import 'package:conver_system_mobile/data/database/tables.dart' show Role;
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
+import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/theme/colors.dart' show ConverColors;
 import 'package:conver_system_mobile/view_models/shell_navigation.dart';
 import 'package:conver_system_mobile/views/characters/characters_view.dart';
@@ -18,6 +19,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import '../helpers/in_memory_secret_store.dart';
+
 /// [SettingsReader] 的内存假实现（ConversationRepository 装配用）。
 class _FakeSettingsReader implements SettingsReader {
   const _FakeSettingsReader();
@@ -30,7 +33,15 @@ class _FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
+
+/// 预写 `onboarding_completed` 标记，使启动门直接进 [HomeShell]（工单 05）。
+Future<void> _markOnboardingCompleted(AppDatabase db) =>
+    SettingsRepository(database: db, secretStore: InMemorySecretStore())
+        .setMany({'onboarding_completed': 'true'});
 
 ShellNavigation _navigationOf(WidgetTester tester) =>
     tester.element(find.byType(NavigationBar)).read<ShellNavigation>();
@@ -42,7 +53,10 @@ Finder _navLabel(String label) => find.descendant(
 
 void main() {
   Future<void> pumpApp(WidgetTester tester) async {
-    await tester.pumpWidget(const ConverApp());
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _markOnboardingCompleted(db);
+    await tester.pumpWidget(ConverApp(database: db));
     await tester.pumpAndSettle();
   }
 
@@ -162,6 +176,7 @@ void main() {
         role: Role.user,
         content: '今晚的星空很美',
       );
+      await _markOnboardingCompleted(db);
       await tester.pumpWidget(ConverApp(database: db));
       await tester.pumpAndSettle();
 
@@ -211,6 +226,7 @@ void main() {
         role: Role.user,
         content: '今晚的星空很美',
       );
+      await _markOnboardingCompleted(db);
       await tester.pumpWidget(ConverApp(database: db));
       await tester.pumpAndSettle();
 

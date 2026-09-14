@@ -49,6 +49,9 @@ class FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => values['user_name'] ?? '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 /// createConversation 必抛的会话仓储子类——命中「新建对话落库失败」路径。

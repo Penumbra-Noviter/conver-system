@@ -7,10 +7,11 @@
 /// `_generate_with_retry` 编排含 3a 非字符串防御分支）。
 ///
 /// 与桌面的形态差异（语义等价）：
-/// - **temperature 不透传（U6 敏感面）**：移动端 `LLMProvider.generate` 无
-///   temperature 参数（M2 R8 既有决策），生成全程单温度由 provider 自身口径
-///   决定，重试收敛靠「校验错误 + 修正建议」折回 prompt 而非降温（记入 spec
-///   §4.2 决策 9 与 grilling-consensus D4）；
+/// - **temperature 用默认 0.7（U-2 更新 R8）**：移动端 `LLMProvider.generate`
+///   现具备 temperature 参数（U-2 补入，OpenAI 透传 / Claude 忽略），生成路径
+///   调用零改动（不显式传 temperature，取默认 0.7），单温度由 provider 口径决定，
+///   重试收敛靠「校验错误 + 修正建议」折回 prompt 而非降温（记入 spec §4.2
+///   决策 9 与 grilling-consensus D4）；
 /// - **强类型非字符串防御**：桌面 reply 为动态值经 `isinstance(reply, str)`
 ///   判定；移动端 `LLMProvider.generate` 强类型返回 `Future<String>`，为忠实
 ///   桌面 3a 防御分支（LLM 返回非字符串 → 计一次失败重试/耗尽返回结构化错误），

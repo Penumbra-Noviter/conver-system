@@ -768,6 +768,9 @@ class _FakeSettingsReader implements SettingsReader {
 
   @override
   Future<String> get userName async => '';
+
+  @override
+  Future<Map<String, String>> get templateVars async => const {};
 }
 
 class _ManifestFake {

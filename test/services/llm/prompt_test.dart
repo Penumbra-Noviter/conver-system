@@ -535,4 +535,48 @@ void main() {
           reason: '触发 user 之后不得残留任何 system');
     });
   });
+
+  // ── 9. extraVars 透传（工单 04 / spec §U-3）──
+
+  group('TestExtraVars', () {
+    test('buildMessages 透传 extraVars 到 system/scenario/phi/userContent', () {
+      final msgs = buildMessages(
+        _char(
+          systemPrompt: '你是{{role}}',
+          scenario: '在{{city}}',
+          postHistoryInstructions: '保持{{mood}}',
+        ),
+        userContent: '{{user}}去{{city}}',
+        userName: '小明',
+        extraVars: {'role': '向导', 'city': '长安', 'mood': '冷静'},
+      );
+      expect(msgs[0], (role: 'system', content: '你是向导'));
+      expect(msgs[1], (role: 'system', content: '[场景设定]\n在长安'));
+      expect(msgs[msgs.length - 2], (role: 'system', content: '保持冷静'));
+      expect(msgs.last, (role: 'user', content: '小明去长安'));
+    });
+
+    test('parseMesExample 透传 extraVars 到消息内容', () {
+      final msgs = parseMesExample(
+        '{{user}}: 我来自{{city}}\n{{char}}: 欢迎来到{{city}}',
+        userName: '小明',
+        charName: '艾莉',
+        extraVars: {'city': '长安'},
+      );
+      expect(msgs, [
+        (role: 'user', content: '我来自长安'),
+        (role: 'assistant', content: '欢迎来到长安'),
+      ]);
+    });
+
+    test('buildMessages 内 mesExample 经 extraVars 替换', () {
+      final msgs = buildMessages(
+        _char(mesExample: '<START>\n{{user}}: 去{{city}}\n{{char}}: 到了{{city}}'),
+        userName: '小明',
+        extraVars: {'city': '长安'},
+      );
+      expect(msgs[1], (role: 'user', content: '去长安'));
+      expect(msgs[2], (role: 'assistant', content: '到了长安'));
+    });
+  });
 }
