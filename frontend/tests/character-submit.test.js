@@ -117,19 +117,20 @@ describe('tagsToComma — 标签数组转逗号字符串（splitTags 逆操作�
     });
 });
 
-describe('buildCharacterPayload — 15 字段集 + 空值语义', () => {
-    it('钉 15 字段集合（字段名逐字）', () => {
+describe('buildCharacterPayload — 16 字段集 + 空值语义', () => {
+    it('钉 16 字段集合（字段名逐字）', () => {
         const payload = buildCharacterPayload({
             name: 'A', description: 'd', personality: 'p', first_mes: 'f',
             scenario: 's', mes_example: 'm', system_prompt: 'sp',
             temperature: '1.5', top_p: 0.9, presence_penalty: 0.5,
             frequency_penalty: -0.3, max_tokens: 4096,
             avatar: 'http://x/a.png', creator: 'me', tags: ['t1'],
+            alternate_greetings: ['备一'],
         });
         expect(Object.keys(payload).sort()).toEqual([
-            'avatar', 'creator', 'description', 'first_mes', 'frequency_penalty',
-            'max_tokens', 'mes_example', 'name', 'personality', 'presence_penalty',
-            'scenario', 'system_prompt', 'tags', 'temperature', 'top_p',
+            'alternate_greetings', 'avatar', 'creator', 'description', 'first_mes',
+            'frequency_penalty', 'max_tokens', 'mes_example', 'name', 'personality',
+            'presence_penalty', 'scenario', 'system_prompt', 'tags', 'temperature', 'top_p',
         ].sort());
     });
 
@@ -172,9 +173,9 @@ describe('buildCharacterPayload — 15 字段集 + 空值语义', () => {
         expect(buildCharacterPayload({ max_tokens: '8192' }).max_tokens).toBe(8192);
     });
 
-    it('空参数对象 → 15 字段全默认（不抛错）', () => {
+    it('空参数对象 → 16 字段全默认（不抛错）', () => {
         const payload = buildCharacterPayload();
-        expect(Object.keys(payload)).toHaveLength(15);
+        expect(Object.keys(payload)).toHaveLength(16);
     });
 });
 
@@ -289,7 +290,7 @@ describe('组件级：form 提交请求体（真实 modal.js + fetch 捕获）',
             scenario: '场景', mes_example: '范例', system_prompt: '提示',
             temperature: 1.25, top_p: 1, presence_penalty: 0, frequency_penalty: 0,
             max_tokens: null, avatar: 'http://x/a.png', creator: '作者',
-            tags: ['甲', '乙', '丙'],
+            tags: ['甲', '乙', '丙'], alternate_greetings: [],
         });
     });
 
@@ -314,7 +315,7 @@ describe('组件级：form 提交请求体（真实 modal.js + fetch 捕获）',
         expect(calls[0].body.avatar).toBeNull();
         expect(calls[0].body.creator).toBe('');
         expect(calls[0].body.temperature).toBe(0.7);
-        expect(Object.keys(calls[0].body)).toHaveLength(15);
+        expect(Object.keys(calls[0].body)).toHaveLength(16);
     });
 });
 
@@ -366,7 +367,7 @@ describe('组件级：wizard 保存请求体（恒 create，creator 恒空）', 
             scenario: '场景', mes_example: '范例', system_prompt: '提示',
             temperature: 0.7, top_p: 1, presence_penalty: 0, frequency_penalty: 0,
             max_tokens: null, avatar: 'http://x/a.png', creator: '',
-            tags: ['冒险', '奇幻'],
+            tags: ['冒险', '奇幻'], alternate_greetings: [],
         });
     });
 });

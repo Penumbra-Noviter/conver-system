@@ -111,7 +111,67 @@ export function avatarPreviewHtml(src) {
 export const NAME_REQUIRED_MESSAGE = '角色名称不能为空';
 
 /**
- * 从显式字段对象构造 11 字段角色 payload（API 请求体契约）
+ * 备用开场白数量上限（对齐对标站 ≤10，PD-2）
+ */
+export const MAX_ALTERNATE_GREETINGS = 10;
+
+/**
+ * 归一化备用开场白列表（编辑面板回填 / 防脏数据）
+ *
+ * 逐项 trim → 过滤空项 → 去重（保持首次出现顺序）→ 截断至上限
+ * MAX_ALTERNATE_GREETINGS。非数组输入 → []（与 tags 归一化一致）。
+ * @param {Array<string>|null|undefined} list - 备用开场白列表
+ * @returns {string[]} 归一化后的列表（长度 ≤ 上限）
+ */
+export function normalizeAlternateGreetings(list) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const raw of list) {
+        if (out.length >= MAX_ALTERNATE_GREETINGS) break;
+        const text = typeof raw === 'string' ? raw.trim() : '';
+        if (!text || seen.has(text)) continue;
+        seen.add(text);
+        out.push(text);
+    }
+    return out;
+}
+
+/**
+ * 尝试向备用开场白列表追加一条（表单/向导共用单一来源）
+ *
+ * trim 后为空 / 与既有项重复 / 已达上限 → 返回归一化后的当前列表（不追加）；
+ * 成功 → 返回追加后的新数组（长度 ≤ 上限）。非数组输入视作 []。
+ * @param {Array<string>|null|undefined} list - 当前列表
+ * @param {string} value - 待添加文本
+ * @returns {string[]} 追加后的列表（不可变，失败时返回当前列表副本）
+ */
+export function addAlternateGreeting(list, value) {
+    const current = normalizeAlternateGreetings(list);
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text || current.length >= MAX_ALTERNATE_GREETINGS || current.includes(text)) {
+        return current;
+    }
+    return [...current, text];
+}
+
+/**
+ * 备用开场白行 HTML（表单/向导共用单一来源，消除两处模板重复）
+ * @param {Array<string>|null|undefined} list - 备用开场白数组
+ * @returns {string} 行 HTML（空/非数组 → ''）
+ */
+export function alternateGreetingRowsHtml(list) {
+    if (!Array.isArray(list)) return '';
+    return list.map((g) => `
+        <div class="alt-greeting-row">
+            <input type="text" class="alt-greeting-input" value="${escapeHtml(g)}">
+            <button type="button" class="btn-icon alt-greeting-remove" title="删除备用开场白">${iconHtml('x', { size: 14 })}</button>
+        </div>
+    `).join('');
+}
+
+/**
+ * 从显式字段对象构造 16 字段角色 payload（API 请求体契约）
  *
  * 空值语义（与现状逐字一致）：`avatar` 空/falsy → null；`creator` 缺省 → 空串；
  * `temperature` 归一为数值（缺省 0.7）；`name/description/personality/first_mes/
@@ -142,6 +202,7 @@ export function buildCharacterPayload(fields = {}) {
         avatar: fields.avatar || null,
         creator: fields.creator ?? '',
         tags: Array.isArray(fields.tags) ? fields.tags : [],
+        alternate_greetings: Array.isArray(fields.alternate_greetings) ? fields.alternate_greetings : [],
     };
 }
 
@@ -190,6 +251,7 @@ export function failSubmit(btn, statusEl, err, restoreLabel) {
 
 export const __all__ = [
     'splitTags', 'tagsToComma', 'TEMP_SLIDER', 'SAMPLING_SLIDERS', 'formatTemperature',
-    'formatSampling', 'avatarPreviewHtml', 'NAME_REQUIRED_MESSAGE', 'buildCharacterPayload',
-    'beginSubmit', 'succeedSubmit', 'failSubmit',
+    'formatSampling', 'avatarPreviewHtml', 'NAME_REQUIRED_MESSAGE', 'MAX_ALTERNATE_GREETINGS',
+    'normalizeAlternateGreetings', 'addAlternateGreeting', 'alternateGreetingRowsHtml',
+    'buildCharacterPayload', 'beginSubmit', 'succeedSubmit', 'failSubmit',
 ];
