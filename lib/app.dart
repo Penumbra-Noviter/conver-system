@@ -16,6 +16,7 @@ import 'services/conversation_export_service.dart';
 import 'services/document_parse_service.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
+import 'services/onboarding.dart';
 import 'services/secure_store.dart';
 import 'services/simulator/game_generator.dart';
 import 'services/simulator/seed_service.dart';
@@ -29,6 +30,7 @@ import 'view_models/theme_controller.dart';
 import 'views/characters/characters_controller.dart';
 import 'views/chat/chat_controller.dart';
 import 'views/home_shell.dart';
+import 'views/onboarding/onboarding_page.dart';
 
 /// 应用根组件（入口层）：provider 装配 + MaterialApp 双主题响应式注入。
 ///
@@ -223,7 +225,9 @@ class ConverApp extends StatelessWidget {
               theme: ConverTheme.light(),
               darkTheme: ConverTheme.dark(),
               themeMode: themeController.themeMode,
-              home: const HomeShell(),
+              // 工单 05：home 由启动门决定——首启（标记缺失）展示指引页，
+              // 已完成/读失败直接进主壳。
+              home: const _StartupGate(),
             ),
           );
         },
@@ -241,5 +245,76 @@ class ConverApp extends StatelessWidget {
     } catch (error) {
       debugPrint('ThemeController.load 失败，保持深色基线: $error');
     }
+  }
+}
+
+/// 首启指引装配门（工单 05 / spec §U-4 高不确定点）。
+///
+/// `MaterialApp.home` 不能 await 异步读标记，故以首帧状态决定：
+/// - `null`（读取中）→ 空 `Scaffold`（占位，避免白闪）；
+/// - `true`（已完成或读失败）→ [HomeShell]；
+/// - `false`（未完成）→ [OnboardingPage]。
+///
+/// 读失败按「保持不展示指引」（避免首启卡死）处理；完成/跳过走**状态翻转**
+/// （`setState` 切 home）而非 `Navigator.pushReplacement`——装配层单源，无导航栈
+/// 副作用。落标记经 [OnboardingService]（drift Settings 表单一键）。
+class _StartupGate extends StatefulWidget {
+  const _StartupGate();
+
+  @override
+  State<_StartupGate> createState() => _StartupGateState();
+}
+
+class _StartupGateState extends State<_StartupGate> {
+  /// null = 读取中；true = 已完成；false = 展示指引。
+  bool? _completed;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_completed == null) {
+      unawaited(_resolve());
+    }
+  }
+
+  /// 读 `onboarding_completed` 标记；读失败视为已完成（直接进主界面）。
+  Future<void> _resolve() async {
+    final service = OnboardingService(
+      settings: context.read<SettingsRepository>(),
+    );
+    var completed = true;
+    try {
+      completed = await service.isCompleted();
+    } catch (error) {
+      debugPrint('OnboardingService.isCompleted 失败，直接进入主界面: $error');
+    }
+    if (mounted) {
+      setState(() => _completed = completed);
+    }
+  }
+
+  /// 「跳过」/「开始使用」落点：落标记后切主界面；落标记失败仍放行进入主界面
+  /// （不把用户困在指引页，二次启动会再次展示）。
+  Future<void> _finish() async {
+    final service = OnboardingService(
+      settings: context.read<SettingsRepository>(),
+    );
+    try {
+      await service.markCompleted();
+    } catch (error) {
+      debugPrint('OnboardingService.markCompleted 失败: $error');
+    }
+    if (mounted) {
+      setState(() => _completed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (_completed) {
+      null => const Scaffold(),
+      true => const HomeShell(),
+      false => OnboardingPage(onFinished: _finish),
+    };
   }
 }

@@ -54,9 +54,10 @@ class SettingsRepository implements SettingsReader {
   final AppDatabase _db;
   final SecretStore _secretStore;
 
-  /// 白名单键集 — 与桌面 `setting.py::ALLOWED_KEYS` **十键逐字相等**，外加三
-  /// mobile 先行键 `temperature` / `max_tokens` / `template_vars`（工单 03/04，
-  /// 桌面无此三键——契约漂移显式标注，spec §U-2/U-3「mobile 先行差异」）。
+  /// 白名单键集 — 与桌面 `setting.py::ALLOWED_KEYS` **十键逐字相等**，外加四
+  /// mobile 先行键 `temperature` / `max_tokens` / `template_vars` /
+  /// `onboarding_completed`（工单 03/04/05，桌面无此四键——契约漂移显式标注，
+  /// spec §U-2/U-3/U-4「mobile 先行差异」）。
   ///
   /// 白名单外的写入一律忽略（[setMany]）；白名单内两 api_key 键重定向到
   /// SecretStore 槽位，其余键落设置表。
@@ -74,6 +75,7 @@ class SettingsRepository implements SettingsReader {
     'temperature',
     'max_tokens',
     'template_vars',
+    'onboarding_completed',
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。

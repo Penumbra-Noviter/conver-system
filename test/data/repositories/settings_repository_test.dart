@@ -37,8 +37,8 @@ void main() {
     return {for (final row in rows) row.key: row.value};
   }
 
-  group('A1 白名单键集（G5 + 工单 03/04）', () {
-    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 三 mobile 先行键', () {
+  group('A1 白名单键集（G5 + 工单 03/04/05）', () {
+    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 四 mobile 先行键', () {
       expect(
         SettingsRepository.allowedKeys,
         equals(<String>{
@@ -55,6 +55,7 @@ void main() {
           'temperature',
           'max_tokens',
           'template_vars',
+          'onboarding_completed',
         }),
       );
     });
@@ -235,6 +236,23 @@ void main() {
     test('template_vars 白名单内：setMany 可写、getAll 可读', () async {
       await repository.setMany({'template_vars': '{"a":"b"}'});
       expect(await repository.getAll(), {'template_vars': '{"a":"b"}'});
+    });
+  });
+
+  group('U-4 onboarding_completed 读写（工单 05）', () {
+    test('白名单内：setMany 可写、getValue 读回一致、getAll 可读', () async {
+      await repository.setMany({'onboarding_completed': 'true'});
+      expect(await repository.getValue('onboarding_completed'), 'true');
+      expect(await repository.getAll(), {'onboarding_completed': 'true'});
+    });
+
+    test('缺失回退空串（isCompleted 判「未完成」的仓储侧契约）', () async {
+      expect(await repository.getValue('onboarding_completed'), '');
+    });
+
+    test('空串值行读回空串（与缺失同判「未完成」）', () async {
+      await repository.setMany({'onboarding_completed': ''});
+      expect(await repository.getValue('onboarding_completed'), '');
     });
   });
 
