@@ -241,6 +241,9 @@ export function renderMessages({ messageId } = {}) {
         canRegenerate: true,
         canContinue: true,
         canBranch: true,
+        // 消息级操作（编辑/删除）：渲染消息列表时开启 — 全量已结算气泡（非仅末条）
+        canEdit: true,
+        canDelete: true,
     });
 
     // 复制按钮事件 + 复制数据补写（FE-1 数据通道单一化：复制内容不经 HTML 属性 —
@@ -265,6 +268,17 @@ export function renderMessages({ messageId } = {}) {
     // F-100 分支按钮事件（末条 assistant 气泡；与重生成/继续同组，同一绑定 seam → branchLastReply）
     container.querySelectorAll('.btn-branch').forEach((btn) => {
         btn.addEventListener('click', () => branchLastReply());
+    });
+
+    // 消息级操作按钮事件（工单 03）：经气泡 data-message-id 定位（复用既有 dataset 安全
+    // 读取模式 — messageId 由工厂写入外层 div 的 data-message-id，不裸插值选择器）
+    container.querySelectorAll('.btn-edit-message').forEach((btn) => {
+        const messageId = Number(btn.closest('.message').dataset.messageId);
+        btn.addEventListener('click', () => editMessage(messageId));
+    });
+    container.querySelectorAll('.btn-delete-message').forEach((btn) => {
+        const messageId = Number(btn.closest('.message').dataset.messageId);
+        btn.addEventListener('click', () => deleteMessage(messageId));
     });
 
     // MS-2 候选控制条事件：左右切换 → 乐观更新渲染 → 调 switch-swipe 落库 → 失败回滚
@@ -1042,6 +1056,135 @@ export async function branchLastReply() {
     });
 }
 
+// ── 消息级编辑重发 + 删除单条消息（工单 03 — 与末条 assistant 动作不同，作用于任意消息）──
+
+/**
+ * 弹出消息内容编辑 modal（textarea），返回用户输入的新内容（空/取消 → null）。
+ * 与 promptImageDescription 同型：openModal + onClose 兜底取消 + 提交按钮读 textarea。
+ * @param {string} initialContent - 预填的原消息内容（HTML 转义防 </textarea> 注入）
+ * @returns {Promise<string|null>}
+ */
+function promptMessageEdit(initialContent) {
+    return new Promise((resolve) => {
+        let settled = false;
+        const done = (value) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+        };
+        const body = `<textarea id="edit-message-input" rows="4" placeholder="编辑消息内容…">${escapeHtml(initialContent)}</textarea>`;
+        const actions = `<button class="btn-primary" id="edit-message-submit">保存</button>`;
+        openModal({
+            title: '编辑消息',
+            body,
+            actions,
+            overlayId: 'edit-message-modal',
+            onOpen: () => document.querySelector('#edit-message-input')?.focus(),
+            onClose: () => done(null),
+        });
+        // 提交按钮：读 textarea → 直接移除遮罩（绕过 close 的 cancelResult）
+        document.querySelector('#edit-message-submit')?.addEventListener('click', () => {
+            const value = document.querySelector('#edit-message-input')?.value?.trim() || '';
+            document.querySelector('#edit-message-modal')?.remove();
+            done(value || null);
+        });
+    });
+}
+
+/**
+ * 消息级编辑重发（仅 user — 工单 03）：
+ *   1. 弹出内容编辑 modal（预填原内容）→ 空/取消 no-op
+ *   2. showConfirm（danger，明示「删除该消息之后的所有对话」）二次确认
+ *   3. messages.edit(messageId, content) → 成功经 settleTurn 重载（同 regenerate）
+ *
+ * 失败走既有错误条通道（renderSendError），不写进消息列表（缓存保持原状）。
+ * 防悬挂：只接受发起时捕获的 convId，isActive 按捕获值派生（不读「当前活动」）。
+ * @param {number|string} messageId - 目标 user 消息 id
+ * @returns {Promise<void>}
+ */
+export async function editMessage(messageId) {
+    const tab = getActiveTab();
+    if (!tab || tab.isStreaming) return;
+    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    const current = Array.isArray(tab.messages)
+        ? (tab.messages.find((m) => m && m.id === messageId)?.content ?? '')
+        : '';
+
+    const content = await promptMessageEdit(current);
+    if (content == null) return;
+
+    const confirmed = await showConfirm({
+        title: '编辑并重发',
+        message: '编辑后将删除该消息之后的所有对话，并基于新内容重新生成回复。',
+        confirmText: '编辑并重发',
+        cancelText: '取消',
+        danger: true,
+    });
+    if (!confirmed) return;
+
+    try {
+        const result = await messages.edit(messageId, content);
+        // 成功 — 统一结算入口 settleTurn：从服务端重载编辑后的新时间线（编辑点后续已
+        // 物理截断 + 新 assistant 回复）。messageId = 新 assistant id（ChatResponse）。
+        const revision = getTab(convId)?.messages.length ?? 0;
+        await settleTurn({
+            convId, getTab, updateTab,
+            isActive: () => getActiveTab()?.conversationId === convId,
+            render: renderMessages,
+            revision, settleIndex: -1, messageId: result.message_id, content: result.reply,
+        });
+        await hooks.refreshConversations();
+    } catch (err) {
+        // 失败 — 既有错误条通道（与 messages.chat / regenerate 同源），不写进消息列表
+        renderSendError(err, '编辑失败', convId);
+    }
+}
+
+/**
+ * 消息级删除单条消息（user/assistant — 工单 03）：
+ *   1. showConfirm（danger，按角色区分警示 — 删 user 明示「连带删除其后的所有对话」、
+ *      删 assistant 明示「仅删除该条回复」）二次确认
+ *   2. messages.delete(messageId) → 成功后简单重载（messages.list + renderMessages，
+ *      不套 settleTurn — 删除无 ChatResponse，无新消息 id 可结算）
+ *
+ * 失败走既有错误条通道（renderSendError），不写进消息列表（缓存保持原状）。
+ * @param {number|string} messageId - 目标消息 id
+ * @returns {Promise<void>}
+ */
+export async function deleteMessage(messageId) {
+    const tab = getActiveTab();
+    if (!tab || tab.isStreaming) return;
+    const convId = tab.conversationId; // 发起时捕获 — 防悬挂核心
+    const target = Array.isArray(tab.messages)
+        ? tab.messages.find((m) => m && m.id === messageId)
+        : null;
+    const isUser = target?.role === 'user';
+
+    const confirmed = await showConfirm({
+        title: '删除消息',
+        message: isUser
+            ? '删除该用户消息将连带删除其后的所有对话，确定要删除吗？'
+            : '仅删除该条回复及其候选，保留触发它的用户消息。确定要删除吗？',
+        detail: isUser ? '该消息之后的 assistant 回复将一并删除' : '删除后仍可继续正常对话',
+        confirmText: '删除',
+        cancelText: '取消',
+        danger: true,
+    });
+    if (!confirmed) return;
+
+    try {
+        await messages.delete(messageId);
+        // 删除无 ChatResponse — 走简单重载（messages.list + renderMessages，不套 settleTurn）
+        const msgs = await messages.list(convId);
+        updateTab(convId, { messages: msgs });
+        if (getActiveTab()?.conversationId === convId) renderMessages();
+        await hooks.refreshConversations();
+    } catch (err) {
+        // 失败 — 既有错误条通道，不写进消息列表
+        renderSendError(err, '删除失败', convId);
+    }
+}
+
 // ── CG-3 对话内出图（生成图片入口 → 提交 → 轮询 → 三态渲染）──
 
 /** 轮询间隔（毫秒）；出图需 10-30 秒，1s 轮询平衡延迟与请求量 */
@@ -1278,6 +1421,8 @@ export const __all__ = [
     'regenerateLastReply',
     'continueLastReply',
     'branchLastReply',
+    'editMessage',
+    'deleteMessage',
     'generateImage',
     'renderCgTaskState',
     'pollImageTask',

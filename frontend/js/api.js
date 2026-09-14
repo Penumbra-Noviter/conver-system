@@ -329,6 +329,21 @@ export const messages = {
     search: (q, limit = 50) => request('GET', `/messages/search?q=${encodeURIComponent(q)}&limit=${limit}`),
     /** 切换消息激活候选（MS-2：body {index}；越界 → 400） */
     switchSwipe: (messageId, index) => request('POST', `/messages/${messageId}/switch-swipe`, { index }),
+    /**
+     * 编辑重发（仅 user 消息级操作）：就地替换 content + 物理截断后续 + 重新生成回复。
+     * PUT /api/messages/{id} body {content}；响应与非流式 ChatResponse 同构。
+     * @param {number|string} messageId - 目标 user 消息 id
+     * @param {string} content - 编辑后的新内容
+     * @returns {Promise<{reply: string, message_id: number, conversation_id: number}>}
+     */
+    edit: (messageId, content) => request('PUT', `/messages/${messageId}`, { content }),
+    /**
+     * 删除单条消息（user/assistant）：角色感知截断。DELETE /api/messages/{id}；
+     * 204 → null（无响应体）。
+     * @param {number|string} messageId - 目标消息 id
+     * @returns {Promise<null>}
+     */
+    delete: (messageId) => request('DELETE', `/messages/${messageId}`),
 };
 
 // ══════════════════════════════════════════════════

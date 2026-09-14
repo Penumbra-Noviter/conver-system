@@ -453,3 +453,77 @@ describe('buildMessagesHtml — F-100 末条 assistant 分支操作（聊天域�
         expect(html).not.toContain('btn-branch');
     });
 });
+
+describe('messageBubbleHtml — 消息级编辑/删除操作按钮（工单 03）', () => {
+    it('user + canEdit:true + messageId → 渲染 .btn-edit-message（edit 图标）', () => {
+        const html = messageBubbleHtml('user', '你好', { canEdit: true, messageId: 1 });
+        expect(html).toContain('btn-edit-message');
+        expect(html).toContain('data-icon="edit"');
+    });
+
+    it('assistant + canEdit:true → 不渲染编辑按钮（仅 user）', () => {
+        const html = messageBubbleHtml('assistant', '回复', { canEdit: true, messageId: 2 });
+        expect(html).not.toContain('btn-edit-message');
+    });
+
+    it('缺省 canEdit:false → 不渲染编辑按钮', () => {
+        expect(messageBubbleHtml('user', 'x', { messageId: 1 })).not.toContain('btn-edit-message');
+    });
+
+    it('user + canEdit:true 但无 messageId → 不渲染编辑按钮（定位后端需要 id）', () => {
+        expect(messageBubbleHtml('user', 'x', { canEdit: true })).not.toContain('btn-edit-message');
+    });
+
+    it('user/assistant + canDelete:true + messageId → 渲染 .btn-delete-message（trash 图标）', () => {
+        expect(messageBubbleHtml('user', 'hi', { canDelete: true, messageId: 1 })).toContain('btn-delete-message');
+        expect(messageBubbleHtml('assistant', 'hi', { canDelete: true, messageId: 2 })).toContain('btn-delete-message');
+        expect(messageBubbleHtml('user', 'hi', { canDelete: true, messageId: 1 })).toContain('data-icon="trash"');
+    });
+
+    it('system + canDelete:true → 不渲染删除按钮（system 不可删）', () => {
+        expect(messageBubbleHtml('system', '提示', { canDelete: true, messageId: 3 })).not.toContain('btn-delete-message');
+    });
+
+    it('streaming 气泡（canEdit/canDelete 均为 true）→ 不渲染编辑/删除按钮', () => {
+        const html = messageBubbleHtml('assistant', '部分', { canEdit: true, canDelete: true, messageId: 2, streaming: true });
+        expect(html).toContain('data-streaming-live="1"');
+        expect(html).not.toContain('btn-edit-message');
+        expect(html).not.toContain('btn-delete-message');
+    });
+});
+
+describe('buildMessagesHtml — 消息级编辑/删除（全量已结算气泡，非仅末条）', () => {
+    it('canEdit:true → 每条 user 气泡渲染编辑按钮（非仅末条）', () => {
+        const html = buildMessagesHtml([
+            { id: 1, role: 'user', content: 'a' },
+            { id: 2, role: 'assistant', content: 'b' },
+            { id: 3, role: 'user', content: 'c' },
+            { id: 4, role: 'assistant', content: 'd' },
+        ], { canEdit: true });
+        expect(html.split('btn-edit-message').length - 1).toBe(2);
+    });
+
+    it('canDelete:true → 每条 user/assistant 气泡渲染删除按钮，system 除外', () => {
+        const html = buildMessagesHtml([
+            { id: 1, role: 'user', content: 'a' },
+            { id: 2, role: 'assistant', content: 'b' },
+            { id: 3, role: 'system', content: 's' },
+        ], { canDelete: true });
+        expect(html.split('btn-delete-message').length - 1).toBe(2);
+    });
+
+    it('streaming 气泡不渲染编辑/删除（其余已结算气泡照常）', () => {
+        const html = buildMessagesHtml([
+            { id: 1, role: 'user', content: 'a' },
+            { id: 2, role: 'assistant', content: '部分', streaming: true },
+        ], { canEdit: true, canDelete: true });
+        expect(html.split('btn-edit-message').length - 1).toBe(1); // 仅 user(id1)
+        expect(html.split('btn-delete-message').length - 1).toBe(1); // 仅 user(id1)，streaming assistant 不渲染
+    });
+
+    it('canEdit/canDelete 缺省（聊天域未开启）→ 无编辑/删除按钮', () => {
+        const html = buildMessagesHtml([{ id: 1, role: 'user', content: 'a' }]);
+        expect(html).not.toContain('btn-edit-message');
+        expect(html).not.toContain('btn-delete-message');
+    });
+});

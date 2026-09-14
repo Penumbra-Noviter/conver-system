@@ -89,6 +89,10 @@ export function userAvatarHtml() {
  *   同组渲染；是否传入由聊天域控制，末条已结算 assistant 才传）
  * @param {boolean} [opts.branch=false] - 渲染「分支」操作按钮（F-100 能力 1 — 与
  *   重生成/继续同组渲染；是否传入由聊天域控制，末条已结算 assistant 才传）
+ * @param {boolean} [opts.canEdit=false] - 渲染「编辑」操作按钮（仅 user；消息级操作 —
+ *   全量已结算气泡，streaming 不渲染；是否传入由聊天域控制）
+ * @param {boolean} [opts.canDelete=false] - 渲染「删除」操作按钮（user/assistant；
+ *   消息级操作 — 全量已结算气泡，streaming 不渲染；是否传入由聊天域控制）
  * @param {Array} [opts.characters=[]] - 角色列表（assistant 头像来源）
  * @param {number|null} [opts.currentCharacterId=null] - 当前角色 id（assistant 头像匹配）
  * @param {number|string|null} [opts.messageId=null] - 消息 id（非空时外层气泡补
@@ -96,13 +100,15 @@ export function userAvatarHtml() {
  * @returns {string} 气泡 HTML（system 角色无头像 + 无复制按钮）
  */
 export function messageBubbleHtml(role, content, opts = {}) {
-    const { streaming = false, stopped = false, error = false, regenerate = false, cont = false, branch = false, characters = [], currentCharacterId = null, messageId, swipes = [], activeSwipeIndex = 0 } = opts;
+    const { streaming = false, stopped = false, error = false, regenerate = false, cont = false, branch = false, canEdit = false, canDelete = false, characters = [], currentCharacterId = null, messageId, swipes = [], activeSwipeIndex = 0 } = opts;
     const classes = ['message', role];
     if (error) classes.push('message-error');
     let bubbleAttrs = streaming ? ' data-streaming-live="1"' : '';
     if (messageId !== undefined && messageId !== null) {
         bubbleAttrs += ` data-message-id="${messageId}"`;
     }
+    // 消息级操作（编辑/删除）定位后端资源需 messageId；瞬时气泡（流式占位/在途无 id）不渲染
+    const hasId = messageId !== undefined && messageId !== null;
     const avatar = role === 'assistant'
         ? assistantAvatarHtml(characters, currentCharacterId)
         : (role === 'user' ? userAvatarHtml() : '');
@@ -122,6 +128,14 @@ export function messageBubbleHtml(role, content, opts = {}) {
     const branchBtn = branch && role === 'assistant'
         ? `<button class="btn-branch" title="分支">${iconHtml('gitBranch')}</button>`
         : '';
+    // 编辑重发按钮（仅 user，消息级操作 — 全量已结算气泡；streaming 气泡不渲染）
+    const editBtn = canEdit && hasId && role === 'user' && !streaming
+        ? `<button class="btn-edit-message" title="编辑">${iconHtml('edit')}</button>`
+        : '';
+    // 删除按钮（user/assistant，消息级操作；streaming 气泡不渲染）
+    const deleteBtn = canDelete && hasId && (role === 'user' || role === 'assistant') && !streaming
+        ? `<button class="btn-delete-message" title="删除">${iconHtml('trash')}</button>`
+        : '';
     // MS-2 候选控制条（仅 assistant 且候选 > 1）：‹ 2/3 › 左右切换，聊天域绑定事件
     const swipeBar = role === 'assistant' && Array.isArray(swipes) && swipes.length > 1
         ? `<div class="swipe-bar" data-swipe-bar>
@@ -131,7 +145,7 @@ export function messageBubbleHtml(role, content, opts = {}) {
           </div>`
         : '';
     const stopTag = stopped ? '<div class="message-stop-tag">（已停止）</div>' : '';
-    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${regenBtn}${contBtn}${branchBtn}${swipeBar}${stopTag}</div>`;
+    return `<div class="${classes.join(' ')}"${bubbleAttrs}>${avatar}<div class="message-content">${body}</div>${copyBtn}${regenBtn}${contBtn}${branchBtn}${editBtn}${deleteBtn}${swipeBar}${stopTag}</div>`;
 }
 
 /**
@@ -151,10 +165,14 @@ export function messageBubbleHtml(role, content, opts = {}) {
  *   渲染「继续」操作按钮（与重生成同组；同一目标语义）
  * @param {boolean} [context.canBranch=false] - 聊天域开关（F-100 能力 1）：末条
  *   assistant 渲染「分支」操作按钮（与重生成/继续同组；同一目标语义）
+ * @param {boolean} [context.canEdit=false] - 聊天域开关（消息级操作）：每条已结算
+ *   user 气泡渲染「编辑」按钮（与重生成/继续/分支不同 — 非仅末条）
+ * @param {boolean} [context.canDelete=false] - 聊天域开关（消息级操作）：每条已结算
+ *   user/assistant 气泡渲染「删除」按钮（非仅末条）
  * @returns {string} 消息区域 HTML
  */
 export function buildMessagesHtml(messages, context = {}) {
-    const { characters = [], currentCharacterId = null, canRegenerate = false, canContinue = false, canBranch = false } = context;
+    const { characters = [], currentCharacterId = null, canRegenerate = false, canContinue = false, canBranch = false, canEdit = false, canDelete = false } = context;
     const last = messages[messages.length - 1];
     // 末条为已结算 assistant 时才渲染重生成/继续/分支按钮（streaming 进行中的气泡不提供）
     const regenTarget = (canRegenerate || canContinue || canBranch) && last?.role === 'assistant' && !last.streaming;
@@ -168,6 +186,9 @@ export function buildMessagesHtml(messages, context = {}) {
         regenerate: canRegenerate && regenTarget && i === messages.length - 1,
         cont: canContinue && regenTarget && i === messages.length - 1,
         branch: canBranch && regenTarget && i === messages.length - 1,
+        // 消息级操作（编辑/删除）：全量已结算气泡透传，角色/streaming/id 过滤在工厂内收敛
+        canEdit,
+        canDelete,
         // MS-2：候选集与激活序号透传（气泡工厂据此渲染候选控制条）
         swipes: m.swipes,
         activeSwipeIndex: m.active_swipe_index ?? 0,
