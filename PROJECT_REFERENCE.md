@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**当前状态**（2026-09-09）：**M6 已交付**——去 AI 味打磨：动效克制子集 8 项（ConverDurations fast140/mid220/slow300 + tabFade160 对齐桌面、零动画库）+ 空态/错误态 + 弱网断线重连（连接失败重试 2 次退避 1s/2s + 断流「回复中断」标记 + NoticeBanner 重试=regenerate replace + idle 60s）+ 实用层无障碍（F-73 浅色 accent #784E14 对比度 ≥4.5:1 + 语义树/15 断言）。全量 **1460 测** / analyze 0 / 覆盖率 96.78% / 期末四轴阻断 0 / **M6 门视觉评审 8/8 PASS**；11 票 7 波 + B1×2 收口（收官 5e7bd33）；TICKETS M6 已归档。**上一里程碑 M5**（2026-09-07：模拟器全量——22 款随包种子 + 本地 HTTP 托管 127.0.0.1:8642 + Key 注入 + 存档管理 + 导入链 + AI 生成 +「我」页；1315 测；收口 3d34ed2）。**下一站 M7**（发布准备：双端图标、Android AAB/iOS 签名、隐私清单），见 [TICKETS.md](TICKETS.md)。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
+**当前状态**（2026-09-14）：**7 项功能全部交付，代码工单（活跃表）与技术债候选区均已清零**。最新里程碑 **M7**（2026-09-09，发布准备：Android 自适应图标 + release 签名 + 隐私清单 + 发布验证门禁，iOS 全链路延后），其后 **U-UX 补全批次**（2026-09-14，聊天首页角色选择与会话管理 / 生成参数 temperature·max_tokens / 模板变量 extraVars / 首次启动分页新手指引）与 **技术债 F-75/76/77 收口**（temperature NaN/Infinity 回退 + clamp）。全量 **1684 测**绿 / analyze 0 / 期末四轴 0 阻断。**尚未交付**：iOS 全链路（图标/签名/隐私/上架，Windows 无 macOS）与模拟器种子游戏内容更新专项（F-75 转出，异形屏固定宽度面板截断）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
 
 **核心能力**（7 项全量，无阉割）：
 - **聊天** — 多轮对话 + SSE 流式打字机渲染 + 停止生成；滑窗上下文、模板变量、重生成、错误态

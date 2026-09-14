@@ -35,7 +35,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - `flutter test`（纯 Dart 单测 + 无头 widget 测试），覆盖率目标 ≥ 90%
 - 业务逻辑（chat/llm/数据层/导入链/生成校验）占比最大且是纯 Dart → 可靠性主要由单测兜底；平台薄层做真机/模拟器验证
 
-## 当前状态（2026-09-10）
+## 当前状态（2026-09-14）
 
 - ✅ 设计已落盘：`docs/mobile-design.md`（单一事实来源）+ `docs/mobile-adaptation-research.md`（决策背景）；决策集 Q0~Q14 已拍板，ADR-0002 见桌面库 `desktop/CONSENSUS.md`
 - ✅ 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35+36+37/AEHD + Flutter 3.47.2；AVD medium_phone 数据已迁至 F:\tools\android\avd，2026-09-04；MCP 插件 preflight 全绿）
@@ -52,6 +52,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - ✅ **真机问题批次已收口**（2026-09-10）：测试连接传 default_model + 注入 toProxyEndpoint 同源改写 + server /proxy 流式反代（全相位超时 60s + key App 侧注入 + SSE 透传）；全量 1612 测绿 / analyze 0 / 真实端点链路 200 PASS / 期末四轴 0 阻断；merge 265e305/8ead524/6cb3885 + 超时修复 fd3820b
 - ✅ **技术债折回 F-68~74 已全部处置**（2026-09-10）：F-68/69/70 消费（release 签名守卫 + 图标色值双向守卫 + privacy_audit 删 Speculative 分支）+ F-71/72/74 复核关闭 + F-73 交叉校验测试；候选区清零；全量 1613 测绿 / analyze 0 / pytest 66
 - ✅ **架构审查批次 C1~C4 已收口**（2026-09-10）：translateError 下沉 LLMProvider 基类默认实现 / 装配腿收敛（wireCredentialsResolver 单一落点）/ 双文件名净化器参数化合并 / 删 PlaceholderGroup + settings 行收敛；全量 1579 测绿（+61）/ analyze 0 / 期末四轴 0 阻断；落债 F-72
+- ✅ **U-UX 补全批次已收口**（2026-09-14）：聊天首页角色选择条 + 会话重命名/删除 / LLMProvider 补 temperature 参数（15 子类）+ 全局 temperature/max_tokens（角色级为主、全局兜底）/ 模板变量 extraVars 全局替换管线 + 编辑页 / 首次启动分页新手指引（启动门 + 跳过持久化）；全量 1681 测绿 / analyze 0 / 期末四轴 0 阻断（修复 F-73 色彩契约回归 eb7b119）；commit b302fb3 / 6abcb6d+126e09d / ced8253 / e6cf008+1dbd0ef
 - ✅ **技术债消费批次 F-75/F-76/F-77 已全部处置**（2026-09-14）：F-76 消费（_resolveTemperature 加 NaN/Infinity 回退全局 + 越界 clamp [0,2]）+ F-75/77 复核关闭（种子 HTML 内容资产 CSS / SettingsReader implements 成本）；候选区清零；全量 1684 测绿（+3）/ analyze 0
 
 ## 文档体系
