@@ -109,6 +109,7 @@ class _CharacterSelector extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final palette = ConverPalette.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: 44,
       child: ListView.separated(
@@ -125,14 +126,14 @@ class _CharacterSelector extends StatelessWidget {
             selected: selected,
             showCheckmark: false,
             onSelected: (_) => controller.selectCharacter(character.id),
-            selectedColor: ConverColors.accent,
+            selectedColor: colorScheme.primary,
             backgroundColor: Colors.transparent,
             labelStyle: TextStyle(
-              color: selected ? ConverColors.onAccent : palette.ink3,
+              color: selected ? colorScheme.onPrimary : palette.ink3,
               fontSize: 13,
             ),
             side: BorderSide(
-              color: selected ? ConverColors.accent : palette.border,
+              color: selected ? colorScheme.primary : palette.border,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(ConverRadii.lg),
