@@ -36,6 +36,26 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 叙述风格与预设对话批次 NPD（2026-09-14 — 7 工单标准档，角色对话降 AI 味）
+
+> 来源：用户对标 AI 风月「角色对话降 AI 味」，立项「叙述风格指令 Mod」+「预设对话」两项，走 project-kickoff 全流程（Grilling → plan-tickets → 3 波）。叙述详见 DEV_LOG〈叙述风格与预设对话批次 NPD（2026-09-14）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| NPD-01 | 叙述风格设置键与访问器（ALLOWED_KEYS 两键 + 默认规则常量 + 两访问器） | 2026-09-14 | e4404f5 |
+| NPD-02 | 叙述风格 prompt 注入与接线（SOURCE_NARRATIVE + after_char 后注入段 + message/chat 接线） | 2026-09-14 | c960c6c |
+| NPD-03 | 叙述风格设置页 UI（开关 + 规则编辑框） | 2026-09-14 | 30bcdf2 |
+| NPD-04 | 预设对话角色字段与往返（preset_dialogues list[PresetDialogue] + conver_system 往返） | 2026-09-14 | daa0981 |
+| NPD-05 | 预设对话快照列与创建固化（conversation.preset_dialogue Text 列 + create 固化） | 2026-09-14 | 3b225f0 |
+| NPD-06 | 预设对话 few-shot 注入（parse_mes_example 解析 + mes_example 后注入） | 2026-09-14 | 59d625a |
+| NPD-07 | 预设对话前端（角色编辑 + 开局双选） | 2026-09-14 | a766fdf |
+
+**验证链：** pytest 1273+1skip→1348+1skip（+75）+ Vitest 1448→1472（+24）+ cargo 70 零改动 | 期末四轴 0 Critical/0 High | doc_sync 零漂移 | 波末修复两笔（character.preset_dialogues 迁移 5c22d86 + 叙述风格默认启用隔离 9493993）
+
+**非阻断落债：** 无（期末四轴 0 阻断，候选区维持清零）
+
+---
+
 ### 技术债消费批次 F-139~F-144（2026-09-14 — 1 做 4 关，轻量档 5 项主会话直做）
 
 > 来源：用户指令「消费技术债 F-139/F-140/F-142/F-143/F-144」（PD 批次期末四轴落债 6 项中除已关 F-141 外 5 项，均 Speculative）。逐项 git grep 复核现状后拍板 1 做 4 关。叙述详见 DEV_LOG〈技术债消费批次 F-139~F-144（2026-09-14）〉。

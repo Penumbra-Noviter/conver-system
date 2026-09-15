@@ -6,6 +6,22 @@
 
 ---
 
+## 叙述风格与预设对话批次 NPD（2026-09-14 — 7 工单标准档，角色对话降 AI 味）
+
+- **来源**：用户对标 AI 风月「角色对话降 AI 味」，立项「叙述风格指令 Mod」+「预设对话」两项。两项 ADR 拍板：叙述风格=全局 settings 两键（非 built-in Mod，因 prompt Mod payload 锁 world 三块无法 emit 前缀 system 段）+ 默认启用 opt-out + `[叙述风格]` system 段注入 after_char 后（expert 亦注入）；预设对话=角色卡 `preset_dialogues: list[PresetDialogue]`（≤10，project-own 字段 conver_system 往返）+ 会话 `conversation.preset_dialogue` Text 快照列（创建时固化）+ 开局弹窗双选。
+- **NPD-01 设置键**（e4404f5）：ALLOWED_KEYS 加 narrative_style_enabled/rules + NARRATIVE_STYLE_DEFAULT_RULES 反 AI 味清单 + 两访问器。
+- **NPD-02 注入**（c960c6c）：prompt.py SOURCE_NARRATIVE + build_messages/build_messages_with_source 加 narrative_style 参数 + _assemble after_char 后注入 `[叙述风格]` system 段（空/纯空白零注入）；message/chat 接线。
+- **NPD-03 设置 UI**（30bcdf2）：设置页叙述风格开关 + 规则编辑框（空占位提示，不复制后端默认常量）。
+- **NPD-04 角色字段**（daa0981）：character.preset_dialogues JSON 列 + PresetDialogue 模型 + 归一化（None→[]/空字段过滤/超10截断/同名去重）+ conver_system 往返。
+- **NPD-05 快照列**（3b225f0）：conversation.preset_dialogue Text 可空列 + 迁移 + ConversationCreate 固化 `data.preset_dialogue or None`（空串→null 不落伪值）。
+- **NPD-06 few-shot 注入**（59d625a）：build_messages 加 preset_dialogue 参数 + _assemble mes_example 后、history 前经 parse_mes_example 注入（source=character）；message 读 conversation.preset_dialogue 快照（改卡不影响已建会话）+ chat 接线。
+- **NPD-07 前端**（a766fdf）：character-submit buildCharacterPayload 加 preset_dialogues + 角色编辑列表 + 开局弹窗「开场白+预设对话」双选。
+- **验证链**：pytest 1273+1skip→1348+1skip（+75）+ Vitest 1448→1472（+24）+ cargo 70 零改动 | 期末四轴 0 Critical/0 High | doc_sync 零漂移。
+- **过程遥测**：标准档 3 波（波1 01+04+05 / 波2 02+03+07 / 波3 06）；波1 04 迁移缺口（character.preset_dialogues 迁移 + schema.sql 补列）波末修复 5c22d86；波2 spec 矛盾（ADR-1 默认启用 vs 01 工单缺省 False）波末修复 9493993——narrative_style_enabled 缺省改 True + build_message_list 改纯透传（查 setting 收拢到 chat._narrative_style）；波3 06 子代理电脑卡死中断（改动落盘但 `if False` 死代码致注入失效）主会话直修；code-review 子智能体 provider 配置故障（deepseek-v4-flash 未配置）连续失败，波末增量审核 + 期末四轴均主会话直做。
+- **非阻断落债**：无（期末四轴 0 阻断，候选区维持清零）。
+
+---
+
 ## 技术债消费批次 F-139~F-144（2026-09-14 — 1 做 4 关，轻量档 5 项主会话直做）
 
 - **来源**：用户指令「消费技术债 F-139/F-140/F-142/F-143/F-144」（PD 批次期末四轴落债 6 项中除已关 F-141 外 5 项，均 Speculative）。逐项 git grep 复核现状后拍板 1 做 4 关。
