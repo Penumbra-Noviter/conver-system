@@ -60,9 +60,13 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import '../data/database/app_database.dart';
 import '../data/database/tables.dart' show Role;
 import '../data/repositories/character_repository.dart';
+import '../data/repositories/companion_repository.dart';
 import '../data/repositories/conversation_repository.dart';
 import '../data/repositories/message_repository.dart';
 import '../data/repositories/settings_repository.dart';
+import 'companion/proactive_message_service.dart';
+import 'companion/relationship_service.dart';
+import 'companion/thought_service.dart';
 import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
@@ -268,6 +272,11 @@ class ChatService {
     CredentialsResolver? credentialsResolver,
     this._memoryService,
     this._reflectionService,
+    this._thoughtService,
+    this._relationshipService,
+    this._proactiveMessageService,
+    this._companionRepository,
+    this._onStageUpgradeProposal,
     List<Duration> connectRetryDelays = const [
       Duration(seconds: 1),
       Duration(seconds: 2),
@@ -289,6 +298,25 @@ class ChatService {
 
   /// 后台反思服务（人机恋阶段 1.5，ADR-0004）；null = 反思未启用（既有装配零改动）。
   final ReflectionService? _reflectionService;
+
+  /// 内心独白服务（阶段 2，PS2-04/07）；null = 独白未启用（既有装配零改动）。
+  /// 剥离恒启用（经此服务），开关控制落库与 prompt 指令。
+  final ThoughtService? _thoughtService;
+
+  /// 关系状态机服务（阶段 2，PS2-03/07）；null = 关系功能未启用。
+  /// 注入链（有状态行时）与回合结束评估共用。
+  final RelationshipService? _relationshipService;
+
+  /// 主动消息服务（阶段 2，PS2-05/07）；null = 主动消息未启用。
+  final ProactiveMessageService? _proactiveMessageService;
+
+  /// 关系状态读面（注入链需查 RelationshipStates 行；companion_repository 为
+  /// 阶段 2 共享只读依赖，缺省 null 时关系注入跳过——既有装配零改动）。
+  final CompanionRepository? _companionRepository;
+
+  /// 亲密/挚爱升级提议回调（阶段 2，SR-10：ChatService 只上报不写库，
+  /// 确认由 UI/装配层经 confirmStageUpgrade 触发）。null = 不回调（缺省）。
+  final void Function(StageUpgradeProposal proposal)? _onStageUpgradeProposal;
 
   /// 凭据解析链（AR-3）：组合序单一归属 [CredentialsResolver]；缺省由
   /// [_settingsRepository] 装配 reader（测试可注入，既有装配零 churn）。
@@ -606,9 +634,12 @@ class ChatService {
     try {
       final msg = await _persistAssistant(state);
       // 完整 assistant 落库后触发后台反思（ADR-0004：fire-and-forget，失败
-      // 降级不阻断主回复；零 token 空流不触发）。
+      // 降级不阻断主回复；零 token 空流不触发）。阶段 2：主动规划/关系评估
+      // 与反思同构并列，三路任一路抛错只 debugPrint、互不影响、不阻断 ChatDone。
       if (msg != null) {
         unawaited(_maybeReflectAfterTurn(state));
+        unawaited(_maybePlanProactiveAfterTurn(state));
+        unawaited(_maybeEvaluateRelationship(state));
       }
       // F3 同类硬化：onDone 与 onCancel 竞态（收尾瞬间取消）下 controller 可能
       // 已关闭，add 前守卫避免 add-after-close 的未处理异常。
@@ -752,12 +783,49 @@ class ChatService {
       return null;
     }
     state.saved = true;
-    final content = await _applyMemoryCommands(state, state.fullContent);
-    return _messageRepository.createMessage(
+    final raw = state.fullContent;
+    // ① thought 剥离（恒启用）先于记忆（spec 判定②：thought 不进记忆链路）。
+    final extracted = extractThought(raw);
+    // ② 记忆只吃剥离后的正文（<add:> 等指令不受 thought 内容污染）。
+    final memoryContent =
+        await _applyMemoryCommands(state, extracted.displayContent);
+    // ③ 落库正文（thought 已剥；剥离后为空 → 空串消息，单测锁定）。
+    final msg = await _messageRepository.createMessage(
       conversationId: state.conversationId,
       role: Role.assistant,
-      content: content,
+      content: memoryContent,
     );
+    // ④ 补落 thought：stripAndPersist 需要已落库消息 id（InnerThoughts.messageId
+    //    FK → Messages），对原始内容重跑剥离仅取其落库/降级副作用，返回的
+    //    displayContent 丢弃（正文已在①②③处理，不重复写）。
+    if (extracted.thoughtContent != null) {
+      await _persistThought(state, msg.id, raw);
+    }
+    return msg;
+  }
+
+  /// 经 [ThoughtService.stripAndPersist] 按开关落内心独白（slot 4）
+  /// 于 [extractThought] 检出 thought 之后；开关关 → 服务侧 debugPrint 不落库；
+  /// 服务抛错 → 降级 log，正文不受影响（对齐「记忆失败不阻断主回复」约束）。
+  Future<void> _persistThought(
+    _StreamRunState state,
+    int messageId,
+    String raw,
+  ) async {
+    final thoughtService = _thoughtService;
+    final characterId = state.characterId;
+    if (thoughtService == null || characterId == null) {
+      return;
+    }
+    try {
+      await thoughtService.stripAndPersist(
+        characterId: characterId,
+        messageId: messageId,
+        content: raw,
+      );
+    } catch (e) {
+      debugPrint('内心独白处理失败，保留正文: $e');
+    }
   }
 
   /// 剥离 assistant 回复中的记忆标签并落库（AC-02/AC-03 记忆链路）。
@@ -806,6 +874,46 @@ class ChatService {
       );
     } catch (e) {
       debugPrint('后台反思失败，跳过: $e');
+    }
+  }
+
+  /// 回合末主动消息规划（阶段 2，PS2-05）：开关/节流/LLM seam 全在服务内部，
+  /// 服务自身不抛（失败返回 0）；此处 try/catch 防御未来实现变更，保隔离面。
+  Future<void> _maybePlanProactiveAfterTurn(_StreamRunState state) async {
+    final service = _proactiveMessageService;
+    final characterId = state.characterId;
+    if (service == null || characterId == null) {
+      return;
+    }
+    try {
+      await service.planAfterTurn(
+        characterId: characterId,
+        conversationId: state.conversationId,
+      );
+    } catch (e) {
+      debugPrint('主动消息规划失败，跳过: $e');
+    }
+  }
+
+  /// 回合末关系评估（阶段 2，PS2-03）：跨亲密/挚爱门槛 → 经
+  /// [_onStageUpgradeProposal] 上报 proposal（ChatService 不写库，SR-10）；
+  /// 普通推进由服务内部直接落库。评估失败 → 降级 log 不阻断主回复。
+  Future<void> _maybeEvaluateRelationship(_StreamRunState state) async {
+    final service = _relationshipService;
+    final characterId = state.characterId;
+    if (service == null || characterId == null) {
+      return;
+    }
+    try {
+      final proposal = await service.evaluateAfterTurn(
+        characterId: characterId,
+        conversationId: state.conversationId,
+      );
+      if (proposal != null) {
+        _onStageUpgradeProposal?.call(proposal);
+      }
+    } catch (e) {
+      debugPrint('关系评估失败，跳过: $e');
     }
   }
 
@@ -1011,6 +1119,44 @@ class ChatService {
         // 记忆注入失败不阻断主回复（降级：无记忆上下文，回复仍可用）。
         debugPrint('记忆注入失败，跳过: $e');
       }
+    }
+
+    // 阶段 2 注入：关系块（有状态行时，判定⑧）+ thought 指令（开关开时）。
+    // 追加于消息尾部（行为指令，不干扰人设/记忆/场景结构）；任一失败降级跳过。
+    final stage2Injections = <LlmMessage>[];
+    final relationshipService = _relationshipService;
+    final companionRepository = _companionRepository;
+    if (companionRepository != null && relationshipService != null) {
+      try {
+        final state = await companionRepository.getRelationship(character.id);
+        if (state != null) {
+          stage2Injections.add(
+            LlmMessage(
+              role: 'system',
+              content: RelationshipService.buildRelationshipInjection(
+                stage: state.stage,
+                affinity: state.affinity,
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('关系注入失败，跳过: $e');
+      }
+    }
+    if (_thoughtService != null) {
+      try {
+        if (await _settingsRepository.innerThoughtEnabled) {
+          stage2Injections.add(
+            LlmMessage(role: 'system', content: buildThoughtInstruction()),
+          );
+        }
+      } catch (e) {
+        debugPrint('内心独白指令注入失败，跳过: $e');
+      }
+    }
+    if (stage2Injections.isNotEmpty) {
+      messages.addAll(stage2Injections);
     }
 
     return messages;
