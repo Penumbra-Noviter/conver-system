@@ -6,6 +6,17 @@
 
 ---
 
+## 架构深化批次 arch-deepening（2026-09-15 — 2 工单标准档串行链，prompt 组装链重构）
+
+- **来源**：用户继架构全库扫描（/improve-codebase-architecture 产出 7 候选 F-145~F-151 + Top recommendation）后走 project-kickoff 全自动档续接（handoff-arch-deepening-20260914）。Grilling 增量审拍板 4 做 3 关。核心结论：`_assemble` 是真深模块（deletion test 通过），参数膨胀只是症状，病根在上游注入链编排重复；`narrative_style` 显式透传 vs `preset_dialogue` 隐式读 ORM 快照的两参数数据流不对称（预设不是 build_message_list 形参，内部隐式读 conversation.preset_dialogue）。
+- **工单 01 注入链 seam 归位（ab587ed，F-145+F-146）**：新增 `chat._build_tagged_injection(db, character, history, current_input, user_name)` 单一编排 seam 收编「_lorebook_world_injection → _mod_prompt_injection → _merge_injections」三步；assemble_chat_context 与 build_prompt_debug 均改调，删两处内联复制；`lorebook_engine.build_world_injection` 返回类型改 `dict[str, list[InjectedSegment]]` + 新增可选 `source_by_id: dict[int, str] | None = None`（None/缺省键→SOURCE_WORLD，值=="auto"→SOURCE_MEMORY）；`LorebookEntryData` 零 source 契约保持（来源经 entry.id 反查注入）；删 `chat._build_tagged_world_injection` / `_WORLD_POSITION_KEYS`；`_WORLD_BLOCK_KEYS` 保留；`mods._REGION_KEYS` 不收敛。
+- **工单 02 组装入口收口（a807363，F-147+F-148）**：`CharacterData.from_orm(character)` 类方法成为唯一 ORM→纯数据投影入口（PROMPT_FIELDS 通配 + prompt_mode/expert_prompt 补位 + None→`CharacterData(name="")` 空角色），删 `chat._character_data` 与 message 内联构造；`build_message_list` 增 `preset_dialogue: str = ""` 显式形参（置于 narrative_style 后），不再隐式读 ORM，快照读取责任上移 chat 层统一（普通/重生成/调试三路径显式传 `conv.preset_dialogue or ""`）。
+- **验证链**：pytest 1349+1skip→1352+1skip（+3：from_orm 3 例 + chat 层快照语义 1 例 − message 层删 1 例）+ cargo 70 零改动 | 期末四轴「通过」0 Critical 0 High（Standards 0 / Spec 2 警告：from_orm 签名 `object|None` 字面漂移（有意保持 prompt.py 零 ORM 依赖）+ debug 日志可观测性扩展 / Falsify 3 弱覆盖缺口：空激活集、未知 source 值、None 直传契约锁 / Architecture 0——两 seam 均真深化无伪深化）| 运行态冒烟：uvicorn + 隔离数据（DATABASE_URL/CONVER_DATA_DIR 指向 .scratch 目录）走 GET /api/conversations/1/prompt-debug，segments 全序 persona→scenario→narrative→[世界知识]→mes_example→预设 few-shot(source=character)→历史→user 正确，world+preset 注入零变更 | 全量 1352 passed 主会话独立复现（46.6s）| merge 43bb61f | doc_sync 12 标记刷新零漂移 | pool_cleanup_check 全合规。
+- **过程遥测**：全自动档串行链（链长 2 ≤ 3 不主动重启）；工单 01 派遣「启动即失败」2 次（网关/模型层异常，无 usage 无内容、provider 多次切换），探路子智能体确认通道恢复后第 3 次（末次）派遣成功——重开预算 3 次用尽前命中，未升级人工裁决；「前次现场核查」未触发（前次无 worktree/分支残留，现场干净）；覆盖率口径修正（`--cov=backend.app.services.*`，工单原文 `app.services.*` 匹配不到——backend 是隐式命名空间包、PYTHONPATH 须指向项目根而非 backend 目录）；基线数字 1225 过时（实际 1352+1skip，doc_sync 已刷新）；编排文件 STATUS token 与 check-complete.py 契约格式不一致（表格单元格 vs 行首独立行）——按脚本契约修正编排文件（token 须行首）；冒烟种子脚本依次排掉四坑：exFAT write EISDIR（pwsh WriteAllText 降级）、PYTHONPATH 指向（命名空间包）、DATABASE_URL 须指向隔离库（默认相对 cwd 会污染开发库）、init_db() 前置（建表 + 自愈迁移）。
+- **非阻断落债**：F-152~F-155（4 项，期末四轴，见 TECH_DEBT 候选区）。
+
+---
+
 ## 叙述风格与预设对话批次 NPD（2026-09-14 — 7 工单标准档，角色对话降 AI 味）
 
 - **来源**：用户对标 AI 风月「角色对话降 AI 味」，立项「叙述风格指令 Mod」+「预设对话」两项。两项 ADR 拍板：叙述风格=全局 settings 两键（非 built-in Mod，因 prompt Mod payload 锁 world 三块无法 emit 前缀 system 段）+ 默认启用 opt-out + `[叙述风格]` system 段注入 after_char 后（expert 亦注入）；预设对话=角色卡 `preset_dialogues: list[PresetDialogue]`（≤10，project-own 字段 conver_system 往返）+ 会话 `conversation.preset_dialogue` Text 快照列（创建时固化）+ 开局弹窗双选。

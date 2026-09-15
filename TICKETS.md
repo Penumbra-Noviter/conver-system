@@ -36,6 +36,21 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 架构深化批次 arch-deepening（2026-09-15 — 2 工单标准档串行链，prompt 组装链重构）
+
+> 来源：用户继架构全库扫描（/improve-codebase-architecture 产出 F-145~F-151 + Top recommendation）后走 project-kickoff 全自动档消费；Grilling 增量审 4 做 3 关。纯后端等价重构，在线 prompt 输出逐字节不变。叙述详见 DEV_LOG〈架构深化批次 arch-deepening（2026-09-15）〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | 注入链 seam 归位（_build_tagged_injection 单一编排 + build_world_injection source_by_id） | F-145+F-146 | 2026-09-15 | ab587ed |
+| 02 | 组装入口收口（CharacterData.from_orm 唯一投影 + build_message_list preset_dialogue 显式化） | F-147+F-148 | 2026-09-15 | a807363 |
+
+**验证链：** pytest 1349+1skip→1352+1skip（+3 用例）+ cargo 70 零改动 | 期末四轴「通过」0 Critical/0 High（Architecture 轴确认两 seam 均真深化、无伪深化；Spec 2 警告 + Falsify 3 弱覆盖缺口非阻断落债）| 全量 1352 passed 主会话独立复现 | 运行态冒烟 segments 全序正确（world/preset 注入序零变更）| merge 43bb61f | doc_sync 零漂移
+
+**非阻断落债：** F-152~F-155（4 项，期末四轴，见 TECH_DEBT 候选区）
+
+---
+
 ### 叙述风格与预设对话批次 NPD（2026-09-14 — 7 工单标准档，角色对话降 AI 味）
 
 > 来源：用户对标 AI 风月「角色对话降 AI 味」，立项「叙述风格指令 Mod」+「预设对话」两项，走 project-kickoff 全流程（Grilling → plan-tickets → 3 波）。叙述详见 DEV_LOG〈叙述风格与预设对话批次 NPD（2026-09-14）〉。

@@ -53,13 +53,10 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-145 | chat.py:160 assemble_chat_context 与 build_prompt_debug 重复注入链编排（取角色→历史→世界书→mod→合并，末端分叉），缺「产出带来源注入块」单一 seam | 架构报告 | Strong | 📝 待立项 | prompt 组装链 |
-| F-146 | lorebook_engine.py:119 build_world_injection 成孤儿（生产路径被 chat._build_tagged_world_injection 复制），position→block 映射在 lorebook/chat/mods 三处复制 | 架构报告 | Strong | 📝 待立项 | prompt 组装链 |
-| F-147 | message.py:178 ORM Character→CharacterData 投影与 chat._character_data 逐字重复，同一概念无 locality（注：F-143 曾复核关闭「有意识镜像收益<成本」，本次架构报告改判 Strong，待 Grilling 重开评估） | 架构报告 | Strong | 📝 待立项 | prompt 组装链 |
-| F-148 | message.py:198 preset_dialogue 隐式读 ORM 快照 vs narrative_style 显式透传，两注入参数数据流不对称（seam 泄漏） | 架构报告 | Worth exploring | 📝 待立项 | prompt 组装链 |
-| F-149 | prompt.py:232 _assemble 9 位置参数 + 8 线性 if 注入点，新注入源需 4 处触碰（三份签名 + if + docstring） | 架构报告 | Worth exploring | 📝 待立项 | prompt 组装链 |
-| F-150 | prompt.py:146 build_messages 与 build_messages_with_source 九参数签名逐字重复，仅差 source 标注，属浅层包装 | 架构报告 | Worth exploring | 📝 待立项 | prompt 组装链 |
-| F-151 | character_card.py:273 与 character-submit.js:187 preset_dialogue 归一化（trim/去重/上限10）前后端各一份，上限常量双端无单一权威 | 架构报告 | Speculative | 📝 待立项 | 前后端契约 |
+| F-152 | lorebook_engine.py:124-159 build_world_injection 空激活集（[]→三空键）与 source_by_id 未知值（非 "auto" 回落 SOURCE_WORLD）两条失败路径无直接单测断言（实现安全，Falsify 契约锁缺口） | arch-deepening 期末四轴 Falsify | Speculative | 📝 待立项 | prompt 组装链 |
+| F-153 | message.py:127-138 build_message_list 新形参 preset_dialogue 无「None 直接传入」防护契约锁（_assemble falsy 短路保证安全但未显式锚定，生产调用方恒 `or ""` 归一） | arch-deepening 期末四轴 Falsify | Speculative | 📝 待立项 | prompt 组装链 |
+| F-154 | prompt.py:76 CharacterData.from_orm 签名 `object/None` 与 spec 字面 `Character/None` 不一致（有意保持 prompt.py 零 ORM 依赖），需 spec/文档注记该选择，防后续改回 Character 类型破坏纯函数层契约 | arch-deepening 期末四轴 Spec | Worth exploring | 📝 待立项 | prompt 组装链 |
+| F-155 | chat.py:918-923 世界书注入 logger.debug 随 seam 归位后 build_prompt_debug 路径也输出同文案日志（原仅 assemble 路径；默认 INFO 无输出、非在线 prompt 变化，纯重构可观测性边界待 spec 追认） | arch-deepening 期末四轴 Spec | Speculative | 📝 待立项 | prompt 组装链 |
 
 
 ### 复核关闭（Speculative 类，防重复提议）
@@ -89,10 +86,31 @@
 | F-142 | CharacterBase.prompt_mode 用 str 未用 Literal——build_messages 仅 `== "expert"` 走 expert 分支、其余任意值运行时安全回退 simple，改 Literal 需破坏 CharacterBase 单一来源或冒 CharacterResponse 序列化风险，纵深防御收益 < 成本 | PD 批次期末四轴 Standards | Speculative | ❌ 复核关闭 |
 | F-143 | chat._character_data 与 message.build_message_list 的 CharacterData 构造逐字镜像——有意识设计（`_character_data` docstring 已声明「同口径单一语义镜像」），仅 2 实例提取 helper 收益 < 成本 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭 |
 | F-144 | character-wizard.js `state.splice` 直接变异 vs character-form.js 以 DOM 为真源——wizard 的 state 是跨步骤向导真源（增删须同步 state 供后续步骤读）、form 的 DOM 是单表单提交时读的真源，语境不同，强行统一收益 < 成本 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭 |
+| F-149 | prompt.py:232 `_assemble` 9 位置参数 + 8 线性 if 注入点——`_build_tagged_injection` seam 归位后参数打包重估留待上游 seam 稳定，Grilling 拍板本批暂不拆单 | arch-deepening Grilling 增量审 | Worth exploring | ❌ 复核关闭 |
+| F-150 | prompt.py:146 `build_messages` 与 `build_messages_with_source` 九参数签名逐字重复——与 F-149 同批判据（seam 归位后重估） | arch-deepening Grilling 增量审 | Worth exploring | ❌ 复核关闭 |
+| F-151 | character_card.py:273 与 character-submit.js:187 preset_dialogue 归一化双端镜像——双端已各自锚定 + 注释互指，跨运行时单一权威不可表达 | arch-deepening Grilling 增量审 | Speculative | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
+
+### 2026-09-15（架构深化批次 arch-deepening：消费 F-145~F-148 全做 + F-149~F-151 复核关闭）
+
+> 来源：用户指令继架构全库扫描（F-145~F-151 落盘）后走 project-kickoff 全自动档消费。Grilling 增量审拍板 4 做 3 关。4 做 = 2 工单标准档串行链（工单 01 注入链 seam 归位 = F-145+F-146；工单 02 组装入口收口 = F-147+F-148），纯重构在线 prompt 输出逐字节不变。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-145 | chat.py 注入链编排两处逐字复制（assemble_chat_context 与 build_prompt_debug） | 架构报告 | Strong | ✅ 已修（2026-09-15：工单 01 `chat._build_tagged_injection` 单一编排 seam 收编三步，两调用点改指；commit ab587ed） |
+| F-146 | lorebook_engine.build_world_injection 孤儿 + position 映射三处复制 | 架构报告 | Strong | ✅ 已修（2026-09-15：工单 01 回并 `build_world_injection` 返回 `dict[str, list[InjectedSegment]]` + 新增 `source_by_id` 可选形参，删 chat._build_tagged_world_injection / _WORLD_POSITION_KEYS；commit ab587ed） |
+| F-147 | ORM Character→CharacterData 投影两处逐字重复 | 架构报告 | Strong | ✅ 已修（2026-09-15：工单 02 `CharacterData.from_orm` 唯一投影入口（None→空角色），删 chat._character_data + message 内联构造；commit a807363） |
+| F-148 | build_message_list 隐式读 ORM 快照 vs narrative_style 显式透传不对称 | 架构报告 | Worth exploring | ✅ 已修（2026-09-15：工单 02 `build_message_list` 增 `preset_dialogue: str = ""` 显式形参，快照读取责任上移 chat 层统一；commit a807363） |
+| F-149 | prompt.py `_assemble` 9 位置参数 + 8 线性 if 注入点 | 架构报告 | Worth exploring | ❌ 复核关闭（`_build_tagged_injection` seam 归位后参数打包重估留待上游 seam 稳定，Grilling 拍板本批不拆单） |
+| F-150 | prompt.py `build_messages` 双签名逐字重复 | 架构报告 | Worth exploring | ❌ 复核关闭（与 F-149 同批判据——seam 归位后重估） |
+| F-151 | preset_dialogue 归一化前后端双份镜像 | 架构报告 | Speculative | ❌ 复核关闭（双端已各自锚定 + 注释互指，跨运行时单一权威不可表达） |
+
+**验证链：** pytest 1349+1skip→1352+1skip（+3 用例）+ cargo 70 零改动 | 期末四轴「通过」0 阻断（Standards 0 / Spec 2 警告 / Falsify 3 弱覆盖缺口 / Architecture 0，两 seam 均真深化无伪深化）| 运行态冒烟 segments 全序正确 | 全量 1352 passed 独立复现 | commit ab587ed + a807363 + merge 43bb61f。
+
+**新落债：** F-152~F-155（4 项，期末四轴非阻断，见候选区）。
 
 ### 2026-09-14（技术债消费批次 ×4：批1 F-115~F-122 3 做 5 关轻量档；批2 F-123~F-126 架构深化全做标准档 4 工单串行；批3 F-130~F-138 7 做 2 关轻量档主会话直做；批4 F-139~F-144 1 做 4 关轻量档主会话直做）
 
@@ -131,24 +149,6 @@
 | F-143 | chat._character_data 与 message.build_message_list CharacterData 构造逐字镜像 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭（有意识镜像——_character_data docstring 已声明同口径单一语义镜像，仅 2 实例提取 helper 收益 < 成本） |
 | F-144 | character-wizard.js state.splice vs character-form.js DOM 真源两套模式 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭（wizard state 是跨步骤向导真源、form DOM 是单表单真源，语境不同，强行统一收益 < 成本） |
 
-### 2026-09-13（技术债消费批次 ×2：批1 F-99/F-100/F-102/F-103/F-106 做 + F-101/F-104/F-105 关 + F-100 能力3 关，标准档 7 工单 3 波；批2 F-110 做 + F-109/F-111 关，轻量档 1 工单）
-
-> 批 1 处置详情：5 项消费（F-99→工单01、F-100 能力1/2→工单06/07、F-102→工单03/04、F-103→工单02、F-106→工单05，见 DEV_LOG〈技术债候选区消费批次〉）；3 项复核关闭——F-101 全路径不产 NULL 理论性 500 不可达、F-104 提取共享 helper 收益 < 成本、F-105 轻重两种守卫是不同 seam 非缺陷；另 F-100 能力 3「模拟器存档开新对话」部分关闭（存档=游戏 localStorage 状态 ≠ BranchSnapshot 对话快照，不同构，语义不清）。期末四轴 0 HIGH 阻断 + 1 MEDIUM 当场修（ddfe978：branch_title 契约断裂——分支调用补传源会话标题，能力 2「父缺失回落 branch_title」恢复生效）+ 非阻断落债 F-109~F-111 / 复核关闭 F-112~F-114。
->
-> 批 2 处置详情：Grilling 实证拍板 1 做 2 关——F-110 三函数样板逐行比对成立（守卫前奏/finally 复原逐字相同、差异仅按钮 selector 与错误文案），提取 chat.js 私有 helper `runLastAssistantAction({buttonSelector, errorLabel, isActive, prepare, action})`（对齐 setChatHooks options-object 先例，handleSend 明确排除），行为保持重构由全量 Vitest 1311 锚定 + grep 收敛 4→2 机械证据，见 DEV_LOG〈技术债候选区消费批次 F-109~F-111〉；F-109/F-111 复核关闭理由见复核关闭表。
-
-| 编号 | 遗留项 | 来源 | 强度 | 处置 |
-|------|--------|------|------|------|
-| F-99 | LLM 适配器多 system 折叠（last system wins 丢弃 persona/scenario/世界书 system 块） | MS-3 期末四轴 | Strong | ✅ 已修（2026-09-13：工单01 `_prepare_messages` 全量合并——按序 \n\n 连接 + 空/空白过滤 + 无 system None，test_llm_shared「取末条」契约修订为「合并」，base.py 覆盖率 100%） |
-| F-100 | spec §BR-2 前端段未消费（消息级分支 + 列表来源标记 + 存档开新对话） | BR-2 期末四轴 | Worth exploring | ✅ 已修（2026-09-13：能力 1 工单06 末条气泡分支按钮创建即打开 + 能力 2 工单07 ConversationResponse 扩分支字段 + 锚预览 + 卡片标记；能力 3 复核关闭——存档≠对话快照语义不清） |
-| F-101 | ModResponse 非可选 str/datetime 映射可空 DB 列（理论性 500） | MD-2 波 1 增量审核 Falsify | Speculative | ❌ 复核关闭（2026-09-13：create_mod/update_mod 全路径经 Schema 默认值落库不产 NULL，理论性不可达） |
-| F-102 | 排序交换非原子（两次 setSortOrder 中间态重复 sort_order） | MD-2 期末四轴 Falsify | Worth exploring | ✅ 已修（2026-09-13：工单03 `reorder_character_mods` 单事务原子端点（空列表 400/归属不符 404）+ 工单04 前端单次 reorder + computeSortSwap 改产完整新序数组，setSortOrder 前端退役） |
-| F-103 | mod-manager.js 混责（UI + 8 codec 纯函数同室） | MD-2 期末四轴 Architecture | Worth exploring | ✅ 已修（2026-09-13：工单02 提取 mod-codec.js 深模块（js 根，零 DOM），8 函数字节等价 9/9 零行为变化证明） |
-| F-104 | 客户端 Blob 下载逻辑第三份拷贝 | MD-2 期末四轴 Standards | Speculative | ❌ 复核关闭（2026-09-13：两处轻度重复，提取共享 helper 收益 < 成本） |
-| F-105 | 角色存在性守卫两处两种实现（轻 vs 重） | MD-2 期末四轴 Standards/Architecture | Speculative | ❌ 复核关闭（2026-09-13：轻量 Character.id 查询与重载会话计数是不同 seam，非缺陷） |
-| F-106 | 导入信封数组类型漏校验（mods:[[]] 建空名 Mod） | MD-2 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-13：工单05 importModsFromEnvelope 补 Array.isArray 拒绝 + 「数组拒绝/合法导入」两臂契约锁，红灯证明测试灵敏） |
-| F-110 | 发送类动作进行中态样板第 4 次复制（chat.js branchLastReply 复制 handleSend/regenerateLastReply/continueLastReply 的 ~20 行 nonStreamingInFlight + 按钮禁用 + thinking 样板） | 技术债批次期末四轴 Architecture | Worth exploring | ✅ 已修（2026-09-13：批 2 工单 F-110 提取 chat.js 私有 `runLastAssistantAction` options-object helper（prepare 可中止 + finally 统一复原含 isConnected 兜底），三函数收缩为 prepare+action 闭包、handleSend 排除；grep 4→2，Vitest 1311 断言零修改全绿） |
-
 ---
 
 ## 处置记录说明
@@ -156,4 +156,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-151），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-155），避免编号冲突。
