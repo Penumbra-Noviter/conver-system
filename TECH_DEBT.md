@@ -49,6 +49,10 @@
 | F-81 | 活跃天数/活跃窗口口径双实现：RelationshipService 导出 `activeDays`/`isRecentlyActive`（判定⑨），ProactiveMessageService 自建 `_lastActiveAt`（同源口径）——因 RelationshipService 构造按单回合评估上下文（required stage/affinity/characterId）、proactive 服务跨角色长驻无法持有实例，seam 不可达未改复用；建议上提共享（ConversationRepository 或独立 ActivityService）交主会话决策 | W3 增量审核 F6（companion-stage2）+ PS2-05 W3 返修核对 | Worth exploring | 📝 待立项 | 伴侣域 |
 | F-82 | `confirmStageUpgrade` 确认时刻重算 affinity 可能产生 stage/affinity 档位不一致中间态（proposal 用活跃态 gain=2 计算 intimacy 61，冷却后 confirm 重算 gain=1 → 写 intimate/59 属 familiar 档；下回合 evaluate 自愈）——建议补「确认时刻活跃状态漂移」复现测试 + 评估确认结果 clamp 到 targetStage 档下限（防落回旧档） | W4 增量审核 F1（companion-stage2） | Worth exploring | 📝 待立项 | 伴侣域 |
 | F-83 | `restoreProactiveSchedules` 置 expired 分支（app.dart:126 `updatePlanStatus`）无 per-plan try/catch——仅 schedule 抛错有降级，updatePlanStatus/listPlansByStatus 抛错会中断整循环，SR-08「单计划抛错不阻断其他计划」语义不完整；测试只盖 schedule 抛错 | W5 增量审核 F1（companion-stage2） | Worth exploring | 📝 待立项 | 伴侣域 |
+| F-84 | 通知热态点按零处理：无 `onDidReceiveNotificationResponse` 回调（深链仅冷启动 consumeProactiveLaunchDeepLink；App 前台/后台存活时点通知不触发送达收口与导航）+ Android 13+ 运行时权限 `requestNotificationsPermission` 未在装配请求 + scheduler 返回 false 站内兜底 SnackBar 缺失 | 期末四轴 S1/S2/A1（companion-stage2，与 C1 同源收尾） | Strong | 📝 待立项 | 伴侣域 |
+| F-85 | `ProactiveDeepLink.tryParse` 的 `int.tryParse` 接受 `0x10`/`+7`/空白与负数 id（SR-02「严格类型化」措辞比实现严格）——归属校验兜底无安全影响，建议正值域校验固化 | 期末四轴 W4-F2/W5-F5（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
+| F-86 | `extractThought` 1MiB 截断可切破 UTF-16 代理对（实测孤立 surrogate）——截断边界按代理对补齐 | 期末四轴 W3-F5（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
+| F-87 | 关系域读契约双依赖点：ChatService 注入 companionRepository 使关系域「读走仓储、写走服务」（W4 过度工程观察，成本低不阻断） | 期末四轴 W4 观察（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
 
 ## 技术债处置记录
 

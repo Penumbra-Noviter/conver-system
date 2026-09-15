@@ -406,6 +406,30 @@ class ProactiveMessageService {
     }
   }
 
+  /// 送达收口（期末四轴 C1 / SR-07）：通知点按/触达后置 sent + sentAt。
+  ///
+  /// 仅 `scheduled` 计划生效并置 `sent`（sentAt 缺省取本层 now）；已
+  /// sent/expired/dropped/不存在 → 返回 null 且零写库（幂等：重复点按不
+  /// 覆盖 sentAt，节流计数/冷却口径不受重放影响）。返回**送达操作对应的
+  /// 计划快照**（status 仍为 scheduled、sentAt null——更新前状态），消费
+  /// 面仅用 characterId 记录「点开主动消息 +5」（P4 启发式）；状态/sentAt
+  /// 以库内查回为准。
+  Future<ProactivePlan?> markDeliveredByMessageId(
+    int messageId, {
+    DateTime? at,
+  }) async {
+    final plan = await _companion.getPlanByMessageId(messageId);
+    if (plan == null || plan.status != ProactivePlanStatus.scheduled) {
+      return null;
+    }
+    await _companion.updatePlanStatus(
+      plan.id,
+      ProactivePlanStatus.sent,
+      sentAt: at ?? _now(),
+    );
+    return plan;
+  }
+
   /// 过期核对（判定⑥）：本角色 scheduled 计划中 messageId 为 null → dropped
   /// （消息载体已消失，优先）；scheduledAt 已过 → expired。幂等：置位后不再
   /// 命中 scheduled 查询。

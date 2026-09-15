@@ -1169,4 +1169,235 @@ void main() {
       expect(await db.select(db.proactivePlans).get(), hasLength(1));
     });
   });
+
+  group('ProactiveMessageService.markDeliveredByMessageId（C1 送达收口 + 节流生产可达）', () {
+    late AppDatabase db;
+    late CompanionRepository companionRepo;
+    late SettingsRepository settingsRepo;
+    late ConversationRepository conversationRepo;
+    late MessageRepository messageRepo;
+    late DateTime fixedNow;
+
+    late int plannerCalls;
+    late int schedulerCalls;
+
+    setUp(() {
+      db = AppDatabase(NativeDatabase.memory());
+      fixedNow = DateTime(2026, 9, 15, 12, 0, 0);
+      companionRepo = CompanionRepository(db, now: () => fixedNow);
+      settingsRepo = SettingsRepository(
+        database: db,
+        secretStore: InMemorySecretStore(),
+      );
+      conversationRepo = ConversationRepository(
+        db,
+        const FakeSettingsReader(),
+        now: () => fixedNow,
+      );
+      messageRepo = MessageRepository(db, now: () => fixedNow);
+      plannerCalls = 0;
+      schedulerCalls = 0;
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    Future<void> enableProactive() async {
+      await settingsRepo.setMany({'proactive_message_enabled': 'true'});
+    }
+
+    Future<({int characterId, int conversationId})> seedChain() async {
+      final character = await db.into(db.characters).insertReturning(
+            CharactersCompanion.insert(
+              name: '艾莉亚',
+              createdAt: fixedNow,
+              updatedAt: fixedNow,
+            ),
+          );
+      final conversation = await db.into(db.conversations).insertReturning(
+            ConversationsCompanion.insert(
+              characterId: character.id,
+              createdAt: fixedNow,
+              updatedAt: fixedNow,
+            ),
+          );
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: conversation.id,
+              role: Role.assistant,
+              content: '开场白',
+              createdAt: fixedNow.subtract(const Duration(days: 1)),
+            ),
+          );
+      return (characterId: character.id, conversationId: conversation.id);
+    }
+
+    Future<ProactivePlan> seedScheduledPlan({
+      required int characterId,
+      required int conversationId,
+      required DateTime scheduledAt,
+      String content = '在途计划',
+    }) async {
+      final message = await messageRepo.createMessage(
+        conversationId: conversationId,
+        role: Role.assistant,
+        content: content,
+      );
+      return companionRepo.createPlan(
+        characterId: characterId,
+        conversationId: conversationId,
+        content: content,
+        scheduledAt: scheduledAt,
+        messageId: message.id,
+      );
+    }
+
+    ProactiveMessageService buildService() {
+      return ProactiveMessageService(
+        companionRepository: companionRepo,
+        settingsRepository: settingsRepo,
+        conversationRepository: conversationRepo,
+        messageRepository: messageRepo,
+        planner: ({
+          required int characterId,
+          required int conversationId,
+          required List<String> dialogueLines,
+        }) async {
+          plannerCalls++;
+          return const (
+            shouldSend: true,
+            minutesFromNow: 30,
+            content: '想你了',
+          );
+        },
+        scheduler: _FakeScheduler((plan) {
+          schedulerCalls++;
+        }),
+        now: () => fixedNow,
+      );
+    }
+
+    test('scheduled 计划送达：置 sent + sentAt 写入，listPlansByStatus(sent) 可查回，返回 plan（characterId 正确）', () async {
+      final ids = await seedChain();
+      final plan = await seedScheduledPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        scheduledAt: fixedNow.add(const Duration(hours: 1)),
+        content: '待送达',
+      );
+      final service = buildService();
+
+      final delivered = await service.markDeliveredByMessageId(plan.messageId!);
+
+      // 任务契约：返回 plan 且 characterId 正确；状态/sentAt 以库内查回为准
+      // （返回对象为更新前快照——concern C1-1，消费面仅用 characterId）。
+      expect(delivered, isNotNull);
+      expect(delivered!.id, plan.id);
+      expect(delivered.characterId, ids.characterId);
+      final sent = await companionRepo.listPlansByStatus(ProactivePlanStatus.sent);
+      expect(sent, hasLength(1));
+      expect(sent.single.id, plan.id);
+      expect(sent.single.status, ProactivePlanStatus.sent);
+      expect(sent.single.sentAt, fixedNow);
+      expect(
+        await companionRepo.listPlansByStatus(ProactivePlanStatus.scheduled),
+        isEmpty,
+      );
+    });
+
+    test('幂等：重复送达 → null 且 sentAt 不被覆盖（显式 at 也不生效）', () async {
+      final ids = await seedChain();
+      final plan = await seedScheduledPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        scheduledAt: fixedNow.add(const Duration(hours: 1)),
+      );
+      final service = buildService();
+
+      final first = await service.markDeliveredByMessageId(plan.messageId!);
+      final second = await service.markDeliveredByMessageId(
+        plan.messageId!,
+        at: fixedNow.add(const Duration(hours: 1)),
+      );
+
+      expect(first, isNotNull);
+      expect(second, isNull);
+      final sent = await companionRepo.listPlansByStatus(ProactivePlanStatus.sent);
+      expect(sent.single.sentAt, fixedNow, reason: '重复点按不得覆盖首次送达时间');
+      expect(sent.single.status, ProactivePlanStatus.sent);
+    });
+
+    test('不存在 messageId → null 零写库', () async {
+      await seedChain();
+      final service = buildService();
+
+      final result = await service.markDeliveredByMessageId(999999);
+
+      expect(result, isNull);
+      expect(await db.select(db.proactivePlans).get(), isEmpty);
+      expect(await companionRepo.listPlansByStatus(ProactivePlanStatus.sent), isEmpty);
+    });
+
+    test('expired 计划 → null 不写（状态机只收 scheduled）', () async {
+      final ids = await seedChain();
+      final plan = await seedScheduledPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        scheduledAt: fixedNow.subtract(const Duration(hours: 1)),
+        content: '已过期',
+      );
+      await companionRepo.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
+      final service = buildService();
+
+      final result = await service.markDeliveredByMessageId(plan.messageId!);
+
+      expect(result, isNull);
+      final expired = await companionRepo.listPlansByStatus(ProactivePlanStatus.expired);
+      expect(expired.single.sentAt, isNull);
+      expect(await companionRepo.listPlansByStatus(ProactivePlanStatus.sent), isEmpty);
+    });
+
+    test('C1 节流生产可达：markDelivered 送达 1 条后同角色 planAfterTurn 被 gate 拒绝，planner 零调用', () async {
+      final ids = await seedChain();
+      await enableProactive();
+      final plan = await seedScheduledPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        scheduledAt: fixedNow.add(const Duration(hours: 1)),
+        content: '送达即节流',
+      );
+      final service = buildService();
+
+      // 生产送达收口：scheduled → sent + sentAt = fixedNow（今日）。状态以库
+      // 查回为准（返回对象为更新前快照，见 concern C1-1）。
+      final delivered = await service.markDeliveredByMessageId(plan.messageId!);
+      expect(delivered, isNotNull);
+
+      // 再规划：sentToday=1（今日计数读到送达写入）、冷却未过（sentAt 距 now
+      // 0h < 6h）→ evaluateSchedule gate 拒绝，planner/scheduler 零调用——
+      // 实证 sent 零写入问题修复后节流在生产路径可达。
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+      expect(result, 0);
+      expect(plannerCalls, 0);
+      expect(schedulerCalls, 0);
+
+      // 口径复核：gate 输入来自 markDelivered 写入的 sent 计划回读（非手工种）。
+      final sent = await companionRepo.listPlansByStatus(ProactivePlanStatus.sent);
+      expect(sent, hasLength(1));
+      expect(sent.single.sentAt, fixedNow);
+      final gate = evaluateSchedule(
+        sentToday: sent.length,
+        lastSentAt: sent.single.sentAt,
+        lastActiveAt: fixedNow.subtract(const Duration(days: 1)),
+        hasInFlightPlan: false,
+        now: fixedNow,
+      );
+      expect(gate.allowed, isFalse);
+      expect(gate.reason, 'cooldown');
+    });
+  });
 }

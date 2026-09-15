@@ -67,6 +67,74 @@ class _RecordingScheduler implements ProactiveNotificationScheduler {
   }
 }
 
+/// C1 送达收口 fake（implements 最小公开面）：记录 markDeliveredByMessageId
+/// 调用并返回可配置计划（null = 计划不存在/非 scheduled）。
+class _FakeProactiveMessageService implements ProactiveMessageService {
+  _FakeProactiveMessageService({this.delivered});
+
+  /// markDeliveredByMessageId 返回值。
+  final ProactivePlan? delivered;
+
+  /// 收到送达收口的 messageId 列表（调用记录）。
+  final List<int> markedMessageIds = [];
+
+  @override
+  Future<ProactivePlan?> markDeliveredByMessageId(
+    int messageId, {
+    DateTime? at,
+  }) async {
+    markedMessageIds.add(messageId);
+    return delivered;
+  }
+
+  @override
+  Future<int> planAfterTurn({
+    required int characterId,
+    required int conversationId,
+  }) async {
+    return 0;
+  }
+}
+
+/// C1 关系侧 fake：记录 recordProactiveMessageOpened 收到的 characterId。
+class _FakeRelationshipService implements RelationshipService {
+  /// 收到「点开主动消息」记录的角色 id 列表。
+  final List<int> openedCharacterIds = [];
+
+  @override
+  Future<StageUpgradeProposal?> recordProactiveMessageOpened(
+    int characterId,
+  ) async {
+    openedCharacterIds.add(characterId);
+    return null;
+  }
+
+  @override
+  Future<StageUpgradeProposal?> evaluateAfterTurn({
+    required int characterId,
+    required int conversationId,
+  }) async {
+    return null;
+  }
+
+  @override
+  Future<bool> confirmStageUpgrade({
+    required int characterId,
+    required RelationshipStage targetStage,
+  }) async {
+    return false;
+  }
+
+  @override
+  Future<void> rejectStageUpgrade({required int characterId}) async {}
+
+  @override
+  Future<int> activeDays(int characterId) async => 0;
+
+  @override
+  Future<bool> isRecentlyActive(int characterId) async => false;
+}
+
 void main() {
   late AppDatabase db;
   late CharacterRepository characterRepo;
@@ -247,6 +315,80 @@ void main() {
 
       expect(navigator.selectCalls, 1, reason: '导航失败不崩溃，tab 已切到聊天列表');
       expect(navigator.opened, isEmpty, reason: 'openConversation 抛错被消化');
+    });
+
+    test('C1：传服务 → 归属通过后 markDelivered 被调用 + recordProactiveMessageOpened 收到 characterId', () async {
+      final seed = await seedConversationWithMessage();
+      final plan = await seedPlan(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+        status: ProactivePlanStatus.scheduled,
+        scheduledAt: DateTime(2026, 9, 20, 10),
+      );
+      final payload = ProactiveDeepLink.encode(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+      );
+      final navigator = _RecordingNavigator();
+      final proactive = _FakeProactiveMessageService(delivered: plan);
+      final relationship = _FakeRelationshipService();
+
+      await handleProactiveDeepLink(
+        payload: payload,
+        navigator: navigator,
+        messageRepository: messageRepo,
+        proactiveMessageService: proactive,
+        relationshipService: relationship,
+      );
+
+      expect(proactive.markedMessageIds, [seed.messageId]);
+      expect(relationship.openedCharacterIds, [plan.characterId]);
+      expect(navigator.selectCalls, 1);
+      expect(navigator.opened.single.conversationId, seed.conversationId);
+      expect(navigator.opened.single.highlightMessageId, seed.messageId);
+    });
+
+    test('C1：markDelivered 返回 null（已送达/不存在）→ 不调 relationship，导航照常', () async {
+      final seed = await seedConversationWithMessage();
+      final payload = ProactiveDeepLink.encode(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+      );
+      final navigator = _RecordingNavigator();
+      final proactive = _FakeProactiveMessageService(delivered: null);
+      final relationship = _FakeRelationshipService();
+
+      await handleProactiveDeepLink(
+        payload: payload,
+        navigator: navigator,
+        messageRepository: messageRepo,
+        proactiveMessageService: proactive,
+        relationshipService: relationship,
+      );
+
+      expect(proactive.markedMessageIds, [seed.messageId]);
+      expect(relationship.openedCharacterIds, isEmpty, reason: '未实际送达（幂等重放）不计点开');
+      expect(navigator.opened, hasLength(1));
+    });
+
+    test('C1：不传服务（既有测试形态）→ 行为不变，导航照常', () async {
+      final seed = await seedConversationWithMessage();
+      final payload = ProactiveDeepLink.encode(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+      );
+      final navigator = _RecordingNavigator();
+
+      await handleProactiveDeepLink(
+        payload: payload,
+        navigator: navigator,
+        messageRepository: messageRepo,
+      );
+
+      expect(navigator.selectCalls, 1);
+      expect(navigator.opened, hasLength(1));
+      expect(navigator.opened.single.conversationId, seed.conversationId);
+      expect(navigator.opened.single.highlightMessageId, seed.messageId);
     });
   });
 

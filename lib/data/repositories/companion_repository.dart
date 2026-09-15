@@ -109,6 +109,15 @@ class CompanionRepository {
         .getSingleOrNull();
   }
 
+  /// 按消息 id 反查计划（C1 送达收口用：通知深链 payload 只有 messageId）。
+  /// messageId 可空列——null/未命中 → null；同 messageId 双计划按 W2 实测
+  /// 会抛 StateError（正常不可达：createPlan 由消息回填唯一），docstring 明示。
+  Future<ProactivePlan?> getPlanByMessageId(int messageId) {
+    return (_db.select(_db.proactivePlans)
+          ..where(($ProactivePlansTable t) => t.messageId.equals(messageId)))
+        .getSingleOrNull();
+  }
+
   /// 更新计划状态；`sentAt` **仅** status = sent 时写入（显式传入优先，
   /// 缺省取本层 now），其余状态不触碰 sentAt（保留原值）。
   Future<void> updatePlanStatus(

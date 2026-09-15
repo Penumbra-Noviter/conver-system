@@ -121,6 +121,8 @@ Future<String?> readProactiveLaunchPayload({
 Future<void> consumeProactiveLaunchDeepLink({
   required ProactiveDeepLinkNavigator navigator,
   required MessageRepository messageRepository,
+  ProactiveMessageService? proactiveMessageService,
+  RelationshipService? relationshipService,
   Future<String?> Function()? readPayload,
 }) async {
   final String? payload;
@@ -137,6 +139,8 @@ Future<void> consumeProactiveLaunchDeepLink({
     payload: payload,
     navigator: navigator,
     messageRepository: messageRepository,
+    proactiveMessageService: proactiveMessageService,
+    relationshipService: relationshipService,
   );
 }
 
@@ -154,6 +158,8 @@ Future<void> handleProactiveDeepLink({
   required String payload,
   required ProactiveDeepLinkNavigator navigator,
   required MessageRepository messageRepository,
+  ProactiveMessageService? proactiveMessageService,
+  RelationshipService? relationshipService,
 }) async {
   final parsed = ProactiveDeepLink.tryParse(payload);
   if (parsed == null) {
@@ -166,6 +172,22 @@ Future<void> handleProactiveDeepLink({
     if (!belongs) {
       navigator.selectChatTab();
       return;
+    }
+    // C1 送达收口（SR-07）：归属校验通过 = 通知已被用户点按触达 → 置 sent +
+    // sentAt（节流计数/冷却口径生产可达），并记录「点开主动消息 +5」
+    // （P4 启发式，PS2-03 recordProactiveMessageOpened 消费）。失败仅
+    // debugPrint 不阻断导航；缺省 null（测试形态）跳过。
+    if (proactiveMessageService != null) {
+      try {
+        final delivered = await proactiveMessageService
+            .markDeliveredByMessageId(parsed.messageId);
+        if (delivered != null && relationshipService != null) {
+          await relationshipService
+              .recordProactiveMessageOpened(delivered.characterId);
+        }
+      } catch (e) {
+        debugPrint('主动消息送达收口失败（不阻断导航）: $e');
+      }
     }
   } catch (e) {
     debugPrint('主动消息深链归属校验失败，回落对话列表: $e');
@@ -442,6 +464,9 @@ class ConverApp extends StatelessWidget {
                 chatController: context.read<ChatController>(),
               ),
               messageRepository: context.read<MessageRepository>(),
+              proactiveMessageService:
+                  context.read<ProactiveMessageService>(),
+              relationshipService: context.read<RelationshipService>(),
             ));
             return null;
           },
