@@ -1030,6 +1030,7 @@ def build_prompt_debug(db: Session, conversation_id: int) -> PromptDebugResponse
         append_current_input=True,
         world=combined,
         narrative_style=narrative_style,
+        preset_dialogue=conv.preset_dialogue or "",
     )
 
     return PromptDebugResponse(
