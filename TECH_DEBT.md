@@ -53,6 +53,7 @@
 | F-85 | `ProactiveDeepLink.tryParse` 的 `int.tryParse` 接受 `0x10`/`+7`/空白与负数 id（SR-02「严格类型化」措辞比实现严格）——归属校验兜底无安全影响，建议正值域校验固化 | 期末四轴 W4-F2/W5-F5（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
 | F-86 | `extractThought` 1MiB 截断可切破 UTF-16 代理对（实测孤立 surrogate）——截断边界按代理对补齐 | 期末四轴 W3-F5（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
 | F-87 | 关系域读契约双依赖点：ChatService 注入 companionRepository 使关系域「读走仓储、写走服务」（W4 过度工程观察，成本低不阻断） | 期末四轴 W4 观察（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
+| F-88 | 冷启动点按送达收口竞态：启动副作用顺序 `_startProactiveNotifications→restoreProactiveSchedules`（app.dart:391 先，pending 且 scheduledAt≤now → expired）先于 `consumeProactiveLaunchDeepLink`（app.dart:458 后，`markDeliveredByMessageId` 仅 scheduled 生效）——通知点按必在 scheduledAt 之后（inexact 弹窗延迟常态），冷启动点按被 expired 吞噬 → sent/sentAt 不落、节流计数/冷却口径不更新、关系 +5 不触发；C1 单测直接调用无 restore 竞态覆盖 | 真机冒烟补验（2026-09-16，companion-stage2 续） | Strong | 📝 待立项 | 伴侣域 |
 
 ## 技术债处置记录
 

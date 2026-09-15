@@ -6,6 +6,17 @@
 
 ---
 
+## 真机冒烟补验批次 — 主动消息通知真通道 + 深链（2026-09-16 — 用户「真机/模拟器冒烟补验」指令）
+
+- **范围**：handoff 阶段 2 收官后的实机验证（阶段 2 交付时纯单测兜底，未做模拟器/真机冒烟；交接建议「通知平台薄层真通道验证是下一批次首选实机验证项」）。API 35 模拟器（medium_phone）+ debug APK 全链路：安装/启动/引导 → 数据库注入（角色/会话/6 消息/关系 familiar-50/2 记忆/1 独白/scheduled 计划，now+90s）→ 排程恢复 → 通知真通道 → 冷/热态点按深链 → 送达收口。
+- **PASS 项**：构建链修复后 APK 安装启动正常、首启引导（4 页分页器）/聊天空态/角色空态/注入数据渲染（角色条/会话列表「6 条消息」）正常；通知排程真通道完整实证（zonedSchedule → AlarmManager `RTC_WAKEUP` 注册 → 到点投递 `NotificationRecord channel=proactive_messages importance=4 vis=PRIVATE`，通知栏「主动消息/角色发来一条消息」固定摘要——SR-03 零内容 / SR-11 锁屏隐私实证）；**冷启动深链导航 PASS**（进程杀后点通知 → App 冷启动 → 直接打开目标会话 + 目标消息琥珀色 3 秒高亮，C1 导航链路真机闭环）。
+- **阻断级发现 4 项**：
+  1. **构建断链（本次已修，Critical）**：flutter_local_notifications 22.3.1 AAR 元数据强制 core library desugaring，`android/app/build.gradle.kts` 未开启 → `checkDebugAarMetadata` 直接失败——**阶段 2 交付后 debug/release APK 均无法构建**（1948 测绿不覆盖 Android 构建配置）。修复：compileOptions `isCoreLibraryDesugaringEnabled = true` + `coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")`；构建复验 PASS。
+  2. **F-84 三项全实锤（未修，Strong 升级确认）**：App 全程未请求运行时权限（`appops POST_NOTIFICATION: ignore, userSet=false`——无 `requestNotificationsPermission` 装配）→ Android 13+ 真实用户开启开关也收不到通知（实测无权限时计划到点通知不显示、importance=NONE）；热态点按零处理实锤（App 存活时点通知 → 仅回聊天首页，payload 未消费、无收口、无导航——`onDidReceiveNotificationResponse` 缺失）；scheduler 返回 false 无站内兜底（代码确认，ProactiveMessageService 忽略返回值）。
+  3. **新发现 C 级竞态：冷启动点按的送达收口被过期置位吞噬（落债 F-88）**：App 冷启动两个启动副作用按**声明顺序**执行——`_startProactiveNotifications→restoreProactiveSchedules`（app.dart:391，先）把「pending 且 scheduledAt ≤ now」置 expired，`consumeProactiveLaunchDeepLink`（app.dart:458，后）消费 payload 调 `markDeliveredByMessageId`（仅 scheduled 生效）。通知点按必在 scheduledAt 之后（inexact 弹窗延迟是常态）→ 冷启动点按几乎必被置 expired → sent/sentAt 不落、节流计数/冷却口径不更新、关系 +5 不触发。C1 的 8 例单测为直接调用无 restore 竞态覆盖；真机实证：点按后 plan=expired、affinity 50 未变。
+  4. 测试数据注意（非缺陷）：数据库直注绕过运行时，`<thought>` 标签原样渲染——剥离仅存在于 ChatService 落库路径（ThoughtService.stripAndPersist），不入库不剥离。
+- **验收口径**：通知排程/投递/冷启动深链导航 = PASS；热态点按/权限请求/收口竞态 = FAIL。**净收益 = 抓出 1 条构建断链（Critical）+ 1 条收口竞态（C 级）+ F-84 三项全实证**——印证交接「通知真通道待实机验证」的提示价值。
+
 ## 人机恋阶段 2 批次 — 主动消息 / 关系状态机 / 内心独白（2026-09-15 — /project-kickoff 全自动档）
 
 - **范围**：执行 handoff 阶段 2 三项（主动消息循环 / 关系状态机 / 内心独白）。Grilling 共识 6 真拍点（P1~P6）全按推荐；threat-model SR-01~15（P0×10 P1×2 P2×3）并入工单验收；ADR-0005/0006/0007 落盘；新增依赖 flutter_local_notifications 22.3.1 / timezone 0.11.1 精确钉版。
