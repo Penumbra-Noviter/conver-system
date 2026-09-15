@@ -20,7 +20,12 @@ import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from backend.app.services.llm.prompt import apply_template_vars
+from backend.app.services.llm.prompt import (
+    SOURCE_MEMORY,
+    SOURCE_WORLD,
+    InjectedSegment,
+    apply_template_vars,
+)
 
 __all__ = [
     "LorebookEntryData",
@@ -121,26 +126,36 @@ def build_world_injection(
     *,
     user_name: str = "User",
     char_name: str = "Character",
-) -> dict[str, list[str]]:
-    """按 position 分组构建注入块（纯函数）
+    source_by_id: dict[int, str] | None = None,
+) -> dict[str, list[InjectedSegment]]:
+    """按 position 分组构建带来源注入块（纯函数）
 
     返回 ``{"system": [...], "before_char": [...], "after_char": [...]}``：
     组内按 (order, id) 升序；content 经 ``{{user}}`` / ``{{char}}`` 模板替换
     （与角色字段模板变量同 seam）。未知 position 回落 world（system 块），
     不静默丢弃。
 
+    source 标注（PD-3 来源保真）：来源经 entry.id 反查 ``source_by_id`` 传入，
+    ``LorebookEntryData`` 自身零 source 契约不变——值为 ``"auto"`` 时标
+    ``SOURCE_MEMORY``，其余（缺省键或非 auto 值）标 ``SOURCE_WORLD``。
+
     Args:
         activated: 激活引擎输出（已排序与否均可，本函数内部稳定排序）
         user_name: {{user}} 模板变量值
         char_name: {{char}} 模板变量值
+        source_by_id: entry id → source（如 "auto"/"manual"）；None/缺省键 → world
 
     Returns:
-        position → 注入内容列表（按 (order, id) 升序）
+        position → 注入分段列表（按 (order, id) 升序）
     """
-    blocks: dict[str, list[str]] = {"system": [], "before_char": [], "after_char": []}
+    blocks: dict[str, list[InjectedSegment]] = {
+        "system": [], "before_char": [], "after_char": [],
+    }
     for entry in sorted(activated, key=_sort_key):
         key = _POSITION_KEYS.get(entry.position, "system")
-        blocks[key].append(apply_template_vars(entry.content, user_name, char_name))
+        source = SOURCE_MEMORY if (source_by_id or {}).get(entry.id) == "auto" else SOURCE_WORLD
+        content = apply_template_vars(entry.content, user_name, char_name)
+        blocks[key].append(InjectedSegment(content=content, source=source))
     return blocks
 
 
