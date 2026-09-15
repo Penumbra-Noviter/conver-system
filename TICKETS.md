@@ -42,9 +42,9 @@
 
 | Ticket | 标题 | F 项 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
-| F-152 | build_world_injection 契约锁：空激活集三空键 + source_by_id 未知值回落 SOURCE_WORLD（+2 用例） | F-152 | 2026-09-15 | 待 commit |
-| F-153 | build_message_list preset_dialogue None 直传零注入契约锁（+1 用例） | F-153 | 2026-09-15 | 待 commit |
-| F-154 | CharacterData.from_orm docstring 注记 object 签名有意保持零 ORM 依赖 | F-154 | 2026-09-15 | 待 commit |
+| F-152 | build_world_injection 契约锁：空激活集三空键 + source_by_id 未知值回落 SOURCE_WORLD（+2 用例） | F-152 | 2026-09-15 | 1e7a93b |
+| F-153 | build_message_list preset_dialogue None 直传零注入契约锁（+1 用例） | F-153 | 2026-09-15 | 1e7a93b |
+| F-154 | CharacterData.from_orm docstring 注记 object 签名有意保持零 ORM 依赖 | F-154 | 2026-09-15 | 1e7a93b |
 
 **验证链：** pytest 1352+1skip→1355+1skip（+3 契约锁）+ 受影响模块 44 passed | 复核关闭 F-155（开发级 debug 日志非在线 prompt 契约，spec 无追认载体）| 技术债候选区 4→0 清零 | doc_sync + pool_cleanup_check 全合规
 **非阻断落债：** 无（候选区清零）
