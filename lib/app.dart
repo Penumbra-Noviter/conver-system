@@ -18,6 +18,7 @@ import 'services/document_parse_service.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/memory/memory_service.dart';
+import 'services/memory/reflection_service.dart';
 import 'services/onboarding.dart';
 import 'services/secure_store.dart';
 import 'services/simulator/game_generator.dart';
@@ -92,6 +93,40 @@ class ConverApp extends StatelessWidget {
         Provider<LLMProviderFactory>(
           create: (_) => const LLMFactory(),
         ),
+        // 人机恋阶段 1.5 后台反思装配（ADR-0004）：ReflectionService 依赖三
+        // 仓储 + LLM 工厂 + 凭据解析链（wireCredentialsResolver 单一落点）；
+        // 置于 ChatService 之前（后者经 provider 消费，装配单源）。
+        Provider<ReflectionService>(
+          create: (context) {
+            final settings = context.read<SettingsRepository>();
+            final factory = context.read<LLMProviderFactory>();
+            return ReflectionService(
+              characterRepository: context.read<CharacterRepository>(),
+              memoryRepository: context.read<MemoryRepository>(),
+              messageRepository: context.read<MessageRepository>(),
+              extractor: ({
+                required String charName,
+                required List<String> dialogueLines,
+                required List<String> existingFacts,
+              }) async {
+                final resolved =
+                    await settings.wireCredentialsResolver().resolve();
+                final llm = factory.create(
+                      provider: resolved.provider,
+                      apiKey: resolved.apiKey,
+                      baseUrl: resolved.baseUrl,
+                    );
+                return extractPersonaFactsWithProvider(
+                  llm: llm,
+                  model: resolved.model,
+                  charName: charName,
+                  dialogueLines: dialogueLines,
+                  existingFacts: existingFacts,
+                );
+              },
+            );
+          },
+        ),
         Provider<ChatService>(
           create: (context) => ChatService(
             database: context.read<AppDatabase>(),
@@ -101,6 +136,7 @@ class ConverApp extends StatelessWidget {
             settingsRepository: context.read<SettingsRepository>(),
             providerFactory: context.read<LLMProviderFactory>(),
             memoryService: context.read<MemoryService>(),
+            reflectionService: context.read<ReflectionService>(),
           ),
         ),
         // M4-03 导出装配：纯逻辑服务（复用三仓储 + SettingsRepository as

@@ -31,6 +31,14 @@
 
 ## 已完成归档
 
+### 人机恋阶段 1.5 批次 — 后台反思提取（2026-09-15 收口）
+
+> 来源：用户「阶段 1.5 可选增强」指令（handoff-ai-companion-mobile 阶段 1.5）。ADR-0004 立项：每 6 回合异步 LLM 提炼人格事实（默认关闭、仅人格事实、去重、失败降级）。交付：ReflectionService + ChatService 挂点 + settings 开关 + 设置页 UI。门禁：全量 **1740 测**绿（+15）/ analyze 0；详见 DEV_LOG〈人机恋阶段 1.5 批次〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| AC-06 | 后台反思提取：ReflectionService + ChatService 挂点 + settings 开关 + 设置页 UI | 2026-09-15 | （见收口提交） |
+
 ### 人机恋阶段 1 MVP 批次 — 记忆 + 抗 OOC + 人设演化（2026-09-15 收口）
 
 > 来源：用户「继续」执行 handoff-ai-companion-mobile（ADR-0003 立项）。5 工单依依赖序 AC-01→AC-05 交付：01 数据层（MemoryEntries 单表 + kind 区分 + PersonaRevisions 版本化 + schemaVersion 1→2 onUpgrade + MemoryRepository 全语义 CRUD）；02 记忆指令（`<add>`/`<persona>`/`<search>` 解析落库 + 记忆三模式 system prompt 模板）；03 记忆注入（ChatService._assembleMessages 每轮重注入人格事实抗 OOC + assistant 落库前剥离标签）；04 人设演化（PersonaEvolutionService 反思 seam + PersonaRevisions 快照 + 用户确认闸门回写 personality）；05 记忆管理 UI（角色卡「记忆」入口 + 条目增改删 + 演化历史）。门禁：全量 **1725 测**绿 / analyze 0；详见 DEV_LOG〈人机恋阶段 1 MVP 批次〉。

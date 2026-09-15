@@ -32,6 +32,7 @@ class ConversationSettingsPage extends StatefulWidget {
 class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
   double _temperature = SettingsRepository.defaultTemperature;
   final TextEditingController _maxTokensController = TextEditingController();
+  bool _reflectionEnabled = false;
   bool _loaded = false;
 
   @override
@@ -51,12 +52,15 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
     try {
       final temperature = await widget.settingsRepository.getTemperature();
       final maxTokens = await widget.settingsRepository.getMaxTokens();
+      final reflectionEnabled =
+          await widget.settingsRepository.memoryReflectionEnabled;
       if (!mounted) {
         return;
       }
       setState(() {
         _temperature = temperature;
         _maxTokensController.text = maxTokens.toString();
+        _reflectionEnabled = reflectionEnabled;
         _loaded = true;
       });
     } catch (e) {
@@ -96,6 +100,27 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       if (!mounted) {
         return;
       }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('保存失败')));
+    }
+  }
+
+  /// 切换后台反思开关（即时写入 `memory_reflection_enabled` 键，ADR-0004）。
+  ///
+  /// 写失败回滚 UI 状态并提示；开关即时生效，无需点「保存」。
+  Future<void> _setReflection(bool value) async {
+    setState(() => _reflectionEnabled = value);
+    try {
+      await widget.settingsRepository.setMany({
+        SettingsRepository.memoryReflectionEnabledKey: value.toString(),
+      });
+    } catch (e) {
+      debugPrint('后台反思开关保存失败: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() => _reflectionEnabled = !value);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('保存失败')));
@@ -161,6 +186,24 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     decoration: const InputDecoration(
                       hintText: '输入最大 token 数',
                     ),
+                  ),
+                  const SizedBox(height: ConverSpacing.space4),
+                  Divider(thickness: 1, color: palette.border),
+                  const SizedBox(height: ConverSpacing.space2),
+                  Text(
+                    '后台反思',
+                    style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+                  ),
+                  const SizedBox(height: ConverSpacing.space1),
+                  Text(
+                    '每 6 回合后台提炼人格事实，增强记忆（需额外 LLM 调用）',
+                    style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('后台反思记忆'),
+                    value: _reflectionEnabled,
+                    onChanged: _setReflection,
                   ),
                   const SizedBox(height: ConverSpacing.space5),
                   FilledButton(

@@ -77,6 +77,7 @@ class SettingsRepository implements SettingsReader {
     'template_vars',
     'onboarding_completed',
     'memory_prompt_mode',
+    'memory_reflection_enabled',
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -118,6 +119,10 @@ class SettingsRepository implements SettingsReader {
   /// 记忆三模式缺省（'medium' = 关键信息记录模式，对齐逆向对照材料的
   /// MEDIUM 档；`services/memory/memory_prompt.dart::MemoryPromptMode` 解析）。
   static const String defaultMemoryPromptMode = 'medium';
+
+  /// 后台反思开关落库键（人机恋阶段 1.5，ADR-0004，mobile 先行键；桌面无
+  /// 对应物）。存储值 'true' 表示开启，其余一律视为关闭。
+  static const String memoryReflectionEnabledKey = 'memory_reflection_enabled';
 
   // ── 键值 CRUD ──
 
@@ -310,6 +315,15 @@ class SettingsRepository implements SettingsReader {
   Future<String> get memoryPromptMode async {
     final value = await getValue(memoryPromptModeKey);
     return value.isEmpty ? defaultMemoryPromptMode : value;
+  }
+
+  /// 后台反思开关（人机恋阶段 1.5，ADR-0004，mobile 先行键）；缺省 **false**
+  /// （默认关闭，成本敏感，用户显式开启）。
+  ///
+  /// 存储值为 'true' 时开启；空串 / 缺失 / 其他值一律 false。
+  Future<bool> get memoryReflectionEnabled async {
+    final value = await getValue(memoryReflectionEnabledKey);
+    return value == 'true';
   }
 
   /// 默认 provider；缺省 [SettingsDefaults.provider]（镜像桌面

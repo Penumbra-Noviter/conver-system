@@ -37,8 +37,8 @@ void main() {
     return {for (final row in rows) row.key: row.value};
   }
 
-  group('A1 白名单键集（G5 + 工单 03/04/05）', () {
-    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 五 mobile 先行键', () {
+  group('A1 白名单键集（G5 + 工单 03/04/05 + 人机恋）', () {
+    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 六 mobile 先行键', () {
       expect(
         SettingsRepository.allowedKeys,
         equals(<String>{
@@ -57,6 +57,7 @@ void main() {
           'template_vars',
           'onboarding_completed',
           'memory_prompt_mode',
+          'memory_reflection_enabled',
         }),
       );
     });

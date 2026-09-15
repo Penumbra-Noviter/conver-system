@@ -69,6 +69,7 @@ import 'llm/llm_provider.dart';
 import 'llm/prompt.dart';
 import 'memory/memory_prompt.dart';
 import 'memory/memory_service.dart';
+import 'memory/reflection_service.dart';
 import 'template_vars.dart';
 
 /// 流式回合的产出事件（sealed：token / done / interrupted / error）。
@@ -266,6 +267,7 @@ class ChatService {
     required this._providerFactory,
     CredentialsResolver? credentialsResolver,
     this._memoryService,
+    this._reflectionService,
     List<Duration> connectRetryDelays = const [
       Duration(seconds: 1),
       Duration(seconds: 2),
@@ -284,6 +286,9 @@ class ChatService {
 
   /// 记忆编排服务（人机恋 AC-02/AC-03）；null = 记忆功能未启用（既有装配零改动）。
   final MemoryService? _memoryService;
+
+  /// 后台反思服务（人机恋阶段 1.5，ADR-0004）；null = 反思未启用（既有装配零改动）。
+  final ReflectionService? _reflectionService;
 
   /// 凭据解析链（AR-3）：组合序单一归属 [CredentialsResolver]；缺省由
   /// [_settingsRepository] 装配 reader（测试可注入，既有装配零 churn）。
@@ -600,6 +605,11 @@ class ChatService {
     }
     try {
       final msg = await _persistAssistant(state);
+      // 完整 assistant 落库后触发后台反思（ADR-0004：fire-and-forget，失败
+      // 降级不阻断主回复；零 token 空流不触发）。
+      if (msg != null) {
+        unawaited(_maybeReflectAfterTurn(state));
+      }
       // F3 同类硬化：onDone 与 onCancel 竞态（收尾瞬间取消）下 controller 可能
       // 已关闭，add 前守卫避免 add-after-close 的未处理异常。
       if (!controller.isClosed) {
@@ -771,6 +781,31 @@ class ChatService {
     } catch (e) {
       debugPrint('记忆指令处理失败，保留原始回复: $e');
       return content;
+    }
+  }
+
+  /// 完整 assistant 落库后触发后台反思（ADR-0004，fire-and-forget）。
+  ///
+  /// 反思功能未启用（[_reflectionService] == null）或角色 id 未知（校验失败
+  /// 路径）→ 跳过；设置开关关闭（缺省 false）→ 跳过；反思失败 → 降级 log
+  /// 不阻断主回复（对齐「记忆失败不阻断主回复」约束）。
+  Future<void> _maybeReflectAfterTurn(_StreamRunState state) async {
+    final reflectionService = _reflectionService;
+    final characterId = state.characterId;
+    if (reflectionService == null || characterId == null) {
+      return;
+    }
+    try {
+      final enabled = await _settingsRepository.memoryReflectionEnabled;
+      if (!enabled) {
+        return;
+      }
+      await reflectionService.reflectAfterTurn(
+        characterId: characterId,
+        conversationId: state.conversationId,
+      );
+    } catch (e) {
+      debugPrint('后台反思失败，跳过: $e');
     }
   }
 

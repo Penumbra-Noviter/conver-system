@@ -35,7 +35,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - `flutter test`（纯 Dart 单测 + 无头 widget 测试），覆盖率目标 ≥ 90%
 - 业务逻辑（chat/llm/数据层/导入链/生成校验）占比最大且是纯 Dart → 可靠性主要由单测兜底；平台薄层做真机/模拟器验证
 
-## 当前状态（2026-09-14）
+## 当前状态（2026-09-15）
 
 - ✅ 设计已落盘：`docs/mobile-design.md`（单一事实来源）+ `docs/mobile-adaptation-research.md`（决策背景）；决策集 Q0~Q14 已拍板，ADR-0002 见桌面库 `desktop/CONSENSUS.md`
 - ✅ 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35+36+37/AEHD + Flutter 3.47.2；AVD medium_phone 数据已迁至 F:\tools\android\avd，2026-09-04；MCP 插件 preflight 全绿）
@@ -55,6 +55,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - ✅ **U-UX 补全批次已收口**（2026-09-14）：聊天首页角色选择条 + 会话重命名/删除 / LLMProvider 补 temperature 参数（15 子类）+ 全局 temperature/max_tokens（角色级为主、全局兜底）/ 模板变量 extraVars 全局替换管线 + 编辑页 / 首次启动分页新手指引（启动门 + 跳过持久化）；全量 1681 测绿 / analyze 0 / 期末四轴 0 阻断（修复 F-73 色彩契约回归 eb7b119）；commit b302fb3 / 6abcb6d+126e09d / ced8253 / e6cf008+1dbd0ef
 - ✅ **技术债消费批次 F-75/F-76/F-77 已全部处置**（2026-09-14）：F-76 消费（_resolveTemperature 加 NaN/Infinity 回退全局 + 越界 clamp [0,2]）+ F-75/77 复核关闭（种子 HTML 内容资产 CSS / SettingsReader implements 成本）；候选区清零；全量 1684 测绿（+3）/ analyze 0
 - ✅ **人机恋阶段 1 MVP 已交付**（2026-09-15，角色对话增强）：记忆 prompt 指令驱动（`<add>`/`<persona>`/`<search>`）+ 每轮重注入人格事实抗 OOC + 人设演化（PersonaRevisions 版本化 + 用户确认闸门）+ 角色卡「记忆」管理页；AC-01~AC-05 全落地（schemaVersion 1→2 + MemoryEntries/PersonaRevisions + MemoryService + PersonaEvolutionService）；全量 1725 测绿 / analyze 0；主动消息/关系状态/内心独白留阶段 2；ADR-0003 见 docs/adr-0003-ai-companion.md；调研见 docs/ai-companion-research.md
+- ✅ **人机恋阶段 1.5 已交付**（2026-09-15，后台反思提取）：每 6 回合异步 LLM 提炼人格事实落 `persona_fact`（默认关闭、仅人格事实、去重、失败降级）；ReflectionService（seam 化）+ ChatService 挂点 + settings 开关 `memory_reflection_enabled` + 设置页 UI；全量 1740 测绿 / analyze 0；ADR-0004 见 docs/adr-0004-ai-companion-reflection.md
 
 ## 文档体系
 

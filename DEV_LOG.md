@@ -6,6 +6,15 @@
 
 ---
 
+## 人机恋阶段 1.5 批次 — 后台反思提取（2026-09-15 — 用户「阶段 1.5 可选增强」指令）
+
+- **范围**：执行 ADR-0004（后台反思提取）——每 N 回合异步 LLM 提炼人格事实落 `persona_fact`，补 prompt 指令驱动（阶段 1）遗漏的稳定事实。三决策拍板：每 6 回合反思（user 消息数 `% 6 == 0` 幂等判定）、默认关闭、仅人格事实。全量 **1740 测**绿（+15）/ analyze 0。
+- **ReflectionService**（`lib/services/memory/reflection_service.dart`）：协议表面 `reflectAfterTurn` 单入口，内聚「节流判定 → 对话历史组装 → extractor 反思 → `parseReflectionFacts` 三级 JSON 数组容错 → 去重落库」；seam 化（`PersonaFactExtractor` typedef + `extractPersonaFactsWithProvider` 生产包装 `generate`），复用 `PersonaEvolutionService` 同构 seam 模式。
+- **挂点**：ChatService 增可选 `ReflectionService` 依赖（`this._reflectionService`，null = 未启用，既有装配零改动）；`_onProviderStreamDone` 完整 assistant 落库后 `unawaited(_maybeReflectAfterTurn)` fire-and-forget，失败降级 `debugPrint` 不阻断主回复。
+- **开关**：settings 白名单加 `memory_reflection_enabled`（默认 false，成本敏感）；`SettingsRepository.memoryReflectionEnabled` getter；「对话」设置子页加 SwitchListTile「后台反思记忆」即时写入。
+- **装配**：app.dart 增 `ReflectionService` provider（extractor 闭包经 `wireCredentialsResolver().resolve()` + `LLMProviderFactory.create`，await 前 capture factory 规避 `use_build_context_synchronously`）。
+- **过程遥测**：主会话直做（纯 Dart 业务 + 无头测试）；合并冲突 0；flaky 0。
+
 ## 人机恋阶段 1 MVP 批次 — 记忆 + 抗 OOC + 人设演化（2026-09-15 — 用户「继续」handoff）
 
 - **范围**：执行 ADR-0003 立项的 AC-01~AC-05（记忆 prompt 指令驱动 + 抗 OOC 每轮重注入 + 人设演化版本化 + 记忆管理 UI）。依依赖序 AC-01→AC-05 交付，全量 **1725 测**绿 / analyze 0。
