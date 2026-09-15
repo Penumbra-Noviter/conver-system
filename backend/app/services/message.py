@@ -156,6 +156,10 @@ def build_message_list(
     空串/纯空白零注入。由调用方（assemble_chat_context / build_prompt_debug）查
     narrative_style_enabled/rules 决定是否传入——本函数不查设置（纯透传）。
 
+    preset_dialogue（06）：预设对话快照文本，直接读 conversation.preset_dialogue
+    快照列（非角色卡 character.preset_dialogues 实时值，改卡不影响已建会话）并
+    透传 build_messages；空串/纯空白零注入。
+
     查询角色与历史消息后，委托给 services/llm/prompt.py 的纯函数完成组装。
 
     append_current_input=False（重生成路径）：不追加当前 user 输入；输出末条
@@ -191,6 +195,7 @@ def build_message_list(
         append_current_input=append_current_input,
         world=world_injection,
         narrative_style=narrative_style,
+        preset_dialogue=conversation.preset_dialogue or "",
     )
 
 

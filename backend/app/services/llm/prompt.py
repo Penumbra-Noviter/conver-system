@@ -152,6 +152,7 @@ def build_messages(
     append_current_input: bool = True,
     world: dict[str, list[str]] | None = None,
     narrative_style: str = "",
+    preset_dialogue: str = "",
 ) -> list[dict[str, str]]:
     """组装发送给 LLM 的消息列表（纯函数，无 DB 依赖；零来源语义）
 
@@ -172,13 +173,16 @@ def build_messages(
             零注入；注入内容已在引擎层做过模板变量替换）
         narrative_style: 叙述风格规则文本（空串/纯空白零注入，输出与不传逐字节
             一致；非空时在 after_char 之后、[世界知识] 之前注入 [叙述风格] system 段）
+        preset_dialogue: 预设对话快照文本（空串/纯空白零注入，输出与不传逐字节
+            一致；非空时在 mes_example 之后、history 之前经 parse_mes_example 解析
+            注入 user/assistant few-shot，source 复用 SOURCE_CHARACTER）
 
     Returns:
         组装好的消息列表，每项只含 role 与 content
     """
     segments = _assemble(
         character, history, user_content, max_rounds, user_name,
-        append_current_input, world, narrative_style,
+        append_current_input, world, narrative_style, preset_dialogue,
     )
     return [{"role": s["role"], "content": s["content"]} for s in segments]
 
@@ -192,6 +196,7 @@ def build_messages_with_source(
     append_current_input: bool = True,
     world: dict[str, list[str | InjectedSegment]] | None = None,
     narrative_style: str = "",
+    preset_dialogue: str = "",
 ) -> list[dict[str, str]]:
     """组装发送给 LLM 的消息列表，逐条标注来源（PD-3 debug 追溯专用，只读见证）
 
@@ -212,13 +217,15 @@ def build_messages_with_source(
         world: 带来源注入块（{before_char/after_char/system: [内容或 InjectedSegment]}）
         narrative_style: 叙述风格规则文本（非空时注入 source=narrative 的
             [叙述风格] system 段；空串/纯空白零注入）
+        preset_dialogue: 预设对话快照文本（非空时注入 source=character 的
+            user/assistant few-shot；空串/纯空白零注入）
 
     Returns:
         带 source 的消息分段列表，content/role 序列与 build_messages 逐条一致
     """
     return _assemble(
         character, history, user_content, max_rounds, user_name,
-        append_current_input, world, narrative_style,
+        append_current_input, world, narrative_style, preset_dialogue,
     )
 
 
@@ -231,6 +238,7 @@ def _assemble(
     append_current_input: bool,
     world: dict[str, list[str | InjectedSegment]] | None,
     narrative_style: str,
+    preset_dialogue: str,
 ) -> list[dict[str, str]]:
     """消息列表组装核心（私有；build_messages / build_messages_with_source 共用）
 
@@ -244,6 +252,8 @@ def _assemble(
             expert/simple 皆注入，因 after_char 不在 expert 替代范围）
         2.75 world["system"] 合并单条 [世界知识]（多条以空行连接）
         3. mes_example（few-shot）
+        3.5 preset_dialogue 非空时注入预设对话 few-shot（source=character；
+            mes_example 之后、history 之前）
         4. 历史消息（正序，滑窗截断）
         5. post_history_instructions（system；expert 模式跳过）
         6. 当前 user 输入（append_current_input=False 时剥离尾随 system）
@@ -309,6 +319,17 @@ def _assemble(
 
     if character.mes_example:
         for example in parse_mes_example(character.mes_example, user_name, char_name):
+            segments.append({
+                "role": example["role"],
+                "content": example["content"],
+                "source": SOURCE_CHARACTER,
+            })
+
+    # 06 预设对话 few-shot 注入：mes_example 之后、history 之前；空/纯空白零注入
+    # （与不传 preset_dialogue 输出逐字节一致）。source 复用 SOURCE_CHARACTER
+    # （预设对话是角色提供的示范，与 mes_example 同源，不新增 source 常量）。
+    if preset_dialogue and preset_dialogue.strip():
+        for example in parse_mes_example(preset_dialogue, user_name, char_name):
             segments.append({
                 "role": example["role"],
                 "content": example["content"],
