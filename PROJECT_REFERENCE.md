@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**当前状态**（2026-09-14）：**7 项功能全部交付，代码工单（活跃表）与技术债候选区均已清零**。最新里程碑 **M7**（2026-09-09，发布准备：Android 自适应图标 + release 签名 + 隐私清单 + 发布验证门禁，iOS 全链路延后），其后 **U-UX 补全批次**（2026-09-14，聊天首页角色选择与会话管理 / 生成参数 temperature·max_tokens / 模板变量 extraVars / 首次启动分页新手指引）与 **技术债 F-75/76/77 收口**（temperature NaN/Infinity 回退 + clamp）。全量 **1684 测**绿 / analyze 0 / 期末四轴 0 阻断。**尚未交付**：iOS 全链路（图标/签名/隐私/上架，Windows 无 macOS）与模拟器种子游戏内容更新专项（F-75 转出，异形屏固定宽度面板截断）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
+**当前状态**（2026-09-14）：**7 项功能全部交付，代码工单（活跃表）与技术债候选区均已清零**。最新里程碑 **M7**（2026-09-09，发布准备：Android 自适应图标 + release 签名 + 隐私清单 + 发布验证门禁，iOS 全链路延后），其后 **U-UX 补全批次**（2026-09-14，聊天首页角色选择与会话管理 / 生成参数 temperature·max_tokens / 模板变量 extraVars / 首次启动分页新手指引）与 **技术债 F-75/76/77 收口**（temperature NaN/Infinity 回退 + clamp）。全量 **1684 测**绿 / analyze 0 / 期末四轴 0 阻断。**尚未交付**：iOS 全链路（图标/签名/隐私/上架，Windows 无 macOS）与模拟器种子游戏内容更新专项（F-75 转出，异形屏固定宽度面板截断）。**新立项（2026-09-15）**：人机恋板块（角色对话增强，ADR-0003，阶段 1 MVP = AC-01~AC-05 记忆 + 抗 OOC + 人设演化）。权威设计文档 = [docs/mobile-design.md](docs/mobile-design.md)（单一事实来源），决策背景 = [docs/mobile-adaptation-research.md](docs/mobile-adaptation-research.md)。
 
 **核心能力**（7 项全量，无阉割）：
 - **聊天** — 多轮对话 + SSE 流式打字机渲染 + 停止生成；滑窗上下文、模板变量、重生成、错误态
@@ -18,6 +18,7 @@
 - **文档解析** — LLM 从自由文本提取角色字段
 - **AI 生成游戏** — 世界观 → 模板填充生成 HTML 游戏 + 六项校验闸门
 - **模拟器** — 22 款内置 + 导入 + AI 生成 HTML 游戏在 WebView 运行：Key 自动注入 / 存档管理（导出/导入/删除）/ CORS 直连（国产 OpenAI 兼容厂商放行）
+- **人机恋（立项中）** — 角色对话增强：独立记忆（prompt 指令驱动）+ 抗 OOC 人设每轮重注入 + 人设演化（版本化 + 用户确认）；主动消息留阶段 2
 
 ## 二、关键决策
 

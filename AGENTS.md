@@ -54,6 +54,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - ✅ **架构审查批次 C1~C4 已收口**（2026-09-10）：translateError 下沉 LLMProvider 基类默认实现 / 装配腿收敛（wireCredentialsResolver 单一落点）/ 双文件名净化器参数化合并 / 删 PlaceholderGroup + settings 行收敛；全量 1579 测绿（+61）/ analyze 0 / 期末四轴 0 阻断；落债 F-72
 - ✅ **U-UX 补全批次已收口**（2026-09-14）：聊天首页角色选择条 + 会话重命名/删除 / LLMProvider 补 temperature 参数（15 子类）+ 全局 temperature/max_tokens（角色级为主、全局兜底）/ 模板变量 extraVars 全局替换管线 + 编辑页 / 首次启动分页新手指引（启动门 + 跳过持久化）；全量 1681 测绿 / analyze 0 / 期末四轴 0 阻断（修复 F-73 色彩契约回归 eb7b119）；commit b302fb3 / 6abcb6d+126e09d / ced8253 / e6cf008+1dbd0ef
 - ✅ **技术债消费批次 F-75/F-76/F-77 已全部处置**（2026-09-14）：F-76 消费（_resolveTemperature 加 NaN/Infinity 回退全局 + 越界 clamp [0,2]）+ F-75/77 复核关闭（种子 HTML 内容资产 CSS / SettingsReader implements 成本）；候选区清零；全量 1684 测绿（+3）/ analyze 0
+- 🔄 **人机恋板块已立项**（2026-09-15，角色对话增强）：阶段 1 MVP = 记忆 prompt 指令驱动（`<add:>`/`<search:>`）+ 每轮重注入人格事实抗 OOC + 人设演化（版本化 + 用户确认闸门）；主动消息/关系状态留阶段 2；拆 AC-01~AC-05；ADR-0003 见 docs/adr-0003-ai-companion.md；调研见 docs/ai-companion-research.md
 
 ## 文档体系
 

@@ -19,6 +19,11 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
+| AC-01 | 数据层：MemoryEntries + PersonaRevisions 表 + migration + 仓储 | 📝 | schemaVersion 1→2 onUpgrade；两表 + 仓储全语义 CRUD |
+| AC-02 | 记忆指令 prompt 模板 + `<add>/<search>` 解析落库 | 📝 | 记忆三模式 system prompt + 解析 LLM 回复标签落库/检索 |
+| AC-03 | 记忆注入 buildMessages（每轮重注入人格事实） | 📝 | CharacterData 扩展记忆上下文；人格事实每轮重注入 system 块 |
+| AC-04 | 人设演化（LLM 反思 + 版本化 + 用户确认闸门） | 📝 | PersonaEvolutionService + PersonaRevisions 快照 + 确认后回写 personality |
+| AC-05 | 记忆管理 UI（角色页条目编辑 + 演化历史） | 📝 | 角色页记忆列表/编辑/删除 + 人设演化历史查看 |
 
 ---
 
