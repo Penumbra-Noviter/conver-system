@@ -148,6 +148,10 @@ class RelationshipService {
   /// - 普通推进（目标非 intimate/soulmate）：直接落库 stage+affinity，返回 null。
   /// - 跨 intimate/soulmate 门槛：返回 [StageUpgradeProposal]，**不写库**
   ///   （SR-10：确认前绝不留痕；proposal 不落库 → 同回合重复调用天然幂等）。
+  ///
+  /// [conversationId] 为预留参数（F4 观察）：当前活跃口径以角色维度
+  /// （[isRecentlyActive]）计算，未按对话细分；保留签名供未来按对话拆解
+  /// 活跃信号（调用方自 PS2-07 起恒传本回合对话 id）。
   Future<StageUpgradeProposal?> evaluateAfterTurn({
     required int characterId,
     required int conversationId,
@@ -169,16 +173,19 @@ class RelationshipService {
 
   /// 确认升级闸门（SR-10 唯一写 intimate/soulmate 的入口）。
   ///
+  /// **F1 域校验（W3 返修）**：[targetStage] 必须是当前 stage 的**合法后继**
+  /// （单向自增，仅允许 index+1）——降档 / 越级 / 原地确认一律拒绝并返回
+  /// false，DB stage/affinity 不变（SR-10 闸门只控触发，F1 补控合法域）。
   /// 重算当前应得 affinity（确定性推进，与 [evaluateAfterTurn] 同源），
   /// 写 stage=targetStage + affinity + updatedAt=now（SR-15 观察：
-  /// 确认时 updatedAt 即转移轨迹时间）。无状态行 → no-op（防御路径）。
-  Future<void> confirmStageUpgrade({
+  /// 确认时 updatedAt 即转移轨迹时间）。无状态行 → no-op 返回 false（防御）。
+  Future<bool> confirmStageUpgrade({
     required int characterId,
     required RelationshipStage targetStage,
   }) async {
     final state = await _companion.getRelationship(characterId);
-    if (state == null) {
-      return;
+    if (state == null || targetStage.index != state.stage.index + 1) {
+      return false;
     }
     final newAffinity = nextAffinity(state.affinity, await _turnGain(characterId));
     await _companion.upsertRelationship(
@@ -186,6 +193,7 @@ class RelationshipService {
       stage: targetStage,
       affinity: newAffinity,
     );
+    return true;
   }
 
   /// 拒绝升级：丢弃提议，零写库副作用（proposal 本就未落库）。

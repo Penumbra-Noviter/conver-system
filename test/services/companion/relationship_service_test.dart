@@ -349,6 +349,64 @@ void main() {
     });
   });
 
+  group('F1 targetStage 域校验（W3 返修：单向自增，拒降档/越级）', () {
+    test('合法后继 familiar→intimate 允许并写库', () async {
+      final ids = await seedCharacterWithConversation();
+      await companion.upsertRelationship(
+        characterId: ids.characterId,
+        stage: RelationshipStage.familiar,
+        affinity: 58,
+      );
+
+      final ok = await service.confirmStageUpgrade(
+        characterId: ids.characterId,
+        targetStage: RelationshipStage.intimate,
+      );
+
+      expect(ok, isTrue);
+      final state = await companion.getRelationship(ids.characterId);
+      expect(state?.stage, RelationshipStage.intimate);
+    });
+
+    test('降档 soulmate→familiar 拒绝且 DB 不变', () async {
+      final ids = await seedCharacterWithConversation();
+      await companion.upsertRelationship(
+        characterId: ids.characterId,
+        stage: RelationshipStage.soulmate,
+        affinity: 80,
+      );
+
+      final ok = await service.confirmStageUpgrade(
+        characterId: ids.characterId,
+        targetStage: RelationshipStage.familiar,
+      );
+
+      expect(ok, isFalse);
+      final state = await companion.getRelationship(ids.characterId);
+      expect(state?.stage, RelationshipStage.soulmate);
+      expect(state?.affinity, 80);
+    });
+
+    test('越级 stranger→soulmate 拒绝且 DB 不变', () async {
+      final ids = await seedCharacterWithConversation();
+      await companion.upsertRelationship(
+        characterId: ids.characterId,
+        stage: RelationshipStage.stranger,
+        affinity: 10,
+      );
+
+      final ok = await service.confirmStageUpgrade(
+        characterId: ids.characterId,
+        targetStage: RelationshipStage.soulmate,
+      );
+
+      expect(ok, isFalse);
+      final state = await companion.getRelationship(ids.characterId);
+      expect(state?.stage, RelationshipStage.stranger);
+      expect(state?.affinity, 10);
+    });
+  });
+
   group('点开主动消息（+proactiveOpenAffinityGain）', () {
     test('普通档位：+6 落库', () async {
       final ids = await seedCharacterWithConversation();
