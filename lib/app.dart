@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    show FlutterLocalNotificationsPlugin;
 import 'package:provider/provider.dart';
 
 import 'data/database/app_database.dart';
@@ -67,11 +69,76 @@ abstract interface class ProactiveDeepLinkNavigator {
   });
 }
 
-/// 深链导航生产接线占位（PS2-08）：`handleProactiveDeepLink` 顶层函数 +
-/// [ProactiveDeepLinkNavigator] seam 已就位；冷启动取参通道
-/// （`getNotificationAppLaunchDetails`）尚未在 notification_service 封装
-/// （PS2-06 未提供、该文件只读）——生产导航实现与真通道接线 PS2-10 补齐，
-/// 当前不实例化（避免未引用死代码）。
+/// 深链导航生产实现（PS2-10）：包 [ShellNavigation] + [ChatController]——
+/// select chat = 切聊天 tab；openConversation = 打开会话（可高亮消息）。
+class AppDeepLinkNavigator implements ProactiveDeepLinkNavigator {
+  /// [navigation] tab 状态；[chatController] 会话打开/高亮入口。
+  AppDeepLinkNavigator({
+    required this.navigation,
+    required this.chatController,
+  });
+
+  final ShellNavigation navigation;
+  final ChatController chatController;
+
+  @override
+  void selectChatTab() => navigation.select(ShellTab.chat);
+
+  @override
+  Future<void> openConversation(
+    int conversationId, {
+    int? highlightMessageId,
+  }) {
+    return chatController.openConversation(
+      conversationId,
+      highlightMessageId: highlightMessageId,
+    );
+  }
+}
+
+/// 冷启动通知 payload 读取薄封装（PS2-10 验收 8）：notification_service 标
+/// 只读（PS2-06 未提供取参通道），真通道在此封装——flutter_local_notifications
+/// 插件单例调 [FlutterLocalNotificationsPlugin.getNotificationAppLaunchDetails]，
+/// 取 `notificationResponse.payload`（SR-03 零 content：payload 仅两 id）。
+///
+/// 插件缺位（测试环境 MissingPluginException）/ 平台异常 → null 静默返回
+/// （验收 8：取参失败静默跳过，不阻塞 App 启动）。
+Future<String?> readProactiveLaunchPayload({
+  FlutterLocalNotificationsPlugin? plugin,
+}) async {
+  try {
+    final details = await (plugin ?? FlutterLocalNotificationsPlugin())
+        .getNotificationAppLaunchDetails();
+    return details?.notificationResponse?.payload;
+  } catch (e) {
+    debugPrint('读取冷启动通知 payload 失败: $e');
+    return null;
+  }
+}
+
+/// 冷启动深链消费（PS2-10 装配层接线）：取参 → 无 payload / 取参失败静默
+/// 跳过（验收 8）→ 否则交 [handleProactiveDeepLink]（归属校验 + 导航）。
+Future<void> consumeProactiveLaunchDeepLink({
+  required ProactiveDeepLinkNavigator navigator,
+  required MessageRepository messageRepository,
+  Future<String?> Function()? readPayload,
+}) async {
+  final String? payload;
+  try {
+    payload = await (readPayload ?? readProactiveLaunchPayload)();
+  } catch (e) {
+    debugPrint('读取冷启动通知 payload 失败: $e');
+    return;
+  }
+  if (payload == null || payload.isEmpty) {
+    return;
+  }
+  await handleProactiveDeepLink(
+    payload: payload,
+    navigator: navigator,
+    messageRepository: messageRepository,
+  );
+}
 
 /// 处理主动消息通知深链（PS2-08 验收 3 + SR-03 归属校验）。
 ///
@@ -80,6 +147,9 @@ abstract interface class ProactiveDeepLinkNavigator {
 /// openConversation(conversationId, highlightMessageId: messageId)；
 /// payload 非法或归属校验失败 → 回落普通导航（仅 select chat 打开对话列表）。
 /// 消费端不读任何 content 参数（SR-03 零内容；payload 仅两 id）。
+///
+/// W5 F2（P3）：openConversation 纳入异常保护——导航抛错 debugPrint 降级，
+/// 不崩溃、不回退（tab 已切到聊天列表，用户可自行选择会话）。
 Future<void> handleProactiveDeepLink({
   required String payload,
   required ProactiveDeepLinkNavigator navigator,
@@ -103,10 +173,14 @@ Future<void> handleProactiveDeepLink({
     return;
   }
   navigator.selectChatTab();
-  await navigator.openConversation(
-    parsed.conversationId,
-    highlightMessageId: parsed.messageId,
-  );
+  try {
+    await navigator.openConversation(
+      parsed.conversationId,
+      highlightMessageId: parsed.messageId,
+    );
+  } catch (e) {
+    debugPrint('主动消息深链打开会话失败（已切聊天 tab）: $e');
+  }
 }
 
 /// 启动排程恢复（SR-08 P0）：只重建「pending 且未过期」的 OS 排程。
@@ -354,6 +428,22 @@ class ConverApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(create: (_) => ShellNavigation()),
+        // PS2-10 冷启动深链接线：依赖 ShellNavigation + ChatController（均
+        // 已声明），故独立哑 Provider 置于其后——取参 → 无 payload/失败
+        // 静默；成功 → handleProactiveDeepLink（归属校验 + 导航高亮）。
+        // 装配层单点（对齐 _startProactiveNotifications 哑 Provider 先例）。
+        Provider<Object?>(
+          create: (context) {
+            unawaited(consumeProactiveLaunchDeepLink(
+              navigator: AppDeepLinkNavigator(
+                navigation: context.read<ShellNavigation>(),
+                chatController: context.read<ChatController>(),
+              ),
+              messageRepository: context.read<MessageRepository>(),
+            ));
+            return null;
+          },
+        ),
         // M3-01 角色装配：文件交换 seam + 角色列表控制器。依赖
         // ShellNavigation 与 ChatController，故置于两者之后（嵌套 provider
         // 只能读取更外层已声明项）。M3-03 将 Stub 换为真实现
