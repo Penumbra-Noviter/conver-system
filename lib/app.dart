@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'data/database/app_database.dart';
 import 'data/repositories/character_repository.dart';
 import 'data/repositories/conversation_repository.dart';
+import 'data/repositories/memory_repository.dart';
 import 'data/repositories/message_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'services/chat_service.dart';
@@ -16,6 +17,7 @@ import 'services/conversation_export_service.dart';
 import 'services/document_parse_service.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
+import 'services/memory/memory_service.dart';
 import 'services/onboarding.dart';
 import 'services/secure_store.dart';
 import 'services/simulator/game_generator.dart';
@@ -75,6 +77,15 @@ class ConverApp extends StatelessWidget {
         Provider<MessageRepository>(
           create: (context) => MessageRepository(context.read<AppDatabase>()),
         ),
+        // AC-01/AC-03 记忆装配：MemoryRepository（数据层）+ MemoryService
+        // （注入组装 / 指令解析落库），供 ChatService 与记忆管理页消费。
+        Provider<MemoryRepository>(
+          create: (context) => MemoryRepository(context.read<AppDatabase>()),
+        ),
+        Provider<MemoryService>(
+          create: (context) =>
+              MemoryService(context.read<MemoryRepository>()),
+        ),
         // M2-T04 聊天装配：LLM 工厂 + 回合编排服务 + 聊天控制器。
         // 视图层（ChatView / ChatEntry）只读 ChatController 与仓储抽象，不触碰
         // 数据层 / 平台存储（layer_boundary_test 契约）；装配链单一收编于此。
@@ -89,6 +100,7 @@ class ConverApp extends StatelessWidget {
             messageRepository: context.read<MessageRepository>(),
             settingsRepository: context.read<SettingsRepository>(),
             providerFactory: context.read<LLMProviderFactory>(),
+            memoryService: context.read<MemoryService>(),
           ),
         ),
         // M4-03 导出装配：纯逻辑服务（复用三仓储 + SettingsRepository as

@@ -1,4 +1,6 @@
-/// drift 表定义 — 与桌面端 ORM 逐字段对齐（schemaVersion=1 冻结）。
+/// drift 表定义 — 前四表与桌面端 ORM 逐字段对齐（schemaVersion=1 冻结）；
+/// MemoryEntries / PersonaRevisions 为人机恋板块（ADR-0003）移动端先行表
+/// （schemaVersion=2，桌面无对应物）。
 ///
 /// 权威源（只读，勿改）：
 /// `desktop/backend/app/models/{character,conversation,message,setting}.py`
@@ -186,4 +188,95 @@ class Settings extends Table {
 
   @override
   Set<Column> get primaryKey => {key};
+}
+
+/// 记忆条目类型 — 单表 `MemoryEntries` 以 [kind] 区分两类记忆（ADR-0003）。
+///
+/// - [personaFact]：人格事实（Profile 语义，LangMem Profile）——身份/喜好/
+///   性格等稳定事实，抗 OOC 每轮重注入。
+/// - [episodic]：情景记忆（LangMem Episodic）——对话经历/关键事件，做
+///   少数次注入（不每轮）。
+///
+/// 落库值取 `.value`（persona_fact / episodic），无桌面锚点（移动端先行）。
+enum MemoryKind {
+  personaFact('persona_fact'),
+  episodic('episodic');
+
+  const MemoryKind(this.value);
+
+  /// 数据库存储值。
+  final String value;
+}
+
+/// [MemoryKind] 的 drift 类型转换器 — 显式按 `.value` 落库（对齐 [RoleConverter]
+/// 的字符串落库惯例，不按下标 INTEGER）。
+class MemoryKindConverter extends TypeConverter<MemoryKind, String> {
+  const MemoryKindConverter();
+
+  @override
+  MemoryKind fromSql(String fromDb) {
+    for (final kind in MemoryKind.values) {
+      if (kind.value == fromDb) {
+        return kind;
+      }
+    }
+    throw ArgumentError.value(fromDb, 'kind', 'Unknown MemoryKind value in database');
+  }
+
+  @override
+  String toSql(MemoryKind value) => value.value;
+}
+
+/// 记忆条目表 — 人机恋板块独立记忆（ADR-0003 方案A：单表 + kind 区分）。
+///
+/// 挂角色名下（`characterId` FK，删除角色时级联清除），单条文本条目；
+/// `importance` 供排序（高者优先注入），`content` 为记忆正文。
+@DataClassName('MemoryEntry')
+@TableIndex(name: 'idx_memory_entries_character_id', columns: {#characterId})
+class MemoryEntries extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  IntColumn get characterId => integer().references(
+        Characters,
+        #id,
+        onDelete: KeyAction.cascade,
+      )();
+
+  /// 必填枚举（persona_fact / episodic），TypeConverter 显式按 `.value` 落库。
+  TextColumn get kind => text().map(const MemoryKindConverter())();
+
+  /// 记忆正文（必填文本）。
+  TextColumn get content => text()();
+
+  /// 重要性（整数，缺省 0；高者优先注入）。
+  IntColumn get importance => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+}
+
+/// 人设演化版本表 — 记录每次人设演化的快照（ADR-0003：版本化 + 用户确认闸门）。
+///
+/// `personalitySnapshot` 为演化时点的角色人格全文快照，`reason` 为演化动机
+/// （LLM 反思产出 / 用户备注），供审阅与回滚。
+@DataClassName('PersonaRevision')
+@TableIndex(name: 'idx_persona_revisions_character_id', columns: {#characterId})
+class PersonaRevisions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  IntColumn get characterId => integer().references(
+        Characters,
+        #id,
+        onDelete: KeyAction.cascade,
+      )();
+
+  /// 演化时点的角色人格全文快照（必填文本）。
+  TextColumn get personalitySnapshot => text()();
+
+  /// 演化动机 / 备注（缺省空串）。
+  TextColumn get reason => text().withDefault(const Constant(''))();
+
+  DateTimeColumn get createdAt => dateTime()();
 }

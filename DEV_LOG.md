@@ -6,6 +6,18 @@
 
 ---
 
+## 人机恋阶段 1 MVP 批次 — 记忆 + 抗 OOC + 人设演化（2026-09-15 — 用户「继续」handoff）
+
+- **范围**：执行 ADR-0003 立项的 AC-01~AC-05（记忆 prompt 指令驱动 + 抗 OOC 每轮重注入 + 人设演化版本化 + 记忆管理 UI）。依依赖序 AC-01→AC-05 交付，全量 **1725 测**绿 / analyze 0。
+- **AC-01 数据层**：`MemoryEntries` 单表 + kind 区分（persona_fact / episodic）+ `PersonaRevisions` 版本化，schemaVersion 1→2 `onUpgrade`（createTable + raw SQL 补 characterId 外键索引；drift 2.34 `createIndex` 签名已改为单参数 Index，故用 customStatement 建索引，避开 API 漂移）；`MemoryRepository` 全语义 CRUD（listEntries/listPersonaFacts/listRecentEpisodic/searchEntries/updateEntry/deleteEntry/listRevisions/getRevision/deleteRevision/addRevision）。
+- **AC-02 记忆指令**：`memory_commands.dart` 纯函数解析 `<add:>`/`<persona:>`/`<search:>` 标签（`>` 终止、`[^>\n]` 排除换行、空内容丢弃、未知标签原样保留）；`memory_prompt.dart` 记忆三模式（strong/medium/weak，对齐逆向对照材料 WEAK/MEDIUM/STRONG 语义，文案自主表述）+ `buildMemoryLibrarySection`；`MemoryService` 编排 applyAssistantReply（add→episodic、persona→persona_fact、search→本地检索、剥离标签）。
+- **AC-03 记忆注入**：ChatService 增可选 `MemoryService` 依赖（`this._memoryService` initializing formal，缺省 null 保持既有装配零改动）；`_assembleMessages` 在人格 system 后插入记忆注入（三模式指令 + 人格事实全量 + 近期情景记忆），注入失败降级跳过不阻断主回复；`_persistAssistant` 落库前经 `_applyMemoryCommands` 剥离标签 + 落库记忆（记忆失败降级保留原始文本）。
+- **AC-04 人设演化**：`PersonaEvolutionService`（reflector seam 注入 + `buildEvolutionMessages` + `reflectPersonaWithProvider` 生产装配）——proposeEvolution（LLM 反思→PersonaRevisions 快照，**不回写** personality，无变化返回 null）/ applyRevision（确认闸门回写）/ discardRevision（拒绝删除快照）。
+- **AC-05 记忆管理 UI**：角色卡「记忆」入口按钮（psychology_outlined）→ `MemoryManagementView`（条目增改删 + 演化历史只读）；`MemoryManagementController` ChangeNotifier 视图模型。
+- **装配**：app.dart 增 `MemoryRepository` / `MemoryService` provider，ChatService 注入 memoryService（生产链路接通）；characters_view 记忆入口经 `context.read<MemoryRepository>()` 现造 controller（对齐 C2「装配唯一落点、视图只消费」约定）。
+- **契约更新**：schemaVersion 1→2（app_database_test 断言同步）；settings 白名单加 `memory_prompt_mode`（十键 + 五 mobile 先行，settings_repository_test 断言同步）；`SettingsRepository.memoryPromptMode` 返回原始字符串、由消费方经 `MemoryPromptMode.fromValue` 解析（data 层不 import services 层，分层不倒挂）。
+- **过程遥测**：主会话直做（纯 Dart 业务 + 无头 widget，未派子智能体）；合并冲突 0；flaky 0；drift build_runner 一次通过（createIndex 签名坑已按 raw SQL 绕开）。
+
 ## 技术债消费批次 F-75/F-76/F-77 — 全部处置（2026-09-14 — 用户「消费技术债」指令）
 
 - **范围**：候选区 3 条全处置（做 1 关 2）——F-76 消费，F-75/F-77 复核关闭。全量 **1684 测**绿（+3）/ analyze 0。**候选区清零**（0 项开放）。

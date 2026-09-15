@@ -25,6 +25,7 @@ import 'package:provider/provider.dart';
 import '../../data/database/app_database.dart' show Character;
 import '../../data/repositories/character_repository.dart'
     show CharacterRepository, CharacterWithCount;
+import '../../data/repositories/memory_repository.dart';
 import '../../services/document_parse_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
@@ -32,6 +33,8 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/notice_banner.dart';
 import 'character_edit_view.dart';
 import 'characters_controller.dart';
+import 'memory_management_controller.dart';
+import 'memory_management_view.dart';
 import 'wizard/character_wizard_controller.dart';
 import 'wizard/character_wizard_view.dart';
 
@@ -460,6 +463,14 @@ class _CharacterCard extends StatelessWidget {
                       ),
                     ),
                     IconButton(
+                      tooltip: '记忆',
+                      icon: Icon(
+                        Icons.psychology_outlined,
+                        color: palette.ink3,
+                      ),
+                      onPressed: () => _openMemory(context),
+                    ),
+                    IconButton(
                       tooltip: '编辑',
                       icon: Icon(Icons.edit_outlined, color: palette.ink3),
                       onPressed: () => _openEdit(context),
@@ -497,6 +508,22 @@ class _CharacterCard extends StatelessWidget {
       MaterialPageRoute<void>(
         builder: (_) =>
             CharacterEditView(controller: controller, character: row.character),
+      ),
+    );
+  }
+
+  /// 打开记忆管理页（AC-05）：经 provider 装配 [MemoryRepository]（装配单源
+  /// app.dart，本层只 context.read 消费，不再现造服务），push
+  /// [MemoryManagementView]。
+  void _openMemory(BuildContext context) {
+    final repository = context.read<MemoryRepository>();
+    final memoryController = MemoryManagementController(
+      memoryRepository: repository,
+      characterId: row.character.id,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MemoryManagementView(controller: memoryController),
       ),
     );
   }

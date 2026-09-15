@@ -38,7 +38,7 @@ void main() {
   }
 
   group('A1 白名单键集（G5 + 工单 03/04/05）', () {
-    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 四 mobile 先行键', () {
+    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 五 mobile 先行键', () {
       expect(
         SettingsRepository.allowedKeys,
         equals(<String>{
@@ -56,6 +56,7 @@ void main() {
           'max_tokens',
           'template_vars',
           'onboarding_completed',
+          'memory_prompt_mode',
         }),
       );
     });

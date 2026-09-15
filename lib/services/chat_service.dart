@@ -67,6 +67,8 @@ import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
 import 'llm/prompt.dart';
+import 'memory/memory_prompt.dart';
+import 'memory/memory_service.dart';
 import 'template_vars.dart';
 
 /// 流式回合的产出事件（sealed：token / done / interrupted / error）。
@@ -217,6 +219,10 @@ class _StreamRunState {
   /// 用户输入内容。
   final String content;
 
+  /// 对话所属角色 id（`_runStreamReply` 校验通过后赋值，供记忆指令落库用；
+  /// 校验失败路径保持 null，记忆链路跳过）。
+  int? characterId;
+
   /// 已停止：调用方取消订阅（或停止收尾完成）后置位。
   bool stopped = false;
 
@@ -259,6 +265,7 @@ class ChatService {
     required this._settingsRepository,
     required this._providerFactory,
     CredentialsResolver? credentialsResolver,
+    this._memoryService,
     List<Duration> connectRetryDelays = const [
       Duration(seconds: 1),
       Duration(seconds: 2),
@@ -274,6 +281,9 @@ class ChatService {
   final MessageRepository _messageRepository;
   final SettingsRepository _settingsRepository;
   final LLMProviderFactory _providerFactory;
+
+  /// 记忆编排服务（人机恋 AC-02/AC-03）；null = 记忆功能未启用（既有装配零改动）。
+  final MemoryService? _memoryService;
 
   /// 凭据解析链（AR-3）：组合序单一归属 [CredentialsResolver]；缺省由
   /// [_settingsRepository] 装配 reader（测试可注入，既有装配零 churn）。
@@ -363,6 +373,8 @@ class ChatService {
       if (character == null) {
         throw CharacterNotFoundError(conv.characterId);
       }
+      // 记忆指令落库依赖角色 id（assistant 落库前剥离标签 + add/persona 落库）。
+      state.characterId = character.id;
       final userName = await _settingsRepository.userName;
       final extraVars = await _settingsRepository.templateVars;
 
@@ -720,17 +732,46 @@ class ChatService {
   /// 幂等落库已累积部分/完整内容为 assistant 消息（A3 停止 / A5 断流 / done
   /// 共用）。无内容或已落库 → 返回 null；落库成功 → 返回消息行。
   ///
+  /// 落库前经记忆链路剥离 `<add:>` / `<persona:>` / `<search:>` 标签（AC-02）：
+  /// 剥离后的展示文本写入 messages.content，标签内容落库记忆（记忆失败降级，
+  /// 保留原始文本，不阻断主回复）。
+  ///
   /// 调用方负责错误处理（DB 写失败按各路径语义收口）。
   Future<Message?> _persistAssistant(_StreamRunState state) async {
     if (state.fullContent.isEmpty || state.saved) {
       return null;
     }
     state.saved = true;
+    final content = await _applyMemoryCommands(state, state.fullContent);
     return _messageRepository.createMessage(
       conversationId: state.conversationId,
       role: Role.assistant,
-      content: state.fullContent,
+      content: content,
     );
+  }
+
+  /// 剥离 assistant 回复中的记忆标签并落库（AC-02/AC-03 记忆链路）。
+  ///
+  /// 记忆功能未启用（[_memoryService] == null）或角色 id 未知（校验失败路径）
+  /// → 原样返回；记忆落库失败 → 降级返回原始文本（标签残留但主回复可用，
+  /// 对齐「记忆失败不阻断主回复」约束）。
+  Future<String> _applyMemoryCommands(
+    _StreamRunState state,
+    String content,
+  ) async {
+    final memoryService = _memoryService;
+    final characterId = state.characterId;
+    if (memoryService == null || characterId == null) {
+      return content;
+    }
+    try {
+      final result =
+          await memoryService.applyAssistantReply(characterId, content);
+      return result.displayContent;
+    } catch (e) {
+      debugPrint('记忆指令处理失败，保留原始回复: $e');
+      return content;
+    }
   }
 
   /// 重生成对话中目标 AI 回复（A4，缺省末条 assistant）。
@@ -912,9 +953,32 @@ class ChatService {
       appendCurrentInput: appendCurrentInput,
       extraVars: extraVars,
     );
-    return [
+    final messages = [
       for (final m in built) LlmMessage(role: m.role, content: m.content),
     ];
+
+    // AC-03 记忆注入：人格事实每轮重注入 + 记忆三模式指令 + 近期情景记忆。
+    // 注入位置 = 人格 system（messages[0]）之后、scenario/few-shot 之前，保证
+    // 抗 OOC 的事实紧随人设；记忆功能未启用（_memoryService == null）跳过。
+    final memoryService = _memoryService;
+    if (memoryService != null) {
+      try {
+        final mode = MemoryPromptMode.fromValue(
+          await _settingsRepository.memoryPromptMode,
+        );
+        final injection =
+            await memoryService.buildInjection(character.id, mode: mode);
+        if (injection.isNotEmpty) {
+          final insertAt = messages.isEmpty ? 0 : 1;
+          messages.insertAll(insertAt, injection);
+        }
+      } catch (e) {
+        // 记忆注入失败不阻断主回复（降级：无记忆上下文，回复仍可用）。
+        debugPrint('记忆注入失败，跳过: $e');
+      }
+    }
+
+    return messages;
   }
 
   /// 组装采样温度：角色 `character.temperature` 为主、全局 [globalTemperature]

@@ -33,15 +33,22 @@ void main() {
     return rows.map((row) => row.data['name'] as String).toList();
   }
 
-  test('schemaVersion 冻结为 1', () {
-    expect(db.schemaVersion, 1);
+  test('schemaVersion 冻结为 2', () {
+    expect(db.schemaVersion, 2);
   });
 
-  test('内存执行器打开成功，4 表可定位', () async {
+  test('内存执行器打开成功，6 表可定位', () async {
     final tables = await sqliteMasterNames('table');
     expect(
       tables,
-      containsAll(['characters', 'conversations', 'messages', 'settings']),
+      containsAll([
+        'characters',
+        'conversations',
+        'messages',
+        'settings',
+        'memory_entries',
+        'persona_revisions',
+      ]),
     );
   });
 

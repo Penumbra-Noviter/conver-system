@@ -2093,6 +2093,848 @@ class SettingsCompanion extends UpdateCompanion<Setting> {
   }
 }
 
+class $MemoryEntriesTable extends MemoryEntries
+    with TableInfo<$MemoryEntriesTable, MemoryEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MemoryEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _characterIdMeta = const VerificationMeta(
+    'characterId',
+  );
+  @override
+  late final GeneratedColumn<int> characterId = GeneratedColumn<int>(
+    'character_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES characters (id) ON DELETE CASCADE',
+    ),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<MemoryKind, String> kind =
+      GeneratedColumn<String>(
+        'kind',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<MemoryKind>($MemoryEntriesTable.$converterkind);
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _importanceMeta = const VerificationMeta(
+    'importance',
+  );
+  @override
+  late final GeneratedColumn<int> importance = GeneratedColumn<int>(
+    'importance',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    characterId,
+    kind,
+    content,
+    importance,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'memory_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MemoryEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('character_id')) {
+      context.handle(
+        _characterIdMeta,
+        characterId.isAcceptableOrUnknown(
+          data['character_id']!,
+          _characterIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_characterIdMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('importance')) {
+      context.handle(
+        _importanceMeta,
+        importance.isAcceptableOrUnknown(data['importance']!, _importanceMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MemoryEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MemoryEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      characterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}character_id'],
+      )!,
+      kind: $MemoryEntriesTable.$converterkind.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}kind'],
+        )!,
+      ),
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      importance: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}importance'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MemoryEntriesTable createAlias(String alias) {
+    return $MemoryEntriesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<MemoryKind, String> $converterkind =
+      const MemoryKindConverter();
+}
+
+class MemoryEntry extends DataClass implements Insertable<MemoryEntry> {
+  final int id;
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  final int characterId;
+
+  /// 必填枚举（persona_fact / episodic），TypeConverter 显式按 `.value` 落库。
+  final MemoryKind kind;
+
+  /// 记忆正文（必填文本）。
+  final String content;
+
+  /// 重要性（整数，缺省 0；高者优先注入）。
+  final int importance;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const MemoryEntry({
+    required this.id,
+    required this.characterId,
+    required this.kind,
+    required this.content,
+    required this.importance,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['character_id'] = Variable<int>(characterId);
+    {
+      map['kind'] = Variable<String>(
+        $MemoryEntriesTable.$converterkind.toSql(kind),
+      );
+    }
+    map['content'] = Variable<String>(content);
+    map['importance'] = Variable<int>(importance);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  MemoryEntriesCompanion toCompanion(bool nullToAbsent) {
+    return MemoryEntriesCompanion(
+      id: Value(id),
+      characterId: Value(characterId),
+      kind: Value(kind),
+      content: Value(content),
+      importance: Value(importance),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory MemoryEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MemoryEntry(
+      id: serializer.fromJson<int>(json['id']),
+      characterId: serializer.fromJson<int>(json['characterId']),
+      kind: serializer.fromJson<MemoryKind>(json['kind']),
+      content: serializer.fromJson<String>(json['content']),
+      importance: serializer.fromJson<int>(json['importance']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'characterId': serializer.toJson<int>(characterId),
+      'kind': serializer.toJson<MemoryKind>(kind),
+      'content': serializer.toJson<String>(content),
+      'importance': serializer.toJson<int>(importance),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  MemoryEntry copyWith({
+    int? id,
+    int? characterId,
+    MemoryKind? kind,
+    String? content,
+    int? importance,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => MemoryEntry(
+    id: id ?? this.id,
+    characterId: characterId ?? this.characterId,
+    kind: kind ?? this.kind,
+    content: content ?? this.content,
+    importance: importance ?? this.importance,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  MemoryEntry copyWithCompanion(MemoryEntriesCompanion data) {
+    return MemoryEntry(
+      id: data.id.present ? data.id.value : this.id,
+      characterId: data.characterId.present
+          ? data.characterId.value
+          : this.characterId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      content: data.content.present ? data.content.value : this.content,
+      importance: data.importance.present
+          ? data.importance.value
+          : this.importance,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MemoryEntry(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('kind: $kind, ')
+          ..write('content: $content, ')
+          ..write('importance: $importance, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    characterId,
+    kind,
+    content,
+    importance,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MemoryEntry &&
+          other.id == this.id &&
+          other.characterId == this.characterId &&
+          other.kind == this.kind &&
+          other.content == this.content &&
+          other.importance == this.importance &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class MemoryEntriesCompanion extends UpdateCompanion<MemoryEntry> {
+  final Value<int> id;
+  final Value<int> characterId;
+  final Value<MemoryKind> kind;
+  final Value<String> content;
+  final Value<int> importance;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const MemoryEntriesCompanion({
+    this.id = const Value.absent(),
+    this.characterId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.content = const Value.absent(),
+    this.importance = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  MemoryEntriesCompanion.insert({
+    this.id = const Value.absent(),
+    required int characterId,
+    required MemoryKind kind,
+    required String content,
+    this.importance = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) : characterId = Value(characterId),
+       kind = Value(kind),
+       content = Value(content),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<MemoryEntry> custom({
+    Expression<int>? id,
+    Expression<int>? characterId,
+    Expression<String>? kind,
+    Expression<String>? content,
+    Expression<int>? importance,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (characterId != null) 'character_id': characterId,
+      if (kind != null) 'kind': kind,
+      if (content != null) 'content': content,
+      if (importance != null) 'importance': importance,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  MemoryEntriesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? characterId,
+    Value<MemoryKind>? kind,
+    Value<String>? content,
+    Value<int>? importance,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return MemoryEntriesCompanion(
+      id: id ?? this.id,
+      characterId: characterId ?? this.characterId,
+      kind: kind ?? this.kind,
+      content: content ?? this.content,
+      importance: importance ?? this.importance,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (characterId.present) {
+      map['character_id'] = Variable<int>(characterId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(
+        $MemoryEntriesTable.$converterkind.toSql(kind.value),
+      );
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (importance.present) {
+      map['importance'] = Variable<int>(importance.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MemoryEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('kind: $kind, ')
+          ..write('content: $content, ')
+          ..write('importance: $importance, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PersonaRevisionsTable extends PersonaRevisions
+    with TableInfo<$PersonaRevisionsTable, PersonaRevision> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PersonaRevisionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _characterIdMeta = const VerificationMeta(
+    'characterId',
+  );
+  @override
+  late final GeneratedColumn<int> characterId = GeneratedColumn<int>(
+    'character_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES characters (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _personalitySnapshotMeta =
+      const VerificationMeta('personalitySnapshot');
+  @override
+  late final GeneratedColumn<String> personalitySnapshot =
+      GeneratedColumn<String>(
+        'personality_snapshot',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    characterId,
+    personalitySnapshot,
+    reason,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'persona_revisions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PersonaRevision> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('character_id')) {
+      context.handle(
+        _characterIdMeta,
+        characterId.isAcceptableOrUnknown(
+          data['character_id']!,
+          _characterIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_characterIdMeta);
+    }
+    if (data.containsKey('personality_snapshot')) {
+      context.handle(
+        _personalitySnapshotMeta,
+        personalitySnapshot.isAcceptableOrUnknown(
+          data['personality_snapshot']!,
+          _personalitySnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_personalitySnapshotMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PersonaRevision map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PersonaRevision(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      characterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}character_id'],
+      )!,
+      personalitySnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}personality_snapshot'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PersonaRevisionsTable createAlias(String alias) {
+    return $PersonaRevisionsTable(attachedDatabase, alias);
+  }
+}
+
+class PersonaRevision extends DataClass implements Insertable<PersonaRevision> {
+  final int id;
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  final int characterId;
+
+  /// 演化时点的角色人格全文快照（必填文本）。
+  final String personalitySnapshot;
+
+  /// 演化动机 / 备注（缺省空串）。
+  final String reason;
+  final DateTime createdAt;
+  const PersonaRevision({
+    required this.id,
+    required this.characterId,
+    required this.personalitySnapshot,
+    required this.reason,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['character_id'] = Variable<int>(characterId);
+    map['personality_snapshot'] = Variable<String>(personalitySnapshot);
+    map['reason'] = Variable<String>(reason);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  PersonaRevisionsCompanion toCompanion(bool nullToAbsent) {
+    return PersonaRevisionsCompanion(
+      id: Value(id),
+      characterId: Value(characterId),
+      personalitySnapshot: Value(personalitySnapshot),
+      reason: Value(reason),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PersonaRevision.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PersonaRevision(
+      id: serializer.fromJson<int>(json['id']),
+      characterId: serializer.fromJson<int>(json['characterId']),
+      personalitySnapshot: serializer.fromJson<String>(
+        json['personalitySnapshot'],
+      ),
+      reason: serializer.fromJson<String>(json['reason']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'characterId': serializer.toJson<int>(characterId),
+      'personalitySnapshot': serializer.toJson<String>(personalitySnapshot),
+      'reason': serializer.toJson<String>(reason),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  PersonaRevision copyWith({
+    int? id,
+    int? characterId,
+    String? personalitySnapshot,
+    String? reason,
+    DateTime? createdAt,
+  }) => PersonaRevision(
+    id: id ?? this.id,
+    characterId: characterId ?? this.characterId,
+    personalitySnapshot: personalitySnapshot ?? this.personalitySnapshot,
+    reason: reason ?? this.reason,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PersonaRevision copyWithCompanion(PersonaRevisionsCompanion data) {
+    return PersonaRevision(
+      id: data.id.present ? data.id.value : this.id,
+      characterId: data.characterId.present
+          ? data.characterId.value
+          : this.characterId,
+      personalitySnapshot: data.personalitySnapshot.present
+          ? data.personalitySnapshot.value
+          : this.personalitySnapshot,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonaRevision(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('personalitySnapshot: $personalitySnapshot, ')
+          ..write('reason: $reason, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, characterId, personalitySnapshot, reason, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PersonaRevision &&
+          other.id == this.id &&
+          other.characterId == this.characterId &&
+          other.personalitySnapshot == this.personalitySnapshot &&
+          other.reason == this.reason &&
+          other.createdAt == this.createdAt);
+}
+
+class PersonaRevisionsCompanion extends UpdateCompanion<PersonaRevision> {
+  final Value<int> id;
+  final Value<int> characterId;
+  final Value<String> personalitySnapshot;
+  final Value<String> reason;
+  final Value<DateTime> createdAt;
+  const PersonaRevisionsCompanion({
+    this.id = const Value.absent(),
+    this.characterId = const Value.absent(),
+    this.personalitySnapshot = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  PersonaRevisionsCompanion.insert({
+    this.id = const Value.absent(),
+    required int characterId,
+    required String personalitySnapshot,
+    this.reason = const Value.absent(),
+    required DateTime createdAt,
+  }) : characterId = Value(characterId),
+       personalitySnapshot = Value(personalitySnapshot),
+       createdAt = Value(createdAt);
+  static Insertable<PersonaRevision> custom({
+    Expression<int>? id,
+    Expression<int>? characterId,
+    Expression<String>? personalitySnapshot,
+    Expression<String>? reason,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (characterId != null) 'character_id': characterId,
+      if (personalitySnapshot != null)
+        'personality_snapshot': personalitySnapshot,
+      if (reason != null) 'reason': reason,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  PersonaRevisionsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? characterId,
+    Value<String>? personalitySnapshot,
+    Value<String>? reason,
+    Value<DateTime>? createdAt,
+  }) {
+    return PersonaRevisionsCompanion(
+      id: id ?? this.id,
+      characterId: characterId ?? this.characterId,
+      personalitySnapshot: personalitySnapshot ?? this.personalitySnapshot,
+      reason: reason ?? this.reason,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (characterId.present) {
+      map['character_id'] = Variable<int>(characterId.value);
+    }
+    if (personalitySnapshot.present) {
+      map['personality_snapshot'] = Variable<String>(personalitySnapshot.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PersonaRevisionsCompanion(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('personalitySnapshot: $personalitySnapshot, ')
+          ..write('reason: $reason, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2100,6 +2942,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ConversationsTable conversations = $ConversationsTable(this);
   late final $MessagesTable messages = $MessagesTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
+  late final $MemoryEntriesTable memoryEntries = $MemoryEntriesTable(this);
+  late final $PersonaRevisionsTable personaRevisions = $PersonaRevisionsTable(
+    this,
+  );
   late final Index idxCharactersName = Index(
     'idx_characters_name',
     'CREATE INDEX idx_characters_name ON characters (name)',
@@ -2112,6 +2958,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_messages_conversation_id',
     'CREATE INDEX idx_messages_conversation_id ON messages (conversation_id)',
   );
+  late final Index idxMemoryEntriesCharacterId = Index(
+    'idx_memory_entries_character_id',
+    'CREATE INDEX idx_memory_entries_character_id ON memory_entries (character_id)',
+  );
+  late final Index idxPersonaRevisionsCharacterId = Index(
+    'idx_persona_revisions_character_id',
+    'CREATE INDEX idx_persona_revisions_character_id ON persona_revisions (character_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2121,9 +2975,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     conversations,
     messages,
     settings,
+    memoryEntries,
+    personaRevisions,
     idxCharactersName,
     idxConversationsCharacterId,
     idxMessagesConversationId,
+    idxMemoryEntriesCharacterId,
+    idxPersonaRevisionsCharacterId,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -2140,6 +2998,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('messages', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'characters',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('memory_entries', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'characters',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('persona_revisions', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -2204,6 +3076,44 @@ final class $$CharactersTableReferences
     ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_conversationsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$MemoryEntriesTable, List<MemoryEntry>>
+  _memoryEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.memoryEntries,
+    aliasName: 'characters__id__memory_entries__character_id',
+  );
+
+  $$MemoryEntriesTableProcessedTableManager get memoryEntriesRefs {
+    final manager = $$MemoryEntriesTableTableManager(
+      $_db,
+      $_db.memoryEntries,
+    ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_memoryEntriesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$PersonaRevisionsTable, List<PersonaRevision>>
+  _personaRevisionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.personaRevisions,
+    aliasName: 'characters__id__persona_revisions__character_id',
+  );
+
+  $$PersonaRevisionsTableProcessedTableManager get personaRevisionsRefs {
+    final manager = $$PersonaRevisionsTableTableManager(
+      $_db,
+      $_db.personaRevisions,
+    ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _personaRevisionsRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -2342,6 +3252,56 @@ class $$CharactersTableFilterComposer
           }) => $$ConversationsTableFilterComposer(
             $db: $db,
             $table: $db.conversations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> memoryEntriesRefs(
+    Expression<bool> Function($$MemoryEntriesTableFilterComposer f) f,
+  ) {
+    final $$MemoryEntriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.memoryEntries,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MemoryEntriesTableFilterComposer(
+            $db: $db,
+            $table: $db.memoryEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> personaRevisionsRefs(
+    Expression<bool> Function($$PersonaRevisionsTableFilterComposer f) f,
+  ) {
+    final $$PersonaRevisionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.personaRevisions,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PersonaRevisionsTableFilterComposer(
+            $db: $db,
+            $table: $db.personaRevisions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2568,6 +3528,56 @@ class $$CharactersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> memoryEntriesRefs<T extends Object>(
+    Expression<T> Function($$MemoryEntriesTableAnnotationComposer a) f,
+  ) {
+    final $$MemoryEntriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.memoryEntries,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MemoryEntriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.memoryEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> personaRevisionsRefs<T extends Object>(
+    Expression<T> Function($$PersonaRevisionsTableAnnotationComposer a) f,
+  ) {
+    final $$PersonaRevisionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.personaRevisions,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PersonaRevisionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.personaRevisions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CharactersTableTableManager
@@ -2583,7 +3593,11 @@ class $$CharactersTableTableManager
           $$CharactersTableUpdateCompanionBuilder,
           (Character, $$CharactersTableReferences),
           Character,
-          PrefetchHooks Function({bool conversationsRefs})
+          PrefetchHooks Function({
+            bool conversationsRefs,
+            bool memoryEntriesRefs,
+            bool personaRevisionsRefs,
+          })
         > {
   $$CharactersTableTableManager(_$AppDatabase db, $CharactersTable table)
     : super(
@@ -2688,40 +3702,89 @@ class $$CharactersTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({conversationsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [
-                if (conversationsRefs) db.conversations,
-              ],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (conversationsRefs)
-                    await $_getPrefetchedData<
-                      Character,
-                      $CharactersTable,
-                      Conversation
-                    >(
-                      currentTable: table,
-                      referencedTable: $$CharactersTableReferences
-                          ._conversationsRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$CharactersTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).conversationsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where(
-                            (e) => e.characterId == item.id,
-                          ),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({
+                conversationsRefs = false,
+                memoryEntriesRefs = false,
+                personaRevisionsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (conversationsRefs) db.conversations,
+                    if (memoryEntriesRefs) db.memoryEntries,
+                    if (personaRevisionsRefs) db.personaRevisions,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (conversationsRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          Conversation
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._conversationsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).conversationsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (memoryEntriesRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          MemoryEntry
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._memoryEntriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).memoryEntriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (personaRevisionsRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          PersonaRevision
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._personaRevisionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).personaRevisionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -2738,7 +3801,11 @@ typedef $$CharactersTableProcessedTableManager =
       $$CharactersTableUpdateCompanionBuilder,
       (Character, $$CharactersTableReferences),
       Character,
-      PrefetchHooks Function({bool conversationsRefs})
+      PrefetchHooks Function({
+        bool conversationsRefs,
+        bool memoryEntriesRefs,
+        bool personaRevisionsRefs,
+      })
     >;
 typedef $$ConversationsTableCreateCompanionBuilder =
     ConversationsCompanion Function({
@@ -3618,6 +4685,678 @@ typedef $$SettingsTableProcessedTableManager =
       Setting,
       PrefetchHooks Function()
     >;
+typedef $$MemoryEntriesTableCreateCompanionBuilder =
+    MemoryEntriesCompanion Function({
+      Value<int> id,
+      required int characterId,
+      required MemoryKind kind,
+      required String content,
+      Value<int> importance,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+    });
+typedef $$MemoryEntriesTableUpdateCompanionBuilder =
+    MemoryEntriesCompanion Function({
+      Value<int> id,
+      Value<int> characterId,
+      Value<MemoryKind> kind,
+      Value<String> content,
+      Value<int> importance,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+final class $$MemoryEntriesTableReferences
+    extends BaseReferences<_$AppDatabase, $MemoryEntriesTable, MemoryEntry> {
+  $$MemoryEntriesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CharactersTable _characterIdTable(_$AppDatabase db) =>
+      db.characters.createAlias('memory_entries__character_id__characters__id');
+
+  $$CharactersTableProcessedTableManager get characterId {
+    final $_column = $_itemColumn<int>('character_id')!;
+
+    final manager = $$CharactersTableTableManager(
+      $_db,
+      $_db.characters,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_characterIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MemoryEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $MemoryEntriesTable> {
+  $$MemoryEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<MemoryKind, MemoryKind, String> get kind =>
+      $composableBuilder(
+        column: $table.kind,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get importance => $composableBuilder(
+    column: $table.importance,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CharactersTableFilterComposer get characterId {
+    final $$CharactersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableFilterComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MemoryEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $MemoryEntriesTable> {
+  $$MemoryEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get importance => $composableBuilder(
+    column: $table.importance,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CharactersTableOrderingComposer get characterId {
+    final $$CharactersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableOrderingComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MemoryEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MemoryEntriesTable> {
+  $$MemoryEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<MemoryKind, String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<int> get importance => $composableBuilder(
+    column: $table.importance,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$CharactersTableAnnotationComposer get characterId {
+    final $$CharactersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MemoryEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MemoryEntriesTable,
+          MemoryEntry,
+          $$MemoryEntriesTableFilterComposer,
+          $$MemoryEntriesTableOrderingComposer,
+          $$MemoryEntriesTableAnnotationComposer,
+          $$MemoryEntriesTableCreateCompanionBuilder,
+          $$MemoryEntriesTableUpdateCompanionBuilder,
+          (MemoryEntry, $$MemoryEntriesTableReferences),
+          MemoryEntry,
+          PrefetchHooks Function({bool characterId})
+        > {
+  $$MemoryEntriesTableTableManager(_$AppDatabase db, $MemoryEntriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MemoryEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MemoryEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MemoryEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> characterId = const Value.absent(),
+                Value<MemoryKind> kind = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<int> importance = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => MemoryEntriesCompanion(
+                id: id,
+                characterId: characterId,
+                kind: kind,
+                content: content,
+                importance: importance,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int characterId,
+                required MemoryKind kind,
+                required String content,
+                Value<int> importance = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+              }) => MemoryEntriesCompanion.insert(
+                id: id,
+                characterId: characterId,
+                kind: kind,
+                content: content,
+                importance: importance,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MemoryEntriesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({characterId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (characterId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.characterId,
+                        referencedTable: $$MemoryEntriesTableReferences
+                            ._characterIdTable(db),
+                        referencedColumn: $$MemoryEntriesTableReferences
+                            ._characterIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MemoryEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MemoryEntriesTable,
+      MemoryEntry,
+      $$MemoryEntriesTableFilterComposer,
+      $$MemoryEntriesTableOrderingComposer,
+      $$MemoryEntriesTableAnnotationComposer,
+      $$MemoryEntriesTableCreateCompanionBuilder,
+      $$MemoryEntriesTableUpdateCompanionBuilder,
+      (MemoryEntry, $$MemoryEntriesTableReferences),
+      MemoryEntry,
+      PrefetchHooks Function({bool characterId})
+    >;
+typedef $$PersonaRevisionsTableCreateCompanionBuilder =
+    PersonaRevisionsCompanion Function({
+      Value<int> id,
+      required int characterId,
+      required String personalitySnapshot,
+      Value<String> reason,
+      required DateTime createdAt,
+    });
+typedef $$PersonaRevisionsTableUpdateCompanionBuilder =
+    PersonaRevisionsCompanion Function({
+      Value<int> id,
+      Value<int> characterId,
+      Value<String> personalitySnapshot,
+      Value<String> reason,
+      Value<DateTime> createdAt,
+    });
+
+final class $$PersonaRevisionsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $PersonaRevisionsTable, PersonaRevision> {
+  $$PersonaRevisionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CharactersTable _characterIdTable(_$AppDatabase db) => db.characters
+      .createAlias('persona_revisions__character_id__characters__id');
+
+  $$CharactersTableProcessedTableManager get characterId {
+    final $_column = $_itemColumn<int>('character_id')!;
+
+    final manager = $$CharactersTableTableManager(
+      $_db,
+      $_db.characters,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_characterIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$PersonaRevisionsTableFilterComposer
+    extends Composer<_$AppDatabase, $PersonaRevisionsTable> {
+  $$PersonaRevisionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personalitySnapshot => $composableBuilder(
+    column: $table.personalitySnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CharactersTableFilterComposer get characterId {
+    final $$CharactersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableFilterComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PersonaRevisionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PersonaRevisionsTable> {
+  $$PersonaRevisionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personalitySnapshot => $composableBuilder(
+    column: $table.personalitySnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CharactersTableOrderingComposer get characterId {
+    final $$CharactersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableOrderingComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PersonaRevisionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PersonaRevisionsTable> {
+  $$PersonaRevisionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get personalitySnapshot => $composableBuilder(
+    column: $table.personalitySnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$CharactersTableAnnotationComposer get characterId {
+    final $$CharactersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PersonaRevisionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PersonaRevisionsTable,
+          PersonaRevision,
+          $$PersonaRevisionsTableFilterComposer,
+          $$PersonaRevisionsTableOrderingComposer,
+          $$PersonaRevisionsTableAnnotationComposer,
+          $$PersonaRevisionsTableCreateCompanionBuilder,
+          $$PersonaRevisionsTableUpdateCompanionBuilder,
+          (PersonaRevision, $$PersonaRevisionsTableReferences),
+          PersonaRevision,
+          PrefetchHooks Function({bool characterId})
+        > {
+  $$PersonaRevisionsTableTableManager(
+    _$AppDatabase db,
+    $PersonaRevisionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PersonaRevisionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PersonaRevisionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PersonaRevisionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> characterId = const Value.absent(),
+                Value<String> personalitySnapshot = const Value.absent(),
+                Value<String> reason = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => PersonaRevisionsCompanion(
+                id: id,
+                characterId: characterId,
+                personalitySnapshot: personalitySnapshot,
+                reason: reason,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int characterId,
+                required String personalitySnapshot,
+                Value<String> reason = const Value.absent(),
+                required DateTime createdAt,
+              }) => PersonaRevisionsCompanion.insert(
+                id: id,
+                characterId: characterId,
+                personalitySnapshot: personalitySnapshot,
+                reason: reason,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$PersonaRevisionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({characterId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (characterId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.characterId,
+                        referencedTable: $$PersonaRevisionsTableReferences
+                            ._characterIdTable(db),
+                        referencedColumn: $$PersonaRevisionsTableReferences
+                            ._characterIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$PersonaRevisionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PersonaRevisionsTable,
+      PersonaRevision,
+      $$PersonaRevisionsTableFilterComposer,
+      $$PersonaRevisionsTableOrderingComposer,
+      $$PersonaRevisionsTableAnnotationComposer,
+      $$PersonaRevisionsTableCreateCompanionBuilder,
+      $$PersonaRevisionsTableUpdateCompanionBuilder,
+      (PersonaRevision, $$PersonaRevisionsTableReferences),
+      PersonaRevision,
+      PrefetchHooks Function({bool characterId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3630,4 +5369,8 @@ class $AppDatabaseManager {
       $$MessagesTableTableManager(_db, _db.messages);
   $$SettingsTableTableManager get settings =>
       $$SettingsTableTableManager(_db, _db.settings);
+  $$MemoryEntriesTableTableManager get memoryEntries =>
+      $$MemoryEntriesTableTableManager(_db, _db.memoryEntries);
+  $$PersonaRevisionsTableTableManager get personaRevisions =>
+      $$PersonaRevisionsTableTableManager(_db, _db.personaRevisions);
 }

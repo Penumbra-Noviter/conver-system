@@ -76,6 +76,7 @@ class SettingsRepository implements SettingsReader {
     'max_tokens',
     'template_vars',
     'onboarding_completed',
+    'memory_prompt_mode',
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -110,6 +111,13 @@ class SettingsRepository implements SettingsReader {
   /// clamp 落 UI 输入层（conversation_settings_page），仓储读取保持 getInt 语义。
   static const int maxTokensMin = 1;
   static const int maxTokensMax = 100000;
+
+  /// 记忆三模式落库键（人机恋 AC-02，mobile 先行键；桌面无对应物）。
+  static const String memoryPromptModeKey = 'memory_prompt_mode';
+
+  /// 记忆三模式缺省（'medium' = 关键信息记录模式，对齐逆向对照材料的
+  /// MEDIUM 档；`services/memory/memory_prompt.dart::MemoryPromptMode` 解析）。
+  static const String defaultMemoryPromptMode = 'medium';
 
   // ── 键值 CRUD ──
 
@@ -292,6 +300,17 @@ class SettingsRepository implements SettingsReader {
   /// （镜像 [getInt] 语义）。合法区间 clamp 由 UI 输入层保证（见
   /// [maxTokensMin] / [maxTokensMax]）。
   Future<int> getMaxTokens() => getInt('max_tokens', defaultValue: defaultMaxTokens);
+
+  /// 记忆三模式原始值（人机恋 AC-02，mobile 先行键）；缺省
+  /// [defaultMemoryPromptMode]（'medium'）。
+  ///
+  /// 返回存储字符串（strong / medium / weak），由消费方经
+  /// `services/memory/memory_prompt.dart::MemoryPromptMode.fromValue` 解析——本
+  /// 仓储不 import services 层（分层不倒挂）。
+  Future<String> get memoryPromptMode async {
+    final value = await getValue(memoryPromptModeKey);
+    return value.isEmpty ? defaultMemoryPromptMode : value;
+  }
 
   /// 默认 provider；缺省 [SettingsDefaults.provider]（镜像桌面
   /// default_provider 的 config 兜底）。

@@ -51,3 +51,4 @@
 
 - 2026-08-28 | 建库：移动端决策登记（决议源于设计文档走查与 grilling Q0~Q14 拍板）；ADR-0002 权威文本在桌面库 CONSENSUS.md
 - 2026-09-15 | 立项人机恋板块（角色对话增强）：ADR-0003 登记；阶段1 MVP 拆 AC-01~AC-05（记忆 prompt 指令驱动 + 抗 OOC 每轮重注入 + 人设演化版本化）；主动消息/关系状态/内心独白留阶段2
+- 2026-09-15 | 人机恋阶段 1 MVP 交付：AC-01~AC-05 全部落地（MemoryEntries 单表 + kind 区分 + PersonaRevisions 版本化 + schemaVersion 1→2；`<add>/<persona>/<search>` 指令解析落库 + 记忆三模式 prompt；ChatService 每轮重注入人格事实抗 OOC + assistant 落库前剥离标签；PersonaEvolutionService 版本化 + 用户确认闸门；角色卡「记忆」管理页）。全量 1725 测绿 / analyze 0

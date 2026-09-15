@@ -19,11 +19,7 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| AC-01 | 数据层：MemoryEntries + PersonaRevisions 表 + migration + 仓储 | 📝 | schemaVersion 1→2 onUpgrade；两表 + 仓储全语义 CRUD |
-| AC-02 | 记忆指令 prompt 模板 + `<add>/<search>` 解析落库 | 📝 | 记忆三模式 system prompt + 解析 LLM 回复标签落库/检索 |
-| AC-03 | 记忆注入 buildMessages（每轮重注入人格事实） | 📝 | CharacterData 扩展记忆上下文；人格事实每轮重注入 system 块 |
-| AC-04 | 人设演化（LLM 反思 + 版本化 + 用户确认闸门） | 📝 | PersonaEvolutionService + PersonaRevisions 快照 + 确认后回写 personality |
-| AC-05 | 记忆管理 UI（角色页条目编辑 + 演化历史） | 📝 | 角色页记忆列表/编辑/删除 + 人设演化历史查看 |
+
 
 ---
 
@@ -34,6 +30,18 @@
 ---
 
 ## 已完成归档
+
+### 人机恋阶段 1 MVP 批次 — 记忆 + 抗 OOC + 人设演化（2026-09-15 收口）
+
+> 来源：用户「继续」执行 handoff-ai-companion-mobile（ADR-0003 立项）。5 工单依依赖序 AC-01→AC-05 交付：01 数据层（MemoryEntries 单表 + kind 区分 + PersonaRevisions 版本化 + schemaVersion 1→2 onUpgrade + MemoryRepository 全语义 CRUD）；02 记忆指令（`<add>`/`<persona>`/`<search>` 解析落库 + 记忆三模式 system prompt 模板）；03 记忆注入（ChatService._assembleMessages 每轮重注入人格事实抗 OOC + assistant 落库前剥离标签）；04 人设演化（PersonaEvolutionService 反思 seam + PersonaRevisions 快照 + 用户确认闸门回写 personality）；05 记忆管理 UI（角色卡「记忆」入口 + 条目增改删 + 演化历史）。门禁：全量 **1725 测**绿 / analyze 0；详见 DEV_LOG〈人机恋阶段 1 MVP 批次〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| AC-01 | 数据层：MemoryEntries + PersonaRevisions 表 + migration + 仓储 | 2026-09-15 | （见收口提交） |
+| AC-02 | 记忆指令 prompt 模板 + `<add>/<persona>/<search>` 解析落库 | 2026-09-15 | （见收口提交） |
+| AC-03 | 记忆注入 buildMessages（每轮重注入人格事实抗 OOC） | 2026-09-15 | （见收口提交） |
+| AC-04 | 人设演化（LLM 反思 + 版本化 + 用户确认闸门） | 2026-09-15 | （见收口提交） |
+| AC-05 | 记忆管理 UI（角色页条目编辑 + 演化历史） | 2026-09-15 | （见收口提交） |
 
 ### 技术债消费批次 F-75/F-76/F-77 — 全部处置（2026-09-14 收口）
 

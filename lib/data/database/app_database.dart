@@ -1,7 +1,8 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=1，M0 冻结）。
+/// 应用数据库 — drift 数据库入口（schemaVersion=2，M0 冻结后 AC-01 升版）。
 ///
-/// - 表注册：characters / conversations / messages / settings
-///   （定义见 `tables.dart`，权威源为桌面端 ORM）
+/// - 表注册：characters / conversations / messages / settings / memory_entries /
+///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
+///   后两表为人机恋板块移动端先行）
 /// - 执行器构造注入：测试 seam，测试用 `AppDatabase(NativeDatabase.memory())`
 ///   在内存中打开真实 schema，不依赖设备
 /// - 运行态连接经 [AppDatabase.open]（drift_flutter 惰性打开，内部即
@@ -22,6 +23,8 @@ part 'app_database.g.dart';
   Conversations,
   Messages,
   Settings,
+  MemoryEntries,
+  PersonaRevisions,
 ])
 class AppDatabase extends _$AppDatabase {
   /// 执行器注入构造（测试 seam / 自定义执行器）。
@@ -33,13 +36,31 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         beforeOpen: (details) async {
           // 对齐桌面端 CASCADE 删除语义（SQLite 默认关闭外键约束）。
           await customStatement('PRAGMA foreign_keys = ON');
+        },
+        onUpgrade: (m, from, to) async {
+          // AC-01：schemaVersion 1→2 新增人机恋两表（memory_entries /
+          // persona_revisions）。createTable 建表后以 raw SQL 补建 characterId
+          // 外键索引（对齐 tables.dart 的 @TableIndex 注解；SQLite 不自动为 FK
+          // 建索引）。索引名与列名用 drift 蛇形约定（表名/列名 snake_case）。
+          if (from < 2) {
+            await m.createTable(memoryEntries);
+            await m.createTable(personaRevisions);
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_memory_entries_character_id '
+              'ON memory_entries (character_id)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_persona_revisions_character_id '
+              'ON persona_revisions (character_id)',
+            );
+          }
         },
       );
 }
