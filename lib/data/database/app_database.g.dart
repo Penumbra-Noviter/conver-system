@@ -2935,6 +2935,1285 @@ class PersonaRevisionsCompanion extends UpdateCompanion<PersonaRevision> {
   }
 }
 
+class $RelationshipStatesTable extends RelationshipStates
+    with TableInfo<$RelationshipStatesTable, RelationshipState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RelationshipStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _characterIdMeta = const VerificationMeta(
+    'characterId',
+  );
+  @override
+  late final GeneratedColumn<int> characterId = GeneratedColumn<int>(
+    'character_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES characters (id) ON DELETE CASCADE',
+    ),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<RelationshipStage, String> stage =
+      GeneratedColumn<String>(
+        'stage',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<RelationshipStage>(
+        $RelationshipStatesTable.$converterstage,
+      );
+  static const VerificationMeta _affinityMeta = const VerificationMeta(
+    'affinity',
+  );
+  @override
+  late final GeneratedColumn<int> affinity = GeneratedColumn<int>(
+    'affinity',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    characterId,
+    stage,
+    affinity,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'relationship_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RelationshipState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('character_id')) {
+      context.handle(
+        _characterIdMeta,
+        characterId.isAcceptableOrUnknown(
+          data['character_id']!,
+          _characterIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_characterIdMeta);
+    }
+    if (data.containsKey('affinity')) {
+      context.handle(
+        _affinityMeta,
+        affinity.isAcceptableOrUnknown(data['affinity']!, _affinityMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RelationshipState map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RelationshipState(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      characterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}character_id'],
+      )!,
+      stage: $RelationshipStatesTable.$converterstage.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}stage'],
+        )!,
+      ),
+      affinity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}affinity'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RelationshipStatesTable createAlias(String alias) {
+    return $RelationshipStatesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<RelationshipStage, String> $converterstage =
+      const RelationshipStageConverter();
+}
+
+class RelationshipState extends DataClass
+    implements Insertable<RelationshipState> {
+  final int id;
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）；每角色至多一行。
+  final int characterId;
+
+  /// 必填枚举（stranger/acquainted/familiar/intimate/soulmate），字符串落库。
+  final RelationshipStage stage;
+
+  /// 亲密度 0-100（仓储/服务层 clamp，DB 不设 CHECK 约束）。
+  final int affinity;
+  final DateTime updatedAt;
+  const RelationshipState({
+    required this.id,
+    required this.characterId,
+    required this.stage,
+    required this.affinity,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['character_id'] = Variable<int>(characterId);
+    {
+      map['stage'] = Variable<String>(
+        $RelationshipStatesTable.$converterstage.toSql(stage),
+      );
+    }
+    map['affinity'] = Variable<int>(affinity);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  RelationshipStatesCompanion toCompanion(bool nullToAbsent) {
+    return RelationshipStatesCompanion(
+      id: Value(id),
+      characterId: Value(characterId),
+      stage: Value(stage),
+      affinity: Value(affinity),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RelationshipState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RelationshipState(
+      id: serializer.fromJson<int>(json['id']),
+      characterId: serializer.fromJson<int>(json['characterId']),
+      stage: serializer.fromJson<RelationshipStage>(json['stage']),
+      affinity: serializer.fromJson<int>(json['affinity']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'characterId': serializer.toJson<int>(characterId),
+      'stage': serializer.toJson<RelationshipStage>(stage),
+      'affinity': serializer.toJson<int>(affinity),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  RelationshipState copyWith({
+    int? id,
+    int? characterId,
+    RelationshipStage? stage,
+    int? affinity,
+    DateTime? updatedAt,
+  }) => RelationshipState(
+    id: id ?? this.id,
+    characterId: characterId ?? this.characterId,
+    stage: stage ?? this.stage,
+    affinity: affinity ?? this.affinity,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  RelationshipState copyWithCompanion(RelationshipStatesCompanion data) {
+    return RelationshipState(
+      id: data.id.present ? data.id.value : this.id,
+      characterId: data.characterId.present
+          ? data.characterId.value
+          : this.characterId,
+      stage: data.stage.present ? data.stage.value : this.stage,
+      affinity: data.affinity.present ? data.affinity.value : this.affinity,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RelationshipState(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('stage: $stage, ')
+          ..write('affinity: $affinity, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, characterId, stage, affinity, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RelationshipState &&
+          other.id == this.id &&
+          other.characterId == this.characterId &&
+          other.stage == this.stage &&
+          other.affinity == this.affinity &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RelationshipStatesCompanion extends UpdateCompanion<RelationshipState> {
+  final Value<int> id;
+  final Value<int> characterId;
+  final Value<RelationshipStage> stage;
+  final Value<int> affinity;
+  final Value<DateTime> updatedAt;
+  const RelationshipStatesCompanion({
+    this.id = const Value.absent(),
+    this.characterId = const Value.absent(),
+    this.stage = const Value.absent(),
+    this.affinity = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  RelationshipStatesCompanion.insert({
+    this.id = const Value.absent(),
+    required int characterId,
+    required RelationshipStage stage,
+    this.affinity = const Value.absent(),
+    required DateTime updatedAt,
+  }) : characterId = Value(characterId),
+       stage = Value(stage),
+       updatedAt = Value(updatedAt);
+  static Insertable<RelationshipState> custom({
+    Expression<int>? id,
+    Expression<int>? characterId,
+    Expression<String>? stage,
+    Expression<int>? affinity,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (characterId != null) 'character_id': characterId,
+      if (stage != null) 'stage': stage,
+      if (affinity != null) 'affinity': affinity,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  RelationshipStatesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? characterId,
+    Value<RelationshipStage>? stage,
+    Value<int>? affinity,
+    Value<DateTime>? updatedAt,
+  }) {
+    return RelationshipStatesCompanion(
+      id: id ?? this.id,
+      characterId: characterId ?? this.characterId,
+      stage: stage ?? this.stage,
+      affinity: affinity ?? this.affinity,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (characterId.present) {
+      map['character_id'] = Variable<int>(characterId.value);
+    }
+    if (stage.present) {
+      map['stage'] = Variable<String>(
+        $RelationshipStatesTable.$converterstage.toSql(stage.value),
+      );
+    }
+    if (affinity.present) {
+      map['affinity'] = Variable<int>(affinity.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RelationshipStatesCompanion(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('stage: $stage, ')
+          ..write('affinity: $affinity, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProactivePlansTable extends ProactivePlans
+    with TableInfo<$ProactivePlansTable, ProactivePlan> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProactivePlansTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _characterIdMeta = const VerificationMeta(
+    'characterId',
+  );
+  @override
+  late final GeneratedColumn<int> characterId = GeneratedColumn<int>(
+    'character_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES characters (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<int> conversationId = GeneratedColumn<int>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversations (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _scheduledAtMeta = const VerificationMeta(
+    'scheduledAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> scheduledAt = GeneratedColumn<DateTime>(
+    'scheduled_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sentAtMeta = const VerificationMeta('sentAt');
+  @override
+  late final GeneratedColumn<DateTime> sentAt = GeneratedColumn<DateTime>(
+    'sent_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<ProactivePlanStatus, String>
+  status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  ).withConverter<ProactivePlanStatus>($ProactivePlansTable.$converterstatus);
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<int> messageId = GeneratedColumn<int>(
+    'message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES messages (id) ON DELETE SET NULL',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    characterId,
+    conversationId,
+    content,
+    scheduledAt,
+    sentAt,
+    status,
+    messageId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'proactive_plans';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProactivePlan> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('character_id')) {
+      context.handle(
+        _characterIdMeta,
+        characterId.isAcceptableOrUnknown(
+          data['character_id']!,
+          _characterIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_characterIdMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('scheduled_at')) {
+      context.handle(
+        _scheduledAtMeta,
+        scheduledAt.isAcceptableOrUnknown(
+          data['scheduled_at']!,
+          _scheduledAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_scheduledAtMeta);
+    }
+    if (data.containsKey('sent_at')) {
+      context.handle(
+        _sentAtMeta,
+        sentAt.isAcceptableOrUnknown(data['sent_at']!, _sentAtMeta),
+      );
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ProactivePlan map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProactivePlan(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      characterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}character_id'],
+      )!,
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      scheduledAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}scheduled_at'],
+      )!,
+      sentAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}sent_at'],
+      ),
+      status: $ProactivePlansTable.$converterstatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}status'],
+        )!,
+      ),
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}message_id'],
+      ),
+    );
+  }
+
+  @override
+  $ProactivePlansTable createAlias(String alias) {
+    return $ProactivePlansTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<ProactivePlanStatus, String> $converterstatus =
+      const ProactivePlanStatusConverter();
+}
+
+class ProactivePlan extends DataClass implements Insertable<ProactivePlan> {
+  final int id;
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  final int characterId;
+
+  /// 必填外键 → conversations.id，ondelete=CASCADE（随对话删除）。
+  final int conversationId;
+
+  /// 预生成文案（必填文本）。
+  final String content;
+
+  /// 计划发送时间（必填）。
+  final DateTime scheduledAt;
+
+  /// 实际发送时间（可空；置 sent 时写，计数/冷却口径单一来源）。
+  final DateTime? sentAt;
+
+  /// 必填枚举（scheduled/sent/expired/dropped），字符串落库。
+  final ProactivePlanStatus status;
+
+  /// 已发送消息 id（可空）；消息删除时 FK setNull（重生成截断场景）。
+  final int? messageId;
+  const ProactivePlan({
+    required this.id,
+    required this.characterId,
+    required this.conversationId,
+    required this.content,
+    required this.scheduledAt,
+    this.sentAt,
+    required this.status,
+    this.messageId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['character_id'] = Variable<int>(characterId);
+    map['conversation_id'] = Variable<int>(conversationId);
+    map['content'] = Variable<String>(content);
+    map['scheduled_at'] = Variable<DateTime>(scheduledAt);
+    if (!nullToAbsent || sentAt != null) {
+      map['sent_at'] = Variable<DateTime>(sentAt);
+    }
+    {
+      map['status'] = Variable<String>(
+        $ProactivePlansTable.$converterstatus.toSql(status),
+      );
+    }
+    if (!nullToAbsent || messageId != null) {
+      map['message_id'] = Variable<int>(messageId);
+    }
+    return map;
+  }
+
+  ProactivePlansCompanion toCompanion(bool nullToAbsent) {
+    return ProactivePlansCompanion(
+      id: Value(id),
+      characterId: Value(characterId),
+      conversationId: Value(conversationId),
+      content: Value(content),
+      scheduledAt: Value(scheduledAt),
+      sentAt: sentAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sentAt),
+      status: Value(status),
+      messageId: messageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(messageId),
+    );
+  }
+
+  factory ProactivePlan.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProactivePlan(
+      id: serializer.fromJson<int>(json['id']),
+      characterId: serializer.fromJson<int>(json['characterId']),
+      conversationId: serializer.fromJson<int>(json['conversationId']),
+      content: serializer.fromJson<String>(json['content']),
+      scheduledAt: serializer.fromJson<DateTime>(json['scheduledAt']),
+      sentAt: serializer.fromJson<DateTime?>(json['sentAt']),
+      status: serializer.fromJson<ProactivePlanStatus>(json['status']),
+      messageId: serializer.fromJson<int?>(json['messageId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'characterId': serializer.toJson<int>(characterId),
+      'conversationId': serializer.toJson<int>(conversationId),
+      'content': serializer.toJson<String>(content),
+      'scheduledAt': serializer.toJson<DateTime>(scheduledAt),
+      'sentAt': serializer.toJson<DateTime?>(sentAt),
+      'status': serializer.toJson<ProactivePlanStatus>(status),
+      'messageId': serializer.toJson<int?>(messageId),
+    };
+  }
+
+  ProactivePlan copyWith({
+    int? id,
+    int? characterId,
+    int? conversationId,
+    String? content,
+    DateTime? scheduledAt,
+    Value<DateTime?> sentAt = const Value.absent(),
+    ProactivePlanStatus? status,
+    Value<int?> messageId = const Value.absent(),
+  }) => ProactivePlan(
+    id: id ?? this.id,
+    characterId: characterId ?? this.characterId,
+    conversationId: conversationId ?? this.conversationId,
+    content: content ?? this.content,
+    scheduledAt: scheduledAt ?? this.scheduledAt,
+    sentAt: sentAt.present ? sentAt.value : this.sentAt,
+    status: status ?? this.status,
+    messageId: messageId.present ? messageId.value : this.messageId,
+  );
+  ProactivePlan copyWithCompanion(ProactivePlansCompanion data) {
+    return ProactivePlan(
+      id: data.id.present ? data.id.value : this.id,
+      characterId: data.characterId.present
+          ? data.characterId.value
+          : this.characterId,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      content: data.content.present ? data.content.value : this.content,
+      scheduledAt: data.scheduledAt.present
+          ? data.scheduledAt.value
+          : this.scheduledAt,
+      sentAt: data.sentAt.present ? data.sentAt.value : this.sentAt,
+      status: data.status.present ? data.status.value : this.status,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProactivePlan(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('content: $content, ')
+          ..write('scheduledAt: $scheduledAt, ')
+          ..write('sentAt: $sentAt, ')
+          ..write('status: $status, ')
+          ..write('messageId: $messageId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    characterId,
+    conversationId,
+    content,
+    scheduledAt,
+    sentAt,
+    status,
+    messageId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProactivePlan &&
+          other.id == this.id &&
+          other.characterId == this.characterId &&
+          other.conversationId == this.conversationId &&
+          other.content == this.content &&
+          other.scheduledAt == this.scheduledAt &&
+          other.sentAt == this.sentAt &&
+          other.status == this.status &&
+          other.messageId == this.messageId);
+}
+
+class ProactivePlansCompanion extends UpdateCompanion<ProactivePlan> {
+  final Value<int> id;
+  final Value<int> characterId;
+  final Value<int> conversationId;
+  final Value<String> content;
+  final Value<DateTime> scheduledAt;
+  final Value<DateTime?> sentAt;
+  final Value<ProactivePlanStatus> status;
+  final Value<int?> messageId;
+  const ProactivePlansCompanion({
+    this.id = const Value.absent(),
+    this.characterId = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.content = const Value.absent(),
+    this.scheduledAt = const Value.absent(),
+    this.sentAt = const Value.absent(),
+    this.status = const Value.absent(),
+    this.messageId = const Value.absent(),
+  });
+  ProactivePlansCompanion.insert({
+    this.id = const Value.absent(),
+    required int characterId,
+    required int conversationId,
+    required String content,
+    required DateTime scheduledAt,
+    this.sentAt = const Value.absent(),
+    required ProactivePlanStatus status,
+    this.messageId = const Value.absent(),
+  }) : characterId = Value(characterId),
+       conversationId = Value(conversationId),
+       content = Value(content),
+       scheduledAt = Value(scheduledAt),
+       status = Value(status);
+  static Insertable<ProactivePlan> custom({
+    Expression<int>? id,
+    Expression<int>? characterId,
+    Expression<int>? conversationId,
+    Expression<String>? content,
+    Expression<DateTime>? scheduledAt,
+    Expression<DateTime>? sentAt,
+    Expression<String>? status,
+    Expression<int>? messageId,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (characterId != null) 'character_id': characterId,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (content != null) 'content': content,
+      if (scheduledAt != null) 'scheduled_at': scheduledAt,
+      if (sentAt != null) 'sent_at': sentAt,
+      if (status != null) 'status': status,
+      if (messageId != null) 'message_id': messageId,
+    });
+  }
+
+  ProactivePlansCompanion copyWith({
+    Value<int>? id,
+    Value<int>? characterId,
+    Value<int>? conversationId,
+    Value<String>? content,
+    Value<DateTime>? scheduledAt,
+    Value<DateTime?>? sentAt,
+    Value<ProactivePlanStatus>? status,
+    Value<int?>? messageId,
+  }) {
+    return ProactivePlansCompanion(
+      id: id ?? this.id,
+      characterId: characterId ?? this.characterId,
+      conversationId: conversationId ?? this.conversationId,
+      content: content ?? this.content,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      sentAt: sentAt ?? this.sentAt,
+      status: status ?? this.status,
+      messageId: messageId ?? this.messageId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (characterId.present) {
+      map['character_id'] = Variable<int>(characterId.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<int>(conversationId.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (scheduledAt.present) {
+      map['scheduled_at'] = Variable<DateTime>(scheduledAt.value);
+    }
+    if (sentAt.present) {
+      map['sent_at'] = Variable<DateTime>(sentAt.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(
+        $ProactivePlansTable.$converterstatus.toSql(status.value),
+      );
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<int>(messageId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProactivePlansCompanion(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('content: $content, ')
+          ..write('scheduledAt: $scheduledAt, ')
+          ..write('sentAt: $sentAt, ')
+          ..write('status: $status, ')
+          ..write('messageId: $messageId')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $InnerThoughtsTable extends InnerThoughts
+    with TableInfo<$InnerThoughtsTable, InnerThought> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InnerThoughtsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _characterIdMeta = const VerificationMeta(
+    'characterId',
+  );
+  @override
+  late final GeneratedColumn<int> characterId = GeneratedColumn<int>(
+    'character_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES characters (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<int> messageId = GeneratedColumn<int>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES messages (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    characterId,
+    messageId,
+    content,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'inner_thoughts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InnerThought> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('character_id')) {
+      context.handle(
+        _characterIdMeta,
+        characterId.isAcceptableOrUnknown(
+          data['character_id']!,
+          _characterIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_characterIdMeta);
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  InnerThought map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InnerThought(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      characterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}character_id'],
+      )!,
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}message_id'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $InnerThoughtsTable createAlias(String alias) {
+    return $InnerThoughtsTable(attachedDatabase, alias);
+  }
+}
+
+class InnerThought extends DataClass implements Insertable<InnerThought> {
+  final int id;
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  final int characterId;
+
+  /// 必填外键 → messages.id，ondelete=CASCADE（thought 随消息删除级联）。
+  final int messageId;
+
+  /// 独白正文（必填文本）。
+  final String content;
+  final DateTime createdAt;
+  const InnerThought({
+    required this.id,
+    required this.characterId,
+    required this.messageId,
+    required this.content,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['character_id'] = Variable<int>(characterId);
+    map['message_id'] = Variable<int>(messageId);
+    map['content'] = Variable<String>(content);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  InnerThoughtsCompanion toCompanion(bool nullToAbsent) {
+    return InnerThoughtsCompanion(
+      id: Value(id),
+      characterId: Value(characterId),
+      messageId: Value(messageId),
+      content: Value(content),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory InnerThought.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InnerThought(
+      id: serializer.fromJson<int>(json['id']),
+      characterId: serializer.fromJson<int>(json['characterId']),
+      messageId: serializer.fromJson<int>(json['messageId']),
+      content: serializer.fromJson<String>(json['content']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'characterId': serializer.toJson<int>(characterId),
+      'messageId': serializer.toJson<int>(messageId),
+      'content': serializer.toJson<String>(content),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  InnerThought copyWith({
+    int? id,
+    int? characterId,
+    int? messageId,
+    String? content,
+    DateTime? createdAt,
+  }) => InnerThought(
+    id: id ?? this.id,
+    characterId: characterId ?? this.characterId,
+    messageId: messageId ?? this.messageId,
+    content: content ?? this.content,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  InnerThought copyWithCompanion(InnerThoughtsCompanion data) {
+    return InnerThought(
+      id: data.id.present ? data.id.value : this.id,
+      characterId: data.characterId.present
+          ? data.characterId.value
+          : this.characterId,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      content: data.content.present ? data.content.value : this.content,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InnerThought(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('messageId: $messageId, ')
+          ..write('content: $content, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, characterId, messageId, content, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InnerThought &&
+          other.id == this.id &&
+          other.characterId == this.characterId &&
+          other.messageId == this.messageId &&
+          other.content == this.content &&
+          other.createdAt == this.createdAt);
+}
+
+class InnerThoughtsCompanion extends UpdateCompanion<InnerThought> {
+  final Value<int> id;
+  final Value<int> characterId;
+  final Value<int> messageId;
+  final Value<String> content;
+  final Value<DateTime> createdAt;
+  const InnerThoughtsCompanion({
+    this.id = const Value.absent(),
+    this.characterId = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.content = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  InnerThoughtsCompanion.insert({
+    this.id = const Value.absent(),
+    required int characterId,
+    required int messageId,
+    required String content,
+    required DateTime createdAt,
+  }) : characterId = Value(characterId),
+       messageId = Value(messageId),
+       content = Value(content),
+       createdAt = Value(createdAt);
+  static Insertable<InnerThought> custom({
+    Expression<int>? id,
+    Expression<int>? characterId,
+    Expression<int>? messageId,
+    Expression<String>? content,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (characterId != null) 'character_id': characterId,
+      if (messageId != null) 'message_id': messageId,
+      if (content != null) 'content': content,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  InnerThoughtsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? characterId,
+    Value<int>? messageId,
+    Value<String>? content,
+    Value<DateTime>? createdAt,
+  }) {
+    return InnerThoughtsCompanion(
+      id: id ?? this.id,
+      characterId: characterId ?? this.characterId,
+      messageId: messageId ?? this.messageId,
+      content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (characterId.present) {
+      map['character_id'] = Variable<int>(characterId.value);
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<int>(messageId.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InnerThoughtsCompanion(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('messageId: $messageId, ')
+          ..write('content: $content, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2946,6 +4225,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PersonaRevisionsTable personaRevisions = $PersonaRevisionsTable(
     this,
   );
+  late final $RelationshipStatesTable relationshipStates =
+      $RelationshipStatesTable(this);
+  late final $ProactivePlansTable proactivePlans = $ProactivePlansTable(this);
+  late final $InnerThoughtsTable innerThoughts = $InnerThoughtsTable(this);
   late final Index idxCharactersName = Index(
     'idx_characters_name',
     'CREATE INDEX idx_characters_name ON characters (name)',
@@ -2966,6 +4249,30 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_persona_revisions_character_id',
     'CREATE INDEX idx_persona_revisions_character_id ON persona_revisions (character_id)',
   );
+  late final Index idxRelationshipStatesCharacterId = Index(
+    'idx_relationship_states_character_id',
+    'CREATE UNIQUE INDEX idx_relationship_states_character_id ON relationship_states (character_id)',
+  );
+  late final Index idxProactivePlansCharacterId = Index(
+    'idx_proactive_plans_character_id',
+    'CREATE INDEX idx_proactive_plans_character_id ON proactive_plans (character_id)',
+  );
+  late final Index idxProactivePlansConversationId = Index(
+    'idx_proactive_plans_conversation_id',
+    'CREATE INDEX idx_proactive_plans_conversation_id ON proactive_plans (conversation_id)',
+  );
+  late final Index idxProactivePlansStatus = Index(
+    'idx_proactive_plans_status',
+    'CREATE INDEX idx_proactive_plans_status ON proactive_plans (status)',
+  );
+  late final Index idxInnerThoughtsCharacterId = Index(
+    'idx_inner_thoughts_character_id',
+    'CREATE INDEX idx_inner_thoughts_character_id ON inner_thoughts (character_id)',
+  );
+  late final Index idxInnerThoughtsMessageId = Index(
+    'idx_inner_thoughts_message_id',
+    'CREATE INDEX idx_inner_thoughts_message_id ON inner_thoughts (message_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2977,11 +4284,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     settings,
     memoryEntries,
     personaRevisions,
+    relationshipStates,
+    proactivePlans,
+    innerThoughts,
     idxCharactersName,
     idxConversationsCharacterId,
     idxMessagesConversationId,
     idxMemoryEntriesCharacterId,
     idxPersonaRevisionsCharacterId,
+    idxRelationshipStatesCharacterId,
+    idxProactivePlansCharacterId,
+    idxProactivePlansConversationId,
+    idxProactivePlansStatus,
+    idxInnerThoughtsCharacterId,
+    idxInnerThoughtsMessageId,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -3012,6 +4328,48 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('persona_revisions', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'characters',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('relationship_states', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'characters',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('proactive_plans', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversations',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('proactive_plans', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'messages',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('proactive_plans', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'characters',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('inner_thoughts', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'messages',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('inner_thoughts', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -3114,6 +4472,63 @@ final class $$CharactersTableReferences
     final cache = $_typedResult.readTableOrNull(
       _personaRevisionsRefsTable($_db),
     );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$RelationshipStatesTable, List<RelationshipState>>
+  _relationshipStatesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.relationshipStates,
+        aliasName: 'characters__id__relationship_states__character_id',
+      );
+
+  $$RelationshipStatesTableProcessedTableManager get relationshipStatesRefs {
+    final manager = $$RelationshipStatesTableTableManager(
+      $_db,
+      $_db.relationshipStates,
+    ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _relationshipStatesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$ProactivePlansTable, List<ProactivePlan>>
+  _proactivePlansRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.proactivePlans,
+    aliasName: 'characters__id__proactive_plans__character_id',
+  );
+
+  $$ProactivePlansTableProcessedTableManager get proactivePlansRefs {
+    final manager = $$ProactivePlansTableTableManager(
+      $_db,
+      $_db.proactivePlans,
+    ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_proactivePlansRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$InnerThoughtsTable, List<InnerThought>>
+  _innerThoughtsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.innerThoughts,
+    aliasName: 'characters__id__inner_thoughts__character_id',
+  );
+
+  $$InnerThoughtsTableProcessedTableManager get innerThoughtsRefs {
+    final manager = $$InnerThoughtsTableTableManager(
+      $_db,
+      $_db.innerThoughts,
+    ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_innerThoughtsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -3302,6 +4717,81 @@ class $$CharactersTableFilterComposer
           }) => $$PersonaRevisionsTableFilterComposer(
             $db: $db,
             $table: $db.personaRevisions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> relationshipStatesRefs(
+    Expression<bool> Function($$RelationshipStatesTableFilterComposer f) f,
+  ) {
+    final $$RelationshipStatesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.relationshipStates,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RelationshipStatesTableFilterComposer(
+            $db: $db,
+            $table: $db.relationshipStates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> proactivePlansRefs(
+    Expression<bool> Function($$ProactivePlansTableFilterComposer f) f,
+  ) {
+    final $$ProactivePlansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.proactivePlans,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProactivePlansTableFilterComposer(
+            $db: $db,
+            $table: $db.proactivePlans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> innerThoughtsRefs(
+    Expression<bool> Function($$InnerThoughtsTableFilterComposer f) f,
+  ) {
+    final $$InnerThoughtsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.innerThoughts,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InnerThoughtsTableFilterComposer(
+            $db: $db,
+            $table: $db.innerThoughts,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -3578,6 +5068,82 @@ class $$CharactersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> relationshipStatesRefs<T extends Object>(
+    Expression<T> Function($$RelationshipStatesTableAnnotationComposer a) f,
+  ) {
+    final $$RelationshipStatesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.relationshipStates,
+          getReferencedColumn: (t) => t.characterId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RelationshipStatesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.relationshipStates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> proactivePlansRefs<T extends Object>(
+    Expression<T> Function($$ProactivePlansTableAnnotationComposer a) f,
+  ) {
+    final $$ProactivePlansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.proactivePlans,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProactivePlansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.proactivePlans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> innerThoughtsRefs<T extends Object>(
+    Expression<T> Function($$InnerThoughtsTableAnnotationComposer a) f,
+  ) {
+    final $$InnerThoughtsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.innerThoughts,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InnerThoughtsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.innerThoughts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CharactersTableTableManager
@@ -3597,6 +5163,9 @@ class $$CharactersTableTableManager
             bool conversationsRefs,
             bool memoryEntriesRefs,
             bool personaRevisionsRefs,
+            bool relationshipStatesRefs,
+            bool proactivePlansRefs,
+            bool innerThoughtsRefs,
           })
         > {
   $$CharactersTableTableManager(_$AppDatabase db, $CharactersTable table)
@@ -3707,6 +5276,9 @@ class $$CharactersTableTableManager
                 conversationsRefs = false,
                 memoryEntriesRefs = false,
                 personaRevisionsRefs = false,
+                relationshipStatesRefs = false,
+                proactivePlansRefs = false,
+                innerThoughtsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -3714,6 +5286,9 @@ class $$CharactersTableTableManager
                     if (conversationsRefs) db.conversations,
                     if (memoryEntriesRefs) db.memoryEntries,
                     if (personaRevisionsRefs) db.personaRevisions,
+                    if (relationshipStatesRefs) db.relationshipStates,
+                    if (proactivePlansRefs) db.proactivePlans,
+                    if (innerThoughtsRefs) db.innerThoughts,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -3781,6 +5356,69 @@ class $$CharactersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (relationshipStatesRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          RelationshipState
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._relationshipStatesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).relationshipStatesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (proactivePlansRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          ProactivePlan
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._proactivePlansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).proactivePlansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (innerThoughtsRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          InnerThought
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._innerThoughtsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).innerThoughtsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -3805,6 +5443,9 @@ typedef $$CharactersTableProcessedTableManager =
         bool conversationsRefs,
         bool memoryEntriesRefs,
         bool personaRevisionsRefs,
+        bool relationshipStatesRefs,
+        bool proactivePlansRefs,
+        bool innerThoughtsRefs,
       })
     >;
 typedef $$ConversationsTableCreateCompanionBuilder =
@@ -3867,6 +5508,24 @@ final class $$ConversationsTableReferences
     ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_messagesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$ProactivePlansTable, List<ProactivePlan>>
+  _proactivePlansRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.proactivePlans,
+    aliasName: 'conversations__id__proactive_plans__conversation_id',
+  );
+
+  $$ProactivePlansTableProcessedTableManager get proactivePlansRefs {
+    final manager = $$ProactivePlansTableTableManager(
+      $_db,
+      $_db.proactivePlans,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_proactivePlansRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -3951,6 +5610,31 @@ class $$ConversationsTableFilterComposer
           }) => $$MessagesTableFilterComposer(
             $db: $db,
             $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> proactivePlansRefs(
+    Expression<bool> Function($$ProactivePlansTableFilterComposer f) f,
+  ) {
+    final $$ProactivePlansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.proactivePlans,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProactivePlansTableFilterComposer(
+            $db: $db,
+            $table: $db.proactivePlans,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4100,6 +5784,31 @@ class $$ConversationsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> proactivePlansRefs<T extends Object>(
+    Expression<T> Function($$ProactivePlansTableAnnotationComposer a) f,
+  ) {
+    final $$ProactivePlansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.proactivePlans,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProactivePlansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.proactivePlans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ConversationsTableTableManager
@@ -4115,7 +5824,11 @@ class $$ConversationsTableTableManager
           $$ConversationsTableUpdateCompanionBuilder,
           (Conversation, $$ConversationsTableReferences),
           Conversation,
-          PrefetchHooks Function({bool characterId, bool messagesRefs})
+          PrefetchHooks Function({
+            bool characterId,
+            bool messagesRefs,
+            bool proactivePlansRefs,
+          })
         > {
   $$ConversationsTableTableManager(_$AppDatabase db, $ConversationsTable table)
     : super(
@@ -4172,67 +5885,96 @@ class $$ConversationsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({characterId = false, messagesRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (messagesRefs) db.messages],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (characterId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.characterId,
-                        referencedTable: $$ConversationsTableReferences
-                            ._characterIdTable(db),
-                        referencedColumn: $$ConversationsTableReferences
-                            ._characterIdTable(db)
-                            .id,
-                      ) as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                characterId = false,
+                messagesRefs = false,
+                proactivePlansRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (messagesRefs) db.messages,
+                    if (proactivePlansRefs) db.proactivePlans,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (characterId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.characterId,
+                            referencedTable: $$ConversationsTableReferences
+                                ._characterIdTable(db),
+                            referencedColumn: $$ConversationsTableReferences
+                                ._characterIdTable(db)
+                                .id,
+                          ) as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (messagesRefs)
+                        await $_getPrefetchedData<
+                          Conversation,
+                          $ConversationsTable,
+                          Message
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationsTableReferences
+                              ._messagesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).messagesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (proactivePlansRefs)
+                        await $_getPrefetchedData<
+                          Conversation,
+                          $ConversationsTable,
+                          ProactivePlan
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationsTableReferences
+                              ._proactivePlansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).proactivePlansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (messagesRefs)
-                    await $_getPrefetchedData<
-                      Conversation,
-                      $ConversationsTable,
-                      Message
-                    >(
-                      currentTable: table,
-                      referencedTable: $$ConversationsTableReferences
-                          ._messagesRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$ConversationsTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).messagesRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where(
-                            (e) => e.conversationId == item.id,
-                          ),
-                      typedResults: items,
-                    ),
-                ];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -4249,7 +5991,11 @@ typedef $$ConversationsTableProcessedTableManager =
       $$ConversationsTableUpdateCompanionBuilder,
       (Conversation, $$ConversationsTableReferences),
       Conversation,
-      PrefetchHooks Function({bool characterId, bool messagesRefs})
+      PrefetchHooks Function({
+        bool characterId,
+        bool messagesRefs,
+        bool proactivePlansRefs,
+      })
     >;
 typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   Value<int> id,
@@ -4285,6 +6031,42 @@ final class $$MessagesTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$ProactivePlansTable, List<ProactivePlan>>
+  _proactivePlansRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.proactivePlans,
+    aliasName: 'messages__id__proactive_plans__message_id',
+  );
+
+  $$ProactivePlansTableProcessedTableManager get proactivePlansRefs {
+    final manager = $$ProactivePlansTableTableManager(
+      $_db,
+      $_db.proactivePlans,
+    ).filter((f) => f.messageId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_proactivePlansRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$InnerThoughtsTable, List<InnerThought>>
+  _innerThoughtsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.innerThoughts,
+    aliasName: 'messages__id__inner_thoughts__message_id',
+  );
+
+  $$InnerThoughtsTableProcessedTableManager get innerThoughtsRefs {
+    final manager = $$InnerThoughtsTableTableManager(
+      $_db,
+      $_db.innerThoughts,
+    ).filter((f) => f.messageId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_innerThoughtsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
     );
   }
 }
@@ -4340,6 +6122,56 @@ class $$MessagesTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> proactivePlansRefs(
+    Expression<bool> Function($$ProactivePlansTableFilterComposer f) f,
+  ) {
+    final $$ProactivePlansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.proactivePlans,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProactivePlansTableFilterComposer(
+            $db: $db,
+            $table: $db.proactivePlans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> innerThoughtsRefs(
+    Expression<bool> Function($$InnerThoughtsTableFilterComposer f) f,
+  ) {
+    final $$InnerThoughtsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.innerThoughts,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InnerThoughtsTableFilterComposer(
+            $db: $db,
+            $table: $db.innerThoughts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -4439,6 +6271,56 @@ class $$MessagesTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> proactivePlansRefs<T extends Object>(
+    Expression<T> Function($$ProactivePlansTableAnnotationComposer a) f,
+  ) {
+    final $$ProactivePlansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.proactivePlans,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProactivePlansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.proactivePlans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> innerThoughtsRefs<T extends Object>(
+    Expression<T> Function($$InnerThoughtsTableAnnotationComposer a) f,
+  ) {
+    final $$InnerThoughtsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.innerThoughts,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InnerThoughtsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.innerThoughts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$MessagesTableTableManager
@@ -4454,7 +6336,11 @@ class $$MessagesTableTableManager
           $$MessagesTableUpdateCompanionBuilder,
           (Message, $$MessagesTableReferences),
           Message,
-          PrefetchHooks Function({bool conversationId})
+          PrefetchHooks Function({
+            bool conversationId,
+            bool proactivePlansRefs,
+            bool innerThoughtsRefs,
+          })
         > {
   $$MessagesTableTableManager(_$AppDatabase db, $MessagesTable table)
     : super(
@@ -4503,45 +6389,96 @@ class $$MessagesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({conversationId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (conversationId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.conversationId,
-                        referencedTable: $$MessagesTableReferences
-                            ._conversationIdTable(db),
-                        referencedColumn: $$MessagesTableReferences
-                            ._conversationIdTable(db)
-                            .id,
-                      ) as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                conversationId = false,
+                proactivePlansRefs = false,
+                innerThoughtsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (proactivePlansRefs) db.proactivePlans,
+                    if (innerThoughtsRefs) db.innerThoughts,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (conversationId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.conversationId,
+                            referencedTable: $$MessagesTableReferences
+                                ._conversationIdTable(db),
+                            referencedColumn: $$MessagesTableReferences
+                                ._conversationIdTable(db)
+                                .id,
+                          ) as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (proactivePlansRefs)
+                        await $_getPrefetchedData<
+                          Message,
+                          $MessagesTable,
+                          ProactivePlan
+                        >(
+                          currentTable: table,
+                          referencedTable: $$MessagesTableReferences
+                              ._proactivePlansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MessagesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).proactivePlansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.messageId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (innerThoughtsRefs)
+                        await $_getPrefetchedData<
+                          Message,
+                          $MessagesTable,
+                          InnerThought
+                        >(
+                          currentTable: table,
+                          referencedTable: $$MessagesTableReferences
+                              ._innerThoughtsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MessagesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).innerThoughtsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.messageId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -4558,7 +6495,11 @@ typedef $$MessagesTableProcessedTableManager =
       $$MessagesTableUpdateCompanionBuilder,
       (Message, $$MessagesTableReferences),
       Message,
-      PrefetchHooks Function({bool conversationId})
+      PrefetchHooks Function({
+        bool conversationId,
+        bool proactivePlansRefs,
+        bool innerThoughtsRefs,
+      })
     >;
 typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   required String key,
@@ -5357,6 +7298,1288 @@ typedef $$PersonaRevisionsTableProcessedTableManager =
       PersonaRevision,
       PrefetchHooks Function({bool characterId})
     >;
+typedef $$RelationshipStatesTableCreateCompanionBuilder =
+    RelationshipStatesCompanion Function({
+      Value<int> id,
+      required int characterId,
+      required RelationshipStage stage,
+      Value<int> affinity,
+      required DateTime updatedAt,
+    });
+typedef $$RelationshipStatesTableUpdateCompanionBuilder =
+    RelationshipStatesCompanion Function({
+      Value<int> id,
+      Value<int> characterId,
+      Value<RelationshipStage> stage,
+      Value<int> affinity,
+      Value<DateTime> updatedAt,
+    });
+
+final class $$RelationshipStatesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $RelationshipStatesTable,
+          RelationshipState
+        > {
+  $$RelationshipStatesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CharactersTable _characterIdTable(_$AppDatabase db) => db.characters
+      .createAlias('relationship_states__character_id__characters__id');
+
+  $$CharactersTableProcessedTableManager get characterId {
+    final $_column = $_itemColumn<int>('character_id')!;
+
+    final manager = $$CharactersTableTableManager(
+      $_db,
+      $_db.characters,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_characterIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$RelationshipStatesTableFilterComposer
+    extends Composer<_$AppDatabase, $RelationshipStatesTable> {
+  $$RelationshipStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<RelationshipStage, RelationshipStage, String>
+  get stage => $composableBuilder(
+    column: $table.stage,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<int> get affinity => $composableBuilder(
+    column: $table.affinity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CharactersTableFilterComposer get characterId {
+    final $$CharactersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableFilterComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RelationshipStatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $RelationshipStatesTable> {
+  $$RelationshipStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stage => $composableBuilder(
+    column: $table.stage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get affinity => $composableBuilder(
+    column: $table.affinity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CharactersTableOrderingComposer get characterId {
+    final $$CharactersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableOrderingComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RelationshipStatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RelationshipStatesTable> {
+  $$RelationshipStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<RelationshipStage, String> get stage =>
+      $composableBuilder(column: $table.stage, builder: (column) => column);
+
+  GeneratedColumn<int> get affinity =>
+      $composableBuilder(column: $table.affinity, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$CharactersTableAnnotationComposer get characterId {
+    final $$CharactersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RelationshipStatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RelationshipStatesTable,
+          RelationshipState,
+          $$RelationshipStatesTableFilterComposer,
+          $$RelationshipStatesTableOrderingComposer,
+          $$RelationshipStatesTableAnnotationComposer,
+          $$RelationshipStatesTableCreateCompanionBuilder,
+          $$RelationshipStatesTableUpdateCompanionBuilder,
+          (RelationshipState, $$RelationshipStatesTableReferences),
+          RelationshipState,
+          PrefetchHooks Function({bool characterId})
+        > {
+  $$RelationshipStatesTableTableManager(
+    _$AppDatabase db,
+    $RelationshipStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RelationshipStatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RelationshipStatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RelationshipStatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> characterId = const Value.absent(),
+                Value<RelationshipStage> stage = const Value.absent(),
+                Value<int> affinity = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => RelationshipStatesCompanion(
+                id: id,
+                characterId: characterId,
+                stage: stage,
+                affinity: affinity,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int characterId,
+                required RelationshipStage stage,
+                Value<int> affinity = const Value.absent(),
+                required DateTime updatedAt,
+              }) => RelationshipStatesCompanion.insert(
+                id: id,
+                characterId: characterId,
+                stage: stage,
+                affinity: affinity,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$RelationshipStatesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({characterId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (characterId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.characterId,
+                        referencedTable: $$RelationshipStatesTableReferences
+                            ._characterIdTable(db),
+                        referencedColumn: $$RelationshipStatesTableReferences
+                            ._characterIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$RelationshipStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RelationshipStatesTable,
+      RelationshipState,
+      $$RelationshipStatesTableFilterComposer,
+      $$RelationshipStatesTableOrderingComposer,
+      $$RelationshipStatesTableAnnotationComposer,
+      $$RelationshipStatesTableCreateCompanionBuilder,
+      $$RelationshipStatesTableUpdateCompanionBuilder,
+      (RelationshipState, $$RelationshipStatesTableReferences),
+      RelationshipState,
+      PrefetchHooks Function({bool characterId})
+    >;
+typedef $$ProactivePlansTableCreateCompanionBuilder =
+    ProactivePlansCompanion Function({
+      Value<int> id,
+      required int characterId,
+      required int conversationId,
+      required String content,
+      required DateTime scheduledAt,
+      Value<DateTime?> sentAt,
+      required ProactivePlanStatus status,
+      Value<int?> messageId,
+    });
+typedef $$ProactivePlansTableUpdateCompanionBuilder =
+    ProactivePlansCompanion Function({
+      Value<int> id,
+      Value<int> characterId,
+      Value<int> conversationId,
+      Value<String> content,
+      Value<DateTime> scheduledAt,
+      Value<DateTime?> sentAt,
+      Value<ProactivePlanStatus> status,
+      Value<int?> messageId,
+    });
+
+final class $$ProactivePlansTableReferences
+    extends BaseReferences<_$AppDatabase, $ProactivePlansTable, ProactivePlan> {
+  $$ProactivePlansTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CharactersTable _characterIdTable(_$AppDatabase db) => db.characters
+      .createAlias('proactive_plans__character_id__characters__id');
+
+  $$CharactersTableProcessedTableManager get characterId {
+    final $_column = $_itemColumn<int>('character_id')!;
+
+    final manager = $$CharactersTableTableManager(
+      $_db,
+      $_db.characters,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_characterIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ConversationsTable _conversationIdTable(_$AppDatabase db) => db
+      .conversations
+      .createAlias('proactive_plans__conversation_id__conversations__id');
+
+  $$ConversationsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<int>('conversation_id')!;
+
+    final manager = $$ConversationsTableTableManager(
+      $_db,
+      $_db.conversations,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $MessagesTable _messageIdTable(_$AppDatabase db) =>
+      db.messages.createAlias('proactive_plans__message_id__messages__id');
+
+  $$MessagesTableProcessedTableManager? get messageId {
+    final $_column = $_itemColumn<int>('message_id');
+    if ($_column == null) return null;
+    final manager = $$MessagesTableTableManager(
+      $_db,
+      $_db.messages,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_messageIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ProactivePlansTableFilterComposer
+    extends Composer<_$AppDatabase, $ProactivePlansTable> {
+  $$ProactivePlansTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get sentAt => $composableBuilder(
+    column: $table.sentAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    ProactivePlanStatus,
+    ProactivePlanStatus,
+    String
+  >
+  get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  $$CharactersTableFilterComposer get characterId {
+    final $$CharactersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableFilterComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ConversationsTableFilterComposer get conversationId {
+    final $$ConversationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessagesTableFilterComposer get messageId {
+    final $$MessagesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableFilterComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProactivePlansTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProactivePlansTable> {
+  $$ProactivePlansTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get sentAt => $composableBuilder(
+    column: $table.sentAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CharactersTableOrderingComposer get characterId {
+    final $$CharactersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableOrderingComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ConversationsTableOrderingComposer get conversationId {
+    final $$ConversationsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessagesTableOrderingComposer get messageId {
+    final $$MessagesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableOrderingComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProactivePlansTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProactivePlansTable> {
+  $$ProactivePlansTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get scheduledAt => $composableBuilder(
+    column: $table.scheduledAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get sentAt =>
+      $composableBuilder(column: $table.sentAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<ProactivePlanStatus, String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  $$CharactersTableAnnotationComposer get characterId {
+    final $$CharactersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ConversationsTableAnnotationComposer get conversationId {
+    final $$ConversationsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessagesTableAnnotationComposer get messageId {
+    final $$MessagesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProactivePlansTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProactivePlansTable,
+          ProactivePlan,
+          $$ProactivePlansTableFilterComposer,
+          $$ProactivePlansTableOrderingComposer,
+          $$ProactivePlansTableAnnotationComposer,
+          $$ProactivePlansTableCreateCompanionBuilder,
+          $$ProactivePlansTableUpdateCompanionBuilder,
+          (ProactivePlan, $$ProactivePlansTableReferences),
+          ProactivePlan,
+          PrefetchHooks Function({
+            bool characterId,
+            bool conversationId,
+            bool messageId,
+          })
+        > {
+  $$ProactivePlansTableTableManager(
+    _$AppDatabase db,
+    $ProactivePlansTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProactivePlansTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProactivePlansTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProactivePlansTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> characterId = const Value.absent(),
+                Value<int> conversationId = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<DateTime> scheduledAt = const Value.absent(),
+                Value<DateTime?> sentAt = const Value.absent(),
+                Value<ProactivePlanStatus> status = const Value.absent(),
+                Value<int?> messageId = const Value.absent(),
+              }) => ProactivePlansCompanion(
+                id: id,
+                characterId: characterId,
+                conversationId: conversationId,
+                content: content,
+                scheduledAt: scheduledAt,
+                sentAt: sentAt,
+                status: status,
+                messageId: messageId,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int characterId,
+                required int conversationId,
+                required String content,
+                required DateTime scheduledAt,
+                Value<DateTime?> sentAt = const Value.absent(),
+                required ProactivePlanStatus status,
+                Value<int?> messageId = const Value.absent(),
+              }) => ProactivePlansCompanion.insert(
+                id: id,
+                characterId: characterId,
+                conversationId: conversationId,
+                content: content,
+                scheduledAt: scheduledAt,
+                sentAt: sentAt,
+                status: status,
+                messageId: messageId,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ProactivePlansTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                characterId = false,
+                conversationId = false,
+                messageId = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (characterId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.characterId,
+                            referencedTable: $$ProactivePlansTableReferences
+                                ._characterIdTable(db),
+                            referencedColumn: $$ProactivePlansTableReferences
+                                ._characterIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (conversationId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.conversationId,
+                            referencedTable: $$ProactivePlansTableReferences
+                                ._conversationIdTable(db),
+                            referencedColumn: $$ProactivePlansTableReferences
+                                ._conversationIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (messageId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.messageId,
+                            referencedTable: $$ProactivePlansTableReferences
+                                ._messageIdTable(db),
+                            referencedColumn: $$ProactivePlansTableReferences
+                                ._messageIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$ProactivePlansTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProactivePlansTable,
+      ProactivePlan,
+      $$ProactivePlansTableFilterComposer,
+      $$ProactivePlansTableOrderingComposer,
+      $$ProactivePlansTableAnnotationComposer,
+      $$ProactivePlansTableCreateCompanionBuilder,
+      $$ProactivePlansTableUpdateCompanionBuilder,
+      (ProactivePlan, $$ProactivePlansTableReferences),
+      ProactivePlan,
+      PrefetchHooks Function({
+        bool characterId,
+        bool conversationId,
+        bool messageId,
+      })
+    >;
+typedef $$InnerThoughtsTableCreateCompanionBuilder =
+    InnerThoughtsCompanion Function({
+      Value<int> id,
+      required int characterId,
+      required int messageId,
+      required String content,
+      required DateTime createdAt,
+    });
+typedef $$InnerThoughtsTableUpdateCompanionBuilder =
+    InnerThoughtsCompanion Function({
+      Value<int> id,
+      Value<int> characterId,
+      Value<int> messageId,
+      Value<String> content,
+      Value<DateTime> createdAt,
+    });
+
+final class $$InnerThoughtsTableReferences
+    extends BaseReferences<_$AppDatabase, $InnerThoughtsTable, InnerThought> {
+  $$InnerThoughtsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CharactersTable _characterIdTable(_$AppDatabase db) =>
+      db.characters.createAlias('inner_thoughts__character_id__characters__id');
+
+  $$CharactersTableProcessedTableManager get characterId {
+    final $_column = $_itemColumn<int>('character_id')!;
+
+    final manager = $$CharactersTableTableManager(
+      $_db,
+      $_db.characters,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_characterIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $MessagesTable _messageIdTable(_$AppDatabase db) =>
+      db.messages.createAlias('inner_thoughts__message_id__messages__id');
+
+  $$MessagesTableProcessedTableManager get messageId {
+    final $_column = $_itemColumn<int>('message_id')!;
+
+    final manager = $$MessagesTableTableManager(
+      $_db,
+      $_db.messages,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_messageIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$InnerThoughtsTableFilterComposer
+    extends Composer<_$AppDatabase, $InnerThoughtsTable> {
+  $$InnerThoughtsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CharactersTableFilterComposer get characterId {
+    final $$CharactersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableFilterComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessagesTableFilterComposer get messageId {
+    final $$MessagesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableFilterComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$InnerThoughtsTableOrderingComposer
+    extends Composer<_$AppDatabase, $InnerThoughtsTable> {
+  $$InnerThoughtsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CharactersTableOrderingComposer get characterId {
+    final $$CharactersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableOrderingComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessagesTableOrderingComposer get messageId {
+    final $$MessagesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableOrderingComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$InnerThoughtsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InnerThoughtsTable> {
+  $$InnerThoughtsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$CharactersTableAnnotationComposer get characterId {
+    final $$CharactersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessagesTableAnnotationComposer get messageId {
+    final $$MessagesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$InnerThoughtsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InnerThoughtsTable,
+          InnerThought,
+          $$InnerThoughtsTableFilterComposer,
+          $$InnerThoughtsTableOrderingComposer,
+          $$InnerThoughtsTableAnnotationComposer,
+          $$InnerThoughtsTableCreateCompanionBuilder,
+          $$InnerThoughtsTableUpdateCompanionBuilder,
+          (InnerThought, $$InnerThoughtsTableReferences),
+          InnerThought,
+          PrefetchHooks Function({bool characterId, bool messageId})
+        > {
+  $$InnerThoughtsTableTableManager(_$AppDatabase db, $InnerThoughtsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InnerThoughtsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$InnerThoughtsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$InnerThoughtsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> characterId = const Value.absent(),
+                Value<int> messageId = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => InnerThoughtsCompanion(
+                id: id,
+                characterId: characterId,
+                messageId: messageId,
+                content: content,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int characterId,
+                required int messageId,
+                required String content,
+                required DateTime createdAt,
+              }) => InnerThoughtsCompanion.insert(
+                id: id,
+                characterId: characterId,
+                messageId: messageId,
+                content: content,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$InnerThoughtsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({characterId = false, messageId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (characterId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.characterId,
+                        referencedTable: $$InnerThoughtsTableReferences
+                            ._characterIdTable(db),
+                        referencedColumn: $$InnerThoughtsTableReferences
+                            ._characterIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+                    if (messageId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.messageId,
+                        referencedTable: $$InnerThoughtsTableReferences
+                            ._messageIdTable(db),
+                        referencedColumn: $$InnerThoughtsTableReferences
+                            ._messageIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$InnerThoughtsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InnerThoughtsTable,
+      InnerThought,
+      $$InnerThoughtsTableFilterComposer,
+      $$InnerThoughtsTableOrderingComposer,
+      $$InnerThoughtsTableAnnotationComposer,
+      $$InnerThoughtsTableCreateCompanionBuilder,
+      $$InnerThoughtsTableUpdateCompanionBuilder,
+      (InnerThought, $$InnerThoughtsTableReferences),
+      InnerThought,
+      PrefetchHooks Function({bool characterId, bool messageId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5373,4 +8596,10 @@ class $AppDatabaseManager {
       $$MemoryEntriesTableTableManager(_db, _db.memoryEntries);
   $$PersonaRevisionsTableTableManager get personaRevisions =>
       $$PersonaRevisionsTableTableManager(_db, _db.personaRevisions);
+  $$RelationshipStatesTableTableManager get relationshipStates =>
+      $$RelationshipStatesTableTableManager(_db, _db.relationshipStates);
+  $$ProactivePlansTableTableManager get proactivePlans =>
+      $$ProactivePlansTableTableManager(_db, _db.proactivePlans);
+  $$InnerThoughtsTableTableManager get innerThoughts =>
+      $$InnerThoughtsTableTableManager(_db, _db.innerThoughts);
 }

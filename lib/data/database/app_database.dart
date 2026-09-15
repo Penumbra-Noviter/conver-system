@@ -1,8 +1,10 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=2，M0 冻结后 AC-01 升版）。
+/// 应用数据库 — drift 数据库入口（schemaVersion=3，M0 冻结 + AC-01 升版 +
+/// PS2-01 升版）。
 ///
 /// - 表注册：characters / conversations / messages / settings / memory_entries /
 ///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
-///   后两表为人机恋板块移动端先行）
+///   后两表为人机恋板块移动端先行）+ relationship_states / proactive_plans /
+///   inner_thoughts（阶段 2 三表，spec §3）
 /// - 执行器构造注入：测试 seam，测试用 `AppDatabase(NativeDatabase.memory())`
 ///   在内存中打开真实 schema，不依赖设备
 /// - 运行态连接经 [AppDatabase.open]（drift_flutter 惰性打开，内部即
@@ -25,6 +27,9 @@ part 'app_database.g.dart';
   Settings,
   MemoryEntries,
   PersonaRevisions,
+  RelationshipStates,
+  ProactivePlans,
+  InnerThoughts,
 ])
 class AppDatabase extends _$AppDatabase {
   /// 执行器注入构造（测试 seam / 自定义执行器）。
@@ -36,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -59,6 +64,42 @@ class AppDatabase extends _$AppDatabase {
             await customStatement(
               'CREATE INDEX IF NOT EXISTS idx_persona_revisions_character_id '
               'ON persona_revisions (character_id)',
+            );
+          }
+
+          // PS2-01：schemaVersion 2→3 新增阶段 2 三表（relationship_states /
+          // proactive_plans / inner_thoughts，spec §3）。沿 from < 2 先例：
+          // createTable 建表 + raw SQL 补 FK 索引；relationship_states 的
+          // character_id 为 UNIQUE（对齐 @TableIndex(unique: true)）。
+          // onUpgrade 默认在事务内执行（drift 默认迁移事务语义未关闭）。
+          if (from < 3) {
+            await m.createTable(relationshipStates);
+            await m.createTable(proactivePlans);
+            await m.createTable(innerThoughts);
+            await customStatement(
+              'CREATE UNIQUE INDEX IF NOT EXISTS '
+              'idx_relationship_states_character_id '
+              'ON relationship_states (character_id)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_proactive_plans_character_id '
+              'ON proactive_plans (character_id)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_proactive_plans_conversation_id '
+              'ON proactive_plans (conversation_id)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_proactive_plans_status '
+              'ON proactive_plans (status)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_inner_thoughts_character_id '
+              'ON inner_thoughts (character_id)',
+            );
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_inner_thoughts_message_id '
+              'ON inner_thoughts (message_id)',
             );
           }
         },

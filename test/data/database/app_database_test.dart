@@ -33,11 +33,11 @@ void main() {
     return rows.map((row) => row.data['name'] as String).toList();
   }
 
-  test('schemaVersion 冻结为 2', () {
-    expect(db.schemaVersion, 2);
+  test('schemaVersion 冻结为 3', () {
+    expect(db.schemaVersion, 3);
   });
 
-  test('内存执行器打开成功，6 表可定位', () async {
+  test('内存执行器打开成功，9 表可定位', () async {
     final tables = await sqliteMasterNames('table');
     expect(
       tables,
@@ -48,6 +48,9 @@ void main() {
         'settings',
         'memory_entries',
         'persona_revisions',
+        'relationship_states',
+        'proactive_plans',
+        'inner_thoughts',
       ]),
     );
   });
@@ -156,6 +159,14 @@ void main() {
       'idx_characters_name',
       'idx_conversations_character_id',
       'idx_messages_conversation_id',
+      'idx_memory_entries_character_id',
+      'idx_persona_revisions_character_id',
+      'idx_relationship_states_character_id',
+      'idx_proactive_plans_character_id',
+      'idx_proactive_plans_conversation_id',
+      'idx_proactive_plans_status',
+      'idx_inner_thoughts_character_id',
+      'idx_inner_thoughts_message_id',
     ]));
   });
 
