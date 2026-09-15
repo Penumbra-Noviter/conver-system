@@ -54,10 +54,12 @@ class SettingsRepository implements SettingsReader {
   final AppDatabase _db;
   final SecretStore _secretStore;
 
-  /// 白名单键集 — 与桌面 `setting.py::ALLOWED_KEYS` **十键逐字相等**，外加四
+  /// 白名单键集 — 与桌面 `setting.py::ALLOWED_KEYS` **十键逐字相等**，外加
   /// mobile 先行键 `temperature` / `max_tokens` / `template_vars` /
   /// `onboarding_completed`（工单 03/04/05，桌面无此四键——契约漂移显式标注，
-  /// spec §U-2/U-3/U-4「mobile 先行差异」）。
+  /// spec §U-2/U-3/U-4「mobile 先行差异」），以及人机恋板块移动端先行键
+  /// （`memory_prompt_mode` / `memory_reflection_enabled` / 阶段 2
+  /// `proactive_message_enabled` / `inner_thought_enabled`，SR-09）。
   ///
   /// 白名单外的写入一律忽略（[setMany]）；白名单内两 api_key 键重定向到
   /// SecretStore 槽位，其余键落设置表。
@@ -78,6 +80,8 @@ class SettingsRepository implements SettingsReader {
     'onboarding_completed',
     'memory_prompt_mode',
     'memory_reflection_enabled',
+    'proactive_message_enabled',
+    'inner_thought_enabled',
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -123,6 +127,15 @@ class SettingsRepository implements SettingsReader {
   /// 后台反思开关落库键（人机恋阶段 1.5，ADR-0004，mobile 先行键；桌面无
   /// 对应物）。存储值 'true' 表示开启，其余一律视为关闭。
   static const String memoryReflectionEnabledKey = 'memory_reflection_enabled';
+
+  /// 主动消息开关落库键（阶段 2，SR-09，mobile 先行键；桌面无对应物）。
+  /// 存储值 'true' 表示开启，其余一律视为关闭（默认关闭，成本敏感）。
+  static const String proactiveMessageEnabledKey = 'proactive_message_enabled';
+
+  /// 内心独白开关落库键（阶段 2，SR-09，mobile 先行键；桌面无对应物）。
+  /// 存储值 'true' 表示开启，其余一律视为关闭（默认关闭）。
+  /// 注：不设 relationship 开关键（Grilling 共识校正，关系状态默认启用）。
+  static const String innerThoughtEnabledKey = 'inner_thought_enabled';
 
   // ── 键值 CRUD ──
 
@@ -323,6 +336,24 @@ class SettingsRepository implements SettingsReader {
   /// 存储值为 'true' 时开启；空串 / 缺失 / 其他值一律 false。
   Future<bool> get memoryReflectionEnabled async {
     final value = await getValue(memoryReflectionEnabledKey);
+    return value == 'true';
+  }
+
+  /// 主动消息开关（阶段 2，SR-09，mobile 先行键）；缺省 **false**（默认关闭，
+  /// 成本敏感，用户显式开启）。
+  ///
+  /// 存储值为 'true' 时开启；空串 / 缺失 / 其他值一律 false（对齐
+  /// [memoryReflectionEnabled] 语义）。
+  Future<bool> get proactiveMessageEnabled async {
+    final value = await getValue(proactiveMessageEnabledKey);
+    return value == 'true';
+  }
+
+  /// 内心独白开关（阶段 2，SR-09，mobile 先行键）；缺省 **false**（默认关闭）。
+  ///
+  /// 存储值为 'true' 时开启；空串 / 缺失 / 其他值一律 false。
+  Future<bool> get innerThoughtEnabled async {
+    final value = await getValue(innerThoughtEnabledKey);
     return value == 'true';
   }
 

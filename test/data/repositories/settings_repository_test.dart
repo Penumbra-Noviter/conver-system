@@ -58,6 +58,8 @@ void main() {
           'onboarding_completed',
           'memory_prompt_mode',
           'memory_reflection_enabled',
+          'proactive_message_enabled',
+          'inner_thought_enabled',
         }),
       );
     });
