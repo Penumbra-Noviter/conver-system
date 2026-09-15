@@ -5,13 +5,19 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:provider/provider.dart';
 
 import 'data/database/app_database.dart';
+import 'data/database/tables.dart' show ProactivePlanStatus;
 import 'data/repositories/character_repository.dart';
+import 'data/repositories/companion_repository.dart';
 import 'data/repositories/conversation_repository.dart';
 import 'data/repositories/memory_repository.dart';
 import 'data/repositories/message_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'services/chat_service.dart';
 import 'services/character_file_exchange.dart';
+import 'services/companion/proactive_message_service.dart';
+import 'services/companion/relationship_service.dart';
+import 'services/companion/stage_upgrade_broker.dart';
+import 'services/companion/thought_service.dart';
 import 'services/conversation_export_file_exchange.dart';
 import 'services/conversation_export_service.dart';
 import 'services/document_parse_service.dart';
@@ -19,6 +25,7 @@ import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/memory/memory_service.dart';
 import 'services/memory/reflection_service.dart';
+import 'services/notifications/notification_service.dart';
 import 'services/onboarding.dart';
 import 'services/secure_store.dart';
 import 'services/simulator/game_generator.dart';
@@ -47,6 +54,104 @@ import 'views/onboarding/onboarding_page.dart';
 ///   控制器构造后先 [ThemeController.load] 预热恢复持久化偏好；首启设置表
 ///   无 theme_mode 行（或恢复失败）→ dark 基线（用户拍板①）。
 /// - 导航状态在入口装配，全局可读；M0 五 tab 壳导航结构不变。
+/// 深链导航意图 seam（PS2-08，可测注入；生产实现包 ShellNavigation +
+/// ChatController，测试注入 fake recorder 断言两动作）。
+abstract interface class ProactiveDeepLinkNavigator {
+  /// 切换到聊天 tab（对话列表）。
+  void selectChatTab();
+
+  /// 打开 [conversationId] 对话并（可选）高亮 [highlightMessageId] 消息。
+  Future<void> openConversation(
+    int conversationId, {
+    int? highlightMessageId,
+  });
+}
+
+/// 深链导航生产接线占位（PS2-08）：`handleProactiveDeepLink` 顶层函数 +
+/// [ProactiveDeepLinkNavigator] seam 已就位；冷启动取参通道
+/// （`getNotificationAppLaunchDetails`）尚未在 notification_service 封装
+/// （PS2-06 未提供、该文件只读）——生产导航实现与真通道接线 PS2-10 补齐，
+/// 当前不实例化（避免未引用死代码）。
+
+/// 处理主动消息通知深链（PS2-08 验收 3 + SR-03 归属校验）。
+///
+/// payload 解析成功且 messageId 属于 payload.conversationId 的对话（经
+/// [messageRepository] 既有查询，不直接写库、不发送）→ select chat +
+/// openConversation(conversationId, highlightMessageId: messageId)；
+/// payload 非法或归属校验失败 → 回落普通导航（仅 select chat 打开对话列表）。
+/// 消费端不读任何 content 参数（SR-03 零内容；payload 仅两 id）。
+Future<void> handleProactiveDeepLink({
+  required String payload,
+  required ProactiveDeepLinkNavigator navigator,
+  required MessageRepository messageRepository,
+}) async {
+  final parsed = ProactiveDeepLink.tryParse(payload);
+  if (parsed == null) {
+    navigator.selectChatTab();
+    return;
+  }
+  try {
+    final messages = await messageRepository.getMessages(parsed.conversationId);
+    final belongs = messages.any((m) => m.id == parsed.messageId);
+    if (!belongs) {
+      navigator.selectChatTab();
+      return;
+    }
+  } catch (e) {
+    debugPrint('主动消息深链归属校验失败，回落对话列表: $e');
+    navigator.selectChatTab();
+    return;
+  }
+  navigator.selectChatTab();
+  await navigator.openConversation(
+    parsed.conversationId,
+    highlightMessageId: parsed.messageId,
+  );
+}
+
+/// 启动排程恢复（SR-08 P0）：只重建「pending 且未过期」的 OS 排程。
+///
+/// - pending 且 scheduledAt ≤ [now] → 置 expired（不排不发送）；
+/// - pending 且未过期 → [scheduler].schedule 重建一次；
+/// - sent/expired/dropped 不在 scheduled 列表 → 天然不重排（零触碰）。
+/// 单计划排程抛错 → 降级 log 跳过，其余计划继续恢复，不整体上抛。
+Future<void> restoreProactiveSchedules({
+  required CompanionRepository companion,
+  required ProactiveNotificationScheduler scheduler,
+  required DateTime now,
+}) async {
+  final pending = await companion.listPlansByStatus(ProactivePlanStatus.scheduled);
+  for (final plan in pending) {
+    if (!plan.scheduledAt.isAfter(now)) {
+      await companion.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
+      continue;
+    }
+    try {
+      await scheduler.schedule(plan);
+    } catch (e) {
+      debugPrint('启动排程恢复失败（计划 ${plan.id} 保持 scheduled）: $e');
+    }
+  }
+}
+
+/// 启动路径主动通知初始化（PS2-08 验收 4）：scheduler 初始化（幂等）+
+/// SR-08 排程恢复；任一失败 debugPrint 降级，不阻断 App 启动。
+Future<void> _startProactiveNotifications(
+  FlutterLocalNotificationsScheduler scheduler,
+  CompanionRepository companion,
+) async {
+  try {
+    await scheduler.initialize();
+    await restoreProactiveSchedules(
+      companion: companion,
+      scheduler: scheduler,
+      now: DateTime.now(),
+    );
+  } catch (e) {
+    debugPrint('主动通知启动初始化失败: $e');
+  }
+}
+
 class ConverApp extends StatelessWidget {
   const ConverApp({super.key, this.database});
 
@@ -127,6 +232,76 @@ class ConverApp extends StatelessWidget {
             );
           },
         ),
+        // 人机恋阶段 2 装配（PS2-08）：CompanionRepository + 三服务 + 通知
+        // scheduler + 升级提议 broker。均在 ChatService 之前声明（后者经
+        // provider 消费，装配单源）；启动初始化/排程恢复经哑 Provider 触发
+        // （unawaited，失败 debugPrint 不阻断构建）。
+        Provider<CompanionRepository>(
+          create: (context) =>
+              CompanionRepository(context.read<AppDatabase>()),
+        ),
+        Provider<ThoughtService>(
+          create: (context) => ThoughtService(
+            companionRepository: context.read<CompanionRepository>(),
+            settingsRepository: context.read<SettingsRepository>(),
+          ),
+        ),
+        Provider<RelationshipService>(
+          create: (context) => RelationshipService(
+            companionRepository: context.read<CompanionRepository>(),
+            conversationRepository: context.read<ConversationRepository>(),
+            messageRepository: context.read<MessageRepository>(),
+          ),
+        ),
+        Provider<FlutterLocalNotificationsScheduler>(
+          create: (_) => FlutterLocalNotificationsScheduler(),
+        ),
+        Provider<ProactiveMessageService>(
+          create: (context) {
+            final settings = context.read<SettingsRepository>();
+            final factory = context.read<LLMProviderFactory>();
+            return ProactiveMessageService(
+              companionRepository: context.read<CompanionRepository>(),
+              settingsRepository: settings,
+              conversationRepository: context.read<ConversationRepository>(),
+              messageRepository: context.read<MessageRepository>(),
+              planner: ({
+                required int characterId,
+                required int conversationId,
+                required List<String> dialogueLines,
+              }) async {
+                final resolved =
+                    await settings.wireCredentialsResolver().resolve();
+                final llm = factory.create(
+                      provider: resolved.provider,
+                      apiKey: resolved.apiKey,
+                      baseUrl: resolved.baseUrl,
+                    );
+                return planProactiveWithProvider(
+                  llm: llm,
+                  model: resolved.model,
+                  characterId: characterId,
+                  conversationId: conversationId,
+                  dialogueLines: dialogueLines,
+                );
+              },
+              scheduler: context.read<FlutterLocalNotificationsScheduler>(),
+            );
+          },
+        ),
+        ChangeNotifierProvider<StageUpgradeBroker>(
+          create: (_) => StageUpgradeBroker(),
+        ),
+        Provider<Object?>(
+          create: (context) {
+            // 启动路径：通知初始化（幂等）+ SR-08 排程恢复；失败不阻断。
+            unawaited(_startProactiveNotifications(
+              context.read<FlutterLocalNotificationsScheduler>(),
+              context.read<CompanionRepository>(),
+            ));
+            return null;
+          },
+        ),
         Provider<ChatService>(
           create: (context) => ChatService(
             database: context.read<AppDatabase>(),
@@ -137,6 +312,12 @@ class ConverApp extends StatelessWidget {
             providerFactory: context.read<LLMProviderFactory>(),
             memoryService: context.read<MemoryService>(),
             reflectionService: context.read<ReflectionService>(),
+            thoughtService: context.read<ThoughtService>(),
+            relationshipService: context.read<RelationshipService>(),
+            proactiveMessageService: context.read<ProactiveMessageService>(),
+            companionRepository: context.read<CompanionRepository>(),
+            onStageUpgradeProposal: (proposal) =>
+                context.read<StageUpgradeBroker>().publish(proposal),
           ),
         ),
         // M4-03 导出装配：纯逻辑服务（复用三仓储 + SettingsRepository as
