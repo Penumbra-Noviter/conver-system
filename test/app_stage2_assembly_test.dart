@@ -14,16 +14,23 @@ import 'package:conver_system_mobile/services/companion/relationship_service.dar
 import 'package:conver_system_mobile/services/companion/stage_upgrade_broker.dart';
 import 'package:conver_system_mobile/services/companion/thought_service.dart';
 import 'package:conver_system_mobile/services/notifications/notification_service.dart';
+import 'package:conver_system_mobile/view_models/shell_navigation.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-import 'helpers/chat_test_env.dart' show FakeSettingsReader;
+import 'helpers/chat_test_env.dart' show ChatTestEnv, FakeSettingsReader;
+import 'helpers/fake_llm_provider.dart';
 
 /// 深链导航 fake recorder（断言 select + openConversation 两动作）。
 class _RecordingNavigator implements ProactiveDeepLinkNavigator {
+  _RecordingNavigator({this.throwOnOpen = false});
+
+  /// openConversation 抛错开关（W5 F2：导航失败降级路径探测）。
+  final bool throwOnOpen;
+
   int selectCalls = 0;
   final List<({int conversationId, int? highlightMessageId})> opened = [];
 
@@ -37,6 +44,9 @@ class _RecordingNavigator implements ProactiveDeepLinkNavigator {
     int conversationId, {
     int? highlightMessageId,
   }) async {
+    if (throwOnOpen) {
+      throw StateError('openConversation boom');
+    }
     opened.add((conversationId: conversationId, highlightMessageId: highlightMessageId));
   }
 }
@@ -121,6 +131,7 @@ void main() {
       var notified = 0;
       broker.addListener(() => notified++);
       final proposal = StageUpgradeProposal(
+        characterId: 1,
         currentStage: RelationshipStage.familiar,
         targetStage: RelationshipStage.intimate,
         affinity: 61,
@@ -135,11 +146,13 @@ void main() {
     test('多次 publish 取最新；clear 清空', () {
       final broker = StageUpgradeBroker();
       final first = StageUpgradeProposal(
+        characterId: 1,
         currentStage: RelationshipStage.familiar,
         targetStage: RelationshipStage.intimate,
         affinity: 61,
       );
       final second = StageUpgradeProposal(
+        characterId: 2,
         currentStage: RelationshipStage.intimate,
         targetStage: RelationshipStage.soulmate,
         affinity: 81,
@@ -215,6 +228,25 @@ void main() {
       expect(payload, contains('conversationId=7'));
       expect(payload, contains('messageId=9'));
       expect(payload, isNot(contains('content=')));
+    });
+
+    test('F2（W5）：归属通过后 openConversation 抛错 → 降级不抛、已切 tab（不回退）',
+        () async {
+      final seed = await seedConversationWithMessage();
+      final payload = ProactiveDeepLink.encode(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+      );
+      final navigator = _RecordingNavigator(throwOnOpen: true);
+
+      await handleProactiveDeepLink(
+        payload: payload,
+        navigator: navigator,
+        messageRepository: messageRepo,
+      );
+
+      expect(navigator.selectCalls, 1, reason: '导航失败不崩溃，tab 已切到聊天列表');
+      expect(navigator.opened, isEmpty, reason: 'openConversation 抛错被消化');
     });
   });
 
@@ -318,6 +350,89 @@ void main() {
       expect(scheduler.scheduledIds, isEmpty);
       final scheduled = await companionRepo.listPlansByStatus(ProactivePlanStatus.scheduled);
       expect(scheduled.map((p) => p.id), containsAll([first.id, second.id]));
+    });
+  });
+
+  group('深链生产接线（PS2-10 验收 8）', () {
+    test('AppDeepLinkNavigator：selectChatTab 切聊天 tab；openConversation 打开'
+        '会话并高亮消息（生产导航实现）', () async {
+      final env = await ChatTestEnv.create();
+      final character = await env.seedCharacter(name: '艾莉亚');
+      final conversation = await env.seedConversation(character.id);
+      final message = await env.seedMessage(
+        conversationId: conversation.id,
+        role: Role.assistant,
+        content: '主动消息正文',
+      );
+      final controller = env.controllerOf(FakeLLMProvider(tokens: const ['ok']));
+      final navigation = ShellNavigation();
+      navigation.select(ShellTab.characters);
+      final navigator = AppDeepLinkNavigator(
+        navigation: navigation,
+        chatController: controller,
+      );
+
+      navigator.selectChatTab();
+      expect(navigation.current, ShellTab.chat);
+
+      await navigator.openConversation(
+        conversation.id,
+        highlightMessageId: message.id,
+      );
+      expect(controller.activeConversation?.id, conversation.id);
+      expect(controller.highlightMessageIds, contains(message.id));
+      await env.close();
+    });
+
+    test('consumeProactiveLaunchDeepLink：无 payload / 取参失败 → 静默跳过'
+        '（验收 8 零导航）', () async {
+      final voidN = _RecordingNavigator();
+      await consumeProactiveLaunchDeepLink(
+        navigator: voidN,
+        messageRepository: messageRepo,
+        readPayload: () async => null,
+      );
+      expect(voidN.selectCalls, 0);
+      expect(voidN.opened, isEmpty, reason: '无 payload 静默');
+
+      final throwN = _RecordingNavigator();
+      await consumeProactiveLaunchDeepLink(
+        navigator: throwN,
+        messageRepository: messageRepo,
+        readPayload: () async => throw StateError('plugin 缺失'),
+      );
+      expect(throwN.selectCalls, 0, reason: '取参失败静默');
+    });
+
+    test('非法 payload → 回落 select chat（handleProactiveDeepLink 语义）',
+        () async {
+      final navigator = _RecordingNavigator();
+      await consumeProactiveLaunchDeepLink(
+        navigator: navigator,
+        messageRepository: messageRepo,
+        readPayload: () async => 'not-a-deeplink',
+      );
+      expect(navigator.selectCalls, 1);
+      expect(navigator.opened, isEmpty);
+    });
+
+    test('合法 payload → select chat + openConversation 高亮（冷启动端到端）',
+        () async {
+      final seed = await seedConversationWithMessage();
+      final payload = ProactiveDeepLink.encode(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+      );
+      final navigator = _RecordingNavigator();
+      await consumeProactiveLaunchDeepLink(
+        navigator: navigator,
+        messageRepository: messageRepo,
+        readPayload: () async => payload,
+      );
+      expect(navigator.selectCalls, 1);
+      expect(navigator.opened, hasLength(1));
+      expect(navigator.opened.single.conversationId, seed.conversationId);
+      expect(navigator.opened.single.highlightMessageId, seed.messageId);
     });
   });
 

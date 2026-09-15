@@ -13,8 +13,20 @@
 /// - 空态「暂无角色」+ 创建引导；「新建角色」入口 push 6 步向导
 ///   （M3-01 留 stub，M3-02a 接真导航；[CharacterWizardView]）。
 ///
-/// 层级：呈现层。经 [CharactersController] 注入，不触碰数据层 / 平台存储
-/// （layer_boundary_test 契约）。
+/// 阶段 2 关系区（PS2-10，spec P4 + 判定⑤⑧ + SR-10）：
+/// - 关系状态经装配图 `CompanionRepository.listRelationships` 只读加载（本层
+///   context.read 消费，不现造仓储；provider 缺位 → 静默降级不渲染，保既有
+///   装配零回归）；
+/// - 卡片显示五段中文 label（UI 层映射，业务枚举保持英文）+ affinity 进度条
+///   （0-100）；无状态行角色不渲染关系区（判定⑧零噪音）；
+/// - 升级提议经装配图 `StageUpgradeBroker`（ChangeNotifier）消费：proposal
+///   归属角色卡展示「升级建议：目标阶段」+ 确认/拒绝（多选态隐藏防误触）；
+///   确认/拒绝只调 `RelationshipService`（SR-10：UI 零直写 relationship_states；
+///   F1 域校验拒绝 confirm=false → 不崩、刷新为现状）；拒绝后本会话同角色
+///   不再重复弹（spec 判定⑤的 UI 侧拒绝记录，broker 只读不扩容）。
+///
+/// 层级：呈现层。经 [CharactersController] 注入 + 装配图 provider 消费，
+/// 不触碰平台存储 / 不现造服务（layer_boundary_test 契约）。
 library;
 
 import 'dart:async';
@@ -22,10 +34,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../data/database/app_database.dart' show Character;
+import '../../data/database/app_database.dart' show Character, RelationshipState;
+import '../../data/database/tables.dart' show RelationshipStage;
 import '../../data/repositories/character_repository.dart'
     show CharacterRepository, CharacterWithCount;
+import '../../data/repositories/companion_repository.dart';
 import '../../data/repositories/memory_repository.dart';
+import '../../services/companion/relationship_service.dart';
+import '../../services/companion/stage_upgrade_broker.dart';
 import '../../services/document_parse_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
@@ -50,6 +66,16 @@ class CharactersView extends StatefulWidget {
 }
 
 class _CharactersViewState extends State<CharactersView> {
+  /// 关系状态行（characterId → 行）；无行角色不在 map（判定⑧零噪音）。
+  Map<int, RelationshipState> _relationships = const {};
+
+  /// 本会话内拒绝过升级提议的角色 id 集（spec 判定⑤「不重复提议」的 UI 侧
+  /// 记录——broker 只读不扩容，拒绝语义落在消费方）。
+  final Set<int> _rejectedCharacterIds = <int>{};
+
+  /// 确认/拒绝进行中的角色 id 集（防重入：按钮忙碌禁用）。
+  final Set<int> _busyCharacterIds = <int>{};
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +86,7 @@ class _CharactersViewState extends State<CharactersView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _ensureLoaded();
+        unawaited(_loadRelationships());
       }
     });
   }
@@ -74,6 +101,106 @@ class _CharactersViewState extends State<CharactersView> {
     } catch (error) {
       debugPrint('角色列表刷新失败，保持缺省空列表: $error');
     }
+  }
+
+  /// 从装配图（app.dart 单一落点）读取 [T]；provider 缺位（既有测试无
+  /// stage2 装配）→ null，调用方降级不渲染（零回归契约）。
+  T? _maybeProvider<T>(BuildContext context) {
+    try {
+      return context.read<T>();
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
+  /// 订阅 [StageUpgradeBroker]（watch 语义：publish / clear 触发本视图重建，
+  /// 升级提议行实时切换）；provider 缺位 → null 降级（既有装配零回归）。
+  StageUpgradeBroker? _maybeBroker(BuildContext context) {
+    try {
+      return Provider.of<StageUpgradeBroker>(context);
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
+  /// 加载全部关系状态行（只读面；completion 后重建本地 map）。
+  ///
+  /// 刷新时机：切回 tab（post-frame）/ 下拉刷新 / 确认·拒绝后；失败仅日志，
+  /// 保持既有 map 不闪烁。删除角色后残留 map entry 无害（无对应卡片即不
+  /// 渲染，关系行本身已随 FK CASCADE 清理——PS2-01 实证）。
+  Future<void> _loadRelationships() async {
+    final repository = _maybeProvider<CompanionRepository>(context);
+    if (repository == null) {
+      return;
+    }
+    try {
+      final rows = await repository.listRelationships();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _relationships = {
+          for (final row in rows) row.characterId: row,
+        };
+      });
+    } catch (error) {
+      debugPrint('关系状态加载失败，保持现状: $error');
+    }
+  }
+
+  /// 确认升级（SR-10：只经 [RelationshipService.confirmStageUpgrade] 落库，
+  /// 视图零直写 relationship_states）。
+  ///
+  /// 成功（true）→ 重载关系行展示新阶段 + broker 清除提议（验收 4）；F1
+  /// 域校验拒绝 / 异常（false）→ 不崩，重载现状 + broker 清除（验收 6）。
+  /// 防重入：同角色 busy 时忽略二次触发。
+  Future<void> _confirmUpgrade(
+    int characterId,
+    StageUpgradeProposal proposal,
+  ) async {
+    if (!_busyCharacterIds.add(characterId)) {
+      return;
+    }
+    setState(() {});
+    try {
+      await context.read<RelationshipService>().confirmStageUpgrade(
+            characterId: characterId,
+            targetStage: proposal.targetStage,
+          );
+    } catch (error) {
+      debugPrint('升级确认失败: $error');
+    }
+    if (!mounted) {
+      return;
+    }
+    _busyCharacterIds.remove(characterId);
+    _maybeProvider<StageUpgradeBroker>(context)?.clear();
+    // 成功 / F1 拒绝 / 异常统一重载为 DB 现状（F-82 观察：affinity 与 stage
+    // 档可能短暂不一致，以落库值实时渲染，不做额外修正）。
+    await _loadRelationships();
+  }
+
+  /// 拒绝升级（SR-10：零写库；spec 判定⑤「本会话不再重复提议」由
+  /// [_rejectedCharacterIds] 承担）。
+  Future<void> _rejectUpgrade(int characterId) async {
+    if (!_busyCharacterIds.add(characterId)) {
+      return;
+    }
+    setState(() {});
+    try {
+      await context
+          .read<RelationshipService>()
+          .rejectStageUpgrade(characterId: characterId);
+    } catch (error) {
+      debugPrint('拒绝升级失败: $error');
+    }
+    if (!mounted) {
+      return;
+    }
+    _busyCharacterIds.remove(characterId);
+    _rejectedCharacterIds.add(characterId);
+    _maybeProvider<StageUpgradeBroker>(context)?.clear();
+    setState(() {});
   }
 
   /// 「新建角色」入口：push 6 步向导（M3-02a 接真导航，替换 M3-01 stub）。
@@ -108,6 +235,8 @@ class _CharactersViewState extends State<CharactersView> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
+    final broker = _maybeBroker(context);
+    final proposal = broker?.lastProposal;
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -132,10 +261,22 @@ class _CharactersViewState extends State<CharactersView> {
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: controller.refresh,
+              // 下拉刷新：角色列表 + 关系状态一并重拉（关系行随对话演进）。
+              onRefresh: () async {
+                await controller.refresh();
+                await _loadRelationships();
+              },
               child: controller.characters.isEmpty
                   ? _EmptyPane(loading: controller.loading)
-                  : _CharacterList(controller: controller),
+                  : _CharacterList(
+                      controller: controller,
+                      relationships: _relationships,
+                      proposal: proposal,
+                      rejectedCharacterIds: _rejectedCharacterIds,
+                      busyCharacterIds: _busyCharacterIds,
+                      onConfirm: _confirmUpgrade,
+                      onReject: _rejectUpgrade,
+                    ),
             ),
           ),
         ],
@@ -296,11 +437,37 @@ class _EmptyPane extends StatelessWidget {
   }
 }
 
-/// 单列角色卡片列表。
+/// 单列角色卡片列表（PS2-10 追加关系区数据与升级提议分发）。
 class _CharacterList extends StatelessWidget {
-  const _CharacterList({required this.controller});
+  const _CharacterList({
+    required this.controller,
+    required this.relationships,
+    required this.proposal,
+    required this.rejectedCharacterIds,
+    required this.busyCharacterIds,
+    required this.onConfirm,
+    required this.onReject,
+  });
 
   final CharactersController controller;
+
+  /// 关系状态行（characterId → 行）；缺席即无行（判定⑧）。
+  final Map<int, RelationshipState> relationships;
+
+  /// 当前升级提议（broker 广播；归属按 [StageUpgradeProposal.characterId]）。
+  final StageUpgradeProposal? proposal;
+
+  /// 本会话拒绝过提议的角色 id 集（判定⑤ UI 侧记录）。
+  final Set<int> rejectedCharacterIds;
+
+  /// 确认/拒绝进行中的角色 id 集（防重入禁用）。
+  final Set<int> busyCharacterIds;
+
+  /// 确认升级回调（上行至 state 层经 RelationshipService 落库）。
+  final void Function(int characterId, StageUpgradeProposal proposal) onConfirm;
+
+  /// 拒绝升级回调（不写库，记拒绝语义）。
+  final void Function(int characterId) onReject;
 
   @override
   Widget build(BuildContext context) {
@@ -315,22 +482,63 @@ class _CharacterList extends StatelessWidget {
       itemCount: controller.characters.length,
       itemBuilder: (context, index) {
         final row = controller.characters[index];
-        return _CharacterCard(row: row, controller: controller);
+        final relationship = relationships[row.character.id];
+        final matchesProposal =
+            proposal != null && proposal!.characterId == row.character.id;
+        return _CharacterCard(
+          row: row,
+          controller: controller,
+          relationship: relationship,
+          proposal: matchesProposal ? proposal : null,
+          rejected: rejectedCharacterIds.contains(row.character.id),
+          busy: busyCharacterIds.contains(row.character.id),
+          onConfirm: onConfirm,
+          onReject: onReject,
+        );
       },
     );
   }
 }
 
 /// 单张角色卡片：头像 / 名称 / 描述（空 → personality 前 60 字）/ 开场白
-/// 预览 / 标签 / 温度 / 对话数徽标 + 四按钮。
+/// 预览 / 标签 / 温度 / 对话数徽标 + 四按钮；PS2-10 追加关系区（五段
+/// label + affinity 进度条 + 升级提议确认/拒绝）。
 ///
 /// M3-05 多选层追加：长按任意卡片进入多选态并勾选该卡；多选态下卡片前置
-/// 勾选框、tap 切换选中，隐藏四按钮（防批量勾选时误触单删 / 开始对话）。
+/// 勾选框、tap 切换选中，隐藏四按钮与升级操作（防批量勾选时误触单删 /
+/// 开始对话 / 升级确认）——关系 label 与进度条为被动展示，保留。
 class _CharacterCard extends StatelessWidget {
-  const _CharacterCard({required this.row, required this.controller});
+  const _CharacterCard({
+    required this.row,
+    required this.controller,
+    required this.relationship,
+    required this.proposal,
+    required this.rejected,
+    required this.busy,
+    required this.onConfirm,
+    required this.onReject,
+  });
 
   final CharacterWithCount row;
   final CharactersController controller;
+
+  /// 该角色关系状态行；null = 无行（不渲染关系区，判定⑧）。
+  final RelationshipState? relationship;
+
+  /// 归属该角色的升级提议；null = 无（含拒绝过后的抑制态）。
+  final StageUpgradeProposal? proposal;
+
+  /// 本会话已拒绝（不弹确认/拒绝操作）。
+  final bool rejected;
+
+  /// 确认/拒绝进行中（禁用防重入）。
+  final bool busy;
+
+  /// 确认升级回调。
+  final void Function(int characterId, StageUpgradeProposal proposal) onConfirm;
+
+  /// 拒绝升级回调。
+  final void Function(int characterId) onReject;
 
   @override
   Widget build(BuildContext context) {
@@ -448,6 +656,22 @@ class _CharacterCard extends StatelessWidget {
                   _ConversationCountBadge(count: row.conversationCount),
                 ],
               ),
+              // PS2-10 关系区：无状态行角色不渲染（判定⑧零噪音）；有行 →
+              // 五段中文 label + affinity 进度条；proposal 归属且未拒绝且
+              // 非多选态 → 追加确认/拒绝操作行（验收 3）。
+              if (relationship != null) ...[
+                const SizedBox(height: ConverSpacing.space2),
+                _RelationshipSection(
+                  relationship: relationship!,
+                  proposal:
+                      proposal != null && !rejected ? proposal : null,
+                  showActions: !selectionMode,
+                  busy: busy,
+                  onConfirm: () =>
+                      onConfirm(character.id, proposal!),
+                  onReject: () => onReject(character.id),
+                ),
+              ],
               // 多选态下隐藏四按钮（防误触；勾选交互经卡片 tap）。
               if (!selectionMode) ...[
                 const SizedBox(height: ConverSpacing.space2),
@@ -606,6 +830,103 @@ class _ConversationCountBadge extends StatelessWidget {
     );
   }
 }
+
+/// 关系区（PS2-10）：五段中文 label + affinity 进度条（0-100 映射），
+/// 归属升级提议存在且 [showActions] 时追加「升级建议：目标阶段」+
+/// 确认/拒绝操作行。
+///
+/// 配色全走 Warm Stone token：label/文案 ink2/ink3，进度条前景走
+/// colorScheme.primary（= accent，ConverPalette 映射说明），容器即卡片底。
+class _RelationshipSection extends StatelessWidget {
+  const _RelationshipSection({
+    required this.relationship,
+    required this.proposal,
+    required this.showActions,
+    required this.busy,
+    required this.onConfirm,
+    required this.onReject,
+  });
+
+  /// 该角色关系状态行（调用方已保证非空）。
+  final RelationshipState relationship;
+
+  /// 归属该角色的升级提议（null = 无/已拒绝/非本卡）。
+  final StageUpgradeProposal? proposal;
+
+  /// 是否展示确认/拒绝操作（多选态 false 防误触）。
+  final bool showActions;
+
+  /// 确认/拒绝进行中（禁用）。
+  final bool busy;
+
+  /// 确认回调。
+  final VoidCallback onConfirm;
+
+  /// 拒绝回调。
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = ConverPalette.of(context);
+    final progress = (relationship.affinity /
+            RelationshipThresholds.affinityMax)
+        .clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              _stageLabel(relationship.stage),
+              style: textTheme.labelMedium?.copyWith(color: palette.ink2),
+            ),
+            const SizedBox(width: ConverSpacing.space3),
+            Expanded(
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 5,
+                borderRadius: BorderRadius.circular(ConverRadii.xs),
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+              ),
+            ),
+          ],
+        ),
+        if (proposal != null && showActions) ...[
+          const SizedBox(height: ConverSpacing.space1),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '升级建议：${_stageLabel(proposal!.targetStage)}',
+                  style: textTheme.labelMedium?.copyWith(color: palette.ink3),
+                ),
+              ),
+              TextButton(
+                onPressed: busy ? null : onConfirm,
+                child: const Text('确认'),
+              ),
+              TextButton(
+                onPressed: busy ? null : onReject,
+                child: const Text('拒绝'),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 关系阶段 → 中文 label（UI 层映射，业务枚举保持英文；spec 五段全覆盖：
+/// 陌生/相识/熟悉/亲密/挚爱）。
+String _stageLabel(RelationshipStage stage) => switch (stage) {
+      RelationshipStage.stranger => '陌生',
+      RelationshipStage.acquainted => '相识',
+      RelationshipStage.familiar => '熟悉',
+      RelationshipStage.intimate => '亲密',
+      RelationshipStage.soulmate => '挚爱',
+    };
 
 /// 卡片描述：非空直接预览；空 → personality 前 60 字（验收 1 兜底语义）。
 String _cardDescription(Character character) {

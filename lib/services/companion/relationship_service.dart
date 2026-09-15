@@ -24,12 +24,19 @@ import '../../data/repositories/conversation_repository.dart';
 import '../../data/repositories/message_repository.dart';
 
 /// 升级提议（亲密/挚爱候选）— 不落库的评估产物（spec 判定⑤）。
+///
+/// [characterId] 为归属角色（PS2-10 补充：UI 定位角色卡与确认闸门必需——
+/// 提议恒按角色评估，归属缺失则 UI 无法渲染/落库）。
 class StageUpgradeProposal {
   const StageUpgradeProposal({
+    required this.characterId,
     required this.currentStage,
     required this.targetStage,
     required this.affinity,
   });
+
+  /// 提议归属角色 id。
+  final int characterId;
 
   /// 当前（DB）阶段。
   final RelationshipStage currentStage;
@@ -273,6 +280,7 @@ class RelationshipService {
         newStage != state.stage;
     if (crossesGate) {
       return StageUpgradeProposal(
+        characterId: characterId,
         currentStage: state.stage,
         targetStage: newStage,
         affinity: newAffinity,
