@@ -7,8 +7,11 @@ NPD-06 预设对话 few-shot 注入 — 契约锁测试
     3. 空串/纯空白零注入（逐字节一致契约锁）
     4. few-shot 段 source 复用 SOURCE_CHARACTER（不新增 source 常量）
     5. 预设对话与叙述风格同时开启时注入序正确（叙述风格在前、preset 在后）
-    6. message.build_message_list 读 conversation.preset_dialogue 快照（非角色实时值）
-    7. chat.assemble_chat_context 普通/重生成两条路径 + build_prompt_debug 均读快照
+    6. message.build_message_list 显式接收 preset_dialogue 快照并透传（F-148 形参显式化，
+       不再隐式读 ORM；快照读取责任由 chat 层调用方承担）
+    7. chat.assemble_chat_context 普通/重生成两条路径 + build_prompt_debug 显式传快照
+    8. CharacterData.from_orm 唯一角色投影入口（PROMPT_FIELDS + prompt_mode/expert_prompt
+       + None 空角色，F-147）
 
 依赖：pytest + SQLite 内存库（conftest.db_session）+ monkeypatch。
 """
@@ -158,46 +161,31 @@ def _make_conversation(db, char_id: int, preset_dialogue: str | None = None) -> 
 
 
 class TestBuildMessageListPreset:
-    """message.build_message_list 读 conversation.preset_dialogue 快照并透传"""
+    """message.build_message_list 显式接收 preset_dialogue 快照并透传（F-148 形参显式化）"""
 
-    def test_reads_snapshot_column(self, db_session) -> None:
-        """快照列非空 → 产出 few-shot"""
+    def test_passes_snapshot_explicitly(self, db_session) -> None:
+        """调用方显式传快照（非空）→ 产出 few-shot"""
         char = _make_character(db_session)
         preset = "<START>\n{{user}}: 预设问\n{{char}}: 预设答"
         conv = _make_conversation(db_session, char.id, preset_dialogue=preset)
 
-        msgs = message_service.build_message_list(db_session, conv, "当前")
+        msgs = message_service.build_message_list(
+            db_session, conv, "当前", preset_dialogue=conv.preset_dialogue or "",
+        )
 
         contents = [m["content"] for m in msgs]
         assert "预设问" in contents
         assert "预设答" in contents
 
     def test_none_snapshot_zero_injection(self, db_session) -> None:
-        """快照列为 None → 零注入（输出不含 preset 内容）"""
+        """快照列为 None → 调用方归一为空串 → 零注入（输出不含 preset 内容）"""
         char = _make_character(db_session)
         conv = _make_conversation(db_session, char.id, preset_dialogue=None)
-        msgs = message_service.build_message_list(db_session, conv, "当前")
+        msgs = message_service.build_message_list(
+            db_session, conv, "当前", preset_dialogue=conv.preset_dialogue or "",
+        )
         contents = [m["content"] for m in msgs]
         assert "预设问" not in contents
-
-    def test_character_change_does_not_affect_existing_conversation(self, db_session) -> None:
-        """快照语义：改角色卡 preset_dialogues 实时值不影响已建会话的注入源"""
-        char = _make_character(
-            db_session,
-            preset_dialogues=[{"name": "角色对话", "content": "{{user}}: 角色问\n{{char}}: 角色答"}],
-        )
-        preset = "<START>\n{{user}}: 快照问\n{{char}}: 快照答"
-        conv = _make_conversation(db_session, char.id, preset_dialogue=preset)
-
-        # 建会话后改角色卡实时值（模拟用户后续编辑角色）
-        char.preset_dialogues = [{"name": "改后", "content": "{{user}}: 改后问\n{{char}}: 改后答"}]
-        db_session.commit()
-
-        msgs = message_service.build_message_list(db_session, conv, "当前")
-        contents = [m["content"] for m in msgs]
-        assert "快照问" in contents
-        assert "快照答" in contents
-        assert "改后问" not in contents
 
 
 # ── 3. chat 层：assemble_chat_context 两条路径 + build_prompt_debug ──
@@ -229,6 +217,26 @@ class TestAssembleChatContextPreset:
         contents = [m["content"] for m in ctx.messages]
         assert "预设问" in contents
         assert "预设答" in contents
+
+    def test_snapshot_vs_character_live_value(self, db_session, monkeypatch) -> None:
+        """快照语义（chat 层承担读快照）：改角色卡 preset_dialogues 实时值不影响已建会话注入源"""
+        _patch_resolve_llm(monkeypatch)
+        char = _make_character(
+            db_session,
+            preset_dialogues=[{"name": "角色对话", "content": "{{user}}: 角色问\n{{char}}: 角色答"}],
+        )
+        preset = "<START>\n{{user}}: 快照问\n{{char}}: 快照答"
+        conv = _make_conversation(db_session, char.id, preset_dialogue=preset)
+
+        # 建会话后改角色卡实时值（模拟用户后续编辑角色）
+        char.preset_dialogues = [{"name": "改后", "content": "{{user}}: 改后问\n{{char}}: 改后答"}]
+        db_session.commit()
+
+        ctx = chat_service.assemble_chat_context(db_session, conv.id, current_input="当前")
+        contents = [m["content"] for m in ctx.messages]
+        assert "快照问" in contents
+        assert "快照答" in contents
+        assert "改后问" not in contents
 
     def test_regenerate_path_injects_snapshot(self, db_session, monkeypatch) -> None:
         """重生成路径（current_input=None）：注入快照 few-shot"""
@@ -263,3 +271,41 @@ class TestBuildPromptDebugPreset:
         ]
         assert len(preset_segments) == 2
         assert all(s.source == SOURCE_CHARACTER for s in preset_segments)
+
+
+# ── 4. CharacterData.from_orm 唯一投影入口 ──
+
+
+class TestCharacterDataFromOrm:
+    """CharacterData.from_orm 角色投影（F-147）：PROMPT_FIELDS + 补位 + None 空角色"""
+
+    def test_projects_prompt_fields_with_defaults(self, db_session) -> None:
+        """PROMPT_FIELDS 通配投影 + prompt_mode/expert_prompt 补位（DB 未设置 → 默认）"""
+        char = _make_character(
+            db_session,
+            name="投影角色",
+            personality="投影人格",
+            scenario="投影场景",
+            mes_example="范例",
+            post_history_instructions="历史后指令",
+        )
+        data = CharacterData.from_orm(char)
+        assert data.name == "投影角色"
+        assert data.system_prompt == ""
+        assert data.personality == "投影人格"
+        assert data.scenario == "投影场景"
+        assert data.mes_example == "范例"
+        assert data.post_history_instructions == "历史后指令"
+        assert data.prompt_mode == "simple"  # 未设置 → 默认补位
+        assert data.expert_prompt == ""
+
+    def test_projects_expert_mode_fields(self, db_session) -> None:
+        """prompt_mode/expert_prompt 从 ORM 透传（expert 模式）"""
+        char = _make_character(db_session, prompt_mode="expert", expert_prompt="专家提示")
+        data = CharacterData.from_orm(char)
+        assert data.prompt_mode == "expert"
+        assert data.expert_prompt == "专家提示"
+
+    def test_none_returns_empty_character(self) -> None:
+        """character 为 None → 空角色 CharacterData(name="")（对齐 build_prompt_debug 可空语义）"""
+        assert CharacterData.from_orm(None) == CharacterData(name="")

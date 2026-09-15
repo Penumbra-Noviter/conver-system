@@ -72,6 +72,29 @@ class CharacterData:
     prompt_mode: str = "simple"
     expert_prompt: str = ""
 
+    @classmethod
+    def from_orm(cls, character: object | None) -> CharacterData:
+        """ORM 角色 → 角色纯数据（唯一投影入口，F-147）
+
+        PROMPT_FIELDS 通配投影 + prompt_mode（默认 "simple"）/ expert_prompt
+        （默认 ""）补位；``character is None`` 时返回空角色 ``CharacterData(name="")``
+        （对齐 build_prompt_debug 的角色可空语义）。message.build_message_list 与
+        chat.build_prompt_debug 均经此入口，角色投影知识只维护一份。
+
+        Args:
+            character: 角色 ORM 实例（None → 空角色）
+
+        Returns:
+            CharacterData（name 恒在，其余字段以默认值兜底）
+        """
+        if character is None:
+            return cls(name="")
+        return cls(
+            **{field: getattr(character, field, "") or "" for field in PROMPT_FIELDS},
+            prompt_mode=getattr(character, "prompt_mode", "") or "simple",
+            expert_prompt=getattr(character, "expert_prompt", "") or "",
+        )
+
 
 @dataclass(frozen=True)
 class InjectedSegment:

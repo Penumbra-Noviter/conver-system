@@ -23,6 +23,7 @@ from backend.app.services.lorebook_engine import (
     build_world_injection,
     collect_scan_text,
 )
+from backend.app.services.llm.prompt import SOURCE_MEMORY, SOURCE_WORLD
 
 __all__: list[str] = []
 
@@ -305,7 +306,7 @@ def test_single_char_and_punctuation_keys_no_error() -> None:
 
 
 def test_build_world_injection_groups_and_order() -> None:
-    """按 position 分组（world→system），组内按 (order, id) 升序"""
+    """按 position 分组（world→system），组内按 (order, id) 升序；source 默认 world"""
     activated = [
         _entry(id=2, order=200, position="world", content="后世界"),
         _entry(id=1, order=100, position="world", content="先世界"),
@@ -313,25 +314,47 @@ def test_build_world_injection_groups_and_order() -> None:
         _entry(id=4, order=50, position="after_char", content="场景后"),
     ]
     blocks = build_world_injection(activated)
-    assert blocks == {
+    assert {key: [seg.content for seg in segs] for key, segs in blocks.items()} == {
         "system": ["先世界", "后世界"],
         "before_char": ["角色前"],
         "after_char": ["场景后"],
     }
+    assert all(
+        seg.source == SOURCE_WORLD for segs in blocks.values() for seg in segs
+    )
 
 
 def test_build_world_injection_template_vars() -> None:
     """content 经 {{user}}/{{char}} 模板替换"""
     activated = [_entry(id=1, position="world", content="{{user}} 与 {{char}} 的回忆")]
     blocks = build_world_injection(activated, user_name="小明", char_name="莉莉")
-    assert blocks["system"] == ["小明 与 莉莉 的回忆"]
+    assert [seg.content for seg in blocks["system"]] == ["小明 与 莉莉 的回忆"]
 
 
 def test_build_world_injection_unknown_position_falls_back() -> None:
     """未知 position 回落 world（system 块），不静默丢弃"""
     activated = [_entry(id=1, position="in_chat", content="未知位置内容")]
     blocks = build_world_injection(activated)
-    assert blocks["system"] == ["未知位置内容"]
+    assert [seg.content for seg in blocks["system"]] == ["未知位置内容"]
+
+
+def test_build_world_injection_source_by_id() -> None:
+    """source_by_id 标注：缺省条目默认 world；值 == "auto" 标注 memory（经 id 反查）"""
+    activated = [
+        _entry(id=1, position="world", content="手动来源"),
+        _entry(id=2, position="world", content="记忆来源"),
+        _entry(id=3, position="after_char", content="未标注条目"),
+    ]
+    blocks = build_world_injection(
+        activated, source_by_id={1: "manual", 2: "auto"}, user_name="小明", char_name="莉莉"
+    )
+    assert [(seg.content, seg.source) for seg in blocks["system"]] == [
+        ("手动来源", SOURCE_WORLD),
+        ("记忆来源", SOURCE_MEMORY),
+    ]
+    assert [(seg.content, seg.source) for seg in blocks["after_char"]] == [
+        ("未标注条目", SOURCE_WORLD),
+    ]
 
 
 # ════════════════════════════════════════════════════════════════

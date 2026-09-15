@@ -22,7 +22,6 @@ from backend.app.models.message import Message, MessageSwipe, Role
 from backend.app.schemas.message import SearchResult
 from backend.app.services import conversation as conversation_service
 from backend.app.services import setting as setting_service
-from backend.app.services.character_fields import PROMPT_FIELDS
 from backend.app.services.exceptions import MessageNotFoundError, SwipeIndexError
 from backend.app.services.llm.prompt import CharacterData, apply_template_vars, build_messages
 
@@ -135,6 +134,7 @@ def build_message_list(
     world_injection: dict[str, list[str]] | None = None,
     history: Sequence[Message] | None = None,
     narrative_style: str = "",
+    preset_dialogue: str = "",
 ) -> list[dict]:
     """构建发送给 LLM 的消息列表
 
@@ -156,9 +156,11 @@ def build_message_list(
     空串/纯空白零注入。由调用方（assemble_chat_context / build_prompt_debug）查
     narrative_style_enabled/rules 决定是否传入——本函数不查设置（纯透传）。
 
-    preset_dialogue（06）：预设对话快照文本，直接读 conversation.preset_dialogue
-    快照列（非角色卡 character.preset_dialogues 实时值，改卡不影响已建会话）并
-    透传 build_messages；空串/纯空白零注入。
+    preset_dialogue（02）：预设对话快照文本，由调用方显式传入（如
+    assemble_chat_context / build_prompt_debug 读 conversation.preset_dialogue
+    快照列——非角色卡 character.preset_dialogues 实时值，改卡不影响已建会话）
+    并透传 build_messages；空串/纯空白零注入。本函数不隐式读 ORM（F-148
+    形参显式化）。
 
     查询角色与历史消息后，委托给 services/llm/prompt.py 的纯函数完成组装。
 
@@ -173,16 +175,9 @@ def build_message_list(
     if not character:
         raise ValueError(f"角色不存在: {conversation.character_id}")
 
-    # 按 PROMPT_FIELDS 从 ORM 提取（单一映射深模块，C5 架构评审）；
-    # prompt_mode / expert_prompt 为 PD-5 项目自有字段，不进 PROMPT_FIELDS，此处显式补
-    char_data = CharacterData(
-        **{
-            field: getattr(character, field, "") or ""
-            for field in PROMPT_FIELDS
-        },
-        prompt_mode=getattr(character, "prompt_mode", "") or "simple",
-        expert_prompt=getattr(character, "expert_prompt", "") or "",
-    )
+    # 角色投影唯一入口（CharacterData.from_orm，F-147）；prompt_mode /
+    # expert_prompt 补位语义收口于该入口
+    char_data = CharacterData.from_orm(character)
     if history is None:
         history = get_messages(db, conversation.id)
 
@@ -195,7 +190,7 @@ def build_message_list(
         append_current_input=append_current_input,
         world=world_injection,
         narrative_style=narrative_style,
-        preset_dialogue=conversation.preset_dialogue or "",
+        preset_dialogue=preset_dialogue,
     )
 
 
