@@ -61,6 +61,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications 22.x 依赖 java.time 等核心库 API，AAR
+        // 元数据强制要求 desugaring（未开启时 checkDebugAarMetadata 直接失败）。
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -110,4 +113,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // flutter_local_notifications 22.x desugaring 运行时依赖（与 compileOptions
+    // isCoreLibraryDesugaringEnabled 配对；版本 2.1.x 支持 minSdk 21+）。
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
