@@ -2,6 +2,12 @@
     <!-- M2 T00：release 安装后联网所需（debug/profile 既有权限不动）；
          cleartext / ATS 豁免 M2 不开，LAN http 归 M5 -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- PS2-06 通知平台薄层：Android 13+ 通知权限（插件 v16+ 自带同一声明，
+         这里显式声明满足验收与文档核对）-->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- PS2-06：重启后重排已排程通知（ScheduledNotificationBootReceiver 所需，
+         SR-08 恢复语义由 PS2-08 装配消费）-->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="汇流"
         android:name="${applicationName}"
@@ -29,6 +35,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- PS2-06 通知接收器（flutter_local_notifications 插件要求，组件名
+             以插件文档为准）：到点派发 + 重启后重排 -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
