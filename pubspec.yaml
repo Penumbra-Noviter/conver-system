@@ -68,6 +68,14 @@ dependencies:
   #   pubspec.lock 既有传递依赖，本批转正声明为 direct main）
   webview_flutter: ^4.14.1
   crypto: ^3.0.7
+  # PS2-06 通知平台薄层（显式申报，精确钉版无 caret；pub add 当前环境解析
+  # 22.3.1 / 0.11.1）：flutter_local_notifications = OS 本地通知排程
+  # （zonedSchedule + Android 13+ POST_NOTIFICATIONS）；timezone =
+  # zonedSchedule 需要的 TZDateTime 时区库（直接依赖，满足
+  # depend_on_referenced_packages lint）。插件要求 compileSdk >= 35，
+  # 项目已 37 达标；minSdk 跟随 flutter.minSdkVersion 无抬升。
+  flutter_local_notifications: 22.3.1
+  timezone: 0.11.1
 
 dev_dependencies:
   flutter_test:

@@ -348,10 +348,14 @@ class ProactiveMessageService {
         if (at == null) {
           continue;
         }
+        // 口径（spec §2 P2 + 判定③ / W3-F2）：每日上限为**全局**（全角色
+        // 当日 sentAt 合计），角色冷却为**本角色**最近 sentAt（角色间互不
+        // 影响——角色 A 已发不会冷却角色 B）。
         if (_isSameDay(at, now)) {
           sentToday++;
         }
-        if (lastSentAt == null || at.isAfter(lastSentAt)) {
+        if (plan.characterId == characterId &&
+            (lastSentAt == null || at.isAfter(lastSentAt))) {
           lastSentAt = at;
         }
       }
