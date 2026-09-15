@@ -53,10 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-152 | lorebook_engine.py:124-159 build_world_injection 空激活集（[]→三空键）与 source_by_id 未知值（非 "auto" 回落 SOURCE_WORLD）两条失败路径无直接单测断言（实现安全，Falsify 契约锁缺口） | arch-deepening 期末四轴 Falsify | Speculative | 📝 待立项 | prompt 组装链 |
-| F-153 | message.py:127-138 build_message_list 新形参 preset_dialogue 无「None 直接传入」防护契约锁（_assemble falsy 短路保证安全但未显式锚定，生产调用方恒 `or ""` 归一） | arch-deepening 期末四轴 Falsify | Speculative | 📝 待立项 | prompt 组装链 |
-| F-154 | prompt.py:76 CharacterData.from_orm 签名 `object/None` 与 spec 字面 `Character/None` 不一致（有意保持 prompt.py 零 ORM 依赖），需 spec/文档注记该选择，防后续改回 Character 类型破坏纯函数层契约 | arch-deepening 期末四轴 Spec | Worth exploring | 📝 待立项 | prompt 组装链 |
-| F-155 | chat.py:918-923 世界书注入 logger.debug 随 seam 归位后 build_prompt_debug 路径也输出同文案日志（原仅 assemble 路径；默认 INFO 无输出、非在线 prompt 变化，纯重构可观测性边界待 spec 追认） | arch-deepening 期末四轴 Spec | Speculative | 📝 待立项 | prompt 组装链 |
 
 
 ### 复核关闭（Speculative 类，防重复提议）
@@ -89,14 +85,17 @@
 | F-149 | prompt.py:232 `_assemble` 9 位置参数 + 8 线性 if 注入点——`_build_tagged_injection` seam 归位后参数打包重估留待上游 seam 稳定，Grilling 拍板本批暂不拆单 | arch-deepening Grilling 增量审 | Worth exploring | ❌ 复核关闭 |
 | F-150 | prompt.py:146 `build_messages` 与 `build_messages_with_source` 九参数签名逐字重复——与 F-149 同批判据（seam 归位后重估） | arch-deepening Grilling 增量审 | Worth exploring | ❌ 复核关闭 |
 | F-151 | character_card.py:273 与 character-submit.js:187 preset_dialogue 归一化双端镜像——双端已各自锚定 + 注释互指，跨运行时单一权威不可表达 | arch-deepening Grilling 增量审 | Speculative | ❌ 复核关闭 |
+| F-155 | chat.py:918-923 世界书注入 logger.debug 可观测性扩展（seam 归位后 build_prompt_debug 路径也输出同文案 debug 日志）——开发级日志非在线 prompt 契约，spec「输出逐字节不变」不覆盖，无 spec 追认载体 | arch-deepening 期末四轴 Spec | Speculative | ❌ 复核关闭 |
 
 ## 技术债处置记录
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
-### 2026-09-15（架构深化批次 arch-deepening：消费 F-145~F-148 全做 + F-149~F-151 复核关闭）
+### 2026-09-15（架构深化批次 arch-deepening + 技术债消费 F-152~F-155 两批次）
 
-> 来源：用户指令继架构全库扫描（F-145~F-151 落盘）后走 project-kickoff 全自动档消费。Grilling 增量审拍板 4 做 3 关。4 做 = 2 工单标准档串行链（工单 01 注入链 seam 归位 = F-145+F-146；工单 02 组装入口收口 = F-147+F-148），纯重构在线 prompt 输出逐字节不变。
+> 批 1 来源：用户指令继架构全库扫描（F-145~F-151 落盘）后走 project-kickoff 全自动档消费。Grilling 增量审拍板 4 做 3 关。4 做 = 2 工单标准档串行链（工单 01 注入链 seam 归位 = F-145+F-146；工单 02 组装入口收口 = F-147+F-148），纯重构在线 prompt 输出逐字节不变。
+>
+> 批 2 来源：用户指令「消费候选区技术债」（F-152~F-155）。逐项 git grep 复核现状后拍板 3 做 1 关，轻量档主会话直做（补契约锁 + 文档注记，零行为变更）。
 
 | 编号 | 遗留项 | 来源 | 强度 | 处置 |
 |------|--------|------|------|------|
@@ -107,10 +106,13 @@
 | F-149 | prompt.py `_assemble` 9 位置参数 + 8 线性 if 注入点 | 架构报告 | Worth exploring | ❌ 复核关闭（`_build_tagged_injection` seam 归位后参数打包重估留待上游 seam 稳定，Grilling 拍板本批不拆单） |
 | F-150 | prompt.py `build_messages` 双签名逐字重复 | 架构报告 | Worth exploring | ❌ 复核关闭（与 F-149 同批判据——seam 归位后重估） |
 | F-151 | preset_dialogue 归一化前后端双份镜像 | 架构报告 | Speculative | ❌ 复核关闭（双端已各自锚定 + 注释互指，跨运行时单一权威不可表达） |
+| F-152 | build_world_injection 空激活集与 source_by_id 未知值无直接单测断言 | arch-deepening 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-15：test_lorebook_engine.py 补 test_build_world_injection_empty_activated（三空键）+ test_build_world_injection_source_by_id_unknown_value（回落 SOURCE_WORLD）两契约锁） |
+| F-153 | build_message_list preset_dialogue 无 None 直传防护契约锁 | arch-deepening 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-15：test_preset_dialogue_injection.py 补 test_none_preset_zero_injection——None falsy 短路零注入，与空串/纯空白同语义） |
+| F-154 | CharacterData.from_orm 签名 object/None 与 spec 字面不一致 | arch-deepening 期末四轴 Spec | Worth exploring | ✅ 已修（2026-09-15：from_orm docstring 注记「object 而非 Character 有意保持 prompt.py 零 ORM 依赖，勿改回」，防未来误改破坏纯函数层契约） |
+| F-155 | 世界书注入 logger.debug 可观测性扩展待 spec 追认 | arch-deepening 期末四轴 Spec | Speculative | ❌ 复核关闭（开发级 debug 日志非在线 prompt 契约，spec「输出逐字节不变」不覆盖，无追认载体；本批证据文件与 DEV_LOG 已记录） |
 
-**验证链：** pytest 1349+1skip→1352+1skip（+3 用例）+ cargo 70 零改动 | 期末四轴「通过」0 阻断（Standards 0 / Spec 2 警告 / Falsify 3 弱覆盖缺口 / Architecture 0，两 seam 均真深化无伪深化）| 运行态冒烟 segments 全序正确 | 全量 1352 passed 独立复现 | commit ab587ed + a807363 + merge 43bb61f。
-
-**新落债：** F-152~F-155（4 项，期末四轴非阻断，见候选区）。
+**验证链（批 1）：** pytest 1349+1skip→1352+1skip（+3 用例）+ cargo 70 零改动 | 期末四轴「通过」0 阻断（Standards 0 / Spec 2 警告 / Falsify 3 弱覆盖缺口 / Architecture 0，两 seam 均真深化无伪深化）| 运行态冒烟 segments 全序正确 | 全量 1352 passed 独立复现 | commit ab587ed + a807363 + merge 43bb61f。
+**验证链（批 2）：** pytest 1352+1skip→1355+1skip（+3 契约锁：空激活集/未知 source 值/None 直传）+ 受影响模块 44 passed | doc_sync + pool_cleanup_check 全合规 | 候选区清零。
 
 ### 2026-09-14（技术债消费批次 ×4：批1 F-115~F-122 3 做 5 关轻量档；批2 F-123~F-126 架构深化全做标准档 4 工单串行；批3 F-130~F-138 7 做 2 关轻量档主会话直做；批4 F-139~F-144 1 做 4 关轻量档主会话直做）
 

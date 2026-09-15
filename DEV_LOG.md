@@ -6,6 +6,16 @@
 
 ---
 
+## 技术债消费批次 F-152~F-155（2026-09-15 — 3 做 1 关，轻量档 4 项主会话直做）
+
+- **来源**：用户指令「消费候选区技术债」（arch-deepening 期末四轴落债 4 项：F-152/F-153/F-155 Speculative + F-154 Worth exploring）。逐项 git grep 复核现状均成立后拍板 3 做 1 关——补契约锁 + 文档注记，零行为变更。
+- **3 做**：F-152 build_world_injection 契约锁 ×2（test_lorebook_engine.py 补 `test_build_world_injection_empty_activated` 三空键 + `test_build_world_injection_source_by_id_unknown_value` 未知标签回落 SOURCE_WORLD）；F-153 build_message_list `preset_dialogue=None` 直传零注入契约锁 ×1（test_preset_dialogue_injection.py 补 `test_none_preset_zero_injection`——falsy 短路与空串/纯空白同语义，生产调用方恒 `or ""` 归一）；F-154 `CharacterData.from_orm` docstring 注记（`object` 而非 `Character` 是有意保持 prompt.py 零 ORM 依赖，勿改回破坏纯函数层契约）。
+- **1 关（F-155）**：世界书注入 `logger.debug` 可观测性扩展——开发级日志非在线 prompt 契约，spec「输出逐字节不变」不覆盖，无 spec 追认载体；本批证据文件与 arch-deepening DEV_LOG 节已记录。
+- **验证链**：pytest 1352+1skip→1355+1skip（+3 契约锁）+ 受影响模块 44 passed | doc_sync + pool_cleanup_check 全合规 | 技术债候选区 4→0 清零（F-155 入复核关闭表）。
+- **非阻断落债**：无（候选区清零）。
+
+---
+
 ## 架构深化批次 arch-deepening（2026-09-15 — 2 工单标准档串行链，prompt 组装链重构）
 
 - **来源**：用户继架构全库扫描（/improve-codebase-architecture 产出 7 候选 F-145~F-151 + Top recommendation）后走 project-kickoff 全自动档续接（handoff-arch-deepening-20260914）。Grilling 增量审拍板 4 做 3 关。核心结论：`_assemble` 是真深模块（deletion test 通过），参数膨胀只是症状，病根在上游注入链编排重复；`narrative_style` 显式透传 vs `preset_dialogue` 隐式读 ORM 快照的两参数数据流不对称（预设不是 build_message_list 形参，内部隐式读 conversation.preset_dialogue）。

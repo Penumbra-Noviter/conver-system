@@ -338,6 +338,19 @@ def test_build_world_injection_unknown_position_falls_back() -> None:
     assert [seg.content for seg in blocks["system"]] == ["未知位置内容"]
 
 
+def test_build_world_injection_empty_activated() -> None:
+    """空激活集 → 三空键（system/before_char/after_char），无崩溃（契约锁 F-152）"""
+    blocks = build_world_injection([])
+    assert blocks == {"system": [], "before_char": [], "after_char": []}
+
+
+def test_build_world_injection_source_by_id_unknown_value() -> None:
+    """source_by_id 值非 "auto"（含未知标签）回落 SOURCE_WORLD（契约锁 F-152）"""
+    activated = [_entry(id=1, position="world", content="未知来源条目")]
+    blocks = build_world_injection(activated, source_by_id={1: "unknown-tag"})
+    assert blocks["system"][0].source == SOURCE_WORLD
+
+
 def test_build_world_injection_source_by_id() -> None:
     """source_by_id 标注：缺省条目默认 world；值 == "auto" 标注 memory（经 id 反查）"""
     activated = [

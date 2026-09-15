@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2895<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1353<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1472<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2898<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1356<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1472<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -722,7 +722,7 @@ conver system/
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.generate-->`generate(messages, temperature=0.7, max_tokens=2048, model=None, top_p=None, presence_penalty=None, frequency_penalty=None)`<!--/AUTO--> | 非流式生成 |
 | <!--AUTO:sig:backend/app/services/llm/openai.py:OpenAIProvider.stream_generate-->`stream_generate(messages, temperature=0.7, max_tokens=2048, model=None, top_p=None, presence_penalty=None, frequency_penalty=None)`<!--/AUTO--> | 流式生成 |
 
-### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~355 行<!--/AUTO-->）
+### 4.29 `backend/app/services/llm/prompt.py` — 提示词构建（<!--AUTO:lines:backend/app/services/llm/prompt.py-->~358 行<!--/AUTO-->）
 
 **职责**：模板变量替换（`{{user}}`/`{{char}}`）、mes_example 解析、system prompt 组装（角色设定注入）。
 
@@ -1511,13 +1511,13 @@ conver system/
 | `backend/tests/test_narrative_style.py` | <!--AUTO:tests:backend/tests/test_narrative_style.py-->29<!--/AUTO--> | 叙述风格设置键与访问器契约锁（NPD-01） |
 | `backend/tests/test_narrative_style_injection.py` | <!--AUTO:tests:backend/tests/test_narrative_style_injection.py-->15<!--/AUTO--> | 叙述风格 prompt 注入契约锁（NPD-02：注入序/空值零注入/expert/prompt-debug source） |
 | `backend/tests/test_preset_dialogue_conversation.py` | <!--AUTO:tests:backend/tests/test_preset_dialogue_conversation.py-->6<!--/AUTO--> | 预设对话快照列 + character 迁移幂等契约锁（NPD-04/05） |
-| `backend/tests/test_preset_dialogue_injection.py` | <!--AUTO:tests:backend/tests/test_preset_dialogue_injection.py-->14<!--/AUTO--> | 预设对话 few-shot 注入契约锁（NPD-06：快照语义/注入序/与叙述风格同开序正确） |
+| `backend/tests/test_preset_dialogue_injection.py` | <!--AUTO:tests:backend/tests/test_preset_dialogue_injection.py-->15<!--/AUTO--> | 预设对话 few-shot 注入契约锁（NPD-06：快照语义/注入序/与叙述风格同开序正确） |
 | `backend/tests/test_edit_resend.py` | <!--AUTO:tests:backend/tests/test_edit_resend.py-->7<!--/AUTO--> | 编辑重发编排契约锁（01：替换+截断+重生成原子性/目标非 user 400/LLM 失败零落库） |
 | `backend/tests/test_error_handler.py` | <!--AUTO:tests:backend/tests/test_error_handler.py-->41<!--/AUTO--> | 统一异常处理器 |
 | `backend/tests/test_error_mapping_export.py` | <!--AUTO:tests:backend/tests/test_error_mapping_export.py-->20<!--/AUTO--> | 错误映射协议表面（__all__ 导出/逐字保值） |
 | `backend/tests/test_game_generator.py` | <!--AUTO:tests:backend/tests/test_game_generator.py-->62<!--/AUTO--> | 游戏生成（校验闸门/场景提取/标题净化/prompt 构造/异步编排） |
 | `backend/tests/test_llm_shared.py` | <!--AUTO:tests:backend/tests/test_llm_shared.py-->20<!--/AUTO--> | LLM 基类共享行为 |
-| `backend/tests/test_lorebook_engine.py` | <!--AUTO:tests:backend/tests/test_lorebook_engine.py-->27<!--/AUTO--> | 世界书激活引擎纯函数契约锁（WL-2：命中矩阵/大小写/depth 边界/概率 RNG 复现/互斥组/排序/零 DB 导入） |
+| `backend/tests/test_lorebook_engine.py` | <!--AUTO:tests:backend/tests/test_lorebook_engine.py-->29<!--/AUTO--> | 世界书激活引擎纯函数契约锁（WL-2：命中矩阵/大小写/depth 边界/概率 RNG 复现/互斥组/排序/零 DB 导入） |
 | `backend/tests/test_lorebook_routes.py` | <!--AUTO:tests:backend/tests/test_lorebook_routes.py-->5<!--/AUTO--> | 世界书 CRUD 路由契约锁（WL-4：列表/创建/部分更新/删除/守卫 404/校验 422） |
 | `backend/tests/test_lorebook_store.py` | <!--AUTO:tests:backend/tests/test_lorebook_store.py-->24<!--/AUTO--> | 世界书条目仓库层契约锁（WL-1：keys 数组/越界拒/级联/替换幂等/ST 解析/保真零回归） |
 | `backend/tests/test_mods.py` | <!--AUTO:tests:backend/tests/test_mods.py-->45<!--/AUTO--> | Mod 挂载层契约锁（MD-1：绑定唯一/禁用零影响/sort_order 叠加序含同序稳定/解绑与级联/空列表零变化/CRUD/404 守卫/target_area 过滤/payload 容错） |
@@ -1650,9 +1650,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2895<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2898<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1353<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1356<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1472<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

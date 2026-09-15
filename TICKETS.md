@@ -36,6 +36,21 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 技术债消费批次 F-152~F-155（2026-09-15 — 3 做 1 关，轻量档 4 项主会话直做）
+
+> 来源：用户指令「消费候选区技术债」（arch-deepening 期末四轴落债 4 项）。逐项 git grep 复核现状后拍板 3 做 1 关（补契约锁 + 文档注记，零行为变更）。叙述详见 DEV_LOG〈技术债消费批次 F-152~F-155（2026-09-15）〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| F-152 | build_world_injection 契约锁：空激活集三空键 + source_by_id 未知值回落 SOURCE_WORLD（+2 用例） | F-152 | 2026-09-15 | 待 commit |
+| F-153 | build_message_list preset_dialogue None 直传零注入契约锁（+1 用例） | F-153 | 2026-09-15 | 待 commit |
+| F-154 | CharacterData.from_orm docstring 注记 object 签名有意保持零 ORM 依赖 | F-154 | 2026-09-15 | 待 commit |
+
+**验证链：** pytest 1352+1skip→1355+1skip（+3 契约锁）+ 受影响模块 44 passed | 复核关闭 F-155（开发级 debug 日志非在线 prompt 契约，spec 无追认载体）| 技术债候选区 4→0 清零 | doc_sync + pool_cleanup_check 全合规
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 架构深化批次 arch-deepening（2026-09-15 — 2 工单标准档串行链，prompt 组装链重构）
 
 > 来源：用户继架构全库扫描（/improve-codebase-architecture 产出 F-145~F-151 + Top recommendation）后走 project-kickoff 全自动档消费；Grilling 增量审 4 做 3 关。纯后端等价重构，在线 prompt 输出逐字节不变。叙述详见 DEV_LOG〈架构深化批次 arch-deepening（2026-09-15）〉。

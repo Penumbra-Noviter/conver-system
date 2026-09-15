@@ -91,6 +91,15 @@ class TestPresetDialoguePrompt:
         without_preset = build_messages(char, history, "当前")
         assert with_preset == without_preset
 
+    def test_none_preset_zero_injection(self) -> None:
+        """None 直传 preset_dialogue 零注入（falsy 短路契约锁 F-153，生产经 or "" 归一）"""
+        char = _char()
+        msgs = build_messages(char, [], "当前", preset_dialogue=None)
+        assert msgs == [
+            {"role": "system", "content": ""},
+            {"role": "user", "content": "当前"},
+        ]
+
     def test_blank_preset_zero_injection(self) -> None:
         """纯空白 preset_dialogue 零注入（不产生空消息）"""
         char = _char()

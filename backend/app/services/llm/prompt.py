@@ -80,6 +80,9 @@ class CharacterData:
         （默认 ""）补位；``character is None`` 时返回空角色 ``CharacterData(name="")``
         （对齐 build_prompt_debug 的角色可空语义）。message.build_message_list 与
         chat.build_prompt_debug 均经此入口，角色投影知识只维护一份。
+        ``character`` 标注 ``object`` 而非 ``Character`` 是有意保持本模块零 ORM
+        依赖（与 lorebook_engine 零 DB 契约同构，F-154）——勿改回 ``Character``
+        类型破坏纯函数层契约。
 
         Args:
             character: 角色 ORM 实例（None → 空角色）
