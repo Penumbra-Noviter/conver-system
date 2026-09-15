@@ -34,7 +34,6 @@ from backend.app.models.message import Message, Role
 from backend.app.schemas.conversation import PromptDebugResponse
 from backend.app.schemas.message import ChatRequest, ChatResponse
 from backend.app.services import conversation as conversation_service
-from backend.app.services.character_fields import PROMPT_FIELDS
 from backend.app.services import lorebook as lorebook_service
 from backend.app.services import memory_palace as memory_palace_service
 from backend.app.services import message as message_service
@@ -181,6 +180,7 @@ def assemble_chat_context(
             db, conv, current_input, max_rounds=max_rounds, user_name=user_name,
             world_injection=world_injection, history=history,
             narrative_style=narrative_style,
+            preset_dialogue=conv.preset_dialogue or "",
         )
     else:
         # 重生成路径：append_current_input=False —— 不追加当前输入，末条为
@@ -189,6 +189,7 @@ def assemble_chat_context(
             db, conv, "", max_rounds=max_rounds, user_name=user_name,
             append_current_input=False, world_injection=world_injection, history=history,
             narrative_style=narrative_style,
+            preset_dialogue=conv.preset_dialogue or "",
         )
 
     # 4. 解析 Provider（凭据读取 + 未配置 Key 校验 + 实例化收口于 resolve_llm）
@@ -976,19 +977,6 @@ def _plain_injection(
     return {key: [seg.content for seg in segs] for key, segs in tagged.items()}
 
 
-def _character_data(character: Character | None) -> CharacterData:
-    """从 ORM 角色构造 CharacterData（PROMPT_FIELDS 投影 + prompt_mode/expert_prompt）
-
-    与 message.build_message_list 的 CharacterData 构造同口径（单一语义镜像）；
-    character 为 None 时返回空角色（name=""）。
-    """
-    return CharacterData(
-        **{field: getattr(character, field, "") or "" for field in PROMPT_FIELDS},
-        prompt_mode=getattr(character, "prompt_mode", "") or "simple",
-        expert_prompt=getattr(character, "expert_prompt", "") or "",
-    )
-
-
 def build_prompt_debug(db: Session, conversation_id: int) -> PromptDebugResponse:
     """构建 prompt-debug 追溯（只读：不落库、不触发 LLM）
 
@@ -1019,7 +1007,7 @@ def build_prompt_debug(db: Session, conversation_id: int) -> PromptDebugResponse
     combined = _build_tagged_injection(db, character, history, "", user_name)
 
     segments = build_messages_with_source(
-        character=_character_data(character),
+        character=CharacterData.from_orm(character),
         history=history,
         user_content="",
         max_rounds=max_rounds,
