@@ -13,7 +13,6 @@ import 'package:conver_system_mobile/data/repositories/conversation_repository.d
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/companion/proactive_message_service.dart';
-import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -614,6 +613,67 @@ void main() {
       final result = await service.planAfterTurn(
         characterId: ids.characterId,
         conversationId: ids.conversationId,
+      );
+
+      expect(result, 0);
+      expect(plannerCalls, 0);
+    });
+
+    test('W3-F2：冷却按角色隔离——A 刚发不影响从未发过的 B 首次规划', () async {
+      final idsA = await seedChain();
+      final idsB = await seedChain();
+      await enableProactive();
+      await seedSentPlan(
+        characterId: idsA.characterId,
+        conversationId: idsA.conversationId,
+        sentAt: fixedNow.subtract(const Duration(minutes: 5)),
+      );
+      final service = buildService();
+
+      final result = await service.planAfterTurn(
+        characterId: idsB.characterId,
+        conversationId: idsB.conversationId,
+      );
+
+      expect(result, 1);
+      expect(plannerCalls, 1);
+    });
+
+    test('W3-F2：B 自己冷却窗口内仍拒绝（本角色口径）', () async {
+      final ids = await seedChain();
+      await enableProactive();
+      await seedSentPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        sentAt: fixedNow.subtract(const Duration(minutes: 5)),
+      );
+      final service = buildService();
+
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+
+      expect(result, 0);
+      expect(plannerCalls, 0);
+    });
+
+    test('W3-F2：全局日限跨角色——A 满 6 次后 B 也被 daily_limit 拒绝', () async {
+      final idsA = await seedChain();
+      final idsB = await seedChain();
+      await enableProactive();
+      for (var i = 0; i < ProactiveThresholds.dailyLimit; i++) {
+        await seedSentPlan(
+          characterId: idsA.characterId,
+          conversationId: idsA.conversationId,
+          sentAt: fixedNow.subtract(Duration(hours: i)),
+        );
+      }
+      final service = buildService();
+
+      final result = await service.planAfterTurn(
+        characterId: idsB.characterId,
+        conversationId: idsB.conversationId,
       );
 
       expect(result, 0);
