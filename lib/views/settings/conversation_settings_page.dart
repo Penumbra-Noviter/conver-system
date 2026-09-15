@@ -9,6 +9,10 @@
 ///
 /// 视图层只做展示编排 + 输入校验，读写经 [SettingsRepository]（数据层），
 /// 不触碰平台存储。
+///
+/// 阶段 2（PS2-09）：「主动消息」与「内心独白」两开关，沿「后台反思」先例
+/// 同构——加载回显、即时写入 `proactive_message_enabled` /
+/// `inner_thought_enabled` 键、写失败回滚 + SnackBar。
 library;
 
 import 'package:flutter/material.dart';
@@ -33,6 +37,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
   double _temperature = SettingsRepository.defaultTemperature;
   final TextEditingController _maxTokensController = TextEditingController();
   bool _reflectionEnabled = false;
+  bool _proactiveEnabled = false;
+  bool _innerThoughtEnabled = false;
   bool _loaded = false;
 
   @override
@@ -54,6 +60,10 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       final maxTokens = await widget.settingsRepository.getMaxTokens();
       final reflectionEnabled =
           await widget.settingsRepository.memoryReflectionEnabled;
+      final proactiveEnabled =
+          await widget.settingsRepository.proactiveMessageEnabled;
+      final innerThoughtEnabled =
+          await widget.settingsRepository.innerThoughtEnabled;
       if (!mounted) {
         return;
       }
@@ -61,6 +71,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         _temperature = temperature;
         _maxTokensController.text = maxTokens.toString();
         _reflectionEnabled = reflectionEnabled;
+        _proactiveEnabled = proactiveEnabled;
+        _innerThoughtEnabled = innerThoughtEnabled;
         _loaded = true;
       });
     } catch (e) {
@@ -92,17 +104,15 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已保存')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已保存')));
     } catch (e) {
       debugPrint('对话参数保存失败: $e');
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('保存失败')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('保存失败')));
     }
   }
 
@@ -121,9 +131,50 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         return;
       }
       setState(() => _reflectionEnabled = !value);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('保存失败')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('保存失败')));
+    }
+  }
+
+  /// 切换主动消息开关（阶段 2，PS2-09，即时写入
+  /// `proactive_message_enabled` 键）。
+  ///
+  /// 写失败回滚 UI 状态并提示；开关即时生效，无需点「保存」。
+  Future<void> _setProactiveMessage(bool value) async {
+    setState(() => _proactiveEnabled = value);
+    try {
+      await widget.settingsRepository.setMany({
+        SettingsRepository.proactiveMessageEnabledKey: value.toString(),
+      });
+    } catch (e) {
+      debugPrint('主动消息开关保存失败: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() => _proactiveEnabled = !value);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('保存失败')));
+    }
+  }
+
+  /// 切换内心独白开关（阶段 2，PS2-09，即时写入
+  /// `inner_thought_enabled` 键）。
+  ///
+  /// 写失败回滚 UI 状态并提示；开关即时生效，无需点「保存」。
+  Future<void> _setInnerThought(bool value) async {
+    setState(() => _innerThoughtEnabled = value);
+    try {
+      await widget.settingsRepository.setMany({
+        SettingsRepository.innerThoughtEnabledKey: value.toString(),
+      });
+    } catch (e) {
+      debugPrint('内心独白开关保存失败: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() => _innerThoughtEnabled = !value);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('保存失败')));
     }
   }
 
@@ -160,8 +211,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     max: SettingsRepository.temperatureMax,
                     divisions: 20,
                     label: _temperature.toStringAsFixed(2),
-                    onChanged: (value) =>
-                        setState(() => _temperature = value),
+                    onChanged: (value) => setState(() => _temperature = value),
                   ),
                   Text(
                     _temperature.toStringAsFixed(2),
@@ -183,9 +233,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                   TextField(
                     controller: _maxTokensController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      hintText: '输入最大 token 数',
-                    ),
+                    decoration: const InputDecoration(hintText: '输入最大 token 数'),
                   ),
                   const SizedBox(height: ConverSpacing.space4),
                   Divider(thickness: 1, color: palette.border),
@@ -205,11 +253,44 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     value: _reflectionEnabled,
                     onChanged: _setReflection,
                   ),
-                  const SizedBox(height: ConverSpacing.space5),
-                  FilledButton(
-                    onPressed: _save,
-                    child: const Text('保存'),
+                  const SizedBox(height: ConverSpacing.space4),
+                  Divider(thickness: 1, color: palette.border),
+                  const SizedBox(height: ConverSpacing.space2),
+                  Text(
+                    '主动消息',
+                    style: textTheme.titleMedium?.copyWith(color: palette.ink1),
                   ),
+                  const SizedBox(height: ConverSpacing.space1),
+                  Text(
+                    '角色会在合适时机主动发消息',
+                    style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('主动消息'),
+                    value: _proactiveEnabled,
+                    onChanged: _setProactiveMessage,
+                  ),
+                  const SizedBox(height: ConverSpacing.space4),
+                  Divider(thickness: 1, color: palette.border),
+                  const SizedBox(height: ConverSpacing.space2),
+                  Text(
+                    '内心独白',
+                    style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+                  ),
+                  const SizedBox(height: ConverSpacing.space1),
+                  Text(
+                    '角色以 <thought> 形式表达内心想法',
+                    style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('内心独白'),
+                    value: _innerThoughtEnabled,
+                    onChanged: _setInnerThought,
+                  ),
+                  const SizedBox(height: ConverSpacing.space5),
+                  FilledButton(onPressed: _save, child: const Text('保存')),
                 ],
               ),
       ),
