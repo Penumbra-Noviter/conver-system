@@ -1,6 +1,7 @@
 /// drift 表定义 — 前四表与桌面端 ORM 逐字段对齐（schemaVersion=1 冻结）；
 /// MemoryEntries / PersonaRevisions 为人机恋板块（ADR-0003）移动端先行表
-/// （schemaVersion=2，桌面无对应物）。
+/// （schemaVersion=2，桌面无对应物）；RelationshipStates / ProactivePlans /
+/// InnerThoughts 为阶段 2 三表（schemaVersion=3，spec §3，桌面无对应物）。
 ///
 /// 权威源（只读，勿改）：
 /// `desktop/backend/app/models/{character,conversation,message,setting}.py`
@@ -277,6 +278,189 @@ class PersonaRevisions extends Table {
 
   /// 演化动机 / 备注（缺省空串）。
   TextColumn get reason => text().withDefault(const Constant(''))();
+
+  DateTimeColumn get createdAt => dateTime()();
+}
+
+/// 关系阶段枚举 — 人机恋关系状态机五段（spec §3 / P4）。
+///
+/// 落库值取 `.value`（stranger/acquainted/familiar/intimate/soulmate），
+/// 沿 [RoleConverter] / [MemoryKindConverter] 字符串落库惯例。
+enum RelationshipStage {
+  stranger('stranger'),
+  acquainted('acquainted'),
+  familiar('familiar'),
+  intimate('intimate'),
+  soulmate('soulmate');
+
+  const RelationshipStage(this.value);
+
+  /// 数据库存储值。
+  final String value;
+}
+
+/// [RelationshipStage] 的 drift 类型转换器 — 显式按 `.value` 落库
+/// （对齐 [RoleConverter]，不按下标 INTEGER）。
+class RelationshipStageConverter
+    extends TypeConverter<RelationshipStage, String> {
+  const RelationshipStageConverter();
+
+  @override
+  RelationshipStage fromSql(String fromDb) {
+    for (final stage in RelationshipStage.values) {
+      if (stage.value == fromDb) {
+        return stage;
+      }
+    }
+    throw ArgumentError.value(
+      fromDb,
+      'stage',
+      'Unknown RelationshipStage value in database',
+    );
+  }
+
+  @override
+  String toSql(RelationshipStage value) => value.value;
+}
+
+/// 关系状态表 — 每角色一行（`characterId` 唯一索引，spec §3 / P4）。
+///
+/// `affinity` 0-100 由仓储/服务层 clamp（无 DB CHECK 先例）；`stage` 为
+/// 五段枚举字符串落库；无行时首回合不注入（判定⑧）。
+@DataClassName('RelationshipState')
+@TableIndex(
+  name: 'idx_relationship_states_character_id',
+  columns: {#characterId},
+  unique: true,
+)
+class RelationshipStates extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）；每角色至多一行。
+  IntColumn get characterId => integer().references(
+        Characters,
+        #id,
+        onDelete: KeyAction.cascade,
+      )();
+
+  /// 必填枚举（stranger/acquainted/familiar/intimate/soulmate），字符串落库。
+  TextColumn get stage => text().map(const RelationshipStageConverter())();
+
+  /// 亲密度 0-100（仓储/服务层 clamp，DB 不设 CHECK 约束）。
+  IntColumn get affinity => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get updatedAt => dateTime()();
+}
+
+/// 主动消息计划状态 — 排程生命周期四态（spec §3 / 判定⑥）。
+///
+/// - [scheduled]：已排程未发送（在途）。
+/// - [sent]：已发送并落 assistant 消息（`messageId` 指向该消息）。
+/// - [expired]：到点未发送（通知失败/错过时机），服务侧核对置位。
+/// - [dropped]：被放弃（如重生成截断使 `messageId` 置空后核对置位）。
+enum ProactivePlanStatus {
+  scheduled('scheduled'),
+  sent('sent'),
+  expired('expired'),
+  dropped('dropped');
+
+  const ProactivePlanStatus(this.value);
+
+  /// 数据库存储值。
+  final String value;
+}
+
+/// [ProactivePlanStatus] 的 drift 类型转换器 — 显式按 `.value` 落库。
+class ProactivePlanStatusConverter
+    extends TypeConverter<ProactivePlanStatus, String> {
+  const ProactivePlanStatusConverter();
+
+  @override
+  ProactivePlanStatus fromSql(String fromDb) {
+    for (final status in ProactivePlanStatus.values) {
+      if (status.value == fromDb) {
+        return status;
+      }
+    }
+    throw ArgumentError.value(
+      fromDb,
+      'status',
+      'Unknown ProactivePlanStatus value in database',
+    );
+  }
+
+  @override
+  String toSql(ProactivePlanStatus value) => value.value;
+}
+
+/// 主动消息计划表 — 预生成文案 + 排程（spec §3 / P1~P3）。
+///
+/// `sentAt` 为每日 6 次 / 冷却 6h 的口径单一来源（判定③）；`messageId`
+/// 指向已落库的 assistant 消息，重生成截断删消息时 FK setNull（判定⑥）。
+@TableIndex(name: 'idx_proactive_plans_character_id', columns: {#characterId})
+@TableIndex(name: 'idx_proactive_plans_conversation_id', columns: {#conversationId})
+@TableIndex(name: 'idx_proactive_plans_status', columns: {#status})
+class ProactivePlans extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  IntColumn get characterId => integer().references(
+        Characters,
+        #id,
+        onDelete: KeyAction.cascade,
+      )();
+
+  /// 必填外键 → conversations.id，ondelete=CASCADE（随对话删除）。
+  IntColumn get conversationId => integer().references(
+        Conversations,
+        #id,
+        onDelete: KeyAction.cascade,
+      )();
+
+  /// 预生成文案（必填文本）。
+  TextColumn get content => text()();
+
+  /// 计划发送时间（必填）。
+  DateTimeColumn get scheduledAt => dateTime()();
+
+  /// 实际发送时间（可空；置 sent 时写，计数/冷却口径单一来源）。
+  DateTimeColumn get sentAt => dateTime().nullable()();
+
+  /// 必填枚举（scheduled/sent/expired/dropped），字符串落库。
+  TextColumn get status => text().map(const ProactivePlanStatusConverter())();
+
+  /// 已发送消息 id（可空）；消息删除时 FK setNull（重生成截断场景）。
+  IntColumn get messageId => integer().nullable().references(
+        Messages,
+        #id,
+        onDelete: KeyAction.setNull,
+      )();
+}
+
+/// 内心独白表 — 剥离的 `<thought>` 内容（spec §3 / P5）。
+///
+/// 不污染 messages/搜索/导出；`messageId` CASCADE 随消息删除级联清空。
+@TableIndex(name: 'idx_inner_thoughts_character_id', columns: {#characterId})
+@TableIndex(name: 'idx_inner_thoughts_message_id', columns: {#messageId})
+class InnerThoughts extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  IntColumn get characterId => integer().references(
+        Characters,
+        #id,
+        onDelete: KeyAction.cascade,
+      )();
+
+  /// 必填外键 → messages.id，ondelete=CASCADE（thought 随消息删除级联）。
+  IntColumn get messageId => integer().references(
+        Messages,
+        #id,
+        onDelete: KeyAction.cascade,
+      )();
+
+  /// 独白正文（必填文本）。
+  TextColumn get content => text()();
 
   DateTimeColumn get createdAt => dateTime()();
 }
