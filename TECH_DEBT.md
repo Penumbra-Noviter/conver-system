@@ -53,6 +53,13 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-145 | chat.py:160 assemble_chat_context 与 build_prompt_debug 重复注入链编排（取角色→历史→世界书→mod→合并，末端分叉），缺「产出带来源注入块」单一 seam | 架构报告 | Strong | 📝 待立项 | prompt 组装链 |
+| F-146 | lorebook_engine.py:119 build_world_injection 成孤儿（生产路径被 chat._build_tagged_world_injection 复制），position→block 映射在 lorebook/chat/mods 三处复制 | 架构报告 | Strong | 📝 待立项 | prompt 组装链 |
+| F-147 | message.py:178 ORM Character→CharacterData 投影与 chat._character_data 逐字重复，同一概念无 locality（注：F-143 曾复核关闭「有意识镜像收益<成本」，本次架构报告改判 Strong，待 Grilling 重开评估） | 架构报告 | Strong | 📝 待立项 | prompt 组装链 |
+| F-148 | message.py:198 preset_dialogue 隐式读 ORM 快照 vs narrative_style 显式透传，两注入参数数据流不对称（seam 泄漏） | 架构报告 | Worth exploring | 📝 待立项 | prompt 组装链 |
+| F-149 | prompt.py:232 _assemble 9 位置参数 + 8 线性 if 注入点，新注入源需 4 处触碰（三份签名 + if + docstring） | 架构报告 | Worth exploring | 📝 待立项 | prompt 组装链 |
+| F-150 | prompt.py:146 build_messages 与 build_messages_with_source 九参数签名逐字重复，仅差 source 标注，属浅层包装 | 架构报告 | Worth exploring | 📝 待立项 | prompt 组装链 |
+| F-151 | character_card.py:273 与 character-submit.js:187 preset_dialogue 归一化（trim/去重/上限10）前后端各一份，上限常量双端无单一权威 | 架构报告 | Speculative | 📝 待立项 | 前后端契约 |
 
 
 ### 复核关闭（Speculative 类，防重复提议）
@@ -149,4 +156,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-144），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-151），避免编号冲突。
