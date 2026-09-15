@@ -3,7 +3,6 @@
 library;
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
-import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/memory_repository.dart';

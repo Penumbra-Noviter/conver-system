@@ -69,10 +69,6 @@ class _CharactersViewState extends State<CharactersView> {
   /// 关系状态行（characterId → 行）；无行角色不在 map（判定⑧零噪音）。
   Map<int, RelationshipState> _relationships = const {};
 
-  /// 本会话内拒绝过升级提议的角色 id 集（spec 判定⑤「不重复提议」的 UI 侧
-  /// 记录——broker 只读不扩容，拒绝语义落在消费方）。
-  final Set<int> _rejectedCharacterIds = <int>{};
-
   /// 确认/拒绝进行中的角色 id 集（防重入：按钮忙碌禁用）。
   final Set<int> _busyCharacterIds = <int>{};
 
@@ -181,7 +177,7 @@ class _CharactersViewState extends State<CharactersView> {
   }
 
   /// 拒绝升级（SR-10：零写库；spec 判定⑤「本会话不再重复提议」由
-  /// [_rejectedCharacterIds] 承担）。
+  /// StageUpgradeBroker.reject 承担——上提装配层，切 tab 重建仍生效）。
   Future<void> _rejectUpgrade(int characterId) async {
     if (!_busyCharacterIds.add(characterId)) {
       return;
@@ -198,7 +194,7 @@ class _CharactersViewState extends State<CharactersView> {
       return;
     }
     _busyCharacterIds.remove(characterId);
-    _rejectedCharacterIds.add(characterId);
+    _maybeProvider<StageUpgradeBroker>(context)?.reject(characterId);
     _maybeProvider<StageUpgradeBroker>(context)?.clear();
     setState(() {});
   }
@@ -272,7 +268,10 @@ class _CharactersViewState extends State<CharactersView> {
                       controller: controller,
                       relationships: _relationships,
                       proposal: proposal,
-                      rejectedCharacterIds: _rejectedCharacterIds,
+                      rejectedCharacterIds:
+                          _maybeProvider<StageUpgradeBroker>(context)
+                                  ?.rejectedCharacterIds ??
+                          const <int>{},
                       busyCharacterIds: _busyCharacterIds,
                       onConfirm: _confirmUpgrade,
                       onReject: _rejectUpgrade,

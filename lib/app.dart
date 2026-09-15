@@ -367,6 +367,7 @@ class ConverApp extends StatelessWidget {
           create: (_) => StageUpgradeBroker(),
         ),
         Provider<Object?>(
+          lazy: false, // W6-F1：无消费者时默认 lazy 永不执行，启动副作用必须立即触发
           create: (context) {
             // 启动路径：通知初始化（幂等）+ SR-08 排程恢复；失败不阻断。
             unawaited(_startProactiveNotifications(
@@ -433,6 +434,7 @@ class ConverApp extends StatelessWidget {
         // 静默；成功 → handleProactiveDeepLink（归属校验 + 导航高亮）。
         // 装配层单点（对齐 _startProactiveNotifications 哑 Provider 先例）。
         Provider<Object?>(
+          lazy: false, // W6-F1：冷启动深链接线副作用，必须立即执行（同启动恢复）
           create: (context) {
             unawaited(consumeProactiveLaunchDeepLink(
               navigator: AppDeepLinkNavigator(

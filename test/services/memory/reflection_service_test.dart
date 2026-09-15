@@ -8,9 +8,7 @@ import 'package:conver_system_mobile/data/repositories/character_repository.dart
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/memory_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
-import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/memory/reflection_service.dart';
-import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -90,8 +88,6 @@ void main() {
     late int extractorCalls;
     late List<String> extractorResult;
     late String capturedCharName;
-    late List<String> capturedDialogue;
-    late List<String> capturedExisting;
 
     setUp(() {
       db = AppDatabase(NativeDatabase.memory());
@@ -102,8 +98,6 @@ void main() {
       extractorCalls = 0;
       extractorResult = const [];
       capturedCharName = '';
-      capturedDialogue = const [];
-      capturedExisting = const [];
     });
 
     tearDown(() async {
@@ -146,8 +140,6 @@ void main() {
         }) async {
           extractorCalls++;
           capturedCharName = charName;
-          capturedDialogue = dialogueLines;
-          capturedExisting = existingFacts;
           return extractorResult;
         },
         interval: interval,

@@ -14,9 +14,17 @@ import 'relationship_service.dart';
 /// 升级提议广播器（ChangeNotifier，装配层单例）。
 class StageUpgradeBroker extends ChangeNotifier {
   StageUpgradeProposal? _lastProposal;
+  final Set<int> _rejected = <int>{};
 
   /// 最近一次发布的升级提议；消费方展示后可用 [clear] 清态。
   StageUpgradeProposal? get lastProposal => _lastProposal;
+
+  /// 本会话内已拒绝过升级提议的角色 id 集合（W6-F2：从视图 State 字段
+  /// 上提，切 tab 重建视图后「本会话不重弹」语义仍成立，spec 判定⑤）。
+  Set<int> get rejectedCharacterIds => _rejected;
+
+  /// 是否已拒绝过 [characterId] 的升级提议（UI 据此隐藏操作行）。
+  bool isRejected(int characterId) => _rejected.contains(characterId);
 
   /// 发布 [proposal] 并通知监听者（PS2-07 回合结束链回调入口）。
   void publish(StageUpgradeProposal proposal) {
@@ -24,7 +32,13 @@ class StageUpgradeBroker extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 清空当前提议（UI 确认/拒绝/关闭后调用，防残留误导下次展示）。
+  /// 记录 [characterId] 的拒绝（零写库，仅会话内记忆）。
+  void reject(int characterId) {
+    _rejected.add(characterId);
+    notifyListeners();
+  }
+
+  /// 清空当前提议与拒绝记录（UI 确认/拒绝/关闭后调用，防残留误导）。
   void clear() {
     _lastProposal = null;
     notifyListeners();
