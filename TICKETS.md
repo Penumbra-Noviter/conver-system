@@ -31,6 +31,24 @@
 
 ## 已完成归档
 
+### 人机恋阶段 2 批次 — 主动消息循环 / 关系状态机 / 内心独白（2026-09-15 收口）
+
+> 来源：handoff-ai-companion-mobile-stage1.5 + /project-kickoff 全自动档（Grilling 共识 P1~P6 全按推荐 + threat-model SR-01~15 + 3 份 ADR）。10 工单 6 波 DAG（W1 01 / W2 02 / W3 03‖04‖05 / W4 06‖07‖09 / W5 08 / W6 10）+ 波末增量审核 W1~W6 六轮 + 期末四轴（固定点 4dddada）。门禁：全量测试绿 / analyze 0（期末清理基线 5 warning）/ 威胁模型 P0 全落地（SR-01~10）。详见 DEV_LOG〈人机恋阶段 2 批次〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| PS2-01 | 数据底座 A：三新表 + schemaVersion 3 迁移 | 2026-09-15 | 16c3eca（merge db7a967） |
+| PS2-02 | 数据底座 B：CompanionRepository + 设置键/getter | 2026-09-15 | a67d88a（merge 5a16e8a） |
+| PS2-03 | 关系状态机服务（枚举/推进/闸门/注入/评估） | 2026-09-15 | 43f0353（merge 4e74d60） |
+| PS2-04 | 内心独白服务（提取/落库/指令） | 2026-09-15 | 616a45d（merge 327211b） |
+| PS2-05 | 主动消息服务（节流/规划 seam/编排/过期核对） | 2026-09-15 | e205ad7（merge dec9ab4） |
+| PS2-06 | 通知平台薄层（scheduler/payload/Android 配置） | 2026-09-15 | c63c547（merge b616c3c） |
+| PS2-07 | ChatService 三挂点集成（剥离/注入/回合结束链） | 2026-09-15 | 17e5ed7（merge 58d7842） |
+| PS2-08 | 装配 + 深链 + 升级 broker + ADR 落盘 | 2026-09-15 | 749e5da（merge 9693f64） |
+| PS2-09 | 设置页两开关 UI | 2026-09-15 | a138d7f（merge 19dcee5） |
+| PS2-10 | 角色卡关系进度 + 升级确认闸门 UI | 2026-09-15 | f3c7d47（merge b4a49f1） |
+| W3 返修 | F1 确认闸门 targetStage 域校验 + F2 角色冷却按 characterId 过滤 | 2026-09-15 | ab42d0c / de6c11f（随 W4 merge） |
+
 ### 人机恋阶段 1.5 批次 — 后台反思提取（2026-09-15 收口）
 
 > 来源：用户「阶段 1.5 可选增强」指令（handoff-ai-companion-mobile 阶段 1.5）。ADR-0004 立项：每 6 回合异步 LLM 提炼人格事实（默认关闭、仅人格事实、去重、失败降级）。交付：ReflectionService + ChatService 挂点 + settings 开关 + 设置页 UI。门禁：全量 **1740 测**绿（+15）/ analyze 0；详见 DEV_LOG〈人机恋阶段 1.5 批次〉。

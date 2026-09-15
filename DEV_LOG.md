@@ -6,6 +6,14 @@
 
 ---
 
+## 人机恋阶段 2 批次 — 主动消息 / 关系状态机 / 内心独白（2026-09-15 — /project-kickoff 全自动档）
+
+- **范围**：执行 handoff 阶段 2 三项（主动消息循环 / 关系状态机 / 内心独白）。Grilling 共识 6 真拍点（P1~P6）全按推荐；threat-model SR-01~15（P0×10 P1×2 P2×3）并入工单验收；ADR-0005/0006/0007 落盘；新增依赖 flutter_local_notifications 22.3.1 / timezone 0.11.1 精确钉版。
+- **10 工单 6 波**：W1 01（16c3eca）→ W2 02（a67d88a）→ W3 03/04/05 并行（43f0353/616a45d/e205ad7）→ W4 06/07/09 并行 + W3 返修 F1/F2（c63c547/17e5ed7/a138d7f + ab42d0c/de6c11f）→ W5 08（749e5da）→ W6 10（f3c7d47）；Lane A 串行链 5 票后按链中重启点交接 Lane E。波末增量审核 W1~W6 六轮全执行。
+- **波末审核命中的真缺陷（门禁收益实证）**：W2-F1 `getActivePlan` 双在途抛 StateError（证据文件表述失实→修正+观察传 PS2-05）；W3-F1/F2 确认闸门无域校验可降档 + 角色冷却跨角色污染（→ 返修派回，先红后绿 3+3 用例）；W5-F1 SR-08 置 expired 无 per-plan catch（→ 落债 F-83）；W6-F1 **哑 Provider lazy 默认永不执行**——冷启动深链接线与排程恢复为真机死代码（→ lazy:false 修复 + 兼容 _maybeProvider 修正，装配冒烟由假阴性转实跑）；W6-F2 拒绝记录视图 State 字段切 tab 丢失（→ 上提 broker，判定⑤语义进程级成立）。
+- **期末**：全量测试绿（含 1 次并发 flaky 重试：character_wizard_step2 全量并发偶发，单跑/目录整批均绿；同批 wizard 既有 drift 多库 warning 场景）/ analyze 0（期末清理基线 5 个 unused import/local）/ 威胁模型 P0 全落地 / 技术债候选区新落 F-78~F-83（Worth exploring ×6：drift 迁移非事务、迁移中断自愈用例、设置失败路径测试、活跃口径双实现、确认漂移、per-plan catch）。
+- **过程遥测**：子智能体 12（Grilling + plan-tickets + threat-model + Implement×5 lane + code-review 审核×6）；合并冲突 0；空返回 0；flaky 2（wizard 全量并发 ×1、characters stage2 全量并发 ×1，均单跑绿）；切票粒度 10 票全低于硬上限（最大 PS2-05 640 行）；门禁命中：增量审核 6 轮共拦回逻辑缺陷 3 个（F1×2 + F2）+ 死代码 1（W6-F1），全部派回修复后复审。
+
 ## 人机恋阶段 1.5 批次 — 后台反思提取（2026-09-15 — 用户「阶段 1.5 可选增强」指令）
 
 - **范围**：执行 ADR-0004（后台反思提取）——每 N 回合异步 LLM 提炼人格事实落 `persona_fact`，补 prompt 指令驱动（阶段 1）遗漏的稳定事实。三决策拍板：每 6 回合反思（user 消息数 `% 6 == 0` 幂等判定）、默认关闭、仅人格事实。全量 **1740 测**绿（+15）/ analyze 0。

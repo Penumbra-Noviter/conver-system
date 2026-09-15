@@ -56,6 +56,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - ✅ **技术债消费批次 F-75/F-76/F-77 已全部处置**（2026-09-14）：F-76 消费（_resolveTemperature 加 NaN/Infinity 回退全局 + 越界 clamp [0,2]）+ F-75/77 复核关闭（种子 HTML 内容资产 CSS / SettingsReader implements 成本）；候选区清零；全量 1684 测绿（+3）/ analyze 0
 - ✅ **人机恋阶段 1 MVP 已交付**（2026-09-15，角色对话增强）：记忆 prompt 指令驱动（`<add>`/`<persona>`/`<search>`）+ 每轮重注入人格事实抗 OOC + 人设演化（PersonaRevisions 版本化 + 用户确认闸门）+ 角色卡「记忆」管理页；AC-01~AC-05 全落地（schemaVersion 1→2 + MemoryEntries/PersonaRevisions + MemoryService + PersonaEvolutionService）；全量 1725 测绿 / analyze 0；主动消息/关系状态/内心独白留阶段 2；ADR-0003 见 docs/adr-0003-ai-companion.md；调研见 docs/ai-companion-research.md
 - ✅ **人机恋阶段 1.5 已交付**（2026-09-15，后台反思提取）：每 6 回合异步 LLM 提炼人格事实落 `persona_fact`（默认关闭、仅人格事实、去重、失败降级）；ReflectionService（seam 化）+ ChatService 挂点 + settings 开关 `memory_reflection_enabled` + 设置页 UI；全量 1740 测绿 / analyze 0；ADR-0004 见 docs/adr-0004-ai-companion-reflection.md
+- ✅ **人机恋阶段 2 已交付**（2026-09-15，主动消息/关系状态机/内心独白）：主动消息循环（回合末异步规划单次产出 + OS 本地通知排程 + 深链进对话 + 启动排程恢复，后台零 LLM）、关系状态机（五段枚举 + 启发式零 LLM + 亲密/挚爱服务层确认闸门 + 角色卡进度展示与拒绝记忆 Broker 上提）、内心独白（`<thought>` 恒剥离落独立表 + 开关）；三新表 schemaVersion 3 迁移 + CompanionRepository + companion 三服务 + notifications 平台薄层（flutter_local_notifications 22.3.1 / timezone 0.11.1 钉版）+ 三份 ADR；威胁建模 SR-01~15 P0 全落地（深链 payload 零内容/归属校验/发送幂等/排程恢复——装配启动副作用经 W6-F1 修复 lazy:false 实跑）；ADR-0005/0006/0007 见 docs/adr-0005/0006/0007-ai-companion-*.md
 
 ## 文档体系
 

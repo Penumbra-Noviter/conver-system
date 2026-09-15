@@ -43,6 +43,12 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-78 | drift 2.34.3 onUpgrade 迁移**非事务原子**（logStatements 探针实测：9 条 CREATE TABLE/INDEX 裸发、全程无 BEGIN/COMMIT）；`app_database.dart:74` 注释与 threat-model SR-07「默认迁移事务语义」表述不实需纠偏；危害路径未见（IF NOT EXISTS + 失败锁库 + user_version 成功后回写 → 中断重开幂等自愈已实证） | W1 增量审核（companion-stage2，Falsify 实证） | Worth exploring | 📝 待立项 | 数据层 |
+| F-79 | 迁移测试缺「中断残留 → 重开自愈」用例（stage2_migration_test 12 用例只覆盖完整成功路径；F-78 的同源补充） | W1 增量审核（companion-stage2） | Worth exploring | 📝 待立项 | 数据层 |
+| F-80 | conversation_settings_page.dart 既有 `_setReflection` 失败回滚分支无测试（阶段 1.5 遗留：既有 widget 测试只覆盖保存按钮失败；2026-09-15 PS2-09 实现核对时发现，本批未越界处置） | PS2-09 遗留建议（companion-stage2） | Worth exploring | 📝 待立项 | 设置 UI |
+| F-81 | 活跃天数/活跃窗口口径双实现：RelationshipService 导出 `activeDays`/`isRecentlyActive`（判定⑨），ProactiveMessageService 自建 `_lastActiveAt`（同源口径）——因 RelationshipService 构造按单回合评估上下文（required stage/affinity/characterId）、proactive 服务跨角色长驻无法持有实例，seam 不可达未改复用；建议上提共享（ConversationRepository 或独立 ActivityService）交主会话决策 | W3 增量审核 F6（companion-stage2）+ PS2-05 W3 返修核对 | Worth exploring | 📝 待立项 | 伴侣域 |
+| F-82 | `confirmStageUpgrade` 确认时刻重算 affinity 可能产生 stage/affinity 档位不一致中间态（proposal 用活跃态 gain=2 计算 intimacy 61，冷却后 confirm 重算 gain=1 → 写 intimate/59 属 familiar 档；下回合 evaluate 自愈）——建议补「确认时刻活跃状态漂移」复现测试 + 评估确认结果 clamp 到 targetStage 档下限（防落回旧档） | W4 增量审核 F1（companion-stage2） | Worth exploring | 📝 待立项 | 伴侣域 |
+| F-83 | `restoreProactiveSchedules` 置 expired 分支（app.dart:126 `updatePlanStatus`）无 per-plan try/catch——仅 schedule 抛错有降级，updatePlanStatus/listPlansByStatus 抛错会中断整循环，SR-08「单计划抛错不阻断其他计划」语义不完整；测试只盖 schedule 抛错 | W5 增量审核 F1（companion-stage2） | Worth exploring | 📝 待立项 | 伴侣域 |
 
 ## 技术债处置记录
 
