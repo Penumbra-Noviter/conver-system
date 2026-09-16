@@ -43,11 +43,21 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-98 | 通知初始化并发交错测试仅覆盖「带回调先、无回调后完成」单方向；反序变体（无回调挂起中带回调进入）未机器化——锁串行分析确认现实现无缺陷，属测试矩阵缺口 | 期末四轴 Falsify（R-F1，techdebt-f91f97） | 低 | 📝 待立项 | 伴侣域 |
-| F-99 | notification_service `_channel.initialize` 返回值被忽略、验收 5「状态与插件实际一致」存契约缝隙（重挂失败时 hot=true 与插件侧不一致无显式处理）——基线实证为既有行为延续，非本批回归 | 期末四轴 Falsify（R-F2，techdebt-f91f97） | 低 | 📝 待立项 | 伴侣域 |
-| F-100 | 告警 seam 测试用例共享 `plugin` 实例，断言顺序敏感（现时序绿；用例间隔离可消除 flake 风险） | 期末四轴 Falsify（I-F4，techdebt-f91f97） | Speculative | 📝 待立项 | 测试 |
+| F-101 | notification_service_test 反序交错用例验收 reason 文本归因错误：「锁失效并行交错则为 1」与实测不符——临时移除 `_initSerial` 锁等待后反序用例仍绿（gate 巧合串行化 calls 仍 2），锁钉力由正序 gate 用例承担；建议修正 reason 文本或补调用顺序断言（钉锁机制本身） | 期末四轴 Falsify（techdebt-f98f100） | 低 | 📝 待立项 | 测试 |
+| F-102 | 03 票验收①「组级 plugin 零引用」字面未达成——告警 seam 用例正常分支仍用组级 scheduler（仅 recoverable/doomed 独立实例）；字面口径与实现差异，无行为风险 | 期末四轴 Spec（techdebt-f98f100） | Speculative | 📝 待立项 | 测试 |
+| F-103 | notification_service.dart 11 处存量 dart format 差异（formatter 版本漂移，基线即存在非本批引入）；全仓 format 归一批次需拍板 | 期末四轴 Standards（techdebt-f98f100） | Speculative | 📝 待立项 | 工具链 |
 
 ## 技术债处置记录
+
+### 2026-09-17 — 技术债消费批次（F-98~F-100 全部处置）
+
+> 来源：handoff-techdebt-f91f97-done-2026-09-17 交接指令（project-kickoff 全自动档）。3 工单并批 1 波串行 lane（F98F100-01 `76f7da8` merge `49a1b12` / F98F100-02 `562e968` merge `e9bfc10` / F98F100-03 `e378f78` merge `6f67160`）。门禁：全量 **2000 测**绿（基线 1996 → +4）/ analyze 0 / 期末四轴 **0 阻断**（结论位「需修 Recommended 2 项无 Critical」：R-S1 dart format 已修、R-S2 文档同步本 commit 收口）；非阻断落债 F-101~103。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-98 | ✅ 已修 | F98F100-01：补反序并发交错 gate 用例（无回调 initialize 挂起 → 带回调后进入 → `_initSerial` 锁串行重挂），钉 `initializeCalls==2` / `registeredCallback same(hotCallback)` / 零告警 / 重挂后可消费；纯测试生产零 diff；锁矩阵正/反双向闭合（Falsify 突变实证：反序钉结果语义、锁机制钉力由正序用例承担） |
+| F-99 | ✅ 已修 | F98F100-02：`_initializeLocked` 首次/重挂两处读 `Future<bool?>` 返回值——false/null 按失败处理（首次不置 `_initialized` 返回 false 可自然重试 / 重挂走 `onHotCallbackLost` seam 返回 false 不更新 `_registeredCallback`）+ docstring 三处补注「成功 = true 且非 null」+ 插件 22.3.1 覆盖赋值实证引用 + fake `bool? initializeResult` 注入面；先红后绿 3 红实锤 |
+| F-100 | ✅ 已修 | F98F100-03：告警 seam 用例 recoverable/doomed 每分支独立 `_FakePlugin`（用例内直接构造 scheduler 避开 build 工厂闭包捕获），消除共享实例顺序敏感断言；行为断言语义零变化；顺序对调双向全绿机器实证 |
 
 ### 2026-09-17 — 技术债消费批次（F-91~F-97 全部处置）
 
@@ -61,20 +71,6 @@
 | F-94 | ✅ 已修 | FD-04：删 `ProactiveMessageService` 构造死参数 `conversationRepository`（按实际 5 处调用点执行：1 装配 + 4 测试）+ 测试替身 super 转发连带清理；grep 零残留、净删 15 行 |
 | F-95 | ✅ 已修 | FD-05：`Messages` 新增 `idx_messages_created_at` + schemaVersion 3→4 + onUpgrade `from<4` 分支（CREATE INDEX IF NOT EXISTS 幂等三机制延续）+ 迁移测试断言链同步（冻结 4/索引/user_version=4/自愈四要素）+ 秒精度复证 docstring（F-3 契约不改存储精度）；先红后绿（8 失败→全绿），v1/v2 夹具 DROP INDEX 逼真走补建路径 |
 | F-96 | ✅ 已修 | FD-06：`RelationshipThresholds` 构造 assert 链（全档 max 严格递增 + intimateMax+1 ≤ affinityMax + 隐含 gap≥1）；非法注入（intimateMax:100 / max 递减）构造失败先红后绿；默认/自定义合法阈值全档反向自洽增强断言；docstring 注明 assert 仅 debug 生效（防御定位装配/测试期契约，release 无注入面） |
-
-### 2026-09-17 — 技术债消费批次（F-78/F-79/F-80/F-81/F-82/F-90 消费 + F-89 复核关闭）
-
-> 来源：handoff-techdebt-f84f88-done-2026-09-16 交接指令（project-kickoff 全自动档）。5 工单 2 波：FDBT-01（`bbefa33` merge `4686036`）/ FDBT-02（`ae4ea54` merge `9a7f55c`）/ FDBT-03（`6deba8e` merge `8cfe865` + 波末修复 `ec72f17`）/ FDBT-04（`25fbbc6` merge `d1c3cbf` + `ec72f17`）/ FDBT-05（`fbc12ed` merge 收口）。门禁：全量 **1987 测**绿（基线 1974 → +13）/ analyze 0 / 期末四轴 **0 阻断**。非阻断落债 F-91~97（候选区 7 条开放）。
-
-| 编号 | 处置 | 详情 |
-|------|------|------|
-| F-78 | ✅ 已修 | app_database.dart:74 注释改述 drift onUpgrade 默认非事务 + 幂等自愈三机制（IF NOT EXISTS / user_version 成功后回写 / 失败锁库），明示不承诺原子性；零行为变更（FDBT-01） |
-| F-79 | ✅ 已修 | stage2_migration_test 新增「中断残留重开自愈」用例：残留态前置断言 → 重开触发 onUpgrade 重跑 → 三表/6 索引齐全 + user_version=3 + 旧行保留（FDBT-01） |
-| F-80 | ✅ 已修 | conversation_settings_page_stage2_test 补后台反思写失败回滚 + SnackBar 用例（复用 `_SaveFailRepo`；生产零 diff；FDBT-02） |
-| F-81 | ✅ 已修 | `MessageRepository.latestMessageAt` 单源（join 单查询全局 max）+ relationship/proactive 两服务改调；`activeDays`/`_allMessagesFor` 保留；乱序 fixture 证伪增强；零装配改动（FDBT-04） |
-| F-82 | ✅ 已修 | `RelationshipThresholds.floorForStage` + confirm 写入 clamp 到 targetStage 档下限；先红后绿（58→59 / 78→79 落库旧档缺陷实锤）；反向自洽断言（默认+自定义阈值全档遍历）；characters_view 注释同步（FDBT-05） |
-| F-90 | ✅ 已修 | notification_service `_hotCallbackRegistered` OR 置位（并发交错不降级）+ 早退告警「热态回调丢失」+ 契约注释（插件覆盖赋值实证纠偏）；零告警断言 + 并发交错用例 + 先 schedule 后装配用例（FDBT-03 + 波末修复） |
-| F-89 | ❌ 复核关闭 | git grep 复核现状成立且无现实危害：`ConverApp.scheduler` 生产恒 null、唯一消费方（F-84 装配接线测试）已有行为级覆盖、排程契约已在 `ProactiveNotificationScheduler` 接口 seam（proactive_message_service.dart:128）——改具体类为接口成本 > 收益（Leverage≈0），关闭留档 |
 
 ## 复核关闭（最近 4 批，滚动保留）
 

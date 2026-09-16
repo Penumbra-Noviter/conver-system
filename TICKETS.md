@@ -31,6 +31,16 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-98~F-100（2026-09-17 收口）
+
+> 来源：handoff-techdebt-f91f97-done-2026-09-17 交接指令（project-kickoff 全自动档）。3 工单并批 1 波串行 lane（同 commit 自洽，02 票改动核心模块按标准档机制）。门禁：全量 **2000 测**绿（基线 1996 → +4）/ analyze 0 / 期末四轴 **0 阻断**（R-S1 dart format 已修 / R-S2 文档同步本批次收口；非阻断落债 F-101~103）。详见 DEV_LOG〈技术债消费批次 techdebt-f98f100〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F98F100-01 | 通知初始化锁反序交错 gate 用例补强（F-98） | 2026-09-17 | 76f7da8（merge 49a1b12） |
+| F98F100-02 | initialize 返回值失败语义消费 + docstring 契约补注（F-99） | 2026-09-17 | 562e968（merge e9bfc10） |
+| F98F100-03 | 告警 seam 用例独立插件去顺序敏感（F-100） | 2026-09-17 | e378f78（merge 6f67160） |
+
 ### 技术债消费批次 F-91~F-97（2026-09-17 收口）
 
 > 来源：handoff-techdebt-f78f90-done-2026-09-17 交接指令（project-kickoff 全自动档）。6 工单合入：FD-01 `8508af1`（+ 波末 merge 手工合取）/ FD-02 `c2e6f0f` / FD-03 `5762ec7`（W1 merge `2778ad9`）/ FD-04 `22672d1` / FD-06 `43efb82`（W2 首批 merge）/ FD-05 `25eef77`（W2 收口）+ 期末修复 R-S1/R-S2 `b0c3650`。门禁：全量 **1996 测**绿（基线 1987 → +9）/ analyze 0 / 期末四轴 **0 阻断**（R-F1/R-F2/I-F4 落债 F-98~100）。详见 DEV_LOG〈技术债消费批次 techdebt-f91f97〉。
@@ -95,24 +105,13 @@
 |--------|------|----------|------|
 | AC-06 | 后台反思提取：ReflectionService + ChatService 挂点 + settings 开关 + 设置页 UI | 2026-09-15 | （见收口提交） |
 
-### 人机恋阶段 1 MVP 批次 — 记忆 + 抗 OOC + 人设演化（2026-09-15 收口）
-
-> 来源：用户「继续」执行 handoff-ai-companion-mobile（ADR-0003 立项）。5 工单依依赖序 AC-01→AC-05 交付：01 数据层（MemoryEntries 单表 + kind 区分 + PersonaRevisions 版本化 + schemaVersion 1→2 onUpgrade + MemoryRepository 全语义 CRUD）；02 记忆指令（`<add>`/`<persona>`/`<search>` 解析落库 + 记忆三模式 system prompt 模板）；03 记忆注入（ChatService._assembleMessages 每轮重注入人格事实抗 OOC + assistant 落库前剥离标签）；04 人设演化（PersonaEvolutionService 反思 seam + PersonaRevisions 快照 + 用户确认闸门回写 personality）；05 记忆管理 UI（角色卡「记忆」入口 + 条目增改删 + 演化历史）。门禁：全量 **1725 测**绿 / analyze 0；详见 DEV_LOG〈人机恋阶段 1 MVP 批次〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| AC-01 | 数据层：MemoryEntries + PersonaRevisions 表 + migration + 仓储 | 2026-09-15 | （见收口提交） |
-| AC-02 | 记忆指令 prompt 模板 + `<add>/<persona>/<search>` 解析落库 | 2026-09-15 | （见收口提交） |
-| AC-03 | 记忆注入 buildMessages（每轮重注入人格事实抗 OOC） | 2026-09-15 | （见收口提交） |
-| AC-04 | 人设演化（LLM 反思 + 版本化 + 用户确认闸门） | 2026-09-15 | （见收口提交） |
-| AC-05 | 记忆管理 UI（角色页条目编辑 + 演化历史） | 2026-09-15 | （见收口提交） |
-
 ## 历史归档索引
 
 > 更早批次折叠为单行（归档细节由 git 历史承担：`git log -p -- TICKETS.md`）。
 
 | 批次 | 日期 | 工单/提交 | 一句话摘要 |
 |------|------|-----------|------------|
+| 人机恋阶段 1 MVP | 2026-09-15 | AC-01~05（收口提交） | 记忆 + 抗 OOC + 人设演化；schemaVersion 1→2；1725 测 |
 | F-75/F-76/F-77 | 2026-09-14 | F-76 | temperature NaN/Infinity 回退 + clamp [0,2]；F-75/77 复核关闭；1684 测 |
 | U-UX 补全批次 | 2026-09-14 | U-1~U-4（b302fb3/6abcb6d/ced8253/e6cf008） | 聊天首页角色选择条 + 会话管理 / 生成参数链路 / 模板变量管线 / 新手指引；1681 测 |
 | 真机问题批次 | 2026-09-10 | T1~T3（05d54b8/2418ff1/2972dd7） | 测试连接传 default_model / 注入 toProxyEndpoint / server /proxy 流式反代；1612 测 |

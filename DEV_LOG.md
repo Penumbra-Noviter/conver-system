@@ -6,6 +6,20 @@
 
 ---
 
+## 技术债消费批次 techdebt-f98f100（2026-09-17 — handoff-techdebt-f91f97-done-2026-09-17 交接指令，/project-kickoff 全自动档）
+
+- **范围**：消费候选区 3 条（F-98 并发交错反序测试缺口 / F-99 initialize 返回值契约缝隙 / F-100 告警 seam 用例共享实例时序敏感）；3 工单并批 1 波串行 lane（三票共享 notification_service_test.dart，串行为唯一安全形态；02 票改动核心模块 → 标准档机制）。先搜开源三分：自建（零新依赖，插件契约已本地实证）。
+- **交付**：
+  - F98F100-01：反序并发交错 gate 用例（无回调挂起中带回调进入 → 锁串行重挂 + 零告警 + 可消费），钉 `_initSerial` 结果语义；纯测试生产零 diff——commit `76f7da8`（+merge `49a1b12`，验收 8/8）
+  - F98F100-02：`_initializeLocked` 两处读 `Future<bool?>` 返回值——首次 false/null 不置 `_initialized` 返回 false（可自然重试）、重挂走 `onHotCallbackLost` seam 返回 false 不更新 `_registeredCallback`（C2 edge 落 docstring）；docstring 三处补注「成功 = true 且非 null」+ 插件 22.3.1 覆盖赋值实证；fake 增 `bool? initializeResult`；先红后绿 3 红实锤（Expected false / Actual true）——commit `562e968`（+merge `e9bfc10`，验收 8/8）
+  - F98F100-03：告警 seam 用例 recoverable/doomed 每分支独立 `_FakePlugin`（直接构造 scheduler 避开 build 工厂闭包捕获）；顺序对调双向全绿机器实证；纯测试生产零 diff——commit `e378f78`（+merge `6f67160`，验收 5/5）
+- **门禁链**：全量 **2000 测**绿（基线 1996 → +4）/ analyze 0 / 期末四轴 **0 阻断**（固定点 3943bf8；结论位「需修 Recommended 2 项无 Critical」——R-S1 测试新增块 dart format 已修 / R-S2 本文档 + TECH_DEBT + TICKETS 同步本 commit 收口）。Falsify 突变实证：02 票失败语义钉力全成立（删 ok!=true 分支全断言红）；01 票反序用例钉结果语义、锁机制钉力由正序用例承担（矩阵闭合）。
+- **过程遥测**：子智能体 6（Grilling 1 + plan-tickets 1 + Implement 3 + code-review 1）+ 主会话直修（R-S1 format）；无重开/冲突/回退；工具链绕行发现——子代理 pwsh 沙箱拦 flutter_tools 子进程写 Flutter cache（lockfile/version-check）导致 flutter.bat 卡死，绕行 = `danger-full-access` + `dart.exe flutter_tools.snapshot` 直跑 + `FLUTTER_ALREADY_LOCKED=true` + `--no-version-check`（01 票实证，02/03 沿用）；03 票全量首轮 chat_entry_test 1 例并发 flake（隔离 10/10 绿 + 重跑 2000/2000 绿，判定环境性与本批零关联，记此不落债）；全量测试 3 次绿。
+- **技术债闭环**：3 条全处置（F-98/F-99/F-100 ✅ 已修）；期末非阻断落债 F-101（01 票 reason 文本归因错误：锁失效时反序用例仍绿，锁钉力由正序用例承担——补调用顺序断言或修正文本）/ F-102（03 票验收①「组级 plugin 零引用」字面未达成，正常分支仍用组级 scheduler）/ F-103（service 11 处存量 format 差异，formatter 版本漂移，全仓归一批次需拍板）；候选区剩 3 条待立项。
+- **知识库召回轨迹**：预检 persona + 精读《并发测试确定性：脚本式fake按位置消费》《补锁测试先枚举分支矩阵》《Falsify测试要钉住缺陷所在层》《worktree落exFAT盘dubious ownership》；开发期 kb-search 未触发（无报错/测试失败绕过该闸门点的库查询）。
+- **编排教训**：① flutter 工具链在子代理沙箱下的绕行配方须随批传递（非技术债，工具链事实）；② 本期无新流程坑——并行票共享文件（01↔02↔03 同文件）通过「同 commit 串行 lane」规避，经验与前批「冲突矩阵再核」合流。
+- **预设接续**：候选区 F-101~103 待下轮 kickoff 预检消费（F-101/F-102 低强度、F-103 Speculative）；交付后复核（约一周后三问）可选。
+
 ## 文档清出机制执行（2026-09-17 — Neat 遗留裁决）
 
 - **背景**：Neat 审计报告两条历史遗留——TECH_DEBT 处置记录 25 节超「最近 2 节」滚动上限；TICKETS 已完成归档批次数未按 6 批上限执行折叠。用户裁决「择机执行」→ 本节点清出。
