@@ -13,20 +13,37 @@
 /// 阶段 2（PS2-09）：「主动消息」与「内心独白」两开关，沿「后台反思」先例
 /// 同构——加载回显、即时写入 `proactive_message_enabled` /
 /// `inner_thought_enabled` 键、写失败回滚 + SnackBar。
+///
+/// F-84：开关 true 且落库成功后，请求 Android 13+ 运行时通知权限——优先
+/// 走 [ConversationSettingsPage.requestNotificationsPermission] seam，未注入
+/// 时经 `FlutterLocalNotificationsScheduler` provider 兜底（对齐 characters_view
+/// `_maybeProvider` 先例）；权限被拒/平台异常仅 debugPrint 降级，开关语义与
+/// 权限正交（不回滚）。
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/repositories/settings_repository.dart';
+import '../../services/notifications/notification_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
 
 /// 「对话」设置子页。
 class ConversationSettingsPage extends StatefulWidget {
-  const ConversationSettingsPage({super.key, required this.settingsRepository});
+  const ConversationSettingsPage({
+    super.key,
+    required this.settingsRepository,
+    this.requestNotificationsPermission,
+  });
 
   /// 设置仓储（应用级统一实例，settings_view 注入）。
   final SettingsRepository settingsRepository;
+
+  /// 通知权限请求 seam（F-84）：注入时优先；未注入时经
+  /// [FlutterLocalNotificationsScheduler] provider 兜底。返回
+  /// true = 已授予；false = 被拒；null = 平台无此能力。结果与开关状态正交。
+  final Future<bool?> Function()? requestNotificationsPermission;
 
   @override
   State<ConversationSettingsPage> createState() =>
@@ -139,13 +156,15 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
   /// 切换主动消息开关（阶段 2，PS2-09，即时写入
   /// `proactive_message_enabled` 键）。
   ///
-  /// 写失败回滚 UI 状态并提示；开关即时生效，无需点「保存」。
+  /// 写失败回滚 UI 状态并提示；开关即时生效，无需点「保存」。落库成功后
+  /// 沿启用路径请求通知权限（F-84），权限结果不影响开关状态。
   Future<void> _setProactiveMessage(bool value) async {
     setState(() => _proactiveEnabled = value);
     try {
       await widget.settingsRepository.setMany({
         SettingsRepository.proactiveMessageEnabledKey: value.toString(),
       });
+      await _requestNotificationPermissionIfNeeded(value);
     } catch (e) {
       debugPrint('主动消息开关保存失败: $e');
       if (!mounted) {
@@ -154,6 +173,40 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       setState(() => _proactiveEnabled = !value);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('保存失败')));
+    }
+  }
+
+  /// 启用路径的 Android 13+ 通知权限请求（F-84，仅 `value == true`）。
+  ///
+  /// seam 注入优先；未注入时经 [FlutterLocalNotificationsScheduler] provider
+  /// 兜底（缺位 → null 跳过）。请求被拒 / 返回 null / 抛错均只 debugPrint
+  /// 降级——权限与开关语义正交，绝不回滚开关也不冒泡到写仓储的 catch。
+  Future<void> _requestNotificationPermissionIfNeeded(bool value) async {
+    if (!value || !mounted) {
+      return;
+    }
+    try {
+      final request =
+          widget.requestNotificationsPermission ??
+          _maybeSchedulerPermission(context);
+      final granted = (request == null) ? null : await request();
+      debugPrint('主动消息通知权限请求结果（F-84）: $granted');
+    } catch (e) {
+      debugPrint('主动消息通知权限请求降级（开关不受影响）: $e');
+    }
+  }
+
+  /// 从装配图（app.dart 单一落点）读取
+  /// [FlutterLocalNotificationsScheduler.requestNotificationsPermission]；
+  /// provider 缺位（既有测试无 stage2 装配）→ null，调用方降级（零回归契约，
+  /// 对齐 characters_view `_maybeProvider` 先例）。
+  Future<bool?> Function()? _maybeSchedulerPermission(BuildContext context) {
+    try {
+      return context
+          .read<FlutterLocalNotificationsScheduler>()
+          .requestNotificationsPermission;
+    } on ProviderNotFoundException {
+      return null;
     }
   }
 
