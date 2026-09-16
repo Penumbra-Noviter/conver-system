@@ -6,6 +6,21 @@
 
 ---
 
+## 技术债消费批次 techdebt-f101f103（2026-09-17 — handoff-techdebt-f98f100-done-2026-09-17 交接指令，/project-kickoff 全自动档）
+
+- **范围**：消费候选区 3 条（F-101 反序 gate 用例验收 reason 文本归因待裁决 / F-102 告警 seam 用例「组级 plugin 零引用」字面验收线 / F-103 全仓 format 存量差异）；2 工单并批 1 波串行 lane（同文件 `notification_service_test.dart`，01/02 区域零重叠）；F-103 复核关闭（用户拍板归一不立项）。先搜开源三分：自建（两票全为仓内测试文件局部增强，零新依赖）。
+- **票面纠偏（本批核心实证）**：F-101 票面 A 方案（修正 reason 文本）修正对象**不存在**——`git show 76f7da8` 原文与 HEAD 的 reason 文本均为「若早退拦截则为 1」（本就正确），`git log -S "锁失效并行交错"` 零命中；票面 B 方案（fake 记录调用顺序断言）经 microtask 推演在锁失效时**不红**（gate 单 Completer FIFO 巧合串行化使 fake 可观测序列与锁生效时全同）。唯一零生产改动可独立钉锁方案 = **B′ 双 gate 两阶段 + 中间态 `initializeCalls==1` 断言**。
+- **交付**：
+  - F101F103-01：反序 gate 用例重构双 gate 两阶段（`gate1` 无回调 lazy 挂起 → `gate2` 带回调 wired 挂起 → `gate2.complete()` + flush microtask 断言中间态 `initializeCalls==1` → `gate1.complete()` 最终断言）——锁失效（移除 `await previous`）突变下中间态红（Expected 1 / Actual 2）实锤，恢复全绿；fake 零改动、生产零 diff——commit `8fd29fe`（merge `61c9ca3`，验收 8/8）
+  - F101F103-02：告警 seam 用例正常分支独立 `normalPlugin`（`_FakePlugin`）+ 独立 `FlutterLocalNotificationsScheduler`（channel/isAndroid 注入），用例内组级 `plugin.`/`scheduler.` 前缀零命中；行为断言语义零变化；顺序对调（doomed 先跑）31 测全绿机器实证——commit `3d2b8b1`（merge `61c9ca3`，验收 5/5）
+  - F-103：❌ 复核关闭（实测全仓 188 文件/223 检查 format 差异为存量 formatter 版本漂移，上批基线 `3943bf8` 同失败、hunk 一一对应；无行为风险；用户拍板归一不立项）——复核关闭表留档一行
+- **门禁链**：全量 **2000 测**全绿（基线 2000，01/02 增强既有用例不净增）/ analyze 0（No issues found）/ 期末四轴 **0 阻断**（固定点 5aeffe7；F-103 复核关闭，候选区清零无新落债）。
+- **过程遥测**：子智能体 4（Grilling 1 + plan-tickets 1 + Implement 1×2 票串行 + 合并主会话）+ 主会话直做（03 文档收尾）；无重开/冲突/回退；01 票突变实验（临时移除 `await previous`）由 Implement 在分支内完成并恢复；全量测试 1 次绿（1 分 07 秒）。
+- **技术债闭环**：3 条全处置（F-101/F-102 ✅ 已修、F-103 ❌ 复核关闭）；候选区清零，无新落债。
+- **知识库召回轨迹**：预检 persona（Conver System）+ 精读 5 条（《Falsify测试要钉住缺陷所在层》《补锁测试先枚举分支矩阵》《并发测试确定性：脚本式fake按位置消费必然不稳定》《技术债票面修复建议须实证复核》《工单验收标准避免行号与grep计数》）；开发期 kb-search 未触发。
+- **编排教训**：① 技术债票面建议本身须实证复核——本批 A 方案修正对象不存在、B 方案不钉锁，均被 git 实证/microtask 推演否定，B′ 双 gate 为唯一零生产改动方案（与知识库《技术债票面修复建议须实证复核》合流复证）；② 「钉缺陷层」经验直接指导裁决：反序用例原不钉锁机制（gate 巧合串行化掩盖），中间态断言钉住等待依赖本身，最终断言钉结果语义——分层钉力明确。
+- **预设接续**：候选区清零（F-101~103 全处置）；残留清理 `.worktrees/f91f97-1` 空壳仍待进程释放后手动删；权限弹窗真机补验、阶段 3 人机恋深化仍开放（可选）；交付后复核（约一周后三问）可选。
+
 ## 技术债消费批次 techdebt-f98f100（2026-09-17 — handoff-techdebt-f91f97-done-2026-09-17 交接指令，/project-kickoff 全自动档）
 
 - **范围**：消费候选区 3 条（F-98 并发交错反序测试缺口 / F-99 initialize 返回值契约缝隙 / F-100 告警 seam 用例共享实例时序敏感）；3 工单并批 1 波串行 lane（三票共享 notification_service_test.dart，串行为唯一安全形态；02 票改动核心模块 → 标准档机制）。先搜开源三分：自建（零新依赖，插件契约已本地实证）。
