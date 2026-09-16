@@ -678,7 +678,12 @@ void main() {
       expect(lost, 0, reason: '正常装配路径零告警');
 
       // 可补救路径：懒初始化后装配重挂成功 → 零告警。
-      final recoverable = build(isAndroid: true);
+      // 每分支独立 _FakePlugin（F-100）：断言语义不依赖分支执行顺序。
+      final recoverablePlugin = _FakePlugin();
+      final recoverable = FlutterLocalNotificationsScheduler(
+        channel: recoverablePlugin,
+        isAndroid: () => true,
+      );
       final recoverableLost = <String>[];
       expect(await recoverable.schedule(buildPlan()), isTrue);
       expect(
@@ -689,12 +694,17 @@ void main() {
         isTrue,
       );
       expect(recoverableLost, isEmpty, reason: '可补救路径（重挂成功）零告警');
-      expect(plugin.registeredCallback, isNotNull);
+      expect(recoverablePlugin.initializeCalls, 2, reason: '懒初始化 1 次 + 重挂 1 次');
+      expect(recoverablePlugin.registeredCallback, isNotNull);
 
       // 不可补救路径：重挂失败（插件 initialize 异常）→ seam 触发 ≥1 次。
-      final doomed = build(isAndroid: true);
+      final doomedPlugin = _FakePlugin();
+      final doomed = FlutterLocalNotificationsScheduler(
+        channel: doomedPlugin,
+        isAndroid: () => true,
+      );
       expect(await doomed.schedule(buildPlan()), isTrue, reason: '懒初始化（无回调）成功');
-      plugin.initializeShouldFail = true; // 重挂失败注入
+      doomedPlugin.initializeShouldFail = true; // 重挂失败注入（仅本分支实例）
       var doomedLost = 0;
       expect(
         await doomed.initialize(
@@ -704,12 +714,12 @@ void main() {
         isFalse,
         reason: '重挂失败按调用失败返回 false',
       );
+      expect(doomedPlugin.initializeCalls, 2, reason: '懒初始化 1 次 + 重挂 1 次');
       expect(
         doomedLost,
         greaterThanOrEqualTo(1),
         reason: '不可补救路径告警 ≥1 次，经可注入 seam 上达调用方',
       );
-      plugin.initializeShouldFail = false;
     });
 
     test(
