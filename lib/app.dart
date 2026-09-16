@@ -282,10 +282,15 @@ Future<void> restoreProactiveSchedules({
   }
 }
 
-/// 启动路径主动通知初始化（PS2-08 验收 4 + F-84 热态接线）：scheduler 初始化
-/// （幂等，**首次调用即透传热态回调**——`_initialized` 守卫后再次调用直接
-/// return，回调只能随首调注册）+ SR-08 排程恢复；任一失败 debugPrint 降级，
-/// 不阻断 App 启动。恢复路径不接失败回调（SR-08 保持静默）。
+/// 启动路径主动通知初始化（PS2-08 验收 4 + F-84 热态接线 + F-92 告警接线）：
+/// scheduler 初始化（幂等；首次调用即透传热态回调，晚到装配经重挂生效）
+/// + SR-08 排程恢复；任一失败 debugPrint 降级，不阻断 App 启动。恢复路径
+/// 不接失败回调（SR-08 保持静默）。
+///
+/// F-92：热态回调丢失告警 seam 在此接线消费——不可补救路径（重挂失败）经
+/// [FlutterLocalNotificationsScheduler.initialize] 的 onHotCallbackLost
+/// 上达装配方并 debugPrint 记录（不得静默）；reason 为失败摘要，不含
+/// payload 内容（SR-12）。
 Future<void> _startProactiveNotifications(
   FlutterLocalNotificationsScheduler scheduler,
   CompanionRepository companion, {
@@ -294,6 +299,8 @@ Future<void> _startProactiveNotifications(
   try {
     await scheduler.initialize(
       onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      onHotCallbackLost: (reason) =>
+          debugPrint('主动通知热态回调丢失（不可补救）: $reason'),
     );
     await restoreProactiveSchedules(
       companion: companion,

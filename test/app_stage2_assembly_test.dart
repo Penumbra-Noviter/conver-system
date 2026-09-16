@@ -116,6 +116,9 @@ class _RecordingChannel implements FlutterLocalNotificationsChannel {
   /// initialize 调用次数（幂等守卫断言：装配只应触发一次初始化）。
   int initializeCalls = 0;
 
+  /// 重挂失败注入（F-92 告警 seam 装配面验证）。
+  bool initializeShouldFail = false;
+
   @override
   Future<bool?> initialize({
     required InitializationSettings settings,
@@ -123,6 +126,9 @@ class _RecordingChannel implements FlutterLocalNotificationsChannel {
   }) async {
     initializeCalls++;
     registeredCallback = onDidReceiveNotificationResponse;
+    if (initializeShouldFail) {
+      throw Exception('init boom');
+    }
     return true;
   }
 
@@ -813,6 +819,71 @@ void main() {
       final controller = context.read<ChatController>();
       expect(controller.activeConversationId, seed.conversationId);
       expect(controller.highlightMessageIds, contains(seed.messageId));
+    });
+
+    testWidgets('装配晚到重挂：scheduler 已被无回调初始化 → 装配重挂回调并端到端触发（F-92 验收8）',
+        (tester) async {
+      final channel = _RecordingChannel();
+      final scheduler = FlutterLocalNotificationsScheduler(
+        channel: channel,
+        isAndroid: () => true,
+      );
+      // 先模拟 schedule 懒初始化（无回调）完成——装配晚到窗口。
+      expect(await scheduler.initialize(), isTrue);
+      expect(channel.initializeCalls, 1);
+      expect(channel.registeredCallback, isNull);
+
+      final seed = await seedConversationWithMessage();
+      await tester.pumpWidget(ConverApp(database: db, scheduler: scheduler));
+      await tester.pump();
+      await tester.pump();
+
+      expect(channel.initializeCalls, 2, reason: '装配晚到触发一次重挂');
+      expect(channel.registeredCallback, isNotNull,
+          reason: '重挂语义：装配回调最终注册生效（F-92 修复前为 null）');
+      final context = tester.element(find.byType(Scaffold).first);
+      context.read<ShellNavigation>().select(ShellTab.characters);
+      channel.registeredCallback!(NotificationResponse(
+        payload: ProactiveDeepLink.encode(
+          conversationId: seed.conversationId,
+          messageId: seed.messageId,
+        ),
+        notificationResponseType: NotificationResponseType.selectedNotification,
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      expect(context.read<ShellNavigation>().current, ShellTab.chat,
+          reason: '重挂后的回调闭包仍走深链消费（导航 + 归属校验）');
+      expect(context.read<ChatController>().activeConversationId,
+          seed.conversationId);
+    });
+
+    testWidgets('装配接线消费告警 seam：重挂失败不阻断启动且重挂尝试上达（F-92 验收3/8）',
+        (tester) async {
+      final channel = _RecordingChannel();
+      final scheduler = FlutterLocalNotificationsScheduler(
+        channel: channel,
+        isAndroid: () => true,
+      );
+
+      // 懒初始化（无回调）成功；随后装配带回调 → 重挂失败。seam 触发语义
+      // （正常/可补救 0 次、不可补救 ≥1 次）由 notification_service_test
+      // 的注入 seam 断言覆盖；此处锚定装配面：重挂尝试确实发生且不阻断
+      // 启动（装配方已把带回调的 initialize 打在 scheduler 上）。
+      expect(await scheduler.initialize(), isTrue);
+      channel.initializeShouldFail = true;
+      await tester.pumpWidget(ConverApp(database: db, scheduler: scheduler));
+      await tester.pump();
+      await tester.pump();
+
+      expect(channel.initializeCalls, 2,
+          reason: '装配晚到触发重挂尝试（装配方接线 consume 告警 seam 路径）');
+      expect(tester.takeException(), isNull, reason: '重挂失败不阻断启动');
+      // 注：插件 22.3.1 的 initialize 会在平台调用前覆盖赋值回调，故重挂
+      // 失败时插件侧回调槽可能已被写入——服务侧 `_hotCallbackRegistered`
+      // 保持 false（保守），下次晚到带回调仍会再尝试重挂。此细节以 service
+      // 层 seam 测试锁定，装配面只锚重挂尝试与启动不阻断。
     });
   });
 
