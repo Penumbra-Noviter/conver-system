@@ -678,9 +678,17 @@ void main() {
 
     test('告警 seam（F-92 验收3）：正常/可补救路径 0 次，不可补救路径 ≥1 次', () async {
       // 正常装配路径：首次 initialize 即带回调 → 零告警。
+      // 独立 _FakePlugin + 独立 scheduler（F-102）：与 recoverable/doomed
+      // 分支同构，用例内不再经组级 scheduler/plugin，断言语义不依赖分支
+      // 执行顺序。
+      final normalPlugin = _FakePlugin();
+      final normal = FlutterLocalNotificationsScheduler(
+        channel: normalPlugin,
+        isAndroid: () => true,
+      );
       var lost = 0;
       expect(
-        await scheduler.initialize(
+        await normal.initialize(
           onDidReceiveNotificationResponse: (r) {},
           onHotCallbackLost: (reason) => lost++,
         ),
