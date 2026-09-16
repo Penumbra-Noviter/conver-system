@@ -59,11 +59,12 @@ class _RecordingScheduler implements ProactiveNotificationScheduler {
   final List<int> scheduledIds = [];
 
   @override
-  Future<void> schedule(ProactivePlan plan) async {
+  Future<bool> schedule(ProactivePlan plan) async {
     if (throwOnSchedule) {
       throw StateError('schedule boom');
     }
     scheduledIds.add(plan.id);
+    return true;
   }
 }
 

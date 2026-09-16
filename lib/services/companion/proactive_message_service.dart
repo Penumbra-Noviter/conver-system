@@ -126,8 +126,11 @@ typedef ProactivePlanner = Future<ProactivePlanDecision?> Function({
 /// 通知排程 seam（接口声明于本票，PS2-06 实现平台薄层）— 为已落库计划注册
 /// 一次 OS 本地通知（判定⑦ inexact 模式细节归实现方）。
 abstract interface class ProactiveNotificationScheduler {
-  /// 排程 [plan] 的本地通知；失败时抛错（由服务降级 debugPrint + 返回 0）。
-  Future<void> schedule(ProactivePlan plan);
+  /// 排程 [plan] 的本地通知；**false = 失败不抛**（P3 站内兜底信号，对齐
+  /// PS2-06 `FlutterLocalNotificationsScheduler` 实现——平台/权限/初始化
+  /// 异常由实现内部消化为 false）。调用方依据返回值决定是否展示站内失败
+  /// 提示；本 seam 不向上抛。
+  Future<bool> schedule(ProactivePlan plan);
 }
 
 /// 解析 LLM 输出的 JSON 对象（SR-01 三级容错，对齐 [parseReflectionFacts]

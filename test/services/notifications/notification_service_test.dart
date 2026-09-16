@@ -24,6 +24,13 @@ class _FakePlugin implements FlutterLocalNotificationsChannel {
   bool scheduleShouldFail = false;
   bool cancelShouldFail = false;
 
+  /// 最近一次 initialize 注册的热态回调（F-84：可被触发断言透传）。
+  DidReceiveNotificationResponseCallback? registeredCallback;
+
+  int permissionCalls = 0;
+  bool? permissionResult = true;
+  bool permissionShouldFail = false;
+
   int? lastZonedId;
   String? lastTitle;
   String? lastBody;
@@ -34,12 +41,25 @@ class _FakePlugin implements FlutterLocalNotificationsChannel {
   int? lastCancelId;
 
   @override
-  Future<bool?> initialize({required InitializationSettings settings}) async {
+  Future<bool?> initialize({
+    required InitializationSettings settings,
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+  }) async {
     initializeCalls++;
+    registeredCallback = onDidReceiveNotificationResponse;
     if (initializeShouldFail) {
       throw Exception('init boom');
     }
     return true;
+  }
+
+  @override
+  Future<bool?> requestNotificationsPermission() async {
+    permissionCalls++;
+    if (permissionShouldFail) {
+      throw Exception('permission boom');
+    }
+    return permissionResult;
   }
 
   @override
@@ -317,6 +337,70 @@ void main() {
       expect(await scheduler.initialize(), isFalse);
       final ok = await scheduler.schedule(buildPlan());
       expect(ok, isFalse);
+    });
+
+    test('initialize 透传 onDidReceiveNotificationResponse 至 channel（回调注册且可触发）', () async {
+      NotificationResponse? received;
+      void callback(NotificationResponse response) {
+        received = response;
+      }
+
+      await scheduler.initialize(onDidReceiveNotificationResponse: callback);
+
+      expect(plugin.registeredCallback, same(callback));
+      plugin.registeredCallback!(
+        const NotificationResponse(
+          notificationResponseType:
+              NotificationResponseType.selectedNotification,
+          payload: 'conver://proactive?conversationId=101&messageId=202',
+          id: 7,
+        ),
+      );
+      expect(received?.payload,
+          'conver://proactive?conversationId=101&messageId=202');
+      expect(received?.id, 7);
+    });
+
+    test('initialize 幂等：再次调用不重注册、不丢失首次回调', () async {
+      void first(NotificationResponse response) {}
+      void second(NotificationResponse response) {}
+
+      expect(
+        await scheduler.initialize(onDidReceiveNotificationResponse: first),
+        isTrue,
+      );
+      expect(plugin.initializeCalls, 1);
+      expect(plugin.registeredCallback, same(first));
+
+      expect(
+        await scheduler.initialize(onDidReceiveNotificationResponse: second),
+        isTrue,
+      );
+      expect(plugin.initializeCalls, 1, reason: '幂等：_initialized 后不重复初始化');
+      expect(plugin.registeredCallback, same(first),
+          reason: '首次注册的回调不被二次调用覆盖');
+    });
+
+    test('requestNotificationsPermission：Android 真路径经 channel 转发（true/false 透传）', () async {
+      plugin.permissionResult = true;
+      expect(await scheduler.requestNotificationsPermission(), isTrue);
+      expect(plugin.permissionCalls, 1);
+
+      plugin.permissionResult = false;
+      expect(await scheduler.requestNotificationsPermission(), isFalse);
+      expect(plugin.permissionCalls, 2);
+    });
+
+    test('requestNotificationsPermission：非 Android → null 且不调 channel', () async {
+      final nonAndroid = build(isAndroid: false);
+      expect(await nonAndroid.requestNotificationsPermission(), isNull);
+      expect(plugin.permissionCalls, 0);
+    });
+
+    test('requestNotificationsPermission：通道异常 → null 不抛（SR-12 摘要日志）', () async {
+      plugin.permissionShouldFail = true;
+      expect(await scheduler.requestNotificationsPermission(), isNull);
+      expect(plugin.permissionCalls, 1);
     });
 
     test('cancel(planId) → true 且映射到通知 id；异常 → false 不抛', () async {

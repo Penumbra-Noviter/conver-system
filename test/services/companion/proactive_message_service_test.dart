@@ -26,8 +26,9 @@ class _FakeScheduler implements ProactiveNotificationScheduler {
   final void Function(ProactivePlan plan) _onCall;
 
   @override
-  Future<void> schedule(ProactivePlan plan) async {
+  Future<bool> schedule(ProactivePlan plan) async {
     _onCall(plan);
+    return true;
   }
 }
 

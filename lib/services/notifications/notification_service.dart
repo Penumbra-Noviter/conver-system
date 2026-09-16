@@ -96,8 +96,13 @@ class ProactiveDeepLink {
 /// 对齐「平台薄层经 seam 隔离」约定。签名与插件 22.3.1 对应方法同形
 /// （裁剪至本票用到的参数）。
 abstract interface class FlutterLocalNotificationsChannel {
-  /// 初始化（Android 通道创建等）；返回 true 表示成功。
-  Future<bool?> initialize({required InitializationSettings settings});
+  /// 初始化（Android 通道创建等）；返回 true 表示成功。热态通知点按回调
+  /// [onDidReceiveNotificationResponse] 同形透传插件（F-84：App 存活时
+  /// 点按消费深链的前提）。
+  Future<bool?> initialize({
+    required InitializationSettings settings,
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+  });
 
   /// 按 TZDateTime 排程一次通知（inexact 模式由调用方指定）。
   Future<void> zonedSchedule({
@@ -112,6 +117,12 @@ abstract interface class FlutterLocalNotificationsChannel {
 
   /// 取消指定 id 的通知。
   Future<void> cancel({required int id, String? tag});
+
+  /// 请求 Android 13+ 运行时通知权限（POST_NOTIFICATIONS，API 33+）。
+  ///
+  /// 返回权限状态：true = 已授予；false = 被拒；null = 平台实现缺失
+  /// （非 Android / 测试环境）。平台异常由调用方（scheduler）消化。
+  Future<bool?> requestNotificationsPermission();
 }
 
 /// 真插件单例的生产适配（插件 22.3.1 无公开构造，经 factory 取单例）。
@@ -121,8 +132,14 @@ class _PluginAdapter implements FlutterLocalNotificationsChannel {
   final FlutterLocalNotificationsPlugin _plugin;
 
   @override
-  Future<bool?> initialize({required InitializationSettings settings}) =>
-      _plugin.initialize(settings: settings);
+  Future<bool?> initialize({
+    required InitializationSettings settings,
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+  }) =>
+      _plugin.initialize(
+        settings: settings,
+        onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      );
 
   @override
   Future<void> zonedSchedule({
@@ -147,6 +164,17 @@ class _PluginAdapter implements FlutterLocalNotificationsChannel {
   @override
   Future<void> cancel({required int id, String? tag}) =>
       _plugin.cancel(id: id, tag: tag);
+
+  @override
+  Future<bool?> requestNotificationsPermission() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) {
+      return null;
+    }
+    return android.requestNotificationsPermission();
+  }
 }
 
 /// 通知排程平台实现（PS2-05 `ProactiveNotificationScheduler` 接口落地）。
@@ -185,9 +213,14 @@ class FlutterLocalNotificationsScheduler
 
   /// 初始化通知通道与 timezone（单例幂等：重复调用不重复初始化）。
   ///
-  /// 成功 true；平台通道缺失/初始化异常 → false 不抛（SR-12 摘要日志）。
+  /// [onDidReceiveNotificationResponse] 为热态通知点按回调（F-84）：首次
+  /// 调用时透传注册；`_initialized` 已 true 时直接返回 true，不重注册——
+  /// 装配必须首次调用即带回调（幂等守卫在 `_initialized` 之前）。成功
+  /// true；平台通道缺失/初始化异常 → false 不抛（SR-12 摘要日志）。
   /// PS2-08 装配时显式调用一次；[schedule] 内部亦会按需懒初始化。
-  Future<bool> initialize() async {
+  Future<bool> initialize({
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+  }) async {
     if (_initialized) {
       return true;
     }
@@ -197,7 +230,10 @@ class FlutterLocalNotificationsScheduler
       const settings = InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       );
-      await _channel.initialize(settings: settings);
+      await _channel.initialize(
+        settings: settings,
+        onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      );
       _initialized = true;
       return true;
     } catch (e) {
@@ -258,6 +294,26 @@ class FlutterLocalNotificationsScheduler
     } catch (e) {
       debugPrint('proactive notify schedule failed: $e');
       return false;
+    }
+  }
+
+  /// 请求 Android 13+ 运行时通知权限（POST_NOTIFICATIONS，API 33+）。
+  ///
+  /// 仅 Android 生效：非 Android → null（iOS 延后注记）；平台实现缺失
+  /// （resolvePlatformSpecificImplementation 为 null）→ 透传 null；通道
+  /// 异常 → debugPrint 摘要 + null 不抛（SR-12）。返回 true = 已授予 /
+  /// false = 被拒 / null = 不可用或未触发。
+  Future<bool?> requestNotificationsPermission() async {
+    if (!_isAndroid()) {
+      debugPrint(
+          'proactive notify permission skipped: iOS pending (macOS path)');
+      return null;
+    }
+    try {
+      return await _channel.requestNotificationsPermission();
+    } catch (e) {
+      debugPrint('proactive notify permission failed: $e');
+      return null;
     }
   }
 
