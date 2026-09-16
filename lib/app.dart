@@ -257,7 +257,8 @@ Future<void> handleProactiveDeepLink({
 /// - pending 且 scheduledAt ≤ [now] → 置 expired（不排不发送）；
 /// - pending 且未过期 → [scheduler].schedule 重建一次；
 /// - sent/expired/dropped 不在 scheduled 列表 → 天然不重排（零触碰）。
-/// 单计划排程抛错 → 降级 log 跳过，其余计划继续恢复，不整体上抛。
+/// 单计划排程抛错或置 expired 抛错 → 降级 log 跳过，其余计划继续恢复，
+/// 不整体上抛（SR-08：抛错计划保持原状态 scheduled，不重排不置位）。
 Future<void> restoreProactiveSchedules({
   required CompanionRepository companion,
   required ProactiveNotificationScheduler scheduler,
@@ -266,7 +267,11 @@ Future<void> restoreProactiveSchedules({
   final pending = await companion.listPlansByStatus(ProactivePlanStatus.scheduled);
   for (final plan in pending) {
     if (!plan.scheduledAt.isAfter(now)) {
-      await companion.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
+      try {
+        await companion.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
+      } catch (e) {
+        debugPrint('启动排程恢复置 expired 失败（计划 ${plan.id} 保持 scheduled）: $e');
+      }
       continue;
     }
     try {
