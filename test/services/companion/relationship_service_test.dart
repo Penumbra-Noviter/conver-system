@@ -144,6 +144,82 @@ void main() {
       }
     });
 
+    test('F-96 构造校验：intimateMax 越界 100 → 构造失败（assert，debug）', () {
+      // 修复前构造不校验 → 正常返回 → 本测试红；修复后 assert 抛错 → 绿。
+      expect(
+        () => RelationshipThresholds(intimateMax: 100),
+        throwsAssertionError,
+      );
+    });
+
+    test('F-96 构造校验：max 非严格递增 → 构造失败（递减与平档）', () {
+      // 递减倒挂：familiarMax 90 > intimateMax 89。
+      expect(
+        () => RelationshipThresholds(familiarMax: 90, intimateMax: 89),
+        throwsAssertionError,
+      );
+      // 平档：familiarMax == intimateMax，非严格递增。
+      expect(
+        () => RelationshipThresholds(familiarMax: 89, intimateMax: 89),
+        throwsAssertionError,
+      );
+    });
+
+    test('F-96 构造校验：合法边界通过（相邻 gap 恰 1 + intimateMax 恰 99）', () {
+      // 全链 gap 恰 1：stranger 10 < acquainted 11 < familiar 12 < intimate 13。
+      const tightMax = RelationshipThresholds(
+        strangerMax: 10,
+        acquaintedMax: 11,
+        familiarMax: 12,
+        intimateMax: 13,
+      );
+      expect(tightMax.floorForStage(RelationshipStage.intimate), 13);
+      expect(tightMax.floorForStage(RelationshipStage.soulmate), 14);
+
+      // intimateMax 恰 99：soulmate 下限 100 恰达 affinityMax 上界。
+      const boundaryMax = RelationshipThresholds(
+        strangerMax: 19,
+        acquaintedMax: 39,
+        familiarMax: 59,
+        intimateMax: 99,
+      );
+      expect(boundaryMax.floorForStage(RelationshipStage.soulmate), 100);
+      expect(
+        boundaryMax.stageForAffinity(
+          boundaryMax.floorForStage(RelationshipStage.soulmate),
+        ),
+        RelationshipStage.soulmate,
+      );
+    });
+
+    test('F-96 全档合法空间：floor 全档 ≤ affinityMax 且相邻 gap ≥ 1（默认 + 自定义）', () {
+      const customMax = RelationshipThresholds(
+        strangerMax: 9,
+        acquaintedMax: 19,
+        familiarMax: 29,
+        intimateMax: 39,
+      );
+      for (final t in [const RelationshipThresholds(), customMax]) {
+        final floors = [
+          for (final stage in RelationshipStage.values) t.floorForStage(stage),
+        ];
+        for (var i = 0; i < floors.length; i++) {
+          expect(
+            floors[i],
+            lessThanOrEqualTo(RelationshipThresholds.affinityMax),
+          );
+          if (i > 0) {
+            expect(floors[i] - floors[i - 1], greaterThanOrEqualTo(1));
+          }
+        }
+        // soulmate 下限显式锚：intimateMax + 1 ≤ affinityMax。
+        expect(
+          t.floorForStage(RelationshipStage.soulmate),
+          lessThanOrEqualTo(RelationshipThresholds.affinityMax),
+        );
+      }
+    });
+
     test('stageForAffinity 五档边界（含端点语义）', () {
       const t = RelationshipThresholds();
       expect(t.stageForAffinity(0), RelationshipStage.stranger);
