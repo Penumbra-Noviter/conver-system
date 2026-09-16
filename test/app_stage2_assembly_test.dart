@@ -82,6 +82,31 @@ class _RecordingScheduler implements ProactiveNotificationScheduler {
   }
 }
 
+/// `updatePlanStatus` 选择性抛错 fake（F-83）：仅 [failPlanIds] 中的计划置
+/// 状态抛错注入，其余透传真实实现——验证 restore 置 expired 分支 per-plan
+/// 降级（抛错计划保持 scheduled，其余计划继续恢复）。
+class _ThrowingUpdatePlanRepo extends CompanionRepository {
+  _ThrowingUpdatePlanRepo(
+    super.db, {
+    required this.failPlanIds,
+  });
+
+  /// 置状态即抛错的计划 id 集合。
+  final Set<int> failPlanIds;
+
+  @override
+  Future<void> updatePlanStatus(
+    int planId,
+    ProactivePlanStatus status, {
+    DateTime? sentAt,
+  }) async {
+    if (failPlanIds.contains(planId)) {
+      throw StateError('updatePlanStatus boom for plan $planId');
+    }
+    await super.updatePlanStatus(planId, status, sentAt: sentAt);
+  }
+}
+
 /// 插件调用面 fake（F-84 热态回调装配接线）：记录 initialize 收到的
 /// [DidReceiveNotificationResponseCallback]，断言首次调用即带回调。
 class _RecordingChannel implements FlutterLocalNotificationsChannel {
@@ -565,6 +590,49 @@ void main() {
       expect(scheduler.scheduledIds, [plan.id], reason: '恢复仍尝试重建排程');
       final scheduled = await companionRepo.listPlansByStatus(ProactivePlanStatus.scheduled);
       expect(scheduled.map((p) => p.id), contains(plan.id), reason: 'false 不置位、状态保持 scheduled');
+    });
+
+    test('单计划置 expired 抛错：保持 scheduled 不排程，其余计划仍恢复，不整体抛', () async {
+      final seed = await seedConversationWithMessage();
+      final throwing = await seedPlan(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+        status: ProactivePlanStatus.scheduled,
+        scheduledAt: DateTime(2026, 9, 10, 10), // 已过期；置 expired 抛错
+      );
+      final okExpired = await seedPlan(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+        status: ProactivePlanStatus.scheduled,
+        scheduledAt: DateTime(2026, 9, 15, 12), // == now，已过期；正常置 expired
+      );
+      final future = await seedPlan(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+        status: ProactivePlanStatus.scheduled,
+        scheduledAt: DateTime(2026, 9, 20, 10), // 未过期；重建排程
+      );
+      final scheduler = _RecordingScheduler();
+      final companion = _ThrowingUpdatePlanRepo(
+        db,
+        failPlanIds: {throwing.id},
+      );
+
+      // 不抛未处理异常（per-plan 降级，对齐 schedule 分支语义）。
+      await restoreProactiveSchedules(
+        companion: companion,
+        scheduler: scheduler,
+        now: DateTime(2026, 9, 15, 12),
+      );
+
+      // 抛错计划 scheduledAt 最早、最先处理——未捕获时后续计划无法执行。
+      expect(scheduler.scheduledIds, [future.id], reason: '仅未过期计划重建一次');
+      final scheduled = await companion.listPlansByStatus(ProactivePlanStatus.scheduled);
+      expect(scheduled.map((p) => p.id), contains(throwing.id),
+          reason: '置 expired 抛错计划保持 scheduled，不重排不置位');
+      final expired = await companion.listPlansByStatus(ProactivePlanStatus.expired);
+      expect(expired.map((p) => p.id), [okExpired.id],
+          reason: '其余过期计划仍置 expired，恢复不中断');
     });
   });
 
