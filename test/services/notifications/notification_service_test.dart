@@ -513,6 +513,64 @@ void main() {
       );
     });
 
+    test('并发反序交错：无回调先挂起、带回调后进入 → 锁串行重挂且零告警（F-98）', () async {
+      final logs = captureDebugPrint();
+
+      NotificationResponse? received;
+      void hotCallback(NotificationResponse response) {
+        received = response;
+      }
+
+      // 反序交错：无回调懒初始化先进入（挂起在 gate，首次置位未完成），
+      // 带回调装配后进入（_initSerial 使其 await previous 挂起）。
+      final gate = Completer<void>();
+      plugin.initializeGate = gate;
+      final lazy = scheduler.initialize();
+      final wired = scheduler.initialize(
+        onDidReceiveNotificationResponse: hotCallback,
+      );
+      // 释放闸门：A（无回调）先完成首次初始化（_initialized=true、不触碰
+      // 回调槽），B（带回调）随后恢复走已初始化重挂分支——锁串行等值结论：
+      // 首次 + 重挂各一次通道调用、晚到回调生效、可补救路径零告警。
+      gate.complete();
+      final results = await Future.wait([lazy, wired]);
+
+      expect(
+        results[1],
+        isTrue,
+        reason: '带回调后到方走可补救重挂路径，按成功返回（无悬挂）',
+      );
+      expect(
+        plugin.initializeCalls,
+        2,
+        reason: '反序交错锁串行：无回调首次 + 带回调重挂各一次（若早退拦截则为 1）',
+      );
+      expect(
+        plugin.registeredCallback,
+        same(hotCallback),
+        reason: '重挂语义：晚到装配回调成为最终生效回调',
+      );
+      expect(
+        logs.any((line) => line?.contains('热态回调丢失') ?? false),
+        isFalse,
+        reason: '可补救路径（重挂成功）零告警',
+      );
+
+      // 重挂后的回调可触发消费（payload 经 registeredCallback 到达消费侧）。
+      plugin.registeredCallback!(
+        const NotificationResponse(
+          notificationResponseType:
+              NotificationResponseType.selectedNotification,
+          payload: 'conver://proactive?conversationId=101&messageId=202',
+          id: 7,
+        ),
+      );
+      expect(
+        received?.payload,
+        'conver://proactive?conversationId=101&messageId=202',
+      );
+    });
+
     test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告警（F-92/F-97）', () async {
       final logs = captureDebugPrint();
 
