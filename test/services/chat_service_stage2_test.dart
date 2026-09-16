@@ -51,8 +51,9 @@ class _RecordingScheduler implements ProactiveNotificationScheduler {
   int calls = 0;
 
   @override
-  Future<void> schedule(ProactivePlan plan) async {
+  Future<bool> schedule(ProactivePlan plan) async {
     calls++;
+    return true;
   }
 }
 
