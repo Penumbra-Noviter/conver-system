@@ -517,7 +517,7 @@ void main() {
       );
     });
 
-    test('并发反序交错：无回调先挂起、带回调后进入 → 锁串行重挂且零告警（F-98）', () async {
+    test('并发反序交错：无回调先挂起、带回调后进入 → 双 gate 两阶段锁串行（F-101）', () async {
       final logs = captureDebugPrint();
 
       NotificationResponse? received;
@@ -525,25 +525,40 @@ void main() {
         received = response;
       }
 
-      // 反序交错：无回调懒初始化先进入（挂起在 gate，首次置位未完成），
-      // 带回调装配后进入（_initSerial 使其 await previous 挂起）。
-      final gate = Completer<void>();
-      plugin.initializeGate = gate;
+      // 票面纠偏（F-101）：A 方案修正对象「若锁失效并行交错则为 1」从未
+      // 存在于仓库（git log -S 零命中，76f7da8 原文为「若早退拦截则为 1」）；
+      // 单 gate 下 gate FIFO 巧合串行化掩盖锁失效（fake 记录调用顺序不钉锁），
+      // 双 gate 中间态断言 initializeCalls == 1 为唯一零生产改动钉锁方案。
+      // 反序交错：无回调懒初始化先进入（挂起在 gate1，首次置位未完成），
+      // 带回调装配后进入——锁生效时 wired 挂在服务层 await previous，
+      // 尚未到达 fake；锁失效（移除 await previous）时 wired 直走首次路径
+      // 直达 fake，中间态为 2，断言红。
+      final gate1 = Completer<void>();
+      final gate2 = Completer<void>();
+      plugin.initializeGate = gate1;
       final lazy = scheduler.initialize();
+      plugin.initializeGate = gate2;
       final wired = scheduler.initialize(
         onDidReceiveNotificationResponse: hotCallback,
       );
-      // 释放闸门：A（无回调）先完成首次初始化（_initialized=true、不触碰
-      // 回调槽），B（带回调）随后恢复走已初始化重挂分支——锁串行等值结论：
-      // 首次 + 重挂各一次通道调用、晚到回调生效、可补救路径零告警。
-      gate.complete();
+      // 先放行 gate2（wired 的重挂通道调用）：此刻 wired 仍挂 await previous
+      // 未达 fake，中间态断言 initializeCalls == 1 钉住等待依赖。
+      gate2.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        plugin.initializeCalls,
+        1,
+        reason: '中间态 initializeCalls == 1：wired 挂在 await previous（锁失效则直达为 2，本断言红）',
+      );
+      // 放行 gate1：lazy 首次完成 → wired 恢复走已初始化重挂（gate2 已放行）。
+      gate1.complete();
       final results = await Future.wait([lazy, wired]);
 
       expect(results[1], isTrue, reason: '带回调后到方走可补救重挂路径，按成功返回（无悬挂）');
       expect(
         plugin.initializeCalls,
         2,
-        reason: '反序交错锁串行：无回调首次 + 带回调重挂各一次（若早退拦截则为 1）',
+        reason: '反序交错锁串行：无回调首次 + 带回调重挂各一次（若早退拦截则为 1；锁失效由中间态断言钉住）',
       );
       expect(
         plugin.registeredCallback,
@@ -663,9 +678,17 @@ void main() {
 
     test('告警 seam（F-92 验收3）：正常/可补救路径 0 次，不可补救路径 ≥1 次', () async {
       // 正常装配路径：首次 initialize 即带回调 → 零告警。
+      // 独立 _FakePlugin + 独立 scheduler（F-102）：与 recoverable/doomed
+      // 分支同构，用例内不再经组级 scheduler/plugin，断言语义不依赖分支
+      // 执行顺序。
+      final normalPlugin = _FakePlugin();
+      final normal = FlutterLocalNotificationsScheduler(
+        channel: normalPlugin,
+        isAndroid: () => true,
+      );
       var lost = 0;
       expect(
-        await scheduler.initialize(
+        await normal.initialize(
           onDidReceiveNotificationResponse: (r) {},
           onHotCallbackLost: (reason) => lost++,
         ),
