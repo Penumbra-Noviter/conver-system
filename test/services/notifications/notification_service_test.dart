@@ -162,6 +162,41 @@ void main() {
       );
     });
 
+    test('正值域：非十进制无符号正整数形态 → null（参数化，两字段均覆盖）', () {
+      const invalidIds = <String>[
+        '0x10', // int.tryParse 会解析为 16（0x 前缀），形态校验必须拒绝
+        '+7', // int.tryParse 会解析为 7（+ 前缀）
+        '-7', // 负数（int.tryParse 解析为 -7，仅 >0 检查会漏）
+        '0', // 零（仅 >0 检查会漏）
+        ' 7', // 前导空白
+        '7 ', // 尾随空白
+        '%207', // 前导空白（百分号编码形态）
+        '7%20', // 尾随空白（百分号编码形态）
+        '007', // 前导 0
+      ];
+      for (final id in invalidIds) {
+        expect(
+          ProactiveDeepLink.tryParse(
+              'conver://proactive?conversationId=$id&messageId=2'),
+          isNull,
+          reason: 'conversationId=$id 应拒绝',
+        );
+        expect(
+          ProactiveDeepLink.tryParse(
+              'conver://proactive?conversationId=1&messageId=$id'),
+          isNull,
+          reason: 'messageId=$id 应拒绝',
+        );
+      }
+    });
+
+    test('正值域：多位数合法正整数 → 解析成功（十进制无符号正整数契约）', () {
+      final parsed = ProactiveDeepLink.tryParse(
+          'conver://proactive?conversationId=987654321&messageId=123456789');
+      expect(parsed?.conversationId, 987654321);
+      expect(parsed?.messageId, 123456789);
+    });
+
     test('溢出整数 → null（int.tryParse 语义）', () {
       expect(
         ProactiveDeepLink.tryParse(
