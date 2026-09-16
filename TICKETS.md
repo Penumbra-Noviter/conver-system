@@ -31,6 +31,19 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-84/F-85/F-88 + F-83 并批（2026-09-16 收口）
+
+> 来源：handoff-mobile-smoke-verified-2026-09-16 交接指令（project-kickoff 全自动档）。6 工单 4 波：W1 01‖02 / W2 03 / W3 04‖05 / W4 06。交付：F-88 送达收口放宽（scheduled∪expired）/ F-85 深链 id 正值域 / F-84 通知 seam 扩展（热态回调透传 + 权限请求 + schedule bool 契约）/ F-84 热态深链接线 + SnackBar 兜底 / F-84 权限请求挂点 / F-83 restore per-plan 降级。门禁：全量 **1974 测**绿（基线 1948 → +26）/ analyze 0 / 期末四轴 **0 阻断**（F-89/F-90 落债 Speculative）。详见 DEV_LOG〈技术债消费批次 F-84/F-85/F-88 + F-83〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F-84-01 | F-88 送达收口放宽（scheduled ∪ expired） | 2026-09-16 | 38059d8（merge 4b51bd1） |
+| F-85-02 | F-85 深链 id 正值域校验 | 2026-09-16 | 262f693（merge 17ec1de） |
+| F-84-03 | F-84 通知 seam 扩展（热态回调 + 权限 + bool 契约） | 2026-09-16 | 3d1f3c1（merge 87b4088） |
+| F-84-04 | F-84 热态深链接线 + SnackBar 兜底（app.dart 装配） | 2026-09-16 | 83c53be（merge dccb603） |
+| F-84-05 | F-84 权限请求（开关启用时） | 2026-09-16 | 5b52e73（merge 8802d7f） |
+| F-83-06 | F-83 restore expired 分支 per-plan 降级 | 2026-09-16 | d56a7c1（merge 971d453） |
+
 ### 人机恋阶段 2 批次 — 主动消息循环 / 关系状态机 / 内心独白（2026-09-15 收口）
 
 > 来源：handoff-ai-companion-mobile-stage1.5 + /project-kickoff 全自动档（Grilling 共识 P1~P6 全按推荐 + threat-model SR-01~15 + 3 份 ADR）。10 工单 6 波 DAG（W1 01 / W2 02 / W3 03‖04‖05 / W4 06‖07‖09 / W5 08 / W6 10）+ 波末增量审核 W1~W6 六轮 + 期末四轴（固定点 4dddada）。门禁：全量测试绿 / analyze 0（期末清理基线 5 warning）/ 威胁模型 P0 全落地（SR-01~10）。详见 DEV_LOG〈人机恋阶段 2 批次〉。

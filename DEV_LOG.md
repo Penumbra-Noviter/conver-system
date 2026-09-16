@@ -6,6 +6,21 @@
 
 ---
 
+## 技术债消费批次 F-84/F-85/F-88 + F-83（2026-09-16 — handoff 交接指令，/project-kickoff 全自动档）
+
+- **范围**：伴侣域通知收尾——F-84（热态点按/权限/排程失败兜底）+ F-88（冷启动收口竞态）+ F-85（深链 id 正值域）+ F-83（restore expired per-plan 降级）；F-86/F-87 复核关闭。6 工单 4 波：W1 01‖02 / W2 03 / W3 04‖05 / W4 06，独立 worktree + 分支 + 每波 merge。
+- **交付**：
+  - F-88：`markDeliveredByMessageId` 白名单放宽 `{scheduled}→{scheduled, expired}`（点按即送达证据；sent 幂等/dropped 排除保持）——commit `38059d8`
+  - F-85：`ProactiveDeepLink.tryParse` 正则 `^[1-9][0-9]*$` 形态校验 + int.tryParse 溢出兜底——commit `262f693`
+  - F-84 三件套：通知 seam 扩展（channel.initialize 透传 `onDidReceiveNotificationResponse` + `requestNotificationsPermission` + `schedule` 契约 `Future<bool>`）commit `3d1f3c1`；热态深链接线（`consumeProactiveNotificationResponse` 复用 `handleProactiveDeepLink` 共享路径 + rootScaffoldMessengerKey + `showScheduleFailedNotice`「通知排程失败」+ 恢复路径静默）commit `83c53be`；权限请求挂点（开关 true 落库成功后恰一次；拒权/异常不回滚）commit `5b52e73`
+  - F-83：restore 置 expired 分支 per-plan try/catch（SR-08 语义完整）commit `d56a7c1`
+- **门禁链**：全量 **1974 测**绿（基线 1948 → +26）/ analyze 0 / 期末四轴 **0 阻断**（固定点 8b72c53；Falsify 实证 tryParse 换行形态/双入口 +5 幂等门控，3 实证通过 + 1 Recommended 落债）。
+- **过程遥测**：子智能体 11（Grilling 1 + plan-tickets 1 + Implement 6 + code-review 1 + 备用）；空返回 0；回退 0；重开 0；合并冲突 0（4 波 ort 全自动无冲突）；全量测试 1 次绿。
+- **技术债闭环**：F-84/F-85/F-88/F-83 ✅ 已修（处置记录 2026-09-16 节）；F-86/F-87 ❌ 复核关闭（git grep 现状复核成立）；期末四轴非阻断落债 F-89（ConverApp.scheduler 测试 seam 未申报，Speculative）/ F-90（schedule 懒初始化先于装配时热态回调可丢失，Speculative）；候选区剩 F-78~82 + F-89/90。
+- **知识库召回轨迹**：预检 persona（Conver System）无新增经验精读；开发期 kb-search 未触发（无报错/无新测试场景缺口）。
+- **预设接续**：候选区 F-78~82（Worth exploring ×5，F-79/F-83 同源）+ F-89/90 待下轮 kickoff 预检消费；权限系统弹窗真机路径留真机验证。
+- **真机冒烟补充验证（同批完成）**：API 35 模拟器 + debug APK（HEAD 971d453，adb 注入 SQLite + 通知栏驱动）——① 热态点按 PASS：通知排程真通道投递（channel=proactive_messages importance=4 vis=PRIVATE，「主动消息/角色发来一条消息」固定摘要）+ App 存活点按 → `onDidReceiveNotificationResponse` → `consumeProactiveNotificationResponse` → `handleProactiveDeepLink` 共享路径 → 计划 sent 落库 + affinity 50→55；② 冷启动点按 F-88 实证 PASS：注入 scheduledAt=now+5s 计划 → 投递（id=7）→ HOME + `am kill`（保留通知，force-stop 会清通知）→ 通知栏点按 → App 冷启动 → `restoreProactiveSchedules` 置 expired → `consumeProactiveLaunchDeepLink` → **expired 计划收口 sent + sentAt 落库**（1789532759 > scheduledAt 1789532710）——F-88 放宽语义真机关环；③ 权限：POST_NOTIFICATIONS granted=true + 真通道投递实证。复验期间 2 次注入脚本撞 same messageId（`getPlanByMessageId` single 查询炸 Too many elements）修正后通过——纯测试数据问题非产品缺陷。证据 `.scratch/techdebt-f84-f88/smoke-20260916.md`。
+
 ## 真机冒烟补验批次 — 主动消息通知真通道 + 深链（2026-09-16 — 用户「真机/模拟器冒烟补验」指令）
 
 - **范围**：handoff 阶段 2 收官后的实机验证（阶段 2 交付时纯单测兜底，未做模拟器/真机冒烟；交接建议「通知平台薄层真通道验证是下一批次首选实机验证项」）。API 35 模拟器（medium_phone）+ debug APK 全链路：安装/启动/引导 → 数据库注入（角色/会话/6 消息/关系 familiar-50/2 记忆/1 独白/scheduled 计划，now+90s）→ 排程恢复 → 通知真通道 → 冷/热态点按深链 → 送达收口。

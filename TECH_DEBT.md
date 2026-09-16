@@ -48,16 +48,23 @@
 | F-80 | conversation_settings_page.dart 既有 `_setReflection` 失败回滚分支无测试（阶段 1.5 遗留：既有 widget 测试只覆盖保存按钮失败；2026-09-15 PS2-09 实现核对时发现，本批未越界处置） | PS2-09 遗留建议（companion-stage2） | Worth exploring | 📝 待立项 | 设置 UI |
 | F-81 | 活跃天数/活跃窗口口径双实现：RelationshipService 导出 `activeDays`/`isRecentlyActive`（判定⑨），ProactiveMessageService 自建 `_lastActiveAt`（同源口径）——因 RelationshipService 构造按单回合评估上下文（required stage/affinity/characterId）、proactive 服务跨角色长驻无法持有实例，seam 不可达未改复用；建议上提共享（ConversationRepository 或独立 ActivityService）交主会话决策 | W3 增量审核 F6（companion-stage2）+ PS2-05 W3 返修核对 | Worth exploring | 📝 待立项 | 伴侣域 |
 | F-82 | `confirmStageUpgrade` 确认时刻重算 affinity 可能产生 stage/affinity 档位不一致中间态（proposal 用活跃态 gain=2 计算 intimacy 61，冷却后 confirm 重算 gain=1 → 写 intimate/59 属 familiar 档；下回合 evaluate 自愈）——建议补「确认时刻活跃状态漂移」复现测试 + 评估确认结果 clamp 到 targetStage 档下限（防落回旧档） | W4 增量审核 F1（companion-stage2） | Worth exploring | 📝 待立项 | 伴侣域 |
-| F-83 | `restoreProactiveSchedules` 置 expired 分支（app.dart:126 `updatePlanStatus`）无 per-plan try/catch——仅 schedule 抛错有降级，updatePlanStatus/listPlansByStatus 抛错会中断整循环，SR-08「单计划抛错不阻断其他计划」语义不完整；测试只盖 schedule 抛错 | W5 增量审核 F1（companion-stage2） | Worth exploring | 📝 待立项 | 伴侣域 |
-| F-84 | 通知热态点按零处理：无 `onDidReceiveNotificationResponse` 回调（深链仅冷启动 consumeProactiveLaunchDeepLink；App 前台/后台存活时点通知不触发送达收口与导航）+ Android 13+ 运行时权限 `requestNotificationsPermission` 未在装配请求 + scheduler 返回 false 站内兜底 SnackBar 缺失 | 期末四轴 S1/S2/A1（companion-stage2，与 C1 同源收尾） | Strong | 📝 待立项 | 伴侣域 |
-| F-85 | `ProactiveDeepLink.tryParse` 的 `int.tryParse` 接受 `0x10`/`+7`/空白与负数 id（SR-02「严格类型化」措辞比实现严格）——归属校验兜底无安全影响，建议正值域校验固化 | 期末四轴 W4-F2/W5-F5（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
-| F-86 | `extractThought` 1MiB 截断可切破 UTF-16 代理对（实测孤立 surrogate）——截断边界按代理对补齐 | 期末四轴 W3-F5（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
-| F-87 | 关系域读契约双依赖点：ChatService 注入 companionRepository 使关系域「读走仓储、写走服务」（W4 过度工程观察，成本低不阻断） | 期末四轴 W4 观察（companion-stage2） | Speculative | 📝 待立项 | 伴侣域 |
-| F-88 | 冷启动点按送达收口竞态：启动副作用顺序 `_startProactiveNotifications→restoreProactiveSchedules`（app.dart:391 先，pending 且 scheduledAt≤now → expired）先于 `consumeProactiveLaunchDeepLink`（app.dart:458 后，`markDeliveredByMessageId` 仅 scheduled 生效）——通知点按必在 scheduledAt 之后（inexact 弹窗延迟常态），冷启动点按被 expired 吞噬 → sent/sentAt 不落、节流计数/冷却口径不更新、关系 +5 不触发；C1 单测直接调用无 restore 竞态覆盖 | 真机冒烟补验（2026-09-16，companion-stage2 续） | Strong | 📝 待立项 | 伴侣域 |
+| F-89 | `ConverApp.scheduler` 构造注入参数（app.dart:309）为 04 测试 seam（生产恒 null，Leverage=0）——必要但 spec 未申报；类型为具体类非接口，未来 fake 面受限 | 期末四轴 Spec（techdebt-f84-f88） | Speculative | 📝 待立项 | 伴侣域 |
+| F-90 | `FlutterLocalNotificationsScheduler.schedule` 懒初始化路径调 `initialize()` 时不带回调（notification_service.dart:267）——若先于装配哑 Provider 的带回调 initialize 完成，`_initialized=true` 后热态回调永久丢失（无日志/无断言）；装配时序现实中占优、风险窗口极小，但契约无防御、「先 schedule 后装配」形态无测试 | 期末四轴 Falsify（techdebt-f84-f88） | Speculative | 📝 待立项 | 伴侣域 |
 
 ## 技术债处置记录
 
-### 2026-09-14 — 技术债消费批次（F-75/F-76/F-77，候选区清零）
+### 2026-09-16 — 技术债消费批次（F-84/F-85/F-88 消费 + F-83 并批 + F-86/F-87 复核关闭）
+
+> 来源：handoff-mobile-smoke-verified-2026-09-16 交接指令（project-kickoff 全自动档）。6 工单 4 波交付：F-88（工单 01 `38059d8`）/ F-85（工单 02 `262f693`）/ F-84 通知 seam（工单 03 `3d1f3c1`）/ F-84 热态接线+SnackBar（工单 04 `83c53be`）/ F-84 权限请求（工单 05 `5b52e73`）/ F-83（工单 06 `d56a7c1`）。门禁：全量 **1974 测**绿（基线 1948 → +26）/ analyze 0 / 期末四轴 **0 阻断**。F-86/F-87 复核关闭（Speculative，git grep 现状复核：extractThought 1MiB 截断仍在 thought_service.dart:32；companionRepository 注入仍在 chat_service.dart:278/315）。期末四轴非阻断落债 F-89/F-90。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-84 | ✅ 已修 | 三件套全落地：① 热态点按——`FlutterLocalNotificationsChannel.initialize` 透传 `onDidReceiveNotificationResponse` + `consumeProactiveNotificationResponse` 复用 `handleProactiveDeepLink` 共享路径（归属校验→markDelivered→+5→导航高亮，异常全降级）；② Android 13+ 权限——`FlutterLocalNotificationsScheduler.requestNotificationsPermission()` 在主动消息开关启用时请求（落库成功后恰一次，拒权/异常不回滚开关）；③ schedule false 站内兜底——`ProactiveNotificationScheduler.schedule` 契约修正 `Future<bool>`（false=失败不抛，对齐 P3）+ `ProactiveMessageService.onScheduleFailed` → `showScheduleFailedNotice`（rootScaffoldMessengerKey + 「通知排程失败」，SR-12 摘要）；启动恢复路径静默 |
+| F-88 | ✅ 已修 | `markDeliveredByMessageId` 状态白名单 `{scheduled}` → `{scheduled, expired}`（点按即送达证据；sent 幂等/dropped 排除保持；冷启动点按已过期通知送达收口不再被吞） |
+| F-85 | ✅ 已修 | `ProactiveDeepLink.tryParse` 参数化正值域校验（`^[1-9][0-9]*$` 形态 + int.tryParse 溢出兜底；0x10/+7/空白/负数/0/前导 0 → null） |
+| F-83 | ✅ 已修 | `restoreProactiveSchedules` 置 expired 分支 per-plan try/catch（单计划 updatePlanStatus 抛错 → debugPrint 降级、保持 scheduled，其余计划继续恢复；SR-08 语义完整） |
+| F-86 | ❌ 复核关闭 | extractThought 1MiB 截断可切破代理对——Thought 域极端截断、最坏单字符渲染缺陷、内心独白默认关闭；成本趋零但本批聚焦通知域，关闭留档（thought_service.dart:32 `_maxThoughtLength = 1 << 20` 现状成立） |
+| F-87 | ❌ 复核关闭 | 关系域读契约双依赖点（ChatService 注入 companionRepository）——W4 架构观察、成本低不阻断、无失效证据，关闭留档（chat_service.dart:278/315 注入现状成立） |
 
 > 来源：用户「消费技术债」指令。F-76 消费（✅ 已修），F-75/F-77 复核关闭（❌）。**候选区清零**（0 项开放）。
 
