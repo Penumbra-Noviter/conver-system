@@ -420,7 +420,6 @@ class ConverApp extends StatelessWidget {
             return ProactiveMessageService(
               companionRepository: context.read<CompanionRepository>(),
               settingsRepository: settings,
-              conversationRepository: context.read<ConversationRepository>(),
               messageRepository: context.read<MessageRepository>(),
               planner: ({
                 required int characterId,

@@ -34,7 +34,6 @@ import '../../data/database/app_database.dart' show ProactivePlan;
 import '../../data/database/tables.dart'
     show ProactivePlanStatus, Role;
 import '../../data/repositories/companion_repository.dart';
-import '../../data/repositories/conversation_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
@@ -282,7 +281,6 @@ class ProactiveMessageService {
   ProactiveMessageService({
     required CompanionRepository companionRepository,
     required SettingsRepository settingsRepository,
-    required ConversationRepository conversationRepository,
     required MessageRepository messageRepository,
     required ProactivePlanner planner,
     required ProactiveNotificationScheduler scheduler,
