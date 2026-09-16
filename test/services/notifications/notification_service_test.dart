@@ -12,6 +12,7 @@ import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/services/companion/proactive_message_service.dart'
     show ProactiveNotificationScheduler;
 import 'package:conver_system_mobile/services/notifications/notification_service.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -379,6 +380,46 @@ void main() {
       expect(plugin.initializeCalls, 1, reason: '幂等：_initialized 后不重复初始化');
       expect(plugin.registeredCallback, same(first),
           reason: '首次注册的回调不被二次调用覆盖');
+    });
+
+    test('先 schedule 后装配：懒初始化后带回调 initialize 不重注册且告警热态回调丢失（F-90）', () async {
+      final logs = <String?>[];
+      final originalDebugPrint = debugPrint;
+      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
+      addTearDown(() => debugPrint = originalDebugPrint);
+
+      void hotCallback(NotificationResponse response) {}
+
+      // 先经 schedule 触发懒初始化：首次 initialize 无回调（异常装配顺序）。
+      expect(await scheduler.schedule(buildPlan()), isTrue);
+      expect(plugin.initializeCalls, 1, reason: 'schedule 懒初始化恰好一次');
+      expect(plugin.registeredCallback, isNull,
+          reason: '懒初始化路径不含热态回调');
+
+      // 后装配带回调 initialize：幂等早退，不重注册、不二次透传回调。
+      expect(
+        await scheduler.initialize(
+          onDidReceiveNotificationResponse: hotCallback,
+        ),
+        isTrue,
+      );
+      expect(plugin.initializeCalls, 1,
+          reason: '幂等：_initialized 后不重复初始化、不二次透传回调');
+      expect(plugin.registeredCallback, isNull,
+          reason: '插件不支持后补回调，懒初始化后的装配回调无法注册');
+
+      // 告警路径存在：热态回调丢失语义 + 根因（schedule 懒初始化先于装配）。
+      expect(
+        logs.any((line) => line?.contains('热态回调丢失') ?? false),
+        isTrue,
+        reason: '已初始化但首次未注册回调的早退路径应输出热态回调丢失告警',
+      );
+      expect(
+        logs.any((line) =>
+            line?.contains('schedule lazy init ran before wiring') ?? false),
+        isTrue,
+        reason: '告警应指明根因：schedule 懒初始化先于装配',
+      );
     });
 
     test('requestNotificationsPermission：Android 真路径经 channel 转发（true/false 透传）', () async {
