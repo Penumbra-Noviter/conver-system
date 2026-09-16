@@ -26,6 +26,10 @@ class _FakePlugin implements FlutterLocalNotificationsChannel {
   int initializeCalls = 0;
   bool initializeShouldFail = false;
 
+  /// initialize 返回值注入开关（F-99 契约面）：缺省 true 保持既有用例
+  /// 零改动；false/null 模拟插件通道初始化失败（服务按 false/null 处理）。
+  bool? initializeResult = true;
+
   /// 可选挂起闸门（波末审核并发用例）：非 null 时 initialize 等待该
   /// Completer 完成后再返回，用于构造「带回调装配」与「懒初始化」交错。
   Completer<void>? initializeGate;
@@ -62,7 +66,7 @@ class _FakePlugin implements FlutterLocalNotificationsChannel {
     if (initializeShouldFail) {
       throw Exception('init boom');
     }
-    return true;
+    return initializeResult;
   }
 
   @override
@@ -706,6 +710,102 @@ void main() {
         reason: '不可补救路径告警 ≥1 次，经可注入 seam 上达调用方',
       );
       plugin.initializeShouldFail = false;
+    });
+
+    test(
+      'initialize 首次返回 false/null → false 不抛 + 失败不缓存可重试（F-99 验收2/3）',
+      () async {
+        final logs = captureDebugPrint();
+
+        plugin.initializeResult = null;
+        expect(await scheduler.initialize(), isFalse, reason: 'null 按失败处理');
+
+        plugin.initializeResult = false;
+        expect(await scheduler.initialize(), isFalse, reason: 'false 按失败处理');
+        expect(
+          logs.any((line) => line?.contains('proactive notify init failed') ?? false),
+          isTrue,
+          reason: 'SR-12 摘要日志：失败路径带 proactive notify 前缀',
+        );
+
+        // 失败不缓存成功态：_initialized 未置位 → 恢复 true 后再次初始化
+        // 递增调用（若误置 _initialized 则早退为 1，行为断言区分两策略）。
+        plugin.initializeResult = true;
+        expect(await scheduler.initialize(), isTrue);
+        expect(
+          plugin.initializeCalls,
+          3,
+          reason: '失败不缓存：再调递增（误置 _initialized 则早退不递增）',
+        );
+      },
+    );
+
+    test(
+      '重挂返回 false → false + onHotCallbackLost ≥1 + 保留旧回调值（F-99 验收4）',
+      () async {
+        final logs = captureDebugPrint();
+
+        void first(NotificationResponse response) {}
+        void second(NotificationResponse response) {}
+
+        expect(
+          await scheduler.initialize(onDidReceiveNotificationResponse: first),
+          isTrue,
+        );
+        expect(plugin.initializeCalls, 1);
+        expect(plugin.registeredCallback, same(first));
+
+        // 重挂注入 false：与异常路径同处理——seam 上报 + 返回 false，
+        // 服务不更新 _registeredCallback 旧值（C2 残余 edge）。
+        final reasons = <String>[];
+        plugin.initializeResult = false;
+        expect(
+          await scheduler.initialize(
+            onDidReceiveNotificationResponse: second,
+            onHotCallbackLost: (reason) => reasons.add(reason),
+          ),
+          isFalse,
+          reason: '重挂路径返回值 false → initialize 返回 false',
+        );
+        expect(
+          reasons.length,
+          greaterThanOrEqualTo(1),
+          reason: '重挂失败经 onHotCallbackLost seam 上达（与异常路径同处理）',
+        );
+        expect(reasons.first, startsWith('hot callback re-register failed'));
+        expect(
+          logs.any((line) => line?.contains('proactive notify hot callback re-register failed') ?? false),
+          isTrue,
+          reason: 'SR-12 摘要日志：失败路径带 proactive notify 前缀',
+        );
+        expect(
+          plugin.registeredCallback,
+          same(second),
+          reason: '插件契约实证：返回值 false 前回调槽已覆盖为新回调（C2 前提）',
+        );
+
+        // 服务保留旧值的行为断言：second 与 first 不 identical → 再调仍
+        // 触发重挂（initializeCalls 递增）；若服务误更新旧值则幂等不递增。
+        plugin.initializeResult = true;
+        expect(
+          await scheduler.initialize(
+            onDidReceiveNotificationResponse: second,
+            onHotCallbackLost: (reason) => reasons.add(reason),
+          ),
+          isTrue,
+        );
+        expect(
+          plugin.initializeCalls,
+          3,
+          reason: '服务保留旧值：晚到同一 second 可再重挂（C2 可补救）',
+        );
+      },
+    );
+
+    test('schedule 联动：初始化返回 false → schedule 降级 false（F-99 验收6）', () async {
+      plugin.initializeResult = false;
+      final ok = await scheduler.schedule(buildPlan());
+      expect(ok, isFalse, reason: '初始化失败后 schedule 返回站内兜底信号');
     });
 
     test(
