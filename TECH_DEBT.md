@@ -55,7 +55,7 @@
 
 ### 2026-09-17 — 技术债消费批次（F-78/F-79/F-80/F-81/F-82/F-90 消费 + F-89 复核关闭）
 
-> 来源：handoff-techdebt-f84f88-done-2026-09-16 交接指令（project-kickoff 全自动档）。5 工单 2 波：FDBT-01（`bbeba33` merge `4686036`）/ FDBT-02（`ae4ea54` merge `9a7f55c`）/ FDBT-03（`6deba8e` merge `8cfe865` + 波末修复 `ec72f17`）/ FDBT-04（`25fbbc6` merge `d1c3cbf` + `ec72f17`）/ FDBT-05（`fbc12ed` merge 收口）。门禁：全量 **1987 测**绿（基线 1974 → +13）/ analyze 0 / 期末四轴 **0 阻断**。非阻断落债 F-91~97（候选区 7 条开放）。
+> 来源：handoff-techdebt-f84f88-done-2026-09-16 交接指令（project-kickoff 全自动档）。5 工单 2 波：FDBT-01（`bbefa33` merge `4686036`）/ FDBT-02（`ae4ea54` merge `9a7f55c`）/ FDBT-03（`6deba8e` merge `8cfe865` + 波末修复 `ec72f17`）/ FDBT-04（`25fbbc6` merge `d1c3cbf` + `ec72f17`）/ FDBT-05（`fbc12ed` merge 收口）。门禁：全量 **1987 测**绿（基线 1974 → +13）/ analyze 0 / 期末四轴 **0 阻断**。非阻断落债 F-91~97（候选区 7 条开放）。
 
 | 编号 | 处置 | 详情 |
 |------|------|------|

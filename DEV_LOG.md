@@ -10,7 +10,7 @@
 
 - **范围**：消费候选区 7 条中的 6 条——F-78（迁移注释纠偏）+ F-79（中断残留自愈用例）+ F-80（后台反思写失败回滚测试）+ F-81（活跃时间查询单源）+ F-82（confirm 档位下限 clamp）+ F-90（通知热态回调契约防御）；F-89 复核关闭。5 工单 2 波：W1 FDBT-01‖02‖03‖04（并行 worktree）+ W2 FDBT-05（Blocked by FDBT-04 串行）。
 - **交付**：
-  - FDBT-01：app_database.dart 注释改述 drift onUpgrade 默认非事务 + 幂等自愈三机制（IF NOT EXISTS / user_version 后写 / 失败锁库）；stage2_migration_test 新增「中断残留重开自愈」用例（残留态前置断言 → 重开重跑 → 表/索引/版本/旧行四要素）——commit `bbeba33`
+  - FDBT-01：app_database.dart 注释改述 drift onUpgrade 默认非事务 + 幂等自愈三机制（IF NOT EXISTS / user_version 后写 / 失败锁库）；stage2_migration_test 新增「中断残留重开自愈」用例（残留态前置断言 → 重开重跑 → 表/索引/版本/旧行四要素）——commit `bbefa33`
   - FDBT-02：conversation_settings_page_stage2_test 补「后台反思写失败 → 回滚 + SnackBar『保存失败』」（复用 `_SaveFailRepo`；生产零 diff）——commit `ae4ea54`
   - FDBT-03：notification_service `_hotCallbackRegistered` 追踪 + 早退告警「热态回调丢失」+ 契约注释（插件覆盖赋值实证纠偏）；测「先 schedule 后装配」不重注册 + 波末修复（并发 OR 置位 / 零告警断言 / 注释归因）——commit `6deba8e` + `ec72f17`
   - FDBT-04：`MessageRepository.latestMessageAt` 单源（join 单查询全局 max）；relationship/proactive 两服务改调；activeDays/_allMessagesFor 保留；乱序 fixture 消除顺序依赖 + 波末证伪增强（最旧消息移窗口外）——commit `25fbbc6` + `ec72f17`
