@@ -19,6 +19,11 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
+| FDBT-01 | 技术债消费 F-78+F-79：迁移注释纠偏 + 中断残留重开自愈用例 | 🔄 进行中 | app_database.dart 注释改述 drift onUpgrade 非事务 + 幂等自愈三机制；stage2_migration_test 新增「中断残留重开自愈」用例（表/索引/user_version/旧行四要素） |
+| FDBT-02 | 技术债消费 F-80：后台反思写失败回滚 UI 契约测试 | 🔄 进行中 | conversation_settings_page_stage2_test 新增「后台反思写失败 → 回滚 + 保存失败 SnackBar」用例；生产零 diff |
+| FDBT-03 | 技术债消费 F-90：通知热态回调装配顺序契约防御 | 🔄 进行中 | notification_service 加 _hotCallbackRegistered + 早退告警 + 契约注释；测「先 schedule 后装配」不重注册 + 告警可达 |
+| FDBT-04 | 技术债消费 F-81：活跃时间查询单源 latestMessageAt | 🔄 进行中 | MessageRepository.latestMessageAt + 两服务改调；保留 activeDays/_allMessagesFor；乱序 fixture 验收；零装配改动 |
+| FDBT-05 | 技术债消费 F-82：confirm 档位下限 clamp + 复现测试 | 📝 已录入（Blocked by FDBT-04） | 先红后绿复现（state 58/78 gain 漂移）+ RelationshipThresholds 档位下限 + confirm 写入 clamp + characters_view 注释同步 |
 
 
 ---
