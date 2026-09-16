@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'
-    show FlutterLocalNotificationsPlugin;
+    show DidReceiveNotificationResponseCallback, FlutterLocalNotificationsPlugin;
 import 'package:provider/provider.dart';
 
 import 'data/database/app_database.dart';
@@ -144,6 +144,53 @@ Future<void> consumeProactiveLaunchDeepLink({
   );
 }
 
+/// 全局 ScaffoldMessenger key（F-84 SnackBar 通道）：装配层单点绑定
+/// `MaterialApp.scaffoldMessengerKey`——provider create 的 context 位于
+/// MaterialApp 之上拿不到 ScaffoldMessenger，故用顶层 key 桥接。
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
+/// 通知排程失败站内提示（F-84 P3 站内兜底 + SR-12 摘要）：经
+/// [rootScaffoldMessengerKey] 展示固定文案「通知排程失败」，不携带计划内容
+/// 原文。messenger 未挂载（装配未完成/测试环境）→ debugPrint 降级不抛。
+void showScheduleFailedNotice() {
+  final messenger = rootScaffoldMessengerKey.currentState;
+  if (messenger == null) {
+    debugPrint('proactive schedule failed notice skipped: messenger not ready');
+    return;
+  }
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(const SnackBar(content: Text('通知排程失败')));
+}
+
+/// 热态通知点按深链消费（F-84 桥接，PS2-10 装配层接线）：与
+/// [consumeProactiveLaunchDeepLink] 同构，payload 来源为
+/// `NotificationResponse.payload`（同步取值，非 Future 读取）。
+///
+/// payload null/空 → 静默（零导航）；非空 → [handleProactiveDeepLink]（归属
+/// 校验 → markDelivered → recordProactiveMessageOpened +5 → 导航高亮，异常
+/// 降级内建）。热态（App 存活）与冷启动（getNotificationAppLaunchDetails）
+/// 互斥，共享同一消费函数与装配组件（导航/仓储/两服务）。
+Future<void> consumeProactiveNotificationResponse({
+  required String? payload,
+  required ProactiveDeepLinkNavigator navigator,
+  required MessageRepository messageRepository,
+  ProactiveMessageService? proactiveMessageService,
+  RelationshipService? relationshipService,
+}) async {
+  if (payload == null || payload.isEmpty) {
+    return;
+  }
+  await handleProactiveDeepLink(
+    payload: payload,
+    navigator: navigator,
+    messageRepository: messageRepository,
+    proactiveMessageService: proactiveMessageService,
+    relationshipService: relationshipService,
+  );
+}
+
 /// 处理主动消息通知深链（PS2-08 验收 3 + SR-03 归属校验）。
 ///
 /// payload 解析成功且 messageId 属于 payload.conversationId 的对话（经
@@ -230,14 +277,19 @@ Future<void> restoreProactiveSchedules({
   }
 }
 
-/// 启动路径主动通知初始化（PS2-08 验收 4）：scheduler 初始化（幂等）+
-/// SR-08 排程恢复；任一失败 debugPrint 降级，不阻断 App 启动。
+/// 启动路径主动通知初始化（PS2-08 验收 4 + F-84 热态接线）：scheduler 初始化
+/// （幂等，**首次调用即透传热态回调**——`_initialized` 守卫后再次调用直接
+/// return，回调只能随首调注册）+ SR-08 排程恢复；任一失败 debugPrint 降级，
+/// 不阻断 App 启动。恢复路径不接失败回调（SR-08 保持静默）。
 Future<void> _startProactiveNotifications(
   FlutterLocalNotificationsScheduler scheduler,
-  CompanionRepository companion,
-) async {
+  CompanionRepository companion, {
+  DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+}) async {
   try {
-    await scheduler.initialize();
+    await scheduler.initialize(
+      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+    );
     await restoreProactiveSchedules(
       companion: companion,
       scheduler: scheduler,
@@ -249,11 +301,15 @@ Future<void> _startProactiveNotifications(
 }
 
 class ConverApp extends StatelessWidget {
-  const ConverApp({super.key, this.database});
+  const ConverApp({super.key, this.database, this.scheduler});
 
   /// 数据库注入点：缺省运行态真实库（惰性打开）；测试注入
   /// `AppDatabase(NativeDatabase.memory())` 以获得确定性行为。
   final AppDatabase? database;
+
+  /// 通知排程器注入点（F-84 装配接线测试 seam）：缺省生产实现（包真插件
+  /// 单例）；测试注入 fake channel 的 scheduler 断言热态回调注册。
+  final FlutterLocalNotificationsScheduler? scheduler;
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +406,7 @@ class ConverApp extends StatelessWidget {
           ),
         ),
         Provider<FlutterLocalNotificationsScheduler>(
-          create: (_) => FlutterLocalNotificationsScheduler(),
+          create: (_) => scheduler ?? FlutterLocalNotificationsScheduler(),
         ),
         Provider<ProactiveMessageService>(
           create: (context) {
@@ -382,22 +438,14 @@ class ConverApp extends StatelessWidget {
                 );
               },
               scheduler: context.read<FlutterLocalNotificationsScheduler>(),
+              // F-84 P3 站内兜底：排程失败 → 全局 SnackBar 摘要文案
+              // （SR-12：不含计划内容原文）。
+              onScheduleFailed: (_) => showScheduleFailedNotice(),
             );
           },
         ),
         ChangeNotifierProvider<StageUpgradeBroker>(
           create: (_) => StageUpgradeBroker(),
-        ),
-        Provider<Object?>(
-          lazy: false, // W6-F1：无消费者时默认 lazy 永不执行，启动副作用必须立即触发
-          create: (context) {
-            // 启动路径：通知初始化（幂等）+ SR-08 排程恢复；失败不阻断。
-            unawaited(_startProactiveNotifications(
-              context.read<FlutterLocalNotificationsScheduler>(),
-              context.read<CompanionRepository>(),
-            ));
-            return null;
-          },
         ),
         Provider<ChatService>(
           create: (context) => ChatService(
@@ -451,6 +499,34 @@ class ConverApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(create: (_) => ShellNavigation()),
+        // F-84 启动哑 Provider（lazy:false 立即执行）：通知初始化（幂等）+
+        // SR-08 排程恢复；热态回调闭包随**首次** initialize 注册（插件不支持
+        // 后补回调，`_initialized` 幂等守卫后再次调用直接 return）。回调复用
+        // 冷启动装配组件（AppDeepLinkNavigator + 两服务），依赖
+        // ShellNavigation/ChatController 已声明，故置于其后。失败不阻断。
+        Provider<Object?>(
+          lazy: false, // W6-F1：无消费者时默认 lazy 永不执行，启动副作用必须立即触发
+          create: (context) {
+            unawaited(_startProactiveNotifications(
+              context.read<FlutterLocalNotificationsScheduler>(),
+              context.read<CompanionRepository>(),
+              onDidReceiveNotificationResponse: (response) {
+                unawaited(consumeProactiveNotificationResponse(
+                  payload: response.payload,
+                  navigator: AppDeepLinkNavigator(
+                    navigation: context.read<ShellNavigation>(),
+                    chatController: context.read<ChatController>(),
+                  ),
+                  messageRepository: context.read<MessageRepository>(),
+                  proactiveMessageService:
+                      context.read<ProactiveMessageService>(),
+                  relationshipService: context.read<RelationshipService>(),
+                ));
+              },
+            ));
+            return null;
+          },
+        ),
         // PS2-10 冷启动深链接线：依赖 ShellNavigation + ChatController（均
         // 已声明），故独立哑 Provider 置于其后——取参 → 无 payload/失败
         // 静默；成功 → handleProactiveDeepLink（归属校验 + 导航高亮）。
@@ -571,6 +647,9 @@ class ConverApp extends StatelessWidget {
               theme: ConverTheme.light(),
               darkTheme: ConverTheme.dark(),
               themeMode: themeController.themeMode,
+              // F-84 SnackBar 通道：装配层单点绑定（provider create 的
+              // context 位于 MaterialApp 之上，经顶层 key 桥接）。
+              scaffoldMessengerKey: rootScaffoldMessengerKey,
               // 工单 05：home 由启动门决定——首启（标记缺失）展示指引页，
               // 已完成/读失败直接进主壳。
               home: const _StartupGate(),

@@ -21,14 +21,17 @@ import '../../helpers/fake_llm_provider.dart' show FakeLLMProvider;
 import '../../helpers/in_memory_secret_store.dart' show InMemorySecretStore;
 
 class _FakeScheduler implements ProactiveNotificationScheduler {
-  _FakeScheduler(this._onCall);
+  _FakeScheduler(this._onCall, {this.result = true});
 
   final void Function(ProactivePlan plan) _onCall;
+
+  /// schedule 返回值（false = 失败不抛，P3 站内兜底信号）。
+  final bool result;
 
   @override
   Future<bool> schedule(ProactivePlan plan) async {
     _onCall(plan);
-    return true;
+    return result;
   }
 }
 
@@ -528,18 +531,23 @@ void main() {
       };
     }
 
-    ProactiveMessageService buildService() {
+    ProactiveMessageService buildService({
+      void Function(ProactivePlan plan)? onScheduleFailed,
+      _FakeScheduler? scheduler,
+    }) {
       return ProactiveMessageService(
         companionRepository: companionRepo,
         settingsRepository: settingsRepo,
         conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         planner: fakePlanner(),
-        scheduler: _FakeScheduler((plan) {
-          schedulerCalls++;
-          scheduledPlans.add(plan);
-        }),
+        scheduler: scheduler ??
+            _FakeScheduler((plan) {
+              schedulerCalls++;
+              scheduledPlans.add(plan);
+            }),
         now: () => fixedNow,
+        onScheduleFailed: onScheduleFailed,
       );
     }
 
@@ -1168,6 +1176,67 @@ void main() {
       expect(plannerCalls, 1);
       expect(schedulerCalls, 1);
       expect(await db.select(db.proactivePlans).get(), hasLength(1));
+    });
+
+    test('schedule 返回 false → onScheduleFailed 触发且收到对应 plan，返回 0（P3 站内兜底信号）', () async {
+      final ids = await seedChain();
+      await enableProactive();
+      final failedPlans = <ProactivePlan>[];
+      final service = buildService(
+        onScheduleFailed: failedPlans.add,
+        scheduler: _FakeScheduler(
+          (plan) => scheduledPlans.add(plan),
+          result: false,
+        ),
+      );
+
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+
+      expect(result, 0);
+      expect(failedPlans, hasLength(1), reason: 'schedule false = 失败信号，必须触发回调');
+      final plans = await db.select(db.proactivePlans).get();
+      expect(failedPlans.single.id, plans.single.id, reason: '回调收到的是对应 plan');
+      expect(failedPlans.single.messageId, plans.single.messageId);
+      final messages = await messageRepo.getMessages(ids.conversationId);
+      expect(messages, hasLength(2), reason: '消息与计划已落库，仅通知排程失败');
+    });
+
+    test('schedule 返回 true → onScheduleFailed 不触发，返回 1', () async {
+      final ids = await seedChain();
+      await enableProactive();
+      var onFailed = 0;
+      final service = buildService(onScheduleFailed: (_) => onFailed++);
+
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+
+      expect(result, 1);
+      expect(onFailed, 0, reason: '成功路径不触发失败回调');
+      expect(schedulerCalls, 1);
+    });
+
+    test('onScheduleFailed 回调自身抛错 → 不向上抛，返回 0（降级不阻断主聊天）', () async {
+      final ids = await seedChain();
+      await enableProactive();
+      final service = buildService(
+        onScheduleFailed: (_) => throw StateError('notice boom'),
+        scheduler: _FakeScheduler(
+          (plan) => scheduledPlans.add(plan),
+          result: false,
+        ),
+      );
+
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+
+      expect(result, 0, reason: '回调异常被服务降级吞掉，planAfterTurn 不抛');
     });
   });
 

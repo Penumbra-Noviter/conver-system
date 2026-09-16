@@ -276,7 +276,9 @@ Future<ProactivePlanDecision?> planProactiveWithProvider({
 
 /// 主动消息服务 — 回合末异步规划编排。
 class ProactiveMessageService {
-  /// [now] 为时间戳来源注入点（测试确定性用），缺省 [DateTime.now]。
+  /// [now] 为时间戳来源注入点（测试确定性用），缺省 [DateTime.now]；
+  /// [onScheduleFailed] 为排程失败站内兜底回调（P3：schedule 返回 false 时
+  /// 触发，收到对应 plan；装配层经它展示 SnackBar，启动恢复路径不接）。
   ProactiveMessageService({
     required CompanionRepository companionRepository,
     required SettingsRepository settingsRepository,
@@ -285,13 +287,15 @@ class ProactiveMessageService {
     required ProactivePlanner planner,
     required ProactiveNotificationScheduler scheduler,
     DateTime Function()? now,
+    void Function(ProactivePlan plan)? onScheduleFailed,
   })  : _companion = companionRepository,
         _settings = settingsRepository,
         _conversations = conversationRepository,
         _messages = messageRepository,
         _planner = planner,
         _scheduler = scheduler,
-        _now = now ?? DateTime.now;
+        _now = now ?? DateTime.now,
+        _onScheduleFailed = onScheduleFailed;
 
   final CompanionRepository _companion;
   final SettingsRepository _settings;
@@ -300,6 +304,7 @@ class ProactiveMessageService {
   final ProactivePlanner _planner;
   final ProactiveNotificationScheduler _scheduler;
   final DateTime Function() _now;
+  final void Function(ProactivePlan plan)? _onScheduleFailed;
 
   /// 每角色在途规划链（并发 in-flight 串行化，SR-04）：同角色第二次并发
   /// 调用直接返回 0，不产生第二条计划。
@@ -401,7 +406,12 @@ class ProactiveMessageService {
         scheduledAt: now.add(Duration(minutes: decision.minutesFromNow)),
         messageId: message.id,
       );
-      await _scheduler.schedule(plan);
+      final scheduled = await _scheduler.schedule(plan);
+      if (!scheduled) {
+        // P3 站内兜底信号：排程失败不抛、不阻断回合收尾，仅通知装配层。
+        _onScheduleFailed?.call(plan);
+        return 0;
+      }
       return 1;
     } catch (e) {
       debugPrint('proactive plan degraded: $e');

@@ -15,11 +15,21 @@ import 'package:conver_system_mobile/services/companion/stage_upgrade_broker.dar
 import 'package:conver_system_mobile/services/companion/thought_service.dart';
 import 'package:conver_system_mobile/services/notifications/notification_service.dart';
 import 'package:conver_system_mobile/view_models/shell_navigation.dart';
+import 'package:conver_system_mobile/views/chat/chat_controller.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    show
+        AndroidScheduleMode,
+        DidReceiveNotificationResponseCallback,
+        InitializationSettings,
+        NotificationDetails,
+        NotificationResponse,
+        NotificationResponseType;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import 'helpers/chat_test_env.dart' show ChatTestEnv, FakeSettingsReader;
 import 'helpers/fake_llm_provider.dart';
@@ -51,11 +61,15 @@ class _RecordingNavigator implements ProactiveDeepLinkNavigator {
   }
 }
 
-/// 排程 fake：记录 schedule 调用、可配置抛错。
+/// 排程 fake：记录 schedule 调用、可配置抛错与返回值（false = 失败不抛）。
 class _RecordingScheduler implements ProactiveNotificationScheduler {
-  _RecordingScheduler({this.throwOnSchedule = false});
+  _RecordingScheduler({this.throwOnSchedule = false, this.result = true});
 
   final bool throwOnSchedule;
+
+  /// schedule 返回值（恢复路径静默测试用 false 断言不抛不出错）。
+  final bool result;
+
   final List<int> scheduledIds = [];
 
   @override
@@ -64,8 +78,45 @@ class _RecordingScheduler implements ProactiveNotificationScheduler {
       throw StateError('schedule boom');
     }
     scheduledIds.add(plan.id);
+    return result;
+  }
+}
+
+/// 插件调用面 fake（F-84 热态回调装配接线）：记录 initialize 收到的
+/// [DidReceiveNotificationResponseCallback]，断言首次调用即带回调。
+class _RecordingChannel implements FlutterLocalNotificationsChannel {
+  /// initialize 收到的热态回调（未注册为 null）。
+  DidReceiveNotificationResponseCallback? registeredCallback;
+
+  /// initialize 调用次数（幂等守卫断言：装配只应触发一次初始化）。
+  int initializeCalls = 0;
+
+  @override
+  Future<bool?> initialize({
+    required InitializationSettings settings,
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+  }) async {
+    initializeCalls++;
+    registeredCallback = onDidReceiveNotificationResponse;
     return true;
   }
+
+  @override
+  Future<void> zonedSchedule({
+    required int id,
+    String? title,
+    String? body,
+    required tz.TZDateTime scheduledDate,
+    required NotificationDetails notificationDetails,
+    required AndroidScheduleMode androidScheduleMode,
+    String? payload,
+  }) async {}
+
+  @override
+  Future<void> cancel({required int id, String? tag}) async {}
+
+  @override
+  Future<bool?> requestNotificationsPermission() async => true;
 }
 
 /// C1 送达收口 fake（implements 最小公开面）：记录 markDeliveredByMessageId
@@ -494,6 +545,27 @@ void main() {
       final scheduled = await companionRepo.listPlansByStatus(ProactivePlanStatus.scheduled);
       expect(scheduled.map((p) => p.id), containsAll([first.id, second.id]));
     });
+
+    test('schedule 返回 false → 恢复路径静默：不抛、计划保持 scheduled（不接失败回调）', () async {
+      final seed = await seedConversationWithMessage();
+      final plan = await seedPlan(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+        status: ProactivePlanStatus.scheduled,
+        scheduledAt: DateTime(2026, 9, 20, 10),
+      );
+      final scheduler = _RecordingScheduler(result: false);
+
+      await restoreProactiveSchedules(
+        companion: companionRepo,
+        scheduler: scheduler,
+        now: DateTime(2026, 9, 15, 12),
+      );
+
+      expect(scheduler.scheduledIds, [plan.id], reason: '恢复仍尝试重建排程');
+      final scheduled = await companionRepo.listPlansByStatus(ProactivePlanStatus.scheduled);
+      expect(scheduled.map((p) => p.id), contains(plan.id), reason: 'false 不置位、状态保持 scheduled');
+    });
   });
 
   group('深链生产接线（PS2-10 验收 8）', () {
@@ -576,6 +648,124 @@ void main() {
       expect(navigator.opened, hasLength(1));
       expect(navigator.opened.single.conversationId, seed.conversationId);
       expect(navigator.opened.single.highlightMessageId, seed.messageId);
+    });
+  });
+
+  group('consumeProactiveNotificationResponse（F-84 热态桥接）', () {
+    test('payload null / 空字符串 → 零导航（静默）', () async {
+      final voidN = _RecordingNavigator();
+      await consumeProactiveNotificationResponse(
+        payload: null,
+        navigator: voidN,
+        messageRepository: messageRepo,
+      );
+      expect(voidN.selectCalls, 0, reason: '无 payload 静默，不切 tab');
+
+      final emptyN = _RecordingNavigator();
+      await consumeProactiveNotificationResponse(
+        payload: '',
+        navigator: emptyN,
+        messageRepository: messageRepo,
+      );
+      expect(emptyN.selectCalls, 0, reason: '空 payload 静默');
+      expect(emptyN.opened, isEmpty);
+    });
+
+    test('非法 payload → 回落 select chat（与冷启动共享回落语义）', () async {
+      final navigator = _RecordingNavigator();
+      await consumeProactiveNotificationResponse(
+        payload: 'not-a-deeplink',
+        navigator: navigator,
+        messageRepository: messageRepo,
+      );
+      expect(navigator.selectCalls, 1);
+      expect(navigator.opened, isEmpty);
+    });
+
+    test('合法 payload → select chat + openConversation 高亮（handleProactiveDeepLink 契约）', () async {
+      final seed = await seedConversationWithMessage();
+      final payload = ProactiveDeepLink.encode(
+        conversationId: seed.conversationId,
+        messageId: seed.messageId,
+      );
+      final navigator = _RecordingNavigator();
+      await consumeProactiveNotificationResponse(
+        payload: payload,
+        navigator: navigator,
+        messageRepository: messageRepo,
+      );
+      expect(navigator.selectCalls, 1);
+      expect(navigator.opened, hasLength(1));
+      expect(navigator.opened.single.conversationId, seed.conversationId);
+      expect(navigator.opened.single.highlightMessageId, seed.messageId);
+    });
+  });
+
+  group('F-84 热态回调装配接线（SB: 启动哑 Provider → scheduler.initialize）', () {
+    testWidgets('注入 fake channel → 首次 initialize 即携带热态回调（幂等守卫后再传无效）', (tester) async {
+      final channel = _RecordingChannel();
+      final scheduler = FlutterLocalNotificationsScheduler(
+        channel: channel,
+        isAndroid: () => true,
+      );
+      await tester.pumpWidget(ConverApp(database: db, scheduler: scheduler));
+      await tester.pump();
+      await tester.pump();
+
+      expect(channel.initializeCalls, 1);
+      expect(channel.registeredCallback, isNotNull,
+          reason: '回调必须在首次 initialize 注册——幂等守卫使后续调用直接 return');
+    });
+
+    testWidgets('热态回调触发 → 归属通过后切聊天 tab 并打开会话高亮（装配端到端）', (tester) async {
+      final seed = await seedConversationWithMessage();
+      final channel = _RecordingChannel();
+      final scheduler = FlutterLocalNotificationsScheduler(
+        channel: channel,
+        isAndroid: () => true,
+      );
+      await tester.pumpWidget(ConverApp(database: db, scheduler: scheduler));
+      await tester.pump();
+      await tester.pump();
+
+      final context = tester.element(find.byType(Scaffold).first);
+      context.read<ShellNavigation>().select(ShellTab.characters);
+      channel.registeredCallback!(NotificationResponse(
+        payload: ProactiveDeepLink.encode(
+          conversationId: seed.conversationId,
+          messageId: seed.messageId,
+        ),
+        notificationResponseType: NotificationResponseType.selectedNotification,
+      ));
+      await tester.pump();
+      await tester.pump();
+
+      expect(context.read<ShellNavigation>().current, ShellTab.chat,
+          reason: '热态点按 → select chat');
+      final controller = context.read<ChatController>();
+      expect(controller.activeConversationId, seed.conversationId);
+      expect(controller.highlightMessageIds, contains(seed.messageId));
+    });
+  });
+
+  group('SnackBar 兜底（F-84 P3 + SR-12 摘要文案）', () {
+    testWidgets('触发 showScheduleFailedNotice → 站内出现「通知排程失败」', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          scaffoldMessengerKey: rootScaffoldMessengerKey,
+          home: const Scaffold(body: SizedBox()),
+        ),
+      );
+
+      showScheduleFailedNotice();
+      await tester.pump();
+
+      expect(find.text('通知排程失败'), findsOneWidget);
+    });
+
+    testWidgets('messenger 未挂载（key 未绑定 MaterialApp）→ 静默不抛', (tester) async {
+      showScheduleFailedNotice();
+      expect(tester.takeException(), isNull);
     });
   });
 
