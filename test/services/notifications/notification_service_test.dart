@@ -372,7 +372,7 @@ void main() {
       expect(received?.id, 7);
     });
 
-    test('initialize 幂等：再次调用不重注册、不丢失首次回调', () async {
+    test('initialize 带新回调晚到 → 重挂生效；同一回调重复 → 幂等零副作用（F-92 验收4）', () async {
       final logs = <String?>[];
       final originalDebugPrint = debugPrint;
       debugPrint = (message, {int? wrapWidth}) => logs.add(message);
@@ -388,28 +388,42 @@ void main() {
       expect(plugin.initializeCalls, 1);
       expect(plugin.registeredCallback, same(first));
 
+      // 带不同回调晚到：仅重挂回调一次（再次 initialize 透传新回调），
+      // 不重复 timezone/通道之外的初始化副作用；可补救路径零告警。
       expect(
         await scheduler.initialize(onDidReceiveNotificationResponse: second),
         isTrue,
       );
-      expect(plugin.initializeCalls, 1, reason: '幂等：_initialized 后不重复初始化');
-      expect(plugin.registeredCallback, same(first),
-          reason: '首次注册的回调不被二次调用覆盖');
+      expect(plugin.initializeCalls, 2,
+          reason: '晚到新回调触发一次重挂（修复前 _initialized 早退为 1）');
+      expect(plugin.registeredCallback, same(second),
+          reason: '重挂语义：晚到装配回调成为最终生效回调（修复前此断言红）');
       expect(
         logs.any((line) => line?.contains('热态回调丢失') ?? false),
         isFalse,
-        reason: '正常装配路径（首次已注册回调）的早退必须零告警——'
-            '防止告警条件被写反（早退即告警）而测试仍绿',
+        reason: '可补救路径（重挂成功）零告警',
       );
+
+      // 同一回调重复晚到：幂等零副作用（不再重挂、无新增通道副作用）。
+      expect(
+        await scheduler.initialize(onDidReceiveNotificationResponse: second),
+        isTrue,
+      );
+      expect(plugin.initializeCalls, 2,
+          reason: '同一回调重复调用幂等：不产生新增副作用');
+      expect(plugin.registeredCallback, same(second));
     });
 
-    test('并发装配回调 + 懒初始化交错：已注册回调不被无回调路径降级（波末审核）', () async {
+    test('并发反序真丢失修复：带回调先完成、无回调后完成 → 插件回调仍非 null（F-92 验收1）', () async {
       final logs = <String?>[];
       final originalDebugPrint = debugPrint;
       debugPrint = (message, {int? wrapWidth}) => logs.add(message);
       addTearDown(() => debugPrint = originalDebugPrint);
 
-      void hotCallback(NotificationResponse response) {}
+      NotificationResponse? received;
+      void hotCallback(NotificationResponse response) {
+        received = response;
+      }
 
       // 构造交错：带回调装配先进入 initialize（挂起在 gate），
       // 无回调懒初始化后进入（此时 _initialized 仍 false，同样挂起）。
@@ -420,16 +434,32 @@ void main() {
       );
       final lazy = scheduler.initialize();
       // 释放闸门：A（带回调）先注册恢复完成，B（无回调）后完成——
-      // 修复前 B 会把 _hotCallbackRegistered 覆盖回 false（假告警根因）。
+      // 修复前 B 会把插件回调槽覆盖为 null（hot=true 与插件实际不一致，
+      // 真丢失面；F-92 已落债）。
       gate.complete();
       await Future.wait([wired, lazy]);
-      expect(plugin.initializeCalls, 2, reason: '两个并发 initialize 都执行了完整路径');
-      // 注：插件侧 registeredCallback 是覆盖语义——并发交错下最后一次
-      // 完成的 initialize 生效（此处为无回调的 B → null），这是插件层行为，
-      // 不在本服务防御范围（F-92 已落债）。本用例只锁定服务侧追踪状态
-      // `_hotCallbackRegistered` 不被无回调路径降级（防假告警）。
 
-      // 早退路径：已注册回调事实应保持 → 零告警（修复前此断言红）。
+      // 锁串行语义：B 在 A 完成后走已初始化早退（无回调 → 静默），
+      // 不再触碰插件回调槽——修复前 B 覆盖为 null，此断言红。
+      expect(plugin.initializeCalls, 1,
+          reason: '无回调后到路径早退，不重复初始化、不覆盖回调槽');
+      expect(plugin.registeredCallback, isNotNull,
+          reason: '并发反序交错后插件侧最终回调非 null（修复前此断言红）');
+      expect(plugin.registeredCallback, same(hotCallback));
+
+      // 触发走消费路径：payload 经 registeredCallback 到达消费侧。
+      plugin.registeredCallback!(
+        const NotificationResponse(
+          notificationResponseType:
+              NotificationResponseType.selectedNotification,
+          payload: 'conver://proactive?conversationId=101&messageId=202',
+          id: 7,
+        ),
+      );
+      expect(received?.payload,
+          'conver://proactive?conversationId=101&messageId=202');
+
+      // 早退路径：已注册回调事实应保持 → 零告警。
       await scheduler.initialize();
       expect(
         logs.any((line) => line?.contains('热态回调丢失') ?? false),
@@ -438,13 +468,16 @@ void main() {
       );
     });
 
-    test('先 schedule 后装配：懒初始化后带回调 initialize 不重注册且告警热态回调丢失（F-90）', () async {
+    test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告警（F-92/F-97）', () async {
       final logs = <String?>[];
       final originalDebugPrint = debugPrint;
       debugPrint = (message, {int? wrapWidth}) => logs.add(message);
       addTearDown(() => debugPrint = originalDebugPrint);
 
-      void hotCallback(NotificationResponse response) {}
+      NotificationResponse? received;
+      void hotCallback(NotificationResponse response) {
+        received = response;
+      }
 
       // 先经 schedule 触发懒初始化：首次 initialize 无回调（异常装配顺序）。
       expect(await scheduler.schedule(buildPlan()), isTrue);
@@ -452,30 +485,119 @@ void main() {
       expect(plugin.registeredCallback, isNull,
           reason: '懒初始化路径不含热态回调');
 
-      // 后装配带回调 initialize：幂等早退，不重注册、不二次透传回调。
+      // 后装配带回调 initialize：晚到重挂（再次 initialize 透传新回调）。
       expect(
         await scheduler.initialize(
           onDidReceiveNotificationResponse: hotCallback,
         ),
         isTrue,
       );
-      expect(plugin.initializeCalls, 1,
-          reason: '幂等：_initialized 后不重复初始化、不二次透传回调');
-      expect(plugin.registeredCallback, isNull,
-          reason: '插件不支持后补回调，懒初始化后的装配回调无法注册');
-
-      // 告警路径存在：热态回调丢失语义 + 根因（schedule 懒初始化先于装配）。
+      expect(plugin.initializeCalls, 2,
+          reason: '装配晚到触发一次重挂（修复前 _initialized 早退为 1）');
+      expect(plugin.registeredCallback, same(hotCallback),
+          reason: '装配回调最终注册生效——重挂语义（修复前此断言红）');
       expect(
         logs.any((line) => line?.contains('热态回调丢失') ?? false),
-        isTrue,
-        reason: '已初始化但首次未注册回调的早退路径应输出热态回调丢失告警',
+        isFalse,
+        reason: '可补救路径零告警（修复前此断言红：现实现早退打告警）',
       );
+
+      // 重挂后的回调可触发消费（payload 到达消费侧）。
+      plugin.registeredCallback!(
+        const NotificationResponse(
+          notificationResponseType:
+              NotificationResponseType.selectedNotification,
+          payload: 'conver://proactive?conversationId=101&messageId=202',
+          id: 7,
+        ),
+      );
+      expect(received?.payload,
+          'conver://proactive?conversationId=101&messageId=202');
+    });
+
+    test('验收2反例：懒初始化完成后、装配晚到前的无回调早退零误告警（F-92）', () async {
+      final logs = <String?>[];
+      final originalDebugPrint = debugPrint;
+      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
+      addTearDown(() => debugPrint = originalDebugPrint);
+
+      void hotCallback(NotificationResponse response) {}
+
+      // 无回调懒初始化先完成（_initialized 已置）。
+      expect(await scheduler.schedule(buildPlan()), isTrue);
+      expect(plugin.initializeCalls, 1);
+      expect(plugin.registeredCallback, isNull);
+
+      // 装配挂起窗口内 third-party 无回调早退：不得误报「热态回调丢失」。
+      expect(await scheduler.initialize(), isTrue);
+      expect(plugin.initializeCalls, 1,
+          reason: '无回调早退不触碰插件回调槽');
       expect(
-        logs.any((line) =>
-            line?.contains('schedule lazy init ran before wiring') ?? false),
-        isTrue,
-        reason: '告警应指明根因：schedule 懒初始化先于装配',
+        logs.any((line) => line?.contains('热态回调丢失') ?? false),
+        isFalse,
+        reason: '无回调早退不得误打假告警（修复前此断言红：现实现此路径告警）',
       );
+
+      // 装配带回调晚到：重挂生效，全程零告警。
+      expect(
+        await scheduler.initialize(
+          onDidReceiveNotificationResponse: hotCallback,
+        ),
+        isTrue,
+      );
+      expect(plugin.initializeCalls, 2);
+      expect(plugin.registeredCallback, same(hotCallback),
+          reason: '装配回调最终注册生效（重挂语义）');
+      expect(
+        logs.any((line) => line?.contains('热态回调丢失') ?? false),
+        isFalse,
+        reason: '可补救路径（重挂成功）全程零告警',
+      );
+    });
+
+    test('告警 seam（F-92 验收3）：正常/可补救路径 0 次，不可补救路径 ≥1 次', () async {
+      // 正常装配路径：首次 initialize 即带回调 → 零告警。
+      var lost = 0;
+      expect(
+        await scheduler.initialize(
+          onDidReceiveNotificationResponse: (r) {},
+          onHotCallbackLost: (reason) => lost++,
+        ),
+        isTrue,
+      );
+      expect(lost, 0, reason: '正常装配路径零告警');
+
+      // 可补救路径：懒初始化后装配重挂成功 → 零告警。
+      final recoverable = build(isAndroid: true);
+      final recoverableLost = <String>[];
+      expect(await recoverable.schedule(buildPlan()), isTrue);
+      expect(
+        await recoverable.initialize(
+          onDidReceiveNotificationResponse: (r) {},
+          onHotCallbackLost: (reason) => recoverableLost.add(reason),
+        ),
+        isTrue,
+      );
+      expect(recoverableLost, isEmpty, reason: '可补救路径（重挂成功）零告警');
+      expect(plugin.registeredCallback, isNotNull);
+
+      // 不可补救路径：重挂失败（插件 initialize 异常）→ seam 触发 ≥1 次。
+      final doomed = build(isAndroid: true);
+      expect(await doomed.schedule(buildPlan()), isTrue,
+          reason: '懒初始化（无回调）成功');
+      plugin.initializeShouldFail = true; // 重挂失败注入
+      var doomedLost = 0;
+      expect(
+        await doomed.initialize(
+          onDidReceiveNotificationResponse: (r) {},
+          onHotCallbackLost: (reason) => doomedLost++,
+        ),
+        isFalse,
+        reason: '重挂失败按调用失败返回 false',
+      );
+      expect(doomedLost, greaterThanOrEqualTo(1),
+          reason: '不可补救路径告警 ≥1 次，经可注入 seam 上达调用方');
+      plugin.initializeShouldFail = false;
     });
 
     test('requestNotificationsPermission：Android 真路径经 channel 转发（true/false 透传）', () async {

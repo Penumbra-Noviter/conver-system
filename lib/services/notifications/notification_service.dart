@@ -13,6 +13,7 @@
 /// `Platform.isAndroid` 分支守卫 + iOS 延后（初始化与 delegate 待 macOS）。
 library;
 
+import 'dart:async' show Completer;
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -211,62 +212,119 @@ class FlutterLocalNotificationsScheduler
 
   bool _initialized = false;
 
-  /// 首次 initialize 成功时是否携带了热态点按回调（F-90 契约防御追踪）。
+  /// 首次 initialize 成功时是否携带了热态点按回调（F-90 契约防御追踪，
+  /// F-92 语义强化）：hot=true 的前提 = 插件侧已注册非 null 回调。
   ///
-  /// 仅在**成功路径**置位：首次调用若 [initialize] 的
-  /// [onDidReceiveNotificationResponse] 非 null 记 true，否则记 false；
-  /// 初始化异常保持 false（下次仍走完整初始化）。幂等早退分支据此区分
-  /// 「首次已注册回调」（正常装配路径，零告警）与「首次未注册回调」
-  /// （schedule 懒初始化先于装配 → 热态回调丢失告警）。
+  /// 仅在**成功路径**置位且一旦为真不再回退（OR 语义）：首次带回调初始化
+  /// 成功 / 晚到装配重挂成功 → true；初始化/重挂异常保持原值（重挂失败时
+  /// 插件槽仍为旧回调或 null，hot 不虚增）。追踪与插件实际一致：hot=true
+  /// ⇒ [_registeredCallback] 非 null ⇒ 服务最后一次成功透传非 null 回调。
   bool _hotCallbackRegistered = false;
 
-  /// 初始化通知通道与 timezone（单例幂等：重复调用不重复初始化）。
+  /// 最近一次成功注册到插件的非 null 热态回调（F-92 重挂幂等判断锚）。
   ///
-  /// 热态通知点按回调 [onDidReceiveNotificationResponse]（F-84）**只能由
-  /// 首次调用携带**：`_initialized` 幂等守卫使后续调用直接 return，再次
-  /// 传入的 callback 不会透传注册（F-90 契约根因）。注：flutter_local_
-  /// notifications 22.3.1 每次 initialize 实际是覆盖赋值回调、支持重设
-  /// （实证 platform_flutter_local_notifications.dart:157）——真正阻断
-  /// 透传的是本服务的幂等早退，后续修复可再次 initialize 重挂回调。
-  /// 契约：
-  /// - 装配必须先于**首次** [schedule]：schedule 懒初始化路径（本方法无参
-  ///   调用）不含回调；若其先置 `_initialized`，后装配带回调的 initialize
-  ///   早退且回调静默丢失——早退分支对「已初始化且首次未注册回调」输出
-  ///   含「热态回调丢失」语义的 debugPrint 告警并指明根因（失效模式）：
-  ///   热态点按无法消费深链（F-84 前提缺失）；
-  /// - 正常装配路径（首次 initialize 即带回调）的幂等重复调用零告警。
+  /// 与 [_hotCallbackRegistered] 同置同清：首次带回调成功 / 重挂成功时
+  /// 记录本次透传的回调；无回调路径不触碰。identical 相等 → 晚到重复
+  /// 调用幂等零副作用（验收 4）；不同 → 触发重挂（验收 2 可补救路径）。
+  DidReceiveNotificationResponseCallback? _registeredCallback;
+
+  /// initialize 临界区串行化尾部（F-92 并发反序修复锚）。
+  ///
+  /// 使并发进入的 initialize 按**进入顺序**串行执行：带回调装配先完成、
+  /// 无回调懒初始化后恢复时走已初始化早退（静默），不再触碰插件回调槽
+  /// ——消除「无回调后完成覆盖已注册回调」的真丢失面（修复前
+  /// `_hotCallbackRegistered` OR 置位只防假告警，防不了插件槽被覆盖）。
+  Future<void>? _initSerial;
+
+  /// 初始化通道设置（首次完整初始化与晚到重挂共用同一 settings）。
+  static const InitializationSettings _initializationSettings =
+      InitializationSettings(
+    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+  );
+
+  /// 初始化通知通道与 timezone（单例幂等；F-92 重挂语义扩展）。
+  ///
+  /// 热态通知点按回调 [onDidReceiveNotificationResponse]（F-84）：首次
+  /// 调用携带 → 随完整初始化注册；**已初始化后的晚到调用**——
+  /// - 无回调（schedule 懒初始化/第三方早退）：静默返回，不触碰插件
+  ///   回调槽、不告警（修复前此路径对「已初始化且未注册回调」误打
+  ///   「热态回调丢失」假告警，F-92 消除——装配可能晚到补救）；
+  /// - 带回调且与已注册回调不同：**重挂**——再次 [initialize] 透传
+  ///   新回调（插件 22.3.1 覆盖赋值已实证 platform_flutter_local_
+  ///   notifications.dart:157，支持重设；Android 通道创建幂等无新增
+  ///   副作用面），成功零告警、失败经 [onHotCallbackLost] seam 上达
+  ///   调用方（不可补救路径）并返回 false；
+  /// - 带回调且 identical 已注册回调：幂等零副作用（验收 4）。
+  /// [onHotCallbackLost]：热态回调不可补救丢失告警 seam（F-92），
+  /// reason 为失败摘要（SR-12：不携带任何 payload 内容）；正常装配与
+  /// 可补救（重挂成功）路径零触发。
   /// 成功 true；平台通道缺失/初始化异常 → false 不抛（SR-12 摘要日志）。
   /// PS2-08 装配时显式调用一次；[schedule] 内部亦会按需懒初始化。
   Future<bool> initialize({
     DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+    void Function(String reason)? onHotCallbackLost,
+  }) async {
+    final previous = _initSerial;
+    final completer = Completer<void>();
+    _initSerial = completer.future;
+    if (previous != null) {
+      await previous;
+    }
+    try {
+      return await _initializeLocked(
+        onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+        onHotCallbackLost: onHotCallbackLost,
+      );
+    } finally {
+      completer.complete();
+    }
+  }
+
+  /// initialize 临界区核心（调用方已持有串行化锁）。
+  Future<bool> _initializeLocked({
+    required DidReceiveNotificationResponseCallback?
+        onDidReceiveNotificationResponse,
+    required void Function(String reason)? onHotCallbackLost,
   }) async {
     if (_initialized) {
-      if (!_hotCallbackRegistered) {
-        debugPrint(
-          'proactive notify hot callback lost (热态回调丢失): schedule lazy '
-          'init ran before wiring; onDidReceiveNotificationResponse must be '
-          'supplied on the first initialize call, otherwise hot-tap deep '
-          'links cannot be consumed',
-        );
+      final callback = onDidReceiveNotificationResponse;
+      if (callback == null) {
+        // 无回调晚到：不触碰插件回调槽（避免覆盖已注册回调），静默。
+        return true;
       }
-      return true;
+      if (identical(callback, _registeredCallback)) {
+        // 同一回调重复晚到：幂等零副作用。
+        return true;
+      }
+      try {
+        await _channel.initialize(
+          settings: _initializationSettings,
+          onDidReceiveNotificationResponse: callback,
+        );
+        _registeredCallback = callback;
+        _hotCallbackRegistered = true;
+        return true;
+      } catch (e) {
+        debugPrint('proactive notify hot callback re-register failed: $e');
+        onHotCallbackLost?.call('hot callback re-register failed: $e');
+        return false;
+      }
     }
     try {
       tzdata.initializeTimeZones();
       tz.setLocalLocation(tz.getLocation(_localTimeZone));
-      const settings = InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      );
       await _channel.initialize(
-        settings: settings,
+        settings: _initializationSettings,
         onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
       );
       _initialized = true;
-      // OR 语义（波末审核修复）：并发「带回调初始化」与「懒初始化无回调」
-      // 在 channel.initialize 挂起时交错，无回调路径不得把已注册回调的
-      // 事实降级回 false（否则后续早退路径假告警「热态回调丢失」）。
+      // OR 语义（F-90 保留）：已注册回调事实不被无回调路径降级；锁串行
+      // 后并发交错不可达，语义与插件实际仍一致（hot=true ⇒ 非 null 回调）。
       _hotCallbackRegistered = _hotCallbackRegistered ||
           onDidReceiveNotificationResponse != null;
+      if (onDidReceiveNotificationResponse != null) {
+        _registeredCallback = onDidReceiveNotificationResponse;
+      }
       return true;
     } catch (e) {
       debugPrint('proactive notify init failed: $e');
