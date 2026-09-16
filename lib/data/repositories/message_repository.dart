@@ -93,6 +93,11 @@ class MessageRepository {
   /// 单条 join 查询（messages ↔ conversations）完成，非逐对话循环；该角色
   /// 无任何消息时返回 null。伴侣域活跃时间判定（RelationshipService /
   /// ProactiveMessageService）统一经本方法取口径单源（F-81）。
+  ///
+  /// 索引加速（F-95，schemaVersion=4）：`idx_messages_created_at` 服务本条
+  /// `ORDER BY created_at DESC LIMIT 1`，SQL 形态与结果语义不变。
+  /// 秒精度为 F-3 既定契约（drift INTEGER 秒存储，亚秒截断）：索引加速
+  /// 不改变精度语义，窗口/天粒度判定不受影响。
   Future<DateTime?> latestMessageAt(int characterId) async {
     final rows = await (_db.select(_db.messages).join([
           innerJoin(

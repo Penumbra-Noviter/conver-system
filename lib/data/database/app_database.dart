@@ -1,5 +1,5 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=3，M0 冻结 + AC-01 升版 +
-/// PS2-01 升版）。
+/// 应用数据库 — drift 数据库入口（schemaVersion=4，M0 冻结 + AC-01 升版 +
+/// PS2-01 升版 + FD-05 升版）。
 ///
 /// - 表注册：characters / conversations / messages / settings / memory_entries /
 ///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
@@ -41,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -105,6 +105,19 @@ class AppDatabase extends _$AppDatabase {
             await customStatement(
               'CREATE INDEX IF NOT EXISTS idx_inner_thoughts_message_id '
               'ON inner_thoughts (message_id)',
+            );
+          }
+
+          // FD-05：schemaVersion 3→4 为 messages.created_at 补建单列索引
+          // （对齐 tables.dart 新增的 @TableIndex；加速 latestMessageAt 的
+          // join + ORDER BY created_at DESC LIMIT 1，不改存储精度——F-3
+          // 已拍板 drift INTEGER 秒）。CREATE INDEX IF NOT EXISTS 幂等，
+          // 中断残留重开时补建；user_version=4 由 drift 成功后回写，失败
+          // 锁库重开重跑（F-78 幂等三机制延续）。
+          if (from < 4) {
+            await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_messages_created_at '
+              'ON messages (created_at)',
             );
           }
         },

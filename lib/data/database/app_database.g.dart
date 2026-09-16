@@ -4241,6 +4241,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_messages_conversation_id',
     'CREATE INDEX idx_messages_conversation_id ON messages (conversation_id)',
   );
+  late final Index idxMessagesCreatedAt = Index(
+    'idx_messages_created_at',
+    'CREATE INDEX idx_messages_created_at ON messages (created_at)',
+  );
   late final Index idxMemoryEntriesCharacterId = Index(
     'idx_memory_entries_character_id',
     'CREATE INDEX idx_memory_entries_character_id ON memory_entries (character_id)',
@@ -4290,6 +4294,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxCharactersName,
     idxConversationsCharacterId,
     idxMessagesConversationId,
+    idxMessagesCreatedAt,
     idxMemoryEntriesCharacterId,
     idxPersonaRevisionsCharacterId,
     idxRelationshipStatesCharacterId,

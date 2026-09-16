@@ -1,10 +1,12 @@
-/// PS2-01 迁移测试 — schemaVersion 2→3（三新表 + FK 索引 + 级联/FK 语义）。
+/// PS2-01 迁移测试 — schemaVersion 2→4（三新表 + FK 索引 + 级联/FK 语义）；
+/// FD-05 追加 messages.created_at 索引，迁移断言按 schemaVersion 4 语义。
 ///
 /// 迁移路径用「降级夹具」构造 v2 存量库：先在最新 schema 的文件库上插入旧
 /// 数据，再 `DROP` 三新表 + `PRAGMA user_version = 2`，关闭后重新打开 —
-/// drift 检测 user_version=2 < 3 会执行 onUpgrade `from < 3` 分支，等价于
-/// 真实 v2 存量库升级。重复打开幂等用同一文件再开验证；全新安装（无表直接
-/// 建库）用内存库验证 schemaVersion 直接为最新、不跑 onUpgrade。
+/// drift 检测 user_version=2 < 4 会执行 onUpgrade `from < 3` 与 `from < 4`
+/// 分支，等价于真实 v2 存量库连续升级。重复打开幂等用同一文件再开验证；
+/// 全新安装（无表直接建库）用内存库验证 schemaVersion 直接为最新、不跑
+/// onUpgrade。
 library;
 
 import 'dart:io';
@@ -24,7 +26,8 @@ const _newTables = <String>[
   'inner_thoughts',
 ];
 
-/// 6 个 FK 索引锚（snake_case 列名）。
+/// 7 个迁移新增索引锚（snake_case 列名）：6 个 FK 索引 + FD-05 的
+/// messages.created_at 索引。
 const _newIndexes = <String>[
   'idx_relationship_states_character_id',
   'idx_proactive_plans_character_id',
@@ -32,11 +35,12 @@ const _newIndexes = <String>[
   'idx_proactive_plans_status',
   'idx_inner_thoughts_character_id',
   'idx_inner_thoughts_message_id',
+  'idx_messages_created_at',
 ];
 
 /// 建一个「v2 存量库」：文件库上建最新 schema → 插旧数据 → 降级到 v2 形态。
 ///
-/// 返回已迁移到 3 的 [AppDatabase] 与临时目录（供 tearDown 清理；db 需
+/// 返回已迁移到 4 的 [AppDatabase] 与临时目录（供 tearDown 清理；db 需
 /// 调用方 close）。
 Future<(AppDatabase, Directory)> openV2UpgradedFixture() async {
   final dir = await Directory.systemTemp.createTemp('ps2_01_migration_');
@@ -80,11 +84,15 @@ Future<(AppDatabase, Directory)> openV2UpgradedFixture() async {
         ),
       );
 
-  // 降级到 v2：标记版本 + 移除阶段 2 三表（索引随表删除）。
+  // 降级到 v2：标记版本 + 移除阶段 2 三表（索引随表删除）+ 移除
+  // messages.created_at 索引（FD-05 属 v4 形态；真实 v2 存量库不含该索引，
+  // 保留会导致 from < 4 分支的 CREATE INDEX 被 IF NOT EXISTS 幂等跳过，
+  // 掩盖「旧库升级补建索引」的真实路径）。
   await db.customStatement('PRAGMA user_version = 2');
   await db.customStatement('DROP TABLE IF EXISTS inner_thoughts');
   await db.customStatement('DROP TABLE IF EXISTS proactive_plans');
   await db.customStatement('DROP TABLE IF EXISTS relationship_states');
+  await db.customStatement('DROP INDEX IF EXISTS idx_messages_created_at');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -121,12 +129,15 @@ Future<(AppDatabase, Directory)> openV1UpgradedFixture() async {
         ),
       );
 
+  // 降级到 v1：user_version=1 + DROP 记忆两表与阶段 2 三表；同时移除
+  // messages.created_at 索引（FD-05 属 v4 形态，真实 v1 存量库不含该索引）。
   await db.customStatement('PRAGMA user_version = 1');
   await db.customStatement('DROP TABLE IF EXISTS inner_thoughts');
   await db.customStatement('DROP TABLE IF EXISTS proactive_plans');
   await db.customStatement('DROP TABLE IF EXISTS relationship_states');
   await db.customStatement('DROP TABLE IF EXISTS persona_revisions');
   await db.customStatement('DROP TABLE IF EXISTS memory_entries');
+  await db.customStatement('DROP INDEX IF EXISTS idx_messages_created_at');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -197,7 +208,7 @@ Future<({int characterId, int conversationId, int messageId})> seedFullChain(
 }
 
 void main() {
-  group('schemaVersion 3 契约（全新安装）', () {
+  group('schemaVersion 4 契约（全新安装）', () {
     late AppDatabase db;
 
     setUp(() {
@@ -208,11 +219,11 @@ void main() {
       await db.close();
     });
 
-    test('AppDatabase.schemaVersion == 3', () {
-      expect(db.schemaVersion, 3);
+    test('AppDatabase.schemaVersion == 4', () {
+      expect(db.schemaVersion, 4);
     });
 
-    test('全新安装直接建 9 表 + 6 新索引（含唯一索引）', () async {
+    test('全新安装直接建 9 表 + 7 迁移新增索引（含唯一索引）', () async {
       final tables = await sqliteMasterNames(db, 'table');
       expect(
         tables,
@@ -239,7 +250,7 @@ void main() {
     });
   });
 
-  group('schemaVersion 2→3 迁移', () {
+  group('schemaVersion 2→4 迁移', () {
     late AppDatabase db;
     late Directory dir;
 
@@ -252,7 +263,7 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test('旧行保留 + 三表/6 索引存在于 sqlite_master + user_version=3', () async {
+    test('旧行保留 + 三表/7 索引存在于 sqlite_master + user_version=4', () async {
       expect(await db.select(db.characters).get().then((r) => r.length), 1);
       expect(await db.select(db.conversations).get().then((r) => r.length), 1);
       expect(await db.select(db.messages).get().then((r) => r.length), 1);
@@ -265,7 +276,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
 
-      expect(await userVersion(db), 3);
+      expect(await userVersion(db), 4);
     });
 
     test('三表可读写 + converter 字符串落库（stage 五值 / status 四值）', () async {
@@ -427,14 +438,15 @@ void main() {
       );
       expect(await userVersion(db), 2);
 
-      // 重开：drift 检测 user_version=2 < 3 重跑 from < 3 分支，IF NOT
-      // EXISTS 幂等补建缺失的表/索引；成功后再把 user_version 回写为 3。
+      // 重开：drift 检测 user_version=2 < 4 重跑 from < 3 与 from < 4 分支，
+      // IF NOT EXISTS 幂等补建缺失的表/索引；成功后再把 user_version
+      // 回写为 4。
       await db.close();
       db = AppDatabase(
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 3);
+      expect(await userVersion(db), 4);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_newTables));
       expect(await sqliteMasterNames(db, 'index'), containsAll(_newIndexes));
 
@@ -454,7 +466,7 @@ void main() {
     });
 
     test('重复打开幂等：同文件重开不重跑迁移，三表与数据仍在', () async {
-      // 当前 db 已迁移到 3；写入一行标识数据后关闭再重开。
+      // 当前 db 已迁移到 4；写入一行标识数据后关闭再重开。
       final now = DateTime.now();
       await db.into(db.relationshipStates).insert(
             RelationshipStatesCompanion.insert(
@@ -469,7 +481,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 3);
+      expect(await userVersion(db), 4);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_newTables));
       expect(await sqliteMasterNames(db, 'index'), containsAll(_newIndexes));
       expect(await db.select(db.relationshipStates).get(), hasLength(1));
@@ -477,7 +489,7 @@ void main() {
     });
   });
 
-  group('schemaVersion 1→3 连续迁移', () {
+  group('schemaVersion 1→4 连续迁移', () {
     late AppDatabase db;
     late Directory dir;
 
@@ -490,7 +502,7 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test('v1 存量库连续升级：记忆两表重建 + 三新表 + 旧行保留 + user_version=3', () async {
+    test('v1 存量库连续升级：记忆两表重建 + 三新表 + 旧行保留 + user_version=4', () async {
       expect(await db.select(db.characters).get().then((r) => r.length), 1);
       expect(await db.select(db.messages).get().then((r) => r.length), 1);
 
@@ -502,7 +514,7 @@ void main() {
       ]));
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
-      expect(await userVersion(db), 3);
+      expect(await userVersion(db), 4);
     });
   });
 

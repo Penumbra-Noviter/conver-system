@@ -158,7 +158,12 @@ class Conversations extends Table {
 }
 
 /// 消息表 — 对齐桌面端 `models/message.py::Message`。
+///
+/// `created_at` 单列索引（FD-05，schemaVersion=4）：加速
+/// `latestMessageAt` 的 join + `ORDER BY created_at DESC LIMIT 1`；
+/// 不改变 createdAt 秒级存储精度（F-3 已拍板，见文件头注释）。
 @TableIndex(name: 'idx_messages_conversation_id', columns: {#conversationId})
+@TableIndex(name: 'idx_messages_created_at', columns: {#createdAt})
 class Messages extends Table {
   IntColumn get id => integer().autoIncrement()();
 

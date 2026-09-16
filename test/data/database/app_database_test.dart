@@ -23,8 +23,8 @@ void main() {
     await db.close();
   });
 
-  test('schemaVersion 冻结为 3', () {
-    expect(db.schemaVersion, 3);
+  test('schemaVersion 冻结为 4', () {
+    expect(db.schemaVersion, 4);
   });
 
   test('内存执行器打开成功，9 表可定位', () async {
@@ -149,6 +149,7 @@ void main() {
       'idx_characters_name',
       'idx_conversations_character_id',
       'idx_messages_conversation_id',
+      'idx_messages_created_at',
       'idx_memory_entries_character_id',
       'idx_persona_revisions_character_id',
       'idx_relationship_states_character_id',
