@@ -108,6 +108,42 @@ void main() {
       expect(RelationshipService.nextAffinity(30, 5), 35);
     });
 
+    test('floorForStage 默认阈值数值标定（intimate 60 / soulmate 80，常量推导）', () {
+      const t = RelationshipThresholds();
+      expect(t.floorForStage(RelationshipStage.stranger), 0);
+      expect(t.floorForStage(RelationshipStage.acquainted), t.strangerMax + 1);
+      expect(t.floorForStage(RelationshipStage.familiar), t.acquaintedMax + 1);
+      expect(t.floorForStage(RelationshipStage.intimate), t.familiarMax + 1);
+      expect(t.floorForStage(RelationshipStage.soulmate), t.intimateMax + 1);
+      // 验收锚（F-82）：默认阈值下 intimate 60、soulmate 80。
+      expect(t.floorForStage(RelationshipStage.intimate), 60);
+      expect(t.floorForStage(RelationshipStage.soulmate), 80);
+    });
+
+    test('floorForStage 与 stageForAffinity 反向自洽（默认 + 自定义阈值推导）', () {
+      // 自定义 max 阈值：验证档位下限从实例常量推导，不锁默认快照。
+      const customMax = RelationshipThresholds(
+        strangerMax: 9,
+        acquaintedMax: 19,
+        familiarMax: 29,
+        intimateMax: 39,
+      );
+      for (final t in [const RelationshipThresholds(), customMax]) {
+        for (final stage in RelationshipStage.values) {
+          final floor = t.floorForStage(stage);
+          // 落库 affinity 达下限 → 必映射回本档。
+          expect(t.stageForAffinity(floor), stage);
+          // 下限 − 1 → 必为前一档（intimate 时 familiar、soulmate 时 intimate）。
+          if (stage.index > 0) {
+            expect(
+              t.stageForAffinity(floor - 1),
+              RelationshipStage.values[stage.index - 1],
+            );
+          }
+        }
+      }
+    });
+
     test('stageForAffinity 五档边界（含端点语义）', () {
       const t = RelationshipThresholds();
       expect(t.stageForAffinity(0), RelationshipStage.stranger);
@@ -319,6 +355,96 @@ void main() {
       expect(state?.stage, RelationshipStage.intimate);
       expect(state?.affinity, 61);
       expect(state?.updatedAt, fixedNow);
+    });
+
+    test('F-82 复现：确认前活跃窗口滑出 → 落库 affinity 达 intimate 档下限（58→60）', () async {
+      final ids = await seedCharacterWithConversation();
+      // 默认阈值（turn=1 / activeDay=2）构造：现有 _testThresholds（turn=3）
+      // 下确认重算 58+3=61 仍达下限，无法复现「跨档后数值不足」中间态。
+      final defaultService = RelationshipService(
+        companionRepository: companion,
+        conversationRepository: conversations,
+        messageRepository: messages,
+        now: () => fixedNow,
+      );
+      await addMessage(
+        conversationId: ids.conversationId,
+        createdAt: fixedNow.subtract(const Duration(days: 2)),
+      );
+      await companion.upsertRelationship(
+        characterId: ids.characterId,
+        stage: RelationshipStage.familiar,
+        affinity: 58,
+      );
+
+      // 评估时活跃：58 + 1 + 2 = 61 → intimate proposal（不写库）。
+      final proposal = await defaultService.evaluateAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+      expect(proposal?.targetStage, RelationshipStage.intimate);
+      expect(proposal?.affinity, 61);
+
+      // 确认前活跃窗口滑出（>7d）：仅 turn 增量 58 + 1 = 59，低于 intimate 下限 60。
+      fixedNow = fixedNow.add(const Duration(days: 8));
+      final ok = await defaultService.confirmStageUpgrade(
+        characterId: ids.characterId,
+        targetStage: RelationshipStage.intimate,
+      );
+      expect(ok, isTrue);
+
+      final state = await companion.getRelationship(ids.characterId);
+      expect(state?.stage, RelationshipStage.intimate);
+      // 修复前：落库 59（stageForAffinity(59)=familiar）→ 红；
+      // 修复后：clamp 至下限 60，落库值与 stage 档自洽 → 绿。
+      expect(state?.affinity, greaterThanOrEqualTo(60));
+      expect(
+        const RelationshipThresholds().stageForAffinity(state!.affinity),
+        RelationshipStage.intimate,
+      );
+    });
+
+    test('F-82 复现：确认前活跃窗口滑出 → 落库 affinity 达 soulmate 档下限（78→80）', () async {
+      final ids = await seedCharacterWithConversation();
+      final defaultService = RelationshipService(
+        companionRepository: companion,
+        conversationRepository: conversations,
+        messageRepository: messages,
+        now: () => fixedNow,
+      );
+      await addMessage(
+        conversationId: ids.conversationId,
+        createdAt: fixedNow.subtract(const Duration(days: 2)),
+      );
+      await companion.upsertRelationship(
+        characterId: ids.characterId,
+        stage: RelationshipStage.intimate,
+        affinity: 78,
+      );
+
+      // 评估时活跃：78 + 1 + 2 = 81 → soulmate proposal（不写库）。
+      final proposal = await defaultService.evaluateAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+      expect(proposal?.targetStage, RelationshipStage.soulmate);
+      expect(proposal?.affinity, 81);
+
+      // 确认前活跃窗口滑出：仅 turn 增量 78 + 1 = 79，低于 soulmate 下限 80。
+      fixedNow = fixedNow.add(const Duration(days: 8));
+      final ok = await defaultService.confirmStageUpgrade(
+        characterId: ids.characterId,
+        targetStage: RelationshipStage.soulmate,
+      );
+      expect(ok, isTrue);
+
+      final state = await companion.getRelationship(ids.characterId);
+      expect(state?.stage, RelationshipStage.soulmate);
+      expect(state?.affinity, greaterThanOrEqualTo(80));
+      expect(
+        const RelationshipThresholds().stageForAffinity(state!.affinity),
+        RelationshipStage.soulmate,
+      );
     });
 
     test('reject 丢弃：DB 保持不变', () async {

@@ -104,6 +104,23 @@ class RelationshipThresholds {
     }
     return RelationshipStage.soulmate;
   }
+
+  /// 档位下限：本档 affinity 的最小合法取值（含端点语义）。
+  ///
+  /// stranger 恒为 [affinityMin]；其余档 = 前一档 max + 1。默认阈值下
+  /// intimate 下限 60（familiarMax+1）、soulmate 下限 80（intimateMax+1），
+  /// 按实例常量推导不锁快照——自定义阈值注入同样生效。与
+  /// [stageForAffinity] 反向自洽：`stageForAffinity(floor) == stage` 且
+  /// `stageForAffinity(floor − 1)` 为前一档（F-82）。
+  int floorForStage(RelationshipStage stage) {
+    return switch (stage) {
+      RelationshipStage.stranger => affinityMin,
+      RelationshipStage.acquainted => strangerMax + 1,
+      RelationshipStage.familiar => acquaintedMax + 1,
+      RelationshipStage.intimate => familiarMax + 1,
+      RelationshipStage.soulmate => intimateMax + 1,
+    };
+  }
 }
 
 /// 关系状态机服务 — 评估 / 推进 / 闸门 / 注入 / 活跃口径。
@@ -186,6 +203,12 @@ class RelationshipService {
   /// 重算当前应得 affinity（确定性推进，与 [evaluateAfterTurn] 同源），
   /// 写 stage=targetStage + affinity + updatedAt=now（SR-15 观察：
   /// 确认时 updatedAt 即转移轨迹时间）。无状态行 → no-op 返回 false（防御）。
+  ///
+  /// **F-82 档位下限 clamp**：评估出 proposal 时活跃窗口尚在（双增量跨档），
+  /// 确认时刻可能已滑出（仅 turn 增量）→ 重算值低于目标档下限；落库前
+  /// clamp 到 [RelationshipThresholds.floorForStage]（取下限、维持重算值、
+  /// 仍受 affinityMax 收敛），保证落库后 `stageForAffinity(affinity) ==
+  /// targetStage` 恒自洽，阶段与好感度不再出现中间态。
   Future<bool> confirmStageUpgrade({
     required int characterId,
     required RelationshipStage targetStage,
@@ -194,11 +217,16 @@ class RelationshipService {
     if (state == null || targetStage.index != state.stage.index + 1) {
       return false;
     }
-    final newAffinity = nextAffinity(state.affinity, await _turnGain(characterId));
+    final recomputed = nextAffinity(
+      state.affinity,
+      await _turnGain(characterId),
+    );
+    final floor = _thresholds.floorForStage(targetStage);
+    final persisted = clampAffinity(recomputed < floor ? floor : recomputed);
     await _companion.upsertRelationship(
       characterId: characterId,
       stage: targetStage,
-      affinity: newAffinity,
+      affinity: persisted,
     );
     return true;
   }

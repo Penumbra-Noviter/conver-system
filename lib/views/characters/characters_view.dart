@@ -171,8 +171,8 @@ class _CharactersViewState extends State<CharactersView> {
     }
     _busyCharacterIds.remove(characterId);
     _maybeProvider<StageUpgradeBroker>(context)?.clear();
-    // 成功 / F1 拒绝 / 异常统一重载为 DB 现状（F-82 观察：affinity 与 stage
-    // 档可能短暂不一致，以落库值实时渲染，不做额外修正）。
+    // 成功 / F1 拒绝 / 异常统一重载为 DB 现状（F-82：落库恒处于档位一致态，
+    // confirm 已 clamp 至目标档下限，以落库值实时渲染）。
     await _loadRelationships();
   }
 
