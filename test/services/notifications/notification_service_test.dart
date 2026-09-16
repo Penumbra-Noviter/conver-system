@@ -152,10 +152,7 @@ void main() {
 
   group('ProactiveDeepLink payload 编解码', () {
     test('encode → tryParse round-trip', () {
-      final raw = ProactiveDeepLink.encode(
-        conversationId: 101,
-        messageId: 202,
-      );
+      final raw = ProactiveDeepLink.encode(conversationId: 101, messageId: 202);
       expect(raw, 'conver://proactive?conversationId=101&messageId=202');
       final parsed = ProactiveDeepLink.tryParse(raw);
       expect(parsed?.conversationId, 101);
@@ -165,7 +162,8 @@ void main() {
     test('合法变体：参数顺序无关 + 多余参数宽容忽略', () {
       expect(
         ProactiveDeepLink.tryParse(
-            'conver://proactive?messageId=9&conversationId=8'),
+          'conver://proactive?messageId=9&conversationId=8',
+        ),
         isNotNull,
       );
       final parsed = ProactiveDeepLink.tryParse(
@@ -177,19 +175,27 @@ void main() {
 
     test('非数字 id → null 不抛（SR-02 int.tryParse，无 as 强转）', () {
       expect(
-        ProactiveDeepLink.tryParse('conver://proactive?conversationId=abc&messageId=2'),
+        ProactiveDeepLink.tryParse(
+          'conver://proactive?conversationId=abc&messageId=2',
+        ),
         isNull,
       );
       expect(
-        ProactiveDeepLink.tryParse('conver://proactive?conversationId=1.5&messageId=2'),
+        ProactiveDeepLink.tryParse(
+          'conver://proactive?conversationId=1.5&messageId=2',
+        ),
         isNull,
       );
       expect(
-        ProactiveDeepLink.tryParse('conver://proactive?conversationId=1&messageId=xyz'),
+        ProactiveDeepLink.tryParse(
+          'conver://proactive?conversationId=1&messageId=xyz',
+        ),
         isNull,
       );
       expect(
-        ProactiveDeepLink.tryParse('conver://proactive?conversationId=-&messageId=2'),
+        ProactiveDeepLink.tryParse(
+          'conver://proactive?conversationId=-&messageId=2',
+        ),
         isNull,
       );
     });
@@ -209,13 +215,15 @@ void main() {
       for (final id in invalidIds) {
         expect(
           ProactiveDeepLink.tryParse(
-              'conver://proactive?conversationId=$id&messageId=2'),
+            'conver://proactive?conversationId=$id&messageId=2',
+          ),
           isNull,
           reason: 'conversationId=$id 应拒绝',
         );
         expect(
           ProactiveDeepLink.tryParse(
-              'conver://proactive?conversationId=1&messageId=$id'),
+            'conver://proactive?conversationId=1&messageId=$id',
+          ),
           isNull,
           reason: 'messageId=$id 应拒绝',
         );
@@ -224,7 +232,8 @@ void main() {
 
     test('正值域：多位数合法正整数 → 解析成功（十进制无符号正整数契约）', () {
       final parsed = ProactiveDeepLink.tryParse(
-          'conver://proactive?conversationId=987654321&messageId=123456789');
+        'conver://proactive?conversationId=987654321&messageId=123456789',
+      );
       expect(parsed?.conversationId, 987654321);
       expect(parsed?.messageId, 123456789);
     });
@@ -232,20 +241,31 @@ void main() {
     test('溢出整数 → null（int.tryParse 语义）', () {
       expect(
         ProactiveDeepLink.tryParse(
-            'conver://proactive?conversationId=99999999999999999999999&messageId=2'),
+          'conver://proactive?conversationId=99999999999999999999999&messageId=2',
+        ),
         isNull,
       );
     });
 
     test('缺字段 / 空值 → null', () {
-      expect(ProactiveDeepLink.tryParse('conver://proactive?conversationId=1'), isNull);
-      expect(ProactiveDeepLink.tryParse('conver://proactive?messageId=2'), isNull);
       expect(
-        ProactiveDeepLink.tryParse('conver://proactive?conversationId=&messageId=2'),
+        ProactiveDeepLink.tryParse('conver://proactive?conversationId=1'),
         isNull,
       );
       expect(
-        ProactiveDeepLink.tryParse('conver://proactive?conversationId=1&messageId='),
+        ProactiveDeepLink.tryParse('conver://proactive?messageId=2'),
+        isNull,
+      );
+      expect(
+        ProactiveDeepLink.tryParse(
+          'conver://proactive?conversationId=&messageId=2',
+        ),
+        isNull,
+      );
+      expect(
+        ProactiveDeepLink.tryParse(
+          'conver://proactive?conversationId=1&messageId=',
+        ),
         isNull,
       );
       expect(ProactiveDeepLink.tryParse('conver://proactive'), isNull);
@@ -255,15 +275,21 @@ void main() {
       expect(ProactiveDeepLink.tryParse(''), isNull);
       expect(ProactiveDeepLink.tryParse('随便什么文本'), isNull);
       expect(
-        ProactiveDeepLink.tryParse('https://proactive?conversationId=1&messageId=2'),
+        ProactiveDeepLink.tryParse(
+          'https://proactive?conversationId=1&messageId=2',
+        ),
         isNull,
       );
       expect(
-        ProactiveDeepLink.tryParse('conver://other?conversationId=1&messageId=2'),
+        ProactiveDeepLink.tryParse(
+          'conver://other?conversationId=1&messageId=2',
+        ),
         isNull,
       );
       expect(
-        ProactiveDeepLink.tryParse('conver://proactive?conversationId=1&messageId=2#frag'),
+        ProactiveDeepLink.tryParse(
+          'conver://proactive?conversationId=1&messageId=2#frag',
+        ),
         isNotNull,
       );
     });
@@ -290,24 +316,34 @@ void main() {
       expect(defaultScheduler, isNotNull);
     });
 
-    test('schedule 成功 → true；zonedSchedule 收到 id/payload/摘要/inexact 模式', () async {
-      final plan = buildPlan(
-        id: 7,
-        conversationId: 101,
-        messageId: 202,
-        scheduledAt: DateTime(2026, 9, 16, 12, 0, 0),
-      );
+    test(
+      'schedule 成功 → true；zonedSchedule 收到 id/payload/摘要/inexact 模式',
+      () async {
+        final plan = buildPlan(
+          id: 7,
+          conversationId: 101,
+          messageId: 202,
+          scheduledAt: DateTime(2026, 9, 16, 12, 0, 0),
+        );
 
-      final ok = await scheduler.schedule(plan);
+        final ok = await scheduler.schedule(plan);
 
-      expect(ok, isTrue);
-      expect(plugin.lastZonedId, 7);
-      expect(plugin.lastPayload,
-          'conver://proactive?conversationId=101&messageId=202');
-      expect(plugin.lastScheduleMode, AndroidScheduleMode.inexactAllowWhileIdle);
-      expect(plugin.lastScheduledDate, tz.TZDateTime.from(
-          DateTime(2026, 9, 16, 12, 0, 0), tz.local));
-    });
+        expect(ok, isTrue);
+        expect(plugin.lastZonedId, 7);
+        expect(
+          plugin.lastPayload,
+          'conver://proactive?conversationId=101&messageId=202',
+        );
+        expect(
+          plugin.lastScheduleMode,
+          AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+        expect(
+          plugin.lastScheduledDate,
+          tz.TZDateTime.from(DateTime(2026, 9, 16, 12, 0, 0), tz.local),
+        );
+      },
+    );
 
     test('SR-11：body 用摘要，content 全文不落任何可见字段', () async {
       final plan = buildPlan();
@@ -351,29 +387,34 @@ void main() {
       expect(ok, isFalse);
     });
 
-    test('initialize 透传 onDidReceiveNotificationResponse 至 channel（回调注册且可触发）', () async {
-      NotificationResponse? received;
-      void callback(NotificationResponse response) {
-        received = response;
-      }
+    test(
+      'initialize 透传 onDidReceiveNotificationResponse 至 channel（回调注册且可触发）',
+      () async {
+        NotificationResponse? received;
+        void callback(NotificationResponse response) {
+          received = response;
+        }
 
-      await scheduler.initialize(onDidReceiveNotificationResponse: callback);
+        await scheduler.initialize(onDidReceiveNotificationResponse: callback);
 
-      expect(plugin.registeredCallback, same(callback));
-      plugin.registeredCallback!(
-        const NotificationResponse(
-          notificationResponseType:
-              NotificationResponseType.selectedNotification,
-          payload: 'conver://proactive?conversationId=101&messageId=202',
-          id: 7,
-        ),
-      );
-      expect(received?.payload,
-          'conver://proactive?conversationId=101&messageId=202');
-      expect(received?.id, 7);
-    });
+        expect(plugin.registeredCallback, same(callback));
+        plugin.registeredCallback!(
+          const NotificationResponse(
+            notificationResponseType:
+                NotificationResponseType.selectedNotification,
+            payload: 'conver://proactive?conversationId=101&messageId=202',
+            id: 7,
+          ),
+        );
+        expect(
+          received?.payload,
+          'conver://proactive?conversationId=101&messageId=202',
+        );
+        expect(received?.id, 7);
+      },
+    );
 
-test('initialize 带新回调晚到 → 重挂生效；同一回调重复 → 幂等零副作用（F-92 验收4）', () async {
+    test('initialize 带新回调晚到 → 重挂生效；同一回调重复 → 幂等零副作用（F-92 验收4）', () async {
       final logs = captureDebugPrint();
 
       void first(NotificationResponse response) {}
@@ -392,10 +433,16 @@ test('initialize 带新回调晚到 → 重挂生效；同一回调重复 → �
         await scheduler.initialize(onDidReceiveNotificationResponse: second),
         isTrue,
       );
-      expect(plugin.initializeCalls, 2,
-          reason: '晚到新回调触发一次重挂（修复前 _initialized 早退为 1）');
-      expect(plugin.registeredCallback, same(second),
-          reason: '重挂语义：晚到装配回调成为最终生效回调（修复前此断言红）');
+      expect(
+        plugin.initializeCalls,
+        2,
+        reason: '晚到新回调触发一次重挂（修复前 _initialized 早退为 1）',
+      );
+      expect(
+        plugin.registeredCallback,
+        same(second),
+        reason: '重挂语义：晚到装配回调成为最终生效回调（修复前此断言红）',
+      );
       expect(
         logs.any((line) => line?.contains('热态回调丢失') ?? false),
         isFalse,
@@ -407,12 +454,11 @@ test('initialize 带新回调晚到 → 重挂生效；同一回调重复 → �
         await scheduler.initialize(onDidReceiveNotificationResponse: second),
         isTrue,
       );
-      expect(plugin.initializeCalls, 2,
-          reason: '同一回调重复调用幂等：不产生新增副作用');
+      expect(plugin.initializeCalls, 2, reason: '同一回调重复调用幂等：不产生新增副作用');
       expect(plugin.registeredCallback, same(second));
     });
 
-test('并发反序真丢失修复：带回调先完成、无回调后完成 → 插件回调仍非 null（F-92 验收1）', () async {
+    test('并发反序真丢失修复：带回调先完成、无回调后完成 → 插件回调仍非 null（F-92 验收1）', () async {
       final logs = captureDebugPrint();
 
       NotificationResponse? received;
@@ -436,10 +482,12 @@ test('并发反序真丢失修复：带回调先完成、无回调后完成 → 
 
       // 锁串行语义：B 在 A 完成后走已初始化早退（无回调 → 静默），
       // 不再触碰插件回调槽——修复前 B 覆盖为 null，此断言红。
-      expect(plugin.initializeCalls, 1,
-          reason: '无回调后到路径早退，不重复初始化、不覆盖回调槽');
-      expect(plugin.registeredCallback, isNotNull,
-          reason: '并发反序交错后插件侧最终回调非 null（修复前此断言红）');
+      expect(plugin.initializeCalls, 1, reason: '无回调后到路径早退，不重复初始化、不覆盖回调槽');
+      expect(
+        plugin.registeredCallback,
+        isNotNull,
+        reason: '并发反序交错后插件侧最终回调非 null（修复前此断言红）',
+      );
       expect(plugin.registeredCallback, same(hotCallback));
 
       // 触发走消费路径：payload 经 registeredCallback 到达消费侧。
@@ -451,8 +499,10 @@ test('并发反序真丢失修复：带回调先完成、无回调后完成 → 
           id: 7,
         ),
       );
-      expect(received?.payload,
-          'conver://proactive?conversationId=101&messageId=202');
+      expect(
+        received?.payload,
+        'conver://proactive?conversationId=101&messageId=202',
+      );
 
       // 早退路径：已注册回调事实应保持 → 零告警。
       await scheduler.initialize();
@@ -463,7 +513,7 @@ test('并发反序真丢失修复：带回调先完成、无回调后完成 → 
       );
     });
 
-test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告警（F-92/F-97）', () async {
+    test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告警（F-92/F-97）', () async {
       final logs = captureDebugPrint();
 
       NotificationResponse? received;
@@ -474,8 +524,7 @@ test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告�
       // 先经 schedule 触发懒初始化：首次 initialize 无回调（异常装配顺序）。
       expect(await scheduler.schedule(buildPlan()), isTrue);
       expect(plugin.initializeCalls, 1, reason: 'schedule 懒初始化恰好一次');
-      expect(plugin.registeredCallback, isNull,
-          reason: '懒初始化路径不含热态回调');
+      expect(plugin.registeredCallback, isNull, reason: '懒初始化路径不含热态回调');
 
       // 后装配带回调 initialize：晚到重挂（再次 initialize 透传新回调）。
       expect(
@@ -484,10 +533,16 @@ test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告�
         ),
         isTrue,
       );
-      expect(plugin.initializeCalls, 2,
-          reason: '装配晚到触发一次重挂（修复前 _initialized 早退为 1）');
-      expect(plugin.registeredCallback, same(hotCallback),
-          reason: '装配回调最终注册生效——重挂语义（修复前此断言红）');
+      expect(
+        plugin.initializeCalls,
+        2,
+        reason: '装配晚到触发一次重挂（修复前 _initialized 早退为 1）',
+      );
+      expect(
+        plugin.registeredCallback,
+        same(hotCallback),
+        reason: '装配回调最终注册生效——重挂语义（修复前此断言红）',
+      );
       expect(
         logs.any((line) => line?.contains('热态回调丢失') ?? false),
         isFalse,
@@ -503,8 +558,10 @@ test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告�
           id: 7,
         ),
       );
-      expect(received?.payload,
-          'conver://proactive?conversationId=101&messageId=202');
+      expect(
+        received?.payload,
+        'conver://proactive?conversationId=101&messageId=202',
+      );
     });
 
     test('验收2反例：懒初始化完成后、装配晚到前的无回调早退零误告警（F-92）', () async {
@@ -519,8 +576,7 @@ test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告�
 
       // 装配挂起窗口内 third-party 无回调早退：不得误报「热态回调丢失」。
       expect(await scheduler.initialize(), isTrue);
-      expect(plugin.initializeCalls, 1,
-          reason: '无回调早退不触碰插件回调槽');
+      expect(plugin.initializeCalls, 1, reason: '无回调早退不触碰插件回调槽');
       expect(
         logs.any((line) => line?.contains('热态回调丢失') ?? false),
         isFalse,
@@ -535,8 +591,11 @@ test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告�
         isTrue,
       );
       expect(plugin.initializeCalls, 2);
-      expect(plugin.registeredCallback, same(hotCallback),
-          reason: '装配回调最终注册生效（重挂语义）');
+      expect(
+        plugin.registeredCallback,
+        same(hotCallback),
+        reason: '装配回调最终注册生效（重挂语义）',
+      );
       expect(
         logs.any((line) => line?.contains('热态回调丢失') ?? false),
         isFalse,
@@ -572,8 +631,7 @@ test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告�
 
       // 不可补救路径：重挂失败（插件 initialize 异常）→ seam 触发 ≥1 次。
       final doomed = build(isAndroid: true);
-      expect(await doomed.schedule(buildPlan()), isTrue,
-          reason: '懒初始化（无回调）成功');
+      expect(await doomed.schedule(buildPlan()), isTrue, reason: '懒初始化（无回调）成功');
       plugin.initializeShouldFail = true; // 重挂失败注入
       var doomedLost = 0;
       expect(
@@ -584,26 +642,35 @@ test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告�
         isFalse,
         reason: '重挂失败按调用失败返回 false',
       );
-      expect(doomedLost, greaterThanOrEqualTo(1),
-          reason: '不可补救路径告警 ≥1 次，经可注入 seam 上达调用方');
+      expect(
+        doomedLost,
+        greaterThanOrEqualTo(1),
+        reason: '不可补救路径告警 ≥1 次，经可注入 seam 上达调用方',
+      );
       plugin.initializeShouldFail = false;
     });
 
-    test('requestNotificationsPermission：Android 真路径经 channel 转发（true/false 透传）', () async {
-      plugin.permissionResult = true;
-      expect(await scheduler.requestNotificationsPermission(), isTrue);
-      expect(plugin.permissionCalls, 1);
+    test(
+      'requestNotificationsPermission：Android 真路径经 channel 转发（true/false 透传）',
+      () async {
+        plugin.permissionResult = true;
+        expect(await scheduler.requestNotificationsPermission(), isTrue);
+        expect(plugin.permissionCalls, 1);
 
-      plugin.permissionResult = false;
-      expect(await scheduler.requestNotificationsPermission(), isFalse);
-      expect(plugin.permissionCalls, 2);
-    });
+        plugin.permissionResult = false;
+        expect(await scheduler.requestNotificationsPermission(), isFalse);
+        expect(plugin.permissionCalls, 2);
+      },
+    );
 
-    test('requestNotificationsPermission：非 Android → null 且不调 channel', () async {
-      final nonAndroid = build(isAndroid: false);
-      expect(await nonAndroid.requestNotificationsPermission(), isNull);
-      expect(plugin.permissionCalls, 0);
-    });
+    test(
+      'requestNotificationsPermission：非 Android → null 且不调 channel',
+      () async {
+        final nonAndroid = build(isAndroid: false);
+        expect(await nonAndroid.requestNotificationsPermission(), isNull);
+        expect(plugin.permissionCalls, 0);
+      },
+    );
 
     test('requestNotificationsPermission：通道异常 → null 不抛（SR-12 摘要日志）', () async {
       plugin.permissionShouldFail = true;

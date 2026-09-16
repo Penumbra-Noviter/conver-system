@@ -511,10 +511,12 @@ class ConverApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => ShellNavigation()),
         // F-84 启动哑 Provider（lazy:false 立即执行）：通知初始化（幂等）+
-        // SR-08 排程恢复；热态回调闭包随**首次** initialize 注册（插件不支持
-        // 后补回调，`_initialized` 幂等守卫后再次调用直接 return）。回调复用
-        // 冷启动装配组件（AppDeepLinkNavigator + 两服务），依赖
-        // ShellNavigation/ChatController 已声明，故置于其后。失败不阻断。
+        // SR-08 排程恢复；热态回调闭包随**首次** initialize 注册，装配晚到
+        // 或顺延重挂经再次 initialize 透传新回调（插件 22.3.1 覆盖赋值、支持
+        // 重设；F-92/F-97 锁串行 + 重挂语义下 `_initialized` 只防重复初始化
+        // 副作用、不再吞回调）。回调复用冷启动装配组件（AppDeepLinkNavigator
+        // + 两服务），依赖 ShellNavigation/ChatController 已声明，故置于其后。
+        // 失败不阻断。
         Provider<Object?>(
           lazy: false, // W6-F1：无消费者时默认 lazy 永不执行，启动副作用必须立即触发
           create: (context) {
