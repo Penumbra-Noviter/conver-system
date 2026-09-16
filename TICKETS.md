@@ -19,14 +19,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| FD-01 | 通知热态回调状态机盲区收口 + 告警 seam（F-92+F-97） | 🔄 进行中 | 并发反序真丢失修复（registeredCallback 非 null 先红后绿）/ 晚到装配零误告警 / 告警 seam 上达装配方 / 幂等重挂 / SR-02·03·F-85 消费路径零改动 |
-| FD-02 | 活跃窗口常量单源（F-91） | 🔄 进行中 | activeWindow/recentWindow 双份 7 天常量收敛单源 + 判定表述统一 + 恰 7 天边界不变（纯重构豁免红绿） |
-| FD-03 | 测试 fixture 双份去重（F-93） | 🔄 进行中 | sqliteMasterNames/_SaveFailRepo 迁 test/helpers 单源 + 告警捕获 setup 共享（纯搬移豁免红绿） |
-| FD-04 | 构造死参数清理（F-94） | 📝 已录入 | 删 ProactiveMessageService.conversationRepository 参数 + 同步 5 处调用点 + grep 零残留（纯重构豁免红绿） |
-| FD-05 | messages.created_at 索引 + 迁移同步（F-95） | 📝 已录入 | idx_messages_created_at + schemaVersion 3→4 + onUpgrade from<4 幂等 + 迁移测试锚同步 + 秒精度复证（Blocked by FD-03） |
-| FD-06 | RelationshipThresholds 构造自洽校验（F-96） | 📝 已录入 | 全档 max 严格递增 + floor ≤ affinityMax + gap≥1 + 非法注入构造失败先红后绿 + 默认零回归 |
-
-> 技术债消费批次 F-91~97（来源：handoff-techdebt-f78f90-done-2026-09-17 交接指令，project-kickoff 全自动档；spec 与工单详情见 `.scratch/techdebt-f91f97/`，不入 git）。
 
 
 ---
@@ -38,6 +30,19 @@
 ---
 
 ## 已完成归档
+
+### 技术债消费批次 F-91~F-97（2026-09-17 收口）
+
+> 来源：handoff-techdebt-f78f90-done-2026-09-17 交接指令（project-kickoff 全自动档）。6 工单合入：FD-01 `8508af1`（+ 波末 merge 手工合取）/ FD-02 `c2e6f0f` / FD-03 `5762ec7`（W1 merge `2778ad9`）/ FD-04 `22672d1` / FD-06 `43efb82`（W2 首批 merge）/ FD-05 `25eef77`（W2 收口）+ 期末修复 R-S1/R-S2 `b0c3650`。门禁：全量 **1996 测**绿（基线 1987 → +9）/ analyze 0 / 期末四轴 **0 阻断**（R-F1/R-F2/I-F4 落债 F-98~100）。详见 DEV_LOG〈技术债消费批次 techdebt-f91f97〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| FD-01 | 通知热态回调状态机盲区收口 + 告警 seam（F-92+F-97） | 2026-09-17 | 8508af1 |
+| FD-02 | 活跃窗口常量单源（F-91） | 2026-09-17 | c2e6f0f |
+| FD-03 | 测试 fixture 双份去重（F-93） | 2026-09-17 | 5762ec7 |
+| FD-04 | 构造死参数清理（F-94） | 2026-09-17 | 22672d1 |
+| FD-05 | messages.created_at 索引 + 迁移同步（F-95） | 2026-09-17 | 25eef77 |
+| FD-06 | RelationshipThresholds 构造自洽校验（F-96） | 2026-09-17 | 43efb82 |
 
 ### 技术债消费批次 F-78/F-79/F-80/F-81/F-82/F-90（2026-09-17 收口）
 

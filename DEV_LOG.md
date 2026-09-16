@@ -6,6 +6,23 @@
 
 ---
 
+## 技术债消费批次 techdebt-f91f97（2026-09-17 — handoff-techdebt-f78f90-done-2026-09-17 交接指令，/project-kickoff 全自动档）
+
+- **范围**：消费候选区 7 条全部——F-92+F-97 并批（通知热态回调状态机盲区 + 告警 seam）+ F-91（活跃窗口常量单源）+ F-93（测试 fixture 双份去重）+ F-94（构造死参数清理）+ F-95（messages.created_at 索引 + schemaVersion 4）+ F-96（RelationshipThresholds 构造自洽校验）。6 工单：W1 FD-01‖02‖03（并行 worktree）+ W2 FD-04‖05‖06（05 Blocked by 03 顺序满足）。
+- **交付**：
+  - FD-01：通知初始化锁串行 `_initSerial`（并发按序执行、无回调后到者早退静默不触碰插件回调槽）+ 重挂语义（新回调再次 initialize 透传，插件 22.3.1 覆盖赋值实证）+ 告警 seam `initialize(..., onHotCallbackLost:)` 上达装配方（正常/可补救 0、不可补救 ≥1）+ `_hotCallbackRegistered` 语义强化（hot=true ⇔ 插件侧已注册非 null）；先红后绿（7 失败→全绿）——commit `8508af1`
+  - FD-02：`companion_time_windows.dart` 深模块（协议表面 1 符号）单源收敛 activeWindow/recentWindow + 判定表述统一「≥now−7d 允许、<now−7d 拒绝」+ 恰 7 天边界锚 + 两常量同源锚（主会话补齐）——commit `c2e6f0f`
+  - FD-03：`sqliteMasterNames`/`_SaveFailRepo` 迁 test/helpers 单源 + 告警捕获 `captureDebugPrint()` 收敛（4 处 setup 形状）——commit `5762ec7`
+  - FD-04：删 `ProactiveMessageService` 构造死参数 conversationRepository（实际 5 处调用点）+ 测试替身 super 转发连带清理；grep 零残留净删 15 行——commit `22672d1`
+  - FD-05：`idx_messages_created_at` 索引 + schemaVersion 3→4 + onUpgrade `from<4` 分支（IF NOT EXISTS 幂等）+ 迁移测试断言链同步（冻结 4/索引/user_version=4/自愈四要素）+ 秒精度复证 docstring；先红后绿（8 失败→全绿），v1/v2 夹具 DROP INDEX 逼真走补建路径——commit `25eef77`
+  - FD-06：RelationshipThresholds 构造 assert 链（全档 max 严格递增 + intimateMax+1 ≤ affinityMax + gap≥1）；非法注入构造失败先红后绿；默认/自定义合法全档反向自洽增强断言——commit `43efb82`
+- **门禁链**：全量 **1996 测**绿（基线 1987 → +9）/ analyze 0 / 期末四轴 **0 阻断**（固定点 0191e50；Standards 2 Recommended / Spec 0 硬错 / Falsify 2 Recommended + 2 Info / Architecture 0）。期末修复 R-S1（测试文件 dart format）/ R-S2（app.dart 装配注释对齐重挂语义）——commit `b0c3650`。
+- **过程遥测**：子智能体 10（Grilling 1 + plan-tickets 1 + Implement 6 + code-review 2 重派）；重开 1（code-review 首次仅返 Architecture 中间态未落盘 → 重派补完）；合并冲突 1（FD-01↔03 共享 notification_service_test.dart，手工合取保留 01 新语义断言 + 03 helper 收敛）；worktree 误入 git 索引（git add -A 卷入嵌入式仓库，gitignore 补 `.worktrees/` 修正）；safe.directory 预注册 6 worktree（exFAT 所有权坑）；全量测试 1 次绿。
+- **技术债闭环**：7 条全处置（F-92+F-97/F-91/F-93/F-94/F-95/F-96 ✅ 已修，处置记录 2026-09-17 节）；期末非阻断落债 F-98（并发交错测试矩阵缺口：反序变体未机器化）/ F-99（initialize 返回值忽略契约缝隙，既有行为）/ F-100（告警 seam 用例共享实例时序敏感，Speculative）；候选区剩 3 条待立项。
+- **知识库召回轨迹**：预检 persona（Conver System）+ 精读《worktree落exFAT盘dubious ownership》（操作坑①实证）；开发期 kb-search 未触发；
+- **编排教训**：① 共享测试文件跨票未入冲突矩阵（FD-01 与 FD-03 同改 notification_service_test）——plan-tickets 冲突面应含「同文件不同票」再核一遍；② FD-02 子代理完成未 commit（半成品：验收 4 同源锚缺失）→ 主会话核验补完，stats 显示「completed」但磁盘态未收口，须 git status 实核。
+- **预设接续**：候选区 F-98~100 待下轮 kickoff 预检消费；权限系统弹窗真机路径、阶段 3 人机恋深化仍开放。
+
 ## 技术债消费批次 techdebt-f78f90（2026-09-17 — handoff-techdebt-f84f88-done-2026-09-16 交接指令，/project-kickoff 全自动档）
 
 - **范围**：消费候选区 7 条中的 6 条——F-78（迁移注释纠偏）+ F-79（中断残留自愈用例）+ F-80（后台反思写失败回滚测试）+ F-81（活跃时间查询单源）+ F-82（confirm 档位下限 clamp）+ F-90（通知热态回调契约防御）；F-89 复核关闭。5 工单 2 波：W1 FDBT-01‖02‖03‖04（并行 worktree）+ W2 FDBT-05（Blocked by FDBT-04 串行）。

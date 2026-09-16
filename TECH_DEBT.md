@@ -43,15 +43,24 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-91 | `ProactiveThresholds.activeWindow`（proactive_message_service.dart:55）与 `RelationshipThresholds.recentWindow` 双份 7 天常量 + 双份窗口判定表述（`>7d 拒绝` vs `≥now−7d 允许`，数学等价但改窗口需动两文件） | 波 1 Architecture 增量审核（techdebt-f78f90） | 中 | 📝 待立项 | 伴侣域 |
-| F-92 | FDBT-03 告警通道缺 seam：热态回调丢失仅 debugPrint（release no-op）、装配方不感知永久性功能缺陷（F-90 防的是深链不可消费） | 波 1 Architecture + Falsify 增量审核（techdebt-f78f90） | 中 | 📝 待立项 | 伴侣域 |
-| F-93 | 测试 fixture 双份：`sqliteMasterNames`（app_database_test.dart:24 vs stage2_migration_test.dart:133）、`_SaveFailRepo`（conversation_settings_widget_test.dart:31 vs conversation_settings_page_stage2_test.dart:30）——SQL 逐字同/同构，改查询需动两文件；notification_service_test 三个新用例重复「logs 数组 + debugPrint 替换 + addTearDown 还原」setup 形状（期末四轴 ST-1 并入） | 波 1 Architecture 增量审核（techdebt-f78f90）+ 期末四轴 Standards 复证 | 中 | 📝 待立项 | 测试 |
-| F-94 | `ProactiveMessageService` 构造死参数 `conversationRepository`（字段已删、类内零引用；为满足 FDBT-04 验收 8「签名不动」的刻意取舍，收口后可删并同步 3 处调用点） | 波 1 Standards 轴（techdebt-f78f90） | 低 | 📝 待立项 | 伴侣域 |
-| F-95 | `latestMessageAt` 无 createdAt 索引（tables.dart 仅 `idx_messages_conversation_id`），大表 join 全表扫描；秒精度截断与 F-3 复证 | 波 1 Falsify 增量审核（techdebt-f78f90） | 低 | 📝 待立项 | 数据层 |
-| F-96 | `RelationshipThresholds` 构造无单调性/可达性校验：注入 `intimateMax≥100` 时 `floorForStage(soulmate)=101` 被 `clampAffinity` 收敛到 100 而 `stageForAffinity(100)=intimate≠soulmate`，落库不一致且无告警；max 递减注入同样静默断裂反向自洽。默认配置不可达（79/80 const 锁死、无配置面）；修复前同配置下同样失效（非本波引入）。防复发断言方向：thresholds 构造全档 max 严格递增 + `floorForStage` 全档 ≤ affinityMax + 相邻档 gap ≥ 1 | 波 2 Falsify 增量审核（techdebt-f78f90）+ 期末四轴 Falsify 复证（FA-1 实测确认） | 低 | 📝 待立项 | 伴侣域 |
-| F-97 | 通知初始化双 bool 状态机 OR 语义假绿盲区：并发反序交错下（带回调先完成、无回调后完成）插件 initialize 覆盖赋值回调为 null（:157 实证），hot=true 宣称有回调、实际已丢，早退路径零告警——OR 只防「有→无降级」掩盖「覆盖丢失」；另无回调懒初始化完成、带回调装配挂起窗口内第三方 initialize 早退会误打假告警。与 F-92 关联但角度不同（F-92=告警通道缺 seam；F-97=状态机语义掩盖真丢失），建议并批消费 | 期末四轴 Architecture（AR-1）+ Falsify（FA-2，techdebt-f78f90） | 中 | 📝 待立项 | 伴侣域 |
+| F-98 | 通知初始化并发交错测试仅覆盖「带回调先、无回调后完成」单方向；反序变体（无回调挂起中带回调进入）未机器化——锁串行分析确认现实现无缺陷，属测试矩阵缺口 | 期末四轴 Falsify（R-F1，techdebt-f91f97） | 低 | 📝 待立项 | 伴侣域 |
+| F-99 | notification_service `_channel.initialize` 返回值被忽略、验收 5「状态与插件实际一致」存契约缝隙（重挂失败时 hot=true 与插件侧不一致无显式处理）——基线实证为既有行为延续，非本批回归 | 期末四轴 Falsify（R-F2，techdebt-f91f97） | 低 | 📝 待立项 | 伴侣域 |
+| F-100 | 告警 seam 测试用例共享 `plugin` 实例，断言顺序敏感（现时序绿；用例间隔离可消除 flake 风险） | 期末四轴 Falsify（I-F4，techdebt-f91f97） | Speculative | 📝 待立项 | 测试 |
 
 ## 技术债处置记录
+
+### 2026-09-17 — 技术债消费批次（F-91~F-97 全部处置）
+
+> 来源：handoff-techdebt-f78f90-done-2026-09-17 交接指令（project-kickoff 全自动档）。6 工单全部合入（FD-01 `8508af1` / FD-02 `c2e6f0f` / FD-03 `5762ec7` W1 merge `2778ad9`；FD-04 `22672d1` / FD-06 `43efb82` / FD-05 `25eef77` W2 merge；期末修复 R-S1/R-S2 `b0c3650`）。门禁：全量 **1996 测**绿（基线 1987 → +9）/ analyze 0 / 期末四轴 **0 阻断**（Recommended 5 条：R-S1/R-S2 已修，R-F1/R-F2/I-F4 落债 F-98~100）。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-92+F-97 | ✅ 已修 | FD-01：通知初始化锁串行 `_initSerial`（并发按序执行，无回调后到者早退静默不触碰插件回调槽——消灭覆盖丢失面）+ 重挂语义（新回调再次 initialize 透传，插件 22.3.1 覆盖赋值实证）+ 告警 seam `initialize(..., onHotCallbackLost:)` 上达装配方（正常/可补救 0、不可补救 ≥1）+ `_hotCallbackRegistered` 语义强化（hot=true ⇔ 插件侧已注册非 null 回调）；先红后绿（7 失败→全绿）；SR-02/03/F-85 消费路径零改动 |
+| F-91 | ✅ 已修 | FD-02：新建 `companion_time_windows.dart` 深模块（协议表面 1 符号 `CompanionTimeWindows.activeWindow`），`ProactiveThresholds.activeWindow` 与 `RelationshipThresholds.recentWindow` 双侧引用收敛单源；判定表述统一「≥now−7d 允许、<now−7d 拒绝」；恰 7 天边界锚测试 + 两常量同源锚（主会话补齐） |
+| F-93 | ✅ 已修 | FD-03：`sqliteMasterNames`（db_meta.dart）/ `_SaveFailRepo`（save_fail_repo.dart）双份 fixture 迁 test/helpers 单源；notification_service_test 三波末用例 + FD-01 新增反例 setup 收敛 `captureDebugPrint()`（debug_print_capture.dart）；纯搬移行为零变化 |
+| F-94 | ✅ 已修 | FD-04：删 `ProactiveMessageService` 构造死参数 `conversationRepository`（按实际 5 处调用点执行：1 装配 + 4 测试）+ 测试替身 super 转发连带清理；grep 零残留、净删 15 行 |
+| F-95 | ✅ 已修 | FD-05：`Messages` 新增 `idx_messages_created_at` + schemaVersion 3→4 + onUpgrade `from<4` 分支（CREATE INDEX IF NOT EXISTS 幂等三机制延续）+ 迁移测试断言链同步（冻结 4/索引/user_version=4/自愈四要素）+ 秒精度复证 docstring（F-3 契约不改存储精度）；先红后绿（8 失败→全绿），v1/v2 夹具 DROP INDEX 逼真走补建路径 |
+| F-96 | ✅ 已修 | FD-06：`RelationshipThresholds` 构造 assert 链（全档 max 严格递增 + intimateMax+1 ≤ affinityMax + 隐含 gap≥1）；非法注入（intimateMax:100 / max 递减）构造失败先红后绿；默认/自定义合法阈值全档反向自洽增强断言；docstring 注明 assert 仅 debug 生效（防御定位装配/测试期契约，release 无注入面） |
 
 ### 2026-09-17 — 技术债消费批次（F-78/F-79/F-80/F-81/F-82/F-90 消费 + F-89 复核关闭）
 
