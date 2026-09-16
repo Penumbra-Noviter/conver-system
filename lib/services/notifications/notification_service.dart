@@ -97,7 +97,11 @@ class ProactiveDeepLink {
 /// 对齐「平台薄层经 seam 隔离」约定。签名与插件 22.3.1 对应方法同形
 /// （裁剪至本票用到的参数）。
 abstract interface class FlutterLocalNotificationsChannel {
-  /// 初始化（Android 通道创建等）；返回 true 表示成功。热态通知点按回调
+  /// 初始化（Android 通道创建等）。**成功 = 返回 true 且非 null**；
+  /// false/null 视为通道初始化失败（F-99 契约：插件 22.3.1 返回 false
+  /// 前已覆盖赋值回调槽——platform_flutter_local_notifications.dart
+  /// Android/Darwin 覆盖赋值实证，故失败时槽内回调仍可能有效，服务只按
+  /// 返回值判定成败，不依据槽状态反推）。热态通知点按回调
   /// [onDidReceiveNotificationResponse] 同形透传插件（F-84：App 存活时
   /// 点按消费深链的前提）。
   Future<bool?> initialize({
@@ -258,7 +262,11 @@ class FlutterLocalNotificationsScheduler
   /// [onHotCallbackLost]：热态回调不可补救丢失告警 seam（F-92），
   /// reason 为失败摘要（SR-12：不携带任何 payload 内容）；正常装配与
   /// 可补救（重挂成功）路径零触发。
-  /// 成功 true；平台通道缺失/初始化异常 → false 不抛（SR-12 摘要日志）。
+  /// 成功 = 插件 initialize 返回 true 且非 null（F-99 契约，见
+  /// [FlutterLocalNotificationsChannel.initialize]）；失败 → false 不抛
+  /// （SR-12 摘要日志）：首次失败不缓存成功态可自然重试，重挂失败经
+  /// [onHotCallbackLost] seam 上达且保留旧回调值（C2：插件槽可能已换
+  /// 新回调，晚到同一新回调可再重挂补救）。
   /// PS2-08 装配时显式调用一次；[schedule] 内部亦会按需懒初始化。
   Future<bool> initialize({
     DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
@@ -281,6 +289,14 @@ class FlutterLocalNotificationsScheduler
   }
 
   /// initialize 临界区核心（调用方已持有串行化锁）。
+  ///
+  /// **成功 = 插件 initialize 返回 true 且非 null**（F-99 契约）；false/null
+  /// 视为通道初始化失败：首次路径不缓存成功态（不置 [_initialized]，返回
+  /// false 允许后续自然重试）、重挂路径与异常同处理（seam 上报 + 返回
+  /// false，不更新 [_registeredCallback] 旧值——C2 残余 edge：插件槽可能
+  /// 已换新回调，服务保留旧值 → 晚到同一新回调可再重挂补救）。hot 追踪
+  /// 仅在成功路径置位（F-90 OR 语义保留；失败保守不置位，不违反 hot=true
+  /// ⇒ 插件侧已注册非 null 回调的单向蕴含）。
   Future<bool> _initializeLocked({
     required DidReceiveNotificationResponseCallback?
         onDidReceiveNotificationResponse,
@@ -297,10 +313,20 @@ class FlutterLocalNotificationsScheduler
         return true;
       }
       try {
-        await _channel.initialize(
+        final ok = await _channel.initialize(
           settings: _initializationSettings,
           onDidReceiveNotificationResponse: callback,
         );
+        if (ok != true) {
+          // false/null：通道初始化失败（插件 22.3.1 返回 false 前回调槽
+          // 已覆盖为新回调——Android/Darwin 覆盖赋值实证）→ 与异常路径
+          // 同处理：seam 上报 + 返回 false，不更新旧值（C2 可补救）。
+          const reason =
+              'hot callback re-register failed: initialize returned not-true';
+          debugPrint('proactive notify $reason');
+          onHotCallbackLost?.call(reason);
+          return false;
+        }
         _registeredCallback = callback;
         _hotCallbackRegistered = true;
         return true;
@@ -313,10 +339,18 @@ class FlutterLocalNotificationsScheduler
     try {
       tzdata.initializeTimeZones();
       tz.setLocalLocation(tz.getLocation(_localTimeZone));
-      await _channel.initialize(
+      final ok = await _channel.initialize(
         settings: _initializationSettings,
         onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
       );
+      if (ok != true) {
+        // false/null：通道创建失败 → 不缓存成功态（不置 _initialized、
+        // 不触碰 hot 追踪），返回 false 允许 schedule/装配自然重试。
+        debugPrint(
+          'proactive notify init failed: initialize returned not-true',
+        );
+        return false;
+      }
       _initialized = true;
       // OR 语义（F-90 保留）：已注册回调事实不被无回调路径降级；锁串行
       // 后并发交错不可达，语义与插件实际仍一致（hot=true ⇒ 非 null 回调）。
