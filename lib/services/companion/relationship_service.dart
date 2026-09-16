@@ -22,6 +22,7 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/companion_repository.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../data/repositories/message_repository.dart';
+import 'companion_time_windows.dart' show CompanionTimeWindows;
 
 /// 升级提议（亲密/挚爱候选）— 不落库的评估产物（spec 判定⑤）。
 ///
@@ -84,8 +85,10 @@ class RelationshipThresholds {
   /// affinity 合法区间上界。
   static const int affinityMax = 100;
 
-  /// 「最近活跃」窗口（spec 判定⑨：now − 7d）。
-  static const Duration recentWindow = Duration(days: 7);
+  /// 「最近活跃」窗口（spec 判定⑨：now − 7d；F-91 单源引用，与 proactive
+  /// 侧共享——边界语义「最近活跃时间 >= now − 7d 允许、< now − 7d 拒绝」，
+  /// 恰 7 天允许）。
+  static const Duration recentWindow = CompanionTimeWindows.activeWindow;
 
   /// affinity → 阶段映射（含端点语义，[RelationshipThresholds.intimateMax]
   /// 之上即 soulmate）。

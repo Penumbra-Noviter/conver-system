@@ -12,6 +12,8 @@ import 'package:conver_system_mobile/data/repositories/companion_repository.dart
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/companion/companion_time_windows.dart'
+    show CompanionTimeWindows;
 import 'package:conver_system_mobile/services/companion/proactive_message_service.dart';
 import 'package:conver_system_mobile/services/companion/relationship_service.dart';
 import 'package:drift/native.dart';
@@ -44,6 +46,17 @@ void main() {
       expect(ProactiveThresholds.activeWindow, const Duration(days: 7));
       expect(ProactiveThresholds.minMinutesFromNow, 10);
       expect(ProactiveThresholds.maxMinutesFromNow, 360);
+    });
+
+    test('活跃窗口两常量同源（F-91 单源锚：改一处即双生效）', () {
+      expect(
+        ProactiveThresholds.activeWindow,
+        RelationshipThresholds.recentWindow,
+      );
+      expect(
+        ProactiveThresholds.activeWindow,
+        CompanionTimeWindows.activeWindow,
+      );
     });
   });
 
