@@ -1339,7 +1339,28 @@ void main() {
       expect(await companionRepo.listPlansByStatus(ProactivePlanStatus.sent), isEmpty);
     });
 
-    test('expired 计划 → null 不写（状态机只收 scheduled）', () async {
+    test('dropped 计划（消息消失 messageId setNull）→ null 零写库', () async {
+      final ids = await seedChain();
+      final plan = await seedScheduledPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        scheduledAt: fixedNow.add(const Duration(hours: 1)),
+      );
+      final messageId = plan.messageId!;
+      // 生产 dropped 链：消息载体删除 → FK setNull。按已消失的 messageId
+      // 点按，getPlanByMessageId 查不到 → null（dropped 天然排除）。
+      await messageRepo.deleteMessagesFrom(ids.conversationId, messageId);
+      final service = buildService();
+
+      final result = await service.markDeliveredByMessageId(messageId);
+
+      expect(result, isNull);
+      expect(await companionRepo.listPlansByStatus(ProactivePlanStatus.sent), isEmpty);
+      final plans = await db.select(db.proactivePlans).get();
+      expect(plans.single.messageId, isNull);
+    });
+
+    test('expired 计划点按 → 同样收口置 sent + sentAt（F-88：点按即送达证据）', () async {
       final ids = await seedChain();
       final plan = await seedScheduledPlan(
         characterId: ids.characterId,
@@ -1350,12 +1371,22 @@ void main() {
       await companionRepo.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
       final service = buildService();
 
-      final result = await service.markDeliveredByMessageId(plan.messageId!);
+      final delivered = await service.markDeliveredByMessageId(plan.messageId!);
 
-      expect(result, isNull);
-      final expired = await companionRepo.listPlansByStatus(ProactivePlanStatus.expired);
-      expect(expired.single.sentAt, isNull);
-      expect(await companionRepo.listPlansByStatus(ProactivePlanStatus.sent), isEmpty);
+      // F-88 新语义：expired 计划被点按 = 送达证据（与 expired「不重排不
+      // 发送」正交——过期仅表示不再重排/发送，用户触达仍是事实）。
+      expect(delivered, isNotNull);
+      expect(delivered!.id, plan.id);
+      expect(delivered.characterId, ids.characterId);
+      expect(
+        await companionRepo.listPlansByStatus(ProactivePlanStatus.expired),
+        isEmpty,
+      );
+      final sent = await companionRepo.listPlansByStatus(ProactivePlanStatus.sent);
+      expect(sent, hasLength(1));
+      expect(sent.single.id, plan.id);
+      expect(sent.single.status, ProactivePlanStatus.sent);
+      expect(sent.single.sentAt, fixedNow);
     });
 
     test('C1 节流生产可达：markDelivered 送达 1 条后同角色 planAfterTurn 被 gate 拒绝，planner 零调用', () async {

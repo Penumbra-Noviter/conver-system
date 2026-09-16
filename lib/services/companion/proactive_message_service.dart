@@ -406,20 +406,25 @@ class ProactiveMessageService {
     }
   }
 
-  /// 送达收口（期末四轴 C1 / SR-07）：通知点按/触达后置 sent + sentAt。
+  /// 送达收口（期末四轴 C1 / SR-07 / F-88 收口放宽）：通知点按/触达后置
+  /// sent + sentAt。
   ///
-  /// 仅 `scheduled` 计划生效并置 `sent`（sentAt 缺省取本层 now）；已
-  /// sent/expired/dropped/不存在 → 返回 null 且零写库（幂等：重复点按不
-  /// 覆盖 sentAt，节流计数/冷却口径不受重放影响）。返回**送达操作对应的
-  /// 计划快照**（status 仍为 scheduled、sentAt null——更新前状态），消费
-  /// 面仅用 characterId 记录「点开主动消息 +5」（P4 启发式）；状态/sentAt
-  /// 以库内查回为准。
+  /// 状态白名单 = {scheduled, expired}：scheduled 计划点按 → 置 sent（sentAt
+  /// 缺省取本层 now）；expired 计划点按 → 同样置 sent（F-88：点按即送达
+  /// 证据——expired 仅表示「不重排不发送」，用户实际触达仍是事实，计入节流
+  /// 计数与亲密值）。sent 幂等（重复点按返回 null 且零写库，sentAt 不被
+  /// 覆盖）；dropped / 不存在（含 messageId null 查不到）→ null 且零写库。
+  /// 返回**送达操作对应的计划快照**（status 仍为 scheduled/expired、sentAt
+  /// null——更新前状态），消费面仅用 characterId 记录「点开主动消息 +5」
+  /// （P4 启发式）；状态/sentAt 以库内查回为准。
   Future<ProactivePlan?> markDeliveredByMessageId(
     int messageId, {
     DateTime? at,
   }) async {
     final plan = await _companion.getPlanByMessageId(messageId);
-    if (plan == null || plan.status != ProactivePlanStatus.scheduled) {
+    if (plan == null ||
+        (plan.status != ProactivePlanStatus.scheduled &&
+            plan.status != ProactivePlanStatus.expired)) {
       return null;
     }
     await _companion.updatePlanStatus(
