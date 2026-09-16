@@ -6,6 +6,21 @@
 
 ---
 
+## 技术债消费批次 techdebt-f104f105（2026-09-17 — handoff-techdebt-f101f103-done-2026-09-17 交接指令，/project-kickoff 全自动档）
+
+- **范围**：消费候选区 2 条（F-104 `characters_view_stage2_test` publish 用例存量 flaky / F-105 票面纠偏表述收窄）；2 工单并批 1 波串行 lane（01 复现定位 + 健壮性修复 / 02 文本修正，文件零交集）。先搜开源三分：自建（flaky 复现复用 Flutter CLI 逐遍循环——`--repeat` 实测不被 flutter_tools 3.47.2 支持，改 shell 循环；文档修正为仓内文本）。
+- **票面归因实证推翻（本批核心实证）**：复现循环（shell 逐遍 10 次全量，时间盒内完成）捕获 **2 次失败（PASS 7/10）**——失败用例均为 `chat_entry_test.dart`「默认选中首角色」（96 行，Expected `<1>`/Actual `<2>`），与上批 f98f100 记录「环境性 flake、不落债」**同一用例**；票面目标 `characters_view_stage2_test.dart` **15 遍零失败**。修复后全量 5 遍仍 2 次失败（同为 chat_entry_test）——「环境性」判定疑似误判，真实竞态（芯片已渲染但 selectedCharacterId 仍为 second.id，根因疑在生产 ChatController 选中时序，置信度中高，未定位具体行）。用户拍板：01 票按 fallback 语义收口 + 另立 **F-106（Strong）** 下批消费。
+- **交付**：
+  - F104F105-01：`pumpStage2` loading 轮询 100 次静默放行 → `pumpUntil`（300 次）+ 显式断言「角色列表加载未在轮询窗口内完成」；5 处 publish 用例（升级建议：亲密 / 多选态确认 / 确认 / 拒绝 / F1）断言前单帧裸 pump → `pumpUntil` 条件等待；无 test 块增删、生产零 diff——commit `a5e79b7`（merge `ffb05c7`，验收 7/7 按 fallback 语义）
+  - F104F105-02：4 处旧版失实表述修正（DEV_LOG 票面纠偏句 / TECH_DEBT 处置记录引注 / TICKETS 归档行 / `notification_service_test.dart` 注释块），统一「从未存在于代码 reason（文档/注释引述除外）」口径 + `git log -S` 命中 4 commit（`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`）实证引据；纯文本/注释、行为零变化——commit `77fb9a1`（merge `ffb05c7`，验收 5/5）
+- **门禁链**：全量 **2000 测**全绿（主会话合并后实测；Implement 侧 02 票全量 3 遍绿）/ analyze 0 / dart format 0 / 期末四轴 **通过**（0 Critical，Recommended 5 项均非阻断）。
+- **审核修复（无）**：期末四轴结论位直接「通过」，无阻断项派回；Recommended 均落债/收尾顺带（见下）。
+- **过程遥测**：子智能体 5（Grilling 1 + plan-tickets 1 + Implement 1×2 票串行 + code-review 1）+ 主会话直做（收尾 03）；无重开/冲突/回退；复现循环 10 遍全量 2 次失败（2/10 复现率）+ 修复后 5 遍 2 次；全量测试主会话 1 次绿。
+- **技术债闭环**：2 条全处置（F-104 ✅ fallback 语义 / F-105 ✅ 已修）；候选区清零后落债 F-106（chat_entry 竞态，Strong，用户拍板）/ F-107（pumpUntil 6 文件重复 + why 现象式，低）/ F-108（纠偏口径文档散落 + `git log -S` 搜索串未注明，Speculative）——F-107/108 来自期末四轴。
+- **知识库召回轨迹**：预检 persona（Conver System）+ 经验摘要扫读（审计快照过期须复核 / 技术债票面修复建议须实证复核 / 复现型竞态先跑复现循环落盘日志 / 验收线语义意图 / 固定日期测试定时炸弹）；开发期 kb-search 未触发。
+- **编排教训**：① **flaky 票面归因必须复现循环实证**——F-104 票面指向 `characters_view_stage2` 是上批期末四轴的代码推断，复现实证 2/10 指向 `chat_entry_test`，推断不可信；② **「隔离绿 + 单跑/重跑绿」不足以判环境性**——上批 f98f100 把同一 chat_entry 竞态判为环境性不落债，本批全量并发 20-40% 复现率证明是真实竞态（时序敏感用例隔离不红、全量并发才红，正是共享状态竞态特征）；③ `flutter test --repeat` 3.47.2 不支持，逐遍循环捕获是可靠替代；④ dart format 全文件重排会把小改动 diff 撑大（251 行 vs 实质 ~15 行），交付说明须标注工具副作用。
+- **预设接续**：候选区 F-106~108 待下轮 kickoff 预检消费（F-106 Strong 必入；F-107 低 / F-108 Speculative）；残留清理 `.worktrees/f91f97-1` 空壳仍待进程释放后手动删（沿用）；权限弹窗真机补验、阶段 3 人机恋深化仍开放（可选）；交付后复核（约一周后三问）可选。
+
 ## 技术债消费批次 techdebt-f101f103（2026-09-17 — handoff-techdebt-f98f100-done-2026-09-17 交接指令，/project-kickoff 全自动档）
 
 - **范围**：消费候选区 3 条（F-101 反序 gate 用例验收 reason 文本归因待裁决 / F-102 告警 seam 用例「组级 plugin 零引用」字面验收线 / F-103 全仓 format 存量差异）；2 工单并批 1 波串行 lane（同文件 `notification_service_test.dart`，01/02 区域零重叠）；F-103 复核关闭（用户拍板归一不立项）。先搜开源三分：自建（两票全为仓内测试文件局部增强，零新依赖）。

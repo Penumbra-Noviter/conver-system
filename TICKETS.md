@@ -31,6 +31,15 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-104~F-105（2026-09-17 收口）
+
+> 来源：handoff-techdebt-f101f103-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（01 复现定位 + 健壮性修复 / 02 表述收窄，生产零 diff）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **通过**（0 Critical）。**票面归因实证推翻**：F-104 复现循环（10 遍全量 2 次失败）指向 `chat_entry_test`「默认选中首角色」竞态（Expected 1/Actual 2），票面目标 `characters_view_stage2` 15 遍零失败——01 票按 fallback 语义收口（pumpStage2 显式断言 + 5 处 publish 前置等待），chat_entry 竞态另立 **F-106**（Strong，用户拍板下批消费）。F-105 四处「从未存在于仓库」失实表述统一为「从未存在于代码 reason（文档/注释引述除外）」口径。非阻断落债 F-107/F-108。详见 DEV_LOG〈技术债消费批次 techdebt-f104f105〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F104F105-01 | characters_view_stage2 等待逻辑健壮性（复现先红 + pumpUntil 同构修复，F-104） | 2026-09-17 | a5e79b7（merge ffb05c7） |
+| F104F105-02 | F-105 表述收窄（4 处「从未存在于仓库」失实表述统一为代码 reason 口径） | 2026-09-17 | 77fb9a1（merge ffb05c7） |
+
 ### 技术债消费批次 F-101~F-103（2026-09-17 收口）
 
 > 来源：handoff-techdebt-f98f100-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（同 commit 自洽，纯测试生产零 diff）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **0 阻断**（F-103 复核关闭，候选区清零无新落债）。票面纠偏：F-101 票面「修正 reason 文本」修正对象不存在（「若锁失效并行交错则为 1」从未存在于**代码 reason**（文档/注释引述除外）；`git log -S` 命中 4 commit（`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`）均为文档/注释引述；`76f7da8` 原文为「若早退拦截则为 1」），B′ 双 gate 中间态断言突变实验实锤。详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉。
@@ -88,30 +97,13 @@
 | F-84-05 | F-84 权限请求（开关启用时） | 2026-09-16 | 5b52e73（merge 8802d7f） |
 | F-83-06 | F-83 restore expired 分支 per-plan 降级 | 2026-09-16 | d56a7c1（merge 971d453） |
 
-### 人机恋阶段 2 批次 — 主动消息循环 / 关系状态机 / 内心独白（2026-09-15 收口）
-
-> 来源：handoff-ai-companion-mobile-stage1.5 + /project-kickoff 全自动档（Grilling 共识 P1~P6 全按推荐 + threat-model SR-01~15 + 3 份 ADR）。10 工单 6 波 DAG（W1 01 / W2 02 / W3 03‖04‖05 / W4 06‖07‖09 / W5 08 / W6 10）+ 波末增量审核 W1~W6 六轮 + 期末四轴（固定点 4dddada）。门禁：全量测试绿 / analyze 0（期末清理基线 5 warning）/ 威胁模型 P0 全落地（SR-01~10）。详见 DEV_LOG〈人机恋阶段 2 批次〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| PS2-01 | 数据底座 A：三新表 + schemaVersion 3 迁移 | 2026-09-15 | 16c3eca（merge db7a967） |
-| PS2-02 | 数据底座 B：CompanionRepository + 设置键/getter | 2026-09-15 | a67d88a（merge 5a16e8a） |
-| PS2-03 | 关系状态机服务（枚举/推进/闸门/注入/评估） | 2026-09-15 | 43f0353（merge 4e74d60） |
-| PS2-04 | 内心独白服务（提取/落库/指令） | 2026-09-15 | 616a45d（merge 327211b） |
-| PS2-05 | 主动消息服务（节流/规划 seam/编排/过期核对） | 2026-09-15 | e205ad7（merge dec9ab4） |
-| PS2-06 | 通知平台薄层（scheduler/payload/Android 配置） | 2026-09-15 | c63c547（merge b616c3c） |
-| PS2-07 | ChatService 三挂点集成（剥离/注入/回合结束链） | 2026-09-15 | 17e5ed7（merge 58d7842） |
-| PS2-08 | 装配 + 深链 + 升级 broker + ADR 落盘 | 2026-09-15 | 749e5da（merge 9693f64） |
-| PS2-09 | 设置页两开关 UI | 2026-09-15 | a138d7f（merge 19dcee5） |
-| PS2-10 | 角色卡关系进度 + 升级确认闸门 UI | 2026-09-15 | f3c7d47（merge b4a49f1） |
-| W3 返修 | F1 确认闸门 targetStage 域校验 + F2 角色冷却按 characterId 过滤 | 2026-09-15 | ab42d0c / de6c11f（随 W4 merge） |
-
 ## 历史归档索引
 
 > 更早批次折叠为单行（归档细节由 git 历史承担：`git log -p -- TICKETS.md`）。
 
 | 批次 | 日期 | 工单/提交 | 一句话摘要 |
 |------|------|-----------|------------|
+| 人机恋阶段 2 | 2026-09-15 | PS2-01~10 + W3 返修 | 主动消息循环 / 关系状态机 / 内心独白；threat-model SR-01~15 P0 全落地 |
 | 人机恋阶段 1.5 | 2026-09-15 | AC-06（收口提交） | 后台反思提取（ReflectionService + ChatService 挂点 + settings 开关 + 设置页 UI）；1740 测 |
 | 人机恋阶段 1 MVP | 2026-09-15 | AC-01~05（收口提交） | 记忆 + 抗 OOC + 人设演化；schemaVersion 1→2；1725 测 |
 | F-75/F-76/F-77 | 2026-09-14 | F-76 | temperature NaN/Infinity 回退 + clamp [0,2]；F-75/77 复核关闭；1684 测 |

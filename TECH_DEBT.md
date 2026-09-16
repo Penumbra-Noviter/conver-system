@@ -43,10 +43,20 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-104 | `characters_view_stage2_test`「publish 驱动确认/拒绝」全量首跑偶发失败（1999+1），单跑/重跑全绿，与本批 diff 零交集——存量 flaky | 期末四轴 F101F103（Spec 门禁实测） | 低 | 📝 待立项 | 测试 |
-| F-105 | 票面纠偏表述精确化：「若锁失效并行交错则为 1」从未存在于**代码 reason**（`git log -S` 命中均为文档/注释引述），非「从未存在于仓库」——核心结论（A 方案修正对象不存在）成立，仅表述收窄 | 期末四轴 F101F103（Falsify） | Speculative | 📝 待立项 | 测试/文档 |
+| F-106 | `chat_entry_test`「默认选中首角色」全量并发竞态（10 遍复现 2 次 + 修复后 5 遍 2 次，Expected 1/Actual 2 at line 96；隔离/单跑全绿）——上批 f98f100 判「环境性不落债」疑似误判；根因疑在生产 ChatController 选中时序（芯片已渲染但 selectedCharacterId 仍为 second.id，置信度中高，未定位具体行） | 复现实证 techdebt-f104f105（用户拍板另立） | Strong | 📝 待立项 | 聊天链路 |
+| F-107 | `pumpUntil` 同构定义 6 测试文件重复（chat_view/chat_entry/semantics/characters_batch_delete/characters_view_stage2/characters_view）+ why 归因式措辞统一为现象式 | 期末四轴 F104F105（Standards/Architecture/Falsify） | 低 | 📝 待立项 | 测试 |
+| F-108 | 纠偏口径文档散落（F-105 修正句复制进 3 处文档，正文反增应收敛 DEV_LOG 指针）+ 修正句未注明 `git log -S` 搜索串（命中集口径敏感，可复现性缺陷） | 期末四轴 F104F105（Architecture/Standards/Spec/Falsify） | Speculative | 📝 待立项 | 测试/文档 |
 
 ## 技术债处置记录
+
+### 2026-09-17 — 技术债消费批次（F-104~F-105 全部处置）
+
+> 来源：handoff-techdebt-f101f103-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（F104F105-01 `a5e79b7` merge `ffb05c7` / F104F105-02 `77fb9a1` merge `ffb05c7`）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **通过**（0 Critical）。**票面归因实证推翻**：F-104 复现循环（shell 逐遍 10 次全量，`--repeat` 不被 flutter_tools 3.47.2 支持）捕获 2 次失败，均为 `chat_entry_test`「默认选中首角色」竞态（Expected 1/Actual 2），票面目标 `characters_view_stage2_test` 15 遍零失败——用户拍板：01 票按 fallback 语义收口（健壮性修复 + 残余风险明确定位），chat_entry 竞态另立 F-106（Strong）下批消费。F-105 四处「从未存在于仓库」失实表述统一为「从未存在于代码 reason（文档/注释引述除外）」口径。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-104 | ✅ 已修（fallback 语义） | F104F105-01：`pumpStage2` loading 轮询 100 次静默放行 → `pumpUntil`（300 次）+ 显式断言「角色列表加载未在轮询窗口内完成」；5 处 publish 用例（升级建议：亲密 / 多选态确认 / 确认 / 拒绝 / F1）断言前单帧裸 pump → 条件等待；无 test 块增删、生产零 diff。票面目标未实证复现（15 遍零失败），残余 flaky = chat_entry_test 竞态（立 F-106），交付说明如实标注 |
+| F-105 | ✅ 已修 | F104F105-02：4 处旧版失实表述修正（DEV_LOG 票面纠偏句 / TECH_DEBT 处置记录引注 / TICKETS 归档行 / `notification_service_test.dart` 注释块），统一「从未存在于代码 reason（文档/注释引述除外）」口径 + `git log -S` 命中 4 commit（`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`）实证引据；纯文本/注释，生产零 diff、行为零变化 |
 
 ### 2026-09-17 — 技术债消费批次（F-101~F-103 全部处置）
 
@@ -57,16 +67,6 @@
 | F-101 | ✅ 已修 | F101F103-01：反序 gate 用例重构双 gate 两阶段 + 中间态 `initializeCalls==1` 断言独立钉 `_initSerial` 锁等待（锁失效突变下红）；fake 零改动、生产零 diff；先红后绿（临时移除 `await previous` → 期望 1 实际 2 红，恢复全绿） |
 | F-102 | ✅ 已修 | F101F103-02：告警 seam 用例正常分支独立 `_FakePlugin` + 独立 scheduler，用例内组级 plugin/scheduler 零引用（字面验收线达成）；行为断言语义零变化；顺序对调双向全绿机器实证；生产零 diff |
 | F-103 | ❌ 复核关闭 | 全仓 188 文件/223 检查 format 差异为存量 formatter 版本漂移（上批基线 `3943bf8` 同检查失败、hunk 一一对应），无行为风险；全仓归一大 diff 噪音，用户已拍板不立项 |
-
-### 2026-09-17 — 技术债消费批次（F-98~F-100 全部处置）
-
-> 来源：handoff-techdebt-f91f97-done-2026-09-17 交接指令（project-kickoff 全自动档）。3 工单并批 1 波串行 lane（F98F100-01 `76f7da8` merge `49a1b12` / F98F100-02 `562e968` merge `e9bfc10` / F98F100-03 `e378f78` merge `6f67160`）。门禁：全量 **2000 测**绿（基线 1996 → +4）/ analyze 0 / 期末四轴 **0 阻断**（结论位「需修 Recommended 2 项无 Critical」：R-S1 dart format 已修、R-S2 文档同步本 commit 收口）；非阻断落债 F-101~103。
-
-| 编号 | 处置 | 详情 |
-|------|------|------|
-| F-98 | ✅ 已修 | F98F100-01：补反序并发交错 gate 用例（无回调 initialize 挂起 → 带回调后进入 → `_initSerial` 锁串行重挂），钉 `initializeCalls==2` / `registeredCallback same(hotCallback)` / 零告警 / 重挂后可消费；纯测试生产零 diff；锁矩阵正/反双向闭合（Falsify 突变实证：反序钉结果语义、锁机制钉力由正序用例承担） |
-| F-99 | ✅ 已修 | F98F100-02：`_initializeLocked` 首次/重挂两处读 `Future<bool?>` 返回值——false/null 按失败处理（首次不置 `_initialized` 返回 false 可自然重试 / 重挂走 `onHotCallbackLost` seam 返回 false 不更新 `_registeredCallback`）+ docstring 三处补注「成功 = true 且非 null」+ 插件 22.3.1 覆盖赋值实证引用 + fake `bool? initializeResult` 注入面；先红后绿 3 红实锤 |
-| F-100 | ✅ 已修 | F98F100-03：告警 seam 用例 recoverable/doomed 每分支独立 `_FakePlugin`（用例内直接构造 scheduler 避开 build 工厂闭包捕获），消除共享实例顺序敏感断言；行为断言语义零变化；顺序对调双向全绿机器实证 |
 
 ## 复核关闭（最近 4 批，滚动保留）
 
