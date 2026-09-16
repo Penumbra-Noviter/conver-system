@@ -548,7 +548,8 @@ void main() {
       expect(
         plugin.initializeCalls,
         1,
-        reason: '中间态 initializeCalls == 1：wired 挂在 await previous（锁失效则直达为 2，本断言红）',
+        reason:
+            '中间态 initializeCalls == 1：wired 挂在 await previous（锁失效则直达为 2，本断言红）',
       );
       // 放行 gate1：lazy 首次完成 → wired 恢复走已初始化重挂（gate2 已放行）。
       gate1.complete();
