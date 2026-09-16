@@ -19,11 +19,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| FDBT-01 | 技术债消费 F-78+F-79：迁移注释纠偏 + 中断残留重开自愈用例 | 🔄 进行中 | app_database.dart 注释改述 drift onUpgrade 非事务 + 幂等自愈三机制；stage2_migration_test 新增「中断残留重开自愈」用例（表/索引/user_version/旧行四要素） |
-| FDBT-02 | 技术债消费 F-80：后台反思写失败回滚 UI 契约测试 | 🔄 进行中 | conversation_settings_page_stage2_test 新增「后台反思写失败 → 回滚 + 保存失败 SnackBar」用例；生产零 diff |
-| FDBT-03 | 技术债消费 F-90：通知热态回调装配顺序契约防御 | 🔄 进行中 | notification_service 加 _hotCallbackRegistered + 早退告警 + 契约注释；测「先 schedule 后装配」不重注册 + 告警可达 |
-| FDBT-04 | 技术债消费 F-81：活跃时间查询单源 latestMessageAt | 🔄 进行中 | MessageRepository.latestMessageAt + 两服务改调；保留 activeDays/_allMessagesFor；乱序 fixture 验收；零装配改动 |
-| FDBT-05 | 技术债消费 F-82：confirm 档位下限 clamp + 复现测试 | 📝 已录入（Blocked by FDBT-04） | 先红后绿复现（state 58/78 gain 漂移）+ RelationshipThresholds 档位下限 + confirm 写入 clamp + characters_view 注释同步 |
 
 
 ---
@@ -35,6 +30,18 @@
 ---
 
 ## 已完成归档
+
+### 技术债消费批次 F-78/F-79/F-80/F-81/F-82/F-90（2026-09-17 收口）
+
+> 来源：handoff-techdebt-f84f88-done-2026-09-16 交接指令（project-kickoff 全自动档）。5 工单 2 波：W1 FDBT-01‖02‖03‖04（并行）+ W2 FDBT-05（Blocked by FDBT-04）。交付：F-78 迁移注释纠偏 + F-79 中断残留自愈用例 / F-80 后台反思写失败回滚测试 / F-90 通知热态回调契约防御（含波末审核修复：并发置位 OR + 零告警断言 + 注释归因纠偏）/ F-81 活跃时间查询单源 latestMessageAt / F-82 confirm 档位下限 clamp（先红后绿）。F-89 复核关闭。门禁：全量 **1987 测**绿（基线 1974 → +13）/ analyze 0 / 期末四轴 **0 阻断**（非阻断落债 F-91~97）。详见 DEV_LOG〈技术债消费批次 techdebt-f78f90〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| FDBT-01 | 迁移注释纠偏 + 中断残留重开自愈用例（F-78+F-79） | 2026-09-17 | bbeba33（merge 4686036） |
+| FDBT-02 | 后台反思写失败回滚 UI 契约（F-80） | 2026-09-17 | ae4ea54（merge 9a7f55c） |
+| FDBT-03 | 通知热态回调装配顺序契约防御（F-90）+ 波末审核修复 | 2026-09-17 | 6deba8e（merge 8cfe865）+ ec72f17 |
+| FDBT-04 | 活跃时间查询单源 latestMessageAt（F-81）+ 证伪增强 | 2026-09-17 | 25fbbc6（merge d1c3cbf）+ ec72f17 |
+| FDBT-05 | confirm 档位下限 clamp 消除中间态（F-82） | 2026-09-17 | fbc12ed（merge 收口） |
 
 ### 技术债消费批次 F-84/F-85/F-88 + F-83 并批（2026-09-16 收口）
 

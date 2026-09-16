@@ -6,6 +6,21 @@
 
 ---
 
+## 技术债消费批次 techdebt-f78f90（2026-09-17 — handoff-techdebt-f84f88-done-2026-09-16 交接指令，/project-kickoff 全自动档）
+
+- **范围**：消费候选区 7 条中的 6 条——F-78（迁移注释纠偏）+ F-79（中断残留自愈用例）+ F-80（后台反思写失败回滚测试）+ F-81（活跃时间查询单源）+ F-82（confirm 档位下限 clamp）+ F-90（通知热态回调契约防御）；F-89 复核关闭。5 工单 2 波：W1 FDBT-01‖02‖03‖04（并行 worktree）+ W2 FDBT-05（Blocked by FDBT-04 串行）。
+- **交付**：
+  - FDBT-01：app_database.dart 注释改述 drift onUpgrade 默认非事务 + 幂等自愈三机制（IF NOT EXISTS / user_version 后写 / 失败锁库）；stage2_migration_test 新增「中断残留重开自愈」用例（残留态前置断言 → 重开重跑 → 表/索引/版本/旧行四要素）——commit `bbeba33`
+  - FDBT-02：conversation_settings_page_stage2_test 补「后台反思写失败 → 回滚 + SnackBar『保存失败』」（复用 `_SaveFailRepo`；生产零 diff）——commit `ae4ea54`
+  - FDBT-03：notification_service `_hotCallbackRegistered` 追踪 + 早退告警「热态回调丢失」+ 契约注释（插件覆盖赋值实证纠偏）；测「先 schedule 后装配」不重注册 + 波末修复（并发 OR 置位 / 零告警断言 / 注释归因）——commit `6deba8e` + `ec72f17`
+  - FDBT-04：`MessageRepository.latestMessageAt` 单源（join 单查询全局 max）；relationship/proactive 两服务改调；activeDays/_allMessagesFor 保留；乱序 fixture 消除顺序依赖 + 波末证伪增强（最旧消息移窗口外）——commit `25fbbc6` + `ec72f17`
+  - FDBT-05：RelationshipThresholds.floorForStage + confirm 写入 clamp 到 targetStage 档下限；先红后绿（58→59 / 78→79 落库旧档缺陷实锤）；反向自洽断言（默认 + 自定义阈值全档遍历）；characters_view 注释同步——commit `fbc12ed`
+- **门禁链**：全量 **1987 测**绿（基线 1974 → +13）/ analyze 0 / 期末四轴 **0 阻断**（固定点 a67e2a7；Standards 0 / Spec 0 硬错 / Falsify 2 低 / Architecture 1 中已认账 F-92/F-97）。
+- **过程遥测**：子智能体 9（Grilling 1 + plan-tickets 1 + Implement 5 + code-review 2 波末）；重开 3（Grilling 中断 1 + FDBT-05 空返回 1 + 期末四轴空返回 1，均无半成品残留）；合并冲突 0（W1 四分支 + W2 单分支 ort 全自动）；全量测试 1 次绿；波末审核修复 1 轮（4 项 Recommended 全收敛）。
+- **技术债闭环**：F-78/F-79/F-80/F-81/F-82/F-90 ✅ 已修（处置记录 2026-09-17 节）；F-89 ❌ 复核关闭（git grep 复核：生产恒 null、排程契约已在接口 seam、Leverage≈0）；非阻断落债 F-91（活跃窗口常量双源）/ F-92（告警缺 seam）/ F-93（测试 fixture 双份）/ F-94（构造死参数）/ F-95（latestMessageAt 无索引）/ F-96（阈值构造无校验）/ F-97（双 bool 状态机 OR 假绿）；候选区剩 7 条开放。
+- **知识库召回轨迹**：预检精读 3 条（《drift迁移非事务原子靠幂等自愈》《哑Provider无消费者default-lazy永不执行》《Flutter测试碰平台依赖必须超时兜底》）——F-78/79 与 F-90 直接消费既有经验结论；开发期 kb-search 未触发额外检索。
+- **预设接续**：候选区 F-91~97（F-92+F-97 建议并批通知域、F-96 阈值构造校验、F-94 死参数删除）待下轮 kickoff 预检消费；权限系统弹窗真机路径、阶段 3 人机恋深化仍开放。
+
 ## 技术债消费批次 F-84/F-85/F-88 + F-83（2026-09-16 — handoff 交接指令，/project-kickoff 全自动档）
 
 - **范围**：伴侣域通知收尾——F-84（热态点按/权限/排程失败兜底）+ F-88（冷启动收口竞态）+ F-85（深链 id 正值域）+ F-83（restore expired per-plan 降级）；F-86/F-87 复核关闭。6 工单 4 波：W1 01‖02 / W2 03 / W3 04‖05 / W4 06，独立 worktree + 分支 + 每波 merge。
