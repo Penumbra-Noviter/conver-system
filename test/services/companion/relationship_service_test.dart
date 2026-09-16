@@ -485,6 +485,32 @@ void main() {
       expect(await service.isRecentlyActive(ids.characterId), isTrue);
     });
 
+    test('isRecentlyActive：跨对话取全局 max（最新消息在另一对话）', () async {
+      final ids = await seedCharacterWithConversation();
+      await addMessage(
+        conversationId: ids.conversationId,
+        createdAt: fixedNow.subtract(const Duration(days: 8)),
+      );
+      final conv2 = await db.into(db.conversations).insertReturning(
+            ConversationsCompanion.insert(
+              characterId: ids.characterId,
+              createdAt: fixedNow,
+              updatedAt: fixedNow,
+            ),
+          );
+      await addMessage(
+        conversationId: conv2.id,
+        createdAt: fixedNow.subtract(const Duration(hours: 2)),
+      );
+
+      // 判定⑨单源（F-81）：isRecentlyActive 观测值与 repository 口径一致。
+      expect(
+        await messages.latestMessageAt(ids.characterId),
+        fixedNow.subtract(const Duration(hours: 2)),
+      );
+      expect(await service.isRecentlyActive(ids.characterId), isTrue);
+    });
+
     test('isRecentlyActive：超过 7 天为 false；无消息为 false', () async {
       final ids = await seedCharacterWithConversation();
       await addMessage(

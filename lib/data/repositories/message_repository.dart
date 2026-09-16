@@ -87,6 +87,26 @@ class MessageRepository {
         .get();
   }
 
+  /// 该角色全部对话（conversations 按 [characterId] 过滤）中消息 `createdAt`
+  /// 的全局最大值（判定⑨「最近消息」口径：角色最近活跃时间）。
+  ///
+  /// 单条 join 查询（messages ↔ conversations）完成，非逐对话循环；该角色
+  /// 无任何消息时返回 null。伴侣域活跃时间判定（RelationshipService /
+  /// ProactiveMessageService）统一经本方法取口径单源（F-81）。
+  Future<DateTime?> latestMessageAt(int characterId) async {
+    final rows = await (_db.select(_db.messages).join([
+          innerJoin(
+            _db.conversations,
+            _db.conversations.id.equalsExp(_db.messages.conversationId),
+          ),
+        ])
+          ..where(_db.conversations.characterId.equals(characterId))
+          ..orderBy([OrderingTerm.desc(_db.messages.createdAt)])
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? null : rows.first.readTable(_db.messages).createdAt;
+  }
+
   /// 跨全部对话的消息 content 模糊检索（桌面 `search_messages` 对应物）。
   ///
   /// - **仅匹配 `messages.content` 子串**（不搜角色名 / 对话标题 / 开场白，

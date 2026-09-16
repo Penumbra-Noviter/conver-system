@@ -13,6 +13,7 @@ import 'package:conver_system_mobile/data/repositories/conversation_repository.d
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/companion/proactive_message_service.dart';
+import 'package:conver_system_mobile/services/companion/relationship_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -816,6 +817,63 @@ void main() {
         conversationId: ids.conversationId,
       );
 
+      expect(result, 1);
+      expect(plannerCalls, 1);
+    });
+
+    test('顺序无关（F-81）：乱序插入同集合 → latestMessageAt 与 _lastActiveAt/isRecentlyActive 判定⑨一致', () async {
+      final ids = await seedChain(); // 对话1：消息在 now−1d。
+      await enableProactive();
+      // 对话2 乱序插入（先较新后较旧），与前序消息构成同一 createdAt 集合——
+      // 断言不依赖消息插入/返回顺序。
+      final conv2 = await db.into(db.conversations).insertReturning(
+            ConversationsCompanion.insert(
+              characterId: ids.characterId,
+              createdAt: fixedNow,
+              updatedAt: fixedNow,
+            ),
+          );
+      final newer = fixedNow.subtract(const Duration(hours: 2));
+      final older = fixedNow.subtract(const Duration(days: 3));
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: conv2.id,
+              role: Role.user,
+              content: '较新消息',
+              createdAt: newer,
+            ),
+          );
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: conv2.id,
+              role: Role.assistant,
+              content: '较旧消息',
+              createdAt: older,
+            ),
+          );
+
+      // 单源锚：repository 全局 max = 较新者（与插入顺序无关）。
+      expect(await messageRepo.latestMessageAt(ids.characterId), newer);
+
+      // 关系侧同一 fixture 判定⑨一致（两位调用方观测值同源）。
+      final relationship = RelationshipService(
+        companionRepository: companionRepo,
+        conversationRepository: conversationRepo,
+        messageRepository: messageRepo,
+        now: () => fixedNow,
+      );
+      expect(
+        await relationship.isRecentlyActive(ids.characterId),
+        isTrue,
+        reason: '最新消息 2h 前 ≥ now−7d → 活跃',
+      );
+
+      // 主动规划侧：_lastActiveAt 走同一口径 → 活跃 gate 放行。
+      final service = buildService();
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
       expect(result, 1);
       expect(plannerCalls, 1);
     });

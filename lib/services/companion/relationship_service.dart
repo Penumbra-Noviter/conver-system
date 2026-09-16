@@ -244,14 +244,12 @@ class RelationshipService {
   }
 
   /// 「最近 7 天有活动」：最近消息 createdAt ≥ now − 7d（≥ 语义，判定⑨）。
+  /// 口径单源：[MessageRepository.latestMessageAt]（F-81）。
   Future<bool> isRecentlyActive(int characterId) async {
-    final messages = await _allMessagesFor(characterId);
-    if (messages.isEmpty) {
+    final latest = await _messages.latestMessageAt(characterId);
+    if (latest == null) {
       return false;
     }
-    final latest = messages
-        .map((m) => m.createdAt)
-        .reduce((a, b) => a.isAfter(b) ? a : b);
     return !latest.isBefore(_now().subtract(RelationshipThresholds.recentWindow));
   }
 
