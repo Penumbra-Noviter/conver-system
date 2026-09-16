@@ -14,11 +14,12 @@ import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/services/companion/proactive_message_service.dart'
     show ProactiveNotificationScheduler;
 import 'package:conver_system_mobile/services/notifications/notification_service.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+
+import '../../helpers/debug_print_capture.dart';
 
 /// 记录调用并可控成败的 channel fake（覆写插件调用面，不触真实通道）。
 class _FakePlugin implements FlutterLocalNotificationsChannel {
@@ -373,10 +374,7 @@ void main() {
     });
 
     test('initialize 幂等：再次调用不重注册、不丢失首次回调', () async {
-      final logs = <String?>[];
-      final originalDebugPrint = debugPrint;
-      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
-      addTearDown(() => debugPrint = originalDebugPrint);
+      final logs = captureDebugPrint();
 
       void first(NotificationResponse response) {}
       void second(NotificationResponse response) {}
@@ -404,10 +402,7 @@ void main() {
     });
 
     test('并发装配回调 + 懒初始化交错：已注册回调不被无回调路径降级（波末审核）', () async {
-      final logs = <String?>[];
-      final originalDebugPrint = debugPrint;
-      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
-      addTearDown(() => debugPrint = originalDebugPrint);
+      final logs = captureDebugPrint();
 
       void hotCallback(NotificationResponse response) {}
 
@@ -439,10 +434,7 @@ void main() {
     });
 
     test('先 schedule 后装配：懒初始化后带回调 initialize 不重注册且告警热态回调丢失（F-90）', () async {
-      final logs = <String?>[];
-      final originalDebugPrint = debugPrint;
-      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
-      addTearDown(() => debugPrint = originalDebugPrint);
+      final logs = captureDebugPrint();
 
       void hotCallback(NotificationResponse response) {}
 

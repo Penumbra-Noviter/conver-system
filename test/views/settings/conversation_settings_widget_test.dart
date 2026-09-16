@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/in_memory_secret_store.dart';
+import '../../helpers/save_fail_repo.dart';
 
 /// 加载失败的仓储替身：getTemperature 抛错 → 覆盖 `_load` catch 分支。
 class _LoadFailRepo extends SettingsRepository {
@@ -25,16 +26,6 @@ class _LoadFailRepo extends SettingsRepository {
 
   @override
   Future<double> getTemperature() async => throw StateError('load fail');
-}
-
-/// 保存失败的仓储替身：setMany 抛错 → 覆盖 `_save` catch 分支。
-class _SaveFailRepo extends SettingsRepository {
-  _SaveFailRepo(AppDatabase db)
-      : super(database: db, secretStore: InMemorySecretStore());
-
-  @override
-  Future<void> setMany(Map<String, String> data) async =>
-      throw StateError('save fail');
 }
 
 void main() {
@@ -166,7 +157,7 @@ void main() {
   });
 
   testWidgets('保存失败 → SnackBar「保存失败」', (tester) async {
-    final failing = _SaveFailRepo(db);
+    final failing = SaveFailRepo(db);
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);

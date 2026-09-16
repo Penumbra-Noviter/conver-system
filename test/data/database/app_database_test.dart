@@ -10,6 +10,8 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/db_meta.dart';
+
 void main() {
   late AppDatabase db;
 
@@ -21,24 +23,12 @@ void main() {
     await db.close();
   });
 
-  Future<List<String>> sqliteMasterNames(String type, {String? table}) async {
-    final rows = await db.customSelect(
-      "SELECT name FROM sqlite_master WHERE type = ?"
-      '${table != null ? ' AND tbl_name = ?' : ''}',
-      variables: [
-        Variable.withString(type),
-        if (table != null) Variable.withString(table),
-      ],
-    ).get();
-    return rows.map((row) => row.data['name'] as String).toList();
-  }
-
   test('schemaVersion 冻结为 3', () {
     expect(db.schemaVersion, 3);
   });
 
   test('内存执行器打开成功，9 表可定位', () async {
-    final tables = await sqliteMasterNames('table');
+    final tables = await sqliteMasterNames(db, 'table');
     expect(
       tables,
       containsAll([
@@ -154,7 +144,7 @@ void main() {
   });
 
   test('最小索引集存在于 sqlite_master', () async {
-    final indexes = await sqliteMasterNames('index');
+    final indexes = await sqliteMasterNames(db, 'index');
     expect(indexes, containsAll(<String>[
       'idx_characters_name',
       'idx_conversations_character_id',
@@ -171,7 +161,7 @@ void main() {
   });
 
   test('settings 主键即 key，无额外索引', () async {
-    final indexes = await sqliteMasterNames('index', table: 'settings');
+    final indexes = await sqliteMasterNames(db, 'index', table: 'settings');
     // TEXT 主键产生 sqlite_autoindex 主键索引，此外不应有显式索引。
     expect(indexes, everyElement(startsWith('sqlite_autoindex')));
   });
