@@ -539,11 +539,7 @@ void main() {
       gate.complete();
       final results = await Future.wait([lazy, wired]);
 
-      expect(
-        results[1],
-        isTrue,
-        reason: '带回调后到方走可补救重挂路径，按成功返回（无悬挂）',
-      );
+      expect(results[1], isTrue, reason: '带回调后到方走可补救重挂路径，按成功返回（无悬挂）');
       expect(
         plugin.initializeCalls,
         2,
@@ -733,7 +729,9 @@ void main() {
         plugin.initializeResult = false;
         expect(await scheduler.initialize(), isFalse, reason: 'false 按失败处理');
         expect(
-          logs.any((line) => line?.contains('proactive notify init failed') ?? false),
+          logs.any(
+            (line) => line?.contains('proactive notify init failed') ?? false,
+          ),
           isTrue,
           reason: 'SR-12 摘要日志：失败路径带 proactive notify 前缀',
         );
@@ -784,7 +782,13 @@ void main() {
         );
         expect(reasons.first, startsWith('hot callback re-register failed'));
         expect(
-          logs.any((line) => line?.contains('proactive notify hot callback re-register failed') ?? false),
+          logs.any(
+            (line) =>
+                line?.contains(
+                  'proactive notify hot callback re-register failed',
+                ) ??
+                false,
+          ),
           isTrue,
           reason: 'SR-12 摘要日志：失败路径带 proactive notify 前缀',
         );
