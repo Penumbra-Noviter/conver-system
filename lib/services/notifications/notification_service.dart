@@ -26,8 +26,9 @@ import '../companion/proactive_message_service.dart'
 
 /// 主动消息深链 payload 编解码纯函数（SR-02 严格类型化 / SR-03 零内容）。
 ///
-/// 格式：`conver://proactive?conversationId=<int>&messageId=<int>`。字段经
-/// `int.tryParse` 严格解析，**无任何 `as int` 强转**；非法/缺失/非数字 →
+/// 格式：`conver://proactive?conversationId=<int>&messageId=<int>`。字段
+/// 仅接受**十进制无符号正整数**（形态校验 + `int.tryParse`，SR-02 严格
+/// 类型化），**无任何 `as int` 强转**；非法/缺失/非数字/非正值域 →
 /// null（不抛）。payload 绝不携带 `ProactivePlans.content` 文本，仅两个
 /// id（深链定位会话内消息；planId 由 OS 通知 id 承载，不重复进 payload）。
 class ProactiveDeepLink {
@@ -39,6 +40,21 @@ class ProactiveDeepLink {
   /// 深链 host（主动消息导航目标）。
   static const String host = 'proactive';
 
+  /// 正值域形态：十进制无符号正整数（首字符非 0，拒绝 0x/+/-/空白/前导 0）。
+  static final RegExp _positiveIntPattern = RegExp(r'^[1-9][0-9]*$');
+
+  /// 严格正值域解析：仅接受十进制无符号正整数，否则返回 null（SR-02）。
+  ///
+  /// Dart `int.tryParse` 接受 `0x`/`+`/`-` 前缀与空白形态，仅靠 `> 0`
+  /// 检查会漏网；故先对**原始字符串形态**做正则校验，合法后再 `int.tryParse`
+  /// （形态合法但超 int64 上限 → 溢出返回 null）。纯函数，不抛。
+  static int? _tryParsePositiveId(String raw) {
+    if (!_positiveIntPattern.hasMatch(raw)) {
+      return null;
+    }
+    return int.tryParse(raw);
+  }
+
   /// 编码深链 payload。
   static String encode({
     required int conversationId,
@@ -49,8 +65,9 @@ class ProactiveDeepLink {
   /// 解析深链 payload；非法返回 null（不抛）。
   ///
   /// 校验链：可解析 URI（FormatException 兜底 → null）→ scheme/host 匹配
-  /// → 两参数 `int.tryParse`（缺失/空/非数字/溢出 → null）。多余 query
-  /// 参数宽容忽略；重复参数取首个（`Uri.queryParameters` 语义）。
+  /// → 两参数正值域校验（仅**十进制无符号正整数**：形态正则拒绝
+  /// `0x`/`+`/`-`/空白/前导 0 → 再 `int.tryParse`，溢出 → null）。多余
+  /// query 参数宽容忽略；重复参数取首个（`Uri.queryParameters` 语义）。
   static ({int conversationId, int messageId})? tryParse(String raw) {
     final Uri uri;
     try {
@@ -62,8 +79,9 @@ class ProactiveDeepLink {
       return null;
     }
     final conversationId =
-        int.tryParse(uri.queryParameters['conversationId'] ?? '');
-    final messageId = int.tryParse(uri.queryParameters['messageId'] ?? '');
+        _tryParsePositiveId(uri.queryParameters['conversationId'] ?? '');
+    final messageId =
+        _tryParsePositiveId(uri.queryParameters['messageId'] ?? '');
     if (conversationId == null || messageId == null) {
       return null;
     }
