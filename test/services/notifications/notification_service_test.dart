@@ -6,6 +6,8 @@
 /// 方法）与注入 isAndroid 守卫可控路径；payload 纯函数穷举非法输入矩阵。
 library;
 
+import 'dart:async';
+
 import 'package:conver_system_mobile/data/database/app_database.dart'
     show ProactivePlan;
 import 'package:conver_system_mobile/data/database/tables.dart';
@@ -22,6 +24,10 @@ import 'package:timezone/timezone.dart' as tz;
 class _FakePlugin implements FlutterLocalNotificationsChannel {
   int initializeCalls = 0;
   bool initializeShouldFail = false;
+
+  /// 可选挂起闸门（波末审核并发用例）：非 null 时 initialize 等待该
+  /// Completer 完成后再返回，用于构造「带回调装配」与「懒初始化」交错。
+  Completer<void>? initializeGate;
   bool scheduleShouldFail = false;
   bool cancelShouldFail = false;
 
@@ -48,6 +54,10 @@ class _FakePlugin implements FlutterLocalNotificationsChannel {
   }) async {
     initializeCalls++;
     registeredCallback = onDidReceiveNotificationResponse;
+    final gate = initializeGate;
+    if (gate != null) {
+      await gate.future;
+    }
     if (initializeShouldFail) {
       throw Exception('init boom');
     }
@@ -363,6 +373,11 @@ void main() {
     });
 
     test('initialize 幂等：再次调用不重注册、不丢失首次回调', () async {
+      final logs = <String?>[];
+      final originalDebugPrint = debugPrint;
+      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
+      addTearDown(() => debugPrint = originalDebugPrint);
+
       void first(NotificationResponse response) {}
       void second(NotificationResponse response) {}
 
@@ -380,6 +395,47 @@ void main() {
       expect(plugin.initializeCalls, 1, reason: '幂等：_initialized 后不重复初始化');
       expect(plugin.registeredCallback, same(first),
           reason: '首次注册的回调不被二次调用覆盖');
+      expect(
+        logs.any((line) => line?.contains('热态回调丢失') ?? false),
+        isFalse,
+        reason: '正常装配路径（首次已注册回调）的早退必须零告警——'
+            '防止告警条件被写反（早退即告警）而测试仍绿',
+      );
+    });
+
+    test('并发装配回调 + 懒初始化交错：已注册回调不被无回调路径降级（波末审核）', () async {
+      final logs = <String?>[];
+      final originalDebugPrint = debugPrint;
+      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
+      addTearDown(() => debugPrint = originalDebugPrint);
+
+      void hotCallback(NotificationResponse response) {}
+
+      // 构造交错：带回调装配先进入 initialize（挂起在 gate），
+      // 无回调懒初始化后进入（此时 _initialized 仍 false，同样挂起）。
+      final gate = Completer<void>();
+      plugin.initializeGate = gate;
+      final wired = scheduler.initialize(
+        onDidReceiveNotificationResponse: hotCallback,
+      );
+      final lazy = scheduler.initialize();
+      // 释放闸门：A（带回调）先注册恢复完成，B（无回调）后完成——
+      // 修复前 B 会把 _hotCallbackRegistered 覆盖回 false（假告警根因）。
+      gate.complete();
+      await Future.wait([wired, lazy]);
+      expect(plugin.initializeCalls, 2, reason: '两个并发 initialize 都执行了完整路径');
+      // 注：插件侧 registeredCallback 是覆盖语义——并发交错下最后一次
+      // 完成的 initialize 生效（此处为无回调的 B → null），这是插件层行为，
+      // 不在本服务防御范围（F-92 已落债）。本用例只锁定服务侧追踪状态
+      // `_hotCallbackRegistered` 不被无回调路径降级（防假告警）。
+
+      // 早退路径：已注册回调事实应保持 → 零告警（修复前此断言红）。
+      await scheduler.initialize();
+      expect(
+        logs.any((line) => line?.contains('热态回调丢失') ?? false),
+        isFalse,
+        reason: '并发交错后首次已注册回调的事实不得被无回调路径降级',
+      );
     });
 
     test('先 schedule 后装配：懒初始化后带回调 initialize 不重注册且告警热态回调丢失（F-90）', () async {

@@ -223,8 +223,11 @@ class FlutterLocalNotificationsScheduler
   /// 初始化通知通道与 timezone（单例幂等：重复调用不重复初始化）。
   ///
   /// 热态通知点按回调 [onDidReceiveNotificationResponse]（F-84）**只能由
-  /// 首次调用携带**：插件不支持后补回调，`_initialized` 幂等守卫使后续
-  /// 调用直接 return，再次传入的 callback 不会透传注册（F-90 契约根因）。
+  /// 首次调用携带**：`_initialized` 幂等守卫使后续调用直接 return，再次
+  /// 传入的 callback 不会透传注册（F-90 契约根因）。注：flutter_local_
+  /// notifications 22.3.1 每次 initialize 实际是覆盖赋值回调、支持重设
+  /// （实证 platform_flutter_local_notifications.dart:157）——真正阻断
+  /// 透传的是本服务的幂等早退，后续修复可再次 initialize 重挂回调。
   /// 契约：
   /// - 装配必须先于**首次** [schedule]：schedule 懒初始化路径（本方法无参
   ///   调用）不含回调；若其先置 `_initialized`，后装配带回调的 initialize
@@ -259,7 +262,11 @@ class FlutterLocalNotificationsScheduler
         onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
       );
       _initialized = true;
-      _hotCallbackRegistered = onDidReceiveNotificationResponse != null;
+      // OR 语义（波末审核修复）：并发「带回调初始化」与「懒初始化无回调」
+      // 在 channel.initialize 挂起时交错，无回调路径不得把已注册回调的
+      // 事实降级回 false（否则后续早退路径假告警「热态回调丢失」）。
+      _hotCallbackRegistered = _hotCallbackRegistered ||
+          onDidReceiveNotificationResponse != null;
       return true;
     } catch (e) {
       debugPrint('proactive notify init failed: $e');

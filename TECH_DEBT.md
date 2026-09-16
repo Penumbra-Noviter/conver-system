@@ -50,6 +50,11 @@
 | F-82 | `confirmStageUpgrade` 确认时刻重算 affinity 可能产生 stage/affinity 档位不一致中间态（proposal 用活跃态 gain=2 计算 intimacy 61，冷却后 confirm 重算 gain=1 → 写 intimate/59 属 familiar 档；下回合 evaluate 自愈）——建议补「确认时刻活跃状态漂移」复现测试 + 评估确认结果 clamp 到 targetStage 档下限（防落回旧档） | W4 增量审核 F1（companion-stage2） | Worth exploring | 📝 待立项 | 伴侣域 |
 | F-89 | `ConverApp.scheduler` 构造注入参数（app.dart:309）为 04 测试 seam（生产恒 null，Leverage=0）——必要但 spec 未申报；类型为具体类非接口，未来 fake 面受限 | 期末四轴 Spec（techdebt-f84-f88） | Speculative | 📝 待立项 | 伴侣域 |
 | F-90 | `FlutterLocalNotificationsScheduler.schedule` 懒初始化路径调 `initialize()` 时不带回调（notification_service.dart:267）——若先于装配哑 Provider 的带回调 initialize 完成，`_initialized=true` 后热态回调永久丢失（无日志/无断言）；装配时序现实中占优、风险窗口极小，但契约无防御、「先 schedule 后装配」形态无测试 | 期末四轴 Falsify（techdebt-f84-f88） | Speculative | 📝 待立项 | 伴侣域 |
+| F-91 | `ProactiveThresholds.activeWindow`（proactive_message_service.dart:55）与 `RelationshipThresholds.recentWindow` 双份 7 天常量 + 双份窗口判定表述（`>7d 拒绝` vs `≥now−7d 允许`，数学等价但改窗口需动两文件） | 波 1 Architecture 增量审核（techdebt-f78f90） | 中 | 📝 待立项 | 伴侣域 |
+| F-92 | FDBT-03 告警通道缺 seam：热态回调丢失仅 debugPrint（release no-op）、装配方不感知永久性功能缺陷（F-90 防的是深链不可消费） | 波 1 Architecture + Falsify 增量审核（techdebt-f78f90） | 中 | 📝 待立项 | 伴侣域 |
+| F-93 | 测试 fixture 双份：`sqliteMasterNames`（app_database_test.dart:24 vs stage2_migration_test.dart:133）、`_SaveFailRepo`（conversation_settings_widget_test.dart:31 vs conversation_settings_page_stage2_test.dart:30）——SQL 逐字同/同构，改查询需动两文件 | 波 1 Architecture 增量审核（techdebt-f78f90） | 中 | 📝 待立项 | 测试 |
+| F-94 | `ProactiveMessageService` 构造死参数 `conversationRepository`（字段已删、类内零引用；为满足 FDBT-04 验收 8「签名不动」的刻意取舍，收口后可删并同步 3 处调用点） | 波 1 Standards 轴（techdebt-f78f90） | 低 | 📝 待立项 | 伴侣域 |
+| F-95 | `latestMessageAt` 无 createdAt 索引（tables.dart 仅 `idx_messages_conversation_id`），大表 join 全表扫描；秒精度截断与 F-3 复证 | 波 1 Falsify 增量审核（techdebt-f78f90） | 低 | 📝 待立项 | 数据层 |
 
 ## 技术债处置记录
 

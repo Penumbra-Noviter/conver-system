@@ -834,7 +834,9 @@ void main() {
             ),
           );
       final newer = fixedNow.subtract(const Duration(hours: 2));
-      final older = fixedNow.subtract(const Duration(days: 3));
+      // 最旧消息移到活跃窗口外（>7d）：若实现误取「窗口内最旧值」，
+      // 活跃 gate 判 inactive → planAfterTurn==0 必红（波末审核证伪增强）。
+      final older = fixedNow.subtract(const Duration(days: 8));
       await db.into(db.messages).insert(
             MessagesCompanion.insert(
               conversationId: conv2.id,
