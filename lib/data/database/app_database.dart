@@ -71,7 +71,12 @@ class AppDatabase extends _$AppDatabase {
           // proactive_plans / inner_thoughts，spec §3）。沿 from < 2 先例：
           // createTable 建表 + raw SQL 补 FK 索引；relationship_states 的
           // character_id 为 UNIQUE（对齐 @TableIndex(unique: true)）。
-          // onUpgrade 默认在事务内执行（drift 默认迁移事务语义未关闭）。
+          // drift onUpgrade 默认非事务（未显式包 transaction）：上述 DDL 逐条
+          // 裸发、无自动 BEGIN/COMMIT 包裹。迁移正确性依赖三机制——CREATE
+          // TABLE / CREATE INDEX 的 IF NOT EXISTS 幂等补建、user_version 迁移
+          // 成功后回写、失败时库被锁无法打开直至重开重跑（重新触发
+          // onUpgrade）。本实现不承诺原子性：引入显式事务包裹属行为变更，
+          // 本票不做。
           if (from < 3) {
             await m.createTable(relationshipStates);
             await m.createTable(proactivePlans);

@@ -417,6 +417,56 @@ void main() {
       expect(await db.select(db.innerThoughts).get(), isEmpty);
     });
 
+    test('中断残留重开自愈：部分建表落盘即关闭 → 重开幂等补全且旧行保留', () async {
+      // 模拟迁移中途被杀留下的残留态：仅 relationship_states 表与其唯一
+      // 索引落盘（onUpgrade 顺序中已执行到 createTable 之后、后续两表
+      // 之前），其余两表及 5 个索引缺失，user_version 未提升（仍为 2）。
+      await db.customStatement('DROP TABLE IF EXISTS proactive_plans');
+      await db.customStatement('DROP TABLE IF EXISTS inner_thoughts');
+      await db.customStatement('PRAGMA user_version = 2');
+
+      // 前置断言：确认残留态真实存在，否则「重开自愈」无从谈起。
+      final residualTables = await sqliteMasterNames(db, 'table');
+      expect(residualTables, contains('relationship_states'));
+      expect(residualTables, isNot(contains('proactive_plans')));
+      expect(residualTables, isNot(contains('inner_thoughts')));
+      final residualIndexes = await sqliteMasterNames(db, 'index');
+      expect(
+        residualIndexes,
+        contains('idx_relationship_states_character_id'),
+      );
+      expect(
+        residualIndexes,
+        isNot(contains('idx_proactive_plans_character_id')),
+      );
+      expect(await userVersion(db), 2);
+
+      // 重开：drift 检测 user_version=2 < 3 重跑 from < 3 分支，IF NOT
+      // EXISTS 幂等补建缺失的表/索引；成功后再把 user_version 回写为 3。
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 3);
+      expect(await sqliteMasterNames(db, 'table'), containsAll(_newTables));
+      expect(await sqliteMasterNames(db, 'index'), containsAll(_newIndexes));
+
+      // 残留唯一索引原样保留（IF NOT EXISTS 跳过而非重建）。
+      final uniqueSql = await db.customSelect(
+        "SELECT sql FROM sqlite_master WHERE type = 'index' "
+        "AND name = 'idx_relationship_states_character_id'",
+      ).getSingle();
+      expect(uniqueSql.data['sql'] as String, contains('UNIQUE'));
+
+      // 旧行保留：v2 时代五张表数据均可读。
+      expect(await db.select(db.characters).get().then((r) => r.length), 1);
+      expect(await db.select(db.conversations).get().then((r) => r.length), 1);
+      expect(await db.select(db.messages).get().then((r) => r.length), 1);
+      expect(await db.select(db.memoryEntries).get().then((r) => r.length), 1);
+      expect(await db.select(db.personaRevisions).get().then((r) => r.length), 1);
+    });
+
     test('重复打开幂等：同文件重开不重跑迁移，三表与数据仍在', () async {
       // 当前 db 已迁移到 3；写入一行标识数据后关闭再重开。
       final now = DateTime.now();
