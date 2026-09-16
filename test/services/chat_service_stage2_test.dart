@@ -102,7 +102,6 @@ class _ThrowingProactiveService extends ProactiveMessageService {
   _ThrowingProactiveService({
     required super.companionRepository,
     required super.settingsRepository,
-    required super.conversationRepository,
     required super.messageRepository,
     required super.planner,
     required super.scheduler,
@@ -184,7 +183,6 @@ void main() {
       ProactiveMessageService(
         companionRepository: companionRepo,
         settingsRepository: settingsRepo,
-        conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         planner: planner,
         scheduler: scheduler,
@@ -527,7 +525,6 @@ void main() {
       final throwingProactive = _ThrowingProactiveService(
         companionRepository: companionRepo,
         settingsRepository: settingsRepo,
-        conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         planner: ({required characterId, required conversationId, required dialogueLines}) async => null,
         scheduler: _RecordingScheduler(),

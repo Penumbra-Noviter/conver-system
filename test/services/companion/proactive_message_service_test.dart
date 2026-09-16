@@ -552,7 +552,6 @@ void main() {
       return ProactiveMessageService(
         companionRepository: companionRepo,
         settingsRepository: settingsRepo,
-        conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         planner: fakePlanner(),
         scheduler: scheduler ??
@@ -1144,7 +1143,6 @@ void main() {
       final service = ProactiveMessageService(
         companionRepository: companionRepo,
         settingsRepository: settingsRepo,
-        conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         planner: fakePlanner(),
         scheduler: _FakeScheduler((plan) {
@@ -1317,7 +1315,6 @@ void main() {
     late AppDatabase db;
     late CompanionRepository companionRepo;
     late SettingsRepository settingsRepo;
-    late ConversationRepository conversationRepo;
     late MessageRepository messageRepo;
     late DateTime fixedNow;
 
@@ -1331,11 +1328,6 @@ void main() {
       settingsRepo = SettingsRepository(
         database: db,
         secretStore: InMemorySecretStore(),
-      );
-      conversationRepo = ConversationRepository(
-        db,
-        const FakeSettingsReader(),
-        now: () => fixedNow,
       );
       messageRepo = MessageRepository(db, now: () => fixedNow);
       plannerCalls = 0;
@@ -1400,7 +1392,6 @@ void main() {
       return ProactiveMessageService(
         companionRepository: companionRepo,
         settingsRepository: settingsRepo,
-        conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         planner: ({
           required int characterId,
