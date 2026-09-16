@@ -38,12 +38,15 @@ import '../../data/repositories/conversation_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
+import 'companion_time_windows.dart' show CompanionTimeWindows;
 
 // 构造为公开命名参数（装配点语义）+ 私有 `_` 字段：initializing formal 无法
 // 同时满足两者，整文件抑制该 lint（对齐 reflection_service 惯例）。
 // ignore_for_file: prefer_initializing_formals
 
 /// 主动消息节流与排程阈值 — 产品参数的单一归属（spec §2 P2 + §6 判定③④）。
+/// 活跃窗口常量引用 [CompanionTimeWindows.activeWindow]（F-91 单源，与
+/// relationship 侧共享；改窗口只动伴侣域单源模块）。
 abstract final class ProactiveThresholds {
   /// 每日发送上限（判定③：当日 sentAt 计数，全局口径）。
   static const int dailyLimit = 6;
@@ -51,8 +54,9 @@ abstract final class ProactiveThresholds {
   /// 角色冷却（判定③：最近 sentAt 距今 ≥ 6h 才可再规划）。
   static const Duration roleCooldown = Duration(hours: 6);
 
-  /// 活跃窗口（P2：仅 7 天内有活动的角色可规划）。
-  static const Duration activeWindow = Duration(days: 7);
+  /// 活跃窗口（P2：仅 7 天内有活动的角色可规划；F-91 单源引用，边界语义
+  /// 「最近活跃时间 >= now − 7d 允许、< now − 7d 拒绝」，恰 7 天允许）。
+  static const Duration activeWindow = CompanionTimeWindows.activeWindow;
 
   /// LLM 决策 minutesFromNow 下界（判定④；SR-04 防短间隔通知风暴）。
   static const int minMinutesFromNow = 10;
@@ -77,9 +81,10 @@ class ProactiveDecision {
 
 /// 节流纯函数（可单测，now 注入精确断言阈值边界）。
 ///
-/// 判定顺序与原因：每日上限 → 冷却 → 活跃窗口 → 在途计划。边界口径：
+/// 判定顺序与原因：每日上限 → 冷却 → 活跃窗口 → 在途计划。边界口径
+/// （F-91 统一语义锚，与 relationship 侧 `>= now − 7d 允许` 一致）：
 /// `sentToday >= dailyLimit` 拒绝；冷却 `now - lastSentAt < 6h` 拒绝（恰好
-/// 6h 允许）；活跃 `now - lastActiveAt > 7d` 或从未活跃拒绝（恰好 7d 允许）。
+/// 6h 允许）；活跃 `lastActiveAt < now − 7d` 或从未活跃拒绝（恰 7d 允许）。
 ProactiveDecision evaluateSchedule({
   required int sentToday,
   required DateTime? lastSentAt,
@@ -95,7 +100,7 @@ ProactiveDecision evaluateSchedule({
     return const ProactiveDecision(allowed: false, reason: 'cooldown');
   }
   if (lastActiveAt == null ||
-      now.difference(lastActiveAt) > ProactiveThresholds.activeWindow) {
+      lastActiveAt.isBefore(now.subtract(ProactiveThresholds.activeWindow))) {
     return const ProactiveDecision(allowed: false, reason: 'inactive');
   }
   if (hasInFlightPlan) {
