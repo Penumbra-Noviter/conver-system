@@ -213,6 +213,22 @@ void main() {
     expect(find.text('保存失败'), findsOneWidget);
   });
 
+  testWidgets('后台反思写失败 → UI 回滚 + SnackBar「保存失败」', (tester) async {
+    final failing = _SaveFailRepo(db);
+    repo = failing;
+    await pumpPage(tester);
+    // 段标题锚文本「后台反思」；开关控件 title 为「后台反思记忆」。
+    expect(find.text('后台反思'), findsOneWidget);
+    expect(switchValue(tester, '后台反思记忆'), isFalse);
+
+    await tester.tap(find.widgetWithText(SwitchListTile, '后台反思记忆'));
+    await tester.pumpAndSettle();
+
+    expect(switchValue(tester, '后台反思记忆'), isFalse, reason: '写失败应回滚 UI');
+    expect(find.text('保存失败'), findsOneWidget);
+    expect(tester.takeException(), isNull, reason: '写失败路径不应有未捕获异常');
+  });
+
   testWidgets('加载失败（阶段 2 getter 抛错）→ 两开关缺省 false，页面不崩溃', (tester) async {
     final failing = _Stage2LoadFailRepo(db);
     repo = failing;
