@@ -2,18 +2,27 @@
 /// 两开关：加载回显 / 切换写 `proactive_message_enabled`、`inner_thought_enabled`
 /// 键 / 写失败回滚 + SnackBar / 加载失败保持缺省。
 ///
-/// seam：ConversationSettingsPage 公开构造（仓储注入），读写经真实
-/// SettingsRepository（内存 drift 真 schema），断言落在仓储可观察值上，
-/// 不锁内部实现（对齐 conversation_settings_widget_test 基建）。
+/// F-84 契约（Android 13+ 通知权限请求挂点）：开关 true 且落库成功后经
+/// `requestNotificationsPermission` seam 恰请求一次；false 路径零请求；
+/// 返回 false/null/抛错均不回滚开关（权限与开关语义正交）；未注入 seam 时
+/// provider 兜底可解析（装配冒烟），provider 缺位降级不崩。
+///
+/// seam：ConversationSettingsPage 公开构造（仓储注入 + 可空权限请求 seam），
+/// 读写经真实 SettingsRepository（内存 drift 真 schema），断言落在仓储
+/// 可观察值上，不锁内部实现（对齐 conversation_settings_widget_test 基建）。
 library;
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/notifications/notification_service.dart';
 import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/views/settings/conversation_settings_page.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../helpers/in_memory_secret_store.dart';
 
@@ -37,6 +46,43 @@ class _Stage2LoadFailRepo extends SettingsRepository {
   Future<bool> get innerThoughtEnabled async => throw StateError('load fail');
 }
 
+/// F-84 通知权限 channel fake：记录请求次数并可控成败，不触真实平台通道。
+class _FakeChannel implements FlutterLocalNotificationsChannel {
+  int permissionCalls = 0;
+  bool? permissionResult = true;
+  bool permissionShouldFail = false;
+
+  @override
+  Future<bool?> initialize({
+    required InitializationSettings settings,
+    DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
+  }) async =>
+      true;
+
+  @override
+  Future<void> zonedSchedule({
+    required int id,
+    String? title,
+    String? body,
+    required tz.TZDateTime scheduledDate,
+    required NotificationDetails notificationDetails,
+    required AndroidScheduleMode androidScheduleMode,
+    String? payload,
+  }) async {}
+
+  @override
+  Future<void> cancel({required int id, String? tag}) async {}
+
+  @override
+  Future<bool?> requestNotificationsPermission() async {
+    permissionCalls++;
+    if (permissionShouldFail) {
+      throw Exception('permission boom');
+    }
+    return permissionResult;
+  }
+}
+
 void main() {
   late AppDatabase db;
   late SettingsRepository repo;
@@ -52,14 +98,31 @@ void main() {
 
   /// 高视口 + 深色暖灰主题（注册 ConverPalette ThemeExtension）包一层
   /// MaterialApp，直接挂载子页。
-  Future<void> pumpPage(WidgetTester tester) async {
+  ///
+  /// [requestNotificationsPermission] 注入 F-84 权限请求 seam（recorder）；
+  /// [scheduler] 非空时以 Provider 装配 [FlutterLocalNotificationsScheduler]
+  /// （模拟生产装配形态，验证未注入 seam 时 provider 兜底可解析）。
+  Future<void> pumpPage(
+    WidgetTester tester, {
+    Future<bool?> Function()? requestNotificationsPermission,
+    FlutterLocalNotificationsScheduler? scheduler,
+  }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
+    final page = ConversationSettingsPage(
+      settingsRepository: repo,
+      requestNotificationsPermission: requestNotificationsPermission,
+    );
     await tester.pumpWidget(
       MaterialApp(
         theme: ConverTheme.dark(),
-        home: ConversationSettingsPage(settingsRepository: repo),
+        home: scheduler == null
+            ? page
+            : Provider<FlutterLocalNotificationsScheduler>.value(
+                value: scheduler,
+                child: page,
+              ),
       ),
     );
     await tester.pumpAndSettle();
@@ -187,5 +250,110 @@ void main() {
       'true',
     );
     expect(switchValue(tester, '主动消息'), isTrue);
+  });
+
+  testWidgets('F-84 开关 true → 落库成功后通知权限请求恰一次', (tester) async {
+    var calls = 0;
+    await pumpPage(tester, requestNotificationsPermission: () async {
+      calls += 1;
+      return true;
+    });
+
+    await tester.tap(find.widgetWithText(SwitchListTile, '主动消息'));
+    await tester.pumpAndSettle();
+
+    expect(calls, 1, reason: '启用路径应恰请求一次权限');
+    expect(
+      await repo.getValue(SettingsRepository.proactiveMessageEnabledKey),
+      'true',
+    );
+    expect(switchValue(tester, '主动消息'), isTrue);
+  });
+
+  testWidgets('F-84 开关 false（关闭路径）→ 不请求权限', (tester) async {
+    await repo.setMany({
+      SettingsRepository.proactiveMessageEnabledKey: 'true',
+    });
+    var calls = 0;
+    await pumpPage(tester, requestNotificationsPermission: () async {
+      calls += 1;
+      return true;
+    });
+
+    await tester.tap(find.widgetWithText(SwitchListTile, '主动消息'));
+    await tester.pumpAndSettle();
+
+    expect(calls, 0, reason: '关闭路径不应请求权限');
+    expect(
+      await repo.getValue(SettingsRepository.proactiveMessageEnabledKey),
+      'false',
+    );
+    expect(switchValue(tester, '主动消息'), isFalse);
+  });
+
+  testWidgets('F-84 权限请求返回 false → 开关不回滚、功能照常生效', (tester) async {
+    await pumpPage(tester, requestNotificationsPermission: () async => false);
+
+    await tester.tap(find.widgetWithText(SwitchListTile, '主动消息'));
+    await tester.pumpAndSettle();
+
+    expect(switchValue(tester, '主动消息'), isTrue, reason: '权限被拒不回滚开关');
+    expect(
+      await repo.getValue(SettingsRepository.proactiveMessageEnabledKey),
+      'true',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('F-84 权限请求返回 null → 开关不回滚、无崩溃', (tester) async {
+    await pumpPage(tester, requestNotificationsPermission: () async => null);
+
+    await tester.tap(find.widgetWithText(SwitchListTile, '主动消息'));
+    await tester.pumpAndSettle();
+
+    expect(switchValue(tester, '主动消息'), isTrue);
+    expect(
+      await repo.getValue(SettingsRepository.proactiveMessageEnabledKey),
+      'true',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('F-84 权限请求抛错 → 开关不回滚、无崩溃（降级 debugPrint）', (tester) async {
+    await pumpPage(
+      tester,
+      requestNotificationsPermission: () async =>
+          throw StateError('permission boom'),
+    );
+
+    await tester.tap(find.widgetWithText(SwitchListTile, '主动消息'));
+    await tester.pumpAndSettle();
+
+    expect(switchValue(tester, '主动消息'), isTrue, reason: '请求异常不回滚开关');
+    expect(
+      await repo.getValue(SettingsRepository.proactiveMessageEnabledKey),
+      'true',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('F-84 未注入 seam → provider 兜底经 scheduler 请求恰一次（装配冒烟）', (tester) async {
+    final channel = _FakeChannel();
+    final scheduler = FlutterLocalNotificationsScheduler(
+      channel: channel,
+      isAndroid: () => true,
+    );
+    await pumpPage(tester, scheduler: scheduler);
+
+    await tester.tap(find.widgetWithText(SwitchListTile, '主动消息'));
+    await tester.pumpAndSettle();
+
+    expect(channel.permissionCalls, 1, reason: 'provider 兜底应转发到 scheduler');
+    expect(switchValue(tester, '主动消息'), isTrue);
+    expect(
+      await repo.getValue(SettingsRepository.proactiveMessageEnabledKey),
+      'true',
+    );
+    expect(tester.takeException(), isNull);
   });
 }
