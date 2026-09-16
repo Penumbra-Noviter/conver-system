@@ -211,17 +211,41 @@ class FlutterLocalNotificationsScheduler
 
   bool _initialized = false;
 
+  /// 首次 initialize 成功时是否携带了热态点按回调（F-90 契约防御追踪）。
+  ///
+  /// 仅在**成功路径**置位：首次调用若 [initialize] 的
+  /// [onDidReceiveNotificationResponse] 非 null 记 true，否则记 false；
+  /// 初始化异常保持 false（下次仍走完整初始化）。幂等早退分支据此区分
+  /// 「首次已注册回调」（正常装配路径，零告警）与「首次未注册回调」
+  /// （schedule 懒初始化先于装配 → 热态回调丢失告警）。
+  bool _hotCallbackRegistered = false;
+
   /// 初始化通知通道与 timezone（单例幂等：重复调用不重复初始化）。
   ///
-  /// [onDidReceiveNotificationResponse] 为热态通知点按回调（F-84）：首次
-  /// 调用时透传注册；`_initialized` 已 true 时直接返回 true，不重注册——
-  /// 装配必须首次调用即带回调（幂等守卫在 `_initialized` 之前）。成功
-  /// true；平台通道缺失/初始化异常 → false 不抛（SR-12 摘要日志）。
+  /// 热态通知点按回调 [onDidReceiveNotificationResponse]（F-84）**只能由
+  /// 首次调用携带**：插件不支持后补回调，`_initialized` 幂等守卫使后续
+  /// 调用直接 return，再次传入的 callback 不会透传注册（F-90 契约根因）。
+  /// 契约：
+  /// - 装配必须先于**首次** [schedule]：schedule 懒初始化路径（本方法无参
+  ///   调用）不含回调；若其先置 `_initialized`，后装配带回调的 initialize
+  ///   早退且回调静默丢失——早退分支对「已初始化且首次未注册回调」输出
+  ///   含「热态回调丢失」语义的 debugPrint 告警并指明根因（失效模式）：
+  ///   热态点按无法消费深链（F-84 前提缺失）；
+  /// - 正常装配路径（首次 initialize 即带回调）的幂等重复调用零告警。
+  /// 成功 true；平台通道缺失/初始化异常 → false 不抛（SR-12 摘要日志）。
   /// PS2-08 装配时显式调用一次；[schedule] 内部亦会按需懒初始化。
   Future<bool> initialize({
     DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
   }) async {
     if (_initialized) {
+      if (!_hotCallbackRegistered) {
+        debugPrint(
+          'proactive notify hot callback lost (热态回调丢失): schedule lazy '
+          'init ran before wiring; onDidReceiveNotificationResponse must be '
+          'supplied on the first initialize call, otherwise hot-tap deep '
+          'links cannot be consumed',
+        );
+      }
       return true;
     }
     try {
@@ -235,6 +259,7 @@ class FlutterLocalNotificationsScheduler
         onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
       );
       _initialized = true;
+      _hotCallbackRegistered = onDidReceiveNotificationResponse != null;
       return true;
     } catch (e) {
       debugPrint('proactive notify init failed: $e');
