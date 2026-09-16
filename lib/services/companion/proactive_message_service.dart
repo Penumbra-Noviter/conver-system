@@ -290,7 +290,6 @@ class ProactiveMessageService {
     void Function(ProactivePlan plan)? onScheduleFailed,
   })  : _companion = companionRepository,
         _settings = settingsRepository,
-        _conversations = conversationRepository,
         _messages = messageRepository,
         _planner = planner,
         _scheduler = scheduler,
@@ -299,7 +298,6 @@ class ProactiveMessageService {
 
   final CompanionRepository _companion;
   final SettingsRepository _settings;
-  final ConversationRepository _conversations;
   final MessageRepository _messages;
   final ProactivePlanner _planner;
   final ProactiveNotificationScheduler _scheduler;
@@ -472,22 +470,12 @@ class ProactiveMessageService {
     }
   }
 
-  /// 角色活跃时间 = 该角色全部对话最近消息的 createdAt 最大值（spec 判定⑨
-  /// 的「最近消息」口径）；无消息返回 null。
-  Future<DateTime?> _lastActiveAt(int characterId) async {
-    final conversations =
-        await _conversations.listConversations(characterId: characterId);
-    DateTime? last;
-    for (final row in conversations) {
-      final messages = await _messages.getMessages(row.conversation.id);
-      if (messages.isNotEmpty) {
-        final at = messages.last.createdAt;
-        if (last == null || at.isAfter(last)) {
-          last = at;
-        }
-      }
-    }
-    return last;
+  /// 角色活跃时间 = 该角色全部对话最近消息 createdAt 全局最大值（判定⑨
+  /// 「最近消息」口径）；无消息返回 null。改调
+  /// [MessageRepository.latestMessageAt] 单源实现（F-81：不再按对话
+  /// getMessages 自算，消除对消息返回顺序的隐式依赖）。
+  Future<DateTime?> _lastActiveAt(int characterId) {
+    return _messages.latestMessageAt(characterId);
   }
 
   /// 在途判定（SR-04）：本角色存在 scheduled 计划（reconcile 后剩余即真正

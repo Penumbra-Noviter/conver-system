@@ -304,6 +304,82 @@ void main() {
     });
   });
 
+  group('latestMessageAt（F-81 判定⑨单源）', () {
+    test('跨多对话取全局 max：最新 createdAt 胜出，他角色不影响', () async {
+      final charA = await seedCharacter();
+      final charB = await seedCharacter(name: '孤立者');
+      final convA1 = await seedConversation(charA.id);
+      final convA2 = await seedConversation(charA.id);
+      final convB = await seedConversation(charB.id);
+
+      // 乱序插入（先较新后较旧）：同 createdAt 集合，断言与插入顺序无关。
+      final newer = fakeNow.subtract(const Duration(hours: 1));
+      final older = fakeNow.subtract(const Duration(days: 3));
+      final otherNewer = fakeNow.subtract(const Duration(minutes: 10));
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: convA2.id,
+              role: Role.assistant,
+              content: '较新',
+              createdAt: newer,
+            ),
+          );
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: convA1.id,
+              role: Role.user,
+              content: '较旧',
+              createdAt: older,
+            ),
+          );
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: convB.id,
+              role: Role.assistant,
+              content: '他角色更近',
+              createdAt: otherNewer,
+            ),
+          );
+
+      expect(await repo.latestMessageAt(charA.id), newer);
+      expect(await repo.latestMessageAt(charB.id), otherNewer);
+    });
+
+    test('单对话：全局 max = 该对话内最新 createdAt（乱序插入）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final t1 = fakeNow.subtract(const Duration(days: 2));
+      final t2 = fakeNow.subtract(const Duration(days: 1));
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: conv.id,
+              role: Role.user,
+              content: '较新',
+              createdAt: t2,
+            ),
+          );
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: conv.id,
+              role: Role.assistant,
+              content: '较旧后插',
+              createdAt: t1,
+            ),
+          );
+
+      expect(await repo.latestMessageAt(char.id), t2);
+    });
+
+    test('无消息 → null（有对话无消息 / 无对话角色）', () async {
+      final char = await seedCharacter();
+      await seedConversation(char.id);
+      expect(await repo.latestMessageAt(char.id), isNull);
+
+      final lonely = await seedCharacter(name: '无对话者');
+      expect(await repo.latestMessageAt(lonely.id), isNull);
+    });
+  });
+
   group('deleteMessagesFrom（A5 锚定截断 + A6 边界与零副作用）', () {
     test('A5: 删除 id≥target（含）全部消息并返回条数；不前移 conv.updated_at',
         () async {
