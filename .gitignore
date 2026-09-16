@@ -58,3 +58,6 @@ app.*.map.json
 
 # Kickoff 过程产物（spec/编排/证据存档不入库——F-5；evidence 目录按约定本地保留）
 .scratch/
+
+.worktrees/
+
