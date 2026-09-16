@@ -14,11 +14,12 @@ import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/services/companion/proactive_message_service.dart'
     show ProactiveNotificationScheduler;
 import 'package:conver_system_mobile/services/notifications/notification_service.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+
+import '../../helpers/debug_print_capture.dart';
 
 /// 记录调用并可控成败的 channel fake（覆写插件调用面，不触真实通道）。
 class _FakePlugin implements FlutterLocalNotificationsChannel {
@@ -372,11 +373,8 @@ void main() {
       expect(received?.id, 7);
     });
 
-    test('initialize 带新回调晚到 → 重挂生效；同一回调重复 → 幂等零副作用（F-92 验收4）', () async {
-      final logs = <String?>[];
-      final originalDebugPrint = debugPrint;
-      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
-      addTearDown(() => debugPrint = originalDebugPrint);
+test('initialize 带新回调晚到 → 重挂生效；同一回调重复 → 幂等零副作用（F-92 验收4）', () async {
+      final logs = captureDebugPrint();
 
       void first(NotificationResponse response) {}
       void second(NotificationResponse response) {}
@@ -414,11 +412,8 @@ void main() {
       expect(plugin.registeredCallback, same(second));
     });
 
-    test('并发反序真丢失修复：带回调先完成、无回调后完成 → 插件回调仍非 null（F-92 验收1）', () async {
-      final logs = <String?>[];
-      final originalDebugPrint = debugPrint;
-      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
-      addTearDown(() => debugPrint = originalDebugPrint);
+test('并发反序真丢失修复：带回调先完成、无回调后完成 → 插件回调仍非 null（F-92 验收1）', () async {
+      final logs = captureDebugPrint();
 
       NotificationResponse? received;
       void hotCallback(NotificationResponse response) {
@@ -468,11 +463,8 @@ void main() {
       );
     });
 
-    test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告警（F-92/F-97）', () async {
-      final logs = <String?>[];
-      final originalDebugPrint = debugPrint;
-      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
-      addTearDown(() => debugPrint = originalDebugPrint);
+test('先 schedule 后装配（可补救）：装配晚到重挂生效且零告警（F-92/F-97）', () async {
+      final logs = captureDebugPrint();
 
       NotificationResponse? received;
       void hotCallback(NotificationResponse response) {
@@ -516,10 +508,7 @@ void main() {
     });
 
     test('验收2反例：懒初始化完成后、装配晚到前的无回调早退零误告警（F-92）', () async {
-      final logs = <String?>[];
-      final originalDebugPrint = debugPrint;
-      debugPrint = (message, {int? wrapWidth}) => logs.add(message);
-      addTearDown(() => debugPrint = originalDebugPrint);
+      final logs = captureDebugPrint();
 
       void hotCallback(NotificationResponse response) {}
 

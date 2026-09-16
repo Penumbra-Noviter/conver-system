@@ -25,16 +25,7 @@ import 'package:provider/provider.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../helpers/in_memory_secret_store.dart';
-
-/// 写失败的仓储替身：setMany 抛错 → 覆盖两开关的写失败回滚分支。
-class _SaveFailRepo extends SettingsRepository {
-  _SaveFailRepo(AppDatabase db)
-    : super(database: db, secretStore: InMemorySecretStore());
-
-  @override
-  Future<void> setMany(Map<String, String> data) async =>
-      throw StateError('save fail');
-}
+import '../../helpers/save_fail_repo.dart';
 
 /// 加载失败的仓储替身：innerThoughtEnabled getter 抛错 → 覆盖 `_load` 的
 /// 阶段 2 读取失败分支（开关保持缺省 false，页面不崩溃）。
@@ -188,7 +179,7 @@ void main() {
   });
 
   testWidgets('主动消息写失败 → UI 回滚 + SnackBar「保存失败」', (tester) async {
-    final failing = _SaveFailRepo(db);
+    final failing = SaveFailRepo(db);
     repo = failing;
     await pumpPage(tester);
     expect(switchValue(tester, '主动消息'), isFalse);
@@ -201,7 +192,7 @@ void main() {
   });
 
   testWidgets('内心独白写失败 → UI 回滚 + SnackBar「保存失败」', (tester) async {
-    final failing = _SaveFailRepo(db);
+    final failing = SaveFailRepo(db);
     repo = failing;
     await pumpPage(tester);
     expect(switchValue(tester, '内心独白'), isFalse);
@@ -214,7 +205,7 @@ void main() {
   });
 
   testWidgets('后台反思写失败 → UI 回滚 + SnackBar「保存失败」', (tester) async {
-    final failing = _SaveFailRepo(db);
+    final failing = SaveFailRepo(db);
     repo = failing;
     await pumpPage(tester);
     // 段标题锚文本「后台反思」；开关控件 title 为「后台反思记忆」。

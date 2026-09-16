@@ -15,6 +15,8 @@ import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/db_meta.dart';
+
 /// 迁移后的三表名（drift 蛇形约定）。
 const _newTables = <String>[
   'relationship_states',
@@ -128,22 +130,6 @@ Future<(AppDatabase, Directory)> openV1UpgradedFixture() async {
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
-}
-
-Future<List<String>> sqliteMasterNames(
-  AppDatabase db,
-  String type, {
-  String? table,
-}) async {
-  final rows = await db.customSelect(
-    "SELECT name FROM sqlite_master WHERE type = ?"
-    '${table != null ? ' AND tbl_name = ?' : ''}',
-    variables: [
-      Variable.withString(type),
-      if (table != null) Variable.withString(table),
-    ],
-  ).get();
-  return rows.map((row) => row.data['name'] as String).toList();
 }
 
 Future<int> userVersion(AppDatabase db) async {
