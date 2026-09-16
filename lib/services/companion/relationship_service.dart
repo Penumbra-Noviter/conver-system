@@ -53,6 +53,14 @@ class StageUpgradeProposal {
 ///
 /// 构造可注入（测试确定性；测试用自定义阈值隔离默认快照）。验收按
 /// 常量引用标定，不锁数值快照。
+///
+/// **构造自洽校验（F-96）**：四档 max 必须严格递增
+/// （strangerMax < acquaintedMax < familiarMax < intimateMax，隐含相邻档
+/// gap ≥ 1）且 soulmate 下限 intimateMax + 1 ≤ [affinityMax]
+/// （即 intimateMax ≤ 99）。校验经 assert 实现仅 debug 生效——防御层定位
+/// 为装配/测试期契约：默认配置不可达（无外部配置面，默认构造恒合法），
+/// 非法阈值只可能来自装配/测试注入，release 无注入面，故非运行时护栏；
+/// 误用即测试/装配期失败，不静默产生 stage/affinity 中间态。
 class RelationshipThresholds {
   const RelationshipThresholds({
     this.turnAffinityGain = 1,
@@ -62,7 +70,26 @@ class RelationshipThresholds {
     this.acquaintedMax = 39,
     this.familiarMax = 59,
     this.intimateMax = 79,
-  });
+  }) : assert(
+          strangerMax < acquaintedMax,
+          'RelationshipThresholds: max 必须严格递增 '
+          '(strangerMax < acquaintedMax)，got $strangerMax >= $acquaintedMax',
+        ),
+       assert(
+          acquaintedMax < familiarMax,
+          'RelationshipThresholds: max 必须严格递增 '
+          '(acquaintedMax < familiarMax)，got $acquaintedMax >= $familiarMax',
+        ),
+       assert(
+          familiarMax < intimateMax,
+          'RelationshipThresholds: max 必须严格递增 '
+          '(familiarMax < intimateMax)，got $familiarMax >= $intimateMax',
+        ),
+       assert(
+          intimateMax + 1 <= affinityMax,
+          'RelationshipThresholds: soulmate 下限 intimateMax + 1 必须 '
+          '≤ affinityMax($affinityMax)，got intimateMax=$intimateMax',
+        );
 
   /// 每回合好感度增量。
   final int turnAffinityGain;
