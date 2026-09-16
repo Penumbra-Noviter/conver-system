@@ -89,8 +89,10 @@ class _Env {
   static Future<_Env> create() async {
     final db = AppDatabase(NativeDatabase.memory());
     final characterRepository = CharacterRepository(db);
-    final conversationRepository =
-        ConversationRepository(db, const FakeSettingsReader());
+    final conversationRepository = ConversationRepository(
+      db,
+      const FakeSettingsReader(),
+    );
     final messageRepository = MessageRepository(db);
     final companionRepository = CompanionRepository(db);
     final chatController = ChatController(
@@ -103,8 +105,9 @@ class _Env {
           database: db,
           secretStore: InMemorySecretStore(),
         ),
-        providerFactory:
-            FixedLLMProviderFactory(FakeLLMProvider(tokens: const ['ok'])),
+        providerFactory: FixedLLMProviderFactory(
+          FakeLLMProvider(tokens: const ['ok']),
+        ),
       ),
       conversationRepository: conversationRepository,
       characterRepository: characterRepository,
@@ -209,9 +212,11 @@ void main() {
         ),
       ),
     );
-    for (var i = 0; i < 100 && env.controller.loading; i++) {
-      await tester.pump(const Duration(milliseconds: 10));
-    }
+    await pumpUntil(
+      tester,
+      () => !env.controller.loading,
+      why: '角色列表加载未在轮询窗口内完成',
+    );
     await tester.pump();
   }
 
@@ -221,17 +226,15 @@ void main() {
     RelationshipStage current,
     RelationshipStage target,
     int affinity,
-  ) =>
-      StageUpgradeProposal(
-        characterId: characterId,
-        currentStage: current,
-        targetStage: target,
-        affinity: affinity,
-      );
+  ) => StageUpgradeProposal(
+    characterId: characterId,
+    currentStage: current,
+    targetStage: target,
+    affinity: affinity,
+  );
 
   group('关系区 · 五段中文 label + affinity 进度条（验收 1）', () {
-    testWidgets('五段全覆盖：陌生/相识/熟悉/亲密/挚爱各一，进度条 0-100 映射',
-        (tester) async {
+    testWidgets('五段全覆盖：陌生/相识/熟悉/亲密/挚爱各一，进度条 0-100 映射', (tester) async {
       final env = await _Env.create();
       final stages = [
         (name: '甲', stage: RelationshipStage.stranger, affinity: 0),
@@ -254,11 +257,17 @@ void main() {
       expect(find.text('挚爱'), findsOneWidget);
       final values = tester
           .widgetList<LinearProgressIndicator>(
-              find.byType(LinearProgressIndicator))
+            find.byType(LinearProgressIndicator),
+          )
           .map((bar) => bar.value)
           .toSet();
-      expect(values, {0.0, 0.2, 0.5, 0.7, 0.95},
-          reason: '进度条 value = affinity / 100 映射');
+      expect(values, {
+        0.0,
+        0.2,
+        0.5,
+        0.7,
+        0.95,
+      }, reason: '进度条 value = affinity / 100 映射');
       await env.close();
     });
 
@@ -271,10 +280,16 @@ void main() {
       await pumpStage2(tester, env);
 
       expect(find.text('熟悉'), findsOneWidget, reason: '有行角色显示关系区');
-      expect(find.byType(LinearProgressIndicator), findsNWidgets(1),
-          reason: '仅一行 → 仅一条进度条');
-      expect(find.text('陌生'), findsNothing,
-          reason: '无行角色不默认补 stranger 行展示（零噪音）');
+      expect(
+        find.byType(LinearProgressIndicator),
+        findsNWidgets(1),
+        reason: '仅一行 → 仅一条进度条',
+      );
+      expect(
+        find.text('陌生'),
+        findsNothing,
+        reason: '无行角色不默认补 stranger 行展示（零噪音）',
+      );
       await env.close();
     });
   });
@@ -287,18 +302,25 @@ void main() {
       await env.seedCharacter('旁观');
       await env.seedRelationship(target.id, RelationshipStage.familiar, 58);
       await env.seedRelationship(
-          (await env.characterRepository.listCharacters())[1].character.id,
-          RelationshipStage.familiar,
-          60);
+        (await env.characterRepository.listCharacters())[1].character.id,
+        RelationshipStage.familiar,
+        60,
+      );
 
       await pumpStage2(tester, env);
-      env.broker.publish(proposalFor(
-        target.id,
-        RelationshipStage.familiar,
-        RelationshipStage.intimate,
-        61,
-      ));
-      await tester.pump();
+      env.broker.publish(
+        proposalFor(
+          target.id,
+          RelationshipStage.familiar,
+          RelationshipStage.intimate,
+          61,
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find.text('升级建议：亲密').evaluate().isNotEmpty,
+        why: '升级建议未在轮询窗口内出现（broker publish 生效延迟）',
+      );
 
       expect(find.text('升级建议：亲密'), findsOneWidget);
       expect(find.text('确认'), findsOneWidget);
@@ -313,14 +335,19 @@ void main() {
       await env.seedRelationship(target.id, RelationshipStage.familiar, 58);
 
       await pumpStage2(tester, env);
-      env.broker.publish(proposalFor(
-        target.id,
-        RelationshipStage.familiar,
-        RelationshipStage.intimate,
-        61,
-      ));
-      await tester.pump();
-      expect(find.text('确认'), findsOneWidget);
+      env.broker.publish(
+        proposalFor(
+          target.id,
+          RelationshipStage.familiar,
+          RelationshipStage.intimate,
+          61,
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find.text('确认').evaluate().isNotEmpty,
+        why: '确认按钮未在轮询窗口内出现（broker publish 生效延迟）',
+      );
 
       await tester.longPress(find.text('目标'));
       await tester.pump();
@@ -340,13 +367,19 @@ void main() {
       await env.seedRelationship(target.id, RelationshipStage.familiar, 58);
 
       await pumpStage2(tester, env);
-      env.broker.publish(proposalFor(
-        target.id,
-        RelationshipStage.familiar,
-        RelationshipStage.intimate,
-        61,
-      ));
-      await tester.pump();
+      env.broker.publish(
+        proposalFor(
+          target.id,
+          RelationshipStage.familiar,
+          RelationshipStage.intimate,
+          61,
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find.text('确认').evaluate().isNotEmpty,
+        why: '确认按钮未在轮询窗口内出现（broker publish 生效延迟）',
+      );
 
       await tester.tap(find.text('确认'));
       await pumpUntil(
@@ -357,13 +390,19 @@ void main() {
 
       final state = await env.companionRepository.getRelationship(target.id);
       expect(state, isNotNull);
-      expect(state!.stage, RelationshipStage.intimate,
-          reason: '确认经服务层落库（SR-10：UI 不直写）');
+      expect(
+        state!.stage,
+        RelationshipStage.intimate,
+        reason: '确认经服务层落库（SR-10：UI 不直写）',
+      );
       // F-82 观察：confirm 重算 affinity = 58 + 回合增量(1) = 59，可能短期
       // 低于 intimate 档下界（下回合自愈）——UI 以落库值实时渲染不修正；
       // 断言只锁「不回退 + 单调推进」。
-      expect(state.affinity, greaterThanOrEqualTo(58),
-          reason: '确认重算 affinity 单调不后退（回合增量 ≥ 0）');
+      expect(
+        state.affinity,
+        greaterThanOrEqualTo(58),
+        reason: '确认重算 affinity 单调不后退（回合增量 ≥ 0）',
+      );
       expect(find.text('亲密'), findsOneWidget, reason: 'UI 刷新为新阶段');
       expect(env.broker.lastProposal, isNull, reason: '确认后提议清除');
       expect(find.text('确认'), findsNothing);
@@ -373,20 +412,27 @@ void main() {
   });
 
   group('拒绝 · 不写库 + 提议清除 + 同角色本会话不重弹（验收 5）', () {
-    testWidgets('点拒绝 → DB stage 不变 + broker 清除 + 重新 publish 同角色不弹',
-        (tester) async {
+    testWidgets('点拒绝 → DB stage 不变 + broker 清除 + 重新 publish 同角色不弹', (
+      tester,
+    ) async {
       final env = await _Env.create();
       final target = await env.seedCharacter('目标');
       await env.seedRelationship(target.id, RelationshipStage.familiar, 58);
 
       await pumpStage2(tester, env);
-      env.broker.publish(proposalFor(
-        target.id,
-        RelationshipStage.familiar,
-        RelationshipStage.intimate,
-        61,
-      ));
-      await tester.pump();
+      env.broker.publish(
+        proposalFor(
+          target.id,
+          RelationshipStage.familiar,
+          RelationshipStage.intimate,
+          61,
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find.text('拒绝').evaluate().isNotEmpty,
+        why: '拒绝按钮未在轮询窗口内出现（broker publish 生效延迟）',
+      );
       await tester.tap(find.text('拒绝'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 20));
@@ -399,12 +445,14 @@ void main() {
       expect(find.text('升级建议'), findsNothing);
 
       // 同角色再次 publish → 本会话不再弹（UI 侧拒绝记录语义）。
-      env.broker.publish(proposalFor(
-        target.id,
-        RelationshipStage.familiar,
-        RelationshipStage.intimate,
-        62,
-      ));
+      env.broker.publish(
+        proposalFor(
+          target.id,
+          RelationshipStage.familiar,
+          RelationshipStage.intimate,
+          62,
+        ),
+      );
       await tester.pump();
       expect(find.text('确认'), findsNothing, reason: '本会话同角色不重弹');
       expect(find.text('升级建议'), findsNothing);
@@ -421,13 +469,19 @@ void main() {
 
       await pumpStage2(tester, env);
       // 非法提议：familiar(index 2) → acquainted(index 1) 非 index+1 后继。
-      env.broker.publish(proposalFor(
-        target.id,
-        RelationshipStage.familiar,
-        RelationshipStage.acquainted,
-        61,
-      ));
-      await tester.pump();
+      env.broker.publish(
+        proposalFor(
+          target.id,
+          RelationshipStage.familiar,
+          RelationshipStage.acquainted,
+          61,
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find.text('确认').evaluate().isNotEmpty,
+        why: '确认按钮未在轮询窗口内出现（broker publish 生效延迟）',
+      );
       await tester.tap(find.text('确认'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 20));
@@ -435,8 +489,7 @@ void main() {
 
       expect(tester.takeException(), isNull, reason: 'confirm false 不崩');
       final state = await env.companionRepository.getRelationship(target.id);
-      expect(state!.stage, RelationshipStage.familiar,
-          reason: 'F1 拒绝：DB 保持现状');
+      expect(state!.stage, RelationshipStage.familiar, reason: 'F1 拒绝：DB 保持现状');
       expect(env.broker.lastProposal, isNull, reason: 'false 后提议清除');
       expect(find.text('熟悉'), findsOneWidget, reason: 'UI 刷新为现状');
       expect(find.text('确认'), findsNothing);
@@ -445,8 +498,7 @@ void main() {
   });
 
   group('批量删除 · 关系行 FK CASCADE（Falsify）', () {
-    testWidgets('删除带关系行角色 → 关系行随级联消失，UI 不特判不崩',
-        (tester) async {
+    testWidgets('删除带关系行角色 → 关系行随级联消失，UI 不特判不崩', (tester) async {
       final env = await _Env.create();
       final doomed = await env.seedCharacter('删除我');
       await env.seedCharacter('留我');
@@ -457,7 +509,10 @@ void main() {
       // 两卡均有「删除」tooltip——锚定目标卡（最近 GestureDetector = 卡片根）
       // 内的删除按钮，避免歧义。
       final doomedCard = find
-          .ancestor(of: find.text('删除我'), matching: find.byType(GestureDetector))
+          .ancestor(
+            of: find.text('删除我'),
+            matching: find.byType(GestureDetector),
+          )
           .first;
       await tester.tap(
         find.descendant(of: doomedCard, matching: find.byTooltip('删除')),
@@ -470,11 +525,17 @@ void main() {
         why: '删除后列表刷新',
       );
 
-      expect(await env.companionRepository.getRelationship(doomed.id), isNull,
-          reason: '关系行随角色 FK CASCADE 清理（无 UI 特判代码）');
+      expect(
+        await env.companionRepository.getRelationship(doomed.id),
+        isNull,
+        reason: '关系行随角色 FK CASCADE 清理（无 UI 特判代码）',
+      );
       expect(tester.takeException(), isNull, reason: '关系 map 残留不含崩溃');
-      expect(find.byType(LinearProgressIndicator), findsNothing,
-          reason: '无关系行可显示的后删除态零噪音');
+      expect(
+        find.byType(LinearProgressIndicator),
+        findsNothing,
+        reason: '无关系行可显示的后删除态零噪音',
+      );
       await env.close();
     });
   });
@@ -503,9 +564,10 @@ void main() {
       final env = await _Env.create();
       await env.seedCharacter('旧形态', firstMes: '开场。');
       await env.seedRelationship(
-          (await env.characterRepository.listCharacters()).single.character.id,
-          RelationshipStage.familiar,
-          55);
+        (await env.characterRepository.listCharacters()).single.character.id,
+        RelationshipStage.familiar,
+        55,
+      );
 
       // 与 characters_view_test.dart 同形：无 MultiProvider 包裹。
       await tester.pumpWidget(
@@ -514,14 +576,19 @@ void main() {
           home: Scaffold(body: CharactersView(controller: env.controller)),
         ),
       );
-      for (var i = 0; i < 100 && env.controller.loading; i++) {
-        await tester.pump(const Duration(milliseconds: 10));
-      }
+      await pumpUntil(
+        tester,
+        () => !env.controller.loading,
+        why: '角色列表加载未在轮询窗口内完成',
+      );
       await tester.pump();
 
       expect(find.text('旧形态'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsNothing,
-          reason: 'provider 缺位降级：不渲染关系区（既有测试零回归）');
+      expect(
+        find.byType(LinearProgressIndicator),
+        findsNothing,
+        reason: 'provider 缺位降级：不渲染关系区（既有测试零回归）',
+      );
       expect(tester.takeException(), isNull);
       await env.close();
     });
