@@ -35,6 +35,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/fake_llm_provider.dart';
 import '../../helpers/in_memory_secret_store.dart';
+import '../../helpers/pump_until.dart';
 
 /// [SettingsReader] 的内存假实现（与 chat 系测试同形）。
 class FakeSettingsReader implements SettingsReader {
@@ -334,16 +335,7 @@ void main() {
     await tester.pump();
   }
 
-  Future<void> pumpUntil(
-    WidgetTester tester,
-    bool Function() condition, {
-    String why = '',
-  }) async {
-    for (var i = 0; i < 300 && !condition(); i++) {
-      await tester.pump(const Duration(milliseconds: 10));
-    }
-    expect(condition(), isTrue, reason: why);
-  }
+  
 
   group('长按进入多选模式（验收 1）', () {
     testWidgets('长按任意卡片 → 勾选标记 + 批量操作栏 + 退出返回普通列表态',

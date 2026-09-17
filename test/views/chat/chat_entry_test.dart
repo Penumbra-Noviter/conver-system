@@ -25,6 +25,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/chat_test_env.dart';
 import '../../helpers/fake_llm_provider.dart';
+import '../../helpers/pump_until.dart';
 
 void main() {
   /// pump ChatView（入口或对话态由 controller.isEntry 决定）。
@@ -38,17 +39,7 @@ void main() {
     await tester.pump();
   }
 
-  /// 循环 pump 直至 [condition] 为真（真实异步落库 / 回合收尾）。
-  Future<void> pumpUntil(
-    WidgetTester tester,
-    bool Function() condition, {
-    String why = '',
-  }) async {
-    for (var i = 0; i < 200 && !condition(); i++) {
-      await tester.pump(const Duration(milliseconds: 10));
-    }
-    expect(condition(), isTrue, reason: why);
-  }
+  
 
   ChatController entryController(ChatTestEnv env, LLMProvider provider) =>
       env.controllerOf(provider);

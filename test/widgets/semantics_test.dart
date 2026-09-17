@@ -56,6 +56,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/chat_test_env.dart';
 import '../helpers/fake_llm_provider.dart';
 import '../helpers/in_memory_secret_store.dart';
+import '../helpers/pump_until.dart';
 
 void main() {
   // ─────────────────────────── 通用断言 helper ───────────────────────────
@@ -80,17 +81,7 @@ void main() {
     await tester.pump();
   }
 
-  /// 循环 pump 直至 [condition] 为真（真实异步落库 / 回合 / 流完成）。
-  Future<void> pumpUntil(
-    WidgetTester tester,
-    bool Function() condition, {
-    String why = '',
-  }) async {
-    for (var i = 0; i < 300 && !condition(); i++) {
-      await tester.pump(const Duration(milliseconds: 10));
-    }
-    expect(condition(), isTrue, reason: why);
-  }
+  
 
   /// 种子角色 + 会话并打开；返回控制器。
   Future<ChatController> openSeededConversation(
