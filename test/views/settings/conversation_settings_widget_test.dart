@@ -67,7 +67,7 @@ void main() {
   testWidgets('保存 max_tokens 后重进页面回显已保存值', (tester) async {
     await pumpPage(tester);
 
-    await tester.enterText(find.byType(TextField), '4096');
+    await tester.enterText(find.byKey(const ValueKey('max-tokens')), '4096');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(await repo.getMaxTokens(), 4096);
@@ -83,17 +83,17 @@ void main() {
   ) async {
     await pumpPage(tester);
 
-    await tester.enterText(find.byType(TextField), '');
+    await tester.enterText(find.byKey(const ValueKey('max-tokens')), '');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(await repo.getMaxTokens(), 2048, reason: '空输入回退缺省');
 
-    await tester.enterText(find.byType(TextField), '-5');
+    await tester.enterText(find.byKey(const ValueKey('max-tokens')), '-5');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(await repo.getMaxTokens(), 1, reason: '负数 clamp 到下限');
 
-    await tester.enterText(find.byType(TextField), '99999999');
+    await tester.enterText(find.byKey(const ValueKey('max-tokens')), '99999999');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(await repo.getMaxTokens(), 100000, reason: '超上限 clamp 到上限');
