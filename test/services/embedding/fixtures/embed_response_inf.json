@@ -1,0 +1,12 @@
+{
+  "_note": "畸形 fixture（SR-17）：embedding 含 Infinity——JSON 字面量 1e999 经 jsonDecode 溢出为 double.infinity（探针实证），isFinite 校验必须拒绝；真实响应待 key 补充。",
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "index": 0,
+      "embedding": [0.1, 1e999, 0.3]
+    }
+  ],
+  "model": "text-embedding-3-small"
+}
