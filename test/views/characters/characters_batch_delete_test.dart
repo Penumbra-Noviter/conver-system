@@ -335,8 +335,6 @@ void main() {
     await tester.pump();
   }
 
-  
-
   group('长按进入多选模式（验收 1）', () {
     testWidgets('长按任意卡片 → 勾选标记 + 批量操作栏 + 退出返回普通列表态',
         (tester) async {

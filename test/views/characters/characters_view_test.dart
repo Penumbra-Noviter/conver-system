@@ -186,7 +186,6 @@ class _CharsEnv {
 }
 
 void main() {
-  
 
   Future<void> pumpChars(
     WidgetTester tester,

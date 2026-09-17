@@ -81,8 +81,6 @@ void main() {
     await tester.pump();
   }
 
-  
-
   /// 种子角色 + 会话并打开；返回控制器。
   Future<ChatController> openSeededConversation(
     WidgetTester tester,

@@ -39,8 +39,6 @@ void main() {
     await tester.pump();
   }
 
-  
-
   ChatController entryController(ChatTestEnv env, LLMProvider provider) =>
       env.controllerOf(provider);
 

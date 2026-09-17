@@ -70,8 +70,6 @@ void main() {
     await tester.pump();
   }
 
-  
-
   /// 种子角色 + 会话并打开（无开场白 → 空消息列表）；返回控制器。
   Future<ChatController> openConversation(
     WidgetTester tester,

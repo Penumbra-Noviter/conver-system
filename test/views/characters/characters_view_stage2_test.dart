@@ -179,7 +179,6 @@ class _Env {
 }
 
 void main() {
-  
 
   /// 带 stage2 装配图（provider 形状对齐 app.dart）pump CharactersView。
   ///
