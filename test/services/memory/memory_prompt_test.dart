@@ -42,7 +42,10 @@ void main() {
   group('buildMemoryLibrarySection', () {
     test('两者皆空返回空串', () {
       expect(
-        buildMemoryLibrarySection(personaFacts: const [], recentEpisodic: const []),
+        buildMemoryLibrarySection(
+          personaFacts: const [],
+          recentEpisodic: const [],
+        ),
         '',
       );
     });
@@ -75,6 +78,44 @@ void main() {
       expect(section, contains('人格事实：'));
       expect(section, contains('近期经历：'));
       expect(section, contains('【当前记忆库内容】'));
+    });
+
+    test('recentSemantic 非空：追加语义相关记忆小节（紧随近期经历）', () {
+      final section = buildMemoryLibrarySection(
+        personaFacts: const ['她叫艾莉亚'],
+        recentEpisodic: const ['今天聊了天气'],
+        recentSemantic: const ['她喜欢咖啡'],
+      );
+      expect(section, contains('语义相关记忆：'));
+      expect(section, contains('- 她喜欢咖啡'));
+      expect(section.indexOf('近期经历：'), lessThan(section.indexOf('语义相关记忆：')));
+      expect(section, isNot(contains('语义相关记忆：\n- 她喜欢咖啡\n- 她喜欢咖啡')));
+    });
+
+    test('recentSemantic 多条：逐条输出且无重复展开', () {
+      final section = buildMemoryLibrarySection(
+        personaFacts: const [],
+        recentEpisodic: const [],
+        recentSemantic: const ['记忆甲', '记忆乙'],
+      );
+      expect(section, contains('【当前记忆库内容】'));
+      expect(section, contains('语义相关记忆：'));
+      expect(section, contains('- 记忆甲'));
+      expect(section, contains('- 记忆乙'));
+    });
+
+    test('recentSemantic 空列表：与原输出一致（零回归）', () {
+      final without = buildMemoryLibrarySection(
+        personaFacts: const ['她叫艾莉亚'],
+        recentEpisodic: const [],
+      );
+      final withEmpty = buildMemoryLibrarySection(
+        personaFacts: const ['她叫艾莉亚'],
+        recentEpisodic: const [],
+        recentSemantic: const [],
+      );
+      expect(withEmpty, without);
+      expect(withEmpty, isNot(contains('语义相关记忆：')));
     });
   });
 }

@@ -9,6 +9,7 @@ import 'package:conver_system_mobile/data/repositories/memory_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/embedding/embedding_service.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/memory/memory_service.dart';
 import 'package:conver_system_mobile/services/memory/reflection_service.dart';
@@ -19,6 +20,30 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/chat_test_env.dart' show FakeSettingsReader;
 import '../helpers/fake_llm_provider.dart';
 import '../helpers/in_memory_secret_store.dart';
+
+/// 记录 backfillPending 调用的 fake [EmbeddingService]（VR-07 懒补嵌 seam）。
+class _FakeEmbeddingService implements EmbeddingService {
+  int backfillCalls = 0;
+
+  @override
+  Future<int> backfillPending(
+    int characterId, {
+    int limit = kEmbeddingMaxBatch,
+  }) async {
+    backfillCalls++;
+    return 0;
+  }
+
+  @override
+  Future<List<MemoryEntry>> semanticSearch(
+    int characterId,
+    String queryText,
+  ) async => const <MemoryEntry>[];
+
+  @override
+  Future<List<List<MemoryEntry>>> buildClusterInput(int characterId) async =>
+      const <List<MemoryEntry>>[];
+}
 
 void main() {
   late AppDatabase db;
@@ -66,6 +91,7 @@ void main() {
   ChatService buildService({
     required LLMProvider provider,
     required ReflectionService reflectionService,
+    EmbeddingService? embeddingService,
   }) {
     return ChatService(
       database: db,
@@ -76,6 +102,7 @@ void main() {
       providerFactory: FixedLLMProviderFactory(provider),
       memoryService: memoryService,
       reflectionService: reflectionService,
+      embeddingService: embeddingService,
     );
   }
 
@@ -88,8 +115,7 @@ void main() {
         required String charName,
         required List<String> dialogueLines,
         required List<String> existingFacts,
-      }) async =>
-          result,
+      }) async => result,
       interval: 1,
     );
   }
@@ -125,14 +151,15 @@ void main() {
       characterRepository: characterRepo,
       memoryRepository: memoryRepo,
       messageRepository: messageRepo,
-      extractor: ({
-        required String charName,
-        required List<String> dialogueLines,
-        required List<String> existingFacts,
-      }) async {
-        extractorCalls++;
-        return const ['用户喜欢咖啡'];
-      },
+      extractor:
+          ({
+            required String charName,
+            required List<String> dialogueLines,
+            required List<String> existingFacts,
+          }) async {
+            extractorCalls++;
+            return const ['用户喜欢咖啡'];
+          },
       interval: 1,
     );
     final provider = FakeLLMProvider(tokens: const ['你好']);
@@ -149,5 +176,35 @@ void main() {
 
     expect(extractorCalls, 0);
     expect(await memoryRepo.listPersonaFacts(conv.characterId), isEmpty);
+  });
+
+  test('反思落库后触发懒补嵌（无记忆标签时不触发 done 路径）', () async {
+    final conv = await seedConversation();
+    await settingsRepo.setMany({
+      SettingsRepository.memoryReflectionEnabledKey: 'true',
+    });
+    final embeddingService = _FakeEmbeddingService();
+    final provider = FakeLLMProvider(tokens: const ['你好']);
+    final service = buildService(
+      provider: provider,
+      reflectionService: buildReflection(['用户喜欢咖啡']),
+      embeddingService: embeddingService,
+    );
+
+    await drainStream(
+      service.streamReply(conversationId: conv.id, content: '嗨'),
+    );
+
+    // 反思落库成功后补嵌触发（fire-and-forget 链：反思 → 补嵌）。
+    var facts = await memoryRepo.listPersonaFacts(conv.characterId);
+    for (var i = 0; i < 200 && facts.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      facts = await memoryRepo.listPersonaFacts(conv.characterId);
+    }
+    expect(facts.map((e) => e.content), contains('用户喜欢咖啡'));
+    for (var i = 0; i < 200 && embeddingService.backfillCalls == 0; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(embeddingService.backfillCalls, 1);
   });
 }
