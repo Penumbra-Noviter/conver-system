@@ -42,10 +42,14 @@ class CharacterRepository {
   final AppDatabase _db;
   final DateTime Function() _now;
 
-  /// 所有角色 + 对话数，按 `updated_at` 倒序（桌面 list_characters）。
+  /// 所有角色 + 对话数，按 `updated_at` 倒序（桌面 list_characters）；
+  /// 同 updated_at 时按 id 升序（创建序）稳定。
   Future<List<CharacterWithCount>> listCharacters() async {
     final (query, countExp) = _baseCharacterQuery();
-    query.orderBy([OrderingTerm.desc(_db.characters.updatedAt)]);
+    query.orderBy([
+      OrderingTerm.desc(_db.characters.updatedAt),
+      OrderingTerm.asc(_db.characters.id),
+    ]);
     final rows = await query.get();
     return [
       for (final row in rows)

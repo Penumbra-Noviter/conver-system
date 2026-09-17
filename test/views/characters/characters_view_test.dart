@@ -43,6 +43,7 @@ import 'package:provider/provider.dart';
 
 import '../../helpers/fake_llm_provider.dart';
 import '../../helpers/in_memory_secret_store.dart';
+import '../../helpers/pump_until.dart';
 
 /// [SettingsReader] 的内存假实现（与 chat 系测试同形）。
 class FakeSettingsReader implements SettingsReader {
@@ -185,17 +186,7 @@ class _CharsEnv {
 }
 
 void main() {
-  /// 循环 pump 直至 [condition] 为真（真实异步落库 / 列表刷新完成）。
-  Future<void> pumpUntil(
-    WidgetTester tester,
-    bool Function() condition, {
-    String why = '',
-  }) async {
-    for (var i = 0; i < 300 && !condition(); i++) {
-      await tester.pump(const Duration(milliseconds: 10));
-    }
-    expect(condition(), isTrue, reason: why);
-  }
+  
 
   Future<void> pumpChars(
     WidgetTester tester,

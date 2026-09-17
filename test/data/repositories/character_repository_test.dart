@@ -92,6 +92,23 @@ void main() {
       expect(refreshed.map((row) => row.character.id), [older.id, newer.id]);
       expect(refreshed.first.conversationCount, 2);
     });
+
+    test('同 updated_at 时按 id 升序（创建序）稳定', () async {
+      // 不推进 fakeNow：两次 seed 落库为同一秒 updated_at（F-106 契约面）。
+      final first = await seedCharacter(name: '先建', secondsAgo: 0);
+      final second = await seedCharacter(name: '后建', secondsAgo: 0);
+      expect(
+        first.updatedAt,
+        second.updatedAt,
+        reason: '前置：两次 seed 必须落在同一 updated_at，否则用例不成立',
+      );
+
+      final list = await repo.listCharacters();
+      expect(
+        list.map((row) => row.character.id),
+        [first.id, second.id],
+      );
+    });
   });
 
   group('getCharacterWithCount', () {

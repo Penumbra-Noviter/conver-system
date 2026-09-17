@@ -40,6 +40,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/chat_test_env.dart';
 import '../../helpers/fake_llm_provider.dart';
+import '../../helpers/pump_until.dart';
 
 /// 导出 seam fake（M4-03 widget 层）：记录分享调用并返回固定文案，
 /// 不触真平台通道。
@@ -69,17 +70,7 @@ void main() {
     await tester.pump();
   }
 
-  /// 循环 pump 直至 [condition] 为真（真实异步落库 / 回合收尾 / 流完成）。
-  Future<void> pumpUntil(
-    WidgetTester tester,
-    bool Function() condition, {
-    String why = '',
-  }) async {
-    for (var i = 0; i < 300 && !condition(); i++) {
-      await tester.pump(const Duration(milliseconds: 10));
-    }
-    expect(condition(), isTrue, reason: why);
-  }
+  
 
   /// 种子角色 + 会话并打开（无开场白 → 空消息列表）；返回控制器。
   Future<ChatController> openConversation(

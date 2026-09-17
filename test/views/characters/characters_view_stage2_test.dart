@@ -46,6 +46,7 @@ import 'package:provider/provider.dart';
 import '../../helpers/chat_test_env.dart' show FakeSettingsReader;
 import '../../helpers/fake_llm_provider.dart';
 import '../../helpers/in_memory_secret_store.dart';
+import '../../helpers/pump_until.dart';
 
 /// seam fake（导出调用链记录，与 characters_view_test 同契约）。
 class _FakeExchange implements CharacterFileExchange {
@@ -178,17 +179,7 @@ class _Env {
 }
 
 void main() {
-  /// 循环 pump 直至 [condition] 为真（真实异步落库 / 关系重载完成）。
-  Future<void> pumpUntil(
-    WidgetTester tester,
-    bool Function() condition, {
-    String why = '',
-  }) async {
-    for (var i = 0; i < 300 && !condition(); i++) {
-      await tester.pump(const Duration(milliseconds: 10));
-    }
-    expect(condition(), isTrue, reason: why);
-  }
+  
 
   /// 带 stage2 装配图（provider 形状对齐 app.dart）pump CharactersView。
   ///
@@ -319,7 +310,7 @@ void main() {
       await pumpUntil(
         tester,
         () => find.text('升级建议：亲密').evaluate().isNotEmpty,
-        why: '升级建议未在轮询窗口内出现（broker publish 生效延迟）',
+        why: '升级建议未在轮询窗口内出现',
       );
 
       expect(find.text('升级建议：亲密'), findsOneWidget);
@@ -346,7 +337,7 @@ void main() {
       await pumpUntil(
         tester,
         () => find.text('确认').evaluate().isNotEmpty,
-        why: '确认按钮未在轮询窗口内出现（broker publish 生效延迟）',
+        why: '确认按钮未在轮询窗口内出现',
       );
 
       await tester.longPress(find.text('目标'));
@@ -378,7 +369,7 @@ void main() {
       await pumpUntil(
         tester,
         () => find.text('确认').evaluate().isNotEmpty,
-        why: '确认按钮未在轮询窗口内出现（broker publish 生效延迟）',
+        why: '确认按钮未在轮询窗口内出现',
       );
 
       await tester.tap(find.text('确认'));
@@ -431,7 +422,7 @@ void main() {
       await pumpUntil(
         tester,
         () => find.text('拒绝').evaluate().isNotEmpty,
-        why: '拒绝按钮未在轮询窗口内出现（broker publish 生效延迟）',
+        why: '拒绝按钮未在轮询窗口内出现',
       );
       await tester.tap(find.text('拒绝'));
       await tester.pump();
@@ -480,7 +471,7 @@ void main() {
       await pumpUntil(
         tester,
         () => find.text('确认').evaluate().isNotEmpty,
-        why: '确认按钮未在轮询窗口内出现（broker publish 生效延迟）',
+        why: '确认按钮未在轮询窗口内出现',
       );
       await tester.tap(find.text('确认'));
       await tester.pump();
