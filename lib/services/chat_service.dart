@@ -67,6 +67,7 @@ import '../data/repositories/settings_repository.dart';
 import 'companion/proactive_message_service.dart';
 import 'companion/relationship_service.dart';
 import 'companion/thought_service.dart';
+import 'embedding/embedding_service.dart';
 import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
@@ -211,7 +212,8 @@ class RegenerateResult {
 /// 走业务错误 [ChatError]（F-45 不落部分内容）。M6-06：仅连接相位叶子
 /// （[ConnectPhaseInterruptedError]）属自动重试窗口，重试耗尽后复用本判定走
 /// 断流收束。
-bool _isConnectionDrop(LLMError error) => error is LLMConnectionInterruptedError;
+bool _isConnectionDrop(LLMError error) =>
+    error is LLMConnectionInterruptedError;
 
 /// [streamReply] 一次运行的共享可变状态（onData / onCancel / 收尾 handler 间
 /// 传递：完整内容累积、是否已落库、provider 订阅句柄、停止标志）。
@@ -236,6 +238,11 @@ class _StreamRunState {
 
   /// 已累积的流式内容（逐 token 追加；完成态即完整回复）。
   String fullContent = '';
+
+  /// 本回合记忆指令是否有落库（VR-07 懒补嵌触发语义：`<add:>`/`<persona:>`
+  /// 落库后 fire-and-forget 补嵌；`_persistAssistant` 经
+  /// `_applyMemoryCommands` 返回值置位）。
+  bool memoryChangedThisTurn = false;
 
   /// 本次回合已发生的连接阶段失败次数（重试编排计数；耗尽后走终态收束）。
   int connectFailures = 0;
@@ -272,6 +279,7 @@ class ChatService {
     CredentialsResolver? credentialsResolver,
     this._memoryService,
     this._reflectionService,
+    this._embeddingService,
     this._thoughtService,
     this._relationshipService,
     this._proactiveMessageService,
@@ -281,8 +289,8 @@ class ChatService {
       Duration(seconds: 1),
       Duration(seconds: 2),
     ],
-  })  : _db = database,
-        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays) {
+  }) : _db = database,
+       _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays) {
     _credentialsResolver = credentialsResolver ?? _wireCredentialsResolver();
   }
 
@@ -298,6 +306,12 @@ class ChatService {
 
   /// 后台反思服务（人机恋阶段 1.5，ADR-0004）；null = 反思未启用（既有装配零改动）。
   final ReflectionService? _reflectionService;
+
+  /// 远端 embedding 编排服务（阶段 3，VR-06/VR-07）；null = 懒补嵌未启用
+  /// （既有装配零改动）。触发语义：本回合记忆落库或反思落库后
+  /// fire-and-forget 触发 [EmbeddingService.backfillPending]（enabled 门在
+  /// 服务内，失败降级不阻断主回复——与 [_maybeReflectAfterTurn] 同构）。
+  final EmbeddingService? _embeddingService;
 
   /// 内心独白服务（阶段 2，PS2-04/07）；null = 独白未启用（既有装配零改动）。
   /// 剥离恒启用（经此服务），开关控制落库与 prompt 指令。
@@ -397,12 +411,15 @@ class ChatService {
     String providerName = '';
     try {
       // 1. 校验对话存在。
-      final conv =
-          await _conversationRepository.getConversation(state.conversationId);
+      final conv = await _conversationRepository.getConversation(
+        state.conversationId,
+      );
       if (conv == null) {
         throw ConversationNotFoundError();
       }
-      final character = await _characterRepository.getCharacter(conv.characterId);
+      final character = await _characterRepository.getCharacter(
+        conv.characterId,
+      );
       if (character == null) {
         throw CharacterNotFoundError(conv.characterId);
       }
@@ -637,6 +654,11 @@ class ChatService {
       // 降级不阻断主回复；零 token 空流不触发）。阶段 2：主动规划/关系评估
       // 与反思同构并列，三路任一路抛错只 debugPrint、互不影响、不阻断 ChatDone。
       if (msg != null) {
+        // VR-07 懒补嵌：本回合有记忆落库（<add:>/<persona:>）才触发；
+        // 反思路径的补嵌触发在 _maybeReflectAfterTurn 落库成功后进行。
+        if (state.memoryChangedThisTurn) {
+          unawaited(_maybeBackfillEmbeddingsAfterTurn(state));
+        }
         unawaited(_maybeReflectAfterTurn(state));
         unawaited(_maybePlanProactiveAfterTurn(state));
         unawaited(_maybeEvaluateRelationship(state));
@@ -644,8 +666,7 @@ class ChatService {
       // F3 同类硬化：onDone 与 onCancel 竞态（收尾瞬间取消）下 controller 可能
       // 已关闭，add 前守卫避免 add-after-close 的未处理异常。
       if (!controller.isClosed) {
-        controller.add(
-            msg != null ? ChatDone(msg.id) : const ChatDone(null));
+        controller.add(msg != null ? ChatDone(msg.id) : const ChatDone(null));
       }
     } catch (e) {
       // 落库失败（如流式中对话被删）→ 收口为 ChatError，不产生未处理异步异常。
@@ -679,14 +700,14 @@ class ChatService {
           // 断流：已累积部分落库 + 非阻塞「回复已中断」。
           final msg = await _persistAssistant(state);
           controller.add(
-            msg != null
-                ? ChatInterrupted(msg.id)
-                : const ChatInterrupted(null),
+            msg != null ? ChatInterrupted(msg.id) : const ChatInterrupted(null),
           );
         } else {
           // LLM 业务错误：F-45 不落部分内容。
           state.saved = true;
-          controller.add(ChatError(llmErrorResponse(error, providerName).message));
+          controller.add(
+            ChatError(llmErrorResponse(error, providerName).message),
+          );
         }
       } else if (error is DomainError) {
         controller.add(ChatError(domainErrorResponse(error).message));
@@ -747,11 +768,11 @@ class ChatService {
     // 异常 + 卡住调用方 stop 收尾）。
     try {
       await state.providerSub?.cancel().timeout(
-            const Duration(seconds: 3),
-            onTimeout: () {
-              debugPrint('停止 cancel 停滞，继续回合收尾');
-            },
-          );
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('停止 cancel 停滞，继续回合收尾');
+        },
+      );
     } catch (e) {
       // F-55：cancel 以错误完成（cancel-unwind 断流）→ 捕获继续回合收尾，不
       // 跳过部分落库与事件流关闭。
@@ -787,13 +808,13 @@ class ChatService {
     // ① thought 剥离（恒启用）先于记忆（spec 判定②：thought 不进记忆链路）。
     final extracted = extractThought(raw);
     // ② 记忆只吃剥离后的正文（<add:> 等指令不受 thought 内容污染）。
-    final memoryContent =
-        await _applyMemoryCommands(state, extracted.displayContent);
+    final applied = await _applyMemoryCommands(state, extracted.displayContent);
+    state.memoryChangedThisTurn = applied.memoryChanged;
     // ③ 落库正文（thought 已剥；剥离后为空 → 空串消息，单测锁定）。
     final msg = await _messageRepository.createMessage(
       conversationId: state.conversationId,
       role: Role.assistant,
-      content: memoryContent,
+      content: applied.displayContent,
     );
     // ④ 补落 thought：stripAndPersist 需要已落库消息 id（InnerThoughts.messageId
     //    FK → Messages），对原始内容重跑剥离仅取其落库/降级副作用，返回的
@@ -830,25 +851,33 @@ class ChatService {
 
   /// 剥离 assistant 回复中的记忆标签并落库（AC-02/AC-03 记忆链路）。
   ///
+  /// 返回剥离后的展示文本 + 本回合是否有记忆落库（`<add:>`/`<persona:>` 任一
+  /// 落库即 true——VR-07 懒补嵌触发语义；search 指令不含落库不计入）。
+  ///
   /// 记忆功能未启用（[_memoryService] == null）或角色 id 未知（校验失败路径）
-  /// → 原样返回；记忆落库失败 → 降级返回原始文本（标签残留但主回复可用，
-  /// 对齐「记忆失败不阻断主回复」约束）。
-  Future<String> _applyMemoryCommands(
+  /// → 原样返回、无落库；记忆落库失败 → 降级返回原始文本（标签残留但主回复
+  /// 可用，对齐「记忆失败不阻断主回复」约束）。
+  Future<({String displayContent, bool memoryChanged})> _applyMemoryCommands(
     _StreamRunState state,
     String content,
   ) async {
     final memoryService = _memoryService;
     final characterId = state.characterId;
     if (memoryService == null || characterId == null) {
-      return content;
+      return (displayContent: content, memoryChanged: false);
     }
     try {
-      final result =
-          await memoryService.applyAssistantReply(characterId, content);
-      return result.displayContent;
+      final result = await memoryService.applyAssistantReply(
+        characterId,
+        content,
+      );
+      return (
+        displayContent: result.displayContent,
+        memoryChanged: result.episodicAdded > 0 || result.personaAdded > 0,
+      );
     } catch (e) {
       debugPrint('记忆指令处理失败，保留原始回复: $e');
-      return content;
+      return (displayContent: content, memoryChanged: false);
     }
   }
 
@@ -872,8 +901,31 @@ class ChatService {
         characterId: characterId,
         conversationId: state.conversationId,
       );
+      // 反思落库成功后懒补嵌（VR-07 U3：反思产出 persona_fact 也需向量）。
+      unawaited(_maybeBackfillEmbeddingsAfterTurn(state));
     } catch (e) {
       debugPrint('后台反思失败，跳过: $e');
+    }
+  }
+
+  /// 回合末懒补嵌（VR-07，spec D4 / U3）：落库路径 fire-and-forget 触发
+  /// [EmbeddingService.backfillPending]，把本回合新增记忆补成向量。
+  ///
+  /// 触发点 = ① 本回合 `<add:>`/`<persona:>` 落库后（done 分支，经
+  /// `state.memoryChangedThisTurn` 门）；② 后台反思落库成功后（见
+  /// [_maybeReflectAfterTurn]）。embedding 未注入/角色 id 未知 → 跳过；
+  /// enabled 门在服务内（未启用零请求）；失败 → debugPrint 降级不阻断主
+  /// 回复（对齐 [_maybeReflectAfterTurn] 模式，SR-18 不重试风暴）。
+  Future<void> _maybeBackfillEmbeddingsAfterTurn(_StreamRunState state) async {
+    final embeddingService = _embeddingService;
+    final characterId = state.characterId;
+    if (embeddingService == null || characterId == null) {
+      return;
+    }
+    try {
+      await embeddingService.backfillPending(characterId);
+    } catch (e) {
+      debugPrint('后台补嵌失败，跳过: $e');
     }
   }
 
@@ -952,7 +1004,9 @@ class ChatService {
     _regenerateInFlight.add(conversationId);
     try {
       // 1. 校验对话存在。
-      final conv = await _conversationRepository.getConversation(conversationId);
+      final conv = await _conversationRepository.getConversation(
+        conversationId,
+      );
       if (conv == null) {
         throw ConversationNotFoundError();
       }
@@ -960,7 +1014,9 @@ class ChatService {
       // F1：快照当前最大消息 id。网络生成期间并发写入的新消息 id 严格递增
       // （> snapshotMaxId），必须在事务删旧时保留，否则无界删除会连带删掉
       // 这条新 user 消息（静默数据丢失）。
-      final snapshotMaxId = await _messageRepository.maxMessageId(conversationId);
+      final snapshotMaxId = await _messageRepository.maxMessageId(
+        conversationId,
+      );
 
       // 2. 解析并校验目标。
       final target = await _resolveRegenerateTarget(conversationId, messageId);
@@ -973,7 +1029,9 @@ class ChatService {
 
       // 4. 组装（append_current_input=False）+ provider 解析。延迟删除：此步抛错
       //    不触碰 DB，旧消息保留。
-      final character = await _characterRepository.getCharacter(conv.characterId);
+      final character = await _characterRepository.getCharacter(
+        conv.characterId,
+      );
       if (character == null) {
         throw CharacterNotFoundError(conv.characterId);
       }
@@ -1008,8 +1066,11 @@ class ChatService {
       // 6. 单事务：有界删旧（target.id <= id <= snapshotMaxId）+ 插新一次提交
       //    （drift 嵌套事务 = savepoint，任一失败整体回滚，防半截断持久化）。
       final saved = await _db.transaction(() async {
-        await _messageRepository.deleteMessagesFrom(conversationId, target.id,
-            toId: snapshotMaxId);
+        await _messageRepository.deleteMessagesFrom(
+          conversationId,
+          target.id,
+          toId: snapshotMaxId,
+        );
         return _messageRepository.createMessage(
           conversationId: conversationId,
           role: Role.assistant,
@@ -1109,8 +1170,10 @@ class ChatService {
         final mode = MemoryPromptMode.fromValue(
           await _settingsRepository.memoryPromptMode,
         );
-        final injection =
-            await memoryService.buildInjection(character.id, mode: mode);
+        final injection = await memoryService.buildInjection(
+          character.id,
+          mode: mode,
+        );
         if (injection.isNotEmpty) {
           final insertAt = messages.isEmpty ? 0 : 1;
           messages.insertAll(insertAt, injection);
@@ -1193,8 +1256,9 @@ class ChatService {
   /// provider/model 覆盖非空优先，空回退设置默认；空 key 抛
   /// [ApiKeyMissingError]「未配置 {provider} API Key，请在设置中填写」；base_url
   /// 空 → null；工厂派生抛 [ProviderNotSupportedError]（未知 Provider）。
-  Future<({String provider, String model, LLMProvider llm})>
-      _resolveProvider(Conversation conv) async {
+  Future<({String provider, String model, LLMProvider llm})> _resolveProvider(
+    Conversation conv,
+  ) async {
     final resolved = await _credentialsResolver.resolve(
       providerOverride: conv.modelProvider,
       modelOverride: conv.modelName,

@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'
-    show DidReceiveNotificationResponseCallback, FlutterLocalNotificationsPlugin;
+    show
+        DidReceiveNotificationResponseCallback,
+        FlutterLocalNotificationsPlugin;
 import 'package:provider/provider.dart';
 
 import 'data/database/app_database.dart';
@@ -66,10 +68,7 @@ abstract interface class ProactiveDeepLinkNavigator {
   void selectChatTab();
 
   /// 打开 [conversationId] 对话并（可选）高亮 [highlightMessageId] 消息。
-  Future<void> openConversation(
-    int conversationId, {
-    int? highlightMessageId,
-  });
+  Future<void> openConversation(int conversationId, {int? highlightMessageId});
 }
 
 /// 深链导航生产实现（PS2-10）：包 [ShellNavigation] + [ChatController]——
@@ -88,10 +87,7 @@ class AppDeepLinkNavigator implements ProactiveDeepLinkNavigator {
   void selectChatTab() => navigation.select(ShellTab.chat);
 
   @override
-  Future<void> openConversation(
-    int conversationId, {
-    int? highlightMessageId,
-  }) {
+  Future<void> openConversation(int conversationId, {int? highlightMessageId}) {
     return chatController.openConversation(
       conversationId,
       highlightMessageId: highlightMessageId,
@@ -232,8 +228,9 @@ Future<void> handleProactiveDeepLink({
         final delivered = await proactiveMessageService
             .markDeliveredByMessageId(parsed.messageId);
         if (delivered != null && relationshipService != null) {
-          await relationshipService
-              .recordProactiveMessageOpened(delivered.characterId);
+          await relationshipService.recordProactiveMessageOpened(
+            delivered.characterId,
+          );
         }
       } catch (e) {
         debugPrint('主动消息送达收口失败（不阻断导航）: $e');
@@ -267,7 +264,9 @@ Future<void> restoreProactiveSchedules({
   required ProactiveNotificationScheduler scheduler,
   required DateTime now,
 }) async {
-  final pending = await companion.listPlansByStatus(ProactivePlanStatus.scheduled);
+  final pending = await companion.listPlansByStatus(
+    ProactivePlanStatus.scheduled,
+  );
   for (final plan in pending) {
     if (!plan.scheduledAt.isAfter(now)) {
       try {
@@ -302,8 +301,7 @@ Future<void> _startProactiveNotifications(
   try {
     await scheduler.initialize(
       onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
-      onHotCallbackLost: (reason) =>
-          debugPrint('主动通知热态回调丢失（不可补救）: $reason'),
+      onHotCallbackLost: (reason) => debugPrint('主动通知热态回调丢失（不可补救）: $reason'),
     );
     await restoreProactiveSchedules(
       companion: companion,
@@ -352,12 +350,10 @@ class ConverApp extends StatelessWidget {
         ),
         // AC-01/AC-03 记忆装配：MemoryRepository（数据层）+ MemoryService
         // （注入组装 / 指令解析落库），供 ChatService 与记忆管理页消费。
+        // MemoryService 声明于 EmbeddingService 之后（VR-07 起依赖后者，
+        // provider 嵌套序即依赖序）。
         Provider<MemoryRepository>(
           create: (context) => MemoryRepository(context.read<AppDatabase>()),
-        ),
-        Provider<MemoryService>(
-          create: (context) =>
-              MemoryService(context.read<MemoryRepository>()),
         ),
         // VR-06 阶段 3 装配腿（P1 端点/凭据独立腿，不并入 CredentialsResolver）：
         // EmbeddingService 依赖 SettingsRepository + MemoryRepository + 可替换
@@ -367,8 +363,8 @@ class ConverApp extends StatelessWidget {
         // 读取只发生在 embedding 已启用后的实际操作路径，默认关（SR-19）下
         // 装配与启动均不触达 SecretStore，测试环境无 MissingPluginException）。
         // lazy:false（W6-F1/persona 教训）：装配腿启动即构造，装配断裂在
-        // 启动期暴露而非等消费；无网络/存储副作用。后续 VR-07/VR-08 将串行
-        // 申报再改本文件（批次内不得并行触碰）。
+        // 启动期暴露而非等消费；无网络/存储副作用。VR-07 起 MemoryService
+        // 依赖本 provider（混合检索 seam），声明次序已在下方对齐。
         Provider<EmbeddingService>(
           lazy: false, // W6-F1：装配腿启动副作用必须立即执行（persona 教训）
           create: (context) {
@@ -400,12 +396,17 @@ class ConverApp extends StatelessWidget {
             );
           },
         ),
+        Provider<MemoryService>(
+          create: (context) => MemoryService(
+            context.read<MemoryRepository>(),
+            // VR-07 串行申报：混合检索 seam（关键词零命中 → 语义兜底入队）。
+            embeddingService: context.read<EmbeddingService>(),
+          ),
+        ),
         // M2-T04 聊天装配：LLM 工厂 + 回合编排服务 + 聊天控制器。
         // 视图层（ChatView / ChatEntry）只读 ChatController 与仓储抽象，不触碰
         // 数据层 / 平台存储（layer_boundary_test 契约）；装配链单一收编于此。
-        Provider<LLMProviderFactory>(
-          create: (_) => const LLMFactory(),
-        ),
+        Provider<LLMProviderFactory>(create: (_) => const LLMFactory()),
         // 人机恋阶段 1.5 后台反思装配（ADR-0004）：ReflectionService 依赖三
         // 仓储 + LLM 工厂 + 凭据解析链（wireCredentialsResolver 单一落点）；
         // 置于 ChatService 之前（后者经 provider 消费，装配单源）。
@@ -417,26 +418,28 @@ class ConverApp extends StatelessWidget {
               characterRepository: context.read<CharacterRepository>(),
               memoryRepository: context.read<MemoryRepository>(),
               messageRepository: context.read<MessageRepository>(),
-              extractor: ({
-                required String charName,
-                required List<String> dialogueLines,
-                required List<String> existingFacts,
-              }) async {
-                final resolved =
-                    await settings.wireCredentialsResolver().resolve();
-                final llm = factory.create(
+              extractor:
+                  ({
+                    required String charName,
+                    required List<String> dialogueLines,
+                    required List<String> existingFacts,
+                  }) async {
+                    final resolved = await settings
+                        .wireCredentialsResolver()
+                        .resolve();
+                    final llm = factory.create(
                       provider: resolved.provider,
                       apiKey: resolved.apiKey,
                       baseUrl: resolved.baseUrl,
                     );
-                return extractPersonaFactsWithProvider(
-                  llm: llm,
-                  model: resolved.model,
-                  charName: charName,
-                  dialogueLines: dialogueLines,
-                  existingFacts: existingFacts,
-                );
-              },
+                    return extractPersonaFactsWithProvider(
+                      llm: llm,
+                      model: resolved.model,
+                      charName: charName,
+                      dialogueLines: dialogueLines,
+                      existingFacts: existingFacts,
+                    );
+                  },
             );
           },
         ),
@@ -445,8 +448,7 @@ class ConverApp extends StatelessWidget {
         // provider 消费，装配单源）；启动初始化/排程恢复经哑 Provider 触发
         // （unawaited，失败 debugPrint 不阻断构建）。
         Provider<CompanionRepository>(
-          create: (context) =>
-              CompanionRepository(context.read<AppDatabase>()),
+          create: (context) => CompanionRepository(context.read<AppDatabase>()),
         ),
         Provider<ThoughtService>(
           create: (context) => ThoughtService(
@@ -472,26 +474,28 @@ class ConverApp extends StatelessWidget {
               companionRepository: context.read<CompanionRepository>(),
               settingsRepository: settings,
               messageRepository: context.read<MessageRepository>(),
-              planner: ({
-                required int characterId,
-                required int conversationId,
-                required List<String> dialogueLines,
-              }) async {
-                final resolved =
-                    await settings.wireCredentialsResolver().resolve();
-                final llm = factory.create(
+              planner:
+                  ({
+                    required int characterId,
+                    required int conversationId,
+                    required List<String> dialogueLines,
+                  }) async {
+                    final resolved = await settings
+                        .wireCredentialsResolver()
+                        .resolve();
+                    final llm = factory.create(
                       provider: resolved.provider,
                       apiKey: resolved.apiKey,
                       baseUrl: resolved.baseUrl,
                     );
-                return planProactiveWithProvider(
-                  llm: llm,
-                  model: resolved.model,
-                  characterId: characterId,
-                  conversationId: conversationId,
-                  dialogueLines: dialogueLines,
-                );
-              },
+                    return planProactiveWithProvider(
+                      llm: llm,
+                      model: resolved.model,
+                      characterId: characterId,
+                      conversationId: conversationId,
+                      dialogueLines: dialogueLines,
+                    );
+                  },
               scheduler: context.read<FlutterLocalNotificationsScheduler>(),
               // F-84 P3 站内兜底：排程失败 → 全局 SnackBar 摘要文案
               // （SR-12：不含计划内容原文）。
@@ -512,6 +516,8 @@ class ConverApp extends StatelessWidget {
             providerFactory: context.read<LLMProviderFactory>(),
             memoryService: context.read<MemoryService>(),
             reflectionService: context.read<ReflectionService>(),
+            // VR-07 串行申报：回合末懒补嵌挂点（有落库/反思成功后触发）。
+            embeddingService: context.read<EmbeddingService>(),
             thoughtService: context.read<ThoughtService>(),
             relationshipService: context.read<RelationshipService>(),
             proactiveMessageService: context.read<ProactiveMessageService>(),
@@ -564,23 +570,27 @@ class ConverApp extends StatelessWidget {
         Provider<Object?>(
           lazy: false, // W6-F1：无消费者时默认 lazy 永不执行，启动副作用必须立即触发
           create: (context) {
-            unawaited(_startProactiveNotifications(
-              context.read<FlutterLocalNotificationsScheduler>(),
-              context.read<CompanionRepository>(),
-              onDidReceiveNotificationResponse: (response) {
-                unawaited(consumeProactiveNotificationResponse(
-                  payload: response.payload,
-                  navigator: AppDeepLinkNavigator(
-                    navigation: context.read<ShellNavigation>(),
-                    chatController: context.read<ChatController>(),
-                  ),
-                  messageRepository: context.read<MessageRepository>(),
-                  proactiveMessageService:
-                      context.read<ProactiveMessageService>(),
-                  relationshipService: context.read<RelationshipService>(),
-                ));
-              },
-            ));
+            unawaited(
+              _startProactiveNotifications(
+                context.read<FlutterLocalNotificationsScheduler>(),
+                context.read<CompanionRepository>(),
+                onDidReceiveNotificationResponse: (response) {
+                  unawaited(
+                    consumeProactiveNotificationResponse(
+                      payload: response.payload,
+                      navigator: AppDeepLinkNavigator(
+                        navigation: context.read<ShellNavigation>(),
+                        chatController: context.read<ChatController>(),
+                      ),
+                      messageRepository: context.read<MessageRepository>(),
+                      proactiveMessageService: context
+                          .read<ProactiveMessageService>(),
+                      relationshipService: context.read<RelationshipService>(),
+                    ),
+                  );
+                },
+              ),
+            );
             return null;
           },
         ),
@@ -591,16 +601,18 @@ class ConverApp extends StatelessWidget {
         Provider<Object?>(
           lazy: false, // W6-F1：冷启动深链接线副作用，必须立即执行（同启动恢复）
           create: (context) {
-            unawaited(consumeProactiveLaunchDeepLink(
-              navigator: AppDeepLinkNavigator(
-                navigation: context.read<ShellNavigation>(),
-                chatController: context.read<ChatController>(),
+            unawaited(
+              consumeProactiveLaunchDeepLink(
+                navigator: AppDeepLinkNavigator(
+                  navigation: context.read<ShellNavigation>(),
+                  chatController: context.read<ChatController>(),
+                ),
+                messageRepository: context.read<MessageRepository>(),
+                proactiveMessageService: context
+                    .read<ProactiveMessageService>(),
+                relationshipService: context.read<RelationshipService>(),
               ),
-              messageRepository: context.read<MessageRepository>(),
-              proactiveMessageService:
-                  context.read<ProactiveMessageService>(),
-              relationshipService: context.read<RelationshipService>(),
-            ));
+            );
             return null;
           },
         ),
@@ -646,8 +658,9 @@ class ConverApp extends StatelessWidget {
             return GameGenerator(
               providerFactory: context.read<LLMProviderFactory>(),
               resolveCredentials: () async {
-                final resolved =
-                    await settings.wireCredentialsResolver().resolve();
+                final resolved = await settings
+                    .wireCredentialsResolver()
+                    .resolve();
                 return GenerationCredentials(
                   provider: resolved.provider,
                   apiKey: resolved.apiKey,
@@ -685,8 +698,7 @@ class ConverApp extends StatelessWidget {
                 // 无需重启 server 即生效。
                 proxyConfigReader: () async => ProxyRouteConfig(
                   endpoint: await settings.baseUrl('openai'),
-                  apiKey: await secretStore
-                      .read(SecretStore.openaiApiKeySlot),
+                  apiKey: await secretStore.read(SecretStore.openaiApiKeySlot),
                 ),
               ),
               loadManifest: loadManifestViaHttp,
