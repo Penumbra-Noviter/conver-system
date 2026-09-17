@@ -6,6 +6,17 @@
 
 ---
 
+## 权限弹窗真机补验批次 — F-84 权限链路三场景（2026-09-17 — 用户「接续（权限弹窗真机补验）」指令）
+
+- **范围**：handoff techdebt-f106f108 可选接续项——F-84 三件套中「Android 13+ 权限开关启用时请求」的 API 35 模拟器（medium_phone）实证，聚焦权限弹窗链路（热态点按已修并有单测兜底，不在本批）。干净起点：debug APK 全新安装 + `pm clear` + `pm revoke POST_NOTIFICATIONS`（`appops` ignore 确认）。
+- **三场景全 PASS**：
+  - 场景 A（允许）：设置 → 对话 → 打开「主动消息」开关 → 系统弹窗「Allow 汇流 to send you notifications?」实证出现（screencap `s2.png`）→ ALLOW → `appops POST_NOTIFICATION` 转 `Default mode: allow` + dumpsys `granted=true`（USER_SET）+ logcat「主动消息通知权限请求结果（F-84）: true」
+  - 场景 B（拒绝）：revoke 后重开 → 弹窗再现（`s3.png`）→ DON'T ALLOW → `appops` ignore + dumpsys `granted=false`（USER_FIXED）+ logcat `: false` + **开关保持 true**（权限与开关语义正交，F-84 契约实证）
+  - 场景 C（幂等）：grant 后关→开 → 无系统弹窗（dump 无 permissioncontroller 节点）+ logcat `: true` + 开关 true
+- **平台语义实证**：`pm revoke`/`grant` 触发系统杀 App 进程（InputManager disposed / no app thread，无 FATAL 非崩溃）——权限变更后测试配方须重启 App 再导航。
+- **门禁**：生产零 diff / 测试零变更（纯验证批次）；证据存 `.scratch/perm-smoke/`（`ui*.xml` 语义树 + `s2.png`/`s3.png` 弹窗截图）。
+- **预设接续**：可选剩「阶段 3 人机恋深化（未拍板）」+ 交付后复核（约一周后三问）。
+
 ## 技术债消费批次 techdebt-f106f108（2026-09-17 — handoff-techdebt-f104f105-done-2026-09-17 交接指令，/project-kickoff 全自动档）
 
 - **范围**：消费候选区 3 条（F-106 Strong「默认选中首角色」竞态 / F-107 `pumpUntil` 6 文件重复低 / F-108 纠偏口径文档散落 Speculative）；2 工单并批 1 波 + 批次收尾（01/02 文件零交集，串行 lane；03 收尾归主会话）。先搜开源三分：自建（flaky 复现复用 `--no-pub` shell 逐遍循环——本批复现 10 遍全量全绿，loop5/6 为 pub get 网络污染 exit 69 不入统计；修复零新依赖）。
