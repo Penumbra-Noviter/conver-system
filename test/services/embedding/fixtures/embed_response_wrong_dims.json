@@ -1,0 +1,17 @@
+{
+  "_note": "畸形 fixture（SR-17）：同一响应内两条 embedding 维度不一致（3 维 vs 4 维）——首样本标定 dims=3 后，后续条目同长校验必须失败；真实响应待 key 补充。",
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "index": 0,
+      "embedding": [0.1, 0.2, 0.3]
+    },
+    {
+      "object": "embedding",
+      "index": 1,
+      "embedding": [0.1, 0.2, 0.3, 0.4]
+    }
+  ],
+  "model": "text-embedding-3-small"
+}

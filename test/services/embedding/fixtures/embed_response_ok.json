@@ -1,0 +1,21 @@
+{
+  "_note": "合成 fixture：schema 依据 OpenAI 官方公开文档 /embeddings 响应样例（object / data[].embedding / index / model / usage）；真实响应待 key 补充（VR-06 验收 8 集成动作）。",
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "index": 0,
+      "embedding": [0.010304959, -0.011924531, 0.0040106527]
+    },
+    {
+      "object": "embedding",
+      "index": 1,
+      "embedding": [-0.0024870758, 0.009504202, -0.01124527]
+    }
+  ],
+  "model": "text-embedding-3-small",
+  "usage": {
+    "prompt_tokens": 8,
+    "total_tokens": 8
+  }
+}
