@@ -2,9 +2,14 @@
 library;
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
+import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/memory_repository.dart';
+import 'package:conver_system_mobile/services/embedding/embedding_client.dart';
+import 'package:conver_system_mobile/services/embedding/embedding_config.dart';
+import 'package:conver_system_mobile/services/embedding/embedding_service.dart';
 import 'package:conver_system_mobile/services/llm/errors.dart';
+import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/memory/persona_evolution_service.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -36,11 +41,15 @@ void main() {
     );
   }
 
-  PersonaEvolutionService buildService(Future<String> Function({
-    required String currentPersonality,
-    required String charName,
-    required List<String> personaFacts,
-  }) reflector) {
+  PersonaEvolutionService buildService(
+    Future<String> Function({
+      required String currentPersonality,
+      required String charName,
+      required List<String> personaFacts,
+      List<String> similarClusters,
+    })
+    reflector,
+  ) {
     return PersonaEvolutionService(
       characterRepository: characterRepo,
       memoryRepository: memoryRepo,
@@ -51,7 +60,12 @@ void main() {
   group('proposeEvolution', () {
     test('反思产出新人格 → 落快照且不回写 personality', () async {
       final character = await seedCharacter();
-      final service = buildService(({required currentPersonality, required charName, required personaFacts}) async {
+      final service = buildService(({
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+        List<String> similarClusters = const [],
+      }) async {
         expect(currentPersonality, '温柔体贴');
         expect(charName, '艾莉亚');
         return '温柔体贴且心思细腻';
@@ -71,7 +85,12 @@ void main() {
 
     test('反思产出空串 → 返回 null 不落快照', () async {
       final character = await seedCharacter();
-      final service = buildService(({required currentPersonality, required charName, required personaFacts}) async {
+      final service = buildService(({
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+        List<String> similarClusters = const [],
+      }) async {
         return '   ';
       });
 
@@ -82,7 +101,12 @@ void main() {
 
     test('反思产出与当前人格相同 → 返回 null 不落快照', () async {
       final character = await seedCharacter();
-      final service = buildService(({required currentPersonality, required charName, required personaFacts}) async {
+      final service = buildService(({
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+        List<String> similarClusters = const [],
+      }) async {
         return currentPersonality;
       });
 
@@ -91,7 +115,12 @@ void main() {
     });
 
     test('角色不存在 → 抛 CharacterNotFoundError', () async {
-      final service = buildService(({required currentPersonality, required charName, required personaFacts}) async {
+      final service = buildService(({
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+        List<String> similarClusters = const [],
+      }) async {
         return '新人格';
       });
       expect(
@@ -104,7 +133,12 @@ void main() {
   group('applyRevision / discardRevision', () {
     test('applyRevision 回写 personality；版本不存在返回 false', () async {
       final character = await seedCharacter();
-      final service = buildService(({required currentPersonality, required charName, required personaFacts}) async {
+      final service = buildService(({
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+        List<String> similarClusters = const [],
+      }) async {
         return '温柔体贴且心思细腻';
       });
       final revision = await service.proposeEvolution(character.id);
@@ -120,7 +154,12 @@ void main() {
 
     test('discardRevision 删除快照且不回写 personality', () async {
       final character = await seedCharacter();
-      final service = buildService(({required currentPersonality, required charName, required personaFacts}) async {
+      final service = buildService(({
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+        List<String> similarClusters = const [],
+      }) async {
         return '新人格';
       });
       final revision = await service.proposeEvolution(character.id);
@@ -148,4 +187,213 @@ void main() {
       expect(messages.last.content, contains('- 她喜欢猫'));
     });
   });
+
+  group('VR-08 聚类摘要注入', () {
+    test('buildEvolutionMessages 非空 similarClusters → 语义相近段落位于事实之后', () {
+      final messages = buildEvolutionMessages(
+        currentPersonality: '温柔',
+        charName: '艾莉亚',
+        personaFacts: const ['她喜欢猫'],
+        similarClusters: const ['喜欢猫；养了三只猫', '怕黑；睡觉留灯'],
+      );
+      final user = messages.last.content;
+      expect(
+        user.indexOf('以下事实语义相近，可能重复：'),
+        greaterThan(user.indexOf('- 她喜欢猫')),
+      );
+      expect(
+        user,
+        contains(
+          '以下事实语义相近，可能重复：\n- 喜欢猫；养了三只猫\n'
+          '- 怕黑；睡觉留灯',
+        ),
+      );
+    });
+
+    test('buildEvolutionMessages 空列表/缺省 → 无聚类段落', () {
+      final withEmpty = buildEvolutionMessages(
+        currentPersonality: '温柔',
+        charName: '艾莉亚',
+        personaFacts: const ['她喜欢猫'],
+        similarClusters: const [],
+      );
+      expect(withEmpty.last.content, isNot(contains('以下事实语义相近')));
+      final omitted = buildEvolutionMessages(
+        currentPersonality: '温柔',
+        charName: '艾莉亚',
+        personaFacts: const ['她喜欢猫'],
+      );
+      expect(omitted.last.content, isNot(contains('以下事实语义相近')));
+    });
+
+    test(
+      'buildClusteredReflector 聚类非空 → 摘要注入 inner 且 characterId 透传',
+      () async {
+        final character = await seedCharacter();
+        final f1 = await memoryRepo.createEntry(
+          characterId: character.id,
+          kind: MemoryKind.personaFact,
+          content: '喜欢猫',
+        );
+        final f2 = await memoryRepo.createEntry(
+          characterId: character.id,
+          kind: MemoryKind.personaFact,
+          content: '养了三只猫',
+        );
+        final calls = <int>[];
+        final embedding = _FakeEmbeddingService(
+          memory: memoryRepo,
+          result: [
+            [f1, f2],
+            [f1],
+          ],
+          calls: calls,
+        );
+        List<String>? received;
+        final reflector = buildClusteredReflector(
+          embeddingService: embedding,
+          inner:
+              ({
+                required currentPersonality,
+                required charName,
+                required personaFacts,
+                List<String> similarClusters = const [],
+              }) async {
+                received = similarClusters;
+                return '聚类演化人格';
+              },
+        );
+
+        final out = await reflector(
+          characterId: character.id,
+          currentPersonality: '现人格',
+          charName: '艾莉亚',
+          personaFacts: const ['喜欢猫'],
+        );
+
+        expect(out, '聚类演化人格');
+        expect(calls, [character.id]);
+        expect(received, isNotNull);
+        expect(received, ['喜欢猫；养了三只猫', '喜欢猫']);
+      },
+    );
+
+    test('buildClusteredReflector 聚类空（降级）→ inner 收空列表且不抛', () async {
+      final calls = <int>[];
+      final embedding = _FakeEmbeddingService(
+        memory: memoryRepo,
+        result: const <List<MemoryEntry>>[],
+        calls: calls,
+      );
+      List<String>? received;
+      final reflector = buildClusteredReflector(
+        embeddingService: embedding,
+        inner:
+            ({
+              required currentPersonality,
+              required charName,
+              required personaFacts,
+              List<String> similarClusters = const [],
+            }) async {
+              received = similarClusters;
+              return currentPersonality;
+            },
+      );
+
+      final out = await reflector(
+        characterId: 3,
+        currentPersonality: '原人格',
+        charName: '艾莉亚',
+        personaFacts: const [],
+      );
+
+      expect(out, '原人格');
+      expect(calls, [3]);
+      expect(received, isEmpty);
+    });
+
+    test('reflectPersonaWithProvider 透传 similarClusters 到组装消息', () async {
+      final provider = _CapturingProvider('新人格');
+      final out = await reflectPersonaWithProvider(
+        llm: provider,
+        model: 'm1',
+        currentPersonality: '温柔',
+        charName: '艾莉亚',
+        personaFacts: const ['她喜欢猫'],
+        similarClusters: const ['喜欢猫；养了三只猫'],
+      );
+      expect(out, '新人格');
+      expect(
+        provider.lastMessages!.last.content,
+        contains('以下事实语义相近，可能重复：\n- 喜欢猫；养了三只猫'),
+      );
+    });
+
+    test('reflectPersonaWithProvider 缺省 → 无聚类段落', () async {
+      final provider = _CapturingProvider('新人格');
+      await reflectPersonaWithProvider(
+        llm: provider,
+        model: 'm1',
+        currentPersonality: '温柔',
+        charName: '艾莉亚',
+        personaFacts: const ['她喜欢猫'],
+      );
+      expect(provider.lastMessages!.last.content, isNot(contains('以下事实语义相近')));
+    });
+  });
+}
+
+class _FakeEmbeddingService extends EmbeddingService {
+  _FakeEmbeddingService({
+    required MemoryRepository memory,
+    required this.result,
+    required this.calls,
+  }) : super(
+         memoryRepository: memory,
+         resolveConfig: _neverConfig,
+         clientFactory: _neverClient,
+       );
+
+  final List<List<MemoryEntry>> result;
+  final List<int> calls;
+
+  @override
+  Future<List<List<MemoryEntry>>> buildClusterInput(int characterId) async {
+    calls.add(characterId);
+    return result;
+  }
+
+  static Future<EmbeddingEndpointConfig> _neverConfig() =>
+      throw UnimplementedError();
+
+  static EmbeddingClient _neverClient(EmbeddingEndpointConfig config) =>
+      throw UnimplementedError();
+}
+
+class _CapturingProvider extends LLMProvider {
+  _CapturingProvider(this.generated) : super(apiKey: 'test-key');
+
+  final String generated;
+  List<LlmMessage>? lastMessages;
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) async {
+    lastMessages = messages;
+    return generated;
+  }
+
+  @override
+  Stream<String> streamGenerate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) {
+    return const Stream<String>.empty();
+  }
 }
