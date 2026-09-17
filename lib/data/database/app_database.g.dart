@@ -4214,6 +4214,994 @@ class InnerThoughtsCompanion extends UpdateCompanion<InnerThought> {
   }
 }
 
+class $EmbeddingEntriesTable extends EmbeddingEntries
+    with TableInfo<$EmbeddingEntriesTable, EmbeddingEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EmbeddingEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _characterIdMeta = const VerificationMeta(
+    'characterId',
+  );
+  @override
+  late final GeneratedColumn<int> characterId = GeneratedColumn<int>(
+    'character_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES characters (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _entryIdMeta = const VerificationMeta(
+    'entryId',
+  );
+  @override
+  late final GeneratedColumn<int> entryId = GeneratedColumn<int>(
+    'entry_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentSnapshotMeta = const VerificationMeta(
+    'contentSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> contentSnapshot = GeneratedColumn<String>(
+    'content_snapshot',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _vectorMeta = const VerificationMeta('vector');
+  @override
+  late final GeneratedColumn<Uint8List> vector = GeneratedColumn<Uint8List>(
+    'vector',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _modelMeta = const VerificationMeta('model');
+  @override
+  late final GeneratedColumn<String> model = GeneratedColumn<String>(
+    'model',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dimsMeta = const VerificationMeta('dims');
+  @override
+  late final GeneratedColumn<int> dims = GeneratedColumn<int>(
+    'dims',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentHashMeta = const VerificationMeta(
+    'contentHash',
+  );
+  @override
+  late final GeneratedColumn<String> contentHash = GeneratedColumn<String>(
+    'content_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    characterId,
+    entryId,
+    contentSnapshot,
+    vector,
+    model,
+    dims,
+    contentHash,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'embedding_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EmbeddingEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('character_id')) {
+      context.handle(
+        _characterIdMeta,
+        characterId.isAcceptableOrUnknown(
+          data['character_id']!,
+          _characterIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_characterIdMeta);
+    }
+    if (data.containsKey('entry_id')) {
+      context.handle(
+        _entryIdMeta,
+        entryId.isAcceptableOrUnknown(data['entry_id']!, _entryIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entryIdMeta);
+    }
+    if (data.containsKey('content_snapshot')) {
+      context.handle(
+        _contentSnapshotMeta,
+        contentSnapshot.isAcceptableOrUnknown(
+          data['content_snapshot']!,
+          _contentSnapshotMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_contentSnapshotMeta);
+    }
+    if (data.containsKey('vector')) {
+      context.handle(
+        _vectorMeta,
+        vector.isAcceptableOrUnknown(data['vector']!, _vectorMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_vectorMeta);
+    }
+    if (data.containsKey('model')) {
+      context.handle(
+        _modelMeta,
+        model.isAcceptableOrUnknown(data['model']!, _modelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_modelMeta);
+    }
+    if (data.containsKey('dims')) {
+      context.handle(
+        _dimsMeta,
+        dims.isAcceptableOrUnknown(data['dims']!, _dimsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dimsMeta);
+    }
+    if (data.containsKey('content_hash')) {
+      context.handle(
+        _contentHashMeta,
+        contentHash.isAcceptableOrUnknown(
+          data['content_hash']!,
+          _contentHashMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_contentHashMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EmbeddingEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EmbeddingEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      characterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}character_id'],
+      )!,
+      entryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}entry_id'],
+      )!,
+      contentSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_snapshot'],
+      )!,
+      vector: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}vector'],
+      )!,
+      model: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}model'],
+      )!,
+      dims: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}dims'],
+      )!,
+      contentHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_hash'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $EmbeddingEntriesTable createAlias(String alias) {
+    return $EmbeddingEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class EmbeddingEntry extends DataClass implements Insertable<EmbeddingEntry> {
+  final int id;
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除清向量）。
+  final int characterId;
+
+  /// 逻辑回指 memory_entries.id（普通 int，不建硬 FK）。
+  final int entryId;
+
+  /// 补嵌时点的文本快照（截断上限 2000 由仓储层负责，SR-21）。
+  final String contentSnapshot;
+
+  /// 向量 blob = float32 LE 打包（1536 维 ≈ 6144 字节，无压缩）。
+  final Uint8List vector;
+
+  /// 模型指纹（如 text-embedding-3-small）。
+  final String model;
+
+  /// 向量维度指纹。
+  final int dims;
+
+  /// SHA-256 hex（内容 hash，SR-21 去重键组成部分）。
+  final String contentHash;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const EmbeddingEntry({
+    required this.id,
+    required this.characterId,
+    required this.entryId,
+    required this.contentSnapshot,
+    required this.vector,
+    required this.model,
+    required this.dims,
+    required this.contentHash,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['character_id'] = Variable<int>(characterId);
+    map['entry_id'] = Variable<int>(entryId);
+    map['content_snapshot'] = Variable<String>(contentSnapshot);
+    map['vector'] = Variable<Uint8List>(vector);
+    map['model'] = Variable<String>(model);
+    map['dims'] = Variable<int>(dims);
+    map['content_hash'] = Variable<String>(contentHash);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  EmbeddingEntriesCompanion toCompanion(bool nullToAbsent) {
+    return EmbeddingEntriesCompanion(
+      id: Value(id),
+      characterId: Value(characterId),
+      entryId: Value(entryId),
+      contentSnapshot: Value(contentSnapshot),
+      vector: Value(vector),
+      model: Value(model),
+      dims: Value(dims),
+      contentHash: Value(contentHash),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory EmbeddingEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EmbeddingEntry(
+      id: serializer.fromJson<int>(json['id']),
+      characterId: serializer.fromJson<int>(json['characterId']),
+      entryId: serializer.fromJson<int>(json['entryId']),
+      contentSnapshot: serializer.fromJson<String>(json['contentSnapshot']),
+      vector: serializer.fromJson<Uint8List>(json['vector']),
+      model: serializer.fromJson<String>(json['model']),
+      dims: serializer.fromJson<int>(json['dims']),
+      contentHash: serializer.fromJson<String>(json['contentHash']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'characterId': serializer.toJson<int>(characterId),
+      'entryId': serializer.toJson<int>(entryId),
+      'contentSnapshot': serializer.toJson<String>(contentSnapshot),
+      'vector': serializer.toJson<Uint8List>(vector),
+      'model': serializer.toJson<String>(model),
+      'dims': serializer.toJson<int>(dims),
+      'contentHash': serializer.toJson<String>(contentHash),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  EmbeddingEntry copyWith({
+    int? id,
+    int? characterId,
+    int? entryId,
+    String? contentSnapshot,
+    Uint8List? vector,
+    String? model,
+    int? dims,
+    String? contentHash,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => EmbeddingEntry(
+    id: id ?? this.id,
+    characterId: characterId ?? this.characterId,
+    entryId: entryId ?? this.entryId,
+    contentSnapshot: contentSnapshot ?? this.contentSnapshot,
+    vector: vector ?? this.vector,
+    model: model ?? this.model,
+    dims: dims ?? this.dims,
+    contentHash: contentHash ?? this.contentHash,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  EmbeddingEntry copyWithCompanion(EmbeddingEntriesCompanion data) {
+    return EmbeddingEntry(
+      id: data.id.present ? data.id.value : this.id,
+      characterId: data.characterId.present
+          ? data.characterId.value
+          : this.characterId,
+      entryId: data.entryId.present ? data.entryId.value : this.entryId,
+      contentSnapshot: data.contentSnapshot.present
+          ? data.contentSnapshot.value
+          : this.contentSnapshot,
+      vector: data.vector.present ? data.vector.value : this.vector,
+      model: data.model.present ? data.model.value : this.model,
+      dims: data.dims.present ? data.dims.value : this.dims,
+      contentHash: data.contentHash.present
+          ? data.contentHash.value
+          : this.contentHash,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EmbeddingEntry(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('entryId: $entryId, ')
+          ..write('contentSnapshot: $contentSnapshot, ')
+          ..write('vector: $vector, ')
+          ..write('model: $model, ')
+          ..write('dims: $dims, ')
+          ..write('contentHash: $contentHash, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    characterId,
+    entryId,
+    contentSnapshot,
+    $driftBlobEquality.hash(vector),
+    model,
+    dims,
+    contentHash,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EmbeddingEntry &&
+          other.id == this.id &&
+          other.characterId == this.characterId &&
+          other.entryId == this.entryId &&
+          other.contentSnapshot == this.contentSnapshot &&
+          $driftBlobEquality.equals(other.vector, this.vector) &&
+          other.model == this.model &&
+          other.dims == this.dims &&
+          other.contentHash == this.contentHash &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class EmbeddingEntriesCompanion extends UpdateCompanion<EmbeddingEntry> {
+  final Value<int> id;
+  final Value<int> characterId;
+  final Value<int> entryId;
+  final Value<String> contentSnapshot;
+  final Value<Uint8List> vector;
+  final Value<String> model;
+  final Value<int> dims;
+  final Value<String> contentHash;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const EmbeddingEntriesCompanion({
+    this.id = const Value.absent(),
+    this.characterId = const Value.absent(),
+    this.entryId = const Value.absent(),
+    this.contentSnapshot = const Value.absent(),
+    this.vector = const Value.absent(),
+    this.model = const Value.absent(),
+    this.dims = const Value.absent(),
+    this.contentHash = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  EmbeddingEntriesCompanion.insert({
+    this.id = const Value.absent(),
+    required int characterId,
+    required int entryId,
+    required String contentSnapshot,
+    required Uint8List vector,
+    required String model,
+    required int dims,
+    required String contentHash,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) : characterId = Value(characterId),
+       entryId = Value(entryId),
+       contentSnapshot = Value(contentSnapshot),
+       vector = Value(vector),
+       model = Value(model),
+       dims = Value(dims),
+       contentHash = Value(contentHash),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<EmbeddingEntry> custom({
+    Expression<int>? id,
+    Expression<int>? characterId,
+    Expression<int>? entryId,
+    Expression<String>? contentSnapshot,
+    Expression<Uint8List>? vector,
+    Expression<String>? model,
+    Expression<int>? dims,
+    Expression<String>? contentHash,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (characterId != null) 'character_id': characterId,
+      if (entryId != null) 'entry_id': entryId,
+      if (contentSnapshot != null) 'content_snapshot': contentSnapshot,
+      if (vector != null) 'vector': vector,
+      if (model != null) 'model': model,
+      if (dims != null) 'dims': dims,
+      if (contentHash != null) 'content_hash': contentHash,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  EmbeddingEntriesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? characterId,
+    Value<int>? entryId,
+    Value<String>? contentSnapshot,
+    Value<Uint8List>? vector,
+    Value<String>? model,
+    Value<int>? dims,
+    Value<String>? contentHash,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return EmbeddingEntriesCompanion(
+      id: id ?? this.id,
+      characterId: characterId ?? this.characterId,
+      entryId: entryId ?? this.entryId,
+      contentSnapshot: contentSnapshot ?? this.contentSnapshot,
+      vector: vector ?? this.vector,
+      model: model ?? this.model,
+      dims: dims ?? this.dims,
+      contentHash: contentHash ?? this.contentHash,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (characterId.present) {
+      map['character_id'] = Variable<int>(characterId.value);
+    }
+    if (entryId.present) {
+      map['entry_id'] = Variable<int>(entryId.value);
+    }
+    if (contentSnapshot.present) {
+      map['content_snapshot'] = Variable<String>(contentSnapshot.value);
+    }
+    if (vector.present) {
+      map['vector'] = Variable<Uint8List>(vector.value);
+    }
+    if (model.present) {
+      map['model'] = Variable<String>(model.value);
+    }
+    if (dims.present) {
+      map['dims'] = Variable<int>(dims.value);
+    }
+    if (contentHash.present) {
+      map['content_hash'] = Variable<String>(contentHash.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EmbeddingEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('entryId: $entryId, ')
+          ..write('contentSnapshot: $contentSnapshot, ')
+          ..write('vector: $vector, ')
+          ..write('model: $model, ')
+          ..write('dims: $dims, ')
+          ..write('contentHash: $contentHash, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SemanticHitsTable extends SemanticHits
+    with TableInfo<$SemanticHitsTable, SemanticHit> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SemanticHitsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _characterIdMeta = const VerificationMeta(
+    'characterId',
+  );
+  @override
+  late final GeneratedColumn<int> characterId = GeneratedColumn<int>(
+    'character_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES characters (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _entryIdMeta = const VerificationMeta(
+    'entryId',
+  );
+  @override
+  late final GeneratedColumn<int> entryId = GeneratedColumn<int>(
+    'entry_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _queryMeta = const VerificationMeta('query');
+  @override
+  late final GeneratedColumn<String> query = GeneratedColumn<String>(
+    'query',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    characterId,
+    entryId,
+    query,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'semantic_hits';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SemanticHit> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('character_id')) {
+      context.handle(
+        _characterIdMeta,
+        characterId.isAcceptableOrUnknown(
+          data['character_id']!,
+          _characterIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_characterIdMeta);
+    }
+    if (data.containsKey('entry_id')) {
+      context.handle(
+        _entryIdMeta,
+        entryId.isAcceptableOrUnknown(data['entry_id']!, _entryIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entryIdMeta);
+    }
+    if (data.containsKey('query')) {
+      context.handle(
+        _queryMeta,
+        query.isAcceptableOrUnknown(data['query']!, _queryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_queryMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SemanticHit map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SemanticHit(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      characterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}character_id'],
+      )!,
+      entryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}entry_id'],
+      )!,
+      query: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}query'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $SemanticHitsTable createAlias(String alias) {
+    return $SemanticHitsTable(attachedDatabase, alias);
+  }
+}
+
+class SemanticHit extends DataClass implements Insertable<SemanticHit> {
+  final int id;
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  final int characterId;
+
+  /// 逻辑回指 memory_entries.id（普通 int，同 [EmbeddingEntries.entryId]）。
+  final int entryId;
+
+  /// 检索 query 快照（必填文本）。
+  final String query;
+  final DateTime createdAt;
+  const SemanticHit({
+    required this.id,
+    required this.characterId,
+    required this.entryId,
+    required this.query,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['character_id'] = Variable<int>(characterId);
+    map['entry_id'] = Variable<int>(entryId);
+    map['query'] = Variable<String>(query);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  SemanticHitsCompanion toCompanion(bool nullToAbsent) {
+    return SemanticHitsCompanion(
+      id: Value(id),
+      characterId: Value(characterId),
+      entryId: Value(entryId),
+      query: Value(query),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory SemanticHit.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SemanticHit(
+      id: serializer.fromJson<int>(json['id']),
+      characterId: serializer.fromJson<int>(json['characterId']),
+      entryId: serializer.fromJson<int>(json['entryId']),
+      query: serializer.fromJson<String>(json['query']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'characterId': serializer.toJson<int>(characterId),
+      'entryId': serializer.toJson<int>(entryId),
+      'query': serializer.toJson<String>(query),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  SemanticHit copyWith({
+    int? id,
+    int? characterId,
+    int? entryId,
+    String? query,
+    DateTime? createdAt,
+  }) => SemanticHit(
+    id: id ?? this.id,
+    characterId: characterId ?? this.characterId,
+    entryId: entryId ?? this.entryId,
+    query: query ?? this.query,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  SemanticHit copyWithCompanion(SemanticHitsCompanion data) {
+    return SemanticHit(
+      id: data.id.present ? data.id.value : this.id,
+      characterId: data.characterId.present
+          ? data.characterId.value
+          : this.characterId,
+      entryId: data.entryId.present ? data.entryId.value : this.entryId,
+      query: data.query.present ? data.query.value : this.query,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SemanticHit(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('entryId: $entryId, ')
+          ..write('query: $query, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, characterId, entryId, query, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SemanticHit &&
+          other.id == this.id &&
+          other.characterId == this.characterId &&
+          other.entryId == this.entryId &&
+          other.query == this.query &&
+          other.createdAt == this.createdAt);
+}
+
+class SemanticHitsCompanion extends UpdateCompanion<SemanticHit> {
+  final Value<int> id;
+  final Value<int> characterId;
+  final Value<int> entryId;
+  final Value<String> query;
+  final Value<DateTime> createdAt;
+  const SemanticHitsCompanion({
+    this.id = const Value.absent(),
+    this.characterId = const Value.absent(),
+    this.entryId = const Value.absent(),
+    this.query = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  SemanticHitsCompanion.insert({
+    this.id = const Value.absent(),
+    required int characterId,
+    required int entryId,
+    required String query,
+    required DateTime createdAt,
+  }) : characterId = Value(characterId),
+       entryId = Value(entryId),
+       query = Value(query),
+       createdAt = Value(createdAt);
+  static Insertable<SemanticHit> custom({
+    Expression<int>? id,
+    Expression<int>? characterId,
+    Expression<int>? entryId,
+    Expression<String>? query,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (characterId != null) 'character_id': characterId,
+      if (entryId != null) 'entry_id': entryId,
+      if (query != null) 'query': query,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  SemanticHitsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? characterId,
+    Value<int>? entryId,
+    Value<String>? query,
+    Value<DateTime>? createdAt,
+  }) {
+    return SemanticHitsCompanion(
+      id: id ?? this.id,
+      characterId: characterId ?? this.characterId,
+      entryId: entryId ?? this.entryId,
+      query: query ?? this.query,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (characterId.present) {
+      map['character_id'] = Variable<int>(characterId.value);
+    }
+    if (entryId.present) {
+      map['entry_id'] = Variable<int>(entryId.value);
+    }
+    if (query.present) {
+      map['query'] = Variable<String>(query.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SemanticHitsCompanion(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('entryId: $entryId, ')
+          ..write('query: $query, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4229,6 +5217,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $RelationshipStatesTable(this);
   late final $ProactivePlansTable proactivePlans = $ProactivePlansTable(this);
   late final $InnerThoughtsTable innerThoughts = $InnerThoughtsTable(this);
+  late final $EmbeddingEntriesTable embeddingEntries = $EmbeddingEntriesTable(
+    this,
+  );
+  late final $SemanticHitsTable semanticHits = $SemanticHitsTable(this);
   late final Index idxCharactersName = Index(
     'idx_characters_name',
     'CREATE INDEX idx_characters_name ON characters (name)',
@@ -4277,6 +5269,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_inner_thoughts_message_id',
     'CREATE INDEX idx_inner_thoughts_message_id ON inner_thoughts (message_id)',
   );
+  late final Index idxEmbeddingEntriesCharacterId = Index(
+    'idx_embedding_entries_character_id',
+    'CREATE INDEX idx_embedding_entries_character_id ON embedding_entries (character_id)',
+  );
+  late final Index idxEmbeddingEntriesCharacterIdContentHash = Index(
+    'idx_embedding_entries_character_id_content_hash',
+    'CREATE UNIQUE INDEX idx_embedding_entries_character_id_content_hash ON embedding_entries (character_id, content_hash)',
+  );
+  late final Index idxSemanticHitsCharacterId = Index(
+    'idx_semantic_hits_character_id',
+    'CREATE INDEX idx_semantic_hits_character_id ON semantic_hits (character_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4291,6 +5295,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     relationshipStates,
     proactivePlans,
     innerThoughts,
+    embeddingEntries,
+    semanticHits,
     idxCharactersName,
     idxConversationsCharacterId,
     idxMessagesConversationId,
@@ -4303,6 +5309,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxProactivePlansStatus,
     idxInnerThoughtsCharacterId,
     idxInnerThoughtsMessageId,
+    idxEmbeddingEntriesCharacterId,
+    idxEmbeddingEntriesCharacterIdContentHash,
+    idxSemanticHitsCharacterId,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -4375,6 +5384,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('inner_thoughts', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'characters',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('embedding_entries', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'characters',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('semantic_hits', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -4534,6 +5557,44 @@ final class $$CharactersTableReferences
     ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_innerThoughtsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$EmbeddingEntriesTable, List<EmbeddingEntry>>
+  _embeddingEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.embeddingEntries,
+    aliasName: 'characters__id__embedding_entries__character_id',
+  );
+
+  $$EmbeddingEntriesTableProcessedTableManager get embeddingEntriesRefs {
+    final manager = $$EmbeddingEntriesTableTableManager(
+      $_db,
+      $_db.embeddingEntries,
+    ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _embeddingEntriesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$SemanticHitsTable, List<SemanticHit>>
+  _semanticHitsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.semanticHits,
+    aliasName: 'characters__id__semantic_hits__character_id',
+  );
+
+  $$SemanticHitsTableProcessedTableManager get semanticHitsRefs {
+    final manager = $$SemanticHitsTableTableManager(
+      $_db,
+      $_db.semanticHits,
+    ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_semanticHitsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -4797,6 +5858,56 @@ class $$CharactersTableFilterComposer
           }) => $$InnerThoughtsTableFilterComposer(
             $db: $db,
             $table: $db.innerThoughts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> embeddingEntriesRefs(
+    Expression<bool> Function($$EmbeddingEntriesTableFilterComposer f) f,
+  ) {
+    final $$EmbeddingEntriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.embeddingEntries,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EmbeddingEntriesTableFilterComposer(
+            $db: $db,
+            $table: $db.embeddingEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> semanticHitsRefs(
+    Expression<bool> Function($$SemanticHitsTableFilterComposer f) f,
+  ) {
+    final $$SemanticHitsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.semanticHits,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SemanticHitsTableFilterComposer(
+            $db: $db,
+            $table: $db.semanticHits,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5149,6 +6260,56 @@ class $$CharactersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> embeddingEntriesRefs<T extends Object>(
+    Expression<T> Function($$EmbeddingEntriesTableAnnotationComposer a) f,
+  ) {
+    final $$EmbeddingEntriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.embeddingEntries,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EmbeddingEntriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.embeddingEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> semanticHitsRefs<T extends Object>(
+    Expression<T> Function($$SemanticHitsTableAnnotationComposer a) f,
+  ) {
+    final $$SemanticHitsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.semanticHits,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SemanticHitsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.semanticHits,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CharactersTableTableManager
@@ -5171,6 +6332,8 @@ class $$CharactersTableTableManager
             bool relationshipStatesRefs,
             bool proactivePlansRefs,
             bool innerThoughtsRefs,
+            bool embeddingEntriesRefs,
+            bool semanticHitsRefs,
           })
         > {
   $$CharactersTableTableManager(_$AppDatabase db, $CharactersTable table)
@@ -5284,6 +6447,8 @@ class $$CharactersTableTableManager
                 relationshipStatesRefs = false,
                 proactivePlansRefs = false,
                 innerThoughtsRefs = false,
+                embeddingEntriesRefs = false,
+                semanticHitsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5294,6 +6459,8 @@ class $$CharactersTableTableManager
                     if (relationshipStatesRefs) db.relationshipStates,
                     if (proactivePlansRefs) db.proactivePlans,
                     if (innerThoughtsRefs) db.innerThoughts,
+                    if (embeddingEntriesRefs) db.embeddingEntries,
+                    if (semanticHitsRefs) db.semanticHits,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5424,6 +6591,48 @@ class $$CharactersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (embeddingEntriesRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          EmbeddingEntry
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._embeddingEntriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).embeddingEntriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (semanticHitsRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          SemanticHit
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._semanticHitsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).semanticHitsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5451,6 +6660,8 @@ typedef $$CharactersTableProcessedTableManager =
         bool relationshipStatesRefs,
         bool proactivePlansRefs,
         bool innerThoughtsRefs,
+        bool embeddingEntriesRefs,
+        bool semanticHitsRefs,
       })
     >;
 typedef $$ConversationsTableCreateCompanionBuilder =
@@ -8585,6 +9796,730 @@ typedef $$InnerThoughtsTableProcessedTableManager =
       InnerThought,
       PrefetchHooks Function({bool characterId, bool messageId})
     >;
+typedef $$EmbeddingEntriesTableCreateCompanionBuilder =
+    EmbeddingEntriesCompanion Function({
+      Value<int> id,
+      required int characterId,
+      required int entryId,
+      required String contentSnapshot,
+      required Uint8List vector,
+      required String model,
+      required int dims,
+      required String contentHash,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+    });
+typedef $$EmbeddingEntriesTableUpdateCompanionBuilder =
+    EmbeddingEntriesCompanion Function({
+      Value<int> id,
+      Value<int> characterId,
+      Value<int> entryId,
+      Value<String> contentSnapshot,
+      Value<Uint8List> vector,
+      Value<String> model,
+      Value<int> dims,
+      Value<String> contentHash,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+final class $$EmbeddingEntriesTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $EmbeddingEntriesTable, EmbeddingEntry> {
+  $$EmbeddingEntriesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CharactersTable _characterIdTable(_$AppDatabase db) => db.characters
+      .createAlias('embedding_entries__character_id__characters__id');
+
+  $$CharactersTableProcessedTableManager get characterId {
+    final $_column = $_itemColumn<int>('character_id')!;
+
+    final manager = $$CharactersTableTableManager(
+      $_db,
+      $_db.characters,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_characterIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$EmbeddingEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $EmbeddingEntriesTable> {
+  $$EmbeddingEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get entryId => $composableBuilder(
+    column: $table.entryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentSnapshot => $composableBuilder(
+    column: $table.contentSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get vector => $composableBuilder(
+    column: $table.vector,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get model => $composableBuilder(
+    column: $table.model,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dims => $composableBuilder(
+    column: $table.dims,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentHash => $composableBuilder(
+    column: $table.contentHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CharactersTableFilterComposer get characterId {
+    final $$CharactersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableFilterComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EmbeddingEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $EmbeddingEntriesTable> {
+  $$EmbeddingEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get entryId => $composableBuilder(
+    column: $table.entryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentSnapshot => $composableBuilder(
+    column: $table.contentSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get vector => $composableBuilder(
+    column: $table.vector,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get model => $composableBuilder(
+    column: $table.model,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dims => $composableBuilder(
+    column: $table.dims,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentHash => $composableBuilder(
+    column: $table.contentHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CharactersTableOrderingComposer get characterId {
+    final $$CharactersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableOrderingComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EmbeddingEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EmbeddingEntriesTable> {
+  $$EmbeddingEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get entryId =>
+      $composableBuilder(column: $table.entryId, builder: (column) => column);
+
+  GeneratedColumn<String> get contentSnapshot => $composableBuilder(
+    column: $table.contentSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<Uint8List> get vector =>
+      $composableBuilder(column: $table.vector, builder: (column) => column);
+
+  GeneratedColumn<String> get model =>
+      $composableBuilder(column: $table.model, builder: (column) => column);
+
+  GeneratedColumn<int> get dims =>
+      $composableBuilder(column: $table.dims, builder: (column) => column);
+
+  GeneratedColumn<String> get contentHash => $composableBuilder(
+    column: $table.contentHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$CharactersTableAnnotationComposer get characterId {
+    final $$CharactersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$EmbeddingEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EmbeddingEntriesTable,
+          EmbeddingEntry,
+          $$EmbeddingEntriesTableFilterComposer,
+          $$EmbeddingEntriesTableOrderingComposer,
+          $$EmbeddingEntriesTableAnnotationComposer,
+          $$EmbeddingEntriesTableCreateCompanionBuilder,
+          $$EmbeddingEntriesTableUpdateCompanionBuilder,
+          (EmbeddingEntry, $$EmbeddingEntriesTableReferences),
+          EmbeddingEntry,
+          PrefetchHooks Function({bool characterId})
+        > {
+  $$EmbeddingEntriesTableTableManager(
+    _$AppDatabase db,
+    $EmbeddingEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EmbeddingEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EmbeddingEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EmbeddingEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> characterId = const Value.absent(),
+                Value<int> entryId = const Value.absent(),
+                Value<String> contentSnapshot = const Value.absent(),
+                Value<Uint8List> vector = const Value.absent(),
+                Value<String> model = const Value.absent(),
+                Value<int> dims = const Value.absent(),
+                Value<String> contentHash = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => EmbeddingEntriesCompanion(
+                id: id,
+                characterId: characterId,
+                entryId: entryId,
+                contentSnapshot: contentSnapshot,
+                vector: vector,
+                model: model,
+                dims: dims,
+                contentHash: contentHash,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int characterId,
+                required int entryId,
+                required String contentSnapshot,
+                required Uint8List vector,
+                required String model,
+                required int dims,
+                required String contentHash,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+              }) => EmbeddingEntriesCompanion.insert(
+                id: id,
+                characterId: characterId,
+                entryId: entryId,
+                contentSnapshot: contentSnapshot,
+                vector: vector,
+                model: model,
+                dims: dims,
+                contentHash: contentHash,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$EmbeddingEntriesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({characterId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (characterId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.characterId,
+                        referencedTable: $$EmbeddingEntriesTableReferences
+                            ._characterIdTable(db),
+                        referencedColumn: $$EmbeddingEntriesTableReferences
+                            ._characterIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$EmbeddingEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EmbeddingEntriesTable,
+      EmbeddingEntry,
+      $$EmbeddingEntriesTableFilterComposer,
+      $$EmbeddingEntriesTableOrderingComposer,
+      $$EmbeddingEntriesTableAnnotationComposer,
+      $$EmbeddingEntriesTableCreateCompanionBuilder,
+      $$EmbeddingEntriesTableUpdateCompanionBuilder,
+      (EmbeddingEntry, $$EmbeddingEntriesTableReferences),
+      EmbeddingEntry,
+      PrefetchHooks Function({bool characterId})
+    >;
+typedef $$SemanticHitsTableCreateCompanionBuilder =
+    SemanticHitsCompanion Function({
+      Value<int> id,
+      required int characterId,
+      required int entryId,
+      required String query,
+      required DateTime createdAt,
+    });
+typedef $$SemanticHitsTableUpdateCompanionBuilder =
+    SemanticHitsCompanion Function({
+      Value<int> id,
+      Value<int> characterId,
+      Value<int> entryId,
+      Value<String> query,
+      Value<DateTime> createdAt,
+    });
+
+final class $$SemanticHitsTableReferences
+    extends BaseReferences<_$AppDatabase, $SemanticHitsTable, SemanticHit> {
+  $$SemanticHitsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CharactersTable _characterIdTable(_$AppDatabase db) =>
+      db.characters.createAlias('semantic_hits__character_id__characters__id');
+
+  $$CharactersTableProcessedTableManager get characterId {
+    final $_column = $_itemColumn<int>('character_id')!;
+
+    final manager = $$CharactersTableTableManager(
+      $_db,
+      $_db.characters,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_characterIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SemanticHitsTableFilterComposer
+    extends Composer<_$AppDatabase, $SemanticHitsTable> {
+  $$SemanticHitsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get entryId => $composableBuilder(
+    column: $table.entryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get query => $composableBuilder(
+    column: $table.query,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CharactersTableFilterComposer get characterId {
+    final $$CharactersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableFilterComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SemanticHitsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SemanticHitsTable> {
+  $$SemanticHitsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get entryId => $composableBuilder(
+    column: $table.entryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get query => $composableBuilder(
+    column: $table.query,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CharactersTableOrderingComposer get characterId {
+    final $$CharactersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableOrderingComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SemanticHitsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SemanticHitsTable> {
+  $$SemanticHitsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get entryId =>
+      $composableBuilder(column: $table.entryId, builder: (column) => column);
+
+  GeneratedColumn<String> get query =>
+      $composableBuilder(column: $table.query, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$CharactersTableAnnotationComposer get characterId {
+    final $$CharactersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SemanticHitsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SemanticHitsTable,
+          SemanticHit,
+          $$SemanticHitsTableFilterComposer,
+          $$SemanticHitsTableOrderingComposer,
+          $$SemanticHitsTableAnnotationComposer,
+          $$SemanticHitsTableCreateCompanionBuilder,
+          $$SemanticHitsTableUpdateCompanionBuilder,
+          (SemanticHit, $$SemanticHitsTableReferences),
+          SemanticHit,
+          PrefetchHooks Function({bool characterId})
+        > {
+  $$SemanticHitsTableTableManager(_$AppDatabase db, $SemanticHitsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SemanticHitsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SemanticHitsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SemanticHitsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> characterId = const Value.absent(),
+                Value<int> entryId = const Value.absent(),
+                Value<String> query = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => SemanticHitsCompanion(
+                id: id,
+                characterId: characterId,
+                entryId: entryId,
+                query: query,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int characterId,
+                required int entryId,
+                required String query,
+                required DateTime createdAt,
+              }) => SemanticHitsCompanion.insert(
+                id: id,
+                characterId: characterId,
+                entryId: entryId,
+                query: query,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$SemanticHitsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({characterId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (characterId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.characterId,
+                        referencedTable: $$SemanticHitsTableReferences
+                            ._characterIdTable(db),
+                        referencedColumn: $$SemanticHitsTableReferences
+                            ._characterIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SemanticHitsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SemanticHitsTable,
+      SemanticHit,
+      $$SemanticHitsTableFilterComposer,
+      $$SemanticHitsTableOrderingComposer,
+      $$SemanticHitsTableAnnotationComposer,
+      $$SemanticHitsTableCreateCompanionBuilder,
+      $$SemanticHitsTableUpdateCompanionBuilder,
+      (SemanticHit, $$SemanticHitsTableReferences),
+      SemanticHit,
+      PrefetchHooks Function({bool characterId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8607,4 +10542,8 @@ class $AppDatabaseManager {
       $$ProactivePlansTableTableManager(_db, _db.proactivePlans);
   $$InnerThoughtsTableTableManager get innerThoughts =>
       $$InnerThoughtsTableTableManager(_db, _db.innerThoughts);
+  $$EmbeddingEntriesTableTableManager get embeddingEntries =>
+      $$EmbeddingEntriesTableTableManager(_db, _db.embeddingEntries);
+  $$SemanticHitsTableTableManager get semanticHits =>
+      $$SemanticHitsTableTableManager(_db, _db.semanticHits);
 }

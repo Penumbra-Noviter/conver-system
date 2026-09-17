@@ -1,4 +1,5 @@
-/// G0.2c 冒烟测试 — drift 4 表 schema 与桌面 ORM 逐字段对齐。
+/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=5，
+/// 11 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表）。
 ///
 /// 全部在内存执行器（`AppDatabase(NativeDatabase.memory())`）上运行，
 /// 经构造注入 seam 打开真实 schema，不依赖设备、无 repositories。
@@ -23,11 +24,11 @@ void main() {
     await db.close();
   });
 
-  test('schemaVersion 冻结为 4', () {
-    expect(db.schemaVersion, 4);
+  test('schemaVersion 冻结为 5', () {
+    expect(db.schemaVersion, 5);
   });
 
-  test('内存执行器打开成功，9 表可定位', () async {
+  test('内存执行器打开成功，11 表可定位', () async {
     final tables = await sqliteMasterNames(db, 'table');
     expect(
       tables,
@@ -41,6 +42,8 @@ void main() {
         'relationship_states',
         'proactive_plans',
         'inner_thoughts',
+        'embedding_entries',
+        'semantic_hits',
       ]),
     );
   });
@@ -48,7 +51,9 @@ void main() {
   test('4 表可写入读取（含列默认值，角色→对话→消息链）', () async {
     final now = DateTime.now();
 
-    final character = await db.into(db.characters).insertReturning(
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
           CharactersCompanion.insert(
             name: '艾莉亚',
             tags: const Value(['奇幻', '导师']),
@@ -64,7 +69,9 @@ void main() {
     expect(character.extensions, {'v2': true});
     expect(character.alternateGreetings, isEmpty);
 
-    final conversation = await db.into(db.conversations).insertReturning(
+    final conversation = await db
+        .into(db.conversations)
+        .insertReturning(
           ConversationsCompanion.insert(
             characterId: character.id,
             createdAt: now,
@@ -75,7 +82,9 @@ void main() {
     expect(conversation.modelProvider, 'claude');
     expect(conversation.modelName, 'claude-sonnet-5');
 
-    final message = await db.into(db.messages).insertReturning(
+    final message = await db
+        .into(db.messages)
+        .insertReturning(
           MessagesCompanion.insert(
             conversationId: conversation.id,
             role: Role.assistant,
@@ -88,7 +97,9 @@ void main() {
 
     await db
         .into(db.settings)
-        .insert(SettingsCompanion.insert(key: 'theme', value: const Value('dark')));
+        .insert(
+          SettingsCompanion.insert(key: 'theme', value: const Value('dark')),
+        );
     final setting = await db.select(db.settings).getSingle();
     expect(setting.key, 'theme');
     expect(setting.value, 'dark');
@@ -107,10 +118,18 @@ void main() {
 
   test('消息落库后 role 的存储值与回读值一致', () async {
     final now = DateTime.now();
-    final character = await db.into(db.characters).insertReturning(
-          CharactersCompanion.insert(name: '诺克斯', createdAt: now, updatedAt: now),
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '诺克斯',
+            createdAt: now,
+            updatedAt: now,
+          ),
         );
-    final conversation = await db.into(db.conversations).insertReturning(
+    final conversation = await db
+        .into(db.conversations)
+        .insertReturning(
           ConversationsCompanion.insert(
             characterId: character.id,
             createdAt: now,
@@ -119,7 +138,9 @@ void main() {
         );
 
     for (final role in Role.values) {
-      await db.into(db.messages).insert(
+      await db
+          .into(db.messages)
+          .insert(
             MessagesCompanion.insert(
               conversationId: conversation.id,
               role: role,
@@ -130,35 +151,39 @@ void main() {
     }
 
     final rows = await db.select(db.messages).get();
-    expect(
-      rows.map((m) => m.role),
-      containsAllInOrder(Role.values),
-    );
+    expect(rows.map((m) => m.role), containsAllInOrder(Role.values));
 
     // 存储层断言：落库值是 .value 字符串，而非枚举下标。
     final rawRoles = await db.customSelect('SELECT role FROM messages').get();
-    expect(
-      rawRoles.map((row) => row.data['role']),
-      ['user', 'assistant', 'system'],
-    );
+    expect(rawRoles.map((row) => row.data['role']), [
+      'user',
+      'assistant',
+      'system',
+    ]);
   });
 
   test('最小索引集存在于 sqlite_master', () async {
     final indexes = await sqliteMasterNames(db, 'index');
-    expect(indexes, containsAll(<String>[
-      'idx_characters_name',
-      'idx_conversations_character_id',
-      'idx_messages_conversation_id',
-      'idx_messages_created_at',
-      'idx_memory_entries_character_id',
-      'idx_persona_revisions_character_id',
-      'idx_relationship_states_character_id',
-      'idx_proactive_plans_character_id',
-      'idx_proactive_plans_conversation_id',
-      'idx_proactive_plans_status',
-      'idx_inner_thoughts_character_id',
-      'idx_inner_thoughts_message_id',
-    ]));
+    expect(
+      indexes,
+      containsAll(<String>[
+        'idx_characters_name',
+        'idx_conversations_character_id',
+        'idx_messages_conversation_id',
+        'idx_messages_created_at',
+        'idx_memory_entries_character_id',
+        'idx_persona_revisions_character_id',
+        'idx_relationship_states_character_id',
+        'idx_proactive_plans_character_id',
+        'idx_proactive_plans_conversation_id',
+        'idx_proactive_plans_status',
+        'idx_inner_thoughts_character_id',
+        'idx_inner_thoughts_message_id',
+        'idx_embedding_entries_character_id',
+        'idx_embedding_entries_character_id_content_hash',
+        'idx_semantic_hits_character_id',
+      ]),
+    );
   });
 
   test('settings 主键即 key，无额外索引', () async {
@@ -170,7 +195,9 @@ void main() {
   test('beforeOpen 启用外键：孤儿对话插入被拒绝', () async {
     final now = DateTime.now();
     await expectLater(
-      db.into(db.conversations).insert(
+      db
+          .into(db.conversations)
+          .insert(
             ConversationsCompanion.insert(
               characterId: 999999,
               createdAt: now,
