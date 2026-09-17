@@ -29,6 +29,12 @@ abstract interface class SecretStore {
   /// openai 协议凭证槽位键 — 与桌面 ALLOWED_KEYS 的 `openai_api_key` 逐字相同
   static const String openaiApiKeySlot = 'openai_api_key';
 
+  /// embedding 协议凭证槽位键（VR-01，阶段 3 装配腿）— 独立槽位，
+  /// 读取时经槽链兜底 openai 槽（见 SettingsRepository.embeddingApiKey）。
+  /// 键名与设置白名单 `embedding_api_key` 逐字相同，SR-16：key 仅经
+  /// SecretStore 注入，settings 表不落明文。
+  static const String embeddingApiKeySlot = 'embedding_api_key';
+
   /// 写入（或覆盖）[key] 槽位的 [value]
   Future<void> write({required String key, required String value});
 

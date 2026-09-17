@@ -12,6 +12,7 @@ import 'package:conver_system_mobile/services/llm/credentials_resolver.dart';
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/secure_store.dart';
 import 'package:drift/native.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/in_memory_secret_store.dart';
@@ -37,8 +38,8 @@ void main() {
     return {for (final row in rows) row.key: row.value};
   }
 
-  group('A1 白名单键集（G5 + 工单 03/04/05 + 人机恋）', () {
-    test('与桌面 ALLOWED_KEYS 十键逐字相等 + 六 mobile 先行键', () {
+  group('A1 白名单键集（G5 + 工单 03/04/05 + 人机恋 + VR-01）', () {
+    test('与桌面 ALLOWED_KEYS 十键逐字相等 + mobile 先行键（含 embedding 四键）', () {
       expect(
         SettingsRepository.allowedKeys,
         equals(<String>{
@@ -60,7 +61,42 @@ void main() {
           'memory_reflection_enabled',
           'proactive_message_enabled',
           'inner_thought_enabled',
+          'embedding_enabled',
+          'embedding_api_key',
+          'embedding_base_url',
+          'embedding_model',
         }),
+      );
+    });
+
+    test('embedding 四键经常量锚定（防字面量漂移）', () {
+      expect(SettingsRepository.embeddingEnabledKey, 'embedding_enabled');
+      expect(SecretStore.embeddingApiKeySlot, 'embedding_api_key');
+      expect(SettingsRepository.embeddingBaseUrlKey, 'embedding_base_url');
+      expect(SettingsRepository.embeddingModelKey, 'embedding_model');
+      expect(
+        SettingsRepository.defaultEmbeddingModel,
+        'text-embedding-3-small',
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SettingsRepository.embeddingEnabledKey),
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SecretStore.embeddingApiKeySlot),
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SettingsRepository.embeddingBaseUrlKey),
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SettingsRepository.embeddingModelKey),
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        isNot(contains('${SecretStore.embeddingApiKeySlot}_extra')),
       );
     });
 
@@ -106,7 +142,10 @@ void main() {
 
     test('getValue 带显式 default：缺失返回 default（镜像桌面 get_value 参数）', () async {
       expect(
-        await repository.getValue('default_provider_name', defaultValue: 'Claude'),
+        await repository.getValue(
+          'default_provider_name',
+          defaultValue: 'Claude',
+        ),
         'Claude',
       );
     });
@@ -119,19 +158,25 @@ void main() {
 
     test('空串值行读取返回空（不返回行存在性）', () async {
       await repository.setMany({'user_name': ''});
-      expect(await tableRows().then((rows) => rows.containsKey('user_name')),
-          isTrue);
+      expect(
+        await tableRows().then((rows) => rows.containsKey('user_name')),
+        isTrue,
+      );
       expect(await repository.getValue('user_name'), '');
     });
 
     test('getInt：数字往返；非数字 / 缺失回退 default', () async {
       await repository.setMany({'sliding_window_rounds': '15'});
-      expect(await repository.getInt('sliding_window_rounds', defaultValue: 30),
-          15);
+      expect(
+        await repository.getInt('sliding_window_rounds', defaultValue: 30),
+        15,
+      );
 
       await repository.setMany({'sliding_window_rounds': 'abc'});
-      expect(await repository.getInt('sliding_window_rounds', defaultValue: 30),
-          30);
+      expect(
+        await repository.getInt('sliding_window_rounds', defaultValue: 30),
+        30,
+      );
 
       expect(await repository.getInt('no_such_key', defaultValue: 7), 7);
     });
@@ -154,18 +199,20 @@ void main() {
       expect(await repository.slidingWindowRounds, 30);
     });
 
-    test('default_provider / default_model 缺省 claude / claude-sonnet-5',
-        () async {
-      expect(await repository.defaultProvider, 'claude');
-      expect(await repository.defaultModel, 'claude-sonnet-5');
+    test(
+      'default_provider / default_model 缺省 claude / claude-sonnet-5',
+      () async {
+        expect(await repository.defaultProvider, 'claude');
+        expect(await repository.defaultModel, 'claude-sonnet-5');
 
-      await repository.setMany({
-        'default_provider': 'deepseek',
-        'default_model': 'deepseek-v4-pro',
-      });
-      expect(await repository.defaultProvider, 'deepseek');
-      expect(await repository.defaultModel, 'deepseek-v4-pro');
-    });
+        await repository.setMany({
+          'default_provider': 'deepseek',
+          'default_model': 'deepseek-v4-pro',
+        });
+        expect(await repository.defaultProvider, 'deepseek');
+        expect(await repository.defaultModel, 'deepseek-v4-pro');
+      },
+    );
   });
 
   group('U-2 temperature / max_tokens 类型化读取（工单 03）', () {
@@ -214,10 +261,7 @@ void main() {
       await repository.setMany({
         'template_vars': '{"city":"长安","place":"月牙泉"}',
       });
-      expect(await repository.templateVars, {
-        'city': '长安',
-        'place': '月牙泉',
-      });
+      expect(await repository.templateVars, {'city': '长安', 'place': '月牙泉'});
     });
 
     test('非法 JSON 回退空 map', () async {
@@ -262,29 +306,46 @@ void main() {
 
   group('A5 apiKey 解析链三级回退（G5，InMemorySecretStore 实证）', () {
     test('第一级：provider 特定槽位（claude / openai 自身即槽位键）', () async {
-      await secretStore.write(key: SecretStore.claudeApiKeySlot, value: 'sk-claude');
+      await secretStore.write(
+        key: SecretStore.claudeApiKeySlot,
+        value: 'sk-claude',
+      );
       expect(await repository.apiKey('claude'), 'sk-claude');
 
-      await secretStore.write(key: SecretStore.openaiApiKeySlot, value: 'sk-openai');
+      await secretStore.write(
+        key: SecretStore.openaiApiKeySlot,
+        value: 'sk-openai',
+      );
       expect(await repository.apiKey('openai'), 'sk-openai');
     });
 
     test('第二级：同协议槽位（deepseek → openai 槽）', () async {
-      await secretStore.write(key: SecretStore.openaiApiKeySlot, value: 'sk-openai');
+      await secretStore.write(
+        key: SecretStore.openaiApiKeySlot,
+        value: 'sk-openai',
+      );
       expect(await repository.apiKey('deepseek'), 'sk-openai');
       expect(await repository.apiKey('qwen'), 'sk-openai');
     });
 
-    test('第三级：跨协议兜底（仅 claude 槽有值时，openai 协议请求解析到 claude 槽值）',
-        () async {
-      await secretStore.write(key: SecretStore.claudeApiKeySlot, value: 'sk-claude');
+    test('第三级：跨协议兜底（仅 claude 槽有值时，openai 协议请求解析到 claude 槽值）', () async {
+      await secretStore.write(
+        key: SecretStore.claudeApiKeySlot,
+        value: 'sk-claude',
+      );
       expect(await repository.apiKey('openai'), 'sk-claude');
       expect(await repository.apiKey('deepseek'), 'sk-claude');
     });
 
     test('双槽位都有值：同协议槽位优先于跨协议兜底', () async {
-      await secretStore.write(key: SecretStore.claudeApiKeySlot, value: 'sk-claude');
-      await secretStore.write(key: SecretStore.openaiApiKeySlot, value: 'sk-openai');
+      await secretStore.write(
+        key: SecretStore.claudeApiKeySlot,
+        value: 'sk-claude',
+      );
+      await secretStore.write(
+        key: SecretStore.openaiApiKeySlot,
+        value: 'sk-openai',
+      );
       expect(await repository.apiKey('deepseek'), 'sk-openai');
       expect(await repository.apiKey('claude'), 'sk-claude');
       expect(await repository.apiKey('openai'), 'sk-openai');
@@ -294,19 +355,27 @@ void main() {
       expect(await repository.apiKey('claude'), '');
 
       await secretStore.write(key: SecretStore.openaiApiKeySlot, value: '');
-      await secretStore.write(key: SecretStore.claudeApiKeySlot, value: 'sk-claude');
+      await secretStore.write(
+        key: SecretStore.claudeApiKeySlot,
+        value: 'sk-claude',
+      );
       expect(await repository.apiKey('openai'), 'sk-claude');
     });
 
     test('未知 provider 透传兜底两槽位（镜像桌面候选序）', () async {
-      await secretStore.write(key: SecretStore.claudeApiKeySlot, value: 'sk-claude');
+      await secretStore.write(
+        key: SecretStore.claudeApiKeySlot,
+        value: 'sk-claude',
+      );
       expect(await repository.apiKey('foo'), 'sk-claude');
     });
   });
 
   group('A6 baseUrl 同形链 + Key 写入重定向（G5）', () {
     test('baseUrl 同形链读设置表：provider 特定 → 同协议 → 跨协议', () async {
-      await repository.setMany({'openai_base_url': 'https://openai.example/v1'});
+      await repository.setMany({
+        'openai_base_url': 'https://openai.example/v1',
+      });
       expect(await repository.baseUrl('deepseek'), 'https://openai.example/v1');
       expect(await repository.baseUrl('openai'), 'https://openai.example/v1');
       expect(await repository.baseUrl('claude'), 'https://openai.example/v1');
@@ -347,10 +416,7 @@ void main() {
     test('重定向写入覆盖旧槽位值；写空串即清空（读回空串）', () async {
       await repository.setMany({'openai_api_key': 'sk-old'});
       await repository.setMany({'openai_api_key': 'sk-new'});
-      expect(
-        await secretStore.read(SecretStore.openaiApiKeySlot),
-        'sk-new',
-      );
+      expect(await secretStore.read(SecretStore.openaiApiKeySlot), 'sk-new');
 
       await repository.setMany({'openai_api_key': ''});
       expect(await secretStore.read(SecretStore.openaiApiKeySlot), '');
@@ -358,13 +424,156 @@ void main() {
     });
   });
 
+  group('VR-01 embedding 设置域（阶段 3 装配腿）', () {
+    test('embeddingEnabled 缺省 false（SR-19 默认关）；仅存 true 才开启', () async {
+      expect(await repository.embeddingEnabled, isFalse);
+
+      await repository.setMany({
+        SettingsRepository.embeddingEnabledKey: 'true',
+      });
+      expect(await repository.embeddingEnabled, isTrue);
+
+      // 其余值一律 false（'1' / 大写 / 空串）
+      await repository.setMany({SettingsRepository.embeddingEnabledKey: '1'});
+      expect(await repository.embeddingEnabled, isFalse);
+      await repository.setMany({
+        SettingsRepository.embeddingEnabledKey: 'TRUE',
+      });
+      expect(await repository.embeddingEnabled, isFalse);
+      await repository.setMany({SettingsRepository.embeddingEnabledKey: ''});
+      expect(await repository.embeddingEnabled, isFalse);
+    });
+
+    test('embedding_api_key 重定向 SecretStore：设置表无行、getAll 无明文', () async {
+      await repository.setMany({
+        SecretStore.embeddingApiKeySlot: 'sk-embed-secret',
+        SettingsRepository.embeddingModelKey: 'text-embedding-3-small',
+      });
+
+      final rows = await tableRows();
+      expect(rows.containsKey('embedding_api_key'), isFalse);
+      expect(rows.containsKey('embedding_model'), isTrue);
+      final all = await repository.getAll();
+      expect(all.containsKey('embedding_api_key'), isFalse);
+      expect(all, containsPair('embedding_model', 'text-embedding-3-small'));
+      expect(all.values, isNot(contains('sk-embed-secret')));
+
+      expect(
+        await secretStore.containsKey(SecretStore.embeddingApiKeySlot),
+        isTrue,
+      );
+      expect(
+        await secretStore.read(SecretStore.embeddingApiKeySlot),
+        'sk-embed-secret',
+      );
+      // getValue 对 embedding_api_key 的读取与写入对称重定向
+      expect(
+        await repository.getValue(SecretStore.embeddingApiKeySlot),
+        'sk-embed-secret',
+      );
+    });
+
+    test('embedding_api_key 写空串即清空槽位（读回空串，视同未配置）', () async {
+      await repository.setMany({SecretStore.embeddingApiKeySlot: 'sk-old'});
+      await repository.setMany({SecretStore.embeddingApiKeySlot: ''});
+      expect(await secretStore.read(SecretStore.embeddingApiKeySlot), '');
+      expect(await repository.getValue(SecretStore.embeddingApiKeySlot), '');
+    });
+
+    test('embeddingApiKey 槽链：embedding 槽优先，空则回退 openai 槽', () async {
+      // 双槽皆空 → 空串
+      expect(await repository.embeddingApiKey, '');
+
+      // 仅 openai 槽 → 兜底
+      await secretStore.write(
+        key: SecretStore.openaiApiKeySlot,
+        value: 'sk-openai',
+      );
+      expect(await repository.embeddingApiKey, 'sk-openai');
+
+      // embedding 槽有值 → 优先于 openai 槽
+      await secretStore.write(
+        key: SecretStore.embeddingApiKeySlot,
+        value: 'sk-embed',
+      );
+      expect(await repository.embeddingApiKey, 'sk-embed');
+
+      // embedding 槽写空串视同未配置，回到 openai 兜底
+      await repository.setMany({SecretStore.embeddingApiKeySlot: ''});
+      expect(await repository.embeddingApiKey, 'sk-openai');
+    });
+
+    test('embeddingApiKey 专用槽链不并入 _slotValue（claude 槽不兜底）', () async {
+      await secretStore.write(
+        key: SecretStore.claudeApiKeySlot,
+        value: 'sk-claude',
+      );
+      // 既有跨协议链对 openai 协议会兜到 claude 槽，但 embedding 链止于 openai
+      expect(await repository.apiKey('openai'), 'sk-claude');
+      expect(await repository.embeddingApiKey, '');
+    });
+
+    test('embeddingModel 缺省 text-embedding-3-small；写入后读回', () async {
+      expect(await repository.embeddingModel, 'text-embedding-3-small');
+
+      await repository.setMany({
+        SettingsRepository.embeddingModelKey: 'text-embedding-3-large',
+      });
+      expect(await repository.embeddingModel, 'text-embedding-3-large');
+
+      await repository.setMany({SettingsRepository.embeddingModelKey: ''});
+      expect(await repository.embeddingModel, 'text-embedding-3-small');
+    });
+
+    test('embeddingBaseUrl 缺省空串；写入后读回', () async {
+      expect(await repository.embeddingBaseUrl, '');
+
+      await repository.setMany({
+        SettingsRepository.embeddingBaseUrlKey: 'https://api.openai.com/v1',
+      });
+      expect(await repository.embeddingBaseUrl, 'https://api.openai.com/v1');
+
+      await repository.setMany({SettingsRepository.embeddingBaseUrlKey: ''});
+      expect(await repository.embeddingBaseUrl, '');
+    });
+
+    test('补漏锚：既有'
+        "'true'"
+        '判定 getter 与 memoryPromptMode 同族语义不回归', () async {
+      // 与 embeddingEnabled 同族的 'true' 判定 getter（本票行覆盖补漏锚）
+      expect(await repository.memoryReflectionEnabled, isFalse);
+      expect(await repository.proactiveMessageEnabled, isFalse);
+      expect(await repository.innerThoughtEnabled, isFalse);
+      expect(await repository.memoryPromptMode, 'medium');
+
+      await repository.setMany({
+        SettingsRepository.memoryReflectionEnabledKey: 'true',
+        SettingsRepository.proactiveMessageEnabledKey: 'true',
+        SettingsRepository.innerThoughtEnabledKey: 'true',
+        SettingsRepository.memoryPromptModeKey: 'strong',
+      });
+      expect(await repository.memoryReflectionEnabled, isTrue);
+      expect(await repository.proactiveMessageEnabled, isTrue);
+      expect(await repository.innerThoughtEnabled, isTrue);
+      expect(await repository.memoryPromptMode, 'strong');
+    });
+
+    test('补漏锚：缺省 secretStore 走 FlutterSecretStore（默认构造路径）', () async {
+      FlutterSecureStorage.setMockInitialValues(const {});
+      final defaultRepository = SettingsRepository(database: db);
+      expect(await defaultRepository.getValue('user_name'), '');
+      expect(await defaultRepository.embeddingApiKey, '');
+    });
+  });
+
   group('落表行为（真 schema 契约）', () {
     test('settings 表主键为 key（TEXT 主键）', () async {
-      final columns = await db.customSelect(
-        'PRAGMA table_info(settings)',
-      ).get();
-      final keyColumn =
-          columns.map((row) => row.data).firstWhere((c) => c['name'] == 'key');
+      final columns = await db
+          .customSelect('PRAGMA table_info(settings)')
+          .get();
+      final keyColumn = columns
+          .map((row) => row.data)
+          .firstWhere((c) => c['name'] == 'key');
       expect(keyColumn['pk'], 1);
     });
 
@@ -390,8 +599,9 @@ void main() {
       );
       await repository.setMany(settings);
 
-      final viaRepository =
-          await repository.wireCredentialsResolver().resolve();
+      final viaRepository = await repository
+          .wireCredentialsResolver()
+          .resolve();
       final manually = await CredentialsResolver(
         defaultProvider: () => repository.defaultProvider,
         defaultModel: () => repository.defaultModel,
@@ -422,13 +632,10 @@ void main() {
       );
     });
 
-    test('空 key 或空槽位 → 两路径同抛 ApiKeyMissingError（既有错误面不改写）',
-        () async {
+    test('空 key 或空槽位 → 两路径同抛 ApiKeyMissingError（既有错误面不改写）', () async {
       await repository.setMany({'default_provider': 'claude'});
 
-      Future<Object?> flat(
-        Future<ResolvedCredentials> Function() run,
-      ) async {
+      Future<Object?> flat(Future<ResolvedCredentials> Function() run) async {
         try {
           await run();
           return null;
@@ -437,13 +644,17 @@ void main() {
         }
       }
 
-      final viaRepository = await flat(repository.wireCredentialsResolver().resolve);
-      final manually = await flat(() => CredentialsResolver(
-            defaultProvider: () => repository.defaultProvider,
-            defaultModel: () => repository.defaultModel,
-            apiKey: repository.apiKey,
-            baseUrl: repository.baseUrl,
-          ).resolve());
+      final viaRepository = await flat(
+        repository.wireCredentialsResolver().resolve,
+      );
+      final manually = await flat(
+        () => CredentialsResolver(
+          defaultProvider: () => repository.defaultProvider,
+          defaultModel: () => repository.defaultModel,
+          apiKey: repository.apiKey,
+          baseUrl: repository.baseUrl,
+        ).resolve(),
+      );
 
       expect(viaRepository, isA<ApiKeyMissingError>());
       expect(manually, isA<ApiKeyMissingError>());

@@ -92,4 +92,37 @@ void main() {
       expect(SecretStore.claudeApiKeySlot, isNot(SecretStore.openaiApiKeySlot));
     });
   });
+
+  group('embedding 槽位键常量（VR-01，SR-16 key 仅经 SecretStore 注入）', () {
+    test('embedding 槽位键逐字为 embedding_api_key', () {
+      expect(SecretStore.embeddingApiKeySlot, 'embedding_api_key');
+    });
+
+    test('embedding 槽位键与既有两槽互异（防复制粘贴同键）', () {
+      expect(
+        SecretStore.embeddingApiKeySlot,
+        isNot(SecretStore.claudeApiKeySlot),
+      );
+      expect(
+        SecretStore.embeddingApiKeySlot,
+        isNot(SecretStore.openaiApiKeySlot),
+      );
+      expect(SecretStore.claudeApiKeySlot, isNot(SecretStore.openaiApiKeySlot));
+    });
+
+    test('embedding 槽位可写读删（与既有槽同契约）', () async {
+      final store = InMemorySecretStore();
+      expect(await store.read(SecretStore.embeddingApiKeySlot), '');
+
+      await store.write(
+        key: SecretStore.embeddingApiKeySlot,
+        value: 'sk-embedding',
+      );
+      expect(await store.read(SecretStore.embeddingApiKeySlot), 'sk-embedding');
+      expect(await store.containsKey(SecretStore.embeddingApiKeySlot), isTrue);
+
+      await store.delete(SecretStore.embeddingApiKeySlot);
+      expect(await store.read(SecretStore.embeddingApiKeySlot), '');
+    });
+  });
 }

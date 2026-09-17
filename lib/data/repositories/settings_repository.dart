@@ -59,9 +59,11 @@ class SettingsRepository implements SettingsReader {
   /// `onboarding_completed`（工单 03/04/05，桌面无此四键——契约漂移显式标注，
   /// spec §U-2/U-3/U-4「mobile 先行差异」），以及人机恋板块移动端先行键
   /// （`memory_prompt_mode` / `memory_reflection_enabled` / 阶段 2
-  /// `proactive_message_enabled` / `inner_thought_enabled`，SR-09）。
+  /// `proactive_message_enabled` / `inner_thought_enabled`，SR-09），以及
+  /// 阶段 3 embedding 四键（`embedding_enabled` / `embedding_api_key` /
+  /// `embedding_base_url` / `embedding_model`，VR-01；key 键重定向 SecretStore）。
   ///
-  /// 白名单外的写入一律忽略（[setMany]）；白名单内两 api_key 键重定向到
+  /// 白名单外的写入一律忽略（[setMany]）；白名单内三 api_key 键重定向到
   /// SecretStore 槽位，其余键落设置表。
   static const Set<String> allowedKeys = <String>{
     'claude_api_key',
@@ -82,6 +84,10 @@ class SettingsRepository implements SettingsReader {
     'memory_reflection_enabled',
     'proactive_message_enabled',
     'inner_thought_enabled',
+    embeddingEnabledKey,
+    SecretStore.embeddingApiKeySlot,
+    embeddingBaseUrlKey,
+    embeddingModelKey,
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -90,10 +96,11 @@ class SettingsRepository implements SettingsReader {
   /// 凭证槽位（provider 名）— 与桌面 `_CRED_SLOTS` 同序：claude、openai。
   static const List<String> _credSlots = <String>['claude', 'openai'];
 
-  /// api_key 两键（SecretStore 槽位键）— 白名单内重定向成员。
+  /// api_key 三键（SecretStore 槽位键）— 白名单内重定向成员。
   static const Set<String> _apiKeyKeys = <String>{
     SecretStore.claudeApiKeySlot,
     SecretStore.openaiApiKeySlot,
+    SecretStore.embeddingApiKeySlot,
   };
 
   /// 全局采样温度缺省（0.7）——对齐桌面角色字段 DB 默认（tables.dart
@@ -137,6 +144,23 @@ class SettingsRepository implements SettingsReader {
   /// 注：不设 relationship 开关键（Grilling 共识校正，关系状态默认启用）。
   static const String innerThoughtEnabledKey = 'inner_thought_enabled';
 
+  /// 远端 embedding 开关落库键（阶段 3，VR-01，mobile 先行键；桌面无
+  /// 对应物）。存储值 'true' 表示开启，其余一律视为关闭（**默认关闭**，
+  /// SR-19 隐私默认：关闭时对话内容不外发远端 embedding 服务）。
+  static const String embeddingEnabledKey = 'embedding_enabled';
+
+  /// embedding base_url 落库键（阶段 3，VR-01，mobile 先行键；桌面无对应物）。
+  /// 非敏感，落设置表；装配时经 `validateEmbeddingBaseUrl` 强制 https（SR-20）。
+  static const String embeddingBaseUrlKey = 'embedding_base_url';
+
+  /// embedding 模型落库键（阶段 3，VR-01，mobile 先行键；桌面无对应物）。
+  /// 缺省 [defaultEmbeddingModel]（U1 裁决：`text-embedding-3-small`，可配置）。
+  static const String embeddingModelKey = 'embedding_model';
+
+  /// embedding 模型缺省（U1 裁决）——OpenAI Compatible 端点通用小模型；
+  /// 取值语义锚定 spec §2 已定前提 8（未决项裁决 U1）。
+  static const String defaultEmbeddingModel = 'text-embedding-3-small';
+
   // ── 键值 CRUD ──
 
   /// 读取单个设置值；不存在或值为空返回 [defaultValue]。
@@ -148,9 +172,9 @@ class SettingsRepository implements SettingsReader {
     if (_apiKeyKeys.contains(key)) {
       return _secretStore.read(key);
     }
-    final row =
-        await (_db.select(_db.settings)..where((t) => t.key.equals(key)))
-            .getSingleOrNull();
+    final row = await (_db.select(
+      _db.settings,
+    )..where((t) => t.key.equals(key))).getSingleOrNull();
     return (row == null || row.value.isEmpty) ? defaultValue : row.value;
   }
 
@@ -165,10 +189,9 @@ class SettingsRepository implements SettingsReader {
   /// 严格镜像桌面 get_all 的设置表查询；api_key 两键因写入重定向而不落表，
   /// 结果天然只含八非敏感键的已有行（设置表无明文 Key）。
   Future<Map<String, String>> getAll() async {
-    final rows =
-        await (_db.select(_db.settings)
-              ..where((t) => t.key.isIn(allowedKeys)))
-            .get();
+    final rows = await (_db.select(
+      _db.settings,
+    )..where((t) => t.key.isIn(allowedKeys))).get();
     return {for (final row in rows) row.key: row.value};
   }
 
@@ -190,10 +213,7 @@ class SettingsRepository implements SettingsReader {
       await _db
           .into(_db.settings)
           .insertOnConflictUpdate(
-            SettingsCompanion.insert(
-              key: entry.key,
-              value: Value(entry.value),
-            ),
+            SettingsCompanion.insert(key: entry.key, value: Value(entry.value)),
           );
     }
   }
@@ -249,11 +269,11 @@ class SettingsRepository implements SettingsReader {
   /// [CredentialsResolver] 为纯 Dart 零 I/O（仅依赖 errors.dart），仓储（数据
   /// 层）引用无环路。
   CredentialsResolver wireCredentialsResolver() => CredentialsResolver(
-        defaultProvider: () => defaultProvider,
-        defaultModel: () => defaultModel,
-        apiKey: apiKey,
-        baseUrl: baseUrl,
-      );
+    defaultProvider: () => defaultProvider,
+    defaultModel: () => defaultModel,
+    apiKey: apiKey,
+    baseUrl: baseUrl,
+  );
 
   // ── 类型化便捷读取（桌面 DB→config 回退链的常量等价复刻）──
 
@@ -317,7 +337,8 @@ class SettingsRepository implements SettingsReader {
   /// 读取 `max_tokens` 键（mobile 先行键，桌面无此键）；非数字/缺失回退缺省
   /// （镜像 [getInt] 语义）。合法区间 clamp 由 UI 输入层保证（见
   /// [maxTokensMin] / [maxTokensMax]）。
-  Future<int> getMaxTokens() => getInt('max_tokens', defaultValue: defaultMaxTokens);
+  Future<int> getMaxTokens() =>
+      getInt('max_tokens', defaultValue: defaultMaxTokens);
 
   /// 记忆三模式原始值（人机恋 AC-02，mobile 先行键）；缺省
   /// [defaultMemoryPromptMode]（'medium'）。
@@ -355,6 +376,47 @@ class SettingsRepository implements SettingsReader {
   Future<bool> get innerThoughtEnabled async {
     final value = await getValue(innerThoughtEnabledKey);
     return value == 'true';
+  }
+
+  /// 远端 embedding 开关（阶段 3，VR-01）；缺省 **false**（SR-19 默认关，
+  /// 对话内容不默认外发远端 embedding 服务）。
+  ///
+  /// 存储值为 'true' 时开启；空串 / 缺失 / 其他值一律 false（对齐
+  /// [memoryReflectionEnabled] / [proactiveMessageEnabled] 语义）。
+  Future<bool> get embeddingEnabled async {
+    final value = await getValue(embeddingEnabledKey);
+    return value == 'true';
+  }
+
+  /// embedding API Key（阶段 3，VR-01）— **专用槽链**，不并入 [_slotValue]：
+  /// 1. embedding 槽位（[SecretStore.embeddingApiKeySlot]）
+  /// 2. openai 槽位兜底（embedding 多走 OpenAI Compatible 端点）
+  /// 3. 两槽皆空 → 空串
+  ///
+  /// 不并入 [_slotValue] 的原因：embedding 协议与 LLM provider 解析链解耦
+  /// （spec §2 已定前提 2「不硬塞 CredentialsResolver」），因此 claude 槽不
+  /// 参与兜底——装配方持 key 后独立注入 Bearer 头（VR-02），SR-16 全程成立。
+  Future<String> get embeddingApiKey async {
+    final embeddingValue = await _secretStore.read(
+      SecretStore.embeddingApiKeySlot,
+    );
+    if (embeddingValue.isNotEmpty) {
+      return embeddingValue;
+    }
+    return _secretStore.read(SecretStore.openaiApiKeySlot);
+  }
+
+  /// embedding base_url（阶段 3，VR-01）；缺省空串（官方默认端点）。
+  ///
+  /// 原始值读设置表（非敏感）；装配时经 `validateEmbeddingBaseUrl` 强制
+  /// https 归一（SR-20，`lib/services/embedding/embedding_config.dart`）。
+  Future<String> get embeddingBaseUrl => getValue(embeddingBaseUrlKey);
+
+  /// embedding 模型（阶段 3，VR-01）；缺省 [defaultEmbeddingModel]
+  /// （`text-embedding-3-small`，U1 裁决可配置）。
+  Future<String> get embeddingModel async {
+    final value = await getValue(embeddingModelKey);
+    return value.isEmpty ? defaultEmbeddingModel : value;
   }
 
   /// 默认 provider；缺省 [SettingsDefaults.provider]（镜像桌面
