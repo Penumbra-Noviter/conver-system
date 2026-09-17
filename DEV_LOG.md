@@ -6,6 +6,21 @@
 
 ---
 
+## 技术债消费批次 techdebt-f106f108（2026-09-17 — handoff-techdebt-f104f105-done-2026-09-17 交接指令，/project-kickoff 全自动档）
+
+- **范围**：消费候选区 3 条（F-106 Strong「默认选中首角色」竞态 / F-107 `pumpUntil` 6 文件重复低 / F-108 纠偏口径文档散落 Speculative）；2 工单并批 1 波 + 批次收尾（01/02 文件零交集，串行 lane；03 收尾归主会话）。先搜开源三分：自建（flaky 复现复用 `--no-pub` shell 逐遍循环——本批复现 10 遍全量全绿，loop5/6 为 pub get 网络污染 exit 69 不入统计；修复零新依赖）。
+- **F-106 根因实证（本批核心）**：复现现场 = `chat_entry_test`「角色选择条渲染全部角色名 + 默认选中首角色」96 行 `expect(c.selectedCharacterId, first.id, reason: '默认选中首角色')`（上批 10 遍 2 次 + 修复后 5 遍 2 次，Expected 1/Actual 2）。静态根因链闭合：`listCharacters` 仅 `ORDER BY updated_at DESC`（无二级排序键）→ drift 秒级整数存储 + `createCharacter` 用 `DateTime.now()` 赋值 → 连续创建同秒同值概率高 → 同值行返回序不确定（SQLite 实现细节非契约）→ `_resolveSelectedCharacterId()` 取 `_characters.first.id` 可能非 seed 首个（`chat_controller.dart`）——「芯片已渲染但选中态未更新」类渲染时序假设被排除（`loadEntry` 全部 await 于 pump 前完成）。本批修复前同刻注入单测**未红**（SQLite 表扫描序恰与 id 序一致，实证记录）+ 复现循环 10 遍全绿 = fallback 语义；修复锚定上批 2+2 实证 + 静态根因闭合，不因本批 0/10 改判。修复方案 A（`id ASC` 二级排序键）vs B（选中取最小 id，不修根因）已拍板 A。
+- **交付**：
+  - F106F108-01：`character_repository.dart` `listCharacters` 排序改 `ORDER BY updated_at DESC, id ASC`（docstring 补契约句「同 updated_at 按创建序稳定」）+ `character_repository_test.dart` 同刻注入锚用例（固定 `fakeNow` 两次 seed → 首元素 id = 较小者）；生产 diff = 1 文件排序行 + 契约注释（上批已拍板突破生产零 diff）；commit `a537f71`（merge `9200f49`，验收 6/6）
+  - F106F108-02：`test/helpers/pump_until.dart` 单一权威定义（窗口统一 300×10ms，docstring 注明用途与失败模式）；6 测试文件删本地定义 + import（chat_view/chat_entry/semantics/characters_batch_delete/characters_view_stage2/characters_view）；`characters_view_stage2_test` **5 处**「（broker publish 生效延迟）」归因 why 改现象式（grep 实证 5 处，共识文本记 4 处差额为第 5 处）；三型 diff（删定义块 + import + why 文本），无 format 重排；生产零 diff；commit `a399b9f`（merge `9200f49`，验收 5/5）
+  - F106F108-03（收尾，主会话）：F-108 收敛——TECH_DEBT/TICKETS 的 F-101/F-105 引述 4-commit 清单复制改「详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉」指针 + DEV_LOG 权威源补注 `git log -S "锁失效并行交错"`（子串口径；完整带若变体命中集不同，勿混用）；候选区清零（F-106/107/108 移出）+ 处置记录新增节 + TICKETS 归档 + AGENTS 状态行；pool_cleanup_check 全绿
+- **先红后绿**：01 必做——本批复现循环 10 遍全绿 → fallback 记录（上批 2+2 实证持续有效）+ 同刻注入单测为确定性语义钉（修复前未红 = rowid 序与 id 序一致的实证，如实标注「先红未达，以语义契约钉 + 上批实证兜底」）；02/03 无先红面（grep 锚「定义唯一 / 4-commit 清单零裸复制」替代）。
+- **门禁链**：全量 **2001 测**全绿（基线 2000 → +1 排序锚用例；主会话合并后实测）+ 6 文件单测 107 测绿 / 仓储单测 9 测绿 / analyze 0（No issues found）/ dart format 0（涉改测试文件 `--set-exit-if-changed`）。
+- **过程遥测**：子智能体 5（Grilling 2 次〔首次中断无产出，重派后闭环〕+ plan-tickets 1 + Implement 2〔01 卡死中断后主会话接管验证/commit，02 编辑完成中断后主会话接管验证/commit〕）；主会话直做 03 收尾；无冲突/回退；复现循环有效 10 遍全绿（loop5/6 pub get 网络污染不计）；全量测试主会话 2 次绿。
+- **编排教训**：① **子代理「无进程活动但 running」= 卡死信号**——本批 01/02 均出现长期 running 且无从属 dart 进程、无 commit，SendMessage 进度询问后仍无进展；按韧性惯例中断 + 主会话接管半成品（01 半成品已 commit、02 编辑完成），接管后立即闭环——半成品往往已近完成，接续优于重派；② `flutter clean` 会删 package_config 需 `dart pub get` 恢复（`dart.exe pub get` 而非 flutter_tools.snapshot pub get——后者参数解析失败）；③ 构建目录文件锁冲突（sqlite3.dll 无法删除）为并发测试残留，clean + pub get 后恢复。
+- **知识库召回轨迹**：预检 persona（Conver System）+ 经验摘要扫读（复现型竞态先跑复现循环落盘日志 / 隔离绿不足以判环境性 / 技术债票面修复建议须实证复核——F-106 均直接命中既有笔记复证）；开发期 kb-search 未触发。
+- **预设接续**：候选区清零（F-106~108 全处置，无新落债）；残留清理 `.worktrees/f91f97-1` 空壳仍待进程释放后手动删（沿用）；权限弹窗真机补验、阶段 3 人机恋深化仍开放（可选）；交付后复核（约一周后三问）可选。
+
 ## 技术债消费批次 techdebt-f104f105（2026-09-17 — handoff-techdebt-f101f103-done-2026-09-17 交接指令，/project-kickoff 全自动档）
 
 - **范围**：消费候选区 2 条（F-104 `characters_view_stage2_test` publish 用例存量 flaky / F-105 票面纠偏表述收窄）；2 工单并批 1 波串行 lane（01 复现定位 + 健壮性修复 / 02 文本修正，文件零交集）。先搜开源三分：自建（flaky 复现复用 Flutter CLI 逐遍循环——`--repeat` 实测不被 flutter_tools 3.47.2 支持，改 shell 循环；文档修正为仓内文本）。
@@ -24,7 +39,7 @@
 ## 技术债消费批次 techdebt-f101f103（2026-09-17 — handoff-techdebt-f98f100-done-2026-09-17 交接指令，/project-kickoff 全自动档）
 
 - **范围**：消费候选区 3 条（F-101 反序 gate 用例验收 reason 文本归因待裁决 / F-102 告警 seam 用例「组级 plugin 零引用」字面验收线 / F-103 全仓 format 存量差异）；2 工单并批 1 波串行 lane（同文件 `notification_service_test.dart`，01/02 区域零重叠）；F-103 复核关闭（用户拍板归一不立项）。先搜开源三分：自建（两票全为仓内测试文件局部增强，零新依赖）。
-- **票面纠偏（本批核心实证）**：F-101 票面 A 方案（修正 reason 文本）修正对象**不存在**——`git show 76f7da8` 原文与 HEAD 的 reason 文本均为「若早退拦截则为 1」（本就正确）；「若锁失效并行交错则为 1」从未存在于**代码 reason**（`git log -S` 命中 4 commit：`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`，均为文档/注释引述）；票面 B 方案（fake 记录调用顺序断言）经 microtask 推演在锁失效时**不红**（gate 单 Completer FIFO 巧合串行化使 fake 可观测序列与锁生效时全同）。唯一零生产改动可独立钉锁方案 = **B′ 双 gate 两阶段 + 中间态 `initializeCalls==1` 断言**。
+- **票面纠偏（本批核心实证）**：F-101 票面 A 方案（修正 reason 文本）修正对象**不存在**——`git show 76f7da8` 原文与 HEAD 的 reason 文本均为「若早退拦截则为 1」（本就正确）；「若锁失效并行交错则为 1」从未存在于**代码 reason**（`git log -S "锁失效并行交错"`（子串口径；完整带若变体命中集不同，勿混用）命中 4 commit：`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`，均为文档/注释引述）；票面 B 方案（fake 记录调用顺序断言）经 microtask 推演在锁失效时**不红**（gate 单 Completer FIFO 巧合串行化使 fake 可观测序列与锁生效时全同）。唯一零生产改动可独立钉锁方案 = **B′ 双 gate 两阶段 + 中间态 `initializeCalls==1` 断言**。
 - **交付**：
   - F101F103-01：反序 gate 用例重构双 gate 两阶段（`gate1` 无回调 lazy 挂起 → `gate2` 带回调 wired 挂起 → `gate2.complete()` + flush microtask 断言中间态 `initializeCalls==1` → `gate1.complete()` 最终断言）——锁失效（移除 `await previous`）突变下中间态红（Expected 1 / Actual 2）实锤，恢复全绿；fake 零改动、生产零 diff——commit `8fd29fe`（merge `61c9ca3`，验收 8/8）
   - F101F103-02：告警 seam 用例正常分支独立 `normalPlugin`（`_FakePlugin`）+ 独立 `FlutterLocalNotificationsScheduler`（channel/isAndroid 注入），用例内组级 `plugin.`/`scheduler.` 前缀零命中；行为断言语义零变化；顺序对调（doomed 先跑）31 测全绿机器实证——commit `3d2b8b1`（merge `61c9ca3`，验收 5/5）

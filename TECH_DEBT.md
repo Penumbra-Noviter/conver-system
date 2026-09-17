@@ -43,11 +43,18 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-106 | `chat_entry_test`「默认选中首角色」全量并发竞态（10 遍复现 2 次 + 修复后 5 遍 2 次，Expected 1/Actual 2 at line 96；隔离/单跑全绿）——上批 f98f100 判「环境性不落债」疑似误判；根因疑在生产 ChatController 选中时序（芯片已渲染但 selectedCharacterId 仍为 second.id，置信度中高，未定位具体行） | 复现实证 techdebt-f104f105（用户拍板另立） | Strong | 📝 待立项 | 聊天链路 |
-| F-107 | `pumpUntil` 同构定义 6 测试文件重复（chat_view/chat_entry/semantics/characters_batch_delete/characters_view_stage2/characters_view）+ why 归因式措辞统一为现象式 | 期末四轴 F104F105（Standards/Architecture/Falsify） | 低 | 📝 待立项 | 测试 |
-| F-108 | 纠偏口径文档散落（F-105 修正句复制进 3 处文档，正文反增应收敛 DEV_LOG 指针）+ 修正句未注明 `git log -S` 搜索串（命中集口径敏感，可复现性缺陷） | 期末四轴 F104F105（Architecture/Standards/Spec/Falsify） | Speculative | 📝 待立项 | 测试/文档 |
 
 ## 技术债处置记录
+
+### 2026-09-17 — 技术债消费批次（F-106~F-108 全部处置）
+
+> 来源：handoff-techdebt-f104f105-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波 + 批次收尾（F106F108-01 `a537f71` / F106F108-02 `a399b9f`，merge `9200f49`）。门禁：全量 **2001 测**绿（基线 2000 → +1 排序锚用例）/ analyze 0 / 期末四轴 **通过**（0 Critical）。**F-106 根因实证**：`listCharacters` 仅 `ORDER BY updated_at DESC` 无二级排序键 + drift 秒级存储 + `DateTime.now()` 连续创建同值 → 同值行返回序不确定 → `_resolveSelectedCharacterId()` 取 `_characters.first.id` 偶发非 seed 首个（chat_entry_test「默认选中首角色」Expected 1/Actual 2）；修复 = `id ASC` 二级排序键（生产 1 文件），同刻注入单测钉序。**F-107 单源收敛**：`test/helpers/pump_until.dart`（窗口统一 300×10ms）替代 6 测试文件各自定义 + why 归因改现象式。**F-108 收敛**：纠偏口径文档落点收敛 DEV_LOG 指针 + 补注 `git log -S` 搜索串。候选区清零，无新落债。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-106 | ✅ 已修 | F106F108-01：`character_repository.dart` `listCharacters` 排序改 `ORDER BY updated_at DESC, id ASC`（同 updated_at 按创建序稳定，docstring 契约句）；`character_repository_test.dart` 新增同刻注入锚用例（固定 `fakeNow` 两次 seed → 首元素 id = 较小者）；本批复现循环 10 遍全绿（fallback，锚定上批 10+5 次实证 Expected 1/Actual 2 + 静态根因闭合） |
+| F-107 | ✅ 已修 | F106F108-02：`test/helpers/pump_until.dart` 单一权威定义（300×10ms，docstring 注明用途与失败模式）；6 测试文件删本地定义 + import；`characters_view_stage2_test` 5 处「（broker publish 生效延迟）」归因 why 改现象式；生产零 diff |
+| F-108 | ✅ 已修 | 批次收尾：TECH_DEBT/TICKETS 的 F-101/F-105 引述收敛为「详见 DEV_LOG」指针（删 4-commit 清单复制）；DEV_LOG 权威源补注 `git log -S "锁失效并行交错"`（子串口径，勿与完整带若变体混用） |
 
 ### 2026-09-17 — 技术债消费批次（F-104~F-105 全部处置）
 
@@ -56,11 +63,11 @@
 | 编号 | 处置 | 详情 |
 |------|------|------|
 | F-104 | ✅ 已修（fallback 语义） | F104F105-01：`pumpStage2` loading 轮询 100 次静默放行 → `pumpUntil`（300 次）+ 显式断言「角色列表加载未在轮询窗口内完成」；5 处 publish 用例（升级建议：亲密 / 多选态确认 / 确认 / 拒绝 / F1）断言前单帧裸 pump → 条件等待；无 test 块增删、生产零 diff。票面目标未实证复现（15 遍零失败），残余 flaky = chat_entry_test 竞态（立 F-106），交付说明如实标注 |
-| F-105 | ✅ 已修 | F104F105-02：4 处旧版失实表述修正（DEV_LOG 票面纠偏句 / TECH_DEBT 处置记录引注 / TICKETS 归档行 / `notification_service_test.dart` 注释块），统一「从未存在于代码 reason（文档/注释引述除外）」口径 + `git log -S` 命中 4 commit（`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`）实证引据；纯文本/注释，生产零 diff、行为零变化 |
+| F-105 | ✅ 已修 | F104F105-02：4 处旧版失实表述修正（DEV_LOG 票面纠偏句 / TECH_DEBT 处置记录引注 / TICKETS 归档行 / `notification_service_test.dart` 注释块），统一「从未存在于代码 reason（文档/注释引述除外）」口径 + `git log -S` 实证引据（commit 清单详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉）；纯文本/注释，生产零 diff、行为零变化 |
 
 ### 2026-09-17 — 技术债消费批次（F-101~F-103 全部处置）
 
-> 来源：handoff-techdebt-f98f100-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（F101F103-01 `8fd29fe` merge `61c9ca3` / F101F103-02 `3d2b8b1` merge `61c9ca3`）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **0 阻断**（F-103 复核关闭；无新落债）。票面纠偏：F-101 票面「修正 reason 文本」修正对象不存在（「若锁失效并行交错则为 1」从未存在于**代码 reason**（文档/注释引述除外），`git log -S` 命中 4 commit（`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`）均为文档/注释引述，`git show 76f7da8` 原文为「若早退拦截则为 1」）；B′ 双 gate 中间态断言为唯一零生产改动独立钉锁方案，突变实验实锤（移除 `await previous` → 中间态期望 1 实际 2 红）。
+> 来源：handoff-techdebt-f98f100-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（F101F103-01 `8fd29fe` merge `61c9ca3` / F101F103-02 `3d2b8b1` merge `61c9ca3`）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **0 阻断**（F-103 复核关闭；无新落债）。票面纠偏：F-101 票面「修正 reason 文本」修正对象不存在（「若锁失效并行交错则为 1」从未存在于**代码 reason**（文档/注释引述除外），`git log -S` 实证引据与 `git show 76f7da8` 原文详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉）；B′ 双 gate 中间态断言为唯一零生产改动独立钉锁方案，突变实验实锤（移除 `await previous` → 中间态期望 1 实际 2 红）。
 
 | 编号 | 处置 | 详情 |
 |------|------|------|

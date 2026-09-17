@@ -31,6 +31,15 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-106~F-108（2026-09-17 收口）
+
+> 来源：handoff-techdebt-f104f105-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波 + 批次收尾（01/02 文件零交集串行 lane）。门禁：全量 **2001 测**绿（基线 2000 → +1 排序锚用例）/ analyze 0 / 期末四轴 **通过**（0 Critical，候选区清零无新落债）。**F-106 根因实证**：`listCharacters` 仅 `ORDER BY updated_at DESC` 无二级排序键 + drift 秒级存储 + 连续创建同值 → 同值行返回序不确定 → `_resolveSelectedCharacterId` 取 `_characters.first.id` 偶发非 seed 首个；修复 = `id ASC` 二级排序键（生产 1 文件，上批已拍板突破生产零 diff），同刻注入单测钉序。F-107 `pumpUntil` 单源收敛 `test/helpers/pump_until.dart`（窗口统一 300）+ why 现象式。F-108 纠偏口径文档收敛 DEV_LOG 指针 + 补注 `git log -S` 搜索串。详见 DEV_LOG〈技术债消费批次 techdebt-f106f108〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F106F108-01 | F-106 listCharacters 二级排序键（同 updated_at 按 id 升序稳定）+ 同刻注入单测 | 2026-09-17 | a537f71（merge 9200f49） |
+| F106F108-02 | F-107 pumpUntil 单源收敛 test/helpers/pump_until.dart + why 现象式 | 2026-09-17 | a399b9f（merge 9200f49） |
+
 ### 技术债消费批次 F-104~F-105（2026-09-17 收口）
 
 > 来源：handoff-techdebt-f101f103-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（01 复现定位 + 健壮性修复 / 02 表述收窄，生产零 diff）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **通过**（0 Critical）。**票面归因实证推翻**：F-104 复现循环（10 遍全量 2 次失败）指向 `chat_entry_test`「默认选中首角色」竞态（Expected 1/Actual 2），票面目标 `characters_view_stage2` 15 遍零失败——01 票按 fallback 语义收口（pumpStage2 显式断言 + 5 处 publish 前置等待），chat_entry 竞态另立 **F-106**（Strong，用户拍板下批消费）。F-105 四处「从未存在于仓库」失实表述统一为「从未存在于代码 reason（文档/注释引述除外）」口径。非阻断落债 F-107/F-108。详见 DEV_LOG〈技术债消费批次 techdebt-f104f105〉。
@@ -42,7 +51,7 @@
 
 ### 技术债消费批次 F-101~F-103（2026-09-17 收口）
 
-> 来源：handoff-techdebt-f98f100-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（同 commit 自洽，纯测试生产零 diff）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **0 阻断**（F-103 复核关闭，候选区清零无新落债）。票面纠偏：F-101 票面「修正 reason 文本」修正对象不存在（「若锁失效并行交错则为 1」从未存在于**代码 reason**（文档/注释引述除外）；`git log -S` 命中 4 commit（`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`）均为文档/注释引述；`76f7da8` 原文为「若早退拦截则为 1」），B′ 双 gate 中间态断言突变实验实锤。详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉。
+> 来源：handoff-techdebt-f98f100-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（同 commit 自洽，纯测试生产零 diff）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **0 阻断**（F-103 复核关闭，候选区清零无新落债）。票面纠偏：F-101 票面「修正 reason 文本」修正对象不存在（「若锁失效并行交错则为 1」从未存在于**代码 reason**（文档/注释引述除外）；`git log -S` 实证引据与 `git show 76f7da8` 原文详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉），B′ 双 gate 中间态断言突变实验实锤。详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉。
 
 | Ticket | 标题 | 完成日期 | 提交 |
 |--------|------|----------|------|
