@@ -1,10 +1,11 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=4，M0 冻结 + AC-01 升版 +
-/// PS2-01 升版 + FD-05 升版）。
+/// 应用数据库 — drift 数据库入口（schemaVersion=5，M0 冻结 + AC-01 升版 +
+/// PS2-01 升版 + FD-05 升版 + VR-04 升版）。
 ///
 /// - 表注册：characters / conversations / messages / settings / memory_entries /
 ///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
 ///   后两表为人机恋板块移动端先行）+ relationship_states / proactive_plans /
-///   inner_thoughts（阶段 2 三表，spec §3）
+///   inner_thoughts（阶段 2 三表，spec §3）+ embedding_entries / semantic_hits
+///   （阶段 3 两表，stage3-vector-recall spec §2 D2）
 /// - 执行器构造注入：测试 seam，测试用 `AppDatabase(NativeDatabase.memory())`
 ///   在内存中打开真实 schema，不依赖设备
 /// - 运行态连接经 [AppDatabase.open]（drift_flutter 惰性打开，内部即
@@ -20,17 +21,21 @@ import 'tables.dart';
 part 'app_database.g.dart';
 
 /// Conver System 移动端数据库。
-@DriftDatabase(tables: [
-  Characters,
-  Conversations,
-  Messages,
-  Settings,
-  MemoryEntries,
-  PersonaRevisions,
-  RelationshipStates,
-  ProactivePlans,
-  InnerThoughts,
-])
+@DriftDatabase(
+  tables: [
+    Characters,
+    Conversations,
+    Messages,
+    Settings,
+    MemoryEntries,
+    PersonaRevisions,
+    RelationshipStates,
+    ProactivePlans,
+    InnerThoughts,
+    EmbeddingEntries,
+    SemanticHits,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   /// 执行器注入构造（测试 seam / 自定义执行器）。
   AppDatabase(super.e);
@@ -41,85 +46,113 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        beforeOpen: (details) async {
-          // 对齐桌面端 CASCADE 删除语义（SQLite 默认关闭外键约束）。
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-        onUpgrade: (m, from, to) async {
-          // AC-01：schemaVersion 1→2 新增人机恋两表（memory_entries /
-          // persona_revisions）。createTable 建表后以 raw SQL 补建 characterId
-          // 外键索引（对齐 tables.dart 的 @TableIndex 注解；SQLite 不自动为 FK
-          // 建索引）。索引名与列名用 drift 蛇形约定（表名/列名 snake_case）。
-          if (from < 2) {
-            await m.createTable(memoryEntries);
-            await m.createTable(personaRevisions);
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_memory_entries_character_id '
-              'ON memory_entries (character_id)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_persona_revisions_character_id '
-              'ON persona_revisions (character_id)',
-            );
-          }
+    beforeOpen: (details) async {
+      // 对齐桌面端 CASCADE 删除语义（SQLite 默认关闭外键约束）。
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
+    onUpgrade: (m, from, to) async {
+      // AC-01：schemaVersion 1→2 新增人机恋两表（memory_entries /
+      // persona_revisions）。createTable 建表后以 raw SQL 补建 characterId
+      // 外键索引（对齐 tables.dart 的 @TableIndex 注解；SQLite 不自动为 FK
+      // 建索引）。索引名与列名用 drift 蛇形约定（表名/列名 snake_case）。
+      if (from < 2) {
+        await m.createTable(memoryEntries);
+        await m.createTable(personaRevisions);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_memory_entries_character_id '
+          'ON memory_entries (character_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_persona_revisions_character_id '
+          'ON persona_revisions (character_id)',
+        );
+      }
 
-          // PS2-01：schemaVersion 2→3 新增阶段 2 三表（relationship_states /
-          // proactive_plans / inner_thoughts，spec §3）。沿 from < 2 先例：
-          // createTable 建表 + raw SQL 补 FK 索引；relationship_states 的
-          // character_id 为 UNIQUE（对齐 @TableIndex(unique: true)）。
-          // drift onUpgrade 默认非事务（未显式包 transaction）：上述 DDL 逐条
-          // 裸发、无自动 BEGIN/COMMIT 包裹。迁移正确性依赖三机制——CREATE
-          // TABLE / CREATE INDEX 的 IF NOT EXISTS 幂等补建、user_version 迁移
-          // 成功后回写、失败时库被锁无法打开直至重开重跑（重新触发
-          // onUpgrade）。本实现不承诺原子性：引入显式事务包裹属行为变更，
-          // 本票不做。
-          if (from < 3) {
-            await m.createTable(relationshipStates);
-            await m.createTable(proactivePlans);
-            await m.createTable(innerThoughts);
-            await customStatement(
-              'CREATE UNIQUE INDEX IF NOT EXISTS '
-              'idx_relationship_states_character_id '
-              'ON relationship_states (character_id)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_proactive_plans_character_id '
-              'ON proactive_plans (character_id)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_proactive_plans_conversation_id '
-              'ON proactive_plans (conversation_id)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_proactive_plans_status '
-              'ON proactive_plans (status)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_inner_thoughts_character_id '
-              'ON inner_thoughts (character_id)',
-            );
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_inner_thoughts_message_id '
-              'ON inner_thoughts (message_id)',
-            );
-          }
+      // PS2-01：schemaVersion 2→3 新增阶段 2 三表（relationship_states /
+      // proactive_plans / inner_thoughts，spec §3）。沿 from < 2 先例：
+      // createTable 建表 + raw SQL 补 FK 索引；relationship_states 的
+      // character_id 为 UNIQUE（对齐 @TableIndex(unique: true)）。
+      // drift onUpgrade 默认非事务（未显式包 transaction）：上述 DDL 逐条
+      // 裸发、无自动 BEGIN/COMMIT 包裹。迁移正确性依赖三机制——CREATE
+      // TABLE / CREATE INDEX 的 IF NOT EXISTS 幂等补建、user_version 迁移
+      // 成功后回写、失败时库被锁无法打开直至重开重跑（重新触发
+      // onUpgrade）。本实现不承诺原子性：引入显式事务包裹属行为变更，
+      // 本票不做。
+      if (from < 3) {
+        await m.createTable(relationshipStates);
+        await m.createTable(proactivePlans);
+        await m.createTable(innerThoughts);
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS '
+          'idx_relationship_states_character_id '
+          'ON relationship_states (character_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_proactive_plans_character_id '
+          'ON proactive_plans (character_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_proactive_plans_conversation_id '
+          'ON proactive_plans (conversation_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_proactive_plans_status '
+          'ON proactive_plans (status)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_inner_thoughts_character_id '
+          'ON inner_thoughts (character_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_inner_thoughts_message_id '
+          'ON inner_thoughts (message_id)',
+        );
+      }
 
-          // FD-05：schemaVersion 3→4 为 messages.created_at 补建单列索引
-          // （对齐 tables.dart 新增的 @TableIndex；加速 latestMessageAt 的
-          // join + ORDER BY created_at DESC LIMIT 1，不改存储精度——F-3
-          // 已拍板 drift INTEGER 秒）。CREATE INDEX IF NOT EXISTS 幂等，
-          // 中断残留重开时补建；user_version=4 由 drift 成功后回写，失败
-          // 锁库重开重跑（F-78 幂等三机制延续）。
-          if (from < 4) {
-            await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_messages_created_at '
-              'ON messages (created_at)',
-            );
-          }
-        },
-      );
+      // FD-05：schemaVersion 3→4 为 messages.created_at 补建单列索引
+      // （对齐 tables.dart 新增的 @TableIndex；加速 latestMessageAt 的
+      // join + ORDER BY created_at DESC LIMIT 1，不改存储精度——F-3
+      // 已拍板 drift INTEGER 秒）。CREATE INDEX IF NOT EXISTS 幂等，
+      // 中断残留重开时补建；user_version=4 由 drift 成功后回写，失败
+      // 锁库重开重跑（F-78 幂等三机制延续）。
+      if (from < 4) {
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_messages_created_at '
+          'ON messages (created_at)',
+        );
+      }
+
+      // VR-04：schemaVersion 4→5 新增阶段 3 两表（embedding_entries /
+      // semantic_hits，spec §2 D2）。沿 from < 2/3 先例：createTable
+      // 建表 + raw SQL 补 FK 索引；embedding_entries 的
+      // (character_id, content_hash) 唯一索引为 SR-21 去重前提（对齐
+      // tables.dart 的 @TableIndex(unique: true)）。drift onUpgrade
+      // 非事务语义同上：本块 DDL 逐条裸发、无 BEGIN/COMMIT。迁移
+      // 正确性依赖三机制——CREATE TABLE / CREATE INDEX 的 IF NOT
+      // EXISTS 幂等补建、user_version=5 迁移成功后回写、失败时库被锁
+      // 无法打开直至重开重跑（F-78 幂等三机制延续）。本块不引入显式
+      // 事务包裹（对齐 F-78 结论：引事务属行为变更，本票不做）。
+      if (from < 5) {
+        await m.createTable(embeddingEntries);
+        await m.createTable(semanticHits);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_embedding_entries_character_id '
+          'ON embedding_entries (character_id)',
+        );
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS '
+          'idx_embedding_entries_character_id_content_hash '
+          'ON embedding_entries (character_id, content_hash)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_semantic_hits_character_id '
+          'ON semantic_hits (character_id)',
+        );
+      }
+    },
+  );
 }

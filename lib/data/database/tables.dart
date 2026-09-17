@@ -1,7 +1,10 @@
 /// drift 表定义 — 前四表与桌面端 ORM 逐字段对齐（schemaVersion=1 冻结）；
 /// MemoryEntries / PersonaRevisions 为人机恋板块（ADR-0003）移动端先行表
 /// （schemaVersion=2，桌面无对应物）；RelationshipStates / ProactivePlans /
-/// InnerThoughts 为阶段 2 三表（schemaVersion=3，spec §3，桌面无对应物）。
+/// InnerThoughts 为阶段 2 三表（schemaVersion=3，spec §3，桌面无对应物）；
+/// Messages.created_at 单列索引为 FD-05（schemaVersion=4）；
+/// EmbeddingEntries / SemanticHits 为阶段 3 两表（schemaVersion=5，
+/// stage3-vector-recall spec §2 D2，桌面无对应物）。
 ///
 /// 权威源（只读，勿改）：
 /// `desktop/backend/app/models/{character,conversation,message,setting}.py`
@@ -79,8 +82,7 @@ class StringListConverter extends TypeConverter<List<String>, String> {
 
 /// `Map<String, dynamic>` JSON 列转换器
 /// （characters.creator_notes / extensions）。
-class StringMapConverter
-    extends TypeConverter<Map<String, dynamic>, String> {
+class StringMapConverter extends TypeConverter<Map<String, dynamic>, String> {
   const StringMapConverter();
 
   @override
@@ -115,18 +117,22 @@ class Characters extends Table {
   TextColumn get systemPrompt => text().withDefault(const Constant(''))();
   TextColumn get postHistoryInstructions =>
       text().withDefault(const Constant(''))();
-  TextColumn get alternateGreetings =>
-      text().map(const StringListConverter()).withDefault(const Constant('[]'))();
-  TextColumn get tags =>
-      text().map(const StringListConverter()).withDefault(const Constant('[]'))();
+  TextColumn get alternateGreetings => text()
+      .map(const StringListConverter())
+      .withDefault(const Constant('[]'))();
+  TextColumn get tags => text()
+      .map(const StringListConverter())
+      .withDefault(const Constant('[]'))();
 
   // ── 元数据 ──
   TextColumn get creator => text().withDefault(const Constant(''))();
   TextColumn get version => text().withDefault(const Constant('1.0'))();
-  TextColumn get creatorNotes =>
-      text().map(const StringMapConverter()).withDefault(const Constant('{}'))();
-  TextColumn get extensions =>
-      text().map(const StringMapConverter()).withDefault(const Constant('{}'))();
+  TextColumn get creatorNotes => text()
+      .map(const StringMapConverter())
+      .withDefault(const Constant('{}'))();
+  TextColumn get extensions => text()
+      .map(const StringMapConverter())
+      .withDefault(const Constant('{}'))();
 
   // ── 项目原有字段 ──
   TextColumn get avatar => text().nullable()();
@@ -142,14 +148,12 @@ class Conversations extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// 必填外键 → characters.id，桌面端 ondelete=CASCADE + index=True。
-  IntColumn get characterId => integer().references(
-        Characters,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
 
   TextColumn get title => text().withDefault(const Constant('新对话'))();
-  TextColumn get modelProvider => text().withDefault(const Constant('claude'))();
+  TextColumn get modelProvider =>
+      text().withDefault(const Constant('claude'))();
   TextColumn get modelName =>
       text().withDefault(const Constant('claude-sonnet-5'))();
 
@@ -168,11 +172,8 @@ class Messages extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// 必填外键 → conversations.id，桌面端 ondelete=CASCADE + index=True。
-  IntColumn get conversationId => integer().references(
-        Conversations,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get conversationId =>
+      integer().references(Conversations, #id, onDelete: KeyAction.cascade)();
 
   /// 必填枚举，TypeConverter 显式按 `.value`（user/assistant/system）落库。
   TextColumn get role => text().map(const RoleConverter())();
@@ -226,7 +227,11 @@ class MemoryKindConverter extends TypeConverter<MemoryKind, String> {
         return kind;
       }
     }
-    throw ArgumentError.value(fromDb, 'kind', 'Unknown MemoryKind value in database');
+    throw ArgumentError.value(
+      fromDb,
+      'kind',
+      'Unknown MemoryKind value in database',
+    );
   }
 
   @override
@@ -243,11 +248,8 @@ class MemoryEntries extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
-  IntColumn get characterId => integer().references(
-        Characters,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
 
   /// 必填枚举（persona_fact / episodic），TypeConverter 显式按 `.value` 落库。
   TextColumn get kind => text().map(const MemoryKindConverter())();
@@ -272,11 +274,8 @@ class PersonaRevisions extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
-  IntColumn get characterId => integer().references(
-        Characters,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
 
   /// 演化时点的角色人格全文快照（必填文本）。
   TextColumn get personalitySnapshot => text()();
@@ -342,11 +341,8 @@ class RelationshipStates extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）；每角色至多一行。
-  IntColumn get characterId => integer().references(
-        Characters,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
 
   /// 必填枚举（stranger/acquainted/familiar/intimate/soulmate），字符串落库。
   TextColumn get stage => text().map(const RelationshipStageConverter())();
@@ -403,24 +399,21 @@ class ProactivePlanStatusConverter
 /// `sentAt` 为每日 6 次 / 冷却 6h 的口径单一来源（判定③）；`messageId`
 /// 指向已落库的 assistant 消息，重生成截断删消息时 FK setNull（判定⑥）。
 @TableIndex(name: 'idx_proactive_plans_character_id', columns: {#characterId})
-@TableIndex(name: 'idx_proactive_plans_conversation_id', columns: {#conversationId})
+@TableIndex(
+  name: 'idx_proactive_plans_conversation_id',
+  columns: {#conversationId},
+)
 @TableIndex(name: 'idx_proactive_plans_status', columns: {#status})
 class ProactivePlans extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
-  IntColumn get characterId => integer().references(
-        Characters,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
 
   /// 必填外键 → conversations.id，ondelete=CASCADE（随对话删除）。
-  IntColumn get conversationId => integer().references(
-        Conversations,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get conversationId =>
+      integer().references(Conversations, #id, onDelete: KeyAction.cascade)();
 
   /// 预生成文案（必填文本）。
   TextColumn get content => text()();
@@ -436,10 +429,10 @@ class ProactivePlans extends Table {
 
   /// 已发送消息 id（可空）；消息删除时 FK setNull（重生成截断场景）。
   IntColumn get messageId => integer().nullable().references(
-        Messages,
-        #id,
-        onDelete: KeyAction.setNull,
-      )();
+    Messages,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
 }
 
 /// 内心独白表 — 剥离的 `<thought>` 内容（spec §3 / P5）。
@@ -451,21 +444,80 @@ class InnerThoughts extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
-  IntColumn get characterId => integer().references(
-        Characters,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
 
   /// 必填外键 → messages.id，ondelete=CASCADE（thought 随消息删除级联）。
-  IntColumn get messageId => integer().references(
-        Messages,
-        #id,
-        onDelete: KeyAction.cascade,
-      )();
+  IntColumn get messageId =>
+      integer().references(Messages, #id, onDelete: KeyAction.cascade)();
 
   /// 独白正文（必填文本）。
   TextColumn get content => text()();
+
+  DateTimeColumn get createdAt => dateTime()();
+}
+
+/// 向量条目表 — 远端 embedding 检索的本地向量存储（spec §2 D2）。
+///
+/// `(characterId, contentHash)` 唯一索引为 SR-21 去重前提；text 快照截断
+/// 上限 2000 由仓储层负责（表层不设 CHECK）；`entryId` 为普通 int 逻辑
+/// 回指 memory_entries（不建硬 FK，避免记忆变更/删除时的引用约束耦合）；
+/// `model`/`dims` 为模型指纹，检索按当前指纹过滤（指纹变更标脏重嵌由
+/// 仓储/服务层处理）。
+@DataClassName('EmbeddingEntry')
+@TableIndex(name: 'idx_embedding_entries_character_id', columns: {#characterId})
+@TableIndex(
+  name: 'idx_embedding_entries_character_id_content_hash',
+  columns: {#characterId, #contentHash},
+  unique: true,
+)
+class EmbeddingEntries extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除清向量）。
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
+
+  /// 逻辑回指 memory_entries.id（普通 int，不建硬 FK）。
+  IntColumn get entryId => integer()();
+
+  /// 补嵌时点的文本快照（截断上限 2000 由仓储层负责，SR-21）。
+  TextColumn get contentSnapshot => text()();
+
+  /// 向量 blob = float32 LE 打包（1536 维 ≈ 6144 字节，无压缩）。
+  BlobColumn get vector => blob()();
+
+  /// 模型指纹（如 text-embedding-3-small）。
+  TextColumn get model => text()();
+
+  /// 向量维度指纹。
+  IntColumn get dims => integer()();
+
+  /// SHA-256 hex（内容 hash，SR-21 去重键组成部分）。
+  TextColumn get contentHash => text()();
+
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+}
+
+/// 语义命中队列表 — `<search:>` 语义兜底命中的延迟注入队列（spec §2 D2）。
+///
+/// 命中入队后由注入装配读取消费（仓储级去重，注入前删除）；`query` 为
+/// 检索 query 快照。
+@DataClassName('SemanticHit')
+@TableIndex(name: 'idx_semantic_hits_character_id', columns: {#characterId})
+class SemanticHits extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → characters.id，ondelete=CASCADE（随角色删除）。
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
+
+  /// 逻辑回指 memory_entries.id（普通 int，同 [EmbeddingEntries.entryId]）。
+  IntColumn get entryId => integer()();
+
+  /// 检索 query 快照（必填文本）。
+  TextColumn get query => text()();
 
   DateTimeColumn get createdAt => dateTime()();
 }
