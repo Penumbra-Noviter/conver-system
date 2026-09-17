@@ -18,6 +18,7 @@ import 'package:conver_system_mobile/data/repositories/settings_repository.dart'
 import 'package:conver_system_mobile/services/chat_service.dart';
 import 'package:conver_system_mobile/services/conversation_export_service.dart';
 import 'package:conver_system_mobile/services/document_parse_service.dart';
+import 'package:conver_system_mobile/services/embedding/embedding_service.dart';
 import 'package:conver_system_mobile/services/simulator/game_generator.dart';
 import 'package:conver_system_mobile/view_models/simulators_controller.dart';
 import 'package:conver_system_mobile/views/home_shell.dart';
@@ -76,6 +77,26 @@ void main() {
       Provider.of<SimulatorsController>(context, listen: false),
       isA<SimulatorsController>(),
       reason: 'SimulatorsController 装配点含 proxyConfigReader 接线，可经装配图构造',
+    );
+  });
+
+  testWidgets('装配图持有 EmbeddingService（VR-06 独立装配腿，lazy:false 启动即构造）',
+      (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _markOnboardingCompleted(db);
+
+    // lazy:false：pump 时 create 立即执行（同步构造 service，零 I/O）；
+    // 默认 embedding_enabled=false（SR-19）→ 配置解析闭包不触达 SecretStore，
+    // 测试环境（真实 FlutterSecretStore 无通道）能构造完成即证明该短路成立。
+    await tester.pumpWidget(ConverApp(database: db));
+    await tester.pumpAndSettle();
+
+    final context = tester.element(find.byType(HomeShell));
+    expect(
+      Provider.of<EmbeddingService>(context, listen: false),
+      isA<EmbeddingService>(),
+      reason: 'EmbeddingService 独立装配腿（VR-06），可经公共装配图解析',
     );
   });
 

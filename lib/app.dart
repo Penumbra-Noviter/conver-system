@@ -23,6 +23,9 @@ import 'services/companion/thought_service.dart';
 import 'services/conversation_export_file_exchange.dart';
 import 'services/conversation_export_service.dart';
 import 'services/document_parse_service.dart';
+import 'services/embedding/embedding_config.dart';
+import 'services/embedding/embedding_service.dart';
+import 'services/embedding/openai_compatible_client.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/memory/memory_service.dart';
@@ -355,6 +358,47 @@ class ConverApp extends StatelessWidget {
         Provider<MemoryService>(
           create: (context) =>
               MemoryService(context.read<MemoryRepository>()),
+        ),
+        // VR-06 阶段 3 装配腿（P1 端点/凭据独立腿，不并入 CredentialsResolver）：
+        // EmbeddingService 依赖 SettingsRepository + MemoryRepository + 可替换
+        // client 工厂。配置组装（VR-01 getter + validateEmbeddingBaseUrl）在
+        // resolveConfig 闭包内、client 构造（VR-02）在 clientFactory 闭包内，
+        // 两者均延迟到服务操作时执行（同步 create 闭包零 I/O——SecretStore
+        // 读取只发生在 embedding 已启用后的实际操作路径，默认关（SR-19）下
+        // 装配与启动均不触达 SecretStore，测试环境无 MissingPluginException）。
+        // lazy:false（W6-F1/persona 教训）：装配腿启动即构造，装配断裂在
+        // 启动期暴露而非等消费；无网络/存储副作用。后续 VR-07/VR-08 将串行
+        // 申报再改本文件（批次内不得并行触碰）。
+        Provider<EmbeddingService>(
+          lazy: false, // W6-F1：装配腿启动副作用必须立即执行（persona 教训）
+          create: (context) {
+            final settings = context.read<SettingsRepository>();
+            return EmbeddingService(
+              memoryRepository: context.read<MemoryRepository>(),
+              resolveConfig: () async {
+                final enabled = await settings.embeddingEnabled;
+                if (!enabled) {
+                  // SR-19 默认关：禁用态零 SecretStore 触碰。
+                  return EmbeddingEndpointConfig(
+                    enabled: false,
+                    apiKey: '',
+                    baseUrl: null,
+                    model: SettingsRepository.defaultEmbeddingModel,
+                  );
+                }
+                return EmbeddingEndpointConfig(
+                  enabled: true,
+                  apiKey: await settings.embeddingApiKey,
+                  baseUrl: validateEmbeddingBaseUrl(
+                    await settings.embeddingBaseUrl,
+                  ),
+                  model: await settings.embeddingModel,
+                );
+              },
+              clientFactory: (config) =>
+                  OpenAICompatibleEmbeddingClient(config: config),
+            );
+          },
         ),
         // M2-T04 聊天装配：LLM 工厂 + 回合编排服务 + 聊天控制器。
         // 视图层（ChatView / ChatEntry）只读 ChatController 与仓储抽象，不触碰
