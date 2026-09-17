@@ -28,8 +28,9 @@ class EmbeddingConfigException implements Exception {
 ///
 /// 返回语义：
 /// - 空 / 空白（null、''、纯空白）→ `null`（官方默认端点）
-/// - `https://...` → 原样归一：trim 后去尾部斜杠（协议前缀不受影响）
-/// - `http://...` 或非 URL 文本 → 抛 [EmbeddingConfigException]
+/// - `https://...`（协议段后含非空 authority）→ 原样归一：trim 后去尾部斜杠
+/// - `http://...`、非 URL 文本、或 `https://` 无 authority（如 `'https://'`、
+///   纯协议段或 `'https:///…'`）→ 抛 [EmbeddingConfigException]
 String? validateEmbeddingBaseUrl(String? value) {
   const prefix = 'https://';
   final trimmed = value?.trim() ?? '';
@@ -41,10 +42,17 @@ String? validateEmbeddingBaseUrl(String? value) {
       'embedding_base_url 必须以 https:// 开头（SR-20 强制 HTTPS）',
     );
   }
-  // 只归一协议前缀之后的主体，防止 'https://' 单独出现时被去斜杠破坏协议段。
+  // 只归一协议前缀之后的主体，并强制要求非空 authority——纯协议段
+  //（'https://'）或以 '/' 起始的路径段（'https:///…'）均为无效端点，错误
+  // 应在装配期暴露而非推迟至请求期（Falsify-1 修复）。
   final body = trimmed
       .substring(prefix.length)
       .replaceFirst(RegExp(r'/+$'), '');
+  if (body.isEmpty || body.startsWith('/')) {
+    throw const EmbeddingConfigException(
+      'embedding_base_url 缺少有效主机（SR-20 强制 HTTPS）',
+    );
+  }
   return '$prefix$body';
 }
 

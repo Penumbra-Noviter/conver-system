@@ -8,7 +8,7 @@
 /// 与桌面的协议面差异（M1-T04 拍板，见工单「高不确定实现点」与 spec §SecureStorage）：
 /// - **砍 .env 腿**：api_key 解析链止于两个 SecretStore 槽位，无配置文件兜底
 /// - **砍 credentials 三元组**：游戏模拟器专用（桌面 credentials()），M1 不迁移
-/// - **api_key 两键读写重定向**：白名单成员资格保留（校验语义与桌面一致），
+/// - **api_key 三键读写重定向**：白名单成员资格保留（校验语义与桌面一致），
 ///   但实际存取走 [SecretStore] 槽位（键名逐字相同），设置表不落明文 Key；
 ///   [getAll] 为桌面 get_all 的严格镜像（设置表查询），因此天然不含 Key 行
 /// - **白名单外 per-provider 动态键**（如 deepseek_api_key）：桌面读侧死路径，
@@ -166,7 +166,7 @@ class SettingsRepository implements SettingsReader {
   /// 读取单个设置值；不存在或值为空返回 [defaultValue]。
   ///
   /// 空串语义（镜像桌面 get_value：`row.value if row and row.value else default`）。
-  /// api_key 两键的读取重定向到 SecretStore 槽位（与写入重定向对称，
+  /// api_key 三键的读取重定向到 SecretStore 槽位（与写入重定向对称，
   /// 使 `getValue('claude_api_key')` 的可观察结果与桌面读 DB 行一致）。
   Future<String> getValue(String key, {String defaultValue = ''}) async {
     if (_apiKeyKeys.contains(key)) {
@@ -186,7 +186,7 @@ class SettingsRepository implements SettingsReader {
 
   /// 读取白名单内所有设置行（key → value，含空串值行）。
   ///
-  /// 严格镜像桌面 get_all 的设置表查询；api_key 两键因写入重定向而不落表，
+  /// 严格镜像桌面 get_all 的设置表查询；api_key 三键因写入重定向而不落表，
   /// 结果天然只含八非敏感键的已有行（设置表无明文 Key）。
   Future<Map<String, String>> getAll() async {
     final rows = await (_db.select(
@@ -197,7 +197,7 @@ class SettingsRepository implements SettingsReader {
 
   /// 批量写入设置：白名单外键忽略；存在则更新、不存在则创建。
   ///
-  /// api_key 两键重定向到 SecretStore 槽位（设置表无明文 Key 行）；
+  /// api_key 三键重定向到 SecretStore 槽位（设置表无明文 Key 行）；
   /// 写空串 = 清空槽位（读回空串，视同未配置，与 SecretStore 契约一致）。
   Future<void> setMany(Map<String, String> data) async {
     for (final entry in data.entries) {

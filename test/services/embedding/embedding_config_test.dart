@@ -50,6 +50,17 @@ void main() {
       );
     });
 
+    test('https 纯协议段/缺 authority 抛配置错误（Falsify-1 防复发）', () {
+      expect(
+        () => validateEmbeddingBaseUrl('https://'),
+        throwsA(isA<EmbeddingConfigException>()),
+      );
+      expect(
+        () => validateEmbeddingBaseUrl('https:///v1/'),
+        throwsA(isA<EmbeddingConfigException>()),
+      );
+    });
+
     test('非 URL 文本抛配置错误', () {
       expect(
         () => validateEmbeddingBaseUrl('not-a-url'),
