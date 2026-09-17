@@ -39,7 +39,7 @@
 ## 技术债消费批次 techdebt-f101f103（2026-09-17 — handoff-techdebt-f98f100-done-2026-09-17 交接指令，/project-kickoff 全自动档）
 
 - **范围**：消费候选区 3 条（F-101 反序 gate 用例验收 reason 文本归因待裁决 / F-102 告警 seam 用例「组级 plugin 零引用」字面验收线 / F-103 全仓 format 存量差异）；2 工单并批 1 波串行 lane（同文件 `notification_service_test.dart`，01/02 区域零重叠）；F-103 复核关闭（用户拍板归一不立项）。先搜开源三分：自建（两票全为仓内测试文件局部增强，零新依赖）。
-- **票面纠偏（本批核心实证）**：F-101 票面 A 方案（修正 reason 文本）修正对象**不存在**——`git show 76f7da8` 原文与 HEAD 的 reason 文本均为「若早退拦截则为 1」（本就正确）；「若锁失效并行交错则为 1」从未存在于**代码 reason**（`git log -S "锁失效并行交错"`（子串口径；完整带若变体命中集不同，勿混用）命中 4 commit：`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`，均为文档/注释引述）；票面 B 方案（fake 记录调用顺序断言）经 microtask 推演在锁失效时**不红**（gate 单 Completer FIFO 巧合串行化使 fake 可观测序列与锁生效时全同）。唯一零生产改动可独立钉锁方案 = **B′ 双 gate 两阶段 + 中间态 `initializeCalls==1` 断言**。
+- **票面纠偏（本批核心实证）**：F-101 票面 A 方案（修正 reason 文本）修正对象**不存在**——`git show 76f7da8` 原文与 HEAD 的 reason 文本均为「若早退拦截则为 1」（本就正确）；「若锁失效并行交错则为 1」从未存在于**代码 reason**（`git log -S "锁失效并行交错"`（子串口径；完整带若变体命中集不同，勿混用，命中集随后续引述变化，本句为 2026-09-17 时点快照）当时命中 4 commit：`8fd29fe`/`5aeffe7`/`2d26a0f`/`1fc3987`，均为文档/注释引述）；票面 B 方案（fake 记录调用顺序断言）经 microtask 推演在锁失效时**不红**（gate 单 Completer FIFO 巧合串行化使 fake 可观测序列与锁生效时全同）。唯一零生产改动可独立钉锁方案 = **B′ 双 gate 两阶段 + 中间态 `initializeCalls==1` 断言**。
 - **交付**：
   - F101F103-01：反序 gate 用例重构双 gate 两阶段（`gate1` 无回调 lazy 挂起 → `gate2` 带回调 wired 挂起 → `gate2.complete()` + flush microtask 断言中间态 `initializeCalls==1` → `gate1.complete()` 最终断言）——锁失效（移除 `await previous`）突变下中间态红（Expected 1 / Actual 2）实锤，恢复全绿；fake 零改动、生产零 diff——commit `8fd29fe`（merge `61c9ca3`，验收 8/8）
   - F101F103-02：告警 seam 用例正常分支独立 `normalPlugin`（`_FakePlugin`）+ 独立 `FlutterLocalNotificationsScheduler`（channel/isAndroid 注入），用例内组级 `plugin.`/`scheduler.` 前缀零命中；行为断言语义零变化；顺序对调（doomed 先跑）31 测全绿机器实证——commit `3d2b8b1`（merge `61c9ca3`，验收 5/5）
