@@ -31,6 +31,7 @@ import 'services/embedding/openai_compatible_client.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/memory/memory_service.dart';
+import 'services/memory/persona_evolution_service.dart';
 import 'services/memory/reflection_service.dart';
 import 'services/notifications/notification_service.dart';
 import 'services/onboarding.dart';
@@ -440,6 +441,48 @@ class ConverApp extends StatelessWidget {
                       existingFacts: existingFacts,
                     );
                   },
+            );
+          },
+        ),
+        // 人机恋阶段 3 装配（F-109）：PersonaEvolutionService 依赖两仓储 +
+        // LLM 工厂 + 凭据解析链（wireCredentialsResolver 单一落点）；reflector
+        // = buildClusteredReflector（VR-08 聚类注入）经 inner 走
+        // reflectPersonaWithProvider，与 ReflectionService 先例同构；默认
+        // lazy——服务构造零 I/O 零启动副作用，不满足 W6-F1 哑 Provider 条件。
+        Provider<PersonaEvolutionService>(
+          create: (context) {
+            final settings = context.read<SettingsRepository>();
+            final factory = context.read<LLMProviderFactory>();
+            return PersonaEvolutionService(
+              characterRepository: context.read<CharacterRepository>(),
+              memoryRepository: context.read<MemoryRepository>(),
+              reflector: buildClusteredReflector(
+                embeddingService: context.read<EmbeddingService>(),
+                inner:
+                    ({
+                      required String currentPersonality,
+                      required String charName,
+                      required List<String> personaFacts,
+                      List<String> similarClusters = const [],
+                    }) async {
+                      final resolved = await settings
+                          .wireCredentialsResolver()
+                          .resolve();
+                      final llm = factory.create(
+                        provider: resolved.provider,
+                        apiKey: resolved.apiKey,
+                        baseUrl: resolved.baseUrl,
+                      );
+                      return reflectPersonaWithProvider(
+                        llm: llm,
+                        model: resolved.model,
+                        currentPersonality: currentPersonality,
+                        charName: charName,
+                        personaFacts: personaFacts,
+                        similarClusters: similarClusters,
+                      );
+                    },
+              ),
             );
           },
         ),

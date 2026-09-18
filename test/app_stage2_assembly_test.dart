@@ -14,6 +14,7 @@ import 'package:conver_system_mobile/services/companion/relationship_service.dar
 import 'package:conver_system_mobile/services/companion/stage_upgrade_broker.dart';
 import 'package:conver_system_mobile/services/companion/thought_service.dart';
 import 'package:conver_system_mobile/services/notifications/notification_service.dart';
+import 'package:conver_system_mobile/services/memory/persona_evolution_service.dart';
 import 'package:conver_system_mobile/view_models/shell_navigation.dart';
 import 'package:conver_system_mobile/views/chat/chat_controller.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
@@ -909,7 +910,7 @@ void main() {
   });
 
   group('ConverApp 装配冒烟（PS2-08 MultiProvider）', () {
-    testWidgets('装配完整：六实例可读 + 启动编排不阻断构建', (tester) async {
+    testWidgets('装配完整：七实例可读 + 启动编排不阻断构建', (tester) async {
       await tester.pumpWidget(ConverApp(database: db));
       await tester.pump();
 
@@ -921,6 +922,7 @@ void main() {
       expect(context.read<ProactiveMessageService>(), isNotNull);
       expect(context.read<StageUpgradeBroker>(), isNotNull);
       expect(context.read<FlutterLocalNotificationsScheduler>(), isNotNull);
+      expect(context.read<PersonaEvolutionService>(), isNotNull);
       // 通知初始化（真插件缺失 → 降级 false）+ SR-08 恢复（空计划）不抛。
       expect(tester.takeException(), isNull);
     });
