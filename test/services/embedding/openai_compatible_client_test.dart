@@ -7,7 +7,9 @@
 ///
 /// fixture 说明：`test/services/embedding/fixtures/` 全部为**合成样例**——
 /// schema 依据 OpenAI 官方公开文档 `/embeddings` 响应样例结构编写；
-/// 真实响应待 key 补充（集成验收动作见 VR-06 验收 8）。
+/// 真实响应待 key 补充（集成验收动作见 VR-06 验收 8）——已于 2026-09-17 用
+/// SiliconFlow `BAAI/bge-m3` 真实端点补抓，见 `embed_response_real_bge_m3.json`
+/// 与本文件尾部「真实样本验收」组（解析 8×1024 + 0.5/0.75 阈值标定）。
 ///
 /// 验收映射：票面验收 1~8 逐条如下
 /// 1 正常 fixture → 数量/顺序一致（happy group）
@@ -28,6 +30,7 @@ import 'dart:typed_data';
 import 'package:conver_system_mobile/services/embedding/embedding_client.dart';
 import 'package:conver_system_mobile/services/embedding/embedding_config.dart';
 import 'package:conver_system_mobile/services/embedding/openai_compatible_client.dart';
+import 'package:conver_system_mobile/services/vector/cosine_similarity.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -536,6 +539,51 @@ void main() {
 
     test('常量契约：kMaxEmbeddingLength = 4096', () {
       expect(kMaxEmbeddingLength, 4096);
+    });
+  });
+
+  group('真实样本验收（VR-06 验收 8，SiliconFlow BAAI/bge-m3）', () {
+    test('真实响应解析：8 条 / 1024 维 / index 顺序 / 全 isFinite', () async {
+      final server = await startServer(
+        FakeEmbeddingServer.text(
+          await readFixture('embed_response_real_bge_m3.json'),
+        ),
+      );
+      final vectors = await clientFor(server).embed(List.filled(8, 'x'));
+
+      expect(vectors, hasLength(8));
+      expect(vectors.every((v) => v.dims == 1024), isTrue,
+          reason: 'bge-m3 真实维度');
+      expect(vectors.every((v) => v.values.every((x) => x.isFinite)), isTrue);
+    });
+
+    test('阈值标定：强相关对 ≥0.75 聚类带；不相关对 <0.5 召回过滤带', () async {
+      final decoded = jsonDecode(
+            await readFixture('embed_response_real_bge_m3.json'),
+          )
+          as Map<String, dynamic>;
+      final byIndex = <int, List<double>>{
+        for (final item in decoded['data'] as List)
+          (item as Map<String, dynamic>)['index'] as int: [
+            for (final x in (item['embedding'] as List)) (x as num).toDouble(),
+          ],
+      };
+      double cos(int i, int j) => cosineSimilarity(byIndex[i]!, byIndex[j]!)!;
+
+      // 同义改写强相关对（标定实测 0.8232 / 0.8006 / 0.8509）。
+      expect(cos(0, 3), greaterThanOrEqualTo(kClusterSimilarityThreshold),
+          reason: '思念同义 → 聚类带');
+      expect(cos(1, 4), greaterThanOrEqualTo(kClusterSimilarityThreshold),
+          reason: '散步同义 → 聚类带');
+      expect(cos(2, 5), greaterThanOrEqualTo(kClusterSimilarityThreshold),
+          reason: '量子密码学同义 → 聚类带');
+      // 跨主题不相关对（标定实测 0.3497 / 0.3402 / 0.3447）。
+      expect(cos(0, 2), lessThan(kSemanticRecallMinSimilarity),
+          reason: '闲聊 vs 量子 → 召回过滤');
+      expect(cos(2, 6), lessThan(kSemanticRecallMinSimilarity),
+          reason: '做菜 vs 量子 → 召回过滤');
+      expect(cos(0, 7), lessThan(kSemanticRecallMinSimilarity),
+          reason: '闲聊 vs 分布式 → 召回过滤');
     });
   });
 }

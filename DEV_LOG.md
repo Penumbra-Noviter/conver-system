@@ -17,7 +17,8 @@
 - **期末非阻断落债**：F-109（PersonaEvolutionService 零装配零调用——演化端到端触发不可达，VR-08 交付 seam 后仍待 UI 入口补全票）。
 - **过程遥测**：子智能体 16（Grilling/plan-tickets/threat-model 前置 3 + Implement 10 + 审核 3）——故障期 5 次空返回/失联（波 4 三票首派 + 波 3 审核 ×2），按韧性惯例降压串行 + 主会话接管（VR-07 半成品 8 文件 / VR-09 半成品 3 文件直接验证补漏收口）；worktree 8 个（vr01~09，分支已并入主树）；合并冲突 0；`git worktree` dubious ownership 需 safe.directory 例外（F 盘）。
 - **知识库召回轨迹**：预检 persona（Conver System）+ 4 条精读（第三方 API 先抓真实响应 / 连接测试走真实配置 / 哑 Provider lazy:false / drift 迁移幂等——本批全部直接命中复证：fixture 标注真实响应待 key、测试连接三权透传、装配 lazy:false、迁移自愈用例）。
-- **预设接续**：候选区 F-109~112 待立项消费（F-109 Worth exploring / F-110~112 Weak）；真实 embedding 响应补抓 + 双阈值标定（VR-06 验收 8 名义生效）；演化入口补全票（F-109）；交付后复核（约一周后三问）可选。
+- **预设接续**：候选区 F-109~112 待立项消费（F-109 Worth exploring / F-110~112 Weak）；演化入口补全票（F-109）；交付后复核（约一周后三问）可选。
+- **验收 8 补验（2026-09-17，用户提供 SiliconFlow key）**：真实端点补抓 `BAAI/bge-m3` 8 条响应（1024 维，usage 103 tokens）落库 fixture `test/services/embedding/fixtures/embed_response_real_bge_m3.json`（合成 fixture 保留，真实样本独立成件——解析器证伪纪律）；新增「真实样本验收」组 2 测：真实响应解析（8×1024 全 isFinite）+ **阈值标定实证**——同义改写强相关对余弦 0.8232/0.8006/0.8509 全过 0.75 聚类带（生产常量 `kClusterSimilarityThreshold`），跨主题不相关对 0.3497/0.3402/0.3447 全被 0.5 召回过滤（`kSemanticRecallMinSimilarity`），弱相关对 0.5313~0.5752 落召回带外聚类带——**0.5/0.75 双阈值在真实分布上验证成立**（召回宽/聚类严分层正确）；测试断言绑定生产常量防漂移；key 未入库（命令行一次性使用，Key 不外泄纪律）。
 
 ## 权限弹窗真机补验批次 — F-84 权限链路三场景（2026-09-17 — 用户「接续（权限弹窗真机补验）」指令）
 
