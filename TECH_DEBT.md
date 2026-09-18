@@ -51,9 +51,17 @@
 | F-118 | apply/discard 异常吞并分支无测试 + view 层 propose 异常 banner 渲染无断言（F-1） | 期末四轴 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
 | F-119 | `_PromptDialog` 取消路径（pop → unmount → dispose）无 widget 测试（F-2） | 期末四轴 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
 | F-120 | LLM 注入链两份同构闭包未收敛（app.dart 装配闭包 vs ReflectionService 先例，S-1/A-1 同源），第三处出现时协议面重复扩张 | 期末四轴 Standards/Architecture（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
-| F-121 | 记忆管理页空态无「新增记忆」入口（既有交互，非本批引入；03 concern ②） | 波 1 Implement concern 裁决（f109-evolution） | Worth exploring | 📝 待立项 | 伴侣域 |
+| F-122 | `characters_view_stage2_test`「升级提议 · publish 驱动确认/拒绝」全量偶发失败（2026-09-17 f121 批次全量 1/2，单文件复跑+全量重跑均绿；publish → UI 等待族残余 flaky，与本批改动零关联——grep 证测试文件无 memory_management 引用） | 期末全量首跑观察（f121 空态入口批次） | Weak | 📝 待立项 | 伴侣域 |
 
 ## 技术债处置记录
+
+### 2026-09-17 — 技术债消费批次（F-121 空态入口 ✅ 已修）
+
+> 来源：handoff-techdebt-f109-evolution-done-2026-09-17 交接指令（F-121 Worth exploring 折回首选；用户拍板折回）。单票直行（F121-01 `688a406`）：`_MemoryList` 空态分支在 `EmptyState` 下方加 `_AddEntryButton`（FilledButton.tonalIcon，复用既有 `_showAddDialog` 选类型→输入→保存全链路）；边界态（entries 空、revisions 非空）ListView 顶部同步补入口；`EmptyState` 组件本体零改动（TP-4 全局定案「操作入口由调用方提供」保持，F-53/F-54 曾有 action 槽被 AR-6 删除的先例佐证）。先红后绿：2 新 widget 用例先红（2 失败「新增记忆」文本缺失）后绿；全量 **2210 测**绿 + analyze 0 + 覆盖率 controller 100%（58/58）/ view 97.75%（174/178，新增行全覆）。全量首跑 1 失败为既有 flaky（characters_view_stage2 publish 等待族，单文件复跑+全量重跑均绿，与本批零关联——grep 证测试文件无 memory_management 引用）→ 落债 F-122。详见 DEV_LOG〈技术债消费批次 F-121 空态入口〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-121 | ✅ 已修 | 记忆管理页空态与边界态「新增记忆」入口：`_AddEntryButton` 深模块单点（onPressed 走 `_showAddDialog`）；空态 Column（EmptyState + space3 + 按钮）、边界态 ListView 顶部 Align 左齐；非空态仍走既有 section header IconButton（tooltip「新增记忆」），三态入口语义统一；widget 测试 +2（空态全链路新增 / 边界态情景记忆新增） |
 
 ### 2026-09-17 — 技术债消费批次（F-109 已修 + F-110~112 复核关闭）
 

@@ -6,6 +6,20 @@
 
 ---
 
+## 技术债消费批次 F-121 空态入口（2026-09-17 — handoff-techdebt-f109-evolution-done 交接指令，用户拍板折回首选候选）
+
+- **预检记录**：完整模式（AGENTS/DEV_LOG/TICKETS/TECH_DEBT 齐备）；档位 = 交接文档建议的 kickoff 全自动档（单票小改主会话直行，无子代理分发）；交付形态 = 源码跑通（flutter test + analyze 全绿即交付验证）。
+- **知识库召回轨迹（kb-search）**：demo vault · Conver System 注册命中（KNOWLEDGE_BASE.md 登记）；persona 精读（先红后绿硬验收 / 票面建议实证复核 / 覆盖率达 90% 带口径）；写测前检索 `widget|dialog|空态|pump|flutter|按钮`——标题/全文命中 1 条《Flutter测试碰平台依赖必须超时兜底》（NativeDatabase.memory() 纯内存非平台依赖，与本次场景不相关，跳过精读），通用 17 条均方法论类无空态/按钮专项——**无直接相关命中，无漏招**（本批未踩库内已有笔记覆盖的坑）。
+- **F-121 阐明**：票面「记忆管理页空态无『新增记忆』入口」= `_MemoryList` empty 分支直接 `EmptyState`（无操作入口）；非空态有 section header IconButton（tooltip「新增记忆」→ `_showAddDialog` 选类型→输入→保存全链路）。修复边界：`EmptyState` 组件 TP-4 全局定案「操作入口由调用方提供，不预建参数槽」（F-53/F-54 曾有 action 槽、被 AR-6 按授权删除的先例佐证）——**不改共享组件**，入口做在调用方。
+- **边界态补强**：entries 空但 revisions 非空（有演化历史无记忆条目）走 ListView 分支同样无入口——一并覆盖（ListView 顶部 Align 左齐 `_AddEntryButton`），三态（空态/边界态/非空态）新增入口语义统一。
+- **交付（单票直行）**：F121-01 `688a406`（lib 1 文件 + test 1 文件，+86/-4）——`_AddEntryButton`（FilledButton.tonalIcon，Icons.add 18px，深模块单点 onPressed 走 `_showAddDialog`）；空态 Column（EmptyState + space3 + 按钮）；边界态 ListView 顶部入口；非空态 header action 不动。
+- **先红后绿**：新增 2 widget 用例（空态「暂无记忆」+ 入口可见 → 全链路新增「空态直接新增」落库 / 边界态仅 revisions → 入口可见 → 情景记忆新增落库）先红（2 失败，断言缺失即票面缺陷）后绿（全文件 13 测过）。
+- **门禁**：全量 **2210 测**绿（基线 2208 → +2）/ `flutter analyze` 0 / 覆盖率 controller **100%**（58/58）+ view **97.75%**（174/178，新增行全覆）/ pre-commit pool-cleanup 通过。
+- **全量首跑 1 失败（与本批零关联）**：`characters_view_stage2_test`「升级提议 · publish 驱动确认/拒绝」（验收 3）瞬时失败——单文件复跑 2/2 通过、全量重跑 2210 全绿；grep 证该测试文件零 `memory_management` 引用（无 import/无调用）→ publish → UI 等待族残余 flaky（F-104 曾修复同类窗口，本次为同族复发观察）→ 落债 **F-122**（Weak，防 review 重复提出 + 下批可复核）。
+- **批次收尾**：TICKETS 归档批次「技术债消费批次 F-121 空态入口」（F121-01 `688a406`）；TECH_DEBT 处置记录新节（F-121 ✅ 已修）+ 候选区 F-121 移出、F-122 落债（清零 1 < 净增 1，持平）；AGENTS 状态行追加。推送仍循既有用户指示「先不推送」。
+
+---
+
 ## 技术债消费批次 F-109 演化入口补全（2026-09-17 — handoff-stage3-vector-recall-a8-local 交接指令，/project-kickoff 全自动档）
 
 - **预检记录**：完整模式（AGENTS/DEV_LOG/TICKETS/TECH_DEBT 齐备）；确认档全自动档（用户拍板）；交付形态 = 源码跑通（flutter test + analyze 全绿即交付验证）。
