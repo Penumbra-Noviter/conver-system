@@ -43,8 +43,16 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-109 | PersonaEvolutionService 零装配零调用（grep 实证）——阶段 3 VR-08 仅交付聚类摘要注入 seam/prompt/装配 helper，proposeEvolution 的 UI/装配入口缺位，人设演化端到端触发不可达 | 阶段 3 plan-tickets 实证（stage3-vector-recall） | Worth exploring | 📝 待立项 | 伴侣域 |
+| F-110 | cosine_similarity.dart 平方和累加未做有限性守卫——极大有限 double（1e200 级）输入致 norm 溢出返回 NaN，违反应收 3「值域 [-1,1]」；float32 打包真实数据不可达（float32 上限 3.4e38 平方和 1e76 不溢出 double） | 波 1 增量审核 Falsify（stage3-vector-recall） | Weak | 📝 待立项 | 向量检索 |
+| F-111 | openai_compatible_client.dart normalizeBaseUrl 对无 host 输入（如 `"https://"` 直构 client）健壮性未验证——装配链经 VR-01 validateEmbeddingBaseUrl 已拦截纯协议段，但绕过装配直构时 dio 5 对无 host URL 是否包装异常待实测 | 波 2 增量审核 Falsify（stage3-vector-recall，重派） | Worth exploring | 📝 待立项 | 向量检索 |
+| F-112 | upsertEmbedding select→insert 两步非原子——同角色同 hash 并发补嵌靠 DB 唯一索引兜底，冲突时抛裸 SqliteException（服务层编排前无竞争窗口，SR-18 降级可吞） | 波 2 增量审核（stage3-vector-recall，重派） | Weak | 📝 待立项 | 向量检索 |
 
 ## 技术债处置记录
+
+### 2026-09-17 — 人机恋阶段 3 批次（净增候选 F-109~112，未消费）
+
+> 本批为功能批次（远端 embedding 向量检索 kickoff），未消费既有候选。波末/期末审核非阻断发现落盘 4 条候选（F-109 plan-tickets 实证 / F-110 波 1 审核 / F-111、F-112 波 2 审核）；Falsify-1（`https://` 纯协议段放行）波内修复不入债。F-110~112 均为 Weak（float32 真实数据不可达 / 装配链已拦截 / 服务层无竞争窗口），F-109 为 Worth exploring（演化端到端入口缺位）。详见 DEV_LOG〈人机恋阶段 3 批次〉。
 
 ### 2026-09-17 — 技术债消费批次（F-106~F-108 全部处置）
 

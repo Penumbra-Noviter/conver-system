@@ -6,6 +6,19 @@
 
 ---
 
+## 人机恋阶段 3 批次 — 远端 embedding 向量检索（2026-09-17 — 用户「阶段 3 人机恋深化」+ kickoff 全流程）
+
+- **范围**：阶段 3 可选高成本方向之一——远端 embedding 向量检索（跨会话语义召回 + 跨会话人格演化）；语音 ASR/TTS 与 Live2D 未立项。Grilling 共识 6 决策点（P1~P6）+ 4 未决项主会话裁决（U1 缺省 `text-embedding-3-small` / U2 阈值 0.5 名义 + 集成标定 / U3 懒补嵌 / U4 被动演化）；威胁建模 SR-16~21（key 单源 / 响应硬校验 / 批量≤20 / 隐私默认关 + 外发告知 / https 强制 / 幂等截断）全部并入验收。
+- **现成方案判定**：协议面**参考** OpenAI Compatible `/embeddings`（dio 直连不引 SDK）；存储/检索/演化自建（移动端无轻量向量栈）；零新依赖。
+- **交付（9 票 4 波）**：W1 VR-01/03/04（装配腿 + 余弦聚类 + 两新表 v4→5 迁移）→ W2 VR-02/05（EmbeddingClient seam + 畸形 fixture 硬校验 / 向量 CRUD + float32 codec）→ W3 VR-06（EmbeddingService 深模块三入口 + 装配 lazy:false + disabled 短路）→ W4 VR-07/08/09（`<search:>` 零命中走语义 + SemanticHits 延迟一轮 ≤3 后消费 / 演化聚类摘要注入（PersonaReflector 可选参数，typedef 互斥最小实验实证）/ 设置页 UI + 测试连接 + 外发告知）。
+- **先红后绿**：各票 TDD 实锤（VR-01 0+3 编译红 / VR-03 突变抽查双红 / VR-04 迁移自愈 / VR-05 负 limit 防御 / VR-06 双突变红 / VR-09 pumpPage 缺口复现红）；VR-02 畸形 fixture 5 类逐类断言。
+- **门禁链**：全量 **2183 测**绿（基线 2001 → +182）/ analyze 0；期末四轴 **通过**（波 1/2 子代理增量审核各 1 轮 + 波 3/4 主会话自审收敛——子代理频道故障期空返回 ×2 后降压：波 4 三票首派 3 故障（0 半成品）→ 重派；重派 2 票失联（留有近完整半成品）→ 主会话接管验证 + 补漏收口）；各票文件范围核验 13/15/4 等全对齐零越界；SR-16~21 断言级落地。
+- **波末审核发现处置**：Falsify-1（`https://` 纯协议段放行）波内修复（authority 守卫 + 防复发断言）；余弦溢出（F-110）/ normalizeBaseUrl 直构健壮性（F-111）/ upsert 并发裸异常（F-112）落债；负 limit 防御测试已存在（审核误报，实测 580-588 行）。
+- **期末非阻断落债**：F-109（PersonaEvolutionService 零装配零调用——演化端到端触发不可达，VR-08 交付 seam 后仍待 UI 入口补全票）。
+- **过程遥测**：子智能体 16（Grilling/plan-tickets/threat-model 前置 3 + Implement 10 + 审核 3）——故障期 5 次空返回/失联（波 4 三票首派 + 波 3 审核 ×2），按韧性惯例降压串行 + 主会话接管（VR-07 半成品 8 文件 / VR-09 半成品 3 文件直接验证补漏收口）；worktree 8 个（vr01~09，分支已并入主树）；合并冲突 0；`git worktree` dubious ownership 需 safe.directory 例外（F 盘）。
+- **知识库召回轨迹**：预检 persona（Conver System）+ 4 条精读（第三方 API 先抓真实响应 / 连接测试走真实配置 / 哑 Provider lazy:false / drift 迁移幂等——本批全部直接命中复证：fixture 标注真实响应待 key、测试连接三权透传、装配 lazy:false、迁移自愈用例）。
+- **预设接续**：候选区 F-109~112 待立项消费（F-109 Worth exploring / F-110~112 Weak）；真实 embedding 响应补抓 + 双阈值标定（VR-06 验收 8 名义生效）；演化入口补全票（F-109）；交付后复核（约一周后三问）可选。
+
 ## 权限弹窗真机补验批次 — F-84 权限链路三场景（2026-09-17 — 用户「接续（权限弹窗真机补验）」指令）
 
 - **范围**：handoff techdebt-f106f108 可选接续项——F-84 三件套中「Android 13+ 权限开关启用时请求」的 API 35 模拟器（medium_phone）实证，聚焦权限弹窗链路（热态点按已修并有单测兜底，不在本批）。干净起点：debug APK 全新安装 + `pm clear` + `pm revoke POST_NOTIFICATIONS`（`appops` ignore 确认）。

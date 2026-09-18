@@ -20,7 +20,6 @@
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
 
-
 ---
 
 ## 技术债区
@@ -30,6 +29,22 @@
 ---
 
 ## 已完成归档
+
+### 人机恋阶段 3 — 远端 embedding 向量检索（2026-09-17 收口）
+
+> 来源：用户「阶段 3 人机恋深化」+ kickoff 全流程（Grilling 共识 + threat-model SR-16~21 + 9 票 4 波）。门禁：全量 **2183 测**绿（基线 2001 → +182）/ analyze 0 / 期末四轴 **通过**（波 1/2/3 子代理审核 + 波 3/4 主会话自审收敛；0 Critical）。零新依赖（dio 5.11.0 / drift 2.34.3 / flutter_secure_storage 11.0.0 / crypto 3.0.7 沿用）。运作故障期处置：3 票首派平台故障空返回 + 审核 2 次空返回 → 降压串行重派 + 主会话接管半成品收口（VR-07/VR-09）。详见 DEV_LOG〈人机恋阶段 3 批次 — 远端 embedding 向量检索〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| VR-01 | embedding 设置装配腿（白名单+槽链+https 校验，SR-16/19/20） | 2026-09-17 | 2a1fa88（审核修复 1b1469c） |
+| VR-02 | EmbeddingClient seam + OpenAI 兼容直连 + 响应硬校验（SR-17） | 2026-09-17 | 36e55c2 |
+| VR-03 | 余弦相似度 + 并查集聚类纯函数 | 2026-09-17 | daeec73 |
+| VR-04 | EmbeddingEntries/SemanticHits 两新表 + schemaVersion 4→5 迁移（SR-21） | 2026-09-17 | c67309e |
+| VR-05 | MemoryRepository 向量/队列 CRUD（float32 codec + 级联标脏） | 2026-09-17 | 281b0f8 |
+| VR-06 | EmbeddingService 编排深模块（懒补嵌≤20/检索 top5@0.5/聚类@0.75）+ 装配 lazy:false | 2026-09-17 | d97526f |
+| VR-07 | `<search:>` 混合检索 + SemanticHits 延迟一轮注入（≤3 后消费；主会话接管收口） | 2026-09-17 | 6461604 |
+| VR-08 | 人设演化聚类摘要注入（PersonaReflector 可选 similarClusters + buildClusteredReflector） | 2026-09-17 | 0f01f67 |
+| VR-09 | 设置页 embedding 配置 UI + 测试连接 + 外发告知（SR-19；主会话接管收口） | 2026-09-17 | 3d3aa16 |
 
 ### 技术债消费批次 F-106~F-108（2026-09-17 收口）
 
