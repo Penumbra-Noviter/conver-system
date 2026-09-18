@@ -6,6 +6,24 @@
 
 ---
 
+## 技术债消费批次 F-109 演化入口补全（2026-09-17 — handoff-stage3-vector-recall-a8-local 交接指令，/project-kickoff 全自动档）
+
+- **预检记录**：完整模式（AGENTS/DEV_LOG/TICKETS/TECH_DEBT 齐备）；确认档全自动档（用户拍板）；交付形态 = 源码跑通（flutter test + analyze 全绿即交付验证）。
+- **preflight**：HEAD `dea7ac0`（领先 origin/mobile 1 commit——handoff 明示验收 8 补验未推送，本批不推）；flutter test 基线 2185 测；git worktree 可用；主分支 mobile 存在。全绿无降级。
+- **知识库召回轨迹**：demo vault · Conver System 注册命中；persona 精读（全自动档偏好 / 票面建议实证复核 / 后台子代理 AskUserQuestion 不转达主会话 / 覆盖率必带口径 / 哑 Provider 挂启动副作用须 lazy:false）；经验摘要扫描 168 条，精读 4 条：哑Provider无消费者default-lazy永不执行 / 后台子代理AskUserQuestion不转达主会话 / 技术债票面修复建议须实证复核 / 覆盖率数字必须带口径声明。
+- **技术债预检**：活跃工单空；候选区 4 条——F-109（Worth exploring，伴侣域，**本批立项**：PersonaEvolutionService 零装配零调用，VR-08 seam 已交付仅缺 UI/装配入口）+ F-110~112（Weak/Worth exploring，随批复核：F-110 余弦有限性守卫 / F-111 normalizeBaseUrl 直构健壮性 / F-112 upsert 两步非原子）。
+- **F-109 票面实证**：grep 确认 `PersonaEvolutionService(` / `proposeEvolution(` / `buildClusteredReflector(` 在 lib 内零装配、仅测试引用——「零装配零调用、端到端触发不可达」成立；票面方向（补 UI/装配入口）合理。现成方案判定：自建（服务与聚类 seam 全在，仅缺装配入口，无开源可比）。
+- **Grilling 共识（用户全票批准）**：F-109 立项——演化闭环经记忆管理页补全端到端可达（Q1 自建 / Q4 并入记忆管理页 / Q5 AppBar 手动按钮 / Q6 列表内联应用拒绝 / Q7 待确认=快照≠当前人格启发式，**用户拍板不升 schemaVersion 5** / E1 服务 `_reflector` 改 `CharacterScopedReflector` + propose 透传 characterId / F1 app.dart Provider 照 ReflectionService 装配先例 + wireCredentialsResolver 闭包 + 装配三件套验证）；**F-110~112 逐条复核全部关闭**（F-110 per-element isFinite 已存在 + float32 截断双防线 / F-111 SR-20 装配链单一落点已拦截 / F-112 唯一索引 `idx_embedding_entries_character_id_content_hash` 实锤存在 + 服务层串行无竞争窗口）；威胁建模命中「外部输入持久化」——**SR-22 纳入本批验收**（propose 对 LLM 产出长度 clamp 2000，用户拍板）；F-111 残余（`normalizeBaseUrl('https://')` 畸形值）用户拍板不立票；不做集冻结（无 schema 迁移/无自动演化/无冷却）；验收底线 5 条见 `.scratch/f109-evolution/grilling-consensus.md`。
+- **交付（3 工单串行 lane 1 波）**：01 E1+SR-22 `2d580ca`（服务签名改造：`PersonaReflector`→`CharacterScopedReflector` 构造/字段 + propose 透传 characterId；SR-22 常量 `maxPersonalitySnapshotLength=2000` 新建（embedding 截断原为内联字面量，实测无既有命名常量按「以实测为准」新建），trim→clamp→空/相等判定→落库，debugPrint 摘要不含原文；测试 16 测含 +3 SR-22，服务范围覆盖率 100%（LF=45/45），clamp 突变抽查红实锤）→ 02 装配腿 `a532e93`（`Provider<PersonaEvolutionService>` 默认 lazy，buildClusteredReflector + wireCredentialsResolver + factory.create + reflectPersonaWithProvider 闭包与 ReflectionService 先例同构；装配冒烟 30 测「七实例可读」；diff 最小化 +46/-1，formatter 漂移已按 F-103 结论回滚）→ 03 确认闸门 UI `4ef0977`（controller 演化三操作 + proposing/appliedRevisionIds/snackMessage + Q7 启发式 load 判定 + SR-16 固定摘要断言不含 key 原文；记忆页 AppBar「提出人设演化」+ tile 双形态 + SnackBar 三态；`characters_view._openMemory` 改 context.read 注入；**顺带修复既有 `_PromptDialog` dispose 时机 bug**（widget CRUD 测试暴露：dialog 退场动画期间 dispose controller → 重构 StatefulWidget）；controller 覆盖率 100%（58/58）、view 97%（163/168））。
+- **波末核验**：三档文件范围核验 **合规 9/9**（全部落在三票申报范围，零越界零未申报共享改动）；声称核对证据 01/02/03 落盘；完成门 3 STATUS 全 DONE；merge `--no-ff` → `9b642d8`（零冲突）；波内复核测试 207 测绿；**共享文件改动存活核验**（app.dart/characters_view.dart 两处已申报改动，diff 抽查存活）。
+- **波末增量审核（fixed dea7ac0）**：**0 阻断**；Falsify 2 非阻断落债（W-1 窄屏 ≤360dp tile 溢出未验证 → F-113；W-2 SR-22 substring 代理对切分 U+FFFD 无崩溃与 embedding 同口径 → F-114）；过度工程零；文件范围合规。
+- **期末门禁**：全量 **2208 测**绿（基线 2185 → +23）/ analyze 0；期末四轴 **通过**（0 Critical；7 条 Weak 落债 F-115~121——S-2 2000 双源 / SP-1 clamp 后相等交叉边界无直接单测 / SP-2 apply 后手动编辑幂等链路无测试证据 / F-1 apply/discard 异常吞并分支 + propose 异常 banner 无断言 / F-2 `_PromptDialog` 取消路径无 widget 测试 / S-1+A-1 同源 LLM 注入链两份同构闭包未收敛；安全红线通过——唯一 `sk-` 命中为测试 fake 异常文本）。
+- **concern 裁决（波末）**：02 app.dart 全文件覆盖率 70.4% vs 新增块安装面 100%——按「装配冒烟只 read 不执行闭包、不触真实凭据」验收语义认定非阻断；03 四项——① 既有 `_PromptDialog` bug 修复并入本票（测试暴露合理）② 空态无「新增记忆」入口 = 既有交互非本批引入 → 落债 F-121 ③ formatter 漂移已最小化 ④ propose 异常固定文案符合 SR-16。
+- **过程遥测**：Implement 子智能体 1（串行 lane 3 票连续完成，零空返回零重开）；worktree 1 个（`.worktrees/f109-lane`，分支 kickoff/f109-01-03 已并入主树）；合并冲突 0；切票粒度对照——预估 01 +55/02 +50/03 +470 = +575 vs 实际 `git diff --stat` +875/-52（03 实际 +721 超预估 +470，主因 widget 测试新建 331 行 + `_PromptDialog` 重构，仍在 1000 硬上限内）；门禁命中——文件范围核验/声称核对/完成门/波末审核均零命中（无越界无伪造），期末四轴拦下 0 阻断（7 Weak 落债 = 审核收益）。
+- **批次收尾**：TICKETS 归档批次「技术债消费批次 F-109 演化入口补全」（F109-01/02/03）；TECH_DEBT 处置记录新节（F-109 ✅ 已修 / F-110~112 ❌ 复核关闭）+ 复核关闭表加 F-110~112 行 + 候选区净增 F-113~121（9 条 Weak/Worth exploring，清零量 4 < 净增 9——审核产出 > 修复容量，已随汇报显式提示用户）；AGENTS 状态行更新；交接建议 skills 同前批。
+
+---
+
 ## 人机恋阶段 3 批次 — 远端 embedding 向量检索（2026-09-17 — 用户「阶段 3 人机恋深化」+ kickoff 全流程）
 
 - **范围**：阶段 3 可选高成本方向之一——远端 embedding 向量检索（跨会话语义召回 + 跨会话人格演化）；语音 ASR/TTS 与 Live2D 未立项。Grilling 共识 6 决策点（P1~P6）+ 4 未决项主会话裁决（U1 缺省 `text-embedding-3-small` / U2 阈值 0.5 名义 + 集成标定 / U3 懒补嵌 / U4 被动演化）；威胁建模 SR-16~21（key 单源 / 响应硬校验 / 批量≤20 / 隐私默认关 + 外发告知 / https 强制 / 幂等截断）全部并入验收。

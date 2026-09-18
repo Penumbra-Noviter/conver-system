@@ -30,6 +30,16 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-109 演化入口补全（2026-09-17 收口）
+
+> 来源：handoff-stage3-vector-recall-a8-local-2026-09-17 交接指令（project-kickoff 全自动档）。3 工单串行 lane（01→02→03 同 Implement，merge `9b642d8`）。门禁：全量 **2208 测**绿（基线 2185 → +23）/ analyze 0 / 波末增量审核 0 阻断（W-1/W-2 落债 F-113/114）/ 期末四轴 **通过**（0 Critical；7 条 Weak 落债 F-115~121）。F-110~112 一并复核关闭（证据见 TECH_DEBT 处置记录）。详见 DEV_LOG〈技术债消费批次 F-109 演化入口补全〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F109-01 | 演化服务 reflector 签名改造 E1（CharacterScopedReflector）+ SR-22 快照长度 clamp | 2026-09-17 | 2d580ca（merge 9b642d8） |
+| F109-02 | 装配腿 Provider<PersonaEvolutionService>（F1）+ 装配冒烟七实例断言 | 2026-09-17 | a532e93（merge 9b642d8） |
+| F109-03 | 确认闸门 UI：controller 三操作 + 记忆页 AppBar/tile 双形态 + 角色页注入入口 | 2026-09-17 | 4ef0977（merge 9b642d8） |
+
 ### 人机恋阶段 3 — 远端 embedding 向量检索（2026-09-17 收口）
 
 > 来源：用户「阶段 3 人机恋深化」+ kickoff 全流程（Grilling 共识 + threat-model SR-16~21 + 9 票 4 波）。门禁：全量 **2183 测**绿（基线 2001 → +182）/ analyze 0 / 期末四轴 **通过**（波 1/2/3 子代理审核 + 波 3/4 主会话自审收敛；0 Critical）。零新依赖（dio 5.11.0 / drift 2.34.3 / flutter_secure_storage 11.0.0 / crypto 3.0.7 沿用）。运作故障期处置：3 票首派平台故障空返回 + 审核 2 次空返回 → 降压串行重派 + 主会话接管半成品收口（VR-07/VR-09）。详见 DEV_LOG〈人机恋阶段 3 批次 — 远端 embedding 向量检索〉。

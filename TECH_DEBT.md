@@ -43,16 +43,32 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-109 | PersonaEvolutionService 零装配零调用（grep 实证）——阶段 3 VR-08 仅交付聚类摘要注入 seam/prompt/装配 helper，proposeEvolution 的 UI/装配入口缺位，人设演化端到端触发不可达 | 阶段 3 plan-tickets 实证（stage3-vector-recall） | Worth exploring | 📝 待立项 | 伴侣域 |
-| F-110 | cosine_similarity.dart 平方和累加未做有限性守卫——极大有限 double（1e200 级）输入致 norm 溢出返回 NaN，违反应收 3「值域 [-1,1]」；float32 打包真实数据不可达（float32 上限 3.4e38 平方和 1e76 不溢出 double） | 波 1 增量审核 Falsify（stage3-vector-recall） | Weak | 📝 待立项 | 向量检索 |
-| F-111 | openai_compatible_client.dart normalizeBaseUrl 对无 host 输入（如 `"https://"` 直构 client）健壮性未验证——装配链经 VR-01 validateEmbeddingBaseUrl 已拦截纯协议段，但绕过装配直构时 dio 5 对无 host URL 是否包装异常待实测 | 波 2 增量审核 Falsify（stage3-vector-recall，重派） | Worth exploring | 📝 待立项 | 向量检索 |
-| F-112 | upsertEmbedding select→insert 两步非原子——同角色同 hash 并发补嵌靠 DB 唯一索引兜底，冲突时抛裸 SqliteException（服务层编排前无竞争窗口，SR-18 降级可吞） | 波 2 增量审核（stage3-vector-recall，重派） | Weak | 📝 待立项 | 向量检索 |
+| F-113 | `memory_management_view.dart` `_RevisionTile` trailing 双中文 TextButton 窄屏（≤360dp）溢出未验证 | 波 1 增量审核 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
+| F-114 | SR-22 `substring(0,2000)` 可能切在代理对中间 → 落库尾部 U+FFFD（实测 UTF-8/JSON 编码均不抛无崩溃，与 embedding 截断同口径先例） | 波 1 增量审核 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
+| F-115 | `maxPersonalitySnapshotLength` 与 `memory_repository.dart:253` 字面量 2000 双源，靠注释对账（S-2） | 期末四轴 Standards（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
+| F-116 | SR-22 clamp 截断后恰等于当前人格 → 返回 null 的交叉边界无直接单测（SP-1） | 期末四轴 Spec（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
+| F-117 | Q7「apply 后手动编辑 → 回待确认 → 再应用幂等」链路无测试证据（SP-2） | 期末四轴 Spec（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
+| F-118 | apply/discard 异常吞并分支无测试 + view 层 propose 异常 banner 渲染无断言（F-1） | 期末四轴 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
+| F-119 | `_PromptDialog` 取消路径（pop → unmount → dispose）无 widget 测试（F-2） | 期末四轴 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
+| F-120 | LLM 注入链两份同构闭包未收敛（app.dart 装配闭包 vs ReflectionService 先例，S-1/A-1 同源），第三处出现时协议面重复扩张 | 期末四轴 Standards/Architecture（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
+| F-121 | 记忆管理页空态无「新增记忆」入口（既有交互，非本批引入；03 concern ②） | 波 1 Implement concern 裁决（f109-evolution） | Worth exploring | 📝 待立项 | 伴侣域 |
 
 ## 技术债处置记录
 
-### 2026-09-17 — 人机恋阶段 3 批次（净增候选 F-109~112，未消费）
+### 2026-09-17 — 技术债消费批次（F-109 已修 + F-110~112 复核关闭）
 
-> 本批为功能批次（远端 embedding 向量检索 kickoff），未消费既有候选。波末/期末审核非阻断发现落盘 4 条候选（F-109 plan-tickets 实证 / F-110 波 1 审核 / F-111、F-112 波 2 审核）；Falsify-1（`https://` 纯协议段放行）波内修复不入债。F-110~112 均为 Weak（float32 真实数据不可达 / 装配链已拦截 / 服务层无竞争窗口），F-109 为 Worth exploring（演化端到端入口缺位）。详见 DEV_LOG〈人机恋阶段 3 批次〉。
+> 来源：handoff-stage3-vector-recall-a8-local-2026-09-17 交接指令（project-kickoff 全自动档）。F-109 立项消费（3 工单串行 lane：01 E1+SR-22 `2d580ca` / 02 装配腿 `a532e93` / 03 确认闸门 UI `4ef0977`，merge `9b642d8`）；F-110~112 逐条 git grep 复核关闭（证据见 `.scratch/f109-evolution/grilling-consensus.md` §4）。门禁：全量 **2208 测**绿（基线 2185 → +23）/ analyze 0 / 波末增量审核 0 阻断（W-1/W-2 落债 F-113/114）/ 期末四轴 **通过**（0 Critical，7 条 Weak 落债 F-115~121）。详见 DEV_LOG〈技术债消费批次 F-109 演化入口补全〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-109 | ✅ 已修 | 演化端到端入口补全三腿：E1 服务 `_reflector` 改 `CharacterScopedReflector` + propose 透传 characterId（PersonaReflector typedef 保留）/ F1 装配腿 `Provider<PersonaEvolutionService>`（默认 lazy，wireCredentialsResolver + buildClusteredReflector 闭包，与 ReflectionService 先例同构）/ 确认闸门 UI（记忆管理页 AppBar「提出人设演化」+ tile 双形态应用拒绝 + Q7 启发式 appliedRevisionIds + SnackBar 三态 + `characters_view` 注入入口）；SR-22 快照长度 clamp 2000（`maxPersonalitySnapshotLength`）；零新依赖、schemaVersion 保持 5；顺带修复既有 `_PromptDialog` dispose 时机 bug（widget 测试暴露） |
+| F-110 | ❌ 复核关闭 | per-element isFinite 守卫已存在（cosine_similarity.dart:32-34）+ float32 截断 Infinity 双防线，票面「float32 真实数据不可达」复核成立 |
+| F-111 | ❌ 复核关闭 | SR-20 装配链单一落点 validateEmbeddingBaseUrl 已拦截全部无 host 输入；normalizeBaseUrl 仅在校验后输入上运行（docstring 明示前置），「绕过装配直构」非支持路径；F-111 残余用户拍板不立票 |
+| F-112 | ❌ 复核关闭 | 唯一索引 `idx_embedding_entries_character_id_content_hash`（unique:true）实锤存在 + 服务层串行 await 无竞争窗口 + 反思链精确去重，票面「服务层无竞争窗口」复核成立 |
+
+### 2026-09-17 — 人机恋阶段 3 批次（净增候选 F-109~112，随后于 F-109 消费批次全部处置）
+
+> 本批为功能批次（远端 embedding 向量检索 kickoff），未消费既有候选。波末/期末审核非阻断发现落盘 4 条候选（F-109 plan-tickets 实证 / F-110 波 1 审核 / F-111、F-112 波 2 审核）；Falsify-1（`https://` 纯协议段放行）波内修复不入债。F-110~112 均为 Weak（float32 真实数据不可达 / 装配链已拦截 / 服务层无竞争窗口），F-109 为 Worth exploring（演化端到端入口缺位）。详见 DEV_LOG〈人机恋阶段 3 批次〉。四候选已由上方「F-109 已修 + F-110~112 复核关闭」节收口。
 
 ### 2026-09-17 — 技术债消费批次（F-106~F-108 全部处置）
 
@@ -89,6 +105,7 @@
 
 | 编号 | 关闭批次 | 单行摘要 |
 |------|----------|----------|
+| F-110/F-111/F-112 | 2026-09-17 | per-element isFinite 守卫 + float32 截断双防线成立（F-110）／SR-20 装配链单一落点已拦截无 host（F-111，残余用户拍板不立票）／唯一索引 `idx_embedding_entries_character_id_content_hash` 实锤 + 服务层无竞争窗口（F-112） |
 | F-103 | 2026-09-17 | 全仓 188 文件/223 检查 format 差异为存量 formatter 版本漂移（基线 `3943bf8` 同失败、hunk 一一对应），无行为风险；全仓归一大 diff 噪音已拍板不立项 |
 | F-86/F-87 | 2026-09-16 | extractThought 1MiB 截断切破代理对（thought_service.dart:32 现状成立）／关系域读契约双依赖点（chat_service.dart:278/315 注入现状成立），本批聚焦通知域关闭留档 |
 | F-74 | 2026-09-10 | 模拟器 server 仅回环绑定 + proxy 目标恒取配置 base + spec 声明不鉴权——加鉴权属过度工程，纵深防御提示留 DEV_LOG |
