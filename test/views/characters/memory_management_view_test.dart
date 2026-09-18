@@ -203,6 +203,48 @@ void main() {
       expect(find.text('暂无记忆'), findsOneWidget);
     });
 
+    testWidgets('F-121 空态：显示「新增记忆」入口 → 全链路新增成功', (tester) async {
+      final controller = buildController(({required characterId, required currentPersonality, required charName, required personaFacts}) async => '新人格');
+      await pumpView(tester, controller);
+
+      // 空态保留原文案，且新增入口可见（F-121：0 条记忆时也可新增）。
+      expect(find.text('暂无记忆'), findsOneWidget);
+      expect(find.text('新增记忆'), findsOneWidget);
+
+      await tester.tap(find.text('新增记忆'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(SimpleDialogOption, '人格事实'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '空态直接新增');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('空态直接新增'), findsOneWidget);
+      expect(find.text('暂无记忆'), findsNothing);
+    });
+
+    testWidgets('F-121 边界态：无记忆条目但有演化历史 → 仍有「新增记忆」入口', (tester) async {
+      await repo.addRevision(
+        characterId: characterId,
+        personalitySnapshot: '演化快照',
+      );
+      final controller = buildController(({required characterId, required currentPersonality, required charName, required personaFacts}) async => '新人格');
+      await pumpView(tester, controller);
+
+      // entries 空但 revisions 非空走 ListView 分支，入口同样可见（F-121 语义完整）。
+      expect(find.text('新增记忆'), findsOneWidget);
+
+      await tester.tap(find.text('新增记忆'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(SimpleDialogOption, '情景记忆'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '边界态新增');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('边界态新增'), findsOneWidget);
+    });
+
     testWidgets('新增：预置条目后 tap 新增 → 人格事实 → 输入 → 保存 → 新条目出现', (tester) async {
       await repo.createEntry(
         characterId: characterId,

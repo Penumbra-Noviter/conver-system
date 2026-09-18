@@ -109,16 +109,37 @@ class _MemoryList extends StatelessWidget {
     final revisions = controller.revisions;
 
     if (entries.isEmpty && revisions.isEmpty) {
-      return EmptyState(
-        icon: Icons.psychology_outlined,
-        message: '暂无记忆',
-        hint: '与角色对话中，AI 会自动记录人格事实与情景记忆',
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const EmptyState(
+            icon: Icons.psychology_outlined,
+            message: '暂无记忆',
+            hint: '与角色对话中，AI 会自动记录人格事实与情景记忆',
+          ),
+          const SizedBox(height: ConverSpacing.space3),
+          _AddEntryButton(onPressed: () => _showAddDialog(context)),
+        ],
       );
     }
 
     return ListView(
       padding: const EdgeInsets.only(bottom: ConverSpacing.space6),
       children: [
+        // 无记忆条目但存在演化历史：入口仍需可见（F-121 语义完整）。
+        if (entries.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              ConverSpacing.space4,
+              ConverSpacing.space1,
+              ConverSpacing.space4,
+              ConverSpacing.space2,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _AddEntryButton(onPressed: () => _showAddDialog(context)),
+            ),
+          ),
         if (entries.isNotEmpty) ...[
           _SectionHeader(
             title: '记忆条目',
@@ -274,6 +295,25 @@ class _PromptDialogState extends State<_PromptDialog> {
           child: const Text('保存'),
         ),
       ],
+    );
+  }
+}
+
+/// 「新增记忆」入口按钮（F-121）。
+///
+/// 空态（无条目无版本）与边界态（无条目有演化历史）使用；非空态沿用
+/// section header 的 IconButton action，不重复渲染本按钮。
+class _AddEntryButton extends StatelessWidget {
+  const _AddEntryButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.tonalIcon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.add, size: 18),
+      label: const Text('新增记忆'),
     );
   }
 }
