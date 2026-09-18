@@ -19,10 +19,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| F113F120-01 | F-116/117/118-controller 测试补强（clamp 交叉边界 / apply→编辑→再应用幂等 / 异常吞并；子代理 A） | 🔄 进行中 | 契约锁补测：SR-22 clamp 后恰等当前人格 → null 不落库 / Q7 reapply 幂等链路 / apply/discard 异常不抛 UI |
-| F113F120-02 | F-113/118-view/119 widget 测试补强（窄屏溢出验证 / propose 异常 banner / 取消路径；子代理 B） | 🔄 进行中 | 窄屏 ≤360dp 无 overflow / propose 异常 NoticeBanner 渲染 / _PromptDialog 取消无 dispose 异常 |
-| F113F120-03 | F-114/115 安全截断单源（truncateUtf16 防劈代理对 + 2000 常量收敛，主会话） | 🔄 进行中 | 单一 `maxSnapshotLength` 常量 + 防 U+FFFD 截断 helper，persona/embedding 两处接入 + helper 单测 |
-| F113F120-04 | F-120 装配闭包收敛（app.dart resolveLlm 抽共享，主会话） | 🔄 进行中 | 两处 wireCredentialsResolver+create 同构面抽单一 helper，装配冒烟零回归 |
 
 ## 技术债区
 
@@ -31,6 +27,17 @@
 ---
 
 ## 已完成归档
+
+### 技术债消费批次 F-113~120 八条全部处置（2026-09-17 收口）
+
+> 来源：handoff-techdebt-f109-evolution-done-2026-09-17 交接指令（用户「消费 F-113~120」指示；8 条 Weak 全处置）。4 工单 3 lane：主会话 F113F120-03（F-114/115 单源收敛）/ F113F120-04（F-120 装配收敛）并行 + 子代理双 lane（A = F113F120-01 测试补强 / B = F113F120-02 widget 补强）。门禁：全量 **2224 测**绿（基线 2210 → +14 = helper 7 + A 4 + B 3）/ analyze 0 / 波及文件覆盖率全 ≥90%（utf16_truncate 100% / persona_evolution_service 100% / memory_repository 100% / controller 100% / view 98.3%）/ pre-commit 池检查通过。**F-113 票面证伪**：360dp 窄屏契约锁直接绿（无溢出，未改生产）。候选区清零后仅剩 F-122（既有 flaky 观察）。详见 DEV_LOG〈技术债消费批次 F-113~120 八条全部处置〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| F113F120-01 | 契约锁补测 A：F-116 clamp 交叉边界 / F-117 Q7 reapply 幂等 / F-118 apply-discard 异常吞并（controller/service） | 2026-09-17 | 84fcdac |
+| F113F120-02 | 契约锁补测 B：F-113 窄屏 360dp 无溢出（票面证伪）/ F-118 propose 异常 banner / F-119 取消路径（widget） | 2026-09-17 | 84fcdac |
+| F113F120-03 | F-114/115 安全截断单源：truncateUtf16 防劈代理对 + maxSnapshotLength 常量收敛两处接入 | 2026-09-17 | 84fcdac |
+| F113F120-04 | F-120 装配闭包收敛：app.dart _resolveLlm 抽共享（两处 reflector 同构段单点） | 2026-09-17 | 84fcdac |
 
 ### 技术债消费批次 F-121 空态入口（2026-09-17 收口）
 

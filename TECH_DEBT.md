@@ -43,17 +43,24 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-113 | `memory_management_view.dart` `_RevisionTile` trailing 双中文 TextButton 窄屏（≤360dp）溢出未验证 | 波 1 增量审核 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
-| F-114 | SR-22 `substring(0,2000)` 可能切在代理对中间 → 落库尾部 U+FFFD（实测 UTF-8/JSON 编码均不抛无崩溃，与 embedding 截断同口径先例） | 波 1 增量审核 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
-| F-115 | `maxPersonalitySnapshotLength` 与 `memory_repository.dart:253` 字面量 2000 双源，靠注释对账（S-2） | 期末四轴 Standards（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
-| F-116 | SR-22 clamp 截断后恰等于当前人格 → 返回 null 的交叉边界无直接单测（SP-1） | 期末四轴 Spec（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
-| F-117 | Q7「apply 后手动编辑 → 回待确认 → 再应用幂等」链路无测试证据（SP-2） | 期末四轴 Spec（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
-| F-118 | apply/discard 异常吞并分支无测试 + view 层 propose 异常 banner 渲染无断言（F-1） | 期末四轴 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
-| F-119 | `_PromptDialog` 取消路径（pop → unmount → dispose）无 widget 测试（F-2） | 期末四轴 Falsify（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
-| F-120 | LLM 注入链两份同构闭包未收敛（app.dart 装配闭包 vs ReflectionService 先例，S-1/A-1 同源），第三处出现时协议面重复扩张 | 期末四轴 Standards/Architecture（f109-evolution） | Weak | 📝 待立项 | 伴侣域 |
 | F-122 | `characters_view_stage2_test`「升级提议 · publish 驱动确认/拒绝」全量偶发失败（2026-09-17 f121 批次全量 1/2，单文件复跑+全量重跑均绿；publish → UI 等待族残余 flaky，与本批改动零关联——grep 证测试文件无 memory_management 引用） | 期末全量首跑观察（f121 空态入口批次） | Weak | 📝 待立项 | 伴侣域 |
 
 ## 技术债处置记录
+
+### 2026-09-17 — 技术债消费批次（F-113~120 八条全部处置）
+
+> 来源：handoff-techdebt-f109-evolution-done-2026-09-17 交接指令（用户「消费 F-113~120」指示，8 条 Weak 全处置）。单 commit `84fcdac`（9 文件 +410/-54，含 2 新文件 lib/utils/utf16_truncate.dart + test/utils/utf16_truncate_test.dart）。门禁：全量 **2224 测**绿（基线 2210 → +14 = helper 7 + A 4 + B 3）/ `flutter analyze` 0 / 波及文件覆盖率全 ≥90%（utf16_truncate 100% / persona_evolution_service 100% / memory_repository 100% / controller 100% / view 98.3%）/ pre-commit 池检查通过。详情与过程遥测见 DEV_LOG〈技术债消费批次 F-113~120 八条全部处置〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-113 | ✅ 已修（契约锁证伪） | 360dp 窄屏 widget 契约锁直接绿（待确认 tile 双按钮无 RenderFlex overflow，`takeException()` null）——票面疑虑证伪，未改生产 |
+| F-114 | ✅ 已修 | `truncateUtf16` 防劈代理对（高代理 0xD800..0xDBFF 结尾多截 1 code unit）+ 单测 3 个代理对边界用例；接入 persona_evolution_service `_clampPersonalitySnapshot` 与 memory_repository `upsertEmbedding` 两处 |
+| F-115 | ✅ 已修 | `maxSnapshotLength = 2000` 单源收于 `lib/utils/utf16_truncate.dart`；persona（原 `maxPersonalitySnapshotLength` 删除）+ embedding 两消费点接入，docstring 对账句改单源引用；测试侧 8 处常量改名同步（语义等价） |
+| F-116 | ✅ 已修 | 契约锁补测：clamp 后恰等于当前人格（current = 2000 字符 + reflector 返回 2001）→ proposeEvolution 返回 null 且不落快照 |
+| F-117 | ✅ 已修 | 契约锁补测：apply → 手动编辑 personality → Q7 重算回待确认 → reapply 同一 revision 幂等（appliedRevisionIds 恢复 + personality 回写） |
+| F-118 | ✅ 已修 | controller 侧 `_ThrowingEvolutionService`（super parameters）异常吞并两用例 + view 侧 propose 异常 NoticeBanner 渲染断言（SR-16 摘要不含异常原文） |
+| F-119 | ✅ 已修 | widget 契约锁：`_PromptDialog` 取消路径（pop → unmount → dispose）无 TextEditingController-disposed 异常且不新增条目（F-109 修复的复证） |
+| F-120 | ✅ 已修 | `app.dart` 顶层 `_resolveLlm`（wireCredentialsResolver + factory.create 返回 record）抽共享，ReflectionService / PersonaEvolutionService 两处装配闭包同构段收敛单点；装配冒烟 112 测零回归 |
 
 ### 2026-09-17 — 技术债消费批次（F-121 空态入口 ✅ 已修）
 

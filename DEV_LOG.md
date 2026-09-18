@@ -6,6 +6,19 @@
 
 ---
 
+## 技术债消费批次 F-113~120 八条全部处置（2026-09-17 — 用户「消费 F-113~120」指示，候选区 8 条 Weak 全处置）
+
+- **票面实证复核（先立票后动手）**：8 条逐条读源码复核现状——全部仍成立、无 F-105 式失实票面；F-114/F-115 同为「快照截断」问题判定合并处置（单源 helper 一并解决），F-120 判定「同构面 = resolve+create 两行」抽顶层 helper 收敛（非全文复制抽象，避免浅模块）。
+- **交付（4 工单 3 lane 单 commit `84fcdac`）**：主会话 F113F120-03（`lib/utils/utf16_truncate.dart` 新建：`maxSnapshotLength = 2000` 单常量 + `truncateUtf16` 防劈代理对〔substring 末尾高代理 0xD800..0xDBFF 再截 1 code unit〕，persona_evolution_service `_clampPersonalitySnapshot` + memory_repository `upsertEmbedding` 两处接入，docstring 对账句改单源；helper 单测 7 测含代理对 3 边界 + 零上限边界〔**测试暴露真 bug**：`truncateUtf16('abc', 0)` → `codeUnitAt(-1)` RangeError，先红后绿修复〕）/ F113F120-04（`app.dart` 顶层 `_resolveLlm` 抽共享，两处装配闭包同构段收敛，删 2 处冗余局部变量）。
+- **子代理双 lane（并行预算，用户批准）**：A = F113F120-01（persona_evolution_service_test + memory_management_controller_test 契约锁补测 4 用例：clamp 后恰等交叉边界 / Q7 reapply 幂等 / apply+discard 异常吞并〔`_ThrowingEvolutionService` super parameters〕；**常量改名 8 处同步**〔F-115 删除旧常量后既有 7 处 + 新增 1 处统一 `maxSnapshotLength`，语义等价，A 自动处理〕；33 测绿 / 两文件 analyze 0）/ B = F113F120-02（memory_management_view_test 契约锁补测 3 用例：窄屏 360dp 无溢出〔**F-113 票面证伪**：直接绿，未改生产〕/ propose 异常 NoticeBanner SR-16 摘要 / `_PromptDialog` 取消路径无 dispose 异常；16 测绿 / 生产零改动）。
+- **协调事件**：① 主会话导入路径笔误（`../utils/` 从 services/memory 解析到不存在目录）被 B 捕获上报，立即修 `../../utils/`；② A 的常量引用与 F-115 删除冲突，send_message 同步后 A 自动改名收敛——并行 lane 跨文件依赖靠「派发前划清文件边界 + 运行中消息同步」化解，零冲突合并。
+- **门禁**：全量 **2224 测**绿（基线 2210 → +14 = helper 7 + A 4 + B 3）/ `flutter analyze` 0 / 波及文件覆盖率全 ≥90%（utf16_truncate 100% / persona_evolution_service 100% / memory_repository 100% / controller 100% / view 175/178 = 98.3%）/ pre-commit 池检查通过（TICKETS 活跃表 4 条 🔄 立项随代码 commit，归档后清空）。
+- **处置汇总**：F-113 契约锁证伪（未改生产）/ F-114 ✅（防劈代理对）/ F-115 ✅（单源收敛）/ F-116~119 ✅（契约锁补测）/ F-120 ✅（装配同构段收敛）；**无复核关闭项**；候选区仅剩 F-122（既有 flaky 观察，非本批产生）。
+- **知识库召回轨迹（kb-search）**：写测前检索 `widget|dialog|空态|pump|flutter|按钮` 无新增相关命中（与 F-121 批同结论）；`use_super_parameters` / `prefer_interpolation_to_compose_strings` 由子代理按 lint 内建规则修正，无需外部经验；无漏招。
+- **批次收尾**：TICKETS 归档批次「技术债消费批次 F-113~120 八条全部处置」（F113F120-01~04 同 commit `84fcdac`）；TECH_DEBT 处置记录新节（8 条全 ✅）+ 候选区 F-113~120 移出（剩 F-122）；AGENTS 状态行追加。
+
+---
+
 ## 技术债消费批次 F-121 空态入口（2026-09-17 — handoff-techdebt-f109-evolution-done 交接指令，用户拍板折回首选候选）
 
 - **预检记录**：完整模式（AGENTS/DEV_LOG/TICKETS/TECH_DEBT 齐备）；档位 = 交接文档建议的 kickoff 全自动档（单票小改主会话直行，无子代理分发）；交付形态 = 源码跑通（flutter test + analyze 全绿即交付验证）。
