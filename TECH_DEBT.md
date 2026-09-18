@@ -43,9 +43,16 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-122 | `characters_view_stage2_test`「升级提议 · publish 驱动确认/拒绝」全量偶发失败（2026-09-17 f121 批次全量 1/2，单文件复跑+全量重跑均绿；publish → UI 等待族残余 flaky，与本批改动零关联——grep 证测试文件无 memory_management 引用） | 期末全量首跑观察（f121 空态入口批次） | Weak | 📝 待立项 | 伴侣域 |
 
 ## 技术债处置记录
+
+### 2026-09-17 — 技术债消费批次（F-122 publish 等待族收口 ✅ 已修）
+
+> 来源：F-121 批次全量首跑 1 失败观察落债（Weak）。单 commit `19e0192`（lib 1 文件 + test 1 文件）。根因：`CharactersView._maybeBroker` 用 `Provider.of<StageUpgradeBroker>(context)`（listen 默认 false）——publish 只改数据不建立 UI 依赖，UI 更新靠轮询兜底；且确认后置等待 `find.text('亲密')` 在确认完成前即被「升级建议：亲密」提前满足，拒绝/F1 固定时长 pump 在负载下不足。修复：broker 读取 `listen: true`（publish 触发一帧重建，publish 用例改单帧断言）+ 确认/拒绝/F1 等待条件改「`broker.lastProposal == null` 且 `find.text('确认')` 消失」双终态；新增 `_GateRelationshipService` Completer 门闩用例确定性复现「提议文本已存在但服务未完成」场景（先红后绿）。门禁：全量 **2225 测**绿（基线 2224 → +1）/ `flutter analyze` 0 / pre-commit 池检查通过；候选区清零、无新落债。详见 DEV_LOG〈技术债消费批次 F-122 publish 等待族收口〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-122 | ✅ 已修 | broker `listen: true` 订阅 + publish 单帧断言；确认/拒绝/F1 双终态等待（broker 清除 ∧ 确认按钮消失）；门闩 seam（`_GateRelationshipService`）确定性复现提前解除场景 |
 
 ### 2026-09-17 — 技术债消费批次（F-113~120 八条全部处置）
 

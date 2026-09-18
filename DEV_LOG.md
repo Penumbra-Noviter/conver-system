@@ -33,6 +33,16 @@
 
 ---
 
+## 技术债消费批次 F-122 publish 等待族收口（2026-09-17 — F-121 批次观察落债，用户「消费 F-122」指示）
+
+- **票面归因实证**：定向重复抽样前 3 轮全绿（瞬时 flaky 无法靠轮次稳定复现），代码审读实锤双缺陷——① 生产真缺陷：`CharactersView._maybeBroker` 走 `Provider.of(context)`（listen 默认 **false**），`publish` 只同步改 `_lastProposal` 不建立 UI 依赖，UI 更新依赖无关帧/轮询兜底（F-104 曾收敛 helper，本次为同族复发根因实证）；② 测试等待语义缺陷：确认后置等待 `find.text('亲密')` 在 broker 清除前即被「升级建议：亲密」提前满足；③ 拒绝/F1 固定 20ms pump 在负载/调度下不足。
+- **交付（F122-01 `19e0192`，主会话直行无子代理）**：生产 1 文件（`characters_view.dart._maybeBroker` 改 `listen: true`，publish 后一帧重建）；测试 1 文件——publish 用例改单帧断言（订阅语义即证明，去轮询）、确认/拒绝/F1 后置等待改「`broker.lastProposal == null` ∧ 确认按钮消失」双终态、新增 `_GateRelationshipService` Completer 门闩 seam（tap → `confirmStarted` → 断言提议/按钮仍在 → release → 双终态放行），确定性复现「提议文本已存在但服务未完成」场景。
+- **先红后绿**：门闩用例 + 双终态改造后首跑 2 失败（拒绝/F1 在 broker 清除后、UI 未重建前读到旧帧「确认」——pumpUntil 先判条件后 pump 的窗口）→ 等待条件补 UI 终态后全绿；定向文件 11 测（基线 10 → +1）。
+- **门禁**：全量 **2225 测**绿（基线 2224 → +1）/ `flutter analyze` 0 / pre-commit pool-cleanup 通过（候选区清零）。验证期另处理孤儿 `flutter_tester` 占用 `build/native_assets/windows/sqlite3.dll` 的环境坑（kill 后恢复），与代码改动无关。
+- **批次收尾**：TICKETS 归档批次「技术债消费批次 F-122 publish 等待族收口」（F122-01 `19e0192`）；TECH_DEBT 处置记录新节（F-122 ✅ 已修）+ 候选区 F-122 移出（**候选区清零，无新落债**）；AGENTS 状态行追加。
+
+---
+
 ## 技术债消费批次 F-109 演化入口补全（2026-09-17 — handoff-stage3-vector-recall-a8-local 交接指令，/project-kickoff 全自动档）
 
 - **预检记录**：完整模式（AGENTS/DEV_LOG/TICKETS/TECH_DEBT 齐备）；确认档全自动档（用户拍板）；交付形态 = 源码跑通（flutter test + analyze 全绿即交付验证）。
