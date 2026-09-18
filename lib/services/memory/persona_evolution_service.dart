@@ -6,11 +6,13 @@
 /// 结果先落 [PersonaRevisions] 快照，用户确认后才经 [applyRevision] 回写。
 ///
 /// 语义锚点：ADR-0003（人设演化 = 版本化 + 用户确认闸门，防漂移/失控）。
-/// [PersonaReflector] 为 LLM 反思 seam（生产装配用 [reflectPersonaWithProvider]
-/// 包装 [LLMProvider.generate]，测试注入 fake 返回固定文本），本类零 wire 依赖。
+/// [CharacterScopedReflector] 为 LLM 反思 seam（生产装配用
+/// [reflectPersonaWithProvider] 经 [buildClusteredReflector] 组合，测试注入
+/// fake），本类零 wire 依赖。
 library;
 
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../data/database/app_database.dart'
     show CharactersCompanion, PersonaRevision;
@@ -19,6 +21,13 @@ import '../../data/repositories/memory_repository.dart';
 import '../embedding/embedding_service.dart';
 import '../llm/errors.dart' show CharacterNotFoundError;
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
+
+/// SR-22：演化产出人格文本的长度上限（字符，UTF-16 code unit 计数口径）。
+///
+/// 与 embedding 内容截断（`memory_repository.dart` 的 2000 上限）同口径；
+/// LLM 产出超限时 [PersonaEvolutionService] 截断后落库，防超长人格注入
+/// 后续 prompt 造成 token 膨胀。
+const int maxPersonalitySnapshotLength = 2000;
 
 /// 人设反思 seam：输入当前人格 + 角色名 + 已沉淀人格事实，产出演化后的人格
 /// 设定文本（空串 = 无变化）。生产装配用 [reflectPersonaWithProvider] 包装，
@@ -144,6 +153,10 @@ CharacterScopedReflector buildClusteredReflector({
 /// 人设演化服务 — LLM 反思 + 版本化快照 + 用户确认闸门。
 class PersonaEvolutionService {
   /// 构造服务；[reflector] 为 LLM 反思 seam（测试注入 fake）。
+  ///
+  /// [reflector] 类型为 [CharacterScopedReflector]：characterId 在
+  /// [proposeEvolution] 调用时才知道，装配无法预绑定，故把角色 id 作为
+  /// reflector 形参（E1 签名改造，共识 §2 Q2）。
   PersonaEvolutionService({
     required this._characterRepository,
     required this._memoryRepository,
@@ -152,7 +165,7 @@ class PersonaEvolutionService {
 
   final CharacterRepository _characterRepository;
   final MemoryRepository _memoryRepository;
-  final PersonaReflector _reflector;
+  final CharacterScopedReflector _reflector;
 
   /// 提出一次人设演化：LLM 反思产出新人格 → 落 [PersonaRevisions] 快照。
   ///
@@ -166,18 +179,34 @@ class PersonaEvolutionService {
     }
     final facts = await _memoryRepository.listPersonaFacts(characterId);
     final newPersonality = (await _reflector(
+      characterId: characterId,
       currentPersonality: character.personality,
       charName: character.name,
       personaFacts: [for (final f in facts) f.content],
     )).trim();
-    if (newPersonality.isEmpty || newPersonality == character.personality) {
+    final snapshot = newPersonality.length > maxPersonalitySnapshotLength
+        ? _clampPersonalitySnapshot(newPersonality)
+        : newPersonality;
+    if (snapshot.isEmpty || snapshot == character.personality) {
       return null;
     }
     return _memoryRepository.addRevision(
       characterId: characterId,
-      personalitySnapshot: newPersonality,
+      personalitySnapshot: snapshot,
       reason: 'AI 反思演化',
     );
+  }
+
+  /// SR-22：超长人格截断至 [maxPersonalitySnapshotLength] 并输出摘要日志。
+  ///
+  /// 日志只含截断提示与长度，**不输出完整原文**（人格文本属用户私密内容，
+  /// 且截断动机本身就是防 token 膨胀）。返回截断后文本供落库。
+  String _clampPersonalitySnapshot(String trimmed) {
+    debugPrint(
+      'SR-22：人设演化产出 ${trimmed.length} 字符，'
+      '已截断至 $maxPersonalitySnapshotLength 字符',
+    );
+    return trimmed.substring(0, maxPersonalitySnapshotLength);
   }
 
   /// 应用（确认）一条人设演化：回写 `characters.personality` 为该版本快照。

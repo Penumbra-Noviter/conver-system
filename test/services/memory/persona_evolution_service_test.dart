@@ -13,6 +13,7 @@ import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/memory/persona_evolution_service.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -41,15 +42,7 @@ void main() {
     );
   }
 
-  PersonaEvolutionService buildService(
-    Future<String> Function({
-      required String currentPersonality,
-      required String charName,
-      required List<String> personaFacts,
-      List<String> similarClusters,
-    })
-    reflector,
-  ) {
+  PersonaEvolutionService buildService(CharacterScopedReflector reflector) {
     return PersonaEvolutionService(
       characterRepository: characterRepo,
       memoryRepository: memoryRepo,
@@ -61,11 +54,12 @@ void main() {
     test('反思产出新人格 → 落快照且不回写 personality', () async {
       final character = await seedCharacter();
       final service = buildService(({
+        required characterId,
         required currentPersonality,
         required charName,
         required personaFacts,
-        List<String> similarClusters = const [],
       }) async {
+        expect(characterId, character.id);
         expect(currentPersonality, '温柔体贴');
         expect(charName, '艾莉亚');
         return '温柔体贴且心思细腻';
@@ -86,10 +80,10 @@ void main() {
     test('反思产出空串 → 返回 null 不落快照', () async {
       final character = await seedCharacter();
       final service = buildService(({
+        required characterId,
         required currentPersonality,
         required charName,
         required personaFacts,
-        List<String> similarClusters = const [],
       }) async {
         return '   ';
       });
@@ -102,10 +96,10 @@ void main() {
     test('反思产出与当前人格相同 → 返回 null 不落快照', () async {
       final character = await seedCharacter();
       final service = buildService(({
+        required characterId,
         required currentPersonality,
         required charName,
         required personaFacts,
-        List<String> similarClusters = const [],
       }) async {
         return currentPersonality;
       });
@@ -116,10 +110,10 @@ void main() {
 
     test('角色不存在 → 抛 CharacterNotFoundError', () async {
       final service = buildService(({
+        required characterId,
         required currentPersonality,
         required charName,
         required personaFacts,
-        List<String> similarClusters = const [],
       }) async {
         return '新人格';
       });
@@ -128,16 +122,81 @@ void main() {
         throwsA(isA<CharacterNotFoundError>()),
       );
     });
+
+    test('SR-22：产出恰好上限长度 → 原样落库', () async {
+      final character = await seedCharacter();
+      final exactlyMax = '格' * maxPersonalitySnapshotLength;
+      final service = buildService(({
+        required characterId,
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+      }) async {
+        return exactlyMax;
+      });
+
+      final revision = await service.proposeEvolution(character.id);
+
+      expect(revision!.personalitySnapshot, exactlyMax);
+    });
+
+    test('SR-22：产出超上限 → 截断至前 maxPersonalitySnapshotLength 字符落库', () async {
+      final character = await seedCharacter();
+      final overlong = 'x' * (maxPersonalitySnapshotLength + 5) + 'TAIL';
+      final service = buildService(({
+        required characterId,
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+      }) async {
+        return overlong;
+      });
+
+      final revision = await service.proposeEvolution(character.id);
+
+      expect(
+        revision!.personalitySnapshot.length,
+        maxPersonalitySnapshotLength,
+      );
+      expect(revision.personalitySnapshot, 'x' * maxPersonalitySnapshotLength);
+      expect(revision.personalitySnapshot, isNot(contains('TAIL')));
+    });
+
+    test('SR-22：超限截断输出 debugPrint 摘要且不含完整原文', () async {
+      final character = await seedCharacter();
+      final overlong = '人格' * (maxPersonalitySnapshotLength ~/ 2 + 3);
+      final captured = <String>[];
+      final original = debugPrint;
+      debugPrint = (message, {wrapWidth}) {
+        captured.add(message ?? '');
+      };
+      addTearDown(() => debugPrint = original);
+      final service = buildService(({
+        required characterId,
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+      }) async {
+        return overlong;
+      });
+
+      await service.proposeEvolution(character.id);
+
+      final log = captured.join('\n');
+      expect(log, contains('截断'));
+      expect(log, contains('$maxPersonalitySnapshotLength'));
+      expect(log, isNot(contains(overlong)));
+    });
   });
 
   group('applyRevision / discardRevision', () {
     test('applyRevision 回写 personality；版本不存在返回 false', () async {
       final character = await seedCharacter();
       final service = buildService(({
+        required characterId,
         required currentPersonality,
         required charName,
         required personaFacts,
-        List<String> similarClusters = const [],
       }) async {
         return '温柔体贴且心思细腻';
       });
@@ -155,10 +214,10 @@ void main() {
     test('discardRevision 删除快照且不回写 personality', () async {
       final character = await seedCharacter();
       final service = buildService(({
+        required characterId,
         required currentPersonality,
         required charName,
         required personaFacts,
-        List<String> similarClusters = const [],
       }) async {
         return '新人格';
       });

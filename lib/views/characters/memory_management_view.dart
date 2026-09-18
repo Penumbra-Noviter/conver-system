@@ -39,7 +39,16 @@ class _MemoryManagementViewState extends State<MemoryManagementView> {
     });
   }
 
-  void _onChanged() => setState(() {});
+  void _onChanged() {
+    final message = widget.controller.snackMessage;
+    if (message != null && mounted) {
+      widget.controller.consumeSnackMessage();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
+    setState(() {});
+  }
 
   @override
   void dispose() {
@@ -51,7 +60,25 @@ class _MemoryManagementViewState extends State<MemoryManagementView> {
   Widget build(BuildContext context) {
     final controller = widget.controller;
     return Scaffold(
-      appBar: AppBar(title: const Text('记忆管理')),
+      appBar: AppBar(
+        title: const Text('记忆管理'),
+        actions: [
+          IconButton(
+            tooltip: '提出人设演化',
+            icon: controller.proposing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.auto_awesome),
+            // proposing 期间禁用（防重复触发重复消费 LLM）。
+            onPressed: controller.proposing
+                ? null
+                : controller.proposeEvolution,
+          ),
+        ],
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -111,7 +138,12 @@ class _MemoryList extends StatelessWidget {
         if (revisions.isNotEmpty) ...[
           const _SectionHeader(title: '人设演化历史'),
           for (final revision in revisions)
-            _RevisionTile(revision: revision),
+            _RevisionTile(
+              revision: revision,
+              applied: controller.appliedRevisionIds.contains(revision.id),
+              onApply: () => controller.applyRevision(revision.id),
+              onDiscard: () => controller.discardRevision(revision.id),
+            ),
         ],
         // 标题说明色来自 palette（无 header 时不影响）。
         const SizedBox.shrink(),
@@ -131,8 +163,11 @@ class _MemoryList extends StatelessWidget {
   }
 
   Future<void> _showEditDialog(BuildContext context, MemoryEntry entry) async {
-    final content =
-        await _promptContent(context, title: '编辑记忆', initial: entry.content);
+    final content = await _promptContent(
+      context,
+      title: '编辑记忆',
+      initial: entry.content,
+    );
     if (content != null && content.isNotEmpty) {
       await controller.updateEntry(entry.id, content: content);
     }
@@ -187,14 +222,44 @@ Future<String?> _promptContent(
   BuildContext context, {
   required String title,
   required String initial,
-}) async {
-  final controller = TextEditingController(text: initial);
-  final result = await showDialog<String>(
+}) {
+  return showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
+    builder: (context) => _PromptDialog(title: title, initial: initial),
+  );
+}
+
+/// 内容输入对话框。
+///
+/// controller 生命周期由 State 持有并在 [dispose] 释放——State.dispose 在
+/// 路由退场动画结束、widget 真正 unmount 时触发，避免在动画期间访问已
+/// dispose 的 controller（widget 测试实证的既有缺陷修复）。
+class _PromptDialog extends StatefulWidget {
+  const _PromptDialog({required this.title, required this.initial});
+
+  final String title;
+  final String initial;
+
+  @override
+  State<_PromptDialog> createState() => _PromptDialogState();
+}
+
+class _PromptDialogState extends State<_PromptDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
       content: TextField(
-        controller: controller,
+        controller: _controller,
         autofocus: true,
         maxLines: 3,
         decoration: const InputDecoration(hintText: '输入记忆内容'),
@@ -205,14 +270,12 @@ Future<String?> _promptContent(
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(controller.text),
+          onPressed: () => Navigator.of(context).pop(_controller.text),
           child: const Text('保存'),
         ),
       ],
-    ),
-  );
-  controller.dispose();
-  return result;
+    );
+  }
 }
 
 /// 记忆类型标签文案。
@@ -240,9 +303,7 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
+            style: Theme.of(context).textTheme.titleMedium
                 ?.copyWith(color: palette.ink1),
           ),
           const Spacer(),
@@ -313,17 +374,30 @@ class _EntryTile extends StatelessWidget {
 }
 
 /// 单条人设演化历史。
+///
+/// [applied] = 快照 == 当前人格（Q7 启发式，controller 判定）：已应用只读；
+/// 未应用（待确认）显示「应用」「拒绝」内联操作。
 class _RevisionTile extends StatelessWidget {
-  const _RevisionTile({required this.revision});
+  const _RevisionTile({
+    required this.revision,
+    required this.applied,
+    required this.onApply,
+    required this.onDiscard,
+  });
 
   final PersonaRevision revision;
+  final bool applied;
+  final VoidCallback onApply;
+  final VoidCallback onDiscard;
 
   @override
   Widget build(BuildContext context) {
     final palette = ConverPalette.of(context);
     final textTheme = Theme.of(context).textTheme;
     final snapshot = revision.personalitySnapshot.trim();
-    final preview = snapshot.length > 80 ? '${snapshot.substring(0, 80)}…' : snapshot;
+    final preview = snapshot.length > 80
+        ? '${snapshot.substring(0, 80)}…'
+        : snapshot;
     return ListTile(
       leading: Icon(Icons.history, color: palette.ink3),
       title: Text(
@@ -336,6 +410,15 @@ class _RevisionTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: textTheme.labelSmall?.copyWith(color: palette.ink4),
       ),
+      trailing: applied
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(onPressed: onApply, child: const Text('应用')),
+                TextButton(onPressed: onDiscard, child: const Text('拒绝')),
+              ],
+            ),
     );
   }
 }

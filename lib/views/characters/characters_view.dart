@@ -43,6 +43,7 @@ import '../../data/repositories/memory_repository.dart';
 import '../../services/companion/relationship_service.dart';
 import '../../services/companion/stage_upgrade_broker.dart';
 import '../../services/document_parse_service.dart';
+import '../../services/memory/persona_evolution_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
 import '../../widgets/empty_state.dart';
@@ -735,14 +736,15 @@ class _CharacterCard extends StatelessWidget {
     );
   }
 
-  /// 打开记忆管理页（AC-05）：经 provider 装配 [MemoryRepository]（装配单源
-  /// app.dart，本层只 context.read 消费，不再现造服务），push
-  /// [MemoryManagementView]。
+  /// 打开记忆管理页（AC-05 + F-109）：经 provider 装配 [MemoryRepository] /
+  /// [PersonaEvolutionService] / [CharacterRepository]（装配单源 app.dart，本层
+  /// 只 context.read 消费，不再现造服务），push [MemoryManagementView]。
   void _openMemory(BuildContext context) {
-    final repository = context.read<MemoryRepository>();
     final memoryController = MemoryManagementController(
-      memoryRepository: repository,
+      memoryRepository: context.read<MemoryRepository>(),
       characterId: row.character.id,
+      evolutionService: context.read<PersonaEvolutionService>(),
+      characterRepository: context.read<CharacterRepository>(),
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
