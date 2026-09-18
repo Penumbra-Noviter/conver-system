@@ -20,6 +20,8 @@
 /// 经 context.read 消费；既有无 provider 用例验证降级兼容。
 library;
 
+import 'dart:async';
+
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
@@ -58,6 +60,37 @@ class _FakeExchange implements CharacterFileExchange {
   Future<CharacterDraft?> importCharacter() async => null;
 }
 
+/// 可控确认闸门：先暴露“操作已开始”，再释放真实服务完成落库。
+class _GateRelationshipService extends RelationshipService {
+  _GateRelationshipService({
+    required super.companionRepository,
+    required super.conversationRepository,
+    required super.messageRepository,
+  });
+
+  final Completer<void> _confirmStarted = Completer<void>();
+  final Completer<void> _releaseConfirm = Completer<void>();
+
+  /// 确认请求已进入服务层。
+  Future<void> get confirmStarted => _confirmStarted.future;
+
+  /// 释放被门闩住的确认请求。
+  void releaseConfirm() => _releaseConfirm.complete();
+
+  @override
+  Future<bool> confirmStageUpgrade({
+    required int characterId,
+    required RelationshipStage targetStage,
+  }) async {
+    _confirmStarted.complete();
+    await _releaseConfirm.future;
+    return super.confirmStageUpgrade(
+      characterId: characterId,
+      targetStage: targetStage,
+    );
+  }
+}
+
 /// 本文件装配基座：内存 drift + 仓储全集 + RelationshipService +
 /// StageUpgradeBroker + CharactersController。
 class _Env {
@@ -87,7 +120,13 @@ class _Env {
   final StageUpgradeBroker broker;
   final CharactersController controller;
 
-  static Future<_Env> create() async {
+  static Future<_Env> create({
+    RelationshipService Function({
+      required CompanionRepository companionRepository,
+      required ConversationRepository conversationRepository,
+      required MessageRepository messageRepository,
+    })? relationshipServiceFactory,
+  }) async {
     final db = AppDatabase(NativeDatabase.memory());
     final characterRepository = CharacterRepository(db);
     final conversationRepository = ConversationRepository(
@@ -116,11 +155,16 @@ class _Env {
     );
     final navigation = ShellNavigation();
     final exchange = _FakeExchange();
-    final relationshipService = RelationshipService(
-      companionRepository: companionRepository,
-      conversationRepository: conversationRepository,
-      messageRepository: messageRepository,
-    );
+    final resolvedRelationshipService = relationshipServiceFactory?.call(
+          companionRepository: companionRepository,
+          conversationRepository: conversationRepository,
+          messageRepository: messageRepository,
+        ) ??
+        RelationshipService(
+          companionRepository: companionRepository,
+          conversationRepository: conversationRepository,
+          messageRepository: messageRepository,
+        );
     final broker = StageUpgradeBroker();
     return _Env(
       db: db,
@@ -131,7 +175,7 @@ class _Env {
       chatController: chatController,
       navigation: navigation,
       exchange: exchange,
-      relationshipService: relationshipService,
+      relationshipService: resolvedRelationshipService,
       broker: broker,
       controller: CharactersController(
         characterRepository: characterRepository,
@@ -306,11 +350,7 @@ void main() {
           61,
         ),
       );
-      await pumpUntil(
-        tester,
-        () => find.text('升级建议：亲密').evaluate().isNotEmpty,
-        why: '升级建议未在轮询窗口内出现',
-      );
+      await tester.pump();
 
       expect(find.text('升级建议：亲密'), findsOneWidget);
       expect(find.text('确认'), findsOneWidget);
@@ -333,11 +373,7 @@ void main() {
           61,
         ),
       );
-      await pumpUntil(
-        tester,
-        () => find.text('确认').evaluate().isNotEmpty,
-        why: '确认按钮未在轮询窗口内出现',
-      );
+      await tester.pump();
 
       await tester.longPress(find.text('目标'));
       await tester.pump();
@@ -365,17 +401,14 @@ void main() {
           61,
         ),
       );
-      await pumpUntil(
-        tester,
-        () => find.text('确认').evaluate().isNotEmpty,
-        why: '确认按钮未在轮询窗口内出现',
-      );
+      await tester.pump();
 
       await tester.tap(find.text('确认'));
       await pumpUntil(
         tester,
-        () => find.text('亲密').evaluate().isNotEmpty,
-        why: '确认后关系重载展示新阶段',
+        () => env.broker.lastProposal == null &&
+            find.text('确认').evaluate().isEmpty,
+        why: '确认后提议未在轮询窗口内清除',
       );
 
       final state = await env.companionRepository.getRelationship(target.id);
@@ -399,6 +432,63 @@ void main() {
       expect(find.text('升级建议'), findsNothing);
       await env.close();
     });
+
+    testWidgets('提议文本已存在时，确认等待仍停在服务未完成态', (tester) async {
+      final env = await _Env.create(
+        relationshipServiceFactory: ({
+          required companionRepository,
+          required conversationRepository,
+          required messageRepository,
+        }) =>
+            _GateRelationshipService(
+          companionRepository: companionRepository,
+          conversationRepository: conversationRepository,
+          messageRepository: messageRepository,
+        ),
+      );
+      final gate = env.relationshipService as _GateRelationshipService;
+      final target = await env.seedCharacter('目标');
+      await env.seedRelationship(target.id, RelationshipStage.familiar, 58);
+
+      await pumpStage2(tester, env);
+      env.broker.publish(
+        proposalFor(
+          target.id,
+          RelationshipStage.familiar,
+          RelationshipStage.intimate,
+          61,
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('确认'));
+      await gate.confirmStarted;
+
+      expect(
+        env.broker.lastProposal,
+        isNotNull,
+        reason: '服务未完成前提议仍在（等待不得被目标阶段文本提前解除）',
+      );
+      expect(find.text('升级建议：亲密'), findsOneWidget);
+      expect(find.text('确认'), findsOneWidget, reason: '确认中操作仍未收敛');
+
+      gate.releaseConfirm();
+      await pumpUntil(
+        tester,
+        () => env.broker.lastProposal == null &&
+            find.text('确认').evaluate().isEmpty,
+        why: '释放门闩后提议未在轮询窗口内清除',
+      );
+
+      final state = await env.companionRepository.getRelationship(target.id);
+      expect(
+        state!.stage,
+        RelationshipStage.intimate,
+        reason: '门闩释放后真实服务落库',
+      );
+      expect(find.text('确认'), findsNothing);
+      expect(find.text('升级建议'), findsNothing);
+      await env.close();
+    });
   });
 
   group('拒绝 · 不写库 + 提议清除 + 同角色本会话不重弹（验收 5）', () {
@@ -418,15 +508,14 @@ void main() {
           61,
         ),
       );
+      await tester.pump();
+      await tester.tap(find.text('拒绝'));
       await pumpUntil(
         tester,
-        () => find.text('拒绝').evaluate().isNotEmpty,
-        why: '拒绝按钮未在轮询窗口内出现',
+        () => env.broker.lastProposal == null &&
+            find.text('确认').evaluate().isEmpty,
+        why: '拒绝后提议未在轮询窗口内清除',
       );
-      await tester.tap(find.text('拒绝'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 20));
-      await tester.pump();
 
       final state = await env.companionRepository.getRelationship(target.id);
       expect(state!.stage, RelationshipStage.familiar, reason: '拒绝不写库');
@@ -467,15 +556,14 @@ void main() {
           61,
         ),
       );
+      await tester.pump();
+      await tester.tap(find.text('确认'));
       await pumpUntil(
         tester,
-        () => find.text('确认').evaluate().isNotEmpty,
-        why: '确认按钮未在轮询窗口内出现',
+        () => env.broker.lastProposal == null &&
+            find.text('确认').evaluate().isEmpty,
+        why: '无效确认后提议未在轮询窗口内清除',
       );
-      await tester.tap(find.text('确认'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 20));
-      await tester.pump();
 
       expect(tester.takeException(), isNull, reason: 'confirm false 不崩');
       final state = await env.companionRepository.getRelationship(target.id);

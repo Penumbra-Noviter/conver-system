@@ -114,7 +114,7 @@ class _CharactersViewState extends State<CharactersView> {
   /// 升级提议行实时切换）；provider 缺位 → null 降级（既有装配零回归）。
   StageUpgradeBroker? _maybeBroker(BuildContext context) {
     try {
-      return Provider.of<StageUpgradeBroker>(context);
+      return Provider.of<StageUpgradeBroker>(context, listen: true);
     } on ProviderNotFoundException {
       return null;
     }
