@@ -18,6 +18,7 @@ import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 
 import '../../services/vector/float32_codec.dart';
+import '../../utils/utf16_truncate.dart' show maxSnapshotLength, truncateUtf16;
 import '../database/app_database.dart';
 import '../database/tables.dart';
 
@@ -232,12 +233,14 @@ class MemoryRepository {
 
   /// 补嵌/更新一条向量（幂等 upsert，SR-21）。
   ///
-  /// `content` 快照截断上限 2000 字符后落库；`contentHash` 为 SHA-256 hex，
-  /// 基于**截断后快照**计算（去重键与落库快照自洽）；同 `(characterId,
-  /// contentHash)` 已存在 → 更新同一行（vector/entryId/指纹/updatedAt），
-  /// 不产生第二行。[vector] 经 float32 小端打包落 blob（[dims] 为模型指纹
-  /// 声明，debug 下断言 `vector.length == dims`）；created_at / updated_at
-  /// 由本层赋值。返回落库后的向量行。
+  /// `content` 快照截断上限 [maxSnapshotLength]（Code Unit 计数，经
+  /// [truncateUtf16] 防劈代理对，单源见 `lib/utils/utf16_truncate.dart`，
+  /// F-115）后落库；`contentHash` 为 SHA-256 hex，基于**截断后快照**计算
+  /// （去重键与落库快照自洽）；同 `(characterId, contentHash)` 已存在 →
+  /// 更新同一行（vector/entryId/指纹/updatedAt），不产生第二行。[vector]
+  /// 经 float32 小端打包落 blob（[dims] 为模型指纹声明，debug 下断言
+  /// `vector.length == dims`）；created_at / updated_at 由本层赋值。返回
+  /// 落库后的向量行。
   Future<EmbeddingEntry> upsertEmbedding({
     required int characterId,
     required int entryId,
@@ -250,9 +253,7 @@ class MemoryRepository {
       vector.length == dims,
       'vector.length (${vector.length}) must match dims ($dims)',
     );
-    final snapshot = content.length > 2000
-        ? content.substring(0, 2000)
-        : content;
+    final snapshot = truncateUtf16(content, maxSnapshotLength);
     final contentHash = sha256.convert(utf8.encode(snapshot)).toString();
     final now = _now();
     final existing = await _embeddingByCharacterAndHash(

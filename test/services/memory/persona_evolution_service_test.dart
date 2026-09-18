@@ -11,6 +11,8 @@ import 'package:conver_system_mobile/services/embedding/embedding_service.dart';
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/memory/persona_evolution_service.dart';
+import 'package:conver_system_mobile/utils/utf16_truncate.dart'
+    show maxSnapshotLength;
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -125,7 +127,7 @@ void main() {
 
     test('SR-22：产出恰好上限长度 → 原样落库', () async {
       final character = await seedCharacter();
-      final exactlyMax = '格' * maxPersonalitySnapshotLength;
+      final exactlyMax = '格' * maxSnapshotLength;
       final service = buildService(({
         required characterId,
         required currentPersonality,
@@ -140,9 +142,9 @@ void main() {
       expect(revision!.personalitySnapshot, exactlyMax);
     });
 
-    test('SR-22：产出超上限 → 截断至前 maxPersonalitySnapshotLength 字符落库', () async {
+    test('SR-22：产出超上限 → 截断至前 maxSnapshotLength 字符落库', () async {
       final character = await seedCharacter();
-      final overlong = 'x' * (maxPersonalitySnapshotLength + 5) + 'TAIL';
+      final overlong = 'x' * (maxSnapshotLength + 5) + 'TAIL';
       final service = buildService(({
         required characterId,
         required currentPersonality,
@@ -156,15 +158,35 @@ void main() {
 
       expect(
         revision!.personalitySnapshot.length,
-        maxPersonalitySnapshotLength,
+        maxSnapshotLength,
       );
-      expect(revision.personalitySnapshot, 'x' * maxPersonalitySnapshotLength);
+      expect(revision.personalitySnapshot, 'x' * maxSnapshotLength);
       expect(revision.personalitySnapshot, isNot(contains('TAIL')));
+    });
+
+    test('SR-22：clamp 后恰等于当前人格 → 返回 null 不落快照', () async {
+      // 当前人格恰好 2000 字符；reflector 产出 2001 字符 → 截断后 == 当前人格
+      // → 与「产出 == 当前人格」同判：无变化，不落快照（F-116）。
+      final currentPersonality = 'a' * maxSnapshotLength;
+      final character = await seedCharacter(personality: currentPersonality);
+      final service = buildService(({
+        required characterId,
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+      }) async {
+        return '${currentPersonality}x';
+      });
+
+      final revision = await service.proposeEvolution(character.id);
+
+      expect(revision, isNull);
+      expect(await memoryRepo.listRevisions(character.id), isEmpty);
     });
 
     test('SR-22：超限截断输出 debugPrint 摘要且不含完整原文', () async {
       final character = await seedCharacter();
-      final overlong = '人格' * (maxPersonalitySnapshotLength ~/ 2 + 3);
+      final overlong = '人格' * (maxSnapshotLength ~/ 2 + 3);
       final captured = <String>[];
       final original = debugPrint;
       debugPrint = (message, {wrapWidth}) {
@@ -184,7 +206,7 @@ void main() {
 
       final log = captured.join('\n');
       expect(log, contains('截断'));
-      expect(log, contains('$maxPersonalitySnapshotLength'));
+      expect(log, contains('$maxSnapshotLength'));
       expect(log, isNot(contains(overlong)));
     });
   });

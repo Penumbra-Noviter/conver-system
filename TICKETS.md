@@ -19,6 +19,10 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
+| F113F120-01 | F-116/117/118-controller 测试补强（clamp 交叉边界 / apply→编辑→再应用幂等 / 异常吞并；子代理 A） | 🔄 进行中 | 契约锁补测：SR-22 clamp 后恰等当前人格 → null 不落库 / Q7 reapply 幂等链路 / apply/discard 异常不抛 UI |
+| F113F120-02 | F-113/118-view/119 widget 测试补强（窄屏溢出验证 / propose 异常 banner / 取消路径；子代理 B） | 🔄 进行中 | 窄屏 ≤360dp 无 overflow / propose 异常 NoticeBanner 渲染 / _PromptDialog 取消无 dispose 异常 |
+| F113F120-03 | F-114/115 安全截断单源（truncateUtf16 防劈代理对 + 2000 常量收敛，主会话） | 🔄 进行中 | 单一 `maxSnapshotLength` 常量 + 防 U+FFFD 截断 helper，persona/embedding 两处接入 + helper 单测 |
+| F113F120-04 | F-120 装配闭包收敛（app.dart resolveLlm 抽共享，主会话） | 🔄 进行中 | 两处 wireCredentialsResolver+create 同构面抽单一 helper，装配冒烟零回归 |
 
 ## 技术债区
 

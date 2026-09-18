@@ -21,13 +21,14 @@ import '../../data/repositories/memory_repository.dart';
 import '../embedding/embedding_service.dart';
 import '../llm/errors.dart' show CharacterNotFoundError;
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
+import '../../utils/utf16_truncate.dart' show maxSnapshotLength, truncateUtf16;
 
 /// SR-22：演化产出人格文本的长度上限（字符，UTF-16 code unit 计数口径）。
 ///
-/// 与 embedding 内容截断（`memory_repository.dart` 的 2000 上限）同口径；
-/// LLM 产出超限时 [PersonaEvolutionService] 截断后落库，防超长人格注入
-/// 后续 prompt 造成 token 膨胀。
-const int maxPersonalitySnapshotLength = 2000;
+/// 上限值与安全截断实现单源收于 [maxSnapshotLength] / [truncateUtf16]
+/// （F-115：与 embedding 内容快照共用，防双源漂移）；LLM 产出超限时
+/// [PersonaEvolutionService] 截断后落库，防超长人格注入后续 prompt 造成
+/// token 膨胀。
 
 /// 人设反思 seam：输入当前人格 + 角色名 + 已沉淀人格事实，产出演化后的人格
 /// 设定文本（空串 = 无变化）。生产装配用 [reflectPersonaWithProvider] 包装，
@@ -184,7 +185,7 @@ class PersonaEvolutionService {
       charName: character.name,
       personaFacts: [for (final f in facts) f.content],
     )).trim();
-    final snapshot = newPersonality.length > maxPersonalitySnapshotLength
+    final snapshot = newPersonality.length > maxSnapshotLength
         ? _clampPersonalitySnapshot(newPersonality)
         : newPersonality;
     if (snapshot.isEmpty || snapshot == character.personality) {
@@ -197,16 +198,17 @@ class PersonaEvolutionService {
     );
   }
 
-  /// SR-22：超长人格截断至 [maxPersonalitySnapshotLength] 并输出摘要日志。
+  /// SR-22：超长人格截断至 [maxSnapshotLength]（Code Unit 计数，经
+  /// [truncateUtf16] 防劈代理对）并输出摘要日志。
   ///
   /// 日志只含截断提示与长度，**不输出完整原文**（人格文本属用户私密内容，
   /// 且截断动机本身就是防 token 膨胀）。返回截断后文本供落库。
   String _clampPersonalitySnapshot(String trimmed) {
     debugPrint(
       'SR-22：人设演化产出 ${trimmed.length} 字符，'
-      '已截断至 $maxPersonalitySnapshotLength 字符',
+      '已截断至 $maxSnapshotLength 字符',
     );
-    return trimmed.substring(0, maxPersonalitySnapshotLength);
+    return truncateUtf16(trimmed, maxSnapshotLength);
   }
 
   /// 应用（确认）一条人设演化：回写 `characters.personality` 为该版本快照。

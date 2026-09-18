@@ -197,14 +197,28 @@ void main() {
 
   group('记忆条目 CRUD（既有行为回归）', () {
     testWidgets('空态：无条目无版本 → 「暂无记忆」', (tester) async {
-      final controller = buildController(({required characterId, required currentPersonality, required charName, required personaFacts}) async => '新人格');
+      final controller = buildController(
+        ({
+          required characterId,
+          required currentPersonality,
+          required charName,
+          required personaFacts,
+        }) async => '新人格',
+      );
       await pumpView(tester, controller);
 
       expect(find.text('暂无记忆'), findsOneWidget);
     });
 
     testWidgets('F-121 空态：显示「新增记忆」入口 → 全链路新增成功', (tester) async {
-      final controller = buildController(({required characterId, required currentPersonality, required charName, required personaFacts}) async => '新人格');
+      final controller = buildController(
+        ({
+          required characterId,
+          required currentPersonality,
+          required charName,
+          required personaFacts,
+        }) async => '新人格',
+      );
       await pumpView(tester, controller);
 
       // 空态保留原文案，且新增入口可见（F-121：0 条记忆时也可新增）。
@@ -228,7 +242,14 @@ void main() {
         characterId: characterId,
         personalitySnapshot: '演化快照',
       );
-      final controller = buildController(({required characterId, required currentPersonality, required charName, required personaFacts}) async => '新人格');
+      final controller = buildController(
+        ({
+          required characterId,
+          required currentPersonality,
+          required charName,
+          required personaFacts,
+        }) async => '新人格',
+      );
       await pumpView(tester, controller);
 
       // entries 空但 revisions 非空走 ListView 分支，入口同样可见（F-121 语义完整）。
@@ -251,7 +272,14 @@ void main() {
         kind: MemoryKind.personaFact,
         content: '已有条目',
       );
-      final controller = buildController(({required characterId, required currentPersonality, required charName, required personaFacts}) async => '新人格');
+      final controller = buildController(
+        ({
+          required characterId,
+          required currentPersonality,
+          required charName,
+          required personaFacts,
+        }) async => '新人格',
+      );
       await pumpView(tester, controller);
 
       // 既有 UI：entries 非空才有「新增记忆」header action（空态 = EmptyState
@@ -274,7 +302,14 @@ void main() {
         kind: MemoryKind.personaFact,
         content: '原内容',
       );
-      final controller = buildController(({required characterId, required currentPersonality, required charName, required personaFacts}) async => '新人格');
+      final controller = buildController(
+        ({
+          required characterId,
+          required currentPersonality,
+          required charName,
+          required personaFacts,
+        }) async => '新人格',
+      );
       await pumpView(tester, controller);
 
       await tester.tap(find.byTooltip('编辑'));
@@ -292,7 +327,14 @@ void main() {
         kind: MemoryKind.personaFact,
         content: '待删内容',
       );
-      final controller = buildController(({required characterId, required currentPersonality, required charName, required personaFacts}) async => '新人格');
+      final controller = buildController(
+        ({
+          required characterId,
+          required currentPersonality,
+          required charName,
+          required personaFacts,
+        }) async => '新人格',
+      );
       await pumpView(tester, controller);
 
       await tester.tap(find.byTooltip('删除'));
@@ -301,6 +343,84 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('待删内容'), findsNothing);
+    });
+  });
+
+  group('F-113 窄屏契约', () {
+    testWidgets('360dp 窄屏下待确认 tile 双按钮渲染无溢出', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      // 待确认版本：快照 != 当前人格（渲染「应用」「拒绝」trailing）。
+      await repo.addRevision(
+        characterId: characterId,
+        personalitySnapshot: '待确认版本',
+      );
+      final controller = buildController(
+        ({
+          required characterId,
+          required currentPersonality,
+          required charName,
+          required personaFacts,
+        }) async => '新人格',
+      );
+      await pumpView(tester, controller);
+
+      // 双按钮确实在树中（防测试空转）；RenderFlex overflow 会以
+      // FlutterError 出现在 takeException——null = 无溢出。
+      expect(find.text('应用'), findsOneWidget);
+      expect(find.text('拒绝'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('F-118 view 侧 notice 契约（SR-16 摘要）', () {
+    testWidgets('propose 异常 → NoticeBanner 固定摘要且不含异常原文', (tester) async {
+      final controller = buildController(({
+        required characterId,
+        required currentPersonality,
+        required charName,
+        required personaFacts,
+      }) async {
+        throw StateError('sk-secret-wire-9432');
+      });
+      await pumpView(tester, controller);
+
+      await tester.tap(find.byTooltip('提出人设演化'));
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('人设演化失败，请稍后重试'), findsOneWidget);
+      expect(find.textContaining('sk-secret-wire'), findsNothing);
+    });
+  });
+
+  group('F-119 _PromptDialog 取消契约', () {
+    testWidgets('取消路径无 disposed-controller 异常且不新增条目', (tester) async {
+      final controller = buildController(
+        ({
+          required characterId,
+          required currentPersonality,
+          required charName,
+          required personaFacts,
+        }) async => '新人格',
+      );
+      await pumpView(tester, controller);
+
+      await tester.tap(find.text('新增记忆'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(SimpleDialogOption, '人格事实'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '取消路径输入');
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+
+      // 取消 = pop(null)：不落库；dispose 时机缺陷会在退场动画期间抛
+      // 「TextEditingController used after being disposed」。
+      expect(find.text('取消路径输入'), findsNothing);
+      expect(tester.takeException(), isNull);
     });
   });
 

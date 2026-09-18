@@ -314,6 +314,28 @@ Future<void> _startProactiveNotifications(
   }
 }
 
+/// 装配层 LLM 凭据解析 + 工厂创建单一落点（F-120）。
+///
+/// ReflectionService / PersonaEvolutionService 两处 reflector 装配闭包中
+/// 的「wireCredentialsResolver().resolve() → factory.create()」同构段收敛
+/// 于此：第三处反射器装配出现时直接复用，不再复制样板；凭据解析链
+/// （wireCredentialsResolver）单一落点约束保持不扩散。
+Future<({LLMProvider llm, String model})> _resolveLlm(
+  BuildContext context,
+) async {
+  final settings = context.read<SettingsRepository>();
+  final factory = context.read<LLMProviderFactory>();
+  final resolved = await settings.wireCredentialsResolver().resolve();
+  return (
+    llm: factory.create(
+      provider: resolved.provider,
+      apiKey: resolved.apiKey,
+      baseUrl: resolved.baseUrl,
+    ),
+    model: resolved.model,
+  );
+}
+
 class ConverApp extends StatelessWidget {
   const ConverApp({super.key, this.database, this.scheduler});
 
@@ -413,8 +435,6 @@ class ConverApp extends StatelessWidget {
         // 置于 ChatService 之前（后者经 provider 消费，装配单源）。
         Provider<ReflectionService>(
           create: (context) {
-            final settings = context.read<SettingsRepository>();
-            final factory = context.read<LLMProviderFactory>();
             return ReflectionService(
               characterRepository: context.read<CharacterRepository>(),
               memoryRepository: context.read<MemoryRepository>(),
@@ -425,17 +445,10 @@ class ConverApp extends StatelessWidget {
                     required List<String> dialogueLines,
                     required List<String> existingFacts,
                   }) async {
-                    final resolved = await settings
-                        .wireCredentialsResolver()
-                        .resolve();
-                    final llm = factory.create(
-                      provider: resolved.provider,
-                      apiKey: resolved.apiKey,
-                      baseUrl: resolved.baseUrl,
-                    );
+                    final llm = await _resolveLlm(context);
                     return extractPersonaFactsWithProvider(
-                      llm: llm,
-                      model: resolved.model,
+                      llm: llm.llm,
+                      model: llm.model,
                       charName: charName,
                       dialogueLines: dialogueLines,
                       existingFacts: existingFacts,
@@ -451,8 +464,6 @@ class ConverApp extends StatelessWidget {
         // lazy——服务构造零 I/O 零启动副作用，不满足 W6-F1 哑 Provider 条件。
         Provider<PersonaEvolutionService>(
           create: (context) {
-            final settings = context.read<SettingsRepository>();
-            final factory = context.read<LLMProviderFactory>();
             return PersonaEvolutionService(
               characterRepository: context.read<CharacterRepository>(),
               memoryRepository: context.read<MemoryRepository>(),
@@ -465,17 +476,10 @@ class ConverApp extends StatelessWidget {
                       required List<String> personaFacts,
                       List<String> similarClusters = const [],
                     }) async {
-                      final resolved = await settings
-                          .wireCredentialsResolver()
-                          .resolve();
-                      final llm = factory.create(
-                        provider: resolved.provider,
-                        apiKey: resolved.apiKey,
-                        baseUrl: resolved.baseUrl,
-                      );
+                      final llm = await _resolveLlm(context);
                       return reflectPersonaWithProvider(
-                        llm: llm,
-                        model: resolved.model,
+                        llm: llm.llm,
+                        model: llm.model,
                         currentPersonality: currentPersonality,
                         charName: charName,
                         personaFacts: personaFacts,

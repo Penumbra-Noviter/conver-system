@@ -7,6 +7,7 @@ import 'package:conver_system_mobile/data/repositories/character_repository.dart
 import 'package:conver_system_mobile/data/repositories/memory_repository.dart';
 import 'package:conver_system_mobile/services/memory/persona_evolution_service.dart';
 import 'package:conver_system_mobile/views/characters/memory_management_controller.dart';
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -281,5 +282,108 @@ void main() {
       expect(controller.appliedRevisionIds, {applied.id});
       expect(controller.appliedRevisionIds, isNot(contains(pending.id)));
     });
+
+    test('Q7 reapply 幂等：apply 后手动编辑 personality → 回待确认 → 再 apply 同一 revision', () async {
+      // F-117。Q7 语义：appliedRevisionIds 由「快照 == 当前人格」启发式在 load
+      // 时重算，非持久状态。同一快照可重复应用：只要当前人格 ≠ 快照即回到
+      // 「待确认」，再次 apply 同一 revision 会幂等回写并重新标记已应用。
+      final controller = buildController();
+      await controller.load();
+      await controller.proposeEvolution();
+      final revisionId = controller.revisions.single.id;
+      controller.consumeSnackMessage();
+
+      // 第一次 apply：快照回写 personality → load 重算 → 已应用。
+      await controller.applyRevision(revisionId);
+      expect(controller.appliedRevisionIds, {revisionId});
+
+      // 手动编辑 personality（模拟外部改动）→ load 后 Q7 重算：快照 ≠ 当前人格
+      // → 回待确认。
+      await characterRepo.updateCharacter(
+        characterId,
+        CharactersCompanion(personality: Value('手动编辑后的人格')),
+      );
+      await controller.load();
+      expect(controller.appliedRevisionIds, isEmpty);
+
+      // 同一 revision 再 apply（幂等重放）：快照再次回写并重新标记已应用。
+      await controller.applyRevision(revisionId);
+      expect(controller.appliedRevisionIds, {revisionId});
+      final updated = await characterRepo.getCharacter(characterId);
+      expect(updated!.personality, '温柔体贴且心思细腻');
+    });
+
+    test('apply 异常（服务抛错）→ 不抛到 UI、无消息、revisions 不变', () async {
+      // F-118 异常吞并分支：与「版本不存在返回 false」是不同路径（false 走
+      // 正常返回，这里服务直接抛错），catch(_) 吞掉且不刷新。
+      final revision = await repo.addRevision(
+        characterId: characterId,
+        personalitySnapshot: 'v1',
+      );
+      final controller = buildController(
+        evolutionService: _ThrowingEvolutionService(
+          characterRepository: characterRepo,
+          memoryRepository: repo,
+        ),
+      );
+      await controller.load();
+
+      await controller.applyRevision(revision.id);
+
+      expect(controller.snackMessage, isNull);
+      expect(controller.appliedRevisionIds, isEmpty);
+      expect(controller.revisions.map((r) => r.id), [revision.id]);
+    });
+
+    test('discard 异常（服务抛错）→ 不抛到 UI、无消息、revisions 不变', () async {
+      // F-118 异常吞并分支：catch(_) 吞掉且保留既有列表。
+      final revision = await repo.addRevision(
+        characterId: characterId,
+        personalitySnapshot: 'v1',
+      );
+      final controller = buildController(
+        evolutionService: _ThrowingEvolutionService(
+          characterRepository: characterRepo,
+          memoryRepository: repo,
+        ),
+      );
+      await controller.load();
+
+      await controller.discardRevision(revision.id);
+
+      expect(controller.snackMessage, isNull);
+      expect(controller.appliedRevisionIds, isEmpty);
+      expect(controller.revisions.map((r) => r.id), [revision.id]);
+    });
   });
+}
+
+/// 异常注入 fake：apply/discard 直接抛错，验证 controller 的 catch(_) 吞并分支。
+///
+/// 与「版本不存在返回 false」是不同路径——false 走正常返回，本类走异常通道；
+/// controller 应把两者都静默处理（不抛到 UI、不置 snackMessage、状态不变）。
+class _ThrowingEvolutionService extends PersonaEvolutionService {
+  _ThrowingEvolutionService({
+    required super.characterRepository,
+    required super.memoryRepository,
+  }) : super(
+         reflector:
+             ({
+               required characterId,
+               required currentPersonality,
+               required charName,
+               required personaFacts,
+             }) async =>
+                 '',
+       );
+
+  @override
+  Future<bool> applyRevision(int revisionId) async {
+    throw StateError('apply 异常注入');
+  }
+
+  @override
+  Future<bool> discardRevision(int revisionId) async {
+    throw StateError('discard 异常注入');
+  }
 }
