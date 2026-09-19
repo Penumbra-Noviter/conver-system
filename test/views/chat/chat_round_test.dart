@@ -150,6 +150,31 @@ class _GatedInterruptRetryProvider extends TickingFakeLLMProvider {
   }
 }
 
+/// 首轮 stream 产 token 后断流（截断标记）；generate（continueReply）返回
+/// **空串**——构造 continueReply 空续写（swipeIndex = -1 no-op 哨兵）场景。
+class _InterruptThenEmptyContinueProvider extends TickingFakeLLMProvider {
+  _InterruptThenEmptyContinueProvider()
+      : super(
+          tokens: const ['a'],
+          errorAfter: LLMConnectionInterruptedError(),
+          delay: const Duration(milliseconds: 5),
+        );
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) async {
+    generateCallCount++;
+    lastMessages = messages;
+    lastMaxTokens = maxTokens;
+    lastModel = model;
+    return '';
+  }
+}
+
 /// [MessageRepository] 的挂起替身（R4 立即停止契约测试用）：createMessage 可在
 /// 进入时挂起于 [gate]（放行后走真实落库）——确定性构造「send 后立即 stop 时
 /// user 写尚未结算」的门控窗口；[gateRole] 限定挂起角色（null → 全部）。
@@ -235,6 +260,35 @@ class _ScriptedChatService implements ChatService {
   }
 }
 
+/// [MessageRepository] 的挂起替身（switchSwipe 防并发测试用）：switchSwipe
+/// 进入时挂起于 [gate]（放行后走真实切换）——确定性构造「切换进行中重复触发」
+/// 的门控窗口；[entered] 标记首次进入。
+class _GatedSwitchRepository extends MessageRepository {
+  _GatedSwitchRepository(super.db);
+
+  /// 挂起器：switchSwipe 进入后 await 其 future。
+  Completer<void>? gate;
+
+  /// switchSwipe 已进入挂起（测试等待其越过入口后发起第二次触发）。
+  final Completer<void> entered = Completer<void>();
+
+  /// switchSwipe 实际调用次数（断言防并发守卫只放行一次）。
+  int switchCalls = 0;
+
+  @override
+  Future<Message> switchSwipe(int messageId, int index) async {
+    switchCalls++;
+    final g = gate;
+    if (g != null) {
+      if (!entered.isCompleted) {
+        entered.complete();
+      }
+      await g.future;
+    }
+    return super.switchSwipe(messageId, index);
+  }
+}
+
 /// 在 [deadline]（5s 墙钟）内轮询 [condition] 直到为真（与
 /// chat_controller_test 同款墙钟语义）。
 Future<void> _until(
@@ -302,7 +356,7 @@ void main() {
     final notice = NoticeRunner();
     final round = ChatRound(
       chatService: service,
-      messageRepository: messageRepo,
+      messageRepository: messageRepository ?? messageRepo,
       noticeRunner: notice,
       reloadMessages: reloadMessages ?? () async {
         env.reloadCalls++;
@@ -595,8 +649,8 @@ void main() {
   });
 
   group('retryInterrupted · 断流重试（M6-08）', () {
-    test('重试成功 → 对截断目标 regenerate：截断行替换、不新增 user 行、标记清、'
-        'notice 清', () async {
+    test('重试成功 → 对截断目标 regenerate（候选追加）：消息行数不变、active 切'
+        '最新候选、标记与 notice 一并结算', () async {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
       final env = wireRound(
@@ -615,17 +669,24 @@ void main() {
       await env.round.retryInterrupted(conversationId: conv.id);
 
       final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2),
+          reason: '候选语义：截断行保留（消息数不变、不新增 user 行、无重复输入）');
       expect([for (final m in msgs) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, '新回复')],
-          reason: 'replace 语义：截断行被替换、不新增 user 行、无重复输入');
+          reason: 'addSwipe(make_active)：active content 覆写为新回复');
+      final swipes = await messageRepo.listSwipes(partial.id);
+      expect([for (final s in swipes) s.index], [0, 1],
+          reason: '候选 0 = 截断原文播种、1 = 新回复（原回复保留为候选）');
+      expect([for (final s in swipes) s.content], ['a', '新回复'],
+          reason: '候选内容逐条保留');
       expect(env.round.hasInterrupted, isFalse, reason: '重试成功无可重试目标');
       expect(env.round.isInterrupted(partial.id), isFalse,
-          reason: '目标标记随替换清除');
+          reason: '结算键 = 目标消息 id：标记随新候选移除');
       expect(env.notice.notice, isNull, reason: '中断已解决，notice 清空');
       expect(env.round.isRegenerating, isFalse, reason: '防并发标志复位');
     });
 
-    test('图标 regenerate（缺省末条）替换截断消息 → 标记与 notice 一并清除'
+    test('图标 regenerate（缺省末条）为截断消息追加候选 → 标记与 notice 一并清除'
         '（B1=W6 F-1 死重试按钮回归）', () async {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
@@ -647,9 +708,13 @@ void main() {
       await env.round.regenerate(conversationId: conv.id);
 
       final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2),
+          reason: '图标 regenerate 候选追加成功：消息行数不变');
       expect([for (final m in msgs) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, '新回复')],
-          reason: '图标 regenerate replace 成功');
+          reason: 'active content 覆写为新回复');
+      expect(await messageRepo.listSwipes(partial.id), hasLength(2),
+          reason: '截断原文保留为候选 0');
       expect(env.round.isInterrupted(partial.id), isFalse,
           reason: '修复后截断标记清除');
       expect(env.round.hasInterrupted, isFalse);
@@ -660,8 +725,8 @@ void main() {
       expect(env.round.isRegenerating, isFalse);
     });
 
-    test('F-64：图标 regenerate 结算键 = 服务实际替换 id（result.replacedMessageId，'
-        '零预解析；行为与 B1 组等价）', () async {
+    test('F-64：图标 regenerate 结算键 = (目标消息 id, swipeIndex)（消费过程结果'
+        '而非调用前推断，零预解析）', () async {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
       final env = wireRound(
@@ -677,16 +742,20 @@ void main() {
       expect(env.round.isInterrupted(partial.id), isTrue);
       expect(env.round.interruptedNoticeTargetId, partial.id);
 
-      // 图标路径零预解析（messageId: null 走服务缺省）；结算以服务实际替换
-      // 目标行 id（replacedMessageId）作键——截断标记与 notice 一并结算。
+      // 图标路径零预解析（messageId: null 走服务缺省）；结算键 = 服务返回的
+      // 目标消息 id + 新候选 swipeIndex（候选追加语义下目标行 id 不删恒命中）。
       await env.round.regenerate(conversationId: conv.id);
 
       final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2),
+          reason: '图标 regenerate 候选追加成功（服务缺省目标 = 末条 assistant）');
       expect([for (final m in msgs) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, '新回复')],
-          reason: '图标 regenerate replace 成功（服务缺省目标 = 末条 assistant）');
+          reason: 'active content 切换为新候选');
+      expect(await messageRepo.listSwipes(partial.id), hasLength(2),
+          reason: '旧回复保留为候选（候选语义可观察差异）');
       expect(env.round.isInterrupted(partial.id), isFalse,
-          reason: '结算键 = 实际替换行 id：截断标记随替换清除');
+          reason: '结算键 = 目标行 id：截断标记随新候选移除');
       expect(env.round.hasInterrupted, isFalse);
       expect(env.round.interruptedNoticeTargetId, isNull,
           reason: '被解目标 == notice 目标：notice 目标复位');
@@ -722,11 +791,13 @@ void main() {
       await retry;
 
       final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2),
+          reason: '重试候选追加成功：消息行数不变');
       expect([for (final m in msgs) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, '新回复')],
-          reason: '重试 replace 成功');
+          reason: 'active content 切换为新候选');
       expect(env.round.isInterrupted(partial.id), isFalse,
-          reason: '目标标记已结算（替换删除）');
+          reason: '目标标记已结算（新候选追加）');
       expect(env.round.interruptedNoticeTargetId, isNull,
           reason: '无余标：notice 目标复位');
       expect(env.notice.notice, '导出成功',
@@ -754,7 +825,7 @@ void main() {
       final msgs = await messageRepo.getMessages(conv.id);
       expect([for (final m in msgs) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, 'a')],
-          reason: '失败不删行、旧截断行保留（延迟删除语义）');
+          reason: '失败零落库：旧截断行与候选均保留');
       expect(env.round.isInterrupted(partial.id), isTrue, reason: '标记保留');
       expect(env.notice.notice, '回复已中断',
           reason: '先错者胜：既有「回复已中断」不被失败文案覆盖');
@@ -990,11 +1061,13 @@ void main() {
   });
 
   group('regenerate · 重生成（A4）', () {
-    test('成功：重载被调 + 新回复替换旧行', () async {
+    test('成功：重载被调 + 候选追加（消息行数不变、active 切最新、旧回复保留为候选）',
+        () async {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
-      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
-      await seedMessage(
+      final userMsg =
+          await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      final oldReply = await seedMessage(
           conversationId: conv.id, role: Role.assistant, content: '旧回复');
       final env = wireRound(FakeLLMProvider(tokens: const ['新回复']));
 
@@ -1003,8 +1076,19 @@ void main() {
       expect(env.reloadCalls, greaterThanOrEqualTo(1), reason: '成功重载列表');
       expect(env.round.isRegenerating, isFalse, reason: '完成复位');
       final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2),
+          reason: '候选语义：消息行数不变（1 user + 1 assistant）');
       expect([for (final m in msgs) (m.role, m.content)],
-          [(Role.user, 'hi'), (Role.assistant, '新回复')]);
+          [(Role.user, 'hi'), (Role.assistant, '新回复')],
+          reason: 'active content 切换为最新候选');
+      expect(msgs.last.id, oldReply.id,
+          reason: '目标消息行保留（候选归属行 id 不变）');
+      expect(userMsg.id, msgs.first.id);
+      final swipes = await messageRepo.listSwipes(oldReply.id);
+      expect([for (final s in swipes) s.index], [0, 1],
+          reason: '候选 0 = 旧回复播种、1 = 新回复');
+      expect([for (final s in swipes) s.content], ['旧回复', '新回复'],
+          reason: '旧回复保留为候选（可对比，不丢失历史）');
     });
 
     test('失败（LLM 生成抛错）→ notice 折叠；不删行、旧回复保留', () async {
@@ -1025,7 +1109,386 @@ void main() {
       final msgs = await messageRepo.getMessages(conv.id);
       expect([for (final m in msgs) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, '旧回复')],
-          reason: '失败不删行、旧回复保留（延迟删除语义）');
+          reason: '失败零落库：旧回复与候选均保留');
+    });
+  });
+
+  group('操作编排 · continueReply（MS-02 契约：swipeIndex / -1 哨兵）', () {
+    test('继续生成成功 → 消息行数不变、内容 = 原回复 + 续写片段、候选追加置激活',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      final reply = await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '原文');
+      final env = wireRound(
+        FakeLLMProvider(tokens: const ['续']),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      await env.round.continueReply(conversationId: conv.id);
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2),
+          reason: '续写不新增消息行（候选追加，不产生新 user）');
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, 'hi'), (Role.assistant, '原文续')],
+          reason: 'active 候选 = 原内容 + 续写片段');
+      expect(msgs.last.id, reply.id, reason: '候选归属行不变');
+      final swipes = await messageRepo.listSwipes(reply.id);
+      expect([for (final s in swipes) s.index], [0, 1],
+          reason: '候选 0 = 原回复播种、1 = 续写结果');
+      expect(env.round.isRegenerating, isFalse, reason: '防并发标志复位');
+    });
+
+    test('截断消息继续生成成功 → 结算键 (messageId, swipeIndex)：标记与 notice 清除',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        InterruptStreamRetryProvider(reply: '补全'),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue);
+
+      await env.round.continueReply(conversationId: conv.id);
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2), reason: '消息行数不变');
+      expect(msgs.last.content, 'a补全',
+          reason: '截断内容 + 续写片段成为新 active 候选');
+      expect(env.round.isInterrupted(partial.id), isFalse,
+          reason: '目标消息获得新候选 = 回复已修复 → 截断标记结算');
+      expect(env.round.hasInterrupted, isFalse);
+      expect(env.round.interruptedNoticeTargetId, isNull);
+      expect(env.notice.notice, isNull, reason: 'notice 目标已解决并清空');
+    });
+
+    test('空续写（swipeIndex = -1 哨兵）→ 不落重复候选、不结算截断标记', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        _InterruptThenEmptyContinueProvider(),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue);
+
+      await env.round.continueReply(conversationId: conv.id);
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs.last.content, 'a',
+          reason: '空续写 no-op：内容零改动');
+      expect(await messageRepo.listSwipes(partial.id), isEmpty,
+          reason: '-1 哨兵：未追加候选（无重复候选行）');
+      expect(env.round.isInterrupted(partial.id), isTrue,
+          reason: '无新候选 → 截断标记保留（未结算）');
+      expect(env.notice.notice, '回复已中断',
+          reason: '既有中断提示保留（-1 不推进 notice 目标）');
+    });
+
+    test('继续生成失败 → notice 单源映射、零候选、内容不变', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      final reply = await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '原文');
+      final env = wireRound(
+        TickingFakeLLMProvider(errorAfter: LLMError('boom')),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      await env.round.continueReply(conversationId: conv.id);
+
+      expect(env.notice.notice, 'boom',
+          reason: 'LLMError 经 chatErrorMessage 单源映射');
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs.last.content, '原文', reason: '失败零落库、内容不变');
+      expect(await messageRepo.listSwipes(reply.id), isEmpty,
+          reason: '失败不产生候选');
+      expect(env.round.isRegenerating, isFalse);
+    });
+
+    test('regenerate 挂起期 continueReply → 被忽略（isRegenerating 共享防并发）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '旧回复');
+      final provider = _GatedInterruptRetryProvider(reply: '新回复');
+      final env = wireRound(provider,
+          reloadMessages: () => messageRepo.getMessages(conv.id));
+
+      final regen = env.round.regenerate(conversationId: conv.id);
+      await _until(() async => provider.generateCallCount >= 1,
+          why: 'generate 已挂起');
+      await env.round.continueReply(conversationId: conv.id);
+
+      provider.gate.complete();
+      await regen;
+
+      expect(provider.generateCallCount, 1,
+          reason: 'continueReply 在 regenerate 挂起期被守卫忽略');
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2), reason: '仅 regenerate 一次候选追加');
+      expect(env.round.isRegenerating, isFalse);
+    });
+  });
+
+  group('操作编排 · switchSwipe（候选切换）', () {
+    test('切换成功 → reload 反映新 active 内容与 DB active index', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      final reply = await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '原回复');
+      await messageRepo.addSwipe(reply.id, '候选一', makeActive: true);
+      await messageRepo.addSwipe(reply.id, '候选二', makeActive: true);
+      late _RoundEnv env;
+      env = wireRound(
+        FakeLLMProvider(tokens: const []),
+        reloadMessages: () async {
+          env.reloadCalls++;
+          return messageRepo.getMessages(conv.id);
+        },
+      );
+
+      await env.round.switchSwipe(
+          conversationId: conv.id, messageId: reply.id, index: 1);
+
+      expect(env.reloadCalls, greaterThanOrEqualTo(1), reason: '切换后重载列表');
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs.last.content, '候选一', reason: 'active 切换为 index 1 候选');
+      expect(msgs.last.activeSwipeIndex, 1, reason: 'DB active index 同步');
+    });
+
+    test('越界 index → notice「候选序号不存在」、active 不变、守卫复位', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      final reply = await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '原回复');
+      await messageRepo.addSwipe(reply.id, '候选一', makeActive: true);
+      final env = wireRound(FakeLLMProvider(tokens: const []));
+
+      await env.round.switchSwipe(
+          conversationId: conv.id, messageId: reply.id, index: 99);
+
+      expect(env.notice.notice, '候选序号不存在: 99',
+          reason: 'SwipeIndexOutOfRangeError 经 chatErrorMessage 单源映射');
+      expect((await messageRepo.getMessages(conv.id)).last.content, '候选一',
+          reason: '失败不切换 active');
+      expect(env.round.isBusy, isFalse, reason: '失败后忙碌态复位');
+    });
+
+    test('目标不存在（跨对话/已删）→ notice「消息不存在」', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(FakeLLMProvider(tokens: const []));
+
+      await env.round.switchSwipe(
+          conversationId: conv.id, messageId: 9999, index: 0);
+
+      expect(env.notice.notice, '消息不存在',
+          reason: '归属校验失败经 chatErrorMessage 单源映射');
+      expect(env.round.isBusy, isFalse);
+    });
+
+    test('切换挂起期重复触发 → 被忽略（防并发守卫；放行后仅一次切换）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      final reply = await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '原回复');
+      await messageRepo.addSwipe(reply.id, '候选一', makeActive: true);
+      final gated = _GatedSwitchRepository(db);
+      final gate = Completer<void>();
+      gated.gate = gate;
+      final env = wireRound(FakeLLMProvider(tokens: const []),
+          messageRepository: gated,
+          reloadMessages: () => messageRepo.getMessages(conv.id));
+
+      final first = env.round.switchSwipe(
+          conversationId: conv.id, messageId: reply.id, index: 1);
+      await _until(() async => gated.entered.isCompleted, why: '切换已挂起');
+      await env.round.switchSwipe(
+          conversationId: conv.id, messageId: reply.id, index: 1);
+
+      gate.complete();
+      await first;
+
+      expect(gated.switchCalls, 1,
+          reason: '挂起期重复切换被防并发守卫忽略');
+      expect(env.round.isBusy, isFalse, reason: '完成后忙碌态复位');
+    });
+  });
+
+  group('操作编排 · deleteMessage / editMessage（MS-03 服务 + 截断标记结算）', () {
+    test('删 user → 截断后续（含截断 assistant）；被删截断标记与 notice 结算清空',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        InterruptStreamRetryProvider(reply: '新回复'),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      final userMsg = (await messageRepo.getMessages(conv.id)).first;
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue);
+
+      await env.round.deleteMessage(
+          conversationId: conv.id, messageId: userMsg.id);
+
+      expect(await messageRepo.getMessages(conv.id), isEmpty,
+          reason: '删 user 截断含自身及后续（候选级联删）');
+      expect(env.round.isInterrupted(partial.id), isFalse,
+          reason: '幽灵防御：被删截断行标记随 reload prune');
+      expect(env.round.hasInterrupted, isFalse);
+      expect(env.round.interruptedNoticeTargetId, isNull,
+          reason: 'notice 目标已随删除结算');
+      expect(env.notice.notice, isNull, reason: '无遗留死重试横幅');
+      expect(env.round.isBusy, isFalse);
+    });
+
+    test('删 assistant → 仅删该条、后续保留、无关截断标记不受影响', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final user1 =
+          await seedMessage(conversationId: conv.id, role: Role.user, content: 'u1');
+      final assistant = await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: 'a1');
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'u2');
+      final env = wireRound(FakeLLMProvider(tokens: const []));
+
+      await env.round.deleteMessage(
+          conversationId: conv.id, messageId: assistant.id);
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, 'u1'), (Role.user, 'u2')],
+          reason: '删 assistant 仅删该条、后续保留');
+      expect(user1.id, msgs.first.id);
+    });
+
+    test('删除失败（目标不存在）→ notice「消息不存在」、列表不变', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      final env = wireRound(FakeLLMProvider(tokens: const []));
+
+      await env.round.deleteMessage(
+          conversationId: conv.id, messageId: 9999);
+
+      expect(env.notice.notice, '消息不存在');
+      expect(await messageRepo.getMessages(conv.id), hasLength(1),
+          reason: '失败零副作用');
+      expect(env.round.isBusy, isFalse);
+    });
+
+    test('编辑重发成功 → user 就地替换 + 截断后续 + 新 assistant；行数不变', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final userMsg =
+          await seedMessage(conversationId: conv.id, role: Role.user, content: '你好');
+      await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '旧回复');
+      final env = wireRound(
+        FakeLLMProvider(tokens: const ['新回复']),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      await env.round.editMessage(
+          conversationId: conv.id, messageId: userMsg.id, newContent: '修正');
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect(msgs, hasLength(2), reason: '编辑不新增行（user 就地替换 + 新 assistant）');
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, '修正'), (Role.assistant, '新回复')],
+          reason: '截断旧后续 + 生成新回复');
+      expect(env.round.isRegenerating, isFalse, reason: '生成类守卫复位');
+    });
+
+    test('编辑截断后续 → 被删截断标记 prune、notice 结算', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final env = wireRound(
+        InterruptStreamRetryProvider(reply: '新回复'),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      env.round.send(conversationId: conv.id, text: 'hi');
+      await _until(() async => env.notice.notice == '回复已中断', why: '断流 notice');
+      final userMsg = (await messageRepo.getMessages(conv.id)).first;
+      final partial = (await messageRepo.getMessages(conv.id)).last;
+      expect(env.round.isInterrupted(partial.id), isTrue);
+
+      await env.round.editMessage(
+          conversationId: conv.id, messageId: userMsg.id, newContent: '修正');
+
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, '修正'), (Role.assistant, '新回复')],
+          reason: '编辑截断旧回复并生成新回复');
+      expect(env.round.isInterrupted(partial.id), isFalse,
+          reason: '幽灵防御：被截断删除的标记随 reload prune');
+      expect(env.round.hasInterrupted, isFalse);
+      expect(env.notice.notice, isNull, reason: '中断已结算');
+    });
+
+    test('编辑失败 → notice 单源映射 + 已替换已截断状态保留（服务层语义）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final userMsg =
+          await seedMessage(conversationId: conv.id, role: Role.user, content: '你好');
+      await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '旧回复');
+      final env = wireRound(
+        TickingFakeLLMProvider(errorAfter: LLMError('boom')),
+        reloadMessages: () => messageRepo.getMessages(conv.id),
+      );
+
+      await env.round.editMessage(
+          conversationId: conv.id, messageId: userMsg.id, newContent: '修正');
+
+      expect(env.notice.notice, 'boom', reason: 'chatErrorMessage 单源映射');
+      final msgs = await messageRepo.getMessages(conv.id);
+      expect([for (final m in msgs) (m.role, m.content)],
+          [(Role.user, '修正')],
+          reason: '编辑失败保留已替换 + 已截断状态（用户可再 regenerate）');
+      expect(env.round.isRegenerating, isFalse);
+    });
+  });
+
+  group('isBusy · 操作进行中状态面', () {
+    test('regenerate 挂起期 isBusy true；完成后复位', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await seedMessage(conversationId: conv.id, role: Role.user, content: 'hi');
+      await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '旧回复');
+      final provider = _GatedInterruptRetryProvider(reply: '新回复');
+      final env = wireRound(provider,
+          reloadMessages: () => messageRepo.getMessages(conv.id));
+
+      final regen = env.round.regenerate(conversationId: conv.id);
+      await _until(() async => provider.generateCallCount >= 1,
+          why: 'generate 已挂起');
+      expect(env.round.isBusy, isTrue, reason: '生成类操作进行中忙碌');
+
+      provider.gate.complete();
+      await regen;
+      expect(env.round.isBusy, isFalse, reason: '完成后复位');
     });
   });
 

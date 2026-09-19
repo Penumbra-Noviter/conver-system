@@ -580,8 +580,8 @@ class ChatController extends ChangeNotifier {
     await _round.stop(currentConversationId: _activeConversationId);
   }
 
-  /// 重生成末条 assistant（A4 UI 面）：委托 [ChatRound.regenerate]（延迟
-  /// 删除：失败不删行、旧回复保留，成功重载列表；失败仅 [notice]）。
+  /// 重生成末条 assistant（A4 UI 面）：委托 [ChatRound.regenerate]（候选
+  /// 追加：消息行保留、旧回复保留为候选，成功重载列表；失败仅 [notice]）。
   Future<void> regenerate() async {
     final cid = _activeConversationId;
     if (cid == null) {
@@ -589,6 +589,62 @@ class ChatController extends ChangeNotifier {
     }
     await _round.regenerate(conversationId: cid);
   }
+
+  /// 继续生成末条 assistant（MS-02 入口，UI 挂点留 05 票）：委托
+  /// [ChatRound.continueReply]（候选追加 + active 置激活；空续写 -1 哨兵
+  /// no-op；防并发与 notice 单源在回合层）。
+  Future<void> continueReply() async {
+    final cid = _activeConversationId;
+    if (cid == null) {
+      return;
+    }
+    await _round.continueReply(conversationId: cid);
+  }
+
+  /// 切换 [messageId] 的激活候选（MS-02 入口，UI 挂点留 05 票）：委托
+  /// [ChatRound.switchSwipe]（切换后 reload 反映新 active；越界/不存在 →
+  /// notice 单源文案）。
+  Future<void> switchSwipe(int messageId, int index) async {
+    final cid = _activeConversationId;
+    if (cid == null) {
+      return;
+    }
+    await _round.switchSwipe(
+      conversationId: cid,
+      messageId: messageId,
+      index: index,
+    );
+  }
+
+  /// 删除单条消息（MS-03 入口，UI 挂点留 05 票）：委托 [ChatRound.deleteMessage]
+  /// （删 user 截断后续、删 assistant 仅删该条；成功后 reload 列表并结算
+  /// 被删范围内的截断标记）。
+  Future<void> deleteMessage(int messageId) async {
+    final cid = _activeConversationId;
+    if (cid == null) {
+      return;
+    }
+    await _round.deleteMessage(conversationId: cid, messageId: messageId);
+  }
+
+  /// 编辑重发（MS-03 入口，UI 挂点留 05 票）：委托 [ChatRound.editMessage]
+  /// （仅 user；就地替换 + 截断后续 + 重新生成；失败保留已替换已截断状态、
+  /// notice 单源文案）。
+  Future<void> editMessage(int messageId, String newContent) async {
+    final cid = _activeConversationId;
+    if (cid == null) {
+      return;
+    }
+    await _round.editMessage(
+      conversationId: cid,
+      messageId: messageId,
+      newContent: newContent,
+    );
+  }
+
+  /// 任意回合操作进行中（聚合状态面，UI 操作入口可达性判据）：流式 / 生成类
+  /// / 终态重载窗口 / 瞬时变更任一进行中即 true（转发 [ChatRound.isBusy]）。
+  bool get isBusy => _round.isBusy;
 
   /// 当前提示是否为「回复已中断」且该提示存在可重试的截断目标——NoticeBanner
   /// 「重试」动作渲染判据（仅截断通知传动作；其它 notice / 零内容断流不传，
