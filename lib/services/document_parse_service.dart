@@ -15,6 +15,7 @@ library;
 import 'dart:convert';
 
 import '../data/repositories/settings_repository.dart';
+import '../utils/llm_json_candidates.dart';
 import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
@@ -241,56 +242,18 @@ class DocumentParseService {
 /// 对齐桌面 `_extract_json`：直接 jsonDecode（须 dict）→ ```json/``` 代码块
 /// 提取 → 花括号范围提取。
 Map<String, dynamic>? extractJsonFromLlm(String raw) {
-  final text = raw.trim();
-
-  // 第一级：直接 JSON 解析（须 dict）。
-  try {
-    final data = jsonDecode(text);
-    if (data is Map<String, dynamic>) {
-      return data;
-    }
-  } on FormatException {
-    // 解析失败 → 尝试下一级。
-  }
-
-  // 第二级：```json / ``` 代码块提取。
-  if (text.contains('```')) {
-    for (final marker in const ['```json\n', '```\n', '```']) {
-      final start = text.indexOf(marker);
-      if (start >= 0) {
-        final end = text.indexOf('```', start + marker.length);
-        if (end >= 0) {
-          final candidate = text.substring(start + marker.length, end).trim();
-          try {
-            final data = jsonDecode(candidate);
-            if (data is Map<String, dynamic>) {
-              return data;
-            }
-          } on FormatException {
-            continue;
-          }
-        }
+  // 候选段枚举（直接 trim 原文 → fenced 段 → 花括号范围段）由
+  // [llmJsonCandidates] 单源承载；本函数只保留 dict 类型化解码。
+  for (final candidate in llmJsonCandidates(raw, open: '{', close: '}')) {
+    try {
+      final data = jsonDecode(candidate);
+      if (data is Map<String, dynamic>) {
+        return data;
       }
+    } on FormatException {
+      // 该候选不可解析 → 尝试下一候选。
     }
   }
-
-  // 第三级：花括号范围提取。
-  final braceStart = text.indexOf('{');
-  if (braceStart >= 0) {
-    final braceEnd = text.lastIndexOf('}');
-    if (braceEnd > braceStart) {
-      final candidate = text.substring(braceStart, braceEnd + 1);
-      try {
-        final data = jsonDecode(candidate);
-        if (data is Map<String, dynamic>) {
-          return data;
-        }
-      } on FormatException {
-        // 解析失败 → 返回 null。
-      }
-    }
-  }
-
   return null;
 }
 

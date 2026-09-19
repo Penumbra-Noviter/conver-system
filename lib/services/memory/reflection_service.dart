@@ -22,6 +22,7 @@ import '../../data/database/tables.dart' show MemoryKind, Role;
 import '../../data/repositories/character_repository.dart';
 import '../../data/repositories/memory_repository.dart';
 import '../../data/repositories/message_repository.dart';
+import '../../utils/llm_json_candidates.dart';
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
 
 // 构造为公开命名参数（装配点语义）+ 私有 `_` 字段：initializing formal 无法
@@ -82,39 +83,12 @@ List<String> parseReflectionFacts(String raw) {
     return const <String>[];
   }
 
-  // 第一级：直接 JSON 数组。
-  final direct = _decodeStringList(text);
-  if (direct != null) {
-    return direct;
-  }
-
-  // 第二级：```json / ``` 代码块提取。
-  if (text.contains('```')) {
-    for (final marker in const ['```json\n', '```\n', '```']) {
-      final start = text.indexOf(marker);
-      if (start >= 0) {
-        final end = text.indexOf('```', start + marker.length);
-        if (end >= 0) {
-          final candidate = text.substring(start + marker.length, end).trim();
-          final decoded = _decodeStringList(candidate);
-          if (decoded != null) {
-            return decoded;
-          }
-        }
-      }
-    }
-  }
-
-  // 第三级：方括号范围提取。
-  final bracketStart = text.indexOf('[');
-  if (bracketStart >= 0) {
-    final bracketEnd = text.lastIndexOf(']');
-    if (bracketEnd > bracketStart) {
-      final candidate = text.substring(bracketStart, bracketEnd + 1);
-      final decoded = _decodeStringList(candidate);
-      if (decoded != null) {
-        return decoded;
-      }
+  // 候选段枚举（直接 trim 原文 → fenced 段 → 方括号范围段）由
+  // [llmJsonCandidates] 单源承载；本函数只保留 array 解码 + 字符串过滤。
+  for (final candidate in llmJsonCandidates(text, open: '[', close: ']')) {
+    final decoded = _decodeStringList(candidate);
+    if (decoded != null) {
+      return decoded;
     }
   }
 

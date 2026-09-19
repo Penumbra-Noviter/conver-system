@@ -30,6 +30,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 
+import '../../utils/llm_json_candidates.dart';
 import '../../data/database/app_database.dart' show ProactivePlan;
 import '../../data/database/tables.dart'
     show ProactivePlanStatus, Role;
@@ -154,36 +155,12 @@ ProactivePlanDecision? parseProactivePlan(String raw) {
     return null;
   }
 
-  final direct = _decodePlan(text);
-  if (direct != null) {
-    return direct;
-  }
-
-  if (text.contains('```')) {
-    for (final marker in const ['```json\n', '```\n', '```']) {
-      final start = text.indexOf(marker);
-      if (start >= 0) {
-        final end = text.indexOf('```', start + marker.length);
-        if (end >= 0) {
-          final candidate = text.substring(start + marker.length, end).trim();
-          final decoded = _decodePlan(candidate);
-          if (decoded != null) {
-            return decoded;
-          }
-        }
-      }
-    }
-  }
-
-  final braceStart = text.indexOf('{');
-  if (braceStart >= 0) {
-    final braceEnd = text.lastIndexOf('}');
-    if (braceEnd > braceStart) {
-      final candidate = text.substring(braceStart, braceEnd + 1);
-      final decoded = _decodePlan(candidate);
-      if (decoded != null) {
-        return decoded;
-      }
+  // 候选段枚举（直接 trim 原文 → fenced 段 → 大括号范围段）由
+  // [llmJsonCandidates] 单源承载；本函数只保留 object 字段校验解码。
+  for (final candidate in llmJsonCandidates(text, open: '{', close: '}')) {
+    final decoded = _decodePlan(candidate);
+    if (decoded != null) {
+      return decoded;
     }
   }
 
