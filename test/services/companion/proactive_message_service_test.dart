@@ -8,10 +8,12 @@ library;
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
+import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/companion_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/chat_service.dart';
 import 'package:conver_system_mobile/services/companion/companion_time_windows.dart'
     show CompanionTimeWindows;
 import 'package:conver_system_mobile/services/companion/proactive_message_service.dart';
@@ -20,7 +22,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/chat_test_env.dart' show FakeSettingsReader;
-import '../../helpers/fake_llm_provider.dart' show FakeLLMProvider;
+import '../../helpers/fake_llm_provider.dart';
 import '../../helpers/in_memory_secret_store.dart' show InMemorySecretStore;
 
 class _FakeScheduler implements ProactiveNotificationScheduler {
@@ -1163,6 +1165,69 @@ void main() {
       final plans = await db.select(db.proactivePlans).get();
       expect(plans.single.status, ProactivePlanStatus.scheduled);
       expect(plans.single.messageId, messages.last.id);
+    });
+
+    test('SR-28 契约锁: sent 计划 + regenerate（候选追加）→ plan.messageId '
+        '非 null 且仍指向原消息（不再因重生成失联）', () async {
+      final character = await db.into(db.characters).insertReturning(
+            CharactersCompanion.insert(
+              name: '艾莉亚',
+              createdAt: fixedNow,
+              updatedAt: fixedNow,
+            ),
+          );
+      final conversation = await db.into(db.conversations).insertReturning(
+            ConversationsCompanion.insert(
+              characterId: character.id,
+              createdAt: fixedNow,
+              updatedAt: fixedNow,
+            ),
+          );
+      await messageRepo.createMessage(
+        conversationId: conversation.id,
+        role: Role.user,
+        content: '你好',
+      );
+      final assistantMsg = await messageRepo.createMessage(
+        conversationId: conversation.id,
+        role: Role.assistant,
+        content: '旧回复',
+      );
+      final plan = await companionRepo.createPlan(
+        characterId: character.id,
+        conversationId: conversation.id,
+        content: '已发送',
+        scheduledAt: fixedNow.subtract(const Duration(minutes: 10)),
+        messageId: assistantMsg.id,
+      );
+      await companionRepo.updatePlanStatus(
+        plan.id,
+        ProactivePlanStatus.sent,
+        sentAt: fixedNow.subtract(const Duration(minutes: 9)),
+      );
+
+      await settingsRepo.setMany({'claude_api_key': 'sk-test'});
+      final chatService = ChatService(
+        database: db,
+        conversationRepository: conversationRepo,
+        characterRepository: CharacterRepository(db, now: () => fixedNow),
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: FixedLLMProviderFactory(
+          FakeLLMProvider(tokens: const ['新回复']),
+        ),
+      );
+
+      final result =
+          await chatService.regenerate(conversationId: conversation.id);
+
+      // 候选语义：消息行保留（无有界删旧）→ 计划不因 regenerate 失联。
+      expect(result.messageId, assistantMsg.id);
+      expect(await messageRepo.listSwipes(assistantMsg.id), hasLength(2));
+      final after = await companionRepo.getPlanByMessageId(assistantMsg.id);
+      expect(after, isNotNull);
+      expect(after!.messageId, assistantMsg.id,
+          reason: 'SR-28: regenerate 候选追加后 plan.messageId 不 setNull');
     });
 
     test('并发 in-flight：同角色两次 planAfterTurn → 仅一条计划一次调度', () async {

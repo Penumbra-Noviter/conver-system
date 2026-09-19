@@ -428,7 +428,7 @@ void main() {
     });
 
     testWidgets('双截断 → 横幅重试后持续可点（指向最近剩余截断）→ 再重试 → 全清'
-        '（F-65① UI 面 + 重写语义）', (tester) async {
+        '（F-65① UI 面 + 候选语义）', (tester) async {
       final env = await ChatTestEnv.create();
       final c = await openConversation(
         tester,
@@ -481,8 +481,13 @@ void main() {
       final settled =
           await env.messageRepository.getMessages(c.activeConversationId!);
       expect([for (final m in settled) (m.role, m.content)],
-          [(Role.user, '第一问'), (Role.assistant, '新回复')],
-          reason: '重写语义：从 A 截断点重写后续全部');
+          [
+            (Role.user, '第一问'),
+            (Role.assistant, '新回复'), // A 行 active 切新回复
+            (Role.user, '第二问'),
+            (Role.assistant, '新回复'), // B 行 active 切新回复
+          ],
+          reason: '候选语义：双截断行保留（1 assistant + N 候选），不重写删除');
       await env.close();
     });
 
