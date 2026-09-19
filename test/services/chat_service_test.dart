@@ -631,6 +631,35 @@ void main() {
     );
   }
 
+  Future<Message> sendAssistantMessage(int conversationId, String content) {
+    return messageRepo.createMessage(
+      conversationId: conversationId,
+      role: Role.assistant,
+      content: content,
+    );
+  }
+
+  /// 四消息对话种子（MS-03 编辑/删除组共用）：开场白 + 首轮对 + 次轮对。
+  /// 返回 (角色, 对话, user1, asst1, user2, asst2)。
+  Future<(Character, Conversation, Message, Message, Message, Message)>
+      seedFourMessageConversation() async {
+    final char = await seedCharacter(firstMes: '开场。');
+    final conv = await seedConversation(char.id);
+    final user1 = await sendUserMessage(conv.id, '第一轮问');
+    final asst1 = await sendAssistantMessage(conv.id, '第一轮答');
+    final user2 = await sendUserMessage(conv.id, '第二轮问');
+    final asst2 = await sendAssistantMessage(conv.id, '第二轮答');
+    return (char, conv, user1, asst1, user2, asst2);
+  }
+
+  /// 消息数查询辅助（级联/截断断言：swipe 与 thought 行数归零）。
+  Future<int> innerThoughtCountFor(int messageId) async {
+    final rows = await (db.select(db.innerThoughts)
+          ..where((t) => t.messageId.equals(messageId)))
+        .get();
+    return rows.length;
+  }
+
   // ── 错误映射纯函数（逐字对齐 error_mapping.py / exceptions.py）──
 
   group('llmErrorResponse（A2 错误面，逐字对齐 llm_error_response）', () {
@@ -2870,6 +2899,434 @@ void main() {
       expect(trigger.content, endsWith('\n$tail'));
       expect(trigger.content, isNot(contains('\uFFFD')),
           reason: '窗口开头的孤立低代理被排除');
+    });
+  });
+
+  group('editAndRegenerate（MS-03 编辑重发）', () {
+    test('成功 → 替换 content + 物理截断后续（候选/thought 级联）'
+        '+ 新 assistant 落库（swipeIndex=0）', () async {
+      final (char, conv, user1, _, _, asst2) =
+          await seedFourMessageConversation();
+      // 被截断 assistant 带候选 + 内心独白（级联目标）。
+      await messageRepo.addSwipe(asst2.id, '二候选', makeActive: false);
+      await db.into(db.innerThoughts).insert(InnerThoughtsCompanion.insert(
+            characterId: char.id,
+            messageId: asst2.id,
+            content: '独白',
+            createdAt: fakeNow,
+          ));
+      final provider = FakeLLMProvider(tokens: const ['新的回复']);
+      wireService(provider);
+
+      final result = await service.editAndRegenerate(
+        conversationId: conv.id,
+        messageId: user1.id,
+        newContent: '修正后的问题',
+      );
+
+      expect(result.reply, '新的回复');
+      expect(result.conversationId, conv.id);
+      expect(result.messageId, isNot(user1.id),
+          reason: '新 assistant 消息，非被编辑 user 行');
+      expect(result.replacedMessageId, result.messageId);
+      expect(result.swipeIndex, 0,
+          reason: '新 assistant 候选 0 = 回复本体（不实际 addSwipe）');
+      // 时间线：开场白 + 修正 user + 新 assistant（后续物理截断删净）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '修正后的问题'),
+        (Role.assistant, '新的回复'),
+      ]);
+      // 被截断 assistant 的候选 / 独白 FK CASCADE 级联删除。
+      expect(await messageRepo.listSwipes(asst2.id), isEmpty,
+          reason: '截断后续消息 → 其候选随消息级联删');
+      expect(await innerThoughtCountFor(asst2.id), 0,
+          reason: 'InnerThoughts.messageId CASCADE 保持（SR-28）');
+      expect(provider.generateCallCount, 1);
+      expect(provider.streamGenerateCallCount, 0,
+          reason: '编辑重发走 non-streaming generate');
+    });
+
+    test('组装契约：generate 收到修正后内容（末条 user），后续不进上下文', () async {
+      final (_, conv, user1, _, _, _) = await seedFourMessageConversation();
+      final provider = FakeLLMProvider(tokens: const ['新的回复']);
+      wireService(provider);
+
+      await service.editAndRegenerate(
+        conversationId: conv.id,
+        messageId: user1.id,
+        newContent: '修正后的问题',
+      );
+
+      final sent = provider.lastMessages!;
+      expect(sent.last, LlmMessage(role: 'user', content: '修正后的问题'));
+      expect(sent.where((m) => m.content.contains('第二轮问')), isEmpty,
+          reason: '被截断后续（第二轮问/答）不进上下文');
+      expect(
+        sent.where(
+            (m) => m == LlmMessage(role: 'user', content: '修正后的问题')),
+        hasLength(1),
+        reason: '无幽灵 user：修正后 user 仅出现一次',
+      );
+    });
+
+    test('编辑末条 user → 之前消息保留，仅替换目标 + 截断其后 + 新回复', () async {
+      final (_, conv, _, _, user2, _) = await seedFourMessageConversation();
+      final provider = FakeLLMProvider(tokens: const ['新第二轮答']);
+      wireService(provider);
+
+      final result = await service.editAndRegenerate(
+        conversationId: conv.id,
+        messageId: user2.id,
+        newContent: '修正后第二轮问',
+      );
+
+      expect(result.reply, '新第二轮答');
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '第一轮问'),
+        (Role.assistant, '第一轮答'),
+        (Role.user, '修正后第二轮问'),
+        (Role.assistant, '新第二轮答'),
+      ]);
+    });
+
+    test('目标不存在 / 跨对话 → MessageNotFoundError 且零副作用', () async {
+      final (_, conv, _, _, _, _) = await seedFourMessageConversation();
+      final otherChar = await seedCharacter();
+      final otherConv = await seedConversation(otherChar.id);
+      final otherMsg = await sendUserMessage(otherConv.id, '他对话消息');
+      final provider = FakeLLMProvider(tokens: const ['x']);
+      wireService(provider);
+      final before = await roleContentsOf(conv.id);
+
+      await expectLater(
+        service.editAndRegenerate(
+          conversationId: conv.id,
+          messageId: 999999,
+          newContent: '改',
+        ),
+        throwsA(isA<MessageNotFoundError>()),
+      );
+      await expectLater(
+        service.editAndRegenerate(
+          conversationId: conv.id,
+          messageId: otherMsg.id, // 归属校验：他对话 id 视为不存在
+          newContent: '改',
+        ),
+        throwsA(isA<MessageNotFoundError>()),
+      );
+      expect(await roleContentsOf(conv.id), before);
+      expect(provider.generateCallCount, 0, reason: '目标解析失败未触发生成');
+    });
+
+    test('目标非 user（assistant）→「只能编辑用户消息」且零副作用', () async {
+      final (_, conv, _, asst1, _, _) = await seedFourMessageConversation();
+      final provider = FakeLLMProvider(tokens: const ['x']);
+      wireService(provider);
+      final before = await roleContentsOf(conv.id);
+      final beforeSwipes = await messageRepo.listSwipes(asst1.id);
+
+      await expectLater(
+        service.editAndRegenerate(
+          conversationId: conv.id,
+          messageId: asst1.id,
+          newContent: '改',
+        ),
+        throwsA(predicate((e) =>
+            e is InvalidRegenerateTargetError &&
+            e.message == '只能编辑用户消息')),
+      );
+      expect(await roleContentsOf(conv.id), before,
+          reason: 'content 未改、后续未截断（零副作用）');
+      expect(await messageRepo.listSwipes(asst1.id), beforeSwipes);
+      expect(provider.generateCallCount, 0);
+    });
+
+    test('生成失败 → content 已替换 + 后续已截断（锁定语义），无新回复，'
+        '文案经 chatErrorMessage 单源映射', () async {
+      final (_, conv, user1, _, _, _) = await seedFourMessageConversation();
+      final provider = FakeLLMProvider(
+          tokens: const [], error: LLMAuthError('claude'));
+      wireService(provider);
+
+      await expectLater(
+        service.editAndRegenerate(
+          conversationId: conv.id,
+          messageId: user1.id,
+          newContent: '修正后的问题',
+        ),
+        throwsA(isA<LLMAuthError>()),
+      );
+
+      // 截断后状态即未来状态：替换 + 截断保留、无新回复（用户可再 regenerate）。
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '修正后的问题'),
+      ]);
+      // 失败文案经 chatErrorMessage 单源（llmErrorResponse 映射）。
+      expect(
+        chatErrorMessage(LLMAuthError('claude'), providerName: 'claude'),
+        'claude API Key 无效，请在设置中更新',
+      );
+    });
+
+    test('未配置 Key → ApiKeyMissingError；替换 + 截断保留（未来状态）',
+        () async {
+      await secretStore.delete(SecretStore.claudeApiKeySlot);
+      final (_, conv, user1, _, _, _) = await seedFourMessageConversation();
+      wireService(FakeLLMProvider(tokens: const ['x']));
+
+      await expectLater(
+        service.editAndRegenerate(
+          conversationId: conv.id,
+          messageId: user1.id,
+          newContent: '修正后的问题',
+        ),
+        throwsA(isA<ApiKeyMissingError>()),
+      );
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '修正后的问题'),
+      ]);
+    });
+
+    test('F4 并发守卫：编辑重发与 regenerate 共享 in-flight（双向拒绝）',
+        () async {
+      final (_, conv, user1, _, _, _) = await seedFourMessageConversation();
+      // 方向一：regenerate 挂起期间 editAndRegenerate 拒绝。
+      final hold1 = _HoldableProvider(reply: '新回复');
+      wireService(hold1);
+      final regenerating = service.regenerate(conversationId: conv.id);
+      await hold1.started.future;
+      await expectLater(
+        service.editAndRegenerate(
+          conversationId: conv.id,
+          messageId: user1.id,
+          newContent: '修正后的问题',
+        ),
+        throwsA(isA<RegenerateBusyError>()),
+      );
+      hold1.gate.complete();
+      await regenerating;
+
+      // 方向二：editAndRegenerate 挂起期间 regenerate 拒绝。
+      final hold2 = _HoldableProvider(reply: '编辑回复');
+      wireService(hold2);
+      final editing = service.editAndRegenerate(
+        conversationId: conv.id,
+        messageId: user1.id,
+        newContent: '修正后的问题',
+      );
+      await hold2.started.future;
+      await expectLater(
+        service.regenerate(conversationId: conv.id),
+        throwsA(isA<RegenerateBusyError>()),
+      );
+      hold2.gate.complete();
+      final result = await editing;
+      expect(result.reply, '编辑回复');
+    });
+
+    test('Falsify: 对话不存在 → ConversationNotFoundError 且零副作用', () async {
+      final (_, conv, _, _, _, _) = await seedFourMessageConversation();
+      wireService(FakeLLMProvider(tokens: const ['x']));
+      final before = await roleContentsOf(conv.id);
+
+      await expectLater(
+        service.editAndRegenerate(
+          conversationId: 999999,
+          messageId: 1,
+          newContent: '改',
+        ),
+        throwsA(isA<ConversationNotFoundError>()),
+      );
+      expect(await roleContentsOf(conv.id), before,
+          reason: '他对话不受影响');
+    });
+
+    test('Falsify: 角色缺失（FK 关闭损坏态）→ CharacterNotFoundError 且'
+        '替换截断未发生（破坏性写前校验）', () async {
+      await db.customStatement('PRAGMA foreign_keys = OFF');
+      final orphanConv = await db.into(db.conversations).insertReturning(
+            ConversationsCompanion.insert(
+              characterId: 999999,
+              title: const Value('损坏对话'),
+              modelProvider: const Value('claude'),
+              modelName: const Value('claude-sonnet-5'),
+              createdAt: fakeNow,
+              updatedAt: fakeNow,
+            ),
+          );
+      final orphanMsg = await db.into(db.messages).insertReturning(
+            MessagesCompanion.insert(
+              conversationId: orphanConv.id,
+              role: Role.user,
+              content: '原内容',
+              createdAt: fakeNow,
+            ),
+          );
+      await db.into(db.messages).insertReturning(
+            MessagesCompanion.insert(
+              conversationId: orphanConv.id,
+              role: Role.assistant,
+              content: '旧回复',
+              createdAt: fakeNow,
+            ),
+          );
+      wireService(FakeLLMProvider(tokens: const ['x']));
+
+      await expectLater(
+        service.editAndRegenerate(
+          conversationId: orphanConv.id,
+          messageId: orphanMsg.id,
+          newContent: '修正后',
+        ),
+        throwsA(isA<CharacterNotFoundError>()),
+      );
+      // 角色校验在 replaceAndTruncateFollowing 之前 → 零副作用。
+      final msgs = await (db.select(db.messages)
+            ..where((t) => t.conversationId.equals(orphanConv.id)))
+          .get();
+      expect([for (final m in msgs) m.content], ['原内容', '旧回复']);
+    });
+  });
+
+  group('deleteMessage（MS-03 删除单条）', () {
+    test('删 user → 截断含自身及后续（候选/thought 级联），返回条数', () async {
+      final (char, conv, user1, _, _, asst2) =
+          await seedFourMessageConversation();
+      await messageRepo.addSwipe(asst2.id, '二候选', makeActive: false);
+      await db.into(db.innerThoughts).insert(InnerThoughtsCompanion.insert(
+            characterId: char.id,
+            messageId: asst2.id,
+            content: '独白',
+            createdAt: fakeNow,
+          ));
+      wireService(FakeLLMProvider(tokens: const ['x']));
+
+      final deleted = await service.deleteMessage(
+          conversationId: conv.id, messageId: user1.id);
+
+      expect(deleted, 4,
+          reason: '删 user1 起 4 条（user1/第一答/第二问/第二答）');
+      expect(await roleContentsOf(conv.id), [(Role.assistant, '开场。')]);
+      expect(await messageRepo.listSwipes(asst2.id), isEmpty);
+      expect(await innerThoughtCountFor(asst2.id), 0);
+    });
+
+    test('删 assistant → 仅删该条 + swipes/thought 级联 + '
+        'ProactivePlans.messageId setNull（SR-28）', () async {
+      final (char, conv, _, _, _, asst2) =
+          await seedFourMessageConversation();
+      await messageRepo.addSwipe(asst2.id, '二候选', makeActive: false);
+      await db.into(db.innerThoughts).insert(InnerThoughtsCompanion.insert(
+            characterId: char.id,
+            messageId: asst2.id,
+            content: '独白',
+            createdAt: fakeNow,
+          ));
+      final planId = await db.into(db.proactivePlans).insert(
+            ProactivePlansCompanion.insert(
+              characterId: char.id,
+              conversationId: conv.id,
+              content: '计划文案',
+              scheduledAt: fakeNow,
+              status: ProactivePlanStatus.scheduled,
+              messageId: Value(asst2.id),
+            ),
+          );
+      wireService(FakeLLMProvider(tokens: const ['x']));
+
+      final deleted = await service.deleteMessage(
+          conversationId: conv.id, messageId: asst2.id);
+
+      expect(deleted, 1);
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '第一轮问'),
+        (Role.assistant, '第一轮答'),
+        (Role.user, '第二轮问'),
+      ]);
+      expect(await messageRepo.listSwipes(asst2.id), isEmpty);
+      expect(await innerThoughtCountFor(asst2.id), 0);
+      // plan 行保留且 messageId 置空（FK SET NULL——不残留 dangling 引用）。
+      final plan = await (db.select(db.proactivePlans)
+            ..where((t) => t.id.equals(planId)))
+          .getSingle();
+      expect(plan.messageId, isNull);
+    });
+
+    test('删 system（非 user 非 assistant）→ 仅删该条', () async {
+      final (char, conv, _, _, _, _) = await seedFourMessageConversation();
+      final sys = await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.system,
+        content: '系统消息',
+      );
+      wireService(FakeLLMProvider(tokens: const ['x']));
+
+      final deleted = await service.deleteMessage(
+          conversationId: conv.id, messageId: sys.id);
+
+      expect(deleted, 1);
+      expect(await messagesOf(conv.id), hasLength(5),
+          reason: '开场 + 四消息（仅删 system 一条）');
+    });
+
+    // 删除不存在 / 跨对话消息 → MessageNotFoundError 且零副作用
+    test('Falsify: 对话不存在 → ConversationNotFoundError', () async {
+      wireService(FakeLLMProvider(tokens: const ['x']));
+      await expectLater(
+        service.deleteMessage(conversationId: 999999, messageId: 1),
+        throwsA(isA<ConversationNotFoundError>()),
+      );
+    });
+
+    test('删除不存在 / 跨对话消息 → MessageNotFoundError 且零副作用', () async {
+      final (_, conv, _, _, _, _) = await seedFourMessageConversation();
+      final otherChar = await seedCharacter();
+      final otherConv = await seedConversation(otherChar.id);
+      final otherMsg = await sendUserMessage(otherConv.id, '他对话消息');
+      wireService(FakeLLMProvider(tokens: const ['x']));
+      final before = await roleContentsOf(conv.id);
+
+      await expectLater(
+        service.deleteMessage(conversationId: conv.id, messageId: 999999),
+        throwsA(isA<MessageNotFoundError>()),
+      );
+      await expectLater(
+        // 跨对话归属校验拒绝（他对话 id 视为不存在）。
+        service.deleteMessage(
+            conversationId: conv.id, messageId: otherMsg.id),
+        throwsA(isA<MessageNotFoundError>()),
+      );
+      expect(await roleContentsOf(conv.id), before);
+    });
+
+    test('删末条 assistant 后 regenerate 行为仍正确（缺省锚定前一 assistant / '
+        '无 assistant 拒绝）', () async {
+      // a) 唯一 assistant 被删 → 末条为 user → 缺省 regenerate 拒绝。
+      final charA = await seedCharacter(); // 无开场白
+      final convA = await seedConversation(charA.id);
+      await sendUserMessage(convA.id, '问');
+      final aa = await sendAssistantMessage(convA.id, '答');
+      wireService(FakeLLMProvider(tokens: const ['x']));
+      await service.deleteMessage(conversationId: convA.id, messageId: aa.id);
+      await expectLater(
+        service.regenerate(conversationId: convA.id),
+        throwsA(isA<InvalidRegenerateTargetError>()),
+      );
+
+      // b) 末条 assistant 被删 → 缺省 regenerate 锚定前一 assistant 成功。
+      final (_, convB, _, asst1, _, asst2) =
+          await seedFourMessageConversation();
+      final provider = FakeLLMProvider(tokens: const ['新答']);
+      wireService(provider);
+      await service.deleteMessage(conversationId: convB.id, messageId: asst2.id);
+      final result = await service.regenerate(conversationId: convB.id);
+      expect(result.messageId, asst1.id);
+      expect(await swipeContentsOf(asst1.id), ['第一轮答', '新答']);
     });
   });
 }

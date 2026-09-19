@@ -199,6 +199,9 @@ class InvalidRegenerateTargetError extends DomainError {
 
   /// 截断后没有可重生成的用户消息（无触发源）。
   InvalidRegenerateTargetError.noTriggerUser() : super('没有可重生成的用户消息');
+
+  /// 编辑目标不是用户消息（MS-03：只能编辑用户消息）。
+  InvalidRegenerateTargetError.notUser() : super('只能编辑用户消息');
 }
 
 /// 重生成进行中（F4 并发双触发守卫：同对话 in-flight 期间拒绝第二次调用）。
