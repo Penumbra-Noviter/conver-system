@@ -516,7 +516,6 @@ class ConverApp extends StatelessWidget {
         Provider<ProactiveMessageService>(
           create: (context) {
             final settings = context.read<SettingsRepository>();
-            final factory = context.read<LLMProviderFactory>();
             return ProactiveMessageService(
               companionRepository: context.read<CompanionRepository>(),
               settingsRepository: settings,
@@ -527,16 +526,11 @@ class ConverApp extends StatelessWidget {
                     required int conversationId,
                     required List<String> dialogueLines,
                   }) async {
-                    final resolved = await settings
-                        .wireCredentialsResolver()
-                        .resolve();
-                    final llm = factory.create(
-                      provider: resolved.provider,
-                      apiKey: resolved.apiKey,
-                      baseUrl: resolved.baseUrl,
-                    );
+                    // S4：planner 凭据解析复用 _resolveLlm 单点（wireCredentialsResolver
+                    // 调用点收敛，不再手写同构段）。
+                    final resolved = await _resolveLlm(context);
                     return planProactiveWithProvider(
-                      llm: llm,
+                      llm: resolved.llm,
                       model: resolved.model,
                       characterId: characterId,
                       conversationId: conversationId,
