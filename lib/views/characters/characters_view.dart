@@ -39,6 +39,7 @@ import '../../data/database/tables.dart' show RelationshipStage;
 import '../../data/repositories/character_repository.dart'
     show CharacterRepository, CharacterWithCount;
 import '../../data/repositories/companion_repository.dart';
+import '../../data/repositories/lorebook_repository.dart';
 import '../../data/repositories/memory_repository.dart';
 import '../../services/companion/relationship_service.dart';
 import '../../services/companion/stage_upgrade_broker.dart';
@@ -50,6 +51,8 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/notice_banner.dart';
 import 'character_edit_view.dart';
 import 'characters_controller.dart';
+import 'lorebook_editor_controller.dart';
+import 'lorebook_editor_view.dart';
 import 'memory_management_controller.dart';
 import 'memory_management_view.dart';
 import 'wizard/character_wizard_controller.dart';
@@ -688,6 +691,7 @@ class _CharacterCard extends StatelessWidget {
                     ),
                     IconButton(
                       tooltip: '记忆',
+                      visualDensity: VisualDensity.compact,
                       icon: Icon(
                         Icons.psychology_outlined,
                         color: palette.ink3,
@@ -695,12 +699,23 @@ class _CharacterCard extends StatelessWidget {
                       onPressed: () => _openMemory(context),
                     ),
                     IconButton(
+                      tooltip: '世界书',
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(
+                        Icons.menu_book_outlined,
+                        color: palette.ink3,
+                      ),
+                      onPressed: () => _openLorebook(context),
+                    ),
+                    IconButton(
                       tooltip: '编辑',
+                      visualDensity: VisualDensity.compact,
                       icon: Icon(Icons.edit_outlined, color: palette.ink3),
                       onPressed: () => _openEdit(context),
                     ),
                     IconButton(
                       tooltip: '导出',
+                      visualDensity: VisualDensity.compact,
                       icon: Icon(
                         Icons.file_download_outlined,
                         color: palette.ink3,
@@ -710,6 +725,7 @@ class _CharacterCard extends StatelessWidget {
                     ),
                     IconButton(
                       tooltip: '删除',
+                      visualDensity: VisualDensity.compact,
                       icon: Icon(
                         Icons.delete_outline,
                         color: Theme.of(context).colorScheme.error,
@@ -749,6 +765,21 @@ class _CharacterCard extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => MemoryManagementView(controller: memoryController),
+      ),
+    );
+  }
+
+  /// 打开世界书编辑器页（WL-04）：经装配图 [LorebookRepository]（app.dart
+  /// 单点装配，本层只 context.read 消费）构造 [LorebookEditorController]，
+  /// push [LorebookEditorView]。
+  void _openLorebook(BuildContext context) {
+    final lorebookController = LorebookEditorController(
+      lorebookRepository: context.read<LorebookRepository>(),
+      characterId: row.character.id,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LorebookEditorView(controller: lorebookController),
       ),
     );
   }

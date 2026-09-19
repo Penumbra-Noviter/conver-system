@@ -8,6 +8,7 @@ import 'data/database/app_database.dart';
 import 'data/repositories/character_repository.dart';
 import 'data/repositories/companion_repository.dart';
 import 'data/repositories/conversation_repository.dart';
+import 'data/repositories/lorebook_repository.dart';
 import 'data/repositories/memory_repository.dart';
 import 'data/repositories/message_repository.dart';
 import 'data/repositories/settings_repository.dart';
@@ -178,6 +179,11 @@ class ConverApp extends StatelessWidget {
         ),
         Provider<MessageRepository>(
           create: (context) => MessageRepository(context.read<AppDatabase>()),
+        ),
+        // WL-04 世界书装配：LorebookRepository（数据层），供角色页世界书
+        // 编辑器与后续注入链路消费。与 MemoryRepository 同构一行装配。
+        Provider<LorebookRepository>(
+          create: (context) => LorebookRepository(context.read<AppDatabase>()),
         ),
         // AC-01/AC-03 记忆装配：MemoryRepository（数据层）+ MemoryService
         // （注入组装 / 指令解析落库），供 ChatService 与记忆管理页消费。

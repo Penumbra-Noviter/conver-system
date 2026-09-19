@@ -21,6 +21,7 @@ import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
@@ -827,6 +828,45 @@ void main() {
 
       expect(tester.takeException(), isNull,
           reason: '角色列表在 1.3x 下无 RenderFlex overflow');
+      await env.close();
+    });
+  });
+
+  group('世界书入口（WL-04 验收 1）', () {
+    testWidgets('卡片存在世界书按钮；tap push LorebookEditorView', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final env = await _CharsEnv.create();
+      await env.seedCharacter();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ConverTheme.dark(),
+          home: MultiProvider(
+            providers: [
+              Provider<LorebookRepository>(
+                create: (_) => LorebookRepository(env.db),
+              ),
+            ],
+            child: Scaffold(body: CharactersView(controller: env.controller)),
+          ),
+        ),
+      );
+      for (var i = 0; i < 100 && env.controller.loading; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      await tester.pump();
+
+      expect(tester.takeException(), isNull,
+          reason: '360dp 下加世界书按钮后卡片按钮行无溢出');
+      expect(find.byTooltip('世界书'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('世界书'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('暂无世界书条目'), findsOneWidget,
+          reason: 'push 世界书编辑器页');
       await env.close();
     });
   });
