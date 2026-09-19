@@ -17,6 +17,8 @@
 /// （[isRecentlyActive]，≥ 语义）。
 library;
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../../data/database/app_database.dart' show Message, RelationshipState;
 import '../../data/database/tables.dart';
 import '../../data/repositories/companion_repository.dart';
@@ -203,6 +205,9 @@ class RelationshipService {
   /// - 跨 intimate/soulmate 门槛：返回 [StageUpgradeProposal]，**不写库**
   ///   （SR-10：确认前绝不留痕；proposal 不落库 → 同回合重复调用天然幂等）。
   ///
+  /// 降级契约（S1 集合层不再 try/catch）：任意步骤抛错（读库 / 活跃信号 /
+  /// 推进落库）→ 内部 debugPrint 降级并返回 null，不向上抛。
+  ///
   /// [conversationId] 为预留参数（F4 观察）：当前活跃口径以角色维度
   /// （[isRecentlyActive]）计算，未按对话细分；保留签名供未来按对话拆解
   /// 活跃信号（调用方自 PS2-07 起恒传本回合对话 id）。
@@ -210,19 +215,24 @@ class RelationshipService {
     required int characterId,
     required int conversationId,
   }) async {
-    var state = await _companion.getRelationship(characterId);
-    if (state == null) {
-      await _companion.upsertRelationship(
-        characterId: characterId,
-        stage: RelationshipStage.stranger,
-        affinity: 0,
-      );
+    try {
+      var state = await _companion.getRelationship(characterId);
+      if (state == null) {
+        await _companion.upsertRelationship(
+          characterId: characterId,
+          stage: RelationshipStage.stranger,
+          affinity: 0,
+        );
+        return null;
+      }
+
+      final gain = await _turnGain(characterId);
+      final newAffinity = nextAffinity(state.affinity, gain);
+      return await _applyOrPropose(state, newAffinity, characterId);
+    } catch (e) {
+      debugPrint('关系评估失败，跳过: $e');
       return null;
     }
-
-    final gain = await _turnGain(characterId);
-    final newAffinity = nextAffinity(state.affinity, gain);
-    return _applyOrPropose(state, newAffinity, characterId);
   }
 
   /// 确认升级闸门（SR-10 唯一写 intimate/soulmate 的入口）。

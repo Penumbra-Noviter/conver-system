@@ -556,15 +556,69 @@ class ConverApp extends StatelessWidget {
             settingsRepository: context.read<SettingsRepository>(),
             providerFactory: context.read<LLMProviderFactory>(),
             memoryService: context.read<MemoryService>(),
-            reflectionService: context.read<ReflectionService>(),
-            // VR-07 串行申报：回合末懒补嵌挂点（有落库/反思成功后触发）。
-            embeddingService: context.read<EmbeddingService>(),
             thoughtService: context.read<ThoughtService>(),
-            relationshipService: context.read<RelationshipService>(),
-            proactiveMessageService: context.read<ProactiveMessageService>(),
             companionRepository: context.read<CompanionRepository>(),
-            onStageUpgradeProposal: (proposal) =>
-                context.read<StageUpgradeBroker>().publish(proposal),
+            // S1：回合末副作用收敛为有序闭包集合（列表序即执行序）——
+            // backfill → reflect → plan → relate。服务内吞错（闭包不得上抛），
+            // 集合层只做条件/顺序编排；backfill 双触发以闭包内协作表达。
+            endOfTurnHooks: [
+              // ① 懒补嵌（VR-07）：本回合记忆落库（memoryChanged 门）才触发。
+              (ctx) async {
+                final embedding = context.read<EmbeddingService>();
+                final characterId = ctx.characterId;
+                if (!ctx.memoryChangedThisTurn || characterId == null) {
+                  return;
+                }
+                await embedding.backfillPending(characterId);
+              },
+              // ② 后台反思（ADR-0004）：开关在设置仓储；成功后直接补嵌
+              //    （reflect 闭包捕获 EmbeddingService，集合层不表达因果边）。
+              (ctx) async {
+                final reflection = context.read<ReflectionService>();
+                final embedding = context.read<EmbeddingService>();
+                final settings = context.read<SettingsRepository>();
+                final characterId = ctx.characterId;
+                if (characterId == null) {
+                  return;
+                }
+                if (!await settings.memoryReflectionEnabled) {
+                  return;
+                }
+                await reflection.reflectAfterTurn(
+                  characterId: characterId,
+                  conversationId: ctx.conversationId,
+                );
+                await embedding.backfillPending(characterId);
+              },
+              // ③ 主动消息规划（PS2-05）：开关/节流/LLM seam 全在服务内部。
+              (ctx) async {
+                final proactive = context.read<ProactiveMessageService>();
+                final characterId = ctx.characterId;
+                if (characterId == null) {
+                  return;
+                }
+                await proactive.planAfterTurn(
+                  characterId: characterId,
+                  conversationId: ctx.conversationId,
+                );
+              },
+              // ④ 关系评估（PS2-03）：proposal 经 broker 上报（不写库，SR-10）。
+              (ctx) async {
+                final relationship = context.read<RelationshipService>();
+                final broker = context.read<StageUpgradeBroker>();
+                final characterId = ctx.characterId;
+                if (characterId == null) {
+                  return;
+                }
+                final proposal = await relationship.evaluateAfterTurn(
+                  characterId: characterId,
+                  conversationId: ctx.conversationId,
+                );
+                if (proposal != null) {
+                  broker.publish(proposal);
+                }
+              },
+            ],
           ),
         ),
         // M4-03 导出装配：纯逻辑服务（复用三仓储 + SettingsRepository as

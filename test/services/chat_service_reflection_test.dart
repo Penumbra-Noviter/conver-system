@@ -93,6 +93,7 @@ void main() {
     required ReflectionService reflectionService,
     EmbeddingService? embeddingService,
   }) {
+    // S1：回合末副作用收敛为装配层闭包集合（列表序 = backfill → reflect）。
     return ChatService(
       database: db,
       conversationRepository: conversationRepo,
@@ -101,8 +102,35 @@ void main() {
       settingsRepository: settingsRepo,
       providerFactory: FixedLLMProviderFactory(provider),
       memoryService: memoryService,
-      reflectionService: reflectionService,
-      embeddingService: embeddingService,
+      endOfTurnHooks: [
+        // backfill：memoryChanged 门（本文件用例无记忆标签 → 恒跳过）。
+        (ctx) async {
+          final characterId = ctx.characterId;
+          if (embeddingService == null ||
+              characterId == null ||
+              !ctx.memoryChangedThisTurn) {
+            return;
+          }
+          await embeddingService.backfillPending(characterId);
+        },
+        // reflect：开关在设置仓储；成功后补嵌（闭包内协作，集合层无因果边）。
+        (ctx) async {
+          final characterId = ctx.characterId;
+          if (characterId == null) {
+            return;
+          }
+          if (!await settingsRepo.memoryReflectionEnabled) {
+            return;
+          }
+          await reflectionService.reflectAfterTurn(
+            characterId: characterId,
+            conversationId: ctx.conversationId,
+          );
+          if (embeddingService != null) {
+            await embeddingService.backfillPending(characterId);
+          }
+        },
+      ],
     );
   }
 

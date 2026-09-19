@@ -17,6 +17,7 @@ import 'package:conver_system_mobile/services/chat_service.dart';
 import 'package:conver_system_mobile/services/embedding/embedding_service.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
 import 'package:conver_system_mobile/services/memory/memory_service.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,7 +30,8 @@ import '../helpers/in_memory_secret_store.dart';
 class _FakeEmbeddingService implements EmbeddingService {
   int backfillCalls = 0;
 
-  /// 置位后 backfillPending 抛该错误（失败降级路径）。
+  /// 置位后 backfillPending 模拟服务内失败：debugPrint 降级返回 0，不向上抛
+  /// （S1 服务内吞错契约——集合层不再 try/catch，降级收敛在服务内部）。
   Object? backfillError;
 
   @override
@@ -39,7 +41,8 @@ class _FakeEmbeddingService implements EmbeddingService {
   }) async {
     backfillCalls++;
     if (backfillError != null) {
-      throw backfillError!;
+      debugPrint('后台补嵌失败，跳过: $backfillError');
+      return 0;
     }
     return 0;
   }
@@ -85,6 +88,7 @@ void main() {
     LLMProvider provider, {
     EmbeddingService? embeddingService,
   }) {
+    // S1：回合末副作用收敛为装配层闭包集合（本文件只注册 backfill 钩子）。
     return ChatService(
       database: db,
       conversationRepository: conversationRepo,
@@ -93,7 +97,18 @@ void main() {
       settingsRepository: settingsRepo,
       providerFactory: FixedLLMProviderFactory(provider),
       memoryService: memoryService,
-      embeddingService: embeddingService,
+      endOfTurnHooks: [
+        // backfill：memoryChanged 门（<add:>/<persona:> 落库才触发）。
+        (ctx) async {
+          final characterId = ctx.characterId;
+          if (embeddingService == null ||
+              characterId == null ||
+              !ctx.memoryChangedThisTurn) {
+            return;
+          }
+          await embeddingService.backfillPending(characterId);
+        },
+      ],
     );
   }
 
@@ -222,7 +237,7 @@ void main() {
       expect(embeddingService.backfillCalls, 0);
     });
 
-    test('补嵌失败：降级不抛、不阻断回合，assistant 正常落库', () async {
+    test('补嵌内部失败：服务内吞（S1 契约），回合不阻断、assistant 正常落库', () async {
       final conv = await seedConversation();
       final embeddingService = _FakeEmbeddingService()
         ..backfillError = StateError('补嵌失败（测试注入）');
