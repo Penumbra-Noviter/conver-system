@@ -497,6 +497,41 @@ class MessageRepository {
     return count > 0;
   }
 
+  /// 编辑重发数据原语（MS-03；桌面 `update_message` + 截断的组合对应物）：
+  /// 就地替换 [messageId] 的 content，并物理删除同一对话内 `id > messageId`
+  /// 的全部后续消息（候选随 FK CASCADE 级联删），单事务原子。
+  ///
+  /// [messageId] 必须属于 [conversationId] 且存在，否则抛
+  /// [MessageNotFoundError]（强校验，零副作用——服务层编辑目标解析的
+  /// 第二道归属防线）。替换只触碰 content（role / createdAt /
+  /// activeSwipeIndex 不变）；编辑目标是 user 消息（无候选），故不处理候选行。
+  ///
+  /// 返回截断删除条数（被编辑 user 保留，仅删其后的消息）。
+  Future<int> replaceAndTruncateFollowing({
+    required int conversationId,
+    required int messageId,
+    required String content,
+  }) {
+    return _db.transaction(() async {
+      final target = await (_db.select(_db.messages)
+            ..where(($MessagesTable t) =>
+                t.id.equals(messageId) &
+                t.conversationId.equals(conversationId)))
+          .getSingleOrNull();
+      if (target == null) {
+        throw MessageNotFoundError();
+      }
+      await (_db.update(_db.messages)
+            ..where(($MessagesTable t) => t.id.equals(messageId)))
+          .write(MessagesCompanion(content: Value(content)));
+      return (_db.delete(_db.messages)
+            ..where(($MessagesTable t) =>
+                t.conversationId.equals(conversationId))
+            ..where(($MessagesTable t) => t.id.isBiggerThanValue(messageId)))
+          .go();
+    });
+  }
+
   /// 消息行定位（swipes 写操作前置校验，桌面 `_require_message`）。
   ///
   /// 消息不存在抛 [MessageNotFoundError]——swipes 写面是强校验操作（区别于

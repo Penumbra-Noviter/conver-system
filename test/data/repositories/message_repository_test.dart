@@ -9,6 +9,7 @@ import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
+import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -780,6 +781,51 @@ void main() {
       expect(await repo.lastMessage(conv.id), isNull,
           reason: '他对话消息不串入');
       expect(await repo.lastMessage(other.id), isNotNull);
+    });
+  });
+
+  group('replaceAndTruncateFollowing（MS-03 编辑重发数据原语）', () {
+    test('成功 → 就地替换 content + 物理截断后续（id > messageId）'
+        '单事务原子，返回截断条数', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final u1 = await sendUserMessage(conv.id, '第一问');
+      await repo.createMessage(
+          conversationId: conv.id, role: Role.assistant, content: '第一答');
+      await sendUserMessage(conv.id, '第二问');
+      final a2 = await repo.createMessage(
+          conversationId: conv.id, role: Role.assistant, content: '第二答');
+      // 被截断消息带候选（FK CASCADE 承保：删消息级联删候选）。
+      await repo.addSwipe(a2.id, '二候选', makeActive: false);
+
+      final deleted = await repo.replaceAndTruncateFollowing(
+        conversationId: conv.id,
+        messageId: u1.id,
+        content: '修正后的问题',
+      );
+
+      expect(deleted, 3, reason: '截断 id > u1.id 的 3 条（第一答/第二问/第二答）');
+      final msgs = await repo.getMessages(conv.id);
+      expect([for (final m in msgs) m.content], ['修正后的问题']);
+      expect(msgs.single.role, Role.user, reason: '替换只触碰 content，role 不变');
+      expect(await repo.listSwipes(a2.id), isEmpty,
+          reason: '被截断消息候选随 FK CASCADE 级联删');
+    });
+
+    test('消息不存在 → MessageNotFoundError（零副作用，强校验）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '有一条');
+
+      await expectLater(
+        repo.replaceAndTruncateFollowing(
+          conversationId: conv.id,
+          messageId: 999999,
+          content: '改',
+        ),
+        throwsA(isA<MessageNotFoundError>()),
+      );
+      expect(await repo.getMessages(conv.id), hasLength(1));
     });
   });
 }

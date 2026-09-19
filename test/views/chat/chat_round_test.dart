@@ -216,6 +216,23 @@ class _ScriptedChatService implements ChatService {
   }) async {
     throw UnimplementedError('F-65③ 脚本化测试不触 continueReply');
   }
+
+  @override
+  Future<RegenerateResult> editAndRegenerate({
+    required int conversationId,
+    required int messageId,
+    required String newContent,
+  }) async {
+    throw UnimplementedError('F-65③ 脚本化测试不触 editAndRegenerate');
+  }
+
+  @override
+  Future<int> deleteMessage({
+    required int conversationId,
+    required int messageId,
+  }) async {
+    throw UnimplementedError('F-65③ 脚本化测试不触 deleteMessage');
+  }
 }
 
 /// 在 [deadline]（5s 墙钟）内轮询 [condition] 直到为真（与

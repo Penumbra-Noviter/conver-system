@@ -42,6 +42,20 @@
 /// 「原 active 内容 + 续写片段」置激活；失败 / 空续写零落库（空续写 no-op，
 /// `swipeIndex = -1` 哨兵）。
 ///
+/// ## 编辑重发（MS-03，editAndRegenerate）
+/// 仅 user 消息：目标解析（归属 + role 校验，失败零副作用）→ 单事务
+/// 「就地替换 content + 物理截断后续（候选随 FK CASCADE）」→ non-streaming
+/// 生成新 assistant 消息（候选 0 = 回复本体，swipeIndex = 0，不实际
+/// addSwipe）。**失败边界锁定**（spec §4.3）：生成失败保留「已替换 + 已截断」
+/// 状态——截断后状态即未来状态，用户可再 regenerate；与桌面「失败回滚
+/// 零落库」的差异为移动端拍板语义。
+///
+/// ## 删除（MS-03，deleteMessage）
+/// 角色感知：删 user → 截断含自身及后续（候选级联）；删 assistant /
+/// system 等非 user → 仅删该条 + swipes 级联；InnerThoughts CASCADE、
+/// ProactivePlans.messageId setNull 由 FK 承保（SR-28 消费者级断言锁定）。
+/// 目标归属校验：不存在 / 跨对话 → [MessageNotFoundError] 零副作用。
+///
 /// ## 断流（A5）
 /// 流终止未到终态（连接异常 / 未收终态帧）→ 已累积部分落库 + 非阻塞
 /// [ChatInterrupted]「回复已中断」。R3 seam 契约：wire 层（T02）把**连接建立
@@ -1184,6 +1198,170 @@ class ChatService {
     } finally {
       _regenerateInFlight.remove(conversationId);
     }
+  }
+
+  /// 编辑重发（MS-03）：仅 user 消息——就地替换 content + 物理截断后续
+  /// （候选随消息级联删）+ 重新生成**新** assistant 回复。
+  ///
+  /// 编排（对齐 `chat.py::edit_and_resend`；失败边界为移动端锁定语义）：
+  /// 0. F4 并发守卫（与 [regenerate] / [continueReply] 共享 in-flight 集合——
+  ///    SR-28：编辑重发与既有生成类操作共享生成链路与并发守卫）；
+  /// 1. 校验对话存在；
+  /// 2. 目标解析：显式 [messageId] 经 [MessageRepository.messageById] 归属
+  ///    校验（不存在 / 跨对话 → [MessageNotFoundError]）；非 user →
+  ///    [InvalidRegenerateTargetError.notUser]（校验失败零副作用）；
+  /// 3. 角色存在性校验提前到破坏性写之前（校验类错误副作用最小化）；
+  /// 4. [MessageRepository.replaceAndTruncateFollowing] 单事务原子：就地替换
+  ///    content + 物理删除 `id > messageId` 的后续（候选随 FK CASCADE）；
+  /// 5. 组装（`append_current_input=False`，历史截止**含**被编辑 user：
+  ///    `messageId + 1` 对 `id < bound` 等价于桌面 `id <= messageId` 含边界）
+  ///    + provider 解析（Key 缺失 → [ApiKeyMissingError]）；
+  /// 6. non-streaming 生成；**失败保留「已替换 + 已截断」状态**——截断后
+  ///    状态即未来状态，用户可再 regenerate（spec §4.3 锁定；与桌面
+  ///    「失败回滚零落库」的差异为本工单拍板语义）；
+  /// 7. 成功：新建 assistant 消息（新消息行；候选 0 = 回复本体，不实际
+  ///    addSwipe），返回 [RegenerateResult]（`messageId`/`replacedMessageId`
+  ///    = 新消息 id，`swipeIndex` = 0）。
+  ///
+  /// 抛出：领域错误（[ConversationNotFoundError] / [CharacterNotFoundError] /
+  /// [MessageNotFoundError] / [InvalidRegenerateTargetError] /
+  /// [RegenerateBusyError] / [ApiKeyMissingError] / [ProviderNotSupportedError]）
+  /// 与 [LLMError]（生成失败，UI 经 [chatErrorMessage] / [llmErrorResponse]
+  /// 映射文案）。
+  Future<RegenerateResult> editAndRegenerate({
+    required int conversationId,
+    required int messageId,
+    required String newContent,
+  }) async {
+    // F4：与 regenerate / continueReply 共享并发守卫（编辑同样写消息域）。
+    if (_regenerateInFlight.contains(conversationId)) {
+      throw RegenerateBusyError();
+    }
+    _regenerateInFlight.add(conversationId);
+    try {
+      // 1. 校验对话存在。
+      final conv = await _conversationRepository.getConversation(
+        conversationId,
+      );
+      if (conv == null) {
+        throw ConversationNotFoundError();
+      }
+
+      // 2. 目标解析（归属校验 + 仅 user）——失败零副作用。
+      final target = await _messageRepository.messageById(
+        conversationId,
+        messageId,
+      );
+      if (target == null) {
+        throw MessageNotFoundError();
+      }
+      if (target.role != Role.user) {
+        throw InvalidRegenerateTargetError.notUser();
+      }
+
+      // 3. 角色存在性校验（破坏性写之前——校验类错误不触碰 DB）。
+      final character = await _characterRepository.getCharacter(
+        conv.characterId,
+      );
+      if (character == null) {
+        throw CharacterNotFoundError(conv.characterId);
+      }
+
+      // 4. 替换 + 截断单事务原子（生成前破坏性变更先行落库——失败保留）。
+      await _messageRepository.replaceAndTruncateFollowing(
+        conversationId: conversationId,
+        messageId: messageId,
+        content: newContent,
+      );
+
+      // 5. 组装（历史截止含被编辑 user）+ provider 解析。
+      final userName = await _settingsRepository.userName;
+      final extraVars = await _settingsRepository.templateVars;
+      final maxRounds = await _settingsRepository.slidingWindowRounds;
+      final messages = await _assembleMessages(
+        conv: conv,
+        character: character,
+        historyBeforeId: messageId + 1, // id <= messageId 含边界（对齐桌面）
+        maxRounds: maxRounds,
+        userName: userName,
+        extraVars: extraVars,
+        appendCurrentInput: false,
+      );
+      final resolved = await _resolveProvider(conv);
+
+      // 5b. 组装生成参数（同 regenerate 语义）。
+      final globalTemperature = await _settingsRepository.getTemperature();
+      final temperature = _resolveTemperature(character, globalTemperature);
+      final maxTokens = await _settingsRepository.getMaxTokens();
+
+      // 6. 生成（LLM 失败 → 异常上抛；已替换 + 已截断状态保留）。
+      final reply = await resolved.llm.generate(
+        messages: messages,
+        model: resolved.model,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      );
+
+      // 7. 新建 assistant 消息（原 assistant 已随截断删除；候选 0 = 本体）。
+      final saved = await _messageRepository.createMessage(
+        conversationId: conversationId,
+        role: Role.assistant,
+        content: reply,
+      );
+
+      return RegenerateResult(
+        reply: reply,
+        messageId: saved.id,
+        replacedMessageId: saved.id,
+        conversationId: conversationId,
+        swipeIndex: 0,
+      );
+    } finally {
+      _regenerateInFlight.remove(conversationId);
+    }
+  }
+
+  /// 删除单条消息（MS-03；对齐 `message.py::delete_message` 角色感知语义）。
+  ///
+  /// - 删 user → 截断含自身及后续（`id >= messageId`；候选随 FK CASCADE
+  ///   级联，InnerThoughts CASCADE、ProactivePlans.messageId setNull 承保——
+  ///   SR-28）；
+  /// - 删 assistant / system 等非 user → 仅删该条（swipes 级联；该条之后
+  ///   的消息保留——服务层不扩散删除范围）。
+  ///
+  /// 目标解析（破坏性操作防御）：[messageId] 必须属于 [conversationId] 且
+  /// 存在，否则 [MessageNotFoundError]（跨对话同 id 视为不存在——归属校验
+  /// 不外泄他对话行）；校验失败零副作用。
+  ///
+  /// 返回实际删除条数（user 截断 = 截断消息总数；单删 = 1）。
+  ///
+  /// 抛出：[ConversationNotFoundError]（对话不存在）/
+  /// [MessageNotFoundError]（目标不存在或跨对话）。
+  Future<int> deleteMessage({
+    required int conversationId,
+    required int messageId,
+  }) async {
+    // 1. 校验对话存在（防御 FK 脏数据，正常不可达）。
+    final conv = await _conversationRepository.getConversation(conversationId);
+    if (conv == null) {
+      throw ConversationNotFoundError();
+    }
+
+    // 2. 目标解析（归属校验：不存在 / 跨对话 → MessageNotFoundError）。
+    final target = await _messageRepository.messageById(
+      conversationId,
+      messageId,
+    );
+    if (target == null) {
+      throw MessageNotFoundError();
+    }
+
+    // 3. 角色感知删除范围（user 截断含自身；非 user 单删该条 + 级联）。
+    if (target.role == Role.user) {
+      return _messageRepository.deleteMessagesFrom(conversationId, messageId);
+    }
+    await _messageRepository.deleteMessage(messageId);
+    return 1;
   }
 
   /// 解析续写目标并校验（对齐桌面 `_resolve_continue_target`：目标 = 末条消息
