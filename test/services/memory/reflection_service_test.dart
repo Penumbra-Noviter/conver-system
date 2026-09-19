@@ -13,6 +13,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/chat_test_env.dart' show FakeSettingsReader;
+import '../../helpers/fake_llm_provider.dart' show FakeLLMProvider;
 
 void main() {
   group('parseReflectionFacts', () {
@@ -75,6 +76,22 @@ void main() {
         existingFacts: const [],
       );
       expect(messages[1].content, contains('（暂无）'));
+    });
+  });
+
+  group('extractPersonaFactsWithProvider', () {
+    test('generate 输出经 parseReflectionFacts 解析并透传 model', () async {
+      final llm = FakeLLMProvider(tokens: ['["用户喜欢咖啡", "用户讨厌香菜"]']);
+      final facts = await extractPersonaFactsWithProvider(
+        llm: llm,
+        model: 'claude-sonnet-5',
+        charName: '艾莉亚',
+        dialogueLines: const ['用户：你好'],
+        existingFacts: const [],
+      );
+      expect(facts, ['用户喜欢咖啡', '用户讨厌香菜']);
+      expect(llm.generateCallCount, 1);
+      expect(llm.lastModel, 'claude-sonnet-5');
     });
   });
 
@@ -245,6 +262,21 @@ void main() {
       );
 
       expect(extractorCalls, 1);
+      expect(added, 1);
+    });
+
+    test('历史超 historyLimit（25 条，interval=5）→ sublist 截断分支照常反思', () async {
+      final convId = await seedConversation();
+      await seedUserMessages(convId, 25);
+      extractorResult = ['用户喜欢咖啡'];
+      final service = buildService(interval: 5);
+
+      final added = await service.reflectAfterTurn(
+        characterId: 1,
+        conversationId: convId,
+      );
+
+      expect(extractorCalls, 1, reason: '25 % 5 == 0 → 节流放行');
       expect(added, 1);
     });
   });
