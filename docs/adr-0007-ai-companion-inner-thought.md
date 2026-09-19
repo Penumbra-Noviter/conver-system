@@ -7,7 +7,7 @@
 ## 前提拆解（第一性原理）
 
 - **不可变事实**：Flutter + 本地优先；`InnerThoughts` 表（PS2-01 冻结）字段 = characterId + messageId（FK Messages）+ content + createdAt；剥离必须零抛错路径（SR-05：剥离器抛不出异常）；切换开关 `inner_thought_enabled`（SR-09 白名单键，'true' 才开启）。
-- **习得惯例**：顶层纯函数 + 服务编排（`extractThought` / `buildThoughtInstruction` 顶层 + `ThoughtService.stripAndPersist` 服务）——沿 `extractPersonaFactsWithProvider` 顶层 seam 先例；正则固定字面量（SR-13 线性复杂度，无嵌套量词）。
+- **习得惯例**：顶层纯函数 + 服务编排（`extractThought` / `buildThoughtInstruction` 顶层 + `ThoughtService.persistThought` 服务）——沿 `extractPersonaFactsWithProvider` 顶层 seam 先例；正则固定字面量（SR-13 线性复杂度，无嵌套量词）。
 
 ## 可选方案
 
@@ -16,7 +16,7 @@
 2. 方案B 开关关时不剥：省一次解析但泄漏面不可控（LLM 牌面不受开关约束）。
 
 ### 落库编排
-1. 方案A `ThoughtService.stripAndPersist({characterId, messageId, content})` 单点编排（开关读 + 落库 + 降级）。
+1. 方案A `ThoughtService.persistThought({characterId, messageId, thoughtContent})` 单点编排（开关读 + 落库 + 降级）。
 2. 方案B ChatService 直落 InnerThoughts：跨层污染，装配不单源。
 
 ### 与记忆链路的顺序
@@ -26,10 +26,10 @@
 ## 最终选择
 
 ✅ 剥离 = **方案A 恒启用**（`extractThought` 顶层纯函数：成对闭合/开无闭合/多块截断/空独白丢弃，SR-05 契约全分支）
-✅ 落库 = **方案A 服务单点**（`stripAndPersist`：检出 + 开关开 → 落 InnerThoughts；开关关 → debugPrint 不落库；无/空独白不落库）
+✅ 落库 = **方案A 服务单点**（`persistThought`：开关开 → 落 InnerThoughts；开关关 → debugPrint 不落库；剥离检出与空独白丢弃归顶层 `extractThought`，服务只收已剥离内容——S5 修订）
 ✅ 顺序 = **thought 先于记忆**（ChatService `_persistAssistant`：`extractThought` 先行，记忆只吃剥离后正文）
 ✅ 指令 = `buildThoughtInstruction` system 块，`innerThoughtEnabled` 开才注入（PS2-07 注入链）
-✅ 集成 = ChatService 顶层纯函数剥离 + 落库后以 `msg.id` 对原文重跑 `stripAndPersist` 取其落库副作用（stripAndPersist 签名需已存在消息 id——InnerThoughts.messageId FK 约束）
+✅ 集成 = ChatService 顶层纯函数剥离、持有已剥离的 `thoughtContent`，落库后将其传给 `persistThought` 按开关落 InnerThoughts（服务只按开关落库，不再二次剥离原文；签名需已存在消息 id——InnerThoughts.messageId FK 约束）
 
 ## 理由
 
@@ -42,3 +42,11 @@
 
 - 正面：正文净化恒定、记忆链路零污染、开关语义清晰（默认关，用户显式开启才落库/要求产出）。
 - 代价：剥离对回复走一次额外 O(n) 扫描（幂等纯函数，代价常数级）；空剥离结果落库为空串消息（守卫在剥离前，单测锁定预期）。
+
+---
+
+## 修订记录
+
+| 日期 | 修订 | 内容 |
+|------|------|------|
+| 2026-09-18 | S5 架构深化（工单 AD-01） | 剥离单次化：`extractThought` 为全链路唯一剥离点，由 ChatService `_persistAssistant` 执行并持有已剥离的 `thoughtContent`；`ThoughtService.stripAndPersist` 改名 `persistThought`，只接收已剥离内容做「开关读 + FK 落库 + 降级」，删除服务内对原文的二次 `extractThought` 重跑。依据：原实现为跨 4 层（顶层剥离 → 服务内重跑）真实重复计算；决策实质（恒剥离 / 服务单点落库 / thought 先于记忆 / 指令注入）全部不变。正文同步更新第 10、19、29、32 行旧方法名与「服务内检出」职责描述，保持 ADR 单一时态真实。

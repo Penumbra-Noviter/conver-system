@@ -6,10 +6,14 @@
 /// ThoughtService — 内心独白（P5）提取 / 落库 / prompt 指令。
 ///
 /// 深模块：协议表面 = [extractThought]（纯函数剥离契约，SR-05）+
-/// [buildThoughtInstruction]（system 指令文案）+ [ThoughtService.stripAndPersist]
-/// （开关编排落库）。剥离**恒启用**（spec 判定①）：无论开关状态，检出
+/// [buildThoughtInstruction]（system 指令文案）+ [ThoughtService.persistThought]
+/// （按开关编排落库）。剥离**恒启用**（spec 判定①）：无论开关状态，检出
 /// `<thought>...</thought>` 一律剥离（防泄漏进 UI/搜索/导出）；开关只控制
 /// 「prompt 是否要求 thought」与「是否落 InnerThoughts 表」。
+///
+/// S5 分工（架构深化）：[extractThought] 为全链路唯一剥离点，由调用方
+/// （ChatService._persistAssistant）执行并持有已剥离的 `thoughtContent`；
+/// 服务只接收已剥离内容做「开关读 + FK 落库 + 降级」，不再对原文重跑。
 ///
 /// 剥离契约（SR-05，按工单 PS2-04 验收 1-3、5 落地）：
 /// - 成对闭合 `<thought>...</thought>`（大小写不敏感）首段 → 剥离 + thought 非空；
@@ -99,31 +103,31 @@ class ThoughtService {
   final CompanionRepository _companionRepository;
   final SettingsRepository _settingsRepository;
 
-  /// 剥离 [content] 并按开关落库，返回剥离后的 displayContent。
+  /// 按开关落库已剥离的 [thoughtContent]（S5：服务不再对原文剥离）。
   ///
-  /// 剥离恒启用：检出 thought（非 null）且 `innerThoughtEnabled` 开启 → 落
-  /// InnerThoughts（characterId / messageId 随参透传）；检出但开关关闭 →
-  /// debugPrint 记录且不落库。无 thought / 空独白 → 不落库。
-  Future<String> stripAndPersist({
+  /// 输入契约：调用方（ChatService）已经 [extractThought] 剥离并把非空独白
+  /// 传入——服务只做「开关读 + FK 落库 + 降级」。`innerThoughtEnabled` 开启 →
+  /// 落 InnerThoughts（characterId / messageId 随参透传）；关闭 → debugPrint
+  /// 记录且不落库。空串 → 防御性直接返回不落库（顶层剥离已丢弃空独白，
+  /// 服务侧不重复判定）。
+  Future<void> persistThought({
     required int characterId,
     required int messageId,
-    required String content,
+    required String thoughtContent,
   }) async {
-    final extracted = extractThought(content);
-    final thought = extracted.thoughtContent;
-    if (thought != null) {
-      final enabled = await _settingsRepository.innerThoughtEnabled;
-      if (enabled) {
-        await _companionRepository.createThought(
-          characterId: characterId,
-          messageId: messageId,
-          content: thought,
-        );
-      } else {
-        debugPrint('ThoughtService: inner thought detected but '
-            'inner_thought_enabled is off; stripped, not persisted.');
-      }
+    if (thoughtContent.isEmpty) {
+      return;
     }
-    return extracted.displayContent;
+    final enabled = await _settingsRepository.innerThoughtEnabled;
+    if (enabled) {
+      await _companionRepository.createThought(
+        characterId: characterId,
+        messageId: messageId,
+        content: thoughtContent,
+      );
+    } else {
+      debugPrint('ThoughtService: thought content received but '
+          'inner_thought_enabled is off; not persisted.');
+    }
   }
 }

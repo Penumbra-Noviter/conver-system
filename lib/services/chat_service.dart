@@ -816,22 +816,24 @@ class ChatService {
       role: Role.assistant,
       content: applied.displayContent,
     );
-    // ④ 补落 thought：stripAndPersist 需要已落库消息 id（InnerThoughts.messageId
-    //    FK → Messages），对原始内容重跑剥离仅取其落库/降级副作用，返回的
-    //    displayContent 丢弃（正文已在①②③处理，不重复写）。
-    if (extracted.thoughtContent != null) {
-      await _persistThought(state, msg.id, raw);
+    // ④ 补落 thought：ChatService 已在上文持有剥离结果（[extractThought]
+    //    为全链路唯一剥离点，S5），服务只按开关落库，不再对原文重跑。
+    final thoughtContent = extracted.thoughtContent;
+    if (thoughtContent != null) {
+      await _persistThought(state, msg.id, thoughtContent);
     }
     return msg;
   }
 
-  /// 经 [ThoughtService.stripAndPersist] 按开关落内心独白（slot 4）
-  /// 于 [extractThought] 检出 thought 之后；开关关 → 服务侧 debugPrint 不落库；
-  /// 服务抛错 → 降级 log，正文不受影响（对齐「记忆失败不阻断主回复」约束）。
+  /// 经 [ThoughtService.persistThought] 按开关落已剥离的内心独白（slot 4）。
+  ///
+  /// [thoughtContent] 来自 [extractThought]（上层唯一剥离点，S5）；开关关 →
+  /// 服务侧 debugPrint 不落库；服务抛错 → 降级 log，正文不受影响（对齐
+  /// 「记忆失败不阻断主回复」约束）。
   Future<void> _persistThought(
     _StreamRunState state,
     int messageId,
-    String raw,
+    String thoughtContent,
   ) async {
     final thoughtService = _thoughtService;
     final characterId = state.characterId;
@@ -839,10 +841,10 @@ class ChatService {
       return;
     }
     try {
-      await thoughtService.stripAndPersist(
+      await thoughtService.persistThought(
         characterId: characterId,
         messageId: messageId,
-        content: raw,
+        thoughtContent: thoughtContent,
       );
     } catch (e) {
       debugPrint('内心独白处理失败，保留正文: $e');

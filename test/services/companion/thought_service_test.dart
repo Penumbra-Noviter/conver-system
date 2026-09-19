@@ -6,8 +6,9 @@
 ///   displayContent 不含 thought 块残留 + thoughtContent null（工单验收 2）；
 ///   空/纯空白独白 → 丢弃不落库；多块 → 提取第一块、其余按无闭合处理
 ///   （工单验收 5）；1 MiB 长度封顶 + 线性处理不抛（SR-13）。
-/// - `stripAndPersist`：剥离恒启用（判定①）；开关开启且检出 → 落
-///   InnerThoughts 可查回；关闭 → 剥离 + debugPrint + 不落库（工单验收 4）。
+/// - `persistThought`：服务只接收已剥离的 `thoughtContent`（S5 全链路单点剥离，
+///   服务不再对原文重跑）；开关开启 → 落 InnerThoughts 可查回；关闭 →
+///   debugPrint + 不落库（工单验收 4）；空串 → 防御不落库。
 /// - `buildThoughtInstruction`：system 指令语义「`<thought>` 包裹且不直接输出」
 ///   （工单验收 5）。
 library;
@@ -138,7 +139,7 @@ void main() {
     });
   });
 
-  group('ThoughtService.stripAndPersist（工单验收 4）', () {
+  group('ThoughtService.persistThought（工单验收 4，S5 已剥离输入）', () {
     late AppDatabase db;
     late CompanionRepository companion;
     late SettingsRepository settings;
@@ -176,24 +177,23 @@ void main() {
             MessagesCompanion.insert(
               conversationId: conversation.id,
               role: Role.assistant,
-              content: '含独白原文',
+              content: '已剥离正文（S5：服务不再接收原文）',
               createdAt: now,
             ),
           );
       return (characterId: character.id, messageId: message.id);
     }
 
-    test('开关开启 + 检出 thought → 落 InnerThoughts 可查回（验收核心 4）', () async {
+    test('开关开启 + 已剥离 thoughtContent → 落 InnerThoughts 可查回（验收核心 4）', () async {
       final ids = await seedChain();
       await settings.setMany({SettingsRepository.innerThoughtEnabledKey: 'true'});
 
-      final display = await service.stripAndPersist(
+      await service.persistThought(
         characterId: ids.characterId,
         messageId: ids.messageId,
-        content: '正文<thought>她动摇了</thought>尾注',
+        thoughtContent: '她动摇了',
       );
 
-      expect(display, '正文尾注');
       final thoughts = await companion.listThoughtsByMessage(ids.messageId);
       expect(thoughts, hasLength(1));
       expect(thoughts.single.content, '她动摇了');
@@ -202,73 +202,28 @@ void main() {
       expect(thoughts.single.createdAt, fixedNow);
     });
 
-    test('开关关闭 + 检出 thought → 仍剥离 + 不落库（判定①）', () async {
+    test('开关关闭 + thoughtContent → debugPrint 不落库（判定①）', () async {
       final ids = await seedChain();
 
-      final display = await service.stripAndPersist(
+      await service.persistThought(
         characterId: ids.characterId,
         messageId: ids.messageId,
-        content: 'A<thought>内心</thought>B',
+        thoughtContent: '内心',
       );
 
-      expect(display, 'AB');
       expect(await companion.listThoughtsByMessage(ids.messageId), isEmpty);
     });
 
-    test('开关开启但无 thought → 不落库 + 原样返回', () async {
+    test('开关开启但 thoughtContent 空串 → 防御不落库', () async {
       final ids = await seedChain();
       await settings.setMany({SettingsRepository.innerThoughtEnabledKey: 'true'});
 
-      final display = await service.stripAndPersist(
+      await service.persistThought(
         characterId: ids.characterId,
         messageId: ids.messageId,
-        content: '普通正文',
+        thoughtContent: '',
       );
 
-      expect(display, '普通正文');
-      expect(await companion.listThoughtsByMessage(ids.messageId), isEmpty);
-    });
-
-    test('开关开启但空独白 → 不落库 + 标签剥离（SR-05 空独白丢弃）', () async {
-      final ids = await seedChain();
-      await settings.setMany({SettingsRepository.innerThoughtEnabledKey: 'true'});
-
-      final display = await service.stripAndPersist(
-        characterId: ids.characterId,
-        messageId: ids.messageId,
-        content: 'A<thought>   </thought>B',
-      );
-
-      expect(display, 'AB');
-      expect(await companion.listThoughtsByMessage(ids.messageId), isEmpty);
-    });
-
-    test('多块 → 仅落第一块 + display 剥离（工单验收 5）', () async {
-      final ids = await seedChain();
-      await settings.setMany({SettingsRepository.innerThoughtEnabledKey: 'true'});
-
-      final display = await service.stripAndPersist(
-        characterId: ids.characterId,
-        messageId: ids.messageId,
-        content: 'A <thought>一</thought> B <thought>二</thought> C',
-      );
-
-      expect(display, 'A  B ');
-      final thoughts = await companion.listThoughtsByMessage(ids.messageId);
-      expect(thoughts, hasLength(1));
-      expect(thoughts.single.content, '一');
-    });
-
-    test('开关关闭 + 开标签无闭合 → 剥离残留 + 不落库', () async {
-      final ids = await seedChain();
-
-      final display = await service.stripAndPersist(
-        characterId: ids.characterId,
-        messageId: ids.messageId,
-        content: '正文<thought>截断',
-      );
-
-      expect(display, '正文');
       expect(await companion.listThoughtsByMessage(ids.messageId), isEmpty);
     });
   });
