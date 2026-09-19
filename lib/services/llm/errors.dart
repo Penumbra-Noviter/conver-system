@@ -212,3 +212,10 @@ class RegenerateBusyError extends DomainError {
 class DocParseError extends DomainError {
   DocParseError(super.message);
 }
+
+/// swipes 候选序号越界（MS-01）：switchSwipe / deleteSwipe 目标 index
+/// 不存在于该消息候选集时抛（桌面 `SwipeIndexError` 对应物，命名对齐
+/// chat-polish spec §4.8 领域错误新增清单）。
+class SwipeIndexOutOfRangeError extends DomainError {
+  SwipeIndexOutOfRangeError(int index) : super('候选序号不存在: $index');
+}

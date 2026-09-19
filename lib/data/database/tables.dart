@@ -4,7 +4,9 @@
 /// InnerThoughts 为阶段 2 三表（schemaVersion=3，spec §3，桌面无对应物）；
 /// Messages.created_at 单列索引为 FD-05（schemaVersion=4）；
 /// EmbeddingEntries / SemanticHits 为阶段 3 两表（schemaVersion=5，
-/// stage3-vector-recall spec §2 D2，桌面无对应物）。
+/// stage3-vector-recall spec §2 D2，桌面无对应物）；
+/// MessageSwipes 候选表 + Messages.active_swipe_index 为 MS-01（schemaVersion=6，
+/// chat-polish spec §4.2，对齐桌面 message.py::MessageSwipe）。
 ///
 /// 权威源（只读，勿改）：
 /// `desktop/backend/app/models/{character,conversation,message,setting}.py`
@@ -181,7 +183,43 @@ class Messages extends Table {
   /// 必填文本。
   TextColumn get content => text()();
 
+  /// 当前激活候选序号（MS-01；spec §4.2 默认 0）。`messages.content` 恒为
+  /// 当前激活候选——切换/追加候选时由仓储层同步覆写（对齐桌面
+  /// `models/message.py::Message.active_swipe_index`，server_default '0'）。
+  IntColumn get activeSwipeIndex => integer().withDefault(const Constant(0))();
+
   DateTimeColumn get createdAt => dateTime()();
+}
+
+/// 消息候选表 — 对齐桌面端 `models/message.py::MessageSwipe`（MS-1）。
+///
+/// 序号 `index` 0 起（候选 0 = 消息原始内容，首次 addSwipe 播种）、
+/// `(message_id, index)` 唯一（对齐桌面 `uq_message_swipes_message_index`）；
+/// 删除消息级联删候选（FK CASCADE）。FK 索引由迁移 raw SQL 补建
+/// （drift 不自动为 FK 建索引，对齐 @TableIndex 注解）。
+@DataClassName('MessageSwipe')
+@TableIndex(name: 'idx_message_swipes_message_id', columns: {#messageId})
+class MessageSwipes extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → messages.id，桌面端 ondelete=CASCADE + index=True。
+  IntColumn get messageId =>
+      integer().references(Messages, #id, onDelete: KeyAction.cascade)();
+
+  /// 候选序号（0 起；必填整数）。
+  IntColumn get index => integer()();
+
+  /// 候选正文（必填文本）。
+  TextColumn get content => text()();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  /// `(message_id, index)` 唯一约束（对齐桌面 UniqueConstraint
+  /// uq_message_swipes_message_index；SQLite 生成 autoindex 实现）。
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {messageId, index},
+      ];
 }
 
 /// 设置表（键值对）— 对齐桌面端 `models/setting.py::Setting`。

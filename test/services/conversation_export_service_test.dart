@@ -180,11 +180,16 @@ void main() {
       expect(character['avatar'], 'avatar.png');
       expect(character['temperature'], 0.7);
 
-      // messages 段：字段序 + 按 created_at 升序 + Role.value 落库值。
+      // messages 段：字段序 + 按 created_at 升序 + Role.value 落库值
+      //（MS-01 追加 active_swipe_index/swipes 尾部键，桌面逐字：无候选消息
+      // active=0、swipes=[]）。
       final messages = (json['messages']! as List).cast<Map<String, dynamic>>();
       expect(messages, hasLength(3));
       for (final m in messages) {
-        expect(m.keys.toList(), ['id', 'role', 'content', 'created_at']);
+        expect(m.keys.toList(),
+            ['id', 'role', 'content', 'created_at', 'active_swipe_index', 'swipes']);
+        expect(m['active_swipe_index'], 0);
+        expect(m['swipes'], isEmpty);
       }
       expect(messages.map((m) => m['role']).toList(),
           ['system', 'user', 'assistant']);
@@ -400,6 +405,85 @@ void main() {
       expect(result.content,
           contains('**assistant**: a b c d\ne\tf'));
       // JSON 侧天然安全（jsonEncode 转义），MD 侧净化——有意差异（A7）。
+    });
+  });
+
+  group('exportJson · swipes 候选集 + active 指标（MS-01 / SR-29）', () {
+    test('含候选消息：active_swipe_index 与 swipes（index 升序 content 列表）逐字', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id, title: '候选导出对话');
+      final msg = await seedMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '原始回复',
+      );
+
+      // 首次 addSwipe 播种候选 0 = 原始回复，追加候选 1 并激活（桌面
+      // add_swipe 语义）；再追加候选 2 不激活。
+      await msgRepo.addSwipe(msg.id, '候选一');
+      await msgRepo.addSwipe(msg.id, '候选二', makeActive: false);
+      await msgRepo.switchSwipe(msg.id, 0);
+
+      final result = await service.exportJson(conv.id);
+      final json = decodeJson(result!.content);
+      final messages =
+          (json['messages']! as List).cast<Map<String, dynamic>>();
+
+      expect(messages, hasLength(1));
+      final exported = messages.single;
+      expect(exported['content'], '原始回复', reason: 'content 恒为激活候选');
+      expect(exported['active_swipe_index'], 0);
+      expect(
+        exported['swipes'],
+        ['原始回复', '候选一', '候选二'],
+        reason: 'swipes = index 升序 content 列表（桌面 list_swipes_batch）',
+      );
+      expect(exported.keys.toList(),
+          ['id', 'role', 'content', 'created_at', 'active_swipe_index', 'swipes']);
+    });
+
+    test('导出→解析重放与源头一致（SR-29 序/值断言；既有导入路径由 BR-01 承接）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id, title: '重放对话');
+      final msg1 = await seedMessage(
+        conversationId: conv.id,
+        role: Role.user,
+        content: '你好',
+      );
+      final msg2 = await seedMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '原始回复',
+      );
+      await msgRepo.addSwipe(msg2.id, '候选一');
+      await msgRepo.addSwipe(msg2.id, '候选二');
+
+      final result = await service.exportJson(conv.id);
+      final json = decodeJson(result!.content);
+      final exported = (json['messages']! as List).cast<Map<String, dynamic>>();
+
+      // 重放：按导出消息序逐条回查源头（内存库读回），序/值逐项一致。
+      final sourceMessages = await msgRepo.getMessages(conv.id);
+      expect(exported.map((m) => m['id']).toList(),
+          sourceMessages.map((m) => m.id).toList());
+      for (var i = 0; i < exported.length; i++) {
+        final source = sourceMessages[i];
+        final swipes = await msgRepo.listSwipes(source.id);
+        expect(exported[i]['content'], source.content,
+            reason: '导入重放后 content = 激活候选，逐条一致');
+        expect(exported[i]['active_swipe_index'], source.activeSwipeIndex);
+        expect(
+          exported[i]['swipes'],
+          swipes.map((s) => s.content).toList(),
+          reason: '候选集 index 升序 + 内容逐值一致',
+        );
+      }
+
+      // 无候选消息（msg1）导出的空候选也一致。
+      final msg1Export = exported.firstWhere((m) => m['id'] == msg1.id);
+      expect(msg1Export['swipes'], isEmpty);
+      expect(msg1Export['active_swipe_index'], 0);
     });
   });
 

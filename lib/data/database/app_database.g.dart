@@ -1579,6 +1579,18 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _activeSwipeIndexMeta = const VerificationMeta(
+    'activeSwipeIndex',
+  );
+  @override
+  late final GeneratedColumn<int> activeSwipeIndex = GeneratedColumn<int>(
+    'active_swipe_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1596,6 +1608,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     conversationId,
     role,
     content,
+    activeSwipeIndex,
     createdAt,
   ];
   @override
@@ -1632,6 +1645,15 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     } else if (isInserting) {
       context.missing(_contentMeta);
     }
+    if (data.containsKey('active_swipe_index')) {
+      context.handle(
+        _activeSwipeIndexMeta,
+        activeSwipeIndex.isAcceptableOrUnknown(
+          data['active_swipe_index']!,
+          _activeSwipeIndexMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1667,6 +1689,10 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
         DriftSqlType.string,
         data['${effectivePrefix}content'],
       )!,
+      activeSwipeIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}active_swipe_index'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1693,12 +1719,18 @@ class Message extends DataClass implements Insertable<Message> {
 
   /// 必填文本。
   final String content;
+
+  /// 当前激活候选序号（MS-01；spec §4.2 默认 0）。`messages.content` 恒为
+  /// 当前激活候选——切换/追加候选时由仓储层同步覆写（对齐桌面
+  /// `models/message.py::Message.active_swipe_index`，server_default '0'）。
+  final int activeSwipeIndex;
   final DateTime createdAt;
   const Message({
     required this.id,
     required this.conversationId,
     required this.role,
     required this.content,
+    required this.activeSwipeIndex,
     required this.createdAt,
   });
   @override
@@ -1710,6 +1742,7 @@ class Message extends DataClass implements Insertable<Message> {
       map['role'] = Variable<String>($MessagesTable.$converterrole.toSql(role));
     }
     map['content'] = Variable<String>(content);
+    map['active_swipe_index'] = Variable<int>(activeSwipeIndex);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -1720,6 +1753,7 @@ class Message extends DataClass implements Insertable<Message> {
       conversationId: Value(conversationId),
       role: Value(role),
       content: Value(content),
+      activeSwipeIndex: Value(activeSwipeIndex),
       createdAt: Value(createdAt),
     );
   }
@@ -1734,6 +1768,7 @@ class Message extends DataClass implements Insertable<Message> {
       conversationId: serializer.fromJson<int>(json['conversationId']),
       role: serializer.fromJson<Role>(json['role']),
       content: serializer.fromJson<String>(json['content']),
+      activeSwipeIndex: serializer.fromJson<int>(json['activeSwipeIndex']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -1745,6 +1780,7 @@ class Message extends DataClass implements Insertable<Message> {
       'conversationId': serializer.toJson<int>(conversationId),
       'role': serializer.toJson<Role>(role),
       'content': serializer.toJson<String>(content),
+      'activeSwipeIndex': serializer.toJson<int>(activeSwipeIndex),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -1754,12 +1790,14 @@ class Message extends DataClass implements Insertable<Message> {
     int? conversationId,
     Role? role,
     String? content,
+    int? activeSwipeIndex,
     DateTime? createdAt,
   }) => Message(
     id: id ?? this.id,
     conversationId: conversationId ?? this.conversationId,
     role: role ?? this.role,
     content: content ?? this.content,
+    activeSwipeIndex: activeSwipeIndex ?? this.activeSwipeIndex,
     createdAt: createdAt ?? this.createdAt,
   );
   Message copyWithCompanion(MessagesCompanion data) {
@@ -1770,6 +1808,9 @@ class Message extends DataClass implements Insertable<Message> {
           : this.conversationId,
       role: data.role.present ? data.role.value : this.role,
       content: data.content.present ? data.content.value : this.content,
+      activeSwipeIndex: data.activeSwipeIndex.present
+          ? data.activeSwipeIndex.value
+          : this.activeSwipeIndex,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1781,13 +1822,21 @@ class Message extends DataClass implements Insertable<Message> {
           ..write('conversationId: $conversationId, ')
           ..write('role: $role, ')
           ..write('content: $content, ')
+          ..write('activeSwipeIndex: $activeSwipeIndex, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, conversationId, role, content, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    conversationId,
+    role,
+    content,
+    activeSwipeIndex,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1796,6 +1845,7 @@ class Message extends DataClass implements Insertable<Message> {
           other.conversationId == this.conversationId &&
           other.role == this.role &&
           other.content == this.content &&
+          other.activeSwipeIndex == this.activeSwipeIndex &&
           other.createdAt == this.createdAt);
 }
 
@@ -1804,12 +1854,14 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<int> conversationId;
   final Value<Role> role;
   final Value<String> content;
+  final Value<int> activeSwipeIndex;
   final Value<DateTime> createdAt;
   const MessagesCompanion({
     this.id = const Value.absent(),
     this.conversationId = const Value.absent(),
     this.role = const Value.absent(),
     this.content = const Value.absent(),
+    this.activeSwipeIndex = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   MessagesCompanion.insert({
@@ -1817,6 +1869,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     required int conversationId,
     required Role role,
     required String content,
+    this.activeSwipeIndex = const Value.absent(),
     required DateTime createdAt,
   }) : conversationId = Value(conversationId),
        role = Value(role),
@@ -1827,6 +1880,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Expression<int>? conversationId,
     Expression<String>? role,
     Expression<String>? content,
+    Expression<int>? activeSwipeIndex,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -1834,6 +1888,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       if (conversationId != null) 'conversation_id': conversationId,
       if (role != null) 'role': role,
       if (content != null) 'content': content,
+      if (activeSwipeIndex != null) 'active_swipe_index': activeSwipeIndex,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -1843,6 +1898,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     Value<int>? conversationId,
     Value<Role>? role,
     Value<String>? content,
+    Value<int>? activeSwipeIndex,
     Value<DateTime>? createdAt,
   }) {
     return MessagesCompanion(
@@ -1850,6 +1906,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
       conversationId: conversationId ?? this.conversationId,
       role: role ?? this.role,
       content: content ?? this.content,
+      activeSwipeIndex: activeSwipeIndex ?? this.activeSwipeIndex,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -1871,6 +1928,9 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     if (content.present) {
       map['content'] = Variable<String>(content.value);
     }
+    if (activeSwipeIndex.present) {
+      map['active_swipe_index'] = Variable<int>(activeSwipeIndex.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1884,6 +1944,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
           ..write('conversationId: $conversationId, ')
           ..write('role: $role, ')
           ..write('content: $content, ')
+          ..write('activeSwipeIndex: $activeSwipeIndex, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -5202,6 +5263,369 @@ class SemanticHitsCompanion extends UpdateCompanion<SemanticHit> {
   }
 }
 
+class $MessageSwipesTable extends MessageSwipes
+    with TableInfo<$MessageSwipesTable, MessageSwipe> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MessageSwipesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<int> messageId = GeneratedColumn<int>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES messages (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _indexMeta = const VerificationMeta('index');
+  @override
+  late final GeneratedColumn<int> index = GeneratedColumn<int>(
+    'index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    messageId,
+    index,
+    content,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'message_swipes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MessageSwipe> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('index')) {
+      context.handle(
+        _indexMeta,
+        index.isAcceptableOrUnknown(data['index']!, _indexMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_indexMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {messageId, index},
+  ];
+  @override
+  MessageSwipe map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MessageSwipe(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}message_id'],
+      )!,
+      index: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}index'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MessageSwipesTable createAlias(String alias) {
+    return $MessageSwipesTable(attachedDatabase, alias);
+  }
+}
+
+class MessageSwipe extends DataClass implements Insertable<MessageSwipe> {
+  final int id;
+
+  /// 必填外键 → messages.id，桌面端 ondelete=CASCADE + index=True。
+  final int messageId;
+
+  /// 候选序号（0 起；必填整数）。
+  final int index;
+
+  /// 候选正文（必填文本）。
+  final String content;
+  final DateTime createdAt;
+  const MessageSwipe({
+    required this.id,
+    required this.messageId,
+    required this.index,
+    required this.content,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['message_id'] = Variable<int>(messageId);
+    map['index'] = Variable<int>(index);
+    map['content'] = Variable<String>(content);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  MessageSwipesCompanion toCompanion(bool nullToAbsent) {
+    return MessageSwipesCompanion(
+      id: Value(id),
+      messageId: Value(messageId),
+      index: Value(index),
+      content: Value(content),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory MessageSwipe.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MessageSwipe(
+      id: serializer.fromJson<int>(json['id']),
+      messageId: serializer.fromJson<int>(json['messageId']),
+      index: serializer.fromJson<int>(json['index']),
+      content: serializer.fromJson<String>(json['content']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'messageId': serializer.toJson<int>(messageId),
+      'index': serializer.toJson<int>(index),
+      'content': serializer.toJson<String>(content),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  MessageSwipe copyWith({
+    int? id,
+    int? messageId,
+    int? index,
+    String? content,
+    DateTime? createdAt,
+  }) => MessageSwipe(
+    id: id ?? this.id,
+    messageId: messageId ?? this.messageId,
+    index: index ?? this.index,
+    content: content ?? this.content,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  MessageSwipe copyWithCompanion(MessageSwipesCompanion data) {
+    return MessageSwipe(
+      id: data.id.present ? data.id.value : this.id,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      index: data.index.present ? data.index.value : this.index,
+      content: data.content.present ? data.content.value : this.content,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageSwipe(')
+          ..write('id: $id, ')
+          ..write('messageId: $messageId, ')
+          ..write('index: $index, ')
+          ..write('content: $content, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, messageId, index, content, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MessageSwipe &&
+          other.id == this.id &&
+          other.messageId == this.messageId &&
+          other.index == this.index &&
+          other.content == this.content &&
+          other.createdAt == this.createdAt);
+}
+
+class MessageSwipesCompanion extends UpdateCompanion<MessageSwipe> {
+  final Value<int> id;
+  final Value<int> messageId;
+  final Value<int> index;
+  final Value<String> content;
+  final Value<DateTime> createdAt;
+  const MessageSwipesCompanion({
+    this.id = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.index = const Value.absent(),
+    this.content = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  MessageSwipesCompanion.insert({
+    this.id = const Value.absent(),
+    required int messageId,
+    required int index,
+    required String content,
+    required DateTime createdAt,
+  }) : messageId = Value(messageId),
+       index = Value(index),
+       content = Value(content),
+       createdAt = Value(createdAt);
+  static Insertable<MessageSwipe> custom({
+    Expression<int>? id,
+    Expression<int>? messageId,
+    Expression<int>? index,
+    Expression<String>? content,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (messageId != null) 'message_id': messageId,
+      if (index != null) 'index': index,
+      if (content != null) 'content': content,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  MessageSwipesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? messageId,
+    Value<int>? index,
+    Value<String>? content,
+    Value<DateTime>? createdAt,
+  }) {
+    return MessageSwipesCompanion(
+      id: id ?? this.id,
+      messageId: messageId ?? this.messageId,
+      index: index ?? this.index,
+      content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<int>(messageId.value);
+    }
+    if (index.present) {
+      map['index'] = Variable<int>(index.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageSwipesCompanion(')
+          ..write('id: $id, ')
+          ..write('messageId: $messageId, ')
+          ..write('index: $index, ')
+          ..write('content: $content, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5221,6 +5645,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $SemanticHitsTable semanticHits = $SemanticHitsTable(this);
+  late final $MessageSwipesTable messageSwipes = $MessageSwipesTable(this);
   late final Index idxCharactersName = Index(
     'idx_characters_name',
     'CREATE INDEX idx_characters_name ON characters (name)',
@@ -5281,6 +5706,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_semantic_hits_character_id',
     'CREATE INDEX idx_semantic_hits_character_id ON semantic_hits (character_id)',
   );
+  late final Index idxMessageSwipesMessageId = Index(
+    'idx_message_swipes_message_id',
+    'CREATE INDEX idx_message_swipes_message_id ON message_swipes (message_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5297,6 +5726,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     innerThoughts,
     embeddingEntries,
     semanticHits,
+    messageSwipes,
     idxCharactersName,
     idxConversationsCharacterId,
     idxMessagesConversationId,
@@ -5312,6 +5742,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxEmbeddingEntriesCharacterId,
     idxEmbeddingEntriesCharacterIdContentHash,
     idxSemanticHitsCharacterId,
+    idxMessageSwipesMessageId,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5398,6 +5829,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('semantic_hits', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'messages',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('message_swipes', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -7218,6 +7656,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   required int conversationId,
   required Role role,
   required String content,
+  Value<int> activeSwipeIndex,
   required DateTime createdAt,
 });
 typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
@@ -7225,6 +7664,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<int> conversationId,
   Value<Role> role,
   Value<String> content,
+  Value<int> activeSwipeIndex,
   Value<DateTime> createdAt,
 });
 
@@ -7285,6 +7725,24 @@ final class $$MessagesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$MessageSwipesTable, List<MessageSwipe>>
+  _messageSwipesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.messageSwipes,
+    aliasName: 'messages__id__message_swipes__message_id',
+  );
+
+  $$MessageSwipesTableProcessedTableManager get messageSwipesRefs {
+    final manager = $$MessageSwipesTableTableManager(
+      $_db,
+      $_db.messageSwipes,
+    ).filter((f) => f.messageId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_messageSwipesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$MessagesTableFilterComposer
@@ -7309,6 +7767,11 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<String> get content => $composableBuilder(
     column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get activeSwipeIndex => $composableBuilder(
+    column: $table.activeSwipeIndex,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7389,6 +7852,31 @@ class $$MessagesTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> messageSwipesRefs(
+    Expression<bool> Function($$MessageSwipesTableFilterComposer f) f,
+  ) {
+    final $$MessageSwipesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.messageSwipes,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageSwipesTableFilterComposer(
+            $db: $db,
+            $table: $db.messageSwipes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$MessagesTableOrderingComposer
@@ -7412,6 +7900,11 @@ class $$MessagesTableOrderingComposer
 
   ColumnOrderings<String> get content => $composableBuilder(
     column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get activeSwipeIndex => $composableBuilder(
+    column: $table.activeSwipeIndex,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7461,6 +7954,11 @@ class $$MessagesTableAnnotationComposer
 
   GeneratedColumn<String> get content =>
       $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<int> get activeSwipeIndex => $composableBuilder(
+    column: $table.activeSwipeIndex,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -7537,6 +8035,31 @@ class $$MessagesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> messageSwipesRefs<T extends Object>(
+    Expression<T> Function($$MessageSwipesTableAnnotationComposer a) f,
+  ) {
+    final $$MessageSwipesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.messageSwipes,
+      getReferencedColumn: (t) => t.messageId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageSwipesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messageSwipes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$MessagesTableTableManager
@@ -7556,6 +8079,7 @@ class $$MessagesTableTableManager
             bool conversationId,
             bool proactivePlansRefs,
             bool innerThoughtsRefs,
+            bool messageSwipesRefs,
           })
         > {
   $$MessagesTableTableManager(_$AppDatabase db, $MessagesTable table)
@@ -7575,12 +8099,14 @@ class $$MessagesTableTableManager
                 Value<int> conversationId = const Value.absent(),
                 Value<Role> role = const Value.absent(),
                 Value<String> content = const Value.absent(),
+                Value<int> activeSwipeIndex = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => MessagesCompanion(
                 id: id,
                 conversationId: conversationId,
                 role: role,
                 content: content,
+                activeSwipeIndex: activeSwipeIndex,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -7589,12 +8115,14 @@ class $$MessagesTableTableManager
                 required int conversationId,
                 required Role role,
                 required String content,
+                Value<int> activeSwipeIndex = const Value.absent(),
                 required DateTime createdAt,
               }) => MessagesCompanion.insert(
                 id: id,
                 conversationId: conversationId,
                 role: role,
                 content: content,
+                activeSwipeIndex: activeSwipeIndex,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0
@@ -7610,12 +8138,14 @@ class $$MessagesTableTableManager
                 conversationId = false,
                 proactivePlansRefs = false,
                 innerThoughtsRefs = false,
+                messageSwipesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (proactivePlansRefs) db.proactivePlans,
                     if (innerThoughtsRefs) db.innerThoughts,
+                    if (messageSwipesRefs) db.messageSwipes,
                   ],
                   addJoins:
                       <
@@ -7691,6 +8221,27 @@ class $$MessagesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (messageSwipesRefs)
+                        await $_getPrefetchedData<
+                          Message,
+                          $MessagesTable,
+                          MessageSwipe
+                        >(
+                          currentTable: table,
+                          referencedTable: $$MessagesTableReferences
+                              ._messageSwipesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MessagesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).messageSwipesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.messageId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -7715,6 +8266,7 @@ typedef $$MessagesTableProcessedTableManager =
         bool conversationId,
         bool proactivePlansRefs,
         bool innerThoughtsRefs,
+        bool messageSwipesRefs,
       })
     >;
 typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
@@ -10520,6 +11072,319 @@ typedef $$SemanticHitsTableProcessedTableManager =
       SemanticHit,
       PrefetchHooks Function({bool characterId})
     >;
+typedef $$MessageSwipesTableCreateCompanionBuilder =
+    MessageSwipesCompanion Function({
+      Value<int> id,
+      required int messageId,
+      required int index,
+      required String content,
+      required DateTime createdAt,
+    });
+typedef $$MessageSwipesTableUpdateCompanionBuilder =
+    MessageSwipesCompanion Function({
+      Value<int> id,
+      Value<int> messageId,
+      Value<int> index,
+      Value<String> content,
+      Value<DateTime> createdAt,
+    });
+
+final class $$MessageSwipesTableReferences
+    extends BaseReferences<_$AppDatabase, $MessageSwipesTable, MessageSwipe> {
+  $$MessageSwipesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MessagesTable _messageIdTable(_$AppDatabase db) =>
+      db.messages.createAlias('message_swipes__message_id__messages__id');
+
+  $$MessagesTableProcessedTableManager get messageId {
+    final $_column = $_itemColumn<int>('message_id')!;
+
+    final manager = $$MessagesTableTableManager(
+      $_db,
+      $_db.messages,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_messageIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MessageSwipesTableFilterComposer
+    extends Composer<_$AppDatabase, $MessageSwipesTable> {
+  $$MessageSwipesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get index => $composableBuilder(
+    column: $table.index,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MessagesTableFilterComposer get messageId {
+    final $$MessagesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableFilterComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageSwipesTableOrderingComposer
+    extends Composer<_$AppDatabase, $MessageSwipesTable> {
+  $$MessageSwipesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get index => $composableBuilder(
+    column: $table.index,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MessagesTableOrderingComposer get messageId {
+    final $$MessagesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableOrderingComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageSwipesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MessageSwipesTable> {
+  $$MessageSwipesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get index =>
+      $composableBuilder(column: $table.index, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$MessagesTableAnnotationComposer get messageId {
+    final $$MessagesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.messageId,
+      referencedTable: $db.messages,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessagesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messages,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageSwipesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MessageSwipesTable,
+          MessageSwipe,
+          $$MessageSwipesTableFilterComposer,
+          $$MessageSwipesTableOrderingComposer,
+          $$MessageSwipesTableAnnotationComposer,
+          $$MessageSwipesTableCreateCompanionBuilder,
+          $$MessageSwipesTableUpdateCompanionBuilder,
+          (MessageSwipe, $$MessageSwipesTableReferences),
+          MessageSwipe,
+          PrefetchHooks Function({bool messageId})
+        > {
+  $$MessageSwipesTableTableManager(_$AppDatabase db, $MessageSwipesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MessageSwipesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MessageSwipesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MessageSwipesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> messageId = const Value.absent(),
+                Value<int> index = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => MessageSwipesCompanion(
+                id: id,
+                messageId: messageId,
+                index: index,
+                content: content,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int messageId,
+                required int index,
+                required String content,
+                required DateTime createdAt,
+              }) => MessageSwipesCompanion.insert(
+                id: id,
+                messageId: messageId,
+                index: index,
+                content: content,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MessageSwipesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({messageId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (messageId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.messageId,
+                        referencedTable: $$MessageSwipesTableReferences
+                            ._messageIdTable(db),
+                        referencedColumn: $$MessageSwipesTableReferences
+                            ._messageIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MessageSwipesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MessageSwipesTable,
+      MessageSwipe,
+      $$MessageSwipesTableFilterComposer,
+      $$MessageSwipesTableOrderingComposer,
+      $$MessageSwipesTableAnnotationComposer,
+      $$MessageSwipesTableCreateCompanionBuilder,
+      $$MessageSwipesTableUpdateCompanionBuilder,
+      (MessageSwipe, $$MessageSwipesTableReferences),
+      MessageSwipe,
+      PrefetchHooks Function({bool messageId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10546,4 +11411,6 @@ class $AppDatabaseManager {
       $$EmbeddingEntriesTableTableManager(_db, _db.embeddingEntries);
   $$SemanticHitsTableTableManager get semanticHits =>
       $$SemanticHitsTableTableManager(_db, _db.semanticHits);
+  $$MessageSwipesTableTableManager get messageSwipes =>
+      $$MessageSwipesTableTableManager(_db, _db.messageSwipes);
 }

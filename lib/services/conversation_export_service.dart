@@ -86,10 +86,16 @@ class ConversationExportService {
   /// 导出对话为 JSON（结构照搬桌面 `export_conversation_json` 逐字段逐序）。
   ///
   /// 三层：`{conversation:{id,title,model_provider,model_name,created_at,
-  /// updated_at}, character:{...}|null, messages:[{id,role,content,created_at}]}`；
-  /// character 段为 9 字段投影（ConversationExportCharacter）；消息按
-  /// `created_at` 升序 + id 兜底（对齐 MessageRepository.getMessages 既有排序）。
-  /// 对话不存在 → `null`；无消息 → `messages: []`。
+  /// updated_at}, character:{...}|null, messages:[{id,role,content,created_at,
+  /// active_swipe_index,swipes}]}`；character 段为 9 字段投影
+  /// （ConversationExportCharacter）；消息按 `created_at` 升序 + id 兜底
+  /// （对齐 MessageRepository.getMessages 既有排序）。对话不存在 → `null`；
+  /// 无消息 → `messages: []`。
+  ///
+  /// MS-01（SR-29 基础）：每条消息追加 `active_swipe_index`（int，默认 0）
+  /// 与 `swipes`（index 升序 content 字符串列表；无候选为空列表）——桌面
+  /// `conversation_export.py` L94-95 逐字，`content` 恒为当前激活候选，
+  /// 既有消费方（搜索/记忆/深链/ProactivePlans）零改动取 active 内容。
   ///
   /// 时间戳：`.toUtc().toIso8601String()`（UTC、带 Z、秒精度 `.000` 后缀）。
   /// 内容保留模板变量字面量（往返保真）。
@@ -121,6 +127,8 @@ class ConversationExportService {
             'role': message.role.value,
             'content': message.content,
             'created_at': message.createdAt.toUtc().toIso8601String(),
+            'active_swipe_index': message.activeSwipeIndex,
+            'swipes': await _swipeContents(message.id),
           },
       ],
     });
@@ -238,6 +246,13 @@ class ConversationExportService {
       'avatar': character.avatar,
       'temperature': character.temperature,
     };
+  }
+
+  /// 消息候选 content 列表（index 升序；无候选返回空列表，MS-01 导出契约
+  /// 对应桌面 `list_swipes_batch` 的 `[content...]` 形态）。
+  Future<List<String>> _swipeContents(int messageId) async {
+    final swipes = await _messageRepository.listSwipes(messageId);
+    return [for (final swipe in swipes) swipe.content];
   }
 
   /// 最终文件名：`{safeFileName(baseName)}.{extension}`。

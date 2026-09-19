@@ -1,11 +1,12 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=5，M0 冻结 + AC-01 升版 +
-/// PS2-01 升版 + FD-05 升版 + VR-04 升版）。
+/// 应用数据库 — drift 数据库入口（schemaVersion=6，M0 冻结 + AC-01 升版 +
+/// PS2-01 升版 + FD-05 升版 + VR-04 升版 + MS-01 升版）。
 ///
 /// - 表注册：characters / conversations / messages / settings / memory_entries /
 ///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
 ///   后两表为人机恋板块移动端先行）+ relationship_states / proactive_plans /
 ///   inner_thoughts（阶段 2 三表，spec §3）+ embedding_entries / semantic_hits
-///   （阶段 3 两表，stage3-vector-recall spec §2 D2）
+///   （阶段 3 两表，stage3-vector-recall spec §2 D2）+ message_swipes（MS-01
+///   候选表，chat-polish spec §4.2）
 /// - 执行器构造注入：测试 seam，测试用 `AppDatabase(NativeDatabase.memory())`
 ///   在内存中打开真实 schema，不依赖设备
 /// - 运行态连接经 [AppDatabase.open]（drift_flutter 惰性打开，内部即
@@ -34,6 +35,7 @@ part 'app_database.g.dart';
     InnerThoughts,
     EmbeddingEntries,
     SemanticHits,
+    MessageSwipes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -46,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -151,6 +153,36 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS idx_semantic_hits_character_id '
           'ON semantic_hits (character_id)',
+        );
+      }
+
+      // MS-01：schemaVersion 5→6 新增候选表 message_swipes +
+      // messages.active_swipe_index 列（chat-polish spec §4.2）。
+      //
+      // 列补建**不用** drift Migration.addColumn——它无 IF NOT EXISTS 语义，
+      // 中断残留重开（列已补、后续 DDL 失败、user_version 未回写）时重复
+      // 补列会 duplicate column 炸库。改走「PRAGMA table_info 探测缺列 →
+      // ALTER TABLE ADD COLUMN」幂等补列（对齐桌面 database.py
+      // `_ensure_messages_active_swipe_index` 探测补列先例），连续重跑
+      // 无副作用。新表与 FK 索引用 CREATE TABLE / CREATE INDEX IF NOT
+      // EXISTS 幂等补建（沿 from < 2/3/5 先例；drift 不自动为 FK 建索引，
+      // raw SQL 补建对齐 tables.dart @TableIndex）。user_version=6 由
+      // drift 成功后回写，失败锁库重开重跑（F-78 幂等三机制延续）。
+      if (from < 6) {
+        final columns = await customSelect('PRAGMA table_info(messages)').get();
+        final hasActiveSwipeIndex = columns.any(
+          (row) => row.data['name'] == 'active_swipe_index',
+        );
+        if (!hasActiveSwipeIndex) {
+          await customStatement(
+            'ALTER TABLE messages ADD COLUMN active_swipe_index '
+            'INTEGER NOT NULL DEFAULT 0',
+          );
+        }
+        await m.createTable(messageSwipes);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_message_swipes_message_id '
+          'ON message_swipes (message_id)',
         );
       }
     },

@@ -1,4 +1,5 @@
-/// 消息仓储 — CRUD + create 副作用 + 锚定截断，语义与桌面 message 服务逐条对齐。
+/// 消息仓储 — CRUD + create 副作用 + 锚定截断 + swipes 候选，语义与桌面
+/// message 服务逐条对齐。
 ///
 /// 桌面权威源（只读，语义锚点）：
 /// `desktop/backend/app/services/message.py`
@@ -21,10 +22,24 @@
 ///   消息插入将被外键约束拒绝——孤儿消息在移动端语义中不存在
 ///   （spec 级联节：依赖 M0 外键 CASCADE + `PRAGMA foreign_keys = ON`）；
 /// - 时间戳全部由本层赋值（drift 列无 DB 默认）。
+///
+/// swipes 对齐要点（MS-01，chat-polish spec §4.2）：
+/// - add_swipe 首次播种候选 0 = 消息当前 content（桌面 L378-381），新候选
+///   index = max+1（L382：删中间留空档后不碰撞）；make_active=True 同步覆写
+///   messages.content 与 active_swipe_index（L384-387）——`messages.content`
+///   恒为「当前激活候选」，既有读面零改动取 active 内容；
+/// - switch_swipe 越界抛 [SwipeIndexOutOfRangeError]（桌面 SwipeIndexError），
+///   合法切换覆写 content + active（L495-496）；
+/// - delete_swipe 删当前激活候选回落「小于被删 index 的最大现存，否则大于的
+///   最小现存」（L536）+ content 跟随回落候选；**移动端有意偏差**：桌面候选 0
+///   受保护拒删（L515-516），移动端允许删空候选集 → active 回落 0 锁定、
+///   content 保留消息本体（工单验收 4/5，详见 concerns/01.md §3）；
+/// - 消息/候选删除的级联由 FK CASCADE + PRAGMA foreign_keys=ON 承保。
 library;
 
 import 'package:drift/drift.dart';
 
+import '../../services/llm/errors.dart';
 import '../database/app_database.dart';
 import '../database/tables.dart';
 import 'conversation_repository.dart';
@@ -346,5 +361,177 @@ class MessageRepository {
           ..limit(1))
         .get();
     return rows.isEmpty ? null : rows.first;
+  }
+
+  // ── swipes 候选（MS-01；桌面 message.py add_swipe/switch_swipe/delete_swipe
+  //    逐字对齐，有意偏差见文件头 docstring）──
+
+  /// 为消息追加候选（桌面 `add_swipe` 对应物，L346-390 逐字）。
+  ///
+  /// - 首次追加（候选集为空）先播种候选 0 = 消息当前 `content`（原始回复，
+  ///   L378-381），新候选从 index 1 起递增；此后 index = max+1（L382：删中间
+  ///   候选留空档后不碰撞）；
+  /// - [makeActive] 缺省 true：同步覆写 `messages.content` 与
+  ///   `active_swipe_index`（L384-387）——content 恒为当前激活候选；
+  /// - 消息不存在抛 [MessageNotFoundError]（桌面 `_require_message`）。
+  ///
+  /// 返回新候选 index（首次追加返回 1）。
+  Future<int> addSwipe(
+    int messageId,
+    String content, {
+    bool makeActive = true,
+  }) {
+    return _db.transaction(() async {
+      final msg = await _requireMessage(messageId);
+      final maxRow = await (_db.select(_db.messageSwipes)
+            ..where(($MessageSwipesTable t) => t.messageId.equals(messageId))
+            ..orderBy([(t) => OrderingTerm.desc(t.index)])
+            ..limit(1))
+          .get();
+      final maxIndex = maxRow.isEmpty ? null : maxRow.first.index;
+      if (maxIndex == null) {
+        await _db.into(_db.messageSwipes).insert(
+              MessageSwipesCompanion.insert(
+                messageId: messageId,
+                index: 0,
+                content: msg.content,
+                createdAt: _now(),
+              ),
+            );
+      }
+      final nextIndex = (maxIndex ?? 0) + 1;
+      await _db.into(_db.messageSwipes).insert(
+            MessageSwipesCompanion.insert(
+              messageId: messageId,
+              index: nextIndex,
+              content: content,
+              createdAt: _now(),
+            ),
+          );
+      if (makeActive) {
+        await _writeActive(messageId, content: content, index: nextIndex);
+      }
+      return nextIndex;
+    });
+  }
+
+  /// 消息候选列表（index 升序；无候选返回空列表——既有消息零回归）。
+  Future<List<MessageSwipe>> listSwipes(int messageId) {
+    return (_db.select(_db.messageSwipes)
+          ..where(($MessageSwipesTable t) => t.messageId.equals(messageId))
+          ..orderBy([(t) => OrderingTerm.asc(t.index)]))
+        .get();
+  }
+
+  /// 切换激活候选（桌面 `switch_swipe` 对应物，L471-499 逐字）。
+  ///
+  /// [index] 必须存在于该消息候选集，否则抛 [SwipeIndexOutOfRangeError]；
+  /// 合法切换后 `messages.content` 覆写为选中候选内容、
+  /// `active_swipe_index` 更新（L495-496）；消息不存在抛
+  /// [MessageNotFoundError]。返回切换后的 [Message]。
+  Future<Message> switchSwipe(int messageId, int index) async {
+    await _requireMessage(messageId); // 存在性校验（不存在抛 MessageNotFoundError）
+    final swipe = await _swipeOrNull(messageId, index);
+    if (swipe == null) {
+      throw SwipeIndexOutOfRangeError(index);
+    }
+    // 桌面 switch_swipe L495-496：content 覆写为选中候选 + index 更新。
+    await _writeActive(messageId, content: swipe.content, index: index);
+    return _requireMessage(messageId);
+  }
+
+  /// 删除候选（桌面 `delete_swipe` 对应物，L502-545；有意偏差见 docstring）。
+  ///
+  /// - [index] 不存在抛 [SwipeIndexOutOfRangeError]；消息不存在抛
+  ///   [MessageNotFoundError]；
+  /// - 删当前激活候选：回落到「小于被删 index 的最大现存，否则大于的最小
+  ///   现存」（桌面 L536）+ content 同步跟随回落候选（L538-542）；
+  /// - **移动端有意偏差**：桌面候选 0 受保护拒删（L515-516），本实现允许删
+  ///   任意候选（含 0）；删空候选集后 active 回落 0 锁定、`messages.content`
+  ///   保留消息本体（工单验收 4/5「候选清空回落 0」，concerns/01.md §3）；
+  /// - 删非激活候选：active/content 不变。
+  ///
+  /// 返回删除后的 [Message]。
+  Future<Message> deleteSwipe(int messageId, int index) {
+    return _db.transaction(() async {
+      final msg = await _requireMessage(messageId);
+      final swipe = await _swipeOrNull(messageId, index);
+      if (swipe == null) {
+        throw SwipeIndexOutOfRangeError(index);
+      }
+      await (_db.delete(_db.messageSwipes)
+            ..where(($MessageSwipesTable t) =>
+                t.messageId.equals(messageId) & t.index.equals(index)))
+          .go();
+
+      if (msg.activeSwipeIndex != index) {
+        return _requireMessage(messageId);
+      }
+      final remaining = await listSwipes(messageId);
+      if (remaining.isEmpty) {
+        // 候选清空退化态：active 回落 0 锁定，content 保留消息本体。
+        await (_db.update(_db.messages)
+              ..where(($MessagesTable t) => t.id.equals(messageId)))
+            .write(const MessagesCompanion(activeSwipeIndex: Value(0)));
+      } else {
+        final lower = [
+          for (final s in remaining)
+            if (s.index < index) s,
+        ];
+        final fallback = lower.isNotEmpty ? lower.last : remaining.first;
+        await _writeActive(messageId,
+            content: fallback.content, index: fallback.index);
+      }
+      return _requireMessage(messageId);
+    });
+  }
+
+  /// 单删一条消息（桌面 delete_message 的「删 assistant 单删该条」分支）。
+  ///
+  /// 返回是否真实删除（0 行 → false，零副作用）；候选随 FK CASCADE 级联删除
+  /// （beforeOpen `PRAGMA foreign_keys = ON` 承保，测试锚 FK CASCADE 断言）。
+  Future<bool> deleteMessage(int messageId) async {
+    final count = await (_db.delete(_db.messages)
+          ..where(($MessagesTable t) => t.id.equals(messageId)))
+        .go();
+    return count > 0;
+  }
+
+  /// 消息行定位（swipes 写操作前置校验，桌面 `_require_message`）。
+  ///
+  /// 消息不存在抛 [MessageNotFoundError]——swipes 写面是强校验操作（区别于
+  /// [messageById] 查询面返回 null 的容错契约）。
+  Future<Message> _requireMessage(int messageId) async {
+    final message = await (_db.select(_db.messages)
+          ..where(($MessagesTable t) => t.id.equals(messageId)))
+        .getSingleOrNull();
+    if (message == null) {
+      throw MessageNotFoundError();
+    }
+    return message;
+  }
+
+  /// 候选行定位（(message_id, index) 精确匹配；不存在返回 null）。
+  Future<MessageSwipe?> _swipeOrNull(int messageId, int index) {
+    return (_db.select(_db.messageSwipes)
+          ..where(($MessageSwipesTable t) =>
+              t.messageId.equals(messageId) & t.index.equals(index)))
+        .getSingleOrNull();
+  }
+
+  /// 覆写消息激活状态（content 跟随激活候选 + active_swipe_index）。
+  Future<void> _writeActive(
+    int messageId, {
+    required String content,
+    required int index,
+  }) {
+    return (_db.update(_db.messages)
+          ..where(($MessagesTable t) => t.id.equals(messageId)))
+        .write(
+          MessagesCompanion(
+            content: Value(content),
+            activeSwipeIndex: Value(index),
+          ),
+        );
   }
 }
