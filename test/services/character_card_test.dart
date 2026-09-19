@@ -524,4 +524,90 @@ void main() {
       expect(result.version, '1.0');
     });
   });
+
+  group('九、character_book 解析入库（WL-01）', () {
+    test('fromV2Card 解析 character_book → lorebookEntries 字段一一对应', () {
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'character_book': {
+              'entries': [
+                {
+                  'keys': ['酒馆', 'tavern'],
+                  'content': '酒馆的老板是莉莉。',
+                  'insertion_order': 55,
+                  'position': 'before_char',
+                  'name': '酒馆',
+                },
+              ],
+            },
+          },
+        },
+      }));
+      expect(result.lorebookEntries, hasLength(1));
+      final entry = result.lorebookEntries[0];
+      expect(entry.title, '酒馆');
+      expect(entry.keys, ['酒馆', 'tavern']);
+      expect(entry.content, '酒馆的老板是莉莉。');
+      expect(entry.order, 55);
+      expect(entry.position, 'before_char');
+      expect(entry.source, 'manual');
+      expect(entry.matchMode, 'or');
+    });
+
+    test('character_book 缺失 / 畸形 → lorebookEntries 空，不抛（SR-26 降级）',
+        () {
+      expect(fromV2Card(_v2Card()).lorebookEntries, isEmpty);
+
+      final badBook = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'character_book': {'entries': 'oops'},
+          },
+        },
+      }));
+      expect(badBook.lorebookEntries, isEmpty);
+    });
+
+    test('解析后 extensions 原始 character_book 保真（解析与保真并存）', () {
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'character_book': {
+              'entries': [
+                {'keys': ['a'], 'content': 'b'},
+              ],
+            },
+          },
+        },
+      }));
+      expect(result.lorebookEntries, hasLength(1));
+      expect(result.extensions['conver_system']!['character_book'], {
+        'entries': [
+          {'keys': ['a'], 'content': 'b'},
+        ],
+      });
+    });
+
+    test('draft.toCompanion 落库装配映射 + null 头像 → Value.absent()', () {
+      final result = fromV2Card(_v2Card({'name': '装配角色', 'temperature': 0.5}));
+      final companion = result.toCompanion();
+      expect(companion.name.value, '装配角色');
+      expect(companion.temperature.value, 0.5);
+      expect(companion.avatar.present, isFalse, reason: 'null 头像保持列默认 null');
+      expect(companion.alternateGreetings.value, ['备选开场白']);
+      expect(companion.extensions.value, isEmpty);
+    });
+
+    test('异常类 toString 带类型前缀（Falsify：断言路径可读）', () {
+      expect(
+        const CardFormatException('x').toString(),
+        contains('CardFormatException: x'),
+      );
+      expect(
+        const CardValidationException('y').toString(),
+        contains('CardValidationException: y'),
+      );
+    });
+  });
 }

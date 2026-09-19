@@ -1,12 +1,13 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=6，M0 冻结 + AC-01 升版 +
-/// PS2-01 升版 + FD-05 升版 + VR-04 升版 + MS-01 升版）。
+/// 应用数据库 — drift 数据库入口（schemaVersion=7，M0 冻结 + AC-01 升版 +
+/// PS2-01 升版 + FD-05 升版 + VR-04 升版 + MS-01 升版 + WL-01 升版）。
 ///
 /// - 表注册：characters / conversations / messages / settings / memory_entries /
 ///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
 ///   后两表为人机恋板块移动端先行）+ relationship_states / proactive_plans /
 ///   inner_thoughts（阶段 2 三表，spec §3）+ embedding_entries / semantic_hits
 ///   （阶段 3 两表，stage3-vector-recall spec §2 D2）+ message_swipes（MS-01
-///   候选表，chat-polish spec §4.2）
+///   候选表，chat-polish spec §4.2）+ lorebook_entries（WL-01 世界书条目表，
+///   chat-polish spec §4.4）
 /// - 执行器构造注入：测试 seam，测试用 `AppDatabase(NativeDatabase.memory())`
 ///   在内存中打开真实 schema，不依赖设备
 /// - 运行态连接经 [AppDatabase.open]（drift_flutter 惰性打开，内部即
@@ -36,6 +37,7 @@ part 'app_database.g.dart';
     EmbeddingEntries,
     SemanticHits,
     MessageSwipes,
+    LorebookEntries,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -48,7 +50,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -183,6 +185,22 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS idx_message_swipes_message_id '
           'ON message_swipes (message_id)',
+        );
+      }
+
+      // WL-01：schemaVersion 6→7 新增世界书条目表 lorebook_entries
+      // （chat-polish spec §4.4，对齐桌面 models/lorebook.py）。沿
+      // from < 2/3/5 先例：createTable 建表 + raw SQL 补 FK 索引
+      // （drift 不自动为 FK 建索引，对齐 tables.dart 的 @TableIndex）。
+      // CREATE TABLE / CREATE INDEX IF NOT EXISTS 幂等补建，中断残留重开
+      // （表缺/索引缺、user_version 未回写）时补全；user_version=7 由
+      // drift 成功后回写，失败锁库重开重跑（F-78 幂等三机制延续）。
+      // 本块不含列变更，无需 PRAGMA table_info 探测补列。
+      if (from < 7) {
+        await m.createTable(lorebookEntries);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_lorebook_entries_character_id '
+          'ON lorebook_entries (character_id)',
         );
       }
     },

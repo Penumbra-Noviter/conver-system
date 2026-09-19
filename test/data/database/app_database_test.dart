@@ -1,5 +1,6 @@
-/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=6，
-/// 12 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表 + MS-01 候选表）。
+/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=7，
+/// 13 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表 + MS-01 候选表 +
+/// WL-01 世界书条目表）。
 ///
 /// 全部在内存执行器（`AppDatabase(NativeDatabase.memory())`）上运行，
 /// 经构造注入 seam 打开真实 schema，不依赖设备、无 repositories。
@@ -24,8 +25,8 @@ void main() {
     await db.close();
   });
 
-  test('schemaVersion 冻结为 6', () {
-    expect(db.schemaVersion, 6);
+  test('schemaVersion 冻结为 7', () {
+    expect(db.schemaVersion, 7);
   });
 
   test('内存执行器打开成功，12 表可定位', () async {
@@ -45,6 +46,7 @@ void main() {
         'embedding_entries',
         'semantic_hits',
         'message_swipes',
+        'lorebook_entries',
       ]),
     );
   });
@@ -184,6 +186,7 @@ void main() {
         'idx_embedding_entries_character_id_content_hash',
         'idx_semantic_hits_character_id',
         'idx_message_swipes_message_id',
+        'idx_lorebook_entries_character_id',
       ]),
     );
   });
@@ -385,5 +388,61 @@ void main() {
     )..where((t) => t.id.equals(message.id))).go();
 
     expect(await db.select(db.messageSwipes).get(), isEmpty);
+  });
+
+  test('lorebook_entries 可写读 + keys JSON 往返 + 默认值（WL-01）', () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '世界书角色',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+    final created = await db.into(db.lorebookEntries).insertReturning(
+          LorebookEntriesCompanion.insert(
+            characterId: character.id,
+            keys: const Value(['酒馆', 'tavern']),
+            content: const Value('酒馆的老板是莉莉。'),
+            order: const Value(55),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    expect(created.keys, ['酒馆', 'tavern'], reason: 'keys JSON 落库/读回数组');
+    expect(created.title, '', reason: '缺省默认');
+    expect(created.constant, isFalse);
+    expect(created.probability, 100);
+    expect(created.groupName, '');
+    expect(created.groupWeight, 100);
+    expect(created.matchMode, 'or');
+    expect(created.position, 'world');
+    expect(created.depth, 20);
+    expect(created.source, 'manual');
+    expect(created.enabled, isTrue);
+  });
+
+  test('lorebook_entries 孤儿角色写入被 FK 拒绝（WL-01，PRAGMA FK=ON 实测）',
+      () async {
+    final now = DateTime.now();
+    await expectLater(
+      db.into(db.lorebookEntries).insert(
+            LorebookEntriesCompanion.insert(
+              characterId: 999999,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          ),
+      throwsA(
+        isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('FOREIGN KEY'),
+        ),
+      ),
+    );
   });
 }
