@@ -62,6 +62,8 @@ class ChatUiMessage {
     this.stopped = false,
     this.interrupted = false,
     this.streaming = false,
+    this.swipeCount = 0,
+    this.activeSwipeIndex = 0,
   });
 
   /// DB 消息 id；在途合成消息为负值。
@@ -82,6 +84,13 @@ class ChatUiMessage {
 
   /// 流式进行中：渲染纯文本 + 闪烁光标（两级降频 streaming 侧）。
   final bool streaming;
+
+  /// 候选数（`message_swipes` 行数；无候选行 = 0，不变量退化态）。候选控制条
+  /// 渲染判据：> 1 才渲染（单选 / 无候选不渲染，对齐桌面 MS-2 契约锁）。
+  final int swipeCount;
+
+  /// 当前激活候选 index（[content] 即该候选内容；无候选行时恒 0）。
+  final int activeSwipeIndex;
 }
 
 /// 聊天 tab 编排控制器。
@@ -148,6 +157,16 @@ class ChatController extends ChangeNotifier {
   // ── 会话状态（DB 权威列表）──
 
   List<Message> _dbMessages = const [];
+
+  /// 候选数缓存（消息 id → swipes 行数），随 [_reloadMessages] 刷新（MS-05：
+  /// 控制条渲染判据的数据面，与 [_dbMessages] 同生命周期，保证「列表与计数
+  /// 同帧一致」）。
+  ///
+  /// 数据层无批量计数读面（本票文件范围为视图 + 控制器），故重载时对会话内
+  /// assistant 消息逐条 [MessageRepository.listSwipes] 计数；重载频率为用户
+  /// 操作级、查询为本地主键索引读，代价可接受。消息行自带的
+  /// `activeSwipeIndex` 无需查询，直接随行读取。
+  Map<int, int> _swipeCounts = const {};
 
   // ── 回合状态机（委托 ChatRound）──
 
@@ -500,7 +519,10 @@ class ChatController extends ChangeNotifier {
   /// 组装展示消息列表：DB 权威消息 + 在途合成消息（user + 流式/停止占位）。
   ///
   /// 已完成 assistant 由 UI 静态 Markdown 渲染；流式占位为纯文本。合成消息
-  /// 状态（在途 user / 占位气泡 / 已停止标记）读自 [ChatRound] 状态面。
+  /// 状态（在途 user / 占位气泡 / 已停止标记）读自 [ChatRound] 状态面；候选面
+  /// （[ChatUiMessage.swipeCount] / [ChatUiMessage.activeSwipeIndex]）读自
+  /// [_swipeCounts] 缓存（随 reload 刷新）与消息行的 `activeSwipeIndex` 列
+  /// （MS-05：控制条渲染判据）。
   List<ChatUiMessage> get messages {
     final result = <ChatUiMessage>[
       for (final m in _dbMessages)
@@ -510,6 +532,8 @@ class ChatController extends ChangeNotifier {
           content: m.content,
           stopped: _round.isStopped(m.id),
           interrupted: _round.isInterrupted(m.id),
+          swipeCount: _swipeCounts[m.id] ?? 0,
+          activeSwipeIndex: m.activeSwipeIndex,
         ),
     ];
     final pendingUser = _round.pendingUserText;
@@ -772,12 +796,14 @@ class ChatController extends ChangeNotifier {
   /// 从 DB 重载当前会话消息（[ChatRound] 的 reloadMessages 回调；不 notify，
   /// 调用方统一收尾通知），返回最新列表供「已停止」标记判定。
   ///
-  /// 只置 [_dbMessages]：null 会话（入口态）清空列表即可——在途合成清理由
-  /// [ChatRound] 调用方（如 [_onStreamDone]）各自负责，本回调不越权。
+  /// 只置 [_dbMessages]（附 [swipeCounts] 计数缓存）：null 会话（入口态）清空
+  /// 列表即可——在途合成清理由 [ChatRound] 调用方（如 [_onStreamDone]）各自
+  /// 负责，本回调不越权。
   Future<List<Message>> _reloadMessages() async {
     final cid = _activeConversationId;
     if (cid == null) {
       _dbMessages = const [];
+      _swipeCounts = const {};
       return _dbMessages;
     }
     try {
@@ -786,6 +812,28 @@ class ChatController extends ChangeNotifier {
       _noticeRunner.setFirst('加载消息失败: $error');
       _dbMessages = const [];
     }
+    _swipeCounts = await _loadSwipeCounts();
     return _dbMessages;
+  }
+
+  /// 读取当前会话内 assistant 消息的候选数（[ChatUiMessage.swipeCount] 来源）。
+  ///
+  /// 只扫 assistant 行（候选仅由 regenerate / continueReply 挂在 assistant 上）；
+  /// 单条读取失败按「无候选」降级并记日志——候选计数是展示增强面，不得因局部
+  /// 读取异常阻塞消息列表呈现（列表本体已在调用方落位）。
+  Future<Map<int, int>> _loadSwipeCounts() async {
+    final counts = <int, int>{};
+    for (final message in _dbMessages) {
+      if (message.role != Role.assistant) {
+        continue;
+      }
+      try {
+        counts[message.id] =
+            (await _messageRepository.listSwipes(message.id)).length;
+      } catch (error) {
+        debugPrint('候选数读取失败（按无候选处理）: $error');
+      }
+    }
+    return counts;
   }
 }

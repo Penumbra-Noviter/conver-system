@@ -325,6 +325,17 @@ class _MessageListState extends State<_MessageList> {
     }
     final position = _scrollController.position;
     position.jumpTo(position.maxScrollExtent);
+    // 懒构建列表：首跳可能基于未布局区段的估算 extent（MS-05 操作按钮使
+    // 12 条消息列表越过 cacheExtent 边界后实证），次帧补跳至修正后的真实底部。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      final p = _scrollController.position;
+      if (p.pixels != p.maxScrollExtent) {
+        p.jumpTo(p.maxScrollExtent);
+      }
+    });
   }
 
   @override
@@ -375,19 +386,32 @@ class _MessageListState extends State<_MessageList> {
         final highlighted = widget.controller.highlightMessageIds.contains(
           message.id,
         );
+        final isLast = index == messages.length - 1;
+        // 消息操作入口可达性（MS-05 验收 5）：生成中 / 重生成中 / 终态重载窗口 /
+        // 瞬时变更进行中（isBusy 聚合）或行未落库（合成负 id）/ 流式占位 →
+        // 入口不可达（按钮禁用）。
+        final showActions = message.id > 0;
+        final actionsEnabled =
+            showActions && !widget.controller.isBusy && !message.streaming;
         return Padding(
           key: _keyFor(message.id),
           padding: const EdgeInsets.symmetric(vertical: ConverSpacing.space2),
           child: switch (message.role) {
             Role.user => _UserBubble(
-              content: message.content,
+              controller: widget.controller,
+              message: message,
+              isLast: isLast,
+              showActions: showActions,
+              actionsEnabled: actionsEnabled,
               highlighted: highlighted,
             ),
             Role.assistant => _AssistantBubble(
               controller: widget.controller,
               roleName: roleLabel,
               message: message,
-              isLast: index == messages.length - 1,
+              isLast: isLast,
+              showActions: showActions,
+              actionsEnabled: actionsEnabled,
               highlighted: highlighted,
             ),
             Role.system => _SystemBubble(
@@ -402,11 +426,30 @@ class _MessageListState extends State<_MessageList> {
   }
 }
 
-/// user 消息气泡：右对齐 + 面板层底色（M3-04c 高亮时为琥珀 wash 底）。
+/// user 消息气泡：右对齐 + 面板层底色（M3-04c 高亮时为琥珀 wash 底）+
+/// 内联「消息操作」入口（MS-05：编辑 / 删除；与文本同行，不额外增加条目高度）。
 class _UserBubble extends StatelessWidget {
-  const _UserBubble({required this.content, this.highlighted = false});
+  const _UserBubble({
+    required this.controller,
+    required this.message,
+    required this.isLast,
+    required this.showActions,
+    required this.actionsEnabled,
+    this.highlighted = false,
+  });
 
-  final String content;
+  final ChatController controller;
+
+  final ChatUiMessage message;
+
+  /// 是否末条消息（消息操作菜单项裁剪依据）。
+  final bool isLast;
+
+  /// 是否渲染操作入口（仅已落库消息；在途合成负 id 不渲染）。
+  final bool showActions;
+
+  /// 操作入口是否可点（生成中 / 终态重载窗口 / 流式占位 → false）。
+  final bool actionsEnabled;
 
   /// 跳转定位高亮命中（琥珀 wash 底色，对齐桌面 `search-highlight`）。
   final bool highlighted;
@@ -414,46 +457,187 @@ class _UserBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = ConverPalette.of(context);
-    return MergeSemantics(
-      child: Semantics(
-        // 屏幕阅读器整体朗读：label「你: 内容」（spec §4.4 覆盖清单 ①）。
-        label: '你: $content',
-        excludeSemantics: true,
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: Container(
-            margin: const EdgeInsets.only(left: ConverSpacing.space8),
-            padding: const EdgeInsets.symmetric(
-              horizontal: ConverSpacing.space3,
-              vertical: ConverSpacing.space2,
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.only(left: ConverSpacing.space8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: ConverSpacing.space3,
+          vertical: ConverSpacing.space2,
+        ),
+        decoration: BoxDecoration(
+          color: highlighted
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.13)
+              : Theme.of(context).colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(ConverRadii.bubble),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // MergeSemantics 只包内容（label「你: 内容」整体朗读，spec §4.4
+            // 覆盖清单 ①）——操作按钮保持独立语义节点（不被内容 label 吞掉）。
+            Flexible(
+              child: MergeSemantics(
+                child: Semantics(
+                  label: '你: ${message.content}',
+                  excludeSemantics: true,
+                  child: Text(
+                    message.content,
+                    style: TextStyle(
+                      color: palette.ink1,
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ),
             ),
-            decoration: BoxDecoration(
-              color: highlighted
-                  ? Theme.of(context).colorScheme.primary
-                        .withValues(alpha: 0.13)
-                  : Theme.of(context).colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(ConverRadii.bubble),
-            ),
-            child: Text(
-              content,
-              style: TextStyle(color: palette.ink1, fontSize: 15, height: 1.5),
-            ),
-          ),
+            if (showActions) ...[
+              const SizedBox(width: ConverSpacing.space1),
+              _MessageActionsButton(
+                controller: controller,
+                message: message,
+                isLast: isLast,
+                enabled: actionsEnabled,
+                compact: true,
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
+/// 消息操作入口按钮（⋯）：打开消息操作菜单。
+///
+/// 形态决策（工单 05 高不确定点，best judgment）：气泡内显式菜单按钮而非长按
+/// ——assistant 气泡内容为可选中 Markdown（`MarkdownBody(selectable: true)`），
+/// 长按被文本选择优先消费，长按入口在两类气泡上行为不一致；显式按钮触屏可
+/// 发现、a11y 语义可达（[Semantics] label「消息操作」），契约锁只锁行为不锁
+/// 形态。菜单项按角色与位置裁剪：末条 assistant 有「继续生成」，user 有
+/// 「编辑」，两者均有「删除」。
+///
+/// 生成中 / 终态重载窗口 / 瞬时变更进行中时禁用（[enabled] false → onPressed
+/// null）；流式占位与在途合成消息由调用方以 [show] 判据不渲染。
+class _MessageActionsButton extends StatelessWidget {
+  const _MessageActionsButton({
+    required this.controller,
+    required this.message,
+    required this.isLast,
+    required this.enabled,
+    this.compact = false,
+  });
+
+  final ChatController controller;
+  final ChatUiMessage message;
+  final bool isLast;
+  final bool enabled;
+
+  /// 紧凑形态（user 气泡内联：与文本同行，不额外增加条目高度）。
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ConverPalette.of(context);
+    // 尺寸守在既有气泡底部图标行高度之下（user 气泡内联 22 / assistant 与
+    // 重生成图标同行 24）：新增入口不改变条目高度，既有滚动/定位契约零回归。
+    final size = compact ? 22.0 : 24.0;
+    final iconSize = compact ? 14.0 : 16.0;
+    return Align(
+      alignment: Alignment.centerLeft,
+      // widthFactor 贴合按钮宽：在 assistant 底部 Row 中不吞掉整行剩余宽度，
+      // 在 user 气泡内联 Row 中同样只占按钮宽。
+      widthFactor: 1,
+      child: Semantics(
+        label: '消息操作',
+        button: true,
+        // container: 强制独立语义节点——无 container 时本配置合并进兄弟/祖先
+        // 语义节点，实测会吞掉同气泡「回复中断」小标 label（F-66 语义断言
+        // 先红后绿实证）；container 后按钮节点与内容/小标互不干扰。
+        container: true,
+        child: IconButton(
+          key: Key('message-actions-${message.id}'),
+          visualDensity: VisualDensity.compact,
+          iconSize: iconSize,
+          padding: EdgeInsets.zero,
+          constraints: BoxConstraints(minWidth: size, minHeight: size),
+          icon: Icon(
+            Icons.more_horiz,
+            color: enabled ? palette.ink3 : palette.ink4,
+          ),
+          onPressed: enabled ? () => unawaited(_openMenu(context)) : null,
+        ),
+      ),
+    );
+  }
+
+  /// 打开操作菜单（[showMenu] 定位到按钮下方；与既有导出菜单同族的 popup
+  /// route）。菜单关闭后让出一帧再开后续对话框：popup route 退场动画期间直接
+  /// push 对话框会与其 FocusScope 收尾竞争（framework `_dependents.isEmpty`
+  /// 断言，widget 测试实证）。
+  Future<void> _openMenu(BuildContext context) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final button = context.findRenderObject() as RenderBox;
+    final action = await showMenu<_MessageAction>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(
+          button.localToGlobal(Offset.zero, ancestor: overlay),
+          button.localToGlobal(
+            button.size.bottomRight(Offset.zero),
+            ancestor: overlay,
+          ),
+        ),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        if (message.role == Role.assistant && isLast)
+          const PopupMenuItem(
+            value: _MessageAction.continueReply,
+            child: Text('继续生成'),
+          ),
+        if (message.role == Role.user)
+          const PopupMenuItem(
+            value: _MessageAction.edit,
+            child: Text('编辑'),
+          ),
+        const PopupMenuItem(
+          value: _MessageAction.delete,
+          child: Text('删除'),
+        ),
+      ],
+    );
+    await Future<void>.microtask(() {});
+    if (!context.mounted) {
+      return;
+    }
+    switch (action) {
+      case _MessageAction.continueReply:
+        await controller.continueReply();
+      case _MessageAction.edit:
+        await _promptEditMessage(context, controller, message);
+      case _MessageAction.delete:
+        await _confirmDeleteMessage(context, controller, message);
+      case null:
+        return;
+    }
+  }
+}
+
 /// assistant 气泡：已完成消息静态 Markdown（两级降频完成侧）；streaming 占位
 /// 纯文本 + 单点闪烁光标；底部常驻重生成小图标（仅末条已结算可点）+
-/// 主动停止「已停止」标记。
+/// 候选切换控制条（候选数 > 1，MS-05）+「消息操作」入口 + 主动停止「已停止」
+/// 标记。
 class _AssistantBubble extends StatelessWidget {
   const _AssistantBubble({
     required this.controller,
     required this.roleName,
     required this.message,
     required this.isLast,
+    required this.showActions,
+    required this.actionsEnabled,
     this.highlighted = false,
   });
 
@@ -464,6 +648,12 @@ class _AssistantBubble extends StatelessWidget {
 
   final ChatUiMessage message;
   final bool isLast;
+
+  /// 是否渲染操作入口（仅已落库消息；流式占位负 id 不渲染）。
+  final bool showActions;
+
+  /// 操作入口是否可点（生成中 / 终态重载窗口 → false）。
+  final bool actionsEnabled;
 
   /// 跳转定位高亮命中（琥珀 wash 底色，对齐桌面 `search-highlight`）。
   final bool highlighted;
@@ -578,19 +768,34 @@ class _AssistantBubble extends StatelessWidget {
               ),
             Padding(
               padding: const EdgeInsets.only(top: ConverSpacing.space1),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  key: ValueKey('regenerate-${message.id}'),
-                  tooltip: '重生成',
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(
-                    Icons.refresh,
-                    size: 18,
-                    color: canRegenerate ? palette.ink3 : palette.ink4,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // MS-05 候选控制条：候选数 > 1 才渲染（单选 / 无候选不渲染，
+                  // 对齐桌面 MS-2 契约锁）。
+                  if (message.swipeCount > 1) ...[
+                    _SwipeBar(controller: controller, message: message),
+                    const SizedBox(width: ConverSpacing.space1),
+                  ],
+                  IconButton(
+                    key: ValueKey('regenerate-${message.id}'),
+                    tooltip: '重生成',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.refresh,
+                      size: 18,
+                      color: canRegenerate ? palette.ink3 : palette.ink4,
+                    ),
+                    onPressed: canRegenerate ? controller.regenerate : null,
                   ),
-                  onPressed: canRegenerate ? controller.regenerate : null,
-                ),
+                  if (showActions)
+                    _MessageActionsButton(
+                      controller: controller,
+                      message: message,
+                      isLast: isLast,
+                      enabled: actionsEnabled,
+                    ),
+                ],
               ),
             ),
           ],
@@ -598,6 +803,248 @@ class _AssistantBubble extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 候选切换控制条（MS-05）：`‹ N/M ›`。
+///
+/// 渲染判据 = 候选数 > 1（由调用方把关）。交互：点击箭头 → 乐观切换（立即按
+/// 新 index 渲染）→ [ChatController.switchSwipe] 落库 → 收尾清乐观值；失败
+/// （领域错误 / 守卫拒绝）时 DB 未变，清乐观值即天然回滚到权威 active，
+/// 无需另存快照。边界箭头禁用（策略锁定为禁用：触屏无 hover 提示，禁用态是
+/// 唯一可视线索；桌面为 clamp no-op）；生成中 / 重生成中 / 终态重载窗口 /
+/// 瞬时变更进行中（[ChatController.isBusy]）时箭头禁用（验收 5 同族守卫）。
+class _SwipeBar extends StatefulWidget {
+  const _SwipeBar({required this.controller, required this.message});
+
+  final ChatController controller;
+  final ChatUiMessage message;
+
+  @override
+  State<_SwipeBar> createState() => _SwipeBarState();
+}
+
+class _SwipeBarState extends State<_SwipeBar> {
+  /// 乐观激活 index（null = 以 DB 权威值为准）。切换 await 收尾后清空：成功
+  /// 时 DB 已更新（reload 后 [ChatUiMessage.activeSwipeIndex] 即新值），失败时
+  /// DB 未变——两种情况清空后显示的都是权威值。
+  int? _optimisticIndex;
+
+  int get _activeIndex => _optimisticIndex ?? widget.message.activeSwipeIndex;
+
+  Future<void> _switch(int delta) async {
+    final count = widget.message.swipeCount;
+    final next = _activeIndex + delta;
+    if (next < 0 || next >= count || widget.controller.isBusy) {
+      return; // 边界 / 忙态：按钮已禁用，此处为防御性 no-op。
+    }
+    setState(() => _optimisticIndex = next);
+    await widget.controller.switchSwipe(widget.message.id, next);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _optimisticIndex = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ConverPalette.of(context);
+    final count = widget.message.swipeCount;
+    final active = _activeIndex;
+    final enabled = !widget.controller.isBusy;
+    return Container(
+      key: Key('swipe-bar-${widget.message.id}'),
+      padding: const EdgeInsets.symmetric(horizontal: ConverSpacing.space1),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(ConverRadii.md),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SwipeArrow(
+            icon: Icons.chevron_left,
+            label: '上一个候选',
+            onPressed: enabled && active > 0 ? () => _switch(-1) : null,
+          ),
+          Semantics(
+            // 屏幕阅读器朗读「候选 2/3」而非裸「2/3」（装饰性计数语义化）。
+            label: '候选 ${active + 1}/$count',
+            excludeSemantics: true,
+            child: Text(
+              '${active + 1}/$count',
+              style: TextStyle(
+                fontSize: 12,
+                color: palette.ink2,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          _SwipeArrow(
+            icon: Icons.chevron_right,
+            label: '下一个候选',
+            onPressed: enabled && active < count - 1 ? () => _switch(1) : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 候选控制条箭头（紧凑视觉密度 + [Semantics] label 语义；禁用态 = onPressed
+/// null）。
+///
+/// 语义用 [Semantics] label 而非 `IconButton.tooltip`：tooltip 会在按钮外挂
+/// `RawTooltip` 并注册全局 pointer 路由（列表项内大量 tooltip 触发 framework
+/// `RawTooltipState ... multiple tickers` 断言，widget 测试实证）；label 提供
+/// 同等屏幕阅读器可读性且零额外监听。
+class _SwipeArrow extends StatelessWidget {
+  const _SwipeArrow({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ConverPalette.of(context);
+    final disabled = onPressed == null;
+    return Semantics(
+      label: label,
+      button: true,
+      child: IconButton(
+        visualDensity: VisualDensity.compact,
+        iconSize: 18,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+        icon: Icon(icon, color: disabled ? palette.ink4 : palette.ink2),
+        onPressed: onPressed,
+      ),
+    );
+  }
+}
+
+/// 消息操作菜单项值表（长按气泡 / 「消息操作」按钮同一菜单）。
+enum _MessageAction {
+  /// 继续生成末条 assistant（候选追加；空续写 no-op）。
+  continueReply,
+
+  /// 编辑 user 消息并重发。
+  edit,
+
+  /// 删除消息（user 截断后续 / assistant 单删）。
+  delete,
+}
+
+/// 编辑消息对话框（预填原内容）→ 提交返回新内容（取消 → null）。
+///
+/// 输入控制器归属本对话框 State（[State.dispose] 时机 = 路由真正卸载后）——
+/// 父方在 `showDialog` await 返回时控制器仍在退场动画中挂树，此时 dispose 会
+/// 触发「TextEditingController was used after being disposed」（widget 测试
+/// 实证；与 F-109 修复的 `_PromptDialog` 同类）。
+class _EditMessageDialog extends StatefulWidget {
+  const _EditMessageDialog({required this.initialText});
+
+  /// 预填的原消息内容。
+  final String initialText;
+
+  @override
+  State<_EditMessageDialog> createState() => _EditMessageDialogState();
+}
+
+class _EditMessageDialogState extends State<_EditMessageDialog> {
+  late final TextEditingController _editor = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _editor.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('编辑消息'),
+      content: TextField(
+        key: const Key('edit-message-field'),
+        controller: _editor,
+        minLines: 1,
+        maxLines: 6,
+        decoration: const InputDecoration(hintText: '编辑消息内容…'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const Key('edit-message-confirm'),
+          onPressed: () => Navigator.of(context).pop(_editor.text.trim()),
+          child: const Text('保存并重发'),
+        ),
+      ],
+    );
+  }
+}
+
+/// 编辑消息对话框（预填原内容）→ 提交经 [ChatController.editMessage]
+/// （仅 user 消息；服务层强校验，非 user → 领域错误 notice）。取消 / 空内容 /
+/// 内容未变 → 零副作用（不触发无意义的截断重生成）。
+Future<void> _promptEditMessage(
+  BuildContext context,
+  ChatController controller,
+  ChatUiMessage message,
+) async {
+  final newContent = await showDialog<String>(
+    context: context,
+    builder: (_) => _EditMessageDialog(initialText: message.content),
+  );
+  if (newContent == null || newContent.isEmpty || newContent == message.content) {
+    return;
+  }
+  await controller.editMessage(message.id, newContent);
+}
+
+/// 删除消息确认对话框（按角色区分语义警示文案，逐字对齐桌面 showConfirm）：
+/// 删 user 明示连带截断其后的全部对话；删 assistant 明示仅删该条回复及候选。
+Future<void> _confirmDeleteMessage(
+  BuildContext context,
+  ChatController controller,
+  ChatUiMessage message,
+) async {
+  final isUser = message.role == Role.user;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('删除消息'),
+      content: Text(
+        isUser
+            ? '删除该用户消息将连带删除其后的所有对话，确定要删除吗？'
+            : '仅删除该条回复及其候选，保留触发它的用户消息。确定要删除吗？',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const Key('confirm-delete-button'),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('删除'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) {
+    return;
+  }
+  await controller.deleteMessage(message.id);
 }
 
 /// system 角色（开场白元信息等）：居中弱化小字（M3-04c 高亮时琥珀 wash 底）。
