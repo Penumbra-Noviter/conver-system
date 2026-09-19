@@ -19,10 +19,11 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show ChangeNotifier, debugPrint;
 
 import '../../data/database/app_database.dart' show Character, CharactersCompanion;
 import '../../data/repositories/character_repository.dart';
+import '../../data/repositories/lorebook_repository.dart';
 import '../../services/character_card.dart';
 import '../../services/character_file_exchange.dart';
 import '../../services/notice_runner.dart';
@@ -41,20 +42,29 @@ class CharactersController extends ChangeNotifier {
   /// [characterRepository] 列表 / 单删 / 编辑数据源；
   /// [fileExchange] 导出平台通道 seam（本票 Stub）；
   /// [navigation] 开始对话切换底部 tab；[chatController] 建会话 / 回入口。
+  ///
+  /// [lorebookRepository]（WL-03）：角色卡 character_book 解析结果的落库
+  /// 目标（[CharacterDraft.lorebookEntries]，经 `parseCharacterBook` 产出）。
+  /// 缺省 null 时导入跳过世界书落库（既有装配零改动；app.dart 装配约束见
+  /// 工单，wiring 追平随后续票）。extensions 原样 character_book 保真不依赖
+  /// 本依赖（保真在 [CharacterDraft.extensions] 内完成）。
   CharactersController({
     required CharacterRepository characterRepository,
     required CharacterFileExchange fileExchange,
     required ShellNavigation navigation,
     required ChatController chatController,
+    LorebookRepository? lorebookRepository,
   })  : _characterRepository = characterRepository,
         _fileExchange = fileExchange,
         _navigation = navigation,
-        _chatController = chatController;
+        _chatController = chatController,
+        _lorebookRepository = lorebookRepository;
 
   final CharacterRepository _characterRepository;
   final CharacterFileExchange _fileExchange;
   final ShellNavigation _navigation;
   final ChatController _chatController;
+  final LorebookRepository? _lorebookRepository;
 
   bool _loading = false;
   bool _hasLoaded = false;
@@ -175,6 +185,12 @@ class CharactersController extends ChangeNotifier {
   ///   格式」等）与校验错（[CardValidationException]，纯原因「角色名称不能
   ///   为空」）分级转 notice；
   /// - 其它异常 / 超时兜底「导入角色失败: $error」。
+  ///
+  /// WL-03（验收 7）：角色落库后，character_book 解析出的世界书条目
+  /// （[CharacterDraft.lorebookEntries]，经 `parseCharacterBook` 产出）经
+  /// [_lorebookRepository] 全量替换落 lorebook_entries 行；缺省未注入仓储 /
+  /// 卡无 character_book → 跳过；落库失败降级不阻断导入（角色已落库，
+  /// debug 留痕——SR-26「任何解析失败降级不阻断导入」）。
   Future<void> importCharacter() async {
     final draft = await _noticeRunner.guard<CharacterDraft?>(
       op: () => _fileExchange.importCharacter(),
@@ -188,7 +204,16 @@ class CharactersController extends ChangeNotifier {
     if (draft == null) {
       return; // 用户取消 / 挂起降级 / 失败，零副作用。
     }
-    await _characterRepository.createCharacter(draft.toCompanion());
+    final created =
+        await _characterRepository.createCharacter(draft.toCompanion());
+    final lorebook = _lorebookRepository;
+    if (lorebook != null && draft.lorebookEntries.isNotEmpty) {
+      try {
+        await lorebook.replaceEntries(created.id, draft.lorebookEntries);
+      } catch (e) {
+        debugPrint('角色卡世界书条目落库失败，跳过: $e');
+      }
+    }
     await refresh();
     _noticeRunner.set('已导入角色「${draft.name}」');
     notifyListeners();

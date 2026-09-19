@@ -579,4 +579,226 @@ void main() {
       expect(msgs[2], (role: 'assistant', content: '到了长安'));
     });
   });
+
+  // ── 10. 世界书注入（WL-03：三位置 world 块 + 空过滤 + [世界知识] 合并）──
+
+  group('TestWorldInjection', () {
+    test('world=null / 全空注入：输出与改动前逐字节一致（验收 1 零回归）', () {
+      final char = _char(
+        systemPrompt: '系统提示',
+        scenario: '场景设定',
+        mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+        postHistoryInstructions: '历史指令',
+      );
+      final history = [
+        _msg(Role.user, '历史1'),
+        _msg(Role.assistant, '历史2'),
+      ];
+      final baseline = buildMessages(
+        char,
+        history: history,
+        userContent: '当前输入',
+        userName: '小明',
+      );
+      // world=null（缺省）逐字节一致。
+      expect(
+        buildMessages(
+          char,
+          history: history,
+          userContent: '当前输入',
+          userName: '小明',
+          world: null,
+        ),
+        baseline,
+      );
+      // 空 map / 三空键逐字节一致。
+      expect(
+        buildMessages(
+          char,
+          history: history,
+          userContent: '当前输入',
+          userName: '小明',
+          world: const {},
+        ),
+        baseline,
+      );
+      expect(
+        buildMessages(
+          char,
+          history: history,
+          userContent: '当前输入',
+          userName: '小明',
+          world: const {
+            'before_char': <String>[],
+            'after_char': <String>[],
+            'system': <String>[],
+          },
+        ),
+        baseline,
+      );
+      // 空 / 纯空白注入项过滤后同样逐字节一致。
+      expect(
+        buildMessages(
+          char,
+          history: history,
+          userContent: '当前输入',
+          userName: '小明',
+          world: const {
+            'before_char': ['', '   '],
+            'after_char': [' ', ''],
+            'system': ['', '\n'],
+          },
+        ),
+        baseline,
+      );
+    });
+
+    test('三位置注入序：before_char → system → scenario → after_char → '
+        '[世界知识] → mes_example → history → PHI → user（验收 2）', () {
+      final msgs = buildMessages(
+        _char(
+          systemPrompt: '系统提示',
+          scenario: '场景设定',
+          mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+          postHistoryInstructions: '历史指令',
+        ),
+        history: [
+          _msg(Role.user, '历史1'),
+          _msg(Role.assistant, '历史2'),
+        ],
+        userContent: '当前输入',
+        userName: '小明',
+        world: const {
+          'before_char': ['前置知识1', '前置知识2'],
+          'after_char': ['后置知识'],
+          'system': ['知识A', '知识B'],
+        },
+      );
+      expect(
+        [for (final m in msgs) m.role],
+        [
+          'system', // before_char
+          'system', // before_char
+          'system', // system prompt
+          'system', // scenario
+          'system', // after_char
+          'system', // [世界知识] 合并
+          'user', // mes_example
+          'assistant', // mes_example
+          'user', // history
+          'assistant', // history
+          'system', // PHI
+          'user', // 当前输入
+        ],
+      );
+      expect(msgs[0], (role: 'system', content: '前置知识1'));
+      expect(msgs[1], (role: 'system', content: '前置知识2'));
+      expect(msgs[2], (role: 'system', content: '系统提示'));
+      expect(msgs[3], (role: 'system', content: '[场景设定]\n场景设定'));
+      expect(msgs[4], (role: 'system', content: '后置知识'));
+      expect(msgs[5], (role: 'system', content: '[世界知识]\n知识A\n\n知识B'));
+      expect(msgs[6], (role: 'user', content: '例问'));
+      expect(msgs[7], (role: 'assistant', content: '例答'));
+      expect(msgs[8], (role: 'user', content: '历史1'));
+      expect(msgs[9], (role: 'assistant', content: '历史2'));
+      expect(msgs[10], (role: 'system', content: '历史指令'));
+      expect(msgs[11], (role: 'user', content: '当前输入'));
+    });
+
+    test('多条 [世界知识] 合并为单条 system，空行连接、按给定序（验收 3）', () {
+      final msgs = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        world: const {
+          'system': ['低order', '高order'],
+        },
+      );
+      expect(msgs, [
+        (role: 'system', content: '系统'),
+        (role: 'system', content: '[世界知识]\n低order\n\n高order'),
+        (role: 'user', content: '你好'),
+      ]);
+      // 合并为单条 system（不产生多条 system 知识消息）。
+      expect(
+        msgs.where((m) => m.content.startsWith('[世界知识]')),
+        hasLength(1),
+      );
+    });
+
+    test('空注入项过滤：不产生空 system 消息（验收 3，不污染上下文）', () {
+      final msgs = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        world: const {
+          'before_char': ['', '   ', '有效前置'],
+          'after_char': ['', '有效后置'],
+          'system': ['', '  ', '知识A'],
+        },
+      );
+      expect(
+        [for (final m in msgs) m.role],
+        ['system', 'system', 'system', 'system', 'user'],
+      );
+      expect(msgs[0].content, '有效前置');
+      expect(msgs[1].content, '系统');
+      expect(msgs[2].content, '有效后置');
+      expect(msgs[3].content, '[世界知识]\n知识A');
+    });
+
+    test('system 块为空 → 不产生 [世界知识] system 消息', () {
+      final msgs = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        world: const {'before_char': ['前置'], 'after_char': ['后置']},
+      );
+      expect(
+        msgs.where((m) => m.content.startsWith('[世界知识]')),
+        isEmpty,
+      );
+      expect(msgs, [
+        (role: 'system', content: '前置'),
+        (role: 'system', content: '系统'),
+        (role: 'system', content: '后置'),
+        (role: 'user', content: '你好'),
+      ]);
+    });
+
+    test('before_char 多块各为独立 system 消息，按给定序', () {
+      final msgs = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        world: const {'before_char': ['前置1', '前置2', '前置3']},
+      );
+      expect(
+        [for (final m in msgs) m.content],
+        ['前置1', '前置2', '前置3', '系统', '你好'],
+      );
+    });
+
+    test('重生成路径：世界书注入不破坏尾随 system 剥离（验收 5）', () {
+      final msgs = buildMessages(
+        _char(
+          systemPrompt: '系统',
+          postHistoryInstructions: '保持人设',
+        ),
+        history: [
+          _msg(Role.user, '第一轮问'),
+          _msg(Role.assistant, '第一轮答'),
+          _msg(Role.user, '第二轮问'),
+        ],
+        userContent: '忽略',
+        appendCurrentInput: false,
+        world: const {
+          'before_char': ['前置'],
+          'system': ['知识'],
+          'after_char': ['后置'],
+        },
+      );
+      // 注入块全部位于头部（system prompt / scenario 前后），尾随剥离只作用于
+      // 历史末端的 PHI system——末条恒为触发 user。
+      expect(msgs.last, (role: 'user', content: '第二轮问'));
+      expect(msgs.last.role, isNot('system'));
+      expect(msgs[0], (role: 'system', content: '前置'));
+    });
+  });
 }

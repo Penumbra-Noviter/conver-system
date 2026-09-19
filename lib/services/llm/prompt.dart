@@ -124,9 +124,14 @@ List<PromptMessage> parseMesExample(
 
 /// 组装发送给 LLM 的消息列表（纯函数，无 DB 依赖）。
 ///
-/// 对齐桌面 `prompt.py::build_messages` 的组装顺序：
+/// 对齐桌面 `prompt.py::build_messages` 的组装顺序（WL-03 起含世界书注入）：
+/// 0. world["before_char"] 注入块（逐条 system，最高优先级——system 首条之前；
+///    移动端无 before_char 概念，对齐桌面 `_assemble` 步骤 0）
 /// 1. system prompt（[CharacterData.systemPrompt] 优先，否则 personality）
 /// 2. scenario（作为 `[场景设定]\n...` 的 system 消息）
+/// 2.5 world["after_char"] 注入块（scenario 之后）
+/// 2.75 world["system"] 合并单条 `[世界知识]`（多条以空行连接、按给定序——
+///    调用方 [LorebookEngine.buildWorldInjection] 已按 (order, id) 升序）
 /// 3. mes_example（few-shot 示例）
 /// 4. 历史消息（正序，滑窗截断：超过 `maxRounds * 2` 条取最后 `maxRounds * 2`
 ///    条；默认 `maxRounds = 30` → 窗口 60 条）
@@ -136,7 +141,13 @@ List<PromptMessage> parseMesExample(
 /// [appendCurrentInput] 为 false（重生成路径）的契约：
 /// 不追加当前 user 输入；末条恢复为历史末条 user（待回复触发源）；因无 user
 /// 末尾兜底而残留的尾随 PHI system 一并剥离（循环剥除末尾所有 system），
-/// 保证末端无 system、触发 user 在列表中仅出现一次。
+/// 保证末端无 system、触发 user 在列表中仅出现一次。世界书注入块全部位于
+/// 头部（history 之前），尾随剥离不受影响。
+///
+/// [world]（WL-03）：世界书注入块 `{before_char/after_char/system: [内容]}`，
+/// 内容为引擎层做过模板变量替换的纯字符串；null / 空 map / 空列表 / 空或
+/// 纯空白项均零注入——输出与改动前**逐字节一致**（零回归硬约束，验收 1）。
+/// 空注入项过滤不产生空 system 消息（验收 3，不污染上下文）。
 ///
 /// [history] 每项至少含 `role` 与 `content`（[HistoryMessage]）；role 经
 /// [_roleStr] 归一为纯字符串（[Role] 取 `.value`，纯字符串原样）。
@@ -148,25 +159,38 @@ List<PromptMessage> buildMessages(
   String userName = 'User',
   bool appendCurrentInput = true,
   Map<String, String> extraVars = const {},
+  Map<String, List<String>>? world,
 }) {
   // 空角色名回退 'Character'。
   final charName = character.name.isEmpty ? 'Character' : character.name;
+
+  // WL-03 世界书注入块：null / 全空 → 空块零注入（输出与改动前逐字节一致）。
+  final worldBlocks = world ?? const <String, List<String>>{};
+  final beforeChar = _filterInjection(worldBlocks['before_char']);
+  final afterChar = _filterInjection(worldBlocks['after_char']);
+  final knowledge = _filterInjection(worldBlocks['system']);
+
+  final messages = <PromptMessage>[];
+
+  // 0. before_char 注入块 — 逐条 system，位于 system prompt 首条之前
+  //   （移动端无 before_char 概念，对齐桌面 _assemble 步骤 0）。
+  for (final content in beforeChar) {
+    messages.add((role: 'system', content: content));
+  }
 
   // 1. system prompt（优先 system_prompt 字段，其次 personality）。
   final systemContent = character.systemPrompt.isNotEmpty
       ? character.systemPrompt
       : character.personality;
-  final messages = <PromptMessage>[
-    (
-      role: 'system',
-      content: applyTemplateVars(
-        systemContent,
-        userName: userName,
-        charName: charName,
-        extraVars: extraVars,
-      ),
+  messages.add((
+    role: 'system',
+    content: applyTemplateVars(
+      systemContent,
+      userName: userName,
+      charName: charName,
+      extraVars: extraVars,
     ),
-  ];
+  ));
 
   // 2. 场景设定 — 附加在 system prompt 后，作为补充上下文。
   if (character.scenario.isNotEmpty) {
@@ -177,6 +201,20 @@ List<PromptMessage> buildMessages(
       extraVars: extraVars,
     );
     messages.add((role: 'system', content: '[场景设定]\n$scenario'));
+  }
+
+  // 2.5 after_char 注入块 — scenario 之后（无 scenario 时紧随 system prompt）。
+  for (final content in afterChar) {
+    messages.add((role: 'system', content: content));
+  }
+
+  // 2.75 [世界知识] 合并单条 system — 多条以空行连接（调用方已按 (order, id)
+  // 升序；空注入项过滤后不产生空 system 消息）。
+  if (knowledge.isNotEmpty) {
+    messages.add((
+      role: 'system',
+      content: '[世界知识]\n${knowledge.join('\n\n')}',
+    ));
   }
 
   // 3. 对话范例（mes_example）— few-shot 示例。
@@ -231,6 +269,13 @@ List<PromptMessage> buildMessages(
 
   return messages;
 }
+
+/// 过滤注入块中的空 / 纯空白内容（对齐桌面 `_filter_injection`：`content and
+/// content.strip()`）——空注入项不产生空 system 消息，不污染上下文。
+List<String> _filterInjection(List<String>? items) => [
+      for (final item in items ?? const <String>[])
+        if (item.trim().isNotEmpty) item,
+    ];
 
 /// 取 `{{token}}:` 前缀之后的内容：先按 token 长度切片，再剥离开头全部冒号
 ///（对齐桌面 `lstrip(":")` 语义，容错无空格 / 连续冒号），最后整体 trim。

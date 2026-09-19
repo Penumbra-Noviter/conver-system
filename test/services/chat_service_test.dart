@@ -15,11 +15,13 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
@@ -3329,8 +3331,327 @@ void main() {
       expect(await swipeContentsOf(asst1.id), ['第一轮答', '新答']);
     });
   });
+
+  // ── 世界书注入链（WL-03：扫描→激活→注入；重生成同吃；滑窗与 depth 解耦）──
+
+  group('世界书注入链（WL-03）', () {
+    late LorebookRepository lorebookRepo;
+
+    setUp(() {
+      lorebookRepo = LorebookRepository(db);
+    });
+
+    /// 为角色落一条世界书条目（字段可覆盖，默认 world 位置 + 必进概率）。
+    Future<int> seedLorebookEntry(
+      int characterId, {
+      String title = '条目',
+      List<String> keys = const [],
+      String content = '知识内容',
+      bool constant = false,
+      int order = 100,
+      int probability = 100,
+      String groupName = '',
+      String matchMode = 'or',
+      String position = 'world',
+      int depth = 20,
+      bool enabled = true,
+    }) async {
+      final entry = await lorebookRepo.createEntry(
+        characterId,
+        LorebookEntryDraft(
+          title: title,
+          keys: keys,
+          content: content,
+          constant: constant,
+          order: order,
+          probability: probability,
+          groupName: groupName,
+          matchMode: matchMode,
+          position: position,
+          depth: depth,
+          enabled: enabled,
+        ),
+      );
+      return entry.id;
+    }
+
+    test('验收4：端到端——扫描→激活→注入 buildMessages，命中注入 [世界知识] 于 scenario 后',
+        () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+      );
+      await seedLorebookEntry(char.id, keys: ['剑'], content: '剑是身份的象征');
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '我拔出了剑');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '剑在手中')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      final knowledge =
+          sent.where((m) => m.content.startsWith('[世界知识]')).toList();
+      expect(knowledge, hasLength(1));
+      expect(knowledge.single.content, '[世界知识]\n剑是身份的象征');
+      // 位置：scenario 之后。
+      final scenarioIndex =
+          sent.indexWhere((m) => m.content.startsWith('[场景设定]'));
+      expect(scenarioIndex, isNot(-1));
+      expect(sent[scenarioIndex + 1].content, startsWith('[世界知识]'));
+      // [世界知识] 位于历史（开场白）之前。
+      final greetingIndex =
+          sent.indexWhere((m) => m.role == 'assistant' && m.content == '开场。');
+      final knowledgeIndex = sent.indexWhere((m) => m.content.startsWith('[世界知识]'));
+      expect(knowledgeIndex, lessThan(greetingIndex));
+    });
+
+    test('验收4：世界书为空 / 全部禁用 → 零注入（与无世界书基线一致）', () async {
+      final char = await seedCharacter(firstMes: '开场。', personality: '人设');
+      final conv = await seedConversation(char.id);
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: '你好').toList();
+      final baseline = provider.lastMessages!;
+      expect(baseline.where((m) => m.content.startsWith('[世界知识]')), isEmpty);
+
+      // 全禁用条目角色：输出与无条目角色逐条一致。
+      final char2 = await seedCharacter(firstMes: '开场。', personality: '人设');
+      await seedLorebookEntry(char2.id,
+          keys: ['你好'], content: '禁用知识', enabled: false);
+      final conv2 = await seedConversation(char2.id);
+      final provider2 = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider2);
+      await service
+          .streamReply(conversationId: conv2.id, content: '你好')
+          .toList();
+      expect(provider2.lastMessages!, baseline);
+    });
+
+    test('世界书仓储读取失败 → 降级空注入，不阻断主回复', () async {
+      final char = await seedCharacter(firstMes: '开场。', personality: '人设');
+      await seedLorebookEntry(char.id, keys: ['你好'], content: '知识');
+      final conv = await seedConversation(char.id);
+
+      // 只读面抛错的仓储（模拟 DB 故障），主回复必须仍可用、无世界书注入。
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: _FakeFactory(provider),
+        lorebookRepository: _ThrowingLorebookRepo(db),
+      );
+      await service.streamReply(conversationId: conv.id, content: '你好').toList();
+
+      final sent = provider.lastMessages!;
+      expect(sent.where((m) => m.content.startsWith('[世界知识]')), isEmpty);
+      expect(await roleContentsOf(conv.id), contains(
+        (Role.assistant, '回复'),
+      ));
+    });
+
+    test('验收2：before_char / after_char / world 三位置端到端注入', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+      );
+      await seedLorebookEntry(char.id,
+          keys: ['剑'], content: '前置知识', position: 'before_char');
+      await seedLorebookEntry(char.id,
+          keys: ['剑'], content: '后置知识', position: 'after_char');
+      await seedLorebookEntry(char.id, keys: ['剑'], content: '世界知识');
+      final conv = await seedConversation(char.id);
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '剑在手')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      expect(sent[0], const LlmMessage(role: 'system', content: '前置知识'));
+      expect(sent[1], const LlmMessage(role: 'system', content: '人设'));
+      expect(sent[2],
+          const LlmMessage(role: 'system', content: '[场景设定]\n场景'));
+      expect(sent[3], const LlmMessage(role: 'system', content: '后置知识'));
+      expect(sent[4],
+          const LlmMessage(role: 'system', content: '[世界知识]\n世界知识'));
+    });
+
+    test('验收4：激活 RNG 可注入——同种子两次装配结果一致（可复现）', () async {
+      final char = await seedCharacter(firstMes: '开场。', personality: '人设');
+      // 中间概率（50%）条目：命中与否依赖 RNG 掷点。
+      await seedLorebookEntry(char.id,
+          keys: ['剑'], content: '概率知识', probability: 50);
+
+      Future<List<LlmMessage>> sendOnce(int conversationId) async {
+        final provider = FakeLLMProvider(tokens: const ['回复']);
+        service = ChatService(
+          database: db,
+          conversationRepository: convRepo,
+          characterRepository: charRepo,
+          messageRepository: messageRepo,
+          settingsRepository: settingsRepo,
+          providerFactory: _FakeFactory(provider),
+          lorebookRandom: Random(42),
+        );
+        await service
+            .streamReply(conversationId: conversationId, content: '剑在手')
+            .toList();
+        return provider.lastMessages!;
+      }
+
+      final conv1 = await seedConversation(char.id);
+      final sent1 = await sendOnce(conv1.id);
+      final conv2 = await seedConversation(char.id);
+      final sent2 = await sendOnce(conv2.id);
+      expect(sent1, sent2, reason: '同种子两次激活结果一致（RNG 可复现）');
+    });
+
+    test('验收5：重生成路径（append_current_input=false）同样吃到注入，'
+        '尾随 system 剥离不被破坏', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        postHistoryInstructions: '保持人设',
+      );
+      await seedLorebookEntry(char.id, keys: ['剑'], content: '剑知识');
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '我拔出了剑');
+      await sendAssistantMessage(conv.id, '旧的回复');
+
+      final provider = FakeLLMProvider(tokens: const ['新回复']);
+      wireService(provider);
+      await service.regenerate(conversationId: conv.id);
+
+      final sent = provider.lastMessages!;
+      // 世界书知识已注入（重生成路径同吃）。
+      expect(sent.where((m) => m.content.startsWith('[世界知识]')), hasLength(1));
+      // 尾随剥离仍生效：末条为触发 user，PHI 不残留。
+      expect(sent.last, LlmMessage(role: 'user', content: '我拔出了剑'));
+      expect(sent.last.role, isNot('system'));
+    });
+
+    test('验收6：滑窗与 depth 解耦——maxRounds 改动不影响激活窗口', () async {
+      final char = await seedCharacter(firstMes: '开场。', personality: '人设');
+      // depth=20：扫描最近 40 条对话消息，不受消息滑窗 maxRounds 影响。
+      await seedLorebookEntry(char.id,
+          keys: ['旧词'], content: '旧词知识', depth: 20);
+      final conv = await seedConversation(char.id);
+      // 8 条历史：触发词位于第 1 条（maxRounds=1 → 消息滑窗仅 2 条，在窗之外）。
+      await sendUserMessage(conv.id, '旧词出现于此');
+      await sendAssistantMessage(conv.id, '答1');
+      await sendUserMessage(conv.id, '问2');
+      await sendAssistantMessage(conv.id, '答2');
+      await sendUserMessage(conv.id, '问3');
+      await sendAssistantMessage(conv.id, '答3');
+      await sendUserMessage(conv.id, '问4');
+      await sendAssistantMessage(conv.id, '答4');
+
+      await settingsRepo.setMany({'sliding_window_rounds': '1'});
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '新问')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      // 触发词位于消息滑窗之外，但世界书扫描窗（depth）不受 maxRounds 影响 → 仍激活。
+      expect(sent.where((m) => m.content.startsWith('[世界知识]')), hasLength(1));
+      // 消息滑窗本身仍生效：历史仅末 2 条（答4 + 已落库的当前输入）→ 追加输入。
+      final historyMsgs = [
+        for (final m in sent)
+          if (m.role == 'user' || m.role == 'assistant') m.content,
+      ];
+      expect(historyMsgs, ['答4', '新问', '新问']);
+      // 触发词消息（旧词出现于此）在滑窗之外，不进入消息列表。
+      expect(historyMsgs, isNot(contains('旧词出现于此')));
+    });
+
+    test('验收4：扫描深度 = max(enabled.depth)——单条目浅 depth 不缩小扫描窗', () async {
+      final char = await seedCharacter(firstMes: '开场。', personality: '人设');
+      // 条目A depth=1（若单独取 depth 只看最近 2 条），条目B depth=20。
+      await seedLorebookEntry(char.id,
+          keys: ['旧词'], content: '浅知识', depth: 1);
+      await seedLorebookEntry(char.id, keys: ['剑'], content: '深知识', depth: 20);
+      final conv = await seedConversation(char.id);
+      // 4 条历史：旧词在第 1 条（depth=1 的 2 条窗口之外），剑在末条。
+      await sendUserMessage(conv.id, '旧词早先说');
+      await sendAssistantMessage(conv.id, '答1');
+      await sendUserMessage(conv.id, '问2');
+      await sendAssistantMessage(conv.id, '我手持剑');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '继续')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      final knowledge =
+          sent.where((m) => m.content.startsWith('[世界知识]')).toList();
+      expect(knowledge, hasLength(1));
+      // max(depth)=20 → 两条均命中，按 (order, id) 升序合并。
+      expect(knowledge.single.content, '[世界知识]\n浅知识\n\n深知识');
+    });
+
+    test('验收4：世界书多条目注入内容不重排历史/PHI/user（位置稳定）', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        postHistoryInstructions: '指令',
+      );
+      await seedLorebookEntry(char.id, keys: ['剑'], content: '知识一', order: 200);
+      await seedLorebookEntry(char.id, keys: ['剑'], content: '知识二', order: 100);
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '剑');
+      await sendAssistantMessage(conv.id, '旧答');
+
+      final provider = FakeLLMProvider(tokens: const ['新答']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '继续')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      // 合并单条，按 order 升序（知识二 order=100 在前）。
+      expect(
+        sent.where((m) => m.content.startsWith('[世界知识]')).single.content,
+        '[世界知识]\n知识二\n\n知识一',
+      );
+      // 位置：system 之后、历史（开场白）之前。
+      final greetingIndex =
+          sent.indexWhere((m) => m.role == 'assistant' && m.content == '开场。');
+      expect(
+        sent[greetingIndex - 1].content,
+        startsWith('[世界知识]'),
+      );
+      // 尾随结构稳定：PHI + user。
+      expect(sent.last, LlmMessage(role: 'user', content: '继续'));
+      expect(sent[sent.length - 2],
+          const LlmMessage(role: 'system', content: '指令'));
+    });
+  });
 }
 
 class _UnknownDomainError extends DomainError {
   _UnknownDomainError() : super('未知领域错误');
+}
+
+/// listEntries 抛错的 [LorebookRepository]——世界书读失败降级路径测试用
+/// （模拟 DB 故障；主回复必须仍可用、世界书零注入）。
+class _ThrowingLorebookRepo extends LorebookRepository {
+  _ThrowingLorebookRepo(super.db);
+
+  @override
+  Future<List<LorebookEntry>> listEntries(int characterId) async {
+    throw StateError('db down');
+  }
 }
