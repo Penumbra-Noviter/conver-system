@@ -38,7 +38,8 @@ class FakeLLMProvider extends LLMProvider {
 
   final List<String> _tokens;
 
-  /// 非 null 时 generate / streamGenerate 立即抛出（原样，不翻译）。
+  /// 非 null 时 generate 原样抛出；streamGenerate 经基类默认翻译上抛
+  /// （LLM 族直通，非 LLM 族包装为 fake LLM 错误）。
   final Object? error;
 
   /// generate 的产物等待时长（观测「重生成进行中」禁用态等慢路径用）；
@@ -80,7 +81,7 @@ class FakeLLMProvider extends LLMProvider {
   }
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
@@ -126,7 +127,8 @@ class TickingFakeLLMProvider extends LLMProvider {
   /// 逐个产出的 token 序列。
   final List<String> _tokens;
 
-  /// 全部 token 产出完毕后的异常（原样上抛，不翻译）；null → 正常完成。
+  /// 全部 token 产出完毕后的异常（LLM 族直通，经基类默认翻译上抛）；
+  /// null → 正常完成。
   final Object? errorAfter;
 
   /// 相邻 token 的产出间隔（真实异步延迟）。
@@ -161,7 +163,7 @@ class TickingFakeLLMProvider extends LLMProvider {
   }
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,

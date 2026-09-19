@@ -469,7 +469,7 @@ class _CapturingProvider extends LLMProvider {
   }
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,

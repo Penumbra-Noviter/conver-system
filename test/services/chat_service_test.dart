@@ -148,7 +148,7 @@ class _TickingProvider extends LLMProvider {
   }
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
@@ -204,7 +204,7 @@ class _StalledProvider extends LLMProvider {
       _tokens.join();
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
@@ -256,7 +256,7 @@ class _CancelErrorProvider extends LLMProvider {
       ''; // F-55 测试仅走流式路径。
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
@@ -314,7 +314,7 @@ class _FaultSequenceProvider extends LLMProvider {
       _tokens.join();
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
@@ -417,13 +417,58 @@ class _HoldableProvider extends LLMProvider {
   }
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
   }) async* {
     throw StateError('F1/F4 测试不走流式路径');
+  }
+}
+
+/// 防御面专用：模拟**违反 S3 契约**的 provider——错误不翻译、原样穿透
+  /// [streamGenerate]（A2 Falsify 输入构造：ChatService 必须对任意非 LLM
+  /// 错误兜底分类，即使 Provider 未走基类默认翻译骨架）。
+  class _RawErrorProvider extends LLMProvider {
+  _RawErrorProvider(this.error) : super(apiKey: 'test-key');
+
+  /// 流式路径原样抛出的错误（领域错误 / 一般异常）。
+  final Object error;
+
+  @override
+  LLMError translateError(Object error) =>
+      error is LLMError ? error : LLMError('fake API 调用失败: $error');
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) async =>
+      '';
+
+  // 原样穿透：不经基类翻译，把错误直接送达 ChatService（防御面测的就是
+  // 这条「Provider 违规」路径；基类默认 streamGenerate 不会产生该形态）。
+  @override
+  Stream<String> streamGenerate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) async* {
+    throw error;
+  }
+
+  @override
+  Stream<String> streamRequest({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) async* {
+    throw UnimplementedError('防御面夹具走覆写 streamGenerate，不走模板路径');
   }
 }
 
@@ -1007,10 +1052,7 @@ void main() {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
 
-      wireService(FakeLLMProvider(
-        tokens: const [],
-        error: ConversationNotFoundError(),
-      ));
+      wireService(_RawErrorProvider(ConversationNotFoundError()));
       final events = await service
           .streamReply(conversationId: conv.id, content: 'hi')
           .toList();
@@ -1024,10 +1066,7 @@ void main() {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
 
-      wireService(FakeLLMProvider(
-        tokens: const [],
-        error: StateError('wire 层未知异常'),
-      ));
+      wireService(_RawErrorProvider(StateError('wire 层未知异常')));
       final events = await service
           .streamReply(conversationId: conv.id, content: 'hi')
           .toList();
