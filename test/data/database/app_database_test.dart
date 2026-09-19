@@ -1,5 +1,5 @@
-/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=5，
-/// 11 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表）。
+/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=6，
+/// 12 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表 + MS-01 候选表）。
 ///
 /// 全部在内存执行器（`AppDatabase(NativeDatabase.memory())`）上运行，
 /// 经构造注入 seam 打开真实 schema，不依赖设备、无 repositories。
@@ -24,11 +24,11 @@ void main() {
     await db.close();
   });
 
-  test('schemaVersion 冻结为 5', () {
-    expect(db.schemaVersion, 5);
+  test('schemaVersion 冻结为 6', () {
+    expect(db.schemaVersion, 6);
   });
 
-  test('内存执行器打开成功，11 表可定位', () async {
+  test('内存执行器打开成功，12 表可定位', () async {
     final tables = await sqliteMasterNames(db, 'table');
     expect(
       tables,
@@ -44,6 +44,7 @@ void main() {
         'inner_thoughts',
         'embedding_entries',
         'semantic_hits',
+        'message_swipes',
       ]),
     );
   });
@@ -182,6 +183,7 @@ void main() {
         'idx_embedding_entries_character_id',
         'idx_embedding_entries_character_id_content_hash',
         'idx_semantic_hits_character_id',
+        'idx_message_swipes_message_id',
       ]),
     );
   });
@@ -212,5 +214,176 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('messages.active_swipe_index 默认 0（MS-01 列契约）', () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '默认值',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final conversation = await db
+        .into(db.conversations)
+        .insertReturning(
+          ConversationsCompanion.insert(
+            characterId: character.id,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final message = await db
+        .into(db.messages)
+        .insertReturning(
+          MessagesCompanion.insert(
+            conversationId: conversation.id,
+            role: Role.assistant,
+            content: '你好',
+            createdAt: now,
+          ),
+        );
+
+    expect(message.activeSwipeIndex, 0, reason: 'spec §4.2 默认 0');
+  });
+
+  test('message_swipes 可写读 + (message_id, index) 唯一约束生效（MS-01）', () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '候选',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final conversation = await db
+        .into(db.conversations)
+        .insertReturning(
+          ConversationsCompanion.insert(
+            characterId: character.id,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final message = await db
+        .into(db.messages)
+        .insertReturning(
+          MessagesCompanion.insert(
+            conversationId: conversation.id,
+            role: Role.assistant,
+            content: '原始回复',
+            createdAt: now,
+          ),
+        );
+
+    await db.into(db.messageSwipes).insert(
+          MessageSwipesCompanion.insert(
+            messageId: message.id,
+            index: 0,
+            content: '原始回复',
+            createdAt: now,
+          ),
+        );
+    final swipe = await db.into(db.messageSwipes).insertReturning(
+          MessageSwipesCompanion.insert(
+            messageId: message.id,
+            index: 1,
+            content: '候选一',
+            createdAt: now,
+          ),
+        );
+    expect(swipe.messageId, message.id);
+    expect(swipe.index, 1);
+    expect(swipe.content, '候选一');
+
+    // 同消息重复 index → UNIQUE 约束拒绝。
+    await expectLater(
+      db.into(db.messageSwipes).insert(
+            MessageSwipesCompanion.insert(
+              messageId: message.id,
+              index: 1,
+              content: '重复',
+              createdAt: now,
+            ),
+          ),
+      throwsA(
+        isA<Exception>().having(
+          (e) => e.toString(),
+          'message',
+          contains('UNIQUE'),
+        ),
+      ),
+    );
+
+    // 不同消息相同 index 可共存（唯一键是 (message_id, index) 组合）。
+    final other = await db
+        .into(db.messages)
+        .insertReturning(
+          MessagesCompanion.insert(
+            conversationId: conversation.id,
+            role: Role.assistant,
+            content: '另一消息',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.messageSwipes).insert(
+          MessageSwipesCompanion.insert(
+            messageId: other.id,
+            index: 1,
+            content: '异消息同 index',
+            createdAt: now,
+          ),
+        );
+  });
+
+  test('删消息 → message_swipes 级联清除（FK CASCADE 实测，SR-27）', () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '级联',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final conversation = await db
+        .into(db.conversations)
+        .insertReturning(
+          ConversationsCompanion.insert(
+            characterId: character.id,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final message = await db
+        .into(db.messages)
+        .insertReturning(
+          MessagesCompanion.insert(
+            conversationId: conversation.id,
+            role: Role.assistant,
+            content: '原始回复',
+            createdAt: now,
+          ),
+        );
+    await db.into(db.messageSwipes).insert(
+          MessageSwipesCompanion.insert(
+            messageId: message.id,
+            index: 0,
+            content: '原始回复',
+            createdAt: now,
+          ),
+        );
+
+    await (db.delete(
+      db.messages,
+    )..where((t) => t.id.equals(message.id))).go();
+
+    expect(await db.select(db.messageSwipes).get(), isEmpty);
   });
 }
