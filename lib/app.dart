@@ -2,14 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'
-    show
-        DidReceiveNotificationResponseCallback,
-        FlutterLocalNotificationsPlugin;
 import 'package:provider/provider.dart';
 
 import 'data/database/app_database.dart';
-import 'data/database/tables.dart' show ProactivePlanStatus;
 import 'data/repositories/character_repository.dart';
 import 'data/repositories/companion_repository.dart';
 import 'data/repositories/conversation_repository.dart';
@@ -18,6 +13,7 @@ import 'data/repositories/message_repository.dart';
 import 'data/repositories/settings_repository.dart';
 import 'services/chat_service.dart';
 import 'services/character_file_exchange.dart';
+import 'services/companion/proactive_deep_link.dart';
 import 'services/companion/proactive_message_service.dart';
 import 'services/companion/relationship_service.dart';
 import 'services/companion/stage_upgrade_broker.dart';
@@ -62,87 +58,6 @@ import 'views/onboarding/onboarding_page.dart';
 ///   控制器构造后先 [ThemeController.load] 预热恢复持久化偏好；首启设置表
 ///   无 theme_mode 行（或恢复失败）→ dark 基线（用户拍板①）。
 /// - 导航状态在入口装配，全局可读；M0 五 tab 壳导航结构不变。
-/// 深链导航意图 seam（PS2-08，可测注入；生产实现包 ShellNavigation +
-/// ChatController，测试注入 fake recorder 断言两动作）。
-abstract interface class ProactiveDeepLinkNavigator {
-  /// 切换到聊天 tab（对话列表）。
-  void selectChatTab();
-
-  /// 打开 [conversationId] 对话并（可选）高亮 [highlightMessageId] 消息。
-  Future<void> openConversation(int conversationId, {int? highlightMessageId});
-}
-
-/// 深链导航生产实现（PS2-10）：包 [ShellNavigation] + [ChatController]——
-/// select chat = 切聊天 tab；openConversation = 打开会话（可高亮消息）。
-class AppDeepLinkNavigator implements ProactiveDeepLinkNavigator {
-  /// [navigation] tab 状态；[chatController] 会话打开/高亮入口。
-  AppDeepLinkNavigator({
-    required this.navigation,
-    required this.chatController,
-  });
-
-  final ShellNavigation navigation;
-  final ChatController chatController;
-
-  @override
-  void selectChatTab() => navigation.select(ShellTab.chat);
-
-  @override
-  Future<void> openConversation(int conversationId, {int? highlightMessageId}) {
-    return chatController.openConversation(
-      conversationId,
-      highlightMessageId: highlightMessageId,
-    );
-  }
-}
-
-/// 冷启动通知 payload 读取薄封装（PS2-10 验收 8）：notification_service 标
-/// 只读（PS2-06 未提供取参通道），真通道在此封装——flutter_local_notifications
-/// 插件单例调 [FlutterLocalNotificationsPlugin.getNotificationAppLaunchDetails]，
-/// 取 `notificationResponse.payload`（SR-03 零 content：payload 仅两 id）。
-///
-/// 插件缺位（测试环境 MissingPluginException）/ 平台异常 → null 静默返回
-/// （验收 8：取参失败静默跳过，不阻塞 App 启动）。
-Future<String?> readProactiveLaunchPayload({
-  FlutterLocalNotificationsPlugin? plugin,
-}) async {
-  try {
-    final details = await (plugin ?? FlutterLocalNotificationsPlugin())
-        .getNotificationAppLaunchDetails();
-    return details?.notificationResponse?.payload;
-  } catch (e) {
-    debugPrint('读取冷启动通知 payload 失败: $e');
-    return null;
-  }
-}
-
-/// 冷启动深链消费（PS2-10 装配层接线）：取参 → 无 payload / 取参失败静默
-/// 跳过（验收 8）→ 否则交 [handleProactiveDeepLink]（归属校验 + 导航）。
-Future<void> consumeProactiveLaunchDeepLink({
-  required ProactiveDeepLinkNavigator navigator,
-  required MessageRepository messageRepository,
-  ProactiveMessageService? proactiveMessageService,
-  RelationshipService? relationshipService,
-  Future<String?> Function()? readPayload,
-}) async {
-  final String? payload;
-  try {
-    payload = await (readPayload ?? readProactiveLaunchPayload)();
-  } catch (e) {
-    debugPrint('读取冷启动通知 payload 失败: $e');
-    return;
-  }
-  if (payload == null || payload.isEmpty) {
-    return;
-  }
-  await handleProactiveDeepLink(
-    payload: payload,
-    navigator: navigator,
-    messageRepository: messageRepository,
-    proactiveMessageService: proactiveMessageService,
-    relationshipService: relationshipService,
-  );
-}
 
 /// 全局 ScaffoldMessenger key（F-84 SnackBar 通道）：装配层单点绑定
 /// `MaterialApp.scaffoldMessengerKey`——provider create 的 context 位于
@@ -164,157 +79,50 @@ void showScheduleFailedNotice() {
     ..showSnackBar(const SnackBar(content: Text('通知排程失败')));
 }
 
-/// 热态通知点按深链消费（F-84 桥接，PS2-10 装配层接线）：与
-/// [consumeProactiveLaunchDeepLink] 同构，payload 来源为
-/// `NotificationResponse.payload`（同步取值，非 Future 读取）。
-///
-/// payload null/空 → 静默（零导航）；非空 → [handleProactiveDeepLink]（归属
-/// 校验 → markDelivered → recordProactiveMessageOpened +5 → 导航高亮，异常
-/// 降级内建）。热态（App 存活）与冷启动（getNotificationAppLaunchDetails）
-/// 互斥，共享同一消费函数与装配组件（导航/仓储/两服务）。
-Future<void> consumeProactiveNotificationResponse({
-  required String? payload,
-  required ProactiveDeepLinkNavigator navigator,
-  required MessageRepository messageRepository,
-  ProactiveMessageService? proactiveMessageService,
-  RelationshipService? relationshipService,
-}) async {
-  if (payload == null || payload.isEmpty) {
-    return;
-  }
-  await handleProactiveDeepLink(
-    payload: payload,
-    navigator: navigator,
-    messageRepository: messageRepository,
-    proactiveMessageService: proactiveMessageService,
-    relationshipService: relationshipService,
-  );
-}
-
-/// 处理主动消息通知深链（PS2-08 验收 3 + SR-03 归属校验）。
-///
-/// payload 解析成功且 messageId 属于 payload.conversationId 的对话（经
-/// [messageRepository] 既有查询，不直接写库、不发送）→ select chat +
-/// openConversation(conversationId, highlightMessageId: messageId)；
-/// payload 非法或归属校验失败 → 回落普通导航（仅 select chat 打开对话列表）。
-/// 消费端不读任何 content 参数（SR-03 零内容；payload 仅两 id）。
-///
-/// W5 F2（P3）：openConversation 纳入异常保护——导航抛错 debugPrint 降级，
-/// 不崩溃、不回退（tab 已切到聊天列表，用户可自行选择会话）。
-Future<void> handleProactiveDeepLink({
-  required String payload,
-  required ProactiveDeepLinkNavigator navigator,
-  required MessageRepository messageRepository,
-  ProactiveMessageService? proactiveMessageService,
-  RelationshipService? relationshipService,
-}) async {
-  final parsed = ProactiveDeepLink.tryParse(payload);
-  if (parsed == null) {
-    navigator.selectChatTab();
-    return;
-  }
-  try {
-    final messages = await messageRepository.getMessages(parsed.conversationId);
-    final belongs = messages.any((m) => m.id == parsed.messageId);
-    if (!belongs) {
-      navigator.selectChatTab();
-      return;
-    }
-    // C1 送达收口（SR-07）：归属校验通过 = 通知已被用户点按触达 → 置 sent +
-    // sentAt（节流计数/冷却口径生产可达），并记录「点开主动消息 +5」
-    // （P4 启发式，PS2-03 recordProactiveMessageOpened 消费）。失败仅
-    // debugPrint 不阻断导航；缺省 null（测试形态）跳过。
-    if (proactiveMessageService != null) {
-      try {
-        final delivered = await proactiveMessageService
-            .markDeliveredByMessageId(parsed.messageId);
-        if (delivered != null && relationshipService != null) {
-          await relationshipService.recordProactiveMessageOpened(
-            delivered.characterId,
-          );
-        }
-      } catch (e) {
-        debugPrint('主动消息送达收口失败（不阻断导航）: $e');
-      }
-    }
-  } catch (e) {
-    debugPrint('主动消息深链归属校验失败，回落对话列表: $e');
-    navigator.selectChatTab();
-    return;
-  }
-  navigator.selectChatTab();
-  try {
-    await navigator.openConversation(
-      parsed.conversationId,
-      highlightMessageId: parsed.messageId,
-    );
-  } catch (e) {
-    debugPrint('主动消息深链打开会话失败（已切聊天 tab）: $e');
-  }
-}
-
-/// 启动排程恢复（SR-08 P0）：只重建「pending 且未过期」的 OS 排程。
-///
-/// - pending 且 scheduledAt ≤ [now] → 置 expired（不排不发送）；
-/// - pending 且未过期 → [scheduler].schedule 重建一次；
-/// - sent/expired/dropped 不在 scheduled 列表 → 天然不重排（零触碰）。
-/// 单计划排程抛错或置 expired 抛错 → 降级 log 跳过，其余计划继续恢复，
-/// 不整体上抛（SR-08：抛错计划保持原状态 scheduled，不重排不置位）。
-Future<void> restoreProactiveSchedules({
-  required CompanionRepository companion,
-  required ProactiveNotificationScheduler scheduler,
-  required DateTime now,
-}) async {
-  final pending = await companion.listPlansByStatus(
-    ProactivePlanStatus.scheduled,
-  );
-  for (final plan in pending) {
-    if (!plan.scheduledAt.isAfter(now)) {
-      try {
-        await companion.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
-      } catch (e) {
-        debugPrint('启动排程恢复置 expired 失败（计划 ${plan.id} 保持 scheduled）: $e');
-      }
-      continue;
-    }
-    try {
-      await scheduler.schedule(plan);
-    } catch (e) {
-      debugPrint('启动排程恢复失败（计划 ${plan.id} 保持 scheduled）: $e');
-    }
-  }
-}
-
-/// 启动路径主动通知初始化（PS2-08 验收 4 + F-84 热态接线 + F-92 告警接线）：
-/// scheduler 初始化（幂等；首次调用即透传热态回调，晚到装配经重挂生效）
-/// + SR-08 排程恢复；任一失败 debugPrint 降级，不阻断 App 启动。恢复路径
-/// 不接失败回调（SR-08 保持静默）。
-///
-/// F-92：热态回调丢失告警 seam 在此接线消费——不可补救路径（重挂失败）经
-/// [FlutterLocalNotificationsScheduler.initialize] 的 onHotCallbackLost
-/// 上达装配方并 debugPrint 记录（不得静默）；reason 为失败摘要，不含
-/// payload 内容（SR-12）。
-Future<void> _startProactiveNotifications(
-  FlutterLocalNotificationsScheduler scheduler,
-  CompanionRepository companion, {
-  DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
-}) async {
-  try {
-    await scheduler.initialize(
-      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
-      onHotCallbackLost: (reason) => debugPrint('主动通知热态回调丢失（不可补救）: $reason'),
-    );
-    await restoreProactiveSchedules(
-      companion: companion,
-      scheduler: scheduler,
-      now: DateTime.now(),
-    );
-  } catch (e) {
-    debugPrint('主动通知启动初始化失败: $e');
-  }
-}
-
 /// 装配层 LLM 凭据解析 + 工厂创建单一落点（F-120）。
+/// 后台反思 + 条件补嵌编排（F-135：反射实际落库才触发补嵌）。
+///
+/// S1 集合层闭包逻辑提为可测纯编排，依赖以函数 seam 注入（测试零实现类）：
+/// 反射返回 0（节流跳过 / 无新事实 / 失败降级）不触发 [backfill]——已落库
+/// 新事实经级联标脏（VR-05）后补嵌才有效，避免每回合无条件重复清扫；① 懒
+/// 补嵌已按 memoryChangedThisTurn 门触发过，此处只对「反射新增」补第二枪。
+/// 反射服务内吞错（S1 契约），本函数不上抛。
+Future<void> reflectAndBackfillPending({
+  required Future<int> Function({
+    required int characterId,
+    required int conversationId,
+  })
+  reflect,
+  required Future<Object?> Function(int characterId) backfill,
+  required int characterId,
+  required int conversationId,
+}) async {
+  final added = await reflect(
+    characterId: characterId,
+    conversationId: conversationId,
+  );
+  if (added > 0) {
+    await backfill(characterId);
+  }
+}
+
+/// 凭据解析 → [GenerationCredentials] 映射（F-138：S4 装配收敛第五处）。
+///
+/// GameGenerator 装配闭包与 [_resolveLlm] 内部共享的
+/// 「wireCredentialsResolver().resolve() → GenerationCredentials」样板单点；
+/// 凭据解析链（wireCredentialsResolver）单一落点约束不扩散到视图/服务层。
+Future<GenerationCredentials> _resolveGenerationCredentials(
+  SettingsRepository settings,
+) async {
+  final resolved = await settings.wireCredentialsResolver().resolve();
+  return GenerationCredentials(
+    provider: resolved.provider,
+    apiKey: resolved.apiKey,
+    model: resolved.model,
+    baseUrl: resolved.baseUrl,
+  );
+}
+
 ///
 /// ReflectionService / PersonaEvolutionService 两处 reflector 装配闭包中
 /// 的「wireCredentialsResolver().resolve() → factory.create()」同构段收敛
@@ -325,14 +133,14 @@ Future<({LLMProvider llm, String model})> _resolveLlm(
 ) async {
   final settings = context.read<SettingsRepository>();
   final factory = context.read<LLMProviderFactory>();
-  final resolved = await settings.wireCredentialsResolver().resolve();
+  final creds = await _resolveGenerationCredentials(settings);
   return (
     llm: factory.create(
-      provider: resolved.provider,
-      apiKey: resolved.apiKey,
-      baseUrl: resolved.baseUrl,
+      provider: creds.provider,
+      apiKey: creds.apiKey,
+      baseUrl: creds.baseUrl,
     ),
-    model: resolved.model,
+    model: creds.model,
   );
 }
 
@@ -572,7 +380,9 @@ class ConverApp extends StatelessWidget {
                 await embedding.backfillPending(characterId);
               },
               // ② 后台反思（ADR-0004）：开关在设置仓储；成功后直接补嵌
-              //    （reflect 闭包捕获 EmbeddingService，集合层不表达因果边）。
+              //    （F-135：反射实际落库 added>0 才补，经 reflectAndBackfillPending
+              //    单点编排；reflect 闭包捕获 EmbeddingService，集合层不表达
+              //    因果边）。
               (ctx) async {
                 final reflection = context.read<ReflectionService>();
                 final embedding = context.read<EmbeddingService>();
@@ -584,11 +394,12 @@ class ConverApp extends StatelessWidget {
                 if (!await settings.memoryReflectionEnabled) {
                   return;
                 }
-                await reflection.reflectAfterTurn(
+                await reflectAndBackfillPending(
+                  reflect: reflection.reflectAfterTurn,
+                  backfill: embedding.backfillPending,
                   characterId: characterId,
                   conversationId: ctx.conversationId,
                 );
-                await embedding.backfillPending(characterId);
               },
               // ③ 主动消息规划（PS2-05）：开关/节流/LLM seam 全在服务内部。
               (ctx) async {
@@ -666,7 +477,7 @@ class ConverApp extends StatelessWidget {
           lazy: false, // W6-F1：无消费者时默认 lazy 永不执行，启动副作用必须立即触发
           create: (context) {
             unawaited(
-              _startProactiveNotifications(
+              startProactiveNotifications(
                 context.read<FlutterLocalNotificationsScheduler>(),
                 context.read<CompanionRepository>(),
                 onDidReceiveNotificationResponse: (response) {
@@ -692,7 +503,7 @@ class ConverApp extends StatelessWidget {
         // PS2-10 冷启动深链接线：依赖 ShellNavigation + ChatController（均
         // 已声明），故独立哑 Provider 置于其后——取参 → 无 payload/失败
         // 静默；成功 → handleProactiveDeepLink（归属校验 + 导航高亮）。
-        // 装配层单点（对齐 _startProactiveNotifications 哑 Provider 先例）。
+        // 装配层单点（对齐 startProactiveNotifications 哑 Provider 先例）。
         Provider<Object?>(
           lazy: false, // W6-F1：冷启动深链接线副作用，必须立即执行（同启动恢复）
           create: (context) {
@@ -752,17 +563,9 @@ class ConverApp extends StatelessWidget {
             final settings = context.read<SettingsRepository>();
             return GameGenerator(
               providerFactory: context.read<LLMProviderFactory>(),
-              resolveCredentials: () async {
-                final resolved = await settings
-                    .wireCredentialsResolver()
-                    .resolve();
-                return GenerationCredentials(
-                  provider: resolved.provider,
-                  apiKey: resolved.apiKey,
-                  model: resolved.model,
-                  baseUrl: resolved.baseUrl,
-                );
-              },
+              // F-138：resolveCredentials 复用凭据解析单点（S4 装配收敛第五处），
+              // 不再手写 wireCredentialsResolver 映射样板。
+              resolveCredentials: () => _resolveGenerationCredentials(settings),
               resolveSimDir: () => SimulatorDataDir().resolve(),
             );
           },

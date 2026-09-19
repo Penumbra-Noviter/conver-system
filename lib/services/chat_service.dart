@@ -196,6 +196,22 @@ class RegenerateResult {
   return (status: 400, message: error.message);
 }
 
+/// 聊天链错误 → 用户可见文案单源（F-124：chat_service 三叉 catch 与
+/// chat_round 判型共 4 处收敛，断流语义变更只需改本函数）。
+///
+/// 领域错误 → [domainErrorResponse] 文案；LLM 错误 → [llmErrorResponse]
+/// 文案（[providerName] 非空时 Auth 消息带前缀）；其余（未预期异常）→
+/// 「生成回复失败: $error」兜底（对齐桌面 O3 语义）。
+String chatErrorMessage(Object error, {String providerName = ''}) {
+  if (error is DomainError) {
+    return domainErrorResponse(error).message;
+  }
+  if (error is LLMError) {
+    return llmErrorResponse(error, providerName).message;
+  }
+  return '生成回复失败: $error';
+}
+
 /// 判定 provider 流异常是否为「连接中断」（断流，R3 seam）。
 ///
 /// 契约（T02 wire 层遵守）：**连接建立段**传输失败（DNS / 拒连 / 连接超时 /
@@ -498,7 +514,7 @@ class ChatService {
       // 有界窗口（S1 红态诊断实证）。
       _settleUserWriteGate(state);
       if (!controller.isClosed) {
-        controller.add(ChatError(domainErrorResponse(e).message));
+        controller.add(ChatError(chatErrorMessage(e)));
         await controller.close();
       }
     } on LLMError catch (e) {
@@ -506,7 +522,9 @@ class ChatService {
       _settleUserWriteGate(state);
       if (!controller.isClosed) {
         state.saved = true; // F-45。
-        controller.add(ChatError(llmErrorResponse(e, providerName).message));
+        controller.add(
+          ChatError(chatErrorMessage(e, providerName: providerName)),
+        );
         await controller.close();
       }
     } catch (e) {
@@ -514,7 +532,7 @@ class ChatService {
       _settleUserWriteGate(state);
       if (!controller.isClosed) {
         state.saved = true;
-        controller.add(ChatError('生成回复失败: $e'));
+        controller.add(ChatError(chatErrorMessage(e)));
         await controller.close();
       }
     } finally {
@@ -706,20 +724,20 @@ class ChatService {
           // LLM 业务错误：F-45 不落部分内容。
           state.saved = true;
           controller.add(
-            ChatError(llmErrorResponse(error, providerName).message),
+            ChatError(chatErrorMessage(error, providerName: providerName)),
           );
         }
       } else if (error is DomainError) {
-        controller.add(ChatError(domainErrorResponse(error).message));
+        controller.add(ChatError(chatErrorMessage(error)));
       } else {
         state.saved = true; // F-45。
-        controller.add(ChatError('生成回复失败: $error'));
+        controller.add(ChatError(chatErrorMessage(error)));
       }
     } catch (e) {
       // 断流部分落库失败（如流式中对话被删）→ 收口为 ChatError。
       // 挂起期间用户停止 → controller 已关闭 → 跳过发事件（对齐外层守卫）。
       if (!controller.isClosed) {
-        controller.add(ChatError('生成回复失败: $e'));
+        controller.add(ChatError(chatErrorMessage(e)));
       }
     } finally {
       if (!controller.isClosed) {
@@ -1022,14 +1040,16 @@ class ChatService {
   ///
   /// 对话无任何消息且角色有非空 first_mes → 首条 assistant 开场白（模板变量
   /// `{{user}}/{{char}}` 与 [extraVars] 自定义变量替换后落库）；否则零副作用。
+  /// F-139：判空读由 [MessageRepository.getMessages] 全量下推为
+  /// [MessageRepository.lastMessage] 单值定位读（S6 语义化读面）。
   Future<void> _autoInsertGreeting(
     Conversation conv,
     Character character,
     String userName,
     Map<String, String> extraVars,
   ) async {
-    final existing = await _messageRepository.getMessages(conv.id);
-    if (existing.isNotEmpty) {
+    final existing = await _messageRepository.lastMessage(conv.id);
+    if (existing != null) {
       return; // 已有消息（含预插开场白）不重复插入。
     }
     if (character.firstMes.isEmpty) {

@@ -6,6 +6,17 @@
 
 ---
 
+## 技术债消费批次 F-123~139 — 十七条全部处置（2026-09-19 — handoff 交接指令，候选区 17 条全处置）
+
+- **Grilling 共识（16 做 1 关）**：交接文档建议「先 F-136/137 flaky 复核 + F-138/139 收敛点，再评估 W1~W6/P1~P3」（用户拍板消费候选区）；逐条现状实证后共识 = 14 做 + 3 复核关闭（F-131 role 宽类型唯一调用方只传 Role / F-134 planner hook 已直测 / F-137 chars_view 5 遍全量零复现）。F-136 有明确加固点（pumpUntil 等加载）做；F-137 无可见盲区按证据关闭。
+- **flaky 复现循环（先跑证据）**：后台 6 遍全量循环——run 1-5 干净基线全绿（F-136/137 本批零复现），run 6 两文件 loading 失败 = 实施期间编辑测试文件的中间态误伤（非 flaky，全量终验兜底）。结论：F-136 静态加固（加载完成显式等待，消除单帧 pump 残余窗口）；F-137 零复现 + 双终态等待在位 → 复核关闭。
+- **五波交付（主会话直行，无子代理派发）**：波 1 F-132（persistThought 服务侧 1 MiB 截断 + 超长用例——**漏改落库参数被测试捕获**先红后绿）/F-133（开关读抛错专测 ×2：服务层上抛契约 + 端到端降级）/F-138（`_resolveGenerationCredentials` 抽共享，GameGenerator + `_resolveLlm` 双侧复用，S4 收敛第五处）/F-139（`_autoInsertGreeting` 改 `lastMessage` 定位读）→ 波 2 F-126（`float32_codec` git mv 至 utils + 4 处 import）/F-129（`CompanionTimeWindows.localDayOf/isSameLocalDay` 单源，双消费点改调）/F-130（索引对账机械测试——**三段正则踩坑**：跨行字面量捕获 IF → `[^...]*` 吃注释中文捕获 user_version → `IF NOT EXISTS` 设必需前缀终局）/F-125（`getActivePlan` limit(1) 双在途不抛 + `_hasInFlightPlan` 去全表绕路，注释同步）→ 波 3 F-124（`chatErrorMessage` 单源 7 处改调）/F-127（view timer 三处删除，controller 单归属）/F-128（`_interruptedNoticeId` noticeId 配对替代文案身份）/F-135（`reflectAndBackfillPending` 函数 seam 编排 added>0 才补嵌）→ 波 4 F-136（chat_entry 断言前置 pumpUntil）→ 波 5 F-123（新建 `lib/services/companion/proactive_deep_link.dart` 深模块八符号，app.dart 摘除约 210 行业务接线圈，剩 ScaffoldMessenger 桥接 + Provider 闭包；装配测试 import 迁移）。
+- **测试工程教训**：① `isNotNull` 与 drift query builder 同名 import 冲突 → 换 `isA`；② SettingsRepository super 参数 positional 不匹配命名构造 → 显式构造；③ 对账正则在「注释含 CREATE INDEX + 中文」下回溯捕获假名，必需前缀 + 白名单消耗是最稳形态。
+- **门禁**：全量 **2274 测**绿（基线 2264 → +10 = F-132 1 + F-133 2 + F-125 1 + F-129 3 + F-135 2 + 对账 1）/ `flutter analyze` 0 / 波及文件覆盖率全 ≥90%（新增 proactive_deep_link、companion_time_windows 测试直测）。
+- **批次收尾**：TICKETS 归档「技术债消费批次 F-123~139」（5 波 5 Ticket）；TECH_DEBT 处置记录新节（14 ✅ + 3 ❌ 复核关闭入表）+ **候选区清零**（空表头状态，禁写叙述）；AGENTS 状态行追加。
+
+---
+
 ## 架构深化批次 S1~S6 — 六条 Strong 全交付（2026-09-18 — /improve-codebase-architecture + /project-kickoff 全自动档）
 
 - **架构评审**：双探索子智能体（伴侣/向量域 + 聊天/核心域）独立走库，15 候选合并为 13 条按强度交付（6 Strong / 6 Worth / 3 Speculative，含双命中提级 S1）；HTML 报告 `D:\tmp\architecture-review-20260918-203548.html`（Tailwind+Mermaid before/after 图 + 删除测试结论 + Top recommendation）。用户拍板**全部 Strong 立项**；未选中 9 条落债 F-123~131（防候选泄漏）。

@@ -43,8 +43,7 @@ void main() {
       env.controllerOf(provider);
 
   group('入口 · 角色选择条与新建按钮', () {
-    testWidgets('标题「聊天」（无临时标注/无副标题文案）+「新建对话」+ 无会话空态',
-        (tester) async {
+    testWidgets('标题「聊天」（无临时标注/无副标题文案）+「新建对话」+ 无会话空态', (tester) async {
       final env = await ChatTestEnv.create();
       final c = entryController(env, FakeLLMProvider(tokens: const []));
       await c.loadEntry();
@@ -64,8 +63,9 @@ void main() {
       await c.loadEntry();
       await pumpChat(tester, c);
 
-      final button =
-          tester.widget<FilledButton>(find.widgetWithText(FilledButton, '新建对话'));
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, '新建对话'),
+      );
       expect(button.onPressed, isNull, reason: '无角色禁用新建');
       expect(find.text('请先在角色页创建角色'), findsOneWidget);
       expect(c.notice, isNull, reason: '禁用提示是 UI 文案，非错误 notice');
@@ -79,6 +79,15 @@ void main() {
       final c = entryController(env, FakeLLMProvider(tokens: const []));
       await c.loadEntry();
       await pumpChat(tester, c);
+
+      // F-136 加固：角色列表异步加载完成（selectedCharacterId 定值）再断言
+      // 默认选中首角色——pumpChat 仅 pump 一帧，加载未完成时该值仍是未定
+      // 态（F-106 id ASC 修复后列表序稳定，残余窗口只留在加载时序）。
+      await pumpUntil(
+        tester,
+        () => c.selectedCharacterId == first.id,
+        why: '角色列表加载未在轮询窗口内完成（默认选中首角色）',
+      );
 
       expect(find.text('艾莉亚'), findsOneWidget);
       expect(find.text('白露'), findsOneWidget);
@@ -113,8 +122,10 @@ void main() {
     testWidgets('新建对话以选中角色建会话（非首角色）', (tester) async {
       final env = await ChatTestEnv.create();
       await env.seedCharacter(name: '艾莉亚');
-      final target =
-          await env.seedCharacter(name: '白露', firstMes: '你好，{{user}}。');
+      final target = await env.seedCharacter(
+        name: '白露',
+        firstMes: '你好，{{user}}。',
+      );
       final c = entryController(env, FakeLLMProvider(tokens: const []));
       await c.loadEntry();
       await pumpChat(tester, c);
@@ -126,10 +137,16 @@ void main() {
       await tester.tap(find.text('新建对话'));
       await pumpUntil(tester, () => !c.isEntry, why: '进入新会话');
 
-      expect(c.activeConversation?.characterId, target.id,
-          reason: '会话归属选中角色而非首角色');
-      expect(find.text('你好，User。', findRichText: true), findsOneWidget,
-          reason: '选中角色开场白经模板替换预插');
+      expect(
+        c.activeConversation?.characterId,
+        target.id,
+        reason: '会话归属选中角色而非首角色',
+      );
+      expect(
+        find.text('你好，User。', findRichText: true),
+        findsOneWidget,
+        reason: '选中角色开场白经模板替换预插',
+      );
       await env.close();
     });
   });
@@ -158,8 +175,11 @@ void main() {
 
       expect(c.isEntry, isFalse);
       expect(c.activeConversationId, conv.id);
-      expect(find.byType(TextField), findsOneWidget,
-          reason: '进入会话 → 对话面板渲染输入框');
+      expect(
+        find.byType(TextField),
+        findsOneWidget,
+        reason: '进入会话 → 对话面板渲染输入框',
+      );
       await env.close();
     });
 
@@ -177,8 +197,11 @@ void main() {
 
       expect(c.isEntry, isFalse);
       expect(c.activeConversationId, isNotNull);
-      expect(find.text('你好，User。', findRichText: true), findsOneWidget,
-          reason: '会话创建预插开场白（{{user}} 已替换）');
+      expect(
+        find.text('你好，User。', findRichText: true),
+        findsOneWidget,
+        reason: '会话创建预插开场白（{{user}} 已替换）',
+      );
       await env.close();
     });
 
@@ -193,8 +216,11 @@ void main() {
       final char = await env.seedCharacter();
       await env.seedConversation(char.id);
       await c.backToEntry(); // loadEntry 幂等刷新（含 backToEntry）
-      await pumpUntil(tester, () => c.conversations.isNotEmpty,
-          why: 'backToEntry 刷新后会话进入列表');
+      await pumpUntil(
+        tester,
+        () => c.conversations.isNotEmpty,
+        why: 'backToEntry 刷新后会话进入列表',
+      );
       await tester.pump();
       expect(find.text('与 艾莉亚 的对话'), findsOneWidget);
       await env.close();
@@ -231,10 +257,12 @@ void main() {
       await tester.tap(find.text('重命名'));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('rename-field')), findsOneWidget,
-          reason: '重命名对话框预填输入框');
-      await tester.enterText(
-          find.byKey(const Key('rename-field')), '我的新对话');
+      expect(
+        find.byKey(const Key('rename-field')),
+        findsOneWidget,
+        reason: '重命名对话框预填输入框',
+      );
+      await tester.enterText(find.byKey(const Key('rename-field')), '我的新对话');
       await tester.tap(find.byKey(const Key('rename-confirm')));
       await pumpUntil(
         tester,
@@ -265,8 +293,7 @@ void main() {
 
       expect(find.text('删除对话'), findsOneWidget, reason: '删除确认对话框');
       await tester.tap(find.byKey(const Key('delete-confirm')));
-      await pumpUntil(tester, () => c.conversations.isEmpty,
-          why: '删除落库并刷新列表');
+      await pumpUntil(tester, () => c.conversations.isEmpty, why: '删除落库并刷新列表');
 
       expect(await env.conversationRepository.getConversation(conv.id), isNull);
       expect(find.text('还没有对话'), findsOneWidget);

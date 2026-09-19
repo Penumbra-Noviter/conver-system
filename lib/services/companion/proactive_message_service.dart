@@ -19,8 +19,8 @@
 ///   → expired（两者都命中时 dropped 优先——消息载体已消失，计划残废）。
 /// - SR-01：三级容错 + 字段级校验，任一失败 → null 不写库不调 scheduler。
 /// - SR-04：pending 单条约束——过期核对 + in-flight 节流 + 每角色内存锁
-///   三重保证（W2 实测：`getActivePlan` 双计划会抛，故一律用
-///   `listPlansByStatus(scheduled)` 按角色过滤）。
+///   三重保证（F-125 后：in-flight 经 [CompanionRepository.getActivePlan]
+///   单角色查询，`limit(1)` 多行不抛，不再全表拉取绕路）。
 /// - SR-07：本票为规划侧（createPlan 语义）；发送 CAS 落发送服务。
 /// - SR-08：启动重建排程恢复留给 PS2-08 装配调用，本票提供
 ///   [_reconcileOverdue] 的回合入口版本（只处理本角色）。
@@ -32,8 +32,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../utils/llm_json_candidates.dart';
 import '../../data/database/app_database.dart' show ProactivePlan;
-import '../../data/database/tables.dart'
-    show ProactivePlanStatus, Role;
+import '../../data/database/tables.dart' show ProactivePlanStatus, Role;
 import '../../data/repositories/companion_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import '../../data/repositories/settings_repository.dart';
@@ -202,11 +201,7 @@ ProactivePlanDecision? _decodePlan(String text) {
     return null;
   }
 
-  return (
-    shouldSend: shouldSend,
-    minutesFromNow: minutesInt,
-    content: content,
-  );
+  return (shouldSend: shouldSend, minutesFromNow: minutesInt, content: content);
 }
 
 /// 组装规划 prompt（纯函数，可单测）。
@@ -215,16 +210,15 @@ ProactivePlanDecision? _decodePlan(String text) {
 /// 10–360 / content 文案），无解释/前缀/Markdown 代码块；user 附对话历史
 /// （user 行带「用户：」前缀，assistant 行原文直给——角色名不在本票仓储
 /// 共享面内，由 LLM 从对话上下文自明）。
-List<LlmMessage> buildProactiveMessages({
-  required List<String> dialogueLines,
-}) {
+List<LlmMessage> buildProactiveMessages({required List<String> dialogueLines}) {
   final dialogueBlock = dialogueLines.isEmpty
       ? '（暂无对话记录）'
       : dialogueLines.join('\n');
   return [
     LlmMessage(
       role: 'system',
-      content: '你是这段对话中的 AI 伴侣角色。判断是否应该在近期主动给用户发'
+      content:
+          '你是这段对话中的 AI 伴侣角色。判断是否应该在近期主动给用户发'
           '一条消息：如果适合，content 写一句自然、贴合当前关系的主动问候或'
           '话题（简洁，1-2 句）；如果不适合，shouldSend 为 false。'
           '只输出一个 JSON 对象：{"shouldSend": true/false, '
@@ -268,13 +262,13 @@ class ProactiveMessageService {
     required ProactiveNotificationScheduler scheduler,
     DateTime Function()? now,
     void Function(ProactivePlan plan)? onScheduleFailed,
-  })  : _companion = companionRepository,
-        _settings = settingsRepository,
-        _messages = messageRepository,
-        _planner = planner,
-        _scheduler = scheduler,
-        _now = now ?? DateTime.now,
-        _onScheduleFailed = onScheduleFailed;
+  }) : _companion = companionRepository,
+       _settings = settingsRepository,
+       _messages = messageRepository,
+       _planner = planner,
+       _scheduler = scheduler,
+       _now = now ?? DateTime.now,
+       _onScheduleFailed = onScheduleFailed;
 
   final CompanionRepository _companion;
   final SettingsRepository _settings;
@@ -325,8 +319,9 @@ class ProactiveMessageService {
       // 判定⑥ + SR-08 回合入口版：本角色 scheduled 计划核对（dropped 优先）。
       await _reconcileOverdue(characterId, now);
 
-      final sentPlans =
-          await _companion.listPlansByStatus(ProactivePlanStatus.sent);
+      final sentPlans = await _companion.listPlansByStatus(
+        ProactivePlanStatus.sent,
+      );
       var sentToday = 0;
       DateTime? lastSentAt;
       for (final plan in sentPlans) {
@@ -337,7 +332,7 @@ class ProactiveMessageService {
         // 口径（spec §2 P2 + 判定③ / W3-F2）：每日上限为**全局**（全角色
         // 当日 sentAt 合计），角色冷却为**本角色**最近 sentAt（角色间互不
         // 影响——角色 A 已发不会冷却角色 B）。
-        if (_isSameDay(at, now)) {
+        if (CompanionTimeWindows.isSameLocalDay(at, now)) {
           sentToday++;
         }
         if (plan.characterId == characterId &&
@@ -430,22 +425,17 @@ class ProactiveMessageService {
   /// （消息载体已消失，优先）；scheduledAt 已过 → expired。幂等：置位后不再
   /// 命中 scheduled 查询。
   Future<void> _reconcileOverdue(int characterId, DateTime now) async {
-    final scheduled =
-        await _companion.listPlansByStatus(ProactivePlanStatus.scheduled);
+    final scheduled = await _companion.listPlansByStatus(
+      ProactivePlanStatus.scheduled,
+    );
     for (final plan in scheduled) {
       if (plan.characterId != characterId) {
         continue;
       }
       if (plan.messageId == null) {
-        await _companion.updatePlanStatus(
-          plan.id,
-          ProactivePlanStatus.dropped,
-        );
+        await _companion.updatePlanStatus(plan.id, ProactivePlanStatus.dropped);
       } else if (!plan.scheduledAt.isAfter(now)) {
-        await _companion.updatePlanStatus(
-          plan.id,
-          ProactivePlanStatus.expired,
-        );
+        await _companion.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
       }
     }
   }
@@ -459,12 +449,10 @@ class ProactiveMessageService {
   }
 
   /// 在途判定（SR-04）：本角色存在 scheduled 计划（reconcile 后剩余即真正
-  /// 在途）。不用 [CompanionRepository.getActivePlan]——W2 实测其双计划会抛
-  /// StateError，此处经 list 过滤确定性不崩。
+  /// 在途）。F-125：改调 [CompanionRepository.getActivePlan]（`limit(1)` 后
+  /// 多行不再抛），替代此前全表拉取再按角色过滤的绕路。
   Future<bool> _hasInFlightPlan(int characterId) async {
-    final scheduled =
-        await _companion.listPlansByStatus(ProactivePlanStatus.scheduled);
-    return scheduled.any((plan) => plan.characterId == characterId);
+    return await _companion.getActivePlan(characterId) != null;
   }
 
   /// 组装对话行（user 署名「用户」，assistant 原文直给），截取最近
@@ -479,7 +467,4 @@ class ProactiveMessageService {
         m.role == Role.user ? '用户：${m.content}' : m.content,
     ];
   }
-
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 }

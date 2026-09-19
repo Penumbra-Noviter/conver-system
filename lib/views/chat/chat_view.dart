@@ -21,7 +21,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../data/database/tables.dart' show Role;
-import '../../theme/chat_markdown_style.dart' show warmStoneMarkdownDark, warmStoneMarkdownLight;
+import '../../theme/chat_markdown_style.dart'
+    show warmStoneMarkdownDark, warmStoneMarkdownLight;
 import '../../theme/colors.dart';
 import '../../theme/conver_palette.dart';
 import '../../theme/motion.dart' show ConverDurations;
@@ -110,8 +111,7 @@ class _ConversationView extends StatelessWidget {
             onDismiss: controller.dismissNotice,
             // T3 流式级可操作提示（M6-08）：仅「回复已中断」且存在可重试截断
             // 目标时传入「重试」动作；其它 notice 零动作（关闭-only）。
-            actionLabel:
-                controller.hasRetryableInterrupted ? '重试' : null,
+            actionLabel: controller.hasRetryableInterrupted ? '重试' : null,
             onAction: controller.hasRetryableInterrupted
                 ? controller.retryInterrupted
                 : null,
@@ -213,10 +213,6 @@ class _MessageListState extends State<_MessageList> {
   /// 插值字符串不 canonical，重建 key 将查不到已挂载 context）。
   final Map<int, GlobalObjectKey> _messageKeys = <int, GlobalObjectKey>{};
 
-  /// 视图侧 3s 高亮清除定时器（dispose 取消防泄漏；与控制器定时器双保险，
-  /// 经 [ChatController.clearHighlight] 幂等收口）。
-  Timer? _highlightTimer;
-
   /// 已处理的高亮请求序号（防同请求重复定位滚动）。
   int? _lastHandledSeq;
 
@@ -230,15 +226,19 @@ class _MessageListState extends State<_MessageList> {
   /// 估位跳近重试上限（防御异常数据；正常 1-2 帧收敛）。
   static const int _maxScrollAttempts = 6;
 
-  GlobalObjectKey _keyFor(int messageId) =>
-      _messageKeys.putIfAbsent(messageId, () => GlobalObjectKey('msg-$messageId'));
+  GlobalObjectKey _keyFor(int messageId) => _messageKeys.putIfAbsent(
+    messageId,
+    () => GlobalObjectKey('msg-$messageId'),
+  );
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onControllerChanged);
     // 首次挂载时高亮可能已就绪（openConversation 在装配前完成）：帧后检查。
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeHandleHighlight());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _maybeHandleHighlight(),
+    );
   }
 
   void _onControllerChanged() {
@@ -246,7 +246,9 @@ class _MessageListState extends State<_MessageList> {
       return;
     }
     setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeHandleHighlight());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _maybeHandleHighlight(),
+    );
   }
 
   /// 按高亮请求序号处理定位：切换会话清 key 集合；新请求 → 视图侧 3s 清除
@@ -264,8 +266,6 @@ class _MessageListState extends State<_MessageList> {
     final targets = controller.highlightMessageIds;
     if (targets.isEmpty) {
       _lastHandledSeq = null;
-      _highlightTimer?.cancel();
-      _highlightTimer = null;
       return;
     }
     final seq = controller.highlightRequestSeq;
@@ -274,14 +274,11 @@ class _MessageListState extends State<_MessageList> {
     }
     _lastHandledSeq = seq;
     final targetId = targets.single;
-    // 视图侧 3s 自动清除（对齐桌面 HIGHLIGHT_DURATION=3000；直接驱控制器收口）。
-    _highlightTimer?.cancel();
-    _highlightTimer = Timer(controller.highlightDuration, () {
-      if (mounted) {
-        controller.clearHighlight();
-      }
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTargetVisible(targetId));
+    // F-127：3s 自动清除由控制器 [_applyHighlight] 定时器单一归属（notify →
+    // 本监听刷新）；视图不再自持 timer。
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _ensureTargetVisible(targetId),
+    );
   }
 
   /// 定位 [targetId] 气泡到视口中部（alignment 0.5 居中）。
@@ -309,8 +306,10 @@ class _MessageListState extends State<_MessageList> {
       return; // 防御：目标可达但异常（测试环境不挂起）；下轮高亮请求会重试。
     }
     final position = _scrollController.position;
-    final targetOffset =
-        (index * _estimatedItemExtent).clamp(0.0, position.maxScrollExtent);
+    final targetOffset = (index * _estimatedItemExtent).clamp(
+      0.0,
+      position.maxScrollExtent,
+    );
     if ((targetOffset - position.pixels).abs() > 1.0) {
       position.jumpTo(targetOffset);
     }
@@ -331,7 +330,7 @@ class _MessageListState extends State<_MessageList> {
   @override
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
-    _highlightTimer?.cancel();
+    // F-127：高亮 3s 清除 timer 已单一归属控制器，视图无需取消。
     _scrollController.dispose();
     super.dispose();
   }
@@ -373,28 +372,29 @@ class _MessageListState extends State<_MessageList> {
       itemBuilder: (context, index) {
         final message = messages[index];
         // 高亮命中：controller 集合按 DB 正 id 判定（合成负 id 永不命中）。
-        final highlighted =
-            widget.controller.highlightMessageIds.contains(message.id);
+        final highlighted = widget.controller.highlightMessageIds.contains(
+          message.id,
+        );
         return Padding(
           key: _keyFor(message.id),
           padding: const EdgeInsets.symmetric(vertical: ConverSpacing.space2),
           child: switch (message.role) {
             Role.user => _UserBubble(
-                content: message.content,
-                highlighted: highlighted,
-              ),
+              content: message.content,
+              highlighted: highlighted,
+            ),
             Role.assistant => _AssistantBubble(
-                controller: widget.controller,
-                roleName: roleLabel,
-                message: message,
-                isLast: index == messages.length - 1,
-                highlighted: highlighted,
-              ),
+              controller: widget.controller,
+              roleName: roleLabel,
+              message: message,
+              isLast: index == messages.length - 1,
+              highlighted: highlighted,
+            ),
             Role.system => _SystemBubble(
-                roleName: roleLabel,
-                content: message.content,
-                highlighted: highlighted,
-              ),
+              roleName: roleLabel,
+              content: message.content,
+              highlighted: highlighted,
+            ),
           },
         );
       },
@@ -429,7 +429,8 @@ class _UserBubble extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: highlighted
-                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.13)
+                  ? Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.13)
                   : Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(ConverRadii.bubble),
             ),
@@ -470,7 +471,8 @@ class _AssistantBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = ConverPalette.of(context);
-    final canRegenerate = !controller.isStreaming &&
+    final canRegenerate =
+        !controller.isStreaming &&
         !controller.isRegenerating &&
         !message.streaming &&
         isLast;
@@ -635,16 +637,16 @@ class _SystemBubble extends StatelessWidget {
                     vertical: ConverSpacing.space1,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
+                    color: Theme.of(context).colorScheme.primary
                         .withValues(alpha: 0.13),
                     borderRadius: BorderRadius.circular(ConverRadii.sm),
                   ),
                   child: text,
                 )
               : Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: ConverSpacing.space8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ConverSpacing.space8,
+                  ),
                   child: text,
                 ),
         ),
@@ -778,9 +780,7 @@ class _ComposerState extends State<_Composer> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         border: Border(
-          top: BorderSide(
-            color: ConverPalette.of(context).border,
-          ),
+          top: BorderSide(color: ConverPalette.of(context).border),
         ),
       ),
       child: SafeArea(
@@ -804,7 +804,9 @@ class _ComposerState extends State<_Composer> {
                     vertical: ConverSpacing.space2,
                   ),
                   filled: true,
-                  fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+                  fillColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerLowest,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(ConverRadii.md),
                     borderSide: BorderSide(color: palette.border),

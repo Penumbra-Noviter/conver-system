@@ -17,7 +17,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 
-import '../../services/vector/float32_codec.dart';
+import '../../utils/float32_codec.dart';
 import '../../utils/utf16_truncate.dart' show maxSnapshotLength, truncateUtf16;
 import '../database/app_database.dart';
 import '../database/tables.dart';

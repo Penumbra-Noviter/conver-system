@@ -73,25 +73,25 @@ class RelationshipThresholds {
     this.familiarMax = 59,
     this.intimateMax = 79,
   }) : assert(
-          strangerMax < acquaintedMax,
-          'RelationshipThresholds: max 必须严格递增 '
-          '(strangerMax < acquaintedMax)，got $strangerMax >= $acquaintedMax',
-        ),
+         strangerMax < acquaintedMax,
+         'RelationshipThresholds: max 必须严格递增 '
+         '(strangerMax < acquaintedMax)，got $strangerMax >= $acquaintedMax',
+       ),
        assert(
-          acquaintedMax < familiarMax,
-          'RelationshipThresholds: max 必须严格递增 '
-          '(acquaintedMax < familiarMax)，got $acquaintedMax >= $familiarMax',
-        ),
+         acquaintedMax < familiarMax,
+         'RelationshipThresholds: max 必须严格递增 '
+         '(acquaintedMax < familiarMax)，got $acquaintedMax >= $familiarMax',
+       ),
        assert(
-          familiarMax < intimateMax,
-          'RelationshipThresholds: max 必须严格递增 '
-          '(familiarMax < intimateMax)，got $familiarMax >= $intimateMax',
-        ),
+         familiarMax < intimateMax,
+         'RelationshipThresholds: max 必须严格递增 '
+         '(familiarMax < intimateMax)，got $familiarMax >= $intimateMax',
+       ),
        assert(
-          intimateMax + 1 <= affinityMax,
-          'RelationshipThresholds: soulmate 下限 intimateMax + 1 必须 '
-          '≤ affinityMax($affinityMax)，got intimateMax=$intimateMax',
-        );
+         intimateMax + 1 <= affinityMax,
+         'RelationshipThresholds: soulmate 下限 intimateMax + 1 必须 '
+         '≤ affinityMax($affinityMax)，got intimateMax=$intimateMax',
+       );
 
   /// 每回合好感度增量。
   final int turnAffinityGain;
@@ -178,10 +178,12 @@ class RelationshipService {
   final RelationshipThresholds _thresholds;
 
   /// clamp 好感度到 [RelationshipThresholds.affinityMin, affinityMax]。
-  static int clampAffinity(int value) => value.clamp(
+  static int clampAffinity(int value) => value
+      .clamp(
         RelationshipThresholds.affinityMin,
         RelationshipThresholds.affinityMax,
-      ).toInt();
+      )
+      .toInt();
 
   /// 推进好感度：current + delta 后恒 clamp（负增量与超上限均收敛）。
   static int nextAffinity(int current, int delta) =>
@@ -303,10 +305,12 @@ class RelationshipService {
   }
 
   /// 该角色全部对话最近消息的 distinct 本地日期数（判定⑨；PS2-05 复用）。
+  /// F-129：日历日口径经 [CompanionTimeWindows.localDayOf] 单源取（proactive
+  /// 同日判定同源，消除两处独立实现的口径漂移）。
   Future<int> activeDays(int characterId) async {
     final messages = await _allMessagesFor(characterId);
     return messages
-        .map((m) => DateTime(m.createdAt.year, m.createdAt.month, m.createdAt.day))
+        .map((m) => CompanionTimeWindows.localDayOf(m.createdAt))
         .toSet()
         .length;
   }
@@ -318,7 +322,9 @@ class RelationshipService {
     if (latest == null) {
       return false;
     }
-    return !latest.isBefore(_now().subtract(RelationshipThresholds.recentWindow));
+    return !latest.isBefore(
+      _now().subtract(RelationshipThresholds.recentWindow),
+    );
   }
 
   /// 回合推进增量：每回合 + 近 7 天活跃额外增量。
@@ -341,7 +347,8 @@ class RelationshipService {
     int characterId,
   ) async {
     final newStage = _thresholds.stageForAffinity(newAffinity);
-    final crossesGate = (newStage == RelationshipStage.intimate ||
+    final crossesGate =
+        (newStage == RelationshipStage.intimate ||
             newStage == RelationshipStage.soulmate) &&
         newStage != state.stage;
     if (crossesGate) {

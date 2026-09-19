@@ -30,17 +30,27 @@ void main() {
     AppDatabase database,
   ) async {
     final now = DateTime(2026, 9, 1);
-    final character = await database.into(database.characters).insertReturning(
-          CharactersCompanion.insert(name: '链主', createdAt: now, updatedAt: now),
+    final character = await database
+        .into(database.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '链主',
+            createdAt: now,
+            updatedAt: now,
+          ),
         );
-    final conversation = await database.into(database.conversations).insertReturning(
+    final conversation = await database
+        .into(database.conversations)
+        .insertReturning(
           ConversationsCompanion.insert(
             characterId: character.id,
             createdAt: now,
             updatedAt: now,
           ),
         );
-    final message = await database.into(database.messages).insertReturning(
+    final message = await database
+        .into(database.messages)
+        .insertReturning(
           MessagesCompanion.insert(
             conversationId: conversation.id,
             role: Role.user,
@@ -141,8 +151,14 @@ void main() {
     test('listRelationships 返回全部并按 characterId 排序', () async {
       final idsA = await seedChain(db);
       final now = DateTime(2026, 9, 1);
-      final other = await db.into(db.characters).insertReturning(
-            CharactersCompanion.insert(name: '乙', createdAt: now, updatedAt: now),
+      final other = await db
+          .into(db.characters)
+          .insertReturning(
+            CharactersCompanion.insert(
+              name: '乙',
+              createdAt: now,
+              updatedAt: now,
+            ),
           );
       await repository.upsertRelationship(
         characterId: other.id,
@@ -217,13 +233,38 @@ void main() {
       expect(result?.content, '在途');
     });
 
+    test('getActivePlan：双在途（数据现实）limit(1) 不抛，返回其一（F-125）', () async {
+      final ids = await seedChain(db);
+      await repository.createPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        content: '在途 A',
+        scheduledAt: fixedNow.add(const Duration(hours: 1)),
+        messageId: null,
+      );
+      await repository.createPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        content: '在途 B',
+        scheduledAt: fixedNow.add(const Duration(hours: 2)),
+        messageId: null,
+      );
+
+      final result = await repository.getActivePlan(ids.characterId);
+      // F-125 契约锁：双在途不再抛 StateError（W2 曾实测抛），任取其一。
+      expect(result, isA<ProactivePlan>(), reason: '双在途 getActivePlan 不抛（F-125）');
+      expect(result!.content, isIn(['在途 A', '在途 B']));
+    });
+
     test('getActivePlan：非 scheduled 状态一律不返回', () async {
       final ids = await seedChain(db);
       for (final status in ProactivePlanStatus.values) {
         if (status == ProactivePlanStatus.scheduled) {
           continue;
         }
-        await db.into(db.proactivePlans).insert(
+        await db
+            .into(db.proactivePlans)
+            .insert(
               ProactivePlansCompanion.insert(
                 characterId: ids.characterId,
                 conversationId: ids.conversationId,
@@ -268,9 +309,9 @@ void main() {
       );
       await repository.updatePlanStatus(plan2.id, ProactivePlanStatus.sent);
       // 上一条 sent 计划也在表中，改按 id 取。
-      final row2 = await (db.select(db.proactivePlans)
-            ..where(($ProactivePlansTable t) => t.id.equals(plan2.id)))
-          .getSingle();
+      final row2 = await (db.select(
+        db.proactivePlans,
+      )..where(($ProactivePlansTable t) => t.id.equals(plan2.id))).getSingle();
       expect(row2.sentAt, fixedNow);
     });
 
@@ -285,9 +326,9 @@ void main() {
       );
 
       await repository.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
-      var reloaded = await (db.select(db.proactivePlans)
-            ..where(($ProactivePlansTable t) => t.id.equals(plan.id)))
-          .getSingle();
+      var reloaded = await (db.select(
+        db.proactivePlans,
+      )..where(($ProactivePlansTable t) => t.id.equals(plan.id))).getSingle();
       expect(reloaded.status, ProactivePlanStatus.expired);
       expect(reloaded.sentAt, isNull);
 
@@ -298,9 +339,9 @@ void main() {
         sentAt: fixedNow,
       );
       await repository.updatePlanStatus(plan.id, ProactivePlanStatus.dropped);
-      reloaded = await (db.select(db.proactivePlans)
-            ..where(($ProactivePlansTable t) => t.id.equals(plan.id)))
-          .getSingle();
+      reloaded = await (db.select(
+        db.proactivePlans,
+      )..where(($ProactivePlansTable t) => t.id.equals(plan.id))).getSingle();
       expect(reloaded.status, ProactivePlanStatus.dropped);
       expect(reloaded.sentAt, fixedNow);
     });
@@ -340,9 +381,7 @@ void main() {
         ProactivePlanStatus.scheduled,
       );
       expect(scheduled.map((p) => p.id), [sooner.id]);
-      final sent = await repository.listPlansByStatus(
-        ProactivePlanStatus.sent,
-      );
+      final sent = await repository.listPlansByStatus(ProactivePlanStatus.sent);
       expect(sent.map((p) => p.id), [later.id]);
     });
   });
@@ -365,7 +404,9 @@ void main() {
     test('listThoughtsByMessage：按消息过滤并按 createdAt 升序', () async {
       final ids = await seedChain(db);
       final now = DateTime(2026, 9, 1);
-      final otherMessage = await db.into(db.messages).insertReturning(
+      final otherMessage = await db
+          .into(db.messages)
+          .insertReturning(
             MessagesCompanion.insert(
               conversationId: ids.conversationId,
               role: Role.assistant,

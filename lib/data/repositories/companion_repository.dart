@@ -22,7 +22,7 @@ class CompanionRepository {
   /// [now] 为时间戳来源注入点（测试确定性用，含 getActivePlan 时间边界），
   /// 缺省 [DateTime.now]。affinity clamp 下/上界常量见类注释。
   CompanionRepository(this._db, {DateTime Function()? now})
-      : _now = now ?? DateTime.now;
+    : _now = now ?? DateTime.now;
 
   final AppDatabase _db;
   final DateTime Function() _now;
@@ -35,9 +35,9 @@ class CompanionRepository {
 
   /// 指定角色的关系状态；无行返回 null。
   Future<RelationshipState?> getRelationship(int characterId) {
-    return (_db.select(_db.relationshipStates)
-          ..where(
-              ($RelationshipStatesTable t) => t.characterId.equals(characterId)))
+    return (_db.select(_db.relationshipStates)..where(
+          ($RelationshipStatesTable t) => t.characterId.equals(characterId),
+        ))
         .getSingleOrNull();
   }
 
@@ -60,17 +60,22 @@ class CompanionRepository {
       affinity: Value(clamped),
       updatedAt: now,
     );
-    return _db.into(_db.relationshipStates).insertReturning(
-      companion,
-      onConflict: DoUpdate((_) => companion, target: [_db.relationshipStates.characterId]),
-    );
+    return _db
+        .into(_db.relationshipStates)
+        .insertReturning(
+          companion,
+          onConflict: DoUpdate(
+            (_) => companion,
+            target: [_db.relationshipStates.characterId],
+          ),
+        );
   }
 
   /// 全部关系状态，按 characterId 升序（确定性排序）。
   Future<List<RelationshipState>> listRelationships() {
-    return (_db.select(_db.relationshipStates)
-          ..orderBy([(t) => OrderingTerm.asc(t.characterId)]))
-        .get();
+    return (_db.select(
+      _db.relationshipStates,
+    )..orderBy([(t) => OrderingTerm.asc(t.characterId)])).get();
   }
 
   // ── 主动消息计划 ──
@@ -84,7 +89,9 @@ class CompanionRepository {
     required DateTime scheduledAt,
     int? messageId,
   }) {
-    return _db.into(_db.proactivePlans).insertReturning(
+    return _db
+        .into(_db.proactivePlans)
+        .insertReturning(
           ProactivePlansCompanion.insert(
             characterId: characterId,
             conversationId: conversationId,
@@ -99,13 +106,21 @@ class CompanionRepository {
 
   /// 指定角色的「在途」计划：status == scheduled 且 scheduledAt > now（now 取
   /// 本层注入点，测试确定性）。到点 / 其他状态一律不返回。
+  ///
+  /// F-125：`limit(1)` 消除单计划假设——同角色存在多条在途（数据现实允许）
+  /// 时不再抛 StateError，任取一条返回；调用方只判「是否存在」语义（服务侧
+  /// `_hasInFlightPlan` 已改调本方法，去全表拉取绕路），确定性由 status + 时间
+  /// 过滤保证，返回哪条不做承诺。
   Future<ProactivePlan?> getActivePlan(int characterId) {
     final at = _now();
     return (_db.select(_db.proactivePlans)
-          ..where(($ProactivePlansTable t) =>
-              t.characterId.equals(characterId) &
-              t.status.equalsValue(ProactivePlanStatus.scheduled) &
-              t.scheduledAt.isBiggerThanValue(at)))
+          ..where(
+            ($ProactivePlansTable t) =>
+                t.characterId.equals(characterId) &
+                t.status.equalsValue(ProactivePlanStatus.scheduled) &
+                t.scheduledAt.isBiggerThanValue(at),
+          )
+          ..limit(1))
         .getSingleOrNull();
   }
 
@@ -125,9 +140,9 @@ class CompanionRepository {
     ProactivePlanStatus status, {
     DateTime? sentAt,
   }) async {
-    await (_db.update(_db.proactivePlans)
-          ..where(($ProactivePlansTable t) => t.id.equals(planId)))
-        .write(
+    await (_db.update(
+      _db.proactivePlans,
+    )..where(($ProactivePlansTable t) => t.id.equals(planId))).write(
       ProactivePlansCompanion(
         status: Value(status),
         sentAt: status == ProactivePlanStatus.sent
@@ -139,9 +154,9 @@ class CompanionRepository {
 
   /// 删除计划；返回是否确有计划被删（不存在 → false 且零副作用）。
   Future<bool> deletePlan(int planId) async {
-    final affected = await (_db.delete(_db.proactivePlans)
-          ..where(($ProactivePlansTable t) => t.id.equals(planId)))
-        .go();
+    final affected = await (_db.delete(
+      _db.proactivePlans,
+    )..where(($ProactivePlansTable t) => t.id.equals(planId))).go();
     return affected > 0;
   }
 
@@ -164,7 +179,9 @@ class CompanionRepository {
     required int messageId,
     required String content,
   }) {
-    return _db.into(_db.innerThoughts).insertReturning(
+    return _db
+        .into(_db.innerThoughts)
+        .insertReturning(
           InnerThoughtsCompanion.insert(
             characterId: characterId,
             messageId: messageId,

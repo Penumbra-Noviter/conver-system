@@ -97,8 +97,8 @@ class ThoughtService {
   ThoughtService({
     required CompanionRepository companionRepository,
     required SettingsRepository settingsRepository,
-  })  : _companionRepository = companionRepository,
-        _settingsRepository = settingsRepository;
+  }) : _companionRepository = companionRepository,
+       _settingsRepository = settingsRepository;
 
   final CompanionRepository _companionRepository;
   final SettingsRepository _settingsRepository;
@@ -110,6 +110,10 @@ class ThoughtService {
   /// 落 InnerThoughts（characterId / messageId 随参透传）；关闭 → debugPrint
   /// 记录且不落库。空串 → 防御性直接返回不落库（顶层剥离已丢弃空独白，
   /// 服务侧不重复判定）。
+  ///
+  /// F-132 服务侧防御：长度上限与提取侧同源（[_maxThoughtLength]）——顶层
+  /// [extractThought] 已截断，此处对非标准调用路径（未来调用方 / 测试直构）
+  /// 自守契约，不依赖「唯一调用方先截断」的隐性前提。
   Future<void> persistThought({
     required int characterId,
     required int messageId,
@@ -118,16 +122,21 @@ class ThoughtService {
     if (thoughtContent.isEmpty) {
       return;
     }
+    final content = thoughtContent.length > _maxThoughtLength
+        ? thoughtContent.substring(0, _maxThoughtLength)
+        : thoughtContent;
     final enabled = await _settingsRepository.innerThoughtEnabled;
     if (enabled) {
       await _companionRepository.createThought(
         characterId: characterId,
         messageId: messageId,
-        content: thoughtContent,
+        content: content,
       );
     } else {
-      debugPrint('ThoughtService: thought content received but '
-          'inner_thought_enabled is off; not persisted.');
+      debugPrint(
+        'ThoughtService: thought content received but '
+        'inner_thought_enabled is off; not persisted.',
+      );
     }
   }
 }

@@ -25,6 +25,17 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/in_memory_secret_store.dart';
 
+/// 开关读抛错替身：`innerThoughtEnabled` getter 抛错（F-133 服务层契约——
+/// persistThought 不吞、上抛给调用方按降级语义处理）。
+class _ThrowingSettingsRepository extends SettingsRepository {
+  _ThrowingSettingsRepository(AppDatabase database)
+      : super(database: database, secretStore: InMemorySecretStore());
+
+  @override
+  Future<bool> get innerThoughtEnabled async =>
+      throw StateError('boom settings');
+}
+
 void main() {
   group('extractThought（SR-05 剥离契约，失败路径优先）', () {
     test('空输入 → 空 display + null', () {
@@ -89,7 +100,9 @@ void main() {
     });
 
     test('多块（两个闭合块）→ 提取第一块、其余按无闭合处理（工单验收 5）', () {
-      final result = extractThought('A <thought>一</thought> B <thought>二</thought> C');
+      final result = extractThought(
+        'A <thought>一</thought> B <thought>二</thought> C',
+      );
       expect(result.displayContent, 'A  B ');
       expect(result.thoughtContent, '一');
     });
@@ -150,7 +163,10 @@ void main() {
       db = AppDatabase(NativeDatabase.memory());
       fixedNow = DateTime(2026, 9, 15, 12, 0, 0);
       companion = CompanionRepository(db, now: () => fixedNow);
-      settings = SettingsRepository(database: db, secretStore: InMemorySecretStore());
+      settings = SettingsRepository(
+        database: db,
+        secretStore: InMemorySecretStore(),
+      );
       service = ThoughtService(
         companionRepository: companion,
         settingsRepository: settings,
@@ -163,17 +179,27 @@ void main() {
 
     Future<({int characterId, int messageId})> seedChain() async {
       final now = DateTime(2026, 9, 1);
-      final character = await db.into(db.characters).insertReturning(
-            CharactersCompanion.insert(name: '链主', createdAt: now, updatedAt: now),
+      final character = await db
+          .into(db.characters)
+          .insertReturning(
+            CharactersCompanion.insert(
+              name: '链主',
+              createdAt: now,
+              updatedAt: now,
+            ),
           );
-      final conversation = await db.into(db.conversations).insertReturning(
+      final conversation = await db
+          .into(db.conversations)
+          .insertReturning(
             ConversationsCompanion.insert(
               characterId: character.id,
               createdAt: now,
               updatedAt: now,
             ),
           );
-      final message = await db.into(db.messages).insertReturning(
+      final message = await db
+          .into(db.messages)
+          .insertReturning(
             MessagesCompanion.insert(
               conversationId: conversation.id,
               role: Role.assistant,
@@ -186,7 +212,9 @@ void main() {
 
     test('开关开启 + 已剥离 thoughtContent → 落 InnerThoughts 可查回（验收核心 4）', () async {
       final ids = await seedChain();
-      await settings.setMany({SettingsRepository.innerThoughtEnabledKey: 'true'});
+      await settings.setMany({
+        SettingsRepository.innerThoughtEnabledKey: 'true',
+      });
 
       await service.persistThought(
         characterId: ids.characterId,
@@ -216,7 +244,9 @@ void main() {
 
     test('开关开启但 thoughtContent 空串 → 防御不落库', () async {
       final ids = await seedChain();
-      await settings.setMany({SettingsRepository.innerThoughtEnabledKey: 'true'});
+      await settings.setMany({
+        SettingsRepository.innerThoughtEnabledKey: 'true',
+      });
 
       await service.persistThought(
         characterId: ids.characterId,
@@ -225,6 +255,45 @@ void main() {
       );
 
       expect(await companion.listThoughtsByMessage(ids.messageId), isEmpty);
+    });
+
+    test(
+      '超长 thoughtContent 服务侧截断到 1 MiB（F-132：与 extractThought 同上限）',
+      () async {
+        final ids = await seedChain();
+        await settings.setMany({
+          SettingsRepository.innerThoughtEnabledKey: 'true',
+        });
+        final maxLength = 1 << 20;
+        final overlong = '${'x' * maxLength}y';
+
+        await service.persistThought(
+          characterId: ids.characterId,
+          messageId: ids.messageId,
+          thoughtContent: overlong,
+        );
+
+        final thoughts = await companion.listThoughtsByMessage(ids.messageId);
+        expect(thoughts.single.content.length, maxLength);
+        expect(thoughts.single.content, endsWith('x'));
+      },
+    );
+
+    test('开关读抛错 → persistThought 上抛（服务不吞，调用方负责降级）F-133', () async {
+      final ids = await seedChain();
+      final throwingService = ThoughtService(
+        companionRepository: companion,
+        settingsRepository: _ThrowingSettingsRepository(db),
+      );
+
+      await expectLater(
+        throwingService.persistThought(
+          characterId: ids.characterId,
+          messageId: ids.messageId,
+          thoughtContent: '心',
+        ),
+        throwsStateError,
+      );
     });
   });
 

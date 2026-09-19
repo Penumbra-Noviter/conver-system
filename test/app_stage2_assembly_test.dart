@@ -9,6 +9,7 @@ import 'package:conver_system_mobile/data/repositories/character_repository.dart
 import 'package:conver_system_mobile/data/repositories/companion_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
+import 'package:conver_system_mobile/services/companion/proactive_deep_link.dart';
 import 'package:conver_system_mobile/services/companion/proactive_message_service.dart';
 import 'package:conver_system_mobile/services/companion/relationship_service.dart';
 import 'package:conver_system_mobile/services/companion/stage_upgrade_broker.dart';
@@ -58,7 +59,10 @@ class _RecordingNavigator implements ProactiveDeepLinkNavigator {
     if (throwOnOpen) {
       throw StateError('openConversation boom');
     }
-    opened.add((conversationId: conversationId, highlightMessageId: highlightMessageId));
+    opened.add((
+      conversationId: conversationId,
+      highlightMessageId: highlightMessageId,
+    ));
   }
 }
 
@@ -87,10 +91,7 @@ class _RecordingScheduler implements ProactiveNotificationScheduler {
 /// 状态抛错注入，其余透传真实实现——验证 restore 置 expired 分支 per-plan
 /// 降级（抛错计划保持 scheduled，其余计划继续恢复）。
 class _ThrowingUpdatePlanRepo extends CompanionRepository {
-  _ThrowingUpdatePlanRepo(
-    super.db, {
-    required this.failPlanIds,
-  });
+  _ThrowingUpdatePlanRepo(super.db, {required this.failPlanIds});
 
   /// 置状态即抛错的计划 id 集合。
   final Set<int> failPlanIds;
@@ -238,17 +239,19 @@ void main() {
     await db.close();
   });
 
-  Future<({int conversationId, int messageId})> seedConversationWithMessage() async {
+  Future<({int conversationId, int messageId})>
+  seedConversationWithMessage() async {
     final character = await characterRepo.createCharacter(
-          CharactersCompanion.insert(
-            name: '艾莉亚',
-            firstMes: Value(''),
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        );
-    final conversation =
-        await conversationRepo.createConversation(characterId: character.id);
+      CharactersCompanion.insert(
+        name: '艾莉亚',
+        firstMes: Value(''),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    );
+    final conversation = await conversationRepo.createConversation(
+      characterId: character.id,
+    );
     final message = await messageRepo.createMessage(
       conversationId: conversation.id,
       role: Role.assistant,
@@ -263,18 +266,20 @@ void main() {
     required ProactivePlanStatus status,
     required DateTime scheduledAt,
   }) async {
-    return companionRepo.createPlan(
-      characterId: 1,
-      conversationId: conversationId,
-      content: '计划内容',
-      scheduledAt: scheduledAt,
-      messageId: messageId,
-    ).then((plan) async {
-      if (status != ProactivePlanStatus.scheduled) {
-        await companionRepo.updatePlanStatus(plan.id, status);
-      }
-      return plan;
-    });
+    return companionRepo
+        .createPlan(
+          characterId: 1,
+          conversationId: conversationId,
+          content: '计划内容',
+          scheduledAt: scheduledAt,
+          messageId: messageId,
+        )
+        .then((plan) async {
+          if (status != ProactivePlanStatus.scheduled) {
+            await companionRepo.updatePlanStatus(plan.id, status);
+          }
+          return plan;
+        });
   }
 
   group('StageUpgradeBroker（PS2-07 回调 → UI 广播）', () {
@@ -336,14 +341,8 @@ void main() {
 
       expect(navigator.selectCalls, 1);
       expect(navigator.opened, hasLength(1));
-      expect(
-        navigator.opened.single.conversationId,
-        seed.conversationId,
-      );
-      expect(
-        navigator.opened.single.highlightMessageId,
-        seed.messageId,
-      );
+      expect(navigator.opened.single.conversationId, seed.conversationId);
+      expect(navigator.opened.single.highlightMessageId, seed.messageId);
     });
 
     test('归属失败（messageId 不属于对话）：回落普通导航打开对话列表', () async {
@@ -382,8 +381,7 @@ void main() {
       expect(payload, isNot(contains('content=')));
     });
 
-    test('F2（W5）：归属通过后 openConversation 抛错 → 降级不抛、已切 tab（不回退）',
-        () async {
+    test('F2（W5）：归属通过后 openConversation 抛错 → 降级不抛、已切 tab（不回退）', () async {
       final seed = await seedConversationWithMessage();
       final payload = ProactiveDeepLink.encode(
         conversationId: seed.conversationId,
@@ -451,7 +449,11 @@ void main() {
       );
 
       expect(proactive.markedMessageIds, [seed.messageId]);
-      expect(relationship.openedCharacterIds, isEmpty, reason: '未实际送达（幂等重放）不计点开');
+      expect(
+        relationship.openedCharacterIds,
+        isEmpty,
+        reason: '未实际送达（幂等重放）不计点开',
+      );
       expect(navigator.opened, hasLength(1));
     });
 
@@ -495,7 +497,9 @@ void main() {
       );
 
       expect(scheduler.scheduledIds, [plan.id]);
-      final scheduled = await companionRepo.listPlansByStatus(ProactivePlanStatus.scheduled);
+      final scheduled = await companionRepo.listPlansByStatus(
+        ProactivePlanStatus.scheduled,
+      );
       expect(scheduled.map((p) => p.id), contains(plan.id));
     });
 
@@ -517,7 +521,9 @@ void main() {
       );
 
       expect(scheduler.scheduledIds, isEmpty);
-      final expired = await companionRepo.listPlansByStatus(ProactivePlanStatus.expired);
+      final expired = await companionRepo.listPlansByStatus(
+        ProactivePlanStatus.expired,
+      );
       expect(expired.map((p) => p.id), contains(plan.id));
     });
 
@@ -547,7 +553,9 @@ void main() {
       );
 
       expect(scheduler.scheduledIds, isEmpty);
-      final plans = await companionRepo.listPlansByStatus(ProactivePlanStatus.sent);
+      final plans = await companionRepo.listPlansByStatus(
+        ProactivePlanStatus.sent,
+      );
       expect(plans, hasLength(1));
     });
 
@@ -574,7 +582,9 @@ void main() {
         now: DateTime(2026, 9, 15, 12),
       );
       expect(scheduler.scheduledIds, isEmpty);
-      final scheduled = await companionRepo.listPlansByStatus(ProactivePlanStatus.scheduled);
+      final scheduled = await companionRepo.listPlansByStatus(
+        ProactivePlanStatus.scheduled,
+      );
       expect(scheduled.map((p) => p.id), containsAll([first.id, second.id]));
     });
 
@@ -595,8 +605,14 @@ void main() {
       );
 
       expect(scheduler.scheduledIds, [plan.id], reason: '恢复仍尝试重建排程');
-      final scheduled = await companionRepo.listPlansByStatus(ProactivePlanStatus.scheduled);
-      expect(scheduled.map((p) => p.id), contains(plan.id), reason: 'false 不置位、状态保持 scheduled');
+      final scheduled = await companionRepo.listPlansByStatus(
+        ProactivePlanStatus.scheduled,
+      );
+      expect(
+        scheduled.map((p) => p.id),
+        contains(plan.id),
+        reason: 'false 不置位、状态保持 scheduled',
+      );
     });
 
     test('单计划置 expired 抛错：保持 scheduled 不排程，其余计划仍恢复，不整体抛', () async {
@@ -620,10 +636,7 @@ void main() {
         scheduledAt: DateTime(2026, 9, 20, 10), // 未过期；重建排程
       );
       final scheduler = _RecordingScheduler();
-      final companion = _ThrowingUpdatePlanRepo(
-        db,
-        failPlanIds: {throwing.id},
-      );
+      final companion = _ThrowingUpdatePlanRepo(db, failPlanIds: {throwing.id});
 
       // 不抛未处理异常（per-plan 降级，对齐 schedule 分支语义）。
       await restoreProactiveSchedules(
@@ -634,12 +647,20 @@ void main() {
 
       // 抛错计划 scheduledAt 最早、最先处理——未捕获时后续计划无法执行。
       expect(scheduler.scheduledIds, [future.id], reason: '仅未过期计划重建一次');
-      final scheduled = await companion.listPlansByStatus(ProactivePlanStatus.scheduled);
-      expect(scheduled.map((p) => p.id), contains(throwing.id),
-          reason: '置 expired 抛错计划保持 scheduled，不重排不置位');
-      final expired = await companion.listPlansByStatus(ProactivePlanStatus.expired);
-      expect(expired.map((p) => p.id), [okExpired.id],
-          reason: '其余过期计划仍置 expired，恢复不中断');
+      final scheduled = await companion.listPlansByStatus(
+        ProactivePlanStatus.scheduled,
+      );
+      expect(
+        scheduled.map((p) => p.id),
+        contains(throwing.id),
+        reason: '置 expired 抛错计划保持 scheduled，不重排不置位',
+      );
+      final expired = await companion.listPlansByStatus(
+        ProactivePlanStatus.expired,
+      );
+      expect(expired.map((p) => p.id), [
+        okExpired.id,
+      ], reason: '其余过期计划仍置 expired，恢复不中断');
     });
   });
 
@@ -654,7 +675,9 @@ void main() {
         role: Role.assistant,
         content: '主动消息正文',
       );
-      final controller = env.controllerOf(FakeLLMProvider(tokens: const ['ok']));
+      final controller = env.controllerOf(
+        FakeLLMProvider(tokens: const ['ok']),
+      );
       final navigation = ShellNavigation();
       navigation.select(ShellTab.characters);
       final navigator = AppDeepLinkNavigator(
@@ -694,8 +717,7 @@ void main() {
       expect(throwN.selectCalls, 0, reason: '取参失败静默');
     });
 
-    test('非法 payload → 回落 select chat（handleProactiveDeepLink 语义）',
-        () async {
+    test('非法 payload → 回落 select chat（handleProactiveDeepLink 语义）', () async {
       final navigator = _RecordingNavigator();
       await consumeProactiveLaunchDeepLink(
         navigator: navigator,
@@ -706,8 +728,7 @@ void main() {
       expect(navigator.opened, isEmpty);
     });
 
-    test('合法 payload → select chat + openConversation 高亮（冷启动端到端）',
-        () async {
+    test('合法 payload → select chat + openConversation 高亮（冷启动端到端）', () async {
       final seed = await seedConversationWithMessage();
       final payload = ProactiveDeepLink.encode(
         conversationId: seed.conversationId,
@@ -777,7 +798,9 @@ void main() {
   });
 
   group('F-84 热态回调装配接线（SB: 启动哑 Provider → scheduler.initialize）', () {
-    testWidgets('注入 fake channel → 首次 initialize 即携带热态回调（幂等守卫后再传无效）', (tester) async {
+    testWidgets('注入 fake channel → 首次 initialize 即携带热态回调（幂等守卫后再传无效）', (
+      tester,
+    ) async {
       final channel = _RecordingChannel();
       final scheduler = FlutterLocalNotificationsScheduler(
         channel: channel,
@@ -788,8 +811,11 @@ void main() {
       await tester.pump();
 
       expect(channel.initializeCalls, 1);
-      expect(channel.registeredCallback, isNotNull,
-          reason: '回调必须在首次 initialize 注册——幂等守卫使后续调用直接 return');
+      expect(
+        channel.registeredCallback,
+        isNotNull,
+        reason: '回调必须在首次 initialize 注册——幂等守卫使后续调用直接 return',
+      );
     });
 
     testWidgets('热态回调触发 → 归属通过后切聊天 tab 并打开会话高亮（装配端到端）', (tester) async {
@@ -805,25 +831,32 @@ void main() {
 
       final context = tester.element(find.byType(Scaffold).first);
       context.read<ShellNavigation>().select(ShellTab.characters);
-      channel.registeredCallback!(NotificationResponse(
-        payload: ProactiveDeepLink.encode(
-          conversationId: seed.conversationId,
-          messageId: seed.messageId,
+      channel.registeredCallback!(
+        NotificationResponse(
+          payload: ProactiveDeepLink.encode(
+            conversationId: seed.conversationId,
+            messageId: seed.messageId,
+          ),
+          notificationResponseType:
+              NotificationResponseType.selectedNotification,
         ),
-        notificationResponseType: NotificationResponseType.selectedNotification,
-      ));
+      );
       await tester.pump();
       await tester.pump();
 
-      expect(context.read<ShellNavigation>().current, ShellTab.chat,
-          reason: '热态点按 → select chat');
+      expect(
+        context.read<ShellNavigation>().current,
+        ShellTab.chat,
+        reason: '热态点按 → select chat',
+      );
       final controller = context.read<ChatController>();
       expect(controller.activeConversationId, seed.conversationId);
       expect(controller.highlightMessageIds, contains(seed.messageId));
     });
 
-    testWidgets('装配晚到重挂：scheduler 已被无回调初始化 → 装配重挂回调并端到端触发（F-92 验收8）',
-        (tester) async {
+    testWidgets('装配晚到重挂：scheduler 已被无回调初始化 → 装配重挂回调并端到端触发（F-92 验收8）', (
+      tester,
+    ) async {
       final channel = _RecordingChannel();
       final scheduler = FlutterLocalNotificationsScheduler(
         channel: channel,
@@ -840,28 +873,38 @@ void main() {
       await tester.pump();
 
       expect(channel.initializeCalls, 2, reason: '装配晚到触发一次重挂');
-      expect(channel.registeredCallback, isNotNull,
-          reason: '重挂语义：装配回调最终注册生效（F-92 修复前为 null）');
+      expect(
+        channel.registeredCallback,
+        isNotNull,
+        reason: '重挂语义：装配回调最终注册生效（F-92 修复前为 null）',
+      );
       final context = tester.element(find.byType(Scaffold).first);
       context.read<ShellNavigation>().select(ShellTab.characters);
-      channel.registeredCallback!(NotificationResponse(
-        payload: ProactiveDeepLink.encode(
-          conversationId: seed.conversationId,
-          messageId: seed.messageId,
+      channel.registeredCallback!(
+        NotificationResponse(
+          payload: ProactiveDeepLink.encode(
+            conversationId: seed.conversationId,
+            messageId: seed.messageId,
+          ),
+          notificationResponseType:
+              NotificationResponseType.selectedNotification,
         ),
-        notificationResponseType: NotificationResponseType.selectedNotification,
-      ));
+      );
       await tester.pump();
       await tester.pump();
 
-      expect(context.read<ShellNavigation>().current, ShellTab.chat,
-          reason: '重挂后的回调闭包仍走深链消费（导航 + 归属校验）');
-      expect(context.read<ChatController>().activeConversationId,
-          seed.conversationId);
+      expect(
+        context.read<ShellNavigation>().current,
+        ShellTab.chat,
+        reason: '重挂后的回调闭包仍走深链消费（导航 + 归属校验）',
+      );
+      expect(
+        context.read<ChatController>().activeConversationId,
+        seed.conversationId,
+      );
     });
 
-    testWidgets('装配接线消费告警 seam：重挂失败不阻断启动且重挂尝试上达（F-92 验收3/8）',
-        (tester) async {
+    testWidgets('装配接线消费告警 seam：重挂失败不阻断启动且重挂尝试上达（F-92 验收3/8）', (tester) async {
       final channel = _RecordingChannel();
       final scheduler = FlutterLocalNotificationsScheduler(
         channel: channel,
@@ -878,8 +921,11 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(channel.initializeCalls, 2,
-          reason: '装配晚到触发重挂尝试（装配方接线 consume 告警 seam 路径）');
+      expect(
+        channel.initializeCalls,
+        2,
+        reason: '装配晚到触发重挂尝试（装配方接线 consume 告警 seam 路径）',
+      );
       expect(tester.takeException(), isNull, reason: '重挂失败不阻断启动');
       // 注：插件 22.3.1 的 initialize 会在平台调用前覆盖赋值回调，故重挂
       // 失败时插件侧回调槽可能已被写入——服务侧 `_hotCallbackRegistered`
@@ -925,6 +971,52 @@ void main() {
       expect(context.read<PersonaEvolutionService>(), isNotNull);
       // 通知初始化（真插件缺失 → 降级 false）+ SR-08 恢复（空计划）不抛。
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('reflectAndBackfillPending 编排（F-135）', () {
+    test('反射 added=0（节流/无新事实/失败降级）→ 不触发补嵌', () async {
+      var reflectCalls = 0;
+      var backfillCalls = 0;
+
+      await reflectAndBackfillPending(
+        reflect:
+            ({required int characterId, required int conversationId}) async {
+              reflectCalls++;
+              return 0;
+            },
+        backfill: (characterId) async {
+          backfillCalls++;
+          return null;
+        },
+        characterId: 7,
+        conversationId: 42,
+      );
+
+      expect(reflectCalls, 1);
+      expect(backfillCalls, 0, reason: '反射未落库（added=0）不补嵌（F-135）');
+    });
+
+    test('反射 added>0 → 补嵌一次且透传角色 id', () async {
+      var reflectCalls = 0;
+      final backfilled = <int>[];
+
+      await reflectAndBackfillPending(
+        reflect:
+            ({required int characterId, required int conversationId}) async {
+              reflectCalls++;
+              return 2;
+            },
+        backfill: (characterId) async {
+          backfilled.add(characterId);
+          return null;
+        },
+        characterId: 7,
+        conversationId: 42,
+      );
+
+      expect(reflectCalls, 1);
+      expect(backfilled, [7], reason: '反射实际落库才补嵌，透传角色 id');
     });
   });
 }

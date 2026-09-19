@@ -11,7 +11,7 @@ import 'dart:convert';
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/memory_repository.dart';
-import 'package:conver_system_mobile/services/vector/float32_codec.dart';
+import 'package:conver_system_mobile/utils/float32_codec.dart';
 import 'package:crypto/crypto.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';

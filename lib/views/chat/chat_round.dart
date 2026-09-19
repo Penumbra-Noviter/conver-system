@@ -39,7 +39,6 @@ import '../../data/database/app_database.dart' show Message;
 import '../../data/database/tables.dart' show Role;
 import '../../data/repositories/message_repository.dart';
 import '../../services/chat_service.dart';
-import '../../services/llm/errors.dart';
 import '../../services/notice_runner.dart';
 
 /// 聊天回合状态机（一条消息回合的发送 / 停止 / 重生成 / 断流提示生命周期）。
@@ -65,11 +64,11 @@ class ChatRound {
     required NoticeRunner noticeRunner,
     required Future<List<Message>> Function() reloadMessages,
     required void Function() notify,
-  })  : _chatService = chatService,
-        _messageRepository = messageRepository,
-        _noticeRunner = noticeRunner,
-        _reloadMessages = reloadMessages,
-        _notify = notify;
+  }) : _chatService = chatService,
+       _messageRepository = messageRepository,
+       _noticeRunner = noticeRunner,
+       _reloadMessages = reloadMessages,
+       _notify = notify;
 
   final ChatService _chatService;
   final MessageRepository _messageRepository;
@@ -162,11 +161,16 @@ class ChatRound {
 
   /// [messageId] 是否已被标记「回复中断」（UI 渲染「回复中断」小标；与
   /// [isStopped] 区分并列——停止/断流为互斥终态，不会同时命中同一消息）。
-  bool isInterrupted(int messageId) => _interruptedMessageIds.contains(messageId);
+  bool isInterrupted(int messageId) =>
+      _interruptedMessageIds.contains(messageId);
 
   /// 会话内是否存在未解决的截断回复标记（气泡「回复中断」小标面；与 notice
   /// 「可重试目标」面分离——零内容断流后仍可能有历史截断标记）。
   bool get hasInterrupted => _interruptedMessageIds.isNotEmpty;
+
+  /// 当前「回复已中断」notice 的身份 seq（F-128：以 noticeId 配对替代文案
+  /// 比较；置位时机 = ChatInterrupted 事件 setFirst 之后）。
+  int? _interruptedNoticeId;
 
   /// 当前「回复已中断」notice 的可重试截断目标消息 id（null = 无可重试目标：
   /// 零内容断流 / 目标已解决 / 导航清理）——NoticeBanner「重试」动作渲染判据。
@@ -174,15 +178,17 @@ class ChatRound {
 
   /// 当前提示是否为「回复已中断」且该提示存在可重试的截断目标——NoticeBanner
   /// 「重试」动作渲染判据（仅截断通知传动作；其它 notice / 零内容断流不传，
-  /// 防动作误挂）。判据（notice 文案 + notice 目标 + reload 窗口）单一归属
-  /// 本回合。
+  /// 防动作误挂）。判据（notice 身份 + notice 目标 + reload 窗口）单一归属
+  /// 本回合。F-128：身份判据用 [NoticeRunner.noticeId] 与 [_interruptedNoticeId]
+  /// 配对（不再比较文案字符串），同文案新旧 notice 天然可区分。
   ///
   /// F-65③：终态一帧 reload 窗口（[_reloadPending]，`_finishRound` 置位至
   /// `_onStreamDone` 收尾）内**不渲染**「重试」按钮——共享守卫期间点击原本是
   /// 静默 no-op（`_regenerateTarget` 直接 return）；窗口内按钮不可达，杜绝
   /// 无响应点击（接受窗口后按钮弹入微调）。
   bool get hasRetryableInterrupted =>
-      _noticeRunner.notice == interruptedNoticeText &&
+      _interruptedNoticeId != null &&
+      _noticeRunner.noticeId == _interruptedNoticeId &&
       _interruptedNoticeTargetId != null &&
       !_reloadPending;
 
@@ -282,10 +288,7 @@ class ChatRound {
   /// 标记并清「回复已中断」提示——与 [retryInterrupted] 后置条件一致，杜绝
   /// 「图标重生成成功后横幅死重试残留」。失败仅 notice（先错者胜）。
   Future<void> regenerate({required int conversationId}) async {
-    await _regenerateTarget(
-      conversationId: conversationId,
-      messageId: null,
-    );
+    await _regenerateTarget(conversationId: conversationId, messageId: null);
   }
 
   /// 重试当前「回复已中断」notice 的截断目标（T3 NoticeBanner「重试」动作，
@@ -322,7 +325,10 @@ class ChatRound {
   /// 重进 [conversationId] 时补后台停止标记（F3b）：该会话有待补标记且
   /// [dbMessages] 末条为 assistant → 标记末条并返回 true（控制器在重载后
   /// 调用；无待补标记 / 末条非 assistant → false 零副作用）。
-  bool applyBackgroundStoppedMark(int conversationId, List<Message> dbMessages) {
+  bool applyBackgroundStoppedMark(
+    int conversationId,
+    List<Message> dbMessages,
+  ) {
     if (!_backgroundStoppedConversationIds.remove(conversationId)) {
       return false;
     }
@@ -383,9 +389,10 @@ class ChatRound {
   /// notice 目标结算：
   /// - 仍有余截断标记 → 目标推进为 max(marks)（F-65①，DB 主键单调即时序；
   ///   notice 保持不清——横幅持续指向最近剩余截断）；
-  /// - 无余标 → notice 目标复位 null，且仅当 notice 文案仍为「回复已中断」
-  ///   （文案门：F-65② 重试期间被并发 `set` 覆盖的提示不被清空）才
-  ///   [_noticeRunner.clear]（中断已全部解决，横幅不再残留）。
+  /// - 无余标 → notice 目标复位 null，且仅当 notice 身份仍为当前中断提示
+  ///   （身份门 F-65②，F-128 改用 [NoticeRunner.noticeId] 与
+  ///   [_interruptedNoticeId] 配对：重试期间被并发 `set` 覆盖的提示不清空）
+  ///   才 [_noticeRunner.clear]（中断已全部解决，横幅不再残留）。
   /// 非 notice 目标的截断被修 → 仅清气泡标记、提示与目标保留。
   void _resolveInterruptedTarget(int messageId) {
     final removed = _interruptedMessageIds.remove(messageId);
@@ -398,8 +405,9 @@ class ChatRound {
       return;
     }
     _interruptedNoticeTargetId = null;
-    if (_noticeRunner.notice == interruptedNoticeText) {
-      // F-65② 文案门：仅当 notice 仍为「回复已中断」才清（防吞并发提示）。
+    if (_noticeRunner.noticeId == _interruptedNoticeId) {
+      // F-65② 身份门：仅当 notice 仍为当前「回复已中断」才清（防吞并发提示）。
+      _interruptedNoticeId = null;
       _noticeRunner.clear();
     }
   }
@@ -413,6 +421,9 @@ class ChatRound {
         _finishRound();
       case ChatInterrupted(:final messageId):
         _noticeRunner.setFirst(ChatRound.interruptedNoticeText);
+        // F-128：置位后记录 notice 身份 seq（配对判据；同文案新旧 notice 可
+        // 区分，替代文案字符串比较）。
+        _interruptedNoticeId = _noticeRunner.noticeId;
         // 截断回复「回复中断」标记（UI 侧、DB 不写）与 notice 重试目标
         // （M6-08）：有内容断流 → 记录截断 id 为标记并作 notice 目标；零部分
         // 内容（messageId null）→ notice 目标复位（提示仍展示但无可重试目标，
@@ -485,15 +496,7 @@ class ChatRound {
     return _syntheticSeq;
   }
 
-  /// 领域 / LLM / 未预期异常的展示文案（重生成与事件流防御面共用）。
-  String _descriptiveError(Object error) {
-    if (error is DomainError) {
-      return domainErrorResponse(error).message;
-    }
-    if (error is LLMError) {
-      // 重生成路径 ChatService 不暴露 provider 名 → 无前缀基础文案。
-      return llmErrorResponse(error, '').message;
-    }
-    return '生成回复失败: $error';
-  }
+  /// 领域 / LLM / 未预期异常的展示文案（F-124：单源 [chatErrorMessage]，
+  /// 与 ChatService 三叉 catch 收敛同源；重生成路径不暴露 provider 名）。
+  String _descriptiveError(Object error) => chatErrorMessage(error);
 }

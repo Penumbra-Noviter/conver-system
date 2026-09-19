@@ -38,7 +38,7 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/memory_repository.dart';
 import '../vector/cluster.dart';
 import '../vector/cosine_similarity.dart';
-import '../vector/float32_codec.dart';
+import '../../utils/float32_codec.dart';
 import 'embedding_client.dart';
 import 'embedding_config.dart';
 
