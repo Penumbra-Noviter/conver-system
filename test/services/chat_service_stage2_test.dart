@@ -77,22 +77,22 @@ class _ThrowingRelationshipService extends RelationshipService {
   }
 }
 
-/// 单路抛错替身：thought 剥离抛错（验证隔离）。
+/// 单路抛错替身：thought 落库抛错（验证隔离；S5 后服务只收已剥离内容）。
 class _ThrowingThoughtService extends ThoughtService {
   _ThrowingThoughtService({
     required super.companionRepository,
     required super.settingsRepository,
   });
 
-  int stripCalls = 0;
+  int persistCalls = 0;
 
   @override
-  Future<String> stripAndPersist({
+  Future<void> persistThought({
     required int characterId,
     required int messageId,
-    required String content,
+    required String thoughtContent,
   }) async {
-    stripCalls++;
+    persistCalls++;
     throw StateError('boom thought');
   }
 }
@@ -315,7 +315,7 @@ void main() {
       await drainStream(
         service.streamReply(conversationId: seed.conversation.id, content: '嗨'),
       );
-      expect(throwing.stripCalls, 1);
+      expect(throwing.persistCalls, 1);
       final messages = await messageRepo.getMessages(seed.conversation.id);
       // 剥离经顶层纯函数恒生效（不依赖服务）；服务抛错只丢 thought 落库。
       expect(
