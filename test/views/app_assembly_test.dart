@@ -7,6 +7,10 @@
 /// 工单 05 追加：`ConverApp` 的 home 由首启指引启动门决定——标记缺失展示
 /// [OnboardingPage]，标记已写直接进 [HomeShell]（spec §U-4 / 验收 5）。故
 /// 既有装配断言须先落 `onboarding_completed` 标记使 HomeShell 出现。
+///
+/// AD-04（S4）追加：ProactiveMessageService 装配腿可经公共装配图解析——
+/// planner 闭包在 create 时仅注册（异步执行才经 `_resolveLlm` 解析凭据），
+/// 构造完成即证明 companion/settings/message 仓储 + scheduler 接线完整。
 library;
 
 import 'package:conver_system_mobile/app.dart';
@@ -16,6 +20,7 @@ import 'package:conver_system_mobile/data/repositories/conversation_repository.d
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
+import 'package:conver_system_mobile/services/companion/proactive_message_service.dart';
 import 'package:conver_system_mobile/services/conversation_export_service.dart';
 import 'package:conver_system_mobile/services/document_parse_service.dart';
 import 'package:conver_system_mobile/services/embedding/embedding_service.dart';
@@ -121,6 +126,26 @@ void main() {
     expect(Provider.of<ChatService>(context, listen: false), isA<ChatService>());
     expect(Provider.of<ConversationExportService>(context, listen: false),
         isA<ConversationExportService>());
+  });
+
+  testWidgets('装配图持有 ProactiveMessageService（AD-04 planner 装配腿可构造）',
+      (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await _markOnboardingCompleted(db);
+
+    await tester.pumpWidget(ConverApp(database: db));
+    await tester.pumpAndSettle();
+
+    // 触发 ProactiveMessageService provider create 闭包：planner 闭包在此仅
+    // 注册（异步执行才经 _resolveLlm 解析凭据，构造阶段零 I/O），构造完成
+    // 即证明 companion/settings/message 仓储 + scheduler 接线完整。
+    final context = tester.element(find.byType(HomeShell));
+    expect(
+      Provider.of<ProactiveMessageService>(context, listen: false),
+      isA<ProactiveMessageService>(),
+      reason: 'ProactiveMessageService 装配腿（AD-04 planner 改调 _resolveLlm），可经公共装配图解析',
+    );
   });
 
   testWidgets('首启（标记缺失）展示 OnboardingPage；跳过 → 进 HomeShell 且二次启动直接 HomeShell',
