@@ -17,17 +17,23 @@
 ///   会话内重载后末条 assistant 标「已停止」（[isStopped]）；无部分内容仅保留
 ///   已发 user；入口态/后台流停止（[currentConversationId] 非本轮会话）记待补
 ///   集合，重进会话时经 [applyBackgroundStoppedMark] 补标（F3b）；
-/// - 重生成：[regenerate] 走 ChatService 延迟删除（失败不删行、旧回复保留），
-///   成功经 [reloadMessages] 重载；[isRegenerating] 防并发；
+/// - 重生成：[regenerate] 走 ChatService 候选追加（消息行保留、新回复落为
+///   新候选并置激活，旧回复可对比；失败零落库、旧回复保留），成功经
+///   [reloadMessages] 重载；[isRegenerating] 防并发；
 /// - 断流：[ChatInterrupted] → notice「回复已中断」（经共享 [NoticeRunner]
 ///   先错者胜，不挡后续操作）+ 截断落库消息标「回复中断」（[isInterrupted]，
 ///   UI 侧标记、DB 不写，与「已停止」[isStopped] 区分并列）；零部分内容
 ///   （[ChatInterrupted] messageId 为 null）→ 仅提示、无标记；
 /// - 断流重试：[retryInterrupted] 对截断目标消息触发 [ChatService.regenerate]
-///   （replace 语义：不新增 user 行），复用 [isRegenerating] 防并发与 notice
-///   先错者胜；重试成功以服务实际替换目标 id（[RegenerateResult.replacedMessageId]）
-///   结算——余标推进 [interruptedNoticeTargetId] 目标、配对门 + 文案门条件清理
-///   （F-65①/②，见 [interruptedNoticeTargetId]）。
+///   （候选追加语义：不新增 user 行），复用 [isRegenerating] 防并发与 notice
+///   先错者胜；重试成功以服务返回的结算键（目标消息 id + 新候选
+///   [RegenerateResult.swipeIndex]）结算——余标推进 [interruptedNoticeTargetId]
+///   目标、配对门 + 文案门条件清理（F-65①/②，见 [interruptedNoticeTargetId]）；
+/// - 操作编排（MS-04）：[continueReply] / [switchSwipe] / [deleteMessage] /
+///   [editMessage] 四入口各带防并发守卫 + 终态 reload + 失败 notice 单源文案
+///   （[chatErrorMessage]）；生成类（regenerate/retry/continue/edit）共享
+///   [isRegenerating]，瞬时变更类（switch/delete）共享 [_isMutatingMessage]，
+///   两族互相排他（[isBusy] 聚合状态面）。
 library;
 
 import 'dart:async';
@@ -39,6 +45,7 @@ import '../../data/database/app_database.dart' show Message;
 import '../../data/database/tables.dart' show Role;
 import '../../data/repositories/message_repository.dart';
 import '../../services/chat_service.dart';
+import '../../services/llm/errors.dart' show MessageNotFoundError;
 import '../../services/notice_runner.dart';
 
 /// 聊天回合状态机（一条消息回合的发送 / 停止 / 重生成 / 断流提示生命周期）。
@@ -86,6 +93,11 @@ class ChatRound {
   String? _pendingUserText;
   bool _isRegenerating = false;
 
+  /// 瞬时变更类操作（[switchSwipe] / [deleteMessage]）进行中标志（防连点 +
+  /// 与生成类操作互斥——删除期间 regenerate 写候选会命中已删行 FK 竞态，
+  /// UI 层排他承保；服务层无删除守卫）。
+  bool _isMutatingMessage = false;
+
   /// 主动停止后落库的 assistant 消息 id 集合（UI 侧「已停止」标记）。
   final Set<int> _stoppedMessageIds = <int>{};
 
@@ -93,8 +105,10 @@ class ChatRound {
   /// 写）。事件驱动记录：ChatInterrupted 带截断 id 即加入（回合即当前会话的
   /// 流，天然限定会话内断流；后台流断流补标不做，重进会话经
   /// [resetForNavigation] 清空属已知限制——对齐 08 Further Notes）；随
-  /// [resetForNavigation] 清空、随 regenerate / [retryInterrupted] 成功
-  /// （目标为该消息时）移除（replace 后旧 id 已删除）。
+  /// [resetForNavigation] 清空、随 regenerate / [continueReply] / 
+  /// [retryInterrupted] 成功（目标为该消息且产生新候选）移除、随
+  /// [deleteMessage] / [editMessage] 物理删行经 [_pruneInterruptedMarks] 清理
+  /// （候选语义下消息行保留，标记结算键 = 目标消息 id + 新候选 index）。
   final Set<int> _interruptedMessageIds = <int>{};
 
   /// 当前「回复已中断」notice 对应的可重试截断消息 id（= 最近一次**有内容**
@@ -136,6 +150,12 @@ class ChatRound {
 
   /// 重生成进行中（disabled 重生成小图标）。
   bool get isRegenerating => _isRegenerating;
+
+  /// 任意回合操作进行中（聚合状态面，UI 操作入口可达性判据）：流式生成 /
+  /// 生成类操作（regenerate / continue / edit）/ 终态重载窗口 / 瞬时变更
+  /// （switch / delete）任一进行中即 true。
+  bool get isBusy =>
+      _isStreaming || _isRegenerating || _reloadPending || _isMutatingMessage;
 
   /// 流式占位气泡已累积的纯文本（逐 token 追加）。
   String get streamingText => _streamingText;
@@ -282,21 +302,46 @@ class ChatRound {
   /// 重生成末条 assistant（A4 UI 面，气泡「重生成」图标路径）：缺省目标 =
   /// 末条 assistant 由服务层解析（零预解析，`messageId: null` 走服务缺省
   /// [_resolveRegenerateTarget]；F-64 单一来源），委托共享 [_regenerateTarget]
-  /// （延迟删除：失败不删行、旧回复保留；成功经 [reloadMessages] 重载）。
+  /// （候选追加：消息行保留、新回复落为新候选并置激活；失败零落库、旧回复
+  /// 保留；成功经 [reloadMessages] 重载）。
   ///
-  /// 清理统一（B1=W6 F-1）：目标恰为该截断消息时，成功同样移除「回复中断」
-  /// 标记并清「回复已中断」提示——与 [retryInterrupted] 后置条件一致，杜绝
-  /// 「图标重生成成功后横幅死重试残留」。失败仅 notice（先错者胜）。
+  /// 清理统一（B1=W6 F-1）：目标恰为该截断消息时，成功（产生新候选）同样
+  /// 移除「回复中断」标记并清「回复已中断」提示——与 [retryInterrupted]
+  /// 后置条件一致，杜绝「图标重生成成功后横幅死重试残留」。失败仅 notice
+  /// （先错者胜）。
   Future<void> regenerate({required int conversationId}) async {
     await _regenerateTarget(conversationId: conversationId, messageId: null);
   }
 
+  /// 继续生成末条 assistant（MS-02 入口，UI 挂点留 05 票）：目标 = 末条
+  /// assistant（缺省 / 显式 [messageId]，皆由服务层校验），走候选追加——
+  /// 不新增消息行、成功内容 = 原 active 内容 + 续写片段并置激活。
+  ///
+  /// 结算契约（concerns/02 §1）：成功产生新候选（[RegenerateResult.swipeIndex]
+  /// `>= 0`）即「目标消息已修复」——目标恰为截断消息时移除「回复中断」标记
+  /// 并走 notice 目标结算（与 [regenerate] 同语义）；**空续写 no-op 哨兵**
+  /// （`swipeIndex == -1`）不产生候选 → 不结算（截断标记保留）。
+  ///
+  /// 守卫与并发策略（isRegenerating 防并发、notice 先错者胜）与
+  /// [_regenerateTarget] 共享 [_runRegenerateOperation] 腿。
+  Future<void> continueReply({
+    required int conversationId,
+    int? messageId,
+  }) async {
+    await _runRegenerateOperation(
+      conversationId: conversationId,
+      op: () => _chatService.continueReply(
+        conversationId: conversationId,
+        messageId: messageId,
+      ),
+    );
+  }
+
   /// 重试当前「回复已中断」notice 的截断目标（T3 NoticeBanner「重试」动作，
   /// M6-08）：目标 = 最近一次有内容断流落库的消息；对目标触发 regenerate
-  /// （replace 语义——不新增 user 行、无重复输入；复用延迟删除：失败旧截断
-  /// 行保留）。无目标（零内容断流 / 目标已解决 / 导航清理）零副作用。守卫
-  /// 与并发策略（isRegenerating 防并发、notice 先错者胜）在 [_regenerateTarget]
-  /// 共享腿内统一。
+  /// （候选追加语义：不新增 user 行；失败旧截断行保留）。无目标（零内容断流
+  /// / 目标已解决 / 导航清理）零副作用。守卫与并发策略（isRegenerating 防
+  /// 并发、notice 先错者胜）在 [_regenerateTarget] 共享腿内统一。
   Future<void> retryInterrupted({required int conversationId}) async {
     final targetId = _interruptedNoticeTargetId;
     if (targetId == null) {
@@ -349,44 +394,175 @@ class ChatRound {
   /// regenerate（图标路径）与 retryInterrupted（横幅路径）共享执行腿
   /// （B1=W6 F-1 收敛）：对 [messageId] 目标（null = 服务层缺省末条 assistant）
   /// 执行 [ChatService.regenerate] → 成功经 [reloadMessages] 重载 → 以服务
-  /// 实际替换目标行 id（[RegenerateResult.replacedMessageId]）作结算键统一
-  /// 结算标记/notice（F-64：客户端零预解析，消除调用前推断-执行间删行窗口）。
+  /// 返回结算键（目标消息 id + [RegenerateResult.swipeIndex]）统一结算
+  /// 标记/notice（F-64：客户端零预解析；候选语义下目标行保留，目标 id 恒命中
+  /// 截断标记；不再消费 [RegenerateResult.replacedMessageId] 兼容字段）。
   ///
-  /// 守卫（isStreaming / [isRegenerating] / 终态重载待办）与失败折叠
-  /// （[NoticeRunner] 先错者胜——既有「回复已中断」不被失败文案覆盖）在共享
-  /// 腿内，两路径并发策略一致。
+  /// 守卫（isStreaming / [isRegenerating] / 终态重载待办 / 瞬时变更进行中）
+  /// 与失败折叠（[NoticeRunner] 先错者胜——既有「回复已中断」不被失败文案
+  /// 覆盖）在共享腿内，regenerate / retryInterrupted / [continueReply] 三路径
+  /// 并发策略一致。
   Future<void> _regenerateTarget({
     required int conversationId,
     required int? messageId,
   }) async {
-    if (_isStreaming || _isRegenerating || _reloadPending) {
+    await _runRegenerateOperation(
+      conversationId: conversationId,
+      op: () => _chatService.regenerate(
+        conversationId: conversationId,
+        messageId: messageId,
+      ),
+    );
+  }
+
+  /// 生成类操作共享执行腿（regenerate / retryInterrupted / [continueReply]）：
+  /// 守卫（流式中 / 重生成中 / 终态重载窗口 / 瞬时变更进行中 → 忽略）→ 置
+  /// [isRegenerating]（与服务层 `_regenerateInFlight` 同语义，UI 防并发）→
+  /// [NoticeRunner.guard]（服务 [op] + 成功 reload，失败折叠 notice）→ 以
+  /// 结算键 `(目标消息 id, swipeIndex)` 结算截断标记（**仅当 `swipeIndex >= 0`
+  /// ——continueReply 空续写 `-1` 哨兵不结算**，concerns/02 §1）。
+  Future<void> _runRegenerateOperation({
+    required int conversationId,
+    required Future<RegenerateResult> Function() op,
+  }) async {
+    if (_isStreaming || _isRegenerating || _reloadPending || _isMutatingMessage) {
       return;
     }
     _isRegenerating = true;
     _notify();
     final result = await _noticeRunner.guard<RegenerateResult>(
       op: () async {
-        final r = await _chatService.regenerate(
-          conversationId: conversationId,
-          messageId: messageId,
-        );
+        final r = await op();
         await _reloadMessages();
         return r;
       },
       onError: (e) => _descriptiveError(e),
     );
-    final replacedId = result?.replacedMessageId;
-    if (replacedId != null) {
-      _resolveInterruptedTarget(replacedId);
+    final messageId = result?.messageId;
+    final swipeIndex = result?.swipeIndex;
+    // 结算键 (目标消息 id, swipeIndex)：仅当产生新候选（swipeIndex >= 0）
+    // 才结算截断标记——continueReply 空续写 -1 哨兵不产生候选，标记保留
+    // （concerns/02 §1；突变实验曾误移此条件被契约锁捕获）。
+    if (messageId != null && swipeIndex != null && swipeIndex >= 0) {
+      _resolveInterruptedTarget(messageId);
     }
     _isRegenerating = false;
     _notify();
   }
 
-  /// 目标消息被 regenerate replace 成功后的截断状态结算：从标记集移除该
-  /// 消息（旧 id 已从 DB 删除）；仅当被解目标 == 当前「回复已中断」notice 的
-  /// 可重试目标（配对门：F-4 零内容断流态 target==null 不误清横幅）才进入
-  /// notice 目标结算：
+  /// 切换 [messageId] 的激活候选（MS-02 入口，UI 挂点留 05 票）：合法切换后
+  /// `messages.content` 覆写为选中候选、active index 更新（仓库不变量），随后
+  /// reload 列表反映新 active 内容。归属校验（目标须属于 [conversationId]）
+  /// 在本层前置（服务层 `ChatService.switchSwipe` 未实现——跨票契约缺口，
+  /// 本层以 [MessageRepository.messageById] 补防御；越界 / 不存在 → notice
+  /// 单源映射）。
+  ///
+  /// 守卫：流式中 / 重生成中 / 终态重载窗口 / 其它瞬时变更进行中 → 忽略
+  /// （防连点与跨操作互踩）。
+  Future<void> switchSwipe({
+    required int conversationId,
+    required int messageId,
+    required int index,
+  }) async {
+    if (_isStreaming || _isRegenerating || _reloadPending || _isMutatingMessage) {
+      return;
+    }
+    _isMutatingMessage = true;
+    _notify();
+    await _noticeRunner.guard<Message>(
+      op: () async {
+        // 归属校验（服务层契约缺口的本层防御；不存在/跨对话 → 领域错误）。
+        final target = await _messageRepository.messageById(
+          conversationId,
+          messageId,
+        );
+        if (target == null) {
+          throw MessageNotFoundError();
+        }
+        await _messageRepository.switchSwipe(messageId, index);
+        await _reloadMessages();
+        return target;
+      },
+      onError: (e) => _descriptiveError(e),
+    );
+    _isMutatingMessage = false;
+    _notify();
+  }
+
+  /// 删除单条消息（MS-03 入口，UI 挂点留 05 票）：角色感知语义由服务层承载
+  /// （删 user 截断含自身及后续、候选级联；删 assistant 仅删该条），成功后
+  /// reload 列表。被删范围内的截断标记经 [_pruneInterruptedMarks] 结算
+  /// （幽灵防御：物理删行后 UI 侧标记与 notice 目标不残留死引用）。
+  ///
+  /// 守卫：与生成类 / 其它瞬时变更互斥（删除期间 regenerate 写候选会产生
+  /// 已删行 FK 竞态——服务层无删除守卫，UI 层排他承保）。
+  Future<void> deleteMessage({
+    required int conversationId,
+    required int messageId,
+  }) async {
+    if (_isStreaming || _isRegenerating || _reloadPending || _isMutatingMessage) {
+      return;
+    }
+    _isMutatingMessage = true;
+    _notify();
+    final reloaded = await _noticeRunner.guard<List<Message>>(
+      op: () async {
+        await _chatService.deleteMessage(
+          conversationId: conversationId,
+          messageId: messageId,
+        );
+        return _reloadMessages();
+      },
+      onError: (e) => _descriptiveError(e),
+    );
+    if (reloaded != null) {
+      _pruneInterruptedMarks(reloaded);
+    }
+    _isMutatingMessage = false;
+    _notify();
+  }
+
+  /// 编辑重发（MS-03 入口，UI 挂点留 05 票）：仅 user 消息（服务层校验），
+  /// 就地替换 content + 截断后续 + 重新生成**新** assistant 回复；成功后
+  /// reload 列表。被截断删除的回复行（含截断标记）经 [_pruneInterruptedMarks]
+  /// 结算（幽灵防御同 [deleteMessage]）。
+  ///
+  /// 守卫：生成类操作（与服务层 `_regenerateInFlight` 共享并发守卫语义），
+  /// 与 regenerate / continue 互斥。
+  Future<void> editMessage({
+    required int conversationId,
+    required int messageId,
+    required String newContent,
+  }) async {
+    if (_isStreaming || _isRegenerating || _reloadPending || _isMutatingMessage) {
+      return;
+    }
+    _isRegenerating = true;
+    _notify();
+    final reloaded = await _noticeRunner.guard<List<Message>>(
+      op: () async {
+        await _chatService.editAndRegenerate(
+          conversationId: conversationId,
+          messageId: messageId,
+          newContent: newContent,
+        );
+        return _reloadMessages();
+      },
+      onError: (e) => _descriptiveError(e),
+    );
+    if (reloaded != null) {
+      _pruneInterruptedMarks(reloaded);
+    }
+    _isRegenerating = false;
+    _notify();
+  }
+
+  /// 目标消息被 regenerate / [continueReply] 成功（产生新候选）或经
+/// [deleteMessage] / [editMessage] 物理删行后的截断状态结算：从标记集移除该
+/// 消息（候选语义下行保留，新候选 = 回复已修复；删行语义下 UI 侧标记不得
+/// 残留为幽灵引用）；仅当被解目标 == 当前「回复已中断」notice 的可重试目标
+/// （配对门：F-4 零内容断流态 target==null 不误清横幅）才进入 notice 目标
+/// 结算：
   /// - 仍有余截断标记 → 目标推进为 max(marks)（F-65①，DB 主键单调即时序；
   ///   notice 保持不清——横幅持续指向最近剩余截断）；
   /// - 无余标 → notice 目标复位 null，且仅当 notice 身份仍为当前中断提示
@@ -409,6 +585,21 @@ class ChatRound {
       // F-65② 身份门：仅当 notice 仍为当前「回复已中断」才清（防吞并发提示）。
       _interruptedNoticeId = null;
       _noticeRunner.clear();
+    }
+  }
+
+  /// 幽灵防御：物理删行操作（[deleteMessage] / [editMessage] 截断后续）后，
+  /// 重载列表 [reloaded] 中已不存在的截断标记逐一结算（移除 + notice 目标
+  /// 推进/清空，复用 [_resolveInterruptedTarget] 的 F-65 逻辑）——防 UI 侧
+  /// 标记与横幅「重试」目标指向已删除消息的死引用。
+  void _pruneInterruptedMarks(List<Message> reloaded) {
+    final aliveIds = {for (final m in reloaded) m.id};
+    final pruned = [
+      for (final id in _interruptedMessageIds)
+        if (!aliveIds.contains(id)) id,
+    ];
+    for (final id in pruned) {
+      _resolveInterruptedTarget(id);
     }
   }
 

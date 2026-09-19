@@ -849,10 +849,13 @@ void main() {
       return conv.id;
     }
 
-    test('regenerate 成功 → 旧回复原位替换，user/开场白保留', () async {
+    test('regenerate 成功 → 候选追加（消息行数不变、active 切最新、旧回复保留为'
+        '候选），user/开场白保留', () async {
       final convId = await seedConversationWithReply();
       final c = wireController(FakeLLMProvider(tokens: const ['新回复']));
       await c.openConversation(convId);
+      final before = await messageRepo.getMessages(convId);
+      final targetId = before.last.id;
 
       await c.regenerate();
 
@@ -866,6 +869,14 @@ void main() {
             (Role.assistant, '新回复'),
           ]));
       expect(c.messages.last.content, '新回复');
+      final msgs = await messageRepo.getMessages(convId);
+      expect(msgs, hasLength(before.length),
+          reason: '候选语义：消息行数不变（不删旧行）');
+      expect(msgs.last.id, targetId, reason: '候选归属行 id 不变');
+      final swipes = await messageRepo.listSwipes(targetId);
+      expect([for (final s in swipes) s.index], [0, 1],
+          reason: '旧回复保留为候选 0（可对比），新回复为候选 1 并置激活');
+      expect([for (final s in swipes) s.content], ['旧回复', '新回复']);
     });
 
     test('regenerate 领域错误（对话不存在）→ notice 映射文案，旧回复保留语义无复发', () async {
@@ -917,6 +928,96 @@ void main() {
       final settled = await messageRepo.getMessages(conv.id);
       expect([for (final m in settled) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, 'ab')]);
+    });
+  });
+
+  group('操作编排 · continueReply / switchSwipe / deleteMessage / editMessage（UI 面）',
+      () {
+    Future<int> seedAssistantReply({String reply = '旧回复'}) async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await messageRepo.createMessage(
+          conversationId: conv.id, role: Role.user, content: '你好');
+      await messageRepo.createMessage(
+          conversationId: conv.id, role: Role.assistant, content: reply);
+      return conv.id;
+    }
+
+    test('continueReply → 转发回合层：条数不变、active = 原回复 + 续写', () async {
+      final convId = await seedAssistantReply(reply: '原文');
+      final c = wireController(FakeLLMProvider(tokens: const ['续']));
+      await c.openConversation(convId);
+
+      await c.continueReply();
+
+      expect(roleContentsOf(c),
+          containsAll([(Role.user, '你好'), (Role.assistant, '原文续')]));
+      expect(c.messages.last.content, '原文续');
+      expect(c.messages, hasLength(2), reason: '续写不新增消息行');
+    });
+
+    test('switchSwipe → 转发回合层：active 切换并 reload 反映', () async {
+      final convId = await seedAssistantReply();
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(convId);
+      final targetId = (await messageRepo.getMessages(convId)).last.id;
+      await messageRepo.addSwipe(targetId, '候选一', makeActive: true);
+      await messageRepo.addSwipe(targetId, '候选二', makeActive: true);
+
+      await c.switchSwipe(targetId, 1);
+
+      expect(c.messages.last.content, '候选一', reason: '切换后 reload 反映新 active');
+      expect((await messageRepo.getMessages(convId)).last.activeSwipeIndex, 1);
+    });
+
+    test('deleteMessage → 转发回合层：删 assistant 仅删该条并 reload', () async {
+      final convId = await seedAssistantReply();
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(convId);
+      final targetId = (await messageRepo.getMessages(convId)).last.id;
+
+      await c.deleteMessage(targetId);
+
+      expect(roleContentsOf(c), [(Role.user, '你好')],
+          reason: '删除后 reload 列表反映');
+    });
+
+    test('editMessage → 转发回合层：user 替换 + 新 assistant + reload', () async {
+      final convId = await seedAssistantReply();
+      final c = wireController(FakeLLMProvider(tokens: const ['新回复']));
+      await c.openConversation(convId);
+      final userId = (await messageRepo.getMessages(convId)).first.id;
+
+      await c.editMessage(userId, '修正');
+
+      expect(roleContentsOf(c), [(Role.user, '修正'), (Role.assistant, '新回复')]);
+    });
+
+    test('入口态（无会话）四操作零副作用 + isBusy 常假', () async {
+      final c = wireController(FakeLLMProvider(tokens: const []));
+
+      await c.continueReply();
+      await c.switchSwipe(1, 0);
+      await c.deleteMessage(1);
+      await c.editMessage(1, 'x');
+
+      expect(c.isBusy, isFalse);
+      expect(c.notice, isNull, reason: '入口态不触任何服务/notice');
+    });
+
+    test('isBusy：流式进行中 true，完成后复位', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(TickingFakeLLMProvider(
+        tokens: const ['a'],
+        delay: const Duration(milliseconds: 20),
+      ));
+      await c.openConversation(conv.id);
+
+      await c.send('hi');
+      expect(c.isBusy, isTrue, reason: '流式生成中忙碌');
+      await _until(() async => !c.isStreaming);
+      expect(c.isBusy, isFalse, reason: '完成后复位');
     });
   });
 
