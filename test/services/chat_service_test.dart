@@ -617,6 +617,12 @@ void main() {
     return [for (final m in msgs) (m.role, m.content)];
   }
 
+  /// 消息候选内容列表（index 升序，候选语义断言辅助；MS-02）。
+  Future<List<String>> swipeContentsOf(int messageId) async {
+    final swipes = await messageRepo.listSwipes(messageId);
+    return [for (final s in swipes) s.content];
+  }
+
   Future<Message> sendUserMessage(int conversationId, String content) {
     return messageRepo.createMessage(
       conversationId: conversationId,
@@ -2162,8 +2168,7 @@ void main() {
       return (char, conv, userMsg, assistantMsg);
     }
 
-    test('A4: 成功 → 单事务删旧 + 插新（旧 assistant 替换，user 保留）',
-        () async {
+    test('A4: 成功 → 候选追加（消息数不变，active 切最新）', () async {
       final (_, conv, userMsg, oldAssistant) =
           await seedConversationWithReply();
       final provider = FakeLLMProvider(tokens: const ['新回复']);
@@ -2173,12 +2178,17 @@ void main() {
 
       expect(result.reply, '新回复');
       expect(result.conversationId, conv.id);
-      expect(result.messageId, isNot(oldAssistant.id));
+      // 候选归属消息 id = 目标行（候选追加不删行）。
+      expect(result.messageId, oldAssistant.id);
+      expect(result.replacedMessageId, oldAssistant.id);
+      expect(result.swipeIndex, 1, reason: '候选 0 = 原回复播种，新回复 = index 1');
+      // 消息数不变：1 assistant + N 候选；messages.content 跟随激活候选。
       expect(await roleContentsOf(conv.id), [
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
         (Role.assistant, '新回复'),
       ]);
+      expect(await swipeContentsOf(oldAssistant.id), ['旧回复', '新回复']);
       // 重生成走 non-streaming generate（非流式）。
       expect(provider.generateCallCount, 1);
       expect(provider.streamGenerateCallCount, 0);
@@ -2206,7 +2216,7 @@ void main() {
           await seedConversationWithReply();
       // 追加第二轮 user + assistant。
       await sendUserMessage(conv.id, '第二问');
-      await messageRepo.createMessage(
+      final second = await messageRepo.createMessage(
         conversationId: conv.id,
         role: Role.assistant,
         content: '第二答',
@@ -2214,34 +2224,40 @@ void main() {
       final provider = FakeLLMProvider(tokens: const ['新答']);
       wireService(provider);
 
-      // 缺省：末条 assistant（第二答）为目标 → 截断其及之后（无），替换为 新答。
+      // 缺省：末条 assistant（第二答）为目标 → 候选追加，第二答行保留。
       await service.regenerate(conversationId: conv.id);
+      expect(await swipeContentsOf(second.id), ['第二答', '新答']);
       expect(await roleContentsOf(conv.id), [
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
         (Role.assistant, '旧回复'),
         (Role.user, '第二问'),
-        (Role.assistant, '新答'),
+        (Role.assistant, '新答'), // active 切到新候选
       ]);
 
-      // 显式：目标 = 第一条 assistant（旧回复）→ 截断其及之后全部。
+      // 显式：目标 = 第一条 assistant（旧回复）→ 候选挂旧回复，后续不截断。
       provider.lastMessages = null;
       final result = await service.regenerate(
           conversationId: conv.id, messageId: oldAssistant.id);
       expect(result.reply, '新答');
-      expect(result.messageId, isNot(oldAssistant.id));
+      expect(result.messageId, oldAssistant.id);
+      expect(await swipeContentsOf(oldAssistant.id), ['旧回复', '新答']);
+      // 时间线无截断：第二答行保留；其 content 仍为第一次缺省 regenerate
+      // 置 active 的「新答」（显式目标 = 旧回复，不触碰第二答行）。
       expect(await roleContentsOf(conv.id), [
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
-        (Role.assistant, '新答'),
+        (Role.assistant, '新答'), // 旧回复行 active 切到新答
+        (Role.user, '第二问'),
+        (Role.assistant, '新答'), // 第二答行保留（content = 缺省路径激活候选）
       ]);
-      // 截断后触发源 user（你好）仍为末条历史（append_current_input=False）。
+      // 触发源 user（你好）仍为末条历史（append_current_input=False）。
       expect(provider.lastMessages!.last,
           LlmMessage(role: 'user', content: userMsg.content));
     });
 
-    test('F-64: RegenerateResult.replacedMessageId 缺省路径 = 末条 assistant'
-        '（实际替换目标行 id，有界删旧前已知）', () async {
+    test('F-64: RegenerateResult 缺省路径 = 末条 assistant（messageId/'
+        'replacedMessageId = 候选归属行 id + swipeIndex=1）', () async {
       final (_, conv, _, oldAssistant) = await seedConversationWithReply();
       // 追加第二轮 user + assistant → 末条 = 第二答。
       await sendUserMessage(conv.id, '第二问');
@@ -2256,8 +2272,10 @@ void main() {
       final result = await service.regenerate(conversationId: conv.id);
 
       expect(result.replacedMessageId, second.id,
-          reason: '缺省目标 = 末条 assistant（实际被替换行 id）');
-      expect(result.messageId, isNot(second.id), reason: '新回复为新 id');
+          reason: '缺省目标 = 末条 assistant（候选归属行 id）');
+      expect(result.messageId, second.id, reason: '候选追加不删行 → messageId = 目标行');
+      expect(result.swipeIndex, 1);
+      expect(await swipeContentsOf(second.id), ['第二答', '新答']);
       expect(await roleContentsOf(conv.id), [
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
@@ -2267,8 +2285,8 @@ void main() {
       ]);
     });
 
-    test('F-64: RegenerateResult.replacedMessageId 显式路径 = 指定 messageId'
-        '目标行 id（被替换行非末条）', () async {
+    test('F-64: RegenerateResult 显式路径 = 指定 messageId 目标行'
+        '（非末条目标同样候选追加、后续保留）', () async {
       final (_, conv, _, oldAssistant) = await seedConversationWithReply();
       // 追加第二轮 user + assistant（目标 = 第一条 assistant，非末条）。
       await sendUserMessage(conv.id, '第二问');
@@ -2283,12 +2301,17 @@ void main() {
           conversationId: conv.id, messageId: oldAssistant.id);
 
       expect(result.replacedMessageId, oldAssistant.id,
-          reason: '显式目标 = 实际被替换行 id');
-      expect(result.messageId, isNot(oldAssistant.id));
+          reason: '显式目标 = 候选归属行 id');
+      expect(result.messageId, oldAssistant.id);
+      expect(result.swipeIndex, 1);
+      expect(await swipeContentsOf(oldAssistant.id), ['旧回复', '新答']);
+      // 后续（第二问/第二答）保留：显式非末条目标候选追加不截断。
       expect(await roleContentsOf(conv.id), [
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
         (Role.assistant, '新答'),
+        (Role.user, '第二问'),
+        (Role.assistant, '第二答'),
       ]);
     });
 
@@ -2303,16 +2326,17 @@ void main() {
         service.regenerate(conversationId: conv.id),
         throwsA(isA<LLMAuthError>()),
       );
-      // 时间线不变：旧回复原样保留。
+      // 时间线不变：旧回复原样保留；无候选追加（失败零副作用）。
       expect(await roleContentsOf(conv.id), [
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
         (Role.assistant, '旧回复'),
       ]);
+      expect(await messageRepo.listSwipes(oldAssistant.id), isEmpty);
     });
 
     test('A4: LLM 失败（连接中断信号）→ 旧消息保留', () async {
-      final (_, conv, _, _) = await seedConversationWithReply();
+      final (_, conv, _, oldAssistant) = await seedConversationWithReply();
       // T02 wire 共享断连信号 [LLMConnectionInterruptedError]（LLM 族子类）。
       final provider = FakeLLMProvider(
           tokens: const [],
@@ -2328,19 +2352,21 @@ void main() {
         (Role.user, '你好'),
         (Role.assistant, '旧回复'),
       ]);
+      expect(await messageRepo.listSwipes(oldAssistant.id), isEmpty,
+          reason: '生成失败不落候选');
     });
 
-    test('F1: 重生成进行中并发新消息 → 新消息保留（有界删除防数据丢失）',
+    test('F1: 重生成进行中并发新消息 → 新消息保留（候选追加不删行）',
         () async {
       final (_, conv, _, oldAssistant) = await seedConversationWithReply();
       final provider = _HoldableProvider(reply: '新回复');
       wireService(provider);
 
-      // 网络 generate 挂起（快照已捕获、事务未执行）。
+      // 网络 generate 挂起（目标已解析、未落库）。
       final regenerating = service.regenerate(conversationId: conv.id);
       await provider.started.future;
 
-      // 生成期间并发发送新 user 消息（id > snapshotMaxId）。
+      // 生成期间并发发送新 user 消息。
       final concurrent = await messageRepo.createMessage(
         conversationId: conv.id,
         role: Role.user,
@@ -2348,30 +2374,31 @@ void main() {
       );
       expect(concurrent.id, greaterThan(oldAssistant.id));
 
-      provider.gate.complete(); // 放行生成 → 有界删旧 + 插新
+      provider.gate.complete(); // 放行生成 → 候选追加
       final result = await regenerating;
 
       expect(result.reply, '新回复');
-      // 有界删除只替换快照内 target 之后的旧消息；并发新 user 保留，
-      // 新回复以新 id 落在其后（F1 数据完整性）。
+      // 无「有界删旧」：目标行保留（active 切新回复）、并发新 user 保留在
+      // 目标行之后（候选追加不删行、不重排）。
       expect(await roleContentsOf(conv.id), [
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
+        (Role.assistant, '新回复'), // 目标行 content 跟随激活候选
         (Role.user, '并发新消息'),
-        (Role.assistant, '新回复'),
       ]);
+      expect(await swipeContentsOf(oldAssistant.id), ['旧回复', '新回复']);
     });
 
     test('F4: 并发双触发 regenerate → 第二次拒绝「重生成进行中」，第一次结果保留',
         () async {
-      final (_, conv, _, _) = await seedConversationWithReply();
+      final (_, conv, _, oldAssistant) = await seedConversationWithReply();
       final provider = _HoldableProvider(reply: '新回复');
       wireService(provider);
 
       final first = service.regenerate(conversationId: conv.id); // 挂起
       await provider.started.future; // 第一次已进入网络阶段（in-flight）
 
-      // 第二次调用基于同一快照解析目标，会把第一次的新回复当截断目标 → 拒绝。
+      // 第二次调用 in-flight 期间直接拒绝（双触发守卫）。
       await expectLater(
         service.regenerate(conversationId: conv.id),
         throwsA(isA<RegenerateBusyError>()),
@@ -2380,12 +2407,13 @@ void main() {
       provider.gate.complete();
       final result = await first;
       expect(result.reply, '新回复');
-      // 第一次结果保留（无第二次事务删除）。
+      // 第一次结果保留（候选追加，无第二次写）。
       expect(await roleContentsOf(conv.id), [
         (Role.assistant, '开场。'),
         (Role.user, '你好'),
         (Role.assistant, '新回复'),
       ]);
+      expect(await swipeContentsOf(oldAssistant.id), ['旧回复', '新回复']);
     });
 
     test('A4: 未配置 Key → 领域错误，旧消息保留', () async {
@@ -2545,6 +2573,303 @@ void main() {
       expect(counting.lastAssistantMessageCalls, 0);
       expect(counting.lastUserMessageBeforeCalls, 1);
       expect(counting.messagesBeforeCalls, 1);
+    });
+  });
+
+  // ── MS-02 continue 续写 ──
+
+  group('continueReply（MS-02）', () {
+    Future<(Character, Conversation, Message, Message)> seedConversationWithReply({
+      String reply = '原回复',
+    }) async {
+      final char = await seedCharacter(firstMes: '开场。');
+      final conv = await seedConversation(char.id);
+      final userMsg = await sendUserMessage(conv.id, '你好');
+      final assistantMsg = await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: reply,
+      );
+      return (char, conv, userMsg, assistantMsg);
+    }
+
+    test('成功 → 消息条数不变，内容 = 原 active 内容 + 续写片段（新候选激活）',
+        () async {
+      final (_, conv, _, target) = await seedConversationWithReply();
+      final provider = FakeLLMProvider(tokens: const ['（接续）']);
+      wireService(provider);
+
+      final result = await service.continueReply(conversationId: conv.id);
+
+      expect(result.reply, '原回复（接续）');
+      expect(result.messageId, target.id, reason: '续写不新增消息行');
+      expect(result.replacedMessageId, target.id);
+      expect(result.swipeIndex, 1, reason: '候选 0 = 原内容播种，续写 = index 1');
+      // 不产生新 user 消息：消息条数不变；active 切到续写候选。
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '你好'),
+        (Role.assistant, '原回复（接续）'),
+      ]);
+      expect(await swipeContentsOf(target.id), ['原回复', '原回复（接续）']);
+      expect(provider.generateCallCount, 1);
+      expect(provider.streamGenerateCallCount, 0);
+    });
+
+    test('触发形态：尾随 user = 续写指令 + 原消息末段；历史含目标（桌面 '
+        'id <= target.id 对齐）', () async {
+      final (_, conv, _, target) =
+          await seedConversationWithReply(reply: '短回复');
+      final provider = FakeLLMProvider(tokens: const ['续']);
+      wireService(provider);
+
+      await service.continueReply(conversationId: conv.id);
+
+      final sent = provider.lastMessages!;
+      final trigger = sent.last;
+      expect(trigger.role, 'user', reason: '续写触发为尾随 user 消息（非 system）');
+      expect(trigger.content, contains('（请继续书写上一条 AI 回复'));
+      expect(trigger.content, endsWith('\n短回复'));
+      // 被续写消息进入上下文（桌面 history_limit 含边界语义）。
+      expect(
+        sent.where((m) => m == LlmMessage(role: 'assistant', content: '短回复')),
+        hasLength(1),
+      );
+    });
+
+    test('末段截断：超长原内容取末 200 字符作为续写锚点', () async {
+      final head = List.filled(60, 'a').join();
+      final tail = List.filled(200, 'b').join();
+      final (_, conv, _, _) =
+          await seedConversationWithReply(reply: '$head$tail');
+      final provider = FakeLLMProvider(tokens: const ['续']);
+      wireService(provider);
+
+      await service.continueReply(conversationId: conv.id);
+
+      final trigger = provider.lastMessages!.last;
+      expect(trigger.content, endsWith('\n$tail'));
+      expect(trigger.content, isNot(contains('a')), reason: '锚点只含末 200 字符');
+    });
+
+    test('断流/停止部分落库消息（普通 assistant 行）→ continue 直接候选追加',
+        () async {
+      // 停止/断流路径落库的部分内容即普通 assistant 行（零特殊分支）。
+      final (_, conv, _, target) =
+          await seedConversationWithReply(reply: '部分回复');
+      final provider = FakeLLMProvider(tokens: const ['续']);
+      wireService(provider);
+
+      final result = await service.continueReply(conversationId: conv.id);
+
+      expect(result.reply, '部分回复续');
+      expect(await swipeContentsOf(target.id), ['部分回复', '部分回复续']);
+    });
+
+    test('LLM 失败 → 零落库（无候选、原内容零改动）', () async {
+      final (_, conv, _, target) = await seedConversationWithReply();
+      final provider =
+          FakeLLMProvider(tokens: const [], error: LLMAuthError('claude'));
+      wireService(provider);
+
+      await expectLater(
+        service.continueReply(conversationId: conv.id),
+        throwsA(isA<LLMAuthError>()),
+      );
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '你好'),
+        (Role.assistant, '原回复'),
+      ]);
+      expect(await messageRepo.listSwipes(target.id), isEmpty);
+    });
+
+    test('空续写（LLM 零产出片段）→ no-op：swipeIndex == -1、无重复候选、'
+        '原内容零改动', () async {
+      final (_, conv, _, target) = await seedConversationWithReply();
+      // generate 返回纯空白 → trim 后空 → 不追加候选（防 base + '' = base 重复行）。
+      final provider = FakeLLMProvider(tokens: const ['   ']);
+      wireService(provider);
+
+      final result = await service.continueReply(conversationId: conv.id);
+
+      expect(result.reply, '原回复');
+      expect(result.swipeIndex, -1, reason: '-1 = 未追加候选（no-op 哨兵）');
+      expect(result.messageId, target.id);
+      expect(await messageRepo.listSwipes(target.id), isEmpty);
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '你好'),
+        (Role.assistant, '原回复'),
+      ]);
+    });
+
+    test('显式 messageId = 末条 assistant → 通过', () async {
+      final (_, conv, _, target) = await seedConversationWithReply();
+      final provider = FakeLLMProvider(tokens: const ['续']);
+      wireService(provider);
+
+      final result = await service.continueReply(
+          conversationId: conv.id, messageId: target.id);
+
+      expect(result.messageId, target.id);
+      expect(await swipeContentsOf(target.id), ['原回复', '原回复续']);
+    });
+
+    test('显式 messageId 非末条（旧 assistant）→ 拒绝', () async {
+      final (_, conv, _, oldAssistant) = await seedConversationWithReply();
+      // 追加第二轮 user + assistant → 旧回复非末条。
+      await sendUserMessage(conv.id, '第二问');
+      await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '第二答',
+      );
+      wireService(FakeLLMProvider(tokens: const ['x']));
+
+      await expectLater(
+        service.continueReply(
+            conversationId: conv.id, messageId: oldAssistant.id),
+        throwsA(isA<InvalidRegenerateTargetError>()),
+      );
+      expect(await messageRepo.listSwipes(oldAssistant.id), isEmpty);
+    });
+
+    test('末条非 assistant（末条 user）→ 拒绝', () async {
+      final (_, conv, _, _) = await seedConversationWithReply();
+      await sendUserMessage(conv.id, '追问');
+      wireService(FakeLLMProvider(tokens: const ['x']));
+
+      await expectLater(
+        service.continueReply(conversationId: conv.id),
+        throwsA(isA<InvalidRegenerateTargetError>()),
+      );
+    });
+
+    test('无 assistant（仅 user）→ 拒绝', () async {
+      final char = await seedCharacter(); // 无开场白
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '只有用户消息');
+
+      wireService(FakeLLMProvider(tokens: const ['x']));
+      await expectLater(
+        service.continueReply(conversationId: conv.id),
+        throwsA(isA<InvalidRegenerateTargetError>()),
+      );
+    });
+
+    test('显式 messageId 不存在 → 拒绝「消息不存在」', () async {
+      final (_, conv, _, _) = await seedConversationWithReply();
+      wireService(FakeLLMProvider(tokens: const ['x']));
+
+      await expectLater(
+        service.continueReply(conversationId: conv.id, messageId: 999999),
+        throwsA(isA<MessageNotFoundError>()),
+      );
+    });
+
+    test('对话不存在 → 拒绝「对话不存在」', () async {
+      wireService(FakeLLMProvider(tokens: const ['x']));
+      await expectLater(
+        service.continueReply(conversationId: 999999),
+        throwsA(isA<ConversationNotFoundError>()),
+      );
+    });
+
+    test('未配置 Key → 领域错误，零落库', () async {
+      await secretStore.delete(SecretStore.claudeApiKeySlot); // 清空默认 Key
+      final (_, conv, _, _) = await seedConversationWithReply();
+      wireService(FakeLLMProvider(tokens: const ['x'])); // factory 不应被调用
+
+      await expectLater(
+        service.continueReply(conversationId: conv.id),
+        throwsA(isA<ApiKeyMissingError>()),
+      );
+      expect(await roleContentsOf(conv.id), [
+        (Role.assistant, '开场。'),
+        (Role.user, '你好'),
+        (Role.assistant, '原回复'),
+      ]);
+    });
+
+    test('并发守卫：同对话 in-flight 期间第二次 continue → 拒绝'
+        '「重生成进行中」', () async {
+      final (_, conv, _, _) = await seedConversationWithReply();
+      final provider = _HoldableProvider(reply: '续');
+      wireService(provider);
+
+      final first = service.continueReply(conversationId: conv.id); // 挂起
+      await provider.started.future;
+
+      await expectLater(
+        service.continueReply(conversationId: conv.id),
+        throwsA(isA<RegenerateBusyError>()),
+      );
+
+      provider.gate.complete();
+      final result = await first;
+      expect(result.reply, '原回复续');
+    });
+
+    test('Falsify: 角色缺失（FK 关闭损坏态）→ continueReply 拒绝'
+        'CharacterNotFoundError 零落库', () async {
+      await db.customStatement('PRAGMA foreign_keys = OFF');
+      final orphanConv = await db.into(db.conversations).insertReturning(
+            ConversationsCompanion.insert(
+              characterId: 999999,
+              title: const Value('损坏对话'),
+              modelProvider: const Value('claude'),
+              modelName: const Value('claude-sonnet-5'),
+              createdAt: fakeNow,
+              updatedAt: fakeNow,
+            ),
+          );
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: orphanConv.id,
+              role: Role.user,
+              content: '你好',
+              createdAt: fakeNow,
+            ),
+          );
+      await db.into(db.messages).insert(
+            MessagesCompanion.insert(
+              conversationId: orphanConv.id,
+              role: Role.assistant,
+              content: '旧回复',
+              createdAt: fakeNow,
+            ),
+          );
+
+      wireService(FakeLLMProvider(tokens: const ['x']));
+      await expectLater(
+        service.continueReply(conversationId: orphanConv.id),
+        throwsA(predicate(
+            (e) => e is CharacterNotFoundError && e.message.contains('角色不存在'))),
+      );
+      final remaining = await (db.select(db.messages)
+            ..where(($MessagesTable t) =>
+                t.conversationId.equals(orphanConv.id)))
+          .get();
+      expect(remaining, hasLength(2), reason: '组装阶段抛错，零落库');
+    });
+
+    test('末段锚防劈代理对：窗口起点为低代理 → 排除后无孤立代理'
+        '（F-114 先例）', () async {
+      // emoji（高+低代理对）落在窗口起点：text = emoji + 'b'*199，
+      // cut 起点 = text[1] 恰为低代理。
+      final tail = List.filled(199, 'b').join();
+      final (_, conv, _, _) =
+          await seedConversationWithReply(reply: '\u{1F600}$tail');
+      final provider = FakeLLMProvider(tokens: const ['续']);
+      wireService(provider);
+
+      await service.continueReply(conversationId: conv.id);
+
+      final trigger = provider.lastMessages!.last;
+      expect(trigger.content, endsWith('\n$tail'));
+      expect(trigger.content, isNot(contains('\uFFFD')),
+          reason: '窗口开头的孤立低代理被排除');
     });
   });
 }

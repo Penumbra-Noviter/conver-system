@@ -208,6 +208,14 @@ class _ScriptedChatService implements ChatService {
   }) async {
     throw UnimplementedError('F-65③ 脚本化测试不触 regenerate');
   }
+
+  @override
+  Future<RegenerateResult> continueReply({
+    required int conversationId,
+    int? messageId,
+  }) async {
+    throw UnimplementedError('F-65③ 脚本化测试不触 continueReply');
+  }
 }
 
 /// 在 [deadline]（5s 墙钟）内轮询 [condition] 直到为真（与
@@ -912,7 +920,7 @@ void main() {
     });
 
     test('F-65①：双截断部分重试 → 目标推进到最近剩余截断、横幅保持 → 再重试 → '
-        '全清（重写语义：DB=[user1, 新回复]）', () async {
+        '全清（候选语义：DB 行保留，A/B 均 active 切新回复）', () async {
       final char = await seedCharacter();
       final conv = await seedConversation(char.id);
       final env = wireRound(
@@ -936,22 +944,28 @@ void main() {
       expect(env.round.interruptedNoticeTargetId, truncatedB.id);
       expect(env.round.hasInterrupted, isTrue);
 
-      // 重试 B：B 被替换（有界删旧），余标 A 推进为 notice 目标、横幅保持。
+      // 重试 B：B 候选追加（行保留、active 切新回复），余标 A 推进为 notice
+      // 目标、横幅保持。
       await env.round.retryInterrupted(conversationId: conv.id);
       expect(env.round.interruptedNoticeTargetId, truncatedA.id,
           reason: 'F-65① 目标推进 = max(marks)（DB 主键单调即时序）');
       expect(env.round.hasInterrupted, isTrue, reason: '余标 A 仍在');
       expect(env.round.isInterrupted(truncatedB.id), isFalse,
-          reason: 'B 已替换删除');
+          reason: 'B 标记已结算（候选追加不删行，行保留）');
       expect(env.notice.notice, '回复已中断',
           reason: '横幅保持（notice 不清，持续指向最近剩余截断）');
 
-      // 重试 A：从 A 截断点重写后续全部消息（有界删旧）→ 全清。
+      // 重试 A：A 候选追加（行保留）→ 标记全清、横幅消失。
       await env.round.retryInterrupted(conversationId: conv.id);
       final msgs = await messageRepo.getMessages(conv.id);
       expect([for (final m in msgs) (m.role, m.content)],
-          [(Role.user, '第一问'), (Role.assistant, '新回复')],
-          reason: '产品语义：从截断点重写后续全部（user2 + 已替换 B 一并重写）');
+          [
+            (Role.user, '第一问'),
+            (Role.assistant, '新回复'), // A 行 active 切新回复
+            (Role.user, '第二问'),
+            (Role.assistant, '新回复'), // B 行 active 切新回复
+          ],
+          reason: '候选语义：双截断行保留（1 assistant + N 候选），不重写删除');
       expect(env.round.hasInterrupted, isFalse, reason: '全清');
       expect(env.round.interruptedNoticeTargetId, isNull);
       expect(env.notice.notice, isNull, reason: '中断全部解决，横幅消失');

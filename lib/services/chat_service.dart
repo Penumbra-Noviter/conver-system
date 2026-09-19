@@ -27,11 +27,20 @@
 /// （成功落库 / 回合已终态不再写）——`_StreamRunState.userWriteSettled` 门 +
 /// `_runStreamReply` 写后 complete + 终态 finally 兜底。
 ///
-/// ## 重生成（A4，延迟删除）
-/// 目标 = 末条 assistant（缺省，PK 锚定）；截断锚定 target.id；组装走
-/// `append_current_input=False`（无幽灵 user）；先校验/组装 + non-streaming 生成
-/// （网络在事务外），成功后 `db.transaction` 删旧 + 插新一次提交；失败不删行、
-/// 旧消息保留。
+/// ## 重生成（A4，候选追加语义，MS-02）
+/// 目标 = 末条 assistant（缺省，PK 锚定）；组装锚定 target.id、走
+/// `append_current_input=False`（无幽灵 user）；先校验/组装 + non-streaming
+/// 生成（网络在事务外），成功后 `MessageRepository.addSwipe` **候选追加**（候选
+/// 0 = 原回复播种、新回复 = index 1、make_active 置激活）——消息数不变
+/// （1 assistant + N 候选），无「有界删旧」（F1 退化为并发写保护，F4 守卫承保）；
+/// 失败零落库、旧消息保留。
+///
+/// ## 续写（MS-02，continueReply）
+/// 目标 = 末条 assistant（对齐桌面「末条须为 AI 回复」）；组装历史**含目标**
+/// （`id <= target.id`，桌面 history_limit 含边界）+ 尾随 **user** 触发消息
+/// （续写指令 + 原消息末段锚，不落库）；成功后候选追加
+/// 「原 active 内容 + 续写片段」置激活；失败 / 空续写零落库（空续写 no-op，
+/// `swipeIndex = -1` 哨兵）。
 ///
 /// ## 断流（A5）
 /// 流终止未到终态（连接异常 / 未收终态帧）→ 已累积部分落库 + 非阻塞
@@ -117,26 +126,36 @@ final class ChatError extends ChatEvent {
 }
 
 /// 重生成结果（桌面 `ChatResponse` 对应物：reply / message_id / conversation_id）。
+///
+/// MS-02 候选语义扩展：`messageId` 与 `replacedMessageId` 均为**候选归属
+/// 消息 id**（= 目标 assistant 行；候选追加不删行），新增 [swipeIndex]（新候选
+/// index）。既有字段名保留保证调用点编译链不断（chat_round.dart
+/// `_regenerateTarget` 以 [replacedMessageId] 结算截断标记仍成立——旧 id 不再
+/// 被删，结算键恒命中）。MS-04 起 UI 结算键 = `(messageId, swipeIndex)`。
 class RegenerateResult {
   const RegenerateResult({
     required this.reply,
     required this.messageId,
     required this.replacedMessageId,
     required this.conversationId,
+    required this.swipeIndex,
   });
 
   /// 新生成的完整回复文本。
   final String reply;
 
-  /// 新落库的 assistant 消息 id。
+  /// 候选归属消息 id（= 目标 assistant 行；候选追加不产生新消息行）。
   final int messageId;
 
-  /// 被替换的旧 assistant 目标行 id（= regenerate 有界删旧前解析的实际替换
-  /// 目标，F-64 截断结算键）——客户端以本字段作结算键，零预解析。
+  /// 候选归属消息 id 兼容字段（= [messageId]，语义随候选追加更新）。
   final int replacedMessageId;
 
   /// 所属对话 id。
   final int conversationId;
+
+  /// 新候选 index（候选 0 = 原回复播种，首次追加 = 1）；**-1 = 未追加候选**
+  /// （continueReply 空续写 no-op 哨兵，MS-04 消费前须判 `>= 0`）。
+  final int swipeIndex;
 }
 
 /// LLM 错误族 → (HTTP 状态码, 用户可见消息) 映射（逐字对齐
@@ -228,6 +247,19 @@ String chatErrorMessage(Object error, {String providerName = ''}) {
 bool _isConnectionDrop(LLMError error) =>
     error is LLMConnectionInterruptedError;
 
+/// 续写指令行（对齐桌面 `chat.py::CONTINUE_INSTRUCTION`，L89-92 逐字）。
+///
+/// 触发形态拍板（桌面实证）：尾随 **user** 消息而非 system——适配器
+/// 「last system wins」契约下尾随 system 会挤掉角色 persona 链（桌面
+/// `_prepare_messages` 锁定），user 形态与普通路径 system 链完全一致。
+const String continueInstruction =
+    '（请继续书写上一条 AI 回复：保持角色人设、语气与文风，'
+    '不要重复或概括已经写过的内容，直接从停下的地方接续）';
+
+/// 续写触发的「原消息末段」锚点长度上限（UTF-16 code unit，对齐桌面
+/// `_CONTINUATION_TAIL_CHARS = 200` 字符口径）。
+const int _continuationTailCodeUnits = 200;
+
 /// 回合末副作用上下文（S1 集合契约）：一次完整 assistant 落库后的回合快照。
 ///
 /// [characterId] 为校验失败路径可空的角色 id（null → 回合末副作用跳过）；
@@ -301,10 +333,15 @@ class _StreamRunState {
 
 /// 一次聊天回合的编排服务。
 ///
-/// 构造依赖：drift 数据库（重生成单事务）+ 四仓储（消息 / 对话 / 角色 / 设置）
-/// + [LLMProviderFactory]（Provider 装配抽象）。无平台存储 / 视图依赖。
+/// 构造依赖：四仓储（消息 / 对话 / 角色 / 设置）+ [LLMProviderFactory]
+/// （Provider 装配抽象）。MS-02 起 regenerate 不再直接持有 drift 数据库——
+/// 候选追加收口于 [MessageRepository.addSwipe]（仓库内事务）。无平台存储 /
+/// 视图依赖。
 class ChatService {
-  /// [database] 供重生成的「删旧 + 插新」单事务（drift 嵌套事务 = savepoint）；
+  /// [database] 参数保留以维持构造签名稳定（app.dart 装配零改动）；
+  /// MS-02 起服务不再直接使用（regenerate 的「有界删旧 + 插新」单事务已删除，
+  /// 候选追加收口于 [MessageRepository.addSwipe]）。
+  ///
   /// [settingsRepository] 提供 Key 解析链与滑窗轮数等设置。
   ///
   /// [connectRetryDelays]：连接建立阶段失败的重试退避序列（M6-06），长度即
@@ -326,13 +363,12 @@ class ChatService {
       Duration(seconds: 1),
       Duration(seconds: 2),
     ],
-  }) : _db = database,
-       _endOfTurnHooks = List<EndOfTurnHook>.unmodifiable(endOfTurnHooks),
+  }) : _endOfTurnHooks = List<EndOfTurnHook>.unmodifiable(endOfTurnHooks),
        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays) {
+    var _ = database; // wildcard：构造签名稳定，服务层不直接持有 AppDatabase。
     _credentialsResolver = credentialsResolver ?? _wireCredentialsResolver();
   }
 
-  final AppDatabase _db;
   final ConversationRepository _conversationRepository;
   final CharacterRepository _characterRepository;
   final MessageRepository _messageRepository;
@@ -368,8 +404,10 @@ class ChatService {
   /// 连接阶段失败的重试退避序列（长度 = 最大重试次数；M6-06 弱网重连）。
   final List<Duration> _connectRetryDelays;
 
-  /// F4：重生成 in-flight 对话集（并发双触发守卫——同对话 in-flight 期间
-  /// 第二次调用抛 [RegenerateBusyError]，防第二次事务删掉第一次的新回复）。
+  /// F4：生成类操作 in-flight 对话集（并发守卫——同对话 in-flight 期间第二次
+  /// regenerate / [continueReply] 抛 [RegenerateBusyError]，防并发对同一目标
+  /// 重复写候选）。MS-02 候选语义下无「第二次事务删第一次新回复」风险，守卫
+  /// 退化为并发写保护（双触发防重复候选追加）。
   final Set<int> _regenerateInFlight = {};
 
   /// 发送一条用户消息并流式生成回复（A2）。
@@ -916,24 +954,29 @@ class ChatService {
     }
   }
 
-  /// 重生成对话中目标 AI 回复（A4，缺省末条 assistant）。
+  /// 重生成对话中目标 AI 回复（A4，缺省末条 assistant）——MS-2 候选追加语义。
   ///
-  /// 编排（对齐 `chat.py::regenerate_chat` + 移动端**延迟删除**定案）：
-  /// 0. F4 并发守卫：同对话 in-flight 期间第二次调用抛 [RegenerateBusyError]；
-  /// 1. 校验对话存在，并捕获 `snapshotMaxId`（当前最大消息 id，F1 有界删除上界）；
+  /// 编排（对齐 `chat.py::regenerate_chat`，桌面 MS-1）：
+  /// 0. F4 并发守卫：同对话生成类操作 in-flight（含 [continueReply]）期间
+  ///    第二次调用抛 [RegenerateBusyError]；
+  /// 1. 校验对话存在；
   /// 2. 解析目标：显式 [messageId] 或末条 assistant；目标非 assistant →
   ///    [InvalidRegenerateTargetError.notAssistant]；不存在 → [MessageNotFoundError]
   ///    / [InvalidRegenerateTargetError.noAssistantReply]；
   /// 3. 校验触发源：目标之前须有 user 消息，否则拒绝「没有可重生成的用户消息」；
-  /// 4. 组装（`append_current_input=False`，历史截断锚定 target.id——桌面「先截
-  ///    断后组装」在延迟删除下以读侧过滤等价实现）+ provider 解析（Key 链）；
-  /// 5. non-streaming 生成（网络在事务外）；**失败不删行，旧消息保留**；
-  /// 6. 成功后 `db.transaction` **有界删旧**（`target.id <= id <= snapshotMaxId`）
-  ///    + 插新一次提交；生成期间并发写入的新消息（id > snapshotMaxId）保留，
-  ///    新回复以新 id 落在其后（F1 数据完整性）。
+  /// 4. 组装（`append_current_input=False`，历史截止锚定 target.id——桌面「先
+  ///    截断后组装」在候选追加下以读侧过滤等价实现）+ provider 解析（Key 链）；
+  /// 5. non-streaming 生成（网络在事务外）；**失败零落库**（候选不追加、
+  ///    原消息保留）；
+  /// 6. 成功后 [MessageRepository.addSwipe] **候选追加**（候选 0 = 原回复播种，
+  ///    新回复 = index 1，`makeActive=true` 同步覆写 content 与
+  ///    active_swipe_index）——消息数不变（1 assistant + N 候选），无
+  ///    「有界删旧」；生成期间并发写入的新消息天然保留（F1 退化为并发写保护，
+  ///    由步骤 0 守卫承保）。
   ///
-  /// 返回 [RegenerateResult.replacedMessageId] = 步骤 2 解析的实际替换目标行 id
-  /// （有界删旧前已知）——客户端截断结算键（F-64 单一来源），无需预解析。
+  /// 返回 [RegenerateResult]：`messageId`/`replacedMessageId` = 目标行 id
+  /// （候选归属消息，不删行）、`swipeIndex` = 新候选 index——客户端结算键
+  /// （F-64 兼容：replacedMessageId 恒命中既有截断标记结算）。
   ///
   /// 抛出：领域错误（[ConversationNotFoundError] / [CharacterNotFoundError] /
   /// [MessageNotFoundError] / [InvalidRegenerateTargetError] /
@@ -943,8 +986,9 @@ class ChatService {
     required int conversationId,
     int? messageId,
   }) async {
-    // F4：并发双触发守卫。网络生成可挂起（秒级），第二次调用基于同一快照解析
-    // 目标会把第一次的新回复当截断目标删掉；in-flight 期间直接拒绝。
+    // F4：并发双触发守卫。网络生成可挂起（秒级）；in-flight 期间直接拒绝，
+    // 防第二次 trigger 基于同一快照对同一目标重复写候选（候选语义下无删行
+    // 风险，但重复追加候选仍是数据污染）。
     if (_regenerateInFlight.contains(conversationId)) {
       throw RegenerateBusyError();
     }
@@ -958,24 +1002,18 @@ class ChatService {
         throw ConversationNotFoundError();
       }
 
-      // F1：快照当前最大消息 id。网络生成期间并发写入的新消息 id 严格递增
-      // （> snapshotMaxId），必须在事务删旧时保留，否则无界删除会连带删掉
-      // 这条新 user 消息（静默数据丢失）。
-      final snapshotMaxId = await _messageRepository.maxMessageId(
-        conversationId,
-      );
-
       // 2. 解析并校验目标。
       final target = await _resolveRegenerateTarget(conversationId, messageId);
 
-      // 3. 校验触发源（截断后必须存在 user 消息）。
+      // 3. 校验触发源（候选追加同样要求触发 user 存在——无触发源的问候语
+      //    重生成仍拒绝）。
       final trigger = await _lastUserBefore(conversationId, target.id);
       if (trigger == null) {
         throw InvalidRegenerateTargetError.noTriggerUser();
       }
 
-      // 4. 组装（append_current_input=False）+ provider 解析。延迟删除：此步抛错
-      //    不触碰 DB，旧消息保留。
+      // 4. 组装（append_current_input=False）+ provider 解析。此步抛错不触碰
+      //    DB，旧消息保留。
       final character = await _characterRepository.getCharacter(
         conv.characterId,
       );
@@ -1002,7 +1040,7 @@ class ChatService {
       final temperature = _resolveTemperature(character, globalTemperature);
       final maxTokens = await _settingsRepository.getMaxTokens();
 
-      // 5. 生成（网络在事务外；LLM 失败 → 异常上抛，未删行、旧消息保留）。
+      // 5. 生成（LLM 失败 → 异常上抛，零落库、原消息与候选均不变）。
       final reply = await resolved.llm.generate(
         messages: messages,
         model: resolved.model,
@@ -1010,30 +1048,197 @@ class ChatService {
         maxTokens: maxTokens,
       );
 
-      // 6. 单事务：有界删旧（target.id <= id <= snapshotMaxId）+ 插新一次提交
-      //    （drift 嵌套事务 = savepoint，任一失败整体回滚，防半截断持久化）。
-      final saved = await _db.transaction(() async {
-        await _messageRepository.deleteMessagesFrom(
-          conversationId,
-          target.id,
-          toId: snapshotMaxId,
-        );
-        return _messageRepository.createMessage(
-          conversationId: conversationId,
-          role: Role.assistant,
-          content: reply,
-        );
-      });
+      // 6. 候选追加单入口（仓库内事务：候选 0 播种 + 新候选置激活 + content
+      //    跟随，原子落库）。消息数不变，无删除。
+      final swipeIndex = await _messageRepository.addSwipe(
+        target.id,
+        reply,
+        makeActive: true,
+      );
 
       return RegenerateResult(
         reply: reply,
-        messageId: saved.id,
+        messageId: target.id,
         replacedMessageId: target.id,
         conversationId: conversationId,
+        swipeIndex: swipeIndex,
       );
     } finally {
       _regenerateInFlight.remove(conversationId);
     }
+  }
+
+  /// 续写对话中末条 AI 回复（MS-2；对齐 `chat.py::continue_chat`，桌面 MS-3）。
+  ///
+  /// 编排：
+  /// 0. 并发守卫（同 [regenerate] 共享 `_regenerateInFlight`——continue 与
+  ///    regenerate 同走 addSwipe 写候选，交错并发会产生候选追加竞态）；
+  /// 1. 校验对话存在；
+  /// 2. 解析目标：**末条消息须为 assistant**（对齐桌面
+  ///    `_resolve_continue_target`——UI 续写按钮只渲染在末条 assistant 气泡）；
+  ///    显式 [messageId] 时要求 == 末条消息 id，否则拒绝；
+  /// 3. 组装（`append_current_input=False`，历史截止**含目标**：`target.id + 1`
+  ///    对 [MessageRepository.messagesBefore] 的 `id < bound` 语义等价于桌面的
+  ///    `id <= target.id` 含边界截止——消息主键为严格递增整数）+ provider 解析；
+  /// 4. **尾随 user 触发消息**（桌面拍板形态：user 而非 system——尾随 system
+  ///    会把 persona 链挤掉）= [continueInstruction] + 原消息末段锚
+  ///    （[_continuationTail] 取末 200 code unit）；LLM 上下文内零新增 DB user 行；
+  /// 5. non-streaming 生成；**失败零落库**（原内容与候选均不变）；
+  /// 6. 成功：`content = 原 active 内容 + 续写片段` 候选追加置激活；**空续写
+  ///    （LLM 零产出片段）no-op**——不追加重复候选（base + '' = base 会产生
+  ///    内容相同候选行），返回 `swipeIndex = -1`（未追加哨兵）。
+  ///
+  /// 返回 [RegenerateResult]（同构）：`messageId`/`replacedMessageId` = 被续写
+  /// 消息 id；`swipeIndex` 成功 = 新候选 index，空续写 = **-1**。
+  ///
+  /// 抛出：领域错误（[ConversationNotFoundError] / [MessageNotFoundError] /
+  /// [InvalidRegenerateTargetError] / [RegenerateBusyError] /
+  /// [ApiKeyMissingError] / [ProviderNotSupportedError]）与 [LLMError]。
+  Future<RegenerateResult> continueReply({
+    required int conversationId,
+    int? messageId,
+  }) async {
+    if (_regenerateInFlight.contains(conversationId)) {
+      throw RegenerateBusyError();
+    }
+    _regenerateInFlight.add(conversationId);
+    try {
+      // 1. 校验对话存在。
+      final conv = await _conversationRepository.getConversation(
+        conversationId,
+      );
+      if (conv == null) {
+        throw ConversationNotFoundError();
+      }
+
+      // 2. 解析并校验目标（末条须为 assistant；显式 id 须 == 末条）。
+      final target = await _resolveContinueTarget(conversationId, messageId);
+
+      // 3. 组装（历史含目标——桌面 id <= target.id 对齐）+ provider 解析。
+      final character = await _characterRepository.getCharacter(
+        conv.characterId,
+      );
+      if (character == null) {
+        throw CharacterNotFoundError(conv.characterId);
+      }
+      final userName = await _settingsRepository.userName;
+      final extraVars = await _settingsRepository.templateVars;
+      final maxRounds = await _settingsRepository.slidingWindowRounds;
+      final messages = await _assembleMessages(
+        conv: conv,
+        character: character,
+        // id < target.id + 1 ⇔ id <= target.id（严格递增整数主键）。桌面
+        // `history_limit_message_id` 含边界（chat.py L141-142），逐字对齐。
+        historyBeforeId: target.id + 1,
+        maxRounds: maxRounds,
+        userName: userName,
+        extraVars: extraVars,
+        appendCurrentInput: false,
+      );
+      final resolved = await _resolveProvider(conv);
+
+      // 4. 尾随续写触发 user 消息（指令 + 原消息末段锚；不落库）。
+      final tail = _continuationTail(target.content);
+      final trigger =
+          tail.isEmpty ? continueInstruction : '$continueInstruction\n$tail';
+      messages.add(LlmMessage(role: 'user', content: trigger));
+
+      // 4b. 组装生成参数（同 regenerate 语义）。
+      final globalTemperature = await _settingsRepository.getTemperature();
+      final temperature = _resolveTemperature(character, globalTemperature);
+      final maxTokens = await _settingsRepository.getMaxTokens();
+
+      // 5. 生成（LLM 失败 → 异常上抛，零落库、原内容零改动）。
+      final reply = await resolved.llm.generate(
+        messages: messages,
+        model: resolved.model,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      );
+
+      // 6. 非空续写 → 候选追加；空续写 → no-op（不落重复候选）。
+      final baseText = target.content;
+      final continuation = reply.trim();
+      if (continuation.isEmpty) {
+        return RegenerateResult(
+          reply: baseText,
+          messageId: target.id,
+          replacedMessageId: target.id,
+          conversationId: conversationId,
+          swipeIndex: -1,
+        );
+      }
+      final newText = '$baseText$continuation';
+      final swipeIndex = await _messageRepository.addSwipe(
+        target.id,
+        newText,
+        makeActive: true,
+      );
+      return RegenerateResult(
+        reply: newText,
+        messageId: target.id,
+        replacedMessageId: target.id,
+        conversationId: conversationId,
+        swipeIndex: swipeIndex,
+      );
+    } finally {
+      _regenerateInFlight.remove(conversationId);
+    }
+  }
+
+  /// 解析续写目标并校验（对齐桌面 `_resolve_continue_target`：目标 = 末条消息
+  /// 且须为 assistant）。
+  ///
+  /// 显式 [messageId] 时要求 == 末条消息 id（非末条 / 不存在 / 非 assistant
+  /// 一律拒绝——续写只能在末条 assistant 之后进行）。错误族复用既有
+  /// [InvalidRegenerateTargetError]（errors.dart 不在 MS-02 文件范围）：无消息
+  /// / 末条非 assistant / 显式非末条 → [InvalidRegenerateTargetError.noAssistantReply]；
+  /// 显式 id 非末条且不存在 → [MessageNotFoundError]（先定位后比较）。
+  Future<Message> _resolveContinueTarget(
+    int conversationId,
+    int? messageId,
+  ) async {
+    final latest = await _messageRepository.lastMessage(conversationId);
+    if (messageId != null) {
+      if (latest == null || latest.id != messageId) {
+        final explicit = await _messageRepository.messageById(
+          conversationId,
+          messageId,
+        );
+        if (explicit == null) {
+          throw MessageNotFoundError();
+        }
+        throw InvalidRegenerateTargetError.noAssistantReply();
+      }
+    }
+    if (latest == null || latest.role != Role.assistant) {
+      throw InvalidRegenerateTargetError.noAssistantReply();
+    }
+    return latest;
+  }
+
+  /// 续写触发的「原消息末段」锚点：strip 后取末 [_continuationTailCodeUnits]
+  /// 个 UTF-16 code unit（对齐桌面 `_continuation_tail` 的末 200 字符）；
+  /// 短内容整体返回；空内容返回空串（触发只含指令）。
+  ///
+  /// 防劈代理对（F-114 先例）：截取窗口首 unit 为低位代理（0xDC00..0xDFFF，
+  /// 其高代理在窗口外）时 +1 排除，避免孤立代理 → U+FFFD。桌面按 code point
+  /// 计数，本实现按 code unit（含代理对内容时差 ≤1 unit），差异见
+  /// concerns/02.md §4。
+  String _continuationTail(String? content) {
+    final text = (content ?? '').trim();
+    if (text.isEmpty) {
+      return '';
+    }
+    if (text.length <= _continuationTailCodeUnits) {
+      return text;
+    }
+    final cut = text.substring(text.length - _continuationTailCodeUnits);
+    final first = cut.codeUnitAt(0);
+    if (first >= 0xDC00 && first <= 0xDFFF) {
+      return text.substring(text.length - _continuationTailCodeUnits + 1);
+    }
+    return cut;
   }
 
   /// autoGreeting 零消息守卫（对齐 `message.py::auto_insert_greeting`）。
