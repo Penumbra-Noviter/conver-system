@@ -22,6 +22,8 @@ import 'package:flutter/foundation.dart' show immutable;
 
 import '../data/database/app_database.dart'
     show Character, CharactersCompanion;
+import '../data/repositories/lorebook_repository.dart'
+    show LorebookEntryDraft, parseCharacterBook;
 
 /// 卡片格式错误——结构无法识别 / 不支持，文案含格式引导（对应桌面
 /// `CardFormatError`；路由层转 422 友好报错的移动端等价物）。
@@ -55,15 +57,19 @@ class CardValidationException implements Exception {
 /// 字段与 drift `Characters` 表对齐（name/description/personality/scenario/
 /// first_mes/mes_example/system_prompt/post_history_instructions/
 /// alternate_greetings/tags/creator/version/creator_notes/extensions/avatar/
-/// temperature），由 [fromV2Card] 产出后由控制器装配落库。
+/// temperature），由 [fromV2Card] 产出后由控制器装配落库；[lorebookEntries]
+/// 为 `extensions.conver_system.character_book` 解析出的世界书条目草案
+/// （WL-01，独立表归 LorebookRepository），装配职责归导入路径
+/// （characters_controller 接线随 WL 票后续）。
 @immutable
 class CharacterDraft {
   /// 构造角色字段快照。
   ///
   /// 缺省字段（[alternateGreetings] / [version] / [creatorNotes] /
-  /// [extensions] / [creator] / [avatar]）有默认值，装配点只传业务字段——
-  /// 缺省语义（对齐新建角色 / 桌面 CharacterBase）单一归属本构造器；
-  /// 导入路径 [fromV2Card] 显式传全字段（归一化产物）不受影响。
+  /// [extensions] / [creator] / [avatar] / [lorebookEntries]）有默认值，
+  /// 装配点只传业务字段——缺省语义（对齐新建角色 / 桌面 CharacterBase）
+  /// 单一归属本构造器；导入路径 [fromV2Card] 显式传全字段（归一化产物）
+  /// 不受影响。
   const CharacterDraft({
     required this.name,
     required this.description,
@@ -81,6 +87,7 @@ class CharacterDraft {
     this.extensions = const <String, dynamic>{},
     this.avatar,
     required this.temperature,
+    this.lorebookEntries = const <LorebookEntryDraft>[],
   });
 
   /// 角色名称（已 strip + 截断 100，非空由 [fromV2Card] 保证）。
@@ -102,6 +109,10 @@ class CharacterDraft {
   /// 头像 data URI / URL（无则 null）。
   final String? avatar;
   final double temperature;
+
+  /// `extensions.conver_system.character_book` 解析出的世界书条目草案
+  /// （WL-01；畸形/缺失 → 空列表，不阻断导入）。
+  final List<LorebookEntryDraft> lorebookEntries;
 
   /// 转换为此角色字段对应的落库 `CharactersCompanion`（导入装配用）。
   ///
@@ -277,6 +288,10 @@ CharacterDraft _buildCreate(Map<String, dynamic> data) {
   // 裁剪到 [0, 2] 合法区间。
   final temperature = _clampTemperature(ns['temperature'] ?? data['temperature'] ?? 0.7);
 
+  // WL-01：character_book 解析为世界书条目草案（畸形降级不抛，SR-26）；
+  // extensions 原始 character_book 保持原样（保真零回归，见库文档）。
+  final lorebookEntries = parseCharacterBook(ns['character_book']);
+
   final version = _truncate(
     (data['character_version'] ?? data['version'] ?? '1.0').toString(),
     50,
@@ -299,6 +314,7 @@ CharacterDraft _buildCreate(Map<String, dynamic> data) {
     extensions: extensions,
     avatar: avatarValue,
     temperature: temperature,
+    lorebookEntries: lorebookEntries,
   );
 }
 

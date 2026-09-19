@@ -5626,6 +5626,961 @@ class MessageSwipesCompanion extends UpdateCompanion<MessageSwipe> {
   }
 }
 
+class $LorebookEntriesTable extends LorebookEntries
+    with TableInfo<$LorebookEntriesTable, LorebookEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LorebookEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _characterIdMeta = const VerificationMeta(
+    'characterId',
+  );
+  @override
+  late final GeneratedColumn<int> characterId = GeneratedColumn<int>(
+    'character_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES characters (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<List<String>, String> keys =
+      GeneratedColumn<String>(
+        'keys',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      ).withConverter<List<String>>($LorebookEntriesTable.$converterkeys);
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _constantMeta = const VerificationMeta(
+    'constant',
+  );
+  @override
+  late final GeneratedColumn<bool> constant = GeneratedColumn<bool>(
+    'constant',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("constant" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _orderMeta = const VerificationMeta('order');
+  @override
+  late final GeneratedColumn<int> order = GeneratedColumn<int>(
+    'order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(100),
+  );
+  static const VerificationMeta _probabilityMeta = const VerificationMeta(
+    'probability',
+  );
+  @override
+  late final GeneratedColumn<int> probability = GeneratedColumn<int>(
+    'probability',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(100),
+  );
+  static const VerificationMeta _groupNameMeta = const VerificationMeta(
+    'groupName',
+  );
+  @override
+  late final GeneratedColumn<String> groupName = GeneratedColumn<String>(
+    'group_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _groupWeightMeta = const VerificationMeta(
+    'groupWeight',
+  );
+  @override
+  late final GeneratedColumn<int> groupWeight = GeneratedColumn<int>(
+    'group_weight',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(100),
+  );
+  static const VerificationMeta _matchModeMeta = const VerificationMeta(
+    'matchMode',
+  );
+  @override
+  late final GeneratedColumn<String> matchMode = GeneratedColumn<String>(
+    'match_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('or'),
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<String> position = GeneratedColumn<String>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('world'),
+  );
+  static const VerificationMeta _depthMeta = const VerificationMeta('depth');
+  @override
+  late final GeneratedColumn<int> depth = GeneratedColumn<int>(
+    'depth',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(20),
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('manual'),
+  );
+  static const VerificationMeta _enabledMeta = const VerificationMeta(
+    'enabled',
+  );
+  @override
+  late final GeneratedColumn<bool> enabled = GeneratedColumn<bool>(
+    'enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    characterId,
+    title,
+    keys,
+    content,
+    constant,
+    order,
+    probability,
+    groupName,
+    groupWeight,
+    matchMode,
+    position,
+    depth,
+    source,
+    enabled,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'lorebook_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LorebookEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('character_id')) {
+      context.handle(
+        _characterIdMeta,
+        characterId.isAcceptableOrUnknown(
+          data['character_id']!,
+          _characterIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_characterIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    }
+    if (data.containsKey('constant')) {
+      context.handle(
+        _constantMeta,
+        constant.isAcceptableOrUnknown(data['constant']!, _constantMeta),
+      );
+    }
+    if (data.containsKey('order')) {
+      context.handle(
+        _orderMeta,
+        order.isAcceptableOrUnknown(data['order']!, _orderMeta),
+      );
+    }
+    if (data.containsKey('probability')) {
+      context.handle(
+        _probabilityMeta,
+        probability.isAcceptableOrUnknown(
+          data['probability']!,
+          _probabilityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('group_name')) {
+      context.handle(
+        _groupNameMeta,
+        groupName.isAcceptableOrUnknown(data['group_name']!, _groupNameMeta),
+      );
+    }
+    if (data.containsKey('group_weight')) {
+      context.handle(
+        _groupWeightMeta,
+        groupWeight.isAcceptableOrUnknown(
+          data['group_weight']!,
+          _groupWeightMeta,
+        ),
+      );
+    }
+    if (data.containsKey('match_mode')) {
+      context.handle(
+        _matchModeMeta,
+        matchMode.isAcceptableOrUnknown(data['match_mode']!, _matchModeMeta),
+      );
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    }
+    if (data.containsKey('depth')) {
+      context.handle(
+        _depthMeta,
+        depth.isAcceptableOrUnknown(data['depth']!, _depthMeta),
+      );
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    }
+    if (data.containsKey('enabled')) {
+      context.handle(
+        _enabledMeta,
+        enabled.isAcceptableOrUnknown(data['enabled']!, _enabledMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LorebookEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LorebookEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      characterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}character_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      keys: $LorebookEntriesTable.$converterkeys.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}keys'],
+        )!,
+      ),
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      constant: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}constant'],
+      )!,
+      order: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order'],
+      )!,
+      probability: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}probability'],
+      )!,
+      groupName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_name'],
+      )!,
+      groupWeight: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}group_weight'],
+      )!,
+      matchMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}match_mode'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}position'],
+      )!,
+      depth: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}depth'],
+      )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      enabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}enabled'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LorebookEntriesTable createAlias(String alias) {
+    return $LorebookEntriesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<List<String>, String> $converterkeys =
+      const StringListConverter();
+}
+
+class LorebookEntry extends DataClass implements Insertable<LorebookEntry> {
+  final int id;
+
+  /// 必填外键 → characters.id，桌面端 ondelete=CASCADE + index=True。
+  final int characterId;
+
+  /// 条目标题（可空/缺省空串，桌面 String(200)）。
+  final String title;
+
+  /// 触发关键词（JSON 数组；桌面《JsonList》 TypeDecorator 语义）。
+  final List<String> keys;
+
+  /// 命中后注入内容（必填文本）。
+  final String content;
+
+  /// 常驻（不判命中直接注入；缺省 false）。
+  final bool constant;
+
+  /// 命中条目排序（升序注入；域 [0,9999]，缺省 100）。
+  final int order;
+
+  /// 独立命中概率（域 [1,100]，缺省 100）。
+  final int probability;
+
+  /// 互斥组名（空=不分组；桌面 String(100)）。
+  final String groupName;
+
+  /// 组内权重（同组随机抽一；域 [1,100]，缺省 100）。
+  final int groupWeight;
+
+  /// 命中模式（or / and；缺省 or）。
+  final String matchMode;
+
+  /// 注入位置（world / before_char / after_char；缺省 world）。
+  final String position;
+
+  /// 参与命中的最近轮数（域 [0,20]，缺省 20；0=只看当前输入）。
+  final int depth;
+
+  /// 条目来源（manual / auto；记忆宫殿产出为 auto，缺省 manual）。
+  final String source;
+
+  /// 单条开关（缺省 true）。
+  final bool enabled;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const LorebookEntry({
+    required this.id,
+    required this.characterId,
+    required this.title,
+    required this.keys,
+    required this.content,
+    required this.constant,
+    required this.order,
+    required this.probability,
+    required this.groupName,
+    required this.groupWeight,
+    required this.matchMode,
+    required this.position,
+    required this.depth,
+    required this.source,
+    required this.enabled,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['character_id'] = Variable<int>(characterId);
+    map['title'] = Variable<String>(title);
+    {
+      map['keys'] = Variable<String>(
+        $LorebookEntriesTable.$converterkeys.toSql(keys),
+      );
+    }
+    map['content'] = Variable<String>(content);
+    map['constant'] = Variable<bool>(constant);
+    map['order'] = Variable<int>(order);
+    map['probability'] = Variable<int>(probability);
+    map['group_name'] = Variable<String>(groupName);
+    map['group_weight'] = Variable<int>(groupWeight);
+    map['match_mode'] = Variable<String>(matchMode);
+    map['position'] = Variable<String>(position);
+    map['depth'] = Variable<int>(depth);
+    map['source'] = Variable<String>(source);
+    map['enabled'] = Variable<bool>(enabled);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LorebookEntriesCompanion toCompanion(bool nullToAbsent) {
+    return LorebookEntriesCompanion(
+      id: Value(id),
+      characterId: Value(characterId),
+      title: Value(title),
+      keys: Value(keys),
+      content: Value(content),
+      constant: Value(constant),
+      order: Value(order),
+      probability: Value(probability),
+      groupName: Value(groupName),
+      groupWeight: Value(groupWeight),
+      matchMode: Value(matchMode),
+      position: Value(position),
+      depth: Value(depth),
+      source: Value(source),
+      enabled: Value(enabled),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LorebookEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LorebookEntry(
+      id: serializer.fromJson<int>(json['id']),
+      characterId: serializer.fromJson<int>(json['characterId']),
+      title: serializer.fromJson<String>(json['title']),
+      keys: serializer.fromJson<List<String>>(json['keys']),
+      content: serializer.fromJson<String>(json['content']),
+      constant: serializer.fromJson<bool>(json['constant']),
+      order: serializer.fromJson<int>(json['order']),
+      probability: serializer.fromJson<int>(json['probability']),
+      groupName: serializer.fromJson<String>(json['groupName']),
+      groupWeight: serializer.fromJson<int>(json['groupWeight']),
+      matchMode: serializer.fromJson<String>(json['matchMode']),
+      position: serializer.fromJson<String>(json['position']),
+      depth: serializer.fromJson<int>(json['depth']),
+      source: serializer.fromJson<String>(json['source']),
+      enabled: serializer.fromJson<bool>(json['enabled']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'characterId': serializer.toJson<int>(characterId),
+      'title': serializer.toJson<String>(title),
+      'keys': serializer.toJson<List<String>>(keys),
+      'content': serializer.toJson<String>(content),
+      'constant': serializer.toJson<bool>(constant),
+      'order': serializer.toJson<int>(order),
+      'probability': serializer.toJson<int>(probability),
+      'groupName': serializer.toJson<String>(groupName),
+      'groupWeight': serializer.toJson<int>(groupWeight),
+      'matchMode': serializer.toJson<String>(matchMode),
+      'position': serializer.toJson<String>(position),
+      'depth': serializer.toJson<int>(depth),
+      'source': serializer.toJson<String>(source),
+      'enabled': serializer.toJson<bool>(enabled),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LorebookEntry copyWith({
+    int? id,
+    int? characterId,
+    String? title,
+    List<String>? keys,
+    String? content,
+    bool? constant,
+    int? order,
+    int? probability,
+    String? groupName,
+    int? groupWeight,
+    String? matchMode,
+    String? position,
+    int? depth,
+    String? source,
+    bool? enabled,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => LorebookEntry(
+    id: id ?? this.id,
+    characterId: characterId ?? this.characterId,
+    title: title ?? this.title,
+    keys: keys ?? this.keys,
+    content: content ?? this.content,
+    constant: constant ?? this.constant,
+    order: order ?? this.order,
+    probability: probability ?? this.probability,
+    groupName: groupName ?? this.groupName,
+    groupWeight: groupWeight ?? this.groupWeight,
+    matchMode: matchMode ?? this.matchMode,
+    position: position ?? this.position,
+    depth: depth ?? this.depth,
+    source: source ?? this.source,
+    enabled: enabled ?? this.enabled,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LorebookEntry copyWithCompanion(LorebookEntriesCompanion data) {
+    return LorebookEntry(
+      id: data.id.present ? data.id.value : this.id,
+      characterId: data.characterId.present
+          ? data.characterId.value
+          : this.characterId,
+      title: data.title.present ? data.title.value : this.title,
+      keys: data.keys.present ? data.keys.value : this.keys,
+      content: data.content.present ? data.content.value : this.content,
+      constant: data.constant.present ? data.constant.value : this.constant,
+      order: data.order.present ? data.order.value : this.order,
+      probability: data.probability.present
+          ? data.probability.value
+          : this.probability,
+      groupName: data.groupName.present ? data.groupName.value : this.groupName,
+      groupWeight: data.groupWeight.present
+          ? data.groupWeight.value
+          : this.groupWeight,
+      matchMode: data.matchMode.present ? data.matchMode.value : this.matchMode,
+      position: data.position.present ? data.position.value : this.position,
+      depth: data.depth.present ? data.depth.value : this.depth,
+      source: data.source.present ? data.source.value : this.source,
+      enabled: data.enabled.present ? data.enabled.value : this.enabled,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LorebookEntry(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('title: $title, ')
+          ..write('keys: $keys, ')
+          ..write('content: $content, ')
+          ..write('constant: $constant, ')
+          ..write('order: $order, ')
+          ..write('probability: $probability, ')
+          ..write('groupName: $groupName, ')
+          ..write('groupWeight: $groupWeight, ')
+          ..write('matchMode: $matchMode, ')
+          ..write('position: $position, ')
+          ..write('depth: $depth, ')
+          ..write('source: $source, ')
+          ..write('enabled: $enabled, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    characterId,
+    title,
+    keys,
+    content,
+    constant,
+    order,
+    probability,
+    groupName,
+    groupWeight,
+    matchMode,
+    position,
+    depth,
+    source,
+    enabled,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LorebookEntry &&
+          other.id == this.id &&
+          other.characterId == this.characterId &&
+          other.title == this.title &&
+          other.keys == this.keys &&
+          other.content == this.content &&
+          other.constant == this.constant &&
+          other.order == this.order &&
+          other.probability == this.probability &&
+          other.groupName == this.groupName &&
+          other.groupWeight == this.groupWeight &&
+          other.matchMode == this.matchMode &&
+          other.position == this.position &&
+          other.depth == this.depth &&
+          other.source == this.source &&
+          other.enabled == this.enabled &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LorebookEntriesCompanion extends UpdateCompanion<LorebookEntry> {
+  final Value<int> id;
+  final Value<int> characterId;
+  final Value<String> title;
+  final Value<List<String>> keys;
+  final Value<String> content;
+  final Value<bool> constant;
+  final Value<int> order;
+  final Value<int> probability;
+  final Value<String> groupName;
+  final Value<int> groupWeight;
+  final Value<String> matchMode;
+  final Value<String> position;
+  final Value<int> depth;
+  final Value<String> source;
+  final Value<bool> enabled;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const LorebookEntriesCompanion({
+    this.id = const Value.absent(),
+    this.characterId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.keys = const Value.absent(),
+    this.content = const Value.absent(),
+    this.constant = const Value.absent(),
+    this.order = const Value.absent(),
+    this.probability = const Value.absent(),
+    this.groupName = const Value.absent(),
+    this.groupWeight = const Value.absent(),
+    this.matchMode = const Value.absent(),
+    this.position = const Value.absent(),
+    this.depth = const Value.absent(),
+    this.source = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  LorebookEntriesCompanion.insert({
+    this.id = const Value.absent(),
+    required int characterId,
+    this.title = const Value.absent(),
+    this.keys = const Value.absent(),
+    this.content = const Value.absent(),
+    this.constant = const Value.absent(),
+    this.order = const Value.absent(),
+    this.probability = const Value.absent(),
+    this.groupName = const Value.absent(),
+    this.groupWeight = const Value.absent(),
+    this.matchMode = const Value.absent(),
+    this.position = const Value.absent(),
+    this.depth = const Value.absent(),
+    this.source = const Value.absent(),
+    this.enabled = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) : characterId = Value(characterId),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<LorebookEntry> custom({
+    Expression<int>? id,
+    Expression<int>? characterId,
+    Expression<String>? title,
+    Expression<String>? keys,
+    Expression<String>? content,
+    Expression<bool>? constant,
+    Expression<int>? order,
+    Expression<int>? probability,
+    Expression<String>? groupName,
+    Expression<int>? groupWeight,
+    Expression<String>? matchMode,
+    Expression<String>? position,
+    Expression<int>? depth,
+    Expression<String>? source,
+    Expression<bool>? enabled,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (characterId != null) 'character_id': characterId,
+      if (title != null) 'title': title,
+      if (keys != null) 'keys': keys,
+      if (content != null) 'content': content,
+      if (constant != null) 'constant': constant,
+      if (order != null) 'order': order,
+      if (probability != null) 'probability': probability,
+      if (groupName != null) 'group_name': groupName,
+      if (groupWeight != null) 'group_weight': groupWeight,
+      if (matchMode != null) 'match_mode': matchMode,
+      if (position != null) 'position': position,
+      if (depth != null) 'depth': depth,
+      if (source != null) 'source': source,
+      if (enabled != null) 'enabled': enabled,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  LorebookEntriesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? characterId,
+    Value<String>? title,
+    Value<List<String>>? keys,
+    Value<String>? content,
+    Value<bool>? constant,
+    Value<int>? order,
+    Value<int>? probability,
+    Value<String>? groupName,
+    Value<int>? groupWeight,
+    Value<String>? matchMode,
+    Value<String>? position,
+    Value<int>? depth,
+    Value<String>? source,
+    Value<bool>? enabled,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return LorebookEntriesCompanion(
+      id: id ?? this.id,
+      characterId: characterId ?? this.characterId,
+      title: title ?? this.title,
+      keys: keys ?? this.keys,
+      content: content ?? this.content,
+      constant: constant ?? this.constant,
+      order: order ?? this.order,
+      probability: probability ?? this.probability,
+      groupName: groupName ?? this.groupName,
+      groupWeight: groupWeight ?? this.groupWeight,
+      matchMode: matchMode ?? this.matchMode,
+      position: position ?? this.position,
+      depth: depth ?? this.depth,
+      source: source ?? this.source,
+      enabled: enabled ?? this.enabled,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (characterId.present) {
+      map['character_id'] = Variable<int>(characterId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (keys.present) {
+      map['keys'] = Variable<String>(
+        $LorebookEntriesTable.$converterkeys.toSql(keys.value),
+      );
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (constant.present) {
+      map['constant'] = Variable<bool>(constant.value);
+    }
+    if (order.present) {
+      map['order'] = Variable<int>(order.value);
+    }
+    if (probability.present) {
+      map['probability'] = Variable<int>(probability.value);
+    }
+    if (groupName.present) {
+      map['group_name'] = Variable<String>(groupName.value);
+    }
+    if (groupWeight.present) {
+      map['group_weight'] = Variable<int>(groupWeight.value);
+    }
+    if (matchMode.present) {
+      map['match_mode'] = Variable<String>(matchMode.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<String>(position.value);
+    }
+    if (depth.present) {
+      map['depth'] = Variable<int>(depth.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (enabled.present) {
+      map['enabled'] = Variable<bool>(enabled.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LorebookEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('characterId: $characterId, ')
+          ..write('title: $title, ')
+          ..write('keys: $keys, ')
+          ..write('content: $content, ')
+          ..write('constant: $constant, ')
+          ..write('order: $order, ')
+          ..write('probability: $probability, ')
+          ..write('groupName: $groupName, ')
+          ..write('groupWeight: $groupWeight, ')
+          ..write('matchMode: $matchMode, ')
+          ..write('position: $position, ')
+          ..write('depth: $depth, ')
+          ..write('source: $source, ')
+          ..write('enabled: $enabled, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5646,6 +6601,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $SemanticHitsTable semanticHits = $SemanticHitsTable(this);
   late final $MessageSwipesTable messageSwipes = $MessageSwipesTable(this);
+  late final $LorebookEntriesTable lorebookEntries = $LorebookEntriesTable(
+    this,
+  );
   late final Index idxCharactersName = Index(
     'idx_characters_name',
     'CREATE INDEX idx_characters_name ON characters (name)',
@@ -5710,6 +6668,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_message_swipes_message_id',
     'CREATE INDEX idx_message_swipes_message_id ON message_swipes (message_id)',
   );
+  late final Index idxLorebookEntriesCharacterId = Index(
+    'idx_lorebook_entries_character_id',
+    'CREATE INDEX idx_lorebook_entries_character_id ON lorebook_entries (character_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5727,6 +6689,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     embeddingEntries,
     semanticHits,
     messageSwipes,
+    lorebookEntries,
     idxCharactersName,
     idxConversationsCharacterId,
     idxMessagesConversationId,
@@ -5743,6 +6706,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxEmbeddingEntriesCharacterIdContentHash,
     idxSemanticHitsCharacterId,
     idxMessageSwipesMessageId,
+    idxLorebookEntriesCharacterId,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5836,6 +6800,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('message_swipes', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'characters',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('lorebook_entries', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -6033,6 +7004,26 @@ final class $$CharactersTableReferences
     ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_semanticHitsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$LorebookEntriesTable, List<LorebookEntry>>
+  _lorebookEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.lorebookEntries,
+    aliasName: 'characters__id__lorebook_entries__character_id',
+  );
+
+  $$LorebookEntriesTableProcessedTableManager get lorebookEntriesRefs {
+    final manager = $$LorebookEntriesTableTableManager(
+      $_db,
+      $_db.lorebookEntries,
+    ).filter((f) => f.characterId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _lorebookEntriesRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -6346,6 +7337,31 @@ class $$CharactersTableFilterComposer
           }) => $$SemanticHitsTableFilterComposer(
             $db: $db,
             $table: $db.semanticHits,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> lorebookEntriesRefs(
+    Expression<bool> Function($$LorebookEntriesTableFilterComposer f) f,
+  ) {
+    final $$LorebookEntriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.lorebookEntries,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LorebookEntriesTableFilterComposer(
+            $db: $db,
+            $table: $db.lorebookEntries,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -6748,6 +7764,31 @@ class $$CharactersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> lorebookEntriesRefs<T extends Object>(
+    Expression<T> Function($$LorebookEntriesTableAnnotationComposer a) f,
+  ) {
+    final $$LorebookEntriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.lorebookEntries,
+      getReferencedColumn: (t) => t.characterId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LorebookEntriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.lorebookEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CharactersTableTableManager
@@ -6772,6 +7813,7 @@ class $$CharactersTableTableManager
             bool innerThoughtsRefs,
             bool embeddingEntriesRefs,
             bool semanticHitsRefs,
+            bool lorebookEntriesRefs,
           })
         > {
   $$CharactersTableTableManager(_$AppDatabase db, $CharactersTable table)
@@ -6887,6 +7929,7 @@ class $$CharactersTableTableManager
                 innerThoughtsRefs = false,
                 embeddingEntriesRefs = false,
                 semanticHitsRefs = false,
+                lorebookEntriesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -6899,6 +7942,7 @@ class $$CharactersTableTableManager
                     if (innerThoughtsRefs) db.innerThoughts,
                     if (embeddingEntriesRefs) db.embeddingEntries,
                     if (semanticHitsRefs) db.semanticHits,
+                    if (lorebookEntriesRefs) db.lorebookEntries,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -7071,6 +8115,27 @@ class $$CharactersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (lorebookEntriesRefs)
+                        await $_getPrefetchedData<
+                          Character,
+                          $CharactersTable,
+                          LorebookEntry
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CharactersTableReferences
+                              ._lorebookEntriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CharactersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).lorebookEntriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.characterId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -7100,6 +8165,7 @@ typedef $$CharactersTableProcessedTableManager =
         bool innerThoughtsRefs,
         bool embeddingEntriesRefs,
         bool semanticHitsRefs,
+        bool lorebookEntriesRefs,
       })
     >;
 typedef $$ConversationsTableCreateCompanionBuilder =
@@ -11385,6 +12451,555 @@ typedef $$MessageSwipesTableProcessedTableManager =
       MessageSwipe,
       PrefetchHooks Function({bool messageId})
     >;
+typedef $$LorebookEntriesTableCreateCompanionBuilder =
+    LorebookEntriesCompanion Function({
+      Value<int> id,
+      required int characterId,
+      Value<String> title,
+      Value<List<String>> keys,
+      Value<String> content,
+      Value<bool> constant,
+      Value<int> order,
+      Value<int> probability,
+      Value<String> groupName,
+      Value<int> groupWeight,
+      Value<String> matchMode,
+      Value<String> position,
+      Value<int> depth,
+      Value<String> source,
+      Value<bool> enabled,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+    });
+typedef $$LorebookEntriesTableUpdateCompanionBuilder =
+    LorebookEntriesCompanion Function({
+      Value<int> id,
+      Value<int> characterId,
+      Value<String> title,
+      Value<List<String>> keys,
+      Value<String> content,
+      Value<bool> constant,
+      Value<int> order,
+      Value<int> probability,
+      Value<String> groupName,
+      Value<int> groupWeight,
+      Value<String> matchMode,
+      Value<String> position,
+      Value<int> depth,
+      Value<String> source,
+      Value<bool> enabled,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+final class $$LorebookEntriesTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $LorebookEntriesTable, LorebookEntry> {
+  $$LorebookEntriesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CharactersTable _characterIdTable(_$AppDatabase db) => db.characters
+      .createAlias('lorebook_entries__character_id__characters__id');
+
+  $$CharactersTableProcessedTableManager get characterId {
+    final $_column = $_itemColumn<int>('character_id')!;
+
+    final manager = $$CharactersTableTableManager(
+      $_db,
+      $_db.characters,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_characterIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$LorebookEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $LorebookEntriesTable> {
+  $$LorebookEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get keys =>
+      $composableBuilder(
+        column: $table.keys,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get constant => $composableBuilder(
+    column: $table.constant,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get order => $composableBuilder(
+    column: $table.order,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get probability => $composableBuilder(
+    column: $table.probability,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get groupName => $composableBuilder(
+    column: $table.groupName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get groupWeight => $composableBuilder(
+    column: $table.groupWeight,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get matchMode => $composableBuilder(
+    column: $table.matchMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get depth => $composableBuilder(
+    column: $table.depth,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CharactersTableFilterComposer get characterId {
+    final $$CharactersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableFilterComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LorebookEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $LorebookEntriesTable> {
+  $$LorebookEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get keys => $composableBuilder(
+    column: $table.keys,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get constant => $composableBuilder(
+    column: $table.constant,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get order => $composableBuilder(
+    column: $table.order,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get probability => $composableBuilder(
+    column: $table.probability,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get groupName => $composableBuilder(
+    column: $table.groupName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get groupWeight => $composableBuilder(
+    column: $table.groupWeight,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get matchMode => $composableBuilder(
+    column: $table.matchMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get depth => $composableBuilder(
+    column: $table.depth,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CharactersTableOrderingComposer get characterId {
+    final $$CharactersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableOrderingComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LorebookEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LorebookEntriesTable> {
+  $$LorebookEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<List<String>, String> get keys =>
+      $composableBuilder(column: $table.keys, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<bool> get constant =>
+      $composableBuilder(column: $table.constant, builder: (column) => column);
+
+  GeneratedColumn<int> get order =>
+      $composableBuilder(column: $table.order, builder: (column) => column);
+
+  GeneratedColumn<int> get probability => $composableBuilder(
+    column: $table.probability,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get groupName =>
+      $composableBuilder(column: $table.groupName, builder: (column) => column);
+
+  GeneratedColumn<int> get groupWeight => $composableBuilder(
+    column: $table.groupWeight,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get matchMode =>
+      $composableBuilder(column: $table.matchMode, builder: (column) => column);
+
+  GeneratedColumn<String> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<int> get depth =>
+      $composableBuilder(column: $table.depth, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<bool> get enabled =>
+      $composableBuilder(column: $table.enabled, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$CharactersTableAnnotationComposer get characterId {
+    final $$CharactersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.characterId,
+      referencedTable: $db.characters,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CharactersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.characters,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$LorebookEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LorebookEntriesTable,
+          LorebookEntry,
+          $$LorebookEntriesTableFilterComposer,
+          $$LorebookEntriesTableOrderingComposer,
+          $$LorebookEntriesTableAnnotationComposer,
+          $$LorebookEntriesTableCreateCompanionBuilder,
+          $$LorebookEntriesTableUpdateCompanionBuilder,
+          (LorebookEntry, $$LorebookEntriesTableReferences),
+          LorebookEntry,
+          PrefetchHooks Function({bool characterId})
+        > {
+  $$LorebookEntriesTableTableManager(
+    _$AppDatabase db,
+    $LorebookEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LorebookEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LorebookEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LorebookEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> characterId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<List<String>> keys = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<bool> constant = const Value.absent(),
+                Value<int> order = const Value.absent(),
+                Value<int> probability = const Value.absent(),
+                Value<String> groupName = const Value.absent(),
+                Value<int> groupWeight = const Value.absent(),
+                Value<String> matchMode = const Value.absent(),
+                Value<String> position = const Value.absent(),
+                Value<int> depth = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<bool> enabled = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => LorebookEntriesCompanion(
+                id: id,
+                characterId: characterId,
+                title: title,
+                keys: keys,
+                content: content,
+                constant: constant,
+                order: order,
+                probability: probability,
+                groupName: groupName,
+                groupWeight: groupWeight,
+                matchMode: matchMode,
+                position: position,
+                depth: depth,
+                source: source,
+                enabled: enabled,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int characterId,
+                Value<String> title = const Value.absent(),
+                Value<List<String>> keys = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<bool> constant = const Value.absent(),
+                Value<int> order = const Value.absent(),
+                Value<int> probability = const Value.absent(),
+                Value<String> groupName = const Value.absent(),
+                Value<int> groupWeight = const Value.absent(),
+                Value<String> matchMode = const Value.absent(),
+                Value<String> position = const Value.absent(),
+                Value<int> depth = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<bool> enabled = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+              }) => LorebookEntriesCompanion.insert(
+                id: id,
+                characterId: characterId,
+                title: title,
+                keys: keys,
+                content: content,
+                constant: constant,
+                order: order,
+                probability: probability,
+                groupName: groupName,
+                groupWeight: groupWeight,
+                matchMode: matchMode,
+                position: position,
+                depth: depth,
+                source: source,
+                enabled: enabled,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$LorebookEntriesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({characterId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (characterId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.characterId,
+                        referencedTable: $$LorebookEntriesTableReferences
+                            ._characterIdTable(db),
+                        referencedColumn: $$LorebookEntriesTableReferences
+                            ._characterIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$LorebookEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LorebookEntriesTable,
+      LorebookEntry,
+      $$LorebookEntriesTableFilterComposer,
+      $$LorebookEntriesTableOrderingComposer,
+      $$LorebookEntriesTableAnnotationComposer,
+      $$LorebookEntriesTableCreateCompanionBuilder,
+      $$LorebookEntriesTableUpdateCompanionBuilder,
+      (LorebookEntry, $$LorebookEntriesTableReferences),
+      LorebookEntry,
+      PrefetchHooks Function({bool characterId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11413,4 +13028,6 @@ class $AppDatabaseManager {
       $$SemanticHitsTableTableManager(_db, _db.semanticHits);
   $$MessageSwipesTableTableManager get messageSwipes =>
       $$MessageSwipesTableTableManager(_db, _db.messageSwipes);
+  $$LorebookEntriesTableTableManager get lorebookEntries =>
+      $$LorebookEntriesTableTableManager(_db, _db.lorebookEntries);
 }

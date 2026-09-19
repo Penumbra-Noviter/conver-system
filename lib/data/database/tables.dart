@@ -559,3 +559,66 @@ class SemanticHits extends Table {
 
   DateTimeColumn get createdAt => dateTime()();
 }
+
+/// 世界书条目表 — 对齐桌面端 `models/lorebook.py::LorebookEntry`
+/// （WL-1；chat-polish spec §4.4 七件套 + 扩展字段）。
+///
+/// `keys` 承载触发关键词 JSON 数组（复用 [StringListConverter] 落库语义）；
+/// order/probability/group_weight/depth 表层不设 CHECK 约束（沿 F-76 先例：
+/// 仓储/服务层裁剪，解析层对 ST 脏数据裁剪、管理层拒绝语义由契约锁锁定）；
+/// 数值域：order [0,9999] / probability [1,100] / group_weight [1,100] /
+/// depth [0,20]。删除角色级联删条目（FK CASCADE）；FK 索引由迁移 raw SQL
+/// 补建（drift 不自动为 FK 建索引，对齐 @TableIndex 注解）。
+@DataClassName('LorebookEntry')
+@TableIndex(name: 'idx_lorebook_entries_character_id', columns: {#characterId})
+class LorebookEntries extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 必填外键 → characters.id，桌面端 ondelete=CASCADE + index=True。
+  IntColumn get characterId =>
+      integer().references(Characters, #id, onDelete: KeyAction.cascade)();
+
+  /// 条目标题（可空/缺省空串，桌面 String(200)）。
+  TextColumn get title => text().withDefault(const Constant(''))();
+
+  /// 触发关键词（JSON 数组；桌面《JsonList》 TypeDecorator 语义）。
+  TextColumn get keys => text()
+      .map(const StringListConverter())
+      .withDefault(const Constant('[]'))();
+
+  /// 命中后注入内容（必填文本）。
+  TextColumn get content => text().withDefault(const Constant(''))();
+
+  /// 常驻（不判命中直接注入；缺省 false）。
+  BoolColumn get constant => boolean().withDefault(const Constant(false))();
+
+  /// 命中条目排序（升序注入；域 [0,9999]，缺省 100）。
+  IntColumn get order => integer().withDefault(const Constant(100))();
+
+  /// 独立命中概率（域 [1,100]，缺省 100）。
+  IntColumn get probability => integer().withDefault(const Constant(100))();
+
+  /// 互斥组名（空=不分组；桌面 String(100)）。
+  TextColumn get groupName => text().withDefault(const Constant(''))();
+
+  /// 组内权重（同组随机抽一；域 [1,100]，缺省 100）。
+  IntColumn get groupWeight => integer().withDefault(const Constant(100))();
+
+  /// 命中模式（or / and；缺省 or）。
+  TextColumn get matchMode => text().withDefault(const Constant('or'))();
+
+  /// 注入位置（world / before_char / after_char；缺省 world）。
+  TextColumn get position => text().withDefault(const Constant('world'))();
+
+  /// 参与命中的最近轮数（域 [0,20]，缺省 20；0=只看当前输入）。
+  IntColumn get depth => integer().withDefault(const Constant(20))();
+
+  /// 条目来源（manual / auto；记忆宫殿产出为 auto，缺省 manual）。
+  TextColumn get source => text().withDefault(const Constant('manual'))();
+
+  /// 单条开关（缺省 true）。
+  BoolColumn get enabled => boolean().withDefault(const Constant(true))();
+
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+}

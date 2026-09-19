@@ -1,8 +1,10 @@
-/// PS2-01 / FD-05 / VR-04 / MS-01 迁移测试 — schemaVersion 2→6 / 1→6 /
-/// 4→6 / 5→6（阶段 2 三表 + FD-05 messages.created_at 索引 + 阶段 3 两表 +
-/// MS-01 message_swipes 表与 messages.active_swipe_index 列）；VR-04 追加
-/// from<5 幂等 / 中断自愈 / 级联 / 唯一索引 / 无硬 FK 契约；MS-01 追加
-/// from<6 幂等补列 / 中断自愈 / (message_id, index) 唯一约束 / FK 级联。
+/// PS2-01 / FD-05 / VR-04 / MS-01 / WL-01 迁移测试 — schemaVersion 2→7 / 1→7 /
+/// 4→7 / 5→7 / 6→7（阶段 2 三表 + FD-05 messages.created_at 索引 + 阶段 3 两表 +
+/// MS-01 message_swipes 表与 messages.active_swipe_index 列 + WL-01
+/// lorebook_entries 表与 FK 索引）；VR-04 追加 from<5 幂等 / 中断自愈 / 级联 /
+/// 唯一索引 / 无硬 FK 契约；MS-01 追加 from<6 幂等补列 / 中断自愈 /
+/// (message_id, index) 唯一约束 / FK 级联；WL-01 追加 from<7 建表 / 中断自愈 /
+/// FK 级联契约。
 ///
 /// 迁移路径用「降级夹具」构造旧版存量库：先在最新 schema 的文件库上插入旧
 /// 数据，再 `DROP` 高版本对象 + `PRAGMA user_version = N`，关闭后重新打开 —
@@ -34,9 +36,13 @@ const _stage3Tables = <String>['embedding_entries', 'semantic_hits'];
 /// MS-01 候选表名（drift 蛇形约定）。
 const _ms01Tables = <String>['message_swipes'];
 
+/// WL-01 世界书条目表名（drift 蛇形约定）。
+const _wl01Tables = <String>['lorebook_entries'];
+
 /// 迁移新增索引锚（snake_case 列名）：6 个阶段 2 FK 索引 + FD-05 的
 /// messages.created_at 索引 + VR-04 的 3 个 embedding/semantic 索引 +
-/// MS-01 的 message_swipes.message_id FK 索引（drift 不自动为 FK 建索引，
+/// MS-01 的 message_swipes.message_id FK 索引 + WL-01 的
+/// lorebook_entries.character_id FK 索引（drift 不自动为 FK 建索引，
 /// raw SQL 补建，对齐 tables.dart @TableIndex）。
 const _newIndexes = <String>[
   'idx_relationship_states_character_id',
@@ -50,6 +56,7 @@ const _newIndexes = <String>[
   'idx_embedding_entries_character_id_content_hash',
   'idx_semantic_hits_character_id',
   'idx_message_swipes_message_id',
+  'idx_lorebook_entries_character_id',
 ];
 
 /// 建一个「v2 存量库」：文件库上建最新 schema → 插旧数据 → 降级到 v2 形态。
@@ -111,9 +118,9 @@ Future<(AppDatabase, Directory)> openV2UpgradedFixture() async {
   // 降级到 v2：标记版本 + 移除阶段 2 三表（索引随表删除）+ 移除
   // messages.created_at 索引（FD-05 属 v4 形态）+ 移除阶段 3 两表与索引
   // （VR-04 属 v5 形态）+ 移除 MS-01 候选表/索引与 active_swipe_index 列
-  // （MS-01 属 v6 形态；真实 v2 存量库不含这些对象，保留会导致
-  // `from < M` 分支的 CREATE 语句被 IF NOT EXISTS 幂等跳过，掩盖「旧库
-  // 升级补建」的真实路径）。
+  // （MS-01 属 v6 形态）+ 移除 WL-01 世界书表与索引（属 v7 形态；真实 v2
+  // 存量库不含这些对象，保留会导致 `from < M` 分支的 CREATE 语句被
+  // IF NOT EXISTS 幂等跳过，掩盖「旧库升级补建」的真实路径）。
   await db.customStatement('PRAGMA user_version = 2');
   await db.customStatement('DROP TABLE IF EXISTS inner_thoughts');
   await db.customStatement('DROP TABLE IF EXISTS proactive_plans');
@@ -124,6 +131,8 @@ Future<(AppDatabase, Directory)> openV2UpgradedFixture() async {
   await db.customStatement('DROP TABLE IF EXISTS message_swipes');
   await db.customStatement('DROP INDEX IF EXISTS idx_message_swipes_message_id');
   await db.customStatement('ALTER TABLE messages DROP COLUMN active_swipe_index');
+  await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
+  await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -168,8 +177,9 @@ Future<(AppDatabase, Directory)> openV1UpgradedFixture() async {
       );
 
   // 降级到 v1：user_version=1 + DROP 记忆两表、阶段 2 三表、阶段 3 两表、
-  // MS-01 候选表/索引与 active_swipe_index 列；同时移除 messages.created_at
-  // 索引（FD-05 属 v4 形态，真实 v1 存量库不含该索引）。
+  // MS-01 候选表/索引与 active_swipe_index 列、WL-01 世界书表/索引；
+  // 同时移除 messages.created_at 索引（FD-05 属 v4 形态，真实 v1 存量库
+  // 不含该索引）。
   await db.customStatement('PRAGMA user_version = 1');
   await db.customStatement('DROP TABLE IF EXISTS inner_thoughts');
   await db.customStatement('DROP TABLE IF EXISTS proactive_plans');
@@ -182,6 +192,8 @@ Future<(AppDatabase, Directory)> openV1UpgradedFixture() async {
   await db.customStatement('DROP TABLE IF EXISTS message_swipes');
   await db.customStatement('DROP INDEX IF EXISTS idx_message_swipes_message_id');
   await db.customStatement('ALTER TABLE messages DROP COLUMN active_swipe_index');
+  await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
+  await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -200,13 +212,16 @@ Future<(AppDatabase, Directory)> openV4UpgradedFixture() async {
   await seedV4LegacyRows(db);
 
   // 降级到 v4：user_version=4 + DROP 阶段 3 两表与其 3 索引（v4 形态不含）
-  // + DROP MS-01 候选表/索引与 active_swipe_index 列（MS-01 属 v6 形态）。
+  // + DROP MS-01 候选表/索引与 active_swipe_index 列（MS-01 属 v6 形态）
+  // + DROP WL-01 世界书表/索引（属 v7 形态）。
   await db.customStatement('PRAGMA user_version = 4');
   await db.customStatement('DROP TABLE IF EXISTS semantic_hits');
   await db.customStatement('DROP TABLE IF EXISTS embedding_entries');
   await db.customStatement('DROP TABLE IF EXISTS message_swipes');
   await db.customStatement('DROP INDEX IF EXISTS idx_message_swipes_message_id');
   await db.customStatement('ALTER TABLE messages DROP COLUMN active_swipe_index');
+  await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
+  await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -252,11 +267,74 @@ Future<(AppDatabase, Directory)> openV5UpgradedFixture() async {
 
   // 降级到 v5：user_version=5 + DROP message_swipes 表/索引 + DROP
   // active_swipe_index 列（真实 v5 存量库无这些对象；不降列会导致
-  // from<6 的补列探测发现列已存在而跳过，掩盖「真实补列」路径）。
+  // from<6 的补列探测发现列已存在而跳过，掩盖「真实补列」路径）
+  // + DROP WL-01 世界书表/索引（属 v7 形态）。
   await db.customStatement('PRAGMA user_version = 5');
   await db.customStatement('DROP TABLE IF EXISTS message_swipes');
   await db.customStatement('DROP INDEX IF EXISTS idx_message_swipes_message_id');
   await db.customStatement('ALTER TABLE messages DROP COLUMN active_swipe_index');
+  await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
+  await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
+  await db.close();
+
+  return (AppDatabase(NativeDatabase(file)), dir);
+}
+
+/// 建一个「v6 存量库」：文件库上建最新 schema → 插 v6 时代数据 →降级到 v6
+/// 形态（user_version=6 + DROP lorebook_entries 表与 FK 索引）。
+///
+/// 打开时 from=6：仅走 `from < 7` 分支（WL-01），等价于真实 v6 存量库单步
+/// 升级；零回归保证 —— from<1/2/3/4/5/6 分支不触发（其幂等性由 v1/v2/v4/v5
+/// 夹具承载）。
+Future<(AppDatabase, Directory)> openV6UpgradedFixture() async {
+  final dir = await Directory.systemTemp.createTemp('wl01_migration_v6_');
+  final file = File('${dir.path}${Platform.pathSeparator}test.db');
+
+  var db = AppDatabase(NativeDatabase(file));
+  final now = DateTime.now();
+  final character = await db
+      .into(db.characters)
+      .insertReturning(
+        CharactersCompanion.insert(name: '星语', createdAt: now, updatedAt: now),
+      );
+  final conversation = await db
+      .into(db.conversations)
+      .insertReturning(
+        ConversationsCompanion.insert(
+          characterId: character.id,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+  await db
+      .into(db.messages)
+      .insertReturning(
+        MessagesCompanion.insert(
+          conversationId: conversation.id,
+          role: Role.assistant,
+          content: '星轨之上，无问西东。',
+          createdAt: now,
+        ),
+      );
+  // v6 时代可写一条候选（message_swipes 属 v6 形态，须保留覆盖「升级时
+  // 候选行原样保留」）。
+  await db
+      .into(db.messageSwipes)
+      .insertReturning(
+        MessageSwipesCompanion.insert(
+          messageId: (await db.select(db.messages).getSingle()).id,
+          index: 0,
+          content: '星轨之上，无问西东。',
+          createdAt: now,
+        ),
+      );
+
+  // 降级到 v6：user_version=6 + DROP WL-01 世界书表/索引（真实 v6 存量库
+  // 无这些对象；不 DROP 会导致 from<7 的建表被 IF NOT EXISTS 幂等跳过，
+  // 掩盖「旧库升级补建」的真实路径）。
+  await db.customStatement('PRAGMA user_version = 6');
+  await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
+  await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -471,11 +549,11 @@ void main() {
       await db.close();
     });
 
-    test('AppDatabase.schemaVersion == 6', () {
-      expect(db.schemaVersion, 6);
+    test('AppDatabase.schemaVersion == 7', () {
+      expect(db.schemaVersion, 7);
     });
 
-    test('全新安装直接建 12 表 + 11 迁移新增索引（含两个唯一索引）', () async {
+    test('全新安装直接建 13 表 + 12 迁移新增索引（含两个唯一索引）', () async {
       final tables = await sqliteMasterNames(db, 'table');
       expect(
         tables,
@@ -489,6 +567,7 @@ void main() {
           ..._stage2Tables,
           ..._stage3Tables,
           ..._ms01Tables,
+          ..._wl01Tables,
         ]),
       );
 
@@ -529,7 +608,7 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test('旧行保留 + 12 表/11 索引存在于 sqlite_master + user_version=6', () async {
+    test('旧行保留 + 13 表/12 索引存在于 sqlite_master + user_version=7', () async {
       expect(await db.select(db.characters).get().then((r) => r.length), 1);
       expect(await db.select(db.conversations).get().then((r) => r.length), 1);
       expect(await db.select(db.messages).get().then((r) => r.length), 1);
@@ -540,12 +619,12 @@ void main() {
       );
 
       final tables = await sqliteMasterNames(db, 'table');
-      expect(tables, containsAll([..._stage2Tables, ..._stage3Tables]));
+      expect(tables, containsAll([..._stage2Tables, ..._stage3Tables, ..._wl01Tables]));
 
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
     });
 
     test('三表可读写 + converter 字符串落库（stage 五值 / status 四值）', () async {
@@ -736,7 +815,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
       expect(
         await sqliteMasterNames(db, 'table'),
         containsAll([..._stage2Tables, ..._stage3Tables]),
@@ -780,7 +859,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
       expect(
         await sqliteMasterNames(db, 'table'),
         containsAll([..._stage2Tables, ..._stage3Tables]),
@@ -804,7 +883,7 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test('v1 存量库连续升级：记忆两表重建 + 三新表 + 两新表 + 旧行保留 + user_version=6', () async {
+    test('v1 存量库连续升级：记忆两表重建 + 三新表 + 两新表 + 世界书表 + 旧行保留 + user_version=7', () async {
       expect(await db.select(db.characters).get().then((r) => r.length), 1);
       expect(await db.select(db.messages).get().then((r) => r.length), 1);
 
@@ -820,7 +899,7 @@ void main() {
       );
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
     });
   });
 
@@ -837,7 +916,7 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test('v4 存量库升级四要素：两表/3 索引存在 + user_version=6 + 旧行保留', () async {
+    test('v4 存量库升级四要素：两表/3 索引存在 + user_version=7 + 旧行保留', () async {
       // 旧行保留：v4 时代 8 张有行表各自数据完整可读。
       expect(await db.select(db.characters).get().then((r) => r.length), 1);
       expect(await db.select(db.conversations).get().then((r) => r.length), 1);
@@ -867,7 +946,7 @@ void main() {
         ]),
       );
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
     });
 
     test(
@@ -1058,7 +1137,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_stage3Tables));
       expect(
         await sqliteMasterNames(db, 'index'),
@@ -1108,7 +1187,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_stage3Tables));
       expect(await sqliteMasterNames(db, 'index'), containsAll(_newIndexes));
       final stored = await db.select(db.embeddingEntries).getSingle();
@@ -1130,7 +1209,7 @@ void main() {
       await dir.delete(recursive: true);
     });
 
-    test('v5 存量库升级四要素：表 + 列 + FK 索引存在 + user_version=6 + 旧行保留',
+    test('v5 存量库升级四要素：表 + 列 + FK 索引存在 + user_version=7 + 旧行保留',
         () async {
       // 旧行保留：v5 时代行仍完整可读（messages.content 原样，未被迁移改写）。
       expect(await db.select(db.characters).get().then((r) => r.length), 1);
@@ -1146,7 +1225,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, contains('idx_message_swipes_message_id'));
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
     });
 
     test('message_swipes 可写读 + (message_id, index) 唯一约束生效（SR-27）', () async {
@@ -1241,7 +1320,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('message_swipes'),
@@ -1273,7 +1352,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 6);
+      expect(await userVersion(db), 7);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('message_swipes'),
@@ -1284,6 +1363,153 @@ void main() {
       );
       final stored = await db.select(db.messageSwipes).getSingle();
       expect(stored.content, '夜航星图，从这里开始。');
+    });
+  });
+
+  group('schemaVersion 6→7 迁移（WL-01）', () {
+    late AppDatabase db;
+    late Directory dir;
+
+    setUp(() async {
+      (db, dir) = await openV6UpgradedFixture();
+    });
+
+    tearDown(() async {
+      await db.close();
+      await dir.delete(recursive: true);
+    });
+
+    test('v6 存量库升级四要素：世界书表 + FK 索引存在 + user_version=7 + 旧行保留',
+        () async {
+      // 旧行保留：v6 时代消息与候选行仍完整可读，未被迁移改写。
+      expect(await db.select(db.characters).get().then((r) => r.length), 1);
+      expect(await db.select(db.conversations).get().then((r) => r.length), 1);
+      final message = await db.select(db.messages).getSingle();
+      expect(message.content, '星轨之上，无问西东。');
+      final swipe = await db.select(db.messageSwipes).getSingle();
+      expect(swipe.content, '星轨之上，无问西东。');
+
+      final tables = await sqliteMasterNames(db, 'table');
+      expect(tables, contains('lorebook_entries'));
+
+      final indexes = await sqliteMasterNames(db, 'index');
+      expect(indexes, contains('idx_lorebook_entries_character_id'));
+
+      expect(await userVersion(db), 7);
+    });
+
+    test('lorebook_entries 可写读 + keys JSON 数组往返', () async {
+      final characterId = (await db.select(db.characters).getSingle()).id;
+      final now = DateTime.now();
+      final created = await db.into(db.lorebookEntries).insertReturning(
+            LorebookEntriesCompanion.insert(
+              characterId: characterId,
+              keys: const Value(['酒馆', 'tavern']),
+              content: const Value('酒馆的老板是莉莉。'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      expect(created.keys, ['酒馆', 'tavern']);
+      expect(created.position, 'world', reason: '缺省默认');
+      expect(created.enabled, isTrue);
+    });
+
+    test('删角色 → lorebook_entries 级联清除（FK=ON 实测，SR-26）', () async {
+      final characterId = (await db.select(db.characters).getSingle()).id;
+      final now = DateTime.now();
+      await db.into(db.lorebookEntries).insert(
+            LorebookEntriesCompanion.insert(
+              characterId: characterId,
+              title: const Value('条目1'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db.into(db.lorebookEntries).insert(
+            LorebookEntriesCompanion.insert(
+              characterId: characterId,
+              title: const Value('条目2'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      expect(await db.select(db.lorebookEntries).get(), hasLength(2));
+
+      await (db.delete(
+        db.characters,
+      )..where((t) => t.id.equals(characterId))).go();
+
+      expect(await db.select(db.lorebookEntries).get(), isEmpty);
+    });
+
+    test('中断残留重开自愈：表缺 + 索引缺 → 重开幂等补全且旧行保留（SR-25）',
+        () async {
+      // 模拟 from<7 迁移中途被杀残留态：user_version 未提升（仍为 6），
+      // lorebook_entries 表与其索引未落盘（DDL 未执行）。
+      await db.customStatement('PRAGMA user_version = 6');
+      await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
+      await db.customStatement(
+        'DROP INDEX IF EXISTS idx_lorebook_entries_character_id',
+      );
+
+      // 前置断言：确认残留态真实存在。
+      final residualTables = await sqliteMasterNames(db, 'table');
+      expect(residualTables, isNot(contains('lorebook_entries')));
+      final residualIndexes = await sqliteMasterNames(db, 'index');
+      expect(
+        residualIndexes,
+        isNot(contains('idx_lorebook_entries_character_id')),
+      );
+      expect(await userVersion(db), 6);
+
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 7);
+      expect(
+        await sqliteMasterNames(db, 'table'),
+        contains('lorebook_entries'),
+      );
+      expect(
+        await sqliteMasterNames(db, 'index'),
+        contains('idx_lorebook_entries_character_id'),
+      );
+      // 旧行保留：v6 时代消息原样可读。
+      final message = await db.select(db.messages).getSingle();
+      expect(message.content, '星轨之上，无问西东。');
+    });
+
+    test('重复打开幂等：同文件重开不重跑迁移，表/索引/数据仍在', () async {
+      final characterId = (await db.select(db.characters).getSingle()).id;
+      final now = DateTime.now();
+      await db.into(db.lorebookEntries).insert(
+            LorebookEntriesCompanion.insert(
+              characterId: characterId,
+              title: const Value('唯一条目'),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 7);
+      expect(
+        await sqliteMasterNames(db, 'table'),
+        contains('lorebook_entries'),
+      );
+      expect(
+        await sqliteMasterNames(db, 'index'),
+        contains('idx_lorebook_entries_character_id'),
+      );
+      final stored = await db.select(db.lorebookEntries).getSingle();
+      expect(stored.title, '唯一条目');
     });
   });
 
