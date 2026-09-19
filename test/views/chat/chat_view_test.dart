@@ -391,7 +391,7 @@ void main() {
       await env.close();
     });
 
-    testWidgets('点「重试」→ regenerate replace：截断行替换、标记与提示消失、'
+    testWidgets('点「重试」→ 候选追加：截断行切新候选、标记与提示消失、'
         '不新增 user 行（验收 3/6）', (tester) async {
       final env = await ChatTestEnv.create();
       final c = await openConversation(
@@ -419,11 +419,19 @@ void main() {
       expect(find.text('重试'), findsNothing, reason: '无可重试目标后动作消失');
       expect(c.hasRetryableInterrupted, isFalse);
       expect(c.messages.last.interrupted, isFalse, reason: '新回复无「回复中断」标');
-      // replace 语义：无重复 user 输入行。
+      // 候选追加语义：重试 = 原截断内容留候选 0、新回复追加为候选 1 并激活，
+      // 不重写删除原行（行级断言在 active 切换下与 replace 不可区分，须以
+      // 候选面钉语义；验收 6）。
       final settled = await env.messageRepository.getMessages(c.activeConversationId!);
       expect([for (final m in settled) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, '新回复')],
-          reason: '图标 regenerate replace 成功、无重复 user 行');
+          reason: '候选追加语义：active 切新回复、无重复 user 行');
+      final swipes = await env.messageRepository.listSwipes(settled.last.id);
+      expect(swipes, hasLength(2),
+          reason: '候选追加语义：原截断内容 + 新回复共存（不重写删除）');
+      expect(swipes.last.content, '新回复', reason: '新候选 = 重试产出并置激活');
+      expect(find.text('2/2'), findsOneWidget,
+          reason: '候选追加语义：控制条出现（2 候选、active=1）');
       await env.close();
     });
 
@@ -559,7 +567,11 @@ void main() {
           await env.messageRepository.getMessages(c.activeConversationId!);
       expect([for (final m in settled) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, '新回复')],
-          reason: '图标 regenerate replace 成功、无重复 user 行');
+          reason: '候选追加语义：active 切新回复、无重复 user 行');
+      // 候选追加语义：截断内容保留为候选 0（图标 regenerate 与横幅重试同源）。
+      final swipes = await env.messageRepository.listSwipes(settled.last.id);
+      expect(swipes, hasLength(2), reason: '候选追加语义：双候选共存');
+      expect(find.text('2/2'), findsOneWidget, reason: '控制条出现（active=1）');
       await env.close();
     });
 
@@ -612,7 +624,7 @@ void main() {
       return c;
     }
 
-    testWidgets('重生成成功 → 新回复原位替换（旧回复消失）', (tester) async {
+    testWidgets('重生成成功 → active 切新回复（旧回复不显示）', (tester) async {
       final env = await ChatTestEnv.create();
       final convId = await seedConversationWithReply(env);
       await openSeeded(
@@ -632,7 +644,7 @@ void main() {
       );
 
       expect(find.text('旧回复', findRichText: true), findsNothing,
-          reason: '成功替换旧回复');
+          reason: '候选语义：active 切新回复，旧回复不再显示');
       final settled = await env.messageRepository.getMessages(convId);
       expect([for (final m in settled) (m.role, m.content)],
           contains((Role.assistant, '新回复')));
@@ -1158,6 +1170,364 @@ void main() {
       expect(find.byKey(const Key('send-button')), findsOneWidget,
           reason: '完成态 send-button Key 恢复（验收 4）');
       expect(c.isStreaming, isFalse);
+      await env.close();
+    });
+  });
+
+  group('MS-05 swipes 候选控制条 + 消息操作（工单 05）', () {
+    /// 种子 [user, assistant] 会话；[swipes] 逐条追加候选（首次 addSwipe 播种
+    /// 候选 0 = 消息原 content，故候选数 = swipes.length + 1、active = 末位）。
+    Future<(int, Message)> seedAssistantWithSwipes(
+      ChatTestEnv env, {
+      List<String> swipes = const [],
+      String original = '原回复',
+    }) async {
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.user, content: '你好');
+      final assistant = await env.seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: original);
+      for (final content in swipes) {
+        await env.messageRepository.addSwipe(assistant.id, content);
+      }
+      return (conv.id, assistant);
+    }
+
+    /// 全新控制器打开 [convId]（每次新建实例 → 不受同会话幂等返回影响）。
+    Future<ChatController> openSeededConversation(
+      WidgetTester tester,
+      ChatTestEnv env,
+      int convId, {
+      LLMProvider? provider,
+    }) async {
+      final c = env.controllerOf(provider ?? FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await c.openConversation(convId);
+      await pumpChat(tester, c);
+      return c;
+    }
+
+    /// 候选控制条箭头按钮（按图标定位；禁用态同样命中）。
+    Finder arrowFinder(IconData icon) =>
+        find.widgetWithIcon(IconButton, icon);
+
+    testWidgets('候选数 ≤1 不渲染控制条（无 swipes 行 / 单候选，验收 1/7）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, assistant) = await seedAssistantWithSwipes(env);
+      await openSeededConversation(tester, env, convId);
+      expect(arrowFinder(Icons.chevron_left), findsNothing,
+          reason: '无 swipes 行视候选数 0 → 不渲染控制条（验收 7 防御）');
+
+      // 单候选行：addSwipe 播种 0 + 新增 1，删 1 后仅余候选 0（候选数 1）。
+      await env.messageRepository.addSwipe(assistant.id, '候选二');
+      await env.messageRepository.deleteSwipe(assistant.id, 1);
+      await openSeededConversation(tester, env, convId);
+      expect(arrowFinder(Icons.chevron_left), findsNothing,
+          reason: '单选（候选数 1）不渲染控制条（桌面 MS-2 契约锁）');
+      expect(find.text('1/1'), findsNothing, reason: '单选不展示计数');
+      await env.close();
+    });
+
+    testWidgets('候选数 2（active=1）→ 渲染「2/2」+ 右箭头禁用、左箭头可点（验收 1/2）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, _) = await seedAssistantWithSwipes(env, swipes: ['候选二']);
+      await openSeededConversation(tester, env, convId);
+
+      expect(find.text('2/2'), findsOneWidget,
+          reason: '计数 = active index + 1 / 候选数');
+      expect(
+        tester.widget<IconButton>(arrowFinder(Icons.chevron_right)).onPressed,
+        isNull,
+        reason: '末候选 → 右箭头禁用（边界策略锁定为禁用）',
+      );
+      expect(
+        tester.widget<IconButton>(arrowFinder(Icons.chevron_left)).onPressed,
+        isNotNull,
+        reason: '非首候选 → 左箭头可点',
+      );
+      await env.close();
+    });
+
+    testWidgets('点左箭头 → switchSwipe 落库（DB active/content 更新）→ 计数推进「1/2」'
+        '（验收 2）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, assistant) =
+          await seedAssistantWithSwipes(env, swipes: ['候选二']);
+      await openSeededConversation(tester, env, convId);
+      expect(find.text('2/2'), findsOneWidget);
+      expect(find.text('候选二', findRichText: true), findsOneWidget);
+
+      await tester.tap(arrowFinder(Icons.chevron_left));
+      await tester.pump();
+      await pumpUntil(tester, () => find.text('1/2').evaluate().isNotEmpty,
+          why: '切换完成、计数推进');
+
+      final row = await env.messageRepository.messageById(convId, assistant.id);
+      expect(row!.activeSwipeIndex, 0, reason: 'DB active_swipe_index 落库为 0');
+      expect(row.content, '原回复',
+          reason: 'messages.content 恒为激活候选（仓库不变量）');
+      expect(find.text('原回复', findRichText: true), findsOneWidget,
+          reason: 'UI 内容切换为候选 0');
+      expect(
+        tester.widget<IconButton>(arrowFinder(Icons.chevron_left)).onPressed,
+        isNull,
+        reason: '切到首候选后左箭头转禁用（边界）',
+      );
+      await env.close();
+    });
+
+    testWidgets('切换失败（目标行已不存在）→ notice 单源文案 + 回滚切换前 active'
+        '（验收 3）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, assistant) =
+          await seedAssistantWithSwipes(env, swipes: ['候选二']);
+      final c = await openSeededConversation(tester, env, convId);
+      expect(find.text('2/2'), findsOneWidget);
+
+      // 竞争窗口：UI 列表之外的 DB 行已消失（并发删除），切换必然失败。
+      await env.messageRepository.deleteMessage(assistant.id);
+
+      await tester.tap(arrowFinder(Icons.chevron_left));
+      await tester.pump();
+      await pumpUntil(tester, () => c.notice != null, why: '失败 notice 上达');
+
+      expect(c.notice, '消息不存在',
+          reason: '领域错误经 chatErrorMessage 单源映射（无未处理异常）');
+      expect(find.text('2/2'), findsOneWidget,
+          reason: '失败回滚：乐观值清除后回落 DB 权威 active');
+      expect(find.text('1/2'), findsNothing, reason: '乐观切换值不残留');
+      expect(tester.takeException(), isNull, reason: '无未处理异常');
+      await env.close();
+    });
+
+    testWidgets('user 消息菜单：编辑 → dialog 输入 → 就地替换 + 截断后续 + 新回复'
+        '（验收 4）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final user = await env.seedMessage(
+          conversationId: conv.id, role: Role.user, content: '你好');
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '旧回复');
+      final c = await openSeededConversation(tester, env, conv.id,
+          provider: FakeLLMProvider(tokens: const ['新回复']));
+
+      await tester.tap(find.byKey(Key('message-actions-${user.id}')));
+      await tester.pumpAndSettle();
+      expect(find.text('编辑'), findsOneWidget, reason: 'user 消息菜单含「编辑」');
+      expect(find.text('删除'), findsOneWidget, reason: 'user 消息菜单含「删除」');
+      expect(find.text('继续生成'), findsNothing,
+          reason: '「继续生成」仅末条 assistant（user 无此入口）');
+
+      await tester.tap(find.text('编辑'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byKey(const Key('edit-message-field')), '改后内容');
+      await tester.tap(find.byKey(const Key('edit-message-confirm')));
+      await tester.pump();
+      await pumpUntil(tester, () => !c.isRegenerating, why: '编辑重发收尾');
+
+      final settled = await env.messageRepository.getMessages(conv.id);
+      expect([for (final m in settled) (m.role, m.content)], [
+        (Role.user, '改后内容'),
+        (Role.assistant, '新回复'),
+      ], reason: '就地替换 user 内容 + 物理截断后续 + 新 assistant 回复（MS-03 语义）');
+      await env.close();
+    });
+
+    testWidgets('user 消息菜单删除 → 确认 dialog → 截断该条及其后对话（验收 4）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final user = await env.seedMessage(
+          conversationId: conv.id, role: Role.user, content: '你好');
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '旧回复');
+      final c = await openSeededConversation(tester, env, conv.id);
+
+      await tester.tap(find.byKey(Key('message-actions-${user.id}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('删除'));
+      await tester.pumpAndSettle();
+      expect(find.text('删除该用户消息将连带删除其后的所有对话，确定要删除吗？'), findsOneWidget,
+          reason: '删 user 的语义警示文案（对齐桌面 showConfirm 文案）');
+
+      await tester.tap(find.byKey(const Key('confirm-delete-button')));
+      await tester.pump();
+      await pumpUntil(tester, () => find.text('旧回复').evaluate().isEmpty,
+          why: '截断完成、后续回复消失');
+
+      expect(await env.messageRepository.getMessages(conv.id), isEmpty,
+          reason: '删 user 消息 → 该条及其后全部删除（截断语义）');
+      expect(c.messages, isEmpty, reason: '控制器消息面同步清空');
+      await env.close();
+    });
+
+    testWidgets('assistant 消息菜单删除 → 仅删该条（保留触发它的 user 消息，验收 4）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.user, content: '你好');
+      final assistant = await env.seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '旧回复');
+      await openSeededConversation(tester, env, conv.id);
+
+      await tester.tap(find.byKey(Key('message-actions-${assistant.id}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('删除'));
+      await tester.pumpAndSettle();
+      expect(
+          find.text('仅删除该条回复及其候选，保留触发它的用户消息。确定要删除吗？'),
+          findsOneWidget,
+          reason: '删 assistant 的语义警示文案（仅删该条）');
+
+      await tester.tap(find.byKey(const Key('confirm-delete-button')));
+      await tester.pump();
+      await pumpUntil(tester, () => find.text('旧回复').evaluate().isEmpty,
+          why: '单删完成');
+
+      final settled = await env.messageRepository.getMessages(conv.id);
+      expect([for (final m in settled) (m.role, m.content)],
+          [(Role.user, '你好')],
+          reason: '删 assistant 仅删该条，user 行保留');
+      await env.close();
+    });
+
+    testWidgets('末条 assistant 菜单「继续生成」→ 候选追加（条数不变、内容 = 原 + 续写）'
+        '（验收 4）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, assistant) =
+          await seedAssistantWithSwipes(env, original: '原文');
+      final c = await openSeededConversation(tester, env, convId,
+          provider: FakeLLMProvider(tokens: const ['，续写片段']));
+
+      await tester.tap(find.byKey(Key('message-actions-${assistant.id}')));
+      await tester.pumpAndSettle();
+      expect(find.text('继续生成'), findsOneWidget,
+          reason: '末条 assistant 菜单含「继续生成」');
+
+      await tester.tap(find.text('继续生成'));
+      await tester.pump();
+      await pumpUntil(tester, () => find.text('2/2').evaluate().isNotEmpty,
+          why: '续写产生新候选（控制条出现）');
+
+      final settled = await env.messageRepository.getMessages(convId);
+      expect(settled, hasLength(2),
+          reason: '继续生成不新增消息行（仅候选追加）');
+      expect(settled.last.content, '原文，续写片段',
+          reason: '新候选内容 = 原 active 内容 + 续写片段');
+      expect(settled.last.activeSwipeIndex, 1, reason: '新候选置激活');
+      expect(c.notice, isNull, reason: '成功路径无提示');
+      await env.close();
+    });
+
+    testWidgets('空续写（LLM 零产出）→ 无候选、零 UI 副作用（swipeIndex=-1 哨兵）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, assistant) =
+          await seedAssistantWithSwipes(env, original: '原文');
+      final c = await openSeededConversation(tester, env, convId,
+          provider: FakeLLMProvider(tokens: const []));
+
+      await tester.tap(find.byKey(Key('message-actions-${assistant.id}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('继续生成'));
+      await tester.pump();
+      await pumpUntil(tester, () => !c.isRegenerating, why: '空续写收尾');
+
+      expect(await env.messageRepository.listSwipes(assistant.id), isEmpty,
+          reason: '空续写不落候选（防内容相同重复候选）');
+      expect(find.text('2/2'), findsNothing, reason: '无候选 → 控制条不出现');
+      expect(find.text('原文', findRichText: true), findsOneWidget,
+          reason: '原内容零改动');
+      expect(c.notice, isNull, reason: '空续写为 no-op，非错误');
+      await env.close();
+    });
+
+    testWidgets('非末条 assistant 无「继续生成」入口（目标恒为末条）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.user, content: '第一问');
+      final first = await env.seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '第一条回复');
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.user, content: '第二问');
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '第二条回复');
+      await openSeededConversation(tester, env, conv.id);
+
+      await tester.tap(find.byKey(Key('message-actions-${first.id}')));
+      await tester.pumpAndSettle();
+      expect(find.text('继续生成'), findsNothing,
+          reason: '非末条 assistant 不提供续写入口（服务层目标恒为末条）');
+      expect(find.text('删除'), findsOneWidget, reason: '非末条仍可删除该条');
+      await env.close();
+    });
+
+    testWidgets('生成中（流式）操作入口不可达：菜单按钮禁用、零底部菜单（验收 5）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final user = await env.seedMessage(
+          conversationId: conv.id, role: Role.user, content: '你好');
+      await env.seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '旧回复');
+      await openSeededConversation(tester, env, conv.id,
+          provider: TickingFakeLLMProvider(
+            tokens: const ['早', '上', '好', '啊'],
+            delay: const Duration(milliseconds: 200),
+          ));
+
+      await sendViaUi(tester, 'hi');
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(
+        tester
+            .widget<IconButton>(
+                find.byKey(Key('message-actions-${user.id}')))
+            .onPressed,
+        isNull,
+        reason: '流式中操作入口不可达（复用 isBusy 守卫）',
+      );
+
+      // 流式收尾（防 pending timer）。
+      await pumpUntil(
+        tester,
+        () => find.text('早上好啊', findRichText: true).evaluate().isNotEmpty,
+        why: '流式完成',
+      );
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(Key('message-actions-${user.id}')))
+            .onPressed,
+        isNotNull,
+        reason: '终态后入口恢复可用',
+      );
+      await env.close();
+    });
+
+    testWidgets('窄屏 360dp 候选控制条无溢出（验收：360dp 无溢出契约）', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final env = await ChatTestEnv.create();
+      final (convId, _) = await seedAssistantWithSwipes(
+        env,
+        swipes: const ['候选二', '候选三'],
+        original: '一段足够长的回复内容，用于验证窄屏下的排版不会横向溢出。',
+      );
+      await openSeededConversation(tester, env, convId);
+
+      expect(find.text('3/3'), findsOneWidget, reason: '三候选计数正确');
+      expect(tester.takeException(), isNull, reason: '窄屏无溢出异常');
       await env.close();
     });
   });
