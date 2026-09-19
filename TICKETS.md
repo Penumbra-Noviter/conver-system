@@ -19,6 +19,26 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
+| CPA-01 | MS-01 swipes 数据模型+迁移(5→6)+仓库层 | 🔄 进行中 | message_swipes 表/active 不变量/越界异常/导出一致性/迁移三路径（SR-25/27/29） |
+| CPA-02 | MS-02 regenerate 切候选+continue 服务 | 📝 已录入 | 候选追加语义/消息数不变/续写失败零改动/结算键适配 |
+| CPA-03 | MS-03 编辑重发+删除服务 | 📝 已录入 | 仅 user 编辑/截断后续/删 user 截断、删 assistant 仅删该条+级联 |
+| CPA-04 | MS-04 回合/控制器结算键+编排 | 📝 已录入 | _regenerateTarget 结算键改目标 id+候选 index/断流重试适配 |
+| CPA-05 | MS-05 swipes 切换 UI+消息操作 | 📝 已录入 | 候选切换控件/编辑删除入口/继续生成按钮 |
+| CPA-06 | WL-01 世界书表+仓库+parse | 📝 已录入 | lorebook_entries 七件套/character_book 解析入库/保真零回归 |
+| CPA-07 | WL-02 世界书激活引擎纯函数 | 🔄 进行中 | 逐字对齐桌面引擎/激活矩阵/加权/同种子复现/零 DB 依赖 |
+| CPA-08 | WL-03 注入链+解析入库 | 📝 已录入 | world=null 零回归/注入序/记忆宫殿条目随引擎注入 |
+| CPA-09 | WL-04 世界书编辑器 UI | 📝 已录入 | 条目 CRUD 编辑器/角色页入口 |
+| CPA-10 | WL-05 记忆宫殿 | 📝 已录入 | LLM 归纳 source=auto/与 MemoryService 并存/失败降级 |
+| CPA-11 | NPD-01 叙述风格 | 📝 已录入 | 默认启用 opt-out/rules 逐字对齐/注入 scenario 后/expert 亦注入 |
+| CPA-12 | NPD-02 预设对话数据+快照+注入 | 📝 已录入 | ≤10 归一化/快照列创建固化/改卡不影响已建会话/few-shot 注入 |
+| CPA-13 | NPD-03 预设对话编辑+开场白 UI | 📝 已录入 | 角色编辑列表/开局双选/greeting 三态（默认/备选/无） |
+| CPA-14 | NPD-04 专家模式 | 📝 已录入 | prompt_mode/expert_prompt 可逆/expert 单条替代三处/空回退 |
+| CPA-15 | SP-01 采样参数+值域守卫 | 📝 已录入 | 四可空列/Claude 请求体三键不存在（SR-23）/值域守卫（SR-24） |
+| CPA-16 | SP-02 对话级采样 UI | 📝 已录入 | 对话设置页可空覆盖 |
+| CPA-17 | PD-04 Prompt Debug | 📝 已录入 | 单一组装核心/segments 来源标注/只读零 LLM 零落库（SR-31） |
+| CPA-18 | BR-01 分支元数据+快照克隆 | 📝 已录入 | 三可空列/BranchSnapshot 版本化/未知版本拒绝（SR-30） |
+| CPA-19 | BR-02 分支 UI+导入导出 | 📝 已录入 | 消息级分支/会话列表来源标记/文件导入导出 |
+
 
 ## 技术债区
 
