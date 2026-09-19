@@ -77,6 +77,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 
@@ -85,6 +86,7 @@ import '../data/database/tables.dart' show Role;
 import '../data/repositories/character_repository.dart';
 import '../data/repositories/companion_repository.dart';
 import '../data/repositories/conversation_repository.dart';
+import '../data/repositories/lorebook_repository.dart';
 import '../data/repositories/message_repository.dart';
 import '../data/repositories/settings_repository.dart';
 import 'companion/relationship_service.dart';
@@ -93,6 +95,7 @@ import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
 import 'llm/prompt.dart';
+import 'lorebook/lorebook_engine.dart';
 import 'memory/memory_prompt.dart';
 import 'memory/memory_service.dart';
 import 'template_vars.dart';
@@ -372,6 +375,8 @@ class ChatService {
     this._memoryService,
     this._thoughtService,
     this._companionRepository,
+    LorebookRepository? lorebookRepository,
+    this._lorebookRandom,
     List<EndOfTurnHook> endOfTurnHooks = const [],
     List<Duration> connectRetryDelays = const [
       Duration(seconds: 1),
@@ -379,7 +384,10 @@ class ChatService {
     ],
   }) : _endOfTurnHooks = List<EndOfTurnHook>.unmodifiable(endOfTurnHooks),
        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays) {
-    var _ = database; // wildcard：构造签名稳定，服务层不直接持有 AppDatabase。
+    // 服务层不直接持有 AppDatabase（wildcard）；例外：世界书仓储缺省需从
+    // [database] 装配（app.dart 装配零改动约束，WL-03），显式注入可覆盖。
+    var _ = database;
+    _lorebookRepository = lorebookRepository ?? LorebookRepository(database);
     _credentialsResolver = credentialsResolver ?? _wireCredentialsResolver();
   }
 
@@ -399,6 +407,14 @@ class ChatService {
   /// 关系状态读面（注入链需查 RelationshipStates 行；companion_repository 为
   /// 阶段 2 共享只读依赖，缺省 null 时关系注入跳过——既有装配零改动）。
   final CompanionRepository? _companionRepository;
+
+  /// 世界书条目仓储（WL-03）：缺省由装配传入的 `database` 构造（app.dart
+  /// 装配零改动约束见构造函数），调用方可显式注入覆盖。
+  late final LorebookRepository _lorebookRepository;
+
+  /// 世界书激活 RNG 注入点（WL-03 验收 4）：null → 引擎每次调用自建
+  /// [Random]（非确定性，符合概率/互斥组语义）；测试注入同种子可复现。
+  final Random? _lorebookRandom;
 
   /// 回合末副作用集合（S1）：装配层注册的有序闭包，列表序即执行序
   /// （backfill → reflect → plan → relate）。缺省 `const []`（零副作用）。
@@ -1451,12 +1467,14 @@ class ChatService {
     );
   }
 
-  /// 组装发送给 LLM 的消息列表（角色字段 → CharacterData + 滑窗 + 历史）。
+  /// 组装发送给 LLM 的消息列表（角色字段 → CharacterData + 滑窗 + 历史 +
+  /// 世界书注入）。
   ///
   /// [historyBeforeId] 非空（重生成路径）时历史只取 `id < historyBeforeId`
   /// 的消息——桌面「先 delete_messages_from 截断、后组装」在**延迟删除**下以
   /// 定位读（[MessageRepository.messagesBefore]）等价实现，保证被重生成目标
-  /// （及其后）不进入自身上下文。
+  /// （及其后）不进入自身上下文。世界书扫描与消息列表共用该历史截止（桌面
+  /// assemble_chat_context 逐字对齐）。
   Future<List<LlmMessage>> _assembleMessages({
     required Conversation conv,
     required Character character,
@@ -1478,6 +1496,22 @@ class ChatService {
     final history = historyBeforeId == null
         ? await _messageRepository.getMessages(conv.id)
         : await _messageRepository.messagesBefore(conv.id, historyBeforeId);
+    // WL-03：世界书扫描→激活→注入（与消息滑窗 maxRounds 解耦，扫描窗由条目
+    // 最大 depth 决定）；世界书为空/全禁用 → 空块零注入（buildMessages 对
+    // null/空块逐字节零变化）。世界书读失败降级为空块不阻断主回复（对齐既有
+    // 记忆注入降级先例）。
+    Map<String, List<String>> world;
+    try {
+      world = await _buildLorebookInjection(
+        character,
+        history,
+        userContent,
+        userName,
+      );
+    } catch (e) {
+      debugPrint('世界书注入失败，跳过: $e');
+      world = const {};
+    }
     final built = buildMessages(
       charData,
       history: history.map(
@@ -1488,6 +1522,7 @@ class ChatService {
       userName: userName,
       appendCurrentInput: appendCurrentInput,
       extraVars: extraVars,
+      world: world,
     );
     final messages = [
       for (final m in built) LlmMessage(role: m.role, content: m.content),
@@ -1554,6 +1589,68 @@ class ChatService {
     }
 
     return messages;
+  }
+
+  /// 世界书扫描→激活→注入（WL-03 验收 4，对齐桌面 `chat.py::
+  /// _lorebook_world_injection`）。
+  ///
+  /// 链路：listEntries → enabled 过滤 → 最大 depth → collectScanText（与消息
+  /// 滑窗 maxRounds 解耦，扫描窗 = 最近 `max(depth)` 轮 = 2*depth 条对话 +
+  /// 当前输入）→ activate（RNG 可注入，null 时引擎每次调用自建非确定性源）→
+  /// buildWorldInjection（position 分组 + `{{user}}/{{char}}` 模板替换 + 来源
+  /// 标注）→ 展平为 buildMessages 的 `{before_char/after_char/system: [内容]}`
+  /// 注入块。无启用条目 → 空块零注入（不污染上下文）。
+  Future<Map<String, List<String>>> _buildLorebookInjection(
+    Character character,
+    List<Message> history,
+    String currentInput,
+    String userName,
+  ) async {
+    final entries = await _lorebookRepository.listEntries(character.id);
+    final enabled = [for (final e in entries) if (e.enabled) e];
+    if (enabled.isEmpty) {
+      return const {};
+    }
+    final depth = enabled.map((e) => e.depth).reduce(max);
+    final scanText = collectScanText<Message>(
+      history,
+      currentInput,
+      depth,
+      roleOf: (m) => m.role.value,
+      contentOf: (m) => m.content,
+    );
+    final dataEntries = [
+      for (final e in enabled)
+        LorebookEntryData(
+          id: e.id,
+          keys: e.keys,
+          content: e.content,
+          constant: e.constant,
+          order: e.order,
+          probability: e.probability,
+          groupName: e.groupName,
+          groupWeight: e.groupWeight,
+          matchMode: e.matchMode,
+          position: e.position,
+          enabled: e.enabled,
+        ),
+    ];
+    final activated = activateLorebookEntries(
+      dataEntries,
+      scanText,
+      rng: _lorebookRandom,
+    );
+    final sourceById = {for (final e in enabled) e.id: e.source};
+    final blocks = buildWorldInjection(
+      activated,
+      userName: userName,
+      charName: character.name.isEmpty ? 'Character' : character.name,
+      sourceById: sourceById,
+    );
+    return {
+      for (final entry in blocks.entries)
+        entry.key: [for (final segment in entry.value) segment.content],
+    };
   }
 
   /// 组装采样温度：角色 `character.temperature` 为主、全局 [globalTemperature]

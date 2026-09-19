@@ -18,6 +18,7 @@ import 'dart:async';
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
@@ -335,6 +336,113 @@ void main() {
       } finally {
         broken.dispose();
       }
+      await env.close();
+    });
+  });
+
+  group('character_book 解析入库（WL-03 验收 7）', () {
+    /// 构造注入了 LorebookRepository 的控制器（缺省装配不注入→跳过不炸）。
+    CharactersController wiredController(_Env env, LorebookRepository repo) {
+      return CharactersController(
+        characterRepository: env.repository,
+        fileExchange: env.exchange,
+        navigation: ShellNavigation(),
+        chatController: env.chatController,
+        lorebookRepository: repo,
+      );
+    }
+
+    testWidgets('导入含 character_book 的角色卡 → lorebook_entries 落行（经 parseCharacterBook）',
+        (tester) async {
+      final env = await _Env.create();
+      final lorebookRepo = LorebookRepository(env.db);
+      final controller = wiredController(env, lorebookRepo);
+      try {
+        // 经 fromV2Card 真实解析链：character_book 位于 conver_system 命名空间。
+        env.exchange.importResult = fromV2Card({
+          'spec': 'chara_card_v2',
+          'spec_version': '2.0',
+          'data': <String, dynamic>{
+            'name': '带世界书的角色',
+            'extensions': <String, dynamic>{
+              'conver_system': <String, dynamic>{
+                'character_book': <String, dynamic>{
+                  'entries': <Map<String, dynamic>>[
+                    <String, dynamic>{
+                      'keys': ['剑'],
+                      'content': '剑是身份的象征',
+                      'constant': false,
+                      'insertion_order': 100,
+                      'enabled': true,
+                      'name': '剑之知识',
+                      'position': 'world',
+                      'depth': 20,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        });
+        await pumpChars(tester, controller);
+        await tester.tap(find.byTooltip('导入角色卡'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.pump();
+
+        // 角色入库。
+        final characters = await env.repository.listCharacters();
+        expect(characters, hasLength(1));
+        final char = characters.single.character;
+        expect(char.name, '带世界书的角色');
+        // lorebook 落行（字段一一对应 parseCharacterBook 产物）。
+        final entries = await lorebookRepo.listEntries(char.id);
+        expect(entries, hasLength(1));
+        expect(entries.single.title, '剑之知识');
+        expect(entries.single.keys, ['剑']);
+        expect(entries.single.content, '剑是身份的象征');
+        expect(entries.single.position, 'world');
+        expect(entries.single.depth, 20);
+        expect(entries.single.enabled, isTrue);
+      } finally {
+        controller.dispose();
+      }
+      await env.close();
+    });
+
+    testWidgets('导入无 character_book 的角色卡 → 零 lorebook 行', (tester) async {
+      final env = await _Env.create();
+      final lorebookRepo = LorebookRepository(env.db);
+      final controller = wiredController(env, lorebookRepo);
+      try {
+        env.exchange.importResult = _draft(name: '无世界书角色');
+        await pumpChars(tester, controller);
+        await tester.tap(find.byTooltip('导入角色卡'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.pump();
+
+        final char = (await env.repository.listCharacters()).single.character;
+        expect(char.name, '无世界书角色');
+        expect(await lorebookRepo.listEntries(char.id), isEmpty);
+      } finally {
+        controller.dispose();
+      }
+      await env.close();
+    });
+
+    testWidgets('未注入 LorebookRepository 的控制器导入照常（缺省跳过不炸）',
+        (tester) async {
+      final env = await _Env.create();
+      env.exchange.importResult = _draft(name: '缺省装配角色');
+      await pumpChars(tester, env.controller);
+      await tester.tap(find.byTooltip('导入角色卡'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump();
+      expect(env.controller.characters.map((r) => r.character.name),
+          ['缺省装配角色']);
+      expect(find.text('已导入角色「缺省装配角色」'), findsOneWidget);
       await env.close();
     });
   });
