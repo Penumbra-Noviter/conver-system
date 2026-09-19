@@ -163,10 +163,40 @@ abstract class LLMProvider {
     double temperature = 0.7,
   });
 
-  /// 流式生成，逐 token 产出。
+  /// 流式生成，逐 token 产出（基类默认实现 = 模板方法，承载错误翻译骨架）。
   ///
-  /// [temperature] 语义同 [generate]（OpenAI 透传、Claude 忽略）。
+  /// 消费 [streamRequest] 内层流逐 token 透传；内层流抛出的任意异常经
+  /// [translateError] 映射为 LLM 错误族后上抛（子类差异面只写端点 / 头 /
+  /// 终态帧 / 帧提取，不再各自复制本骨架）。[temperature] 语义同 [generate]
+  /// （OpenAI 透传、Claude 忽略）。
   Stream<String> streamGenerate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) async* {
+    try {
+      // 注意不用 yield*：Dart 语义下 yield* 将内层流错误直接转发到外层流，
+      // 不经外层 try/catch；await for 则将错误在其语句处抛出、可被捕获翻译。
+      await for (final token in streamRequest(
+        messages: messages,
+        maxTokens: maxTokens,
+        model: model,
+        temperature: temperature,
+      )) {
+        yield token;
+      }
+    } catch (e) {
+      throw translateError(e);
+    }
+  }
+
+  /// Provider 特有流式 wire 扩展点（protected 语义）。
+  ///
+  /// 子类只实现本方法：端点 / 头 / 终态帧 / 帧提取（可复用 [streamSse] 共享
+  /// 低级骨架），错误翻译收尾由基类默认 [streamGenerate] 单点承载。参数面与
+  /// [streamGenerate] 同构（messages / maxTokens / model / temperature）。
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,

@@ -40,7 +40,7 @@ class _ThrowingProvider extends LLMProvider {
       throw UnimplementedError();
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
@@ -79,7 +79,7 @@ class _DefaultChainProvider extends LLMProvider {
       throw UnimplementedError();
 
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
@@ -100,6 +100,60 @@ class _HookProvider extends _DefaultChainProvider {
       return LLMError('Test 专属钩子命中: ${error.message}');
     }
     return null;
+  }
+}
+
+/// 探针 `streamRequest`（S3 基类默认 streamGenerate 专项测试用）。
+///
+/// 按配置产出 [tokens] 或在订阅时抛 [error]（原样，不翻译），并记录
+/// streamGenerate 透传下来的参数（messages / maxTokens / model / temperature）。
+/// 不覆写 [translateError] 与 [streamGenerate]——依赖基类默认实现，验证模板
+/// 方法「错误翻译上抛 + 逐 token 透传」契约。
+class _StreamRequestProbeProvider extends LLMProvider {
+  _StreamRequestProbeProvider({
+    super.apiKey = 'k',
+    List<String> tokens = const [],
+    this.error,
+  }) : _tokens = List<String>.unmodifiable(tokens);
+
+  final List<String> _tokens;
+
+  /// 非 null 时 streamRequest 订阅即抛出该异常（原样，不翻译）。
+  final Object? error;
+
+  // 调用记录（基类 streamGenerate 透传断言用）。
+  List<LlmMessage>? lastMessages;
+  int? lastMaxTokens;
+  String? lastModel;
+  final List<double> temperatures = [];
+
+  @override
+  Future<String> generate({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) =>
+      throw UnimplementedError();
+
+  @override
+  Stream<String> streamRequest({
+    required List<LlmMessage> messages,
+    int maxTokens = 2048,
+    String? model,
+    double temperature = 0.7,
+  }) async* {
+    lastMessages = messages;
+    lastMaxTokens = maxTokens;
+    lastModel = model;
+    temperatures.add(temperature);
+    final e = error;
+    if (e != null) {
+      throw e;
+    }
+    for (final token in _tokens) {
+      yield token;
+    }
   }
 }
 
@@ -212,6 +266,54 @@ void main() {
     test('translateError 对已 LLMError 原样返回', () {
       final e = LLMAuthError('Claude');
       expect(_ThrowingProvider().translateError(e), same(e));
+    });
+  });
+
+  group('LLMProvider 默认 streamGenerate 模板方法（S3：基类承载翻译骨架，'
+      '子类只留 streamRequest 差异面）', () {
+    test('streamRequest 抛错 → 翻译上抛 LLM 族（错误不经 yield* 原样转发）',
+        () async {
+      final probe = _StreamRequestProbeProvider(error: StateError('boom'));
+      await expectLater(
+        probe.streamGenerate(messages: const []).toList(),
+        throwsA(
+          isA<LLMError>().having(
+            (e) => e.message,
+            'message',
+            'LLM API 调用失败: Bad state: boom',
+          ),
+        ),
+      );
+    });
+
+    test('正常流逐 token 透传（含 temperature 与其余参数透传）', () async {
+      final probe = _StreamRequestProbeProvider(
+        tokens: const ['Hel', 'lo', ', ', 'world'],
+      );
+      const messages = [LlmMessage(role: 'user', content: 'hi')];
+      final collected = <String>[];
+      await for (final token in probe.streamGenerate(
+        messages: messages,
+        maxTokens: 42,
+        model: 'm1',
+        temperature: 0.37,
+      )) {
+        collected.add(token);
+      }
+      expect(collected, ['Hel', 'lo', ', ', 'world']);
+      // 参数透传：基类默认实现按调用方入参原样咨询 streamRequest。
+      expect(probe.lastMessages, same(messages));
+      expect(probe.lastMaxTokens, 42);
+      expect(probe.lastModel, 'm1');
+      expect(probe.temperatures, [0.37]);
+    });
+
+    test('默认实现保留「不用 yield*」陷阱注释（防误改回归锚）', () {
+      // 陷阱本质：yield* 将内层流错误直接转发到外层流、不经外层 try/catch，
+      // 使翻译收尾失效。该注释是模板方法契约的一部分，误删即红。
+      final source =
+          File('lib/services/llm/llm_provider.dart').readAsStringSync();
+      expect(source, contains('不用 yield*'));
     });
   });
 

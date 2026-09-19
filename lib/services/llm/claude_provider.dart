@@ -90,31 +90,16 @@ class ClaudeProvider extends LLMProvider {
     });
   }
 
+  /// Anthropic 流式 wire 扩展点（protected 语义，基类默认 [LLMProvider.streamGenerate]
+  /// 承载错误翻译骨架）：POST + SSE 消费，逐 token 产出（共享骨架 [streamSse]，
+  /// 本方法只提供 Anthropic 差异面：端点 / 头 / 终态帧 / 帧提取 / 流错帧）。
+  /// [temperature] 接收但忽略（U-2：Anthropic 已弃用该键，请求体不携带）。
   @override
-  Stream<String> streamGenerate({
+  Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
-  }) async* {
-    try {
-      // 注意不用 yield*：Dart 语义下 yield* 将内层流错误直接转发到外层流，
-      // 不经外层 try/catch；await for 则将错误在其语句处抛出、可被捕获翻译。
-      await for (final token in _streamRequest(messages,
-          maxTokens: maxTokens, model: model)) {
-        yield token;
-      }
-    } catch (e) {
-      throw translateError(e);
-    }
-  }
-
-  /// 流式请求体：POST + SSE 消费，逐 token 产出（共享骨架 [streamSse]，
-  /// 本方法只提供 Anthropic 差异面：端点 / 头 / 终态帧 / 帧提取 / 流错帧）。
-  Stream<String> _streamRequest(
-    List<LlmMessage> messages, {
-    required int maxTokens,
-    String? model,
   }) async* {
     yield* streamSse(
       uri: _messagesUri(),
