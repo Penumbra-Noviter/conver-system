@@ -583,4 +583,203 @@ void main() {
       expect(await repo.searchMessages('   '), isEmpty);
     });
   });
+
+  group('语义化定位读（S6）', () {
+    Future<Message> send(int conversationId, Role role, String content) {
+      return repo.createMessage(
+        conversationId: conversationId,
+        role: role,
+        content: content,
+      );
+    }
+
+    test('lastAssistantMessage: 无消息 / 仅 user → null', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      expect(await repo.lastAssistantMessage(conv.id), isNull);
+
+      await sendUserMessage(conv.id, '只有用户消息');
+      expect(await repo.lastAssistantMessage(conv.id), isNull);
+    });
+
+    test('lastAssistantMessage: 末条 assistant（createdAt DESC 优先，user 不干扰）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await send(conv.id, Role.assistant, '开场');
+      await sendUserMessage(conv.id, '第一问');
+      final first = await send(conv.id, Role.assistant, '第一答');
+      fakeNow = fakeNow.add(const Duration(seconds: 5));
+      await sendUserMessage(conv.id, '第二问');
+      final second = await send(conv.id, Role.assistant, '第二答');
+
+      final last = await repo.lastAssistantMessage(conv.id);
+
+      expect(last, isNotNull);
+      expect(last!.id, second.id);
+      expect(last.content, '第二答');
+      expect(first.id, isNot(second.id), reason: '两条 assistant 均已落库');
+    });
+
+    test('lastAssistantMessage: 同秒两条 assistant → id 大者胜（id DESC 兜底）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      // 不拨动 fakeNow：三条同秒，判定只能靠 id 兜底。
+      await send(conv.id, Role.assistant, '开场');
+      await send(conv.id, Role.assistant, '旧答');
+      final last = await send(conv.id, Role.assistant, '末答');
+
+      final got = await repo.lastAssistantMessage(conv.id);
+
+      expect(got!.id, last.id, reason: '同秒末条 = id 最大者');
+    });
+
+    test('lastUserMessageBefore: beforeId 前无 user（无 user / 全部晚于）→ null',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await send(conv.id, Role.assistant, '开场');
+
+      // 仅 assistant → null。
+      expect(
+        await repo.lastUserMessageBefore(conv.id, 999999),
+        isNull,
+      );
+
+      await sendUserMessage(conv.id, '你好');
+      final reply = await send(conv.id, Role.assistant, '回复');
+      // beforeId 指向最早 user 自身 → 其前无 user → null（id < beforeId 开区间）。
+      expect(await repo.lastUserMessageBefore(conv.id, reply.id), isNotNull);
+    });
+
+    test('lastUserMessageBefore: 取 id < beforeId 的最近一条 user（role 过滤）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final u1 = await sendUserMessage(conv.id, '第一问');
+      fakeNow = fakeNow.add(const Duration(seconds: 3));
+      final a1 = await send(conv.id, Role.assistant, '第一答');
+      fakeNow = fakeNow.add(const Duration(seconds: 3));
+      final u2 = await sendUserMessage(conv.id, '第二问');
+      fakeNow = fakeNow.add(const Duration(seconds: 3));
+      final a2 = await send(conv.id, Role.assistant, '第二答');
+
+      expect((await repo.lastUserMessageBefore(conv.id, a2.id))!.id, u2.id);
+      expect((await repo.lastUserMessageBefore(conv.id, a1.id))!.id, u1.id);
+    });
+
+    test('lastUserMessageBefore: 同秒多条 → id 大者胜（与 _lastUserBefore 逐位等价）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      // 不拨动 fakeNow：u1/u2 同秒，beforeId 前最近 user 靠 id 兜底。
+      final u1 = await sendUserMessage(conv.id, '第一问');
+      final a1 = await send(conv.id, Role.assistant, '第一答');
+      final u2 = await sendUserMessage(conv.id, '第二问');
+      final a2 = await send(conv.id, Role.assistant, '第二答');
+
+      final got = await repo.lastUserMessageBefore(conv.id, a2.id);
+
+      expect(got!.id, u2.id, reason: '同秒取 id 最大者');
+      expect(u1.id, isNot(u2.id));
+      expect(a1.id, isNot(a2.id));
+    });
+
+    test('messagesBefore: id < beforeId 开区间正序（与 getMessages 同序）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final m1 = await sendUserMessage(conv.id, 'm1');
+      fakeNow = fakeNow.add(const Duration(seconds: 10));
+      final m2 = await sendUserMessage(conv.id, 'm2');
+      fakeNow = fakeNow.add(const Duration(seconds: -5)); // 回到较早时刻
+      final m3 = await sendUserMessage(conv.id, 'm3');
+      fakeNow = fakeNow.add(const Duration(seconds: 20));
+      final m4 = await sendUserMessage(conv.id, 'm4');
+
+      final before = await repo.messagesBefore(conv.id, m4.id);
+
+      expect(before.map((m) => m.id), [m1.id, m3.id, m2.id],
+          reason: 'createdAt ASC（m3 早于 m2）+ id ASC 兜底');
+      // 与 getMessages 过滤同序：全量正序取 id < beforeId 逐条一致。
+      final full = await repo.getMessages(conv.id);
+      expect(
+        before.map((m) => m.id),
+        full.where((m) => m.id < m4.id).map((m) => m.id),
+        reason: '与 getMessages 同序',
+      );
+    });
+
+    test('messagesBefore: beforeId 小于全部 → 空列表', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final first = await sendUserMessage(conv.id, '最早');
+
+      expect(await repo.messagesBefore(conv.id, first.id), isEmpty);
+    });
+
+    test('messageById: 本对话命中', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final u = await sendUserMessage(conv.id, '你好');
+      await send(conv.id, Role.assistant, '回复');
+
+      final got = await repo.messageById(conv.id, u.id);
+
+      expect(got, isNotNull);
+      expect(got!.id, u.id);
+      expect(got.role, Role.user);
+    });
+
+    test('messageById: 跨对话同 id → null（对话归属校验）', () async {
+      final charA = await seedCharacter(name: '甲');
+      final charB = await seedCharacter(name: '乙');
+      final convA = await seedConversation(charA.id);
+      final convB = await seedConversation(charB.id);
+      final inA = await sendUserMessage(convA.id, '甲的消息');
+      final inB = await sendUserMessage(convB.id, '乙的消息');
+
+      expect((await repo.messageById(convB.id, inA.id)), isNull,
+          reason: 'id 属于另一对话 → 归属校验拒绝');
+      expect((await repo.messageById(convA.id, inB.id)), isNull);
+    });
+
+    test('messageById: 不存在 id → null', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '有一条');
+
+      expect(await repo.messageById(conv.id, 999999), isNull);
+    });
+
+    test('lastMessage: 末条 = createdAt DESC, id DESC（同秒 id 兜底）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final u1 = await sendUserMessage(conv.id, '第一问');
+      final a1 = await send(conv.id, Role.assistant, '第一答');
+      // 同秒：a1 之后同秒插入 u2 → 末条 = u2（id 兜底）。
+      final u2 = await sendUserMessage(conv.id, '第二问');
+
+      final last = await repo.lastMessage(conv.id);
+
+      expect(last!.id, u2.id, reason: '同秒末条 = id 最大者');
+      expect(last.role, Role.user);
+      expect(u1.id, isNot(a1.id));
+    });
+
+    test('lastMessage: 无消息 → null；跨对话隔离', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final other = await seedConversation(char.id);
+
+      expect(await repo.lastMessage(conv.id), isNull);
+
+      await sendUserMessage(other.id, '另一对话有消息');
+      expect(await repo.lastMessage(conv.id), isNull,
+          reason: '他对话消息不串入');
+      expect(await repo.lastMessage(other.id), isNotNull);
+    });
+  });
 }

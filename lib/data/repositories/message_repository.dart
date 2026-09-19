@@ -251,4 +251,100 @@ class MessageRepository {
         .get();
     return rows.isEmpty ? 0 : rows.first.id;
   }
+
+  /// 对话内末条 assistant 消息（缺省重生成目标，对齐桌面
+  /// `_resolve_regenerate_target` 的 no-messageId 分支）。
+  ///
+  /// 单值读 `ORDER BY created_at DESC, id DESC LIMIT 1`——与「全量正序 +
+  /// reversed 遍历取首个 assistant」逐位等价（含同秒 id 兜底，F-106 先例）；
+  /// 无匹配（无消息 / 无 assistant）返回 null。
+  Future<Message?> lastAssistantMessage(int conversationId) async {
+    final rows = await (_db.select(_db.messages)
+          ..where(($MessagesTable t) =>
+              t.conversationId.equals(conversationId))
+          ..where(($MessagesTable t) => t.role.equalsValue(Role.assistant))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.createdAt),
+            (t) => OrderingTerm.desc(t.id),
+          ])
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// 对话内 [beforeId] 之前最近的一条 user 消息（重生成触发源，对齐桌面
+  /// `_last_user_before`）。
+  ///
+  /// 判定语义与既有 `_lastUserBefore` 逐位等价：`role == user` 且 `id <
+  /// beforeId` 的正序序列末条 = 倒序序列首条，故单值读
+  /// `WHERE role='user' AND id < beforeId ORDER BY created_at DESC, id DESC
+  /// LIMIT 1`（id 为自增主键，`id < beforeId` 即「该行之前」；同秒 id 兜底）。
+  /// 无匹配返回 null。
+  Future<Message?> lastUserMessageBefore(
+    int conversationId,
+    int beforeId,
+  ) async {
+    final rows = await (_db.select(_db.messages)
+          ..where(($MessagesTable t) =>
+              t.conversationId.equals(conversationId))
+          ..where(($MessagesTable t) => t.role.equalsValue(Role.user))
+          ..where(($MessagesTable t) => t.id.isSmallerThanValue(beforeId))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.createdAt),
+            (t) => OrderingTerm.desc(t.id),
+          ])
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// 对话内 [beforeId] 之前的全部消息，`ORDER BY created_at ASC, id ASC`
+  /// 正序序列（与 [getMessages] 同序，buildMessages 滑窗依赖保持）。
+  ///
+  /// [beforeId] 为开区间上界（`id < beforeId`，不含目标行及其后）；无匹配
+  /// 返回空列表。不下推滑窗——maxRounds 为「轮」语义非条数，保持服务层 →
+  /// buildMessages 纯函数边界（S6 共识）。
+  Future<List<Message>> messagesBefore(
+    int conversationId,
+    int beforeId,
+  ) {
+    return (_db.select(_db.messages)
+          ..where(($MessagesTable t) =>
+              t.conversationId.equals(conversationId))
+          ..where(($MessagesTable t) => t.id.isSmallerThanValue(beforeId))
+          ..orderBy([
+            (t) => OrderingTerm.asc(t.createdAt),
+            (t) => OrderingTerm.asc(t.id),
+          ]))
+        .get();
+  }
+
+  /// 显式 id 定位 + 对话归属校验（重生成显式 messageId 分支）。
+  ///
+  /// 仅当 [messageId] 属于 [conversationId] 时返回该行；id 不存在或属于
+  /// 其他对话（跨对话同 id）一律返回 null——归属校验不抛错、不外泄他对话
+  /// 行。查询异常上抛（仓库不吞错）。
+  Future<Message?> messageById(int conversationId, int messageId) {
+    return (_db.select(_db.messages)
+          ..where(($MessagesTable t) => t.conversationId.equals(conversationId))
+          ..where(($MessagesTable t) => t.id.equals(messageId)))
+        .getSingleOrNull();
+  }
+
+  /// 对话内末条消息（chat_round 末条读下推）。
+  ///
+  /// 单值读 `ORDER BY created_at DESC, id DESC LIMIT 1`（同秒 id 兜底，
+  /// F-106 先例）；无消息返回 null。调用方保留查询异常吞并语义（尽力而为
+  /// 标记判定），仓库不吞错。
+  Future<Message?> lastMessage(int conversationId) async {
+    final rows = await (_db.select(_db.messages)
+          ..where(($MessagesTable t) => t.conversationId.equals(conversationId))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.createdAt),
+            (t) => OrderingTerm.desc(t.id),
+          ])
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? null : rows.first;
+  }
 }
