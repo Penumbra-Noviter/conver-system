@@ -467,10 +467,12 @@ class ChatRound {
 
   /// 返回 [conversationId] 当前最后一条消息（无则 null；查询异常按 null 处理
   /// ——标记判定为尽力而为，不因 DB 读取失败阻塞）。
+  ///
+  /// 末条读下推 [MessageRepository.lastMessage]（S6：不再全量拉取 + 线性
+  /// 遍历）；仓库不吞错，异常在本调用方吞并（try/catch 语义保留）。
   Future<Message?> _lastMessageOrNull(int conversationId) async {
     try {
-      final messages = await _messageRepository.getMessages(conversationId);
-      return messages.isEmpty ? null : messages.last;
+      return await _messageRepository.lastMessage(conversationId);
     } catch (_) {
       return null;
     }

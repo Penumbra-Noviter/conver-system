@@ -1052,7 +1052,8 @@ class ChatService {
   ///
   /// [historyBeforeId] 非空（重生成路径）时历史只取 `id < historyBeforeId`
   /// 的消息——桌面「先 delete_messages_from 截断、后组装」在**延迟删除**下以
-  /// 读侧过滤等价实现，保证被重生成目标（及其后）不进入自身上下文。
+  /// 定位读（[MessageRepository.messagesBefore]）等价实现，保证被重生成目标
+  /// （及其后）不进入自身上下文。
   Future<List<LlmMessage>> _assembleMessages({
     required Conversation conv,
     required Character character,
@@ -1071,10 +1072,9 @@ class ChatService {
       mesExample: character.mesExample,
       postHistoryInstructions: character.postHistoryInstructions,
     );
-    final allHistory = await _messageRepository.getMessages(conv.id);
     final history = historyBeforeId == null
-        ? allHistory
-        : allHistory.where((m) => m.id < historyBeforeId);
+        ? await _messageRepository.getMessages(conv.id)
+        : await _messageRepository.messagesBefore(conv.id, historyBeforeId);
     final built = buildMessages(
       charData,
       history: history.map(
@@ -1201,19 +1201,20 @@ class ChatService {
 
   /// 解析重生成目标并校验（对话归属 + 必须为 assistant；对齐
   /// `chat.py::_resolve_regenerate_target`）。
+  ///
+  /// 显式 [messageId]：经 [MessageRepository.messageById] 定位（跨对话同 id
+  /// 或不存在 → [MessageNotFoundError]，与原「对话内线性遍历未命中」逐位
+  /// 等价）；缺省：经 [MessageRepository.lastAssistantMessage] 取末条
+  /// assistant（无 → [InvalidRegenerateTargetError.noAssistantReply]）。
   Future<Message> _resolveRegenerateTarget(
     int conversationId,
     int? messageId,
   ) async {
-    final messages = await _messageRepository.getMessages(conversationId);
     if (messageId != null) {
-      Message? target;
-      for (final m in messages) {
-        if (m.id == messageId) {
-          target = m;
-          break;
-        }
-      }
+      final target = await _messageRepository.messageById(
+        conversationId,
+        messageId,
+      );
       if (target == null) {
         throw MessageNotFoundError();
       }
@@ -1222,25 +1223,19 @@ class ChatService {
       }
       return target;
     }
-    // 缺省：末条 assistant（getMessages 为 created_at 正序 / id 兜底）。
-    for (final m in messages.reversed) {
-      if (m.role == Role.assistant) {
-        return m;
-      }
+    // 缺省：末条 assistant（定位读 DESC 序首条，同秒 id 兜底）。
+    final lastAssistant = await _messageRepository.lastAssistantMessage(
+      conversationId,
+    );
+    if (lastAssistant == null) {
+      throw InvalidRegenerateTargetError.noAssistantReply();
     }
-    throw InvalidRegenerateTargetError.noAssistantReply();
+    return lastAssistant;
   }
 
   /// 返回 [targetId] 之前最近的一条 user 消息（重生成触发源）；无则 null
   /// （对齐 `chat.py::_last_user_before`）。
-  Future<Message?> _lastUserBefore(int conversationId, int targetId) async {
-    final messages = await _messageRepository.getMessages(conversationId);
-    Message? last;
-    for (final m in messages) {
-      if (m.role == Role.user && m.id < targetId) {
-        last = m;
-      }
-    }
-    return last;
+  Future<Message?> _lastUserBefore(int conversationId, int targetId) {
+    return _messageRepository.lastUserMessageBefore(conversationId, targetId);
   }
 }

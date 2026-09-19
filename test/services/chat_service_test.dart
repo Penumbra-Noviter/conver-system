@@ -381,6 +381,49 @@ class _GatedMessageRepository extends MessageRepository {
   }
 }
 
+/// [MessageRepository] 的调用计数替身（S6 I/O 契约）：统计定位读与全量读
+/// 调用次数，其余透传真实实现——重生成路径「不再全量拉取、定位读 ≤3 次」
+/// 的实证锚（口径：不含 F1 快照 [maxMessageId]，该读原路径已有）。
+class _CountingMessageRepository extends MessageRepository {
+  _CountingMessageRepository(super.db, {super.now});
+
+  int getMessagesCalls = 0;
+  int lastAssistantMessageCalls = 0;
+  int lastUserMessageBeforeCalls = 0;
+  int messagesBeforeCalls = 0;
+  int messageByIdCalls = 0;
+
+  @override
+  Future<List<Message>> getMessages(int conversationId) {
+    getMessagesCalls++;
+    return super.getMessages(conversationId);
+  }
+
+  @override
+  Future<Message?> lastAssistantMessage(int conversationId) {
+    lastAssistantMessageCalls++;
+    return super.lastAssistantMessage(conversationId);
+  }
+
+  @override
+  Future<Message?> lastUserMessageBefore(int conversationId, int beforeId) {
+    lastUserMessageBeforeCalls++;
+    return super.lastUserMessageBefore(conversationId, beforeId);
+  }
+
+  @override
+  Future<List<Message>> messagesBefore(int conversationId, int beforeId) {
+    messagesBeforeCalls++;
+    return super.messagesBefore(conversationId, beforeId);
+  }
+
+  @override
+  Future<Message?> messageById(int conversationId, int messageId) {
+    messageByIdCalls++;
+    return super.messageById(conversationId, messageId);
+  }
+}
+
 /// 可控挂起的 non-streaming provider：generate 在进入时完成 [started]、挂起于
 /// [gate]，放行后返回 [reply]——F1（重生成期间并发新消息）与 F4（并发双触发
 /// 拒绝）回归测试用：可在 generate 挂起期间对 DB 做并发写入 / 发起第二次调用。
@@ -2464,6 +2507,44 @@ void main() {
                 t.conversationId.equals(orphanConv.id)))
           .get();
       expect(remaining, hasLength(2));
+    });
+
+    test('S6: 重生成不再全量拉取——缺省/显式均 3 次定位读（getMessages=0）',
+        () async {
+      final (_, conv, _, oldAssistant) = await seedConversationWithReply();
+      // 追加第二轮 user + assistant（缺省目标 = 第二答；显式目标 = 旧回复）。
+      await sendUserMessage(conv.id, '第二问');
+      await messageRepo.createMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '第二答',
+      );
+      final counting = _CountingMessageRepository(db, now: () => fakeNow);
+      messageRepo = counting;
+      wireService(FakeLLMProvider(tokens: const ['新答']));
+
+      // 缺省路径：目标解析 = lastAssistantMessage。
+      await service.regenerate(conversationId: conv.id);
+      expect(counting.getMessagesCalls, 0, reason: '不再全量拉取');
+      expect(counting.lastAssistantMessageCalls, 1);
+      expect(counting.lastUserMessageBeforeCalls, 1);
+      expect(counting.messagesBeforeCalls, 1);
+      expect(counting.messageByIdCalls, 0);
+
+      // 显式路径：目标解析 = messageById（归属校验）。
+      counting
+        ..getMessagesCalls = 0
+        ..lastAssistantMessageCalls = 0
+        ..lastUserMessageBeforeCalls = 0
+        ..messagesBeforeCalls = 0
+        ..messageByIdCalls = 0;
+      await service.regenerate(
+          conversationId: conv.id, messageId: oldAssistant.id);
+      expect(counting.getMessagesCalls, 0, reason: '显式路径同样不再全量拉取');
+      expect(counting.messageByIdCalls, 1);
+      expect(counting.lastAssistantMessageCalls, 0);
+      expect(counting.lastUserMessageBeforeCalls, 1);
+      expect(counting.messagesBeforeCalls, 1);
     });
   });
 }
