@@ -57,22 +57,15 @@ class _RecordingScheduler implements ProactiveNotificationScheduler {
   }
 }
 
-/// 单路抛错替身：关系评估抛错（验证 ChatService 侧隔离）。
-class _ThrowingRelationshipService extends RelationshipService {
-  _ThrowingRelationshipService({
-    required super.companionRepository,
-    required super.conversationRepository,
-    required super.messageRepository,
-  });
+/// 关系仓储抛错替身（关系服务内吞错的失败注入点，S1 服务内吞错契约）。
+class _BoomCompanionRepository extends CompanionRepository {
+  _BoomCompanionRepository(super.db);
 
-  int evaluateCalls = 0;
+  int getCalls = 0;
 
   @override
-  Future<StageUpgradeProposal?> evaluateAfterTurn({
-    required int characterId,
-    required int conversationId,
-  }) async {
-    evaluateCalls++;
+  Future<RelationshipState?> getRelationship(int characterId) async {
+    getCalls++;
     throw StateError('boom relationship');
   }
 }
@@ -94,28 +87,6 @@ class _ThrowingThoughtService extends ThoughtService {
   }) async {
     persistCalls++;
     throw StateError('boom thought');
-  }
-}
-
-/// 单路抛错替身：主动规划抛错（验证隔离；真实服务内部已 catch，此为防御面）。
-class _ThrowingProactiveService extends ProactiveMessageService {
-  _ThrowingProactiveService({
-    required super.companionRepository,
-    required super.settingsRepository,
-    required super.messageRepository,
-    required super.planner,
-    required super.scheduler,
-  });
-
-  int planCalls = 0;
-
-  @override
-  Future<int> planAfterTurn({
-    required int characterId,
-    required int conversationId,
-  }) async {
-    planCalls++;
-    throw StateError('boom proactive');
   }
 }
 
@@ -196,6 +167,8 @@ void main() {
     ProactiveMessageService? proactiveMessageService,
     void Function(StageUpgradeProposal proposal)? onStageUpgradeProposal,
   }) {
+    // S1：回合末副作用收敛为装配层闭包集合（列表序 = backfill → reflect →
+    // plan → relate）；服务内吞错，闭包只做 null/条件编排。
     return ChatService(
       database: db,
       conversationRepository: conversationRepo,
@@ -205,10 +178,40 @@ void main() {
       providerFactory: FixedLLMProviderFactory(provider),
       memoryService: memoryService,
       thoughtService: thoughtService,
-      relationshipService: relationshipService,
-      proactiveMessageService: proactiveMessageService,
       companionRepository: companionRepo,
-      onStageUpgradeProposal: onStageUpgradeProposal,
+      endOfTurnHooks: [
+        // backfill：本文件无 embedding 注入 → 恒跳过（占位保持集合序）。
+        (ctx) async {},
+        // reflect：本文件无 reflection 服务 → 恒跳过。
+        (ctx) async {},
+        // plan：主动消息规划（服务内吞错）。
+        (ctx) async {
+          final service = proactiveMessageService;
+          final characterId = ctx.characterId;
+          if (service == null || characterId == null) {
+            return;
+          }
+          await service.planAfterTurn(
+            characterId: characterId,
+            conversationId: ctx.conversationId,
+          );
+        },
+        // relate：关系评估（服务内吞错）；proposal 经回调上报。
+        (ctx) async {
+          final service = relationshipService;
+          final characterId = ctx.characterId;
+          if (service == null || characterId == null) {
+            return;
+          }
+          final proposal = await service.evaluateAfterTurn(
+            characterId: characterId,
+            conversationId: ctx.conversationId,
+          );
+          if (proposal != null) {
+            onStageUpgradeProposal?.call(proposal);
+          }
+        },
+      ],
     );
   }
 
@@ -511,7 +514,7 @@ void main() {
       expect(state?.affinity, 58);
     });
 
-    test('单路抛错隔离：proactive 抛错不阻断 ChatDone，其余两路仍执行', () async {
+    test('proactive planner 抛错：服务内吞错，ChatDone 不阻断，relate/thought 仍执行', () async {
       final seed = await seedConversation();
       await settingsRepo.setMany({
         SettingsRepository.proactiveMessageEnabledKey: 'true',
@@ -522,12 +525,17 @@ void main() {
         stage: RelationshipStage.familiar,
         affinity: 59,
       );
-      final throwingProactive = _ThrowingProactiveService(
-        companionRepository: companionRepo,
-        settingsRepository: settingsRepo,
-        messageRepository: messageRepo,
-        planner: ({required characterId, required conversationId, required dialogueLines}) async => null,
-        scheduler: _RecordingScheduler(),
+      var plannerCalls = 0;
+      final proactive = buildProactive(
+        ({
+          required int characterId,
+          required int conversationId,
+          required List<String> dialogueLines,
+        }) async {
+          plannerCalls++;
+          throw StateError('boom proactive（服务内吞）');
+        },
+        _RecordingScheduler(),
       );
       final provider = FakeLLMProvider(tokens: const ['你好<thought>独白</thought>啦']);
       StageUpgradeProposal? received;
@@ -535,7 +543,7 @@ void main() {
         provider: provider,
         thoughtService: buildThought(),
         relationshipService: buildRelationship(),
-        proactiveMessageService: throwingProactive,
+        proactiveMessageService: proactive,
         onStageUpgradeProposal: (proposal) => received = proposal,
       );
 
@@ -543,8 +551,10 @@ void main() {
         service.streamReply(conversationId: seed.conversation.id, content: '嗨'),
       );
 
+      // planner 抛错被 planAfterTurn 内部吞（S1 服务内吞错契约，返回 0），
+      // 不产生未处理异常；relate 路仍执行（proposal 回调）——编排不中断。
       await waitFor(() => received != null);
-      expect(throwingProactive.planCalls, 1);
+      expect(plannerCalls, 1);
       // thought 路仍执行（落库）。
       final messages = await messageRepo.getMessages(seed.conversation.id);
       final assistant = messages.singleWhere((m) => m.role == Role.assistant);
@@ -555,23 +565,30 @@ void main() {
       );
     });
 
-    test('关系评估抛错：主回复仍 ChatDone（未处理异常不冒泡）', () async {
+    test('关系服务内吞错：主回复仍 ChatDone（集合层不 try/catch）', () async {
       final seed = await seedConversation();
-      final throwing = _ThrowingRelationshipService(
-        companionRepository: companionRepo,
+      final boomRepo = _BoomCompanionRepository(db);
+      final relationship = RelationshipService(
+        companionRepository: boomRepo,
         conversationRepository: conversationRepo,
         messageRepository: messageRepo,
+        now: () => fixedNow,
       );
       final provider = FakeLLMProvider(tokens: const ['你好']);
       final service = buildService(
         provider: provider,
-        relationshipService: throwing,
+        relationshipService: relationship,
       );
 
       await drainStream(
         service.streamReply(conversationId: seed.conversation.id, content: '嗨'),
       );
-      expect(throwing.evaluateCalls, 1);
+      expect(boomRepo.getCalls, 1);
+      final messages = await messageRepo.getMessages(seed.conversation.id);
+      expect(
+        messages.where((m) => m.role == Role.assistant).single.content,
+        '你好',
+      );
     });
   });
 

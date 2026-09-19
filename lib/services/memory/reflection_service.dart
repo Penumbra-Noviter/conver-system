@@ -18,6 +18,8 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../../data/database/tables.dart' show MemoryKind, Role;
 import '../../data/repositories/character_repository.dart';
 import '../../data/repositories/memory_repository.dart';
@@ -157,7 +159,11 @@ class ReflectionService {
   final int _interval;
   final int _historyLimit;
 
-  /// 回合落库后触发一次反思（异步 fire-and-forget，失败上抛由调用方降级）。
+  /// 回合落库后触发一次反思（异步 fire-and-forget，服务内吞错，S1）。
+  ///
+  /// 降级契约（S1 集合层不再 try/catch）：任意步骤抛错（读库 / [extractor] /
+  /// 落库）→ 内部 debugPrint 降级并返回 0，不向上抛——调用方 `unawaited`
+  /// 编排无需防御性 try。
   ///
   /// 编排：
   /// 1. 节流——该对话 user 消息数须 > 0 且 `% interval == 0`，否则返回 0；
@@ -165,53 +171,58 @@ class ReflectionService {
   /// 3. 取最近 [historyLimit] 条消息组装对话行（user 署名「用户」、assistant
   ///    署名角色名）；
   /// 4. [extractor] 反思产出事实 → 逐条 trim 去重后落 `persona_fact`；
-  /// 5. 返回实际落库条数（0 = 无新事实）。
+  /// 5. 返回实际落库条数（0 = 无新事实/节流跳过/失败降级）。
   Future<int> reflectAfterTurn({
     required int characterId,
     required int conversationId,
   }) async {
-    final messages = await _messageRepository.getMessages(conversationId);
-    final userCount = messages.where((m) => m.role == Role.user).length;
-    if (userCount == 0 || userCount % _interval != 0) {
-      return 0;
-    }
-
-    final character = await _characterRepository.getCharacter(characterId);
-    if (character == null) {
-      return 0;
-    }
-
-    final existing = await _memoryRepository.listPersonaFacts(characterId);
-    final existingSet = <String>{for (final f in existing) f.content.trim()};
-
-    final recent = messages.length > _historyLimit
-        ? messages.sublist(messages.length - _historyLimit)
-        : messages;
-    final dialogueLines = <String>[
-      for (final m in recent)
-        m.role == Role.user ? '用户：${m.content}' : '${character.name}：${m.content}',
-    ];
-
-    final extracted = await _extractor(
-      charName: character.name,
-      dialogueLines: dialogueLines,
-      existingFacts: existingSet.toList(),
-    );
-
-    var added = 0;
-    for (final fact in extracted) {
-      final trimmed = fact.trim();
-      if (trimmed.isEmpty || existingSet.contains(trimmed)) {
-        continue;
+    try {
+      final messages = await _messageRepository.getMessages(conversationId);
+      final userCount = messages.where((m) => m.role == Role.user).length;
+      if (userCount == 0 || userCount % _interval != 0) {
+        return 0;
       }
-      await _memoryRepository.createEntry(
-        characterId: characterId,
-        kind: MemoryKind.personaFact,
-        content: trimmed,
+
+      final character = await _characterRepository.getCharacter(characterId);
+      if (character == null) {
+        return 0;
+      }
+
+      final existing = await _memoryRepository.listPersonaFacts(characterId);
+      final existingSet = <String>{for (final f in existing) f.content.trim()};
+
+      final recent = messages.length > _historyLimit
+          ? messages.sublist(messages.length - _historyLimit)
+          : messages;
+      final dialogueLines = <String>[
+        for (final m in recent)
+          m.role == Role.user ? '用户：${m.content}' : '${character.name}：${m.content}',
+      ];
+
+      final extracted = await _extractor(
+        charName: character.name,
+        dialogueLines: dialogueLines,
+        existingFacts: existingSet.toList(),
       );
-      existingSet.add(trimmed); // 防单次提取内的重复事实。
-      added++;
+
+      var added = 0;
+      for (final fact in extracted) {
+        final trimmed = fact.trim();
+        if (trimmed.isEmpty || existingSet.contains(trimmed)) {
+          continue;
+        }
+        await _memoryRepository.createEntry(
+          characterId: characterId,
+          kind: MemoryKind.personaFact,
+          content: trimmed,
+        );
+        existingSet.add(trimmed); // 防单次提取内的重复事实。
+        added++;
+      }
+      return added;
+    } catch (e) {
+      debugPrint('后台反思失败，跳过: $e');
+      return 0;
     }
-    return added;
   }
 }

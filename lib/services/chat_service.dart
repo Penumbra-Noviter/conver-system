@@ -64,17 +64,14 @@ import '../data/repositories/companion_repository.dart';
 import '../data/repositories/conversation_repository.dart';
 import '../data/repositories/message_repository.dart';
 import '../data/repositories/settings_repository.dart';
-import 'companion/proactive_message_service.dart';
 import 'companion/relationship_service.dart';
 import 'companion/thought_service.dart';
-import 'embedding/embedding_service.dart';
 import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
 import 'llm/prompt.dart';
 import 'memory/memory_prompt.dart';
 import 'memory/memory_service.dart';
-import 'memory/reflection_service.dart';
 import 'template_vars.dart';
 
 /// 流式回合的产出事件（sealed：token / done / interrupted / error）。
@@ -215,6 +212,34 @@ class RegenerateResult {
 bool _isConnectionDrop(LLMError error) =>
     error is LLMConnectionInterruptedError;
 
+/// 回合末副作用上下文（S1 集合契约）：一次完整 assistant 落库后的回合快照。
+///
+/// [characterId] 为校验失败路径可空的角色 id（null → 回合末副作用跳过）；
+/// [memoryChangedThisTurn] 记录本回合 `<add:>`/`<persona:>` 是否有落库
+/// （VR-07 懒补嵌触发语义，`_applyMemoryCommands` 返回值置位）。
+class EndOfTurnContext {
+  const EndOfTurnContext({
+    required this.characterId,
+    required this.conversationId,
+    required this.memoryChangedThisTurn,
+  });
+
+  /// 对话所属角色 id（校验失败路径保持 null）。
+  final int? characterId;
+
+  /// 回合所属对话 id。
+  final int conversationId;
+
+  /// 本回合记忆指令是否有落库（`<add:>`/`<persona:>`）。
+  final bool memoryChangedThisTurn;
+}
+
+/// 回合末副作用钩子（S1）：装配层注册的有序闭包，消费方依列表序 `unawaited`
+/// 执行。降级契约 = 服务内吞错（闭包不得上抛）；集合层只做顺序编排，
+/// 不 try/catch。backfill 双触发（memoryChanged 门 + reflect 落库成功后）以
+/// 闭包内协作表达，集合层不承载因果边。
+typedef EndOfTurnHook = Future<void> Function(EndOfTurnContext ctx);
+
 /// [streamReply] 一次运行的共享可变状态（onData / onCancel / 收尾 handler 间
 /// 传递：完整内容累积、是否已落库、provider 订阅句柄、停止标志）。
 class _StreamRunState {
@@ -278,18 +303,15 @@ class ChatService {
     required this._providerFactory,
     CredentialsResolver? credentialsResolver,
     this._memoryService,
-    this._reflectionService,
-    this._embeddingService,
     this._thoughtService,
-    this._relationshipService,
-    this._proactiveMessageService,
     this._companionRepository,
-    this._onStageUpgradeProposal,
+    List<EndOfTurnHook> endOfTurnHooks = const [],
     List<Duration> connectRetryDelays = const [
       Duration(seconds: 1),
       Duration(seconds: 2),
     ],
   }) : _db = database,
+       _endOfTurnHooks = List<EndOfTurnHook>.unmodifiable(endOfTurnHooks),
        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays) {
     _credentialsResolver = credentialsResolver ?? _wireCredentialsResolver();
   }
@@ -304,33 +326,18 @@ class ChatService {
   /// 记忆编排服务（人机恋 AC-02/AC-03）；null = 记忆功能未启用（既有装配零改动）。
   final MemoryService? _memoryService;
 
-  /// 后台反思服务（人机恋阶段 1.5，ADR-0004）；null = 反思未启用（既有装配零改动）。
-  final ReflectionService? _reflectionService;
-
-  /// 远端 embedding 编排服务（阶段 3，VR-06/VR-07）；null = 懒补嵌未启用
-  /// （既有装配零改动）。触发语义：本回合记忆落库或反思落库后
-  /// fire-and-forget 触发 [EmbeddingService.backfillPending]（enabled 门在
-  /// 服务内，失败降级不阻断主回复——与 [_maybeReflectAfterTurn] 同构）。
-  final EmbeddingService? _embeddingService;
-
   /// 内心独白服务（阶段 2，PS2-04/07）；null = 独白未启用（既有装配零改动）。
   /// 剥离恒启用（经此服务），开关控制落库与 prompt 指令。
   final ThoughtService? _thoughtService;
-
-  /// 关系状态机服务（阶段 2，PS2-03/07）；null = 关系功能未启用。
-  /// 注入链（有状态行时）与回合结束评估共用。
-  final RelationshipService? _relationshipService;
-
-  /// 主动消息服务（阶段 2，PS2-05/07）；null = 主动消息未启用。
-  final ProactiveMessageService? _proactiveMessageService;
 
   /// 关系状态读面（注入链需查 RelationshipStates 行；companion_repository 为
   /// 阶段 2 共享只读依赖，缺省 null 时关系注入跳过——既有装配零改动）。
   final CompanionRepository? _companionRepository;
 
-  /// 亲密/挚爱升级提议回调（阶段 2，SR-10：ChatService 只上报不写库，
-  /// 确认由 UI/装配层经 confirmStageUpgrade 触发）。null = 不回调（缺省）。
-  final void Function(StageUpgradeProposal proposal)? _onStageUpgradeProposal;
+  /// 回合末副作用集合（S1）：装配层注册的有序闭包，列表序即执行序
+  /// （backfill → reflect → plan → relate）。缺省 `const []`（零副作用）。
+  /// 降级契约 = 服务内吞错；集合层只做顺序编排，不 try/catch。
+  final List<EndOfTurnHook> _endOfTurnHooks;
 
   /// 凭据解析链（AR-3）：组合序单一归属 [CredentialsResolver]；缺省由
   /// [_settingsRepository] 装配 reader（测试可注入，既有装配零 churn）。
@@ -650,18 +657,11 @@ class ChatService {
     }
     try {
       final msg = await _persistAssistant(state);
-      // 完整 assistant 落库后触发后台反思（ADR-0004：fire-and-forget，失败
-      // 降级不阻断主回复；零 token 空流不触发）。阶段 2：主动规划/关系评估
-      // 与反思同构并列，三路任一路抛错只 debugPrint、互不影响、不阻断 ChatDone。
+      // 完整 assistant 落库后依列表序触发回合末副作用集合（S1）：装配层注册
+      // backfill/reflect/plan/relate 四个闭包；服务内吞错（闭包不得上抛），
+      // 集合层只做顺序编排、不 try/catch；零 token 空流（msg == null）不触发。
       if (msg != null) {
-        // VR-07 懒补嵌：本回合有记忆落库（<add:>/<persona:>）才触发；
-        // 反思路径的补嵌触发在 _maybeReflectAfterTurn 落库成功后进行。
-        if (state.memoryChangedThisTurn) {
-          unawaited(_maybeBackfillEmbeddingsAfterTurn(state));
-        }
-        unawaited(_maybeReflectAfterTurn(state));
-        unawaited(_maybePlanProactiveAfterTurn(state));
-        unawaited(_maybeEvaluateRelationship(state));
+        _runEndOfTurnHooks(state);
       }
       // F3 同类硬化：onDone 与 onCancel 竞态（收尾瞬间取消）下 controller 可能
       // 已关闭，add 前守卫避免 add-after-close 的未处理异常。
@@ -883,91 +883,18 @@ class ChatService {
     }
   }
 
-  /// 完整 assistant 落库后触发后台反思（ADR-0004，fire-and-forget）。
+  /// 依 [_endOfTurnHooks] 列表序逐个以 `unawaited` 触发回合末副作用（S1）。
   ///
-  /// 反思功能未启用（[_reflectionService] == null）或角色 id 未知（校验失败
-  /// 路径）→ 跳过；设置开关关闭（缺省 false）→ 跳过；反思失败 → 降级 log
-  /// 不阻断主回复（对齐「记忆失败不阻断主回复」约束）。
-  Future<void> _maybeReflectAfterTurn(_StreamRunState state) async {
-    final reflectionService = _reflectionService;
-    final characterId = state.characterId;
-    if (reflectionService == null || characterId == null) {
-      return;
-    }
-    try {
-      final enabled = await _settingsRepository.memoryReflectionEnabled;
-      if (!enabled) {
-        return;
-      }
-      await reflectionService.reflectAfterTurn(
-        characterId: characterId,
-        conversationId: state.conversationId,
-      );
-      // 反思落库成功后懒补嵌（VR-07 U3：反思产出 persona_fact 也需向量）。
-      unawaited(_maybeBackfillEmbeddingsAfterTurn(state));
-    } catch (e) {
-      debugPrint('后台反思失败，跳过: $e');
-    }
-  }
-
-  /// 回合末懒补嵌（VR-07，spec D4 / U3）：落库路径 fire-and-forget 触发
-  /// [EmbeddingService.backfillPending]，把本回合新增记忆补成向量。
-  ///
-  /// 触发点 = ① 本回合 `<add:>`/`<persona:>` 落库后（done 分支，经
-  /// `state.memoryChangedThisTurn` 门）；② 后台反思落库成功后（见
-  /// [_maybeReflectAfterTurn]）。embedding 未注入/角色 id 未知 → 跳过；
-  /// enabled 门在服务内（未启用零请求）；失败 → debugPrint 降级不阻断主
-  /// 回复（对齐 [_maybeReflectAfterTurn] 模式，SR-18 不重试风暴）。
-  Future<void> _maybeBackfillEmbeddingsAfterTurn(_StreamRunState state) async {
-    final embeddingService = _embeddingService;
-    final characterId = state.characterId;
-    if (embeddingService == null || characterId == null) {
-      return;
-    }
-    try {
-      await embeddingService.backfillPending(characterId);
-    } catch (e) {
-      debugPrint('后台补嵌失败，跳过: $e');
-    }
-  }
-
-  /// 回合末主动消息规划（阶段 2，PS2-05）：开关/节流/LLM seam 全在服务内部，
-  /// 服务自身不抛（失败返回 0）；此处 try/catch 防御未来实现变更，保隔离面。
-  Future<void> _maybePlanProactiveAfterTurn(_StreamRunState state) async {
-    final service = _proactiveMessageService;
-    final characterId = state.characterId;
-    if (service == null || characterId == null) {
-      return;
-    }
-    try {
-      await service.planAfterTurn(
-        characterId: characterId,
-        conversationId: state.conversationId,
-      );
-    } catch (e) {
-      debugPrint('主动消息规划失败，跳过: $e');
-    }
-  }
-
-  /// 回合末关系评估（阶段 2，PS2-03）：跨亲密/挚爱门槛 → 经
-  /// [_onStageUpgradeProposal] 上报 proposal（ChatService 不写库，SR-10）；
-  /// 普通推进由服务内部直接落库。评估失败 → 降级 log 不阻断主回复。
-  Future<void> _maybeEvaluateRelationship(_StreamRunState state) async {
-    final service = _relationshipService;
-    final characterId = state.characterId;
-    if (service == null || characterId == null) {
-      return;
-    }
-    try {
-      final proposal = await service.evaluateAfterTurn(
-        characterId: characterId,
-        conversationId: state.conversationId,
-      );
-      if (proposal != null) {
-        _onStageUpgradeProposal?.call(proposal);
-      }
-    } catch (e) {
-      debugPrint('关系评估失败，跳过: $e');
+  /// 集合层只做顺序编排：构造 [EndOfTurnContext] 后逐闭包调用，不 try/catch
+  /// （降级契约 = 服务内吞错，闭包不得上抛）；列表序即执行序，装配层可见。
+  void _runEndOfTurnHooks(_StreamRunState state) {
+    final context = EndOfTurnContext(
+      characterId: state.characterId,
+      conversationId: state.conversationId,
+      memoryChangedThisTurn: state.memoryChangedThisTurn,
+    );
+    for (final hook in _endOfTurnHooks) {
+      unawaited(hook(context));
     }
   }
 
@@ -1189,9 +1116,8 @@ class ChatService {
     // 阶段 2 注入：关系块（有状态行时，判定⑧）+ thought 指令（开关开时）。
     // 追加于消息尾部（行为指令，不干扰人设/记忆/场景结构）；任一失败降级跳过。
     final stage2Injections = <LlmMessage>[];
-    final relationshipService = _relationshipService;
     final companionRepository = _companionRepository;
-    if (companionRepository != null && relationshipService != null) {
+    if (companionRepository != null) {
       try {
         final state = await companionRepository.getRelationship(character.id);
         if (state != null) {

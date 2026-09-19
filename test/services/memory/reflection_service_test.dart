@@ -279,5 +279,31 @@ void main() {
       expect(extractorCalls, 1, reason: '25 % 5 == 0 → 节流放行');
       expect(added, 1);
     });
+
+    test('extractor 抛错：服务内吞错返回 0（S1 降级契约，不向上抛）', () async {
+      final convId = await seedConversation();
+      await seedUserMessages(convId, 6);
+      final service = ReflectionService(
+        characterRepository: characterRepo,
+        memoryRepository: memoryRepo,
+        messageRepository: messageRepo,
+        extractor: ({
+          required String charName,
+          required List<String> dialogueLines,
+          required List<String> existingFacts,
+        }) async {
+          throw StateError('reflection boom（测试注入）');
+        },
+        interval: 6,
+      );
+
+      final added = await service.reflectAfterTurn(
+        characterId: 1,
+        conversationId: convId,
+      );
+
+      expect(added, 0, reason: '失败路径返回 0（无新事实语义）');
+      expect(await memoryRepo.listPersonaFacts(1), isEmpty);
+    });
   });
 }
