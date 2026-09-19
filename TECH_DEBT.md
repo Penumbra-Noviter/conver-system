@@ -43,8 +43,38 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-123 | W1 深链消费业务下沉 proactive 域：`app.dart:106-315` 约 210 行业务接线圈（readLaunchPayload/consume×2/handle/restore/start）混居装配文件，编解码在 notification_service；装配文件 1/4 是非装配业务 | 架构报告 2026-09-17 | Worth exploring | 📝 待立项 | 伴侣域 |
+| F-124 | W2 错误→用户文案映射 4 处实现：`chat_service.dart:485-512/671-675/698-717` 与 `chat_round.dart:487-496` 各写 Domain/LLM/未知三叉判型；断流语义变更需多处对齐 | 架构报告 2026-09-17 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-125 | W3 `getActivePlan` 契约与数据现实冲突：`companion_repository.dart:102-110` 单计划假设（W2 实证双计划抛 StateError），服务侧 `proactive_message_service.dart:455-474/487-491` 全表拉取绕路且同回合两次全量查询 | 架构报告 2026-09-17 | Worth exploring | 📝 待立项 | 数据层 |
+| F-126 | W4 float32 codec 反向依赖：`memory_repository.dart:20/271/286` data 层 import `services/vector/float32_codec.dart`（F-115 同性质 utf16_truncate 已归 utils）；纯迁移消除反向边 | 架构报告 2026-09-17 | Worth exploring | 📝 待立项 | 数据层 |
+| F-127 | W5 高亮 3s 清除双 timer：`chat_controller.dart:182/691-714` 与 `chat_view.dart:216-284` 各持 Timer 实现同一概念；删 view 侧、生命周期单一归属 controller（需 widget 测试锁 3s） | 架构报告 2026-09-17 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-128 | W6 截断可重试判据以文案字符串作身份：`chat_round.dart:184-187/401-403` 比较 `interruptedNoticeText`，与 `notice_runner.dart:42-45` 既有 noticeId 身份机制并存；改显式状态（notice 目标 + noticeId 配对） | 架构报告 2026-09-17 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-129 | P1 本地日历日口径两处独立：`proactive_message_service.dart:506-507`（年/月/日比较）与 `relationship_service.dart:296-302`（DateTime(y,m,d) 去重）；收进伴生域单源（F-91 先例） | 架构报告 2026-09-17 | Speculative | 📝 待立项 | 伴侣域 |
+| F-130 | P2 迁移索引双写：`tables.dart:169-170/468-473` 等 8 处 @TableIndex 与 `app_database.dart:65-155` onUpgrade raw SQL 各自维护；索引清单单源或机械对账测试 | 架构报告 2026-09-17 | Speculative | 📝 待立项 | 数据层 |
+| F-131 | P3 `HistoryMessage.role` 宽类型 Object + toString 兜底：`prompt.dart:51-62/246-254` 未知对象静默混入消息流；收窄为真 Role 与真 String 的密封联合（编译期拒绝） | 架构报告 2026-09-17 | Speculative | 📝 待立项 | 聊天链路 |
+| F-132 | persistThought 超长无服务侧防御：thought 服务契约依赖唯一调用方（顶层已截断），服务侧无长度校验；波 1 审核观察（Weak） | 波 1 增量审核 | Speculative | 📝 待立项 | 伴侣域 |
+| F-133 | thought 开关读抛错路径无直测：服务内开关读失败降级由 catch 兜底但无专测断言；波 1 审核观察 | 波 1 增量审核 | Speculative | 📝 待立项 | 伴侣域 |
+| F-134 | planner 闭包运行时路径未直测：AD-04 后装配测试未执行 planner 闭包运行路径（_resolveLlm 成功路径由既有 reflector 测试间接覆盖）；波 1 审核观察 | 波 1 增量审核 | Speculative | 📝 待立项 | 伴侣域 |
+| F-135 | reflect 失败路径多一次 backfillPending：AD-02 后反射失败仍触发补嵌（app.dart:587-591 无条件补嵌），与波前语义差异、无测试锚（embedding enabled 门 + 幂等兜底，无可观察影响） | 波 2 增量审核 | Weak | 📝 待立项 | 聊天链路 |
+| F-136 | chat_entry_test「默认选中首角色」全量负载 flaky 复现 2 次（本批波末复核×2，单文件复跑全绿）：F-106 id ASC 修复后残余窗口，F-104 史（Expected 1/Actual 2） | 波末复核观察 | Worth exploring | 📝 待立项 | 测试质量 |
+| F-137 | characters_view_stage2 publish 等待族全量负载 flaky（本批波末复核 1 次，单文件复跑全绿）：F-122 双终态修复后残余窗口 | 波末复核观察 | Worth exploring | 📝 待立项 | 测试质量 |
+| F-138 | GameGenerator.resolveCredentials 同构段：`app.dart:757` 手写 wireCredentialsResolver 映射 GenerationCredentials（S4 范围外观察，spec 明示随批落债） | 期末 Spec 轴观察 | Weak | 📝 待立项 | 装配层 |
+| F-139 | `_autoInsertGreeting` 全量判空读：`chat_service.dart:1102` 仍以 getMessages 全量判空（S6 范围外观察，spec 明示随批落债） | 期末 Spec 轴观察 | Weak | 📝 待立项 | 数据层 |
 
 ## 技术债处置记录
+
+### 2026-09-18 — 架构深化批次（S1~S6 六条 Strong 全 ✅ 已修）
+
+> 来源：improve-codebase-architecture 报告（D:\tmp\architecture-review-20260918-203548.html）六条 Strong，用户拍板全立项；project-kickoff 全自动档 3 波（波 1 = AD-01/03/04，波 2 = AD-02/05，波 3 = AD-06）。门禁：全量 **2264 测**绿（基线 2225 → +39）/ analyze 0 / 波及文件覆盖率全 ≥90%（多数 100%）/ 波末两轮增量审核 0 阻断 / 期末主会话四轴复核通过（**子代理聚合故障降级**：四路内部审核完成但通知未送达聚合层、聚合层不可续接，主会话以波末两轮增量审核 + 锚文本抽查 + 全量绿合成期末结论，如实标注）。非阻断发现落债 F-132~139（波末审核 + 复核 flaky 观察 + spec 范围外随批落债）。候选区保留 F-123~131（未选中候选）与 F-132~139（本批新落）。详见 DEV_LOG〈架构深化批次 S1~S6 — 六条 Strong 全交付〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| AD-01（S5） | ✅ 已修 | extractThought 全链路唯一剥离点；stripAndPersist → persistThought（收已剥离结果）；ADR-0007 第 32 行排布句改写 + 修订记录节；`6341a22` |
+| AD-02（S1） | ✅ 已修 | EndOfTurnHook 有序集合（backfill→reflect→plan→relate）+ 服务内吞错契约（reflect/relate 迁移内部降级）+ 构造收敛（删 5 参数）；_persistThought 排除；`17add6a` |
+| AD-03（S2） | ✅ 已修 | lib/utils/llm_json_candidates.dart 单源 + 三调用方改调（类型化解码保留）；marker 字面量单源；`2507f62` |
+| AD-04（S4） | ✅ 已修 | planner 闭包改调 _resolveLlm（F-120「第三处出现即复用」承诺兑现）；行为零变化；`a21bd9d` |
+| AD-05（S3） | ✅ 已修 | 基类默认 streamGenerate（模板方法）+ protected streamRequest 扩展点；双 provider 删覆写；夹具 12 类迁移 + _RawErrorProvider 保 A2 契约；`de07cb9` |
+| AD-06（S6） | ✅ 已修 | MessageRepository 5 定位读（lastAssistantMessage/lastUserMessageBefore/messagesBefore/messageById/lastMessage）+ chat_service 三判据下推 + chat_round last 下推；重生成 I/O 实证 getMessages=0 + ≤3 定位读；`1f60ffd` |
 
 ### 2026-09-17 — 技术债消费批次（F-122 publish 等待族收口 ✅ 已修）
 

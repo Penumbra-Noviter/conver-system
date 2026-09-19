@@ -6,6 +6,19 @@
 
 ---
 
+## 架构深化批次 S1~S6 — 六条 Strong 全交付（2026-09-18 — /improve-codebase-architecture + /project-kickoff 全自动档）
+
+- **架构评审**：双探索子智能体（伴侣/向量域 + 聊天/核心域）独立走库，15 候选合并为 13 条按强度交付（6 Strong / 6 Worth / 3 Speculative，含双命中提级 S1）；HTML 报告 `D:\tmp\architecture-review-20260918-203548.html`（Tailwind+Mermaid before/after 图 + 删除测试结论 + Top recommendation）。用户拍板**全部 Strong 立项**；未选中 9 条落债 F-123~131（防候选泄漏）。
+- **Grilling 增量**：审增量不重开——S1 降级契约 = 服务内吞错 + 装配层构造注入有序闭包列表 + `_persistThought` 排除（代码事实修正报告图：它是落库链内 await 步骤非 fire-and-forget）；S5 重开 ADR-0007 第 32 行排布句（决策实质不动，追加修订节不建新 ADR）；S6 补 `messageById` 第五查询面；现成方案三分全自建（项目内部协议面收敛）。
+- **plan-tickets**：6 票出口预检通过（引用文件真实存在 / 依赖无环 / 粒度全达标：验收 5-8 条、+15~+697 行 ≤1000、seam ≤1）；S4 锚点校准（GameGenerator 段为范围外，随批落债 F-138）；S6 `_autoInsertGreeting` 范围外落债 F-139。
+- **三波执行（标准档全自动）**：波 1 AD-01/03/04（并行 3，merge c7425d3 零冲突）→ 波 2 AD-02/05（merge fa895b2，AD-02 Blocked by AD-01）→ 波 3 AD-06（merge f5652f8）。每票独立 worktree + TDD 先红后绿 + 突变抽查全过；六票全量自跑绿（2222/2242/2226/2247/2243/2264）。
+- **遥测**：波时长 = 每波约 8-12 分钟（worktree pub get + 全量/范围测试主导）；并行 3/2/1；回退/冲突 0 次；重开 0 次；空返回 0 次；切票粒度对照——AD-02 实际 +697 vs 预估 +180（差量 = 370 行 hooks 专项测试 + 三测试文件构造迁移，源文件 4 文件与预估一致，判定合理解释）；波末增量审核每轴 findings = 波 1: 4 非阻断（Falsify 3 + Overengineering 1）/ 波 2: 4 非阻断；门禁命中 = 波末文件范围核验拦下 0（三票合规，AD-02 两文件属「工单内已申报编排表漏记」复核纠正）、复核 flaky 识别 2 次（chat_entry ×2 + chars_view ×1 独立重跑全绿，零误伤）。
+- **考察**：① 嵌套子代理聚合层通知丢失（四路内部审核 ready 但结果未达聚合层，聚合层 continuation state 丢失不可续接）——期末四轴降级为主会话复核合成（波末两轮增量审核 + 锚文本抽查：`_maybe*`/`stripAndPersist` 清零、`streamGenerate` 仅基类单点、chat_round 零全量读、planner 段无凭据调用）如实标注，非阻断；② final-review 缺失由本 DEV_LOG 节 + wave1/2 报告 + 主会话复核记录共同承担。
+- **门禁**：全量 **2264 测**绿（基线 2225 → +39）/ `flutter analyze` 0 / 波及文件覆盖率全 ≥90%（多文件 100%）/ pre-commit 池检查通过（TICKETS 活跃表归档后清空）。
+- **批次收尾**：TICKETS 归档「架构深化批次 S1~S6」（AD-01~06 + commit/merege 行）；TECH_DEBT 处置记录新节（6 票 ✅）+ 新落债 F-132~139（波末审核非阻断 4 + flaky 观察 2 + spec 范围外 2）；AGENTS 状态行追加。
+
+---
+
 ## 技术债消费批次 F-113~120 八条全部处置（2026-09-17 — 用户「消费 F-113~120」指示，候选区 8 条 Weak 全处置）
 
 - **票面实证复核（先立票后动手）**：8 条逐条读源码复核现状——全部仍成立、无 F-105 式失实票面；F-114/F-115 同为「快照截断」问题判定合并处置（单源 helper 一并解决），F-120 判定「同构面 = resolve+create 两行」抽顶层 helper 收敛（非全文复制抽象，避免浅模块）。
