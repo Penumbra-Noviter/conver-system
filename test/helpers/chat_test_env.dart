@@ -56,20 +56,31 @@ class ChatTestEnv {
     this.lorebookRepository,
     this.settingsRepository,
     this.secretStore,
-  );
+    DateTime Function() now,
+  ) : _now = now;
+
+  /// 时间戳来源（直抄 chat_controller_test 的 fakeNow 注入形态）：角色仓储
+  /// 与分支服务复用同一时钟，保证测试内不产生第二个独立时间源（F-141）。
+  final DateTime Function() _now;
 
   /// 创建环境并预置默认 claude Key（未配置 Key 的测试自行删除）。
-  static Future<ChatTestEnv> create() async {
+  ///
+  /// [now] 为时间戳来源注入点（测试确定性用，直抄 chat_controller_test 的
+  /// `fakeNow` 可变变量 + 闭包先例），缺省 [DateTime.now]——既有 8 个消费
+  /// 文件一律零实参调用 `ChatTestEnv.create()`，源码级兼容零破坏（F-141）。
+  static Future<ChatTestEnv> create({DateTime Function()? now}) async {
+    final clock = now ?? DateTime.now;
     final db = AppDatabase(NativeDatabase.memory());
     final secretStore = InMemorySecretStore();
     final env = ChatTestEnv._(
       db,
       ConversationRepository(db, const FakeSettingsReader()),
-      CharacterRepository(db),
+      CharacterRepository(db, now: clock),
       MessageRepository(db),
       LorebookRepository(db),
       SettingsRepository(database: db, secretStore: secretStore),
       secretStore,
+      clock,
     );
     await env.secretStore.write(key: 'claude_api_key', value: 'sk-e2e-test');
     return env;
@@ -133,10 +144,15 @@ class ChatTestEnv {
       characterRepository: characterRepository,
       messageRepository: messageRepository,
       lorebookRepository: lorebookRepository,
+      now: _now,
     );
   }
 
   /// 种子角色；[name] 为非空必填，[firstMes] 为开场白（空 → 不预插）。
+  ///
+  /// 时间戳取自注入时钟（F-141：移除字面 [DateTime.now]，测试可确定性控制
+  /// seed 落库时刻；companion 的 createdAt/updatedAt 属必填命名参数，且
+  /// [CharacterRepository.createCharacter] 会再以同一时钟覆写——逐值等价）。
   Future<Character> seedCharacter({
     String name = '艾莉亚',
     String firstMes = '',
@@ -145,8 +161,8 @@ class ChatTestEnv {
       CharactersCompanion.insert(
         name: name,
         firstMes: Value(firstMes),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+        createdAt: _now(),
+        updatedAt: _now(),
       ),
     );
   }

@@ -93,20 +93,24 @@ void main() {
       expect(refreshed.first.conversationCount, 2);
     });
 
-    test('同 updated_at 时按 id 升序（创建序）稳定', () async {
-      // 不推进 fakeNow：两次 seed 落库为同一秒 updated_at（F-106 契约面）。
+    test('同 updated_at 时按 id 升序（创建序）稳定（F-141 契约锁）', () async {
+      // 不推进 fakeNow：多次 seed 落库为同一秒 updated_at（F-106 契约面）。
+      // F-141：夹具注入可控时钟后测试同刻铺种多角色，此排序即「默认选中首
+      // 角色」契约的仓库层双口径——跨秒会打破（后建者 updated_at DESC 排首，
+      // 实证段红，见 git 历史 a6132fd），时钟可控后同刻落库走 id ASC。
       final first = await seedCharacter(name: '先建', secondsAgo: 0);
-      final second = await seedCharacter(name: '后建', secondsAgo: 0);
+      final second = await seedCharacter(name: '次建', secondsAgo: 0);
+      final third = await seedCharacter(name: '后建', secondsAgo: 0);
       expect(
         first.updatedAt,
-        second.updatedAt,
-        reason: '前置：两次 seed 必须落在同一 updated_at，否则用例不成立',
+        third.updatedAt,
+        reason: '前置：多次 seed 必须落在同一 updated_at，否则用例不成立',
       );
 
       final list = await repo.listCharacters();
       expect(
         list.map((row) => row.character.id),
-        [first.id, second.id],
+        [first.id, second.id, third.id],
       );
     });
   });
