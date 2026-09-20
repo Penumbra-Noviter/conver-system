@@ -1,8 +1,9 @@
-/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=9，
+/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=10，
 /// 13 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表 + MS-01 候选表 +
 /// WL-01 世界书条目表 + NPD-02 characters.preset_dialogues /
 /// conversations.preset_dialogue 两列 + NPD-04 characters.prompt_mode /
-/// characters.expert_prompt 两列）。
+/// characters.expert_prompt 两列 + SP-01 conversations.top_p /
+/// presence_penalty / frequency_penalty / max_tokens 四列）。
 ///
 /// 全部在内存执行器（`AppDatabase(NativeDatabase.memory())`）上运行，
 /// 经构造注入 seam 打开真实 schema，不依赖设备、无 repositories。
@@ -27,8 +28,8 @@ void main() {
     await db.close();
   });
 
-  test('schemaVersion 冻结为 9', () {
-    expect(db.schemaVersion, 9);
+  test('schemaVersion 冻结为 10', () {
+    expect(db.schemaVersion, 10);
   });
 
   test('内存执行器打开成功，12 表可定位', () async {
@@ -553,5 +554,55 @@ void main() {
     final stored = await db.select(db.characters).getSingle();
     expect(stored.promptMode, 'expert');
     expect(stored.expertPrompt, '你是{{char}}，整段专家提示词。{{user}}');
+  });
+
+  test('conversations 四采样列缺省 null + 写读往返（SP-01 列契约）', () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '采样角色',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final conversation = await db
+        .into(db.conversations)
+        .insertReturning(
+          ConversationsCompanion.insert(
+            characterId: character.id,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    // 四可空列缺省 null（NULL = 不覆盖 provider 默认）。
+    expect(conversation.topP, null);
+    expect(conversation.presencePenalty, null);
+    expect(conversation.frequencyPenalty, null);
+    expect(conversation.maxTokens, null);
+
+    await (db.update(db.conversations)
+          ..where((t) => t.id.equals(conversation.id)))
+        .write(
+          ConversationsCompanion(
+            topP: const Value(0.4),
+            presencePenalty: const Value(-1.2),
+            frequencyPenalty: const Value(0.8),
+            maxTokens: const Value(512),
+          ),
+        );
+    final stored = await db.select(db.conversations).getSingle();
+    expect(stored.topP, 0.4);
+    expect(stored.presencePenalty, -1.2);
+    expect(stored.frequencyPenalty, 0.8);
+    expect(stored.maxTokens, 512);
+
+    // 显式写 null 还原（Value(null) 可清空覆盖）。
+    await (db.update(db.conversations)
+          ..where((t) => t.id.equals(conversation.id)))
+        .write(ConversationsCompanion(topP: const Value(null)));
+    final cleared = await db.select(db.conversations).getSingle();
+    expect(cleared.topP, null);
   });
 }

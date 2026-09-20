@@ -488,6 +488,51 @@ void main() {
     });
   });
 
+  group('SR-23 契约锁（SP-01）：Claude wire 请求体三采样键必须不存在', () {
+    test('generate 显式非 null topP/presence/frequency → 三键不写（含 temperature）',
+        () async {
+      final server = await startedServer(FakeLlmServer.jsonResponse({
+        'id': 'msg_sp1',
+        'type': 'message',
+        'role': 'assistant',
+        'content': [
+          {'type': 'text', 'text': 'ok'},
+        ],
+      }));
+      // Anthropic 对未知顶层参数返回 400（非忽略）——三键连 temperature 一起
+      // 不得写入请求体，即使显式传入非 null 值（SR-23，temperature 不发送为
+      // 同款先例）。
+      await makeProvider(server).generate(
+        messages: messages,
+        topP: 0.9,
+        presencePenalty: 1.5,
+        frequencyPenalty: -0.5,
+      );
+      final body = server.captured.single.jsonBody!;
+      expect(body, isNot(contains('top_p')));
+      expect(body, isNot(contains('presence_penalty')));
+      expect(body, isNot(contains('frequency_penalty')));
+      expect(body, isNot(contains('temperature')));
+    });
+
+    test('streamGenerate 显式非 null 三参数 → 三键不写（含 temperature）', () async {
+      final server = await startedServer(FakeLlmServer.anthropic(['ok']));
+      await makeProvider(server)
+          .streamGenerate(
+            messages: messages,
+            topP: 0.2,
+            presencePenalty: 1.0,
+            frequencyPenalty: 0.0,
+          )
+          .toList();
+      final body = server.captured.single.jsonBody!;
+      expect(body, isNot(contains('top_p')));
+      expect(body, isNot(contains('presence_penalty')));
+      expect(body, isNot(contains('frequency_penalty')));
+      expect(body, isNot(contains('temperature')));
+    });
+  });
+
   group('normalizeClaudeBaseUrl（F5：base 已含版本段不再拼 /v1/v1/messages）', () {
     test('末尾 v1 → 剥去版本段', () {
       expect(normalizeClaudeBaseUrl('https://api.anthropic.com/v1'),

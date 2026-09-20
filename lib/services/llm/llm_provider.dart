@@ -156,11 +156,20 @@ abstract class LLMProvider {
   /// [temperature] 采样温度，缺省 0.7（对齐桌面 `BaseLLM.generate` 签名，
   /// U-2 更新：原 R8「不透传 temperature」定案仅对 Claude 成立）。OpenAI 透传
   /// 进请求体；Claude 接收但忽略（Anthropic 已弃用该键）。
+  ///
+  /// SP-01 采样参数三可空覆盖（[topP] / [presencePenalty] /
+  /// [frequencyPenalty]）：缺省 null = 不覆盖 provider 默认。wire 语义
+  /// Provider 各有定案——OpenAI 非 null 透传进请求体（null 不写键）；Claude
+  /// 契约上**必须不发送**三键（SR-23，Anthropic 未知顶层参数返回 400 非忽略，
+  /// 含显式传入非 null 值时也忽略）。
   Future<String> generate({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   });
 
   /// 流式生成，逐 token 产出（基类默认实现 = 模板方法，承载错误翻译骨架）。
@@ -168,12 +177,17 @@ abstract class LLMProvider {
   /// 消费 [streamRequest] 内层流逐 token 透传；内层流抛出的任意异常经
   /// [translateError] 映射为 LLM 错误族后上抛（子类差异面只写端点 / 头 /
   /// 终态帧 / 帧提取，不再各自复制本骨架）。[temperature] 语义同 [generate]
-  /// （OpenAI 透传、Claude 忽略）。
+  /// （OpenAI 透传、Claude 忽略）。[topP] / [presencePenalty] /
+  /// [frequencyPenalty] 语义同 [generate]（SP-01；缺省 null = 不覆盖，
+  /// 按入参原样透传给 [streamRequest]）。
   Stream<String> streamGenerate({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     try {
       // 注意不用 yield*：Dart 语义下 yield* 将内层流错误直接转发到外层流，
@@ -183,6 +197,9 @@ abstract class LLMProvider {
         maxTokens: maxTokens,
         model: model,
         temperature: temperature,
+        topP: topP,
+        presencePenalty: presencePenalty,
+        frequencyPenalty: frequencyPenalty,
       )) {
         yield token;
       }
@@ -195,12 +212,16 @@ abstract class LLMProvider {
   ///
   /// 子类只实现本方法：端点 / 头 / 终态帧 / 帧提取（可复用 [streamSse] 共享
   /// 低级骨架），错误翻译收尾由基类默认 [streamGenerate] 单点承载。参数面与
-  /// [streamGenerate] 同构（messages / maxTokens / model / temperature）。
+  /// [streamGenerate] 同构（messages / maxTokens / model / temperature /
+  /// topP / presencePenalty / frequencyPenalty）。
   Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   });
 
   /// 测试 API 连接是否可用（校验 Key 有效性与网络可达性）。

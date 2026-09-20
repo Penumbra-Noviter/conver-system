@@ -53,6 +53,10 @@ class FakeLLMProvider extends LLMProvider {
   List<LlmMessage>? lastMessages;
   int? lastMaxTokens;
   String? lastModel;
+  double? lastTemperature;
+  double? lastTopP;
+  double? lastPresencePenalty;
+  double? lastFrequencyPenalty;
 
   @override
   LLMError translateError(Object error) =>
@@ -64,11 +68,18 @@ class FakeLLMProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastMessages = messages;
     lastMaxTokens = maxTokens;
     lastModel = model;
+    lastTemperature = temperature;
+    lastTopP = topP;
+    lastPresencePenalty = presencePenalty;
+    lastFrequencyPenalty = frequencyPenalty;
     final delay = generateDelay;
     if (delay != null) {
       await Future<void>.delayed(delay);
@@ -86,11 +97,18 @@ class FakeLLMProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     streamGenerateCallCount++;
     lastMessages = messages;
     lastMaxTokens = maxTokens;
     lastModel = model;
+    lastTemperature = temperature;
+    lastTopP = topP;
+    lastPresencePenalty = presencePenalty;
+    lastFrequencyPenalty = frequencyPenalty;
     final e = error;
     if (e != null) {
       throw e;
@@ -150,6 +168,9 @@ class TickingFakeLLMProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -168,6 +189,9 @@ class TickingFakeLLMProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     streamGenerateCallCount++;
     lastMessages = messages;
@@ -207,6 +231,9 @@ class InterruptStreamRetryProvider extends TickingFakeLLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -233,6 +260,9 @@ class InterruptThenAuthFailProvider extends TickingFakeLLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastMessages = messages;

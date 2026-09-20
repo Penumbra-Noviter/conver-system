@@ -36,6 +36,9 @@ class _ThrowingProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) =>
       throw UnimplementedError();
 
@@ -45,6 +48,9 @@ class _ThrowingProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) =>
       throw UnimplementedError();
 
@@ -75,6 +81,9 @@ class _DefaultChainProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) =>
       throw UnimplementedError();
 
@@ -84,6 +93,9 @@ class _DefaultChainProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) =>
       throw UnimplementedError();
 }
@@ -126,6 +138,9 @@ class _StreamRequestProbeProvider extends LLMProvider {
   int? lastMaxTokens;
   String? lastModel;
   final List<double> temperatures = [];
+  double? lastTopP;
+  double? lastPresencePenalty;
+  double? lastFrequencyPenalty;
 
   @override
   Future<String> generate({
@@ -133,6 +148,9 @@ class _StreamRequestProbeProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) =>
       throw UnimplementedError();
 
@@ -142,11 +160,17 @@ class _StreamRequestProbeProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     lastMessages = messages;
     lastMaxTokens = maxTokens;
     lastModel = model;
     temperatures.add(temperature);
+    lastTopP = topP;
+    lastPresencePenalty = presencePenalty;
+    lastFrequencyPenalty = frequencyPenalty;
     final e = error;
     if (e != null) {
       throw e;
@@ -314,6 +338,32 @@ void main() {
       final source =
           File('lib/services/llm/llm_provider.dart').readAsStringSync();
       expect(source, contains('不用 yield*'));
+    });
+
+    test('SP-01：streamGenerate 透传采样三参数到 streamRequest（值一致）', () async {
+      final probe = _StreamRequestProbeProvider(tokens: const ['a']);
+      final collected = <String>[];
+      await for (final token in probe.streamGenerate(
+        messages: const [LlmMessage(role: 'user', content: 'hi')],
+        topP: 0.3,
+        presencePenalty: -1.0,
+        frequencyPenalty: 1.5,
+      )) {
+        collected.add(token);
+      }
+      expect(collected, ['a']);
+      // 基类默认实现按调用方入参原样咨询 streamRequest（含采样三参数）。
+      expect(probe.lastTopP, 0.3);
+      expect(probe.lastPresencePenalty, -1.0);
+      expect(probe.lastFrequencyPenalty, 1.5);
+    });
+
+    test('SP-01：不传采样三参数 → streamRequest 收到 null（缺省零回归）', () async {
+      final probe = _StreamRequestProbeProvider(tokens: const ['a']);
+      await for (final _ in probe.streamGenerate(messages: const [])) {}
+      expect(probe.lastTopP, isNull);
+      expect(probe.lastPresencePenalty, isNull);
+      expect(probe.lastFrequencyPenalty, isNull);
     });
   });
 

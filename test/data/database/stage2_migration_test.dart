@@ -1,15 +1,18 @@
-/// PS2-01 / FD-05 / VR-04 / MS-01 / WL-01 / NPD-02 / NPD-04 迁移测试 —
+/// PS2-01 / FD-05 / VR-04 / MS-01 / WL-01 / NPD-02 / NPD-04 / SP-01 迁移测试 —
 /// schemaVersion
-/// 2→9 / 1→9 / 4→9 / 5→9 / 6→9 / 7→9 / 8→9（阶段 2 三表 + FD-05
-/// messages.created_at
+/// 2→10 / 1→10 / 4→10 / 5→10 / 6→10 / 7→10 / 8→10 / 9→10（阶段 2 三表 +
+/// FD-05 messages.created_at
 /// 索引 + 阶段 3 两表 + MS-01 message_swipes 表与 messages.active_swipe_index
 /// 列 + WL-01 lorebook_entries 表与 FK 索引 + NPD-02 characters.preset_dialogues
 /// 列与 conversations.preset_dialogue 列 + NPD-04 characters.prompt_mode /
-/// characters.expert_prompt 两列）；VR-04 追加 from<5 幂等 / 中断自愈 /
+/// characters.expert_prompt 两列 + SP-01 conversations.top_p /
+/// presence_penalty / frequency_penalty / max_tokens 四列）；VR-04 追加 from<5
+/// 幂等 / 中断自愈 /
 /// 级联 / 唯一索引 / 无硬 FK 契约；MS-01 追加 from<6 幂等补列 / 中断自愈 /
 /// (message_id, index) 唯一约束 / FK 级联；WL-01 追加 from<7 建表 / 中断自愈 /
 /// FK 级联契约；NPD-02 追加 from<8 幂等补列 / 中断自愈 / 重复打开幂等契约；
-/// NPD-04 追加 from<9 幂等补两列 / 中断自愈 / 重复打开幂等契约。
+/// NPD-04 追加 from<9 幂等补两列 / 中断自愈 / 重复打开幂等契约；SP-01 追加
+/// from<10 幂等补四列 / 中断自愈 / 重复打开幂等契约。
 ///
 /// 迁移路径用「降级夹具」构造旧版存量库：先在最新 schema 的文件库上插入旧
 /// 数据，再 `DROP` 高版本对象 + `PRAGMA user_version = N`，关闭后重新打开 —
@@ -144,6 +147,10 @@ Future<(AppDatabase, Directory)> openV2UpgradedFixture() async {
   await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.customStatement('ALTER TABLE characters DROP COLUMN prompt_mode');
   await db.customStatement('ALTER TABLE characters DROP COLUMN expert_prompt');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN top_p');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN presence_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN frequency_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN max_tokens');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -210,6 +217,10 @@ Future<(AppDatabase, Directory)> openV1UpgradedFixture() async {
   await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.customStatement('ALTER TABLE characters DROP COLUMN prompt_mode');
   await db.customStatement('ALTER TABLE characters DROP COLUMN expert_prompt');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN top_p');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN presence_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN frequency_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN max_tokens');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -243,6 +254,10 @@ Future<(AppDatabase, Directory)> openV4UpgradedFixture() async {
   await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.customStatement('ALTER TABLE characters DROP COLUMN prompt_mode');
   await db.customStatement('ALTER TABLE characters DROP COLUMN expert_prompt');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN top_p');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN presence_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN frequency_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN max_tokens');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -301,6 +316,10 @@ Future<(AppDatabase, Directory)> openV5UpgradedFixture() async {
   await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.customStatement('ALTER TABLE characters DROP COLUMN prompt_mode');
   await db.customStatement('ALTER TABLE characters DROP COLUMN expert_prompt');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN top_p');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN presence_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN frequency_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN max_tokens');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -366,6 +385,10 @@ Future<(AppDatabase, Directory)> openV6UpgradedFixture() async {
   await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.customStatement('ALTER TABLE characters DROP COLUMN prompt_mode');
   await db.customStatement('ALTER TABLE characters DROP COLUMN expert_prompt');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN top_p');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN presence_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN frequency_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN max_tokens');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -417,6 +440,10 @@ Future<(AppDatabase, Directory)> openV7UpgradedFixture() async {
   await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.customStatement('ALTER TABLE characters DROP COLUMN prompt_mode');
   await db.customStatement('ALTER TABLE characters DROP COLUMN expert_prompt');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN top_p');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN presence_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN frequency_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN max_tokens');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -465,6 +492,61 @@ Future<(AppDatabase, Directory)> openV8UpgradedFixture() async {
   await db.customStatement('PRAGMA user_version = 8');
   await db.customStatement('ALTER TABLE characters DROP COLUMN prompt_mode');
   await db.customStatement('ALTER TABLE characters DROP COLUMN expert_prompt');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN top_p');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN presence_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN frequency_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN max_tokens');
+  await db.close();
+
+  return (AppDatabase(NativeDatabase(file)), dir);
+}
+
+/// 建一个「v9 存量库」：文件库上建最新 schema → 插 v9 时代数据 → 降级到 v9
+/// 形态（user_version=9 + DROP conversations.top_p / presence_penalty /
+/// frequency_penalty / max_tokens 四列——SP-01 四列属 v10 形态）。
+///
+/// 打开时 from=9：仅走 `from < 10` 分支（SP-01），等价于真实 v9 存量库单步
+/// 升级；零回归保证 —— from<1..9 分支不触发（其幂等性由 v1/v2/v4/v5/v6/v7/v8
+/// 夹具承载）。
+Future<(AppDatabase, Directory)> openV9UpgradedFixture() async {
+  final dir = await Directory.systemTemp.createTemp('sp01_migration_v9_');
+  final file = File('${dir.path}${Platform.pathSeparator}test.db');
+
+  var db = AppDatabase(NativeDatabase(file));
+  final now = DateTime.now();
+  final character = await db
+      .into(db.characters)
+      .insertReturning(
+        CharactersCompanion.insert(name: '星萤', createdAt: now, updatedAt: now),
+      );
+  final conversation = await db
+      .into(db.conversations)
+      .insertReturning(
+        ConversationsCompanion.insert(
+          characterId: character.id,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+  await db
+      .into(db.messages)
+      .insertReturning(
+        MessagesCompanion.insert(
+          conversationId: conversation.id,
+          role: Role.assistant,
+          content: '星火落处，萤光自明。',
+          createdAt: now,
+        ),
+      );
+
+  // 降级到 v9：user_version=9 + DROP 四列（真实 v9 存量库无 SP-01 四列；
+  // 不 DROP 会导致 from<10 的补列探测发现列已存在而跳过，掩盖「真实补列」
+  // 路径）。
+  await db.customStatement('PRAGMA user_version = 9');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN top_p');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN presence_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN frequency_penalty');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN max_tokens');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -674,7 +756,7 @@ seedVectorRows(AppDatabase db, int characterId) async {
 }
 
 void main() {
-  group('schemaVersion 9 契约（全新安装）', () {
+  group('schemaVersion 10 契约（全新安装）', () {
     late AppDatabase db;
 
     setUp(() {
@@ -685,12 +767,12 @@ void main() {
       await db.close();
     });
 
-    test('AppDatabase.schemaVersion == 9', () {
-      expect(db.schemaVersion, 9);
+    test('AppDatabase.schemaVersion == 10', () {
+      expect(db.schemaVersion, 10);
     });
 
     test('全新安装直接建 13 表 + 12 迁移新增索引（含两个唯一索引）+ NPD-02 '
-        '两列 + NPD-04 两列',
+        '两列 + NPD-04 两列 + SP-01 四列',
         () async {
       final tables = await sqliteMasterNames(db, 'table');
       expect(
@@ -728,6 +810,15 @@ void main() {
       expect(
         await tableColumns(db, 'characters'),
         containsAll(['prompt_mode', 'expert_prompt']),
+      );
+
+      // SP-01 四列（schemaVersion 10 形态）：conversations.top_p /
+      // presence_penalty / frequency_penalty / max_tokens。
+      expect(
+        await tableColumns(db, 'conversations'),
+        containsAll(
+          ['top_p', 'presence_penalty', 'frequency_penalty', 'max_tokens'],
+        ),
       );
 
       // 两个唯一索引：阶段 2 relationship_states.character_id 与阶段 3
@@ -780,7 +871,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
     });
 
     test('三表可读写 + converter 字符串落库（stage 五值 / status 四值）', () async {
@@ -971,7 +1062,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(
         await sqliteMasterNames(db, 'table'),
         containsAll([..._stage2Tables, ..._stage3Tables]),
@@ -1015,7 +1106,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(
         await sqliteMasterNames(db, 'table'),
         containsAll([..._stage2Tables, ..._stage3Tables]),
@@ -1055,7 +1146,7 @@ void main() {
       );
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
     });
   });
 
@@ -1102,7 +1193,7 @@ void main() {
         ]),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
     });
 
     test(
@@ -1293,7 +1384,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_stage3Tables));
       expect(
         await sqliteMasterNames(db, 'index'),
@@ -1343,7 +1434,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_stage3Tables));
       expect(await sqliteMasterNames(db, 'index'), containsAll(_newIndexes));
       final stored = await db.select(db.embeddingEntries).getSingle();
@@ -1381,7 +1472,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, contains('idx_message_swipes_message_id'));
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
     });
 
     test('message_swipes 可写读 + (message_id, index) 唯一约束生效（SR-27）', () async {
@@ -1476,7 +1567,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('message_swipes'),
@@ -1508,7 +1599,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('message_swipes'),
@@ -1551,7 +1642,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, contains('idx_lorebook_entries_character_id'));
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
     });
 
     test('lorebook_entries 可写读 + keys JSON 数组往返', () async {
@@ -1624,7 +1715,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('lorebook_entries'),
@@ -1655,7 +1746,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('lorebook_entries'),
@@ -1707,7 +1798,7 @@ void main() {
       final conversation = await db.select(db.conversations).getSingle();
       expect(conversation.presetDialogue, isNull);
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
     });
 
     test('两列可写读：preset_dialogues JSON 往返 + preset_dialogue 快照', () async {
@@ -1762,7 +1853,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(await tableColumns(db, 'characters'), contains('preset_dialogues'));
       expect(await tableColumns(db, 'conversations'), contains('preset_dialogue'));
       // 旧行保留 + 存量行新列默认。
@@ -1792,7 +1883,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(await tableColumns(db, 'characters'), contains('preset_dialogues'));
       expect(await tableColumns(db, 'conversations'), contains('preset_dialogue'));
       final stored = await db.select(db.characters).getSingle();
@@ -1835,7 +1926,7 @@ void main() {
       expect(character.promptMode, 'simple');
       expect(character.expertPrompt, '');
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
     });
 
     test('两列可写读：prompt_mode / expert_prompt 往返（prompt_mode=expert + '
@@ -1876,7 +1967,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(
         await tableColumns(db, 'characters'),
         containsAll(['prompt_mode', 'expert_prompt']),
@@ -1906,7 +1997,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 9);
+      expect(await userVersion(db), 10);
       expect(
         await tableColumns(db, 'characters'),
         containsAll(['prompt_mode', 'expert_prompt']),
@@ -1914,6 +2005,143 @@ void main() {
       final stored = await db.select(db.characters).getSingle();
       expect(stored.promptMode, 'expert');
       expect(stored.expertPrompt, '整段提示');
+    });
+  });
+
+  group('schemaVersion 9→10 迁移（SP-01）', () {
+    late AppDatabase db;
+    late Directory dir;
+
+    setUp(() async {
+      (db, dir) = await openV9UpgradedFixture();
+    });
+
+    tearDown(() async {
+      await db.close();
+      await dir.delete(recursive: true);
+    });
+
+    test('v9 存量库升级四要素：四列存在 + user_version=10 + 旧行保留 + 存量行新列 NULL',
+        () async {
+      // 旧行保留：v9 时代行原样可读，未被迁移改写。
+      expect(await db.select(db.characters).get().then((r) => r.length), 1);
+      expect(await db.select(db.conversations).get().then((r) => r.length), 1);
+      final message = await db.select(db.messages).getSingle();
+      expect(message.content, '星火落处，萤光自明。');
+
+      // 四列存在（snake_case 名）。
+      expect(
+        await tableColumns(db, 'conversations'),
+        containsAll(
+          ['top_p', 'presence_penalty', 'frequency_penalty', 'max_tokens'],
+        ),
+      );
+
+      // 存量行新列 = NULL（可空列无默认 → 既有行 NULL 零影响，NULL = 不覆盖
+      // provider 默认）。
+      final conversation = await db.select(db.conversations).getSingle();
+      expect(conversation.topP, isNull);
+      expect(conversation.presencePenalty, isNull);
+      expect(conversation.frequencyPenalty, isNull);
+      expect(conversation.maxTokens, isNull);
+
+      expect(await userVersion(db), 10);
+    });
+
+    test('四列可写读：top_p / presence_penalty / frequency_penalty / max_tokens 往返',
+        () async {
+      final conversation = await db.select(db.conversations).getSingle();
+
+      await (db.update(db.conversations)
+            ..where((t) => t.id.equals(conversation.id)))
+          .write(
+            ConversationsCompanion(
+              topP: const Value(0.35),
+              presencePenalty: const Value(-1.0),
+              frequencyPenalty: const Value(1.75),
+              maxTokens: const Value(768),
+            ),
+          );
+      final stored = await db.select(db.conversations).getSingle();
+      expect(stored.topP, 0.35);
+      expect(stored.presencePenalty, -1.0);
+      expect(stored.frequencyPenalty, 1.75);
+      expect(stored.maxTokens, 768);
+    });
+
+    test('中断残留重开自愈：一列已补、其余未补 → 重开幂等补全且旧行保留（SR-25）',
+        () async {
+      // 模拟 from<10 迁移中途被杀残留态：top_p 列已补（ALTER 成功），
+      // presence_penalty / frequency_penalty / max_tokens 未补（后续 DDL
+      // 未执行），user_version 未提升（仍为 9）。重开时补列探测发现 top_p
+      // 已存在 → 幂等跳过（不 duplicate column），补齐其余三列。
+      await db.customStatement(
+        'ALTER TABLE conversations DROP COLUMN presence_penalty',
+      );
+      await db.customStatement(
+        'ALTER TABLE conversations DROP COLUMN frequency_penalty',
+      );
+      await db.customStatement(
+        'ALTER TABLE conversations DROP COLUMN max_tokens',
+      );
+      await db.customStatement('PRAGMA user_version = 9');
+
+      // 前置断言：确认残留态真实存在。
+      final residualColumns = await tableColumns(db, 'conversations');
+      expect(residualColumns, contains('top_p'));
+      expect(residualColumns, isNot(contains('presence_penalty')));
+      expect(residualColumns, isNot(contains('frequency_penalty')));
+      expect(residualColumns, isNot(contains('max_tokens')));
+      expect(await userVersion(db), 9, reason: '残留态 user_version 未提升');
+
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 10);
+      expect(
+        await tableColumns(db, 'conversations'),
+        containsAll(
+          ['top_p', 'presence_penalty', 'frequency_penalty', 'max_tokens'],
+        ),
+      );
+      // 旧行保留 + 存量行新列默认 NULL。
+      final conversation = await db.select(db.conversations).getSingle();
+      expect(conversation.topP, isNull);
+      expect(conversation.maxTokens, isNull);
+      expect(
+        (await db.select(db.messages).getSingle()).content,
+        '星火落处，萤光自明。',
+      );
+    });
+
+    test('重复打开幂等：同文件重开不重跑迁移，列/数据仍在（验收 8）', () async {
+      final conversation = await db.select(db.conversations).getSingle();
+      await (db.update(db.conversations)
+            ..where((t) => t.id.equals(conversation.id)))
+          .write(
+            ConversationsCompanion(
+              topP: const Value(0.9),
+              maxTokens: const Value(4096),
+            ),
+          );
+
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 10);
+      expect(
+        await tableColumns(db, 'conversations'),
+        containsAll(
+          ['top_p', 'presence_penalty', 'frequency_penalty', 'max_tokens'],
+        ),
+      );
+      final stored = await db.select(db.conversations).getSingle();
+      expect(stored.topP, 0.9);
+      expect(stored.maxTokens, 4096);
     });
   });
 

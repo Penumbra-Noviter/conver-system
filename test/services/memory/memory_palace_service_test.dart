@@ -48,6 +48,9 @@ class _TemperatureRecordingLLM extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastModel = model;
@@ -61,6 +64,9 @@ class _TemperatureRecordingLLM extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     yield reply;
   }

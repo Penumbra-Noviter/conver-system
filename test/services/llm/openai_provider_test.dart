@@ -369,6 +369,77 @@ void main() {
     });
   });
 
+  group('采样参数透传（SP-01，锚 openai.py _optional_sampling_kwargs）', () {
+    test('generate 非 null 三参数 → 三键透传值正确', () async {
+      final server = await startedServer(FakeLlmServer.jsonResponse({
+        'choices': [
+          {'message': {'role': 'assistant', 'content': 'x'}},
+        ],
+      }));
+      await makeProvider(server).generate(
+        messages: messages,
+        topP: 0.5,
+        presencePenalty: -1.5,
+        frequencyPenalty: 2.0,
+      );
+      final body = server.captured.single.jsonBody!;
+      expect(body['top_p'], 0.5);
+      expect(body['presence_penalty'], -1.5);
+      expect(body['frequency_penalty'], 2.0);
+    });
+
+    test('generate 三参数缺省 null → 三键不写（不覆盖 provider 默认）', () async {
+      final server = await startedServer(FakeLlmServer.jsonResponse({
+        'choices': [
+          {'message': {'role': 'assistant', 'content': 'x'}},
+        ],
+      }));
+      await makeProvider(server).generate(messages: messages);
+      final body = server.captured.single.jsonBody!;
+      expect(body, isNot(contains('top_p')));
+      expect(body, isNot(contains('presence_penalty')));
+      expect(body, isNot(contains('frequency_penalty')));
+    });
+
+    test('generate 部分非 null → 只写非 null 键（其余不写）', () async {
+      final server = await startedServer(FakeLlmServer.jsonResponse({
+        'choices': [
+          {'message': {'role': 'assistant', 'content': 'x'}},
+        ],
+      }));
+      await makeProvider(server).generate(messages: messages, topP: 0.25);
+      final body = server.captured.single.jsonBody!;
+      expect(body['top_p'], 0.25);
+      expect(body, isNot(contains('presence_penalty')));
+      expect(body, isNot(contains('frequency_penalty')));
+    });
+
+    test('streamGenerate 非 null 三参数 → 三键透传', () async {
+      final server = await startedServer(FakeLlmServer.openAi(['ok']));
+      await makeProvider(server)
+          .streamGenerate(
+            messages: messages,
+            topP: 0.75,
+            presencePenalty: 0.5,
+            frequencyPenalty: -1.0,
+          )
+          .toList();
+      final body = server.captured.single.jsonBody!;
+      expect(body['top_p'], 0.75);
+      expect(body['presence_penalty'], 0.5);
+      expect(body['frequency_penalty'], -1.0);
+    });
+
+    test('streamGenerate 三参数缺省 null → 三键不写', () async {
+      final server = await startedServer(FakeLlmServer.openAi(['ok']));
+      await makeProvider(server).streamGenerate(messages: messages).toList();
+      final body = server.captured.single.jsonBody!;
+      expect(body, isNot(contains('top_p')));
+      expect(body, isNot(contains('presence_penalty')));
+      expect(body, isNot(contains('frequency_penalty')));
+    });
+  });
+
   group('translateError 错误翻译原语契约（Falsify：原始异常不得穿透）', () {
     OpenAIProvider provider() => OpenAIProvider(apiKey: apiKey);
 

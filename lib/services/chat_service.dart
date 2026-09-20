@@ -545,11 +545,17 @@ class ChatService {
         userContent: state.content,
       );
 
-      // 4b. 组装生成参数（工单 03）：温度按「角色为主、全局兜底」，max_tokens
-      // 取全局设置。
+      // 4b. 组装生成参数（SP-01）：conv 采样四列非空 → 覆盖；NULL → 既有链
+      //（温度角色为主/全局兜底、max_tokens 全局、三采样参数 null 不覆盖
+      // provider 默认）；SR-24 守卫在 _resolveSamplingParameters 单点承载。
       final globalTemperature = await _settingsRepository.getTemperature();
-      final temperature = _resolveTemperature(character, globalTemperature);
-      final maxTokens = await _settingsRepository.getMaxTokens();
+      final globalMaxTokens = await _settingsRepository.getMaxTokens();
+      final params = _resolveSamplingParameters(
+        conv: conv,
+        character: character,
+        globalTemperature: globalTemperature,
+        globalMaxTokens: globalMaxTokens,
+      );
 
       // 5. provider 解析（Key 缺失 → ApiKeyMissingError；未知 → 工厂抛）。
       final resolved = await _resolveProvider(conv);
@@ -570,8 +576,11 @@ class ChatService {
         llm: resolved.llm,
         messages: messages,
         model: resolved.model,
-        temperature: temperature,
-        maxTokens: maxTokens,
+        temperature: params.temperature,
+        maxTokens: params.maxTokens,
+        topP: params.topP,
+        presencePenalty: params.presencePenalty,
+        frequencyPenalty: params.frequencyPenalty,
       );
     } on DomainError catch (e) {
       // F3：调用方可能在解析失败瞬间取消订阅（controller 已 close），
@@ -637,6 +646,9 @@ class ChatService {
     required String model,
     required double temperature,
     required int maxTokens,
+    required double? topP,
+    required double? presencePenalty,
+    required double? frequencyPenalty,
   }) {
     if (state.stopped || controller.isClosed) {
       return;
@@ -647,6 +659,9 @@ class ChatService {
           model: model,
           temperature: temperature,
           maxTokens: maxTokens,
+          topP: topP,
+          presencePenalty: presencePenalty,
+          frequencyPenalty: frequencyPenalty,
         )
         .listen(
           (token) {
@@ -670,6 +685,9 @@ class ChatService {
                 model: model,
                 temperature: temperature,
                 maxTokens: maxTokens,
+                topP: topP,
+                presencePenalty: presencePenalty,
+                frequencyPenalty: frequencyPenalty,
                 error: error,
               ),
             );
@@ -703,6 +721,9 @@ class ChatService {
     required String model,
     required double temperature,
     required int maxTokens,
+    required double? topP,
+    required double? presencePenalty,
+    required double? frequencyPenalty,
     required Object error,
   }) async {
     if (state.stopped || controller.isClosed) {
@@ -725,6 +746,9 @@ class ChatService {
         model: model,
         temperature: temperature,
         maxTokens: maxTokens,
+        topP: topP,
+        presencePenalty: presencePenalty,
+        frequencyPenalty: frequencyPenalty,
       );
       return;
     }
@@ -1064,18 +1088,26 @@ class ChatService {
       );
       final resolved = await _resolveProvider(conv);
 
-      // 4b. 组装生成参数（工单 03）：温度按「角色为主、全局兜底」，max_tokens
-      // 取全局设置（与 streamReply 同组装语义）。
+      // 4b. 组装生成参数（SP-01）：与 streamReply 共享同一解析单点
+      // _resolveSamplingParameters（conv 四列覆盖 / 既有链 + SR-24 守卫）。
       final globalTemperature = await _settingsRepository.getTemperature();
-      final temperature = _resolveTemperature(character, globalTemperature);
-      final maxTokens = await _settingsRepository.getMaxTokens();
+      final globalMaxTokens = await _settingsRepository.getMaxTokens();
+      final params = _resolveSamplingParameters(
+        conv: conv,
+        character: character,
+        globalTemperature: globalTemperature,
+        globalMaxTokens: globalMaxTokens,
+      );
 
       // 5. 生成（LLM 失败 → 异常上抛，零落库、原消息与候选均不变）。
       final reply = await resolved.llm.generate(
         messages: messages,
         model: resolved.model,
-        temperature: temperature,
-        maxTokens: maxTokens,
+        temperature: params.temperature,
+        maxTokens: params.maxTokens,
+        topP: params.topP,
+        presencePenalty: params.presencePenalty,
+        frequencyPenalty: params.frequencyPenalty,
       );
 
       // 6. 候选追加单入口（仓库内事务：候选 0 播种 + 新候选置激活 + content
@@ -1173,17 +1205,25 @@ class ChatService {
           tail.isEmpty ? continueInstruction : '$continueInstruction\n$tail';
       messages.add(LlmMessage(role: 'user', content: trigger));
 
-      // 4b. 组装生成参数（同 regenerate 语义）。
+      // 4b. 组装生成参数（SP-01：conv 四列覆盖 / 既有链 + SR-24 守卫单点）。
       final globalTemperature = await _settingsRepository.getTemperature();
-      final temperature = _resolveTemperature(character, globalTemperature);
-      final maxTokens = await _settingsRepository.getMaxTokens();
+      final globalMaxTokens = await _settingsRepository.getMaxTokens();
+      final params = _resolveSamplingParameters(
+        conv: conv,
+        character: character,
+        globalTemperature: globalTemperature,
+        globalMaxTokens: globalMaxTokens,
+      );
 
       // 5. 生成（LLM 失败 → 异常上抛，零落库、原内容零改动）。
       final reply = await resolved.llm.generate(
         messages: messages,
         model: resolved.model,
-        temperature: temperature,
-        maxTokens: maxTokens,
+        temperature: params.temperature,
+        maxTokens: params.maxTokens,
+        topP: params.topP,
+        presencePenalty: params.presencePenalty,
+        frequencyPenalty: params.frequencyPenalty,
       );
 
       // 6. 非空续写 → 候选追加；空续写 → no-op（不落重复候选）。
@@ -1305,17 +1345,25 @@ class ChatService {
       );
       final resolved = await _resolveProvider(conv);
 
-      // 5b. 组装生成参数（同 regenerate 语义）。
+      // 5b. 组装生成参数（SP-01：conv 四列覆盖 / 既有链 + SR-24 守卫单点）。
       final globalTemperature = await _settingsRepository.getTemperature();
-      final temperature = _resolveTemperature(character, globalTemperature);
-      final maxTokens = await _settingsRepository.getMaxTokens();
+      final globalMaxTokens = await _settingsRepository.getMaxTokens();
+      final params = _resolveSamplingParameters(
+        conv: conv,
+        character: character,
+        globalTemperature: globalTemperature,
+        globalMaxTokens: globalMaxTokens,
+      );
 
       // 6. 生成（LLM 失败 → 异常上抛；已替换 + 已截断状态保留）。
       final reply = await resolved.llm.generate(
         messages: messages,
         model: resolved.model,
-        temperature: temperature,
-        maxTokens: maxTokens,
+        temperature: params.temperature,
+        maxTokens: params.maxTokens,
+        topP: params.topP,
+        presencePenalty: params.presencePenalty,
+        frequencyPenalty: params.frequencyPenalty,
       );
 
       // 7. 新建 assistant 消息（原 assistant 已随截断删除；候选 0 = 本体）。
@@ -1707,6 +1755,69 @@ class ChatService {
           SettingsRepository.temperatureMax,
         )
         .toDouble();
+  }
+
+  /// 组装生成参数组（SP-01）：conv 采样四列非空 → 覆盖；NULL → 走既有链
+  /// （温度 = 角色为主、全局兜底 [_resolveTemperature]；max_tokens = 全局
+  /// [globalMaxTokens]；topP/presencePenalty/frequencyPenalty = null 不覆盖
+  /// provider 默认）。
+  ///
+  /// SR-24 值域守卫（对齐 `_resolveTemperature` F-76 先例）：conv 覆盖值非法
+  /// （NaN / ±Infinity / 越界）clamp 或回退——**绝不透传**非法值给 wire。
+  /// streamReply / regenerate / continueReply / editAndRegenerate 四路径共用
+  /// 本单点（共享透传腿）。
+  ({
+    double temperature,
+    int maxTokens,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
+  })
+  _resolveSamplingParameters({
+    required Conversation conv,
+    required Character character,
+    required double globalTemperature,
+    required int globalMaxTokens,
+  }) {
+    return (
+      temperature: _resolveTemperature(character, globalTemperature),
+      maxTokens: _resolveMaxTokens(conv.maxTokens, globalMaxTokens),
+      topP: _guardSamplingRange(conv.topP, min: 0, max: 1),
+      presencePenalty: _guardSamplingRange(
+        conv.presencePenalty,
+        min: -2,
+        max: 2,
+      ),
+      frequencyPenalty: _guardSamplingRange(
+        conv.frequencyPenalty,
+        min: -2,
+        max: 2,
+      ),
+    );
+  }
+
+  /// SR-24 值域守卫（SP-01）：可空采样覆盖值的 clamp/回退——NaN/±Infinity
+  /// 回退 null（不覆盖 provider 默认）、越界 clamp 到 [min, max]（合法值
+  /// 原样透传），绝不把非法值交给 wire。
+  double? _guardSamplingRange(
+    double? value, {
+    required double min,
+    required double max,
+  }) {
+    if (value == null || value.isNaN || value.isInfinite) {
+      return null;
+    }
+    return value.clamp(min, max).toDouble();
+  }
+
+  /// SR-24 max_tokens 守卫（SP-01）：conv 覆盖值 < 1（0/负数非法）回退全局
+  /// [globalMaxTokens]（沿 SettingsRepository「负数回退 defaultMaxTokens」
+  /// 语义）；null 走全局既有链；合法值原样覆盖。
+  int _resolveMaxTokens(int? value, int globalMaxTokens) {
+    if (value == null || value < 1) {
+      return globalMaxTokens;
+    }
+    return value;
   }
 
   /// provider 解析（AR-3：委派 [CredentialsResolver]——组合序单一归属
