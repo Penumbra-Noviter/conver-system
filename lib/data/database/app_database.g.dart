@@ -203,6 +203,19 @@ class $CharactersTable extends Characters
     requiredDuringInsert: false,
     defaultValue: const Constant(0.7),
   );
+  @override
+  late final GeneratedColumnWithTypeConverter<List<Map<String, String>>, String>
+  presetDialogues =
+      GeneratedColumn<String>(
+        'preset_dialogues',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      ).withConverter<List<Map<String, String>>>(
+        $CharactersTable.$converterpresetDialogues,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -244,6 +257,7 @@ class $CharactersTable extends Characters
     extensions,
     avatar,
     temperature,
+    presetDialogues,
     createdAt,
     updatedAt,
   ];
@@ -452,6 +466,12 @@ class $CharactersTable extends Characters
         DriftSqlType.double,
         data['${effectivePrefix}temperature'],
       )!,
+      presetDialogues: $CharactersTable.$converterpresetDialogues.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}preset_dialogues'],
+        )!,
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -476,6 +496,8 @@ class $CharactersTable extends Characters
       const StringMapConverter();
   static TypeConverter<Map<String, dynamic>, String> $converterextensions =
       const StringMapConverter();
+  static TypeConverter<List<Map<String, String>>, String>
+  $converterpresetDialogues = const PresetDialogueListConverter();
 }
 
 class Character extends DataClass implements Insertable<Character> {
@@ -498,6 +520,15 @@ class Character extends DataClass implements Insertable<Character> {
   final Map<String, dynamic> extensions;
   final String? avatar;
   final double temperature;
+
+  /// 预设对话列表（JSON 数组 `[{name, content}]`，对齐桌面
+  /// `models/character.py::Character.preset_dialogues`；缺省 `[]`）。
+  ///
+  /// 值域与归一化（≤[PresetDialogueListConverter] 的健壮往返之外的语义）由
+  /// `character_card.dart::_normalizePresetDialogues` 单一承载——桌面
+  /// `_normalize_preset_dialogues`（PRESET_DIALOGUE_MAX=10 截断 / 空字段过滤 /
+  /// 同名去重）逐字镜像，导入侧落到本列前已完成归一化（深层语义不进城）。
+  final List<Map<String, String>> presetDialogues;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Character({
@@ -518,6 +549,7 @@ class Character extends DataClass implements Insertable<Character> {
     required this.extensions,
     this.avatar,
     required this.temperature,
+    required this.presetDialogues,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -561,6 +593,11 @@ class Character extends DataClass implements Insertable<Character> {
       map['avatar'] = Variable<String>(avatar);
     }
     map['temperature'] = Variable<double>(temperature);
+    {
+      map['preset_dialogues'] = Variable<String>(
+        $CharactersTable.$converterpresetDialogues.toSql(presetDialogues),
+      );
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -587,6 +624,7 @@ class Character extends DataClass implements Insertable<Character> {
           ? const Value.absent()
           : Value(avatar),
       temperature: Value(temperature),
+      presetDialogues: Value(presetDialogues),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -621,6 +659,9 @@ class Character extends DataClass implements Insertable<Character> {
       extensions: serializer.fromJson<Map<String, dynamic>>(json['extensions']),
       avatar: serializer.fromJson<String?>(json['avatar']),
       temperature: serializer.fromJson<double>(json['temperature']),
+      presetDialogues: serializer.fromJson<List<Map<String, String>>>(
+        json['presetDialogues'],
+      ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -648,6 +689,9 @@ class Character extends DataClass implements Insertable<Character> {
       'extensions': serializer.toJson<Map<String, dynamic>>(extensions),
       'avatar': serializer.toJson<String?>(avatar),
       'temperature': serializer.toJson<double>(temperature),
+      'presetDialogues': serializer.toJson<List<Map<String, String>>>(
+        presetDialogues,
+      ),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -671,6 +715,7 @@ class Character extends DataClass implements Insertable<Character> {
     Map<String, dynamic>? extensions,
     Value<String?> avatar = const Value.absent(),
     double? temperature,
+    List<Map<String, String>>? presetDialogues,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Character(
@@ -692,6 +737,7 @@ class Character extends DataClass implements Insertable<Character> {
     extensions: extensions ?? this.extensions,
     avatar: avatar.present ? avatar.value : this.avatar,
     temperature: temperature ?? this.temperature,
+    presetDialogues: presetDialogues ?? this.presetDialogues,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -732,6 +778,9 @@ class Character extends DataClass implements Insertable<Character> {
       temperature: data.temperature.present
           ? data.temperature.value
           : this.temperature,
+      presetDialogues: data.presetDialogues.present
+          ? data.presetDialogues.value
+          : this.presetDialogues,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -757,6 +806,7 @@ class Character extends DataClass implements Insertable<Character> {
           ..write('extensions: $extensions, ')
           ..write('avatar: $avatar, ')
           ..write('temperature: $temperature, ')
+          ..write('presetDialogues: $presetDialogues, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -782,6 +832,7 @@ class Character extends DataClass implements Insertable<Character> {
     extensions,
     avatar,
     temperature,
+    presetDialogues,
     createdAt,
     updatedAt,
   );
@@ -806,6 +857,7 @@ class Character extends DataClass implements Insertable<Character> {
           other.extensions == this.extensions &&
           other.avatar == this.avatar &&
           other.temperature == this.temperature &&
+          other.presetDialogues == this.presetDialogues &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -828,6 +880,7 @@ class CharactersCompanion extends UpdateCompanion<Character> {
   final Value<Map<String, dynamic>> extensions;
   final Value<String?> avatar;
   final Value<double> temperature;
+  final Value<List<Map<String, String>>> presetDialogues;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const CharactersCompanion({
@@ -848,6 +901,7 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     this.extensions = const Value.absent(),
     this.avatar = const Value.absent(),
     this.temperature = const Value.absent(),
+    this.presetDialogues = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -869,6 +923,7 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     this.extensions = const Value.absent(),
     this.avatar = const Value.absent(),
     this.temperature = const Value.absent(),
+    this.presetDialogues = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : name = Value(name),
@@ -892,6 +947,7 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     Expression<String>? extensions,
     Expression<String>? avatar,
     Expression<double>? temperature,
+    Expression<String>? presetDialogues,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -914,6 +970,7 @@ class CharactersCompanion extends UpdateCompanion<Character> {
       if (extensions != null) 'extensions': extensions,
       if (avatar != null) 'avatar': avatar,
       if (temperature != null) 'temperature': temperature,
+      if (presetDialogues != null) 'preset_dialogues': presetDialogues,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -937,6 +994,7 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     Value<Map<String, dynamic>>? extensions,
     Value<String?>? avatar,
     Value<double>? temperature,
+    Value<List<Map<String, String>>>? presetDialogues,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -959,6 +1017,7 @@ class CharactersCompanion extends UpdateCompanion<Character> {
       extensions: extensions ?? this.extensions,
       avatar: avatar ?? this.avatar,
       temperature: temperature ?? this.temperature,
+      presetDialogues: presetDialogues ?? this.presetDialogues,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -1030,6 +1089,11 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     if (temperature.present) {
       map['temperature'] = Variable<double>(temperature.value);
     }
+    if (presetDialogues.present) {
+      map['preset_dialogues'] = Variable<String>(
+        $CharactersTable.$converterpresetDialogues.toSql(presetDialogues.value),
+      );
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1059,6 +1123,7 @@ class CharactersCompanion extends UpdateCompanion<Character> {
           ..write('extensions: $extensions, ')
           ..write('avatar: $avatar, ')
           ..write('temperature: $temperature, ')
+          ..write('presetDialogues: $presetDialogues, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1133,6 +1198,17 @@ class $ConversationsTable extends Conversations
     requiredDuringInsert: false,
     defaultValue: const Constant('claude-sonnet-5'),
   );
+  static const VerificationMeta _presetDialogueMeta = const VerificationMeta(
+    'presetDialogue',
+  );
+  @override
+  late final GeneratedColumn<String> presetDialogue = GeneratedColumn<String>(
+    'preset_dialogue',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1162,6 +1238,7 @@ class $ConversationsTable extends Conversations
     title,
     modelProvider,
     modelName,
+    presetDialogue,
     createdAt,
     updatedAt,
   ];
@@ -1212,6 +1289,15 @@ class $ConversationsTable extends Conversations
         modelName.isAcceptableOrUnknown(data['model_name']!, _modelNameMeta),
       );
     }
+    if (data.containsKey('preset_dialogue')) {
+      context.handle(
+        _presetDialogueMeta,
+        presetDialogue.isAcceptableOrUnknown(
+          data['preset_dialogue']!,
+          _presetDialogueMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1257,6 +1343,10 @@ class $ConversationsTable extends Conversations
         DriftSqlType.string,
         data['${effectivePrefix}model_name'],
       )!,
+      presetDialogue: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}preset_dialogue'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1282,6 +1372,15 @@ class Conversation extends DataClass implements Insertable<Conversation> {
   final String title;
   final String modelProvider;
   final String modelName;
+
+  /// 预设对话快照（可空 TEXT；NPD-02，对齐桌面
+  /// `models/conversation.py::Conversation.preset_dialogue`）。
+  ///
+  /// 创建对话时固化（`createConversation` 传入的 presetDialogue 原样落列；
+  /// None/空串 → null 不落伪值——桌面 `data.preset_dialogue or None` 语义）。
+  /// 快照语义 = 创建时固化：改角色卡 presetDialogues 实时值不影响已建会话
+  /// 注入源（对话组装只读本列）。
+  final String? presetDialogue;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Conversation({
@@ -1290,6 +1389,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     required this.title,
     required this.modelProvider,
     required this.modelName,
+    this.presetDialogue,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1301,6 +1401,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     map['title'] = Variable<String>(title);
     map['model_provider'] = Variable<String>(modelProvider);
     map['model_name'] = Variable<String>(modelName);
+    if (!nullToAbsent || presetDialogue != null) {
+      map['preset_dialogue'] = Variable<String>(presetDialogue);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1313,6 +1416,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       title: Value(title),
       modelProvider: Value(modelProvider),
       modelName: Value(modelName),
+      presetDialogue: presetDialogue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(presetDialogue),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1329,6 +1435,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       title: serializer.fromJson<String>(json['title']),
       modelProvider: serializer.fromJson<String>(json['modelProvider']),
       modelName: serializer.fromJson<String>(json['modelName']),
+      presetDialogue: serializer.fromJson<String?>(json['presetDialogue']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1342,6 +1449,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       'title': serializer.toJson<String>(title),
       'modelProvider': serializer.toJson<String>(modelProvider),
       'modelName': serializer.toJson<String>(modelName),
+      'presetDialogue': serializer.toJson<String?>(presetDialogue),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1353,6 +1461,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     String? title,
     String? modelProvider,
     String? modelName,
+    Value<String?> presetDialogue = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Conversation(
@@ -1361,6 +1470,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     title: title ?? this.title,
     modelProvider: modelProvider ?? this.modelProvider,
     modelName: modelName ?? this.modelName,
+    presetDialogue: presetDialogue.present
+        ? presetDialogue.value
+        : this.presetDialogue,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1375,6 +1487,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           ? data.modelProvider.value
           : this.modelProvider,
       modelName: data.modelName.present ? data.modelName.value : this.modelName,
+      presetDialogue: data.presetDialogue.present
+          ? data.presetDialogue.value
+          : this.presetDialogue,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1388,6 +1503,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           ..write('title: $title, ')
           ..write('modelProvider: $modelProvider, ')
           ..write('modelName: $modelName, ')
+          ..write('presetDialogue: $presetDialogue, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1401,6 +1517,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     title,
     modelProvider,
     modelName,
+    presetDialogue,
     createdAt,
     updatedAt,
   );
@@ -1413,6 +1530,7 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           other.title == this.title &&
           other.modelProvider == this.modelProvider &&
           other.modelName == this.modelName &&
+          other.presetDialogue == this.presetDialogue &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1423,6 +1541,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
   final Value<String> title;
   final Value<String> modelProvider;
   final Value<String> modelName;
+  final Value<String?> presetDialogue;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const ConversationsCompanion({
@@ -1431,6 +1550,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.title = const Value.absent(),
     this.modelProvider = const Value.absent(),
     this.modelName = const Value.absent(),
+    this.presetDialogue = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -1440,6 +1560,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.title = const Value.absent(),
     this.modelProvider = const Value.absent(),
     this.modelName = const Value.absent(),
+    this.presetDialogue = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : characterId = Value(characterId),
@@ -1451,6 +1572,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     Expression<String>? title,
     Expression<String>? modelProvider,
     Expression<String>? modelName,
+    Expression<String>? presetDialogue,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -1460,6 +1582,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
       if (title != null) 'title': title,
       if (modelProvider != null) 'model_provider': modelProvider,
       if (modelName != null) 'model_name': modelName,
+      if (presetDialogue != null) 'preset_dialogue': presetDialogue,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -1471,6 +1594,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     Value<String>? title,
     Value<String>? modelProvider,
     Value<String>? modelName,
+    Value<String?>? presetDialogue,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -1480,6 +1604,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
       title: title ?? this.title,
       modelProvider: modelProvider ?? this.modelProvider,
       modelName: modelName ?? this.modelName,
+      presetDialogue: presetDialogue ?? this.presetDialogue,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -1503,6 +1628,9 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     if (modelName.present) {
       map['model_name'] = Variable<String>(modelName.value);
     }
+    if (presetDialogue.present) {
+      map['preset_dialogue'] = Variable<String>(presetDialogue.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1520,6 +1648,7 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
           ..write('title: $title, ')
           ..write('modelProvider: $modelProvider, ')
           ..write('modelName: $modelName, ')
+          ..write('presetDialogue: $presetDialogue, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -6829,6 +6958,7 @@ typedef $$CharactersTableCreateCompanionBuilder = CharactersCompanion Function({
   Value<Map<String, dynamic>> extensions,
   Value<String?> avatar,
   Value<double> temperature,
+  Value<List<Map<String, String>>> presetDialogues,
   required DateTime createdAt,
   required DateTime updatedAt,
 });
@@ -6850,6 +6980,7 @@ typedef $$CharactersTableUpdateCompanionBuilder = CharactersCompanion Function({
   Value<Map<String, dynamic>> extensions,
   Value<String?> avatar,
   Value<double> temperature,
+  Value<List<Map<String, String>>> presetDialogues,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -7134,6 +7265,16 @@ class $$CharactersTableFilterComposer
   ColumnFilters<double> get temperature => $composableBuilder(
     column: $table.temperature,
     builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<
+    List<Map<String, String>>,
+    List<Map<String, String>>,
+    String
+  >
+  get presetDialogues => $composableBuilder(
+    column: $table.presetDialogues,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
@@ -7466,6 +7607,11 @@ class $$CharactersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get presetDialogues => $composableBuilder(
+    column: $table.presetDialogues,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -7555,6 +7701,12 @@ class $$CharactersTableAnnotationComposer
 
   GeneratedColumn<double> get temperature => $composableBuilder(
     column: $table.temperature,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<List<Map<String, String>>, String>
+  get presetDialogues => $composableBuilder(
+    column: $table.presetDialogues,
     builder: (column) => column,
   );
 
@@ -7846,6 +7998,8 @@ class $$CharactersTableTableManager
                 Value<Map<String, dynamic>> extensions = const Value.absent(),
                 Value<String?> avatar = const Value.absent(),
                 Value<double> temperature = const Value.absent(),
+                Value<List<Map<String, String>>> presetDialogues =
+                    const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => CharactersCompanion(
@@ -7866,6 +8020,7 @@ class $$CharactersTableTableManager
                 extensions: extensions,
                 avatar: avatar,
                 temperature: temperature,
+                presetDialogues: presetDialogues,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -7888,6 +8043,8 @@ class $$CharactersTableTableManager
                 Value<Map<String, dynamic>> extensions = const Value.absent(),
                 Value<String?> avatar = const Value.absent(),
                 Value<double> temperature = const Value.absent(),
+                Value<List<Map<String, String>>> presetDialogues =
+                    const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => CharactersCompanion.insert(
@@ -7908,6 +8065,7 @@ class $$CharactersTableTableManager
                 extensions: extensions,
                 avatar: avatar,
                 temperature: temperature,
+                presetDialogues: presetDialogues,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -8175,6 +8333,7 @@ typedef $$ConversationsTableCreateCompanionBuilder =
       Value<String> title,
       Value<String> modelProvider,
       Value<String> modelName,
+      Value<String?> presetDialogue,
       required DateTime createdAt,
       required DateTime updatedAt,
     });
@@ -8185,6 +8344,7 @@ typedef $$ConversationsTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String> modelProvider,
       Value<String> modelName,
+      Value<String?> presetDialogue,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -8278,6 +8438,11 @@ class $$ConversationsTableFilterComposer
 
   ColumnFilters<String> get modelName => $composableBuilder(
     column: $table.modelName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get presetDialogue => $composableBuilder(
+    column: $table.presetDialogue,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8394,6 +8559,11 @@ class $$ConversationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get presetDialogue => $composableBuilder(
+    column: $table.presetDialogue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8450,6 +8620,11 @@ class $$ConversationsTableAnnotationComposer
 
   GeneratedColumn<String> get modelName =>
       $composableBuilder(column: $table.modelName, builder: (column) => column);
+
+  GeneratedColumn<String> get presetDialogue => $composableBuilder(
+    column: $table.presetDialogue,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -8568,6 +8743,7 @@ class $$ConversationsTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String> modelProvider = const Value.absent(),
                 Value<String> modelName = const Value.absent(),
+                Value<String?> presetDialogue = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => ConversationsCompanion(
@@ -8576,6 +8752,7 @@ class $$ConversationsTableTableManager
                 title: title,
                 modelProvider: modelProvider,
                 modelName: modelName,
+                presetDialogue: presetDialogue,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -8586,6 +8763,7 @@ class $$ConversationsTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String> modelProvider = const Value.absent(),
                 Value<String> modelName = const Value.absent(),
+                Value<String?> presetDialogue = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => ConversationsCompanion.insert(
@@ -8594,6 +8772,7 @@ class $$ConversationsTableTableManager
                 title: title,
                 modelProvider: modelProvider,
                 modelName: modelName,
+                presetDialogue: presetDialogue,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

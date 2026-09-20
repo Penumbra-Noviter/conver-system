@@ -99,6 +99,10 @@ class ConversationRepository {
   ///   [SettingsReader] 的设置值，再回退常量 `claude` / `claude-sonnet-5`；
   /// - 角色存在且 `first_mes` 非空 → 预插首条 assistant 开场白
   ///   （模板替换后），对话 updated_at 随之前移。
+  /// - [presetDialogue]（NPD-02）：预设对话快照文本，创建时固化到
+  ///   `conversations.preset_dialogue` 列；None/空串 → null（不落伪值，桌面
+  ///   `data.preset_dialogue or None` 语义）。快照语义 = 创建时固化——改角色
+  ///   卡 presetDialogues 实时值不影响已建会话注入源（验收 5 契约锁）。
   ///
   /// 角色不存在时经外键约束拒绝（与桌面 FK 语义一致，不做预检兜底）。
   Future<Conversation> createConversation({
@@ -106,6 +110,7 @@ class ConversationRepository {
     String? title,
     String? modelProvider,
     String? modelName,
+    String? presetDialogue,
   }) async {
     final character = await (_db.select(_db.characters)
           ..where(($CharactersTable t) => t.id.equals(characterId)))
@@ -126,6 +131,10 @@ class ConversationRepository {
       fromSettings: '',
       fallback: defaultConversationTitle(character?.name),
     );
+    // 快照归一：None/空串 → null 不落伪值（桌面 `data.preset_dialogue or None`；
+    // 纯空白 truthy 原样固化，注入门控由 buildMessages 的 trim 检查承载）。
+    final presetSnapshot =
+        (presetDialogue == null || presetDialogue.isEmpty) ? null : presetDialogue;
 
     final now = _now();
     var conversation = await _db.into(_db.conversations).insertReturning(
@@ -134,6 +143,7 @@ class ConversationRepository {
             title: Value(effectiveTitle),
             modelProvider: Value(provider),
             modelName: Value(model),
+            presetDialogue: Value(presetSnapshot),
             createdAt: now,
             updatedAt: now,
           ),

@@ -4,15 +4,19 @@
 /// V2 信封 / 裸 data / 无 spec data 信封 / V1 旧卡四种格式识别、字段归一化、
 /// 头像往返、extensions.conver_system 命名空间保真。纯 Dart 零平台依赖。
 ///
-/// 语义锚点（共识 A3 + 工单 M3-03 验收 1-5）：
+/// 语义锚点（共识 A3 + 工单 M3-03 验收 1-5 + NPD-02）：
 /// - 导出映射：`version → data.character_version`；temperature 注入
-///   `extensions.conver_system`；base64 头像去前缀进 data.avatar、URL 头像进
-///   命名空间 avatar_url；None 集合字段 → `[]` / `{}`；
+///   `extensions.conver_system`；preset_dialogues 注入同一命名空间（不落 data
+///   顶层）；base64 头像去前缀进 data.avatar、URL 头像进命名空间 avatar_url；
+///   None 集合字段 → `[]` / `{}`；
 /// - 导入四格式优先级：V2 信封 → 无 spec 的 data 信封 → V1 旧卡（char_name
 ///   等 8 字段归一）→ 裸 data；非法结构抛 [CardFormatException]（文案含格式
 ///   引导），缺失 / 纯空白 name 抛 [CardValidationException]（纯原因）；
 /// - 类型容错：[_asList] / [_asDict] / [_inferMime] / [_toDataUri] /
-///   [_clampTemperature] / name 截断 100 / version 截断 50。
+///   [_clampTemperature] / name 截断 100 / version 截断 50；
+/// - 预设对话（NPD-02）：[_normalizePresetDialogues] 桌面
+///   `_normalize_preset_dialogues` 逐字——非 list → []、空字段过滤、
+///   trim 同名去重、[presetDialogueMax]（10）截断；conver_system 命名空间往返。
 library;
 
 import 'dart:convert';
@@ -51,6 +55,11 @@ class CardValidationException implements Exception {
   String toString() => 'CardValidationException: $message';
 }
 
+/// 预设对话条目最大数量（NPD-02；桌面
+/// `schemas/character.py::PRESET_DIALOGUE_MAX == 10`，归一化超量截断单一来源，
+/// 测试 `preset_dialogue_max_constant` 契约锁）。
+const int presetDialogueMax = 10;
+
 /// V2 卡解析 / 归一化后的角色字段快照（导入侧产出，供落库装配
 /// `CharactersCompanion`）。
 ///
@@ -87,6 +96,7 @@ class CharacterDraft {
     this.extensions = const <String, dynamic>{},
     this.avatar,
     required this.temperature,
+    this.presetDialogues = const <Map<String, String>>[],
     this.lorebookEntries = const <LorebookEntryDraft>[],
   });
 
@@ -109,6 +119,10 @@ class CharacterDraft {
   /// 头像 data URI / URL（无则 null）。
   final String? avatar;
   final double temperature;
+
+  /// 预设对话列表（NPD-02；`extensions.conver_system.preset_dialogues` 读回后经
+  /// [_normalizePresetDialogues] 归一化的 `{name, content}` 列表）。
+  final List<Map<String, String>> presetDialogues;
 
   /// `extensions.conver_system.character_book` 解析出的世界书条目草案
   /// （WL-01；畸形/缺失 → 空列表，不阻断导入）。
@@ -136,6 +150,7 @@ class CharacterDraft {
       extensions: Value(extensions),
       avatar: avatar == null ? const Value.absent() : Value(avatar!),
       temperature: Value(temperature),
+      presetDialogues: Value(presetDialogues),
     );
   }
 }
@@ -163,8 +178,8 @@ const _v1ToV2Map = <String, String>{
 
 /// 角色 ORM → V2 信封 Map（导出用）。
 ///
-/// 非 V2 标准字段（temperature / URL 头像 / lorebook 等）经
-/// `extensions.conver_system` 命名空间保真，保证导出→导入往返不丢数据。
+/// 非 V2 标准字段（temperature / URL 头像 / preset_dialogues / lorebook 等）
+/// 经 `extensions.conver_system` 命名空间保真，保证导出→导入往返不丢数据。
 ///
 /// 返回 V2 信封 Map（spec + spec_version + data）；不抛异常。
 Map<String, dynamic> toV2Card(Character char) {
@@ -173,6 +188,13 @@ Map<String, dynamic> toV2Card(Character char) {
 
   // temperature：以 DB 实时值为准写入命名空间。
   ns['temperature'] = char.temperature;
+
+  // NPD-02 预设对话：写入 conver_system 命名空间（不落 data 顶层，与
+  // temperature/avatar_url 同归类）；空列表不写（对齐桌面
+  // `if char.preset_dialogues` 语义——空态导出不产生伪键）。
+  if (char.presetDialogues.isNotEmpty) {
+    ns['preset_dialogues'] = char.presetDialogues;
+  }
 
   // 头像：base64 data URI → data.avatar（去前缀，ST 兼容）；URL → 命名空间
   // avatar_url；无头像两者皆缺。
@@ -292,6 +314,11 @@ CharacterDraft _buildCreate(Map<String, dynamic> data) {
   // extensions 原始 character_book 保持原样（保真零回归，见库文档）。
   final lorebookEntries = parseCharacterBook(ns['character_book']);
 
+  // NPD-02 预设对话：conver_system 命名空间读回并归一化（桌面
+  // `_normalize_preset_dialogues` 逐字；None/非 list/标量 → []、空字段过滤、
+  // trim 同名去重、超 10 截断——SR-26，脏数据收敛不阻断导入）。
+  final presetDialogues = _normalizePresetDialogues(ns['preset_dialogues']);
+
   final version = _truncate(
     (data['character_version'] ?? data['version'] ?? '1.0').toString(),
     50,
@@ -314,6 +341,7 @@ CharacterDraft _buildCreate(Map<String, dynamic> data) {
     extensions: extensions,
     avatar: avatarValue,
     temperature: temperature,
+    presetDialogues: presetDialogues,
     lorebookEntries: lorebookEntries,
   );
 }
@@ -406,6 +434,52 @@ Map<String, dynamic> _asDict(Object? value) {
 Map<String, dynamic> _converSystem(Map<String, dynamic> extensions) {
   final ns = extensions[_nsKey];
   return ns is Map ? _stringKeyedMap(ns) : <String, dynamic>{};
+}
+
+/// 预设对话归一化：非 list → []；逐项 name/content trim 非空；按 name 去重
+/// 保留首个；截断至 [presetDialogueMax]。
+///
+/// NPD-02（桌面 `character_card.py::_normalize_preset_dialogues` 逐字移植）：
+/// PD-4 预设对话导入侧容错——脏数据（None / 非 list / 空字段 / 同名重复 /
+/// 超量）全部收敛为「干净 list[dict]」，再交落库装配（SR-26 解析失败降级
+/// 不阻断导入）。
+List<Map<String, String>> _normalizePresetDialogues(Object? value) {
+  if (value is! List) {
+    return const <Map<String, String>>[];
+  }
+  final result = <Map<String, String>>[];
+  final seen = <String>{};
+  for (final item in value) {
+    if (item is! Map) {
+      continue;
+    }
+    final name = _presetField(item['name']);
+    final content = _presetField(item['content']);
+    if (name.isEmpty || content.isEmpty) {
+      continue;
+    }
+    if (!seen.add(name)) {
+      continue;
+    }
+    result.add(<String, String>{'name': name, 'content': content});
+    if (result.length >= presetDialogueMax) {
+      break;
+    }
+  }
+  return result;
+}
+
+/// 预设对话字段 str()（含 falsy 归一）——桌面 `str(item.get(k) or "")` 的 Dart
+/// 等价：null / 空串 / 假值（false / 0）→ 空串，其余 `toString()` 后 trim。
+///
+/// 逐字对齐桌面 `_normalize_preset_dialogues` 的 `or ""` 判定（Python falsy
+/// 语义：None / '' / False / 0 归空；非零数值与 truthy 布尔经 str() 保留——
+/// 桌面契约锁用例 `int → "123"` 即由此保证）。
+String _presetField(Object? value) {
+  if (value == null || value == '' || value == false || value == 0) {
+    return '';
+  }
+  return value.toString().trim();
 }
 
 /// 温度值裁剪到 [0, 2] 合法区间，非法值回退默认 0.7（桌面 `_clamp_temperature`）。

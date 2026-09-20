@@ -35,6 +35,7 @@ Character _character({
   String version = '1.0',
   Map<String, dynamic> creatorNotes = const {'note': '创作者备注'},
   Map<String, dynamic> extensions = const {},
+  List<Map<String, String>> presetDialogues = const [],
   String? avatar,
   double temperature = 0.7,
 }) {
@@ -54,6 +55,7 @@ Character _character({
     version: version,
     creatorNotes: creatorNotes,
     extensions: extensions,
+    presetDialogues: presetDialogues,
     avatar: avatar,
     temperature: temperature,
     createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
@@ -108,6 +110,7 @@ void _expectRoundtripEqual(Character char, CharacterDraft result) {
   expect(result.creatorNotes, char.creatorNotes);
   expect(result.avatar, char.avatar);
   expect(result.temperature, char.temperature);
+  expect(result.presetDialogues, char.presetDialogues);
   for (final entry in char.extensions.entries) {
     expect(result.extensions[entry.key], entry.value);
   }
@@ -608,6 +611,173 @@ void main() {
         const CardValidationException('y').toString(),
         contains('CardValidationException: y'),
       );
+    });
+  });
+
+  group('十、预设对话 presetDialogues 往返与归一化（NPD-02，桌面 PD-4 契约移植）',
+      () {
+    /// [(name, content)] 提取（CharacterDraft.presetDialogues 为
+    /// List<Map<String, String>>，兼容桌面 _pd_pairs 断言形态）。
+    List<(String, String)> pdPairs(List<Map<String, String>> items) =>
+        [for (final item in items) (item['name']!, item['content']!)];
+
+    test('presetDialogueMax 单一来源常量 == 10（spec 锚点）', () {
+      expect(presetDialogueMax, 10);
+    });
+
+    test('toV2Card 预设对话写入 extensions.conver_system 命名空间，不落 data 顶层',
+        () {
+      const pd = [
+        {'name': '寒暄', 'content': '你好，请问怎么称呼？'},
+      ];
+      final card = toV2Card(_character(presetDialogues: pd));
+      final data = card['data']! as Map<String, dynamic>;
+      final ns = (data['extensions']! as Map<String, dynamic>)['conver_system']!
+          as Map<String, dynamic>;
+      expect(data.containsKey('preset_dialogues'), isFalse,
+          reason: '不落 data 顶层');
+      expect(ns['preset_dialogues'], pd);
+    });
+
+    test('toV2Card 空预设对话（None / []）不写命名空间', () {
+      for (final value in <List<Map<String, String>>>[const [], const []]) {
+        final ns = ((toV2Card(_character(presetDialogues: value))['data']!
+                as Map<String, dynamic>)['extensions']!
+            as Map<String, dynamic>)['conver_system']! as Map<String, dynamic>;
+        expect(ns.containsKey('preset_dialogues'), isFalse);
+      }
+    });
+
+    test('fromV2Card 从 conver_system 命名空间读回预设对话列表', () {
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'preset_dialogues': [
+              {'name': '寒暄', 'content': '你好。'},
+              {'name': '告别', 'content': '再见。'},
+            ],
+          },
+        },
+      }));
+      expect(pdPairs(result.presetDialogues), [
+        ('寒暄', '你好。'),
+        ('告别', '再见。'),
+      ]);
+    });
+
+    test('预设对话导出→导入往返保真（name/content 逐项一致）', () {
+      const pd = [
+        {'name': '寒暄', 'content': '你好，久等了。'},
+        {'name': '告别', 'content': '下次再见。'},
+      ];
+      final result = _roundtrip(_character(presetDialogues: pd));
+      expect(pdPairs(result.presetDialogues), [
+        ('寒暄', '你好，久等了。'),
+        ('告别', '下次再见。'),
+      ]);
+    });
+
+    test('脏数据：None / dict / str → []（SR-26 降级）', () {
+      for (final dirty in <Object?>[null, {'name': 'x', 'content': 'y'}, '文本']) {
+        final result = fromV2Card(_v2Card({
+          'extensions': {
+            'conver_system': {'preset_dialogues': dirty},
+          },
+        }));
+        expect(result.presetDialogues, isEmpty, reason: 'dirty=$dirty');
+      }
+    });
+
+    test('list 内含非 dict 项（str / int / null）被跳过', () {
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'preset_dialogues': [
+              '非字典',
+              {'name': '有效', 'content': '正文'},
+              123,
+              null,
+              {'name': 'x', 'content': 'y'},
+            ],
+          },
+        },
+      }));
+      expect(pdPairs(result.presetDialogues), [('有效', '正文'), ('x', 'y')]);
+    });
+
+    test('name / content 非 str（int）→ str() 化保留', () {
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'preset_dialogues': [
+              {'name': 123, 'content': 456},
+            ],
+          },
+        },
+      }));
+      expect(pdPairs(result.presetDialogues), [('123', '456')]);
+    });
+
+    test('空 name 或空 content（含 trim 后空）的项被过滤', () {
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'preset_dialogues': [
+              {'name': '', 'content': '有内容'},
+              {'name': '有标题', 'content': ''},
+              {'name': '   ', 'content': '空白标题'},
+              {'name': '有标题', 'content': '  '},
+              {'name': '有效', 'content': '正文'},
+            ],
+          },
+        },
+      }));
+      expect(pdPairs(result.presetDialogues), [('有效', '正文')]);
+    });
+
+    test('trim 后同名去重保留首个', () {
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'preset_dialogues': [
+              {'name': ' 寒暄 ', 'content': ' 你好 '},
+              {'name': '寒暄', 'content': '重复的第二个'},
+            ],
+          },
+        },
+      }));
+      expect(pdPairs(result.presetDialogues), [('寒暄', '你好')]);
+    });
+
+    test('超 10 截断到 10（保留首批非空非重项）', () {
+      final pd = [
+        for (var i = 0; i < 12; i++) {'name': '示范$i', 'content': '内容$i'},
+      ];
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {'preset_dialogues': pd},
+        },
+      }));
+      expect(result.presetDialogues, hasLength(10));
+      expect(pdPairs(result.presetDialogues), [
+        for (var i = 0; i < 10; i++) ('示范$i', '内容$i'),
+      ]);
+    });
+
+    test('draft.toCompanion 落库装配映射 presetDialogues 列（NPD-02）', () {
+      final result = fromV2Card(_v2Card({
+        'extensions': {
+          'conver_system': {
+            'preset_dialogues': [
+              {'name': '寒暄', 'content': '你好。'},
+            ],
+          },
+        },
+      }));
+      final companion = result.toCompanion();
+      expect(companion.presetDialogues.value, [
+        {'name': '寒暄', 'content': '你好。'},
+      ]);
     });
   });
 }

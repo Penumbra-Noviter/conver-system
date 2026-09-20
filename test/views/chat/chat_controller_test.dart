@@ -64,6 +64,7 @@ class _ThrowingConversationRepository extends ConversationRepository {
     String? title,
     String? modelProvider,
     String? modelName,
+    String? presetDialogue,
   }) {
     throw StateError('create failed');
   }

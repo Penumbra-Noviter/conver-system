@@ -3791,6 +3791,132 @@ void main() {
       expect(await roleContentsOf(conv.id), contains((Role.assistant, '回复')));
     });
   });
+
+  // ── 预设对话注入链（NPD-02：会话快照 → _assembleMessages 透传 → 注入）──
+
+  group('预设对话注入链（NPD-02）', () {
+    const snapshot = '<START>\n{{user}}: 请自我介绍\n{{char}}: 我叫艾莉亚。';
+
+    test('验收6：会话快照非空 → 透传 buildMessages，注入 mes_example 后 / history 前',
+        () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+        mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+      );
+      final conv = await convRepo.createConversation(
+        characterId: char.id,
+        presetDialogue: snapshot,
+      );
+      await sendUserMessage(conv.id, '你好');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: '再来').toList();
+
+      final sent = provider.lastMessages!;
+      final exampleIndex = sent.indexWhere((m) => m.content == '例问');
+      final presetUserIndex = sent.indexWhere((m) => m.content == '请自我介绍');
+      final presetCharIndex = sent.indexWhere((m) => m.content == '我叫艾莉亚。');
+      final historyIndex = sent.indexWhere((m) => m.content == '你好');
+      final currentIndex = sent.indexWhere((m) => m.content == '再来');
+      expect(exampleIndex, isNot(-1), reason: 'mes_example 应注入');
+      expect(presetUserIndex, greaterThan(exampleIndex),
+          reason: 'presetDialogue 注入于 mes_example 之后');
+      expect(presetCharIndex, greaterThan(presetUserIndex));
+      expect(historyIndex, greaterThan(presetCharIndex),
+          reason: 'presetDialogue 注入于 history 之前');
+      expect(currentIndex, greaterThan(historyIndex));
+      expect(await roleContentsOf(conv.id), contains((Role.assistant, '回复')));
+    });
+
+    test('验收6：会话无快照 → 零注入（组装输出不含预设 few-shot）', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '你好');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: '再来').toList();
+
+      final sent = provider.lastMessages!;
+      expect(sent.where((m) => m.content == '请自我介绍'), isEmpty,
+          reason: '无快照 → 零注入');
+      expect(sent.where((m) => m.content == '我叫艾莉亚。'), isEmpty);
+      // 常规 few-shot（mes_example）不受影响。
+      expect(sent.where((m) => m.content == '例问'), hasLength(1));
+    });
+
+    test('验收5：快照固化——改角色卡 presetDialogues 实时值不影响已建会话注入源',
+        () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+      );
+      final conv = await convRepo.createConversation(
+        characterId: char.id,
+        presetDialogue: snapshot,
+      );
+      // 创建后修改角色卡 presetDialogues 实时值（改卡不影响已建会话）。
+      await (db.update(db.characters)..where((t) => t.id.equals(char.id))).write(
+        CharactersCompanion(
+          presetDialogues: Value(const [
+            {'name': '变更', 'content': '后改的预设对话'},
+          ]),
+        ),
+      );
+      await sendUserMessage(conv.id, '你好');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: '再来').toList();
+
+      final sent = provider.lastMessages!;
+      expect(sent.where((m) => m.content == '请自我介绍'), hasLength(1),
+          reason: '注入源为创建时固化的快照');
+      expect(sent.where((m) => m.content == '我叫艾莉亚。'), hasLength(1));
+      expect(sent.where((m) => m.content.contains('后改的预设对话')), isEmpty,
+          reason: '改卡实时值不进入已建会话注入');
+    });
+
+    test('验收5：regenerate 共用同一条腿（_assembleMessages）→ 重生成路径亦注入',
+        () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+      );
+      final conv = await convRepo.createConversation(
+        characterId: char.id,
+        presetDialogue: snapshot,
+      );
+      await sendUserMessage(conv.id, '问题');
+      final oldAssistant = await sendAssistantMessage(conv.id, '旧答');
+
+      final provider = FakeLLMProvider(tokens: const ['新答']);
+      wireService(provider);
+      await service.regenerate(
+        conversationId: conv.id,
+        messageId: oldAssistant.id,
+      );
+
+      final sent = provider.lastMessages!;
+      expect(sent.where((m) => m.content == '请自我介绍'), hasLength(1),
+          reason: 'regenerate 同吃预设对话注入');
+      expect(sent.where((m) => m.content == '我叫艾莉亚。'), hasLength(1));
+      // 注入位于触发 user（历史末条）之前。
+      final triggerIndex = sent.indexWhere((m) => m.content == '问题');
+      final presetCharIndex = sent.indexWhere((m) => m.content == '我叫艾莉亚。');
+      expect(triggerIndex, greaterThan(presetCharIndex));
+      expect(await swipeContentsOf(oldAssistant.id), ['旧答', '新答']);
+    });
+  });
 }
 
 class _UnknownDomainError extends DomainError {

@@ -1,5 +1,6 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=7，M0 冻结 + AC-01 升版 +
-/// PS2-01 升版 + FD-05 升版 + VR-04 升版 + MS-01 升版 + WL-01 升版）。
+/// 应用数据库 — drift 数据库入口（schemaVersion=8，M0 冻结 + AC-01 升版 +
+/// PS2-01 升版 + FD-05 升版 + VR-04 升版 + MS-01 升版 + WL-01 升版 +
+/// NPD-02 升版）。
 ///
 /// - 表注册：characters / conversations / messages / settings / memory_entries /
 ///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
@@ -8,6 +9,8 @@
 ///   （阶段 3 两表，stage3-vector-recall spec §2 D2）+ message_swipes（MS-01
 ///   候选表，chat-polish spec §4.2）+ lorebook_entries（WL-01 世界书条目表，
 ///   chat-polish spec §4.4）
+/// - NPD-02：characters.preset_dialogues + conversations.preset_dialogue 两列
+///   （schemaVersion 7→8，chat-polish spec §4.5）
 /// - 执行器构造注入：测试 seam，测试用 `AppDatabase(NativeDatabase.memory())`
 ///   在内存中打开真实 schema，不依赖设备
 /// - 运行态连接经 [AppDatabase.open]（drift_flutter 惰性打开，内部即
@@ -50,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -202,6 +205,45 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS idx_lorebook_entries_character_id '
           'ON lorebook_entries (character_id)',
         );
+      }
+
+      // NPD-02：schemaVersion 7→8 新增 characters.preset_dialogues 列
+      // （JSON 默认 '[]'）与 conversations.preset_dialogue 可空快照列
+      // （chat-polish spec §4.5，对齐桌面 database.py
+      // `_ensure_character_preset_dialogue_column` /
+      // `_ensure_conversation_preset_dialogue` 探测补列先例）。
+      //
+      // 列补建**不用** drift Migration.addColumn——它无 IF NOT EXISTS 语义，
+      // 中断残留重开（列已补、user_version 未回写）时重复补列会 duplicate
+      // column 炸库。改走「PRAGMA table_info 探测缺列 → ALTER TABLE ADD
+      // COLUMN」幂等补列（沿 from < 6 的 messages.active_swipe_index 先例）。
+      // 本块不含新表/新索引，无需 CREATE IF NOT EXISTS。user_version=8 由
+      // drift 成功后回写，失败锁库重开重跑（F-78 幂等三机制延续）。既有行
+      // 默认值：characters → '[]'（preset_dialogues 非空默认）、
+      // conversations → null（preset_dialogue 可空，零影响）。
+      if (from < 8) {
+        final charColumns = await customSelect('PRAGMA table_info(characters)')
+            .get();
+        final hasPresetDialogues = charColumns.any(
+          (row) => row.data['name'] == 'preset_dialogues',
+        );
+        if (!hasPresetDialogues) {
+          await customStatement(
+            'ALTER TABLE characters ADD COLUMN preset_dialogues '
+            "TEXT NOT NULL DEFAULT '[]'",
+          );
+        }
+        final convColumns = await customSelect(
+          'PRAGMA table_info(conversations)',
+        ).get();
+        final hasPresetDialogue = convColumns.any(
+          (row) => row.data['name'] == 'preset_dialogue',
+        );
+        if (!hasPresetDialogue) {
+          await customStatement(
+            'ALTER TABLE conversations ADD COLUMN preset_dialogue TEXT',
+          );
+        }
       }
     },
   );

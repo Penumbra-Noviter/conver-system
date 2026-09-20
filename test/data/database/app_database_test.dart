@@ -1,6 +1,7 @@
-/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=7，
+/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=8，
 /// 13 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表 + MS-01 候选表 +
-/// WL-01 世界书条目表）。
+/// WL-01 世界书条目表 + NPD-02 characters.preset_dialogues /
+/// conversations.preset_dialogue 两列）。
 ///
 /// 全部在内存执行器（`AppDatabase(NativeDatabase.memory())`）上运行，
 /// 经构造注入 seam 打开真实 schema，不依赖设备、无 repositories。
@@ -25,8 +26,8 @@ void main() {
     await db.close();
   });
 
-  test('schemaVersion 冻结为 7', () {
-    expect(db.schemaVersion, 7);
+  test('schemaVersion 冻结为 8', () {
+    expect(db.schemaVersion, 8);
   });
 
   test('内存执行器打开成功，12 表可定位', () async {
@@ -444,5 +445,69 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('characters.preset_dialogues 缺省 [] + JSON 往返（NPD-02 列契约）', () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '预设对话角色',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    expect(character.presetDialogues, isEmpty, reason: '缺省 JSON []');
+
+    await (db.update(db.characters)..where((t) => t.id.equals(character.id)))
+        .write(
+          CharactersCompanion(
+            presetDialogues: const Value([
+              {'name': '寒暄', 'content': '你好，请问怎么称呼？'},
+              {'name': '告别', 'content': '下次再见。'},
+            ]),
+          ),
+        );
+    final stored = await db.select(db.characters).getSingle();
+    expect(stored.presetDialogues, [
+      {'name': '寒暄', 'content': '你好，请问怎么称呼？'},
+      {'name': '告别', 'content': '下次再见。'},
+    ]);
+  });
+
+  test('conversations.preset_dialogue 缺省 null + 快照写入（NPD-02 列契约）',
+      () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '快照角色',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final conversation = await db
+        .into(db.conversations)
+        .insertReturning(
+          ConversationsCompanion.insert(
+            characterId: character.id,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    expect(conversation.presetDialogue, null, reason: '可空快照列缺省 null');
+
+    await (db.update(db.conversations)
+          ..where((t) => t.id.equals(conversation.id)))
+        .write(
+          ConversationsCompanion(
+            presetDialogue:
+                const Value('<START>\n{{user}}: 你好\n{{char}}: 欢迎'),
+          ),
+        );
+    final stored = await db.select(db.conversations).getSingle();
+    expect(stored.presetDialogue, '<START>\n{{user}}: 你好\n{{char}}: 欢迎');
   });
 }

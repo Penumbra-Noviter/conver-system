@@ -124,7 +124,8 @@ List<PromptMessage> parseMesExample(
 
 /// 组装发送给 LLM 的消息列表（纯函数，无 DB 依赖）。
 ///
-/// 对齐桌面 `prompt.py::build_messages` 的组装顺序（WL-03 起含世界书注入）：
+/// 对齐桌面 `prompt.py::build_messages` 的组装顺序（WL-03 起含世界书注入，
+/// NPD-02 起含预设对话注入）：
 /// 0. world["before_char"] 注入块（逐条 system，最高优先级——system 首条之前；
 ///    移动端无 before_char 概念，对齐桌面 `_assemble` 步骤 0）
 /// 1. system prompt（[CharacterData.systemPrompt] 优先，否则 personality）
@@ -133,6 +134,7 @@ List<PromptMessage> parseMesExample(
 /// 2.75 world["system"] 合并单条 `[世界知识]`（多条以空行连接、按给定序——
 ///    调用方 [LorebookEngine.buildWorldInjection] 已按 (order, id) 升序）
 /// 3. mes_example（few-shot 示例）
+/// 3.5 presetDialogue（非空时）经 parseMesExample 注入 user/assistant few-shot
 /// 4. 历史消息（正序，滑窗截断：超过 `maxRounds * 2` 条取最后 `maxRounds * 2`
 ///    条；默认 `maxRounds = 30` → 窗口 60 条）
 /// 5. post_history_instructions（system 消息）
@@ -155,6 +157,13 @@ List<PromptMessage> parseMesExample(
 /// [世界知识] 之前**（对齐桌面 `_assemble` 步骤 2.7，expert/simple 皆注入，
 /// 因 after_char 不在 expert 替代范围）。
 ///
+/// [presetDialogue]（NPD-02）：预设对话快照文本（桌面 `preset_dialogue`）。
+/// 空 / 纯空白零注入——输出与不传 presetDialogue 逐字节一致（零回归硬约束，
+/// 验收 3）；非空时经 [parseMesExample] 复用 few-shot 解析注入 user/assistant
+/// 消息于 **mes_example 之后、history 之前**（对齐桌面 `_assemble` 步骤 3.5；
+/// source=character——预设对话是角色提供的示范，与 mes_example 同源，移动端
+/// 组装产物无来源标注字段，语义锚记于本 docstring，PD-04 抽组装核心时保持）。
+///
 /// [history] 每项至少含 `role` 与 `content`（[HistoryMessage]）；role 经
 /// [_roleStr] 归一为纯字符串（[Role] 取 `.value`，纯字符串原样）。
 List<PromptMessage> buildMessages(
@@ -167,6 +176,7 @@ List<PromptMessage> buildMessages(
   Map<String, String> extraVars = const {},
   Map<String, List<String>>? world,
   String? narrativeStyle,
+  String? presetDialogue,
 }) {
   // 空角色名回退 'Character'。
   final charName = character.name.isEmpty ? 'Character' : character.name;
@@ -237,6 +247,22 @@ List<PromptMessage> buildMessages(
     messages.addAll(
       parseMesExample(
         character.mesExample,
+        userName: userName,
+        charName: charName,
+        extraVars: extraVars,
+      ),
+    );
+  }
+
+  // 3.5 预设对话 few-shot 注入（NPD-02）— mes_example 之后、history 之前。
+  // 对齐桌面 `_assemble` 步骤 3.5：空/纯空白零注入（与不传 presetDialogue
+  // 输出逐字节一致——验收 3 零回归）；非空时经 parseMesExample 复用 few-shot
+  // 解析（模板变量替换、<START> 多轮分隔），source=character（预设对话是角色
+  // 提供的示范，与 mes_example 同源，不新增来源常量——语义锚记于 docstring）。
+  if (presetDialogue != null && presetDialogue.trim().isNotEmpty) {
+    messages.addAll(
+      parseMesExample(
+        presetDialogue,
         userName: userName,
         charName: charName,
         extraVars: extraVars,
