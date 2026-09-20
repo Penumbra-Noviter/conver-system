@@ -17,7 +17,10 @@
 /// character.py，PD-5 逐字）；
 /// Conversations.topP / presencePenalty / frequencyPenalty / maxTokens 四列为
 /// SP-01（schemaVersion=10，chat-polish spec §4.6 采样参数，对齐桌面
-/// chat.py ChatContext SP-1，NULL=不覆盖 provider 默认）。
+/// chat.py ChatContext SP-1，NULL=不覆盖 provider 默认）；
+/// Conversations.parentConversationId / branchFromMessageId / branchTitle
+/// 三可空列为 BR-01（schemaVersion=11，chat-polish spec §4.7 分支元数据，
+/// 对齐桌面 models/conversation.py，逻辑引用不建硬 FK——删源不影响派生）。
 ///
 /// 权威源（只读，勿改）：
 /// `desktop/backend/app/models/{character,conversation,message,setting}.py`
@@ -258,6 +261,20 @@ class Conversations extends Table {
   /// max_tokens 覆盖（可空 INTEGER；SP-01，对齐桌面 ChatContext.max_tokens。
   /// NULL = 不覆盖 provider 默认即走全局链；≥1 校验由服务层守卫——SR-24）。
   IntColumn get maxTokens => integer().nullable()();
+
+  // ── BR-01 分支元数据（schemaVersion=11，chat-polish spec §4.7，对齐桌面
+  //    `models/conversation.py::Conversation` 三可空列）──
+
+  /// 派生来源会话 id（可空 INTEGER；逻辑引用**不建硬 FK**——删源会话不阻塞、
+  /// 不影响已派生分支，删源时由服务层把派生分支的 parent / 锚引用置空并锁定
+  /// （对齐桌面 BR-2 删源置空策略，SR-29）。
+  IntColumn get parentConversationId => integer().nullable()();
+
+  /// 分叉锚消息 id（快照末条；可空 INTEGER；逻辑引用不建硬 FK，随删源置空）。
+  IntColumn get branchFromMessageId => integer().nullable()();
+
+  /// 分支显示名（可空 VARCHAR 语义；删源置空时保留——分支显示名仍可用）。
+  TextColumn get branchTitle => text().nullable()();
 
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

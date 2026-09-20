@@ -1,18 +1,21 @@
-/// PS2-01 / FD-05 / VR-04 / MS-01 / WL-01 / NPD-02 / NPD-04 / SP-01 迁移测试 —
-/// schemaVersion
-/// 2→10 / 1→10 / 4→10 / 5→10 / 6→10 / 7→10 / 8→10 / 9→10（阶段 2 三表 +
+/// PS2-01 / FD-05 / VR-04 / MS-01 / WL-01 / NPD-02 / NPD-04 / SP-01 / BR-01
+/// 迁移测试 — schemaVersion
+/// 2→11 / 1→11 / 4→11 / 5→11 / 6→11 / 7→11 / 8→11 / 9→11 / 10→11（阶段 2 三表 +
 /// FD-05 messages.created_at
 /// 索引 + 阶段 3 两表 + MS-01 message_swipes 表与 messages.active_swipe_index
 /// 列 + WL-01 lorebook_entries 表与 FK 索引 + NPD-02 characters.preset_dialogues
 /// 列与 conversations.preset_dialogue 列 + NPD-04 characters.prompt_mode /
 /// characters.expert_prompt 两列 + SP-01 conversations.top_p /
-/// presence_penalty / frequency_penalty / max_tokens 四列）；VR-04 追加 from<5
-/// 幂等 / 中断自愈 /
+/// presence_penalty / frequency_penalty / max_tokens 四列 + BR-01
+/// conversations.parent_conversation_id / branch_from_message_id /
+/// branch_title 三可空列（逻辑引用不建硬 FK，删源不影响派生））；VR-04 追加
+/// from<5 幂等 / 中断自愈 /
 /// 级联 / 唯一索引 / 无硬 FK 契约；MS-01 追加 from<6 幂等补列 / 中断自愈 /
 /// (message_id, index) 唯一约束 / FK 级联；WL-01 追加 from<7 建表 / 中断自愈 /
 /// FK 级联契约；NPD-02 追加 from<8 幂等补列 / 中断自愈 / 重复打开幂等契约；
 /// NPD-04 追加 from<9 幂等补两列 / 中断自愈 / 重复打开幂等契约；SP-01 追加
-/// from<10 幂等补四列 / 中断自愈 / 重复打开幂等契约。
+/// from<10 幂等补四列 / 中断自愈 / 重复打开幂等契约；BR-01 追加
+/// from<11 幂等补三列 / 中断自愈 / 重复打开幂等契约 / 无硬 FK 契约。
 ///
 /// 迁移路径用「降级夹具」构造旧版存量库：先在最新 schema 的文件库上插入旧
 /// 数据，再 `DROP` 高版本对象 + `PRAGMA user_version = N`，关闭后重新打开 —
@@ -552,6 +555,59 @@ Future<(AppDatabase, Directory)> openV9UpgradedFixture() async {
   return (AppDatabase(NativeDatabase(file)), dir);
 }
 
+/// 建一个「v10 存量库」（BR-01 迁移夹具）：最新 schema 文件库插入角色/对话/
+/// 消息链 → 降级到 v10 形态（user_version=10 + DROP conversations.parent_
+/// conversation_id / branch_from_message_id / branch_title 三列——BR-01 三列
+/// 属 v11 形态）。
+///
+/// 打开时 from=10：仅走 `from < 11` 分支（BR-01），等价于真实 v10 存量库单步
+/// 升级；零回归保证 —— from<1..10 分支不触发（其幂等性由 v1/v2/v4/v5/v6/v7/v8/
+/// v9 夹具承载）。
+Future<(AppDatabase, Directory)> openV10UpgradedFixture() async {
+  final dir = await Directory.systemTemp.createTemp('br01_migration_v10_');
+  final file = File('${dir.path}${Platform.pathSeparator}test.db');
+
+  var db = AppDatabase(NativeDatabase(file));
+  final now = DateTime.now();
+  final character = await db
+      .into(db.characters)
+      .insertReturning(
+        CharactersCompanion.insert(name: '星萤', createdAt: now, updatedAt: now),
+      );
+  final conversation = await db
+      .into(db.conversations)
+      .insertReturning(
+        ConversationsCompanion.insert(
+          characterId: character.id,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+  await db
+      .into(db.messages)
+      .insertReturning(
+        MessagesCompanion.insert(
+          conversationId: conversation.id,
+          role: Role.assistant,
+          content: '星火落处，萤光自明。',
+          createdAt: now,
+        ),
+      );
+
+  // 降级到 v10：user_version=10 + DROP 三列（真实 v10 存量库无 BR-01 三列；
+  // 不 DROP 会导致 from<11 的补列探测发现列已存在而跳过，掩盖「真实补列」
+  // 路径）。
+  await db.customStatement('PRAGMA user_version = 10');
+  await db
+      .customStatement('ALTER TABLE conversations DROP COLUMN parent_conversation_id');
+  await db
+      .customStatement('ALTER TABLE conversations DROP COLUMN branch_from_message_id');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN branch_title');
+  await db.close();
+
+  return (AppDatabase(NativeDatabase(file)), dir);
+}
+
 /// 在最新 schema 库上插入 v4 时代 8 张有行表各一行（settings 为空表），
 /// 返回 characterId（供级联/唯一约束用例复用）。
 Future<int> seedV4LegacyRows(AppDatabase db) async {
@@ -768,7 +824,7 @@ void main() {
     });
 
     test('AppDatabase.schemaVersion == 10', () {
-      expect(db.schemaVersion, 10);
+      expect(db.schemaVersion, 11);
     });
 
     test('全新安装直接建 13 表 + 12 迁移新增索引（含两个唯一索引）+ NPD-02 '
@@ -871,7 +927,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
     });
 
     test('三表可读写 + converter 字符串落库（stage 五值 / status 四值）', () async {
@@ -1062,7 +1118,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await sqliteMasterNames(db, 'table'),
         containsAll([..._stage2Tables, ..._stage3Tables]),
@@ -1106,7 +1162,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await sqliteMasterNames(db, 'table'),
         containsAll([..._stage2Tables, ..._stage3Tables]),
@@ -1146,7 +1202,7 @@ void main() {
       );
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
     });
   });
 
@@ -1193,7 +1249,7 @@ void main() {
         ]),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
     });
 
     test(
@@ -1384,7 +1440,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_stage3Tables));
       expect(
         await sqliteMasterNames(db, 'index'),
@@ -1434,7 +1490,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_stage3Tables));
       expect(await sqliteMasterNames(db, 'index'), containsAll(_newIndexes));
       final stored = await db.select(db.embeddingEntries).getSingle();
@@ -1472,7 +1528,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, contains('idx_message_swipes_message_id'));
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
     });
 
     test('message_swipes 可写读 + (message_id, index) 唯一约束生效（SR-27）', () async {
@@ -1567,7 +1623,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('message_swipes'),
@@ -1599,7 +1655,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('message_swipes'),
@@ -1642,7 +1698,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, contains('idx_lorebook_entries_character_id'));
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
     });
 
     test('lorebook_entries 可写读 + keys JSON 数组往返', () async {
@@ -1715,7 +1771,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('lorebook_entries'),
@@ -1746,7 +1802,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('lorebook_entries'),
@@ -1798,7 +1854,7 @@ void main() {
       final conversation = await db.select(db.conversations).getSingle();
       expect(conversation.presetDialogue, isNull);
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
     });
 
     test('两列可写读：preset_dialogues JSON 往返 + preset_dialogue 快照', () async {
@@ -1853,7 +1909,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(await tableColumns(db, 'characters'), contains('preset_dialogues'));
       expect(await tableColumns(db, 'conversations'), contains('preset_dialogue'));
       // 旧行保留 + 存量行新列默认。
@@ -1883,7 +1939,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(await tableColumns(db, 'characters'), contains('preset_dialogues'));
       expect(await tableColumns(db, 'conversations'), contains('preset_dialogue'));
       final stored = await db.select(db.characters).getSingle();
@@ -1926,7 +1982,7 @@ void main() {
       expect(character.promptMode, 'simple');
       expect(character.expertPrompt, '');
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
     });
 
     test('两列可写读：prompt_mode / expert_prompt 往返（prompt_mode=expert + '
@@ -1967,7 +2023,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await tableColumns(db, 'characters'),
         containsAll(['prompt_mode', 'expert_prompt']),
@@ -1997,7 +2053,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await tableColumns(db, 'characters'),
         containsAll(['prompt_mode', 'expert_prompt']),
@@ -2045,7 +2101,7 @@ void main() {
       expect(conversation.frequencyPenalty, isNull);
       expect(conversation.maxTokens, isNull);
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
     });
 
     test('四列可写读：top_p / presence_penalty / frequency_penalty / max_tokens 往返',
@@ -2099,7 +2155,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await tableColumns(db, 'conversations'),
         containsAll(
@@ -2132,7 +2188,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 10);
+      expect(await userVersion(db), 11);
       expect(
         await tableColumns(db, 'conversations'),
         containsAll(
@@ -2142,6 +2198,170 @@ void main() {
       final stored = await db.select(db.conversations).getSingle();
       expect(stored.topP, 0.9);
       expect(stored.maxTokens, 4096);
+    });
+  });
+
+  group('schemaVersion 10→11 迁移（BR-01）', () {
+    late AppDatabase db;
+    late Directory dir;
+
+    setUp(() async {
+      (db, dir) = await openV10UpgradedFixture();
+    });
+
+    tearDown(() async {
+      await db.close();
+      await dir.delete(recursive: true);
+    });
+
+    test('v10 存量库升级四要素：三列存在 + user_version=11 + 旧行保留 + 存量行新列 NULL',
+        () async {
+      // 旧行保留：v10 时代行原样可读，未被迁移改写。
+      expect(await db.select(db.characters).get().then((r) => r.length), 1);
+      expect(await db.select(db.conversations).get().then((r) => r.length), 1);
+      final message = await db.select(db.messages).getSingle();
+      expect(message.content, '星火落处，萤光自明。');
+
+      // 三列存在（snake_case 名）。
+      expect(
+        await tableColumns(db, 'conversations'),
+        containsAll(
+          ['parent_conversation_id', 'branch_from_message_id', 'branch_title'],
+        ),
+      );
+
+      // 存量行新列 = NULL（三列均可空无默认 → 既有行 NULL 零影响）。
+      final conversation = await db.select(db.conversations).getSingle();
+      expect(conversation.parentConversationId, isNull);
+      expect(conversation.branchFromMessageId, isNull);
+      expect(conversation.branchTitle, isNull);
+
+      expect(await userVersion(db), 11);
+    });
+
+    test('三列可写读：parent_conversation_id / branch_from_message_id / branch_title 往返',
+        () async {
+      final conversation = await db.select(db.conversations).getSingle();
+
+      await (db.update(db.conversations)
+            ..where((t) => t.id.equals(conversation.id)))
+          .write(
+            ConversationsCompanion(
+              parentConversationId: const Value(42),
+              branchFromMessageId: const Value(7),
+              branchTitle: const Value('雪夜分叉'),
+            ),
+          );
+      final stored = await db.select(db.conversations).getSingle();
+      expect(stored.parentConversationId, 42);
+      expect(stored.branchFromMessageId, 7);
+      expect(stored.branchTitle, '雪夜分叉');
+
+      // 三列可空：显式写 null 可回落（删源置空策略的落库基础）。
+      await (db.update(db.conversations)
+            ..where((t) => t.id.equals(conversation.id)))
+          .write(
+            const ConversationsCompanion(
+              parentConversationId: Value(null),
+              branchFromMessageId: Value(null),
+            ),
+          );
+      final cleared = await db.select(db.conversations).getSingle();
+      expect(cleared.parentConversationId, isNull);
+      expect(cleared.branchFromMessageId, isNull);
+    });
+
+    test('中断残留重开自愈：一列已补、其余未补 → 重开幂等补全且旧行保留（SR-25）',
+        () async {
+      // 模拟 from<11 迁移中途被杀残留态：parent_conversation_id 列已补
+      // （ALTER 成功），branch_from_message_id / branch_title 未补（后续
+      // DDL 未执行），user_version 未提升（仍为 10）。重开时补列探测发现
+      // parent_conversation_id 已存在 → 幂等跳过（不 duplicate column），
+      // 补齐其余两列。
+      await db.customStatement(
+        'ALTER TABLE conversations DROP COLUMN branch_from_message_id',
+      );
+      await db.customStatement(
+        'ALTER TABLE conversations DROP COLUMN branch_title',
+      );
+      await db.customStatement('PRAGMA user_version = 10');
+
+      // 前置断言：确认残留态真实存在。
+      final residualColumns = await tableColumns(db, 'conversations');
+      expect(residualColumns, contains('parent_conversation_id'));
+      expect(residualColumns, isNot(contains('branch_from_message_id')));
+      expect(residualColumns, isNot(contains('branch_title')));
+      expect(await userVersion(db), 10, reason: '残留态 user_version 未提升');
+
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 11);
+      expect(
+        await tableColumns(db, 'conversations'),
+        containsAll(
+          ['parent_conversation_id', 'branch_from_message_id', 'branch_title'],
+        ),
+      );
+      // 旧行保留 + 存量行新列默认 NULL。
+      final conversation = await db.select(db.conversations).getSingle();
+      expect(conversation.parentConversationId, isNull);
+      expect(conversation.branchTitle, isNull);
+      expect(
+        (await db.select(db.messages).getSingle()).content,
+        '星火落处，萤光自明。',
+      );
+    });
+
+    test('重复打开幂等：同文件重开不重跑迁移，列/数据仍在（验收 8）', () async {
+      final conversation = await db.select(db.conversations).getSingle();
+      await (db.update(db.conversations)
+            ..where((t) => t.id.equals(conversation.id)))
+          .write(
+            ConversationsCompanion(
+              parentConversationId: const Value(11),
+              branchFromMessageId: const Value(3),
+              branchTitle: const Value('旧分支'),
+            ),
+          );
+
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 11);
+      expect(
+        await tableColumns(db, 'conversations'),
+        containsAll(
+          ['parent_conversation_id', 'branch_from_message_id', 'branch_title'],
+        ),
+      );
+      final stored = await db.select(db.conversations).getSingle();
+      expect(stored.parentConversationId, 11);
+      expect(stored.branchFromMessageId, 3);
+      expect(stored.branchTitle, '旧分支');
+    });
+
+    test('三列逻辑引用不建硬 FK：conversations 外键仅 character_id（删源不触发外键报错）',
+        () async {
+      // conversations 表现存唯一硬 FK = character_id（对齐既有模型）；
+      // BR-01 三列是逻辑引用，不得在 foreign_key_list 出现——删源会话时
+      // 由服务层置空派生分支引用（无 FK RESTRICT 阻止删除）。
+      final fkRows = await db.customSelect(
+        'PRAGMA foreign_key_list(conversations)',
+      ).get();
+      final referencingColumns = fkRows
+          .map((row) => row.data['from'] as String)
+          .toList();
+      expect(referencingColumns, ['character_id']);
+      expect(
+        referencingColumns,
+        isNot(contains('parent_conversation_id')),
+        reason: 'BR-01 三列为逻辑引用，不建硬 FK（删源不影响派生）',
+      );
     });
   });
 

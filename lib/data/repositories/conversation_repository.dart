@@ -220,11 +220,26 @@ class ConversationRepository {
   /// 删除单条对话；返回是否确有对话被删（不存在 → false 且零副作用）。
   ///
   /// 其消息由外键 CASCADE 随之消失（无显式级联代码）。
+  ///
+  /// BR-01 删源置空策略（对齐桌面 `conversation.py::delete_conversation`
+  /// BR-2）：删除源会话**不连坐已派生分支**——先将其子会话的
+  /// parent_conversation_id / branch_from_message_id 置 NULL（与 SQLite
+  /// ON DELETE SET NULL 同语义；BR-01 三列为逻辑引用不建硬 FK，本层显式
+  /// 兑现并锁定），branch_title 保留（分支显示名仍可用）。单事务原子。
   Future<bool> deleteConversation(int conversationId) async {
-    final affected = await (_db.delete(_db.conversations)
-          ..where(($ConversationsTable t) => t.id.equals(conversationId)))
-        .go();
-    return affected > 0;
+    return _db.transaction(() async {
+      await (_db.update(_db.conversations)
+            ..where(($ConversationsTable t) =>
+                t.parentConversationId.equals(conversationId)))
+          .write(const ConversationsCompanion(
+            parentConversationId: Value(null),
+            branchFromMessageId: Value(null),
+          ));
+      final affected = await (_db.delete(_db.conversations)
+            ..where(($ConversationsTable t) => t.id.equals(conversationId)))
+          .go();
+      return affected > 0;
+    });
   }
 
   /// 清空全部对话及消息（桌面 delete_all_conversations 对应物）。

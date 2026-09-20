@@ -1,9 +1,11 @@
-/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=10，
+/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=11，
 /// 13 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表 + MS-01 候选表 +
 /// WL-01 世界书条目表 + NPD-02 characters.preset_dialogues /
 /// conversations.preset_dialogue 两列 + NPD-04 characters.prompt_mode /
 /// characters.expert_prompt 两列 + SP-01 conversations.top_p /
-/// presence_penalty / frequency_penalty / max_tokens 四列）。
+/// presence_penalty / frequency_penalty / max_tokens 四列 + BR-01
+/// conversations.parent_conversation_id / branch_from_message_id /
+/// branch_title 三可空列）。
 ///
 /// 全部在内存执行器（`AppDatabase(NativeDatabase.memory())`）上运行，
 /// 经构造注入 seam 打开真实 schema，不依赖设备、无 repositories。
@@ -11,7 +13,7 @@ library;
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,8 +30,51 @@ void main() {
     await db.close();
   });
 
-  test('schemaVersion 冻结为 10', () {
-    expect(db.schemaVersion, 10);
+  test('schemaVersion 冻结为 11', () {
+    expect(db.schemaVersion, 11);
+  });
+
+  test('BR-01 三可空列：新建 schema 即含分支元数据列，缺省 NULL（全新安装路径）',
+      () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '艾莉亚',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final conversation = await db
+        .into(db.conversations)
+        .insertReturning(
+          ConversationsCompanion.insert(
+            characterId: character.id,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+    // 全新安装（createAll）直接建列——三列缺省 NULL（非分支会话零影响）。
+    expect(conversation.parentConversationId, isNull);
+    expect(conversation.branchFromMessageId, isNull);
+    expect(conversation.branchTitle, isNull);
+
+    // 列可写：普通会话升级为分支引用后读回一致。
+    await (db.update(db.conversations)
+          ..where((t) => t.id.equals(conversation.id)))
+        .write(
+          ConversationsCompanion(
+            parentConversationId: const Value(9),
+            branchFromMessageId: const Value(5),
+            branchTitle: const Value('分叉'),
+          ),
+        );
+    final updated = await db.select(db.conversations).getSingle();
+    expect(updated.parentConversationId, 9);
+    expect(updated.branchFromMessageId, 5);
+    expect(updated.branchTitle, '分叉');
   });
 
   test('内存执行器打开成功，12 表可定位', () async {

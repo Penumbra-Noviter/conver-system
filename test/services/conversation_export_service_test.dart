@@ -19,7 +19,10 @@ import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
+import 'package:conver_system_mobile/services/branch/branch_service.dart';
+import 'package:conver_system_mobile/services/branch/branch_snapshot.dart';
 import 'package:conver_system_mobile/services/conversation_export_service.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -522,6 +525,76 @@ void main() {
       final result = await nullCharService.exportJson(conv.id);
 
       expect(result!.fileName, '${conv.id}.json');
+    });
+  });
+
+  group('BR-01 快照导出→导入往返（SR-29：候选集 + active + 世界书，序/值断言）', () {
+    test('exportSnapshot → fromJson → cloneFromSnapshot 逐项一致（真实导入往返）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id, title: '源对话');
+      await seedMessage(
+          conversationId: conv.id, role: Role.user, content: '第一轮问');
+      final a1 = await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '第一轮答');
+      await seedMessage(
+          conversationId: conv.id, role: Role.user, content: '第二轮问');
+      final a2 = await seedMessage(
+          conversationId: conv.id, role: Role.assistant, content: '第二轮答');
+      // A2 候选：候选 0 = 原始内容播种、候选 1 激活（content 跟随激活候选）。
+      await msgRepo.addSwipe(a2.id, '重写答');
+      // 无候选消息（a1）保留 —— 往返后 active=0 形态。
+      expect(a1.id, isNot(a2.id));
+
+      final lorebookRepo = LorebookRepository(db, now: () => fakeNow);
+      await lorebookRepo.createEntry(
+        char.id,
+        LorebookEntryDraft(
+          title: '雪色',
+          keys: ['雪', '夜'],
+          content: '雪夜是分叉的起点。',
+          constant: true,
+        ),
+      );
+      final branchService = BranchService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: msgRepo,
+        lorebookRepository: lorebookRepo,
+        now: () => fakeNow,
+      );
+
+      // 导出（文件 seam 产物）→ 解析（版本校验 + 结构校验）→ 克隆导入。
+      final result = await branchService.exportSnapshot(conv.id);
+      final snapshot = BranchSnapshot.fromJson(jsonDecode(result!.content));
+      final clone = await branchService.cloneFromSnapshot(snapshot, title: '导入克隆');
+
+      expect(clone.id, isNot(conv.id));
+      expect(clone.title, '导入克隆', reason: '显式 title 覆盖快照标题');
+
+      // 消息顺序/条数/角色逐项一致。
+      final cloneMessages = await msgRepo.getMessages(clone.id);
+      expect(cloneMessages.map((m) => m.content).toList(),
+          ['第一轮问', '第一轮答', '第二轮问', '重写答']);
+      expect(cloneMessages.map((m) => m.role.value).toList(),
+          ['user', 'assistant', 'user', 'assistant']);
+
+      // 候选集 + active 一致；无候选消息 active=0 零影响。
+      expect(cloneMessages.last.activeSwipeIndex, 1);
+      expect(
+        (await msgRepo.listSwipes(cloneMessages.last.id))
+            .map((s) => s.content)
+            .toList(),
+        ['第二轮答', '重写答'],
+      );
+      expect(cloneMessages.first.activeSwipeIndex, 0);
+      expect(await msgRepo.listSwipes(cloneMessages.first.id), isEmpty);
+
+      // 世界书条目随快照往返：复制为独立行（导出 N 条 → 导入后 N 副本）。
+      expect(snapshot.lorebookEntries.single.title, '雪色');
+      expect(await lorebookRepo.listEntries(char.id), hasLength(2));
+      expect(snapshot.swipes.single.activeSwipeIndex, 1);
     });
   });
 }
