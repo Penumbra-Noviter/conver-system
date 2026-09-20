@@ -22,7 +22,8 @@ library;
 
 import 'dart:async';
 
-import 'package:conver_system_mobile/data/database/app_database.dart' show Message;
+import 'package:conver_system_mobile/data/database/app_database.dart'
+    show Conversation, ConversationsCompanion, Message;
 import 'package:conver_system_mobile/data/database/tables.dart' show Role;
 import 'package:conver_system_mobile/services/conversation_export_file_exchange.dart';
 import 'package:conver_system_mobile/services/conversation_export_service.dart';
@@ -34,6 +35,7 @@ import 'package:conver_system_mobile/theme/conver_theme.dart';
 import 'package:conver_system_mobile/views/chat/chat_controller.dart';
 import 'package:conver_system_mobile/views/chat/chat_view.dart';
 import 'package:conver_system_mobile/widgets/notice_banner.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1528,6 +1530,197 @@ void main() {
 
       expect(find.text('3/3'), findsOneWidget, reason: '三候选计数正确');
       expect(tester.takeException(), isNull, reason: '窄屏无溢出异常');
+      await env.close();
+    });
+  });
+
+  group('SP-02 · 对话设置入口 + 采样弹层（对话级覆盖）', () {
+    /// 种子会话并回写采样四列（nullable → `Value(null)` 显式写 NULL；
+    /// 列原本即 NULL，等价语义）。
+    Future<Conversation> seedSampledConversation(
+      ChatTestEnv env,
+      int characterId, {
+      double? topP,
+      double? presencePenalty,
+      double? frequencyPenalty,
+      int? maxTokens,
+    }) async {
+      final conv = await env.seedConversation(characterId);
+      return (await env.conversationRepository.updateConversation(
+        conv.id,
+        ConversationsCompanion(
+          topP: Value(topP),
+          presencePenalty: Value(presencePenalty),
+          frequencyPenalty: Value(frequencyPenalty),
+          maxTokens: Value(maxTokens),
+        ),
+      ))!;
+    }
+
+    testWidgets('对话态顶栏出现「对话设置」入口', (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final c = env.controllerOf(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+      await pumpChat(tester, c);
+
+      expect(find.byTooltip('对话设置'), findsOneWidget,
+          reason: '对话态顶栏有对话设置入口');
+      await env.close();
+    });
+
+    testWidgets('入口页（无会话）不出现「对话设置」入口', (tester) async {
+      final env = await ChatTestEnv.create();
+      final c = env.controllerOf(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      expect(find.byTooltip('对话设置'), findsNothing,
+          reason: '入口页零入口（仅在对话态渲染）');
+      await env.close();
+    });
+
+    testWidgets('点「对话设置」→ 弹层回显覆盖值（数值输入，无「沿用全局」态）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await seedSampledConversation(
+        env,
+        char.id,
+        topP: 0.4,
+        presencePenalty: -1.2,
+        frequencyPenalty: 0.8,
+        maxTokens: 512,
+      );
+      final c = env.controllerOf(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byTooltip('对话设置'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('对话采样参数'), findsOneWidget);
+      expect(find.text('沿用全局/默认'), findsNothing,
+          reason: '全部覆盖 → 无沿用全局态');
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('sampling-field-top_p')))
+            .controller!
+            .text,
+        '0.4',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+                find.byKey(const Key('sampling-field-max_tokens')))
+            .controller!
+            .text,
+        '512',
+      );
+      await env.close();
+    });
+
+    testWidgets('弹层内开覆盖 + 输入越界值 → 保存落库 clamp 后值（回显行刷新）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final c = env.controllerOf(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byTooltip('对话设置'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sampling-switch-top_p')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('sampling-field-top_p')),
+        '1.5',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('sampling-save')));
+      await tester.pumpAndSettle();
+
+      await pumpUntil(
+        tester,
+        () => c.activeConversation?.topP == 1.0,
+        why: '保存完成且回显行刷新（UI 层 clamp 1.5 → 1.0）',
+      );
+      final row = await env.conversationRepository.getConversation(conv.id);
+      expect(row?.topP, 1.0, reason: 'UI 层 clamp 后落库');
+      expect(row?.presencePenalty, isNull);
+      expect(row?.maxTokens, isNull);
+      await env.close();
+    });
+
+    testWidgets('清除覆盖（关掉开关）→ 保存落 NULL；重开弹层回显「沿用全局/默认」',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await seedSampledConversation(
+        env,
+        char.id,
+        topP: 0.4,
+        maxTokens: 512,
+      );
+      final c = env.controllerOf(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byTooltip('对话设置'));
+      await tester.pumpAndSettle();
+      for (final key in const [
+        'sampling-switch-top_p',
+        'sampling-switch-presence_penalty',
+        'sampling-switch-frequency_penalty',
+        'sampling-switch-max_tokens',
+      ]) {
+        await tester.tap(find.byKey(Key(key)));
+        await tester.pump();
+      }
+      await tester.tap(find.byKey(const Key('sampling-save')));
+      await tester.pumpAndSettle();
+
+      await pumpUntil(
+        tester,
+        () => c.activeConversation?.topP == null,
+        why: '清除覆盖保存完成',
+      );
+      final row = await env.conversationRepository.getConversation(conv.id);
+      expect(row?.topP, isNull);
+      expect(row?.maxTokens, isNull);
+
+      // 重开弹层 → 「沿用全局/默认」四行
+      await tester.tap(find.byTooltip('对话设置'));
+      await tester.pumpAndSettle();
+      expect(find.text('沿用全局/默认'), findsNWidgets(4));
+      await env.close();
+    });
+
+    testWidgets('弹层取消 → 零副作用（不落库不弹 notice）', (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final c = env.controllerOf(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byTooltip('对话设置'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sampling-switch-top_p')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('sampling-field-top_p')),
+        '0.3',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('sampling-cancel')));
+      await tester.pumpAndSettle();
+
+      final row = await env.conversationRepository.getConversation(conv.id);
+      expect(row?.topP, isNull, reason: '取消不落库');
+      expect(c.notice, isNull);
       await env.close();
     });
   });

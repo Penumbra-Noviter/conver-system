@@ -29,6 +29,7 @@ import '../../theme/motion.dart' show ConverDurations;
 import '../../widgets/notice_banner.dart';
 import 'chat_controller.dart';
 import 'chat_entry.dart';
+import 'conversation_sampling_sheet.dart';
 
 /// 聊天 tab：入口（最近对话 + 新建）与对话面板之间按
 /// [ChatController.isEntry] 切换。
@@ -156,6 +157,12 @@ class _ConversationHeader extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: textTheme.titleMedium?.copyWith(color: palette.ink1),
           ),
+        ),
+        IconButton(
+          tooltip: '对话设置',
+          key: const Key('conversation-settings-button'),
+          icon: const Icon(Icons.tune),
+          onPressed: () => _openConversationSamplingSettings(context, controller),
         ),
         PopupMenuButton<_ConversationExportAction>(
           tooltip: '导出对话',
@@ -1045,6 +1052,47 @@ Future<void> _confirmDeleteMessage(
     return;
   }
   await controller.deleteMessage(message.id);
+}
+
+/// 打开「对话采样参数」弹层（SP-02）：以当前会话四列回显，保存经
+/// [ChatController.saveConversationSampling] 落四列（三态：覆盖 → clamp 后
+/// 数值 / 清除/沿用全局 → NULL）。会话缺失（入口仅对话态渲染，防御兜底）→
+/// 零副作用；弹层取消 → 零副作用。
+Future<void> _openConversationSamplingSettings(
+  BuildContext context,
+  ChatController controller,
+) async {
+  final conversation = controller.activeConversation;
+  if (conversation == null) {
+    return;
+  }
+  final result = await showModalBottomSheet<ConversationSamplingInput>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+      ),
+      child: ConversationSamplingSheet(
+        initial: ConversationSamplingInput(
+          topP: conversation.topP,
+          presencePenalty: conversation.presencePenalty,
+          frequencyPenalty: conversation.frequencyPenalty,
+          maxTokens: conversation.maxTokens,
+        ),
+      ),
+    ),
+  );
+  if (result == null) {
+    return; // 取消：零副作用。
+  }
+  await controller.saveConversationSampling(
+    topP: result.topP,
+    presencePenalty: result.presencePenalty,
+    frequencyPenalty: result.frequencyPenalty,
+    maxTokens: result.maxTokens,
+  );
 }
 
 /// system 角色（开场白元信息等）：居中弱化小字（M3-04c 高亮时琥珀 wash 底）。
