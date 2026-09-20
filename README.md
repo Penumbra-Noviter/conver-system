@@ -4,21 +4,10 @@ Conver System 的移动端应用（Flutter，Android + iOS 独立运行，无桌
 
 ## 状态
 
-- **技术债 F-91~F-97 已全部处置**（2026-09-17）：通知热态回调状态机盲区收口 + 告警 seam（锁串行/重挂/onHotCallbackLost）/ 活跃窗口常量单源 / 测试 fixture 三 helper 去重 / 构造死参数清理 / messages.created_at 索引 + schemaVersion 4 / RelationshipThresholds 构造自洽校验；全量 1996 测试绿/analyze 0/期末四轴 0 阻断
-- **技术债 F-78/79/80/81/82/90 已收口**（2026-09-17）：迁移注释纠偏 + 中断残留重开自愈用例 / 后台反思写失败回滚 UI 契约 / 活跃时间查询单源 `latestMessageAt` / confirm 档位下限 clamp 消除 stage/affinity 中间态 / 通知热态回调契约防御；F-89 复核关闭；全量 1987 测试绿/analyze 0/期末四轴 0 阻断
-- **通知域技术债 F-84/F-85/F-88+F-83 已收口**（2026-09-16）：热态点按 + Android 13+ 权限请求 + 排程失败站内兜底 / 深链 id 正值域 / 冷启动送达收口放宽（expired 点按即送达证据）；全量 1974 测试绿/analyze 0
-- **人机恋阶段 1/1.5/2 已交付**（2026-09-15）：记忆指令 + 抗 OOC + 人设演化 / 后台反思提取 / 主动消息（OS 通知+深链）+ 关系状态机 + 内心独白；全量 1740 测试绿/analyze 0
-- **技术债 F-75/76/77 已收口**（2026-09-14）：temperature NaN/Infinity 回退 + 越界 clamp；技术债候选区清零；全量 1684 测试绿/analyze 0
-- **U-UX 补全批次已交付**（2026-09-14）：聊天首页角色选择条 + 会话重命名/删除 / 对话生成参数 temperature·max_tokens（角色级为主、全局兜底）/ 模板变量 extraVars 管线 + 编辑页 / 首次启动分页新手指引；全量 1681 测试绿/analyze 0/期末四轴 0 阻断
-- **M7 已交付**（2026-09-09，Android 范围收窄、iOS 延后）：自适应启动图标（PIL 管线程序化生成「汇」字形占位稿 + flutter_launcher_icons adaptive/monochrome/legacy）+ release 签名（仓库外 keystore + gitignored key.properties，AAB/APK 同证书）+ 隐私清单（docs/privacy-android.md 三节式 + 零第三方 SDK 实证审计）+ 发布验证门禁（docs/release-android.md 版本策略 1.0.0+1 + 双产物命令链 + AVD 冒烟 PASS）；1518 测试全绿/analyze 0/期末四轴 0 阻断；发布构建 `flutter build appbundle|apk --release`
-- **M6 已交付**（2026-09-08）：去 AI 味打磨——动效克制子集 8 项（ConverDurations 对齐桌面 + 零动画库）/ 空态·错误态 / 弱网断线重连（重试 2 次退避 1s/2s + 断流「回复中断」标记 + 横幅重试 + idle 60s）/ 实用层无障碍（F-73 浅色 accent #784E14 ≥4.5:1 + a11y 语义 15 断言）；1460 测试全绿/analyze 0/覆盖率 96.78%，期末四轴阻断 0，M6 门视觉评审 8/8 PASS
-- **M5 已交付**（2026-09-07）：模拟器全量——22 款游戏随包种子 + 本地 HTTP 托管（127.0.0.1:8642 固定端口 + 路径穿越守卫 + Android/iOS 明文回环）+ 列表页四态/懒启动 + Key 自动注入（自包含 JS 脚本，桌面 key-injector 契约逐字 + claude key 恒不进游戏）+ 官方端点提示条 + 存档管理（底部 sheet 一次管全部 + 导出分享/导入/删除对齐桌面格式）+ 导入链（净化/去重/恶意拒绝二次确认）+ AI 生成（六项校验重试≤3）+「我」页收口（手册/关于/桌面版说明）；1315 测试全绿/analyze 0；M5 门冒烟 PASS（CORS 直连复验 + 杀进程存档持久化 + 五游戏 25 轮零崩溃 + 注入幂等 + 超时守卫）
-- **M4 已交付**（2026-09-06）：导出/文档解析——聊天顶栏 ⋯ 菜单导出 JSON/MD（文件名角色名净化 + share_plus 分享面板 + 平台超时兜底）/ 向导「AI 智能解析」LLM 文档解析（三级提取+白名单+错误折叠）；802 测试全绿/analyze 0/冒烟 PASS（ShareSheet 弹出 ×2 + 临时文件生成 + 内容语义 + 超时兜底实测）
-- **M3 已交付**（2026-08-30）：角色+搜索——角色列表卡片+四按钮+下拉刷新+长按批量删除 / 6 步全屏向导+5 模板 / V2 卡导入导出（file_picker ^12.1.2 / share_plus ^13.3.0 / path_provider ^2.1.6 转正）/ 跨对话搜索防抖五态+跳转定位 3s 高亮；729 测试全绿/analyze 0/覆盖率剔除 drift 98.06%，冒烟 PASS（建角色→落库→搜索→跳转高亮真机实证）
-- **M2 已交付**（2026-08-29）：聊天核心——LLM Provider 双协议 SSE wire（Claude/OpenAI 直连官方协议）+ ChatService 回合编排（滑窗/模板变量/重生成/停止/断流）+ 打字机 UI（两级降频）+ 最小临时会话入口 + 设置页测试连接；477 测试全绿/analyze 0/覆盖率手写口径 95.42%，模拟器冒烟窄路径 PASS（真实流式待配置 Key）
-- **M1 已交付**（2026-08-29）：数据层 + 设置——4 仓储 CRUD 全语义（天然级联/聚合计数/自动命名副作用）、SecureStorage 双协议槽位（真实 Keystore 通道验证）、模型清单静态单源（8 provider/60 模型）、主题三值切换（auto/浅/深 + 浅色 token 全套），模拟器验收通过（Key 真通道往返/切主题即时生效/154 测试全绿）
-- **M0 已交付**（2026-08-29）：Flutter 工程脚手架 + drift 4 表 + Warm Stone 深色主题 token + 5 tab 底部导航壳；应用 launcher 名「汇流」
-- 权威设计文档：`docs/mobile-design.md`（架构 / 7 项功能全量 / 依赖清单 / M0–M7 里程碑）
+- **当前状态见 [AGENTS.md](AGENTS.md) §当前状态**——逐批次交付记录（M0~M7 + 人机恋阶段 + 技术债批次，最新在前，2026-09-21 收口 F-140/141/142，全量 2836 测绿）
+- **已做与避坑见 [DEV_LOG.md](DEV_LOG.md)**（倒序，最新在前）
+- **里程碑定位**：M0 脚手架（2026-08-29）→ M1 数据层+设置 → M2 聊天核心 → M3 角色+搜索 → M4 导出/文档解析 → M5 模拟器全量 → M6 去 AI 味打磨 → M7 发布（Android 2026-09-09；iOS 延后，Windows 无 macOS 路径）
+- 权威设计文档：`docs/mobile-design.md`（架构 / 7 项功能全量 / 依赖清单 / 里程碑）
 - 技术调研：`docs/mobile-adaptation-research.md`
 - 模拟器决策（ADR-0002）与桌面环境装载/验证记录见桌面端仓库：`desktop/CONSENSUS.md`、`desktop/DEV_LOG.md`
 
