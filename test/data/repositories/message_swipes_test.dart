@@ -24,6 +24,25 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// F-142「空输入短路零查询」证明：拦截 [QueryExecutor.runSelect] 计数，断言
+/// 空输入路径不发出任何 SQL 查询（比「关闭库仍返回」更强——后者在库未真正
+/// 建立连接时退化为空表查询，无法区分零查询与空结果）。
+class _CountingInterceptor extends QueryInterceptor {
+  _CountingInterceptor(this._onRunSelect);
+
+  final void Function() _onRunSelect;
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) {
+    _onRunSelect();
+    return super.runSelect(executor, statement, args);
+  }
+}
+
 void main() {
   late AppDatabase db;
   late MessageRepository repo;
@@ -137,6 +156,88 @@ void main() {
       expect(swipes.map((s) => s.index).toList(), [0, 1, 2]);
       expect(swipes.map((s) => s.content).toList(),
           ['原始回复', '候选二', '候选一']);
+    });
+  });
+
+  group('listSwipesBatch（F-142：drift isIn 单次拉全量，消 branch/export N+1）', () {
+    test('空输入短路：返回 const {}（零查询，不触达 DB）', () async {
+      // 以拦截器计数 runSelect：空输入路径不得发出任何 SQL 查询。
+      var selectCount = 0;
+      final batch = await db.runWithInterceptor(
+        () => repo.listSwipesBatch(const []),
+        interceptor: _CountingInterceptor(() => selectCount++),
+      );
+
+      expect(batch, isEmpty);
+      expect(selectCount, 0, reason: '空输入短路——零查询，不触达 DB');
+    });
+
+    test('多消息混合：有候选/无候选/不存在/重复各自形态（无候选消息不在 map）', () async {
+      final withSwipes = await seedMessage(content: '候选消息');
+      final noSwipes = await seedMessage(content: '无候选消息');
+      await repo.addSwipe(withSwipes.id, '候选一');
+      await repo.addSwipe(withSwipes.id, '候选二');
+
+      final batch = await repo.listSwipesBatch([
+        withSwipes.id,
+        noSwipes.id,
+        999999, // 不存在消息（message_swipes 无其行）
+        withSwipes.id, // 重复请求不产生重复键
+      ]);
+
+      expect(
+        batch.keys.toList(),
+        [withSwipes.id],
+        reason: 'map 仅含候选消息键（无候选/不存在/重复均不出现）',
+      );
+      expect(batch, isNot(contains(noSwipes.id)));
+      expect(batch, isNot(contains(999999)));
+      expect(batch[withSwipes.id]!.map((s) => s.index).toList(), [0, 1, 2]);
+      expect(batch[withSwipes.id]!.map((s) => s.content).toList(),
+          ['候选消息', '候选一', '候选二']);
+    });
+
+    test('每键 index 升序：乱序落库也按 index 排序（与 listSwipes 同序契约）', () async {
+      final msg = await seedMessage(content: '原始');
+      // 直接落库乱序 index（绕过 addSwipe 的 max+1 自增），验证 batch 排序
+      // 独立于插入序、以 index 升序为契约。
+      await db.into(db.messageSwipes).insert(MessageSwipesCompanion.insert(
+          messageId: msg.id, index: 2, content: 'c2', createdAt: now));
+      await db.into(db.messageSwipes).insert(MessageSwipesCompanion.insert(
+          messageId: msg.id, index: 0, content: 'c0', createdAt: now));
+      await db.into(db.messageSwipes).insert(MessageSwipesCompanion.insert(
+          messageId: msg.id, index: 1, content: 'c1', createdAt: now));
+
+      final batch = await repo.listSwipesBatch([msg.id]);
+
+      expect(batch[msg.id]!.map((s) => s.index).toList(), [0, 1, 2]);
+      expect(batch[msg.id]!.map((s) => s.content).toList(), ['c0', 'c1', 'c2']);
+      // 与逐条 listSwipes 排序契约对拍（同键同序）。
+      expect(
+        batch[msg.id]!.map((s) => s.index).toList(),
+        (await repo.listSwipes(msg.id)).map((s) => s.index).toList(),
+      );
+    });
+
+    test('与逐条 listSwipes 对拍：batch map 内容 == 逐消息结果拼接（等价契约）', () async {
+      final m1 = await seedMessage(content: 'm1 原始');
+      final m2 = await seedMessage(content: 'm2 原始');
+      final m3 = await seedMessage(content: 'm3 无候选');
+      await repo.addSwipe(m1.id, 'm1-候选一');
+      await repo.addSwipe(m2.id, 'm2-候选一');
+      await repo.addSwipe(m2.id, 'm2-候选二');
+
+      final ids = [m1.id, m2.id, m3.id];
+      final batch = await repo.listSwipesBatch(ids);
+
+      final expected = <int, List<MessageSwipe>>{};
+      for (final messageId in ids) {
+        final swipes = await repo.listSwipes(messageId);
+        if (swipes.isNotEmpty) {
+          expected[messageId] = swipes;
+        }
+      }
+      expect(batch, expected, reason: '一次 batch 查询结果与逐条 listSwipes 拼接逐项一致');
     });
   });
 

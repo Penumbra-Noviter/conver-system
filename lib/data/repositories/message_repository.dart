@@ -423,6 +423,29 @@ class MessageRepository {
         .get();
   }
 
+  /// 批量候选拉取（F-142：drift `isIn` 单次查询，消 branch/export 逐消息 N+1）。
+  ///
+  /// - 一次查询覆盖 [messageIds] 全部候选行（无新 join、无 schema 变更），
+  ///   每 messageId 子列表按 `index` 升序（与 [listSwipes] 同查询面同序）；
+  /// - 消息无候选不在返回 map（消费方以 `?? const []` 兜底）；
+  /// - 空输入短路返回 `const {}`（零查询，不触达 DB）。
+  Future<Map<int, List<MessageSwipe>>> listSwipesBatch(
+      Iterable<int> messageIds) async {
+    final ids = messageIds.toList();
+    if (ids.isEmpty) {
+      return const {};
+    }
+    final rows = await (_db.select(_db.messageSwipes)
+          ..where(($MessageSwipesTable t) => t.messageId.isIn(ids))
+          ..orderBy([(t) => OrderingTerm.asc(t.index)]))
+        .get();
+    final batch = <int, List<MessageSwipe>>{};
+    for (final row in rows) {
+      (batch[row.messageId] ??= []).add(row);
+    }
+    return batch;
+  }
+
   /// 切换激活候选（桌面 `switch_swipe` 对应物，L471-499 逐字）。
   ///
   /// [index] 必须存在于该消息候选集，否则抛 [SwipeIndexOutOfRangeError]；
