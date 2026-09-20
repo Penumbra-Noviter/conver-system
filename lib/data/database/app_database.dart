@@ -1,6 +1,6 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=8，M0 冻结 + AC-01 升版 +
+/// 应用数据库 — drift 数据库入口（schemaVersion=9，M0 冻结 + AC-01 升版 +
 /// PS2-01 升版 + FD-05 升版 + VR-04 升版 + MS-01 升版 + WL-01 升版 +
-/// NPD-02 升版）。
+/// NPD-02 升版 + NPD-04 升版）。
 ///
 /// - 表注册：characters / conversations / messages / settings / memory_entries /
 ///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
@@ -11,6 +11,8 @@
 ///   chat-polish spec §4.4）
 /// - NPD-02：characters.preset_dialogues + conversations.preset_dialogue 两列
 ///   （schemaVersion 7→8，chat-polish spec §4.5）
+/// - NPD-04：characters.prompt_mode + characters.expert_prompt 两列
+///   （schemaVersion 8→9，chat-polish spec §4.5 专家模式，桌面 PD-5）
 /// - 执行器构造注入：测试 seam，测试用 `AppDatabase(NativeDatabase.memory())`
 ///   在内存中打开真实 schema，不依赖设备
 /// - 运行态连接经 [AppDatabase.open]（drift_flutter 惰性打开，内部即
@@ -53,7 +55,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -242,6 +244,43 @@ class AppDatabase extends _$AppDatabase {
         if (!hasPresetDialogue) {
           await customStatement(
             'ALTER TABLE conversations ADD COLUMN preset_dialogue TEXT',
+          );
+        }
+      }
+
+      // NPD-04：schemaVersion 8→9 新增 characters.prompt_mode 列（默认
+      // 'simple'）与 characters.expert_prompt 列（默认 ''）（chat-polish
+      // spec §4.5 专家模式，对齐桌面 database.py
+      // `_ensure_character_expert_columns` 探测补列先例）。
+      //
+      // 列补建**不用** drift Migration.addColumn——它无 IF NOT EXISTS 语义，
+      // 中断残留重开（列已补、user_version 未回写）时重复补列会 duplicate
+      // column 炸库。改走「PRAGMA table_info 探测缺列 → ALTER TABLE ADD
+      // COLUMN」幂等补列（沿 from < 6/7/8 多列补建先例），逐列探测、逐列
+      // 补建——中断残留（一列已补、一列未补）重开时已补列幂等跳过、未补列
+      // 补齐。本块不含新表/新索引，无需 CREATE IF NOT EXISTS。
+      // user_version=9 由 drift 成功后回写，失败锁库重开重跑（F-78 幂等
+      // 三机制延续）。既有行默认值：prompt_mode → 'simple'、expert_prompt
+      // → ''（验收 1：既有行默认 simple/''）。
+      if (from < 9) {
+        final charColumns = await customSelect('PRAGMA table_info(characters)')
+            .get();
+        final hasPromptMode = charColumns.any(
+          (row) => row.data['name'] == 'prompt_mode',
+        );
+        if (!hasPromptMode) {
+          await customStatement(
+            'ALTER TABLE characters ADD COLUMN prompt_mode '
+            "TEXT NOT NULL DEFAULT 'simple'",
+          );
+        }
+        final hasExpertPrompt = charColumns.any(
+          (row) => row.data['name'] == 'expert_prompt',
+        );
+        if (!hasExpertPrompt) {
+          await customStatement(
+            'ALTER TABLE characters ADD COLUMN expert_prompt '
+            "TEXT NOT NULL DEFAULT ''",
           );
         }
       }

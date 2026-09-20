@@ -11,7 +11,10 @@
 /// §4.4，对齐桌面 models/lorebook.py）；
 /// Characters.presetDialogues + Conversations.presetDialogue 两列为 NPD-02
 /// （schemaVersion=8，chat-polish spec §4.5，对齐桌面 character.py /
-/// conversation.py）。
+/// conversation.py）；
+/// Characters.promptMode + Characters.expertPrompt 两列为 NPD-04
+/// （schemaVersion=9，chat-polish spec §4.5 专家模式，对齐桌面
+/// character.py，PD-5 逐字）。
 ///
 /// 权威源（只读，勿改）：
 /// `desktop/backend/app/models/{character,conversation,message,setting}.py`
@@ -189,6 +192,19 @@ class Characters extends Table {
   TextColumn get presetDialogues => text()
       .map(const PresetDialogueListConverter())
       .withDefault(const Constant('[]'))();
+
+  // ── NPD-04 专家模式 ──
+  /// 组装模式（simple/expert，缺省 simple；对齐桌面
+  /// `models/character.py::Character.prompt_mode`）。expert 且非空
+  /// [Characters.expertPrompt] 时，buildMessages 以整段 expert prompt 单条
+  /// 替代 system_prompt/personality、scenario、post_history_instructions
+  /// 三处结构化注入（桌面 PD-5）。
+  TextColumn get promptMode => text().withDefault(const Constant('simple'))();
+
+  /// 专家模式整段 system prompt（缺省空串；对齐桌面
+  /// `models/character.py::Character.expert_prompt`）。expert + 空/纯空白 →
+  /// 回退 simple 结构化组装（安全兜底）。
+  TextColumn get expertPrompt => text().withDefault(const Constant(''))();
 
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

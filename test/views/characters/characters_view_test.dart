@@ -168,6 +168,8 @@ class _CharsEnv {
     List<String> tags = const [],
     double temperature = 0.7,
     List<Map<String, String>> presetDialogues = const [],
+    String promptMode = 'simple',
+    String expertPrompt = '',
   }) {
     return characterRepository.createCharacter(
       CharactersCompanion(
@@ -178,6 +180,8 @@ class _CharsEnv {
         tags: Value(tags),
         temperature: Value(temperature),
         presetDialogues: Value(presetDialogues),
+        promptMode: Value(promptMode),
+        expertPrompt: Value(expertPrompt),
       ),
     );
   }
@@ -595,6 +599,207 @@ void main() {
       expect(ns['preset_dialogues'], [
         {'name': '寒暄', 'content': '你好。'},
       ]);
+      await env.close();
+    });
+  });
+
+  group('编辑 · 专家模式两态切换（NPD-04 验收 7）', () {
+    Future<void> openEditTall(WidgetTester tester, _CharsEnv env) async {
+      // 高画布：专家提示词 textarea 位于表单下部，默认 800x600 视口下
+      // ListView 懒构建不到该段。拉高画布使其全部进入 cacheExtent。
+      tester.view.physicalSize = const Size(800, 2600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await pumpChars(tester, env, env.controller);
+      await tester.tap(find.byTooltip('编辑'));
+      await tester.pumpAndSettle();
+    }
+
+    /// 读取专家提示词 textarea 文本（TextFormField 内层 TextField 的
+    /// controller 值）。
+    String expertPromptText(WidgetTester tester) {
+      final field = tester.widget<TextField>(
+        find.descendant(
+          of: find.byKey(const Key('expert-prompt-field')),
+          matching: find.byType(TextField),
+        ),
+      );
+      return field.controller!.text;
+    }
+
+    testWidgets('expert 角色打开编辑：专家态展示大 textarea（预填 expertPrompt）+ '
+        '结构化字段灰显', (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '专家',
+        personality: '人设A',
+        promptMode: 'expert',
+        expertPrompt: '你是{{char}}，整段专家提示词。',
+      );
+
+      await openEditTall(tester, env);
+
+      expect(
+        expertPromptText(tester),
+        '你是{{char}}，整段专家提示词。',
+        reason: 'textarea 预填角色 expertPrompt',
+      );
+      final personality = tester.widget<TextFormField>(
+        find.byKey(const Key('field-personality')),
+      );
+      expect(personality.enabled, isFalse, reason: '专家态结构化字段（人格）灰显');
+      await env.close();
+    });
+
+    testWidgets('两态切换可逆：expert → simple 保留 expertPrompt；再切回 expert 还原', (
+      tester,
+    ) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '专家',
+        personality: '人设A',
+        promptMode: 'expert',
+        expertPrompt: '保留这段提示词',
+      );
+
+      await openEditTall(tester, env);
+
+      // 切到 simple：结构化字段恢复可编辑，expertPrompt 不丢（controller 态）。
+      // 段按文本命中歧义（「专家模式」同时为小节标题），故限定在 SegmentedButton 内。
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SegmentedButton<String>),
+          matching: find.text('基础模式'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final personality = tester.widget<TextFormField>(
+        find.byKey(const Key('field-personality')),
+      );
+      expect(personality.enabled, isTrue, reason: 'simple 态结构化字段恢复可编辑');
+
+      // 再切回 expert：textarea 内容还原（可逆不丢）。
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SegmentedButton<String>),
+          matching: find.text('专家模式'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        expertPromptText(tester),
+        '保留这段提示词',
+        reason: 'expert → simple → expert 切换 expertPrompt 不丢',
+      );
+      await env.close();
+    });
+
+    testWidgets('专家态保存 payload 同时携带 prompt_mode + expert_prompt 落库', (
+      tester,
+    ) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(name: '专家', personality: '人设A');
+
+      await openEditTall(tester, env);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SegmentedButton<String>),
+          matching: find.text('专家模式'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const Key('expert-prompt-field')),
+          matching: find.byType(TextField),
+        ),
+        '你是{{char}}，专家整段。',
+      );
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      await pumpUntil(
+        tester,
+        () => env.controller.characters.single.character.promptMode == 'expert',
+        why: '保存后列表刷新，角色 promptMode 为 expert',
+      );
+      final saved = env.controller.characters.single.character;
+      expect(saved.promptMode, 'expert');
+      expect(saved.expertPrompt, '你是{{char}}，专家整段。');
+      await env.close();
+    });
+
+    testWidgets('expert → simple 保存：promptMode 回到 simple 且 expertPrompt '
+        '保留（可逆不丢，落库仍携带）', (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '专家',
+        promptMode: 'expert',
+        expertPrompt: '要保留的专家整段',
+      );
+
+      await openEditTall(tester, env);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SegmentedButton<String>),
+          matching: find.text('基础模式'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      await pumpUntil(
+        tester,
+        () => env.controller.characters.single.character.promptMode == 'simple',
+        why: '保存后列表刷新，角色 promptMode 为 simple',
+      );
+      final saved = env.controller.characters.single.character;
+      expect(saved.promptMode, 'simple');
+      expect(
+        saved.expertPrompt,
+        '要保留的专家整段',
+        reason: 'expert → simple 保存 expertPrompt 不丢',
+      );
+      await env.close();
+    });
+
+    testWidgets('DB 脏模式值（非 simple/expert）→ 归一为基础模式并持久化回写'
+        '（Falsify：非 expert 值收敛 simple，防 SegmentedButton 越集选中与脏值扩散）', (
+      tester,
+    ) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '脏模式',
+        promptMode: 'weird',
+        expertPrompt: '未知模式下的文本',
+      );
+
+      // 打开编辑页不崩；脏模式归一为基础模式（结构化字段可编辑、无 textarea）。
+      await openEditTall(tester, env);
+      expect(find.text('编辑角色'), findsOneWidget);
+      final personality = tester.widget<TextFormField>(
+        find.byKey(const Key('field-personality')),
+      );
+      expect(personality.enabled, isTrue, reason: 'weird 归一为 simple（结构化字段可编辑）');
+      expect(
+        find.byKey(const Key('expert-prompt-field')),
+        findsNothing,
+        reason: '非 expert 态不展示专家提示词 textarea',
+      );
+
+      // 保存后持久化归一：promptMode 回写 simple（非脏值扩散），expertPrompt
+      // 保留（可逆不丢）。
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      await pumpUntil(
+        tester,
+        () => env.controller.characters.single.character.promptMode == 'simple',
+        why: '保存后列表刷新，脏模式被归一为 simple',
+      );
+      final saved = env.controller.characters.single.character;
+      expect(saved.promptMode, 'simple', reason: '脏模式值回写 simple（归一收敛）');
+      expect(saved.expertPrompt, '未知模式下的文本');
       await env.close();
     });
   });

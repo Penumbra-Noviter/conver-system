@@ -27,6 +27,8 @@ CharacterData _char({
   String scenario = '',
   String mesExample = '',
   String postHistoryInstructions = '',
+  String promptMode = 'simple',
+  String expertPrompt = '',
 }) =>
     CharacterData(
       name: name,
@@ -35,6 +37,8 @@ CharacterData _char({
       scenario: scenario,
       mesExample: mesExample,
       postHistoryInstructions: postHistoryInstructions,
+      promptMode: promptMode,
+      expertPrompt: expertPrompt,
     );
 
 /// 抽取列表中 role ∈ {user, assistant} 的消息内容（滑窗断言辅助）。
@@ -1182,6 +1186,263 @@ void main() {
       );
       expect(msgs.last, (role: 'user', content: '第二轮问'));
       expect(msgs.last.role, isNot('system'));
+    });
+  });
+
+  // ── 13. 专家模式（NPD-04：promptMode/expertPrompt 分流，桌面 PD-5 逐字移植）──
+
+  group('TestExpertMode', () {
+    test('simple 模式输出与改动前逐字节一致（验收 2 零回归硬约束）', () {
+      final char = _char(
+        systemPrompt: '系统提示',
+        personality: '人格设定',
+        scenario: '场景设定',
+        mesExample: '<START>\n{{user}}: 例1\n{{char}}: 例2',
+        postHistoryInstructions: '历史指令',
+      );
+      final history = [
+        _msg(Role.user, '历史1'),
+        _msg(Role.assistant, '历史2'),
+      ];
+      final baseline = buildMessages(
+        char,
+        history: history,
+        userContent: '当前输入',
+        userName: '小明',
+        world: const {
+          'before_char': ['前置'],
+          'after_char': ['后置'],
+          'system': ['知识'],
+        },
+        narrativeStyle: '叙述规则',
+        presetDialogue: '<START>\n{{user}}: 示范问\n{{char}}: 示范答',
+      );
+      // 显式 safe 默认（promptMode simple + expertPrompt 空）与缺省模式字段
+      // 完全一致——expert 不参与 simple 组装路径。
+      expect(
+        buildMessages(
+          _char(
+            promptMode: 'simple',
+            expertPrompt: '',
+            systemPrompt: '系统提示',
+            personality: '人格设定',
+            scenario: '场景设定',
+            mesExample: '<START>\n{{user}}: 例1\n{{char}}: 例2',
+            postHistoryInstructions: '历史指令',
+          ),
+          history: history,
+          userContent: '当前输入',
+          userName: '小明',
+          world: const {
+            'before_char': ['前置'],
+            'after_char': ['后置'],
+            'system': ['知识'],
+          },
+          narrativeStyle: '叙述规则',
+          presetDialogue: '<START>\n{{user}}: 示范问\n{{char}}: 示范答',
+        ),
+        baseline,
+      );
+    });
+
+    test('expert + 非空 → system 段仅一条 expert_prompt，无 scenario/PHI 独立 '
+        'system（验收 3，桌面锁逐字）', () {
+      final msgs = buildMessages(
+        _char(
+          promptMode: 'expert',
+          expertPrompt: '你是{{char}}，月下剑客。',
+          systemPrompt: '系统提示', // 应被忽略
+          personality: '人格设定', // 应被忽略
+          scenario: '场景设定', // 应被忽略（无 [场景设定]）
+          postHistoryInstructions: '历史指令', // 应被忽略（无 PHI）
+          mesExample: '<START>\n{{user}}: 例1\n{{char}}: 例2',
+        ),
+        history: [
+          _msg(Role.user, '历史1'),
+          _msg(Role.assistant, '历史2'),
+        ],
+        userContent: '当前输入',
+        userName: '小明',
+      );
+      expect(msgs, [
+        (role: 'system', content: '你是艾莉，月下剑客。'),
+        (role: 'user', content: '例1'),
+        (role: 'assistant', content: '例2'),
+        (role: 'user', content: '历史1'),
+        (role: 'assistant', content: '历史2'),
+        (role: 'user', content: '当前输入'),
+      ]);
+      expect(msgs.where((m) => m.role == 'system'), hasLength(1),
+          reason: '仅一条 system，无 scenario/PHI 独立 system');
+    });
+
+    test('expert_prompt 内 {{char}}/{{user}} 经 applyTemplateVars 替换（验收 3）', () {
+      final msgs = buildMessages(
+        _char(
+          promptMode: 'expert',
+          expertPrompt: '{{user}} 与 {{char}} 同行',
+        ),
+        userContent: '你好',
+        userName: '小明',
+      );
+      expect(msgs.first, (role: 'system', content: '小明 与 艾莉 同行'));
+    });
+
+    test('expert + 空串 expertPrompt → 回退 simple 结构化组装（验收 4）', () {
+      final expertMsgs = buildMessages(
+        _char(
+          promptMode: 'expert',
+          expertPrompt: '',
+          systemPrompt: '系统提示',
+          scenario: '场景设定',
+          postHistoryInstructions: '历史指令',
+        ),
+        userContent: '当前输入',
+      );
+      final simpleMsgs = buildMessages(
+        _char(
+          systemPrompt: '系统提示',
+          scenario: '场景设定',
+          postHistoryInstructions: '历史指令',
+        ),
+        userContent: '当前输入',
+      );
+      expect(expertMsgs, simpleMsgs);
+    });
+
+    test('expert + 纯空白 expertPrompt → 回退 simple（strip 后为空即视为空，验收 4）',
+        () {
+      final msgs = buildMessages(
+        _char(promptMode: 'expert', expertPrompt: '   \n  '),
+        userContent: '你好',
+      );
+      // 回退 simple：默认空 system + user（与 simple 最小态一致）。
+      expect(msgs, [
+        (role: 'system', content: ''),
+        (role: 'user', content: '你好'),
+      ]);
+    });
+
+    test('非 expert 值（simple / weird / 空串）一律走 simple 结构化组装（Falsify）',
+        () {
+      for (final mode in ['simple', 'weird', '']) {
+        final msgs = buildMessages(
+          _char(promptMode: mode, expertPrompt: '这段不应被注入'),
+          userContent: '你好',
+        );
+        expect(msgs, [
+          (role: 'system', content: ''),
+          (role: 'user', content: '你好'),
+        ], reason: 'mode="$mode" 不走 expert');
+      }
+    });
+  });
+
+  // ── 14. expert + 世界书 + mes_example + 叙述风格（验收 5）──
+
+  group('TestExpertWorldInjection', () {
+    test('expert 只替代角色静态字段；before/after/world 世界书 + mes_example '
+        '仍按序注入（验收 5）', () {
+      final msgs = buildMessages(
+        _char(
+          promptMode: 'expert',
+          expertPrompt: '专家指令',
+          mesExample: '<START>\n{{user}}: 例1\n{{char}}: 例2',
+        ),
+        history: [
+          _msg(Role.user, '历史1'),
+          _msg(Role.assistant, '历史2'),
+        ],
+        userContent: '当前输入',
+        world: const {
+          'before_char': ['世界前'],
+          'after_char': ['世界后'],
+          'system': ['世界知识1', '世界知识2'],
+        },
+      );
+      expect(msgs, [
+        (role: 'system', content: '世界前'),
+        (role: 'system', content: '专家指令'),
+        (role: 'system', content: '世界后'),
+        (role: 'system', content: '[世界知识]\n世界知识1\n\n世界知识2'),
+        (role: 'user', content: '例1'),
+        (role: 'assistant', content: '例2'),
+        (role: 'user', content: '历史1'),
+        (role: 'assistant', content: '历史2'),
+        (role: 'user', content: '当前输入'),
+      ]);
+    });
+
+    test('expert 亦注入叙述风格（after_char 不在替代范围；NPD-01 契约延续）', () {
+      final msgs = buildMessages(
+        _char(promptMode: 'expert', expertPrompt: '专家指令'),
+        userContent: '你好',
+        world: const {'after_char': ['后置知识']},
+        narrativeStyle: '禁止总结式收尾',
+      );
+      expect(
+        [for (final m in msgs) m.content],
+        ['专家指令', '后置知识', '[叙述风格]\n禁止总结式收尾', '你好'],
+      );
+    });
+
+    test('expert 亦注入预设对话 few-shot（注入段与模式分流正交；NPD-02 契约延续）',
+        () {
+      final msgs = buildMessages(
+        _char(promptMode: 'expert', expertPrompt: '专家指令'),
+        userContent: '你好',
+        presetDialogue: '<START>\n{{user}}: 示范问\n{{char}}: 示范答',
+      );
+      expect(
+        [for (final m in msgs) m.role],
+        ['system', 'user', 'assistant', 'user'],
+      );
+      expect(msgs[1], (role: 'user', content: '示范问'));
+      expect(msgs[2], (role: 'assistant', content: '示范答'));
+    });
+  });
+
+  // ── 15. expert + history / user / 重生成（验收 5）──
+
+  group('TestExpertHistoryUser', () {
+    test('expert 下 history/user 仍按序注入', () {
+      final msgs = buildMessages(
+        _char(promptMode: 'expert', expertPrompt: '专家指令'),
+        history: [_msg(Role.user, '问1'), _msg(Role.assistant, '答1')],
+        userContent: '问2',
+      );
+      expect(msgs, [
+        (role: 'system', content: '专家指令'),
+        (role: 'user', content: '问1'),
+        (role: 'assistant', content: '答1'),
+        (role: 'user', content: '问2'),
+      ]);
+    });
+
+    test('appendCurrentInput=false：末条为历史末条 user，无尾随 system'
+        '（expert 无 PHI，剥离天然安全）', () {
+      final msgs = buildMessages(
+        _char(promptMode: 'expert', expertPrompt: '专家指令'),
+        history: [
+          _msg(Role.user, '问1'),
+          _msg(Role.assistant, '答1'),
+          _msg(Role.user, '问2'),
+        ],
+        userContent: '忽略',
+        appendCurrentInput: false,
+      );
+      expect(msgs.last, (role: 'user', content: '问2'));
+      expect(msgs.last.role, isNot('system'));
+    });
+
+    test('appendCurrentInput=false + 空历史：尾随 system 全剥离，输出无 user', () {
+      final msgs = buildMessages(
+        _char(promptMode: 'expert', expertPrompt: '专家指令'),
+        userContent: '忽略',
+        appendCurrentInput: false,
+      );
+      expect([for (final m in msgs) if (m.role == 'user') m], isEmpty);
+      expect(msgs, isEmpty, reason: '剥离全部尾随 system 后无残留');
     });
   });
 }

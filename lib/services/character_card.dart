@@ -97,6 +97,8 @@ class CharacterDraft {
     this.avatar,
     required this.temperature,
     this.presetDialogues = const <Map<String, String>>[],
+    this.promptMode = 'simple',
+    this.expertPrompt = '',
     this.lorebookEntries = const <LorebookEntryDraft>[],
   });
 
@@ -123,6 +125,12 @@ class CharacterDraft {
   /// 预设对话列表（NPD-02；`extensions.conver_system.preset_dialogues` 读回后经
   /// [_normalizePresetDialogues] 归一化的 `{name, content}` 列表）。
   final List<Map<String, String>> presetDialogues;
+
+  /// 组装模式（simple/expert，缺省 simple；NPD-04，桌面 PD-5）。
+  final String promptMode;
+
+  /// 专家模式整段 system prompt（缺省空串；NPD-04，桌面 PD-5）。
+  final String expertPrompt;
 
   /// `extensions.conver_system.character_book` 解析出的世界书条目草案
   /// （WL-01；畸形/缺失 → 空列表，不阻断导入）。
@@ -151,6 +159,8 @@ class CharacterDraft {
       avatar: avatar == null ? const Value.absent() : Value(avatar!),
       temperature: Value(temperature),
       presetDialogues: Value(presetDialogues),
+      promptMode: Value(promptMode),
+      expertPrompt: Value(expertPrompt),
     );
   }
 }
@@ -194,6 +204,16 @@ Map<String, dynamic> toV2Card(Character char) {
   // `if char.preset_dialogues` 语义——空态导出不产生伪键）。
   if (char.presetDialogues.isNotEmpty) {
     ns['preset_dialogues'] = char.presetDialogues;
+  }
+
+  // PD-5 专家模式：非默认值写入命名空间（对齐桌面 `if char.prompt_mode ==
+  // "expert"` / `if char.expert_prompt` 语义）——默认 simple / 空串不落卡；
+  // expert + 空 prompt 时 mode 保真、空 prompt 不落卡（验收 6）。
+  if (char.promptMode == 'expert') {
+    ns['prompt_mode'] = char.promptMode;
+  }
+  if (char.expertPrompt.isNotEmpty) {
+    ns['expert_prompt'] = char.expertPrompt;
   }
 
   // 头像：base64 data URI → data.avatar（去前缀，ST 兼容）；URL → 命名空间
@@ -319,6 +339,13 @@ CharacterDraft _buildCreate(Map<String, dynamic> data) {
   // trim 同名去重、超 10 截断——SR-26，脏数据收敛不阻断导入）。
   final presetDialogues = _normalizePresetDialogues(ns['preset_dialogues']);
 
+  // PD-5 专家模式：conver_system 命名空间往返（对齐桌面
+  // `prompt_mode = str(ns.get("prompt_mode") or "simple")` /
+  // `expert_prompt = str(ns.get("expert_prompt") or "")` 的 falsy 归默认语义；
+  // 非默认值具备 int → str 化保留的容错——[CharacterDraft] 构造默认值兜底）。
+  final promptMode = _nsField(ns['prompt_mode'], 'simple');
+  final expertPrompt = _nsField(ns['expert_prompt'], '');
+
   final version = _truncate(
     (data['character_version'] ?? data['version'] ?? '1.0').toString(),
     50,
@@ -342,6 +369,8 @@ CharacterDraft _buildCreate(Map<String, dynamic> data) {
     avatar: avatarValue,
     temperature: temperature,
     presetDialogues: presetDialogues,
+    promptMode: promptMode,
+    expertPrompt: expertPrompt,
     lorebookEntries: lorebookEntries,
   );
 }
@@ -480,6 +509,17 @@ String _presetField(Object? value) {
     return '';
   }
   return value.toString().trim();
+}
+
+/// 专家模式命名空间字段 str()（falsy 归默认）——桌面
+/// `str(ns.get("prompt_mode") or "simple")` / `str(ns.get("expert_prompt") or "")`
+/// 的 Dart 等价：null / 空串 / 假值（false / 0）→ [fallback]，其余
+/// `toString()` **原样不 trim**（对齐桌面 str() 无 trim；`int → "123"` 容错）。
+String _nsField(Object? value, String fallback) {
+  if (value == null || value == '' || value == false || value == 0) {
+    return fallback;
+  }
+  return value.toString();
 }
 
 /// 温度值裁剪到 [0, 2] 合法区间，非法值回退默认 0.7（桌面 `_clamp_temperature`）。

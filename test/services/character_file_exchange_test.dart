@@ -37,6 +37,8 @@ Character _character({
   List<Map<String, String>> presetDialogues = const [],
   String? avatar,
   double temperature = 0.7,
+  String promptMode = 'simple',
+  String expertPrompt = '',
 }) {
   return Character(
     id: 1,
@@ -57,6 +59,8 @@ Character _character({
     presetDialogues: presetDialogues,
     avatar: avatar,
     temperature: temperature,
+    promptMode: promptMode,
+    expertPrompt: expertPrompt,
     createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
     updatedAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
   );

@@ -584,6 +584,8 @@ void main() {
     String mesExample = '',
     String postHistoryInstructions = '',
     double? temperature,
+    String promptMode = 'simple',
+    String expertPrompt = '',
   }) {
     return charRepo.createCharacter(
       CharactersCompanion.insert(
@@ -597,6 +599,8 @@ void main() {
         temperature: temperature == null
             ? const Value.absent()
             : Value(temperature),
+        promptMode: Value(promptMode),
+        expertPrompt: Value(expertPrompt),
         createdAt: fakeNow,
         updatedAt: fakeNow,
       ),
@@ -3914,6 +3918,144 @@ void main() {
       final triggerIndex = sent.indexWhere((m) => m.content == '问题');
       final presetCharIndex = sent.indexWhere((m) => m.content == '我叫艾莉亚。');
       expect(triggerIndex, greaterThan(presetCharIndex));
+      expect(await swipeContentsOf(oldAssistant.id), ['旧答', '新答']);
+    });
+  });
+
+  // ── 专家模式注入链（NPD-04：CharacterData 透传 → buildMessages 分流）──
+
+  group('专家模式注入链（NPD-04）', () {
+    test('expert + 非空 expertPrompt → system 段仅一条（expert prompt 内容），'
+        '无 scenario/PHI 独立 system（验收 3）', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+        postHistoryInstructions: '保持人设。',
+        promptMode: 'expert',
+        expertPrompt: '你是{{char}}，月下剑客。',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '你好');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '再来')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      // [叙述风格] 为独立注入段（expert 亦注入，NPD-01 契约延续）——断言
+      // 非叙述风格的 system 段仅一条 expert prompt，无 personality/scenario/PHI。
+      final nonNarrativeSystems = [
+        for (final m in sent)
+          if (m.role == 'system' && !m.content.startsWith('[叙述风格]')) m.content,
+      ];
+      expect(nonNarrativeSystems, [
+        '你是艾莉亚，月下剑客。',
+      ], reason: 'system 段仅一条 expert prompt，无 personality/scenario/PHI');
+      expect(sent.where((m) => m.content.startsWith('[场景设定]')), isEmpty);
+      expect(sent.where((m) => m.content == '保持人设。'), isEmpty);
+      expect(await roleContentsOf(conv.id), contains((Role.assistant, '回复')));
+    });
+
+    test('expert + 空 expertPrompt → 回退 simple 结构化组装（验收 4）', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+        postHistoryInstructions: '保持人设。',
+        promptMode: 'expert',
+        expertPrompt: '   ',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '你好');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service
+          .streamReply(conversationId: conv.id, content: '再来')
+          .toList();
+
+      final sent = provider.lastMessages!;
+      expect(
+        sent.where((m) => m.content == '人设'),
+        hasLength(1),
+        reason: '回退 simple：personality 结构化 system 生效',
+      );
+      expect(sent.where((m) => m.content == '[场景设定]\n场景'), hasLength(1));
+      expect(
+        sent.where((m) => m.content == '保持人设。'),
+        hasLength(1),
+        reason: 'PHI 恢复注入',
+      );
+    });
+
+    test(
+      'expert 角色 + mesExample/world/narrative/preset 注入照旧（验收 5 组装链）',
+      () async {
+        final char = await seedCharacter(
+          firstMes: '开场。',
+          personality: '人设',
+          scenario: '场景',
+          mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+          promptMode: 'expert',
+          expertPrompt: '专家整段',
+        );
+        final conv = await convRepo.createConversation(
+          characterId: char.id,
+          presetDialogue: '<START>\n{{user}}: 示范问\n{{char}}: 示范答',
+        );
+        await sendUserMessage(conv.id, '你好');
+
+        final provider = FakeLLMProvider(tokens: const ['回复']);
+        wireService(provider);
+        await service
+            .streamReply(conversationId: conv.id, content: '再来')
+            .toList();
+
+        final sent = provider.lastMessages!;
+        // mes_example 注入。
+        expect(sent.where((m) => m.content == '例问'), hasLength(1));
+        expect(sent.where((m) => m.content == '例答'), hasLength(1));
+        // 叙述风格注入（expert 亦注入，NPD-01 契约延续）。
+        expect(sent.where((m) => m.content.startsWith('[叙述风格]')), hasLength(1));
+        // 预设对话 few-shot 注入。
+        expect(sent.where((m) => m.content == '示范问'), hasLength(1));
+        expect(sent.where((m) => m.content == '示范答'), hasLength(1));
+      },
+    );
+
+    test('regenerate 路径：expert 角色末条为触发 user，尾随系统剥离不破坏（验收 5）', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+        postHistoryInstructions: '保持人设。',
+        promptMode: 'expert',
+        expertPrompt: '专家整段',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '问题');
+      final oldAssistant = await sendAssistantMessage(conv.id, '旧答');
+
+      final provider = FakeLLMProvider(tokens: const ['新答']);
+      wireService(provider);
+      await service.regenerate(
+        conversationId: conv.id,
+        messageId: oldAssistant.id,
+      );
+
+      final sent = provider.lastMessages!;
+      expect(sent.last.role, 'user', reason: '末条为触发 user');
+      expect(sent.last.content, '问题');
+      // [叙述风格] 为独立注入段；非叙述风格 system 段仅 expert prompt 一条
+      //（expert 无 PHI——三处替代面不产出 scenario/PHI 独立 system）。
+      final nonNarrativeSystems = [
+        for (final m in sent)
+          if (m.role == 'system' && !m.content.startsWith('[叙述风格]')) m.content,
+      ];
+      expect(nonNarrativeSystems, ['专家整段']);
       expect(await swipeContentsOf(oldAssistant.id), ['旧答', '新答']);
     });
   });

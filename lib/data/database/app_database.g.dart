@@ -216,6 +216,30 @@ class $CharactersTable extends Characters
       ).withConverter<List<Map<String, String>>>(
         $CharactersTable.$converterpresetDialogues,
       );
+  static const VerificationMeta _promptModeMeta = const VerificationMeta(
+    'promptMode',
+  );
+  @override
+  late final GeneratedColumn<String> promptMode = GeneratedColumn<String>(
+    'prompt_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('simple'),
+  );
+  static const VerificationMeta _expertPromptMeta = const VerificationMeta(
+    'expertPrompt',
+  );
+  @override
+  late final GeneratedColumn<String> expertPrompt = GeneratedColumn<String>(
+    'expert_prompt',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -258,6 +282,8 @@ class $CharactersTable extends Characters
     avatar,
     temperature,
     presetDialogues,
+    promptMode,
+    expertPrompt,
     createdAt,
     updatedAt,
   ];
@@ -362,6 +388,21 @@ class $CharactersTable extends Characters
         temperature.isAcceptableOrUnknown(
           data['temperature']!,
           _temperatureMeta,
+        ),
+      );
+    }
+    if (data.containsKey('prompt_mode')) {
+      context.handle(
+        _promptModeMeta,
+        promptMode.isAcceptableOrUnknown(data['prompt_mode']!, _promptModeMeta),
+      );
+    }
+    if (data.containsKey('expert_prompt')) {
+      context.handle(
+        _expertPromptMeta,
+        expertPrompt.isAcceptableOrUnknown(
+          data['expert_prompt']!,
+          _expertPromptMeta,
         ),
       );
     }
@@ -472,6 +513,14 @@ class $CharactersTable extends Characters
           data['${effectivePrefix}preset_dialogues'],
         )!,
       ),
+      promptMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}prompt_mode'],
+      )!,
+      expertPrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}expert_prompt'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -529,6 +578,18 @@ class Character extends DataClass implements Insertable<Character> {
   /// `_normalize_preset_dialogues`（PRESET_DIALOGUE_MAX=10 截断 / 空字段过滤 /
   /// 同名去重）逐字镜像，导入侧落到本列前已完成归一化（深层语义不进城）。
   final List<Map<String, String>> presetDialogues;
+
+  /// 组装模式（simple/expert，缺省 simple；对齐桌面
+  /// `models/character.py::Character.prompt_mode`）。expert 且非空
+  /// [Characters.expertPrompt] 时，buildMessages 以整段 expert prompt 单条
+  /// 替代 system_prompt/personality、scenario、post_history_instructions
+  /// 三处结构化注入（桌面 PD-5）。
+  final String promptMode;
+
+  /// 专家模式整段 system prompt（缺省空串；对齐桌面
+  /// `models/character.py::Character.expert_prompt`）。expert + 空/纯空白 →
+  /// 回退 simple 结构化组装（安全兜底）。
+  final String expertPrompt;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Character({
@@ -550,6 +611,8 @@ class Character extends DataClass implements Insertable<Character> {
     this.avatar,
     required this.temperature,
     required this.presetDialogues,
+    required this.promptMode,
+    required this.expertPrompt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -598,6 +661,8 @@ class Character extends DataClass implements Insertable<Character> {
         $CharactersTable.$converterpresetDialogues.toSql(presetDialogues),
       );
     }
+    map['prompt_mode'] = Variable<String>(promptMode);
+    map['expert_prompt'] = Variable<String>(expertPrompt);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -625,6 +690,8 @@ class Character extends DataClass implements Insertable<Character> {
           : Value(avatar),
       temperature: Value(temperature),
       presetDialogues: Value(presetDialogues),
+      promptMode: Value(promptMode),
+      expertPrompt: Value(expertPrompt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -662,6 +729,8 @@ class Character extends DataClass implements Insertable<Character> {
       presetDialogues: serializer.fromJson<List<Map<String, String>>>(
         json['presetDialogues'],
       ),
+      promptMode: serializer.fromJson<String>(json['promptMode']),
+      expertPrompt: serializer.fromJson<String>(json['expertPrompt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -692,6 +761,8 @@ class Character extends DataClass implements Insertable<Character> {
       'presetDialogues': serializer.toJson<List<Map<String, String>>>(
         presetDialogues,
       ),
+      'promptMode': serializer.toJson<String>(promptMode),
+      'expertPrompt': serializer.toJson<String>(expertPrompt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -716,6 +787,8 @@ class Character extends DataClass implements Insertable<Character> {
     Value<String?> avatar = const Value.absent(),
     double? temperature,
     List<Map<String, String>>? presetDialogues,
+    String? promptMode,
+    String? expertPrompt,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Character(
@@ -738,6 +811,8 @@ class Character extends DataClass implements Insertable<Character> {
     avatar: avatar.present ? avatar.value : this.avatar,
     temperature: temperature ?? this.temperature,
     presetDialogues: presetDialogues ?? this.presetDialogues,
+    promptMode: promptMode ?? this.promptMode,
+    expertPrompt: expertPrompt ?? this.expertPrompt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -781,6 +856,12 @@ class Character extends DataClass implements Insertable<Character> {
       presetDialogues: data.presetDialogues.present
           ? data.presetDialogues.value
           : this.presetDialogues,
+      promptMode: data.promptMode.present
+          ? data.promptMode.value
+          : this.promptMode,
+      expertPrompt: data.expertPrompt.present
+          ? data.expertPrompt.value
+          : this.expertPrompt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -807,6 +888,8 @@ class Character extends DataClass implements Insertable<Character> {
           ..write('avatar: $avatar, ')
           ..write('temperature: $temperature, ')
           ..write('presetDialogues: $presetDialogues, ')
+          ..write('promptMode: $promptMode, ')
+          ..write('expertPrompt: $expertPrompt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -814,7 +897,7 @@ class Character extends DataClass implements Insertable<Character> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     name,
     description,
@@ -833,9 +916,11 @@ class Character extends DataClass implements Insertable<Character> {
     avatar,
     temperature,
     presetDialogues,
+    promptMode,
+    expertPrompt,
     createdAt,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -858,6 +943,8 @@ class Character extends DataClass implements Insertable<Character> {
           other.avatar == this.avatar &&
           other.temperature == this.temperature &&
           other.presetDialogues == this.presetDialogues &&
+          other.promptMode == this.promptMode &&
+          other.expertPrompt == this.expertPrompt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -881,6 +968,8 @@ class CharactersCompanion extends UpdateCompanion<Character> {
   final Value<String?> avatar;
   final Value<double> temperature;
   final Value<List<Map<String, String>>> presetDialogues;
+  final Value<String> promptMode;
+  final Value<String> expertPrompt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const CharactersCompanion({
@@ -902,6 +991,8 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     this.avatar = const Value.absent(),
     this.temperature = const Value.absent(),
     this.presetDialogues = const Value.absent(),
+    this.promptMode = const Value.absent(),
+    this.expertPrompt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -924,6 +1015,8 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     this.avatar = const Value.absent(),
     this.temperature = const Value.absent(),
     this.presetDialogues = const Value.absent(),
+    this.promptMode = const Value.absent(),
+    this.expertPrompt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : name = Value(name),
@@ -948,6 +1041,8 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     Expression<String>? avatar,
     Expression<double>? temperature,
     Expression<String>? presetDialogues,
+    Expression<String>? promptMode,
+    Expression<String>? expertPrompt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -971,6 +1066,8 @@ class CharactersCompanion extends UpdateCompanion<Character> {
       if (avatar != null) 'avatar': avatar,
       if (temperature != null) 'temperature': temperature,
       if (presetDialogues != null) 'preset_dialogues': presetDialogues,
+      if (promptMode != null) 'prompt_mode': promptMode,
+      if (expertPrompt != null) 'expert_prompt': expertPrompt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -995,6 +1092,8 @@ class CharactersCompanion extends UpdateCompanion<Character> {
     Value<String?>? avatar,
     Value<double>? temperature,
     Value<List<Map<String, String>>>? presetDialogues,
+    Value<String>? promptMode,
+    Value<String>? expertPrompt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -1018,6 +1117,8 @@ class CharactersCompanion extends UpdateCompanion<Character> {
       avatar: avatar ?? this.avatar,
       temperature: temperature ?? this.temperature,
       presetDialogues: presetDialogues ?? this.presetDialogues,
+      promptMode: promptMode ?? this.promptMode,
+      expertPrompt: expertPrompt ?? this.expertPrompt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -1094,6 +1195,12 @@ class CharactersCompanion extends UpdateCompanion<Character> {
         $CharactersTable.$converterpresetDialogues.toSql(presetDialogues.value),
       );
     }
+    if (promptMode.present) {
+      map['prompt_mode'] = Variable<String>(promptMode.value);
+    }
+    if (expertPrompt.present) {
+      map['expert_prompt'] = Variable<String>(expertPrompt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1124,6 +1231,8 @@ class CharactersCompanion extends UpdateCompanion<Character> {
           ..write('avatar: $avatar, ')
           ..write('temperature: $temperature, ')
           ..write('presetDialogues: $presetDialogues, ')
+          ..write('promptMode: $promptMode, ')
+          ..write('expertPrompt: $expertPrompt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -6959,6 +7068,8 @@ typedef $$CharactersTableCreateCompanionBuilder = CharactersCompanion Function({
   Value<String?> avatar,
   Value<double> temperature,
   Value<List<Map<String, String>>> presetDialogues,
+  Value<String> promptMode,
+  Value<String> expertPrompt,
   required DateTime createdAt,
   required DateTime updatedAt,
 });
@@ -6981,6 +7092,8 @@ typedef $$CharactersTableUpdateCompanionBuilder = CharactersCompanion Function({
   Value<String?> avatar,
   Value<double> temperature,
   Value<List<Map<String, String>>> presetDialogues,
+  Value<String> promptMode,
+  Value<String> expertPrompt,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -7275,6 +7388,16 @@ class $$CharactersTableFilterComposer
   get presetDialogues => $composableBuilder(
     column: $table.presetDialogues,
     builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get promptMode => $composableBuilder(
+    column: $table.promptMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get expertPrompt => $composableBuilder(
+    column: $table.expertPrompt,
+    builder: (column) => ColumnFilters(column),
   );
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
@@ -7612,6 +7735,16 @@ class $$CharactersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get promptMode => $composableBuilder(
+    column: $table.promptMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get expertPrompt => $composableBuilder(
+    column: $table.expertPrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -7707,6 +7840,16 @@ class $$CharactersTableAnnotationComposer
   GeneratedColumnWithTypeConverter<List<Map<String, String>>, String>
   get presetDialogues => $composableBuilder(
     column: $table.presetDialogues,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get promptMode => $composableBuilder(
+    column: $table.promptMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get expertPrompt => $composableBuilder(
+    column: $table.expertPrompt,
     builder: (column) => column,
   );
 
@@ -8000,6 +8143,8 @@ class $$CharactersTableTableManager
                 Value<double> temperature = const Value.absent(),
                 Value<List<Map<String, String>>> presetDialogues =
                     const Value.absent(),
+                Value<String> promptMode = const Value.absent(),
+                Value<String> expertPrompt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => CharactersCompanion(
@@ -8021,6 +8166,8 @@ class $$CharactersTableTableManager
                 avatar: avatar,
                 temperature: temperature,
                 presetDialogues: presetDialogues,
+                promptMode: promptMode,
+                expertPrompt: expertPrompt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -8045,6 +8192,8 @@ class $$CharactersTableTableManager
                 Value<double> temperature = const Value.absent(),
                 Value<List<Map<String, String>>> presetDialogues =
                     const Value.absent(),
+                Value<String> promptMode = const Value.absent(),
+                Value<String> expertPrompt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => CharactersCompanion.insert(
@@ -8066,6 +8215,8 @@ class $$CharactersTableTableManager
                 avatar: avatar,
                 temperature: temperature,
                 presetDialogues: presetDialogues,
+                promptMode: promptMode,
+                expertPrompt: expertPrompt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
