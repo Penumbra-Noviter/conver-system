@@ -4,8 +4,9 @@
 /// - 标题「聊天」（无「临时」标注、无「后续里程碑替换」副标题文案）；
 /// - 角色选择条：横向滑动渲染全部角色名，选中高亮，tap 调
 ///   [ChatController.selectCharacter]；
-/// - 「新建对话」以 [ChatController.selectedCharacterId] 建会话并直达；无角色
-///   → 禁用 + 提示「请先在角色页创建角色」；创建中防连点；
+/// - 「新建对话」以 [ChatController.selectedCharacterId] 为底，先弹选择面板
+///   （开场白 + 预设对话，NPD-03）再创建并直达；无角色 → 禁用 + 提示
+///   「请先在角色页创建角色」；创建中防连点；
 /// - 会话列表项长按弹出「重命名 / 删除」：重命名经预填标题对话框委托
 ///   [ChatController.renameConversation]；删除经确认对话框委托
 ///   [ChatController.removeConversation]；
@@ -17,8 +18,10 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../data/database/app_database.dart' show Conversation;
-import '../../theme/colors.dart';
+import '../../data/database/app_database.dart'
+    show Character, Conversation;
+import '../../theme/colors.dart'
+    show ConverRadii, ConverSpacing;
 import '../../theme/conver_palette.dart';
 import '../../widgets/empty_state.dart';
 import 'chat_controller.dart';
@@ -63,7 +66,7 @@ class ChatEntry extends StatelessWidget {
             ),
             child: FilledButton.icon(
               key: const Key('new-conversation'),
-              onPressed: canCreate ? controller.createConversation : null,
+              onPressed: canCreate ? () => _openNewConversationSheet(context) : null,
               icon: const Icon(Icons.add),
               label: const Text('新建对话'),
             ),
@@ -91,6 +94,38 @@ class ChatEntry extends StatelessWidget {
           ),
           Expanded(child: _ConversationList(controller: controller)),
         ],
+      ),
+    );
+  }
+
+  /// 打开「新建对话」选择面板（NPD-03）：开场白 + 预设对话二选后确认建会话。
+  ///
+  /// 以 [ChatController.selectedCharacterId] 定位角色并从控制器已加载角色列表
+  /// 取角色数据（firstMes / alternateGreetings / presetDialogues 供给下拉）；
+  /// 面板确认回调 [ChatController.createConversationFor]（greeting/presetDialogue
+  /// 三态透传）。选中态角色已从列表消失（陈旧缓存）→ 直接走既有 notice 路径
+  /// （controller 内部 guard，零残留会话）。
+  Future<void> _openNewConversationSheet(BuildContext context) async {
+    final characterId = controller.selectedCharacterId;
+    if (characterId == null) {
+      return;
+    }
+    Character? selected;
+    for (final character in controller.characters) {
+      if (character.id == characterId) {
+        selected = character;
+        break;
+      }
+    }
+    if (selected == null) {
+      await controller.createConversationFor(characterId);
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => _NewConversationSheet(
+        controller: controller,
+        character: selected!,
       ),
     );
   }
@@ -335,6 +370,185 @@ class _RenameConversationDialogState extends State<_RenameConversationDialog> {
           child: const Text('确定'),
         ),
       ],
+    );
+  }
+}
+
+/// 开场白下拉选项（NPD-03）：label 为展示文本，value 为传入 greeting 的参数值。
+///
+/// value 语义（三态）：null = 默认（first_mes 零回归路径）、非空字符串 = 指定
+/// 文本（模板替换后预插）、空串 = 无开场白（不预插）。由 [ChatController
+/// .createConversationFor] 透传落库。
+class _GreetingOption {
+  const _GreetingOption(this.label, this.greeting);
+
+  final String label;
+
+  /// greeting 参数值：null / 指定文本 / 空串三态。
+  final Object? greeting;
+}
+
+/// 预设对话下拉选项（NPD-03）：label 为预设名，content 为快照文本。
+///
+/// [content] 为 null 表示「不使用预设」（快照列不落伪值）；非空为选中预设的
+/// content 原文（创建时固化快照）。
+class _PresetOption {
+  const _PresetOption(this.label, this.content);
+
+  final String label;
+  final String? content;
+}
+
+/// 「新建对话」选择面板（NPD-03 验收 4）：开场白下拉（默认/备选/无）+ 预设
+/// 对话下拉（不使用/各预设）→ 「开始对话」经 [ChatController.createConversationFor]
+/// 三态透传建会话并直达。
+///
+/// 契约锁（docstring 锚桌面 conversation.py::create_conversation 的 greeting /
+/// preset_dialogue 语义）：
+/// - 开场白「默认」→ greeting: null（first_mes 零回归）；备选文本 → greeting:
+///   该文本（模板替换后）；「无开场白」→ greeting: 空串；
+/// - 预设「不使用」→ presetDialogue: null；选中预设 → content 原样快照固化。
+///
+/// 角色数据（firstMes / alternateGreetings / presetDialogues）来自入口已加载
+/// 的 [Character] 行（controller.characters 快照）；角色在面板打开期间被删 →
+/// 确认动作仍经 controller 既有 guard（notice 路径），本面板零额外逻辑。
+class _NewConversationSheet extends StatefulWidget {
+  const _NewConversationSheet({
+    required this.controller,
+    required this.character,
+  });
+
+  final ChatController controller;
+  final Character character;
+
+  @override
+  State<_NewConversationSheet> createState() => _NewConversationSheetState();
+}
+
+class _NewConversationSheetState extends State<_NewConversationSheet> {
+  late final List<_GreetingOption> _greetings = _buildGreetings();
+  late final List<_PresetOption> _presets = _buildPresets();
+  int _greetingIndex = 0;
+  int _presetIndex = 0;
+
+  /// 开场白选项：默认（first_mes，标「默认」+ 内容预览）+ alternateGreetings
+  /// 各项（trim 非空过滤）+ 「无开场白」。首项 = 默认（零回归路径）。
+  List<_GreetingOption> _buildGreetings() {
+    final firstMes = widget.character.firstMes;
+    return [
+      _GreetingOption(
+        firstMes.isEmpty ? '默认' : '默认（$firstMes）',
+        null,
+      ),
+      for (final text in widget.character.alternateGreetings)
+        if (text.trim().isNotEmpty) _GreetingOption(text, text),
+      const _GreetingOption('无开场白', ''),
+    ];
+  }
+
+  /// 预设对话选项：首项「不使用」（content null）+ 各预设 {name, content}
+  /// （name trim 非空过滤；快照取 content 原文）。
+  List<_PresetOption> _buildPresets() {
+    return [
+      const _PresetOption('不使用', null),
+      for (final preset in widget.character.presetDialogues)
+        if ((preset['name'] ?? '').trim().isNotEmpty)
+          _PresetOption(preset['name']!, preset['content'] ?? ''),
+    ];
+  }
+
+  /// 确认：pop 面板 → 经 createConversationFor 三态透传建会话并直达。
+  ///
+  /// 角色删除 / 不存在守卫由 controller 既有路径承载（验收 6），层面无重复
+  /// 逻辑；防连点（[_creatingConversation]）同 controller 单一归属。
+  void _start() {
+    Navigator.of(context).pop();
+    widget.controller.createConversationFor(
+      widget.character.id,
+      greeting: _greetings[_greetingIndex].greeting,
+      presetDialogue: _presets[_presetIndex].content,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = ConverPalette.of(context);
+    return SafeArea(
+      child: Padding(
+        key: const Key('new-conversation-sheet'),
+        padding: const EdgeInsets.fromLTRB(
+          ConverSpacing.space4,
+          ConverSpacing.space3,
+          ConverSpacing.space4,
+          ConverSpacing.space4,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '新建对话',
+              style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+            ),
+            const SizedBox(height: ConverSpacing.space2),
+            Text('开场白', style: textTheme.bodySmall?.copyWith(color: palette.ink3)),
+            DropdownButton<int>(
+              key: const Key('greeting-select'),
+              value: _greetingIndex,
+              isExpanded: true,
+              items: [
+                for (var i = 0; i < _greetings.length; i++)
+                  DropdownMenuItem<int>(
+                    value: i,
+                    child: Text(
+                      _greetings[i].label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (index) {
+                if (index != null) {
+                  setState(() => _greetingIndex = index);
+                }
+              },
+            ),
+            const SizedBox(height: ConverSpacing.space2),
+            Text('预设对话', style: textTheme.bodySmall?.copyWith(color: palette.ink3)),
+            DropdownButton<int>(
+              key: const Key('preset-select'),
+              value: _presetIndex,
+              isExpanded: true,
+              items: [
+                for (var i = 0; i < _presets.length; i++)
+                  DropdownMenuItem<int>(
+                    value: i,
+                    child: Text(
+                      _presets[i].label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (index) {
+                if (index != null) {
+                  setState(() => _presetIndex = index);
+                }
+              },
+            ),
+            const SizedBox(height: ConverSpacing.space3),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                key: const Key('start-conversation'),
+                onPressed: _start,
+                child: const Text('开始对话'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

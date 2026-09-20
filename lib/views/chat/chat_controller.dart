@@ -307,7 +307,18 @@ class ChatController extends ChangeNotifier {
   /// 删除 → [notice] 提示且停留入口，零残留会话。[createConversation] 以选中
   /// 角色委托本方法；[_creatingConversation] 防连点标志单一归属本处（任一建
   /// 会话流程进行中互相忽略）。
-  Future<void> createConversationFor(int characterId) async {
+  ///
+  /// [greeting] / [presetDialogue]（NPD-03）同形透传 [ConversationRepository
+  /// .createConversation]：greeting 三态（null= first_mes 零回归 / 指定文本 /
+  /// 显式空串=无开场白），presetDialogue 快照固化。三层调用语义：
+  /// 无选中角色 → [createConversation]（本方法不触达）；指定角色（角色卡
+  /// 「开始对话」）→ 不传新参数（first_mes 零回归）；选择 UI（新建对话
+  /// 面板）→ 「无开场白」传 `''`、「默认」传 null、备选文本传 String。
+  Future<void> createConversationFor(
+    int characterId, {
+    Object? greeting,
+    String? presetDialogue,
+  }) async {
     if (_creatingConversation) {
       return;
     }
@@ -325,8 +336,11 @@ class ChatController extends ChangeNotifier {
       return;
     }
     final conversation = await _noticeRunner.guard<Conversation>(
-      op: () =>
-          _conversationRepository.createConversation(characterId: characterId),
+      op: () => _conversationRepository.createConversation(
+        characterId: characterId,
+        greeting: greeting,
+        presetDialogue: presetDialogue,
+      ),
       onError: (e) => '新建对话失败: $e',
     );
     _creatingConversation = false;

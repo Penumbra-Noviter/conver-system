@@ -97,8 +97,18 @@ class ConversationRepository {
   /// - [title] 为空或未传 → 占位「与 {角色名} 的对话」；
   /// - [modelProvider] / [modelName] 非空显式值优先，否则回退
   ///   [SettingsReader] 的设置值，再回退常量 `claude` / `claude-sonnet-5`；
-  /// - 角色存在且 `first_mes` 非空 → 预插首条 assistant 开场白
-  ///   （模板替换后），对话 updated_at 随之前移。
+  /// - [greeting]（NPD-03）开场白三态，锚桌面 `create_conversation` 的
+  ///   `model_fields_set` 判定（Python `if "greeting" in ...` 语义的 Dart
+  ///   镜像——Dart 无 model_fields_set，三态由「显式传入」调用点保证：
+  ///   - null（未传 / 显式传 null，Dart 无法区分）→ 沿用现状：角色
+  ///     `first_mes` 非空则预插首条 assistant 开场白（模板变量替换后），
+  ///     first_mes 空则零预插（验收 1/2 零回归）；
+  ///   - 非空字符串 → 预插**该内容**（模板变量替换后），与 first_mes 原值
+  ///     无关（即使 first_mes 为空也预插）；
+  ///   - 显式空串 → **不预插**（消息表为空，即使角色有 first_mes）。
+  ///   纯空白字符串按 truthy 处理（`isNotEmpty`）→ 预插，与桌面 `if
+  ///   greeting_text:` 的 Python truthiness 对齐；非 String 显式值属契约外
+  ///   （调用点保证三态），防御性回退 first_mes 路径。
   /// - [presetDialogue]（NPD-02）：预设对话快照文本，创建时固化到
   ///   `conversations.preset_dialogue` 列；None/空串 → null（不落伪值，桌面
   ///   `data.preset_dialogue or None` 语义）。快照语义 = 创建时固化——改角色
@@ -110,6 +120,7 @@ class ConversationRepository {
     String? title,
     String? modelProvider,
     String? modelName,
+    Object? greeting,
     String? presetDialogue,
   }) async {
     final character = await (_db.select(_db.characters)
@@ -149,15 +160,20 @@ class ConversationRepository {
           ),
         );
 
-    // 预插开场白：把角色 first_mes（模板替换后）插入为首条 assistant 消息。
-    if (character != null && character.firstMes.isNotEmpty) {
+    // 预插开场白三态（桌面 `if "greeting" in model_fields_set` 语义镜像）：
+    //   greeting 为 String 时以其值为准（空串 no-op；非空模板替换后预插）；
+    //   greeting 非 String（含 null）时回退角色 first_mes（既有语义）。
+    // 纯空白 truthy 走预插（与桌面 Python truthiness 一致，不 trim 判定）。
+    final greetingText =
+        (greeting is String) ? greeting : (character?.firstMes ?? '');
+    if (character != null && greetingText.isNotEmpty) {
       final userName = _resolveValue(
         fromSettings: await _settings.userName,
         fallback: _fallbackUserName,
       );
       final extraVars = await _settings.templateVars;
-      final greeting = applyTemplateVars(
-        character.firstMes,
+      final resolved = applyTemplateVars(
+        greetingText,
         userName: userName,
         charName: character.name,
         extraVars: extraVars,
@@ -167,7 +183,7 @@ class ConversationRepository {
             MessagesCompanion.insert(
               conversationId: conversation.id,
               role: Role.assistant,
-              content: greeting,
+              content: resolved,
               createdAt: greetingAt,
             ),
           );
