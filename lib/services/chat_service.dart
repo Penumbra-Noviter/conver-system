@@ -1512,6 +1512,19 @@ class ChatService {
       debugPrint('世界书注入失败，跳过: $e');
       world = const {};
     }
+    // NPD-01 叙述风格：开关缺省开（opt-out）。开关开启 → 读取 rules（仓储内
+    // 空回退默认常量）透传 buildMessages；开关关闭 → 不透传 rules（组装零注入
+    // 且不读 rules，验收 6）。设置读取失败 → 降级零注入不阻断主回复（对齐世界
+    // 书注入降级先例）。
+    String? narrativeStyle;
+    try {
+      if (await _settingsRepository.narrativeStyleEnabled) {
+        narrativeStyle = await _settingsRepository.narrativeStyleRules;
+      }
+    } catch (e) {
+      debugPrint('叙述风格读取失败，跳过: $e');
+      narrativeStyle = null;
+    }
     final built = buildMessages(
       charData,
       history: history.map(
@@ -1523,6 +1536,7 @@ class ChatService {
       appendCurrentInput: appendCurrentInput,
       extraVars: extraVars,
       world: world,
+      narrativeStyle: narrativeStyle,
     );
     final messages = [
       for (final m in built) LlmMessage(role: m.role, content: m.content),

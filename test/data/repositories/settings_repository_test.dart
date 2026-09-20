@@ -67,6 +67,8 @@ void main() {
           'embedding_model',
           'memory_palace_enabled',
           'memory_palace_every_rounds',
+          'narrative_style_enabled',
+          'narrative_style_rules',
         }),
       );
     });
@@ -730,6 +732,117 @@ void main() {
       await repository.setMany({
         'memory_palace_enabled_extra': 'true',
         'memory_palace': '1',
+      });
+      expect(await repository.getAll(), isEmpty);
+    });
+  });
+
+  group('NPD-01 叙述风格设置键（白名单 + 真值口径 + 回退）', () {
+    /// 桌面 `setting.py::NARRATIVE_STYLE_DEFAULT_RULES`（278~290 行）逐字
+    /// 迁移的期望值（独立来源：桌面文件 eval 值，含文末冲突从句）。
+    const expectedDefaultRules =
+        '叙述风格约束（降低 AI 生成痕迹）：\n'
+        '1. 禁止总结式收尾，不以感慨、升华或归纳结束回复。\n'
+        '2. 禁止「总之」「值得注意的是」「首先……其次……」等句式。\n'
+        '3. 只输出角色台词、动作与内心活动，不输出说明性正文。\n'
+        '4. 禁止括号外旁白与动机解释，想法只通过动作或内心呈现。\n'
+        '5. 禁止复读用户输入，不机械重复对方刚说过的话。\n'
+        '6. 禁止使用 emoji、markdown 标题或列表，行文以自然段落为主。\n'
+        '7. 禁止机械对称的一问一答与堆砌式小作文。\n'
+        '8. 保持人称与语气一致，与角色设定契合。\n'
+        '9. 不确定如何回应时，用短句与动作推进场景。\n'
+        '若与角色设定冲突，以角色设定为准。';
+
+    test('allowedKeys 含两键常量（锚：narrativeStyleEnabledKey / narrativeStyleRulesKey）', () {
+      expect(SettingsRepository.narrativeStyleEnabledKey, 'narrative_style_enabled');
+      expect(SettingsRepository.narrativeStyleRulesKey, 'narrative_style_rules');
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SettingsRepository.narrativeStyleEnabledKey),
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SettingsRepository.narrativeStyleRulesKey),
+      );
+    });
+
+    test('默认规则常量逐字对齐桌面（含文末冲突从句，验收 3）', () {
+      expect(SettingsRepository.narrativeStyleDefaultRules, expectedDefaultRules);
+      expect(
+        SettingsRepository.narrativeStyleDefaultRules,
+        endsWith('若与角色设定冲突，以角色设定为准。'),
+      );
+    });
+
+    test('可经 setMany/getValue 往返（白名单内可写，验收 1）', () async {
+      await repository.setMany({
+        SettingsRepository.narrativeStyleEnabledKey: '0',
+        SettingsRepository.narrativeStyleRulesKey: '自定义规则',
+      });
+      expect(
+        await repository.getValue(SettingsRepository.narrativeStyleEnabledKey),
+        '0',
+      );
+      expect(
+        await repository.getValue(SettingsRepository.narrativeStyleRulesKey),
+        '自定义规则',
+      );
+    });
+
+    test('narrativeStyleEnabled 缺省 true（无键视为开启，opt-out，验收 2）', () async {
+      expect(await repository.narrativeStyleEnabled, isTrue);
+    });
+
+    test('真值口径矩阵：\'0\' 关闭；\'1\'/\'true\'/\'yes\' 大小写不敏感 → true（验收 2）', () async {
+      await repository.setMany({SettingsRepository.narrativeStyleEnabledKey: '0'});
+      expect(await repository.narrativeStyleEnabled, isFalse, reason: "'0' 显式关闭");
+
+      for (final value in ['1', 'true', 'TRUE', 'True', 'yes', 'YES', 'Yes']) {
+        await repository.setMany({SettingsRepository.narrativeStyleEnabledKey: value});
+        expect(
+          await repository.narrativeStyleEnabled,
+          isTrue,
+          reason: "存储值 '$value' 应视为开启",
+        );
+      }
+    });
+
+    test('真值口径：白名单外值视为关闭；空串回退缺省 default（对齐桌面 get_value）', () async {
+      await repository.setMany({SettingsRepository.narrativeStyleEnabledKey: '2'});
+      expect(await repository.narrativeStyleEnabled, isFalse);
+
+      // 桌面 get_value(key, default="1")：空值行回退 default "1" → true。
+      // （镜像 getValue defaultValue 语义——本票 getter 以 '1' 为缺省。）
+      await repository.setMany({SettingsRepository.narrativeStyleEnabledKey: ''});
+      expect(await repository.narrativeStyleEnabled, isTrue);
+    });
+
+    test('narrativeStyleRules 非空返回原值（验收 3）', () async {
+      await repository.setMany({
+        SettingsRepository.narrativeStyleRulesKey: '我的自定义叙述规则',
+      });
+      expect(
+        await repository.narrativeStyleRules,
+        '我的自定义叙述规则',
+      );
+    });
+
+    test('narrativeStyleRules 空 / 缺省回退默认规则常量（验收 3）', () async {
+      expect(await repository.narrativeStyleRules, expectedDefaultRules);
+
+      await repository.setMany({SettingsRepository.narrativeStyleRulesKey: ''});
+      expect(await repository.narrativeStyleRules, expectedDefaultRules);
+    });
+
+    test('narrativeStyleRules 纯空白原样返回（桌面 or 语义：\'   \' 为 truthy）', () async {
+      await repository.setMany({SettingsRepository.narrativeStyleRulesKey: '   '});
+      expect(await repository.narrativeStyleRules, '   ');
+    });
+
+    test('白名单外 narrative 附近键名仍被忽略（既有语义不回归）', () async {
+      await repository.setMany({
+        'narrative_style_enabled_extra': 'true',
+        'narrative_style': '1',
       });
       expect(await repository.getAll(), isEmpty);
     });

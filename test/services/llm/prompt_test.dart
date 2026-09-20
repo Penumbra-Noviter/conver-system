@@ -801,4 +801,220 @@ void main() {
       expect(msgs[0], (role: 'system', content: '前置'));
     });
   });
+
+  // ── 11. 叙述风格注入（NPD-01：narrativeStyle 段 + 零注入 + 注入序）──
+
+  group('TestNarrativeStyleInjection', () {
+    test('narrativeStyle null / 空串 / 纯空白：输出与不传逐字节一致（验收 4 零回归）', () {
+      final char = _char(
+        systemPrompt: '系统提示',
+        scenario: '场景设定',
+        mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+        postHistoryInstructions: '历史指令',
+      );
+      final history = [
+        _msg(Role.user, '历史1'),
+        _msg(Role.assistant, '历史2'),
+      ];
+      final baseline = buildMessages(
+        char,
+        history: history,
+        userContent: '当前输入',
+        userName: '小明',
+        world: const {
+          'before_char': ['前置'],
+          'after_char': ['后置'],
+          'system': ['知识'],
+        },
+      );
+      // 不传 narrativeStyle（缺省 null）。
+      expect(
+        buildMessages(
+          char,
+          history: history,
+          userContent: '当前输入',
+          userName: '小明',
+          world: const {
+            'before_char': ['前置'],
+            'after_char': ['后置'],
+            'system': ['知识'],
+          },
+        ),
+        baseline,
+      );
+      // 显式 null / 空串 / 纯空白 / 空白字符段 → 均零注入。
+      for (final narrative in [null, '', '   ', '\n\t']) {
+        expect(
+          buildMessages(
+            char,
+            history: history,
+            userContent: '当前输入',
+            userName: '小明',
+            world: const {
+              'before_char': ['前置'],
+              'after_char': ['后置'],
+              'system': ['知识'],
+            },
+            narrativeStyle: narrative,
+          ),
+          baseline,
+          reason: 'narrativeStyle=${narrative ?? 'null'}(empty/whitespace) 应零注入',
+        );
+      }
+      expect(
+        baseline.where((m) => m.content.startsWith('[叙述风格]')),
+        isEmpty,
+      );
+    });
+
+    test('非空 → [叙述风格]\\n... system 段注入于 after_char 之后、[世界知识] 之前、'
+        'mes_example 之前（验收 5，修正后锚）', () {
+      final msgs = buildMessages(
+        _char(
+          systemPrompt: '系统提示',
+          scenario: '场景设定',
+          mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+          postHistoryInstructions: '历史指令',
+        ),
+        history: [
+          _msg(Role.user, '历史1'),
+          _msg(Role.assistant, '历史2'),
+        ],
+        userContent: '当前输入',
+        userName: '小明',
+        world: const {
+          'before_char': ['前置知识1'],
+          'after_char': ['后置知识'],
+          'system': ['知识A', '知识B'],
+        },
+        narrativeStyle: '禁止总结式收尾',
+      );
+      expect(
+        [for (final m in msgs) m.content],
+        [
+          '前置知识1', // before_char
+          '系统提示',
+          '[场景设定]\n场景设定',
+          '后置知识', // after_char
+          '[叙述风格]\n禁止总结式收尾', // narrative
+          '[世界知识]\n知识A\n\n知识B', // [世界知识]
+          '例问', // mes_example user
+          '例答', // mes_example assistant
+          '历史1',
+          '历史2',
+          '历史指令',
+          '当前输入',
+        ],
+      );
+      // 角色序列断言：[叙述风格] 为 system 段。
+      final narrativeIndex = msgs.indexWhere(
+        (m) => m.content.startsWith('[叙述风格]'),
+      );
+      final scenarioIndex = msgs.indexWhere(
+        (m) => m.content.startsWith('[场景设定]'),
+      );
+      final knowledgeIndex = msgs.indexWhere(
+        (m) => m.content.startsWith('[世界知识]'),
+      );
+      final userExampleIndex = msgs.indexWhere((m) => m.content == '例问');
+      expect(msgs[narrativeIndex].role, 'system');
+      expect(narrativeIndex, greaterThan(scenarioIndex));
+      expect(narrativeIndex, lessThan(knowledgeIndex));
+      expect(narrativeIndex, lessThan(userExampleIndex));
+    });
+
+    test('注入于 after_char 之后（修正锚：after_char 后、[世界知识] 前为高不确定点 1 修正）', () {
+      final msgs = buildMessages(
+        _char(systemPrompt: '系统', scenario: '场景'),
+        userContent: '你好',
+        world: const {
+          'after_char': ['后置知识'],
+        },
+        narrativeStyle: '自定义规则',
+      );
+      expect(
+        [for (final m in msgs) m.content],
+        ['系统', '[场景设定]\n场景', '后置知识', '[叙述风格]\n自定义规则', '你好'],
+      );
+    });
+
+    test('内容原样保留（不 trim，逐字对齐桌面 f-string；仅注入门控检查 strip）', () {
+      final msgs = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        narrativeStyle: '  自定义规则内容  ',
+      );
+      expect(
+        msgs.where((m) => m.content.startsWith('[叙述风格]')).single.content,
+        '[叙述风格]\n  自定义规则内容  ',
+      );
+    });
+
+    test('无世界书时：scenario 之后、mes_example 之前（场景锚）', () {
+      final msgs = buildMessages(
+        _char(
+          systemPrompt: '系统',
+          scenario: '场景',
+          mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+        ),
+        userContent: '当前输入',
+        narrativeStyle: '叙述规则',
+      );
+      expect(
+        [for (final m in msgs) m.content],
+        ['系统', '[场景设定]\n场景', '[叙述风格]\n叙述规则', '例问', '例答', '当前输入'],
+      );
+    });
+
+    test('expert 亦注入的移动端保证：buildMessages 无模式分流，narrativeStyle 注入'
+        '不依赖任何模式字段（组装层不分流，验收 6）', () {
+      // 移动端当前无 expert 概念（NPD-04 未来补齐）；按桌面 `_assemble`
+      // 语义，narrative 注入与 expert/simple 分流正交——本函数无分流分支，
+      // narrativeStyle 恒注入，结构性保证 expert 亦注入。
+      final simple = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        narrativeStyle: '规则',
+      );
+      expect(
+        simple.where((m) => m.content.startsWith('[叙述风格]')),
+        hasLength(1),
+      );
+      // 无 scenario / 无 world 的最简角色同样注入（不依赖结构化字段存在）。
+      final minimal = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        narrativeStyle: '规则',
+      );
+      expect(
+        minimal.where((m) => m.content.startsWith('[叙述风格]')),
+        hasLength(1),
+      );
+    });
+
+    test('重生成路径（appendCurrentInput=false）：narrative 段位置稳定，尾随剥离不受影响', () {
+      final msgs = buildMessages(
+        _char(
+          systemPrompt: '系统',
+          postHistoryInstructions: '保持人设',
+        ),
+        history: [
+          _msg(Role.user, '第一轮问'),
+          _msg(Role.assistant, '第一轮答'),
+          _msg(Role.user, '第二轮问'),
+        ],
+        userContent: '忽略',
+        appendCurrentInput: false,
+        narrativeStyle: '叙述规则',
+      );
+      // 注入段位于 system prompt 之后（2.7 位）、history 之前——头部结构不受
+      // 尾随剥离影响。
+      expect(
+        [for (final m in msgs) m.content],
+        ['系统', '[叙述风格]\n叙述规则', '第一轮问', '第一轮答', '第二轮问'],
+      );
+      expect(msgs.last, (role: 'user', content: '第二轮问'));
+      expect(msgs.last.role, isNot('system'));
+    });
+  });
 }

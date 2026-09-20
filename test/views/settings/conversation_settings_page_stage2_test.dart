@@ -98,7 +98,7 @@ void main() {
     Future<bool?> Function()? requestNotificationsPermission,
     FlutterLocalNotificationsScheduler? scheduler,
   }) async {
-    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     final page = ConversationSettingsPage(
@@ -466,6 +466,126 @@ void main() {
         '999',
         reason: '超上限 clamp 到上限',
       );
+    });
+  });
+
+  group('NPD-01 叙述风格（验收 7）', () {
+    testWidgets('加载回显：开关缺省开（默认 true）→ 开关 on；规则空 → 文本框空 + 默认常量 hint', (tester) async {
+      await pumpPage(tester);
+      expect(tester.takeException(), isNull);
+
+      expect(switchValue(tester, '启用叙述风格'), isTrue, reason: '默认开回显');
+      final textField = tester.widget<TextField>(
+        find.byKey(const ValueKey('narrative-rules')),
+      );
+      expect(textField.controller!.text, isEmpty, reason: '未配置规则 → 空回显');
+      expect(
+        textField.decoration?.hintText,
+        SettingsRepository.narrativeStyleDefaultRules,
+        reason: '空回显默认常量提示',
+      );
+    });
+
+    testWidgets('加载回显：enabled=false + 自定义 rules → 开关 off + 文本框回显自定义内容', (tester) async {
+      await repo.setMany({
+        SettingsRepository.narrativeStyleEnabledKey: '0',
+        SettingsRepository.narrativeStyleRulesKey: '我的叙述规则',
+      });
+      await pumpPage(tester);
+
+      expect(switchValue(tester, '启用叙述风格'), isFalse);
+      expect(
+        find.widgetWithText(TextField, '我的叙述规则'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('切换「启用叙述风格」→ 写 narrativeStyleEnabledKey 且重建回显一致', (tester) async {
+      await pumpPage(tester);
+      expect(switchValue(tester, '启用叙述风格'), isTrue, reason: '缺省开');
+
+      await tester.tap(find.widgetWithText(SwitchListTile, '启用叙述风格'));
+      await tester.pumpAndSettle();
+      expect(
+        await repo.getValue(SettingsRepository.narrativeStyleEnabledKey),
+        'false',
+      );
+      expect(switchValue(tester, '启用叙述风格'), isFalse);
+
+      await rebuildPage(tester);
+      expect(switchValue(tester, '启用叙述风格'), isFalse, reason: '重建回显关闭');
+    });
+
+    testWidgets('叙述风格开关写失败 → UI 回滚 + SnackBar「保存失败」', (tester) async {
+      final failing = SaveFailRepo(db);
+      repo = failing;
+      await pumpPage(tester);
+      expect(switchValue(tester, '启用叙述风格'), isTrue);
+
+      await tester.tap(find.widgetWithText(SwitchListTile, '启用叙述风格'));
+      await tester.pumpAndSettle();
+
+      expect(switchValue(tester, '启用叙述风格'), isTrue, reason: '写失败应回滚 UI');
+      expect(find.text('保存失败'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('保存写两键：规则 textarea 输入 + 保存 → enabled 与 rules 均落库', (tester) async {
+      await pumpPage(tester);
+
+      // 关闭开关（即时写入 enabled=false）+ 输入自定义规则 → 保存两键。
+      await tester.tap(find.widgetWithText(SwitchListTile, '启用叙述风格'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('narrative-rules')),
+        '禁止总结式收尾。',
+      );
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      expect(
+        await repo.getValue(SettingsRepository.narrativeStyleEnabledKey),
+        'false',
+        reason: '保存写 enabled 键',
+      );
+      expect(
+        await repo.getValue(SettingsRepository.narrativeStyleRulesKey),
+        '禁止总结式收尾。',
+        reason: '保存写 rules 键',
+      );
+    });
+
+    testWidgets('保存规则为空 → 写空 rules 键（读回回退默认常量）', (tester) async {
+      await repo.setMany({
+        SettingsRepository.narrativeStyleEnabledKey: '1',
+        SettingsRepository.narrativeStyleRulesKey: '旧规则',
+      });
+      await pumpPage(tester);
+      expect(
+        find.widgetWithText(TextField, '旧规则'),
+        findsOneWidget,
+      );
+
+      await tester.enterText(find.byKey(const ValueKey('narrative-rules')), '');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      expect(
+        await repo.narrativeStyleRules,
+        SettingsRepository.narrativeStyleDefaultRules,
+        reason: '空 rules 保存后读回回退默认常量（验收 3 在 UI 保存路径成立）',
+      );
+    });
+
+    testWidgets('保存失败 → SnackBar「保存失败」（沿既有 _save catch 先例）', (tester) async {
+      final failing = SaveFailRepo(db);
+      repo = failing;
+      await pumpPage(tester);
+
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(find.text('保存失败'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

@@ -149,6 +149,12 @@ List<PromptMessage> parseMesExample(
 /// 纯空白项均零注入——输出与改动前**逐字节一致**（零回归硬约束，验收 1）。
 /// 空注入项过滤不产生空 system 消息（验收 3，不污染上下文）。
 ///
+/// [narrativeStyle]（NPD-01）：叙述风格规则文本（桌面 `narrative_style`）。
+/// 空 / 纯空白零注入——输出与不传 narrativeStyle 逐字节一致（零回归硬约束，
+/// 验收 4）；非空时注入 `[叙述风格]\n...` system 段于 **after_char 之后、
+/// [世界知识] 之前**（对齐桌面 `_assemble` 步骤 2.7，expert/simple 皆注入，
+/// 因 after_char 不在 expert 替代范围）。
+///
 /// [history] 每项至少含 `role` 与 `content`（[HistoryMessage]）；role 经
 /// [_roleStr] 归一为纯字符串（[Role] 取 `.value`，纯字符串原样）。
 List<PromptMessage> buildMessages(
@@ -160,6 +166,7 @@ List<PromptMessage> buildMessages(
   bool appendCurrentInput = true,
   Map<String, String> extraVars = const {},
   Map<String, List<String>>? world,
+  String? narrativeStyle,
 }) {
   // 空角色名回退 'Character'。
   final charName = character.name.isEmpty ? 'Character' : character.name;
@@ -206,6 +213,14 @@ List<PromptMessage> buildMessages(
   // 2.5 after_char 注入块 — scenario 之后（无 scenario 时紧随 system prompt）。
   for (final content in afterChar) {
     messages.add((role: 'system', content: content));
+  }
+
+  // 2.7 [叙述风格] system 段 — after_char 之后、[世界知识] 之前（NPD-01）。
+  // 对齐桌面 `_assemble` 步骤 2.7：空/纯空白零注入（与不传 narrativeStyle
+  // 输出逐字节一致）；内容原样保留（桌面 f-string 不做 trim，仅门控检查
+  // strip）。expert/simple 皆注入（after_char 不在 expert 替代范围）。
+  if (narrativeStyle != null && narrativeStyle.trim().isNotEmpty) {
+    messages.add((role: 'system', content: '[叙述风格]\n$narrativeStyle'));
   }
 
   // 2.75 [世界知识] 合并单条 system — 多条以空行连接（调用方已按 (order, id)

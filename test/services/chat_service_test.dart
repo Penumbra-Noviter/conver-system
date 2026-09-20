@@ -880,13 +880,16 @@ void main() {
           .toList();
 
       final sent = provider.lastMessages!;
-      // 组装顺序：system(personality 回退) → scenario → mes_example → 历史 → PHI → user。
+      // 组装顺序：system(personality 回退) → scenario → [叙述风格]（默认开） →
+      // mes_example → 历史 → PHI → user。
       expect(sent[0],
           const LlmMessage(role: 'system', content: '艾莉亚的人设'));
       expect(sent[1],
           const LlmMessage(role: 'system', content: '[场景设定]\n艾莉亚的场景'));
-      expect(sent[2], const LlmMessage(role: 'user', content: '例问'));
-      expect(sent[3], const LlmMessage(role: 'assistant', content: '例答'));
+      expect(sent[2],
+          LlmMessage(role: 'system', content: '[叙述风格]\n${SettingsRepository.narrativeStyleDefaultRules}'));
+      expect(sent[3], const LlmMessage(role: 'user', content: '例问'));
+      expect(sent[4], const LlmMessage(role: 'assistant', content: '例答'));
       expect(sent[sent.length - 2],
           const LlmMessage(role: 'system', content: '艾莉亚的指令'));
       expect(sent.last, const LlmMessage(role: 'user', content: 'User你好'));
@@ -3401,7 +3404,9 @@ void main() {
       final scenarioIndex =
           sent.indexWhere((m) => m.content.startsWith('[场景设定]'));
       expect(scenarioIndex, isNot(-1));
-      expect(sent[scenarioIndex + 1].content, startsWith('[世界知识]'));
+      // NPD-01：叙述风格默认开 → scenario 后先注入 [叙述风格]，[世界知识] 紧随其后。
+      expect(sent[scenarioIndex + 1].content, startsWith('[叙述风格]'));
+      expect(sent[scenarioIndex + 2].content, startsWith('[世界知识]'));
       // [世界知识] 位于历史（开场白）之前。
       final greetingIndex =
           sent.indexWhere((m) => m.role == 'assistant' && m.content == '开场。');
@@ -3482,6 +3487,8 @@ void main() {
           const LlmMessage(role: 'system', content: '[场景设定]\n场景'));
       expect(sent[3], const LlmMessage(role: 'system', content: '后置知识'));
       expect(sent[4],
+          LlmMessage(role: 'system', content: '[叙述风格]\n${SettingsRepository.narrativeStyleDefaultRules}'));
+      expect(sent[5],
           const LlmMessage(role: 'system', content: '[世界知识]\n世界知识'));
     });
 
@@ -3639,6 +3646,151 @@ void main() {
           const LlmMessage(role: 'system', content: '指令'));
     });
   });
+
+  // ── 叙述风格注入链（NPD-01：设置读取 → 透传 → 零注入）──
+
+  group('叙述风格注入链（NPD-01）', () {
+    test('验收5：缺省开启 + 规则空 → 注入默认规则常量段，位置 scenario 后 / mes_example 前', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+        mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '你好');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: '再来').toList();
+
+      final sent = provider.lastMessages!;
+      final narrative = sent
+          .where((m) => m.content.startsWith('[叙述风格]'))
+          .toList();
+      expect(narrative, hasLength(1));
+      expect(
+        narrative.single.content,
+        '[叙述风格]\n${SettingsRepository.narrativeStyleDefaultRules}',
+      );
+      // 位置：scenario 之后、mes_example 之前。
+      final scenarioIndex =
+          sent.indexWhere((m) => m.content.startsWith('[场景设定]'));
+      final narrativeIndex = sent.indexWhere(
+        (m) => m.content.startsWith('[叙述风格]'),
+      );
+      final userExampleIndex = sent.indexWhere((m) => m.content == '例问');
+      expect(scenarioIndex, isNot(-1));
+      expect(narrativeIndex, greaterThan(scenarioIndex));
+      expect(narrativeIndex, lessThan(userExampleIndex));
+    });
+
+    test('验收5：自定义 rules 透传注入（DB 非空返回原值）', () async {
+      await settingsRepo.setMany({
+        SettingsRepository.narrativeStyleRulesKey: '自定义叙述规则',
+      });
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '你好');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: '再来').toList();
+
+      final sent = provider.lastMessages!;
+      expect(
+        sent.where((m) => m.content.startsWith('[叙述风格]')).single.content,
+        '[叙述风格]\n自定义叙述规则',
+      );
+    });
+
+    test('验收6：开关关闭（enabled=false）→ 组装零注入且不读 rules', () async {
+      await settingsRepo.setMany({
+        SettingsRepository.narrativeStyleEnabledKey: '0',
+        SettingsRepository.narrativeStyleRulesKey: '不应被读取的规则',
+      });
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '你好');
+
+      // 计数仓储替身：验证关闭路径不触碰 rules getter（验收 6「不读 rules」）。
+      final probing = _NarrativeProbeRepo(db, secretStore);
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: probing,
+        providerFactory: _FakeFactory(provider),
+      );
+      await service.streamReply(conversationId: conv.id, content: '再来').toList();
+
+      final sent = provider.lastMessages!;
+      expect(
+        sent.where((m) => m.content.startsWith('[叙述风格]')),
+        isEmpty,
+        reason: '开关关闭 → 组装零注入',
+      );
+      expect(probing.narrativeRulesReadCount, 0, reason: '开关关闭 → 不读 rules');
+      expect(await roleContentsOf(conv.id), contains((Role.assistant, '回复')));
+    });
+
+    test('验收5：regenerate 共用同一条腿（_assembleMessages）→ 重生成路径亦注入', () async {
+      final char = await seedCharacter(
+        firstMes: '开场。',
+        personality: '人设',
+        scenario: '场景',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '问题');
+      final oldAssistant = await sendAssistantMessage(conv.id, '旧答');
+
+      final provider = FakeLLMProvider(tokens: const ['新答']);
+      wireService(provider);
+      await service.regenerate(
+        conversationId: conv.id,
+        messageId: oldAssistant.id,
+      );
+
+      final sent = provider.lastMessages!;
+      expect(
+        sent.where((m) => m.content.startsWith('[叙述风格]')),
+        hasLength(1),
+        reason: 'regenerate 同吃叙述风格注入',
+      );
+      expect(await swipeContentsOf(oldAssistant.id), ['旧答', '新答']);
+    });
+
+    test('设置读取失败 → 降级零注入，不阻断主回复（沿世界书降级先例）', () async {
+      final char = await seedCharacter(firstMes: '开场。', personality: '人设');
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '你好');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: _ThrowingNarrativeSettingsRepo(db, secretStore),
+        providerFactory: _FakeFactory(provider),
+      );
+      await service.streamReply(conversationId: conv.id, content: '再来').toList();
+
+      final sent = provider.lastMessages!;
+      expect(sent.where((m) => m.content.startsWith('[叙述风格]')), isEmpty);
+      expect(await roleContentsOf(conv.id), contains((Role.assistant, '回复')));
+    });
+  });
 }
 
 class _UnknownDomainError extends DomainError {
@@ -3654,4 +3806,29 @@ class _ThrowingLorebookRepo extends LorebookRepository {
   Future<List<LorebookEntry>> listEntries(int characterId) async {
     throw StateError('db down');
   }
+}
+
+/// 计数 `narrativeStyleRules` 读取次数的仓储替身（NPD-01 验收 6：开关关闭
+/// 时组装链不得读取 rules；超类行为不变，仅叠加计数）。
+class _NarrativeProbeRepo extends SettingsRepository {
+  _NarrativeProbeRepo(AppDatabase db, InMemorySecretStore secretStore)
+      : super(database: db, secretStore: secretStore);
+
+  int narrativeRulesReadCount = 0;
+
+  @override
+  Future<String> get narrativeStyleRules async {
+    narrativeRulesReadCount++;
+    return super.narrativeStyleRules;
+  }
+}
+
+/// 叙述风格设置读取抛错的仓储替身（NPD-01：设置读取失败降级路径——主回复
+/// 必须仍可用、叙述风格零注入，沿世界书降级先例）。
+class _ThrowingNarrativeSettingsRepo extends SettingsRepository {
+  _ThrowingNarrativeSettingsRepo(AppDatabase db, InMemorySecretStore secretStore)
+      : super(database: db, secretStore: secretStore);
+
+  @override
+  Future<bool> get narrativeStyleEnabled async => throw StateError('db down');
 }
