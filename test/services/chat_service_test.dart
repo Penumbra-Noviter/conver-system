@@ -3379,6 +3379,73 @@ void main() {
     });
   });
 
+  // ── switchSwipe（F-140 契约补位：归属校验进服务层，与 deleteMessage 同构）──
+
+  group('switchSwipe（F-140 契约补位）', () {
+    test('成功切换 → content/activeSwipeIndex 覆写为选中候选，返回后切换 Message',
+        () async {
+      final (_, conv, _, asst1, _, _) = await seedFourMessageConversation();
+      await messageRepo.addSwipe(asst1.id, '候选一', makeActive: true);
+      await messageRepo.addSwipe(asst1.id, '候选二', makeActive: true);
+      wireService(FakeLLMProvider(tokens: const []));
+
+      final switched = await service.switchSwipe(
+          conversationId: conv.id, messageId: asst1.id, index: 1);
+
+      expect(switched.id, asst1.id, reason: '服务层返回切换后的该 Message');
+      expect(switched.content, '候选一',
+          reason: 'content 已被仓库层覆写为选中候选');
+      expect(switched.activeSwipeIndex, 1, reason: 'active index 同步为选中候选');
+      final row =
+          (await messagesOf(conv.id)).firstWhere((m) => m.id == asst1.id);
+      expect(row.content, '候选一', reason: 'DB 行 content 同步覆写');
+      expect(row.activeSwipeIndex, 1, reason: 'DB 行 active index 同步');
+      // 对拍 MessageRepository.listSwipes：候选集内容原样保留（仅 active 移动）。
+      expect(await swipeContentsOf(asst1.id), ['第一轮答', '候选一', '候选二'],
+          reason: '候选集 index 升序内容不变');
+    });
+
+    test('Falsify: 不存在 / 跨对话 → MessageNotFoundError 且零副作用', () async {
+      final (_, conv, _, _, _, _) = await seedFourMessageConversation();
+      final otherChar = await seedCharacter();
+      final otherConv = await seedConversation(otherChar.id);
+      final otherMsg = await sendUserMessage(otherConv.id, '他对话消息');
+      wireService(FakeLLMProvider(tokens: const []));
+      final before = await roleContentsOf(conv.id);
+
+      await expectLater(
+        service.switchSwipe(
+            conversationId: conv.id, messageId: 999999, index: 0),
+        throwsA(isA<MessageNotFoundError>()),
+      );
+      await expectLater(
+        // 跨对话归属校验拒绝（他对话 id 视为不存在）。
+        service.switchSwipe(
+            conversationId: conv.id, messageId: otherMsg.id, index: 0),
+        throwsA(isA<MessageNotFoundError>()),
+      );
+      expect(await roleContentsOf(conv.id), before, reason: '校验失败零副作用');
+    });
+
+    test('越界 index → SwipeIndexOutOfRangeError 由仓库层原样上抛，active 不变',
+        () async {
+      final (_, conv, _, asst1, _, _) = await seedFourMessageConversation();
+      await messageRepo.addSwipe(asst1.id, '候选一', makeActive: true);
+      await messageRepo.addSwipe(asst1.id, '候选二', makeActive: true);
+      wireService(FakeLLMProvider(tokens: const []));
+
+      await expectLater(
+        service.switchSwipe(
+            conversationId: conv.id, messageId: asst1.id, index: 99),
+        throwsA(isA<SwipeIndexOutOfRangeError>()),
+      );
+      final row =
+          (await messagesOf(conv.id)).firstWhere((m) => m.id == asst1.id);
+      expect(row.content, '候选二', reason: '失败不切换 active');
+      expect(row.activeSwipeIndex, 2, reason: '失败后 active index 保持');
+    });
+  });
+
   // ── 世界书注入链（WL-03：扫描→激活→注入；重生成同吃；滑窗与 depth 解耦）──
 
   group('世界书注入链（WL-03）', () {

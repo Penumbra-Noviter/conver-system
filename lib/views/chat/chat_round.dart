@@ -45,7 +45,6 @@ import '../../data/database/app_database.dart' show Message;
 import '../../data/database/tables.dart' show Role;
 import '../../data/repositories/message_repository.dart';
 import '../../services/chat_service.dart';
-import '../../services/llm/errors.dart' show MessageNotFoundError;
 import '../../services/notice_runner.dart';
 
 /// 聊天回合状态机（一条消息回合的发送 / 停止 / 重生成 / 断流提示生命周期）。
@@ -450,12 +449,11 @@ class ChatRound {
     _notify();
   }
 
-  /// 切换 [messageId] 的激活候选（MS-02 入口，UI 挂点留 05 票）：合法切换后
+  /// 切换 [messageId] 的激活候选（MS-02 入口，UI 挂点留 05 票）：委托
+  /// [ChatService.switchSwipe]（归属校验与 [deleteMessage] 同构——目标不存在 /
+  /// 跨对话 → 领域错误；越界 [index] 由仓库层原样上抛），合法切换后
   /// `messages.content` 覆写为选中候选、active index 更新（仓库不变量），随后
-  /// reload 列表反映新 active 内容。归属校验（目标须属于 [conversationId]）
-  /// 在本层前置（服务层 `ChatService.switchSwipe` 未实现——跨票契约缺口，
-  /// 本层以 [MessageRepository.messageById] 补防御；越界 / 不存在 → notice
-  /// 单源映射）。
+  /// reload 列表反映新 active 内容。越界 / 不存在 → notice 单源映射。
   ///
   /// 守卫：流式中 / 重生成中 / 终态重载窗口 / 其它瞬时变更进行中 → 忽略
   /// （防连点与跨操作互踩）。
@@ -471,17 +469,13 @@ class ChatRound {
     _notify();
     await _noticeRunner.guard<Message>(
       op: () async {
-        // 归属校验（服务层契约缺口的本层防御；不存在/跨对话 → 领域错误）。
-        final target = await _messageRepository.messageById(
-          conversationId,
-          messageId,
+        final switched = await _chatService.switchSwipe(
+          conversationId: conversationId,
+          messageId: messageId,
+          index: index,
         );
-        if (target == null) {
-          throw MessageNotFoundError();
-        }
-        await _messageRepository.switchSwipe(messageId, index);
         await _reloadMessages();
-        return target;
+        return switched;
       },
       onError: (e) => _descriptiveError(e),
     );

@@ -56,6 +56,11 @@
 /// ProactivePlans.messageId setNull 由 FK 承保（SR-28 消费者级断言锁定）。
 /// 目标归属校验：不存在 / 跨对话 → [MessageNotFoundError] 零副作用。
 ///
+/// ## 候选切换（MS-01，switchSwipe，F-140 契约补位）
+/// 归属校验与 [deleteMessage] 同构（不存在 / 跨对话 → [MessageNotFoundError]）；
+/// 越界 [index] 由仓库层原样上抛 [SwipeIndexOutOfRangeError]（服务层零捕获、
+/// 零重映射）。成功返回切换后的 [Message]（content 已被覆写为选中候选）。
+///
 /// ## 断流（A5）
 /// 流终止未到终态（连接异常 / 未收终态帧）→ 已累积部分落库 + 非阻塞
 /// [ChatInterrupted]「回复已中断」。R3 seam 契约：wire 层（T02）把**连接建立
@@ -1452,6 +1457,33 @@ class ChatService {
     }
     await _messageRepository.deleteMessage(messageId);
     return 1;
+  }
+
+  /// 切换 [conversationId] 内 [messageId] 的激活候选（F-140，契约表 §4.8 实现
+  /// 补位；对齐 `message.py::switch_swipe`）。
+  ///
+  /// 归属校验与 [deleteMessage] 同构：[messageId] 必须属于 [conversationId]
+  /// 且存在，否则 [MessageNotFoundError]（**跨对话同 id 视为不存在**——与删除
+  /// 语义同一来源，不外泄他对话行）；越界 [index] 由仓库层
+  /// [MessageRepository.switchSwipe] 原样上抛 [SwipeIndexOutOfRangeError]——
+  /// 服务层零捕获、零重映射（仓库抛什么就是什么）。校验失败零副作用。
+  ///
+  /// 成功返回切换后的 [Message]：`messages.content` 已被仓库层覆写为选中候选、
+  /// `active_swipe_index` 已更新（契约表 `→ Message`）。
+  Future<Message> switchSwipe({
+    required int conversationId,
+    required int messageId,
+    required int index,
+  }) async {
+    // 目标解析（归属校验：不存在 / 跨对话 → MessageNotFoundError）。
+    final target = await _messageRepository.messageById(
+      conversationId,
+      messageId,
+    );
+    if (target == null) {
+      throw MessageNotFoundError();
+    }
+    return _messageRepository.switchSwipe(messageId, index);
   }
 
   /// 解析续写目标并校验（对齐桌面 `_resolve_continue_target`：目标 = 末条消息
