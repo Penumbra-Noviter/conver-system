@@ -107,121 +107,22 @@
 | F113F120-03 | F-114/115 安全截断单源：truncateUtf16 防劈代理对 + maxSnapshotLength 常量收敛两处接入 | 2026-09-17 | 84fcdac |
 | F113F120-04 | F-120 装配闭包收敛：app.dart _resolveLlm 抽共享（两处 reflector 同构段单点） | 2026-09-17 | 84fcdac |
 
-### 技术债消费批次 F-121 空态入口（2026-09-17 收口）
-
-> 来源：handoff-techdebt-f109-evolution-done-2026-09-17 交接指令（Worth exploring 折回首选候选）。单票直行（F121-01 `688a406`，主会话直接实施，无子代理分发）。门禁：全量 **2210 测**绿（基线 2208 → +2 空态/边界态用例）/ analyze 0 / 覆盖率 controller 100%（58/58）+ view 97.75%（174/178，新增行全覆）/ pre-commit 池检查通过。**设计要点**：EmptyState 组件保持 TP-4 全局定案不动（操作入口由调用方提供），`_AddEntryButton`（FilledButton.tonalIcon）复用既有 `_showAddDialog` 新增链；边界态（entries 空、revisions 非空）同步补入口。全量首跑 1 失败（characters_view_stage2 publish 驱动用例瞬时 flaky，单文件复跑 + 全量重跑均绿，与本批零关联——grep 证测试文件无 memory_management 引用）→ 立 F-122 Weak 观察。详见 DEV_LOG〈技术债消费批次 F-121 空态入口〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| F121-01 | F-121 记忆管理页空态「新增记忆」入口（空态/边界态按钮 + 全链路复测） | 2026-09-17 | 688a406 |
-
-### 技术债消费批次 F-109 演化入口补全（2026-09-17 收口）
-
-> 来源：handoff-stage3-vector-recall-a8-local-2026-09-17 交接指令（project-kickoff 全自动档）。3 工单串行 lane（01→02→03 同 Implement，merge `9b642d8`）。门禁：全量 **2208 测**绿（基线 2185 → +23）/ analyze 0 / 波末增量审核 0 阻断（W-1/W-2 落债 F-113/114）/ 期末四轴 **通过**（0 Critical；7 条 Weak 落债 F-115~121）。F-110~112 一并复核关闭（证据见 TECH_DEBT 处置记录）。详见 DEV_LOG〈技术债消费批次 F-109 演化入口补全〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| F109-01 | 演化服务 reflector 签名改造 E1（CharacterScopedReflector）+ SR-22 快照长度 clamp | 2026-09-17 | 2d580ca（merge 9b642d8） |
-| F109-02 | 装配腿 Provider<PersonaEvolutionService>（F1）+ 装配冒烟七实例断言 | 2026-09-17 | a532e93（merge 9b642d8） |
-| F109-03 | 确认闸门 UI：controller 三操作 + 记忆页 AppBar/tile 双形态 + 角色页注入入口 | 2026-09-17 | 4ef0977（merge 9b642d8） |
-
-### 人机恋阶段 3 — 远端 embedding 向量检索（2026-09-17 收口）
-
-> 来源：用户「阶段 3 人机恋深化」+ kickoff 全流程（Grilling 共识 + threat-model SR-16~21 + 9 票 4 波）。门禁：全量 **2183 测**绿（基线 2001 → +182）/ analyze 0 / 期末四轴 **通过**（波 1/2/3 子代理审核 + 波 3/4 主会话自审收敛；0 Critical）。零新依赖（dio 5.11.0 / drift 2.34.3 / flutter_secure_storage 11.0.0 / crypto 3.0.7 沿用）。运作故障期处置：3 票首派平台故障空返回 + 审核 2 次空返回 → 降压串行重派 + 主会话接管半成品收口（VR-07/VR-09）。详见 DEV_LOG〈人机恋阶段 3 批次 — 远端 embedding 向量检索〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| VR-01 | embedding 设置装配腿（白名单+槽链+https 校验，SR-16/19/20） | 2026-09-17 | 2a1fa88（审核修复 1b1469c） |
-| VR-02 | EmbeddingClient seam + OpenAI 兼容直连 + 响应硬校验（SR-17） | 2026-09-17 | 36e55c2 |
-| VR-03 | 余弦相似度 + 并查集聚类纯函数 | 2026-09-17 | daeec73 |
-| VR-04 | EmbeddingEntries/SemanticHits 两新表 + schemaVersion 4→5 迁移（SR-21） | 2026-09-17 | c67309e |
-| VR-05 | MemoryRepository 向量/队列 CRUD（float32 codec + 级联标脏） | 2026-09-17 | 281b0f8 |
-| VR-06 | EmbeddingService 编排深模块（懒补嵌≤20/检索 top5@0.5/聚类@0.75）+ 装配 lazy:false | 2026-09-17 | d97526f |
-| VR-07 | `<search:>` 混合检索 + SemanticHits 延迟一轮注入（≤3 后消费；主会话接管收口） | 2026-09-17 | 6461604 |
-| VR-08 | 人设演化聚类摘要注入（PersonaReflector 可选 similarClusters + buildClusteredReflector） | 2026-09-17 | 0f01f67 |
-| VR-09 | 设置页 embedding 配置 UI + 测试连接 + 外发告知（SR-19；主会话接管收口） | 2026-09-17 | 3d3aa16 |
-
-### 技术债消费批次 F-106~F-108（2026-09-17 收口）
-
-> 来源：handoff-techdebt-f104f105-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波 + 批次收尾（01/02 文件零交集串行 lane）。门禁：全量 **2001 测**绿（基线 2000 → +1 排序锚用例）/ analyze 0 / 期末四轴 **通过**（0 Critical，候选区清零无新落债）。**F-106 根因实证**：`listCharacters` 仅 `ORDER BY updated_at DESC` 无二级排序键 + drift 秒级存储 + 连续创建同值 → 同值行返回序不确定 → `_resolveSelectedCharacterId` 取 `_characters.first.id` 偶发非 seed 首个；修复 = `id ASC` 二级排序键（生产 1 文件，上批已拍板突破生产零 diff），同刻注入单测钉序。F-107 `pumpUntil` 单源收敛 `test/helpers/pump_until.dart`（窗口统一 300）+ why 现象式。F-108 纠偏口径文档收敛 DEV_LOG 指针 + 补注 `git log -S` 搜索串。详见 DEV_LOG〈技术债消费批次 techdebt-f106f108〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| F106F108-01 | F-106 listCharacters 二级排序键（同 updated_at 按 id 升序稳定）+ 同刻注入单测 | 2026-09-17 | a537f71（merge 9200f49） |
-| F106F108-02 | F-107 pumpUntil 单源收敛 test/helpers/pump_until.dart + why 现象式 | 2026-09-17 | a399b9f（merge 9200f49） |
-
-### 技术债消费批次 F-104~F-105（2026-09-17 收口）
-
-> 来源：handoff-techdebt-f101f103-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（01 复现定位 + 健壮性修复 / 02 表述收窄，生产零 diff）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **通过**（0 Critical）。**票面归因实证推翻**：F-104 复现循环（10 遍全量 2 次失败）指向 `chat_entry_test`「默认选中首角色」竞态（Expected 1/Actual 2），票面目标 `characters_view_stage2` 15 遍零失败——01 票按 fallback 语义收口（pumpStage2 显式断言 + 5 处 publish 前置等待），chat_entry 竞态另立 **F-106**（Strong，用户拍板下批消费）。F-105 四处「从未存在于仓库」失实表述统一为「从未存在于代码 reason（文档/注释引述除外）」口径。非阻断落债 F-107/F-108。详见 DEV_LOG〈技术债消费批次 techdebt-f104f105〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| F104F105-01 | characters_view_stage2 等待逻辑健壮性（复现先红 + pumpUntil 同构修复，F-104） | 2026-09-17 | a5e79b7（merge ffb05c7） |
-| F104F105-02 | F-105 表述收窄（4 处「从未存在于仓库」失实表述统一为代码 reason 口径） | 2026-09-17 | 77fb9a1（merge ffb05c7） |
-
-### 技术债消费批次 F-101~F-103（2026-09-17 收口）
-
-> 来源：handoff-techdebt-f98f100-done-2026-09-17 交接指令（project-kickoff 全自动档）。2 工单并批 1 波串行 lane（同 commit 自洽，纯测试生产零 diff）。门禁：全量 **2000 测**绿 / analyze 0 / 期末四轴 **0 阻断**（F-103 复核关闭，候选区清零无新落债）。票面纠偏：F-101 票面「修正 reason 文本」修正对象不存在（「若锁失效并行交错则为 1」从未存在于**代码 reason**（文档/注释引述除外）；`git log -S` 实证引据与 `git show 76f7da8` 原文详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉），B′ 双 gate 中间态断言突变实验实锤。详见 DEV_LOG〈技术债消费批次 techdebt-f101f103〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| F101F103-01 | 反序 gate 用例双 gate 中间态断言独立钉锁（F-101） | 2026-09-17 | 8fd29fe（merge 61c9ca3） |
-| F101F103-02 | 告警 seam 用例正常分支独立插件实例（F-102） | 2026-09-17 | 3d2b8b1（merge 61c9ca3） |
-
-### 技术债消费批次 F-98~F-100（2026-09-17 收口）
-
-> 来源：handoff-techdebt-f91f97-done-2026-09-17 交接指令（project-kickoff 全自动档）。3 工单并批 1 波串行 lane（同 commit 自洽，02 票改动核心模块按标准档机制）。门禁：全量 **2000 测**绿（基线 1996 → +4）/ analyze 0 / 期末四轴 **0 阻断**（R-S1 dart format 已修 / R-S2 文档同步本批次收口；非阻断落债 F-101~103）。详见 DEV_LOG〈技术债消费批次 techdebt-f98f100〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| F98F100-01 | 通知初始化锁反序交错 gate 用例补强（F-98） | 2026-09-17 | 76f7da8（merge 49a1b12） |
-| F98F100-02 | initialize 返回值失败语义消费 + docstring 契约补注（F-99） | 2026-09-17 | 562e968（merge e9bfc10） |
-| F98F100-03 | 告警 seam 用例独立插件去顺序敏感（F-100） | 2026-09-17 | e378f78（merge 6f67160） |
-
-### 技术债消费批次 F-91~F-97（2026-09-17 收口）
-
-> 来源：handoff-techdebt-f78f90-done-2026-09-17 交接指令（project-kickoff 全自动档）。6 工单合入：FD-01 `8508af1`（+ 波末 merge 手工合取）/ FD-02 `c2e6f0f` / FD-03 `5762ec7`（W1 merge `2778ad9`）/ FD-04 `22672d1` / FD-06 `43efb82`（W2 首批 merge）/ FD-05 `25eef77`（W2 收口）+ 期末修复 R-S1/R-S2 `b0c3650`。门禁：全量 **1996 测**绿（基线 1987 → +9）/ analyze 0 / 期末四轴 **0 阻断**（R-F1/R-F2/I-F4 落债 F-98~100）。详见 DEV_LOG〈技术债消费批次 techdebt-f91f97〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| FD-01 | 通知热态回调状态机盲区收口 + 告警 seam（F-92+F-97） | 2026-09-17 | 8508af1 |
-| FD-02 | 活跃窗口常量单源（F-91） | 2026-09-17 | c2e6f0f |
-| FD-03 | 测试 fixture 双份去重（F-93） | 2026-09-17 | 5762ec7 |
-| FD-04 | 构造死参数清理（F-94） | 2026-09-17 | 22672d1 |
-| FD-05 | messages.created_at 索引 + 迁移同步（F-95） | 2026-09-17 | 25eef77 |
-| FD-06 | RelationshipThresholds 构造自洽校验（F-96） | 2026-09-17 | 43efb82 |
-
-### 技术债消费批次 F-78/F-79/F-80/F-81/F-82/F-90（2026-09-17 收口）
-
-> 来源：handoff-techdebt-f84f88-done-2026-09-16 交接指令（project-kickoff 全自动档）。5 工单 2 波：W1 FDBT-01‖02‖03‖04（并行）+ W2 FDBT-05（Blocked by FDBT-04）。交付：F-78 迁移注释纠偏 + F-79 中断残留自愈用例 / F-80 后台反思写失败回滚测试 / F-90 通知热态回调契约防御（含波末审核修复：并发置位 OR + 零告警断言 + 注释归因纠偏）/ F-81 活跃时间查询单源 latestMessageAt / F-82 confirm 档位下限 clamp（先红后绿）。F-89 复核关闭。门禁：全量 **1987 测**绿（基线 1974 → +13）/ analyze 0 / 期末四轴 **0 阻断**（非阻断落债 F-91~97）。详见 DEV_LOG〈技术债消费批次 techdebt-f78f90〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| FDBT-01 | 迁移注释纠偏 + 中断残留重开自愈用例（F-78+F-79） | 2026-09-17 | bbefa33（merge 4686036） |
-| FDBT-02 | 后台反思写失败回滚 UI 契约（F-80） | 2026-09-17 | ae4ea54（merge 9a7f55c） |
-| FDBT-03 | 通知热态回调装配顺序契约防御（F-90）+ 波末审核修复 | 2026-09-17 | 6deba8e（merge 8cfe865）+ ec72f17 |
-| FDBT-04 | 活跃时间查询单源 latestMessageAt（F-81）+ 证伪增强 | 2026-09-17 | 25fbbc6（merge d1c3cbf）+ ec72f17 |
-| FDBT-05 | confirm 档位下限 clamp 消除中间态（F-82） | 2026-09-17 | fbc12ed（merge 收口） |
-
-### 技术债消费批次 F-84/F-85/F-88 + F-83 并批（2026-09-16 收口）
-
-> 来源：handoff-mobile-smoke-verified-2026-09-16 交接指令（project-kickoff 全自动档）。6 工单 4 波：W1 01‖02 / W2 03 / W3 04‖05 / W4 06。交付：F-88 送达收口放宽（scheduled∪expired）/ F-85 深链 id 正值域 / F-84 通知 seam 扩展（热态回调透传 + 权限请求 + schedule bool 契约）/ F-84 热态深链接线 + SnackBar 兜底 / F-84 权限请求挂点 / F-83 restore per-plan 降级。门禁：全量 **1974 测**绿（基线 1948 → +26）/ analyze 0 / 期末四轴 **0 阻断**（F-89/F-90 落债 Speculative）。详见 DEV_LOG〈技术债消费批次 F-84/F-85/F-88 + F-83〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| F-84-01 | F-88 送达收口放宽（scheduled ∪ expired） | 2026-09-16 | 38059d8（merge 4b51bd1） |
-| F-85-02 | F-85 深链 id 正值域校验 | 2026-09-16 | 262f693（merge 17ec1de） |
-| F-84-03 | F-84 通知 seam 扩展（热态回调 + 权限 + bool 契约） | 2026-09-16 | 3d1f3c1（merge 87b4088） |
-| F-84-04 | F-84 热态深链接线 + SnackBar 兜底（app.dart 装配） | 2026-09-16 | 83c53be（merge dccb603） |
-| F-84-05 | F-84 权限请求（开关启用时） | 2026-09-16 | 5b52e73（merge 8802d7f） |
-| F-83-06 | F-83 restore expired 分支 per-plan 降级 | 2026-09-16 | d56a7c1（merge 971d453） |
-
 ## 历史归档索引
 
 > 更早批次折叠为单行（归档细节由 git 历史承担：`git log -p -- TICKETS.md`）。
 
 | 批次 | 日期 | 工单/提交 | 一句话摘要 |
-|------|------|-----------|------------|
+|------|-----------|------------|------------|
+| F-121 | 2026-09-17 | F121-01（688a406） | 记忆管理页空态/边界态「新增记忆」入口；2210 测 |
+| F-109 | 2026-09-17 | F109-01~03（merge 9b642d8） | 演化闭环入口（E1 签名 / F1 装配腿 / 确认闸门 UI）；2208 测 |
+| 人机恋阶段 3 | 2026-09-17 | VR-01~09 | 远端 embedding 向量检索（语义召回 + 聚类演化注入）；2183 测 |
+| F-106~F-108 | 2026-09-17 | F106F108-01/02（merge 9200f49） | listCharacters 二级排序键 + pumpUntil 单源 + 口径收敛；2001 测 |
+| F-104~F-105 | 2026-09-17 | F104F105-01/02（merge ffb05c7） | characters_view_stage2 等待健壮性 + 表述收窄；2000 测 |
+| F-101~F-103 | 2026-09-17 | F101F103-01/02（merge 61c9ca3） | 反序 gate 双 gate 钉锁 + 告警 seam 独立插件；2000 测 |
+| F-98~F-100 | 2026-09-17 | F98F100-01~03 | gate 补强 + 失败语义消费 + 独立插件；2000 测 |
+| F-91~F-97 | 2026-09-17 | FD-01~06 + b0c3650 | 通知锁串行 + 单源收敛 + 迁移索引 + 校验链；1996 测 |
+| F-78/F-79/F-80/F-81/F-82/F-90 | 2026-09-17 | FDBT-01~05 | 数据层/设置/伴侣域六债收口；1987 测 |
+| F-84/F-85/F-88+F-83 | 2026-09-16 | F-84-01~05/F-85-02/F-83-06 | 通知域收口（送达放宽/深链/热态/seam 扩展）；1974 测 |
 | 人机恋阶段 2 | 2026-09-15 | PS2-01~10 + W3 返修 | 主动消息循环 / 关系状态机 / 内心独白；threat-model SR-01~15 P0 全落地 |
 | 人机恋阶段 1.5 | 2026-09-15 | AC-06（收口提交） | 后台反思提取（ReflectionService + ChatService 挂点 + settings 开关 + 设置页 UI）；1740 测 |
 | 人机恋阶段 1 MVP | 2026-09-15 | AC-01~05（收口提交） | 记忆 + 抗 OOC + 人设演化；schemaVersion 1→2；1725 测 |

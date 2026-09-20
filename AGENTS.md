@@ -35,7 +35,7 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 - `flutter test`（纯 Dart 单测 + 无头 widget 测试），覆盖率目标 ≥ 90%
 - 业务逻辑（chat/llm/数据层/导入链/生成校验）占比最大且是纯 Dart → 可靠性主要由单测兜底；平台薄层做真机/模拟器验证
 
-## 当前状态（2026-09-20）
+## 当前状态（2026-09-21）
 
 - ✅ 设计已落盘：`docs/mobile-design.md`（单一事实来源）+ `docs/mobile-adaptation-research.md`（决策背景）；决策集 Q0~Q14 已拍板，ADR-0002 见桌面库 `desktop/CONSENSUS.md`
 - ✅ 工具链就绪（D:\Desktop\tools\Cache：JDK17/Gradle8.9/SDK35+36+37/AEHD + Flutter 3.47.2；AVD medium_phone 数据已迁至 F:\tools\android\avd，2026-09-04；MCP 插件 preflight 全绿）
@@ -76,6 +76,6 @@ iOS 需 macOS + Xcode（Windows 开发机不可行，走 CI/借 Mac）。
 
 ## 文档体系
 
-标准档：CLAUDE（本文件）/ [PROJECT_REFERENCE.md](PROJECT_REFERENCE.md)（项目事实）/ [TICKETS.md](TICKETS.md)（唯一待办来源）/ [DEV_LOG.md](DEV_LOG.md)（已做）/ [CONSENSUS.md](CONSENSUS.md)（决策）/ [CONTEXT.md](CONTEXT.md)（领域词汇）。规则见 [docs/documentation-standards.md](docs/documentation-standards.md)。
+标准档：AGENTS（本文件）/ [PROJECT_REFERENCE.md](PROJECT_REFERENCE.md)（项目事实）/ [TICKETS.md](TICKETS.md)（唯一待办来源）/ [DEV_LOG.md](DEV_LOG.md)（已做）/ [CONSENSUS.md](CONSENSUS.md)（决策）/ [CONTEXT.md](CONTEXT.md)（领域词汇）。规则见 [docs/documentation-standards.md](docs/documentation-standards.md)。
 
 **档位制**：模块数 ≥ 8 且文档 > 1 页时自动升完整档（新增 CODE_WIKI.md + `scripts/doc_sync.py` 机械防漂移 + F-01 pre-commit 门），对标桌面库。
