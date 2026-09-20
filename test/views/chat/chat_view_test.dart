@@ -21,6 +21,8 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:conver_system_mobile/data/database/app_database.dart'
     show Conversation, ConversationsCompanion, Message;
@@ -1721,6 +1723,234 @@ void main() {
       final row = await env.conversationRepository.getConversation(conv.id);
       expect(row?.topP, isNull, reason: '取消不落库');
       expect(c.notice, isNull);
+      await env.close();
+    });
+  });
+
+  group('BR-02 消息级分支 + 快照导入导出（工单 19）', () {
+    /// 种子 [user, assistant, user, assistant] 源会话；返回会话 + 消息 id。
+    Future<(int, List<int>)> seedBranchSource(ChatTestEnv env) async {
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final ids = <int>[
+        (await env.seedMessage(
+                conversationId: conv.id, role: Role.user, content: '你好'))
+            .id,
+        (await env.seedMessage(
+                conversationId: conv.id,
+                role: Role.assistant,
+                content: '旧回复'))
+            .id,
+        (await env.seedMessage(
+                conversationId: conv.id, role: Role.user, content: '第二问'))
+            .id,
+        (await env.seedMessage(
+                conversationId: conv.id,
+                role: Role.assistant,
+                content: '第二答'))
+            .id,
+      ];
+      return (conv.id, ids);
+    }
+
+    testWidgets('消息菜单「分支」可达：user 与 assistant 均有「分支」项（验收 1）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, ids) = await seedBranchSource(env);
+      final c = env.controllerOf(
+        FakeLLMProvider(tokens: const []),
+        branchService: env.branchServiceOf(),
+      );
+      await c.loadEntry();
+      await c.openConversation(convId);
+      await pumpChat(tester, c);
+
+      // user 消息菜单：编辑 + 删除 + 分支（编辑仅 user 有）。
+      await tester.tap(find.byKey(Key('message-actions-${ids[0]}')));
+      await tester.pumpAndSettle();
+      expect(find.text('分支'), findsOneWidget, reason: 'user 消息菜单含「分支」');
+      expect(find.text('编辑'), findsOneWidget, reason: 'user 菜单仍有「编辑」');
+      expect(find.text('删除'), findsOneWidget, reason: 'user 菜单仍有「删除」');
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      // assistant 消息菜单：删除 + 分支（非末条无「继续生成」）。
+      await tester.tap(find.byKey(Key('message-actions-${ids[1]}')));
+      await tester.pumpAndSettle();
+      expect(find.text('分支'), findsOneWidget, reason: 'assistant 消息菜单含「分支」');
+      expect(find.text('继续生成'), findsNothing,
+          reason: '非末条 assistant 无「继续生成」');
+      expect(find.text('删除'), findsOneWidget);
+      await env.close();
+    });
+
+    testWidgets('点「分支」→ 直达新会话 + 消息序列 = 源截断含锚 + 源零改动（验收 1）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, ids) = await seedBranchSource(env);
+      final c = env.controllerOf(
+        FakeLLMProvider(tokens: const []),
+        branchService: env.branchServiceOf(),
+      );
+      await c.loadEntry();
+      await c.openConversation(convId);
+      await pumpChat(tester, c);
+
+      // 锚 = 第一条 assistant 回复（含触发它的 user + 该回复；其后消息截断）。
+      await tester.tap(find.byKey(Key('message-actions-${ids[1]}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('分支'));
+      await tester.pump();
+      await pumpUntil(tester, () => c.activeConversationId != convId,
+          why: '分支完成直达新会话');
+
+      expect(c.isEntry, isFalse, reason: '停留在对话面板');
+      expect(
+        [for (final m in c.messages) (m.role, m.content)],
+        [(Role.user, '你好'), (Role.assistant, '旧回复')],
+        reason: '新会话消息序列 = 源截断到锚（含锚）',
+      );
+      final branchRow =
+          await env.conversationRepository.getConversation(c.activeConversationId!);
+      expect(branchRow!.parentConversationId, convId, reason: '父引用指向源');
+      final sourceAfter = await env.messageRepository.getMessages(convId);
+      expect(
+        [for (final m in sourceAfter) m.content],
+        ['你好', '旧回复', '第二问', '第二答'],
+        reason: '源会话零改动（消息数/内容不变）',
+      );
+      await env.close();
+    });
+
+    testWidgets('顶栏菜单含「导出分支快照」「导入分支快照」入口（验收 4/5）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, _) = await seedBranchSource(env);
+      final c = env.controllerOf(
+        FakeLLMProvider(tokens: const []),
+        branchService: env.branchServiceOf(),
+        exportFileExchange: ConversationExportFileExchange(),
+      );
+      await c.loadEntry();
+      await c.openConversation(convId);
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('导出分支快照'), findsOneWidget, reason: '快照导出入口');
+      expect(find.text('导入分支快照'), findsOneWidget, reason: '快照导入入口');
+      expect(find.text('导出 JSON'), findsOneWidget, reason: '既有导出项并存');
+      await env.close();
+    });
+
+    testWidgets('点「导出分支快照」→ seam 收到 {title}-branch.json + notice（验收 4）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      await env.conversationRepository.updateConversation(
+        conv.id,
+        const ConversationsCompanion(title: Value('雪夜分叉')),
+      );
+      final seam = _FakeExportFileExchange(
+        message: '已导出 雪夜分叉-branch.json（分享面板已打开）',
+      );
+      final c = env.controllerOf(
+        FakeLLMProvider(tokens: const []),
+        branchService: env.branchServiceOf(),
+        exportFileExchange: seam,
+      );
+      await c.loadEntry();
+      await c.openConversation(conv.id);
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('导出分支快照'));
+      await tester.pumpAndSettle();
+
+      expect(seam.calls, hasLength(1), reason: 'seam 恰好被调用一次');
+      expect(seam.lastFileName, '雪夜分叉-branch.json',
+          reason: '文件名 = {净化标题}-branch.json');
+      expect(find.text('已导出 雪夜分叉-branch.json（分享面板已打开）'), findsOneWidget,
+          reason: '非阻塞 notice 展示 seam 文案');
+      expect(c.exporting, isFalse, reason: '完成后复位');
+      await env.close();
+    });
+
+    testWidgets('点「导入分支快照」→ 合法文件 → 克隆会话并直达（验收 5）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, _) = await seedBranchSource(env);
+      final branch = env.branchServiceOf();
+      final snapshot = await branch.buildBranchSnapshot(convId);
+      final bytes = Uint8List.fromList(
+        utf8.encode(jsonEncode(snapshot.toJson())),
+      );
+      final seam = ConversationExportFileExchange(
+        pickJsonBytes: () async => bytes,
+        platformTimeout: const Duration(seconds: 5),
+      );
+      final c = env.controllerOf(
+        FakeLLMProvider(tokens: const []),
+        branchService: branch,
+        exportFileExchange: seam,
+      );
+      await c.loadEntry();
+      await c.openConversation(convId);
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('导入分支快照'));
+      await tester.pump();
+      await pumpUntil(tester, () => c.activeConversationId != convId,
+          why: '导入完成直达克隆会话');
+
+      expect(c.isEntry, isFalse);
+      expect(
+        [for (final m in c.messages) (m.role, m.content)],
+        [
+          (Role.user, '你好'),
+          (Role.assistant, '旧回复'),
+          (Role.user, '第二问'),
+          (Role.assistant, '第二答'),
+        ],
+        reason: '克隆会话消息序列与快照一致（世界书/swipes 重建）',
+      );
+      expect(tester.takeException(), isNull, reason: '导入过程无未处理异常');
+      await env.close();
+    });
+
+    testWidgets('导入未知版本 → notice「快照版本不支持」+ 停留原会话（验收 5/6）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final (convId, _) = await seedBranchSource(env);
+      final bad = Uint8List.fromList(utf8.encode('{"version": 99}'));
+      final seam = ConversationExportFileExchange(
+        pickJsonBytes: () async => bad,
+        platformTimeout: const Duration(seconds: 5),
+      );
+      final c = env.controllerOf(
+        FakeLLMProvider(tokens: const []),
+        branchService: env.branchServiceOf(),
+        exportFileExchange: seam,
+      );
+      await c.loadEntry();
+      await c.openConversation(convId);
+      await pumpChat(tester, c);
+
+      await tester.tap(find.byTooltip('导出对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('导入分支快照'));
+      await tester.pump();
+      await pumpUntil(tester, () => c.notice != null, why: 'SR-30 拒绝 notice 上达');
+
+      expect(find.text('快照版本不支持'), findsOneWidget,
+          reason: 'SR-30 未知版本拒绝文案呈现于 NoticeBanner');
+      expect(c.activeConversationId, convId, reason: '导入失败停留原会话');
+      expect(tester.takeException(), isNull, reason: '不崩溃');
       await env.close();
     });
   });

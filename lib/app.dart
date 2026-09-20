@@ -12,6 +12,7 @@ import 'data/repositories/lorebook_repository.dart';
 import 'data/repositories/memory_repository.dart';
 import 'data/repositories/message_repository.dart';
 import 'data/repositories/settings_repository.dart';
+import 'services/branch/branch_service.dart';
 import 'services/chat_service.dart';
 import 'services/character_file_exchange.dart';
 import 'services/companion/proactive_deep_link.dart';
@@ -500,6 +501,18 @@ class ConverApp extends StatelessWidget {
         Provider<ConversationExportFileExchange>(
           create: (_) => ConversationExportFileExchange(),
         ),
+        // BR-01/BR-02 分支装配（18 票 D6 遗留接线）：BranchService 消费四仓储
+        // + 数据库（快照重建事务落库面），供消息菜单「分支」与快照导入导出
+        // 编排。置于 ChatController 之前（provider 嵌套读外层）。
+        Provider<BranchService>(
+          create: (context) => BranchService(
+            database: context.read<AppDatabase>(),
+            conversationRepository: context.read<ConversationRepository>(),
+            characterRepository: context.read<CharacterRepository>(),
+            messageRepository: context.read<MessageRepository>(),
+            lorebookRepository: context.read<LorebookRepository>(),
+          ),
+        ),
         ChangeNotifierProvider<ChatController>(
           create: (context) => ChatController(
             chatService: context.read<ChatService>(),
@@ -508,6 +521,7 @@ class ConverApp extends StatelessWidget {
             messageRepository: context.read<MessageRepository>(),
             exportService: context.read<ConversationExportService>(),
             exportFileExchange: context.read<ConversationExportFileExchange>(),
+            branchService: context.read<BranchService>(),
           ),
         ),
         ChangeNotifierProvider<ThemeController>(

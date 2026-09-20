@@ -8,12 +8,20 @@
 ///   （不区分格式分支，full-path 一致）；文件名净化由服务层完成，
 ///   本 seam 原样透传 [ConversationExportResult.fileName]。
 ///
-/// 平台防御（spec A6 / M3 先例契约）：取临时目录 / 分享每个平台调用点
-/// `.timeout(platformTimeout)`——Flutter 平台通道挂起**不抛错**，须超时
+/// BR-02 快照导入扩展：构造注入 [PickJsonBytes]（缺省 file_picker 选单个
+/// `.json`），[importSnapshot] 选文件 → [parseBranchSnapshotBytes] 解析校验
+/// （SR-30：未知版本 / 结构畸形拒绝，错误类型供控制器映射文案）。
+///
+/// 平台防御（spec A6 / M3 先例契约）：取临时目录 / 分享 / pick 每个平台调用
+/// 点 `.timeout(platformTimeout)`——Flutter 平台通道挂起**不抛错**，须超时
 /// 兜底不挂死；超时降级抛 [StateError]（文案锚 M3「获取临时目录超时」/
 /// 「分享面板超时」），控制器转非阻塞 notice。
 library;
 
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'branch/branch_snapshot.dart';
 import 'conversation_export_service.dart';
 import 'platform_file_exchange.dart';
 
@@ -26,17 +34,21 @@ import 'platform_file_exchange.dart';
 /// 临时目录 / fake 分享回调断言调用链与文件内容；「挂起不抛错」fake
 /// 断言超时降级为 [StateError]。
 class ConversationExportFileExchange {
-  /// [resolveTempDirectory] 缺省 path_provider `getTemporaryDirectory`；
-  /// [shareFile] 缺省 share_plus 分享面板；[platformTimeout] 全部平台
-  /// 调用点的超时兜底（缺省 3s）。
+  /// [pickJsonBytes] 缺省 file_picker 选单个 `.json` 读字节（BR-02 快照
+  /// 导入；用户取消 → null）；[resolveTempDirectory] 缺省 path_provider
+  /// `getTemporaryDirectory`；[shareFile] 缺省 share_plus 分享面板；
+  /// [platformTimeout] 全部平台调用点的超时兜底（缺省 3s）。
   ConversationExportFileExchange({
+    PickJsonBytes? pickJsonBytes,
     ResolveTempDirectory? resolveTempDirectory,
     ShareFile? shareFile,
     this.platformTimeout = const Duration(seconds: 3),
-  })  : _resolveTempDirectory =
+  })  : _pickJsonBytes = pickJsonBytes ?? defaultPickJsonFile,
+        _resolveTempDirectory =
             resolveTempDirectory ?? defaultResolveTempDirectory,
         _shareFile = shareFile ?? defaultShareViaPlus;
 
+  final PickJsonBytes _pickJsonBytes;
   final ResolveTempDirectory _resolveTempDirectory;
   final ShareFile _shareFile;
 
@@ -56,4 +68,44 @@ class ConversationExportFileExchange {
       platformTimeout: platformTimeout,
     );
   }
+
+  /// 快照导入：系统文件选择器选单个 `.json` 并解析为 [BranchSnapshot]。
+  ///
+  /// 用户取消 / pick 挂起超时降级 → 返回 `null`（零副作用，不弹错误）；文件
+  /// 内容非 UTF-8 / 非 JSON / 字段结构非法 → [InvalidBranchSnapshotError]
+  /// （控制器映射「快照格式无效」）；version 缺失 / 未知 →
+  /// [BranchSnapshotUnsupportedVersionError]（映射「快照版本不支持」，
+  /// SR-30）——解析细节不泄露给调用方文案。
+  Future<BranchSnapshot?> importSnapshot() async {
+    final bytes = await pickJsonWithTimeout(
+      pickJsonBytes: _pickJsonBytes,
+      platformTimeout: platformTimeout,
+    );
+    if (bytes == null) {
+      return null;
+    }
+    return parseBranchSnapshotBytes(bytes);
+  }
+}
+
+/// 分支快照文件字节（UTF-8 `.json`）→ [BranchSnapshot]。
+///
+/// 字节层格式错误（非 UTF-8 / 非 JSON）归入 [InvalidBranchSnapshotError]；
+/// version 缺失 / 未知 → [BranchSnapshotUnsupportedVersionError]；字段结构
+/// 校验失败 → [InvalidBranchSnapshotError]（均由 [BranchSnapshot.fromJson]
+/// 抛出，本函数只把字节层格式错误折叠进结构非法一类——SR-30 双错误分类）。
+BranchSnapshot parseBranchSnapshotBytes(Uint8List bytes) {
+  final String text;
+  try {
+    text = utf8.decode(bytes, allowMalformed: false);
+  } on FormatException {
+    throw InvalidBranchSnapshotError('快照文件不是合法的 UTF-8 文本');
+  }
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(text);
+  } on FormatException {
+    throw InvalidBranchSnapshotError('快照文件不是合法的 JSON');
+  }
+  return BranchSnapshot.fromJson(decoded);
 }
