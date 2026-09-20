@@ -1468,7 +1468,7 @@ class ChatService {
   }
 
   /// 组装发送给 LLM 的消息列表（角色字段 → CharacterData + 滑窗 + 历史 +
-  /// 世界书注入 + 叙述风格 + 预设对话快照）。
+  /// 世界书注入 + 叙述风格 + 预设对话快照 + 专家模式分流）。
   ///
   /// [historyBeforeId] 非空（重生成路径）时历史只取 `id < historyBeforeId`
   /// 的消息——桌面「先 delete_messages_from 截断、后组装」在**延迟删除**下以
@@ -1479,6 +1479,10 @@ class ChatService {
   /// NPD-02 预设对话：本方法为**唯一组装点**（streamReply / regenerate 共用），
   /// 读会话快照 `conv.presetDialogue` 透传 buildMessages——快照非空 → 注入；
   /// 快照空/会话无快照 → 不透传（buildMessages 零注入，验收 6）。
+  ///
+  /// NPD-04 专家模式：角色 [Character.promptMode] / [Character.expertPrompt]
+  /// 原样透传 CharacterData → buildMessages（expert + 非空 → 单条 expert
+  /// prompt 替代 system/scenario/PHI；expert + 空 → 回退 simple）。
   Future<List<LlmMessage>> _assembleMessages({
     required Conversation conv,
     required Character character,
@@ -1496,6 +1500,10 @@ class ChatService {
       scenario: character.scenario,
       mesExample: character.mesExample,
       postHistoryInstructions: character.postHistoryInstructions,
+      // NPD-04：专家模式两字段透传 buildMessages（expert + 非空 → 单条
+      // expert prompt 替代 system/scenario/PHI；expert + 空 → 回退 simple）。
+      promptMode: character.promptMode,
+      expertPrompt: character.expertPrompt,
     );
     final history = historyBeforeId == null
         ? await _messageRepository.getMessages(conv.id)

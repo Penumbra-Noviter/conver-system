@@ -38,6 +38,8 @@ Character _character({
   List<Map<String, String>> presetDialogues = const [],
   String? avatar,
   double temperature = 0.7,
+  String promptMode = 'simple',
+  String expertPrompt = '',
 }) {
   return Character(
     id: 1,
@@ -58,6 +60,8 @@ Character _character({
     presetDialogues: presetDialogues,
     avatar: avatar,
     temperature: temperature,
+    promptMode: promptMode,
+    expertPrompt: expertPrompt,
     createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
     updatedAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
   );
@@ -111,6 +115,8 @@ void _expectRoundtripEqual(Character char, CharacterDraft result) {
   expect(result.avatar, char.avatar);
   expect(result.temperature, char.temperature);
   expect(result.presetDialogues, char.presetDialogues);
+  expect(result.promptMode, char.promptMode);
+  expect(result.expertPrompt, char.expertPrompt);
   for (final entry in char.extensions.entries) {
     expect(result.extensions[entry.key], entry.value);
   }
@@ -778,6 +784,102 @@ void main() {
       expect(companion.presetDialogues.value, [
         {'name': '寒暄', 'content': '你好。'},
       ]);
+    });
+  });
+
+  group('十一、专家模式 promptMode / expertPrompt 往返（NPD-04，桌面 PD-5 契约移植）', () {
+    test('非默认值写入 conver_system 命名空间（prompt_mode:expert + 非空 '
+        'expert_prompt）且不落 data 顶层（验收 6）', () {
+      final card = toV2Card(
+        _character(promptMode: 'expert', expertPrompt: '你是{{char}}，专家整段提示。'),
+      );
+      final data = card['data']! as Map<String, dynamic>;
+      final ns =
+          (data['extensions']! as Map<String, dynamic>)['conver_system']!
+              as Map<String, dynamic>;
+      expect(data.containsKey('prompt_mode'), isFalse, reason: '不落 data 顶层');
+      expect(data.containsKey('expert_prompt'), isFalse);
+      expect(ns['prompt_mode'], 'expert');
+      expect(ns['expert_prompt'], '你是{{char}}，专家整段提示。');
+    });
+
+    test('默认值（simple / 空 prompt）不写命名空间（验收 6）', () {
+      final ns =
+          ((toV2Card(_character())['data']!
+                      as Map<String, dynamic>)['extensions']!
+                  as Map<String, dynamic>)['conver_system']!
+              as Map<String, dynamic>;
+      expect(ns.containsKey('prompt_mode'), isFalse);
+      expect(ns.containsKey('expert_prompt'), isFalse);
+    });
+
+    test('expert + 空 prompt：mode 保真、空 prompt 不落卡（验收 6）', () {
+      final card = toV2Card(_character(promptMode: 'expert', expertPrompt: ''));
+      final ns =
+          ((card['data']! as Map<String, dynamic>)['extensions']!
+                  as Map<String, dynamic>)['conver_system']!
+              as Map<String, dynamic>;
+      expect(ns['prompt_mode'], 'expert', reason: 'mode 保真');
+      expect(ns.containsKey('expert_prompt'), isFalse, reason: '空 prompt 不落卡');
+    });
+
+    test('fromV2Card 从命名空间读回 prompt_mode / expert_prompt（含 None 回退）', () {
+      final result = fromV2Card(
+        _v2Card({
+          'extensions': {
+            'conver_system': {
+              'prompt_mode': 'expert',
+              'expert_prompt': '你是{{char}}，整段。',
+            },
+          },
+        }),
+      );
+      expect(result.promptMode, 'expert');
+      expect(result.expertPrompt, '你是{{char}}，整段。');
+      // 无命名空间字段 → 回退默认（simple / ''）。
+      final plain = fromV2Card(_v2Card());
+      expect(plain.promptMode, 'simple');
+      expect(plain.expertPrompt, '');
+    });
+
+    test('脏数据：prompt_mode / expert_prompt 非 str（int）→ str() 化（桌面 '
+        '`str(... or ...)` falsy 语义）', () {
+      final result = fromV2Card(
+        _v2Card({
+          'extensions': {
+            'conver_system': {'prompt_mode': 123, 'expert_prompt': 456},
+          },
+        }),
+      );
+      expect(result.promptMode, '123');
+      expect(result.expertPrompt, '456');
+    });
+
+    test('expert 态导出→导入往返保真（验收 6）', () {
+      final result = _roundtrip(
+        _character(promptMode: 'expert', expertPrompt: '你是{{char}}，专家整段提示。'),
+      );
+      expect(result.promptMode, 'expert');
+      expect(result.expertPrompt, '你是{{char}}，专家整段提示。');
+    });
+
+    test('simple 默认态往返保真（导入回读默认值）', () {
+      final result = _roundtrip(_character());
+      expect(result.promptMode, 'simple');
+      expect(result.expertPrompt, '');
+    });
+
+    test('draft.toCompanion 落库装配映射 promptMode / expertPrompt 列（NPD-04）', () {
+      final result = fromV2Card(
+        _v2Card({
+          'extensions': {
+            'conver_system': {'prompt_mode': 'expert', 'expert_prompt': '整段'},
+          },
+        }),
+      );
+      final companion = result.toCompanion();
+      expect(companion.promptMode.value, 'expert');
+      expect(companion.expertPrompt.value, '整段');
     });
   });
 }

@@ -1,7 +1,8 @@
-/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=8，
+/// G0.2c 冒烟测试 — drift schema 与桌面 ORM 逐字段对齐（schemaVersion=9，
 /// 13 表：4 基础表 + 记忆两表 + 阶段 2 三表 + 阶段 3 两表 + MS-01 候选表 +
 /// WL-01 世界书条目表 + NPD-02 characters.preset_dialogues /
-/// conversations.preset_dialogue 两列）。
+/// conversations.preset_dialogue 两列 + NPD-04 characters.prompt_mode /
+/// characters.expert_prompt 两列）。
 ///
 /// 全部在内存执行器（`AppDatabase(NativeDatabase.memory())`）上运行，
 /// 经构造注入 seam 打开真实 schema，不依赖设备、无 repositories。
@@ -26,8 +27,8 @@ void main() {
     await db.close();
   });
 
-  test('schemaVersion 冻结为 8', () {
-    expect(db.schemaVersion, 8);
+  test('schemaVersion 冻结为 9', () {
+    expect(db.schemaVersion, 9);
   });
 
   test('内存执行器打开成功，12 表可定位', () async {
@@ -509,5 +510,48 @@ void main() {
         );
     final stored = await db.select(db.conversations).getSingle();
     expect(stored.presetDialogue, '<START>\n{{user}}: 你好\n{{char}}: 欢迎');
+  });
+
+  test(
+    'characters.prompt_mode / expert_prompt 缺省 simple / ""（NPD-04 列契约）',
+    () async {
+      final now = DateTime.now();
+      final character = await db
+          .into(db.characters)
+          .insertReturning(
+            CharactersCompanion.insert(
+              name: '专家角色',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      expect(character.promptMode, 'simple', reason: '缺省 simple');
+      expect(character.expertPrompt, '', reason: '缺省空串');
+    },
+  );
+
+  test('characters.prompt_mode / expert_prompt 写读往返（NPD-04 列契约）', () async {
+    final now = DateTime.now();
+    final character = await db
+        .into(db.characters)
+        .insertReturning(
+          CharactersCompanion.insert(
+            name: '专家角色',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+    await (db.update(
+      db.characters,
+    )..where((t) => t.id.equals(character.id))).write(
+      CharactersCompanion(
+        promptMode: const Value('expert'),
+        expertPrompt: const Value('你是{{char}}，整段专家提示词。{{user}}'),
+      ),
+    );
+    final stored = await db.select(db.characters).getSingle();
+    expect(stored.promptMode, 'expert');
+    expect(stored.expertPrompt, '你是{{char}}，整段专家提示词。{{user}}');
   });
 }

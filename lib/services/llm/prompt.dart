@@ -24,6 +24,11 @@ typedef PromptMessage = ({String role, String content});
 /// - [scenario]: 场景设定（组装为 `[场景设定]\n...` 的 system 消息）
 /// - [mesExample]: 对话范例（few-shot，`<START>` 分隔多轮）
 /// - [postHistoryInstructions]: 历史后指令（历史之后、当前输入之前）
+/// - [promptMode]: 组装模式（`simple`=结构化组装；`expert`=整段
+///   [expertPrompt] 替代 system_prompt/personality、scenario、
+///   post_history_instructions 三处——桌面 PD-5，NPD-04）
+/// - [expertPrompt]: 专家模式整段 system prompt（仅 `promptMode == 'expert'`
+///   且非空时生效）
 class CharacterData {
   /// [name] 必填，其余字段默认空串（与桌面 dataclass 默认对齐）。
   const CharacterData({
@@ -33,6 +38,8 @@ class CharacterData {
     this.scenario = '',
     this.mesExample = '',
     this.postHistoryInstructions = '',
+    this.promptMode = 'simple',
+    this.expertPrompt = '',
   });
 
   final String name;
@@ -41,6 +48,12 @@ class CharacterData {
   final String scenario;
   final String mesExample;
   final String postHistoryInstructions;
+
+  /// 组装模式（`simple`/`expert`，缺省 `simple`）。
+  final String promptMode;
+
+  /// 专家模式整段 system prompt（缺省空串；仅 expert 且非空时生效）。
+  final String expertPrompt;
 }
 
 /// 历史消息条目 — 按桌面 `prompt.py::build_messages` 的历史项契约，每项至少
@@ -125,11 +138,12 @@ List<PromptMessage> parseMesExample(
 /// 组装发送给 LLM 的消息列表（纯函数，无 DB 依赖）。
 ///
 /// 对齐桌面 `prompt.py::build_messages` 的组装顺序（WL-03 起含世界书注入，
-/// NPD-02 起含预设对话注入）：
+/// NPD-02 起含预设对话注入，NPD-04 起含专家模式分流）：
 /// 0. world["before_char"] 注入块（逐条 system，最高优先级——system 首条之前；
 ///    移动端无 before_char 概念，对齐桌面 `_assemble` 步骤 0）
-/// 1. system prompt（[CharacterData.systemPrompt] 优先，否则 personality）
-/// 2. scenario（作为 `[场景设定]\n...` 的 system 消息）
+/// 1. system prompt（[CharacterData.systemPrompt] 优先，否则 personality）；
+///    expert 模式以 [CharacterData.expertPrompt] 单条替代 1/2/5 三处结构化注入
+/// 2. scenario（作为 `[场景设定]\n...` 的 system 消息）；expert 模式不产出
 /// 2.5 world["after_char"] 注入块（scenario 之后）
 /// 2.75 world["system"] 合并单条 `[世界知识]`（多条以空行连接、按给定序——
 ///    调用方 [LorebookEngine.buildWorldInjection] 已按 (order, id) 升序）
@@ -137,14 +151,22 @@ List<PromptMessage> parseMesExample(
 /// 3.5 presetDialogue（非空时）经 parseMesExample 注入 user/assistant few-shot
 /// 4. 历史消息（正序，滑窗截断：超过 `maxRounds * 2` 条取最后 `maxRounds * 2`
 ///    条；默认 `maxRounds = 30` → 窗口 60 条）
-/// 5. post_history_instructions（system 消息）
+/// 5. post_history_instructions（system 消息；expert 模式跳过）
 /// 6. 当前 user 输入（[appendCurrentInput] 为 true 时）
+///
+/// [promptMode] / [expertPrompt]（NPD-04，桌面 PD-5 逐字）：expert 且
+/// expertPrompt 非空 → system 段仅一条 `applyTemplateVars(expertPrompt)`，
+/// 无 scenario / PHI 独立 system；expert 且空 / 纯空白 → 回退 simple 结构化
+/// 组装（安全兜底，不产出空 system）；非 expert 值一律走 simple。expert 分流
+/// 只替代角色静态字段：before/after/world 世界书注入、[叙述风格]、mes_example、
+/// 预设对话、history、user 全部照旧（注入段与模式分流正交）。
 ///
 /// [appendCurrentInput] 为 false（重生成路径）的契约：
 /// 不追加当前 user 输入；末条恢复为历史末条 user（待回复触发源）；因无 user
 /// 末尾兜底而残留的尾随 PHI system 一并剥离（循环剥除末尾所有 system），
 /// 保证末端无 system、触发 user 在列表中仅出现一次。世界书注入块全部位于
-/// 头部（history 之前），尾随剥离不受影响。
+/// 头部（history 之前），尾随剥离不受影响。expert 模式无 PHI（步骤 5 跳过），
+/// 剥离天然安全。
 ///
 /// [world]（WL-03）：世界书注入块 `{before_char/after_char/system: [内容]}`，
 /// 内容为引擎层做过模板变量替换的纯字符串；null / 空 map / 空列表 / 空或
@@ -195,29 +217,52 @@ List<PromptMessage> buildMessages(
     messages.add((role: 'system', content: content));
   }
 
-  // 1. system prompt（优先 system_prompt 字段，其次 personality）。
-  final systemContent = character.systemPrompt.isNotEmpty
-      ? character.systemPrompt
-      : character.personality;
-  messages.add((
-    role: 'system',
-    content: applyTemplateVars(
-      systemContent,
-      userName: userName,
-      charName: charName,
-      extraVars: extraVars,
-    ),
-  ));
+  // NPD-04 专家模式分流：expert 且 expertPrompt strip 后非空 → 以单条
+  // expertPrompt（模板变量替换后）替代 1/2/5 三处结构化注入（system_prompt/
+  // personality、scenario、post_history_instructions）——对齐桌面 `_assemble`
+  // (character.prompt_mode == "expert" and bool(expert_prompt.strip())) 逐字；
+  // expert + 空/纯空白 → 回退 simple 结构化组装（安全兜底，不产出空 system）。
+  final expert =
+      character.promptMode == 'expert' &&
+      character.expertPrompt.trim().isNotEmpty;
 
-  // 2. 场景设定 — 附加在 system prompt 后，作为补充上下文。
-  if (character.scenario.isNotEmpty) {
-    final scenario = applyTemplateVars(
-      character.scenario,
-      userName: userName,
-      charName: charName,
-      extraVars: extraVars,
-    );
-    messages.add((role: 'system', content: '[场景设定]\n$scenario'));
+  // 1. system prompt 区 — expert：单条替代；simple：system_prompt 优先，否则
+  //    personality，scenario 作为补充 system 追加。
+  if (expert) {
+    messages.add((
+      role: 'system',
+      content: applyTemplateVars(
+        character.expertPrompt,
+        userName: userName,
+        charName: charName,
+        extraVars: extraVars,
+      ),
+    ));
+  } else {
+    // 1. system prompt（优先 system_prompt 字段，其次 personality）。
+    final systemContent = character.systemPrompt.isNotEmpty
+        ? character.systemPrompt
+        : character.personality;
+    messages.add((
+      role: 'system',
+      content: applyTemplateVars(
+        systemContent,
+        userName: userName,
+        charName: charName,
+        extraVars: extraVars,
+      ),
+    ));
+
+    // 2. 场景设定 — 附加在 system prompt 后，作为补充上下文。
+    if (character.scenario.isNotEmpty) {
+      final scenario = applyTemplateVars(
+        character.scenario,
+        userName: userName,
+        charName: charName,
+        extraVars: extraVars,
+      );
+      messages.add((role: 'system', content: '[场景设定]\n$scenario'));
+    }
   }
 
   // 2.5 after_char 注入块 — scenario 之后（无 scenario 时紧随 system prompt）。
@@ -280,8 +325,9 @@ List<PromptMessage> buildMessages(
     messages.add((role: _roleStr(msg.role), content: msg.content));
   }
 
-  // 5. 历史后指令 — 附加在历史消息之后、当前输入之前。
-  if (character.postHistoryInstructions.isNotEmpty) {
+  // 5. 历史后指令 — 附加在历史消息之后、当前输入之前。expert 模式跳过
+  //（PHI 在替代面之内——桌面 `_assemble` `if not expert and ...` 逐字）。
+  if (!expert && character.postHistoryInstructions.isNotEmpty) {
     final phi = applyTemplateVars(
       character.postHistoryInstructions,
       userName: userName,
