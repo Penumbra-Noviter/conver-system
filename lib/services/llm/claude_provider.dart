@@ -7,6 +7,9 @@
 ///   逐 token 产出；`message_stop` 为终态；`ping` 忽略；`error` 事件抛错终止。
 /// - **temperature 接收但忽略**（U-2 更新 R8 定案：Anthropic 官方已弃用
 ///   temperature，Opus 4.6 后非 1.0 值 → HTTP 400），请求体不携带该键。
+/// - **SP-01 采样三参数接收但忽略**（SR-23：Anthropic 对未知顶层参数返回
+///   400 非忽略——top_p / presence_penalty / frequency_penalty 连 temperature
+///   一起**必须不写**请求体，含显式传入非 null 值时），仅 max_tokens 可用。
 /// - 401/429/408/504 → Auth / RateLimit / Timeout；400 content_filter →
 ///   ContentFilter；连接失败 → LLM 族兜底；流中途断连（EOF 未到终态 / 连接重置）
 ///   → 可区分的 [LLMConnectionInterruptedError]（供 T03 断流处理）。
@@ -77,8 +80,13 @@ class ClaudeProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) {
     // U-2：temperature 接收但忽略（Anthropic 已弃用该键，请求体不携带）。
+    // SR-23：topP / presencePenalty / frequencyPenalty 接收但忽略——Anthropic
+    // 未知顶层参数返回 400（非忽略），请求体三键恒不写（含显式非 null 值）。
     return runTranslated(() async {
       final body = _buildBody(messages, maxTokens: maxTokens, model: model);
       final response = await _dio.post(
@@ -94,12 +102,17 @@ class ClaudeProvider extends LLMProvider {
   /// 承载错误翻译骨架）：POST + SSE 消费，逐 token 产出（共享骨架 [streamSse]，
   /// 本方法只提供 Anthropic 差异面：端点 / 头 / 终态帧 / 帧提取 / 流错帧）。
   /// [temperature] 接收但忽略（U-2：Anthropic 已弃用该键，请求体不携带）。
+  /// [topP] / [presencePenalty] / [frequencyPenalty] 接收但忽略（SR-23：
+  /// Anthropic 未知顶层参数返回 400，三键恒不写，含显式非 null 值）。
   @override
   Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     yield* streamSse(
       uri: _messagesUri(),

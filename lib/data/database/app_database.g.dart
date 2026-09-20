@@ -1318,6 +1318,48 @@ class $ConversationsTable extends Conversations
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _topPMeta = const VerificationMeta('topP');
+  @override
+  late final GeneratedColumn<double> topP = GeneratedColumn<double>(
+    'top_p',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _presencePenaltyMeta = const VerificationMeta(
+    'presencePenalty',
+  );
+  @override
+  late final GeneratedColumn<double> presencePenalty = GeneratedColumn<double>(
+    'presence_penalty',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _frequencyPenaltyMeta = const VerificationMeta(
+    'frequencyPenalty',
+  );
+  @override
+  late final GeneratedColumn<double> frequencyPenalty = GeneratedColumn<double>(
+    'frequency_penalty',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _maxTokensMeta = const VerificationMeta(
+    'maxTokens',
+  );
+  @override
+  late final GeneratedColumn<int> maxTokens = GeneratedColumn<int>(
+    'max_tokens',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1348,6 +1390,10 @@ class $ConversationsTable extends Conversations
     modelProvider,
     modelName,
     presetDialogue,
+    topP,
+    presencePenalty,
+    frequencyPenalty,
+    maxTokens,
     createdAt,
     updatedAt,
   ];
@@ -1407,6 +1453,36 @@ class $ConversationsTable extends Conversations
         ),
       );
     }
+    if (data.containsKey('top_p')) {
+      context.handle(
+        _topPMeta,
+        topP.isAcceptableOrUnknown(data['top_p']!, _topPMeta),
+      );
+    }
+    if (data.containsKey('presence_penalty')) {
+      context.handle(
+        _presencePenaltyMeta,
+        presencePenalty.isAcceptableOrUnknown(
+          data['presence_penalty']!,
+          _presencePenaltyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('frequency_penalty')) {
+      context.handle(
+        _frequencyPenaltyMeta,
+        frequencyPenalty.isAcceptableOrUnknown(
+          data['frequency_penalty']!,
+          _frequencyPenaltyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('max_tokens')) {
+      context.handle(
+        _maxTokensMeta,
+        maxTokens.isAcceptableOrUnknown(data['max_tokens']!, _maxTokensMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1456,6 +1532,22 @@ class $ConversationsTable extends Conversations
         DriftSqlType.string,
         data['${effectivePrefix}preset_dialogue'],
       ),
+      topP: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}top_p'],
+      ),
+      presencePenalty: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}presence_penalty'],
+      ),
+      frequencyPenalty: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}frequency_penalty'],
+      ),
+      maxTokens: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}max_tokens'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1490,6 +1582,26 @@ class Conversation extends DataClass implements Insertable<Conversation> {
   /// 快照语义 = 创建时固化：改角色卡 presetDialogues 实时值不影响已建会话
   /// 注入源（对话组装只读本列）。
   final String? presetDialogue;
+
+  /// top-p 采样（可空 REAL；SP-01，对齐桌面 chat.py ChatContext.top_p。
+  /// NULL = 不覆盖 provider 默认；值域 [0,1] 的 clamp/回退守卫落在
+  /// `chat_service.dart::_resolveSamplingParameters` 服务层——SR-24，表层
+  /// 不设 CHECK（沿既有 F-76 先例）。
+  final double? topP;
+
+  /// presence penalty 采样（可空 REAL；SP-01，对齐桌面
+  /// ChatContext.presence_penalty。NULL = 不覆盖 provider 默认；值域 [-2,2]
+  /// 由服务层守卫——SR-24）。
+  final double? presencePenalty;
+
+  /// frequency penalty 采样（可空 REAL；SP-01，对齐桌面
+  /// ChatContext.frequency_penalty。NULL = 不覆盖 provider 默认；值域 [-2,2]
+  /// 由服务层守卫——SR-24）。
+  final double? frequencyPenalty;
+
+  /// max_tokens 覆盖（可空 INTEGER；SP-01，对齐桌面 ChatContext.max_tokens。
+  /// NULL = 不覆盖 provider 默认即走全局链；≥1 校验由服务层守卫——SR-24）。
+  final int? maxTokens;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Conversation({
@@ -1499,6 +1611,10 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     required this.modelProvider,
     required this.modelName,
     this.presetDialogue,
+    this.topP,
+    this.presencePenalty,
+    this.frequencyPenalty,
+    this.maxTokens,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1512,6 +1628,18 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     map['model_name'] = Variable<String>(modelName);
     if (!nullToAbsent || presetDialogue != null) {
       map['preset_dialogue'] = Variable<String>(presetDialogue);
+    }
+    if (!nullToAbsent || topP != null) {
+      map['top_p'] = Variable<double>(topP);
+    }
+    if (!nullToAbsent || presencePenalty != null) {
+      map['presence_penalty'] = Variable<double>(presencePenalty);
+    }
+    if (!nullToAbsent || frequencyPenalty != null) {
+      map['frequency_penalty'] = Variable<double>(frequencyPenalty);
+    }
+    if (!nullToAbsent || maxTokens != null) {
+      map['max_tokens'] = Variable<int>(maxTokens);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1528,6 +1656,16 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       presetDialogue: presetDialogue == null && nullToAbsent
           ? const Value.absent()
           : Value(presetDialogue),
+      topP: topP == null && nullToAbsent ? const Value.absent() : Value(topP),
+      presencePenalty: presencePenalty == null && nullToAbsent
+          ? const Value.absent()
+          : Value(presencePenalty),
+      frequencyPenalty: frequencyPenalty == null && nullToAbsent
+          ? const Value.absent()
+          : Value(frequencyPenalty),
+      maxTokens: maxTokens == null && nullToAbsent
+          ? const Value.absent()
+          : Value(maxTokens),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1545,6 +1683,10 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       modelProvider: serializer.fromJson<String>(json['modelProvider']),
       modelName: serializer.fromJson<String>(json['modelName']),
       presetDialogue: serializer.fromJson<String?>(json['presetDialogue']),
+      topP: serializer.fromJson<double?>(json['topP']),
+      presencePenalty: serializer.fromJson<double?>(json['presencePenalty']),
+      frequencyPenalty: serializer.fromJson<double?>(json['frequencyPenalty']),
+      maxTokens: serializer.fromJson<int?>(json['maxTokens']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1559,6 +1701,10 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       'modelProvider': serializer.toJson<String>(modelProvider),
       'modelName': serializer.toJson<String>(modelName),
       'presetDialogue': serializer.toJson<String?>(presetDialogue),
+      'topP': serializer.toJson<double?>(topP),
+      'presencePenalty': serializer.toJson<double?>(presencePenalty),
+      'frequencyPenalty': serializer.toJson<double?>(frequencyPenalty),
+      'maxTokens': serializer.toJson<int?>(maxTokens),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1571,6 +1717,10 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     String? modelProvider,
     String? modelName,
     Value<String?> presetDialogue = const Value.absent(),
+    Value<double?> topP = const Value.absent(),
+    Value<double?> presencePenalty = const Value.absent(),
+    Value<double?> frequencyPenalty = const Value.absent(),
+    Value<int?> maxTokens = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Conversation(
@@ -1582,6 +1732,14 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     presetDialogue: presetDialogue.present
         ? presetDialogue.value
         : this.presetDialogue,
+    topP: topP.present ? topP.value : this.topP,
+    presencePenalty: presencePenalty.present
+        ? presencePenalty.value
+        : this.presencePenalty,
+    frequencyPenalty: frequencyPenalty.present
+        ? frequencyPenalty.value
+        : this.frequencyPenalty,
+    maxTokens: maxTokens.present ? maxTokens.value : this.maxTokens,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1599,6 +1757,14 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       presetDialogue: data.presetDialogue.present
           ? data.presetDialogue.value
           : this.presetDialogue,
+      topP: data.topP.present ? data.topP.value : this.topP,
+      presencePenalty: data.presencePenalty.present
+          ? data.presencePenalty.value
+          : this.presencePenalty,
+      frequencyPenalty: data.frequencyPenalty.present
+          ? data.frequencyPenalty.value
+          : this.frequencyPenalty,
+      maxTokens: data.maxTokens.present ? data.maxTokens.value : this.maxTokens,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1613,6 +1779,10 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           ..write('modelProvider: $modelProvider, ')
           ..write('modelName: $modelName, ')
           ..write('presetDialogue: $presetDialogue, ')
+          ..write('topP: $topP, ')
+          ..write('presencePenalty: $presencePenalty, ')
+          ..write('frequencyPenalty: $frequencyPenalty, ')
+          ..write('maxTokens: $maxTokens, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1627,6 +1797,10 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     modelProvider,
     modelName,
     presetDialogue,
+    topP,
+    presencePenalty,
+    frequencyPenalty,
+    maxTokens,
     createdAt,
     updatedAt,
   );
@@ -1640,6 +1814,10 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           other.modelProvider == this.modelProvider &&
           other.modelName == this.modelName &&
           other.presetDialogue == this.presetDialogue &&
+          other.topP == this.topP &&
+          other.presencePenalty == this.presencePenalty &&
+          other.frequencyPenalty == this.frequencyPenalty &&
+          other.maxTokens == this.maxTokens &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1651,6 +1829,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
   final Value<String> modelProvider;
   final Value<String> modelName;
   final Value<String?> presetDialogue;
+  final Value<double?> topP;
+  final Value<double?> presencePenalty;
+  final Value<double?> frequencyPenalty;
+  final Value<int?> maxTokens;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const ConversationsCompanion({
@@ -1660,6 +1842,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.modelProvider = const Value.absent(),
     this.modelName = const Value.absent(),
     this.presetDialogue = const Value.absent(),
+    this.topP = const Value.absent(),
+    this.presencePenalty = const Value.absent(),
+    this.frequencyPenalty = const Value.absent(),
+    this.maxTokens = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -1670,6 +1856,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.modelProvider = const Value.absent(),
     this.modelName = const Value.absent(),
     this.presetDialogue = const Value.absent(),
+    this.topP = const Value.absent(),
+    this.presencePenalty = const Value.absent(),
+    this.frequencyPenalty = const Value.absent(),
+    this.maxTokens = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : characterId = Value(characterId),
@@ -1682,6 +1872,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     Expression<String>? modelProvider,
     Expression<String>? modelName,
     Expression<String>? presetDialogue,
+    Expression<double>? topP,
+    Expression<double>? presencePenalty,
+    Expression<double>? frequencyPenalty,
+    Expression<int>? maxTokens,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -1692,6 +1886,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
       if (modelProvider != null) 'model_provider': modelProvider,
       if (modelName != null) 'model_name': modelName,
       if (presetDialogue != null) 'preset_dialogue': presetDialogue,
+      if (topP != null) 'top_p': topP,
+      if (presencePenalty != null) 'presence_penalty': presencePenalty,
+      if (frequencyPenalty != null) 'frequency_penalty': frequencyPenalty,
+      if (maxTokens != null) 'max_tokens': maxTokens,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -1704,6 +1902,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     Value<String>? modelProvider,
     Value<String>? modelName,
     Value<String?>? presetDialogue,
+    Value<double?>? topP,
+    Value<double?>? presencePenalty,
+    Value<double?>? frequencyPenalty,
+    Value<int?>? maxTokens,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -1714,6 +1916,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
       modelProvider: modelProvider ?? this.modelProvider,
       modelName: modelName ?? this.modelName,
       presetDialogue: presetDialogue ?? this.presetDialogue,
+      topP: topP ?? this.topP,
+      presencePenalty: presencePenalty ?? this.presencePenalty,
+      frequencyPenalty: frequencyPenalty ?? this.frequencyPenalty,
+      maxTokens: maxTokens ?? this.maxTokens,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -1740,6 +1946,18 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     if (presetDialogue.present) {
       map['preset_dialogue'] = Variable<String>(presetDialogue.value);
     }
+    if (topP.present) {
+      map['top_p'] = Variable<double>(topP.value);
+    }
+    if (presencePenalty.present) {
+      map['presence_penalty'] = Variable<double>(presencePenalty.value);
+    }
+    if (frequencyPenalty.present) {
+      map['frequency_penalty'] = Variable<double>(frequencyPenalty.value);
+    }
+    if (maxTokens.present) {
+      map['max_tokens'] = Variable<int>(maxTokens.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1758,6 +1976,10 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
           ..write('modelProvider: $modelProvider, ')
           ..write('modelName: $modelName, ')
           ..write('presetDialogue: $presetDialogue, ')
+          ..write('topP: $topP, ')
+          ..write('presencePenalty: $presencePenalty, ')
+          ..write('frequencyPenalty: $frequencyPenalty, ')
+          ..write('maxTokens: $maxTokens, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -8485,6 +8707,10 @@ typedef $$ConversationsTableCreateCompanionBuilder =
       Value<String> modelProvider,
       Value<String> modelName,
       Value<String?> presetDialogue,
+      Value<double?> topP,
+      Value<double?> presencePenalty,
+      Value<double?> frequencyPenalty,
+      Value<int?> maxTokens,
       required DateTime createdAt,
       required DateTime updatedAt,
     });
@@ -8496,6 +8722,10 @@ typedef $$ConversationsTableUpdateCompanionBuilder =
       Value<String> modelProvider,
       Value<String> modelName,
       Value<String?> presetDialogue,
+      Value<double?> topP,
+      Value<double?> presencePenalty,
+      Value<double?> frequencyPenalty,
+      Value<int?> maxTokens,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -8594,6 +8824,26 @@ class $$ConversationsTableFilterComposer
 
   ColumnFilters<String> get presetDialogue => $composableBuilder(
     column: $table.presetDialogue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get topP => $composableBuilder(
+    column: $table.topP,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get presencePenalty => $composableBuilder(
+    column: $table.presencePenalty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get frequencyPenalty => $composableBuilder(
+    column: $table.frequencyPenalty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get maxTokens => $composableBuilder(
+    column: $table.maxTokens,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8715,6 +8965,26 @@ class $$ConversationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get topP => $composableBuilder(
+    column: $table.topP,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get presencePenalty => $composableBuilder(
+    column: $table.presencePenalty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get frequencyPenalty => $composableBuilder(
+    column: $table.frequencyPenalty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get maxTokens => $composableBuilder(
+    column: $table.maxTokens,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8776,6 +9046,22 @@ class $$ConversationsTableAnnotationComposer
     column: $table.presetDialogue,
     builder: (column) => column,
   );
+
+  GeneratedColumn<double> get topP =>
+      $composableBuilder(column: $table.topP, builder: (column) => column);
+
+  GeneratedColumn<double> get presencePenalty => $composableBuilder(
+    column: $table.presencePenalty,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get frequencyPenalty => $composableBuilder(
+    column: $table.frequencyPenalty,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get maxTokens =>
+      $composableBuilder(column: $table.maxTokens, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -8895,6 +9181,10 @@ class $$ConversationsTableTableManager
                 Value<String> modelProvider = const Value.absent(),
                 Value<String> modelName = const Value.absent(),
                 Value<String?> presetDialogue = const Value.absent(),
+                Value<double?> topP = const Value.absent(),
+                Value<double?> presencePenalty = const Value.absent(),
+                Value<double?> frequencyPenalty = const Value.absent(),
+                Value<int?> maxTokens = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => ConversationsCompanion(
@@ -8904,6 +9194,10 @@ class $$ConversationsTableTableManager
                 modelProvider: modelProvider,
                 modelName: modelName,
                 presetDialogue: presetDialogue,
+                topP: topP,
+                presencePenalty: presencePenalty,
+                frequencyPenalty: frequencyPenalty,
+                maxTokens: maxTokens,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -8915,6 +9209,10 @@ class $$ConversationsTableTableManager
                 Value<String> modelProvider = const Value.absent(),
                 Value<String> modelName = const Value.absent(),
                 Value<String?> presetDialogue = const Value.absent(),
+                Value<double?> topP = const Value.absent(),
+                Value<double?> presencePenalty = const Value.absent(),
+                Value<double?> frequencyPenalty = const Value.absent(),
+                Value<int?> maxTokens = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => ConversationsCompanion.insert(
@@ -8924,6 +9222,10 @@ class $$ConversationsTableTableManager
                 modelProvider: modelProvider,
                 modelName: modelName,
                 presetDialogue: presetDialogue,
+                topP: topP,
+                presencePenalty: presencePenalty,
+                frequencyPenalty: frequencyPenalty,
+                maxTokens: maxTokens,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

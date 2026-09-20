@@ -463,6 +463,9 @@ class _CapturingProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     lastMessages = messages;
     return generated;
@@ -474,6 +477,9 @@ class _CapturingProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) {
     return const Stream<String>.empty();
   }

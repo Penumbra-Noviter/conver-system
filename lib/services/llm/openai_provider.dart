@@ -5,6 +5,9 @@
 /// - POST `{normalizedBase}/chat/completions`（[normalizeBaseUrl] 补 `/v1` 段）；
 ///   `Authorization: Bearer <key>` 头；temperature **照传**（U-2：由
 ///   generate/streamGenerate 的 `temperature` 参数驱动，缺省 0.7 逐字透传）；
+///   SP-01 采样三参数（topP / presencePenalty / frequencyPenalty）非 null 透传
+///   进请求体（锚 openai.py `_optional_sampling_kwargs`）、null 不写键（不
+///   覆盖 API 默认）；
 ///   `choices[0].delta.content` 逐 token 产出（null / 空 choices 跳过，锚
 ///   research R1-2）；`[DONE]` 终态。
 /// - 401/429/408/504 → Auth / RateLimit / Timeout；400 content_filter →
@@ -64,10 +67,20 @@ class OpenAIProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) {
     return runTranslated(() async {
-      final body = _buildBody(messages,
-          maxTokens: maxTokens, model: model, temperature: temperature);
+      final body = _buildBody(
+        messages,
+        maxTokens: maxTokens,
+        model: model,
+        temperature: temperature,
+        topP: topP,
+        presencePenalty: presencePenalty,
+        frequencyPenalty: frequencyPenalty,
+      );
       final response = await _dio.post(
         _chatCompletionsUri().toString(),
         data: body,
@@ -81,21 +94,31 @@ class OpenAIProvider extends LLMProvider {
   /// 承载错误翻译骨架）：POST + SSE 消费，逐 token 产出（共享骨架 [streamSse]，
   /// 本方法只提供 OpenAI 差异面：端点 / 头 / 终态帧 / 帧提取；无流内错误帧
   /// 语义 → [streamSse.errorFrameException] 缺省 null）。[temperature] 照传。
+  /// [topP] / [presencePenalty] / [frequencyPenalty] 非 null 透传（SP-01，
+  /// 锚 openai.py `_optional_sampling_kwargs`），null 不写键。
   @override
   Stream<String> streamRequest({
     required List<LlmMessage> messages,
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     yield* streamSse(
       uri: _chatCompletionsUri(),
       body: jsonEncode(
-        _buildBody(messages,
-            maxTokens: maxTokens,
-            model: model,
-            temperature: temperature,
-            streaming: true),
+        _buildBody(
+          messages,
+          maxTokens: maxTokens,
+          model: model,
+          temperature: temperature,
+          topP: topP,
+          presencePenalty: presencePenalty,
+          frequencyPenalty: frequencyPenalty,
+          streaming: true,
+        ),
       ),
       headers: {'authorization': 'Bearer $apiKey'},
       isTerminated: isOpenAiDone,
@@ -103,12 +126,18 @@ class OpenAIProvider extends LLMProvider {
     );
   }
 
-  /// 组装 Chat Completions 请求体；temperature 照传（U-2：取传入参数，缺省 0.7）。
+  /// 组装 Chat Completions 请求体；temperature 照传（U-2：取传入参数，缺省
+  /// 0.7）。采样三参数仅非 null 时写键（SP-01，锚 openai.py
+  /// `_optional_sampling_kwargs`：None 不传 SDK → 走 API 默认，避免把 null
+  /// 当字面值发给 OpenAI 造成 400）。
   Map<String, dynamic> _buildBody(
     List<LlmMessage> messages, {
     required int maxTokens,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
     bool streaming = false,
   }) {
     final prepared = prepareMessages(messages);
@@ -124,6 +153,9 @@ class OpenAIProvider extends LLMProvider {
       'temperature': temperature,
       'max_tokens': maxTokens,
       'messages': chat,
+      'top_p': ?topP,
+      'presence_penalty': ?presencePenalty,
+      'frequency_penalty': ?frequencyPenalty,
       if (streaming) 'stream': true,
     };
   }

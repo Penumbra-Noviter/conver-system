@@ -91,6 +91,9 @@ class _ContentThenZeroInterruptProvider extends TickingFakeLLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     _streamCalls++;
     streamGenerateCallCount++;
@@ -108,6 +111,9 @@ class _ContentThenZeroInterruptProvider extends TickingFakeLLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -140,6 +146,9 @@ class _GatedInterruptRetryProvider extends TickingFakeLLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -166,6 +175,9 @@ class _InterruptThenEmptyContinueProvider extends TickingFakeLLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastMessages = messages;

@@ -14,7 +14,10 @@
 /// conversation.py）；
 /// Characters.promptMode + Characters.expertPrompt 两列为 NPD-04
 /// （schemaVersion=9，chat-polish spec §4.5 专家模式，对齐桌面
-/// character.py，PD-5 逐字）。
+/// character.py，PD-5 逐字）；
+/// Conversations.topP / presencePenalty / frequencyPenalty / maxTokens 四列为
+/// SP-01（schemaVersion=10，chat-polish spec §4.6 采样参数，对齐桌面
+/// chat.py ChatContext SP-1，NULL=不覆盖 provider 默认）。
 ///
 /// 权威源（只读，勿改）：
 /// `desktop/backend/app/models/{character,conversation,message,setting}.py`
@@ -233,6 +236,28 @@ class Conversations extends Table {
   /// 快照语义 = 创建时固化：改角色卡 presetDialogues 实时值不影响已建会话
   /// 注入源（对话组装只读本列）。
   TextColumn get presetDialogue => text().nullable()();
+
+  // ── SP-01 采样参数（每对话可空覆盖，NULL = 不覆盖 provider 默认）──
+
+  /// top-p 采样（可空 REAL；SP-01，对齐桌面 chat.py ChatContext.top_p。
+  /// NULL = 不覆盖 provider 默认；值域 [0,1] 的 clamp/回退守卫落在
+  /// `chat_service.dart::_resolveSamplingParameters` 服务层——SR-24，表层
+  /// 不设 CHECK（沿既有 F-76 先例）。
+  RealColumn get topP => real().nullable()();
+
+  /// presence penalty 采样（可空 REAL；SP-01，对齐桌面
+  /// ChatContext.presence_penalty。NULL = 不覆盖 provider 默认；值域 [-2,2]
+  /// 由服务层守卫——SR-24）。
+  RealColumn get presencePenalty => real().nullable()();
+
+  /// frequency penalty 采样（可空 REAL；SP-01，对齐桌面
+  /// ChatContext.frequency_penalty。NULL = 不覆盖 provider 默认；值域 [-2,2]
+  /// 由服务层守卫——SR-24）。
+  RealColumn get frequencyPenalty => real().nullable()();
+
+  /// max_tokens 覆盖（可空 INTEGER；SP-01，对齐桌面 ChatContext.max_tokens。
+  /// NULL = 不覆盖 provider 默认即走全局链；≥1 校验由服务层守卫——SR-24）。
+  IntColumn get maxTokens => integer().nullable()();
 
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

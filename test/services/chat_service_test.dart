@@ -136,6 +136,9 @@ class _TickingProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     lastMessages = messages;
@@ -155,6 +158,9 @@ class _TickingProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     streamGenerateCallCount++;
     lastMessages = messages;
@@ -202,6 +208,9 @@ class _StalledProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async =>
       _tokens.join();
 
@@ -211,6 +220,9 @@ class _StalledProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     for (final token in _tokens) {
       yield token;
@@ -254,6 +266,9 @@ class _CancelErrorProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async =>
       ''; // F-55 测试仅走流式路径。
 
@@ -263,6 +278,9 @@ class _CancelErrorProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) =>
       _events.stream;
 
@@ -312,6 +330,9 @@ class _FaultSequenceProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async =>
       _tokens.join();
 
@@ -321,6 +342,9 @@ class _FaultSequenceProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     final now = _clock.elapsed;
     if (_lastCallAt != Duration.zero) {
@@ -452,6 +476,9 @@ class _HoldableProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async {
     generateCallCount++;
     if (!started.isCompleted) {
@@ -467,6 +494,9 @@ class _HoldableProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     throw StateError('F1/F4 测试不走流式路径');
   }
@@ -491,6 +521,9 @@ class _HoldableProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async =>
       '';
 
@@ -502,6 +535,9 @@ class _HoldableProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     throw error;
   }
@@ -512,6 +548,9 @@ class _HoldableProvider extends LLMProvider {
     int maxTokens = 2048,
     String? model,
     double temperature = 0.7,
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
   }) async* {
     throw UnimplementedError('防御面夹具走覆写 streamGenerate，不走模板路径');
   }
@@ -4057,6 +4096,225 @@ void main() {
       ];
       expect(nonNarrativeSystems, ['专家整段']);
       expect(await swipeContentsOf(oldAssistant.id), ['旧答', '新答']);
+    });
+  });
+
+  // ── SP-01 · 采样参数组解析 + SR-24 值域守卫 ──
+
+  group('SP-01 · 采样参数组解析 + SR-24 值域守卫', () {
+    Future<void> setSamplingColumns(
+      int conversationId, {
+      double? topP,
+      double? presencePenalty,
+      double? frequencyPenalty,
+      int? maxTokens,
+    }) async {
+      await (db.update(db.conversations)
+            ..where((t) => t.id.equals(conversationId)))
+          .write(
+            ConversationsCompanion(
+              topP: topP == null ? const Value.absent() : Value(topP),
+              presencePenalty: presencePenalty == null
+                  ? const Value.absent()
+                  : Value(presencePenalty),
+              frequencyPenalty: frequencyPenalty == null
+                  ? const Value.absent()
+                  : Value(frequencyPenalty),
+              maxTokens:
+                  maxTokens == null ? const Value.absent() : Value(maxTokens),
+            ),
+          );
+    }
+
+    test('streamReply conv 列非空 → 三参数与 maxTokens 覆盖透传；温度既有链不变',
+        () async {
+      final char = await seedCharacter(temperature: 0.3);
+      final conv = await seedConversation(char.id);
+      await setSamplingColumns(
+        conv.id,
+        topP: 0.4,
+        presencePenalty: -1.2,
+        frequencyPenalty: 0.8,
+        maxTokens: 512,
+      );
+
+      final provider = FakeLLMProvider(tokens: const ['r']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: 'hi').toList();
+
+      expect(provider.lastTopP, 0.4);
+      expect(provider.lastPresencePenalty, -1.2);
+      expect(provider.lastFrequencyPenalty, 0.8);
+      expect(provider.lastMaxTokens, 512);
+      expect(provider.lastTemperature, 0.3,
+          reason: 'conv 无温度列，温度恒走角色为主既有链');
+    });
+
+    test('streamReply conv 列 NULL → topP/presence/frequency null（不覆盖 provider '
+        '默认）、maxTokens 走全局、温度既有链', () async {
+      await settingsRepo.setMany({'max_tokens': '777'});
+      final char = await seedCharacter(temperature: 0.3);
+      final conv = await seedConversation(char.id);
+
+      final provider = FakeLLMProvider(tokens: const ['r']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: 'hi').toList();
+
+      expect(provider.lastTopP, isNull);
+      expect(provider.lastPresencePenalty, isNull);
+      expect(provider.lastFrequencyPenalty, isNull);
+      expect(provider.lastMaxTokens, 777, reason: 'conv 列 NULL → 全局 max_tokens');
+      expect(provider.lastTemperature, 0.3);
+    });
+
+    test('conv 列 NULL + 角色温度 == 默认 → 回退全局温度（既有链保持）', () async {
+      await settingsRepo.setMany({'temperature': '0.5'});
+      final char = await seedCharacter(); // temperature 缺省 0.7 == defaultTemperature
+      final conv = await seedConversation(char.id);
+
+      final provider = FakeLLMProvider(tokens: const ['r']);
+      wireService(provider);
+      await service.streamReply(conversationId: conv.id, content: 'hi').toList();
+
+      expect(provider.lastTemperature, 0.5,
+          reason: '角色温度 == 默认 → 全局兜底（F-76 判定契约保持）');
+    });
+
+    test('SR-24 topP 守卫：NaN/±Infinity 回退 null，越界 clamp [0,1]，绝不透传',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final provider = FakeLLMProvider(tokens: const ['r']);
+      wireService(provider);
+
+      Future<void> sendWith({required double topP}) async {
+        await setSamplingColumns(conv.id, topP: topP);
+        await service.streamReply(conversationId: conv.id, content: 'hi').toList();
+      }
+
+      await sendWith(topP: double.nan);
+      expect(provider.lastTopP, isNull, reason: 'NaN 回退 null（不覆盖 provider 默认）');
+      await sendWith(topP: double.infinity);
+      expect(provider.lastTopP, isNull, reason: '+Infinity 回退 null');
+      await sendWith(topP: double.negativeInfinity);
+      expect(provider.lastTopP, isNull, reason: '-Infinity 回退 null');
+      await sendWith(topP: 1.5);
+      expect(provider.lastTopP, 1.0, reason: '越界 clamp 到上限');
+      await sendWith(topP: -0.5);
+      expect(provider.lastTopP, 0.0, reason: '越界 clamp 到下限');
+      await sendWith(topP: 0.0);
+      expect(provider.lastTopP, 0.0, reason: '合法下边界原样透传');
+      await sendWith(topP: 1.0);
+      expect(provider.lastTopP, 1.0, reason: '合法上边界原样透传');
+    });
+
+    test('SR-24 presence/frequency 守卫：NaN/Infinity 回退 null，越界 clamp [-2,2]',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final provider = FakeLLMProvider(tokens: const ['r']);
+      wireService(provider);
+
+      Future<void> sendWith({
+        double? presencePenalty,
+        double? frequencyPenalty,
+      }) async {
+        await setSamplingColumns(
+          conv.id,
+          presencePenalty: presencePenalty,
+          frequencyPenalty: frequencyPenalty,
+        );
+        await service.streamReply(conversationId: conv.id, content: 'hi').toList();
+      }
+
+      await sendWith(presencePenalty: double.nan);
+      expect(provider.lastPresencePenalty, isNull, reason: 'NaN 回退 null');
+      await sendWith(presencePenalty: -3.0);
+      expect(provider.lastPresencePenalty, -2.0, reason: '越界 clamp 到下限');
+      await sendWith(presencePenalty: 2.5);
+      expect(provider.lastPresencePenalty, 2.0, reason: '越界 clamp 到上限');
+
+      await sendWith(frequencyPenalty: double.infinity);
+      expect(provider.lastFrequencyPenalty, isNull, reason: '+Infinity 回退 null');
+      await sendWith(frequencyPenalty: -3.0);
+      expect(provider.lastFrequencyPenalty, -2.0, reason: '越界 clamp 到下限');
+      await sendWith(frequencyPenalty: 2.5);
+      expect(provider.lastFrequencyPenalty, 2.0, reason: '越界 clamp 到上限');
+
+      await sendWith(presencePenalty: -2.0, frequencyPenalty: 2.0);
+      expect(provider.lastPresencePenalty, -2.0, reason: '合法下边界原样透传');
+      expect(provider.lastFrequencyPenalty, 2.0, reason: '合法上边界原样透传');
+    });
+
+    test('SR-24 maxTokens 守卫：<1 回退全局，合法值覆盖（绝不透传非法值）', () async {
+      await settingsRepo.setMany({'max_tokens': '888'});
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final provider = FakeLLMProvider(tokens: const ['r']);
+      wireService(provider);
+
+      Future<void> sendWith(int? maxTokens) async {
+        await setSamplingColumns(conv.id, maxTokens: maxTokens);
+        await service.streamReply(conversationId: conv.id, content: 'hi').toList();
+      }
+
+      await sendWith(null);
+      expect(provider.lastMaxTokens, 888, reason: 'conv 列 NULL → 全局兜底');
+      await sendWith(0);
+      expect(provider.lastMaxTokens, 888, reason: 'maxTokens=0 非法 → 回退全局');
+      await sendWith(-10);
+      expect(provider.lastMaxTokens, 888, reason: 'maxTokens=-10 非法 → 回退全局');
+      await sendWith(512);
+      expect(provider.lastMaxTokens, 512, reason: '合法值覆盖全局');
+    });
+
+    test('regenerate conv 列非空 → generate 收到三参数 + maxTokens 覆盖（共享透传腿）',
+        () async {
+      final char = await seedCharacter(firstMes: '开场。');
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '问题');
+      final asst = await sendAssistantMessage(conv.id, '旧答');
+      await setSamplingColumns(
+        conv.id,
+        topP: 0.6,
+        presencePenalty: -0.5,
+        frequencyPenalty: 1.0,
+        maxTokens: 300,
+      );
+
+      final provider = FakeLLMProvider(tokens: const ['新答']);
+      wireService(provider);
+      await service.regenerate(conversationId: conv.id, messageId: asst.id);
+
+      expect(provider.lastTopP, 0.6);
+      expect(provider.lastPresencePenalty, -0.5);
+      expect(provider.lastFrequencyPenalty, 1.0);
+      expect(provider.lastMaxTokens, 300);
+      expect(await swipeContentsOf(asst.id), ['旧答', '新答']);
+    });
+
+    test('continueReply conv 列非空 → generate 收到三参数 + maxTokens 覆盖', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '问题');
+      await sendAssistantMessage(conv.id, '旧答。');
+      await setSamplingColumns(
+        conv.id,
+        topP: 0.2,
+        presencePenalty: 1.5,
+        frequencyPenalty: -1.0,
+        maxTokens: 200,
+      );
+
+      final provider = FakeLLMProvider(tokens: const ['续写']);
+      wireService(provider);
+      final result = await service.continueReply(conversationId: conv.id);
+
+      expect(result.swipeIndex, 1);
+      expect(provider.lastTopP, 0.2);
+      expect(provider.lastPresencePenalty, 1.5);
+      expect(provider.lastFrequencyPenalty, -1.0);
+      expect(provider.lastMaxTokens, 200);
     });
   });
 }
