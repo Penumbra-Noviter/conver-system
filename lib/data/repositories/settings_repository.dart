@@ -90,6 +90,8 @@ class SettingsRepository implements SettingsReader {
     embeddingModelKey,
     memoryPalaceEnabledKey,
     memoryPalaceEveryRoundsKey,
+    narrativeStyleEnabledKey,
+    narrativeStyleRulesKey,
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -181,6 +183,35 @@ class SettingsRepository implements SettingsReader {
   /// 语义由服务层 [shouldSummarize] 纯函数承载，UI 输入层一律 ≥1）。
   static const int memoryPalaceEveryRoundsMin = 1;
   static const int memoryPalaceEveryRoundsMax = 999;
+
+  /// 叙述风格开关落库键（NPD-01；桌面对应物 `narrative_style_enabled`）。
+  /// 与记忆宫殿相反：**默认开启**（缺省 true，opt-out——降 AI 味是跨角色
+  /// 通用诉求，全新安装未配置该键即视为开启，对齐桌面 ADR-1）；'0' 显式
+  /// 关闭；'1'/'true'/'yes' 大小写不敏感 → true（真值口径见
+  /// [SettingsRepository.narrativeStyleEnabled]）。
+  static const String narrativeStyleEnabledKey = 'narrative_style_enabled';
+
+  /// 叙述风格自定义规则落库键（NPD-01；桌面对应物 `narrative_style_rules`）。
+  /// 空 / 缺省回退 [narrativeStyleDefaultRules]（桌面
+  /// `NARRATIVE_STYLE_DEFAULT_RULES`，反 AI 味清单，逐字对齐）。
+  static const String narrativeStyleRulesKey = 'narrative_style_rules';
+
+  /// 叙述风格默认规则（反 AI 味清单）——逐字迁移自桌面
+  /// `desktop/backend/app/services/setting.py::NARRATIVE_STYLE_DEFAULT_RULES`
+  /// （278~290 行，含文末「若与角色设定冲突，以角色设定为准」冲突从句）。
+  /// 注入链在用户未自定义规则时回退此文本。
+  static const String narrativeStyleDefaultRules =
+      '叙述风格约束（降低 AI 生成痕迹）：\n'
+      '1. 禁止总结式收尾，不以感慨、升华或归纳结束回复。\n'
+      '2. 禁止「总之」「值得注意的是」「首先……其次……」等句式。\n'
+      '3. 只输出角色台词、动作与内心活动，不输出说明性正文。\n'
+      '4. 禁止括号外旁白与动机解释，想法只通过动作或内心呈现。\n'
+      '5. 禁止复读用户输入，不机械重复对方刚说过的话。\n'
+      '6. 禁止使用 emoji、markdown 标题或列表，行文以自然段落为主。\n'
+      '7. 禁止机械对称的一问一答与堆砌式小作文。\n'
+      '8. 保持人称与语气一致，与角色设定契合。\n'
+      '9. 不确定如何回应时，用短句与动作推进场景。\n'
+      '若与角色设定冲突，以角色设定为准。';
 
   // ── 键值 CRUD ──
 
@@ -415,6 +446,28 @@ class SettingsRepository implements SettingsReader {
   /// 缺省（镜像 [getInt] 语义）。
   Future<int> get memoryPalaceEveryRounds =>
       getInt(memoryPalaceEveryRoundsKey, defaultValue: defaultMemoryPalaceEveryRounds);
+
+  /// 叙述风格开关（NPD-01）；缺省 **true**（未配置键视为开启，opt-out，
+  /// 对齐桌面 ADR-1 默认启用——降 AI 味是跨角色通用诉求）。
+  ///
+  /// 真值口径（逐字对齐桌面 `narrative_style_enabled`：
+  /// `get_value(db, key, "1").lower() in ("1", "true", "yes")`）：
+  /// - '0' 显式关闭；
+  /// - '1' / 'true' / 'yes' 大小写不敏感 → true；
+  /// - 缺失 / 空串 → 回退缺省 '1' → true（getValue 空串语义镜像桌面
+  ///   `row.value if row and row.value else default`）。
+  Future<bool> get narrativeStyleEnabled async {
+    final value = await getValue(narrativeStyleEnabledKey, defaultValue: '1');
+    return const {'1', 'true', 'yes'}.contains(value.toLowerCase());
+  }
+
+  /// 叙述风格规则（NPD-01）；DB 非空返回原值，空 / 缺省回退
+  /// [narrativeStyleDefaultRules]（桌面 `narrative_style_rules`：
+  /// `get_value(db, key) or NARRATIVE_STYLE_DEFAULT_RULES`）。
+  Future<String> get narrativeStyleRules async {
+    final value = await getValue(narrativeStyleRulesKey);
+    return value.isEmpty ? narrativeStyleDefaultRules : value;
+  }
 
   /// 远端 embedding 开关（阶段 3，VR-01）；缺省 **false**（SR-19 默认关，
   /// 对话内容不默认外发远端 embedding 服务）。

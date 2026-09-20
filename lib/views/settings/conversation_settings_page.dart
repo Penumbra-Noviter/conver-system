@@ -93,6 +93,9 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       TextEditingController();
   final TextEditingController _embeddingModelController =
       TextEditingController();
+  bool _narrativeEnabled = true;
+  final TextEditingController _narrativeRulesController =
+      TextEditingController();
   bool _loaded = false;
 
   /// 生产缺省 client 工厂（VR-09）：按装配面快照构造 dio 直连实现。
@@ -113,6 +116,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
     _embeddingApiKeyController.dispose();
     _embeddingBaseUrlController.dispose();
     _embeddingModelController.dispose();
+    _narrativeRulesController.dispose();
     super.dispose();
   }
 
@@ -133,6 +137,13 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
           await widget.settingsRepository.memoryPalaceEnabled;
       final memoryPalaceRounds =
           await widget.settingsRepository.memoryPalaceEveryRounds;
+      final narrativeEnabled =
+          await widget.settingsRepository.narrativeStyleEnabled;
+      // 规则原始值（不经 getter 的默认常量回退——空则回显空 + 默认常量 hint；
+      // 沿「直读对应键、避免他键值显示进本槽」先例）。
+      final narrativeRules = await widget.settingsRepository.getValue(
+        SettingsRepository.narrativeStyleRulesKey,
+      );
       // key 直读 embedding 槽位（不做 openai 槽兜底，回显对齐
       // api_config_section「直读对应槽位，避免他槽值显示进本槽」先例）。
       final embeddingApiKey =
@@ -156,6 +167,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         _embeddingEnabled = embeddingEnabled;
         _memoryPalaceEnabled = memoryPalaceEnabled;
         _memoryPalaceRoundsController.text = memoryPalaceRounds.toString();
+        _narrativeEnabled = narrativeEnabled;
+        _narrativeRulesController.text = narrativeRules;
         _embeddingApiKeyController.text = embeddingApiKey;
         _embeddingBaseUrlController.text = embeddingBaseUrl;
         _embeddingModelController.text = embeddingModel;
@@ -227,6 +240,12 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
           SettingsRepository.embeddingModelKey: embeddingModel,
         SettingsRepository.memoryPalaceEveryRoundsKey:
             memoryPalaceRounds.toString(),
+        // NPD-01：保存写两键——开关状态 + 规则文本（空 → 写空串，读回回退
+        // 默认常量）。
+        SettingsRepository.narrativeStyleEnabledKey:
+            _narrativeEnabled.toString(),
+        SettingsRepository.narrativeStyleRulesKey:
+            _narrativeRulesController.text.trim(),
       });
       if (!mounted) {
         return;
@@ -379,6 +398,28 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         return;
       }
       setState(() => _memoryPalaceEnabled = !value);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('保存失败')));
+    }
+  }
+
+  /// 切换叙述风格开关（NPD-01，即时写入 `narrative_style_enabled` 键）。
+  ///
+  /// 默认开（opt-out，缺省 true——降 AI 味是跨角色通用诉求）；写失败回滚 UI
+  /// 状态并提示；开关即时生效，无需点「保存」。规则文本经底部「保存」落库
+  /// （两键一并写入，见 [_save]）。
+  Future<void> _setNarrativeStyle(bool value) async {
+    setState(() => _narrativeEnabled = value);
+    try {
+      await widget.settingsRepository.setMany({
+        SettingsRepository.narrativeStyleEnabledKey: value.toString(),
+      });
+    } catch (e) {
+      debugPrint('叙述风格开关保存失败: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() => _narrativeEnabled = !value);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('保存失败')));
     }
@@ -611,6 +652,33 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       hintText: '每 N 回合归纳一次',
+                    ),
+                  ),
+                  const SizedBox(height: ConverSpacing.space5),
+                  Divider(thickness: 1, color: palette.border),
+                  const SizedBox(height: ConverSpacing.space2),
+                  Text(
+                    '叙述风格',
+                    style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+                  ),
+                  const SizedBox(height: ConverSpacing.space1),
+                  Text(
+                    '降低 AI 生成痕迹（默认开启，可自定义规则）',
+                    style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('启用叙述风格'),
+                    value: _narrativeEnabled,
+                    onChanged: _setNarrativeStyle,
+                  ),
+                  TextField(
+                    key: const ValueKey('narrative-rules'),
+                    controller: _narrativeRulesController,
+                    maxLines: 6,
+                    minLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: SettingsRepository.narrativeStyleDefaultRules,
                     ),
                   ),
                   const SizedBox(height: ConverSpacing.space5),
