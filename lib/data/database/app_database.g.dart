@@ -1360,6 +1360,37 @@ class $ConversationsTable extends Conversations
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _parentConversationIdMeta =
+      const VerificationMeta('parentConversationId');
+  @override
+  late final GeneratedColumn<int> parentConversationId = GeneratedColumn<int>(
+    'parent_conversation_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _branchFromMessageIdMeta =
+      const VerificationMeta('branchFromMessageId');
+  @override
+  late final GeneratedColumn<int> branchFromMessageId = GeneratedColumn<int>(
+    'branch_from_message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _branchTitleMeta = const VerificationMeta(
+    'branchTitle',
+  );
+  @override
+  late final GeneratedColumn<String> branchTitle = GeneratedColumn<String>(
+    'branch_title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1394,6 +1425,9 @@ class $ConversationsTable extends Conversations
     presencePenalty,
     frequencyPenalty,
     maxTokens,
+    parentConversationId,
+    branchFromMessageId,
+    branchTitle,
     createdAt,
     updatedAt,
   ];
@@ -1483,6 +1517,33 @@ class $ConversationsTable extends Conversations
         maxTokens.isAcceptableOrUnknown(data['max_tokens']!, _maxTokensMeta),
       );
     }
+    if (data.containsKey('parent_conversation_id')) {
+      context.handle(
+        _parentConversationIdMeta,
+        parentConversationId.isAcceptableOrUnknown(
+          data['parent_conversation_id']!,
+          _parentConversationIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('branch_from_message_id')) {
+      context.handle(
+        _branchFromMessageIdMeta,
+        branchFromMessageId.isAcceptableOrUnknown(
+          data['branch_from_message_id']!,
+          _branchFromMessageIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('branch_title')) {
+      context.handle(
+        _branchTitleMeta,
+        branchTitle.isAcceptableOrUnknown(
+          data['branch_title']!,
+          _branchTitleMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1548,6 +1609,18 @@ class $ConversationsTable extends Conversations
         DriftSqlType.int,
         data['${effectivePrefix}max_tokens'],
       ),
+      parentConversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}parent_conversation_id'],
+      ),
+      branchFromMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}branch_from_message_id'],
+      ),
+      branchTitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}branch_title'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1602,6 +1675,17 @@ class Conversation extends DataClass implements Insertable<Conversation> {
   /// max_tokens 覆盖（可空 INTEGER；SP-01，对齐桌面 ChatContext.max_tokens。
   /// NULL = 不覆盖 provider 默认即走全局链；≥1 校验由服务层守卫——SR-24）。
   final int? maxTokens;
+
+  /// 派生来源会话 id（可空 INTEGER；逻辑引用**不建硬 FK**——删源会话不阻塞、
+  /// 不影响已派生分支，删源时由服务层把派生分支的 parent / 锚引用置空并锁定
+  /// （对齐桌面 BR-2 删源置空策略，SR-29）。
+  final int? parentConversationId;
+
+  /// 分叉锚消息 id（快照末条；可空 INTEGER；逻辑引用不建硬 FK，随删源置空）。
+  final int? branchFromMessageId;
+
+  /// 分支显示名（可空 VARCHAR 语义；删源置空时保留——分支显示名仍可用）。
+  final String? branchTitle;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Conversation({
@@ -1615,6 +1699,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     this.presencePenalty,
     this.frequencyPenalty,
     this.maxTokens,
+    this.parentConversationId,
+    this.branchFromMessageId,
+    this.branchTitle,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1641,6 +1728,15 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     if (!nullToAbsent || maxTokens != null) {
       map['max_tokens'] = Variable<int>(maxTokens);
     }
+    if (!nullToAbsent || parentConversationId != null) {
+      map['parent_conversation_id'] = Variable<int>(parentConversationId);
+    }
+    if (!nullToAbsent || branchFromMessageId != null) {
+      map['branch_from_message_id'] = Variable<int>(branchFromMessageId);
+    }
+    if (!nullToAbsent || branchTitle != null) {
+      map['branch_title'] = Variable<String>(branchTitle);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1666,6 +1762,15 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       maxTokens: maxTokens == null && nullToAbsent
           ? const Value.absent()
           : Value(maxTokens),
+      parentConversationId: parentConversationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentConversationId),
+      branchFromMessageId: branchFromMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(branchFromMessageId),
+      branchTitle: branchTitle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(branchTitle),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1687,6 +1792,13 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       presencePenalty: serializer.fromJson<double?>(json['presencePenalty']),
       frequencyPenalty: serializer.fromJson<double?>(json['frequencyPenalty']),
       maxTokens: serializer.fromJson<int?>(json['maxTokens']),
+      parentConversationId: serializer.fromJson<int?>(
+        json['parentConversationId'],
+      ),
+      branchFromMessageId: serializer.fromJson<int?>(
+        json['branchFromMessageId'],
+      ),
+      branchTitle: serializer.fromJson<String?>(json['branchTitle']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1705,6 +1817,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
       'presencePenalty': serializer.toJson<double?>(presencePenalty),
       'frequencyPenalty': serializer.toJson<double?>(frequencyPenalty),
       'maxTokens': serializer.toJson<int?>(maxTokens),
+      'parentConversationId': serializer.toJson<int?>(parentConversationId),
+      'branchFromMessageId': serializer.toJson<int?>(branchFromMessageId),
+      'branchTitle': serializer.toJson<String?>(branchTitle),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1721,6 +1836,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     Value<double?> presencePenalty = const Value.absent(),
     Value<double?> frequencyPenalty = const Value.absent(),
     Value<int?> maxTokens = const Value.absent(),
+    Value<int?> parentConversationId = const Value.absent(),
+    Value<int?> branchFromMessageId = const Value.absent(),
+    Value<String?> branchTitle = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Conversation(
@@ -1740,6 +1858,13 @@ class Conversation extends DataClass implements Insertable<Conversation> {
         ? frequencyPenalty.value
         : this.frequencyPenalty,
     maxTokens: maxTokens.present ? maxTokens.value : this.maxTokens,
+    parentConversationId: parentConversationId.present
+        ? parentConversationId.value
+        : this.parentConversationId,
+    branchFromMessageId: branchFromMessageId.present
+        ? branchFromMessageId.value
+        : this.branchFromMessageId,
+    branchTitle: branchTitle.present ? branchTitle.value : this.branchTitle,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1765,6 +1890,15 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           ? data.frequencyPenalty.value
           : this.frequencyPenalty,
       maxTokens: data.maxTokens.present ? data.maxTokens.value : this.maxTokens,
+      parentConversationId: data.parentConversationId.present
+          ? data.parentConversationId.value
+          : this.parentConversationId,
+      branchFromMessageId: data.branchFromMessageId.present
+          ? data.branchFromMessageId.value
+          : this.branchFromMessageId,
+      branchTitle: data.branchTitle.present
+          ? data.branchTitle.value
+          : this.branchTitle,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1783,6 +1917,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           ..write('presencePenalty: $presencePenalty, ')
           ..write('frequencyPenalty: $frequencyPenalty, ')
           ..write('maxTokens: $maxTokens, ')
+          ..write('parentConversationId: $parentConversationId, ')
+          ..write('branchFromMessageId: $branchFromMessageId, ')
+          ..write('branchTitle: $branchTitle, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1801,6 +1938,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
     presencePenalty,
     frequencyPenalty,
     maxTokens,
+    parentConversationId,
+    branchFromMessageId,
+    branchTitle,
     createdAt,
     updatedAt,
   );
@@ -1818,6 +1958,9 @@ class Conversation extends DataClass implements Insertable<Conversation> {
           other.presencePenalty == this.presencePenalty &&
           other.frequencyPenalty == this.frequencyPenalty &&
           other.maxTokens == this.maxTokens &&
+          other.parentConversationId == this.parentConversationId &&
+          other.branchFromMessageId == this.branchFromMessageId &&
+          other.branchTitle == this.branchTitle &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1833,6 +1976,9 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
   final Value<double?> presencePenalty;
   final Value<double?> frequencyPenalty;
   final Value<int?> maxTokens;
+  final Value<int?> parentConversationId;
+  final Value<int?> branchFromMessageId;
+  final Value<String?> branchTitle;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const ConversationsCompanion({
@@ -1846,6 +1992,9 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.presencePenalty = const Value.absent(),
     this.frequencyPenalty = const Value.absent(),
     this.maxTokens = const Value.absent(),
+    this.parentConversationId = const Value.absent(),
+    this.branchFromMessageId = const Value.absent(),
+    this.branchTitle = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -1860,6 +2009,9 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     this.presencePenalty = const Value.absent(),
     this.frequencyPenalty = const Value.absent(),
     this.maxTokens = const Value.absent(),
+    this.parentConversationId = const Value.absent(),
+    this.branchFromMessageId = const Value.absent(),
+    this.branchTitle = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : characterId = Value(characterId),
@@ -1876,6 +2028,9 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     Expression<double>? presencePenalty,
     Expression<double>? frequencyPenalty,
     Expression<int>? maxTokens,
+    Expression<int>? parentConversationId,
+    Expression<int>? branchFromMessageId,
+    Expression<String>? branchTitle,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -1890,6 +2045,11 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
       if (presencePenalty != null) 'presence_penalty': presencePenalty,
       if (frequencyPenalty != null) 'frequency_penalty': frequencyPenalty,
       if (maxTokens != null) 'max_tokens': maxTokens,
+      if (parentConversationId != null)
+        'parent_conversation_id': parentConversationId,
+      if (branchFromMessageId != null)
+        'branch_from_message_id': branchFromMessageId,
+      if (branchTitle != null) 'branch_title': branchTitle,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -1906,6 +2066,9 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     Value<double?>? presencePenalty,
     Value<double?>? frequencyPenalty,
     Value<int?>? maxTokens,
+    Value<int?>? parentConversationId,
+    Value<int?>? branchFromMessageId,
+    Value<String?>? branchTitle,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -1920,6 +2083,9 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
       presencePenalty: presencePenalty ?? this.presencePenalty,
       frequencyPenalty: frequencyPenalty ?? this.frequencyPenalty,
       maxTokens: maxTokens ?? this.maxTokens,
+      parentConversationId: parentConversationId ?? this.parentConversationId,
+      branchFromMessageId: branchFromMessageId ?? this.branchFromMessageId,
+      branchTitle: branchTitle ?? this.branchTitle,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -1958,6 +2124,15 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
     if (maxTokens.present) {
       map['max_tokens'] = Variable<int>(maxTokens.value);
     }
+    if (parentConversationId.present) {
+      map['parent_conversation_id'] = Variable<int>(parentConversationId.value);
+    }
+    if (branchFromMessageId.present) {
+      map['branch_from_message_id'] = Variable<int>(branchFromMessageId.value);
+    }
+    if (branchTitle.present) {
+      map['branch_title'] = Variable<String>(branchTitle.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1980,6 +2155,9 @@ class ConversationsCompanion extends UpdateCompanion<Conversation> {
           ..write('presencePenalty: $presencePenalty, ')
           ..write('frequencyPenalty: $frequencyPenalty, ')
           ..write('maxTokens: $maxTokens, ')
+          ..write('parentConversationId: $parentConversationId, ')
+          ..write('branchFromMessageId: $branchFromMessageId, ')
+          ..write('branchTitle: $branchTitle, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -8711,6 +8889,9 @@ typedef $$ConversationsTableCreateCompanionBuilder =
       Value<double?> presencePenalty,
       Value<double?> frequencyPenalty,
       Value<int?> maxTokens,
+      Value<int?> parentConversationId,
+      Value<int?> branchFromMessageId,
+      Value<String?> branchTitle,
       required DateTime createdAt,
       required DateTime updatedAt,
     });
@@ -8726,6 +8907,9 @@ typedef $$ConversationsTableUpdateCompanionBuilder =
       Value<double?> presencePenalty,
       Value<double?> frequencyPenalty,
       Value<int?> maxTokens,
+      Value<int?> parentConversationId,
+      Value<int?> branchFromMessageId,
+      Value<String?> branchTitle,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -8844,6 +9028,21 @@ class $$ConversationsTableFilterComposer
 
   ColumnFilters<int> get maxTokens => $composableBuilder(
     column: $table.maxTokens,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get parentConversationId => $composableBuilder(
+    column: $table.parentConversationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get branchFromMessageId => $composableBuilder(
+    column: $table.branchFromMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get branchTitle => $composableBuilder(
+    column: $table.branchTitle,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8985,6 +9184,21 @@ class $$ConversationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get parentConversationId => $composableBuilder(
+    column: $table.parentConversationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get branchFromMessageId => $composableBuilder(
+    column: $table.branchFromMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get branchTitle => $composableBuilder(
+    column: $table.branchTitle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9062,6 +9276,21 @@ class $$ConversationsTableAnnotationComposer
 
   GeneratedColumn<int> get maxTokens =>
       $composableBuilder(column: $table.maxTokens, builder: (column) => column);
+
+  GeneratedColumn<int> get parentConversationId => $composableBuilder(
+    column: $table.parentConversationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get branchFromMessageId => $composableBuilder(
+    column: $table.branchFromMessageId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get branchTitle => $composableBuilder(
+    column: $table.branchTitle,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -9185,6 +9414,9 @@ class $$ConversationsTableTableManager
                 Value<double?> presencePenalty = const Value.absent(),
                 Value<double?> frequencyPenalty = const Value.absent(),
                 Value<int?> maxTokens = const Value.absent(),
+                Value<int?> parentConversationId = const Value.absent(),
+                Value<int?> branchFromMessageId = const Value.absent(),
+                Value<String?> branchTitle = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => ConversationsCompanion(
@@ -9198,6 +9430,9 @@ class $$ConversationsTableTableManager
                 presencePenalty: presencePenalty,
                 frequencyPenalty: frequencyPenalty,
                 maxTokens: maxTokens,
+                parentConversationId: parentConversationId,
+                branchFromMessageId: branchFromMessageId,
+                branchTitle: branchTitle,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -9213,6 +9448,9 @@ class $$ConversationsTableTableManager
                 Value<double?> presencePenalty = const Value.absent(),
                 Value<double?> frequencyPenalty = const Value.absent(),
                 Value<int?> maxTokens = const Value.absent(),
+                Value<int?> parentConversationId = const Value.absent(),
+                Value<int?> branchFromMessageId = const Value.absent(),
+                Value<String?> branchTitle = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
               }) => ConversationsCompanion.insert(
@@ -9226,6 +9464,9 @@ class $$ConversationsTableTableManager
                 presencePenalty: presencePenalty,
                 frequencyPenalty: frequencyPenalty,
                 maxTokens: maxTokens,
+                parentConversationId: parentConversationId,
+                branchFromMessageId: branchFromMessageId,
+                branchTitle: branchTitle,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),

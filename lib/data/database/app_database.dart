@@ -1,6 +1,6 @@
-/// 应用数据库 — drift 数据库入口（schemaVersion=10，M0 冻结 + AC-01 升版 +
+/// 应用数据库 — drift 数据库入口（schemaVersion=11，M0 冻结 + AC-01 升版 +
 /// PS2-01 升版 + FD-05 升版 + VR-04 升版 + MS-01 升版 + WL-01 升版 +
-/// NPD-02 升版 + NPD-04 升版 + SP-01 升版）。
+/// NPD-02 升版 + NPD-04 升版 + SP-01 升版 + BR-01 升版）。
 ///
 /// - 表注册：characters / conversations / messages / settings / memory_entries /
 ///   persona_revisions（定义见 `tables.dart`；前四表权威源为桌面端 ORM，
@@ -16,6 +16,9 @@
 /// - SP-01：conversations.top_p / presence_penalty / frequency_penalty /
 ///   max_tokens 四列（schemaVersion 9→10，chat-polish spec §4.6 采样参数，
 ///   NULL=不覆盖 provider 默认）
+/// - BR-01：conversations.parent_conversation_id / branch_from_message_id /
+///   branch_title 三可空列（schemaVersion 10→11，chat-polish spec §4.7 分支
+///   元数据，逻辑引用不建硬 FK）
 /// - 执行器构造注入：测试 seam，测试用 `AppDatabase(NativeDatabase.memory())`
 ///   在内存中打开真实 schema，不依赖设备
 /// - 运行态连接经 [AppDatabase.open]（drift_flutter 惰性打开，内部即
@@ -58,7 +61,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -311,6 +314,40 @@ class AppDatabase extends _$AppDatabase {
           'max_tokens': 'INTEGER',
         };
         for (final entry in sp01Columns.entries) {
+          final hasColumn = convColumns.any(
+            (row) => row.data['name'] == entry.key,
+          );
+          if (!hasColumn) {
+            await customStatement(
+              'ALTER TABLE conversations ADD COLUMN ${entry.key} ${entry.value}',
+            );
+          }
+        }
+      }
+      // BR-01：schemaVersion 10→11 新增 conversations.parent_conversation_id /
+      // branch_from_message_id / branch_title 三可空列（chat-polish spec §4.7
+      // 分支元数据，对齐桌面 models/conversation.py 与 database.py
+      // `_ensure_*` 探测补列先例）。
+      //
+      // 列补建**不用** drift Migration.addColumn——它无 IF NOT EXISTS 语义，
+      // 中断残留重开（列已补、user_version 未回写）时重复补列会 duplicate
+      // column 炸库。改走「PRAGMA table_info 探测缺列 → ALTER TABLE ADD
+      // COLUMN」幂等补列（沿 from < 6/7/8/9/10 先例），逐列探测、逐列补建。
+      // 本块不含新表/新索引，无需 CREATE IF NOT EXISTS。user_version=11 由
+      // drift 成功后回写，失败锁库重开重跑（F-78 幂等三机制延续）。既有行
+      // 新列值 = NULL（三列均可空无默认，零影响）。**不建硬 FK**——三列是
+      // 逻辑引用（删源会话时由服务层把派生分支的 parent / 锚引用置空，
+      // 沿桌面 BR-2 删源置空策略；SQLite 无 FK 则删源不触发 RESTRICT）。
+      if (from < 11) {
+        final convColumns = await customSelect(
+          'PRAGMA table_info(conversations)',
+        ).get();
+        const br01Columns = <String, String>{
+          'parent_conversation_id': 'INTEGER',
+          'branch_from_message_id': 'INTEGER',
+          'branch_title': 'TEXT',
+        };
+        for (final entry in br01Columns.entries) {
           final hasColumn = convColumns.any(
             (row) => row.data['name'] == entry.key,
           );
