@@ -276,6 +276,19 @@ class _ScriptedChatService implements ChatService {
   }) async {
     throw UnimplementedError('F-65③ 脚本化测试不触 deleteMessage');
   }
+
+  @override
+  Future<Message> switchSwipe({
+    required int conversationId,
+    required int messageId,
+    required int index,
+  }) async {
+    // 接口顺应存根：_ScriptedChatService implements ChatService，ChatService
+    // 新增 switchSwipe 后编译必需（F-140）。脚本化编排仅驱动 streamReply
+    // 事件流；switchSwipe 组走真实 ChatService（行为等价由该组既有断言
+    // 承保）——被触即炸，保持脚本化测试诚实性（F-65③ 关联）。
+    throw UnimplementedError('F-65③ 脚本化测试不触 switchSwipe');
+  }
 }
 
 /// [MessageRepository] 的挂起替身（switchSwipe 防并发测试用）：switchSwipe
