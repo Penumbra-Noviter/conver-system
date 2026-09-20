@@ -384,6 +384,49 @@ class ChatController extends ChangeNotifier {
     await loadEntry();
   }
 
+  /// 保存当前会话的采样参数覆盖（SP-02）：经
+  /// [ConversationRepository.updateConversation] 部分更新写 conversations 四列
+  /// （topP / presencePenalty / frequencyPenalty / maxTokens），四参数可空
+  /// 三态：
+  /// - 非 null → 显式覆盖，`Value(x)` 落列；
+  /// - null → 清除覆盖（沿用全局/默认），`Value(null)` 显式写 NULL——
+  ///   契约锁「保存后 Conversations 列值 = 显式覆盖值 或 NULL」（drift
+  ///   UpdateCompanion 显式 `Value(null)` 会写 SQL NULL，非忽略）。
+  ///
+  /// 成功 → [activeConversation] 刷新为仓储回读行（弹层回显立即生效）；
+  /// 会话不存在（已删除）→ [notice]「对话不存在」（guard，不崩溃）；仓储
+  /// 异常 → notice 折叠（先错者胜）。入口态（无活动会话，UI 不渲染入口）→
+  /// 防御性 no-op。
+  Future<void> saveConversationSampling({
+    double? topP,
+    double? presencePenalty,
+    double? frequencyPenalty,
+    int? maxTokens,
+  }) async {
+    final cid = _activeConversationId;
+    if (cid == null) {
+      return;
+    }
+    final updated = await _noticeRunner.guard<Conversation?>(
+      op: () => _conversationRepository.updateConversation(
+        cid,
+        ConversationsCompanion(
+          topP: Value(topP),
+          presencePenalty: Value(presencePenalty),
+          frequencyPenalty: Value(frequencyPenalty),
+          maxTokens: Value(maxTokens),
+        ),
+      ),
+      onError: (e) => '保存采样参数失败: $e',
+    );
+    if (updated == null) {
+      _noticeRunner.setFirst('对话不存在');
+      return;
+    }
+    _activeConversation = updated;
+    notifyListeners();
+  }
+
   /// 删除会话（U-1）：委托 [ConversationRepository.deleteConversation]
   /// 落库，随后 [loadEntry] 刷新列表。
   ///

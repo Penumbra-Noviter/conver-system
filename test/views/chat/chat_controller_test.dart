@@ -1545,4 +1545,130 @@ void main() {
       expect(c.conversations.map((e) => e.conversation.id).toList(), before);
     });
   });
+
+  group('SP-02 · 对话级采样参数保存（saveConversationSampling）', () {
+    test('保存 → 落四列（updateConversation），activeConversation 刷新为回读行',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+
+      await c.saveConversationSampling(
+        topP: 0.4,
+        presencePenalty: -1.2,
+        frequencyPenalty: 0.8,
+        maxTokens: 512,
+      );
+
+      final row = await convRepo.getConversation(conv.id);
+      expect(row?.topP, 0.4);
+      expect(row?.presencePenalty, -1.2);
+      expect(row?.frequencyPenalty, 0.8);
+      expect(row?.maxTokens, 512);
+      expect(c.activeConversation?.topP, 0.4,
+          reason: '回显行刷新为回读行');
+      expect(c.notice, isNull);
+    });
+
+    test('全 null（清除覆盖）→ 四列落 NULL（契约锁：列值 = 覆盖值或 NULL）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await convRepo.updateConversation(
+        conv.id,
+        ConversationsCompanion(
+          topP: Value(0.4),
+          presencePenalty: Value(-1.2),
+          frequencyPenalty: Value(0.8),
+          maxTokens: Value(512),
+        ),
+      );
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+      expect((await convRepo.getConversation(conv.id))?.topP, 0.4,
+          reason: '前置覆盖已就位');
+
+      await c.saveConversationSampling();
+
+      final row = await convRepo.getConversation(conv.id);
+      expect(row?.topP, isNull);
+      expect(row?.presencePenalty, isNull);
+      expect(row?.frequencyPenalty, isNull);
+      expect(row?.maxTokens, isNull);
+    });
+
+    test('单项清除：只传部分非 null → 该列覆盖、其余回 NULL，不影响既有非目标列',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await convRepo.updateConversation(
+        conv.id,
+        ConversationsCompanion(
+          topP: Value(0.4),
+          presencePenalty: Value(-1.2),
+        ),
+      );
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+
+      await c.saveConversationSampling(
+        topP: null,
+        presencePenalty: -0.5,
+        frequencyPenalty: null,
+        maxTokens: 256,
+      );
+
+      final row = await convRepo.getConversation(conv.id);
+      expect(row?.topP, isNull, reason: 'top_p 清除回 null');
+      expect(row?.presencePenalty, -0.5, reason: 'presence 覆盖');
+      expect(row?.frequencyPenalty, isNull);
+      expect(row?.maxTokens, 256);
+    });
+
+    test('会话删除后保存 → notice「对话不存在」（guard 不崩溃）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+      await convRepo.deleteConversation(conv.id); // 模拟他处删除
+
+      await c.saveConversationSampling(topP: 0.2);
+
+      expect(c.notice, '对话不存在');
+      // 缓存行保持打开时快照（不自动清空），guard 语义 = notice 提示不崩溃。
+      expect(c.activeConversation?.id, conv.id);
+    });
+
+    test('入口态（无活动会话）→ 保存 no-op，零副作用', () async {
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.saveConversationSampling(topP: 0.2);
+
+      expect(c.notice, isNull);
+      expect(c.activeConversation, isNull);
+    });
+
+    test('保存不触全局设置；改全局 temperature/max_tokens 不影响会话覆盖列'
+        '（会话覆盖优先互证）', () async {
+      await settingsRepo.setMany({'temperature': '0.5', 'max_tokens': '2048'});
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+
+      await c.saveConversationSampling(topP: 0.4, maxTokens: 512);
+
+      expect(await settingsRepo.getTemperature(), 0.5,
+          reason: '会话保存不写全局温度');
+      expect(await settingsRepo.getMaxTokens(), 2048,
+          reason: '会话保存不写全局 max_tokens');
+
+      await settingsRepo.setMany({'temperature': '1.2', 'max_tokens': '4096'});
+      final row = await convRepo.getConversation(conv.id);
+      expect(row?.topP, 0.4, reason: '改全局不影响会话覆盖列');
+      expect(row?.maxTokens, 512);
+    });
+  });
 }
