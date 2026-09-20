@@ -65,6 +65,8 @@ void main() {
           'embedding_api_key',
           'embedding_base_url',
           'embedding_model',
+          'memory_palace_enabled',
+          'memory_palace_every_rounds',
         }),
       );
     });
@@ -663,6 +665,73 @@ void main() {
         (manually! as ApiKeyMissingError).message,
         reason: '拆错路径文案与手工接线逐字一致',
       );
+    });
+  });
+
+  group('WL-05 记忆宫殿设置键（白名单 + 类型化 getter）', () {
+    test('allowedKeys 含两键常量（锚：memoryPalaceEnabledKey / memoryPalaceEveryRoundsKey）', () {
+      expect(SettingsRepository.memoryPalaceEnabledKey, 'memory_palace_enabled');
+      expect(
+        SettingsRepository.memoryPalaceEveryRoundsKey,
+        'memory_palace_every_rounds',
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SettingsRepository.memoryPalaceEnabledKey),
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SettingsRepository.memoryPalaceEveryRoundsKey),
+      );
+    });
+
+    test('缺省常量：enabled 缺省 false、every_rounds 缺省 6（对齐 reflection 先例默认关）', () {
+      expect(SettingsRepository.defaultMemoryPalaceEveryRounds, 6);
+    });
+
+    test('memoryPalaceEnabled 缺省 false（无键 / 空串 / 其他值）', () async {
+      expect(await repository.memoryPalaceEnabled, isFalse);
+
+      await repository.setMany({SettingsRepository.memoryPalaceEnabledKey: ''});
+      expect(await repository.memoryPalaceEnabled, isFalse);
+
+      await repository.setMany({SettingsRepository.memoryPalaceEnabledKey: '1'});
+      expect(await repository.memoryPalaceEnabled, isFalse);
+
+      await repository.setMany({SettingsRepository.memoryPalaceEnabledKey: 'TRUE'});
+      expect(await repository.memoryPalaceEnabled, isFalse);
+    });
+
+    test('memoryPalaceEnabled 存储值 true 即开启；写空串恢复缺省', () async {
+      expect(await repository.memoryPalaceEnabled, isFalse);
+      await repository.setMany({SettingsRepository.memoryPalaceEnabledKey: 'true'});
+      expect(await repository.memoryPalaceEnabled, isTrue);
+
+      await repository.setMany({SettingsRepository.memoryPalaceEnabledKey: ''});
+      expect(await repository.memoryPalaceEnabled, isFalse);
+    });
+
+    test('memoryPalaceEveryRounds 缺省 6；非法值回退缺省', () async {
+      expect(await repository.memoryPalaceEveryRounds, 6);
+
+      await repository.setMany({SettingsRepository.memoryPalaceEveryRoundsKey: 'abc'});
+      expect(await repository.memoryPalaceEveryRounds, 6);
+
+      await repository.setMany({SettingsRepository.memoryPalaceEveryRoundsKey: ''});
+      expect(await repository.memoryPalaceEveryRounds, 6);
+    });
+
+    test('memoryPalaceEveryRounds 写入读回', () async {
+      await repository.setMany({SettingsRepository.memoryPalaceEveryRoundsKey: '12'});
+      expect(await repository.memoryPalaceEveryRounds, 12);
+    });
+
+    test('白名单外 memory_palace 附近键名仍被忽略（既有语义不回归）', () async {
+      await repository.setMany({
+        'memory_palace_enabled_extra': 'true',
+        'memory_palace': '1',
+      });
+      expect(await repository.getAll(), isEmpty);
     });
   });
 }

@@ -102,4 +102,35 @@ void main() {
       expect(await repository.innerThoughtEnabled, isFalse);
     });
   });
+
+  group('WL-05 记忆宫殿两键（阶段 2 附加）', () {
+    test('allowedKeys 含 memoryPalaceEnabledKey / memoryPalaceEveryRoundsKey', () {
+      expect(SettingsRepository.allowedKeys, contains('memory_palace_enabled'));
+      expect(
+        SettingsRepository.allowedKeys,
+        contains('memory_palace_every_rounds'),
+      );
+    });
+
+    test('可经 setMany/getValue 往返（白名单内可写）', () async {
+      await repository.setMany({
+        SettingsRepository.memoryPalaceEnabledKey: 'true',
+        SettingsRepository.memoryPalaceEveryRoundsKey: '12',
+      });
+      expect(
+        await repository.getValue(SettingsRepository.memoryPalaceEnabledKey),
+        'true',
+      );
+      expect(
+        await repository.getValue(SettingsRepository.memoryPalaceEveryRoundsKey),
+        '12',
+      );
+    });
+
+    test('memoryPalaceEnabled 缺省 false（opt-in 成本敏感）', () async {
+      expect(await repository.memoryPalaceEnabled, isFalse);
+      await repository.setMany({SettingsRepository.memoryPalaceEnabledKey: 'true'});
+      expect(await repository.memoryPalaceEnabled, isTrue);
+    });
+  });
 }

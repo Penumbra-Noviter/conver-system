@@ -79,10 +79,13 @@ class ConversationSettingsPage extends StatefulWidget {
 class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
   double _temperature = SettingsRepository.defaultTemperature;
   final TextEditingController _maxTokensController = TextEditingController();
+  final TextEditingController _memoryPalaceRoundsController =
+      TextEditingController();
   bool _reflectionEnabled = false;
   bool _proactiveEnabled = false;
   bool _innerThoughtEnabled = false;
   bool _embeddingEnabled = false;
+  bool _memoryPalaceEnabled = false;
   bool _embeddingTesting = false;
   final TextEditingController _embeddingApiKeyController =
       TextEditingController();
@@ -106,6 +109,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
   @override
   void dispose() {
     _maxTokensController.dispose();
+    _memoryPalaceRoundsController.dispose();
     _embeddingApiKeyController.dispose();
     _embeddingBaseUrlController.dispose();
     _embeddingModelController.dispose();
@@ -125,6 +129,10 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
           await widget.settingsRepository.innerThoughtEnabled;
       final embeddingEnabled =
           await widget.settingsRepository.embeddingEnabled;
+      final memoryPalaceEnabled =
+          await widget.settingsRepository.memoryPalaceEnabled;
+      final memoryPalaceRounds =
+          await widget.settingsRepository.memoryPalaceEveryRounds;
       // key 直读 embedding 槽位（不做 openai 槽兜底，回显对齐
       // api_config_section「直读对应槽位，避免他槽值显示进本槽」先例）。
       final embeddingApiKey =
@@ -146,6 +154,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         _proactiveEnabled = proactiveEnabled;
         _innerThoughtEnabled = innerThoughtEnabled;
         _embeddingEnabled = embeddingEnabled;
+        _memoryPalaceEnabled = memoryPalaceEnabled;
+        _memoryPalaceRoundsController.text = memoryPalaceRounds.toString();
         _embeddingApiKeyController.text = embeddingApiKey;
         _embeddingBaseUrlController.text = embeddingBaseUrl;
         _embeddingModelController.text = embeddingModel;
@@ -193,6 +203,20 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       return;
     }
     final embeddingModel = _embeddingModelController.text.trim();
+    // 记忆宫殿归纳轮数（WL-05）：非数字回退缺省、越界 clamp 到合法区间
+    // （对齐 memory_palace_rounds clamp 语义；[memoryPalaceEveryRoundsMin]/
+    // [memoryPalaceEveryRoundsMax] 见仓储常量）。
+    final palaceParsed = int.tryParse(
+      _memoryPalaceRoundsController.text.trim(),
+    );
+    final memoryPalaceRounds = palaceParsed == null
+        ? SettingsRepository.defaultMemoryPalaceEveryRounds
+        : palaceParsed
+              .clamp(
+                SettingsRepository.memoryPalaceEveryRoundsMin,
+                SettingsRepository.memoryPalaceEveryRoundsMax,
+              )
+              .toInt();
     try {
       await widget.settingsRepository.setMany({
         'temperature': _temperature.toString(),
@@ -201,6 +225,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         SettingsRepository.embeddingBaseUrlKey: ?embeddingBaseUrl,
         if (embeddingModel.isNotEmpty)
           SettingsRepository.embeddingModelKey: embeddingModel,
+        SettingsRepository.memoryPalaceEveryRoundsKey:
+            memoryPalaceRounds.toString(),
       });
       if (!mounted) {
         return;
@@ -332,6 +358,27 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         return;
       }
       setState(() => _embeddingEnabled = !value);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('保存失败')));
+    }
+  }
+
+  /// 切换记忆宫殿开关（WL-05，即时写入 `memory_palace_enabled` 键）。
+  ///
+  /// 默认关（成本敏感 opt-in：开启后对话内容将经归纳 LLM 产出世界书条目）；
+  /// 写失败回滚 UI 状态并提示；开关即时生效，无需点「保存」。
+  Future<void> _setMemoryPalace(bool value) async {
+    setState(() => _memoryPalaceEnabled = value);
+    try {
+      await widget.settingsRepository.setMany({
+        SettingsRepository.memoryPalaceEnabledKey: value.toString(),
+      });
+    } catch (e) {
+      debugPrint('记忆宫殿开关保存失败: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() => _memoryPalaceEnabled = !value);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('保存失败')));
     }
@@ -540,6 +587,32 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     onChanged: _setEmbeddingEnabled,
                   ),
                   _embeddingFields(textTheme),
+                  const SizedBox(height: ConverSpacing.space4),
+                  Divider(thickness: 1, color: palette.border),
+                  const SizedBox(height: ConverSpacing.space2),
+                  Text(
+                    '记忆宫殿',
+                    style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+                  ),
+                  const SizedBox(height: ConverSpacing.space1),
+                  Text(
+                    '每 6 回合归纳对话要点为世界书条目',
+                    style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('启用记忆宫殿'),
+                    value: _memoryPalaceEnabled,
+                    onChanged: _setMemoryPalace,
+                  ),
+                  TextField(
+                    key: const ValueKey('memory-palace-rounds'),
+                    controller: _memoryPalaceRoundsController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      hintText: '每 N 回合归纳一次',
+                    ),
+                  ),
                   const SizedBox(height: ConverSpacing.space5),
                   FilledButton(onPressed: _save, child: const Text('保存')),
                 ],

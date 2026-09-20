@@ -363,4 +363,109 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  group('WL-05 记忆宫殿开关 + 轮数输入（验收 5）', () {
+    testWidgets('加载回显：enabled=true / every_rounds=12 与存储一致', (tester) async {
+      await repo.setMany({
+        SettingsRepository.memoryPalaceEnabledKey: 'true',
+        SettingsRepository.memoryPalaceEveryRoundsKey: '12',
+      });
+      await pumpPage(tester);
+
+      expect(switchValue(tester, '启用记忆宫殿'), isTrue);
+      expect(
+        find.widgetWithText(TextField, '12'),
+        findsOneWidget,
+        reason: '轮数输入回显 12',
+      );
+      expect(find.text('每 6 回合归纳对话要点为世界书条目'), findsOneWidget);
+    });
+
+    testWidgets('缺省：开关 false / 轮数输入 6', (tester) async {
+      await pumpPage(tester);
+
+      expect(switchValue(tester, '启用记忆宫殿'), isFalse);
+      expect(find.widgetWithText(TextField, '6'), findsOneWidget);
+    });
+
+    testWidgets('切换「启用记忆宫殿」→ 写 memoryPalaceEnabledKey 且重建回显一致', (tester) async {
+      await pumpPage(tester);
+      expect(switchValue(tester, '启用记忆宫殿'), isFalse);
+
+      await tester.tap(find.widgetWithText(SwitchListTile, '启用记忆宫殿'));
+      await tester.pumpAndSettle();
+      expect(
+        await repo.getValue(SettingsRepository.memoryPalaceEnabledKey),
+        'true',
+      );
+      expect(switchValue(tester, '启用记忆宫殿'), isTrue);
+
+      await rebuildPage(tester);
+      expect(switchValue(tester, '启用记忆宫殿'), isTrue);
+    });
+
+    testWidgets('记忆宫殿开关写失败 → UI 回滚 + SnackBar「保存失败」', (tester) async {
+      final failing = SaveFailRepo(db);
+      repo = failing;
+      await pumpPage(tester);
+      expect(switchValue(tester, '启用记忆宫殿'), isFalse);
+
+      await tester.tap(find.widgetWithText(SwitchListTile, '启用记忆宫殿'));
+      await tester.pumpAndSettle();
+
+      expect(switchValue(tester, '启用记忆宫殿'), isFalse, reason: '写失败应回滚 UI');
+      expect(find.text('保存失败'), findsOneWidget);
+    });
+
+    testWidgets('保存按钮写轮数：非数字回退缺省 6 / 非法 clamp', (tester) async {
+      await pumpPage(tester);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('memory-palace-rounds')),
+        '3',
+      );
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(
+        await repo.getValue(SettingsRepository.memoryPalaceEveryRoundsKey),
+        '3',
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('memory-palace-rounds')),
+        'abc',
+      );
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(
+        await repo.getValue(SettingsRepository.memoryPalaceEveryRoundsKey),
+        '6',
+        reason: '非数字回退缺省 6',
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('memory-palace-rounds')),
+        '-5',
+      );
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(
+        await repo.getValue(SettingsRepository.memoryPalaceEveryRoundsKey),
+        '1',
+        reason: '负数 clamp 到下限',
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('memory-palace-rounds')),
+        '9999',
+      );
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(
+        await repo.getValue(SettingsRepository.memoryPalaceEveryRoundsKey),
+        '999',
+        reason: '超上限 clamp 到上限',
+      );
+    });
+  });
 }
