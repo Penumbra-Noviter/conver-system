@@ -93,34 +93,24 @@ void main() {
       expect(refreshed.first.conversationCount, 2);
     });
 
-    test('跨秒 seed → 后建角色排首（F-141 根因实证：修复前红）', () async {
-      // F-141 实证（诊断，不保留为常绿用例）：夹具 seedCharacter 曾用真实
-      // DateTime.now() 填时间戳——两个 seed 落在秒边界两侧时，后建者
-      // updated_at 更晚，`updated_at DESC` 排序把后建者顶到 first。断言
-      // 「首角色 = 先建」即打破「默认选中首角色」契约（复现 first.id == 2）。
-      final first = await seedCharacter(name: '先建');
-      advanceSeconds(1); // 推进 1s 跨秒（对齐 F-136 观察：真实时钟跨秒 seed）。
-      await seedCharacter(name: '后建');
-
-      final list = await repo.listCharacters();
-      expect(list.first.character.id, first.id,
-          reason: '跨秒两 seed 时首角色应为先建（修复前实得后建者排首）');
-    });
-
-    test('同 updated_at 时按 id 升序（创建序）稳定', () async {
-      // 不推进 fakeNow：两次 seed 落库为同一秒 updated_at（F-106 契约面）。
+    test('同 updated_at 时按 id 升序（创建序）稳定（F-141 契约锁）', () async {
+      // 不推进 fakeNow：多次 seed 落库为同一秒 updated_at（F-106 契约面）。
+      // F-141：夹具注入可控时钟后测试同刻铺种多角色，此排序即「默认选中首
+      // 角色」契约的仓库层双口径——跨秒会打破（后建者 updated_at DESC 排首，
+      // 实证段红，见 git 历史 a6132fd），时钟可控后同刻落库走 id ASC。
       final first = await seedCharacter(name: '先建', secondsAgo: 0);
-      final second = await seedCharacter(name: '后建', secondsAgo: 0);
+      final second = await seedCharacter(name: '次建', secondsAgo: 0);
+      final third = await seedCharacter(name: '后建', secondsAgo: 0);
       expect(
         first.updatedAt,
-        second.updatedAt,
-        reason: '前置：两次 seed 必须落在同一 updated_at，否则用例不成立',
+        third.updatedAt,
+        reason: '前置：多次 seed 必须落在同一 updated_at，否则用例不成立',
       );
 
       final list = await repo.listCharacters();
       expect(
         list.map((row) => row.character.id),
-        [first.id, second.id],
+        [first.id, second.id, third.id],
       );
     });
   });

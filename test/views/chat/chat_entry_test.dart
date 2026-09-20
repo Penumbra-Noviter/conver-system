@@ -28,6 +28,11 @@ import '../../helpers/fake_llm_provider.dart';
 import '../../helpers/pump_until.dart';
 
 void main() {
+  // 固定起始时刻（drift 落库为 unix 秒）——F-141：角色选择条相关用例经
+  // ChatTestEnv.create(now: ...) 注入可控时钟，同刻铺种多角色（updated_at
+  // 相等 → id ASC 创建序），「默认选中首角色」断言不再依赖真实秒边界运气。
+  var fakeNow = DateTime.fromMillisecondsSinceEpoch(1700000000 * 1000);
+
   /// pump ChatView（入口或对话态由 controller.isEntry 决定）。
   Future<void> pumpChat(WidgetTester tester, ChatController controller) async {
     await tester.pumpWidget(
@@ -73,7 +78,8 @@ void main() {
     });
 
     testWidgets('角色选择条渲染全部角色名 + 默认选中首角色 + tap 切换高亮', (tester) async {
-      final env = await ChatTestEnv.create();
+      // F-141：两 seed 同刻落库（注入固定时钟），「默认选中首角色」确定性命中。
+      final env = await ChatTestEnv.create(now: () => fakeNow);
       final first = await env.seedCharacter(name: '艾莉亚');
       final second = await env.seedCharacter(name: '白露');
       final c = entryController(env, FakeLLMProvider(tokens: const []));
@@ -120,7 +126,7 @@ void main() {
     });
 
     testWidgets('新建对话以选中角色建会话（非首角色）', (tester) async {
-      final env = await ChatTestEnv.create();
+      final env = await ChatTestEnv.create(now: () => fakeNow);
       await env.seedCharacter(name: '艾莉亚');
       final target = await env.seedCharacter(
         name: '白露',
