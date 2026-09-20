@@ -1468,13 +1468,17 @@ class ChatService {
   }
 
   /// 组装发送给 LLM 的消息列表（角色字段 → CharacterData + 滑窗 + 历史 +
-  /// 世界书注入）。
+  /// 世界书注入 + 叙述风格 + 预设对话快照）。
   ///
   /// [historyBeforeId] 非空（重生成路径）时历史只取 `id < historyBeforeId`
   /// 的消息——桌面「先 delete_messages_from 截断、后组装」在**延迟删除**下以
   /// 定位读（[MessageRepository.messagesBefore]）等价实现，保证被重生成目标
   /// （及其后）不进入自身上下文。世界书扫描与消息列表共用该历史截止（桌面
   /// assemble_chat_context 逐字对齐）。
+  ///
+  /// NPD-02 预设对话：本方法为**唯一组装点**（streamReply / regenerate 共用），
+  /// 读会话快照 `conv.presetDialogue` 透传 buildMessages——快照非空 → 注入；
+  /// 快照空/会话无快照 → 不透传（buildMessages 零注入，验收 6）。
   Future<List<LlmMessage>> _assembleMessages({
     required Conversation conv,
     required Character character,
@@ -1537,6 +1541,10 @@ class ChatService {
       extraVars: extraVars,
       world: world,
       narrativeStyle: narrativeStyle,
+      // NPD-02：会话快照透传（创建时固化的 presetDialogue；快照空/无 → null
+      // 透传 → buildMessages 零注入。改角色卡 presetDialogues 实时值不影响
+      // 已建会话——注入源恒为本快照列，验收 5/6）。
+      presetDialogue: conv.presetDialogue,
     );
     final messages = [
       for (final m in built) LlmMessage(role: m.role, content: m.content),

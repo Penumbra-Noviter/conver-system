@@ -271,6 +271,62 @@ void main() {
     });
   });
 
+  group('createConversation · 预设对话快照（NPD-02 验收 5）', () {
+    test('带 presetDialogue → 快照固化入 conversations.preset_dialogue', () async {
+      final char = await seedCharacter(name: '艾莉亚');
+      final conv = await repo.createConversation(
+        characterId: char.id,
+        presetDialogue: '<START>\n{{user}}: 你好\n{{char}}: 欢迎',
+      );
+
+      final stored = await repo.getConversation(conv.id);
+      expect(stored!.presetDialogue, '<START>\n{{user}}: 你好\n{{char}}: 欢迎');
+    });
+
+    test('空串 → 快照列不落伪值（null），其余创建语义零回归', () async {
+      final char = await seedCharacter(name: '诺克斯');
+      final conv = await repo.createConversation(
+        characterId: char.id,
+        presetDialogue: '',
+      );
+      expect(conv.presetDialogue, isNull);
+    });
+
+    test('快照语义契约锁：改角色卡 presetDialogues 实时值不影响已建会话快照',
+        () async {
+      final char = await seedCharacter(name: '艾莉亚');
+      final conv = await repo.createConversation(
+        characterId: char.id,
+        presetDialogue: '<START>\n{{user}}: 固化快照{{char}}',
+      );
+
+      // 创建后修改角色卡 presetDialogues（实时值变为另一快照文本）。
+      await (db.update(db.characters)..where((t) => t.id.equals(char.id))).write(
+        CharactersCompanion(
+          presetDialogues: Value(const [
+            {'name': '变更', 'content': '后改的内容'},
+          ]),
+        ),
+      );
+
+      // 已建会话的注入源仍为创建时固化的快照（改卡零影响）。
+      final stored = await repo.getConversation(conv.id);
+      expect(stored!.presetDialogue, '<START>\n{{user}}: 固化快照{{char}}');
+    });
+
+    test('纯空白 → 非空串原样固化（桌面 or None 语义；注入门控在 buildMessages',
+        () async {
+      final char = await seedCharacter(name: '夜莺');
+      final conv = await repo.createConversation(
+        characterId: char.id,
+        presetDialogue: '   ',
+      );
+      // 桌面 `data.preset_dialogue or None`：Python 纯空白 truthy → 原样固化
+      // （buildMessages 侧以 trim 门控零注入），非空串不归一为 null。
+      expect(conv.presetDialogue, '   ');
+    });
+  });
+
   group('updateConversation（A6 部分更新）', () {
     test('仅显式字段变更且 updated_at 前移', () async {
       final char = await seedCharacter();

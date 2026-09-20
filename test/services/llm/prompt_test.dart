@@ -1017,4 +1017,171 @@ void main() {
       expect(msgs.last.role, isNot('system'));
     });
   });
+
+  // ── 12. 预设对话注入（NPD-02：presetDialogue few-shot + 零注入 + 注入序）──
+
+  group('TestPresetDialogueInjection', () {
+    test('presetDialogue null / 空串 / 纯空白：输出与不传逐字节一致（验收 3 零回归）', () {
+      final char = _char(
+        systemPrompt: '系统提示',
+        scenario: '场景设定',
+        mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+        postHistoryInstructions: '历史指令',
+      );
+      final history = [
+        _msg(Role.user, '历史1'),
+        _msg(Role.assistant, '历史2'),
+      ];
+      final baseline = buildMessages(
+        char,
+        history: history,
+        userContent: '当前输入',
+        userName: '小明',
+        world: const {
+          'before_char': ['前置'],
+          'after_char': ['后置'],
+          'system': ['知识'],
+        },
+        narrativeStyle: '叙述规则',
+      );
+      // 不传 presetDialogue（缺省 null）。
+      expect(
+        buildMessages(
+          char,
+          history: history,
+          userContent: '当前输入',
+          userName: '小明',
+          world: const {
+            'before_char': ['前置'],
+            'after_char': ['后置'],
+            'system': ['知识'],
+          },
+          narrativeStyle: '叙述规则',
+        ),
+        baseline,
+      );
+      // 显式 null / 空串 / 纯空白 → 均零注入。
+      for (final preset in [null, '', '   ', '\n\t']) {
+        expect(
+          buildMessages(
+            char,
+            history: history,
+            userContent: '当前输入',
+            userName: '小明',
+            world: const {
+              'before_char': ['前置'],
+              'after_char': ['后置'],
+              'system': ['知识'],
+            },
+            narrativeStyle: '叙述规则',
+            presetDialogue: preset,
+          ),
+          baseline,
+          reason:
+              'presetDialogue=${preset ?? 'null'}(empty/whitespace) 应零注入',
+        );
+      }
+    });
+
+    test('非空 → mes_example 之后、history 之前经 parseMesExample 注入 user/'
+        'assistant few-shot（验收 4）', () {
+      final msgs = buildMessages(
+        _char(
+          systemPrompt: '系统提示',
+          scenario: '场景设定',
+          mesExample: '<START>\n{{user}}: 例问\n{{char}}: 例答',
+          postHistoryInstructions: '历史指令',
+        ),
+        history: [
+          _msg(Role.user, '历史1'),
+          _msg(Role.assistant, '历史2'),
+        ],
+        userContent: '当前输入',
+        userName: '小明',
+        presetDialogue: '<START>\n{{user}}: 请自我介绍\n{{char}}: 我叫{{char}}。',
+      );
+      expect(
+        [for (final m in msgs) m.role],
+        [
+          'system', // system prompt
+          'system', // scenario
+          'user', // mes_example 例问
+          'assistant', // mes_example 例答
+          'user', // presetDialogue few-shot
+          'assistant', // presetDialogue few-shot
+          'user', // history
+          'assistant', // history
+          'system', // PHI
+          'user', // 当前输入
+        ],
+      );
+      // 位置锚：presetDialogue 在 mes_example 之后、history 之前。
+      final exampleIndex = msgs.indexWhere((m) => m.content == '例问');
+      final presetUserIndex = msgs.indexWhere((m) => m.content == '请自我介绍');
+      final presetCharIndex = msgs.indexWhere((m) => m.content == '我叫艾莉。');
+      final historyIndex = msgs.indexWhere((m) => m.content == '历史1');
+      final currentIndex = msgs.indexWhere((m) => m.content == '当前输入');
+      expect(exampleIndex, isNot(-1));
+      expect(presetUserIndex, greaterThan(exampleIndex));
+      expect(presetCharIndex, greaterThan(presetUserIndex));
+      expect(historyIndex, greaterThan(presetCharIndex));
+      expect(currentIndex, greaterThan(historyIndex));
+    });
+
+    test('多轮 <START> 分隔 + 模板变量替换（含 extraVars）', () {
+      final msgs = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        userName: '小明',
+        extraVars: const {'city': '长安'},
+        presetDialogue:
+            '<START>\n{{user}}: 去{{city}}\n{{char}}: 到了{{city}}\n'
+            '<START>\n{{user}}: 再见\n{{char}}: 后会有期',
+      );
+      expect(
+        [for (final m in msgs) m.role],
+        ['system', 'user', 'assistant', 'user', 'assistant', 'user'],
+      );
+      expect(msgs[1], (role: 'user', content: '去长安'));
+      expect(msgs[2], (role: 'assistant', content: '到了长安'));
+      expect(msgs[3], (role: 'user', content: '再见'));
+      expect(msgs[4], (role: 'assistant', content: '后会有期'));
+    });
+
+    test('经 parseMesExample 复用解析：行与内容 trim 与 mes_example 语义一致', () {
+      // presetDialogue 快照文本与 mes_example 走同一 parseMesExample——行级
+      // trim + 内容 trim（含 lstrip(":") 容错），非「原样保真注入」。
+      final msgs = buildMessages(
+        _char(systemPrompt: '系统'),
+        userContent: '你好',
+        presetDialogue: '{{user}}:  你好  \n{{char}}:  欢迎  ',
+      );
+      expect(msgs[1], (role: 'user', content: '你好'));
+      expect(msgs[2], (role: 'assistant', content: '欢迎'));
+    });
+
+    test('重生成路径（appendCurrentInput=false）：preset few-shot 段位置稳定，'
+        '尾随剥离不受影响', () {
+      final msgs = buildMessages(
+        _char(
+          systemPrompt: '系统',
+          postHistoryInstructions: '保持人设',
+        ),
+        history: [
+          _msg(Role.user, '第一轮问'),
+          _msg(Role.assistant, '第一轮答'),
+          _msg(Role.user, '第二轮问'),
+        ],
+        userContent: '忽略',
+        appendCurrentInput: false,
+        presetDialogue: '<START>\n{{user}}: 示范问\n{{char}}: 示范答',
+      );
+      expect(
+        [for (final m in msgs) m.content],
+        ['系统', '示范问', '示范答', '第一轮问', '第一轮答', '第二轮问'],
+      );
+      expect(msgs.last, (role: 'user', content: '第二轮问'));
+      expect(msgs.last.role, isNot('system'));
+    });
+  });
 }

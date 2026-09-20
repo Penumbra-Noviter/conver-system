@@ -6,7 +6,12 @@
 /// EmbeddingEntries / SemanticHits 为阶段 3 两表（schemaVersion=5，
 /// stage3-vector-recall spec §2 D2，桌面无对应物）；
 /// MessageSwipes 候选表 + Messages.active_swipe_index 为 MS-01（schemaVersion=6，
-/// chat-polish spec §4.2，对齐桌面 message.py::MessageSwipe）。
+/// chat-polish spec §4.2，对齐桌面 message.py::MessageSwipe）；
+/// LorebookEntries 世界书条目表为 WL-01（schemaVersion=7，chat-polish spec
+/// §4.4，对齐桌面 models/lorebook.py）；
+/// Characters.presetDialogues + Conversations.presetDialogue 两列为 NPD-02
+/// （schemaVersion=8，chat-polish spec §4.5，对齐桌面 character.py /
+/// conversation.py）。
 ///
 /// 权威源（只读，勿改）：
 /// `desktop/backend/app/models/{character,conversation,message,setting}.py`
@@ -99,6 +104,39 @@ class StringMapConverter extends TypeConverter<Map<String, dynamic>, String> {
   String toSql(Map<String, dynamic> value) => jsonEncode(value);
 }
 
+/// `List<Map<String, String>>` JSON 列转换器（characters.preset_dialogues——
+/// 预设对话 `{name, content}` 列表，NPD-02）。
+///
+/// 脏数据（空串 / 非数组 / 非 dict 项）降级空列表（SR-26；值域与去重语义由
+/// `character_card.dart::_normalizePresetDialogues` 承载，本转换器只做无损
+/// JSON 往返）。
+class PresetDialogueListConverter
+    extends TypeConverter<List<Map<String, String>>, String> {
+  const PresetDialogueListConverter();
+
+  @override
+  List<Map<String, String>> fromSql(String fromDb) {
+    if (fromDb.isEmpty) {
+      return const <Map<String, String>>[];
+    }
+    final decoded = jsonDecode(fromDb);
+    if (decoded is! List) {
+      return const <Map<String, String>>[];
+    }
+    return [
+      for (final item in decoded)
+        if (item is Map)
+          <String, String>{
+            for (final entry in item.entries)
+              entry.key.toString(): entry.value.toString(),
+          },
+    ];
+  }
+
+  @override
+  String toSql(List<Map<String, String>> value) => jsonEncode(value);
+}
+
 /// 角色表 — 对齐桌面端 `models/character.py::Character`
 /// （SillyTavern Character Card V2 全字段）。
 @TableIndex(name: 'idx_characters_name', columns: {#name})
@@ -140,6 +178,18 @@ class Characters extends Table {
   TextColumn get avatar => text().nullable()();
   RealColumn get temperature => real().withDefault(const Constant(0.7))();
 
+  // ── NPD-02 预设对话 ──
+  /// 预设对话列表（JSON 数组 `[{name, content}]`，对齐桌面
+  /// `models/character.py::Character.preset_dialogues`；缺省 `[]`）。
+  ///
+  /// 值域与归一化（≤[PresetDialogueListConverter] 的健壮往返之外的语义）由
+  /// `character_card.dart::_normalizePresetDialogues` 单一承载——桌面
+  /// `_normalize_preset_dialogues`（PRESET_DIALOGUE_MAX=10 截断 / 空字段过滤 /
+  /// 同名去重）逐字镜像，导入侧落到本列前已完成归一化（深层语义不进城）。
+  TextColumn get presetDialogues => text()
+      .map(const PresetDialogueListConverter())
+      .withDefault(const Constant('[]'))();
+
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 }
@@ -158,6 +208,15 @@ class Conversations extends Table {
       text().withDefault(const Constant('claude'))();
   TextColumn get modelName =>
       text().withDefault(const Constant('claude-sonnet-5'))();
+
+  /// 预设对话快照（可空 TEXT；NPD-02，对齐桌面
+  /// `models/conversation.py::Conversation.preset_dialogue`）。
+  ///
+  /// 创建对话时固化（`createConversation` 传入的 presetDialogue 原样落列；
+  /// None/空串 → null 不落伪值——桌面 `data.preset_dialogue or None` 语义）。
+  /// 快照语义 = 创建时固化：改角色卡 presetDialogues 实时值不影响已建会话
+  /// 注入源（对话组装只读本列）。
+  TextColumn get presetDialogue => text().nullable()();
 
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

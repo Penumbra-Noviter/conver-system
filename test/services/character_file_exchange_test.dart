@@ -34,6 +34,7 @@ Character _character({
   String version = '1.0',
   Map<String, dynamic> creatorNotes = const {'a': 1},
   Map<String, dynamic> extensions = const {},
+  List<Map<String, String>> presetDialogues = const [],
   String? avatar,
   double temperature = 0.7,
 }) {
@@ -53,6 +54,7 @@ Character _character({
     version: version,
     creatorNotes: creatorNotes,
     extensions: extensions,
+    presetDialogues: presetDialogues,
     avatar: avatar,
     temperature: temperature,
     createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),

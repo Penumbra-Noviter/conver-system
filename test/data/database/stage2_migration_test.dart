@@ -1,10 +1,11 @@
-/// PS2-01 / FD-05 / VR-04 / MS-01 / WL-01 迁移测试 — schemaVersion 2→7 / 1→7 /
-/// 4→7 / 5→7 / 6→7（阶段 2 三表 + FD-05 messages.created_at 索引 + 阶段 3 两表 +
-/// MS-01 message_swipes 表与 messages.active_swipe_index 列 + WL-01
-/// lorebook_entries 表与 FK 索引）；VR-04 追加 from<5 幂等 / 中断自愈 / 级联 /
-/// 唯一索引 / 无硬 FK 契约；MS-01 追加 from<6 幂等补列 / 中断自愈 /
+/// PS2-01 / FD-05 / VR-04 / MS-01 / WL-01 / NPD-02 迁移测试 — schemaVersion
+/// 2→8 / 1→8 / 4→8 / 5→8 / 6→8 / 7→8（阶段 2 三表 + FD-05 messages.created_at
+/// 索引 + 阶段 3 两表 + MS-01 message_swipes 表与 messages.active_swipe_index
+/// 列 + WL-01 lorebook_entries 表与 FK 索引 + NPD-02 characters.preset_dialogues
+/// 列与 conversations.preset_dialogue 列）；VR-04 追加 from<5 幂等 / 中断自愈 /
+/// 级联 / 唯一索引 / 无硬 FK 契约；MS-01 追加 from<6 幂等补列 / 中断自愈 /
 /// (message_id, index) 唯一约束 / FK 级联；WL-01 追加 from<7 建表 / 中断自愈 /
-/// FK 级联契约。
+/// FK 级联契约；NPD-02 追加 from<8 幂等补列 / 中断自愈 / 重复打开幂等契约。
 ///
 /// 迁移路径用「降级夹具」构造旧版存量库：先在最新 schema 的文件库上插入旧
 /// 数据，再 `DROP` 高版本对象 + `PRAGMA user_version = N`，关闭后重新打开 —
@@ -120,7 +121,8 @@ Future<(AppDatabase, Directory)> openV2UpgradedFixture() async {
   // （VR-04 属 v5 形态）+ 移除 MS-01 候选表/索引与 active_swipe_index 列
   // （MS-01 属 v6 形态）+ 移除 WL-01 世界书表与索引（属 v7 形态；真实 v2
   // 存量库不含这些对象，保留会导致 `from < M` 分支的 CREATE 语句被
-  // IF NOT EXISTS 幂等跳过，掩盖「旧库升级补建」的真实路径）。
+  // IF NOT EXISTS 幂等跳过，掩盖「旧库升级补建」的真实路径）+ 移除 NPD-02
+  // 两列（preset_dialogues / preset_dialogue 属 v8 形态）。
   await db.customStatement('PRAGMA user_version = 2');
   await db.customStatement('DROP TABLE IF EXISTS inner_thoughts');
   await db.customStatement('DROP TABLE IF EXISTS proactive_plans');
@@ -133,6 +135,8 @@ Future<(AppDatabase, Directory)> openV2UpgradedFixture() async {
   await db.customStatement('ALTER TABLE messages DROP COLUMN active_swipe_index');
   await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
   await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
+  await db.customStatement('ALTER TABLE characters DROP COLUMN preset_dialogues');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -179,7 +183,7 @@ Future<(AppDatabase, Directory)> openV1UpgradedFixture() async {
   // 降级到 v1：user_version=1 + DROP 记忆两表、阶段 2 三表、阶段 3 两表、
   // MS-01 候选表/索引与 active_swipe_index 列、WL-01 世界书表/索引；
   // 同时移除 messages.created_at 索引（FD-05 属 v4 形态，真实 v1 存量库
-  // 不含该索引）。
+  // 不含该索引）+ 移除 NPD-02 两列（属 v8 形态）。
   await db.customStatement('PRAGMA user_version = 1');
   await db.customStatement('DROP TABLE IF EXISTS inner_thoughts');
   await db.customStatement('DROP TABLE IF EXISTS proactive_plans');
@@ -194,6 +198,8 @@ Future<(AppDatabase, Directory)> openV1UpgradedFixture() async {
   await db.customStatement('ALTER TABLE messages DROP COLUMN active_swipe_index');
   await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
   await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
+  await db.customStatement('ALTER TABLE characters DROP COLUMN preset_dialogues');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -213,7 +219,7 @@ Future<(AppDatabase, Directory)> openV4UpgradedFixture() async {
 
   // 降级到 v4：user_version=4 + DROP 阶段 3 两表与其 3 索引（v4 形态不含）
   // + DROP MS-01 候选表/索引与 active_swipe_index 列（MS-01 属 v6 形态）
-  // + DROP WL-01 世界书表/索引（属 v7 形态）。
+  // + DROP WL-01 世界书表/索引（属 v7 形态）+ DROP NPD-02 两列（属 v8 形态）。
   await db.customStatement('PRAGMA user_version = 4');
   await db.customStatement('DROP TABLE IF EXISTS semantic_hits');
   await db.customStatement('DROP TABLE IF EXISTS embedding_entries');
@@ -222,6 +228,8 @@ Future<(AppDatabase, Directory)> openV4UpgradedFixture() async {
   await db.customStatement('ALTER TABLE messages DROP COLUMN active_swipe_index');
   await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
   await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
+  await db.customStatement('ALTER TABLE characters DROP COLUMN preset_dialogues');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -268,13 +276,15 @@ Future<(AppDatabase, Directory)> openV5UpgradedFixture() async {
   // 降级到 v5：user_version=5 + DROP message_swipes 表/索引 + DROP
   // active_swipe_index 列（真实 v5 存量库无这些对象；不降列会导致
   // from<6 的补列探测发现列已存在而跳过，掩盖「真实补列」路径）
-  // + DROP WL-01 世界书表/索引（属 v7 形态）。
+  // + DROP WL-01 世界书表/索引（属 v7 形态）+ DROP NPD-02 两列（属 v8 形态）。
   await db.customStatement('PRAGMA user_version = 5');
   await db.customStatement('DROP TABLE IF EXISTS message_swipes');
   await db.customStatement('DROP INDEX IF EXISTS idx_message_swipes_message_id');
   await db.customStatement('ALTER TABLE messages DROP COLUMN active_swipe_index');
   await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
   await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
+  await db.customStatement('ALTER TABLE characters DROP COLUMN preset_dialogues');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -331,10 +341,61 @@ Future<(AppDatabase, Directory)> openV6UpgradedFixture() async {
 
   // 降级到 v6：user_version=6 + DROP WL-01 世界书表/索引（真实 v6 存量库
   // 无这些对象；不 DROP 会导致 from<7 的建表被 IF NOT EXISTS 幂等跳过，
-  // 掩盖「旧库升级补建」的真实路径）。
+  // 掩盖「旧库升级补建」的真实路径）+ DROP NPD-02 两列（属 v8 形态）。
   await db.customStatement('PRAGMA user_version = 6');
   await db.customStatement('DROP TABLE IF EXISTS lorebook_entries');
   await db.customStatement('DROP INDEX IF EXISTS idx_lorebook_entries_character_id');
+  await db.customStatement('ALTER TABLE characters DROP COLUMN preset_dialogues');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
+  await db.close();
+
+  return (AppDatabase(NativeDatabase(file)), dir);
+}
+
+/// 建一个「v7 存量库」：文件库上建最新 schema → 插 v7 时代数据 → 降级到 v7
+/// 形态（user_version=7 + DROP characters.preset_dialogues 列与
+/// conversations.preset_dialogue 列）。
+///
+/// 打开时 from=7：仅走 `from < 8` 分支（NPD-02），等价于真实 v7 存量库单步
+/// 升级；零回归保证 —— from<1/2/3/4/5/6/7 分支不触发（其幂等性由 v1/v2/v4/
+/// v5/v6 夹具承载）。
+Future<(AppDatabase, Directory)> openV7UpgradedFixture() async {
+  final dir = await Directory.systemTemp.createTemp('npd02_migration_v7_');
+  final file = File('${dir.path}${Platform.pathSeparator}test.db');
+
+  var db = AppDatabase(NativeDatabase(file));
+  final now = DateTime.now();
+  final character = await db
+      .into(db.characters)
+      .insertReturning(
+        CharactersCompanion.insert(name: '夜莺', createdAt: now, updatedAt: now),
+      );
+  final conversation = await db
+      .into(db.conversations)
+      .insertReturning(
+        ConversationsCompanion.insert(
+          characterId: character.id,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+  await db
+      .into(db.messages)
+      .insertReturning(
+        MessagesCompanion.insert(
+          conversationId: conversation.id,
+          role: Role.assistant,
+          content: '夜莺的歌，只在黎明前唱。',
+          createdAt: now,
+        ),
+      );
+
+  // 降级到 v7：user_version=7 + DROP 两列（真实 v7 存量库无 preset_dialogues /
+  // preset_dialogue；不 DROP 会导致 from<8 的补列探测发现列已存在而跳过，
+  // 掩盖「真实补列」路径）。
+  await db.customStatement('PRAGMA user_version = 7');
+  await db.customStatement('ALTER TABLE characters DROP COLUMN preset_dialogues');
+  await db.customStatement('ALTER TABLE conversations DROP COLUMN preset_dialogue');
   await db.close();
 
   return (AppDatabase(NativeDatabase(file)), dir);
@@ -427,6 +488,12 @@ Future<int> seedV4LegacyRows(AppDatabase db) async {
 Future<int> userVersion(AppDatabase db) async {
   final row = await db.customSelect('PRAGMA user_version').getSingle();
   return row.data['user_version'] as int;
+}
+
+/// 表列名列表（NPD-02 补列契约断言辅助，按 PRAGMA table_info 行序）。
+Future<List<String>> tableColumns(AppDatabase db, String table) async {
+  final rows = await db.customSelect('PRAGMA table_info($table)').get();
+  return [for (final row in rows) row.data['name'] as String];
 }
 
 /// 插入角色→对话→消息链，并挂上三新表各一行，返回相关 id。
@@ -538,7 +605,7 @@ seedVectorRows(AppDatabase db, int characterId) async {
 }
 
 void main() {
-  group('schemaVersion 6 契约（全新安装）', () {
+  group('schemaVersion 8 契约（全新安装）', () {
     late AppDatabase db;
 
     setUp(() {
@@ -549,11 +616,12 @@ void main() {
       await db.close();
     });
 
-    test('AppDatabase.schemaVersion == 7', () {
-      expect(db.schemaVersion, 7);
+    test('AppDatabase.schemaVersion == 8', () {
+      expect(db.schemaVersion, 8);
     });
 
-    test('全新安装直接建 13 表 + 12 迁移新增索引（含两个唯一索引）', () async {
+    test('全新安装直接建 13 表 + 12 迁移新增索引（含两个唯一索引）+ NPD-02 两列',
+        () async {
       final tables = await sqliteMasterNames(db, 'table');
       expect(
         tables,
@@ -573,6 +641,17 @@ void main() {
 
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
+
+      // NPD-02 两列（schemaVersion 8 形态）：characters.preset_dialogues
+      // （JSON 默认 '[]'）+ conversations.preset_dialogue（可空快照）。
+      expect(
+        await tableColumns(db, 'characters'),
+        contains('preset_dialogues'),
+      );
+      expect(
+        await tableColumns(db, 'conversations'),
+        contains('preset_dialogue'),
+      );
 
       // 两个唯一索引：阶段 2 relationship_states.character_id 与阶段 3
       // embedding_entries (character_id, content_hash)（SR-21 去重前提）。
@@ -624,7 +703,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
     });
 
     test('三表可读写 + converter 字符串落库（stage 五值 / status 四值）', () async {
@@ -815,7 +894,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
       expect(
         await sqliteMasterNames(db, 'table'),
         containsAll([..._stage2Tables, ..._stage3Tables]),
@@ -859,7 +938,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
       expect(
         await sqliteMasterNames(db, 'table'),
         containsAll([..._stage2Tables, ..._stage3Tables]),
@@ -899,7 +978,7 @@ void main() {
       );
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, containsAll(_newIndexes));
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
     });
   });
 
@@ -946,7 +1025,7 @@ void main() {
         ]),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
     });
 
     test(
@@ -1137,7 +1216,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_stage3Tables));
       expect(
         await sqliteMasterNames(db, 'index'),
@@ -1187,7 +1266,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
       expect(await sqliteMasterNames(db, 'table'), containsAll(_stage3Tables));
       expect(await sqliteMasterNames(db, 'index'), containsAll(_newIndexes));
       final stored = await db.select(db.embeddingEntries).getSingle();
@@ -1225,7 +1304,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, contains('idx_message_swipes_message_id'));
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
     });
 
     test('message_swipes 可写读 + (message_id, index) 唯一约束生效（SR-27）', () async {
@@ -1320,7 +1399,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('message_swipes'),
@@ -1352,7 +1431,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('message_swipes'),
@@ -1395,7 +1474,7 @@ void main() {
       final indexes = await sqliteMasterNames(db, 'index');
       expect(indexes, contains('idx_lorebook_entries_character_id'));
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
     });
 
     test('lorebook_entries 可写读 + keys JSON 数组往返', () async {
@@ -1468,7 +1547,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('lorebook_entries'),
@@ -1499,7 +1578,7 @@ void main() {
         NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
       );
 
-      expect(await userVersion(db), 7);
+      expect(await userVersion(db), 8);
       expect(
         await sqliteMasterNames(db, 'table'),
         contains('lorebook_entries'),
@@ -1510,6 +1589,139 @@ void main() {
       );
       final stored = await db.select(db.lorebookEntries).getSingle();
       expect(stored.title, '唯一条目');
+    });
+  });
+
+  group('schemaVersion 7→8 迁移（NPD-02）', () {
+    late AppDatabase db;
+    late Directory dir;
+
+    setUp(() async {
+      (db, dir) = await openV7UpgradedFixture();
+    });
+
+    tearDown(() async {
+      await db.close();
+      await dir.delete(recursive: true);
+    });
+
+    test('v7 存量库升级四要素：两列存在 + user_version=8 + 旧行保留 + 新列默认',
+        () async {
+      // 旧行保留：v7 时代行原样可读，未被迁移改写。
+      expect(await db.select(db.characters).get().then((r) => r.length), 1);
+      expect(await db.select(db.conversations).get().then((r) => r.length), 1);
+      final message = await db.select(db.messages).getSingle();
+      expect(message.content, '夜莺的歌，只在黎明前唱。');
+
+      // 两列存在。
+      expect(
+        await tableColumns(db, 'characters'),
+        contains('preset_dialogues'),
+      );
+      expect(
+        await tableColumns(db, 'conversations'),
+        contains('preset_dialogue'),
+      );
+
+      // 存量行新列默认：characters.preset_dialogues = []（JSON '[]'），
+      // conversations.preset_dialogue = null（既有行 NULL 零影响）。
+      final character = await db.select(db.characters).getSingle();
+      expect(character.presetDialogues, isEmpty);
+      final conversation = await db.select(db.conversations).getSingle();
+      expect(conversation.presetDialogue, isNull);
+
+      expect(await userVersion(db), 8);
+    });
+
+    test('两列可写读：preset_dialogues JSON 往返 + preset_dialogue 快照', () async {
+      final character = await db.select(db.characters).getSingle();
+      final conversation = await db.select(db.conversations).getSingle();
+
+      await (db.update(db.characters)..where((t) => t.id.equals(character.id)))
+          .write(
+            CharactersCompanion(
+              presetDialogues: const Value([
+                {'name': '寒暄', 'content': '你好。'},
+              ]),
+            ),
+          );
+      final storedChar = await db.select(db.characters).getSingle();
+      expect(storedChar.presetDialogues, [
+        {'name': '寒暄', 'content': '你好。'},
+      ]);
+
+      await (db.update(db.conversations)
+            ..where((t) => t.id.equals(conversation.id)))
+          .write(
+            ConversationsCompanion(
+              presetDialogue: const Value('<START>\n{{user}}: 你好\n{{char}}: 欢迎'),
+            ),
+          );
+      final storedConv = await db.select(db.conversations).getSingle();
+      expect(storedConv.presetDialogue, '<START>\n{{user}}: 你好\n{{char}}: 欢迎');
+      expect(conversation.presetDialogue, isNull, reason: '更新前快照为空');
+    });
+
+    test('中断残留重开自愈：一列已补、一列未补 → 重开幂等补全且旧行保留（SR-25）',
+        () async {
+      // 模拟 from<8 迁移中途被杀残留态：characters.preset_dialogues 列已补
+      // （ALTER 成功），conversations.preset_dialogue 未补（后续 DDL 未执行），
+      // user_version 未提升（仍为 7）。重开时补列探测发现 preset_dialogues
+      // 已存在 → 幂等跳过（不 duplicate column），补上 preset_dialogue。
+      await db.customStatement(
+        'ALTER TABLE conversations DROP COLUMN preset_dialogue',
+      );
+      await db.customStatement('PRAGMA user_version = 7');
+
+      // 前置断言：确认残留态真实存在。
+      final residualCharColumns = await tableColumns(db, 'characters');
+      expect(residualCharColumns, contains('preset_dialogues'));
+      final residualConvColumns = await tableColumns(db, 'conversations');
+      expect(residualConvColumns, isNot(contains('preset_dialogue')));
+      expect(await userVersion(db), 7, reason: '残留态 user_version 未提升');
+
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 8);
+      expect(await tableColumns(db, 'characters'), contains('preset_dialogues'));
+      expect(await tableColumns(db, 'conversations'), contains('preset_dialogue'));
+      // 旧行保留 + 存量行新列默认。
+      final character = await db.select(db.characters).getSingle();
+      expect(character.presetDialogues, isEmpty);
+      final conversation = await db.select(db.conversations).getSingle();
+      expect(conversation.presetDialogue, isNull);
+      expect(
+        (await db.select(db.messages).getSingle()).content,
+        '夜莺的歌，只在黎明前唱。',
+      );
+    });
+
+    test('重复打开幂等：同文件重开不重跑迁移，列/数据仍在（验收 7）', () async {
+      final character = await db.select(db.characters).getSingle();
+      await (db.update(db.characters)..where((t) => t.id.equals(character.id)))
+          .write(
+            CharactersCompanion(
+              presetDialogues: const Value([
+                {'name': '唯一', 'content': '内容'},
+              ]),
+            ),
+          );
+
+      await db.close();
+      db = AppDatabase(
+        NativeDatabase(File('${dir.path}${Platform.pathSeparator}test.db')),
+      );
+
+      expect(await userVersion(db), 8);
+      expect(await tableColumns(db, 'characters'), contains('preset_dialogues'));
+      expect(await tableColumns(db, 'conversations'), contains('preset_dialogue'));
+      final stored = await db.select(db.characters).getSingle();
+      expect(stored.presetDialogues, [
+        {'name': '唯一', 'content': '内容'},
+      ]);
     });
   });
 
