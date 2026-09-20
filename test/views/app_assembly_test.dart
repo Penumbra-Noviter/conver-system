@@ -17,6 +17,7 @@ import 'package:conver_system_mobile/app.dart';
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
@@ -24,8 +25,10 @@ import 'package:conver_system_mobile/services/companion/proactive_message_servic
 import 'package:conver_system_mobile/services/conversation_export_service.dart';
 import 'package:conver_system_mobile/services/document_parse_service.dart';
 import 'package:conver_system_mobile/services/embedding/embedding_service.dart';
+import 'package:conver_system_mobile/services/memory/memory_palace_service.dart';
 import 'package:conver_system_mobile/services/simulator/game_generator.dart';
 import 'package:conver_system_mobile/view_models/simulators_controller.dart';
+import 'package:conver_system_mobile/views/characters/characters_controller.dart';
 import 'package:conver_system_mobile/views/home_shell.dart';
 import 'package:conver_system_mobile/views/onboarding/onboarding_page.dart';
 import 'package:drift/native.dart';
@@ -126,6 +129,16 @@ void main() {
     expect(Provider.of<ChatService>(context, listen: false), isA<ChatService>());
     expect(Provider.of<ConversationExportService>(context, listen: false),
         isA<ConversationExportService>());
+    // WL-05：MemoryPalaceService 装配腿（extractor 闭包经 _resolveLlm 接线，
+    // 构造零 I/O 零启动副作用——构造完成即证明四仓储 + extractor seam 接线
+    // 完整）。CharactersController 装配腿含 LorebookRepository 接线
+    // （concerns/08 §1 遗留补齐：生产链路 import character_book → 落行）。
+    expect(Provider.of<MemoryPalaceService>(context, listen: false),
+        isA<MemoryPalaceService>());
+    expect(Provider.of<LorebookRepository>(context, listen: false),
+        isA<LorebookRepository>());
+    expect(Provider.of<CharactersController>(context, listen: false),
+        isA<CharactersController>());
   });
 
   testWidgets('装配图持有 ProactiveMessageService（AD-04 planner 装配腿可构造）',

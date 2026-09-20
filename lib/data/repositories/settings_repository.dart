@@ -88,6 +88,8 @@ class SettingsRepository implements SettingsReader {
     SecretStore.embeddingApiKeySlot,
     embeddingBaseUrlKey,
     embeddingModelKey,
+    memoryPalaceEnabledKey,
+    memoryPalaceEveryRoundsKey,
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -160,6 +162,25 @@ class SettingsRepository implements SettingsReader {
   /// embedding 模型缺省（U1 裁决）——OpenAI Compatible 端点通用小模型；
   /// 取值语义锚定 spec §2 已定前提 8（未决项裁决 U1）。
   static const String defaultEmbeddingModel = 'text-embedding-3-small';
+
+  /// 记忆宫殿开关落库键（WL-05，mobile 先行键；桌面对应物
+  /// `memory_palace_enabled`）。存储值 'true' 表示开启，其余一律视为关闭
+  /// （默认关闭，成本敏感 opt-in，对齐 [memoryReflectionEnabledKey] 先例）。
+  static const String memoryPalaceEnabledKey = 'memory_palace_enabled';
+
+  /// 记忆宫殿归纳轮数间隔落库键（WL-05，mobile 先行键；桌面对应物
+  /// `memory_palace_every_rounds`）。
+  static const String memoryPalaceEveryRoundsKey = 'memory_palace_every_rounds';
+
+  /// 记忆宫殿归纳轮数间隔缺省（6；对齐 reflection interval 缺省，桌面
+  /// spec §WL-5「默认 6」）。
+  static const int defaultMemoryPalaceEveryRounds = 6;
+
+  /// 记忆宫殿归纳轮数间隔合法区间 [1, 999]（移动端 UI 输入 clamp 面；无
+  /// 桌面锚点，语义「每 N 轮归纳一次」，0/负数无意义——0 每回合触发的
+  /// 语义由服务层 [shouldSummarize] 纯函数承载，UI 输入层一律 ≥1）。
+  static const int memoryPalaceEveryRoundsMin = 1;
+  static const int memoryPalaceEveryRoundsMax = 999;
 
   // ── 键值 CRUD ──
 
@@ -377,6 +398,23 @@ class SettingsRepository implements SettingsReader {
     final value = await getValue(innerThoughtEnabledKey);
     return value == 'true';
   }
+
+  /// 记忆宫殿开关（WL-05，mobile 先行键）；缺省 **false**（默认关闭，
+  /// 成本敏感 opt-in——对话内容不默认外发归纳 LLM，对齐 reflection 先例）。
+  ///
+  /// 存储值为 'true' 时开启；空串 / 缺失 / 其他值一律 false。
+  Future<bool> get memoryPalaceEnabled async {
+    final value = await getValue(memoryPalaceEnabledKey);
+    return value == 'true';
+  }
+
+  /// 记忆宫殿归纳轮数间隔（WL-05）；缺省 [defaultMemoryPalaceEveryRounds]
+  /// （6；桌面 spec「每 N 轮完整回合」口径，工单高不确定点 2 契约锁锁定）。
+  ///
+  /// 读取 `memory_palace_every_rounds` 键（mobile 先行键）；非数字/缺失回退
+  /// 缺省（镜像 [getInt] 语义）。
+  Future<int> get memoryPalaceEveryRounds =>
+      getInt(memoryPalaceEveryRoundsKey, defaultValue: defaultMemoryPalaceEveryRounds);
 
   /// 远端 embedding 开关（阶段 3，VR-01）；缺省 **false**（SR-19 默认关，
   /// 对话内容不默认外发远端 embedding 服务）。

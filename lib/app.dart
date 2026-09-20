@@ -28,6 +28,7 @@ import 'services/embedding/openai_compatible_client.dart';
 import 'services/llm/factory.dart';
 import 'services/llm/llm_provider.dart';
 import 'services/memory/memory_service.dart';
+import 'services/memory/memory_palace_service.dart';
 import 'services/memory/persona_evolution_service.dart';
 import 'services/memory/reflection_service.dart';
 import 'services/notifications/notification_service.dart';
@@ -271,6 +272,35 @@ class ConverApp extends StatelessWidget {
             );
           },
         ),
+        // WL-05 记忆宫殿装配：MemoryPalaceService（LLM 归纳 → 世界书 auto
+        // 条目）。依赖四仓储 + extractor seam（经 _resolveLlm 复用 S4 装配单点，
+        // provider/model 与对话同源；temperature 沿用角色/全局链——服务读角色
+        // 时按角色 temperature 优先、全局兜底解析后传入 seam）。置于 ChatService
+        // 之前（回合末 hook 闭包经 provider 消费，装配单源）。服务构造零 I/O
+        // 零启动副作用（默认 lazy，对齐 RefectionService 先例）。
+        Provider<MemoryPalaceService>(
+          create: (context) => MemoryPalaceService(
+            characterRepository: context.read<CharacterRepository>(),
+            messageRepository: context.read<MessageRepository>(),
+            lorebookRepository: context.read<LorebookRepository>(),
+            settingsRepository: context.read<SettingsRepository>(),
+            extractor:
+                ({
+                  required String charName,
+                  required List<String> dialogueLines,
+                  required double temperature,
+                }) async {
+                  final llm = await _resolveLlm(context);
+                  return extractMemoryDraftWithProvider(
+                    llm: llm.llm,
+                    model: llm.model,
+                    charName: charName,
+                    dialogueLines: dialogueLines,
+                    temperature: temperature,
+                  );
+                },
+          ),
+        ),
         // 人机恋阶段 3 装配（F-109）：PersonaEvolutionService 依赖两仓储 +
         // LLM 工厂 + 凭据解析链（wireCredentialsResolver 单一落点）；reflector
         // = buildClusteredReflector（VR-08 聚类注入）经 inner 走
@@ -435,6 +465,24 @@ class ConverApp extends StatelessWidget {
                   broker.publish(proposal);
                 }
               },
+              // ⑤ 记忆宫殿（WL-05）：开关在设置仓储 opt-in；阈值/归纳/落库
+              //    全在服务内部（含每 N 轮节流），服务内吞错（S1）。
+              (ctx) async {
+                final palace = context.read<MemoryPalaceService>();
+                final settings = context.read<SettingsRepository>();
+                final characterId = ctx.characterId;
+                if (characterId == null) {
+                  return;
+                }
+                if (!await settings.memoryPalaceEnabled) {
+                  return;
+                }
+                await palace.summarizeAfterTurn(
+                  characterId: characterId,
+                  conversationId: ctx.conversationId,
+                  everyRounds: await settings.memoryPalaceEveryRounds,
+                );
+              },
             ],
           ),
         ),
@@ -552,6 +600,7 @@ class ConverApp extends StatelessWidget {
             fileExchange: context.read<CharacterFileExchange>(),
             navigation: context.read<ShellNavigation>(),
             chatController: context.read<ChatController>(),
+            lorebookRepository: context.read<LorebookRepository>(),
           ),
         ),
         // M5-03 模拟器装配：唯一一次模拟器接线（app.dart + home_shell.dart）。
