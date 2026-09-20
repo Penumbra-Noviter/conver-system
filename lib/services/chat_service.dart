@@ -175,6 +175,32 @@ class RegenerateResult {
   final int swipeIndex;
 }
 
+/// prompt-debug 追溯结果（PD-04；只读见证，SR-31）。
+///
+/// 与真实发送走同一 `_assemble` 组装核心与同一上游（history 滑窗、世界书扫描、
+/// narrative/preset/expert 参数），segments 逐条含来源标注（[PromptSegment]），
+/// 仅 debug 路径消费——零 LLM、零落库、本地渲染零外发。
+class PromptDebugResult {
+  const PromptDebugResult({
+    required this.characterName,
+    required this.model,
+    required this.promptMode,
+    required this.segments,
+  });
+
+  /// 角色名（空回退 ''；桌面 `build_prompt_debug` 同名语义）。
+  final String characterName;
+
+  /// 模型 `provider/model`（对齐桌面 `f"{conv.model_provider}/{conv.model_name}"`）。
+  final String model;
+
+  /// 组装模式（simple/expert，对齐桌面 prompt_mode）。
+  final String promptMode;
+
+  /// 带来源标注的组装分段（content/role 序列与真实发送 messages 逐条一致）。
+  final List<PromptSegment> segments;
+}
+
 /// LLM 错误族 → (HTTP 状态码, 用户可见消息) 映射（逐字对齐
 /// `error_mapping.py::llm_error_response`，列表顺序即匹配优先级）。
 ///
@@ -1560,14 +1586,21 @@ class ChatService {
     // 最大 depth 决定）；世界书为空/全禁用 → 空块零注入（buildMessages 对
     // null/空块逐字节零变化）。世界书读失败降级为空块不阻断主回复（对齐既有
     // 记忆注入降级先例）。
+    // PD-04：引擎带来源注入块（world/memory）→ 在此展平为纯字符串给
+    // buildMessages（逐字节零变化契约）；debug 腿 [promptDebug] 复用同一
+    // _buildLorebookInjection 透传带来源块给 buildMessagesWithSource。
     Map<String, List<String>> world;
     try {
-      world = await _buildLorebookInjection(
+      final tagged = await _buildLorebookInjection(
         character,
         history,
         userContent,
         userName,
       );
+      world = {
+        for (final entry in tagged.entries)
+          entry.key: [for (final segment in entry.value) segment.content],
+      };
     } catch (e) {
       debugPrint('世界书注入失败，跳过: $e');
       world = const {};
@@ -1669,6 +1702,96 @@ class ChatService {
     return messages;
   }
 
+  /// 构建 prompt-debug 追溯（PD-04；只读：零 LLM 零落库，SR-31）。
+  ///
+  /// 与真实发送走**同一组装核心与同一上游**（对齐桌面 `chat.py::
+  /// build_prompt_debug`）：
+  /// - 同一上游：[historyBeforeId]=null 全量历史 + [_buildLorebookInjection]
+  ///   同一世界书扫描链路（手动→world / auto→memory 来源标注）+ 叙述风格
+  ///   同一解析单点（`narrativeStyleEnabled` 门 + rules）+ 预设对话快照
+  ///   `conv.presetDialogue` + 专家模式两字段透传；
+  /// - 同一组装核心：[buildMessagesWithSource] 与 [buildMessages] 共用
+  ///   `_assemble`（单一组装实现，不复制顺序），debug segments 的 content/role
+  ///   序列与真实发送逐条一致（仅末条为 source=user 的空内容占位——桌面
+  ///   build_prompt_debug 以 `user_content=""` + `append_current_input=True`
+  ///   表达的「待回复输入槽」语义，验收 4/5）。
+  ///
+  /// 零外发保证：本方法只读仓储（会话/角色/设置/消息/世界书），不调用
+  /// [_resolveProvider]（零 Provider 创建）、不落库任何消息（SR-31），本地
+  /// 渲染零外发。
+  ///
+  /// 对话不存在 → [ConversationNotFoundError]；角色不存在 →
+  /// [CharacterNotFoundError]（与真实发送路径同判）。
+  Future<PromptDebugResult> promptDebug({required int conversationId}) async {
+    final conv = await _conversationRepository.getConversation(conversationId);
+    if (conv == null) {
+      throw ConversationNotFoundError();
+    }
+    final character = await _characterRepository.getCharacter(conv.characterId);
+    if (character == null) {
+      throw CharacterNotFoundError(conv.characterId);
+    }
+    final userName = await _settingsRepository.userName;
+    final extraVars = await _settingsRepository.templateVars;
+    final maxRounds = await _settingsRepository.slidingWindowRounds;
+    final history = await _messageRepository.getMessages(conv.id);
+
+    // 同一上游：世界书扫描（带来源标注，零 LLM）。
+    Map<String, List<InjectedSegment>> world;
+    try {
+      world = await _buildLorebookInjection(character, history, '', userName);
+    } catch (e) {
+      debugPrint('世界书注入失败，跳过: $e');
+      world = const {};
+    }
+    // 同一上游：叙述风格（与 [_assembleMessages] 同解析单点、同降级）。
+    String? narrativeStyle;
+    try {
+      if (await _settingsRepository.narrativeStyleEnabled) {
+        narrativeStyle = await _settingsRepository.narrativeStyleRules;
+      }
+    } catch (e) {
+      debugPrint('叙述风格读取失败，跳过: $e');
+      narrativeStyle = null;
+    }
+
+    // 同一组装核心：buildMessagesWithSource 与 buildMessages 共享 `_assemble`。
+    final segments = buildMessagesWithSource(
+      CharacterData(
+        name: character.name,
+        systemPrompt: character.systemPrompt,
+        personality: character.personality,
+        scenario: character.scenario,
+        mesExample: character.mesExample,
+        postHistoryInstructions: character.postHistoryInstructions,
+        // NPD-04：专家模式两字段透传（expert + 非空 → 单条 expert prompt
+        // 替代 system/scenario/PHI；expert + 空 → 回退 simple）。
+        promptMode: character.promptMode,
+        expertPrompt: character.expertPrompt,
+      ),
+      history: history.map(
+        (m) => HistoryMessage(role: m.role, content: m.content),
+      ),
+      userContent: '',
+      maxRounds: maxRounds,
+      userName: userName,
+      appendCurrentInput: true,
+      extraVars: extraVars,
+      world: world,
+      narrativeStyle: narrativeStyle,
+      // 会话快照透传（与真实发送同源——NPD-02 快照语义）。
+      presetDialogue: conv.presetDialogue,
+    );
+
+    return PromptDebugResult(
+      characterName: character.name,
+      // 对齐桌面 `f"{conv.model_provider}/{conv.model_name}"`。
+      model: '${conv.modelProvider}/${conv.modelName}',
+      promptMode: character.promptMode,
+      segments: segments,
+    );
+  }
+
   /// 世界书扫描→激活→注入（WL-03 验收 4，对齐桌面 `chat.py::
   /// _lorebook_world_injection`）。
   ///
@@ -1676,9 +1799,12 @@ class ChatService {
   /// 滑窗 maxRounds 解耦，扫描窗 = 最近 `max(depth)` 轮 = 2*depth 条对话 +
   /// 当前输入）→ activate（RNG 可注入，null 时引擎每次调用自建非确定性源）→
   /// buildWorldInjection（position 分组 + `{{user}}/{{char}}` 模板替换 + 来源
-  /// 标注）→ 展平为 buildMessages 的 `{before_char/after_char/system: [内容]}`
-  /// 注入块。无启用条目 → 空块零注入（不污染上下文）。
-  Future<Map<String, List<String>>> _buildLorebookInjection(
+  /// 标注）→ 返回**带来源**注入块 `{before_char/after_char/system: [InjectedSegment]}`
+  /// （world/memory 来源保真，PD-04 起不再展平——真实发送腿在
+  /// [_assembleMessages] 处展平为纯字符串给 buildMessages，输出逐字节零变化）；
+  /// debug 腿（[promptDebug]）直接透传 buildMessagesWithSource）。无启用条目
+  /// → 空块零注入（不污染上下文）。
+  Future<Map<String, List<InjectedSegment>>> _buildLorebookInjection(
     Character character,
     List<Message> history,
     String currentInput,
@@ -1719,16 +1845,12 @@ class ChatService {
       rng: _lorebookRandom,
     );
     final sourceById = {for (final e in enabled) e.id: e.source};
-    final blocks = buildWorldInjection(
+    return buildWorldInjection(
       activated,
       userName: userName,
       charName: character.name.isEmpty ? 'Character' : character.name,
       sourceById: sourceById,
     );
-    return {
-      for (final entry in blocks.entries)
-        entry.key: [for (final segment in entry.value) segment.content],
-    };
   }
 
   /// 组装采样温度：角色 `character.temperature` 为主、全局 [globalTemperature]

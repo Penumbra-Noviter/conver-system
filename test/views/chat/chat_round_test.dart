@@ -264,6 +264,12 @@ class _ScriptedChatService implements ChatService {
   }
 
   @override
+  Future<PromptDebugResult> promptDebug({required int conversationId}) async {
+    // PD-04：脚本化测试仅编排 streamReply 事件流，不触 promptDebug 只读腿。
+    throw UnimplementedError('F-65③ 脚本化测试不触 promptDebug');
+  }
+
+  @override
   Future<int> deleteMessage({
     required int conversationId,
     required int messageId,

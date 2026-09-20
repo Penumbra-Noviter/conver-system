@@ -28,6 +28,7 @@ import 'package:conver_system_mobile/data/repositories/settings_repository.dart'
 import 'package:conver_system_mobile/services/chat_service.dart';
 import 'package:conver_system_mobile/services/llm/errors.dart';
 import 'package:conver_system_mobile/services/llm/llm_provider.dart';
+import 'package:conver_system_mobile/services/llm/prompt.dart';
 import 'package:conver_system_mobile/services/secure_store.dart' show SecretStore;
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -4315,6 +4316,227 @@ void main() {
       expect(provider.lastPresencePenalty, 1.5);
       expect(provider.lastFrequencyPenalty, -1.0);
       expect(provider.lastMaxTokens, 200);
+    });
+  });
+
+  // ── Prompt Debug 只读追溯（PD-04，验收 3/4/5；SR-31）──
+
+  group('Prompt Debug 只读追溯（PD-04）', () {
+    /// 落一条世界书条目（source 可指定：manual→world / auto→memory）。
+    /// 独立建仓避免污染既有字段缺省；constant=true 保证确定性（RNG 无关）。
+    Future<void> seedDebugLorebookEntry(
+      int characterId, {
+      String content = '知识内容',
+      String source = 'manual',
+      String position = 'world',
+    }) async {
+      final repo = LorebookRepository(db);
+      await repo.createEntry(
+        characterId,
+        LorebookEntryDraft(
+          content: content,
+          constant: true,
+          position: position,
+          source: source,
+        ),
+      );
+    }
+
+    test('验收3 SR-31：promptDebug 零 LLM 调用（工厂 create 计数 0）+ '
+        '零落库（消息表行数不变）+ 零外发（无 generate/stream 调用）', () async {
+      final char = await seedCharacter(
+        personality: '人设',
+        scenario: '场景',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '问1');
+      await sendAssistantMessage(conv.id, '答1');
+
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      final factory = _FakeFactory(provider);
+      service = ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: factory,
+      );
+      factory.createCallCount = 0;
+      final before = (await messagesOf(conv.id)).length;
+
+      final result = await service.promptDebug(conversationId: conv.id);
+
+      expect(factory.createCallCount, 0, reason: '零 LLM：promptDebug 不建 Provider');
+      expect(provider.generateCallCount, 0);
+      expect(provider.streamGenerateCallCount, 0);
+      expect(await messagesOf(conv.id), hasLength(before),
+          reason: '零落库：消息表行数不变');
+      expect(result.characterName, char.name);
+      expect(result.model, '${conv.modelProvider}/${conv.modelName}');
+      expect(result.promptMode, char.promptMode);
+    });
+
+    test('验收4：promptDebug 与真实发送走同一组装核心与同一上游——逐条 content '
+        '一致（历史滑窗 + 世界书扫描 + 叙述风格 + 预设 + expert 参数）',
+        () async {
+      await settingsRepo.setMany({
+        SettingsRepository.narrativeStyleEnabledKey: '1',
+        SettingsRepository.narrativeStyleRulesKey: '不要 AI 味',
+      });
+      final char = await seedCharacter(
+        personality: '{{char}}的人设',
+        scenario: '{{char}}的场景',
+        mesExample: '<START>\n{{user}}: 例1\n{{char}}: 例2',
+        postHistoryInstructions: '保持人设。',
+      );
+      final conv = await convRepo.createConversation(
+        characterId: char.id,
+        presetDialogue: '<START>\n{{user}}: 预1\n{{char}}: 预2',
+      );
+      await sendUserMessage(conv.id, '问1');
+      await sendAssistantMessage(conv.id, '答1');
+      await seedDebugLorebookEntry(char.id, content: '剑是身份的象征');
+      await seedDebugLorebookEntry(
+        char.id,
+        content: '记忆宫殿条目',
+        source: 'auto',
+      );
+
+      final provider = FakeLLMProvider(tokens: const []);
+      wireService(provider);
+      // 真实发送（零 token → 空流不落库 assistant，仅 history 多一条 user）。
+      await service.streamReply(conversationId: conv.id, content: '实时输入')
+          .toList();
+      final realSent = provider.lastMessages!;
+
+      final debug = await service.promptDebug(conversationId: conv.id);
+
+      // 逐条一致：除末条（真实=当前输入 / debug=空 content 占位）外全部相同。
+      expect(debug.segments.length, realSent.length,
+          reason: '同一组装核心产出同长度序列');
+      for (var i = 0; i < realSent.length - 1; i++) {
+        expect(debug.segments[i].role, realSent[i].role,
+            reason: 'role 逐条一致 @$i');
+        expect(debug.segments[i].content, realSent[i].content,
+            reason: 'content 逐条一致 @$i（同一上游）');
+      }
+      expect(debug.segments.last.role, 'user');
+      expect(debug.segments.last.content, '',
+          reason: 'debug 末条为 user 空内容占位（桌面对齐）');
+      expect(debug.segments.last.source, sourceUser);
+      // 同一上游确实携带全部注入物。
+      final contents = [for (final s in debug.segments) s.content];
+      expect(contents, contains('[叙述风格]\n不要 AI 味'));
+      expect(contents, contains(contains('剑是身份的象征')));
+      expect(contents, contains(contains('记忆宫殿条目')));
+      expect(contents, contains('预1'));
+      expect(contents, contains('保持人设。'));
+    });
+
+    test('验收4 expert：system 段单条 expert_prompt（来源 character），'
+        '无 scenario/PHI', () async {
+      final char = await seedCharacter(
+        personality: '人设',
+        scenario: '场景',
+        postHistoryInstructions: '保持人设。',
+        promptMode: 'expert',
+        expertPrompt: '你是{{char}}，专家整段。',
+      );
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, '问');
+
+      final debug = await (ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: _FakeFactory(FakeLLMProvider()),
+      ))
+          .promptDebug(conversationId: conv.id);
+
+      expect(debug.promptMode, 'expert');
+      expect(debug.segments.first,
+          (role: 'system', content: '你是艾莉亚，专家整段。', source: sourceCharacter));
+      expect(debug.segments.where((s) => s.content.startsWith('[场景设定]')),
+          isEmpty);
+      expect(debug.segments.where((s) => s.content == '保持人设。'), isEmpty);
+    });
+
+    test('验收5：空对话 + 无注入 → 仅 system(character) + user(user) '
+        '（叙述风格关闭排除干扰）', () async {
+      await settingsRepo.setMany({SettingsRepository.narrativeStyleEnabledKey: '0'});
+      final char = await seedCharacter(personality: '你是空态角色。');
+      final conv = await seedConversation(char.id);
+
+      final debug = await (ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: _FakeFactory(FakeLLMProvider()),
+      ))
+          .promptDebug(conversationId: conv.id);
+
+      expect([
+        for (final s in debug.segments)
+          (role: s.role, content: s.content, source: s.source),
+      ], [
+        (role: 'system', content: '你是空态角色。', source: sourceCharacter),
+        (role: 'user', content: '', source: sourceUser),
+      ]);
+    });
+
+    test('世界书 manual → world / auto → memory 来源在 promptDebug 逐段保真',
+        () async {
+      await settingsRepo.setMany({SettingsRepository.narrativeStyleEnabledKey: '0'});
+      final char = await seedCharacter(personality: '人设');
+      final conv = await seedConversation(char.id);
+      await seedDebugLorebookEntry(
+        char.id,
+        content: '手动世界知识',
+        source: 'manual',
+        position: 'before_char',
+      );
+      await seedDebugLorebookEntry(
+        char.id,
+        content: '记忆条目',
+        source: 'auto',
+      );
+
+      final debug = await (ChatService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        providerFactory: _FakeFactory(FakeLLMProvider()),
+      ))
+          .promptDebug(conversationId: conv.id);
+
+      final byContent = {
+        for (final s in debug.segments) s.content: s.source,
+      };
+      expect(byContent['手动世界知识'], sourceWorld);
+      expect(byContent['[世界知识]\n记忆条目'], sourceMemory);
+    });
+
+    test('对话不存在 → ConversationNotFoundError（只读守护，SR-31 无副作用）',
+        () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final provider = FakeLLMProvider(tokens: const ['回复']);
+      wireService(provider);
+      final before = (await messagesOf(conv.id)).length;
+
+      await expectLater(
+        service.promptDebug(conversationId: conv.id + 9999),
+        throwsA(isA<ConversationNotFoundError>()),
+      );
+      expect(provider.generateCallCount, 0);
+      expect(await messagesOf(conv.id), hasLength(before));
     });
   });
 }
