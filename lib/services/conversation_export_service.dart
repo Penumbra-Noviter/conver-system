@@ -28,7 +28,7 @@ library;
 
 import 'dart:convert';
 
-import '../data/database/app_database.dart' show Character, Conversation;
+import '../data/database/app_database.dart' show Character, Conversation, Message;
 import '../data/repositories/character_repository.dart';
 import '../data/repositories/conversation_repository.dart';
 import '../data/repositories/message_repository.dart';
@@ -109,6 +109,9 @@ class ConversationExportService {
 
     final characterData = character == null ? null : _characterJson(character);
     final messages = await _messageRepository.getMessages(base.id);
+    // F-142：一次 batch 查询取全量候选（消逐消息 N+1）；无候选消息不在
+    // map，导出侧以 `?? const []` 兜底——`swipes` 键内容与逐条拉取逐字节等价。
+    final swipeContents = await _listSwipeContentsBatch(messages);
 
     final content = jsonEncode({
       'conversation': {
@@ -128,7 +131,7 @@ class ConversationExportService {
             'content': message.content,
             'created_at': message.createdAt.toUtc().toIso8601String(),
             'active_swipe_index': message.activeSwipeIndex,
-            'swipes': await _swipeContents(message.id),
+            'swipes': swipeContents[message.id] ?? const <String>[],
           },
       ],
     });
@@ -248,11 +251,19 @@ class ConversationExportService {
     };
   }
 
-  /// 消息候选 content 列表（index 升序；无候选返回空列表，MS-01 导出契约
-  /// 对应桌面 `list_swipes_batch` 的 `[content...]` 形态）。
-  Future<List<String>> _swipeContents(int messageId) async {
-    final swipes = await _messageRepository.listSwipes(messageId);
-    return [for (final swipe in swipes) swipe.content];
+  /// 全部消息候选 content（messageId → index 升序 content 列表，`swipes` 键
+  /// 填充源）。单次 batch 查询取全量（F-142，消逐消息 N+1）；无候选消息
+  /// 不在 map，导出侧以 `?? const []` 兜底——内容序与逐条 `listSwipes` 拼接
+  /// 逐字节等价（MS-01 导出契约，对应桌面 `list_swipes_batch`）。
+  Future<Map<int, List<String>>> _listSwipeContentsBatch(
+      List<Message> messages) async {
+    final swipes = await _messageRepository.listSwipesBatch([
+      for (final message in messages) message.id,
+    ]);
+    return {
+      for (final entry in swipes.entries)
+        entry.key: [for (final swipe in entry.value) swipe.content],
+    };
   }
 
   /// 最终文件名：`{safeFileName(baseName)}.{extension}`。

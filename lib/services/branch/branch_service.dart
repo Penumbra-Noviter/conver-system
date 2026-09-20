@@ -120,11 +120,14 @@ class BranchService {
               if (message.id <= uptoMessageId) message,
           ];
 
+    // F-142：一次 batch 查询取全量候选（消逐消息 N+1）；无候选消息不在 map，
+    // 以 `?? const []` 兜底后沿用「空候选跳过不产出候选条目」语义。
+    final candidatesByMessage = await _messageRepository.listSwipesBatch([
+      for (final message in truncated) message.id,
+    ]);
     final swipes = <BranchSnapshotSwipe>[];
     for (var index = 0; index < truncated.length; index++) {
-      final candidates = await _messageRepository.listSwipes(
-        truncated[index].id,
-      );
+      final candidates = candidatesByMessage[truncated[index].id] ?? const [];
       if (candidates.isEmpty) {
         continue; // 无候选消息不产出候选条目（重建回落 active=0）。
       }
