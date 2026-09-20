@@ -186,6 +186,11 @@ class _CharacterSelector extends StatelessWidget {
 enum _ConversationItemAction { rename, delete }
 
 /// 最近对话列表（`listConversations`，updated_at 倒序）+ 空态 + 长按管理菜单。
+///
+/// BR-02 分支来源标记：parent 引用存活的会话在消息数下行追加
+/// 「分支自「父标题」· 锚消息预览」；父会话已删（BR-01 删源置空策略——
+/// parent/锚置空、branch_title 保留）降级显示「分支（来源会话已删除）」；
+/// 普通会话无标记。
 class _ConversationList extends StatelessWidget {
   const _ConversationList({required this.controller});
 
@@ -219,6 +224,7 @@ class _ConversationList extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         final item = conversations[index];
+        final conversation = item.conversation;
         return ListTile(
           onTap: () => controller.openConversation(item.conversation.id),
           onLongPress: () => _showItemMenu(context, item.conversation),
@@ -228,9 +234,40 @@ class _ConversationList extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: textTheme.bodyLarge?.copyWith(color: palette.ink2),
           ),
-          subtitle: Text(
-            '${item.messageCount} 条消息',
-            style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${item.messageCount} 条消息',
+                style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+              ),
+              if (_branchMark(controller, conversation) case final mark?)
+                Padding(
+                  padding: const EdgeInsets.only(top: ConverSpacing.space1),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.call_split,
+                        size: 12,
+                        color: palette.ink4,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          mark,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: palette.ink4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
           trailing: Icon(
             Icons.chevron_right,
@@ -239,6 +276,22 @@ class _ConversationList extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// 分支来源标记文案（BR-02 验收 3 语义）：
+  /// - parent 存活 → 「分支自「父标题」· 锚消息预览」（父/锚缺失降级空预览）；
+  /// - parent 已删（置空策略）→ 按保留的 [Conversation.branchTitle] 降级
+  ///   「分支（来源会话已删除）」；
+  /// - 普通会话 → null（不显示标记）。
+  String? _branchMark(ChatController controller, Conversation conversation) {
+    if (conversation.parentConversationId != null) {
+      final source = controller.branchSources[conversation.id];
+      return '分支自「${source?.parentTitle ?? ''}」· ${source?.anchorPreview ?? ''}';
+    }
+    if (conversation.branchTitle != null) {
+      return '分支（来源会话已删除）';
+    }
+    return null;
   }
 
   /// 长按菜单：底部 sheet「重命名 / 删除」，按选择分发到对应对话框。

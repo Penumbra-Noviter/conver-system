@@ -305,4 +305,57 @@ void main() {
       await env.close();
     });
   });
+
+  group('入口 · 分支来源标记（BR-02 验收 3）', () {
+    /// 种子角色 + 会话 + 首答；经真实分支服务生成分支会话（父/锚记录落库）；
+    /// 返回源会话 id。
+    Future<int> seedBranch(ChatTestEnv env) async {
+      final char = await env.seedCharacter();
+      final conv = await env.seedConversation(char.id);
+      final anchor = await env.seedMessage(
+        conversationId: conv.id,
+        role: Role.assistant,
+        content: '第一答',
+      );
+      final branch = env.branchServiceOf();
+      await branch.branchFromMessage(conv.id, anchor.id, title: '雪夜分叉');
+      return conv.id;
+    }
+
+    testWidgets('分支会话列表项显示「分支自「父标题」· 锚预览」（父会话存活）',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      await seedBranch(env);
+      final c = entryController(env, FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      // 父会话标题「与 艾莉亚 的对话」+ 锚消息「第一答」预览。
+      expect(find.textContaining('分支自「与 艾莉亚 的对话」'), findsOneWidget,
+          reason: 'parent 存活 → 显示父标题');
+      expect(find.textContaining('第一答'), findsOneWidget,
+          reason: '锚消息预览渲染于列表副标');
+      expect(find.textContaining('分支自'), findsOneWidget,
+          reason: '仅分支会话有标记（父/普通会话无）');
+      expect(c.branchSources, isNotEmpty, reason: '控制器分支来源标记已加载');
+      await env.close();
+    });
+
+    testWidgets('父会话删除后 → 分支列表项降级显示「分支（来源会话已删除）」',
+        (tester) async {
+      final env = await ChatTestEnv.create();
+      final parentId = await seedBranch(env);
+      // BR-01 删源置空策略：parent/锚置空、branchTitle 保留（D2 契约）。
+      await env.conversationRepository.deleteConversation(parentId);
+      final c = entryController(env, FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+      await pumpChat(tester, c);
+
+      expect(find.text('分支（来源会话已删除）'), findsOneWidget,
+          reason: '父已删（引用置空）→ 按 branchTitle 降级「分支」标记');
+      expect(find.textContaining('分支自'), findsNothing,
+          reason: '父标题不可用，不再显示「分支自」');
+      await env.close();
+    });
+  });
 }

@@ -44,9 +44,12 @@ import '../../data/database/tables.dart' show Role;
 import '../../data/repositories/character_repository.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../data/repositories/message_repository.dart';
+import '../../services/branch/branch_service.dart';
+import '../../services/branch/branch_snapshot.dart';
 import '../../services/chat_service.dart';
 import '../../services/conversation_export_file_exchange.dart';
 import '../../services/conversation_export_service.dart';
+import '../../services/llm/errors.dart' show DomainError;
 import '../../services/notice_runner.dart';
 import 'chat_round.dart';
 
@@ -93,6 +96,18 @@ class ChatUiMessage {
   final int activeSwipeIndex;
 }
 
+/// 分支来源标记数据（[ChatController.branchSources] 项）：父会话标题 + 锚
+/// 消息预览。会话列表行「分支自「父标题」· 锚预览」标记渲染用。
+class BranchSource {
+  const BranchSource({required this.parentTitle, required this.anchorPreview});
+
+  /// 父会话标题。
+  final String parentTitle;
+
+  /// 锚消息内容预览（截断；父/锚缺失时为空串，降级不显示预览）。
+  final String anchorPreview;
+}
+
 /// 聊天 tab 编排控制器。
 ///
 /// 用法：装配层构造后经 provider 注入；ChatView 首次挂载时若
@@ -107,6 +122,9 @@ class ChatController extends ChangeNotifier {
   /// 导出装配（M4-03）：[exportService] + [exportFileExchange] 为可选依赖——
   /// 不传（既有测试装配不变）时导出方法给出「导出功能未配置」错误 notice，
   /// 不触真正平台通道；装配层（app.dart / chat_test_env）注入真实现或 fake。
+  ///
+  /// 分支装配（BR-02）：[branchService] 为可选依赖——不传时分支 / 快照导入
+  /// 导出方法给出「功能未配置」notice（既有测试装配不变）；装配层注入真实现。
   ChatController({
     required ChatService chatService,
     required ConversationRepository conversationRepository,
@@ -115,12 +133,14 @@ class ChatController extends ChangeNotifier {
     this.highlightDuration = const Duration(seconds: 3),
     ConversationExportService? exportService,
     ConversationExportFileExchange? exportFileExchange,
+    BranchService? branchService,
   })  : _chatService = chatService,
         _conversationRepository = conversationRepository,
         _characterRepository = characterRepository,
         _messageRepository = messageRepository,
         _exportService = exportService,
-        _exportFileExchange = exportFileExchange;
+        _exportFileExchange = exportFileExchange,
+        _branchService = branchService;
 
   final ChatService _chatService;
   final ConversationRepository _conversationRepository;
@@ -132,6 +152,10 @@ class ChatController extends ChangeNotifier {
 
   /// 导出文件 seam（M4-02）；可选——null 时导出降级为错误 notice。
   final ConversationExportFileExchange? _exportFileExchange;
+
+  /// 分支服务（BR-02）；可选——null 时分支 / 快照导入导出降级为「功能未配置」
+  /// notice（装配层注入真实现；测试注入真实 / 门控子类）。
+  final BranchService? _branchService;
 
   /// 跳转定位高亮的自动清除时长（对齐桌面 `HIGHLIGHT_DURATION=3000`）。
   final Duration highlightDuration;
@@ -185,6 +209,15 @@ class ChatController extends ChangeNotifier {
 
   /// 导出进行中（防连点：重复触发被忽略，完成复位）。
   bool _exporting = false;
+
+  /// 分支编排进行中（[branchFromMessage] 防连点：重复触发被忽略，完成复位）。
+  bool _branching = false;
+
+  /// 快照导入进行中（[importSnapshot] 防连点：重复触发被忽略，完成复位）。
+  bool _importing = false;
+
+  /// 分支来源标记缓存（会话 id → 父标题 + 锚消息预览；随 [loadEntry] 刷新）。
+  Map<int, BranchSource> _branchSources = const {};
 
   // ── 跳转定位高亮（M3-04c）──
 
@@ -249,12 +282,15 @@ class ChatController extends ChangeNotifier {
       _conversations = const [];
       _characters = const [];
       _selectedCharacterId = null;
+      _branchSources = const {};
       _hasLoadedEntry = true;
       _loadingEntry = false;
       notifyListeners();
       return;
     }
     _conversations = conversations;
+    // 分支来源标记随列表一起刷新（逐条失败降级不显示，不阻塞列表加载）。
+    _branchSources = await _collectBranchSources(conversations);
     final characters = await _noticeRunner.guard(
       op: () => _characterRepository.listCharacters(),
       onError: (e) => '加载对话失败: $e',
@@ -760,9 +796,10 @@ class ChatController extends ChangeNotifier {
 
   /// 导出编排公共腿：服务生成 → seam 分享，全程经非阻塞 notice 反馈。
   ///
-  /// [produce] 为服务导出入口（json / markdown 分腿）；[exporting] 防连点
-  /// 复用 [_exporting] 标志，导出期间重复触发被忽略；对话不存在 →
-  /// [produce] 返回 null → notice「对话不存在」且**不触 seam**（归零副作用）。
+  /// [produce] 为服务导出入口（json / markdown / 分支快照分腿）；
+  /// [exporting] 防连点复用 [_exporting] 标志，导出期间重复触发被忽略；
+  /// 对话不存在 → [produce] 返回 null → notice「对话不存在」且**不触 seam**
+  /// （归零副作用）。
   Future<void> _export(
     Future<ConversationExportResult?> Function(int conversationId)? produce,
   ) async {
@@ -770,9 +807,8 @@ class ChatController extends ChangeNotifier {
     if (cid == null) {
       return; // 菜单仅在会话态出现；防御性兜底（零副作用）。
     }
-    final service = _exportService;
     final seam = _exportFileExchange;
-    if (service == null || seam == null || produce == null) {
+    if (seam == null || produce == null) {
       _noticeRunner.setFirst('导出功能未配置');
       notifyListeners();
       return;
@@ -804,6 +840,174 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // ── 分支面（BR-02）──
+
+  /// 分支编排进行中（[branchFromMessage] 防连点：重复触发被忽略）。
+  bool get branching => _branching;
+
+  /// 快照导入进行中（[importSnapshot] 防连点：重复触发被忽略）。
+  bool get importing => _importing;
+
+  /// 分支来源标记（会话 id → 父标题 + 锚消息预览；随 [loadEntry] 刷新）。
+  ///
+  /// 仅 parent 引用存活的会话有标记；父已删（置空策略——parent/锚置空、
+  /// branch_title 保留，BR-01 契约）由视图按 [Conversation.branchTitle]
+  /// 降级「分支」标记。
+  Map<int, BranchSource> get branchSources => _branchSources;
+
+  /// 从当前会话的 [messageId] 处派生分支并直达新会话（BR-02 消息菜单「分支」）。
+  ///
+  /// 编排：经 [BranchService.branchFromMessage]（校验源+锚 → 截断快照含锚 →
+  /// 重建 → 记录 parent/锚/分支名 → 新会话）；成功 → [openConversation] 直达
+  /// 新分支会话（内部处理在途流式停止）；失败 → notice 单源文案
+  /// （[_branchErrorText]：领域错误自带文案 / 「分支失败: {e}」兜底）。
+  /// 守卫：入口态 / 分支进行中（[_branching] 防连点）/ 回合忙态
+  /// （[_round.isBusy] 复用 guard 腿）→ 零副作用忽略。
+  Future<void> branchFromMessage(int messageId) async {
+    final cid = _activeConversationId;
+    if (cid == null || _branching || _round.isBusy) {
+      return;
+    }
+    final branch = _branchService;
+    if (branch == null) {
+      _noticeRunner.setFirst('分支功能未配置');
+      notifyListeners();
+      return;
+    }
+    _branching = true;
+    notifyListeners();
+    try {
+      final result = await _noticeRunner.guard<Conversation>(
+        op: () => branch.branchFromMessage(cid, messageId),
+        onError: _branchErrorText,
+      );
+      if (result != null) {
+        await openConversation(result.id);
+      }
+    } finally {
+      _branching = false;
+      notifyListeners();
+    }
+  }
+
+  /// 导入分支快照为克隆会话并直达（BR-02 顶栏「导入分支快照」）。
+  ///
+  /// 编排：文件 seam 选 `.json`（[ConversationExportFileExchange.importSnapshot]）
+  /// → 解析校验（未知版本 / 格式无效拒绝，SR-30 文案映射）→
+  /// [BranchService.cloneFromSnapshot] 重建（消息/候选/世界书条目复制）→
+  /// [openConversation] 直达新会话。用户取消 → 零副作用；畸形文件 / 未知版本
+  /// → notice「快照格式无效」/「快照版本不支持」，不崩溃、不影响现有会话。
+  /// 守卫：入口态 / 导入进行中（[_importing] 防连点）/ 回合忙态 → 忽略。
+  Future<void> importSnapshot() async {
+    final cid = _activeConversationId;
+    if (cid == null || _importing || _round.isBusy) {
+      return;
+    }
+    final branch = _branchService;
+    final seam = _exportFileExchange;
+    if (branch == null || seam == null) {
+      _noticeRunner.setFirst('导入功能未配置');
+      notifyListeners();
+      return;
+    }
+    _importing = true;
+    notifyListeners();
+    try {
+      final snapshot = await _noticeRunner.guard<BranchSnapshot?>(
+        op: () => seam.importSnapshot(),
+        onError: _snapshotImportErrorText,
+      );
+      if (snapshot == null) {
+        return; // 用户取消 / 解析失败（notice 已折叠）→ 零副作用。
+      }
+      final conversation = await _noticeRunner.guard<Conversation>(
+        op: () => branch.cloneFromSnapshot(snapshot),
+        onError: _snapshotImportErrorText,
+      );
+      if (conversation != null) {
+        await openConversation(conversation.id);
+      }
+    } finally {
+      _importing = false;
+      notifyListeners();
+    }
+  }
+
+  /// 导出当前会话为分支快照（`{title}-branch.json`；复用 M4 分享 seam）。
+  ///
+  /// 经 [BranchService.exportSnapshot] 产出 [ConversationExportResult]（文件名
+  /// 净化 + JSON 载荷）→ seam 写临时文件并分享 → notice seam 文案；对话不存在
+  /// → 「对话不存在」且不触 seam；branchService 未装配 → 「导出功能未配置」。
+  Future<void> exportSnapshot() => _export(_branchService?.exportSnapshot);
+
+  /// 分支失败 notice 文案单源（BR-02 验收 2）：领域错误 → 其自带文案
+  /// （「对话不存在」/「消息不存在」）；其余 → 「分支失败: {e}」兜底。
+  static String _branchErrorText(Object error) {
+    if (error is DomainError) {
+      return error.message;
+    }
+    return '分支失败: $error';
+  }
+
+  /// 快照导入失败 notice 文案单源（BR-02 验收 5/6，SR-30 文案映射，不泄露
+  /// 解析细节）：未知版本 → 「快照版本不支持」；格式无效 →
+  /// 「快照格式无效」；领域错误 → 其自带文案；其余 → 「导入快照失败: {e}」。
+  static String _snapshotImportErrorText(Object error) {
+    if (error is BranchSnapshotUnsupportedVersionError) {
+      return '快照版本不支持';
+    }
+    if (error is InvalidBranchSnapshotError) {
+      return '快照格式无效';
+    }
+    if (error is DomainError) {
+      return error.message;
+    }
+    return '导入快照失败: $error';
+  }
+
+  /// 收集分支来源标记（父标题 + 锚消息预览）；逐条失败降级为不显示标记并记
+  /// 日志——标记是展示增强面，单条读取异常不阻塞会话列表加载。
+  Future<Map<int, BranchSource>> _collectBranchSources(
+    List<ConversationWithCount> conversations,
+  ) async {
+    final sources = <int, BranchSource>{};
+    for (final item in conversations) {
+      final conversation = item.conversation;
+      final parentId = conversation.parentConversationId;
+      final anchorId = conversation.branchFromMessageId;
+      if (parentId == null || anchorId == null) {
+        continue;
+      }
+      try {
+        final parent = await _conversationRepository.getConversation(parentId);
+        if (parent == null) {
+          continue; // 父引用残留但已删（删除路径已置空，理论不可达）：降级不显示。
+        }
+        final anchor = await _messageRepository.messageById(parentId, anchorId);
+        sources[conversation.id] = BranchSource(
+          parentTitle: parent.title,
+          anchorPreview: anchor == null ? '' : _anchorPreview(anchor.content),
+        );
+      } catch (error) {
+        debugPrint('分支来源标记读取失败（降级不显示）: $error');
+      }
+    }
+    return sources;
+  }
+
+  /// 锚消息预览：首行去空白后截断到 [maxAnchorPreviewChars]（列表副标用，
+  /// 超长以省略号收尾）。
+  static String _anchorPreview(String content) {
+    final line = content.split('\n').first.trim();
+    if (line.length <= maxAnchorPreviewChars) {
+      return line;
+    }
+    return '${line.substring(0, maxAnchorPreviewChars)}…';
+  }
+
+  /// 锚消息预览截断上限（列表副标单行空间，截断以省略号收尾）。
+  static const int maxAnchorPreviewChars = 14;
 
   /// 释放时取消在途流式订阅（[ChatRound.dispose]，ChatService 停止语义：已
   /// 累积部分落库）与高亮定位定时器，并清空高亮状态（防泄漏 / 防「notify

@@ -8,9 +8,11 @@ import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/branch/branch_service.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
 import 'package:conver_system_mobile/services/conversation_export_file_exchange.dart';
 import 'package:conver_system_mobile/services/conversation_export_service.dart';
@@ -51,6 +53,7 @@ class ChatTestEnv {
     this.conversationRepository,
     this.characterRepository,
     this.messageRepository,
+    this.lorebookRepository,
     this.settingsRepository,
     this.secretStore,
   );
@@ -64,6 +67,7 @@ class ChatTestEnv {
       ConversationRepository(db, const FakeSettingsReader()),
       CharacterRepository(db),
       MessageRepository(db),
+      LorebookRepository(db),
       SettingsRepository(database: db, secretStore: secretStore),
       secretStore,
     );
@@ -75,6 +79,7 @@ class ChatTestEnv {
   final ConversationRepository conversationRepository;
   final CharacterRepository characterRepository;
   final MessageRepository messageRepository;
+  final LorebookRepository lorebookRepository;
   final SettingsRepository settingsRepository;
   final InMemorySecretStore secretStore;
 
@@ -92,6 +97,7 @@ class ChatTestEnv {
     LLMProvider provider, {
     ConversationExportService? exportService,
     ConversationExportFileExchange? exportFileExchange,
+    BranchService? branchService,
     List<Duration> connectRetryDelays = const [
       Duration(seconds: 1),
       Duration(seconds: 2),
@@ -113,6 +119,20 @@ class ChatTestEnv {
       messageRepository: messageRepository,
       exportService: exportService,
       exportFileExchange: exportFileExchange,
+      branchService: branchService,
+    );
+  }
+
+  /// 装配分支服务（BR-02）：真实仓储 + 内存库（与 [controllerOf] 同源）。
+  ///
+  /// 分支流程测试用：`env.controllerOf(provider, branchService: env.branchServiceOf())`。
+  BranchService branchServiceOf() {
+    return BranchService(
+      database: db,
+      conversationRepository: conversationRepository,
+      characterRepository: characterRepository,
+      messageRepository: messageRepository,
+      lorebookRepository: lorebookRepository,
     );
   }
 

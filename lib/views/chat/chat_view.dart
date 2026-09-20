@@ -129,7 +129,16 @@ class _ConversationView extends StatelessWidget {
 }
 
 /// 对话顶栏导出动作（menu 值表）。
-enum _ConversationExportAction { json, markdown }
+enum _ConversationExportAction {
+  json,
+  markdown,
+
+  /// 导出当前会话为分支快照（`{title}-branch.json`，BR-02 验收 4）。
+  branchExport,
+
+  /// 导入分支快照为克隆会话并直达（BR-02 验收 5）。
+  branchImport,
+}
 
 /// 对话顶栏：返回（回入口刷新最近列表）+ 会话标题 + 导出菜单（⋯）。
 ///
@@ -175,7 +184,7 @@ class _ConversationHeader extends StatelessWidget {
         ),
         PopupMenuButton<_ConversationExportAction>(
           tooltip: '导出对话',
-          enabled: !controller.exporting,
+          enabled: !controller.exporting && !controller.branching && !controller.importing,
           icon: const Icon(Icons.more_vert),
           onSelected: (action) {
             switch (action) {
@@ -183,6 +192,10 @@ class _ConversationHeader extends StatelessWidget {
                 controller.exportJson();
               case _ConversationExportAction.markdown:
                 controller.exportMarkdown();
+              case _ConversationExportAction.branchExport:
+                controller.exportSnapshot();
+              case _ConversationExportAction.branchImport:
+                controller.importSnapshot();
             }
           },
           itemBuilder: (context) => const [
@@ -193,6 +206,14 @@ class _ConversationHeader extends StatelessWidget {
             PopupMenuItem(
               value: _ConversationExportAction.markdown,
               child: Text('导出 Markdown'),
+            ),
+            PopupMenuItem(
+              value: _ConversationExportAction.branchExport,
+              child: Text('导出分支快照'),
+            ),
+            PopupMenuItem(
+              value: _ConversationExportAction.branchImport,
+              child: Text('导入分支快照'),
             ),
           ],
         ),
@@ -533,7 +554,7 @@ class _UserBubble extends StatelessWidget {
 /// 长按被文本选择优先消费，长按入口在两类气泡上行为不一致；显式按钮触屏可
 /// 发现、a11y 语义可达（[Semantics] label「消息操作」），契约锁只锁行为不锁
 /// 形态。菜单项按角色与位置裁剪：末条 assistant 有「继续生成」，user 有
-/// 「编辑」，两者均有「删除」。
+/// 「编辑」，任意已落库消息有「分支」（BR-02 验收 1），两者均有「删除」。
 ///
 /// 生成中 / 终态重载窗口 / 瞬时变更进行中时禁用（[enabled] false → onPressed
 /// null）；流式占位与在途合成消息由调用方以 [show] 判据不渲染。
@@ -619,6 +640,11 @@ class _MessageActionsButton extends StatelessWidget {
             value: _MessageAction.edit,
             child: Text('编辑'),
           ),
+        // BR-02：分支对任意已落库消息可达（user / assistant 均有）。
+        const PopupMenuItem(
+          value: _MessageAction.branch,
+          child: Text('分支'),
+        ),
         const PopupMenuItem(
           value: _MessageAction.delete,
           child: Text('删除'),
@@ -636,6 +662,8 @@ class _MessageActionsButton extends StatelessWidget {
         await _promptEditMessage(context, controller, message);
       case _MessageAction.delete:
         await _confirmDeleteMessage(context, controller, message);
+      case _MessageAction.branch:
+        await controller.branchFromMessage(message.id);
       case null:
         return;
     }
@@ -954,6 +982,9 @@ enum _MessageAction {
 
   /// 删除消息（user 截断后续 / assistant 单删）。
   delete,
+
+  /// 从该消息处分叉出新分支会话（任意已落库消息，BR-02 验收 1）。
+  branch,
 }
 
 /// 编辑消息对话框（预填原内容）→ 提交返回新内容（取消 → null）。

@@ -13,14 +13,17 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
+import 'package:conver_system_mobile/services/branch/branch_service.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
 import 'package:conver_system_mobile/services/conversation_export_file_exchange.dart';
 import 'package:conver_system_mobile/services/conversation_export_service.dart';
@@ -194,9 +197,13 @@ class _FakeExportFileExchange extends ConversationExportFileExchange {
   final Completer<void>? gate;
   int calls = 0;
 
+  /// 最近一次收到导出的文件名（BR-02 快照导出断言 `{title}-branch.json`）。
+  String? lastFileName;
+
   @override
   Future<String> exportFile(ConversationExportResult result) async {
     calls++;
+    lastFileName = result.fileName;
     final g = gate;
     if (g != null) {
       await g.future;
@@ -208,12 +215,42 @@ class _FakeExportFileExchange extends ConversationExportFileExchange {
   }
 }
 
+/// branchFromMessage 先等 [gate] 再走真实分支逻辑的子类——构造「分支进行中」
+/// 的并发窗口（_branching 防连点测试的「进行中」腿）。
+class _GatedBranchService extends BranchService {
+  _GatedBranchService({
+    required super.database,
+    required super.conversationRepository,
+    required super.characterRepository,
+    required super.messageRepository,
+    required super.lorebookRepository,
+    super.now,
+    required this.gate,
+  });
+
+  final Completer<void> gate;
+  int calls = 0;
+
+  @override
+  Future<Conversation> branchFromMessage(
+    int conversationId,
+    int messageId, {
+    String? title,
+  }) async {
+    calls++;
+    await gate.future;
+    return super.branchFromMessage(conversationId, messageId, title: title);
+  }
+}
+
 void main() {
   late AppDatabase db;
   late ConversationRepository convRepo;
   late MessageRepository messageRepo;
   late CharacterRepository charRepo;
   late SettingsRepository settingsRepo;
+  late LorebookRepository lorebookRepo;
+  late BranchService branchService;
   late InMemorySecretStore secretStore;
   ChatController? controller;
 
@@ -226,6 +263,15 @@ void main() {
         now: () => fakeNow);
     messageRepo = MessageRepository(db, now: () => fakeNow);
     charRepo = CharacterRepository(db, now: () => fakeNow);
+    lorebookRepo = LorebookRepository(db, now: () => fakeNow);
+    branchService = BranchService(
+      database: db,
+      conversationRepository: convRepo,
+      characterRepository: charRepo,
+      messageRepository: messageRepo,
+      lorebookRepository: lorebookRepo,
+      now: () => fakeNow,
+    );
     secretStore = InMemorySecretStore();
     settingsRepo = SettingsRepository(database: db, secretStore: secretStore);
     await settingsRepo.setMany({'claude_api_key': 'sk-default'});
@@ -243,12 +289,15 @@ void main() {
   /// （M3-04c 定时清除测试用短时长，缺省 3s 对齐桌面 HIGHLIGHT_DURATION）。
   /// [exportService] / [exportFileExchange] 为 M4-03 导出依赖（缺省 null →
   /// 导出方法给「导出功能未配置」notice；测试注入 fake 断言调用链）。
+  /// [branchService] 为 BR-02 分支编排依赖（缺省 null → 分支/快照方法给
+  /// 「功能未配置」notice；测试注入真实/门控子类断言分支流程）。
   ChatController wireController(
     LLMProvider provider, {
     MessageRepository? messageRepository,
     Duration? highlightDuration,
     ConversationExportService? exportService,
     ConversationExportFileExchange? exportFileExchange,
+    BranchService? branchService,
   }) {
     final messages = messageRepository ?? messageRepo;
     final service = ChatService(
@@ -267,6 +316,7 @@ void main() {
       highlightDuration: highlightDuration ?? const Duration(seconds: 3),
       exportService: exportService,
       exportFileExchange: exportFileExchange,
+      branchService: branchService,
     );
     controller = c;
     return c;
@@ -292,6 +342,36 @@ void main() {
 
   List<(Role, String)> roleContentsOf(ChatController c) =>
       [for (final m in c.messages) (m.role, m.content)];
+
+  /// 种子 [user/assistant/user/assistant] 源会话（无开场白 → 不预插）；返回
+  /// 会话 + 消息 id（id 升序）。
+  Future<(Conversation, List<int>)> seedBranchSource() async {
+    final char = await seedCharacter();
+    final conv = await seedConversation(char.id);
+    final ids = <int>[
+      (await messageRepo.createMessage(
+              conversationId: conv.id,
+              role: Role.user,
+              content: '第一轮问'))
+          .id,
+      (await messageRepo.createMessage(
+              conversationId: conv.id,
+              role: Role.assistant,
+              content: '第一轮答'))
+          .id,
+      (await messageRepo.createMessage(
+              conversationId: conv.id,
+              role: Role.user,
+              content: '第二轮问'))
+          .id,
+      (await messageRepo.createMessage(
+              conversationId: conv.id,
+              role: Role.assistant,
+              content: '第二轮答'))
+          .id,
+    ];
+    return (conv, ids);
+  }
 
   group('loadEntry · 入口（最近对话 + 新建可用性）', () {
     test('loadEntry → conversations 填充；有角色可新建', () async {
@@ -1669,6 +1749,289 @@ void main() {
       final row = await convRepo.getConversation(conv.id);
       expect(row?.topP, 0.4, reason: '改全局不影响会话覆盖列');
       expect(row?.maxTokens, 512);
+    });
+  });
+
+  group('BR-02 分支编排 · branchFromMessage（验收 1/2）', () {
+    test('分支 → 新会话直达 + 消息序列 = 源截断含锚 + 源零改动（验收 1）', () async {
+      final (conv, ids) = await seedBranchSource();
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+      );
+      await c.openConversation(conv.id);
+
+      await c.branchFromMessage(ids[1]);
+
+      expect(c.activeConversationId, isNot(conv.id), reason: '分支后直达新会话');
+      expect(c.isEntry, isFalse, reason: '停留在对话面板');
+      expect(roleContentsOf(c), [
+        (Role.user, '第一轮问'),
+        (Role.assistant, '第一轮答'),
+      ], reason: '新会话消息序列 = 源截断到锚（含锚）');
+      final branchRow = await convRepo.getConversation(c.activeConversationId!);
+      expect(branchRow!.parentConversationId, conv.id, reason: '父引用指向源');
+      expect(branchRow.branchFromMessageId, ids[1], reason: '锚消息 id 记录');
+      final sourceAfter = await messageRepo.getMessages(conv.id);
+      expect(
+        [for (final m in sourceAfter) m.content],
+        ['第一轮问', '第一轮答', '第二轮问', '第二轮答'],
+        reason: '源会话零改动（消息数/内容不变）',
+      );
+      expect(c.notice, isNull, reason: '成功路径无 notice（导航已清）');
+    });
+
+    test('分支进行中重复触发 → 第二次被忽略（_branching 防连点，验收 2）', () async {
+      final (conv, ids) = await seedBranchSource();
+      final gate = Completer<void>();
+      final gated = _GatedBranchService(
+        database: db,
+        conversationRepository: convRepo,
+        characterRepository: charRepo,
+        messageRepository: messageRepo,
+        lorebookRepository: lorebookRepo,
+        now: () => fakeNow,
+        gate: gate,
+      );
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: gated,
+      );
+      await c.openConversation(conv.id);
+
+      final first = c.branchFromMessage(ids[0]);
+      final second = c.branchFromMessage(ids[0]); // 进行中被忽略
+      expect(c.branching, isTrue, reason: '首次分支进行中');
+      gate.complete();
+      await first;
+      await second;
+      expect(c.branching, isFalse, reason: '完成后复位');
+      expect(gated.calls, 1, reason: '第二次调用未触发服务（防连点）');
+
+      final list = await convRepo.listConversations();
+      final branches = list
+          .where((e) => e.conversation.parentConversationId == conv.id)
+          .toList();
+      expect(branches, hasLength(1), reason: '只产生一个分支会话');
+    });
+
+    test('分支失败（锚不存在）→ notice 单源文案，停留原会话零副作用（验收 2）',
+        () async {
+      final (conv, _) = await seedBranchSource();
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+      );
+      await c.openConversation(conv.id);
+
+      await c.branchFromMessage(999999);
+
+      expect(c.notice, '消息不存在', reason: 'MessageNotFoundError 单源文案');
+      expect(c.activeConversationId, conv.id, reason: '失败停留原会话');
+      expect(await convRepo.listConversations(), hasLength(1),
+          reason: '零新会话');
+    });
+
+    test('branchService 未装配 → notice「分支功能未配置」零副作用', () async {
+      final (conv, ids) = await seedBranchSource();
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+
+      await c.branchFromMessage(ids[0]);
+
+      expect(c.notice, '分支功能未配置');
+      expect(c.activeConversationId, conv.id);
+      expect(await convRepo.listConversations(), hasLength(1));
+    });
+  });
+
+  group('BR-02 快照导入导出 · importSnapshot / exportSnapshot（验收 4/5/6）', () {
+    /// 由分支服务构建 [conversationId] 的合法快照 JSON 字节。
+    Future<Uint8List> snapshotBytesOf(int conversationId) async {
+      final snapshot = await branchService.buildBranchSnapshot(conversationId);
+      return Uint8List.fromList(
+        utf8.encode(jsonEncode(snapshot.toJson())),
+      );
+    }
+
+    /// 带 [bytes] 版本 pick 的文件 seam（平台调用点被 fake 取代）。
+    ConversationExportFileExchange seamPicking(Future<Uint8List?> Function() pick) {
+      return ConversationExportFileExchange(
+        pickJsonBytes: pick,
+        platformTimeout: const Duration(seconds: 5),
+      );
+    }
+
+    test('合法快照导入 → 克隆会话并直达 + 消息序列与快照一致（验收 5）', () async {
+      final (conv, _) = await seedBranchSource();
+      final bytes = await snapshotBytesOf(conv.id);
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+        exportFileExchange: seamPicking(() async => bytes),
+      );
+      await c.openConversation(conv.id);
+
+      await c.importSnapshot();
+
+      expect(c.activeConversationId, isNot(conv.id), reason: '导入生成克隆会话并直达');
+      final cloned = await convRepo.getConversation(c.activeConversationId!);
+      expect(cloned!.parentConversationId, isNull,
+          reason: '导入克隆为独立会话（不设 parent）');
+      expect(roleContentsOf(c), [
+        (Role.user, '第一轮问'),
+        (Role.assistant, '第一轮答'),
+        (Role.user, '第二轮问'),
+        (Role.assistant, '第二轮答'),
+      ], reason: '消息序列与快照一致');
+    });
+
+    test('未知版本 → notice「快照版本不支持」（SR-30 文案），不创建会话（验收 5/6）',
+        () async {
+      final (conv, _) = await seedBranchSource();
+      final bad = Uint8List.fromList(utf8.encode('{"version": 99}'));
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+        exportFileExchange: seamPicking(() async => bad),
+      );
+      await c.openConversation(conv.id);
+
+      await c.importSnapshot();
+
+      expect(c.notice, '快照版本不支持', reason: 'SR-30 未知版本拒绝文案');
+      expect(c.activeConversationId, conv.id, reason: '失败停留原会话');
+      expect(await convRepo.listConversations(), hasLength(1),
+          reason: '零新会话（不影响现有会话）');
+    });
+
+    test('畸形文件（非 JSON）→ notice「快照格式无效」不崩溃（验收 6）', () async {
+      final (conv, _) = await seedBranchSource();
+      final bad = Uint8List.fromList(utf8.encode('这不是 JSON 内容'));
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+        exportFileExchange: seamPicking(() async => bad),
+      );
+      await c.openConversation(conv.id);
+
+      await c.importSnapshot();
+
+      expect(c.notice, '快照格式无效', reason: 'InvalidBranchSnapshotError 文案');
+      expect(c.activeConversationId, conv.id);
+      expect(await convRepo.listConversations(), hasLength(1),
+          reason: '不影响现有会话');
+    });
+
+    test('快照缺关键字段（version=1 但缺 character_id）→ notice「快照格式无效」',
+        () async {
+      final (conv, _) = await seedBranchSource();
+      final bad = Uint8List.fromList(utf8.encode('{"version": 1}'));
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+        exportFileExchange: seamPicking(() async => bad),
+      );
+      await c.openConversation(conv.id);
+
+      await c.importSnapshot();
+
+      expect(c.notice, '快照格式无效', reason: '字段结构校验失败归类为格式无效');
+      expect(c.activeConversationId, conv.id);
+      expect(await convRepo.listConversations(), hasLength(1));
+    });
+
+    test('用户取消（pick 返回 null）→ 零副作用无 notice', () async {
+      final (conv, _) = await seedBranchSource();
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+        exportFileExchange: seamPicking(() async => null),
+      );
+      await c.openConversation(conv.id);
+
+      await c.importSnapshot();
+
+      expect(c.notice, isNull, reason: '取消不弹提示');
+      expect(c.activeConversationId, conv.id);
+      expect(await convRepo.listConversations(), hasLength(1));
+    });
+
+    test('导入进行中重复触发 → 第二次被忽略（_importing 防连点）', () async {
+      final (conv, _) = await seedBranchSource();
+      final bytes = await snapshotBytesOf(conv.id);
+      final gate = Completer<Uint8List?>();
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+        exportFileExchange: ConversationExportFileExchange(
+          pickJsonBytes: () => gate.future,
+          platformTimeout: const Duration(seconds: 30),
+        ),
+      );
+      await c.openConversation(conv.id);
+
+      final first = c.importSnapshot();
+      final second = c.importSnapshot();
+      expect(c.importing, isTrue, reason: '首次导入进行中');
+      gate.complete(bytes);
+      await first;
+      await second;
+      expect(c.importing, isFalse, reason: '完成后复位');
+      expect(await convRepo.listConversations(), hasLength(2),
+          reason: '只克隆一次（第二次被忽略）');
+    });
+
+    test('快照导出 → seam.exportFile 收到 {title}-branch.json + seam 文案（验收 4）',
+        () async {
+      final char = await seedCharacter(name: '艾莉亚');
+      final conv = await seedConversation(char.id);
+      await convRepo.updateConversation(
+        conv.id,
+        ConversationsCompanion(title: Value('雪夜分叉')),
+      );
+      final seam = _FakeExportFileExchange(
+        message: '已导出 雪夜分叉-branch.json（分享面板已打开）',
+      );
+      final c = wireController(
+        FakeLLMProvider(tokens: const []),
+        branchService: branchService,
+        exportFileExchange: seam,
+      );
+      await c.openConversation(conv.id);
+
+      await c.exportSnapshot();
+
+      expect(seam.calls, 1, reason: 'seam 恰好被调用一次');
+      expect(seam.lastFileName, '雪夜分叉-branch.json',
+          reason: '文件名 = {净化标题}-branch.json');
+      expect(c.notice, '已导出 雪夜分叉-branch.json（分享面板已打开）',
+          reason: '成功经 seam 文案反馈');
+      expect(c.exporting, isFalse, reason: '完成后复位');
+    });
+
+    test('branchService 未装配 → exportSnapshot notice「导出功能未配置」', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+
+      await c.exportSnapshot();
+
+      expect(c.notice, '导出功能未配置');
+      expect(c.activeConversationId, conv.id);
+    });
+
+    test('branchService 未装配 → importSnapshot notice「导入功能未配置」', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.openConversation(conv.id);
+
+      await c.importSnapshot();
+
+      expect(c.notice, '导入功能未配置');
+      expect(c.activeConversationId, conv.id);
     });
   });
 }
