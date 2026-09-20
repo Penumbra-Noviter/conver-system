@@ -6,6 +6,24 @@
 
 ---
 
+## 技术债消费批次 F-140/F-141/F-142 — 三条全部处置（2026-09-21 — 用户「待立项消费」拍板，project-kickoff 全自动档）
+
+- **批次源**：用户「F-140/141/142 待立项消费」（chat-polish-aigs 期末落债三条：SPEC-1 契约缺口 Worth / chat_entry flaky Strong / branch N+1 Worth）；基线 `5b64def`（2829 测）。项目完整模式 + 全自动档（persona 偏好），高風險面②（T-01/T-03 触碰既有核心模块）→ 标准档单波 3 并行。
+- **Grilling 共识（技术债条目为审查共识产物，只审增量）**：F-140 做·方向 A（服务层落地与 deleteMessage 同构、spec §4.8 实现补位免修订，理由：契约表 1:1 成真 + ChatRound 消除补偿 + 四姊妹方法全部服务层、switchSwipe 是唯一缺位者）；F-141 做·测试侧修正（**控制器侧无真实竞态实证**——loadEntry 单次赋值 + 单线程事件循环；根因 = seedCharacter 的 `DateTime.now()` 被 createCharacter 的 `_now()` 覆写致测试无法控序 + drift 秒级存储 + 两 seed 跨秒边界 → `updated_at DESC` 后种者排首 → `_resolveSelectedCharacterId` 取 first.id=2；F-136 pumpUntil 对其无效——排序错时条件永不满足）；F-142 做·R2（batch 原语 + 两消费方，桌面 list_swipes_batch 语义参考、移动端自建 drift `isIn`；`_loadSwipeCounts` 因逐条 try/catch 降级语义冲突明确不动）；三分：三条均自建零新依赖。
+- **plan-tickets**：spec + 3 票（T-01 switchSwipe 落地 / T-02 ChatTestEnv 可控时钟 / T-03 swipes batch），三票零互依赖、文件范围零交集、出口四检全过（23 引用文件真实存在 / 无环 / 粒度 ≤500 行 / 验收 ≤8 条）。
+- **波 1 三并行（首次派发全部被 kill——「Background agent task stopped」→ 重开路径）**：重开前现场核查——T-01 4 文件未提交（含只读 chat_round_test 越界待核）、T-02 先红后绿已落地（a6132fd 红 + d107291 绿）、T-03 4 文件未提交 + cov_report.py 临时产物。重开 prompt 带现场核查指令续作。
+- **逐票交付**：
+  - T-01/F-140（commit `6b5ba9a`，merge d85ff5a）：ChatService.switchSwipe 落地 + ChatRound 改调（守卫/notice/reload 保留）；范围测试全绿；覆盖率 chat_service 92.3% / chat_round 96.9%；**范围偏差**：只读 chat_round_test 13 行接口顺应存根（`_ScriptedChatService implements ChatService`，Dart 接口增方法编译必需；行为中性 UnimplementedError 被触即炸；无零 diff 替代）——子代理上报 → 主会话批准归「记录警告」+ 证据文件落盘偏差节；票文「回归组 5 用例」实测 4 用例（以实测为准）。
+  - T-02/F-141（commits `a6132fd`+`d107291`，merge 97e556b）：ChatTestEnv 注入可控时钟（`create({DateTime Function()? now})` 默认参数，8 消费文件零实参调用源码兼容；直抄 chat_controller_test fakeNow 先例）；先红复现 `Expected: <1> / Actual: <2>` → 修复恒绿；契约锁双口径（仓库层三 seed 同刻 id 升序 + widget 层 pumpUntil）；**突击抽查**：反转 id DESC 双口径均红（非伪测试），仅删 id ASC 未红系 SQLite 单列排序回落 rowid 序（契约锁锁行为非实现细节，证据注明）；全量 4 遍首跑零复现（3× +2829 + 1× --coverage）。
+  - T-03/F-142（commit `d617564`，merge 007776c）：listSwipesBatch（`isIn` 单查询 + 空输入短路 + index 升序 + 无候选不在 map）+ branch/export 两消费方改调；输出逐字节等价（既有断言零改动全绿）；覆盖率三文件 96.6~100%；Falsify 突变抽查 3 项全捕获（空短路移除→runSelect 计数暴露 / 候选恒空→branch 断言失败）；cov_report.py 临时产物已删。
+- **波末**：范围核验三档 = 合规×2 + 记录警告×1（T-01 存根，有权依据）；完成门 3 DONE；合并回 mobile（HEAD `007776c`）；受影响模块 289 测全绿。增量审核（固定点 5b64def）**0 阻断**：Falsify 3 条非阻断（listSwipesBatch isIn 无分块上限声明 🟡 / switchSwipe 与 deleteMessage 归属校验同构重复 💭 / seedCharacter 双 `_now()` 死求值 💭）+ 负结果具名记录（T-01→仓库层契约衔接 TOCTOU 由 `_requireMessage` 关闭、T-03 空输入短路/absent-key 兜底语义正确、T-02 时钟注入 8 消费文件无同刻 flakiness、ChatRound 状态机 `_isMutatingMessage=false` 恒可达、存根响亮失败非静默）；remove pass 10→3（7 条证据裁定删除）。
+- **期末全量**：2836 测绿（基线 2829 → +7 = chat_service_test +3 + message_swipes_test +4）/ analyze 0。
+- **期末四轴**（code-review 子智能体，固定点 `5b64def`）：**通过（无需继续修改）**——四轴 0 阻断、0 硬违规；Standards 1 🟡（F-144 归属校验同构重复——spec §4.1 明确「与 deleteMessage 同构」为 spec 强制重复，抑制为基线 smell，F-144 已登记评估合理）；Spec 0 缺失 0 偏差（§4.1/4.2/4.3 全命中，F-141「同刻两 seed」以三 seed 实现为超集非偏差）；Falsify 1 💭（listSwipesBatch 单查未分块规模边界，非缺陷，与波末 F-143 同源 → 去重复证标注）；Architecture 0 阻断（listSwipesBatch seam 深增量高 Leverage / chat_round 归纯编排 / 夹具修复属地正确 / F-144 落债判定合理）。
+- **批次教训/避坑（蒸馏候选）**：① **子代理后台任务被 kill（Background agent task stopped）后 worktree 保留现场**——重开路径 = 现场核查（git worktree list + 各 worktree `git status`/`git log` 分辨已完成/半成品）+ 复用 worktree/分支续作，不重建；本批 T-02 已完成先红后绿两 commit 只需收尾，T-01/T-03 半成品续作，避免重做（0 损耗）；② 波中只读文件因接口演化被编译必需修改（Dart implements 增方法）——子代理上报、主会话批准归记录警告、证据落盘偏差节，不静默越界也不机械回退；③ 测试夹具时钟失控是 flaky 根因可实证的常见形态（createCharacter 覆写显式时间戳）——夹具即修复属地。
+- **批次收尾**：TICKETS 归档「技术债消费批次 F-140/F-141/F-142」（T-01~03）；TECH_DEBT 处置记录新节（F-140/141/142 ✅ 已修移出候选区）+ 新落债 F-143/144/145（波末增量审核 3 条非阻断；F-143 期末复证标注）；AGENTS 状态行追加；`.scratch/techdebt-f140f142/` 待 Neat 清场（含 3 个 worktree 与 kickoff 分支清理，删除清单经用户确认）。
+
+---
+
 ## 移动端角色对话打磨批次 chat-polish-aigs（2026-09-19/20 — handoff 交接指令 + /project-kickoff 全自动接续）
 
 - **批次源**：handoff-conver-mobile-chat-polish-aigs-20260919（用户「/project-kickoff 全自动接续」两段式）；Grilling 共识已确认（10 项开放决策采纳），威胁建模 SR-23~31；19 票 / 10 功能族，基线 `88003fc`（2274 测）。

@@ -27,6 +27,16 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-140/F-141/F-142 三条全部处置（2026-09-21 收口）
+
+> 来源：用户「F-140/141/142 待立项消费」（project-kickoff 全自动档，标准档单波 3 并行——高風險面② 命中既有核心模块）。基线 `5b64def`（2829 测）。门禁：全量 **2836 测**绿（基线 2829 → +7）/ analyze 0 / 波及文件覆盖率全 ≥90% / 波末增量审核 0 阻断（3 条非阻断落债 F-143~145）/ 期末四轴 **通过（0 Critical）**。详见 DEV_LOG〈技术债消费批次 F-140/F-141/F-142 — 三条全部处置〉与 `.scratch/techdebt-f140f142/`（spec/issues/evidence）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| T-01 | F-140：落地 ChatService.switchSwipe，ChatRound 改调服务层 | 2026-09-21 | 6b5ba9a（merge d85ff5a） |
+| T-02 | F-141：ChatTestEnv 注入可控时钟，锁死「默认选中首角色」契约 | 2026-09-21 | a6132fd + d107291（merge 97e556b） |
+| T-03 | F-142：MessageRepository batch 原语，消 branch/export 逐消息 N+1 | 2026-09-21 | d617564（merge 007776c） |
+
 ### 移动端角色对话打磨批次 chat-polish-aigs（19 票 / 10 功能族，2026-09-20 收口）
 
 > 来源：handoff-conver-mobile-chat-polish-aigs-20260919（用户 `/project-kickoff 全自动接续`），Grilling 共识已确认；基线 `88003fc`。主会话编排 15 波全部收口（R1 并行 01+07 → R13 并行 16+18），19/19 票合入，主分支全量 **2829 测**绿（基线 2274 → +555）/ analyze 0 / 每波波及文件覆盖率全 ≥90%（app.dart 装配缺口 3 案例预警条款放行）/ 期末四轴 **通过（0 Critical）**；对准桌面 1.1.0 角色对话（swipes/世界书/记忆宫殿/叙述风格/预设对话/专家模式/采样参数/Prompt Debug/分支）。详见 DEV_LOG〈移动端角色对话打磨批次 chat-polish-aigs〉与 `.scratch/chat-polish-aigs/`（spec/issues/concerns/threat-model）。

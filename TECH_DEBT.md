@@ -43,11 +43,21 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-140 | spec §4.8 契约表声明 `ChatService.switchSwipe({conversationId, messageId, index})` 未在服务层实现——落地于 `MessageRepository.switchSwipe(messageId, index)`（message_repository.dart:432），conversationId 归属校验由视图层 ChatRound 前置补偿（chat_round.dart:456-486）。已申报偏差（concerns/04 §2），功能面完整；收口二选一：落地服务层方法（含归属校验）或修订 spec §4.8 契约表 + 修订日志 | 期末四轴 Spec 轴 | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-141 | chat_entry_test「默认选中首角色」（Expected 1/Actual 2 竞态）全量首跑**批次内 4 次复用**（2026-09-19/20：05/11/13/17 波），单文件重跑恒绿。F-106（listCharacters id ASC 二级排序键）/ F-122（publish 等待族）/ F-136（断言前置 pumpUntil）修复后仍复发——chat_entry 侧同类竞态未彻底收敛，需根因深挖（候选怀疑：入口角色列表加载与选择条初始化的 publish 时序） | 波末多波观察 + 期末四轴 Falsify 复证 | Strong | 📝 待立项 | 聊天链路 |
-| F-142 | `BranchService.buildBranchSnapshot`（branch_service.dart:124-138）逐消息 `listSwipes` N+1 查询；桌面有 batch 读先例。对话规模常态下无害，快照导出大对话时成本线性放大 | 期末四轴 Falsify/Architecture | Worth exploring | 📝 待立项 | 分支域 |
+| F-143 | `MessageRepository.listSwipesBatch`（message_repository.dart:439）`isIn(ids)` 无分块、无上限声明：消费方（branch_service.dart:125 / conversation_export_service.dart:114）把完整消息 id 列表投入单条 SQL，超过 SQLITE_MAX_VARIABLE_NUMBER（默认 32766）时抛「too many SQL variables」硬失败；旧逐消息 `listSwipes` N+1 任意规模可跑（慢不失败）。触发规模远超真实对话量级，非阻断；docstring 声明 bound 或将来补 chunking | 波 1 增量审核 Falsify（期末四轴 Falsify 复证） | Worth exploring | 📝 待立项 | 数据层 |
+| F-144 | `ChatService.switchSwipe`（chat_service.dart:1478-1483）归属校验与 `deleteMessage`（L1446-1451）逐行同构重复（`messageById → null → MessageNotFoundError`）；抽提非本波该做（对齐桌面逐字惯例），纯结构重复 | 波 1 增量审核 Falsify | Speculative | 📝 待立项 | 聊天链路 |
+| F-145 | `ChatTestEnv.seedCharacter`（chat_test_env.dart:164-165）对 companion 的 `createdAt/updatedAt` 两次 `_now()` 求值，随后被 `createCharacter` 单次时钟调用整体覆写丢弃——死求值/夹具误导（未来步进时钟场景两值可能不同但无观测影响） | 波 1 增量审核 Falsify | Speculative | 📝 待立项 | 测试夹具 |
 
 ## 技术债处置记录
+
+### 2026-09-21 — 技术债消费批次（F-140/F-141/F-142 全部处置，候选区留 F-143~145）
+
+> 来源：用户「F-140/141/142 待立项消费」拍板；project-kickoff 全自动档单波 3 并行（高風險面② → 标准档）。门禁：全量 **2836 测**绿（基线 2829 → +7）/ `flutter analyze` 0 / 波及文件覆盖率全 ≥90% / 波末增量审核 0 阻断 / 期末四轴 **通过（0 Critical）**。处置详情与逐条实证见 DEV_LOG〈技术债消费批次 F-140/F-141/F-142 — 三条全部处置〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-140 | ✅ 已修 | `ChatService.switchSwipe` 服务层落地（chat_service.dart 新方法 + 归属校验与 deleteMessage 同构 + 越界原样上抛），ChatRound 改调服务层（守卫/notice/reload 保留），spec §4.8 契约表实现补位免修订；chat_round_test 13 行接口顺应存根（Dart implements 编译必需，批准归记录警告）；T-01 commit `6b5ba9a`（merge d85ff5a） |
+| F-141 | ✅ 已修 | 根因实证 = 测试夹具不可控时钟（seedCharacter 的 `DateTime.now()` 被 createCharacter 的 `_now()` 覆写 + drift 秒级存储 + 两 seed 跨秒边界 → 排序错 → first.id=2），非控制器竞态；ChatTestEnv 注入可控时钟（`create({now})` 默认参数，抄 chat_controller_test 先例）；先红（a6132fd 复现 first.id==2）后绿（d107291）+ 契约锁双口径 + 全量 4 遍首跑零复现；T-02 commits `a6132fd`+`d107291`（merge 97e556b） |
+| F-142 | ✅ 已修 | `MessageRepository.listSwipesBatch` batch 原语（drift `isIn` 单查询 + 空输入短路 + index 升序），branch_service.buildBranchSnapshot 与 conversation_export_service JSON 导出两消费方改调，输出逐字节等价（既有断言零改动全绿）；`_loadSwipeCounts` 明确不动；T-03 commit `d617564`（merge 007776c） |
 
 ### 2026-09-19 — 技术债消费批次（F-123~139 十七条全部处置，候选区清零）
 
