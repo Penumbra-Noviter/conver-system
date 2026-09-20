@@ -19,8 +19,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/database/tables.dart' show Role;
+import '../../services/chat_service.dart' show ChatService;
 import '../../theme/chat_markdown_style.dart'
     show warmStoneMarkdownDark, warmStoneMarkdownLight;
 import '../../theme/colors.dart';
@@ -30,6 +32,7 @@ import '../../widgets/notice_banner.dart';
 import 'chat_controller.dart';
 import 'chat_entry.dart';
 import 'conversation_sampling_sheet.dart';
+import 'prompt_debug_sheet.dart';
 
 /// 聊天 tab：入口（最近对话 + 新建）与对话面板之间按
 /// [ChatController.isEntry] 切换。
@@ -163,6 +166,12 @@ class _ConversationHeader extends StatelessWidget {
           key: const Key('conversation-settings-button'),
           icon: const Icon(Icons.tune),
           onPressed: () => _openConversationSamplingSettings(context, controller),
+        ),
+        IconButton(
+          tooltip: 'Prompt 调试',
+          key: const Key('prompt-debug-button'),
+          icon: const Icon(Icons.bug_report_outlined),
+          onPressed: () => _openPromptDebug(context, controller),
         ),
         PopupMenuButton<_ConversationExportAction>(
           tooltip: '导出对话',
@@ -1093,6 +1102,43 @@ Future<void> _openConversationSamplingSettings(
     frequencyPenalty: result.frequencyPenalty,
     maxTokens: result.maxTokens,
   );
+}
+
+/// 打开「Prompt 调试」只读面板（PD-04）：经 [ChatService.promptDebug] 取
+/// 逐条带来源的组装分段，展示于 [PromptDebugSheet]。
+///
+/// 会话缺失（入口仅对话态渲染，防御兜底）→ 零副作用；读取失败 → 静默降级
+/// （debug 是增强面，不阻断聊天主路径——对齐「展示增强面失败不阻塞列表
+/// 呈现」的既有降级先例）。
+Future<void> _openPromptDebug(
+  BuildContext context,
+  ChatController controller,
+) async {
+  final conversation = controller.activeConversation;
+  if (conversation == null) {
+    return;
+  }
+  try {
+    final result = await context
+        .read<ChatService>()
+        .promptDebug(conversationId: conversation.id);
+    if (!context.mounted) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+        ),
+        child: PromptDebugSheet(result: result),
+      ),
+    );
+  } catch (e) {
+    debugPrint('Prompt 调试读取失败，保持对话: $e');
+  }
 }
 
 /// system 角色（开场白元信息等）：居中弱化小字（M3-04c 高亮时琥珀 wash 底）。
