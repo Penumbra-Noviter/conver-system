@@ -6,6 +6,20 @@
 
 ---
 
+## 移动端角色对话打磨批次 chat-polish-aigs（2026-09-19/20 — handoff 交接指令 + /project-kickoff 全自动接续）
+
+- **批次源**：handoff-conver-mobile-chat-polish-aigs-20260919（用户「/project-kickoff 全自动接续」两段式）；Grilling 共识已确认（10 项开放决策采纳），威胁建模 SR-23~31；19 票 / 10 功能族，基线 `88003fc`（2274 测）。
+- **编排**：`.scratch/chat-polish-aigs/orchestration.md` 15 波全收口——R1 并行 01+07 → R2 并行 02+06 → R3 并行 03+09 → R4 04 → R5 05 → R6 08 → R7 10 → R8 11 → R9 12 → R10 13 → R11 14 → R12 15 → **R13 并行 16+18**（文件范围零重叠核验）→ R14 17 → R15 19。每票独立 worktree `F:\Craft\conver system\.worktrees\<slug>` + 分支 `kickoff/<编号>-<slug>`；每波主会话收口（全量验证 + lcov 覆盖核对 + 增量审核 0 阻断 + concerns 落盘）；批次末统一 TICKETS 归档。
+- **日期分界**：CPA-01~07/09（swipes/世界书表+引擎/编辑器 UI）2026-09-19 于交接文档前已合入；本会话收口 CPA-08/10~19（注入链/记忆宫殿/叙述风格/预设对话×2/专家模式/采样×2/Prompt Debug/分支×2）2026-09-20。
+- **逐波门禁（主会话独立核验）**：19 票全部「全量测试 + analyze 0 + 波及文件覆盖率 ≥90%（lcov 解析）+ 残留零命中 + 文件范围核验」通过；主分支各波 merge 后全量逐次累加：2484 → 2503 → 2553 → 2582 → 2613 → 2637 → 2672 → 2694 → 2784（R13 并行 +90）→ 2808 → **2829**（基线 2274 → +555）；每波增量审核 0 阻断（Standards/Spec/Falsify/Architecture 四维主会话审阅）。
+- **关键实证与决策（concerns/01~19 全文落盘）**：注入锚实证修正（NPD-01 票面「scenario 后」为 WL-03 前旧文 → after_char 后/[世界知识] 前，桌面 `_assemble` 2.7 逐字）；`Value(null)` 落库实证（drift Companion 忽略 nullToAbsent 只检 present → Repo 零改动）；Dart valid-override 签名 ripple（加基类可选参数强制 17 类 × 19 覆写面同步，含 15 票 + 14 票 drift 必填字段 ripple 同类）；迁移幂等 PRAGMA+ALTER 同构 6 块（schemaVersion 5→11）；`_assemble` 单一组装核心抽核零变化契约（PD-04）；删源置空 D2 桌面对照（BR-01）；世界书复制独立行 D1 桌面有意偏差。
+- **Falsify 对抗**：子代理突变抽查 30+ 全红 + 主会话逐波对抗审阅；期末四轴 Falsify 轴构造失败输入无崩溃面（守卫矩阵全过）。
+- **期末四轴**（code-review 子智能体，固定点 `88003fc`）：**通过（0 Critical）**——Standards 3 Info（S1 database 参数签名稳定遗留 / S2 sourceMod spec 背书占位 / S3 记忆宫殿全捕获契约降级）；Spec 1 Recommended + 2 Info（**SPEC-1** `ChatService.switchSwipe` 契约缺口已申报补偿 → 落债 F-140；SPEC-2/3 spec 内联形态差异 → spec 修订日志批尾统一）；Falsify 5 Info；Architecture 3 Info（switchSwipe Locality 与 SPEC-1 同源）。修订日志已折回 spec.md。
+- **批次教训/避坑（蒸馏候选）**：① 子代理慢速完成型（30-60 分钟无间歇输出但实际推进，中途 worktree git status 采样判断）——多次「误判中断」后主会话接管收尾（01/04/05 先例）；② 突变检查残留会留生产代码——波末/接手半成品第一件事 grep `MUTATION`/`PROBE`/`TEMP`（01/05 先例）；③ flutter test 被 kill 残留 flutter_tester 进程锁 sqlite3.dll → 重跑前 `Get-Process flutter_tester | Stop-Process -Force`（本批多次）；④ job/interrupt 后子代理可能继续写完并提交——kill 后检查 worktree 新 commit；⑤ 气泡内显式 label Semantics 必须 `container: true` 隔离（05，F-66 语义吞并实证）；⑥ ListView 懒构建消息行高变化 `_scrollToBottom` 需 post-frame 补跳（05，差 19.33px）；⑦ **编排文件波记录编辑须插入而非替换**（本会话两次误删前波记录已修复，教训固化）；⑧ **勿全库 `dart format`**（14/15 票：仓库非 format-clean，全库/多文件格式引入 1700-3000 行噪音，须逐文件核对还原）；⑨ **禁 serena 写类工具**（15 票 replace_in_files 误写主工作区 6 测试文件，已回滚核验，后续票禁用）；⑩ **禁 `grep pattern file > file` 同文件重定向**（15 票覆盖 chat_service_test 850 行）；⑪ 票面注入锚/前置假设写于前置票落地前后会过时——派发时实证修正（NPD-01 锚、15 票子类零改动）；⑫ **chat_entry「默认选中首角色」flaky 批次内 4 次复用**（05/11/13/17 波首跑，单文件重跑恒绿）——F-106（排序）/F-122（publish 等待族）/F-136（加载等待）修复后仍复发 → 落债 F-141（Strong，需根因深挖）；⑬ shell `>` 重定向在主工作区 vs worktree 的路径解析陷阱（后续票统一用 worktree 绝对路径）。
+- **批次收尾**：TICKETS 归档「移动端角色对话打磨批次 chat-polish-aigs」（CPA-01~19）；TECH_DEBT 新落债 F-140/141/142（SPEC-1 契约缺口 Worth / chat_entry flaky Strong / branch N+1 Worth）；spec 修订日志批尾统一（SPEC-1/2/3）；AGENTS 状态行追加；`.scratch/chat-polish-aigs/` 待 Neat 清场（删除清单经用户确认）。
+
+---
+
 ## 技术债消费批次 F-123~139 — 十七条全部处置（2026-09-19 — handoff 交接指令，候选区 17 条全处置）
 
 - **Grilling 共识（16 做 1 关）**：交接文档建议「先 F-136/137 flaky 复核 + F-138/139 收敛点，再评估 W1~W6/P1~P3」（用户拍板消费候选区）；逐条现状实证后共识 = 14 做 + 3 复核关闭（F-131 role 宽类型唯一调用方只传 Role / F-134 planner hook 已直测 / F-137 chars_view 5 遍全量零复现）。F-136 有明确加固点（pumpUntil 等加载）做；F-137 无可见盲区按证据关闭。

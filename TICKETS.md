@@ -19,27 +19,6 @@
 
 | Ticket | 标题 | 状态 | 验收摘要 |
 |--------|------|------|----------|
-| CPA-01 | MS-01 swipes 数据模型+迁移(5→6)+仓库层 | 🔄 进行中 | message_swipes 表/active 不变量/越界异常/导出一致性/迁移三路径（SR-25/27/29） |
-| CPA-02 | MS-02 regenerate 切候选+continue 服务 | 📝 已录入 | 候选追加语义/消息数不变/续写失败零改动/结算键适配 |
-| CPA-03 | MS-03 编辑重发+删除服务 | 📝 已录入 | 仅 user 编辑/截断后续/删 user 截断、删 assistant 仅删该条+级联 |
-| CPA-04 | MS-04 回合/控制器结算键+编排 | 📝 已录入 | _regenerateTarget 结算键改目标 id+候选 index/断流重试适配 |
-| CPA-05 | MS-05 swipes 切换 UI+消息操作 | 📝 已录入 | 候选切换控件/编辑删除入口/继续生成按钮 |
-| CPA-06 | WL-01 世界书表+仓库+parse | 📝 已录入 | lorebook_entries 七件套/character_book 解析入库/保真零回归 |
-| CPA-07 | WL-02 世界书激活引擎纯函数 | 🔄 进行中 | 逐字对齐桌面引擎/激活矩阵/加权/同种子复现/零 DB 依赖 |
-| CPA-08 | WL-03 注入链+解析入库 | 📝 已录入 | world=null 零回归/注入序/记忆宫殿条目随引擎注入 |
-| CPA-09 | WL-04 世界书编辑器 UI | 📝 已录入 | 条目 CRUD 编辑器/角色页入口 |
-| CPA-10 | WL-05 记忆宫殿 | 📝 已录入 | LLM 归纳 source=auto/与 MemoryService 并存/失败降级 |
-| CPA-11 | NPD-01 叙述风格 | 📝 已录入 | 默认启用 opt-out/rules 逐字对齐/注入 scenario 后/expert 亦注入 |
-| CPA-12 | NPD-02 预设对话数据+快照+注入 | 📝 已录入 | ≤10 归一化/快照列创建固化/改卡不影响已建会话/few-shot 注入 |
-| CPA-13 | NPD-03 预设对话编辑+开场白 UI | 📝 已录入 | 角色编辑列表/开局双选/greeting 三态（默认/备选/无） |
-| CPA-14 | NPD-04 专家模式 | 📝 已录入 | prompt_mode/expert_prompt 可逆/expert 单条替代三处/空回退 |
-| CPA-15 | SP-01 采样参数+值域守卫 | 📝 已录入 | 四可空列/Claude 请求体三键不存在（SR-23）/值域守卫（SR-24） |
-| CPA-16 | SP-02 对话级采样 UI | 📝 已录入 | 对话设置页可空覆盖 |
-| CPA-17 | PD-04 Prompt Debug | 📝 已录入 | 单一组装核心/segments 来源标注/只读零 LLM 零落库（SR-31） |
-| CPA-18 | BR-01 分支元数据+快照克隆 | 📝 已录入 | 三可空列/BranchSnapshot 版本化/未知版本拒绝（SR-30） |
-| CPA-19 | BR-02 分支 UI+导入导出 | 📝 已录入 | 消息级分支/会话列表来源标记/文件导入导出 |
-
-
 ## 技术债区
 
 > 技术债候选池与处置记录统一见 [TECH_DEBT.md](TECH_DEBT.md)。
@@ -47,6 +26,32 @@
 ---
 
 ## 已完成归档
+
+### 移动端角色对话打磨批次 chat-polish-aigs（19 票 / 10 功能族，2026-09-20 收口）
+
+> 来源：handoff-conver-mobile-chat-polish-aigs-20260919（用户 `/project-kickoff 全自动接续`），Grilling 共识已确认；基线 `88003fc`。主会话编排 15 波全部收口（R1 并行 01+07 → R13 并行 16+18），19/19 票合入，主分支全量 **2829 测**绿（基线 2274 → +555）/ analyze 0 / 每波波及文件覆盖率全 ≥90%（app.dart 装配缺口 3 案例预警条款放行）/ 期末四轴 **通过（0 Critical）**；对准桌面 1.1.0 角色对话（swipes/世界书/记忆宫殿/叙述风格/预设对话/专家模式/采样参数/Prompt Debug/分支）。详见 DEV_LOG〈移动端角色对话打磨批次 chat-polish-aigs〉与 `.scratch/chat-polish-aigs/`（spec/issues/concerns/threat-model）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| CPA-01 | MS-01 swipes 数据模型+迁移(5→6)+仓库层 | 2026-09-19 | 6191fa3 |
+| CPA-02 | MS-02 regenerate 切候选+continue 服务 | 2026-09-19 | dc31c03 |
+| CPA-03 | MS-03 编辑重发+删除服务 | 2026-09-19 | 58c9609 |
+| CPA-04 | MS-04 回合/控制器结算键+编排 | 2026-09-19 | 8d87bbd |
+| CPA-05 | MS-05 swipes 切换 UI+消息操作 | 2026-09-19 | 7866ce6（merge a0bb7d4） |
+| CPA-06 | WL-01 世界书表+仓库+parse | 2026-09-19 | ff0ca73 |
+| CPA-07 | WL-02 世界书激活引擎纯函数 | 2026-09-19 | 333d31f |
+| CPA-08 | WL-03 注入链+解析入库 | 2026-09-20 | 06fb16a（merge aed2c2e） |
+| CPA-09 | WL-04 世界书编辑器 UI | 2026-09-19 | c4ba233 |
+| CPA-10 | WL-05 记忆宫殿 | 2026-09-20 | 1c35e85（merge 7f3ca27） |
+| CPA-11 | NPD-01 叙述风格 | 2026-09-20 | d956593（merge 45f4f18） |
+| CPA-12 | NPD-02 预设对话数据+快照+注入 | 2026-09-20 | bcfb0aa（merge f52c868） |
+| CPA-13 | NPD-03 预设对话编辑+开场白 UI | 2026-09-20 | 7e5299b（merge 45a34ef） |
+| CPA-14 | NPD-04 专家模式 | 2026-09-20 | e4cb71f（merge 8ca55aa） |
+| CPA-15 | SP-01 采样参数+值域守卫 | 2026-09-20 | 6782d04（merge a8fca09） |
+| CPA-16 | SP-02 对话级采样 UI | 2026-09-20 | 85b2abb（merge df00802） |
+| CPA-17 | PD-04 Prompt Debug | 2026-09-20 | 41d0ecb（merge 0287c1d） |
+| CPA-18 | BR-01 分支元数据+快照克隆 | 2026-09-20 | aa21421（merge a064a8e） |
+| CPA-19 | BR-02 分支 UI+导入导出 | 2026-09-20 | a9e837f（merge b9f764b） |
 
 ### 技术债消费批次 F-123~139 十七条全部处置（2026-09-19 收口）
 

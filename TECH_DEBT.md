@@ -43,6 +43,9 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-140 | spec §4.8 契约表声明 `ChatService.switchSwipe({conversationId, messageId, index})` 未在服务层实现——落地于 `MessageRepository.switchSwipe(messageId, index)`（message_repository.dart:432），conversationId 归属校验由视图层 ChatRound 前置补偿（chat_round.dart:456-486）。已申报偏差（concerns/04 §2），功能面完整；收口二选一：落地服务层方法（含归属校验）或修订 spec §4.8 契约表 + 修订日志 | 期末四轴 Spec 轴 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-141 | chat_entry_test「默认选中首角色」（Expected 1/Actual 2 竞态）全量首跑**批次内 4 次复用**（2026-09-19/20：05/11/13/17 波），单文件重跑恒绿。F-106（listCharacters id ASC 二级排序键）/ F-122（publish 等待族）/ F-136（断言前置 pumpUntil）修复后仍复发——chat_entry 侧同类竞态未彻底收敛，需根因深挖（候选怀疑：入口角色列表加载与选择条初始化的 publish 时序） | 波末多波观察 + 期末四轴 Falsify 复证 | Strong | 📝 待立项 | 聊天链路 |
+| F-142 | `BranchService.buildBranchSnapshot`（branch_service.dart:124-138）逐消息 `listSwipes` N+1 查询；桌面有 batch 读先例。对话规模常态下无害，快照导出大对话时成本线性放大 | 期末四轴 Falsify/Architecture | Worth exploring | 📝 待立项 | 分支域 |
 
 ## 技术债处置记录
 
