@@ -167,6 +167,7 @@ class _CharsEnv {
     String firstMes = '',
     List<String> tags = const [],
     double temperature = 0.7,
+    List<Map<String, String>> presetDialogues = const [],
   }) {
     return characterRepository.createCharacter(
       CharactersCompanion(
@@ -176,6 +177,7 @@ class _CharsEnv {
         firstMes: Value(firstMes),
         tags: Value(tags),
         temperature: Value(temperature),
+        presetDialogues: Value(presetDialogues),
       ),
     );
   }
@@ -438,6 +440,161 @@ void main() {
       expect(env.controller.characters.single.character.name, '原名',
           reason: '取消零副作用');
       expect(find.text('原名'), findsOneWidget, reason: '回到列表且展示原值');
+      await env.close();
+    });
+  });
+
+  group('编辑 · 预设对话列表（NPD-03 验收 5）', () {
+    Future<void> openEdit(WidgetTester tester, _CharsEnv env) async {
+      // 高画布：预设对话区位于表单下部，默认 800x600 视口下 ListView 懒构建
+      // 不到该段（widget 不在树中即断言找不到）。拉高画布使其全部进入
+      // cacheExtent。
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await pumpChars(tester, env, env.controller);
+      await tester.tap(find.byTooltip('编辑'));
+      await tester.pumpAndSettle();
+    }
+
+    /// 读取预设行字段文本（TextFormField 内层 TextField 的 controller 值）。
+    String presetFieldText(WidgetTester tester, String key) {
+      final field = tester.widget<TextField>(
+        find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.byType(TextField),
+        ),
+      );
+      return field.controller!.text;
+    }
+
+    testWidgets('既有 presetDialogues 预填各行列（重开面板字段还原）', (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '艾莉亚',
+        presetDialogues: const [
+          {'name': '寒暄', 'content': '你好，请问怎么称呼？'},
+          {'name': '战斗', 'content': '准备好了吗{{user}}。'},
+        ],
+      );
+
+      await openEdit(tester, env);
+
+      expect(presetFieldText(tester, 'preset-name-0'), '寒暄',
+          reason: '重开面板：第 0 行 name 字段还原');
+      expect(presetFieldText(tester, 'preset-content-0'), '你好，请问怎么称呼？');
+      expect(presetFieldText(tester, 'preset-name-1'), '战斗',
+          reason: '重开面板：第 1 行字段还原');
+      expect(presetFieldText(tester, 'preset-content-1'), '准备好了吗{{user}}。');
+      await env.close();
+    });
+
+    testWidgets('增删行：添加行数 +1，删除行数 -1；保存 payload 含 presetDialogues 落库',
+        (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '艾莉亚',
+        presetDialogues: const [
+          {'name': '寒暄', 'content': '你好。'},
+        ],
+      );
+
+      await openEdit(tester, env);
+      expect(find.byKey(const Key('preset-name-0')), findsOneWidget);
+
+      // 添加一行 → 两行；该项为零值，保存时被空项去重过滤。
+      await tester.tap(find.byKey(const Key('preset-add')));
+      await tester.pump();
+      expect(find.byKey(const Key('preset-name-1')), findsOneWidget);
+
+      // 删除新增空行 → 回一行；再删原行 → 零行。
+      await tester.tap(find.byKey(const Key('preset-delete-1')));
+      await tester.pump();
+      expect(find.byKey(const Key('preset-name-1')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('preset-delete-0')));
+      await tester.pump();
+      expect(find.byKey(const Key('preset-name-0')), findsNothing);
+
+      // 重新添加并填写 → 保存 payload 含该预设落库。
+      await tester.tap(find.byKey(const Key('preset-add')));
+      await tester.pump();
+      await tester.enterText(
+          find.byKey(const Key('preset-name-0')), '雨后');
+      await tester.enterText(
+          find.byKey(const Key('preset-content-0')), '雨停了，{{user}}。');
+
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      final saved = env.controller.characters.single.character;
+      expect(saved.presetDialogues, [
+        {'name': '雨后', 'content': '雨停了，{{user}}。'},
+      ]);
+      await env.close();
+    });
+
+    testWidgets('上限 10：满行时添加按钮禁用（超出阻止）；删除后解除', (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '艾莉亚',
+        presetDialogues: [
+          for (var i = 0; i < 10; i++)
+            {'name': '预设$i', 'content': '内容$i'},
+        ],
+      );
+
+      await openEdit(tester, env);
+
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(const Key('preset-add')))
+            .onPressed,
+        isNull,
+        reason: '已达上限 10：添加按钮禁用（超出阻止）',
+      );
+
+      // 删除一行 → 解除禁用，可继续添加。
+      await tester.tap(find.byKey(const Key('preset-delete-9')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(const Key('preset-add')))
+            .onPressed,
+        isNotNull,
+      );
+      await env.close();
+    });
+
+    testWidgets('空项去重：name/content 任空过滤 + 同名保留首个 + conver_system 往返',
+        (tester) async {
+      final env = await _CharsEnv.create();
+      await env.seedCharacter(
+        name: '艾莉亚',
+        presetDialogues: const [
+          {'name': '寒暄', 'content': '你好。'},
+          {'name': '寒暄', 'content': '重复同名（应被保留首个去重）'},
+          {'name': '  ', 'content': '空白名（应被过滤）'},
+          {'name': '缺内容', 'content': '   '},
+        ],
+      );
+
+      await openEdit(tester, env);
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+
+      final saved = env.controller.characters.single.character;
+      expect(saved.presetDialogues, [
+        {'name': '寒暄', 'content': '你好。'},
+      ], reason: '同名去重保留首个 + 空字段过滤');
+
+      // conver_system 往返：toV2Card 读回同一列表。
+      final ns = ((toV2Card(saved)['data']! as Map<String, dynamic>)['extensions']!
+              as Map<String, dynamic>)['conver_system']!
+          as Map<String, dynamic>;
+      expect(ns['preset_dialogues'], [
+        {'name': '寒暄', 'content': '你好。'},
+      ]);
       await env.close();
     });
   });

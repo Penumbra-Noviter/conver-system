@@ -64,6 +64,7 @@ class _ThrowingConversationRepository extends ConversationRepository {
     String? title,
     String? modelProvider,
     String? modelName,
+    Object? greeting,
     String? presetDialogue,
   }) {
     throw StateError('create failed');
@@ -1062,6 +1063,80 @@ void main() {
       expect(c.activeConversationId, isNotNull);
       expect(c.isEntry, isFalse);
       expect(c.activeConversation?.characterId, isNotNull);
+    });
+  });
+
+  group('createConversationFor · greeting/presetDialogue 透传（NPD-03 验收 3）', () {
+    test('greeting 指定文本 → 该文本（模板替换后）预插，角色 first_mes 被覆盖',
+        () async {
+      final target =
+          await seedCharacter(name: '目标角色', firstMes: '旧的开场白');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversationFor(
+        target.id,
+        greeting: '{{user}}，欢迎来到{{char}}的世界。',
+      );
+
+      expect(c.activeConversationId, isNotNull);
+      expect(roleContentsOf(c), [(Role.assistant, 'User，欢迎来到目标角色的世界。')],
+          reason: '透传指定 greeting，不取角色 first_mes');
+    });
+
+    test('greeting 显式空串 → 会话无开场白（消息列表为空）', () async {
+      final target = await seedCharacter(name: '目标角色', firstMes: '有开场白');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversationFor(target.id, greeting: '');
+
+      expect(c.activeConversationId, isNotNull);
+      expect(roleContentsOf(c), isEmpty, reason: 'greeting 空串 = 无开场白');
+    });
+
+    test('greeting 未传（null）→ first_mes 预插（透传零回归）', () async {
+      final target = await seedCharacter(name: '目标角色', firstMes: '你好，{{user}}。');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversationFor(target.id);
+
+      expect(roleContentsOf(c), [(Role.assistant, '你好，User。')],
+          reason: '不传 greeting 沿用 first_mes 预插（既有语义）');
+    });
+
+    test('presetDialogue 透传 → 会话快照固化落库', () async {
+      final target = await seedCharacter(name: '目标角色');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversationFor(
+        target.id,
+        presetDialogue: '<START>\n{{user}}: 你好\n{{char}}: 欢迎',
+      );
+
+      final stored =
+          await convRepo.getConversation(c.activeConversationId!);
+      expect(stored!.presetDialogue, '<START>\n{{user}}: 你好\n{{char}}: 欢迎');
+    });
+
+    test('greeting 指定文本 + presetDialogue 同时透传', () async {
+      final target = await seedCharacter(name: '目标角色', firstMes: '旧开场白');
+      final c = wireController(FakeLLMProvider(tokens: const []));
+      await c.loadEntry();
+
+      await c.createConversationFor(
+        target.id,
+        greeting: '新开场白',
+        presetDialogue: '<START>\n快照内容',
+      );
+
+      expect(roleContentsOf(c), [(Role.assistant, '新开场白')]);
+      expect(
+        (await convRepo.getConversation(c.activeConversationId!))!.presetDialogue,
+        '<START>\n快照内容',
+      );
     });
   });
 

@@ -134,7 +134,10 @@ void main() {
       await tester.pump();
       expect(c.selectedCharacterId, target.id);
 
+      // NPD-03：新建对话先弹选择面板（默认=默认开场白+不使用预设），确认建会话。
       await tester.tap(find.text('新建对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('start-conversation')));
       await pumpUntil(tester, () => !c.isEntry, why: '进入新会话');
 
       expect(
@@ -191,6 +194,8 @@ void main() {
       await pumpChat(tester, c);
 
       await tester.tap(find.text('新建对话'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('start-conversation')));
       await tester.pump();
       await tester.pump();
       await tester.pump();

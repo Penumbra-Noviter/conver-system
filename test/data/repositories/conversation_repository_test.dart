@@ -271,6 +271,87 @@ void main() {
     });
   });
 
+  group('createConversation · greeting 三态（NPD-03 验收 1/2）', () {
+    test('未传（null）→ 预插 first_mes（模板变量替换，零回归断言）', () async {
+      final char = await seedCharacter(
+        name: '艾莉亚',
+        firstMes: '你好，{{user}}！我是{{char}}。',
+      );
+      final withUser = ConversationRepository(
+        db,
+        const FakeSettingsReader({'user_name': '阿明'}),
+        now: () => fakeNow,
+      );
+      final conv = await withUser.createConversation(
+        characterId: char.id,
+        greeting: null,
+      );
+      expect(
+        (await messagesOf(conv.id)).single.content,
+        '你好，阿明！我是艾莉亚。',
+        reason: '显式传 null 与未传语义一致：预插 first_mes 并模板替换',
+      );
+    });
+
+    test('指定文本 → 预插该内容（模板变量替换后），无视 first_mes 原值', () async {
+      final char = await seedCharacter(
+        name: '夜莺',
+        firstMes: '不会被使用的旧开场白',
+      );
+      final withUser = ConversationRepository(
+        db,
+        const FakeSettingsReader({'user_name': '旅人'}),
+        now: () => fakeNow,
+      );
+
+      final conv = await withUser.createConversation(
+        characterId: char.id,
+        greeting: '{{user}}，欢迎来到{{char}}的故事。',
+      );
+
+      expect(
+        (await messagesOf(conv.id)).single.content,
+        '旅人，欢迎来到夜莺的故事。',
+        reason: '指定 greeting 文本替换 {{user}}/{{char}} 后预插',
+      );
+    });
+
+    test('first_mes 为空 + 指定文本 → 仍预插指定文本（greeting 独立于 first_mes）',
+        () async {
+      final char = await seedCharacter(name: '空开场角色');
+      final conv = await repo.createConversation(
+        characterId: char.id,
+        greeting: '显式指定开场白。',
+      );
+
+      expect((await messagesOf(conv.id)).single.content, '显式指定开场白。');
+    });
+
+    test('显式空串 → 不预插（消息表为空），即使角色有 first_mes', () async {
+      final char = await seedCharacter(
+        name: '艾莉亚',
+        firstMes: '有开场白但被显式禁用',
+      );
+      final conv = await repo.createConversation(
+        characterId: char.id,
+        greeting: '',
+      );
+      expect(await messagesOf(conv.id), isEmpty,
+          reason: 'greeting 显式空串 = 无开场白：消息表必须为空');
+      expect(
+        (await repo.listConversations(characterId: char.id)).single.messageCount,
+        0,
+      );
+    });
+
+    test('first_mes 为空 + 未传 greeting → 不预插（既有语义不变，验收 2）',
+        () async {
+      final char = await seedCharacter(name: '无名');
+      final conv = await repo.createConversation(characterId: char.id);
+      expect(await messagesOf(conv.id), isEmpty);
+    });
+  });
+
   group('createConversation · 预设对话快照（NPD-02 验收 5）', () {
     test('带 presetDialogue → 快照固化入 conversations.preset_dialogue', () async {
       final char = await seedCharacter(name: '艾莉亚');
