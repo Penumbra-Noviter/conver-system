@@ -429,6 +429,12 @@ class MessageRepository {
   ///   每 messageId 子列表按 `index` 升序（与 [listSwipes] 同查询面同序）；
   /// - 消息无候选不在返回 map（消费方以 `?? const []` 兜底）；
   /// - 空输入短路返回 `const {}`（零查询，不触达 DB）。
+  /// - 输入规模 bound：单条 SQL 变量数受引擎 `SQLITE_MAX_VARIABLE_NUMBER`
+  ///   约束（SQLite ≥3.32 默认 32766，编译期可调低，本仓打包引擎按默认计）；
+  ///   [messageIds] 长度须 ≤ 该上限——超限 drift 抛「too many SQL variables」
+  ///   硬失败（区别于旧逐条 [listSwipes] 的慢不失败）；调用方负责保证规模
+  ///   （branch/export 消费方输入均受单对话消息数约束，远低于上限）；
+  ///   将来超规模由调用方自行分块，本方法不承担 chunking。
   Future<Map<int, List<MessageSwipe>>> listSwipesBatch(
       Iterable<int> messageIds) async {
     final ids = messageIds.toList();
