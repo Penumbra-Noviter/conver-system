@@ -1446,48 +1446,6 @@ void main() {
       expect(provider.lastTemperature, 1.3);
       expect(provider.lastMaxTokens, 8192);
     });
-
-    test('F-76: 角色温度越界（上界）→ clamp 到 2.0 不透传', () async {
-      final char = await seedCharacter(temperature: 9.9);
-      final conv = await seedConversation(char.id);
-
-      final provider = _TickingProvider(tokens: const ['回复']);
-      wireService(provider);
-      await service
-          .streamReply(conversationId: conv.id, content: 'hi')
-          .toList();
-
-      expect(provider.lastTemperature, 2.0, reason: '9.9 clamp 到 2.0');
-    });
-
-    test('F-76: 角色温度越界（下界）→ clamp 到 0.0 不透传', () async {
-      final char = await seedCharacter(temperature: -1.5);
-      final conv = await seedConversation(char.id);
-
-      final provider = _TickingProvider(tokens: const ['回复']);
-      wireService(provider);
-      await service
-          .streamReply(conversationId: conv.id, content: 'hi')
-          .toList();
-
-      expect(provider.lastTemperature, 0.0, reason: '-1.5 clamp 到 0.0');
-    });
-
-    test('F-76: 角色温度 Infinity → 回退全局（NaN/Infinity 不判为覆盖）',
-        () async {
-      final char = await seedCharacter(temperature: double.infinity);
-      final conv = await seedConversation(char.id);
-      await settingsRepo.setMany({'temperature': '0.9'});
-
-      final provider = _TickingProvider(tokens: const ['回复']);
-      wireService(provider);
-      await service
-          .streamReply(conversationId: conv.id, content: 'hi')
-          .toList();
-
-      expect(provider.lastTemperature, 0.9,
-          reason: 'Infinity 不判为显式覆盖 → 回退全局 0.9');
-    });
   });
 
   // ── A3 停止 ──

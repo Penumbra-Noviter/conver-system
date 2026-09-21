@@ -100,6 +100,7 @@ import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
 import 'llm/prompt.dart';
+import 'llm/temperature.dart';
 import 'lorebook/lorebook_engine.dart';
 import 'memory/memory_prompt.dart';
 import 'memory/memory_service.dart';
@@ -1899,38 +1900,12 @@ class ChatService {
     );
   }
 
-  /// 组装采样温度：角色 `character.temperature` 为主、全局 [globalTemperature]
-  /// 兜底（工单 03 判定契约，spec §U-2 高不确定点）。
-  ///
-  /// 角色温度 == [SettingsRepository.defaultTemperature]（0.7，DB 默认）判定为
-  /// 「未显式覆盖」→ 回退全局值；接受「显式设 0.7 会被全局覆盖」的边界。
-  ///
-  /// 防御（F-76）：DB 层无 CHECK 约束，`character.temperature` 可能为
-  /// NaN/Infinity（`==` 对 NaN 恒 false 会误判「已覆盖」透传致 API 400）或
-  /// 越界值——NaN/Infinity 回退全局、越界 clamp 到合法区间
-  /// [SettingsRepository.temperatureMin, temperatureMax]（对齐
-  /// `SettingsRepository.getTemperature` 契约）。
-  double _resolveTemperature(Character character, double globalTemperature) {
-    final temperature = character.temperature;
-    if (temperature.isNaN ||
-        temperature.isInfinite ||
-        temperature == SettingsRepository.defaultTemperature) {
-      return globalTemperature;
-    }
-    return temperature
-        .clamp(
-          SettingsRepository.temperatureMin,
-          SettingsRepository.temperatureMax,
-        )
-        .toDouble();
-  }
-
   /// 组装生成参数组（SP-01）：conv 采样四列非空 → 覆盖；NULL → 走既有链
-  /// （温度 = 角色为主、全局兜底 [_resolveTemperature]；max_tokens = 全局
+  /// （温度 = 角色为主、全局兜底 [resolveCharTemperature]；max_tokens = 全局
   /// [globalMaxTokens]；topP/presencePenalty/frequencyPenalty = null 不覆盖
   /// provider 默认）。
   ///
-  /// SR-24 值域守卫（对齐 `_resolveTemperature` F-76 先例）：conv 覆盖值非法
+  /// SR-24 值域守卫（对齐 [resolveCharTemperature] F-76 防线）：conv 覆盖值非法
   /// （NaN / ±Infinity / 越界）clamp 或回退——**绝不透传**非法值给 wire。
   /// streamReply / regenerate / continueReply / editAndRegenerate 四路径共用
   /// 本单点（共享透传腿）。
@@ -1948,7 +1923,7 @@ class ChatService {
     required int globalMaxTokens,
   }) {
     return (
-      temperature: _resolveTemperature(character, globalTemperature),
+      temperature: resolveCharTemperature(character.temperature, globalTemperature),
       maxTokens: _resolveMaxTokens(conv.maxTokens, globalMaxTokens),
       topP: _guardSamplingRange(conv.topP, min: 0, max: 1),
       presencePenalty: _guardSamplingRange(
