@@ -384,6 +384,153 @@ void main() {
       final sent = await repository.listPlansByStatus(ProactivePlanStatus.sent);
       expect(sent.map((p) => p.id), [later.id]);
     });
+
+    test('listOverdueScheduled：=now 命中、>now 不命中（≤ 含端点 = !isAfter 语义）',
+        () async {
+      final ids = await seedChain(db);
+      await repository.createPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        content: '恰在 now',
+        scheduledAt: fixedNow,
+        messageId: ids.messageId,
+      );
+      await repository.createPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        content: '已过点',
+        scheduledAt: fixedNow.subtract(const Duration(minutes: 1)),
+        messageId: ids.messageId,
+      );
+      await repository.createPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        content: '未到点',
+        scheduledAt: fixedNow.add(const Duration(hours: 1)),
+        messageId: ids.messageId,
+      );
+
+      final overdue = await repository.listOverdueScheduled(fixedNow);
+      expect(
+        overdue.map((p) => p.content),
+        ['已过点', '恰在 now'],
+        reason: 'scheduledAt 升序确定性 + ≤now 含端点（=now 命中、>now 不命中）',
+      );
+    });
+
+    test('listOverdueScheduled：非 scheduled 状态到点不入列', () async {
+      final ids = await seedChain(db);
+      for (final status in ProactivePlanStatus.values) {
+        if (status == ProactivePlanStatus.scheduled) {
+          continue;
+        }
+        final plan = await repository.createPlan(
+          characterId: ids.characterId,
+          conversationId: ids.conversationId,
+          content: 'plan-${status.value}',
+          scheduledAt: fixedNow.subtract(const Duration(hours: 1)),
+          messageId: null,
+        );
+        await repository.updatePlanStatus(plan.id, status);
+      }
+      expect(await repository.listOverdueScheduled(fixedNow), isEmpty);
+    });
+
+    test('listOverdueScheduled：characterId=null 全局 / 非空仅该角色', () async {
+      final idsA = await seedChain(db);
+      final idsB = await seedChain(db);
+      await repository.createPlan(
+        characterId: idsA.characterId,
+        conversationId: idsA.conversationId,
+        content: 'A 过期',
+        scheduledAt: fixedNow.subtract(const Duration(minutes: 5)),
+        messageId: null,
+      );
+      await repository.createPlan(
+        characterId: idsB.characterId,
+        conversationId: idsB.conversationId,
+        content: 'B 过期',
+        scheduledAt: fixedNow.subtract(const Duration(minutes: 3)),
+        messageId: null,
+      );
+
+      final global = await repository.listOverdueScheduled(fixedNow);
+      expect(global, hasLength(2), reason: 'characterId null = 全局');
+      final onlyA = await repository.listOverdueScheduled(
+        fixedNow,
+        characterId: idsA.characterId,
+      );
+      expect(
+        onlyA.map((p) => p.characterId),
+        [idsA.characterId],
+        reason: 'characterId 非空追加角色过滤',
+      );
+    });
+
+    test('listScheduledWithNullMessage：messageId null 命中且无时间条件；有消息不入列',
+        () async {
+      final ids = await seedChain(db);
+      await repository.createPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        content: '无消息·未来',
+        scheduledAt: fixedNow.add(const Duration(hours: 24)),
+        messageId: null,
+      );
+      await repository.createPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        content: '无消息·已过',
+        scheduledAt: fixedNow.subtract(const Duration(hours: 1)),
+        messageId: null,
+      );
+      await repository.createPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        content: '有消息',
+        scheduledAt: fixedNow.subtract(const Duration(hours: 1)),
+        messageId: ids.messageId,
+      );
+
+      final nullMsg = await repository.listScheduledWithNullMessage();
+      expect(
+        nullMsg.map((p) => p.content),
+        unorderedEquals(['无消息·未来', '无消息·已过']),
+        reason: '无时间条件：未来与已过均命中的 dropped 定位读',
+      );
+    });
+
+    test('listScheduledWithNullMessage：characterId 过滤；非 scheduled 无消息不入列',
+        () async {
+      final idsA = await seedChain(db);
+      final idsB = await seedChain(db);
+      await repository.createPlan(
+        characterId: idsA.characterId,
+        conversationId: idsA.conversationId,
+        content: 'A 无消息',
+        scheduledAt: fixedNow.add(const Duration(hours: 1)),
+        messageId: null,
+      );
+      final b = await repository.createPlan(
+        characterId: idsB.characterId,
+        conversationId: idsB.conversationId,
+        content: 'B 无消息',
+        scheduledAt: fixedNow.add(const Duration(hours: 1)),
+        messageId: null,
+      );
+      await repository.updatePlanStatus(b.id, ProactivePlanStatus.dropped);
+
+      final onlyA = await repository.listScheduledWithNullMessage(
+        characterId: idsA.characterId,
+      );
+      expect(onlyA.map((p) => p.content), ['A 无消息']);
+      final global = await repository.listScheduledWithNullMessage();
+      expect(
+        global.map((p) => p.content),
+        ['A 无消息'],
+        reason: '只有 scheduled 态的 null-message 计划命中（dropped 不入列）',
+      );
+    });
   });
 
   group('内心独白 InnerThoughts', () {
