@@ -53,6 +53,8 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-156 | build-desktop.ps1 `Assert-Or-Build-BackendExe` 只认缺失不认过期——后端 exe 早于 backend 源码时被静默复用，打包出旧版后端（2026-09-21 实测 dist/conver_backend 为 8-28 构建，v1.1.0 发布 exe 同源缺九月全部功能） | 打包新程序 2026-09-21 | Worth exploring | 📝 待立项 | 打包/运维 |
+| F-157 | CharacterUpdate 其余 list/dict 字段（tags/alternate_greetings/creator_notes/extensions）显式 null → NULL 写库 → 后续 GET 响应序列化 500（preset_dialogues 同类已修，此四字段未覆盖；当前前端无显式 null 路径未触发） | 打包 2026-09-21 修复 Falsify 快审 | Speculative | 📝 待立项 | API 契约 |
 
 
 ### 复核关闭（Speculative 类，防重复提议）
@@ -158,4 +160,4 @@
 - 候选区只保留开放条目（📝 待立项 / 🔄 进行中），处置后条目移入「技术债处置记录」按日期分节。
 - ❌ 复核关闭的 Speculative 类条目在候选区「复核关闭」表中保留单行压缩摘要防重复提议（Worth exploring 类关闭理由完整保留于处置记录）。
 - 处置记录滚动保留最近 2 节；更早的归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）。
-- 新条目从最大编号 +1 递增（当前最大 F-155），避免编号冲突。
+- 新条目从最大编号 +1 递增（当前最大 F-157），避免编号冲突。

@@ -36,6 +36,20 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 桌面打包 + preset_dialogues 存量 NULL 500 修复（2026-09-21 — 用户指令直接交付，无工单）
+
+> 来源：用户指令「打包新程序」。dist 包此前为 2026-08-28 后端（v1.1.0 发布 exe 同源，缺九月全部后端功能）；重建后端 exe + dist 壳（-SkipInstaller 常规档），冒烟暴露旧库升级 GET /api/characters 500。叙述详见 DEV_LOG〈桌面打包新程序 + preset_dialogues 存量 NULL 500 修复（2026-09-21）〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| 打包 | dist/conver-system.exe（10.6MB 壳）+ dist/conver_backend（16.3MB，含九月全部功能 + 修复） | 2026-09-21 | —（dist gitignore） |
+| 修复 | preset_dialogues 存量 NULL → 响应 []（CharacterBase mode=before 验证器 + API 层回归测试） | 2026-09-21 | ea3c515 |
+
+**验证链：** pytest 1355+1skip→1356+1skip（+1 回归零回归）+ doc_sync 零漂移 | 冒烟重跑：验收 4a/4b/5/6 + 阻断 2 全 PASS（原 500 的验收 5 现 200）
+**非阻断落债：** F-156/F-157（见 TECH_DEBT 候选区）
+
+---
+
 ### 技术债消费批次 F-152~F-155（2026-09-15 — 3 做 1 关，轻量档 4 项主会话直做）
 
 > 来源：用户指令「消费候选区技术债」（arch-deepening 期末四轴落债 4 项）。逐项 git grep 复核现状后拍板 3 做 1 关（补契约锁 + 文档注记，零行为变更）。叙述详见 DEV_LOG〈技术债消费批次 F-152~F-155（2026-09-15）〉。
@@ -118,126 +132,19 @@
 
 ---
 
-### 采样参数扩展批次 SP（2026-09-14 — 3 工单小档，AI 风月对话质量对标）
-
-> 来源：用户对标 AI 风月「对话质量 / prompt 工程」维度，选定「采样参数扩展」。语义约束（实证）：anthropic 1.0.0 `messages.create` 已移除全部采样参数（仅 `max_tokens` 可用），故 top_p/presence_penalty/frequency_penalty 仅 OpenAI 系生效、Claude 系仅透传 max_tokens。叙述详见 DEV_LOG〈采样参数扩展批次 SP（2026-09-14）〉。
-
-| Ticket | 标题 | F 项 | 完成日期 | 提交 |
-|--------|------|------|----------|------|
-| SP-1 | 后端数据层：Character 加 4 采样列 + 自愈迁移 + schema + character_fields + 往返保真 | — | 2026-09-14 | 6967f5c |
-| SP-2 | LLM 调用链透传 + provider 分化（OpenAI 全透传 / Claude 仅 max_tokens） | — | 2026-09-14 | 6967f5c |
-| SP-3 | 前端角色表单/向导加采样参数控件 | — | 2026-09-14 | 6967f5c |
-
-**验证链：** pytest 1225+1skip→1234+1skip（+9 契约锁：test_character_sampling 4 + test_sampling_transmit 5）+ Vitest 1379→1380（+1 Falsify max_tokens 守卫）+ cargo 70 零改动 | 期末三轴 0 阻断（Falsify 主会话直修 max_tokens NaN 守卫）| 双钩子通过
-
-**非阻断落债：** 无
-
----
-
-### 技术债消费批次 F-130~F-138（2026-09-14 — 7 做 2 关，轻量档 9 项主会话直做）
-
-> 来源：用户指令「消费技术债 F-130~138」（消息编辑重发期末四轴落债 9 项）。逐项 git grep 复核现状后拍板 7 做 2 关。叙述详见 DEV_LOG〈技术债消费批次 F-130~F-138（2026-09-14）〉。
-
-| Ticket | 标题 | F 项 | 完成日期 | 提交 |
-|--------|------|------|----------|------|
-| F-130 | edit_and_resend 去 conversation_id 参数 + _resolve_edit_target 简化 + 删 require_message 别名（目标解析收敛单一入口） | F-130 | 2026-09-14 | 45a67aa |
-| F-131 | delete_message/edit_and_resend bulk delete synchronize_session=False→'fetch'（消除 identity map 残留） | F-131 | 2026-09-14 | 45a67aa |
-| F-132 | 消息操作按钮 css hover 显示 + 图标样式统一对齐 copy | F-132 | 2026-09-14 | 45a67aa |
-| F-134 | conftest autoflush=False 对齐生产 SessionLocal | F-134 | 2026-09-14 | 45a67aa |
-| F-135 | promptTextarea helper 收敛 promptMessageEdit/promptImageDescription | F-135 | 2026-09-14 | 45a67aa |
-| F-137 | EditMessageRequest strip 后拒绝全空白 | F-137 | 2026-09-14 | 45a67aa |
-| F-138 | error_mapping 400 家族异常提取 _HTTP_400_DOMAIN_ERRORS 元组常量 | F-138 | 2026-09-14 | 45a67aa |
-
-**验证链：** pytest 1225+1skip（净 0：+2 防复发断言 −2 归属/会话防御测试）+ Vitest 1379 + cargo 70 零回退全绿 | 复核关闭 F-133/F-136（理由见 TECH_DEBT.md 复核关闭表）| 技术债候选区 9→0 清零 | 复核关闭表滚动保留最近 4 批（08 月 15 条整批删除）
-**非阻断落债：** 无（候选区清零）
-
----
-
-### 消息编辑重发 + 删除单条消息批次（2026-09-14 — 3 工单小档，对标 AI 风月消息级操作）
-
-> 来源：用户对标 AI 风月「把角色对话打磨更精细」，选定「消息编辑重发 + 删除单条消息」。叙述详见 DEV_LOG〈消息编辑重发 + 删除单条消息批次（2026-09-14）〉。
-
-| Ticket | 标题 | F 项 | 完成日期 | 提交 |
-|--------|------|------|----------|------|
-| T1 | 后端 service 层：update_message/delete_message/edit_and_resend（编辑重发编排 + 角色感知删除） | — | 2026-09-14 | a365b81 |
-| T2 | 后端端点：PUT 编辑重发 + DELETE 删除单条（EditMessageRequest + 路由） | — | 2026-09-14 | 3bcd80f |
-| T3 | 前端 UI：编辑/删除按钮 + 二次确认 + 重载（messages.edit/delete + messageBubbleHtml 按钮） | — | 2026-09-14 | 8269f1e |
-
-**验证链：** pytest 1200+1skip→1223+1skip（+23）→ 期末审核修复 1225+1skip（+2 级联契约锁）；Vitest 1351→1378（+27）→ 修复 1379（+1 互斥锁）；cargo 70 零改动 | 期末四轴 0 Critical/0 HIGH（2 MEDIUM 主会话直修：bulk-delete 级联零测试锁定 + 前端 nonStreamingInFlight 互斥缺口）| doc_sync 零漂移
-**非阻断落债：** F-130~F-138（9 项，来源期末四轴 + 工单 03 concern）
-
----
-
-### 技术债消费批次 F-127~F-129（2026-09-14 — 2 做 1 关，轻量档 3 项主会话直做）
-
-> 来源：用户指令「消费 F-127~129」（架构批次期末四轴观察级落债）。逐项 git grep 复核后拍板 2 做 1 关。叙述详见 DEV_LOG〈技术债消费批次 F-127~F-129（2026-09-14）〉。
-
-| Ticket | 标题 | F 项 | 完成日期 | 提交 |
-|--------|------|------|----------|------|
-| F-127 | add_swipe 加 commit 参数 + append 单 commit 原子落库（消除两段提交窗口） | F-127 | 2026-09-14 | 5ed88f5 |
-| F-129 | _ensure_conversation_branch_columns 单连接循环补三列 | F-129 | 2026-09-14 | 5ed88f5 |
-
-**验证链：** pytest 1199+1skip→1200+1skip（+1 防复发断言 test_append_swipe_and_bump_single_commit_atomic）+ Vitest 1351 + cargo 70 零回退全绿 | 复核关闭 F-128（commit=False 后 msg 未 expire 命中 identity map，剩余再取是合理结构）| 技术债候选区 3→0 清零
-**非阻断落债：** 无（候选区清零）
-
----
-
-### 架构深化候选消费批次 F-123~F-126（2026-09-14 — 4 做，标准档 4 工单串行）
-
-> 来源：用户指令「全做」架构深化扫描 4 候选（F-123~F-126，source=架构报告 2026-09-14）。纯重构行为零变化。叙述详见 DEV_LOG〈架构深化候选消费批次 F-123~F-126（2026-09-14）〉。
-
-| Ticket | 标题 | F 项 | 完成日期 | 提交 |
-|--------|------|------|----------|------|
-| T1 | Mod 区过滤读取单一 seam（list_enabled_mods_for_area 下沉 mods.py） | F-123 | 2026-09-14 | a016d7c |
-| T2 | 追加候选「持久化仪式」收口（append_swipe_and_bump 单一入口） | F-124 | 2026-09-14 | 49d342c |
-| T3 | generate+LLM 错误映射接线收口（_generate_with_error_mapping 私有 seam，stream_reply 排除） | F-126 | 2026-09-14 | 114aae6 |
-| T4 | 自愈迁移原语抽取（_ensure_column 通用原语 + 三 wrapper 退化声明） | F-125 | 2026-09-14 | 19868f2 |
-
-**验证链：** pytest 1174+1skip→1199+1skip（+25 契约锁）+ Vitest 1351 + cargo 70 零回退全绿 | 冒烟 uvicorn 8899 docs/models/available 全 200 | 期末四轴「通过」0 Critical（Architecture 轴确认四工单均真深化，无伪深化）+ 观察级落债 F-127~F-129 | doc_sync 零漂移
-**非阻断落债：** F-127~F-129（append 两段提交非原子 / 冗余重取 / 三连接）
-
----
-
-### 技术债消费批次 F-115~F-122（2026-09-14 — 3 做 5 关，轻量档 8 项主会话直做）
-
-> 来源：用户指令「消费」+ userselect F-115~F-122（mod-cg-wiring 期末四轴落债 8 项）。逐项 git grep 复核现状后拍板 3 做 5 关。叙述详见 DEV_LOG〈技术债消费批次 F-115~F-122（2026-09-14）〉。
-
-| Ticket | 标题 | F 项 | 完成日期 | 提交 |
-|--------|------|------|----------|------|
-| F-117 | mod-css.js 空串 payload 过滤（跳过空串防游离换行，防复发断言） | F-117 | 2026-09-14 | 0fb43ba |
-| F-119 | database.py `isinstance(bind, Engine)` 替代 hasattr duck-type | F-119 | 2026-09-14 | 0fb43ba |
-| F-120 | cg-review.js NaN 守卫（actionEl 脱离 tile 静默 no-op 防御） | F-120 | 2026-09-14 | 0fb43ba |
-
-**验证链：** pytest 1173+1skip→1174+1skip + Vitest 1351 零回退 + cargo 70 零改动全绿 | 复核关闭 F-115/116/118/121/122（理由见 TECH_DEBT.md 复核关闭表）| 技术债候选区 8→0 清零 | 一并删除 `.scratch/mod-cg-wiring/`（归档已完成，一次性产物无用）
-**非阻断落债：** 无（候选区清零）
-
----
-
-### mod-cg-wiring 批次（2026-09-14 — Mod memory/css 消费 + CG 解锁/画廊/加权自动出图，标准档 7 工单）
-
-> 来源：用户指令「检查项目进度，看还有哪些原有设计未落地」→ 选第一梯队半成品（Mod memory/css 消费方 + CG 解锁端点/加权自动出图接线）；project-kickoff 全自动档。Grilling 四 ADR 拍板（memory 区=归纳指令叠加 / css 区=会话内样式注入 / 画廊=cg-review 扩 tab+录入表单 / 自动出图=回合末概率触发+全局 settings 键）。叙述详见 DEV_LOG〈mod-cg-wiring 批次（2026-09-14）〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| T1 | cg_images weight 列迁移 + add_cg 扩参（weight/unlocked/is_special，幂等去重不改既有语义） | 2026-09-14 | 52c3b03 |
-| T2 | CG 路由三件套：POST/GET /api/characters/{id}/cg + POST /api/cg/{id}/unlock（零 ORM 走 gallery service） | 2026-09-14 | 351871d |
-| T3 | memory 区 Mod 消费：summarize_turn 扩 extra_instructions + chat 回读注入（纯文本 \n 连接，无 Mod 字节级不变） | 2026-09-14 | 96386e7 |
-| T4 | css 区 Mod 前端注入 seam（mod-css.js 深模块 + chat.js onTabsChanged 接线） | 2026-09-14 | e079d80 |
-| T5 | 画廊页签 + 录入表单 + 锁定态交互（cg-review.js 页签自建 + api.js 三方法） | 2026-09-14 | 112e722 |
-| T6 | 回合末概率触发 + settings 键 cg_auto_trigger_probability + _maybe_auto_cg | 2026-09-14 | c5ef42d |
-| T7 | 版本号 0.6.1 → 1.1.0（package.json/package-lock/tauri.conf/Cargo.toml/Cargo.lock） | 2026-09-14 | da28e69 |
-
-**验证链：** pytest 1117+1skip→1173+1skip（+56）+ Vitest 1311→1351（+40）+ cargo 70 零改动，全绿 | 运行态冒烟：uvicorn 8899 docs/available 200 + CG 真实链路（录入→列表→解锁）全通 | 期末四轴 0 HIGH 阻断 + 2 MEDIUM 当场修（7e953d5：_maybe_auto_cg 恢复 unlock_cg seam + 删 provider/model 死参数，防复发断言 test_unlock_uses_unlock_cg_seam）+ 安全红线 0 违例 | doc_sync 零漂移
-**非阻断落债：** F-115~F-122（8 项，详见 TECH_DEBT.md 候选区）；另 merge 遗漏修复——T2 分支初漏合并（de50b80 补齐，冒烟发现 unlock 端点 405 定位）
-
----
-
-### 历史归档索引（2026-09-14 二次压缩：2026-08-27 ~ 2026-09-13 批次）
+### 历史归档索引（2026-09-21 三次压缩：2026-08-27 ~ 2026-09-14 批次）
 
 > 折叠规则见头部「归档清出机制」。原文细节由 git 历史承担（`git log -p -- TO-TICKETS.md`）；叙述详情见 DEV_LOG 同名节。
 
 | 日期 | 批次 | 提交 | 摘要 |
 |------|------|------|------|
+| 2026-09-14 | 采样参数扩展批次 SP（3 工单小档） | 6967f5c | 4 采样列迁移 + LLM 透传分化（Claude 仅 max_tokens）+ 前端控件 |
+| 2026-09-14 | 技术债消费批次 F-130~F-138（7 做 2 关） | 45a67aa | 目标解析收敛 + bulk delete 同步 fetch + autoflush 对齐 + 400 元组常量 |
+| 2026-09-14 | 消息编辑重发 + 删除单条消息批次（3 工单小档） | a365b81→8269f1e | update/delete_message + 编辑重发编排 + 前端按钮与二次确认 |
+| 2026-09-14 | 技术债消费批次 F-127~F-129（2 做 1 关） | 5ed88f5 | append 单 commit 原子落库 + 迁移单连接循环 |
+| 2026-09-14 | 架构深化候选消费批次 F-123~F-126（4 做） | a016d7c→19868f2 | Mod 过滤 seam + 持久化仪式 + 错误映射 + _ensure_column 原语 |
+| 2026-09-14 | 技术债消费批次 F-115~F-122（3 做 5 关） | 0fb43ba | mod-css 空串过滤 + Engine 判定 + NaN 守卫 |
+| 2026-09-14 | mod-cg-wiring 批次（7 工单标准档） | 52c3b03→da28e69 | Mod memory/css 消费 + CG 解锁/画廊/加权自动出图 + 版本 1.1.0 |
 | 2026-09-13 | 技术债消费批次 F-109~F-111（1 做 2 关） | 57bef68 | runLastAssistantAction 末条 assistant 动作样板提取 |
 | 2026-09-12 | Mod 挂载批次 MD-2（Mod 管理 UI + 注入链集成） | 0c3edfb | Mod 管理面板 + assemble_chat_context 注入 + 挂载/开关/排序 |
 | 2026-09-12 | Mod 挂载批次 MD-1（Mod 数据模型与注入叠加） | e047462 | mods + mod_bindings 新表 + apply_prompt_mods 三区域叠加纯函数 |

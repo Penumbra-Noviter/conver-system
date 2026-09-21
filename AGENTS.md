@@ -74,6 +74,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 - ✅ **打包与推送（2026-09-14）**：dist/conver-system.exe 10.6MB 测试包（-SkipInstaller）+ 全链测试 + 冒烟 5 项全过；origin/main 推送 484555d..1a3c1a9
 - ✅ **消息编辑重发/删除批次（2026-09-14 kickoff 小档 3 工单）**：后端 service `update_message` / `delete_message`（角色感知删除：USER 截断其及后续 / ASSISTANT 仅删该条 + 候选级联）→ HTTP 端点 `PUT /api/messages/{message_id}`（编辑重发，仅 user，物理截断后续 + 单 commit 原子落库，LLM 失败零落库）/ `DELETE /api/messages/{message_id}`（204）→ 前端消息编辑重发 + 删除单条 UI；code-review 0 Critical、期末四轴 0 阻断；技术债落债 F-130~F-138；pytest 1200→1225+1skip、Vitest 1351→1379、cargo 70 零改动；TICKETS 3 工单归档 + DEV_LOG 叙述归档
 - ✅ **架构深化 arch-deepening 批次（2026-09-15 kickoff 全自动档标准档 2 工单串行链）**：消费架构扫描候选 F-145~F-151（4 做 3 关）——工单 01 注入链 seam 归位（`chat._build_tagged_injection` 单一编排 + `lorebook_engine.build_world_injection` 返回 `dict[str, list[InjectedSegment]]` + `source_by_id` 可选形参，删 chat 副本）；工单 02 组装入口收口（`CharacterData.from_orm` 唯一 ORM→纯数据投影 + `build_message_list` 增 `preset_dialogue` 显式形参，快照读取责任上移 chat 层）；F-149/150/151 复核关闭（seam 归位后重估 / 跨运行时单一权威不可表达）；纯重构在线输出逐字节不变；期末四轴 0 阻断（两 seam 均真深化无伪深化）；pytest 1349→1352+1skip、cargo 70 零改动；非阻断落债 F-152~F-155
+- ✅ **打包新程序 + preset_dialogues 存量 NULL 500 修复（2026-09-21 用户指令直做，无工单）**：dist 包此前为 8-28 后端（v1.1.0 发布 exe 同源缺九月全部功能；后端补齐只认缺失不认过期）；重建后端 exe + dist 壳（-SkipInstaller 常规档），冒烟暴露 GET /api/characters 500（自愈迁移补列预设对话 JSON 可空列，存量行 NULL 对必填 list 响应 serialize 失败）→ `CharacterBase.preset_dialogues` mode=before 验证器 None→[]（+ API 层回归测试，先红后绿）；冒烟重跑 5 项全 PASS（原 500 的验收 5 现 200）；pytest 1356+1skip、Vitest 1472、cargo 70；落债 F-156/F-157
 
 ## 待办管理
 

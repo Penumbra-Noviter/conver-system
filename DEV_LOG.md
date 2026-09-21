@@ -12,6 +12,17 @@
 
 ---
 
+## 桌面打包新程序 + preset_dialogues 存量 NULL 500 修复（2026-09-21 — 用户指令直接交付，无工单）
+
+- **来源**：用户指令「打包新程序」。两处现状核对：(1) dist/conver_backend/conver_backend.exe 为 2026-08-28 构建，**不含九月全部后端功能**（五批对标 WL/MS/BR/CG/MD、mod-cg-wiring、消息编辑/重发、arch-deepening、F-152~155）；v1.1.0 GitHub Release 挂载的 exe（11075584B，与 dist 同字节）同样跑 8-28 后端；(2) `Assert-Or-Build-BackendExe` 只认「缺失」不认「过期」（Test-Path 即返回），旧后端包被静默复用——本次先重建后端 exe 再走全链。
+- **打包**：build-backend.ps1 重建 dist/conver_backend/conver_backend.exe（16.3MB，onedir 含随包前端运行子集）→ build-desktop.ps1 -SkipInstaller 全链（cargo test 70 → pytest 1355+1skip → vitest 1472 → tauri build --no-bundle 53.7s → dist 壳 10.6MB → 冒烟）。
+- **冒烟暴露缺陷**：验收 5 GET /api/characters 500 —— `ResponseValidationError: preset_dialogues Input should be a valid list, input: None`。根因：存量库字符行 preset_dialogues 为 SQL NULL（自愈迁移 `_ensure_character_preset_dialogue_column` 补 JSON 可空列无回填；`default=list` 仅字段缺席生效，ORM 读回显式 None）；响应 schema `CharacterBase.preset_dialogues: list[PresetDialogue]`（default_factory）对显式 None 验不过 → FastAPI serialize_response 500。**真实升级路径缺陷**：旧数据目录用户升级新包即角色列表全挂。
+- **修复**（ea3c515）：`CharacterBase.preset_dialogues` 增 `mode="before"` 验证器 `_coerce_none_preset_dialogues`（None→[]）。实证三态：响应序列化（list/get，from_attributes 读 NULL→[]）、create 显式 null→[]、update 显式 null→[]（Pydantic v2 子类重声明字段继承基类验证器，此前显式 null 会 NULL 写库制造同类隐患）；update 省略字段→None 不触发（exclude_unset 跳过），partial update 语义零变更。回归测试 test_character_schema.py（API 层 TestClient 全路径 + SQL 强制列 NULL 模拟存量行 + expire_all 防 identity map 掩盖，先红后绿）。
+- **验证链**：pytest 1355+1skip→1356+1skip（+1 回归零回归）+ doc_sync 零漂移（CODE_WIKI §5.1 登记新测试文件 + 计数刷新 2899/1357=passed+skip 口径）+ 重建后端 exe 后重跑冒烟：验收 4a/4b/5/6 + 阻断 2 全 PASS（原 500 的验收 5 现 HTTP 200）。cargo/vitest 本轮零改动不重跑（变更仅后端 Python）。
+- **落债**：F-156（后端 exe 过期复用缺口，Worth exploring）+ F-157（CharacterUpdate 其余 list/dict 字段 tags/alternate_greetings/creator_notes/extensions 显式 null 同类缺口，Speculative）入 TECH_DEBT 候选区。
+
+---
+
 ## 技术债消费批次 F-152~F-155（2026-09-15 — 3 做 1 关，轻量档 4 项主会话直做）
 
 - **来源**：用户指令「消费候选区技术债」（arch-deepening 期末四轴落债 4 项：F-152/F-153/F-155 Speculative + F-154 Worth exploring）。逐项 git grep 复核现状均成立后拍板 3 做 1 关——补契约锁 + 文档注记，零行为变更。
