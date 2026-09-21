@@ -171,6 +171,59 @@ class CompanionRepository {
         .get();
   }
 
+  /// 已过期（scheduled 且 `scheduledAt <= now`）的主动消息计划——谓词单源进
+  /// SQL（F-151）：回合入口 `_reconcileOverdue` 与启动恢复
+  /// `restoreProactiveSchedules` 共调本方法，两处「对 now 的过期核对」日期
+  /// 口径自动一致，不再全表拉入 Dart 内存过滤。
+  ///
+  /// `<=` 含端点 = 现状 `!scheduledAt.isAfter(now)` 语义（恰在 now 即已过期）；
+  /// [characterId] 非空追加角色过滤，null = 全局。scheduledAt 升序 + id 升序
+  /// （确定性，对齐 [listPlansByStatus]）。
+  Future<List<ProactivePlan>> listOverdueScheduled(
+    DateTime now, {
+    int? characterId,
+  }) {
+    return (_db.select(_db.proactivePlans)
+          ..where(($ProactivePlansTable t) {
+            var condition = t.status.equalsValue(ProactivePlanStatus.scheduled) &
+                t.scheduledAt.isSmallerOrEqualValue(now);
+            if (characterId != null) {
+              condition = condition & t.characterId.equals(characterId);
+            }
+            return condition;
+          })
+          ..orderBy([
+            (t) => OrderingTerm.asc(t.scheduledAt),
+            (t) => OrderingTerm.asc(t.id),
+          ]))
+        .get();
+  }
+
+  /// scheduled 且 messageId 为 null 的主动消息计划——dropped 分支独立定位读
+  /// （F-151：与过期核对语义差异显式保留，**无时间条件**：消息载体已消失，
+  /// 计划残废，早于/晚于 now 均属 dropped）。
+  ///
+  /// [characterId] 非空追加角色过滤，null = 全局。scheduledAt 升序 + id 升序
+  /// （确定性，对齐 [listPlansByStatus]）。
+  Future<List<ProactivePlan>> listScheduledWithNullMessage({
+    int? characterId,
+  }) {
+    return (_db.select(_db.proactivePlans)
+          ..where(($ProactivePlansTable t) {
+            var condition = t.status.equalsValue(ProactivePlanStatus.scheduled) &
+                t.messageId.isNull();
+            if (characterId != null) {
+              condition = condition & t.characterId.equals(characterId);
+            }
+            return condition;
+          })
+          ..orderBy([
+            (t) => OrderingTerm.asc(t.scheduledAt),
+            (t) => OrderingTerm.asc(t.id),
+          ]))
+        .get();
+  }
+
   // ── 内心独白 ──
 
   /// 创建一条内心独白（剥离的 `<thought>` 内容）；created_at 由本层赋值。

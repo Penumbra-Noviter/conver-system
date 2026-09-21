@@ -1122,6 +1122,89 @@ void main() {
       expect(otherPlan.status, ProactivePlanStatus.scheduled);
     });
 
+    test('过期核对含端点：scheduledAt == now 恰过期（≤ 含端点 = !isAfter 语义）',
+        () async {
+      final ids = await seedChain();
+      await enableProactive();
+      await seedScheduledPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        scheduledAt: fixedNow, // == now
+        content: '恰在 now',
+      );
+      final service = buildService();
+
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+
+      expect(result, 1);
+      final plans = await db.select(db.proactivePlans).get();
+      expect(
+        plans.where((p) => p.status == ProactivePlanStatus.expired),
+        hasLength(1),
+        reason: 'scheduledAt == now 恰过期（端点语义经 SQL 谓词保留）',
+      );
+      expect(
+        plans.where((p) => p.status == ProactivePlanStatus.scheduled),
+        hasLength(1),
+      );
+    });
+
+    test('reconcile 角色隔离：他角色过期/null-message 计划均不动（SQL characterId 过滤）',
+        () async {
+      final ids = await seedChain();
+      final other = await seedChain();
+      await enableProactive();
+      await seedScheduledPlan(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+        scheduledAt: fixedNow.subtract(const Duration(hours: 2)),
+        content: '本角色过期',
+      );
+      await seedScheduledPlan(
+        characterId: other.characterId,
+        conversationId: other.conversationId,
+        scheduledAt: fixedNow.subtract(const Duration(hours: 2)),
+        content: '他角色过期',
+      );
+      await companionRepo.createPlan(
+        characterId: other.characterId,
+        conversationId: other.conversationId,
+        content: '他角色无消息',
+        scheduledAt: fixedNow.subtract(const Duration(hours: 1)),
+        messageId: null,
+      );
+      final service = buildService();
+
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+
+      expect(result, 1);
+      final plans = await db.select(db.proactivePlans).get();
+      expect(
+        plans.firstWhere((p) => p.content == '本角色过期').status,
+        ProactivePlanStatus.expired,
+      );
+      expect(
+        plans.firstWhere((p) => p.content == '他角色过期').status,
+        ProactivePlanStatus.scheduled,
+        reason: '他角色过期计划不动（过期定位读按 characterId 过滤）',
+      );
+      expect(
+        plans.firstWhere((p) => p.content == '他角色无消息').status,
+        ProactivePlanStatus.scheduled,
+        reason: '他角色 null-message 计划不动（dropped 定位读按 characterId 过滤）',
+      );
+      expect(
+        plans.where((p) => p.status == ProactivePlanStatus.scheduled),
+        hasLength(3),
+      );
+    });
+
     test('planner 抛错 → debugPrint 降级返回 0，不落库不调 scheduler', () async {
       final ids = await seedChain();
       await enableProactive();

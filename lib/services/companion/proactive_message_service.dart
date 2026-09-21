@@ -422,21 +422,28 @@ class ProactiveMessageService {
   }
 
   /// 过期核对（判定⑥）：本角色 scheduled 计划中 messageId 为 null → dropped
-  /// （消息载体已消失，优先）；scheduledAt 已过 → expired。幂等：置位后不再
+  /// （消息载体已消失，优先）；scheduledAt ≤ now → expired。幂等：置位后不再
   /// 命中 scheduled 查询。
+  ///
+  /// F-151：谓词单源进 SQL——dropped 经
+  /// [CompanionRepository.listScheduledWithNullMessage]（无时间条件），
+  /// expired 经 [CompanionRepository.listOverdueScheduled]（scheduledAt ≤ now，
+  /// 含端点）；两定位读均按 characterId 过滤，不再全表拉 scheduled 再内存
+  /// 过滤。dropped 先置位，随后的 overdue 查询因此自然排除已置 dropped 的
+  /// 计划（状态不再是 scheduled），保持「两者命中 dropped 优先」判定⑥。
   Future<void> _reconcileOverdue(int characterId, DateTime now) async {
-    final scheduled = await _companion.listPlansByStatus(
-      ProactivePlanStatus.scheduled,
+    final noMessage = await _companion.listScheduledWithNullMessage(
+      characterId: characterId,
     );
-    for (final plan in scheduled) {
-      if (plan.characterId != characterId) {
-        continue;
-      }
-      if (plan.messageId == null) {
-        await _companion.updatePlanStatus(plan.id, ProactivePlanStatus.dropped);
-      } else if (!plan.scheduledAt.isAfter(now)) {
-        await _companion.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
-      }
+    for (final plan in noMessage) {
+      await _companion.updatePlanStatus(plan.id, ProactivePlanStatus.dropped);
+    }
+    final overdue = await _companion.listOverdueScheduled(
+      now,
+      characterId: characterId,
+    );
+    for (final plan in overdue) {
+      await _companion.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
     }
   }
 

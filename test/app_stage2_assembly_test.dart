@@ -659,6 +659,47 @@ void main() {
         okExpired.id,
       ], reason: '其余过期计划仍置 expired，恢复不中断');
     });
+
+    test('scheduled 且 messageId null：过期置 expired、未过期重建排程（与 reconcile '
+        'dropped 分支语义差异保留——restore 无 dropped 分支）', () async {
+      final seed = await seedConversationWithMessage();
+      final pastNoMsg = await seedPlan(
+        conversationId: seed.conversationId,
+        messageId: null,
+        status: ProactivePlanStatus.scheduled,
+        scheduledAt: DateTime(2026, 9, 10, 10), // 已过期且无消息
+      );
+      final futureNoMsg = await seedPlan(
+        conversationId: seed.conversationId,
+        messageId: null,
+        status: ProactivePlanStatus.scheduled,
+        scheduledAt: DateTime(2026, 9, 20, 10), // 未过期且无消息
+      );
+      final scheduler = _RecordingScheduler();
+
+      await restoreProactiveSchedules(
+        companion: companionRepo,
+        scheduler: scheduler,
+        now: DateTime(2026, 9, 15, 12),
+      );
+
+      expect(scheduler.scheduledIds, [futureNoMsg.id],
+          reason: '无消息的未过期计划仍重建排程（restore 不做 dropped）');
+      final expired = await companionRepo.listPlansByStatus(
+        ProactivePlanStatus.expired,
+      );
+      expect(expired.map((p) => p.id), contains(pastNoMsg.id),
+          reason: '无消息的过期计划置 expired（listOverdueScheduled 无 messageId 条件）');
+      final dropped = await companionRepo.listPlansByStatus(
+        ProactivePlanStatus.dropped,
+      );
+      expect(dropped, isEmpty, reason: 'restore 仅 expired 分支，不会置 dropped');
+      final scheduled = await companionRepo.listPlansByStatus(
+        ProactivePlanStatus.scheduled,
+      );
+      expect(scheduled.map((p) => p.id), [futureNoMsg.id],
+          reason: '未过期计划重建排程后状态保持 scheduled（SR-08 不置位）');
+    });
   });
 
   group('深链生产接线（PS2-10 验收 8）', () {

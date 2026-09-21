@@ -207,6 +207,11 @@ Future<void> handleProactiveDeepLink({
 /// - sent/expired/dropped 不在 scheduled 列表 → 天然不重排（零触碰）。
 /// 单计划排程抛错或置 expired 抛错 → 降级 log 跳过，其余计划继续恢复，
 /// 不整体上抛（SR-08：抛错计划保持原状态 scheduled，不重排不置位）。
+///
+/// F-151：过期判定改由 [CompanionRepository.listOverdueScheduled] 单源
+/// （谓词进 SQL，`scheduledAt <= now` 含端点 = 现状 `!isAfter(now)` 语义），
+/// 与回合入口 `_reconcileOverdue` 日期口径自动一致；不再 Dart 侧逐计划重写
+/// 同一过期规则（全表拉入内存再过滤形态退出，对齐 F-125 先例）。
 Future<void> restoreProactiveSchedules({
   required CompanionRepository companion,
   required ProactiveNotificationScheduler scheduler,
@@ -215,8 +220,11 @@ Future<void> restoreProactiveSchedules({
   final pending = await companion.listPlansByStatus(
     ProactivePlanStatus.scheduled,
   );
+  final overdueIds = {
+    for (final plan in await companion.listOverdueScheduled(now)) plan.id,
+  };
   for (final plan in pending) {
-    if (!plan.scheduledAt.isAfter(now)) {
+    if (overdueIds.contains(plan.id)) {
       try {
         await companion.updatePlanStatus(plan.id, ProactivePlanStatus.expired);
       } catch (e) {
