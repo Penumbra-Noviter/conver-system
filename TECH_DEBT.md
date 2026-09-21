@@ -52,6 +52,8 @@
 | F-152 | `ChatService` 构造持有 `AppDatabase`（chat_service.dart:389-423，`var _ = database` wildcard）仅为缺省构造 LorebookRepository 兜底，装配层（app.dart:187-189）已注入 repo 但参数可选——数据层类型泄漏进服务协议面；修复 = lorebookRepository required + 删 database 参数（测试构造面 churn 有界） | 架构报告 2026-09-21 C7 | Worth exploring | 📝 待立项 | 装配层 |
 | F-153 | `app.dart` endOfTurnHooks（:409-487）五闭包逐个复制「characterId 空守卫 + context.read 取用」样板；开关读取不对称（反思/宫殿装配层读、主动消息服务内读） | 架构报告 2026-09-21 C8 | Speculative | 📝 待立项 | 装配层 |
 | F-154 | `RelationshipService`（relationship_service.dart:164）`required ConversationRepository conversationRepository` 构造参数在 C5 删除 `_allMessagesFor`/`_conversations` 后**零消费死参**：8 处构造点（app.dart:372 + 7 测试）被迫传一个不改变行为的仓储；删除 = 8 构造点机械改（与 C7 构造净化同款模式）；C5 当时因出票面范围保留 | 波 1 增量审核（架构批次） | Speculative | 📝 待立项 | 装配层 |
+| F-155 | `memory_palace_service.dart:270-272` 字符决策口径变化：旧实现 Dart UTF-16 码元和 vs C3 后 SQLite `LENGTH()` 码点和——emoji 类会话恰在阈值边界时 `shouldSummarize` 判定可翻（docstring 已显式声明，零行为变化契约的窄输入漂移）；附带 `reflection` `messageStats`+`recentMessages` 双查询非单快照（单写模型下可忽略 💭） | 波 2 增量审核 Falsify（架构批次） | Speculative | 📝 待立项 | 聊天链路 |
+| F-156 | `chat_service.dart:1664/:1682` `_buildAssembleContext` 每次调用双跑 `_assemble` 核心（send 腿弃用 segments 只取 built）——发送热路径组装成本翻倍，纯 CPU 行为等价；潜在优化 = 共享段惰性求值 segments 或双返回值按需 | 波 2 增量审核（架构批次） | Worth exploring | 📝 待立项 | 聊天链路 |
 
 ## 技术债处置记录
 
