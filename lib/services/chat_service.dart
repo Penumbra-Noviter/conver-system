@@ -380,6 +380,38 @@ class _StreamRunState {
   final Completer<void> userWriteSettled = Completer<void>();
 }
 
+/// 组装上溯上下文共享段的结果（F-156，C4 惰性化）。
+///
+/// [built] 经 `buildMessages` **立即求值**（send 腿 [_assembleMessages]
+/// 消费，热路径零额外成本）；[segments] 为 `late final` 惰性字段——首次被
+/// debug 腿 [promptDebug] 访问时经一次性组装闭包求值（惰性求值 + 记忆化，
+/// 至多组装一次），此后重复读取复用同一实例。send 腿永不触碰 [segments]。
+///
+/// **捕获契约**：组装闭包由 [_buildAssembleContext] 在本调用内构造，捕获
+/// **本调用**的参数集与中间量（send/debug 两腿的 `userContent` /
+/// `appendCurrentInput` / `historyBeforeId` 不同 → 各调用闭包独立）；闭包
+/// 内部只消费已求值中间量（CharacterData 投影 / 历史消息 / 世界书带来源
+/// 注入块 / 叙述风格 / 预设对话快照），**不进行任何上游 IO 读取**（F-149
+/// 单点收口不破坏）。
+class _AssembleContext {
+  _AssembleContext({
+    required this.built,
+    required this._buildSegments,
+  });
+
+  /// send 腿消费：经 `buildMessages` 的 `List<PromptMessage>`（立即求值，
+  /// 世界书块展平为纯字符串）。
+  final List<PromptMessage> built;
+
+  /// 一次性组装闭包（首次读 [segments] 时执行，捕获本调用中间量，记
+  /// 忆化至多一次）。
+  final List<PromptSegment> Function() _buildSegments;
+
+  /// debug 腿消费：经 `buildMessagesWithSource` 的 `List<PromptSegment>`
+  /// （世界书块带来源标注；惰性求值 + 记忆化）。
+  late final List<PromptSegment> segments = _buildSegments();
+}
+
 /// 一次聊天回合的编排服务。
 ///
 /// 构造依赖：四仓储（消息 / 对话 / 角色 / 设置）+ [LLMProviderFactory]
@@ -1594,16 +1626,17 @@ class ChatService {
   /// 共享段止于 `buildMessages` / `buildMessagesWithSource` 产物（两者共用
   /// 同一私有 `_assemble` 组装核心，content/role 序列逐条一致）：
   /// - **built**：经 `buildMessages` 的 `List<PromptMessage>`（send 腿用，
-  ///   世界书块展平为纯字符串）；
+  ///   世界书块展平为纯字符串）；**立即求值**（F-156 惰性化，热路径零额外成本）；
   /// - **segments**：经 `buildMessagesWithSource` 的 `List<PromptSegment>`
-  ///   （debug 腿用，世界书块带来源标注）。
+  ///   （debug 腿用，世界书块带来源标注）。**惰性求值**——返回的
+  ///   [_AssembleContext] 以 `late final` 字段持有，仅 debug 腿首次访问时
+  ///   组装一次（记忆化至多一次），send 腿永不触碰。
   ///
   /// **注入豁免（有意声明，PD-04 契约面不变）**：memory 注入（AC-03）与
   /// 阶段 2 关系/thought 注入**不在本段**——它们只存在于 send 腿
   /// [_assembleMessages]（本就单源，非收敛对象）；debug 腿 [promptDebug]
   /// 维持注入豁免（「逐条一致」契约在 memory 缺省下成立）。
-  Future<({List<PromptMessage> built, List<PromptSegment> segments})>
-      _buildAssembleContext({
+  Future<_AssembleContext> _buildAssembleContext({
     required Conversation conv,
     required Character character,
     required int? historyBeforeId,
@@ -1679,19 +1712,25 @@ class ChatService {
       // 已建会话——注入源恒为本快照列，验收 5/6）。
       presetDialogue: conv.presetDialogue,
     );
-    final segments = buildMessagesWithSource(
-      charData,
-      history: historyMessages,
-      userContent: userContent,
-      maxRounds: maxRounds,
-      userName: userName,
-      appendCurrentInput: appendCurrentInput,
-      extraVars: extraVars,
-      world: world,
-      narrativeStyle: narrativeStyle,
-      presetDialogue: conv.presetDialogue,
+    // F-156 惰性化：built 立即求值（send 腿零额外成本）；segments 转为
+    // 惰性闭包——捕获**本调用**的中间量（charData / historyMessages / world /
+    // narrativeStyle / conv 快照），闭包内不重取任何上游 IO。send 腿（只读
+    // built）永不触发；debug 腿首次读 segments 时组装一次并记忆化。
+    return _AssembleContext(
+      built: built,
+      buildSegments: () => buildMessagesWithSource(
+        charData,
+        history: historyMessages,
+        userContent: userContent,
+        maxRounds: maxRounds,
+        userName: userName,
+        appendCurrentInput: appendCurrentInput,
+        extraVars: extraVars,
+        world: world,
+        narrativeStyle: narrativeStyle,
+        presetDialogue: conv.presetDialogue,
+      ),
     );
-    return (built: built, segments: segments);
   }
 
   /// 组装发送给 LLM 的消息列表（角色字段 → CharacterData + 滑窗 + 历史 +
