@@ -37,7 +37,10 @@
 - `BUILD +1` 是硬性要求（versionCode 必须先 +1）；`MAJOR.MINOR.PATCH` 段按变更
   类型可选提升。
 - 例：基线 `1.0.0+1` → 首次 bugfix 发布 `1.0.1+2`；首个新功能 `1.1.0+3`。
-- 修改位置：根目录 `pubspec.yaml` 的 `version:` 行，然后 `flutter pub get`。
+- 修改位置：根目录 `pubspec.yaml` 的 `version:` 行，然后 `flutter pub get`；
+  **同步改 `lib/views/settings/about_page.dart` 的 `AboutPage.appVersion` 常量**
+  （关于页展示版本；`manual_pages_test` 版本防漂移测试逐字对拍 pubspec，
+  漏改即测试红——1.1.0 发布曾漏改实锤，2026-09-22 修复并在此固化同步点）。
 - 验证：发布后抽查包内 versionCode / versionName（见 §3 核对步骤）。
 
 ---

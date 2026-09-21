@@ -17,9 +17,10 @@ class AboutPage extends StatelessWidget {
   /// 应用展示名（用户定稿）。
   static const String appName = '汇流';
 
-  /// 版本号（与 `pubspec.yaml` `version: 1.0.0+1` 对齐；`manual_pages_test`
-  /// 的版本防漂移测试逐字对拍 pubspec，防常量与清单脱节）。
-  static const String appVersion = '1.0.0+1';
+  /// 版本号（与 `pubspec.yaml` `version: 1.1.0+2` 对齐；`manual_pages_test`
+  /// 的版本防漂移测试逐字对拍 pubspec，防常量与清单脱节——发版改号时须与
+  /// pubspec 同步改，见 `docs/release-android.md` §1 修改位置）。
+  static const String appVersion = '1.1.0+2';
 
   @override
   Widget build(BuildContext context) {
