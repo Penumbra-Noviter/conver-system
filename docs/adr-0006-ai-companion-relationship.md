@@ -30,6 +30,7 @@
 ✅ 闸门 = `confirmStageUpgrade({characterId, targetStage})` 唯一写口 + **F1 合法后继域校验**（单向自增，拒降档/越级/原地）；`rejectStageUpgrade` 显式 no-op
 ✅ 注入 = `buildRelationshipInjection` 每轮 system 注入「当前关系阶段 + 好感度」（判定⑧：有状态行才注入，首回合不注入）
 ✅ 活跃口径 = `activeDays`（distinct 本地日期数）/ `isRecentlyActive`（最近消息 ≥ now−7d），判定⑨单一来源
+> **退役注记（2026-09-21 架构批次）**：`activeDays` 已退役删除（F-81/F-91 后无生产消费方），活跃口径执行侧收敛于 `latestMessageAt` → `isRecentlyActive`（F-81 单源）；名字可按未来展示需求重开。
 ✅ 广播 = ChatService 回调 → `StageUpgradeBroker.publish`（装配层 ChangeNotifier），UI 消费 `lastProposal`
 
 ## 理由
