@@ -186,9 +186,9 @@ class ChatController extends ChangeNotifier {
   /// 控制条渲染判据的数据面，与 [_dbMessages] 同生命周期，保证「列表与计数
   /// 同帧一致」）。
   ///
-  /// 数据层无批量计数读面（本票文件范围为视图 + 控制器），故重载时对会话内
-  /// assistant 消息逐条 [MessageRepository.listSwipes] 计数；重载频率为用户
-  /// 操作级、查询为本地主键索引读，代价可接受。消息行自带的
+  /// 数据层有批量计数读面 [MessageRepository.listSwipesBatch]（F-142），重载
+  /// 时对会话内 assistant 消息 id 单次批量查询计数（消逐消息 N+1）；读取失败
+  /// 按**整批一键降级**（见 [_loadSwipeCounts]）处理。消息行自带的
   /// `activeSwipeIndex` 无需查询，直接随行读取。
   Map<int, int> _swipeCounts = const {};
 
@@ -1079,22 +1079,26 @@ class ChatController extends ChangeNotifier {
 
   /// 读取当前会话内 assistant 消息的候选数（[ChatUiMessage.swipeCount] 来源）。
   ///
-  /// 只扫 assistant 行（候选仅由 regenerate / continueReply 挂在 assistant 上）；
-  /// 单条读取失败按「无候选」降级并记日志——候选计数是展示增强面，不得因局部
-  /// 读取异常阻塞消息列表呈现（列表本体已在调用方落位）。
+  /// 只收集 assistant 消息 id（候选仅由 regenerate / continueReply 挂在
+  /// assistant 上；非 assistant 不查询、结果 map 不含其键），单次调用
+  /// [MessageRepository.listSwipesBatch] 批量读取（消逐消息 N+1）；无候选消息
+  /// 不在 batch map 中，以 `batch[id]?.length ?? 0` 兜底为 0。
+  ///
+  /// 降级语义为**整批一键**：batch 原语为单条 SQL（drift `isIn`），语句级无
+  /// 部分失败，故单 try/catch 包裹——整批失败按「无候选」处理并记日志。候选
+  /// 计数是展示增强面，不得因读取异常阻塞消息列表呈现（列表本体已在调用方
+  /// 落位）。
   Future<Map<int, int>> _loadSwipeCounts() async {
-    final counts = <int, int>{};
-    for (final message in _dbMessages) {
-      if (message.role != Role.assistant) {
-        continue;
-      }
-      try {
-        counts[message.id] =
-            (await _messageRepository.listSwipes(message.id)).length;
-      } catch (error) {
-        debugPrint('候选数读取失败（按无候选处理）: $error');
-      }
+    final assistantIds = <int>[
+      for (final message in _dbMessages)
+        if (message.role == Role.assistant) message.id,
+    ];
+    try {
+      final batch = await _messageRepository.listSwipesBatch(assistantIds);
+      return {for (final id in assistantIds) id: batch[id]?.length ?? 0};
+    } catch (error) {
+      debugPrint('候选数读取失败（按无候选处理）: $error');
+      return const {};
     }
-    return counts;
   }
 }

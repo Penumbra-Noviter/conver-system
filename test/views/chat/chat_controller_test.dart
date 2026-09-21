@@ -35,6 +35,7 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/debug_print_capture.dart';
 import '../../helpers/fake_llm_provider.dart';
 import '../../helpers/in_memory_secret_store.dart';
 
@@ -130,6 +131,43 @@ class _SlowMessageRepository extends MessageRepository {
       role: role,
       content: content,
     );
+  }
+}
+
+/// listSwipesBatch 调用记录子类（F-146 C1）：记录批量入参（assistant ids）与
+/// 调用次数，断言「单次批量调用、零逐条 listSwipes 残留」。
+class _RecordingBatchMessageRepository extends MessageRepository {
+  _RecordingBatchMessageRepository(super.db, {super.now});
+
+  /// 每次 [listSwipesBatch] 收到的 messageIds（顺序 = 调用方传入）。
+  final List<List<int>> batchCalls = [];
+
+  /// 逐条 [listSwipes] 调用次数（断言零残留）。
+  int listSwipesCalls = 0;
+
+  @override
+  Future<Map<int, List<MessageSwipe>>> listSwipesBatch(
+      Iterable<int> messageIds) {
+    batchCalls.add(messageIds.toList());
+    return super.listSwipesBatch(messageIds);
+  }
+
+  @override
+  Future<List<MessageSwipe>> listSwipes(int messageId) {
+    listSwipesCalls++;
+    return super.listSwipes(messageId);
+  }
+}
+
+/// listSwipesBatch 必抛的消息仓储子类——命中「候选计数整批失败 → 按无候选
+/// 整批降级」路径（F-146 C1）。
+class _ThrowingBatchMessageRepository extends MessageRepository {
+  _ThrowingBatchMessageRepository(super.db, {super.now});
+
+  @override
+  Future<Map<int, List<MessageSwipe>>> listSwipesBatch(
+      Iterable<int> messageIds) {
+    throw StateError('batch failed');
   }
 }
 
@@ -1010,6 +1048,104 @@ void main() {
       final settled = await messageRepo.getMessages(conv.id);
       expect([for (final m in settled) (m.role, m.content)],
           [(Role.user, 'hi'), (Role.assistant, 'ab')]);
+    });
+  });
+
+  group('swipeCounts · 候选计数批量读（F-146 C1）', () {
+    /// 种子 [开场白(assistant) / user / assistant 回复] 三消息会话，返回
+    /// 会话 id + 三消息 id（id 升序）。
+    Future<(int, List<int>)> seedAssistantConversation() async {
+      final char = await seedCharacter(firstMes: '开场。');
+      final conv = await seedConversation(char.id);
+      final ids = [
+        (await messageRepo.getMessages(conv.id)).single.id, // 开场白
+        (await messageRepo.createMessage(
+                conversationId: conv.id, role: Role.user, content: '你好'))
+            .id,
+        (await messageRepo.createMessage(
+                conversationId: conv.id,
+                role: Role.assistant,
+                content: '回复'))
+            .id,
+      ];
+      return (conv.id, ids);
+    }
+
+    test('单次 listSwipesBatch、输入 = assistant ids、零逐条残留；有/无候选双态',
+        () async {
+      final (convId, ids) = await seedAssistantConversation();
+      final greetingId = ids[0];
+      final replyId = ids[2];
+      // 有候选：assistant 回复追加一个候选（首追加播种候选 0 = 原文 → 共 2 条）。
+      await messageRepo.addSwipe(replyId, '候选一');
+      final spy = _RecordingBatchMessageRepository(db, now: () => fakeNow);
+      final c = wireController(FakeLLMProvider(tokens: const []),
+          messageRepository: spy);
+
+      await c.openConversation(convId);
+
+      // 批量形态：单次调用，输入仅 assistant 消息 id（user 不在批内）。
+      expect(spy.batchCalls, hasLength(1), reason: '候选计数为单次批量调用');
+      expect(spy.batchCalls.single, [
+        greetingId,
+        replyId,
+      ], reason: '输入面 = 仅 assistant 消息 id（开场白 + 回复），顺序随消息列表');
+      expect(spy.listSwipesCalls, 0, reason: '逐条 listSwipes 循环零残留');
+      // 有/无候选双态与现状一致。
+      expect(
+          [for (final m in c.messages) (m.role, m.swipeCount)],
+          [(Role.assistant, 0), (Role.user, 0), (Role.assistant, 2)],
+          reason: '无候选 = 0、有候选 = 候选行数、user 不进 map 键面恒 0');
+    });
+
+    test('整批失败 → 整表按「无候选」降级（空 map，列表呈现不阻塞；诊断入日志）',
+        () async {
+      final (convId, _) = await seedAssistantConversation();
+      final logs = captureDebugPrint();
+      final throwing = _ThrowingBatchMessageRepository(db, now: () => fakeNow);
+      final c = wireController(FakeLLMProvider(tokens: const []),
+          messageRepository: throwing);
+
+      await c.openConversation(convId);
+
+      // 列表本体不因候选计数异常阻塞（计数为展示增强面）。
+      expect([for (final m in c.messages) (m.role, m.content)],
+          containsAll([
+            (Role.assistant, '开场。'),
+            (Role.user, '你好'),
+            (Role.assistant, '回复'),
+          ]));
+      // 整批降级单元：全部 assistant 消息计数为 0（空 map → `?? 0` 兜底）。
+      expect(
+          c.messages.where((m) => m.role == Role.assistant).map(
+              (m) => m.swipeCount),
+          everyElement(0),
+          reason: '整批失败返回空 map，所有消息按无候选处理（降级单元 = 整批）');
+      expect(
+          logs.any((line) =>
+              line?.contains('候选数读取失败（按无候选处理）: ') ?? false),
+          isTrue,
+          reason: '整批失败打印诊断（原文案保持）');
+      expect(
+          logs.any((line) => line?.contains('batch failed') ?? false), isTrue);
+    });
+
+    test('空会话（无 assistant 消息）→ 批量空输入短路，零查询零崩溃', () async {
+      final char = await seedCharacter(); // 无开场白 → 会话零消息
+      final conv = await seedConversation(char.id);
+      final spy = _RecordingBatchMessageRepository(db, now: () => fakeNow);
+      final c = wireController(FakeLLMProvider(tokens: const []),
+          messageRepository: spy);
+
+      await c.openConversation(conv.id);
+
+      expect(c.messages, isEmpty, reason: '空会话列表为空，不阻塞呈现');
+      expect(
+        spy.batchCalls.single,
+        isEmpty,
+        reason: '空消息列表 → listSwipesBatch 空输入（既有契约短路）',
+      );
+      expect(spy.listSwipesCalls, 0);
     });
   });
 
