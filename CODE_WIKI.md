@@ -2,7 +2,7 @@
 
 > 版本：Phase 1-5 + P6.1~6.5 + P2.5/3.5/4.3 + U7~U9 模拟器 + SIM-API-1 + 技术债区清零（TD-1~76，2026-08-14）全部完成
 > 生成日期：2026-08-15
-> 测试状态：<!--AUTO:tests_total:total-->2899<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1357<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1472<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
+> 测试状态：<!--AUTO:tests_total:total-->2902<!--/AUTO--> 项全绿（pytest <!--AUTO:tests_total:pytest-->1360<!--/AUTO--> + Vitest <!--AUTO:tests_total:vitest-->1472<!--/AUTO--> + cargo test <!--AUTO:tests_total:cargo-->70<!--/AUTO-->）
 >
 
 ---
@@ -1491,7 +1491,7 @@ conver system/
 | `backend/tests/test_character_sampling.py` | <!--AUTO:tests:backend/tests/test_character_sampling.py-->4<!--/AUTO--> | 采样参数契约锁（SP-1：迁移幂等/往返保真/clamp） |
 | `backend/tests/test_sampling_transmit.py` | <!--AUTO:tests:backend/tests/test_sampling_transmit.py-->5<!--/AUTO--> | 采样参数透传契约锁（SP-2：OpenAI 透传/Claude 不传/_sampling_kwargs） |
 | `backend/tests/test_character_import_avatar.py` | <!--AUTO:tests:backend/tests/test_character_import_avatar.py-->2<!--/AUTO--> | 角色导入非 ASCII avatar 500 回归（服务层 ValueError 缺陷路径 + API 层全路径） |
-| `backend/tests/test_character_schema.py` | <!--AUTO:tests:backend/tests/test_character_schema.py-->1<!--/AUTO--> | 角色 schema 序列化契约锁（preset_dialogues 存量 NULL 归一，GET /api/characters 500 回归） |
+| `backend/tests/test_character_schema.py` | <!--AUTO:tests:backend/tests/test_character_schema.py-->4<!--/AUTO--> | 角色 schema 序列化契约锁（preset_dialogues 存量 NULL 归一，GET /api/characters 500 回归） |
 | `backend/tests/test_chat_service.py` | <!--AUTO:tests:backend/tests/test_chat_service.py-->43<!--/AUTO--> | 对话编排（准备/完成/错误响应） |
 | `backend/tests/test_chat_continue.py` | <!--AUTO:tests:backend/tests/test_chat_continue.py-->21<!--/AUTO--> | 续写端点契约锁（MS-3：条数不变/不追加 user/失败零改动/续写触发形态/空续写 no-op/错误矩阵） |
 | `backend/tests/test_chat_mod_injection.py` | <!--AUTO:tests:backend/tests/test_chat_mod_injection.py-->13<!--/AUTO--> | prompt 注入链集成契约锁（MD-2：三区域叠加/禁用与非 prompt 区零影响/无 Mod 零回归/sort_order 升序/叠加于世界书之上不新增尾随 system） |
@@ -1651,9 +1651,9 @@ devDependencies：`vitest` + `@vitest/coverage-v8` + `jsdom`（测试）+ `@taur
 
 ## 七、测试基线
 
-> 三层合计：**<!--AUTO:tests_total:total-->2899<!--/AUTO-->** 项全绿。
+> 三层合计：**<!--AUTO:tests_total:total-->2902<!--/AUTO-->** 项全绿。
 >
-> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1357<!--/AUTO-->
+> - pytest（后端，含 1 skip）：<!--AUTO:tests_total:pytest-->1360<!--/AUTO-->
 > - Vitest（前端）：<!--AUTO:tests_total:vitest-->1472<!--/AUTO-->
 > - cargo test（壳）：<!--AUTO:tests_total:cargo-->70<!--/AUTO-->
 

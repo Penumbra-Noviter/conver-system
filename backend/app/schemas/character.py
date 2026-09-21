@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 # ── 预设对话（few-shot 示范，项目自有字段，不进 V2 规范清单）──
@@ -57,16 +57,37 @@ class CharacterBase(BaseModel):
     # PD-4 预设对话（项目自有字段，不进 V2 规范清单，经 conver_system 命名空间往返）
     preset_dialogues: list[PresetDialogue] = Field(default_factory=list, description="预设对话（few-shot 示范）")
 
-    @field_validator("preset_dialogues", mode="before")
-    @classmethod
-    def _coerce_none_preset_dialogues(cls, value: object) -> object:
-        """存量行 NULL 归一：preset_dialogues 为 None 时按 [] 处理（默认值仅字段缺席生效）
+    # F-157（2026-09-21）：同型补齐 tags/alternate_greetings/creator_notes/extensions——
+    # update 显式 null 经 exclude_unset+setattr 落 NULL 库、存量行自愈补列为 NULL，
+    # 两类路径都会令必填 list/dict 响应 serialize 500。按默认形态统一归一（None 不入库）。
 
-        旧库升级（_ensure_character_preset_dialogue_column 补列无回填）与显式 null
-        写库都会产出 NULL 行；list 型必填字段遇 None 令 FastAPI serialize_response
-        抛 ResponseValidationError（GET /api/characters 500，2026-09-21 冒烟实测）。
+    @field_validator(
+        "tags",
+        "alternate_greetings",
+        "creator_notes",
+        "extensions",
+        "preset_dialogues",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_none_to_json_default(cls, value: object, info: ValidationInfo) -> object:
+        """list/dict JSON 字段 NULL 归一：None → 字段默认形态（默认值仅字段缺席生效）
+
+        default_factory 只在字段缺席时生效，显式 None（存量行自愈补列无回填 / update
+        显式 null）会令必填 list/dict 字段在响应 serialize 时抛 ResponseValidationError
+        （GET /api/characters 500，2026-09-21 冒烟实测）。省略字段（partial update）
+        不触发本验证器（validate_default=False），exclude_unset 语义零变更。
         """
-        return [] if value is None else value
+        if value is None:
+            defaults: dict[str, object] = {
+                "tags": [],
+                "alternate_greetings": [],
+                "creator_notes": {},
+                "extensions": {},
+                "preset_dialogues": [],
+            }
+            return defaults[info.field_name]
+        return value
 
 
 # ── 请求体（继承基类，字段清单由 CharacterBase 唯一定义）──
