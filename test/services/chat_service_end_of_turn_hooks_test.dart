@@ -11,6 +11,7 @@ import 'package:conver_system_mobile/data/database/tables.dart' show Role;
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/companion_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/memory_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
@@ -119,7 +120,7 @@ void main() {
     MemoryService? memory,
   }) {
     return ChatService(
-      database: db,
+      lorebookRepository: LorebookRepository(db),
       conversationRepository: conversationRepo,
       characterRepository: characterRepo,
       messageRepository: messageRepo,

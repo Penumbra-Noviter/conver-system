@@ -15,28 +15,31 @@
 ///   每条消耗 1 轮（2 条消息），`incremental = max(0, 总消息数 - autoCount*2)`，
 ///   杜绝 N>1 时累计单调恒触发；
 /// - 归纳窗口：最近 [memoryPalaceWindow] 条 + 字符预算
-///   [memoryPalaceCharBudget]（从后往前截断，保留最近内容）；
+///   [memoryPalaceCharBudget]（从后往前截断，保留最近内容；经
+///   [MessageRepository.recentMessages] 定位读 + [recentDialogueWindow]
+///   单源窗口 builder）；
 /// - 归纳失败隔离：LLM 异常 / 非法 JSON / 落库异常均内部吞错（S1 降级），
 ///   返回 0 不向上抛——回合末 hook 零防御性 try；
 /// - 开关读取约定 = 服务内部（[MemoryPalaceService.summarizeAfterTurn] 首行
 ///   读 `memoryPalaceEnabled` + `memoryPalaceEveryRounds`，装配层零设置读取）。
 ///
-/// 温度：沿用角色/全局链（对齐 ChatService._resolveTemperature 语义）——
-/// 角色 temperature 非缺省时优先，否则回退全局设置；越界 clamp。
+/// 温度：沿用角色/全局链（[resolveCharTemperature] 单源）——角色
+/// temperature 非缺省时优先，否则回退全局设置；越界 clamp。
 library;
 
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 
-import '../../data/database/app_database.dart' show Character, Message;
 import '../../data/database/tables.dart' show Role;
 import '../../data/repositories/character_repository.dart';
 import '../../data/repositories/lorebook_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../utils/llm_json_candidates.dart';
+import '../llm/dialogue_window.dart';
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
+import '../llm/temperature.dart';
 
 // 构造为公开命名参数（装配点语义）+ 私有 `_` 字段：initializing formal 无法
 // 同时满足两者，整文件抑制该 lint（对齐 document_parse_service 惯例）。
@@ -169,7 +172,7 @@ List<LlmMessage> buildMemorySummarizeMessages({
 /// 生产装配用的归纳实现：组装 prompt 并经 [llm].generate 产出草案。
 ///
 /// [model] 为调用模型名（透传 provider）；[temperature] 已由调用方按角色/全局
-/// 链解析（[MemoryPalaceService._resolveTemperature]）。返回
+  /// 链解析（[resolveCharTemperature]）。返回
 /// [Future<MemoryDraft?>] 与 [MemoryDraftExtractor] 签名同形（装配层闭包
 /// 绑定 llm/model 后传入服务）。
 Future<MemoryDraft?> extractMemoryDraftWithProvider({
@@ -229,11 +232,15 @@ class MemoryPalaceService {
   /// 编排无需防御性 try（对齐 [ReflectionService.reflectAfterTurn]）。
   ///
   /// 编排：
-  /// 1. 读对话消息（空 → 0）与角色（不存在 → 0）；
+  /// 1. 读对话消息聚合统计（[MessageRepository.messageStats] 单查询聚合，
+  ///    空 → 0）与角色（不存在 → 0）；
   /// 2. 增量计数：auto 条目数 × 2 从消息总数中消耗（桌面 Falsify 修复），
   ///    `incremental = max(0, total - autoCount*2)`；
-  /// 3. 字符数 = 消息内容长度和；[shouldSummarize] 判定（轮数 / 字符数 or）；
-  /// 4. 归纳窗口（最近 [memoryPalaceWindow] 条 + 字符预算截断）→ 对话行；
+  /// 3. 字符数 = 消息内容长度和（聚合单源）；[shouldSummarize] 判定
+  ///    （轮数 / 字符数 or）；
+  /// 4. 归纳窗口（最近 [memoryPalaceWindow] 条 + 字符预算截断，经
+  ///    [MessageRepository.recentMessages] + [recentDialogueWindow]）→
+  ///    对话行；
   /// 5. 温度按角色/全局链解析 → [_extractor] 归纳 → [parseMemoryDraft] 语义
   ///    的草案（null = 失败降级）；
   /// 6. [persistDrafts] 落库，返回实际新增条数（0 = 节流跳过 / 失败降级）。
@@ -246,8 +253,8 @@ class MemoryPalaceService {
     }
     final everyRounds = await _settingsRepository.memoryPalaceEveryRounds;
     try {
-      final messages = await _messageRepository.getMessages(conversationId);
-      if (messages.isEmpty) {
+      final stats = await _messageRepository.messageStats(conversationId);
+      if (stats.total == 0) {
         return 0;
       }
       final character = await _characterRepository.getCharacter(characterId);
@@ -257,22 +264,33 @@ class MemoryPalaceService {
 
       final entries = await _lorebookRepository.listEntries(characterId);
       final autoCount = entries.where((e) => e.source == 'auto').length;
-      final incremental = (messages.length - autoCount * 2) > 0
-          ? messages.length - autoCount * 2
+      final incremental = (stats.total - autoCount * 2) > 0
+          ? stats.total - autoCount * 2
           : 0;
-      final charCount =
-          messages.fold<int>(0, (sum, m) => sum + m.content.length);
       if (!shouldSummarize(
         incremental,
-        charCount,
+        stats.chars,
         everyRounds: everyRounds,
         charThreshold: _charThreshold,
       )) {
         return 0;
       }
 
-      final dialogueLines = _buildDialogueLines(messages);
-      final temperature = await _resolveTemperature(character);
+      final dialogueLines = [
+        for (final m in recentDialogueWindow(
+          await _messageRepository.recentMessages(
+            conversationId,
+            memoryPalaceWindow,
+          ),
+          limit: memoryPalaceWindow,
+          charBudget: memoryPalaceCharBudget,
+        ))
+          m.role == Role.user
+              ? '用户：${m.content}'
+              : '${m.role.value}：${m.content}',
+      ];
+      final global = await _settingsRepository.getTemperature();
+      final temperature = resolveCharTemperature(character.temperature, global);
       final draft = await _extractor(
         charName: character.name,
         dialogueLines: dialogueLines,
@@ -333,52 +351,6 @@ class MemoryPalaceService {
     return inserted;
   }
 
-  // ── 内部实现 ──
-
-  /// 归纳窗口对话行：最近 [memoryPalaceWindow] 条 + 字符预算从后往前截断
-  /// （保留最近内容，最相关），行格式 `role: content`。
-  List<String> _buildDialogueLines(List<Message> messages) {
-    final window = messages.length > memoryPalaceWindow
-        ? messages.sublist(messages.length - memoryPalaceWindow)
-        : messages;
-    var budget = 0;
-    final kept = <Message>[];
-    for (final m in window.reversed) {
-      budget += m.content.length;
-      if (budget > memoryPalaceCharBudget) {
-        break;
-      }
-      kept.add(m);
-    }
-    final ordered = kept.reversed.toList();
-    return [
-      for (final m in ordered)
-        m.role == Role.user
-            ? '用户：${m.content}'
-            : '${m.role.value}：${m.content}',
-    ];
-  }
-
-  /// 采样温度解析：角色 `character.temperature` 为主、全局设置兜底（对齐
-  /// ChatService._resolveTemperature 语义，工单「temperature 沿用角色/全局
-  /// 链」）。角色温度 == [SettingsRepository.defaultTemperature]（0.7，DB
-  /// 默认）判定为「未显式覆盖」→ 回退全局值；NaN/Infinity 回退全局（防
-  /// API 400）；越界 clamp 到合法区间。
-  Future<double> _resolveTemperature(Character character) async {
-    final global = await _settingsRepository.getTemperature();
-    final temperature = character.temperature;
-    if (temperature.isNaN ||
-        temperature.isInfinite ||
-        temperature == SettingsRepository.defaultTemperature) {
-      return global;
-    }
-    return temperature
-        .clamp(
-          SettingsRepository.temperatureMin,
-          SettingsRepository.temperatureMax,
-        )
-        .toDouble();
-  }
 }
 
 /// 去重指纹：keys 集合（排序去重，顺序无关）+ content。

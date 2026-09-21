@@ -11,6 +11,7 @@ import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/companion_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
@@ -428,6 +429,7 @@ void main() {
     late int plannerCalls;
     late ProactivePlanDecision? plannerResult;
     late Object? plannerError;
+    late List<String> capturedDialogueLines;
     late int schedulerCalls;
     late List<ProactivePlan> scheduledPlans;
 
@@ -452,6 +454,7 @@ void main() {
         content: '想你了',
       );
       plannerError = null;
+      capturedDialogueLines = const [];
       schedulerCalls = 0;
       scheduledPlans = [];
     });
@@ -539,6 +542,7 @@ void main() {
         required List<String> dialogueLines,
       }) async {
         plannerCalls++;
+        capturedDialogueLines = dialogueLines;
         final err = plannerError;
         if (err != null) {
           throw err;
@@ -833,6 +837,28 @@ void main() {
 
       expect(result, 1);
       expect(plannerCalls, 1);
+    });
+
+    test('署名逐字：assistant 原文直给 / user「用户：」（经 recentMessages + 单源窗口）',
+        () async {
+      final ids = await seedChain(); // 角色「艾莉亚」+ 开场白(assistant)
+      await enableProactive();
+      await messageRepo.createMessage(
+        conversationId: ids.conversationId,
+        role: Role.user,
+        content: '你好呀',
+      );
+      final service = buildService();
+
+      final result = await service.planAfterTurn(
+        characterId: ids.characterId,
+        conversationId: ids.conversationId,
+      );
+
+      expect(result, 1);
+      expect(plannerCalls, 1);
+      expect(capturedDialogueLines, ['开场白', '用户：你好呀'],
+          reason: 'assistant 原文直给 / user「用户：」署名逐字');
     });
 
     test('顺序无关（F-81）：乱序插入同集合 → latestMessageAt 与 _lastActiveAt/isRecentlyActive 判定⑨一致', () async {
@@ -1291,7 +1317,7 @@ void main() {
 
       await settingsRepo.setMany({'claude_api_key': 'sk-test'});
       final chatService = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: conversationRepo,
         characterRepository: CharacterRepository(db, now: () => fixedNow),
         messageRepository: messageRepo,

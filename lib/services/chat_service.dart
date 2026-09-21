@@ -100,6 +100,7 @@ import 'llm/credentials_resolver.dart';
 import 'llm/errors.dart';
 import 'llm/llm_provider.dart';
 import 'llm/prompt.dart';
+import 'llm/temperature.dart';
 import 'lorebook/lorebook_engine.dart';
 import 'memory/memory_prompt.dart';
 import 'memory/memory_service.dart';
@@ -386,9 +387,9 @@ class _StreamRunState {
 /// 候选追加收口于 [MessageRepository.addSwipe]（仓库内事务）。无平台存储 /
 /// 视图依赖。
 class ChatService {
-  /// [database] 参数保留以维持构造签名稳定（app.dart 装配零改动）；
-  /// MS-02 起服务不再直接使用（regenerate 的「有界删旧 + 插新」单事务已删除，
-  /// 候选追加收口于 [MessageRepository.addSwipe]）。
+  /// [lorebookRepository] 为世界书仓储——装配层恒传（app.dart provider 单点
+  /// `context.read<LorebookRepository>()`），服务协议面不再包含数据层 infra
+  /// 类型（数据层 infra 类型已退出构造参数）。
   ///
   /// [settingsRepository] 提供 Key 解析链与滑窗轮数等设置。
   ///
@@ -396,7 +397,6 @@ class ChatService {
   /// 最大重试次数。生产默认 `[1s, 2s]`（重试 2 次，指数退避）；测试注入短值
   /// 以获得确定性退避时序。
   ChatService({
-    required AppDatabase database,
     required this._conversationRepository,
     required this._characterRepository,
     required this._messageRepository,
@@ -406,7 +406,7 @@ class ChatService {
     this._memoryService,
     this._thoughtService,
     this._companionRepository,
-    LorebookRepository? lorebookRepository,
+    required LorebookRepository lorebookRepository,
     this._lorebookRandom,
     List<EndOfTurnHook> endOfTurnHooks = const [],
     List<Duration> connectRetryDelays = const [
@@ -415,10 +415,7 @@ class ChatService {
     ],
   }) : _endOfTurnHooks = List<EndOfTurnHook>.unmodifiable(endOfTurnHooks),
        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays) {
-    // 服务层不直接持有 AppDatabase（wildcard）；例外：世界书仓储缺省需从
-    // [database] 装配（app.dart 装配零改动约束，WL-03），显式注入可覆盖。
-    var _ = database;
-    _lorebookRepository = lorebookRepository ?? LorebookRepository(database);
+    _lorebookRepository = lorebookRepository;
     _credentialsResolver = credentialsResolver ?? _wireCredentialsResolver();
   }
 
@@ -1587,8 +1584,123 @@ class ChatService {
     );
   }
 
+  /// 组装上溯上下文共享段（F-149，C4）。
+  ///
+  /// 真实发送腿 [_assembleMessages] 与调试腿 [promptDebug] 各自重建的上溯段
+  /// 单点收口：CharacterData 八字段投影 + 历史取数（[historyBeforeId] 非空 →
+  /// `id < historyBeforeId` 定位读，重生成路径） + 世界书扫描（带来源、
+  /// try/catch 降级）+ 叙述风格（开关/降级）——两端只付差异参，本段只跑一次。
+  ///
+  /// 共享段止于 `buildMessages` / `buildMessagesWithSource` 产物（两者共用
+  /// 同一私有 `_assemble` 组装核心，content/role 序列逐条一致）：
+  /// - **built**：经 `buildMessages` 的 `List<PromptMessage>`（send 腿用，
+  ///   世界书块展平为纯字符串）；
+  /// - **segments**：经 `buildMessagesWithSource` 的 `List<PromptSegment>`
+  ///   （debug 腿用，世界书块带来源标注）。
+  ///
+  /// **注入豁免（有意声明，PD-04 契约面不变）**：memory 注入（AC-03）与
+  /// 阶段 2 关系/thought 注入**不在本段**——它们只存在于 send 腿
+  /// [_assembleMessages]（本就单源，非收敛对象）；debug 腿 [promptDebug]
+  /// 维持注入豁免（「逐条一致」契约在 memory 缺省下成立）。
+  Future<({List<PromptMessage> built, List<PromptSegment> segments})>
+      _buildAssembleContext({
+    required Conversation conv,
+    required Character character,
+    required int? historyBeforeId,
+    required int maxRounds,
+    required String userName,
+    required bool appendCurrentInput,
+    required String userContent,
+    Map<String, String> extraVars = const {},
+  }) async {
+    final charData = CharacterData(
+      name: character.name,
+      systemPrompt: character.systemPrompt,
+      personality: character.personality,
+      scenario: character.scenario,
+      mesExample: character.mesExample,
+      postHistoryInstructions: character.postHistoryInstructions,
+      // NPD-04：专家模式两字段透传 buildMessages（expert + 非空 → 单条
+      // expert prompt 替代 system/scenario/PHI；expert + 空 → 回退 simple）。
+      promptMode: character.promptMode,
+      expertPrompt: character.expertPrompt,
+    );
+    final history = historyBeforeId == null
+        ? await _messageRepository.getMessages(conv.id)
+        : await _messageRepository.messagesBefore(conv.id, historyBeforeId);
+    // WL-03：世界书扫描→激活→注入（与消息滑窗 maxRounds 解耦，扫描窗由条目
+    // 最大 depth 决定）；世界书为空/全禁用 → 空块零注入。世界书读失败降级为
+    // 空块不阻断主回复（对齐既有记忆注入降级先例）。
+    // PD-04：带来源注入块（world/memory）在此透传（debug 腿）或展平为纯
+    // 字符串（send 腿 buildMessages），逐字节零变化契约。
+    Map<String, List<InjectedSegment>> world;
+    try {
+      world = await _buildLorebookInjection(
+        character,
+        history,
+        userContent,
+        userName,
+      );
+    } catch (e) {
+      debugPrint('世界书注入失败，跳过: $e');
+      world = const {};
+    }
+    // NPD-01 叙述风格：开关缺省开（opt-out）。开关开启 → 读取 rules（仓储内
+    // 空回退默认常量）透传 buildMessages；开关关闭 → 不透传 rules（组装零注入
+    // 且不读 rules）。设置读取失败 → 降级零注入不阻断主回复（对齐世界书注入
+    // 降级先例）。
+    String? narrativeStyle;
+    try {
+      if (await _settingsRepository.narrativeStyleEnabled) {
+        narrativeStyle = await _settingsRepository.narrativeStyleRules;
+      }
+    } catch (e) {
+      debugPrint('叙述风格读取失败，跳过: $e');
+      narrativeStyle = null;
+    }
+    final historyMessages = [
+      for (final m in history) HistoryMessage(role: m.role, content: m.content),
+    ];
+    final built = buildMessages(
+      charData,
+      history: historyMessages,
+      userContent: userContent,
+      maxRounds: maxRounds,
+      userName: userName,
+      appendCurrentInput: appendCurrentInput,
+      extraVars: extraVars,
+      world: {
+        for (final entry in world.entries)
+          entry.key: [for (final segment in entry.value) segment.content],
+      },
+      narrativeStyle: narrativeStyle,
+      // NPD-02：会话快照透传（创建时固化的 presetDialogue；快照空/无 → null
+      // 透传 → buildMessages 零注入。改角色卡 presetDialogues 实时值不影响
+      // 已建会话——注入源恒为本快照列，验收 5/6）。
+      presetDialogue: conv.presetDialogue,
+    );
+    final segments = buildMessagesWithSource(
+      charData,
+      history: historyMessages,
+      userContent: userContent,
+      maxRounds: maxRounds,
+      userName: userName,
+      appendCurrentInput: appendCurrentInput,
+      extraVars: extraVars,
+      world: world,
+      narrativeStyle: narrativeStyle,
+      presetDialogue: conv.presetDialogue,
+    );
+    return (built: built, segments: segments);
+  }
+
   /// 组装发送给 LLM 的消息列表（角色字段 → CharacterData + 滑窗 + 历史 +
   /// 世界书注入 + 叙述风格 + 预设对话快照 + 专家模式分流）。
+  ///
+  /// 上溯段（CharacterData 八字段投影 / 历史 / 世界书 / 叙述风格）经
+  /// [_buildAssembleContext] 与 debug 腿 [promptDebug] 共享单点；本方法在
+  /// 共享产物之外追加 **send 腿独有**的 memory 注入（AC-03）与阶段 2
+  /// 关系/thought 注入（见方法体，非 [_buildAssembleContext] 范围）。
   ///
   /// [historyBeforeId] 非空（重生成路径）时历史只取 `id < historyBeforeId`
   /// 的消息——桌面「先 delete_messages_from 截断、后组装」在**延迟删除**下以
@@ -1613,76 +1725,19 @@ class ChatService {
     String userContent = '',
     Map<String, String> extraVars = const {},
   }) async {
-    final charData = CharacterData(
-      name: character.name,
-      systemPrompt: character.systemPrompt,
-      personality: character.personality,
-      scenario: character.scenario,
-      mesExample: character.mesExample,
-      postHistoryInstructions: character.postHistoryInstructions,
-      // NPD-04：专家模式两字段透传 buildMessages（expert + 非空 → 单条
-      // expert prompt 替代 system/scenario/PHI；expert + 空 → 回退 simple）。
-      promptMode: character.promptMode,
-      expertPrompt: character.expertPrompt,
-    );
-    final history = historyBeforeId == null
-        ? await _messageRepository.getMessages(conv.id)
-        : await _messageRepository.messagesBefore(conv.id, historyBeforeId);
-    // WL-03：世界书扫描→激活→注入（与消息滑窗 maxRounds 解耦，扫描窗由条目
-    // 最大 depth 决定）；世界书为空/全禁用 → 空块零注入（buildMessages 对
-    // null/空块逐字节零变化）。世界书读失败降级为空块不阻断主回复（对齐既有
-    // 记忆注入降级先例）。
-    // PD-04：引擎带来源注入块（world/memory）→ 在此展平为纯字符串给
-    // buildMessages（逐字节零变化契约）；debug 腿 [promptDebug] 复用同一
-    // _buildLorebookInjection 透传带来源块给 buildMessagesWithSource。
-    Map<String, List<String>> world;
-    try {
-      final tagged = await _buildLorebookInjection(
-        character,
-        history,
-        userContent,
-        userName,
-      );
-      world = {
-        for (final entry in tagged.entries)
-          entry.key: [for (final segment in entry.value) segment.content],
-      };
-    } catch (e) {
-      debugPrint('世界书注入失败，跳过: $e');
-      world = const {};
-    }
-    // NPD-01 叙述风格：开关缺省开（opt-out）。开关开启 → 读取 rules（仓储内
-    // 空回退默认常量）透传 buildMessages；开关关闭 → 不透传 rules（组装零注入
-    // 且不读 rules，验收 6）。设置读取失败 → 降级零注入不阻断主回复（对齐世界
-    // 书注入降级先例）。
-    String? narrativeStyle;
-    try {
-      if (await _settingsRepository.narrativeStyleEnabled) {
-        narrativeStyle = await _settingsRepository.narrativeStyleRules;
-      }
-    } catch (e) {
-      debugPrint('叙述风格读取失败，跳过: $e');
-      narrativeStyle = null;
-    }
-    final built = buildMessages(
-      charData,
-      history: history.map(
-        (m) => HistoryMessage(role: m.role, content: m.content),
-      ),
-      userContent: userContent,
+    final context = await _buildAssembleContext(
+      conv: conv,
+      character: character,
+      historyBeforeId: historyBeforeId,
       maxRounds: maxRounds,
       userName: userName,
       appendCurrentInput: appendCurrentInput,
+      userContent: userContent,
       extraVars: extraVars,
-      world: world,
-      narrativeStyle: narrativeStyle,
-      // NPD-02：会话快照透传（创建时固化的 presetDialogue；快照空/无 → null
-      // 透传 → buildMessages 零注入。改角色卡 presetDialogues 实时值不影响
-      // 已建会话——注入源恒为本快照列，验收 5/6）。
-      presetDialogue: conv.presetDialogue,
     );
     final messages = [
-      for (final m in built) LlmMessage(role: m.role, content: m.content),
+      for (final m in context.built)
+        LlmMessage(role: m.role, content: m.content),
     ];
 
     // AC-03 记忆注入：人格事实每轮重注入 + 记忆三模式指令 + 近期情景记忆。
@@ -1752,15 +1807,21 @@ class ChatService {
   ///
   /// 与真实发送走**同一组装核心与同一上游**（对齐桌面 `chat.py::
   /// build_prompt_debug`）：
-  /// - 同一上游：[historyBeforeId]=null 全量历史 + [_buildLorebookInjection]
-  ///   同一世界书扫描链路（手动→world / auto→memory 来源标注）+ 叙述风格
-  ///   同一解析单点（`narrativeStyleEnabled` 门 + rules）+ 预设对话快照
-  ///   `conv.presetDialogue` + 专家模式两字段透传；
+  /// - 同一上游：[_buildAssembleContext] 共享段单点（[historyBeforeId]=null
+  ///   全量历史 + 世界书扫描链路（手动→world / auto→memory 来源标注）+
+  ///   叙述风格同一解析单点（`narrativeStyleEnabled` 门 + rules）+ 预设对话
+  ///   快照 `conv.presetDialogue` + 专家模式两字段透传）；
   /// - 同一组装核心：[buildMessagesWithSource] 与 [buildMessages] 共用
   ///   `_assemble`（单一组装实现，不复制顺序），debug segments 的 content/role
   ///   序列与真实发送逐条一致（仅末条为 source=user 的空内容占位——桌面
   ///   build_prompt_debug 以 `user_content=""` + `append_current_input=True`
   ///   表达的「待回复输入槽」语义，验收 4/5）。
+  ///
+  /// **注入豁免（有意声明，PD-04 契约面不变）**：debug 腿**不含** memory 注入
+  /// （AC-03）与阶段 2 关系/thought 注入——这两段仅存在于真实发送腿
+  /// [_assembleMessages]（本就单源，非收敛对象）；「逐条一致」契约在 memory
+  /// 缺省下成立（见 chat_service_test PD-04 验收 4），豁免为有意声明而非
+  /// 静默缺口。
   ///
   /// 零外发保证：本方法只读仓储（会话/角色/设置/消息/世界书），不调用
   /// [_resolveProvider]（零 Provider 创建）、不落库任何消息（SR-31），本地
@@ -1780,53 +1841,20 @@ class ChatService {
     final userName = await _settingsRepository.userName;
     final extraVars = await _settingsRepository.templateVars;
     final maxRounds = await _settingsRepository.slidingWindowRounds;
-    final history = await _messageRepository.getMessages(conv.id);
 
-    // 同一上游：世界书扫描（带来源标注，零 LLM）。
-    Map<String, List<InjectedSegment>> world;
-    try {
-      world = await _buildLorebookInjection(character, history, '', userName);
-    } catch (e) {
-      debugPrint('世界书注入失败，跳过: $e');
-      world = const {};
-    }
-    // 同一上游：叙述风格（与 [_assembleMessages] 同解析单点、同降级）。
-    String? narrativeStyle;
-    try {
-      if (await _settingsRepository.narrativeStyleEnabled) {
-        narrativeStyle = await _settingsRepository.narrativeStyleRules;
-      }
-    } catch (e) {
-      debugPrint('叙述风格读取失败，跳过: $e');
-      narrativeStyle = null;
-    }
-
-    // 同一组装核心：buildMessagesWithSource 与 buildMessages 共享 `_assemble`。
-    final segments = buildMessagesWithSource(
-      CharacterData(
-        name: character.name,
-        systemPrompt: character.systemPrompt,
-        personality: character.personality,
-        scenario: character.scenario,
-        mesExample: character.mesExample,
-        postHistoryInstructions: character.postHistoryInstructions,
-        // NPD-04：专家模式两字段透传（expert + 非空 → 单条 expert prompt
-        // 替代 system/scenario/PHI；expert + 空 → 回退 simple）。
-        promptMode: character.promptMode,
-        expertPrompt: character.expertPrompt,
-      ),
-      history: history.map(
-        (m) => HistoryMessage(role: m.role, content: m.content),
-      ),
-      userContent: '',
+    // 同一组装核心与同一上游：_buildAssembleContext 共享段（与真实发送腿同一
+    // CharacterData 投影 / 历史 / 世界书扫描 / 叙述风格单点）；debug 参数面 =
+    // historyBeforeId null（全量历史）+ userContent 空 + appendCurrentInput
+    // true（桌面对齐的「待回复输入槽」）。
+    final context = await _buildAssembleContext(
+      conv: conv,
+      character: character,
+      historyBeforeId: null,
       maxRounds: maxRounds,
       userName: userName,
       appendCurrentInput: true,
+      userContent: '',
       extraVars: extraVars,
-      world: world,
-      narrativeStyle: narrativeStyle,
-      // 会话快照透传（与真实发送同源——NPD-02 快照语义）。
-      presetDialogue: conv.presetDialogue,
     );
 
     return PromptDebugResult(
@@ -1834,7 +1862,7 @@ class ChatService {
       // 对齐桌面 `f"{conv.model_provider}/{conv.model_name}"`。
       model: '${conv.modelProvider}/${conv.modelName}',
       promptMode: character.promptMode,
-      segments: segments,
+      segments: context.segments,
     );
   }
 
@@ -1899,38 +1927,12 @@ class ChatService {
     );
   }
 
-  /// 组装采样温度：角色 `character.temperature` 为主、全局 [globalTemperature]
-  /// 兜底（工单 03 判定契约，spec §U-2 高不确定点）。
-  ///
-  /// 角色温度 == [SettingsRepository.defaultTemperature]（0.7，DB 默认）判定为
-  /// 「未显式覆盖」→ 回退全局值；接受「显式设 0.7 会被全局覆盖」的边界。
-  ///
-  /// 防御（F-76）：DB 层无 CHECK 约束，`character.temperature` 可能为
-  /// NaN/Infinity（`==` 对 NaN 恒 false 会误判「已覆盖」透传致 API 400）或
-  /// 越界值——NaN/Infinity 回退全局、越界 clamp 到合法区间
-  /// [SettingsRepository.temperatureMin, temperatureMax]（对齐
-  /// `SettingsRepository.getTemperature` 契约）。
-  double _resolveTemperature(Character character, double globalTemperature) {
-    final temperature = character.temperature;
-    if (temperature.isNaN ||
-        temperature.isInfinite ||
-        temperature == SettingsRepository.defaultTemperature) {
-      return globalTemperature;
-    }
-    return temperature
-        .clamp(
-          SettingsRepository.temperatureMin,
-          SettingsRepository.temperatureMax,
-        )
-        .toDouble();
-  }
-
   /// 组装生成参数组（SP-01）：conv 采样四列非空 → 覆盖；NULL → 走既有链
-  /// （温度 = 角色为主、全局兜底 [_resolveTemperature]；max_tokens = 全局
+  /// （温度 = 角色为主、全局兜底 [resolveCharTemperature]；max_tokens = 全局
   /// [globalMaxTokens]；topP/presencePenalty/frequencyPenalty = null 不覆盖
   /// provider 默认）。
   ///
-  /// SR-24 值域守卫（对齐 `_resolveTemperature` F-76 先例）：conv 覆盖值非法
+  /// SR-24 值域守卫（对齐 [resolveCharTemperature] F-76 防线）：conv 覆盖值非法
   /// （NaN / ±Infinity / 越界）clamp 或回退——**绝不透传**非法值给 wire。
   /// streamReply / regenerate / continueReply / editAndRegenerate 四路径共用
   /// 本单点（共享透传腿）。
@@ -1948,7 +1950,7 @@ class ChatService {
     required int globalMaxTokens,
   }) {
     return (
-      temperature: _resolveTemperature(character, globalTemperature),
+      temperature: resolveCharTemperature(character.temperature, globalTemperature),
       maxTokens: _resolveMaxTokens(conv.maxTokens, globalMaxTokens),
       topP: _guardSamplingRange(conv.topP, min: 0, max: 1),
       presencePenalty: _guardSamplingRange(

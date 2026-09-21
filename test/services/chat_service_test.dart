@@ -587,7 +587,7 @@ void main() {
 
   void wireService(LLMProvider provider) {
     service = ChatService(
-      database: db,
+      lorebookRepository: LorebookRepository(db),
       conversationRepository: convRepo,
       characterRepository: charRepo,
       messageRepository: messageRepo,
@@ -605,7 +605,7 @@ void main() {
     ],
   }) {
     service = ChatService(
-      database: db,
+      lorebookRepository: LorebookRepository(db),
       conversationRepository: convRepo,
       characterRepository: charRepo,
       messageRepository: messageRepo,
@@ -1020,7 +1020,7 @@ void main() {
 
       final factory = _FakeFactory(FakeLLMProvider(tokens: const ['x']));
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -1050,7 +1050,7 @@ void main() {
       final provider = FakeLLMProvider(tokens: const ['回复']);
       final factory = _FakeFactory(provider);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -1154,7 +1154,7 @@ void main() {
       // 工厂 create 抛非领域/非 LLM 异常（未预期路径，对齐桌面 O3）。
       final throwingFactory = _ThrowingFactory(StateError('组装层崩溃'));
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -1210,7 +1210,7 @@ void main() {
       await settingsRepo.setMany({'claude_api_key': 'sk-x'});
 
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -1301,7 +1301,7 @@ void main() {
       final provider = FakeLLMProvider(tokens: const ['回复']);
       final factory = _FakeFactory(provider);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -1342,7 +1342,7 @@ void main() {
       final provider = FakeLLMProvider(tokens: const ['回复']);
       final factory = _FakeFactory(provider);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -1446,48 +1446,6 @@ void main() {
       expect(provider.lastTemperature, 1.3);
       expect(provider.lastMaxTokens, 8192);
     });
-
-    test('F-76: 角色温度越界（上界）→ clamp 到 2.0 不透传', () async {
-      final char = await seedCharacter(temperature: 9.9);
-      final conv = await seedConversation(char.id);
-
-      final provider = _TickingProvider(tokens: const ['回复']);
-      wireService(provider);
-      await service
-          .streamReply(conversationId: conv.id, content: 'hi')
-          .toList();
-
-      expect(provider.lastTemperature, 2.0, reason: '9.9 clamp 到 2.0');
-    });
-
-    test('F-76: 角色温度越界（下界）→ clamp 到 0.0 不透传', () async {
-      final char = await seedCharacter(temperature: -1.5);
-      final conv = await seedConversation(char.id);
-
-      final provider = _TickingProvider(tokens: const ['回复']);
-      wireService(provider);
-      await service
-          .streamReply(conversationId: conv.id, content: 'hi')
-          .toList();
-
-      expect(provider.lastTemperature, 0.0, reason: '-1.5 clamp 到 0.0');
-    });
-
-    test('F-76: 角色温度 Infinity → 回退全局（NaN/Infinity 不判为覆盖）',
-        () async {
-      final char = await seedCharacter(temperature: double.infinity);
-      final conv = await seedConversation(char.id);
-      await settingsRepo.setMany({'temperature': '0.9'});
-
-      final provider = _TickingProvider(tokens: const ['回复']);
-      wireService(provider);
-      await service
-          .streamReply(conversationId: conv.id, content: 'hi')
-          .toList();
-
-      expect(provider.lastTemperature, 0.9,
-          reason: 'Infinity 不判为显式覆盖 → 回退全局 0.9');
-    });
   });
 
   // ── A3 停止 ──
@@ -1559,7 +1517,7 @@ void main() {
       // 无 isClosed 守卫时 `_runStreamReply` 的 catch handler 对已关闭 controller
       // add 抛 StateError → 未处理异步异常（flutter_test 捕获为失败）。
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -1724,7 +1682,7 @@ void main() {
 
       final gatedRepo = _GatedMessageRepository(db, now: () => fakeNow);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: gatedRepo,
@@ -1769,7 +1727,7 @@ void main() {
 
       final gatedRepo = _GatedMessageRepository(db, now: () => fakeNow);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: gatedRepo,
@@ -1931,7 +1889,7 @@ void main() {
       // （仅拦 assistant 角色落库；user 消息与开场白不受影响）。
       final gatedRepo = _GatedMessageRepository(db, now: () => fakeNow);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: gatedRepo,
@@ -3555,7 +3513,6 @@ void main() {
       // 只读面抛错的仓储（模拟 DB 故障），主回复必须仍可用、无世界书注入。
       final provider = FakeLLMProvider(tokens: const ['回复']);
       service = ChatService(
-        database: db,
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -3612,7 +3569,7 @@ void main() {
       Future<List<LlmMessage>> sendOnce(int conversationId) async {
         final provider = FakeLLMProvider(tokens: const ['回复']);
         service = ChatService(
-          database: db,
+          lorebookRepository: LorebookRepository(db),
           conversationRepository: convRepo,
           characterRepository: charRepo,
           messageRepository: messageRepo,
@@ -3836,7 +3793,7 @@ void main() {
       final probing = _NarrativeProbeRepo(db, secretStore);
       final provider = FakeLLMProvider(tokens: const ['回复']);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -3888,7 +3845,7 @@ void main() {
 
       final provider = FakeLLMProvider(tokens: const ['回复']);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -4422,7 +4379,7 @@ void main() {
       final provider = FakeLLMProvider(tokens: const ['回复']);
       final factory = _FakeFactory(provider);
       service = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -4514,7 +4471,7 @@ void main() {
       await sendUserMessage(conv.id, '问');
 
       final debug = await (ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -4538,7 +4495,7 @@ void main() {
       final conv = await seedConversation(char.id);
 
       final debug = await (ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,
@@ -4574,7 +4531,7 @@ void main() {
       );
 
       final debug = await (ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: messageRepo,

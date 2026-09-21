@@ -123,7 +123,7 @@ class _Env {
     final messageRepository = MessageRepository(db);
     final chatController = ChatController(
       chatService: ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: conversationRepository,
         characterRepository: repository,
         messageRepository: messageRepository,

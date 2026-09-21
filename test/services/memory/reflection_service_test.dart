@@ -108,6 +108,7 @@ void main() {
     late int extractorCalls;
     late List<String> extractorResult;
     late String capturedCharName;
+    late List<String> capturedDialogueLines;
 
     setUp(() async {
       db = AppDatabase(NativeDatabase.memory());
@@ -127,6 +128,7 @@ void main() {
       extractorCalls = 0;
       extractorResult = const [];
       capturedCharName = '';
+      capturedDialogueLines = const [];
     });
 
     tearDown(() async {
@@ -170,6 +172,7 @@ void main() {
         }) async {
           extractorCalls++;
           capturedCharName = charName;
+          capturedDialogueLines = dialogueLines;
           return extractorResult;
         },
         interval: interval,
@@ -291,6 +294,72 @@ void main() {
 
       expect(extractorCalls, 1, reason: '25 % 5 == 0 → 节流放行');
       expect(added, 1);
+    });
+
+    test('署名逐字：user「用户：」+ assistant 角色名（经 recentMessages + 单源窗口）',
+        () async {
+      final convId = await seedConversation();
+      await seedUserMessages(convId, 6); // 6 % 6 == 0 → 节流放行。
+      for (var i = 0; i < 2; i++) {
+        await messageRepo.createMessage(
+          conversationId: convId,
+          role: Role.assistant,
+          content: '助手回应 $i',
+        );
+      }
+      extractorResult = ['用户平和'];
+      final service = buildService();
+
+      final added = await service.reflectAfterTurn(
+        characterId: 1,
+        conversationId: convId,
+      );
+
+      expect(added, 1);
+      expect(capturedDialogueLines, [
+        for (var i = 0; i < 6; i++) '用户：用户消息 $i',
+        for (var i = 0; i < 2; i++) '艾莉亚：助手回应 $i',
+      ], reason: '署名文本逐字：用户:/角色名:');
+    });
+
+    test('historyLimit 构造可注入：窗口只含最近 N 条并保持升序', () async {
+      final convId = await seedConversation();
+      await seedUserMessages(convId, 6);
+      await messageRepo.createMessage(
+        conversationId: convId,
+        role: Role.assistant,
+        content: '最后答',
+      );
+      extractorResult = ['事实'];
+      final service = ReflectionService(
+        characterRepository: characterRepo,
+        memoryRepository: memoryRepo,
+        messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
+        extractor: ({
+          required String charName,
+          required List<String> dialogueLines,
+          required List<String> existingFacts,
+        }) async {
+          extractorCalls++;
+          capturedDialogueLines = dialogueLines;
+          return extractorResult;
+        },
+        interval: 6,
+        historyLimit: 3,
+      );
+
+      final added = await service.reflectAfterTurn(
+        characterId: 1,
+        conversationId: convId,
+      );
+
+      expect(added, 1);
+      expect(capturedDialogueLines, [
+        '用户：用户消息 4',
+        '用户：用户消息 5',
+        '艾莉亚：最后答',
+      ], reason: '尾 3 升序：u4、u5、最后答');
     });
 
     test('extractor 抛错：服务内吞错返回 0（S1 降级契约，不向上抛）', () async {

@@ -254,6 +254,7 @@ void main() {
     late MemoryDraft? extractorResult;
     late String capturedCharName;
     late double capturedTemperature;
+    late List<String> capturedDialogueLines;
 
     setUp(() async {
       db = AppDatabase(NativeDatabase.memory());
@@ -274,6 +275,7 @@ void main() {
       extractorResult = null;
       capturedCharName = '';
       capturedTemperature = 0;
+      capturedDialogueLines = const [];
     });
 
     tearDown(() async {
@@ -331,6 +333,7 @@ void main() {
               extractorCalls++;
               capturedCharName = charName;
               capturedTemperature = temperature;
+              capturedDialogueLines = dialogueLines;
               return extractorResult;
             },
         charThreshold: charThreshold,
@@ -646,6 +649,29 @@ void main() {
       expect(added, 1, reason: '超窗口消息截断分支照常归纳');
     });
 
+    test('署名逐字：user「用户：」/ assistant「role.value：」（recentMessages + 单源窗口）',
+        () async {
+      final seed = await seedConversation();
+      await seedMessages(seed.conversationId, 6); // 6 轮 = 12 条 → 触发归纳。
+      extractorResult = const MemoryDraft(title: 'T', keys: ['k'], content: 'c');
+      final service = buildService();
+
+      final added = await service.summarizeAfterTurn(
+        characterId: seed.characterId,
+        conversationId: seed.conversationId,
+      );
+
+      expect(added, 1);
+      expect(extractorCalls, 1);
+      expect(capturedDialogueLines, [
+        // seedMessages 逐轮交替落 user/assistant（每轮 2 条），窗口保序。
+        for (var i = 0; i < 6; i++) ...[
+          '用户：用户消息 $i',
+          'assistant：助手消息 $i',
+        ],
+      ], reason: '署名逐字：用户:/role.value 各自保持');
+    });
+
     group('验收 7 端到端：auto 条目落库后命中 keys 即注入且来源标 memory', () {
       test('persistDrafts → listEntries(source=auto) → buildWorldInjection 来源标 memory', () async {
         final seed = await seedConversation();
@@ -771,7 +797,7 @@ void main() {
       );
 
       final service = ChatService(
-        database: db,
+        lorebookRepository: lorebookRepo,
         conversationRepository: conversationRepo,
         characterRepository: characterRepo,
         messageRepository: messageRepo,
@@ -871,7 +897,7 @@ void main() {
       );
 
       final service = ChatService(
-        database: db,
+        lorebookRepository: lorebookRepo,
         conversationRepository: conversationRepo,
         characterRepository: characterRepo,
         messageRepository: messageRepo,

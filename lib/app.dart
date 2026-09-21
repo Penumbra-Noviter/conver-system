@@ -414,7 +414,7 @@ class ConverApp extends StatelessWidget {
         ),
         Provider<ChatService>(
           create: (context) => ChatService(
-            database: context.read<AppDatabase>(),
+            lorebookRepository: context.read<LorebookRepository>(),
             conversationRepository: context.read<ConversationRepository>(),
             characterRepository: context.read<CharacterRepository>(),
             messageRepository: context.read<MessageRepository>(),

@@ -133,7 +133,7 @@ void main() {
         content: '问1',
       );
       final service = ChatService(
-        database: env.db,
+        lorebookRepository: env.lorebookRepository,
         conversationRepository: env.conversationRepository,
         characterRepository: env.characterRepository,
         messageRepository: env.messageRepository,
@@ -225,7 +225,7 @@ void main() {
     testWidgets('入口页（无会话）不出现「Prompt 调试」入口', (tester) async {
       final env = await ChatTestEnv.create();
       final service = ChatService(
-        database: env.db,
+        lorebookRepository: env.lorebookRepository,
         conversationRepository: env.conversationRepository,
         characterRepository: env.characterRepository,
         messageRepository: env.messageRepository,
