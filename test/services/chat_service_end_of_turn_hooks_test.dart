@@ -223,6 +223,7 @@ void main() {
         characterRepository: characterRepo,
         memoryRepository: memoryRepo,
         messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
         extractor: ({
           required String charName,
           required List<String> dialogueLines,
@@ -240,9 +241,6 @@ void main() {
           (ctx) async {
             final characterId = ctx.characterId;
             if (characterId == null) {
-              return;
-            }
-            if (!await settingsRepo.memoryReflectionEnabled) {
               return;
             }
             await reflection.reflectAfterTurn(
@@ -285,6 +283,7 @@ void main() {
         characterRepository: characterRepo,
         memoryRepository: memoryRepo,
         messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
         extractor: ({
           required String charName,
           required List<String> dialogueLines,
@@ -304,9 +303,6 @@ void main() {
             order.add('reflect');
             final characterId = ctx.characterId;
             if (characterId == null) {
-              return;
-            }
-            if (!await settingsRepo.memoryReflectionEnabled) {
               return;
             }
             await reflection.reflectAfterTurn(

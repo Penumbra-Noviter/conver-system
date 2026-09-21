@@ -17,7 +17,9 @@
 /// - 归纳窗口：最近 [memoryPalaceWindow] 条 + 字符预算
 ///   [memoryPalaceCharBudget]（从后往前截断，保留最近内容）；
 /// - 归纳失败隔离：LLM 异常 / 非法 JSON / 落库异常均内部吞错（S1 降级），
-///   返回 0 不向上抛——回合末 hook 零防御性 try。
+///   返回 0 不向上抛——回合末 hook 零防御性 try；
+/// - 开关读取约定 = 服务内部（[MemoryPalaceService.summarizeAfterTurn] 首行
+///   读 `memoryPalaceEnabled` + `memoryPalaceEveryRounds`，装配层零设置读取）。
 ///
 /// 温度：沿用角色/全局链（对齐 ChatService._resolveTemperature 语义）——
 /// 角色 temperature 非缺省时优先，否则回退全局设置；越界 clamp。
@@ -218,6 +220,10 @@ class MemoryPalaceService {
 
   /// 回合落库后触发一次记忆宫殿归纳（异步 fire-and-forget，服务内吞错，S1）。
   ///
+  /// 首行门：开关 `memoryPalaceEnabled` 关闭 → 0 且零副作用；轮数间隔
+  /// `memoryPalaceEveryRounds` 亦由服务内部读取（开关读取约定 = 服务内部，
+  /// 装配层闭包不再读设置，对齐 `planAfterTurn` 先例）。
+  ///
   /// 降级契约（S1 集合层不再 try/catch）：任意步骤抛错（读库 / [_extractor] /
   /// 落库）→ 内部 debugPrint 降级并返回 0，不向上抛——调用方 `unawaited`
   /// 编排无需防御性 try（对齐 [ReflectionService.reflectAfterTurn]）。
@@ -234,8 +240,11 @@ class MemoryPalaceService {
   Future<int> summarizeAfterTurn({
     required int characterId,
     required int conversationId,
-    required int everyRounds,
   }) async {
+    if (!await _settingsRepository.memoryPalaceEnabled) {
+      return 0;
+    }
+    final everyRounds = await _settingsRepository.memoryPalaceEveryRounds;
     try {
       final messages = await _messageRepository.getMessages(conversationId);
       if (messages.isEmpty) {

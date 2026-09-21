@@ -24,6 +24,7 @@ import '../../data/database/tables.dart' show MemoryKind, Role;
 import '../../data/repositories/character_repository.dart';
 import '../../data/repositories/memory_repository.dart';
 import '../../data/repositories/message_repository.dart';
+import '../../data/repositories/settings_repository.dart';
 import '../../utils/llm_json_candidates.dart';
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
 
@@ -135,19 +136,26 @@ Future<List<String>> extractPersonaFactsWithProvider({
 }
 
 /// 后台反思服务 — 每 N 回合异步提炼人格事实并落库。
+///
+/// 开关读取约定 = **服务内部**（[reflectAfterTurn] 首行读
+/// `memoryReflectionEnabled`，对齐 `planAfterTurn` 先例——开关属服务「本回合
+/// 是否运行」职责，装配层回合末闭包零设置读取）。
 class ReflectionService {
-  /// [interval] 为反思节流间隔（每 N 回合一次，缺省 6）；[historyLimit] 为
-  /// 送入反思的最近对话消息条数上限（缺省 20）。
+  /// [settingsRepository] 为设置仓储（服务内读反思开关，首行门）；[interval]
+  /// 为反思节流间隔（每 N 回合一次，缺省 6）；[historyLimit] 为送入反思的
+  /// 最近对话消息条数上限（缺省 20）。
   ReflectionService({
     required CharacterRepository characterRepository,
     required MemoryRepository memoryRepository,
     required MessageRepository messageRepository,
+    required SettingsRepository settingsRepository,
     required PersonaFactExtractor extractor,
     int interval = 6,
     int historyLimit = 20,
   })  : _characterRepository = characterRepository,
         _memoryRepository = memoryRepository,
         _messageRepository = messageRepository,
+        _settingsRepository = settingsRepository,
         _extractor = extractor,
         _interval = interval,
         _historyLimit = historyLimit;
@@ -155,11 +163,15 @@ class ReflectionService {
   final CharacterRepository _characterRepository;
   final MemoryRepository _memoryRepository;
   final MessageRepository _messageRepository;
+  final SettingsRepository _settingsRepository;
   final PersonaFactExtractor _extractor;
   final int _interval;
   final int _historyLimit;
 
   /// 回合落库后触发一次反思（异步 fire-and-forget，服务内吞错，S1）。
+  ///
+  /// 首行门：开关 `memoryReflectionEnabled` 关闭 → 0 且零副作用（开关读取
+  /// 约定 = 服务内部，装配层闭包不再读设置）。
   ///
   /// 降级契约（S1 集合层不再 try/catch）：任意步骤抛错（读库 / [extractor] /
   /// 落库）→ 内部 debugPrint 降级并返回 0，不向上抛——调用方 `unawaited`
@@ -176,6 +188,9 @@ class ReflectionService {
     required int characterId,
     required int conversationId,
   }) async {
+    if (!await _settingsRepository.memoryReflectionEnabled) {
+      return 0;
+    }
     try {
       final messages = await _messageRepository.getMessages(conversationId);
       final userCount = messages.where((m) => m.role == Role.user).length;

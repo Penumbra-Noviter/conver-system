@@ -8,12 +8,14 @@ import 'package:conver_system_mobile/data/repositories/character_repository.dart
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/memory_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
+import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/memory/reflection_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/chat_test_env.dart' show FakeSettingsReader;
 import '../../helpers/fake_llm_provider.dart' show FakeLLMProvider;
+import '../../helpers/in_memory_secret_store.dart';
 
 void main() {
   group('parseReflectionFacts', () {
@@ -101,17 +103,27 @@ void main() {
     late ConversationRepository conversationRepo;
     late MessageRepository messageRepo;
     late MemoryRepository memoryRepo;
+    late SettingsRepository settingsRepo;
 
     late int extractorCalls;
     late List<String> extractorResult;
     late String capturedCharName;
 
-    setUp(() {
+    setUp(() async {
       db = AppDatabase(NativeDatabase.memory());
       characterRepo = CharacterRepository(db);
       conversationRepo = ConversationRepository(db, const FakeSettingsReader());
       messageRepo = MessageRepository(db);
       memoryRepo = MemoryRepository(db);
+      settingsRepo = SettingsRepository(
+        database: db,
+        secretStore: InMemorySecretStore(),
+      );
+      // 开关读取约定 = 服务内部（reflectAfterTurn 首行门）：缺省关闭，用例
+      // 需反思路径时显式开启（对齐服务内读语义的断言迁移）。
+      await settingsRepo.setMany({
+        SettingsRepository.memoryReflectionEnabledKey: 'true',
+      });
       extractorCalls = 0;
       extractorResult = const [];
       capturedCharName = '';
@@ -150,6 +162,7 @@ void main() {
         characterRepository: characterRepo,
         memoryRepository: memoryRepo,
         messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
         extractor: ({
           required String charName,
           required List<String> dialogueLines,
@@ -287,6 +300,7 @@ void main() {
         characterRepository: characterRepo,
         memoryRepository: memoryRepo,
         messageRepository: messageRepo,
+        settingsRepository: settingsRepo,
         extractor: ({
           required String charName,
           required List<String> dialogueLines,
@@ -303,6 +317,25 @@ void main() {
       );
 
       expect(added, 0, reason: '失败路径返回 0（无新事实语义）');
+      expect(await memoryRepo.listPersonaFacts(1), isEmpty);
+    });
+
+    test('开关关闭 → 零调用零落库（首行门，C8 开关读取收敛服务内）', () async {
+      final convId = await seedConversation();
+      await seedUserMessages(convId, 6);
+      await settingsRepo.setMany({
+        SettingsRepository.memoryReflectionEnabledKey: 'false',
+      });
+      extractorResult = ['用户喜欢咖啡'];
+      final service = buildService();
+
+      final added = await service.reflectAfterTurn(
+        characterId: 1,
+        conversationId: convId,
+      );
+
+      expect(added, 0, reason: '开关关闭 → 首行返回 0');
+      expect(extractorCalls, 0, reason: '开关关闭路径 extractor 零调用');
       expect(await memoryRepo.listPersonaFacts(1), isEmpty);
     });
   });
