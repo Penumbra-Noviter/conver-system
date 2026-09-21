@@ -432,7 +432,7 @@ def main(argv: list[str] | None = None) -> int:
         "--tickets-file",
         type=str,
         default="TO-TICKETS.md",
-        help="任务池文件名（conver system 用 TICKETS.md，默认 TO-TICKETS.md）",
+        help="任务池文件名（默认 TO-TICKETS.md）",
     )
     ap.add_argument(
         "--candidate-section",
