@@ -12,6 +12,16 @@
 
 ---
 
+## 技术债消费批次 F-156~F-157（2026-09-22 — 2 做 0 关，主会话直做）
+
+- **来源**：用户「折回消费」userselect 全选 F-156/F-157（project-kickoff 分支 B 折回）。预检逐项 git grep 复核现状均成立：F-156 `Assert-Or-Build-BackendExe` 的 `if (Test-Path $Path) { return }` 只认缺失不认过期（8-28 后端进 9-14 包的根因）；F-157 `update_character` 的 `model_dump(exclude_unset=True)`+`setattr` 会把显式 null 落 NULL 库、存量自愈补列 NULL 两路都令必填 list/dict 响应 serialize 500。
+- **F-157（98a04af）**：`CharacterBase` 统一 `mode="before"` 验证器 `_coerce_none_to_json_default`（tags/alternate_greetings→[]、creator_notes/extensions→{}、preset_dialogues→[]），收敛原单字段 `_coerce_none_preset_dialogues`。契约统一为「None 不入库」：create/update 显式 null 归一默认形态、GET 存量 NULL 归一；省略字段（partial update）validate_default=False 不触发、exclude_unset 语义零变更。契约锁定 test_character_schema.py +3 用例（存量 NULL 响应归一 / update 显式 null / create 显式 null——后者由 code-review Spec 轴提出，将未申报契约变化转为显式锁定），先红后绿。
+- **F-156（5ba98df）**：`desktop-common.ps1` 新增 `Get-ConverRepoRoot`/`Get-ConverBackendRebuildInputs`（重建输入集 = spec 打包面：backend app/scripts/run_backend/spec/requirements + 前端运行子集 index.html/css/js/simulators，node_modules 不在打包面不列）/`Test-ConverBackendExeIsCurrent`（exe mtime ≥ 源最新 mtime，-Root 可注入供测试）；`Assert-Or-Build-BackendExe` 四象限统一入口：新鲜 return / 缺失补 / 过期重建 / -SkipBackendBuild 缺失报错·过期告警放行（原两分支重复构建块收敛单一流）。docs/tauri-desktop.md 两处 + build/smoke 注释同步「缺失/过期」新语义。
+- **验证链**：pytest 1356+1skip→1359+1skip（+3 零回归）+ doc_sync 零漂移（test_character_schema 1→4，pytest 标记 1357→1360 口径）+ pool_cleanup_check 全合规 | F-156 逻辑四场景脚本化验证（缺/旧/新/源更新 → False/False/True/False + 空输入集不阻塞）+ 真实环境 fresh 不重建 + 冒烟 happy path 全 PASS（后端 exe 重建携带 F-157 修复）| code-review 四轴通过（0 阻断：Standards 1 + Spec 1 + Falsify 1 + Architecture 2 全 🟡/💭；2 🟡 当场收口——create-null 契约锁定测试 + 重复构建块收敛；💭 空输入集兜底已文档化、字段名双重声明轻微留待观察）。
+- **落债**：无（候选区 2→0 清零；评审非阻断 💭 属文档化行为与轻微结构，不入池防膨胀）。
+
+---
+
 ## 桌面打包新程序 + preset_dialogues 存量 NULL 500 修复（2026-09-21 — 用户指令直接交付，无工单）
 
 - **来源**：用户指令「打包新程序」。两处现状核对：(1) dist/conver_backend/conver_backend.exe 为 2026-08-28 构建，**不含九月全部后端功能**（五批对标 WL/MS/BR/CG/MD、mod-cg-wiring、消息编辑/重发、arch-deepening、F-152~155）；v1.1.0 GitHub Release 挂载的 exe（11075584B，与 dist 同字节）同样跑 8-28 后端；(2) `Assert-Or-Build-BackendExe` 只认「缺失」不认「过期」（Test-Path 即返回），旧后端包被静默复用——本次先重建后端 exe 再走全链。

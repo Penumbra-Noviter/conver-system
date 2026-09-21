@@ -53,8 +53,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-156 | build-desktop.ps1 `Assert-Or-Build-BackendExe` 只认缺失不认过期——后端 exe 早于 backend 源码时被静默复用，打包出旧版后端（2026-09-21 实测 dist/conver_backend 为 8-28 构建，v1.1.0 发布 exe 同源缺九月全部功能） | 打包新程序 2026-09-21 | Worth exploring | 📝 待立项 | 打包/运维 |
-| F-157 | CharacterUpdate 其余 list/dict 字段（tags/alternate_greetings/creator_notes/extensions）显式 null → NULL 写库 → 后续 GET 响应序列化 500（preset_dialogues 同类已修，此四字段未覆盖；当前前端无显式 null 路径未触发） | 打包 2026-09-21 修复 Falsify 快审 | Speculative | 📝 待立项 | API 契约 |
 
 
 ### 复核关闭（Speculative 类，防重复提议）
@@ -93,6 +91,17 @@
 
 > 按处置日期分节，滚动保留最近 2 节；更早的节由 git 历史归档（`git log -p -- TECH_DEBT.md`）。
 
+### 2026-09-22（技术债消费批次 F-156~F-157，2 做 0 关，主会话直做）
+
+> 来源：用户「折回消费」userselect 全选 F-156/F-157。逐项 git grep 复核现状后 2 做 0 关。code-review 四轴通过（0 阻断）。
+
+| 编号 | 遗留项 | 来源 | 强度 | 处置 |
+|------|--------|------|------|------|
+| F-157 | CharacterUpdate 其余 list/dict 字段（tags/alternate_greetings/creator_notes/extensions）显式 null → NULL 写库 → 响应序列化 500 同类缺口 | 打包 2026-09-21 修复 Falsify 快审 | Speculative | ✅ 已修（2026-09-22：CharacterBase 统一 mode=before 验证器 `_coerce_none_to_json_default` None→默认形态，create/update/response 三态契约锁定 test_character_schema.py +3 用例；commit 98a04af） |
+| F-156 | `Assert-Or-Build-BackendExe` 只认缺失不认过期——后端 exe 早于源码被静默复用 | 打包新程序 2026-09-21 | Worth exploring | ✅ 已修（2026-09-22：Get-ConverBackendRebuildInputs/Test-ConverBackendExeIsCurrent 过期检测，四象限 缺失补/过期重建/-Skip 缺失报错/过期告警放行；逻辑四场景脚本化验证 + 冒烟 happy path；commit 5ba98df） |
+
+**验证链：** pytest 1356+1skip→1359+1skip（+3 契约锁零回归）+ doc_sync 零漂移 + pool_cleanup_check 全合规 | code-review 四轴 0 阻断（2 🟡 当场收口：create-null 契约锁定 + 重复构建块收敛）| 候选区 2→0 清零。
+
 ### 2026-09-15（架构深化批次 arch-deepening + 技术债消费 F-152~F-155 两批次）
 
 > 批 1 来源：用户指令继架构全库扫描（F-145~F-151 落盘）后走 project-kickoff 全自动档消费。Grilling 增量审拍板 4 做 3 关。4 做 = 2 工单标准档串行链（工单 01 注入链 seam 归位 = F-145+F-146；工单 02 组装入口收口 = F-147+F-148），纯重构在线 prompt 输出逐字节不变。
@@ -115,45 +124,6 @@
 
 **验证链（批 1）：** pytest 1349+1skip→1352+1skip（+3 用例）+ cargo 70 零改动 | 期末四轴「通过」0 阻断（Standards 0 / Spec 2 警告 / Falsify 3 弱覆盖缺口 / Architecture 0，两 seam 均真深化无伪深化）| 运行态冒烟 segments 全序正确 | 全量 1352 passed 独立复现 | commit ab587ed + a807363 + merge 43bb61f。
 **验证链（批 2）：** pytest 1352+1skip→1355+1skip（+3 契约锁：空激活集/未知 source 值/None 直传）+ 受影响模块 44 passed | doc_sync + pool_cleanup_check 全合规 | 候选区清零。
-
-### 2026-09-14（技术债消费批次 ×4：批1 F-115~F-122 3 做 5 关轻量档；批2 F-123~F-126 架构深化全做标准档 4 工单串行；批3 F-130~F-138 7 做 2 关轻量档主会话直做；批4 F-139~F-144 1 做 4 关轻量档主会话直做）
-
-> 来源：用户指令「消费」+ userselect F-115~F-122。逐项 git grep 复核现状后拍板 3 做 5 关（全 Speculative/Worth exploring，成本收益显式权衡）。处置后候选区清零。
-
-| 编号 | 遗留项 | 来源 | 强度 | 处置 |
-|------|--------|------|------|------|
-| F-117 | `mod-css.js::collectCssPayloads` 空串 payload 产生游离 `\n`（与后端 `_memory_mod_instructions` 语义不一致） | mod-cg-wiring 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-14：`.map(payload)` 后加 `.filter((p) => p.trim() !== '')` 跳过空串；防复发断言——多 Mod 拼接测试加空串 payload 锁定 textContent 无游离换行） |
-| F-119 | `database.py::_ensure_cg_images_weight` 用 `hasattr(bind, "connect")` 脆弱 duck-type 区分 Engine/Connection | mod-cg-wiring 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-14：改 `isinstance(bind, Engine)` + `from sqlalchemy import Engine`；test_gallery 45 用例锁定两路径行为不变） |
-| F-120 | `cg-review.js::handleCgGalleryClick` `Number(tile?.dataset.cgId)` 在 actionEl 脱离 `.cg-tile` 时得 `NaN` 静默 no-op | mod-cg-wiring 期末四轴 Falsify | Speculative | ✅ 已修（2026-09-14：加 `Number.isNaN(cgId)||Number.isNaN(characterId)` 守卫 early return） |
-| F-115 | `images.py::list_cg` 路由暴露 `group_name`/`unlocked_only` 查询参数（spec 未定义、前端未消费） | mod-cg-wiring 期末四轴 Spec/Standards | Speculative | ❌ 复核关闭（透传 gallery.list_cg 既有过滤参数非无中生有；画廊分组过滤可预见需求，删除反而未来返工） |
-| F-116 | 锁定 CG 的 `url` 仍含于 list 响应体 | mod-cg-wiring 期末四轴 Falsify | Speculative | ❌ 复核关闭（spec 设计使然——list 全量含未解锁；锁定=软 UX 门非机密边界，前端渲染层已正确不加载锁定原图） |
-| F-118 | `reconcileCharacterCss` 把合法空态也置 null 击穿去重守卫（流式重复拉取低效） | mod-cg-wiring 期末四轴 Falsify | Speculative | ❌ 复核关闭（`applyCharacterCss` false 无法区分「无 css Mod 空态」vs「取数失败」，修复需改返回契约牵动 17 用例，实际开销可忽略——成本收益不成比例） |
-| F-121 | 候选池过滤内联 chat.py（加权候选池概念拆两模块） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭（回合末一次性触发语义 ≠ gallery.list_cg 展示过滤；下沉只增被 chat.py 独调的窄函数 Leverage 低，spec 已划 chat.py 为触发编排落点） |
-| F-122 | chat.py 持续膨胀，两处回合末副作用触发器并列（Repeated Switches 雏形） | mod-cg-wiring 期末四轴 Architecture | Worth exploring | ❌ 复核关闭（chat.py 本就是编排 seam，两触发器各有独立领域语义，仅 2 实例抽象「触发器」收益 < 成本） |
-| F-123 | Mod 区过滤读取 Repeated Switch | 架构报告 2026-09-14 | Strong | ✅ 已修（2026-09-14：工单 T1 `list_enabled_mods_for_area` 下沉 mods.py 单一 seam，chat.py 两调用点改指，`Mod.id.in_` 0 / 覆盖率 97.79%，commit a016d7c） |
-| F-124 | 候选追加「持久化仪式」重复 + 不变量泄漏 | 架构报告 2026-09-14 | Strong | ✅ 已修（2026-09-14：工单 T2 `append_swipe_and_bump` 收口 message.py 单一入口，`updated_at=datetime` 0 / 覆盖率 96.11%，commit 49d342c） |
-| F-125 | 自愈迁移原语 Repeated Switch | 架构报告 2026-09-14 | Worth exploring | ✅ 已修（2026-09-14：工单 T4 `_ensure_column` 通用原语 + 三 wrapper 退化为声明，`ALTER TABLE` 1 / `PRAGMA table_info` 1，commit 19868f2） |
-| F-126 | generate+LLM 错误映射接线重复 | 架构报告 2026-09-14 | Speculative | ✅ 已修（2026-09-14：工单 T3 私有 `_generate_with_error_mapping` 三调用点复用，stream_reply 刻意排除，`except LLMError` 2，commit 114aae6） |
-| F-127 | `append_swipe_and_bump` 两段提交非原子 | arch-f123-126 期末四轴 Falsify/Architecture | Worth exploring | ✅ 已修（2026-09-14：add_swipe 加 `commit=False` 参数 + append 单 commit 原子落库，防复发断言 test_append_swipe_and_bump_single_commit_atomic） |
-| F-128 | `append_swipe_and_bump` 冗余重取 | arch-f123-126 期末四轴 Architecture | Speculative | ❌ 复核关闭（commit=False 后 msg 未 expire，_require_message 命中 identity map 不发 SQL；剩余再取一次是 append 需 conversation_id 而 add_swipe 返回 index 的合理结构） |
-| F-129 | `_ensure_conversation_branch_columns` 三连接/三 commit | arch-f123-126 期末四轴 Architecture | Speculative | ✅ 已修（2026-09-14：Engine 形态单连接循环补三列，Connection 形态直接循环） |
-| F-130 | `require_message` 零行为透传别名 + 目标解析知识散布（路由 require_message → _resolve_edit_target 再查 → update_message 三查同消息冗余） | 消息编辑重发期末四轴 Standards/Architecture/Spec | Worth exploring | ✅ 已修（2026-09-14：edit_and_resend 去 conversation_id 参数、_resolve_edit_target 简化只传 message_id 派生 conversation_id、删 require_message 公开别名 + 路由直调，目标解析知识收口单一入口） |
-| F-131 | 级联删除 Seam 依赖全局 PRAGMA + `synchronize_session=False` bulk delete 后 identity map 残留被删对象 | 消息编辑重发期末四轴 Architecture/Falsify | Worth exploring | ✅ 已修（2026-09-14：delete_message/edit_and_resend 两处 bulk delete 改 `synchronize_session="fetch"` 消除身份映射残留 + 防复发断言 test_delete_user_syncs_identity_map；PRAGMA 依赖文档化为 SQLite 连接级固有，非模块可局部化） |
-| F-132 | 消息操作按钮 css 悬停显示不统一（copy hover 显示，regen/cont/branch/edit/delete 常驻） | 工单 03 期末 concern + 期末四轴观察 | Worth exploring | ✅ 已修（2026-09-14：style.css 操作按钮组加 opacity 0→hover 0.6→自身 1 统一 hover 显示 + 图标按钮样式对齐 copy） |
-| F-133 | editMessage/deleteMessage 角色判定取自 tab.messages 乐观缓存，漂移时二次确认文案错述破坏范围 | 消息编辑重发期末四轴 Falsify | Speculative | ❌ 复核关闭（乐观 UI 既有模式——与 regenerate/continue/branch 同源读 tab 缓存；服务端 404 兜底，二次确认文案错述非破坏性（用户可取消）） |
-| F-134 | autoflush 分歧——conftest db_session 默认 autoflush=True vs 生产 SessionLocal autoflush=False | 消息编辑重发期末四轴 Falsify | Speculative | ✅ 已修（2026-09-14：conftest sessionmaker 加 autoflush=False 对齐生产，测试复现生产 flush 时序） |
-| F-135 | promptMessageEdit 与 promptImageDescription 同型重复 | 消息编辑重发期末四轴 Architecture + 工单 03 concern | Speculative | ✅ 已修（2026-09-14：提取 chat.js 私有 promptTextarea helper 收敛两同型函数，DOM id/行为逐字保持） |
-| F-136 | `_resolve_edit_target` 与 `_resolve_continue_target`/regenerate 解析构成平行家族萌芽 | 消息编辑重发期末四轴 Architecture | Speculative | ❌ 复核关闭（三解析函数独立领域语义——edit=user / continue=末条 assistant / regenerate=assistant+缺省末条，仅 3 实例抽象「目标解析器」收益 < 成本） |
-| F-137 | `EditMessageRequest.content` 仅 min_length=1，全空白字符串穿过校验送生成 | 消息编辑重发期末四轴 Falsify（观察） | Speculative | ✅ 已修（2026-09-14：加 field_validator strip 后拒绝全空白 + 防复发断言 test_edit_blank_content_422） |
-| F-138 | error_mapping.py 400 分支 isinstance 元组行膨胀（~180 字符） | 消息编辑重发期末四轴 Standards | Speculative | ✅ 已修（2026-09-14：提取模块常量 `_HTTP_400_DOMAIN_ERRORS` 多行元组，400 分支改指常量） |
-| F-141 | build_prompt_debug character=None 时 character.prompt_mode AttributeError | PD 批次期末四轴 Falsify | Worth exploring | ❌ 复核关闭（误报：_character_data 用 getattr 默认值返回空 CharacterData + character_name/prompt_mode 均有 if-else 守卫 + _lorebook_world_injection/_mod_prompt_injection None 时返回空注入，None 路径已完整覆盖） |
-| F-139 | CharacterUpdate.prompt_mode/expert_prompt Optional[str]=None 但 ORM 列 nullable=False，显式 null 触发 IntegrityError(500) | PD 批次波 1 增量审核 Falsify | Speculative | ✅ 已修（2026-09-14：CharacterUpdate 加 field_validator 拒绝 name/prompt_mode/expert_prompt 显式 null，防复发断言 test_update_rejects_null_for_not_null_columns 三字段 422；附带修复 name 同构缺口） |
-| F-140 | character-wizard.js 备用开场白删除 indexOf(row) 后 splice(idx,1)，idx 可能 -1 误删末项 | PD 批次波 2 增量审核 Falsify | Speculative | ❌ 复核关闭（row 经 btn.closest 定位且事件委托在 altList 上，row 必在 DOM 内，indexOf 不可能 -1，单线程无并发，不可达） |
-| F-142 | CharacterBase.prompt_mode 用 str 未用 Literal 枚举 | PD 批次期末四轴 Standards | Speculative | ❌ 复核关闭（build_messages 仅 ==expert 走 expert 分支、其余任意值安全回退 simple，改 Literal 需破坏 CharacterBase 单一来源或冒响应序列化风险，纵深防御收益 < 成本） |
-| F-143 | chat._character_data 与 message.build_message_list CharacterData 构造逐字镜像 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭（有意识镜像——_character_data docstring 已声明同口径单一语义镜像，仅 2 实例提取 helper 收益 < 成本） |
-| F-144 | character-wizard.js state.splice vs character-form.js DOM 真源两套模式 | PD 批次期末四轴 Architecture | Speculative | ❌ 复核关闭（wizard state 是跨步骤向导真源、form DOM 是单表单真源，语境不同，强行统一收益 < 成本） |
-
----
 
 ## 处置记录说明
 

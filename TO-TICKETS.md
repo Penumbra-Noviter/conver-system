@@ -36,6 +36,20 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文 54 批次由 git 历史承担）。
 
+### 技术债消费批次 F-156~F-157（2026-09-22 — 2 做 0 关，主会话直做）
+
+> 来源：用户「折回消费」userselect 全选 F-156/F-157。逐项 git grep 复核现状后 2 做 0 关。叙述详见 DEV_LOG〈技术债消费批次 F-156~F-157（2026-09-22）〉。
+
+| Ticket | 标题 | F 项 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| T-01 | CharacterBase 统一验证器：tags/alternate_greetings/creator_notes/extensions 显式 null/存量 NULL 归一默认形态（None 不入库契约 create/update/response 三态锁定） | F-157 | 2026-09-22 | 98a04af |
+| T-02 | Assert-Or-Build-BackendExe 过期检测（Get-ConverBackendRebuildInputs/Test-ConverBackendExeIsCurrent，四象限：缺失补/过期重建/-Skip 缺失报错/过期告警放行） | F-156 | 2026-09-22 | 5ba98df |
+
+**验证链：** pytest 1356+1skip→1359+1skip（+3 契约锁零回归）+ doc_sync 零漂移 + pool_cleanup_check 全合规 | F-156 逻辑四场景脚本化验证 + 真实环境 fresh 不重建 + 冒烟 happy path 全 PASS | code-review 四轴通过（0 阻断；2 🟡——create-null 契约锁定测试 + 重复构建块收敛——当场收口）
+**非阻断落债：** 无（候选区清零）
+
+---
+
 ### 桌面打包 + preset_dialogues 存量 NULL 500 修复（2026-09-21 — 用户指令直接交付，无工单）
 
 > 来源：用户指令「打包新程序」。dist 包此前为 2026-08-28 后端（v1.1.0 发布 exe 同源，缺九月全部后端功能）；重建后端 exe + dist 壳（-SkipInstaller 常规档），冒烟暴露旧库升级 GET /api/characters 500。叙述详见 DEV_LOG〈桌面打包新程序 + preset_dialogues 存量 NULL 500 修复（2026-09-21）〉。
@@ -110,34 +124,13 @@
 
 **验证链：** pytest 1272+1skip→1273+1skip（+1 防复发断言）+ Vitest 1448 + cargo 70 零改动全绿 | 复核关闭 F-140/142/143/144（理由见 TECH_DEBT.md 复核关闭表）| 技术债候选区 5→0 清零
 **非阻断落债：** 无（候选区清零）
-
----
-
-### Prompt 打磨批次 PD（2026-09-14 — 6 工单标准档，预设开场白/Prompt Debug/专家模式）
-
-> 来源：用户对标 AI 风月「对话质量 / Prompt 工程」第二轮，选定「预设开场白选择 + Prompt Debug 面板 + 专家模式自由编辑 PROMPT」三功能。叙述详见 DEV_LOG〈Prompt 打磨批次 PD（2026-09-14）〉。
-
-| Ticket | 标题 | 完成日期 | 提交 |
-|--------|------|----------|------|
-| PD-1 | 预设开场白后端：ConversationCreate.greeting override + create_conversation 消费 alternate_greetings | 2026-09-14 | 7f9b849 |
-| PD-2 | 预设开场白前端：备用开场白编辑 + 新建对话开场白选择 | 2026-09-14 | e2d4118 |
-| PD-3 | Prompt Debug 后端：prompt-debug 端点 + 带来源组装追溯（_assemble 共享核心） | 2026-09-14 | b90df29 |
-| PD-4 | Prompt Debug 前端：只读预览面板（来源色标） | 2026-09-14 | 3d55076 |
-| PD-5 | 专家模式后端：prompt_mode/expert_prompt 列 + 自愈迁移 + build_messages 分流 | 2026-09-14 | 0b85c4d |
-| PD-6 | 专家模式前端：基础/专家两态编辑 | 2026-09-14 | e03eefc |
-
-**验证链：** pytest 1234+1skip→1272+1skip（+38）+ Vitest 1379→1448（+69）+ cargo 70 零改动 | 期末四轴 0 Critical/0 High（1 Medium F-141 + 3 Low F-142~144 落债）| doc_sync 零漂移 | 运行态冒烟（prompt-debug 端点 + expert 单条分流 + greeting override）全通
-
-**非阻断落债：** F-139~F-144（6 项，见 TECH_DEBT 候选区）
-
----
-
 ### 历史归档索引（2026-09-21 三次压缩：2026-08-27 ~ 2026-09-14 批次）
 
 > 折叠规则见头部「归档清出机制」。原文细节由 git 历史承担（`git log -p -- TO-TICKETS.md`）；叙述详情见 DEV_LOG 同名节。
 
 | 日期 | 批次 | 提交 | 摘要 |
 |------|------|------|------|
+| 2026-09-14 | Prompt 打磨批次 PD（6 工单标准档） | 7f9b849→e03eefc | 预设开场白 + Prompt Debug 面板 + 专家模式自由编辑 |
 | 2026-09-14 | 采样参数扩展批次 SP（3 工单小档） | 6967f5c | 4 采样列迁移 + LLM 透传分化（Claude 仅 max_tokens）+ 前端控件 |
 | 2026-09-14 | 技术债消费批次 F-130~F-138（7 做 2 关） | 45a67aa | 目标解析收敛 + bulk delete 同步 fetch + autoflush 对齐 + 400 元组常量 |
 | 2026-09-14 | 消息编辑重发 + 删除单条消息批次（3 工单小档） | a365b81→8269f1e | update/delete_message + 编辑重发编排 + 前端按钮与二次确认 |
