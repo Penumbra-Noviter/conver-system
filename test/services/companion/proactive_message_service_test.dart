@@ -900,7 +900,6 @@ void main() {
       // 关系侧同一 fixture 判定⑨一致（两位调用方观测值同源）。
       final relationship = RelationshipService(
         companionRepository: companionRepo,
-        conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         now: () => fixedNow,
       );

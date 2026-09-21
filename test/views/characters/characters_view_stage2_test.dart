@@ -65,7 +65,6 @@ class _FakeExchange implements CharacterFileExchange {
 class _GateRelationshipService extends RelationshipService {
   _GateRelationshipService({
     required super.companionRepository,
-    required super.conversationRepository,
     required super.messageRepository,
   });
 
@@ -124,7 +123,6 @@ class _Env {
   static Future<_Env> create({
     RelationshipService Function({
       required CompanionRepository companionRepository,
-      required ConversationRepository conversationRepository,
       required MessageRepository messageRepository,
     })? relationshipServiceFactory,
   }) async {
@@ -158,12 +156,10 @@ class _Env {
     final exchange = _FakeExchange();
     final resolvedRelationshipService = relationshipServiceFactory?.call(
           companionRepository: companionRepository,
-          conversationRepository: conversationRepository,
           messageRepository: messageRepository,
         ) ??
         RelationshipService(
           companionRepository: companionRepository,
-          conversationRepository: conversationRepository,
           messageRepository: messageRepository,
         );
     final broker = StageUpgradeBroker();
@@ -438,12 +434,10 @@ void main() {
       final env = await _Env.create(
         relationshipServiceFactory: ({
           required companionRepository,
-          required conversationRepository,
           required messageRepository,
         }) =>
             _GateRelationshipService(
           companionRepository: companionRepository,
-          conversationRepository: conversationRepository,
           messageRepository: messageRepository,
         ),
       );

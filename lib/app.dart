@@ -371,7 +371,6 @@ class ConverApp extends StatelessWidget {
         Provider<RelationshipService>(
           create: (context) => RelationshipService(
             companionRepository: context.read<CompanionRepository>(),
-            conversationRepository: context.read<ConversationRepository>(),
             messageRepository: context.read<MessageRepository>(),
           ),
         ),
