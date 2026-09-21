@@ -151,18 +151,20 @@ class ChatTestEnv {
   /// 种子角色；[name] 为非空必填，[firstMes] 为开场白（空 → 不预插）。
   ///
   /// 时间戳取自注入时钟（F-141：移除字面 [DateTime.now]，测试可确定性控制
-  /// seed 落库时刻；companion 的 createdAt/updatedAt 属必填命名参数，且
-  /// [CharacterRepository.createCharacter] 会再以同一时钟覆写——逐值等价）。
+  /// seed 落库时刻）；companion 的 createdAt/updatedAt 属必填命名参数，其
+  /// 值恒被 createCharacter 覆写、仅占位——任取一值占位即可，无观测语义
+  /// （勿以此断言时间）。
   Future<Character> seedCharacter({
     String name = '艾莉亚',
     String firstMes = '',
   }) {
+    final now = _now();
     return characterRepository.createCharacter(
       CharactersCompanion.insert(
         name: name,
         firstMes: Value(firstMes),
-        createdAt: _now(),
-        updatedAt: _now(),
+        createdAt: now,
+        updatedAt: now,
       ),
     );
   }
