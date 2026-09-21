@@ -1,6 +1,6 @@
 # TECH_DEBT: conver system mobile
 
-> **技术债候选池**（未立项子集）与**处置记录**。本文件与 [TICKETS.md](TICKETS.md)（任务池）分离——候选不等于任务，不自动进入任何 session 的 preflight 认领；消费 = 显式「立项」（从候选区取出 → 转入 `TICKETS.md` 活跃工单，或标记 ❌ 不立项附理由）。
+> **技术债候选池**（未立项子集）与**处置记录**。本文件与 [TO-TICKETS.md](TO-TICKETS.md)（任务池）分离——候选不等于任务，不自动进入任何 session 的 preflight 认领；消费 = 显式「立项」（从候选区取出 → 转入 `TO-TICKETS.md` 活跃工单，或标记 ❌ 不立项附理由）。
 > 读取契约与强度消费规则见 [AGENTS.md](AGENTS.md) §3 任务清单生命周期（项目级，与桌面库同构）。
 
 ---
@@ -35,7 +35,7 @@
 3. 处置记录按日期分节，滚动保留最近 2 节；更早节整体删除（归档由 git 历史承担）。
 4. **候选区 0 项时正文只留标题 + 空表格，不写任何「当前 0 项待立项 / 历史消费罗列」叙述**——处置事实由「技术债处置记录」与 git 历史承担（2026-09-07 用户拍板，防清空后残留历史罗列）。
 5. 清出动作绑定会话末 commit 前节点执行，不新增仪式。
-6. **机械约束**由 `scripts/pool_cleanup_check.py --check --tickets-file TICKETS.md --candidate-section "## 候选区"` 强制（挂 pre-commit，失败拒提交）——本库候选区节名非标准（`候选区`）且无「维护说明」footer 锚点，脚本按节名参数与「无 footer 节则不检查」自适应：候选区无 ✅/❌ 滞留、活跃工单无 ✅/❌、重复标题、非空与必要节、表格列数异常报格式问题；安装 `sh scripts/install-pre-commit.sh`（每 clone 一次，本库安装脚本按上述参数定制）。
+6. **机械约束**由 `scripts/pool_cleanup_check.py --check --tickets-file TO-TICKETS.md --candidate-section "## 候选区"` 强制（挂 pre-commit，失败拒提交）——本库候选区节名非标准（`候选区`）且无「维护说明」footer 锚点，脚本按节名参数与「无 footer 节则不检查」自适应：候选区无 ✅/❌ 滞留、活跃工单无 ✅/❌、重复标题、非空与必要节、表格列数异常报格式问题；安装 `sh scripts/install-pre-commit.sh`（每 clone 一次，本库安装脚本按上述参数定制）。
 
 ---
 
@@ -43,6 +43,15 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| F-146 | `chat_controller._loadSwipeCounts`（chat_controller.dart:1085-1099）仍是逐消息 `listSwipes` N+1——`listSwipesBatch` 原语（F-142）已有 branch/export 两消费方，「第三处出现即复用」惯例未兑现；控制面 docstring（:188-193）保留原语存在前的让步注释 | 架构报告 2026-09-21 C1 | Strong | 📝 待立项 | 聊天链路 |
+| F-147 | 采样温度解析链双实现：`chat_service.dart:1913-1926` 与 `memory_palace_service.dart:358-372` 逐字重复「角色为主/全局兜底 + NaN 回退 + clamp」（F-76 NaN 防线被复制），各带整套防御测试 | 架构报告 2026-09-21 C2 | Strong | 📝 待立项 | 聊天链路 |
+| F-148 | 回合末三服务（reflection:194-200 / proactive:460-469 / memory_palace:329-351）各自重建「最近对话窗口」：全量 getMessages → sublist(20) → 署名行，窗口常量 20 三处、署名格式三套微差，每回合 ×3 全量读 | 架构报告 2026-09-21 C3 | Strong | 📝 待立项 | 数据层 |
+| F-149 | ChatService 组装上溯上下文双份维护：`_assembleMessages`（:1606-1683）与 `promptDebug`（:1771-1839）各自重建 CharacterData 投影/历史/世界书/叙述风格；promptDebug 不含 memory/stage2 注入——生产开启记忆后「逐条一致」契约不成立（测试仅在 memoryService 缺省时通过） | 架构报告 2026-09-21 C4 | Strong | 📝 待立项 | 聊天链路 |
+| F-150 | `RelationshipService.activeDays`（relationship_service.dart:307-316 + _allMessagesFor:369-380 全量拉取）生产零调用方（回合增量早改 isRecentlyActive，F-81 收口）；deletion test 通过；删除需 ADR-0006「活跃口径」是否 UI 展示的先决确认 | 架构报告 2026-09-21 C5 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-151 | 主动消息「过期核对」双实现：`proactive_message_service.dart:427-441` _reconcileOverdue 与 `proactive_deep_link.dart:210-233` restoreProactiveSchedules 各自实现 scheduled→expired（`!scheduledAt.isAfter(now)` 同义两处）；F-125 同类「全表拉取+内存过滤」已移除，此为遗留 | 架构报告 2026-09-21 C6 | Worth exploring | 📝 待立项 | 聊天链路 |
+| F-152 | `ChatService` 构造持有 `AppDatabase`（chat_service.dart:389-423，`var _ = database` wildcard）仅为缺省构造 LorebookRepository 兜底，装配层（app.dart:187-189）已注入 repo 但参数可选——数据层类型泄漏进服务协议面；修复 = lorebookRepository required + 删 database 参数（测试构造面 churn 有界） | 架构报告 2026-09-21 C7 | Worth exploring | 📝 待立项 | 装配层 |
+| F-153 | `app.dart` endOfTurnHooks（:409-487）五闭包逐个复制「characterId 空守卫 + context.read 取用」样板；开关读取不对称（反思/宫殿装配层读、主动消息服务内读） | 架构报告 2026-09-21 C8 | Speculative | 📝 待立项 | 装配层 |
+| F-154 | `RelationshipService`（relationship_service.dart:164）`required ConversationRepository conversationRepository` 构造参数在 C5 删除 `_allMessagesFor`/`_conversations` 后**零消费死参**：8 处构造点（app.dart:372 + 7 测试）被迫传一个不改变行为的仓储；删除 = 8 构造点机械改（与 C7 构造净化同款模式）；C5 当时因出票面范围保留 | 波 1 增量审核（架构批次） | Speculative | 📝 待立项 | 装配层 |
 
 ## 技术债处置记录
 

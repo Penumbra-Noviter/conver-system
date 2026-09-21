@@ -7,9 +7,9 @@
 > 2. 每会话结束、commit 之前：完成 → ✅/❌ → 移入归档；新评审候选（含未拍板的 `Worth exploring` / `Speculative`）立即录入 [TECH_DEBT.md](TECH_DEBT.md) 候选池（带 编号/来源/强度/状态/归属方向）
 > 3. 待办**不得写在 memory / DEV_LOG / 个人笔记里**——不落 TICKETS 就不算数
 >
-> **归档清出机制（与桌面库同构，2026-08-28 建库即启用）**：已完成归档最近 6 个批次完整保留；更早折叠为「历史归档索引」单行（细节由 git 历史承担：`git log -p -- TICKETS.md`）；叙述（来源/验证链/过程遥测）只写 DEV_LOG.md。
+> **归档清出机制（与桌面库同构，2026-08-28 建库即启用）**：已完成归档最近 6 个批次完整保留；更早折叠为「历史归档索引」单行（细节由 git 历史承担：`git log -p -- TO-TICKETS.md`）；叙述（来源/验证链/过程遥测）只写 DEV_LOG.md。
 >
-> **机械检查**：`scripts/pool_cleanup_check.py --check --tickets-file TICKETS.md --candidate-section "## 候选区"`（挂 pre-commit，失败拒提交）核对活跃工单无 ✅/❌ 滞留与候选区结构；安装 `sh scripts/install-pre-commit.sh`（每 clone 一次，本库安装脚本按上述参数定制，规则见 TECH_DEBT.md「清出机制」）。
+> **机械检查**：`scripts/pool_cleanup_check.py --check --tickets-file TO-TICKETS.md --candidate-section "## 候选区"`（挂 pre-commit，失败拒提交）核对活跃工单无 ✅/❌ 滞留与候选区结构；安装 `sh scripts/install-pre-commit.sh`（每 clone 一次，本库安装脚本按上述参数定制，规则见 TECH_DEBT.md「清出机制」）。
 >
 > 状态：📝 已录入 | 🔄 进行中 | ✅ 完成 | ❌ 关闭
 
@@ -119,7 +119,7 @@
 
 ## 历史归档索引
 
-> 更早批次折叠为单行（归档细节由 git 历史承担：`git log -p -- TICKETS.md`）。
+> 更早批次折叠为单行（归档细节由 git 历史承担：`git log -p -- TO-TICKETS.md`）。
 
 | 批次 | 日期 | 工单/提交 | 一句话摘要 |
 |------|-----------|------------|------------|
