@@ -109,6 +109,24 @@ Future<void> reflectAndBackfillPending({
   }
 }
 
+/// 回合末闭包样板归一（F-153，C8）：统一「characterId 空守卫」——校验失败
+/// 路径 [EndOfTurnContext.characterId] 为 null 时整闭包 no-op；业务体只收到
+/// 非空 characterId 与 conversationId，闭包只写业务体。
+///
+/// 开关读取约定 = **服务内部**（对齐 `planAfterTurn` 先例——开关属服务
+/// 「本回合是否运行」职责），本集合层零设置读取；五闭包执行序、门条件、
+/// S1 服务内吞错语义均不在此改变。
+Future<void> _endOfTurnHook(
+  EndOfTurnContext ctx,
+  Future<void> Function(int characterId, int conversationId) body,
+) async {
+  final characterId = ctx.characterId;
+  if (characterId == null) {
+    return;
+  }
+  await body(characterId, ctx.conversationId);
+}
+
 /// 凭据解析 → [GenerationCredentials] 映射（F-138：S4 装配收敛第五处）。
 ///
 /// GameGenerator 装配闭包与 [_resolveLlm] 内部共享的
@@ -247,14 +265,16 @@ class ConverApp extends StatelessWidget {
         // 数据层 / 平台存储（layer_boundary_test 契约）；装配链单一收编于此。
         Provider<LLMProviderFactory>(create: (_) => const LLMFactory()),
         // 人机恋阶段 1.5 后台反思装配（ADR-0004）：ReflectionService 依赖三
-        // 仓储 + LLM 工厂 + 凭据解析链（wireCredentialsResolver 单一落点）；
-        // 置于 ChatService 之前（后者经 provider 消费，装配单源）。
+        // 仓储 + 设置仓储（开关读取收敛服务内，C8）+ LLM 工厂 + 凭据解析链
+        // （wireCredentialsResolver 单一落点）；置于 ChatService 之前（后者经
+        // provider 消费，装配单源）。
         Provider<ReflectionService>(
           create: (context) {
             return ReflectionService(
               characterRepository: context.read<CharacterRepository>(),
               memoryRepository: context.read<MemoryRepository>(),
               messageRepository: context.read<MessageRepository>(),
+              settingsRepository: context.read<SettingsRepository>(),
               extractor:
                   ({
                     required String charName,
@@ -404,85 +424,71 @@ class ConverApp extends StatelessWidget {
             thoughtService: context.read<ThoughtService>(),
             companionRepository: context.read<CompanionRepository>(),
             // S1：回合末副作用收敛为有序闭包集合（列表序即执行序）——
-            // backfill → reflect → plan → relate。服务内吞错（闭包不得上抛），
-            // 集合层只做条件/顺序编排；backfill 双触发以闭包内协作表达。
+            // backfill → reflect → plan → relate → palace。服务内吞错（闭包
+            // 不得上抛），集合层只做条件/顺序编排；backfill 双触发以闭包内
+            // 协作表达。开关读取约定 = 服务内部（本集合零设置读取，F-153）。
             endOfTurnHooks: [
               // ① 懒补嵌（VR-07）：本回合记忆落库（memoryChanged 门）才触发。
               (ctx) async {
                 final embedding = context.read<EmbeddingService>();
-                final characterId = ctx.characterId;
-                if (!ctx.memoryChangedThisTurn || characterId == null) {
+                if (!ctx.memoryChangedThisTurn) {
                   return;
                 }
-                await embedding.backfillPending(characterId);
+                await _endOfTurnHook(ctx, (characterId, conversationId) async {
+                  await embedding.backfillPending(characterId);
+                });
               },
-              // ② 后台反思（ADR-0004）：开关在设置仓储；成功后直接补嵌
-              //    （F-135：反射实际落库 added>0 才补，经 reflectAndBackfillPending
-              //    单点编排；reflect 闭包捕获 EmbeddingService，集合层不表达
-              //    因果边）。
+              // ② 后台反思（ADR-0004）：开关由 reflectAfterTurn 首行内部读取；
+              // 成功后直接补嵌（F-135：反射实际落库 added>0 才补，经
+              // reflectAndBackfillPending 单点编排；reflect 闭包捕获
+              // EmbeddingService，集合层不表达因果边）。
               (ctx) async {
                 final reflection = context.read<ReflectionService>();
                 final embedding = context.read<EmbeddingService>();
-                final settings = context.read<SettingsRepository>();
-                final characterId = ctx.characterId;
-                if (characterId == null) {
-                  return;
-                }
-                if (!await settings.memoryReflectionEnabled) {
-                  return;
-                }
-                await reflectAndBackfillPending(
-                  reflect: reflection.reflectAfterTurn,
-                  backfill: embedding.backfillPending,
-                  characterId: characterId,
-                  conversationId: ctx.conversationId,
-                );
+                await _endOfTurnHook(ctx, (characterId, conversationId) async {
+                  await reflectAndBackfillPending(
+                    reflect: reflection.reflectAfterTurn,
+                    backfill: embedding.backfillPending,
+                    characterId: characterId,
+                    conversationId: conversationId,
+                  );
+                });
               },
               // ③ 主动消息规划（PS2-05）：开关/节流/LLM seam 全在服务内部。
               (ctx) async {
                 final proactive = context.read<ProactiveMessageService>();
-                final characterId = ctx.characterId;
-                if (characterId == null) {
-                  return;
-                }
-                await proactive.planAfterTurn(
-                  characterId: characterId,
-                  conversationId: ctx.conversationId,
-                );
+                await _endOfTurnHook(ctx, (characterId, conversationId) async {
+                  await proactive.planAfterTurn(
+                    characterId: characterId,
+                    conversationId: conversationId,
+                  );
+                });
               },
               // ④ 关系评估（PS2-03）：proposal 经 broker 上报（不写库，SR-10）。
               (ctx) async {
                 final relationship = context.read<RelationshipService>();
                 final broker = context.read<StageUpgradeBroker>();
-                final characterId = ctx.characterId;
-                if (characterId == null) {
-                  return;
-                }
-                final proposal = await relationship.evaluateAfterTurn(
-                  characterId: characterId,
-                  conversationId: ctx.conversationId,
-                );
-                if (proposal != null) {
-                  broker.publish(proposal);
-                }
+                await _endOfTurnHook(ctx, (characterId, conversationId) async {
+                  final proposal = await relationship.evaluateAfterTurn(
+                    characterId: characterId,
+                    conversationId: conversationId,
+                  );
+                  if (proposal != null) {
+                    broker.publish(proposal);
+                  }
+                });
               },
-              // ⑤ 记忆宫殿（WL-05）：开关在设置仓储 opt-in；阈值/归纳/落库
-              //    全在服务内部（含每 N 轮节流），服务内吞错（S1）。
+              // ⑤ 记忆宫殿（WL-05）：开关 + 每 N 轮节流由 summarizeAfterTurn
+              //    首行内部读取（opt-in）；阈值/归纳/落库全在服务内部，服务内
+              //    吞错（S1）。
               (ctx) async {
                 final palace = context.read<MemoryPalaceService>();
-                final settings = context.read<SettingsRepository>();
-                final characterId = ctx.characterId;
-                if (characterId == null) {
-                  return;
-                }
-                if (!await settings.memoryPalaceEnabled) {
-                  return;
-                }
-                await palace.summarizeAfterTurn(
-                  characterId: characterId,
-                  conversationId: ctx.conversationId,
-                  everyRounds: await settings.memoryPalaceEveryRounds,
-                );
+                await _endOfTurnHook(ctx, (characterId, conversationId) async {
+                  await palace.summarizeAfterTurn(
+                    characterId: characterId,
+                    conversationId: conversationId,
+                  );
+                });
               },
             ],
           ),

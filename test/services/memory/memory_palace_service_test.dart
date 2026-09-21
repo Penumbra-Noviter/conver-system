@@ -255,7 +255,7 @@ void main() {
     late String capturedCharName;
     late double capturedTemperature;
 
-    setUp(() {
+    setUp(() async {
       db = AppDatabase(NativeDatabase.memory());
       characterRepo = CharacterRepository(db);
       conversationRepo = ConversationRepository(db, const FakeSettingsReader());
@@ -265,6 +265,11 @@ void main() {
         database: db,
         secretStore: InMemorySecretStore(),
       );
+      // 开关读取约定 = 服务内部（summarizeAfterTurn 首行门）：缺省关闭，
+      // 本组用例直接调服务需先开启（断言随读取位置迁移，语义不变）。
+      await settingsRepo.setMany({
+        SettingsRepository.memoryPalaceEnabledKey: 'true',
+      });
       extractorCalls = 0;
       extractorResult = null;
       capturedCharName = '';
@@ -341,7 +346,6 @@ void main() {
         final added = await service.summarizeAfterTurn(
           characterId: seed.characterId,
           conversationId: seed.conversationId,
-          everyRounds: 6,
         );
 
         expect(added, 0);
@@ -362,7 +366,6 @@ void main() {
         final added = await service.summarizeAfterTurn(
           characterId: seed.characterId,
           conversationId: seed.conversationId,
-          everyRounds: 6,
         );
 
         expect(added, 1);
@@ -388,7 +391,6 @@ void main() {
         final added = await service.summarizeAfterTurn(
           characterId: seed.characterId,
           conversationId: seed.conversationId,
-          everyRounds: 6,
         );
 
         expect(added, 1);
@@ -410,7 +412,6 @@ void main() {
           await service.summarizeAfterTurn(
             characterId: seed.characterId,
             conversationId: seed.conversationId,
-            everyRounds: 6,
           ),
           1,
         );
@@ -419,7 +420,6 @@ void main() {
         final again = await service.summarizeAfterTurn(
           characterId: seed.characterId,
           conversationId: seed.conversationId,
-          everyRounds: 6,
         );
         expect(again, 0);
         expect(extractorCalls, 1, reason: '增量计数下不应再次调用 extractor');
@@ -441,7 +441,6 @@ void main() {
         final added = await service.summarizeAfterTurn(
           characterId: seed.characterId,
           conversationId: seed.conversationId,
-          everyRounds: 6,
         );
 
         expect(added, 0);
@@ -457,7 +456,6 @@ void main() {
         final added = await service.summarizeAfterTurn(
           characterId: seed.characterId,
           conversationId: seed.conversationId,
-          everyRounds: 6,
         );
 
         expect(added, 0);
@@ -473,7 +471,6 @@ void main() {
           await service.summarizeAfterTurn(
             characterId: 99999,
             conversationId: seed.conversationId,
-            everyRounds: 6,
           ),
           0,
           reason: '角色不存在 → 早退 0',
@@ -486,7 +483,6 @@ void main() {
           await service.summarizeAfterTurn(
             characterId: seed.characterId,
             conversationId: emptyConv.id,
-            everyRounds: 6,
           ),
           0,
           reason: '对话无消息 → 早退 0',
@@ -504,7 +500,6 @@ void main() {
           await service.summarizeAfterTurn(
             characterId: seed.characterId,
             conversationId: seed.conversationId,
-            everyRounds: 6,
           ),
           1,
         );
@@ -528,7 +523,6 @@ void main() {
           await service.summarizeAfterTurn(
             characterId: hotCharacter.id,
             conversationId: hotConv.id,
-            everyRounds: 6,
           ),
           1,
         );
@@ -647,7 +641,6 @@ void main() {
       final added = await service.summarizeAfterTurn(
         characterId: seed.characterId,
         conversationId: seed.conversationId,
-        everyRounds: 6,
       );
 
       expect(added, 1, reason: '超窗口消息截断分支照常归纳');
@@ -786,20 +779,17 @@ void main() {
         providerFactory: FixedLLMProviderFactory(
           FakeLLMProvider(tokens: const ['你好']),
         ),
-        // S1：hook 列表序，记忆宫殿钩子追加在后（装配层同构闭包）。
+        // S1：hook 列表序，记忆宫殿钩子追加在后（装配层同构闭包；开关 +
+        // everyRounds 读取约定 = 服务内部，闭包零设置读取）。
         endOfTurnHooks: [
           (ctx) async {
             final characterId = ctx.characterId;
             if (characterId == null) {
               return;
             }
-            if (!await settingsRepo.memoryPalaceEnabled) {
-              return;
-            }
             await palace.summarizeAfterTurn(
               characterId: characterId,
               conversationId: ctx.conversationId,
-              everyRounds: await settingsRepo.memoryPalaceEveryRounds,
             );
           },
         ],
@@ -848,6 +838,21 @@ void main() {
       final conv = await conversationRepo.createConversation(
         characterId: character.id,
       );
+      // 预置 12 条消息（6 轮完整回合 ≥ everyRounds 缺省 6 的阈值）：若开关
+      // 门失效，本轮（+2 条）后 shouldSummarize 必达 → extractor 被调用——
+      // 确保本用例唯一拦截因素是服务内开关门（开关缺省关闭语义）。
+      for (var i = 0; i < 6; i++) {
+        await messageRepo.createMessage(
+          conversationId: conv.id,
+          role: Role.user,
+          content: '预置用户消息 $i',
+        );
+        await messageRepo.createMessage(
+          conversationId: conv.id,
+          role: Role.assistant,
+          content: '预置助手消息 $i',
+        );
+      }
 
       var extractorCalls = 0;
       final palace = MemoryPalaceService(
@@ -880,13 +885,9 @@ void main() {
             if (characterId == null) {
               return;
             }
-            if (!await settingsRepo.memoryPalaceEnabled) {
-              return;
-            }
             await palace.summarizeAfterTurn(
               characterId: characterId,
               conversationId: ctx.conversationId,
-              everyRounds: await settingsRepo.memoryPalaceEveryRounds,
             );
           },
         ],
@@ -897,7 +898,7 @@ void main() {
         content: '嗨',
       ).drain<Object?>();
 
-      // 缺省关闭 → hook 早退，零归纳零落库。
+      // 缺省关闭 → 服务内首行门早退（summarizeAfterTurn 读开关），零归纳零落库。
       await Future<void>.delayed(const Duration(milliseconds: 50));
       expect(extractorCalls, 0);
       expect(await lorebookRepo.listEntries(character.id), isEmpty);

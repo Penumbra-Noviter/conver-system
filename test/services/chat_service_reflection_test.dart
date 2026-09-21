@@ -113,13 +113,11 @@ void main() {
           }
           await embeddingService.backfillPending(characterId);
         },
-        // reflect：开关在设置仓储；成功后补嵌（闭包内协作，集合层无因果边）。
+        // reflect：开关读取约定 = 服务内部（reflectAfterTurn 首行门）；
+        // 成功后补嵌（闭包内协作，集合层无因果边）。
         (ctx) async {
           final characterId = ctx.characterId;
           if (characterId == null) {
-            return;
-          }
-          if (!await settingsRepo.memoryReflectionEnabled) {
             return;
           }
           await reflectionService.reflectAfterTurn(
@@ -139,6 +137,7 @@ void main() {
       characterRepository: characterRepo,
       memoryRepository: memoryRepo,
       messageRepository: messageRepo,
+      settingsRepository: settingsRepo,
       extractor: ({
         required String charName,
         required List<String> dialogueLines,
@@ -179,6 +178,7 @@ void main() {
       characterRepository: characterRepo,
       memoryRepository: memoryRepo,
       messageRepository: messageRepo,
+      settingsRepository: settingsRepo,
       extractor:
           ({
             required String charName,
