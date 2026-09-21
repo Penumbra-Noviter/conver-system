@@ -10,6 +10,7 @@ import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/memory_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
@@ -90,7 +91,7 @@ void main() {
   }) {
     // S1：回合末副作用收敛为装配层闭包集合（本文件只注册 backfill 钩子）。
     return ChatService(
-      database: db,
+      lorebookRepository: LorebookRepository(db),
       conversationRepository: conversationRepo,
       characterRepository: characterRepo,
       messageRepository: messageRepo,

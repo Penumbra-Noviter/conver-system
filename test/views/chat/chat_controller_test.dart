@@ -339,7 +339,7 @@ void main() {
   }) {
     final messages = messageRepository ?? messageRepo;
     final service = ChatService(
-      database: db,
+      lorebookRepository: lorebookRepo,
       conversationRepository: convRepo,
       characterRepository: charRepo,
       messageRepository: messages,
@@ -465,7 +465,7 @@ void main() {
           _ThrowingListConversationRepository(db, const FakeSettingsReader());
       final c = ChatController(
         chatService: ChatService(
-          database: db,
+          lorebookRepository: lorebookRepo,
           conversationRepository: throwingListRepo,
           characterRepository: charRepo,
           messageRepository: messageRepo,
@@ -496,7 +496,7 @@ void main() {
           _ThrowingListCharactersRepository(db, now: () => fakeNow);
       final c = ChatController(
         chatService: ChatService(
-          database: db,
+          lorebookRepository: lorebookRepo,
           conversationRepository: convRepo,
           characterRepository: throwingCharRepo,
           messageRepository: messageRepo,
@@ -523,7 +523,7 @@ void main() {
           _ThrowingConversationRepository(db, const FakeSettingsReader());
       final c = ChatController(
         chatService: ChatService(
-          database: db,
+          lorebookRepository: lorebookRepo,
           conversationRepository: throwingConvRepo,
           characterRepository: charRepo,
           messageRepository: messageRepo,
@@ -584,7 +584,7 @@ void main() {
           _ThrowingGetConversationRepository(db, const FakeSettingsReader());
       final c = ChatController(
         chatService: ChatService(
-          database: db,
+          lorebookRepository: lorebookRepo,
           conversationRepository: convRepo,
           characterRepository: charRepo,
           messageRepository: messageRepo,

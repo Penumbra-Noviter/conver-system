@@ -387,9 +387,9 @@ class _StreamRunState {
 /// 候选追加收口于 [MessageRepository.addSwipe]（仓库内事务）。无平台存储 /
 /// 视图依赖。
 class ChatService {
-  /// [database] 参数保留以维持构造签名稳定（app.dart 装配零改动）；
-  /// MS-02 起服务不再直接使用（regenerate 的「有界删旧 + 插新」单事务已删除，
-  /// 候选追加收口于 [MessageRepository.addSwipe]）。
+  /// [lorebookRepository] 为世界书仓储——装配层恒传（app.dart provider 单点
+  /// `context.read<LorebookRepository>()`），服务协议面不再包含数据层 infra
+  /// 类型（数据层 infra 类型已退出构造参数）。
   ///
   /// [settingsRepository] 提供 Key 解析链与滑窗轮数等设置。
   ///
@@ -397,7 +397,6 @@ class ChatService {
   /// 最大重试次数。生产默认 `[1s, 2s]`（重试 2 次，指数退避）；测试注入短值
   /// 以获得确定性退避时序。
   ChatService({
-    required AppDatabase database,
     required this._conversationRepository,
     required this._characterRepository,
     required this._messageRepository,
@@ -407,7 +406,7 @@ class ChatService {
     this._memoryService,
     this._thoughtService,
     this._companionRepository,
-    LorebookRepository? lorebookRepository,
+    required LorebookRepository lorebookRepository,
     this._lorebookRandom,
     List<EndOfTurnHook> endOfTurnHooks = const [],
     List<Duration> connectRetryDelays = const [
@@ -416,10 +415,7 @@ class ChatService {
     ],
   }) : _endOfTurnHooks = List<EndOfTurnHook>.unmodifiable(endOfTurnHooks),
        _connectRetryDelays = List<Duration>.unmodifiable(connectRetryDelays) {
-    // 服务层不直接持有 AppDatabase（wildcard）；例外：世界书仓储缺省需从
-    // [database] 装配（app.dart 装配零改动约束，WL-03），显式注入可覆盖。
-    var _ = database;
-    _lorebookRepository = lorebookRepository ?? LorebookRepository(database);
+    _lorebookRepository = lorebookRepository;
     _credentialsResolver = credentialsResolver ?? _wireCredentialsResolver();
   }
 

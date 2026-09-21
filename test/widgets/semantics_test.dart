@@ -25,6 +25,7 @@ import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart' show Role;
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_reader.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
@@ -128,7 +129,7 @@ void main() {
     msgRepo = MessageRepository(charsDb);
     chatController = ChatController(
       chatService: ChatService(
-        database: charsDb,
+        lorebookRepository: LorebookRepository(charsDb),
         conversationRepository: convRepo,
         characterRepository: charRepo,
         messageRepository: msgRepo,

@@ -27,6 +27,7 @@ import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/companion_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/character_card.dart';
@@ -137,7 +138,7 @@ class _Env {
     final companionRepository = CompanionRepository(db);
     final chatController = ChatController(
       chatService: ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: conversationRepository,
         characterRepository: characterRepository,
         messageRepository: messageRepository,

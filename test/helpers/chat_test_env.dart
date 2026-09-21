@@ -115,7 +115,7 @@ class ChatTestEnv {
     ],
   }) {
     final service = ChatService(
-      database: db,
+      lorebookRepository: lorebookRepository,
       conversationRepository: conversationRepository,
       characterRepository: characterRepository,
       messageRepository: messageRepository,

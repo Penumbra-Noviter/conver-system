@@ -797,7 +797,7 @@ void main() {
       );
 
       final service = ChatService(
-        database: db,
+        lorebookRepository: lorebookRepo,
         conversationRepository: conversationRepo,
         characterRepository: characterRepo,
         messageRepository: messageRepo,
@@ -897,7 +897,7 @@ void main() {
       );
 
       final service = ChatService(
-        database: db,
+        lorebookRepository: lorebookRepo,
         conversationRepository: conversationRepo,
         characterRepository: characterRepo,
         messageRepository: messageRepo,

@@ -11,6 +11,7 @@ import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/character_repository.dart';
 import 'package:conver_system_mobile/data/repositories/companion_repository.dart';
 import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
+import 'package:conver_system_mobile/data/repositories/lorebook_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
 import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/chat_service.dart';
@@ -1316,7 +1317,7 @@ void main() {
 
       await settingsRepo.setMany({'claude_api_key': 'sk-test'});
       final chatService = ChatService(
-        database: db,
+        lorebookRepository: LorebookRepository(db),
         conversationRepository: conversationRepo,
         characterRepository: CharacterRepository(db, now: () => fixedNow),
         messageRepository: messageRepo,
