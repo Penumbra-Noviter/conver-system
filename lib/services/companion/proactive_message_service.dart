@@ -36,6 +36,7 @@ import '../../data/database/tables.dart' show ProactivePlanStatus, Role;
 import '../../data/repositories/companion_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../llm/dialogue_window.dart';
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
 import 'companion_time_windows.dart' show CompanionTimeWindows;
 
@@ -463,14 +464,18 @@ class ProactiveMessageService {
   }
 
   /// 组装对话行（user 署名「用户」，assistant 原文直给），截取最近
-  /// [ProactiveThresholds.historyLimit] 条。
+  /// [ProactiveThresholds.historyLimit] 条（经
+  /// [MessageRepository.recentMessages] 定位读 + [recentDialogueWindow]
+  /// 单源窗口 builder）。
   Future<List<String>> _dialogueLines(int conversationId) async {
-    final messages = await _messages.getMessages(conversationId);
-    final recent = messages.length > ProactiveThresholds.historyLimit
-        ? messages.sublist(messages.length - ProactiveThresholds.historyLimit)
-        : messages;
     return [
-      for (final m in recent)
+      for (final m in recentDialogueWindow(
+        await _messages.recentMessages(
+          conversationId,
+          ProactiveThresholds.historyLimit,
+        ),
+        limit: ProactiveThresholds.historyLimit,
+      ))
         m.role == Role.user ? '用户：${m.content}' : m.content,
     ];
   }

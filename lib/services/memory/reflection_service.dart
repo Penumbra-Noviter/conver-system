@@ -26,6 +26,7 @@ import '../../data/repositories/memory_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../utils/llm_json_candidates.dart';
+import '../llm/dialogue_window.dart';
 import '../llm/llm_provider.dart' show LlmMessage, LLMProvider;
 
 // 构造为公开命名参数（装配点语义）+ 私有 `_` 字段：initializing formal 无法
@@ -178,10 +179,13 @@ class ReflectionService {
   /// 编排无需防御性 try。
   ///
   /// 编排：
-  /// 1. 节流——该对话 user 消息数须 > 0 且 `% interval == 0`，否则返回 0；
+  /// 1. 节流——该对话 user 消息数须 > 0 且 `% interval == 0`（经
+  ///    [MessageRepository.messageStats] 聚合定位读，全量口径不随窗口缩小），
+  ///    否则返回 0；
   /// 2. 读角色（不存在 → 0）与已有人格事实（去重基准）；
   /// 3. 取最近 [historyLimit] 条消息组装对话行（user 署名「用户」、assistant
-  ///    署名角色名）；
+  ///    署名角色名；经 [MessageRepository.recentMessages] 定位读 +
+  ///    [recentDialogueWindow] 单源窗口 builder）；
   /// 4. [extractor] 反思产出事实 → 逐条 trim 去重后落 `persona_fact`；
   /// 5. 返回实际落库条数（0 = 无新事实/节流跳过/失败降级）。
   Future<int> reflectAfterTurn({
@@ -192,9 +196,8 @@ class ReflectionService {
       return 0;
     }
     try {
-      final messages = await _messageRepository.getMessages(conversationId);
-      final userCount = messages.where((m) => m.role == Role.user).length;
-      if (userCount == 0 || userCount % _interval != 0) {
+      final stats = await _messageRepository.messageStats(conversationId);
+      if (stats.userCount == 0 || stats.userCount % _interval != 0) {
         return 0;
       }
 
@@ -206,11 +209,14 @@ class ReflectionService {
       final existing = await _memoryRepository.listPersonaFacts(characterId);
       final existingSet = <String>{for (final f in existing) f.content.trim()};
 
-      final recent = messages.length > _historyLimit
-          ? messages.sublist(messages.length - _historyLimit)
-          : messages;
       final dialogueLines = <String>[
-        for (final m in recent)
+        for (final m in recentDialogueWindow(
+          await _messageRepository.recentMessages(
+            conversationId,
+            _historyLimit,
+          ),
+          limit: _historyLimit,
+        ))
           m.role == Role.user ? '用户：${m.content}' : '${character.name}：${m.content}',
       ];
 

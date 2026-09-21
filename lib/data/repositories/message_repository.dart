@@ -79,6 +79,12 @@ class MessageSearchHit {
   final Character character;
 }
 
+/// 对话消息聚合统计（[MessageRepository.messageStats] 返回形态）。
+///
+/// 字段口径以该方法 docstring 为单源（total/userCount 为 COUNT 精确值；
+/// chars 为 SQLite `LENGTH()` 字符和）。
+typedef MessageStats = ({int total, int userCount, int chars});
+
 /// 消息仓储 — 表面与桌面 message 服务对应
 /// （get_messages / create_message / delete_messages_from / search_messages；
 /// build_message_list 归 M2，不在此实现）。
@@ -100,6 +106,60 @@ class MessageRepository {
             (t) => OrderingTerm.asc(t.id),
           ]))
         .get();
+  }
+
+  /// 对话最近 [limit] 条消息，等价于 [getMessages] 的 `(created_at asc,
+  /// id asc)` 升序序列取尾 N（实现为 desc 排序 + limit + reverse——倒序首 N
+  /// 反转即升序尾 N，含同秒 id 兜底），返回仍为升序。
+  ///
+  /// - [limit] ≤ 0 → 空列表（SQLite `LIMIT` 负数为「无限制」，显式短路防
+  ///   隐式全量）；
+  /// - 空会话 → 空列表。
+  ///
+  /// 回合末伴生服务（反思 / 主动消息 / 记忆宫殿）的最近对话窗口经本条定位
+  /// 读收敛（F-148），替代每回合全量 [getMessages] 拉取。
+  Future<List<Message>> recentMessages(int conversationId, int limit) async {
+    if (limit <= 0) {
+      return const <Message>[];
+    }
+    final rows = await (_db.select(_db.messages)
+          ..where(($MessagesTable t) => t.conversationId.equals(conversationId))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.createdAt),
+            (t) => OrderingTerm.desc(t.id),
+          ])
+          ..limit(limit))
+        .get();
+    return rows.reversed.toList();
+  }
+
+  /// 对话消息聚合统计（F-148 决策面单查询聚合：COUNT/SUM，不传整表行）。
+  ///
+  /// - [total]：消息总数（空会话 0）；
+  /// - [userCount]：user 角色消息数（反思节流口径：全量 user 数 `% interval`
+  ///   == 0，须整会话计——不随窗口缩小）；
+  /// - [chars]：全部消息 `content` 的 SQLite `LENGTH()` 字符和。口径注意：
+  ///   SQLite 按 Unicode 码点计字（BMP 内与 Dart `String.length` 的 UTF-16
+  ///   码元数逐字符一致；仅含补充平面码位——如 emoji——时二者不等）。消费方
+  ///   为阈值布尔判定，历史实现同为「逐条字符串长度和」的字符级语义。
+  ///
+  /// 每回合末服务以本方法 + [recentMessages] 替代全量 [getMessages]
+  /// （决策口经聚合、窗口口径经定位读，I/O 从 O(n) 行传输降为 O(1) 行）。
+  Future<MessageStats> messageStats(int conversationId) async {
+    final messages = _db.messages;
+    final totalExpr = messages.id.count();
+    final userExpr = countAll(filter: messages.role.equalsValue(Role.user));
+    final charsExpr =
+        coalesce([messages.content.length.sum(), const Constant(0)]);
+    final query = _db.selectOnly(messages)
+      ..where(messages.conversationId.equals(conversationId));
+    query.addColumns([totalExpr, userExpr, charsExpr]);
+    final row = await query.getSingle();
+    return (
+      total: row.read(totalExpr) ?? 0,
+      userCount: row.read(userExpr) ?? 0,
+      chars: row.read(charsExpr) ?? 0,
+    );
   }
 
   /// 该角色全部对话（conversations 按 [characterId] 过滤）中消息 `createdAt`

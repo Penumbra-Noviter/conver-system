@@ -305,6 +305,140 @@ void main() {
     });
   });
 
+  group('recentMessages（C3 定位读：等价 (createdAt asc, id asc) 取尾 N）', () {
+    test('等价 getMessages 升序序取尾 N（时间主导 + 同秒 id 兜底）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+
+      fakeNow = fakeNow.add(const Duration(seconds: 10));
+      final m1 = await sendUserMessage(conv.id, 'later');
+      fakeNow = fakeNow.add(const Duration(seconds: -5));
+      final m2 = await sendUserMessage(conv.id, 'early-a');
+      final m3 = await sendUserMessage(conv.id, 'early-b');
+      // getMessages 升序：[m2(早), m3(同秒 id 兜底), m1(晚)]。
+      expect(m2.createdAt, m3.createdAt);
+      final full = await repo.getMessages(conv.id);
+      expect(full.map((m) => m.id), [m2.id, m3.id, m1.id]);
+
+      final recent2 = await repo.recentMessages(conv.id, 2);
+      expect(
+        recent2.map((m) => m.id),
+        [m3.id, m1.id],
+        reason: 'asc 序取尾 2 = [m3, m1]',
+      );
+      expect(recent2.first.createdAt.isBefore(recent2.last.createdAt), isTrue,
+          reason: '返回保持升序');
+
+      // 与 getMessages 尾 N 逐条等价的 oracle 断言（非自证：以 getMessages 为锚）。
+      for (final requested in [1, 2, 3, 5]) {
+        final k = requested > full.length ? full.length : requested;
+        final expected = full.skip(full.length - k);
+        final got = await repo.recentMessages(conv.id, requested);
+        expect(got.map((m) => m.id), expected.map((m) => m.id),
+            reason: 'requested=$requested');
+      }
+    });
+
+    test('同秒多条 → id asc 兜底取尾（不依赖插入顺序）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      // 不拨动 fakeNow：三条同秒，升序靠 id 兜底。
+      final m1 = await sendUserMessage(conv.id, 'a');
+      final m2 = await sendUserMessage(conv.id, 'b');
+      final m3 = await sendUserMessage(conv.id, 'c');
+      expect(m1.id < m2.id && m2.id < m3.id, isTrue,
+          reason: '同秒窗口判定依赖 id 兜底，锚定 id 递增');
+
+      final recent = await repo.recentMessages(conv.id, 2);
+      expect(recent.map((m) => m.id), [m2.id, m3.id], reason: '尾 2 = m2, m3');
+    });
+
+    test('limit ≥ 条数 → 全量升序；limit < 条数 → 截尾', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      final m1 = await sendUserMessage(conv.id, 'a');
+      final m2 = await sendUserMessage(conv.id, 'b');
+      final m3 = await sendUserMessage(conv.id, 'c');
+
+      final all = await repo.recentMessages(conv.id, 10);
+      expect(all.map((m) => m.id), [m1.id, m2.id, m3.id],
+          reason: 'limit 超量 → 全量升序');
+      final tail1 = await repo.recentMessages(conv.id, 1);
+      expect(tail1.map((m) => m.id), [m3.id], reason: 'limit=1 → 仅末条');
+    });
+
+    test('空会话 → 空列表', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      expect(await repo.recentMessages(conv.id, 20), isEmpty);
+    });
+
+    test('limit ≤ 0 → 空列表（防 SQLite LIMIT 负数即无限制的隐式全量）', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      await sendUserMessage(conv.id, 'a');
+      expect(await repo.recentMessages(conv.id, 0), isEmpty);
+      expect(await repo.recentMessages(conv.id, -1), isEmpty);
+    });
+
+    test('跨对话隔离：他对话消息不串入', () async {
+      final char = await seedCharacter();
+      final convA = await seedConversation(char.id);
+      final convB = await seedConversation(char.id);
+      final a1 = await sendUserMessage(convA.id, '甲的 a');
+      final a2 = await sendUserMessage(convA.id, '甲的 b');
+      final b1 = await sendUserMessage(convB.id, '乙的 a');
+
+      expect((await repo.recentMessages(convA.id, 10)).map((m) => m.id),
+          [a1.id, a2.id]);
+      expect((await repo.recentMessages(convA.id, 1)).single.id, a2.id);
+      expect((await repo.recentMessages(convB.id, 10)).single.id, b1.id,
+          reason: '他对话消息不串入');
+    });
+  });
+
+  group('messageStats（C3 决策面定位读聚含）', () {
+    test('混合角色：total / userCount / chars 精确', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      // 内容为 BMP 字符串：SQLite LENGTH 计码点 == Dart String.length。
+      await repo.createMessage(
+          conversationId: conv.id, role: Role.user, content: '你好ABC'); // 5
+      await repo.createMessage(
+          conversationId: conv.id, role: Role.assistant, content: '回复123'); // 5
+      await repo.createMessage(
+          conversationId: conv.id, role: Role.user, content: '结尾'); // 2
+
+      final stats = await repo.messageStats(conv.id);
+      expect(stats.total, 3);
+      expect(stats.userCount, 2);
+      expect(stats.chars, 12, reason: '5 + 5 + 2');
+    });
+
+    test('空会话 → (0, 0, 0)', () async {
+      final char = await seedCharacter();
+      final conv = await seedConversation(char.id);
+      expect(await repo.messageStats(conv.id), (total: 0, userCount: 0, chars: 0));
+    });
+
+    test('跨对话隔离 + system 角色不计 userCount', () async {
+      final char = await seedCharacter();
+      final convA = await seedConversation(char.id);
+      final convB = await seedConversation(char.id);
+      await repo.createMessage(
+          conversationId: convA.id, role: Role.user, content: 'A用户');
+      await repo.createMessage(
+          conversationId: convA.id, role: Role.system, content: 'A系统');
+      await repo.createMessage(
+          conversationId: convB.id, role: Role.user, content: 'B');
+
+      final stats = await repo.messageStats(convA.id);
+      expect(stats.total, 2);
+      expect(stats.userCount, 1, reason: 'system 消息不计 user');
+      expect(await repo.messageStats(convB.id), (total: 1, userCount: 1, chars: 1));
+    });
+  });
+
   group('latestMessageAt（F-81 判定⑨单源）', () {
     test('跨多对话取全局 max：最新 createdAt 胜出，他角色不影响', () async {
       final charA = await seedCharacter();
