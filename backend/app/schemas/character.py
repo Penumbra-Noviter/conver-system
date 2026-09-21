@@ -57,6 +57,17 @@ class CharacterBase(BaseModel):
     # PD-4 预设对话（项目自有字段，不进 V2 规范清单，经 conver_system 命名空间往返）
     preset_dialogues: list[PresetDialogue] = Field(default_factory=list, description="预设对话（few-shot 示范）")
 
+    @field_validator("preset_dialogues", mode="before")
+    @classmethod
+    def _coerce_none_preset_dialogues(cls, value: object) -> object:
+        """存量行 NULL 归一：preset_dialogues 为 None 时按 [] 处理（默认值仅字段缺席生效）
+
+        旧库升级（_ensure_character_preset_dialogue_column 补列无回填）与显式 null
+        写库都会产出 NULL 行；list 型必填字段遇 None 令 FastAPI serialize_response
+        抛 ResponseValidationError（GET /api/characters 500，2026-09-21 冒烟实测）。
+        """
+        return [] if value is None else value
+
 
 # ── 请求体（继承基类，字段清单由 CharacterBase 唯一定义）──
 
