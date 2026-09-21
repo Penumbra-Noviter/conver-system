@@ -35,7 +35,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 |------|------|
 | `-SkipTests` | 跳过全部测试步骤 |
 | `-SkipSmoke` | 构建后不执行冒烟 |
-| `-SkipBackendBuild` | 后端 exe 缺失时不自动打包 |
+| `-SkipBackendBuild` | 后端 exe 缺失/过期时不自动打包（缺失报错；过期告警放行） |
 | `-SmokeArgs @('-UseInstaller')` | 透传给冒烟脚本 |
 
 注意事项：
@@ -80,7 +80,7 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-desktop.ps1 -UseInstaller
 | `-RunMigrationCheck` | 轻量复跑迁移脚本幂等（验收 7） |
 | `-ForceKillStale` | 强制清理残留壳实例（单实例机制会拦截新实例；默认遇到即报错） |
 | `-CleanAppData` | 冒烟后删除数据目录（**危险**，会删除既有数据，默认关） |
-| `-SkipBackendBuild` | 后端 exe 缺失时不自动打包（直接报错） |
+| `-SkipBackendBuild` | 后端 exe 缺失/过期时不自动打包（缺失直接报错；过期告警放行） |
 | `-SkipInstaller` | tauri build 改 `--no-bundle` 仅编译壳，不产 NSIS 安装器（常规打包默认加——用户惯例：安装包仅在明确提需求时打包） |
 
 安全边界（脚本内显式守卫）：

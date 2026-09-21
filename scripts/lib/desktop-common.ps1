@@ -41,31 +41,109 @@ function Stop-ConverPortListeners {
     return ,$killed
 }
 
+function Get-ConverRepoRoot {
+    <#
+    .SYNOPSIS
+        推导仓库根目录（本文件 scripts/lib/desktop-common.ps1 两级上溯）。
+    .OUTPUTS
+        返回归一化（Resolve-Path）后的仓库根绝对路径字符串。
+    #>
+    return (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+}
+
+function Get-ConverBackendRebuildInputs {
+    <#
+    .SYNOPSIS
+        后端打包 exe 的全部重建输入路径（即 PyInstaller spec 打包面）。
+    .DESCRIPTION
+        输入 = backend 源（app/scripts/run_backend/spec/requirements）+ 前端运行子集
+        （conver_backend.spec 的 _FRONTEND_RUNTIME datas：index.html/css/js/simulators）。
+        前端子集漏列会让「前端改动不进后端包」被误判为新鲜；node_modules 不在打包面，不列。
+    .PARAMETER Root
+        仓库根（见 Get-ConverRepoRoot）。
+    .OUTPUTS
+        输入路径字符串数组（不存在路径由调用方静默容错）。
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+    return @(
+        (Join-Path $Root "backend\app"),
+        (Join-Path $Root "backend\scripts"),
+        (Join-Path $Root "backend\run_backend.py"),
+        (Join-Path $Root "backend\conver_backend.spec"),
+        (Join-Path $Root "backend\requirements.txt"),
+        (Join-Path $Root "frontend\index.html"),
+        (Join-Path $Root "frontend\css"),
+        (Join-Path $Root "frontend\js"),
+        (Join-Path $Root "frontend\simulators")
+    )
+}
+
+function Test-ConverBackendExeIsCurrent {
+    <#
+    .SYNOPSIS
+        判断后端打包 exe 是否为最新（F-156：只认缺失不认过期的旧缺口）。
+    .DESCRIPTION
+        exe 存在且 LastWriteTime 不早于全部重建输入的最新 mtime → $true（新鲜）；
+        exe 缺失或任输入更新 → $false（过期）。mtime 口径对 git 检出场景宽松（同批检出
+        时间接近），仅源码改动后明显拉开。输入集为空的异常场景返回 $true（不阻塞调用方）。
+    .PARAMETER ExePath
+        后端 exe 完整路径（dist\conver_backend\conver_backend.exe）。
+    .PARAMETER Root
+        仓库根；缺省按 Get-ConverRepoRoot 推导（测试可注入临时根）。
+    .OUTPUTS
+        布尔：exe 是否新鲜。
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ExePath,
+        [string]$Root
+    )
+    if (-not (Test-Path $ExePath)) { return $false }
+    if (-not $Root) { $Root = Get-ConverRepoRoot }
+    $exeTime = (Get-Item $ExePath).LastWriteTime
+    $newest = Get-ChildItem -Path (Get-ConverBackendRebuildInputs -Root $Root) -Recurse -File -ErrorAction SilentlyContinue |
+        Measure-Object -Property LastWriteTime -Maximum
+    if ($null -eq $newest.Maximum) { return $true }
+    return ($exeTime -ge $newest.Maximum)
+}
+
 function Assert-Or-Build-BackendExe {
     <#
     .SYNOPSIS
-        断言后端打包 exe 存在；缺失时自动调 build-backend.ps1 补齐，复查仍缺失则 throw。
+        断言后端打包 exe 存在且不过期；缺失/过期时自动调 build-backend.ps1 补齐，复查仍不对则 throw。
     .DESCRIPTION
         合并 build-desktop.ps1 与 smoke-desktop.ps1 两处重复实现（ARC9-T05）：
-        -SkipBackendBuild 指定时缺失直接 throw（不自动打包）；
-        未指定时调 scripts/build-backend.ps1（PyInstaller onedir），执行后复查，
-        仍缺失即 throw——绝不静默继续。
+        - 缺失（F-156 前即有的行为）：-SkipBackendBuild 指定时直接 throw；未指定时调
+          scripts/build-backend.ps1（PyInstaller onedir），执行后复查，仍缺失即 throw——绝不静默继续。
+        - 过期（F-156 补齐，2026-09-21）：exe 早于 backend/前端运行子集源码时自动重建，
+          防「旧后端包被静默复用」（实测 8-28 后端进 9-14 包）；-SkipBackendBuild 指定时
+          降级为警告放行（exe 已存在，用户显式选择不构建，交由调用方判断）。
     .PARAMETER Path
         后端 exe 完整路径（dist\conver_backend\conver_backend.exe）。
     .PARAMETER SkipBackendBuild
-        缺失时不自动调 build-backend.ps1（直接报错）。
+        缺失/过期时不自动调 build-backend.ps1（缺失直接报错，过期告警放行）。
     #>
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path,
         [switch]$SkipBackendBuild
     )
-    if (Test-Path $Path) { return }
-    if ($SkipBackendBuild) {
-        throw "未找到后端打包 exe：$Path（-SkipBackendBuild 已指定，不自动打包）"
-    }
     $buildScript = Join-Path $PSScriptRoot "..\build-backend.ps1"
-    Write-Host "后端打包 exe 缺失，调用 build-backend.ps1（PyInstaller onedir）..." -ForegroundColor Yellow
+    # F-156 四象限统一入口：缺失→补、过期→重建、-SkipBackendBuild 时缺失报错/过期告警放行
+    if ((Test-Path $Path) -and (Test-ConverBackendExeIsCurrent -ExePath $Path)) { return }
+    $stale = Test-Path $Path  # 仍存在 = 过期而非缺失
+    if ($SkipBackendBuild) {
+        if (-not $stale) {
+            throw "未找到后端打包 exe：$Path（-SkipBackendBuild 已指定，不自动打包）"
+        }
+        Write-Host "警告：后端打包 exe 已过期（backend/前端源码更新），-SkipBackendBuild 已指定不重建：$Path" -ForegroundColor Yellow
+        return
+    }
+    $reason = if ($stale) { "过期（backend/前端源码更新）" } else { "缺失" }
+    Write-Host "后端打包 exe $reason，调用 build-backend.ps1（PyInstaller onedir）..." -ForegroundColor Yellow
     & $buildScript
     if (-not (Test-Path $Path)) {
         throw "build-backend.ps1 执行后仍未找到 $Path"

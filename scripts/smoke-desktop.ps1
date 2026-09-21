@@ -16,7 +16,7 @@
 # 设计要点：
 #   - 壳-后端环境变量通道（spec 接口契约）：以 CONVER_BACKEND_CMD 指向 PyInstaller
 #     打包后端 exe（dist/conver_backend/conver_backend.exe），与「P6.4-2 用
-#     CONVER_BACKEND_CMD 指 exe」的波次计划一致；后端 exe 缺失时自动调 build-backend.ps1
+#     CONVER_BACKEND_CMD 指 exe」的波次计划一致；后端 exe 缺失/过期时自动调 build-backend.ps1
 #   - 数据目录：CONVER_DATA_DIR 覆盖 > %APPDATA%\ConverSystem（与壳/后端同一契约）；
 #     冒烟只碰数据目录，绝不触碰项目根 conver_system.db（脚本内显式守卫）
 #   - 退出：壳在 CONVER_EXIT_AFTER_SECS 秒后走正常退出流程（ExitRequested → kill 子进程），
@@ -33,7 +33,7 @@ param(
     [switch]$UseInstaller,
     # 安装器路径（缺省经共享 helper Get-ConverInstallerPath 按 tauri.conf.json 推导 NSIS 产物路径）
     [string]$InstallerPath = "",
-    # 后端 exe 缺失时不自动调用 build-backend.ps1（直接报错）
+    # 后端 exe 缺失/过期时不自动调用 build-backend.ps1（缺失直接报错；过期告警放行——F-156）
     [switch]$SkipBackendBuild,
     # 启动前强制清理残留的 conver-system.exe 实例（单实例机制会使新实例直接退出）
     [switch]$ForceKillStale,
@@ -144,8 +144,8 @@ if ($BackendEnv) {
 }
 
 if ($injectBackendEnv) {
-    # ── 后端 exe 缺失时自动补齐（仅注入路径需要）────────────────────────
-    # -SkipBackendBuild 语义不变：缺失时不自动打包，直接报错
+    # ── 后端 exe 缺失/过期时自动补齐（仅注入路径需要）────────────────────────
+    # -SkipBackendBuild 语义（F-156）：缺失直接报错；过期告警放行（desktop-common.ps1）
     Assert-Or-Build-BackendExe -Path $BackendExe -SkipBackendBuild:$SkipBackendBuild
 }
 

@@ -44,7 +44,7 @@ param(
     # 跳过 NSIS 安装器产出（tauri build 改 --no-bundle，仅生成 release 壳供 dist 测试包）。
     # 用户惯例（2026-08-14）：安装包仅在明确提需求时才打包——常规打包默认加此开关。
     [switch]$SkipInstaller,
-    # 后端打包产物缺失时不自动调用 build-backend.ps1（冒烟将报错退出）
+    # 后端打包产物缺失/过期时不自动调用 build-backend.ps1（缺失报错退出；过期告警放行——见 desktop-common.ps1 F-156）
     [switch]$SkipBackendBuild,
     # 透传给冒烟脚本的额外参数（如 -UseInstaller、-ReadyTimeoutSec）
     [string[]]$SmokeArgs = @()
@@ -104,8 +104,8 @@ Write-Host "根目录 : $Root"
 # tauri.conf.json 的 bundle.resources 指向 dist/conver_backend（期末审核阻断1 修复）：
 # tauri-build 在编译期校验该路径存在性——cargo test 即会失败（干净检出必挂），
 # 故后端打包必须早于任何 cargo 编译（复审整改：原步骤 4 前置）。
-# -SkipBackendBuild 语义不变（缺失时不自动打包）：原实现警告后继续、由 tauri-build
-# 资源校验失败兜底；现统一走 helper 提前明确报错——同一失败结果，信息更清晰。
+# -SkipBackendBuild 语义（F-156 扩展）：缺失/过期均不自动打包——缺失走 helper 提前明确报错；
+# 过期由 helper 告警放行（exe 已存在，tauri-build 资源校验仍会通过，仅打包面可能旧）。
 
 Assert-Or-Build-BackendExe -Path $BackendExe -SkipBackendBuild:$SkipBackendBuild
 
