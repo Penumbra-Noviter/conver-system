@@ -12,6 +12,20 @@
 
 ---
 
+## 模拟器简介自动生成批次（2026-09-22 — 用户「卡片简介太模板化，能否自动从游戏文件识别内容并总结成介绍」拍板混合方案）
+
+- **批次源**：用户截图反馈模拟器卡片简介呆板（8 张卡片 5 张被省略号截断，句式统一「AI 驱动的X（kw1/kw2/kw3），需配置 AI 接口；存档走 localStorage」——后半句是开发技术细节混入用户文案）。探索实证：22 款种子简介全部硬编码于 `assets/simulators/manifest.json`（人工模板句）；导入游戏 description 为空（manifest_parser 宽容降级空串，卡片空白）；游戏内容载体在 JS 内 prompt 设定段（蛛网之影「世界观」13 处）而非可见 UI（每款仅 400~500 字符按钮词）。基线 `d2a1c9c`。
+- **方案拍板**：AskUserQuestion 三选一 → **混合方案**（规则提取即时兜底恒开 + LLM 精修可选开关 + 结果写回 manifest 缓存；种子 22 款一次性生成固化）。备选被否：纯规则（无文采）/ 纯人工（不满足「自动」）。
+- **落地五块**：① `game_summary_extractor.dart` 纯函数提取器（`<title>` + 可见文本 + JS prompt 段关键词窗口抽取，容错逐级降级不抛，`maxFallbackChars=60` 码点截断不劈代理对）；② `game_description_generator.dart` LLM 精修（仿 GameGenerator 链：LLMFactory + `_resolveGenerationCredentials` S4 装配单点第六处，`callRefine` seam，prompt 显式禁「AI 驱动/模拟器/localStorage」技术词 + 反虚构约束，`maxSummaryTokens=100`）；③ `game_summary_service.dart` 编排（导入成功 → 规则简介同步写回 onlyIfEmpty → 开关开启时异步精修替换 → 落盘后 `onDescriptionRefined` 刷新列表，无「生成中」UI 态）；④ 写回单源化——`_updateManifestEntryDescription` 上提 `import_service.updateManifestEntryDescription`（含 onlyIfEmpty 模式，F-47 与本品共用一条读-改-写原子路径）；⑤ 设置键 `simulator_llm_description_enabled`（默认关，成本敏感 opt-in）+ 对话设置页「模拟器简介」区开关。
+- **接线**：import_flow 新增 `OnGameImported` 成功挂点（typedef + 构造注入 + handleImport 成功路径调用）；simulators_view 缺省流接线 `GameSummaryService`；app.dart 两个新 provider（GameDescriptionGenerator 于 GameGenerator 后、GameSummaryService 于 SimulatorsController 后——refresh 回调依赖 controller 装配）。
+- **证伪抓出 2 真 bug（先红后绿实锤）**：① 仿微.html fallback 残留孤立 `<div`——snippet 窗口截断把 `</textarea>` 切走，`_stripTagsAndFragments` 补清截断残留尖括号；② 规则提取全空（纯 CSS 页面）时精修仍被触发——LLM 无内容依据会凭空编造，服务层改「fallback 为空 → 不写回也不调度精修」。
+- **种子 22 款固化**：以提取的 title + prompt 段为依据逐款核写（本环境无 API key，由主模型承担「LLM 生成 + 人工审校」角色，约束与功能内 prompt 逐字一致：≤60 字 / 无技术词 / 只写实际内容）；Python 只改 description 字段重写 manifest（diff 22 行全为 description）；样例：蛛网之影「在纽约高楼间荡起蛛丝，背负『能力越大责任越大』的英雄宿命」、仿微「在仿真的微信界面里经营社交关系——聊天、朋友圈，还可导入文档定制角色」。
+- **期末全量**：**2897 测**绿（新增 30 用例：extractor 10 / generator 7 / service 8 / 设置键 1 / 开关 1 / 挂点 3）/ analyze 0 / 波及文件覆盖率全 ≥90%（两新服务 100%，import_service 95.6%）。
+- **存量失败记录（非本批引入）**：`manual_pages_test` 版本防漂移失败——pubspec 已是 `1.1.0+2`，AboutPage.appVersion 仍报 `1.0.0+1`（发布批 7f20557 改版本号漏改 About 页），`git stash` 回基线复现确认 → **落债 F-157**（Strong，发布卫生）。
+- **批次收尾**：TO-TICKETS 归档「模拟器简介自动生成批次」（GS-01~03，commit `45fe7f5`）；TECH_DEBT 候选区录 F-157；AGENTS 状态行追加；手册 §8/§9 补「卡片简介」「模拟器简介」两行。
+
+---
+
 ## 技术债消费批次 F-154~156 — 全部处置（2026-09-21 — 用户「继续处理 F-154~156」拍板，project-kickoff 全自动档）
 
 - **批次源**：用户「继续处理 F-154~156」（架构审查批次 C1~C8 波末/波末审核落债三条：relationship 构造死参 💭 / palace 字符口径漂移 💭 / _buildAssembleContext 双跑 CPU 🟡）；基线 `0066e0b`（2869 测）。项目完整模式 + 全自动档，高风险面②（F-156 触碰核心聊天链路）→ 标准档波 1 双并行。

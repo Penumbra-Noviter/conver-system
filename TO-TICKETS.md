@@ -27,6 +27,16 @@
 
 ## 已完成归档
 
+### 模拟器简介自动生成批次（2026-09-22 收口）
+
+> 来源：用户「每个模拟器卡片简介太模板化，能否自动从游戏文件识别内容并总结成介绍」（AskUserQuestion 三选一拍板**混合方案**：规则提取兜底 + LLM 精修可选 + 结果写回 manifest）。基线 `d2a1c9c`。门禁：全量 **2897 测**绿（新增 extractor/generator/service/写回/设置键/开关/挂点测试；**存量 1 失败** = `manual_pages_test` 版本防漂移——pubspec 1.1.0+2 vs AboutPage 1.0.0+1，基线即挂非本批引入，落债 F-157）/ analyze 0 / 波及文件覆盖率全 ≥90%（game_summary_extractor 98.2% / game_description_generator 100% / game_summary_service 100% / import_service 95.6% / game_generator 97.0%）/ 证伪抓出并修复 **2 真 bug**（窗口截断残留孤立标签「仿微.html `<div`」/ 规则提取全空时精修仍被触发——LLM 无内容依据会凭空编造，现直接跳过）。种子 22 款简介重写固化（以提取内容为依据 + 人工审校，约束与功能内 prompt 一致：≤60 字、无「AI 驱动/模拟器/localStorage」技术词）。详见 DEV_LOG〈模拟器简介自动生成批次 — 混合方案落地〉。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| GS-01 | 规则提取器 + LLM 精修 + 编排服务（game_summary_extractor / game_description_generator / game_summary_service） | 2026-09-22 | 45fe7f5 |
+| GS-02 | 设置键 `simulator_llm_description_enabled` + 对话设置页开关 + import_flow 挂点 + app.dart 装配 + view 接线 | 2026-09-22 | 45fe7f5 |
+| GS-03 | 种子 22 款简介重写固化 manifest + 手册 §8/§9 说明两行 | 2026-09-22 | 45fe7f5 |
+
 ### 技术债消费批次 F-154~156 全部处置（2026-09-21 收口）
 
 > 来源：用户「继续处理 F-154~156」（技术债消费决策点折回，project-kickoff 全自动档，标准档波 1 双并行——高風險面② 命中核心聊天链路）。基线 `0066e0b`（2869 测）。门禁：全量 **2869 测**绿（与基线等数）/ analyze 0 / 波及文件覆盖率全 ≥90%（relationship_service 98.5% / chat_service 92.5%）/ 波末增量审核 **0 阻断**（F-156 send 腿零 segments 支付静态求证 + 命名疑似项实证排除）/ 期末四轴 **通过（0 阻断，1 💭 格式已收尾 f688b1b）**。F-155 复核关闭（零代码，漂移已双处文档化 + 修复属过度工程）。**候选区清零**。详见 DEV_LOG〈技术债消费批次 F-154~156 — 全部处置〉与 `.scratch/techdebt-f154f156/`（orchestration/evidence）。
