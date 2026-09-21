@@ -8,14 +8,10 @@ library;
 import 'package:conver_system_mobile/data/database/app_database.dart';
 import 'package:conver_system_mobile/data/database/tables.dart';
 import 'package:conver_system_mobile/data/repositories/companion_repository.dart';
-import 'package:conver_system_mobile/data/repositories/conversation_repository.dart';
 import 'package:conver_system_mobile/data/repositories/message_repository.dart';
-import 'package:conver_system_mobile/data/repositories/settings_repository.dart';
 import 'package:conver_system_mobile/services/companion/relationship_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import '../../helpers/in_memory_secret_store.dart';
 
 /// 测试专用确定性阈值（与默认值不同，验证「构造可注入」且不锁默认快照）。
 const _testThresholds = RelationshipThresholds(
@@ -27,7 +23,6 @@ const _testThresholds = RelationshipThresholds(
 void main() {
   late AppDatabase db;
   late CompanionRepository companion;
-  late ConversationRepository conversations;
   late MessageRepository messages;
   late RelationshipService service;
   late DateTime fixedNow;
@@ -36,14 +31,9 @@ void main() {
     db = AppDatabase(NativeDatabase.memory());
     fixedNow = DateTime(2026, 9, 15, 12, 0, 0);
     companion = CompanionRepository(db, now: () => fixedNow);
-    conversations = ConversationRepository(
-      db,
-      SettingsRepository(database: db, secretStore: InMemorySecretStore()),
-    );
     messages = MessageRepository(db);
     service = RelationshipService(
       companionRepository: companion,
-      conversationRepository: conversations,
       messageRepository: messages,
       now: () => fixedNow,
       thresholds: _testThresholds,
@@ -439,7 +429,6 @@ void main() {
       // 下确认重算 58+3=61 仍达下限，无法复现「跨档后数值不足」中间态。
       final defaultService = RelationshipService(
         companionRepository: companion,
-        conversationRepository: conversations,
         messageRepository: messages,
         now: () => fixedNow,
       );
@@ -484,7 +473,6 @@ void main() {
       final ids = await seedCharacterWithConversation();
       final defaultService = RelationshipService(
         companionRepository: companion,
-        conversationRepository: conversations,
         messageRepository: messages,
         now: () => fixedNow,
       );

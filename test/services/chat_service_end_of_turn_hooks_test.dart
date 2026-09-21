@@ -331,7 +331,6 @@ void main() {
       final boomRepo = _BoomCompanionRepository(db);
       final relationship = RelationshipService(
         companionRepository: boomRepo,
-        conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         now: () => DateTime(2026, 9, 15, 12, 0, 0),
       );

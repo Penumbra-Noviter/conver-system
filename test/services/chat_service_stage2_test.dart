@@ -158,7 +158,6 @@ void main() {
 
   RelationshipService buildRelationship() => RelationshipService(
     companionRepository: companionRepo,
-    conversationRepository: conversationRepo,
     messageRepository: messageRepo,
     now: () => fixedNow,
   );
@@ -651,7 +650,6 @@ void main() {
       final boomRepo = _BoomCompanionRepository(db);
       final relationship = RelationshipService(
         companionRepository: boomRepo,
-        conversationRepository: conversationRepo,
         messageRepository: messageRepo,
         now: () => fixedNow,
       );

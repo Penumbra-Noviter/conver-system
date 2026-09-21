@@ -22,7 +22,6 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import '../../data/database/app_database.dart' show RelationshipState;
 import '../../data/database/tables.dart';
 import '../../data/repositories/companion_repository.dart';
-import '../../data/repositories/conversation_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import 'companion_time_windows.dart' show CompanionTimeWindows;
 
@@ -161,7 +160,6 @@ class RelationshipService {
   /// 注入点（测试确定性）。
   RelationshipService({
     required CompanionRepository companionRepository,
-    required ConversationRepository conversationRepository,
     required MessageRepository messageRepository,
     DateTime Function()? now,
     RelationshipThresholds? thresholds,
