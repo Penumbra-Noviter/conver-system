@@ -20,6 +20,7 @@
 | Flutter `version` | Android | 说明 |
 |---|---|---|
 | `1.0.0+1` | versionName=`1.0.0` / versionCode=`1` | **首发基线**（M7 定版，不得回退） |
+| `1.1.0+2` | versionName=`1.1.0` / versionCode=`2` | 首次新功能发布（角色对话打磨对齐桌面 1.1.0：swipes/世界书/记忆宫殿/叙述风格/预设对话/专家模式/采样参数/Prompt Debug/分支 + 人机恋三段 + 架构深化） |
 | `+BUILD` 段 | versionCode | 单调递增整数；Android 以此判定新旧、阻止降级安装 |
 | `MAJOR.MINOR.PATCH` 段 | versionName | 展示给用户；同上架页面「版本」列 |
 

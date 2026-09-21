@@ -4,9 +4,9 @@ Conver System 的移动端应用（Flutter，Android + iOS 独立运行，无桌
 
 ## 状态
 
-- **当前状态见 [AGENTS.md](AGENTS.md) §当前状态**——逐批次交付记录（M0~M7 + 人机恋阶段 + 技术债批次，最新在前，2026-09-21 收口 F-140/141/142，全量 2836 测绿）
+- **当前状态见 [AGENTS.md](AGENTS.md) §当前状态**——逐批次交付记录（M0~M7 + 人机恋阶段 + 技术债 + 架构深化批次，最新在前，2026-09-21 收口 F-154~156，全量 2869 测绿；当前版本 1.1.0+2）
 - **已做与避坑见 [DEV_LOG.md](DEV_LOG.md)**（倒序，最新在前）
-- **里程碑定位**：M0 脚手架（2026-08-29）→ M1 数据层+设置 → M2 聊天核心 → M3 角色+搜索 → M4 导出/文档解析 → M5 模拟器全量 → M6 去 AI 味打磨 → M7 发布（Android 2026-09-09；iOS 延后，Windows 无 macOS 路径）
+- **里程碑定位**：M0 脚手架（2026-08-29）→ M1 数据层+设置 → M2 聊天核心 → M3 角色+搜索 → M4 导出/文档解析 → M5 模拟器全量 → M6 去 AI 味打磨 → M7 发布（Android 2026-09-09；iOS 延后，Windows 无 macOS 路径）→ 1.1.0 角色对话增强（2026-09-21）
 - 权威设计文档：`docs/mobile-design.md`（架构 / 7 项功能全量 / 依赖清单 / 里程碑）
 - 技术调研：`docs/mobile-adaptation-research.md`
 - 模拟器决策（ADR-0002）与桌面环境装载/验证记录见桌面端仓库：`desktop/CONSENSUS.md`、`desktop/DEV_LOG.md`
@@ -15,6 +15,7 @@ Conver System 的移动端应用（Flutter，Android + iOS 独立运行，无桌
 
 - [项目规则](AGENTS.md) — 技术栈、目录约定、测试规范、档位制
 - [项目介绍](PROJECT_REFERENCE.md) — 背景、关键决策、常碰坑点
+- [用户使用手册](docs/user-manual.md) — 面向最终用户：安装 / Key 配置 / 全部功能使用 / 隐私 / 常见问题
 - [设计文档](docs/mobile-design.md) — 架构、7 项功能、模拟器专题、里程碑 M0–M7（单一事实来源）
 - [任务清单](TO-TICKETS.md) — 唯一待办事实来源（M0–M7 已录入）
 - [发布指南](docs/release-android.md) — 版本策略、AAB/APK 发布命令链、签名核对、keystore 生命周期
