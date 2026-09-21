@@ -48,9 +48,8 @@ import 'import_service.dart'
         ImportResult,
         SimulatorDuplicateError,
         importGame,
-        readManifestOrRebuild,
         scanSuspicious,
-        writeManifest;
+        updateManifestEntryDescription;
 
 /// 最大重试次数（校验失败后重试打磨；桌面 MAX_RETRIES 逐字）——总尝试
 /// attempt ≤ 首试 + maxGenerationRetries = 4。
@@ -560,8 +559,8 @@ class GameGenerator {
   }
 
   /// 将派生 description 补写回 sim_dir/manifest.json 对应条目（F-47）——幂等：
-  /// 条目不存在 / 已一致 / id 缺失均不写盘（读操作经 [readManifestOrRebuild]
-  /// 自带自愈口径，与导入链一致）。
+  /// 条目不存在 / 已一致 / id 缺失均不写盘。委托 import_service 公开
+  /// [updateManifestEntryDescription] 读-改-写单一落点，不重复实现。
   void _updateManifestEntryDescription(
     Directory simDir,
     Map<String, dynamic> game,
@@ -571,21 +570,7 @@ class GameGenerator {
     if (id is! String || description is! String) {
       return;
     }
-    final manifest = readManifestOrRebuild(simDir);
-    final simulators = manifest['simulators'];
-    if (simulators is! List) {
-      return;
-    }
-    for (final entry in simulators) {
-      if (entry is Map && entry['id'] == id) {
-        if (entry['description'] == description) {
-          return; // 幂等：已一致不重写
-        }
-        entry['description'] = description;
-        writeManifest(simDir, manifest);
-        return;
-      }
-    }
+    updateManifestEntryDescription(simDir, id, description);
   }
 }
 

@@ -96,6 +96,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
   bool _narrativeEnabled = true;
   final TextEditingController _narrativeRulesController =
       TextEditingController();
+  bool _simulatorSummaryRefineEnabled = false;
   bool _loaded = false;
 
   /// 生产缺省 client 工厂（VR-09）：按装配面快照构造 dio 直连实现。
@@ -155,6 +156,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
             SettingsRepository.embeddingBaseUrlKey,
           );
       final embeddingModel = await widget.settingsRepository.embeddingModel;
+      final simulatorSummaryRefineEnabled =
+          await widget.settingsRepository.simulatorLlmDescriptionEnabled;
       if (!mounted) {
         return;
       }
@@ -172,6 +175,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         _embeddingApiKeyController.text = embeddingApiKey;
         _embeddingBaseUrlController.text = embeddingBaseUrl;
         _embeddingModelController.text = embeddingModel;
+        _simulatorSummaryRefineEnabled = simulatorSummaryRefineEnabled;
         _loaded = true;
       });
     } catch (e) {
@@ -425,6 +429,29 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
     }
   }
 
+  /// 切换模拟器简介 LLM 精修开关（本批次，即时写入
+  /// `simulator_llm_description_enabled` 键）。
+  ///
+  /// 默认关（成本敏感 opt-in：开启后导入游戏简介将调用已配置 LLM 生成）；
+  /// 写失败回滚 UI 状态并提示；开关即时生效，无需点「保存」。规则提取兜底
+  /// 简介恒执行，与本开关无关。
+  Future<void> _setSimulatorSummaryRefine(bool value) async {
+    setState(() => _simulatorSummaryRefineEnabled = value);
+    try {
+      await widget.settingsRepository.setMany({
+        SettingsRepository.simulatorLlmDescriptionEnabledKey: value.toString(),
+      });
+    } catch (e) {
+      debugPrint('模拟器简介精修开关保存失败: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() => _simulatorSummaryRefineEnabled = !value);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('保存失败')));
+    }
+  }
+
   /// 测试连接（VR-09）：读表单三权现值（key / base_url / model）组装
   /// [EmbeddingEndpointConfig]，经 [ConversationSettingsPage.embeddingClientFactory]
   /// 构造 client 后 `embed(['ping'])` 直连验证。
@@ -653,6 +680,24 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     decoration: const InputDecoration(
                       hintText: '每 N 回合归纳一次',
                     ),
+                  ),
+                  const SizedBox(height: ConverSpacing.space5),
+                  Divider(thickness: 1, color: palette.border),
+                  const SizedBox(height: ConverSpacing.space2),
+                  Text(
+                    '模拟器简介',
+                    style: textTheme.titleMedium?.copyWith(color: palette.ink1),
+                  ),
+                  const SizedBox(height: ConverSpacing.space1),
+                  Text(
+                    '导入游戏自动生成简介（规则提取恒开；精修需调用已配置 LLM）',
+                    style: textTheme.bodySmall?.copyWith(color: palette.ink4),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('简介 LLM 精修'),
+                    value: _simulatorSummaryRefineEnabled,
+                    onChanged: _setSimulatorSummaryRefine,
                   ),
                   const SizedBox(height: ConverSpacing.space5),
                   Divider(thickness: 1, color: palette.border),

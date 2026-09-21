@@ -6,7 +6,7 @@
       "file": "人生模拟器v3.html",
       "name": "人生模拟器 v3",
       "type": "ai",
-      "description": "AI 驱动的生命模拟（天赋/事件/结局），需配置 AI 接口；存档走 localStorage（ls_ 前缀）",
+      "description": "从天赋到结局，投胎开启第二人生——每个选择都改写命运的轨迹",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -23,7 +23,7 @@
       "file": "蛛网之影.html",
       "name": "蛛网之影",
       "type": "ai",
-      "description": "AI 驱动的蜘蛛侠世界观角色扮演，需配置 AI 接口；存档走 localStorage（spiderweb_ 前缀）",
+      "description": "在纽约高楼间荡起蛛丝，背负「能力越大责任越大」的英雄宿命",
       "config": {
         "endpoint": "set-endpoint",
         "apikey": "set-apikey",
@@ -39,7 +39,7 @@
       "file": "ido偶像模拟器.html",
       "name": "星途物语 · 爱豆模拟器",
       "type": "ai",
-      "description": "AI 驱动的偶像养成模拟（星途物语：出道/通告/粉丝），需配置 AI 接口；存档走 localStorage（xingtu_ 前缀）",
+      "description": "架空近未来娱乐圈，从练习生到顶流——通告、资源与危机写就你的星途",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -55,7 +55,7 @@
       "file": "仙途.html",
       "name": "仙途",
       "type": "ai",
-      "description": "AI 驱动的修仙模拟（玄元大陆：境界/奇遇/宗门），需配置 AI 接口；存档走 localStorage（xiantu_ 前缀）",
+      "description": "踏入玄元大陆修真问道，境界、奇遇与宗门抉择成就你的仙途",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -71,7 +71,7 @@
       "file": "仿微.html",
       "name": "仿微 · 微信 AI",
       "type": "ai",
-      "description": "AI 驱动的微信界面社交模拟（仿微：聊天/朋友圈），需配置 AI 接口；存档走 localStorage（wxai_ 前缀）",
+      "description": "在仿真的微信界面里经营社交关系——聊天、朋友圈，还可导入文档定制角色",
       "config": {
         "endpoint": "inpBase",
         "apikey": "inpKey",
@@ -88,7 +88,7 @@
       "file": "侦探模拟v3.html",
       "name": "迷雾侦探 v3",
       "type": "ai",
-      "description": "AI 驱动的推理探案（迷雾侦探：现场/线索/结案），需配置 AI 接口；存档走 localStorage（detective-ai- 前缀）",
+      "description": "亲临迷雾现场收集线索，与 AI 搭档抽丝剥茧——直到揭出结案真相",
       "config": {
         "endpoint": "api-base",
         "apikey": "api-key",
@@ -104,7 +104,7 @@
       "file": "克苏鲁跑团AIv2.html",
       "name": "克苏鲁跑团 v2",
       "type": "ai",
-      "description": "AI 守秘人的克苏鲁跑团（CoC 7e：调查/检定/理智），需配置 AI 接口；存档走 localStorage（coc_ 前缀）",
+      "description": "CoC 7e 守秘人主持的调查团，检定与理智值是你的生存赌注",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -120,7 +120,7 @@
       "file": "哈利波特.html",
       "name": "霍格沃茨 · 命运之书",
       "type": "ai",
-      "description": "哈利·波特世界观 AI 角色扮演（霍格沃茨命运之书），需配置 AI 接口；存档走 localStorage（hpbook_ 前缀）",
+      "description": "翻开命运之书，在霍格沃茨的魔法天空下书写你的巫师传说",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -136,7 +136,7 @@
       "file": "小马宝莉.html",
       "name": "小马宝莉",
       "type": "ai",
-      "description": "小马宝莉世界观 AI 角色扮演，需配置 AI 接口；存档走 localStorage（wg_ 前缀）",
+      "description": "小马谷的友谊魔法——在小马利亚与伙伴们开启温暖的冒险日常",
       "config": {
         "endpoint": "s-endpoint",
         "apikey": "s-key",
@@ -152,7 +152,7 @@
       "file": "恋樱学园v2.html",
       "name": "恋樱学园 v2",
       "type": "ai",
-      "description": "AI 驱动的校园恋爱模拟（恋樱学园），需配置 AI 接口；存档走 localStorage（sakura_ 前缀）",
+      "description": "重返樱花盛开的校园，在心动与日常间经营青涩的恋爱物语",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -168,7 +168,7 @@
       "file": "无尽之海.html",
       "name": "无尽之海",
       "type": "ai",
-      "description": "AI 驱动的航海冒险模拟（无尽之海：航行/贸易/探险），需配置 AI 接口；存档走 localStorage（endless_sea_ 前缀）",
+      "description": "扬帆无尽之海，掌握潮汐之力——航海、冒险与深海秘辛等你探索",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -184,7 +184,7 @@
       "file": "无限流v2.html",
       "name": "无限流 v2",
       "type": "ai",
-      "description": "AI 驱动的无限流副本轮回模拟（无限轮回），需配置 AI 接口；存档走 localStorage（il_ 前缀）",
+      "description": "坠入无限轮回的副本世界，在一次次循环中挣扎求生、寻找出口",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -200,7 +200,7 @@
       "file": "暮色女巫v2.html",
       "name": "暮色女巫 v2",
       "type": "ai",
-      "description": "AI 驱动的女巫生存模拟（灰溪村的冬天：痕迹/搜查/审判），需配置 AI 接口；存档走 localStorage（twilight_ 前缀）",
+      "description": "1387 年欧洲边境的寒冬村庄，你是一名挣扎求生的年轻女巫",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -219,7 +219,7 @@
       "file": "朕的江山.html",
       "name": "朕的江山",
       "type": "ai",
-      "description": "AI 驱动的皇帝治国模拟（朝政/选妃/天下），需配置 AI 接口；存档走 localStorage（emperor_ 前缀）",
+      "description": "登基大晟朝，朝堂博弈、民生国策与江山抉择尽在你的御案",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -235,7 +235,7 @@
       "file": "江湖志v2.html",
       "name": "江湖志 v2",
       "type": "ai",
-      "description": "AI 驱动的武侠人生角色扮演（江湖志：闯荡/门派/恩怨），需配置 AI 接口；存档走 localStorage（jianghu_ 前缀）",
+      "description": "踏入《江湖志》武侠世界，刀光剑影里书写一生——死亡可回档重来",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -251,7 +251,7 @@
       "file": "灵网飞升.html",
       "name": "灵网飞升",
       "type": "ai",
-      "description": "AI 驱动的赛博修仙角色扮演（灵网飞升：灵网/飞升），需配置 AI 接口；存档走 localStorage（lwfs_ 前缀）",
+      "description": "灵硅纪元的赛博修仙——底层艰辛、作恶有代价，一切按世界观运转",
       "config": {
         "endpoint": "a-base",
         "apikey": "a-key",
@@ -267,7 +267,7 @@
       "file": "社会.html",
       "name": "混社会模拟器",
       "type": "ai",
-      "description": "AI 驱动的混社会人生角色扮演（《混社会模拟器》），需配置 AI 接口；存档走 localStorage（hsh_ 前缀）",
+      "description": "在临江市的三面江湖里打拼——帮派、行动与结局由你选择写就",
       "config": {
         "endpoint": "w-endpoint",
         "apikey": "w-apikey",
@@ -283,7 +283,7 @@
       "file": "神明v3.html",
       "name": "神明 v3",
       "type": "ai",
-      "description": "AI 驱动的都市神明模拟（Urban God），需配置 AI 接口；存档走 localStorage（god_ 前缀）",
+      "description": "2047 年新京市，你是一位降临都市的神明，俯瞰觉醒者世界的暗流",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -300,7 +300,7 @@
       "file": "许愿柳.html",
       "name": "许愿柳",
       "type": "ai",
-      "description": "AI 驱动的沉浸式角色扮演（许愿柳），需配置 AI 接口；存档走 localStorage（xuyangliu_ 前缀）",
+      "description": "寻到许愿柳，许下一个愿望——它必实现，但请想清楚你究竟想要什么",
       "config": {
         "endpoint": "api-base",
         "apikey": "api-key",
@@ -317,7 +317,7 @@
       "file": "都市异能v2.html",
       "name": "都市异能 v2",
       "type": "ai",
-      "description": "AI 驱动的都市异能角色扮演（Urban Awakening），需配置 AI 接口；存档走 localStorage（urban_ 前缀）",
+      "description": "觉醒你的核心异能——它决定战斗风格与你在都市中的每一步",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",
@@ -334,7 +334,7 @@
       "file": "高中生模拟器.html",
       "name": "高中生模拟器",
       "type": "ai",
-      "description": "AI 驱动的高中校园生活角色扮演，需配置 AI 接口；存档走 localStorage（wg_ 前缀）",
+      "description": "回到 2020 年代的海城高中，青春与遗憾都从这里开始",
       "config": {
         "endpoint": "s-endpoint",
         "apikey": "s-key",
@@ -350,7 +350,7 @@
       "file": "魔法少女小圆.html",
       "name": "魔法少女小圆",
       "type": "ai",
-      "description": "魔法少女小圆世界观 TRPG（见泷原），AI 驱动，需配置 AI 接口；存档走 localStorage（madoka_ 前缀）",
+      "description": "见泷原的魔法少女 TRPG——与丘比缔结契约，用愿望换取战斗的宿命",
       "config": {
         "endpoint": "cfg-endpoint",
         "apikey": "cfg-apikey",

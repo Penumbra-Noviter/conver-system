@@ -398,6 +398,59 @@ void main() {
       await tester.pump();
       expect(find.text('导入失败：Bad state: 磁盘故障'), findsOneWidget);
     });
+
+    testWidgets('onImported 挂点：成功导入后回调（数据目录/条目/HTML 文本）',
+        (tester) async {
+      final calls = <(String, String)>[];
+      final flow = SimulatorImportFlow(
+        resolveSimDir: () async => parent,
+        pickHtmlFile: () async =>
+            (name: 'game.html', bytes: utf8.encode('<html>内容</html>')),
+        runImportGame: (dir, name, bytes) async => okResult(),
+        onImported: (dir, game, html) =>
+            calls.add((game['id'] as String, html)),
+      );
+      await _pumpHarness(tester, flow);
+      await tester.tap(find.text('导入'));
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      expect(calls, [('game', '<html>内容</html>')]);
+      expect(find.text('导入成功'), findsOneWidget);
+    });
+
+    testWidgets('onImported 挂点：失败（重复 409）→ 不回调', (tester) async {
+      var called = false;
+      final flow = SimulatorImportFlow(
+        resolveSimDir: () async => parent,
+        pickHtmlFile: () async =>
+            (name: 'dup.html', bytes: utf8.encode('<html>重复</html>')),
+        runImportGame: (dir, name, bytes) async =>
+            throw const SimulatorDuplicateError(
+          '游戏已存在（内容与现有文件相同）：dup.html',
+        ),
+        onImported: (dir, game, html) => called = true,
+      );
+      await _pumpHarness(tester, flow);
+      await tester.tap(find.text('导入'));
+      await tester.pumpAndSettle();
+      expect(called, isFalse);
+    });
+
+    testWidgets('onImported 挂点：未接线（null）→ 零副作用不崩', (tester) async {
+      final flow = SimulatorImportFlow(
+        resolveSimDir: () async => parent,
+        pickHtmlFile: () async =>
+            (name: 'game.html', bytes: utf8.encode('<html>x</html>')),
+        runImportGame: (dir, name, bytes) async => okResult(),
+      );
+      await _pumpHarness(tester, flow);
+      await tester.tap(find.text('导入'));
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('导入成功'), findsOneWidget);
+    });
   });
 
   group('hooks 接线 — SimulatorsView 导入入口派发到导入流', () {

@@ -69,6 +69,7 @@ void main() {
           'memory_palace_every_rounds',
           'narrative_style_enabled',
           'narrative_style_rules',
+          'simulator_llm_description_enabled',
         }),
       );
     });
@@ -101,6 +102,34 @@ void main() {
       expect(
         SettingsRepository.allowedKeys,
         isNot(contains('${SecretStore.embeddingApiKeySlot}_extra')),
+      );
+    });
+
+    test('模拟器简介精修键经常量锚定 + 默认关 + 往返', () async {
+      expect(
+        SettingsRepository.simulatorLlmDescriptionEnabledKey,
+        'simulator_llm_description_enabled',
+      );
+      expect(
+        SettingsRepository.allowedKeys,
+        contains(SettingsRepository.simulatorLlmDescriptionEnabledKey),
+      );
+      // 默认关（成本敏感 opt-in）。
+      expect(await repository.simulatorLlmDescriptionEnabled, isFalse);
+      // 写入 'true' → 开；其他值 → 关。
+      await repository.setMany({
+        SettingsRepository.simulatorLlmDescriptionEnabledKey: 'true',
+      });
+      expect(await repository.simulatorLlmDescriptionEnabled, isTrue);
+      await repository.setMany({
+        SettingsRepository.simulatorLlmDescriptionEnabledKey: 'false',
+      });
+      expect(await repository.simulatorLlmDescriptionEnabled, isFalse);
+      // 白名单外写入不落表。
+      await repository.setMany({'simulator_llm_description_enabled_extra': '1'});
+      expect(
+        await tableRows().then((rows) => rows.keys),
+        isNot(contains('simulator_llm_description_enabled_extra')),
       );
     });
 

@@ -26,8 +26,8 @@
 /// `findDuplicate` / `nextAvailableFilename` / `scanInputIds` / `probeConfig` /
 /// `probeEndpointMode` / `scanSuspicious` / `readManifest` / `writeManifest` /
 /// `readManifestOrRebuild` / `rebuildManifest` / `appendManifestEntry` /
-/// `importGame` / `ImportResult` / `SimulatorImportError` /
-/// `SimulatorDuplicateError` / `ManifestAppender`。
+/// `updateManifestEntryDescription` / `importGame` / `ImportResult` /
+/// `SimulatorImportError` / `SimulatorDuplicateError` / `ManifestAppender`。
 library;
 
 import 'dart:convert';
@@ -695,6 +695,41 @@ void appendManifestEntry(Directory simDir, Map<String, dynamic> entry) {
   final manifest = readManifestOrRebuild(simDir);
   (manifest['simulators'] as List).add(entry);
   writeManifest(simDir, manifest);
+}
+
+/// 将 description 写回 sim_dir/manifest.json 对应 id 条目（读-改-写原子替换）——
+/// 幂等：条目不存在 / 已一致 / id 缺失均不写盘（读操作经
+/// [readManifestOrRebuild] 自带自愈口径，与导入链一致）。
+///
+/// 本函数是「description 补写回 manifest」的单一落点：GameGenerator 派生描述
+/// （F-47）与简介生成（本批次导入挂点）共用；[onlyIfEmpty] = true 时条目已有
+/// 非空 description 则跳过（用于「仅填充缺失描述」路径——导入游戏补简介不
+/// 覆盖既有描述）。
+void updateManifestEntryDescription(
+  Directory simDir,
+  String id,
+  String description, {
+  bool onlyIfEmpty = false,
+}) {
+  final manifest = readManifestOrRebuild(simDir);
+  final simulators = manifest['simulators'];
+  if (simulators is! List) {
+    return;
+  }
+  for (final entry in simulators) {
+    if (entry is Map && entry['id'] == id) {
+      final current = entry['description'];
+      if (onlyIfEmpty && current is String && current.isNotEmpty) {
+        return; // 仅填充缺失描述：既有描述不覆盖
+      }
+      if (current == description) {
+        return; // 幂等：已一致不重写
+      }
+      entry['description'] = description;
+      writeManifest(simDir, manifest);
+      return;
+    }
+  }
 }
 
 /// 现存 manifest 条目 id 集（缺失/损坏按磁盘重建口径，与 append 自愈一致）。

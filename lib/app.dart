@@ -35,7 +35,10 @@ import 'services/memory/reflection_service.dart';
 import 'services/notifications/notification_service.dart';
 import 'services/onboarding.dart';
 import 'services/secure_store.dart';
+import 'services/simulator/game_description_generator.dart'
+    show GameDescriptionGenerator;
 import 'services/simulator/game_generator.dart';
+import 'services/simulator/game_summary_service.dart' show GameSummaryService;
 import 'services/simulator/seed_service.dart';
 import 'services/simulator/simulator_contracts.dart';
 import 'services/simulator/simulator_data_dir.dart';
@@ -644,6 +647,17 @@ class ConverApp extends StatelessWidget {
             );
           },
         ),
+        // 简介 LLM 精修（本批次，混合方案）：复用 LLM 工厂 + 凭据解析单点
+        // （S4 装配收敛第六处），失败由 GameSummaryService 内部降级。
+        Provider<GameDescriptionGenerator>(
+          create: (context) {
+            final settings = context.read<SettingsRepository>();
+            return GameDescriptionGenerator(
+              providerFactory: context.read<LLMProviderFactory>(),
+              resolveCredentials: () => _resolveGenerationCredentials(settings),
+            );
+          },
+        ),
         ChangeNotifierProvider<SimulatorsController>(
           create: (context) {
             final dataDir = SimulatorDataDir();
@@ -676,6 +690,18 @@ class ConverApp extends StatelessWidget {
               loadManifest: loadManifestViaHttp,
             );
           },
+        ),
+        // 模拟器简介编排（本批次，混合方案）：导入挂点消费。声明于
+        // SimulatorsController 之后——onDescriptionRefined 刷新回调依赖
+        // controller 装配。精修开关读取设置键（默认关，成本敏感 opt-in）。
+        Provider<GameSummaryService>(
+          create: (context) => GameSummaryService(
+            generator: context.read<GameDescriptionGenerator>(),
+            llmRefinementEnabled: () =>
+                context.read<SettingsRepository>().simulatorLlmDescriptionEnabled,
+            onDescriptionRefined: () =>
+                context.read<SimulatorsController>().refresh(),
+          ),
         ),
       ],
       child: Builder(

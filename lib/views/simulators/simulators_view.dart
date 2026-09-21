@@ -28,6 +28,7 @@ import 'package:provider/provider.dart'
     show ReadContext;
 
 import '../../services/simulator/game_generator.dart' show GameGenerator;
+import '../../services/simulator/game_summary_service.dart' show GameSummaryService;
 import '../../services/simulator/save_bridge.dart' show SaveGame;
 import '../../theme/colors.dart' show ConverRadii, ConverSpacing;
 import '../../theme/conver_palette.dart';
@@ -144,8 +145,22 @@ class _SimulatorsViewState extends State<SimulatorsView> {
   /// AppBar「导入」：注入/缺省导入流（同 _wireImportHook 语义；闭包经
   /// mounted 守卫后调用，context 为当前 State 有效 context）。
   Future<void> _openImportFlow(BuildContext context) {
-    final flow = widget.importFlow ?? SimulatorImportFlow();
+    final flow = widget.importFlow ?? _buildDefaultImportFlow(context);
     return flow.handleImport(context);
+  }
+
+  /// 生产默认导入流（本批次）：接线简介编排服务——导入成功 → 规则简介写回 +
+  /// LLM 精修异步替换（精修落盘后经装配层刷新回调自动上屏，无「生成中」态）。
+  SimulatorImportFlow _buildDefaultImportFlow(BuildContext context) {
+    final summaryService = context.read<GameSummaryService>();
+    return SimulatorImportFlow(
+      onImported: (simDir, game, html) =>
+          summaryService.summarizeOnImport(
+            simDir: simDir,
+            game: game,
+            html: html,
+          ),
+    );
   }
 
   /// AppBar「AI 生成」：打开生成对话框（测试注入记录 fake；缺省 = 生产实现

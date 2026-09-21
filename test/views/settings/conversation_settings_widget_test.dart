@@ -110,6 +110,29 @@ void main() {
     expect(await repo.getTemperature(), greaterThan(0.7));
   });
 
+  testWidgets('模拟器简介精修开关：默认关 → 打开写库 → 重进回显开', (tester) async {
+    await pumpPage(tester);
+
+    // 默认关（成本敏感 opt-in）。
+    expect(await repo.simulatorLlmDescriptionEnabled, isFalse);
+    expect(
+      find.widgetWithText(SwitchListTile, '简介 LLM 精修'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.widgetWithText(SwitchListTile, '简介 LLM 精修'));
+    await tester.pumpAndSettle();
+    expect(await repo.simulatorLlmDescriptionEnabled, isTrue);
+
+    // 卸载后重建子页（强制重新 _load）→ 回显开。
+    await tester.pumpWidget(const SizedBox());
+    await pumpPage(tester);
+    final tile = tester.widget<SwitchListTile>(
+      find.widgetWithText(SwitchListTile, '简介 LLM 精修'),
+    );
+    expect(tile.value, isTrue);
+  });
+
   testWidgets('设置页「对话」导航入口 → 子页并可返回', (tester) async {
     final themeController = ThemeController(settingsRepository: repo);
     addTearDown(themeController.dispose);

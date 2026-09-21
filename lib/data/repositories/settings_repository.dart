@@ -92,6 +92,7 @@ class SettingsRepository implements SettingsReader {
     memoryPalaceEveryRoundsKey,
     narrativeStyleEnabledKey,
     narrativeStyleRulesKey,
+    simulatorLlmDescriptionEnabledKey,
   };
 
   /// theme_mode 落库键（ThemeController 跨文件契约键名）。
@@ -160,6 +161,13 @@ class SettingsRepository implements SettingsReader {
   /// embedding 模型落库键（阶段 3，VR-01，mobile 先行键；桌面无对应物）。
   /// 缺省 [defaultEmbeddingModel]（U1 裁决：`text-embedding-3-small`，可配置）。
   static const String embeddingModelKey = 'embedding_model';
+
+  /// 模拟器简介 LLM 精修开关落库键（本批次，mobile 先行键；桌面无对应物）。
+  /// 存储值 'true' 表示开启，其余一律视为关闭（**默认关闭**，成本敏感
+  /// opt-in：开启后导入游戏简介将调用已配置 LLM 生成，产生 token 消耗；规则
+  /// 提取兜底简介恒执行，与本品开关无关）。
+  static const String simulatorLlmDescriptionEnabledKey =
+      'simulator_llm_description_enabled';
 
   /// embedding 模型缺省（U1 裁决）——OpenAI Compatible 端点通用小模型；
   /// 取值语义锚定 spec §2 已定前提 8（未决项裁决 U1）。
@@ -508,6 +516,14 @@ class SettingsRepository implements SettingsReader {
   Future<String> get embeddingModel async {
     final value = await getValue(embeddingModelKey);
     return value.isEmpty ? defaultEmbeddingModel : value;
+  }
+
+  /// 模拟器简介 LLM 精修开关（本批次）；缺省 **false**（成本敏感 opt-in，
+  /// 对齐 [embeddingEnabled] / [memoryReflectionEnabled] 语义：存储值为
+  /// 'true' 时开启，空串 / 缺失 / 其他值一律 false）。
+  Future<bool> get simulatorLlmDescriptionEnabled async {
+    final value = await getValue(simulatorLlmDescriptionEnabledKey);
+    return value == 'true';
   }
 
   /// 默认 provider；缺省 [SettingsDefaults.provider]（镜像桌面

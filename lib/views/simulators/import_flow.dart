@@ -14,8 +14,11 @@
 /// [platformTimeout]（全部平台/IO 调用点超时兜底，缺省 10s——复用 M4
 /// `pickJsonWithTimeout` 超时兜底模式，挂起不挂死）。
 ///
-/// 协议表面（深模块）：[PickHtmlFile] / [RunImportGame] / [SimulatorImportFlow] /
-/// `defaultPickHtmlFile`。
+/// 协议表面（深模块）：[PickHtmlFile] / [RunImportGame] / [OnGameImported] /
+/// [SimulatorImportFlow] / `defaultPickHtmlFile`。
+// ignore_for_file: prefer_initializing_formals — 构造为公开命名参数（装配点
+// 语义）+ 私有 `_` 字段，initializing formal 无法同时满足两者（对齐
+// game_generator.dart 同款惯例）。
 library;
 
 import 'dart:async';
@@ -50,6 +53,12 @@ typedef PickHtmlFile = Future<PickedHtmlFile?> Function();
 typedef RunImportGame =
     Future<ImportResult> Function(Directory simDir, String filename, List<int> content);
 
+/// 导入成功回调（本批次简介生成挂点）：成功落盘后调用，参数为数据目录 /
+/// 条目 map / 解码后 HTML 文本。同步入口——内部可自行调度异步工作（如 LLM
+/// 精修 fire-and-forget）。null = 不接线（默认与测试行为零副作用）。
+typedef OnGameImported =
+    void Function(Directory simDir, Map<String, dynamic> game, String htmlText);
+
 /// 缺省 pick：file_picker 选单个 `.html`（FileType.custom +
 /// allowedExtensions ['html']）并读取字节；用户取消 → null。
 // coverage:ignore-start
@@ -80,14 +89,17 @@ class SimulatorImportFlow {
     Future<Directory> Function()? resolveSimDir,
     PickHtmlFile? pickHtmlFile,
     RunImportGame? runImportGame,
+    OnGameImported? onImported,
     this.platformTimeout = const Duration(seconds: 10),
   })  : _resolveSimDir = resolveSimDir ?? _defaultResolveSimDir,
         _pickHtmlFile = pickHtmlFile ?? defaultPickHtmlFile,
-        _runImportGame = runImportGame ?? importGame;
+        _runImportGame = runImportGame ?? importGame,
+        _onImported = onImported;
 
   final Future<Directory> Function() _resolveSimDir;
   final PickHtmlFile _pickHtmlFile;
   final RunImportGame _runImportGame;
+  final OnGameImported? _onImported;
 
   /// 平台/IO 调用点的超时兜底时长（挂起降级为明确文案，不挂死）。
   final Duration platformTimeout;
@@ -189,6 +201,9 @@ class SimulatorImportFlow {
       if (result == null) {
         return; // 超时取消 / 迟到补偿统一出口（toast 已在 TimeoutException 分支给出）
       }
+      // 简介生成挂点（本批次）：成功落盘后同步入口——规则提取写回 + LLM 精修
+      // 异步调度（内部自行管理，不阻塞导入反馈）。
+      _onImported?.call(simDir, result.game, text);
       final file = result.game['file'] as String? ?? picked.name;
       toast(
         result.renamed ? '导入成功（已改名为 $file）' : '导入成功',
