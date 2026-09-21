@@ -394,10 +394,7 @@ class _StreamRunState {
 /// 注入块 / 叙述风格 / 预设对话快照），**不进行任何上游 IO 读取**（F-149
 /// 单点收口不破坏）。
 class _AssembleContext {
-  _AssembleContext({
-    required this.built,
-    required this._buildSegments,
-  });
+  _AssembleContext({required this.built, required this._buildSegments});
 
   /// send 腿消费：经 `buildMessages` 的 `List<PromptMessage>`（立即求值，
   /// 世界书块展平为纯字符串）。
