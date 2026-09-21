@@ -12,14 +12,14 @@
 /// stranger 0-19 / acquainted 20-39 / familiar 40-59 / intimate 60-79 /
 /// soulmate 80-100（含端点语义）。
 ///
-/// 活跃口径（判定⑨）：该角色全部对话最近消息的 distinct 本地日期数
-/// （[activeDays]）；「最近 7 天有活动」= 最近消息 createdAt ≥ now − 7d
-/// （[isRecentlyActive]，≥ 语义）。
+/// 活跃口径（判定⑨，F-81 单源）：该角色「最近 7 天有活动」= 最近消息
+/// createdAt ≥ now − 7d（[isRecentlyActive]，≥ 语义；口径取
+/// [MessageRepository.latestMessageAt] 单查询判定）。
 library;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 
-import '../../data/database/app_database.dart' show Message, RelationshipState;
+import '../../data/database/app_database.dart' show RelationshipState;
 import '../../data/database/tables.dart';
 import '../../data/repositories/companion_repository.dart';
 import '../../data/repositories/conversation_repository.dart';
@@ -166,13 +166,11 @@ class RelationshipService {
     DateTime Function()? now,
     RelationshipThresholds? thresholds,
   }) : _companion = companionRepository,
-       _conversations = conversationRepository,
        _messages = messageRepository,
        _now = now ?? DateTime.now,
        _thresholds = thresholds ?? const RelationshipThresholds();
 
   final CompanionRepository _companion;
-  final ConversationRepository _conversations;
   final MessageRepository _messages;
   final DateTime Function() _now;
   final RelationshipThresholds _thresholds;
@@ -304,17 +302,6 @@ class RelationshipService {
     return _applyOrPropose(state, newAffinity, characterId);
   }
 
-  /// 该角色全部对话最近消息的 distinct 本地日期数（判定⑨；PS2-05 复用）。
-  /// F-129：日历日口径经 [CompanionTimeWindows.localDayOf] 单源取（proactive
-  /// 同日判定同源，消除两处独立实现的口径漂移）。
-  Future<int> activeDays(int characterId) async {
-    final messages = await _allMessagesFor(characterId);
-    return messages
-        .map((m) => CompanionTimeWindows.localDayOf(m.createdAt))
-        .toSet()
-        .length;
-  }
-
   /// 「最近 7 天有活动」：最近消息 createdAt ≥ now − 7d（≥ 语义，判定⑨）。
   /// 口径单源：[MessageRepository.latestMessageAt]（F-81）。
   Future<bool> isRecentlyActive(int characterId) async {
@@ -329,8 +316,9 @@ class RelationshipService {
 
   /// 回合推进增量：每回合 + 近 7 天活跃额外增量。
   ///
-  /// 「每日活跃 +2」取活跃信号（isRecentlyActive）而非 activeDays 乘法——
-  /// 防单次评估因历史活跃天数过多产生跳档跳跃；数值经 [nextAffinity] 恒 clamp。
+  /// 「每日活跃 +2」取活跃信号（[isRecentlyActive]，F-81 单源）而非按历史
+  /// 活跃天数乘算——防单次评估因历史活跃天数过多产生跳档跳跃；数值经
+  /// [nextAffinity] 恒 clamp。
   Future<int> _turnGain(int characterId) async {
     var gain = _thresholds.turnAffinityGain;
     if (await isRecentlyActive(characterId)) {
@@ -365,17 +353,5 @@ class RelationshipService {
       affinity: newAffinity,
     );
     return null;
-  }
-
-  /// 该角色全部对话的全部消息（活跃口径数据源）。
-  Future<List<Message>> _allMessagesFor(int characterId) async {
-    final conversations = await _conversations.listConversations(
-      characterId: characterId,
-    );
-    final messages = <Message>[];
-    for (final entry in conversations) {
-      messages.addAll(await _messages.getMessages(entry.conversation.id));
-    }
-    return messages;
   }
 }

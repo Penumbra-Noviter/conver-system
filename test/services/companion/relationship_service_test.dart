@@ -650,34 +650,6 @@ void main() {
   });
 
   group('活跃天数口径（判定⑨）', () {
-    test('activeDays：跨对话 distinct 本地日期数', () async {
-      final ids = await seedCharacterWithConversation();
-      final conv2 = await db.into(db.conversations).insertReturning(
-            ConversationsCompanion.insert(
-              characterId: ids.characterId,
-              createdAt: fixedNow,
-              updatedAt: fixedNow,
-            ),
-          );
-
-      // 同日期（本地）多条去重；跨日期计数。
-      final day1 = DateTime(2026, 9, 10, 8);
-      final day1b = DateTime(2026, 9, 10, 22);
-      final day2 = DateTime(2026, 9, 11, 9);
-      final day3 = DateTime(2026, 9, 12, 10);
-      await addMessage(conversationId: ids.conversationId, createdAt: day1);
-      await addMessage(conversationId: ids.conversationId, createdAt: day1b);
-      await addMessage(conversationId: conv2.id, createdAt: day2);
-      await addMessage(conversationId: ids.conversationId, createdAt: day3);
-
-      expect(await service.activeDays(ids.characterId), 3);
-    });
-
-    test('activeDays：无消息返回 0', () async {
-      final ids = await seedCharacterWithConversation();
-      expect(await service.activeDays(ids.characterId), 0);
-    });
-
     test('isRecentlyActive：最近消息 ≥ now−7d 为 true', () async {
       final ids = await seedCharacterWithConversation();
       await addMessage(

@@ -214,9 +214,6 @@ class _FakeRelationshipService implements RelationshipService {
   Future<void> rejectStageUpgrade({required int characterId}) async {}
 
   @override
-  Future<int> activeDays(int characterId) async => 0;
-
-  @override
   Future<bool> isRecentlyActive(int characterId) async => false;
 }
 
