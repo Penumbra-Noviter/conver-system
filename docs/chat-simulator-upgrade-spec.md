@@ -2,7 +2,7 @@
 
 > 来源：AI风月（aigirlfriendstudio.com）对标调研（证据链与本批三份规格笔记在仓库外 `D:\tmp\fetchflow-aigs\`：aigs-chat-sim-benchmark.md / aigs-lorebook-memory-palace-spec.md / aigs-mod-msg-branch-cg-spec.md）
 > 定位：纯本地、不盈利、不建社交体系；只做聊天与模拟器功能体验
-> 规则：本文件是五批工单的**规格依据**；工单本体登记在 TICKETS.md 活跃表，完成时按既有归档机制入档
+> 规则：本文件是五批工单的**规格依据**；工单本体登记在 TO-TICKETS.md 活跃表，完成时按既有归档机制入档
 
 ## 0. 全局约束（五批共用）
 

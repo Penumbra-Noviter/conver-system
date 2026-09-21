@@ -51,7 +51,7 @@
 
 - [文档规范](docs/documentation-standards.md) — 文档架构与单一事实来源规则
 - [共识文档](CONSENSUS.md) — 需求定义与技术决策
-- [待办清单](TICKETS.md) — 唯一待办事实来源（活跃 + 归档）
+- [待办清单](TO-TICKETS.md) — 唯一待办事实来源（活跃 + 归档）
 - [开发日志](DEV_LOG.md) — 已做与避坑记录
 - 技术细节统一以 `docs/` 为准：**[架构设计](docs/architecture.md)** · **[API 设计](docs/api-design.md)** · **[LLM 集成](docs/llm-integration.md)** · **[P2.5 导入导出](docs/p2.5-character-import-export.md)**
 - 用户视角（安装/使用）见 [README.md](README.md)

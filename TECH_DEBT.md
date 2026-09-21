@@ -1,9 +1,9 @@
 # TECH_DEBT: conver system
 
-> **技术债候选池**（未立项子集）与**处置记录**。本文件与 `TICKETS.md`（任务池，本项目任务文件名为 `TICKETS.md` 而非 `TO-TICKETS.md`）分离——候选不等于任务，不自动进入任何 session 的 preflight 认领；消费 = 显式「立项」（从候选区取出 → 转入 `TICKETS.md` 活跃工单，或标记 ❌ 不立项附理由）。
+> **技术债候选池**（未立项子集）与**处置记录**。本文件与 `TO-TICKETS.md`（任务池，本项目任务文件名为 `TO-TICKETS.md` 而非 `TO-TICKETS.md`）分离——候选不等于任务，不自动进入任何 session 的 preflight 认领；消费 = 显式「立项」（从候选区取出 → 转入 `TO-TICKETS.md` 活跃工单，或标记 ❌ 不立项附理由）。
 > 读取契约与强度消费规则见 project-kickoff 步骤 0 预检（`AGENTS.md` §3 任务清单生命周期）。
 >
-> 本文件由 `TICKETS.md` 技术债区独立化迁移而来（2026-08-24，对齐 AGENTS.md §3 规范），原文完整保留审计追溯。
+> 本文件由 `TO-TICKETS.md` 技术债区独立化迁移而来（2026-08-24，对齐 AGENTS.md §3 规范），原文完整保留审计追溯。
 
 ---
 
@@ -38,14 +38,14 @@
 2. ❌ 关闭条目压缩：具复核价值的关闭项（防 review 重复提出的 Speculative 类）保留单行摘要于「复核关闭」表，其余直接删除
 3. 处置记录按日期分节，滚动保留最近 **2 节**（同日多批次合并计为一节）；更早归档由 git 历史承担（`git log -p -- TECH_DEBT.md`）
 4. 清出动作绑定既有维护节点：每会话结束、commit 之前同步执行，不新增仪式
-5. **机械约束**由 `scripts/pool_cleanup_check.py --check --tickets-file TICKETS.md` 强制（任务池本库名为 `TICKETS.md`）：候选区无 ✅/❌ 滞留、复核关闭表全 ❌、活跃工单无 ✅/❌、重复标题、脚注「当前最大 F-N」与全库最大编号一致、非空与必要节、表格列数异常报格式问题；本库沿用既有 `scripts/install-hooks.bat`（doc_sync 检查），清出检查建议并入同一 pre-commit（2026-08-31 起，脚本已就位）
+5. **机械约束**由 `scripts/pool_cleanup_check.py --check --tickets-file TO-TICKETS.md` 强制（任务池本库名为 `TO-TICKETS.md`）：候选区无 ✅/❌ 滞留、复核关闭表全 ❌、活跃工单无 ✅/❌、重复标题、脚注「当前最大 F-N」与全库最大编号一致、非空与必要节、表格列数异常报格式问题；本库沿用既有 `scripts/install-hooks.bat`（doc_sync 检查），清出检查建议并入同一 pre-commit（2026-08-31 起，脚本已就位）
 
 ### 多 session 防污染
 
-1. **任务所有权分离**：`TICKETS.md` 是唯一任务池（preflight 只读它）；本文件是候选池（只写不认领）
+1. **任务所有权分离**：`TO-TICKETS.md` 是唯一任务池（preflight 只读它）；本文件是候选池（只写不认领）
 2. **条目归属标注**：每条目必填「来源」与「归属方向」，session 只认领自己方向匹配的条目
 3. **消费显式化**：从候选区转工单必须带一句话理由（强度 + 方向匹配），禁止静默批量认领
-4. **写冲突隔离**：候选人落盘写本文件（评审 session 独占），任务状态变更写 `TICKETS.md`（认领 session 独占），不同 session 写不同文件，不互踩
+4. **写冲突隔离**：候选人落盘写本文件（评审 session 独占），任务状态变更写 `TO-TICKETS.md`（认领 session 独占），不同 session 写不同文件，不互踩
 
 ---
 

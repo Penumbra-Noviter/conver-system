@@ -1,6 +1,6 @@
 # Conver System — 开发日志 (DEV_LOG)
 
-> 只记「已做」与决策/避坑；待办一律进 [TICKETS.md](TICKETS.md)（唯一待办事实来源）。
+> 只记「已做」与决策/避坑；待办一律进 [TO-TICKETS.md](TO-TICKETS.md)（唯一待办事实来源）。
 > 格式：`YYYY-MM-DD | <操作> | <描述>`（倒序，最新在前）
 > 滚动摘要窗口上限 12 条，超限在文档同步时折叠为阶段摘要（回落 6~8 条，规则见 [AGENTS.md](AGENTS.md)「待办管理」）。
 

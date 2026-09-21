@@ -10,7 +10,7 @@
 | 文档 | 角色 | 唯一来源（什么信息只归它管） |
 |------|------|------------------------------|
 | `CONSENSUS.md` | 需求 + 决策 | 产品决策、技术选型、规格定义。**改设计前先更新这里** |
-| `TICKETS.md` | **唯一待办事实来源** | 所有未完成/已归档工单（含完成日期 + 提交哈希）。待办**绝不落** DEV_LOG / memory / 个人笔记 |
+| `TO-TICKETS.md` | **唯一待办事实来源** | 所有未完成/已归档工单（含完成日期 + 提交哈希）。待办**绝不落** DEV_LOG / memory / 个人笔记 |
 | `DEV_LOG.md` | 已做 + 避坑 | 完成记录、bug 根因、优化/重构进展。只记「已做」，不记待办 |
 | `PROJECT_REFERENCE.md` | 项目介绍 | 一句话、项目概述、关键决策、常碰坑点。**不复制技术细节**（技术细节指向 docs/） |
 | `README.md` | 用户视角 | 安装、使用、快速开始、贡献入口。不维护技术栈表/路线图副本 |
@@ -21,7 +21,7 @@
 | `docs/chat-simulator-upgrade-spec.md` | 专项设计 | 聊天/模拟器升级五批工单（WL/MS/BR/CG/MD）的规格依据：字段表 + 纯函数签名 + 契约锁用例 |
 | `docs/external-benchmark-aigirlfriend.md` | 调研档案（只读） | 外部对标站（AI风月）的事实、方法论、证据位置与复用轮子；**不承载本项目实现规格** |
 | `docs/tauri-setup.md` | 技术事实 | Tauri 桌面端工具链安装、路径、环境注意事项 |
-| `docs/development-plan.md` | 历史 | **已被 TICKETS.md 取代**，仅作历史保留，不再维护 |
+| `docs/development-plan.md` | 历史 | **已被 TO-TICKETS.md 取代**，仅作历史保留，不再维护 |
 | `.claude/` 记忆 + Serena memory | 会话上下文 | 项目状态、规范速记；**不持待办** |
 
 > 参照项目经验：技术细节统一以 docs/ 为准（对标 Profit Calculator 的 CODE_WIKI.md 角色），PROJECT_REFERENCE 与 README 只写各自角色该有的内容。
@@ -34,7 +34,7 @@
 - 只记「已做」与决策/避坑；待办一律进 TICKETS。
 - Bug 修复保留「根因 + 修复方案」细节（这是日志最值钱的部分），其余条目一行浓缩。
 
-### TICKETS.md
+### TO-TICKETS.md
 - 状态流转：📝 已录入 → 🔄 进行中（开始实现前认领）→ ✅/❌ 完成 → **移入「已完成归档」区**并记完成日期 + 提交哈希。
 - **活跃表只保留未完成工单**；已完成项不在原位打勾，一律归档。
 - 新评审候选（含未拍板的 `Worth exploring` / `Speculative`）立即录入活跃表。

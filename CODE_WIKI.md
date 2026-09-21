@@ -233,7 +233,7 @@ conver system/
 ├── docs/                           ← 设计文档（架构/API/LLM/Tauri，见 PROJECT_REFERENCE §五）
 ├── AGENTS.md                       ← 项目规则与当前状态
 ├── PROJECT_REFERENCE.md            ← 项目介绍书（介绍/决策/坑点）
-├── TICKETS.md                      ← 唯一待办事实来源
+├── TO-TICKETS.md                      ← 唯一待办事实来源
 ├── DEV_LOG.md                      ← 开发日志（已做）
 ├── CONSENSUS.md                    ← 共识文档（需求定义与技术决策）
 └── CODE_WIKI.md                    ← 本文档（技术细节单一权威源）

@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit 钩子：①清出机制机械检查（TECH_DEBT/TICKETS） ②拦截 CODE_WIKI 机械标记漂移。
+# pre-commit 钩子：①清出机制机械检查（TECH_DEBT/TO-TICKETS） ②拦截 CODE_WIKI 机械标记漂移。
 # 由 scripts/install-hooks.bat 复制到 .git/hooks/pre-commit（.git/hooks 不入库）。
 # 未安装 Python 时跳过（不阻塞提交）；安装了则强校验。
 # 手动测试：sh .git/hooks/pre-commit
@@ -11,8 +11,8 @@ if ! command -v python >/dev/null 2>&1; then
     exit 0
 fi
 
-# ① 清出机制机械检查（任务池本库名为 TICKETS.md；失败拒绝提交）
-if ! python scripts/pool_cleanup_check.py --check --tickets-file TICKETS.md; then
+# ① 清出机制机械检查（任务池本库名为 TO-TICKETS.md；失败拒绝提交）
+if ! python scripts/pool_cleanup_check.py --check --tickets-file TO-TICKETS.md; then
     echo ""
     echo "pre-commit 拦截：清出机制检查未通过（候选区/复核关闭/活跃工单/脚注编号/表格列数）。" >&2
     echo "处置指引见 TECH_DEBT.md「清出机制」第 5 条；可 --no-verify 临时绕过，但请随后补上。" >&2

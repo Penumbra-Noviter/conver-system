@@ -1,7 +1,7 @@
 # 外部对标档案：AI风月（aigirlfriendstudio.com）
 
 > **角色**：本文件是该外部站点的**调研档案 + 方法论沉淀**（对方是什么、怎么查出来的、证据在哪）。
-> **不承载**：本项目要实现什么 → 见 [chat-simulator-upgrade-spec.md](chat-simulator-upgrade-spec.md)；待办 → 见 [TICKETS.md](../TICKETS.md)。
+> **不承载**：本项目要实现什么 → 见 [chat-simulator-upgrade-spec.md](chat-simulator-upgrade-spec.md)；待办 → 见 [TO-TICKETS.md](../TO-TICKETS.md)。
 > **维护约定**：本文件是**只读历史档案**，后续如需补充对方事实，续写在本文件；不要把这些事实复制进其他文档。
 > **调研轮次**：2026-09-10（单会话完成，FetchFlow 流程）
 
