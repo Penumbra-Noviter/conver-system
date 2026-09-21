@@ -27,6 +27,16 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-143~145 三条全部处置（2026-09-21 收口）
+
+> 来源：用户「按技术债消费决策点折回 F-143~145」（project-kickoff 全自动档，标准档单波 3 并行——高風險面② 命中既有核心模块）。基线 `bba4e31`（2836 测）。门禁：全量 **2836 测**绿（零新增测试，与 Grilling 共识一致）/ analyze 0 / 波及文件覆盖率全 ≥90%（docstring/结构重构无新增可执行行为）/ 波末增量审核 **0 阻断**（T-02 突变抽查实证双归属路径测试灵敏度）/ 期末四轴 **通过（0 findings，0 阻断）**。候选区清零，无新落债。详见 DEV_LOG〈技术债消费批次 F-143~145 — 三条全部处置〉与 `.scratch/techdebt-f143f145/`（grilling-consensus/evidence/reviews）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| T-01 | F-143：listSwipesBatch docstring 声明输入规模 bound（SQLITE_MAX_VARIABLE_NUMBER） | 2026-09-21 | d1c755f（merge def3a4b） |
+| T-02 | F-144：ChatService 归属校验抽提 `_requireMessageOwnership`（对齐桌面 message.py::_require_message） | 2026-09-21 | 9094f12（merge 32071f0） |
+| T-03 | F-145：ChatTestEnv.seedCharacter 时间戳单次求值 + 占位语义 docstring | 2026-09-21 | f5d9104（merge a885886） |
+
 ### 技术债消费批次 F-140/F-141/F-142 三条全部处置（2026-09-21 收口）
 
 > 来源：用户「F-140/141/142 待立项消费」（project-kickoff 全自动档，标准档单波 3 并行——高風險面② 命中既有核心模块）。基线 `5b64def`（2829 测）。门禁：全量 **2836 测**绿（基线 2829 → +7）/ analyze 0 / 波及文件覆盖率全 ≥90% / 波末增量审核 0 阻断（3 条非阻断落债 F-143~145）/ 期末四轴 **通过（0 Critical）**。详见 DEV_LOG〈技术债消费批次 F-140/F-141/F-142 — 三条全部处置〉与 `.scratch/techdebt-f140f142/evidence/`。

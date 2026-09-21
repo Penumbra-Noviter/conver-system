@@ -43,11 +43,18 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-143 | `MessageRepository.listSwipesBatch`（message_repository.dart:439）`isIn(ids)` 无分块、无上限声明：消费方（branch_service.dart:125 / conversation_export_service.dart:114）把完整消息 id 列表投入单条 SQL，超过 SQLITE_MAX_VARIABLE_NUMBER（默认 32766）时抛「too many SQL variables」硬失败；旧逐消息 `listSwipes` N+1 任意规模可跑（慢不失败）。触发规模远超真实对话量级，非阻断；docstring 声明 bound 或将来补 chunking | 波 1 增量审核 Falsify（期末四轴 Falsify 复证） | Worth exploring | 📝 待立项 | 数据层 |
-| F-144 | `ChatService.switchSwipe`（chat_service.dart:1478-1483）归属校验与 `deleteMessage`（L1446-1451）逐行同构重复（`messageById → null → MessageNotFoundError`）；抽提非本波该做（对齐桌面逐字惯例），纯结构重复 | 波 1 增量审核 Falsify | Speculative | 📝 待立项 | 聊天链路 |
-| F-145 | `ChatTestEnv.seedCharacter`（chat_test_env.dart:164-165）对 companion 的 `createdAt/updatedAt` 两次 `_now()` 求值，随后被 `createCharacter` 单次时钟调用整体覆写丢弃——死求值/夹具误导（未来步进时钟场景两值可能不同但无观测影响） | 波 1 增量审核 Falsify | Speculative | 📝 待立项 | 测试夹具 |
 
 ## 技术债处置记录
+
+### 2026-09-21 — 技术债消费批次（F-143~145 三条全部处置，候选区清零）
+
+> 来源：用户「按技术债消费决策点折回 F-143~145」拍板；project-kickoff 全自动档标准档单波 3 并行（高風險面② → 最低标准档）。门禁：全量 **2836 测**绿（零新增测试）/ `flutter analyze` 0 / 波末增量审核 0 阻断 / 期末四轴 **通过（0 findings）**。处置详情与逐条实证见 DEV_LOG〈技术债消费批次 F-143~145 — 三条全部处置〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-143 | ✅ 已修 | `listSwipesBatch` docstring 声明输入规模 bound（SQLITE_MAX_VARIABLE_NUMBER ≥3.32 默认 32766 + 超限「too many SQL variables」硬失败 + 调用方职责「须 ≤ 上限、超规模自行分块」）；方法体与两消费方零改动、零新增测试（Grilling 定案：chunking 属 YAGNI，触发规模超真实对话量级三数量级）；顺带修正候选区原行消费方行号漂移（conversation_export_service.dart:114 → :260，实际在 `_listSwipeContentsBatch` 内）；T-01 commit `d1c755f`（merge def3a4b） |
+| F-144 | ✅ 已修 | `ChatService` 抽提私有 `_requireMessageOwnership`（messageById → null → MessageNotFoundError，跨对话同 id 视为不存在）；deleteMessage 接返回值用 target.role（user 截断/非 user 单删不变量保留）、switchSwipe 只 await 不接值（越界原样上抛保留）；`_resolveContinueTarget` 零改动；**桌面前提实证修正**：桌面 message.py:259 早有 `_require_message`（6 调用点），抽提 = 对齐桌面既有结构非偏离（helper docstring 注明 id-only vs conversation 过滤差异）；零新增测试（双路径用例兜底 + 突变抽查实证灵敏度）；T-02 commit `9094f12`（merge 32071f0） |
+| F-145 | ✅ 已修 | `ChatTestEnv.seedCharacter` 两次 `_now()` 收敛为单次局部变量两字段同引用（createdAt/updatedAt 必填命名参数保留）；docstring 从「逐值等价」改述为「值恒被 createCharacter 覆写／占位、无观测语义」；零新增测试（覆写契约由 character_repository_test:133-137 锚定）；T-03 commit `f5d9104`（merge a885886） |
 
 ### 2026-09-21 — 技术债消费批次（F-140/F-141/F-142 全部处置，候选区留 F-143~145）
 

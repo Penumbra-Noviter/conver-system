@@ -6,6 +6,25 @@
 
 ---
 
+## 技术债消费批次 F-143~145 — 三条全部处置（2026-09-21 — 用户「按技术债消费决策点折回」拍板，project-kickoff 全自动档）
+
+- **批次源**：用户「按「技術債消費決策點」折回 F-143~145」（chat-polish-aigs 期末落债三条：isIn 无分块上限声明 🟡 / 归属校验同构重复 💭 / seedCharacter 死求值 💭）；基线 `bba4e31`（2836 测）。项目完整模式 + 全自动档（persona 偏好），高风险面②（T-01/T-03 触碰既有核心模块）→ 标准档单波 3 并行。
+- **Grilling 共识（技术债条目为审查共识产物，只审增量）**：F-143 做·方案 A（docstring 声明 bound：SQLITE_MAX_VARIABLE_NUMBER ≥3.32 默认 32766 + 超限「too many SQL variables」硬失败 + 调用方职责「须 ≤ 上限、超规模自行分块」；chunking 属 YAGNI——触发规模 = 单对话消息数，距上限三数量级；零新增测试，bound 系引擎常量非本仓行为）；F-144 做·抽提 `_requireMessageOwnership` 私有 helper（**桌面前提实证修正**：桌面 `message.py:259` 早有 `_require_message`（6 调用点、delete_message/switch_swipe 均调用），移动端抽提 = 对齐桌面既有结构而非「有意偏离」，helper docstring 以对齐说明 + 注明 id-only vs conversation 过滤差异；deleteMessage 接返回值用 target.role、switchSwipe 只 await 不接值、`_resolveContinueTarget` 明确不纳入；零新增测试）；F-145 做·单次 `_now()` 求值（createdAt/updatedAt 必填命名参数不可省，只收敛值）＋ docstring 从「逐值等价」改述「值恒被 createCharacter 覆写／占位」；零新增测试（步进时钟锁「两值可能不同」= 锁无观测影响中间态；覆写契约已锚定）。三分：三条均自建零新依赖。
+- **plan-tickets**：spec + 3 票（T-01 bound 声明 / T-02 归属校验抽提 / T-03 夹具单次时钟），三票零互依赖、文件范围零交集、出口四检全过（引用文件真实存在 / 无环 / 粒度全 ≤500 行 / 验收 ≤8 条）。三票共享 TECH_DEBD.md 行级并发写风险 → 剥离文档改动，**收口批次末主会话统一执行**（工单文件修订 + 验收标注，规避三 worktree 并发写同一文档的合并摩擦）。
+- **波 1 三并行（全部一次成功，零重开）**：每票独立 worktree（`F:\Craft\conver system\.worktrees\f143-bound|f144-ownership|f145-single-now`）+ kickoff 分支。
+- **逐票交付**：
+  - T-01/F-143（commit `d1c755f`，merge def3a4b）：listSwipesBatch docstring +6 行纯注释 bound 条款（锚文本 SQLITE_MAX_VARIABLE_NUMBER/32766/too many SQL variables/须 ≤/分块 5/5 命中），方法体与两消费方（branch_service.dart:125 / conversation_export_service.dart:260 `_listSwipeContentsBatch` 内——原候选区 `:114` 行号漂移顺带修正）零改动；analyze 0 / message_swipes_test 25 用例全过；零新增测试。
+  - T-02/F-144（commit `9094f12`，merge 32071f0）：`_requireMessageOwnership`（L1419-1439，docstring 锚文本跨对话同 id 视为不存在 / 对齐桌面 message.py::_require_message）+ deleteMessage 接值走 target.role 两分支 / switchSwipe 只 await 越界原样上抛 / `_resolveContinueTarget` 零改动；analyze 0 / chat_service_test 155 用例全过；**极端突变抽查**（删 null→throw 后双归属路径恰红、爆炸半径精确、恢复零残留）实证测试灵敏度。
+  - T-03/F-145（commit `f5d9104`，merge a885886）：seedCharacter 单次 now 求值（6 插入/4 删除单 hunk 落 seedCharacter）、方法体内 `_now()` 字面命中 1、「逐值等价」残留 0；analyze 0 / chat_service_test + character_repository_test 164 用例全过（覆写契约锚定用例零改动通过）。
+- **环境避坑注记**：3 个新 worktree 首次跑测试均遇 sqlite3 native asset 从 GitHub 下载超时（无公网）——复制主仓库已验证缓存（`.dart_tool/`/`build/`，gitignored）后 hook 哈希命中离线复用，全绿；环境缓存问题与改动无关。
+- **波末**：文件范围核验三档 = 全合规（T-01 仅 message_repository.dart / T-02 仅 chat_service.dart / T-03 仅 chat_test_env.dart，零共享文件触碰）；证据三文件落盘；三分支 --no-ff 合并（def3a4b / 32071f0 / a885886）；受影响模块 189 用例全绿。增量审核（固定点 bba4e31）**0 阻断**：Falsify findings 0（超限/重复/Set/空输入/跨对话/越界/返回值误用/隐蔽改调/helper 绕过 + T-03 递增时钟极端装置全被如实预言；32766 口径/消费方规模声称/打包引擎前提逐项实证）+ 负结果具名记录；mutant 抽查 T-02 null→throw 双归属路径红、爆炸半径精确、恢复零残留；文件范围合规；过度工程 0 项。
+- **期末全量**：2836 测绿（与基线等数——本批零新增测试，Grilling 共识）+ analyze 0。
+- **期末四轴**（code-review 子智能体，固定点 `bba4e31`）：**通过（无需继续修改）**——四轴 0 findings、0 阻断、0 警告；Standards（红线 grep 零命中 / 无 try/catch / 无过度工程）、Spec（三票验收锚文本逐条字面命中 / T-02 桌面前提亲验成立 / 无孤儿代码零依赖零绕契约）、Falsify（bound 契约诚实性 + 抽提逐字等价 + 单次求值无观测影响全实证）、Architecture（T-01 深模块契约面增强 / T-02 Locality 提升对齐桌面 / T-03 属地正确）；覆盖 3/3 manifest 全 reviewed、0 UNREVIEWED。
+- **批次教训/避坑（蒸馏候选）**：① 技术债共享文档（TECH_DEBD.md）跨工单行级并发写 = 合并摩擦源——批次内将文档改动剥离收口主会话统一执行，工单只交代码（本批实证零冲突）；② 「对齐桌面逐字惯例」类债面归因须对桌面源码实证复核——F-144 票面「桌面逐字内联」被证伪（桌面 message.py:259 早有 helper），审计快照复核惯例再次命中（与「技术债票面修复建议须实证复核」同构）；③ 新 worktree 首次跑 flutter test 的 sqlite3 native asset 离线下载失败可用主仓库已验证缓存复制解决（hook 哈希命中即离线复用）。
+- **批次收尾**：TICKETS 归档「技术债消费批次 F-143~145」（T-01~03，候选区清零）；TECH_DEBD 处置记录新节（F-143/144/145 ✅ 已修移出候选区，候选区清零、无新落债）；AGENTS 状态行追加；`.scratch/techdebt-f143f145/` 待 Neat 清场（3 个 worktree 与 kickoff 分支清理，删除清单经用户确认）。
+
+---
+
 ## 技术债消费批次 F-140/F-141/F-142 — 三条全部处置（2026-09-21 — 用户「待立项消费」拍板，project-kickoff 全自动档）
 
 - **批次源**：用户「F-140/141/142 待立项消费」（chat-polish-aigs 期末落债三条：SPEC-1 契约缺口 Worth / chat_entry flaky Strong / branch N+1 Worth）；基线 `5b64def`（2829 测）。项目完整模式 + 全自动档（persona 偏好），高風險面②（T-01/T-03 触碰既有核心模块）→ 标准档单波 3 并行。
