@@ -43,19 +43,26 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-146 | `chat_controller._loadSwipeCounts`（chat_controller.dart:1085-1099）仍是逐消息 `listSwipes` N+1——`listSwipesBatch` 原语（F-142）已有 branch/export 两消费方，「第三处出现即复用」惯例未兑现；控制面 docstring（:188-193）保留原语存在前的让步注释 | 架构报告 2026-09-21 C1 | Strong | 📝 待立项 | 聊天链路 |
-| F-147 | 采样温度解析链双实现：`chat_service.dart:1913-1926` 与 `memory_palace_service.dart:358-372` 逐字重复「角色为主/全局兜底 + NaN 回退 + clamp」（F-76 NaN 防线被复制），各带整套防御测试 | 架构报告 2026-09-21 C2 | Strong | 📝 待立项 | 聊天链路 |
-| F-148 | 回合末三服务（reflection:194-200 / proactive:460-469 / memory_palace:329-351）各自重建「最近对话窗口」：全量 getMessages → sublist(20) → 署名行，窗口常量 20 三处、署名格式三套微差，每回合 ×3 全量读 | 架构报告 2026-09-21 C3 | Strong | 📝 待立项 | 数据层 |
-| F-149 | ChatService 组装上溯上下文双份维护：`_assembleMessages`（:1606-1683）与 `promptDebug`（:1771-1839）各自重建 CharacterData 投影/历史/世界书/叙述风格；promptDebug 不含 memory/stage2 注入——生产开启记忆后「逐条一致」契约不成立（测试仅在 memoryService 缺省时通过） | 架构报告 2026-09-21 C4 | Strong | 📝 待立项 | 聊天链路 |
-| F-150 | `RelationshipService.activeDays`（relationship_service.dart:307-316 + _allMessagesFor:369-380 全量拉取）生产零调用方（回合增量早改 isRecentlyActive，F-81 收口）；deletion test 通过；删除需 ADR-0006「活跃口径」是否 UI 展示的先决确认 | 架构报告 2026-09-21 C5 | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-151 | 主动消息「过期核对」双实现：`proactive_message_service.dart:427-441` _reconcileOverdue 与 `proactive_deep_link.dart:210-233` restoreProactiveSchedules 各自实现 scheduled→expired（`!scheduledAt.isAfter(now)` 同义两处）；F-125 同类「全表拉取+内存过滤」已移除，此为遗留 | 架构报告 2026-09-21 C6 | Worth exploring | 📝 待立项 | 聊天链路 |
-| F-152 | `ChatService` 构造持有 `AppDatabase`（chat_service.dart:389-423，`var _ = database` wildcard）仅为缺省构造 LorebookRepository 兜底，装配层（app.dart:187-189）已注入 repo 但参数可选——数据层类型泄漏进服务协议面；修复 = lorebookRepository required + 删 database 参数（测试构造面 churn 有界） | 架构报告 2026-09-21 C7 | Worth exploring | 📝 待立项 | 装配层 |
-| F-153 | `app.dart` endOfTurnHooks（:409-487）五闭包逐个复制「characterId 空守卫 + context.read 取用」样板；开关读取不对称（反思/宫殿装配层读、主动消息服务内读） | 架构报告 2026-09-21 C8 | Speculative | 📝 待立项 | 装配层 |
 | F-154 | `RelationshipService`（relationship_service.dart:164）`required ConversationRepository conversationRepository` 构造参数在 C5 删除 `_allMessagesFor`/`_conversations` 后**零消费死参**：8 处构造点（app.dart:372 + 7 测试）被迫传一个不改变行为的仓储；删除 = 8 构造点机械改（与 C7 构造净化同款模式）；C5 当时因出票面范围保留 | 波 1 增量审核（架构批次） | Speculative | 📝 待立项 | 装配层 |
 | F-155 | `memory_palace_service.dart:270-272` 字符决策口径变化：旧实现 Dart UTF-16 码元和 vs C3 后 SQLite `LENGTH()` 码点和——emoji 类会话恰在阈值边界时 `shouldSummarize` 判定可翻（docstring 已显式声明，零行为变化契约的窄输入漂移）；附带 `reflection` `messageStats`+`recentMessages` 双查询非单快照（单写模型下可忽略 💭） | 波 2 增量审核 Falsify（架构批次） | Speculative | 📝 待立项 | 聊天链路 |
 | F-156 | `chat_service.dart:1664/:1682` `_buildAssembleContext` 每次调用双跑 `_assemble` 核心（send 腿弃用 segments 只取 built）——发送热路径组装成本翻倍，纯 CPU 行为等价；潜在优化 = 共享段惰性求值 segments 或双返回值按需 | 波 2 增量审核（架构批次） | Worth exploring | 📝 待立项 | 聊天链路 |
 
 ## 技术债处置记录
+
+### 2026-09-21 — 架构审查候选 C1~C8 按强度交付（F-146~153 全部处置，候选区留 F-154~156）
+
+> 来源：用户「架构审查优化候选按强度交付 + kickoff 全自动」拍板；标准档两波（波 1 并行 4 lane + 波 2 串行链）。门禁：全量 **2869 测**绿（基线 2836 → +33）/ `flutter analyze` 0 / 波及文件覆盖率全 ≥90%（两处预警条款放行）/ 波 1+波 2 增量审核 0 阻断 / 期末四轴 **通过（0 阻断，全 💭）**。处置详情与逐条实证见 DEV_LOG〈架构审查候选 C1~C8 按强度交付〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-146（C1） | ✅ 已修 | `chat_controller._loadSwipeCounts` 改调单次 `listSwipesBatch(assistantIds)` + 整批一键降级（catch → debugPrint + return const {}）；docstring 过时让步改写；测试 +3 + 突变实证；commit `bfb9e98`（merge fcd09f4） |
+| F-147（C2） | ✅ 已修 | `lib/services/llm/temperature.dart` `resolveCharTemperature` 纯函数单源（常量自 SettingsRepository 导入）；chat_service 删 _resolveTemperature 直调、palace 留 async 壳；防御测试收敛值域表 10 值域；grep _resolveTemperature 零命中；commit `d78ed37`（merge b074885） |
+| F-148（C3） | ✅ 已修 | `recentMessages(cid, limit)` 定位读（等价序取尾 N）+ `dialogue_window.dart` 纯 builder（charBudget 恰等保留）；三服务（reflection/proactive/palace）删全量 getMessages→sublist→署名循环改调，署名三元表达式逐字保持；链上新增 `messageStats` O(1) 聚合面（波 2 审核裁定记录警告放行，chars 码点口径随 F-155 记录）；commit `6f3026a`（merge b074885） |
+| F-149（C4） | ✅ 已修 | `_buildAssembleContext` 共享段（CharacterData 投影/历史/世界书带来源/叙述风格单点收口，止于 built/segments）；memory/stage2 注入留 send 腿原样；promptDebug 豁免 docstring 显式声明；PD-04 断言零改动；双跑 _assemble CPU 代价随 F-156 记录；commit `fd41251`（merge b074885） |
+| F-150（C5） | ✅ 已修 | `activeDays` + `_allMessagesFor` + 关联测试删除（连带 `_conversations` 字段清理）；ADR-0006 退役注记；app_stage2_assembly_test override 行删；grep 生产零残留；死参 conversationRepository 遗留随 F-154；commit `1b87e6f`（merge 3db1f0a） |
+| F-151（C6） | ✅ 已修 | `CompanionRepository.listOverdueScheduled(now,{characterId})`（scheduled + scheduledAt ≤ now 含端点）+ `listScheduledWithNullMessage`（dropped 独立）；reconcile dropped 先置位 + restore per-plan try/catch（SR-08）保留；两处全表扫退出；sent 归集共识备注未动；commit `8c2a473`（merge ff9a057） |
+| F-152（C7） | ✅ 已修 | `lorebookRepository` required + 删 `AppDatabase`/wildcard/缺省分支（docstring 移除 WL-03 让步）；app.dart 改传 `context.read<LorebookRepository>()`；45 构造点（19 测试文件 + app）机械改；`LorebookRepository(` 构造仅 app.dart 一处（装配单点）；commit `7525f68`（merge b074885） |
+| F-153（C8） | ✅ 已修 | `_endOfTurnHook` helper 归一守卫/取用；开关读取收敛服务内（ReflectionService +required settingsRepository 7 构造点；palace 删 everyRounds 参数内部读）；发现修复伪测试（palace 开关缺省关闭零灵敏度 → 预置 12 条消息）；commit `9c46f71`（merge cd687c5） |
 
 ### 2026-09-21 — 技术债消费批次（F-143~145 三条全部处置，候选区清零）
 

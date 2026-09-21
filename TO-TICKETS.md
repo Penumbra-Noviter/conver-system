@@ -27,6 +27,21 @@
 
 ## 已完成归档
 
+### 架构审查候选 C1~C8 按强度交付（2026-09-21 收口）
+
+> 来源：用户「/improve-codebase-architecture 架构审查优化候选按强度交付 + /project-kickoff 全自动」（persona 先例：先 Strong 后剩余）。基线 `9aceed4`（2836 测）。架构报告 `D:\tmp\architecture-review-20260921-113927.html`（Top recommendation = C1）；Grilling 增量审定案 8 票全做；两波执行（波 1 并行 C1/C8/C5/C6 + 波 2 串行链 C3→C2→C4→C7）。门禁：全量 **2869 测**绿（基线 2836 → +33）/ analyze 0 / 波及文件覆盖率全 ≥90%（C6 与 C8 两处 app.dart/proactive_deep_link 缺口按 chat-polish 预警条款放行，期末四轴复核通过）/ 波 1 增量审核 **0 阻断**（落债 F-154）/ 波 2 增量审核 **0 阻断**（messageStats 记录警告放行；落债 F-155/156）/ 期末四轴 **通过（0 阻断，全 💭）**。候选区留 F-154~156（非遗落债）。详见 DEV_LOG〈架构审查候选 C1~C8 按强度交付〉与 `.scratch/arch-review-20260921/`（grilling-consensus/orchestration/evidence/reviews）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| 01 | C1/F-146：chat_controller 候选计数改调 listSwipesBatch（整批降级） | 2026-09-21 | bfb9e98（merge fcd09f4） |
+| 02 | C8/F-153：endOfTurnHooks 样板归一 + 开关读取收敛服务内 | 2026-09-21 | 9c46f71（merge cd687c5） |
+| 03 | C5/F-150：RelationshipService.activeDays 死面删除（+ADR-0006 退役注记） | 2026-09-21 | 1b87e6f（merge 3db1f0a） |
+| 04 | C6/F-151：过期核对谓词进 SQL（listOverdueScheduled 单源） | 2026-09-21 | 8c2a473（merge ff9a057） |
+| 05 | C3/F-148：最近对话窗口单源（recentMessages + dialogue_window builder） | 2026-09-21 | 6f3026a（merge b074885） |
+| 06 | C2/F-147：温度解析链单源（resolveCharTemperature 纯函数） | 2026-09-21 | d78ed37（merge b074885） |
+| 07 | C4/F-149：组装上溯上下文单点（_buildAssembleContext 共享段） | 2026-09-21 | fd41251（merge b074885） |
+| 08 | C7/F-152：ChatService 构造面净化（lorebookRepository required） | 2026-09-21 | 7525f68（merge b074885） |
+
 ### 技术债消费批次 F-143~145 三条全部处置（2026-09-21 收口）
 
 > 来源：用户「按技术债消费决策点折回 F-143~145」（project-kickoff 全自动档，标准档单波 3 并行——高風險面② 命中既有核心模块）。基线 `bba4e31`（2836 测）。门禁：全量 **2836 测**绿（零新增测试，与 Grilling 共识一致）/ analyze 0 / 波及文件覆盖率全 ≥90%（docstring/结构重构无新增可执行行为）/ 波末增量审核 **0 阻断**（T-02 突变抽查实证双归属路径测试灵敏度）/ 期末四轴 **通过（0 findings，0 阻断）**。候选区清零，无新落债。详见 DEV_LOG〈技术债消费批次 F-143~145 — 三条全部处置〉与 `.scratch/techdebt-f143f145/`（orchestration/evidence）。

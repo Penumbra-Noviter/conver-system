@@ -6,6 +6,21 @@
 
 ---
 
+## 架构审查候选 C1~C8 按强度交付（2026-09-21 — 用户「/improve-codebase-architecture 架构审查优化候选按强度交付 + /project-kickoff 全自动」）
+
+- **批次源**：用户「架构审查优化候选按强度交付 + kickoff 全自动」（persona 先例：先 Strong 后剩余，ARC-1~10 三次实证）；基线 `9aceed4`（2836 测）。项目完整模式 + 全自动档（persona 偏好），高风险面②（C2/C3/C4/C7 触碰核心聊天链路与数据层）→ 标准档两波。
+- **架构审查**：探查代理全库扫描（热点 = 聊天链路/数据层/companion 域/装配层）→ 8 候选（C1~C4 Strong / C5~C7 Worth exploring / C8 Speculative）+ HTML 报告（`D:\tmp\architecture-review-20260921-113927.html`，离线自适应内联 CSS，Top recommendation = C1）；候选落盘 TECH_DEBD F-146~153（来源=架构报告，防重提闭环）。
+- **Grilling 增量审（8 问采纳定案）**：C1 做·整批一键降级（单 SQL 无部分失败，降级单元升为整批；docstring 过时让步改写）；C2 做·`lib/services/llm/temperature.dart` 纯函数（常量自 SettingsRepository 导入，两服务各改一行，防御测试收敛值域表）；C3 做·`recentMessages` 定位读（等价序取尾 N）+ 窗口 builder，**署名保留三套语义逐字不变**（三语义非三复制），reflection 可注入 limit 透传；C4 做·**保守**（共享段止于 built/segments，注入段留 send 腿本就单源，promptDebug 豁免 + docstring 声明，PD-04 不重开）；C5 关闭即删除（ADR-0006 无 UI 展示强制 + 生产全收敛 latestMessageAt → 删 activeDays/_allMessagesFor + 测试 + ADR 退役注记）；C6 做·谓词单源进 SQL（listOverdueScheduled 含端点 + listScheduledWithNullMessage，sent 归集记共识备注不在票）；C7 做·**全额**（WL-03「app.dart 装配零改动」实证为波级约束无跨波效力，churn 按实测 45 构造点非候选称 16）；C8 轻做（_endOfTurnHook 归一 + 开关读取收敛单位置=服务内）。三判定：全部自建零新依赖。
+- **plan-tickets**：spec + 8 票（01-C1 ~ 08-C7）+ 元数据表；**实测校正**：C7 真构造点 45（app 1 + test 44，共识 46 误计 chat_round_test 桩类）、已传 repo 仅 1 处（chat_service_test:3557）、测试文件 19 个非 8；波结构定案 = 波 1 四并行（C1/C8/C5/C6）+ 波 2~5 合并**单串行链 lane**（C3→C2→C4→C7，阻塞边首尾相接，冲突图驱动 chat_service 串行独占）。
+- **波 1 四并行（零重开）**：C1（`bfb9e98`，listSwipesBatch 批量 + 整批降级，突变改回逐条 3/3 红）/ C8（`9c46f71`，EOT hook 归一 + 开关收敛服务内，发现修复 1 伪测试——palace 开关缺省关闭原消息量未达归纳阈值零灵敏度，预置 12 条使门唯一拦截 + 删门突变红实锤）/ C5（`1b87e6f`，activeDays 死面删除 + ADR 退役注记，连带 _conversations 字段清理，conversationRepository 构造死参留 F-154）/ C6（`8c2a473`，listOverdueScheduled 含端点 + dropped 独立定位，突变 ≤→> 三处端点测试红）。四票合并点 fcd09f4/cd687c5/3db1f0a/ff9a057；共享文件 app_stage2_assembly_test C5×C6 双方存活；受影响模块 295 用例全绿；增量审核（固定点 9aceed4）**0 阻断**（负结果全具名 + mutant 静态验证 C1 删 catch/C6 端点被测试圈住；非阻断落债 F-154）。
+- **波 2 串行链**：C3（`6f3026a`，recentMessages + dialogue_window builder，署名逐字测试断言捕获，**链上新增 messageStats O(1) 聚合面**——票面外但满足验收线的必要件，波 2 审核裁定记录警告放行）/ C2（`d78ed37`，temperature.dart 单源 + 值域表 10 值域，grep _resolveTemperature 零命中）/ C4（`fd41251`，_buildAssembleContext 共享段，PD-04 断言零改动，CharacterData 构造点两处并一处）/ C7（`7525f68`，构造净化 45 构造点 + app.dart wiring，LorebookRepository( 构造仅 app.dart 一处达成装配单点）；链 merge `b074885`；受影响模块 377 用例全绿；增量审核（固定点 ff9a057）**0 阻断**（messageStats 裁定 = 必要件成立记录警告放行，C3 验收线「×3 收敛」实为 5 次 O(1) 读 + chars 码点口径漂移记入开发日志；2🟡 2💭 判断性；mutant 2 处真实执行被击杀——dialogue_window >→>= 3 用例红、limit≤0 短路删除 1 用例红〔SQLite 负 LIMIT=无限制陷阱如实触发〕；非阻断落债 F-155/156）。
+- **期末全量**：**2869 测**绿（基线 2836 → +33 = C1+3 C6+8 C3+C2+C4+C7 链带测试净增）/ analyze 0。
+- **期末四轴**（code-review 子智能体，固定点 `9aceed4`）：**通过（无需继续修改）**——四轴 0 阻断、全 💭 判断性；Standards（新公开 API 注解+docstring 全齐 / 安全红线仅测试夹具 / pubspec 零变更；开关读取在服务 try 外的字面缺口与基线传播边界相同）；Spec（8 票验收锚逐条 grep 全过 / messageStats 与 conversationRepository 死参两处申报偏差核实一致）；Falsify（三个风险区 C3×C2/C6×C1/C8×C7×C4 全部未击穿；唯一边角 = C1 整批降级在 >32,766 条助手消息病态会话下全量降 0，F-143 caller-duty 字面违反窄且已声明）；Architecture（C3 对话窗口单源/C2 温度单源/C4 组装落点单源/C7 数据层类型退出协议面/C8 守卫单点 + 开关三服务统一约定，均达成深模块形态）；覆盖 22/22 全 reviewed 0 UNREVIEWED。
+- **批次避坑（蒸馏候选）**：① 「TICKETS→TO-TICKETS 更名」为并发维护动作（批次运行期间由外部提交 58e9f8f + 41fdd54 + fa6024b 落库，含我的未提交 F-155/156 录入）——多 session 同仓并行时文档同步须以磁盘事实（git status + HEAD）为准续作，不假设自己持有唯一写权；② 架构候选的强度校准会系统性低估 churn（C7 候选称 16 构造点、实测 45——「票面修复建议须实证复核」惯例的 churn 侧版本）；③ 波级增量审核对「为实现验收线而新增的票面外 API」要给明确裁定通道（messageStats 记录警告放行 vs 回退补票），不能静默吞。
+- **批次收尾**：TO-TICKETS 归档「架构审查候选 C1~C8 按强度交付」（01~08 八票）；TECH_DEBD 处置记录新节（F-146~153 ✅ 已修移出候选区，候选区留 F-154~156）；AGENTS 状态行追加；`.scratch/arch-review-20260921/` 待 Neat 清场（5 worktree + 5 kickoff 分支 + 一次性产物，删除清单经用户确认）。
+
+---
+
 ## 技术债消费批次 F-143~145 — 三条全部处置（2026-09-21 — 用户「按技术债消费决策点折回」拍板，project-kickoff 全自动档）
 
 - **批次源**：用户「按「技術債消費決策點」折回 F-143~145」（chat-polish-aigs 期末落债三条：isIn 无分块上限声明 🟡 / 归属校验同构重复 💭 / seedCharacter 死求值 💭）；基线 `bba4e31`（2836 测）。项目完整模式 + 全自动档（persona 偏好），高风险面②（T-01/T-03 触碰既有核心模块）→ 标准档单波 3 并行。
