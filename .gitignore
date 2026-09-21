@@ -61,3 +61,6 @@ app.*.map.json
 
 .worktrees/
 
+# Serena 工具本地状态（项目索引/记忆缓存，不入库）
+.serena/
+
