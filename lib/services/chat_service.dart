@@ -1416,6 +1416,28 @@ class ChatService {
     }
   }
 
+  /// 归属校验（归属语义单一出处，[deleteMessage] / [switchSwipe] 双调用点共用）：
+  /// [messageId] 必须属于 [conversationId] 且存在，否则 [MessageNotFoundError]
+  /// （**跨对话同 id 视为不存在**，不外泄他对话行）；校验失败零副作用。
+  ///
+  /// 结构对齐桌面 message.py::_require_message：桌面把存在守卫早已抽成 helper、
+  /// delete_message / switch_swipe 双路径共用，本 helper 为移动端追平该结构；
+  /// 唯一差异 = 桌面 id-only（按 message_id 查，无对话过滤）vs 移动端带
+  /// [conversationId] 过滤。
+  Future<Message> _requireMessageOwnership({
+    required int conversationId,
+    required int messageId,
+  }) async {
+    final target = await _messageRepository.messageById(
+      conversationId,
+      messageId,
+    );
+    if (target == null) {
+      throw MessageNotFoundError();
+    }
+    return target;
+  }
+
   /// 删除单条消息（MS-03；对齐 `message.py::delete_message` 角色感知语义）。
   ///
   /// - 删 user → 截断含自身及后续（`id >= messageId`；候选随 FK CASCADE
@@ -1424,9 +1446,8 @@ class ChatService {
   /// - 删 assistant / system 等非 user → 仅删该条（swipes 级联；该条之后
   ///   的消息保留——服务层不扩散删除范围）。
   ///
-  /// 目标解析（破坏性操作防御）：[messageId] 必须属于 [conversationId] 且
-  /// 存在，否则 [MessageNotFoundError]（跨对话同 id 视为不存在——归属校验
-  /// 不外泄他对话行）；校验失败零副作用。
+  /// 目标解析（破坏性操作防御）委托 [_requireMessageOwnership]——归属语义
+  /// （不存在 / 跨对话拒绝、校验失败零副作用）见该 helper docstring（单一出处）。
   ///
   /// 返回实际删除条数（user 截断 = 截断消息总数；单删 = 1）。
   ///
@@ -1442,14 +1463,11 @@ class ChatService {
       throw ConversationNotFoundError();
     }
 
-    // 2. 目标解析（归属校验：不存在 / 跨对话 → MessageNotFoundError）。
-    final target = await _messageRepository.messageById(
-      conversationId,
-      messageId,
+    // 2. 目标解析（归属校验，见 _requireMessageOwnership）。
+    final target = await _requireMessageOwnership(
+      conversationId: conversationId,
+      messageId: messageId,
     );
-    if (target == null) {
-      throw MessageNotFoundError();
-    }
 
     // 3. 角色感知删除范围（user 截断含自身；非 user 单删该条 + 级联）。
     if (target.role == Role.user) {
@@ -1462,11 +1480,10 @@ class ChatService {
   /// 切换 [conversationId] 内 [messageId] 的激活候选（F-140，契约表 §4.8 实现
   /// 补位；对齐 `message.py::switch_swipe`）。
   ///
-  /// 归属校验与 [deleteMessage] 同构：[messageId] 必须属于 [conversationId]
-  /// 且存在，否则 [MessageNotFoundError]（**跨对话同 id 视为不存在**——与删除
-  /// 语义同一来源，不外泄他对话行）；越界 [index] 由仓库层
+  /// 归属校验委托 [_requireMessageOwnership]（存在性 / 跨对话拒绝语义单一出处，
+  /// 与 [deleteMessage] 共用同一 helper）；越界 [index] 由仓库层
   /// [MessageRepository.switchSwipe] 原样上抛 [SwipeIndexOutOfRangeError]——
-  /// 服务层零捕获、零重映射（仓库抛什么就是什么）。校验失败零副作用。
+  /// 服务层零捕获、零重映射（仓库抛什么就是什么）。
   ///
   /// 成功返回切换后的 [Message]：`messages.content` 已被仓库层覆写为选中候选、
   /// `active_swipe_index` 已更新（契约表 `→ Message`）。
@@ -1475,14 +1492,11 @@ class ChatService {
     required int messageId,
     required int index,
   }) async {
-    // 目标解析（归属校验：不存在 / 跨对话 → MessageNotFoundError）。
-    final target = await _messageRepository.messageById(
-      conversationId,
-      messageId,
+    // 目标解析（归属校验，见 _requireMessageOwnership）。
+    await _requireMessageOwnership(
+      conversationId: conversationId,
+      messageId: messageId,
     );
-    if (target == null) {
-      throw MessageNotFoundError();
-    }
     return _messageRepository.switchSwipe(messageId, index);
   }
 
