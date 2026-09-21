@@ -43,11 +43,18 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| F-154 | `RelationshipService`（relationship_service.dart:164）`required ConversationRepository conversationRepository` 构造参数在 C5 删除 `_allMessagesFor`/`_conversations` 后**零消费死参**：8 处构造点（app.dart:372 + 7 测试）被迫传一个不改变行为的仓储；删除 = 8 构造点机械改（与 C7 构造净化同款模式）；C5 当时因出票面范围保留 | 波 1 增量审核（架构批次） | Speculative | 📝 待立项 | 装配层 |
-| F-155 | `memory_palace_service.dart:270-272` 字符决策口径变化：旧实现 Dart UTF-16 码元和 vs C3 后 SQLite `LENGTH()` 码点和——emoji 类会话恰在阈值边界时 `shouldSummarize` 判定可翻（docstring 已显式声明，零行为变化契约的窄输入漂移）；附带 `reflection` `messageStats`+`recentMessages` 双查询非单快照（单写模型下可忽略 💭） | 波 2 增量审核 Falsify（架构批次） | Speculative | 📝 待立项 | 聊天链路 |
-| F-156 | `chat_service.dart:1664/:1682` `_buildAssembleContext` 每次调用双跑 `_assemble` 核心（send 腿弃用 segments 只取 built）——发送热路径组装成本翻倍，纯 CPU 行为等价；潜在优化 = 共享段惰性求值 segments 或双返回值按需 | 波 2 增量审核（架构批次） | Worth exploring | 📝 待立项 | 聊天链路 |
 
 ## 技术债处置记录
+
+### 2026-09-21 — 技术债消费批次（F-154~156 全部处置，候选区清零）
+
+> 来源：用户「继续处理 F-154~156」（技术债消费决策点折回）；project-kickoff 全自动档标准档波 1 双并行（高風險面②——F-156 触碰核心聊天链路）。门禁：全量 **2869 测**绿（与基线等数——F-154 纯删传参未删用例、F-156 零测试改动）/ `flutter analyze` 0 / 波及文件覆盖率全 ≥90%（relationship_service 98.5% / chat_service 92.5%）/ 波末增量审核 0 阻断 / 期末四轴 **通过（0 阻断，1 💭 格式已收尾）**。处置详情见 DEV_LOG〈技术债消费批次 F-154~156 — 全部处置〉。
+
+| 编号 | 处置 | 详情 |
+|------|------|------|
+| F-154 | ✅ 已修 | 删 `RelationshipService` 构造死参 `conversationRepository`（relationship_service.dart:164 删参 + :25 unused import）+ 9 构造点（app.dart:374 + 8 测试行）传参清理 + 6 连带全清（_GateRelationshipService super 转发 / 工厂签名 / 工厂调用 / 兜底构造 / 闭包签名+体 / relationship_service_test late conversations 字段 + 3 unused import——agent 发现票面外易漏点）；app.dart provider 保留（4 其他消费者）；grep 服务内零命中；T-01 commit `7430023` |
+| F-155 | ❌ 复核关闭 | palace 字符决策口径漂移（SQLite LENGTH() 码点和 vs 旧 Dart UTF-16 码元和）已**双处显式文档化**（message_repository.dart:85 + 服务 docstring），emoji 恰在阈值边界（缺省 **10000**，票面「6000」修正——6000 为窗口截断预算）属病态输入、无真实触发证据，修复（SQL 层对齐 UTF-16 或改决策指标）属过度工程；`messageStats`+`recentMessages` 双查询非单快照在单写模型下可忽略；生产零 diff |
+| F-156 | ✅ 已修 | `_buildAssembleContext` 改返私有 `_AssembleContext` 结果类（`built` 立即求值 + `segments` `late final` 惰性闭包捕获本调用参数集、闭包内零上游 IO）——send 腿零组装支付、debug 腿首次访问触发一次；上游 IO 单次保持（F-149 不破坏）；SR-31/PD-04 断言零改动绿（极端突变 segments→const[] 4 锚红实证灵敏度）；T-02 commit `5014e6c` + 格式收尾 `f688b1b` |
 
 ### 2026-09-21 — 架构审查候选 C1~C8 按强度交付（F-146~153 全部处置，候选区留 F-154~156）
 
@@ -202,6 +209,7 @@
 
 | 编号 | 关闭批次 | 单行摘要 |
 |------|----------|----------|
+| F-155 | 2026-09-21 | palace 字符决策口径漂移（SQLite LENGTH() 码点和 vs 旧 Dart UTF-16 码元和）已双处文档化（message_repository.dart:85 + 服务 docstring）+ 阈值边界病态输入无触发证据，修复属过度工程；阈值修正 10000 非 6000（6000 为窗口预算） |
 | F-131/F-134/F-137 | 2026-09-19 | prompt role 唯一构造点只传 Role（F-131）／planner hook 已直测 + _resolveLlm 间接覆盖为本批同函数覆盖（F-134）／chars_view publish 等待族 5 遍全量零复现 + 双终态在位（F-137） |
 | F-110/F-111/F-112 | 2026-09-17 | per-element isFinite 守卫 + float32 截断双防线成立（F-110）／SR-20 装配链单一落点已拦截无 host（F-111，残余用户拍板不立票）／唯一索引 `idx_embedding_entries_character_id_content_hash` 实锤 + 服务层无竞争窗口（F-112） |
 | F-103 | 2026-09-17 | 全仓 188 文件/223 检查 format 差异为存量 formatter 版本漂移（基线 `3943bf8` 同失败、hunk 一一对应），无行为风险；全仓归一大 diff 噪音已拍板不立项 |

@@ -12,6 +12,20 @@
 
 ---
 
+## 技术债消费批次 F-154~156 — 全部处置（2026-09-21 — 用户「继续处理 F-154~156」拍板，project-kickoff 全自动档）
+
+- **批次源**：用户「继续处理 F-154~156」（架构审查批次 C1~C8 波末/波末审核落债三条：relationship 构造死参 💭 / palace 字符口径漂移 💭 / _buildAssembleContext 双跑 CPU 🟡）；基线 `0066e0b`（2869 测）。项目完整模式 + 全自动档，高风险面②（F-156 触碰核心聊天链路）→ 标准档波 1 双并行。
+- **Grilling 增量审（四决策点定案）**：F-154 做·删死参（实证编辑面 9 构造行 + 3 连带：_GateRelationshipService 超参转发漏删即编译断裂 / 工厂签名 / unused import+late 字段——analyze 0 门禁三易漏点；app.dart provider 保留 4 其他消费者）；F-155 **复核关闭**·零代码（漂移双处显式文档化 + 病态边界输入 + 无真实触发证据 + 修复属过度工程；**票面阈值修正 10000 非 6000**——6000 为窗口截断预算；💭 双查询非快照单写模型可忽略）；F-156 做·`_buildAssembleContext` 返私有结果类（built 立即 + segments `late final` 惰性，send 腿永不触碰，上游 IO 单次保持）。三判定：自建零新依赖。
+- **plan-tickets**：spec + 2 票（T-01/F-154、T-02/F-156）+ F-155 关闭 spec Further Notes；行号 grep 实证修正（T-01 测试文件 5 个非 6——app_stage2 用 implements 桩无 super 转发；proactive :903/end_of_turn_hooks :334/characters_view :166/:446）；T-02 关键陷阱 = 惰性闭包捕获本调用参数集 + 闭包内零上游 IO。
+- **波 1 双并行（零重开）**：T-01/F-154（`7430023`，7 文件 +0/−25 纯删）——9 构造点 + 6 连带全清，**agent 发现票面外易漏点**（relationship_service_test late conversations 字段 + 3 unused import 连带清理），analyze 0 两轮 / 5 测试 133 用例全绿 / relationship_service 覆盖率 98.5%；T-02/F-156（`5014e6c`，单文件 +55/−16）——`_AssembleContext` 惰性记忆化（record 不可行论证：需 late 字段承载「至多组装一次」状态），chat_service_test **零改动**（零行号漂移），**极端突变**（segments→const []）4 个 PD-04 行为锚红实证灵敏度，chat_service 覆盖率 92.5%。
+- **波末**：文件范围两票全合规；双分支 --no-ff 零冲突合并；受影响 285 用例全绿。增量审核（固定点 0066e0b）**0 阻断**：F-154 零悬挂引用全仓 grep 实证 / F-156 send 腿零 segments 支付静态求证（.segments 消费唯一 :1904 debug 腿）+ 构造命名疑似项（私有 field formal 参数名剥离下划线）最小 Dart 片段实证排除 + 行为等价实跑复证（10 负结果具名）；_AssembleContext 非过度封装（record 不可行）；mutant 静态确认锚真实性。
+- **期末全量**：**2869 测**绿（与基线等数——F-154 纯删传参未删用例、F-156 零测试改动）/ analyze 0。
+- **期末四轴**（固定点 `0066e0b`）：**通过（0 阻断，1 💭）**——四轴 0 Critical/0 Recommended；Standards 1 💭 = `_AssembleContext` 构造跨 4 行应折叠单行（本批引入格式漂移，按 R-S1 先例收尾捎带修复 `f688b1b`）；Spec 0 违例（验收锚全实跑 + F-155 阈值修正实证成立）；Falsify 0（惰性闭包两腿捕获正确 + segments 异常同步上抛不吞 + send 腿永不上抛）；Architecture 0（死参退出构造面 / 惰性+记忆化最小正确形状）；覆盖 8/8 0 UNREVIEWED。
+- **批次避坑（蒸馏候选）**：① 波级审核「横向确证被 Implementer 例外」形态——F-156 的 send 腿零支付无法直接运行时断言（惰性字段不触发即无观测），靠「静态求证 + 突变验证行为锚」双保险是等价证据组合；② 锁「无观测影响的中间态/N+1 优化」类债时在验收线里写断言可能锁死实现细节（F-156 未写、以行为锚兜底——与 F-145「勿锁无影响中间态」同构）。
+- **批次收尾**：TO-TICKETS 归档「技术债消费批次 F-154~156」（T-01~02 + F-155 关闭注记）；TECH_DEBD 处置记录新节（F-154 ✅ / F-155 ❌ 复核关闭入表 / F-156 ✅，**候选区清零**）；AGENTS 状态行追加；`.scratch/techdebt-f154f156/` 待 Neat 清场（2 worktree + 2 kickoff 分支 + 一次性产物，删除清单经用户确认）。
+
+---
+
 ## 架构审查候选 C1~C8 按强度交付（2026-09-21 — 用户「/improve-codebase-architecture 架构审查优化候选按强度交付 + /project-kickoff 全自动」）
 
 - **批次源**：用户「架构审查优化候选按强度交付 + kickoff 全自动」（persona 先例：先 Strong 后剩余，ARC-1~10 三次实证）；基线 `9aceed4`（2836 测）。项目完整模式 + 全自动档（persona 偏好），高风险面②（C2/C3/C4/C7 触碰核心聊天链路与数据层）→ 标准档两波。

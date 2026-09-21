@@ -27,6 +27,15 @@
 
 ## 已完成归档
 
+### 技术债消费批次 F-154~156 全部处置（2026-09-21 收口）
+
+> 来源：用户「继续处理 F-154~156」（技术债消费决策点折回，project-kickoff 全自动档，标准档波 1 双并行——高風險面② 命中核心聊天链路）。基线 `0066e0b`（2869 测）。门禁：全量 **2869 测**绿（与基线等数）/ analyze 0 / 波及文件覆盖率全 ≥90%（relationship_service 98.5% / chat_service 92.5%）/ 波末增量审核 **0 阻断**（F-156 send 腿零 segments 支付静态求证 + 命名疑似项实证排除）/ 期末四轴 **通过（0 阻断，1 💭 格式已收尾 f688b1b）**。F-155 复核关闭（零代码，漂移已双处文档化 + 修复属过度工程）。**候选区清零**。详见 DEV_LOG〈技术债消费批次 F-154~156 — 全部处置〉与 `.scratch/techdebt-f154f156/`（orchestration/evidence）。
+
+| Ticket | 标题 | 完成日期 | 提交 |
+|--------|------|----------|------|
+| T-01 | F-154：删除 RelationshipService 构造死参 conversationRepository（9 构造点 + 连带清理） | 2026-09-21 | 7430023 |
+| T-02 | F-156：_buildAssembleContext 惰性 segments（send 腿零组装支付） | 2026-09-21 | 5014e6c + f688b1b |
+
 ### 架构审查候选 C1~C8 按强度交付（2026-09-21 收口）
 
 > 来源：用户「/improve-codebase-architecture 架构审查优化候选按强度交付 + /project-kickoff 全自动」（persona 先例：先 Strong 后剩余）。基线 `9aceed4`（2836 测）。架构审查结论 Top recommendation = C1；Grilling 增量审定案 8 票全做；两波执行（波 1 并行 C1/C8/C5/C6 + 波 2 串行链 C3→C2→C4→C7）。门禁：全量 **2869 测**绿（基线 2836 → +33）/ analyze 0 / 波及文件覆盖率全 ≥90%（C6 与 C8 两处 app.dart/proactive_deep_link 缺口按 chat-polish 预警条款放行，期末四轴复核通过）/ 波 1 增量审核 **0 阻断**（落债 F-154）/ 波 2 增量审核 **0 阻断**（messageStats 记录警告放行；落债 F-155/156）/ 期末四轴 **通过（0 阻断，全 💭）**。候选区留 F-154~156（非遗落债）。详见 DEV_LOG〈架构审查候选 C1~C8 按强度交付〉与 `.scratch/arch-review-20260921/`（orchestration/evidence）。
